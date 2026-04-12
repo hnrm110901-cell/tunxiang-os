@@ -7,7 +7,7 @@
  */
 import { useState, useEffect, useCallback } from 'react';
 import { Drawer, Modal, Input, Pagination, message, Spin, Progress } from 'antd';
-import { txFetch } from '../../../api/index';
+import { txFetchData } from '../../../api/index';
 
 // ---- 颜色常量（保留现有深色主题）----
 const BG_1 = '#112228';
@@ -332,7 +332,7 @@ function MemberListDrawer({
   const fetchMembers = useCallback(async (seg: MemberSegment, p: number) => {
     setLoading(true);
     try {
-      const data = await txFetch<{ items: SegmentMember[]; total: number }>(
+      const data = await txFetchData<{ items: SegmentMember[]; total: number }>(
         `/api/v1/member/customers?rfm_level=${encodeURIComponent(seg.rfm_level)}&page=${p}&size=${PAGE_SIZE}`,
       );
       setMembers(data.items || []);
@@ -360,7 +360,7 @@ function MemberListDrawer({
     if (!segment) return;
     try {
       // 导出时拉取全量（最多500条）
-      const data = await txFetch<{ items: SegmentMember[]; total: number }>(
+      const data = await txFetchData<{ items: SegmentMember[]; total: number }>(
         `/api/v1/member/customers?rfm_level=${encodeURIComponent(segment.rfm_level)}&page=1&size=500`,
       );
       exportCSV(data.items || [], segment.name);
@@ -534,7 +534,7 @@ function CampaignModal({
         channel,
         message_template: messageText,
       };
-      await txFetch('/api/v1/member/campaigns', {
+      await txFetchData('/api/v1/member/campaigns', {
         method: 'POST',
         body: JSON.stringify(payload),
       });
@@ -698,7 +698,7 @@ export function SegmentCenterPage() {
     setLoadingSegments(true);
     setApiError(null);
     try {
-      const data = await txFetch<RFMDistributionData>('/api/v1/member/rfm/distribution');
+      const data = await txFetchData<RFMDistributionData>('/api/v1/member/rfm/distribution');
       const dist = data.distribution || [];
 
       const mapped: MemberSegment[] = dist.map((item): MemberSegment => {

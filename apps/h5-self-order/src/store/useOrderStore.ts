@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { DishItem, CustomOption } from '@/api/menuApi';
+import type { DishItem } from '@/api/menuApi';
 
 /* ---- 购物车条目 ---- */
 export interface CartItem {

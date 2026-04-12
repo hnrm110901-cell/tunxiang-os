@@ -5,7 +5,7 @@
  */
 import { useState, useEffect, useCallback } from 'react';
 import { TxLineChart, TxBarChart } from '../../../components/charts';
-import { txFetch } from '../../../api';
+import { txFetchData } from '../../../api';
 
 // ---------- 类型 ----------
 interface RevenueChannel {
@@ -94,9 +94,9 @@ export function FinanceAnalysisPage() {
     const today = new Date().toISOString().slice(0, 10);
     try {
       const [revRes, costRes, marginRes] = await Promise.allSettled([
-        txFetch<RevenueData>(`/api/v1/analytics/revenue?period=${p}`),
-        txFetch<CostData>(`/api/v1/analytics/cost?period=${p}`),
-        txFetch<ChannelMarginData>(`/api/v1/analytics/channel-margin?date=${today}`),
+        txFetchData<RevenueData>(`/api/v1/analytics/revenue?period=${p}`),
+        txFetchData<CostData>(`/api/v1/analytics/cost?period=${p}`),
+        txFetchData<ChannelMarginData>(`/api/v1/analytics/channel-margin?date=${today}`),
       ]);
       if (revRes.status === 'fulfilled' && revRes.value.data) {
         const d = revRes.value.data;

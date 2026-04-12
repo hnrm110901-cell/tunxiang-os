@@ -33,7 +33,7 @@ import {
 import type { ActionType, ProColumns } from '@ant-design/pro-components';
 import { WarningOutlined } from '@ant-design/icons';
 import dayjs, { Dayjs } from 'dayjs';
-import { txFetch } from '../../../api';
+import { txFetchData } from '../../../api';
 
 const { Title } = Typography;
 const { RangePicker } = DatePicker;
@@ -81,7 +81,7 @@ export default function AttendanceAnomalies() {
   useEffect(() => {
     (async () => {
       try {
-        const res = await txFetch<{ store_id: string; store_name: string }[]>('/api/v1/org/stores');
+        const res = await txFetchData<{ store_id: string; store_name: string }[]>('/api/v1/org/stores');
         const list = res.data ?? [];
         setStores(list);
         if (list.length > 0) setStoreId(list[0].store_id);
@@ -171,7 +171,7 @@ export default function AttendanceAnomalies() {
           columns={columns}
           request={async (params) => {
             if (!storeId) return { data: [], total: 0, success: true };
-            const res = await txFetch<{ items: AnomalyRecord[]; total: number }>(
+            const res = await txFetchData<{ items: AnomalyRecord[]; total: number }>(
               `/api/v1/attendance/anomalies?store_id=${storeId}&start_date=${dateRange[0].format('YYYY-MM-DD')}&end_date=${dateRange[1].format('YYYY-MM-DD')}&page=${params.current ?? 1}&size=${params.pageSize ?? 20}`,
             );
             return {
@@ -197,7 +197,7 @@ export default function AttendanceAnomalies() {
         onFinish={async (values) => {
           if (!adjustTarget) return false;
           try {
-            await txFetch(`/api/v1/attendance/records/${adjustTarget.id}/adjust`, {
+            await txFetchData(`/api/v1/attendance/records/${adjustTarget.id}/adjust`, {
               method: 'POST',
               body: JSON.stringify({
                 new_clock_in: values.new_clock_in,

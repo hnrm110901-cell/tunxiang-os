@@ -11,7 +11,7 @@
  *  - 作废：Popconfirm 二次确认
  *
  * API 基地址: /api/v1/payroll/records
- * X-Tenant-ID 通过 txFetch 统一注入
+ * X-Tenant-ID 通过 txFetchData 统一注入
  */
 
 import { useRef, useState } from 'react';
@@ -39,7 +39,7 @@ import {
   ProTable,
 } from '@ant-design/pro-components';
 import type { ColumnsType } from 'antd/es/table';
-import { txFetch } from '../../api';
+import { txFetchData } from '../../api';
 
 const { Title } = Typography;
 
@@ -216,7 +216,7 @@ export function PayrollRecordsPage() {
     query.set('size',  String(params.pageSize ?? 20));
 
     try {
-      const data = await txFetch<RecordListResp>(
+      const data = await txFetchData<RecordListResp>(
         `/api/v1/payroll/records?${query.toString()}`,
       );
       return { data: data.items, total: data.total, success: true };
@@ -234,7 +234,7 @@ export function PayrollRecordsPage() {
     pay_month: number;
   }) => {
     try {
-      await txFetch('/api/v1/payroll/calculate', {
+      await txFetchData('/api/v1/payroll/calculate', {
         method: 'POST',
         body: JSON.stringify(values),
       });
@@ -253,7 +253,7 @@ export function PayrollRecordsPage() {
     try {
       await Promise.all(
         ids.map((id) =>
-          txFetch(`/api/v1/payroll/records/${id}/approve`, { method: 'POST' }),
+          txFetchData(`/api/v1/payroll/records/${id}/approve`, { method: 'POST' }),
         ),
       );
       messageApi.success(`已审批 ${ids.length} 条薪资单`);
@@ -268,7 +268,7 @@ export function PayrollRecordsPage() {
 
   const handleVoid = async (id: string) => {
     try {
-      await txFetch(`/api/v1/payroll/records/${id}/void`, { method: 'POST' });
+      await txFetchData(`/api/v1/payroll/records/${id}/void`, { method: 'POST' });
       messageApi.success('薪资单已作废');
       actionRef.current?.reload();
     } catch (err) {
@@ -283,7 +283,7 @@ export function PayrollRecordsPage() {
     setDrawerLoading(true);
     setLineItems([]);
     try {
-      const items = await txFetch<PayrollLineItem[]>(
+      const items = await txFetchData<PayrollLineItem[]>(
         `/api/v1/payroll/records/${record.id}/items`,
       );
       setLineItems(items);

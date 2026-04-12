@@ -6,7 +6,7 @@
  * Section 4: 储值卡概览
  */
 import React, { useCallback, useEffect, useState } from 'react';
-import { txFetch } from '../api';
+import { txFetchData } from '../api';
 
 // ─── 工具函数 ──────────────────────────────────────────────────
 
@@ -433,10 +433,10 @@ export function CrmPage() {
 
     // 并行请求：活跃度分析 + 增长分析
     Promise.all([
-      txFetch<{ active_members: number; mau: number; avg_order_value_fen?: number }>(
+      txFetchData<{ active_members: number; mau: number; avg_order_value_fen?: number }>(
         `/api/v1/member/analytics/activity?start_date=${firstDay}&end_date=${todayStr}`,
       ).catch(() => null),
-      txFetch<{ total_members: number; new_members_period: number }>(
+      txFetchData<{ total_members: number; new_members_period: number }>(
         `/api/v1/member/analytics/growth?start_date=${firstDay}&end_date=${todayStr}`,
       ).catch(() => null),
     ]).then(([activityData, growthData]) => {
@@ -456,7 +456,7 @@ export function CrmPage() {
   // ── 加载 RFM 分布 ─────────────────────────────────────────────
   useEffect(() => {
     setRfmError(false);
-    txFetch<{ distribution: RfmDistItem[]; total: number }>(
+    txFetchData<{ distribution: RfmDistItem[]; total: number }>(
       '/api/v1/member/rfm/distribution',
     ).then((data) => {
       setRfmItems(data.distribution ?? []);
@@ -476,7 +476,7 @@ export function CrmPage() {
     });
     if (searchKeyword.trim()) query.set('q', searchKeyword.trim());
 
-    txFetch<{ items: MemberItem[]; total: number }>(
+    txFetchData<{ items: MemberItem[]; total: number }>(
       `/api/v1/member/customers?${query.toString()}`,
     ).then((data) => {
       setMembers(data.items ?? []);
@@ -499,7 +499,7 @@ export function CrmPage() {
     const firstDay = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().slice(0, 10);
     const todayStr = today.toISOString().slice(0, 10);
 
-    txFetch<StoredValueStats>(
+    txFetchData<StoredValueStats>(
       `/api/v1/member/analytics/stored-value?start_date=${firstDay}&end_date=${todayStr}`,
     ).then((data) => {
       setStoredValue(data);
@@ -521,8 +521,8 @@ export function CrmPage() {
 
     // 并行：基本详情 + 最近订单
     Promise.all([
-      txFetch<MemberItem>(`/api/v1/member/customers/${member.customer_id}`).catch(() => null),
-      txFetch<{ items: Array<{ order_id: string; total_fen: number; created_at: string }>; total: number }>(
+      txFetchData<MemberItem>(`/api/v1/member/customers/${member.customer_id}`).catch(() => null),
+      txFetchData<{ items: Array<{ order_id: string; total_fen: number; created_at: string }>; total: number }>(
         `/api/v1/member/customers/${member.customer_id}/orders?page=1&size=3`,
       ).catch(() => null),
     ]).then(([detail, orders]) => {

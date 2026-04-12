@@ -22,7 +22,7 @@ import { ProColumns, ProTable } from '@ant-design/pro-components';
 import type { ActionType } from '@ant-design/pro-components';
 import { Line, Pie } from '@ant-design/charts';
 import dayjs from 'dayjs';
-import { txFetch } from '../../../api';
+import { txFetchData } from '../../../api';
 
 // ─── Design Token ────────────────────────────────────────────────────────────
 const TX_PRIMARY = '#FF6B35';
@@ -236,7 +236,7 @@ export default function PayrollLaborCost() {
           query.set('page', String(params.current ?? 1));
           query.set('size', String(params.pageSize ?? 20));
           try {
-            const res = await txFetch(`/api/v1/payroll/labor-cost/analysis?${query}`) as { ok: boolean; data: AnalysisResp };
+            const res = await txFetchData(`/api/v1/payroll/labor-cost/analysis?${query}`) as { ok: boolean; data: AnalysisResp };
             if (res.ok && res.data) {
               setSummary(res.data.summary);
               setTrends(res.data.trends ?? []);

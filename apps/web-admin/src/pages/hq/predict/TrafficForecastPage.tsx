@@ -3,14 +3,14 @@
  * 天气图标叠加列头 | 高峰时段橙色高亮
  * 排班联动：当前排班 X 人 / 建议 Y 人
  *
- * 数据源：txFetch（后端 API）
+ * 数据源：txFetchData（后端 API）
  * 纯 CSS 实现，无第三方图表库
  */
 import { useState, useEffect, useCallback } from 'react';
 import { Select, Button, Spin, Tag, Tooltip } from 'antd';
 import { ReloadOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
-import { txFetch } from '../../../api';
+import { txFetchData } from '../../../api';
 
 // ─── 类型定义 ───────────────────────────────────────────────────────────────
 
@@ -138,8 +138,8 @@ export function TrafficForecastPage() {
     try {
       // TODO: 后端就绪后替换
       // const [trafficRes, staffRes] = await Promise.allSettled([
-      //   txFetch(`/api/v1/predict/traffic/matrix?store_id=${selectedStore}`),
-      //   txFetch(`/api/v1/predict/staffing?store_id=${selectedStore}`),
+      //   txFetchData(`/api/v1/predict/traffic/matrix?store_id=${selectedStore}`),
+      //   txFetchData(`/api/v1/predict/staffing?store_id=${selectedStore}`),
       // ]);
       await new Promise(r => setTimeout(r, 400));
       setColumns(mockDayColumns());

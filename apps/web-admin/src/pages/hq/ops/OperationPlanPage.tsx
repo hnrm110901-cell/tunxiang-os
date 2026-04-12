@@ -3,7 +3,7 @@
  * 展示所有需要人工确认的高风险操作计划，支持实时 SSE 推送
  */
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { txFetch } from '../../../api';
+import { txFetchData } from '../../../api';
 
 // ─── 类型定义 ───
 
@@ -131,7 +131,7 @@ function ConfirmDialog({ plan, action, onClose, onSuccess }: ConfirmDialogProps)
     setLoading(true);
     setError('');
     try {
-      await txFetch(`/api/v1/operation-plans/${plan.plan_id}/${action}`, {
+      await txFetchData(`/api/v1/operation-plans/${plan.plan_id}/${action}`, {
         method: 'POST',
         body: JSON.stringify({ operator_id: localStorage.getItem('tx_user_id') || 'admin' }),
       });
@@ -324,7 +324,7 @@ export function OperationPlanPage() {
 
   const fetchPlans = useCallback(async () => {
     try {
-      const data = await txFetch<{ items: OperationPlan[] }>('/api/v1/operation-plans/pending');
+      const data = await txFetchData<{ items: OperationPlan[] }>('/api/v1/operation-plans/pending');
       setPlans(data.items || []);
     } catch {
       /* 降级：保留现有数据 */

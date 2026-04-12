@@ -3,7 +3,7 @@
  * 运营节点监控仪表板，深色主题，与 EventBusHealthPage 风格一致
  */
 import { useEffect, useState, useCallback } from 'react';
-import { txFetch } from '../../../api';
+import { txFetchData } from '../../../api';
 
 // ─── 类型定义 ───
 
@@ -170,7 +170,7 @@ function CompleteModal({ node, storeId, onClose, onSuccess }: CompleteModalProps
     setLoading(true);
     setError('');
     try {
-      await txFetch('/api/v1/daily-review/complete-node', {
+      await txFetchData('/api/v1/daily-review/complete-node', {
         method: 'POST',
         body: JSON.stringify({
           store_id: storeId,
@@ -280,7 +280,7 @@ export function DailyReviewPage() {
 
   const fetchSingle = useCallback(async (storeId: string) => {
     try {
-      const data = await txFetch<DailyReviewData>(
+      const data = await txFetchData<DailyReviewData>(
         `/api/v1/daily-review/today?store_id=${encodeURIComponent(storeId)}`,
       );
       setReviewData(data);
@@ -296,7 +296,7 @@ export function DailyReviewPage() {
   const fetchMulti = useCallback(async () => {
     try {
       const ids = DEMO_STORES.map(s => s.id).join(',');
-      const res = await txFetch<{ items: MultiStoreSummaryItem[] }>(
+      const res = await txFetchData<{ items: MultiStoreSummaryItem[] }>(
         `/api/v1/daily-review/multi-store?store_ids=${encodeURIComponent(ids)}`,
       );
       setMultiData(res.items);

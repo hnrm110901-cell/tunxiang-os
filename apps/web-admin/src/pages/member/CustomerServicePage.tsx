@@ -27,7 +27,7 @@ import {
 } from '@ant-design/icons';
 import { ProTable } from '@ant-design/pro-components';
 import type { ProColumns } from '@ant-design/pro-components';
-import { txFetch } from '../../api';
+import { txFetchData } from '../../api';
 
 const { Title, Text } = Typography;
 const { TextArea } = Input;
@@ -153,7 +153,7 @@ function AIAnalysisPanel({ onOrderCreated }: { onOrderCreated: (order: WorkOrder
     setError(null);
     setResult(null);
     try {
-      const data = await txFetch<CSHandleResult>('/api/v1/brain/customer-service/handle', {
+      const data = await txFetchData<CSHandleResult>('/api/v1/brain/customer-service/handle', {
         method: 'POST',
         body: JSON.stringify(form),
       });

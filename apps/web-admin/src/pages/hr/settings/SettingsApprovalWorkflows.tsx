@@ -39,7 +39,7 @@ import {
   ProFormText,
   ProTable,
 } from '@ant-design/pro-components';
-import { txFetch } from '../../../api';
+import { txFetchData } from '../../../api';
 
 const { Title, Text } = Typography;
 
@@ -101,7 +101,7 @@ export default function SettingsApprovalWorkflows() {
   const saveNodes = async () => {
     if (!currentTemplate) return;
     try {
-      await txFetch(`/api/v1/approval-engine/templates/${currentTemplate.id}`, {
+      await txFetchData(`/api/v1/approval-engine/templates/${currentTemplate.id}`, {
         method: 'PUT',
         body: JSON.stringify({ nodes }),
       });
@@ -210,7 +210,7 @@ export default function SettingsApprovalWorkflows() {
           query.set('size', String(params.pageSize || 20));
           if (params.category) query.set('category', params.category);
           try {
-            const data = await txFetch<TemplateListResp>(
+            const data = await txFetchData<TemplateListResp>(
               `/api/v1/approval-engine/templates?${query.toString()}`,
             );
             return { data: data.items || [], total: data.total || 0, success: true };

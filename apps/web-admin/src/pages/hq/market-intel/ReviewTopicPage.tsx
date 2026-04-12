@@ -5,7 +5,7 @@
  * 话题列表（话题词/频率/情感/门店分布）+ 时间范围筛选 7/30/90 天
  */
 import { useState, useEffect } from 'react';
-import { txFetch } from '../../../api';
+import { txFetchData } from '../../../api';
 
 // ---- 颜色常量 ----
 const BG   = '#0d1e28';
@@ -84,7 +84,7 @@ const FALLBACK_TOPICS: TopicItem[] = [
 async function fetchReviewTopics(days: DaysRange): Promise<{ topics: TopicItem[]; isFallback: boolean }> {
   try {
     // 优先调用专用话题接口
-    const data = await txFetch<ApiTopicData>(
+    const data = await txFetchData<ApiTopicData>(
       `/api/v1/analytics/reviews/topics?days=${days}`
     );
     if (data?.topics?.length) {
@@ -108,7 +108,7 @@ async function fetchReviewTopics(days: DaysRange): Promise<{ topics: TopicItem[]
   } catch {
     // 降级：调用差评菜品接口转换
     try {
-      const neg = await txFetch<ApiTopicData>(
+      const neg = await txFetchData<ApiTopicData>(
         `/api/v1/analysis/dish/negative-reviews?store_id=hq&days=${days}&limit=10`
       );
       if (neg?.items?.length) {

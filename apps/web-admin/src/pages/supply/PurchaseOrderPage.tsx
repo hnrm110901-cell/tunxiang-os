@@ -3,7 +3,7 @@
  * Tab1: 采购订单 | Tab2: 供应商管理 | Tab3: 价格记录
  *
  * 技术栈：Ant Design 5.x + ProComponents
- * API: txFetch → /api/v1/supply/* ; try/catch 降级 Mock
+ * API: txFetchData → /api/v1/supply/* ; try/catch 降级 Mock
  * 金额规范：存储/传输用分（fen），展示用元（÷100），提交时×100
  */
 import React, { useRef, useState, useEffect, useCallback } from 'react';
@@ -49,7 +49,7 @@ import {
   WarningOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
-import { txFetch, txFetchData } from '../../api/client';
+import { txFetchData } from '../../api/client';
 
 const { Text } = Typography;
 const { RangePicker } = DatePicker;
@@ -233,7 +233,7 @@ function Sparkline({ data, width = 320, height = 60 }: SparklineProps) {
   );
 }
 
-// ─── API 层（txFetch + Mock 降级）────────────────────────────────────────────
+// ─── API 层（txFetchData + Mock 降级）────────────────────────────────────────────
 
 const API_PO = '/api/v1/supply/purchase-orders';
 const API_SUPPLIERS = '/api/v1/suppliers';
@@ -283,11 +283,11 @@ async function fetchPODetail(id: string): Promise<PurchaseOrder | null> {
 }
 
 async function createPurchaseOrder(payload: unknown): Promise<void> {
-  await txFetch(API_PO, { method: 'POST', body: JSON.stringify(payload) });
+  await txFetchData(API_PO, { method: 'POST', body: JSON.stringify(payload) });
 }
 
 async function actionPO(id: string, action: string, body?: unknown): Promise<void> {
-  await txFetch(`${API_PO}/${id}/${action}`, {
+  await txFetchData(`${API_PO}/${id}/${action}`, {
     method: 'PATCH',
     body: body ? JSON.stringify(body) : undefined,
   });
@@ -304,7 +304,7 @@ async function fetchSuppliers(): Promise<{ items: Supplier[]; total: number }> {
 async function createOrUpdateSupplier(payload: unknown, id?: string): Promise<void> {
   const url = id ? `${API_SUPPLIERS}/${id}` : API_SUPPLIERS;
   const method = id ? 'PUT' : 'POST';
-  await txFetch(url, { method, body: JSON.stringify(payload) });
+  await txFetchData(url, { method, body: JSON.stringify(payload) });
 }
 
 async function fetchPriceRecords(): Promise<PriceRecord[]> {

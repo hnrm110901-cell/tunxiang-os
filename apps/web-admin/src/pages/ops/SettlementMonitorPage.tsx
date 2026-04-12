@@ -18,7 +18,7 @@ import {
   MinusCircleOutlined, EditOutlined, ReloadOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
-import { txFetch } from '../../api';
+import { txFetchData } from '../../api';
 
 const { Text } = Typography;
 
@@ -183,11 +183,10 @@ export function SettlementMonitorPage() {
       if (selectedBrand) params.set('brand_id', selectedBrand);
       if (selectedStatus) params.set('status', selectedStatus);
 
-      const resp = await txFetch(`/api/v1/ops/settlement/monitor?${params.toString()}`);
-      const json = await resp.json() as { ok: boolean; data: MonitorData };
-      if (json.ok && json.data) {
-        setSummary(json.data.summary);
-        setStores(json.data.stores);
+      const monitorData = await txFetchData<MonitorData>(`/api/v1/ops/settlement/monitor?${params.toString()}`);
+      if (monitorData) {
+        setSummary((monitorData as MonitorData).summary);
+        setStores((monitorData as MonitorData).stores);
       }
     } catch {
       // 静默降级：保留 mock 数据，不弹错误
@@ -218,7 +217,7 @@ export function SettlementMonitorPage() {
     if (!remarkTarget) return;
     setRemarkSaving(true);
     try {
-      const resp = await txFetch('/api/v1/ops/settlement/monitor/remark', {
+      const resp = await txFetchData('/api/v1/ops/settlement/monitor/remark', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

@@ -22,7 +22,7 @@ import {
 import { ProTable } from '@ant-design/pro-components';
 import type { ActionType, ProColumns } from '@ant-design/pro-components';
 import { WalletOutlined } from '@ant-design/icons';
-import { txFetch } from '../../../api';
+import { txFetchData } from '../../../api';
 
 const { Title } = Typography;
 const TX_PRIMARY = '#FF6B35';
@@ -69,7 +69,7 @@ export default function LeaveBalances() {
   useEffect(() => {
     (async () => {
       try {
-        const res = await txFetch<{ store_id: string; store_name: string }[]>('/api/v1/org/stores');
+        const res = await txFetchData<{ store_id: string; store_name: string }[]>('/api/v1/org/stores');
         const list = res.data ?? [];
         setStores(list);
         if (list.length > 0) setStoreId(list[0].store_id);
@@ -157,7 +157,7 @@ export default function LeaveBalances() {
           columns={columns}
           request={async () => {
             if (!storeId) return { data: [], total: 0, success: true };
-            const res = await txFetch<{ items: LeaveBalance[]; total: number }>(
+            const res = await txFetchData<{ items: LeaveBalance[]; total: number }>(
               `/api/v1/leave-requests/balance?store_id=${storeId}`,
             );
             return {

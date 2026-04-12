@@ -4,7 +4,7 @@
  * 调用 GET /api/v1/finance/budgets/summary  POST /api/v1/finance/budgets  POST /api/v1/finance/budgets/{id}/execute
  */
 import { useState, useCallback, useEffect } from 'react';
-import { txFetch } from '../../../api';
+import { txFetchData } from '../../../api';
 
 // ─── 类型定义 ───
 
@@ -212,7 +212,7 @@ function BudgetModal({ onClose, onSaved }: BudgetModalProps) {
       }
 
       await Promise.all(payloads.map(p =>
-        txFetch<BudgetPlan>('/api/v1/finance/budgets', {
+        txFetchData<BudgetPlan>('/api/v1/finance/budgets', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(p),
@@ -375,7 +375,7 @@ function ExecuteSection({ budgets, onRecorded }: ExecuteSectionProps) {
     setSaving(true);
     setMsg('');
     try {
-      await txFetch(`/api/v1/finance/budgets/${matched.id}/execute`, {
+      await txFetchData(`/api/v1/finance/budgets/${matched.id}/execute`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -497,7 +497,7 @@ export function BudgetTrackerPage() {
     setError('');
     try {
       const params = new URLSearchParams({ store_id: storeId, period });
-      const data = await txFetch<BudgetSummary>(`/api/v1/finance/budgets/summary?${params}`);
+      const data = await txFetchData<BudgetSummary>(`/api/v1/finance/budgets/summary?${params}`);
       setSummary(data);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : '加载失败');
@@ -510,7 +510,7 @@ export function BudgetTrackerPage() {
   const fetchBudgets = useCallback(async () => {
     try {
       const params = new URLSearchParams({ store_id: storeId, period });
-      const data = await txFetch<{ items: BudgetPlan[] }>(`/api/v1/finance/budgets?${params}`);
+      const data = await txFetchData<{ items: BudgetPlan[] }>(`/api/v1/finance/budgets?${params}`);
       setBudgets(data.items || []);
     } catch {
       setBudgets([]);

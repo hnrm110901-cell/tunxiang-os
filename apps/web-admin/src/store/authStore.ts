@@ -5,7 +5,7 @@
  * - 登录 / 登出 / Token 刷新
  */
 import { create } from 'zustand';
-import { apiPost } from '../api/client';
+import { apiPost, txFetch } from '../api/client';
 
 // ─── 类型 ───
 
@@ -115,46 +115,18 @@ export const useAuthStore = create<AuthState>((set, get, store) => ({
   isAuthenticated: false,
 
   login: async (username: string, password: string) => {
-    try {
-      const data = await apiPost<LoginResponse>(
-        '/api/v1/auth/login',
-        { username, password },
-        { skipAuth: true },
-      );
-
-      persistToStorage(data.token, data.user);
-      set({
-        token: data.token,
-        user: data.user,
-        isAuthenticated: true,
-      });
-      scheduleTokenRefresh(store);
-    } catch (err) {
-      // Mock 降级：当后端不可用时，允许任意账号登录
-      if (
-        err instanceof TypeError ||
-        (err instanceof Error && err.message.includes('网络错误'))
-      ) {
-        const mockUser: TxUser = {
-          user_id: 'mock-001',
-          username,
-          display_name: username,
-          tenant_id: 'demo-tenant',
-          role: 'admin',
-          permissions: ['*'],
-        };
-        const mockToken = 'mock-jwt-token';
-
-        persistToStorage(mockToken, mockUser);
-        set({
-          token: mockToken,
-          user: mockUser,
-          isAuthenticated: true,
-        });
-        return;
-      }
-      throw err;
-    }
+    const resp = await txFetch<LoginResponse>(
+      '/api/v1/auth/login',
+      { method: 'POST', body: JSON.stringify({ username, password }), skipAuth: true },
+    );
+    const data = resp.data!;
+    persistToStorage(data.token, data.user);
+    set({
+      token: data.token,
+      user: data.user,
+      isAuthenticated: true,
+    });
+    scheduleTokenRefresh(store);
   },
 
   logout: () => {

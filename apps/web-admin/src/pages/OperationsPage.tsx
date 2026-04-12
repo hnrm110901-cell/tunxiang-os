@@ -4,7 +4,7 @@
  */
 
 import React, { useEffect, useState, useCallback } from 'react';
-import { txFetch } from '../api';
+import { txFetchData } from '../api';
 
 // ─── 类型定义 ───
 
@@ -218,7 +218,7 @@ export function OperationsPage() {
     setReviewLoading(true);
     setReviewError(null);
     try {
-      const data = await txFetch<DailyReviewStatus>('/api/v1/ops/daily-review/status');
+      const data = await txFetchData<DailyReviewStatus>('/api/v1/ops/daily-review/status');
       setReview(data);
     } catch (e) {
       setReviewError(e instanceof Error ? e.message : '运营状态加载失败');
@@ -229,7 +229,7 @@ export function OperationsPage() {
     // 异常数
     setAlertLoading(true);
     try {
-      const data = await txFetch<AlertCount>('/api/v1/ops/alerts/count');
+      const data = await txFetchData<AlertCount>('/api/v1/ops/alerts/count');
       setAlertCount(data);
     } catch {
       setAlertCount(null);
@@ -240,7 +240,7 @@ export function OperationsPage() {
     // 待审批数
     setApprovalLoading(true);
     try {
-      const data = await txFetch<ApprovalCount>('/api/v1/ops/approvals/count?status=pending');
+      const data = await txFetchData<ApprovalCount>('/api/v1/ops/approvals/count?status=pending');
       setApprovalCount(data);
     } catch {
       setApprovalCount(null);

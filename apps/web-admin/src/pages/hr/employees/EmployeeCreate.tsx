@@ -13,7 +13,7 @@ import {
   ProFormText,
   StepsForm,
 } from '@ant-design/pro-components';
-import { txFetch } from '../../../api';
+import { txFetchData } from '../../../api';
 
 // ─── 类型 ────────────────────────────────────────────────────────────────────
 
@@ -31,7 +31,7 @@ export default function EmployeeCreate() {
     <Card title="新建员工">
       <StepsForm
         onFinish={async (values) => {
-          const resp = await txFetch<CreateEmployeeResp>('/api/v1/employees', {
+          const resp = await txFetchData<CreateEmployeeResp>('/api/v1/employees', {
             method: 'POST',
             body: JSON.stringify(values),
           });
@@ -91,7 +91,7 @@ export default function EmployeeCreate() {
             width="md"
             rules={[{ required: true, message: '请选择部门' }]}
             request={async () => {
-              const resp = await txFetch<{ items: { id: string; name: string }[] }>(
+              const resp = await txFetchData<{ items: { id: string; name: string }[] }>(
                 '/api/v1/org-structure/departments',
               );
               return (resp.data?.items ?? []).map((d) => ({ label: d.name, value: d.id }));
@@ -104,7 +104,7 @@ export default function EmployeeCreate() {
             width="md"
             rules={[{ required: true, message: '请选择岗位' }]}
             request={async () => {
-              const resp = await txFetch<{ items: { id: string; name: string }[] }>(
+              const resp = await txFetchData<{ items: { id: string; name: string }[] }>(
                 '/api/v1/job-grades',
               );
               return (resp.data?.items ?? []).map((j) => ({ label: j.name, value: j.id }));
@@ -116,7 +116,7 @@ export default function EmployeeCreate() {
             label="职级"
             width="md"
             request={async () => {
-              const resp = await txFetch<{ items: { id: string; name: string }[] }>(
+              const resp = await txFetchData<{ items: { id: string; name: string }[] }>(
                 '/api/v1/job-grades?type=grade',
               );
               return (resp.data?.items ?? []).map((g) => ({ label: g.name, value: g.id }));

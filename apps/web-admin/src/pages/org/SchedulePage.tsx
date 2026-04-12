@@ -51,7 +51,7 @@ import {
 } from '@ant-design/icons';
 import dayjs, { Dayjs } from 'dayjs';
 import isoWeek from 'dayjs/plugin/isoWeek';
-import { txFetch } from '../../api';
+import { txFetchData } from '../../api';
 
 dayjs.extend(isoWeek);
 
@@ -269,7 +269,7 @@ function WeekView({ storeId }: { storeId: string }) {
     if (!storeId) return;
     setLoading(true);
     try {
-      const data = await txFetch<WeekScheduleResp>(
+      const data = await txFetchData<WeekScheduleResp>(
         `/api/v1/org/schedules?store_id=${storeId}&week=${weekStart.format('YYYY-MM-DD')}`,
       );
       setRows(data.employees);
@@ -308,7 +308,7 @@ function WeekView({ storeId }: { storeId: string }) {
     try {
       const existing = rows.find((r) => r.employee_id === employeeId)?.shifts[dateStr];
       if (existing?.schedule_id && newType !== 'off') {
-        await txFetch(`/api/v1/org/schedules/${existing.schedule_id}`, {
+        await txFetchData(`/api/v1/org/schedules/${existing.schedule_id}`, {
           method: 'PATCH',
           body: JSON.stringify({
             employee_id: employeeId,
@@ -318,7 +318,7 @@ function WeekView({ storeId }: { storeId: string }) {
           }),
         });
       } else if (newType !== 'off') {
-        await txFetch('/api/v1/org/schedules', {
+        await txFetchData('/api/v1/org/schedules', {
           method: 'POST',
           body: JSON.stringify({
             store_id: storeId,
@@ -473,7 +473,7 @@ function MonthView({ storeId }: { storeId: string }) {
     if (!storeId) return;
     setLoading(true);
     try {
-      const data = await txFetch<MonthDaySummary[]>(
+      const data = await txFetchData<MonthDaySummary[]>(
         `/api/v1/org/schedules?store_id=${storeId}&week=${month.startOf('month').format('YYYY-MM-DD')}`,
       );
       setDaySummaries(Array.isArray(data) ? data : []);
@@ -490,7 +490,7 @@ function MonthView({ storeId }: { storeId: string }) {
     setSelectedDay(dateStr);
     try {
       const d = dayjs(dateStr);
-      const data = await txFetch<WeekScheduleResp>(
+      const data = await txFetchData<WeekScheduleResp>(
         `/api/v1/org/schedules?store_id=${storeId}&week=${d.isoWeekday(1).format('YYYY-MM-DD')}`,
       );
       setDayDetail(data.employees ?? []);
@@ -637,7 +637,7 @@ function TemplatePanel({ storeId }: { storeId: string }) {
   useEffect(() => {
     (async () => {
       try {
-        const data = await txFetch<ScheduleTemplate[]>(`/api/v1/schedules/templates?store_id=${storeId}`);
+        const data = await txFetchData<ScheduleTemplate[]>(`/api/v1/schedules/templates?store_id=${storeId}`);
         setTemplates(data);
       } catch {
         setTemplates(generateMockTemplates());
@@ -660,7 +660,7 @@ function TemplatePanel({ storeId }: { storeId: string }) {
     };
 
     try {
-      await txFetch('/api/v1/schedules/templates', {
+      await txFetchData('/api/v1/schedules/templates', {
         method: 'POST',
         body: JSON.stringify({ name: newName, description: newDesc, shifts: newShifts, store_id: storeId }),
       });
@@ -678,7 +678,7 @@ function TemplatePanel({ storeId }: { storeId: string }) {
 
   const handleDelete = async (id: string) => {
     try {
-      await txFetch(`/api/v1/schedules/templates/${id}`, { method: 'DELETE' });
+      await txFetchData(`/api/v1/schedules/templates/${id}`, { method: 'DELETE' });
     } catch {
       // Mock mode
     }
@@ -688,7 +688,7 @@ function TemplatePanel({ storeId }: { storeId: string }) {
 
   const handleApply = async (templateId: string) => {
     try {
-      await txFetch('/api/v1/schedules/batch', {
+      await txFetchData('/api/v1/schedules/batch', {
         method: 'POST',
         body: JSON.stringify({ store_id: storeId, template_id: templateId }),
       });
@@ -861,7 +861,7 @@ function AIForecastCard({ storeId, weekStart }: { storeId: string; weekStart: Da
     (async () => {
       setLoading(true);
       try {
-        const data = await txFetch<TrafficForecast[]>(
+        const data = await txFetchData<TrafficForecast[]>(
           `/api/v1/schedules/ai-forecast?store_id=${storeId}&week_start=${weekStart.format('YYYY-MM-DD')}`,
         );
         setForecast(data);
@@ -875,7 +875,7 @@ function AIForecastCard({ storeId, weekStart }: { storeId: string; weekStart: Da
 
   const handleAdopt = async () => {
     try {
-      await txFetch('/api/v1/schedules/batch', {
+      await txFetchData('/api/v1/schedules/batch', {
         method: 'POST',
         body: JSON.stringify({
           store_id: storeId,
@@ -985,7 +985,7 @@ export function SchedulePage() {
   useEffect(() => {
     (async () => {
       try {
-        const data = await txFetch<StoreListResp>('/api/v1/org/stores?status=active');
+        const data = await txFetchData<StoreListResp>('/api/v1/org/stores?status=active');
         if (data?.items?.length) {
           setStoreOptions(data.items);
           setStoreId(data.items[0].value);

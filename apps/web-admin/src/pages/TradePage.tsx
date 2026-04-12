@@ -4,7 +4,7 @@
  */
 
 import React, { useEffect, useState, useCallback } from 'react';
-import { txFetch } from '../api';
+import { txFetchData } from '../api';
 
 // ─── 类型定义 ───
 
@@ -277,7 +277,7 @@ export function TradePage() {
     setKpiLoading(true);
     setKpiError(null);
     try {
-      const data = await txFetch<DailyProfitKPI>('/api/v1/finance/daily-profit');
+      const data = await txFetchData<DailyProfitKPI>('/api/v1/finance/daily-profit');
       setKpi(data);
     } catch (e) {
       setKpiError(e instanceof Error ? e.message : '加载失败');
@@ -289,7 +289,7 @@ export function TradePage() {
     setOrdersLoading(true);
     setOrdersError(null);
     try {
-      const data = await txFetch<{ items: OrderItem[]; total: number }>(
+      const data = await txFetchData<{ items: OrderItem[]; total: number }>(
         '/api/v1/trade/orders?page=1&size=10',
       );
       setOrders(data.items ?? []);
@@ -303,7 +303,7 @@ export function TradePage() {
     setPayLoading(true);
     setPayError(null);
     try {
-      const data = await txFetch<{ items: PaymentMethod[] }>(
+      const data = await txFetchData<{ items: PaymentMethod[] }>(
         '/api/v1/finance/analytics/payment-methods?period=day',
       );
       setPayMethods(data.items ?? []);
@@ -316,7 +316,7 @@ export function TradePage() {
     // 小时营收热力图
     setHourlyLoading(true);
     try {
-      const data = await txFetch<{ items: HourlyRevenue[] }>(
+      const data = await txFetchData<{ items: HourlyRevenue[] }>(
         '/api/v1/finance/analytics/hourly-revenue?period=day',
       );
       setHourly(data.items ?? []);

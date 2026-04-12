@@ -79,7 +79,7 @@ function formatElapsed(createdAt: number): string {
 
 export function TimeoutAlert() {
   const [alerts, setAlerts] = useState<TimeoutTicket[]>(MOCK_ALERTS);
-  const [tick, setTick] = useState(0);
+  const [_tick, setTick] = useState(0);
   const [tab, setTab] = useState<'active' | 'history'>('active');
 
   // 每秒刷新

@@ -32,7 +32,7 @@ import {
   FallOutlined,
   InfoCircleOutlined,
 } from '@ant-design/icons';
-import { txFetch } from '../../../api';
+import { txFetchData } from '../../../api';
 
 const { Title, Text } = Typography;
 
@@ -233,16 +233,16 @@ export function ROIOverviewPage() {
     const days = daysByPeriod[period];
 
     Promise.allSettled([
-      txFetch<{ items: RoiTrendPoint[]; degraded?: boolean }>(
+      txFetchData<{ items: RoiTrendPoint[]; degraded?: boolean }>(
         `/api/v1/private-domain/roi-trend?days=${days}`,
       ),
-      txFetch<{ items: RevenueChannel[] }>(
+      txFetchData<{ items: RevenueChannel[] }>(
         `/api/v1/finance/analytics/revenue-composition?period=${period}`,
       ),
-      txFetch<{ items: FinanceTrendPoint[] }>(
+      txFetchData<{ items: FinanceTrendPoint[] }>(
         `/api/v1/finance/analytics/trend?period=month&days=${days}`,
       ),
-      txFetch<{ items: MemberGrowthPoint[] }>(
+      txFetchData<{ items: MemberGrowthPoint[] }>(
         `/api/v1/member/analytics/growth?period=month&days=${days}`,
       ),
     ]).then(([roiRes, chRes, finRes, memRes]) => {

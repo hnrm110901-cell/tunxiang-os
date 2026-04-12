@@ -43,7 +43,7 @@ import {
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import dayjs from 'dayjs';
-import { txFetch } from '../../../api';
+import { txFetchData } from '../../../api';
 
 const { Title, Text } = Typography;
 const { RangePicker } = DatePicker;
@@ -109,29 +109,29 @@ interface TodaySessionStats {
 // ─── API 函数 ─────────────────────────────────────────────────────────────────
 
 async function fetchBanquetMenus(page = 1, size = 20): Promise<{ items: BanquetMenu[]; total: number }> {
-  return txFetch(`/api/v1/menu/banquet-menus?page=${page}&size=${size}`);
+  return txFetchData(`/api/v1/menu/banquet-menus?page=${page}&size=${size}`);
 }
 
 async function fetchBanquetMenuDetail(id: string): Promise<BanquetMenuDetail> {
-  return txFetch(`/api/v1/menu/banquet-menus/${id}`);
+  return txFetchData(`/api/v1/menu/banquet-menus/${id}`);
 }
 
 async function createBanquetMenu(payload: Omit<BanquetMenu, 'id' | 'section_count'>): Promise<BanquetMenu> {
-  return txFetch('/api/v1/menu/banquet-menus', {
+  return txFetchData('/api/v1/menu/banquet-menus', {
     method: 'POST',
     body: JSON.stringify(payload),
   });
 }
 
 async function toggleBanquetMenu(id: string, isActive: boolean): Promise<void> {
-  return txFetch(`/api/v1/menu/banquet-menus/${id}`, {
+  return txFetchData(`/api/v1/menu/banquet-menus/${id}`, {
     method: 'PATCH',
     body: JSON.stringify({ is_active: isActive }),
   });
 }
 
 async function addMenuSection(menuId: string, payload: { section_name: string; sort_order: number }): Promise<MenuSection> {
-  return txFetch(`/api/v1/menu/banquet-menus/${menuId}/sections`, {
+  return txFetchData(`/api/v1/menu/banquet-menus/${menuId}/sections`, {
     method: 'POST',
     body: JSON.stringify(payload),
   });
@@ -142,7 +142,7 @@ async function addSectionItem(
   sectionId: string,
   payload: { dish_id: string; dish_name: string; qty: number; note?: string },
 ): Promise<SectionItem> {
-  return txFetch(`/api/v1/menu/banquet-menus/${menuId}/sections/${sectionId}/items`, {
+  return txFetchData(`/api/v1/menu/banquet-menus/${menuId}/sections/${sectionId}/items`, {
     method: 'POST',
     body: JSON.stringify(payload),
   });
@@ -150,7 +150,7 @@ async function addSectionItem(
 
 async function fetchTodaySessions(): Promise<{ items: BanquetSession[]; total: number }> {
   const today = dayjs().format('YYYY-MM-DD');
-  return txFetch(`/api/v1/menu/banquet-sessions?date=${today}`);
+  return txFetchData(`/api/v1/menu/banquet-sessions?date=${today}`);
 }
 
 // ─── 今日场次统计卡片 ─────────────────────────────────────────────────────────

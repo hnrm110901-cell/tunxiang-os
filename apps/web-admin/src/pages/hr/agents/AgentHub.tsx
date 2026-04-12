@@ -34,7 +34,7 @@ import {
   RocketOutlined,
   RobotOutlined,
 } from '@ant-design/icons';
-import { txFetch } from '../../../api';
+import { txFetchData } from '../../../api';
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -124,7 +124,7 @@ export default function AgentHub() {
   const load = async () => {
     setLoading(true);
     try {
-      const data = await txFetch<DashboardResp>('/api/v1/hr/dashboard/');
+      const data = await txFetchData<DashboardResp>('/api/v1/hr/dashboard/');
       setSummaries(data.agent_summaries || []);
     } catch {
       // 降级：不阻塞页面

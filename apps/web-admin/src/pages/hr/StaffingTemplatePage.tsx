@@ -35,7 +35,7 @@ import {
   Tag,
 } from 'antd';
 import { CopyOutlined, PlusOutlined, UploadOutlined } from '@ant-design/icons';
-import { txFetch } from '../../api/client';
+import { txFetchData } from '../../api/client';
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 //  类型
@@ -131,7 +131,7 @@ const StaffingTemplatePage: React.FC = () => {
   const loadSummary = async () => {
     setSummaryLoading(true);
     try {
-      const resp = await txFetch<StoreSummary[]>('/api/v1/staffing-templates/summary');
+      const resp = await txFetchData<StoreSummary[]>('/api/v1/staffing-templates/summary');
       setSummaryList(resp.data ?? []);
     } catch (err) {
       console.error('加载汇总失败', err);
@@ -147,7 +147,7 @@ const StaffingTemplatePage: React.FC = () => {
   // ── 删除 ──
   const handleDelete = async (id: string) => {
     try {
-      await txFetch<null>(`/api/v1/staffing-templates/${id}`, { method: 'DELETE' });
+      await txFetchData<null>(`/api/v1/staffing-templates/${id}`, { method: 'DELETE' });
       message.success('删除成功');
       actionRef.current?.reload();
       loadSummary();
@@ -168,7 +168,7 @@ const StaffingTemplatePage: React.FC = () => {
     }
     setCopyLoading(true);
     try {
-      const resp = await txFetch<CopyResult>('/api/v1/staffing-templates/copy', {
+      const resp = await txFetchData<CopyResult>('/api/v1/staffing-templates/copy', {
         method: 'POST',
         body: JSON.stringify({
           source_store_type: copySource,
@@ -192,13 +192,13 @@ const StaffingTemplatePage: React.FC = () => {
   const handleSubmit = async (values: Record<string, unknown>) => {
     try {
       if (editRecord) {
-        await txFetch<StaffingTemplate>(`/api/v1/staffing-templates/${editRecord.id}`, {
+        await txFetchData<StaffingTemplate>(`/api/v1/staffing-templates/${editRecord.id}`, {
           method: 'PUT',
           body: JSON.stringify(values),
         });
         message.success('更新成功');
       } else {
-        await txFetch<StaffingTemplate>('/api/v1/staffing-templates', {
+        await txFetchData<StaffingTemplate>('/api/v1/staffing-templates', {
           method: 'POST',
           body: JSON.stringify(values),
         });
@@ -359,7 +359,7 @@ const StaffingTemplatePage: React.FC = () => {
           query.set('page', String(params.current ?? 1));
           query.set('size', String(params.pageSize ?? 20));
           try {
-            const resp = await txFetch<ListResult>(
+            const resp = await txFetchData<ListResult>(
               `/api/v1/staffing-templates?${query.toString()}`,
             );
             const list = resp.data;

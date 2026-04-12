@@ -15,7 +15,7 @@ import { useRef, useState } from 'react';
 import { Button, Modal, Space, Table, Tag, Typography, message } from 'antd';
 import { UserAddOutlined, CheckOutlined } from '@ant-design/icons';
 import { ActionType, ProColumns, ProTable } from '@ant-design/pro-components';
-import { txFetch } from '../../../api';
+import { txFetchData } from '../../../api';
 
 const { Title } = Typography;
 
@@ -71,7 +71,7 @@ export default function ScheduleGaps() {
     setCandidateLoading(true);
     setCandidateModal(true);
     try {
-      const res = await txFetch(
+      const res = await txFetchData(
         `/api/v1/schedules/gaps/${gap.id}/candidates?store_id=${gap.store_id}`,
       ) as { ok: boolean; data: { items: Candidate[] } };
       if (res.ok) {
@@ -83,7 +83,7 @@ export default function ScheduleGaps() {
 
   const handleFill = async (employeeId: string) => {
     try {
-      const res = await txFetch(`/api/v1/schedules/gaps/${currentGapId}/fill`, {
+      const res = await txFetchData(`/api/v1/schedules/gaps/${currentGapId}/fill`, {
         method: 'POST',
         body: JSON.stringify({ employee_id: employeeId }),
       }) as { ok: boolean };
@@ -187,7 +187,7 @@ export default function ScheduleGaps() {
           query.set('page', String(params.current ?? 1));
           query.set('size', String(params.pageSize ?? 20));
           try {
-            const res = await txFetch(`/api/v1/schedules/gaps?${query}`) as {
+            const res = await txFetchData(`/api/v1/schedules/gaps?${query}`) as {
               ok: boolean;
               data: { items: GapItem[]; total: number };
             };

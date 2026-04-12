@@ -9,7 +9,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Card, Col, Row, Tag } from 'antd';
 import { ActionType, ProColumns, ProTable } from '@ant-design/pro-components';
 import { Column } from '@ant-design/charts';
-import { txFetch } from '../../../api';
+import { txFetchData } from '../../../api';
 
 // ─── 类型 ────────────────────────────────────────────────────────────────────
 
@@ -43,7 +43,7 @@ export default function GovernanceBenchmark() {
   const [benchData, setBenchData] = useState<BenchmarkResp | null>(null);
 
   const loadData = async (m: string) => {
-    const resp = await txFetch<BenchmarkResp>(
+    const resp = await txFetchData<BenchmarkResp>(
       `/api/v1/hr/governance/benchmark?metric=${m}`,
     );
     setBenchData(resp.data);

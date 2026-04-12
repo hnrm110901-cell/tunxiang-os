@@ -6,7 +6,7 @@
  */
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { txFetch } from '../../../api';
+import { txFetchData } from '../../../api';
 
 // ---- 颜色常量 ----
 const BG_0 = '#0d1e28';
@@ -703,7 +703,7 @@ export function JourneyCanvasPage() {
     setCanvasLoading(true);
     setError(null);
     try {
-      const data = await txFetch<{ journey: JourneySummary; canvas: CanvasData }>(
+      const data = await txFetchData<{ journey: JourneySummary; canvas: CanvasData }>(
         `/api/v1/member/journeys/${journeyId}/canvas`
       );
       if (data.journey) setJourney(data.journey);
@@ -803,7 +803,7 @@ export function JourneyCanvasPage() {
     setSaveLoading(true);
     setError(null);
     try {
-      await txFetch(`/api/v1/member/journeys/${journeyId}/canvas`, {
+      await txFetchData(`/api/v1/member/journeys/${journeyId}/canvas`, {
         method: 'PUT',
         body: JSON.stringify({ nodes, edges }),
       });
@@ -827,12 +827,12 @@ export function JourneyCanvasPage() {
     setPublishLoading(true);
     try {
       // 先保存画布
-      await txFetch(`/api/v1/member/journeys/${journeyId}/canvas`, {
+      await txFetchData(`/api/v1/member/journeys/${journeyId}/canvas`, {
         method: 'PUT',
         body: JSON.stringify({ nodes, edges }),
       });
       // 再更新状态为激活
-      await txFetch(`/api/v1/member/journeys/${journeyId}/status`, {
+      await txFetchData(`/api/v1/member/journeys/${journeyId}/status`, {
         method: 'PATCH',
         body: JSON.stringify({ status: 'active' }),
       });

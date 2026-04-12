@@ -40,7 +40,7 @@ import {
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import type { Dayjs } from 'dayjs';
-import { txFetch } from '../../../api';
+import { txFetchData } from '../../../api';
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -108,7 +108,7 @@ export default function BudgetRecommendation() {
   const [stores, setStores] = useState<{ id: string; name: string }[]>([]);
 
   useEffect(() => {
-    txFetch<{ items: { id: string; store_name: string }[] }>('/api/v1/stores?page=1&size=100')
+    txFetchData<{ items: { id: string; store_name: string }[] }>('/api/v1/stores?page=1&size=100')
       .then((resp) => {
         const list = (resp.data?.items || []).map((s) => ({ id: s.id, name: s.store_name }));
         setStores(list);
@@ -124,7 +124,7 @@ export default function BudgetRecommendation() {
     if (!storeId) return;
     setLoading(true);
     try {
-      const resp = await txFetch<{ data: BudgetData }>('/api/v1/agent/salary_advisor/budget_recommendation', {
+      const resp = await txFetchData<{ data: BudgetData }>('/api/v1/agent/salary_advisor/budget_recommendation', {
         method: 'POST',
         body: JSON.stringify({
           store_id: storeId,

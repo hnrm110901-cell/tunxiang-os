@@ -43,7 +43,6 @@ interface SwimLaneData {
 // ─── Constants ───
 
 const API_BASE = (window as any).__STORE_API_BASE__ || '';
-const TENANT_ID = (window as any).__TENANT_ID__ || '';
 const DEPT_ID = (window as any).__KDS_DEPT_ID__ || '';
 const OPERATOR_ID = (window as any).__OPERATOR_ID__ || '';
 const REFRESH_MS = 15_000;
@@ -219,15 +218,12 @@ export function SwimLaneBoard() {
     }
 
     try {
-      const res = await txFetch(
+      const data = await txFetch<SwimLaneData>(
         `${API_BASE}/api/v1/kds/swimlane/board?dept_id=${encodeURIComponent(DEPT_ID)}`,
         undefined,
-        TENANT_ID,
       );
-      if (res.ok) {
-        setData(res.data as SwimLaneData);
-        setError(null);
-      }
+      setData(data);
+      setError(null);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : '加载失败');
     } finally {
@@ -252,7 +248,6 @@ export function SwimLaneBoard() {
           method: 'POST',
           body: JSON.stringify({ step_id: stepId, operator_id: OPERATOR_ID || null }),
         },
-        TENANT_ID,
       );
       await fetchBoard();
     } catch (err: unknown) {

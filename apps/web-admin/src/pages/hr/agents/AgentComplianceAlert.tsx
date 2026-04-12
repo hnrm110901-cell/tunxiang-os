@@ -38,7 +38,7 @@ import {
   ProFormTextArea,
   ProTable,
 } from '@ant-design/pro-components';
-import { txFetch } from '../../../api';
+import { txFetchData } from '../../../api';
 
 const { Title, Text } = Typography;
 
@@ -172,7 +172,7 @@ export default function AgentComplianceAlert() {
             <a
               onClick={async () => {
                 try {
-                  await txFetch(`/api/v1/compliance/alerts/${r.id}/acknowledge`, {
+                  await txFetchData(`/api/v1/compliance/alerts/${r.id}/acknowledge`, {
                     method: 'POST',
                     body: JSON.stringify({ acknowledged_by: 'current_user', note: '' }),
                   });
@@ -193,7 +193,7 @@ export default function AgentComplianceAlert() {
               width={400}
               onFinish={async (values) => {
                 try {
-                  await txFetch(`/api/v1/compliance/alerts/${r.id}/resolve`, {
+                  await txFetchData(`/api/v1/compliance/alerts/${r.id}/resolve`, {
                     method: 'POST',
                     body: JSON.stringify({
                       resolved_by: 'current_user',
@@ -269,7 +269,7 @@ export default function AgentComplianceAlert() {
           if (params.category) query.set('category', params.category);
           if (params.status) query.set('status', params.status);
           try {
-            const data = await txFetch<AlertListResp>(
+            const data = await txFetchData<AlertListResp>(
               `/api/v1/compliance/alerts?${query.toString()}`,
             );
             const items = data.items || [];
@@ -291,7 +291,7 @@ export default function AgentComplianceAlert() {
             icon={<ReloadOutlined />}
             onClick={async () => {
               try {
-                await txFetch('/api/v1/compliance/scan', {
+                await txFetchData('/api/v1/compliance/scan', {
                   method: 'POST',
                   body: JSON.stringify({ scan_type: 'all' }),
                 });

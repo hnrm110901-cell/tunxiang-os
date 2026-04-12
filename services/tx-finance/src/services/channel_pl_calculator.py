@@ -209,8 +209,8 @@ class ChannelPLCalculator:
             )
             row = result.mappings().first()
             return int(row["total_food_cost"]) if row else 0
-        except Exception:
-            # order_items 表可能尚未建立，返回 0 不影响其他计算
+        except Exception as exc:  # noqa: BLE001 — order_items表可能未建立，返回0不影响其他计算
+            logger.warning("channel_pl.food_cost_query_failed", error=str(exc))
             return 0
 
     async def reconcile_bill(

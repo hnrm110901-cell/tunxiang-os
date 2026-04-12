@@ -40,7 +40,17 @@ services:
       REDIS_URL: redis://redis:6379/0
       TX_TRADE_URL: http://tx-trade:8001
       TX_MENU_URL: http://tx-menu:8002
+      TX_MEMBER_URL: http://tx-member:8003
+      TX_GROWTH_URL: http://tx-growth:8004
+      TX_OPS_URL: http://tx-ops:8005
+      TX_SUPPLY_URL: http://tx-supply:8006
+      TX_FINANCE_URL: http://tx-finance:8007
       TX_AGENT_URL: http://tx-agent:8008
+      TX_ANALYTICS_URL: http://tx-analytics:8009
+      TX_BRAIN_URL: http://tx-brain:8010
+      TX_INTEL_URL: http://tx-intel:8011
+      TX_ORG_URL: http://tx-org:8012
+      TX_CIVIC_URL: http://tx-civic:8014
       WECOM_CORP_ID: ${WECOM_CORP_ID}
       WECOM_AGENT_ID: ${WECOM_AGENT_ID}
       WECOM_SECRET: ${WECOM_SECRET}
@@ -124,6 +134,32 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+
+  tx-ops:
+    build:
+      context: .
+      dockerfile: services/tx-ops/Dockerfile
+    ports:
+      - "8005:8005"
+    environment:
+      DATABASE_URL: postgresql+asyncpg://tunxiang:changeme_dev@postgres/tunxiang_os
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  tx-civic:
+    build:
+      context: .
+      dockerfile: services/tx-civic/Dockerfile
+    ports:
+      - "8014:8014"
+    environment:
+      DATABASE_URL: postgresql+asyncpg://tunxiang:changeme_dev@postgres/tunxiang_os
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
 
   tx-analytics:
     build:

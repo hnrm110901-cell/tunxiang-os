@@ -519,10 +519,11 @@ async def finish_cooking(
                     svc = DiningSessionService(notify_db, tenant_id_str)
                     await svc.record_dish_served(dining_session_id, dish_count=dish_qty)
                     await notify_db.commit()
-                except Exception:
+                except Exception as exc:  # noqa: BLE001 — 回调失败不阻断出餐确认
                     log.warning(
                         "kds_actions.finish_cooking.session_callback_failed",
                         session_id=str(dining_session_id),
+                        error=str(exc),
                         exc_info=True,
                     )
 

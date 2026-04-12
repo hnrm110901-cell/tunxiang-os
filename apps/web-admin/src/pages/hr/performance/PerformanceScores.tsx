@@ -24,7 +24,7 @@ import {
   ProFormTextArea,
   ProTable,
 } from '@ant-design/pro-components';
-import { txFetch } from '../../../api';
+import { txFetchData } from '../../../api';
 
 const { Title } = Typography;
 
@@ -122,7 +122,7 @@ export default function PerformanceScores() {
             }
             onFinish={async (values) => {
               try {
-                const res = await txFetch('/api/v1/performance/scores', {
+                const res = await txFetchData('/api/v1/performance/scores', {
                   method: 'POST',
                   body: JSON.stringify(values),
                 }) as { ok: boolean };
@@ -145,7 +145,7 @@ export default function PerformanceScores() {
               rules={[{ required: true, message: '请选择员工' }]}
               request={async () => {
                 try {
-                  const res = await txFetch('/api/v1/org/employees?page=1&size=200') as {
+                  const res = await txFetchData('/api/v1/org/employees?page=1&size=200') as {
                     ok: boolean;
                     data: { items: { id: string; name: string }[] };
                   };
@@ -172,7 +172,7 @@ export default function PerformanceScores() {
           query.set('page', String(params.current ?? 1));
           query.set('size', String(params.pageSize ?? 20));
           try {
-            const res = await txFetch(`/api/v1/performance/scores?${query}`) as {
+            const res = await txFetchData(`/api/v1/performance/scores?${query}`) as {
               ok: boolean;
               data: { items: ScoreRecord[]; total: number };
             };

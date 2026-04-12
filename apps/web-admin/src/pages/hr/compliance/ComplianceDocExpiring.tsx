@@ -9,7 +9,7 @@ import { useRef, useState } from 'react';
 import { Button, Space, Tag, message } from 'antd';
 import { ActionType, ProColumns, ProTable } from '@ant-design/pro-components';
 import { NotificationOutlined } from '@ant-design/icons';
-import { txFetch } from '../../../api';
+import { txFetchData } from '../../../api';
 
 // ─── 类型 ────────────────────────────────────────────────────────────────────
 
@@ -102,7 +102,7 @@ export default function ComplianceDocExpiring() {
           if (params.current) query.set('page', String(params.current));
           if (params.pageSize) query.set('size', String(params.pageSize));
           query.set('days', activeTab);
-          const resp = await txFetch<{ items: ExpiringDoc[]; total: number }>(
+          const resp = await txFetchData<{ items: ExpiringDoc[]; total: number }>(
             `/api/v1/employee-documents/expiring?${query.toString()}`,
           );
           const d = resp.data;

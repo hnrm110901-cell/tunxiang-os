@@ -5,7 +5,7 @@
  */
 import { useEffect, useState, useCallback } from 'react';
 import { Alert, Button } from 'antd';
-import { txFetch } from '../../../api';
+import { txFetchData } from '../../../api';
 
 // ─── 类型定义 ───
 
@@ -167,7 +167,7 @@ export function InventoryIntelPage() {
     setLoadingDash(true);
     setSelectedIds(new Set());
     try {
-      const data = await txFetch<DashboardData>(
+      const data = await txFetchData<DashboardData>(
         `/api/v1/inventory/dashboard?store_id=${encodeURIComponent(storeId)}`,
       );
       setDashboard(data);
@@ -198,10 +198,10 @@ export function InventoryIntelPage() {
     try {
       // 同时调用聚合接口和 Orchestrate
       const [planResult, orchestrateResult] = await Promise.allSettled([
-        txFetch<AIPlanData>(`/api/v1/inventory/restock-plan?store_id=${encodeURIComponent(storeId)}`, {
+        txFetchData<AIPlanData>(`/api/v1/inventory/restock-plan?store_id=${encodeURIComponent(storeId)}`, {
           method: 'POST',
         }),
-        txFetch<OrchestrateResult>('/api/v1/orchestrate', {
+        txFetchData<OrchestrateResult>('/api/v1/orchestrate', {
           method: 'POST',
           body: JSON.stringify({
             intent: `为门店 ${storeId} 生成今日补货计划，分析所有低库存食材，给出优先级和建议采购量`,

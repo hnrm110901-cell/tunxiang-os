@@ -30,7 +30,7 @@ import {
   CloseOutlined,
 } from '@ant-design/icons';
 import { ConfigProvider } from 'antd';
-import { txFetch } from '../../api';
+import { txFetchData } from '../../api';
 
 const { Title, Text } = Typography;
 
@@ -142,7 +142,7 @@ export function MemberTierPage() {
 
   // ── 数据加载 ──
   useEffect(() => {
-    txFetch<{ tiers: Tier[]; total_members: number }>('/api/v1/member/tiers')
+    txFetchData<{ tiers: Tier[]; total_members: number }>('/api/v1/member/tiers')
       .then((data) => {
         setTiers(data.tiers);
         if (data.tiers.length > 0) {
@@ -154,7 +154,7 @@ export function MemberTierPage() {
       .catch(() => message.error('加载等级配置失败'))
       .finally(() => setLoading(false));
 
-    txFetch<{ items: UpgradeLogItem[]; upgrade_count: number; downgrade_count: number }>(
+    txFetchData<{ items: UpgradeLogItem[]; upgrade_count: number; downgrade_count: number }>(
       '/api/v1/member/tiers/upgrade-log?days=7'
     )
       .then((data) => {
@@ -199,7 +199,7 @@ export function MemberTierPage() {
         color: vals.color,
         icon: selectedTier.icon,
       };
-      await txFetch(`/api/v1/member/tiers/${selectedTier.id}`, {
+      await txFetchData(`/api/v1/member/tiers/${selectedTier.id}`, {
         method: 'PUT',
         body: JSON.stringify(body),
       });

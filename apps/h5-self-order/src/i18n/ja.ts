@@ -88,6 +88,22 @@ export const ja: Record<keyof typeof zh, string> = {
   submitFeedback: '送信',
   feedbackReward: '送信で{points}ポイント獲得',
 
+  payResultSuccess: 'お支払い完了',
+  payResultFailed: 'お支払い失敗',
+  payResultRetryHint: '戻ってもう一度お試しください',
+  payResultOrderNo: '注文番号',
+  payResultAmount: 'お支払い金額',
+  payResultEstTime: '提供予定時間',
+  payResultMinutes: '分',
+  payResultProgress: '注文進行状況',
+  payResultViewOrder: '注文を確認',
+  payResultContinue: '追加注文',
+
+  demoMode: 'デモモード',
+  demoWelcome: 'いらっしゃいませ',
+  demoLoadingHint: 'メニューに移動中...',
+  cashPay: '現地精算',
+
   back: '戻る',
   confirm: '確認',
   cancel: 'キャンセル',

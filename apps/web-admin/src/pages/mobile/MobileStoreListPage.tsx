@@ -10,7 +10,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MobileLayout } from '../../components/MobileLayout';
-import { txFetch } from '../../api/client';
+import { txFetchData } from '../../api/client';
 
 // ─── 类型 ───
 
@@ -191,7 +191,7 @@ export function MobileStoreListPage() {
     let cancelled = false;
     setLoading(true);
 
-    txFetch<StoreItem[]>('/api/v1/analytics/store-list')
+    txFetchData<StoreItem[]>('/api/v1/analytics/store-list')
       .then(res => {
         if (!cancelled) setStores(res.data ?? MOCK_STORES);
       })

@@ -88,6 +88,22 @@ export const ko: Record<keyof typeof zh, string> = {
   submitFeedback: '제출',
   feedbackReward: '제출 시 {points}포인트 적립',
 
+  payResultSuccess: '결제 완료',
+  payResultFailed: '결제 실패',
+  payResultRetryHint: '돌아가서 다시 시도하세요',
+  payResultOrderNo: '주문 번호',
+  payResultAmount: '결제 금액',
+  payResultEstTime: '예상 대기 시간',
+  payResultMinutes: '분',
+  payResultProgress: '주문 진행 상황',
+  payResultViewOrder: '주문 확인',
+  payResultContinue: '추가 주문',
+
+  demoMode: '데모 모드',
+  demoWelcome: '어서오세요',
+  demoLoadingHint: '메뉴로 이동 중...',
+  cashPay: '현장 결제',
+
   back: '뒤로',
   confirm: '확인',
   cancel: '취소',

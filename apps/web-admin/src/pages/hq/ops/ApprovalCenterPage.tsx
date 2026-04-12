@@ -3,7 +3,7 @@
  * 接入 POST/GET /api/v1/approvals/* (tx-org approval_router v2)
  */
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { txFetch } from '../../../api';
+import { txFetchData } from '../../../api';
 
 // ─── 类型定义 ────────────────────────────────────────────────────────────────
 
@@ -130,29 +130,29 @@ async function apiListApprovals(params: ListParams): Promise<ListResp> {
   if (params.business_type) qs.set('business_type', params.business_type);
   qs.set('page', String(params.page || 1));
   qs.set('size', String(params.size || 50));
-  return txFetch<ListResp>(`/api/v1/approvals?${qs}`);
+  return txFetchData<ListResp>(`/api/v1/approvals?${qs}`);
 }
 
 async function apiGetDetail(id: string): Promise<Record<string, unknown>> {
-  return txFetch<Record<string, unknown>>(`/api/v1/approvals/${encodeURIComponent(id)}`);
+  return txFetchData<Record<string, unknown>>(`/api/v1/approvals/${encodeURIComponent(id)}`);
 }
 
 async function apiApprove(id: string, req: ActionReq): Promise<unknown> {
-  return txFetch(`/api/v1/approvals/${encodeURIComponent(id)}/approve`, {
+  return txFetchData(`/api/v1/approvals/${encodeURIComponent(id)}/approve`, {
     method: 'POST',
     body: JSON.stringify(req),
   });
 }
 
 async function apiReject(id: string, req: ActionReq): Promise<unknown> {
-  return txFetch(`/api/v1/approvals/${encodeURIComponent(id)}/reject`, {
+  return txFetchData(`/api/v1/approvals/${encodeURIComponent(id)}/reject`, {
     method: 'POST',
     body: JSON.stringify(req),
   });
 }
 
 async function apiPendingCount(): Promise<PendingCountData> {
-  return txFetch<PendingCountData>('/api/v1/approvals/pending-count');
+  return txFetchData<PendingCountData>('/api/v1/approvals/pending-count');
 }
 
 // ─── 子组件 ──────────────────────────────────────────────────────────────────

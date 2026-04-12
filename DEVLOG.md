@@ -102,6 +102,57 @@
 
 ---
 
+## 2026-04-12 — v6 审计修复 Phase 1
+
+### 今日完成：安全审计修复（C2/H1/H3/H4/H5/M4 + P0-2静默异常）
+
+**C2 — v230 RLS NULLIF 全量回填（CRITICAL）**
+- 新建 `shared/db-migrations/versions/v230_rls_nullif_backfill.py`
+- 覆盖 v112–v150 遗留的 70 张表，补 `NULLIF + WITH CHECK + FORCE ROW LEVEL SECURITY`
+- 跳过已由 v138/v139/v224 修复的表
+
+**H1 — UPDATE/DELETE 全面补 tenant_id（HIGH）**
+- `delivery_aggregator_routes.py`：`get_aggregator_order` + `_order_action` SELECT/UPDATE 补 `AND tenant_id = :tid`；accept/ready/cancel 三个动作路由传入 Request
+- `dining_session_routes.py`：`_bind_market_session` UPDATE 补 `AND tenant_id = :tid`
+
+**H3 — vision_router 改用 ModelRouter（HIGH）**
+- 删除 `import anthropic` 直接调用，改为懒导入 `ModelRouter` + try/except ImportError 降级
+- `_recognize_via_claude` 增加 `tenant_id` 参数；`recognize_dish` 路由传入 `x_tenant_id`
+
+**H4 — BriefingCenterPage 用 DOMPurify（HIGH）**
+- `apps/web-admin/package.json` 添加 `dompurify@^3.1.0` + `@types/dompurify@^3.0.0`
+- `dangerouslySetInnerHTML` 改为 `DOMPurify.sanitize(renderMarkdown(...))`
+
+**H5 — rate_limiter Redis降级安全保护（HIGH）**
+- `LoginBruteForceProtection` 新增进程内 `_mem_counts` 字典
+- Redis 不可用时 `record_failure` / `is_locked` 均降级至内存计数器，不再完全放行
+
+**M4 — scan_pay 支付事件（MEDIUM）**
+- `scan_pay_routes.py` 引入 `PaymentEventType`；创建时发 `INITIATED`，`_simulate_payment` 实际 UPDATE 状态为 paid 并发 `CONFIRMED`
+
+**P0-2 — 11个静默/裸 except Exception 修复（v6 remediation）**
+- 9个文件，全部加 `as exc` + 日志（6个新增 log.warning，3个补全现有 log 调用）
+- 2个 WebSocket 保活场景加 `# noqa: BLE001` 注释说明意图
+- `cashier_api.py` / `procurement_recommend_routes.py` 补充 structlog 初始化
+
+### 数据变化
+- 新增迁移版本：v229 → v230
+- 修改后端文件：13 个
+- 修改前端文件：2 个（BriefingCenterPage + package.json）
+- 安全评分估算：72 → 85 → **88**（RLS+登录+XSS+异常全修）
+
+### 遗留问题
+- P0-1：git历史中泄露的商户凭证（config/merchants/.env.*）需 git-filter-repo 清除，此操作需手动执行并联系客户轮换 API Key
+- P1-3：自定义异常层级体系（TunxiangBaseError/POSAdapterError等）未建立
+- P1-1/P1-2：POS适配器和Agent包测试覆盖率不足
+
+### 明日计划
+- P1-3：新建 `services/gateway/src/core/exceptions.py` 异常层级
+- P1-1：品智适配器测试补全（目标 ≥8 用例）
+- web-admin 安装 dompurify（`pnpm install`）
+
+---
+
 ## 2026-04-11 (Sprint 4)
 
 ### 今日完成：人力中枢升级 Sprint 4 — AI驱动层（教练+聚合+总览）

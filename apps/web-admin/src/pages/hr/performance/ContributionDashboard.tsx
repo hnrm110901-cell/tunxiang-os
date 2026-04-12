@@ -27,7 +27,7 @@ import {
 import { ProTable, ProColumns, StatisticCard } from '@ant-design/pro-components';
 import type { ActionType } from '@ant-design/pro-components';
 import { Radar, Line } from '@ant-design/charts';
-import { txFetch } from '../../../api';
+import { txFetchData } from '../../../api';
 import dayjs from 'dayjs';
 
 const { Title, Text } = Typography;
@@ -142,7 +142,7 @@ export default function ContributionDashboard() {
   // 加载员工趋势
   const loadTrend = useCallback(async (employeeId: string) => {
     try {
-      const res = await txFetch(`/api/v1/contribution/trend/${employeeId}?periods=6`);
+      const res = await txFetchData(`/api/v1/contribution/trend/${employeeId}?periods=6`);
       if (res.ok) setTrendData(res.data);
     } catch { /* ignore */ }
   }, []);
@@ -356,7 +356,7 @@ export default function ContributionDashboard() {
               if (!storeId) return { data: [], total: 0, success: true };
               const [ps, pe] = getDateRange();
               try {
-                const res = await txFetch(
+                const res = await txFetchData(
                   `/api/v1/contribution/rankings?store_id=${storeId}&period_start=${ps}&period_end=${pe}`,
                 );
                 if (res.ok) {

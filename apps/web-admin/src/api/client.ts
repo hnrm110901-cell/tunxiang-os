@@ -47,19 +47,25 @@ export class TxApiError extends Error {
   }
 }
 
+export interface TxFetchOptions extends RequestInit {
+  /** 设为 true 时，401 响应不触发自动登出/刷页（用于登录端点） */
+  skipAuth?: boolean;
+}
+
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '';
 
-export async function txFetch<T>(path: string, options?: RequestInit): Promise<TxResponse<T>> {
+export async function txFetch<T>(path: string, options?: TxFetchOptions): Promise<TxResponse<T>> {
+  const { skipAuth, ...fetchOptions } = options ?? {};
   const token = getToken();
   const tenantId = getTenantId();
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
     ...(tenantId ? { 'X-Tenant-ID': tenantId } : {}),
-    ...((options?.headers as Record<string, string>) || {}),
+    ...((fetchOptions.headers as Record<string, string>) || {}),
   };
-  const resp = await fetch(`${API_BASE}${path}`, { ...options, headers });
-  if (resp.status === 401) {
+  const resp = await fetch(`${API_BASE}${path}`, { ...fetchOptions, headers });
+  if (resp.status === 401 && !skipAuth) {
     clearAuth(); window.location.reload();
     throw new TxApiError('认证已过期', 'UNAUTHORIZED', 401);
   }
@@ -81,8 +87,9 @@ export async function apiGet<T>(path: string): Promise<T> {
 }
 
 /** 便捷方法：POST，返回 data 字段 */
-export async function apiPost<T>(path: string, body?: unknown): Promise<T> {
+export async function apiPost<T>(path: string, body?: unknown, options?: TxFetchOptions): Promise<T> {
   return txFetchData<T>(path, {
+    ...options,
     method: 'POST',
     body: body !== undefined ? JSON.stringify(body) : undefined,
   });

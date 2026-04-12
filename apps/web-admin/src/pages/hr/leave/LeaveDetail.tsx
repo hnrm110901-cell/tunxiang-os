@@ -40,7 +40,7 @@ import {
   CloseCircleOutlined,
   ClockCircleOutlined,
 } from '@ant-design/icons';
-import { txFetch } from '../../../api';
+import { txFetchData } from '../../../api';
 
 const { Title, Text } = Typography;
 const TX_PRIMARY = '#FF6B35';
@@ -96,7 +96,7 @@ export default function LeaveDetail({ leaveId }: { leaveId?: string }) {
     if (!id) return;
     setLoading(true);
     try {
-      const res = await txFetch<LeaveDetailData>(`/api/v1/leave-requests/${id}`);
+      const res = await txFetchData<LeaveDetailData>(`/api/v1/leave-requests/${id}`);
       setData(res.data);
     } catch {
       message.error('加载请假详情失败');
@@ -211,7 +211,7 @@ export default function LeaveDetail({ leaveId }: { leaveId?: string }) {
             <Button
               onClick={async () => {
                 try {
-                  await txFetch(`/api/v1/leave-requests/${id}/cancel`, { method: 'POST' });
+                  await txFetchData(`/api/v1/leave-requests/${id}/cancel`, { method: 'POST' });
                   message.success('已取消');
                   load();
                 } catch {
@@ -232,7 +232,7 @@ export default function LeaveDetail({ leaveId }: { leaveId?: string }) {
         onOpenChange={setApproveOpen}
         onFinish={async (values) => {
           try {
-            await txFetch(`/api/v1/leave-requests/${id}/approve`, {
+            await txFetchData(`/api/v1/leave-requests/${id}/approve`, {
               method: 'POST',
               body: JSON.stringify({ comment: values.comment }),
             });
@@ -257,7 +257,7 @@ export default function LeaveDetail({ leaveId }: { leaveId?: string }) {
         onOpenChange={setRejectOpen}
         onFinish={async (values) => {
           try {
-            await txFetch(`/api/v1/leave-requests/${id}/reject`, {
+            await txFetchData(`/api/v1/leave-requests/${id}/reject`, {
               method: 'POST',
               body: JSON.stringify({ comment: values.comment }),
             });

@@ -6,7 +6,7 @@
  */
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { ChartPlaceholder } from '../../../components/ChartPlaceholder';
-import { txFetch } from '../../../api';
+import { txFetchData } from '../../../api';
 
 // ---------- 类型 ----------
 type TableAlertType = 'overtime-bill' | 'uncleared' | 'normal';
@@ -100,7 +100,7 @@ export function CruiseMonitorPage() {
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await txFetch<CruiseDashboard>(
+      const res = await txFetchData<CruiseDashboard>(
         `/api/v1/ops/daily-review?date=${todayDate}`,
       );
       if (res.data) setDashboard(res.data);

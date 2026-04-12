@@ -34,7 +34,7 @@ import {
   ProFormText,
 } from '@ant-design/pro-components';
 import type { DataNode } from 'antd/es/tree';
-import { txFetch } from '../../../api';
+import { txFetchData } from '../../../api';
 
 const { Title, Text } = Typography;
 
@@ -104,7 +104,7 @@ export default function OrgStructure() {
   const loadTree = async () => {
     setLoading(true);
     try {
-      const resp = await txFetch<OrgNode[]>('/api/v1/org-structure/tree');
+      const resp = await txFetchData<OrgNode[]>('/api/v1/org-structure/tree');
       setTree(resp.data ?? []);
     } catch {
       message.error('加载组织架构失败');
@@ -128,7 +128,7 @@ export default function OrgStructure() {
 
   const handleDelete = async () => {
     if (!selected) return;
-    await txFetch(`/api/v1/org-structure/departments/${selected.id}`, { method: 'DELETE' });
+    await txFetchData(`/api/v1/org-structure/departments/${selected.id}`, { method: 'DELETE' });
     message.success('删除成功');
     setSelected(null);
     loadTree();
@@ -198,7 +198,7 @@ export default function OrgStructure() {
         open={addVisible}
         onOpenChange={setAddVisible}
         onFinish={async (values) => {
-          await txFetch('/api/v1/org-structure/departments', {
+          await txFetchData('/api/v1/org-structure/departments', {
             method: 'POST',
             body: JSON.stringify({ ...values, parent_id: selected?.id }),
           });
@@ -230,7 +230,7 @@ export default function OrgStructure() {
         initialValues={selected ? { name: selected.name, type: selected.type, head_name: selected.head_name } : {}}
         onFinish={async (values) => {
           if (!selected) return false;
-          await txFetch(`/api/v1/org-structure/departments/${selected.id}`, {
+          await txFetchData(`/api/v1/org-structure/departments/${selected.id}`, {
             method: 'PUT',
             body: JSON.stringify(values),
           });

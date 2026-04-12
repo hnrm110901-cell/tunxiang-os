@@ -18,7 +18,7 @@ import { ProColumns, ProTable } from '@ant-design/pro-components';
 import type { ActionType } from '@ant-design/pro-components';
 import { Line } from '@ant-design/charts';
 import { useParams } from 'react-router-dom';
-import { txFetch } from '../../../api';
+import { txFetchData } from '../../../api';
 
 const { Title, Text } = Typography;
 const TX_PRIMARY = '#FF6B35';
@@ -65,7 +65,7 @@ export default function PerformancePointDetail() {
     if (!employee_id) return;
     (async () => {
       try {
-        const res = await txFetch(`/api/v1/points/detail/${employee_id}?page=1&size=1`) as {
+        const res = await txFetchData(`/api/v1/points/detail/${employee_id}?page=1&size=1`) as {
           ok: boolean;
           data: DetailResp;
         };
@@ -164,7 +164,7 @@ export default function PerformancePointDetail() {
           query.set('page', String(params.current ?? 1));
           query.set('size', String(params.pageSize ?? 20));
           try {
-            const res = await txFetch(`/api/v1/points/detail/${employee_id}?${query}`) as {
+            const res = await txFetchData(`/api/v1/points/detail/${employee_id}?${query}`) as {
               ok: boolean;
               data: DetailResp;
             };

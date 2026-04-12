@@ -23,8 +23,12 @@
  * 徐记海鲜专属页面：
  *   /banquet-control → BanquetControlScreen（宴席控菜大屏，厨师长宴席同步出品）
  */
+import { useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { getStoreToken } from './api/index';
+import { KdsLoginPage } from './pages/KdsLoginPage';
 import { KDSBoardPage } from './pages/KDSBoardPage';
+import { StoreSelectPage } from './pages/StoreSelectPage';
 import { HistoryPage } from './pages/HistoryPage';
 import { StatsPage } from './pages/StatsPage';
 import { KDSConfigPage } from './pages/KDSConfigPage';
@@ -49,14 +53,27 @@ import { DigitalMenuBoardPage } from './pages/DigitalMenuBoardPage';
 import BanquetControlScreen from './pages/BanquetControlScreen';
 
 export default function App() {
+  // 演示模式：?demo=true 时跳过登录
+  const isDemoUrl = new URLSearchParams(window.location.search).get('demo') === 'true';
+  const [isLoggedIn, setIsLoggedIn] = useState(() => !!getStoreToken() || isDemoUrl);
+
+  if (!isLoggedIn) {
+    return <KdsLoginPage onLogin={() => setIsLoggedIn(true)} />;
+  }
+
   return (
     <BrowserRouter>
       <Routes>
-        {/* 默认跳转到新版看板 */}
-        <Route path="/" element={<Navigate to="/board" replace />} />
+        {/* 默认跳转到门店选择页 */}
+        <Route path="/" element={<Navigate to="/select" replace />} />
 
-        {/* 新页面 */}
-        <Route path="/board" element={<KitchenBoard />} />
+        {/* 门店选择页 */}
+        <Route path="/select" element={<StoreSelectPage />} />
+
+        {/* 演示就绪看板（水平滚动，支持 ?store=wh&demo=true） */}
+        <Route path="/board" element={<KDSBoardPage />} />
+        {/* 旧版三列看板（保留） */}
+        <Route path="/board-kitchen" element={<KitchenBoard />} />
         <Route path="/zone-board" element={<ZoneKitchenBoard />} />
         <Route path="/booking-prep" element={<BookingPrepView />} />
         <Route path="/dept" element={<DeptSelector />} />
@@ -79,7 +96,7 @@ export default function App() {
         <Route path="/banquet-control" element={<BanquetControlScreen />} />
 
         {/* 原有页面（保留兼容） */}
-        <Route path="/board-legacy" element={<KDSBoardPage />} />
+        <Route path="/board-legacy" element={<KitchenBoard />} />
         <Route path="/history" element={<HistoryPage />} />
         <Route path="/stats" element={<StatsPage />} />
         <Route path="/config" element={<KDSConfigPage />} />

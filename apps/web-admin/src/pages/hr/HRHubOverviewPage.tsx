@@ -37,7 +37,7 @@ import {
 } from '@ant-design/icons';
 import { Pie } from '@ant-design/charts';
 import { useNavigate } from 'react-router-dom';
-import { txFetch } from '../../api/client';
+import { txFetchData } from '../../api/client';
 
 const { Title, Text } = Typography;
 
@@ -85,7 +85,7 @@ export default function HRHubOverviewPage() {
     let cancelled = false;
     (async () => {
       try {
-        const res = await txFetch<HubOverview>('/api/v1/alert-aggregation/hub-overview');
+        const res = await txFetchData<HubOverview>('/api/v1/alert-aggregation/hub-overview');
         if (!cancelled && res.data) setData(res.data);
       } catch (err) {
         console.error('Failed to load hub overview', err);

@@ -2,7 +2,10 @@
  * 迎宾端 — iPad/平板横屏应用
  * 预订台账 / 到店签到 / 排队叫号 / 桌台分配 / 宴请接待
  */
+import { useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, Link, useLocation } from 'react-router-dom';
+import { getStoreToken } from './api/index';
+import { ReceptionLoginPage } from './pages/ReceptionLoginPage';
 import { ReservationBoard } from './pages/ReservationBoard';
 import { CheckInPage } from './pages/CheckInPage';
 import { QueuePage } from './pages/QueuePage';
@@ -108,6 +111,17 @@ function SideNav() {
 }
 
 export default function App() {
+  const [isLoggedIn, setIsLoggedIn] = useState(() => !!getStoreToken());
+
+  if (!isLoggedIn) {
+    return (
+      <>
+        <style>{CSS_VARS}</style>
+        <ReceptionLoginPage onLogin={() => setIsLoggedIn(true)} />
+      </>
+    );
+  }
+
   return (
     <>
       <style>{CSS_VARS}</style>

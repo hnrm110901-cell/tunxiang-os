@@ -9,7 +9,7 @@ import { useEffect, useState } from 'react';
 import { Card, Col, Row, Space, Tag, message } from 'antd';
 import { ProColumns, ProTable } from '@ant-design/pro-components';
 import { Pie } from '@ant-design/charts';
-import { txFetch } from '../../../api';
+import { txFetchData } from '../../../api';
 
 // ─── 类型 ────────────────────────────────────────────────────────────────────
 
@@ -49,7 +49,7 @@ export default function GovernanceRiskStores() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    txFetch<RiskStoreResp>('/api/v1/hr/governance/risk-stores')
+    txFetchData<RiskStoreResp>('/api/v1/hr/governance/risk-stores')
       .then((resp) => setData(resp.data?.items ?? []))
       .catch(() => message.error('加载风险门店数据失败'))
       .finally(() => setLoading(false));

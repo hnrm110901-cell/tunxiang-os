@@ -6,7 +6,7 @@
  */
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { txFetch } from '../../../api';
+import { txFetchData } from '../../../api';
 
 // ---- 颜色常量 ----
 const BG   = '#0d1e28';
@@ -81,7 +81,7 @@ const FALLBACK_OPPORTUNITIES: Opportunity[] = [
 // ---- API ----
 async function fetchNewProductOpportunities(): Promise<{ items: Opportunity[]; isFallback: boolean }> {
   try {
-    const data = await txFetch<ApiOpportunityData>(
+    const data = await txFetchData<ApiOpportunityData>(
       '/api/v1/analytics/new-product-opportunities'
     );
     const rows = data?.opportunities || data?.items || [];

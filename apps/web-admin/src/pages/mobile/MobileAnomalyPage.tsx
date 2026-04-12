@@ -5,7 +5,7 @@
  */
 import { useState } from 'react';
 import { MobileLayout } from '../../components/MobileLayout';
-import { txFetch } from '../../api/client';
+import { txFetchData } from '../../api/client';
 
 // ─── 类型 ───
 
@@ -183,7 +183,7 @@ export function MobileAnomalyPage() {
     })));
 
     // 后端提交（静默失败）
-    txFetch(`/api/v1/anomalies/${id}/handle`, { method: 'POST' }).catch(() => {});
+    txFetchData(`/api/v1/anomalies/${id}/handle`, { method: 'POST' }).catch(() => {});
   };
 
   const totalUnhandled = groups.reduce((sum, g) => sum + g.items.filter(i => !i.handled).length, 0);

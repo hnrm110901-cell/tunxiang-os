@@ -3,7 +3,7 @@
  * Tab1: 供应商档案 | Tab2: 询价管理(RFQ) | Tab3: 风险评估
  *
  * 技术栈：Ant Design 5.x + ProComponents
- * API: supplierApi (txFetch) — try/catch 降级 Mock 数据
+ * API: supplierApi (txFetchData) — try/catch 降级 Mock 数据
  * 金额规范：存储/传输分(fen)，展示元(÷100)
  */
 import React, { useRef, useState, useCallback, useEffect } from 'react';

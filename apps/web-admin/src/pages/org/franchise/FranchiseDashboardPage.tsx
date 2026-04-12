@@ -45,7 +45,7 @@ import {
   TrophyOutlined,
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
-import { txFetch } from '../../../api';
+import { txFetchData } from '../../../api';
 
 const { Title, Text } = Typography;
 
@@ -243,9 +243,9 @@ export function FranchiseDashboardPage() {
     setStatsLoading(true);
     setLoading(true);
     const [statsRes, feesRes, franchiseeRes] = await Promise.allSettled([
-      txFetch<DashboardStats>('/api/v1/org/franchisees/stats'),
-      txFetch<{ items: RoyaltyBill[] }>('/api/v1/org/fees?status=overdue'),
-      txFetch<{ items: Franchisee[] }>('/api/v1/org/franchisees?status=active&page_size=5'),
+      txFetchData<DashboardStats>('/api/v1/org/franchisees/stats'),
+      txFetchData<{ items: RoyaltyBill[] }>('/api/v1/org/fees?status=overdue'),
+      txFetchData<{ items: Franchisee[] }>('/api/v1/org/franchisees?status=active&page_size=5'),
     ]);
 
     if (statsRes.status === 'fulfilled') {
@@ -278,9 +278,9 @@ export function FranchiseDashboardPage() {
   const loadDetail = async (id: string) => {
     setDrawerLoading(true);
     const [detailRes, kpiRes, billsRes] = await Promise.allSettled([
-      txFetch<FranchiseeDetail>(`/api/v1/org/franchisees/${id}`),
-      txFetch<{ items: KpiMonth[] }>(`/api/v1/org/franchisees/${id}/kpi`),
-      txFetch<{ items: RoyaltyBill[] }>(`/api/v1/org/fees?franchisee_id=${id}`),
+      txFetchData<FranchiseeDetail>(`/api/v1/org/franchisees/${id}`),
+      txFetchData<{ items: KpiMonth[] }>(`/api/v1/org/franchisees/${id}/kpi`),
+      txFetchData<{ items: RoyaltyBill[] }>(`/api/v1/org/fees?franchisee_id=${id}`),
     ]);
 
     const base = franchisees.find(f => f.id === id) ?? null;
@@ -310,7 +310,7 @@ export function FranchiseDashboardPage() {
     setCreateLoading(true);
     try {
       const values = await createForm.validateFields();
-      await txFetch('/api/v1/org/franchisees', {
+      await txFetchData('/api/v1/org/franchisees', {
         method: 'POST',
         body: JSON.stringify({
           ...values,

@@ -5,7 +5,7 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
-import { txFetch } from '../api';
+import { txFetchData } from '../api';
 
 // ─── 类型 ───
 
@@ -293,7 +293,7 @@ export function HomePage() {
     let cancelled = false;
     setLoading(true);
 
-    txFetch<HomeData>('/api/v1/dashboard/home')
+    txFetchData<HomeData>('/api/v1/dashboard/home')
       .then(res => {
         if (!cancelled) setData(res);
       })

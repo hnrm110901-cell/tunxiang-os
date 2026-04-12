@@ -1,6 +1,7 @@
 from .ai_marketing_orchestrator import AiMarketingOrchestratorAgent
 from .ai_waiter import AIWaiterAgent
 from .banquet_growth import BanquetGrowthAgent
+from .cost_diagnosis import CostDiagnosisAgent
 
 # Intel Agents (情报Agent)
 from .competitor_watch import CompetitorWatchAgent
@@ -90,4 +91,6 @@ ALL_SKILL_AGENTS = [
     ClosingAgent,
     # AI营销编排 Agent (v207)
     AiMarketingOrchestratorAgent,
+    # 成本核算Agent (P1)
+    CostDiagnosisAgent,
 ]

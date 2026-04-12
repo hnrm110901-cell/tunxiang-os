@@ -2,6 +2,8 @@
  * LoginPage — 登录页面
  */
 import { useState, FormEvent } from 'react';
+import { useAuthStore } from '../store/authStore';
+import { TxApiError } from '../api/client';
 
 interface LoginPageProps { onLogin: () => void; }
 
@@ -10,23 +12,21 @@ export function LoginPage({ onLogin }: LoginPageProps) {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const login = useAuthStore((s) => s.login);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault(); setError(''); setLoading(true);
     try {
-      const res = await fetch('/api/v1/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username, password }) });
-      const json = await res.json();
-      if (json.ok) {
-        localStorage.setItem('tx_token', json.data.token);
-        localStorage.setItem('tx_user', JSON.stringify(json.data.user));
-        const u = json.data.user as { tenant_id?: string } | undefined;
-        if (u?.tenant_id) localStorage.setItem('tx_tenant_id', u.tenant_id);
-        onLogin();
+      await login(username, password);
+      onLogin();
+    } catch (err) {
+      if (err instanceof TxApiError) {
+        setError(err.message || '用户名或密码错误');
+      } else if (err instanceof TypeError) {
+        setError('网络错误，请检查连接');
       } else {
-        setError(json.error?.message || '登录失败');
+        setError('登录失败，请稍后重试');
       }
-    } catch (_err) {
-      setError('网络错误，请检查连接');
     } finally {
       setLoading(false);
     }

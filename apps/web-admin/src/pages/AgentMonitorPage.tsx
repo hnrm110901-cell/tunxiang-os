@@ -16,7 +16,7 @@ import {
   Typography,
 } from 'antd';
 import { StatisticCard } from '@ant-design/pro-components';
-import { txFetch } from '../api';
+import { txFetchData } from '../api';
 
 const { Text, Paragraph } = Typography;
 
@@ -217,7 +217,7 @@ export function AgentMonitorPage() {
   // 拉取 Agent 状态
   const fetchStatus = useCallback(async () => {
     try {
-      const data = await txFetch<AgentStatusData>('/api/v1/agent-monitor/status');
+      const data = await txFetchData<AgentStatusData>('/api/v1/agent-monitor/status');
       setStatusData(data);
     } catch (err) {
       // 静默失败，保留上次数据
@@ -231,7 +231,7 @@ export function AgentMonitorPage() {
     setDecLoading(true);
     try {
       const qs = agentId ? `?agent_id=${encodeURIComponent(agentId)}&limit=20` : '?limit=20';
-      const data = await txFetch<DecisionRecord[]>(`/api/v1/agent-monitor/decisions${qs}`);
+      const data = await txFetchData<DecisionRecord[]>(`/api/v1/agent-monitor/decisions${qs}`);
       setDecisions(data);
     } catch {
       setDecisions([]);

@@ -3,7 +3,7 @@
  * 调用 POST /api/v1/brain/menu/optimize，展示AI排菜方案
  */
 import { useState } from 'react';
-import { txFetch, txFetchData } from '../../api';
+import { txFetchData } from '../../api';
 
 // ─── 类型定义 ───
 
@@ -128,7 +128,7 @@ export function MenuOptimizePage() {
     setError(null);
     setResult(null);
     try {
-      const resp = await txFetch<MenuOptimizeResult>('/api/v1/brain/menu-optimizer', {
+      const resp = await txFetchData<MenuOptimizeResult>('/api/v1/brain/menu-optimizer', {
         method: 'POST',
         body: JSON.stringify({ store_id: storeId, date, meal_period: mealPeriod }),
       });

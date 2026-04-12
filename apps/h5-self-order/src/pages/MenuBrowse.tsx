@@ -7,6 +7,43 @@ import type { Category, DishItem, AiRecommendation } from '@/api/menuApi';
 import DishCard from '@/components/DishCard';
 import CartBar from '@/components/CartBar';
 
+// ─── 尝在一起演示 Mock 数据 ──────────────────────────────────────────────────
+
+const MOCK_CATEGORIES: Category[] = [
+  { id: 'signature', name: '招牌', icon: '⭐', sortOrder: 1 },
+  { id: 'hunan',     name: '湘菜', icon: '🌶️', sortOrder: 2 },
+  { id: 'cold',      name: '凉菜', icon: '🥗', sortOrder: 3 },
+  { id: 'soup',      name: '汤羹', icon: '🍲', sortOrder: 4 },
+  { id: 'staple',    name: '主食', icon: '🍚', sortOrder: 5 },
+  { id: 'drinks',    name: '饮品', icon: '🥤', sortOrder: 6 },
+];
+
+function makeDish(id: string, name: string, catId: string, price: number, desc: string, tags: DishItem['tags'] = []): DishItem {
+  return {
+    id, name, categoryId: catId, description: desc, price,
+    images: [], tags, allergens: [], customOptions: [], soldOut: false, sortOrder: 1,
+  };
+}
+
+const MOCK_DISHES: DishItem[] = [
+  makeDish('d001', '剁椒鱼头', 'signature', 88, '新鲜花鲢，酱料手工腌制48小时，鲜辣过瘾', [{ type: 'signature', label: '招牌' }, { type: 'spicy2', label: '中辣' }]),
+  makeDish('d002', '口味虾', 'signature', 128, '青壳龙虾，秘制口味酱现炒，肉质Q弹', [{ type: 'signature', label: '招牌' }, { type: 'spicy3', label: '特辣' }]),
+  makeDish('d003', '毛氏红烧肉', 'signature', 68, '五花肉精选，冰糖入味，软糯不腻', [{ type: 'signature', label: '招牌' }]),
+  makeDish('d004', '农家小炒肉', 'hunan', 48, '土猪五花，搭配青椒爆炒，香辣鲜嫩', [{ type: 'spicy2', label: '中辣' }]),
+  makeDish('d005', '湘西土匪鸭', 'hunan', 68, '麻辣干香，湘西传统做法', [{ type: 'spicy3', label: '特辣' }]),
+  makeDish('d006', '剁椒蒸蛋', 'hunan', 28, '嫩豆腐配剁椒，口感滑嫩', [{ type: 'spicy1', label: '微辣' }]),
+  makeDish('d007', '辣椒炒腊肉', 'hunan', 52, '自制腊肉，搭配新鲜辣椒，烟熏香浓', [{ type: 'spicy2', label: '中辣' }]),
+  makeDish('d008', '擂辣椒', 'cold', 26, '传统手工擂制，鲜辣开胃', [{ type: 'spicy2', label: '中辣' }]),
+  makeDish('d009', '酸辣蕨根粉', 'cold', 24, '手工蕨根粉，酸爽开胃', [{ type: 'spicy1', label: '微辣' }]),
+  makeDish('d010', '皮蛋豆腐', 'cold', 22, '嫩豆腐配皮蛋，淋上特调酱汁', []),
+  makeDish('d011', '猪肚鸡汤', 'soup', 58, '滋补老母鸡与猪肚慢炖4小时', []),
+  makeDish('d012', '酸萝卜老鸭汤', 'soup', 52, '酸萝卜去腻，老鸭鲜甜', []),
+  makeDish('d013', '剁椒蛋炒饭', 'staple', 22, '米饭粒粒分明，剁椒提香', [{ type: 'spicy1', label: '微辣' }]),
+  makeDish('d014', '手工米粉', 'staple', 18, '湘式手工米粉，劲道爽滑', []),
+  makeDish('d015', '冰镇梅子汤', 'drinks', 12, '酸甜开胃，解辣必备', []),
+  makeDish('d016', '湘茶冷泡茶', 'drinks', 16, '本地茶农直供，清凉回甘', []),
+];
+
 /** 菜单浏览页 — 左分类 + 右菜品列表 */
 export default function MenuBrowse() {
   const { t } = useLang();
@@ -34,9 +71,16 @@ export default function MenuBrowse() {
     fetchCategories(storeId).then((cats) => {
       setCategories(cats);
       if (cats.length > 0) setActiveCat(cats[0].id);
-    }).catch(() => { /* mock fallback */ });
+    }).catch(() => {
+      // API 不可用时使用演示 mock 数据
+      setCategories(MOCK_CATEGORIES);
+      setActiveCat(MOCK_CATEGORIES[0].id);
+    });
 
-    fetchDishes(storeId).then(setDishes).catch(() => { /* mock fallback */ });
+    fetchDishes(storeId).then(setDishes).catch(() => {
+      // API 不可用时使用演示 mock 数据
+      setDishes(MOCK_DISHES);
+    });
   }, [storeId, navigate]);
 
   // AI推荐

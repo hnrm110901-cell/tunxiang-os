@@ -41,7 +41,7 @@ import {
   TeamOutlined,
   ClockCircleOutlined,
 } from '@ant-design/icons';
-import { txFetch, txFetchData } from '../../api';
+import { txFetchData } from '../../api';
 
 const { Title, Text } = Typography;
 

@@ -49,7 +49,7 @@ import {
 } from '@ant-design/icons';
 import { Line } from '@ant-design/charts';
 import dayjs from 'dayjs';
-import { txFetch } from '../../api/client';
+import { txFetchData } from '../../api/client';
 
 const { Title, Text } = Typography;
 
@@ -157,7 +157,7 @@ export default function StoreReadinessPage() {
   const fetchDashboard = useCallback(async () => {
     setDashLoading(true);
     try {
-      const res = await txFetch<DashboardData>('/api/v1/store-readiness/dashboard');
+      const res = await txFetchData<DashboardData>('/api/v1/store-readiness/dashboard');
       setDashboard(res.data);
     } catch (err) {
       message.error('获取仪表板数据失败');
@@ -169,7 +169,7 @@ export default function StoreReadinessPage() {
   const fetchToday = useCallback(async () => {
     setTodayLoading(true);
     try {
-      const res = await txFetch<{ items: ReadinessRecord[] }>('/api/v1/store-readiness/today');
+      const res = await txFetchData<{ items: ReadinessRecord[] }>('/api/v1/store-readiness/today');
       setTodayItems(res.data?.items ?? []);
     } catch (err) {
       message.error('获取今日就绪度失败');
@@ -182,7 +182,7 @@ export default function StoreReadinessPage() {
     if (!trendStoreId) return;
     setTrendLoading(true);
     try {
-      const res = await txFetch<{ items: TrendPoint[] }>(
+      const res = await txFetchData<{ items: TrendPoint[] }>(
         `/api/v1/store-readiness/trend?store_id=${encodeURIComponent(trendStoreId)}&days=${trendDays}`,
       );
       setTrendData(res.data?.items ?? []);
@@ -206,7 +206,7 @@ export default function StoreReadinessPage() {
 
   const handleDelete = async (id: string) => {
     try {
-      await txFetch(`/api/v1/store-readiness/${id}`, { method: 'DELETE' });
+      await txFetchData(`/api/v1/store-readiness/${id}`, { method: 'DELETE' });
       message.success('删除成功');
       tableRef.current?.reload();
       fetchDashboard();
@@ -479,7 +479,7 @@ export default function StoreReadinessPage() {
             query.set('sort', sort.overall_score === 'ascend' ? 'overall_score' : '-overall_score');
           }
           try {
-            const res = await txFetch<{ items: ReadinessRecord[]; total: number }>(
+            const res = await txFetchData<{ items: ReadinessRecord[]; total: number }>(
               `/api/v1/store-readiness?${query.toString()}`,
             );
             return {
@@ -603,13 +603,13 @@ export default function StoreReadinessPage() {
               },
             };
             if (detailRecord) {
-              await txFetch(`/api/v1/store-readiness/${detailRecord.id}`, {
+              await txFetchData(`/api/v1/store-readiness/${detailRecord.id}`, {
                 method: 'PUT',
                 body: JSON.stringify(body),
               });
               message.success('更新成功');
             } else {
-              await txFetch('/api/v1/store-readiness', {
+              await txFetchData('/api/v1/store-readiness', {
                 method: 'POST',
                 body: JSON.stringify(body),
               });

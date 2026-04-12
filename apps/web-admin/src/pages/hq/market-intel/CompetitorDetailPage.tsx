@@ -5,7 +5,7 @@
  */
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { txFetch } from '../../../api';
+import { txFetchData } from '../../../api';
 
 // ---- 颜色常量（深色主题） ----
 const BG_0 = '#0d1e28';
@@ -420,7 +420,7 @@ export function CompetitorDetailPage() {
       if (showRefreshing) setRefreshing(true);
       else setLoading(true);
       setError(null);
-      const data = await txFetch<CompetitorDetail>(
+      const data = await txFetchData<CompetitorDetail>(
         `/api/v1/analytics/competitors/${encodeURIComponent(competitorId)}`
       );
       setDetail(data);

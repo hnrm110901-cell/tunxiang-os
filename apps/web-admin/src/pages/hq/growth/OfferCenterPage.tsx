@@ -5,7 +5,7 @@
  * 数据来源: GET/POST /api/v1/member/promotions
  */
 import { useState, useEffect, useCallback } from 'react';
-import { txFetch } from '../../../api';
+import { txFetchData } from '../../../api';
 
 // ---- 颜色常量 ----
 const BG_1 = '#112228';
@@ -339,7 +339,7 @@ function CreateOfferForm({ onSuccess }: { onSuccess: () => void }) {
     setSubmitting(true);
     setSubmitError(null);
     try {
-      await txFetch('/api/v1/member/promotions', {
+      await txFetchData('/api/v1/member/promotions', {
         method: 'POST',
         body: JSON.stringify({ ...form, status }),
       });
@@ -662,7 +662,7 @@ export function OfferCenterPage() {
         size: String(pageSize),
       });
       if (statusFilter !== 'all') params.set('status', statusFilter);
-      const resp = await txFetch<PromotionListResponse>(`/api/v1/member/promotions?${params}`);
+      const resp = await txFetchData<PromotionListResponse>(`/api/v1/member/promotions?${params}`);
       setTemplates(resp.items ?? []);
       setTotal(resp.total ?? 0);
     } catch (e: unknown) {
@@ -678,7 +678,7 @@ export function OfferCenterPage() {
     setLoadingRedemption(true);
     setErrorRedemption(null);
     try {
-      const resp = await txFetch<RedemptionStatsResponse>('/api/v1/member/promotions/redemption-stats?days=7');
+      const resp = await txFetchData<RedemptionStatsResponse>('/api/v1/member/promotions/redemption-stats?days=7');
       setRedemptionData(resp.items ?? []);
     } catch (e: unknown) {
       setErrorRedemption(e instanceof Error ? e.message : '加载失败');

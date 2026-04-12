@@ -30,7 +30,7 @@ function detectDevice(): DeviceInfo {
   const isAndroidTablet = /Android/.test(ua) && !/Mobile/.test(ua);
   const isPad = isIPad || isAndroidTablet || (window.innerWidth >= 768 && 'ontouchstart' in window);
   const isLandscape = window.innerWidth > window.innerHeight;
-  const hasNativeBridge = !!(window as Record<string, unknown>).TXBridge;
+  const hasNativeBridge = !!(window as unknown as Record<string, unknown>).TXBridge;
 
   return {
     isPad,
@@ -154,7 +154,7 @@ export function getPosHostUrl(): string {
  * 通过 HTTP 发送外设指令到安卓 POS（iPad/浏览器环境使用）
  */
 export async function sendToPOS(action: string, payload: Record<string, unknown> = {}): Promise<void> {
-  const bridge = (window as Record<string, unknown>).TXBridge as Record<string, Function> | undefined;
+  const bridge = (window as unknown as Record<string, unknown>).TXBridge as Record<string, Function> | undefined;
   if (bridge && typeof bridge[action] === 'function') {
     // 安卓 POS 环境：直接调用 JS Bridge
     bridge[action](JSON.stringify(payload));

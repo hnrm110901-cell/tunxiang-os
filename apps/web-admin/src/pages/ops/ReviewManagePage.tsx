@@ -18,7 +18,7 @@ import {
   StarFilled, MessageOutlined, EyeInvisibleOutlined,
   BarChartOutlined, CommentOutlined,
 } from '@ant-design/icons';
-import { txFetch } from '../../api';
+import { txFetchData } from '../../api';
 
 const { TextArea } = Input;
 const { Text, Paragraph } = Typography;
@@ -278,7 +278,7 @@ export function ReviewManagePage() {
   const loadStats = async () => {
     setStatsLoading(true);
     try {
-      const data = await txFetch<StatsData>('/api/v1/trade/reviews/stats');
+      const data = await txFetchData<StatsData>('/api/v1/trade/reviews/stats');
       setStats(data);
     } catch {
       // Mock fallback
@@ -311,7 +311,7 @@ export function ReviewManagePage() {
     }
     setReplyLoading(true);
     try {
-      await txFetch(`/api/v1/trade/reviews/${replyModal.reviewId}/reply`, {
+      await txFetchData(`/api/v1/trade/reviews/${replyModal.reviewId}/reply`, {
         method: 'POST',
         body: JSON.stringify({ content: replyText }),
       });
@@ -329,7 +329,7 @@ export function ReviewManagePage() {
   // ── 隐藏评价 ──
   const handleHide = async (reviewId: string) => {
     try {
-      await txFetch(`/api/v1/trade/reviews/${reviewId}/hide`, { method: 'POST' });
+      await txFetchData(`/api/v1/trade/reviews/${reviewId}/hide`, { method: 'POST' });
       message.success('评价已隐藏');
       actionRef.current?.reload();
     } catch {
@@ -807,7 +807,7 @@ export function ReviewManagePage() {
             qp.set('size', String(params.pageSize ?? 20));
 
             try {
-              const data = await txFetch<ReviewListData>(
+              const data = await txFetchData<ReviewListData>(
                 `/api/v1/trade/reviews?${qp.toString()}`
               );
               // 同步顶部统计

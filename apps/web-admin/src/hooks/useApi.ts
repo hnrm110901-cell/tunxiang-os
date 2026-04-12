@@ -7,7 +7,7 @@
  * - 缓存（相同 URL 在 cacheMs 内不重复请求）
  */
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { apiRequest, ApiError, ApiRequestOptions } from '../api/client';
+import { txFetchData, ApiError } from '../api/client';
 
 // ─── 简易缓存 ───
 
@@ -21,7 +21,7 @@ const DEFAULT_CACHE_MS = 5_000;
 
 // ─── useApi ───
 
-export interface UseApiOptions<T> extends ApiRequestOptions {
+export interface UseApiOptions<T> extends RequestInit {
   /** 自动刷新间隔（毫秒），0 或不传则不自动刷新 */
   interval?: number;
   /** 缓存有效期（毫秒），默认 5000 */
@@ -79,7 +79,7 @@ export function useApi<T>(
     setError(null);
 
     try {
-      const result = await apiRequest<T>(url, requestOptions);
+      const result = await txFetchData<T>(url, requestOptions);
       if (!mountedRef.current) return;
 
       setData(result);
@@ -94,7 +94,7 @@ export function useApi<T>(
 
       const apiErr = err instanceof ApiError
         ? err
-        : new ApiError(err instanceof Error ? err.message : '未知错误', 0);
+        : new ApiError(err instanceof Error ? err.message : '未知错误', 'UNKNOWN', 0);
       setError(apiErr);
 
       // Mock 降级
@@ -141,7 +141,7 @@ export function useApi<T>(
 
 // ─── useMutation ───
 
-export interface UseMutationOptions extends Omit<ApiRequestOptions, 'body'> {
+export interface UseMutationOptions extends Omit<RequestInit, 'body'> {
   /** 成功后的回调 */
   onSuccess?: (data: unknown) => void;
   /** 失败后的回调 */
@@ -183,10 +183,10 @@ export function useMutation<TData = unknown, TBody = unknown>(
     setSuccess(false);
 
     try {
-      const result = await apiRequest<TData>(url, {
+      const result = await txFetchData<TData>(url, {
         ...requestOptions,
         method,
-        body,
+        body: body !== undefined ? JSON.stringify(body) : undefined,
       });
       if (!mountedRef.current) return null;
 
@@ -199,7 +199,7 @@ export function useMutation<TData = unknown, TBody = unknown>(
 
       const apiErr = err instanceof ApiError
         ? err
-        : new ApiError(err instanceof Error ? err.message : '未知错误', 0);
+        : new ApiError(err instanceof Error ? err.message : '未知错误', 'UNKNOWN', 0);
       setError(apiErr);
       onError?.(apiErr);
       return null;

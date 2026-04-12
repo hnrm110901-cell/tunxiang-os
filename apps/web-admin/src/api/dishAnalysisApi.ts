@@ -2,7 +2,7 @@
  * 菜品分析 API — /api/v1/analysis/dish/*
  * 销量排行、毛利排行、退菜率、四象限、菜单优化建议
  */
-import { txFetch } from './index';
+import { txFetchData } from './index';
 
 // ─── 类型 ───
 
@@ -57,7 +57,7 @@ export async function fetchDishSalesRank(
   period: 'day' | 'week' | 'month' = 'week',
   limit = 20,
 ): Promise<{ items: DishSalesRank[] }> {
-  return txFetch(
+  return txFetchData<{ items: DishSalesRank[] }>(
     `/api/v1/analysis/dish/sales-rank?store_id=${encodeURIComponent(storeId)}&period=${period}&limit=${limit}`,
   );
 }
@@ -68,7 +68,7 @@ export async function fetchDishMarginRank(
   period: 'day' | 'week' | 'month' = 'week',
   limit = 20,
 ): Promise<{ items: DishMarginRank[] }> {
-  return txFetch(
+  return txFetchData<{ items: DishMarginRank[] }>(
     `/api/v1/analysis/dish/margin-rank?store_id=${encodeURIComponent(storeId)}&period=${period}&limit=${limit}`,
   );
 }
@@ -78,7 +78,7 @@ export async function fetchDishReturnRate(
   storeId: string,
   period: 'day' | 'week' | 'month' = 'week',
 ): Promise<{ items: DishReturnRate[] }> {
-  return txFetch(
+  return txFetchData<{ items: DishReturnRate[] }>(
     `/api/v1/analysis/dish/return-rate?store_id=${encodeURIComponent(storeId)}&period=${period}`,
   );
 }
@@ -88,7 +88,7 @@ export async function fetchDishQuadrant(
   storeId: string,
   period: 'day' | 'week' | 'month' = 'month',
 ): Promise<{ items: DishQuadrant[] }> {
-  return txFetch(
+  return txFetchData<{ items: DishQuadrant[] }>(
     `/api/v1/analysis/dish/quadrant?store_id=${encodeURIComponent(storeId)}&period=${period}`,
   );
 }
@@ -97,7 +97,7 @@ export async function fetchDishQuadrant(
 export async function fetchMenuSuggestions(
   storeId: string,
 ): Promise<{ items: MenuSuggestion[] }> {
-  return txFetch(
+  return txFetchData<{ items: MenuSuggestion[] }>(
     `/api/v1/analysis/dish/suggestions?store_id=${encodeURIComponent(storeId)}`,
   );
 }

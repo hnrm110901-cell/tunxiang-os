@@ -36,7 +36,6 @@ type Period = 'today' | 'week' | 'month';
 // ─── Constants ───
 
 const API_BASE = (window as any).__STORE_API_BASE__ || '';
-const TENANT_ID = (window as any).__TENANT_ID__ || '';
 const STORE_ID = (window as any).__STORE_ID__ || '';
 
 const STATUS_COLORS = {
@@ -153,15 +152,12 @@ export function StationProfitPage() {
       return;
     }
     try {
-      const res = await txFetch(
+      const data = await txFetch<ProfitSummary>(
         `${API_BASE}/api/v1/kds/station-profit?store_id=${STORE_ID}&period=${p}`,
         undefined,
-        TENANT_ID,
       );
-      if (res.ok) {
-        setSummary(res.data as ProfitSummary);
-        setError(null);
-      }
+      setSummary(data);
+      setError(null);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : '加载失败');
     } finally {

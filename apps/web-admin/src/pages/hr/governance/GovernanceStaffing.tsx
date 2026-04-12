@@ -9,7 +9,7 @@ import { useEffect, useState } from 'react';
 import { Card, Col, Row, Tag, message } from 'antd';
 import { ProColumns, ProTable } from '@ant-design/pro-components';
 import { Column } from '@ant-design/charts';
-import { txFetch } from '../../../api';
+import { txFetchData } from '../../../api';
 
 // ─── 类型 ────────────────────────────────────────────────────────────────────
 
@@ -35,7 +35,7 @@ export default function GovernanceStaffing() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    txFetch<StaffingResp>('/api/v1/hr/governance/staffing')
+    txFetchData<StaffingResp>('/api/v1/hr/governance/staffing')
       .then((resp) => setData(resp.data?.items ?? []))
       .catch(() => message.error('加载编制数据失败'))
       .finally(() => setLoading(false));

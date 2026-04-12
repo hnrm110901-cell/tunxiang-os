@@ -14,10 +14,11 @@ TENANTS = [
     {
         "tenant_id": uuid.UUID("10000000-0000-0000-0000-000000000001"),
         "name": "尝在一起", "brand_id": "brand_czyz", "cuisine": "湘菜",
-        "daily_orders": (80, 120), "avg_ticket_fen": (6000, 8000),
+        "daily_orders": (100, 160), "avg_ticket_fen": (13000, 18000),
         "stores": [
-            {"name": "尝在一起·芙蓉路店", "code": "CZYZ-FRR", "city": "长沙", "district": "芙蓉区", "seats": 80, "area": 200},
-            {"name": "尝在一起·岳麓店", "code": "CZYZ-YL", "city": "长沙", "district": "岳麓区", "seats": 60, "area": 150},
+            {"name": "尝在一起·文化城店", "code": "CZYZ-WH001", "city": "长沙", "district": "芙蓉区", "seats": 180, "area": 450},
+            {"name": "尝在一起·浏小鲜", "code": "CZYZ-LXX001", "city": "长沙", "district": "开福区", "seats": 120, "area": 300},
+            {"name": "尝在一起·永安店", "code": "CZYZ-YA001", "city": "长沙", "district": "天心区", "seats": 100, "area": 260},
         ],
         "dishes": [
             {"name": "剁椒鱼头", "price": 8800, "cost": 3200, "cat": "招牌菜"},

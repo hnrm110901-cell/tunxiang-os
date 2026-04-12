@@ -11,7 +11,7 @@ import {
   RobotOutlined, CheckCircleOutlined, CloseCircleOutlined,
   SendOutlined, ReloadOutlined, ExclamationCircleOutlined,
 } from '@ant-design/icons';
-import { txFetch } from '../../../api';
+import { txFetchData } from '../../../api';
 import { reviewSuggestion, publishSuggestion } from '../../../api/growthHubApi';
 import type { AgentSuggestion } from '../../../api/growthHubApi';
 
@@ -76,7 +76,7 @@ export function AgentWorkbenchPage() {
   const fetchSuggestions = useCallback(async () => {
     setLoading(true);
     try {
-      const resp = await txFetch<{ items: AgentSuggestion[]; total: number }>(
+      const resp = await txFetchData<{ items: AgentSuggestion[]; total: number }>(
         '/api/v1/growth/agent-suggestions?review_state=pending_review&page=1&size=50'
       );
       if (resp.data) {
@@ -131,7 +131,7 @@ export function AgentWorkbenchPage() {
   const fetchMetrics = useCallback(async () => {
     setMetricsLoading(true);
     try {
-      const resp = await txFetch<MetricsData>('/api/v1/growth/agent-suggestions/metrics?days=7');
+      const resp = await txFetchData<MetricsData>('/api/v1/growth/agent-suggestions/metrics?days=7');
       if (resp.data) setMetrics(resp.data);
     } catch (err) {
       console.error('fetch metrics error', err);

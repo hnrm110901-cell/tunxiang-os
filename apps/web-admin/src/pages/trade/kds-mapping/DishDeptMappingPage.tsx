@@ -43,7 +43,7 @@ import {
   WarningOutlined,
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
-import { txFetch } from '../../../api';
+import { txFetchData } from '../../../api';
 
 const { Title, Text } = Typography;
 
@@ -86,16 +86,16 @@ interface CatalogDishOption {
 // ─── API 函数 ─────────────────────────────────────────────────────────────────
 
 async function fetchDepartments(storeId: string): Promise<{ items: KdsDepartment[]; total: number }> {
-  return txFetch(`/api/v1/kds/departments?store_id=${storeId}`);
+  return txFetchData(`/api/v1/kds/departments?store_id=${storeId}`);
 }
 
 async function fetchMappings(storeId: string, deptId: string): Promise<{ items: DishDeptMapping[]; total: number }> {
   const params = new URLSearchParams({ store_id: storeId, dept_id: deptId });
-  return txFetch(`/api/v1/kds/dish-dept-mappings?${params.toString()}`);
+  return txFetchData(`/api/v1/kds/dish-dept-mappings?${params.toString()}`);
 }
 
 async function deleteMapping(id: string): Promise<void> {
-  return txFetch(`/api/v1/kds/dish-dept-mappings/${id}`, { method: 'DELETE' });
+  return txFetchData(`/api/v1/kds/dish-dept-mappings/${id}`, { method: 'DELETE' });
 }
 
 async function batchCreateMappings(payload: {
@@ -104,27 +104,27 @@ async function batchCreateMappings(payload: {
   dish_ids: string[];
   is_primary: boolean;
 }): Promise<{ created: number }> {
-  return txFetch('/api/v1/kds/dish-dept-mappings/batch', {
+  return txFetchData('/api/v1/kds/dish-dept-mappings/batch', {
     method: 'POST',
     body: JSON.stringify(payload),
   });
 }
 
 async function patchMapping(id: string, payload: Partial<DishDeptMapping>): Promise<DishDeptMapping> {
-  return txFetch(`/api/v1/kds/dish-dept-mappings/${id}`, {
+  return txFetchData(`/api/v1/kds/dish-dept-mappings/${id}`, {
     method: 'PATCH',
     body: JSON.stringify(payload),
   });
 }
 
 async function fetchUnassignedDishes(storeId: string): Promise<UnassignedDishInfo> {
-  return txFetch(`/api/v1/kds/dish-dept-mappings/unassigned?store_id=${storeId}`);
+  return txFetchData(`/api/v1/kds/dish-dept-mappings/unassigned?store_id=${storeId}`);
 }
 
 async function fetchCatalogDishes(storeId: string, keyword?: string): Promise<{ items: CatalogDishOption[] }> {
   const params = new URLSearchParams({ store_id: storeId });
   if (keyword) params.set('keyword', keyword);
-  return txFetch(`/api/v1/menu/dishes?${params.toString()}`);
+  return txFetchData(`/api/v1/menu/dishes?${params.toString()}`);
 }
 
 // ─── 门店选项类型 ────────────────────────────────────────────────────────────
@@ -332,7 +332,7 @@ const BatchImportModal: React.FC<BatchImportModalProps> = ({
 
 async function fetchStores(): Promise<StoreOption[]> {
   try {
-    const res = await txFetch<{ items: StoreOption[] }>('/api/v1/menu/dish-dept-mappings/stores');
+    const res = await txFetchData<{ items: StoreOption[] }>('/api/v1/menu/dish-dept-mappings/stores');
     return res?.items ?? [];
   } catch {
     return [];

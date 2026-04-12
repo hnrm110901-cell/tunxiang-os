@@ -26,7 +26,6 @@ interface CallingItem {
 
 const WS_URL = (window as any).__KDS_WS_URL__ || '';
 const STORE_NAME = (window as any).__STORE_NAME__ || '屯象餐厅';
-const BRAND_LOGO = (window as any).__BRAND_LOGO__ || '';
 
 // 叫号播报停留时间
 const CALLING_DISPLAY_SEC = 15;

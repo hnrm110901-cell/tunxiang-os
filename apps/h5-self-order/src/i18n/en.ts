@@ -88,6 +88,22 @@ export const en: Record<keyof typeof zh, string> = {
   submitFeedback: 'Submit',
   feedbackReward: 'Earn {points} points after submitting',
 
+  payResultSuccess: 'Payment Successful',
+  payResultFailed: 'Payment Failed',
+  payResultRetryHint: 'Please go back and try again',
+  payResultOrderNo: 'Order No.',
+  payResultAmount: 'Amount Paid',
+  payResultEstTime: 'Estimated Wait',
+  payResultMinutes: 'min',
+  payResultProgress: 'Order Progress',
+  payResultViewOrder: 'View Order',
+  payResultContinue: 'Continue Ordering',
+
+  demoMode: 'Demo Mode',
+  demoWelcome: 'Welcome',
+  demoLoadingHint: 'Entering menu...',
+  cashPay: 'Pay at Counter',
+
   back: 'Back',
   confirm: 'Confirm',
   cancel: 'Cancel',

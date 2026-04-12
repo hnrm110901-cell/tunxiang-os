@@ -37,7 +37,7 @@ export interface ManagerAlert {
   is_read: boolean;
 }
 
-export interface StoreComparison {
+export interface ManagerStoreComparison {
   store_id: string;
   store_name: string;
   today_revenue_fen: number;
@@ -100,9 +100,9 @@ export async function getTodayStats(storeId: string): Promise<StoreDailyStats> {
 /**
  * 多门店今日汇总对比
  */
-export async function getMultiStoreOverview(storeIds: string[]): Promise<StoreComparison[]> {
+export async function getMultiStoreOverview(storeIds: string[]): Promise<ManagerStoreComparison[]> {
   const qs = storeIds.map((id) => `store_ids=${encodeURIComponent(id)}`).join('&');
-  return txFetchData<StoreComparison[]>(
+  return txFetchData<ManagerStoreComparison[]>(
     `/api/v1/analytics/store-comparison?${qs}&period=today`,
   );
 }

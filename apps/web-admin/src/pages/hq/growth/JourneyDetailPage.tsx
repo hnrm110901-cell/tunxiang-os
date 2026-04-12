@@ -5,7 +5,7 @@
  */
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { txFetch } from '../../../api';
+import { txFetchData } from '../../../api';
 
 // ---- 颜色常量 ----
 const BG_0 = '#0d1e28';
@@ -533,7 +533,7 @@ export function JourneyDetailPage() {
     setLoading(true);
     setError(null);
     try {
-      const data = await txFetch<JourneyDetail>(`/api/v1/member/journeys/${journeyId}`);
+      const data = await txFetchData<JourneyDetail>(`/api/v1/member/journeys/${journeyId}`);
       setJourney(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : '加载旅程数据失败');
@@ -546,7 +546,7 @@ export function JourneyDetailPage() {
     if (!journeyId) return;
     setLogsLoading(true);
     try {
-      const data = await txFetch<{ items: ExecutionLog[]; total: number }>(
+      const data = await txFetchData<{ items: ExecutionLog[]; total: number }>(
         `/api/v1/member/journeys/${journeyId}/logs?size=100`
       );
       setLogs(data.items ?? []);
@@ -567,7 +567,7 @@ export function JourneyDetailPage() {
     const newStatus: JourneyStatus = journey.status === 'active' ? 'paused' : 'active';
     setStatusLoading(true);
     try {
-      const updated = await txFetch<JourneyDetail>(
+      const updated = await txFetchData<JourneyDetail>(
         `/api/v1/member/journeys/${journeyId}/status`,
         {
           method: 'PATCH',

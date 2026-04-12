@@ -29,7 +29,7 @@ import {
 import { ProTable } from '@ant-design/pro-components';
 import type { ActionType, ProColumns } from '@ant-design/pro-components';
 import { ClockCircleOutlined, ReloadOutlined } from '@ant-design/icons';
-import { txFetch } from '../../../api';
+import { txFetchData } from '../../../api';
 
 const { Title } = Typography;
 
@@ -78,7 +78,7 @@ export default function AttendanceToday() {
   useEffect(() => {
     (async () => {
       try {
-        const res = await txFetch<{ store_id: string; store_name: string }[]>('/api/v1/org/stores');
+        const res = await txFetchData<{ store_id: string; store_name: string }[]>('/api/v1/org/stores');
         const list = res.data ?? [];
         setStores(list);
         if (list.length > 0) setStoreId(list[0].store_id);
@@ -92,7 +92,7 @@ export default function AttendanceToday() {
     if (!storeId) return;
     setLoading(true);
     try {
-      const res = await txFetch<TodayStats>(`/api/v1/attendance/today?store_id=${storeId}`);
+      const res = await txFetchData<TodayStats>(`/api/v1/attendance/today?store_id=${storeId}`);
       setStats(res.data);
     } catch {
       message.error('加载今日考勤失败');
@@ -204,7 +204,7 @@ export default function AttendanceToday() {
           columns={columns}
           request={async () => {
             if (!storeId) return { data: [], total: 0, success: true };
-            const res = await txFetch<{ items: ClockRecord[]; total: number }>(
+            const res = await txFetchData<{ items: ClockRecord[]; total: number }>(
               `/api/v1/attendance/today-records?store_id=${storeId}`,
             );
             return {

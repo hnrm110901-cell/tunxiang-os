@@ -4,7 +4,7 @@
  * 接入真实API: /api/v1/boss-bi/alerts + /api/v1/analytics/competitive（降级）
  */
 import { useEffect, useState } from 'react';
-import { txFetch } from '../../../api';
+import { txFetchData } from '../../../api';
 
 // ---- 颜色常量 ----
 const BG_PAGE = '#0d1e28';
@@ -122,7 +122,7 @@ const FALLBACK_CARDS: IntelCard[] = [
 async function fetchDashboardData(): Promise<DashboardData> {
   let alerts: BossAlert[] = [];
   try {
-    const res = await txFetch<{ items?: BossAlert[] }>('/api/v1/boss-bi/alerts');
+    const res = await txFetchData<{ items?: BossAlert[] }>('/api/v1/boss-bi/alerts');
     alerts = res.items || [];
   } catch {
     // 降级：空预警

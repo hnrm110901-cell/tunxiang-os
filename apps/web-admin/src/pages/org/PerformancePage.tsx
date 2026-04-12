@@ -52,7 +52,7 @@ import {
   FireOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
-import { txFetch } from '../../api';
+import { txFetchData } from '../../api';
 
 const { Title, Text } = Typography;
 
@@ -277,7 +277,7 @@ function RankingTab() {
   const loadRanking = useCallback(async () => {
     setRankingLoading(true);
     try {
-      const data = await txFetch<{ items: PerformanceRecord[] }>(
+      const data = await txFetchData<{ items: PerformanceRecord[] }>(
         `/api/v1/org/performance?store_id=current&period=${period}`,
       );
       setAllRecords(data?.items ?? []);
@@ -429,14 +429,14 @@ function InputTab() {
 
   useEffect(() => {
     setConfigLoading(true);
-    txFetch<{ configs: Record<string, KPIItem[]> }>('/api/v1/org/performance/kpi-configs')
+    txFetchData<{ configs: Record<string, KPIItem[]> }>('/api/v1/org/performance/kpi-configs')
       .then((data) => setKpiConfigs(data?.configs ?? EMPTY_KPI_CONFIGS))
       .catch(() => setKpiConfigs(EMPTY_KPI_CONFIGS))
       .finally(() => setConfigLoading(false));
   }, []);
 
   useEffect(() => {
-    txFetch<{ items: PerformanceRecord[] }>(`/api/v1/org/performance?store_id=current&period=${dayjs().subtract(1, 'month').format('YYYY-MM')}`)
+    txFetchData<{ items: PerformanceRecord[] }>(`/api/v1/org/performance?store_id=current&period=${dayjs().subtract(1, 'month').format('YYYY-MM')}`)
       .then((data) => setSubmittedRecords(data?.items ?? []))
       .catch(() => setSubmittedRecords([]));
   }, []);
@@ -478,7 +478,7 @@ function InputTab() {
             scores,
           };
           try {
-            await txFetch('/api/v1/org/performance/score', {
+            await txFetchData('/api/v1/org/performance/score', {
               method: 'POST',
               body: JSON.stringify(payload),
             });
@@ -623,7 +623,7 @@ function RewardTab() {
   const loadRewards = useCallback(async () => {
     setRewardLoading(true);
     try {
-      const data = await txFetch<{ items: RewardRecord[] }>(
+      const data = await txFetchData<{ items: RewardRecord[] }>(
         `/api/v1/org/performance?store_id=current&period=${dayjs().format('YYYY-MM')}&type=rewards`,
       );
       setRewardRecords(data?.items ?? []);
@@ -716,7 +716,7 @@ function RewardTab() {
           modalProps={{ destroyOnClose: true, width: 500 }}
           onFinish={async (values) => {
             try {
-              await txFetch('/api/v1/org/performance/score', {
+              await txFetchData('/api/v1/org/performance/score', {
                 method: 'POST',
                 body: JSON.stringify({
                   employee_id: values.employee_id,

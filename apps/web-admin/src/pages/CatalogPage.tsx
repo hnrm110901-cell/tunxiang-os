@@ -3,7 +3,7 @@
  * 真实 API 接入 + 分类筛选 + 四象限视图 + 成本率 + 快速调价
  */
 import { useEffect, useState, useRef, useCallback } from 'react';
-import { txFetch } from '../api';
+import { txFetchData } from '../api';
 
 // ─── 类型定义 ───────────────────────────────────────────────
 
@@ -401,7 +401,7 @@ export function CatalogPage() {
 
   // ─── 获取分类 ───
   useEffect(() => {
-    txFetch<{ categories: DishCategory[] }>(`/api/v1/menu/categories?store_id=${encodeURIComponent(storeId)}`)
+    txFetchData<{ categories: DishCategory[] }>(`/api/v1/menu/categories?store_id=${encodeURIComponent(storeId)}`)
       .then((data) => setCategories(data.categories ?? []))
       .catch(() => setCategories([]));
   }, [storeId]);
@@ -412,7 +412,7 @@ export function CatalogPage() {
     try {
       const catParam = selectedCategory !== 'all' ? `&category_id=${encodeURIComponent(selectedCategory)}` : '';
       const searchParam = search ? `&name=${encodeURIComponent(search)}` : '';
-      const data = await txFetch<DishListResp>(
+      const data = await txFetchData<DishListResp>(
         `/api/v1/menu/dishes?store_id=${encodeURIComponent(storeId)}&page=${page}&size=${PAGE_SIZE}${catParam}${searchParam}`,
       );
       const items = data.items ?? [];
@@ -456,7 +456,7 @@ export function CatalogPage() {
     );
     setEditingPriceId(null);
     try {
-      await txFetch(`/api/v1/menu/dishes/${encodeURIComponent(dishId)}`, {
+      await txFetchData(`/api/v1/menu/dishes/${encodeURIComponent(dishId)}`, {
         method: 'PATCH',
         body: JSON.stringify({ price_fen: newPriceFen }),
       });
@@ -473,7 +473,7 @@ export function CatalogPage() {
       prev.map((d) => (d.id === dish.id ? { ...d, is_available: next } : d)),
     );
     try {
-      await txFetch(`/api/v1/menu/dishes/${encodeURIComponent(dish.id)}`, {
+      await txFetchData(`/api/v1/menu/dishes/${encodeURIComponent(dish.id)}`, {
         method: 'PATCH',
         body: JSON.stringify({ is_available: next }),
       });

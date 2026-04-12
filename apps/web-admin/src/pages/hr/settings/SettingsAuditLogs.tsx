@@ -18,7 +18,7 @@ import {
   ProColumns,
   ProTable,
 } from '@ant-design/pro-components';
-import { txFetch } from '../../../api';
+import { txFetchData } from '../../../api';
 
 const { Title } = Typography;
 
@@ -158,7 +158,7 @@ export default function SettingsAuditLogs() {
             query.set('sort', sorter.created_at === 'ascend' ? 'asc' : 'desc');
           }
           try {
-            const data = await txFetch<AuditLogListResp>(
+            const data = await txFetchData<AuditLogListResp>(
               `/api/v1/audit-logs?${query.toString()}`,
             );
             return { data: data.items || [], total: data.total || 0, success: true };

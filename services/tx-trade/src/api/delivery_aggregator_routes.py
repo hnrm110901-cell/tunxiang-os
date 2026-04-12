@@ -202,8 +202,16 @@ async def list_aggregator_orders(
 # ── 3. 聚合订单详情 ──────────────────────────────────────────────────────────
 
 @router.get("/orders/{aggregator_order_id}", summary="聚合订单详情")
-async def get_aggregator_order(aggregator_order_id: str = Path(...), db: AsyncSession = Depends(_get_db)) -> dict:
-    row = await db.execute(text("SELECT * FROM aggregator_orders WHERE id = :oid"), {"oid": aggregator_order_id})
+async def get_aggregator_order(
+    request: Request,
+    aggregator_order_id: str = Path(...),
+    db: AsyncSession = Depends(_get_db),
+) -> dict:
+    tid = _get_tenant_id(request)
+    row = await db.execute(
+        text("SELECT * FROM aggregator_orders WHERE id = :oid AND tenant_id = :tid"),
+        {"oid": aggregator_order_id, "tid": tid},
+    )
     order = row.fetchone()
     if not order:
         raise HTTPException(status_code=404, detail={"ok": False, "error": {"code": "ORDER_NOT_FOUND"}})
@@ -221,8 +229,13 @@ _STATUS_TRANSITIONS = {
 }
 
 
-async def _order_action(db: AsyncSession, oid: str, action: str, reason: Optional[str] = None) -> dict:
-    row = await db.execute(text("SELECT id, platform, status FROM aggregator_orders WHERE id = :oid"), {"oid": oid})
+async def _order_action(
+    db: AsyncSession, tid: str, oid: str, action: str, reason: Optional[str] = None
+) -> dict:
+    row = await db.execute(
+        text("SELECT id, platform, status FROM aggregator_orders WHERE id = :oid AND tenant_id = :tid"),
+        {"oid": oid, "tid": tid},
+    )
     order = row.fetchone()
     if not order:
         raise HTTPException(status_code=404, detail={"ok": False, "error": {"code": "ORDER_NOT_FOUND"}})
@@ -230,25 +243,25 @@ async def _order_action(db: AsyncSession, oid: str, action: str, reason: Optiona
     if order.status not in cfg["allowed_from"]:
         raise HTTPException(status_code=409, detail={"ok": False, "error": {"code": "INVALID_STATUS_TRANSITION", "message": f"{order.status} 不允许 {action}"}})
     sets = "status = :target, updated_at = NOW()"
-    params: dict = {"oid": oid, "target": cfg["target"]}
+    params: dict = {"oid": oid, "tid": tid, "target": cfg["target"]}
     if reason:
         sets += ", cancel_reason = :reason"; params["reason"] = reason
-    await db.execute(text(f"UPDATE aggregator_orders SET {sets} WHERE id = :oid"), params)
+    await db.execute(text(f"UPDATE aggregator_orders SET {sets} WHERE id = :oid AND tenant_id = :tid"), params)
     await db.commit()
     return {"ok": True, "data": {"aggregator_order_id": oid, "platform": order.platform, "status": cfg["target"]}, "error": None}
 
 
 @router.post("/orders/{oid}/accept", summary="接单")
-async def accept_order(oid: str = Path(...), db: AsyncSession = Depends(_get_db)) -> dict:
-    return await _order_action(db, oid, "accept")
+async def accept_order(request: Request, oid: str = Path(...), db: AsyncSession = Depends(_get_db)) -> dict:
+    return await _order_action(db, _get_tenant_id(request), oid, "accept")
 
 @router.post("/orders/{oid}/ready", summary="备餐完成")
-async def mark_ready(oid: str = Path(...), db: AsyncSession = Depends(_get_db)) -> dict:
-    return await _order_action(db, oid, "ready")
+async def mark_ready(request: Request, oid: str = Path(...), db: AsyncSession = Depends(_get_db)) -> dict:
+    return await _order_action(db, _get_tenant_id(request), oid, "ready")
 
 @router.post("/orders/{oid}/cancel", summary="取消单")
-async def cancel_order(oid: str = Path(...), body: CancelBody = CancelBody(), db: AsyncSession = Depends(_get_db)) -> dict:
-    return await _order_action(db, oid, "cancel", body.reason)
+async def cancel_order(request: Request, oid: str = Path(...), body: CancelBody = CancelBody(), db: AsyncSession = Depends(_get_db)) -> dict:
+    return await _order_action(db, _get_tenant_id(request), oid, "cancel", body.reason)
 
 
 # ── 7. 平台状态 ──────────────────────────────────────────────────────────────

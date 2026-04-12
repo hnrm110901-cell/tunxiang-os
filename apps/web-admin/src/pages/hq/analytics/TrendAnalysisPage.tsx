@@ -4,7 +4,7 @@
  * 手写SVG折线图，无图表库依赖
  */
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
-import { txFetch } from '../../../api';
+import { txFetchData } from '../../../api';
 
 // ---------- 类型 ----------
 
@@ -406,7 +406,7 @@ export function TrendAnalysisPage() {
 
   // ---------- 初始化：获取门店列表 ----------
   useEffect(() => {
-    txFetch<{ items: { store_id: string; store_name: string }[] }>(
+    txFetchData<{ items: { store_id: string; store_name: string }[] }>(
       '/api/v1/dashboard/store-ranking?period=day',
     ).then((res) => {
       const opts = res.items.map((s) => ({ store_id: s.store_id, store_name: s.store_name }));
@@ -424,7 +424,7 @@ export function TrendAnalysisPage() {
     setLoading(true);
     setError(null);
     setTrendData([]);
-    txFetch<{ store_id: string; days: number; trend: TrendPoint[] }>(
+    txFetchData<{ store_id: string; days: number; trend: TrendPoint[] }>(
       `/api/v1/boss-bi/store/${encodeURIComponent(storeId)}/trend?days=${days}`,
     ).then((res) => {
       setTrendData(res.trend || []);
@@ -436,7 +436,7 @@ export function TrendAnalysisPage() {
   // ---------- 拉取异常预警 ----------
   useEffect(() => {
     setAlertsLoading(true);
-    txFetch<{ alerts: BossAlert[]; total: number; threshold_pct: number }>(
+    txFetchData<{ alerts: BossAlert[]; total: number; threshold_pct: number }>(
       '/api/v1/boss-bi/alerts',
     ).then((res) => {
       setBossAlerts(res.alerts || []);
@@ -529,7 +529,7 @@ export function TrendAnalysisPage() {
     setAiLoading(true);
     setAiReport(null);
     try {
-      const result = await txFetch<{ synthesis: string }>('/api/v1/orchestrate', {
+      const result = await txFetchData<{ synthesis: string }>('/api/v1/orchestrate', {
         method: 'POST',
         body: JSON.stringify({
           intent: `分析门店 ${storeId} 近${days}天的经营趋势，找出关键变化点和原因`,

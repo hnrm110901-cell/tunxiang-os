@@ -16,11 +16,13 @@ from __future__ import annotations
 
 from typing import List
 
+import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel
 
 from shared.ontology.src.database import get_db as _get_db
 
+logger = structlog.get_logger(__name__)
 router = APIRouter(tags=["procurement-recommend"])
 
 
@@ -172,7 +174,8 @@ async def get_supplier_scores(
             "tenant_id": x_tenant_id,
         })
         suppliers = result.fetchall()
-    except Exception:
+    except Exception as exc:  # noqa: BLE001 — suppliers表可能未建立，降级为空列表
+        logger.warning("procurement_recommend.supplier_query_failed", ingredient_id=ingredient_id, error=str(exc))
         suppliers = []
 
     scores = []

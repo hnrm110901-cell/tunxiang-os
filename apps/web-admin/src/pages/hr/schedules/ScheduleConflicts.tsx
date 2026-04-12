@@ -14,7 +14,7 @@ import { useRef, useState } from 'react';
 import { Button, Card, Col, Popconfirm, Row, Space, Statistic, Tag, Typography, message } from 'antd';
 import { ExclamationCircleOutlined, DeleteOutlined, EditOutlined } from '@ant-design/icons';
 import { ActionType, ProColumns, ProTable } from '@ant-design/pro-components';
-import { txFetch } from '../../../api';
+import { txFetchData } from '../../../api';
 
 const { Title } = Typography;
 
@@ -49,7 +49,7 @@ export default function ScheduleConflicts() {
 
   const handleCancelShift = async (shiftId: string) => {
     try {
-      const res = await txFetch(`/api/v1/schedules/${shiftId}`, {
+      const res = await txFetchData(`/api/v1/schedules/${shiftId}`, {
         method: 'DELETE',
       }) as { ok: boolean };
       if (res.ok) {
@@ -155,7 +155,7 @@ export default function ScheduleConflicts() {
           query.set('page', String(params.current ?? 1));
           query.set('size', String(params.pageSize ?? 20));
           try {
-            const res = await txFetch(`/api/v1/schedules/conflicts?${query}`) as {
+            const res = await txFetchData(`/api/v1/schedules/conflicts?${query}`) as {
               ok: boolean;
               data: ConflictsResp;
             };

@@ -24,7 +24,7 @@ import {
   ProFormTimePicker,
   ProTable,
 } from '@ant-design/pro-components';
-import { txFetch } from '../../../api';
+import { txFetchData } from '../../../api';
 
 const { Title } = Typography;
 const TX_PRIMARY = '#FF6B35';
@@ -75,7 +75,7 @@ export default function ScheduleTemplates() {
       const url = isEdit
         ? `/api/v1/schedules/templates/${editRecord?.id}`
         : '/api/v1/schedules/templates';
-      const res = await txFetch(url, {
+      const res = await txFetchData(url, {
         method: isEdit ? 'PUT' : 'POST',
         body: JSON.stringify(values),
       }) as { ok: boolean };
@@ -240,7 +240,7 @@ export default function ScheduleTemplates() {
           query.set('page', String(params.current ?? 1));
           query.set('size', String(params.pageSize ?? 20));
           try {
-            const res = await txFetch(`/api/v1/schedules/templates?${query}`) as {
+            const res = await txFetchData(`/api/v1/schedules/templates?${query}`) as {
               ok: boolean;
               data: { items: TemplateItem[]; total: number };
             };

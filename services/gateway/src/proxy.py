@@ -50,6 +50,12 @@ DOMAIN_ROUTES = {
     "store-analysis": os.getenv("TX_ANALYTICS_URL", "http://localhost:8009"),
     "knowledge-query": os.getenv("TX_ANALYTICS_URL", "http://localhost:8009"),
     "narrative": os.getenv("TX_ANALYTICS_URL", "http://localhost:8009"),
+    "dashboard": os.getenv("TX_ANALYTICS_URL", "http://localhost:8009"),
+    "boss-bi": os.getenv("TX_ANALYTICS_URL", "http://localhost:8009"),
+    "analysis": os.getenv("TX_ANALYTICS_URL", "http://localhost:8009"),
+    # Agent 额外子域路由（tx-agent:8008）
+    "store-health": os.getenv("TX_AGENT_URL", "http://localhost:8008"),
+    "orchestrate": os.getenv("TX_AGENT_URL", "http://localhost:8008"),
     # Supply 子域路由（tx-supply:8006）
     "procurement-recommend": os.getenv("TX_SUPPLY_URL", "http://localhost:8006"),
     # Insights routes (tx-analytics:8009)

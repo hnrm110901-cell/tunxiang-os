@@ -39,7 +39,7 @@ import {
 import dayjs, { Dayjs } from 'dayjs';
 import isoWeek from 'dayjs/plugin/isoWeek';
 import { useSearchParams } from 'react-router-dom';
-import { txFetch } from '../../../api';
+import { txFetchData } from '../../../api';
 
 dayjs.extend(isoWeek);
 
@@ -105,7 +105,7 @@ export default function ScheduleStoreWeek() {
     if (!storeId) return;
     setLoading(true);
     try {
-      const res = await txFetch(
+      const res = await txFetchData(
         `/api/v1/schedules/week?store_id=${storeId}&start_date=${weekStart.format('YYYY-MM-DD')}`,
       ) as { ok: boolean; data: { employees: EmployeeWeekRow[] } };
       if (res.ok) {
@@ -198,7 +198,7 @@ export default function ScheduleStoreWeek() {
         date: editTarget.date,
         ...values,
       };
-      const res = await txFetch('/api/v1/schedules', {
+      const res = await txFetchData('/api/v1/schedules', {
         method: 'POST',
         body: JSON.stringify(payload),
       }) as { ok: boolean };
@@ -246,7 +246,7 @@ export default function ScheduleStoreWeek() {
             }
             onFinish={async (values) => {
               try {
-                const res = await txFetch('/api/v1/schedules/batch', {
+                const res = await txFetchData('/api/v1/schedules/batch', {
                   method: 'POST',
                   body: JSON.stringify({ store_id: storeId, ...values }),
                 }) as { ok: boolean };
@@ -279,7 +279,7 @@ export default function ScheduleStoreWeek() {
               rules={[{ required: true }]}
               request={async () => {
                 try {
-                  const res = await txFetch(`/api/v1/org/employees?store_id=${storeId}&page=1&size=200`) as {
+                  const res = await txFetchData(`/api/v1/org/employees?store_id=${storeId}&page=1&size=200`) as {
                     ok: boolean;
                     data: { items: { id: string; name: string }[] };
                   };

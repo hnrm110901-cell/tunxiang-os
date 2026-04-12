@@ -54,7 +54,7 @@ import {
   MinusCircleOutlined,
   CalculatorOutlined,
 } from '@ant-design/icons';
-import { txFetch } from '../../api';
+import { txFetchData } from '../../api';
 
 const { Text, Title } = Typography;
 
@@ -135,7 +135,7 @@ function genId(prefix: string): string {
   return `${prefix}_${idCounter}`;
 }
 
-// ─── API 层（txFetch + try/catch 空数据 fallback）──────────────
+// ─── API 层（txFetchData + try/catch 空数据 fallback）──────────────
 
 interface BomListResponse { items: BomRecord[]; total: number; }
 interface IngredientListResponse { items: IngredientOption[]; total: number; }
@@ -143,7 +143,7 @@ interface DishListResponse { items: DishOption[]; total: number; }
 
 async function fetchBomList(page = 1): Promise<BomRecord[]> {
   try {
-    const res = await txFetch<BomListResponse>(`/api/v1/supply/recipes?page=${page}`);
+    const res = await txFetchData<BomListResponse>(`/api/v1/supply/recipes?page=${page}`);
     return res.data?.items ?? EMPTY_BOM_LIST;
   } catch (err) {
     console.error('[BOMPage] fetchBomList 失败:', err);
@@ -153,7 +153,7 @@ async function fetchBomList(page = 1): Promise<BomRecord[]> {
 
 async function fetchBomDetail(id: string): Promise<BomRecord | null> {
   try {
-    const res = await txFetch<BomRecord>(`/api/v1/supply/recipes/${id}`);
+    const res = await txFetchData<BomRecord>(`/api/v1/supply/recipes/${id}`);
     return res.data ?? null;
   } catch (err) {
     console.error('[BOMPage] fetchBomDetail 失败:', err);
@@ -163,7 +163,7 @@ async function fetchBomDetail(id: string): Promise<BomRecord | null> {
 
 async function fetchIngredients(): Promise<IngredientOption[]> {
   try {
-    const res = await txFetch<IngredientListResponse>('/api/v1/menu/ingredients?page=1&size=500');
+    const res = await txFetchData<IngredientListResponse>('/api/v1/menu/ingredients?page=1&size=500');
     return res.data?.items ?? EMPTY_INGREDIENT_LIST;
   } catch (err) {
     console.error('[BOMPage] fetchIngredients 失败:', err);
@@ -173,7 +173,7 @@ async function fetchIngredients(): Promise<IngredientOption[]> {
 
 async function fetchDishes(): Promise<DishOption[]> {
   try {
-    const res = await txFetch<DishListResponse>('/api/v1/menu/dishes?page=1&size=200');
+    const res = await txFetchData<DishListResponse>('/api/v1/menu/dishes?page=1&size=200');
     return res.data?.items ?? EMPTY_DISH_LIST;
   } catch (err) {
     console.error('[BOMPage] fetchDishes 失败:', err);
@@ -183,7 +183,7 @@ async function fetchDishes(): Promise<DishOption[]> {
 
 async function createBom(payload: { dish_id: string; ingredients: BomIngredient[] }): Promise<BomRecord | null> {
   try {
-    const res = await txFetch<BomRecord>('/api/v1/supply/recipes', {
+    const res = await txFetchData<BomRecord>('/api/v1/supply/recipes', {
       method: 'POST',
       body: JSON.stringify(payload),
     });
@@ -196,7 +196,7 @@ async function createBom(payload: { dish_id: string; ingredients: BomIngredient[
 
 async function saveBom(bom: BomRecord): Promise<boolean> {
   try {
-    await txFetch<BomRecord>(`/api/v1/supply/recipes/${bom.id}`, {
+    await txFetchData<BomRecord>(`/api/v1/supply/recipes/${bom.id}`, {
       method: 'PATCH',
       body: JSON.stringify({ ingredients: bom.ingredients }),
     });
@@ -209,7 +209,7 @@ async function saveBom(bom: BomRecord): Promise<boolean> {
 
 async function deleteBom(id: string): Promise<boolean> {
   try {
-    await txFetch<unknown>(`/api/v1/supply/recipes/${id}`, { method: 'DELETE' });
+    await txFetchData<unknown>(`/api/v1/supply/recipes/${id}`, { method: 'DELETE' });
     return true;
   } catch (err) {
     console.error('[BOMPage] deleteBom 失败:', err);
@@ -219,7 +219,7 @@ async function deleteBom(id: string): Promise<boolean> {
 
 async function calculateBomCost(recipeId: string, targetQty: number): Promise<{ total_cost_fen: number; margin_rate: number } | null> {
   try {
-    const res = await txFetch<{ total_cost_fen: number; margin_rate: number }>(
+    const res = await txFetchData<{ total_cost_fen: number; margin_rate: number }>(
       '/api/v1/supply/recipes/calculate',
       {
         method: 'POST',

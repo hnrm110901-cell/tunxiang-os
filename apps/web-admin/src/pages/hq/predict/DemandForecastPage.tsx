@@ -4,13 +4,13 @@
  * 类别折叠：凉菜 / 热菜 / 海鲜 / 主食 / 饮品
  * 一键生成采购单按钮
  *
- * 数据源：txFetch（后端 API）
+ * 数据源：txFetchData（后端 API）
  */
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Select, Button, Spin, Tag, Modal, message, Input, Collapse } from 'antd';
 import { ReloadOutlined, ShoppingCartOutlined, SearchOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
-import { txFetch } from '../../../api';
+import { txFetchData } from '../../../api';
 
 // ─── 类型定义 ───────────────────────────────────────────────────────────────
 
@@ -117,7 +117,7 @@ export function DemandForecastPage() {
     setLoading(true);
     try {
       // TODO: 后端就绪后替换
-      // const res = await txFetch<{ items: DemandItem[] }>(
+      // const res = await txFetchData<{ items: DemandItem[] }>(
       //   `/api/v1/predict/demand/list?store_id=${selectedStore}`,
       // );
       await new Promise(r => setTimeout(r, 400));
@@ -179,7 +179,7 @@ export function DemandForecastPage() {
         setGenerating(true);
         try {
           // TODO: 后端就绪后替换
-          // await txFetch('/api/v1/supply/purchase-order/generate', {
+          // await txFetchData('/api/v1/supply/purchase-order/generate', {
           //   method: 'POST',
           //   body: JSON.stringify({ store_id: selectedStore, items: needPurchase }),
           // });

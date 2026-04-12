@@ -36,7 +36,7 @@ import {
 import type { ActionType, ProColumns } from '@ant-design/pro-components';
 import { EditOutlined } from '@ant-design/icons';
 import dayjs, { Dayjs } from 'dayjs';
-import { txFetch } from '../../../api';
+import { txFetchData } from '../../../api';
 
 const { Title, Text } = Typography;
 const TX_PRIMARY = '#FF6B35';
@@ -89,7 +89,7 @@ export default function AttendanceAdjustments() {
   useEffect(() => {
     (async () => {
       try {
-        const res = await txFetch<{ store_id: string; store_name: string }[]>('/api/v1/org/stores');
+        const res = await txFetchData<{ store_id: string; store_name: string }[]>('/api/v1/org/stores');
         const list = res.data ?? [];
         setStores(list);
         if (list.length > 0) setStoreId(list[0].store_id);
@@ -176,7 +176,7 @@ export default function AttendanceAdjustments() {
           columns={columns}
           request={async (params) => {
             if (!storeId) return { data: [], total: 0, success: true };
-            const res = await txFetch<{ items: AttendanceRecord[]; total: number }>(
+            const res = await txFetchData<{ items: AttendanceRecord[]; total: number }>(
               `/api/v1/attendance/records?store_id=${storeId}&year=${month.year()}&month=${month.month() + 1}&page=${params.current ?? 1}&size=${params.pageSize ?? 20}`,
             );
             return {
@@ -202,7 +202,7 @@ export default function AttendanceAdjustments() {
         onFinish={async (values) => {
           if (!adjustTarget) return false;
           try {
-            await txFetch(`/api/v1/attendance/records/${adjustTarget.id}/adjust`, {
+            await txFetchData(`/api/v1/attendance/records/${adjustTarget.id}/adjust`, {
               method: 'POST',
               body: JSON.stringify({
                 new_clock_in: values.new_clock_in,

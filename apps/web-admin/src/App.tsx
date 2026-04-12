@@ -2,9 +2,9 @@
  * web-admin — 总部管理后台
  * 路由已按产品域拆分到 src/routes/*.tsx
  */
-import { useState } from 'react';
+import { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { getToken, clearAuth, isTokenExpired } from './api/client';
+import { useAuthStore } from './store/authStore';
 import { ShellHQ } from './shell/ShellHQ';
 import { LoginPage } from './pages/LoginPage';
 import { DashboardPage } from './pages/DashboardPage';
@@ -21,7 +21,7 @@ import { PayrollConfigPage } from './pages/org/PayrollConfigPage';
 import { PayrollRecordsPage } from './pages/org/PayrollRecordsPage';
 import { FinanceAuditPage } from './pages/finance/FinanceAuditPage';
 import PnLReportPage from './pages/finance/PnLReportPage';
-import PayrollPage from './pages/finance/PayrollPage';
+import FinancePayrollPage from './pages/finance/PayrollPage';
 import { PatrolInspectionPage } from './pages/ops/PatrolInspectionPage';
 import { HACCPPage } from './pages/ops/HACCPPage';
 import { EnergyBudgetPage } from './pages/ops/EnergyBudgetPage';
@@ -151,6 +151,8 @@ import EmployeeTrainingPage from './pages/org/EmployeeTrainingPage';
 import BrandRegionPage from './pages/org/BrandRegionPage';
 // ─── Y-I2: 抖音团购管理 ───────────────────────────────────────────────────────
 import DouyinVoucherPage from './pages/trade/DouyinVoucherPage';
+// ─── AI经营合伙人 ─────────────────────────────────────────────────────────────
+import { ChiefAgentPage } from './pages/agent/ChiefAgentPage';
 // ─── Sprint 1: AI 中枢 ────────────────────────────────────────────────────────
 import { AgentHubPage as HQAgentHubPage } from './pages/hq/agent/AgentHubPage';
 import { AgentCommandCenterPage } from './pages/hq/agent/AgentCommandCenterPage';
@@ -193,26 +195,17 @@ import HRHubOverviewPage from './pages/hr/HRHubOverviewPage';
 import AiMarketingDashboardPage from './pages/marketing/AiMarketingDashboardPage';
 
 function App() {
-  const [isLoggedIn, setIsLoggedIn] = useState(() => {
-    const token = getToken();
-    if (!token || isTokenExpired()) { clearAuth(); return false; }
-    return true;
-  });
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const restore = useAuthStore((s) => s.restore);
+  const logout = useAuthStore((s) => s.logout);
 
-  const handleLogout = () => {
-    const token = getToken();
-    if (token) {
-      fetch('/api/v1/auth/logout', { method: 'POST', headers: { Authorization: `Bearer ${token}` } }).catch(() => {});
-    }
-    clearAuth();
-    setIsLoggedIn(false);
-  };
+  useEffect(() => { restore(); }, [restore]);
 
-  if (!isLoggedIn) { return <LoginPage onLogin={() => setIsLoggedIn(true)} />; }
+  if (!isAuthenticated) { return <LoginPage onLogin={() => {}} />; }
 
   return (
     <BrowserRouter>
-      <ShellHQ onLogout={handleLogout}>
+      <ShellHQ onLogout={logout}>
         <Routes>
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="/dashboard" element={<DashboardPage />} />
@@ -230,7 +223,7 @@ function App() {
           <Route path="/org/payroll-records" element={<PayrollRecordsPage />} />
           <Route path="/finance/audit" element={<FinanceAuditPage />} />
           <Route path="/finance/pnl-report" element={<PnLReportPage />} />
-          <Route path="/finance/payroll" element={<PayrollPage />} />
+          <Route path="/finance/payroll" element={<FinancePayrollPage />} />
           <Route path="/ops/patrol-inspection" element={<PatrolInspectionPage />} />
           <Route path="/ops/haccp" element={<HACCPPage />} />
           <Route path="/ops/energy-budget" element={<EnergyBudgetPage />} />
@@ -261,6 +254,7 @@ function App() {
           <Route path="/hq/trade/banquet-templates" element={<BanquetTemplatePage />} />
           <Route path="/hq/supply/suppliers" element={<SupplierPortalPage />} />
           <Route path="/agent/dashboard" element={<AgentDashboardPage />} />
+          <Route path="/agent/chief" element={<ChiefAgentPage />} />
           {/* ─── Phase1: 财务刚需 ─── */}
           <Route path="/finance/wine-storage" element={<WineStoragePage />} />
           <Route path="/finance/deposits" element={<DepositManagePage />} />

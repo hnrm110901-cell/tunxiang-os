@@ -6,11 +6,19 @@ import { createOrder } from '@/api/orderApi';
 import { fetchCoupons, initiatePayment, queryPaymentStatus } from '@/api/paymentApi';
 import type { PayMethod, Coupon } from '@/api/paymentApi';
 
-const PAY_METHODS: { key: PayMethod; icon: string }[] = [
+type DemoPayMethod = PayMethod | 'cash';
+
+const PAY_METHODS: { key: DemoPayMethod; icon: string }[] = [
   { key: 'wechat', icon: '💬' },
   { key: 'alipay', icon: '🅰️' },
   { key: 'unionpay', icon: '💳' },
+  { key: 'cash', icon: '💰' },
 ];
+
+/** 生成演示用订单号 */
+function genDemoOrderId() {
+  return 'CZYZ' + Date.now().toString().slice(-8);
+}
 
 /** 结账页 — 支付方式 + 优惠券 + 会员价 */
 export default function Checkout() {
@@ -26,7 +34,7 @@ export default function Checkout() {
   const clearCart = useOrderStore((s) => s.clearCart);
 
   const total = cartTotal();
-  const [payMethod, setPayMethod] = useState<PayMethod>('wechat');
+  const [payMethod, setPayMethod] = useState<DemoPayMethod>('wechat');
   const [coupons, setCoupons] = useState<Coupon[]>([]);
   const [selectedCoupon, setSelectedCoupon] = useState<string>('');
   const [showCouponPicker, setShowCouponPicker] = useState(false);
@@ -60,10 +68,23 @@ export default function Checkout() {
     }
   };
 
-  // 支付
+  // 支付（演示模式：跳过真实支付，3秒后跳转成功页）
   const handlePay = useCallback(async () => {
-    if (!phone) { setNeedPhone(true); return; }
+    // 演示模式：无需手机号验证，直接走 mock 流程
+    const isDemo = !storeId || storeId.startsWith('czyz') || storeId.startsWith('demo');
+
+    if (!isDemo && !phone) { setNeedPhone(true); return; }
     setPaying(true);
+
+    if (isDemo) {
+      // 演示模式：3 秒模拟支付处理
+      await new Promise((r) => setTimeout(r, 3000));
+      const demoOrderId = genDemoOrderId();
+      clearCart();
+      navigate(`/pay/${demoOrderId}/result?status=success&amount=${payableAmount.toFixed(2)}`);
+      return;
+    }
+
     try {
       // 1. 创建订单
       const { orderId } = await createOrder({
@@ -80,23 +101,28 @@ export default function Checkout() {
         couponId: selectedCoupon || undefined,
       });
 
-      // 2. 发起支付
+      // 2. 现场结账 — 直接跳转成功页，不走线上支付
+      if (payMethod === 'cash') {
+        clearCart();
+        navigate(`/pay/${orderId}/result?status=success&amount=${payableAmount.toFixed(2)}`);
+        return;
+      }
+
+      // 3. 发起线上支付
       const payResult = await initiatePayment({
         orderId,
-        method: payMethod,
+        method: payMethod as PayMethod,
         couponId: selectedCoupon || undefined,
         phone,
       });
 
-      // 3. 处理支付结果
+      // 4. 处理支付结果
       if (payResult.redirectUrl) {
-        // 支付宝/银联 H5 跳转
         window.location.href = payResult.redirectUrl;
         return;
       }
 
       if (payResult.wechatPayParams && typeof (window as any).WeixinJSBridge !== 'undefined') {
-        // 微信 JSAPI 支付
         (window as any).WeixinJSBridge.invoke(
           'getBrandWCPayRequest',
           payResult.wechatPayParams,
@@ -104,14 +130,14 @@ export default function Checkout() {
         );
       }
 
-      // 4. 轮询支付状态
+      // 5. 轮询支付状态
       const pollStatus = async () => {
         for (let i = 0; i < 30; i++) {
           await new Promise((r) => setTimeout(r, 2000));
           const { status } = await queryPaymentStatus(payResult.paymentId);
           if (status === 'success') {
             clearCart();
-            navigate(`/order/${orderId}/track`);
+            navigate(`/pay/${orderId}/result?status=success&amount=${payableAmount.toFixed(2)}`);
             return;
           }
           if (status === 'failed') {
@@ -125,12 +151,13 @@ export default function Checkout() {
     } catch {
       setPaying(false);
     }
-  }, [phone, storeId, tableNo, cart, remark, selectedCoupon, payMethod, clearCart, navigate]);
+  }, [phone, storeId, tableNo, cart, remark, selectedCoupon, payMethod, payableAmount, clearCart, navigate]);
 
-  const payMethodLabel: Record<PayMethod, string> = {
+  const payMethodLabel: Record<DemoPayMethod, string> = {
     wechat: t('wechatPay'),
     alipay: t('alipay'),
     unionpay: t('unionPay'),
+    cash: t('cashPay'),
   };
 
   return (
@@ -331,7 +358,7 @@ export default function Checkout() {
             transition: 'background 0.2s',
           }}
         >
-          {paying ? t('loading') : `${t('payNow')} ${t('yuan')}${payableAmount.toFixed(2)}`}
+          {paying ? '正在处理，请稍候...' : `${t('payNow')} ${t('yuan')}${payableAmount.toFixed(2)}`}
         </button>
       </div>
     </div>

@@ -36,7 +36,7 @@ import {
 } from '@ant-design/pro-components';
 import type { ProColumns } from '@ant-design/pro-components';
 import { UserOutlined, SwapOutlined } from '@ant-design/icons';
-import { txFetch } from '../../../api';
+import { txFetchData } from '../../../api';
 
 const { Title, Text } = Typography;
 
@@ -155,7 +155,7 @@ export default function StoreOpsFillGaps() {
   useEffect(() => {
     (async () => {
       try {
-        const res = await txFetch<{ store_id: string; store_name: string }[]>('/api/v1/org/stores');
+        const res = await txFetchData<{ store_id: string; store_name: string }[]>('/api/v1/org/stores');
         const list = res.data ?? [];
         setStores(list);
         if (list.length > 0) setStoreId(list[0].store_id);
@@ -169,7 +169,7 @@ export default function StoreOpsFillGaps() {
   const loadCandidates = async (gapId: string) => {
     setCandidatesLoading(true);
     try {
-      const res = await txFetch<Candidate[]>(
+      const res = await txFetchData<Candidate[]>(
         `/api/v1/store-ops/fill-suggestions?gap_id=${gapId}`,
       );
       setCandidates(res.data ?? []);
@@ -189,7 +189,7 @@ export default function StoreOpsFillGaps() {
   const handleFillGap = async (values: Record<string, unknown>) => {
     if (!selectedGap || !fillTarget) return false;
     try {
-      await txFetch('/api/v1/store-ops/fill-gap', {
+      await txFetchData('/api/v1/store-ops/fill-gap', {
         method: 'POST',
         body: JSON.stringify({
           gap_id: selectedGap.id,
@@ -264,7 +264,7 @@ export default function StoreOpsFillGaps() {
                   ...(params.urgency ? { urgency: params.urgency } : {}),
                   ...(params.status ? { status: params.status } : {}),
                 });
-                const res = await txFetch<{ items: GapItem[]; total: number }>(
+                const res = await txFetchData<{ items: GapItem[]; total: number }>(
                   `/api/v1/store-ops/gaps?${query.toString()}`,
                 );
                 return { data: res.data?.items ?? [], total: res.data?.total ?? 0, success: true };

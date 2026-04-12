@@ -7,7 +7,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Alert, Button } from 'antd';
 import { TxLineChart } from '../../../components/charts';
-import { txFetch } from '../../../api';
+import { txFetchData } from '../../../api';
 
 // ---------- 类型定义 ----------
 interface OverviewKPI {
@@ -75,11 +75,11 @@ export function OpsDashboardPage() {
     const period = dateRange === 'today' ? 'day' : dateRange === 'week' ? 'week' : 'month';
     try {
       const [kpiRes, alertsRes, agentRes, rankRes, trendRes] = await Promise.allSettled([
-        txFetch<{ items: OverviewKPI[] }>(`/api/v1/ops/dashboard/kpi?period=${period}`),
-        txFetch<{ items: StoreRankItem[] }>(`/api/v1/ops/dashboard/store-ranking?period=${period}`),
-        txFetch<{ items: DecisionSuggestion[] }>('/api/v1/brain/decisions/recent?limit=10'),
-        txFetch<{ items: StoreRankItem[] }>(`/api/v1/analytics/alerts?status=active&level=critical&period=${period}`),
-        txFetch<HourlyTrend>('/api/v1/ops/dashboard/hourly-trend'),
+        txFetchData<{ items: OverviewKPI[] }>(`/api/v1/ops/dashboard/kpi?period=${period}`),
+        txFetchData<{ items: StoreRankItem[] }>(`/api/v1/ops/dashboard/store-ranking?period=${period}`),
+        txFetchData<{ items: DecisionSuggestion[] }>('/api/v1/brain/decisions/recent?limit=10'),
+        txFetchData<{ items: StoreRankItem[] }>(`/api/v1/analytics/alerts?status=active&level=critical&period=${period}`),
+        txFetchData<HourlyTrend>('/api/v1/ops/dashboard/hourly-trend'),
       ]);
       if (kpiRes.status === 'fulfilled') setKpis(kpiRes.value.data?.items ?? []);
       if (alertsRes.status === 'fulfilled') setStores(alertsRes.value.data?.items ?? []);

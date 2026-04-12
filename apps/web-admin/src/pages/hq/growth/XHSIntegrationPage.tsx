@@ -4,7 +4,7 @@
  * 渠道配置检测 + 笔记监控 + AI内容建议 + 数据分析
  */
 import { useState, useEffect, useCallback } from 'react';
-import { txFetch } from '../../../api';
+import { txFetchData } from '../../../api';
 
 const BG_1 = '#0d1e28';
 const BG_2 = '#1a2a33';
@@ -67,7 +67,7 @@ function useChannelConfig() {
 
   useEffect(() => {
     setLoading(true);
-    txFetch<ChannelConfig>('/api/v1/system/channel-config?channel=xhs')
+    txFetchData<ChannelConfig>('/api/v1/system/channel-config?channel=xhs')
       .then(data => {
         setConfig(data);
         setError(null);
@@ -91,7 +91,7 @@ function useXHSPosts(enabled: boolean) {
   useEffect(() => {
     if (!enabled) return;
     setLoading(true);
-    txFetch<{ items: XHSPost[]; analytics: XHSAnalytics }>('/api/v1/analytics/xhs/posts')
+    txFetchData<{ items: XHSPost[]; analytics: XHSAnalytics }>('/api/v1/analytics/xhs/posts')
       .then(data => {
         setPosts(data.items || []);
         setAnalytics(data.analytics || null);
@@ -383,7 +383,7 @@ function AIContentTab() {
     setError(null);
     setResult(null);
     try {
-      const data = await txFetch<AIContentSuggestion>('/api/v1/orchestrate', {
+      const data = await txFetchData<AIContentSuggestion>('/api/v1/orchestrate', {
         method: 'POST',
         body: JSON.stringify({
           agent: 'content_writer',

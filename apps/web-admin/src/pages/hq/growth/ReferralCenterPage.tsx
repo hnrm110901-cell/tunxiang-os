@@ -7,7 +7,7 @@
  *   - /api/v1/member/referrals/leaderboard
  */
 import { useState, useEffect } from 'react';
-import { txFetch } from '../../../api';
+import { txFetchData } from '../../../api';
 
 // ─── 主题常量 ───
 const BG = '#0d1e28';
@@ -516,7 +516,7 @@ export function ReferralCenterPage() {
     async function loadCampaigns() {
       setLoadingCampaigns(true);
       try {
-        const resp = await txFetch<{
+        const resp = await txFetchData<{
           items: ReferralCampaign[];
           stats?: ReferralStats;
         }>('/api/v1/member/referral-campaigns?page=1&size=20');
@@ -535,7 +535,7 @@ export function ReferralCenterPage() {
     async function loadLeaderboard() {
       setLoadingLeaderboard(true);
       try {
-        const resp = await txFetch<{ items: LeaderboardEntry[] }>(
+        const resp = await txFetchData<{ items: LeaderboardEntry[] }>(
           '/api/v1/member/referrals/leaderboard?period=month&size=10',
         );
         if (!cancelled) {
@@ -558,14 +558,14 @@ export function ReferralCenterPage() {
     setCreating(true);
     setCreateResult(null);
     try {
-      await txFetch('/api/v1/member/referral-campaigns', {
+      await txFetchData('/api/v1/member/referral-campaigns', {
         method: 'POST',
         body: JSON.stringify(data),
       });
       setCreateResult('success');
       setShowCreateModal(false);
       // 刷新列表
-      const resp = await txFetch<{ items: ReferralCampaign[] }>(
+      const resp = await txFetchData<{ items: ReferralCampaign[] }>(
         '/api/v1/member/referral-campaigns?page=1&size=20',
       );
       setCampaigns(resp.items || []);

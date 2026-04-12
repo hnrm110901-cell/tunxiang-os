@@ -9,7 +9,7 @@
  *   - 一旦后端上线，移除 apiUnavailable 降级逻辑即可
  */
 import { useState, useEffect, useCallback } from 'react';
-import { txFetch } from '../../../api';
+import { txFetchData } from '../../../api';
 
 // ── 设计 Token ──────────────────────────────────────────────────
 const BG_1   = '#0d1e28';
@@ -125,7 +125,7 @@ export function GroupBuyPage() {
     setLoading(true);
     setApiError(null);
     try {
-      const data = await txFetch<{ items: GroupBuyActivity[]; total: number } | GroupBuyActivity[]>(
+      const data = await txFetchData<{ items: GroupBuyActivity[]; total: number } | GroupBuyActivity[]>(
         '/api/v1/member/group-buys?page=1&size=20'
       );
       const list = Array.isArray(data) ? data : (data as { items: GroupBuyActivity[] }).items ?? [];
@@ -146,7 +146,7 @@ export function GroupBuyPage() {
   const loadTeams = useCallback(async () => {
     if (apiUnavailable) return;
     try {
-      const data = await txFetch<{ items: GroupBuyTeam[] } | GroupBuyTeam[]>(
+      const data = await txFetchData<{ items: GroupBuyTeam[] } | GroupBuyTeam[]>(
         '/api/v1/member/group-buys/teams?page=1&size=20'
       );
       const list = Array.isArray(data) ? data : (data as { items: GroupBuyTeam[] }).items ?? [];
@@ -729,7 +729,7 @@ function CreateModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (
     setSubmitting(true);
     setError(null);
     try {
-      await txFetch('/api/v1/member/group-buys', {
+      await txFetchData('/api/v1/member/group-buys', {
         method: 'POST',
         body: JSON.stringify({
           name: form.name.trim(),

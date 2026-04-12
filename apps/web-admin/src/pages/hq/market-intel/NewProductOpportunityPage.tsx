@@ -7,7 +7,7 @@
  */
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { txFetch } from '../../../api';
+import { txFetchData } from '../../../api';
 
 // ---- 颜色常量（深色主题） ----
 const BG_0 = '#0d1e28';
@@ -539,7 +539,7 @@ export function NewProductOpportunityPage() {
     if (!opportunityId) return;
     setLoading(true);
     setError(null);
-    txFetch<OpportunityDetail>(
+    txFetchData<OpportunityDetail>(
       `/api/v1/analytics/new-product-opportunities/${encodeURIComponent(opportunityId)}`
     )
       .then(data => { setDetail(data); })
@@ -553,7 +553,7 @@ export function NewProductOpportunityPage() {
     setAiLoading(true);
     setAiError(null);
     try {
-      const result = await txFetch<AiAnalysis>('/api/v1/orchestrate', {
+      const result = await txFetchData<AiAnalysis>('/api/v1/orchestrate', {
         method: 'POST',
         body: JSON.stringify({
           agent: 'menu_advisor',
@@ -574,7 +574,7 @@ export function NewProductOpportunityPage() {
     if (!opportunityId || addingToRd || rdSuccess) return;
     setAddingToRd(true);
     try {
-      await txFetch('/api/v1/menu/rd/opportunities', {
+      await txFetchData('/api/v1/menu/rd/opportunities', {
         method: 'POST',
         body: JSON.stringify({ opportunity_id: opportunityId }),
       });

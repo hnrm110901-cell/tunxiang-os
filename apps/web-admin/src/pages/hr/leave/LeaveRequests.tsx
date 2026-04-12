@@ -33,7 +33,7 @@ import {
 } from '@ant-design/pro-components';
 import type { ActionType, ProColumns } from '@ant-design/pro-components';
 import { CalendarOutlined } from '@ant-design/icons';
-import { txFetch } from '../../../api';
+import { txFetchData } from '../../../api';
 
 const { Title } = Typography;
 const TX_PRIMARY = '#FF6B35';
@@ -93,7 +93,7 @@ export default function LeaveRequests() {
   useEffect(() => {
     (async () => {
       try {
-        const res = await txFetch<{ store_id: string; store_name: string }[]>('/api/v1/org/stores');
+        const res = await txFetchData<{ store_id: string; store_name: string }[]>('/api/v1/org/stores');
         const list = res.data ?? [];
         setStores(list);
         if (list.length > 0) setStoreId(list[0].store_id);
@@ -110,7 +110,7 @@ export default function LeaveRequests() {
   const handleApprove = async (values: Record<string, unknown>) => {
     if (!approveTarget) return false;
     try {
-      await txFetch(`/api/v1/leave-requests/${approveTarget.id}/approve`, {
+      await txFetchData(`/api/v1/leave-requests/${approveTarget.id}/approve`, {
         method: 'POST',
         body: JSON.stringify({ comment: values.comment }),
       });
@@ -127,7 +127,7 @@ export default function LeaveRequests() {
   const handleReject = async (values: Record<string, unknown>) => {
     if (!rejectTarget) return false;
     try {
-      await txFetch(`/api/v1/leave-requests/${rejectTarget.id}/reject`, {
+      await txFetchData(`/api/v1/leave-requests/${rejectTarget.id}/reject`, {
         method: 'POST',
         body: JSON.stringify({ comment: values.comment }),
       });
@@ -230,7 +230,7 @@ export default function LeaveRequests() {
               page: String(params.current ?? 1),
               size: String(params.pageSize ?? 20),
             });
-            const res = await txFetch<{ items: LeaveRequest[]; total: number }>(
+            const res = await txFetchData<{ items: LeaveRequest[]; total: number }>(
               `/api/v1/leave-requests?${query.toString()}`,
             );
             return {

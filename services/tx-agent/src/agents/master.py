@@ -64,7 +64,8 @@ class MasterAgent:
         - serve_*/kitchen_* → serve_dispatch (出餐调度)
         - member_*/rfm_* → member_insight (会员洞察)
         - inventory_*/stock_* → inventory_alert (库存预警)
-        - finance_*/cost_* → finance_audit (财务稽核)
+        - finance_* → finance_audit (财务稽核)
+        - cost_*/stocktake_*/break_even/contribution_*/scenario_*/dish_margin/price_trend_* → cost_diagnosis (成本核算)
         - inspect_*/quality_* → store_inspect (巡店质检)
         - service_*/complaint_* → smart_service (智能客服)
         - campaign_*/journey_* → private_ops (私域运营)
@@ -80,7 +81,14 @@ class MasterAgent:
             "inventory": "inventory_alert",
             "stock": "inventory_alert",
             "finance": "finance_audit",
-            "cost": "finance_audit",
+            # 成本核算Agent接管所有成本类意图
+            "cost": "cost_diagnosis",
+            "stocktake": "cost_diagnosis",
+            "break": "cost_diagnosis",      # break_even
+            "contribution": "cost_diagnosis",
+            "scenario": "cost_diagnosis",
+            "price": "cost_diagnosis",      # price_trend_alert
+            "channel": "cost_diagnosis",    # channel_cost_compare
             "inspect": "store_inspect",
             "quality": "store_inspect",
             "service": "smart_service",

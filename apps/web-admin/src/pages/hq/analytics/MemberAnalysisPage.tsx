@@ -5,7 +5,7 @@
  */
 import { useState, useEffect, useCallback } from 'react';
 import { TxLineChart, TxScatterChart } from '../../../components/charts';
-import { txFetch } from '../../../api';
+import { txFetchData } from '../../../api';
 
 // ---------- 类型 ----------
 interface OverviewKPI {
@@ -99,9 +99,9 @@ export function MemberAnalysisPage() {
     const p = PERIOD_MAP[period] ?? 'month';
     try {
       const [overviewRes, clvRes, churnRes] = await Promise.allSettled([
-        txFetch<MemberOverviewData>(`/api/v1/member/analytics/overview?period=${p}`),
-        txFetch<CLVData>(`/api/v1/member/analytics/clv?period=${p}`),
-        txFetch<ChurnRiskData>(`/api/v1/member/analytics/churn-risk?limit=10`),
+        txFetchData<MemberOverviewData>(`/api/v1/member/analytics/overview?period=${p}`),
+        txFetchData<CLVData>(`/api/v1/member/analytics/clv?period=${p}`),
+        txFetchData<ChurnRiskData>(`/api/v1/member/analytics/churn-risk?limit=10`),
       ]);
       if (overviewRes.status === 'fulfilled' && overviewRes.value.data) {
         const d = overviewRes.value.data;

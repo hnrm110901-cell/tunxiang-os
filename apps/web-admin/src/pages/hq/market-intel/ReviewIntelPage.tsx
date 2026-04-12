@@ -5,7 +5,7 @@
  * 评论分析（好评率/差评热词）列表展示 + 主题词频图
  */
 import { useEffect, useState } from 'react';
-import { txFetch } from '../../../api';
+import { txFetchData } from '../../../api';
 
 // ---- 颜色常量 ----
 const BG_PAGE = '#0d1e28';
@@ -109,7 +109,7 @@ async function fetchReviewIntel(tab: ReviewTab, timeRange: TimeRange): Promise<R
   const themes = tab === 'own' ? FALLBACK_OWN_THEMES : FALLBACK_COMP_THEMES;
 
   try {
-    const res = await txFetch<ReviewIntelData>(
+    const res = await txFetchData<ReviewIntelData>(
       `/api/v1/analytics/reviews/intel?tab=${tab}&days=${days}`
     );
     if (res && res.reviews) return res;

@@ -3,7 +3,7 @@
  * ProTable 主列表 | DrawerForm 创建/编辑 | Modal 生成报价单
  *
  * 技术栈：Ant Design 5.x + ProComponents
- * API: txFetch → /api/v1/banquets/templates ; try/catch 降级 Mock
+ * API: txFetchData → /api/v1/banquets/templates ; try/catch 降级 Mock
  * 金额规范：存储/传输分(fen)，展示元(÷100)，提交时×100
  */
 import React, { useRef, useState, useCallback } from 'react';
@@ -50,7 +50,7 @@ import {
   PlusCircleOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
-import { txFetch } from '../../../api/client';
+import { txFetchData } from '../../../api/client';
 
 const { Text, Title } = Typography;
 
@@ -415,7 +415,7 @@ function TemplateDrawerForm({ editRecord, trigger, onSuccess }: TemplateDrawerFo
             : '/api/v1/banquets/templates';
           const method = isEdit ? 'PATCH' : 'POST';
 
-          await txFetch(url, { method, body: JSON.stringify(payload) });
+          await txFetchData(url, { method, body: JSON.stringify(payload) });
           message.success(isEdit ? '模板更新成功' : '套餐模板创建成功');
           onSuccess();
           return true;
@@ -557,7 +557,7 @@ function BuildQuoteModal({ template, open, onClose }: BuildQuoteModalProps) {
       const values = form.getFieldsValue();
       setLoading(true);
       try {
-        const res = await txFetch<QuoteResult>(
+        const res = await txFetchData<QuoteResult>(
           `/api/v1/banquets/templates/${template.id}/build-quote`,
           {
             method: 'POST',
@@ -749,7 +749,7 @@ export function BanquetTemplatePage() {
 
   const handleToggleActive = useCallback(async (record: BanquetTemplate, checked: boolean) => {
     try {
-      await txFetch(`/api/v1/banquets/templates/${record.id}`, {
+      await txFetchData(`/api/v1/banquets/templates/${record.id}`, {
         method: 'PATCH',
         body: JSON.stringify({ is_active: checked }),
       });
@@ -905,7 +905,7 @@ export function BanquetTemplatePage() {
               qs.set('page', String(params.current ?? 1));
               qs.set('size', String(params.pageSize ?? 20));
 
-              const res = await txFetch<{ items: BanquetTemplate[]; total: number }>(
+              const res = await txFetchData<{ items: BanquetTemplate[]; total: number }>(
                 `/api/v1/banquets/templates?${qs.toString()}`,
               );
               if (res.data) {

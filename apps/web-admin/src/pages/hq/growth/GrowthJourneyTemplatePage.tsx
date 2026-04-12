@@ -13,7 +13,7 @@ import * as echarts from 'echarts/core';
 import { BarChart } from 'echarts/charts';
 import { GridComponent, TooltipComponent, LegendComponent } from 'echarts/components';
 import { CanvasRenderer } from 'echarts/renderers';
-import { txFetch } from '../../../api';
+import { txFetchData } from '../../../api';
 import type { JourneyTemplate, JourneyStep, ExperimentSummary, ExperimentSelectResult, ExperimentAutoPauseResult } from '../../../api/growthHubApi';
 
 echarts.use([BarChart, GridComponent, TooltipComponent, LegendComponent, CanvasRenderer]);
@@ -86,7 +86,7 @@ export function GrowthJourneyTemplatePage() {
       const params: Record<string, string> = {};
       if (filterType) params.journey_type = filterType;
       const qs = Object.keys(params).length > 0 ? '?' + new URLSearchParams(params).toString() : '';
-      const resp = await txFetch<{ items: JourneyTemplate[]; total: number }>(`/api/v1/growth/journey-templates${qs}`);
+      const resp = await txFetchData<{ items: JourneyTemplate[]; total: number }>(`/api/v1/growth/journey-templates${qs}`);
       if (resp.data) setTemplates(resp.data.items);
     } catch (err) {
       console.error('fetch templates error', err);
@@ -103,7 +103,7 @@ export function GrowthJourneyTemplatePage() {
     if (!tpl.steps) {
       setDetailLoading(true);
       try {
-        const resp = await txFetch<JourneyTemplate>(`/api/v1/growth/journey-templates/${tpl.id}`);
+        const resp = await txFetchData<JourneyTemplate>(`/api/v1/growth/journey-templates/${tpl.id}`);
         if (resp.data) setSelectedTemplate(resp.data);
       } catch (err) {
         console.error('fetch template detail error', err);
@@ -120,9 +120,9 @@ export function GrowthJourneyTemplatePage() {
     setExpLoading(true);
     try {
       const [summaryResp, selectResp, pauseResp] = await Promise.all([
-        txFetch<ExperimentSummary>(`/api/v1/growth/experiments/${templateId}/summary`),
-        txFetch<ExperimentSelectResult>(`/api/v1/growth/experiments/${templateId}/select-variant`),
-        txFetch<ExperimentAutoPauseResult>(`/api/v1/growth/experiments/${templateId}/auto-pause-check?min_samples=30`),
+        txFetchData<ExperimentSummary>(`/api/v1/growth/experiments/${templateId}/summary`),
+        txFetchData<ExperimentSelectResult>(`/api/v1/growth/experiments/${templateId}/select-variant`),
+        txFetchData<ExperimentAutoPauseResult>(`/api/v1/growth/experiments/${templateId}/auto-pause-check?min_samples=30`),
       ]);
       if (summaryResp.data) setExpSummary(summaryResp.data);
       if (selectResp.data) setExpSelectResult(selectResp.data);

@@ -1,10 +1,13 @@
 """速率限制中间件 — 滑动窗口算法，基于Redis实现
 
 每个app_id + 分钟桶作为key，使用INCR + EXPIRE实现计数。
-Redis不可用时优雅降级：放行请求并记录警告，不拒绝服务。
+Redis不可用时：
+  - 普通速率限制：优雅降级，放行请求并记录警告。
+  - 登录暴力破解保护：降级到内存计数器，保持安全保护。
 """
 
 import time
+from collections import defaultdict
 from typing import Optional
 
 import structlog
@@ -158,6 +161,10 @@ class LoginBruteForceProtection:
     等保三级要求：连续失败5次→锁定30分钟
     独立于普通限速，专门针对登录接口
     Key: "login_fail:ip:{ip}" 和 "login_fail:user:{username}"
+
+    Redis降级策略：
+      - Redis不可用时切换到进程内内存计数器，保持安全保护。
+      - 内存计数器不跨进程/重启共享，但优于完全放行攻击者。
     """
 
     MAX_ATTEMPTS = 5
@@ -165,18 +172,51 @@ class LoginBruteForceProtection:
 
     def __init__(self, redis_client=None) -> None:
         self._redis = redis_client
+        # 内存降级计数器：key → (count, expire_at)
+        self._mem_counts: dict[str, tuple[int, float]] = defaultdict(lambda: (0, 0.0))
 
     def set_redis(self, client) -> None:
         self._redis = client
 
+    def _mem_increment(self, key: str) -> int:
+        """内存计数器自增，到期自动重置。"""
+        now = time.time()
+        count, expire_at = self._mem_counts[key]
+        if now >= expire_at:
+            count = 0
+        count += 1
+        self._mem_counts[key] = (count, now + self.LOCKOUT_SECONDS)
+        return count
+
+    def _mem_get(self, key: str) -> int:
+        """内存计数器读取，到期返回0。"""
+        count, expire_at = self._mem_counts[key]
+        if time.time() >= expire_at:
+            return 0
+        return count
+
+    def _mem_clear(self, *keys: str) -> None:
+        """内存计数器清除（登录成功后调用）。"""
+        for k in keys:
+            self._mem_counts[k] = (0, 0.0)
+
     async def record_failure(self, ip: str, username: str) -> int:
-        """记录失败，返回剩余尝试次数。Redis不可用时降级为放行。"""
+        """记录失败，返回剩余尝试次数。Redis不可用时降级为内存计数器。"""
+        ip_key = f"login_fail:ip:{ip}"
+        user_key = f"login_fail:user:{username}"
         if not self._redis:
-            return self.MAX_ATTEMPTS
+            count = max(self._mem_increment(ip_key), self._mem_increment(user_key))
+            remaining = max(0, self.MAX_ATTEMPTS - count)
+            logger.info(
+                "login_failure_recorded_mem",
+                ip=ip,
+                username=username,
+                count=count,
+                remaining=remaining,
+            )
+            return remaining
         try:
             pipe = self._redis.pipeline()
-            ip_key = f"login_fail:ip:{ip}"
-            user_key = f"login_fail:user:{username}"
             pipe.incr(ip_key)
             pipe.expire(ip_key, self.LOCKOUT_SECONDS)
             pipe.incr(user_key)
@@ -192,31 +232,39 @@ class LoginBruteForceProtection:
                 remaining=remaining,
             )
             return remaining
-        except Exception as exc:  # noqa: BLE001 — Redis故障不阻断登录（降级）
-            logger.warning("brute_force_redis_error", error=str(exc))
-            return self.MAX_ATTEMPTS
+        except Exception as exc:  # noqa: BLE001 — Redis故障降级到内存计数器
+            logger.warning("brute_force_redis_error_fallback_mem", error=str(exc))
+            count = max(self._mem_increment(ip_key), self._mem_increment(user_key))
+            return max(0, self.MAX_ATTEMPTS - count)
 
     async def is_locked(self, ip: str, username: str) -> bool:
-        """检查IP或用户名是否已被锁定。"""
+        """检查IP或用户名是否已被锁定。Redis不可用时降级为内存计数器。"""
+        ip_key = f"login_fail:ip:{ip}"
+        user_key = f"login_fail:user:{username}"
         if not self._redis:
-            return False
+            return (
+                self._mem_get(ip_key) >= self.MAX_ATTEMPTS
+                or self._mem_get(user_key) >= self.MAX_ATTEMPTS
+            )
         try:
-            ip_key = f"login_fail:ip:{ip}"
-            user_key = f"login_fail:user:{username}"
             ip_count = await self._redis.get(ip_key) or 0
             user_count = await self._redis.get(user_key) or 0
             return int(ip_count) >= self.MAX_ATTEMPTS or int(user_count) >= self.MAX_ATTEMPTS
-        except Exception as exc:  # noqa: BLE001 — Redis故障降级为放行
-            logger.warning("brute_force_check_error", error=str(exc))
-            return False
+        except Exception as exc:  # noqa: BLE001 — Redis故障降级到内存计数器
+            logger.warning("brute_force_check_error_fallback_mem", error=str(exc))
+            return (
+                self._mem_get(ip_key) >= self.MAX_ATTEMPTS
+                or self._mem_get(user_key) >= self.MAX_ATTEMPTS
+            )
 
     async def clear_on_success(self, ip: str, username: str) -> None:
         """登录成功后清除失败计数。"""
+        ip_key = f"login_fail:ip:{ip}"
+        user_key = f"login_fail:user:{username}"
+        self._mem_clear(ip_key, user_key)
         if not self._redis:
             return
         try:
-            await self._redis.delete(
-                f"login_fail:ip:{ip}", f"login_fail:user:{username}"
-            )
+            await self._redis.delete(ip_key, user_key)
         except Exception as exc:  # noqa: BLE001 — Redis故障不阻断成功登录
             logger.warning("brute_force_clear_error", error=str(exc))

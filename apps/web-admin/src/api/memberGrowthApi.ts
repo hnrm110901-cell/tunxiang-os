@@ -22,7 +22,7 @@ export interface MemberDashboardData {
   member_revenue_change: number;
   rfm_distribution: RFMDistItem[];
   lifecycle: LifecycleStep[];
-  trend_30d: TrendPoint[];
+  trend_30d: MemberTrendPoint[];
   channel_sources: ChannelSource[];
 }
 
@@ -39,7 +39,7 @@ export interface LifecycleStep {
   conversion_rate: number;
 }
 
-export interface TrendPoint {
+export interface MemberTrendPoint {
   date: string;
   new_members: number;
   active: number;

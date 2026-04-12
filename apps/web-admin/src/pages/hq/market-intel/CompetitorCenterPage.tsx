@@ -5,7 +5,7 @@
  * 竞品列表（名称/类型/距离/评分/人均）+ 新增竞品弹窗
  */
 import { useEffect, useState } from 'react';
-import { txFetch } from '../../../api';
+import { txFetchData } from '../../../api';
 
 // ---- 颜色常量 ----
 const BG_PAGE = '#0d1e28';
@@ -114,7 +114,7 @@ const FALLBACK_RADAR: RadarDimension[] = [
 
 async function fetchCompetitors(): Promise<Competitor[]> {
   try {
-    const res = await txFetch<{ items?: Competitor[] }>('/api/v1/analytics/competitive');
+    const res = await txFetchData<{ items?: Competitor[] }>('/api/v1/analytics/competitive');
     if (res.items && res.items.length > 0) return res.items;
   } catch {
     // 降级
@@ -134,7 +134,7 @@ function AddCompetitorModal({ onClose, onAdd }: { onClose: () => void; onAdd: (c
     if (!form.name.trim()) return;
     setSubmitting(true);
     try {
-      await txFetch('/api/v1/analytics/competitors', {
+      await txFetchData('/api/v1/analytics/competitors', {
         method: 'POST',
         body: JSON.stringify({
           name: form.name,

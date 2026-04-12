@@ -308,7 +308,8 @@ async def _query_pending_actions(
             db.execute(alerts_sql, params),
         )
         swaps_count = r_swaps.scalar() or 0
-    except Exception:
+    except Exception as exc:  # noqa: BLE001 — 换班表可能未建立，降级查询
+        log.warning("store_ops.pending_swaps_unavailable", error=str(exc))
         r_leaves, r_anomalies, r_alerts = await asyncio.gather(
             db.execute(pending_leaves_sql, params),
             db.execute(anomalies_sql, params),

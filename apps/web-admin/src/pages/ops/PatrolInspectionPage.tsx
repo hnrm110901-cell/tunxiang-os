@@ -19,7 +19,7 @@ import {
   RobotOutlined, DownloadOutlined, EyeOutlined, ExclamationCircleOutlined,
   CheckCircleOutlined, CloseCircleOutlined,
 } from '@ant-design/icons';
-import { txFetch } from '../../api';
+import { txFetchData } from '../../api';
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -286,7 +286,7 @@ export function PatrolInspectionPage() {
     };
 
     try {
-      const result = await txFetch<AnalyzeResult>('/api/v1/brain/patrol/analyze', {
+      const result = await txFetchData<AnalyzeResult>('/api/v1/brain/patrol/analyze', {
         method: 'POST',
         body: JSON.stringify(payload),
       });

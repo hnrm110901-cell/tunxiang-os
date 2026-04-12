@@ -6,7 +6,7 @@
  *      GET /api/v1/trade/tables?store_id=XXX, POST /api/v1/trade/tables, PATCH /api/v1/trade/tables/{id}
  */
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { txFetch } from '../../api';
+import { txFetchData } from '../../api';
 
 // ─── 类型定义 ────────────────────────────────────────────────────────────────
 
@@ -123,7 +123,7 @@ function AddStoreModal({ onClose, onAdd }: AddStoreModalProps) {
     if (Object.keys(e).length > 0) { setErrors(e); return; }
     setSubmitting(true);
     try {
-      await txFetch('/api/v1/trade/stores', {
+      await txFetchData('/api/v1/trade/stores', {
         method: 'POST',
         body: JSON.stringify({ ...form, status: 'active' as StoreStatus }),
       });
@@ -530,7 +530,7 @@ function StoreListTab() {
   // 加载门店列表
   useEffect(() => {
     setLoadingStores(true);
-    txFetch<{ items: Store[] }>('/api/v1/trade/stores?page=1&size=200')
+    txFetchData<{ items: Store[] }>('/api/v1/trade/stores?page=1&size=200')
       .then(res => { setStores(res.items ?? []); })
       .catch(() => { setStores(FALLBACK_STORES); })
       .finally(() => { setLoadingStores(false); });
@@ -558,7 +558,7 @@ function StoreListTab() {
   const handleAdd = async (data: Omit<Store, 'id' | 'today_revenue_fen' | 'table_count' | 'created_at'>) => {
     const payload = { ...data, today_revenue_fen: 0, table_count: 0 };
     try {
-      const created = await txFetch<Store>('/api/v1/trade/stores', {
+      const created = await txFetchData<Store>('/api/v1/trade/stores', {
         method: 'POST',
         body: JSON.stringify(payload),
       });
@@ -577,7 +577,7 @@ function StoreListTab() {
   const handleToggleStatus = useCallback(async (store: Store) => {
     const newStatus: StoreStatus = store.status === 'active' ? 'suspended' : 'active';
     try {
-      await txFetch(`/api/v1/trade/stores/${store.id}`, {
+      await txFetchData(`/api/v1/trade/stores/${store.id}`, {
         method: 'PATCH', body: JSON.stringify({ status: newStatus }),
       });
     } catch {
@@ -748,7 +748,7 @@ function TableConfigTab() {
   // 加载门店列表（Tab2 独立加载，不依赖 Tab1）
   useEffect(() => {
     setLoadingStores(true);
-    txFetch<{ items: Store[] }>('/api/v1/trade/stores?page=1&size=200')
+    txFetchData<{ items: Store[] }>('/api/v1/trade/stores?page=1&size=200')
       .then(res => {
         const list = res.items ?? [];
         setStores(list);
@@ -767,7 +767,7 @@ function TableConfigTab() {
     setLoading(true);
     setSelectedIds(new Set());
     try {
-      const res = await txFetch<{ items: TableItem[] }>(`/api/v1/trade/tables?store_id=${storeId}`);
+      const res = await txFetchData<{ items: TableItem[] }>(`/api/v1/trade/tables?store_id=${storeId}`);
       setTables(res.items ?? FALLBACK_TABLES);
     } catch {
       setTables(FALLBACK_TABLES);
@@ -793,7 +793,7 @@ function TableConfigTab() {
 
   const handleSaveTable = useCallback(async (updated: TableItem) => {
     try {
-      await txFetch(`/api/v1/trade/tables/${updated.id}`, {
+      await txFetchData(`/api/v1/trade/tables/${updated.id}`, {
         method: 'PATCH', body: JSON.stringify(updated),
       });
     } catch { /* 降级 */ }
@@ -804,7 +804,7 @@ function TableConfigTab() {
   const handleAddTable = useCallback(async (data: Omit<TableItem, 'id' | 'status'>) => {
     const newTable: TableItem = { ...data, id: `t${Date.now()}`, status: 'available' };
     try {
-      await txFetch('/api/v1/trade/tables', {
+      await txFetchData('/api/v1/trade/tables', {
         method: 'POST', body: JSON.stringify({ ...newTable, store_id: selectedStoreId }),
       });
     } catch { /* 降级 */ }

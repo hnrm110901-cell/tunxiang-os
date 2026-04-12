@@ -6,7 +6,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Card, Table, Tag, Tabs, Spin, Space, Button } from 'antd';
 import { ReloadOutlined } from '@ant-design/icons';
-import { txFetch } from '../../../api';
+import { txFetchData } from '../../../api';
 import type { JourneyEnrollment } from '../../../api/growthHubApi';
 
 // ---- 颜色常量 ----
@@ -75,7 +75,7 @@ export function GrowthJourneyRunsPage() {
       const params: Record<string, string> = { page: String(page), size: String(pageSize) };
       if (activeTab !== 'all') params.journey_state = activeTab;
       const qs = new URLSearchParams(params).toString();
-      const resp = await txFetch<{ items: EnrollmentRow[]; total: number }>(
+      const resp = await txFetchData<{ items: EnrollmentRow[]; total: number }>(
         `/api/v1/growth/journey-enrollments?${qs}`
       );
       if (resp.data) {

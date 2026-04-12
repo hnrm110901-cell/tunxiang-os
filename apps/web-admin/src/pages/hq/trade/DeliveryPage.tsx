@@ -3,7 +3,7 @@
  * 统一管理美团 / 饿了么 / 抖音三平台外卖订单
  */
 import { useEffect, useState, useCallback } from 'react';
-import { txFetch } from '../../../api';
+import { txFetchData } from '../../../api';
 
 // ─── 类型定义 ───
 
@@ -267,7 +267,7 @@ export function DeliveryPage() {
       if (selectedStore) params.set('store_id', selectedStore);
       if (platformFilter !== 'all') params.set('platform', platformFilter);
       if (statusFilter !== 'all') params.set('status', statusFilter);
-      const data = await txFetch<{ items: DeliveryOrder[]; total: number }>(
+      const data = await txFetchData<{ items: DeliveryOrder[]; total: number }>(
         `/api/v1/delivery/orders${params.toString() ? '?' + params.toString() : ''}`,
       );
       setOrders(data.items);
@@ -279,7 +279,7 @@ export function DeliveryPage() {
   const fetchStats = useCallback(async () => {
     try {
       const params = selectedStore ? `?store_id=${encodeURIComponent(selectedStore)}` : '';
-      const data = await txFetch<DailyStats>(`/api/v1/delivery/stats/daily${params}`);
+      const data = await txFetchData<DailyStats>(`/api/v1/delivery/stats/daily${params}`);
       setStats(data);
     } catch {
       /* 保留旧数据 */
@@ -295,7 +295,7 @@ export function DeliveryPage() {
 
   // 初始加载门店列表
   useEffect(() => {
-    txFetch<{ items: { id: string; name: string }[] }>('/api/v1/delivery/platforms')
+    txFetchData<{ items: { id: string; name: string }[] }>('/api/v1/delivery/platforms')
       .then((d) => setStores(d.items || []))
       .catch(() => {/* 忽略 */});
   }, []);
@@ -321,7 +321,7 @@ export function DeliveryPage() {
       prev.map((o) => (o.id === orderId ? { ...o, status: 'confirmed' as const } : o)),
     );
     try {
-      await txFetch(`/api/v1/delivery/orders/${orderId}/confirm`, { method: 'POST' });
+      await txFetchData(`/api/v1/delivery/orders/${orderId}/confirm`, { method: 'POST' });
     } catch {
       /* 回滚或忽略，下次刷新会同步 */
     }
@@ -335,7 +335,7 @@ export function DeliveryPage() {
       prev.map((o) => (o.id === orderId ? { ...o, status: 'rejected' as const } : o)),
     );
     try {
-      await txFetch(`/api/v1/delivery/orders/${orderId}/reject`, {
+      await txFetchData(`/api/v1/delivery/orders/${orderId}/reject`, {
         method: 'POST',
         body: JSON.stringify({ reason }),
       });

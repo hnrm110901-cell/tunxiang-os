@@ -2,7 +2,7 @@
  * 驾驶舱 API — /api/v1/dashboard/*
  * 经营总览、门店排行、预警、趋势
  */
-import { txFetch } from './index';
+import { txFetchData } from './index';
 
 // ─── 类型 ───
 
@@ -46,14 +46,14 @@ export async function fetchDashboardOverview(
   date?: string,
 ): Promise<{ items: OverviewKPI[] }> {
   const dateParam = date ? `?date=${encodeURIComponent(date)}` : '';
-  return txFetch(`/api/v1/dashboard/overview${dateParam}`);
+  return txFetchData<{ items: OverviewKPI[] }>(`/api/v1/dashboard/overview${dateParam}`);
 }
 
 /** 获取门店排行 */
 export async function fetchStoreRanking(
   period: 'day' | 'week' | 'month' = 'day',
 ): Promise<{ items: StoreRankItem[] }> {
-  return txFetch(`/api/v1/dashboard/store-ranking?period=${period}`);
+  return txFetchData<{ items: StoreRankItem[] }>(`/api/v1/dashboard/store-ranking?period=${period}`);
 }
 
 /** 获取驾驶舱预警列表 */
@@ -61,7 +61,7 @@ export async function fetchDashboardAlerts(
   page = 1,
   size = 20,
 ): Promise<{ items: DashboardAlert[]; total: number }> {
-  return txFetch(`/api/v1/dashboard/alerts?page=${page}&size=${size}`);
+  return txFetchData<{ items: DashboardAlert[]; total: number }>(`/api/v1/dashboard/alerts?page=${page}&size=${size}`);
 }
 
 /** 获取经营趋势（日/周/月） */
@@ -70,7 +70,7 @@ export async function fetchRevenueTrend(
   period: 'day' | 'week' | 'month' = 'week',
   days = 30,
 ): Promise<{ items: TrendPoint[] }> {
-  return txFetch(
+  return txFetchData<{ items: TrendPoint[] }>(
     `/api/v1/dashboard/trend?store_id=${encodeURIComponent(storeId)}&period=${period}&days=${days}`,
   );
 }
@@ -82,5 +82,10 @@ export async function fetchRealtimeMetrics(): Promise<{
   active_stores: number;
   active_alerts: number;
 }> {
-  return txFetch('/api/v1/dashboard/realtime');
+  return txFetchData<{
+  total_revenue_fen: number;
+  total_orders: number;
+  active_stores: number;
+  active_alerts: number;
+}>('/api/v1/dashboard/realtime');
 }

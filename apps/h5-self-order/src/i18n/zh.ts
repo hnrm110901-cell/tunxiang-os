@@ -93,6 +93,24 @@ export const zh = {
   submitFeedback: '提交评价',
   feedbackReward: '提交后赠送{points}积分',
 
+  // PayResult
+  payResultSuccess: '支付成功',
+  payResultFailed: '支付失败',
+  payResultRetryHint: '请返回重试',
+  payResultOrderNo: '订单号',
+  payResultAmount: '支付金额',
+  payResultEstTime: '预计出餐时间',
+  payResultMinutes: '分钟',
+  payResultProgress: '出餐进度',
+  payResultViewOrder: '查看订单',
+  payResultContinue: '继续点餐',
+
+  // DemoEntry
+  demoMode: '演示模式',
+  demoWelcome: '欢迎光临',
+  demoLoadingHint: '正在进入点餐页面...',
+  cashPay: '现场结账',
+
   // Common
   back: '返回',
   confirm: '确认',

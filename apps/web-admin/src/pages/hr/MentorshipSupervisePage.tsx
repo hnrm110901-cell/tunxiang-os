@@ -38,7 +38,7 @@ import {
   Tag,
 } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
-import { txFetch } from '../../api/client';
+import { txFetchData } from '../../api/client';
 import dayjs from 'dayjs';
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -124,7 +124,7 @@ export default function MentorshipSupervisePage() {
   const loadStats = async () => {
     setStatsLoading(true);
     try {
-      const resp = await txFetch<StatisticsData>('/api/v1/mentorships/statistics');
+      const resp = await txFetchData<StatisticsData>('/api/v1/mentorships/statistics');
       setStats(resp.data);
     } catch (err) {
       console.error('Failed to load statistics', err);
@@ -137,7 +137,7 @@ export default function MentorshipSupervisePage() {
   const loadLeaderboard = async () => {
     setLeaderboardLoading(true);
     try {
-      const resp = await txFetch<LeaderboardItem[]>('/api/v1/mentorships/leaderboard?top=10');
+      const resp = await txFetchData<LeaderboardItem[]>('/api/v1/mentorships/leaderboard?top=10');
       setLeaderboard(resp.data ?? []);
     } catch (err) {
       console.error('Failed to load leaderboard', err);
@@ -154,7 +154,7 @@ export default function MentorshipSupervisePage() {
   // ━━━━ 创建带教关系 ━━━━
   const handleCreate = async (values: Record<string, unknown>) => {
     try {
-      await txFetch('/api/v1/mentorships', {
+      await txFetchData('/api/v1/mentorships', {
         method: 'POST',
         body: JSON.stringify(values),
       });
@@ -174,7 +174,7 @@ export default function MentorshipSupervisePage() {
   // ━━━━ 完成带教 ━━━━
   const handleComplete = async () => {
     try {
-      await txFetch(`/api/v1/mentorships/${completeModal.id}/complete`, {
+      await txFetchData(`/api/v1/mentorships/${completeModal.id}/complete`, {
         method: 'PUT',
         body: JSON.stringify({
           mentor_score: completeForm.mentor_score,
@@ -201,7 +201,7 @@ export default function MentorshipSupervisePage() {
       return;
     }
     try {
-      await txFetch(`/api/v1/mentorships/${terminateModal.id}/terminate`, {
+      await txFetchData(`/api/v1/mentorships/${terminateModal.id}/terminate`, {
         method: 'PUT',
         body: JSON.stringify({ notes: terminateNotes.trim() }),
       });
@@ -220,7 +220,7 @@ export default function MentorshipSupervisePage() {
   // ━━━━ 删除带教关系 ━━━━
   const handleDelete = async (id: string) => {
     try {
-      await txFetch(`/api/v1/mentorships/${id}`, { method: 'DELETE' });
+      await txFetchData(`/api/v1/mentorships/${id}`, { method: 'DELETE' });
       message.success('带教关系已删除');
       actionRef.current?.reload();
       loadStats();
@@ -441,7 +441,7 @@ export default function MentorshipSupervisePage() {
         request={async (params) => {
           const { current, pageSize, status, store_id } = params;
           try {
-            const res = await txFetch<{ items: Mentorship[]; total: number }>(
+            const res = await txFetchData<{ items: Mentorship[]; total: number }>(
               `/api/v1/mentorships?page=${current}&size=${pageSize}${status ? '&status=' + status : ''}${store_id ? '&store_id=' + store_id : ''}`,
             );
             return {

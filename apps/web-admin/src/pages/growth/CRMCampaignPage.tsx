@@ -3,7 +3,7 @@
  * 调用 POST /api/v1/brain/crm/campaign，生成微信群/朋友圈/小程序文案
  */
 import { useState, useEffect } from 'react';
-import { txFetch } from '../../api';
+import { txFetchData } from '../../api';
 
 // ─── 类型定义 ───
 
@@ -145,7 +145,7 @@ export function CRMCampaignPage() {
         ...form,
         budget_fen: Math.round(form.budget_yuan * 100), // 元→分
       };
-      const data = await txFetch<CampaignResult>('/api/v1/brain/crm/campaign', {
+      const data = await txFetchData<CampaignResult>('/api/v1/brain/crm/campaign', {
         method: 'POST',
         body: JSON.stringify(payload),
       });

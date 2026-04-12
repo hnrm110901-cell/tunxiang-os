@@ -3,7 +3,7 @@
  * 将临期食材自动转化为有利润的特供菜，推送到 POS 屏幕和小程序
  */
 import { useEffect, useState, useCallback } from 'react';
-import { txFetch } from '../../../api';
+import { txFetchData } from '../../../api';
 
 // ─── 类型定义 ───
 
@@ -188,7 +188,7 @@ export function SmartSpecialsPage() {
   // 加载今日已有方案
   const loadToday = useCallback(async () => {
     try {
-      const data = await txFetch<SpecialsData | null>(`/api/v1/specials/today?store_id=${encodeURIComponent(storeId)}`);
+      const data = await txFetchData<SpecialsData | null>(`/api/v1/specials/today?store_id=${encodeURIComponent(storeId)}`);
       if (data) {
         setSpecials(data);
         // 恢复已推送状态
@@ -214,7 +214,7 @@ export function SmartSpecialsPage() {
     setError(null);
     setPushSuccess(false);
     try {
-      const data = await txFetch<SpecialsData>(`/api/v1/specials/generate?store_id=${encodeURIComponent(storeId)}`, {
+      const data = await txFetchData<SpecialsData>(`/api/v1/specials/generate?store_id=${encodeURIComponent(storeId)}`, {
         method: 'POST',
       });
       setSpecials(data);
@@ -232,7 +232,7 @@ export function SmartSpecialsPage() {
     setPushing(true);
     setError(null);
     try {
-      await txFetch('/api/v1/specials/push', {
+      await txFetchData('/api/v1/specials/push', {
         method: 'POST',
         body: JSON.stringify({ store_id: storeId, dish_ids: Array.from(selected) }),
       });

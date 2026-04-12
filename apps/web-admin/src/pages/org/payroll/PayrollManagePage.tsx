@@ -7,7 +7,7 @@
  * Tab3: 薪资配置    — 岗位方案管理
  *
  * API 基地址: /api/v1/org/payroll/
- * X-Tenant-ID 通过 txFetch 统一注入
+ * X-Tenant-ID 通过 txFetchData 统一注入
  * API 失败自动降级 Mock 数据，不阻断 UI
  */
 
@@ -50,7 +50,7 @@ import {
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import dayjs from 'dayjs';
-import { txFetch } from '../../../api';
+import { txFetchData } from '../../../api';
 
 const { Title, Text } = Typography;
 
@@ -284,7 +284,7 @@ export function PayrollManagePage() {
     try {
       const year = selectedMonth.year();
       const month = selectedMonth.month() + 1;
-      const data = await txFetch<{ items: PayrollRecord[] }>(
+      const data = await txFetchData<{ items: PayrollRecord[] }>(
         `/api/v1/org/payroll/records?store_id=${CURRENT_STORE_ID}&year=${year}&month=${month}`,
       );
       setRecords(data.items);
@@ -300,7 +300,7 @@ export function PayrollManagePage() {
     const year = selectedMonth.year();
     const month = selectedMonth.month() + 1;
     try {
-      const data = await txFetch<PayrollSummary>(
+      const data = await txFetchData<PayrollSummary>(
         `/api/v1/org/payroll/summary?store_id=${CURRENT_STORE_ID}&year=${year}&month=${month}`,
       );
       setSummary(data);
@@ -313,7 +313,7 @@ export function PayrollManagePage() {
   const loadConfigs = useCallback(async () => {
     setConfigLoading(true);
     try {
-      const data = await txFetch<{ items: PayrollConfig[] }>(
+      const data = await txFetchData<{ items: PayrollConfig[] }>(
         `/api/v1/org/payroll/configs?store_id=${CURRENT_STORE_ID}`,
       );
       setConfigs(data.items);
@@ -327,7 +327,7 @@ export function PayrollManagePage() {
   // ── API：审批 ─────────────────────────────────────────────────────────────
   const handleApprove = async (record: PayrollRecord) => {
     try {
-      await txFetch(`/api/v1/org/payroll/records/${record.id}/approve`, { method: 'POST' });
+      await txFetchData(`/api/v1/org/payroll/records/${record.id}/approve`, { method: 'POST' });
       messageApi.success(`已审批 ${record.employee_name} 的薪资单`);
       loadRecords();
     } catch {
@@ -340,7 +340,7 @@ export function PayrollManagePage() {
   // ── API：作废 ─────────────────────────────────────────────────────────────
   const handleVoid = async (record: PayrollRecord) => {
     try {
-      await txFetch(`/api/v1/org/payroll/records/${record.id}/void`, { method: 'POST' });
+      await txFetchData(`/api/v1/org/payroll/records/${record.id}/void`, { method: 'POST' });
       messageApi.warning(`已作废 ${record.employee_name} 的薪资单`);
       loadRecords();
     } catch {
@@ -356,7 +356,7 @@ export function PayrollManagePage() {
       const values = await batchForm.validateFields();
       const year = values.month.year();
       const month = values.month.month() + 1;
-      const result = await txFetch<{ records: PayrollRecord[]; employee_count: number; total_salary_fen: number }>(
+      const result = await txFetchData<{ records: PayrollRecord[]; employee_count: number; total_salary_fen: number }>(
         '/api/v1/org/payroll/batch-calculate',
         {
           method: 'POST',
@@ -394,12 +394,12 @@ export function PayrollManagePage() {
         effective_to: values.effective_to?.format('YYYY-MM-DD') || null,
       };
       if (editingConfig?.id) {
-        await txFetch(`/api/v1/org/payroll/configs/${editingConfig.id}`, {
+        await txFetchData(`/api/v1/org/payroll/configs/${editingConfig.id}`, {
           method: 'PUT',
           body: JSON.stringify({ store_id: CURRENT_STORE_ID, ...payload }),
         });
       } else {
-        await txFetch('/api/v1/org/payroll/configs', {
+        await txFetchData('/api/v1/org/payroll/configs', {
           method: 'POST',
           body: JSON.stringify({ store_id: CURRENT_STORE_ID, ...payload }),
         });
@@ -453,7 +453,7 @@ export function PayrollManagePage() {
   // ── 查看详情：切换到 Tab2 ─────────────────────────────────────────────────
   const openDetail = async (record: PayrollRecord) => {
     try {
-      const full = await txFetch<PayrollRecord>(`/api/v1/org/payroll/records/${record.id}`);
+      const full = await txFetchData<PayrollRecord>(`/api/v1/org/payroll/records/${record.id}`);
       setDetailRecord(full);
     } catch {
       setDetailRecord(record);
