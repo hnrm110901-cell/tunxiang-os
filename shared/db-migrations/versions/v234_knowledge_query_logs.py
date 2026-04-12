@@ -10,8 +10,8 @@ Create Date: 2026-04-12
 
 from alembic import op
 
-revision = "v234"
-down_revision = "v233"
+revision = "v234c"
+down_revision = "v234b"
 branch_labels = None
 depends_on = None
 
