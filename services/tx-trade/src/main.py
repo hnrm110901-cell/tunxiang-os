@@ -47,6 +47,7 @@ from .api.inventory_menu_routes import router as inventory_menu_router
 from .api.invoice_routes import router as invoice_router
 from .api.kds_chef_stats_routes import router as kds_chef_stats_router
 from .api.kds_config_routes import router as kds_config_router
+from .api.kds_rules_routes import router as kds_rules_router
 from .api.kds_pause_grab_routes import router as kds_pause_grab_router
 from .api.kds_prep_routes import router as kds_prep_router
 from .api.kds_routes import router as kds_router
@@ -207,6 +208,7 @@ app.include_router(shift_report_router,  prefix="/api/v1/shifts")
 app.include_router(dispatch_rule_router,    prefix="/api/v1/dispatch-rules")
 app.include_router(dispatch_code_router,   prefix="/api/v1/dispatch-codes")
 app.include_router(kds_config_router,      prefix="/api/v1/kds-call")
+app.include_router(kds_rules_router,       prefix="/api/v1/kds-rules")
 app.include_router(kitchen_monitor_router, prefix="/api/v1/kitchen")
 app.include_router(table_monitor_router)
 app.include_router(booking_prep_router,    prefix="/api/v1/booking-prep")

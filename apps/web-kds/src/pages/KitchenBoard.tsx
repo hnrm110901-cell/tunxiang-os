@@ -13,6 +13,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { useKdsWebSocket, type KDSTicket, type RemakeAlert } from '../hooks/useKdsWebSocket';
 import { warmUpAudio } from '../utils/audio';
 import { pauseTicket, resumeTicket, grabTicket } from '../api/kdsOpsApi';
+import { useKDSRules } from '../hooks/useKDSRules';
+import { getTimeLevelFromRules, getChannelColor, type KDSRuleConfig } from '../api/kdsRulesApi';
 
 // ─── KDS 配置（从 localStorage 读取） ───
 
@@ -89,6 +91,10 @@ const TIME_COLORS: Record<TimeLevel, string> = {
 export function KitchenBoard() {
   const config = getKdsConfig();
   const wsEnabled = !!config.host;
+
+  // 加载门店KDS规则配置（storeId 从 localStorage 读取，或使用默认）
+  const storeId = localStorage.getItem('kds_store_id') || null;
+  const { rules } = useKDSRules(storeId);
 
   // WebSocket 数据源
   const {
@@ -360,6 +366,7 @@ export function KitchenBoard() {
               isFlashing={rushTicketIds.has(t.id)}
               isPaused={pausedIds.has(t.id)}
               onGrab={grabMode && operatorId ? () => handleGrab(t.id) : undefined}
+              rules={rules}
             />
           ))}
         </BoardColumn>
@@ -377,6 +384,7 @@ export function KitchenBoard() {
               isFlashing={rushTicketIds.has(t.id)}
               isPaused={pausedIds.has(t.id)}
               onPause={() => togglePause(t.id)}
+              rules={rules}
             />
           ))}
         </BoardColumn>
@@ -535,34 +543,50 @@ function BoardColumn({ title, count, color, bgColor, children }: {
 
 // ─── 工单卡片 ───
 
-function TicketCard({ ticket: t, actionLabel, actionColor, onAction, tick: _tick, isFlashing, isPaused, onPause, onGrab }: {
+function TicketCard({ ticket: t, actionLabel, actionColor, onAction, tick: _tick, isFlashing, isPaused, onPause, onGrab, rules }: {
   ticket: KDSTicket; actionLabel: string; actionColor: string;
   onAction: () => void; tick: number; isFlashing?: boolean;
   isPaused?: boolean;
   onPause?: () => void;
   onGrab?: () => void;
+  rules: KDSRuleConfig;
 }) {
+  const elapsedMinutes = (Date.now() - t.createdAt) / 60000;
+  const ruleLevel = getTimeLevelFromRules(elapsedMinutes, rules);
   const level = getTimeLevel(t.createdAt);
   const elapsed = formatElapsed(t.createdAt);
   const isRush = t.priority === 'rush';
   const isVip = t.priority === 'vip';
   const isCritical = level === 'critical';
 
-  const borderColor = isCritical
-    ? '#A32D2D'
-    : isRush ? '#BA7517' : isVip ? '#722ed1' : '#333';
+  // 使用规则配置的颜色（优先），回退到默认色
+  const urgentColor = rules.urgent_color;
+  const warnColor = rules.warn_color;
+
+  const borderColor = ruleLevel === 'urgent'
+    ? urgentColor
+    : ruleLevel === 'warning'
+      ? warnColor
+      : isRush ? '#BA7517' : isVip ? '#722ed1' : '#333';
+
+  // channel 标识（KDSTicket 扩展字段，若存在则显示）
+  const channelTag = (t as unknown as { channel?: string }).channel as string | undefined;
+  const channelColor = channelTag ? getChannelColor(channelTag, rules) : null;
+  const channelLabel: Record<string, string> = {
+    dine_in: '堂食', takeout: '外卖', pickup: '自取',
+  };
 
   // 催单闪烁：来自 WebSocket rush_order 的最近告警
   const rushFlashing = isFlashing || isRush;
 
   return (
     <div style={{
-      background: isCritical ? '#1a0505' : '#111',
+      background: ruleLevel === 'urgent' ? '#1a0505' : '#111',
       borderRadius: 12, padding: 14,
       borderLeft: `6px solid ${borderColor}`,
-      border: isCritical ? '2px solid #A32D2D' : undefined,
+      border: ruleLevel === 'urgent' ? `2px solid ${urgentColor}` : undefined,
       borderLeftWidth: 6, borderLeftStyle: 'solid', borderLeftColor: borderColor,
-      animation: isCritical
+      animation: ruleLevel === 'urgent'
         ? 'kds-border-flash 1.5s infinite'
         : rushFlashing
           ? 'kds-rush-flash 1s infinite'
@@ -570,9 +594,25 @@ function TicketCard({ ticket: t, actionLabel, actionColor, onAction, tick: _tick
     }}>
       {/* 头部：桌号 + 标签 + 时间 */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
           <span style={{ fontSize: 26, fontWeight: 'bold', color: '#fff' }}>{t.tableNo}</span>
           <span style={{ fontSize: 16, color: '#666' }}>#{t.orderNo}</span>
+          {/* 渠道标识（受规则开关控制） */}
+          {rules.show_channel_badge && channelColor && channelTag && (
+            <span style={{
+              display: 'inline-flex', alignItems: 'center', gap: 3,
+              fontSize: 13, padding: '1px 7px', borderRadius: 5,
+              background: channelColor + '33',
+              border: `1px solid ${channelColor}`,
+              color: channelColor, fontWeight: 600,
+            }}>
+              <span style={{
+                width: 7, height: 7, borderRadius: '50%',
+                background: channelColor, display: 'inline-block',
+              }} />
+              {channelLabel[channelTag] ?? channelTag}
+            </span>
+          )}
           {isRush && (
             <span style={{
               fontSize: 16, padding: '2px 10px', borderRadius: 6,
@@ -593,7 +633,7 @@ function TicketCard({ ticket: t, actionLabel, actionColor, onAction, tick: _tick
         </div>
         <div style={{
           fontSize: 28, fontWeight: 'bold',
-          color: TIME_COLORS[level],
+          color: ruleLevel === 'urgent' ? urgentColor : ruleLevel === 'warning' ? warnColor : TIME_COLORS[level],
           fontFamily: 'JetBrains Mono, monospace',
         }}>
           {elapsed}
