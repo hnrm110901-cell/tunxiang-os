@@ -155,6 +155,7 @@ async def create_binding(
         condition_json=body.condition_json,
         description=body.description,
     )
+    await db.commit()
     return {"ok": True, "data": _binding_to_dict(binding)}
 
 
@@ -177,6 +178,7 @@ async def update_binding(
         )
     except NoResultFound:
         raise HTTPException(status_code=404, detail=f"Binding {binding_id} not found")
+    await db.commit()
     return {"ok": True, "data": _binding_to_dict(binding)}
 
 
@@ -192,4 +194,5 @@ async def delete_binding(
         await svc.delete_binding(x_tenant_id, binding_id)
     except NoResultFound:
         raise HTTPException(status_code=404, detail=f"Binding {binding_id} not found")
+    await db.commit()
     return {"ok": True, "data": {"deleted": str(binding_id)}}

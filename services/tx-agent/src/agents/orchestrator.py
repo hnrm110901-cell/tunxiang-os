@@ -358,13 +358,16 @@ class AgentOrchestrator:
 
             return result
 
-        except (RuntimeError, ValueError, asyncio.CancelledError) as exc:
+        except Exception as exc:  # noqa: BLE001 — 编排最外层兜底，确保 SessionRun 状态更新
             # P0-5: 编排异常时标记 SessionRun 为 failed
             if self.db is not None and session_id:
-                await self._update_session_status(
-                    session_id, "failed",
-                    result_json={"error": str(exc)},
-                )
+                try:
+                    await self._update_session_status(
+                        session_id, "failed",
+                        result_json={"error": str(exc)},
+                    )
+                except Exception:  # noqa: BLE001 — 状态更新失败不应掩盖原始异常
+                    logger.error("session_status_update_failed", session_id=session_id, exc_info=True)
             raise
 
     # ─────────────────────────────────────────────────────────────────────────
@@ -641,6 +644,7 @@ class AgentOrchestrator:
                             "error": last_error,
                         },
                     )
+                await asyncio.sleep(min(1.0 * step.retry_count, 5.0))  # 线性退避，最多5秒
                 continue  # 重试
 
             # 最终失败

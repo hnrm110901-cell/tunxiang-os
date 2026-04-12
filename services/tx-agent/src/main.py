@@ -230,11 +230,13 @@ async def list_agents(
 async def dispatch_agent(
     agent_id: str,
     action: str,
-    params: dict = {},
+    params: dict | None = None,
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
     db: AsyncSession = Depends(get_db_with_tenant_factory),
 ):
     """调度指定 Agent 执行（真实租户 + DB + ModelRouter）"""
+    if params is None:
+        params = {}
     from .agents.master import MasterAgent
     from .agents.skills import ALL_SKILL_AGENTS
     from .services.model_router import ModelRouter

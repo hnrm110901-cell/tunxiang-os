@@ -1,5 +1,6 @@
 """Session Checkpoint 断点记录 — 支持 Agent 任务暂停、人工审核和断点恢复"""
 import uuid
+from datetime import datetime
 
 from sqlalchemy import DateTime, ForeignKey, String, Text
 from sqlalchemy.dialects.postgresql import JSON, UUID
@@ -55,7 +56,7 @@ class SessionCheckpoint(TenantBase):
     resolved_by: Mapped[str | None] = mapped_column(
         String(100), nullable=True, comment="解决者",
     )
-    resolved_at: Mapped[str | None] = mapped_column(
+    resolved_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True, comment="解决时间",
     )
     resolved_comment: Mapped[str | None] = mapped_column(
@@ -63,6 +64,6 @@ class SessionCheckpoint(TenantBase):
     )
 
     # 恢复时间
-    resumed_at: Mapped[str | None] = mapped_column(
+    resumed_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True, comment="Session 恢复时间",
     )

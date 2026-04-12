@@ -13,6 +13,7 @@ from dataclasses import dataclass, field
 from typing import Any, Optional
 
 import structlog
+from sqlalchemy.exc import SQLAlchemyError
 
 logger = structlog.get_logger()
 
@@ -136,7 +137,7 @@ class SkillAgent(ABC):
                     )
                     self._db.add(event)
                     await self._db.flush()
-            except (ImportError, AttributeError, TypeError) as e:
+            except (ImportError, AttributeError, TypeError, SQLAlchemyError) as e:
                 logger.debug("session_event_skip", reason=str(e))
 
         logger.info(

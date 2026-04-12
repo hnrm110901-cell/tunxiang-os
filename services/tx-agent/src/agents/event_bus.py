@@ -303,6 +303,7 @@ DEFAULT_EVENT_HANDLERS: dict[str, list[tuple[str, str]]] = {
         ("member_insight", "update_customer_rfm"),      # 更新会员RFM分层
         ("private_ops", "check_journey_trigger"),        # 检查私域旅程触发条件
         ("finance_audit", "update_daily_revenue"),       # 更新日营收
+        ("personalization", "generate_reorder_prompt"),  # 消费后→生成复购提醒文案
     ],
     "trade.discount.blocked": [
         ("discount_guard", "log_violation"),             # 记录折扣违规
@@ -354,10 +355,6 @@ DEFAULT_EVENT_HANDLERS: dict[str, list[tuple[str, str]]] = {
     "member.profile_updated": [
         ("personalization", "generate_batch_reasons"),    # 用户画像更新→重新生成推荐理由
     ],
-    "trade.order.paid": [
-        ("personalization", "generate_reorder_prompt"),   # 消费后→生成复购提醒文案
-    ],
-
     # ── 排位Agent事件驱动 ────────────────────────────────────────────
     "trade.table.freed": [
         ("queue_seating", "auto_call_next"),              # 桌台空出自动叫号

@@ -228,6 +228,7 @@ async def resolve_checkpoint(
     except SessionStateError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
 
+    await db.commit()
     return {"ok": True, "data": _serialize_session(session_run)}
 
 
@@ -250,6 +251,7 @@ async def create_session(
         trigger_type=req.trigger_type,
         trigger_data=req.trigger_data,
     )
+    await db.commit()
     return {"ok": True, "data": _serialize_session(session_run)}
 
 
@@ -311,6 +313,7 @@ async def start_session(
     except SessionStateError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
 
+    await db.commit()
     return {"ok": True, "data": _serialize_session(session_run)}
 
 
@@ -339,6 +342,7 @@ async def pause_session(
     except SessionStateError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
 
+    await db.commit()
     return {"ok": True, "data": _serialize_checkpoint(checkpoint)}
 
 
@@ -357,6 +361,7 @@ async def cancel_session(
     except SessionStateError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
 
+    await db.commit()
     return {"ok": True, "data": _serialize_session(session_run)}
 
 

@@ -1,5 +1,6 @@
 """Session Run 运行实例 — Agent 任务执行的持久化会话记录，支持断点恢复"""
 import uuid
+from datetime import datetime
 
 from sqlalchemy import DateTime, Index, Integer, String, Text, func
 from sqlalchemy.dialects.postgresql import JSON, UUID
@@ -82,10 +83,10 @@ class SessionRun(TenantBase):
     )
 
     # 时间
-    started_at: Mapped[str | None] = mapped_column(
+    started_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True, comment="开始时间",
     )
-    finished_at: Mapped[str | None] = mapped_column(
+    finished_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True, comment="结束时间",
     )
 

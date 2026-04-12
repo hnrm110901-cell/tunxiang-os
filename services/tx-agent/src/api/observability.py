@@ -26,7 +26,7 @@ router = APIRouter(prefix="/api/v1/agent/observability", tags=["observability"])
 # ── DB 依赖 ──────────────────────────────────────────────────────────────────
 
 async def _get_db(
-    x_tenant_id: str = Header("default", alias="X-Tenant-ID"),
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
 ) -> AsyncSession:
     async for session in get_db_with_tenant(x_tenant_id):
         yield session
@@ -114,9 +114,9 @@ async def get_kpis(
             },
         }
     except (SQLAlchemyError, ConnectionError) as exc:
-        logger.warning("observability.kpis.db_error", error=str(exc))
+        logger.error("observability.kpis.db_error", error=str(exc), exc_info=True)
         return {
-            "ok": True,
+            "ok": False, "error": {"message": "DB query failed", "detail": str(exc)},
             "data": {
                 "total_sessions": 0,
                 "completed": 0,
@@ -191,9 +191,9 @@ async def get_sessions(
             },
         }
     except (SQLAlchemyError, ConnectionError) as exc:
-        logger.warning("observability.sessions.db_error", error=str(exc))
+        logger.error("observability.sessions.db_error", error=str(exc), exc_info=True)
         return {
-            "ok": True,
+            "ok": False, "error": {"message": "DB query failed", "detail": str(exc)},
             "data": {"items": [], "total": 0, "page": page, "size": size},
         }
 
@@ -245,9 +245,9 @@ async def get_session_timeline(
             },
         }
     except (SQLAlchemyError, ConnectionError) as exc:
-        logger.warning("observability.timeline.db_error", error=str(exc), session_id=session_id)
+        logger.error("observability.timeline.db_error", error=str(exc), session_id=session_id, exc_info=True)
         return {
-            "ok": True,
+            "ok": False, "error": {"message": "DB query failed", "detail": str(exc)},
             "data": {"session_id": session_id, "events": [], "count": 0},
         }
 
@@ -341,9 +341,9 @@ async def get_effectiveness(
             },
         }
     except (SQLAlchemyError, ConnectionError) as exc:
-        logger.warning("observability.effectiveness.db_error", error=str(exc))
+        logger.error("observability.effectiveness.db_error", error=str(exc), exc_info=True)
         return {
-            "ok": True,
+            "ok": False, "error": {"message": "DB query failed", "detail": str(exc)},
             "data": {"agents": [], "decision_type_distribution": []},
         }
 
@@ -437,9 +437,9 @@ async def get_health(
             },
         }
     except (SQLAlchemyError, ConnectionError) as exc:
-        logger.warning("observability.health.db_error", error=str(exc))
+        logger.error("observability.health.db_error", error=str(exc), exc_info=True)
         return {
-            "ok": True,
+            "ok": False, "error": {"message": "DB query failed", "detail": str(exc)},
             "data": {
                 "overall_status": "unhealthy",
                 "recent_5min": {"total": 0, "failed": 0},
