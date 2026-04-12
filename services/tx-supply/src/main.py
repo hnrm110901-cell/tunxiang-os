@@ -44,6 +44,11 @@ from .api.transfer_routes import router as transfer_router
 from .api.warehouse_ops_routes import router as warehouse_ops_router
 from .api.edi_routes import router as edi_router
 from .api.smart_procurement_routes import router as smart_procurement_router
+from .api.mobile_supply_routes import (
+    router as mobile_supply_router,
+    transfer_ext_router,
+    edi_ext_router,
+)
 
 app = FastAPI(title="TunxiangOS tx-supply", version="3.0.0")
 
@@ -102,6 +107,9 @@ app.include_router(supplier_portal_router)
 app.include_router(supplier_portal_v2_router)   # Y-E10 去除静默内存降级
 app.include_router(edi_router)                   # 供应商EDI对接（v217表）
 app.include_router(smart_procurement_router)     # 预测驱动智能采购（v219表，对标Fourth iQ）
+app.include_router(mobile_supply_router)         # 移动端供应链：扫码采购/收货/盘点（模块3.3）
+app.include_router(transfer_ext_router)          # 调拨扩展：execute 端点
+app.include_router(edi_ext_router)               # EDI 扩展：供应商查看订单 + 确认发货
 
 @app.get("/health")
 async def health():

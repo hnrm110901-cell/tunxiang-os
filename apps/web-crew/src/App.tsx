@@ -83,6 +83,9 @@ import { DailyBriefPage } from './pages/manager/DailyBriefPage';
 import { StoreLivePage } from './pages/manager/StoreLivePage';
 import { StoreIncidentsCenterPage } from './pages/manager/StoreIncidentsCenterPage';
 import { PatrolExecutionPage } from './pages/manager/PatrolExecutionPage';
+// ─── 模块3.3: 供应链移动端 ────────────────────────────────────────────────────
+import { MobilePurchasePage } from './pages/supply/MobilePurchasePage';
+import { MobileStocktakePage } from './pages/supply/MobileStocktakePage';
 
 const tabs = [
   { path: '/tables',   label: '桌台',   icon: 'T' },
@@ -97,7 +100,7 @@ const tabs = [
 function BottomTab() {
   const loc = useLocation();
   // 在全屏子页面中隐藏底栏
-  const hiddenPaths = ['/open-table', '/order-full', '/rush', '/table-ops', '/member', '/complaint', '/service-confirm', '/peak-alert', '/order-status', '/table-detail', '/table-side-pay', '/seat-split', '/crew-stats', '/manager-app', '/receiving', '/stocktake', '/handover', '/route-optimize', '/shift-schedule', '/dish-recognize', '/shift-summary', '/self-pay-link', '/discount-request', '/scan-pay', '/stored-value-recharge', '/printer-settings', '/waitlist', '/member-level-config', '/group-dashboard', '/store-detail', '/live-seafood', '/reservations', '/daily-settlement', '/shift-handover', '/issue-report', '/member-lookup', '/member-points', '/member/', '/approvals', '/manager-dashboard', '/manager/', '/urge', '/schedule-clock', '/me', '/store/'];
+  const hiddenPaths = ['/open-table', '/order-full', '/rush', '/table-ops', '/member', '/complaint', '/service-confirm', '/peak-alert', '/order-status', '/table-detail', '/table-side-pay', '/seat-split', '/crew-stats', '/manager-app', '/receiving', '/stocktake', '/handover', '/route-optimize', '/shift-schedule', '/dish-recognize', '/shift-summary', '/self-pay-link', '/discount-request', '/scan-pay', '/stored-value-recharge', '/printer-settings', '/waitlist', '/member-level-config', '/group-dashboard', '/store-detail', '/live-seafood', '/reservations', '/daily-settlement', '/shift-handover', '/issue-report', '/member-lookup', '/member-points', '/member/', '/approvals', '/manager-dashboard', '/manager/', '/urge', '/schedule-clock', '/me', '/store/', '/supply/'];
   const shouldHide = hiddenPaths.some(p => loc.pathname.startsWith(p));
   if (shouldHide) return null;
 
@@ -215,6 +218,9 @@ export default function App() {
           <Route path="/manager/store-live" element={<StoreLivePage />} />
           <Route path="/manager/incidents" element={<StoreIncidentsCenterPage />} />
           <Route path="/manager/patrol" element={<PatrolExecutionPage />} />
+          {/* ─── 模块3.3: 供应链移动端 ─── */}
+          <Route path="/supply/purchase" element={<MobilePurchasePage />} />
+          <Route path="/supply/stocktake" element={<MobileStocktakePage />} />
           {/* 催菜/加菜流程 */}
           <Route path="/urge" element={<UrgePage />} />
           {/* 排班查看（Tab页） */}
