@@ -336,6 +336,11 @@ from .api.billing_rules_routes import router as billing_rules_router
 
 app.include_router(billing_rules_router)
 
+# ── 模块2.4: 外卖平台闭环 — 菜单/估清双向同步 + 线上接单 ──
+from .api.omni_sync_routes import router as omni_sync_router
+
+app.include_router(omni_sync_router)
+
 
 @app.get("/health")
 async def health():

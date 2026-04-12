@@ -32,6 +32,7 @@ import { BarCounterPage } from './pages/BarCounterPage';
 import { QuickShiftReportPage } from './pages/QuickShiftReportPage';
 import FoodCourtPage from './pages/FoodCourtPage';  // TC-P2-12 智慧商街档口收银
 import { OmniChannelOrders } from './pages/OmniChannelOrders';  // 外卖聚合接单
+import { OnlineOrdersPage } from './pages/OnlineOrdersPage';  // 模块2.4: 外卖平台闭环
 import { TrainingModePage } from './pages/TrainingModePage';
 import { TrainingModeBanner } from './components/TrainingModeBanner';
 import { useTrainingMode } from './hooks/useTrainingMode';
@@ -93,6 +94,8 @@ function AppLayout() {
         <Route path="/food-court" element={<FoodCourtPage />} />
         {/* ─── Phase 2B: 外卖聚合接单 ─── */}
         <Route path="/delivery" element={<OmniChannelOrders />} />
+        {/* ─── 模块2.4: 外卖平台闭环 — 菜单/估清/线上接单 ─── */}
+        <Route path="/online-orders" element={<OnlineOrdersPage />} />
         {/* ─── 训练/演示模式入口 ─── */}
         <Route path="/training" element={<TrainingModePage />} />
       </Routes>
