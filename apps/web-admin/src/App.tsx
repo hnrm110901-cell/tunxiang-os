@@ -147,6 +147,8 @@ import SCRMAgentPage from './pages/growth/SCRMAgentPage';
 import OmniOrderCenterPage from './pages/trade/OmniOrderCenterPage';
 // ─── OR-02: 员工培训管理 ───────────────────────────────────────────────────────
 import EmployeeTrainingPage from './pages/org/EmployeeTrainingPage';
+// ─── 模块3.2: 加盟商管理闭环 ──────────────────────────────────────────────────
+import FranchiseManagePage from './pages/org/FranchiseManagePage';
 // ─── Y-H1/Y-H2: 多品牌管理统一 + 多区域管理 ────────────────────────────────────
 import BrandRegionPage from './pages/org/BrandRegionPage';
 // ─── Y-I2: 抖音团购管理 ───────────────────────────────────────────────────────
@@ -389,6 +391,8 @@ function App() {
           <Route path="/trade/omni-orders" element={<OmniOrderCenterPage />} />
           {/* ─── OR-02: 员工培训管理 ─── */}
           <Route path="/org/training" element={<EmployeeTrainingPage />} />
+          {/* ─── 模块3.2: 加盟商管理闭环 ─── */}
+          <Route path="/org/franchise" element={<FranchiseManagePage />} />
           {/* ─── Y-H1/Y-H2: 多品牌管理统一 + 多区域管理 ─── */}
           <Route path="/org/brands" element={<BrandRegionPage />} />
           {/* ─── Y-I2: 抖音团购管理 ─── */}

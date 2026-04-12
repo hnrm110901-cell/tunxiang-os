@@ -4,6 +4,35 @@
 
 ---
 
+## 2026-04-12 (加盟商管理闭环 v240 — 模块3.2)
+
+### 今日完成
+- [tx-org] 新建 `franchise_v5_routes.py`，注册 `/api/v1/franchise` 前缀，14 个 API 端点：
+  - 加盟商档案：列表/新建/更新/合同详情（4 个）
+  - 加盟费收缴：应收列表（含逾期天数计算）/标记收款/批量生成本月应收（3 个）
+  - 公共代码：列表/新增/更新/同步到门店（4 个）
+  - 对账报表：营业额汇总/费用收缴汇总（2 个）
+- [db-migrations] 新建 v240 迁移：`franchise_common_codes`（新表+RLS）+ `franchisees`/`franchise_fees` 扩展列
+- [web-admin] 新建 `FranchiseManagePage.tsx`，4-Tab 完整 UI：
+  - Tab1 加盟商档案（列表+新建Modal+合同Drawer+文件上传占位）
+  - Tab2 费用收缴（逾期标红+收款Modal+批量生成本月应收）
+  - Tab3 公共代码（多选+批量同步）
+  - Tab4 对账报表（营业额/费用收缴双表格+月份筛选）
+- [web-admin] 注册路由 `/org/franchise`
+
+### 数据变化
+- 迁移版本：v239 → v240
+- 新增 API 端点：14 个（franchise_v5_routes.py）
+- 新增前端页面：1 个（FranchiseManagePage.tsx）
+
+### 遗留问题
+- 合同文件上传（OSS）占位，待 storage 模块接入
+- 营业额报表 JOIN orders.store_id 字段类型需确认（UUID vs TEXT）
+
+### 明日计划
+- 连通测试：franchise_v5 API + 迁移执行
+- 加盟费自动逾期标记（定时任务/触发器）
+
 ## 2026-04-12 (最低消费/服务费规则引擎 v238)
 
 ### 今日完成
