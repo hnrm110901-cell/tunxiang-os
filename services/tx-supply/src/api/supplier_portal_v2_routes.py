@@ -1,11 +1,11 @@
 """
-供应商门户路由 v2 — 去除静默内存降级，显式只读降级页
+供应商门户路由 v2 — 全量接入真实数据库
 Y-E10
 
 设计原则：
 - DB 不可用时：显式返回 503，禁止静默内存降级
 - 所有写操作有结构化审计日志
-- Mock 数据显式标注 _data_source: "mock"
+- 所有端点均查询真实数据库（supplier_accounts / supplier_rfq_requests / purchase_orders）
 """
 from __future__ import annotations
 
@@ -29,70 +29,6 @@ router = APIRouter(
     prefix="/api/v1/supply/supplier-portal",
     tags=["supplier-portal-v2"],
 )
-
-# ──────────────────────────────────────────────────────────────────────────────
-# Mock 数据（显式标注，非静默）
-# ──────────────────────────────────────────────────────────────────────────────
-
-MOCK_SUPPLIERS: list[dict] = [
-    {
-        "id": "sup-001",
-        "name": "新鲜海鲜供应商（张记）",
-        "rating": 4.8,
-        "total_orders": 156,
-        "portal_status": "active",
-        "category": "seafood",
-        "contact_email": "zhang@example.com",
-        "_data_source": "mock",
-    },
-    {
-        "id": "sup-002",
-        "name": "有机蔬菜基地（绿源）",
-        "rating": 4.5,
-        "total_orders": 89,
-        "portal_status": "active",
-        "category": "vegetable",
-        "contact_email": "lv@example.com",
-        "_data_source": "mock",
-    },
-    {
-        "id": "sup-003",
-        "name": "冻品批发（新农都）",
-        "rating": 3.9,
-        "total_orders": 210,
-        "portal_status": "active",
-        "category": "frozen",
-        "contact_email": "xnd@example.com",
-        "_data_source": "mock",
-    },
-]
-
-MOCK_RFQS: list[dict] = [
-    {
-        "id": "rfq-001",
-        "request_no": "RFQ-202604-0001",
-        "supplier_id": "sup-001",
-        "status": "pending",
-        "items": [{"ingredient_id": "ing-001", "name": "鲈鱼", "qty": 50, "unit": "kg"}],
-        "expected_delivery_date": "2026-04-10",
-        "quoted_price_fen": None,
-        "created_at": "2026-04-06T08:00:00+00:00",
-        "_data_source": "mock",
-    },
-]
-
-MOCK_PURCHASE_ORDERS: list[dict] = [
-    {
-        "id": "po-001",
-        "order_no": "PO-202604-0001",
-        "supplier_id": "sup-001",
-        "status": "pending_confirm",
-        "total_amount_fen": 175000,
-        "items": [{"name": "鲈鱼", "qty": 50, "unit": "kg", "unit_price_fen": 3500}],
-        "created_at": "2026-04-06T09:00:00+00:00",
-        "_data_source": "mock",
-    },
-]
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -520,33 +456,86 @@ async def list_purchase_orders(
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
     db: AsyncSession = Depends(_get_db),
 ) -> dict:
-    """供应商视角的采购订单列表（Mock，采购订单表由 tx-supply 其他模块管理）"""
-    # 采购订单由 purchase_order_routes 模块管理，此处提供供应商视角聚合
-    # 无 DB 依赖，显式标注 mock
-    logger.info(
-        "purchase_orders_list_mock",
-        supplier_id=supplier_id,
-        status=status,
-        tenant_id=x_tenant_id,
-        note="采购订单需跨服务查询，当前返回 mock 数据，生产接入 purchase_orders 表",
-    )
-    items = MOCK_PURCHASE_ORDERS
-    if supplier_id:
-        items = [po for po in items if po["supplier_id"] == supplier_id]
-    if status:
-        items = [po for po in items if po["status"] == status]
+    """供应商视角的采购订单列表"""
+    try:
+        await _set_tenant(db, x_tenant_id)
 
-    return {
-        "ok": True,
-        "data": {
-            "items": items,
-            "total": len(items),
-            "page": page,
-            "size": size,
-        },
-        "_data_source": "mock",
-        "_mock_note": "生产环境需接入 purchase_orders 表",
-    }
+        where_clauses = ["po.tenant_id = :tenant_id", "po.is_deleted = FALSE"]
+        params: dict = {"tenant_id": x_tenant_id, "limit": size, "offset": (page - 1) * size}
+
+        if supplier_id:
+            where_clauses.append("po.supplier_id = :supplier_id")
+            params["supplier_id"] = supplier_id
+        if status:
+            where_clauses.append("po.status = :status")
+            params["status"] = status
+
+        where_sql = " AND ".join(where_clauses)
+
+        result = await db.execute(
+            text(f"""
+                SELECT
+                    po.id,
+                    po.po_number,
+                    po.supplier_id,
+                    sa.name AS supplier_name,
+                    po.store_id,
+                    po.status,
+                    po.total_amount_fen,
+                    po.expected_delivery_date,
+                    po.actual_delivery_date,
+                    po.notes,
+                    po.created_at,
+                    po.updated_at,
+                    COALESCE(
+                        json_agg(
+                            json_build_object(
+                                'id', poi.id,
+                                'ingredient_id', poi.ingredient_id,
+                                'name', poi.ingredient_name,
+                                'qty', poi.quantity,
+                                'unit', poi.unit,
+                                'unit_price_fen', poi.unit_price_fen,
+                                'subtotal_fen', poi.subtotal_fen
+                            )
+                        ) FILTER (WHERE poi.id IS NOT NULL),
+                        '[]'::json
+                    ) AS items
+                FROM purchase_orders po
+                LEFT JOIN supplier_accounts sa ON po.supplier_id = sa.id
+                LEFT JOIN purchase_order_items poi ON poi.po_id = po.id
+                WHERE {where_sql}
+                GROUP BY po.id, sa.name
+                ORDER BY po.created_at DESC
+                LIMIT :limit OFFSET :offset
+            """),
+            params,
+        )
+        rows = [dict(r) for r in result.mappings().all()]
+
+        count_result = await db.execute(
+            text(f"SELECT COUNT(*) FROM purchase_orders po WHERE {where_sql}"),
+            {k: v for k, v in params.items() if k not in ("limit", "offset")},
+        )
+        total = count_result.scalar_one()
+
+        return {
+            "ok": True,
+            "data": {
+                "items": rows,
+                "total": total,
+                "page": page,
+                "size": size,
+            },
+            "_data_source": "db",
+        }
+
+    except (OperationalError, InterfaceError, ProgrammingError) as exc:
+        logger.error("purchase_orders_list_db_error", error=str(exc), tenant_id=x_tenant_id)
+        raise HTTPException(
+            status_code=http_status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=_db_unavailable_response(),
+        )
 
 
 @router.post("/purchase-orders/{po_id}/confirm")
@@ -563,12 +552,54 @@ async def confirm_purchase_order(
     try:
         await _set_tenant(db, x_tenant_id)
 
-        # 尝试查询（验证 DB 可用）
-        await db.execute(text("SELECT 1"))
+        result = await db.execute(
+            text("""
+                SELECT id, status, po_number
+                FROM purchase_orders
+                WHERE id = :po_id AND is_deleted = FALSE
+            """),
+            {"po_id": po_id},
+        )
+        row = result.mappings().first()
+
+        if row is None:
+            raise HTTPException(
+                status_code=http_status.HTTP_404_NOT_FOUND,
+                detail={"ok": False, "error": {"code": "NOT_FOUND", "message": "采购订单不存在"}},
+            )
+        if row["status"] not in ("pending_confirm", "draft", "approved"):
+            raise HTTPException(
+                status_code=http_status.HTTP_400_BAD_REQUEST,
+                detail={
+                    "ok": False,
+                    "error": {
+                        "code": "INVALID_STATUS",
+                        "message": f"采购订单当前状态 '{row['status']}' 不可确认",
+                    },
+                },
+            )
+
+        await db.execute(
+            text("""
+                UPDATE purchase_orders
+                SET status = 'confirmed',
+                    expected_delivery_date = COALESCE(:expected_delivery_date, expected_delivery_date),
+                    notes = COALESCE(:notes, notes),
+                    updated_at = NOW()
+                WHERE id = :po_id
+            """),
+            {
+                "po_id": po_id,
+                "expected_delivery_date": body.estimated_deliver_date,
+                "notes": body.notes,
+            },
+        )
+        await db.commit()
 
         logger.info(
             "purchase_order_confirmed",
             po_id=po_id,
+            po_number=row["po_number"],
             estimated_deliver_date=str(body.estimated_deliver_date) if body.estimated_deliver_date else None,
             tenant_id=x_tenant_id,
             who="supplier",
@@ -583,10 +614,10 @@ async def confirm_purchase_order(
                 "status": "confirmed",
                 "estimated_deliver_date": str(body.estimated_deliver_date) if body.estimated_deliver_date else None,
             },
-            "_data_source": "mock",
-            "_mock_note": "生产环境需更新 purchase_orders 表",
         }
 
+    except HTTPException:
+        raise
     except (OperationalError, InterfaceError) as exc:
         await db.rollback()
         logger.error("po_confirm_db_error", error=str(exc), po_id=po_id)
@@ -594,6 +625,14 @@ async def confirm_purchase_order(
             status_code=http_status.HTTP_503_SERVICE_UNAVAILABLE,
             detail=_db_unavailable_response(),
         )
+    except ProgrammingError as exc:
+        await db.rollback()
+        if "does not exist" in str(exc).lower():
+            raise HTTPException(
+                status_code=http_status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail=_db_unavailable_response(),
+            )
+        raise
 
 
 @router.post("/purchase-orders/{po_id}/deliver")
@@ -609,11 +648,57 @@ async def confirm_delivery(
     """
     try:
         await _set_tenant(db, x_tenant_id)
-        await db.execute(text("SELECT 1"))
+
+        result = await db.execute(
+            text("""
+                SELECT id, status, po_number
+                FROM purchase_orders
+                WHERE id = :po_id AND is_deleted = FALSE
+            """),
+            {"po_id": po_id},
+        )
+        row = result.mappings().first()
+
+        if row is None:
+            raise HTTPException(
+                status_code=http_status.HTTP_404_NOT_FOUND,
+                detail={"ok": False, "error": {"code": "NOT_FOUND", "message": "采购订单不存在"}},
+            )
+        if row["status"] not in ("confirmed", "approved"):
+            raise HTTPException(
+                status_code=http_status.HTTP_400_BAD_REQUEST,
+                detail={
+                    "ok": False,
+                    "error": {
+                        "code": "INVALID_STATUS",
+                        "message": f"采购订单当前状态 '{row['status']}' 不可发货（需先确认接单）",
+                    },
+                },
+            )
+
+        await db.execute(
+            text("""
+                UPDATE purchase_orders
+                SET status = 'delivered',
+                    actual_delivery_date = :actual_delivery_date,
+                    notes = CASE WHEN :delivery_notes IS NOT NULL
+                                 THEN COALESCE(notes || E'\\n', '') || :delivery_notes
+                                 ELSE notes END,
+                    updated_at = NOW()
+                WHERE id = :po_id
+            """),
+            {
+                "po_id": po_id,
+                "actual_delivery_date": body.actual_deliver_date,
+                "delivery_notes": body.delivery_notes,
+            },
+        )
+        await db.commit()
 
         logger.info(
             "purchase_order_delivered",
             po_id=po_id,
+            po_number=row["po_number"],
             actual_deliver_date=str(body.actual_deliver_date),
             tracking_no=body.tracking_no,
             tenant_id=x_tenant_id,
@@ -630,10 +715,10 @@ async def confirm_delivery(
                 "actual_deliver_date": str(body.actual_deliver_date),
                 "tracking_no": body.tracking_no,
             },
-            "_data_source": "mock",
-            "_mock_note": "生产环境需更新 purchase_orders 表并触发收货流程",
         }
 
+    except HTTPException:
+        raise
     except (OperationalError, InterfaceError) as exc:
         await db.rollback()
         logger.error("po_deliver_db_error", error=str(exc), po_id=po_id)
@@ -641,6 +726,14 @@ async def confirm_delivery(
             status_code=http_status.HTTP_503_SERVICE_UNAVAILABLE,
             detail=_db_unavailable_response(),
         )
+    except ProgrammingError as exc:
+        await db.rollback()
+        if "does not exist" in str(exc).lower():
+            raise HTTPException(
+                status_code=http_status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail=_db_unavailable_response(),
+            )
+        raise
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -708,32 +801,15 @@ async def list_suppliers_portal(
         }
 
     except (OperationalError, InterfaceError, ProgrammingError) as exc:
-        logger.warning(
-            "supplier_list_db_unavailable",
+        logger.error(
+            "supplier_list_db_error",
             error=str(exc),
             tenant_id=x_tenant_id,
-            fallback="mock",
         )
-        # DB 不可用时返回 Mock，但显式标注
-        filtered = MOCK_SUPPLIERS
-        if category:
-            filtered = [s for s in filtered if s["category"] == category]
-        if portal_status:
-            filtered = [s for s in filtered if s["portal_status"] == portal_status]
-        if rating_min is not None:
-            filtered = [s for s in filtered if s["rating"] >= rating_min]
-
-        return {
-            "ok": True,
-            "data": {
-                "items": filtered,
-                "total": len(filtered),
-                "page": page,
-                "size": size,
-            },
-            "_data_source": "mock",
-            "_mock_note": "DB 暂时不可用，返回演示数据，生产环境请确保数据库迁移已执行",
-        }
+        raise HTTPException(
+            status_code=http_status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=_db_unavailable_response(),
+        )
 
 
 @router.put("/suppliers/{supplier_id}/rating")

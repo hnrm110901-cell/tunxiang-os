@@ -191,54 +191,6 @@ async def _find_available_candidates(
         return []
 
 
-# ── Mock数据 ─────────────────────────────────────────────────────────────────
-
-
-def _mock_absent_schedule() -> dict[str, Any]:
-    return {
-        "schedule_id": "mock-sched-001",
-        "employee_id": "mock-emp-010",
-        "emp_name": "孙八",
-        "store_id": "mock-store-001",
-        "shift_date": date.today().isoformat(),
-        "start_time": "11:00",
-        "end_time": "21:00",
-        "role": "waiter",
-    }
-
-
-def _mock_candidates(store_id: str, role: str) -> list[dict[str, Any]]:
-    return [
-        {
-            "employee_id": "mock-emp-020",
-            "emp_name": "候选A",
-            "role": role,
-            "store_id": store_id,
-            "phone": "138****1001",
-            "score": 95.0,
-            "reason": "同店同岗，当天无排班",
-        },
-        {
-            "employee_id": "mock-emp-021",
-            "emp_name": "候选B",
-            "role": role,
-            "store_id": "mock-store-002",
-            "phone": "138****1002",
-            "score": 65.0,
-            "reason": "同岗不同店，当天无排班",
-        },
-        {
-            "employee_id": "mock-emp-022",
-            "emp_name": "候选C",
-            "role": "chef",
-            "store_id": store_id,
-            "phone": "138****1003",
-            "score": 50.0,
-            "reason": "同店不同岗，可跨岗补位",
-        },
-    ]
-
-
 # ── Agent 类 ─────────────────────────────────────────────────────────────────
 
 
@@ -382,25 +334,11 @@ class AttendanceRecoveryAgent(SkillAgent):
         )
 
         if not self._db:
-            logger.info("recovery_detect_mock", tenant_id=self.tenant_id)
-            schedule = _mock_absent_schedule()
-            gap_id = f"mock-gap-{uuid4().hex[:8]}"
-            candidates = _mock_candidates(
-                schedule["store_id"], schedule["role"]
-            )
-            urgency = _urgency_level(schedule.get("start_time"))
+            logger.warning("recovery_detect_no_db", tenant_id=self.tenant_id)
             return AgentResult(
-                success=True,
+                success=False,
                 action="detect_absence",
-                data={
-                    "schedule": schedule,
-                    "gap_id": gap_id,
-                    "urgency": urgency,
-                    "candidates": candidates,
-                    "candidate_count": len(candidates),
-                },
-                reasoning=f"检测到{schedule['emp_name']}缺勤，已创建缺口并找到{len(candidates)}名候选人",
-                confidence=0.90,
+                error="数据库连接不可用",
             )
 
         # 真实逻辑
@@ -479,13 +417,11 @@ class AttendanceRecoveryAgent(SkillAgent):
                                error="缺少 store_id")
 
         if not self._db:
-            candidates = _mock_candidates(store_id, role)
+            logger.warning("recovery_replacements_no_db", tenant_id=self.tenant_id)
             return AgentResult(
-                success=True,
+                success=False,
                 action="find_replacements",
-                data={"candidates": candidates},
-                reasoning=f"找到{len(candidates)}名候选人（mock）",
-                confidence=0.80,
+                error="数据库连接不可用",
             )
 
         # 获取预订上下文用于候选人评分

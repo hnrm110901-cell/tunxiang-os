@@ -168,9 +168,31 @@ async def _load_employee_for_turnover(
         SELECT e.id::text AS employee_id, e.emp_name, e.role,
                e.seniority_months, e.daily_wage_standard_fen, e.performance_score,
                e.grade_level, e.training_completed, e.hire_date,
-               COALESCE(NULLIF(TRIM(LOWER(s.city)), ''), 'changsha') AS store_city
+               COALESCE(NULLIF(TRIM(LOWER(s.city)), ''), 'changsha') AS store_city,
+               ps.total_salary_fen AS payroll_salary_fen,
+               COALESCE(att.avg_work_hours, 0.0) AS avg_daily_work_hours,
+               COALESCE(att.present_days, 0) AS attendance_present_days,
+               COALESCE(att.total_days, 0) AS attendance_total_days
         FROM employees e
         JOIN stores s ON s.id = e.store_id AND s.tenant_id = e.tenant_id
+        LEFT JOIN LATERAL (
+            SELECT total_salary_fen
+            FROM payroll_summaries ps2
+            WHERE ps2.tenant_id = e.tenant_id
+              AND ps2.employee_id = e.id
+            ORDER BY ps2.period_year DESC, ps2.period_month DESC
+            LIMIT 1
+        ) ps ON true
+        LEFT JOIN LATERAL (
+            SELECT
+                AVG(work_hours) AS avg_work_hours,
+                COUNT(*) FILTER (WHERE status = 'present') AS present_days,
+                COUNT(*) AS total_days
+            FROM daily_attendance da
+            WHERE da.tenant_id = e.tenant_id
+              AND da.employee_id = e.id
+              AND da.date >= CURRENT_DATE - INTERVAL '90 days'
+        ) att ON true
         WHERE e.tenant_id = CAST(:tenant_id AS uuid)
           AND e.id = CAST(:employee_id AS uuid)
           AND e.is_deleted = false
@@ -195,19 +217,24 @@ def _build_turnover_from_row(row: dict[str, Any]) -> dict[str, Any]:
     role_key = _normalize_position(row.get("role") or "waiter")
     bench = _benchmark_for(city_key, role_key)
     p50 = bench["p50"]
+
+    # Prefer payroll_summaries total_salary_fen; fall back to daily_wage * 26
+    payroll_sal = row.get("payroll_salary_fen")
     daily = row.get("daily_wage_standard_fen")
     monthly_est: Optional[int] = None
-    if daily is not None and int(daily) > 0:
+    if payroll_sal is not None and int(payroll_sal) > 0:
+        monthly_est = int(payroll_sal)
+    elif daily is not None and int(daily) > 0:
         monthly_est = int(daily) * 26
 
     if monthly_est is None:
         sal_score = 55
-        sal_detail = "缺少日薪标准，按中等竞争力估算"
+        sal_detail = "缺少薪资记录，按中等竞争力估算"
     else:
         ratio = monthly_est / max(1, p50)
         if ratio < 0.85:
             sal_score = 78
-            sal_detail = f"月薪估算低于市场P50约 {int((1 - ratio) * 100)}%"
+            sal_detail = f"月薪低于市场P50约 {int((1 - ratio) * 100)}%"
         elif ratio < 1.0:
             sal_score = 62
             sal_detail = "略低于市场P50"
@@ -232,8 +259,26 @@ def _build_turnover_from_row(row: dict[str, Any]) -> dict[str, Any]:
         perf_score = 36
         perf_detail = "近周期绩效稳定"
 
-    attend_score = 32
-    attend_detail = "无考勤聚合字段，按默认稳定度"
+    # Derive attendance stability from real daily_attendance aggregates
+    present_days = int(row.get("attendance_present_days") or 0)
+    total_days = int(row.get("attendance_total_days") or 0)
+    if total_days >= 10:
+        att_rate = present_days / total_days
+        if att_rate >= 0.95:
+            attend_score = 18
+            attend_detail = f"近90天出勤率{att_rate:.0%}，出勤优秀"
+        elif att_rate >= 0.85:
+            attend_score = 32
+            attend_detail = f"近90天出勤率{att_rate:.0%}，出勤正常"
+        elif att_rate >= 0.70:
+            attend_score = 52
+            attend_detail = f"近90天出勤率{att_rate:.0%}，出勤偏低"
+        else:
+            attend_score = 72
+            attend_detail = f"近90天出勤率{att_rate:.0%}，出勤异常，流失风险上升"
+    else:
+        attend_score = 32
+        attend_detail = "无足够考勤记录，按默认稳定度"
 
     sm = row.get("seniority_months")
     if sm is not None:
@@ -311,8 +356,17 @@ async def _load_store_employees(
 ) -> list[dict[str, Any]]:
     q = text("""
         SELECT e.id::text AS employee_id, e.emp_name, e.daily_wage_standard_fen,
-               e.role, e.performance_score, e.seniority_months
+               e.role, e.performance_score, e.seniority_months,
+               ps.total_salary_fen AS payroll_salary_fen
         FROM employees e
+        LEFT JOIN LATERAL (
+            SELECT total_salary_fen
+            FROM payroll_summaries ps2
+            WHERE ps2.tenant_id = e.tenant_id
+              AND ps2.employee_id = e.id
+            ORDER BY ps2.period_year DESC, ps2.period_month DESC
+            LIMIT 1
+        ) ps ON true
         WHERE e.tenant_id = CAST(:tenant_id AS uuid)
           AND e.store_id = CAST(:store_id AS uuid)
           AND e.is_deleted = false
@@ -605,8 +659,15 @@ class SalaryAdvisorAgent(SkillAgent):
             rows = await _load_store_employees(self._db, self.tenant_id, str(store_id), 5)
             for r in rows:
                 pr, wt = _priority_for_raise_row(r)
+                # Prefer actual payroll record; fall back to daily_wage * 26
+                payroll_sal = r.get("payroll_salary_fen")
                 daily = r.get("daily_wage_standard_fen") or 0
-                base_monthly = int(daily) * 26 if int(daily) > 0 else 400000
+                if payroll_sal is not None and int(payroll_sal) > 0:
+                    base_monthly = int(payroll_sal)
+                elif int(daily) > 0:
+                    base_monthly = int(daily) * 26
+                else:
+                    base_monthly = 400000
                 candidates.append(
                     {
                         "employee_id": r["employee_id"],

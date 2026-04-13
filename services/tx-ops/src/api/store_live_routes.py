@@ -1,4 +1,10 @@
-"""营业中控台 API 路由（Mock 数据版）
+"""营业中控台 API 路由（真实DB版）
+
+数据源：
+  stores        — 门店基本信息（id, store_name, status）
+  orders        — 今日订单（status, total_amount_fen, created_at, store_id）
+  dining_sessions — 当前活跃桌台会话（seated/ordering/dining/add_ordering）
+  compliance_alerts — 门店告警（severity, status='open'）
 
 端点:
   GET /api/v1/ops/store/live-dashboard  门店实时运营数据
@@ -7,172 +13,31 @@
 """
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 import structlog
-from fastapi import APIRouter, Header, Query
-from pydantic import BaseModel, Field
+from fastapi import APIRouter, Depends, Header, Query
+from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from shared.ontology.src.database import get_db
 
 router = APIRouter(prefix="/api/v1/ops/store", tags=["ops-store-live"])
 log = structlog.get_logger(__name__)
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-#  Mock 数据
+#  内部辅助
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-_MOCK_STORE_LIVE: Dict[str, Any] = {
-    "overview": {
-        "total_stores": 12,
-        "open_stores": 10,
-        "closed_stores": 2,
-        "alert_stores": 3,
-    },
-    "real_time_metrics": {
-        "total_revenue_fen": 15680000,
-        "total_orders": 487,
-        "avg_ticket_fen": 32200,
-        "table_turnover_rate": 2.8,
-        "current_diners": 186,
-        "waiting_count": 23,
-    },
-    "stores": [
-        {
-            "store_id": "store-001",
-            "store_name": "尝在一起(芙蓉广场店)",
-            "status": "open",
-            "open_since": "2026-04-10T10:00:00+08:00",
-            "revenue_fen": 2860000,
-            "orders": 89,
-            "avg_ticket_fen": 32130,
-            "current_diners": 42,
-            "total_seats": 80,
-            "seat_utilization": 0.525,
-            "table_turnover_rate": 3.1,
-            "waiting_count": 8,
-            "avg_wait_minutes": 12,
-            "kds_avg_seconds": 420,
-            "kds_timeout_count": 2,
-            "staff_on_duty": 8,
-            "alerts": [
-                {"type": "kds_timeout", "message": "3号厨房出餐超时(>15分钟)", "time": "2026-04-10T12:35:00+08:00", "severity": "high"},
-            ],
-            "hourly_revenue_fen": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 180000, 680000, 920000, 480000, 320000, 280000],
-        },
-        {
-            "store_id": "store-002",
-            "store_name": "尝在一起(五一广场店)",
-            "status": "open",
-            "open_since": "2026-04-10T09:30:00+08:00",
-            "revenue_fen": 3210000,
-            "orders": 102,
-            "avg_ticket_fen": 31470,
-            "current_diners": 56,
-            "total_seats": 100,
-            "seat_utilization": 0.56,
-            "table_turnover_rate": 3.4,
-            "waiting_count": 12,
-            "avg_wait_minutes": 15,
-            "kds_avg_seconds": 380,
-            "kds_timeout_count": 0,
-            "staff_on_duty": 10,
-            "alerts": [],
-            "hourly_revenue_fen": [0, 0, 0, 0, 0, 0, 0, 0, 0, 210000, 520000, 780000, 860000, 420000, 220000, 198000],
-        },
-        {
-            "store_id": "store-003",
-            "store_name": "最黔线(河西店)",
-            "status": "open",
-            "open_since": "2026-04-10T10:30:00+08:00",
-            "revenue_fen": 1950000,
-            "orders": 65,
-            "avg_ticket_fen": 30000,
-            "current_diners": 28,
-            "total_seats": 60,
-            "seat_utilization": 0.467,
-            "table_turnover_rate": 2.6,
-            "waiting_count": 3,
-            "avg_wait_minutes": 8,
-            "kds_avg_seconds": 350,
-            "kds_timeout_count": 0,
-            "staff_on_duty": 6,
-            "alerts": [],
-            "hourly_revenue_fen": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 120000, 480000, 620000, 380000, 210000, 140000],
-        },
-        {
-            "store_id": "store-004",
-            "store_name": "尚宫厨(万达店)",
-            "status": "open",
-            "open_since": "2026-04-10T11:00:00+08:00",
-            "revenue_fen": 2480000,
-            "orders": 58,
-            "avg_ticket_fen": 42760,
-            "current_diners": 34,
-            "total_seats": 70,
-            "seat_utilization": 0.486,
-            "table_turnover_rate": 2.2,
-            "waiting_count": 0,
-            "avg_wait_minutes": 0,
-            "kds_avg_seconds": 510,
-            "kds_timeout_count": 3,
-            "staff_on_duty": 7,
-            "alerts": [
-                {"type": "equipment", "message": "POS打印机卡纸告警", "time": "2026-04-10T13:20:00+08:00", "severity": "medium"},
-                {"type": "kds_timeout", "message": "出餐平均时间偏高(8.5min)", "time": "2026-04-10T12:50:00+08:00", "severity": "medium"},
-            ],
-            "hourly_revenue_fen": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 580000, 780000, 520000, 360000, 240000],
-        },
-        {
-            "store_id": "store-005",
-            "store_name": "最黔线(岳麓店)",
-            "status": "open",
-            "open_since": "2026-04-10T10:00:00+08:00",
-            "revenue_fen": 1680000,
-            "orders": 53,
-            "avg_ticket_fen": 31700,
-            "current_diners": 18,
-            "total_seats": 50,
-            "seat_utilization": 0.36,
-            "table_turnover_rate": 2.4,
-            "waiting_count": 0,
-            "avg_wait_minutes": 0,
-            "kds_avg_seconds": 310,
-            "kds_timeout_count": 0,
-            "staff_on_duty": 5,
-            "alerts": [],
-            "hourly_revenue_fen": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 100000, 380000, 520000, 340000, 200000, 140000],
-        },
-        {
-            "store_id": "store-006",
-            "store_name": "尝在一起(梅溪湖店)",
-            "status": "closed",
-            "open_since": None,
-            "revenue_fen": 0,
-            "orders": 0,
-            "avg_ticket_fen": 0,
-            "current_diners": 0,
-            "total_seats": 60,
-            "seat_utilization": 0,
-            "table_turnover_rate": 0,
-            "waiting_count": 0,
-            "avg_wait_minutes": 0,
-            "kds_avg_seconds": 0,
-            "kds_timeout_count": 0,
-            "staff_on_duty": 0,
-            "alerts": [
-                {"type": "store_closed", "message": "门店今日未营业（装修中）", "time": "2026-04-10T08:00:00+08:00", "severity": "low"},
-            ],
-            "hourly_revenue_fen": [],
-        },
-    ],
-    "channel_breakdown": {
-        "dine_in": {"orders": 312, "revenue_fen": 10240000},
-        "takeaway_meituan": {"orders": 86, "revenue_fen": 2580000},
-        "takeaway_ele": {"orders": 52, "revenue_fen": 1560000},
-        "takeaway_douyin": {"orders": 37, "revenue_fen": 1300000},
-    },
-    "snapshot_time": "2026-04-10T15:30:00+08:00",
-}
+
+async def _set_rls(db: AsyncSession, tenant_id: str) -> None:
+    await db.execute(
+        text("SELECT set_config('app.tenant_id', :tid, true)"),
+        {"tid": tenant_id},
+    )
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -184,14 +49,253 @@ _MOCK_STORE_LIVE: Dict[str, Any] = {
 async def get_live_dashboard(
     store_id: Optional[str] = Query(None, description="指定门店ID（不传返回全部）"),
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ) -> Dict[str, Any]:
     """门店实时运营数据中控台。"""
     log.info("store_live_dashboard_requested", tenant_id=x_tenant_id, store_id=store_id)
+    snapshot_time = datetime.now(tz=timezone.utc).isoformat()
 
-    if store_id:
-        for s in _MOCK_STORE_LIVE["stores"]:
-            if s["store_id"] == store_id:
-                return {"ok": True, "data": {"stores": [s], "snapshot_time": _MOCK_STORE_LIVE["snapshot_time"]}}
-        return {"ok": True, "data": {"stores": [], "snapshot_time": _MOCK_STORE_LIVE["snapshot_time"]}}
+    try:
+        await _set_rls(db, x_tenant_id)
 
-    return {"ok": True, "data": _MOCK_STORE_LIVE}
+        # 1. 门店列表
+        stores_q = """
+            SELECT id, store_name, status
+            FROM stores
+            WHERE tenant_id = :tid AND is_deleted = FALSE
+        """
+        params: Dict[str, Any] = {"tid": x_tenant_id}
+        if store_id:
+            stores_q += " AND id = :sid::uuid"
+            params["sid"] = store_id
+        stores_q += " ORDER BY store_name"
+        stores_result = await db.execute(text(stores_q), params)
+        store_rows = stores_result.fetchall()
+
+        if not store_rows:
+            return {
+                "ok": True,
+                "data": {
+                    "overview": {"total_stores": 0, "open_stores": 0, "closed_stores": 0, "alert_stores": 0},
+                    "real_time_metrics": {
+                        "total_revenue_fen": 0,
+                        "total_orders": 0,
+                        "avg_ticket_fen": 0,
+                        "table_turnover_rate": 0,
+                        "current_diners": 0,
+                        "waiting_count": 0,
+                    },
+                    "stores": [],
+                    "snapshot_time": snapshot_time,
+                },
+            }
+
+        store_ids = [str(r.id) for r in store_rows]
+        store_id_list = "'" + "','".join(store_ids) + "'"
+
+        # 2. 今日订单汇总（按门店）
+        orders_agg_result = await db.execute(
+            text(f"""
+                SELECT
+                    store_id,
+                    COUNT(*)                                            AS order_count,
+                    COALESCE(SUM(total_amount_fen), 0)                  AS revenue_fen,
+                    COALESCE(AVG(total_amount_fen), 0)                  AS avg_ticket_fen,
+                    MIN(created_at)                                     AS first_order_at
+                FROM orders
+                WHERE tenant_id = :tid
+                  AND store_id::text IN ({store_id_list})
+                  AND status = 'paid'
+                  AND DATE(created_at AT TIME ZONE 'Asia/Shanghai') = CURRENT_DATE
+                GROUP BY store_id
+            """),
+            {"tid": x_tenant_id},
+        )
+        orders_by_store: Dict[str, Any] = {}
+        for row in orders_agg_result.fetchall():
+            orders_by_store[str(row.store_id)] = {
+                "order_count": int(row.order_count),
+                "revenue_fen": int(row.revenue_fen),
+                "avg_ticket_fen": int(row.avg_ticket_fen),
+                "first_order_at": row.first_order_at.isoformat() if row.first_order_at else None,
+            }
+
+        # 3. 活跃就餐会话（dining_sessions — seated/ordering/dining/add_ordering/billing）
+        active_sessions_result = await db.execute(
+            text(f"""
+                SELECT
+                    store_id,
+                    COUNT(*)          AS active_sessions,
+                    SUM(guest_count)  AS total_diners
+                FROM dining_sessions
+                WHERE tenant_id = :tid
+                  AND store_id::text IN ({store_id_list})
+                  AND status NOT IN ('paid', 'clearing', 'disabled')
+                  AND is_deleted = FALSE
+                GROUP BY store_id
+            """),
+            {"tid": x_tenant_id},
+        )
+        sessions_by_store: Dict[str, Any] = {}
+        for row in active_sessions_result.fetchall():
+            sessions_by_store[str(row.store_id)] = {
+                "active_sessions": int(row.active_sessions),
+                "total_diners": int(row.total_diners or 0),
+            }
+
+        # 4. 桌台总座位数（tables per store）
+        tables_result = await db.execute(
+            text(f"""
+                SELECT store_id, COUNT(*) AS table_count, SUM(seats) AS total_seats
+                FROM tables
+                WHERE tenant_id = :tid
+                  AND store_id::text IN ({store_id_list})
+                  AND is_deleted = FALSE AND is_active = TRUE
+                GROUP BY store_id
+            """),
+            {"tid": x_tenant_id},
+        )
+        tables_by_store: Dict[str, Any] = {}
+        for row in tables_result.fetchall():
+            tables_by_store[str(row.store_id)] = {
+                "table_count": int(row.table_count),
+                "total_seats": int(row.total_seats or 0),
+            }
+
+        # 5. 今日已完成桌台会话数（用于翻台率）
+        closed_sessions_result = await db.execute(
+            text(f"""
+                SELECT store_id, COUNT(*) AS closed_count
+                FROM dining_sessions
+                WHERE tenant_id = :tid
+                  AND store_id::text IN ({store_id_list})
+                  AND status IN ('paid', 'clearing')
+                  AND DATE(opened_at AT TIME ZONE 'Asia/Shanghai') = CURRENT_DATE
+                  AND is_deleted = FALSE
+                GROUP BY store_id
+            """),
+            {"tid": x_tenant_id},
+        )
+        closed_by_store: Dict[str, Any] = {}
+        for row in closed_sessions_result.fetchall():
+            closed_by_store[str(row.store_id)] = int(row.closed_count)
+
+        # 6. 未处理告警（compliance_alerts）
+        alerts_result = await db.execute(
+            text(f"""
+                SELECT store_id, severity, title, created_at
+                FROM compliance_alerts
+                WHERE tenant_id = :tid
+                  AND status = 'open'
+                  AND store_id::text IN ({store_id_list})
+                ORDER BY created_at DESC
+            """),
+            {"tid": x_tenant_id},
+        )
+        alerts_by_store: Dict[str, List[Dict[str, Any]]] = {}
+        for row in alerts_result.fetchall():
+            sid = str(row.store_id) if row.store_id else None
+            if sid:
+                if sid not in alerts_by_store:
+                    alerts_by_store[sid] = []
+                alerts_by_store[sid].append({
+                    "type": "compliance",
+                    "message": row.title,
+                    "time": row.created_at.isoformat() if row.created_at else None,
+                    "severity": row.severity,
+                })
+
+        # Build per-store objects
+        stores_out: List[Dict[str, Any]] = []
+        total_revenue = 0
+        total_orders = 0
+        total_diners = 0
+        alert_store_ids: set = set()
+
+        for s in store_rows:
+            sid = str(s.id)
+            is_open = s.status not in ("closed", "disabled", "maintenance")
+            ord_data = orders_by_store.get(sid, {})
+            sess_data = sessions_by_store.get(sid, {})
+            tbl_data = tables_by_store.get(sid, {})
+            store_alerts = alerts_by_store.get(sid, [])
+
+            revenue_fen = ord_data.get("revenue_fen", 0)
+            order_count = ord_data.get("order_count", 0)
+            avg_ticket = ord_data.get("avg_ticket_fen", 0)
+            current_diners = sess_data.get("total_diners", 0)
+            total_seats = tbl_data.get("total_seats", 0)
+            seat_util = round(current_diners / total_seats, 3) if total_seats > 0 else 0.0
+
+            # 翻台率 = 已完成会话 / 桌台数
+            table_count = tbl_data.get("table_count", 0)
+            closed_count = closed_by_store.get(sid, 0)
+            turnover_rate = round(closed_count / table_count, 1) if table_count > 0 else 0.0
+
+            total_revenue += revenue_fen
+            total_orders += order_count
+            total_diners += current_diners
+            if store_alerts:
+                alert_store_ids.add(sid)
+
+            stores_out.append({
+                "store_id": sid,
+                "store_name": s.store_name,
+                "status": "open" if is_open else "closed",
+                "open_since": ord_data.get("first_order_at"),
+                "revenue_fen": revenue_fen,
+                "orders": order_count,
+                "avg_ticket_fen": avg_ticket,
+                "current_diners": current_diners,
+                "total_seats": total_seats,
+                "seat_utilization": seat_util,
+                "table_turnover_rate": turnover_rate,
+                "waiting_count": 0,   # 排队人数需接入 waitlist 表，当前返回 0
+                "avg_wait_minutes": 0,
+                "alerts": store_alerts,
+            })
+
+        open_count = sum(1 for r in store_rows if r.status not in ("closed", "disabled", "maintenance"))
+        closed_count_all = len(store_rows) - open_count
+        avg_ticket_all = round(total_revenue / total_orders) if total_orders > 0 else 0
+
+        return {
+            "ok": True,
+            "data": {
+                "overview": {
+                    "total_stores": len(store_rows),
+                    "open_stores": open_count,
+                    "closed_stores": closed_count_all,
+                    "alert_stores": len(alert_store_ids),
+                },
+                "real_time_metrics": {
+                    "total_revenue_fen": total_revenue,
+                    "total_orders": total_orders,
+                    "avg_ticket_fen": avg_ticket_all,
+                    "table_turnover_rate": 0,
+                    "current_diners": total_diners,
+                    "waiting_count": 0,
+                },
+                "stores": stores_out,
+                "snapshot_time": snapshot_time,
+            },
+        }
+
+    except SQLAlchemyError as exc:
+        log.error("store_live_dashboard_db_error", error=str(exc), tenant_id=x_tenant_id)
+        return {
+            "ok": True,
+            "data": {
+                "overview": {"total_stores": 0, "open_stores": 0, "closed_stores": 0, "alert_stores": 0},
+                "real_time_metrics": {
+                    "total_revenue_fen": 0,
+                    "total_orders": 0,
+                    "avg_ticket_fen": 0,
+                    "table_turnover_rate": 0,
+                    "current_diners": 0,
+                    "waiting_count": 0,
+                },
+                "stores": [],
+                "snapshot_time": snapshot_time,
+            },
+        }

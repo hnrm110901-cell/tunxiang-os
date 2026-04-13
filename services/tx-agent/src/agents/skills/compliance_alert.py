@@ -332,120 +332,6 @@ compliance_alert_service = SimpleNamespace(
 )
 
 
-def _mock_documents() -> list[dict[str, Any]]:
-    today = date.today()
-    return [
-        {
-            "alert_id": "doc:mock-e001:health_cert_expiry",
-            "category": "document",
-            "severity": "critical",
-            "title": "健康证即将或已经到期",
-            "detail": f"张三 的健康证将于 {(today + timedelta(days=3)).isoformat()} 到期",
-            "employee_id": "mock-e001",
-            "employee_name": "张三",
-            "store_id": "mock-s001",
-            "meta": {
-                "document_type": "健康证",
-                "expiry_date": (today + timedelta(days=3)).isoformat(),
-            },
-        },
-        {
-            "alert_id": "doc:mock-e002:id_card_expiry",
-            "category": "document",
-            "severity": "high",
-            "title": "身份证即将或已经到期",
-            "detail": f"李四 的身份证将于 {(today + timedelta(days=18)).isoformat()} 到期",
-            "employee_id": "mock-e002",
-            "employee_name": "李四",
-            "store_id": "mock-s001",
-            "meta": {
-                "document_type": "身份证",
-                "expiry_date": (today + timedelta(days=18)).isoformat(),
-            },
-        },
-        {
-            "alert_id": "doc:mock-e003:health_cert_expiry",
-            "category": "document",
-            "severity": "medium",
-            "title": "健康证即将或已经到期",
-            "detail": f"王五 的健康证将于 {(today + timedelta(days=50)).isoformat()} 到期",
-            "employee_id": "mock-e003",
-            "employee_name": "王五",
-            "store_id": "mock-s002",
-            "meta": {
-                "document_type": "健康证",
-                "expiry_date": (today + timedelta(days=50)).isoformat(),
-            },
-        },
-    ]
-
-
-def _mock_performance() -> list[dict[str, Any]]:
-    return [
-        {
-            "alert_id": "perf:mock-e004:2",
-            "category": "performance",
-            "severity": "high",
-            "title": "连续低绩效",
-            "detail": "赵六 当前绩效档为 2，需关注改进",
-            "employee_id": "mock-e004",
-            "employee_name": "赵六",
-            "store_id": "mock-s001",
-            "meta": {"performance_score": "2"},
-        },
-        {
-            "alert_id": "perf:mock-e005:D",
-            "category": "performance",
-            "severity": "high",
-            "title": "连续低绩效",
-            "detail": "钱七 当前绩效档为 D，需关注改进",
-            "employee_id": "mock-e005",
-            "employee_name": "钱七",
-            "store_id": "mock-s002",
-            "meta": {"performance_score": "D"},
-        },
-    ]
-
-
-def _mock_attendance() -> list[dict[str, Any]]:
-    today = date.today()
-    d_str = today.isoformat()
-    return [
-        {
-            "alert_id": "att:mock-a001",
-            "category": "attendance",
-            "severity": "critical",
-            "title": "考勤异常：absent",
-            "detail": f"孙八 在 {d_str} 状态为 absent",
-            "employee_id": "mock-e006",
-            "employee_name": "孙八",
-            "store_id": "mock-s001",
-            "meta": {
-                "date": d_str,
-                "status": "absent",
-                "late_minutes": 0,
-                "early_leave_minutes": 0,
-            },
-        },
-        {
-            "alert_id": "att:mock-a002",
-            "category": "attendance",
-            "severity": "medium",
-            "title": "考勤异常：late",
-            "detail": f"周九 在 {d_str} 状态为 late",
-            "employee_id": "mock-e007",
-            "employee_name": "周九",
-            "store_id": "mock-s001",
-            "meta": {
-                "date": d_str,
-                "status": "late",
-                "late_minutes": 12,
-                "early_leave_minutes": 0,
-            },
-        },
-    ]
-
-
 class ComplianceAlertAgent(SkillAgent):
     """合规预警 Skill：证件、绩效、考勤三类扫描与汇总。"""
 
@@ -519,10 +405,10 @@ class ComplianceAlertAgent(SkillAgent):
                 self._db, self.tenant_id, store_id
             )
         else:
-            logger.info("compliance_scan_all_mock", tenant_id=self.tenant_id)
-            documents = _mock_documents()
-            performance = _mock_performance()
-            attendance = _mock_attendance()
+            logger.warning("compliance_scan_all_no_db", tenant_id=self.tenant_id)
+            documents = []
+            performance = []
+            attendance = []
         summary = compliance_alert_service.merge_summaries(
             documents, performance, attendance
         )
@@ -548,8 +434,8 @@ class ComplianceAlertAgent(SkillAgent):
                 self._db, self.tenant_id, store_id
             )
         else:
-            logger.info("compliance_scan_documents_mock", tenant_id=self.tenant_id)
-            documents = _mock_documents()
+            logger.warning("compliance_scan_documents_no_db", tenant_id=self.tenant_id)
+            documents = []
         summary = compliance_alert_service.summarize_severities(documents)
         return AgentResult(
             success=True,
@@ -566,8 +452,8 @@ class ComplianceAlertAgent(SkillAgent):
                 self._db, self.tenant_id, store_id
             )
         else:
-            logger.info("compliance_scan_performance_mock", tenant_id=self.tenant_id)
-            performance = _mock_performance()
+            logger.warning("compliance_scan_performance_no_db", tenant_id=self.tenant_id)
+            performance = []
         summary = compliance_alert_service.summarize_severities(performance)
         return AgentResult(
             success=True,
@@ -584,8 +470,8 @@ class ComplianceAlertAgent(SkillAgent):
                 self._db, self.tenant_id, store_id
             )
         else:
-            logger.info("compliance_scan_attendance_mock", tenant_id=self.tenant_id)
-            attendance = _mock_attendance()
+            logger.warning("compliance_scan_attendance_no_db", tenant_id=self.tenant_id)
+            attendance = []
         summary = compliance_alert_service.summarize_severities(attendance)
         return AgentResult(
             success=True,
@@ -602,23 +488,17 @@ class ComplianceAlertAgent(SkillAgent):
                 self._db, self.tenant_id, store_id
             )
         else:
-            logger.info("compliance_alert_summary_mock", tenant_id=self.tenant_id)
-            documents = _mock_documents()
-            performance = _mock_performance()
-            attendance = _mock_attendance()
-            summary = compliance_alert_service.merge_summaries(
-                documents, performance, attendance
-            )
+            logger.warning("compliance_alert_summary_no_db", tenant_id=self.tenant_id)
             payload = {
-                "summary": summary,
+                "summary": {"total": 0, "critical": 0, "high": 0, "medium": 0, "low": 0},
                 "counts_by_category": {
-                    "documents": len(documents),
-                    "performance": len(performance),
-                    "attendance": len(attendance),
+                    "documents": 0,
+                    "performance": 0,
+                    "attendance": 0,
                 },
-                "documents": documents,
-                "performance": performance,
-                "attendance": attendance,
+                "documents": [],
+                "performance": [],
+                "attendance": [],
             }
         return AgentResult(
             success=True,

@@ -202,42 +202,6 @@ async def _load_training_courses(
     return _TRAINING_COURSES
 
 
-# ── Mock数据 ─────────────────────────────────────────────────────────────────
-
-
-def _mock_skill_gaps() -> dict[str, Any]:
-    return {
-        "employee_name": "张三",
-        "employee_id": "mock-emp-001",
-        "current_role": "waiter",
-        "current_skills": ["服务礼仪", "点单操作"],
-        "gaps": {
-            "current_role_gaps": ["菜品知识", "客诉处理", "卫生规范"],
-            "promotion_role": "manager",
-            "promotion_gaps": ["团队管理", "排班调度", "成本分析", "客户关系",
-                              "合规管理", "数据分析", "培训带教", "菜品知识",
-                              "客诉处理", "卫生规范"],
-        },
-        "gap_count": 3,
-        "promotion_gap_count": 10,
-    }
-
-
-def _mock_growth_plan() -> dict[str, Any]:
-    return _build_growth_plan(
-        employee_name="张三",
-        role="waiter",
-        gaps={
-            "current_role_gaps": ["菜品知识", "客诉处理", "卫生规范"],
-            "promotion_role": "manager",
-            "promotion_gaps": ["团队管理", "排班调度", "成本分析", "数据分析"],
-        },
-        courses=_match_courses(
-            ["菜品知识", "客诉处理", "卫生规范", "团队管理", "排班调度", "成本分析", "数据分析"]
-        ),
-    )
-
-
 # ── Agent 类 ─────────────────────────────────────────────────────────────────
 
 
@@ -290,14 +254,11 @@ class GrowthCoachAgent(SkillAgent):
                                error="缺少 employee_id")
 
         if not self._db:
-            logger.info("growth_gaps_mock", tenant_id=self.tenant_id)
-            data = _mock_skill_gaps()
+            logger.warning("growth_gaps_no_db", tenant_id=self.tenant_id)
             return AgentResult(
-                success=True,
+                success=False,
                 action="analyze_skill_gaps",
-                data=data,
-                reasoning=f"{data['employee_name']}当前岗位技能差距{data['gap_count']}项",
-                confidence=0.85,
+                error="数据库连接不可用",
             )
 
         emp = await _load_employee_skills(self._db, self.tenant_id, employee_id)
@@ -373,14 +334,11 @@ class GrowthCoachAgent(SkillAgent):
                                error="缺少 employee_id")
 
         if not self._db:
-            logger.info("growth_plan_mock", tenant_id=self.tenant_id)
-            plan = _mock_growth_plan()
+            logger.warning("growth_plan_no_db", tenant_id=self.tenant_id)
             return AgentResult(
-                success=True,
+                success=False,
                 action="create_growth_plan",
-                data=plan,
-                reasoning=f"已为{plan['employee_name']}生成成长计划，共{plan['total_courses']}门课程",
-                confidence=0.80,
+                error="数据库连接不可用",
             )
 
         emp = await _load_employee_skills(self._db, self.tenant_id, employee_id)
@@ -606,10 +564,11 @@ class GrowthCoachAgent(SkillAgent):
                 rows = [dict(r) for r in result.mappings()]
                 return self._aggregate_store_skills(rows, required_skills)
             except (OperationalError, ProgrammingError) as exc:
-                logger.warning("menu_skill_scan_fallback", error=str(exc))
+                logger.warning("menu_skill_scan_failed", error=str(exc))
+                return []
 
-        # Mock降级
-        return self._mock_store_coverage(required_skills)
+        logger.warning("menu_skill_scan_no_db", tenant_id=self.tenant_id)
+        return []
 
     @staticmethod
     def _aggregate_store_skills(
@@ -666,39 +625,3 @@ class GrowthCoachAgent(SkillAgent):
             })
         return results
 
-    @staticmethod
-    def _mock_store_coverage(required_skills: list[str]) -> list[dict[str, Any]]:
-        """Mock数据"""
-        mock_stores = [
-            {
-                "store_id": "mock-store-01",
-                "store_name": "旗舰店",
-                "chef_count": 5,
-                "skill_counts": {required_skills[0]: 3} if required_skills else {},
-                "missing_skills": required_skills[1:] if len(required_skills) > 1 else [],
-                "qualified_chefs": [
-                    {"employee_id": "mock-chef-01", "emp_name": "王大厨",
-                     "matched_skills": required_skills[:1]},
-                ],
-            },
-            {
-                "store_id": "mock-store-02",
-                "store_name": "社区店",
-                "chef_count": 3,
-                "skill_counts": {},
-                "missing_skills": required_skills,
-                "qualified_chefs": [],
-            },
-            {
-                "store_id": "mock-store-03",
-                "store_name": "商场店",
-                "chef_count": 4,
-                "skill_counts": {s: 2 for s in required_skills},
-                "missing_skills": [],
-                "qualified_chefs": [
-                    {"employee_id": "mock-chef-03", "emp_name": "李大厨",
-                     "matched_skills": required_skills},
-                ],
-            },
-        ]
-        return mock_stores

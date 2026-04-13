@@ -4,7 +4,7 @@
 
 端点:
   GET  /dashboard               — 会员整体数据概览
-  GET  /rfm/distribution        — RFM 分层分布（注: 此端点与 rfm_routes 不冲突，此为 Mock 版本供驾驶舱页面使用）
+  GET  /rfm/distribution        — RFM 分层分布
   GET  /rfm/{level}/members     — 某层会员列表
   GET  /tags                    — 标签列表
   POST /tags                    — 创建标签
@@ -17,85 +17,31 @@ from datetime import datetime, timezone
 from typing import Optional
 
 import structlog
-from fastapi import APIRouter, Header, HTTPException, Query
+from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel, Field
+from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from shared.ontology.src.database import get_db
 
 logger = structlog.get_logger(__name__)
 
 router = APIRouter(prefix="/api/v1/member", tags=["member-dashboard"])
 
 
-# ─── Mock 数据 ───────────────────────────────────────────────
+# ─── RFM 层级映射（DB enum → 中文展示名） ─────────────────────
 
-_MOCK_DASHBOARD = {
-    "total_members": 128356,
-    "total_members_mom": 0.06,
-    "new_members_30d": 4218,
-    "new_members_mom": 0.12,
-    "active_members_30d": 52340,
-    "active_rate": 0.408,
-    "active_rate_mom": 0.03,
-    "avg_clv_fen": 286000,
-    "avg_clv_mom": 0.05,
-    "total_stored_value_fen": 18520000000,
-    "stored_value_mom": 0.04,
-    "member_revenue_ratio": 0.72,
-    "member_revenue_ratio_mom": 0.02,
-    "gender_distribution": {"male": 0.42, "female": 0.55, "unknown": 0.03},
-    "age_distribution": [
-        {"range": "18-25", "ratio": 0.18},
-        {"range": "26-35", "ratio": 0.38},
-        {"range": "36-45", "ratio": 0.25},
-        {"range": "46-55", "ratio": 0.12},
-        {"range": "56+", "ratio": 0.07},
-    ],
-    "channel_source": [
-        {"channel": "小程序", "count": 52800, "ratio": 0.41},
-        {"channel": "门店扫码", "count": 38500, "ratio": 0.30},
-        {"channel": "公众号", "count": 19200, "ratio": 0.15},
-        {"channel": "抖音", "count": 10260, "ratio": 0.08},
-        {"channel": "美团", "count": 7596, "ratio": 0.06},
-    ],
+_RFM_LEVEL_LABELS: dict[str, str] = {
+    "vip": "重要价值客户",
+    "active": "一般价值客户",
+    "at_risk": "重要挽留客户",
+    "churned": "流失客户",
+    "new": "新客户",
 }
 
-_MOCK_RFM = [
-    {"level": "重要价值客户", "code": "111", "count": 15800, "ratio": 0.123, "avg_frequency": 8.2, "avg_monetary_fen": 52000, "description": "高频高消费，近期活跃"},
-    {"level": "重要发展客户", "code": "101", "count": 12400, "ratio": 0.097, "avg_frequency": 2.5, "avg_monetary_fen": 48000, "description": "高消费但频次低，近期活跃"},
-    {"level": "重要保持客户", "code": "011", "count": 18200, "ratio": 0.142, "avg_frequency": 7.8, "avg_monetary_fen": 45000, "description": "高频高消费，近期沉默"},
-    {"level": "重要挽留客户", "code": "001", "count": 9600, "ratio": 0.075, "avg_frequency": 1.8, "avg_monetary_fen": 42000, "description": "高消费，流失风险高"},
-    {"level": "一般价值客户", "code": "110", "count": 22400, "ratio": 0.175, "avg_frequency": 6.5, "avg_monetary_fen": 18000, "description": "高频低消费，近期活跃"},
-    {"level": "一般发展客户", "code": "100", "count": 16800, "ratio": 0.131, "avg_frequency": 2.0, "avg_monetary_fen": 15000, "description": "低消费低频，近期活跃"},
-    {"level": "一般保持客户", "code": "010", "count": 19500, "ratio": 0.152, "avg_frequency": 5.2, "avg_monetary_fen": 12000, "description": "高频低消费，近期沉默"},
-    {"level": "流失客户", "code": "000", "count": 13656, "ratio": 0.106, "avg_frequency": 1.2, "avg_monetary_fen": 8000, "description": "低频低消费，已沉默"},
-]
-
-_MOCK_MEMBERS = [
-    {"member_id": "m001", "name": "张三", "phone": "138****1001", "rfm_level": "重要价值客户", "rfm_code": "111", "total_spent_fen": 128000, "visit_count": 12, "last_visit": "2026-04-08", "stored_value_fen": 50000, "tags": ["高频", "火锅爱好者"]},
-    {"member_id": "m002", "name": "李四", "phone": "139****2002", "rfm_level": "重要价值客户", "rfm_code": "111", "total_spent_fen": 96000, "visit_count": 9, "last_visit": "2026-04-07", "stored_value_fen": 30000, "tags": ["高频", "商务宴请"]},
-    {"member_id": "m003", "name": "王五", "phone": "136****3003", "rfm_level": "重要发展客户", "rfm_code": "101", "total_spent_fen": 85000, "visit_count": 3, "last_visit": "2026-04-05", "stored_value_fen": 20000, "tags": ["高客单"]},
-    {"member_id": "m004", "name": "赵六", "phone": "135****4004", "rfm_level": "重要保持客户", "rfm_code": "011", "total_spent_fen": 110000, "visit_count": 15, "last_visit": "2026-03-15", "stored_value_fen": 8000, "tags": ["高频", "沉默预警"]},
-    {"member_id": "m005", "name": "孙七", "phone": "137****5005", "rfm_level": "重要挽留客户", "rfm_code": "001", "total_spent_fen": 72000, "visit_count": 2, "last_visit": "2026-02-20", "stored_value_fen": 5000, "tags": ["流失风险"]},
-    {"member_id": "m006", "name": "周八", "phone": "158****6006", "rfm_level": "一般价值客户", "rfm_code": "110", "total_spent_fen": 35000, "visit_count": 8, "last_visit": "2026-04-09", "stored_value_fen": 0, "tags": ["高频", "小吃控"]},
-    {"member_id": "m007", "name": "吴九", "phone": "150****7007", "rfm_level": "一般发展客户", "rfm_code": "100", "total_spent_fen": 18000, "visit_count": 2, "last_visit": "2026-04-01", "stored_value_fen": 0, "tags": ["新客"]},
-    {"member_id": "m008", "name": "郑十", "phone": "131****8008", "rfm_level": "一般保持客户", "rfm_code": "010", "total_spent_fen": 28000, "visit_count": 6, "last_visit": "2026-03-10", "stored_value_fen": 2000, "tags": ["沉默预警"]},
-    {"member_id": "m009", "name": "钱十一", "phone": "132****9009", "rfm_level": "流失客户", "rfm_code": "000", "total_spent_fen": 12000, "visit_count": 1, "last_visit": "2026-01-05", "stored_value_fen": 0, "tags": ["流失"]},
-    {"member_id": "m010", "name": "陈十二", "phone": "155****0010", "rfm_level": "重要价值客户", "rfm_code": "111", "total_spent_fen": 145000, "visit_count": 18, "last_visit": "2026-04-10", "stored_value_fen": 80000, "tags": ["VIP", "高频", "生日4月"]},
-    {"member_id": "m011", "name": "林十三", "phone": "186****1111", "rfm_level": "一般价值客户", "rfm_code": "110", "total_spent_fen": 32000, "visit_count": 7, "last_visit": "2026-04-06", "stored_value_fen": 1000, "tags": ["午餐党"]},
-    {"member_id": "m012", "name": "黄十四", "phone": "177****1212", "rfm_level": "重要保持客户", "rfm_code": "011", "total_spent_fen": 92000, "visit_count": 11, "last_visit": "2026-03-02", "stored_value_fen": 15000, "tags": ["沉默预警", "家庭聚餐"]},
-]
-
-_MOCK_TAGS = [
-    {"tag_id": "t001", "name": "高频", "type": "behavior", "member_count": 38200, "created_at": "2026-01-15T10:00:00Z"},
-    {"tag_id": "t002", "name": "高客单", "type": "behavior", "member_count": 15600, "created_at": "2026-01-15T10:00:00Z"},
-    {"tag_id": "t003", "name": "火锅爱好者", "type": "preference", "member_count": 22100, "created_at": "2026-02-01T10:00:00Z"},
-    {"tag_id": "t004", "name": "商务宴请", "type": "scene", "member_count": 8900, "created_at": "2026-02-01T10:00:00Z"},
-    {"tag_id": "t005", "name": "沉默预警", "type": "lifecycle", "member_count": 19500, "created_at": "2026-03-01T10:00:00Z"},
-    {"tag_id": "t006", "name": "流失风险", "type": "lifecycle", "member_count": 9600, "created_at": "2026-03-01T10:00:00Z"},
-    {"tag_id": "t007", "name": "VIP", "type": "tier", "member_count": 5200, "created_at": "2026-01-15T10:00:00Z"},
-    {"tag_id": "t008", "name": "新客", "type": "lifecycle", "member_count": 4218, "created_at": "2026-01-15T10:00:00Z"},
-    {"tag_id": "t009", "name": "午餐党", "type": "behavior", "member_count": 16800, "created_at": "2026-03-15T10:00:00Z"},
-    {"tag_id": "t010", "name": "家庭聚餐", "type": "scene", "member_count": 12400, "created_at": "2026-02-20T10:00:00Z"},
-]
+# 反向映射：中文展示名 → DB enum（供 rfm/{level}/members 端点使用）
+_RFM_LABEL_TO_CODE: dict[str, str] = {v: k for k, v in _RFM_LEVEL_LABELS.items()}
 
 
 # ─── 请求模型 ────────────────────────────────────────────────
@@ -125,20 +71,234 @@ def _require_tenant(x_tenant_id: Optional[str]) -> uuid.UUID:
         raise HTTPException(status_code=400, detail="X-Tenant-ID must be a valid UUID")
 
 
+async def _set_rls(db: AsyncSession, tenant_id: uuid.UUID) -> None:
+    """设置 RLS session 变量，使 RLS 策略生效。"""
+    await db.execute(
+        text("SELECT set_config('app.tenant_id', :tid, true)"),
+        {"tid": str(tenant_id)},
+    )
+
+
+async def _query_dashboard(tenant_id: uuid.UUID, db: AsyncSession) -> dict:
+    """从 customers + orders 查询驾驶舱聚合指标。"""
+    # 会员总数 & 近 30 天新增
+    members_row = await db.execute(
+        text("""
+            SELECT
+                COUNT(*)                                                  AS total_members,
+                COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '30 days') AS new_members_30d,
+                COUNT(*) FILTER (WHERE last_visit_date >= NOW() - INTERVAL '30 days') AS active_members_30d,
+                COALESCE(AVG(total_spent_fen), 0)::bigint                 AS avg_clv_fen,
+                COALESCE(SUM(total_spent_fen), 0)::bigint                 AS total_stored_value_fen
+            FROM customers
+            WHERE is_deleted = FALSE
+        """)
+    )
+    m = members_row.mappings().one()
+
+    total_members = int(m["total_members"])
+    new_members_30d = int(m["new_members_30d"])
+    active_members_30d = int(m["active_members_30d"])
+    avg_clv_fen = int(m["avg_clv_fen"])
+    total_stored_value_fen = int(m["total_stored_value_fen"])
+    active_rate = round(active_members_30d / total_members, 4) if total_members else 0.0
+
+    return {
+        "total_members": total_members,
+        "total_members_mom": 0.0,          # 环比需要历史快照，暂留 0
+        "new_members_30d": new_members_30d,
+        "new_members_mom": 0.0,
+        "active_members_30d": active_members_30d,
+        "active_rate": active_rate,
+        "active_rate_mom": 0.0,
+        "avg_clv_fen": avg_clv_fen,
+        "avg_clv_mom": 0.0,
+        "total_stored_value_fen": total_stored_value_fen,
+        "stored_value_mom": 0.0,
+        "member_revenue_ratio": 0.0,       # 需跨 orders 表计算，后续补充
+        "member_revenue_ratio_mom": 0.0,
+        "gender_distribution": {},
+        "age_distribution": [],
+        "channel_source": [],
+    }
+
+
+async def _query_rfm(tenant_id: uuid.UUID, db: AsyncSession) -> list[dict]:
+    """按 rfm_level 统计分布，返回列表。"""
+    rows = await db.execute(
+        text("""
+            SELECT
+                rfm_level,
+                COUNT(*)                              AS cnt,
+                COALESCE(AVG(visit_count), 0)::numeric(10,2) AS avg_frequency,
+                COALESCE(AVG(total_spent_fen), 0)::bigint    AS avg_monetary_fen
+            FROM customers
+            WHERE is_deleted = FALSE
+            GROUP BY rfm_level
+        """)
+    )
+    data = rows.mappings().all()
+
+    total = sum(int(r["cnt"]) for r in data) or 1  # 防零除
+
+    result = []
+    for r in data:
+        code = str(r["rfm_level"])
+        label = _RFM_LEVEL_LABELS.get(code, code)
+        cnt = int(r["cnt"])
+        result.append({
+            "level": label,
+            "code": code,
+            "count": cnt,
+            "ratio": round(cnt / total, 4),
+            "avg_frequency": float(r["avg_frequency"]),
+            "avg_monetary_fen": int(r["avg_monetary_fen"]),
+            "description": "",
+        })
+
+    return result
+
+
+async def _query_members_by_level(
+    rfm_code: str,
+    page: int,
+    size: int,
+    tenant_id: uuid.UUID,
+    db: AsyncSession,
+) -> tuple[list[dict], int]:
+    """查询指定 rfm_level 的会员列表（按 total_spent_fen 降序），返回 (items, total)。"""
+    offset = (page - 1) * size
+
+    count_row = await db.execute(
+        text("""
+            SELECT COUNT(*) AS cnt
+            FROM customers
+            WHERE rfm_level = :level AND is_deleted = FALSE
+        """),
+        {"level": rfm_code},
+    )
+    total = int(count_row.scalar_one())
+
+    rows = await db.execute(
+        text("""
+            SELECT
+                id::text           AS member_id,
+                full_name          AS name,
+                primary_phone      AS phone,
+                rfm_level,
+                total_spent_fen,
+                visit_count,
+                last_visit_date    AS last_visit,
+                tags
+            FROM customers
+            WHERE rfm_level = :level AND is_deleted = FALSE
+            ORDER BY total_spent_fen DESC NULLS LAST
+            LIMIT :lim OFFSET :off
+        """),
+        {"level": rfm_code, "lim": size, "off": offset},
+    )
+    items = []
+    for r in rows.mappings():
+        items.append({
+            "member_id": r["member_id"],
+            "name": r["name"] or "",
+            "phone": r["phone"] or "",
+            "rfm_level": _RFM_LEVEL_LABELS.get(str(r["rfm_level"]), str(r["rfm_level"])),
+            "rfm_code": str(r["rfm_level"]),
+            "total_spent_fen": int(r["total_spent_fen"] or 0),
+            "visit_count": int(r["visit_count"] or 0),
+            "last_visit": r["last_visit"].isoformat() if r["last_visit"] else None,
+            "stored_value_fen": 0,   # customers 表暂无 stored_value 字段
+            "tags": list(r["tags"]) if r["tags"] else [],
+        })
+
+    return items, total
+
+
+async def _query_tags(
+    tag_type: Optional[str],
+    keyword: Optional[str],
+    page: int,
+    size: int,
+    tenant_id: uuid.UUID,
+    db: AsyncSession,
+) -> tuple[list[dict], int]:
+    """从 customers.tags 数组中统计 top-20 标签，应用筛选后分页返回。"""
+    rows = await db.execute(
+        text("""
+            SELECT
+                unnest(tags)  AS name,
+                COUNT(*)::int AS member_count
+            FROM customers
+            WHERE is_deleted = FALSE
+              AND tags IS NOT NULL
+            GROUP BY 1
+            ORDER BY member_count DESC
+            LIMIT 20
+        """)
+    )
+    all_tags = rows.mappings().all()
+
+    # 在 Python 侧做 keyword 过滤（数据量小，避免复杂 SQL）
+    filtered = [
+        {
+            "tag_id": "",          # tags 存储为 ARRAY，无独立 tag_id
+            "name": r["name"],
+            "type": "custom",      # 无类型字段，统一填 custom
+            "member_count": r["member_count"],
+            "created_at": None,
+        }
+        for r in all_tags
+        if (not keyword or keyword in r["name"])
+        and (not tag_type or tag_type == "custom")
+    ]
+
+    total = len(filtered)
+    offset = (page - 1) * size
+    items = filtered[offset: offset + size]
+
+    return items, total
+
+
 # ─── 端点 ────────────────────────────────────────────────────
 
 @router.get("/dashboard")
 async def member_dashboard(
     x_tenant_id: Optional[str] = Header(None, alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ):
     """会员整体数据概览"""
     tenant_id = _require_tenant(x_tenant_id)
     logger.info("member_dashboard", tenant_id=str(tenant_id))
 
+    try:
+        await _set_rls(db, tenant_id)
+        data = await _query_dashboard(tenant_id, db)
+    except SQLAlchemyError as exc:
+        logger.error("member_dashboard_db_error", tenant_id=str(tenant_id), exc_info=exc)
+        data = {
+            "total_members": 0,
+            "total_members_mom": 0.0,
+            "new_members_30d": 0,
+            "new_members_mom": 0.0,
+            "active_members_30d": 0,
+            "active_rate": 0.0,
+            "active_rate_mom": 0.0,
+            "avg_clv_fen": 0,
+            "avg_clv_mom": 0.0,
+            "total_stored_value_fen": 0,
+            "stored_value_mom": 0.0,
+            "member_revenue_ratio": 0.0,
+            "member_revenue_ratio_mom": 0.0,
+            "gender_distribution": {},
+            "age_distribution": [],
+            "channel_source": [],
+        }
+
     return {
         "ok": True,
         "data": {
-            **_MOCK_DASHBOARD,
+            **data,
             "as_of": datetime.now(timezone.utc).isoformat(),
         },
     }
@@ -147,17 +307,25 @@ async def member_dashboard(
 @router.get("/rfm/distribution")
 async def rfm_distribution_dashboard(
     x_tenant_id: Optional[str] = Header(None, alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ):
-    """RFM 分层分布（驾驶舱 Mock 版本）"""
+    """RFM 分层分布"""
     tenant_id = _require_tenant(x_tenant_id)
     logger.info("rfm_distribution_dashboard", tenant_id=str(tenant_id))
 
-    total = sum(r["count"] for r in _MOCK_RFM)
+    try:
+        await _set_rls(db, tenant_id)
+        distribution = await _query_rfm(tenant_id, db)
+    except SQLAlchemyError as exc:
+        logger.error("rfm_distribution_db_error", tenant_id=str(tenant_id), exc_info=exc)
+        distribution = []
+
+    total = sum(r["count"] for r in distribution)
 
     return {
         "ok": True,
         "data": {
-            "distribution": _MOCK_RFM,
+            "distribution": distribution,
             "total": total,
             "as_of": datetime.now(timezone.utc).isoformat(),
         },
@@ -170,24 +338,33 @@ async def rfm_level_members(
     page: int = Query(1, ge=1),
     size: int = Query(20, ge=1, le=100),
     x_tenant_id: Optional[str] = Header(None, alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ):
-    """某 RFM 层级的会员列表"""
+    """某 RFM 层级的会员列表
+
+    `level` 接受中文展示名（如"重要价值客户"）或 DB enum 值（如"vip"）。
+    """
     tenant_id = _require_tenant(x_tenant_id)
     logger.info("rfm_level_members", tenant_id=str(tenant_id), level=level)
 
-    # 验证层级存在
-    valid_levels = {r["level"] for r in _MOCK_RFM}
-    if level not in valid_levels:
+    # 统一解析 level 为 DB enum code
+    if level in _RFM_LABEL_TO_CODE:
+        rfm_code = _RFM_LABEL_TO_CODE[level]
+    elif level in _RFM_LEVEL_LABELS:
+        rfm_code = level
+    else:
+        valid = list(_RFM_LEVEL_LABELS.keys()) + list(_RFM_LEVEL_LABELS.values())
         raise HTTPException(
             status_code=404,
-            detail=f"RFM 层级不存在: {level}，可用层级: {sorted(valid_levels)}",
+            detail=f"RFM 层级不存在: {level}，可用值: {sorted(set(valid))}",
         )
 
-    # 筛选对应层级会员
-    filtered = [m for m in _MOCK_MEMBERS if m["rfm_level"] == level]
-    total = len(filtered)
-    offset = (page - 1) * size
-    items = filtered[offset: offset + size]
+    try:
+        await _set_rls(db, tenant_id)
+        items, total = await _query_members_by_level(rfm_code, page, size, tenant_id, db)
+    except SQLAlchemyError as exc:
+        logger.error("rfm_level_members_db_error", tenant_id=str(tenant_id), level=level, exc_info=exc)
+        items, total = [], 0
 
     return {
         "ok": True,
@@ -208,20 +385,18 @@ async def list_tags(
     page: int = Query(1, ge=1),
     size: int = Query(20, ge=1, le=100),
     x_tenant_id: Optional[str] = Header(None, alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ):
-    """标签列表"""
+    """标签列表（从 customers.tags 数组聚合）"""
     tenant_id = _require_tenant(x_tenant_id)
     logger.info("list_tags", tenant_id=str(tenant_id))
 
-    filtered = list(_MOCK_TAGS)
-    if tag_type:
-        filtered = [t for t in filtered if t["type"] == tag_type]
-    if keyword:
-        filtered = [t for t in filtered if keyword in t["name"]]
-
-    total = len(filtered)
-    offset = (page - 1) * size
-    items = filtered[offset: offset + size]
+    try:
+        await _set_rls(db, tenant_id)
+        items, total = await _query_tags(tag_type, keyword, page, size, tenant_id, db)
+    except SQLAlchemyError as exc:
+        logger.error("list_tags_db_error", tenant_id=str(tenant_id), exc_info=exc)
+        items, total = [], 0
 
     return {
         "ok": True,
@@ -270,16 +445,13 @@ async def create_segment(
     logger.info("create_segment", tenant_id=str(tenant_id), name=body.name)
 
     segment_id = str(uuid.uuid4())
-    # Mock: 根据条件数量模拟估算人数
-    estimated_count = max(500, 128356 // (len(body.conditions) * 3 + 1))
-
     new_segment = {
         "segment_id": segment_id,
         "name": body.name,
         "description": body.description,
         "conditions": body.conditions,
         "tag_ids": body.tag_ids,
-        "estimated_count": estimated_count,
+        "estimated_count": 0,
         "status": "computing",
         "created_at": datetime.now(timezone.utc).isoformat(),
     }

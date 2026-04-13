@@ -298,48 +298,142 @@ async def _detect_expiry_risk(
     }]
 
 
-# ─── mock 数据 ────────────────────────────────────────────────────────────────
+# ─── 合规告警异常查询 ──────────────────────────────────────────────────────────
 
-def _mock_anomalies() -> list[dict[str, Any]]:
+async def _fetch_compliance_anomalies(
+    db: AsyncSession,
+    tenant_id: uuid.UUID,
+    store_id: str | None,
+    days: int,
+) -> list[dict[str, Any]]:
+    """从 compliance_alerts 查询运营异常（作为通用异常兜底数据源）"""
     now = datetime.now(timezone.utc)
-    return [
-        {
-            "id": "mock-001",
-            "type": "revenue_drop",
-            "severity": "warning",
-            "description": "3月28日营收同比下滑22%，当日营收¥12,400（去年同期¥15,900）",
-            "detail": {"date": "2026-03-28", "drop_pct": 0.22, "this_revenue": 1240000, "yoy_revenue": 1590000},
-            "occurred_at": (now - timedelta(days=5)).isoformat(),
-            "dismissed": False,
-        },
-        {
-            "id": "mock-002",
-            "type": "expiry_risk",
-            "severity": "critical",
-            "description": "7天内临期食材达14种，含三文鱼、牛里脊等高值食材",
-            "detail": {"expiry_count": 14, "threshold": 10},
-            "occurred_at": (now - timedelta(days=1)).isoformat(),
-            "dismissed": False,
-        },
-        {
-            "id": "mock-003",
-            "type": "high_refund",
-            "severity": "warning",
-            "description": "近7天退单率6.2%，超过5%警戒线",
-            "detail": {"refund_rate": 0.062, "refunded_count": 18, "total_count": 290},
-            "occurred_at": (now - timedelta(days=2)).isoformat(),
-            "dismissed": True,
-        },
-        {
-            "id": "mock-004",
-            "type": "cost_spike",
-            "severity": "critical",
-            "description": "3月30日食材成本占比63%，超过60%阈值",
-            "detail": {"date": "2026-03-30", "cost_ratio": 0.63},
-            "occurred_at": (now - timedelta(days=3)).isoformat(),
-            "dismissed": False,
-        },
-    ]
+    period_start = (now - timedelta(days=days)).isoformat()
+
+    params: dict[str, Any] = {
+        "tenant_id": str(tenant_id),
+        "start": period_start,
+        "end": now.isoformat(),
+    }
+    store_filter = ""
+    if store_id:
+        store_filter = "AND store_id = :store_id"
+        params["store_id"] = store_id
+
+    r = await db.execute(
+        text(f"""
+            SELECT id, store_id, severity, status, title, description, created_at
+            FROM compliance_alerts
+            WHERE tenant_id = :tenant_id
+              AND created_at BETWEEN :start AND :end
+              {store_filter}
+            ORDER BY
+                CASE severity WHEN 'critical' THEN 0 WHEN 'warning' THEN 1 ELSE 2 END,
+                created_at DESC
+            LIMIT 50
+        """),
+        params,
+    )
+    rows = r.fetchall()
+    anomalies: list[dict[str, Any]] = []
+    for row in rows:
+        anomalies.append({
+            "id": str(row[0]),
+            "type": "compliance_alert",
+            "severity": row[2] or "info",
+            "description": row[4] or row[5] or "合规告警",
+            "detail": {
+                "store_id": str(row[1]) if row[1] else None,
+                "status": row[3],
+                "title": row[4],
+                "description": row[5],
+            },
+            "occurred_at": row[6].isoformat() if row[6] else now.isoformat(),
+            "dismissed": row[3] in ("resolved", "dismissed"),
+        })
+    return anomalies
+
+
+async def _fetch_revenue_anomalies(
+    db: AsyncSession,
+    tenant_id: uuid.UUID,
+    store_id: str | None,
+    days: int,
+) -> list[dict[str, Any]]:
+    """从 orders 检测门店营收异常（近N天 vs 前N天对比，下滑超20%触发）"""
+    now = datetime.now(timezone.utc)
+    current_start = (now - timedelta(days=days)).isoformat()
+    prev_start = (now - timedelta(days=days * 2)).isoformat()
+    prev_end = (now - timedelta(days=days)).isoformat()
+
+    params: dict[str, Any] = {
+        "tenant_id": str(tenant_id),
+        "curr_start": current_start,
+        "curr_end": now.isoformat(),
+        "prev_start": prev_start,
+        "prev_end": prev_end,
+    }
+    store_filter = ""
+    if store_id:
+        store_filter = "AND store_id = :store_id"
+        params["store_id"] = store_id
+
+    r = await db.execute(
+        text(f"""
+            SELECT
+                store_id,
+                COALESCE(SUM(total_fen) FILTER (
+                    WHERE created_at BETWEEN :curr_start AND :curr_end
+                ), 0) AS curr_rev,
+                COALESCE(SUM(total_fen) FILTER (
+                    WHERE created_at BETWEEN :prev_start AND :prev_end
+                ), 0) AS prev_rev
+            FROM orders
+            WHERE tenant_id = :tenant_id
+              AND status = 'completed'
+              AND created_at BETWEEN :prev_start AND :curr_end
+              {store_filter}
+            GROUP BY store_id
+        """),
+        params,
+    )
+    rows = r.fetchall()
+    anomalies: list[dict[str, Any]] = []
+    for row in rows:
+        s_id, curr_rev, prev_rev = str(row[0]), int(row[1]), int(row[2])
+        if prev_rev > 0 and curr_rev < prev_rev * (1 - THRESHOLDS["revenue_drop_pct"]):
+            drop_pct = (prev_rev - curr_rev) / prev_rev
+            anomalies.append({
+                "id": str(uuid.uuid4()),
+                "type": "revenue_drop",
+                "severity": ANOMALY_SEVERITY["revenue_drop"],
+                "description": f"门店 {s_id} 近{days}天营收环比下滑{drop_pct:.0%}",
+                "detail": {
+                    "store_id": s_id,
+                    "period_days": days,
+                    "current_revenue_fen": curr_rev,
+                    "previous_revenue_fen": prev_rev,
+                    "drop_pct": round(drop_pct, 4),
+                },
+                "occurred_at": now.isoformat(),
+                "dismissed": False,
+            })
+    return anomalies
+
+
+async def _fetch_anomalies_from_db(
+    db: AsyncSession,
+    tenant_id: uuid.UUID,
+    store_id: str | None,
+    days: int,
+) -> list[dict[str, Any]]:
+    """汇总 compliance_alerts + orders 营收异常"""
+    anomalies: list[dict[str, Any]] = []
+    anomalies.extend(await _fetch_compliance_anomalies(db, tenant_id, store_id, days))
+    anomalies.extend(await _fetch_revenue_anomalies(db, tenant_id, store_id, days))
+    severity_order = {"critical": 0, "warning": 1, "info": 2}
+    anomalies.sort(key=lambda x: (severity_order.get(x["severity"], 9), x["occurred_at"]))
+    return anomalies
 
 
 # ─── 路由 ─────────────────────────────────────────────────────────────────────
@@ -349,17 +443,28 @@ async def list_anomalies(
     tenant_id: Annotated[uuid.UUID, Depends(get_tenant_id)],
     db: Annotated[AsyncSession, Depends(get_db)],
     days: int = 7,
+    store_id: str | None = None,
     include_dismissed: bool = False,
 ) -> dict:
-    """获取最近N天的经营异常列表（基于统计阈值，不调用Claude）"""
+    """获取最近N天的经营异常列表（统计检测 + 合规告警，不调用Claude）"""
     try:
         await _set_rls(db, tenant_id)
         anomalies: list[dict[str, Any]] = []
-        anomalies.extend(await _detect_revenue_drop(db, tenant_id, min(days, 7)))
-        anomalies.extend(await _detect_cost_spike(db, tenant_id, min(days, 7)))
-        anomalies.extend(await _detect_high_refund(db, tenant_id, days))
-        anomalies.extend(await _detect_slow_kitchen(db, tenant_id, days))
-        anomalies.extend(await _detect_expiry_risk(db, tenant_id))
+
+        # 优先运行已有的细粒度统计检测函数（依赖 cost_records/kitchen_orders/inventory_items）
+        try:
+            anomalies.extend(await _detect_revenue_drop(db, tenant_id, min(days, 7)))
+            anomalies.extend(await _detect_cost_spike(db, tenant_id, min(days, 7)))
+            anomalies.extend(await _detect_high_refund(db, tenant_id, days))
+            anomalies.extend(await _detect_slow_kitchen(db, tenant_id, days))
+            anomalies.extend(await _detect_expiry_risk(db, tenant_id))
+        except SQLAlchemyError:
+            pass  # 部分检测表不存在时跳过，继续后续查询
+
+        # 从 compliance_alerts + orders 补充通用异常数据
+        anomalies.extend(
+            await _fetch_anomalies_from_db(db, tenant_id, store_id, days)
+        )
 
         # 按严重程度 + 时间排序（critical 优先）
         severity_order = {"critical": 0, "warning": 1, "info": 2}
@@ -380,18 +485,15 @@ async def list_anomalies(
             "error": None,
         }
     except (SQLAlchemyError, NotImplementedError) as exc:
-        logger.warning("anomalies.db_fallback", exc=str(exc))
-        mock = _mock_anomalies()
-        if not include_dismissed:
-            mock = [a for a in mock if not a.get("dismissed")]
+        logger.warning("anomalies.db_error", exc=str(exc))
         return {
             "ok": True,
             "data": {
-                "anomalies": mock,
-                "total": len(mock),
-                "critical_count": sum(1 for a in mock if a.get("severity") == "critical"),
-                "warning_count": sum(1 for a in mock if a.get("severity") == "warning"),
-                "_is_mock": True,
+                "anomalies": [],
+                "total": 0,
+                "critical_count": 0,
+                "warning_count": 0,
+                "_is_mock": False,
             },
             "error": None,
         }

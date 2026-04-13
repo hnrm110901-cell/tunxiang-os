@@ -54,19 +54,6 @@ class GiftCardPurchaseReq(BaseModel):
 
 
 # ──────────────────────────────────────────────────────────────────
-# 降级 Mock 数据（DB 失败时兜底，不影响前端）
-# ──────────────────────────────────────────────────────────────────
-
-_MOCK_PLANS = [
-    {"id": "plan-100", "name": "充100", "amount_fen": 10000, "bonus_fen": 0, "sort_order": 1},
-    {"id": "plan-200", "name": "充200送10", "amount_fen": 20000, "bonus_fen": 1000, "sort_order": 2},
-    {"id": "plan-300", "name": "充300送30", "amount_fen": 30000, "bonus_fen": 3000, "sort_order": 3},
-    {"id": "plan-500", "name": "充500送60", "amount_fen": 50000, "bonus_fen": 6000, "sort_order": 4},
-    {"id": "plan-1000", "name": "充1000送150", "amount_fen": 100000, "bonus_fen": 15000, "sort_order": 5},
-]
-
-
-# ──────────────────────────────────────────────────────────────────
 # 工具函数
 # ──────────────────────────────────────────────────────────────────
 
@@ -151,10 +138,10 @@ async def get_plans(
             """),
         )
         items = [dict(r) for r in result.mappings()]
-        return {"ok": True, "data": {"items": items if items else _MOCK_PLANS}}
+        return {"ok": True, "data": {"items": items}}
     except SQLAlchemyError as exc:
         logger.error("miniapp_stored_value_plans_db_error", error=str(exc))
-        return {"ok": True, "data": {"items": _MOCK_PLANS}}
+        return {"ok": True, "data": {"items": []}}
 
 
 @router.post("/stored-value/recharge")

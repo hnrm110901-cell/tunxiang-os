@@ -486,81 +486,167 @@ async def _generate_business_interventions(risk_signals: dict[str, dict[str, Any
     return suggestions
 
 
-# ── Mock数据 ─────────────────────────────────────────────────────────────────
+async def _fetch_risk_employees(
+    db: Any,
+    tenant_id: str,
+    store_id: Optional[str],
+) -> list[dict[str, Any]]:
+    """查询高风险员工：近30天缺勤>3次、绩效差档(D/F/E)、或薪资低于同岗均值15%以上。
 
+    三个条件取并集，每位员工只返回一条记录。
+    SQLAlchemyError时返回空列表。
+    """
+    store_clause = ""
+    params: dict[str, Any] = {"tenant_id": tenant_id}
+    if store_id:
+        store_clause = "AND e.store_id = CAST(:store_id AS uuid)"
+        params["store_id"] = store_id
 
-def _mock_risk_employees() -> list[dict[str, Any]]:
-    return [
-        {
-            "employee_id": "mock-emp-101",
-            "emp_name": "高风险A",
-            "store_id": "mock-store-001",
-            "store_name": "尝在一起·万达店",
-            "risk_score": 85,
-            "risk_level": "critical",
-            "risk_color": "red",
-            "alert_level": 2,
-            "dimensions": {
-                "attendance_anomaly": {"score": 85, "detail": "近30天异常6次，前30天2次"},
-                "performance_decline": {"score": 75, "detail": "当前绩效档 D"},
-                "engagement_drop": {"score": 80, "detail": "30天无积分变动"},
-                "tenure_risk": {"score": 72, "detail": "工龄4个月"},
-                "complaint_history": {"score": 0, "detail": "无投诉记录"},
-                "business_performance": {"score": 70, "detail": "营收下降22%", "signals": ["营收下降22%"]},
-                "service_quality": {"score": 60, "detail": "退菜率上升80%", "signals": ["退菜率上升80%"]},
-            },
-            "interventions": [
-                "【紧急】多维度同时下滑，建议立即安排面谈，评估是否需要调岗或协商解除",
-                "安排直属上级进行一对一关怀谈话，了解考勤异常原因（家庭/健康/排班）",
-                "安排技能辅导或岗位培训，帮助提升绩效",
-                "经营业绩下滑：建议安排技能培训或调换岗位，激发工作积极性",
-            ],
-        },
-        {
-            "employee_id": "mock-emp-102",
-            "emp_name": "中风险B",
-            "store_id": "mock-store-001",
-            "store_name": "尝在一起·万达店",
-            "risk_score": 65,
-            "risk_level": "high",
-            "risk_color": "orange",
-            "alert_level": 1,
-            "dimensions": {
-                "attendance_anomaly": {"score": 55, "detail": "近30天异常3次，前30天2次"},
-                "performance_decline": {"score": 50, "detail": "当前绩效档 C"},
-                "engagement_drop": {"score": 80, "detail": "30天无积分变动"},
-                "tenure_risk": {"score": 38, "detail": "工龄24个月"},
-                "complaint_history": {"score": 0, "detail": "无投诉记录"},
-                "business_performance": {"score": 35, "detail": "经营表现正常", "signals": []},
-                "service_quality": {"score": 20, "detail": "服务质量正常", "signals": []},
-            },
-            "interventions": [
-                "鼓励参与积分活动，提供额外激励机会",
-            ],
-        },
-        {
-            "employee_id": "mock-emp-103",
-            "emp_name": "低风险C",
-            "store_id": "mock-store-002",
-            "store_name": "尝在一起·悦方店",
-            "risk_score": 35,
-            "risk_level": "low",
-            "risk_color": "gray",
-            "alert_level": 0,
-            "dimensions": {
-                "attendance_anomaly": {"score": 30, "detail": "近30天异常1次，前30天1次"},
-                "performance_decline": {"score": 40, "detail": "当前绩效档 B"},
-                "engagement_drop": {"score": 30, "detail": "近期有积分活动"},
-                "tenure_risk": {"score": 28, "detail": "工龄48个月"},
-                "complaint_history": {"score": 0, "detail": "无投诉记录"},
-                "business_performance": {"score": 10, "detail": "经营表现正常", "signals": []},
-                "service_quality": {"score": 5, "detail": "服务质量正常", "signals": []},
-            },
-            "interventions": [
-                "保持现有管理节奏，定期回顾员工状态",
-            ],
-        },
-    ]
+    q = text(f"""
+        WITH absence_counts AS (
+            SELECT da.employee_id::text AS emp_id,
+                   COUNT(*) AS absent_cnt
+            FROM daily_attendance da
+            WHERE da.tenant_id = CAST(:tenant_id AS uuid)
+              AND da.status = 'absent'
+              AND da.work_date >= CURRENT_DATE - INTERVAL '30 days'
+              AND COALESCE(da.is_deleted, false) = false
+            GROUP BY da.employee_id
+        ),
+        role_salary_avg AS (
+            SELECT e2.role, AVG(e2.base_salary) AS avg_salary
+            FROM employees e2
+            WHERE e2.tenant_id = CAST(:tenant_id AS uuid)
+              AND e2.is_deleted = false
+              AND e2.base_salary IS NOT NULL
+            GROUP BY e2.role
+        )
+        SELECT e.id::text AS employee_id,
+               e.emp_name,
+               e.store_id::text AS store_id,
+               e.role,
+               e.performance_score,
+               e.base_salary,
+               COALESCE(ac.absent_cnt, 0) AS absent_cnt,
+               rsa.avg_salary AS role_avg_salary
+        FROM employees e
+        LEFT JOIN absence_counts ac ON ac.emp_id = e.id::text
+        LEFT JOIN role_salary_avg rsa ON rsa.role = e.role
+        WHERE e.tenant_id = CAST(:tenant_id AS uuid)
+          AND e.is_deleted = false
+          AND COALESCE(e.is_active, true) = true
+          {store_clause}
+          AND (
+            COALESCE(ac.absent_cnt, 0) > 3
+            OR UPPER(COALESCE(e.performance_score::text, '')) IN ('D', 'E', 'F', '1', '2')
+            OR (
+              e.base_salary IS NOT NULL
+              AND rsa.avg_salary IS NOT NULL
+              AND rsa.avg_salary > 0
+              AND e.base_salary < rsa.avg_salary * 0.85
+            )
+          )
+        ORDER BY COALESCE(ac.absent_cnt, 0) DESC, e.emp_name
+        LIMIT 200
+    """)
+    try:
+        result = await db.execute(q, params)
+        rows = [dict(r) for r in result.mappings()]
+    except (OperationalError, ProgrammingError) as exc:
+        logger.warning("turnover_fetch_risk_employees_failed", error=str(exc))
+        return []
+
+    employees: list[dict[str, Any]] = []
+    for row in rows:
+        emp_id = str(row.get("employee_id") or "")
+        if not emp_id:
+            continue
+        absent_cnt = int(row.get("absent_cnt") or 0)
+        perf_raw = str(row.get("performance_score") or "").strip().upper()
+        base_salary = row.get("base_salary")
+        role_avg = row.get("role_avg_salary")
+
+        # 考勤风险评分
+        att_score = 0
+        if absent_cnt > 3:
+            att_score = min(90, absent_cnt * 15)
+
+        # 绩效风险评分
+        perf_score = 0
+        if perf_raw in ("F", "E", "1"):
+            perf_score = 90
+        elif perf_raw in ("D", "2"):
+            perf_score = 75
+        elif perf_raw in ("C", "3"):
+            perf_score = 50
+
+        # 薪资风险评分
+        salary_score = 0
+        if base_salary and role_avg and float(role_avg) > 0:
+            ratio = float(base_salary) / float(role_avg)
+            if ratio < 0.75:
+                salary_score = 70
+            elif ratio < 0.85:
+                salary_score = 50
+
+        att_dim = {
+            "score": att_score,
+            "detail": f"近30天缺勤{absent_cnt}次",
+            "recent_anomalies": absent_cnt,
+            "prev_anomalies": 0,
+            "emp_name": row.get("emp_name") or "",
+            "store_id": str(row.get("store_id") or ""),
+        }
+        perf_dim = {
+            "score": perf_score,
+            "performance_score": perf_raw,
+            "detail": f"当前绩效档 {perf_raw}" if perf_raw else "无绩效数据",
+            "emp_name": row.get("emp_name") or "",
+            "store_id": str(row.get("store_id") or ""),
+        }
+        engage_dim = {"score": 50, "detail": "积分数据待接入"}
+        tenure_dim = {"score": 45, "detail": "工龄数据待接入"}
+        complaint_dim = {"score": 0, "detail": "无投诉记录"}
+        biz_dim = {
+            "score": salary_score,
+            "detail": f"薪资低于同岗均值{round((1 - float(base_salary) / float(role_avg)) * 100)}%" if (base_salary and role_avg and float(role_avg) > 0) else "薪资数据正常",
+            "signals": [],
+        }
+        svc_dim = {"score": 0, "detail": "服务质量正常", "signals": []}
+
+        dimensions = {
+            "attendance_anomaly": att_dim,
+            "performance_decline": perf_dim,
+            "engagement_drop": engage_dim,
+            "tenure_risk": tenure_dim,
+            "complaint_history": complaint_dim,
+            "business_performance": biz_dim,
+            "service_quality": svc_dim,
+        }
+        dim_scores = {k: v["score"] for k, v in dimensions.items()}
+        risk_score = _calculate_risk_score(dim_scores)
+
+        if risk_score >= 80:
+            alert_level = 2
+        elif risk_score >= 60:
+            alert_level = 1
+        else:
+            alert_level = 0
+
+        employees.append({
+            "employee_id": emp_id,
+            "emp_name": row.get("emp_name") or emp_id,
+            "store_id": str(row.get("store_id") or ""),
+            "risk_score": risk_score,
+            "risk_level": _risk_level(risk_score),
+            "risk_color": _risk_color(risk_score),
+            "alert_level": alert_level,
+            "dimensions": dimensions,
+            "interventions": _generate_interventions(dimensions),
+        })
+
+    employees.sort(key=lambda e: e["risk_score"], reverse=True)
+    return employees
 
 
 # ── Agent 类 ─────────────────────────────────────────────────────────────────
@@ -610,18 +696,11 @@ class TurnoverRiskAgent(SkillAgent):
     async def _scan_attendance_trends(self, params: dict[str, Any]) -> AgentResult:
         store_id = self._store_scope(params)
         if not self._db:
-            logger.info("turnover_scan_att_mock", tenant_id=self.tenant_id)
-            mock = _mock_risk_employees()
-            trends = {
-                e["employee_id"]: e["dimensions"]["attendance_anomaly"]
-                for e in mock
-            }
+            logger.warning("turnover_scan_att_no_db", tenant_id=self.tenant_id)
             return AgentResult(
-                success=True,
+                success=False,
                 action="scan_attendance_trends",
-                data={"trends": trends, "employee_count": len(trends)},
-                reasoning=f"考勤趋势扫描完成（mock），{len(trends)}名员工",
-                confidence=0.80,
+                error="数据库连接不可用",
             )
 
         trends = await _scan_attendance_trends(self._db, self.tenant_id, store_id)
@@ -636,18 +715,11 @@ class TurnoverRiskAgent(SkillAgent):
     async def _scan_performance_trends(self, params: dict[str, Any]) -> AgentResult:
         store_id = self._store_scope(params)
         if not self._db:
-            logger.info("turnover_scan_perf_mock", tenant_id=self.tenant_id)
-            mock = _mock_risk_employees()
-            trends = {
-                e["employee_id"]: e["dimensions"]["performance_decline"]
-                for e in mock
-            }
+            logger.warning("turnover_scan_perf_no_db", tenant_id=self.tenant_id)
             return AgentResult(
-                success=True,
+                success=False,
                 action="scan_performance_trends",
-                data={"trends": trends, "employee_count": len(trends)},
-                reasoning=f"绩效趋势扫描完成（mock），{len(trends)}名员工",
-                confidence=0.80,
+                error="数据库连接不可用",
             )
 
         trends = await _scan_performance_trends(self._db, self.tenant_id, store_id)
@@ -664,19 +736,11 @@ class TurnoverRiskAgent(SkillAgent):
         store_id = self._store_scope(params)
 
         if not self._db:
-            logger.info("turnover_calc_mock", tenant_id=self.tenant_id)
-            employees = _mock_risk_employees()
-            high_count = sum(1 for e in employees if e["risk_score"] >= 60)
+            logger.warning("turnover_calc_no_db", tenant_id=self.tenant_id)
             return AgentResult(
-                success=True,
+                success=False,
                 action="calculate_risk_score",
-                data={
-                    "employees": employees,
-                    "total_scanned": len(employees),
-                    "high_risk_count": high_count,
-                },
-                reasoning=f"离职风险评估完成（mock），{high_count}/{len(employees)}人为高风险",
-                confidence=0.80,
+                error="数据库连接不可用",
             )
 
         # 真实逻辑：聚合7个维度
@@ -775,14 +839,11 @@ class TurnoverRiskAgent(SkillAgent):
         # 先计算该员工风险
         store_id = self._store_scope(params)
         if not self._db:
-            mock = _mock_risk_employees()
-            target = next((e for e in mock if e["employee_id"] == employee_id), mock[0])
+            logger.warning("turnover_intervention_no_db", tenant_id=self.tenant_id)
             return AgentResult(
-                success=True,
+                success=False,
                 action="generate_intervention",
-                data=target,
-                reasoning=f"已为{target['emp_name']}生成{len(target['interventions'])}条干预建议（mock）",
-                confidence=0.80,
+                error="数据库连接不可用",
             )
 
         att_trends = await _scan_attendance_trends(self._db, self.tenant_id, store_id)

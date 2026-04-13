@@ -10,8 +10,13 @@ from datetime import date, datetime, timedelta
 from typing import Literal, Optional
 
 import structlog
-from fastapi import APIRouter, Header, HTTPException, Query
+from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel, Field
+from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from shared.ontology.src.database import get_db
 
 logger = structlog.get_logger(__name__)
 
@@ -72,29 +77,6 @@ def _build_week_schedule(crew_id: str) -> list[dict]:
     return items
 
 
-def _build_mock_swaps(crew_id: str) -> list[dict]:
-    """返回换班申请 Mock 数据。"""
-    today = date.today()
-    return [
-        {
-            "id": "sw-001",
-            "from_date": (today - timedelta(days=3)).strftime("%m-%d"),
-            "to_crew": "李四",
-            "reason": "家里有事",
-            "status": "approved",
-            "created_at": (today - timedelta(days=4)).strftime("%m-%d") + " 10:20",
-        },
-        {
-            "id": "sw-002",
-            "from_date": (today + timedelta(days=2)).strftime("%m-%d"),
-            "to_crew": "王五",
-            "reason": "看病",
-            "status": "pending",
-            "created_at": (today - timedelta(days=1)).strftime("%m-%d") + " 14:05",
-        },
-    ]
-
-
 # ---------- 时间窗口校验 ----------
 
 _CLOCK_WINDOW_HOURS_BEFORE = 1   # 班次开始前 N 小时内可打上班卡
@@ -112,6 +94,49 @@ def _validate_clock_window(checkin_type: str, now: datetime) -> bool:
         return 6 <= hour <= 23
     # clock_out
     return 6 <= hour <= 24
+
+
+# ---------- DB 辅助 ----------
+
+async def _fetch_swaps_from_db(
+    db: AsyncSession,
+    crew_id: str,
+    tenant_id: str,
+    status: Optional[str],
+) -> list[dict]:
+    """从 crew_shift_swaps 查询换班申请列表，按 created_at 降序。"""
+    await db.execute(
+        text("SELECT set_config('app.tenant_id', :tid, true)"),
+        {"tid": tenant_id},
+    )
+    sql = text("""
+        SELECT
+            id::text                                        AS id,
+            from_date,
+            to_crew_id,
+            reason,
+            status,
+            TO_CHAR(created_at AT TIME ZONE 'Asia/Shanghai', 'MM-DD HH24:MI')  AS created_at
+        FROM crew_shift_swaps
+        WHERE crew_id = :crew_id::uuid
+          AND is_deleted = FALSE
+          AND (:status IS NULL OR status = :status)
+        ORDER BY created_at DESC
+        LIMIT 50
+    """)
+    result = await db.execute(sql, {"crew_id": crew_id, "status": status})
+    rows = result.mappings().all()
+    items = []
+    for row in rows:
+        items.append({
+            "id":         row["id"],
+            "from_date":  row["from_date"].strftime("%m-%d") if row["from_date"] else "",
+            "to_crew":    row["to_crew_id"],
+            "reason":     row["reason"],
+            "status":     row["status"],
+            "created_at": row["created_at"] or "",
+        })
+    return items
 
 
 # ---------- 路由 ----------
@@ -261,20 +286,22 @@ async def get_my_shift_swaps(
     ),
     x_operator_id: str = Header(default="op-001", alias="X-Operator-ID"),
     x_tenant_id: str   = Header(default="",       alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ):
     """
     查询我的换班申请列表。
 
-    可按 status 筛选：pending / approved / rejected。
+    从 crew_shift_swaps 表查询，可按 status 筛选：pending / approved / rejected。
+    DB 不可用时降级返回空列表。
     """
     log = logger.bind(operator_id=x_operator_id, tenant_id=x_tenant_id, status=status)
     try:
-        items = _build_mock_swaps(x_operator_id)
-        if status:
-            items = [i for i in items if i["status"] == status]
-
+        items = await _fetch_swaps_from_db(db, x_operator_id, x_tenant_id, status)
         log.info("crew_shift_swaps_ok", count=len(items))
         return {"ok": True, "data": {"items": items, "total": len(items)}}
+    except SQLAlchemyError as e:
+        log.warning("crew_shift_swaps_db_error", error=str(e))
+        return {"ok": True, "data": {"items": [], "total": 0}}
     except ValueError as e:
         log.warning("crew_shift_swaps_value_error", error=str(e))
         raise HTTPException(status_code=400, detail=str(e))

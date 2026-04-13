@@ -11,132 +11,23 @@
 """
 from __future__ import annotations
 
+import json
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Optional
 
 import structlog
-from fastapi import APIRouter, Header, HTTPException, Query
+from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel, Field
+from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from shared.ontology.src.database import get_db
 
 logger = structlog.get_logger(__name__)
 
 router = APIRouter(prefix="/api/v1/growth/journeys", tags=["journey-designer"])
-
-
-# ─── Mock 数据 ───────────────────────────────────────────────
-
-_MOCK_JOURNEYS: dict[str, dict[str, Any]] = {
-    "j001": {
-        "journey_id": "j001",
-        "name": "新客首次到店欢迎旅程",
-        "description": "新客首次消费后自动触发，引导注册会员、领券、储值",
-        "status": "running",
-        "trigger": {"event": "order.paid", "conditions": [{"field": "is_first_visit", "operator": "eq", "value": True}]},
-        "target_segment": "新客",
-        "enrolled_count": 4218,
-        "completed_count": 3500,
-        "conversion_rate": 0.83,
-        "nodes": [
-            {"node_id": "n1", "type": "trigger", "name": "首次消费", "config": {"event": "order.paid"}, "position": {"x": 100, "y": 200}, "next_nodes": ["n2"]},
-            {"node_id": "n2", "type": "delay", "name": "等待30分钟", "config": {"duration_minutes": 30}, "position": {"x": 300, "y": 200}, "next_nodes": ["n3"]},
-            {"node_id": "n3", "type": "action", "name": "发送欢迎短信", "config": {"channel": "sms", "template": "welcome_new"}, "position": {"x": 500, "y": 200}, "next_nodes": ["n4"]},
-            {"node_id": "n4", "type": "condition", "name": "是否已注册会员", "config": {"field": "is_member", "operator": "eq", "value": True}, "position": {"x": 700, "y": 200}, "next_nodes": ["n5", "n6"]},
-            {"node_id": "n5", "type": "action", "name": "推送新客券", "config": {"channel": "wechat", "coupon_id": "c001"}, "position": {"x": 900, "y": 100}, "next_nodes": []},
-            {"node_id": "n6", "type": "action", "name": "推送注册引导", "config": {"channel": "sms", "template": "register_guide"}, "position": {"x": 900, "y": 300}, "next_nodes": []},
-        ],
-        "created_at": "2026-01-15T10:00:00Z",
-        "updated_at": "2026-04-01T15:30:00Z",
-        "created_by": "admin",
-    },
-    "j002": {
-        "journey_id": "j002",
-        "name": "沉默客户唤醒旅程",
-        "description": "30天未到店的会员，通过多触点逐步唤醒",
-        "status": "running",
-        "trigger": {"event": "member.dormant", "conditions": [{"field": "days_since_last_visit", "operator": "gte", "value": 30}]},
-        "target_segment": "沉默预警",
-        "enrolled_count": 8600,
-        "completed_count": 5200,
-        "conversion_rate": 0.38,
-        "nodes": [
-            {"node_id": "n1", "type": "trigger", "name": "30天未到店", "config": {"event": "member.dormant"}, "position": {"x": 100, "y": 200}, "next_nodes": ["n2"]},
-            {"node_id": "n2", "type": "action", "name": "发送唤醒短信", "config": {"channel": "sms", "template": "dormant_recall_1"}, "position": {"x": 300, "y": 200}, "next_nodes": ["n3"]},
-            {"node_id": "n3", "type": "delay", "name": "等待3天", "config": {"duration_minutes": 4320}, "position": {"x": 500, "y": 200}, "next_nodes": ["n4"]},
-            {"node_id": "n4", "type": "condition", "name": "是否回访", "config": {"field": "has_visited", "operator": "eq", "value": True}, "position": {"x": 700, "y": 200}, "next_nodes": ["n5", "n6"]},
-            {"node_id": "n5", "type": "action", "name": "发送感谢", "config": {"channel": "wechat", "template": "thank_you"}, "position": {"x": 900, "y": 100}, "next_nodes": []},
-            {"node_id": "n6", "type": "action", "name": "推送大额券", "config": {"channel": "sms", "coupon_id": "c005"}, "position": {"x": 900, "y": 300}, "next_nodes": ["n7"]},
-            {"node_id": "n7", "type": "delay", "name": "等待7天", "config": {"duration_minutes": 10080}, "position": {"x": 1100, "y": 300}, "next_nodes": ["n8"]},
-            {"node_id": "n8", "type": "action", "name": "人工跟进", "config": {"channel": "task", "assign_to": "store_manager"}, "position": {"x": 1300, "y": 300}, "next_nodes": []},
-        ],
-        "created_at": "2026-02-01T10:00:00Z",
-        "updated_at": "2026-03-20T14:00:00Z",
-        "created_by": "admin",
-    },
-    "j003": {
-        "journey_id": "j003",
-        "name": "生日关怀旅程",
-        "description": "会员生日前3天触发，包含祝福、专属券、生日特权提醒",
-        "status": "running",
-        "trigger": {"event": "member.birthday_approaching", "conditions": [{"field": "days_to_birthday", "operator": "lte", "value": 3}]},
-        "target_segment": "全部会员",
-        "enrolled_count": 12000,
-        "completed_count": 10800,
-        "conversion_rate": 0.72,
-        "nodes": [
-            {"node_id": "n1", "type": "trigger", "name": "生日前3天", "config": {"event": "member.birthday_approaching"}, "position": {"x": 100, "y": 200}, "next_nodes": ["n2"]},
-            {"node_id": "n2", "type": "action", "name": "发送生日祝福", "config": {"channel": "wechat", "template": "birthday_wish"}, "position": {"x": 300, "y": 200}, "next_nodes": ["n3"]},
-            {"node_id": "n3", "type": "action", "name": "发放生日券", "config": {"channel": "system", "coupon_id": "c004"}, "position": {"x": 500, "y": 200}, "next_nodes": ["n4"]},
-            {"node_id": "n4", "type": "delay", "name": "生日当天", "config": {"duration_minutes": 4320}, "position": {"x": 700, "y": 200}, "next_nodes": ["n5"]},
-            {"node_id": "n5", "type": "action", "name": "生日当天提醒", "config": {"channel": "sms", "template": "birthday_day"}, "position": {"x": 900, "y": 200}, "next_nodes": []},
-        ],
-        "created_at": "2026-01-10T10:00:00Z",
-        "updated_at": "2026-01-10T10:00:00Z",
-        "created_by": "admin",
-    },
-    "j004": {
-        "journey_id": "j004",
-        "name": "高价值客户培育旅程",
-        "description": "识别消费潜力高的客户，通过VIP服务逐步提升消费频次和客单",
-        "status": "paused",
-        "trigger": {"event": "member.rfm_upgraded", "conditions": [{"field": "rfm_code", "operator": "in", "value": ["101", "110"]}]},
-        "target_segment": "重要发展客户",
-        "enrolled_count": 3200,
-        "completed_count": 1800,
-        "conversion_rate": 0.45,
-        "nodes": [
-            {"node_id": "n1", "type": "trigger", "name": "RFM升级", "config": {"event": "member.rfm_upgraded"}, "position": {"x": 100, "y": 200}, "next_nodes": ["n2"]},
-            {"node_id": "n2", "type": "action", "name": "分配专属顾问", "config": {"channel": "task", "assign_to": "vip_advisor"}, "position": {"x": 300, "y": 200}, "next_nodes": ["n3"]},
-            {"node_id": "n3", "type": "action", "name": "推送VIP权益", "config": {"channel": "wechat", "template": "vip_benefits"}, "position": {"x": 500, "y": 200}, "next_nodes": ["n4"]},
-            {"node_id": "n4", "type": "delay", "name": "等待7天", "config": {"duration_minutes": 10080}, "position": {"x": 700, "y": 200}, "next_nodes": ["n5"]},
-            {"node_id": "n5", "type": "action", "name": "邀请品鉴活动", "config": {"channel": "sms", "template": "vip_tasting_invite"}, "position": {"x": 900, "y": 200}, "next_nodes": []},
-        ],
-        "created_at": "2026-03-01T10:00:00Z",
-        "updated_at": "2026-04-05T09:00:00Z",
-        "created_by": "admin",
-    },
-    "j005": {
-        "journey_id": "j005",
-        "name": "宴席后续跟进旅程",
-        "description": "宴席结束后自动跟进，收集反馈、推荐下次预订",
-        "status": "draft",
-        "trigger": {"event": "banquet.completed", "conditions": []},
-        "target_segment": "宴席客户",
-        "enrolled_count": 0,
-        "completed_count": 0,
-        "conversion_rate": 0.0,
-        "nodes": [
-            {"node_id": "n1", "type": "trigger", "name": "宴席结束", "config": {"event": "banquet.completed"}, "position": {"x": 100, "y": 200}, "next_nodes": ["n2"]},
-            {"node_id": "n2", "type": "delay", "name": "等待2小时", "config": {"duration_minutes": 120}, "position": {"x": 300, "y": 200}, "next_nodes": ["n3"]},
-            {"node_id": "n3", "type": "action", "name": "发送感谢+评价邀请", "config": {"channel": "sms", "template": "banquet_feedback"}, "position": {"x": 500, "y": 200}, "next_nodes": ["n4"]},
-            {"node_id": "n4", "type": "delay", "name": "等待30天", "config": {"duration_minutes": 43200}, "position": {"x": 700, "y": 200}, "next_nodes": ["n5"]},
-            {"node_id": "n5", "type": "action", "name": "推送下次宴席优惠", "config": {"channel": "wechat", "template": "banquet_promo"}, "position": {"x": 900, "y": 200}, "next_nodes": []},
-        ],
-        "created_at": "2026-04-08T10:00:00Z",
-        "updated_at": "2026-04-08T10:00:00Z",
-        "created_by": "admin",
-    },
-}
 
 
 # ─── 请求模型 ────────────────────────────────────────────────
@@ -185,6 +76,81 @@ def ok(data: Any) -> dict:
     return {"ok": True, "data": data}
 
 
+def _row_to_journey(row: Any, *, include_nodes: bool = True) -> dict:
+    """Convert a DB row from journey_definitions into the API response shape."""
+    # Derive status from is_active + is_deleted
+    if row.is_deleted:
+        status = "stopped"
+    elif row.is_active:
+        status = "running"
+    else:
+        status = "draft"
+
+    # trigger shape: store trigger_event + trigger_conditions together
+    trigger = {
+        "event": row.trigger_event,
+        "conditions": row.trigger_conditions if row.trigger_conditions else [],
+    }
+
+    steps = row.steps if row.steps else []
+
+    result: dict[str, Any] = {
+        "journey_id": str(row.id),
+        "name": row.name,
+        "description": row.description,
+        "status": status,
+        "trigger": trigger,
+        "target_segment": row.target_segment,
+        "enrolled_count": row.enrolled_count or 0,
+        "completed_count": row.completed_count or 0,
+        "conversion_rate": (
+            round(row.completed_count / row.enrolled_count, 2)
+            if (row.enrolled_count and row.enrolled_count > 0)
+            else 0.0
+        ),
+        "node_count": len(steps),
+        "created_at": row.created_at.isoformat() if row.created_at else None,
+        "updated_at": row.updated_at.isoformat() if row.updated_at else None,
+        "version": row.version,
+    }
+
+    if include_nodes:
+        result["nodes"] = steps
+
+    return result
+
+
+_JOURNEY_SELECT = """
+    SELECT
+        d.id,
+        d.name,
+        d.description,
+        d.is_active,
+        d.is_deleted,
+        d.trigger_event,
+        d.trigger_conditions,
+        d.steps,
+        d.target_segment,
+        d.version,
+        d.created_at,
+        d.updated_at,
+        COUNT(e.id) FILTER (WHERE e.status IN ('active', 'completed', 'exited', 'failed'))
+            AS enrolled_count,
+        COUNT(e.id) FILTER (WHERE e.status = 'completed')
+            AS completed_count
+    FROM journey_definitions d
+    LEFT JOIN journey_enrollments e
+           ON e.journey_definition_id = d.id
+          AND e.tenant_id = d.tenant_id
+"""
+
+_JOURNEY_GROUP = """
+    GROUP BY d.id, d.name, d.description, d.is_active, d.is_deleted,
+             d.trigger_event, d.trigger_conditions, d.steps, d.target_segment,
+             d.version, d.created_at, d.updated_at
+"""
+
+
 # ─── 端点 ────────────────────────────────────────────────────
 
 @router.get("/")
@@ -194,81 +160,183 @@ async def list_journeys(
     page: int = Query(1, ge=1),
     size: int = Query(20, ge=1, le=100),
     x_tenant_id: Optional[str] = Header(None, alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ):
     """旅程列表"""
     tenant_id = _require_tenant(x_tenant_id)
     logger.info("list_journeys", tenant_id=str(tenant_id), status=status)
 
-    items = list(_MOCK_JOURNEYS.values())
-    if status:
-        items = [j for j in items if j["status"] == status]
-    if keyword:
-        items = [j for j in items if keyword in j["name"] or keyword in (j.get("description") or "")]
+    try:
+        await db.execute(
+            text("SELECT set_config('app.tenant_id', :tid, true)"),
+            {"tid": str(tenant_id)},
+        )
 
-    # 列表不返回 nodes 详情
-    list_items = []
-    for j in items:
-        item = {k: v for k, v in j.items() if k != "nodes"}
-        item["node_count"] = len(j.get("nodes", []))
-        list_items.append(item)
+        conditions = ["d.is_deleted = false"]
+        params: dict = {"size": size, "offset": (page - 1) * size}
 
-    total = len(list_items)
-    offset = (page - 1) * size
-    paged = list_items[offset: offset + size]
+        # Map status filter to DB columns
+        if status == "running":
+            conditions.append("d.is_active = true")
+        elif status in ("draft", "paused"):
+            conditions.append("d.is_active = false")
+        elif status == "stopped":
+            # stopped journeys have is_deleted = true; exclude from default list
+            conditions = ["d.is_deleted = true"]
 
-    return ok({
-        "items": paged,
-        "total": total,
-        "page": page,
-        "size": size,
-    })
+        if keyword:
+            conditions.append(
+                "(d.name ILIKE :keyword OR d.description ILIKE :keyword)"
+            )
+            params["keyword"] = f"%{keyword}%"
+
+        where_clause = " AND ".join(conditions)
+
+        rows = (
+            await db.execute(
+                text(
+                    f"""
+                    {_JOURNEY_SELECT}
+                    WHERE {where_clause}
+                    {_JOURNEY_GROUP}
+                    ORDER BY d.updated_at DESC
+                    LIMIT :size OFFSET :offset
+                    """
+                ),
+                params,
+            )
+        ).fetchall()
+
+        count_row = (
+            await db.execute(
+                text(
+                    f"SELECT COUNT(*) AS cnt FROM journey_definitions d WHERE {where_clause}"
+                ),
+                {k: v for k, v in params.items() if k not in ("size", "offset")},
+            )
+        ).fetchone()
+
+        total = count_row.cnt if count_row else 0
+        items = [_row_to_journey(row, include_nodes=False) for row in rows]
+
+        return ok({"items": items, "total": total, "page": page, "size": size})
+
+    except SQLAlchemyError as exc:
+        logger.error("list_journeys.db_error", error=str(exc))
+        return ok({"items": [], "total": 0, "page": page, "size": size, "_degraded": True})
 
 
 @router.get("/{journey_id}")
 async def get_journey(
     journey_id: str,
     x_tenant_id: Optional[str] = Header(None, alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ):
     """旅程详情（含节点定义）"""
     tenant_id = _require_tenant(x_tenant_id)
     logger.info("get_journey", tenant_id=str(tenant_id), journey_id=journey_id)
 
-    journey = _MOCK_JOURNEYS.get(journey_id)
-    if not journey:
-        raise HTTPException(status_code=404, detail=f"旅程不存在: {journey_id}")
+    try:
+        await db.execute(
+            text("SELECT set_config('app.tenant_id', :tid, true)"),
+            {"tid": str(tenant_id)},
+        )
 
-    return ok(journey)
+        row = (
+            await db.execute(
+                text(
+                    f"""
+                    {_JOURNEY_SELECT}
+                    WHERE d.id = :journey_id::uuid
+                    {_JOURNEY_GROUP}
+                    """
+                ),
+                {"journey_id": journey_id},
+            )
+        ).fetchone()
+
+        if not row:
+            raise HTTPException(status_code=404, detail=f"旅程不存在: {journey_id}")
+
+        return ok(_row_to_journey(row, include_nodes=True))
+
+    except HTTPException:
+        raise
+    except SQLAlchemyError as exc:
+        logger.error("get_journey.db_error", journey_id=journey_id, error=str(exc))
+        raise HTTPException(status_code=503, detail="旅程查询暂时不可用，请稍后重试")
 
 
 @router.post("/")
 async def create_journey(
     body: CreateJourneyRequest,
     x_tenant_id: Optional[str] = Header(None, alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ):
     """创建旅程"""
     tenant_id = _require_tenant(x_tenant_id)
     logger.info("create_journey", tenant_id=str(tenant_id), name=body.name)
 
-    journey_id = f"j{uuid.uuid4().hex[:8]}"
-    now = datetime.now(timezone.utc).isoformat()
+    try:
+        await db.execute(
+            text("SELECT set_config('app.tenant_id', :tid, true)"),
+            {"tid": str(tenant_id)},
+        )
 
-    new_journey = {
-        "journey_id": journey_id,
-        "name": body.name,
-        "description": body.description,
-        "status": "draft",
-        "trigger": body.trigger,
-        "target_segment": body.target_segment,
-        "enrolled_count": 0,
-        "completed_count": 0,
-        "conversion_rate": 0.0,
-        "nodes": [n.model_dump() for n in body.nodes],
-        "created_at": now,
-        "updated_at": now,
-        "created_by": "current_user",
-    }
+        trigger_event = body.trigger.get("event", "manual")
+        trigger_conditions = body.trigger.get("conditions", [])
+        nodes_data = [n.model_dump() for n in body.nodes]
 
-    return ok(new_journey)
+        row = (
+            await db.execute(
+                text(
+                    """
+                    INSERT INTO journey_definitions (
+                        tenant_id, name, description,
+                        trigger_event, trigger_conditions, steps,
+                        target_segment, is_active
+                    ) VALUES (
+                        :tenant_id::uuid, :name, :description,
+                        :trigger_event, :trigger_conditions::jsonb, :steps::jsonb,
+                        :target_segment, false
+                    )
+                    RETURNING id, name, description, is_active, is_deleted,
+                              trigger_event, trigger_conditions, steps, target_segment,
+                              version, created_at, updated_at
+                    """
+                ),
+                {
+                    "tenant_id": str(tenant_id),
+                    "name": body.name,
+                    "description": body.description,
+                    "trigger_event": trigger_event,
+                    "trigger_conditions": json.dumps(trigger_conditions, ensure_ascii=False),
+                    "steps": json.dumps(nodes_data, ensure_ascii=False),
+                    "target_segment": body.target_segment,
+                },
+            )
+        ).fetchone()
+
+        await db.commit()
+
+        # Synthesise a response row-like object with zero enrollment counts
+        class _FakeRow:
+            pass
+
+        fake = _FakeRow()
+        for col in ("id", "name", "description", "is_active", "is_deleted",
+                    "trigger_event", "trigger_conditions", "steps",
+                    "target_segment", "version", "created_at", "updated_at"):
+            setattr(fake, col, getattr(row, col))
+        fake.enrolled_count = 0  # type: ignore[attr-defined]
+        fake.completed_count = 0  # type: ignore[attr-defined]
+
+        return ok(_row_to_journey(fake, include_nodes=True))
+
+    except SQLAlchemyError as exc:
+        await db.rollback()
+        logger.error("create_journey.db_error", error=str(exc))
+        raise HTTPException(status_code=503, detail="旅程创建暂时不可用，请稍后重试")
 
 
 @router.put("/{journey_id}")
@@ -276,36 +344,120 @@ async def update_journey(
     journey_id: str,
     body: UpdateJourneyRequest,
     x_tenant_id: Optional[str] = Header(None, alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ):
     """更新旅程（运行中的旅程不允许修改节点）"""
     tenant_id = _require_tenant(x_tenant_id)
     logger.info("update_journey", tenant_id=str(tenant_id), journey_id=journey_id)
 
-    journey = _MOCK_JOURNEYS.get(journey_id)
-    if not journey:
-        raise HTTPException(status_code=404, detail=f"旅程不存在: {journey_id}")
-
-    if journey["status"] == "running" and body.nodes is not None:
-        raise HTTPException(
-            status_code=422,
-            detail="运行中的旅程不允许修改节点，请先暂停",
+    try:
+        await db.execute(
+            text("SELECT set_config('app.tenant_id', :tid, true)"),
+            {"tid": str(tenant_id)},
         )
 
-    # Mock: 构建更新后的数据
-    updated = dict(journey)
-    if body.name is not None:
-        updated["name"] = body.name
-    if body.description is not None:
-        updated["description"] = body.description
-    if body.trigger is not None:
-        updated["trigger"] = body.trigger
-    if body.target_segment is not None:
-        updated["target_segment"] = body.target_segment
-    if body.nodes is not None:
-        updated["nodes"] = [n.model_dump() for n in body.nodes]
-    updated["updated_at"] = datetime.now(timezone.utc).isoformat()
+        # Fetch current row to validate
+        current = (
+            await db.execute(
+                text(
+                    "SELECT id, is_active, is_deleted FROM journey_definitions "
+                    "WHERE id = :jid::uuid AND is_deleted = false"
+                ),
+                {"jid": journey_id},
+            )
+        ).fetchone()
 
-    return ok(updated)
+        if not current:
+            raise HTTPException(status_code=404, detail=f"旅程不存在: {journey_id}")
+
+        if current.is_active and body.nodes is not None:
+            raise HTTPException(
+                status_code=422,
+                detail="运行中的旅程不允许修改节点，请先暂停",
+            )
+
+        # Build SET clause dynamically
+        set_parts = ["updated_at = NOW()", "version = version + 1"]
+        params: dict = {"jid": journey_id}
+
+        if body.name is not None:
+            set_parts.append("name = :name")
+            params["name"] = body.name
+        if body.description is not None:
+            set_parts.append("description = :description")
+            params["description"] = body.description
+        if body.trigger is not None:
+            set_parts.append("trigger_event = :trigger_event")
+            set_parts.append("trigger_conditions = :trigger_conditions::jsonb")
+            params["trigger_event"] = body.trigger.get("event", "manual")
+            params["trigger_conditions"] = json.dumps(
+                body.trigger.get("conditions", []), ensure_ascii=False
+            )
+        if body.target_segment is not None:
+            set_parts.append("target_segment = :target_segment")
+            params["target_segment"] = body.target_segment
+        if body.nodes is not None:
+            set_parts.append("steps = :steps::jsonb")
+            params["steps"] = json.dumps(
+                [n.model_dump() for n in body.nodes], ensure_ascii=False
+            )
+
+        row = (
+            await db.execute(
+                text(
+                    f"""
+                    UPDATE journey_definitions
+                    SET {', '.join(set_parts)}
+                    WHERE id = :jid::uuid AND is_deleted = false
+                    RETURNING id, name, description, is_active, is_deleted,
+                              trigger_event, trigger_conditions, steps, target_segment,
+                              version, created_at, updated_at
+                    """
+                ),
+                params,
+            )
+        ).fetchone()
+
+        if not row:
+            raise HTTPException(status_code=404, detail=f"旅程不存在: {journey_id}")
+
+        await db.commit()
+
+        # Fetch enrollment counts separately
+        enroll_row = (
+            await db.execute(
+                text(
+                    """
+                    SELECT
+                        COUNT(*) FILTER (WHERE status IN ('active','completed','exited','failed')) AS enrolled_count,
+                        COUNT(*) FILTER (WHERE status = 'completed') AS completed_count
+                    FROM journey_enrollments
+                    WHERE journey_definition_id = :jid::uuid
+                    """
+                ),
+                {"jid": journey_id},
+            )
+        ).fetchone()
+
+        class _FakeRow:
+            pass
+
+        fake = _FakeRow()
+        for col in ("id", "name", "description", "is_active", "is_deleted",
+                    "trigger_event", "trigger_conditions", "steps",
+                    "target_segment", "version", "created_at", "updated_at"):
+            setattr(fake, col, getattr(row, col))
+        fake.enrolled_count = enroll_row.enrolled_count if enroll_row else 0  # type: ignore[attr-defined]
+        fake.completed_count = enroll_row.completed_count if enroll_row else 0  # type: ignore[attr-defined]
+
+        return ok(_row_to_journey(fake, include_nodes=True))
+
+    except HTTPException:
+        raise
+    except SQLAlchemyError as exc:
+        await db.rollback()
+        logger.error("update_journey.db_error", journey_id=journey_id, error=str(exc))
+        raise HTTPException(status_code=503, detail="旅程更新暂时不可用，请稍后重试")
 
 
 @router.patch("/{journey_id}/status")
@@ -313,6 +465,7 @@ async def change_journey_status(
     journey_id: str,
     body: StatusChangeRequest,
     x_tenant_id: Optional[str] = Header(None, alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ):
     """启动/暂停/结束旅程"""
     tenant_id = _require_tenant(x_tenant_id)
@@ -323,11 +476,7 @@ async def change_journey_status(
         action=body.action,
     )
 
-    journey = _MOCK_JOURNEYS.get(journey_id)
-    if not journey:
-        raise HTTPException(status_code=404, detail=f"旅程不存在: {journey_id}")
-
-    valid_transitions = {
+    valid_transitions: dict[str, set[str]] = {
         "start": {"draft", "paused"},
         "pause": {"running"},
         "stop": {"running", "paused"},
@@ -339,22 +488,93 @@ async def change_journey_status(
             detail=f"无效操作: {body.action}，可用操作: start/pause/stop",
         )
 
-    current_status = journey["status"]
-    allowed_from = valid_transitions[body.action]
-    if current_status not in allowed_from:
-        raise HTTPException(
-            status_code=422,
-            detail=f"当前状态 {current_status} 不允许执行 {body.action}，"
-                   f"要求状态: {', '.join(sorted(allowed_from))}",
+    try:
+        await db.execute(
+            text("SELECT set_config('app.tenant_id', :tid, true)"),
+            {"tid": str(tenant_id)},
         )
 
-    new_status_map = {"start": "running", "pause": "paused", "stop": "stopped"}
-    new_status = new_status_map[body.action]
+        current = (
+            await db.execute(
+                text(
+                    "SELECT id, is_active, is_deleted FROM journey_definitions "
+                    "WHERE id = :jid::uuid"
+                ),
+                {"jid": journey_id},
+            )
+        ).fetchone()
 
-    return ok({
-        "journey_id": journey_id,
-        "previous_status": current_status,
-        "current_status": new_status,
-        "action": body.action,
-        "updated_at": datetime.now(timezone.utc).isoformat(),
-    })
+        if not current:
+            raise HTTPException(status_code=404, detail=f"旅程不存在: {journey_id}")
+
+        # Derive current status
+        if current.is_deleted:
+            current_status = "stopped"
+        elif current.is_active:
+            current_status = "running"
+        else:
+            current_status = "draft"
+
+        allowed_from = valid_transitions[body.action]
+        if current_status not in allowed_from:
+            raise HTTPException(
+                status_code=422,
+                detail=(
+                    f"当前状态 {current_status} 不允许执行 {body.action}，"
+                    f"要求状态: {', '.join(sorted(allowed_from))}"
+                ),
+            )
+
+        # Compute new DB state
+        if body.action == "start":
+            new_is_active = True
+            new_is_deleted = False
+            new_status = "running"
+        elif body.action == "pause":
+            new_is_active = False
+            new_is_deleted = False
+            new_status = "paused"
+        else:  # stop
+            new_is_active = False
+            new_is_deleted = True
+            new_status = "stopped"
+
+        await db.execute(
+            text(
+                """
+                UPDATE journey_definitions
+                SET is_active = :is_active,
+                    is_deleted = :is_deleted,
+                    updated_at = NOW()
+                WHERE id = :jid::uuid
+                """
+            ),
+            {
+                "jid": journey_id,
+                "is_active": new_is_active,
+                "is_deleted": new_is_deleted,
+            },
+        )
+        await db.commit()
+
+        return ok(
+            {
+                "journey_id": journey_id,
+                "previous_status": current_status,
+                "current_status": new_status,
+                "action": body.action,
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+            }
+        )
+
+    except HTTPException:
+        raise
+    except SQLAlchemyError as exc:
+        await db.rollback()
+        logger.error(
+            "change_journey_status.db_error",
+            journey_id=journey_id,
+            action=body.action,
+            error=str(exc),
+        )
+        raise HTTPException(status_code=503, detail="旅程状态变更暂时不可用，请稍后重试")

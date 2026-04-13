@@ -12,145 +12,19 @@ import uuid
 from typing import Optional
 
 import structlog
-from fastapi import APIRouter, Header, HTTPException, Query
+from fastapi import APIRouter, Depends, Header, HTTPException, Query
+from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from shared.ontology.src.database import get_db
 
 logger = structlog.get_logger(__name__)
 
 router = APIRouter(prefix="/api/v1/analytics/region-overview", tags=["region-overview"])
 
 
-# ─── Mock 数据 ───────────────────────────────────────────────
-
-_MOCK_REGIONS = {
-    "r001": {
-        "region_id": "r001",
-        "region_name": "华中大区",
-        "manager": "张明",
-        "store_count": 12,
-        "metrics": {
-            "revenue_fen": 462000000,
-            "revenue_mom": 0.08,
-            "avg_ticket_fen": 8500,
-            "avg_ticket_mom": 0.03,
-            "turnover_rate": 3.1,
-            "turnover_mom": 0.05,
-            "gross_margin": 0.62,
-            "gross_margin_mom": -0.01,
-            "labor_efficiency_fen": 265000,
-            "labor_efficiency_mom": 0.04,
-            "complaint_rate": 0.009,
-            "complaint_mom": -0.002,
-        },
-        "brands": [
-            {"brand": "尝在一起", "store_count": 6, "revenue_fen": 258000000, "revenue_mom": 0.10},
-            {"brand": "最黔线", "store_count": 4, "revenue_fen": 136000000, "revenue_mom": 0.05},
-            {"brand": "尚宫厨", "store_count": 2, "revenue_fen": 68000000, "revenue_mom": 0.06},
-        ],
-        "stores": [
-            {"store_id": "s001", "store_name": "尝在一起·五一广场店", "city": "长沙", "revenue_fen": 52000000, "revenue_mom": 0.12, "health_level": "A"},
-            {"store_id": "s002", "store_name": "尝在一起·IFS店", "city": "长沙", "revenue_fen": 48000000, "revenue_mom": 0.08, "health_level": "A"},
-            {"store_id": "s003", "store_name": "最黔线·太平街店", "city": "长沙", "revenue_fen": 38000000, "revenue_mom": 0.05, "health_level": "B"},
-            {"store_id": "s004", "store_name": "最黔线·梅溪湖店", "city": "长沙", "revenue_fen": 33000000, "revenue_mom": -0.02, "health_level": "B"},
-            {"store_id": "s011", "store_name": "尝在一起·光谷店", "city": "武汉", "revenue_fen": 45000000, "revenue_mom": 0.09, "health_level": "A"},
-            {"store_id": "s012", "store_name": "尝在一起·江汉路店", "city": "武汉", "revenue_fen": 42000000, "revenue_mom": 0.07, "health_level": "B"},
-        ],
-    },
-    "r002": {
-        "region_id": "r002",
-        "region_name": "华东大区",
-        "manager": "李娜",
-        "store_count": 15,
-        "metrics": {
-            "revenue_fen": 610000000,
-            "revenue_mom": 0.06,
-            "avg_ticket_fen": 10200,
-            "avg_ticket_mom": 0.02,
-            "turnover_rate": 2.8,
-            "turnover_mom": -0.02,
-            "gross_margin": 0.58,
-            "gross_margin_mom": -0.03,
-            "labor_efficiency_fen": 290000,
-            "labor_efficiency_mom": 0.02,
-            "complaint_rate": 0.011,
-            "complaint_mom": 0.001,
-        },
-        "brands": [
-            {"brand": "尚宫厨", "store_count": 8, "revenue_fen": 380000000, "revenue_mom": 0.07},
-            {"brand": "尝在一起", "store_count": 5, "revenue_fen": 162000000, "revenue_mom": 0.04},
-            {"brand": "最黔线", "store_count": 2, "revenue_fen": 68000000, "revenue_mom": 0.03},
-        ],
-        "stores": [
-            {"store_id": "s005", "store_name": "尚宫厨·国金店", "city": "上海", "revenue_fen": 68000000, "revenue_mom": 0.09, "health_level": "A"},
-            {"store_id": "s006", "store_name": "尚宫厨·新天地店", "city": "上海", "revenue_fen": 35000000, "revenue_mom": -0.05, "health_level": "C"},
-            {"store_id": "s010", "store_name": "尚宫厨·西湖店", "city": "杭州", "revenue_fen": 42000000, "revenue_mom": 0.06, "health_level": "B"},
-            {"store_id": "s013", "store_name": "尝在一起·南京西路店", "city": "上海", "revenue_fen": 46000000, "revenue_mom": 0.05, "health_level": "B"},
-            {"store_id": "s014", "store_name": "尝在一起·湖滨银泰店", "city": "杭州", "revenue_fen": 39000000, "revenue_mom": 0.04, "health_level": "B"},
-        ],
-    },
-    "r003": {
-        "region_id": "r003",
-        "region_name": "华南大区",
-        "manager": "王强",
-        "store_count": 8,
-        "metrics": {
-            "revenue_fen": 320000000,
-            "revenue_mom": 0.10,
-            "avg_ticket_fen": 9200,
-            "avg_ticket_mom": 0.04,
-            "turnover_rate": 3.4,
-            "turnover_mom": 0.08,
-            "gross_margin": 0.60,
-            "gross_margin_mom": 0.01,
-            "labor_efficiency_fen": 275000,
-            "labor_efficiency_mom": 0.06,
-            "complaint_rate": 0.007,
-            "complaint_mom": -0.003,
-        },
-        "brands": [
-            {"brand": "尝在一起", "store_count": 4, "revenue_fen": 168000000, "revenue_mom": 0.12},
-            {"brand": "最黔线", "store_count": 3, "revenue_fen": 108000000, "revenue_mom": 0.08},
-            {"brand": "尚宫厨", "store_count": 1, "revenue_fen": 44000000, "revenue_mom": 0.05},
-        ],
-        "stores": [
-            {"store_id": "s007", "store_name": "尝在一起·天河城店", "city": "广州", "revenue_fen": 46000000, "revenue_mom": 0.10, "health_level": "B"},
-            {"store_id": "s015", "store_name": "尝在一起·万象城店", "city": "深圳", "revenue_fen": 52000000, "revenue_mom": 0.14, "health_level": "A"},
-            {"store_id": "s016", "store_name": "最黔线·珠江新城店", "city": "广州", "revenue_fen": 40000000, "revenue_mom": 0.07, "health_level": "B"},
-        ],
-    },
-    "r004": {
-        "region_id": "r004",
-        "region_name": "西南大区",
-        "manager": "赵静",
-        "store_count": 6,
-        "metrics": {
-            "revenue_fen": 215000000,
-            "revenue_mom": -0.02,
-            "avg_ticket_fen": 7600,
-            "avg_ticket_mom": -0.01,
-            "turnover_rate": 2.6,
-            "turnover_mom": -0.05,
-            "gross_margin": 0.55,
-            "gross_margin_mom": -0.04,
-            "labor_efficiency_fen": 230000,
-            "labor_efficiency_mom": -0.02,
-            "complaint_rate": 0.015,
-            "complaint_mom": 0.004,
-        },
-        "brands": [
-            {"brand": "最黔线", "store_count": 3, "revenue_fen": 105000000, "revenue_mom": -0.03},
-            {"brand": "尝在一起", "store_count": 2, "revenue_fen": 72000000, "revenue_mom": 0.01},
-            {"brand": "尚宫厨", "store_count": 1, "revenue_fen": 38000000, "revenue_mom": -0.05},
-        ],
-        "stores": [
-            {"store_id": "s008", "store_name": "最黔线·春熙路店", "city": "成都", "revenue_fen": 22000000, "revenue_mom": -0.10, "health_level": "D"},
-            {"store_id": "s009", "store_name": "尝在一起·解放碑店", "city": "重庆", "revenue_fen": 35000000, "revenue_mom": -0.03, "health_level": "C"},
-            {"store_id": "s017", "store_name": "最黔线·宽窄巷子店", "city": "成都", "revenue_fen": 38000000, "revenue_mom": 0.02, "health_level": "B"},
-            {"store_id": "s018", "store_name": "尝在一起·观音桥店", "city": "重庆", "revenue_fen": 37000000, "revenue_mom": 0.01, "health_level": "B"},
-        ],
-    },
-}
-
-# 指标中文名
+# ─── 指标中文名 ──────────────────────────────────────────────
 _METRIC_LABELS = {
     "revenue_fen": "营收（分）",
     "avg_ticket_fen": "客单价（分）",
@@ -172,110 +46,265 @@ def _require_tenant(x_tenant_id: Optional[str]) -> uuid.UUID:
         raise HTTPException(status_code=400, detail="X-Tenant-ID must be a valid UUID")
 
 
+async def _set_tenant(db: AsyncSession, tenant_id: uuid.UUID) -> None:
+    await db.execute(
+        text("SELECT set_config('app.tenant_id', :tid, true)"),
+        {"tid": str(tenant_id)},
+    )
+
+
 # ─── 端点 ────────────────────────────────────────────────────
 
 @router.get("/")
 async def region_overview(
     dimension: str = Query("region", description="维度: region / brand"),
     x_tenant_id: Optional[str] = Header(None, alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ):
     """区域/品牌维度汇总数据"""
     tenant_id = _require_tenant(x_tenant_id)
     logger.info("region_overview", tenant_id=str(tenant_id), dimension=dimension)
 
-    if dimension == "brand":
-        # 按品牌聚合
-        brand_map: dict[str, dict] = {}
-        for r in _MOCK_REGIONS.values():
-            for b in r["brands"]:
-                name = b["brand"]
-                if name not in brand_map:
-                    brand_map[name] = {
-                        "brand": name,
+    try:
+        await _set_tenant(db, tenant_id)
+
+        if dimension == "brand":
+            # 按品牌聚合：group stores by brand_id, join orders for revenue
+            rows = await db.execute(text("""
+                SELECT
+                    s.brand_id,
+                    COUNT(DISTINCT s.id)                        AS store_count,
+                    COALESCE(SUM(o.final_amount_fen), 0)        AS revenue_fen,
+                    s.region
+                FROM stores s
+                LEFT JOIN orders o
+                    ON o.store_id = s.id
+                    AND o.status  = 'paid'
+                    AND o.is_deleted = false
+                WHERE s.is_deleted = false
+                  AND s.status     = 'active'
+                GROUP BY s.brand_id, s.region
+            """))
+            raw = rows.fetchall()
+
+            brand_map: dict[str, dict] = {}
+            for r in raw:
+                brand = r.brand_id or "unknown"
+                if brand not in brand_map:
+                    brand_map[brand] = {
+                        "brand": brand,
                         "store_count": 0,
                         "revenue_fen": 0,
                         "regions": [],
                     }
-                brand_map[name]["store_count"] += b["store_count"]
-                brand_map[name]["revenue_fen"] += b["revenue_fen"]
-                brand_map[name]["regions"].append(r["region_name"])
+                brand_map[brand]["store_count"] += r.store_count
+                brand_map[brand]["revenue_fen"]  += r.revenue_fen
+                if r.region and r.region not in brand_map[brand]["regions"]:
+                    brand_map[brand]["regions"].append(r.region)
+
+            return {
+                "ok": True,
+                "data": {
+                    "dimension": "brand",
+                    "items": list(brand_map.values()),
+                    "total": len(brand_map),
+                },
+            }
+
+        # ── 按区域汇总 ───────────────────────────────────────────────
+        # Group stores by the `region` varchar field; join orders for revenue/metrics
+        region_rows = await db.execute(text("""
+            SELECT
+                COALESCE(s.region, '未分区')                    AS region_name,
+                COUNT(DISTINCT s.id)                            AS store_count,
+                COALESCE(SUM(o.final_amount_fen), 0)            AS revenue_fen,
+                COALESCE(SUM(o.guest_count), 0)                 AS total_guests,
+                COUNT(o.id)                                     AS order_count,
+                CASE WHEN COUNT(o.id) > 0
+                     THEN COALESCE(SUM(o.final_amount_fen), 0)::float / COUNT(o.id)
+                     ELSE 0 END                                 AS avg_ticket_fen
+            FROM stores s
+            LEFT JOIN orders o
+                ON o.store_id    = s.id
+                AND o.status     = 'paid'
+                AND o.is_deleted = false
+            WHERE s.is_deleted = false
+              AND s.status     = 'active'
+            GROUP BY COALESCE(s.region, '未分区')
+            ORDER BY revenue_fen DESC
+        """))
+        region_raw = region_rows.fetchall()
+
+        # Per-region brand breakdown
+        brand_rows = await db.execute(text("""
+            SELECT
+                COALESCE(s.region, '未分区')                    AS region_name,
+                COALESCE(s.brand_id, 'unknown')                 AS brand,
+                COUNT(DISTINCT s.id)                            AS store_count,
+                COALESCE(SUM(o.final_amount_fen), 0)            AS revenue_fen
+            FROM stores s
+            LEFT JOIN orders o
+                ON o.store_id    = s.id
+                AND o.status     = 'paid'
+                AND o.is_deleted = false
+            WHERE s.is_deleted = false
+              AND s.status     = 'active'
+            GROUP BY COALESCE(s.region, '未分区'), COALESCE(s.brand_id, 'unknown')
+        """))
+        brand_raw = brand_rows.fetchall()
+
+        # Build brand lookup keyed by region
+        brand_by_region: dict[str, list] = {}
+        for br in brand_raw:
+            brand_by_region.setdefault(br.region_name, []).append({
+                "brand":       br.brand,
+                "store_count": br.store_count,
+                "revenue_fen": br.revenue_fen,
+            })
+
+        items = []
+        for r in region_raw:
+            items.append({
+                "region_id":   r.region_name,   # use region name as stable key
+                "region_name": r.region_name,
+                "store_count": r.store_count,
+                "metrics": {
+                    "revenue_fen":   r.revenue_fen,
+                    "avg_ticket_fen": int(r.avg_ticket_fen),
+                    "order_count":   r.order_count,
+                    "total_guests":  r.total_guests,
+                },
+                "brands": brand_by_region.get(r.region_name, []),
+            })
+
+        total_revenue = sum(i["metrics"]["revenue_fen"] for i in items)
+        total_stores  = sum(i["store_count"] for i in items)
 
         return {
             "ok": True,
             "data": {
-                "dimension": "brand",
-                "items": list(brand_map.values()),
-                "total": len(brand_map),
+                "dimension": "region",
+                "items": items,
+                "total": len(items),
+                "group_summary": {
+                    "total_stores":    total_stores,
+                    "total_revenue_fen": total_revenue,
+                    "metric_labels":   _METRIC_LABELS,
+                },
             },
         }
 
-    # 按区域
-    items = []
-    for r in _MOCK_REGIONS.values():
-        items.append({
-            "region_id": r["region_id"],
-            "region_name": r["region_name"],
-            "manager": r["manager"],
-            "store_count": r["store_count"],
-            "metrics": r["metrics"],
-            "brands": r["brands"],
-        })
-
-    # 全集团汇总
-    total_revenue = sum(r["metrics"]["revenue_fen"] for r in _MOCK_REGIONS.values())
-    total_stores = sum(r["store_count"] for r in _MOCK_REGIONS.values())
-
-    return {
-        "ok": True,
-        "data": {
-            "dimension": "region",
-            "items": items,
-            "total": len(items),
-            "group_summary": {
-                "total_stores": total_stores,
-                "total_revenue_fen": total_revenue,
-                "metric_labels": _METRIC_LABELS,
+    except SQLAlchemyError as exc:
+        logger.error("region_overview.db_error", error=str(exc))
+        return {
+            "ok": True,
+            "data": {
+                "dimension": dimension,
+                "items": [],
+                "total": 0,
+                "group_summary": {
+                    "total_stores": 0,
+                    "total_revenue_fen": 0,
+                    "metric_labels": _METRIC_LABELS,
+                },
             },
-        },
-    }
+        }
 
 
 @router.get("/{region_id}/stores")
 async def region_stores(
     region_id: str,
-    sort_by: str = Query("revenue_fen", description="排序: revenue_fen/health_level"),
+    sort_by: str = Query("revenue_fen", description="排序: revenue_fen/store_name"),
     sort_order: str = Query("desc", description="排序方向: asc/desc"),
     page: int = Query(1, ge=1),
     size: int = Query(20, ge=1, le=100),
     x_tenant_id: Optional[str] = Header(None, alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ):
     """区域内门店列表"""
     tenant_id = _require_tenant(x_tenant_id)
     logger.info("region_stores", tenant_id=str(tenant_id), region_id=region_id)
 
-    region = _MOCK_REGIONS.get(region_id)
-    if not region:
-        raise HTTPException(status_code=404, detail=f"区域不存在: {region_id}")
+    try:
+        await _set_tenant(db, tenant_id)
 
-    stores = list(region["stores"])
-    reverse = sort_order == "desc"
-    if sort_by == "health_level":
-        stores.sort(key=lambda s: s["health_level"], reverse=not reverse)
-    else:
-        stores.sort(key=lambda s: s.get("revenue_fen", 0), reverse=reverse)
+        # Verify the region exists (region_id is the region string value)
+        check = await db.execute(text("""
+            SELECT COUNT(*)
+            FROM stores
+            WHERE is_deleted = false
+              AND status     = 'active'
+              AND COALESCE(region, '未分区') = :region_id
+        """), {"region_id": region_id})
+        total = check.scalar() or 0
+        if total == 0:
+            raise HTTPException(status_code=404, detail=f"区域不存在: {region_id}")
 
-    total = len(stores)
-    offset = (page - 1) * size
-    items = stores[offset: offset + size]
+        # Ordering
+        allowed_sorts = {"revenue_fen", "store_name"}
+        if sort_by not in allowed_sorts:
+            sort_by = "revenue_fen"
+        direction = "DESC" if sort_order == "desc" else "ASC"
+        offset = (page - 1) * size
 
-    return {
-        "ok": True,
-        "data": {
-            "region_id": region["region_id"],
-            "region_name": region["region_name"],
-            "items": items,
-            "total": total,
-            "page": page,
-            "size": size,
-        },
-    }
+        rows = await db.execute(text(f"""
+            SELECT
+                s.id::text                                      AS store_id,
+                s.store_name,
+                s.city,
+                s.brand_id,
+                COALESCE(SUM(o.final_amount_fen), 0)            AS revenue_fen,
+                COUNT(o.id)                                     AS order_count
+            FROM stores s
+            LEFT JOIN orders o
+                ON o.store_id    = s.id
+                AND o.status     = 'paid'
+                AND o.is_deleted = false
+            WHERE s.is_deleted = false
+              AND s.status     = 'active'
+              AND COALESCE(s.region, '未分区') = :region_id
+            GROUP BY s.id, s.store_name, s.city, s.brand_id
+            ORDER BY {sort_by} {direction}
+            LIMIT :size OFFSET :offset
+        """), {"region_id": region_id, "size": size, "offset": offset})
+        store_rows = rows.fetchall()
+
+        items = [
+            {
+                "store_id":    r.store_id,
+                "store_name":  r.store_name,
+                "city":        r.city,
+                "brand_id":    r.brand_id,
+                "revenue_fen": r.revenue_fen,
+                "order_count": r.order_count,
+            }
+            for r in store_rows
+        ]
+
+        return {
+            "ok": True,
+            "data": {
+                "region_id":   region_id,
+                "region_name": region_id,
+                "items":  items,
+                "total":  total,
+                "page":   page,
+                "size":   size,
+            },
+        }
+
+    except HTTPException:
+        raise
+    except SQLAlchemyError as exc:
+        logger.error("region_stores.db_error", error=str(exc))
+        return {
+            "ok": True,
+            "data": {
+                "region_id":   region_id,
+                "region_name": region_id,
+                "items":  [],
+                "total":  0,
+                "page":   page,
+                "size":   size,
+            },
+        }

@@ -652,138 +652,35 @@ class GroupDashboardService:
             return []
 
     # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    #  Mock 数据（db=None 时降级使用）
+    #  无 DB 会话时的空值降级（db=None 时使用）
     # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
     @staticmethod
     def _mock_group_kpi(tenant_id: str, date: str) -> GroupKPISnapshot:
-        """返回集团 KPI mock 数据（用于开发/测试）"""
-        if tenant_id == "tenant-empty":
-            return GroupKPISnapshot(
-                tenant_id=tenant_id,
-                date=date,
-                total_revenue_fen=0,
-                avg_ticket_fen=0,
-                table_turnover_rate=0.0,
-                gross_margin_pct=0.0,
-                active_store_count=0,
-                alert_count=0,
-            )
+        """db=None 时返回空 KPI 快照（无硬编码数据）"""
         return GroupKPISnapshot(
             tenant_id=tenant_id,
             date=date,
-            total_revenue_fen=6_240_000,   # 62,400元
-            avg_ticket_fen=8_800,          # 88元
-            table_turnover_rate=3.2,
-            gross_margin_pct=63.5,
-            active_store_count=12,
-            alert_count=2,
-            revenue_wow_pct=8.3,
+            total_revenue_fen=0,
+            avg_ticket_fen=0,
+            table_turnover_rate=0.0,
+            gross_margin_pct=0.0,
+            active_store_count=0,
+            alert_count=0,
+            revenue_wow_pct=None,
         )
 
     @staticmethod
     def _mock_brand_ranking(tenant_id: str, days: int) -> list[BrandPerformance]:
-        """返回多品牌排名 mock 数据"""
-        brands = [
-            {
-                "brand_id": "brand-001",
-                "brand_name": "尝在一起",
-                "revenue_fen": 3_800_000,
-                "order_count": 420,
-                "store_count": 6,
-                "wow_pct": 12.5,
-            },
-            {
-                "brand_id": "brand-002",
-                "brand_name": "最黔线",
-                "revenue_fen": 2_100_000,
-                "order_count": 280,
-                "store_count": 4,
-                "wow_pct": -3.2,
-            },
-            {
-                "brand_id": "brand-003",
-                "brand_name": "尚宫厨",
-                "revenue_fen": 1_450_000,
-                "order_count": 190,
-                "store_count": 2,
-                "wow_pct": 5.8,
-            },
-        ]
-        return [
-            BrandPerformance(
-                rank=idx,
-                brand_id=b["brand_id"],
-                brand_name=b["brand_name"],
-                revenue_fen=b["revenue_fen"],
-                order_count=b["order_count"],
-                avg_ticket_fen=b["revenue_fen"] // b["order_count"],
-                store_count=b["store_count"],
-                revenue_wow_pct=b["wow_pct"],
-            )
-            for idx, b in enumerate(brands, start=1)
-        ]
+        """db=None 时返回空品牌排名列表（无硬编码数据）"""
+        return []
 
     @staticmethod
     def _mock_store_alerts(tenant_id: str, threshold_pct: float) -> list[StoreAlert]:
-        """返回门店预警 mock 数据（固定含偏差 > 20% 的门店）"""
-        # 集团均值基准（mock）
-        baseline = 520_000.0  # 5,200元/天
-
-        candidates = [
-            {
-                "store_id": "store-007",
-                "store_name": "长沙万象城店",
-                "brand_id": "brand-001",
-                "brand_name": "尝在一起",
-                "revenue_fen": 260_000,   # 偏差 -50%
-            },
-            {
-                "store_id": "store-011",
-                "store_name": "岳麓区学院路店",
-                "brand_id": "brand-002",
-                "brand_name": "最黔线",
-                "revenue_fen": 390_000,   # 偏差 -25%
-            },
-        ]
-
-        alerts = []
-        for c in candidates:
-            deviation = _calc_deviation_pct(float(c["revenue_fen"]), baseline)
-            if deviation is None:
-                continue
-            if deviation <= -(threshold_pct * 100):
-                alerts.append(
-                    StoreAlert(
-                        store_id=c["store_id"],
-                        store_name=c["store_name"],
-                        brand_id=c["brand_id"],
-                        brand_name=c["brand_name"],
-                        metric_name="revenue",
-                        actual_value=float(c["revenue_fen"]),
-                        baseline_value=baseline,
-                        deviation_pct=deviation,
-                        severity=_determine_severity(deviation),
-                    )
-                )
-
-        alerts.sort(key=lambda a: a.deviation_pct)
-        return alerts
+        """db=None 时返回空预警列表（无硬编码数据）"""
+        return []
 
     @staticmethod
     def _mock_store_trend(store_id: str, days: int) -> list[dict]:
-        """返回单店趋势 mock 数据"""
-        today = datetime.now().date()
-        result = []
-        for i in range(days):
-            date = today - timedelta(days=days - 1 - i)
-            base_revenue = 480_000 + (i % 7) * 20_000
-            result.append(
-                {
-                    "date": date.isoformat(),
-                    "revenue_fen": base_revenue,
-                    "order_count": 55 + (i % 7) * 3,
-                    "avg_ticket_fen": base_revenue // (55 + (i % 7) * 3),
-                }
-            )
-        return result
+        """db=None 时返回空趋势列表（无硬编码数据）"""
+        return []

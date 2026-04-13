@@ -16,260 +16,17 @@ from datetime import datetime, timezone
 from typing import Optional
 
 import structlog
-from fastapi import APIRouter, Header, HTTPException, Query
+from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel, Field
+from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from shared.ontology.src.database import get_db
 
 logger = structlog.get_logger(__name__)
 
 router = APIRouter(prefix="/api/v1/member", tags=["coupon-benefit"])
-
-
-# ─── Mock 数据 ───────────────────────────────────────────────
-
-_MOCK_COUPONS = [
-    {
-        "coupon_id": "c001",
-        "name": "新客满100减20",
-        "type": "full_reduction",
-        "threshold_fen": 10000,
-        "discount_fen": 2000,
-        "discount_rate": None,
-        "max_discount_fen": None,
-        "status": "active",
-        "total_issued": 5000,
-        "total_used": 3200,
-        "use_rate": 0.64,
-        "start_date": "2026-03-01",
-        "end_date": "2026-06-30",
-        "scope": "all_stores",
-        "target_segment": "新客",
-        "created_at": "2026-02-28T10:00:00Z",
-    },
-    {
-        "coupon_id": "c002",
-        "name": "会员日8折券",
-        "type": "discount",
-        "threshold_fen": 0,
-        "discount_fen": None,
-        "discount_rate": 0.8,
-        "max_discount_fen": 5000,
-        "status": "active",
-        "total_issued": 12000,
-        "total_used": 8800,
-        "use_rate": 0.733,
-        "start_date": "2026-01-01",
-        "end_date": "2026-12-31",
-        "scope": "all_stores",
-        "target_segment": "全部会员",
-        "created_at": "2025-12-25T10:00:00Z",
-    },
-    {
-        "coupon_id": "c003",
-        "name": "午市特惠满50减10",
-        "type": "full_reduction",
-        "threshold_fen": 5000,
-        "discount_fen": 1000,
-        "discount_rate": None,
-        "max_discount_fen": None,
-        "status": "active",
-        "total_issued": 8000,
-        "total_used": 5600,
-        "use_rate": 0.70,
-        "start_date": "2026-03-15",
-        "end_date": "2026-05-15",
-        "scope": "all_stores",
-        "target_segment": "午餐党",
-        "created_at": "2026-03-10T10:00:00Z",
-    },
-    {
-        "coupon_id": "c004",
-        "name": "生日专享免单券",
-        "type": "free",
-        "threshold_fen": 0,
-        "discount_fen": 8800,
-        "discount_rate": None,
-        "max_discount_fen": 8800,
-        "status": "active",
-        "total_issued": 1200,
-        "total_used": 680,
-        "use_rate": 0.567,
-        "start_date": "2026-01-01",
-        "end_date": "2026-12-31",
-        "scope": "all_stores",
-        "target_segment": "生日会员",
-        "created_at": "2025-12-20T10:00:00Z",
-    },
-    {
-        "coupon_id": "c005",
-        "name": "沉默唤醒满80减30",
-        "type": "full_reduction",
-        "threshold_fen": 8000,
-        "discount_fen": 3000,
-        "discount_rate": None,
-        "max_discount_fen": None,
-        "status": "paused",
-        "total_issued": 3000,
-        "total_used": 450,
-        "use_rate": 0.15,
-        "start_date": "2026-02-01",
-        "end_date": "2026-04-30",
-        "scope": "all_stores",
-        "target_segment": "沉默预警",
-        "created_at": "2026-01-28T10:00:00Z",
-    },
-    {
-        "coupon_id": "c006",
-        "name": "抖音专属7折券",
-        "type": "discount",
-        "threshold_fen": 0,
-        "discount_fen": None,
-        "discount_rate": 0.7,
-        "max_discount_fen": 8000,
-        "status": "expired",
-        "total_issued": 20000,
-        "total_used": 14500,
-        "use_rate": 0.725,
-        "start_date": "2026-01-15",
-        "end_date": "2026-03-15",
-        "scope": "selected_stores",
-        "target_segment": "抖音新客",
-        "created_at": "2026-01-10T10:00:00Z",
-    },
-]
-
-_MOCK_STORED_VALUE_PLANS = [
-    {
-        "plan_id": "sv001",
-        "name": "充500送50",
-        "charge_fen": 50000,
-        "gift_fen": 5000,
-        "gift_rate": 0.10,
-        "status": "active",
-        "total_sold": 2800,
-        "total_charge_fen": 140000000,
-        "start_date": "2026-01-01",
-        "end_date": None,
-    },
-    {
-        "plan_id": "sv002",
-        "name": "充1000送150",
-        "charge_fen": 100000,
-        "gift_fen": 15000,
-        "gift_rate": 0.15,
-        "status": "active",
-        "total_sold": 1500,
-        "total_charge_fen": 150000000,
-        "start_date": "2026-01-01",
-        "end_date": None,
-    },
-    {
-        "plan_id": "sv003",
-        "name": "充2000送400",
-        "charge_fen": 200000,
-        "gift_fen": 40000,
-        "gift_rate": 0.20,
-        "status": "active",
-        "total_sold": 680,
-        "total_charge_fen": 136000000,
-        "start_date": "2026-01-01",
-        "end_date": None,
-    },
-    {
-        "plan_id": "sv004",
-        "name": "充5000送1200",
-        "charge_fen": 500000,
-        "gift_fen": 120000,
-        "gift_rate": 0.24,
-        "status": "active",
-        "total_sold": 220,
-        "total_charge_fen": 110000000,
-        "start_date": "2026-02-01",
-        "end_date": None,
-    },
-]
-
-_MOCK_GIFT_CARDS = [
-    {
-        "card_id": "gc001",
-        "name": "心意卡·200元",
-        "face_value_fen": 20000,
-        "price_fen": 20000,
-        "type": "fixed",
-        "status": "active",
-        "total_sold": 850,
-        "total_redeemed": 620,
-        "design_theme": "经典红",
-        "created_at": "2026-01-01T10:00:00Z",
-    },
-    {
-        "card_id": "gc002",
-        "name": "心意卡·500元",
-        "face_value_fen": 50000,
-        "price_fen": 50000,
-        "type": "fixed",
-        "status": "active",
-        "total_sold": 420,
-        "total_redeemed": 310,
-        "design_theme": "经典红",
-        "created_at": "2026-01-01T10:00:00Z",
-    },
-    {
-        "card_id": "gc003",
-        "name": "企业团购卡·1000元",
-        "face_value_fen": 100000,
-        "price_fen": 95000,
-        "type": "fixed",
-        "status": "active",
-        "total_sold": 1200,
-        "total_redeemed": 880,
-        "design_theme": "商务蓝",
-        "created_at": "2026-02-01T10:00:00Z",
-    },
-    {
-        "card_id": "gc004",
-        "name": "自选金额卡",
-        "face_value_fen": None,
-        "price_fen": None,
-        "type": "custom",
-        "min_fen": 10000,
-        "max_fen": 500000,
-        "status": "active",
-        "total_sold": 180,
-        "total_redeemed": 95,
-        "design_theme": "节日特别版",
-        "created_at": "2026-03-01T10:00:00Z",
-    },
-]
-
-_MOCK_POINTS_CONFIG = {
-    "earn_rules": [
-        {"action": "消费", "rule": "每消费1元积1分", "rate": 1, "unit": "元/分"},
-        {"action": "签到", "rule": "每日签到5分", "fixed_points": 5},
-        {"action": "评价", "rule": "消费后评价10分", "fixed_points": 10},
-        {"action": "生日", "rule": "生日当天双倍积分", "multiplier": 2},
-        {"action": "推荐新客", "rule": "成功推荐100分", "fixed_points": 100},
-    ],
-    "redeem_rules": [
-        {"type": "cash_deduction", "label": "积分抵现", "rate": 100, "description": "100积分抵1元", "max_deduction_ratio": 0.5},
-        {"type": "gift_exchange", "label": "积分换礼", "description": "指定礼品兑换"},
-        {"type": "coupon_exchange", "label": "积分换券", "description": "积分兑换优惠券"},
-    ],
-    "expiry_rule": {
-        "type": "annual_clear",
-        "description": "每年12月31日清零当年1月1日前获取的积分",
-        "advance_notice_days": 30,
-    },
-    "tier_multiplier": [
-        {"tier": "普通会员", "multiplier": 1.0},
-        {"tier": "银卡会员", "multiplier": 1.2},
-        {"tier": "金卡会员", "multiplier": 1.5},
-        {"tier": "钻石会员", "multiplier": 2.0},
-    ],
-    "total_points_issued": 52680000,
-    "total_points_redeemed": 31200000,
-    "total_points_expired": 8500000,
-    "current_liability_fen": 12980000,
-}
 
 
 # ─── 请求模型 ────────────────────────────────────────────────
@@ -300,6 +57,13 @@ def _require_tenant(x_tenant_id: Optional[str]) -> uuid.UUID:
         raise HTTPException(status_code=400, detail="X-Tenant-ID must be a valid UUID")
 
 
+async def _set_rls(db: AsyncSession, tenant_id: str) -> None:
+    await db.execute(
+        text("SELECT set_config('app.tenant_id', :tid, true)"),
+        {"tid": tenant_id},
+    )
+
+
 # ─── 端点 ────────────────────────────────────────────────────
 
 @router.get("/coupons")
@@ -309,107 +73,280 @@ async def list_coupons(
     page: int = Query(1, ge=1),
     size: int = Query(20, ge=1, le=100),
     x_tenant_id: Optional[str] = Header(None, alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ):
     """优惠券列表"""
     tenant_id = _require_tenant(x_tenant_id)
     logger.info("list_coupons", tenant_id=str(tenant_id))
 
-    filtered = list(_MOCK_COUPONS)
-    if status:
-        filtered = [c for c in filtered if c["status"] == status]
-    if coupon_type:
-        filtered = [c for c in filtered if c["type"] == coupon_type]
+    await _set_rls(db, str(tenant_id))
+    try:
+        # Build dynamic WHERE clauses
+        filters = [
+            "tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid",
+            "is_deleted = false",
+        ]
+        params: dict = {"limit": size, "offset": (page - 1) * size}
 
-    total = len(filtered)
-    offset = (page - 1) * size
-    items = filtered[offset: offset + size]
+        if status:
+            # Map status values: active → is_active=true, paused/expired → is_active=false
+            if status == "active":
+                filters.append("is_active = true")
+            else:
+                filters.append("is_active = false")
+        if coupon_type:
+            filters.append("coupon_type = :coupon_type")
+            params["coupon_type"] = coupon_type
 
-    # 汇总统计
-    summary = {
-        "total_active": sum(1 for c in _MOCK_COUPONS if c["status"] == "active"),
-        "total_issued": sum(c["total_issued"] for c in _MOCK_COUPONS),
-        "total_used": sum(c["total_used"] for c in _MOCK_COUPONS),
-        "avg_use_rate": round(
-            sum(c["use_rate"] for c in _MOCK_COUPONS) / len(_MOCK_COUPONS), 3
-        ),
-    }
+        where_clause = " AND ".join(filters)
 
-    return {
-        "ok": True,
-        "data": {
-            "items": items,
-            "total": total,
-            "page": page,
-            "size": size,
-            "summary": summary,
-        },
-    }
+        count_result = await db.execute(
+            text(f"SELECT COUNT(*) AS total FROM coupons WHERE {where_clause}"),
+            params,
+        )
+        total = count_result.scalar() or 0
+
+        rows_result = await db.execute(
+            text(f"""
+                SELECT
+                    id::TEXT            AS coupon_id,
+                    name,
+                    coupon_type         AS type,
+                    min_order_fen       AS threshold_fen,
+                    cash_amount_fen     AS discount_fen,
+                    discount_rate,
+                    NULL::INT           AS max_discount_fen,
+                    CASE WHEN is_active THEN 'active' ELSE 'paused' END AS status,
+                    claimed_count       AS total_issued,
+                    0                   AS total_used,
+                    0.0                 AS use_rate,
+                    start_date,
+                    end_date,
+                    applicable_scope    AS scope,
+                    description         AS target_segment,
+                    created_at
+                FROM coupons
+                WHERE {where_clause}
+                ORDER BY created_at DESC
+                LIMIT :limit OFFSET :offset
+            """),
+            params,
+        )
+        items = []
+        for r in rows_result.mappings():
+            item = dict(r)
+            if item.get("created_at"):
+                item["created_at"] = item["created_at"].isoformat()
+            if item.get("start_date"):
+                item["start_date"] = str(item["start_date"])
+            if item.get("end_date"):
+                item["end_date"] = str(item["end_date"])
+            items.append(item)
+
+        # Summary stats
+        summary_result = await db.execute(
+            text("""
+                SELECT
+                    COUNT(*) FILTER (WHERE is_active = true AND is_deleted = false)  AS total_active,
+                    COALESCE(SUM(claimed_count) FILTER (WHERE is_deleted = false), 0) AS total_issued
+                FROM coupons
+                WHERE tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid
+            """),
+        )
+        summary_row = summary_result.mappings().first()
+        summary = {
+            "total_active": summary_row["total_active"] if summary_row else 0,
+            "total_issued": summary_row["total_issued"] if summary_row else 0,
+            "total_used": 0,
+            "avg_use_rate": 0.0,
+        }
+
+        return {
+            "ok": True,
+            "data": {
+                "items": items,
+                "total": total,
+                "page": page,
+                "size": size,
+                "summary": summary,
+            },
+        }
+    except SQLAlchemyError as exc:
+        logger.error("list_coupons_db_error", error=str(exc))
+        return {
+            "ok": True,
+            "data": {
+                "items": [],
+                "total": 0,
+                "page": page,
+                "size": size,
+                "summary": {"total_active": 0, "total_issued": 0, "total_used": 0, "avg_use_rate": 0.0},
+            },
+        }
 
 
 @router.post("/coupons")
 async def create_coupon(
     body: CreateCouponRequest,
     x_tenant_id: Optional[str] = Header(None, alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ):
     """创建优惠券"""
     tenant_id = _require_tenant(x_tenant_id)
     logger.info("create_coupon", tenant_id=str(tenant_id), name=body.name, coupon_type=body.type)
 
-    coupon_id = str(uuid.uuid4())
-    new_coupon = {
-        "coupon_id": coupon_id,
-        "name": body.name,
-        "type": body.type,
-        "threshold_fen": body.threshold_fen,
-        "discount_fen": body.discount_fen,
-        "discount_rate": body.discount_rate,
-        "max_discount_fen": body.max_discount_fen,
-        "status": "active",
-        "total_issued": 0,
-        "total_used": 0,
-        "use_rate": 0.0,
-        "total_quota": body.total_quota,
-        "start_date": body.start_date,
-        "end_date": body.end_date,
-        "scope": body.scope,
-        "store_ids": body.store_ids,
-        "target_segment": body.target_segment,
-        "created_at": datetime.now(timezone.utc).isoformat(),
-    }
+    await _set_rls(db, str(tenant_id))
+    try:
+        coupon_id = str(uuid.uuid4())
+        now = datetime.now(timezone.utc)
+        await db.execute(
+            text("""
+                INSERT INTO coupons (
+                    id, tenant_id, name, coupon_type,
+                    min_order_fen, cash_amount_fen, discount_rate,
+                    total_quantity, start_date, end_date,
+                    applicable_scope, applicable_ids,
+                    description, is_active, created_at, updated_at
+                ) VALUES (
+                    :id, :tenant_id, :name, :coupon_type,
+                    :min_order_fen, :cash_amount_fen, :discount_rate,
+                    :total_quantity, :start_date, :end_date,
+                    :applicable_scope, :applicable_ids::jsonb,
+                    :description, true, :created_at, :created_at
+                )
+            """),
+            {
+                "id": coupon_id,
+                "tenant_id": str(tenant_id),
+                "name": body.name,
+                "coupon_type": body.type,
+                "min_order_fen": body.threshold_fen,
+                "cash_amount_fen": body.discount_fen,
+                "discount_rate": body.discount_rate,
+                "total_quantity": body.total_quota,
+                "start_date": body.start_date,
+                "end_date": body.end_date,
+                "applicable_scope": body.scope,
+                "applicable_ids": str(body.store_ids) if body.store_ids else "[]",
+                "description": body.target_segment,
+                "created_at": now,
+            },
+        )
+        await db.commit()
 
-    return {
-        "ok": True,
-        "data": new_coupon,
-    }
+        return {
+            "ok": True,
+            "data": {
+                "coupon_id": coupon_id,
+                "name": body.name,
+                "type": body.type,
+                "threshold_fen": body.threshold_fen,
+                "discount_fen": body.discount_fen,
+                "discount_rate": body.discount_rate,
+                "max_discount_fen": body.max_discount_fen,
+                "status": "active",
+                "total_issued": 0,
+                "total_used": 0,
+                "use_rate": 0.0,
+                "total_quota": body.total_quota,
+                "start_date": body.start_date,
+                "end_date": body.end_date,
+                "scope": body.scope,
+                "store_ids": body.store_ids,
+                "target_segment": body.target_segment,
+                "created_at": now.isoformat(),
+            },
+        }
+    except SQLAlchemyError as exc:
+        await db.rollback()
+        logger.error("create_coupon_db_error", error=str(exc))
+        raise HTTPException(status_code=500, detail="创建优惠券失败，请稍后重试")
 
 
 @router.get("/stored-value/plans")
 async def list_stored_value_plans(
     status: Optional[str] = Query(None, description="状态筛选: active/paused"),
     x_tenant_id: Optional[str] = Header(None, alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ):
     """储值方案列表"""
     tenant_id = _require_tenant(x_tenant_id)
     logger.info("list_stored_value_plans", tenant_id=str(tenant_id))
 
-    filtered = list(_MOCK_STORED_VALUE_PLANS)
-    if status:
-        filtered = [p for p in filtered if p["status"] == status]
+    await _set_rls(db, str(tenant_id))
+    try:
+        filters = [
+            "tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid",
+            "is_deleted = false",
+        ]
+        params: dict = {}
 
-    total_balance_fen = sum(p["total_charge_fen"] for p in _MOCK_STORED_VALUE_PLANS)
+        if status == "active":
+            filters.append("is_active = true")
+        elif status == "paused":
+            filters.append("is_active = false")
 
-    return {
-        "ok": True,
-        "data": {
-            "items": filtered,
-            "total": len(filtered),
-            "summary": {
-                "total_balance_fen": total_balance_fen,
-                "total_plans": len(_MOCK_STORED_VALUE_PLANS),
-                "total_customers": sum(p["total_sold"] for p in _MOCK_STORED_VALUE_PLANS),
+        where_clause = " AND ".join(filters)
+
+        rows_result = await db.execute(
+            text(f"""
+                SELECT
+                    id::TEXT                AS plan_id,
+                    name,
+                    recharge_amount_fen     AS charge_fen,
+                    gift_amount_fen         AS gift_fen,
+                    CASE
+                        WHEN recharge_amount_fen > 0
+                        THEN ROUND(gift_amount_fen::NUMERIC / recharge_amount_fen, 4)
+                        ELSE 0
+                    END                     AS gift_rate,
+                    CASE WHEN is_active THEN 'active' ELSE 'paused' END AS status,
+                    0                       AS total_sold,
+                    0                       AS total_charge_fen,
+                    valid_from::TEXT        AS start_date,
+                    valid_until::TEXT       AS end_date
+                FROM stored_value_recharge_plans
+                WHERE {where_clause}
+                ORDER BY sort_order ASC, recharge_amount_fen ASC
+            """),
+            params,
+        )
+        items = [dict(r) for r in rows_result.mappings()]
+
+        # Summary totals
+        summary_result = await db.execute(
+            text("""
+                SELECT COUNT(*) AS total_plans
+                FROM stored_value_recharge_plans
+                WHERE tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid
+                  AND is_deleted = false
+            """),
+        )
+        summary_row = summary_result.mappings().first()
+        total_plans = summary_row["total_plans"] if summary_row else 0
+
+        return {
+            "ok": True,
+            "data": {
+                "items": items,
+                "total": len(items),
+                "summary": {
+                    "total_balance_fen": 0,
+                    "total_plans": total_plans,
+                    "total_customers": 0,
+                },
             },
-        },
-    }
+        }
+    except SQLAlchemyError as exc:
+        logger.error("list_stored_value_plans_db_error", error=str(exc))
+        return {
+            "ok": True,
+            "data": {
+                "items": [],
+                "total": 0,
+                "summary": {"total_balance_fen": 0, "total_plans": 0, "total_customers": 0},
+            },
+        }
 
 
 @router.get("/gift-cards")
@@ -419,41 +356,192 @@ async def list_gift_cards(
     page: int = Query(1, ge=1),
     size: int = Query(20, ge=1, le=100),
     x_tenant_id: Optional[str] = Header(None, alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ):
-    """礼品卡列表"""
+    """礼品卡列表（gift_cards 表尚未建立时返回空列表）"""
     tenant_id = _require_tenant(x_tenant_id)
     logger.info("list_gift_cards", tenant_id=str(tenant_id))
 
-    filtered = list(_MOCK_GIFT_CARDS)
-    if status:
-        filtered = [g for g in filtered if g["status"] == status]
-    if card_type:
-        filtered = [g for g in filtered if g["type"] == card_type]
+    await _set_rls(db, str(tenant_id))
+    try:
+        filters = [
+            "tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid",
+            "is_deleted = false",
+        ]
+        params: dict = {"limit": size, "offset": (page - 1) * size}
 
-    total = len(filtered)
-    offset = (page - 1) * size
-    items = filtered[offset: offset + size]
+        if status:
+            params["status"] = status
+            filters.append("status = :status")
+        if card_type:
+            params["card_type"] = card_type
+            filters.append("card_type = :card_type")
 
-    return {
-        "ok": True,
-        "data": {
-            "items": items,
-            "total": total,
-            "page": page,
-            "size": size,
-        },
-    }
+        where_clause = " AND ".join(filters)
+
+        count_result = await db.execute(
+            text(f"SELECT COUNT(*) AS total FROM gift_cards WHERE {where_clause}"),
+            params,
+        )
+        total = count_result.scalar() or 0
+
+        rows_result = await db.execute(
+            text(f"""
+                SELECT
+                    id::TEXT            AS card_id,
+                    name,
+                    face_value_fen,
+                    price_fen,
+                    card_type           AS type,
+                    status,
+                    0                   AS total_sold,
+                    0                   AS total_redeemed,
+                    design_theme,
+                    created_at
+                FROM gift_cards
+                WHERE {where_clause}
+                ORDER BY created_at DESC
+                LIMIT :limit OFFSET :offset
+            """),
+            params,
+        )
+        items = []
+        for r in rows_result.mappings():
+            item = dict(r)
+            if item.get("created_at"):
+                item["created_at"] = item["created_at"].isoformat()
+            items.append(item)
+
+        return {
+            "ok": True,
+            "data": {
+                "items": items,
+                "total": total,
+                "page": page,
+                "size": size,
+            },
+        }
+    except SQLAlchemyError as exc:
+        logger.warning("list_gift_cards_db_error", error=str(exc))
+        # gift_cards table may not exist yet — return empty gracefully
+        return {
+            "ok": True,
+            "data": {
+                "items": [],
+                "total": 0,
+                "page": page,
+                "size": size,
+            },
+        }
 
 
 @router.get("/points/config")
 async def get_points_config(
     x_tenant_id: Optional[str] = Header(None, alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ):
     """积分规则配置"""
     tenant_id = _require_tenant(x_tenant_id)
     logger.info("get_points_config", tenant_id=str(tenant_id))
 
-    return {
-        "ok": True,
-        "data": _MOCK_POINTS_CONFIG,
-    }
+    await _set_rls(db, str(tenant_id))
+    try:
+        # Fetch earn rules from points_rules
+        earn_result = await db.execute(
+            text("""
+                SELECT
+                    rule_name       AS action,
+                    earn_type,
+                    points_per_100fen,
+                    fixed_points,
+                    multiplier
+                FROM points_rules
+                WHERE tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid
+                  AND is_active = true
+                  AND is_deleted = false
+                ORDER BY earn_type
+            """),
+        )
+        earn_rows = list(earn_result.mappings())
+
+        earn_rules = []
+        for r in earn_rows:
+            rule: dict = {
+                "action": r["action"] or r["earn_type"],
+                "earn_type": r["earn_type"],
+            }
+            if r["fixed_points"] and r["fixed_points"] > 0:
+                rule["fixed_points"] = r["fixed_points"]
+                rule["rule"] = f"{rule['action']} {r['fixed_points']}分"
+            elif r["multiplier"] and float(r["multiplier"]) != 1.0:
+                rule["multiplier"] = float(r["multiplier"])
+                rule["rule"] = f"{rule['action']}积分x{r['multiplier']}"
+            else:
+                rate = float(r["points_per_100fen"])
+                rule["rate"] = rate
+                rule["unit"] = "元/分"
+                rule["rule"] = f"每消费1元积{rate}分"
+            earn_rules.append(rule)
+
+        # Fetch tier multipliers from member_level_configs
+        tier_result = await db.execute(
+            text("""
+                SELECT
+                    level_name,
+                    birthday_bonus_multiplier AS multiplier
+                FROM member_level_configs
+                WHERE tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid
+                  AND is_active = true
+                  AND is_deleted = false
+                ORDER BY sort_order ASC
+            """),
+        )
+        tier_rows = list(tier_result.mappings())
+        tier_multiplier = [
+            {"tier": r["level_name"], "multiplier": float(r["multiplier"])}
+            for r in tier_rows
+        ]
+
+        # Aggregate points balance stats
+        stats_result = await db.execute(
+            text("""
+                SELECT
+                    COALESCE(SUM(points), 0) AS total_points_balance
+                FROM member_points_balance
+                WHERE tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid
+            """),
+        )
+        stats_row = stats_result.mappings().first()
+        total_balance = int(stats_row["total_points_balance"]) if stats_row else 0
+
+        return {
+            "ok": True,
+            "data": {
+                "earn_rules": earn_rules,
+                "redeem_rules": [
+                    {"type": "cash_deduction", "label": "积分抵现", "rate": 100,
+                     "description": "100积分抵1元", "max_deduction_ratio": 0.5},
+                    {"type": "gift_exchange", "label": "积分换礼", "description": "指定礼品兑换"},
+                    {"type": "coupon_exchange", "label": "积分换券", "description": "积分兑换优惠券"},
+                ],
+                "expiry_rule": {
+                    "type": "annual_clear",
+                    "description": "每年12月31日清零当年1月1日前获取的积分",
+                    "advance_notice_days": 30,
+                },
+                "tier_multiplier": tier_multiplier,
+                "total_points_balance": total_balance,
+            },
+        }
+    except SQLAlchemyError as exc:
+        logger.error("get_points_config_db_error", error=str(exc))
+        return {
+            "ok": True,
+            "data": {
+                "earn_rules": [],
+                "redeem_rules": [],
+                "expiry_rule": {},
+                "tier_multiplier": [],
+                "total_points_balance": 0,
+            },
+        }

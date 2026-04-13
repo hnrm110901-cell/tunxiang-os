@@ -16,6 +16,7 @@ from typing import Optional
 
 from fastapi import APIRouter, Header, HTTPException
 from sqlalchemy import func, select, text
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import async_session_factory
@@ -70,47 +71,284 @@ async def _set_tenant(session: AsyncSession, tenant_id: str) -> None:
     )
 
 
-# ─── Mock 数据（数据库不可用时的保底） ─────────────────────────────────────
+# ─── DB 查询辅助（数据库不可用时返回零值保底） ────────────────────────────
 
 
-def _mock_overview(target_date: date) -> dict:
-    return {
+async def _query_overview(
+    target_date: date,
+    tenant_id: str,
+    db: AsyncSession,
+    brand_id: Optional[str] = None,
+) -> dict:
+    """查询总体 KPI，DB 报 SQLAlchemyError 时返回零值结构。"""
+    tenant_uuid = uuid.UUID(tenant_id)
+    day_start, day_end = _day_window(target_date)
+    yesterday_start, yesterday_end = _day_window(target_date - timedelta(days=1))
+
+    _zero = {
         "date": target_date.isoformat(),
-        "revenue_fen": 12500000,
-        "revenue_change": 0.08,
-        "order_count": 280,
-        "order_change": 0.05,
-        "table_turnover_rate": 2.3,
-        "turnover_change": 0.02,
-        "avg_order_value_fen": 44642,
-        "aov_change": -0.01,
-        "online_stores": 3,
-        "total_stores": 5,
-        "_is_mock": True,
+        "revenue_fen": 0,
+        "revenue_change": 0.0,
+        "order_count": 0,
+        "order_change": 0.0,
+        "table_turnover_rate": 0.0,
+        "turnover_change": 0.0,
+        "avg_order_value_fen": 0,
+        "aov_change": 0.0,
+        "online_stores": 0,
+        "total_stores": 0,
     }
 
+    try:
+        await _set_tenant(db, tenant_id)
 
-def _mock_store_ranking(target_date: date, limit: int) -> list[dict]:
-    sample = [
-        {"rank": 1, "store_id": "mock-001", "store_name": "旗舰店", "revenue_fen": 3500000, "order_count": 85},
-        {"rank": 2, "store_id": "mock-002", "store_name": "商场店", "revenue_fen": 2800000, "order_count": 72},
-        {"rank": 3, "store_id": "mock-003", "store_name": "社区店", "revenue_fen": 2200000, "order_count": 60},
-        {"rank": 4, "store_id": "mock-004", "store_name": "街边店", "revenue_fen": 1800000, "order_count": 45},
-        {"rank": 5, "store_id": "mock-005", "store_name": "写字楼店", "revenue_fen": 1200000, "order_count": 38},
-    ]
-    return sample[:min(limit, len(sample))]
+        # 今日营收与订单数
+        if brand_id:
+            today_stmt = (
+                select(
+                    func.coalesce(func.sum(Order.final_amount_fen), 0).label("revenue_fen"),
+                    func.count(Order.id).label("order_count"),
+                )
+                .join(Store, Store.id == Order.store_id)
+                .where(Order.tenant_id == tenant_uuid)
+                .where(Store.brand_id == brand_id)
+                .where(Order.status.not_in(list(_EXCLUDED_STATUSES)))
+                .where(Order.order_time >= day_start)
+                .where(Order.order_time < day_end)
+            )
+        else:
+            today_stmt = (
+                select(
+                    func.coalesce(func.sum(Order.final_amount_fen), 0).label("revenue_fen"),
+                    func.count(Order.id).label("order_count"),
+                )
+                .where(Order.tenant_id == tenant_uuid)
+                .where(Order.status.not_in(list(_EXCLUDED_STATUSES)))
+                .where(Order.order_time >= day_start)
+                .where(Order.order_time < day_end)
+            )
+
+        today_row = (await db.execute(today_stmt)).one()
+        revenue_fen: int = today_row[0]
+        order_count: int = today_row[1]
+
+        # 昨日数据
+        if brand_id:
+            yesterday_stmt = (
+                select(
+                    func.coalesce(func.sum(Order.final_amount_fen), 0).label("revenue_fen"),
+                    func.count(Order.id).label("order_count"),
+                )
+                .join(Store, Store.id == Order.store_id)
+                .where(Order.tenant_id == tenant_uuid)
+                .where(Store.brand_id == brand_id)
+                .where(Order.status.not_in(list(_EXCLUDED_STATUSES)))
+                .where(Order.order_time >= yesterday_start)
+                .where(Order.order_time < yesterday_end)
+            )
+        else:
+            yesterday_stmt = (
+                select(
+                    func.coalesce(func.sum(Order.final_amount_fen), 0).label("revenue_fen"),
+                    func.count(Order.id).label("order_count"),
+                )
+                .where(Order.tenant_id == tenant_uuid)
+                .where(Order.status.not_in(list(_EXCLUDED_STATUSES)))
+                .where(Order.order_time >= yesterday_start)
+                .where(Order.order_time < yesterday_end)
+            )
+
+        yesterday_row = (await db.execute(yesterday_stmt)).one()
+        yesterday_revenue: int = yesterday_row[0]
+        yesterday_orders: int = yesterday_row[1]
+
+        aov_fen = revenue_fen // order_count if order_count > 0 else 0
+        yesterday_aov = yesterday_revenue // yesterday_orders if yesterday_orders > 0 else 0
+
+        # 门店数量
+        stores_stmt = select(
+            func.count(Store.id).label("total"),
+            func.count(Store.id).filter(Store.is_active == True).label("online"),  # noqa: E712
+        ).where(Store.tenant_id == tenant_uuid)
+        if brand_id:
+            stores_stmt = stores_stmt.where(Store.brand_id == brand_id)
+        stores_row = (await db.execute(stores_stmt)).one()
+        total_stores: int = stores_row[0]
+        online_stores: int = stores_row[1]
+
+        # 翻台率
+        seats_stmt = (
+            select(func.coalesce(func.sum(Store.seats), 0).label("total_seats"))
+            .where(Store.tenant_id == tenant_uuid)
+            .where(Store.is_active == True)  # noqa: E712
+        )
+        if brand_id:
+            seats_stmt = seats_stmt.where(Store.brand_id == brand_id)
+        total_seats: int = (await db.execute(seats_stmt)).scalar() or 0
+
+        turnover_count: int = (
+            await db.execute(
+                select(func.count(Order.id))
+                .where(Order.tenant_id == tenant_uuid)
+                .where(Order.order_type == "dine_in")
+                .where(Order.status.not_in(list(_EXCLUDED_STATUSES)))
+                .where(Order.order_time >= day_start)
+                .where(Order.order_time < day_end)
+            )
+        ).scalar() or 0
+        table_turnover_rate = round(turnover_count / total_seats, 2) if total_seats > 0 else 0.0
+
+        yesterday_turnover_count: int = (
+            await db.execute(
+                select(func.count(Order.id))
+                .where(Order.tenant_id == tenant_uuid)
+                .where(Order.order_type == "dine_in")
+                .where(Order.status.not_in(list(_EXCLUDED_STATUSES)))
+                .where(Order.order_time >= yesterday_start)
+                .where(Order.order_time < yesterday_end)
+            )
+        ).scalar() or 0
+        yesterday_turnover_rate = (
+            round(yesterday_turnover_count / total_seats, 2) if total_seats > 0 else 0.0
+        )
+
+        return {
+            "date": target_date.isoformat(),
+            "revenue_fen": revenue_fen,
+            "revenue_change": _safe_change(revenue_fen, yesterday_revenue),
+            "order_count": order_count,
+            "order_change": _safe_change(order_count, yesterday_orders),
+            "table_turnover_rate": table_turnover_rate,
+            "turnover_change": _safe_change(table_turnover_rate, yesterday_turnover_rate),
+            "avg_order_value_fen": aov_fen,
+            "aov_change": _safe_change(aov_fen, yesterday_aov),
+            "online_stores": online_stores,
+            "total_stores": total_stores,
+        }
+
+    except SQLAlchemyError as exc:
+        logger.warning("_query_overview: SQLAlchemy error, returning zeros. error=%r", exc)
+        return _zero
 
 
-def _mock_category_sales(target_date: date) -> dict:
-    categories = [
-        {"category": "海鲜", "revenue_fen": 4500000, "percentage": 0.36},
-        {"category": "热菜", "revenue_fen": 3200000, "percentage": 0.256},
-        {"category": "凉菜", "revenue_fen": 1800000, "percentage": 0.144},
-        {"category": "汤品", "revenue_fen": 1500000, "percentage": 0.12},
-        {"category": "饮品", "revenue_fen": 900000, "percentage": 0.072},
-        {"category": "主食", "revenue_fen": 600000, "percentage": 0.048},
-    ]
-    return {"categories": categories, "total_fen": 12500000, "_is_mock": True}
+async def _query_store_ranking(
+    target_date: date,
+    limit: int,
+    tenant_id: str,
+    db: AsyncSession,
+) -> list[dict]:
+    """查询门店营收排行榜，DB 报 SQLAlchemyError 时返回空列表。"""
+    tenant_uuid = uuid.UUID(tenant_id)
+    day_start, day_end = _day_window(target_date)
+
+    try:
+        await _set_tenant(db, tenant_id)
+
+        stmt = (
+            select(
+                Store.id.label("store_id"),
+                Store.store_name.label("store_name"),
+                func.coalesce(func.sum(Order.final_amount_fen), 0).label("revenue_fen"),
+                func.count(Order.id).label("order_count"),
+            )
+            .join(Order, Order.store_id == Store.id)
+            .where(Store.tenant_id == tenant_uuid)
+            .where(Order.tenant_id == tenant_uuid)
+            .where(Order.status.not_in(list(_EXCLUDED_STATUSES)))
+            .where(Order.order_time >= day_start)
+            .where(Order.order_time < day_end)
+            .group_by(Store.id, Store.store_name)
+            .order_by(func.sum(Order.final_amount_fen).desc())
+            .limit(limit)
+        )
+
+        rows = (await db.execute(stmt)).all()
+        return [
+            {
+                "rank": idx + 1,
+                "store_id": str(row.store_id),
+                "store_name": row.store_name,
+                "revenue_fen": row.revenue_fen,
+                "order_count": row.order_count,
+            }
+            for idx, row in enumerate(rows)
+        ]
+
+    except SQLAlchemyError as exc:
+        logger.warning("_query_store_ranking: SQLAlchemy error, returning empty list. error=%r", exc)
+        return []
+
+
+async def _query_category_sales(
+    target_date: date,
+    tenant_id: str,
+    db: AsyncSession,
+) -> dict:
+    """查询品类销售占比，DB 报 SQLAlchemyError 时返回零值结构。"""
+    tenant_uuid = uuid.UUID(tenant_id)
+    day_start, day_end = _day_window(target_date)
+
+    _zero: dict = {"date": target_date.isoformat(), "categories": [], "total_fen": 0}
+
+    try:
+        await _set_tenant(db, tenant_id)
+
+        stmt = (
+            select(
+                DishCategory.name.label("category"),
+                func.coalesce(func.sum(OrderItem.subtotal_fen), 0).label("revenue_fen"),
+            )
+            .join(Order, Order.id == OrderItem.order_id)
+            .join(Dish, Dish.id == OrderItem.dish_id)
+            .join(DishCategory, DishCategory.id == Dish.category_id)
+            .where(Order.tenant_id == tenant_uuid)
+            .where(Order.status.not_in(list(_EXCLUDED_STATUSES)))
+            .where(Order.order_time >= day_start)
+            .where(Order.order_time < day_end)
+            .group_by(DishCategory.name)
+            .order_by(func.sum(OrderItem.subtotal_fen).desc())
+        )
+
+        rows = (await db.execute(stmt)).all()
+        total_fen: int = sum(row.revenue_fen for row in rows)
+
+        categories = [
+            {
+                "category": row.category,
+                "revenue_fen": row.revenue_fen,
+                "percentage": round(row.revenue_fen / total_fen, 4) if total_fen > 0 else 0.0,
+            }
+            for row in rows
+        ]
+
+        # 无 dish_id 关联的订单项（历史数据/散装菜品）放入"其他"
+        no_cat_fen: int = (
+            await db.execute(
+                select(func.coalesce(func.sum(OrderItem.subtotal_fen), 0).label("revenue_fen"))
+                .join(Order, Order.id == OrderItem.order_id)
+                .where(Order.tenant_id == tenant_uuid)
+                .where(Order.status.not_in(list(_EXCLUDED_STATUSES)))
+                .where(Order.order_time >= day_start)
+                .where(Order.order_time < day_end)
+                .where(OrderItem.dish_id.is_(None))
+            )
+        ).scalar() or 0
+
+        if no_cat_fen > 0:
+            total_fen += no_cat_fen
+            categories.append({
+                "category": "其他",
+                "revenue_fen": no_cat_fen,
+                "percentage": round(no_cat_fen / total_fen, 4) if total_fen > 0 else 0.0,
+            })
+            for cat in categories:
+                cat["percentage"] = round(cat["revenue_fen"] / total_fen, 4) if total_fen > 0 else 0.0
+
+        return {"date": target_date.isoformat(), "categories": categories, "total_fen": total_fen}
+
+    except SQLAlchemyError as exc:
+        logger.warning("_query_category_sales: SQLAlchemy error, returning zeros. error=%r", exc)
+        return _zero
 
 
 # ─── GET /api/v1/analytics/overview ────────────────────────────────────────
@@ -131,149 +369,31 @@ async def get_overview(
     """
     tenant_id = _require_tenant(x_tenant_id)
     target_date = _parse_date(date)
-    day_start, day_end = _day_window(target_date)
-    yesterday_start, yesterday_end = _day_window(target_date - timedelta(days=1))
-    tenant_uuid = uuid.UUID(tenant_id)
+
+    _zero_overview = {
+        "date": target_date.isoformat(),
+        "revenue_fen": 0,
+        "revenue_change": 0.0,
+        "order_count": 0,
+        "order_change": 0.0,
+        "table_turnover_rate": 0.0,
+        "turnover_change": 0.0,
+        "avg_order_value_fen": 0,
+        "aov_change": 0.0,
+        "online_stores": 0,
+        "total_stores": 0,
+    }
 
     try:
         async with async_session_factory() as session:
-            await _set_tenant(session, tenant_id)
-
-            # ── 1. 今日营收与订单数 ──────────────────────────────────────────
-            today_stmt = (
-                select(
-                    func.coalesce(func.sum(Order.final_amount_fen), 0).label("revenue_fen"),
-                    func.count(Order.id).label("order_count"),
-                )
-                .where(Order.tenant_id == tenant_uuid)
-                .where(Order.status.not_in(list(_EXCLUDED_STATUSES)))
-                .where(Order.order_time >= day_start)
-                .where(Order.order_time < day_end)
-            )
-            if brand_id:
-                # 通过 Store JOIN 过滤品牌
-                today_stmt = (
-                    select(
-                        func.coalesce(func.sum(Order.final_amount_fen), 0).label("revenue_fen"),
-                        func.count(Order.id).label("order_count"),
-                    )
-                    .join(Store, Store.id == Order.store_id)
-                    .where(Order.tenant_id == tenant_uuid)
-                    .where(Store.brand_id == brand_id)
-                    .where(Order.status.not_in(list(_EXCLUDED_STATUSES)))
-                    .where(Order.order_time >= day_start)
-                    .where(Order.order_time < day_end)
-                )
-
-            today_result = await session.execute(today_stmt)
-            today_row = today_result.one()
-            revenue_fen: int = today_row[0]
-            order_count: int = today_row[1]
-
-            # ── 2. 昨日数据（计算环比） ──────────────────────────────────────
-            yesterday_stmt = (
-                select(
-                    func.coalesce(func.sum(Order.final_amount_fen), 0).label("revenue_fen"),
-                    func.count(Order.id).label("order_count"),
-                )
-                .where(Order.tenant_id == tenant_uuid)
-                .where(Order.status.not_in(list(_EXCLUDED_STATUSES)))
-                .where(Order.order_time >= yesterday_start)
-                .where(Order.order_time < yesterday_end)
-            )
-            if brand_id:
-                yesterday_stmt = (
-                    select(
-                        func.coalesce(func.sum(Order.final_amount_fen), 0).label("revenue_fen"),
-                        func.count(Order.id).label("order_count"),
-                    )
-                    .join(Store, Store.id == Order.store_id)
-                    .where(Order.tenant_id == tenant_uuid)
-                    .where(Store.brand_id == brand_id)
-                    .where(Order.status.not_in(list(_EXCLUDED_STATUSES)))
-                    .where(Order.order_time >= yesterday_start)
-                    .where(Order.order_time < yesterday_end)
-                )
-
-            yesterday_result = await session.execute(yesterday_stmt)
-            yesterday_row = yesterday_result.one()
-            yesterday_revenue: int = yesterday_row[0]
-            yesterday_orders: int = yesterday_row[1]
-
-            # ── 3. 客单价 ────────────────────────────────────────────────────
-            aov_fen = revenue_fen // order_count if order_count > 0 else 0
-            yesterday_aov = yesterday_revenue // yesterday_orders if yesterday_orders > 0 else 0
-
-            # ── 4. 门店数量（在线 + 总数） ───────────────────────────────────
-            stores_stmt = select(
-                func.count(Store.id).label("total"),
-                func.count(Store.id).filter(Store.is_active == True).label("online"),  # noqa: E712
-            ).where(Store.tenant_id == tenant_uuid)
-            if brand_id:
-                stores_stmt = stores_stmt.where(Store.brand_id == brand_id)
-
-            stores_result = await session.execute(stores_stmt)
-            stores_row = stores_result.one()
-            total_stores: int = stores_row[0]
-            online_stores: int = stores_row[1]
-
-            # ── 5. 翻台率：当日结束桌次 / 总桌台数（用座位数近似） ──────────
-            seats_stmt = select(
-                func.coalesce(func.sum(Store.seats), 0).label("total_seats"),
-            ).where(Store.tenant_id == tenant_uuid).where(Store.is_active == True)  # noqa: E712
-            if brand_id:
-                seats_stmt = seats_stmt.where(Store.brand_id == brand_id)
-
-            seats_result = await session.execute(seats_stmt)
-            total_seats: int = seats_result.scalar() or 0
-
-            # 翻台次数 ≈ 今日有桌号的订单数（dine_in 类型）
-            turnover_count_stmt = (
-                select(func.count(Order.id))
-                .where(Order.tenant_id == tenant_uuid)
-                .where(Order.order_type == "dine_in")
-                .where(Order.status.not_in(list(_EXCLUDED_STATUSES)))
-                .where(Order.order_time >= day_start)
-                .where(Order.order_time < day_end)
-            )
-            turnover_count_result = await session.execute(turnover_count_stmt)
-            turnover_count: int = turnover_count_result.scalar() or 0
-
-            table_turnover_rate = round(turnover_count / total_seats, 2) if total_seats > 0 else 0.0
-
-            # 昨日翻台率（用于环比）
-            yesterday_turnover_stmt = (
-                select(func.count(Order.id))
-                .where(Order.tenant_id == tenant_uuid)
-                .where(Order.order_type == "dine_in")
-                .where(Order.status.not_in(list(_EXCLUDED_STATUSES)))
-                .where(Order.order_time >= yesterday_start)
-                .where(Order.order_time < yesterday_end)
-            )
-            yesterday_turnover_result = await session.execute(yesterday_turnover_stmt)
-            yesterday_turnover_count: int = yesterday_turnover_result.scalar() or 0
-            yesterday_turnover_rate = round(yesterday_turnover_count / total_seats, 2) if total_seats > 0 else 0.0
-
-            data = {
-                "date": target_date.isoformat(),
-                "revenue_fen": revenue_fen,
-                "revenue_change": _safe_change(revenue_fen, yesterday_revenue),
-                "order_count": order_count,
-                "order_change": _safe_change(order_count, yesterday_orders),
-                "table_turnover_rate": table_turnover_rate,
-                "turnover_change": _safe_change(table_turnover_rate, yesterday_turnover_rate),
-                "avg_order_value_fen": aov_fen,
-                "aov_change": _safe_change(aov_fen, yesterday_aov),
-                "online_stores": online_stores,
-                "total_stores": total_stores,
-            }
+            data = await _query_overview(target_date, tenant_id, session, brand_id=brand_id)
 
     except (OSError, ConnectionRefusedError, TimeoutError) as exc:
-        logger.warning("overview: DB connection error, using mock data. error=%r", exc)
-        data = _mock_overview(target_date)
+        logger.warning("overview: DB connection error, returning zeros. error=%r", exc)
+        data = _zero_overview
     except Exception as exc:  # noqa: BLE001 — 最外层兜底，驾驶舱不返回 500
-        logger.warning("overview: unexpected DB error, using mock data. error=%r", exc, exc_info=True)
-        data = _mock_overview(target_date)
+        logger.warning("overview: unexpected error, returning zeros. error=%r", exc, exc_info=True)
+        data = _zero_overview
 
     return {"ok": True, "data": data}
 
@@ -296,65 +416,19 @@ async def get_store_ranking(
     """
     tenant_id = _require_tenant(x_tenant_id)
     target_date = _parse_date(date)
-    day_start, day_end = _day_window(target_date)
-    tenant_uuid = uuid.UUID(tenant_id)
     limit = max(1, min(limit, 100))  # 安全边界
 
     try:
         async with async_session_factory() as session:
-            await _set_tenant(session, tenant_id)
-
-            stmt = (
-                select(
-                    Store.id.label("store_id"),
-                    Store.store_name.label("store_name"),
-                    func.coalesce(func.sum(Order.final_amount_fen), 0).label("revenue_fen"),
-                    func.count(Order.id).label("order_count"),
-                )
-                .join(Order, Order.store_id == Store.id)
-                .where(Store.tenant_id == tenant_uuid)
-                .where(Order.tenant_id == tenant_uuid)
-                .where(Order.status.not_in(list(_EXCLUDED_STATUSES)))
-                .where(Order.order_time >= day_start)
-                .where(Order.order_time < day_end)
-                .group_by(Store.id, Store.store_name)
-                .order_by(func.sum(Order.final_amount_fen).desc())
-                .limit(limit)
-            )
-
-            result = await session.execute(stmt)
-            rows = result.all()
-
-            stores = [
-                {
-                    "rank": idx + 1,
-                    "store_id": str(row.store_id),
-                    "store_name": row.store_name,
-                    "revenue_fen": row.revenue_fen,
-                    "order_count": row.order_count,
-                }
-                for idx, row in enumerate(rows)
-            ]
-
-            data = {
-                "date": target_date.isoformat(),
-                "stores": stores,
-            }
+            stores = await _query_store_ranking(target_date, limit, tenant_id, session)
+            data = {"date": target_date.isoformat(), "stores": stores}
 
     except (OSError, ConnectionRefusedError, TimeoutError) as exc:
-        logger.warning("store-ranking: DB connection error, using mock data. error=%r", exc)
-        data = {
-            "date": target_date.isoformat(),
-            "stores": _mock_store_ranking(target_date, limit),
-            "_is_mock": True,
-        }
+        logger.warning("store-ranking: DB connection error, returning empty. error=%r", exc)
+        data = {"date": target_date.isoformat(), "stores": []}
     except Exception as exc:  # noqa: BLE001 — 最外层兜底，驾驶舱不返回 500
-        logger.warning("store-ranking: unexpected DB error, using mock data. error=%r", exc, exc_info=True)
-        data = {
-            "date": target_date.isoformat(),
-            "stores": _mock_store_ranking(target_date, limit),
-            "_is_mock": True,
-        }
+        logger.warning("store-ranking: unexpected error, returning empty. error=%r", exc, exc_info=True)
+        data = {"date": target_date.isoformat(), "stores": []}
 
     return {"ok": True, "data": data}
 
@@ -379,81 +453,16 @@ async def get_category_sales(
     """
     tenant_id = _require_tenant(x_tenant_id)
     target_date = _parse_date(date)
-    day_start, day_end = _day_window(target_date)
-    tenant_uuid = uuid.UUID(tenant_id)
 
     try:
         async with async_session_factory() as session:
-            await _set_tenant(session, tenant_id)
-
-            # 通过 order_items → dish → dish_categories JOIN 统计品类销售
-            stmt = (
-                select(
-                    DishCategory.name.label("category"),
-                    func.coalesce(func.sum(OrderItem.subtotal_fen), 0).label("revenue_fen"),
-                )
-                .join(Order, Order.id == OrderItem.order_id)
-                .join(Dish, Dish.id == OrderItem.dish_id)
-                .join(DishCategory, DishCategory.id == Dish.category_id)
-                .where(Order.tenant_id == tenant_uuid)
-                .where(Order.status.not_in(list(_EXCLUDED_STATUSES)))
-                .where(Order.order_time >= day_start)
-                .where(Order.order_time < day_end)
-                .group_by(DishCategory.name)
-                .order_by(func.sum(OrderItem.subtotal_fen).desc())
-            )
-
-            result = await session.execute(stmt)
-            rows = result.all()
-
-            total_fen: int = sum(row.revenue_fen for row in rows)
-
-            categories = [
-                {
-                    "category": row.category,
-                    "revenue_fen": row.revenue_fen,
-                    "percentage": round(row.revenue_fen / total_fen, 4) if total_fen > 0 else 0.0,
-                }
-                for row in rows
-            ]
-
-            # 无 dish_id 关联的订单项（历史数据/散装菜品）放入"其他"
-            no_category_stmt = (
-                select(
-                    func.coalesce(func.sum(OrderItem.subtotal_fen), 0).label("revenue_fen"),
-                )
-                .join(Order, Order.id == OrderItem.order_id)
-                .where(Order.tenant_id == tenant_uuid)
-                .where(Order.status.not_in(list(_EXCLUDED_STATUSES)))
-                .where(Order.order_time >= day_start)
-                .where(Order.order_time < day_end)
-                .where(OrderItem.dish_id.is_(None))
-            )
-            no_cat_result = await session.execute(no_category_stmt)
-            no_cat_fen: int = no_cat_result.scalar() or 0
-
-            if no_cat_fen > 0:
-                total_fen += no_cat_fen
-                categories.append({
-                    "category": "其他",
-                    "revenue_fen": no_cat_fen,
-                    "percentage": round(no_cat_fen / total_fen, 4) if total_fen > 0 else 0.0,
-                })
-                # 重新计算占比（因 total 变了）
-                for cat in categories:
-                    cat["percentage"] = round(cat["revenue_fen"] / total_fen, 4) if total_fen > 0 else 0.0
-
-            data = {
-                "date": target_date.isoformat(),
-                "categories": categories,
-                "total_fen": total_fen,
-            }
+            data = await _query_category_sales(target_date, tenant_id, session)
 
     except (OSError, ConnectionRefusedError, TimeoutError) as exc:
-        logger.warning("category-sales: DB connection error, using mock data. error=%r", exc)
-        data = _mock_category_sales(target_date)
+        logger.warning("category-sales: DB connection error, returning zeros. error=%r", exc)
+        data = {"date": target_date.isoformat(), "categories": [], "total_fen": 0}
     except Exception as exc:  # noqa: BLE001 — 最外层兜底，驾驶舱不返回 500
-        logger.warning("category-sales: unexpected DB error, using mock data. error=%r", exc, exc_info=True)
-        data = _mock_category_sales(target_date)
+        logger.warning("category-sales: unexpected error, returning zeros. error=%r", exc, exc_info=True)
+        data = {"date": target_date.isoformat(), "categories": [], "total_fen": 0}
 
     return {"ok": True, "data": data}

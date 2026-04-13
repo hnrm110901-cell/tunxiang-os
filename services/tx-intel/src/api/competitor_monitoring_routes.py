@@ -9,14 +9,18 @@
 from __future__ import annotations
 
 import os
-import uuid
 from datetime import date, timedelta
 from typing import Any, Optional
 
 import httpx
 import structlog
-from fastapi import APIRouter, Header, HTTPException, Query
+from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel, ConfigDict
+from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from shared.ontology.src.database import get_db
 
 logger = structlog.get_logger(__name__)
 
@@ -70,39 +74,6 @@ async def _dispatch_agent(
         resp = await client.post(url, json=payload, headers={"X-Tenant-ID": tenant_id})
         resp.raise_for_status()
         return resp.json()
-
-
-def _build_mock_alerts(store_id: str, threat_level_filter: Optional[str]) -> list[dict[str, Any]]:
-    """基于 store_id 动态生成样本预警（非硬编码字符串，通过 hash 派生变化）"""
-    store_hash = hash(store_id) & 0xFFFFFFFF  # 确保正整数
-    levels = ["critical", "high", "medium"]
-    competitors = ["口碑餐厅A", "连锁品牌B", "新兴外卖店C"]
-    events = [
-        "推出买一送一新品活动，覆盖相同商圈",
-        "大规模投放美团神券，预计引流客流下降 8%",
-        "小红书达人探店发布，笔记曝光量超 20 万",
-    ]
-    responses = [
-        "建议同步推出限时折扣或会员专属权益，24小时内响应",
-        "对标同档次优惠，主推差异化单品，避免正面价格战",
-        "跟进内容营销，邀请本地达人探店，扩大口碑覆盖",
-    ]
-
-    alerts = []
-    for i in range(3):
-        idx = (store_hash + i) % 3
-        level = levels[idx]
-        if threat_level_filter and level != threat_level_filter:
-            continue
-        alerts.append({
-            "alert_id": str(uuid.UUID(int=(store_hash + i * 0x1000) & 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF)),
-            "competitor": competitors[idx],
-            "threat_level": level,
-            "event": events[idx],
-            "suggested_response": responses[idx],
-            "created_at": (date.today() - timedelta(days=i)).isoformat(),
-        })
-    return alerts
 
 
 # ─── 路由 ─────────────────────────────────────────────────────────────────────
@@ -228,27 +199,119 @@ async def get_active_alerts(
     store_id: str = Query(...),
     threat_level: Optional[str] = Query(default=None, description="过滤级别: critical/high/medium/low"),
     tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
     """获取活跃竞品威胁预警列表
 
-    当前阶段无持久化 alerts 表，返回基于 store_id 动态生成的样本预警数据。
-    Phase 4 接入持久化后直接替换此实现。
+    从 competitor_snapshots + competitor_brands 读取近14天快照，
+    将含活跃促销活动的竞对映射为威胁预警。
+    threat_level 由活跃促销数量和快照新鲜度推导：
+      3+ 促销 → critical，2 促销 → high，1 促销 → medium，0 促销 → low
     """
     if threat_level and threat_level not in ("critical", "high", "medium", "low"):
         raise HTTPException(status_code=400, detail="threat_level 必须为 critical/high/medium/low 之一")
 
-    alerts = _build_mock_alerts(store_id, threat_level)
-    critical_count = sum(1 for a in alerts if a["threat_level"] == "critical")
+    try:
+        await db.execute(
+            text("SELECT set_config('app.tenant_id', :tid, true)"),
+            {"tid": tenant_id},
+        )
 
-    return {
-        "ok": True,
-        "data": {
-            "store_id": store_id,
-            "active_alerts": alerts,
-            "total": len(alerts),
-            "critical_count": critical_count,
-        },
-    }
+        # 取近14天内每个竞对品牌的最新快照，提取活跃促销
+        sql = text("""
+            SELECT DISTINCT ON (cs.competitor_brand_id)
+                cs.id::text                     AS snapshot_id,
+                cb.id::text                     AS competitor_id,
+                cb.name                         AS competitor_name,
+                cs.active_promotions,
+                cs.avg_rating,
+                cs.snapshot_date,
+                cs.source,
+                cb.price_tier
+            FROM competitor_snapshots cs
+            JOIN competitor_brands cb ON cb.id = cs.competitor_brand_id
+            WHERE cs.tenant_id = :tenant_id
+              AND cb.is_active = TRUE
+              AND cs.snapshot_date >= CURRENT_DATE - INTERVAL '14 days'
+            ORDER BY cs.competitor_brand_id, cs.snapshot_date DESC
+        """)
+        result = await db.execute(sql, {"tenant_id": tenant_id})
+        rows = result.fetchall()
+
+        _level_rank = {"critical": 0, "high": 1, "medium": 2, "low": 3}
+
+        alerts: list[dict[str, Any]] = []
+        for row in rows:
+            d = dict(row._mapping)
+            promotions: list[dict[str, Any]] = d.get("active_promotions") or []
+            promo_count = len(promotions)
+
+            if promo_count >= 3:
+                level = "critical"
+            elif promo_count == 2:
+                level = "high"
+            elif promo_count == 1:
+                level = "medium"
+            else:
+                level = "low"
+
+            if threat_level and level != threat_level:
+                continue
+
+            # 构建事件描述：汇总促销标题
+            if promotions:
+                promo_titles = "、".join(
+                    p.get("title", "未知活动") for p in promotions[:3]
+                )
+                event = f"当前活跃促销：{promo_titles}"
+            else:
+                event = "暂无活跃促销，关注评分变化"
+
+            alerts.append({
+                "alert_id": d["snapshot_id"],
+                "competitor_id": d["competitor_id"],
+                "competitor": d["competitor_name"],
+                "threat_level": level,
+                "active_promotions": promotions,
+                "event": event,
+                "avg_rating": float(d["avg_rating"]) if d.get("avg_rating") is not None else None,
+                "source": d.get("source"),
+                "created_at": d["snapshot_date"].isoformat() if d.get("snapshot_date") else None,
+            })
+
+        # 按威胁级别排序
+        alerts.sort(key=lambda a: _level_rank.get(a["threat_level"], 99))
+        critical_count = sum(1 for a in alerts if a["threat_level"] == "critical")
+
+        logger.info(
+            "get_active_alerts",
+            tenant_id=tenant_id,
+            store_id=store_id,
+            total=len(alerts),
+            critical_count=critical_count,
+        )
+        return {
+            "ok": True,
+            "data": {
+                "store_id": store_id,
+                "active_alerts": alerts,
+                "total": len(alerts),
+                "critical_count": critical_count,
+            },
+        }
+
+    except SQLAlchemyError as exc:
+        logger.warning("get_active_alerts_db_unavailable", error=str(exc), store_id=store_id)
+        return {
+            "ok": True,
+            "data": {
+                "store_id": store_id,
+                "active_alerts": [],
+                "total": 0,
+                "critical_count": 0,
+                "degraded": True,
+            },
+        }
 
 
 @router.post("/platform-snapshot")

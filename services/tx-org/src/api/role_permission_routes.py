@@ -1,4 +1,4 @@
-"""角色权限管理 API — 接入真实 DB（role_configs 表）
+"""角色权限管理 API — 全量接入真实 DB
 
 端点列表（prefix=/api/v1/org）：
   GET    /permissions/tree        — 权限树（静态配置）
@@ -6,20 +6,19 @@
   POST   /roles-admin             — 创建角色（写入 role_configs DB）
   PATCH  /roles-admin/{role_id}   — 更新角色权限（写入 role_configs DB）
   DELETE /roles-admin/{role_id}   — 删除角色（软删除 role_configs）
-  GET    /user-roles              — 用户角色列表（graceful fallback 内存数据）
-  PATCH  /user-roles/{user_id}    — 更新用户角色（graceful fallback）
-  POST   /user-roles/batch        — 批量设置用户角色（graceful fallback）
-  GET    /audit-logs              — 操作日志（graceful fallback 内存数据）
+  GET    /user-roles              — 用户角色列表（employees JOIN roles DB 查询）
+  PATCH  /user-roles/{user_id}    — 更新用户角色（employees DB 写入）
+  POST   /user-roles/batch        — 批量设置用户角色（employees DB 批量写入）
+  GET    /audit-logs              — 操作日志（audit_logs DB 查询）
 
 DB 失败时：列表类端点返回空集合，不返回 500。
-所有接口需 X-Tenant-ID header（user-roles/audit-logs 端点除外，保持前向兼容）。
+所有接口需 X-Tenant-ID header。
 
 统一响应格式: {"ok": bool, "data": {}, "error": {}}
 """
 from __future__ import annotations
 
-import uuid
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Any, Optional
 
 import structlog
@@ -136,28 +135,6 @@ ALL_PERM_KEYS = [
     for group in PERMISSION_TREE
     for child in group["children"]
 ]
-
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-#  用户角色/审计日志：内存 fallback（role_configs 无 user 关联表）
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-_MOCK_USERS: list[dict] = [
-    {"id": "u-001", "name": "张伟", "phone": "138****1234", "store": "旗舰店", "roles": ["超级管理员"], "last_login": "2026-04-02 09:30:00", "status": "active"},
-    {"id": "u-002", "name": "李娜", "phone": "139****5678", "store": "万达店", "roles": ["品牌经理"], "last_login": "2026-04-02 08:15:00", "status": "active"},
-    {"id": "u-003", "name": "王芳", "phone": "136****9012", "store": "步行街店", "roles": ["店长"], "last_login": "2026-04-01 18:20:00", "status": "active"},
-    {"id": "u-004", "name": "赵敏", "phone": "137****3456", "store": "大学城店", "roles": ["收银员"], "last_login": "2026-04-02 07:55:00", "status": "active"},
-    {"id": "u-005", "name": "刘洋", "phone": "135****7890", "store": "旗舰店", "roles": ["区域经理"], "last_login": "2026-04-01 17:00:00", "status": "active"},
-]
-
-_now = datetime.now()
-_MOCK_AUDIT_LOGS: list[dict] = [
-    {"id": "log-001", "time": (_now - timedelta(minutes=15)).strftime("%Y-%m-%d %H:%M:%S"), "operator": "张伟", "action": "修改权限", "target": "品牌经理", "ip": "192.168.1.100", "detail": "新增营销管理-审批权限"},
-    {"id": "log-002", "time": (_now - timedelta(hours=1)).strftime("%Y-%m-%d %H:%M:%S"), "operator": "张伟", "action": "登录", "target": "系统", "ip": "192.168.1.100", "detail": "总部后台登录成功"},
-    {"id": "log-003", "time": (_now - timedelta(hours=2)).strftime("%Y-%m-%d %H:%M:%S"), "operator": "李娜", "action": "修改权限", "target": "区域经理", "ip": "10.0.0.55", "detail": "新增供应链-新增权限"},
-    {"id": "log-004", "time": (_now - timedelta(hours=3)).strftime("%Y-%m-%d %H:%M:%S"), "operator": "张伟", "action": "删除", "target": "临时活动角色", "ip": "192.168.1.100", "detail": "删除自定义角色：临时活动角色"},
-    {"id": "log-005", "time": (_now - timedelta(hours=5)).strftime("%Y-%m-%d %H:%M:%S"), "operator": "李娜", "action": "审批", "target": "门店折扣申请#2046", "ip": "10.0.0.55", "detail": "审批通过，折扣率85%"},
-]
-
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 #  请求模型
@@ -509,77 +486,293 @@ async def delete_role_admin(
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-#  端点 — 用户角色（内存 fallback，待 employee_role_assignments 完整对接后替换）
+#  端点 — 用户角色（employees JOIN roles 真实 DB 查询）
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 
 @router.get("/user-roles")
 async def list_user_roles(
+    request: Request,
     page: int = Query(default=1, ge=1),
     size: int = Query(default=20, ge=1, le=100),
     keyword: str = Query(default=""),
+    db: AsyncSession = Depends(get_db),
 ) -> dict:
-    """GET /api/v1/org/user-roles — 用户角色列表（内存 fallback）"""
-    filtered = _MOCK_USERS
+    """GET /api/v1/org/user-roles — 用户角色列表（employees JOIN roles DB 查询）"""
+    tenant_id = _get_tenant_id(request)
+    await _set_rls(db, tenant_id)
+
+    conditions = ["e.tenant_id = :tid::uuid", "e.status != 'resigned'"]
+    params: dict[str, Any] = {"tid": tenant_id}
+
     if keyword:
-        filtered = [u for u in _MOCK_USERS if keyword in u["name"] or keyword in u["phone"]]
-    total = len(filtered)
-    start = (page - 1) * size
-    items = filtered[start: start + size]
+        conditions.append("(e.full_name ILIKE :kw OR e.phone ILIKE :kw)")
+        params["kw"] = f"%{keyword}%"
+
+    where_clause = " AND ".join(conditions)
+
+    try:
+        count_result = await db.execute(
+            text(f"SELECT COUNT(*) FROM employees e WHERE {where_clause}"),
+            params,
+        )
+        total = count_result.scalar() or 0
+
+        offset = (page - 1) * size
+        params["limit"] = size
+        params["offset"] = offset
+
+        result = await db.execute(
+            text(
+                f"SELECT e.id, e.full_name, e.phone, e.status, e.employment_type, "
+                f"       e.store_id, e.created_at, "
+                f"       r.id AS role_id, r.name AS role_name, "
+                f"       COALESCE(r.permissions, '[]'::jsonb) AS permissions "
+                f"FROM employees e "
+                f"LEFT JOIN roles r ON r.id = e.role_id AND r.tenant_id = :tid::uuid "
+                f"WHERE {where_clause} "
+                f"ORDER BY e.created_at DESC "
+                f"LIMIT :limit OFFSET :offset"
+            ),
+            params,
+        )
+        rows = result.mappings().fetchall()
+    except SQLAlchemyError as exc:
+        log.error("list_user_roles_db_error", error=str(exc), exc_info=True)
+        return _ok({"items": [], "total": 0, "page": page, "size": size, "_db_error": True})
+
+    items = []
+    for row in rows:
+        d = _row_to_dict(row)
+        perms = d.get("permissions") or []
+        if isinstance(perms, str):
+            import json
+            try:
+                perms = json.loads(perms)
+            except (ValueError, TypeError):
+                perms = []
+        items.append({
+            "id": d["id"],
+            "name": d.get("full_name", ""),
+            "phone": d.get("phone", ""),
+            "store_id": d.get("store_id"),
+            "status": d.get("status", ""),
+            "employment_type": d.get("employment_type", ""),
+            "role_id": d.get("role_id"),
+            "roles": [d["role_name"]] if d.get("role_name") else [],
+            "permissions": perms,
+            "created_at": d.get("created_at"),
+        })
+
+    log.info("user_roles_listed", tenant_id=tenant_id, total=total, page=page)
     return _ok({"items": items, "total": total, "page": page, "size": size})
 
 
 @router.patch("/user-roles/{user_id}")
-async def update_user_roles(user_id: str, req: UpdateUserRolesReq) -> dict:
-    """PATCH /api/v1/org/user-roles/{user_id} — 更新用户角色（内存 fallback）"""
-    for u in _MOCK_USERS:
-        if u["id"] == user_id:
-            u["roles"] = req.roles
-            log.info("user_roles_updated", user_id=user_id, roles=req.roles)
-            return _ok({"id": u["id"], "name": u["name"], "roles": u["roles"]})
-    return _err(f"用户 {user_id} 不存在", 404)
+async def update_user_roles(
+    user_id: str,
+    req: UpdateUserRolesReq,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """PATCH /api/v1/org/user-roles/{user_id} — 更新员工角色（按角色名查询 roles 表后写入 employees）"""
+    tenant_id = _get_tenant_id(request)
+    await _set_rls(db, tenant_id)
+
+    # req.roles 传角色名列表，取第一个匹配的角色 id 写入 employees.role_id
+    role_id: Optional[str] = None
+    role_name: Optional[str] = None
+    if req.roles:
+        try:
+            role_result = await db.execute(
+                text(
+                    "SELECT id, name FROM roles "
+                    "WHERE tenant_id = :tid::uuid AND name = :rname "
+                    "LIMIT 1"
+                ),
+                {"tid": tenant_id, "rname": req.roles[0]},
+            )
+            role_row = role_result.mappings().first()
+            if role_row:
+                role_id = str(role_row["id"])
+                role_name = role_row["name"]
+        except SQLAlchemyError as exc:
+            log.error("update_user_roles_role_lookup_error", error=str(exc), exc_info=True)
+            raise HTTPException(status_code=503, detail="数据库服务暂时不可用") from exc
+
+    try:
+        result = await db.execute(
+            text(
+                "UPDATE employees "
+                "SET role_id = :role_id::uuid, updated_at = NOW() "
+                "WHERE id = :uid::uuid AND tenant_id = :tid::uuid "
+                "RETURNING id, full_name, phone, status"
+            ),
+            {"role_id": role_id, "uid": user_id, "tid": tenant_id},
+        )
+        row = result.mappings().first()
+        await db.commit()
+    except SQLAlchemyError as exc:
+        log.error("update_user_roles_db_error", error=str(exc), exc_info=True)
+        raise HTTPException(status_code=503, detail="数据库服务暂时不可用") from exc
+
+    if not row:
+        return _err(f"用户 {user_id} 不存在", 404)
+
+    d = _row_to_dict(row)
+    log.info("user_roles_updated", user_id=user_id, roles=req.roles)
+    return _ok({
+        "id": d["id"],
+        "name": d.get("full_name", ""),
+        "roles": [role_name] if role_name else req.roles,
+    })
 
 
 @router.post("/user-roles/batch")
-async def batch_set_user_roles(req: BatchUserRolesReq) -> dict:
-    """POST /api/v1/org/user-roles/batch — 批量设置用户角色（内存 fallback）"""
-    updated_ids = []
-    for u in _MOCK_USERS:
-        if u["id"] in req.user_ids:
-            u["roles"] = req.roles
-            updated_ids.append(u["id"])
+async def batch_set_user_roles(
+    req: BatchUserRolesReq,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """POST /api/v1/org/user-roles/batch — 批量设置员工角色（按角色名查询后批量更新 employees）"""
+    tenant_id = _get_tenant_id(request)
+    await _set_rls(db, tenant_id)
+
+    role_id: Optional[str] = None
+    if req.roles:
+        try:
+            role_result = await db.execute(
+                text(
+                    "SELECT id FROM roles "
+                    "WHERE tenant_id = :tid::uuid AND name = :rname "
+                    "LIMIT 1"
+                ),
+                {"tid": tenant_id, "rname": req.roles[0]},
+            )
+            role_row = role_result.mappings().first()
+            if role_row:
+                role_id = str(role_row["id"])
+        except SQLAlchemyError as exc:
+            log.error("batch_set_user_roles_role_lookup_error", error=str(exc), exc_info=True)
+            raise HTTPException(status_code=503, detail="数据库服务暂时不可用") from exc
+
+    updated_ids: list[str] = []
+    try:
+        for uid in req.user_ids:
+            res = await db.execute(
+                text(
+                    "UPDATE employees "
+                    "SET role_id = :role_id::uuid, updated_at = NOW() "
+                    "WHERE id = :uid::uuid AND tenant_id = :tid::uuid "
+                    "RETURNING id"
+                ),
+                {"role_id": role_id, "uid": uid, "tid": tenant_id},
+            )
+            if res.mappings().first():
+                updated_ids.append(uid)
+        await db.commit()
+    except SQLAlchemyError as exc:
+        log.error("batch_set_user_roles_db_error", error=str(exc), exc_info=True)
+        raise HTTPException(status_code=503, detail="数据库服务暂时不可用") from exc
+
     log.info("batch_roles_set", count=len(updated_ids), roles=req.roles)
     return _ok({"updated_count": len(updated_ids), "user_ids": updated_ids})
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-#  端点 — 操作日志（内存 fallback，待 audit_logs 表建立后接入）
+#  端点 — 操作日志（audit_logs 真实 DB 查询，SQLAlchemyError fallback 空列表）
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 
 @router.get("/audit-logs")
 async def list_audit_logs(
+    request: Request,
     page: int = Query(default=1, ge=1),
     size: int = Query(default=20, ge=1, le=100),
     keyword: str = Query(default=""),
     action: str = Query(default=""),
     start_time: str = Query(default=""),
     end_time: str = Query(default=""),
+    db: AsyncSession = Depends(get_db),
 ) -> dict:
-    """GET /api/v1/org/audit-logs — 操作日志列表（内存 fallback）"""
-    filtered = list(_MOCK_AUDIT_LOGS)
+    """GET /api/v1/org/audit-logs — 操作日志列表（audit_logs DB 查询，DB 失败返回空列表）"""
+    tenant_id = _get_tenant_id(request)
+    await _set_rls(db, tenant_id)
+
+    conditions = ["tenant_id = :tid::uuid"]
+    params: dict[str, Any] = {"tid": tenant_id}
+
     if keyword:
-        filtered = [
-            log_item for log_item in filtered
-            if keyword in log_item["operator"] or keyword in log_item.get("target", "")
-        ]
+        # keyword 匹配操作人 id（user_id）、resource_type 或 details 文本
+        conditions.append(
+            "(al.user_id::text ILIKE :kw OR al.resource_type ILIKE :kw "
+            "OR al.details::text ILIKE :kw)"
+        )
+        params["kw"] = f"%{keyword}%"
+
     if action:
-        filtered = [log_item for log_item in filtered if log_item["action"] == action]
+        conditions.append("al.action = :action")
+        params["action"] = action
+
     if start_time:
-        filtered = [log_item for log_item in filtered if log_item["time"] >= start_time]
+        conditions.append("al.created_at >= :start_time::timestamptz")
+        params["start_time"] = start_time
+
     if end_time:
-        filtered = [log_item for log_item in filtered if log_item["time"] <= end_time]
-    total = len(filtered)
-    start = (page - 1) * size
-    items = filtered[start: start + size]
+        conditions.append("al.created_at <= :end_time::timestamptz")
+        params["end_time"] = end_time
+
+    where_clause = " AND ".join(conditions)
+
+    try:
+        count_result = await db.execute(
+            text(f"SELECT COUNT(*) FROM audit_logs al WHERE {where_clause}"),
+            params,
+        )
+        total = count_result.scalar() or 0
+
+        offset = (page - 1) * size
+        params["limit"] = size
+        params["offset"] = offset
+
+        result = await db.execute(
+            text(
+                f"SELECT al.id, al.user_id, al.action, al.resource_type, "
+                f"       al.resource_id, al.ip_address, al.user_agent, "
+                f"       al.created_at, al.details "
+                f"FROM audit_logs al "
+                f"WHERE {where_clause} "
+                f"ORDER BY al.created_at DESC "
+                f"LIMIT :limit OFFSET :offset"
+            ),
+            params,
+        )
+        rows = result.mappings().fetchall()
+    except SQLAlchemyError as exc:
+        log.error("list_audit_logs_db_error", error=str(exc), exc_info=True)
+        return _ok({"items": [], "total": 0, "page": page, "size": size, "_db_error": True})
+
+    items = []
+    for row in rows:
+        d = _row_to_dict(row)
+        details = d.get("details") or {}
+        if isinstance(details, str):
+            import json
+            try:
+                details = json.loads(details)
+            except (ValueError, TypeError):
+                details = {}
+        items.append({
+            "id": d["id"],
+            "time": d.get("created_at"),
+            "user_id": d.get("user_id"),
+            "action": d.get("action", ""),
+            "resource_type": d.get("resource_type", ""),
+            "resource_id": d.get("resource_id"),
+            "ip": d.get("ip_address", ""),
+            "user_agent": d.get("user_agent", ""),
+            "detail": details,
+        })
+
+    log.info("audit_logs_listed", tenant_id=tenant_id, total=total, page=page)
     return _ok({"items": items, "total": total, "page": page, "size": size})

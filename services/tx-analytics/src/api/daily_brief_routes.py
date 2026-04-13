@@ -251,47 +251,21 @@ def _generate_recommendations(
     return actions
 
 
-def _mock_daily_brief(store_id: str, target_date: date) -> dict[str, Any]:
-    """当 DB 不可用时返回演示数据"""
+def _degraded_daily_brief(store_id: str, target_date: date) -> dict[str, Any]:
+    """当 DB 不可用时返回降级响应（空数据，前端据此显示"数据暂不可用"）"""
     return {
         "store_id": store_id,
         "date": target_date.isoformat(),
         "revenue_metrics": {
-            "today": {"revenue": 18600, "order_count": 142, "avg_ticket": 131, "margin_rate": 0.38},
-            "vs_yesterday": {"revenue": 0.05, "order_count": 0.03, "avg_ticket": 0.02, "margin_rate": 0.01},
-            "vs_last_week": {"revenue": -0.08, "order_count": -0.05, "avg_ticket": -0.03, "margin_rate": -0.02},
+            "today": {"revenue": 0, "order_count": 0, "avg_ticket": 0, "margin_rate": 0},
+            "vs_yesterday": {"revenue": None, "order_count": None, "avg_ticket": None, "margin_rate": None},
+            "vs_last_week": {"revenue": None, "order_count": None, "avg_ticket": None, "margin_rate": None},
         },
-        "anomalies": [
-            {"type": "refund", "description": "今日退单3笔", "count": 3},
-            {"type": "discount_anomaly", "description": "折扣异常1次", "count": 1},
-        ],
-        "agent_decisions": [
-            {"agent_id": "discount_guard", "action": "拦截异常折扣: 88折→5折", "reasoning": "单笔毛利低于阈值", "confidence": 0.92, "status": "executed"},
-            {"agent_id": "inventory_alert", "action": "三文鱼库存预警", "reasoning": "剩余量低于安全库存", "confidence": 0.85, "status": "notified"},
-        ],
-        "dish_rankings": {
-            "top5_hot": [
-                {"rank": 1, "dish_name": "酸菜鱼", "quantity": 38, "revenue": 2280},
-                {"rank": 2, "dish_name": "水煮牛肉", "quantity": 32, "revenue": 2240},
-                {"rank": 3, "dish_name": "麻辣香锅", "quantity": 28, "revenue": 1960},
-                {"rank": 4, "dish_name": "剁椒鱼头", "quantity": 22, "revenue": 1760},
-                {"rank": 5, "dish_name": "蒜蓉小龙虾", "quantity": 18, "revenue": 1620},
-            ],
-            "top5_slow": [
-                {"rank": 1, "dish_name": "凉拌木耳", "quantity": 2, "revenue": 36},
-                {"rank": 2, "dish_name": "清蒸南瓜", "quantity": 3, "revenue": 54},
-                {"rank": 3, "dish_name": "银耳莲子羹", "quantity": 3, "revenue": 48},
-                {"rank": 4, "dish_name": "白灼菜心", "quantity": 4, "revenue": 56},
-                {"rank": 5, "dish_name": "醋溜土豆丝", "quantity": 5, "revenue": 60},
-            ],
-        },
-        "recommendations": [
-            "营收环比上升5%，表现良好，建议保持现有运营策略",
-            "热销菜品: 酸菜鱼、水煮牛肉、麻辣香锅，建议确保食材备货充足",
-            "滞销菜品: 凉拌木耳、清蒸南瓜、银耳莲子羹，建议考虑促销或调整菜单位置",
-            "存在退单异常，建议复盘出品质量和服务流程",
-        ],
-        "_is_mock": True,
+        "anomalies": [],
+        "agent_decisions": [],
+        "dish_rankings": {"top5_hot": [], "top5_slow": []},
+        "recommendations": ["数据暂时无法加载，请稍后重试"],
+        "_degraded": True,
     }
 
 
@@ -502,4 +476,4 @@ async def get_store_daily_brief(
 
     except (SQLAlchemyError, ConnectionError, ValueError, RuntimeError) as exc:
         logger.warning("daily_brief_generation_fallback", store_id=store_id, error=str(exc), exc_info=True)
-        return {"ok": True, "data": _mock_daily_brief(store_id, d)}
+        return {"ok": True, "data": _degraded_daily_brief(store_id, d)}

@@ -28,11 +28,27 @@ from decimal import Decimal
 from typing import Optional
 
 import structlog
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from pydantic import BaseModel, Field
+from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from shared.ontology.src.database import get_db_with_tenant
 
 logger = structlog.get_logger()
 router = APIRouter(prefix="/api/v1/trade/banquet", tags=["banquet-order-payment"])
+
+
+# ─── 依赖注入 ─────────────────────────────────────────────────────────────────
+
+async def _get_tenant_db(x_tenant_id: str = Header(..., alias="X-Tenant-ID")):
+    async for session in get_db_with_tenant(x_tenant_id):
+        yield session
+
+
+def _tid(x_tenant_id: str = Header(..., alias="X-Tenant-ID")) -> str:
+    return x_tenant_id
 
 
 # ─── 工具函数 ────────────────────────────────────────────────────────────────
@@ -61,145 +77,19 @@ def _fen_to_yuan_str(fen: int) -> str:
     return f"¥{yuan:.2f}"
 
 
-# ─── Mock 数据存储 ──────────────────────────────────────────────────────────
-
-MOCK_BANQUET_ORDERS: dict[str, dict] = {
-    "ban-001": {
-        "id": "ban-001",
-        "tenant_id": "t-demo-001",
-        "store_id": "s-demo-001",
-        "contact_name": "张总",
-        "contact_phone": "13800138001",
-        "banquet_date": "2026-05-01",
-        "banquet_time": "18:00",
-        "guest_count": 20,
-        "table_ids": [],
-        "total_fen": 580000,
-        "deposit_rate": "0.30",
-        "deposit_fen": 174000,
-        "balance_fen": 406000,
-        "deposit_status": "paid",
-        "balance_status": "unpaid",
-        "payment_status": "deposit_paid",
-        "status": "confirmed",
-        "notes": "需要婚庆布置",
-        "cancel_reason": None,
-        "cancelled_at": None,
-        "is_deleted": False,
-        "created_at": "2026-04-01T10:00:00+08:00",
-        "updated_at": "2026-04-01T12:00:00+08:00",
-    },
-    "ban-002": {
-        "id": "ban-002",
-        "tenant_id": "t-demo-001",
-        "store_id": "s-demo-001",
-        "contact_name": "李总婚宴",
-        "contact_phone": "13800138002",
-        "banquet_date": "2026-04-20",
-        "banquet_time": "12:00",
-        "guest_count": 60,
-        "table_ids": [],
-        "total_fen": 1280000,
-        "deposit_rate": "0.30",
-        "deposit_fen": 384000,
-        "balance_fen": 896000,
-        "deposit_status": "paid",
-        "balance_status": "paid",
-        "payment_status": "fully_paid",
-        "status": "confirmed",
-        "notes": "60人婚宴，徐记海鲜全席",
-        "cancel_reason": None,
-        "cancelled_at": None,
-        "is_deleted": False,
-        "created_at": "2026-03-15T09:00:00+08:00",
-        "updated_at": "2026-04-05T14:00:00+08:00",
-    },
-    "ban-003": {
-        "id": "ban-003",
-        "tenant_id": "t-demo-001",
-        "store_id": "s-demo-001",
-        "contact_name": "王氏家宴",
-        "contact_phone": "13800138003",
-        "banquet_date": "2026-04-25",
-        "banquet_time": "19:00",
-        "guest_count": 12,
-        "table_ids": [],
-        "total_fen": 320000,
-        "deposit_rate": "0.30",
-        "deposit_fen": 96000,
-        "balance_fen": 224000,
-        "deposit_status": "unpaid",
-        "balance_status": "unpaid",
-        "payment_status": "unpaid",
-        "status": "pending",
-        "notes": "",
-        "cancel_reason": None,
-        "cancelled_at": None,
-        "is_deleted": False,
-        "created_at": "2026-04-06T08:00:00+08:00",
-        "updated_at": "2026-04-06T08:00:00+08:00",
-    },
-}
-
-# 支付记录：banquet_order_id -> list[payment_record]
-MOCK_PAYMENTS: dict[str, list[dict]] = {
-    "ban-001": [
-        {
-            "id": "pay-001-dep",
-            "tenant_id": "t-demo-001",
-            "banquet_order_id": "ban-001",
-            "payment_stage": "deposit",
-            "amount_fen": 174000,
-            "payment_method": "wechat",
-            "payment_status": "paid",
-            "transaction_id": "WX20260401120001",
-            "paid_at": "2026-04-01T12:00:00+08:00",
-            "refund_amount_fen": 0,
-            "refunded_at": None,
-            "operator_id": None,
-            "notes": "微信支付定金",
-            "created_at": "2026-04-01T12:00:00+08:00",
-            "updated_at": "2026-04-01T12:00:00+08:00",
-        }
-    ],
-    "ban-002": [
-        {
-            "id": "pay-002-dep",
-            "tenant_id": "t-demo-001",
-            "banquet_order_id": "ban-002",
-            "payment_stage": "deposit",
-            "amount_fen": 384000,
-            "payment_method": "wechat",
-            "payment_status": "paid",
-            "transaction_id": "WX20260315090001",
-            "paid_at": "2026-03-15T09:30:00+08:00",
-            "refund_amount_fen": 0,
-            "refunded_at": None,
-            "operator_id": None,
-            "notes": "",
-            "created_at": "2026-03-15T09:30:00+08:00",
-            "updated_at": "2026-03-15T09:30:00+08:00",
-        },
-        {
-            "id": "pay-002-bal",
-            "tenant_id": "t-demo-001",
-            "banquet_order_id": "ban-002",
-            "payment_stage": "balance",
-            "amount_fen": 896000,
-            "payment_method": "transfer",
-            "payment_status": "paid",
-            "transaction_id": "TF20260405140001",
-            "paid_at": "2026-04-05T14:00:00+08:00",
-            "refund_amount_fen": 0,
-            "refunded_at": None,
-            "operator_id": None,
-            "notes": "对公转账",
-            "created_at": "2026-04-05T14:00:00+08:00",
-            "updated_at": "2026-04-05T14:00:00+08:00",
-        },
-    ],
-    "ban-003": [],
-}
+def _serialize_order(row: dict) -> dict:
+    """将数据库行中的特殊类型转换为 JSON 可序列化格式。"""
+    out = {}
+    for k, v in row.items():
+        if isinstance(v, uuid.UUID):
+            out[k] = str(v)
+        elif isinstance(v, (datetime, date, time)):
+            out[k] = v.isoformat()
+        elif isinstance(v, Decimal):
+            out[k] = str(v)
+        else:
+            out[k] = v
+    return out
 
 
 # ─── Request/Response Models ──────────────────────────────────────────────
@@ -268,94 +158,163 @@ class RefundReq(BaseModel):
 
 @router.get("/orders")
 async def list_orders(
-    request: Request,
     banquet_date: Optional[str] = None,
     payment_status: Optional[str] = None,
     store_id: Optional[str] = None,
     page: int = 1,
     size: int = 20,
+    db: AsyncSession = Depends(_get_tenant_db),
+    tenant_id: str = Depends(_tid),
 ):
     """宴席订单列表，支持日期/支付状态/门店过滤。"""
-    tenant_id = _get_tenant_id(request)
-
-    items = [
-        o for o in MOCK_BANQUET_ORDERS.values()
-        if not o["is_deleted"] and o["tenant_id"] == tenant_id
-    ]
+    conditions = ["is_deleted = FALSE"]
+    params: dict = {"offset": (page - 1) * size, "limit": size}
 
     if banquet_date:
-        items = [o for o in items if o["banquet_date"] == banquet_date]
+        conditions.append("banquet_date = :banquet_date")
+        params["banquet_date"] = banquet_date
     if payment_status:
-        items = [o for o in items if o["payment_status"] == payment_status]
+        conditions.append("payment_status = :payment_status")
+        params["payment_status"] = payment_status
     if store_id:
-        items = [o for o in items if o["store_id"] == store_id]
+        conditions.append("store_id = :store_id::UUID")
+        params["store_id"] = store_id
 
-    total = len(items)
-    start = (page - 1) * size
-    paginated = items[start: start + size]
+    where = " AND ".join(conditions)
 
-    return _ok({"items": paginated, "total": total, "page": page, "size": size})
+    try:
+        count_r = await db.execute(
+            text(f"SELECT COUNT(*) FROM banquet_orders WHERE {where}"),
+            params,
+        )
+        total: int = count_r.scalar() or 0
+
+        rows_r = await db.execute(
+            text(
+                f"SELECT * FROM banquet_orders WHERE {where} "
+                f"ORDER BY created_at DESC LIMIT :limit OFFSET :offset"
+            ),
+            params,
+        )
+        items = [_serialize_order(dict(r)) for r in rows_r.mappings()]
+    except SQLAlchemyError:
+        logger.exception("banquet_order.list_orders.db_error", tenant_id=tenant_id)
+        items = []
+        total = 0
+
+    return _ok({"items": items, "total": total, "page": page, "size": size})
 
 
 # ─── 2. 宴席订单详情 ──────────────────────────────────────────────────────────
 
 @router.get("/orders/{order_id}")
-async def get_order(order_id: str, request: Request):
+async def get_order(
+    order_id: str,
+    db: AsyncSession = Depends(_get_tenant_db),
+    tenant_id: str = Depends(_tid),
+):
     """宴席订单详情，含支付记录列表。"""
-    tenant_id = _get_tenant_id(request)
-    order = MOCK_BANQUET_ORDERS.get(order_id)
-    if not order or order["is_deleted"] or order["tenant_id"] != tenant_id:
+    try:
+        order_r = await db.execute(
+            text(
+                "SELECT * FROM banquet_orders "
+                "WHERE id = :oid::UUID AND is_deleted = FALSE"
+            ),
+            {"oid": order_id},
+        )
+        row = order_r.mappings().first()
+    except SQLAlchemyError:
+        logger.exception("banquet_order.get_order.db_error", order_id=order_id, tenant_id=tenant_id)
+        return _err("数据库查询失败", "DB_ERROR")
+
+    if not row:
         return _err("订单不存在", "NOT_FOUND")
 
-    payments = MOCK_PAYMENTS.get(order_id, [])
+    order = _serialize_order(dict(row))
+
+    try:
+        pays_r = await db.execute(
+            text(
+                "SELECT * FROM banquet_payments "
+                "WHERE banquet_order_id = :oid::UUID ORDER BY created_at ASC"
+            ),
+            {"oid": order_id},
+        )
+        payments = [_serialize_order(dict(p)) for p in pays_r.mappings()]
+    except SQLAlchemyError:
+        logger.exception("banquet_order.get_order.payments_db_error", order_id=order_id, tenant_id=tenant_id)
+        payments = []
+
     return _ok({**order, "payments": payments})
 
 
 # ─── 3. 创建宴席预订 ──────────────────────────────────────────────────────────
 
 @router.post("/orders")
-async def create_order(body: CreateOrderReq, request: Request):
+async def create_order(
+    body: CreateOrderReq,
+    db: AsyncSession = Depends(_get_tenant_db),
+    tenant_id: str = Depends(_tid),
+):
     """
     创建宴席预订。
     deposit_fen = total_fen × deposit_rate（四舍五入到分），
     balance_fen = total_fen − deposit_fen。
     """
-    tenant_id = _get_tenant_id(request)
-
     deposit_fen = round(body.total_fen * body.deposit_rate)
     balance_fen = body.total_fen - deposit_fen
-    now_str = datetime.now().astimezone().isoformat()
     order_id = str(uuid.uuid4())
 
-    order: dict = {
-        "id": order_id,
-        "tenant_id": tenant_id,
-        "store_id": body.store_id,
-        "contact_name": body.contact_name,
-        "contact_phone": body.contact_phone,
-        "banquet_date": body.banquet_date,
-        "banquet_time": body.banquet_time,
-        "guest_count": body.guest_count,
-        "table_ids": body.table_ids,
-        "total_fen": body.total_fen,
-        "deposit_rate": str(body.deposit_rate),
-        "deposit_fen": deposit_fen,
-        "balance_fen": balance_fen,
-        "deposit_status": "unpaid",
-        "balance_status": "unpaid",
-        "payment_status": "unpaid",
-        "status": "pending",
-        "notes": body.notes,
-        "cancel_reason": None,
-        "cancelled_at": None,
-        "is_deleted": False,
-        "created_at": now_str,
-        "updated_at": now_str,
-    }
+    import json
+    try:
+        result = await db.execute(
+            text("""
+                INSERT INTO banquet_orders (
+                    id, tenant_id, store_id,
+                    contact_name, contact_phone,
+                    banquet_date, banquet_time,
+                    guest_count, table_ids,
+                    total_fen, deposit_rate, deposit_fen, balance_fen,
+                    deposit_status, balance_status, payment_status,
+                    status, notes,
+                    cancel_reason, cancelled_at, is_deleted
+                ) VALUES (
+                    :id::UUID, :tenant_id::UUID, :store_id::UUID,
+                    :contact_name, :contact_phone,
+                    :banquet_date::DATE, :banquet_time::TIME,
+                    :guest_count, :table_ids::JSONB,
+                    :total_fen, :deposit_rate, :deposit_fen, :balance_fen,
+                    'unpaid', 'unpaid', 'unpaid',
+                    'pending', :notes,
+                    NULL, NULL, FALSE
+                )
+                RETURNING *
+            """),
+            {
+                "id": order_id,
+                "tenant_id": tenant_id,
+                "store_id": body.store_id,
+                "contact_name": body.contact_name,
+                "contact_phone": body.contact_phone,
+                "banquet_date": body.banquet_date,
+                "banquet_time": body.banquet_time,
+                "guest_count": body.guest_count,
+                "table_ids": json.dumps(body.table_ids),
+                "total_fen": body.total_fen,
+                "deposit_rate": str(body.deposit_rate),
+                "deposit_fen": deposit_fen,
+                "balance_fen": balance_fen,
+                "notes": body.notes,
+            },
+        )
+        await db.commit()
+        row = result.mappings().first()
+    except SQLAlchemyError:
+        await db.rollback()
+        logger.exception("banquet_order.create_order.db_error", tenant_id=tenant_id)
+        raise HTTPException(status_code=503, detail="数据库写入失败，请稍后重试")
 
-    MOCK_BANQUET_ORDERS[order_id] = order
-    MOCK_PAYMENTS[order_id] = []
-
+    order = _serialize_order(dict(row))
     logger.info("banquet_order.created", order_id=order_id, tenant_id=tenant_id,
                 total_fen=body.total_fen, deposit_fen=deposit_fen)
     return _ok(order)
@@ -364,16 +323,33 @@ async def create_order(body: CreateOrderReq, request: Request):
 # ─── 4. 更新预订信息 ──────────────────────────────────────────────────────────
 
 @router.put("/orders/{order_id}")
-async def update_order(order_id: str, body: UpdateOrderReq, request: Request):
+async def update_order(
+    order_id: str,
+    body: UpdateOrderReq,
+    db: AsyncSession = Depends(_get_tenant_db),
+    tenant_id: str = Depends(_tid),
+):
     """
     更新预订信息。仅允许在未支付（payment_status=unpaid）或只付了定金时修改。
     若已全额支付则不可修改。
     """
-    tenant_id = _get_tenant_id(request)
-    order = MOCK_BANQUET_ORDERS.get(order_id)
-    if not order or order["is_deleted"] or order["tenant_id"] != tenant_id:
+    try:
+        order_r = await db.execute(
+            text(
+                "SELECT * FROM banquet_orders "
+                "WHERE id = :oid::UUID AND is_deleted = FALSE"
+            ),
+            {"oid": order_id},
+        )
+        row = order_r.mappings().first()
+    except SQLAlchemyError:
+        logger.exception("banquet_order.update_order.db_error", order_id=order_id, tenant_id=tenant_id)
+        raise HTTPException(status_code=503, detail="数据库查询失败")
+
+    if not row:
         return _err("订单不存在", "NOT_FOUND")
 
+    order = dict(row)
     if order["payment_status"] == "fully_paid":
         raise HTTPException(
             status_code=400,
@@ -393,17 +369,44 @@ async def update_order(order_id: str, body: UpdateOrderReq, request: Request):
         updates["balance_fen"] = new_total - new_deposit
         updates["deposit_rate"] = str(new_rate)
 
-    updates["updated_at"] = datetime.now().astimezone().isoformat()
-    order.update(updates)
+    if not updates:
+        return _ok(_serialize_order(order))
+
+    set_clauses = []
+    params: dict = {"oid": order_id}
+    for field, val in updates.items():
+        set_clauses.append(f"{field} = :{field}")
+        params[field] = val
+    set_clauses.append("updated_at = NOW()")
+
+    try:
+        result = await db.execute(
+            text(
+                f"UPDATE banquet_orders SET {', '.join(set_clauses)} "
+                f"WHERE id = :oid::UUID RETURNING *"
+            ),
+            params,
+        )
+        await db.commit()
+        updated_row = result.mappings().first()
+    except SQLAlchemyError:
+        await db.rollback()
+        logger.exception("banquet_order.update_order.write_error", order_id=order_id, tenant_id=tenant_id)
+        raise HTTPException(status_code=503, detail="数据库写入失败，请稍后重试")
 
     logger.info("banquet_order.updated", order_id=order_id, tenant_id=tenant_id)
-    return _ok(order)
+    return _ok(_serialize_order(dict(updated_row)))
 
 
 # ─── 5. 取消预订 ─────────────────────────────────────────────────────────────
 
 @router.post("/orders/{order_id}/cancel")
-async def cancel_order(order_id: str, body: CancelOrderReq, request: Request):
+async def cancel_order(
+    order_id: str,
+    body: CancelOrderReq,
+    db: AsyncSession = Depends(_get_tenant_db),
+    tenant_id: str = Depends(_tid),
+):
     """
     取消预订。
     - 未支付：直接取消。
@@ -411,11 +414,23 @@ async def cancel_order(order_id: str, body: CancelOrderReq, request: Request):
       退款通过 /refund 端点处理。
     - 已全额支付：不允许直接取消，须走退款流程再取消。
     """
-    tenant_id = _get_tenant_id(request)
-    order = MOCK_BANQUET_ORDERS.get(order_id)
-    if not order or order["is_deleted"] or order["tenant_id"] != tenant_id:
+    try:
+        order_r = await db.execute(
+            text(
+                "SELECT * FROM banquet_orders "
+                "WHERE id = :oid::UUID AND is_deleted = FALSE"
+            ),
+            {"oid": order_id},
+        )
+        row = order_r.mappings().first()
+    except SQLAlchemyError:
+        logger.exception("banquet_order.cancel_order.db_error", order_id=order_id, tenant_id=tenant_id)
+        raise HTTPException(status_code=503, detail="数据库查询失败")
+
+    if not row:
         return _err("订单不存在", "NOT_FOUND")
 
+    order = dict(row)
     if order["status"] == "cancelled":
         return _err("订单已取消", "ALREADY_CANCELLED")
 
@@ -425,21 +440,40 @@ async def cancel_order(order_id: str, body: CancelOrderReq, request: Request):
             detail="已全额支付的订单请先完成退款，再取消预订",
         )
 
-    now_str = datetime.now().astimezone().isoformat()
-    order["status"] = "cancelled"
-    order["cancel_reason"] = body.cancel_reason
-    order["cancelled_at"] = now_str
-    order["updated_at"] = now_str
+    try:
+        result = await db.execute(
+            text("""
+                UPDATE banquet_orders
+                SET status = 'cancelled',
+                    cancel_reason = :reason,
+                    cancelled_at = NOW(),
+                    updated_at = NOW()
+                WHERE id = :oid::UUID
+                RETURNING *
+            """),
+            {"oid": order_id, "reason": body.cancel_reason},
+        )
+        await db.commit()
+        updated_row = result.mappings().first()
+    except SQLAlchemyError:
+        await db.rollback()
+        logger.exception("banquet_order.cancel_order.write_error", order_id=order_id, tenant_id=tenant_id)
+        raise HTTPException(status_code=503, detail="数据库写入失败，请稍后重试")
 
     logger.info("banquet_order.cancelled", order_id=order_id,
                 reason=body.cancel_reason, tenant_id=tenant_id)
-    return _ok(order)
+    return _ok(_serialize_order(dict(updated_row)))
 
 
 # ─── 6. 支付定金 ─────────────────────────────────────────────────────────────
 
 @router.post("/orders/{order_id}/pay-deposit")
-async def pay_deposit(order_id: str, body: PayDepositReq, request: Request):
+async def pay_deposit(
+    order_id: str,
+    body: PayDepositReq,
+    db: AsyncSession = Depends(_get_tenant_db),
+    tenant_id: str = Depends(_tid),
+):
     """
     支付定金。
 
@@ -449,11 +483,23 @@ async def pay_deposit(order_id: str, body: PayDepositReq, request: Request):
     - 若 amount_fen >= total_fen，视为全额支付，同时更新 balance_status=paid
     - 返回：更新后的订单状态 + 支付凭证
     """
-    tenant_id = _get_tenant_id(request)
-    order = MOCK_BANQUET_ORDERS.get(order_id)
-    if not order or order["is_deleted"] or order["tenant_id"] != tenant_id:
+    try:
+        order_r = await db.execute(
+            text(
+                "SELECT * FROM banquet_orders "
+                "WHERE id = :oid::UUID AND is_deleted = FALSE"
+            ),
+            {"oid": order_id},
+        )
+        row = order_r.mappings().first()
+    except SQLAlchemyError:
+        logger.exception("banquet_order.pay_deposit.db_error", order_id=order_id, tenant_id=tenant_id)
+        raise HTTPException(status_code=503, detail="数据库查询失败")
+
+    if not row:
         return _err("订单不存在", "NOT_FOUND")
 
+    order = dict(row)
     if order["status"] == "cancelled":
         raise HTTPException(status_code=400, detail="订单已取消，不可支付")
 
@@ -470,58 +516,90 @@ async def pay_deposit(order_id: str, body: PayDepositReq, request: Request):
             ),
         )
 
-    now_str = datetime.now().astimezone().isoformat()
     pay_id = str(uuid.uuid4())
-
-    payment_rec = {
-        "id": pay_id,
-        "tenant_id": tenant_id,
-        "banquet_order_id": order_id,
-        "payment_stage": "deposit",
-        "amount_fen": body.amount_fen,
-        "payment_method": body.payment_method,
-        "payment_status": "paid",
-        "transaction_id": body.transaction_id,
-        "paid_at": now_str,
-        "refund_amount_fen": 0,
-        "refunded_at": None,
-        "operator_id": None,
-        "notes": body.notes,
-        "created_at": now_str,
-        "updated_at": now_str,
-    }
-    MOCK_PAYMENTS.setdefault(order_id, []).append(payment_rec)
-
-    # 更新订单状态
-    order["deposit_status"] = "paid"
-    order["updated_at"] = now_str
-
     total_fen: int = order["total_fen"]
+
+    # 状态机：全额支付判断
     if body.amount_fen >= total_fen:
-        # 全额支付
-        order["balance_status"] = "paid"
-        order["payment_status"] = "fully_paid"
+        new_balance_status = "paid"
+        new_payment_status = "fully_paid"
     else:
-        order["payment_status"] = "deposit_paid"
+        new_balance_status = "unpaid"
+        new_payment_status = "deposit_paid"
+
+    try:
+        pay_r = await db.execute(
+            text("""
+                INSERT INTO banquet_payments (
+                    id, tenant_id, banquet_order_id,
+                    payment_stage, amount_fen, payment_method,
+                    payment_status, transaction_id, paid_at,
+                    refund_amount_fen, refunded_at, operator_id, notes
+                ) VALUES (
+                    :id::UUID, :tenant_id::UUID, :banquet_order_id::UUID,
+                    'deposit', :amount_fen, :payment_method,
+                    'paid', :transaction_id, NOW(),
+                    0, NULL, NULL, :notes
+                )
+                RETURNING *
+            """),
+            {
+                "id": pay_id,
+                "tenant_id": tenant_id,
+                "banquet_order_id": order_id,
+                "amount_fen": body.amount_fen,
+                "payment_method": body.payment_method,
+                "transaction_id": body.transaction_id,
+                "notes": body.notes,
+            },
+        )
+        order_r2 = await db.execute(
+            text("""
+                UPDATE banquet_orders
+                SET deposit_status = 'paid',
+                    balance_status = :balance_status,
+                    payment_status = :payment_status,
+                    updated_at = NOW()
+                WHERE id = :oid::UUID
+                RETURNING *
+            """),
+            {
+                "oid": order_id,
+                "balance_status": new_balance_status,
+                "payment_status": new_payment_status,
+            },
+        )
+        await db.commit()
+        payment_rec = _serialize_order(dict(pay_r.mappings().first()))
+        updated_order = _serialize_order(dict(order_r2.mappings().first()))
+    except SQLAlchemyError:
+        await db.rollback()
+        logger.exception("banquet_order.pay_deposit.write_error", order_id=order_id, tenant_id=tenant_id)
+        raise HTTPException(status_code=503, detail="数据库写入失败，请稍后重试")
 
     logger.info(
         "banquet_payment.deposit_paid",
         order_id=order_id,
         amount_fen=body.amount_fen,
-        payment_status=order["payment_status"],
+        payment_status=new_payment_status,
         tenant_id=tenant_id,
     )
     return _ok({
-        "order": order,
+        "order": updated_order,
         "payment": payment_rec,
-        "receipt_summary": _build_receipt_summary(order, payment_rec),
+        "receipt_summary": _build_receipt_summary(updated_order, payment_rec),
     })
 
 
 # ─── 7. 支付尾款 ─────────────────────────────────────────────────────────────
 
 @router.post("/orders/{order_id}/pay-balance")
-async def pay_balance(order_id: str, body: PayBalanceReq, request: Request):
+async def pay_balance(
+    order_id: str,
+    body: PayBalanceReq,
+    db: AsyncSession = Depends(_get_tenant_db),
+    tenant_id: str = Depends(_tid),
+):
     """
     支付尾款。
 
@@ -531,11 +609,23 @@ async def pay_balance(order_id: str, body: PayBalanceReq, request: Request):
     - amount_fen 必须 >= balance_fen
     - 成功后：payment_status=fully_paid, balance_status=paid
     """
-    tenant_id = _get_tenant_id(request)
-    order = MOCK_BANQUET_ORDERS.get(order_id)
-    if not order or order["is_deleted"] or order["tenant_id"] != tenant_id:
+    try:
+        order_r = await db.execute(
+            text(
+                "SELECT * FROM banquet_orders "
+                "WHERE id = :oid::UUID AND is_deleted = FALSE"
+            ),
+            {"oid": order_id},
+        )
+        row = order_r.mappings().first()
+    except SQLAlchemyError:
+        logger.exception("banquet_order.pay_balance.db_error", order_id=order_id, tenant_id=tenant_id)
+        raise HTTPException(status_code=503, detail="数据库查询失败")
+
+    if not row:
         return _err("订单不存在", "NOT_FOUND")
 
+    order = dict(row)
     if order["status"] == "cancelled":
         raise HTTPException(status_code=400, detail="订单已取消，不可支付")
 
@@ -558,33 +648,61 @@ async def pay_balance(order_id: str, body: PayBalanceReq, request: Request):
             ),
         )
 
-    now_str = datetime.now().astimezone().isoformat()
     pay_id = str(uuid.uuid4())
 
-    payment_rec = {
-        "id": pay_id,
-        "tenant_id": tenant_id,
-        "banquet_order_id": order_id,
-        "payment_stage": "balance",
-        "amount_fen": body.amount_fen,
-        "payment_method": body.payment_method,
-        "payment_status": "paid",
-        "transaction_id": body.transaction_id,
-        "paid_at": now_str,
-        "refund_amount_fen": 0,
-        "refunded_at": None,
-        "operator_id": None,
-        "notes": body.notes,
-        "created_at": now_str,
-        "updated_at": now_str,
-    }
-    MOCK_PAYMENTS.setdefault(order_id, []).append(payment_rec)
-
-    order["balance_status"] = "paid"
-    order["payment_status"] = "fully_paid"
-    order["updated_at"] = now_str
-
-    all_payments = MOCK_PAYMENTS.get(order_id, [])
+    try:
+        pay_r = await db.execute(
+            text("""
+                INSERT INTO banquet_payments (
+                    id, tenant_id, banquet_order_id,
+                    payment_stage, amount_fen, payment_method,
+                    payment_status, transaction_id, paid_at,
+                    refund_amount_fen, refunded_at, operator_id, notes
+                ) VALUES (
+                    :id::UUID, :tenant_id::UUID, :banquet_order_id::UUID,
+                    'balance', :amount_fen, :payment_method,
+                    'paid', :transaction_id, NOW(),
+                    0, NULL, NULL, :notes
+                )
+                RETURNING *
+            """),
+            {
+                "id": pay_id,
+                "tenant_id": tenant_id,
+                "banquet_order_id": order_id,
+                "amount_fen": body.amount_fen,
+                "payment_method": body.payment_method,
+                "transaction_id": body.transaction_id,
+                "notes": body.notes,
+            },
+        )
+        order_r2 = await db.execute(
+            text("""
+                UPDATE banquet_orders
+                SET balance_status = 'paid',
+                    payment_status = 'fully_paid',
+                    updated_at = NOW()
+                WHERE id = :oid::UUID
+                RETURNING *
+            """),
+            {"oid": order_id},
+        )
+        # 取全部支付记录（含刚插入的）
+        all_pays_r = await db.execute(
+            text(
+                "SELECT * FROM banquet_payments "
+                "WHERE banquet_order_id = :oid::UUID ORDER BY created_at ASC"
+            ),
+            {"oid": order_id},
+        )
+        await db.commit()
+        payment_rec = _serialize_order(dict(pay_r.mappings().first()))
+        updated_order = _serialize_order(dict(order_r2.mappings().first()))
+        all_payments = [_serialize_order(dict(p)) for p in all_pays_r.mappings()]
+    except SQLAlchemyError:
+        await db.rollback()
+        logger.exception("banquet_order.pay_balance.write_error", order_id=order_id, tenant_id=tenant_id)
+        raise HTTPException(status_code=503, detail="数据库写入失败，请稍后重试")
 
     logger.info(
         "banquet_payment.balance_paid",
@@ -593,7 +711,7 @@ async def pay_balance(order_id: str, body: PayBalanceReq, request: Request):
         tenant_id=tenant_id,
     )
     return _ok({
-        "order": order,
+        "order": updated_order,
         "payment": payment_rec,
         "all_payments": all_payments,
     })
@@ -602,7 +720,12 @@ async def pay_balance(order_id: str, body: PayBalanceReq, request: Request):
 # ─── 8. 退款 ─────────────────────────────────────────────────────────────────
 
 @router.post("/orders/{order_id}/refund")
-async def refund_payment(order_id: str, body: RefundReq, request: Request):
+async def refund_payment(
+    order_id: str,
+    body: RefundReq,
+    db: AsyncSession = Depends(_get_tenant_db),
+    tenant_id: str = Depends(_tid),
+):
     """
     退款。
 
@@ -615,112 +738,234 @@ async def refund_payment(order_id: str, body: RefundReq, request: Request):
     - full 全额退款：
         * payment_status 为 deposit_paid 或 fully_paid
     """
-    tenant_id = _get_tenant_id(request)
-    order = MOCK_BANQUET_ORDERS.get(order_id)
-    if not order or order["is_deleted"] or order["tenant_id"] != tenant_id:
+    try:
+        order_r = await db.execute(
+            text(
+                "SELECT * FROM banquet_orders "
+                "WHERE id = :oid::UUID AND is_deleted = FALSE"
+            ),
+            {"oid": order_id},
+        )
+        order_row = order_r.mappings().first()
+    except SQLAlchemyError:
+        logger.exception("banquet_order.refund.db_error", order_id=order_id, tenant_id=tenant_id)
+        raise HTTPException(status_code=503, detail="数据库查询失败")
+
+    if not order_row:
         return _err("订单不存在", "NOT_FOUND")
 
-    now_str = datetime.now().astimezone().isoformat()
-    payments = MOCK_PAYMENTS.get(order_id, [])
+    order = dict(order_row)
 
-    if body.refund_type == "deposit":
-        if order["deposit_status"] != "paid":
-            raise HTTPException(status_code=400, detail="定金尚未支付，无法退款")
-        if order["balance_status"] == "paid":
-            raise HTTPException(
-                status_code=400,
-                detail="已全额支付，不可仅退定金，请使用 refund_type=full 申请全额退款",
-            )
-        # 找到定金支付记录
-        deposit_pays = [p for p in payments
-                        if p["payment_stage"] == "deposit" and p["payment_status"] == "paid"]
-        if not deposit_pays:
-            raise HTTPException(status_code=400, detail="未找到有效定金支付记录")
-        target_pay = deposit_pays[-1]
-        if body.amount_fen > target_pay["amount_fen"]:
-            raise HTTPException(
-                status_code=400,
-                detail=f"退款金额不可超过已付定金 {_fen_to_yuan_str(target_pay['amount_fen'])}",
-            )
-        target_pay["payment_status"] = "refunded"
-        target_pay["refund_amount_fen"] = body.amount_fen
-        target_pay["refunded_at"] = now_str
-        target_pay["updated_at"] = now_str
-        order["deposit_status"] = "unpaid"
-        order["payment_status"] = "refunded" if order["balance_status"] == "unpaid" else "deposit_paid"
-        order["updated_at"] = now_str
-
-    elif body.refund_type == "balance":
-        if order["payment_status"] != "fully_paid":
-            raise HTTPException(
-                status_code=400,
-                detail="仅全额支付状态下可退尾款",
-            )
-        balance_pays = [p for p in payments
-                        if p["payment_stage"] == "balance" and p["payment_status"] == "paid"]
-        if not balance_pays:
-            raise HTTPException(status_code=400, detail="未找到有效尾款支付记录")
-        target_pay = balance_pays[-1]
-        if body.amount_fen > target_pay["amount_fen"]:
-            raise HTTPException(
-                status_code=400,
-                detail=f"退款金额不可超过已付尾款 {_fen_to_yuan_str(target_pay['amount_fen'])}",
-            )
-        target_pay["payment_status"] = "refunded"
-        target_pay["refund_amount_fen"] = body.amount_fen
-        target_pay["refunded_at"] = now_str
-        target_pay["updated_at"] = now_str
-        order["balance_status"] = "unpaid"
-        order["payment_status"] = "deposit_paid"
-        order["updated_at"] = now_str
-
-    elif body.refund_type == "full":
-        if order["payment_status"] not in ("deposit_paid", "fully_paid"):
-            raise HTTPException(
-                status_code=400,
-                detail="当前支付状态不允许全额退款",
-            )
-        # 退所有已付款项
-        refunded_total = 0
-        for pay in payments:
-            if pay["payment_status"] == "paid":
-                pay["payment_status"] = "refunded"
-                pay["refund_amount_fen"] = pay["amount_fen"]
-                pay["refunded_at"] = now_str
-                pay["updated_at"] = now_str
-                refunded_total += pay["amount_fen"]
-        order["deposit_status"] = "unpaid"
-        order["balance_status"] = "unpaid"
-        order["payment_status"] = "refunded"
-        order["updated_at"] = now_str
-
-        logger.info(
-            "banquet_payment.full_refunded",
-            order_id=order_id,
-            refunded_total=refunded_total,
-            tenant_id=tenant_id,
+    try:
+        pays_r = await db.execute(
+            text(
+                "SELECT * FROM banquet_payments "
+                "WHERE banquet_order_id = :oid::UUID ORDER BY created_at ASC"
+            ),
+            {"oid": order_id},
         )
+        payments = [dict(p) for p in pays_r.mappings()]
+    except SQLAlchemyError:
+        logger.exception("banquet_order.refund.payments_error", order_id=order_id, tenant_id=tenant_id)
+        raise HTTPException(status_code=503, detail="数据库查询失败")
 
-    else:
-        raise HTTPException(status_code=400, detail="无效的退款类型")
+    try:
+        if body.refund_type == "deposit":
+            if order["deposit_status"] != "paid":
+                raise HTTPException(status_code=400, detail="定金尚未支付，无法退款")
+            if order["balance_status"] == "paid":
+                raise HTTPException(
+                    status_code=400,
+                    detail="已全额支付，不可仅退定金，请使用 refund_type=full 申请全额退款",
+                )
+            deposit_pays = [
+                p for p in payments
+                if p["payment_stage"] == "deposit" and p["payment_status"] == "paid"
+            ]
+            if not deposit_pays:
+                raise HTTPException(status_code=400, detail="未找到有效定金支付记录")
+            target_pay = deposit_pays[-1]
+            if body.amount_fen > target_pay["amount_fen"]:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"退款金额不可超过已付定金 {_fen_to_yuan_str(target_pay['amount_fen'])}",
+                )
+            await db.execute(
+                text("""
+                    UPDATE banquet_payments
+                    SET payment_status = 'refunded',
+                        refund_amount_fen = :refund_fen,
+                        refunded_at = NOW(),
+                        updated_at = NOW()
+                    WHERE id = :pid::UUID
+                """),
+                {"pid": str(target_pay["id"]), "refund_fen": body.amount_fen},
+            )
+            new_payment_status = (
+                "refunded" if order["balance_status"] == "unpaid" else "deposit_paid"
+            )
+            order_result = await db.execute(
+                text("""
+                    UPDATE banquet_orders
+                    SET deposit_status = 'unpaid',
+                        payment_status = :payment_status,
+                        updated_at = NOW()
+                    WHERE id = :oid::UUID
+                    RETURNING *
+                """),
+                {"oid": order_id, "payment_status": new_payment_status},
+            )
 
-    return _ok({"order": order, "payments": payments})
+        elif body.refund_type == "balance":
+            if order["payment_status"] != "fully_paid":
+                raise HTTPException(
+                    status_code=400,
+                    detail="仅全额支付状态下可退尾款",
+                )
+            balance_pays = [
+                p for p in payments
+                if p["payment_stage"] == "balance" and p["payment_status"] == "paid"
+            ]
+            if not balance_pays:
+                raise HTTPException(status_code=400, detail="未找到有效尾款支付记录")
+            target_pay = balance_pays[-1]
+            if body.amount_fen > target_pay["amount_fen"]:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"退款金额不可超过已付尾款 {_fen_to_yuan_str(target_pay['amount_fen'])}",
+                )
+            await db.execute(
+                text("""
+                    UPDATE banquet_payments
+                    SET payment_status = 'refunded',
+                        refund_amount_fen = :refund_fen,
+                        refunded_at = NOW(),
+                        updated_at = NOW()
+                    WHERE id = :pid::UUID
+                """),
+                {"pid": str(target_pay["id"]), "refund_fen": body.amount_fen},
+            )
+            order_result = await db.execute(
+                text("""
+                    UPDATE banquet_orders
+                    SET balance_status = 'unpaid',
+                        payment_status = 'deposit_paid',
+                        updated_at = NOW()
+                    WHERE id = :oid::UUID
+                    RETURNING *
+                """),
+                {"oid": order_id},
+            )
+
+        elif body.refund_type == "full":
+            if order["payment_status"] not in ("deposit_paid", "fully_paid"):
+                raise HTTPException(
+                    status_code=400,
+                    detail="当前支付状态不允许全额退款",
+                )
+            paid_ids = [
+                str(p["id"]) for p in payments if p["payment_status"] == "paid"
+            ]
+            if paid_ids:
+                await db.execute(
+                    text("""
+                        UPDATE banquet_payments
+                        SET payment_status = 'refunded',
+                            refund_amount_fen = amount_fen,
+                            refunded_at = NOW(),
+                            updated_at = NOW()
+                        WHERE id = ANY(:ids::UUID[])
+                    """),
+                    {"ids": paid_ids},
+                )
+            refunded_total = sum(p["amount_fen"] for p in payments if p["payment_status"] == "paid")
+            order_result = await db.execute(
+                text("""
+                    UPDATE banquet_orders
+                    SET deposit_status = 'unpaid',
+                        balance_status = 'unpaid',
+                        payment_status = 'refunded',
+                        updated_at = NOW()
+                    WHERE id = :oid::UUID
+                    RETURNING *
+                """),
+                {"oid": order_id},
+            )
+            logger.info(
+                "banquet_payment.full_refunded",
+                order_id=order_id,
+                refunded_total=refunded_total,
+                tenant_id=tenant_id,
+            )
+
+        else:
+            raise HTTPException(status_code=400, detail="无效的退款类型")
+
+        # 读取最新支付记录
+        final_pays_r = await db.execute(
+            text(
+                "SELECT * FROM banquet_payments "
+                "WHERE banquet_order_id = :oid::UUID ORDER BY created_at ASC"
+            ),
+            {"oid": order_id},
+        )
+        await db.commit()
+        updated_order = _serialize_order(dict(order_result.mappings().first()))
+        final_payments = [_serialize_order(dict(p)) for p in final_pays_r.mappings()]
+
+    except HTTPException:
+        await db.rollback()
+        raise
+    except SQLAlchemyError:
+        await db.rollback()
+        logger.exception("banquet_order.refund.write_error", order_id=order_id, tenant_id=tenant_id)
+        raise HTTPException(status_code=503, detail="数据库写入失败，请稍后重试")
+
+    return _ok({"order": updated_order, "payments": final_payments})
 
 
 # ─── 9. 支付凭证 ─────────────────────────────────────────────────────────────
 
 @router.get("/orders/{order_id}/receipt")
-async def get_receipt(order_id: str, request: Request):
+async def get_receipt(
+    order_id: str,
+    db: AsyncSession = Depends(_get_tenant_db),
+    tenant_id: str = Depends(_tid),
+):
     """
     获取支付凭证。
     返回定金收据 + 尾款收据的格式化文本，可用于前端打印/分享。
     """
-    tenant_id = _get_tenant_id(request)
-    order = MOCK_BANQUET_ORDERS.get(order_id)
-    if not order or order["is_deleted"] or order["tenant_id"] != tenant_id:
+    try:
+        order_r = await db.execute(
+            text(
+                "SELECT * FROM banquet_orders "
+                "WHERE id = :oid::UUID AND is_deleted = FALSE"
+            ),
+            {"oid": order_id},
+        )
+        row = order_r.mappings().first()
+    except SQLAlchemyError:
+        logger.exception("banquet_order.get_receipt.db_error", order_id=order_id, tenant_id=tenant_id)
+        return _err("数据库查询失败", "DB_ERROR")
+
+    if not row:
         return _err("订单不存在", "NOT_FOUND")
 
-    payments = MOCK_PAYMENTS.get(order_id, [])
+    order = _serialize_order(dict(row))
+
+    try:
+        pays_r = await db.execute(
+            text(
+                "SELECT * FROM banquet_payments "
+                "WHERE banquet_order_id = :oid::UUID ORDER BY created_at ASC"
+            ),
+            {"oid": order_id},
+        )
+        payments = [_serialize_order(dict(p)) for p in pays_r.mappings()]
+    except SQLAlchemyError:
+        logger.exception("banquet_order.get_receipt.payments_error", order_id=order_id, tenant_id=tenant_id)
+        payments = []
 
     receipts = []
     for pay in payments:
@@ -740,43 +985,76 @@ async def get_receipt(order_id: str, request: Request):
 # ─── 10. 月度统计 ─────────────────────────────────────────────────────────────
 
 @router.get("/stats")
-async def get_stats(request: Request, year: int = 2026, month: int = 4):
+async def get_stats(
+    year: int = 2026,
+    month: int = 4,
+    db: AsyncSession = Depends(_get_tenant_db),
+    tenant_id: str = Depends(_tid),
+):
     """
     宴席预订月度统计。
     返回：预订数/定金收入/尾款收入/取消率 + 各状态分布。
     """
-    tenant_id = _get_tenant_id(request)
+    month_start = f"{year:04d}-{month:02d}-01"
+    # 次月第一天作为上限（不含）
+    next_month = month + 1 if month < 12 else 1
+    next_year = year if month < 12 else year + 1
+    month_end = f"{next_year:04d}-{next_month:02d}-01"
 
-    orders = [
-        o for o in MOCK_BANQUET_ORDERS.values()
-        if not o["is_deleted"] and o["tenant_id"] == tenant_id
-    ]
+    try:
+        stats_r = await db.execute(
+            text("""
+                SELECT
+                    COUNT(*) AS total_count,
+                    COUNT(*) FILTER (WHERE status = 'cancelled') AS cancelled_count,
+                    COUNT(*) FILTER (WHERE payment_status IN ('deposit_paid', 'fully_paid')) AS deposit_paid_count,
+                    COUNT(*) FILTER (WHERE payment_status = 'fully_paid') AS fully_paid_count,
+                    COUNT(*) FILTER (WHERE payment_status = 'unpaid') AS unpaid_count
+                FROM banquet_orders
+                WHERE is_deleted = FALSE
+                  AND banquet_date >= :month_start::DATE
+                  AND banquet_date < :month_end::DATE
+            """),
+            {"month_start": month_start, "month_end": month_end},
+        )
+        stats_row = stats_r.mappings().first()
 
-    month_prefix = f"{year:04d}-{month:02d}"
-    month_orders = [o for o in orders if o["banquet_date"].startswith(month_prefix)]
+        income_r = await db.execute(
+            text("""
+                SELECT
+                    COALESCE(SUM(bp.amount_fen) FILTER (WHERE bp.payment_stage = 'deposit'), 0) AS deposit_income,
+                    COALESCE(SUM(bp.amount_fen) FILTER (WHERE bp.payment_stage = 'balance'), 0) AS balance_income
+                FROM banquet_payments bp
+                JOIN banquet_orders bo ON bp.banquet_order_id = bo.id
+                WHERE bp.payment_status = 'paid'
+                  AND bo.is_deleted = FALSE
+                  AND bo.banquet_date >= :month_start::DATE
+                  AND bo.banquet_date < :month_end::DATE
+            """),
+            {"month_start": month_start, "month_end": month_end},
+        )
+        income_row = income_r.mappings().first()
 
-    total_count = len(month_orders)
-    cancelled_count = sum(1 for o in month_orders if o["status"] == "cancelled")
-    deposit_paid_count = sum(
-        1 for o in month_orders if o["payment_status"] in ("deposit_paid", "fully_paid")
-    )
-    fully_paid_count = sum(1 for o in month_orders if o["payment_status"] == "fully_paid")
-    unpaid_count = sum(1 for o in month_orders if o["payment_status"] == "unpaid")
+    except SQLAlchemyError:
+        logger.exception("banquet_order.get_stats.db_error", tenant_id=tenant_id)
+        return _ok({
+            "year": year,
+            "month": month,
+            "total_count": 0,
+            "cancelled_count": 0,
+            "cancel_rate": 0.0,
+            "deposit_paid_count": 0,
+            "fully_paid_count": 0,
+            "unpaid_count": 0,
+            "deposit_income_fen": 0,
+            "balance_income_fen": 0,
+            "total_income_fen": 0,
+        })
 
-    # 统计实收定金/尾款（已付款项）
-    all_month_pay_ids = {o["id"] for o in month_orders}
-    deposit_income = 0
-    balance_income = 0
-    for oid, pays in MOCK_PAYMENTS.items():
-        if oid not in all_month_pay_ids:
-            continue
-        for p in pays:
-            if p["payment_status"] == "paid":
-                if p["payment_stage"] == "deposit":
-                    deposit_income += p["amount_fen"]
-                elif p["payment_stage"] == "balance":
-                    balance_income += p["amount_fen"]
-
+    total_count = int(stats_row["total_count"] or 0)
+    cancelled_count = int(stats_row["cancelled_count"] or 0)
+    deposit_income = int(income_row["deposit_income"] or 0)
+    balance_income = int(income_row["balance_income"] or 0)
     cancel_rate = round(cancelled_count / total_count, 4) if total_count > 0 else 0.0
 
     return _ok({
@@ -785,9 +1063,9 @@ async def get_stats(request: Request, year: int = 2026, month: int = 4):
         "total_count": total_count,
         "cancelled_count": cancelled_count,
         "cancel_rate": cancel_rate,
-        "deposit_paid_count": deposit_paid_count,
-        "fully_paid_count": fully_paid_count,
-        "unpaid_count": unpaid_count,
+        "deposit_paid_count": int(stats_row["deposit_paid_count"] or 0),
+        "fully_paid_count": int(stats_row["fully_paid_count"] or 0),
+        "unpaid_count": int(stats_row["unpaid_count"] or 0),
         "deposit_income_fen": deposit_income,
         "balance_income_fen": balance_income,
         "total_income_fen": deposit_income + balance_income,

@@ -1,6 +1,6 @@
 """
 员工培训管理路由 — DB持久化版
-OR-02: employee_trainings / training_plans 表（v195迁移）
+OR-02: employee_trainings / training_plans 表（v104迁移）
 """
 from __future__ import annotations
 
@@ -12,6 +12,7 @@ import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
@@ -32,109 +33,6 @@ CERT_RISK = {
     "onboarding": (60, "low"),
 }
 DEFAULT_CERT_RISK = (30, "medium")
-
-# ── Mock 数据（真实感，供无数据时降级展示） ───────────────────────────────────
-
-MOCK_TRAINING_RECORDS = [
-    {
-        "id": "tr-001",
-        "employee_id": "emp-001",
-        "employee_name": "张厨师",
-        "training_type": "food_safety",
-        "training_name": "食品安全持证上岗",
-        "training_date": "2025-10-15",
-        "duration_hours": 8.0,
-        "location": "线下",
-        "passed": True,
-        "score": 92.5,
-        "certificate_no": "FS2025-0891",
-        "certificate_expires_at": "2026-10-14",
-        "status": "completed",
-    },
-    {
-        "id": "tr-002",
-        "employee_id": "emp-002",
-        "employee_name": "李服务员",
-        "training_type": "service",
-        "training_name": "服务礼仪标准化培训",
-        "training_date": "2026-03-20",
-        "duration_hours": 4.0,
-        "location": "线下",
-        "passed": True,
-        "score": 88.0,
-        "certificate_no": None,
-        "certificate_expires_at": None,
-        "status": "completed",
-    },
-    {
-        "id": "tr-003",
-        "employee_id": "emp-003",
-        "employee_name": "王收银",
-        "training_type": "compliance",
-        "training_name": "消防安全培训",
-        "training_date": "2025-04-10",
-        "duration_hours": 6.0,
-        "location": "线下",
-        "passed": True,
-        "score": 95.0,
-        "certificate_no": "FIRE2025-0234",
-        "certificate_expires_at": "2026-04-25",
-        "status": "completed",
-    },
-    {
-        "id": "tr-004",
-        "employee_id": "emp-004",
-        "employee_name": "赵后厨",
-        "training_type": "skills",
-        "training_name": "刀工技能提升专项",
-        "training_date": "2026-02-28",
-        "duration_hours": 16.0,
-        "location": "门店",
-        "passed": True,
-        "score": 78.5,
-        "certificate_no": None,
-        "certificate_expires_at": None,
-        "status": "completed",
-    },
-    {
-        "id": "tr-005",
-        "employee_id": "emp-005",
-        "employee_name": "钱传菜",
-        "training_type": "onboarding",
-        "training_name": "新员工入职培训",
-        "training_date": "2026-04-01",
-        "duration_hours": 2.0,
-        "location": "线上",
-        "passed": False,
-        "score": 55.0,
-        "certificate_no": None,
-        "certificate_expires_at": None,
-        "status": "failed",
-    },
-]
-
-MOCK_PLANS = [
-    {
-        "id": "plan-001",
-        "name": "食品安全季度复训",
-        "training_type": "food_safety",
-        "frequency": "quarterly",
-        "required_roles": ["chef", "prep_cook"],
-        "is_mandatory": True,
-        "reminder_days_before": 14,
-        "is_active": True,
-    },
-    {
-        "id": "plan-002",
-        "name": "服务礼仪月度强化",
-        "training_type": "service",
-        "frequency": "monthly",
-        "required_roles": ["waiter", "host"],
-        "is_mandatory": True,
-        "reminder_days_before": 7,
-        "is_active": True,
-    },
-]
 
 # ── 辅助函数 ─────────────────────────────────────────────────────────────────
 
@@ -191,10 +89,7 @@ class TrainingRecordCreate(BaseModel):
 
 class TrainingRecordUpdate(BaseModel):
     score: Optional[float] = Field(None, ge=0, le=100)
-    passed: Optional[bool] = None
-    certificate_no: Optional[str] = None
-    certificate_expires_at: Optional[str] = None
-    notes: Optional[str] = None
+    certificate_no: Optional[str] = None  # maps to certificate_id
     status: Optional[str] = None
 
 
@@ -233,13 +128,14 @@ async def list_training_records(
         conditions.append("employee_id = :employee_id")
         params["employee_id"] = employee_id
     if training_type:
-        conditions.append("training_type = :training_type")
-        params["training_type"] = training_type
+        # training_type maps to category in employee_trainings
+        conditions.append("category = :category")
+        params["category"] = training_type
     if date_from:
-        conditions.append("training_date >= :date_from")
+        conditions.append("assigned_at::date >= :date_from")
         params["date_from"] = date_from
     if date_to:
-        conditions.append("training_date <= :date_to")
+        conditions.append("assigned_at::date <= :date_to")
         params["date_to"] = date_to
 
     where = " AND ".join(conditions)
@@ -254,13 +150,13 @@ async def list_training_records(
 
         rows_res = await db.execute(
             text(f"""
-                SELECT id, employee_id, training_type, training_name, trainer_id,
-                       training_date, duration_hours, location, score, passed,
-                       certificate_no, certificate_expires_at, notes, status,
+                SELECT id, employee_id, category, course_name, course_id,
+                       assigned_at, completed_at, score, status,
+                       certificate_id, pass_threshold,
                        created_at, updated_at
                 FROM employee_trainings
                 WHERE {where}
-                ORDER BY training_date DESC, created_at DESC
+                ORDER BY assigned_at DESC, created_at DESC
                 LIMIT :size OFFSET :offset
             """),
             {**params, "size": size, "offset": offset},
@@ -272,45 +168,24 @@ async def list_training_records(
             item = {
                 "id": str(r.id),
                 "employee_id": str(r.employee_id),
-                "training_type": r.training_type,
-                "training_name": r.training_name,
-                "trainer_id": str(r.trainer_id) if r.trainer_id else None,
-                "training_date": r.training_date.isoformat() if r.training_date else None,
-                "duration_hours": float(r.duration_hours) if r.duration_hours is not None else 0,
-                "location": r.location,
-                "score": float(r.score) if r.score is not None else None,
-                "passed": r.passed,
-                "certificate_no": r.certificate_no,
-                "certificate_expires_at": (
-                    r.certificate_expires_at.isoformat()
-                    if r.certificate_expires_at else None
-                ),
-                "notes": r.notes,
+                "training_type": r.category,
+                "training_name": r.course_name,
+                "course_id": r.course_id,
+                "training_date": r.assigned_at.date().isoformat() if r.assigned_at else None,
+                "completed_at": r.completed_at.isoformat() if r.completed_at else None,
+                "score": int(r.score) if r.score is not None else None,
+                "passed": r.status == "completed",
+                "certificate_no": r.certificate_id,
+                "pass_threshold": r.pass_threshold,
                 "status": r.status,
                 "created_at": r.created_at.isoformat() if r.created_at else None,
             }
-            # 注入证书剩余天数
-            if item["certificate_expires_at"]:
-                days = _days_until(item["certificate_expires_at"])
-                item["cert_days_remaining"] = days
-                item["cert_status"] = _cert_status(days)
             items.append(item)
 
-    except Exception as exc:  # noqa: BLE001 — DB不可用时降级mock
+    except SQLAlchemyError as exc:
         logger.warning("training_records_db_fallback", error=str(exc))
-        # 过滤mock
-        filtered = list(MOCK_TRAINING_RECORDS)
-        if employee_id:
-            filtered = [r for r in filtered if r.get("employee_id") == employee_id]
-        if training_type:
-            filtered = [r for r in filtered if r.get("training_type") == training_type]
-        total = len(filtered)
-        items = filtered[(page - 1) * size: (page - 1) * size + size]
-        for item in items:
-            if item.get("certificate_expires_at"):
-                days = _days_until(item["certificate_expires_at"])
-                item["cert_days_remaining"] = days
-                item["cert_status"] = _cert_status(days)
+        total = 0
+        items = []
 
     logger.info("training_records_listed", tenant_id=tid, total=total, page=page)
     return {"ok": True, "data": {"items": items, "total": total, "page": page, "size": size}}
@@ -336,49 +211,51 @@ async def create_training_record(
         raise HTTPException(status_code=400, detail=f"status 须为 {'/'.join(STATUSES)}")
 
     try:
-        date.fromisoformat(body.training_date)
+        assigned_at = datetime.fromisoformat(body.training_date).replace(tzinfo=timezone.utc)
     except ValueError as e:
         raise HTTPException(status_code=400, detail="training_date 格式须为 YYYY-MM-DD") from e
 
     record_id = uuid.uuid4()
     now = datetime.now(timezone.utc)
+    # Determine completed_at: set when status is completed/failed
+    completed_at = now if body.status in ("completed", "failed") else None
+    # Map passed/score: score stored as INT, cast if provided
+    score_int = int(body.score) if body.score is not None else None
 
     try:
         await db.execute(
             text("""
                 INSERT INTO employee_trainings
-                    (id, tenant_id, employee_id, training_type, training_name,
-                     trainer_id, training_date, duration_hours, location,
-                     score, passed, certificate_no, certificate_expires_at,
-                     notes, status, created_at, updated_at)
+                    (id, tenant_id, employee_id, category, course_name,
+                     course_id, assigned_at, started_at, completed_at,
+                     score, certificate_id, status,
+                     is_deleted, created_at, updated_at)
                 VALUES
-                    (:id, :tid, :employee_id, :training_type, :training_name,
-                     :trainer_id, :training_date, :duration_hours, :location,
-                     :score, :passed, :certificate_no, :certificate_expires_at,
-                     :notes, :status, :now, :now)
+                    (:id, :tid, :employee_id, :category, :course_name,
+                     :course_id, :assigned_at, :started_at, :completed_at,
+                     :score, :certificate_id, :status,
+                     false, :now, :now)
             """),
             {
                 "id": record_id,
                 "tid": tid,
                 "employee_id": body.employee_id,
-                "training_type": body.training_type,
-                "training_name": body.training_name,
-                "trainer_id": body.trainer_id,
-                "training_date": body.training_date,
-                "duration_hours": body.duration_hours,
-                "location": body.location,
-                "score": body.score,
-                "passed": body.passed,
-                "certificate_no": body.certificate_no,
-                "certificate_expires_at": body.certificate_expires_at,
-                "notes": body.notes,
+                "category": body.training_type,
+                "course_name": body.training_name,
+                "course_id": None,
+                "assigned_at": assigned_at,
+                "started_at": assigned_at if body.status in ("in_progress", "completed", "failed") else None,
+                "completed_at": completed_at,
+                "score": score_int,
+                "certificate_id": body.certificate_no,
                 "status": body.status,
                 "now": now,
             },
         )
         await db.commit()
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+    except SQLAlchemyError as e:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail="培训记录创建失败") from e
 
     logger.info(
         "training_record_created",
@@ -407,30 +284,19 @@ async def update_training_record(
 
     if body.score is not None:
         set_parts.append("score = :score")
-        params["score"] = body.score
-    if body.passed is not None:
-        set_parts.append("passed = :passed")
-        params["passed"] = body.passed
+        params["score"] = int(body.score)
     if body.certificate_no is not None:
-        set_parts.append("certificate_no = :certificate_no")
-        params["certificate_no"] = body.certificate_no
-    if body.certificate_expires_at is not None:
-        try:
-            date.fromisoformat(body.certificate_expires_at)
-        except ValueError as e:
-            raise HTTPException(
-                status_code=400, detail="certificate_expires_at 格式须为 YYYY-MM-DD"
-            ) from e
-        set_parts.append("certificate_expires_at = :certificate_expires_at")
-        params["certificate_expires_at"] = body.certificate_expires_at
-    if body.notes is not None:
-        set_parts.append("notes = :notes")
-        params["notes"] = body.notes
+        set_parts.append("certificate_id = :certificate_id")
+        params["certificate_id"] = body.certificate_no
     if body.status is not None:
         if body.status not in STATUSES:
             raise HTTPException(status_code=400, detail=f"status 须为 {'/'.join(STATUSES)}")
         set_parts.append("status = :status")
         params["status"] = body.status
+        # Auto-set completed_at when transitioning to terminal status
+        if body.status in ("completed", "failed"):
+            set_parts.append("completed_at = :completed_at")
+            params["completed_at"] = now
 
     try:
         result = await db.execute(
@@ -448,8 +314,9 @@ async def update_training_record(
         await db.commit()
     except HTTPException:
         raise
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+    except SQLAlchemyError as e:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail="培训记录更新失败") from e
 
     logger.info("training_record_updated", record_id=record_id, tenant_id=tid)
     return {"ok": True, "data": {"id": record_id, "updated": True}}
@@ -474,15 +341,17 @@ async def get_expiring_certificates(
     try:
         rows_res = await db.execute(
             text("""
-                SELECT id, employee_id, training_type, training_name,
-                       certificate_no, certificate_expires_at, status
+                SELECT id, employee_id, category, course_name,
+                       certificate_id, completed_at, status
                 FROM employee_trainings
                 WHERE tenant_id = :tid
                   AND is_deleted = false
-                  AND certificate_expires_at IS NOT NULL
-                  AND certificate_expires_at <= :cutoff
-                  AND certificate_expires_at >= :today
-                ORDER BY certificate_expires_at ASC
+                  AND certificate_id IS NOT NULL
+                  AND status = 'completed'
+                  AND completed_at IS NOT NULL
+                  AND completed_at::date + INTERVAL '1 year' <= :cutoff
+                  AND completed_at::date + INTERVAL '1 year' >= :today
+                ORDER BY completed_at ASC
             """),
             {"tid": tid, "cutoff": cutoff, "today": today},
         )
@@ -490,17 +359,25 @@ async def get_expiring_certificates(
 
         items = []
         for r in rows:
-            exp_str = r.certificate_expires_at.isoformat()
+            # Approximate certificate expiry as 1 year from completed_at
+            if not r.completed_at:
+                continue
+            exp_date = date(
+                r.completed_at.year + 1,
+                r.completed_at.month,
+                r.completed_at.day,
+            )
+            exp_str = exp_date.isoformat()
             days_remaining = _days_until(exp_str)
-            _, risk_level = CERT_RISK.get(r.training_type or "", DEFAULT_CERT_RISK)
-            if r.training_type == "food_safety":
+            _, risk_level = CERT_RISK.get(r.category or "", DEFAULT_CERT_RISK)
+            if r.category == "food_safety":
                 risk_level = "high"
             items.append({
                 "record_id": str(r.id),
                 "employee_id": str(r.employee_id),
-                "training_type": r.training_type,
-                "training_name": r.training_name,
-                "certificate_no": r.certificate_no,
+                "training_type": r.category,
+                "training_name": r.course_name,
+                "certificate_no": r.certificate_id,
                 "certificate_expires_at": exp_str,
                 "days_remaining": days_remaining,
                 "cert_status": _cert_status(days_remaining),
@@ -508,31 +385,9 @@ async def get_expiring_certificates(
                 "action": "安排复训",
             })
 
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
-    except Exception as exc:  # noqa: BLE001 — DB不可用时降级mock
+    except SQLAlchemyError as exc:
         logger.warning("expiring_certs_db_fallback", error=str(exc))
         items = []
-        for r in MOCK_TRAINING_RECORDS:
-            if not r.get("certificate_expires_at"):
-                continue
-            days_remaining = _days_until(r["certificate_expires_at"])
-            if 0 <= days_remaining <= days:
-                _, risk_level = CERT_RISK.get(r.get("training_type", ""), DEFAULT_CERT_RISK)
-                if r.get("training_type") == "food_safety":
-                    risk_level = "high"
-                items.append({
-                    "record_id": r["id"],
-                    "employee_id": r["employee_id"],
-                    "training_type": r.get("training_type"),
-                    "training_name": r.get("training_name"),
-                    "certificate_no": r.get("certificate_no"),
-                    "certificate_expires_at": r["certificate_expires_at"],
-                    "days_remaining": days_remaining,
-                    "cert_status": _cert_status(days_remaining),
-                    "risk_level": risk_level,
-                    "action": "安排复训",
-                })
 
     logger.info("expiring_certs_queried", tenant_id=tid, days=days, count=len(items))
     return {"ok": True, "data": {"items": items, "total": len(items), "query_days": days}}
@@ -584,11 +439,9 @@ async def list_training_plans(
             for r in rows
         ]
 
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
-    except Exception as exc:  # noqa: BLE001 — DB不可用时降级mock
+    except SQLAlchemyError as exc:
         logger.warning("training_plans_db_fallback", error=str(exc))
-        items = MOCK_PLANS
+        items = []
 
     return {"ok": True, "data": {"items": items, "total": len(items)}}
 
@@ -633,8 +486,9 @@ async def create_training_plan(
             },
         )
         await db.commit()
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+    except SQLAlchemyError as e:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail="培训计划创建失败") from e
 
     logger.info("training_plan_created", plan_id=str(plan_id), name=body.name, tenant_id=tid)
     return {"ok": True, "data": {"id": str(plan_id), "name": body.name}}
@@ -668,16 +522,16 @@ async def get_training_stats(
     expiring_30_cutoff = date.fromordinal(today.toordinal() + 30)
 
     try:
-        # 本月培训人次
+        # 本月培训人次（以 assigned_at 为准）
         monthly_res = await db.execute(
             text("""
                 SELECT COUNT(*) as count,
-                       COUNT(CASE WHEN passed = true THEN 1 END) as passed_count
+                       COUNT(CASE WHEN status = 'completed' THEN 1 END) as passed_count
                 FROM employee_trainings
                 WHERE tenant_id = :tid
                   AND is_deleted = false
-                  AND training_date >= :month_start
-                  AND training_date < :month_end
+                  AND assigned_at >= :month_start
+                  AND assigned_at < :month_end
             """),
             {"tid": tid, "month_start": month_start, "month_end": month_end},
         )
@@ -686,30 +540,32 @@ async def get_training_stats(
         monthly_passed = monthly_row.passed_count or 0
         pass_rate = round(monthly_passed / max(monthly_count, 1) * 100, 1)
 
-        # 证书持有人数（有效证书）
+        # 证书持有人数（持有 certificate_id 且已完成）
         cert_res = await db.execute(
             text("""
                 SELECT COUNT(DISTINCT employee_id) as cert_holders
                 FROM employee_trainings
                 WHERE tenant_id = :tid
                   AND is_deleted = false
-                  AND certificate_no IS NOT NULL
-                  AND (certificate_expires_at IS NULL OR certificate_expires_at > :today)
+                  AND certificate_id IS NOT NULL
+                  AND status = 'completed'
             """),
-            {"tid": tid, "today": today},
+            {"tid": tid},
         )
         cert_holders = cert_res.scalar() or 0
 
-        # 即将到期数（30天内）
+        # 即将到期数（完成时间距今超过 335 天，约 30 天内到期，假设证书有效期 1 年）
         expiring_res = await db.execute(
             text("""
                 SELECT COUNT(*) as expiring
                 FROM employee_trainings
                 WHERE tenant_id = :tid
                   AND is_deleted = false
-                  AND certificate_expires_at IS NOT NULL
-                  AND certificate_expires_at <= :cutoff
-                  AND certificate_expires_at >= :today
+                  AND certificate_id IS NOT NULL
+                  AND status = 'completed'
+                  AND completed_at IS NOT NULL
+                  AND completed_at::date + INTERVAL '1 year' <= :cutoff
+                  AND completed_at::date + INTERVAL '1 year' >= :today
             """),
             {"tid": tid, "cutoff": expiring_30_cutoff, "today": today},
         )
@@ -718,20 +574,20 @@ async def get_training_stats(
         # 按培训类型分组统计
         by_type_res = await db.execute(
             text("""
-                SELECT training_type,
+                SELECT category,
                        COUNT(*) as total,
-                       COUNT(CASE WHEN passed = true THEN 1 END) as passed
+                       COUNT(CASE WHEN status = 'completed' THEN 1 END) as passed
                 FROM employee_trainings
                 WHERE tenant_id = :tid
                   AND is_deleted = false
-                GROUP BY training_type
+                GROUP BY category
                 ORDER BY total DESC
             """),
             {"tid": tid},
         )
         by_type = [
             {
-                "training_type": r.training_type or "other",
+                "training_type": r.category or "other",
                 "total": r.total,
                 "passed": r.passed,
                 "pass_rate": round((r.passed or 0) / max(r.total, 1) * 100, 1),
@@ -739,28 +595,21 @@ async def get_training_stats(
             for r in by_type_res.fetchall()
         ]
 
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
-    except Exception as exc:  # noqa: BLE001 — DB不可用时降级mock
+    except SQLAlchemyError as exc:
         logger.warning("training_stats_db_fallback", error=str(exc))
-        monthly_count = 5
-        pass_rate = 80.0
-        cert_holders = 3
-        expiring_count = 1
-        by_type = [
-            {"training_type": "food_safety", "total": 1, "passed": 1, "pass_rate": 100.0},
-            {"training_type": "service", "total": 1, "passed": 1, "pass_rate": 100.0},
-            {"training_type": "compliance", "total": 1, "passed": 1, "pass_rate": 100.0},
-            {"training_type": "skills", "total": 1, "passed": 1, "pass_rate": 100.0},
-            {"training_type": "onboarding", "total": 1, "passed": 0, "pass_rate": 0.0},
-        ]
+        monthly_count = 0
+        monthly_passed = 0
+        pass_rate = 0.0
+        cert_holders = 0
+        expiring_count = 0
+        by_type = []
 
     return {
         "ok": True,
         "data": {
             "month": month_start.strftime("%Y-%m"),
             "monthly_count": monthly_count,
-            "monthly_passed": monthly_passed if 'monthly_passed' in dir() else int(monthly_count * pass_rate / 100),
+            "monthly_passed": monthly_passed,
             "pass_rate": pass_rate,
             "cert_holders": cert_holders,
             "expiring_30_days": expiring_count,
@@ -779,19 +628,17 @@ async def get_employee_training_profile(
     tid = _parse_tenant(x_tenant_id)
     await _set_rls(db, tid)
 
-    today = date.today()
-
     try:
         rows_res = await db.execute(
             text("""
-                SELECT id, training_type, training_name, training_date,
-                       duration_hours, score, passed, certificate_no,
-                       certificate_expires_at, status, notes, created_at
+                SELECT id, category, course_name, course_id,
+                       assigned_at, started_at, completed_at,
+                       score, certificate_id, status, created_at
                 FROM employee_trainings
                 WHERE tenant_id = :tid
                   AND employee_id = :eid
                   AND is_deleted = false
-                ORDER BY training_date DESC
+                ORDER BY assigned_at DESC
             """),
             {"tid": tid, "eid": employee_id},
         )
@@ -799,58 +646,56 @@ async def get_employee_training_profile(
 
         records = []
         active_certs = []
-        total_hours = 0.0
 
         for r in rows:
-            exp_str = (
-                r.certificate_expires_at.isoformat() if r.certificate_expires_at else None
-            )
             item = {
                 "id": str(r.id),
-                "training_type": r.training_type,
-                "training_name": r.training_name,
-                "training_date": r.training_date.isoformat() if r.training_date else None,
-                "duration_hours": float(r.duration_hours or 0),
-                "score": float(r.score) if r.score is not None else None,
-                "passed": r.passed,
-                "certificate_no": r.certificate_no,
-                "certificate_expires_at": exp_str,
+                "training_type": r.category,
+                "training_name": r.course_name,
+                "course_id": r.course_id,
+                "training_date": r.assigned_at.date().isoformat() if r.assigned_at else None,
+                "completed_at": r.completed_at.isoformat() if r.completed_at else None,
+                "score": int(r.score) if r.score is not None else None,
+                "passed": r.status == "completed",
+                "certificate_no": r.certificate_id,
                 "status": r.status,
-                "notes": r.notes,
             }
-            if exp_str:
+            # Approximate cert expiry as 1 year from completed_at if certificate issued
+            if r.certificate_id and r.completed_at:
+                exp_date = date(
+                    r.completed_at.year + 1,
+                    r.completed_at.month,
+                    r.completed_at.day,
+                )
+                exp_str = exp_date.isoformat()
                 days = _days_until(exp_str)
+                item["certificate_expires_at"] = exp_str
                 item["cert_days_remaining"] = days
                 item["cert_status"] = _cert_status(days)
                 if days >= 0:
                     active_certs.append({
-                        "training_type": r.training_type,
-                        "training_name": r.training_name,
-                        "certificate_no": r.certificate_no,
+                        "training_type": r.category,
+                        "training_name": r.course_name,
+                        "certificate_no": r.certificate_id,
                         "certificate_expires_at": exp_str,
                         "days_remaining": days,
                         "cert_status": _cert_status(days),
                     })
             records.append(item)
-            total_hours += float(r.duration_hours or 0)
 
         completed = sum(1 for r in records if r["status"] == "completed")
         failed = sum(1 for r in records if r["status"] == "failed")
         total = len(records)
         completion_rate = round(completed / max(total, 1) * 100, 1)
 
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
-    except Exception as exc:  # noqa: BLE001 — DB不可用时降级mock
+    except SQLAlchemyError as exc:
         logger.warning("employee_training_profile_db_fallback", error=str(exc), employee_id=employee_id)
-        filtered = [r for r in MOCK_TRAINING_RECORDS if r.get("employee_id") == employee_id]
-        records = filtered
+        records = []
         active_certs = []
-        total_hours = sum(r.get("duration_hours", 0) for r in records)
-        completed = sum(1 for r in records if r.get("passed"))
-        failed = sum(1 for r in records if r.get("passed") is False)
-        total = len(records)
-        completion_rate = round(completed / max(total, 1) * 100, 1)
+        completed = 0
+        failed = 0
+        total = 0
+        completion_rate = 0.0
 
     return {
         "ok": True,
@@ -861,7 +706,6 @@ async def get_employee_training_profile(
                 "completed": completed,
                 "failed": failed,
                 "completion_rate": completion_rate,
-                "total_hours": total_hours,
                 "active_certificates": len(active_certs),
             },
             "certificates": active_certs,

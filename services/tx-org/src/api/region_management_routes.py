@@ -13,6 +13,7 @@ import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
@@ -20,72 +21,6 @@ from shared.ontology.src.database import get_db
 logger = structlog.get_logger(__name__)
 
 router = APIRouter(prefix="/api/v1/org/regions", tags=["region-management"])
-
-# ── Mock 数据（DB不可用时降级，三层结构：大区→省→城市） ───────────────────────
-
-MOCK_REGIONS_TREE = {
-    "id": "region-001",
-    "name": "华中大区",
-    "level": 1,
-    "store_count": 15,
-    "region_code": "HZ",
-    "tax_rate": 0.06,
-    "is_active": True,
-    "children": [
-        {
-            "id": "region-011",
-            "name": "湖南省",
-            "level": 2,
-            "store_count": 10,
-            "region_code": "HN",
-            "tax_rate": 0.06,
-            "is_active": True,
-            "children": [
-                {
-                    "id": "region-111",
-                    "name": "长沙市",
-                    "level": 3,
-                    "store_count": 8,
-                    "region_code": "CS",
-                    "tax_rate": 0.06,
-                    "is_active": True,
-                    "children": [],
-                },
-                {
-                    "id": "region-112",
-                    "name": "株洲市",
-                    "level": 3,
-                    "store_count": 2,
-                    "region_code": "ZZ",
-                    "tax_rate": 0.06,
-                    "is_active": True,
-                    "children": [],
-                },
-            ],
-        },
-        {
-            "id": "region-012",
-            "name": "湖北省",
-            "level": 2,
-            "store_count": 5,
-            "region_code": "HB",
-            "tax_rate": 0.06,
-            "is_active": True,
-            "children": [
-                {
-                    "id": "region-121",
-                    "name": "武汉市",
-                    "level": 3,
-                    "store_count": 5,
-                    "region_code": "WH",
-                    "tax_rate": 0.06,
-                    "is_active": True,
-                    "children": [],
-                }
-            ],
-        },
-    ],
-}
 
 
 # ── 辅助函数 ──────────────────────────────────────────────────────────────────
@@ -245,16 +180,11 @@ async def list_regions(
             logger.info("list_regions_flat", tenant_id=tenant_id, total=total)
             return _ok({"items": flat_rows, "total": total, "page": page, "size": size})
 
-    except (OSError, RuntimeError, ValueError) as exc:
+    except (SQLAlchemyError, OSError, RuntimeError, ValueError) as exc:
         logger.warning("list_regions_db_unavailable", error=str(exc))
         if tree:
-            return _ok({"tree": [MOCK_REGIONS_TREE], "total_nodes": 7, "degraded": True})
-        flat = [
-            {"region_id": "region-001", "name": "华中大区", "level": 1, "store_count": 15},
-            {"region_id": "region-011", "name": "湖南省", "level": 2, "store_count": 10},
-            {"region_id": "region-111", "name": "长沙市", "level": 3, "store_count": 8},
-        ]
-        return _ok({"items": flat, "total": 3, "page": 1, "size": 3, "degraded": True})
+            return _ok({"tree": [], "total_nodes": 0, "degraded": True})
+        return _ok({"items": [], "total": 0, "page": page, "size": size, "degraded": True})
 
 
 @router.get("/{region_id}")
@@ -318,7 +248,7 @@ async def get_region_detail(
 
     except HTTPException:
         raise
-    except (OSError, RuntimeError, ValueError) as exc:
+    except (SQLAlchemyError, OSError, RuntimeError, ValueError) as exc:
         logger.warning("get_region_detail_db_unavailable", error=str(exc))
         return _ok({
             "region_id": region_id,
@@ -500,7 +430,7 @@ async def get_region_stores(
 
     except HTTPException:
         raise
-    except (OSError, RuntimeError, ValueError) as exc:
+    except (SQLAlchemyError, OSError, RuntimeError, ValueError) as exc:
         logger.warning("get_region_stores_db_unavailable", error=str(exc))
         return _ok({"items": [], "total": 0, "page": page, "size": size, "degraded": True})
 
@@ -576,7 +506,7 @@ async def get_region_performance(
 
     except HTTPException:
         raise
-    except (OSError, RuntimeError, ValueError) as exc:
+    except (SQLAlchemyError, OSError, RuntimeError, ValueError) as exc:
         logger.warning("get_region_performance_db_unavailable", error=str(exc))
         return _ok({
             "region_id": region_id,

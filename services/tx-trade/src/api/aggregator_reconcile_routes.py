@@ -19,6 +19,11 @@ import structlog
 from fastapi import APIRouter, BackgroundTasks, Header, HTTPException, Path, Query
 from fastapi import status as http_status
 from pydantic import BaseModel, Field
+from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from shared.ontology.src.database import async_session_factory
 
 logger = structlog.get_logger(__name__)
 
@@ -74,79 +79,71 @@ def _now_str() -> str:
     return _now().isoformat()
 
 
-def _mock_platform_orders(platform: str, reconcile_date: str) -> list[dict]:
+def _get_platform_orders_placeholder(platform: str, reconcile_date: str) -> list[dict]:
     """
-    [mock] 模拟从平台 API 拉取当天订单列表。
-    生产替换：调用各平台对账接口。
+    平台侧订单占位函数 — 未来替换为各平台对账 API 调用。
+    美团：POST /waimai/order/queryOrderDetail
+    饿了么：GET /api/v3/order/order_list
+    抖音：POST /goodlife/v1/order/query
+    当前返回空列表，差异计算将标记所有本地订单为 local_only。
     """
-    base_orders = [
-        {
-            "platform_order_id": f"{platform[:2].upper()}-PLAT-0001",
-            "total_fen": 5800,
-            "status": "completed",
-        },
-        {
-            "platform_order_id": f"{platform[:2].upper()}-PLAT-0002",
-            "total_fen": 12400,
-            "status": "completed",
-        },
-        {
-            "platform_order_id": f"{platform[:2].upper()}-PLAT-0003",
-            "total_fen": 8800,
-            "status": "cancelled",
-        },
-    ]
-    return base_orders
+    return []
 
 
-def _mock_local_orders(
-    platform: str, reconcile_date: str, tenant_id: str
+async def _fetch_local_orders(
+    db: AsyncSession,
+    platform: str,
+    reconcile_date: str,
+    store_id: Optional[str],
 ) -> list[dict]:
     """
-    [mock] 从本地聚合订单表查询当天该平台的订单。
-    生产替换：SELECT * FROM aggregator_orders WHERE platform=? AND DATE(created_at)=? AND tenant_id=?
+    从 orders 表查询指定平台当天的已支付订单（RLS 已由调用方 session 保障）。
     """
-    # 尝试从内存 _ORDERS 读取（若有真实 Webhook 推送的订单）
     try:
-        from .delivery_aggregator_routes import _ORDERS as _LIVE_ORDERS
-        local = [
+        params: dict = {
+            "platform": platform,
+            "reconcile_date": reconcile_date,
+        }
+        store_filter = ""
+        if store_id:
+            store_filter = " AND store_id = :store_id"
+            params["store_id"] = store_id
+
+        result = await db.execute(
+            text(f"""
+                SELECT
+                    external_order_id  AS platform_order_id,
+                    total_fen,
+                    status
+                FROM orders
+                WHERE channel = :platform
+                  AND status = 'paid'
+                  AND DATE(created_at AT TIME ZONE 'Asia/Shanghai') = :reconcile_date::date
+                  {store_filter}
+                ORDER BY created_at
+            """),
+            params,
+        )
+        rows = result.fetchall()
+        return [
             {
-                "platform_order_id": o["platform_order_id"],
-                "total_fen": o["total_fen"],
-                "status": o["status"],
+                "platform_order_id": row[0] or f"LOCAL-{uuid.uuid4().hex[:8]}",
+                "total_fen": int(row[1]),
+                "status": row[2],
             }
-            for o in _LIVE_ORDERS.values()
-            if o["tenant_id"] == tenant_id
-            and o["platform"] == platform
-            and o.get("created_at", "")[:10] == reconcile_date
+            for row in rows
         ]
-        if local:
-            return local
-    except ImportError:
-        pass
-
-    # 回退到 mock 数据（与平台多一条差异）
-    return [
-        {
-            "platform_order_id": f"{platform[:2].upper()}-PLAT-0001",
-            "total_fen": 5800,
-            "status": "completed",
-        },
-        {
-            "platform_order_id": f"{platform[:2].upper()}-PLAT-0002",
-            "total_fen": 12400,
-            "status": "completed",
-        },
-        # 本地缺少 PLAT-0003（模拟"平台有/本地无"差异）
-        {
-            "platform_order_id": f"{platform[:2].upper()}-LOCAL-ONLY-0001",
-            "total_fen": 3200,
-            "status": "completed",
-        },  # 本地多一条（模拟"本地有/平台无"差异）
-    ]
+    except SQLAlchemyError as exc:
+        logger.warning(
+            "aggregator_reconcile.local_orders_query_fail",
+            platform=platform,
+            reconcile_date=reconcile_date,
+            error=str(exc),
+        )
+        return []
 
 
-def _run_reconcile_logic(
+async def _run_reconcile_logic(
     task_id: str,
     tenant_id: str,
     platform: str,
@@ -154,14 +151,20 @@ def _run_reconcile_logic(
     store_id: Optional[str],
 ) -> dict:
     """
-    对账核心逻辑（同步执行，由后台任务调用）：
-    1. 拉取本地订单
-    2. 拉取平台订单（mock）
+    对账核心逻辑（异步执行，由后台任务调用）：
+    1. 从 orders 表拉取本地订单
+    2. 拉取平台订单（占位，待接入平台 API）
     3. 找出三类差异：local_only / platform_only / amount_mismatch
     4. 写入 _RECONCILE_RESULTS 和 _DISCREPANCIES
     """
-    local_orders = _mock_local_orders(platform, reconcile_date, tenant_id)
-    platform_orders = _mock_platform_orders(platform, reconcile_date)
+    platform_orders = _get_platform_orders_placeholder(platform, reconcile_date)
+
+    async with async_session_factory() as db:
+        await db.execute(
+            text("SELECT set_config('app.tenant_id', :tid, true)"),
+            {"tid": tenant_id},
+        )
+        local_orders = await _fetch_local_orders(db, platform, reconcile_date, store_id)
 
     local_map = {o["platform_order_id"]: o for o in local_orders}
     platform_map = {o["platform_order_id"]: o for o in platform_orders}
@@ -271,7 +274,7 @@ def _run_reconcile_logic(
         "total_discrepancy_fen": total_discrepancy_fen,
         "status": "completed",
         "completed_at": _now_str(),
-        "_data_source": "mock",
+        "_data_source": "db",
     }
     _RECONCILE_RESULTS[result_key] = result
 

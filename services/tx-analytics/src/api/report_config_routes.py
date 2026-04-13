@@ -102,50 +102,6 @@ class NarrativeTemplateUpdate(BaseModel):
     is_default: Optional[bool] = None
 
 
-# ─── 叙事模板内存存储（非关键路径，保留内存实现） ─────────────────────────────
-
-MOCK_NARRATIVE_TEMPLATES: list[dict[str, Any]] = [
-    {
-        "id": "tpl-001",
-        "name": "标准经营日报",
-        "brand_focus": "营业额/毛利",
-        "prompt_prefix": "请以专业财务视角，分析今日经营数据，重点关注营业额完成情况和毛利变化趋势。",
-        "metrics_weights": {"revenue": 0.5, "gross_profit": 0.3, "order_count": 0.2},
-        "tone": "professional",
-        "is_default": True,
-        "is_deleted": False,
-        "created_at": "2026-01-01T00:00:00Z",
-        "updated_at": "2026-01-01T00:00:00Z",
-    },
-    {
-        "id": "tpl-002",
-        "name": "徐记海鲜活鲜专报",
-        "brand_focus": "活鲜销售/毛利/损耗",
-        "prompt_prefix": "请以高端海鲜餐饮品牌视角，重点分析活鲜品类销售、损耗控制和毛利表现，与品牌标准对比。",
-        "metrics_weights": {"revenue": 0.3, "seafood_revenue": 0.4, "waste_rate": 0.2, "gross_margin": 0.1},
-        "tone": "executive",
-        "is_default": False,
-        "is_deleted": False,
-        "created_at": "2026-01-01T00:00:00Z",
-        "updated_at": "2026-01-01T00:00:00Z",
-    },
-    {
-        "id": "tpl-003",
-        "name": "快餐效率简报",
-        "brand_focus": "翻台率/人效/品项销量",
-        "prompt_prefix": "请用简洁口语化的方式，报告今日翻台率、人效和热销品项，适合晨会快速分享。",
-        "metrics_weights": {"table_turn_rate": 0.35, "labor_efficiency": 0.35, "top_dish_sales": 0.3},
-        "tone": "casual",
-        "is_default": False,
-        "is_deleted": False,
-        "created_at": "2026-01-01T00:00:00Z",
-        "updated_at": "2026-01-01T00:00:00Z",
-    },
-]
-
-_custom_templates: dict[str, dict[str, Any]] = {}
-
-
 # ─── 叙事辅助 ───────────────────────────────────────────────────────────────
 
 def _generate_narrative_preview(template: dict[str, Any], mock_data: dict[str, Any]) -> str:
@@ -484,72 +440,159 @@ async def cancel_schedule(report_id: str) -> dict[str, Any]:
     return {"ok": True, "data": {"report_id": report_id, "schedule_config": None}}
 
 
-# ─── AI叙事模板（保留内存实现，非关键路径） ──────────────────────────────────
+# ─── AI叙事模板（DB 实现） ───────────────────────────────────────────────────
 
 @router.get("/narrative-templates")
-async def list_narrative_templates() -> dict[str, Any]:
+async def list_narrative_templates(
+    db: AsyncSession = Depends(_get_db),
+) -> dict[str, Any]:
     """获取叙事模板列表"""
-    built_in = list(MOCK_NARRATIVE_TEMPLATES)
-    custom_tpls = [t for t in _custom_templates.values() if not t.get("is_deleted")]
-    all_templates = built_in + custom_tpls
-    return {"ok": True, "data": {"items": all_templates, "total": len(all_templates)}}
+    try:
+        result = await db.execute(
+            text(
+                "SELECT id, name, brand_focus, prompt_prefix, metrics_weights, "
+                "tone, is_default, is_system, created_at, updated_at "
+                "FROM narrative_templates "
+                "WHERE is_deleted = FALSE "
+                "ORDER BY is_system DESC, is_default DESC, created_at ASC"
+            )
+        )
+        items = [dict(r) for r in result.mappings().all()]
+    except SQLAlchemyError as exc:
+        logger.warning("narrative_templates_list_failed", error=str(exc))
+        items = []
+    return {"ok": True, "data": {"items": items, "total": len(items)}}
 
 
 @router.post("/narrative-templates")
-async def create_narrative_template(body: NarrativeTemplateCreate) -> dict[str, Any]:
+async def create_narrative_template(
+    body: NarrativeTemplateCreate,
+    db: AsyncSession = Depends(_get_db),
+) -> dict[str, Any]:
     """创建叙事模板"""
     template_id = str(uuid.uuid4())
-    now = datetime.now(timezone.utc).isoformat()
-    template: dict[str, Any] = {
-        "id": template_id,
-        "name": body.name,
-        "brand_focus": body.brand_focus,
-        "prompt_prefix": body.prompt_prefix,
-        "metrics_weights": body.metrics_weights,
-        "tone": body.tone,
-        "is_default": body.is_default,
-        "is_deleted": False,
-        "created_at": now,
-        "updated_at": now,
-    }
-    _custom_templates[template_id] = template
+    now = datetime.now(timezone.utc)
+    try:
+        await db.execute(
+            text(
+                "INSERT INTO narrative_templates "
+                "(id, tenant_id, name, brand_focus, prompt_prefix, metrics_weights, "
+                "tone, is_default, is_system, created_at, updated_at) "
+                "VALUES (:id, current_setting('app.tenant_id')::uuid, :name, :brand_focus, "
+                ":prompt_prefix, :metrics_weights::jsonb, :tone, :is_default, FALSE, "
+                ":created_at, :updated_at)"
+            ),
+            {
+                "id": template_id,
+                "name": body.name,
+                "brand_focus": body.brand_focus or "",
+                "prompt_prefix": body.prompt_prefix or "",
+                "metrics_weights": _json_str(body.metrics_weights or {}),
+                "tone": body.tone,
+                "is_default": body.is_default,
+                "created_at": now,
+                "updated_at": now,
+            },
+        )
+    except SQLAlchemyError as exc:
+        logger.error("narrative_template_create_failed", error=str(exc))
+        raise HTTPException(status_code=500, detail="创建叙事模板失败") from exc
     logger.info("narrative_template_created", template_id=template_id, name=body.name)
-    return {"ok": True, "data": template}
+    return {
+        "ok": True,
+        "data": {
+            "id": template_id,
+            "name": body.name,
+            "brand_focus": body.brand_focus,
+            "prompt_prefix": body.prompt_prefix,
+            "metrics_weights": body.metrics_weights,
+            "tone": body.tone,
+            "is_default": body.is_default,
+            "is_system": False,
+            "created_at": now.isoformat(),
+            "updated_at": now.isoformat(),
+        },
+    }
 
 
 @router.put("/narrative-templates/{template_id}")
 async def update_narrative_template(
-    template_id: str, body: NarrativeTemplateUpdate,
+    template_id: str,
+    body: NarrativeTemplateUpdate,
+    db: AsyncSession = Depends(_get_db),
 ) -> dict[str, Any]:
     """更新叙事模板"""
-    for tpl in MOCK_NARRATIVE_TEMPLATES:
-        if tpl["id"] == template_id:
-            raise HTTPException(status_code=400, detail="内置模板不可修改，请创建自定义模板")
+    try:
+        check = await db.execute(
+            text(
+                "SELECT is_system FROM narrative_templates "
+                "WHERE id = :id AND is_deleted = FALSE"
+            ),
+            {"id": template_id},
+        )
+        row = check.mappings().first()
+    except SQLAlchemyError as exc:
+        logger.error("narrative_template_lookup_failed", error=str(exc))
+        raise HTTPException(status_code=500, detail="查询叙事模板失败") from exc
 
-    template = _custom_templates.get(template_id)
-    if template is None or template.get("is_deleted"):
+    if row is None:
         raise HTTPException(status_code=404, detail=f"模板 {template_id} 不存在")
+    if row["is_system"]:
+        raise HTTPException(status_code=400, detail="内置模板不可修改，请创建自定义模板")
 
-    update_fields = body.model_dump(exclude_none=True)
-    template.update(update_fields)
-    template["updated_at"] = datetime.now(timezone.utc).isoformat()
+    updates = body.model_dump(exclude_none=True)
+    if not updates:
+        raise HTTPException(status_code=400, detail="无更新字段")
+
+    set_clauses: list[str] = ["updated_at = NOW()"]
+    params: dict[str, Any] = {"id": template_id}
+    json_fields = {"metrics_weights"}
+
+    for field, value in updates.items():
+        if field in json_fields:
+            set_clauses.append(f"{field} = :{field}::jsonb")
+            params[field] = _json_str(value)
+        else:
+            set_clauses.append(f"{field} = :{field}")
+            params[field] = value
+
+    try:
+        await db.execute(
+            text(f"UPDATE narrative_templates SET {', '.join(set_clauses)} WHERE id = :id"),  # noqa: S608
+            params,
+        )
+    except SQLAlchemyError as exc:
+        logger.error("narrative_template_update_failed", error=str(exc))
+        raise HTTPException(status_code=500, detail="更新叙事模板失败") from exc
 
     logger.info("narrative_template_updated", template_id=template_id)
-    return {"ok": True, "data": template}
+    return {"ok": True, "data": {"template_id": template_id, "updated_fields": list(updates.keys())}}
 
 
 @router.post("/narrative-templates/{template_id}/preview")
-async def preview_narrative_template(template_id: str) -> dict[str, Any]:
+async def preview_narrative_template(
+    template_id: str,
+    db: AsyncSession = Depends(_get_db),
+) -> dict[str, Any]:
     """预览叙事效果"""
-    template: Optional[dict[str, Any]] = None
-    for tpl in MOCK_NARRATIVE_TEMPLATES:
-        if tpl["id"] == template_id:
-            template = tpl
-            break
-    if template is None:
-        template = _custom_templates.get(template_id)
-    if template is None or (isinstance(template, dict) and template.get("is_deleted")):
+    try:
+        result = await db.execute(
+            text(
+                "SELECT id, name, brand_focus, prompt_prefix, metrics_weights, tone "
+                "FROM narrative_templates "
+                "WHERE id = :id AND is_deleted = FALSE"
+            ),
+            {"id": template_id},
+        )
+        row = result.mappings().first()
+    except SQLAlchemyError as exc:
+        logger.error("narrative_template_preview_fetch_failed", error=str(exc))
+        raise HTTPException(status_code=500, detail="查询叙事模板失败") from exc
+
+    if row is None:
         raise HTTPException(status_code=404, detail=f"模板 {template_id} 不存在")
+
+    template: dict[str, Any] = dict(row)
 
     mock_data: dict[str, Any] = {
         "revenue_fen": 2856000,

@@ -92,7 +92,7 @@ async def _load_current_schedules(
 ) -> list[dict[str, Any]]:
     """从 unified_schedules 查当前排班。"""
     q = text("""
-        SELECT us.id::text, us.employee_id::text, us.shift_date,
+        SELECT us.id::text, us.employee_id::text, us.schedule_date AS shift_date,
                us.start_time, us.end_time, us.role,
                e.emp_name
         FROM unified_schedules us
@@ -100,9 +100,9 @@ async def _load_current_schedules(
           ON e.id = us.employee_id AND e.tenant_id = us.tenant_id
         WHERE us.tenant_id = CAST(:tenant_id AS uuid)
           AND us.store_id = CAST(:store_id AS uuid)
-          AND us.shift_date BETWEEN :week_start AND :week_end
+          AND us.schedule_date BETWEEN :week_start AND :week_end
           AND COALESCE(us.is_deleted, false) = false
-        ORDER BY us.shift_date, us.start_time
+        ORDER BY us.schedule_date, us.start_time
     """)
     try:
         result = await db.execute(q, {

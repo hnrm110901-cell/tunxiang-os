@@ -12,6 +12,7 @@ import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
@@ -59,66 +60,6 @@ GRADE_THRESHOLDS = [
 
 # 考核周期类型
 PERIOD_TYPES = ("monthly", "quarterly", "annual")
-
-# Mock 数据
-MOCK_PERIODS = [
-    {
-        "id": "period-2026-03",
-        "name": "2026年3月考核",
-        "period_type": "monthly",
-        "period_key": "2026-03",
-        "status": "completed",
-        "participant_count": 12,
-        "avg_score": 82.5,
-        "created_at": "2026-04-01T00:00:00+00:00",
-    },
-    {
-        "id": "period-2026-04",
-        "name": "2026年4月考核",
-        "period_type": "monthly",
-        "period_key": "2026-04",
-        "status": "in_progress",
-        "participant_count": 0,
-        "avg_score": None,
-        "created_at": "2026-04-06T00:00:00+00:00",
-    },
-]
-
-MOCK_SCORES = [
-    {
-        "employee_id": "emp-001",
-        "employee_name": "张厨师",
-        "role": "chef",
-        "period_key": "2026-03",
-        "kpi_scores": {"service": 88, "efficiency": 92, "attendance": 95, "quality": 85},
-        "weighted_score": 91.0,
-        "grade": "A",
-        "grade_label": "优秀",
-        "supervisor_comment": "厨艺精湛，效率突出",
-    },
-    {
-        "employee_id": "emp-002",
-        "employee_name": "李服务员",
-        "role": "waiter",
-        "period_key": "2026-03",
-        "kpi_scores": {"service": 90, "efficiency": 78, "attendance": 92, "customer_feedback": 85},
-        "weighted_score": 87.8,
-        "grade": "B",
-        "grade_label": "良好",
-        "supervisor_comment": "服务态度好，需提升效率",
-    },
-    {
-        "employee_id": "emp-003",
-        "employee_name": "王收银",
-        "role": "cashier",
-        "period_key": "2026-03",
-        "kpi_scores": {"service": 85, "efficiency": 90, "attendance": 88, "accuracy": 98},
-        "weighted_score": 90.1,
-        "grade": "A",
-        "grade_label": "优秀",
-        "supervisor_comment": "精确度高，服务规范",
-    },
-]
 
 # ── 辅助函数 ─────────────────────────────────────────────────────────────────
 
@@ -263,13 +204,10 @@ async def list_performance_periods(
 
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
-    except Exception as exc:  # noqa: BLE001 — DB不可用时降级mock
+    except SQLAlchemyError as exc:
         logger.warning("performance_periods_db_fallback", error=str(exc))
-        filtered = MOCK_PERIODS
-        if period_type:
-            filtered = [p for p in MOCK_PERIODS if p["period_type"] == period_type]
-        total = len(filtered)
-        items = filtered[(page - 1) * size: (page - 1) * size + size]
+        total = 0
+        items = []
 
     return {"ok": True, "data": {"items": items, "total": total, "page": page, "size": size}}
 
@@ -328,9 +266,8 @@ async def create_performance_period(
         raise
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
-    except Exception as exc:  # noqa: BLE001 — DB不可用时降级mock
+    except SQLAlchemyError as exc:
         logger.warning("create_period_db_fallback", error=str(exc))
-        # mock成功响应
         period_id = uuid.uuid4()
 
     logger.info("performance_period_created",
@@ -404,7 +341,7 @@ async def batch_evaluate(
             )
         except ValueError as e:
             raise HTTPException(status_code=400, detail=str(e)) from e
-        except Exception as exc:  # noqa: BLE001 — DB不可用时仅计算不持久化
+        except SQLAlchemyError as exc:
             logger.warning("evaluate_db_fallback", error=str(exc),
                            employee_id=item.employee_id)
 
@@ -442,7 +379,7 @@ async def batch_evaluate(
         await db.commit()
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
-    except Exception as exc:  # noqa: BLE001 — 不影响主流程
+    except SQLAlchemyError as exc:
         logger.warning("update_period_stats_fallback", error=str(exc))
 
     logger.info("batch_evaluate_completed",
@@ -503,15 +440,9 @@ async def get_period_results(
 
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
-    except Exception as exc:  # noqa: BLE001 — DB不可用时降级mock
+    except SQLAlchemyError as exc:
         logger.warning("period_results_db_fallback", error=str(exc))
-        items = [
-            {
-                "rank": i + 1,
-                **{k: v for k, v in r.items()},
-            }
-            for i, r in enumerate(MOCK_SCORES)
-        ]
+        items = []
 
     all_scores = [item["weighted_score"] for item in items]
     grade_dist = _grade_distribution(all_scores)
@@ -588,21 +519,9 @@ async def get_employee_performance_history(
 
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
-    except Exception as exc:  # noqa: BLE001 — DB不可用时降级mock
+    except SQLAlchemyError as exc:
         logger.warning("employee_perf_history_db_fallback", error=str(exc), employee_id=employee_id)
-        filtered = [s for s in MOCK_SCORES if s.get("employee_id") == employee_id]
-        history = [
-            {
-                "period_key": s.get("period_key"),
-                "period_type": "monthly",
-                "kpi_scores": s.get("kpi_scores", {}),
-                "weighted_score": s.get("weighted_score", 0),
-                "grade": s.get("grade", "C"),
-                "grade_label": s.get("grade_label", "合格"),
-                "supervisor_comment": s.get("supervisor_comment"),
-            }
-            for s in filtered
-        ]
+        history = []
 
     # 趋势计算
     if len(history) >= 2:
@@ -694,21 +613,23 @@ async def get_performance_stats(
         raise
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
-    except Exception as exc:  # noqa: BLE001 — DB不可用时降级mock
+    except SQLAlchemyError as exc:
         logger.warning("performance_stats_db_fallback", error=str(exc))
-        all_scores = [s["weighted_score"] for s in MOCK_SCORES]
-        avg_score = round(sum(all_scores) / len(all_scores), 2)
-        grade_dist = _grade_distribution(all_scores)
-        excellent_count = grade_dist.get("A", 0)
-        excellent_rate = round(excellent_count / len(all_scores) * 100, 1)
-        needs_improvement_count = grade_dist.get("D", 0) + grade_dist.get("E", 0)
-        needs_improvement_rate = round(needs_improvement_count / len(all_scores) * 100, 1)
-        pass_count = sum(1 for s in all_scores if s >= 60)
-        pass_rate = round(pass_count / len(all_scores) * 100, 1)
-        period_row = type("obj", (object,), {  # type: ignore[assignment]
-            "period_key": "2026-03", "name": "2026年3月考核", "status": "completed"
-        })()
-        current_period_id = "mock-period"
+        return {
+            "ok": True,
+            "data": {
+                "period_id": None,
+                "period_key": period_key,
+                "period_name": "",
+                "total_employees": 0,
+                "avg_score": 0.0,
+                "excellent_rate": 0.0,
+                "pass_rate": 0.0,
+                "needs_improvement_rate": 0.0,
+                "grade_distribution": {"A": 0, "B": 0, "C": 0, "D": 0, "E": 0},
+                "kpi_weights": KPI_WEIGHTS,
+            },
+        }
 
     return {
         "ok": True,

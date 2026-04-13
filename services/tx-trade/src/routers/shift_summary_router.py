@@ -5,13 +5,17 @@
 - GET  /api/v1/crew/shift-summary-history  — 历史摘要列表
 """
 import json
-from datetime import datetime, timedelta
 from typing import Any, Optional
 
 import structlog
-from fastapi import APIRouter, Header, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
+from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from shared.ontology.src.database import get_db
 
 logger = structlog.get_logger(__name__)
 
@@ -67,8 +71,8 @@ async def _stream_claude(user_prompt: str):
     try:
         import anthropic  # type: ignore
     except ImportError:
-        # anthropic SDK 未安装时回退 Mock 流
-        async for chunk in _mock_stream():
+        # anthropic SDK 未安装时回退空流
+        async for chunk in _empty_stream():
             yield chunk
         return
 
@@ -87,64 +91,62 @@ async def _stream_claude(user_prompt: str):
         yield f"data: {json.dumps({'chunk': '', 'done': True})}\n\n"
     except anthropic.APIConnectionError as e:
         logger.warning("claude_api_connection_error", error=str(e))
-        async for chunk in _mock_stream():
+        async for chunk in _empty_stream():
             yield chunk
     except anthropic.RateLimitError as e:
         logger.warning("claude_api_rate_limit", error=str(e))
-        async for chunk in _mock_stream():
+        async for chunk in _empty_stream():
             yield chunk
     except anthropic.APIStatusError as e:
         logger.error("claude_api_status_error", status_code=e.status_code, error=str(e))
-        async for chunk in _mock_stream():
+        async for chunk in _empty_stream():
             yield chunk
 
 
-async def _mock_stream():
-    """Claude API 不可用时的 Mock 回退流。"""
-    import asyncio
-    mock_text = (
-        "本班共接待桌次符合预期，营业额表现良好，高于昨日均值约15%。"
-        "翻台率维持正常水平，服务满意度优秀。"
-        "需关注备餐区设备故障及物料库存补充事项，请下班同事优先处理。"
-    )
-    for char in mock_text:
-        payload = json.dumps({"chunk": char, "done": False}, ensure_ascii=False)
-        yield f"data: {payload}\n\n"
-        await asyncio.sleep(0.03)
+async def _empty_stream():
+    """Claude API 不可用时的降级空流（返回空数组信号，不输出伪造内容）。"""
     yield f"data: {json.dumps({'chunk': '', 'done': True})}\n\n"
 
 
-# ---------- Mock 历史数据 ----------
+# ---------- DB 历史摘要查询 ----------
 
-def _build_mock_history(crew_id: str) -> list[dict[str, Any]]:
-    """返回历史摘要 Mock 数据。"""
-    now = datetime.now()
-    return [
-        {
-            "id": "hs-001",
-            "crew_id": crew_id,
-            "summary": "上午班共接待9桌，营业额2,140元，翻台率2.1次，整体运营平稳，无特殊事项。",
-            "shift_date": (now - timedelta(hours=6)).strftime("%Y-%m-%d"),
-            "shift_label": "今日午班",
-            "created_at": (now - timedelta(hours=6)).strftime("%m-%d %H:%M"),
-        },
-        {
-            "id": "hs-002",
-            "crew_id": crew_id,
-            "summary": "昨日晚班接待15桌，营业额4,520元，高峰期出现短暂等位，服务质量良好，收到2条好评。",
-            "shift_date": (now - timedelta(days=1)).strftime("%Y-%m-%d"),
-            "shift_label": "昨日晚班",
-            "created_at": (now - timedelta(days=1)).strftime("%m-%d %H:%M"),
-        },
-        {
-            "id": "hs-003",
-            "crew_id": crew_id,
-            "summary": "前日午班接待11桌，营业额3,200元，运营平稳，无异常事项需要交接。",
-            "shift_date": (now - timedelta(days=2)).strftime("%Y-%m-%d"),
-            "shift_label": "前日午班",
-            "created_at": (now - timedelta(days=2)).strftime("%m-%d %H:%M"),
-        },
-    ]
+async def _fetch_history_from_db(
+    db: AsyncSession,
+    crew_id: str,
+    tenant_id: str,
+) -> list[dict[str, Any]]:
+    """从 crew_shift_summaries 查询历史摘要，按 created_at 降序，最多返回 20 条。"""
+    await db.execute(
+        text("SELECT set_config('app.tenant_id', :tid, true)"),
+        {"tid": tenant_id},
+    )
+    sql = text("""
+        SELECT
+            id::text                                            AS id,
+            crew_id::text                                       AS crew_id,
+            summary,
+            shift_date,
+            shift_label,
+            TO_CHAR(created_at AT TIME ZONE 'Asia/Shanghai', 'MM-DD HH24:MI') AS created_at_label
+        FROM crew_shift_summaries
+        WHERE crew_id = :crew_id::uuid
+          AND is_deleted = FALSE
+        ORDER BY created_at DESC
+        LIMIT 20
+    """)
+    result = await db.execute(sql, {"crew_id": crew_id})
+    rows = result.mappings().all()
+    items = []
+    for row in rows:
+        items.append({
+            "id":         row["id"],
+            "crew_id":    row["crew_id"],
+            "summary":    row["summary"],
+            "shift_date": row["shift_date"].isoformat() if row["shift_date"] else "",
+            "shift_label": row["shift_label"] or "",
+            "created_at": row["created_at_label"] or "",
+        })
+    return items
 
 
 # ---------- 路由 ----------
@@ -162,6 +164,7 @@ async def generate_shift_summary(
     - 构建 prompt，调用 Claude API (claude-haiku-4-5-20251001) streaming
     - 以 SSE 格式流式返回：data: {"chunk": "...", "done": false}\\n\\n
     - 结束：data: {"chunk": "", "done": true}\\n\\n
+    - Claude API 不可用时立即发送 done:true 空流，不输出伪造内容
     """
     log = logger.bind(
         operator_id=x_operator_id,
@@ -190,18 +193,22 @@ async def generate_shift_summary(
 async def get_shift_summary_history(
     x_operator_id: str = Header(default="op-001", alias="X-Operator-ID"),
     x_tenant_id: str   = Header(default="",       alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ):
     """
     获取历史摘要列表。
 
-    生产环境：从 crew_shift_summaries 表查询，按 created_at 降序。
-    当前：返回 Mock 数据。
+    从 crew_shift_summaries 表查询，按 created_at 降序。
+    DB 不可用时降级返回空列表。
     """
     log = logger.bind(operator_id=x_operator_id, tenant_id=x_tenant_id)
     try:
-        items = _build_mock_history(x_operator_id)
+        items = await _fetch_history_from_db(db, x_operator_id, x_tenant_id)
         log.info("shift_summary_history_ok", count=len(items))
         return {"ok": True, "data": {"items": items, "total": len(items)}}
+    except SQLAlchemyError as e:
+        log.warning("shift_summary_history_db_error", error=str(e))
+        return {"ok": True, "data": {"items": [], "total": 0}}
     except ValueError as e:
         log.warning("shift_summary_history_value_error", error=str(e))
         raise HTTPException(status_code=400, detail=str(e))

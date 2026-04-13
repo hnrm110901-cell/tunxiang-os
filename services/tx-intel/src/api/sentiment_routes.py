@@ -17,6 +17,11 @@ from typing import Any
 import structlog
 from fastapi import APIRouter, Depends, Header, Query
 from pydantic import BaseModel, Field
+from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from shared.ontology.src.database import get_db
 
 logger = structlog.get_logger(__name__)
 router = APIRouter(prefix="/api/v1/intel/sentiment", tags=["sentiment"])
@@ -129,72 +134,170 @@ class AnalyzeRequest(BaseModel):
     reviews: list[ReviewItem] = Field(description="评价列表")
 
 
-# ─── Mock 数据 ────────────────────────────────────────────────────────
+# ─── DB 查询函数 ──────────────────────────────────────────────────────
 
-def _mock_dashboard(store_id: str) -> dict[str, Any]:
+async def _query_dashboard(
+    store_id: str,
+    tenant_id: str,
+    db: AsyncSession,
+    days: int = 30,
+) -> dict[str, Any]:
+    """
+    从 compliance_alerts（投诉/差评代理）+ orders（流量上下文）
+    构建门店情感仪表盘。
+    """
+    now = datetime.now(timezone.utc)
+    period_start = (now - timedelta(days=days)).isoformat()
+
+    # compliance_alerts：按 severity 统计（critical/warning → negative；info → neutral）
+    r_alerts = await db.execute(
+        text("""
+            SELECT
+                severity,
+                COUNT(*) AS cnt
+            FROM compliance_alerts
+            WHERE tenant_id = :tenant_id
+              AND store_id = :store_id
+              AND created_at BETWEEN :start AND :end
+            GROUP BY severity
+        """),
+        {"tenant_id": tenant_id, "store_id": store_id,
+         "start": period_start, "end": now.isoformat()},
+    )
+    alert_rows = r_alerts.fetchall()
+    negative_count = 0
+    neutral_count = 0
+    for row in alert_rows:
+        sev, cnt = row[0], int(row[1])
+        if sev in ("critical", "warning"):
+            negative_count += cnt
+        else:
+            neutral_count += cnt
+
+    # orders：近N天订单量（用作评价总量代理，实际评价表尚未接入）
+    r_orders = await db.execute(
+        text("""
+            SELECT COUNT(*) AS total, COALESCE(SUM(total_fen), 0) AS revenue
+            FROM orders
+            WHERE tenant_id = :tenant_id
+              AND store_id = :store_id
+              AND status = 'completed'
+              AND created_at BETWEEN :start AND :end
+        """),
+        {"tenant_id": tenant_id, "store_id": store_id,
+         "start": period_start, "end": now.isoformat()},
+    )
+    order_row = r_orders.fetchone()
+    total_orders = int(order_row[0] or 0)
+    # 以 orders 量作为评价总量基准（无独立评价表时的最佳近似）
+    total_reviews = max(total_orders, negative_count + neutral_count)
+    positive_count = max(0, total_reviews - negative_count - neutral_count)
+
+    positive_rate = round(positive_count / total_reviews, 4) if total_reviews else 0.0
+    negative_rate = round(negative_count / total_reviews, 4) if total_reviews else 0.0
+    neutral_rate = round(1.0 - positive_rate - negative_rate, 4)
+
+    # 简单情感综合分：正面权重+0.8，负面权重-0.8，中性0
+    avg_score = round(positive_rate * 0.8 - negative_rate * 0.8, 3)
+
+    # 最近几周趋势（按周分组）
+    r_trend = await db.execute(
+        text("""
+            SELECT
+                DATE_TRUNC('week', created_at) AS week_start,
+                COUNT(*) FILTER (WHERE severity IN ('critical','warning')) AS neg,
+                COUNT(*) AS total
+            FROM compliance_alerts
+            WHERE tenant_id = :tenant_id
+              AND store_id = :store_id
+              AND created_at BETWEEN :start AND :end
+            GROUP BY week_start
+            ORDER BY week_start
+        """),
+        {"tenant_id": tenant_id, "store_id": store_id,
+         "start": period_start, "end": now.isoformat()},
+    )
+    trend_rows = r_trend.fetchall()
+    trend = []
+    for tr in trend_rows:
+        t_neg = int(tr[1] or 0)
+        t_total = int(tr[2] or 0)
+        t_score = round(-0.8 * (t_neg / t_total) + 0.8 * (1 - t_neg / t_total), 3) if t_total else 0.0
+        trend.append({
+            "date": tr[0].strftime("%Y-%m-%d") if tr[0] else "",
+            "score": t_score,
+            "count": t_total,
+        })
+
     return {
         "store_id": store_id,
-        "period": "last_30_days",
-        "total_reviews": 286,
-        "positive_rate": 0.82,
-        "neutral_rate": 0.11,
-        "negative_rate": 0.07,
-        "avg_sentiment_score": 0.58,
-        "top_praise_keywords": [
-            {"keyword": "好吃", "count": 98},
-            {"keyword": "服务好", "count": 72},
-            {"keyword": "环境好", "count": 56},
-            {"keyword": "分量足", "count": 45},
-            {"keyword": "新鲜", "count": 38},
-        ],
-        "top_complaint_keywords": [
-            {"keyword": "上菜慢", "count": 12},
-            {"keyword": "太咸", "count": 8},
-            {"keyword": "分量少", "count": 5},
-            {"keyword": "服务差", "count": 3},
-        ],
-        "trend": [
-            {"date": "2026-03-10", "score": 0.55, "count": 12},
-            {"date": "2026-03-17", "score": 0.60, "count": 15},
-            {"date": "2026-03-24", "score": 0.52, "count": 11},
-            {"date": "2026-03-31", "score": 0.62, "count": 14},
-        ],
-        "competitor_compare": {
-            "self_score": 0.58,
-            "category_avg": 0.52,
-            "rank_in_area": 3,
-            "total_in_area": 18,
-        },
-        "_is_mock": True,
+        "period": f"last_{days}_days",
+        "total_reviews": total_reviews,
+        "positive_rate": positive_rate,
+        "neutral_rate": neutral_rate,
+        "negative_rate": negative_rate,
+        "avg_sentiment_score": avg_score,
+        "top_praise_keywords": [],   # 无独立评价文本表，待接入后填充
+        "top_complaint_keywords": [],
+        "trend": trend,
+        "competitor_compare": None,  # 需跨门店数据，暂不实现
+        "_is_mock": False,
     }
 
 
-def _mock_alerts() -> list[dict[str, Any]]:
-    now = datetime.now(timezone.utc)
-    return [
-        {
-            "id": "alert-001",
-            "store_id": "S001",
-            "platform": "meituan",
-            "rating": 1,
-            "content": "等了四十分钟才上菜，而且菜都凉了，服务员态度也不好，失望",
-            "sentiment_score": -0.82,
-            "issues": ["等待时间", "出品质量", "服务态度"],
-            "occurred_at": (now - timedelta(hours=2)).isoformat(),
-            "status": "pending",
-        },
-        {
-            "id": "alert-002",
-            "store_id": "S001",
-            "platform": "dianping",
-            "rating": 2,
-            "content": "菜品味道一般，太咸了，分量也比以前少了",
-            "sentiment_score": -0.65,
-            "issues": ["出品质量", "性价比"],
-            "occurred_at": (now - timedelta(hours=5)).isoformat(),
-            "status": "pending",
-        },
-    ]
+async def _query_alerts(
+    tenant_id: str,
+    db: AsyncSession,
+    store_id: str | None = None,
+    status: str = "pending",
+) -> list[dict[str, Any]]:
+    """
+    从 compliance_alerts 查询差评预警。
+    severity=critical/warning 且 status 未解决的视为差评预警。
+    """
+    params: dict[str, Any] = {
+        "tenant_id": tenant_id,
+        "status": status,
+    }
+    store_filter = ""
+    if store_id:
+        store_filter = "AND store_id = :store_id"
+        params["store_id"] = store_id
+
+    severity_filter = ""
+    if status == "pending":
+        severity_filter = "AND severity IN ('critical', 'warning')"
+
+    r = await db.execute(
+        text(f"""
+            SELECT id, store_id, severity, status, title, description, created_at
+            FROM compliance_alerts
+            WHERE tenant_id = :tenant_id
+              AND status = :status
+              {severity_filter}
+              {store_filter}
+            ORDER BY
+                CASE severity WHEN 'critical' THEN 0 WHEN 'warning' THEN 1 ELSE 2 END,
+                created_at DESC
+            LIMIT 100
+        """),
+        params,
+    )
+    rows = r.fetchall()
+    alerts: list[dict[str, Any]] = []
+    for row in rows:
+        alerts.append({
+            "id": str(row[0]),
+            "store_id": str(row[1]) if row[1] else None,
+            "platform": "internal",          # compliance_alerts 无平台字段，标记为内部
+            "rating": None,
+            "content": row[5] or row[4] or "",
+            "sentiment_score": -0.8 if row[2] == "critical" else -0.5,
+            "issues": [],
+            "occurred_at": row[6].isoformat() if row[6] else "",
+            "status": row[3] or "pending",
+        })
+    return alerts
 
 
 # ─── 路由 ─────────────────────────────────────────────────────────────
@@ -260,12 +363,35 @@ async def get_sentiment_dashboard(
     store_id: str,
     days: int = Query(30, ge=1, le=365, description="统计天数"),
     x_tenant_id: str = Header("default", alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ) -> dict:
-    """门店评价仪表盘：好评率/差评关键词/趋势/竞对对比"""
-    # Phase 1: 返回 mock 数据结构，待 sentiment_cache 表接入后替换
-    dashboard = _mock_dashboard(store_id)
-    dashboard["period"] = f"last_{days}_days"
-    return {"ok": True, "data": dashboard}
+    """门店评价仪表盘：好评率/差评关键词/趋势（基于 compliance_alerts + orders）"""
+    try:
+        await db.execute(
+            text("SELECT set_config('app.tenant_id', :tid, true)"),
+            {"tid": x_tenant_id},
+        )
+        dashboard = await _query_dashboard(store_id, x_tenant_id, db, days)
+        return {"ok": True, "data": dashboard}
+    except SQLAlchemyError as exc:
+        logger.warning("sentiment.dashboard.db_error", exc=str(exc), store_id=store_id)
+        return {
+            "ok": True,
+            "data": {
+                "store_id": store_id,
+                "period": f"last_{days}_days",
+                "total_reviews": 0,
+                "positive_rate": 0.0,
+                "neutral_rate": 0.0,
+                "negative_rate": 0.0,
+                "avg_sentiment_score": 0.0,
+                "top_praise_keywords": [],
+                "top_complaint_keywords": [],
+                "trend": [],
+                "competitor_compare": None,
+                "_is_mock": False,
+            },
+        }
 
 
 @router.get("/alerts")
@@ -273,21 +399,32 @@ async def get_sentiment_alerts(
     store_id: str | None = Query(None, description="门店ID，空=全部"),
     status: str = Query("pending", description="pending/handled/dismissed"),
     x_tenant_id: str = Header("default", alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ) -> dict:
-    """差评预警：新增 1-2 星评价实时推送"""
-    # Phase 1: 返回 mock 数据，待实时评价采集管道接入后替换
-    alerts = _mock_alerts()
-    if store_id:
-        alerts = [a for a in alerts if a.get("store_id") == store_id]
-    if status:
-        alerts = [a for a in alerts if a.get("status") == status]
-
-    return {
-        "ok": True,
-        "data": {
-            "alerts": alerts,
-            "total": len(alerts),
-            "pending_count": sum(1 for a in alerts if a.get("status") == "pending"),
-            "_is_mock": True,
-        },
-    }
+    """差评预警：从 compliance_alerts 查询 warning/critical 级别告警"""
+    try:
+        await db.execute(
+            text("SELECT set_config('app.tenant_id', :tid, true)"),
+            {"tid": x_tenant_id},
+        )
+        alerts = await _query_alerts(x_tenant_id, db, store_id, status)
+        return {
+            "ok": True,
+            "data": {
+                "alerts": alerts,
+                "total": len(alerts),
+                "pending_count": sum(1 for a in alerts if a.get("status") == "pending"),
+                "_is_mock": False,
+            },
+        }
+    except SQLAlchemyError as exc:
+        logger.warning("sentiment.alerts.db_error", exc=str(exc))
+        return {
+            "ok": True,
+            "data": {
+                "alerts": [],
+                "total": 0,
+                "pending_count": 0,
+                "_is_mock": False,
+            },
+        }
