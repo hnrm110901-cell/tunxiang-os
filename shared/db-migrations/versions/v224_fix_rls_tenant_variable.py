@@ -42,11 +42,15 @@ def upgrade() -> None:
     for table, policy in _AFFECTED:
         # 1. 删除使用错误变量的旧策略
         op.execute(f"DROP POLICY IF EXISTS {policy} ON {table};")
-        # 2. 创建使用正确变量的新策略
+        # 2. 创建使用正确变量的新策略（::uuid cast 兼容 UUID 类型列）
         op.execute(f"""
-            CREATE POLICY {policy} ON {table}
-            USING (tenant_id = NULLIF(current_setting('app.tenant_id', true), ''))
-            WITH CHECK (tenant_id = NULLIF(current_setting('app.tenant_id', true), ''));
+            DO $$ BEGIN
+                IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='{table}' AND policyname='{policy}') THEN
+                    EXECUTE 'CREATE POLICY {policy} ON {table}
+                        USING (tenant_id = NULLIF(current_setting(''app.tenant_id'', true), '''')::uuid)
+                        WITH CHECK (tenant_id = NULLIF(current_setting(''app.tenant_id'', true), '''')::uuid)';
+                END IF;
+            END$$;
         """)
 
 
