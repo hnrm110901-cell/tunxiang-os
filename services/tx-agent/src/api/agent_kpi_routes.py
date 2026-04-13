@@ -713,6 +713,65 @@ async def collect_kpi_snapshots(
     except SQLAlchemyError as exc:
         logger.warning("kpi_collect.store_inspect_failed", error=str(exc))
 
+    # 4. smart_dispatch — 来源: kds_tasks
+    smart_dispatch_avg: float | None = None
+    smart_dispatch_ontime: float | None = None
+    try:
+        r = await db.execute(text("""
+            SELECT
+                AVG(EXTRACT(EPOCH FROM (served_at - called_at)))::float AS avg_seconds,
+                COUNT(*) FILTER (WHERE promised_at IS NOT NULL AND served_at <= promised_at)::float
+                  / GREATEST(COUNT(*) FILTER (WHERE promised_at IS NOT NULL), 1)::float * 100
+                  AS on_time_pct
+            FROM kds_tasks
+            WHERE tenant_id = :tid::uuid
+              AND status = 'served'
+              AND served_at IS NOT NULL
+              AND called_at IS NOT NULL
+              AND DATE(created_at AT TIME ZONE 'Asia/Shanghai') = :d
+        """), {"tid": x_tenant_id, "d": target_date.isoformat()})
+        row = r.mappings().fetchone()
+        if row and row["avg_seconds"] is not None:
+            smart_dispatch_avg = round(float(row["avg_seconds"]), 1)
+            smart_dispatch_ontime = round(float(row["on_time_pct"]), 2)
+    except SQLAlchemyError as exc:
+        logger.warning("kpi_collect.smart_dispatch_failed", error=str(exc))
+
+    # 5. store_patrol — patrol_response_time 来源: compliance_alerts
+    patrol_response: float | None = None
+    try:
+        r = await db.execute(text("""
+            SELECT
+                AVG(EXTRACT(EPOCH FROM (resolved_at - created_at)) / 60)::float AS avg_response_minutes
+            FROM compliance_alerts
+            WHERE tenant_id = :tid::uuid
+              AND status = 'resolved'
+              AND resolved_at IS NOT NULL
+              AND DATE(resolved_at AT TIME ZONE 'Asia/Shanghai') = :d
+        """), {"tid": x_tenant_id, "d": target_date.isoformat()})
+        row = r.mappings().fetchone()
+        if row and row["avg_response_minutes"] is not None:
+            patrol_response = round(float(row["avg_response_minutes"]), 1)
+    except SQLAlchemyError as exc:
+        logger.warning("kpi_collect.patrol_response_failed", error=str(exc))
+
+    # 6. inventory_alert — stockout_rate 来源: dishes
+    stockout_rate: float | None = None
+    try:
+        r = await db.execute(text("""
+            SELECT
+                COUNT(*) FILTER (WHERE is_available = false)::float
+                  / GREATEST(COUNT(*), 1)::float * 100 AS stockout_rate_pct
+            FROM dishes
+            WHERE tenant_id = :tid::uuid
+              AND is_deleted = false
+        """), {"tid": x_tenant_id})
+        row = r.mappings().fetchone()
+        if row and row["stockout_rate_pct"] is not None:
+            stockout_rate = round(float(row["stockout_rate_pct"]), 2)
+    except SQLAlchemyError as exc:
+        logger.warning("kpi_collect.stockout_rate_failed", error=str(exc))
+
     # real_values：(agent_id, kpi_type) → measured_value（已有真实数据的覆盖估算）
     real_values: dict[tuple[str, str], float] = {}
     if discount_exc_rate is not None:
@@ -723,6 +782,14 @@ async def collect_kpi_snapshots(
         real_values[("member_insight", "member_repurchase_rate")] = member_repurchase
     if compliance_score is not None:
         real_values[("store_inspect", "compliance_score")] = compliance_score
+    if smart_dispatch_avg is not None:
+        real_values[("smart_dispatch", "avg_dish_time_seconds")] = smart_dispatch_avg
+    if smart_dispatch_ontime is not None:
+        real_values[("smart_dispatch", "on_time_rate")] = smart_dispatch_ontime
+    if patrol_response is not None:
+        real_values[("store_patrol", "patrol_response_time")] = patrol_response
+    if stockout_rate is not None:
+        real_values[("inventory_alert", "stockout_rate")] = stockout_rate
 
     # ── 构建快照列表 ──────────────────────────────────────────────────────────
     rows_to_insert: list[dict] = []
