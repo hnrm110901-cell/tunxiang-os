@@ -1,4 +1,21 @@
-## 2026-04-13 (续)
+## 2026-04-13 (续2) members/governance/ck_recipe 全量DB化
+
+### 今日完成
+- [tx-member] members.py: create_customer(幂等INSERT+emit)/list_customers(分页+rfm过滤)/get_customer/get_customer_orders 全量接入 customers/orders 表
+- [tx-org] governance_routes.py: avg_labor_cost_rate + cost_deviation 接入 payroll_summaries 表（近30天薪资/营收比率，按门店偏差，OperationalError降级0）
+- [tx-supply] ck_recipe_routes.py: 删除6个全局内存字典，12个端点全量DB化（dish_recipes/ck_production_plans/ck_dispatch_orders三组表）
+
+### 数据变化
+- 消灭 TODO 数：3条硬编码占位（avg_labor_cost_rate=0, cost_deviation=0, customer_id="new"）
+- 消灭内存字典：6个（_RECIPES/_RECIPE_INGREDIENTS/_PLANS/_PLAN_ITEMS/_DISPATCH_ORDERS/_DISPATCH_ITEMS）
+
+### 遗留问题
+- insights_routes.py — demo 门店数据仍硬编码（MEDIUM）
+- food_court_routes.py — settlement_ratio mock 1.0（LOW）
+- 9个 KPI 估算值（serve_dispatch/inventory_agent/finance_audit ROI，LOW）
+- v254/v255 迁移DAG双叉可能需要 v256 合并迁移
+
+## 2026-04-13 (续) 导播手册 + 交付评分卡 + member/org/supply DB化
 
 ### 今日完成
 - [docs] 门店全流程演示导播手册 v1.0 — 8阶段60分钟脚本+三商户差异演示要点+4种异常备选脚本
