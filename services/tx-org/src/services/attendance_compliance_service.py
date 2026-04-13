@@ -718,3 +718,346 @@ async def scan_all_compliance(
             "medium": medium,
         },
     }
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  AttendanceComplianceLogService — attendance_compliance_logs 表 CRUD
+#
+#  v255 新增表的持久化 + 查询 + 确认/驳回操作。
+#  扫描方法委托给上面的函数，结果持久化到日志表。
+# ══════════════════════════════════════════════════════════════════════════════
+
+
+class AttendanceComplianceLogService:
+    """考勤合规违规记录管理（基于 v255 attendance_compliance_logs 表）"""
+
+    def __init__(self, db: AsyncSession, tenant_id: str) -> None:
+        self._db = db
+        self._tenant_id = tenant_id
+
+    async def run_full_scan(
+        self,
+        check_date: str,
+        store_id: str | None = None,
+    ) -> dict[str, Any]:
+        """运行全部深度合规检测，结果写入 attendance_compliance_logs"""
+        await _set_tenant(self._db, self._tenant_id)
+
+        if store_id:
+            scan_result = await scan_all_compliance(
+                self._db, self._tenant_id, store_id,
+                (check_date, check_date),
+            )
+        else:
+            scan_result = {
+                "gps_anomalies": [],
+                "device_anomalies": [],
+                "overtime_violations": [],
+                "rest_violations": [],
+                "summary": {"total_violations": 0, "critical": 0, "high": 0, "medium": 0},
+            }
+
+        # 持久化扫描结果到 compliance_logs 表
+        inserted = 0
+        for item in scan_result.get("gps_anomalies", []):
+            await self._insert_log(
+                employee_id=item.get("employee_id", ""),
+                employee_name=item.get("emp_name"),
+                store_id=store_id,
+                check_date=check_date,
+                violation_type="gps_anomaly",
+                severity=item.get("severity", "medium"),
+                detail=item,
+            )
+            inserted += 1
+
+        for item in scan_result.get("device_anomalies", []):
+            await self._insert_log(
+                employee_id=item.get("employee_id", ""),
+                employee_name=item.get("emp_name"),
+                store_id=store_id,
+                check_date=check_date,
+                violation_type="same_device",
+                severity=item.get("severity", "high"),
+                detail=item,
+            )
+            inserted += 1
+
+        for item in scan_result.get("overtime_violations", []):
+            await self._insert_log(
+                employee_id=item.get("employee_id", ""),
+                employee_name=item.get("emp_name"),
+                store_id=store_id,
+                check_date=check_date,
+                violation_type="overtime_exceed",
+                severity=_severity_for_rule_name(str(item.get("rule", ""))),
+                detail=item,
+            )
+            inserted += 1
+
+        for item in scan_result.get("rest_violations", []):
+            await self._insert_log(
+                employee_id=item.get("employee_id", ""),
+                employee_name=item.get("emp_name"),
+                store_id=store_id,
+                check_date=check_date,
+                violation_type="proxy_punch",
+                severity="high",
+                detail=item,
+            )
+            inserted += 1
+
+        try:
+            await self._db.commit()
+        except (OperationalError, ProgrammingError) as exc:
+            logger.warning("run_full_scan_commit_failed", error=str(exc))
+
+        return {
+            "scan_date": check_date,
+            "store_id": store_id,
+            "inserted": inserted,
+            "summary": scan_result.get("summary", {}),
+        }
+
+    async def list_violations(
+        self,
+        store_id: str | None = None,
+        violation_type: str | None = None,
+        status: str | None = None,
+        page: int = 1,
+        size: int = 20,
+    ) -> dict[str, Any]:
+        """违规记录分页列表"""
+        await _set_tenant(self._db, self._tenant_id)
+
+        conditions = ["tenant_id = CAST(:tenant_id AS uuid)", "is_deleted = false"]
+        params: dict[str, Any] = {"tenant_id": self._tenant_id}
+
+        if store_id:
+            conditions.append("store_id = CAST(:store_id AS uuid)")
+            params["store_id"] = store_id
+        if violation_type:
+            conditions.append("violation_type = :violation_type")
+            params["violation_type"] = violation_type
+        if status:
+            conditions.append("status = :status")
+            params["status"] = status
+
+        where = " AND ".join(conditions)
+
+        count_q = text(f"SELECT COUNT(*) FROM attendance_compliance_logs WHERE {where}")
+        try:
+            count_result = await self._db.execute(count_q, params)
+            total = count_result.scalar() or 0
+        except (OperationalError, ProgrammingError) as exc:
+            logger.warning("list_violations_count_failed", error=str(exc))
+            total = 0
+
+        offset = (page - 1) * size
+        data_q = text(f"""
+            SELECT id::text, employee_id::text, employee_name, store_id::text,
+                   check_date, violation_type, severity, detail,
+                   status, confirmed_by::text, confirmed_at, appeal_reason,
+                   created_at, updated_at
+            FROM attendance_compliance_logs
+            WHERE {where}
+            ORDER BY created_at DESC
+            LIMIT :limit OFFSET :offset
+        """)
+        params["limit"] = size
+        params["offset"] = offset
+
+        try:
+            result = await self._db.execute(data_q, params)
+            rows = [dict(r) for r in result.mappings()]
+        except (OperationalError, ProgrammingError) as exc:
+            logger.warning("list_violations_query_failed", error=str(exc))
+            rows = []
+
+        for row in rows:
+            for key in ("check_date", "confirmed_at", "created_at", "updated_at"):
+                val = row.get(key)
+                if val and hasattr(val, "isoformat"):
+                    row[key] = val.isoformat()
+
+        return {"items": rows, "total": total, "page": page, "size": size}
+
+    async def get_violation(self, log_id: str) -> dict[str, Any] | None:
+        """获取单条违规详情"""
+        await _set_tenant(self._db, self._tenant_id)
+        q = text("""
+            SELECT id::text, employee_id::text, employee_name, store_id::text,
+                   check_date, violation_type, severity, detail,
+                   status, confirmed_by::text, confirmed_at, appeal_reason,
+                   created_at, updated_at
+            FROM attendance_compliance_logs
+            WHERE id = CAST(:log_id AS uuid)
+              AND tenant_id = CAST(:tenant_id AS uuid)
+              AND is_deleted = false
+        """)
+        try:
+            result = await self._db.execute(
+                q, {"log_id": log_id, "tenant_id": self._tenant_id},
+            )
+            row = result.mappings().first()
+        except (OperationalError, ProgrammingError) as exc:
+            logger.warning("get_violation_failed", error=str(exc))
+            return None
+        if not row:
+            return None
+        data = dict(row)
+        for key in ("check_date", "confirmed_at", "created_at", "updated_at"):
+            val = data.get(key)
+            if val and hasattr(val, "isoformat"):
+                data[key] = val.isoformat()
+        return data
+
+    async def confirm_violation(self, log_id: str, confirmer_id: str) -> dict[str, Any]:
+        """确认违规"""
+        await _set_tenant(self._db, self._tenant_id)
+        q = text("""
+            UPDATE attendance_compliance_logs
+            SET status = 'confirmed',
+                confirmed_by = CAST(:confirmer_id AS uuid),
+                confirmed_at = NOW(),
+                updated_at = NOW()
+            WHERE id = CAST(:log_id AS uuid)
+              AND tenant_id = CAST(:tenant_id AS uuid)
+              AND is_deleted = false
+              AND status = 'pending'
+            RETURNING id::text
+        """)
+        try:
+            result = await self._db.execute(
+                q,
+                {"log_id": log_id, "confirmer_id": confirmer_id, "tenant_id": self._tenant_id},
+            )
+            await self._db.commit()
+            row = result.scalar()
+        except (OperationalError, ProgrammingError) as exc:
+            logger.warning("confirm_violation_failed", error=str(exc))
+            return {"ok": False, "error": str(exc)}
+
+        if not row:
+            return {"ok": False, "error": "记录不存在或状态非pending"}
+        return {"ok": True, "id": row}
+
+    async def dismiss_violation(self, log_id: str, reason: str) -> dict[str, Any]:
+        """驳回/申诉违规"""
+        await _set_tenant(self._db, self._tenant_id)
+        q = text("""
+            UPDATE attendance_compliance_logs
+            SET status = 'dismissed',
+                appeal_reason = :reason,
+                updated_at = NOW()
+            WHERE id = CAST(:log_id AS uuid)
+              AND tenant_id = CAST(:tenant_id AS uuid)
+              AND is_deleted = false
+              AND status IN ('pending', 'confirmed')
+            RETURNING id::text
+        """)
+        try:
+            result = await self._db.execute(
+                q,
+                {"log_id": log_id, "reason": reason, "tenant_id": self._tenant_id},
+            )
+            await self._db.commit()
+            row = result.scalar()
+        except (OperationalError, ProgrammingError) as exc:
+            logger.warning("dismiss_violation_failed", error=str(exc))
+            return {"ok": False, "error": str(exc)}
+
+        if not row:
+            return {"ok": False, "error": "记录不存在或状态不可驳回"}
+        return {"ok": True, "id": row}
+
+    async def get_compliance_stats(self, month: str | None = None) -> dict[str, Any]:
+        """合规统计：各类型违规数量 + 状态分布"""
+        await _set_tenant(self._db, self._tenant_id)
+        month_filter = month or date.today().strftime("%Y-%m")
+        start_date = f"{month_filter}-01"
+        y, m_num = int(month_filter[:4]), int(month_filter[5:7])
+        if m_num == 12:
+            end_date_str = f"{y + 1}-01-01"
+        else:
+            end_date_str = f"{y}-{m_num + 1:02d}-01"
+
+        q = text("""
+            SELECT violation_type, severity, status, COUNT(*) AS cnt
+            FROM attendance_compliance_logs
+            WHERE tenant_id = CAST(:tenant_id AS uuid)
+              AND is_deleted = false
+              AND check_date >= CAST(:start AS date)
+              AND check_date < CAST(:end AS date)
+            GROUP BY violation_type, severity, status
+            ORDER BY violation_type, severity
+        """)
+        try:
+            result = await self._db.execute(
+                q,
+                {"tenant_id": self._tenant_id, "start": start_date, "end": end_date_str},
+            )
+            rows = [dict(r) for r in result.mappings()]
+        except (OperationalError, ProgrammingError) as exc:
+            logger.warning("get_compliance_stats_failed", error=str(exc))
+            rows = []
+
+        by_type: dict[str, int] = {}
+        by_severity: dict[str, int] = {}
+        by_status: dict[str, int] = {}
+        total = 0
+        for row in rows:
+            cnt = int(row.get("cnt", 0))
+            total += cnt
+            vt = str(row.get("violation_type", "unknown"))
+            sev = str(row.get("severity", "medium"))
+            st = str(row.get("status", "pending"))
+            by_type[vt] = by_type.get(vt, 0) + cnt
+            by_severity[sev] = by_severity.get(sev, 0) + cnt
+            by_status[st] = by_status.get(st, 0) + cnt
+
+        return {
+            "month": month_filter,
+            "total": total,
+            "by_type": by_type,
+            "by_severity": by_severity,
+            "by_status": by_status,
+        }
+
+    async def _insert_log(
+        self,
+        employee_id: str,
+        employee_name: str | None,
+        store_id: str | None,
+        check_date: str,
+        violation_type: str,
+        severity: str,
+        detail: dict[str, Any],
+    ) -> None:
+        """将检测结果写入 attendance_compliance_logs 表"""
+        q = text("""
+            INSERT INTO attendance_compliance_logs
+                (tenant_id, employee_id, employee_name, store_id, check_date,
+                 violation_type, severity, detail, status)
+            VALUES
+                (CAST(:tenant_id AS uuid), CAST(:employee_id AS uuid), :employee_name,
+                 CAST(:store_id AS uuid), CAST(:check_date AS date),
+                 :violation_type, :severity, CAST(:detail AS jsonb), 'pending')
+        """)
+        try:
+            await self._db.execute(q, {
+                "tenant_id": self._tenant_id,
+                "employee_id": employee_id,
+                "employee_name": employee_name,
+                "store_id": store_id,
+                "check_date": check_date,
+                "violation_type": violation_type,
+                "severity": severity,
+                "detail": json.dumps(detail, ensure_ascii=False, default=str),
+            })
+        except (OperationalError, ProgrammingError) as exc:
+            logger.warning(
+                "insert_compliance_log_failed",
+                error=str(exc),
+                violation_type=violation_type,
+            )
