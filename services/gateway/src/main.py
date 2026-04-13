@@ -188,6 +188,10 @@ app.include_router(wecom_bot_router)
 # 品智POS 同步健康检查 API（GET /api/v1/sync/health）
 app.include_router(sync_health_router)
 
+# C-04: 演示监控面板
+from .api.demo_monitor_routes import router as demo_monitor_router
+app.include_router(demo_monitor_router)  # C-04: 演示监控面板
+
 # 域路由代理（通配路由 /api/v1/{domain}/{path}，放最后）
 app.include_router(proxy_router)
 

@@ -1,3 +1,23 @@
+## 2026-04-14 (续)
+
+### 今日完成
+- [tx-analytics] merchant_targets_routes.py — 三商户KPI目标配置+实际差距分析，Gap B-03 关闭
+- [tx-analytics] ai_evidence_chain_routes.py — AI结论可追溯证据链（POST/GET），Gap B-04 关闭
+- [scripts] demo-reset.sh — 演示环境一键重置（支持--merchant/--keep-members/--dry-run），Gap C-03 关闭
+- [gateway] demo_monitor_routes.py — GET /api/v1/demo/monitor 实时监控面板，Gap C-04 关闭
+
+### 数据变化
+- 新增 API：4个（merchant-targets/evidence-chain/demo/monitor）
+- 新增脚本：1个（demo-reset.sh）
+- 五月差距关闭：B-03 ✅ B-04 ✅ C-03 ✅ C-04 ✅（全部7项差距已关闭）
+
+### 遗留问题
+- AIEvidenceChain 当前为内存存储，五月 Week 3 迁移至 DB（v256）
+- merchant_targets PUT 当前内存存储，五月 Week 3 迁移至 DB（v257）
+
+### 明日计划
+- 五月 Week 3：v256/v257 迁移 + 压测脚本 + sgc演示就绪度提升至≥85
+
 ## 2026-04-14
 
 ### 今日完成

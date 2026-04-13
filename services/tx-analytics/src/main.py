@@ -32,6 +32,8 @@ from .api.daily_brief_routes import router as daily_brief_router
 from .api.hq_brand_analytics_routes import router as hq_brand_analytics_router
 from .api.merchant_data_quality_routes import router as data_quality_router
 from .api.seed_loader import load_p0_seeds
+from .api.merchant_targets_routes import router as merchant_targets_router   # May W2: B-03
+from .api.ai_evidence_chain_routes import router as ai_evidence_chain_router  # May W2: B-04
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
@@ -78,6 +80,8 @@ app.include_router(insights_router)
 app.include_router(daily_brief_router)
 app.include_router(hq_brand_analytics_router)
 app.include_router(data_quality_router)  # May W1: 数据质量验收
+app.include_router(merchant_targets_router)   # May W2: B-03 分商户目标
+app.include_router(ai_evidence_chain_router)  # May W2: B-04 证据链
 
 @app.get("/health")
 async def health():
