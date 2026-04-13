@@ -3,6 +3,7 @@
  * 统一管理美团 / 饿了么 / 抖音三平台外卖订单
  */
 import { useEffect, useState, useCallback } from 'react';
+import { formatPrice } from '@tx-ds/utils';
 import { txFetchData } from '../../../api';
 
 // ─── 类型定义 ───
@@ -52,6 +53,7 @@ const STATUS_META: Record<string, { label: string; color: string; bg: string }> 
 
 // ─── 工具函数 ───
 
+/** @deprecated Use formatPrice from @tx-ds/utils */
 function fenToYuan(fen: number): string {
   return (fen / 100).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }

@@ -15,6 +15,7 @@
  */
 
 import { useRef, useState } from 'react';
+import { formatPrice } from '@tx-ds/utils';
 import {
   Button,
   Descriptions,
@@ -92,6 +93,7 @@ const STATUS_ENUM: Record<string, { text: string; status: string }> = {
 
 // ─── 金额工具 ─────────────────────────────────────────────────────────────────
 
+/** @deprecated Use formatPrice from @tx-ds/utils */
 const fenToYuan = (fen: number) => `¥${(fen / 100).toFixed(2)}`;
 
 // ─── 页面组件 ─────────────────────────────────────────────────────────────────

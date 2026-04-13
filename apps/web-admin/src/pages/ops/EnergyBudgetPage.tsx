@@ -21,6 +21,7 @@ import {
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { txFetchData } from '../../api';
+import { formatPrice } from '@tx-ds/utils';
 
 const { Text, Title } = Typography;
 
@@ -117,6 +118,7 @@ function calcPct(actual: number, budget: number): number {
   return Math.round((actual / budget) * 100);
 }
 
+/** @deprecated Use formatPrice from @tx-ds/utils */
 function fenToYuan(fen: number): string {
   return (fen / 100).toFixed(2);
 }

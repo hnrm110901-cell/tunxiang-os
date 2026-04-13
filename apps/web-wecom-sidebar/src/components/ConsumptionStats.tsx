@@ -4,6 +4,7 @@
  * 金额单位：分 → 元（除以100，保留两位小数）
  */
 import React from 'react';
+import { formatPrice } from '@tx-ds/utils';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import 'dayjs/locale/zh-cn';
@@ -11,7 +12,7 @@ import 'dayjs/locale/zh-cn';
 dayjs.extend(relativeTime);
 dayjs.locale('zh-cn');
 
-/** 分 → 元字符串（"¥1,234.56"） */
+/** @deprecated Use formatPrice from @tx-ds/utils */
 function fenToYuan(fen: number): string {
   return `¥${(fen / 100).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',')}`;
 }

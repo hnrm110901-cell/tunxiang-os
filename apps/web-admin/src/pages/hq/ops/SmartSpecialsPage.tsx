@@ -3,6 +3,7 @@
  * 将临期食材自动转化为有利润的特供菜，推送到 POS 屏幕和小程序
  */
 import { useEffect, useState, useCallback } from 'react';
+import { formatPrice } from '@tx-ds/utils';
 import { txFetchData } from '../../../api';
 
 // ─── 类型定义 ───
@@ -49,6 +50,7 @@ const STORES = [
 
 // ─── 工具函数 ───
 
+/** @deprecated Use formatPrice from @tx-ds/utils */
 function fenToYuan(fen: number): string {
   return (fen / 100).toFixed(2);
 }

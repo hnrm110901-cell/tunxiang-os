@@ -35,6 +35,7 @@ import {
   PlusOutlined,
 } from '@ant-design/icons';
 import { ActionType, ProColumns, ProTable } from '@ant-design/pro-components';
+import { formatPrice } from '@tx-ds/utils';
 
 const { Title, Text } = Typography;
 
@@ -83,6 +84,7 @@ interface PreviewItem {
 
 // ── 工具函数 ──────────────────────────────────────────────────────────────────
 
+/** @deprecated Use formatPrice from @tx-ds/utils */
 const fenToYuan = (fen: number): string => (fen / 100).toFixed(2);
 
 const getTenantId = (): string =>

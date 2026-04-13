@@ -43,6 +43,7 @@ import {
 import { txFetchData } from '../../api';
 import dayjs from 'dayjs';
 import type { Dayjs } from 'dayjs';
+import { formatPrice } from '@tx-ds/utils';
 
 const { Title, Text } = Typography;
 const { RangePicker } = DatePicker;
@@ -83,6 +84,7 @@ const STATUS_OPTIONS = [
   { value: 'converted', label: '已转收入' },
 ];
 
+/** @deprecated Use formatPrice from @tx-ds/utils */
 function fenToYuan(fen: number): string {
   return (fen / 100).toFixed(2);
 }

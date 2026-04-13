@@ -11,6 +11,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { formatPrice } from '@tx-ds/utils';
 import {
   Badge,
   Button,
@@ -159,6 +160,7 @@ interface DailyReport {
 }
 
 // ─── 辅助工具 ─────────────────────────────────────────────────────────────
+/** @deprecated Use formatPrice from @tx-ds/utils */
 const fenToYuan = (fen: number): string => `¥${(fen / 100).toFixed(2)}`;
 
 const ROLE_MAP: Record<string, string> = {

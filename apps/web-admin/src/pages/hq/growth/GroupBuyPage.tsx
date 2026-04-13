@@ -9,6 +9,7 @@
  *   - 一旦后端上线，移除 apiUnavailable 降级逻辑即可
  */
 import { useState, useEffect, useCallback } from 'react';
+import { formatPrice } from '@tx-ds/utils';
 import { txFetchData } from '../../../api';
 
 // ── 设计 Token ──────────────────────────────────────────────────
@@ -77,6 +78,7 @@ interface CreateGroupBuyForm {
 }
 
 // ── 工具函数 ────────────────────────────────────────────────────
+/** @deprecated Use formatPrice from @tx-ds/utils */
 function fenToYuan(v: number): string {
   return `¥${(v / 100).toFixed(2)}`;
 }

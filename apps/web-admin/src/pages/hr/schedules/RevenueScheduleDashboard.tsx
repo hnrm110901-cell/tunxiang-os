@@ -22,6 +22,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { formatPrice } from '@tx-ds/utils';
 import {
   Alert,
   Button,
@@ -128,6 +129,7 @@ interface SavingsData {
 
 // ---- Helpers ----
 
+/** @deprecated Use formatPrice from @tx-ds/utils */
 const fen2yuan = (fen: number): string => (fen / 100).toFixed(2);
 const fen2yuanInt = (fen: number): string => Math.round(fen / 100).toLocaleString();
 

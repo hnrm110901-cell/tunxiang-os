@@ -41,6 +41,7 @@ import {
   SwapOutlined,
   DownloadOutlined,
 } from '@ant-design/icons';
+import { formatPrice } from '@tx-ds/utils';
 
 const { Title, Text } = Typography;
 const { RangePicker } = DatePicker;
@@ -48,6 +49,7 @@ const { RangePicker } = DatePicker;
 // ─── 工具函数 ──────────────────────────────────────────────────────────────────
 
 /** 分转元，保留两位小数 */
+/** @deprecated Use formatPrice from @tx-ds/utils */
 const fen2yuan = (fen: number): string => (fen / 100).toFixed(2);
 
 /** 分转元数字 */

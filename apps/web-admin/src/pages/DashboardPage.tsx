@@ -20,6 +20,7 @@ import {
 } from '@ant-design/icons';
 import { Line } from '@ant-design/charts';
 import { txFetchData, getTokenPayload } from '../api/client';
+import { formatPrice } from '@tx-ds/utils';
 
 const { Text, Paragraph } = Typography;
 
@@ -91,6 +92,7 @@ interface DashboardSummary {
 // ─── 工具函数 ───
 
 const fen2wan = (fen: number) => `${(fen / 1_000_000).toFixed(2)}万`;
+/** @deprecated Use formatPrice from @tx-ds/utils */
 const fen2yuan = (fen: number) => `¥${(fen / 100).toLocaleString('zh-CN', { minimumFractionDigits: 0 })}`;
 
 function healthColor(score: number): string {

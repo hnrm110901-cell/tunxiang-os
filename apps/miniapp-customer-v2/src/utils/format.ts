@@ -3,10 +3,13 @@
  *
  * Currency amounts throughout the system are stored in fen (分, integer cents).
  * Dates arrive as ISO-8601 strings from the API.
+ *
+ * NOTE: fenToYuan / fenToYuanDisplay 与 @tunxiang/design-system 的 formatPrice
+ * 功能一致。Web端请用 formatPrice，小程序端继续用本文件的函数。
  */
 
 /**
- * Converts a fen amount to a plain decimal string.
+ * 分转元（不带¥前缀）
  * @example fenToYuan(1250) => "12.50"
  */
 export function fenToYuan(fen: number): string {
@@ -15,11 +18,19 @@ export function fenToYuan(fen: number): string {
 }
 
 /**
- * Converts a fen amount to a display string prefixed with ¥.
+ * 分转元（带¥前缀），等价于 @tx-ds/utils 的 formatPrice
  * @example fenToYuanDisplay(1250) => "¥12.50"
  */
 export function fenToYuanDisplay(fen: number): string {
   return `¥${fenToYuan(fen)}`
+}
+
+/**
+ * formatPrice 别名 — 与 @tunxiang/design-system 保持接口一致
+ * 小程序端无法直接引用 @tx-ds/utils，因此在本文件提供同名函数
+ */
+export function formatPrice(fen: number): string {
+  return fenToYuanDisplay(fen)
 }
 
 /**

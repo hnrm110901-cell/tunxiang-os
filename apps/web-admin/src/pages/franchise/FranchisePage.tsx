@@ -45,6 +45,7 @@ import {
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { txFetchData } from '../../api';
+import { formatPrice } from '@tx-ds/utils';
 
 const { Title, Text } = Typography;
 const { Option } = Select;
@@ -113,6 +114,7 @@ interface FeesStats {
 // ─── 工具函数 ────────────────────────────────────────────────
 
 const fenToWan = (fen: number): string => (fen / 100 / 10000).toFixed(2);
+/** @deprecated Use formatPrice from @tx-ds/utils */
 const fenToYuan = (fen: number): string => (fen / 100).toLocaleString('zh-CN', { minimumFractionDigits: 2 });
 
 const ORG_BASE = '/api/v1/org';

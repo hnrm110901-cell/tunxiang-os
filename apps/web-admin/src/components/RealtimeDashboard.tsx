@@ -21,6 +21,7 @@ import {
   TeamOutlined,
   ThunderboltOutlined,
 } from '@ant-design/icons';
+import { formatPrice } from '@tx-ds/utils';
 
 const { Text } = Typography;
 
@@ -50,6 +51,7 @@ interface RealtimeDashboardProps {
 // ── 工具函数 ──────────────────────────────────────────────────────────────────
 
 /** 分 → 元，带千分位 */
+/** @deprecated Use formatPrice from @tx-ds/utils */
 const fenToYuan = (fen: number): string =>
   (fen / 100).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 

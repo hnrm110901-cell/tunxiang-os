@@ -51,6 +51,7 @@ import {
   ProTable,
 } from '@ant-design/pro-components';
 import dayjs from 'dayjs';
+import { formatPrice } from '@tx-ds/utils';
 
 const { Title, Text } = Typography;
 
@@ -96,6 +97,7 @@ interface Transaction {
 
 // ─── 工具函数 ──────────────────────────────────────────────────────────────────
 
+/** @deprecated Use formatPrice from @tx-ds/utils */
 const fen2yuan = (fen: number) => `¥${(fen / 100).toFixed(2)}`;
 const fenToInputYuan = (fen: number) => fen / 100;
 const inputYuanToFen = (yuan: number) => Math.round(yuan * 100);

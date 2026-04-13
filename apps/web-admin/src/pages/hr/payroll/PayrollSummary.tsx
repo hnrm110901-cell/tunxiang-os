@@ -24,6 +24,7 @@ import { ProColumns, ProTable } from '@ant-design/pro-components';
 import type { ActionType } from '@ant-design/pro-components';
 import { Column } from '@ant-design/charts';
 import { txFetchData } from '../../../api';
+import { formatPrice } from '@tx-ds/utils';
 
 const { Title } = Typography;
 const TX_PRIMARY = '#FF6B35';
@@ -61,6 +62,7 @@ interface SummaryResp {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
+/** @deprecated Use formatPrice from @tx-ds/utils */
 const fenToYuan = (fen: number) => `¥${(fen / 100).toFixed(2)}`;
 
 // ─── Component ───────────────────────────────────────────────────────────────

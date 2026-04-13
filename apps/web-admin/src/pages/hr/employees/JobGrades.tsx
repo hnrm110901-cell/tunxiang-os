@@ -21,6 +21,7 @@ import {
   ProTable,
 } from '@ant-design/pro-components';
 import { txFetchData } from '../../../api';
+import { formatPrice } from '@tx-ds/utils';
 
 // ─── 类型 ────────────────────────────────────────────────────────────────────
 
@@ -45,6 +46,7 @@ const categoryMap: Record<string, { text: string; color: string }> = {
   support: { text: '后勤', color: 'default' },
 };
 
+/** @deprecated Use formatPrice from @tx-ds/utils */
 function fenToYuan(fen: number): string {
   return (fen / 100).toLocaleString('zh-CN', { minimumFractionDigits: 0 });
 }

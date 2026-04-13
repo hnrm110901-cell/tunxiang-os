@@ -7,6 +7,7 @@
  * 金额规范：存储/传输分(fen)，展示元(÷100)，提交时×100
  */
 import React, { useRef, useState, useCallback } from 'react';
+import { formatPrice } from '@tx-ds/utils';
 import {
   ProTable,
   DrawerForm,
@@ -181,6 +182,7 @@ const MOCK_DISHES: BanquetDishItem[] = [
 
 // ─── 工具函数 ─────────────────────────────────────────────────────────────────
 
+/** @deprecated Use formatPrice from @tx-ds/utils */
 const fenToYuan = (fen: number) => (fen / 100).toFixed(2);
 const yuanToFen = (yuan: number) => Math.round(yuan * 100);
 

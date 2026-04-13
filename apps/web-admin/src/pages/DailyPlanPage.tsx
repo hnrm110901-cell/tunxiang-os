@@ -4,6 +4,7 @@
  */
 import { useState, useEffect, useCallback } from 'react';
 import { txFetchData } from '../api';
+import { formatPrice } from '@tx-ds/utils';
 
 // ---- 颜色常量 ----
 const BG_0 = '#0d1e28';
@@ -65,6 +66,7 @@ const todayStr = () => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 };
 
+/** @deprecated Use formatPrice from @tx-ds/utils */
 const fenToYuan = (fen: number) => (fen / 100).toLocaleString('zh-CN', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 
 const weekDayMap = ['日', '一', '二', '三', '四', '五', '六'];

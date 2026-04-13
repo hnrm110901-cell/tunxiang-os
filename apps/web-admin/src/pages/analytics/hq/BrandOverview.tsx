@@ -33,6 +33,7 @@ import { ProTable } from '@ant-design/pro-components';
 import type { ProColumns } from '@ant-design/pro-components';
 import { Line } from '@ant-design/charts';
 
+import { formatPrice } from '@tx-ds/utils';
 import { fenToYuan, pctDisplay } from '../../../utils/format';
 import {
   getBrandsOverview,

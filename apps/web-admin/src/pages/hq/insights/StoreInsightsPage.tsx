@@ -5,6 +5,7 @@
  * API: GET /api/v1/analytics/store-insights?date=&period=
  */
 import { useEffect, useState, useMemo } from 'react';
+import { formatPrice } from '@tx-ds/utils';
 import { apiGet } from '../../../api/client';
 
 // ─── 类型 ──────────────────────────────────────────────────────────────────────
@@ -40,6 +41,7 @@ const FALLBACK: StoreMetric[] = [
 
 // ─── 辅助 ──────────────────────────────────────────────────────────────────────
 
+/** @deprecated Use formatPrice from @tx-ds/utils */
 const fen2yuan = (fen: number) => `¥${(fen / 100).toLocaleString('zh-CN', { minimumFractionDigits: 0 })}`;
 const pct = (v: number) => `${(v * 100).toFixed(1)}%`;
 
