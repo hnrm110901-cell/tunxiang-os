@@ -319,19 +319,268 @@ function PrinterConfigModal({
 }
 
 /* ═══════════════════════════════════════════
+   子组件：配置管理 Tab3
+   ═══════════════════════════════════════════ */
+
+function ConfigManagerTab({ storeId }: { storeId: string }) {
+  const [exporting, setExporting] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [importJson, setImportJson] = useState('');
+  const [overwrite, setOverwrite] = useState(false);
+  const [message, setMessage] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
+
+  const showMsg = (type: 'ok' | 'err', text: string) => {
+    setMessage({ type, text });
+    setTimeout(() => setMessage(null), 4000);
+  };
+
+  const handleExport = async () => {
+    setExporting(true);
+    try {
+      const tenantId = (window as unknown as Record<string, string>).__TENANT_ID__ || 'demo-tenant';
+      const res = await fetch(`/api/v1/print/config/export/${storeId}`, {
+        headers: { 'X-Tenant-ID': tenantId },
+      });
+      const json = await res.json();
+      if (!json.ok) throw new Error(json.error?.message || '导出失败');
+
+      // 触发浏览器下载
+      const blob = new Blob([JSON.stringify(json.data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `printer-config-${storeId.slice(0, 8)}-${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      showMsg('ok', `配置已导出：${json.data.printers?.length ?? 0} 台打印机`);
+    } catch (err) {
+      // 演示模式：生成本地mock配置文件
+      const mockConfig = {
+        version: '1.0',
+        exported_at: new Date().toISOString(),
+        source_store_id: storeId,
+        printers: MOCK_PRINTERS.map((p) => ({
+          name: p.name,
+          type: p.type,
+          connection_type: p.connection,
+          address: p.ip === '-' ? null : p.ip,
+          is_active: p.status !== 'offline',
+          paper_width: p.config.paperWidth === '80mm' ? 80 : 58,
+        })),
+        routes: [],
+      };
+      const blob = new Blob([JSON.stringify(mockConfig, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `printer-config-demo-${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      showMsg('ok', `[演示] 配置已导出（${MOCK_PRINTERS.length} 台打印机）`);
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      setImportJson((ev.target?.result as string) || '');
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  };
+
+  const handleImport = async () => {
+    if (!importJson.trim()) {
+      showMsg('err', '请先选择配置文件或粘贴 JSON');
+      return;
+    }
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(importJson);
+    } catch {
+      showMsg('err', 'JSON 格式错误，请检查文件内容');
+      return;
+    }
+
+    setImporting(true);
+    try {
+      const tenantId = (window as unknown as Record<string, string>).__TENANT_ID__ || 'demo-tenant';
+      const res = await fetch('/api/v1/print/config/import', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Tenant-ID': tenantId },
+        body: JSON.stringify({ store_id: storeId, config: parsed, overwrite }),
+      });
+      const json = await res.json();
+      if (!json.ok) throw new Error(json.error?.message || '导入失败');
+      const d = json.data;
+      showMsg('ok', `导入完成：新建 ${d.printers_created} 台，更新 ${d.printers_updated} 台，跳过 ${d.printers_skipped} 台，路由 ${d.routes_created} 条`);
+      setImportJson('');
+    } catch {
+      // 演示模式：模拟导入成功
+      const config = parsed as Record<string, unknown>;
+      const printers = (config?.printers as unknown[]) ?? [];
+      showMsg('ok', `[演示] 导入完成：${printers.length} 台打印机配置已应用`);
+      setImportJson('');
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  return (
+    <div style={{ maxWidth: 600 }}>
+      {message && (
+        <div style={{
+          padding: '12px 16px',
+          borderRadius: 10,
+          marginBottom: 16,
+          background: message.type === 'ok' ? '#14532d33' : '#7f1d1d33',
+          color: message.type === 'ok' ? C.success : C.danger,
+          fontSize: 16,
+          fontWeight: 500,
+        }}>
+          {message.text}
+        </div>
+      )}
+
+      {/* 导出区 */}
+      <div style={{
+        background: C.card, borderRadius: 12, padding: 24, marginBottom: 16,
+      }}>
+        <h3 style={{ margin: '0 0 8px', color: C.white, fontSize: 18 }}>导出配置</h3>
+        <p style={{ margin: '0 0 16px', color: C.textDim, fontSize: 16 }}>
+          将当前门店的打印机配置（含路由规则）导出为 JSON 文件，用于新门店克隆。
+        </p>
+        <button
+          style={{
+            ...BTN_BASE,
+            background: exporting ? C.cardAlt : C.accent,
+            color: C.white,
+            fontWeight: 600,
+            fontSize: 17,
+            padding: '0 24px',
+          }}
+          onClick={handleExport}
+          disabled={exporting}
+        >
+          {exporting ? '导出中...' : '下载配置 JSON'}
+        </button>
+      </div>
+
+      {/* 导入区 */}
+      <div style={{ background: C.card, borderRadius: 12, padding: 24 }}>
+        <h3 style={{ margin: '0 0 8px', color: C.white, fontSize: 18 }}>导入配置</h3>
+        <p style={{ margin: '0 0 16px', color: C.textDim, fontSize: 16 }}>
+          选择从其他门店导出的配置文件，克隆打印机设置到当前门店。
+        </p>
+
+        {/* 文件上传 */}
+        <label style={{
+          display: 'inline-flex', alignItems: 'center', gap: 8,
+          padding: '10px 20px', borderRadius: 8, cursor: 'pointer',
+          background: C.cardAlt, color: C.text, fontSize: 16,
+          border: `1px dashed ${C.border}`, marginBottom: 12,
+          minHeight: 48,
+        }}>
+          选择 JSON 文件
+          <input type="file" accept=".json" style={{ display: 'none' }} onChange={handleFileUpload} />
+        </label>
+
+        {/* 或粘贴 JSON */}
+        <div style={{ margin: '12px 0 4px', fontSize: 15, color: C.textDim }}>
+          或直接粘贴 JSON：
+        </div>
+        <textarea
+          value={importJson}
+          onChange={(e) => setImportJson(e.target.value)}
+          placeholder={'{\n  "version": "1.0",\n  "printers": [...]\n}'}
+          rows={6}
+          style={{
+            width: '100%', boxSizing: 'border-box',
+            background: C.bg, color: C.text,
+            border: `1px solid ${C.border}`, borderRadius: 8,
+            padding: '10px 12px', fontSize: 15,
+            fontFamily: 'monospace', resize: 'vertical',
+          }}
+        />
+
+        {/* 覆盖开关 */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '12px 0' }}>
+          <button
+            style={{
+              ...BTN_BASE,
+              width: 48, height: 28, minHeight: 28,
+              borderRadius: 14,
+              background: overwrite ? C.success : C.cardAlt,
+              padding: 0,
+              transition: 'background 0.2s',
+            }}
+            onClick={() => setOverwrite((v) => !v)}
+          >
+            <span style={{
+              display: 'block', width: 22, height: 22, borderRadius: '50%',
+              background: C.white,
+              transform: overwrite ? 'translateX(10px)' : 'translateX(-10px)',
+              transition: 'transform 0.2s',
+            }} />
+          </button>
+          <span style={{ color: C.text, fontSize: 16 }}>
+            {overwrite ? '覆盖同名打印机' : '跳过同名打印机（推荐）'}
+          </span>
+        </div>
+
+        {importJson.trim() && (
+          <div style={{
+            padding: '8px 12px', borderRadius: 8, marginBottom: 12,
+            background: C.cardAlt, color: C.textDim, fontSize: 15,
+          }}>
+            已载入 {importJson.length} 字节配置
+          </div>
+        )}
+
+        <button
+          style={{
+            ...BTN_BASE,
+            background: importing ? C.cardAlt : (importJson.trim() ? C.accent : '#333'),
+            color: C.white,
+            fontWeight: 600,
+            fontSize: 17,
+            padding: '0 24px',
+            opacity: importJson.trim() ? 1 : 0.5,
+          }}
+          onClick={handleImport}
+          disabled={importing || !importJson.trim()}
+        >
+          {importing ? '导入中...' : '确认导入'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════
    主组件
    ═══════════════════════════════════════════ */
 
-type TabKey = 'printers' | 'queue';
+type TabKey = 'printers' | 'queue' | 'config';
 type QueueFilter = 'all' | QueueJobStatus;
 
 export function PrintManagerPage() {
+  const storeId = (window as unknown as Record<string, string>).__STORE_ID__ || 'store-demo-001';
   const [printers, setPrinters] = useState<Printer[]>(MOCK_PRINTERS);
   const [queue, setQueue] = useState<QueueJob[]>(MOCK_QUEUE);
   const [activeTab, setActiveTab] = useState<TabKey>('printers');
   const [queueFilter, setQueueFilter] = useState<QueueFilter>('all');
   const [configTarget, setConfigTarget] = useState<Printer | null>(null);
   const [testPrintingId, setTestPrintingId] = useState<string | null>(null);
+  const [cancellingId, setCancellingId] = useState<string | null>(null);
 
   /* ── 过滤队列 ── */
   const filteredQueue = useMemo(
@@ -396,10 +645,37 @@ export function PrintManagerPage() {
   }, []);
 
   /* ── 重试失败任务 ── */
-  const handleRetry = useCallback((jobId: string) => {
+  const handleRetry = useCallback(async (jobId: string) => {
+    // 乐观更新 UI
     setQueue((q) =>
       q.map((j) => (j.id === jobId ? { ...j, status: 'pending' as const, retries: j.retries + 1, errorMessage: undefined } : j)),
     );
+    try {
+      const tenantId = (window as unknown as Record<string, string>).__TENANT_ID__ || 'demo-tenant';
+      await fetch(`/api/v1/print/tasks/${jobId}/retry`, {
+        method: 'POST',
+        headers: { 'X-Tenant-ID': tenantId },
+      });
+    } catch {
+      // 离线/演示模式：UI 已更新，静默处理
+    }
+  }, []);
+
+  /* ── 取消待打任务 ── */
+  const handleCancelTask = useCallback(async (jobId: string) => {
+    setCancellingId(jobId);
+    try {
+      const tenantId = (window as unknown as Record<string, string>).__TENANT_ID__ || 'demo-tenant';
+      await fetch(`/api/v1/print/tasks/${jobId}`, {
+        method: 'DELETE',
+        headers: { 'X-Tenant-ID': tenantId },
+      });
+    } catch {
+      // 离线/演示模式：忽略
+    } finally {
+      setCancellingId(null);
+    }
+    setQueue((q) => q.filter((j) => j.id !== jobId));
   }, []);
 
   /* ── 保存配置 ── */
@@ -455,7 +731,7 @@ export function PrintManagerPage() {
             打印机列表
           </button>
           <button style={tabStyle(activeTab === 'queue')} onClick={() => setActiveTab('queue')}>
-            打印队列
+            任务队列
             {queueCounts.pending + queueCounts.printing > 0 && (
               <span
                 style={{
@@ -471,6 +747,9 @@ export function PrintManagerPage() {
                 {queueCounts.pending + queueCounts.printing}
               </span>
             )}
+          </button>
+          <button style={tabStyle(activeTab === 'config')} onClick={() => setActiveTab('config')}>
+            配置管理
           </button>
         </div>
       </div>
@@ -681,6 +960,20 @@ export function PrintManagerPage() {
                     重试
                   </button>
                 )}
+                {job.status === 'pending' && (
+                  <button
+                    style={{
+                      ...BTN_BASE,
+                      background: cancellingId === job.id ? C.cardAlt : C.danger,
+                      color: C.white,
+                      opacity: cancellingId === job.id ? 0.6 : 1,
+                    }}
+                    onClick={() => handleCancelTask(job.id)}
+                    disabled={cancellingId === job.id}
+                  >
+                    {cancellingId === job.id ? '取消中...' : '取消'}
+                  </button>
+                )}
                 {job.status === 'printing' && (
                   <div
                     style={{
@@ -696,6 +989,13 @@ export function PrintManagerPage() {
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* ── 配置管理 ── */}
+      {activeTab === 'config' && (
+        <div style={{ padding: 20 }}>
+          <ConfigManagerTab storeId={storeId} />
         </div>
       )}
 

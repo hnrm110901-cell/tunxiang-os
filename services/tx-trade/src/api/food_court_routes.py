@@ -698,6 +698,166 @@ async def get_outlet_compare(
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# 商户别名端点（/merchants 别名 → /outlets，保持 API 语义一致）
+# ─────────────────────────────────────────────────────────────────────────────
+
+@router.get("/merchants")
+async def list_merchants(
+    store_id: Optional[str] = Query(None, description="按门店过滤"),
+    status: Optional[str] = Query(None, description="按状态过滤"),
+    page: int = Query(1, ge=1),
+    size: int = Query(20, ge=1, le=100),
+):
+    """获取商户（档口）列表（含当日营业额）—— /outlets 的语义别名。"""
+    return await list_outlets(store_id=store_id, status=status, page=page, size=size)
+
+
+@router.post("/merchants")
+async def create_merchant(req: OutletCreateRequest):
+    """新建档口商户 —— /outlets POST 的语义别名。"""
+    return await create_outlet(req=req)
+
+
+@router.put("/merchants/{merchant_id}")
+async def update_merchant(merchant_id: str, req: OutletUpdateRequest):
+    """更新档口商户信息 —— /outlets PUT 的语义别名。"""
+    return await update_outlet(outlet_id=merchant_id, req=req)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 日结结算端点
+# ─────────────────────────────────────────────────────────────────────────────
+
+class SettlementSplitRequest(BaseModel):
+    store_id: str = Field(..., description="门店ID")
+    settlement_date: Optional[date] = Field(None, description="结算日期，默认今日")
+    outlet_ids: Optional[list[str]] = Field(None, description="指定档口ID列表，默认全部")
+
+
+@router.get("/settlement/daily")
+async def get_daily_settlement(
+    store_id: Optional[str] = Query(None, description="门店ID"),
+    settlement_date: Optional[date] = Query(None, description="结算日期，默认今日"),
+):
+    """按档口拆分日结（各商户营业额/订单数/应结金额）。"""
+    try:
+        outlets = [o for o in MOCK_OUTLETS if not o["is_deleted"]]
+        if store_id:
+            outlets = [o for o in outlets if o["store_id"] == store_id]
+
+        target_date = settlement_date or date.today()
+
+        settlement_items: list[dict] = []
+        total_revenue = 0
+        total_orders = 0
+        total_settlement = 0
+
+        for outlet in outlets:
+            revenue = outlet.get("today_revenue_fen", 0)
+            order_count = outlet.get("today_order_count", 0)
+            ratio = float(outlet.get("settlement_ratio", "1.0"))
+            settlement_amount = int(revenue * ratio)
+
+            total_revenue += revenue
+            total_orders += order_count
+            total_settlement += settlement_amount
+
+            settlement_items.append({
+                "outlet_id": outlet["id"],
+                "outlet_name": outlet["name"],
+                "outlet_code": outlet.get("outlet_code"),
+                "location": outlet.get("location"),
+                "owner_name": outlet.get("owner_name"),
+                "revenue_fen": revenue,
+                "order_count": order_count,
+                "avg_order_fen": revenue // order_count if order_count > 0 else 0,
+                "settlement_ratio": ratio,
+                "settlement_amount_fen": settlement_amount,
+                "status": outlet["status"],
+            })
+
+        return {
+            "ok": True,
+            "data": {
+                "settlement_date": str(target_date),
+                "store_id": store_id,
+                "total_revenue_fen": total_revenue,
+                "total_order_count": total_orders,
+                "total_settlement_fen": total_settlement,
+                "outlet_count": len(settlement_items),
+                "outlets": settlement_items,
+            },
+        }
+    except (KeyError, TypeError, ZeroDivisionError) as exc:
+        logger.error("daily_settlement_failed", error=str(exc))
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+@router.post("/settlement/split")
+async def settlement_split(req: SettlementSplitRequest):
+    """日结时按商户分账汇总（生成各档口结算单）。"""
+    try:
+        target_date = req.settlement_date or date.today()
+
+        outlets = [o for o in MOCK_OUTLETS if not o["is_deleted"]]
+        if req.outlet_ids:
+            outlets = [o for o in outlets if o["id"] in req.outlet_ids]
+
+        split_results: list[dict] = []
+        grand_total_fen = 0
+
+        for outlet in outlets:
+            revenue = outlet.get("today_revenue_fen", 0)
+            order_count = outlet.get("today_order_count", 0)
+            ratio = float(outlet.get("settlement_ratio", "1.0"))
+            settlement_amount = int(revenue * ratio)
+            platform_fee = int(revenue * 0.005)  # 模拟 0.5% 平台服务费
+            net_payout = settlement_amount - platform_fee
+
+            grand_total_fen += net_payout
+
+            split_results.append({
+                "outlet_id": outlet["id"],
+                "outlet_name": outlet["name"],
+                "outlet_code": outlet.get("outlet_code"),
+                "owner_name": outlet.get("owner_name"),
+                "owner_phone": outlet.get("owner_phone"),
+                "settlement_date": str(target_date),
+                "revenue_fen": revenue,
+                "order_count": order_count,
+                "settlement_ratio": ratio,
+                "gross_settlement_fen": settlement_amount,
+                "platform_fee_fen": platform_fee,
+                "net_payout_fen": net_payout,
+                "status": "settled",
+                "settled_at": datetime.now().isoformat(),
+            })
+
+        logger.info(
+            "settlement_split_completed",
+            store_id=req.store_id,
+            outlet_count=len(split_results),
+            grand_total_fen=grand_total_fen,
+            date=str(target_date),
+        )
+
+        return {
+            "ok": True,
+            "data": {
+                "store_id": req.store_id,
+                "settlement_date": str(target_date),
+                "outlet_count": len(split_results),
+                "grand_total_payout_fen": grand_total_fen,
+                "split_details": split_results,
+                "generated_at": datetime.now().isoformat(),
+            },
+        }
+    except (KeyError, TypeError) as exc:
+        logger.error("settlement_split_failed", error=str(exc))
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
 @router.get("/orders")
 async def list_outlet_orders(
     outlet_id: Optional[str] = Query(None, description="按档口过滤"),
