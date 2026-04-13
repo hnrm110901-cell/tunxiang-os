@@ -370,8 +370,10 @@ async def _search_hybrid_v2(
     返回格式与原 Qdrant 路径一致，确保 48 个 Skill Agent 无感切换。
     """
     try:
-        # TODO: 接入实际 DB session
-        # 当前阶段先 fallback 到 Qdrant，等 DB session 注入机制就绪后切换
+        from shared.knowledge_store.hybrid_search import HybridSearchEngine
+        from shared.knowledge_store.reranker import RerankerService
+        from shared.ontology.src.database import TenantSession
+
         logger.info(
             "search_hybrid_v2_invoked",
             collection=collection,
@@ -379,27 +381,23 @@ async def _search_hybrid_v2(
             top_k=top_k,
         )
 
-        # 暂时 fallback 到 Qdrant（DB session 未注入）
-        # 未来接入 DB session 后启用:
-        # from shared.knowledge_store.hybrid_search import HybridSearchEngine
-        # from shared.knowledge_store.reranker import RerankerService
-        # results = await HybridSearchEngine.search(
-        #     query=query,
-        #     collection=collection,
-        #     tenant_id=tenant_id,
-        #     db=db,  # 需要注入
-        #     top_k=20,
-        #     filters=filters,
-        # )
-        # reranked = await RerankerService.rerank(query, results, top_k=top_k)
-        # return _format_hybrid_results(reranked)
+        async with TenantSession(tenant_id) as db:
+            results = await HybridSearchEngine.search(
+                query=query,
+                collection=collection,
+                tenant_id=tenant_id,
+                db=db,
+                top_k=top_k * 4,  # 拉取更多候选供 rerank
+                filters=filters,
+            )
+            reranked = await RerankerService.rerank(query, results, top_k=top_k)
 
-        # Fallback: 使用原 Qdrant 路径（DB session 未注入前复用）
-        return await _search_qdrant(collection, query, tenant_id, top_k, filters)
+        return _format_hybrid_results(reranked)
 
     except Exception as exc:
         logger.warning("search_hybrid_v2_error", error=str(exc), exc_info=True)
-        return []
+        # Fallback: 使用原 Qdrant 路径（混合检索失败时降级）
+        return await _search_qdrant(collection, query, tenant_id, top_k, filters)
 
 
 async def _index_to_pgvector(
@@ -411,12 +409,29 @@ async def _index_to_pgvector(
 ) -> None:
     """双写辅助：将文档索引到 pgvector（旁路写入，失败不影响主流程）。"""
     try:
-        # TODO: 接入实际 DB session 后启用
-        # from shared.knowledge_store.pg_vector_store import PgVectorStore
-        # vector = await EmbeddingService.embed_text(text)
-        # await PgVectorStore.upsert(db, collection, doc_id, text, vector, metadata, tenant_id)
+        from shared.knowledge_store.pg_vector_store import PgVectorStore
+        from shared.ontology.src.database import TenantSession
+
+        vector = await EmbeddingService.embed_text(text)
+        async with TenantSession(tenant_id) as db:
+            await PgVectorStore.upsert_chunks(
+                [
+                    {
+                        "text": text,
+                        "embedding": vector,
+                        "metadata": metadata,
+                        "doc_id": doc_id,
+                        "document_id": doc_id,
+                        "collection": collection,
+                        "chunk_index": 0,
+                        "token_count": len(text.split()),
+                    }
+                ],
+                tenant_id,
+                db,
+            )
         logger.info(
-            "index_to_pgvector_placeholder",
+            "index_to_pgvector_ok",
             collection=collection,
             doc_id=doc_id,
             tenant_id=tenant_id,
@@ -437,3 +452,27 @@ def _doc_id_to_int(doc_id: str) -> int:
     """将字符串doc_id转换为Qdrant使用的整数ID（取MD5前16字节）"""
     digest = hashlib.md5(doc_id.encode()).hexdigest()
     return int(digest[:16], 16)
+
+
+def _format_hybrid_results(results: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """将 HybridSearchEngine / RerankerService 输出格式化为与 Qdrant 路径一致的结构。
+
+    兼容两种输入格式：
+    - HybridSearchEngine: {doc_id, text, score, metadata, ...}
+    - RerankerService:    {doc_id, text, rerank_score, ...}
+    """
+    formatted = []
+    for item in results:
+        formatted.append(
+            {
+                "doc_id": item.get("doc_id", ""),
+                "score": item.get("rerank_score", item.get("score", 0.0)),
+                "text": item.get("text", ""),
+                "metadata": {
+                    k: v
+                    for k, v in item.items()
+                    if k not in ("doc_id", "text", "score", "rerank_score", "tenant_id")
+                },
+            }
+        )
+    return formatted
