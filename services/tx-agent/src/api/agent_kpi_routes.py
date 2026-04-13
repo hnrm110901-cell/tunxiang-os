@@ -637,15 +637,104 @@ async def collect_kpi_snapshots(
         else list(AGENT_KPI_DEFAULTS.keys())
     )
 
-    # ── 构建快照列表 ──
+    # ── 采集真实业务指标（部分 KPI 已接入 DB，其余估算） ──────────────────────
+    await db.execute(
+        text("SELECT set_config('app.tenant_id', :tid, true)"),
+        {"tid": x_tenant_id},
+    )
+
+    # 1. discount_guardian — 来源: orders
+    discount_exc_rate: float | None = None
+    gross_margin_protect: float | None = None
+    try:
+        r = await db.execute(text("""
+            SELECT
+                COUNT(*) FILTER (
+                    WHERE total_amount_fen > 0
+                      AND discount_amount_fen::float / total_amount_fen > 0.3
+                )::float                                  AS exc_count,
+                COUNT(*)::float                           AS total_count
+            FROM orders
+            WHERE tenant_id = :tid::uuid
+              AND DATE(created_at AT TIME ZONE 'Asia/Shanghai') = :d
+              AND status = 'completed'
+        """), {"tid": x_tenant_id, "d": target_date.isoformat()})
+        row = r.mappings().fetchone()
+        total = row["total_count"] or 0
+        if total > 0:
+            discount_exc_rate = round(row["exc_count"] / total * 100, 2)
+            gross_margin_protect = round(100 - discount_exc_rate, 2)
+    except SQLAlchemyError as exc:
+        logger.warning("kpi_collect.discount_guardian_failed", error=str(exc))
+
+    # 2. member_insight — 复购率来源: orders (含 member_id 的去重客户)
+    member_repurchase: float | None = None
+    try:
+        r = await db.execute(text("""
+            WITH period AS (
+                SELECT member_id, COUNT(*) AS order_count
+                FROM orders
+                WHERE tenant_id   = :tid::uuid
+                  AND status      = 'completed'
+                  AND member_id   IS NOT NULL
+                  AND created_at >= :d_start::timestamptz
+                  AND created_at <  :d_end::timestamptz
+                GROUP BY member_id
+            )
+            SELECT
+                COUNT(*) FILTER (WHERE order_count >= 2)::float AS repurchase_count,
+                COUNT(*)::float                                  AS total_members
+            FROM period
+        """), {
+            "tid": x_tenant_id,
+            "d_start": (target_date - timedelta(days=29)).isoformat(),
+            "d_end": (target_date + timedelta(days=1)).isoformat(),
+        })
+        row = r.mappings().fetchone()
+        total_m = row["total_members"] or 0
+        if total_m > 0:
+            member_repurchase = round(row["repurchase_count"] / total_m * 100, 2)
+    except SQLAlchemyError as exc:
+        logger.warning("kpi_collect.member_insight_failed", error=str(exc))
+
+    # 3. store_inspect — 合规评分来源: compliance_alerts
+    compliance_score: float | None = None
+    try:
+        r = await db.execute(text("""
+            SELECT COUNT(*)::int AS open_alerts
+            FROM compliance_alerts
+            WHERE tenant_id = :tid::uuid
+              AND status    = 'open'
+              AND DATE(created_at AT TIME ZONE 'Asia/Shanghai') <= :d
+        """), {"tid": x_tenant_id, "d": target_date.isoformat()})
+        open_alerts = r.scalar() or 0
+        # 每个未处理预警扣5分，最低0分
+        compliance_score = max(0.0, round(100 - open_alerts * 5, 2))
+    except SQLAlchemyError as exc:
+        logger.warning("kpi_collect.store_inspect_failed", error=str(exc))
+
+    # real_values：(agent_id, kpi_type) → measured_value（已有真实数据的覆盖估算）
+    real_values: dict[tuple[str, str], float] = {}
+    if discount_exc_rate is not None:
+        real_values[("discount_guardian", "discount_exception_rate")] = discount_exc_rate
+    if gross_margin_protect is not None:
+        real_values[("discount_guardian", "gross_margin_protection_rate")] = gross_margin_protect
+    if member_repurchase is not None:
+        real_values[("member_insight", "member_repurchase_rate")] = member_repurchase
+    if compliance_score is not None:
+        real_values[("store_inspect", "compliance_score")] = compliance_score
+
+    # ── 构建快照列表 ──────────────────────────────────────────────────────────
     rows_to_insert: list[dict] = []
     for aid in agents_to_collect:
         kpi_list = AGENT_KPI_DEFAULTS.get(aid, [])
         for kpi in kpi_list:
             target = kpi["target_value"]
             direction = kpi["direction"]
-            # 占位测量值：生产时替换为真实业务查询
-            if direction == "lower_better":
+            key = (aid, kpi["kpi_type"])
+            if key in real_values:
+                measured = real_values[key]
+            elif direction == "lower_better":
                 measured = round(target * 0.85, 2)
             else:
                 measured = round(target * 1.02, 2)
@@ -660,7 +749,7 @@ async def collect_kpi_snapshots(
                 "achievement_rate": rate,
                 "store_id": store_id_val,
                 "snapshot_date": target_date,
-                "metadata": None,
+                "metadata": '{"source": "real_db"}' if key in real_values else None,
             })
 
     # ── 批量写入（ON CONFLICT 跳过重复） ──

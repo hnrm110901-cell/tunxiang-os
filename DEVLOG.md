@@ -4,6 +4,58 @@
 
 ---
 
+## 2026-04-13 宴会KDS + 定金 v252 迁移（补写遗留建表）
+
+### 今日完成
+- [shared/db-migrations/v252] 新增 `banquet_kds_dishes` 表：
+  - 字段：tenant_id / session_id / dish_id / dish_name / total_qty / served_qty / serve_status（pending/serving/served）/ called_at / served_at / sequence_no / notes / is_deleted
+  - 索引：(tenant_id, session_id) + (session_id, sequence_no)
+  - RLS：NULLIF(current_setting('app.tenant_id', true), '')::uuid
+- [shared/db-migrations/v252] 新增 `banquet_session_deposits` 表：
+  - 字段：tenant_id / session_id / amount_fen / balance_fen / payment_method / status（active/applied/refunded）/ operator_id / notes / collected_at / applied_at / is_deleted
+  - 索引：(tenant_id, session_id) + (session_id, status)
+  - RLS：同上
+- 幂等建表（`if table not in existing_tables`），downgrade 用 CASCADE DROP
+
+### 数据变化
+- 迁移版本：v251 → v252
+- 新增表：2个（banquet_kds_dishes + banquet_session_deposits）
+- 修复：banquet_kds_routes.py + banquet_deposit_routes.py 依赖的表此前未建，现补齐
+
+### 遗留问题
+- serve_dispatch / inventory_agent 等9个 KPI 仍为估算值
+- agent_auto_executions 仍为空
+
+### 明日计划
+- 推进下一待排模块
+
+---
+
+## 2026-04-13 agent_kpi_snapshots 真实 DB 测量值接入（4个KPI替换占位估算）
+
+### 今日完成
+- [tx-agent/agent_kpi_routes.py] `collect_kpi_snapshots` 前置采集真实业务指标：
+  - `discount_guardian.discount_exception_rate`：查 `orders` 表，当日完成订单中 discount_amount_fen/total_amount_fen > 30% 的比率（%）
+  - `discount_guardian.gross_margin_protection_rate`：100 - discount_exception_rate（联动推导）
+  - `member_insight.member_repurchase_rate`：滚动30日窗口，统计含会员ID的订单中复购2次+的会员比例（%）
+  - `store_inspect.compliance_score`：100 - open compliance_alerts × 5，下限0分
+  - 查询失败时静默降级到估算值（SQLAlchemyError → log.warning，不影响其他KPI）
+  - 真实数据行写入 metadata: '{"source": "real_db"}'，估算行 metadata: null
+  - 其余9个KPI（serve_dispatch/inventory_agent等）保持 target×系数估算，待各业务表成熟后逐步接入
+
+### 数据变化
+- 无新迁移
+- 采集精度提升：13个KPI中4个从估算升为真实DB查询
+
+### 遗留问题
+- serve_dispatch / inventory_agent / finance_audit 等剩余9个KPI仍为估算（待各服务真实表接入）
+- agent_auto_executions 仍为空
+
+### 明日计划
+- 推进下一待排模块
+
+---
+
 ## 2026-04-13 企业挂账 v251 全量 DB 迁移（account + billing 完整落库）
 
 ### 今日完成
