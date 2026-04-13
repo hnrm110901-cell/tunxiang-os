@@ -15,13 +15,17 @@
 """
 from __future__ import annotations
 
-import hashlib
 from datetime import datetime
 from typing import Optional
 
 import structlog
-from fastapi import APIRouter, Header, HTTPException, Query
+from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel, Field
+from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from shared.ontology.src.database import get_db
 
 logger = structlog.get_logger()
 
@@ -100,48 +104,44 @@ ALLERGEN_LABELS: dict[str, str] = {
 # ─── 4因子评分引擎 ─────────────────────────────────────────────────────────────
 
 def _score_dishes(
-    dishes: list[dict],
-    history_top: list[str],      # 用户历史高频菜品ID
-    hot_dishes: list[str],       # 当前时段热销菜品ID
+    dishes: list[PersonalizedDish],
+    history_top: list[str],      # 用户历史高频菜名
+    hot_dishes: list[str],       # 当前时段热销菜名
     cart_items: list[str],       # 购物车中已有菜品ID
     user_allergies: list[str],   # 用户过敏原列表
     is_subscriber: bool,         # 是否付费会员
 ) -> list[PersonalizedDish]:
     """4因子加权 + 过敏过滤 + 会员价"""
     results = []
-    filtered_count = 0
 
     for dish in dishes:
-        did = dish.get("id", "")
-        name = dish.get("name", "")
-        price = dish.get("price_fen", 0)
+        name = dish.name
+        price = dish.price_fen
 
-        # ─── 过敏原检测 ────────────────────────────────────────────
-        dish_allergens = DISH_ALLERGENS.get(name, [])
-        matched_allergens = [a for a in dish_allergens if a in user_allergies]
+        # ─── 过敏原检测（使用DB字段）─────────────────────────────
+        matched_allergens = [a for a in dish.allergens if a in user_allergies]
         allergen_warning = None
         if matched_allergens:
             labels = [ALLERGEN_LABELS.get(a, a) for a in matched_allergens]
             allergen_warning = f"含{'/'.join(labels)}，您已标记过敏"
-            filtered_count += 1
 
         # ─── 4因子评分 ─────────────────────────────────────────────
         score = 0.0
         reason = ""
         reason_type = ""
 
-        # 1. 历史偏好 (0.35)
-        if did in history_top:
-            rank = history_top.index(did)
+        # 1. 历史偏好 (0.35) — 按菜名匹配
+        if name in history_top:
+            rank = history_top.index(name)
             history_score = max(0, (10 - rank) / 10) * 0.35
             score += history_score
             if history_score > 0.1:
                 reason = "您的常点菜品"
                 reason_type = "history"
 
-        # 2. 时段热销 (0.25)
-        if did in hot_dishes:
-            rank = hot_dishes.index(did)
+        # 2. 时段热销 (0.25) — 按菜名匹配
+        if name in hot_dishes:
+            rank = hot_dishes.index(name)
             hot_score = max(0, (10 - rank) / 10) * 0.25
             score += hot_score
             if not reason and hot_score > 0.1:
@@ -151,8 +151,8 @@ def _score_dishes(
                 reason_type = "hot"
 
         # 3. 购物篮关联 (0.25) — 简化版：同品类提权
-        dish_cat = dish.get("category", "")
-        cart_cats = [d.get("category", "") for d in dishes if d.get("id") in cart_items]
+        dish_cat = dish.category
+        cart_cats = [d.category for d in dishes if d.dish_id in cart_items]
         if dish_cat and dish_cat not in cart_cats and cart_items:
             score += 0.15  # 品类互补
             if not reason:
@@ -176,20 +176,20 @@ def _score_dishes(
             score *= 0.1  # 大幅降权但不完全移除（前端控制显隐）
 
         results.append(PersonalizedDish(
-            dish_id=did,
+            dish_id=dish.dish_id,
             name=name,
-            category=dish.get("category", ""),
+            category=dish.category,
             price_fen=price,
             member_price_fen=member_price,
-            image_url=dish.get("image_url", ""),
+            image_url=dish.image_url,
             personal_score=round(score, 4),
             reason=reason,
             reason_type=reason_type,
             allergen_warning=allergen_warning,
-            allergens=dish_allergens,
+            allergens=dish.allergens,
             is_recommended=score > 0.2,
-            is_sold_out=dish.get("is_sold_out", False),
-            tags=dish.get("tags", []),
+            is_sold_out=dish.is_sold_out,
+            tags=dish.tags,
         ))
 
     # 按个性化分排序（降序）
@@ -224,30 +224,118 @@ async def get_personalized_menu(
     customer_id: str = Query("", description="客户ID（未登录为空）"),
     cart_items: str = Query("", description="购物车菜品ID,逗号分隔"),
     x_tenant_id: str = Header(None, alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ):
     """返回个性化排序的菜品列表"""
     if not x_tenant_id:
         raise HTTPException(status_code=400, detail="X-Tenant-ID required")
 
-    # TODO: 从DB读取真实菜品数据
-    dishes = DEMO_DISHES
+    # 设置 RLS 租户上下文
+    await db.execute(
+        text("SELECT set_config('app.tenant_id', :tid, true)"),
+        {"tid": x_tenant_id},
+    )
 
-    # TODO: 从 tx-member 读取用户画像（当前mock）
-    # 真实场景：调用 GET /api/v1/member/recommend/order-time
-    history_top = ["d01", "d03", "d02", "d05"]  # 用户历史Top菜品
-    user_allergies: list[str] = []               # 用户过敏原
-    is_subscriber = False                        # 是否付费会员
-    user_segment = "S3"                          # RFM分层
+    # ─── 1. 从DB读取真实菜品 ──────────────────────────────────────
+    dishes: list[PersonalizedDish] = []
+    try:
+        dish_rows = await db.execute(
+            text("""
+                SELECT
+                    d.id::text AS dish_id,
+                    d.dish_name AS name,
+                    COALESCE(c.name, '其他') AS category,
+                    d.price_fen,
+                    d.image_url,
+                    d.is_available,
+                    d.allergens,
+                    d.tags
+                FROM dishes d
+                LEFT JOIN dish_categories c
+                    ON c.id = d.category_id AND c.tenant_id = d.tenant_id
+                WHERE d.tenant_id = :tid::uuid
+                  AND (d.store_id = :sid::uuid OR d.store_id IS NULL)
+                  AND d.is_deleted = false
+                ORDER BY COALESCE(c.sort_order, 999), d.dish_name
+                LIMIT 200
+            """),
+            {"tid": x_tenant_id, "sid": store_id},
+        )
+        for row in dish_rows.mappings():
+            dishes.append(PersonalizedDish(
+                dish_id=row["dish_id"],
+                name=row["name"],
+                category=row["category"],
+                price_fen=row["price_fen"],
+                member_price_fen=None,
+                image_url=row["image_url"] or "",
+                personal_score=0.0,
+                is_sold_out=not row["is_available"],
+                allergens=row["allergens"] or [],
+                tags=row["tags"] or [],
+            ))
+    except SQLAlchemyError:
+        logger.exception("personalized_menu.dishes_query_failed", tenant_id=x_tenant_id, store_id=store_id)
+        dishes = []
 
-    # 从请求参数提取
-    cart_list = [c.strip() for c in cart_items.split(",") if c.strip()]
+    # ─── 2. 从DB读取用户历史偏好 ─────────────────────────────────
+    history_top: list[str] = []
+    if customer_id:
+        try:
+            history_rows = await db.execute(
+                text("""
+                    SELECT oi.dish_name, COUNT(*) AS cnt
+                    FROM order_items oi
+                    JOIN orders o ON o.id = oi.order_id AND o.tenant_id = oi.tenant_id
+                    WHERE oi.tenant_id = :tid::uuid
+                      AND o.customer_id = :cid::uuid
+                      AND o.created_at >= NOW() - INTERVAL '90 days'
+                      AND o.status IN ('paid', 'completed')
+                    GROUP BY oi.dish_name
+                    ORDER BY cnt DESC
+                    LIMIT 10
+                """),
+                {"tid": x_tenant_id, "cid": customer_id},
+            )
+            history_top = [row["dish_name"] for row in history_rows.mappings()]
+        except SQLAlchemyError:
+            logger.exception("personalized_menu.history_query_failed", tenant_id=x_tenant_id, customer_id=customer_id)
+            history_top = []
+
+    # ─── 3. 从DB读取当前时段热销菜 ───────────────────────────────
+    hot_dishes: list[str] = []
+    try:
+        hot_rows = await db.execute(
+            text("""
+                SELECT oi.dish_name, COUNT(*) AS cnt
+                FROM order_items oi
+                JOIN orders o ON o.id = oi.order_id AND o.tenant_id = oi.tenant_id
+                WHERE oi.tenant_id = :tid::uuid
+                  AND o.store_id = :sid::uuid
+                  AND o.status IN ('paid', 'completed')
+                  AND o.created_at >= NOW() - INTERVAL '7 days'
+                GROUP BY oi.dish_name
+                ORDER BY cnt DESC
+                LIMIT 10
+            """),
+            {"tid": x_tenant_id, "sid": store_id},
+        )
+        hot_dishes = [row["dish_name"] for row in hot_rows.mappings()]
+    except SQLAlchemyError:
+        logger.exception("personalized_menu.hot_dishes_query_failed", tenant_id=x_tenant_id, store_id=store_id)
+        hot_dishes = []
+
+    # TODO: 从 tx-member 读取用户画像（Phase 3 feature）
+    user_allergies: list[str] = []   # 用户过敏原
+    is_subscriber = False            # 是否付费会员
+    user_segment = "S3"              # RFM分层
 
     # TODO: 从 X-User-Segment / X-User-Prefs headers读取（Phase 3中间件注入）
-    # segment_header = request.headers.get("X-User-Segment", "")
-    # prefs_header = request.headers.get("X-User-Prefs", "")
+
+    # 从请求参数提取购物车
+    cart_list = [c.strip() for c in cart_items.split(",") if c.strip()]
 
     meal_period = _current_meal_period()
-    hot_dishes = ["d03", "d01", "d05", "d06", "d11"]  # 当前时段热销
 
     # 执行个性化评分
     personalized = _score_dishes(
