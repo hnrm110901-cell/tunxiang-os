@@ -199,25 +199,6 @@ def _score_dishes(
 
 # ─── Endpoint ──────────────────────────────────────────────────────────────────
 
-# Demo数据（生产环境从DB读取）
-DEMO_DISHES = [
-    {"id": "d01", "name": "剁椒鱼头", "category": "招牌菜", "price_fen": 8800, "tags": ["招牌"]},
-    {"id": "d02", "name": "农家小炒肉", "category": "热菜", "price_fen": 4200},
-    {"id": "d03", "name": "口味虾", "category": "招牌菜", "price_fen": 12800, "tags": ["季节"]},
-    {"id": "d04", "name": "辣椒炒肉", "category": "热菜", "price_fen": 3800},
-    {"id": "d05", "name": "红烧肉", "category": "热菜", "price_fen": 5800},
-    {"id": "d06", "name": "蒜蓉粉丝蒸扇贝", "category": "海鲜", "price_fen": 6800},
-    {"id": "d07", "name": "凉拌黄瓜", "category": "凉菜", "price_fen": 900},
-    {"id": "d08", "name": "夫妻肺片", "category": "凉菜", "price_fen": 3200},
-    {"id": "d09", "name": "皮蛋豆腐", "category": "凉菜", "price_fen": 1800},
-    {"id": "d10", "name": "鲈鱼（活）", "category": "活鲜", "price_fen": 5800},
-    {"id": "d11", "name": "基围虾（活）", "category": "活鲜", "price_fen": 9800},
-    {"id": "d13", "name": "番茄蛋汤", "category": "汤羹", "price_fen": 1200},
-    {"id": "d15", "name": "米饭", "category": "主食", "price_fen": 300},
-    {"id": "d17", "name": "酸梅汤", "category": "饮品", "price_fen": 800},
-]
-
-
 @router.get("")
 async def get_personalized_menu(
     store_id: str = Query(..., description="门店ID"),

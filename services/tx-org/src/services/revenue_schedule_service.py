@@ -149,9 +149,9 @@ class RevenueScheduleService:
             if hourly_data:
                 return self._aggregate_hourly_to_slots(hourly_data)
 
-            # 方案C：mock 兜底
-            logger.warning("revenue_schedule.fallback_to_mock", store_id=store_id)
-            return self._mock_revenue_pattern()
+            # 方案C：无历史数据，返回降级空结构
+            logger.warning("revenue_schedule.no_historical_data", store_id=store_id)
+            return self._degraded_revenue_pattern()
 
         # 从日营收按时段占比拆分
         return self._split_daily_to_slots(daily_revenues)
@@ -311,33 +311,24 @@ class RevenueScheduleService:
             "data_source": "actual",
         }
 
-    def _mock_revenue_pattern(self) -> Dict[str, Any]:
-        """兜底mock数据（基于长沙中型餐饮门店典型值）。"""
-        mock_data = {
-            "early_morning": 15000,
-            "lunch_peak":    120000,
-            "lunch_valley":  25000,
-            "dinner_peak":   145000,
-            "dinner_valley": 28000,
-            "night":         12000,
-        }
+    def _degraded_revenue_pattern(self) -> Dict[str, Any]:
+        """无历史数据时的降级响应（所有时段返回零值）。"""
         slots = []
         for key, name, start, end in TIME_SLOTS:
-            avg = mock_data.get(key, 10000)
             slots.append({
                 "slot_key": key,
                 "slot_name": name,
                 "start_time": start,
                 "end_time": end,
-                "avg_revenue_fen": avg,
-                "peak_revenue_fen": int(avg * 1.3),
-                "std_dev_fen": int(avg * 0.15),
+                "avg_revenue_fen": 0,
+                "peak_revenue_fen": 0,
+                "std_dev_fen": 0,
                 "sample_days": 0,
             })
         return {
             "slots": slots,
-            "total_avg_daily_revenue_fen": sum(mock_data.values()),
-            "data_source": "mock",
+            "total_avg_daily_revenue_fen": 0,
+            "data_source": "degraded",
         }
 
     # ------------------------------------------------------------------

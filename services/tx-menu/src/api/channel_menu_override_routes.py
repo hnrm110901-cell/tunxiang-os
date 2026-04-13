@@ -14,7 +14,7 @@ Y-C4
 from __future__ import annotations
 
 import uuid as _uuid
-from datetime import date, datetime, time
+from datetime import date, datetime
 from typing import Optional
 
 import structlog
@@ -45,96 +45,6 @@ _CHANNEL_DISPLAY = {
     "all": "全渠道",
 }
 
-# ─── Mock 数据（3个门店不同渠道的差异配置） ────────────────────────────────────
-
-MOCK_OVERRIDES = [
-    {
-        "id": "ov-001",
-        "store_id": "store-wuyi",
-        "store_name": "五一广场店",
-        "dish_id": "dish-steam-fish",
-        "dish_name": "招牌蒸鱼",
-        "channel": "meituan",
-        "channel_display": "外卖-美团",
-        "brand_price_fen": 9800,
-        "override_price_fen": 10800,
-        "price_diff_fen": 1000,
-        "price_diff_rate": 0.102,
-        "is_available": True,
-        "override_reason": "regional_price",
-        "effective_date": "2026-01-01",
-        "expires_date": None,
-    },
-    {
-        "id": "ov-002",
-        "store_id": "store-wuyi",
-        "store_name": "五一广场店",
-        "dish_id": "dish-white-shrimp",
-        "dish_name": "白灼虾",
-        "channel": "takeaway",
-        "channel_display": "外卖（自营）",
-        "brand_price_fen": 7800,
-        "override_price_fen": None,
-        "price_diff_fen": None,
-        "price_diff_rate": None,
-        "is_available": False,
-        "override_reason": "stock",
-        "note": "外卖不提供生猛海鲜",
-        "effective_date": "2026-01-01",
-        "expires_date": None,
-    },
-    {
-        "id": "ov-003",
-        "store_id": "store-guanggu",
-        "store_name": "光谷店",
-        "dish_id": "dish-steam-fish",
-        "dish_name": "招牌蒸鱼",
-        "channel": "meituan",
-        "channel_display": "外卖-美团",
-        "brand_price_fen": 9800,
-        "override_price_fen": 9800,
-        "price_diff_fen": 0,
-        "price_diff_rate": 0.0,
-        "is_available": True,
-        "override_reason": None,
-        "effective_date": "2026-01-01",
-        "expires_date": None,
-    },
-    {
-        "id": "ov-004",
-        "store_id": "store-xintiandi",
-        "store_name": "新天地店",
-        "dish_id": "dish-steam-fish",
-        "dish_name": "招牌蒸鱼",
-        "channel": "meituan",
-        "channel_display": "外卖-美团",
-        "brand_price_fen": 9800,
-        "override_price_fen": 13800,
-        "price_diff_fen": 4000,
-        "price_diff_rate": 0.408,
-        "is_available": True,
-        "override_reason": "regional_price",
-        "effective_date": "2026-01-01",
-        "expires_date": None,
-    },
-    {
-        "id": "ov-005",
-        "store_id": "store-xintiandi",
-        "store_name": "新天地店",
-        "dish_id": "dish-boiled-fish",
-        "dish_name": "水煮鱼",
-        "channel": "dine_in",
-        "channel_display": "堂食",
-        "brand_price_fen": 6800,
-        "override_price_fen": 6800,
-        "price_diff_fen": 0,
-        "price_diff_rate": 0.0,
-        "is_available": True,
-        "override_reason": None,
-        "effective_date": "2026-01-01",
-        "expires_date": None,
-    },
-]
 
 # ─── 工具函数 ────────────────────────────────────────────────────────────────
 
@@ -666,36 +576,80 @@ async def detect_conflicts(
     threshold_rate: float = Query(0.30, ge=0.01, le=2.0,
                                   description="价差阈值：外卖比堂食高X%则告警，默认0.30=30%"),
     request: Request = None,
-    _db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ) -> dict:
     """检测渠道间价格冲突。
     规则：若某菜品在外卖渠道(meituan/eleme/douyin/takeaway)的价格比堂食(dine_in)高于阈值，则告警。
-    使用Mock数据演示冲突检测逻辑。
+    从 channel_menu_overrides 表读取真实数据进行检测。
     """
+    from sqlalchemy.exc import SQLAlchemyError
+
     tenant_id = _tenant_id(request)
 
-    # 以Mock数据演示冲突检测
-    conflict_dishes = []
+    try:
+        _tid = _uuid.UUID(tenant_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=f"tenant_id 格式错误: {tenant_id}") from exc
 
-    # 构建菜品-渠道价格映射
+    store_filter_params: dict = {"tid": _tid}
+    store_filter_sql = ""
+    if store_id:
+        try:
+            store_filter_params["sid"] = _uuid.UUID(store_id)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=f"store_id 格式错误: {store_id}") from exc
+        store_filter_sql = "AND cmo.store_id = :sid"
+
+    await _set_rls(db, tenant_id)
+
+    conflict_dishes = []
+    try:
+        # 查询每个 (store_id, dish_id) 跨渠道的有效价格
+        # effective_price = override price_fen 若有，否则用 brand price_fen
+        result = await db.execute(
+            text(f"""
+                SELECT
+                    cmo.store_id::text,
+                    cmo.dish_id::text,
+                    d.dish_name,
+                    cmo.channel,
+                    COALESCE(cmo.price_fen, d.price_fen) AS effective_price_fen,
+                    d.price_fen                           AS brand_price_fen
+                FROM channel_menu_overrides cmo
+                JOIN dishes d
+                  ON d.id = cmo.dish_id
+                 AND d.tenant_id = cmo.tenant_id
+                 AND d.is_deleted = false
+                WHERE cmo.tenant_id = :tid
+                  AND cmo.is_deleted = false
+                  AND cmo.is_available = true
+                  AND (cmo.expires_date IS NULL OR cmo.expires_date >= CURRENT_DATE)
+                  {store_filter_sql}
+                ORDER BY cmo.store_id, cmo.dish_id, cmo.channel
+            """),
+            store_filter_params,
+        )
+        rows = result.fetchall()
+    except SQLAlchemyError:
+        log.exception("conflict_detection.query_failed", tenant_id=tenant_id)
+        rows = []
+
+    # 构建 (store_id, dish_id) → {channel: price} 映射
+    _delivery_channels = {"meituan", "eleme", "douyin", "takeaway"}
     dish_channel_prices: dict[str, dict] = {}
-    for ov in MOCK_OVERRIDES:
-        if store_id and ov["store_id"] != store_id:
-            continue
-        key = f"{ov['store_id']}:{ov['dish_id']}"
+    for r in rows:
+        key = f"{r[0]}:{r[1]}"
         if key not in dish_channel_prices:
             dish_channel_prices[key] = {
-                "store_name": ov["store_name"],
-                "dish_name": ov["dish_name"],
-                "dish_id": ov["dish_id"],
-                "brand_price_fen": ov["brand_price_fen"],
+                "store_id": r[0],
+                "dish_id": r[1],
+                "dish_name": r[2],
+                "brand_price_fen": r[5],
                 "channels": {},
             }
-        effective_price = ov.get("override_price_fen") or ov["brand_price_fen"]
-        dish_channel_prices[key]["channels"][ov["channel"]] = effective_price
+        dish_channel_prices[key]["channels"][r[3]] = r[4]
 
     # 检测冲突
-    _delivery_channels = {"meituan", "eleme", "douyin", "takeaway"}
     for _key, dish_info in dish_channel_prices.items():
         channels = dish_info["channels"]
         dine_in_price = channels.get("dine_in", dish_info["brand_price_fen"])
@@ -705,7 +659,7 @@ async def detect_conflicts(
                 diff_rate = (ch_price - dine_in_price) / dine_in_price
                 if diff_rate > threshold_rate:
                     conflict_dishes.append({
-                        "store_name": dish_info["store_name"],
+                        "store_id": dish_info["store_id"],
                         "dish_name": dish_info["dish_name"],
                         "dish_id": dish_info["dish_id"],
                         "conflict_channel": ch,

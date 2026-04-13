@@ -15,112 +15,86 @@
 
 统一响应格式: {"ok": bool, "data": {}, "error": None}
 所有接口需 X-Tenant-ID header。
-"""
-import uuid
-from datetime import datetime, timezone
-from typing import List, Optional
 
-from fastapi import APIRouter, HTTPException, Query, Request
+DB 表说明：
+  stores.store_name        ↔ API name
+  stores.operation_mode    ↔ API type  (direct / franchise)
+  tables.table_no          ↔ API number
+  tables.seats             ↔ API capacity
+  tables.config->>shape    ↔ API shape
+  tables.config->>note     ↔ API note
+"""
+import json
+import uuid
+from typing import Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
+from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from shared.ontology.src.database import get_db
 
 router = APIRouter(tags=["store-management"])
+
 
 # ─── 工具 ──────────────────────────────────────────────────────────────────────
 
 def _ok(data: dict | list) -> dict:
     return {"ok": True, "data": data, "error": None}
 
-def _now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
 
 def _get_tenant_id(request: Request) -> str:
-    return request.headers.get("X-Tenant-ID", "")
+    tid = getattr(request.state, "tenant_id", None) or request.headers.get("X-Tenant-ID", "")
+    if not tid:
+        raise HTTPException(status_code=400, detail="X-Tenant-ID header required")
+    return tid
 
-# ─── Mock 存储（内存，重启清空） ───────────────────────────────────────────────
 
-DEMO_TENANT_ID = "10000000-0000-0000-0000-000000000001"
-DEMO_STORE_ID  = "20000000-0000-0000-0000-000000000001"
+async def _set_rls(db: AsyncSession, tenant_id: str) -> None:
+    """在当前 DB 会话中设置 RLS app.tenant_id。"""
+    await db.execute(
+        text("SELECT set_config('app.tenant_id', :tid, true)"),
+        {"tid": tenant_id},
+    )
 
-_STORES: List[dict] = [
-    {
-        "id": DEMO_STORE_ID, "tenant_id": DEMO_TENANT_ID,
-        "name": "徐记海鲜·五一广场旗舰店", "type": "direct", "city": "长沙",
-        "address": "湖南省长沙市天心区五一广场8号", "status": "active",
-        "today_revenue_fen": 0, "table_count": 15,
-        "manager": "李淳", "phone": "0731-88888888",
-        "created_at": "2026-04-04T00:00:00Z", "is_deleted": False,
-    },
-    {
-        "id": "s1", "tenant_id": "demo",
-        "name": "五一广场店", "type": "direct", "city": "长沙",
-        "address": "五一广场1号", "status": "active",
-        "today_revenue_fen": 1280000, "table_count": 40,
-        "manager": "李明", "phone": "13900001111",
-        "created_at": "2024-03-01T00:00:00Z", "is_deleted": False,
-    },
-    {
-        "id": "s2", "tenant_id": "demo",
-        "name": "东塘店", "type": "direct", "city": "长沙",
-        "address": "东塘路88号", "status": "active",
-        "today_revenue_fen": 860000, "table_count": 28,
-        "manager": "王芳", "phone": "13900002222",
-        "created_at": "2024-05-15T00:00:00Z", "is_deleted": False,
-    },
-    {
-        "id": "s3", "tenant_id": "demo",
-        "name": "河西万达店", "type": "franchise", "city": "长沙",
-        "address": "万达广场3楼", "status": "active",
-        "today_revenue_fen": 720000, "table_count": 32,
-        "manager": "赵强", "phone": "13900003333",
-        "created_at": "2024-08-20T00:00:00Z", "is_deleted": False,
-    },
-    {
-        "id": "s4", "tenant_id": "demo",
-        "name": "株洲神农城店", "type": "franchise", "city": "株洲",
-        "address": "神农城商圈B2", "status": "suspended",
-        "today_revenue_fen": 0, "table_count": 24,
-        "manager": "张建国", "phone": "13900004444",
-        "created_at": "2024-11-10T00:00:00Z", "is_deleted": False,
-    },
-]
 
-_TABLES: List[dict] = [
-    # 演示门店桌台（徐记海鲜·五一广场旗舰店）
-    {"id": "d01", "store_id": DEMO_STORE_ID, "number": "A01", "area": "大厅A区", "capacity": 4,  "status": "available", "shape": "square",    "note": "", "is_deleted": False},
-    {"id": "d02", "store_id": DEMO_STORE_ID, "number": "A02", "area": "大厅A区", "capacity": 4,  "status": "available", "shape": "square",    "note": "", "is_deleted": False},
-    {"id": "d03", "store_id": DEMO_STORE_ID, "number": "A03", "area": "大厅A区", "capacity": 6,  "status": "occupied",  "shape": "rectangle", "note": "", "is_deleted": False},
-    {"id": "d04", "store_id": DEMO_STORE_ID, "number": "A04", "area": "大厅A区", "capacity": 6,  "status": "available", "shape": "rectangle", "note": "", "is_deleted": False},
-    {"id": "d05", "store_id": DEMO_STORE_ID, "number": "A05", "area": "大厅A区", "capacity": 8,  "status": "available", "shape": "rectangle", "note": "", "is_deleted": False},
-    {"id": "d06", "store_id": DEMO_STORE_ID, "number": "B01", "area": "大厅B区", "capacity": 4,  "status": "available", "shape": "square",    "note": "", "is_deleted": False},
-    {"id": "d07", "store_id": DEMO_STORE_ID, "number": "B02", "area": "大厅B区", "capacity": 4,  "status": "reserved",  "shape": "square",    "note": "", "is_deleted": False},
-    {"id": "d08", "store_id": DEMO_STORE_ID, "number": "B03", "area": "大厅B区", "capacity": 6,  "status": "available", "shape": "rectangle", "note": "", "is_deleted": False},
-    {"id": "d09", "store_id": DEMO_STORE_ID, "number": "B04", "area": "大厅B区", "capacity": 8,  "status": "available", "shape": "rectangle", "note": "", "is_deleted": False},
-    {"id": "d10", "store_id": DEMO_STORE_ID, "number": "B05", "area": "大厅B区", "capacity": 10, "status": "available", "shape": "rectangle", "note": "", "is_deleted": False},
-    {"id": "d11", "store_id": DEMO_STORE_ID, "number": "VIP1","area": "贵宾包厢", "capacity": 8,  "status": "available", "shape": "rectangle", "note": "", "is_deleted": False},
-    {"id": "d12", "store_id": DEMO_STORE_ID, "number": "VIP2","area": "贵宾包厢", "capacity": 10, "status": "available", "shape": "rectangle", "note": "", "is_deleted": False},
-    {"id": "d13", "store_id": DEMO_STORE_ID, "number": "VIP3","area": "贵宾包厢", "capacity": 12, "status": "available", "shape": "rectangle", "note": "", "is_deleted": False},
-    {"id": "d14", "store_id": DEMO_STORE_ID, "number": "VIP4","area": "贵宾包厢", "capacity": 16, "status": "occupied",  "shape": "rectangle", "note": "", "is_deleted": False},
-    {"id": "d15", "store_id": DEMO_STORE_ID, "number": "T01", "area": "室外露台", "capacity": 4,  "status": "available", "shape": "round",     "note": "", "is_deleted": False},
-    # 原 mock 门店桌台
-    {"id": "t1",  "store_id": "s1", "number": "A01", "area": "大厅", "capacity": 4,  "status": "available", "shape": "square",    "note": "", "is_deleted": False},
-    {"id": "t2",  "store_id": "s1", "number": "A02", "area": "大厅", "capacity": 2,  "status": "occupied",  "shape": "round",     "note": "", "is_deleted": False},
-    {"id": "t3",  "store_id": "s1", "number": "A03", "area": "大厅", "capacity": 6,  "status": "available", "shape": "rectangle", "note": "", "is_deleted": False},
-    {"id": "t4",  "store_id": "s1", "number": "A04", "area": "大厅", "capacity": 4,  "status": "reserved",  "shape": "square",    "note": "", "is_deleted": False},
-    {"id": "t5",  "store_id": "s1", "number": "A05", "area": "大厅", "capacity": 4,  "status": "cleaning",  "shape": "square",    "note": "", "is_deleted": False},
-    {"id": "t6",  "store_id": "s1", "number": "A06", "area": "大厅", "capacity": 8,  "status": "available", "shape": "rectangle", "note": "", "is_deleted": False},
-    {"id": "t7",  "store_id": "s1", "number": "A07", "area": "大厅", "capacity": 2,  "status": "occupied",  "shape": "round",     "note": "", "is_deleted": False},
-    {"id": "t8",  "store_id": "s1", "number": "A08", "area": "大厅", "capacity": 4,  "status": "available", "shape": "square",    "note": "", "is_deleted": False},
-    {"id": "t9",  "store_id": "s1", "number": "B01", "area": "包厢", "capacity": 8,  "status": "reserved",  "shape": "rectangle", "note": "", "is_deleted": False},
-    {"id": "t10", "store_id": "s1", "number": "B02", "area": "包厢", "capacity": 10, "status": "available", "shape": "rectangle", "note": "", "is_deleted": False},
-    {"id": "t11", "store_id": "s1", "number": "B03", "area": "包厢", "capacity": 12, "status": "occupied",  "shape": "rectangle", "note": "", "is_deleted": False},
-    {"id": "t12", "store_id": "s1", "number": "B04", "area": "包厢", "capacity": 8,  "status": "available", "shape": "rectangle", "note": "", "is_deleted": False},
-    {"id": "t13", "store_id": "s1", "number": "C01", "area": "室外", "capacity": 4,  "status": "available", "shape": "square",    "note": "", "is_deleted": False},
-    {"id": "t14", "store_id": "s1", "number": "C02", "area": "室外", "capacity": 4,  "status": "available", "shape": "square",    "note": "", "is_deleted": False},
-    {"id": "t15", "store_id": "s1", "number": "C03", "area": "室外", "capacity": 2,  "status": "occupied",  "shape": "round",     "note": "", "is_deleted": False},
-    {"id": "t16", "store_id": "s1", "number": "D01", "area": "吧台", "capacity": 2,  "status": "available", "shape": "round",     "note": "", "is_deleted": False},
-    {"id": "t17", "store_id": "s1", "number": "D02", "area": "吧台", "capacity": 2,  "status": "occupied",  "shape": "round",     "note": "", "is_deleted": False},
-    {"id": "t18", "store_id": "s1", "number": "D03", "area": "吧台", "capacity": 2,  "status": "available", "shape": "round",     "note": "", "is_deleted": False},
-]
+def _row_to_store(row) -> dict:
+    """将 stores 行映射为 API 响应字典。"""
+    d = dict(row._mapping)
+    # 字段别名：store_name → name，operation_mode → type
+    d["name"] = d.pop("store_name", "")
+    d["type"] = d.pop("operation_mode", "direct") or "direct"
+    # 将 UUID/datetime 转为字符串
+    for k in ("id", "tenant_id", "manager_id"):
+        if d.get(k) is not None:
+            d[k] = str(d[k])
+    for k in ("created_at", "updated_at"):
+        if d.get(k) is not None:
+            d[k] = d[k].isoformat()
+    return d
+
+
+def _row_to_table(row) -> dict:
+    """将 tables 行映射为 API 响应字典。"""
+    d = dict(row._mapping)
+    # 字段别名：table_no → number，seats → capacity
+    d["number"] = d.pop("table_no", "")
+    d["capacity"] = d.pop("seats", 0)
+    # 从 config JSON 提取 shape / note
+    config = d.pop("config", None) or {}
+    d["shape"] = config.get("shape", "square")
+    d["note"] = config.get("note", "")
+    # 将 UUID/datetime 转为字符串
+    for k in ("id", "tenant_id", "store_id"):
+        if d.get(k) is not None:
+            d[k] = str(d[k])
+    for k in ("created_at", "updated_at"):
+        if d.get(k) is not None:
+            d[k] = d[k].isoformat()
+    return d
+
 
 # ─── 请求/响应模型 ─────────────────────────────────────────────────────────────
 
@@ -133,12 +107,14 @@ class StoreCreate(BaseModel):
     manager: str = Field("", max_length=32)
     phone: Optional[str] = Field(None, max_length=20)
 
+
 class StorePatch(BaseModel):
     status: Optional[str] = Field(None, pattern="^(active|suspended)$")
     name: Optional[str] = Field(None, max_length=64)
     manager: Optional[str] = Field(None, max_length=32)
     phone: Optional[str] = Field(None, max_length=20)
     address: Optional[str] = Field(None, max_length=128)
+
 
 class TableCreate(BaseModel):
     store_id: str
@@ -148,6 +124,7 @@ class TableCreate(BaseModel):
     shape: str = Field("square", pattern="^(square|round|rectangle)$")
     note: Optional[str] = Field("", max_length=128)
 
+
 class TablePatch(BaseModel):
     number: Optional[str] = Field(None, max_length=16)
     area: Optional[str] = Field(None, max_length=16)
@@ -155,6 +132,7 @@ class TablePatch(BaseModel):
     shape: Optional[str] = Field(None, pattern="^(square|round|rectangle)$")
     status: Optional[str] = Field(None, pattern="^(available|occupied|reserved|cleaning)$")
     note: Optional[str] = Field(None, max_length=128)
+
 
 # ─── 门店端点 ──────────────────────────────────────────────────────────────────
 
@@ -166,83 +144,215 @@ async def list_stores(
     status: Optional[str] = Query(None),
     type: Optional[str] = Query(None),
     city: Optional[str] = Query(None),
+    db: AsyncSession = Depends(get_db),
 ):
     """门店列表（支持按状态/类型/城市过滤）"""
-    items = [s for s in _STORES if not s["is_deleted"]]
-    if status:
-        items = [s for s in items if s["status"] == status]
-    if type:
-        items = [s for s in items if s["type"] == type]
-    if city:
-        items = [s for s in items if s["city"] == city]
+    tenant_id = _get_tenant_id(request)
+    await _set_rls(db, tenant_id)
 
-    total = len(items)
-    start = (page - 1) * size
-    paged = items[start: start + size]
-    return _ok({"items": paged, "total": total, "page": page, "size": size})
+    conditions = ["is_deleted = false"]
+    params: dict = {}
+    if status:
+        conditions.append("status = :status")
+        params["status"] = status
+    if type:
+        conditions.append("operation_mode = :type")
+        params["type"] = type
+    if city:
+        conditions.append("city = :city")
+        params["city"] = city
+
+    where = " AND ".join(conditions)
+    offset = (page - 1) * size
+
+    try:
+        count_res = await db.execute(
+            text(f"SELECT COUNT(*) FROM stores WHERE {where}"),
+            params,
+        )
+        total = count_res.scalar() or 0
+
+        rows = await db.execute(
+            text(
+                f"SELECT id, tenant_id, store_name, store_code, city, address, status,"
+                f" phone, operation_mode, is_deleted, created_at, updated_at"
+                f" FROM stores WHERE {where}"
+                f" ORDER BY created_at DESC LIMIT :size OFFSET :offset"
+            ),
+            {**params, "size": size, "offset": offset},
+        )
+        items = [_row_to_store(r) for r in rows]
+    except SQLAlchemyError:
+        items = []
+        total = 0
+
+    return _ok({"items": items, "total": total, "page": page, "size": size})
 
 
 @router.post("/api/v1/trade/stores", status_code=201)
-async def create_store(request: Request, body: StoreCreate):
+async def create_store(
+    request: Request,
+    body: StoreCreate,
+    db: AsyncSession = Depends(get_db),
+):
     """新增门店"""
-    new_store = {
-        "id": str(uuid.uuid4()),
-        "tenant_id": _get_tenant_id(request),
-        "name": body.name,
-        "type": body.type,
-        "city": body.city,
-        "address": body.address,
-        "status": body.status,
-        "today_revenue_fen": 0,
-        "table_count": 0,
-        "manager": body.manager,
-        "phone": body.phone or "",
-        "created_at": _now_iso(),
-        "is_deleted": False,
-    }
-    _STORES.append(new_store)
-    return _ok(new_store)
+    tenant_id = _get_tenant_id(request)
+    await _set_rls(db, tenant_id)
+
+    new_id = str(uuid.uuid4())
+    store_code = "S-" + new_id[:8].upper()
+
+    try:
+        row = await db.execute(
+            text("""
+                INSERT INTO stores
+                    (id, tenant_id, store_name, store_code, city, address, status,
+                     phone, operation_mode, is_deleted)
+                VALUES
+                    (:id, :tenant_id, :store_name, :store_code, :city, :address, :status,
+                     :phone, :operation_mode, false)
+                RETURNING id, tenant_id, store_name, store_code, city, address, status,
+                          phone, operation_mode, is_deleted, created_at, updated_at
+            """),
+            {
+                "id": new_id,
+                "tenant_id": tenant_id,
+                "store_name": body.name,
+                "store_code": store_code,
+                "city": body.city,
+                "address": body.address,
+                "status": body.status,
+                "phone": body.phone or "",
+                "operation_mode": body.type,
+            },
+        )
+        await db.commit()
+        store = _row_to_store(row.one())
+        return _ok(store)
+    except SQLAlchemyError as exc:
+        await db.rollback()
+        raise HTTPException(status_code=503, detail=f"门店创建失败: {exc}")
 
 
 @router.get("/api/v1/trade/stores/{store_id}")
-async def get_store(request: Request, store_id: str):
+async def get_store(
+    store_id: str,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
     """门店详情"""
-    store = next((s for s in _STORES if s["id"] == store_id and not s["is_deleted"]), None)
-    if store is None:
+    tenant_id = _get_tenant_id(request)
+    await _set_rls(db, tenant_id)
+
+    try:
+        row = await db.execute(
+            text("""
+                SELECT id, tenant_id, store_name, store_code, city, address, status,
+                       phone, operation_mode, is_deleted, created_at, updated_at
+                FROM stores
+                WHERE id = :store_id AND is_deleted = false
+            """),
+            {"store_id": store_id},
+        )
+        rec = row.one_or_none()
+    except SQLAlchemyError:
+        rec = None
+
+    if rec is None:
         raise HTTPException(status_code=404, detail="Store not found")
-    return _ok(store)
+    return _ok(_row_to_store(rec))
 
 
 @router.patch("/api/v1/trade/stores/{store_id}")
-async def patch_store(request: Request, store_id: str, body: StorePatch):
+async def patch_store(
+    store_id: str,
+    body: StorePatch,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
     """更新门店信息/状态"""
-    store = next((s for s in _STORES if s["id"] == store_id and not s["is_deleted"]), None)
-    if store is None:
-        raise HTTPException(status_code=404, detail="Store not found")
+    tenant_id = _get_tenant_id(request)
+    await _set_rls(db, tenant_id)
 
-    if body.status is not None:
-        store["status"] = body.status
+    # 先确认存在
+    try:
+        exists = await db.execute(
+            text("SELECT id FROM stores WHERE id = :store_id AND is_deleted = false"),
+            {"store_id": store_id},
+        )
+        if exists.one_or_none() is None:
+            raise HTTPException(status_code=404, detail="Store not found")
+    except HTTPException:
+        raise
+    except SQLAlchemyError:
+        raise HTTPException(status_code=503, detail="查询门店失败")
+
+    # 构建 SET 片段
+    set_parts = ["updated_at = NOW()"]
+    params: dict = {"store_id": store_id}
+
     if body.name is not None:
-        store["name"] = body.name
-    if body.manager is not None:
-        store["manager"] = body.manager
+        set_parts.append("store_name = :store_name")
+        params["store_name"] = body.name
+    if body.status is not None:
+        set_parts.append("status = :status")
+        params["status"] = body.status
     if body.phone is not None:
-        store["phone"] = body.phone
+        set_parts.append("phone = :phone")
+        params["phone"] = body.phone
     if body.address is not None:
-        store["address"] = body.address
+        set_parts.append("address = :address")
+        params["address"] = body.address
 
-    store["updated_at"] = _now_iso()
-    return _ok(store)
+    try:
+        row = await db.execute(
+            text(
+                f"UPDATE stores SET {', '.join(set_parts)}"
+                f" WHERE id = :store_id AND is_deleted = false"
+                f" RETURNING id, tenant_id, store_name, store_code, city, address, status,"
+                f"           phone, operation_mode, is_deleted, created_at, updated_at"
+            ),
+            params,
+        )
+        await db.commit()
+        rec = row.one_or_none()
+    except SQLAlchemyError as exc:
+        await db.rollback()
+        raise HTTPException(status_code=503, detail=f"门店更新失败: {exc}")
+
+    if rec is None:
+        raise HTTPException(status_code=404, detail="Store not found")
+    return _ok(_row_to_store(rec))
 
 
 @router.delete("/api/v1/trade/stores/{store_id}")
-async def delete_store(request: Request, store_id: str):
+async def delete_store(
+    store_id: str,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
     """软删除门店"""
-    store = next((s for s in _STORES if s["id"] == store_id and not s["is_deleted"]), None)
-    if store is None:
+    tenant_id = _get_tenant_id(request)
+    await _set_rls(db, tenant_id)
+
+    try:
+        row = await db.execute(
+            text("""
+                UPDATE stores
+                SET is_deleted = true, updated_at = NOW()
+                WHERE id = :store_id AND is_deleted = false
+                RETURNING id
+            """),
+            {"store_id": store_id},
+        )
+        await db.commit()
+        rec = row.one_or_none()
+    except SQLAlchemyError as exc:
+        await db.rollback()
+        raise HTTPException(status_code=503, detail=f"门店删除失败: {exc}")
+
+    if rec is None:
         raise HTTPException(status_code=404, detail="Store not found")
-    store["is_deleted"] = True
-    store["deleted_at"] = _now_iso()
     return _ok({"message": "Store deleted", "id": store_id})
 
 
@@ -256,87 +366,241 @@ async def list_tables(
     status: Optional[str] = Query(None),
     page: int = Query(1, ge=1),
     size: int = Query(100, ge=1, le=500),
+    db: AsyncSession = Depends(get_db),
 ):
     """桌台列表（按 store_id / area / status 过滤）"""
-    items = [t for t in _TABLES if not t["is_deleted"]]
-    if store_id:
-        items = [t for t in items if t["store_id"] == store_id]
-    if area:
-        items = [t for t in items if t["area"] == area]
-    if status:
-        items = [t for t in items if t["status"] == status]
+    tenant_id = _get_tenant_id(request)
+    await _set_rls(db, tenant_id)
 
-    total = len(items)
-    start = (page - 1) * size
-    paged = items[start: start + size]
-    return _ok({"items": paged, "total": total, "page": page, "size": size})
+    conditions = ["is_deleted = false"]
+    params: dict = {}
+    if store_id:
+        conditions.append("store_id = :store_id")
+        params["store_id"] = store_id
+    if area:
+        conditions.append("area = :area")
+        params["area"] = area
+    if status:
+        conditions.append("status = :status")
+        params["status"] = status
+
+    where = " AND ".join(conditions)
+    offset = (page - 1) * size
+
+    try:
+        count_res = await db.execute(
+            text(f"SELECT COUNT(*) FROM tables WHERE {where}"),
+            params,
+        )
+        total = count_res.scalar() or 0
+
+        rows = await db.execute(
+            text(
+                f"SELECT id, tenant_id, store_id, table_no, area, seats, status,"
+                f" config, is_deleted, created_at, updated_at"
+                f" FROM tables WHERE {where}"
+                f" ORDER BY sort_order, table_no LIMIT :size OFFSET :offset"
+            ),
+            {**params, "size": size, "offset": offset},
+        )
+        items = [_row_to_table(r) for r in rows]
+    except SQLAlchemyError:
+        items = []
+        total = 0
+
+    return _ok({"items": items, "total": total, "page": page, "size": size})
 
 
 @router.post("/api/v1/trade/tables", status_code=201)
-async def create_table(request: Request, body: TableCreate):
+async def create_table(
+    request: Request,
+    body: TableCreate,
+    db: AsyncSession = Depends(get_db),
+):
     """新增桌台"""
-    # 校验门店存在
-    store = next((s for s in _STORES if s["id"] == body.store_id and not s["is_deleted"]), None)
-    if store is None:
-        raise HTTPException(status_code=404, detail="Store not found")
+    tenant_id = _get_tenant_id(request)
+    await _set_rls(db, tenant_id)
 
-    new_table = {
-        "id": str(uuid.uuid4()),
-        "store_id": body.store_id,
-        "number": body.number,
-        "area": body.area,
-        "capacity": body.capacity,
-        "status": "available",
-        "shape": body.shape,
-        "note": body.note or "",
-        "created_at": _now_iso(),
-        "is_deleted": False,
-    }
-    _TABLES.append(new_table)
-    # 更新门店桌台数
-    store["table_count"] = len([t for t in _TABLES if t["store_id"] == body.store_id and not t["is_deleted"]])
-    return _ok(new_table)
+    # 校验门店存在且属于本租户
+    try:
+        store_check = await db.execute(
+            text("SELECT id FROM stores WHERE id = :store_id AND is_deleted = false"),
+            {"store_id": body.store_id},
+        )
+        if store_check.one_or_none() is None:
+            raise HTTPException(status_code=404, detail="Store not found")
+    except HTTPException:
+        raise
+    except SQLAlchemyError:
+        raise HTTPException(status_code=503, detail="门店查询失败")
+
+    new_id = str(uuid.uuid4())
+    config = {"shape": body.shape, "note": body.note or ""}
+
+    try:
+        row = await db.execute(
+            text("""
+                INSERT INTO tables
+                    (id, tenant_id, store_id, table_no, area, seats, status, config, is_deleted)
+                VALUES
+                    (:id, :tenant_id, :store_id, :table_no, :area, :seats, 'available', :config, false)
+                RETURNING id, tenant_id, store_id, table_no, area, seats, status,
+                          config, is_deleted, created_at, updated_at
+            """),
+            {
+                "id": new_id,
+                "tenant_id": tenant_id,
+                "store_id": body.store_id,
+                "table_no": body.number,
+                "area": body.area,
+                "seats": body.capacity,
+                "config": json.dumps(config),
+            },
+        )
+        await db.commit()
+        table = _row_to_table(row.one())
+        return _ok(table)
+    except SQLAlchemyError as exc:
+        await db.rollback()
+        raise HTTPException(status_code=503, detail=f"桌台创建失败: {exc}")
 
 
 @router.get("/api/v1/trade/tables/{table_id}")
-async def get_table(request: Request, table_id: str):
+async def get_table(
+    table_id: str,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
     """桌台详情"""
-    table = next((t for t in _TABLES if t["id"] == table_id and not t["is_deleted"]), None)
-    if table is None:
+    tenant_id = _get_tenant_id(request)
+    await _set_rls(db, tenant_id)
+
+    try:
+        row = await db.execute(
+            text("""
+                SELECT id, tenant_id, store_id, table_no, area, seats, status,
+                       config, is_deleted, created_at, updated_at
+                FROM tables
+                WHERE id = :table_id AND is_deleted = false
+            """),
+            {"table_id": table_id},
+        )
+        rec = row.one_or_none()
+    except SQLAlchemyError:
+        rec = None
+
+    if rec is None:
         raise HTTPException(status_code=404, detail="Table not found")
-    return _ok(table)
+    return _ok(_row_to_table(rec))
 
 
 @router.patch("/api/v1/trade/tables/{table_id}")
-async def patch_table(request: Request, table_id: str, body: TablePatch):
+async def patch_table(
+    table_id: str,
+    body: TablePatch,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
     """修改桌台配置"""
-    table = next((t for t in _TABLES if t["id"] == table_id and not t["is_deleted"]), None)
-    if table is None:
+    tenant_id = _get_tenant_id(request)
+    await _set_rls(db, tenant_id)
+
+    # 先读取现有行以便合并 config
+    try:
+        existing_row = await db.execute(
+            text("""
+                SELECT id, config FROM tables
+                WHERE id = :table_id AND is_deleted = false
+            """),
+            {"table_id": table_id},
+        )
+        existing = existing_row.one_or_none()
+    except SQLAlchemyError:
+        raise HTTPException(status_code=503, detail="桌台查询失败")
+
+    if existing is None:
         raise HTTPException(status_code=404, detail="Table not found")
 
-    for field_name, value in body.model_dump(exclude_unset=True).items():
-        if value is not None:
-            table[field_name] = value
+    # 合并 config（shape / note 存在 config JSON 中）
+    current_config: dict = {}
+    if existing.config:
+        try:
+            current_config = json.loads(existing.config) if isinstance(existing.config, str) else dict(existing.config)
+        except (ValueError, TypeError):
+            current_config = {}
 
-    table["updated_at"] = _now_iso()
-    return _ok(table)
+    set_parts = ["updated_at = NOW()"]
+    params: dict = {"table_id": table_id}
+
+    if body.number is not None:
+        set_parts.append("table_no = :table_no")
+        params["table_no"] = body.number
+    if body.area is not None:
+        set_parts.append("area = :area")
+        params["area"] = body.area
+    if body.capacity is not None:
+        set_parts.append("seats = :seats")
+        params["seats"] = body.capacity
+    if body.status is not None:
+        set_parts.append("status = :status")
+        params["status"] = body.status
+    if body.shape is not None:
+        current_config["shape"] = body.shape
+    if body.note is not None:
+        current_config["note"] = body.note
+
+    # 如果 shape/note 有变更，写回 config
+    if body.shape is not None or body.note is not None:
+        set_parts.append("config = :config")
+        params["config"] = json.dumps(current_config)
+
+    try:
+        row = await db.execute(
+            text(
+                f"UPDATE tables SET {', '.join(set_parts)}"
+                f" WHERE id = :table_id AND is_deleted = false"
+                f" RETURNING id, tenant_id, store_id, table_no, area, seats, status,"
+                f"           config, is_deleted, created_at, updated_at"
+            ),
+            params,
+        )
+        await db.commit()
+        rec = row.one_or_none()
+    except SQLAlchemyError as exc:
+        await db.rollback()
+        raise HTTPException(status_code=503, detail=f"桌台更新失败: {exc}")
+
+    if rec is None:
+        raise HTTPException(status_code=404, detail="Table not found")
+    return _ok(_row_to_table(rec))
 
 
 @router.delete("/api/v1/trade/tables/{table_id}")
-async def delete_table(request: Request, table_id: str):
+async def delete_table(
+    table_id: str,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
     """软删除桌台"""
-    table = next((t for t in _TABLES if t["id"] == table_id and not t["is_deleted"]), None)
-    if table is None:
+    tenant_id = _get_tenant_id(request)
+    await _set_rls(db, tenant_id)
+
+    try:
+        row = await db.execute(
+            text("""
+                UPDATE tables
+                SET is_deleted = true, updated_at = NOW()
+                WHERE id = :table_id AND is_deleted = false
+                RETURNING id
+            """),
+            {"table_id": table_id},
+        )
+        await db.commit()
+        rec = row.one_or_none()
+    except SQLAlchemyError as exc:
+        await db.rollback()
+        raise HTTPException(status_code=503, detail=f"桌台删除失败: {exc}")
+
+    if rec is None:
         raise HTTPException(status_code=404, detail="Table not found")
-
-    table["is_deleted"] = True
-    table["deleted_at"] = _now_iso()
-
-    # 更新门店桌台数
-    store = next((s for s in _STORES if s["id"] == table["store_id"]), None)
-    if store:
-        store["table_count"] = len([
-            t for t in _TABLES if t["store_id"] == table["store_id"] and not t["is_deleted"]
-        ])
-
     return _ok({"message": "Table deleted", "id": table_id})

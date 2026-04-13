@@ -15,7 +15,8 @@ from datetime import datetime, timezone
 
 import httpx
 import structlog
-from sqlalchemy import select, update
+from sqlalchemy import select, text, update
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..models.soldout_record import SoldoutRecord
@@ -52,45 +53,6 @@ class InventoryAlert:
     impacted_dishes: list[ImpactedDish] = field(default_factory=list)
 
 
-# ─── 模拟数据：无真实DB schema时的合理Mock ───
-# 实际使用时替换为对应的 tx-supply/tx-menu 数据库查询
-
-MOCK_DISH_INGREDIENTS: list[dict] = [
-    {
-        "dish_id": "d1",
-        "dish_name": "宫保鸡丁",
-        "ingredient_id": "i1",
-        "ingredient_name": "鸡胸肉",
-        "per_dish_usage": 0.25,  # kg
-        "alert_threshold": 2.0,
-    },
-    {
-        "dish_id": "d3",
-        "dish_name": "佛跳墙",
-        "ingredient_id": "i2",
-        "ingredient_name": "鲍鱼",
-        "per_dish_usage": 0.15,
-        "alert_threshold": 1.0,
-    },
-    {
-        "dish_id": "d3",
-        "dish_name": "佛跳墙",
-        "ingredient_id": "i3",
-        "ingredient_name": "鱼翅",
-        "per_dish_usage": 0.10,
-        "alert_threshold": 0.5,
-    },
-    {
-        "dish_id": "d5",
-        "dish_name": "小笼包",
-        "ingredient_id": "i4",
-        "ingredient_name": "猪肉馅",
-        "per_dish_usage": 0.05,
-        "alert_threshold": 0.5,
-    },
-]
-
-
 async def _fetch_dish_ingredients_by_ingredient(
     ingredient_id: str,
     tenant_id: str,
@@ -99,13 +61,44 @@ async def _fetch_dish_ingredients_by_ingredient(
     """
     查询依赖指定食材的所有菜品及其用量配置。
 
-    实际应查询 tx-supply 的 dish_bom / recipe 表。
-    当前使用 Mock 数据直到 BOM 表 schema 确定。
+    联查 dish_ingredients（BOM）+ dishes 获取菜品名称。
+    ingredient_id 字段在 dish_ingredients 中为 String(50)，存储原始 ID 字符串。
     """
-    return [
-        row for row in MOCK_DISH_INGREDIENTS
-        if row["ingredient_id"] == ingredient_id
-    ]
+    sql = text("""
+        SELECT
+            di.dish_id::text    AS dish_id,
+            d.dish_name         AS dish_name,
+            di.ingredient_id    AS ingredient_id,
+            di.quantity         AS per_dish_usage,
+            di.unit             AS unit
+        FROM dish_ingredients di
+        JOIN dishes d ON d.id = di.dish_id
+            AND d.tenant_id = di.tenant_id
+        WHERE di.ingredient_id = :ingredient_id
+          AND di.is_deleted = false
+          AND d.is_deleted = false
+    """)
+    try:
+        result = await db.execute(sql, {"ingredient_id": ingredient_id})
+        rows = result.mappings().all()
+        return [
+            {
+                "dish_id": row["dish_id"],
+                "dish_name": row["dish_name"],
+                "ingredient_id": row["ingredient_id"],
+                "ingredient_name": ingredient_id,  # 名称由调用方传入或另查
+                "per_dish_usage": float(row["per_dish_usage"]),
+                "unit": row["unit"],
+            }
+            for row in rows
+        ]
+    except SQLAlchemyError as exc:
+        logger.error(
+            "inventory.fetch_dish_ingredients.failed",
+            ingredient_id=ingredient_id,
+            error=str(exc),
+        )
+        return []
 
 
 async def _fetch_all_ingredient_stocks(
@@ -116,39 +109,42 @@ async def _fetch_all_ingredient_stocks(
     """
     查询门店所有食材的当前库存及预警阈值。
 
-    实际应查询 tx-supply 的 ingredient_stocks 表。
-    当前使用 Mock 数据。
+    从 ingredients 表查询（门店库存台账）：
+      current_quantity — 当前库存量
+      min_quantity     — 预警下限（alert threshold）
     """
-    return [
-        {
-            "ingredient_id": "i1",
-            "ingredient_name": "鸡胸肉",
-            "current_stock": 0.4,   # kg — 低库存
-            "threshold": 2.0,
-            "unit": "kg",
-        },
-        {
-            "ingredient_id": "i2",
-            "ingredient_name": "鲍鱼",
-            "current_stock": 0.0,   # kg — 售完
-            "threshold": 1.0,
-            "unit": "kg",
-        },
-        {
-            "ingredient_id": "i3",
-            "ingredient_name": "鱼翅",
-            "current_stock": 0.8,
-            "threshold": 0.5,
-            "unit": "kg",
-        },
-        {
-            "ingredient_id": "i4",
-            "ingredient_name": "猪肉馅",
-            "current_stock": 2.5,
-            "threshold": 0.5,
-            "unit": "kg",
-        },
-    ]
+    sql = text("""
+        SELECT
+            id::text            AS ingredient_id,
+            ingredient_name,
+            current_quantity    AS current_stock,
+            min_quantity        AS threshold,
+            unit
+        FROM ingredients
+        WHERE store_id = :store_id::uuid
+          AND is_deleted = false
+        ORDER BY ingredient_name
+    """)
+    try:
+        result = await db.execute(sql, {"store_id": store_id})
+        rows = result.mappings().all()
+        return [
+            {
+                "ingredient_id": row["ingredient_id"],
+                "ingredient_name": row["ingredient_name"],
+                "current_stock": float(row["current_stock"]),
+                "threshold": float(row["threshold"]),
+                "unit": row["unit"],
+            }
+            for row in rows
+        ]
+    except SQLAlchemyError as exc:
+        logger.error(
+            "inventory.fetch_all_stocks.failed",
+            store_id=store_id,
+            error=str(exc),
+        )
+        return []
 
 
 # ─── 核心业务函数 ───

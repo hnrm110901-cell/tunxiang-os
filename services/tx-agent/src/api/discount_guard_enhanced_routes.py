@@ -13,8 +13,13 @@ from datetime import date, datetime, timedelta, timezone
 from typing import Optional
 
 import structlog
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Depends, Header, Query
 from pydantic import BaseModel
+from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from shared.ontology.src.database import get_db_with_tenant
 
 logger = structlog.get_logger()
 
@@ -24,65 +29,17 @@ router = APIRouter(
 )
 
 
-# ─── Mock 数据（真实感异常案例，未来替换为真实DB查询）───────────────────────
-
-MOCK_HIGH_FREQ_MEMBERS: list[dict] = [
-    {
-        "member_id": "mem-vip-001",
-        "name": "张**（VIP）",
-        "discount_count": 7,
-        "total_saved_fen": 68000,
-        "risk_level": "high",
-        "latest_discount": "2026-04-06",
-        "note": "30天内7次折扣，累计减免¥680",
-    },
-    {
-        "member_id": "mem-002",
-        "name": "李**",
-        "discount_count": 4,
-        "total_saved_fen": 28600,
-        "risk_level": "medium",
-        "latest_discount": "2026-04-05",
-        "note": "30天内4次折扣，超出阈值",
-    },
-    {
-        "member_id": "mem-003",
-        "name": "王**",
-        "discount_count": 2,
-        "total_saved_fen": 12000,
-        "risk_level": "low",
-        "latest_discount": "2026-04-04",
-        "note": "在正常范围内",
-    },
-]
-
-MOCK_SUSPICIOUS_TABLES: list[dict] = [
-    {
-        "table_id": "table-A8",
-        "table_name": "A8桌",
-        "consecutive_discount_days": 5,
-        "discount_count": 8,
-        "related_employees": [
-            {"id": "emp-011", "name": "赵服务员", "count": 6},
-        ],
-        "anomaly_score": 0.87,
-        "note": "A8桌连续5天被赵服务员打折，高度可疑",
-    },
-    {
-        "table_id": "table-VIP3",
-        "table_name": "VIP包间3",
-        "consecutive_discount_days": 3,
-        "discount_count": 3,
-        "related_employees": [
-            {"id": "emp-024", "name": "钱经理", "count": 3},
-        ],
-        "anomaly_score": 0.72,
-        "note": "包间3连续3天由同一经理操作折扣",
-    },
-]
-
 # 内存决策日志（服务重启清零；生产环境替换为 DB 持久化）
 _DECISION_LOGS: list[dict] = []
+
+
+# ─── DB 依赖 ─────────────────────────────────────────────────────────────────
+
+def _make_get_db(tenant_id: str):
+    async def _get_db():
+        async for session in get_db_with_tenant(tenant_id):
+            yield session
+    return _get_db
 
 
 # ─── 请求体模型 ──────────────────────────────────────────────────────────────
@@ -174,6 +131,229 @@ def _build_constraints_check(
     }
 
 
+# ─── DB 查询函数 ──────────────────────────────────────────────────────────────
+
+async def _query_high_freq_members(
+    db: AsyncSession,
+    store_id: Optional[str],
+    days: int,
+    threshold: int,
+) -> list[dict]:
+    """查询高频折扣会员：同一会员在 days 天内折扣次数 >= threshold。
+
+    从 customers + orders 表联合查询，统计折扣次数和累计折扣金额。
+    """
+    since = datetime.now(timezone.utc) - timedelta(days=days)
+    store_filter = "AND o.store_id = :store_id" if store_id else ""
+
+    sql = text(f"""
+        SELECT
+            c.id::text                         AS member_id,
+            c.full_name                        AS name,
+            COUNT(o.id)                        AS discount_count,
+            COALESCE(SUM(o.discount_amount_fen), 0) AS total_saved_fen,
+            MAX(o.created_at)::date::text      AS latest_discount
+        FROM customers c
+        JOIN orders o ON o.customer_id = c.id
+            AND o.tenant_id = c.tenant_id
+        WHERE o.discount_amount_fen > 0
+          AND o.created_at >= :since
+          AND o.status NOT IN ('cancelled', 'refunded')
+          {store_filter}
+        GROUP BY c.id, c.full_name
+        HAVING COUNT(o.id) >= :threshold
+        ORDER BY COUNT(o.id) DESC
+        LIMIT 200
+    """)
+
+    params: dict = {"since": since, "threshold": threshold}
+    if store_id:
+        params["store_id"] = store_id
+
+    try:
+        result = await db.execute(sql, params)
+        rows = result.mappings().all()
+    except SQLAlchemyError as exc:
+        logger.error("discount_guard.member_freq_query_failed", error=str(exc))
+        return []
+
+    members = []
+    for row in rows:
+        count = int(row["discount_count"])
+        total_fen = int(row["total_saved_fen"])
+        level = _calc_risk_level(count, threshold)
+        members.append({
+            "member_id": row["member_id"],
+            "name": row["name"] or "未知",
+            "discount_count": count,
+            "total_saved_fen": total_fen,
+            "risk_level": level,
+            "latest_discount": row["latest_discount"],
+            "note": f"{days}天内{count}次折扣，累计减免¥{total_fen / 100:.0f}",
+        })
+    return members
+
+
+async def _query_member_history(
+    db: AsyncSession,
+    member_id: str,
+    days: int,
+) -> dict:
+    """查询单个会员近 days 天的折扣历史（次数 + 累计金额）。"""
+    since = datetime.now(timezone.utc) - timedelta(days=days)
+    sql = text("""
+        SELECT
+            COUNT(o.id)                             AS discount_count,
+            COALESCE(SUM(o.discount_amount_fen), 0) AS total_saved_fen
+        FROM orders o
+        WHERE o.customer_id = :member_id::uuid
+          AND o.discount_amount_fen > 0
+          AND o.created_at >= :since
+          AND o.status NOT IN ('cancelled', 'refunded')
+    """)
+    try:
+        result = await db.execute(sql, {"member_id": member_id, "since": since})
+        row = result.mappings().one_or_none()
+        if row:
+            return {
+                "discount_count": int(row["discount_count"]),
+                "total_saved_fen": int(row["total_saved_fen"]),
+            }
+    except (SQLAlchemyError, ValueError) as exc:
+        logger.warning("discount_guard.member_history_query_failed", member_id=member_id, error=str(exc))
+    return {"discount_count": 0, "total_saved_fen": 0}
+
+
+async def _query_suspicious_tables(
+    db: AsyncSession,
+    store_id: Optional[str],
+    days: int,
+    min_consecutive: int,
+) -> list[dict]:
+    """查询连续折扣异常桌台。
+
+    逻辑：
+    - 从 dining_sessions + orders 联合查询
+    - 统计每张桌台在 days 内折扣订单出现的不同日期数（作为连续天数近似值）
+    - 统计关联的 waiter_id（员工）及各自操作次数
+    - 连续折扣日期数 >= min_consecutive 的桌台纳入预警
+    """
+    since = datetime.now(timezone.utc) - timedelta(days=days)
+    store_filter = "AND ds.store_id = :store_id" if store_id else ""
+
+    sql = text(f"""
+        SELECT
+            ds.table_id::text                          AS table_id,
+            COUNT(DISTINCT o.created_at::date)         AS consecutive_discount_days,
+            COUNT(o.id)                                AS discount_count,
+            AVG(CASE WHEN o.discount_amount_fen > 0
+                     THEN o.discount_amount_fen::float / NULLIF(o.total_amount_fen, 0)
+                     ELSE 0 END)                       AS avg_discount_rate,
+            json_agg(DISTINCT o.waiter_id)
+                FILTER (WHERE o.waiter_id IS NOT NULL) AS waiter_ids
+        FROM dining_sessions ds
+        JOIN orders o ON o.tenant_id = ds.tenant_id
+            AND o.table_number = (
+                SELECT t.table_no FROM tables t WHERE t.id = ds.table_id LIMIT 1
+            )
+        WHERE ds.opened_at >= :since
+          AND o.discount_amount_fen > 0
+          AND o.status NOT IN ('cancelled', 'refunded')
+          {store_filter}
+        GROUP BY ds.table_id
+        HAVING COUNT(DISTINCT o.created_at::date) >= :min_consecutive
+        ORDER BY COUNT(DISTINCT o.created_at::date) DESC
+        LIMIT 100
+    """)
+
+    params: dict = {"since": since, "min_consecutive": min_consecutive}
+    if store_id:
+        params["store_id"] = store_id
+
+    try:
+        result = await db.execute(sql, params)
+        rows = result.mappings().all()
+    except SQLAlchemyError as exc:
+        logger.error("discount_guard.table_pattern_query_failed", error=str(exc))
+        return []
+
+    tables = []
+    for row in rows:
+        consecutive_days = int(row["consecutive_discount_days"])
+        discount_count = int(row["discount_count"])
+        avg_rate = float(row["avg_discount_rate"] or 0)
+        # 异常评分：综合连续天数和折扣率
+        anomaly_score = min(0.99, (consecutive_days / max(days, 1)) * 0.6 + avg_rate * 0.4)
+
+        waiter_ids = row["waiter_ids"] or []
+        related_employees = [
+            {"id": str(wid), "name": "", "count": discount_count}
+            for wid in waiter_ids
+            if wid
+        ]
+
+        tables.append({
+            "table_id": row["table_id"],
+            "table_name": f"桌台-{row['table_id'][:8]}",
+            "consecutive_discount_days": consecutive_days,
+            "discount_count": discount_count,
+            "related_employees": related_employees,
+            "anomaly_score": round(anomaly_score, 2),
+            "note": f"该桌台{consecutive_days}天内出现{discount_count}次折扣，异常评分{anomaly_score:.2f}",
+        })
+    return tables
+
+
+async def _query_table_history(
+    db: AsyncSession,
+    table_id: str,
+    days: int,
+) -> Optional[dict]:
+    """查询单个桌台近 days 天的折扣历史。"""
+    since = datetime.now(timezone.utc) - timedelta(days=days)
+    sql = text("""
+        SELECT
+            COUNT(DISTINCT o.created_at::date)         AS consecutive_discount_days,
+            COUNT(o.id)                                AS discount_count,
+            AVG(CASE WHEN o.discount_amount_fen > 0
+                     THEN o.discount_amount_fen::float / NULLIF(o.total_amount_fen, 0)
+                     ELSE 0 END)                       AS avg_discount_rate,
+            json_agg(DISTINCT o.waiter_id)
+                FILTER (WHERE o.waiter_id IS NOT NULL) AS waiter_ids
+        FROM dining_sessions ds
+        JOIN orders o ON o.tenant_id = ds.tenant_id
+            AND o.table_number = (
+                SELECT t.table_no FROM tables t WHERE t.id = ds.table_id LIMIT 1
+            )
+        WHERE ds.table_id = :table_id::uuid
+          AND ds.opened_at >= :since
+          AND o.discount_amount_fen > 0
+          AND o.status NOT IN ('cancelled', 'refunded')
+    """)
+    try:
+        result = await db.execute(sql, {"table_id": table_id, "since": since})
+        row = result.mappings().one_or_none()
+        if row and int(row["discount_count"]) > 0:
+            consecutive_days = int(row["consecutive_discount_days"])
+            avg_rate = float(row["avg_discount_rate"] or 0)
+            anomaly_score = min(0.99, (consecutive_days / max(days, 1)) * 0.6 + avg_rate * 0.4)
+            waiter_ids = row["waiter_ids"] or []
+            return {
+                "table_id": table_id,
+                "table_name": f"桌台-{table_id[:8]}",
+                "consecutive_discount_days": consecutive_days,
+                "discount_count": int(row["discount_count"]),
+                "related_employees": [
+                    {"id": str(wid), "name": "", "count": int(row["discount_count"])}
+                    for wid in waiter_ids if wid
+                ],
+                "anomaly_score": round(anomaly_score, 2),
+            }
+    except (SQLAlchemyError, ValueError) as exc:
+        logger.warning("discount_guard.table_history_query_failed", table_id=table_id, error=str(exc))
+    return None
+
+
 # ─── Action 1: 会员折扣频率检测 ──────────────────────────────────────────────
 
 @router.get("/member-frequency")
@@ -191,20 +371,12 @@ async def get_high_frequency_members(
       medium — count 在 threshold 到 2× threshold 之间
       high   — count > 2× threshold
     """
-    # 按风险等级排序：high > medium > low
     _LEVEL_ORDER = {"high": 0, "medium": 1, "low": 2}
 
-    # 根据 threshold 重新计算每条记录的风险等级（Mock数据固化了level，此处演示动态计算）
-    members_with_risk: list[dict] = []
-    for m in MOCK_HIGH_FREQ_MEMBERS:
-        level = _calc_risk_level(m["discount_count"], threshold)
-        members_with_risk.append({**m, "risk_level": level})
+    async for db in get_db_with_tenant(tenant_id):
+        suspicious = await _query_high_freq_members(db, store_id, days, threshold)
 
-    # 按风险等级排序
-    members_with_risk.sort(key=lambda x: _LEVEL_ORDER.get(x["risk_level"], 9))
-
-    # 仅返回超过阈值的（threshold 内的 low 过滤掉）
-    suspicious = [m for m in members_with_risk if m["discount_count"] >= threshold]
+    suspicious.sort(key=lambda x: _LEVEL_ORDER.get(x["risk_level"], 9))
 
     total_amount_fen = sum(m["total_saved_fen"] for m in suspicious)
 
@@ -246,15 +418,11 @@ async def check_member_frequency_realtime(
     查询该会员近 `days` 天折扣历史，叠加本次，判断是否超阈值。
     用于 POS 下单时实时拦截/提醒。
     """
-    # 查找 Mock 数据中该会员的历史记录
-    existing: Optional[dict] = next(
-        (m for m in MOCK_HIGH_FREQ_MEMBERS if m["member_id"] == body.member_id),
-        None,
-    )
+    async for db in get_db_with_tenant(tenant_id):
+        history = await _query_member_history(db, body.member_id, days)
 
-    # 历史次数（不含本次）
-    history_count: int = existing["discount_count"] if existing else 0
-    history_saved_fen: int = existing["total_saved_fen"] if existing else 0
+    history_count: int = history["discount_count"]
+    history_saved_fen: int = history["total_saved_fen"]
 
     # 本次叠加
     new_count = history_count + 1
@@ -289,7 +457,7 @@ async def check_member_frequency_realtime(
             "recommendation": recommendation,
         },
         constraints_check=_build_constraints_check(body.discount_amount_fen, is_suspicious),
-        confidence=0.92 if existing else 0.75,  # 有历史记录时置信度更高
+        confidence=0.92 if history_count > 0 else 0.75,
         created_at=datetime.now(timezone.utc),
     )
     _record_decision(decision)
@@ -338,24 +506,17 @@ async def get_suspicious_table_patterns(
     同一桌台在 `days` 内连续出现折扣且天数 ≥ min_consecutive，
     可能是内部员工为熟人/关系户长期优惠。
     """
-    # 根据 min_consecutive 过滤
-    suspicious = [
-        t for t in MOCK_SUSPICIOUS_TABLES
-        if t["consecutive_discount_days"] >= min_consecutive
-    ]
+    async for db in get_db_with_tenant(tenant_id):
+        suspicious = await _query_suspicious_tables(db, store_id, days, min_consecutive)
 
-    # 按 anomaly_score 降序排列
     suspicious.sort(key=lambda x: x["anomaly_score"], reverse=True)
 
-    total_tables = len(MOCK_SUSPICIOUS_TABLES)
+    total_tables = len(suspicious)
     avg_discount = (
-        sum(t["discount_count"] for t in MOCK_SUSPICIOUS_TABLES) / total_tables
+        sum(t["discount_count"] for t in suspicious) / total_tables
         if total_tables > 0 else 0
     )
-    suspicious_rate = (
-        round(len(suspicious) / total_tables * 100, 1)
-        if total_tables > 0 else 0.0
-    )
+    suspicious_rate = round(total_tables / max(total_tables, 1) * 100, 1) if total_tables > 0 else 0.0
 
     logger.info(
         "table_pattern_scan",
@@ -386,6 +547,7 @@ async def get_suspicious_table_patterns(
 async def analyze_table_pattern_realtime(
     body: TablePatternAnalyzeRequest,
     tenant_id: str = Query(..., description="租户ID"),
+    days: int = Query(7, ge=1, le=30, description="统计窗口（天）"),
 ) -> dict:
     """实时分析本次折扣是否延续了该桌台的异常模式。
 
@@ -394,10 +556,8 @@ async def analyze_table_pattern_realtime(
     - 是否总是同一员工操作
     - 综合给出 alert_level: none / warning / critical
     """
-    existing_table: Optional[dict] = next(
-        (t for t in MOCK_SUSPICIOUS_TABLES if t["table_id"] == body.table_id),
-        None,
-    )
+    async for db in get_db_with_tenant(tenant_id):
+        existing_table = await _query_table_history(db, body.table_id, days)
 
     if existing_table is None:
         # 首次出现：无历史记录，低风险
@@ -429,18 +589,19 @@ async def analyze_table_pattern_realtime(
         anomaly_score = existing_table["anomaly_score"]
 
         # 模式匹配：连续天数 ≥ 3 且是同一员工 → critical；连续天数 ≥ 2 → warning
+        table_name = existing_table.get("table_name", body.table_id)
         if consecutive_days >= 3 and is_same_employee:
             is_pattern_match = True
             alert_level = "critical"
             alert_message = (
-                f"高度异常！{existing_table['table_name']}已连续{consecutive_days}天出现折扣，"
+                f"高度异常！{table_name}已连续{consecutive_days}天出现折扣，"
                 f"且本次仍由同一员工操作，强烈建议上报管理层审查。"
             )
         elif consecutive_days >= 2:
             is_pattern_match = True
             alert_level = "warning"
             alert_message = (
-                f"注意：{existing_table['table_name']}近期已连续{consecutive_days}天出现折扣，"
+                f"注意：{table_name}近期已连续{consecutive_days}天出现折扣，"
                 f"本次折扣已延续该模式，请主管确认是否合规。"
             )
         else:
@@ -515,8 +676,8 @@ async def get_discount_guard_summary(
 ) -> dict:
     """折扣守护汇总统计：今日/本周/本月检查与拦截情况。
 
-    Mock 数据模拟真实运营场景。
-    TOP3 高风险员工和桌台直接来自 MOCK 数据。
+    实时会话数据来自内存决策日志；周期统计从 DB 聚合。
+    TOP3 高风险员工和桌台来自 DB 查询（7天窗口）。
     """
     # 从决策日志中统计真实数据
     member_checks = [d for d in _DECISION_LOGS if d["decision_type"] == "member_frequency_check"]
@@ -534,9 +695,15 @@ async def get_discount_guard_summary(
         if d["output_action"].get("is_suspicious")
     )
 
+    # TOP3 高风险桌台（从 DB 查 7 天）
+    async for db in get_db_with_tenant(tenant_id):
+        top_tables_raw = await _query_suspicious_tables(db, store_id, 7, 2)
+
+    top3_tables = sorted(top_tables_raw, key=lambda x: x["anomaly_score"], reverse=True)[:3]
+
     # TOP3 高风险员工（从桌台异常模式中提取）
     employee_counter: dict[str, dict] = {}
-    for table in MOCK_SUSPICIOUS_TABLES:
+    for table in top_tables_raw:
         for emp in table["related_employees"]:
             eid = emp["id"]
             if eid not in employee_counter:
@@ -553,17 +720,48 @@ async def get_discount_guard_summary(
         reverse=True,
     )[:3]
 
-    # TOP3 高风险桌台
-    top3_tables = sorted(
-        MOCK_SUSPICIOUS_TABLES,
-        key=lambda x: x["anomaly_score"],
-        reverse=True,
-    )[:3]
-
-    # Mock 周期统计（真实场景替换为 DB 聚合查询）
     today_str = date.today().isoformat()
     week_start = (date.today() - timedelta(days=date.today().weekday())).isoformat()
     month_start = date.today().replace(day=1).isoformat()
+
+    # DB 周期聚合
+    period_stats: dict = {}
+    try:
+        async for db in get_db_with_tenant(tenant_id):
+            store_filter = "AND store_id = :store_id::uuid" if store_id else ""
+            for period_key, period_start_str in [
+                ("today", today_str),
+                ("this_week", week_start),
+                ("this_month", month_start),
+            ]:
+                sql = text(f"""
+                    SELECT
+                        COUNT(id)                                  AS checks,
+                        COUNT(id) FILTER (WHERE discount_amount_fen > 0) AS alerts,
+                        COALESCE(SUM(discount_amount_fen), 0)      AS intercepted_fen
+                    FROM orders
+                    WHERE created_at >= :period_start
+                      AND status NOT IN ('cancelled', 'refunded')
+                      AND discount_amount_fen > 0
+                      {store_filter}
+                """)
+                params: dict = {"period_start": period_start_str}
+                if store_id:
+                    params["store_id"] = store_id
+                result = await db.execute(sql, params)
+                row = result.mappings().one_or_none()
+                period_stats[period_key] = {
+                    "checks": int(row["checks"]) if row else 0,
+                    "alerts": int(row["alerts"]) if row else 0,
+                    "intercepted_fen": int(row["intercepted_fen"]) if row else 0,
+                }
+    except SQLAlchemyError as exc:
+        logger.warning("discount_guard.summary_period_query_failed", error=str(exc))
+        period_stats = {
+            "today": {"checks": 0, "alerts": 0, "intercepted_fen": 0},
+            "this_week": {"checks": 0, "alerts": 0, "intercepted_fen": 0},
+            "this_month": {"checks": 0, "alerts": 0, "intercepted_fen": 0},
+        }
 
     return {
         "ok": True,
@@ -577,22 +775,15 @@ async def get_discount_guard_summary(
             },
             "today": {
                 "period": today_str,
-                "checks": 142,
-                "alerts": 8,
-                "intercepted_fen": 34600,
-                "note": "Mock数据；真实数据接入DB后替换",
+                **period_stats.get("today", {}),
             },
             "this_week": {
                 "period_start": week_start,
-                "checks": 978,
-                "alerts": 41,
-                "intercepted_fen": 218000,
+                **period_stats.get("this_week", {}),
             },
             "this_month": {
                 "period_start": month_start,
-                "checks": 3841,
-                "alerts": 167,
-                "intercepted_fen": 892000,
+                **period_stats.get("this_month", {}),
             },
             "top3_risky_employees": top3_employees,
             "top3_risky_tables": [

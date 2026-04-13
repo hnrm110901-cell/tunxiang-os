@@ -484,15 +484,11 @@ class WorkforcePlannerAgent(SkillAgent):
             week_start = today + timedelta(days=days_to_monday)
 
         if not self._db:
-            logger.info("workforce_revenue_schedule_mock", tenant_id=self.tenant_id)
+            logger.warning("workforce_revenue_schedule_no_db", tenant_id=self.tenant_id)
             return AgentResult(
-                success=True,
+                success=False,
                 action="analyze_revenue_schedule",
-                data=_mock_revenue_schedule(store_id, week_start),
-                reasoning="营收驱动排班分析完成（mock数据，未连接数据库）",
-                confidence=0.70,
-                agent_level=2,
-                rollback_window_min=30,
+                error="数据库连接不可用",
             )
 
         # 真实逻辑：调用 RevenueScheduleService
@@ -510,13 +506,9 @@ class WorkforcePlannerAgent(SkillAgent):
                 tenant_id=self.tenant_id,
             )
             return AgentResult(
-                success=True,
+                success=False,
                 action="analyze_revenue_schedule",
-                data=_mock_revenue_schedule(store_id, week_start),
-                reasoning=f"数据库查询失败，降级为mock数据: {exc}",
-                confidence=0.60,
-                agent_level=2,
-                rollback_window_min=30,
+                error=f"数据库查询失败: {exc}",
             )
 
         savings = plan["summary"]
@@ -610,75 +602,3 @@ class WorkforcePlannerAgent(SkillAgent):
         )
 
 
-# ── 营收驱动排班 mock 数据 ──────────────────────────────────────────────────────
-
-
-def _mock_revenue_schedule(store_id: str, week_start: date) -> dict[str, Any]:
-    """营收驱动排班 mock 数据（基于长沙中型门店典型值）。"""
-    daily_plans = []
-    weekday_names = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"]
-    mock_slots_base = [
-        ("early_morning", "早班前", "06:00", "09:00", 15000),
-        ("lunch_peak", "午高峰", "11:00", "13:30", 120000),
-        ("lunch_valley", "午低谷", "13:30", "17:00", 25000),
-        ("dinner_peak", "晚高峰", "17:00", "20:30", 145000),
-        ("dinner_valley", "晚低谷", "20:30", "22:00", 28000),
-        ("night", "夜班", "22:00", "02:00", 12000),
-    ]
-    weekday_factors = [1.0, 0.95, 0.95, 1.0, 1.15, 1.30, 1.25]
-
-    for d in range(7):
-        target = week_start + timedelta(days=d)
-        factor = weekday_factors[d]
-        slots = []
-        for key, name, st, et, base_rev in mock_slots_base:
-            rev = int(base_rev * factor)
-            # 简化：每4万营收需1人（前厅）
-            optimal = {
-                "前厅": max(1, round(rev / 40000)),
-                "后厨": max(1, round(rev / 50000)),
-                "收银": 1,
-                "清洁": 1 if key in ("lunch_peak", "dinner_peak") else 0,
-            }
-            current = {
-                "前厅": max(1, optimal["前厅"] - (1 if d % 3 == 0 else 0)),
-                "后厨": optimal["后厨"],
-                "收银": 1,
-                "清洁": 0,
-            }
-            delta = {}
-            for pos in optimal:
-                diff = optimal[pos] - current.get(pos, 0)
-                if diff != 0:
-                    delta[pos] = diff
-            slots.append({
-                "slot_key": key,
-                "slot_name": name,
-                "start_time": st,
-                "end_time": et,
-                "predicted_revenue_fen": rev,
-                "optimal_staff": optimal,
-                "current_staff": current,
-                "delta": delta,
-                "suggested_employees": [],
-            })
-        daily_plans.append({
-            "date": target.isoformat(),
-            "weekday": d,
-            "weekday_name": weekday_names[d],
-            "slots": slots,
-        })
-
-    return {
-        "store_id": store_id,
-        "week_start": week_start.isoformat(),
-        "week_end": (week_start + timedelta(days=6)).isoformat(),
-        "daily_plans": daily_plans,
-        "summary": {
-            "total_labor_cost_current_fen": 320000,
-            "total_labor_cost_optimal_fen": 295000,
-            "savings_fen": 25000,
-            "savings_pct": 7.8,
-        },
-        "employee_count": 10,
-    }
