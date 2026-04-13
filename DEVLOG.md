@@ -1,3 +1,31 @@
+## 2026-04-13 (续5-9) 大规模 mock 消除冲刺 — 全服务 DB 接入
+
+### 今日完成
+- [全局] 60+ 文件 mock 消除，覆盖 14 个微服务全部非测试路由
+- [tx-org] efficiency/employee_training/performance_scoring/region_management/role_permission — 5 个组织路由 DB 化
+- [tx-analytics] hq_overview/region_overview/narrative_enhanced/report_config/store_health_radar/daily_brief/group_dashboard_service — 7 个分析模块 DB 化
+- [tx-intel] health_score/anomaly/sentiment/competitor_monitoring — 4 个智能模块 DB 化
+- [tx-member] member_dashboard/coupon_benefit/stored_value_miniapp — 会员看板 DB 化
+- [tx-ops] alert_rule/briefing/incident/inspection_exec/rectification/store_live/integration_health — 7 个运营路由 DB 化
+- [tx-agent] 6 个 Skill Agent（attendance_recovery/turnover_risk/compliance_alert/growth_coach/salary_advisor/workforce_planner）— mock 替换为真实 DB 查询
+- [tx-trade] banquet_order/review/aggregator_reconcile/crew_schedule/shift_summary/self_delivery/store_management/prediction_service — 8 个交易模块 DB 化
+- [tx-growth] distribution/journey_designer/wecom_scrm/campaign_engine_db/discount_guard — 5 个增长模块 DB 化
+- [tx-supply] supplier_portal_v2/inventory_menu_sync_service — 供应链模块 DB 化
+- [tx-menu] channel_menu_override/dish_ranking_engine — 菜单模块 DB 化
+- [gateway] growth_intel_relay — 网关智能中继 DB 化
+
+### 数据变化
+- 迁移版本：v255 → v258（新增 performance_periods/narrative_templates/growth_intel_relay 表）
+- 所有新表均含 RLS + tenant_id 隔离
+
+### 遗留问题
+- gateway/auth.py DEMO_USERS：由 TX_ENABLE_DEMO_AUTH 环境变量控制，生产关闭，开发便于调试，保留
+- tunxiang-api auth_routes：遗留兼容层，非主服务路径
+
+### 明日计划
+- 运行完整测试套件，验证 DB 接入无回归
+- 更新 DEVLOG 评分
+
 ## 2026-04-13 (续4) 个性化菜单+会员洞察 DB化+Claude API
 
 ### 今日完成
