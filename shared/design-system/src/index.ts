@@ -15,5 +15,9 @@ export * from './themes';
 // Utils
 export * from './utils';
 
+// Hooks
+export { useSwipe } from './hooks/useSwipe';
+export type { UseSwipeOptions, UseSwipeReturn } from './hooks/useSwipe';
+
 // Biz components
 export * from './biz';

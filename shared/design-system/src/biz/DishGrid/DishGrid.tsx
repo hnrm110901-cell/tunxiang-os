@@ -13,10 +13,14 @@ import styles from './DishGrid.module.css';
 
 export interface DishGridProps {
   dishes: DishData[];
-  variant: 'grid' | 'horizontal';
+  variant: 'grid' | 'horizontal' | 'compact';
   quantities?: Record<string, number>;
   onAddDish: (dish: DishData) => void;
   onTapDish?: (dish: DishData) => void;
+  /** Show tags on DishCard (default false) */
+  showTags?: boolean;
+  /** Show allergens on DishCard (default false) */
+  showAllergens?: boolean;
   /** Enable virtual scrolling when dish count > threshold (default 50) */
   virtualThreshold?: number;
   className?: string;
@@ -27,6 +31,11 @@ const GRID_ROW_HEIGHT = 180;
 const HORIZONTAL_ITEM_HEIGHT = 100;
 const BUFFER_COUNT = 10;
 
+/** Layout class: 'compact' and 'horizontal' both use column layout */
+function layoutClass(variant: DishGridProps['variant']): string {
+  return variant === 'grid' ? styles.gridLayout : styles.horizontalLayout;
+}
+
 /* ---------- simple (non-virtual) renderer ---------- */
 function SimpleGrid({
   dishes,
@@ -34,21 +43,20 @@ function SimpleGrid({
   quantities,
   onAddDish,
   onTapDish,
+  showTags,
+  showAllergens,
   className,
 }: Omit<DishGridProps, 'virtualThreshold'>) {
   return (
-    <div
-      className={cn(
-        variant === 'grid' ? styles.gridLayout : styles.horizontalLayout,
-        className,
-      )}
-    >
+    <div className={cn(layoutClass(variant), className)}>
       {dishes.map((dish) => (
         <DishCard
           key={dish.id}
           variant={variant}
           dish={dish}
           quantity={quantities?.[dish.id]}
+          showTags={showTags}
+          showAllergens={showAllergens}
           onAdd={() => onAddDish(dish)}
           onTap={onTapDish ? () => onTapDish(dish) : undefined}
         />
@@ -73,12 +81,14 @@ function VirtualGrid({
   quantities,
   onAddDish,
   onTapDish,
+  showTags,
+  showAllergens,
   className,
 }: Omit<DishGridProps, 'virtualThreshold'>) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [visibleRange, setVisibleRange] = useState({ start: 0, end: 30 });
 
-  const itemHeight = variant === 'grid' ? GRID_ROW_HEIGHT : HORIZONTAL_ITEM_HEIGHT;
+  const itemHeight = variant === 'grid' ? GRID_ROW_HEIGHT : variant === 'compact' ? 72 : HORIZONTAL_ITEM_HEIGHT;
 
   // For grid variant, estimate columns from container width
   const [columns, setColumns] = useState(variant === 'grid' ? 3 : 1);
@@ -151,9 +161,7 @@ function VirtualGrid({
     >
       <div className={styles.virtualSpacer} style={{ height: totalHeight }}>
         <div
-          className={
-            variant === 'grid' ? styles.gridLayout : styles.horizontalLayout
-          }
+          className={layoutClass(variant)}
           style={{
             position: 'absolute',
             top: offsetTop,
@@ -167,6 +175,8 @@ function VirtualGrid({
               variant={variant}
               dish={dish}
               quantity={quantities?.[dish.id]}
+              showTags={showTags}
+              showAllergens={showAllergens}
               onAdd={() => onAddDish(dish)}
               onTap={onTapDish ? () => onTapDish(dish) : undefined}
             />
@@ -184,6 +194,8 @@ export default function DishGrid({
   quantities,
   onAddDish,
   onTapDish,
+  showTags,
+  showAllergens,
   virtualThreshold = 50,
   className,
 }: DishGridProps) {
@@ -198,6 +210,8 @@ export default function DishGrid({
       quantities={quantities}
       onAddDish={onAddDish}
       onTapDish={onTapDish}
+      showTags={showTags}
+      showAllergens={showAllergens}
       className={className}
     />
   );

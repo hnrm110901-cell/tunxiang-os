@@ -4,6 +4,8 @@ import { useLang } from '@/i18n/LangContext';
 import { useOrderStore } from '@/store/useOrderStore';
 import { fetchCategories, fetchDishes } from '@/api/menuApi';
 import { getOrderSummary, createOrder } from '@/api/orderApi';
+import { CategoryNav, DishCard } from '@tx-ds/biz';
+import type { DishData } from '@tx-ds/biz';
 import type { Category, DishItem } from '@/api/menuApi';
 import type { OrderSummary } from '@/api/orderApi';
 
@@ -99,6 +101,17 @@ export default function AddMorePage() {
 
   const addCount = Object.values(addItems).reduce((sum, qty) => sum + qty, 0);
 
+  // DishItem → DishData mapper for shared DishCard
+  const toDishData = useCallback((d: DishItem): DishData => ({
+    id: d.id,
+    name: d.name,
+    priceFen: Math.round(d.price * 100),
+    category: activeCat,
+    images: d.images,
+    tags: d.tags,
+    soldOut: d.soldOut,
+  }), [activeCat]);
+
   // 提交加菜
   const handleSubmit = useCallback(async () => {
     if (submitting || addCount === 0) return;
@@ -178,130 +191,32 @@ export default function AddMorePage() {
 
       {/* 分类 + 菜品 */}
       <div style={{ display: 'flex', minHeight: 'calc(100vh - 260px)' }}>
-        {/* 左侧分类栏 */}
-        <div style={{
-          width: 80, flexShrink: 0,
-          background: 'var(--tx-bg-secondary)',
-          overflowY: 'auto',
-        }}>
-          {categories.map((cat) => (
-            <button
-              key={cat.id}
-              className="tx-pressable"
-              onClick={() => setActiveCat(cat.id)}
-              style={{
-                width: '100%', padding: '14px 8px',
-                fontSize: 'var(--tx-font-xs)',
-                color: activeCat === cat.id ? '#FF6B35' : 'var(--tx-text-secondary)',
-                fontWeight: activeCat === cat.id ? 600 : 400,
-                background: activeCat === cat.id ? 'var(--tx-bg-primary)' : 'transparent',
-                borderLeft: activeCat === cat.id ? '3px solid #FF6B35' : '3px solid transparent',
-                textAlign: 'center',
-              }}
-            >
-              {cat.name}
-            </button>
-          ))}
-        </div>
+        {/* 左侧分类栏 — 共享 CategoryNav */}
+        <CategoryNav
+          categories={categories.map((c) => ({ id: c.id, name: c.name }))}
+          activeId={activeCat}
+          layout="sidebar"
+          onSelect={setActiveCat}
+        />
 
-        {/* 右侧菜品列表 */}
+        {/* 右侧菜品列表 — 共享 DishCard */}
         <div style={{ flex: 1, padding: '0 12px', overflowY: 'auto' }}>
           {dishes.length === 0 ? (
             <div style={{ textAlign: 'center', padding: 32, color: 'var(--tx-text-tertiary)', fontSize: 'var(--tx-font-sm)' }}>
               {t('loading')}
             </div>
           ) : (
-            dishes.filter((d) => !d.soldOut).map((dish) => {
-              const qty = addItems[dish.id] ?? 0;
-              return (
-                <div
-                  key={dish.id}
-                  style={{
-                    display: 'flex', gap: 10, padding: '12px 0',
-                    borderBottom: '1px solid rgba(255,255,255,0.04)',
-                  }}
-                >
-                  <img
-                    src={dish.images[0] ?? '/placeholder-dish.png'}
-                    alt={dish.name}
-                    loading="lazy"
-                    style={{ width: 64, height: 64, borderRadius: 8, objectFit: 'cover', flexShrink: 0 }}
-                  />
-                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-                    <div>
-                      <div style={{ fontSize: 'var(--tx-font-sm)', fontWeight: 600, color: 'var(--tx-text-primary)' }}>
-                        {dish.name}
-                      </div>
-                      {dish.tags.length > 0 && (
-                        <div style={{ display: 'flex', gap: 4, marginTop: 4, flexWrap: 'wrap' }}>
-                          {dish.tags.slice(0, 2).map((tag) => (
-                            <span key={tag.type} style={{
-                              padding: '1px 6px', borderRadius: 4,
-                              background: 'rgba(255,107,53,0.1)',
-                              fontSize: 10, color: '#FF6B35',
-                            }}>
-                              {tag.label}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <span style={{ fontSize: 'var(--tx-font-sm)', fontWeight: 700, color: '#FF6B35' }}>
-                        {t('yuan')}{dish.price.toFixed(0)}
-                      </span>
-                      {qty === 0 ? (
-                        <button
-                          className="tx-pressable"
-                          onClick={() => handleAdd(dish.id)}
-                          style={{
-                            width: 28, height: 28, borderRadius: 14,
-                            background: '#FF6B35',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            color: '#fff', fontSize: 18,
-                          }}
-                        >
-                          +
-                        </button>
-                      ) : (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <button
-                            className="tx-pressable"
-                            onClick={() => handleMinus(dish.id)}
-                            style={{
-                              width: 26, height: 26, borderRadius: 13,
-                              background: 'var(--tx-bg-tertiary)',
-                              display: 'flex', alignItems: 'center', justifyContent: 'center',
-                              color: 'var(--tx-text-secondary)', fontSize: 16,
-                            }}
-                          >
-                            -
-                          </button>
-                          <span style={{
-                            fontSize: 'var(--tx-font-sm)', fontWeight: 600,
-                            color: 'var(--tx-text-primary)', minWidth: 16, textAlign: 'center',
-                          }}>
-                            {qty}
-                          </span>
-                          <button
-                            className="tx-pressable"
-                            onClick={() => handleAdd(dish.id)}
-                            style={{
-                              width: 26, height: 26, borderRadius: 13,
-                              background: '#FF6B35',
-                              display: 'flex', alignItems: 'center', justifyContent: 'center',
-                              color: '#fff', fontSize: 16,
-                            }}
-                          >
-                            +
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              );
-            })
+            dishes.filter((d) => !d.soldOut).map((dish) => (
+              <DishCard
+                key={dish.id}
+                dish={toDishData(dish)}
+                variant="horizontal"
+                quantity={addItems[dish.id] ?? 0}
+                showTags
+                showImage
+                onAdd={() => handleAdd(dish.id)}
+              />
+            ))
           )}
         </div>
       </div>

@@ -16,9 +16,10 @@
  */
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { useSwipe } from '../hooks/useSwipe';
 import { fetchTicketQueue, startTicket, completeTicket } from '../api/kdsOpsApi';
 import { warmUpAudio, playNewOrder, playTimeout } from '../utils/audio';
+import { OrderTicketCard } from '@tx-ds/biz';
+import type { OrderTicketData } from '@tx-ds/biz';
 
 
 // ─── CSS Variables ──────────────────────────────────────
@@ -41,18 +42,6 @@ const CSS_VARS = `
   @keyframes kds-pulse {
     0%, 100% { opacity: 1; }
     50% { opacity: 0.65; }
-  }
-  @keyframes kds-border-flash {
-    0%, 100% { border-color: #A32D2D; box-shadow: 0 0 0 0 rgba(163,45,45,0); }
-    50% { border-color: #ff4d4f; box-shadow: 0 0 20px 4px rgba(163,45,45,0.5); }
-  }
-  @keyframes kds-card-in {
-    from { opacity: 0; transform: translateY(-16px) scale(0.96); }
-    to   { opacity: 1; transform: translateY(0) scale(1); }
-  }
-  @keyframes kds-warn-flash {
-    0%, 100% { border-color: #BA7517; }
-    50% { border-color: #f5a623; }
   }
 `;
 
@@ -86,33 +75,6 @@ interface GroupedDish {
 
 type ViewMode = 'scroll' | 'paged';
 type GroupMode = 'by-table' | 'by-dish';
-
-// ─── 时间状态 ──────────────────────────────────────────
-
-type TimeStatus = 'normal' | 'warning' | 'overtime';
-
-function getTimeStatus(createdAt: number, timeLimit: number): TimeStatus {
-  const elapsedMin = (Date.now() - createdAt) / 60000;
-  if (elapsedMin >= timeLimit) return 'overtime';
-  if (elapsedMin >= timeLimit * 0.5) return 'warning';
-  return 'normal';
-}
-
-/** Get time color using KDS theme CSS custom properties */
-function getTimeColor(elapsedMs: number, timeLimitMin: number): string {
-  const elapsedMin = elapsedMs / 60000;
-  const ratio = elapsedMin / timeLimitMin;
-  if (ratio >= 1.0) return 'var(--tx-kds-red)';
-  if (ratio >= 0.5) return 'var(--tx-kds-amber)';
-  return 'var(--tx-kds-green)';
-}
-
-function formatElapsed(createdAt: number): string {
-  const totalSec = Math.floor((Date.now() - createdAt) / 1000);
-  const m = Math.floor(totalSec / 60);
-  const s = totalSec % 60;
-  return `${m}:${String(s).padStart(2, '0')}`;
-}
 
 // ─── 门店配置 ─────────────────────────────────────────
 
@@ -181,6 +143,31 @@ function buildMockTickets(): DemoTicket[] {
   ];
 }
 
+// ─── DemoTicket → OrderTicketData mapper ─────────────────
+
+function toTicketData(t: DemoTicket): OrderTicketData {
+  return {
+    id: t.id,
+    orderNo: t.orderNo,
+    tableNo: t.tableNo,
+    status: t.status === 'pending' ? 'pending' : t.status === 'cooking' ? 'cooking' : 'done',
+    priority: t.priority,
+    createdAt: new Date(t.createdAt).toISOString(),
+    timeoutMinutes: t.timeLimit,
+    items: t.items.map((item, i) => ({
+      id: `${t.id}-${i}`,
+      name: item.name,
+      qty: item.qty,
+      remark: item.notes || undefined,
+    })),
+  };
+}
+
+/** Simple overtime check for stat counting */
+function isOvertime(createdAt: number, timeLimit: number): boolean {
+  return (Date.now() - createdAt) / 60000 >= timeLimit;
+}
+
 // ─── Pagination helpers ──────────────────────────────────
 
 const TICKETS_PER_PAGE = 6;
@@ -196,7 +183,7 @@ export function KDSBoardPage() {
   const storeName = STORE_MAP[storeId] || '未知门店';
 
   const [tickets, setTickets] = useState<DemoTicket[]>(() => buildMockTickets());
-  const [tick, setTick] = useState(0); // 每秒刷新倒计时
+  const [now, setNow] = useState(() => Date.now());
   const [clock, setClock] = useState(() => formatClock());
   const [audioWarmed, setAudioWarmed] = useState(false);
 
@@ -219,7 +206,7 @@ export function KDSBoardPage() {
   useEffect(() => {
     mountedRef.current = true;
     const timer = setInterval(() => {
-      setTick((t) => t + 1);
+      setNow(Date.now());
       setClock(formatClock());
     }, 1000);
     return () => {
@@ -409,7 +396,7 @@ export function KDSBoardPage() {
   const pendingCount = activeTickets.filter((t) => t.status === 'pending').length;
   const cookingCount = activeTickets.filter((t) => t.status === 'cooking').length;
   const overtimeCount = activeTickets.filter(
-    (t) => getTimeStatus(t.createdAt, t.timeLimit) === 'overtime',
+    (t) => isOvertime(t.createdAt, t.timeLimit),
   ).length;
 
   // ─── Pagination (paged mode) ──────────────────────
@@ -647,10 +634,14 @@ export function KDSBoardPage() {
               </div>
             ) : (
               pagedTickets.map((ticket) => (
-                <KDSTicketCard
+                <OrderTicketCard
                   key={ticket.id}
-                  ticket={ticket}
-                  tick={tick}
+                  ticket={toTicketData(ticket)}
+                  kds
+                  now={now}
+                  swipeable
+                  onSwipeComplete={() => handleComplete(ticket.id)}
+                  isFlashing={ticket.priority === 'rush'}
                   onStart={() => handleStart(ticket.id)}
                   onComplete={() => handleComplete(ticket.id)}
                 />
@@ -717,13 +708,18 @@ export function KDSBoardPage() {
             <EmptyState isDemo={isDemo} />
           ) : (
             activeTickets.map((ticket) => (
-              <KDSTicketCard
-                key={ticket.id}
-                ticket={ticket}
-                tick={tick}
-                onStart={() => handleStart(ticket.id)}
-                onComplete={() => handleComplete(ticket.id)}
-              />
+              <div key={ticket.id} style={{ width: 260, flexShrink: 0 }}>
+                <OrderTicketCard
+                  ticket={toTicketData(ticket)}
+                  kds
+                  now={now}
+                  swipeable
+                  onSwipeComplete={() => handleComplete(ticket.id)}
+                  isFlashing={ticket.priority === 'rush'}
+                  onStart={() => handleStart(ticket.id)}
+                  onComplete={() => handleComplete(ticket.id)}
+                />
+              </div>
             ))
           )}
 
@@ -914,320 +910,3 @@ function DishGroupCard({ dish }: { dish: GroupedDish }) {
   );
 }
 
-// ─── 工单卡片 ─────────────────────────────────────────
-
-function KDSTicketCard({
-  ticket,
-  tick: _tick,
-  onStart,
-  onComplete,
-}: {
-  ticket: DemoTicket;
-  tick: number;
-  onStart: () => void;
-  onComplete: () => void;
-}) {
-  const status = getTimeStatus(ticket.createdAt, ticket.timeLimit);
-  const elapsed = formatElapsed(ticket.createdAt);
-  const elapsedMs = Date.now() - ticket.createdAt;
-  const isVip = ticket.priority === 'vip';
-  const isRush = ticket.priority === 'rush';
-  const isCooking = ticket.status === 'cooking';
-
-  // 颜色编码 — using CSS vars via getTimeColor
-  const timerColor = getTimeColor(elapsedMs, ticket.timeLimit);
-
-  const borderColor =
-    status === 'overtime'
-      ? '#A32D2D'
-      : status === 'warning'
-        ? '#BA7517'
-        : 'rgba(255,255,255,0.1)';
-
-  const cardBg =
-    status === 'overtime'
-      ? 'linear-gradient(160deg, #1a0505 0%, #200808 100%)'
-      : '#111827';
-
-  const cardAnimation =
-    status === 'overtime'
-      ? 'kds-border-flash 1.5s infinite'
-      : status === 'warning'
-        ? 'kds-warn-flash 2s infinite'
-        : 'kds-card-in 0.3s ease-out';
-
-  // 左滑完成手势
-  const { swipeHandlers, swipeOffset, isSwiping } = useSwipe({
-    onSwipeLeft: onComplete,
-    threshold: 72,
-  });
-
-  return (
-    <div
-      style={{
-        width: 240,
-        flexShrink: 0,
-        position: 'relative',
-        overflow: 'hidden',
-        borderRadius: 16,
-      }}
-    >
-      {/* 左滑提示底层 */}
-      <div
-        style={{
-          position: 'absolute',
-          inset: 0,
-          background: 'var(--tx-kds-green)',
-          borderRadius: 16,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'flex-end',
-          paddingRight: 20,
-          opacity: isSwiping && swipeOffset < -20 ? Math.min(1, Math.abs(swipeOffset) / 72) : 0,
-          transition: isSwiping ? 'none' : 'opacity 0.2s',
-        }}
-      >
-        <span style={{ color: '#fff', fontSize: 28, fontWeight: 700 }}>完成</span>
-      </div>
-
-      {/* 主卡片 */}
-      <div
-        {...swipeHandlers}
-        style={{
-          width: '100%',
-          minHeight: 300,
-          background: cardBg,
-          border: `2px solid ${borderColor}`,
-          borderRadius: 16,
-          padding: '16px 14px 14px',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 0,
-          cursor: isSwiping ? 'grabbing' : 'grab',
-          userSelect: 'none',
-          transform: `translateX(${swipeOffset}px)`,
-          transition: isSwiping ? 'none' : 'transform 0.25s ease, border-color 0.3s',
-          animation: cardAnimation,
-          position: 'relative',
-        }}
-      >
-        {/* 卡头：桌号 + 状态标签 + 倒计时 */}
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'flex-start',
-            marginBottom: 12,
-          }}
-        >
-          <div>
-            <div
-              style={{
-                fontSize: 28,
-                fontWeight: 800,
-                color: '#fff',
-                lineHeight: 1,
-                marginBottom: 4,
-              }}
-            >
-              {ticket.tableNo}
-            </div>
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-              <span style={{ fontSize: 14, color: 'rgba(255,255,255,0.35)' }}>
-                #{ticket.orderNo}
-              </span>
-              {isVip && (
-                <span
-                  style={{
-                    fontSize: 13,
-                    padding: '1px 8px',
-                    borderRadius: 5,
-                    background: 'linear-gradient(135deg, #C5A347, #E8D48B)',
-                    color: '#1a1a00',
-                    fontWeight: 700,
-                  }}
-                >
-                  VIP
-                </span>
-              )}
-              {isRush && (
-                <span
-                  style={{
-                    fontSize: 13,
-                    padding: '1px 8px',
-                    borderRadius: 5,
-                    background: '#A32D2D',
-                    color: '#fff',
-                    fontWeight: 700,
-                    animation: 'kds-pulse 1s infinite',
-                  }}
-                >
-                  催
-                </span>
-              )}
-            </div>
-          </div>
-
-          {/* 倒计时 */}
-          <div
-            style={{
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'flex-end',
-            }}
-          >
-            <div
-              style={{
-                fontSize: 32,
-                fontWeight: 800,
-                color: timerColor,
-                fontFamily: 'JetBrains Mono, "Courier New", monospace',
-                lineHeight: 1,
-                animation:
-                  status === 'warning' || status === 'overtime'
-                    ? 'kds-pulse 1.5s infinite'
-                    : undefined,
-              }}
-            >
-              {elapsed}
-            </div>
-            <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.3)', marginTop: 3 }}>
-              {status === 'overtime' ? '已超时' : status === 'warning' ? '即将超时' : '正常'}
-            </div>
-          </div>
-        </div>
-
-        {/* 分割线 */}
-        <div
-          style={{
-            height: 1,
-            background: 'rgba(255,255,255,0.06)',
-            marginBottom: 12,
-          }}
-        />
-
-        {/* 菜品列表 */}
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {ticket.items.map((item, i) => (
-            <div
-              key={i}
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'flex-start',
-              }}
-            >
-              <div style={{ flex: 1 }}>
-                <span style={{ fontSize: 20, fontWeight: 700, color: '#F0F0F0' }}>
-                  {item.name}
-                </span>
-                {item.notes && (
-                  <span
-                    style={{
-                      fontSize: 15,
-                      color: 'var(--tx-kds-amber)',
-                      marginLeft: 6,
-                      fontWeight: 400,
-                    }}
-                  >
-                    ({item.notes})
-                  </span>
-                )}
-              </div>
-              <span
-                style={{
-                  fontSize: 20,
-                  fontWeight: 700,
-                  color: '#FF6B35',
-                  minWidth: 40,
-                  textAlign: 'right',
-                }}
-              >
-                x{item.qty}
-              </span>
-            </div>
-          ))}
-        </div>
-
-        {/* 操作按钮 */}
-        <div style={{ marginTop: 16 }}>
-          {ticket.status === 'pending' ? (
-            <ActionButton
-              label="开始制作"
-              color="#185FA5"
-              onClick={onStart}
-            />
-          ) : (
-            <ActionButton
-              label="出餐完成"
-              color="var(--tx-kds-green)"
-              onClick={onComplete}
-            />
-          )}
-        </div>
-
-        {/* 左滑提示文字（状态为 cooking 时显示） */}
-        {isCooking && (
-          <div
-            style={{
-              textAlign: 'center',
-              marginTop: 8,
-              fontSize: 13,
-              color: 'rgba(255,255,255,0.2)',
-            }}
-          >
-            左滑完成出餐
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// ─── 操作按钮（触控优化） ──────────────────────────────
-
-function ActionButton({
-  label,
-  color,
-  onClick,
-}: {
-  label: string;
-  color: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      onClick={(e) => {
-        e.stopPropagation();
-        onClick();
-      }}
-      onPointerDown={(e) => {
-        (e.currentTarget as HTMLButtonElement).style.transform = 'scale(0.97)';
-      }}
-      onPointerUp={(e) => {
-        (e.currentTarget as HTMLButtonElement).style.transform = 'scale(1)';
-      }}
-      onPointerLeave={(e) => {
-        (e.currentTarget as HTMLButtonElement).style.transform = 'scale(1)';
-      }}
-      style={{
-        width: '100%',
-        height: 56,
-        border: 'none',
-        borderRadius: 12,
-        background: color,
-        color: '#fff',
-        fontSize: 20,
-        fontWeight: 700,
-        cursor: 'pointer',
-        transition: 'transform 200ms ease',
-        minHeight: 56,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-      }}
-    >
-      {label}
-    </button>
-  );
-}

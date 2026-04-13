@@ -11,6 +11,7 @@
 import React, { useMemo } from 'react';
 import styles from './OrderTicketCard.module.css';
 import { cn } from '../../utils/cn';
+import { useSwipe } from '../../hooks/useSwipe';
 
 export interface TicketDishItem {
   id: string;
@@ -50,12 +51,30 @@ export interface OrderTicketCardProps {
   ticket: OrderTicketData;
   /** 紧凑模式（KDS横排） */
   compact?: boolean;
+  /** KDS大屏模式（大字体 + 大按钮） */
+  kds?: boolean;
   /** 当前时间戳（ms），用于计算倒计时 */
   now?: number;
+  /** 是否暂停出品 */
+  isPaused?: boolean;
+  /** 催单闪烁 */
+  isFlashing?: boolean;
+  /** 自定义主操作按钮文案（覆盖默认的"开始制作"/"出餐完成"） */
+  actionLabel?: string;
   onStart?: (ticket: OrderTicketData) => void;
   onComplete?: (ticket: OrderTicketData) => void;
   onRush?: (ticket: OrderTicketData) => void;
+  /** 停菜/恢复回调 */
+  onPause?: (ticket: OrderTicketData) => void;
+  /** 抢单回调 */
+  onGrab?: (ticket: OrderTicketData) => void;
   onClick?: (ticket: OrderTicketData) => void;
+  /** 启用左滑手势（KDS 大屏左滑完成出餐） */
+  swipeable?: boolean;
+  /** 左滑完成回调（swipeable=true 时使用） */
+  onSwipeComplete?: (ticket: OrderTicketData) => void;
+  /** 左滑底层提示文案（默认 "完成"） */
+  swipeLabel?: string;
 }
 
 const STATUS_META: Record<TicketStatus, { label: string; className: string }> = {
@@ -75,11 +94,20 @@ const PRIORITY_META: Record<TicketPriority, { label: string; className: string }
 export default function OrderTicketCard({
   ticket,
   compact,
+  kds,
   now,
+  isPaused,
+  isFlashing,
+  actionLabel,
   onStart,
   onComplete,
   onRush,
+  onPause,
+  onGrab,
   onClick,
+  swipeable,
+  onSwipeComplete,
+  swipeLabel = '完成',
 }: OrderTicketCardProps) {
   const statusMeta = STATUS_META[ticket.status] ?? STATUS_META.pending;
   const priorityMeta = PRIORITY_META[ticket.priority ?? 'normal'];
@@ -94,26 +122,54 @@ export default function OrderTicketCard({
     return { mins, secs, totalMins: mins };
   }, [now, ticket.createdAt]);
 
-  const isOvertime = ticket.timeoutMinutes != null && elapsed.totalMins >= ticket.timeoutMinutes;
+  // Time level for color coding
+  const timeLevel: 'normal' | 'warning' | 'critical' = useMemo(() => {
+    const timeout = ticket.timeoutMinutes ?? 25;
+    const warn = Math.max(Math.floor(timeout * 0.6), 5);
+    if (elapsed.totalMins >= timeout) return 'critical';
+    if (elapsed.totalMins >= warn) return 'warning';
+    return 'normal';
+  }, [elapsed.totalMins, ticket.timeoutMinutes]);
+
+  const isOvertime = timeLevel === 'critical';
 
   const servedCount = ticket.items.filter((i) => i.served).length;
   const totalCount = ticket.items.length;
 
-  return (
+  const hasActions = onStart || onComplete || onRush || onGrab || onPause;
+
+  // Swipe gesture (optional, KDS left-swipe-to-complete)
+  const { swipeHandlers, swipeOffset, isSwiping } = useSwipe({
+    onSwipeLeft: swipeable && onSwipeComplete ? () => onSwipeComplete(ticket) : undefined,
+    threshold: 72,
+  });
+
+  const cardContent = (
     <div
       className={cn(
         styles.card,
         compact && styles.compact,
+        kds && styles.kds,
         isOvertime && styles.overtime,
+        isFlashing && styles.flashing,
+        isPaused && styles.paused,
         ticket.priority === 'rush' && styles.rush,
         ticket.priority === 'vip' && styles.vip,
       )}
+      style={swipeable ? {
+        transform: `translateX(${swipeOffset}px)`,
+        transition: isSwiping ? 'none' : 'transform 0.25s ease',
+        cursor: isSwiping ? 'grabbing' : 'grab',
+        userSelect: 'none',
+      } : undefined}
+      {...(swipeable ? swipeHandlers : {})}
       onClick={() => onClick?.(ticket)}
     >
       {/* Header */}
       <div className={styles.header}>
         <div className={styles.headerLeft}>
           <span className={styles.tableNo}>{ticket.tableNo}</span>
+          <span className={styles.orderNo}>#{ticket.orderNo}</span>
           {ticket.channel && (
             <span className={styles.channelBadge}>{ticket.channel}</span>
           )}
@@ -124,27 +180,28 @@ export default function OrderTicketCard({
           )}
         </div>
         <div className={styles.headerRight}>
-          <span className={cn(styles.statusBadge, styles[statusMeta.className])}>
-            {statusMeta.label}
-          </span>
-          <span className={cn(styles.timer, isOvertime && styles.timerOvertime)}>
+          <span className={cn(
+            styles.timer,
+            styles[`time${timeLevel.charAt(0).toUpperCase()}${timeLevel.slice(1)}`],
+          )}>
             {elapsed.mins}:{elapsed.secs.toString().padStart(2, '0')}
           </span>
         </div>
       </div>
 
-      {/* Order number */}
-      <div className={styles.orderNoRow}>
-        <span className={styles.orderNo}>#{ticket.orderNo}</span>
-        {ticket.guestCount != null && (
-          <span className={styles.guestCount}>{ticket.guestCount}人</span>
-        )}
-        {totalCount > 0 && (
-          <span className={styles.progress}>
-            {servedCount}/{totalCount}
-          </span>
-        )}
-      </div>
+      {/* Meta row */}
+      {(ticket.guestCount != null || totalCount > 0) && (
+        <div className={styles.orderNoRow}>
+          {ticket.guestCount != null && (
+            <span className={styles.guestCount}>{ticket.guestCount}人</span>
+          )}
+          {totalCount > 0 && (
+            <span className={styles.progress}>
+              {servedCount}/{totalCount}
+            </span>
+          )}
+        </div>
+      )}
 
       {/* Dish list */}
       <div className={styles.dishList}>
@@ -161,6 +218,13 @@ export default function OrderTicketCard({
         ))}
       </div>
 
+      {/* Pause indicator */}
+      {isPaused && (
+        <div className={styles.pausedBanner}>
+          ⏸ 已停菜 — 暂缓出品
+        </div>
+      )}
+
       {/* Remark */}
       {ticket.remark && (
         <div className={styles.ticketRemark}>
@@ -169,9 +233,20 @@ export default function OrderTicketCard({
       )}
 
       {/* Actions */}
-      {(onStart || onComplete || onRush) && (
+      {hasActions && (
         <div className={styles.actions}>
-          {onRush && ticket.status === 'pending' && (
+          {/* Grab mode button (highest priority) */}
+          {onGrab && ticket.status === 'pending' && (
+            <button
+              type="button"
+              className={cn(styles.actionBtn, styles.grabBtn)}
+              onClick={(e) => { e.stopPropagation(); onGrab(ticket); }}
+            >
+              抢单
+            </button>
+          )}
+          {/* Rush button */}
+          {onRush && ticket.status === 'pending' && !onGrab && (
             <button
               type="button"
               className={cn(styles.actionBtn, styles.rushBtn)}
@@ -180,26 +255,69 @@ export default function OrderTicketCard({
               催单
             </button>
           )}
-          {onStart && ticket.status === 'pending' && (
+          {/* Primary action (start/complete) */}
+          {onStart && ticket.status === 'pending' && !onGrab && (
             <button
               type="button"
               className={cn(styles.actionBtn, styles.startBtn)}
+              disabled={isPaused}
               onClick={(e) => { e.stopPropagation(); onStart(ticket); }}
             >
-              开始制作
+              {actionLabel ?? '开始制作'}
             </button>
           )}
           {onComplete && ticket.status === 'cooking' && (
             <button
               type="button"
               className={cn(styles.actionBtn, styles.completeBtn)}
+              disabled={isPaused}
               onClick={(e) => { e.stopPropagation(); onComplete(ticket); }}
             >
-              出餐完成
+              {actionLabel ?? '完成出品'}
+            </button>
+          )}
+          {/* Pause/Resume toggle */}
+          {onPause && ticket.status === 'cooking' && (
+            <button
+              type="button"
+              className={cn(styles.actionBtn, styles.pauseBtn, isPaused && styles.pauseBtnActive)}
+              onClick={(e) => { e.stopPropagation(); onPause(ticket); }}
+            >
+              {isPaused ? '▶' : '⏸'}
             </button>
           )}
         </div>
       )}
+
+      {/* Swipe hint text (cooking state) */}
+      {swipeable && ticket.status === 'cooking' && (
+        <div className={styles.swipeHint}>
+          左滑完成出餐
+        </div>
+      )}
     </div>
   );
+
+  // Swipeable wrapper: card sits on top of reveal layer
+  if (swipeable) {
+    return (
+      <div className={styles.swipeWrapper}>
+        {/* Reveal layer behind card */}
+        <div
+          className={styles.swipeReveal}
+          style={{
+            opacity: isSwiping && swipeOffset < -20
+              ? Math.min(1, Math.abs(swipeOffset) / 72)
+              : 0,
+            transition: isSwiping ? 'none' : 'opacity 0.2s',
+          }}
+        >
+          <span className={styles.swipeRevealText}>{swipeLabel}</span>
+        </div>
+        {cardContent}
+      </div>
+    );
+  }
+
+  return cardContent;
 }

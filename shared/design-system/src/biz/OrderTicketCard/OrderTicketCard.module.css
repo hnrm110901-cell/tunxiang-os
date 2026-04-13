@@ -23,9 +23,24 @@
   min-width: 160px;
 }
 
+/* KDS large display variant */
+.kds {
+  padding: 14px;
+  gap: 8px;
+  border-radius: 12px;
+  border-width: 2px;
+  border-left-width: 6px;
+}
+
 .overtime {
   border-color: var(--tx-danger, #DC2626);
   animation: pulseOvertime 2s ease-in-out infinite;
+}
+
+.kds.overtime {
+  background: #1a0505;
+  border-color: #A32D2D;
+  animation: kdsBorderFlash 1.5s infinite;
 }
 
 .rush {
@@ -36,9 +51,27 @@
   border-color: #9333EA;
 }
 
+.flashing {
+  animation: kdsRushFlash 1s infinite;
+}
+
+.paused {
+  opacity: 0.85;
+}
+
 @keyframes pulseOvertime {
   0%, 100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0); }
   50% { box-shadow: 0 0 8px 2px rgba(220, 38, 38, 0.3); }
+}
+
+@keyframes kdsBorderFlash {
+  0%, 100% { border-color: #A32D2D; }
+  50% { border-color: #ff4d4f; }
+}
+
+@keyframes kdsRushFlash {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 77, 79, 0); }
+  50% { box-shadow: 0 0 16px 4px rgba(255, 77, 79, 0.6); }
 }
 
 /* Header */
@@ -71,6 +104,10 @@
 
 .compact .tableNo {
   font-size: 16px;
+}
+
+.kds .tableNo {
+  font-size: 26px;
 }
 
 .channelBadge {
@@ -140,7 +177,13 @@
   font-weight: 700;
   color: var(--tx-text-secondary, #94A3B8);
   font-variant-numeric: tabular-nums;
+  font-family: 'JetBrains Mono', 'SF Mono', monospace;
 }
+
+/* Time level colors */
+.timeNormal { color: #0F6E56; }
+.timeWarning { color: #BA7517; }
+.timeCritical { color: #A32D2D; }
 
 .timerOvertime {
   color: #EF4444;
@@ -148,6 +191,10 @@
 
 .compact .timer {
   font-size: 12px;
+}
+
+.kds .timer {
+  font-size: 28px;
 }
 
 /* Order number row */
@@ -208,6 +255,12 @@
   font-size: 12px;
 }
 
+.kds .dishQty {
+  font-size: 22px;
+  min-width: 50px;
+  text-align: right;
+}
+
 .dishName {
   font-size: 14px;
   font-weight: 600;
@@ -216,6 +269,11 @@
 
 .compact .dishName {
   font-size: 12px;
+}
+
+.kds .dishName {
+  font-size: 20px;
+  font-weight: 700;
 }
 
 .dishSpec {
@@ -299,4 +357,130 @@
 .completeBtn {
   background: var(--tx-success, #0F6E56);
   color: #fff;
+}
+
+.grabBtn {
+  background: var(--tx-primary, #FF6B35);
+  color: #fff;
+}
+
+.pauseBtn {
+  flex: 0 0 auto;
+  width: 36px;
+  background: rgba(100, 116, 139, 0.15);
+  color: #94A3B8;
+}
+
+.pauseBtnActive {
+  background: rgba(15, 110, 86, 0.15);
+  color: #10B981;
+}
+
+/* KDS action overrides — larger touch targets */
+.kds .actionBtn {
+  min-height: 56px;
+  font-size: 20px;
+  border-radius: 8px;
+}
+
+.kds .pauseBtn {
+  width: 56px;
+  font-size: 22px;
+}
+
+.kds .dishRemark {
+  font-size: 16px;
+}
+
+.kds .dishSpec {
+  font-size: 14px;
+  padding: 1px 6px;
+}
+
+/* Paused banner */
+.pausedBanner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 4px;
+  background: rgba(217, 119, 6, 0.12);
+  color: #D97706;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.kds .pausedBanner {
+  padding: 10px 14px;
+  font-size: 18px;
+  border-radius: 6px;
+}
+
+.kds .ticketRemark {
+  font-size: 16px;
+  padding: 8px 12px;
+}
+
+.kds .remarkIcon {
+  width: 20px;
+  height: 20px;
+  font-size: 13px;
+}
+
+.kds .orderNo {
+  font-size: 16px;
+}
+
+.kds .guestCount,
+.kds .progress {
+  font-size: 16px;
+}
+
+.kds .channelBadge,
+.kds .priorityBadge {
+  font-size: 14px;
+  padding: 2px 8px;
+}
+
+.kds .statusBadge {
+  font-size: 14px;
+  padding: 3px 10px;
+}
+
+/* Swipe gesture support */
+
+.swipeWrapper {
+  position: relative;
+  overflow: hidden;
+  border-radius: 12px;
+}
+
+.swipeReveal {
+  position: absolute;
+  inset: 0;
+  background: var(--tx-success, #0F6E56);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding-right: 20px;
+}
+
+.swipeRevealText {
+  color: #fff;
+  font-size: 28px;
+  font-weight: 700;
+}
+
+.swipeHint {
+  text-align: center;
+  margin-top: 4px;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.2);
+}
+
+.kds .swipeHint {
+  font-size: 15px;
+  margin-top: 8px;
 }

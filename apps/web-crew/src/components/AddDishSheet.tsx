@@ -12,7 +12,7 @@
  */
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { txFetch } from '../api/index';
-import { DishCard, CategoryNav, MenuSearch } from '@tx-ds/biz';
+import { DishGrid, CategoryNav, MenuSearch } from '@tx-ds/biz';
 import type { DishData } from '@tx-ds/biz';
 import { formatPrice } from '@tx-ds/utils';
 
@@ -176,13 +176,25 @@ export function AddDishSheet({ visible, onClose, orderId, storeId, onSuccess }: 
     return { count, totalFen };
   }, [quantities, dishes]);
 
-  // 修改数量（DishCard onAdd 每次 +1）
+  // 修改数量（DishGrid onAddDish 每次 +1）
   const handleAddDish = useCallback((dishId: string) => {
     setQuantities((prev) => ({
       ...prev,
       [dishId]: (prev[dishId] || 0) + 1,
     }));
   }, []);
+
+  /** DishGrid 的 onAddDish/onTapDish 回调（接收 DishData，反查 dish_id） */
+  const handleGridAdd = useCallback((dish: DishData) => {
+    if (dishes.find((d) => d.dish_id === dish.id)?.sold_out) return;
+    handleAddDish(dish.id);
+  }, [dishes, handleAddDish]);
+
+  /** 菜品数据转换为 DishData[] — 缓存避免重复计算 */
+  const gridDishes = useMemo(
+    () => filteredDishes.map(toDishData),
+    [filteredDishes],
+  );
 
   // CategoryNav 分类数据转换
   const navCategories = useMemo(
@@ -342,22 +354,14 @@ export function AddDishSheet({ visible, onClose, orderId, storeId, onSuccess }: 
               {searchQuery ? `未找到"${searchQuery}"相关菜品` : '该分类暂无菜品'}
             </div>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {filteredDishes.map((dish) => {
-                const qty = quantities[dish.dish_id] || 0;
-                return (
-                  <DishCard
-                    key={dish.dish_id}
-                    dish={toDishData(dish)}
-                    variant="compact"
-                    quantity={qty}
-                    showTags
-                    onAdd={() => handleAddDish(dish.dish_id)}
-                    onTap={() => !dish.sold_out && handleAddDish(dish.dish_id)}
-                  />
-                );
-              })}
-            </div>
+            <DishGrid
+              dishes={gridDishes}
+              variant="compact"
+              quantities={quantities}
+              showTags
+              onAddDish={handleGridAdd}
+              onTapDish={handleGridAdd}
+            />
           )}
         </div>
 

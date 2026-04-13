@@ -13,7 +13,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useOrderStore } from '../store/orderStore';
 import { createOrder, addItem as apiAddItem } from '../api/tradeApi';
 import { fetchDishes, type DishItem } from '../api/menuApi';
-import { DishCard, CategoryNav, MenuSearch, CartPanel } from '@tx-ds/biz';
+import { DishGrid, CategoryNav, MenuSearch, CartPanel } from '@tx-ds/biz';
 import type { DishData, CartItem } from '@tx-ds/biz';
 import { formatPrice } from '@tx-ds/utils';
 import { LiveSeafoodOrderSheet } from '../components/LiveSeafoodOrderSheet';
@@ -343,6 +343,37 @@ export function CashierPage() {
     [items],
   );
 
+  // ── DishGrid 适配 ───────────────────────────────────────────────────────────
+
+  /** dishId → ExtendedDishItem 查找表，用于 DishGrid 回调中还原原始菜品对象 */
+  const dishLookup = useMemo(() => {
+    const map = new Map<string, ExtendedDishItem>();
+    for (const d of dishes) {
+      map.set(d.id, d);
+    }
+    return map;
+  }, [dishes]);
+
+  /** 购物车数量映射：Record<dishId, quantity> */
+  const dishQuantities = useMemo(() => {
+    const rec: Record<string, number> = {};
+    for (const item of items) {
+      rec[item.dishId] = (rec[item.dishId] ?? 0) + item.quantity;
+    }
+    return rec;
+  }, [items]);
+
+  /** DishGrid onAddDish / onTapDish 回调：DishData → ExtendedDishItem → handleDishPress */
+  const handleGridDishAction = useCallback(
+    (dish: DishData) => {
+      const original = dishLookup.get(dish.id);
+      if (original) {
+        handleDishPress(original);
+      }
+    },
+    [dishLookup, handleDishPress],
+  );
+
   // ── 渲染 ─────────────────────────────────────────────────────────────────────
 
   return (
@@ -394,19 +425,13 @@ export function CashierPage() {
 
         {/* 菜品网格 */}
         <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch', padding: 12 }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(148px, 1fr))', gap: 10 }}>
-            {filteredDishes.map((d) => (
-              <DishCard
-                key={d.id}
-                dish={toDishData(d)}
-                variant="grid"
-                quantity={getQuantityForDish(d.id)}
-                showImage={false}
-                onAdd={() => handleDishPress(d)}
-                onTap={() => handleDishPress(d)}
-              />
-            ))}
-          </div>
+          <DishGrid
+            dishes={filteredDishes.map((d) => toDishData(d))}
+            variant="grid"
+            quantities={dishQuantities}
+            onAddDish={handleGridDishAction}
+            onTapDish={handleGridDishAction}
+          />
           {filteredDishes.length === 0 && (
             <div style={{ textAlign: 'center', padding: '40px 0', color: '#64748b', fontSize: 16 }}>
               {searchQuery ? `未找到"${searchQuery}"相关菜品` : '该分类暂无菜品'}

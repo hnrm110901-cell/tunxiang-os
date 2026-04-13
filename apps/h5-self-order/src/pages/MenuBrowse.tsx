@@ -4,7 +4,7 @@ import { useLang } from '@/i18n/LangContext';
 import { useOrderStore } from '@/store/useOrderStore';
 import { fetchCategories, fetchDishes, searchDishes, fetchAiRecommendations } from '@/api/menuApi';
 import type { Category, AiRecommendation } from '@/api/menuApi';
-import { DishCard, CategoryNav, MenuSearch, CartPanel, SpecSheet } from '@tx-ds/biz';
+import { DishGrid, CategoryNav, MenuSearch, CartPanel, SpecSheet } from '@tx-ds/biz';
 import type { DishData, SpecGroup } from '@tx-ds/biz';
 import { formatPrice } from '@tx-ds/utils';
 
@@ -160,9 +160,14 @@ export default function MenuBrowse() {
     setSpecDish(null);
   }, [specDish, addToCart]);
 
-  const getQuantity = useCallback((dishId: string) =>
-    cart.filter((c) => c.dish.id === dishId).reduce((sum, c) => sum + c.quantity, 0),
-  [cart]);
+  /** 购物车数量映射：Record<dishId, quantity> */
+  const dishQuantities = useMemo(() => {
+    const rec: Record<string, number> = {};
+    for (const c of cart) {
+      rec[c.dish.id] = (rec[c.dish.id] ?? 0) + c.quantity;
+    }
+    return rec;
+  }, [cart]);
 
   const displayDishes = useMemo(
     () => searchResults ?? dishes.filter((d) => !activeCat || d.category === activeCat),
@@ -246,20 +251,17 @@ export default function MenuBrowse() {
           )}
 
           {/* 菜品列表 */}
-          {displayDishes.map((dish) => (
-            <DishCard
-              key={dish.id}
-              dish={dish}
+          {displayDishes.length > 0 ? (
+            <DishGrid
+              dishes={displayDishes}
               variant="horizontal"
-              quantity={getQuantity(dish.id)}
+              quantities={dishQuantities}
               showTags
               showAllergens
-              onAdd={() => handleDishTap(dish)}
-              onTap={() => handleDishTap(dish)}
+              onAddDish={handleDishTap}
+              onTapDish={handleDishTap}
             />
-          ))}
-
-          {displayDishes.length === 0 && (
+          ) : (
             <div style={{ textAlign: 'center', padding: 48, color: 'var(--tx-text-tertiary)', fontSize: 'var(--tx-font-sm)' }}>
               {searchResults ? 'No results' : t('loading')}
             </div>
