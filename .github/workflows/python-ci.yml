@@ -195,12 +195,14 @@ jobs:
             echo "No hardcoded secrets detected"
           fi
 
+      # 失败时见 Job 状态（continue-on-error）；修复依赖后可改为阻断合并
       - name: Pip audit (dependency vulnerabilities)
+        continue-on-error: true
         run: |
-          # 收集所有 requirements.txt 并审计
+          set -e
           for req in services/*/requirements.txt; do
             if [ -f "$req" ]; then
               echo "=== Auditing: $req ==="
-              pip-audit -r "$req" --desc || true
+              pip-audit -r "$req" --desc
             fi
           done

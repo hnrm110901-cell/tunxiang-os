@@ -37,6 +37,7 @@ from .api.cost_routes import router as cost_routes_router
 from .api.expense_dashboard import router as expense_dashboard_router
 from .api.event_webhook_routes import router as event_webhook_router
 from .api.procurement_routes import router as procurement_router
+from .api.report_routes import router as report_router
 
 app = FastAPI(
     title="tx-expense · 屯象费控管理服务",
@@ -71,6 +72,7 @@ app.include_router(cost_routes_router,       prefix="/api/v1/expense/costs",    
 app.include_router(expense_dashboard_router, prefix="/api/v1/expense/dashboard",         tags=["费控看板"])
 app.include_router(event_webhook_router,                                                 tags=["内部事件"])
 app.include_router(procurement_router,       prefix="/api/v1/expense/procurement",       tags=["采购付款"])
+app.include_router(report_router,            prefix="/api/v1/expense/reports",           tags=["费控报表"])
 
 
 @app.get("/health")

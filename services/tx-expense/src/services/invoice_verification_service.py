@@ -1059,12 +1059,71 @@ async def process_invoice_upload(
     if ocr_items and ocr_result["success"]:
         await _create_invoice_items(db, invoice_id, tenant_id, ocr_items)
 
+    # ── Step 10: 集团级跨品牌去重检查 ────────────────────────────────────────
+    # 仅当 OCR 识别出 invoice_code + invoice_number 时才执行（定额发票等跳过）
+    group_dedup_result: Optional[dict] = None
+    if invoice_code and invoice_number:
+        try:
+            from .invoice_dedup_service import invoice_dedup_service as _dedup_svc
+            group_dedup_result = await _dedup_svc.check_group_dedup(
+                db=db,
+                invoice_code=invoice_code,
+                invoice_number=invoice_number,
+                tenant_id=tenant_id,
+                invoice_id=invoice_id,
+                expense_application_id=application_id,
+            )
+            if group_dedup_result.get("is_duplicate"):
+                # 在 invoices 记录的 notes 字段追加集团去重警告
+                warning_note = (
+                    f"[集团去重警告] {group_dedup_result.get('message', '跨品牌重复发票')}"
+                )
+                try:
+                    await db.execute(
+                        text("""
+                            UPDATE invoices SET
+                                notes = CASE
+                                    WHEN notes IS NULL OR notes = '' THEN :note
+                                    ELSE notes || '；' || :note
+                                END,
+                                updated_at = NOW()
+                            WHERE id = :invoice_id AND tenant_id = :tenant_id
+                        """),
+                        {
+                            "note": warning_note,
+                            "invoice_id": str(invoice_id),
+                            "tenant_id": str(tenant_id),
+                        },
+                    )
+                    await db.flush()
+                except Exception as exc:
+                    log.error(
+                        "invoice_group_dedup_note_update_error",
+                        error=str(exc),
+                        invoice_id=str(invoice_id),
+                        exc_info=True,
+                    )
+
+                compliance_issues.append(warning_note)
+                needs_manual_review = True
+        except Exception as exc:
+            # 集团去重失败不阻断主流程，降级处理
+            log.error(
+                "invoice_group_dedup_check_error",
+                error=str(exc),
+                invoice_id=str(invoice_id),
+                invoice_code=invoice_code,
+                invoice_number=invoice_number,
+                exc_info=True,
+            )
+
     log.info(
         "invoice_upload_done",
         invoice_id=str(invoice_id),
         ocr_success=ocr_result["success"],
         verify_status=verify_status,
         is_duplicate=is_duplicate,
+        group_dedup_is_duplicate=group_dedup_result.get("is_duplicate") if group_dedup_result else None,
         compliance_issues_count=len(compliance_issues),
         needs_manual_review=needs_manual_review,
     )
@@ -1080,6 +1139,7 @@ async def process_invoice_upload(
         "suggested_category": suggested_category,
         "compliance_issues": compliance_issues,
         "needs_manual_review": needs_manual_review,
+        "group_dedup": group_dedup_result,
     }
 
 

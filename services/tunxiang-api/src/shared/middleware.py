@@ -1,6 +1,6 @@
 """中间件 — 租户隔离 + 请求日志
 
-与 gateway/src/middleware.py 逻辑一致，适配单体入口。
+与 gateway/src/middleware/ 包内中间件职责对齐，适配单体入口（独立实现）。
 """
 import logging
 import time
