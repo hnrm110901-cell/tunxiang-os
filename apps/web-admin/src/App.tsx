@@ -202,6 +202,8 @@ import PromotionRulesV2Page from './pages/marketing/PromotionRulesV2Page';
 // ─── P3: HQ总部管控看板 ────────────────────────────────────────────────────────
 import { BrandOverview } from './pages/analytics/hq/BrandOverview';
 import { StorePerformanceMatrix } from './pages/analytics/hq/StorePerformanceMatrix';
+// ─── 模块4.4: Agent KPI 绑定仪表盘 ────────────────────────────────────────────
+import AgentKPIDashboard from './pages/AgentKPIDashboard';
 
 function App() {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
@@ -423,6 +425,8 @@ function App() {
           <Route path="/trade/delivery" element={<DeliveryDispatchPage />} />
           {/* ─── Y-A9: 企业客户管理（团餐） ─── */}
           <Route path="/trade/corporate" element={<CorporateCustomerPage />} />
+          {/* ─── 模块4.4: Agent KPI 绑定仪表盘 ─── */}
+          <Route path="/agent/kpi" element={<AgentKPIDashboard />} />
         </Routes>
       </ShellHQ>
     </BrowserRouter>

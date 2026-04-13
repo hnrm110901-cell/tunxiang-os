@@ -502,12 +502,14 @@ v233 → v234(费用基础) → v235(申请审批) → v236(通知+差标)
 ### 数据变化
 - 新增 API 端点：29 个（budgets 8 + budget_v2 3 + payroll 9 + vat 9）
 - 修改文件：`services/tx-finance/src/main.py`
+- [web-admin] 注册 `AgentKPIDashboard` 路由 `/agent/kpi`（模块4.4收尾）
+- [db-migrations] 补充 v249：`banquet_kds_dishes` + `banquet_session_deposits` 两表迁移（含RLS + 索引 + check约束）
 
 ### 遗留问题
 - 无
 
 ### 明日计划
-- 为新注册路由补充集成测试（pytest）
+- Phase 1-4 全部完成，等待产品验收 / 客户演示
 
 ---
 
