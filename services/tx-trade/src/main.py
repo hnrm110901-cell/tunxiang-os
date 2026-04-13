@@ -356,6 +356,14 @@ from .api.omni_sync_routes import router as omni_sync_router
 app.include_router(omni_sync_router)
 
 
+try:
+    from .api.table_card_api import router as table_card_router
+    app.include_router(table_card_router)
+except Exception as e:
+    import logging as _logging
+    _logging.getLogger(__name__).warning(f"table_card_router load failed: {e}")
+
+
 @app.get("/health")
 async def health():
     return {"ok": True, "data": {"service": "tx-trade", "version": "4.0.0"}}

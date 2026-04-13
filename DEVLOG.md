@@ -4,6 +4,66 @@
 
 ---
 
+## 2026-04-13 subscription_routes 内存→DB + WechatPay 接入（v255 member_subscriptions 表）
+
+### 今日完成
+- [shared/db-migrations/v255] 新增 member_subscriptions 表（月卡/季卡/年卡，含 out_trade_no/prepay_id）
+- [tx-member/subscription_routes.py] 移除 _subscriptions 内存 dict，全量接入 DB：
+  - create_subscription：INSERT member_subscriptions + 调用 WechatPayService.create_prepay
+  - get_my_subscription：SELECT active 订阅
+  - cancel_subscription：UPDATE auto_renew=FALSE
+- 微信支付：由 mock 字符串改为 WechatPayService（mock_mode 自动处理非生产环境）
+
+### 数据变化
+- 迁移版本：v253 → v255（独立分支，与 v254 平行）
+- 新增表：member_subscriptions
+
+### 遗留问题
+- openid 需前端从微信小程序登录获取后传入，未传时支付降级为空 paySign
+
+### 明日计划
+- 推进下一待排模块
+
+---
+
+## 2026-04-13 invoice_service 内存存储→DB 持久化（v254 invoice_requests 表）
+
+### 今日完成
+- [shared/db-migrations/v254] 新增 invoice_requests 表（顾客开票申请，与 v238 费控 invoices 表独立）
+- [tx-trade/services/invoice_service.py] 移除 _invoices/_invoice_queue 内存存储，全量接入 invoice_requests DB
+  - create_invoice_request：INSERT RETURNING
+  - submit_to_tax_platform：UPDATE 状态+税控编码（mock 标注待替换）
+  - get_invoice_status：SELECT by id
+  - get_invoice_ledger：SELECT by tenant+日期范围
+  - generate_qrcode_data：token 无需持久化，TTL 改为30天
+
+### 数据变化
+- 迁移版本：v253 → v254
+- 新增表：invoice_requests
+
+### 遗留问题
+- 税控平台对接仍为 mock（需采购金税四期 API 凭证后替换）
+
+### 明日计划
+- 推进下一待排模块
+
+## 2026-04-13 table_card_api 重构 + DB 接入（6端点从 stub 变为真实查询）
+
+### 今日完成
+- [tx-trade/table_card_api.py] 工厂模式→标准 APIRouter，Depends(lambda:None)→真实 DB 注入
+- list_tables / get_table_detail / statistics / field-rankings / record_click / update_table_status 6端点接入真实 tables 表
+- [tx-trade/main.py] 注册 table_card_router
+
+### 数据变化
+- 无新迁移（复用 v002 tables 表）
+
+### 遗留问题
+- card_fields 智能推荐字段（context_resolver 依赖）暂返回 []，待业务上线后再接入
+- field_rankings 无 DB 表，暂返回空列表
+
+### 明日计划
+- 推进下一待排模块
+
 ## 2026-04-13 指标口径字典 + 演示前一键巡检 API（Week 2/3 P0 交付）
 
 ### 今日完成
