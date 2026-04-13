@@ -4,7 +4,7 @@ import { useLang } from '@/i18n/LangContext';
 import { useOrderStore } from '@/store/useOrderStore';
 import { fetchDishDetail } from '@/api/menuApi';
 import type { DishItem } from '@/api/menuApi';
-import AllergenBadge from '@/components/AllergenBadge';
+import { AllergenBadge } from '@tx-ds/biz';
 
 /** 菜品详情页 — 大图轮播 + 溯源 + 营养 + 定制 */
 export default function DishDetail() {

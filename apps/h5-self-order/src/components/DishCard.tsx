@@ -1,3 +1,4 @@
+// @deprecated — use DishCard from @tx-ds/biz instead
 import { useLang } from '@/i18n/LangContext';
 import type { DishItem } from '@/api/menuApi';
 import AllergenBadge from './AllergenBadge';

@@ -32,6 +32,7 @@ import {
   PlusCircleOutlined,
   MinusCircleOutlined,
 } from '@ant-design/icons';
+import { formatPrice } from '@tx-ds/utils';
 
 const { Text } = Typography;
 
@@ -101,6 +102,7 @@ async function deleteSpec(dishId: string, specId: string): Promise<void> {
 
 // ─── 工具函数 ────────────────────────────────────────────────
 
+/** @deprecated — use formatPrice from @tx-ds/utils */
 function fenToYuan(fen: number): string {
   const yuan = fen / 100;
   return yuan >= 0 ? `+¥${yuan.toFixed(2)}` : `-¥${Math.abs(yuan).toFixed(2)}`;

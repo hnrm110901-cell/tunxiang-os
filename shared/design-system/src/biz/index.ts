@@ -21,3 +21,15 @@ export type {
   AddToCartAnimationProps,
   AddToCartAnimationHandle,
 } from './AddToCartAnimation/AddToCartAnimation';
+export { default as AllergenBadge } from './AllergenBadge/AllergenBadge';
+export type { AllergenBadgeProps, Allergen } from './AllergenBadge/AllergenBadge';
+export { default as DishManageCard } from './DishManageCard/DishManageCard';
+export type {
+  DishManageCardProps,
+  DishManageData,
+} from './DishManageCard/DishManageCard';
+export { default as MenuSchemePreview } from './MenuSchemePreview/MenuSchemePreview';
+export type {
+  MenuSchemePreviewProps,
+  MenuSchemeData,
+} from './MenuSchemePreview/MenuSchemePreview';

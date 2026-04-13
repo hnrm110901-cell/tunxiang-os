@@ -348,8 +348,20 @@ export function CashierPage() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: 'var(--tx-bg, #0B1A20)', color: '#fff', fontFamily: '-apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", sans-serif' }}>
 
-      {/* ── 顶部：搜索 + 桌号信息 ── */}
+      {/* ── 顶部：返回 + 搜索 + 桌号信息 ── */}
       <div style={{ padding: '12px 16px 0', display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
+        <button
+          type="button"
+          onClick={() => { store.clear(); navigate('/tables'); }}
+          style={{
+            flexShrink: 0, background: 'none', border: 'none', color: '#fff',
+            fontSize: 22, cursor: 'pointer', padding: '4px 8px', borderRadius: 6,
+            display: 'flex', alignItems: 'center',
+          }}
+          aria-label="返回桌台"
+        >
+          ←
+        </button>
         <div style={{ flex: 1 }}>
           <MenuSearch
             value={searchQuery}

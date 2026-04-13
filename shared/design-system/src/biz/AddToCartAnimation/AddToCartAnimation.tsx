@@ -10,6 +10,7 @@
 import {
   forwardRef,
   useCallback,
+  useEffect,
   useImperativeHandle,
   useRef,
   useState,
@@ -120,11 +121,9 @@ function FlyingDotEl({
   const rafRef = useRef<number>(0);
   const startTimeRef = useRef<number>(0);
 
-  const animateRef = useRef<((time: number) => void) | null>(null);
-
-  // Build the callback once
-  if (!animateRef.current) {
-    animateRef.current = (time: number) => {
+  // Build the animation callback and start via useEffect (safe under strict mode)
+  useEffect(() => {
+    const animate = (time: number) => {
       if (!startTimeRef.current) startTimeRef.current = time;
       const elapsed = time - startTimeRef.current;
       const t = Math.min(elapsed / DURATION, 1);
@@ -156,22 +155,15 @@ function FlyingDotEl({
       }
 
       if (t < 1) {
-        rafRef.current = requestAnimationFrame(animateRef.current!);
+        rafRef.current = requestAnimationFrame(animate);
       } else {
         onDone();
       }
     };
-  }
 
-  // Start animation on mount
-  const mountedRef = useRef(false);
-  if (!mountedRef.current) {
-    mountedRef.current = true;
-    // Use a microtask to ensure the element is in the DOM
-    queueMicrotask(() => {
-      rafRef.current = requestAnimationFrame(animateRef.current!);
-    });
-  }
+    rafRef.current = requestAnimationFrame(animate);
+    return () => cancelAnimationFrame(rafRef.current);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return <div ref={elRef} className={styles.dot} />;
 }

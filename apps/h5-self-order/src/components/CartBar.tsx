@@ -1,3 +1,4 @@
+// @deprecated — use CartPanel from @tx-ds/biz instead
 import { useLang } from '@/i18n/LangContext';
 import styles from './CartBar.module.css';
 

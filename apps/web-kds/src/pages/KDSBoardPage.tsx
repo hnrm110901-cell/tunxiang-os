@@ -19,7 +19,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useSwipe } from '../hooks/useSwipe';
 import { fetchTicketQueue, startTicket, completeTicket } from '../api/kdsOpsApi';
 import { warmUpAudio, playNewOrder, playTimeout } from '../utils/audio';
-import { formatPrice } from '@tx-ds/utils';
+
 
 // ─── CSS Variables ──────────────────────────────────────
 

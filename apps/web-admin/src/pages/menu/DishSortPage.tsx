@@ -27,6 +27,7 @@ import {
   SaveOutlined,
   StarFilled,
 } from '@ant-design/icons';
+import { formatPrice } from '@tx-ds/utils';
 
 const { Text } = Typography;
 
@@ -83,6 +84,7 @@ async function saveDishSort(items: { id: string; sort_order: number }[]): Promis
 
 // ─── 工具函数 ────────────────────────────────────────────────
 
+/** @deprecated — use formatPrice from @tx-ds/utils */
 function fenToYuan(fen: number) {
   return `¥${(fen / 100).toFixed(2)}`;
 }

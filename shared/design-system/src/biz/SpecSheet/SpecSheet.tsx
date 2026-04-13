@@ -89,9 +89,16 @@ export default function SpecSheet({
 
   // ── Confirm ──────────────────────────────────────────────────────────────────
 
+  const missingRequired = useMemo(() => {
+    return specGroups
+      .filter((g) => g.required && (selections[g.id] ?? []).length === 0)
+      .map((g) => g.name);
+  }, [specGroups, selections]);
+
   const handleConfirm = useCallback(() => {
+    if (missingRequired.length > 0) return;
     onConfirm(selections, quantity);
-  }, [selections, quantity, onConfirm]);
+  }, [selections, quantity, onConfirm, missingRequired]);
 
   // ── Quantity ─────────────────────────────────────────────────────────────────
 
@@ -204,8 +211,11 @@ export default function SpecSheet({
             type="button"
             className={cn(styles.confirmBtn, 'tx-pressable')}
             onClick={handleConfirm}
+            disabled={missingRequired.length > 0}
           >
-            加入购物车 {formatPrice(totalPriceFen)}
+            {missingRequired.length > 0
+              ? `请选择${missingRequired[0]}`
+              : `加入购物车 ${formatPrice(totalPriceFen)}`}
           </button>
         </div>
       </div>

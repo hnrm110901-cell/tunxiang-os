@@ -23,8 +23,7 @@
  *   onClose={() => setSelected(null)}
  * />
  */
-import React from 'react';
-import { Drawer, Space } from 'antd';
+import React, { useEffect, useRef, useCallback } from 'react';
 import ZBadge from './ZBadge';
 import ZButton from './ZButton';
 import styles from './DetailDrawer.module.css';
@@ -93,82 +92,114 @@ const DetailDrawer: React.FC<DetailDrawerProps> = ({
   actions = [],
   width = 480,
 }) => {
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  // Close on Escape key
+  useEffect(() => {
+    if (!open) return;
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', handleKey);
+    return () => document.removeEventListener('keydown', handleKey);
+  }, [open, onClose]);
+
+  // Click outside to close
+  const handleBackdropClick = useCallback(
+    (e: React.MouseEvent) => {
+      if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
+        onClose();
+      }
+    },
+    [onClose],
+  );
+
+  if (!open) return null;
+
   return (
-    <Drawer
-      open={open}
-      onClose={onClose}
-      placement="right"
-      width={width}
-      mask={false}
-      closable={true}
-      style={{ boxShadow: '-4px 0 16px rgba(0,0,0,0.08)' }}
-      styles={{ body: { padding: 0, display: 'flex', flexDirection: 'column', height: '100%' } }}
-      title={
-        <div className={styles.drawerHeader}>
-          <div className={styles.titleRow}>
-            <span className={styles.title}>{title}</span>
-            {status && (
-              <ZBadge type={status.type} label={status.label} />
+    <div className={styles.drawerOverlay} onClick={handleBackdropClick}>
+      <div
+        ref={panelRef}
+        className={styles.drawerPanel}
+        style={{ width }}
+      >
+        {/* ── Header ── */}
+        <div className={styles.drawerHeaderBar}>
+          <div className={styles.drawerHeader}>
+            <div className={styles.titleRow}>
+              <span className={styles.title}>{title}</span>
+              {status && (
+                <ZBadge type={status.type} label={status.label} />
+              )}
+            </div>
+            {subtitle && (
+              <div className={styles.subtitle}>{subtitle}</div>
+            )}
+            {extra && (
+              <div className={styles.extra}>{extra}</div>
             )}
           </div>
-          {subtitle && (
-            <div className={styles.subtitle}>{subtitle}</div>
-          )}
-          {extra && (
-            <div className={styles.extra}>{extra}</div>
-          )}
+          <button
+            type="button"
+            className={styles.closeBtn}
+            onClick={onClose}
+            aria-label="关闭"
+          >
+            ×
+          </button>
         </div>
-      }
-    >
-      <div className={styles.body}>
-        {/* ── 指标行 ──────────────────────────────────────────────── */}
-        {metrics.length > 0 && (
-          <div className={styles.metricsRow}>
-            {metrics.map((m, i) => (
-              <div key={i} className={styles.metricCell}>
-                <div
-                  className={styles.metricValue}
-                  style={m.valueColor ? { color: m.valueColor } : undefined}
-                >
-                  {m.value}
+
+        {/* ── Body ── */}
+        <div className={styles.body}>
+          {/* ── 指标行 ──────────────────────────────────────────────── */}
+          {metrics.length > 0 && (
+            <div className={styles.metricsRow}>
+              {metrics.map((m, i) => (
+                <div key={i} className={styles.metricCell}>
+                  <div
+                    className={styles.metricValue}
+                    style={m.valueColor ? { color: m.valueColor } : undefined}
+                  >
+                    {m.value}
+                  </div>
+                  <div className={styles.metricLabel}>{m.label}</div>
                 </div>
-                <div className={styles.metricLabel}>{m.label}</div>
+              ))}
+            </div>
+          )}
+
+          {/* ── Sections / Children ─────────────────────────────────── */}
+          <div className={styles.scrollArea}>
+            {children ?? sections.map((s, i) => (
+              <div key={i} className={styles.section}>
+                {s.title && <div className={styles.sectionTitle}>{s.title}</div>}
+                <div className={styles.sectionContent}>{s.content}</div>
               </div>
             ))}
           </div>
-        )}
+        </div>
 
-        {/* ── Sections / Children ─────────────────────────────────── */}
-        <div className={styles.scrollArea}>
-          {children ?? sections.map((s, i) => (
-            <div key={i} className={styles.section}>
-              {s.title && <div className={styles.sectionTitle}>{s.title}</div>}
-              <div className={styles.sectionContent}>{s.content}</div>
+        {/* ── 底部操作区 ────────────────────────────────────────────── */}
+        {actions.length > 0 && (
+          <div className={styles.footer}>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              {actions.map((a, i) => (
+                <ZButton
+                  key={a.key ?? i}
+                  variant={a.type === 'primary' ? 'primary' : a.type === 'danger' ? 'danger' : 'secondary'}
+                  onClick={a.onClick}
+                  disabled={a.disabled}
+                  loading={a.loading}
+                  size="md"
+                >
+                  {a.label}
+                </ZButton>
+              ))}
             </div>
-          ))}
-        </div>
+          </div>
+        )}
       </div>
-
-      {/* ── 底部操作区 ────────────────────────────────────────────── */}
-      {actions.length > 0 && (
-        <div className={styles.footer}>
-          <Space size={8} style={{ width: '100%', justifyContent: 'flex-end' }}>
-            {actions.map((a, i) => (
-              <ZButton
-                key={a.key ?? i}
-                variant={a.type === 'primary' ? 'primary' : a.type === 'danger' ? 'danger' : 'secondary'}
-                onClick={a.onClick}
-                disabled={a.disabled}
-                loading={a.loading}
-                size="md"
-              >
-                {a.label}
-              </ZButton>
-            ))}
-          </Space>
-        </div>
-      )}
-    </Drawer>
+    </div>
   );
 };
 

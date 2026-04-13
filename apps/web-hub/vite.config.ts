@@ -7,6 +7,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, 'src'),
+      '@tx-ds': path.resolve(__dirname, '../../shared/design-system/src'),
     },
   },
   server: {
