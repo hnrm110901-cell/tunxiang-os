@@ -12,6 +12,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { getStoreToken } from '../api/index';
 
+const TENANT_ID = import.meta.env.VITE_TENANT_ID || '';
+
 // ─── 类型定义 ────────────────────────────────────────────────────────────────
 
 interface BanquetSession {
@@ -51,6 +53,7 @@ async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
     headers: {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${token}`,
+      ...(TENANT_ID ? { 'X-Tenant-ID': TENANT_ID } : {}),
       ...(options?.headers ?? {}),
     },
   });

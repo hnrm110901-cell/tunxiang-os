@@ -97,13 +97,7 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     conn = op.get_bind()
-    try:
-        conn.execute(sa.text("DROP POLICY IF EXISTS agent_kpi_snapshots_tenant_isolation ON agent_kpi_snapshots"))
-    except Exception:  # noqa: BLE001
-        pass
-    try:
-        conn.execute(sa.text("DROP POLICY IF EXISTS agent_kpi_configs_tenant_isolation ON agent_kpi_configs"))
-    except Exception:  # noqa: BLE001
-        pass
+    conn.execute(sa.text("DROP POLICY IF EXISTS agent_kpi_snapshots_tenant_isolation ON agent_kpi_snapshots"))
+    conn.execute(sa.text("DROP POLICY IF EXISTS agent_kpi_configs_tenant_isolation ON agent_kpi_configs"))
     op.drop_table("agent_kpi_snapshots")
     op.drop_table("agent_kpi_configs")
