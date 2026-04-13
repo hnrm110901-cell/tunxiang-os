@@ -7,7 +7,9 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useOrderStore } from '../store/orderStore';
 import { createPayment, settleOrder, printReceipt as apiPrintReceipt } from '../api/tradeApi';
 import { printReceipt as bridgePrint } from '../bridge/TXBridge';
+import { formatPrice } from '@tx-ds/utils';
 
+/** @deprecated Use formatPrice from @tx-ds/utils */
 const fen2yuan = (fen: number) => `¥${(fen / 100).toFixed(2)}`;
 
 /* ---------- Mock 企业客户数据（后续对接 tx-member API） ---------- */

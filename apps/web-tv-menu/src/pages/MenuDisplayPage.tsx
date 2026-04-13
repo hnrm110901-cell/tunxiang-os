@@ -4,6 +4,7 @@
  * 纯展示（无用户交互），每60秒刷新API，每30秒自动切换分类
  */
 import { useState, useEffect, useCallback, type CSSProperties } from 'react';
+import { formatPrice } from '@tx-ds/utils';
 
 /* ======================== 类型 ======================== */
 interface Category {
@@ -178,7 +179,7 @@ function DishCardTV({ dish }: { dish: Dish }) {
   };
 
   const priceDisplay = dish.price_fen > 0
-    ? `¥${(dish.price_fen / 100).toFixed(0)}`
+    ? formatPrice(dish.price_fen)
     : '时价';
 
   return (

@@ -3,6 +3,7 @@
  * 统一管理美团/饿了么/抖音/自营四平台外卖订单、平台状态、配送分析
  */
 import { useEffect, useState, useCallback, useRef } from 'react';
+import { formatPrice } from '@tx-ds/utils';
 
 // ─── Constants ───
 
@@ -158,6 +159,7 @@ async function fetchJSON<T>(path: string, fallback: T): Promise<T> {
 
 // ─── Utility ───
 
+/** @deprecated Use formatPrice from @tx-ds/utils */
 function fenToYuan(fen: number): string {
   return (fen / 100).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }

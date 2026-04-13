@@ -2,8 +2,11 @@
  * CrewOrderPage - 服务员桌旁点餐页
  * 桌号选择 + 分类Tab + 菜品列表 + 购物车 + 下单确认
  */
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { CategoryNav, DishCard } from '@tx-ds/biz';
+import type { DishData } from '@tx-ds/biz';
+import { formatPrice } from '@tx-ds/utils';
 
 /* ---------- 类型 ---------- */
 interface DishItem {
@@ -86,7 +89,22 @@ export function CrewOrderPage() {
     return p;
   }, [cart]);
 
-  const vibrate = () => { try { navigator.vibrate(50); } catch (_e) { /* noop */ } };
+  const vibrate = useCallback(() => { try { navigator.vibrate(50); } catch (_e) { /* noop */ } }, []);
+
+  // Map DishItem → DishData for shared component
+  const toDishData = useCallback((d: DishItem): DishData => ({
+    id: d.id,
+    name: d.name,
+    priceFen: d.price * 100,  // mock data is in yuan, shared component expects fen
+    image: d.image,
+    tags: d.tags,
+    soldOut: false,
+  }), []);
+
+  const navCategories = useMemo(
+    () => CATEGORIES.map(c => ({ id: c, name: c })),
+    [],
+  );
 
   const addToCart = (dish: DishItem) => {
     vibrate();
@@ -238,127 +256,68 @@ export function CrewOrderPage() {
 
       {/* 内容区：左分类 + 右菜品 */}
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
-        {/* 左侧分类 */}
-        <div style={{
-          width: 80, background: '#0d1f26', overflowY: 'auto', flexShrink: 0,
-        }}>
-          {CATEGORIES.map(cat => (
-            <button
-              key={cat}
-              onClick={() => { vibrate(); setActiveCategory(cat); }}
-              style={{
-                display: 'block', width: '100%', padding: '16px 4px', border: 'none',
-                background: activeCategory === cat ? '#112228' : 'transparent',
-                color: activeCategory === cat ? '#FF6B35' : '#94a3b8',
-                fontSize: 16, fontWeight: activeCategory === cat ? 700 : 400,
-                cursor: 'pointer', borderLeft: activeCategory === cat ? '3px solid #FF6B35' : '3px solid transparent',
-                minHeight: 48,
-              }}
-            >
-              {cat}
-            </button>
-          ))}
-        </div>
+        {/* 左侧分类 — 共享 CategoryNav 组件 */}
+        <CategoryNav
+          categories={navCategories}
+          activeId={activeCategory}
+          onSelect={(id) => { vibrate(); setActiveCategory(id); }}
+          direction="vertical"
+        />
 
-        {/* 右侧菜品列表 */}
+        {/* 右侧菜品列表 — 共享 DishCard 组件 + 服务员专属操作 */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '8px 10px' }}>
           {filteredDishes.map(dish => {
             const inCart = cart.get(dish.id);
             const qty = inCart?.qty ?? 0;
             return (
-              <div key={dish.id} style={{
-                background: '#112228', borderRadius: 10, padding: 12, marginBottom: 8,
-                display: 'flex', gap: 10,
-              }}>
-                {/* 图片占位 */}
+              <div key={dish.id} style={{ marginBottom: 8 }}>
+                <DishCard
+                  dish={toDishData(dish)}
+                  variant="horizontal"
+                  qty={qty}
+                  onAdd={() => addToCart(dish)}
+                  onMinus={() => removeFromCart(dish.id)}
+                />
+                {/* 服务员专属：做法/备注/推荐 操作行 */}
                 <div style={{
-                  width: 64, height: 64, borderRadius: 8, background: '#1a2a33',
-                  flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: 24, color: '#334155',
+                  display: 'flex', alignItems: 'center', gap: 6, marginTop: 4,
+                  paddingLeft: 74, flexWrap: 'wrap',
                 }}>
-                  {dish.name.charAt(0)}
-                </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                    <span style={{ fontSize: 16, fontWeight: 600 }}>{dish.name}</span>
-                    {dish.tags.map(tag => (
-                      <span key={tag} style={{
-                        fontSize: 12, background: tag === '招牌' ? '#FF6B3522' : tag === '新品' ? '#22c55e22' : '#3b82f622',
-                        color: tag === '招牌' ? '#FF6B35' : tag === '新品' ? '#22c55e' : '#3b82f6',
-                        borderRadius: 4, padding: '1px 5px',
-                      }}>
-                        {tag}
-                      </span>
-                    ))}
-                  </div>
-                  <div style={{ fontSize: 18, fontWeight: 700, color: '#FF6B35', marginTop: 4 }}>
-                    &yen;{dish.price}
-                  </div>
-                  {/* 操作行 */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6, flexWrap: 'wrap' }}>
-                    {PRACTICES[dish.name] && (
-                      <button
-                        onClick={() => { vibrate(); if (qty > 0) setShowPractice(dish.id); else { addToCart(dish); setShowPractice(dish.id); } }}
-                        style={{
-                          background: '#1a2a33', border: 'none', borderRadius: 6, padding: '4px 8px',
-                          color: '#94a3b8', fontSize: 14, cursor: 'pointer', minHeight: 32,
-                        }}
-                      >
-                        {inCart?.practice || '做法'}
-                      </button>
-                    )}
+                  {PRACTICES[dish.name] && (
                     <button
-                      onClick={() => { vibrate(); if (qty > 0) { setRemarkDishId(dish.id); setRemarkText(inCart?.remark ?? ''); } else { addToCart(dish); setRemarkDishId(dish.id); setRemarkText(''); } }}
+                      onClick={() => { vibrate(); if (qty > 0) setShowPractice(dish.id); else { addToCart(dish); setShowPractice(dish.id); } }}
                       style={{
                         background: '#1a2a33', border: 'none', borderRadius: 6, padding: '4px 8px',
-                        color: '#94a3b8', fontSize: 14, cursor: 'pointer', minHeight: 32,
+                        color: inCart?.practice ? '#FF6B35' : '#94a3b8', fontSize: 14,
+                        cursor: 'pointer', minHeight: 32,
                       }}
                     >
-                      备注
+                      {inCart?.practice || '做法'}
                     </button>
-                    {qty > 0 && (
-                      <button
-                        onClick={() => toggleRecommend(dish.id)}
-                        style={{
-                          background: inCart?.isRecommended ? '#FF6B3533' : '#1a2a33',
-                          border: 'none', borderRadius: 6, padding: '4px 8px',
-                          color: inCart?.isRecommended ? '#FF6B35' : '#94a3b8',
-                          fontSize: 14, cursor: 'pointer', minHeight: 32,
-                        }}
-                      >
-                        {inCart?.isRecommended ? '已推荐' : '推荐'}
-                      </button>
-                    )}
-                    <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
-                      {qty > 0 && (
-                        <button
-                          onClick={() => removeFromCart(dish.id)}
-                          style={{
-                            width: 32, height: 32, borderRadius: 16, background: '#1a2a33',
-                            border: '1px solid #334155', color: '#94a3b8', fontSize: 18,
-                            cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            padding: 0,
-                          }}
-                        >
-                          -
-                        </button>
-                      )}
-                      {qty > 0 && (
-                        <span style={{ fontSize: 18, fontWeight: 700, minWidth: 20, textAlign: 'center' }}>{qty}</span>
-                      )}
-                      <button
-                        onClick={() => addToCart(dish)}
-                        style={{
-                          width: 32, height: 32, borderRadius: 16, background: '#FF6B35',
-                          border: 'none', color: '#fff', fontSize: 18,
-                          cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          padding: 0,
-                        }}
-                      >
-                        +
-                      </button>
-                    </div>
-                  </div>
+                  )}
+                  <button
+                    onClick={() => { vibrate(); if (qty > 0) { setRemarkDishId(dish.id); setRemarkText(inCart?.remark ?? ''); } else { addToCart(dish); setRemarkDishId(dish.id); setRemarkText(''); } }}
+                    style={{
+                      background: '#1a2a33', border: 'none', borderRadius: 6, padding: '4px 8px',
+                      color: inCart?.remark ? '#FF6B35' : '#94a3b8', fontSize: 14,
+                      cursor: 'pointer', minHeight: 32,
+                    }}
+                  >
+                    {inCart?.remark ? '已备注' : '备注'}
+                  </button>
+                  {qty > 0 && (
+                    <button
+                      onClick={() => toggleRecommend(dish.id)}
+                      style={{
+                        background: inCart?.isRecommended ? '#FF6B3533' : '#1a2a33',
+                        border: 'none', borderRadius: 6, padding: '4px 8px',
+                        color: inCart?.isRecommended ? '#FF6B35' : '#94a3b8',
+                        fontSize: 14, cursor: 'pointer', minHeight: 32,
+                      }}
+                    >
+                      {inCart?.isRecommended ? '已推荐' : '推荐'}
+                    </button>
+                  )}
                 </div>
               </div>
             );
@@ -384,7 +343,7 @@ export function CrewOrderPage() {
             <span style={{ fontSize: 16, color: '#94a3b8' }}> 件</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-            <span style={{ fontSize: 22, fontWeight: 700, color: '#FF6B35' }}>&yen;{totalPrice}</span>
+            <span style={{ fontSize: 22, fontWeight: 700, color: '#FF6B35' }}>{formatPrice(totalPrice * 100)}</span>
             <button
               onClick={() => { vibrate(); setShowConfirm(true); }}
               style={{
@@ -526,7 +485,7 @@ export function CrewOrderPage() {
                   </div>
                   <div style={{ textAlign: 'right', flexShrink: 0 }}>
                     <div style={{ fontSize: 16, color: '#FF6B35' }}>x{item.qty}</div>
-                    <div style={{ fontSize: 16, fontWeight: 600 }}>&yen;{item.dish.price * item.qty}</div>
+                    <div style={{ fontSize: 16, fontWeight: 600 }}>{formatPrice(item.dish.price * item.qty * 100)}</div>
                   </div>
                 </div>
               ))}
@@ -536,7 +495,7 @@ export function CrewOrderPage() {
               padding: '12px 0 8px', borderTop: '1px solid #1a2a33',
             }}>
               <span style={{ fontSize: 16, color: '#94a3b8' }}>共 {totalQty} 件</span>
-              <span style={{ fontSize: 24, fontWeight: 700, color: '#FF6B35' }}>&yen;{totalPrice}</span>
+              <span style={{ fontSize: 24, fontWeight: 700, color: '#FF6B35' }}>{formatPrice(totalPrice * 100)}</span>
             </div>
             <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
               <button

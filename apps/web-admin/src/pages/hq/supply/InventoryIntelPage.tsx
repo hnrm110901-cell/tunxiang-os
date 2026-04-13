@@ -4,6 +4,7 @@
  * 深色主题，与 EventBusHealthPage 风格一致
  */
 import { useEffect, useState, useCallback } from 'react';
+import { formatPrice } from '@tx-ds/utils';
 import { Alert, Button } from 'antd';
 import { txFetchData } from '../../../api';
 
@@ -92,6 +93,7 @@ function urgencyConfig(urgency?: string): { label: string; color: string } {
   }
 }
 
+/** @deprecated Use formatPrice from @tx-ds/utils */
 function fenToYuan(fen: number): string {
   return `¥${(fen / 100).toFixed(2)}`;
 }

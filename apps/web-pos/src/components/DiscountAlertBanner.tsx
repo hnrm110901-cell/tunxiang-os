@@ -18,6 +18,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import type { DiscountAlert } from '../hooks/usePOSAlerts';
+import { formatPrice } from '@tx-ds/utils';
 
 // ─── 常量 ───
 
@@ -25,6 +26,7 @@ const AUTO_DISMISS_MS = 15_000;
 
 // ─── 工具函数 ───
 
+/** @deprecated Use formatPrice from @tx-ds/utils */
 /** 将分为元，保留整数 */
 const fenToYuan = (fen: number): string =>
   (fen / 100).toFixed(0);

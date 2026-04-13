@@ -23,6 +23,7 @@ import type { ActionType } from '@ant-design/pro-components';
 import { Line, Pie } from '@ant-design/charts';
 import dayjs from 'dayjs';
 import { txFetchData } from '../../../api';
+import { formatPrice } from '@tx-ds/utils';
 
 // ─── Design Token ────────────────────────────────────────────────────────────
 const TX_PRIMARY = '#FF6B35';
@@ -69,6 +70,7 @@ type Dimension = 'store' | 'region' | 'brand' | 'role';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
+/** @deprecated Use formatPrice from @tx-ds/utils */
 const fenToYuan = (fen: number) => `¥${(fen / 100).toFixed(2)}`;
 const fenToWan = (fen: number) => `${(fen / 100 / 10000).toFixed(1)}万`;
 

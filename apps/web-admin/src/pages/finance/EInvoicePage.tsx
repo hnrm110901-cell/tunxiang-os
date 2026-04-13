@@ -39,6 +39,7 @@ import {
   RollbackOutlined,
   SyncOutlined,
 } from '@ant-design/icons';
+import { formatPrice } from '@tx-ds/utils';
 
 const { RangePicker } = DatePicker;
 const { Title, Text } = Typography;
@@ -86,6 +87,7 @@ function getTenantId(): string {
   return '';
 }
 
+/** @deprecated Use formatPrice from @tx-ds/utils */
 function fenToYuan(fen: number): string {
   return (fen / 100).toFixed(2);
 }

@@ -1,0 +1,329 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   CartPanel — sidebar mode (POS 右侧固定面板)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.sidebar {
+  width: 320px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--tx-bg-secondary);
+  color: var(--tx-text-primary);
+  flex-shrink: 0;
+}
+
+.sidebarHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.sidebarTitle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--tx-font-lg, 20px);
+  font-weight: 700;
+}
+
+.tableTag {
+  font-size: var(--tx-font-sm, 14px);
+  font-weight: 400;
+  color: var(--tx-text-secondary);
+  background: var(--tx-bg-tertiary, rgba(255, 255, 255, 0.06));
+  padding: 2px 8px;
+  border-radius: var(--tx-radius-sm, 4px);
+}
+
+.clearBtn {
+  font-size: var(--tx-font-sm, 14px);
+  color: var(--tx-text-tertiary, #666);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px 8px;
+}
+
+.clearBtn:hover {
+  color: var(--tx-danger, #ff4d4f);
+}
+
+/* ── Item list ──────────────────────────────────────────────────────────────── */
+
+.itemList {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 0 16px;
+}
+
+.emptyHint {
+  color: var(--tx-text-tertiary, #666);
+  text-align: center;
+  margin-top: 40px;
+  font-size: var(--tx-font-md, 16px);
+}
+
+.itemRow {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.itemInfo {
+  flex: 1;
+  min-width: 0;
+}
+
+.itemName {
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.itemNotes {
+  font-size: var(--tx-font-sm, 14px);
+  color: var(--tx-text-secondary);
+  margin-top: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.itemPrice {
+  font-size: var(--tx-font-md, 16px);
+  color: var(--tx-text-secondary);
+  margin-top: 2px;
+}
+
+/* ── Quantity controls ──────────────────────────────────────────────────────── */
+
+.qtyControls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.qtyBtn {
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  min-height: 36px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(255, 255, 255, 0.15);
+  background: transparent;
+  color: var(--tx-text-primary);
+  font-size: 20px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 150ms ease, border-color 150ms ease;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.qtyBtn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.qtyBtn:active {
+  background: rgba(255, 255, 255, 0.14);
+  transform: scale(0.95);
+}
+
+.qtyValue {
+  font-size: 18px;
+  font-weight: 600;
+  min-width: 20px;
+  text-align: center;
+}
+
+/* ── Footer ─────────────────────────────────────────────────────────────────── */
+
+.sidebarFooter {
+  padding: 12px 16px 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.subtotalRow,
+.discountRow,
+.finalRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 0;
+}
+
+.subtotalRow {
+  font-size: var(--tx-font-md, 16px);
+  color: var(--tx-text-secondary);
+}
+
+.discountRow {
+  font-size: var(--tx-font-md, 16px);
+  color: var(--tx-success, #52c41a);
+}
+
+.finalRow {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--tx-brand, #FF6B2C);
+  margin-top: 4px;
+}
+
+.actionRow {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.holdBtn {
+  flex: 1;
+  height: var(--tx-touch-min, 48px);
+  border-radius: var(--tx-radius-md, 8px);
+  background: var(--tx-bg-tertiary, #333);
+  color: var(--tx-text-primary);
+  border: none;
+  font-size: var(--tx-font-md, 16px);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 150ms ease;
+}
+
+.holdBtn:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.holdBtn:active {
+  transform: scale(0.98);
+}
+
+.settleBtn {
+  flex: 2;
+  height: var(--tx-touch-min, 48px);
+  min-height: var(--tx-touch-min, 48px);
+  border-radius: var(--tx-radius-md, 8px);
+  background: var(--tx-brand, #FF6B2C);
+  color: #fff;
+  border: none;
+  font-size: var(--tx-font-md, 16px);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 150ms ease, opacity 150ms ease;
+}
+
+.settleBtn:hover {
+  background: var(--tx-brand-hover, #e55a1e);
+}
+
+.settleBtn:active {
+  transform: scale(0.98);
+}
+
+.settleBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   CartPanel — bottom-bar mode (H5/移动端底部栏)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.bottomBar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 56px;
+  padding: 8px 16px;
+  padding-bottom: calc(8px + var(--safe-area-bottom, 0px));
+  background: var(--tx-bg-secondary);
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  z-index: 100;
+  box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.25);
+}
+
+.cartIconWrap {
+  position: relative;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: var(--tx-bg-tertiary, rgba(255, 255, 255, 0.08));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.cartSvg {
+  display: block;
+}
+
+.badge {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  min-width: 20px;
+  height: 20px;
+  border-radius: 10px;
+  background: var(--tx-brand, #FF6B2C);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 5px;
+}
+
+.totalSection {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.totalLabel {
+  font-size: var(--tx-font-xs, 12px);
+  color: var(--tx-text-secondary);
+}
+
+.totalAmount {
+  font-size: var(--tx-font-xl, 20px);
+  font-weight: 700;
+  color: var(--tx-text-primary);
+}
+
+.checkoutBtn {
+  padding: 0 24px;
+  height: 48px;
+  border-radius: var(--tx-radius-full, 24px);
+  background: var(--tx-brand, #FF6B2C);
+  color: #fff;
+  font-size: var(--tx-font-md, 16px);
+  font-weight: 600;
+  white-space: nowrap;
+  border: none;
+  cursor: pointer;
+  transition: background 150ms ease;
+}
+
+.checkoutBtn:hover {
+  background: var(--tx-brand-hover, #e55a1e);
+}
+
+.checkoutBtn:active {
+  transform: scale(0.97);
+}

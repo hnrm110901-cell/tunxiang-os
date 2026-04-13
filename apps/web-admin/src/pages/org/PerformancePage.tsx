@@ -16,6 +16,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { formatPrice } from '@tx-ds/utils';
 import {
   Badge,
   Button,
@@ -145,6 +146,7 @@ function statusColor(status: string): string {
     : TX_DANGER;
 }
 
+/** @deprecated Use formatPrice from @tx-ds/utils */
 function fenToYuan(fen: number): string {
   return `¥${(Math.abs(fen) / 100).toFixed(0)}`;
 }

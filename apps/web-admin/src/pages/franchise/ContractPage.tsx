@@ -59,6 +59,7 @@ import dayjs from 'dayjs';
 const { Title, Text } = Typography;
 
 import { txFetchData } from '../../api';
+import { formatPrice } from '@tx-ds/utils';
 
 // ─── 类型定义 ──────────────────────────────────────────────────
 
@@ -106,6 +107,7 @@ interface ContractStats {
 
 // ─── 工具函数 ──────────────────────────────────────────────────
 
+/** @deprecated Use formatPrice from @tx-ds/utils */
 const fenToYuan = (fen: number): string =>
   (fen / 100).toLocaleString('zh-CN', { minimumFractionDigits: 2 });
 

@@ -1,0 +1,51 @@
+.kpi {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.label {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.valueRow {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.value {
+  font-family: -apple-system, 'SF Pro Display', 'Inter', var(--font-ui, sans-serif);
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+.value.sm { font-size: 24px; }
+.value.md { font-size: 32px; }
+.value.lg { font-size: 48px; }
+
+.unit {
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--text-tertiary);
+}
+
+.change {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 12px;
+  font-weight: 500;
+  margin-top: 2px;
+}
+
+.change.up   { color: var(--green); }
+.change.down { color: var(--red); }
+.change.flat { color: var(--text-tertiary); }

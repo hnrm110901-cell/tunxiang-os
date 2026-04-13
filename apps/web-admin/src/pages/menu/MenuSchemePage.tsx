@@ -48,6 +48,7 @@ import {
   DeleteOutlined,
   ReloadOutlined,
 } from '@ant-design/icons';
+import { formatPrice } from '@tx-ds/utils';
 import {
   listSchemes,
   createScheme,
@@ -79,9 +80,10 @@ const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
   archived: { label: '已归档', color: 'warning' },
 };
 
+/** @deprecated Use formatPrice from @tx-ds/utils */
 const fenToYuan = (fen: number | null | undefined): string => {
   if (fen == null) return '—';
-  return `¥${(fen / 100).toFixed(2)}`;
+  return formatPrice(fen);
 };
 
 // ─── Tab1：方案列表 ──────────────────────────────────────────────────────────

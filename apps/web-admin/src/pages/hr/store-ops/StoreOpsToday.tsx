@@ -16,6 +16,7 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
+import { formatPrice } from '@tx-ds/utils';
 import {
   Alert,
   Badge,
@@ -279,6 +280,7 @@ export default function StoreOpsToday() {
     load();
   }, [storeId, date]);
 
+  /** @deprecated Use formatPrice from @tx-ds/utils */
   const fenToYuan = (fen: number) => `¥${(fen / 100).toFixed(0)}`;
 
   return (

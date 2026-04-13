@@ -4,6 +4,7 @@
  * 纯展示（无用户交互）
  */
 import { useState, useEffect, type CSSProperties } from 'react';
+import { formatPrice } from '@tx-ds/utils';
 
 /* ======================== 类型 ======================== */
 interface SpecialDish {
@@ -117,8 +118,8 @@ function SpecialCard({ dish, index }: { dish: SpecialDish; index: number }) {
     lineHeight: 1,
   };
 
-  const originalDisplay = `¥${(dish.originalPrice_fen / 100).toFixed(0)}`;
-  const specialDisplay = `¥${(dish.specialPrice_fen / 100).toFixed(0)}`;
+  const originalDisplay = formatPrice(dish.originalPrice_fen);
+  const specialDisplay = formatPrice(dish.specialPrice_fen);
 
   return (
     <div style={cardStyle}>

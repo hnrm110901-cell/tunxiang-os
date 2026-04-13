@@ -4,6 +4,7 @@
  * 调用 GET /api/v1/finance/budgets/summary  POST /api/v1/finance/budgets  POST /api/v1/finance/budgets/{id}/execute
  */
 import { useState, useCallback, useEffect } from 'react';
+import { formatPrice } from '@tx-ds/utils';
 import { txFetchData } from '../../../api';
 
 // ─── 类型定义 ───
@@ -74,7 +75,7 @@ const STORE_OPTIONS = [
 
 // ─── 工具函数 ───
 
-/** 分转元，千分位格式 */
+/** @deprecated Use formatPrice from @tx-ds/utils */
 function fenToYuan(fen: number): string {
   return (fen / 100).toLocaleString('zh-CN', { minimumFractionDigits: 0 });
 }

@@ -7,6 +7,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MobileLayout } from '../../components/MobileLayout';
 import { txFetchData } from '../../api/client';
+import { formatPrice } from '@tx-ds/utils';
 
 // ─── 类型 ───
 
@@ -40,6 +41,7 @@ const MOCK_DATA: MobileDashboardData = {
 
 // ─── 工具函数 ───
 
+/** @deprecated Use formatPrice from @tx-ds/utils */
 const fen2yuan = (fen: number) => (fen / 100).toLocaleString('zh-CN', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 
 function marginColor(pct: number): string {

@@ -4,6 +4,7 @@
  * 封装多品牌总览、门店绩效矩阵、品牌对比、品牌P&L四类接口。
  * 金额字段统一使用分（整数），展示层通过 fenToYuan() 转换。
  */
+import { formatPrice } from '@tx-ds/utils';
 import { txFetchData } from './index';
 
 // ─── 公共参数类型 ────────────────────────────────────────────────────────────

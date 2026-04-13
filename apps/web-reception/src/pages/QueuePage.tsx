@@ -1,7 +1,11 @@
 /**
  * 排队叫号 — 大桌/小桌分开排队，取号/叫号/过号
+ *
+ * 使用 @tx-ds/biz QueueTicket 共享组件渲染排队号牌
  */
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
+import { QueueTicket, StatusBar } from '@tx-ds/biz';
+import type { QueueTicketData, QueueTicketStatus, TableSize } from '@tx-ds/biz';
 
 type QueueStatus = 'waiting' | 'called' | 'seated' | 'skipped';
 
@@ -16,13 +20,6 @@ interface QueueItem {
   takenAt: string;       // 取号时间
   estimatedWait: number; // 预估等待分钟
 }
-
-const STATUS_CONFIG: Record<QueueStatus, { label: string; color: string; bg: string }> = {
-  waiting: { label: '等待中', color: 'var(--tx-info)',    bg: '#EBF3FF' },
-  called:  { label: '已叫号', color: 'var(--tx-primary)', bg: 'var(--tx-primary-light)' },
-  seated:  { label: '已入座', color: 'var(--tx-success)', bg: '#E8F5F0' },
-  skipped: { label: '已过号', color: 'var(--tx-text-3)',  bg: '#F0F0F0' },
-};
 
 const INITIAL_QUEUE: QueueItem[] = [
   { id: 'Q1', number: '大01', type: 'large', guestCount: 8,  customerName: '钱先生', phone: '138****1111', status: 'called',  takenAt: '11:05', estimatedWait: 0 },
@@ -48,17 +45,40 @@ export function QueuePage() {
   const largeWaiting = largeQueue.filter(q => q.status === 'waiting').length;
   const smallWaiting = smallQueue.filter(q => q.status === 'waiting').length;
 
-  const handleCall = (id: string) => {
-    setQueue(prev => prev.map(q => q.id === id ? { ...q, status: 'called' as QueueStatus } : q));
-  };
+  /** QueueItem → QueueTicketData 映射 */
+  const toTicketData = useCallback((item: QueueItem): QueueTicketData => {
+    // 计算已等待分钟
+    const now = new Date();
+    const [hh, mm] = item.takenAt.split(':').map(Number);
+    const takenDate = new Date();
+    takenDate.setHours(hh, mm, 0, 0);
+    const waitMinutes = Math.max(0, Math.round((now.getTime() - takenDate.getTime()) / 60000));
 
-  const handleSkip = (id: string) => {
-    setQueue(prev => prev.map(q => q.id === id ? { ...q, status: 'skipped' as QueueStatus } : q));
-  };
+    return {
+      id: item.id,
+      number: item.number,
+      size: item.type as TableSize,  // 'large'|'small' → TableSize
+      guestCount: item.guestCount,
+      customerName: item.customerName,
+      phone: item.phone || undefined,
+      status: item.status as QueueTicketStatus,
+      takenAt: item.takenAt,
+      waitMinutes,
+      estimatedWait: item.status === 'waiting' ? item.estimatedWait : undefined,
+    };
+  }, []);
 
-  const handleSeat = (id: string) => {
-    setQueue(prev => prev.map(q => q.id === id ? { ...q, status: 'seated' as QueueStatus } : q));
-  };
+  const handleCall = useCallback((ticket: QueueTicketData) => {
+    setQueue(prev => prev.map(q => q.id === ticket.id ? { ...q, status: 'called' as QueueStatus } : q));
+  }, []);
+
+  const handleSkip = useCallback((ticket: QueueTicketData) => {
+    setQueue(prev => prev.map(q => q.id === ticket.id ? { ...q, status: 'skipped' as QueueStatus } : q));
+  }, []);
+
+  const handleSeat = useCallback((ticket: QueueTicketData) => {
+    setQueue(prev => prev.map(q => q.id === ticket.id ? { ...q, status: 'seated' as QueueStatus } : q));
+  }, []);
 
   const handleTakeNumber = () => {
     if (!newName.trim()) return;
@@ -92,21 +112,14 @@ export function QueuePage() {
             background: '#EBF3FF',
             padding: '8px 20px',
             borderRadius: 'var(--tx-radius-sm)',
-            fontSize: 20,
-            fontWeight: 700,
-            color: 'var(--tx-info)',
           }}>
-            大桌等待: {largeWaiting}组
-          </div>
-          <div style={{
-            background: '#EBF3FF',
-            padding: '8px 20px',
-            borderRadius: 'var(--tx-radius-sm)',
-            fontSize: 20,
-            fontWeight: 700,
-            color: 'var(--tx-info)',
-          }}>
-            小桌等待: {smallWaiting}组
+            <StatusBar
+              size="compact"
+              items={[
+                { label: '大桌等待', value: largeWaiting, suffix: '组', color: 'var(--tx-info)' },
+                { label: '小桌等待', value: smallWaiting, suffix: '组', color: 'var(--tx-info)' },
+              ]}
+            />
           </div>
           <button
             onClick={() => setShowTakeNumber(true)}
@@ -133,6 +146,7 @@ export function QueuePage() {
         <QueueColumn
           title="大桌 (6人及以上)"
           items={largeQueue}
+          toTicketData={toTicketData}
           onCall={handleCall}
           onSkip={handleSkip}
           onSeat={handleSeat}
@@ -141,6 +155,7 @@ export function QueuePage() {
         <QueueColumn
           title="小桌 (1-5人)"
           items={smallQueue}
+          toTicketData={toTicketData}
           onCall={handleCall}
           onSkip={handleSkip}
           onSeat={handleSeat}
@@ -278,13 +293,14 @@ export function QueuePage() {
 }
 
 function QueueColumn({
-  title, items, onCall, onSkip, onSeat,
+  title, items, toTicketData, onCall, onSkip, onSeat,
 }: {
   title: string;
   items: QueueItem[];
-  onCall: (id: string) => void;
-  onSkip: (id: string) => void;
-  onSeat: (id: string) => void;
+  toTicketData: (item: QueueItem) => QueueTicketData;
+  onCall: (ticket: QueueTicketData) => void;
+  onSkip: (ticket: QueueTicketData) => void;
+  onSeat: (ticket: QueueTicketData) => void;
 }) {
   return (
     <div style={{
@@ -313,107 +329,22 @@ function QueueColumn({
         display: 'flex',
         flexDirection: 'column',
         gap: 12,
-      }}>
-        {items.map(item => {
-          const st = STATUS_CONFIG[item.status];
-          return (
-            <div key={item.id} style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 16,
-              padding: 16,
-              borderRadius: 'var(--tx-radius-md)',
-              border: `2px solid ${item.status === 'called' ? 'var(--tx-primary)' : 'var(--tx-border)'}`,
-              background: item.status === 'called' ? 'var(--tx-primary-light)' : '#fff',
-              opacity: item.status === 'skipped' || item.status === 'seated' ? 0.5 : 1,
-            }}>
-              {/* 排队号 */}
-              <div style={{
-                fontSize: 28,
-                fontWeight: 800,
-                color: item.status === 'called' ? 'var(--tx-primary)' : 'var(--tx-text-1)',
-                minWidth: 64,
-              }}>
-                {item.number}
-              </div>
-
-              {/* 信息 */}
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 20, fontWeight: 600 }}>
-                  {item.customerName} <span style={{ color: 'var(--tx-text-3)' }}>{item.guestCount}人</span>
-                </div>
-                <div style={{ fontSize: 16, color: 'var(--tx-text-3)', marginTop: 2 }}>
-                  取号 {item.takenAt}
-                  {item.status === 'waiting' && item.estimatedWait > 0 && (
-                    <span> | 预计等 {item.estimatedWait}分钟</span>
-                  )}
-                </div>
-              </div>
-
-              {/* 状态 + 操作 */}
-              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                <span style={{
-                  fontSize: 18,
-                  fontWeight: 700,
-                  color: st.color,
-                  background: st.bg,
-                  padding: '4px 12px',
-                  borderRadius: 6,
-                }}>
-                  {st.label}
-                </span>
-                {item.status === 'waiting' && (
-                  <button
-                    onClick={() => onCall(item.id)}
-                    style={{
-                      minWidth: 72,
-                      height: 48,
-                      borderRadius: 'var(--tx-radius-sm)',
-                      border: 'none',
-                      background: 'var(--tx-primary)',
-                      color: '#fff',
-                      fontSize: 18,
-                      fontWeight: 700,
-                      cursor: 'pointer',
-                    }}
-                  >叫号</button>
-                )}
-                {item.status === 'called' && (
-                  <>
-                    <button
-                      onClick={() => onSeat(item.id)}
-                      style={{
-                        minWidth: 72,
-                        height: 48,
-                        borderRadius: 'var(--tx-radius-sm)',
-                        border: 'none',
-                        background: 'var(--tx-success)',
-                        color: '#fff',
-                        fontSize: 18,
-                        fontWeight: 700,
-                        cursor: 'pointer',
-                      }}
-                    >入座</button>
-                    <button
-                      onClick={() => onSkip(item.id)}
-                      style={{
-                        minWidth: 72,
-                        height: 48,
-                        borderRadius: 'var(--tx-radius-sm)',
-                        border: '2px solid var(--tx-border)',
-                        background: '#fff',
-                        color: 'var(--tx-text-2)',
-                        fontSize: 18,
-                        fontWeight: 700,
-                        cursor: 'pointer',
-                      }}
-                    >过号</button>
-                  </>
-                )}
-              </div>
-            </div>
-          );
-        })}
+        /* 覆盖 QueueTicket 暗色默认变量 → 亮色主题 */
+        '--tx-bg-card': '#fff',
+        '--tx-border': 'var(--tx-border, #E5E7EB)',
+        '--tx-text-primary': 'var(--tx-text-1, #1F2937)',
+        '--tx-text-secondary': 'var(--tx-text-2, #6B7280)',
+        '--tx-text-tertiary': 'var(--tx-text-3, #9CA3AF)',
+      } as React.CSSProperties}>
+        {items.map(item => (
+          <QueueTicket
+            key={item.id}
+            ticket={toTicketData(item)}
+            onCall={onCall}
+            onSeat={onSeat}
+            onSkip={onSkip}
+          />
+        ))}
       </div>
     </div>
   );

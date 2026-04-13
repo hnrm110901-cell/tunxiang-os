@@ -1,0 +1,32 @@
+.avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  font-weight: 700;
+  flex-shrink: 0;
+  user-select: none;
+  overflow: hidden;
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+}
+
+/* Size variants */
+.sm  { width: 28px; height: 28px; font-size: 11px; }
+.md  { width: 36px; height: 36px; font-size: 14px; }
+.lg  { width: 48px; height: 48px; font-size: 18px; }
+.xl  { width: 64px; height: 64px; font-size: 22px; }
+
+/* Color variants (role-based) */
+.mint    { background: rgba(10,175,154,0.12); color: var(--accent); }
+.blue    { background: rgba(0,122,255,0.10);  color: #007AFF; }
+.green   { background: rgba(26,122,82,0.12);  color: var(--green); }
+.purple  { background: rgba(175,82,222,0.12); color: #AF52DE; }
+.red     { background: rgba(197,48,48,0.10);  color: var(--red); }

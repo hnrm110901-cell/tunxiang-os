@@ -7,6 +7,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { formatPrice } from '@tx-ds/utils';
 import { txFetch } from '../api/index';
 
 // ─── 类型定义 ──────────────────────────────────────────────────────────────────
@@ -104,6 +105,7 @@ const STORE_ID = (window as { __STORE_ID__?: string }).__STORE_ID__ || '';
 
 // ─── 工具函数 ──────────────────────────────────────────────────────────────────
 
+/** @deprecated Use formatPrice from @tx-ds/utils */
 function fenToYuan(fen: number | null | undefined): string {
   if (fen == null) return '—';
   return `¥${(fen / 100).toFixed(2)}`;

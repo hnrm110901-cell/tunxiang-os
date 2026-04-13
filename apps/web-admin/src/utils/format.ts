@@ -1,8 +1,10 @@
 /**
  * 屯象OS Admin — 通用格式化工具
  */
+import { formatPrice } from '@tx-ds/utils';
 
 /** 将分转换为带¥前缀的元格式，两位小数，千位分隔 */
+/** @deprecated Use formatPrice from @tx-ds/utils */
 export const fenToYuan = (fen: number): string =>
   `¥${(fen / 100).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 

@@ -40,6 +40,7 @@ import {
 import { ProTable } from '@ant-design/pro-components';
 import type { ProColumns, ActionType } from '@ant-design/pro-components';
 import type { ColumnsType } from 'antd/es/table';
+import { formatPrice } from '@tx-ds/utils';
 
 const { Title, Text, Paragraph } = Typography;
 const { Option } = Select;

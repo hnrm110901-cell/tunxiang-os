@@ -55,6 +55,7 @@ import {
   CalculatorOutlined,
 } from '@ant-design/icons';
 import { txFetchData } from '../../api';
+import { formatPrice } from '@tx-ds/utils';
 
 const { Text, Title } = Typography;
 
@@ -114,6 +115,7 @@ const EMPTY_DISH_LIST: DishOption[] = [];
 
 // ─── 工具函数 ──────────────────────────────────────────────────
 
+/** @deprecated — use formatPrice from @tx-ds/utils */
 function fenToYuan(fen: number): string {
   return (fen / 100).toFixed(2);
 }

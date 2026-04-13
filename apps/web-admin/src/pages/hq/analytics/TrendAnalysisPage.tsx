@@ -4,6 +4,7 @@
  * 手写SVG折线图，无图表库依赖
  */
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
+import { formatPrice } from '@tx-ds/utils';
 import { txFetchData } from '../../../api';
 
 // ---------- 类型 ----------
@@ -81,7 +82,7 @@ function formatVal(v: number, unit: string): string {
   return `${v.toLocaleString()}${unit}`;
 }
 
-/** 将分转为元后格式化 */
+/** @deprecated Use formatPrice from @tx-ds/utils */
 function fenToYuan(fen: number): number {
   return fen / 100;
 }

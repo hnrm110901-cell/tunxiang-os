@@ -5,6 +5,7 @@
  * 数据来源: /api/v1/finance/analytics/revenue-composition
  */
 import { useState, useEffect } from 'react';
+import { formatPrice } from '@tx-ds/utils';
 import { txFetchData } from '../../../api';
 
 // ─── 主题常量 ───
@@ -58,6 +59,7 @@ function fenToWan(fen: number): string {
   return `¥${yuan.toFixed(0)}`;
 }
 
+/** @deprecated Use formatPrice from @tx-ds/utils */
 function fenToYuan(fen: number): string {
   return `¥${(fen / 100).toLocaleString('zh-CN', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
 }

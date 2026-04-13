@@ -32,6 +32,7 @@ import {
   FallOutlined,
   InfoCircleOutlined,
 } from '@ant-design/icons';
+import { formatPrice } from '@tx-ds/utils';
 import { txFetchData } from '../../../api';
 
 const { Title, Text } = Typography;
@@ -80,6 +81,7 @@ const CHANNEL_META: Record<string, { color: string; defaultCAC: number; defaultL
 // ─── 工具函数 ────────────────────────────────────────────────────────────────
 
 const fen2wan = (fen: number) => (fen / 1_000_000).toFixed(1) + '万';
+/** @deprecated Use formatPrice from @tx-ds/utils */
 const fen2yuan = (fen: number) => (fen / 100).toFixed(0);
 
 /** ROI 数字颜色规则：≥3=绿色 / 1-3=蓝色 / <1=红色 */

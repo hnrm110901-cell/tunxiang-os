@@ -35,6 +35,7 @@ import {
   ThunderboltOutlined,
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
+import { formatPrice } from '@tx-ds/utils';
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -82,6 +83,7 @@ interface HealthItem {
 
 // ─── 工具函数 ────────────────────────────────────────────────────────────────
 
+/** @deprecated — use formatPrice from @tx-ds/utils */
 const fmtPrice = (fen: number) => `¥${(fen / 100).toFixed(0)}`;
 
 const TAG_COLORS: Record<string, string> = {

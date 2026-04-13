@@ -4,6 +4,7 @@
  * 调用 GET /api/v1/finance/pl/store  /api/v1/finance/cost/breakdown
  */
 import { useState, useCallback } from 'react';
+import { formatPrice } from '@tx-ds/utils';
 import { txFetchData } from '../../../api';
 
 // ---------- 类型定义 ----------
@@ -42,7 +43,7 @@ interface CostBreakdownItem {
 
 // ---------- 工具函数 ----------
 
-/** 分 → 元，千分位，保留2位小数 */
+/** @deprecated Use formatPrice from @tx-ds/utils */
 function fenToYuan(fen: number): string {
   return (fen / 100).toLocaleString('zh-CN', {
     minimumFractionDigits: 2,

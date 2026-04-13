@@ -18,7 +18,8 @@
     "ignoreDeprecations": "6.0",
     "baseUrl": ".",
     "paths": {
-      "@/*": ["src/*"]
+      "@/*": ["src/*"],
+      "@tx-ds/*": ["../../shared/design-system/src/*"]
     }
   },
   "include": ["src"]

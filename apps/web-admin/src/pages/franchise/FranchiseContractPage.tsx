@@ -52,6 +52,7 @@ import {
   ProTable,
 } from '@ant-design/pro-components';
 import type { ProColumns } from '@ant-design/pro-components';
+import { formatPrice } from '@tx-ds/utils';
 
 const { Text } = Typography;
 
@@ -126,6 +127,7 @@ interface FeeStats {
 
 // ─── 辅助函数 ──────────────────────────────────────────────────────────────────
 
+/** @deprecated Use formatPrice from @tx-ds/utils */
 const fenToYuan = (fen: number): string => (fen / 100).toFixed(2);
 
 const CONTRACT_TYPE_MAP: Record<string, string> = {

@@ -5,7 +5,9 @@
  * 收银员可选择一张券核销，或跳过不使用。
  */
 import type { EligibleCoupon } from '../api/couponApi';
+import { formatPrice } from '@tx-ds/utils';
 
+/** @deprecated Use formatPrice from @tx-ds/utils */
 const fen2yuan = (fen: number) => (fen / 100).toFixed(2);
 
 const COUPON_TYPE_LABEL: Record<string, string> = {

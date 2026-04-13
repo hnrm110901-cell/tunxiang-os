@@ -50,6 +50,7 @@ import {
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { txFetchData } from '../../api/client';
+import { formatPrice } from '@tx-ds/utils';
 
 const { Text } = Typography;
 const { RangePicker } = DatePicker;
@@ -140,6 +141,7 @@ interface CreatePOFormValues {
 
 // ─── 工具函数 ──────────────────────────────────────────────────────────────────
 
+/** @deprecated Use formatPrice from @tx-ds/utils */
 const fenToYuan = (fen: number): string => (fen / 100).toFixed(2);
 const fenToWan = (fen: number): string => (fen / 1000000).toFixed(2);
 

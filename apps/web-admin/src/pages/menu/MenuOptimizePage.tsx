@@ -1,117 +1,162 @@
 /**
- * MenuOptimizePage — 智能排菜AI建议
- * 调用 POST /api/v1/brain/menu/optimize，展示AI排菜方案
+ * MenuOptimizePage — 菜品优化AI推荐
+ * 调用 POST /api/v1/menu/recommendation/generate  生成推荐方案
+ * 调用 GET  /api/v1/menu/recommendation/history    历史记录
+ * 调用 POST /api/v1/menu/recommendation/apply      应用方案
  */
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import {
+  Button,
+  Card,
+  Col,
+  message,
+  Progress,
+  Row,
+  Select,
+  Space,
+  Statistic,
+  Tabs,
+  Tag,
+  Tooltip,
+  Typography,
+} from 'antd';
+import {
+  BulbOutlined,
+  CheckCircleOutlined,
+  ExperimentOutlined,
+  HistoryOutlined,
+  ReloadOutlined,
+  RocketOutlined,
+  ThunderboltOutlined,
+} from '@ant-design/icons';
+import { ProTable } from '@ant-design/pro-components';
+import type { ActionType, ProColumns } from '@ant-design/pro-components';
 import { txFetchData } from '../../api';
+import { formatPrice } from '@tx-ds/utils';
+
+const { Text } = Typography;
 
 // ─── 类型定义 ───
 
-interface RecommendedDish {
+interface DishRecommendation {
   dish_id: string;
   dish_name: string;
-  reason: string;
-  expected_lift: string;
-  priority: number;
+  category: string;
+  current_price_fen: number;
+  suggested_price_fen?: number;
+  quadrant: 'star' | 'cash_cow' | 'question' | 'dog';
+  action: 'keep' | 'promote' | 'demote' | 'add' | 'remove' | 'price_up' | 'price_down' | 'combo';
+  confidence: number;
+  reasoning: string;
+  factors: string[];
+  sales_7d: number;
+  sales_30d: number;
+  gross_margin_pct: number;
+  inventory_days?: number;
+  combo_with: string[];
 }
 
-interface ComboSuggestion {
-  combo_name: string;
-  dishes: string[];
-  reason: string;
+interface RecommendationSummary {
+  total_dishes: number;
+  keep_count: number;
+  promote_count: number;
+  demote_count: number;
+  add_count: number;
+  remove_count: number;
+  combo_count: number;
+  estimated_margin_change_pct: number;
+  estimated_turnover_change_pct: number;
+  ai_confidence: number;
+  key_insights: string[];
 }
 
-interface HardConstraint {
-  constraint_id: string;
-  label: string;
-  detail: string;
-}
-
-interface MenuOptimizeResult {
+interface RecommendationPlan {
+  plan_id: string;
   store_id: string;
+  target_date: string;
   meal_period: string;
-  date: string;
-  recommended_dishes: RecommendedDish[];
-  dishes_to_deplete: string[];
-  combo_suggestions: ComboSuggestion[];
-  menu_adjustments: string[];
-  hard_constraints: HardConstraint[];
+  optimization_goal: string;
+  summary: RecommendationSummary;
+  dishes: DishRecommendation[];
+  generated_at: string;
+  applied_at?: string;
 }
 
-// ─── 餐段常量（固定配置，无需 API） ───
+interface HistoryRecord {
+  plan_id: string;
+  store_id: string;
+  target_date: string;
+  total_dishes: number;
+  applied: boolean;
+  applied_at?: string;
+  optimization_goal: string;
+  estimated_margin_change_pct: number;
+  generated_at: string;
+}
 
-const MEAL_PERIODS = [
-  { value: 'breakfast', label: '早市' },
-  { value: 'lunch', label: '午市' },
-  { value: 'dinner', label: '晚市' },
+type OptimizationGoal = 'balanced' | 'margin' | 'turnover' | 'inventory';
+
+// ─── 常量 ───
+
+const OPTIMIZATION_GOALS: { value: OptimizationGoal; label: string }[] = [
+  { value: 'balanced', label: '综合平衡' },
+  { value: 'margin', label: '毛利优先' },
+  { value: 'turnover', label: '翻台优先' },
+  { value: 'inventory', label: '库存消耗' },
 ];
 
-// ─── 工具函数 ───
+const MEAL_PERIODS = [
+  { value: 'lunch', label: '午市' },
+  { value: 'dinner', label: '晚市' },
+  { value: 'breakfast', label: '早市' },
+];
 
-function copyText(text: string, onSuccess: () => void) {
-  if (navigator.clipboard) {
-    navigator.clipboard.writeText(text).then(onSuccess).catch(() => {
-      fallbackCopy(text, onSuccess);
-    });
-  } else {
-    fallbackCopy(text, onSuccess);
-  }
-}
+const QUADRANT_CONFIG: Record<string, { color: string; label: string }> = {
+  star: { color: 'gold', label: '明星菜' },
+  cash_cow: { color: 'green', label: '现金牛' },
+  question: { color: 'blue', label: '问题菜' },
+  dog: { color: 'default', label: '瘦狗菜' },
+};
 
-function fallbackCopy(text: string, onSuccess: () => void) {
-  const el = document.createElement('textarea');
-  el.value = text;
-  el.style.position = 'fixed';
-  el.style.opacity = '0';
-  document.body.appendChild(el);
-  el.select();
-  document.execCommand('copy');
-  document.body.removeChild(el);
-  onSuccess();
-}
+const ACTION_CONFIG: Record<string, { color: string; label: string }> = {
+  keep: { color: 'default', label: '保持' },
+  promote: { color: 'green', label: '推广' },
+  demote: { color: 'orange', label: '降级' },
+  add: { color: 'cyan', label: '新增' },
+  remove: { color: 'red', label: '移除' },
+  price_up: { color: 'volcano', label: '涨价' },
+  price_down: { color: 'purple', label: '降价' },
+  combo: { color: 'geekblue', label: '组合' },
+};
 
-function formatResultAsText(result: MenuOptimizeResult): string {
-  const lines: string[] = [
-    `屯象OS · 智能排菜建议`,
-    `门店：${result.store_id}  餐段：${result.meal_period}  日期：${result.date}`,
-    '',
-    '== 重点推荐菜品 ==',
-    ...result.recommended_dishes.map(
-      (d, i) => `${i + 1}. ${d.dish_name}（优先级${d.priority}）\n   原因：${d.reason}\n   预期提升：${d.expected_lift}`,
-    ),
-    '',
-    '== 今日待消耗菜品 ==',
-    result.dishes_to_deplete.join('、'),
-    '',
-    '== 推荐套餐组合 ==',
-    ...result.combo_suggestions.map(
-      (c) => `${c.combo_name}：${c.dishes.join(' + ')}\n   理由：${c.reason}`,
-    ),
-    '',
-    '== 菜单调整建议 ==',
-    ...result.menu_adjustments.map((a, i) => `${i + 1}. ${a}`),
-    '',
-    '== 三条硬约束 ==',
-    ...result.hard_constraints.map((c) => `• ${c.label}：${c.detail}`),
-  ];
-  return lines.join('\n');
-}
+// ─── 样式常量 ───
+
+const PAGE_BG = '#0d1e28';
+const CARD_BG = '#1a2a33';
+const BORDER_COLOR = '#2a3a44';
+const ACCENT = '#FF6B35';
+
+const darkCardStyle: React.CSSProperties = {
+  background: CARD_BG,
+  border: `1px solid ${BORDER_COLOR}`,
+  borderRadius: 10,
+};
 
 // ─── 主组件 ───
 
 export function MenuOptimizePage() {
-  const today = new Date().toISOString().slice(0, 10);
-
   const [storeId, setStoreId] = useState('');
   const [stores, setStores] = useState<{ id: string; name: string }[]>([]);
-  const [mealPeriod, setMealPeriod] = useState<string>('lunch');
-  const [date, setDate] = useState(today);
+  const [goal, setGoal] = useState<OptimizationGoal>('balanced');
+  const [mealPeriod, setMealPeriod] = useState('lunch');
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<MenuOptimizeResult | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [copyToast, setCopyToast] = useState(false);
-  const [sendToast, setSendToast] = useState(false);
+  const [applyLoading, setApplyLoading] = useState(false);
+  const [plan, setPlan] = useState<RecommendationPlan | null>(null);
+  const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
+  const [activeTab, setActiveTab] = useState('recommend');
+  const historyRef = useRef<ActionType>();
 
+  // 加载门店列表
   useEffect(() => {
     txFetchData<{ items: { id: string; name: string }[] }>('/api/v1/org/stores?page=1&size=100')
       .then((data) => {
@@ -123,413 +168,576 @@ export function MenuOptimizePage() {
       .catch(() => setStores([]));
   }, []);
 
-  const handleGetAdvice = async () => {
+  // 生成推荐方案
+  const handleGenerate = useCallback(async () => {
+    if (!storeId) {
+      message.warning('请先选择门店');
+      return;
+    }
     setLoading(true);
-    setError(null);
-    setResult(null);
+    setPlan(null);
+    setSelectedRowKeys([]);
     try {
-      const resp = await txFetchData<MenuOptimizeResult>('/api/v1/brain/menu-optimizer', {
-        method: 'POST',
-        body: JSON.stringify({ store_id: storeId, date, meal_period: mealPeriod }),
-      });
-      setResult(resp ?? null);
-      if (!resp) {
-        setError('AI 返回数据为空，请重试');
-      }
+      const result = await txFetchData<RecommendationPlan>(
+        '/api/v1/menu/recommendation/generate',
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            store_id: storeId,
+            meal_period: mealPeriod,
+            optimization_goal: goal,
+          }),
+        },
+      );
+      setPlan(result);
+      message.success('AI推荐方案已生成');
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : '获取建议失败，请重试');
+      message.error(e instanceof Error ? e.message : '生成推荐方案失败');
     } finally {
       setLoading(false);
     }
-  };
+  }, [storeId, mealPeriod, goal]);
 
-  const handleExport = () => {
-    if (!result) return;
-    const text = formatResultAsText(result);
-    const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `menu-optimize-${result.date}-${result.meal_period}.txt`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
+  // 应用方案
+  const handleApply = useCallback(async (applyAll: boolean) => {
+    if (!plan) return;
+    setApplyLoading(true);
+    try {
+      const actions = applyAll
+        ? undefined
+        : selectedRowKeys.map((key) => {
+            const dish = plan.dishes.find((d) => d.dish_id === key);
+            return dish ? { dish_id: dish.dish_id, action: dish.action } : null;
+          }).filter(Boolean);
 
-  const handleSendToChef = () => {
-    setSendToast(true);
-    setTimeout(() => setSendToast(false), 3000);
-  };
+      await txFetchData('/api/v1/menu/recommendation/apply', {
+        method: 'POST',
+        body: JSON.stringify({
+          plan_id: plan.plan_id,
+          store_id: plan.store_id,
+          apply_actions: actions,
+        }),
+      });
+      message.success(applyAll ? '方案已全部应用' : `已应用 ${selectedRowKeys.length} 项建议`);
+      setPlan((prev) => prev ? { ...prev, applied_at: new Date().toISOString() } : prev);
+      historyRef.current?.reload();
+    } catch (e: unknown) {
+      message.error(e instanceof Error ? e.message : '应用方案失败');
+    } finally {
+      setApplyLoading(false);
+    }
+  }, [plan, selectedRowKeys]);
 
-  const handleCopyAll = () => {
-    if (!result) return;
-    copyText(formatResultAsText(result), () => {
-      setCopyToast(true);
-      setTimeout(() => setCopyToast(false), 2000);
-    });
-  };
+  // ─── 推荐表格列定义 ───
+  const recommendColumns: ProColumns<DishRecommendation>[] = [
+    {
+      title: '菜品名',
+      dataIndex: 'dish_name',
+      width: 160,
+      fixed: 'left',
+      render: (_, record) => {
+        const q = QUADRANT_CONFIG[record.quadrant];
+        return (
+          <Space>
+            <span style={{
+              display: 'inline-block', width: 8, height: 8, borderRadius: '50%',
+              background: q?.color === 'gold' ? '#faad14' : q?.color === 'green' ? '#52c41a' : q?.color === 'blue' ? '#1890ff' : '#888',
+            }} />
+            <Text strong style={{ color: '#fff' }}>{record.dish_name}</Text>
+          </Space>
+        );
+      },
+    },
+    {
+      title: '分类',
+      dataIndex: 'category',
+      width: 100,
+      render: (text) => <Text style={{ color: '#aaa' }}>{text as string}</Text>,
+    },
+    {
+      title: '当前价',
+      dataIndex: 'current_price_fen',
+      width: 90,
+      align: 'right',
+      render: (_, record) => <Text style={{ color: '#ccc' }}>{formatPrice(record.current_price_fen)}</Text>,
+    },
+    {
+      title: '建议价',
+      dataIndex: 'suggested_price_fen',
+      width: 90,
+      align: 'right',
+      render: (_, record) => {
+        if (!record.suggested_price_fen || record.suggested_price_fen === record.current_price_fen) {
+          return <Text style={{ color: '#666' }}>-</Text>;
+        }
+        const isUp = record.suggested_price_fen > record.current_price_fen;
+        return (
+          <Text strong style={{ color: isUp ? '#ff4d4f' : '#52c41a' }}>
+            {formatPrice(record.suggested_price_fen)}
+          </Text>
+        );
+      },
+    },
+    {
+      title: '四象限',
+      dataIndex: 'quadrant',
+      width: 90,
+      render: (_, record) => {
+        const cfg = QUADRANT_CONFIG[record.quadrant];
+        return <Tag color={cfg?.color}>{cfg?.label}</Tag>;
+      },
+    },
+    {
+      title: '推荐动作',
+      dataIndex: 'action',
+      width: 80,
+      render: (_, record) => {
+        const cfg = ACTION_CONFIG[record.action];
+        return <Tag color={cfg?.color}>{cfg?.label}</Tag>;
+      },
+    },
+    {
+      title: '7日销量',
+      dataIndex: 'sales_7d',
+      width: 80,
+      align: 'right',
+      sorter: (a, b) => a.sales_7d - b.sales_7d,
+    },
+    {
+      title: '毛利率',
+      dataIndex: 'gross_margin_pct',
+      width: 120,
+      sorter: (a, b) => a.gross_margin_pct - b.gross_margin_pct,
+      render: (_, record) => (
+        <Space>
+          <Progress
+            percent={Math.round(record.gross_margin_pct * 100)}
+            size="small"
+            strokeColor={record.gross_margin_pct >= 0.6 ? '#52c41a' : record.gross_margin_pct >= 0.4 ? '#faad14' : '#ff4d4f'}
+            style={{ width: 60, marginBottom: 0 }}
+            showInfo={false}
+          />
+          <Text style={{ color: '#ccc', fontSize: 12 }}>{(record.gross_margin_pct * 100).toFixed(1)}%</Text>
+        </Space>
+      ),
+    },
+    {
+      title: 'AI置信度',
+      dataIndex: 'confidence',
+      width: 110,
+      sorter: (a, b) => a.confidence - b.confidence,
+      render: (_, record) => (
+        <Progress
+          percent={Math.round(record.confidence * 100)}
+          size="small"
+          strokeColor={ACCENT}
+          format={(pct) => `${pct}%`}
+          style={{ marginBottom: 0 }}
+        />
+      ),
+    },
+    {
+      title: '推理说明',
+      dataIndex: 'reasoning',
+      width: 200,
+      ellipsis: true,
+      render: (_, record) => (
+        <Tooltip title={record.reasoning} placement="topLeft" overlayStyle={{ maxWidth: 400 }}>
+          <Text style={{ color: '#aaa', fontSize: 12 }}>{record.reasoning}</Text>
+        </Tooltip>
+      ),
+    },
+  ];
 
-  const storeName = stores.find((s) => s.id === storeId)?.name ?? storeId;
-  const mealLabel = MEAL_PERIODS.find((m) => m.value === mealPeriod)?.label ?? mealPeriod;
+  // ─── 历史记录列定义 ───
+  const historyColumns: ProColumns<HistoryRecord>[] = [
+    {
+      title: '方案ID',
+      dataIndex: 'plan_id',
+      width: 180,
+      ellipsis: true,
+      render: (text) => <Text copyable style={{ color: '#ccc', fontSize: 12 }}>{text as string}</Text>,
+    },
+    {
+      title: '生成日期',
+      dataIndex: 'generated_at',
+      width: 160,
+      render: (text) => <Text style={{ color: '#ccc' }}>{String(text).slice(0, 16).replace('T', ' ')}</Text>,
+    },
+    {
+      title: '目标日期',
+      dataIndex: 'target_date',
+      width: 110,
+    },
+    {
+      title: '优化目标',
+      dataIndex: 'optimization_goal',
+      width: 100,
+      render: (text) => {
+        const g = OPTIMIZATION_GOALS.find((o) => o.value === text);
+        return <Tag>{g?.label ?? text}</Tag>;
+      },
+    },
+    {
+      title: '菜品数',
+      dataIndex: 'total_dishes',
+      width: 80,
+      align: 'right',
+    },
+    {
+      title: '预估毛利变化',
+      dataIndex: 'estimated_margin_change_pct',
+      width: 130,
+      align: 'right',
+      render: (_, record) => {
+        const pct = record.estimated_margin_change_pct ?? 0;
+        const color = pct > 0 ? '#52c41a' : pct < 0 ? '#ff4d4f' : '#888';
+        return <Text style={{ color }}>{pct > 0 ? '+' : ''}{pct.toFixed(1)}%</Text>;
+      },
+    },
+    {
+      title: '状态',
+      dataIndex: 'applied',
+      width: 100,
+      render: (_, record) =>
+        record.applied
+          ? <Tag icon={<CheckCircleOutlined />} color="success">已应用</Tag>
+          : <Tag color="default">未应用</Tag>,
+    },
+  ];
 
-  return (
-    <div style={{ padding: 24, minHeight: '100vh', background: '#0d1e28', color: '#fff' }}>
-      {/* 页头 */}
-      <div style={{ marginBottom: 24 }}>
-        <h2 style={{ margin: 0, fontSize: 22, fontWeight: 700 }}>🧠 智能排菜AI建议</h2>
-        <p style={{ color: '#888', margin: '4px 0 0', fontSize: 13 }}>
-          基于库存状态与菜品表现，AI生成今日最优排菜方案
-        </p>
-      </div>
+  // ─── 汇总卡片 ───
+  const renderSummaryCards = () => {
+    if (!plan) return null;
+    const s = plan.summary;
+    const kpis: { label: string; value: number; color?: string; suffix?: string }[] = [
+      { label: '总菜品', value: s.total_dishes, color: '#fff' },
+      { label: '保持', value: s.keep_count, color: '#888' },
+      { label: '推广', value: s.promote_count, color: '#52c41a' },
+      { label: '新增', value: s.add_count, color: '#1890ff' },
+      { label: '移除', value: s.remove_count, color: '#ff4d4f' },
+      { label: '组合', value: s.combo_count, color: '#722ed1' },
+    ];
 
-      {/* 触发区 */}
-      <div style={{
-        background: '#1a2a33', borderRadius: 12, border: '1px solid #2a3a44',
-        padding: '20px 24px', marginBottom: 24,
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
-          {/* 门店 */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <label style={{ color: '#888', fontSize: 12 }}>门店</label>
-            <select
-              value={storeId}
-              onChange={(e) => setStoreId(e.target.value)}
-              style={selectStyle}
-            >
-              {stores.map((s) => (
-                <option key={s.id} value={s.id}>{s.name}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* 餐段 */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <label style={{ color: '#888', fontSize: 12 }}>餐段</label>
-            <div style={{ display: 'flex', gap: 8 }}>
-              {MEAL_PERIODS.map((m) => (
-                <button
-                  key={m.value}
-                  onClick={() => setMealPeriod(m.value)}
-                  style={{
-                    padding: '6px 16px', borderRadius: 6, border: 'none', fontSize: 13,
-                    background: mealPeriod === m.value ? '#FF6B35' : '#2a3a44',
-                    color: mealPeriod === m.value ? '#fff' : '#ccc',
-                    cursor: 'pointer', fontWeight: mealPeriod === m.value ? 700 : 400,
-                    transition: 'background 0.15s',
-                  }}
-                >
-                  {m.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* 日期 */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <label style={{ color: '#888', fontSize: 12 }}>日期</label>
-            <input
-              type="date"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-              style={selectStyle}
-            />
-          </div>
-
-          {/* 触发按钮 */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignSelf: 'flex-end' }}>
-            <label style={{ color: 'transparent', fontSize: 12 }}>_</label>
-            <button
-              onClick={handleGetAdvice}
-              disabled={loading}
-              style={{
-                padding: '8px 20px', borderRadius: 6, border: 'none', fontSize: 14,
-                background: loading ? '#2a3a44' : '#FF6B35',
-                color: loading ? '#888' : '#fff',
-                fontWeight: 600, cursor: loading ? 'not-allowed' : 'pointer',
-                display: 'flex', alignItems: 'center', gap: 8,
-                transition: 'background 0.2s',
+    return (
+      <Row gutter={[12, 12]} style={{ marginBottom: 16 }}>
+        {kpis.map((kpi) => (
+          <Col key={kpi.label} xs={12} sm={8} md={4}>
+            <Card size="small" style={darkCardStyle} bodyStyle={{ padding: '12px 16px' }}>
+              <Statistic
+                title={<Text style={{ color: '#888', fontSize: 12 }}>{kpi.label}</Text>}
+                value={kpi.value}
+                valueStyle={{ color: kpi.color ?? '#fff', fontSize: 22, fontWeight: 700 }}
+              />
+            </Card>
+          </Col>
+        ))}
+        <Col xs={12} sm={8} md={4}>
+          <Card size="small" style={darkCardStyle} bodyStyle={{ padding: '12px 16px' }}>
+            <Statistic
+              title={<Text style={{ color: '#888', fontSize: 12 }}>预估毛利变化</Text>}
+              value={s.estimated_margin_change_pct * 100}
+              precision={1}
+              suffix="%"
+              prefix={s.estimated_margin_change_pct > 0 ? '+' : ''}
+              valueStyle={{
+                color: s.estimated_margin_change_pct > 0 ? '#52c41a' : s.estimated_margin_change_pct < 0 ? '#ff4d4f' : '#fff',
+                fontSize: 22, fontWeight: 700,
               }}
-            >
-              {loading ? (
-                <>
-                  <span style={spinnerStyle} />
-                  分析中...
-                </>
-              ) : '✨ 获取AI排菜建议'}
-            </button>
-          </div>
+            />
+          </Card>
+        </Col>
+        <Col xs={12} sm={8} md={4}>
+          <Card size="small" style={darkCardStyle} bodyStyle={{ padding: '12px 16px' }}>
+            <Statistic
+              title={<Text style={{ color: '#888', fontSize: 12 }}>AI置信度</Text>}
+              value={Math.round(s.ai_confidence * 100)}
+              suffix="%"
+              valueStyle={{ color: ACCENT, fontSize: 22, fontWeight: 700 }}
+            />
+          </Card>
+        </Col>
+      </Row>
+    );
+  };
+
+  // ─── 关键洞察 ───
+  const renderInsights = () => {
+    if (!plan?.summary.key_insights?.length) return null;
+    return (
+      <Card
+        size="small"
+        title={<Space><BulbOutlined style={{ color: '#faad14' }} /><Text style={{ color: '#ddd' }}>AI 关键洞察</Text></Space>}
+        style={{ ...darkCardStyle, marginBottom: 16 }}
+        headStyle={{ background: 'transparent', borderBottom: `1px solid ${BORDER_COLOR}`, color: '#ddd' }}
+        bodyStyle={{ padding: '12px 20px' }}
+      >
+        <ul style={{ margin: 0, paddingLeft: 20 }}>
+          {plan.summary.key_insights.map((insight, idx) => (
+            <li key={idx} style={{ color: '#ccc', fontSize: 13, lineHeight: 2 }}>{insight}</li>
+          ))}
+        </ul>
+      </Card>
+    );
+  };
+
+  // ─── Tab: AI推荐方案 ───
+  const renderRecommendTab = () => (
+    <>
+      {/* 顶部操作栏 */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap',
+        marginBottom: 20, padding: '16px 20px',
+        background: CARD_BG, borderRadius: 10, border: `1px solid ${BORDER_COLOR}`,
+      }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <Text style={{ color: '#888', fontSize: 12 }}>门店</Text>
+          <Select
+            value={storeId || undefined}
+            onChange={setStoreId}
+            placeholder="选择门店"
+            style={{ minWidth: 180 }}
+            options={stores.map((s) => ({ value: s.id, label: s.name }))}
+          />
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <Text style={{ color: '#888', fontSize: 12 }}>餐段</Text>
+          <Select
+            value={mealPeriod}
+            onChange={setMealPeriod}
+            style={{ minWidth: 100 }}
+            options={MEAL_PERIODS}
+          />
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <Text style={{ color: '#888', fontSize: 12 }}>优化目标</Text>
+          <Select
+            value={goal}
+            onChange={setGoal}
+            style={{ minWidth: 130 }}
+            options={OPTIMIZATION_GOALS}
+          />
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignSelf: 'flex-end' }}>
+          <Text style={{ color: 'transparent', fontSize: 12 }}>_</Text>
+          <Button
+            type="primary"
+            icon={<ThunderboltOutlined />}
+            loading={loading}
+            onClick={handleGenerate}
+            style={{ background: ACCENT, borderColor: ACCENT }}
+          >
+            生成AI推荐
+          </Button>
         </div>
       </div>
 
-      {/* 错误提示 */}
-      {error && (
+      {/* 空状态 */}
+      {!plan && !loading && (
         <div style={{
-          background: '#A32D2D22', border: '1px solid #A32D2D55', borderRadius: 8,
-          padding: '12px 16px', marginBottom: 20, color: '#FF6B6B', fontSize: 13,
+          background: CARD_BG, borderRadius: 12, border: `1px dashed ${BORDER_COLOR}`,
+          padding: '60px 24px', textAlign: 'center',
         }}>
-          ⚠️ {error}
-        </div>
-      )}
-
-      {/* 加载中 */}
-      {loading && (
-        <div style={{
-          background: '#1a2a33', borderRadius: 12, padding: '60px 24px', textAlign: 'center',
-        }}>
-          <div style={{ fontSize: 40, marginBottom: 14, display: 'inline-block', animation: 'tx-spin 1.5s linear infinite' }}>🧠</div>
-          <div style={{ color: '#ccc', fontSize: 15 }}>AI 正在分析{storeName} · {mealLabel}排菜数据...</div>
-          <div style={{ color: '#666', fontSize: 13, marginTop: 6 }}>通常需要3-8秒</div>
-        </div>
-      )}
-
-      {/* 结果展示 */}
-      {result && !loading && (
-        <>
-          {/* 操作栏 */}
-          <div style={{
-            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-            marginBottom: 20, flexWrap: 'wrap', gap: 12,
-          }}>
-            <div style={{ color: '#888', fontSize: 13 }}>
-              {storeName} · {mealLabel} · {result.date}
-            </div>
-            <div style={{ display: 'flex', gap: 10 }}>
-              <button onClick={handleExport} style={actionBtnStyle}>
-                📥 一键导出建议
-              </button>
-              <button onClick={handleSendToChef} style={actionBtnStyle}>
-                👨‍🍳 发送给厨长
-              </button>
-              <button onClick={handleCopyAll} style={actionBtnStyle}>
-                📋 复制全部
-              </button>
-            </div>
+          <ExperimentOutlined style={{ fontSize: 52, color: '#555', marginBottom: 14 }} />
+          <div style={{ color: '#888', fontSize: 15 }}>选择门店和优化目标，点击「生成AI推荐」</div>
+          <div style={{ color: '#666', fontSize: 13, marginTop: 6 }}>
+            AI将分析菜品四象限、毛利率、销量趋势与库存数据，生成优化方案
           </div>
+        </div>
+      )}
 
-          {/* Toast 提示 */}
-          {sendToast && (
-            <div style={toastStyle}>
-              ✅ 已发送（功能开发中）
-            </div>
-          )}
-          {copyToast && (
-            <div style={toastStyle}>
-              ✅ 已复制到剪贴板
-            </div>
-          )}
+      {/* 方案结果 */}
+      {plan && !loading && (
+        <>
+          {renderSummaryCards()}
+          {renderInsights()}
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 20 }}>
-
-            {/* 1. 重点推荐菜品 */}
-            <section>
-              <SectionTitle>⭐ 重点推荐菜品</SectionTitle>
-              <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap' }}>
-                {result.recommended_dishes.map((dish) => (
-                  <div
-                    key={dish.dish_id}
-                    style={{
-                      background: '#1a2a33',
-                      border: dish.priority === 1 ? '2px solid #FF6B35' : '1px solid #2a3a44',
-                      borderRadius: 10, padding: '16px 18px', minWidth: 200, flex: '1 1 200px',
-                      maxWidth: 280, position: 'relative',
-                    }}
-                  >
-                    {dish.priority === 1 && (
-                      <span style={{
-                        position: 'absolute', top: -10, right: 12, fontSize: 10,
-                        background: '#FF6B35', color: '#fff', borderRadius: 6,
-                        padding: '2px 8px', fontWeight: 700,
-                      }}>
-                        TOP PICK
-                      </span>
-                    )}
-                    <div style={{ fontSize: 18, fontWeight: 800, color: '#fff', marginBottom: 6 }}>
-                      {dish.dish_name}
-                    </div>
-                    <div style={{ fontSize: 12, color: '#185FA5', marginBottom: 8, lineHeight: 1.5 }}>
-                      {dish.reason}
-                    </div>
-                    <div style={{
-                      fontSize: 12, color: '#0F6E56', background: '#0F6E5622',
-                      borderRadius: 4, padding: '3px 8px', display: 'inline-block',
-                    }}>
-                      {dish.expected_lift}
-                    </div>
-                    <div style={{
-                      position: 'absolute', top: 12, left: 12, width: 20, height: 20,
-                      borderRadius: '50%', background: dish.priority === 1 ? '#FF6B35' : '#2a3a44',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      fontSize: 10, fontWeight: 700, color: '#fff',
-                    }}>
-                      {dish.priority}
-                    </div>
+          {/* 推荐表格 */}
+          <ProTable<DishRecommendation>
+            columns={recommendColumns}
+            dataSource={plan.dishes}
+            rowKey="dish_id"
+            search={false}
+            dateFormatter="string"
+            pagination={{ pageSize: 20, showSizeChanger: true }}
+            scroll={{ x: 1200 }}
+            rowSelection={{
+              selectedRowKeys,
+              onChange: setSelectedRowKeys,
+            }}
+            headerTitle={
+              <Space>
+                <RocketOutlined style={{ color: ACCENT }} />
+                <Text style={{ color: '#ddd', fontWeight: 600 }}>菜品推荐明细</Text>
+                <Tag>{plan.dishes.length} 道</Tag>
+              </Space>
+            }
+            toolBarRender={() => [
+              <Button
+                key="filter-promote"
+                size="small"
+                onClick={() => {
+                  const keys = plan.dishes
+                    .filter((d) => d.action === 'promote' || d.action === 'add' || d.action === 'combo')
+                    .map((d) => d.dish_id);
+                  setSelectedRowKeys(keys);
+                }}
+              >
+                选中推广/新增/组合
+              </Button>,
+            ]}
+            options={{
+              density: true,
+              reload: false,
+            }}
+            style={{ ...darkCardStyle }}
+            cardProps={{ bodyStyle: { padding: 0 } }}
+            expandable={{
+              expandedRowRender: (record) => (
+                <div style={{ padding: '8px 16px', color: '#aaa', fontSize: 13 }}>
+                  <div style={{ marginBottom: 8 }}>
+                    <Text strong style={{ color: '#ccc' }}>推理说明：</Text>
+                    {record.reasoning}
                   </div>
-                ))}
-              </div>
-            </section>
-
-            {/* 2. 今日待消耗菜品 */}
-            {result.dishes_to_deplete.length > 0 && (
-              <section>
-                <SectionTitle>⚠️ 今日待消耗菜品</SectionTitle>
-                <div style={{
-                  background: '#A32D2D22', border: '1px solid #A32D2D55', borderRadius: 8,
-                  padding: '12px 16px', color: '#FF6B6B', fontSize: 14,
-                }}>
-                  <span style={{ fontWeight: 700, marginRight: 8 }}>以下食材临期，建议今日优先推售：</span>
-                  {result.dishes_to_deplete.join('、')}
-                </div>
-              </section>
-            )}
-
-            {/* 3. 推荐套餐组合 */}
-            {result.combo_suggestions.length > 0 && (
-              <section>
-                <SectionTitle>🍱 推荐套餐组合</SectionTitle>
-                <div style={{ overflowX: 'auto' }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-                    <thead>
-                      <tr style={{ background: '#1a2a33' }}>
-                        <th style={thStyle}>套餐名</th>
-                        <th style={thStyle}>菜品组合</th>
-                        <th style={thStyle}>推荐理由</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {result.combo_suggestions.map((combo, idx) => (
-                        <tr key={idx} style={{ borderBottom: '1px solid #2a3a44' }}>
-                          <td style={tdStyle}>
-                            <span style={{ fontWeight: 700, color: '#FF6B35' }}>{combo.combo_name}</span>
-                          </td>
-                          <td style={tdStyle}>
-                            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                              {combo.dishes.map((d, i) => (
-                                <span key={i} style={{
-                                  background: '#185FA522', color: '#185FA5',
-                                  borderRadius: 4, padding: '2px 8px', fontSize: 12,
-                                }}>
-                                  {d}
-                                </span>
-                              ))}
-                            </div>
-                          </td>
-                          <td style={{ ...tdStyle, color: '#aaa' }}>{combo.reason}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </section>
-            )}
-
-            {/* 4. 菜单调整建议 */}
-            {result.menu_adjustments.length > 0 && (
-              <section>
-                <SectionTitle>📋 菜单调整建议</SectionTitle>
-                <div style={{ background: '#1a2a33', borderRadius: 8, padding: '16px 20px' }}>
-                  <ol style={{ margin: 0, paddingLeft: 20, lineHeight: 2 }}>
-                    {result.menu_adjustments.map((item, idx) => (
-                      <li key={idx} style={{ color: '#ccc', fontSize: 14 }}>{item}</li>
-                    ))}
-                  </ol>
-                </div>
-              </section>
-            )}
-
-            {/* 5. 三条硬约束 */}
-            {result.hard_constraints.length > 0 && (
-              <section>
-                <SectionTitle>🔒 三条硬约束</SectionTitle>
-                <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap' }}>
-                  {result.hard_constraints.map((c) => (
-                    <div
-                      key={c.constraint_id}
-                      style={{
-                        background: '#152028', border: '1px solid #2a3a44', borderRadius: 10,
-                        padding: '14px 18px', flex: '1 1 200px',
-                      }}
-                    >
-                      <div style={{ color: '#BA7517', fontSize: 13, fontWeight: 700, marginBottom: 6 }}>
-                        {c.label}
-                      </div>
-                      <div style={{ color: '#888', fontSize: 12, lineHeight: 1.6 }}>{c.detail}</div>
+                  {record.factors.length > 0 && (
+                    <div style={{ marginBottom: 8 }}>
+                      <Text strong style={{ color: '#ccc' }}>影响因子：</Text>
+                      <Space wrap style={{ marginTop: 4 }}>
+                        {record.factors.map((f, i) => <Tag key={i} color="processing">{f}</Tag>)}
+                      </Space>
                     </div>
-                  ))}
+                  )}
+                  {record.combo_with.length > 0 && (
+                    <div>
+                      <Text strong style={{ color: '#ccc' }}>推荐搭配：</Text>
+                      <Space wrap style={{ marginTop: 4 }}>
+                        {record.combo_with.map((c, i) => <Tag key={i} color="geekblue">{c}</Tag>)}
+                      </Space>
+                    </div>
+                  )}
+                  {record.inventory_days != null && (
+                    <div style={{ marginTop: 8 }}>
+                      <Text strong style={{ color: '#ccc' }}>库存天数：</Text>
+                      <Text style={{ color: record.inventory_days <= 3 ? '#ff4d4f' : '#ccc' }}>
+                        {record.inventory_days} 天
+                      </Text>
+                    </div>
+                  )}
+                  <div style={{ marginTop: 8 }}>
+                    <Text strong style={{ color: '#ccc' }}>30日销量：</Text>
+                    <Text style={{ color: '#ccc' }}>{record.sales_30d}</Text>
+                  </div>
                 </div>
-              </section>
+              ),
+            }}
+          />
+
+          {/* 底部操作栏 */}
+          <div style={{
+            display: 'flex', justifyContent: 'flex-end', gap: 12,
+            marginTop: 16, padding: '12px 20px',
+            background: CARD_BG, borderRadius: 10, border: `1px solid ${BORDER_COLOR}`,
+          }}>
+            {plan.applied_at && (
+              <Tag icon={<CheckCircleOutlined />} color="success" style={{ lineHeight: '30px' }}>
+                已于 {plan.applied_at.slice(0, 16).replace('T', ' ')} 应用
+              </Tag>
             )}
+            <Button
+              onClick={() => handleApply(false)}
+              disabled={selectedRowKeys.length === 0 || !!plan.applied_at}
+              loading={applyLoading}
+            >
+              选择性应用 ({selectedRowKeys.length})
+            </Button>
+            <Button
+              type="primary"
+              icon={<CheckCircleOutlined />}
+              onClick={() => handleApply(true)}
+              disabled={!!plan.applied_at}
+              loading={applyLoading}
+              style={!plan.applied_at ? { background: ACCENT, borderColor: ACCENT } : {}}
+            >
+              全部应用
+            </Button>
           </div>
         </>
       )}
+    </>
+  );
 
-      {/* 空状态 */}
-      {!result && !loading && !error && (
-        <div style={{
-          background: '#1a2a33', borderRadius: 12, border: '1px dashed #2a3a44',
-          padding: '60px 24px', textAlign: 'center',
-        }}>
-          <div style={{ fontSize: 52, marginBottom: 14 }}>🧠</div>
-          <div style={{ color: '#888', fontSize: 15 }}>选择门店、餐段和日期，点击「获取AI排菜建议」</div>
-          <div style={{ color: '#666', fontSize: 13, marginTop: 6 }}>
-            AI将分析库存状态、临期食材与历史菜品表现，约3-8秒出建议
-          </div>
-        </div>
-      )}
-
-      <style>{`
-        @keyframes tx-spin {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(360deg); }
+  // ─── Tab: 历史记录 ───
+  const renderHistoryTab = () => (
+    <ProTable<HistoryRecord>
+      actionRef={historyRef}
+      columns={historyColumns}
+      rowKey="plan_id"
+      search={false}
+      dateFormatter="string"
+      pagination={{ pageSize: 10 }}
+      request={async () => {
+        if (!storeId) return { data: [], total: 0, success: true };
+        try {
+          const data = await txFetchData<{ items: HistoryRecord[]; total: number }>(
+            `/api/v1/menu/recommendation/history?store_id=${encodeURIComponent(storeId)}&limit=50`,
+          );
+          return { data: data.items ?? [], total: data.total ?? 0, success: true };
+        } catch {
+          message.error('加载历史记录失败');
+          return { data: [], total: 0, success: true };
         }
-      `}</style>
-    </div>
+      }}
+      params={{ storeId }}
+      headerTitle={
+        <Space>
+          <HistoryOutlined style={{ color: ACCENT }} />
+          <Text style={{ color: '#ddd', fontWeight: 600 }}>推荐方案历史</Text>
+        </Space>
+      }
+      toolBarRender={() => [
+        <Button key="reload" icon={<ReloadOutlined />} onClick={() => historyRef.current?.reload()}>
+          刷新
+        </Button>,
+      ]}
+      style={darkCardStyle}
+      cardProps={{ bodyStyle: { padding: 0 } }}
+      options={{ density: true, reload: false }}
+    />
   );
-}
 
-// ─── 子组件 ───
-
-function SectionTitle({ children }: { children: React.ReactNode }) {
   return (
-    <div style={{
-      fontSize: 15, fontWeight: 700, color: '#ddd',
-      marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6,
-    }}>
-      {children}
+    <div style={{ padding: 24, minHeight: '100vh', background: PAGE_BG, color: '#fff' }}>
+      {/* 页头 */}
+      <div style={{ marginBottom: 24 }}>
+        <h2 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: '#fff' }}>
+          <ExperimentOutlined style={{ marginRight: 8, color: ACCENT }} />
+          菜品优化AI推荐
+        </h2>
+        <p style={{ color: '#888', margin: '4px 0 0', fontSize: 13 }}>
+          基于菜品四象限分析、毛利率、销量趋势与库存数据，AI生成最优菜品调整方案
+        </p>
+      </div>
+
+      <Tabs
+        activeKey={activeTab}
+        onChange={setActiveTab}
+        items={[
+          {
+            key: 'recommend',
+            label: (
+              <Space><ThunderboltOutlined />AI推荐方案</Space>
+            ),
+            children: renderRecommendTab(),
+          },
+          {
+            key: 'history',
+            label: (
+              <Space><HistoryOutlined />历史记录</Space>
+            ),
+            children: renderHistoryTab(),
+          },
+        ]}
+      />
     </div>
   );
 }
-
-// ─── 样式常量 ───
-
-const selectStyle: React.CSSProperties = {
-  padding: '7px 12px', borderRadius: 6, border: '1px solid #2a3a44',
-  background: '#152028', color: '#fff', fontSize: 13, cursor: 'pointer',
-  outline: 'none', minWidth: 180,
-};
-
-const actionBtnStyle: React.CSSProperties = {
-  padding: '7px 16px', borderRadius: 6, border: '1px solid #2a3a44',
-  background: '#1a2a33', color: '#ccc', fontSize: 13, cursor: 'pointer',
-  transition: 'background 0.15s, color 0.15s',
-};
-
-const spinnerStyle: React.CSSProperties = {
-  display: 'inline-block', width: 14, height: 14,
-  border: '2px solid #888', borderTopColor: '#fff',
-  borderRadius: '50%', animation: 'tx-spin 0.7s linear infinite',
-};
-
-const thStyle: React.CSSProperties = {
-  padding: '10px 14px', textAlign: 'left', color: '#888',
-  fontSize: 12, fontWeight: 700, borderBottom: '1px solid #2a3a44',
-};
-
-const tdStyle: React.CSSProperties = {
-  padding: '10px 14px', color: '#ccc', verticalAlign: 'top',
-};
-
-const toastStyle: React.CSSProperties = {
-  position: 'fixed', bottom: 32, right: 32, zIndex: 9999,
-  background: '#0F6E56', color: '#fff', borderRadius: 8,
-  padding: '10px 20px', fontSize: 14, fontWeight: 600,
-  boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
-};

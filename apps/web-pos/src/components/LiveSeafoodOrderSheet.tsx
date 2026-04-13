@@ -21,6 +21,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import ReactDOM from 'react-dom';
 import { getMacMiniUrl } from '../bridge/TXBridge';
+import { formatPrice } from '@tx-ds/utils';
 
 // ─── Design Tokens ───────────────────────────────────────────────────────────
 
@@ -58,6 +59,7 @@ function ensureKeyframes(): void {
 
 // ─── 辅助函数 ─────────────────────────────────────────────────────────────────
 
+/** @deprecated Use formatPrice from @tx-ds/utils */
 const fen2yuan = (fen: number): string => `¥${(fen / 100).toFixed(2)}`;
 
 function weightUnitLabel(unit: string): string {

@@ -1,0 +1,270 @@
+/* ─── DishCard Base ─── */
+
+.card {
+  position: relative;
+  overflow: hidden;
+  background: var(--tx-bg-secondary, #112228);
+  border-radius: var(--tx-radius-md, 12px);
+  cursor: pointer;
+  transition: transform var(--tx-motion-fast, 150ms cubic-bezier(0.22, 1, 0.36, 1));
+  user-select: none;
+}
+
+.soldOut {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+/* ─── Grid Variant ─── */
+
+.grid {
+  display: flex;
+  flex-direction: column;
+  min-width: 148px;
+}
+
+.grid .imageWrap {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  border-radius: var(--tx-radius-md, 12px) var(--tx-radius-md, 12px) 0 0;
+  background: var(--tx-bg-tertiary, #1a2a33);
+  flex-shrink: 0;
+}
+
+.grid .info {
+  padding: 10px 12px 12px;
+}
+
+/* ─── Horizontal Variant ─── */
+
+.horizontal {
+  display: flex;
+  flex-direction: row;
+  gap: 12px;
+  padding: 12px;
+}
+
+.horizontal .imageWrap {
+  position: relative;
+  width: 110px;
+  height: 110px;
+  flex-shrink: 0;
+  border-radius: var(--tx-radius-sm, 8px);
+  overflow: hidden;
+  background: var(--tx-bg-tertiary, #1a2a33);
+}
+
+.horizontal .info {
+  flex: 1;
+  min-width: 0;
+}
+
+/* ─── Compact Variant ─── */
+
+.compact {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+}
+
+.compact .info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+
+.compact .name {
+  flex-shrink: 1;
+  min-width: 0;
+}
+
+.compact .bottom {
+  margin-top: 0;
+  padding-top: 0;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.compact .priceRow {
+  flex-direction: row;
+}
+
+/* ─── Image ─── */
+
+.image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.soldOutOverlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.6);
+  color: var(--tx-text-secondary, #94a3b8);
+  font-size: var(--tx-font-sm, 13px);
+  font-weight: 600;
+  letter-spacing: 0.05em;
+}
+
+/* ─── Tags (overlay on image) ─── */
+
+.tags {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.tag {
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  color: #fff;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+/* ─── Inline tags (compact variant) ─── */
+
+.tagsInline {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.tagInline {
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+/* ─── Info ─── */
+
+.info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.name {
+  font-size: var(--tx-font-dish-name, var(--tx-font-md, 15px));
+  font-weight: 600;
+  color: var(--tx-text-primary, #e2e8f0);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.3;
+}
+
+.desc {
+  font-size: var(--tx-font-xs, 11px);
+  color: var(--tx-text-tertiary, #64748b);
+  margin-top: 4px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  line-height: 1.4;
+}
+
+/* ─── Allergens ─── */
+
+.allergens {
+  display: flex;
+  gap: 4px;
+  margin-top: 6px;
+  flex-wrap: wrap;
+}
+
+.allergen {
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-size: 10px;
+  color: var(--tx-text-secondary, #94a3b8);
+  background: var(--tx-bg-tertiary, #1a2a33);
+  border: 1px solid var(--tx-border, #1a2a33);
+}
+
+/* ─── Bottom (price + add button) ─── */
+
+.bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: auto;
+  padding-top: 8px;
+  gap: 8px;
+}
+
+.priceRow {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+}
+
+.price {
+  font-size: var(--tx-font-md, 15px);
+  font-weight: 700;
+  color: #FF6B2C;
+  white-space: nowrap;
+}
+
+.memberPrice {
+  font-size: var(--tx-font-xs, 11px);
+  color: var(--tx-text-tertiary, #64748b);
+  text-decoration: line-through;
+  white-space: nowrap;
+}
+
+/* ─── Add Button ─── */
+
+.addBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--tx-touch-min, 44px);
+  height: var(--tx-touch-min, 44px);
+  min-width: 36px;
+  min-height: 36px;
+  border-radius: 50%;
+  border: none;
+  background: #FF6B2C;
+  color: #fff;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition:
+    transform var(--tx-motion-fast, 150ms cubic-bezier(0.22, 1, 0.36, 1)),
+    background-color var(--tx-motion-fast, 150ms cubic-bezier(0.22, 1, 0.36, 1));
+  -webkit-tap-highlight-color: transparent;
+}
+
+.addBtn:active {
+  background: #E55A1F;
+}
+
+.plus {
+  font-size: 22px;
+  font-weight: 300;
+  line-height: 1;
+}
+
+.badge {
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1;
+}

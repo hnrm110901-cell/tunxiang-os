@@ -18,6 +18,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ConfigProvider, Select, Spin, Table, Tag } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import RealtimeDashboard from '../../components/RealtimeDashboard';
+import { formatPrice } from '@tx-ds/utils';
 
 // ─── Design Token（驾驶舱暗色） ────────────────────────────────────────────────
 const T = {
@@ -78,6 +79,7 @@ const STORE_OPTIONS = [
 ];
 
 // ─── 工具函数 ──────────────────────────────────────────────────────────────────
+/** @deprecated Use formatPrice from @tx-ds/utils */
 const fenToYuan = (fen: number) =>
   (fen / 100).toLocaleString('zh-CN', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 
