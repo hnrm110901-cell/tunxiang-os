@@ -4,6 +4,81 @@
 
 ---
 
+## 2026-04-13 模块4.4 AI Agent深化绑定业务KPI — 9大Agent指标追踪+ROI仪表盘
+
+### 今日完成
+- [shared/db-migrations/v248] 新增 `agent_kpi_configs` 表（Agent KPI指标配置，含RLS）
+- [shared/db-migrations/v248] 新增 `agent_kpi_snapshots` 表（每日KPI快照归档，含RLS）
+- [tx-agent/api/agent_kpi_routes.py] 新增7个端点：
+  - `GET /api/v1/agent-kpi/configs` — 获取所有Agent KPI配置（内置9大Agent共15个KPI定义）
+  - `POST /api/v1/agent-kpi/configs` — 创建自定义KPI配置
+  - `PUT /api/v1/agent-kpi/configs/{config_id}` — 更新KPI配置
+  - `GET /api/v1/agent-kpi/snapshots` — 获取KPI快照列表（支持日期范围过滤）
+  - `POST /api/v1/agent-kpi/snapshots/collect` — 手动触发快照采集
+  - `GET /api/v1/agent-kpi/dashboard` — KPI总览仪表盘（全局达成率+各Agent卡片+7日趋势）
+  - `GET /api/v1/agent-kpi/roi-report` — ROI报告（节省金额/拦截次数/损耗降低）
+- [tx-agent/main.py] 注册 agent_kpi_router
+- [web-admin/AgentKPIDashboard.tsx] 新增KPI仪表盘前端页面：
+  - 9张Agent KPI卡片（当前值 vs 目标值 + 三色进度条 + 7日趋势迷你图）
+  - ROI汇总区域（本月节省金额/折扣拦截次数/食材损耗降低%）
+  - 30秒自动刷新 + 响应式Tailwind布局
+
+### 数据变化
+- 迁移版本：v247 → v248
+- 新增DB表：2个（agent_kpi_configs + agent_kpi_snapshots）
+- 新增API端点：7个（tx-agent服务）
+- 新增前端页面：1个（AgentKPIDashboard）
+
+### 9大Agent KPI配置
+| Agent | KPI类型 | 目标值 | 单位 |
+|-------|---------|--------|------|
+| 折扣守护 | discount_exception_rate | <2 | % |
+| 折扣守护 | gross_margin_protection_rate | >98 | % |
+| 出餐调度 | avg_dish_time_seconds | <600 | 秒 |
+| 出餐调度 | on_time_rate | >95 | % |
+| 会员洞察 | member_repurchase_rate | >40 | % |
+| 会员洞察 | clv_growth_rate | >10 | % |
+| 库存预警 | waste_rate | <3 | % |
+| 库存预警 | stockout_rate | <1 | % |
+| 财务稽核 | anomaly_detection_rate | >99 | % |
+| 财务稽核 | cost_variance | <5 | % |
+| 巡店质检 | compliance_score | >90 | 分 |
+| 巡店质检 | patrol_response_time | <30 | 分钟 |
+
+### 遗留问题
+- snapshots/collect 当前使用模拟数据；生产接入需各服务暴露指标查询接口
+- agent_kpi_configs 自定义配置未接入真实DB写入（当前返回内存对象）
+- AgentKPIDashboard 未挂载到路由表（需在 App.tsx/router 中注册）
+
+### 明日计划
+- 将 AgentKPIDashboard 注册到 web-admin 路由
+- 考虑从 agent_roi_metrics 表拉取真实ROI数据填充 roi-report
+
+---
+
+## 2026-04-13 tx-analytics 驾驶舱 DB注入 + 趋势图/Top菜品端点
+
+### 今日完成
+- [tx-analytics/dashboard_routes.py] 全部路由从 `db=None` 升级为 `Depends(get_db)` 真实注入（旧代码实际调用均 AttributeError，本次修复）
+- [tx-analytics/sql_queries.py] 新增 `query_revenue_trend`：最近 N 天逐日营收序列（biz_date 分组，升序）
+- [tx-analytics/sql_queries.py] 新增 `query_top_dishes`：Top N 菜品（按销量/营收排序，sort_col 非用户输入，无注入风险）
+- [tx-analytics/dashboard_routes.py] 新增 `GET /dashboard/trend/{store_id}`（days 1-365）
+- [tx-analytics/dashboard_routes.py] 新增 `GET /dashboard/top-dishes/{store_id}`（days/limit/order_by: qty|revenue）
+
+### 数据变化
+- 无新迁移
+- 新增端点：2个（趋势图 + Top菜品）
+- 修复端点：6个（today/stores/ranking/comparison/alerts 全部接通真实DB）
+
+### 遗留问题
+- franchise_v5 mark-overdue 建议接入 APScheduler 定时（当前仅手动 POST）
+- 多租户 Workers 仍为 DEFAULT_TENANT_ID 单租户模式
+
+### 明日计划
+- tx-analytics 驾驶舱趋势图前端联调 或 推进 tx-finance 月度 P&L 接口
+
+---
+
 ## 2026-04-12 模块4.1 宴会深度产品化 — KDS场次出品 + 定金抵扣
 
 ### 今日完成
