@@ -156,18 +156,8 @@ async def _load_revenue_by_slot(
             return rows
     except (OperationalError, ProgrammingError):
         pass
-    # 降级 mock
-    return _mock_revenue_by_slot()
-
-
-def _mock_revenue_by_slot() -> dict[str, int]:
-    return {
-        "morning": 280000,
-        "lunch_peak": 980000,
-        "afternoon": 180000,
-        "dinner_peak": 1200000,
-        "night": 120000,
-    }
+    # 降级：返回空字典
+    return {}
 
 
 async def _load_labor_forecast(
@@ -185,31 +175,6 @@ async def _load_labor_forecast(
         needed = max(1, round(rev / per_person_target))
         ideal[slot] = needed
     return ideal
-
-
-def _mock_schedules() -> list[dict[str, Any]]:
-    today = date.today()
-    start, _ = _week_range(today)
-    return [
-        {
-            "id": f"mock-sched-{i}",
-            "employee_id": f"mock-emp-{i:03d}",
-            "emp_name": name,
-            "shift_date": (start + timedelta(days=d)).isoformat(),
-            "start_time": st,
-            "end_time": et,
-            "role": role,
-        }
-        for i, (name, d, st, et, role) in enumerate([
-            ("张三", 0, "09:00", "14:00", "waiter"),
-            ("李四", 0, "09:00", "14:00", "waiter"),
-            ("王五", 0, "11:00", "21:00", "chef"),
-            ("赵六", 0, "11:00", "21:00", "chef"),
-            ("钱七", 0, "14:00", "21:00", "waiter"),
-            ("孙八", 0, "17:00", "23:00", "waiter"),
-            ("周九", 0, "17:00", "23:00", "waiter"),
-        ])
-    ]
 
 
 def _mock_optimization() -> dict[str, Any]:
@@ -323,15 +288,16 @@ class WorkforcePlannerAgent(SkillAgent):
                                error="缺少 store_id")
         week_start, week_end = _week_range()
 
-        if self._db:
-            schedules = await _load_current_schedules(
-                self._db, self.tenant_id, store_id, week_start, week_end
+        if not self._db:
+            return AgentResult(
+                success=False,
+                action="analyze_schedule_efficiency",
+                error="数据库连接不可用",
             )
-            revenue = await _load_revenue_by_slot(self._db, self.tenant_id, store_id)
-        else:
-            logger.info("workforce_analyze_mock", tenant_id=self.tenant_id)
-            schedules = _mock_schedules()
-            revenue = _mock_revenue_by_slot()
+        schedules = await _load_current_schedules(
+            self._db, self.tenant_id, store_id, week_start, week_end
+        )
+        revenue = await _load_revenue_by_slot(self._db, self.tenant_id, store_id)
 
         # 统计各时段排班人数（简化：按 start_time 归时段）
         slot_counts: dict[str, int] = {s: 0 for s, _, _ in _TIME_SLOTS}
@@ -377,14 +343,10 @@ class WorkforcePlannerAgent(SkillAgent):
                                error="缺少 store_id")
 
         if not self._db:
-            logger.info("workforce_suggest_mock", tenant_id=self.tenant_id)
-            data = _mock_optimization()
             return AgentResult(
-                success=True,
+                success=False,
                 action="suggest_optimization",
-                data=data,
-                reasoning=f"排班优化建议生成完成（mock），共{data['summary']['total_suggestions']}条建议",
-                confidence=0.80,
+                error="数据库连接不可用",
             )
 
         # 真实逻辑：对比当前排班 vs 理想配置
@@ -461,11 +423,13 @@ class WorkforcePlannerAgent(SkillAgent):
             return AgentResult(success=False, action="get_labor_forecast",
                                error="缺少 store_id")
 
-        if self._db:
-            forecast = await _load_labor_forecast(self._db, self.tenant_id, store_id)
-        else:
-            logger.info("workforce_forecast_mock", tenant_id=self.tenant_id)
-            forecast = {s: _DEFAULT_STAFF_BASELINE[s] for s, _, _ in _TIME_SLOTS}
+        if not self._db:
+            return AgentResult(
+                success=False,
+                action="get_labor_forecast",
+                error="数据库连接不可用",
+            )
+        forecast = await _load_labor_forecast(self._db, self.tenant_id, store_id)
 
         total = sum(forecast.values())
         slot_details = [

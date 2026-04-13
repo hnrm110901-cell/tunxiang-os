@@ -137,28 +137,6 @@ def _parse_perf_score(raw: Any) -> Optional[float]:
         return None
 
 
-def _mock_turnover_payload() -> dict[str, Any]:
-    dimension_scores = {
-        "salary_competitiveness": {"score": 65, "detail": "低于市场P50 15%"},
-        "performance_trend": {"score": 40, "detail": "近3月绩效稳定"},
-        "attendance_stability": {"score": 30, "detail": "出勤正常"},
-        "seniority": {"score": 50, "detail": "工龄18个月，中等"},
-        "growth_potential": {"score": 60, "detail": "最近无晋升/培训"},
-    }
-    dims = {k: v["score"] for k, v in dimension_scores.items()}
-    risk_score = _weighted_risk(dims)
-    return {
-        "risk_score": risk_score,
-        "risk_level": _risk_level(risk_score),
-        "dimension_scores": dimension_scores,
-        "retention_suggestions": [
-            "建议调薪至市场P50水平",
-            "安排技能培训提升成长感",
-            "考虑岗位晋升或横向调动",
-        ],
-    }
-
-
 async def _load_employee_for_turnover(
     db: Any,
     tenant_id: str,
@@ -408,51 +386,6 @@ def _priority_for_raise_row(row: dict[str, Any]) -> tuple[str, float]:
     return "low", score
 
 
-def _mock_raise_candidates() -> list[dict[str, Any]]:
-    return [
-        {
-            "employee_id": "mock-emp-01",
-            "emp_name": "张三",
-            "current_salary_fen": 400000,
-            "priority": "high",
-            "weight": 3.0,
-            "reason": "离职风险偏高且绩效优秀，优先倾斜",
-        },
-        {
-            "employee_id": "mock-emp-02",
-            "emp_name": "李四",
-            "current_salary_fen": 520000,
-            "priority": "high",
-            "weight": 3.0,
-            "reason": "薪酬低于同岗P50，需补齐竞争力",
-        },
-        {
-            "employee_id": "mock-emp-03",
-            "emp_name": "王五",
-            "current_salary_fen": 380000,
-            "priority": "medium",
-            "weight": 2.0,
-            "reason": "绩效稳定，适度激励",
-        },
-        {
-            "employee_id": "mock-emp-04",
-            "emp_name": "赵六",
-            "current_salary_fen": 610000,
-            "priority": "medium",
-            "weight": 2.0,
-            "reason": "工龄与贡献匹配，预留成长空间",
-        },
-        {
-            "employee_id": "mock-emp-05",
-            "emp_name": "钱七",
-            "current_salary_fen": 450000,
-            "priority": "low",
-            "weight": 1.0,
-            "reason": "整体平稳，预算内普调",
-        },
-    ]
-
-
 def _allocate_raise_plans(
     budget_fen: int,
     candidates: list[dict[str, Any]],
@@ -604,14 +537,17 @@ class SalaryAdvisorAgent(SkillAgent):
                     risk_level=payload["risk_level"],
                 )
             else:
-                payload = _mock_turnover_payload()
-                logger.info(
-                    "salary_advisor_turnover_fallback",
-                    employee_id=str(employee_id),
+                return AgentResult(
+                    success=False,
+                    action="predict_turnover_risk",
+                    error=f"未找到员工记录: {employee_id}",
                 )
         else:
-            payload = _mock_turnover_payload()
-            logger.info("salary_advisor_turnover_mock", employee_id=str(employee_id))
+            return AgentResult(
+                success=False,
+                action="predict_turnover_risk",
+                error="数据库连接不可用",
+            )
 
         return AgentResult(
             success=True,
@@ -646,47 +582,52 @@ class SalaryAdvisorAgent(SkillAgent):
                 error="budget_fen 必须为正整数",
             )
 
+        if self._db is None:
+            return AgentResult(
+                success=False,
+                action="optimize_raise_plan",
+                error="数据库连接不可用",
+            )
+
+        try:
+            uuid.UUID(str(store_id))
+        except ValueError:
+            return AgentResult(
+                success=False,
+                action="optimize_raise_plan",
+                error="store_id 不是合法 UUID",
+            )
+
         candidates: list[dict[str, Any]] = []
-        if self._db is not None:
-            try:
-                uuid.UUID(str(store_id))
-            except ValueError:
-                return AgentResult(
-                    success=False,
-                    action="optimize_raise_plan",
-                    error="store_id 不是合法 UUID",
-                )
-            rows = await _load_store_employees(self._db, self.tenant_id, str(store_id), 5)
-            for r in rows:
-                pr, wt = _priority_for_raise_row(r)
-                # Prefer actual payroll record; fall back to daily_wage * 26
-                payroll_sal = r.get("payroll_salary_fen")
-                daily = r.get("daily_wage_standard_fen") or 0
-                if payroll_sal is not None and int(payroll_sal) > 0:
-                    base_monthly = int(payroll_sal)
-                elif int(daily) > 0:
-                    base_monthly = int(daily) * 26
-                else:
-                    base_monthly = 400000
-                candidates.append(
-                    {
-                        "employee_id": r["employee_id"],
-                        "emp_name": r.get("emp_name") or "员工",
-                        "current_salary_fen": base_monthly,
-                        "priority": pr,
-                        "weight": 3.0 if pr == "high" else 2.0 if pr == "medium" else 1.0,
-                        "reason": "按门店员工绩效与司龄综合排序分配预算",
-                    }
-                )
-        if len(candidates) < 5:
-            mocks = _mock_raise_candidates()
-            existing = {c["employee_id"] for c in candidates}
-            for m in mocks:
-                if len(candidates) >= 5:
-                    break
-                if m["employee_id"] not in existing:
-                    candidates.append(dict(m))
-                    existing.add(m["employee_id"])
+        rows = await _load_store_employees(self._db, self.tenant_id, str(store_id), 5)
+        for r in rows:
+            pr, wt = _priority_for_raise_row(r)
+            # Prefer actual payroll record; fall back to daily_wage * 26
+            payroll_sal = r.get("payroll_salary_fen")
+            daily = r.get("daily_wage_standard_fen") or 0
+            if payroll_sal is not None and int(payroll_sal) > 0:
+                base_monthly = int(payroll_sal)
+            elif int(daily) > 0:
+                base_monthly = int(daily) * 26
+            else:
+                base_monthly = 400000
+            candidates.append(
+                {
+                    "employee_id": r["employee_id"],
+                    "emp_name": r.get("emp_name") or "员工",
+                    "current_salary_fen": base_monthly,
+                    "priority": pr,
+                    "weight": 3.0 if pr == "high" else 2.0 if pr == "medium" else 1.0,
+                    "reason": "按门店员工绩效与司龄综合排序分配预算",
+                }
+            )
+
+        if not candidates:
+            return AgentResult(
+                success=False,
+                action="optimize_raise_plan",
+                error="未查询到门店员工数据",
+            )
 
         candidates = candidates[:5]
         prio_order = {"high": 0, "medium": 1, "low": 2}

@@ -41,56 +41,10 @@ VALID_TRANSITIONS: dict[str, list[str]] = {
 }
 
 # ---------------------------------------------------------------------------
-# Mock fallback（DB不可用时降级）
+# 降级兜底（DB不可用时返回空列表，避免返回过期的硬编码数据）
 # ---------------------------------------------------------------------------
 
-MOCK_CAMPAIGNS: list[dict] = [
-    {
-        "id": "camp-001",
-        "name": "五一大促",
-        "campaign_type": "discount",
-        "status": "active",
-        "start_at": "2026-05-01T00:00:00Z",
-        "end_at": "2026-05-07T23:59:59Z",
-        "total_participants": 142,
-        "used_fen": 86400,
-        "budget_fen": None,
-        "priority": 10,
-        "rules": {"threshold_fen": 5000, "discount_rate": 0.88},
-        "target_audience": {"levels": ["VIP", "regular"]},
-        "applicable_stores": [],
-    },
-    {
-        "id": "camp-002",
-        "name": "会员日满100减20",
-        "campaign_type": "combo",
-        "status": "scheduled",
-        "start_at": "2026-04-15T00:00:00Z",
-        "end_at": "2026-04-15T23:59:59Z",
-        "total_participants": 0,
-        "used_fen": 0,
-        "budget_fen": 500000,
-        "priority": 5,
-        "rules": {"threshold_fen": 10000, "discount_fen": 2000},
-        "target_audience": {"levels": ["VIP", "regular", "new"]},
-        "applicable_stores": [],
-    },
-    {
-        "id": "camp-003",
-        "name": "新会员首单折扣",
-        "campaign_type": "discount",
-        "status": "active",
-        "start_at": "2026-01-01T00:00:00Z",
-        "end_at": "2026-12-31T23:59:59Z",
-        "total_participants": 389,
-        "used_fen": 234500,
-        "budget_fen": 1000000,
-        "priority": 8,
-        "rules": {"threshold_fen": 0, "discount_rate": 0.9},
-        "target_audience": {"levels": ["new"]},
-        "applicable_stores": [],
-    },
-]
+_FALLBACK_CAMPAIGNS: list[dict] = []
 
 # ---------------------------------------------------------------------------
 # 统一响应
@@ -222,7 +176,7 @@ async def list_campaigns(
 
     except SQLAlchemyError:
         logger.warning("list_campaigns_db_error_fallback", tenant_id=x_tenant_id)
-        items = MOCK_CAMPAIGNS
+        items = _FALLBACK_CAMPAIGNS
         if status:
             items = [c for c in items if c["status"] == status]
         if campaign_type:
@@ -309,7 +263,7 @@ async def get_campaign(
         raise
     except SQLAlchemyError:
         logger.warning("get_campaign_db_error_fallback", campaign_id=campaign_id, tenant_id=x_tenant_id)
-        for c in MOCK_CAMPAIGNS:
+        for c in _FALLBACK_CAMPAIGNS:
             if c["id"] == campaign_id:
                 return ok_response(c)
         raise HTTPException(status_code=404, detail=error_response("NOT_FOUND", f"活动不存在: {campaign_id}"))
@@ -831,7 +785,7 @@ async def get_campaign_stats(
         raise
     except SQLAlchemyError:
         logger.warning("get_stats_db_error_fallback", campaign_id=campaign_id, tenant_id=x_tenant_id)
-        for c in MOCK_CAMPAIGNS:
+        for c in _FALLBACK_CAMPAIGNS:
             if c["id"] == campaign_id:
                 return ok_response({
                     "campaign_id": campaign_id,

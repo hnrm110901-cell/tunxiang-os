@@ -123,7 +123,7 @@ def _determine_severity(deviation_pct: float) -> str:
 class GroupDashboardService:
     """集团驾驶舱数据聚合服务。
 
-    db=None 时使用内嵌 mock 数据，适用于单元测试和开发联调。
+    db=None 时返回空值降级数据（零值/空列表），不使用硬编码 mock。
     """
 
     # ── 今日集团核心 KPI ──────────────────────────────────
@@ -146,7 +146,7 @@ class GroupDashboardService:
         today = datetime.now().date()
 
         if db is None:
-            return self._mock_group_kpi(tenant_id, today.isoformat())
+            return self._degraded_group_kpi(tenant_id, today.isoformat())
 
         try:
             row = await db.execute(
@@ -288,7 +288,7 @@ class GroupDashboardService:
         log.info("group_dashboard.get_brand_ranking", tenant_id=tenant_id, days=days)
 
         if db is None:
-            return self._mock_brand_ranking(tenant_id, days)
+            return self._degraded_brand_ranking(tenant_id, days)
 
         today = datetime.now().date()
         start_date = today - timedelta(days=days - 1)
@@ -401,7 +401,7 @@ class GroupDashboardService:
         )
 
         if db is None:
-            return self._mock_store_alerts(tenant_id, threshold_pct)
+            return self._degraded_store_alerts(tenant_id, threshold_pct)
 
         today = datetime.now().date()
 
@@ -601,7 +601,7 @@ class GroupDashboardService:
         days = min(days, 90)  # 上限 90 天
 
         if db is None:
-            return self._mock_store_trend(store_id, days)
+            return self._degraded_store_trend(store_id, days)
 
         today = datetime.now().date()
         start_date = today - timedelta(days=days - 1)
@@ -656,8 +656,8 @@ class GroupDashboardService:
     # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
     @staticmethod
-    def _mock_group_kpi(tenant_id: str, date: str) -> GroupKPISnapshot:
-        """db=None 时返回空 KPI 快照（无硬编码数据）"""
+    def _degraded_group_kpi(tenant_id: str, date: str) -> GroupKPISnapshot:
+        """db=None 时返回空 KPI 快照（无硬编码数据，零值降级）"""
         return GroupKPISnapshot(
             tenant_id=tenant_id,
             date=date,
@@ -671,16 +671,16 @@ class GroupDashboardService:
         )
 
     @staticmethod
-    def _mock_brand_ranking(tenant_id: str, days: int) -> list[BrandPerformance]:
+    def _degraded_brand_ranking(tenant_id: str, days: int) -> list[BrandPerformance]:
         """db=None 时返回空品牌排名列表（无硬编码数据）"""
         return []
 
     @staticmethod
-    def _mock_store_alerts(tenant_id: str, threshold_pct: float) -> list[StoreAlert]:
+    def _degraded_store_alerts(tenant_id: str, threshold_pct: float) -> list[StoreAlert]:
         """db=None 时返回空预警列表（无硬编码数据）"""
         return []
 
     @staticmethod
-    def _mock_store_trend(store_id: str, days: int) -> list[dict]:
+    def _degraded_store_trend(store_id: str, days: int) -> list[dict]:
         """db=None 时返回空趋势列表（无硬编码数据）"""
         return []

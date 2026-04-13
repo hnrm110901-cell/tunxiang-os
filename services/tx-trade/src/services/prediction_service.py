@@ -46,12 +46,12 @@ _PEAK_PERIODS = [
     (17, 30, 20, 0,  1.4),
 ]
 
-# ─── Mock 兜底数据（无数据库/ML 时使用） ───
-_MOCK_DISH_AVG_SECONDS: dict[str, float] = {
+# ─── 默认兜底数据（无历史数据/ML 不可用时使用） ───
+_DEFAULT_DISH_PREP_SECONDS: dict[str, float] = {
     "default": 600.0,   # 10分钟兜底
 }
 
-_MOCK_TABLE_AVG_DINING_MINUTES: dict[int, float] = {
+_DEFAULT_TABLE_DINING_MINUTES: dict[int, float] = {
     2: 45.0,
     4: 55.0,
     6: 70.0,
@@ -244,7 +244,7 @@ def _get_peak_factor(now: Optional[datetime] = None) -> float:
 
 
 # ────────────────────────────────────────────
-# 规则引擎：菜品平均制作时长（DB + Mock降级）
+# 规则引擎：菜品平均制作时长（DB + 默认值降级）
 # ────────────────────────────────────────────
 
 async def _get_dish_avg_seconds(
@@ -256,31 +256,32 @@ async def _get_dish_avg_seconds(
 ) -> tuple[float, bool]:
     """
     返回 (avg_cook_seconds, has_real_data)。
-    先查过去30天历史均值；无数据时降级到mock。
+    先查过去30天 kds_tasks 历史均值（called_at → served_at 为实际制作+叫菜时长）；
+    无数据时降级到默认兜底值。
     """
     if db is None:
-        return _MOCK_DISH_AVG_SECONDS.get(dish_id, _MOCK_DISH_AVG_SECONDS["default"]), False
+        return _DEFAULT_DISH_PREP_SECONDS.get(dish_id, _DEFAULT_DISH_PREP_SECONDS["default"]), False
 
     try:
         from sqlalchemy import text as sa_text
         sql = sa_text("""
-            SELECT AVG(EXTRACT(EPOCH FROM (finished_at - started_at))) AS avg_seconds,
+            SELECT AVG(EXTRACT(EPOCH FROM (kt.served_at - kt.called_at))) AS avg_seconds,
                    COUNT(*) AS sample_count
-            FROM kds_tasks
-            WHERE dish_id = :dish_id
-              AND dept_id = :dept_id
-              AND store_id = :store_id
-              AND tenant_id = :tenant_id
-              AND finished_at IS NOT NULL
-              AND started_at IS NOT NULL
-              AND finished_at > NOW() - INTERVAL '30 days'
+            FROM kds_tasks kt
+            JOIN order_items oi ON oi.id = kt.order_item_id
+            WHERE oi.dish_id = :dish_id::uuid
+              AND kt.dept_id = :dept_id::uuid
+              AND kt.tenant_id = :tenant_id::uuid
+              AND kt.called_at IS NOT NULL
+              AND kt.served_at IS NOT NULL
+              AND kt.served_at > NOW() - INTERVAL '30 days'
+              AND kt.status = 'done'
         """)
         result = await db.execute(
             sql,
             {
                 "dish_id": dish_id,
                 "dept_id": dept_id,
-                "store_id": store_id,
                 "tenant_id": tenant_id,
             },
         )
@@ -290,7 +291,7 @@ async def _get_dish_avg_seconds(
     except Exception as exc:  # noqa: BLE001 — 最外层兜底
         logger.warning("dish_avg_seconds_query_failed", dish_id=dish_id, error=str(exc), exc_info=True)
 
-    return _MOCK_DISH_AVG_SECONDS.get(dish_id, _MOCK_DISH_AVG_SECONDS["default"]), False
+    return _DEFAULT_DISH_PREP_SECONDS.get(dish_id, _DEFAULT_DISH_PREP_SECONDS["default"]), False
 
 
 async def _get_queue_depth(
@@ -324,7 +325,7 @@ async def _get_queue_depth(
 
 
 # ────────────────────────────────────────────
-# 规则引擎：桌台平均就餐时长（DB + Mock降级）
+# 规则引擎：桌台平均就餐时长（DB + 默认值降级）
 # ────────────────────────────────────────────
 
 async def _get_avg_dining_minutes(
@@ -335,29 +336,29 @@ async def _get_avg_dining_minutes(
 ) -> tuple[float, bool]:
     """
     返回 (avg_dining_minutes, has_real_data)。
-    查过去30天同规模桌台的就餐时长均值。
+    查过去30天 dining_sessions 中同容量桌台的完整就餐时长均值
+    （opened_at → cleared_at）。
     """
     if db is None:
-        fallback = _MOCK_TABLE_AVG_DINING_MINUTES.get(
+        fallback = _DEFAULT_TABLE_DINING_MINUTES.get(
             seats,
-            _MOCK_TABLE_AVG_DINING_MINUTES[4],
+            _DEFAULT_TABLE_DINING_MINUTES[4],
         )
         return fallback, False
 
     try:
         from sqlalchemy import text as sa_text
         sql = sa_text("""
-            SELECT AVG(EXTRACT(EPOCH FROM (closed_at - opened_at)) / 60) AS avg_min,
+            SELECT AVG(EXTRACT(EPOCH FROM (ds.cleared_at - ds.opened_at)) / 60) AS avg_min,
                    COUNT(*) AS sample_count
-            FROM orders o
-            JOIN tables t ON t.no = o.table_no AND t.store_id = o.store_id
-            WHERE o.store_id = :store_id
-              AND o.tenant_id = :tenant_id
-              AND o.status = 'closed'
+            FROM dining_sessions ds
+            JOIN tables t ON t.id = ds.table_id
+            WHERE ds.store_id = :store_id::uuid
+              AND ds.tenant_id = :tenant_id::uuid
+              AND ds.status = 'paid'
               AND t.seats = :seats
-              AND o.closed_at > NOW() - INTERVAL '30 days'
-              AND o.closed_at IS NOT NULL
-              AND o.opened_at IS NOT NULL
+              AND ds.cleared_at IS NOT NULL
+              AND ds.cleared_at > NOW() - INTERVAL '30 days'
         """)
         result = await db.execute(
             sql,
@@ -370,12 +371,12 @@ async def _get_avg_dining_minutes(
         logger.warning("avg_dining_minutes_query_failed", seats=seats, error=str(exc), exc_info=True)
 
     # 按座位数插值兜底
-    keys = sorted(_MOCK_TABLE_AVG_DINING_MINUTES.keys())
+    keys = sorted(_DEFAULT_TABLE_DINING_MINUTES.keys())
     best = keys[0]
     for k in keys:
         if k <= seats:
             best = k
-    return _MOCK_TABLE_AVG_DINING_MINUTES[best], False
+    return _DEFAULT_TABLE_DINING_MINUTES[best], False
 
 
 # ────────────────────────────────────────────
