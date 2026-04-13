@@ -18,8 +18,8 @@ from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import UUID
 
-revision = "v244"
-down_revision = "v243"
+revision = "v244b"
+down_revision = "v244"
 branch_labels = None
 depends_on = None
 
