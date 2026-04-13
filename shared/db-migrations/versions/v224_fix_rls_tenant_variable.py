@@ -26,10 +26,13 @@ down_revision = "v223"
 branch_labels = None
 depends_on = None
 
-# 受影响的表及其旧策略名称
-# tenant_id 在这些表中是 String(50)，不需要 ::UUID 转换
-_AFFECTED = [
+# UUID tenant_id 表（需要 ::uuid 转换）
+_UUID_TABLES = [
     ("corporate_customers", "corporate_customers_tenant"),
+]
+
+# varchar/text tenant_id 表（不需要转换）
+_VARCHAR_TABLES = [
     ("corporate_orders", "corporate_orders_tenant"),
     ("corporate_bills", "corporate_bills_tenant"),
     ("aggregator_orders", "aggregator_orders_tenant"),
@@ -39,16 +42,26 @@ _AFFECTED = [
 
 
 def upgrade() -> None:
-    for table, policy in _AFFECTED:
-        # 1. 删除使用错误变量的旧策略
+    for table, policy in _UUID_TABLES:
         op.execute(f"DROP POLICY IF EXISTS {policy} ON {table};")
-        # 2. 创建使用正确变量的新策略（::uuid cast 兼容 UUID 类型列）
         op.execute(f"""
             DO $$ BEGIN
                 IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='{table}' AND policyname='{policy}') THEN
                     EXECUTE 'CREATE POLICY {policy} ON {table}
                         USING (tenant_id = NULLIF(current_setting(''app.tenant_id'', true), '''')::uuid)
                         WITH CHECK (tenant_id = NULLIF(current_setting(''app.tenant_id'', true), '''')::uuid)';
+                END IF;
+            END$$;
+        """)
+
+    for table, policy in _VARCHAR_TABLES:
+        op.execute(f"DROP POLICY IF EXISTS {policy} ON {table};")
+        op.execute(f"""
+            DO $$ BEGIN
+                IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='{table}' AND policyname='{policy}') THEN
+                    EXECUTE 'CREATE POLICY {policy} ON {table}
+                        USING (tenant_id = NULLIF(current_setting(''app.tenant_id'', true), ''''))
+                        WITH CHECK (tenant_id = NULLIF(current_setting(''app.tenant_id'', true), ''''))';
                 END IF;
             END$$;
         """)
