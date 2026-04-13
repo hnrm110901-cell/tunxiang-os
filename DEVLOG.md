@@ -4,6 +4,30 @@
 
 ---
 
+## 2026-04-12 模块4.1 宴会深度产品化 — KDS场次出品 + 定金抵扣
+
+### 今日完成
+- [tx-trade/banquet_kds_routes.py] 新建：宴会KDS端点（5个）— GET sessions/dishes/progress、POST serve/call，懒加载KDS菜品记录，旁路emit KdsEventType事件
+- [tx-trade/banquet_deposit_routes.py] 新建：宴会定金抵扣端点（4个）— 收定金/查余额/抵扣/退款，先进先出扣减，emit DepositEventType事件
+- [tx-trade/main.py] 注册 banquet_kds_router + banquet_deposit_router
+- [web-kds/BanquetKDSPage.tsx] 新建：宴会KDS出品看板，场次卡片+进度条+菜品状态（灰/橙/绿），10秒自动刷新
+- [web-kds/App.tsx] 注册 /banquet-kds 路由
+- [web-pos/BanquetDepositPage.tsx] 新建：宴会定金管理POS页，收定金/余额抵扣/退定金三Tab
+- [web-pos/App.tsx] 注册 /banquet-deposit 路由
+- [shared/events/event_types.py] DepositEventType 新增 REGISTERED / CONVERTED 枚举值
+
+### 数据变化
+- 新增 API 端点：9个（5个KDS + 4个定金）
+- 新增页面：2个（BanquetKDSPage + BanquetDepositPage）
+
+### 遗留问题
+- banquet_kds_dishes 表、banquet_session_deposits 表需补 Alembic 迁移（vNext）
+
+### 明日计划
+- 补写 Alembic 迁移：banquet_kds_dishes + banquet_session_deposits 建表
+
+---
+
 ## 2026-04-12 模块4.2 打印管理可视化中心 + 模块4.3 智慧商街多商户
 
 ### 今日完成

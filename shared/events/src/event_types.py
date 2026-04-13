@@ -305,7 +305,9 @@ class DepositEventType(str, Enum):
     """押金事件"""
 
     COLLECTED = "deposit.collected"                        # 押金收取
+    REGISTERED = "deposit.registered"                      # 宴会定金登记（收取的别名，模块4.1）
     APPLIED = "deposit.applied"                            # 押金抵扣
+    CONVERTED = "deposit.converted"                        # 定金转预收（宴会结账抵扣，模块4.1）
     REFUNDED = "deposit.refunded"                          # 押金退还
     CONVERTED_TO_REVENUE = "deposit.converted_to_revenue"  # 转收入
     EXPIRED = "deposit.expired"                            # 押金过期
