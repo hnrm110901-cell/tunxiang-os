@@ -115,46 +115,52 @@ _INITIAL_BINDINGS: list[tuple[str, str, str, int, str]] = [
 
 
 def upgrade() -> None:
+    conn = op.get_bind()
+    existing = sa.inspect(conn).get_table_names()
+
+
     # ── 1. 创建 event_agent_bindings 表 ──
-    op.create_table(
-        "event_agent_bindings",
-        sa.Column("id", postgresql.UUID(), server_default=sa.text("gen_random_uuid()"), primary_key=True),
-        sa.Column("tenant_id", postgresql.UUID(), nullable=False),
-        sa.Column("event_type", sa.String(100), nullable=False),
-        sa.Column("agent_id", sa.String(100), nullable=False),
-        sa.Column("action", sa.String(100), nullable=False),
-        sa.Column("priority", sa.Integer(), server_default=sa.text("50"), nullable=False),
-        sa.Column("enabled", sa.Boolean(), server_default=sa.text("true"), nullable=False),
-        sa.Column("condition_json", postgresql.JSON(), nullable=True),
-        sa.Column("description", sa.String(500), nullable=True),
-        sa.Column("source", sa.String(20), server_default=sa.text("'config'"), nullable=False),
-        sa.Column("created_at", sa.TIMESTAMP(timezone=True), server_default=sa.text("now()")),
-        sa.Column("updated_at", sa.TIMESTAMP(timezone=True), server_default=sa.text("now()")),
-        sa.Column("is_deleted", sa.Boolean(), server_default=sa.text("false")),
-    )
 
-    # ── 2. 创建索引 ──
-    op.create_index("ix_eab_event_type", "event_agent_bindings", ["event_type"])
-    op.create_index("ix_eab_agent_id", "event_agent_bindings", ["agent_id"])
-    op.create_index("ix_eab_tenant_enabled", "event_agent_bindings", ["tenant_id", "enabled"])
+    if 'event_agent_bindings' not in existing:
+        op.create_table(
+            "event_agent_bindings",
+            sa.Column("id", postgresql.UUID(), server_default=sa.text("gen_random_uuid()"), primary_key=True),
+            sa.Column("tenant_id", postgresql.UUID(), nullable=False),
+            sa.Column("event_type", sa.String(100), nullable=False),
+            sa.Column("agent_id", sa.String(100), nullable=False),
+            sa.Column("action", sa.String(100), nullable=False),
+            sa.Column("priority", sa.Integer(), server_default=sa.text("50"), nullable=False),
+            sa.Column("enabled", sa.Boolean(), server_default=sa.text("true"), nullable=False),
+            sa.Column("condition_json", postgresql.JSON(), nullable=True),
+            sa.Column("description", sa.String(500), nullable=True),
+            sa.Column("source", sa.String(20), server_default=sa.text("'config'"), nullable=False),
+            sa.Column("created_at", sa.TIMESTAMP(timezone=True), server_default=sa.text("now()")),
+            sa.Column("updated_at", sa.TIMESTAMP(timezone=True), server_default=sa.text("now()")),
+            sa.Column("is_deleted", sa.Boolean(), server_default=sa.text("false")),
+        )
 
-    # ── 3. RLS ──
-    _add_rls("event_agent_bindings", "eab")
+        # ── 2. 创建索引 ──
+        op.create_index("ix_eab_event_type", "event_agent_bindings", ["event_type"])
+        op.create_index("ix_eab_agent_id", "event_agent_bindings", ["agent_id"])
+        op.create_index("ix_eab_tenant_enabled", "event_agent_bindings", ["tenant_id", "enabled"])
 
-    # ── 4. 插入初始化数据（从 DEFAULT_EVENT_HANDLERS 转换） ──
-    # 使用临时 SET app.tenant_id 让 RLS 允许插入
-    op.execute(f"SET LOCAL app.tenant_id = '{_SYSTEM_TENANT}'")
+        # ── 3. RLS ──
+        _add_rls("event_agent_bindings", "eab")
 
-    for event_type, agent_id, action, priority, description in _INITIAL_BINDINGS:
-        # 转义单引号（虽然当前数据无需，但防御性编程）
-        desc_escaped = description.replace("'", "''")
-        op.execute(f"""
-            INSERT INTO event_agent_bindings
-                (tenant_id, event_type, agent_id, action, priority, enabled, source, description)
-            VALUES
-                ('{_SYSTEM_TENANT}'::uuid, '{event_type}', '{agent_id}', '{action}',
-                 {priority}, true, 'default', '{desc_escaped}')
-        """)
+        # ── 4. 插入初始化数据（从 DEFAULT_EVENT_HANDLERS 转换） ──
+        # 使用临时 SET app.tenant_id 让 RLS 允许插入
+        op.execute(f"SET LOCAL app.tenant_id = '{_SYSTEM_TENANT}'")
+
+        for event_type, agent_id, action, priority, description in _INITIAL_BINDINGS:
+            # 转义单引号（虽然当前数据无需，但防御性编程）
+            desc_escaped = description.replace("'", "''")
+            op.execute(f"""
+                INSERT INTO event_agent_bindings
+                    (tenant_id, event_type, agent_id, action, priority, enabled, source, description)
+                VALUES
+                    ('{_SYSTEM_TENANT}'::uuid, '{event_type}', '{agent_id}', '{action}',
+                     {priority}, true, 'default', '{desc_escaped}')
+            """)
 
 
 def downgrade() -> None:
