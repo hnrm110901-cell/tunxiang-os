@@ -20,6 +20,8 @@
 """
 from __future__ import annotations
 
+import asyncio
+import json
 import uuid
 from datetime import datetime, timezone
 from typing import Optional
@@ -380,13 +382,94 @@ async def publish_scheme(
         """),
         {"sid": sid, "tid": tid},
     )
+
+    # ── 自动快照：将当前菜品列表写入 menu_plan_versions ──────────────────
+    # 1) 查询当前方案的最大版本号
+    ver_row = await db.execute(
+        text("""
+            SELECT COALESCE(MAX(version_number), 0)
+            FROM menu_plan_versions
+            WHERE scheme_id = :sid AND tenant_id = :tid AND is_deleted = false
+        """),
+        {"sid": sid, "tid": tid},
+    )
+    next_version = (ver_row.scalar() or 0) + 1
+
+    # 2) 查询方案所有菜品作为 snapshot
+    snap_res = await db.execute(
+        text("""
+            SELECT msi.id, msi.dish_id, d.dish_name, d.price_fen AS default_price_fen,
+                   msi.price_fen, msi.is_available, msi.sort_order, msi.notes
+            FROM menu_scheme_items msi
+            LEFT JOIN dishes d ON d.id = msi.dish_id
+            WHERE msi.scheme_id = :sid AND msi.tenant_id = :tid
+            ORDER BY msi.sort_order, msi.id
+        """),
+        {"sid": sid, "tid": tid},
+    )
+    snapshot = [
+        {
+            "item_id": str(r[0]),
+            "dish_id": str(r[1]),
+            "dish_name": r[2],
+            "default_price_fen": r[3],
+            "price_fen": r[4],
+            "is_available": r[5],
+            "sort_order": r[6],
+            "notes": r[7],
+        }
+        for r in snap_res.fetchall()
+    ]
+
+    await db.execute(
+        text("""
+            INSERT INTO menu_plan_versions
+              (id, tenant_id, scheme_id, version_number, change_summary,
+               snapshot_json, published_by, created_at, is_deleted)
+            VALUES
+              (gen_random_uuid(), :tid, :sid, :ver, :summary,
+               :snap::jsonb, :operator, now(), false)
+        """),
+        {
+            "tid": tid,
+            "sid": sid,
+            "ver": next_version,
+            "summary": f"v{next_version} — 发布时自动快照，共 {len(snapshot)} 个菜品",
+            "snap": json.dumps(snapshot, ensure_ascii=False),
+            "operator": x_tenant_id,  # 无 operator header 时用 tenant_id 作标识
+        },
+    )
+
     await db.commit()
-    log.info("menu_scheme.published", scheme_id=scheme_id, tenant_id=x_tenant_id)
+    log.info(
+        "menu_scheme.published",
+        scheme_id=scheme_id,
+        tenant_id=x_tenant_id,
+        version=next_version,
+        snapshot_items=len(snapshot),
+    )
+
+    # 发射事件（异步旁路，不阻塞响应）
+    try:
+        from shared.events.src.emitter import emit_event
+        from shared.events.src.event_types import MenuEventType
+        asyncio.create_task(emit_event(
+            event_type=MenuEventType.PLAN_PUBLISHED,
+            tenant_id=str(tid),
+            stream_id=scheme_id,
+            payload={"version": next_version, "item_count": len(snapshot)},
+            source_service="tx-menu",
+        ))
+    except Exception:  # noqa: BLE001 — 事件发射失败不影响主业务
+        pass
+
     return {
         "ok": True,
         "data": {
             "scheme_id": scheme_id,
             "status": "published",
+            "version": next_version,
+            "snapshot_items": len(snapshot),
             "published_at": datetime.now(timezone.utc).isoformat(),
         },
     }
@@ -421,7 +504,19 @@ async def distribute_scheme(
     if row[0] != "published":
         _err(400, "只有已发布的方案才能下发，请先发布方案")
 
+    # 获取本方案当前最新版本号（用于 distribute_log）
+    ver_row = await db.execute(
+        text("""
+            SELECT COALESCE(MAX(version_number), NULL)
+            FROM menu_plan_versions
+            WHERE scheme_id = :sid AND tenant_id = :tid AND is_deleted = false
+        """),
+        {"sid": sid, "tid": tid},
+    )
+    current_version = ver_row.scalar()  # None 表示尚未有版本快照
+
     distributed_count = 0
+    distributed_store_ids: list[str] = []
     for store_id_str in req.store_ids:
         try:
             store_uuid = uuid.UUID(store_id_str)
@@ -443,21 +538,61 @@ async def distribute_scheme(
                 "operator": req.operator,
             },
         )
+        # 写 distribute_log
+        await db.execute(
+            text("""
+                INSERT INTO menu_distribute_log
+                  (id, tenant_id, scheme_id, store_id, version_number,
+                   status, error_message, distributed_by, distributed_at, is_deleted)
+                VALUES
+                  (gen_random_uuid(), :tid, :sid, :store_id, :ver,
+                   'success', NULL, :operator, now(), false)
+            """),
+            {
+                "tid": tid,
+                "sid": sid,
+                "store_id": store_uuid,
+                "ver": current_version,
+                "operator": req.operator,
+            },
+        )
         distributed_count += 1
+        distributed_store_ids.append(str(store_uuid))
 
     await db.commit()
     log.info(
         "menu_scheme.distributed",
         scheme_id=scheme_id,
         store_count=distributed_count,
+        version=current_version,
         tenant_id=x_tenant_id,
     )
+
+    # 发射 PLAN_DISTRIBUTED 事件（异步旁路）
+    try:
+        from shared.events.src.emitter import emit_event
+        from shared.events.src.event_types import MenuEventType
+        asyncio.create_task(emit_event(
+            event_type=MenuEventType.PLAN_DISTRIBUTED,
+            tenant_id=str(tid),
+            stream_id=scheme_id,
+            payload={
+                "store_ids": distributed_store_ids,
+                "version": current_version,
+                "distributed_by": req.operator,
+            },
+            source_service="tx-menu",
+        ))
+    except Exception:  # noqa: BLE001 — 事件发射失败不影响主业务
+        pass
+
     return {
         "ok": True,
         "data": {
             "scheme_id": scheme_id,
             "distributed_store_count": distributed_count,
             "total_requested": len(req.store_ids),
+            "version": current_version,
         },
     }
 

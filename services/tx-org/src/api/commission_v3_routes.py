@@ -634,16 +634,89 @@ async def calculate_commission(
                     })
                     total_fen += earned
 
-            elif rule_type in ("table", "time_slot"):
-                # table/time_slot：当前版本基于固定金额直接累加（未来接入订单数据）
-                if amount_fen > 0:
+            elif rule_type == "table":
+                # 桌型提成：统计员工在该桌型服务的桌次数 × 每桌 amount_fen
+                # 数据来源：dining_sessions.lead_waiter_id + tables.table_type
+                target_table_type = params.get("table_type", "")
+                table_filter = ""
+                if target_table_type:
+                    table_filter = "AND t.table_type = :table_type"
+                table_count_row = await db.execute(
+                    text(f"""
+                        SELECT COUNT(ds.id) AS table_count
+                        FROM dining_sessions ds
+                        JOIN tables t ON t.id = ds.table_id
+                        WHERE ds.tenant_id     = :tid
+                          AND ds.store_id      = :store_id
+                          AND ds.lead_waiter_id = :employee_id
+                          AND ds.opened_at::date BETWEEN :start_date AND :end_date
+                          AND ds.status        = 'closed'
+                          {table_filter}
+                    """),
+                    {
+                        "tid": x_tenant_id,
+                        "store_id": str(body.store_id),
+                        "employee_id": str(body.employee_id),
+                        "start_date": body.start_date,
+                        "end_date": body.end_date,
+                        **({"table_type": target_table_type} if target_table_type else {}),
+                    },
+                )
+                table_count = int(table_count_row.fetchone().table_count or 0)
+                earned = table_count * amount_fen
+                if earned > 0:
                     breakdown.append({
                         "rule_id": str(rule.rule_id),
-                        "rule_type": rule_type,
-                        "description": f"{rule_type}固定提成",
-                        "earned_fen": amount_fen,
+                        "rule_type": "table",
+                        "description": (
+                            f"桌型提成 table_type={target_table_type or '全部'} "
+                            f"桌次={table_count} × {amount_fen}分"
+                        ),
+                        "earned_fen": earned,
                     })
-                    total_fen += amount_fen
+                    total_fen += earned
+
+            elif rule_type == "time_slot":
+                # 时段提成：统计员工在指定时段服务的桌次，对时段内桌型提成应用 multiplier
+                # 或：直接统计时段内 dining_sessions 桌次 × amount_fen × multiplier
+                start_time_str = params.get("start_time", "00:00")
+                end_time_str = params.get("end_time", "23:59")
+                multiplier = float(params.get("multiplier", 1.0))
+                slot_count_row = await db.execute(
+                    text("""
+                        SELECT COUNT(ds.id) AS slot_count
+                        FROM dining_sessions ds
+                        WHERE ds.tenant_id      = :tid
+                          AND ds.store_id       = :store_id
+                          AND ds.lead_waiter_id = :employee_id
+                          AND ds.opened_at::date BETWEEN :start_date AND :end_date
+                          AND ds.opened_at::time BETWEEN :start_time::time AND :end_time::time
+                          AND ds.status         = 'closed'
+                    """),
+                    {
+                        "tid": x_tenant_id,
+                        "store_id": str(body.store_id),
+                        "employee_id": str(body.employee_id),
+                        "start_date": body.start_date,
+                        "end_date": body.end_date,
+                        "start_time": start_time_str,
+                        "end_time": end_time_str,
+                    },
+                )
+                slot_count = int(slot_count_row.fetchone().slot_count or 0)
+                base = slot_count * amount_fen
+                earned = int(base * multiplier)
+                if earned > 0:
+                    breakdown.append({
+                        "rule_id": str(rule.rule_id),
+                        "rule_type": "time_slot",
+                        "description": (
+                            f"时段提成 {start_time_str}~{end_time_str} "
+                            f"桌次={slot_count} × {amount_fen}分 × {multiplier}"
+                        ),
+                        "earned_fen": earned,
+                    })
+                    total_fen += earned
 
     except HTTPException:
         raise
@@ -792,6 +865,21 @@ async def monthly_settle(
         )
         agg_list = agg_rows.fetchall()
 
+        # 批量拉取涉及员工的姓名（一次查询，避免 N+1）
+        employee_ids = list({str(r.employee_id) for r in agg_list})
+        employee_names: dict[str, str] = {}
+        if employee_ids:
+            name_rows = await db.execute(
+                text("""
+                    SELECT id, name FROM employees
+                    WHERE tenant_id = :tid AND id = ANY(:ids::uuid[])
+                      AND is_deleted = FALSE
+                """),
+                {"tid": x_tenant_id, "ids": employee_ids},
+            )
+            for nr in name_rows.fetchall():
+                employee_names[str(nr.id)] = nr.name or ""
+
         for row in agg_list:
             record_id = uuid.uuid4()
             total_fen = int(row.total_fee_fen or 0)
@@ -800,21 +888,25 @@ async def monthly_settle(
                 "total_fen": total_fen,
                 "period": f"{start_date} ~ {end_date}",
             }])
+            emp_name = employee_names.get(str(row.employee_id), "")
 
             # UPSERT：已结算的不覆盖
             result = await db.execute(
                 text("""
                     INSERT INTO commission_records
                         (id, tenant_id, employee_id, store_id, year_month,
-                         total_commission_fen, breakdown, status, settled_at)
+                         total_commission_fen, breakdown, status, settled_at,
+                         employee_name)
                     VALUES (:id, :tid, :employee_id, :store_id, :year_month,
-                            :total_fen, :breakdown::jsonb, 'settled', NOW())
+                            :total_fen, :breakdown::jsonb, 'settled', NOW(),
+                            :employee_name)
                     ON CONFLICT (tenant_id, employee_id, store_id, year_month)
                     DO UPDATE SET
                         total_commission_fen = EXCLUDED.total_commission_fen,
                         breakdown            = EXCLUDED.breakdown,
                         status               = EXCLUDED.status,
                         settled_at           = EXCLUDED.settled_at,
+                        employee_name        = EXCLUDED.employee_name,
                         updated_at           = NOW()
                     WHERE commission_records.status <> 'settled'
                 """),
@@ -826,6 +918,7 @@ async def monthly_settle(
                     "year_month": body.year_month,
                     "total_fen": total_fen,
                     "breakdown": breakdown_json,
+                    "employee_name": emp_name,
                 },
             )
             if result.rowcount > 0:

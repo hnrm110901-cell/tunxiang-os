@@ -17,7 +17,7 @@ from typing import Any, Optional
 from uuid import uuid4
 
 import structlog
-from fastapi import APIRouter, Depends, Header, HTTPException, Query
+from fastapi import APIRouter, Depends, File, Header, HTTPException, Query, UploadFile
 from pydantic import BaseModel, Field
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
@@ -814,3 +814,117 @@ async def report_fees_summary(
                 "grand_overdue_fen": 0, "collection_rate": 0.0,
             },
         }
+
+
+# ─── 合同文件上传 ─────────────────────────────────────────────────────────────
+
+@router.post("/franchisees/{franchisee_id}/contract/upload")
+async def upload_contract_file(
+    franchisee_id: str,
+    file: UploadFile = File(...),
+    x_tenant_id: str = Header("demo-tenant", alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    """上传加盟合同文件（PDF/图片），存储至 COS，并将 URL 写回加盟商档案。"""
+    from shared.integrations.cos_upload import get_cos_upload_service, COSUploadError
+
+    # 校验文件类型（仅允许 PDF 和常见图片）
+    allowed_mime = {
+        "application/pdf",
+        "image/jpeg",
+        "image/png",
+        "image/webp",
+    }
+    content_type = file.content_type or "application/octet-stream"
+    if content_type not in allowed_mime:
+        raise HTTPException(
+            status_code=400,
+            detail=f"不支持的文件类型 {content_type}，请上传 PDF 或图片",
+        )
+
+    try:
+        await _set_rls(db, x_tenant_id)
+        # 确认加盟商存在
+        exists_res = await db.execute(
+            text("SELECT id FROM franchisees WHERE id = :id AND is_deleted = false"),
+            {"id": franchisee_id},
+        )
+        if not exists_res.fetchone():
+            raise HTTPException(status_code=404, detail="加盟商不存在")
+
+        file_bytes = await file.read()
+        cos = get_cos_upload_service()
+        upload_result = await cos.upload_file(
+            file_bytes=file_bytes,
+            filename=file.filename or "contract",
+            content_type=content_type,
+            folder="contracts",
+        )
+        file_url: str = upload_result["url"]
+
+        # 写回档案
+        await db.execute(
+            text("""
+                UPDATE franchisees
+                SET contract_file_url = :url, updated_at = NOW()
+                WHERE id = :id AND is_deleted = false
+            """),
+            {"url": file_url, "id": franchisee_id},
+        )
+        await db.commit()
+        log.info(
+            "franchise_v5.contract.uploaded",
+            franchisee_id=franchisee_id,
+            url=file_url,
+            tenant_id=x_tenant_id,
+        )
+        return {"ok": True, "data": {"franchisee_id": franchisee_id, "contract_file_url": file_url}}
+    except HTTPException:
+        raise
+    except COSUploadError as exc:
+        log.error("franchise_v5.contract.upload.cos_error", error=str(exc), franchisee_id=franchisee_id)
+        raise HTTPException(status_code=502, detail=f"文件上传失败：{exc}")
+    except SQLAlchemyError as exc:
+        log.error("franchise_v5.contract.upload.db_error", error=str(exc), franchisee_id=franchisee_id)
+        await db.rollback()
+        raise HTTPException(status_code=500, detail="数据库更新失败，请重试")
+
+
+# ─── 加盟费逾期自动标记 ───────────────────────────────────────────────────────
+
+@router.post("/fees/mark-overdue")
+async def mark_overdue_fees(
+    x_tenant_id: str = Header("demo-tenant", alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    """将所有 due_date < 今日 且 status='pending' 的费用记录批量标记为 overdue。
+
+    幂等：重复调用安全，已 overdue/paid 的记录不受影响。
+    推荐由定时任务每天 00:05 触发（或前端手动触发）。
+    """
+    try:
+        await _set_rls(db, x_tenant_id)
+        result = await db.execute(
+            text("""
+                UPDATE franchise_fees
+                SET status     = 'overdue',
+                    updated_at = NOW()
+                WHERE tenant_id = :tid
+                  AND status    = 'pending'
+                  AND due_date  < CURRENT_DATE
+                  AND is_deleted = false
+            """),
+            {"tid": x_tenant_id},
+        )
+        marked_count = result.rowcount
+        await db.commit()
+        log.info(
+            "franchise_v5.fees.mark_overdue",
+            marked_count=marked_count,
+            tenant_id=x_tenant_id,
+        )
+        return {"ok": True, "data": {"marked_count": marked_count, "as_of": date.today().isoformat()}}
+    except SQLAlchemyError as exc:
+        log.error("franchise_v5.fees.mark_overdue.db_error", error=str(exc), tenant_id=x_tenant_id)
+        await db.rollback()
+        raise HTTPException(status_code=500, detail="批量标记逾期失败，请重试")

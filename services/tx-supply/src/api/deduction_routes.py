@@ -128,6 +128,22 @@ async def rollback_deduction_route(
     await _set_rls(db, x_tenant_id)
     try:
         data = await rollback_deduction(order_id, x_tenant_id, db)
+        # ─── Phase 1 平行事件写入：扣料回滚（每条回补记录一个事件）───
+        for item in data.get("restored_items", []):
+            asyncio.create_task(emit_event(
+                event_type=InventoryEventType.ADJUSTED,
+                tenant_id=x_tenant_id,
+                stream_id=item.get("ingredient_id", order_id),
+                payload={
+                    "ingredient_id": item.get("ingredient_id"),
+                    "ingredient_name": item.get("ingredient_name", ""),
+                    "delta_g": item.get("quantity", 0),
+                    "reason": "deduction_rollback",
+                    "order_id": order_id,
+                },
+                source_service="tx-supply",
+                causation_id=order_id,
+            ))
         return {"ok": True, "data": data}
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
@@ -179,6 +195,27 @@ async def finalize_stocktake_route(
     await _set_rls(db, x_tenant_id)
     try:
         data = await finalize_stocktake(stocktake_id, x_tenant_id, db)
+        # ─── Phase 1 平行事件写入：盘点完成调整（每条差异一个事件）───
+        for diff in data.get("differences", []):
+            delta = diff.get("delta_g", 0)
+            if delta == 0:
+                continue
+            asyncio.create_task(emit_event(
+                event_type=InventoryEventType.ADJUSTED,
+                tenant_id=x_tenant_id,
+                stream_id=diff.get("ingredient_id", stocktake_id),
+                payload={
+                    "stocktake_id": stocktake_id,
+                    "ingredient_id": diff.get("ingredient_id"),
+                    "ingredient_name": diff.get("ingredient_name", ""),
+                    "delta_g": delta,
+                    "system_qty_g": diff.get("system_qty_g"),
+                    "actual_qty_g": diff.get("actual_qty_g"),
+                    "reason": "stocktake_finalize",
+                },
+                source_service="tx-supply",
+                causation_id=stocktake_id,
+            ))
         return {"ok": True, "data": data}
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
