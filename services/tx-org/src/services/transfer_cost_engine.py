@@ -174,8 +174,8 @@ class TransferCostEngine:
         order = await self.get_transfer(order_id)
         if not order:
             raise ValueError("借调单不存在")
-        if order["status"] not in ("active", "approved"):
-            raise ValueError(f"借调单状态为 {order['status']}，无法完成")
+        if order["status"] != "active":
+            raise ValueError(f"借调单状态为 {order['status']}，仅 active 状态可完成")
 
         now = datetime.now(tz=timezone.utc)
         await self.db.execute(

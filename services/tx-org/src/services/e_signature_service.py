@@ -296,6 +296,14 @@ class ESignatureService:
     ) -> dict[str, Any]:
         """发起签署，创建签署记录，状态=pending_sign"""
         await self._ensure_tenant()
+
+        # 日期校验
+        from datetime import date as _date
+        parsed_start = _date.fromisoformat(start_date)
+        parsed_end = _date.fromisoformat(end_date)
+        if parsed_end < parsed_start:
+            raise ValueError("合同结束日期不能早于开始日期")
+
         tid = _parse_uuid(self.tenant_id, "tenant_id")
         tpl_id = _parse_uuid(template_id, "template_id")
         eid = _parse_uuid(employee_id, "employee_id")

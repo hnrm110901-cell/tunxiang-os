@@ -179,8 +179,9 @@ export default function ContractSigningPage() {
               style={{ background: TX_PRIMARY, borderColor: TX_PRIMARY }}
               onClick={async () => {
                 try {
-                  // 使用 mock signer_id
-                  await companySignContract(record.id, '00000000-0000-0000-0000-000000000001');
+                  // TODO: 从用户上下文获取真实 signer_id，当前使用占位值
+                  const signerId = localStorage.getItem('tx_user_id') || '00000000-0000-0000-0000-000000000001';
+                  await companySignContract(record.id, signerId);
                   message.success('企业盖章完成，合同已生效');
                   reloadAll();
                 } catch {
