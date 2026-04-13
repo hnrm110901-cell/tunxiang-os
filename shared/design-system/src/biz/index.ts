@@ -1,6 +1,10 @@
 /**
- * @tunxiang/design-system — 业务组件
- * 统一菜单业务组件：DishCard / CategoryNav / MenuSearch
+ * @tunxiang/design-system — 业务组件（13个）
+ *
+ * 菜单：DishCard / CategoryNav / MenuSearch / DishGrid / DishImage / SpecSheet
+ * 购物车：CartPanel / AddToCartAnimation
+ * 管理：DishManageCard / MenuSchemePreview / AllergenBadge
+ * 运营：OrderTicketCard / QueueTicket
  */
 export { default as DishCard } from './DishCard/DishCard';
 export type { DishCardProps, DishData } from './DishCard/types';
@@ -33,3 +37,18 @@ export type {
   MenuSchemePreviewProps,
   MenuSchemeData,
 } from './MenuSchemePreview/MenuSchemePreview';
+export { default as OrderTicketCard } from './OrderTicketCard/OrderTicketCard';
+export type {
+  OrderTicketCardProps,
+  OrderTicketData,
+  TicketDishItem,
+  TicketStatus,
+  TicketPriority,
+} from './OrderTicketCard/OrderTicketCard';
+export { default as QueueTicket } from './QueueTicket/QueueTicket';
+export type {
+  QueueTicketProps,
+  QueueTicketData,
+  QueueTicketStatus,
+  TableSize,
+} from './QueueTicket/QueueTicket';

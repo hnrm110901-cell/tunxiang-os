@@ -5,6 +5,7 @@
  */
 import { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
+import { formatPrice } from '@tx-ds/utils';
 import { txFetch } from '../api/index';
 
 /* ---------- 样式常量 ---------- */
@@ -32,6 +33,7 @@ const DISCOUNT_TYPES = [
 const QUICK_REASONS = ['等待时间长', 'VIP会员', '生日庆祝', '客诉补偿'];
 
 /* ---------- 工具函数 ---------- */
+/** @deprecated Use formatPrice from @tx-ds/utils */
 function fenToYuan(fen: number): string {
   return (fen / 100).toFixed(2);
 }

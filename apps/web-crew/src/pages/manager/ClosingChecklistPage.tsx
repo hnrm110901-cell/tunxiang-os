@@ -9,6 +9,7 @@
  */
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { formatPrice } from '@tx-ds/utils';
 import { txFetch } from '../../api';
 
 // ─── 类型 ──────────────────────────────────────────────────────────────────────
@@ -34,6 +35,7 @@ interface PreCheckSummary {
   shiftClosed: boolean;
 }
 
+/** @deprecated Use formatPrice from @tx-ds/utils */
 const fen2yuan = (fen: number) => `¥${(fen / 100).toFixed(2)}`;
 const today = () => {
   const d = new Date();

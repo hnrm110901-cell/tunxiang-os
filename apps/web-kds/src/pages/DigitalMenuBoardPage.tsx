@@ -14,6 +14,7 @@
  *   断线 3 秒后自动重连。
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { formatPrice } from '@tx-ds/utils';
 
 // ─── Types ───
 
@@ -74,8 +75,9 @@ const MOCK_CONFIG: BoardConfig = {
 
 // ─── Helpers ───
 
+/** @deprecated Use formatPrice from @tx-ds/utils */
 function fenToYuan(fen: number): string {
-  return (fen / 100).toFixed(2);
+  return formatPrice(fen).replace('¥', '');
 }
 
 function formatTime(d: Date): string {

@@ -4,6 +4,59 @@
 
 ---
 
+## 2026-04-13 (设计系统扩展 + 全端UI统一 + formatPrice迁移)
+
+### 今日完成
+
+**共享设计系统扩展（13个业务组件）**
+- [design-system/biz] 新增 DishManageCard — 管理端菜品卡片（四象限/成本率/库存/操作）
+- [design-system/biz] 新增 MenuSchemePreview — 菜谱方案预览卡片（状态/门店覆盖/版本）
+- [design-system/biz] 新增 OrderTicketCard — KDS/服务员共享出餐工单卡片（超时/催单/状态流）
+- [design-system/biz] 新增 QueueTicket — 排队号牌卡片（叫号/入座/过号/等待时长）
+- [design-system/biz] 已有组件修复：DetailDrawer移除antd依赖 / AddToCartAnimation修复useEffect清理 / SpecSheet必选规格校验
+
+**多端设计系统接入**
+- [web-admin] 接入 @tx-ds 设计系统 + 8个菜单页面迁移formatPrice
+- [web-tv-menu] 接入 @tx-ds + MenuDisplayPage/SpecialDisplayPage使用formatPrice
+- [web-hub] 接入 @tx-ds（配置完成）
+- [web-reception] 接入 @tx-ds（配置完成）
+
+**页面重构**
+- [web-crew/CrewOrderPage] 使用共享 CategoryNav + DishCard + formatPrice
+- [web-kds/DigitalMenuBoardPage] fenToYuan → formatPrice
+- [h5/QueuePreOrderPage] 使用共享 DishCard + CategoryNav + MenuSearch
+- [h5/CollabCart] fenToYuan → formatPrice
+- [web-pos/CashierPage] 添加返回桌台导航按钮
+
+**fenToYuan → formatPrice 全局迁移**
+- web-crew: 14个页面添加 formatPrice import + @deprecated标记
+- web-pos: 25个页面/组件添加 formatPrice import + @deprecated标记
+- web-admin: 8个菜单页面完成迁移
+- h5-self-order: 2个组件完成迁移
+- web-kds: 1个页面完成迁移
+- 总计：~50个文件完成迁移（全局161个文件中）
+
+**后端API**
+- [tx-menu] 新增 menu_display_routes.py — 3个端点（菜单展示/规格组/批量沽清）
+
+### 数据变化
+- 新增组件：4个（DishManageCard / MenuSchemePreview / OrderTicketCard / QueueTicket）
+- 新增 API 模块：1个（menu_display_routes）
+- 设计系统业务组件：9 → 13 个
+
+### 遗留问题
+- fenToYuan 迁移未覆盖全部 161 个文件（剩余 ~110 个：admin ~80、miniapp-v2 ~30）
+- miniapp-customer-v2 尚未接入 @tx-ds 设计系统（微信小程序架构差异需适配）
+- web-wecom-sidebar 的 ConsumptionStats.tsx 有 fenToYuan 未迁移
+
+### 明日计划
+- 继续 web-admin 剩余页面 fenToYuan 迁移（finance/analytics/trade/org 等域）
+- miniapp-customer-v2 设计系统适配方案评估
+- OrderTicketCard 集成到 KitchenBoard 页面
+- QueueTicket 集成到 QueuePage 页面
+
+---
+
 ## 2026-04-12 (餐饮知识库Agent V2 — 四阶段全量交付)
 
 ### 今日完成：知识库Agent从"被动检索管道"升级为"Agentic RAG + LightRAG知识图谱"
