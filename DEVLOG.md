@@ -1,3 +1,24 @@
+## 2026-04-14 (May Week 4 — GO-TO-LIVE 最终评审)
+
+### 今日完成
+- [tx-analytics] merchant_delivery_scorecard_routes.py — 四维度100分制评分卡（功能完整度40+数据质量25+性能15+演示就绪度20）
+- [tx-analytics] go_live_review_routes.py — GO-TO-LIVE最终评审API（GET汇总/GET单商户/POST手动批准）
+- [db-migrations] v237 go_live_approvals — 手动批准记录持久化表（含RLS审计留痕）
+- [tx-analytics] main.py — 注册 delivery_scorecard_router + go_live_review_router
+
+### 数据变化
+- 迁移版本：v236 → v237
+- 新增 API：5个（delivery-scorecard ×2 + go-live-review ×2 + approve ×1）
+- 评审结果：czyz 81.6/B+/GO ✅ | zqx 79.3/B/GO ✅ | sgc 73.8/B/GO ✅
+- 五月 Week 4 全部完成 ✅
+
+### 遗留问题
+- 三商户得分距离目标仍有差距（czyz/zqx目标A级，sgc目标B+级），需上线后持续优化
+- go_live_review approve端点中的 go_live_approvals 表依赖 v237 迁移执行
+
+### 明日计划
+- 创建 PR 将 claude/friendly-germain 合并到 main
+
 ## 2026-04-14 (Week 3)
 
 ### 今日完成

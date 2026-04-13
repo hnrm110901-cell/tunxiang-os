@@ -34,6 +34,8 @@ from .api.merchant_data_quality_routes import router as data_quality_router
 from .api.seed_loader import load_p0_seeds
 from .api.merchant_targets_routes import router as merchant_targets_router   # May W2: B-03
 from .api.ai_evidence_chain_routes import router as ai_evidence_chain_router  # May W2: B-04
+from .api.merchant_delivery_scorecard_routes import router as delivery_scorecard_router  # W4: 交付评分卡
+from .api.go_live_review_routes import router as go_live_review_router  # May W4: GO-TO-LIVE 评审
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
@@ -82,6 +84,8 @@ app.include_router(hq_brand_analytics_router)
 app.include_router(data_quality_router)  # May W1: 数据质量验收
 app.include_router(merchant_targets_router)   # May W2: B-03 分商户目标
 app.include_router(ai_evidence_chain_router)  # May W2: B-04 证据链
+app.include_router(delivery_scorecard_router)  # W4: 商户交付评分卡
+app.include_router(go_live_review_router)      # May W4: GO-TO-LIVE 最终评审
 
 @app.get("/health")
 async def health():
