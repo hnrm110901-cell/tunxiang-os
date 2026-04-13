@@ -17,6 +17,7 @@
 """
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 from datetime import datetime, timedelta, timezone
@@ -333,7 +334,7 @@ async def seat_entry(
         await _set_tenant(db, tenant_id)
 
         result = await db.execute(
-            text("SELECT id, status, pre_order_items, pre_order_total_fen FROM waitlist_entries WHERE id = :eid"),
+            text("SELECT id, store_id, status, pre_order_items, pre_order_total_fen FROM waitlist_entries WHERE id = :eid"),
             {"eid": entry_id},
         )
         entry = result.mappings().one_or_none()
@@ -358,14 +359,87 @@ async def seat_entry(
         pre_order_items: list = []
         if raw_items:
             pre_order_items = raw_items if isinstance(raw_items, list) else json.loads(raw_items)
+        created_order_id: str | None = None
         if pre_order_items:
-            # TODO: 调用 dining_session / order API 创建正式订单
-            # 将 pre_order_items 转为正式 order items
-            logger.info("pre_order_merged", extra={
-                "entry_id": entry_id,
-                "items_count": len(pre_order_items),
-                "total_fen": int(entry["pre_order_total_fen"] or 0),
-            })
+            total_fen = int(entry["pre_order_total_fen"] or 0)
+            order_id = str(uuid4())
+            order_no = f"WL-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}-{entry_id.replace('-', '')[-4:].upper()}"
+            store_id = str(entry["store_id"])
+
+            await db.execute(
+                text("""
+                    INSERT INTO orders
+                        (id, tenant_id, store_id, order_no, table_number,
+                         order_type, status, total_amount_fen, final_amount_fen,
+                         order_time, created_at)
+                    VALUES
+                        (:id, :tid::uuid, :sid::uuid, :ono, :tbl,
+                         'dine_in', 'active', :total, :total,
+                         NOW(), NOW())
+                """),
+                {
+                    "id": order_id,
+                    "tid": tenant_id,
+                    "sid": store_id,
+                    "ono": order_no,
+                    "tbl": body.table_id,
+                    "total": total_fen,
+                },
+            )
+            for idx, item in enumerate(pre_order_items):
+                await db.execute(
+                    text("""
+                        INSERT INTO order_items
+                            (id, tenant_id, order_id, dish_id, item_name,
+                             quantity, unit_price_fen, subtotal_fen, sort_order, created_at)
+                        VALUES
+                            (:id, :tid::uuid, :oid, :did, :name,
+                             :qty, :price, :sub, :sort, NOW())
+                    """),
+                    {
+                        "id": str(uuid4()),
+                        "tid": tenant_id,
+                        "oid": order_id,
+                        "did": item.get("dish_id", ""),
+                        "name": item.get("dish_name", ""),
+                        "qty": item.get("quantity", 1),
+                        "price": item.get("unit_price_fen", 0),
+                        "sub": item.get("unit_price_fen", 0) * item.get("quantity", 1),
+                        "sort": idx,
+                    },
+                )
+            created_order_id = order_id
+            logger.info(
+                "pre_order_merged",
+                extra={
+                    "entry_id": entry_id,
+                    "order_id": order_id,
+                    "order_no": order_no,
+                    "items_count": len(pre_order_items),
+                    "total_fen": total_fen,
+                },
+            )
+            try:
+                from shared.events.src.emitter import emit_event
+                from shared.events.src.event_types import OrderEventType
+                asyncio.create_task(
+                    emit_event(
+                        event_type=OrderEventType.CREATED,
+                        tenant_id=tenant_id,
+                        stream_id=order_id,
+                        payload={
+                            "order_id": order_id,
+                            "order_no": order_no,
+                            "source": "waitlist_pre_order",
+                            "waitlist_entry_id": entry_id,
+                            "item_count": len(pre_order_items),
+                            "total_amount_fen": total_fen,
+                        },
+                        source_service="tx-trade",
+                    )
+                )
+            except Exception:  # noqa: BLE001
+                pass  # 事件旁路，不影响主流程
 
         await db.commit()
 
@@ -375,6 +449,7 @@ async def seat_entry(
             "seated_at": now.isoformat(),
             "pre_order_merged": len(pre_order_items) > 0,
             "pre_order_items_count": len(pre_order_items),
+            "order_id": created_order_id,
         })
     except HTTPException:
         raise
