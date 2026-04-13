@@ -9,6 +9,7 @@
 import { useCallback, useState } from 'react';
 import React from 'react';
 import { txFetch } from '../api';
+import { formatPrice } from '@tx-ds/utils';
 
 // ─── 类型 ────────────────────────────────────────────────────────────────────
 
@@ -234,6 +235,7 @@ function Toast({ msg, type }: { msg: string; type: 'success' | 'error' }) {
 
 // ─── 押金额显示 ───────────────────────────────────────────────────────────────
 
+/** @deprecated Use formatPrice from @tx-ds/utils */
 function fenToYuan(fen: number): string {
   return (fen / 100).toFixed(2);
 }

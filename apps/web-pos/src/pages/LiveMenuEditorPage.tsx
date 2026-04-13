@@ -8,6 +8,7 @@
  * 因缺货下架的菜品显示"等待食材"状态，食材到货后变为"恢复上架"。
  */
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
+import { formatPrice } from '@tx-ds/utils';
 
 // ─── 类型 ───
 
@@ -58,6 +59,7 @@ const MOCK_DISHES: Dish[] = [
 
 // ─── 工具 ───
 
+/** @deprecated Use formatPrice from @tx-ds/utils */
 function fenToYuan(fen: number): string {
   return (fen / 100).toFixed(2).replace(/\.?0+$/, '');
 }

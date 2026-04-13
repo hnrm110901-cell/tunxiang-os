@@ -15,6 +15,8 @@
  *   window.TXBridge?.print(text) || fetch('/api/device/print', { method:'POST', body: text });
  */
 
+import { formatPrice } from '@tx-ds/utils';
+
 // ─── 类型定义 ─────────────────────────────────────────────────────────────────
 
 export interface QuickOrderItem {
@@ -49,6 +51,7 @@ export interface QuickOrder {
 
 // ─── 工具函数 ─────────────────────────────────────────────────────────────────
 
+/** @deprecated Use formatPrice from @tx-ds/utils */
 /** 将分转为元字符串，如 8800 → "88.00" */
 function fen2yuan(fen: number): string {
   return (fen / 100).toFixed(2);

@@ -15,7 +15,9 @@ import { DiscountPreviewSheet, type DiscountParams } from '../components/Discoun
 import CustomerBrainPanel from '../components/CustomerBrainPanel';
 import { CouponEligibleSheet } from '../components/CouponEligibleSheet';
 import { useCouponEligibility } from '../hooks/useCouponEligibility';
+import { formatPrice } from '@tx-ds/utils';
 
+/** @deprecated Use formatPrice from @tx-ds/utils */
 const fen2yuan = (fen: number) => `¥${(fen / 100).toFixed(2)}`;
 
 const PAYMENT_METHODS = [

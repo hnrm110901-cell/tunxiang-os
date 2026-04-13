@@ -6,6 +6,7 @@
  * 布局：档口选择器 → 3列（品项 | 订单明细 | 结算面板）→ 底部Tab
  */
 import { useState, useCallback } from 'react';
+import { formatPrice } from '@tx-ds/utils';
 
 // ─── Design Token（CSS 变量）────────────────────────────────────────────────
 const TOKEN = {
@@ -95,6 +96,7 @@ const MOCK_MENU: Record<string, MenuItem[]> = {
 
 // ─── 工具函数 ─────────────────────────────────────────────────────────────────
 
+/** @deprecated Use formatPrice from @tx-ds/utils */
 const fenToYuan = (fen: number): string => (fen / 100).toFixed(2);
 
 // ─── 子组件 ───────────────────────────────────────────────────────────────────

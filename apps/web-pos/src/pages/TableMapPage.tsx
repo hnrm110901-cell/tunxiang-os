@@ -6,6 +6,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { fetchTableStatus, type TableStatus } from '../api/posOpsApi';
 import { OrderActionPanel } from './OrderActionPanel';
+import { formatPrice } from '@tx-ds/utils';
 
 /* ─── 样式常量 ─── */
 const C = {
@@ -58,6 +59,7 @@ const MOCK_TABLES: TableStatus[] = [
 ];
 
 /* ─── 工具函数 ─── */
+/** @deprecated Use formatPrice from @tx-ds/utils */
 const fen2yuan = (fen: number) => `¥${(fen / 100).toFixed(0)}`;
 const formatMinutes = (min: number) => {
   if (min < 60) return `${min}分钟`;

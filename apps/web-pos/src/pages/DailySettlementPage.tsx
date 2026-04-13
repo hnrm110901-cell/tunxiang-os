@@ -11,6 +11,7 @@
  */
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { formatPrice } from '@tx-ds/utils';
 
 /* ─────────────────────────────────────────
    设计 Token
@@ -39,6 +40,7 @@ const TENANT_ID = (window as unknown as Record<string, unknown>).__TENANT_ID__ a
 /* ─────────────────────────────────────────
    工具函数
 ───────────────────────────────────────── */
+/** @deprecated Use formatPrice from @tx-ds/utils */
 const fen2yuan = (fen: number): string => `¥${(fen / 100).toFixed(2)}`;
 
 function fmtDate(d: Date): string {

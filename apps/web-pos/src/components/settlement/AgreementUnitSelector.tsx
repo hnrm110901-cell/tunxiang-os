@@ -10,6 +10,7 @@
  *  - 无 Ant Design 依赖
  */
 import { useEffect, useRef, useState } from 'react';
+import { formatPrice } from '@tx-ds/utils';
 
 // ─── 类型定义 ─────────────────────────────────────────────────────────────────
 
@@ -36,6 +37,7 @@ interface AgreementUnitSelectorProps {
 
 // ─── 工具函数 ─────────────────────────────────────────────────────────────────
 
+/** @deprecated Use formatPrice from @tx-ds/utils */
 const fen2yuan = (fen: number) => `¥${(fen / 100).toFixed(2)}`;
 
 // ─── 子组件：单位卡片 ─────────────────────────────────────────────────────────

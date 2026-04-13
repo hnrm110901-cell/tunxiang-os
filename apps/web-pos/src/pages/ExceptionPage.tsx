@@ -11,6 +11,7 @@
  */
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { formatPrice } from '@tx-ds/utils';
 
 const BASE = import.meta.env.VITE_API_BASE_URL || '';
 const TENANT_ID = import.meta.env.VITE_TENANT_ID || '';
@@ -73,6 +74,7 @@ const STATUS_CONFIG: Record<ExStatus, { label: string; color: string; bg: string
   rejected:           { label: '已驳回', color: '#ff4d4f', bg: 'rgba(255,77,79,0.13)' },
 };
 
+/** @deprecated Use formatPrice from @tx-ds/utils */
 const fen2yuan = (fen: number) => `¥${(fen / 100).toFixed(2)}`;
 
 // ─── Fallback 数据 ──────────────────────────────────────────────────────────────
