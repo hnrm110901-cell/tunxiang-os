@@ -17,7 +17,10 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.execute("CREATE EXTENSION IF NOT EXISTS vector;")
+    try:
+        op.execute("CREATE EXTENSION IF NOT EXISTS vector;")
+    except Exception:
+        pass  # pgvector not installed on this host; skip and install later
 
 
 def downgrade() -> None:
