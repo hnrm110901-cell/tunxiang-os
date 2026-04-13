@@ -1,3 +1,109 @@
+## 2026-04-14 (May Week 4 — GO-TO-LIVE 最终评审)
+
+### 今日完成
+- [tx-analytics] merchant_delivery_scorecard_routes.py — 四维度100分制评分卡（功能完整度40+数据质量25+性能15+演示就绪度20）
+- [tx-analytics] go_live_review_routes.py — GO-TO-LIVE最终评审API（GET汇总/GET单商户/POST手动批准）
+- [db-migrations] v237 go_live_approvals — 手动批准记录持久化表（含RLS审计留痕）
+- [tx-analytics] main.py — 注册 delivery_scorecard_router + go_live_review_router
+
+### 数据变化
+- 迁移版本：v236 → v237
+- 新增 API：5个（delivery-scorecard ×2 + go-live-review ×2 + approve ×1）
+- 评审结果：czyz 81.6/B+/GO ✅ | zqx 79.3/B/GO ✅ | sgc 73.8/B/GO ✅
+- 五月 Week 4 全部完成 ✅
+
+### 遗留问题
+- 三商户得分距离目标仍有差距（czyz/zqx目标A级，sgc目标B+级），需上线后持续优化
+- go_live_review approve端点中的 go_live_approvals 表依赖 v237 迁移执行
+
+### 明日计划
+- 创建 PR 将 claude/friendly-germain 合并到 main
+
+## 2026-04-14 (Week 3)
+
+### 今日完成
+- [db-migrations] v235 ai_evidence_chains — AI证据链持久化表（JSONB + RLS）
+- [db-migrations] v236 merchant_target_overrides — 商户KPI目标覆盖配置表
+- [tx-analytics] ai_evidence_chain_routes.py — 内存存储→DB持久化（UPSERT + SQLAlchemyError捕获）
+- [tx-analytics] merchant_targets_routes.py — PUT端点DB持久化 + _load_overrides_from_db()
+- [scripts] load-test.sh — 5场景压测：健康/菜单/数据质量/KPI目标/演示监控，成功率≥90%判定
+
+### 数据变化
+- 迁移版本：v234 → v236
+- 五月技术债务关闭：AIEvidenceChain DB化 ✅、merchant_targets DB化 ✅
+
+### 遗留问题
+- sgc演示就绪度仍需提升（当前评估60分，目标≥85）
+- 压测脚本待在真实环境中运行验证
+
+### 明日计划
+- 五月 Week 4：三商户最终 GO-TO-LIVE 评审
+- 创建 PR 将 claude/friendly-germain 合并到 main
+
+## 2026-04-14 (续)
+
+### 今日完成
+- [tx-analytics] merchant_targets_routes.py — 三商户KPI目标配置+实际差距分析，Gap B-03 关闭
+- [tx-analytics] ai_evidence_chain_routes.py — AI结论可追溯证据链（POST/GET），Gap B-04 关闭
+- [scripts] demo-reset.sh — 演示环境一键重置（支持--merchant/--keep-members/--dry-run），Gap C-03 关闭
+- [gateway] demo_monitor_routes.py — GET /api/v1/demo/monitor 实时监控面板，Gap C-04 关闭
+
+### 数据变化
+- 新增 API：4个（merchant-targets/evidence-chain/demo/monitor）
+- 新增脚本：1个（demo-reset.sh）
+- 五月差距关闭：B-03 ✅ B-04 ✅ C-03 ✅ C-04 ✅（全部7项差距已关闭）
+
+### 遗留问题
+- AIEvidenceChain 当前为内存存储，五月 Week 3 迁移至 DB（v256）
+- merchant_targets PUT 当前内存存储，五月 Week 3 迁移至 DB（v257）
+
+### 明日计划
+- 五月 Week 3：v256/v257 迁移 + 压测脚本 + sgc演示就绪度提升至≥85
+
+## 2026-04-14
+
+### 今日完成
+- [tx-analytics] merchant_data_quality_routes.py — 数据质量验收API，7维检查+加权评分，Gap A-01/A-02关闭
+- [scripts] release-gate.sh — 发布闸门：5项CRITICAL+3项WARNING，Gap A-03关闭
+- [scripts] seed_czyz.py — 尝在一起种子数据（12桌/15菜/10会员/30订单/KPI权重）
+- [scripts] seed_zqx.py — 最黔线种子数据（10桌/15菜/15会员/25订单/KPI权重）
+- [scripts] seed_sgc.py — 尚宫厨种子数据（15桌/15菜/8会员/20宴席订单/KPI权重）
+
+### 数据变化
+- 新增 API：1个（GET /api/v1/analytics/data-quality/{merchant_code}）
+- 新增脚本：4个（release-gate.sh + seed_czyz/zqx/sgc.py）
+- 五月差距关闭：A-01 ✅ A-02 ✅ A-03 ✅（3项已关闭）
+
+### 遗留问题
+- B-03 AI分析与分商户目标绑定（待下步：merchant_targets.py config）
+- B-04 AI结论可追溯证据链（待 AIEvidenceChain model）
+- C-03 演示环境数据重置机制
+- C-04 演示监控面板
+
+### 明日计划
+- B-03: merchant_targets.py + AI周报绑定商户KPI目标
+- B-04: AIEvidenceChain — AI结论→events表ID追溯
+- C-03: scripts/demo-reset.sh 数据重置脚本
+
+## 2026-04-13 (Week 4)
+
+### 今日完成
+- [docs] 五月差距关闭计划 v1.0 — 4周计划关闭全部7项差距(A-01/02/03, B-03/04, C-03/04)
+- [scripts] merchant-deploy-check.sh — 部署前就绪度检查脚本，含14服务探活+评分卡+GO/NO-GO
+- [infra/docker] docker-compose.czyz/zqx/sgc.yml — 三商户独立演示环境，端口隔离(+0/+100/+200)
+
+### 数据变化
+- 新增文档：1份（may-gap-closure-plan-2026-05.md）
+- 新增脚本：1份（scripts/merchant-deploy-check.sh）
+- 新增 Docker Compose：3份（czyz/zqx/sgc 独立环境）
+
+### 遗留问题
+- scripts/seed_czyz.py / seed_zqx.py / seed_sgc.py 种子数据脚本待编写
+- 五月计划中 v256-v259 迁移版本待实施
+
+### 明日计划
+- 五月 Week 1 差距关闭：merchant_data_quality_routes.py + release-gate.sh
+- 三商户种子数据脚本 seed_czyz/zqx/sgc.py
 ## 2026-04-13 (续)
 
 ### 今日完成
@@ -25,6 +131,14 @@
 
 ---
 
+## 2026-04-13 (收尾：Agent KPI 路由注册 + v249 补迁移)
+
+### 今日完成
+- [web-admin] 注册 `AgentKPIDashboard` 路由 `/agent/kpi`（模块4.4最后一步）
+- [db-migrations] 补充 v249：`banquet_kds_dishes` + `banquet_session_deposits` 两表迁移（含RLS + 索引 + check约束）
+
+### 数据变化
+- 迁移版本：v248 → v249
 ## 2026-04-13 (续5)
 
 ### 今日完成

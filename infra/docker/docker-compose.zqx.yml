@@ -1,0 +1,274 @@
+# ============================================================
+# 屯象OS — 最黔线 (zqx) 演示环境
+# 用法: docker compose -f docker-compose.zqx.yml up -d
+# 端口偏移: +100 (postgres=5532, gateway=8100, web-admin=5273)
+# KPI 重点: 客单价 / 会员复购 / 渠道组合
+# ============================================================
+
+x-merchant-env: &merchant-env
+  TX_MERCHANT_CODE: "zqx"
+  TX_TENANT_ID: "zqx-demo-tenant"
+  TX_MERCHANT_NAME: "最黔线"
+
+x-py-common: &py-common
+  image: python:3.11-slim
+  restart: unless-stopped
+  networks:
+    - txos-zqx
+  environment: &common-env
+    DATABASE_URL: postgresql+asyncpg://tunxiang:tunxiang_zqx_2024@postgres:5532/tunxiang_zqx
+    REDIS_URL: redis://redis:6380/0
+    TX_ENV: demo
+    TX_AUTH_ENABLED: "false"
+    TX_RATE_LIMIT_ENABLED: "false"
+    LOG_LEVEL: INFO
+    PYTHONPATH: /app
+    PYTHONUNBUFFERED: "1"
+    TX_MERCHANT_CODE: "zqx"
+    TX_TENANT_ID: "zqx-demo-tenant"
+    TX_MERCHANT_NAME: "最黔线"
+  depends_on:
+    postgres:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+
+services:
+  # ── 基础设施 ──────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: tunxiang
+      POSTGRES_PASSWORD: tunxiang_zqx_2024
+      POSTGRES_DB: tunxiang_zqx
+    ports:
+      - "5532:5432"
+    volumes:
+      - zqx_pg_data:/var/lib/postgresql/data
+      - ./init-rls.sql:/docker-entrypoint-initdb.d/01-rls.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tunxiang -d tunxiang_zqx"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - txos-zqx
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "6380:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - txos-zqx
+
+  # ── 数据库迁移（一次性 job）────────────────────────────────
+  migrate:
+    <<: *py-common
+    restart: "no"
+    working_dir: /app
+    command: >
+      sh -c "pip install -q -i https://pypi.tuna.tsinghua.edu.cn/simple
+             alembic asyncpg sqlalchemy psycopg2-binary &&
+             alembic -c shared/db-migrations/alembic.ini upgrade head &&
+             echo '✅ zqx 迁移完成'"
+    volumes:
+      - ../../shared:/app/shared
+      - ../../services:/app/services
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # ── 种子数据（迁移完成后执行）──────────────────────────────
+  seed-data:
+    <<: *py-common
+    restart: "no"
+    command: >
+      sh -c "pip install -q -i https://pypi.tuna.tsinghua.edu.cn/simple
+             sqlalchemy asyncpg psycopg2-binary httpx &&
+             python3 /app/scripts/seed_zqx.py &&
+             echo '✅ zqx 种子数据植入完成'"
+    volumes:
+      - ../../scripts:/app/scripts
+      - ../../shared:/app/shared
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  # ── API Gateway ───────────────────────────────────────────
+  gateway:
+    <<: *py-common
+    working_dir: /app
+    command: >
+      sh -c "pip install -q -i https://pypi.tuna.tsinghua.edu.cn/simple
+             -r services/gateway/requirements.txt &&
+             uvicorn services.gateway.src.main:app
+             --host 0.0.0.0 --port 8100"
+    ports:
+      - "8100:8100"
+    volumes:
+      - ../../services/gateway:/app/services/gateway
+      - ../../shared:/app/shared
+    depends_on:
+      seed-data:
+        condition: service_completed_successfully
+
+  # ── 核心业务微服务 ────────────────────────────────────────
+  tx-trade:
+    <<: *py-common
+    working_dir: /app
+    command: >
+      sh -c "pip install -q -i https://pypi.tuna.tsinghua.edu.cn/simple
+             -r services/tx-trade/requirements.txt &&
+             cd /app/services/tx-trade &&
+             uvicorn src.main:app --host 0.0.0.0 --port 8101"
+    ports:
+      - "8101:8101"
+    volumes:
+      - ../../services/tx-trade:/app/services/tx-trade
+      - ../../shared:/app/shared
+    depends_on:
+      seed-data:
+        condition: service_completed_successfully
+
+  tx-menu:
+    <<: *py-common
+    working_dir: /app
+    command: >
+      sh -c "pip install -q -i https://pypi.tuna.tsinghua.edu.cn/simple
+             -r services/tx-menu/requirements.txt &&
+             cd /app/services/tx-menu &&
+             uvicorn src.main:app --host 0.0.0.0 --port 8102"
+    ports:
+      - "8102:8102"
+    volumes:
+      - ../../services/tx-menu:/app/services/tx-menu
+      - ../../shared:/app/shared
+    depends_on:
+      seed-data:
+        condition: service_completed_successfully
+
+  tx-member:
+    <<: *py-common
+    working_dir: /app
+    command: >
+      sh -c "pip install -q -i https://pypi.tuna.tsinghua.edu.cn/simple
+             -r services/tx-member/requirements.txt &&
+             cd /app/services/tx-member &&
+             uvicorn src.main:app --host 0.0.0.0 --port 8103"
+    ports:
+      - "8103:8103"
+    volumes:
+      - ../../services/tx-member:/app/services/tx-member
+      - ../../shared:/app/shared
+    depends_on:
+      seed-data:
+        condition: service_completed_successfully
+
+  tx-analytics:
+    <<: *py-common
+    working_dir: /app
+    command: >
+      sh -c "pip install -q -i https://pypi.tuna.tsinghua.edu.cn/simple
+             -r services/tx-analytics/requirements.txt &&
+             cd /app/services/tx-analytics &&
+             uvicorn src.main:app --host 0.0.0.0 --port 8109"
+    ports:
+      - "8109:8109"
+    volumes:
+      - ../../services/tx-analytics:/app/services/tx-analytics
+      - ../../shared:/app/shared
+    depends_on:
+      seed-data:
+        condition: service_completed_successfully
+
+  tx-agent:
+    <<: *py-common
+    working_dir: /app
+    command: >
+      sh -c "pip install -q -i https://pypi.tuna.tsinghua.edu.cn/simple
+             -r services/tx-agent/requirements.txt &&
+             cd /app/services/tx-agent &&
+             uvicorn src.main:app --host 0.0.0.0 --port 8108"
+    ports:
+      - "8108:8108"
+    volumes:
+      - ../../services/tx-agent:/app/services/tx-agent
+      - ../../shared:/app/shared
+    depends_on:
+      seed-data:
+        condition: service_completed_successfully
+
+  # ── 前端（Vite Dev Server）────────────────────────────────
+  web-admin:
+    image: node:20-alpine
+    restart: unless-stopped
+    working_dir: /app
+    command: >
+      sh -c "npm config set registry https://registry.npmmirror.com &&
+             npm install && npm run dev -- --host 0.0.0.0 --port 5273"
+    ports:
+      - "5273:5273"
+    volumes:
+      - ../../apps/web-admin:/app
+      - zqx_web_admin_nm:/app/node_modules
+    environment:
+      VITE_API_BASE_URL: http://localhost:8100
+      VITE_MERCHANT_CODE: zqx
+      VITE_TENANT_ID: zqx-demo-tenant
+    networks:
+      - txos-zqx
+
+  web-pos:
+    image: node:20-alpine
+    restart: unless-stopped
+    working_dir: /app
+    command: >
+      sh -c "npm config set registry https://registry.npmmirror.com &&
+             npm install && npm run dev -- --host 0.0.0.0 --port 5274"
+    ports:
+      - "5274:5274"
+    volumes:
+      - ../../apps/web-pos:/app
+      - zqx_web_pos_nm:/app/node_modules
+    environment:
+      VITE_API_BASE_URL: http://localhost:8100
+      VITE_MERCHANT_CODE: zqx
+      VITE_TENANT_ID: zqx-demo-tenant
+    networks:
+      - txos-zqx
+
+  web-kds:
+    image: node:20-alpine
+    restart: unless-stopped
+    working_dir: /app
+    command: >
+      sh -c "npm config set registry https://registry.npmmirror.com &&
+             npm install && npm run dev -- --host 0.0.0.0 --port 5275"
+    ports:
+      - "5275:5275"
+    volumes:
+      - ../../apps/web-kds:/app
+      - zqx_web_kds_nm:/app/node_modules
+    environment:
+      VITE_API_BASE_URL: http://localhost:8100
+      VITE_MERCHANT_CODE: zqx
+      VITE_TENANT_ID: zqx-demo-tenant
+    networks:
+      - txos-zqx
+
+volumes:
+  zqx_pg_data:
+  zqx_web_admin_nm:
+  zqx_web_pos_nm:
+  zqx_web_kds_nm:
+
+networks:
+  txos-zqx:
+    driver: bridge
