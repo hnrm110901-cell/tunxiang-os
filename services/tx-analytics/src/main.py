@@ -30,6 +30,9 @@ from .api.anomaly_routes import router as anomaly_router
 from .api.insights_routes import router as insights_router
 from .api.daily_brief_routes import router as daily_brief_router
 from .api.hq_brand_analytics_routes import router as hq_brand_analytics_router
+from .api.weekly_brief_routes import router as weekly_brief_router        # W2 4/13 周报
+from .api.monthly_brief_routes import router as monthly_brief_router      # W2 4/13 月报
+from .api.merchant_kpi_config_routes import router as merchant_kpi_router  # W2 4/13 商户KPI权重
 from .api.seed_loader import load_p0_seeds
 
 @asynccontextmanager
@@ -76,6 +79,9 @@ app.include_router(anomaly_router)
 app.include_router(insights_router)
 app.include_router(daily_brief_router)
 app.include_router(hq_brand_analytics_router)
+app.include_router(weekly_brief_router)    # W2: GET /api/v1/analytics/weekly-brief/*
+app.include_router(monthly_brief_router)   # W2: GET /api/v1/analytics/monthly-brief/*
+app.include_router(merchant_kpi_router)    # W2: GET/PUT /api/v1/analytics/merchant-kpi/*
 
 @app.get("/health")
 async def health():

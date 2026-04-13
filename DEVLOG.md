@@ -4,6 +4,71 @@
 
 ---
 
+## 2026-04-13 AI 经营周报/月报 + 三商户 KPI 权重配置（Week 2 P0 交付项）
+
+### 今日完成
+- [tx-analytics/weekly_brief_routes.py] 新增 AI 周报端点：
+  - `GET /api/v1/analytics/weekly-brief/{store_id}` — 单店周报（本周指标 vs 上周/去年同期 + 结构性问题诊断 + 下周3条策略建议）
+  - `GET /api/v1/analytics/weekly-brief/group` — 集团多店周报汇总（门店营收排名 + 总体 vs 上周对比）
+  - 结构性问题自动识别：营收连续下滑/毛利偏低/同比衰退/菜单集中度高
+  - 下周策略自动生成：基于营收/毛利/品项/会员4个维度规则引擎
+- [tx-analytics/monthly_brief_routes.py] 新增 AI 月报端点：
+  - `GET /api/v1/analytics/monthly-brief/{store_id}` — 单店月报（经营体检8项评分 + 投入产出建议）
+  - `GET /api/v1/analytics/monthly-brief/group` — 集团月报汇总（各店毛利率/客单/排名）
+  - 经营体检8项：营收增长/毛利健康/客单趋势/会员复购/折扣纪律/日结合规（含自动评级A/B/C/D）
+  - 投入产出建议3方向：成本端/营收端/运营端各2条可执行建议
+- [tx-analytics/merchant_kpi_config_routes.py] 新增商户 KPI 权重配置：
+  - `GET /api/v1/analytics/merchant-kpi/configs` — 读取 DB 自定义权重（降级内置默认值）
+  - `PUT /api/v1/analytics/merchant-kpi/configs` — UPSERT 商户权重配置（权重和校验）
+  - `GET /api/v1/analytics/merchant-kpi/score/{store_id}` — 按商户权重计算综合评分
+  - 内置三商户预置权重：czyz（翻台优先）/ zqx（客单+复购优先）/ sgc（客单+宴会定金优先）
+- [shared/db-migrations/v253] merchant_kpi_weight_configs 表（JSONB权重 + RLS + 唯一约束）
+- [tx-analytics/main.py] 注册3个新路由
+
+### 数据变化
+- 迁移版本：v252 → v253
+- 新增表：1个（merchant_kpi_weight_configs）
+- 新增端点：7个（周报×2 + 月报×2 + 商户KPI配置×3）
+
+### 对应计划
+- 四月交付计划 Week 2（4/8-4/14）P0 验收项：三商户日/周/月 AI 分析产品化
+
+### 遗留问题
+- serve_dispatch / inventory_agent 等 KPI 仍为估算值（待真实表成熟后接入）
+- 周报/月报翻台率/出餐率暂用估算值（需接 KDS 和桌台真实数据）
+
+### 明日计划
+- 推进 Week 3 演示环境巡检（门店全流程演示导播手册）
+
+---
+
+## 2026-04-13 waitlist 入座预点菜转正式订单 + digital_menu_board 过时注释清理
+
+### 今日完成
+- [tx-trade/waitlist_routes.py] `seat_entry` 实现预点菜转正式订单：
+  - SELECT 新增 `store_id` 字段
+  - 有 `pre_order_items` 时：INSERT orders（order_type='dine_in', status='active'）+ INSERT order_items（逐条，subtotal=qty×price）
+  - `order_no` 格式 `WL-{timestamp}-{entry_id后4位大写}`，`table_number` 来自 `SeatBody.table_id`
+  - 旁路发 `OrderEventType.CREATED` 事件（asyncio.create_task，失败不影响主流程）
+  - 响应新增 `order_id` 字段（无预点菜时为 null）
+  - 移除 `# TODO: 调用 dining_session / order API 创建正式订单` 占位注释
+- [tx-trade/digital_menu_board_router.py] 清理两处过时 TODO 注释：
+  - `get_board_data`：代码已查询 dishes + dish_categories 真实表，删除"TODO: 接入菜品表和库存表"注释
+  - `get_board_config`：代码已查询 stores.config + dish_categories + dishes，删除"TODO: 接入门店配置表"注释
+
+### 数据变化
+- 无新迁移
+- 修复：waitlist 预点菜功能从 logger.info 占位升级为真实订单写入
+
+### 遗留问题
+- serve_dispatch / inventory_agent 等9个 KPI 仍为估算值
+- table_card_api.py 端点未注册（复杂功能，已标记延后）
+
+### 明日计划
+- 推进下一待排模块
+
+---
+
 ## 2026-04-13 宴会KDS + 定金 v252 迁移（补写遗留建表）
 
 ### 今日完成
