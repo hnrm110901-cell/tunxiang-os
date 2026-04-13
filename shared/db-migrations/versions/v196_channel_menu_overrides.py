@@ -70,7 +70,6 @@ def upgrade() -> None:
     op.create_index(
         'idx_channel_menu_overrides_lookup',
         'channel_menu_overrides', ['tenant_id', 'store_id', 'channel'],
-        comment='查询门店渠道覆盖的主索引',
     )
 
     # ─── 2. premium_membership_cards — 付费会员卡档案 ────────────────────────
@@ -120,7 +119,6 @@ def upgrade() -> None:
     op.create_index(
         'idx_premium_membership_cards_end_date',
         'premium_membership_cards', ['tenant_id', 'end_date'],
-        comment='到期预警查询',
     )
 
     # ─── RLS 策略（2张新表） ────────────────────────────────────────────────────

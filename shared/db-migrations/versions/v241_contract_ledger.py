@@ -246,7 +246,6 @@ def upgrade() -> None:
         "ix_contract_alerts_tenant_type_date",
         "contract_alerts",
         ["tenant_id", "alert_type", sa.text("created_at::date")],
-        comment="用于幂等检查：今日是否已创建同类型预警",
     )
 
     # RLS
