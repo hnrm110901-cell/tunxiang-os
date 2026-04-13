@@ -683,15 +683,15 @@ async def get_retail_stats(
         "order_count": total_count,
         "paid_order_count": int(gmv_row.paid_count),
         "top_products": top_products,
-    return {"items": items, "total": total, "page": page, "size": size}
+    }
 
 
-# ── 后台管理 ─────────────────────────────────────────────────
+# ── 후台管理（旧版，已废弃，由上方 create_product/update_product 替代）─────
 
 VALID_PRODUCT_STATUSES = ("draft", "on_sale", "off_sale")
 
 
-async def create_product(
+async def _legacy_create_product(
     name: str,
     category: str,
     price_fen: int,
