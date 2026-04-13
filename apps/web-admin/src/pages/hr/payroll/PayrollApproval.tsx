@@ -28,6 +28,7 @@ import {
   ProTable,
 } from '@ant-design/pro-components';
 import { txFetchData } from '../../../api';
+import { formatPrice } from '@tx-ds/utils';
 
 const { Title } = Typography;
 
@@ -56,6 +57,7 @@ interface PayrollItem {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
+/** @deprecated Use formatPrice from @tx-ds/utils */
 const fenToYuan = (fen: number) => `¥${(fen / 100).toFixed(2)}`;
 
 const STATUS_TAG: Record<ApprovalStatus, { color: string; label: string }> = {

@@ -50,7 +50,7 @@ export default function GovernanceRiskStores() {
 
   useEffect(() => {
     txFetchData<RiskStoreResp>('/api/v1/hr/governance/risk-stores')
-      .then((resp) => setData(resp.data?.items ?? []))
+      .then((resp) => setData(resp?.items ?? []))
       .catch(() => message.error('加载风险门店数据失败'))
       .finally(() => setLoading(false));
   }, []);

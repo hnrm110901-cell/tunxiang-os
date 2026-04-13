@@ -248,8 +248,15 @@ jobs:
               if [ -f "services/$svc/requirements.txt" ]; then
                 pip install -r "services/$svc/requirements.txt" 2>/dev/null || true
               fi
+              if [ "$svc" = "gateway" ]; then
+                bash scripts/gateway-import-smoke.sh || FAILED=1
+              fi
               cd "services/$svc"
-              PYTHONPATH=src:../../ python -m pytest src/tests/ --tb=short -q || FAILED=1
+              IGNORE_SMOKE=""
+              if [ "$svc" = "gateway" ]; then
+                IGNORE_SMOKE="--ignore=src/tests/test_main_import_smoke.py"
+              fi
+              PYTHONPATH=src:../../ python -m pytest src/tests/ --tb=short -q $IGNORE_SMOKE || FAILED=1
               cd ../..
             else
               echo "No tests directory found"

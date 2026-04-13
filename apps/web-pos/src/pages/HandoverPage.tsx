@@ -9,6 +9,7 @@
  */
 import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { formatPrice } from '@tx-ds/utils';
 
 /* ---------- 样式常量 ---------- */
 const C = {
@@ -24,6 +25,7 @@ const C = {
   warning: '#BA7517',
 };
 
+/** @deprecated Use formatPrice from @tx-ds/utils */
 const fen2yuan = (fen: number) => `¥${(fen / 100).toFixed(2)}`;
 
 /* ---------- Mock 班次数据 ---------- */

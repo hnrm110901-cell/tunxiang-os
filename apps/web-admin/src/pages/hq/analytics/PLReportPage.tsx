@@ -4,6 +4,7 @@
  * 调用 GET /api/v1/finance/pl/store  /api/v1/finance/cost/breakdown
  */
 import { useState, useCallback } from 'react';
+import { formatPrice } from '@tx-ds/utils';
 import { txFetchData } from '../../../api';
 
 // ---------- 类型定义 ----------
@@ -42,7 +43,7 @@ interface CostBreakdownItem {
 
 // ---------- 工具函数 ----------
 
-/** 分 → 元，千分位，保留2位小数 */
+/** @deprecated Use formatPrice from @tx-ds/utils */
 function fenToYuan(fen: number): string {
   return (fen / 100).toLocaleString('zh-CN', {
     minimumFractionDigits: 2,
@@ -190,9 +191,9 @@ export function PLReportPage() {
         txFetchData<PLReport>(`/api/v1/analytics/pl-report?store_id=${encodeURIComponent(storeId)}&start=${start}&end=${end}`),
         txFetchData<{ items: CostBreakdownItem[] }>(`/api/v1/finance/cost/breakdown?store_id=${encodeURIComponent(storeId)}&start_date=${start}&end_date=${end}&top_n=10`),
       ]);
-      if (plRes.status === 'fulfilled' && plRes.value.data) setReport(plRes.value.data);
+      if (plRes.status === 'fulfilled' && plRes.value) setReport(plRes.value);
       else setReport(null);
-      if (cbRes.status === 'fulfilled' && cbRes.value.data) setBreakdown(cbRes.value.data.items ?? []);
+      if (cbRes.status === 'fulfilled' && cbRes.value) setBreakdown(cbRes.value.items ?? []);
       else setBreakdown([]);
     } catch {
       setReport(null);
@@ -450,7 +451,7 @@ export function PLReportPage() {
               }}>
                 <div style={{ fontSize: 11, color: '#999', marginBottom: 6 }}>{kpi.label}</div>
                 <div style={{
-                  fontSize: kpi.kind === 'net' ? 22 : 20,
+                  fontSize: (kpi as { kind?: string }).kind === 'net' ? 22 : 20,
                   fontWeight: 'bold', color: kpi.color,
                   lineHeight: 1.2,
                 }}>

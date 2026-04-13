@@ -32,6 +32,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
 import { txFetchData } from '../../api/client';
+import { formatPrice } from '@tx-ds/utils';
 
 const { Text, Title } = Typography;
 
@@ -95,6 +96,7 @@ interface PendingPurchaseOrders {
 
 // ─── 工具函数 ─────────────────────────────────────────────────────────────────
 
+/** @deprecated Use formatPrice from @tx-ds/utils */
 const fenToYuan = (fen: number) => (fen / 100).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 // ─── 主页面 ───────────────────────────────────────────────────────────────────

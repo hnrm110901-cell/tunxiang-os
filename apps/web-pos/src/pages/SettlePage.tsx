@@ -5,6 +5,11 @@
  *   - 点击"折扣"按钮 → 打开底部抽屉 → 调用 tx-brain 折扣分析 API
  *   - allow/warn 决策后收银员可确认，reject 时禁止执行
  *   - API 失败时降级处理，不阻断正常操作
+ *
+ * 2026-04-12 新增：账单规则引擎（最低消费/服务费，v238）
+ *   - 支付前调用 /api/v1/orders/{id}/apply-billing-rules
+ *   - 若有服务费：在账单上显示服务费明细行
+ *   - 若未达最低消费：弹出 Toast 提示差额
  */
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -15,7 +20,60 @@ import { DiscountPreviewSheet, type DiscountParams } from '../components/Discoun
 import CustomerBrainPanel from '../components/CustomerBrainPanel';
 import { CouponEligibleSheet } from '../components/CouponEligibleSheet';
 import { useCouponEligibility } from '../hooks/useCouponEligibility';
+import { formatPrice } from '@tx-ds/utils';
 
+// ── 账单规则类型 ──────────────────────────────────────────────────────────────
+
+interface ServiceFeeItem {
+  rule_id: string;
+  calc_method: string;
+  fee_fen: number;
+  description: string;
+}
+
+interface BillingRulesResult {
+  service_fee_items: ServiceFeeItem[];
+  service_fee_fen: number;
+  min_spend_shortfall_fen: number;
+  min_spend_required_fen: number;
+  total_extra_fen: number;
+  exempted: boolean;
+  exemption_reason: string | null;
+  message: string;
+}
+
+/** 调用账单规则引擎 API */
+async function applyBillingRules(
+  orderId: string,
+  storeId: string,
+  orderAmountFen: number,
+  guestCount: number,
+  memberTier?: string,
+): Promise<BillingRulesResult | null> {
+  try {
+    const res = await fetch(`/api/v1/orders/${orderId}/apply-billing-rules`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Tenant-ID': import.meta.env.VITE_TENANT_ID || '',
+      },
+      body: JSON.stringify({
+        store_id: storeId,
+        order_amount_fen: orderAmountFen,
+        guest_count: guestCount,
+        member_tier: memberTier || null,
+      }),
+    });
+    if (!res.ok) return null;
+    const json = await res.json();
+    return json.ok ? (json.data as BillingRulesResult) : null;
+  } catch {
+    // 网络失败时降级，不阻断结账
+    return null;
+  }
+}
+
+/** @deprecated Use formatPrice from @tx-ds/utils */
 const fen2yuan = (fen: number) => `¥${(fen / 100).toFixed(2)}`;
 
 const PAYMENT_METHODS = [
@@ -50,6 +108,11 @@ export function SettlePage() {
   const [discountParams, setDiscountParams] = useState<DiscountParams | null>(null);
   // 暂存待确认的折扣金额，AI 批准后才真正写入 store
   const [pendingDiscountFen, setPendingDiscountFen] = useState<number>(0);
+
+  // 账单规则状态（服务费/最低消费）
+  const [billingRules, setBillingRules] = useState<BillingRulesResult | null>(null);
+  // 最低消费 Toast 提示
+  const [minSpendToast, setMinSpendToast] = useState<string | null>(null);
 
   // campaign.checkout_eligible 可用券检查
   // customerId 从 URL search params 中取（会员到店绑定后由收银台写入）
@@ -101,9 +164,27 @@ export function SettlePage() {
     setPaying(true);
 
     try {
-      // 1. 创建支付记录
+      // 0. 应用账单规则（服务费/最低消费）
       if (orderId) {
-        await createPayment(orderId, method, finalFen);
+        const storeId = import.meta.env.VITE_STORE_ID || '';
+        const rules = await applyBillingRules(orderId, storeId, finalFen, 1, undefined);
+        setBillingRules(rules);
+
+        if (rules && rules.min_spend_shortfall_fen > 0) {
+          // 未达最低消费 → 显示 Toast 提示（不阻断，允许收银员继续）
+          const actualYuan = (finalFen / 100).toFixed(2);
+          const requiredYuan = (rules.min_spend_required_fen / 100).toFixed(2);
+          const gapYuan = (rules.min_spend_shortfall_fen / 100).toFixed(2);
+          setMinSpendToast(`本桌消费¥${actualYuan}，最低消费¥${requiredYuan}，差额¥${gapYuan}`);
+          // Toast 自动消失（3秒）
+          setTimeout(() => setMinSpendToast(null), 3000);
+        }
+      }
+
+      // 1. 创建支付记录（含服务费）
+      const totalWithFees = billingRules ? finalFen + billingRules.service_fee_fen : finalFen;
+      if (orderId) {
+        await createPayment(orderId, method, totalWithFees);
       }
 
       // 2. 结算订单
@@ -161,8 +242,38 @@ export function SettlePage() {
             ))}
           </tbody>
         </table>
+        {/* 服务费明细行 */}
+        {billingRules && billingRules.service_fee_items.length > 0 && (
+          <div style={{ marginTop: 8 }}>
+            {billingRules.service_fee_items.map((item) => (
+              <div
+                key={item.rule_id}
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  padding: '6px 8px',
+                  borderRadius: 6,
+                  background: 'rgba(22,119,255,0.08)',
+                  border: '1px solid rgba(22,119,255,0.2)',
+                  marginBottom: 4,
+                  fontSize: 15,
+                  color: '#1677FF',
+                }}
+              >
+                <span>{item.description}</span>
+                <span style={{ fontWeight: 700 }}>+{fen2yuan(item.fee_fen)}</span>
+              </div>
+            ))}
+          </div>
+        )}
+
         <div style={{ marginTop: 16, fontSize: 24, fontWeight: 'bold', color: '#FF6B2C', textAlign: 'right' }}>
-          应付: {fen2yuan(finalFen)}
+          应付: {fen2yuan(billingRules ? finalFen + billingRules.service_fee_fen : finalFen)}
+          {billingRules && billingRules.service_fee_fen > 0 && (
+            <span style={{ fontSize: 14, color: '#8A94A4', marginLeft: 8, fontWeight: 400 }}>
+              （含服务费{fen2yuan(billingRules.service_fee_fen)}）
+            </span>
+          )}
         </div>
 
         {/* 折扣区域 */}
@@ -293,6 +404,30 @@ export function SettlePage() {
         onApply={coupon.apply}
         onClose={coupon.closeSheet}
       />
+
+      {/* 最低消费 Toast 提示 */}
+      {minSpendToast && (
+        <div
+          style={{
+            position: 'fixed',
+            bottom: 80,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            background: 'rgba(250,173,20,0.95)',
+            color: '#1a1a1a',
+            padding: '12px 24px',
+            borderRadius: 10,
+            fontSize: 16,
+            fontWeight: 600,
+            boxShadow: '0 4px 20px rgba(0,0,0,0.4)',
+            zIndex: 9999,
+            maxWidth: '80vw',
+            textAlign: 'center',
+          }}
+        >
+          ⚠ {minSpendToast}
+        </div>
+      )}
     </div>
   );
 }

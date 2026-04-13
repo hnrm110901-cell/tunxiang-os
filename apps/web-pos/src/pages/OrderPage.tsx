@@ -20,6 +20,7 @@ import { ComboSelectorSheet } from '../components/ComboSelectorSheet';
 import DishRecommendBanner from '../components/DishRecommendBanner';
 import type { LiveSeafoodOrderSheetProps } from '../components/LiveSeafoodOrderSheet';
 import type { ComboSelectorSheetProps } from '../components/ComboSelectorSheet';
+import { formatPrice } from '@tx-ds/utils';
 
 // ─── 扩展类型 ──────────────────────────────────────────────────────────────────
 
@@ -83,6 +84,7 @@ const FALLBACK_DISHES: ExtendedDishItem[] = [
 
 // ─── 辅助 ──────────────────────────────────────────────────────────────────────
 
+/** @deprecated Use formatPrice from @tx-ds/utils */
 const fen2yuan = (fen: number) => `¥${(fen / 100).toFixed(2)}`;
 const STORE_ID = import.meta.env.VITE_STORE_ID || '11111111-1111-1111-1111-111111111111';
 

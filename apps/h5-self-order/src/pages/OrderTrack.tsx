@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useLang } from '@/i18n/LangContext';
 import { getOrderStatus, rushOrder as rushOrderApi } from '@/api/orderApi';
-import type { OrderStatusInfo, OrderStatus } from '@/api/orderApi';
+import type { OrderStatusInfo } from '@/api/orderApi';
 import ProgressTracker from '@/components/ProgressTracker';
 
 const RUSH_COOLDOWN = 30; // 催菜冷却秒数

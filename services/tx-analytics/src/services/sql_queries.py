@@ -560,3 +560,121 @@ async def query_alerts_today(
         }
         for r in rows
     ]
+
+
+# ──────────────────────────────────────────────
+# 9. 多日营收趋势（趋势图）
+# ──────────────────────────────────────────────
+
+async def query_revenue_trend(
+    store_id: str,
+    tenant_id: str,
+    days: int,
+    db: AsyncSession,
+) -> list[dict]:
+    """查询最近 N 天逐日营收趋势
+
+    Args:
+        store_id: 门店ID
+        tenant_id: 租户ID
+        days: 天数（1-365）
+        db: 异步数据库会话
+
+    Returns:
+        [{"date": "YYYY-MM-DD", "revenue_fen": int, "order_count": int}]，按日期升序
+    """
+    log.info("query_revenue_trend", store_id=store_id, tenant_id=tenant_id, days=days)
+
+    result = await db.execute(
+        text("""
+            SELECT DATE(COALESCE(biz_date, created_at::date)) AS biz_day,
+                   COALESCE(SUM(final_amount_fen), 0)::bigint  AS revenue_fen,
+                   COUNT(*)::int                               AS order_count
+            FROM orders
+            WHERE store_id  = :store_id
+              AND tenant_id = :tenant_id
+              AND DATE(COALESCE(biz_date, created_at::date)) >= CURRENT_DATE - :days * INTERVAL '1 day'
+              AND status    IN ('completed', 'paid')
+              AND is_deleted = FALSE
+            GROUP BY biz_day
+            ORDER BY biz_day
+        """),
+        {"store_id": store_id, "tenant_id": tenant_id, "days": days},
+    )
+    rows = result.mappings().all()
+    return [
+        {
+            "date": str(r["biz_day"]),
+            "revenue_fen": int(r["revenue_fen"]),
+            "order_count": int(r["order_count"]),
+        }
+        for r in rows
+    ]
+
+
+# ──────────────────────────────────────────────
+# 10. Top 菜品（按销量/营收）
+# ──────────────────────────────────────────────
+
+async def query_top_dishes(
+    store_id: str,
+    tenant_id: str,
+    days: int,
+    limit: int,
+    order_by: str,
+    db: AsyncSession,
+) -> list[dict]:
+    """查询最近 N 天 Top 菜品
+
+    Args:
+        store_id: 门店ID
+        tenant_id: 租户ID
+        days: 统计天数（1-365）
+        limit: 返回条数（1-50）
+        order_by: 排序字段 "qty"（销量）| "revenue"（营收）
+        db: 异步数据库会话
+
+    Returns:
+        [{"rank", "dish_id", "dish_name", "category", "sales_qty", "revenue_fen", "avg_price_fen"}]
+    """
+    sort_col = "SUM(oi.quantity)" if order_by == "qty" else "SUM(oi.subtotal_fen)"
+    log.info("query_top_dishes", store_id=store_id, tenant_id=tenant_id, days=days, limit=limit, order_by=order_by)
+
+    result = await db.execute(
+        text(f"""
+            SELECT oi.dish_id,
+                   COALESCE(d.dish_name, oi.item_name) AS dish_name,
+                   d.category,
+                   SUM(oi.quantity)::int              AS sales_qty,
+                   SUM(oi.subtotal_fen)::bigint       AS revenue_fen,
+                   CASE WHEN SUM(oi.quantity) > 0
+                        THEN (SUM(oi.subtotal_fen) / SUM(oi.quantity))::int
+                        ELSE 0 END                    AS avg_price_fen
+            FROM order_items oi
+            JOIN orders o ON o.id = oi.order_id AND o.tenant_id = oi.tenant_id
+            LEFT JOIN dishes d ON d.id = oi.dish_id AND d.tenant_id = oi.tenant_id
+            WHERE o.store_id  = :store_id
+              AND o.tenant_id = :tenant_id
+              AND DATE(COALESCE(o.biz_date, o.created_at::date)) >= CURRENT_DATE - :days * INTERVAL '1 day'
+              AND o.status    IN ('completed', 'paid')
+              AND o.is_deleted  = FALSE
+              AND oi.is_deleted = FALSE
+            GROUP BY oi.dish_id, COALESCE(d.dish_name, oi.item_name), d.category
+            ORDER BY {sort_col} DESC
+            LIMIT :limit
+        """),
+        {"store_id": store_id, "tenant_id": tenant_id, "days": days, "limit": limit},
+    )
+    rows = result.mappings().all()
+    return [
+        {
+            "rank": idx + 1,
+            "dish_id": str(r["dish_id"]) if r["dish_id"] else None,
+            "dish_name": r["dish_name"] or "",
+            "category": r["category"] or "",
+            "sales_qty": int(r["sales_qty"]),
+            "revenue_fen": int(r["revenue_fen"]),
+            "avg_price_fen": int(r["avg_price_fen"]),
+        }
+        for idx, r in enumerate(rows)
+    ]

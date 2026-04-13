@@ -174,7 +174,7 @@ export default function DRIWorkOrderCenterPage() {
     setStatsLoading(true);
     try {
       const resp = await txFetchData<Statistics>('/api/v1/dri-workorders/statistics');
-      setStats(resp.data);
+      setStats(resp);
     } catch (err) {
       // 统计加载失败不阻塞页面
       console.error('Failed to load statistics', err);
@@ -192,7 +192,7 @@ export default function DRIWorkOrderCenterPage() {
     setDetailLoading(true);
     try {
       const resp = await txFetchData<DRIWorkOrder>(`/api/v1/dri-workorders/${id}`);
-      setCurrentOrder(resp.data);
+      setCurrentOrder(resp);
       setDrawerVisible(true);
     } catch (err) {
       message.error('加载工单详情失败');
@@ -274,7 +274,7 @@ export default function DRIWorkOrderCenterPage() {
         body: JSON.stringify(body),
       });
       message.success(`工单已${transitionLabel[targetStatus] ?? '流转'}`);
-      setCurrentOrder(resp.data);
+      setCurrentOrder(resp);
       actionRef.current?.reload();
       loadStats();
       setTransitionModal((prev) => ({ ...prev, visible: false }));
@@ -306,7 +306,7 @@ export default function DRIWorkOrderCenterPage() {
         body: JSON.stringify(newAction),
       });
       message.success('行动项已添加');
-      setCurrentOrder(resp.data);
+      setCurrentOrder(resp);
       setActionFormVisible(false);
       setNewAction({ action: '', assigned_to: '', due_date: '' });
     } catch (err) {
@@ -324,7 +324,7 @@ export default function DRIWorkOrderCenterPage() {
         { method: 'PUT' },
       );
       message.success('行动项已完成');
-      setCurrentOrder(resp.data);
+      setCurrentOrder(resp);
     } catch (err) {
       message.error('操作失败');
       console.error(err);
@@ -579,8 +579,8 @@ export default function DRIWorkOrderCenterPage() {
               `/api/v1/dri-workorders?${query.toString()}`,
             );
             return {
-              data: resp.data?.items ?? [],
-              total: resp.data?.total ?? 0,
+              data: resp?.items ?? [],
+              total: resp?.total ?? 0,
               success: true,
             };
           } catch {
@@ -624,7 +624,7 @@ export default function DRIWorkOrderCenterPage() {
           request={async () => {
             try {
               const resp = await txFetchData<{ id: string; name: string }[]>('/api/v1/stores?size=200');
-              const items = (resp.data as unknown as { items?: { id: string; name: string }[] })?.items ?? resp.data ?? [];
+              const items = (resp as unknown as { items?: { id: string; name: string }[] })?.items ?? resp ?? [];
               return (Array.isArray(items) ? items : []).map((s) => ({
                 label: s.name,
                 value: s.id,
@@ -642,7 +642,7 @@ export default function DRIWorkOrderCenterPage() {
           request={async () => {
             try {
               const resp = await txFetchData<{ id: string; name: string }[]>('/api/v1/employees?size=200');
-              const items = (resp.data as unknown as { items?: { id: string; name: string }[] })?.items ?? resp.data ?? [];
+              const items = (resp as unknown as { items?: { id: string; name: string }[] })?.items ?? resp ?? [];
               return (Array.isArray(items) ? items : []).map((e) => ({
                 label: e.name,
                 value: e.id,

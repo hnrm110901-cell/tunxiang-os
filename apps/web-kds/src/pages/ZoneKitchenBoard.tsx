@@ -11,8 +11,11 @@
  */
 import { useState, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { useKdsWebSocket, type KDSTicket, type RemakeAlert } from '../hooks/useKdsWebSocket';
+import { useKdsWebSocket, type KDSTicket } from '../hooks/useKdsWebSocket';
 import { warmUpAudio } from '../utils/audio';
+import { OrderTicketCard } from '@tx-ds/biz';
+import type { OrderTicketData } from '@tx-ds/biz';
+import { RemakeOverlay } from '../components/RemakeOverlay';
 
 // ─── 区域类型 ───
 
@@ -76,34 +79,28 @@ function sortTickets(tickets: KDSTicket[]): KDSTicket[] {
   });
 }
 
-// ─── 时间格式 ───
+// ─── KDSTicket → OrderTicketData 转换（含区域标签） ───
 
-function elapsedMin(ts: number): number {
-  return Math.floor((Date.now() - ts) / 60000);
+function toTicketData(t: KDSTicket): OrderTicketData {
+  const ticketZone = inferZone(t.tableNo);
+  return {
+    id: t.id,
+    orderNo: t.orderNo,
+    tableNo: t.tableNo,
+    status: t.status,
+    priority: t.priority,
+    createdAt: new Date(t.createdAt).toISOString(),
+    timeoutMinutes: getTimeoutThresholds().critical,
+    channel: ticketZone === 'vip' ? '包厢' : ticketZone === 'hall' ? '大厅' : undefined,
+    items: t.items.map((item, i) => ({
+      id: `${t.id}-${i}`,
+      name: item.name,
+      qty: item.qty,
+      spec: item.spec,
+      remark: item.notes || undefined,
+    })),
+  };
 }
-
-function formatElapsed(ts: number): string {
-  const total = Math.floor((Date.now() - ts) / 1000);
-  const m = Math.floor(total / 60);
-  const s = total % 60;
-  return `${m}:${String(s).padStart(2, '0')}`;
-}
-
-type TimeLevel = 'normal' | 'warning' | 'critical';
-
-function getTimeLevel(ts: number): TimeLevel {
-  const { warn, critical } = getTimeoutThresholds();
-  const m = elapsedMin(ts);
-  if (m >= critical) return 'critical';
-  if (m >= warn) return 'warning';
-  return 'normal';
-}
-
-const TIME_COLORS: Record<TimeLevel, string> = {
-  normal: '#0F6E56',
-  warning: '#BA7517',
-  critical: '#A32D2D',
-};
 
 // ─── Mock 数据 ───
 
@@ -147,6 +144,7 @@ export function ZoneKitchenBoard() {
     wsEnabled ? [] : MOCK_TICKETS,
   );
   const [tick, setTick] = useState(0);
+  const [now, setNow] = useState(Date.now());
   const [audioWarmed, setAudioWarmed] = useState(false);
 
   useEffect(() => {
@@ -154,7 +152,10 @@ export function ZoneKitchenBoard() {
   }, [wsEnabled, wsTickets]);
 
   useEffect(() => {
-    const timer = setInterval(() => setTick(t => t + 1), 1000);
+    const timer = setInterval(() => {
+      setTick(t => t + 1);
+      setNow(Date.now());
+    }, 1000);
     return () => clearInterval(timer);
   }, []);
 
@@ -229,7 +230,7 @@ export function ZoneKitchenBoard() {
     >
       {/* 重做弹窗 */}
       {remakeAlerts.length > 0 && (
-        <RemakeOverlay alerts={remakeAlerts} onDismiss={dismissRemakeAlert} />
+        <RemakeOverlay alerts={remakeAlerts} onDismiss={dismissRemakeAlert} slideAnimation="zkb-slide-in" />
       )}
 
       {/* 超时告警条 */}
@@ -347,28 +348,26 @@ export function ZoneKitchenBoard() {
       <div style={{ flex: 1, display: 'flex', gap: 2, overflow: 'hidden' }}>
         <ZoneBoardColumn title="待制作" count={pending.length} color="#BA7517" bgColor="#1a1a00">
           {pending.map(t => (
-            <ZoneTicketCard
+            <OrderTicketCard
               key={t.id}
-              ticket={t}
-              actionLabel="开始制作"
-              actionColor="#1890ff"
-              onAction={() => startCooking(t.id)}
-              tick={tick}
+              ticket={toTicketData(t)}
+              kds
+              now={now}
               isFlashing={rushTicketIds.has(t.id)}
+              onStart={() => startCooking(t.id)}
             />
           ))}
         </ZoneBoardColumn>
 
         <ZoneBoardColumn title="制作中" count={cooking.length} color="#1890ff" bgColor="#001a1a">
           {cooking.map(t => (
-            <ZoneTicketCard
+            <OrderTicketCard
               key={t.id}
-              ticket={t}
-              actionLabel="完成出品"
-              actionColor="#0F6E56"
-              onAction={() => completeCooking(t.id)}
-              tick={tick}
+              ticket={toTicketData(t)}
+              kds
+              now={now}
               isFlashing={rushTicketIds.has(t.id)}
+              onComplete={() => completeCooking(t.id)}
             />
           ))}
         </ZoneBoardColumn>
@@ -380,19 +379,11 @@ export function ZoneKitchenBoard() {
         </ZoneBoardColumn>
       </div>
 
-      {/* 动画 CSS */}
+      {/* 动画 CSS（border-flash / rush-flash 已迁移到 OrderTicketCard.module.css） */}
       <style>{`
         @keyframes zkb-pulse {
           0%, 100% { opacity: 1; }
           50% { opacity: 0.7; }
-        }
-        @keyframes zkb-border-flash {
-          0%, 100% { border-color: #A32D2D; }
-          50% { border-color: #ff4d4f; }
-        }
-        @keyframes zkb-rush-flash {
-          0%, 100% { box-shadow: 0 0 0 0 rgba(255, 77, 79, 0); }
-          50% { box-shadow: 0 0 16px 4px rgba(255, 77, 79, 0.6); }
         }
         @keyframes zkb-slide-in {
           from { opacity: 0; transform: translateY(-12px); }
@@ -400,22 +391,6 @@ export function ZoneKitchenBoard() {
         }
       `}</style>
     </div>
-  );
-}
-
-// ─── 区域标签 ───
-
-function ZoneTag({ zone, size = 14 }: { zone: Zone; size?: number }) {
-  if (zone === 'all') return null;
-  const cfg = ZONE_CONFIG[zone];
-  return (
-    <span style={{
-      fontSize: size, padding: '2px 8px', borderRadius: 5,
-      background: cfg.bg, color: cfg.color,
-      fontWeight: 'bold', display: 'inline-block',
-    }}>
-      {cfg.label}
-    </span>
   );
 }
 
@@ -446,102 +421,21 @@ function ZoneBoardColumn({ title, count, color, bgColor, children }: {
   );
 }
 
-// ─── 工单卡片（带区域标签） ───
+// (ZoneTicketCard removed — now uses shared OrderTicketCard from @tx-ds/biz)
 
-function ZoneTicketCard({ ticket: t, actionLabel, actionColor, onAction, tick: _tick, isFlashing }: {
-  ticket: KDSTicket; actionLabel: string; actionColor: string;
-  onAction: () => void; tick: number; isFlashing?: boolean;
-}) {
-  const level = getTimeLevel(t.createdAt);
-  const elapsed = formatElapsed(t.createdAt);
-  const isRush = t.priority === 'rush';
-  const isVip = t.priority === 'vip';
-  const isCritical = level === 'critical';
-  const ticketZone = inferZone(t.tableNo);
+// ─── 区域标签（header stats + DoneCard 仍需内联渲染） ───
 
-  const borderColor = isCritical
-    ? '#A32D2D'
-    : isRush ? '#BA7517' : isVip ? '#722ed1' : '#333';
-
+function ZoneTag({ zone, size = 14 }: { zone: Zone; size?: number }) {
+  if (zone === 'all') return null;
+  const cfg = ZONE_CONFIG[zone];
   return (
-    <div style={{
-      background: isCritical ? '#1a0505' : '#111',
-      borderRadius: 12, padding: 14,
-      borderLeft: `6px solid ${borderColor}`,
-      animation: isCritical
-        ? 'zkb-border-flash 1.5s infinite'
-        : isFlashing || isRush
-          ? 'zkb-rush-flash 1s infinite'
-          : undefined,
+    <span style={{
+      fontSize: size, padding: '2px 8px', borderRadius: 5,
+      background: cfg.bg, color: cfg.color,
+      fontWeight: 'bold', display: 'inline-block',
     }}>
-      {/* 头部 */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-          <span style={{ fontSize: 26, fontWeight: 'bold', color: '#fff' }}>{t.tableNo}</span>
-          {/* 区域标签 */}
-          <ZoneTag zone={ticketZone} size={16} />
-          <span style={{ fontSize: 16, color: '#666' }}>#{t.orderNo}</span>
-          {isRush && (
-            <span style={{
-              fontSize: 16, padding: '2px 10px', borderRadius: 6,
-              background: '#A32D2D', color: '#fff', fontWeight: 'bold',
-              animation: 'zkb-pulse 1s infinite',
-            }}>催</span>
-          )}
-          {isVip && (
-            <span style={{
-              fontSize: 16, padding: '2px 10px', borderRadius: 6,
-              background: 'linear-gradient(135deg, #C5A347, #E8D48B)',
-              color: '#1a1a00', fontWeight: 'bold',
-            }}>VIP</span>
-          )}
-        </div>
-        <div style={{
-          fontSize: 28, fontWeight: 'bold',
-          color: TIME_COLORS[level],
-          fontFamily: 'JetBrains Mono, monospace',
-        }}>
-          {elapsed}
-        </div>
-      </div>
-
-      {/* 菜品列表 */}
-      {t.items.map((item, i) => (
-        <div key={i} style={{
-          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-          padding: '4px 0', fontSize: 20, fontWeight: 'bold',
-        }}>
-          <span style={{ flex: 1 }}>
-            {item.name}
-            {item.notes && (
-              <span style={{ fontSize: 16, color: '#A32D2D', marginLeft: 6, fontWeight: 'normal' }}>
-                ({item.notes})
-              </span>
-            )}
-          </span>
-          <span style={{ color: '#FF6B35', fontSize: 22, minWidth: 50, textAlign: 'right' }}>
-            x{item.qty}
-          </span>
-        </div>
-      ))}
-
-      {/* 操作按钮 */}
-      <button
-        onClick={onAction}
-        style={{
-          width: '100%', marginTop: 10, padding: '14px 0',
-          border: 'none', borderRadius: 8,
-          background: actionColor, color: '#fff',
-          fontSize: 20, fontWeight: 'bold',
-          cursor: 'pointer', minHeight: 56,
-          transition: 'transform 200ms ease',
-        }}
-        onTouchStart={e => (e.currentTarget.style.transform = 'scale(0.97)')}
-        onTouchEnd={e => (e.currentTarget.style.transform = 'scale(1)')}
-      >
-        {actionLabel}
-      </button>
-    </div>
+      {cfg.label}
+    </span>
   );
 }
 
@@ -578,56 +472,3 @@ function ZoneDoneCard({ ticket: t }: { ticket: KDSTicket }) {
   );
 }
 
-// ─── 重做弹窗 ───
-
-function RemakeOverlay({ alerts, onDismiss }: {
-  alerts: RemakeAlert[];
-  onDismiss: (taskId: string) => void;
-}) {
-  return (
-    <div style={{
-      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)',
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      zIndex: 1000,
-    }}>
-      <div style={{
-        background: '#1a1a1a', borderRadius: 16, padding: 28,
-        border: '3px solid #A32D2D', maxWidth: 480, width: '90%',
-        animation: 'zkb-slide-in 0.3s ease-out',
-      }}>
-        <div style={{
-          fontSize: 28, fontWeight: 'bold', color: '#ff4d4f',
-          marginBottom: 20, textAlign: 'center',
-        }}>重做通知</div>
-        {alerts.map(a => (
-          <div key={a.taskId} style={{
-            background: '#222', borderRadius: 12, padding: 16,
-            marginBottom: 12, borderLeft: '6px solid #A32D2D',
-          }}>
-            <div style={{ fontSize: 22, fontWeight: 'bold', color: '#fff', marginBottom: 8 }}>
-              {a.tableNumber && `${a.tableNumber} - `}{a.dishName}
-              {a.remakeCount > 1 && (
-                <span style={{ fontSize: 18, color: '#ff4d4f', marginLeft: 8 }}>(第{a.remakeCount}次)</span>
-              )}
-            </div>
-            <div style={{ fontSize: 18, color: '#BA7517', marginBottom: 12 }}>
-              原因: {a.reason}
-            </div>
-            <button
-              onClick={() => onDismiss(a.taskId)}
-              style={{
-                width: '100%', padding: '14px 0', background: '#A32D2D',
-                color: '#fff', border: 'none', borderRadius: 8,
-                fontSize: 20, fontWeight: 'bold', cursor: 'pointer', minHeight: 56,
-              }}
-              onTouchStart={e => (e.currentTarget.style.transform = 'scale(0.97)')}
-              onTouchEnd={e => (e.currentTarget.style.transform = 'scale(1)')}
-            >
-              收到，立即重做
-            </button>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}

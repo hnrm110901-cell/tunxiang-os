@@ -37,6 +37,7 @@ import {
 import type { ProColumns, ActionType } from '@ant-design/pro-components';
 import { ProTable } from '@ant-design/pro-components';
 import dayjs from 'dayjs';
+import { formatPrice } from '@tx-ds/utils';
 
 // ─── 类型定义 ─────────────────────────────────────────────────────────────────
 
@@ -124,6 +125,7 @@ const MOCK_ORDERS: OutletOrder[] = [
 
 // ─── 工具函数 ─────────────────────────────────────────────────────────────────
 
+/** @deprecated Use formatPrice from @tx-ds/utils */
 const fenToYuan = (fen: number): string => `¥${(fen / 100).toFixed(2)}`;
 
 const statusMap: Record<string, { color: string; label: string }> = {

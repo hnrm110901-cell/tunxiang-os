@@ -708,7 +708,7 @@ async def checkout_with_discounts(
                 )
                 await db.commit()
             except Exception as exc:  # noqa: BLE001 — 折扣日志写入失败不阻断结算
-                logger.warning("cashier.discount_log_write_failed", error=str(exc))
+                logger.warning("cashier.discount_log_write_failed", error=str(exc), exc_info=True)
                 await db.rollback()
 
             discount_result = {

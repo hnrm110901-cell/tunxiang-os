@@ -7,6 +7,7 @@
 import {
   fenToYuan,
   fenToYuanDisplay,
+  formatPrice,
   formatDate,
   formatPhone,
   truncate,
@@ -69,6 +70,17 @@ describe('fenToYuanDisplay', () => {
 
   it('formats large amounts with the ¥ prefix', () => {
     expect(fenToYuanDisplay(999900)).toBe('¥9999.00')
+  })
+})
+
+// ─── formatPrice (alias for fenToYuanDisplay) ──────────────────────────────
+
+describe('formatPrice', () => {
+  it('is equivalent to fenToYuanDisplay', () => {
+    expect(formatPrice(1250)).toBe('¥12.50')
+    expect(formatPrice(0)).toBe('¥0.00')
+    expect(formatPrice(100)).toBe('¥1.00')
+    expect(formatPrice(999900)).toBe('¥9999.00')
   })
 })
 

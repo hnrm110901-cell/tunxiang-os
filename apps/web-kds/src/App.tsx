@@ -51,6 +51,7 @@ import { StationProfitPage } from './pages/StationProfitPage';
 import { CustomerCallingScreen } from './pages/CustomerCallingScreen';
 import { DigitalMenuBoardPage } from './pages/DigitalMenuBoardPage';
 import BanquetControlScreen from './pages/BanquetControlScreen';
+import { BanquetKDSPage } from './pages/BanquetKDSPage';
 
 export default function App() {
   // 演示模式：?demo=true 时跳过登录
@@ -94,6 +95,8 @@ export default function App() {
         <Route path="/menu-board" element={<DigitalMenuBoardPage />} />
         {/* 徐记海鲜：宴席控菜大屏 */}
         <Route path="/banquet-control" element={<BanquetControlScreen />} />
+        {/* 模块4.1：宴会KDS出品看板 */}
+        <Route path="/banquet-kds" element={<BanquetKDSPage />} />
 
         {/* 原有页面（保留兼容） */}
         <Route path="/board-legacy" element={<KitchenBoard />} />

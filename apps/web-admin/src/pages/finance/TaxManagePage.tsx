@@ -33,9 +33,10 @@ import {
 import { ActionType, ProColumns, ProTable } from '@ant-design/pro-components';
 import { StatisticCard } from '@ant-design/pro-components';
 import dayjs, { Dayjs } from 'dayjs';
+import { formatPrice } from '@tx-ds/utils';
 
 const { Title, Text } = Typography;
-const { TabPane } = require('antd').Tabs ?? {};
+// TabPane removed (not used)
 
 // ── 类型定义 ──────────────────────────────────────────────────────────────────
 
@@ -97,6 +98,7 @@ interface PlAccountMapping {
 
 // ── 工具函数 ──────────────────────────────────────────────────────────────────
 
+/** @deprecated Use formatPrice from @tx-ds/utils */
 const fenToYuan = (fen: number): string => (fen / 100).toFixed(2);
 
 const getTenantId = (): string =>

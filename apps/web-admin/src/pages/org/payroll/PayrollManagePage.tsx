@@ -12,6 +12,7 @@
  */
 
 import { useCallback, useEffect, useState } from 'react';
+import { formatPrice } from '@tx-ds/utils';
 import {
   Alert,
   Button,
@@ -134,6 +135,7 @@ interface PayrollConfig {
 
 // ─── 工具函数 ──────────────────────────────────────────────────────────────────
 
+/** @deprecated Use formatPrice from @tx-ds/utils */
 function fenToYuan(fen: number): string {
   return (Math.abs(fen) / 100).toFixed(2);
 }

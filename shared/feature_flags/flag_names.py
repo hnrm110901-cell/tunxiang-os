@@ -111,6 +111,24 @@ class OrgFlags:
     # 菜品技能匹配
     HR_SKILL_MATCH = "org.hr.skill_match.enable"
 
+    # 企微/钉钉IM实接同步
+    HR_IM_SYNC = "org.hr.im_sync.enable"
+
+    # 电子签约模块
+    HR_E_SIGNATURE = "org.hr.e_signature.enable"
+
+    # 员工积分赛马机制
+    HR_POINTS_RACE = "org.hr.points_race.enable"
+
+    # 绩效在线打分评审
+    HR_REVIEW_CYCLE = "org.hr.review_cycle.enable"
+
+    # 薪税申报对接
+    HR_TAX_FILING = "org.hr.tax_filing.enable"
+
+    # 考勤深度合规检测
+    HR_ATTENDANCE_COMPLIANCE = "org.hr.attendance_compliance.enable"
+
 
 class MemberFlags:
     """会员CDP域 Flag 名称。"""
@@ -155,3 +173,25 @@ class SupplyFlags:
 
     # AI智能补货计划（需要tx-brain支持）
     SMART_REORDER = "supply.intel.smart_reorder.enable"
+
+
+class KnowledgeFlags:
+    """知识库域 Flag 名称。"""
+
+    # Phase 1: pgvector 混合检索（替代 Qdrant）
+    HYBRID_SEARCH_V2 = "knowledge.search.hybrid_v2.enable"
+
+    # Phase 1: 文档处理管线
+    DOCUMENT_PIPELINE = "knowledge.document.pipeline.enable"
+
+    # Phase 2: Agentic RAG（智能检索路由）
+    AGENTIC_RAG = "knowledge.rag.agentic.enable"
+
+    # Phase 2: 纠错式 RAG（检索质量自动修正）
+    CORRECTIVE_RAG = "knowledge.rag.corrective.enable"
+
+    # Phase 3: LightRAG 知识图谱增强
+    LIGHTRAG_GRAPH = "knowledge.graph.lightrag.enable"
+
+    # Phase 4: 边缘知识同步（Mac mini 本地副本）
+    EDGE_KNOWLEDGE_SYNC = "knowledge.edge.sync.enable"

@@ -12,6 +12,7 @@
  */
 
 import { useCallback, useEffect, useState } from 'react';
+import { formatPrice } from '@tx-ds/utils';
 import {
   Badge,
   Button,
@@ -144,6 +145,7 @@ const EMPTY_STATS: DashboardStats = {
 
 // ─── 工具函数 ──────────────────────────────────────────────────────────────────
 
+/** @deprecated Use formatPrice from @tx-ds/utils */
 function fenToYuan(fen: number): string {
   return (fen / 100).toFixed(2);
 }

@@ -121,8 +121,8 @@ export default function ComplianceTasks() {
           const resp = await txFetchData<{ items: TaskItem[]; total: number }>(
             `/api/v1/compliance/alerts?${query.toString()}`,
           );
-          const d = resp.data;
-          return { data: d?.items ?? [], total: d?.total ?? 0, success: resp.ok };
+          const d = resp;
+          return { data: d?.items ?? [], total: d?.total ?? 0, success: true };
         }}
       />
 

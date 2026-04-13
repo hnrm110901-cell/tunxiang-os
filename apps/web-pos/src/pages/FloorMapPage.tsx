@@ -6,6 +6,7 @@
 import { useState, useEffect, useCallback, useRef, type CSSProperties } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { txFetch } from '../api/index';
+import { formatPrice } from '@tx-ds/utils';
 
 /* ─── 颜色常量 ─── */
 const C = {
@@ -61,6 +62,7 @@ const AREAS = ['大厅', '包厢A', '包厢B', '室外', '吧台'];
 
 
 /* ─── 工具函数 ─── */
+/** @deprecated Use formatPrice from @tx-ds/utils */
 const fen2yuan = (fen: number) => `¥${(fen / 100).toFixed(0)}`;
 const formatMin = (min: number) => (min < 60 ? `${min}分钟` : `${Math.floor(min / 60)}时${min % 60}分`);
 const vibrate = () => { try { navigator.vibrate?.(50); } catch { /* no-op */ } };

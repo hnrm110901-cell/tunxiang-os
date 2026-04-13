@@ -13,7 +13,8 @@
     "react": "^18.3.0",
     "react-dom": "^18.3.0",
     "zustand": "^4.4.0",
-    "dayjs": "^1.11.0"
+    "dayjs": "^1.11.0",
+    "@tunxiang/design-system": "workspace:*"
   },
   "devDependencies": {
     "@types/react": "^18.3.0",

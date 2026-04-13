@@ -79,10 +79,10 @@ export function AgentWorkbenchPage() {
       const resp = await txFetchData<{ items: AgentSuggestion[]; total: number }>(
         '/api/v1/growth/agent-suggestions?review_state=pending_review&page=1&size=50'
       );
-      if (resp.data) {
-        setSuggestions(resp.data.items);
-        if (resp.data.items.length > 0 && !selectedId) {
-          setSelectedId(resp.data.items[0].id);
+      if (resp) {
+        setSuggestions(resp.items);
+        if (resp.items.length > 0 && !selectedId) {
+          setSelectedId(resp.items[0].id);
         }
       }
     } catch (err) {
@@ -132,7 +132,7 @@ export function AgentWorkbenchPage() {
     setMetricsLoading(true);
     try {
       const resp = await txFetchData<MetricsData>('/api/v1/growth/agent-suggestions/metrics?days=7');
-      if (resp.data) setMetrics(resp.data);
+      if (resp) setMetrics(resp);
     } catch (err) {
       console.error('fetch metrics error', err);
     } finally {
@@ -470,7 +470,7 @@ export function AgentWorkbenchPage() {
                         <Card size="small" style={{ background: 'rgba(82,196,26,0.08)', border: `1px solid rgba(82,196,26,0.2)`, textAlign: 'center' }}>
                           <div style={{ color: TEXT_SECONDARY, fontSize: 11 }}>{key}</div>
                           <div style={{ color: SUCCESS_GREEN, fontSize: 20, fontWeight: 700 }}>
-                            {typeof val === 'number' && val < 1 ? `${(val * 100).toFixed(1)}%` : val}
+                            {typeof val === 'number' && val < 1 ? `${(val * 100).toFixed(1)}%` : String(val ?? '')}
                           </div>
                         </Card>
                       </Col>

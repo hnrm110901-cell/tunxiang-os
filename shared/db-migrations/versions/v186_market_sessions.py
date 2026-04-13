@@ -11,8 +11,8 @@ from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
-revision = "v186"
-down_revision = "v185"
+revision = "v186b"
+down_revision = "v186"
 branch_labels = None
 depends_on = None
 
@@ -94,11 +94,19 @@ def upgrade() -> None:
             END IF;
         END$$;
     """)
-    op.execute(
-        "CREATE INDEX IF NOT EXISTS idx_ds_market_session "
-        "ON dining_sessions (tenant_id, market_session_id) "
-        "WHERE market_session_id IS NOT NULL"
-    )
+    op.execute("""
+        DO $$
+        BEGIN
+            IF EXISTS (
+                SELECT 1 FROM information_schema.tables
+                WHERE table_name = 'dining_sessions'
+            ) THEN
+                CREATE INDEX IF NOT EXISTS idx_ds_market_session
+                ON dining_sessions (tenant_id, market_session_id)
+                WHERE market_session_id IS NOT NULL;
+            END IF;
+        END$$;
+    """)
 
 
 def downgrade() -> None:

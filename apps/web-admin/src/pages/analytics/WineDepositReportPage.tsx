@@ -50,12 +50,14 @@ import {
   type EnterpriseSignRecord,
   type EnterpriseBill,
 } from '../../api/enterpriseAdminApi';
+import { formatPrice } from '@tx-ds/utils';
 
 const { Title, Text } = Typography;
 const { RangePicker } = DatePicker;
 
 // ─── 工具函数 ───
 
+/** @deprecated Use formatPrice from @tx-ds/utils */
 function fenToYuan(fen: number): string {
   return (fen / 100).toFixed(2);
 }
@@ -136,7 +138,7 @@ function WineSummaryTab() {
   ];
 
   // 明细表
-  const detailColumns: ColumnsType<(typeof detail)['items'][0]> = [
+  const detailColumns: ColumnsType<WineListResponse['items'][0]> = [
     { title: '客户', dataIndex: 'customer_id', key: 'cust', ellipsis: true },
     { title: '酒品', dataIndex: 'wine_name', key: 'wine_name', ellipsis: true },
     {

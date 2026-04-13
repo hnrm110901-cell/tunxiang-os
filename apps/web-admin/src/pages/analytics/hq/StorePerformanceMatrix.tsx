@@ -39,6 +39,7 @@ import {
 import { ProTable } from '@ant-design/pro-components';
 import type { ProColumns, RequestData } from '@ant-design/pro-components';
 
+import { formatPrice } from '@tx-ds/utils';
 import { fenToYuan, pctDisplay } from '../../../utils/format';
 import {
   getBrandStorePerformance,

@@ -4,6 +4,7 @@
  * 接入真实 API: GET/POST /api/v1/stamp-cards/templates
  */
 import { useState, useEffect, useCallback } from 'react';
+import { formatPrice } from '@tx-ds/utils';
 import { txFetchData } from '../../../api';
 
 // ── 设计 Token ──────────────────────────────────────────────────
@@ -55,6 +56,7 @@ interface CreateTemplateForm {
 }
 
 // ── 工具函数 ────────────────────────────────────────────────────
+/** @deprecated Use formatPrice from @tx-ds/utils */
 function fenToYuan(v: number): string {
   return v > 0 ? `¥${(v / 100).toFixed(0)}起` : '无门槛';
 }

@@ -191,7 +191,7 @@ const EMPTY_VERSIONS: VersionHistory[] = [];
 async function fetchTemplates(): Promise<{ items: MenuTemplate[]; total: number }> {
   try {
     const res = await txFetchData<{ items: MenuTemplate[]; total: number }>('/api/v1/menu/templates');
-    return res.data ?? { items: EMPTY_TEMPLATES, total: 0 };
+    return res ?? { items: EMPTY_TEMPLATES, total: 0 };
   } catch (err) {
     console.error('[MenuTemplatePage] fetchTemplates 失败:', err);
     return { items: EMPTY_TEMPLATES, total: 0 };
@@ -201,7 +201,7 @@ async function fetchTemplates(): Promise<{ items: MenuTemplate[]; total: number 
 async function fetchTemplateSections(templateId: string): Promise<MenuSection[]> {
   try {
     const res = await txFetchData<MenuSection[]>(`/api/v1/menu/templates/${templateId}/sections`);
-    return res.data ?? EMPTY_SECTIONS;
+    return res ?? EMPTY_SECTIONS;
   } catch (err) {
     console.error('[MenuTemplatePage] fetchTemplateSections 失败:', err);
     return EMPTY_SECTIONS;
@@ -225,8 +225,8 @@ async function createTemplate(payload: {
     method: 'POST',
     body: JSON.stringify(payload),
   });
-  if (!res.data) throw new Error('创建模板失败');
-  return res.data;
+  if (!res) throw new Error('创建模板失败');
+  return res;
 }
 
 async function updateTemplate(
@@ -237,8 +237,8 @@ async function updateTemplate(
     method: 'PUT',
     body: JSON.stringify(payload),
   });
-  if (!res.data) throw new Error('更新模板失败');
-  return res.data;
+  if (!res) throw new Error('更新模板失败');
+  return res;
 }
 
 async function updateSectionOrder(
@@ -283,13 +283,13 @@ async function publishToStores(payload: {
     method: 'POST',
     body: JSON.stringify(payload),
   });
-  return res.data ?? { publish_id: '', status: 'unknown' };
+  return res ?? { publish_id: '', status: 'unknown' };
 }
 
 async function fetchPublishStatus(templateId: string): Promise<PublishRecord[]> {
   try {
     const res = await txFetchData<PublishRecord[]>(`/api/v1/menu/publish-status?template_id=${templateId}`);
-    return res.data ?? EMPTY_PUBLISH_RECORDS;
+    return res ?? EMPTY_PUBLISH_RECORDS;
   } catch (err) {
     console.error('[MenuTemplatePage] fetchPublishStatus 失败:', err);
     return EMPTY_PUBLISH_RECORDS;
@@ -299,7 +299,7 @@ async function fetchPublishStatus(templateId: string): Promise<PublishRecord[]> 
 async function fetchVersionHistory(templateId: string): Promise<VersionHistory[]> {
   try {
     const res = await txFetchData<VersionHistory[]>(`/api/v1/menu/templates/${templateId}/versions`);
-    return res.data ?? EMPTY_VERSIONS;
+    return res ?? EMPTY_VERSIONS;
   } catch (err) {
     console.error('[MenuTemplatePage] fetchVersionHistory 失败:', err);
     return EMPTY_VERSIONS;
@@ -862,7 +862,7 @@ const PublishTab: React.FC<PublishTabProps> = ({ template }) => {
   // 加载门店列表
   useEffect(() => {
     txFetchData<{ items: StoreOption[] }>('/api/v1/system/stores?size=200')
-      .then((res) => setStores(res.data?.items ?? EMPTY_STORES))
+      .then((res) => setStores(res?.items ?? EMPTY_STORES))
       .catch((err) => console.error('[PublishTab] 加载门店失败:', err));
   }, []);
   const [diffModalOpen, setDiffModalOpen] = useState(false);

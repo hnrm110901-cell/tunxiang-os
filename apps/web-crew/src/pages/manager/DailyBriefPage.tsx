@@ -7,6 +7,7 @@
  */
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { formatPrice } from '@tx-ds/utils';
 import { txFetch } from '../../api';
 
 // ─── 类型 ──────────────────────────────────────────────────────────────────────
@@ -72,6 +73,7 @@ const FALLBACK: DailyBrief = {
 };
 
 const STORE_ID = import.meta.env.VITE_STORE_ID || '';
+/** @deprecated Use formatPrice from @tx-ds/utils */
 const fen2yuan = (fen: number) => `¥${(fen / 100).toLocaleString('zh-CN', { minimumFractionDigits: 0 })}`;
 const pct = (v: number) => `${(v * 100).toFixed(1)}%`;
 

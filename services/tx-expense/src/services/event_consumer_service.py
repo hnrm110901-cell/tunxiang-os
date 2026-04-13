@@ -1,0 +1,397 @@
+"""
+费控事件消费者服务
+订阅来自其他微服务的业务事件，路由到对应的 Agent 处理函数。
+
+订阅的事件：
+  ops.daily_close.completed    → A1备用金守护（日结对账）
+  org.employee.departed        → A1备用金守护（账户冻结）
+  supply.purchase_order.goods_received → 采购付款联动（P1实现）
+  trade.revenue.daily_summary  → A4预算预警（P1实现）
+
+设计原则：
+  - 幂等性：同一事件重复消费只处理一次（基于 event_id 去重）
+  - 快速响应：事件接收即返回 200，实际处理异步执行
+  - 失败隔离：单个事件处理失败不影响其他事件
+  - 审计日志：每条事件消费记录都写日志
+"""
+from __future__ import annotations
+
+from collections import OrderedDict
+from datetime import date
+from typing import Any
+from uuid import UUID
+
+import structlog
+
+log = structlog.get_logger(__name__)
+
+# 内存幂等 set（LRU，最多保存最近1000条）
+_processed_events: OrderedDict[str, bool] = OrderedDict()
+MAX_IDEMPOTENCY_CACHE = 1000
+
+
+def _is_duplicate(event_id: str) -> bool:
+    """检查事件是否已处理（内存LRU幂等）。
+
+    同一 event_id 的事件只处理一次。服务重启后缓存清空，
+    可接受少量重复处理（P1升级为Redis持久化幂等）。
+    """
+    if event_id in _processed_events:
+        return True
+    _processed_events[event_id] = True
+    if len(_processed_events) > MAX_IDEMPOTENCY_CACHE:
+        _processed_events.popitem(last=False)
+    return False
+
+
+async def process_event(
+    db_factory: Any,
+    event_type: str,
+    event_id: str,
+    tenant_id: str,
+    payload: dict[str, Any],
+) -> None:
+    """事件处理主路由。
+
+    db_factory: 异步数据库 session 工厂（后台任务需要独立 session）。
+    支持 TenantSession(tenant_id) 协议（async context manager）。
+    """
+    if _is_duplicate(event_id):
+        log.info(
+            "event_duplicate_skipped",
+            event_id=event_id,
+            event_type=event_type,
+        )
+        return
+
+    log.info(
+        "event_processing",
+        event_id=event_id,
+        event_type=event_type,
+        tenant_id=tenant_id,
+    )
+
+    try:
+        async with db_factory(tenant_id) as db:
+            if event_type == "ops.daily_close.completed":
+                await _handle_daily_close(db, UUID(tenant_id), payload)
+
+            elif event_type == "org.employee.departed":
+                await _handle_employee_departure(db, UUID(tenant_id), payload)
+
+            elif event_type == "expense.application.submitted":
+                await _handle_application_submitted(db, UUID(tenant_id), payload)
+
+            elif event_type == "supply.purchase_order.approved":
+                await _handle_purchase_order_approved(db, UUID(tenant_id), payload)
+
+            elif event_type == "supply.purchase_order.cancelled":
+                await _handle_purchase_order_cancelled(db, UUID(tenant_id), payload)
+
+            elif event_type == "supply.purchase_order.goods_received":
+                # 货物已收，可触发最终付款；当前仅记录，待 P2 实现
+                log.info(
+                    "event_received",
+                    event_type=event_type,
+                    note="goods_received_logged_pending_p2",
+                )
+
+            elif event_type == "trade.revenue.daily_summary":
+                # P1实现：A4预算动态调整
+                log.info(
+                    "event_deferred",
+                    event_type=event_type,
+                    reason="P1_not_implemented",
+                )
+
+            else:
+                log.warning(
+                    "event_unknown_type",
+                    event_type=event_type,
+                    event_id=event_id,
+                )
+
+    except (ValueError, KeyError) as exc:
+        log.error(
+            "event_processing_failed",
+            event_id=event_id,
+            event_type=event_type,
+            error=str(exc),
+            exc_info=True,
+        )
+        # 不向上抛出：事件处理失败不应影响其他业务
+
+    except Exception as exc:  # noqa: BLE001 — 最外层兜底，防止后台任务静默崩溃
+        log.error(
+            "event_processing_unexpected_error",
+            event_id=event_id,
+            event_type=event_type,
+            error=str(exc),
+            exc_info=True,
+        )
+
+
+async def _handle_daily_close(
+    db: Any,
+    tenant_id: UUID,
+    payload: dict[str, Any],
+) -> None:
+    """处理 ops.daily_close.completed 事件。
+
+    payload 预期字段：
+      store_id              (str UUID, 必填)
+      pos_session_id        (str, 可选)
+      close_date            (str ISO date, 可选，默认今日)
+      pos_petty_cash_declared (int 分, 可选，默认 0)
+    """
+    try:
+        from src.agents.a1_petty_cash_guardian import run as a1_run
+    except ImportError:
+        log.warning(
+            "a1_agent_not_available",
+            trigger="pos_daily_close",
+            note="A1 agent not yet implemented; skipping.",
+        )
+        return
+
+    store_id = UUID(payload["store_id"])
+    pos_session_id = payload.get("pos_session_id", "")
+    close_date_str = payload.get("close_date", str(date.today()))
+    close_date = date.fromisoformat(close_date_str)
+    pos_declared = int(payload.get("pos_petty_cash_declared", 0))
+
+    result = await a1_run(
+        db=db,
+        tenant_id=tenant_id,
+        trigger="pos_daily_close",
+        payload={
+            "store_id": store_id,
+            "pos_session_id": pos_session_id,
+            "pos_declared_petty_cash": pos_declared,
+            "close_date": close_date,
+        },
+    )
+    log.info(
+        "daily_close_handled",
+        store_id=str(store_id),
+        tenant_id=str(tenant_id),
+        result=result,
+    )
+
+    # A6 POS对账Agent：备用金核销 + 成本数据更新
+    try:
+        from src.agents.a6_pos_reconciliation import A6POSReconciliationAgent
+
+        a6 = A6POSReconciliationAgent()
+        a6_event_data = {
+            "tenant_id": str(tenant_id),
+            "store_id": str(store_id),
+            "date": str(close_date),
+            "pos_summary": {
+                "pos_petty_cash_balance": pos_declared,
+                "pos_session_id": pos_session_id,
+                **{k: v for k, v in payload.items()
+                   if k not in ("store_id", "pos_session_id", "close_date",
+                                "pos_petty_cash_declared")},
+            },
+        }
+        await a6.handle_daily_close(a6_event_data, db)
+    except ImportError:
+        log.warning(
+            "a6_agent_not_available",
+            trigger="pos_daily_close",
+            note="A6 agent not yet available; skipping.",
+        )
+    except Exception as exc:  # noqa: BLE001 — A6 失败不影响 A1 已完成的核销
+        log.error(
+            "a6_agent_failed",
+            store_id=str(store_id),
+            tenant_id=str(tenant_id),
+            error=str(exc),
+            exc_info=True,
+        )
+
+
+async def _handle_application_submitted(
+    db: Any,
+    tenant_id: UUID,
+    payload: dict[str, Any],
+) -> None:
+    """处理 expense.application.submitted 事件，触发 A2 发票核验。
+
+    payload 预期字段：
+      application_id  (str UUID, 必填)
+    """
+    try:
+        from src.agents.a2_invoice_verifier import run as a2_run
+    except ImportError:
+        log.warning(
+            "a2_agent_not_available",
+            trigger="application_submitted",
+            note="A2 agent not yet implemented; skipping.",
+        )
+        return
+
+    application_id = UUID(payload["application_id"])
+    result = await a2_run(
+        db=db,
+        tenant_id=tenant_id,
+        trigger="application_submitted",
+        payload={"application_id": application_id},
+    )
+    log.info(
+        "invoice_verification_triggered",
+        application_id=str(application_id),
+        tenant_id=str(tenant_id),
+        result=result,
+    )
+
+
+async def _handle_purchase_order_approved(
+    db: Any,
+    tenant_id: UUID,
+    payload: dict[str, Any],
+) -> None:
+    """处理 supply.purchase_order.approved 事件。
+
+    自动为采购订单创建付款单草稿（幂等：同一订单重复触发只创建一张）。
+
+    payload 预期字段：
+      purchase_order_id   (str UUID, 必填)
+      purchase_order_no   (str, 可选)
+      supplier_id         (str UUID, 可选)
+      supplier_name       (str, 可选)
+      total_amount        (int 分, 必填)
+      payment_type        (str, 可选, 默认 purchase)
+      due_date            (str ISO date, 可选)
+      items               (list[dict], 可选)
+    """
+    try:
+        from src.services.procurement_payment_service import ProcurementPaymentService
+    except ImportError:
+        log.warning(
+            "procurement_payment_service_not_available",
+            trigger="purchase_order_approved",
+            note="ProcurementPaymentService not yet available; skipping.",
+        )
+        return
+
+    purchase_order_id_str = payload.get("purchase_order_id")
+    if not purchase_order_id_str:
+        log.error(
+            "event_missing_purchase_order_id",
+            event_type="supply.purchase_order.approved",
+            payload_keys=list(payload.keys()),
+        )
+        return
+
+    svc = ProcurementPaymentService()
+    payment = await svc.create_from_purchase_order(
+        db=db,
+        tenant_id=tenant_id,
+        order_data=payload,
+    )
+    await db.commit()
+
+    log.info(
+        "purchase_order_approved_payment_created",
+        tenant_id=str(tenant_id),
+        payment_id=str(payment.id),
+        purchase_order_id=purchase_order_id_str,
+    )
+
+
+async def _handle_purchase_order_cancelled(
+    db: Any,
+    tenant_id: UUID,
+    payload: dict[str, Any],
+) -> None:
+    """处理 supply.purchase_order.cancelled 事件。
+
+    查找对应付款单并标记为 cancelled。若无对应付款单，静默跳过。
+
+    payload 预期字段：
+      purchase_order_id   (str UUID, 必填)
+    """
+    try:
+        from src.services.procurement_payment_service import ProcurementPaymentService
+    except ImportError:
+        log.warning(
+            "procurement_payment_service_not_available",
+            trigger="purchase_order_cancelled",
+            note="ProcurementPaymentService not yet available; skipping.",
+        )
+        return
+
+    purchase_order_id_str = payload.get("purchase_order_id")
+    if not purchase_order_id_str:
+        log.error(
+            "event_missing_purchase_order_id",
+            event_type="supply.purchase_order.cancelled",
+            payload_keys=list(payload.keys()),
+        )
+        return
+
+    purchase_order_id = UUID(purchase_order_id_str)
+    svc = ProcurementPaymentService()
+    payment = await svc.cancel_payment_by_order_id(
+        db=db,
+        tenant_id=tenant_id,
+        purchase_order_id=purchase_order_id,
+    )
+    if payment is not None:
+        await db.commit()
+
+    log.info(
+        "purchase_order_cancelled_payment_updated",
+        tenant_id=str(tenant_id),
+        purchase_order_id=purchase_order_id_str,
+        payment_cancelled=payment is not None,
+    )
+
+
+async def _handle_employee_departure(
+    db: Any,
+    tenant_id: UUID,
+    payload: dict[str, Any],
+) -> None:
+    """处理 org.employee.departed 事件。
+
+    payload 预期字段：
+      employee_id     (str UUID, 必填)
+      store_id        (str UUID, 可选，无则用零值 UUID)
+      departure_date  (str ISO date, 可选，默认今日)
+    """
+    try:
+        from src.agents.a1_petty_cash_guardian import run as a1_run
+    except ImportError:
+        log.warning(
+            "a1_agent_not_available",
+            trigger="employee_departure",
+            note="A1 agent not yet implemented; skipping.",
+        )
+        return
+
+    employee_id = UUID(payload["employee_id"])
+    store_id = UUID(
+        payload.get("store_id", "00000000-0000-0000-0000-000000000000")
+    )
+    departure_date_str = payload.get("departure_date", str(date.today()))
+    departure_date = date.fromisoformat(departure_date_str)
+
+    result = await a1_run(
+        db=db,
+        tenant_id=tenant_id,
+        trigger="employee_departure",
+        payload={
+            "store_id": store_id,
+            "employee_id": employee_id,
+            "departure_date": departure_date,
+        },
+    )
+    log.info(
+        "employee_departure_handled",
+        employee_id=str(employee_id),
+        tenant_id=str(tenant_id),
+        result=result,
+    )

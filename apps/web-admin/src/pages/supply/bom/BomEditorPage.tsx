@@ -62,6 +62,7 @@ import {
 import type { ColumnsType } from 'antd/es/table';
 import ReactECharts from 'echarts-for-react';
 import { txFetchData } from '../../../api';
+import { formatPrice } from '@tx-ds/utils';
 
 const { Title, Text } = Typography;
 const { Panel } = Collapse;
@@ -126,6 +127,7 @@ interface CostBreakdownItem {
 
 // ─── 工具函数 ─────────────────────────────────────────────────────────────────
 
+/** @deprecated Use formatPrice from @tx-ds/utils */
 const fenToYuan = (fen: number): string => (fen / 100).toFixed(2);
 const yuanToFen = (yuan: number): number => Math.round(yuan * 100);
 

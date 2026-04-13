@@ -38,6 +38,8 @@ import { useTrainingMode } from './hooks/useTrainingMode';
 import { FastFoodPage } from './pages/fastfood/FastFoodPage';
 import { CallNumberScreen } from './pages/fastfood/CallNumberScreen';
 import { FastFoodKDSView } from './pages/fastfood/FastFoodKDSView';
+import { PrintManagerPage } from './pages/PrintManagerPage';  // 模块4.2 打印管理可视化中心
+import { BanquetDepositPage } from './pages/BanquetDepositPage';  // 模块4.1 宴会定金管理
 
 const STORE_ID: string =
   (window as unknown as Record<string, unknown>).__STORE_ID__ as string || '';
@@ -102,6 +104,10 @@ function AppLayout() {
         <Route path="/fastfood" element={<FastFoodPage />} />
         <Route path="/fastfood/call-screen" element={<CallNumberScreen />} />
         <Route path="/fastfood/kds" element={<FastFoodKDSView />} />
+        {/* ─── 模块4.1: 宴会定金管理 ─── */}
+        <Route path="/banquet-deposit" element={<BanquetDepositPage />} />
+        {/* ─── 模块4.2: 打印管理可视化中心 ─── */}
+        <Route path="/print-manager" element={<PrintManagerPage />} />
       </Routes>
     </div>
   );

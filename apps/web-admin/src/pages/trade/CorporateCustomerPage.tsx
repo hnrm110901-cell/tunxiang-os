@@ -48,6 +48,7 @@ import {
   ProTable,
 } from '@ant-design/pro-components';
 import type { Dayjs } from 'dayjs';
+import { formatPrice } from '@tx-ds/utils';
 
 const { Text, Title } = Typography;
 const { RangePicker } = DatePicker;
@@ -101,6 +102,7 @@ const fetchJson = async (url: string, options?: RequestInit) => {
 
 // ─── 工具函数 ──────────────────────────────────────────────────────────────
 
+/** @deprecated Use formatPrice from @tx-ds/utils */
 const fenToYuan = (fen: number) => (fen / 100).toLocaleString('zh-CN', {
   minimumFractionDigits: 2, maximumFractionDigits: 2,
 });

@@ -51,6 +51,7 @@ import {
   ProTable,
 } from '@ant-design/pro-components';
 import dayjs from 'dayjs';
+import { formatPrice } from '@tx-ds/utils';
 
 const { Title, Text } = Typography;
 
@@ -96,6 +97,7 @@ interface Transaction {
 
 // ─── 工具函数 ──────────────────────────────────────────────────────────────────
 
+/** @deprecated Use formatPrice from @tx-ds/utils */
 const fen2yuan = (fen: number) => `¥${(fen / 100).toFixed(2)}`;
 const fenToInputYuan = (fen: number) => fen / 100;
 const inputYuanToFen = (yuan: number) => Math.round(yuan * 100);
@@ -816,7 +818,7 @@ function ChargeModal({ open, unit, onClose, onSuccess }: {
           />
         </Form.Item>
         <Form.Item name="print_voucher" valuePropName="checked">
-          <Checkbox icon={<PrinterOutlined />}>打印凭证</Checkbox>
+          <Checkbox><PrinterOutlined /> 打印凭证</Checkbox>
         </Form.Item>
       </Form>
     </Modal>
@@ -945,7 +947,7 @@ function RepayModal({ open, unit, onClose, onSuccess }: {
         </Form.Item>
 
         <Form.Item name="print_voucher" valuePropName="checked">
-          <Checkbox icon={<PrinterOutlined />}>打印还款凭证</Checkbox>
+          <Checkbox><PrinterOutlined /> 打印还款凭证</Checkbox>
         </Form.Item>
       </Form>
     </Modal>

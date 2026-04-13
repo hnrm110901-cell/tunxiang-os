@@ -78,9 +78,9 @@ export function GrowthJourneyRunsPage() {
       const resp = await txFetchData<{ items: EnrollmentRow[]; total: number }>(
         `/api/v1/growth/journey-enrollments?${qs}`
       );
-      if (resp.data) {
-        setEnrollments(resp.data.items);
-        setTotal(resp.data.total);
+      if (resp) {
+        setEnrollments(resp.items);
+        setTotal(resp.total);
       }
     } catch (err) {
       console.error('fetch enrollments error', err);
@@ -109,7 +109,7 @@ export function GrowthJourneyRunsPage() {
       title: '旅程名', dataIndex: 'journey_name', key: 'journey_name', width: 160,
       render: (val: string | undefined, record: EnrollmentRow) => (
         <span style={{ color: TEXT_PRIMARY }}>
-          {val || record.journey_template_id?.slice(0, 8) || '-'}
+          {val || record.template_id?.slice(0, 8) || '-'}
         </span>
       ),
     },

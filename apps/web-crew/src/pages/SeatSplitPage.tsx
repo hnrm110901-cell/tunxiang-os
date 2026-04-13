@@ -9,6 +9,7 @@
  */
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { formatPrice } from '@tx-ds/utils';
 import { txFetch } from '../api/index';
 
 // ─── 颜色常量 ───────────────────────────────────────────────
@@ -28,6 +29,7 @@ const C = {
 };
 
 // ─── 工具函数 ────────────────────────────────────────────────
+/** @deprecated Use formatPrice from @tx-ds/utils */
 const fen2yuan = (fen: number) => `¥${(fen / 100).toFixed(2)}`;
 
 // ─── 类型定义 ────────────────────────────────────────────────

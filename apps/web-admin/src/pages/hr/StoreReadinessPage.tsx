@@ -158,7 +158,7 @@ export default function StoreReadinessPage() {
     setDashLoading(true);
     try {
       const res = await txFetchData<DashboardData>('/api/v1/store-readiness/dashboard');
-      setDashboard(res.data);
+      setDashboard(res);
     } catch (err) {
       message.error('获取仪表板数据失败');
     } finally {
@@ -170,7 +170,7 @@ export default function StoreReadinessPage() {
     setTodayLoading(true);
     try {
       const res = await txFetchData<{ items: ReadinessRecord[] }>('/api/v1/store-readiness/today');
-      setTodayItems(res.data?.items ?? []);
+      setTodayItems(res?.items ?? []);
     } catch (err) {
       message.error('获取今日就绪度失败');
     } finally {
@@ -185,7 +185,7 @@ export default function StoreReadinessPage() {
       const res = await txFetchData<{ items: TrendPoint[] }>(
         `/api/v1/store-readiness/trend?store_id=${encodeURIComponent(trendStoreId)}&days=${trendDays}`,
       );
-      setTrendData(res.data?.items ?? []);
+      setTrendData(res?.items ?? []);
     } catch (err) {
       message.error('获取趋势数据失败');
     } finally {
@@ -483,8 +483,8 @@ export default function StoreReadinessPage() {
               `/api/v1/store-readiness?${query.toString()}`,
             );
             return {
-              data: res.data?.items ?? [],
-              total: res.data?.total ?? 0,
+              data: res?.items ?? [],
+              total: res?.total ?? 0,
               success: true,
             };
           } catch {

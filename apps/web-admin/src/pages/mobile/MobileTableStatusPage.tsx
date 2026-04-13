@@ -114,7 +114,7 @@ export function MobileTableStatusPage() {
 
     txFetchData<TableItem[]>(`/api/v1/trade/tables?store_id=${storeId}`)
       .then(res => {
-        setTables(res.data ?? generateMockTables(storeId));
+        setTables(res ?? generateMockTables(storeId));
       })
       .catch(() => {
         setTables(generateMockTables(storeId));

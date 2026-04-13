@@ -15,6 +15,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MobileLayout } from '../../components/MobileLayout';
 import { txFetchData } from '../../api/client';
+import { formatPrice } from '@tx-ds/utils';
 
 // ─── 类型 ───
 
@@ -55,6 +56,7 @@ const MOCK: DashboardStats = {
 
 // ─── 工具函数 ───
 
+/** @deprecated Use formatPrice from @tx-ds/utils */
 const fen2yuan = (fen: number) =>
   (fen / 100).toLocaleString('zh-CN', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 
@@ -123,7 +125,7 @@ export function MobileHomePage() {
 
     txFetchData<DashboardStats>('/api/v1/analytics/dashboard-stats')
       .then(res => {
-        if (!cancelled) setData(res.data ?? MOCK);
+        if (!cancelled) setData(res ?? MOCK);
       })
       .catch(() => {
         if (!cancelled) setData(MOCK);

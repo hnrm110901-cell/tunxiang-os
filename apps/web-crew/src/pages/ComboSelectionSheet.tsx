@@ -11,6 +11,7 @@
  *   - 合计 = combo.price_fen + 所有已选 extra_price_fen 之和
  */
 import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
+import { formatPrice } from '@tx-ds/utils';
 import type { ComboDetail, ComboGroup, ComboSelection } from '../api/comboApi';
 
 // ─── Design Tokens ───
@@ -29,6 +30,7 @@ const C = {
 };
 
 // ─── 辅助函数 ───
+/** @deprecated Use formatPrice from @tx-ds/utils */
 function fenToYuan(fen: number): string {
   return (fen / 100).toFixed(2);
 }

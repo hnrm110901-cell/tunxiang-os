@@ -13,6 +13,7 @@
  */
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { formatPrice } from '@tx-ds/utils';
 
 /* ─────────────────────────────────────────
    设计 Token（与屯象OS Token 规范对齐）
@@ -38,6 +39,7 @@ const T = {
 /* ─────────────────────────────────────────
    工具函数
 ───────────────────────────────────────── */
+/** @deprecated Use formatPrice from @tx-ds/utils */
 const fen2yuan = (fen: number): string => `¥${(fen / 100).toFixed(2)}`;
 const fmt = (d: string | null): string => d ? d.replace('T', ' ').slice(0, 16) : '—';
 

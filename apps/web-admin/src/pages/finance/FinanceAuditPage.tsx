@@ -28,6 +28,7 @@ import {
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { txFetchData } from '../../api';
+import { formatPrice } from '@tx-ds/utils';
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -121,6 +122,7 @@ const SEVERITY_LABEL: Record<AnomalySeverity, string> = {
 
 // ─── 工具函数 ───
 
+/** @deprecated Use formatPrice from @tx-ds/utils */
 function fenToYuan(fen: number): string {
   return (fen / 100).toFixed(2);
 }

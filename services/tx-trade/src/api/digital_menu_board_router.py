@@ -91,8 +91,7 @@ async def get_board_data(
 ) -> dict:
     """返回当前门店菜单数据（含库存/沽清状态）。
 
-    TODO: 接入菜品表和库存表进行真实查询。
-    目前返回结构化示例数据供前端开发对接。
+    查询 dishes 表，JOIN dish_categories，过滤 is_deleted=false 和 store_id 匹配。
     """
     logger.info("board_data_requested", store_id=store_id, tenant_id=x_tenant_id)
 
@@ -146,7 +145,7 @@ async def get_board_config(
 ) -> dict:
     """返回菜单大屏展示配置（分类顺序、特价菜、推荐菜）。
 
-    TODO: 接入门店配置表进行真实查询。
+    查询 stores.config 取门店公告，查询 dish_categories 取分类顺序，查询 dishes 取特价/推荐菜 ID 列表。
     """
     logger.info("board_config_requested", store_id=store_id, tenant_id=x_tenant_id)
 

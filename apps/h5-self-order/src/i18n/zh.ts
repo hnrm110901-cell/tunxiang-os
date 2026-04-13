@@ -105,6 +105,23 @@ export const zh = {
   payResultViewOrder: '查看订单',
   payResultContinue: '继续点餐',
 
+  // AddMorePage
+  addMoreTitle: '继续点餐',
+  addMoreExisting: '已有',
+  addMoreDishUnit: '道菜',
+  addMoreBadge: '新增',
+  addMoreSubmit: '追加点餐',
+
+  // OrderConfirmPage
+  orderConfirmTitle: '确认订单',
+  orderConfirmItemCount: '件商品',
+  orderConfirmItems: '已选菜品',
+  orderConfirmDelete: '删除',
+  orderConfirmPoints: '积分抵扣',
+  orderConfirmSubtotal: '小计',
+  orderConfirmDiscount: '优惠',
+  orderConfirmPayable: '应付',
+
   // DemoEntry
   demoMode: '演示模式',
   demoWelcome: '欢迎光临',

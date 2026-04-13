@@ -41,9 +41,9 @@ import {
   ThunderboltOutlined,
 } from '@ant-design/icons';
 import { ProTable, StatisticCard } from '@ant-design/pro-components';
-import type { ProColumns } from '@ant-design/pro-components';
+import type { ColumnsType } from 'antd/es/table';
 import { Bar } from '@ant-design/charts';
-import { txFetch } from '../../api';
+import { txFetchData } from '../../api';
 
 // ─── Design Token（深色驾驶舱主题）───────────────────────────────────────────
 const C = {
@@ -148,10 +148,10 @@ export default function AiMarketingDashboardPage() {
   const fetchHealthScore = useCallback(async () => {
     setLoadingHS(true);
     try {
-      const res = await txFetch(
+      const res = await txFetchData<HealthScore>(
         `/api/v1/agent/ai-marketing/health-score?store_id=${storeId}&channel_count=4&monthly_touches_per_member=3&avg_open_rate=0.25&attributed_order_pct=0.08`
       );
-      setHealthScore(res.data ?? null);
+      setHealthScore(res ?? null);
     } catch {
       message.error('获取健康评分失败，请检查网络或服务状态');
     } finally {
@@ -163,10 +163,10 @@ export default function AiMarketingDashboardPage() {
   const fetchPerformance = useCallback(async () => {
     setLoadingPS(true);
     try {
-      const res = await txFetch(
+      const res = await txFetchData<PerformanceSummary>(
         `/api/v1/growth/ai-marketing/performance-summary?store_id=${storeId}&days=${days}`
       );
-      setPerfSummary(res.data ?? null);
+      setPerfSummary(res ?? null);
     } catch {
       message.error('获取营销绩效数据失败');
     } finally {
@@ -178,11 +178,11 @@ export default function AiMarketingDashboardPage() {
   const fetchTouchLog = useCallback(async (page = 1) => {
     setLoadingTouchLog(true);
     try {
-      const res = await txFetch(
+      const res = await txFetchData<{ items: TouchLog[]; total: number }>(
         `/api/v1/agent/ai-marketing/touch-log?store_id=${storeId}&days=${days}&page=${page}&size=20`
       );
-      setTouchLogs(res.data?.items ?? []);
-      setTouchTotal(res.data?.total ?? 0);
+      setTouchLogs(res?.items ?? []);
+      setTouchTotal(res?.total ?? 0);
       setTouchPage(page);
     } catch {
       message.error('获取触达日志失败');
@@ -204,7 +204,7 @@ export default function AiMarketingDashboardPage() {
     try {
       const values = await triggerForm.validateFields();
       setTriggerLoading(true);
-      await txFetch('/api/v1/agent/ai-marketing/trigger', {
+      await txFetchData('/api/v1/agent/ai-marketing/trigger', {
         method: 'POST',
         body: JSON.stringify({ store_id: storeId, ...values }),
       });
@@ -227,7 +227,7 @@ export default function AiMarketingDashboardPage() {
     : [];
 
   // ─── 列定义 ──────────────────────────────────────────────────────────────
-  const campaignColumns: ProColumns<CampaignPerf>[] = [
+  const campaignColumns: ColumnsType<CampaignPerf> = [
     { title: '活动类型', dataIndex: 'type' },
     { title: '发送数',   dataIndex: 'sent',              align: 'right' },
     { title: '归因订单', dataIndex: 'attributed_orders', align: 'right' },
@@ -239,7 +239,7 @@ export default function AiMarketingDashboardPage() {
     },
   ];
 
-  const touchLogColumns: ProColumns<TouchLog>[] = [
+  const touchLogColumns: ColumnsType<TouchLog> = [
     {
       title: '触达ID',
       dataIndex: 'touch_id',
@@ -578,7 +578,7 @@ export default function AiMarketingDashboardPage() {
           触达日志
         </div>
         <ProTable<TouchLog>
-          columns={touchLogColumns}
+          columns={touchLogColumns as import('@ant-design/pro-components').ProColumns<TouchLog>[]}
           dataSource={touchLogs}
           rowKey="touch_id"
           loading={loadingTouchLog}

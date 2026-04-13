@@ -36,7 +36,7 @@ export default function GovernanceStaffing() {
 
   useEffect(() => {
     txFetchData<StaffingResp>('/api/v1/hr/governance/staffing')
-      .then((resp) => setData(resp.data?.items ?? []))
+      .then((resp) => setData(resp?.items ?? []))
       .catch(() => message.error('加载编制数据失败'))
       .finally(() => setLoading(false));
   }, []);

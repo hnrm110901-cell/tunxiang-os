@@ -13,8 +13,8 @@ Create Date: 2026-04-12
 from alembic import op
 import sqlalchemy as sa
 
-revision = "v233"
-down_revision = "v232"
+revision = "v233c"
+down_revision = "v233b"
 branch_labels = None
 depends_on = None
 
@@ -121,11 +121,16 @@ _SGC_CONFIG = """{
 
 
 def upgrade() -> None:
+    conn = op.get_bind()
+    existing = sa.inspect(conn).get_table_names()
+    if 'tenants' not in existing:
+        return
+
     # 尝在一起
     op.execute(
         sa.text("""
             UPDATE tenants
-               SET systems_config = :cfg::jsonb,
+               SET systems_config = CAST(:cfg AS jsonb),
                    sync_enabled   = TRUE
              WHERE code = 't-czq'
         """).bindparams(cfg=_CZYZ_CONFIG)
@@ -135,7 +140,7 @@ def upgrade() -> None:
     op.execute(
         sa.text("""
             UPDATE tenants
-               SET systems_config = :cfg::jsonb,
+               SET systems_config = CAST(:cfg AS jsonb),
                    sync_enabled   = TRUE
              WHERE code = 't-zqx'
         """).bindparams(cfg=_ZQX_CONFIG)
@@ -145,7 +150,7 @@ def upgrade() -> None:
     op.execute(
         sa.text("""
             UPDATE tenants
-               SET systems_config = :cfg::jsonb,
+               SET systems_config = CAST(:cfg AS jsonb),
                    sync_enabled   = TRUE
              WHERE code = 't-sgc'
         """).bindparams(cfg=_SGC_CONFIG)

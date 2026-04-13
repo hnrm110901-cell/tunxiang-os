@@ -27,6 +27,7 @@ import { EditOutlined, UserOutlined } from '@ant-design/icons';
 import { ProColumns, ProTable, StatisticCard } from '@ant-design/pro-components';
 import { Line } from '@ant-design/charts';
 import { txFetchData } from '../../../api';
+import { formatPrice } from '@tx-ds/utils';
 
 const { Title, Text } = Typography;
 
@@ -124,6 +125,7 @@ const statusBadge: Record<string, { status: 'success' | 'processing' | 'default'
   terminated: { status: 'default', text: '解除' },
 };
 
+/** @deprecated Use formatPrice from @tx-ds/utils */
 function fenToYuan(fen: number): string {
   return (fen / 100).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
@@ -151,8 +153,8 @@ export default function EmployeeDetail() {
       txFetchData<ProfileTabs>(`/api/v1/employees/${employeeId}/profile-tabs`),
     ])
       .then(([bResp, tResp]) => {
-        setBasic(bResp.data);
-        setTabs(tResp.data);
+        setBasic(bResp);
+        setTabs(tResp);
       })
       .catch(() => message.error('加载员工信息失败'))
       .finally(() => setLoading(false));

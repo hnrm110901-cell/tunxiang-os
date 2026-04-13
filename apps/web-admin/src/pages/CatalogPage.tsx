@@ -4,6 +4,7 @@
  */
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { txFetchData } from '../api';
+import { formatPrice } from '@tx-ds/utils';
 
 // ─── 类型定义 ───────────────────────────────────────────────
 
@@ -44,8 +45,9 @@ interface SummaryStats {
 
 // ─── 工具函数 ────────────────────────────────────────────────
 
+/** @deprecated — use formatPrice from @tx-ds/utils */
 function fenToYuan(fen: number): string {
-  return (fen / 100).toFixed(2);
+  return formatPrice(fen);
 }
 
 function costRateColor(rate?: number): string {

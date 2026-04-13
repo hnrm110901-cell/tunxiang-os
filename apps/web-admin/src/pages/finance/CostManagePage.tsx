@@ -50,11 +50,13 @@ import {
   getStoreFinanceConfigs,
 } from '../../api/costApi';
 import { txFetchData } from '../../api';
+import { formatPrice } from '@tx-ds/utils';
 
 const { Title, Text, Paragraph } = Typography;
 
 // ─── 工具函数 ──────────────────────────────────────────────────────────────────
 
+/** @deprecated Use formatPrice from @tx-ds/utils */
 function fenToYuan(fen: number): string {
   return (fen / 100).toFixed(2);
 }
@@ -452,7 +454,7 @@ function CostDetailTab({
             placeholder="成本类型（全部）"
             options={[{ value: '', label: '全部类型' }, ...COST_TYPE_OPTIONS]}
             value={costType ?? ''}
-            onChange={(v) => setCostType(v || undefined)}
+            onChange={(v) => setCostType((v || undefined) as CostType | undefined)}
             style={{ width: 160 }}
           />
           <Button

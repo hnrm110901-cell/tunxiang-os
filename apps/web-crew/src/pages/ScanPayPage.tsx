@@ -6,6 +6,7 @@
  */
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { formatPrice } from '@tx-ds/utils';
 import { txFetch } from '../api/index';
 import { startScan, isAndroidPOS, printReceipt } from '../bridge/TXBridge';
 
@@ -38,6 +39,7 @@ interface PaymentStatusResult {
 
 // ─── 工具 ───
 
+/** @deprecated Use formatPrice from @tx-ds/utils */
 function fenToYuan(fen: number): string {
   return (fen / 100).toFixed(2);
 }

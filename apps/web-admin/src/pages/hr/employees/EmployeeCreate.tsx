@@ -35,9 +35,9 @@ export default function EmployeeCreate() {
             method: 'POST',
             body: JSON.stringify(values),
           });
-          if (resp.ok && resp.data) {
-            message.success(`员工创建成功，工号: ${resp.data.employee_no}`);
-            navigate(`/hr/employees/${resp.data.id}`);
+          if (resp) {
+            message.success(`员工创建成功，工号: ${resp.employee_no}`);
+            navigate(`/hr/employees/${resp.id}`);
           }
         }}
       >
@@ -94,7 +94,7 @@ export default function EmployeeCreate() {
               const resp = await txFetchData<{ items: { id: string; name: string }[] }>(
                 '/api/v1/org-structure/departments',
               );
-              return (resp.data?.items ?? []).map((d) => ({ label: d.name, value: d.id }));
+              return (resp?.items ?? []).map((d) => ({ label: d.name, value: d.id }));
             }}
             fieldProps={{ showSearch: true }}
           />
@@ -107,7 +107,7 @@ export default function EmployeeCreate() {
               const resp = await txFetchData<{ items: { id: string; name: string }[] }>(
                 '/api/v1/job-grades',
               );
-              return (resp.data?.items ?? []).map((j) => ({ label: j.name, value: j.id }));
+              return (resp?.items ?? []).map((j) => ({ label: j.name, value: j.id }));
             }}
             fieldProps={{ showSearch: true }}
           />
@@ -119,7 +119,7 @@ export default function EmployeeCreate() {
               const resp = await txFetchData<{ items: { id: string; name: string }[] }>(
                 '/api/v1/job-grades?type=grade',
               );
-              return (resp.data?.items ?? []).map((g) => ({ label: g.name, value: g.id }));
+              return (resp?.items ?? []).map((g) => ({ label: g.name, value: g.id }));
             }}
           />
           <ProFormSelect

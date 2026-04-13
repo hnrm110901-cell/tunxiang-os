@@ -4,3 +4,5 @@ packages:
   - "apps/web-crew"
   - "apps/web-admin"
   - "apps/web-hub"
+  - "shared/design-system"
+  - "apps/h5-self-order"

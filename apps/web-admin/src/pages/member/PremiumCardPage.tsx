@@ -443,12 +443,12 @@ function ProductConfigTab() {
               <div>
                 <Text strong style={{ fontSize: 12 }}>权益包：</Text>
                 <div style={{ marginTop: 4 }}>
-                  {p.benefits.discount_rate && (
+                  {!!p.benefits.discount_rate && (
                     <Tag color="blue">{((p.benefits.discount_rate as number) * 10).toFixed(1)}折优惠</Tag>
                   )}
-                  {p.benefits.priority_booking && <Tag color="purple">优先订位</Tag>}
-                  {p.benefits.birthday_bonus && <Tag color="pink">生日双倍积分</Tag>}
-                  {p.benefits.all_benefits && <Tag color="gold">全部权益</Tag>}
+                  {!!p.benefits.priority_booking && <Tag color="purple">优先订位</Tag>}
+                  {!!p.benefits.birthday_bonus && <Tag color="pink">生日双倍积分</Tag>}
+                  {!!p.benefits.all_benefits && <Tag color="gold">全部权益</Tag>}
                   {Array.isArray(p.benefits.free_dishes) && (
                     <Tag color="green">赠 {(p.benefits.free_dishes as string[]).join('/')}</Tag>
                   )}

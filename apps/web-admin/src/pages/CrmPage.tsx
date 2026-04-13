@@ -7,12 +7,14 @@
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import { txFetchData } from '../api';
+import { formatPrice } from '@tx-ds/utils';
 
 // ─── 工具函数 ──────────────────────────────────────────────────
 
 const maskPhone = (phone: string) =>
   phone.replace(/(\d{3})\d{4}(\d{4})/, '$1****$2');
 
+/** @deprecated Use formatPrice from @tx-ds/utils */
 const fenToYuan = (fen: number) =>
   (fen / 100).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 

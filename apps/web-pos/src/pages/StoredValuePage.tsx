@@ -6,6 +6,7 @@
  */
 import { useState, useCallback } from 'react';
 import { txFetch } from '../api/index';
+import { formatPrice } from '@tx-ds/utils';
 
 // ─── 类型定义 ───────────────────────────────────────────────────────────────
 
@@ -34,6 +35,7 @@ const PRESET_AMOUNTS = [100, 200, 500, 1000, 2000, 5000];
 
 // ─── 工具函数 ────────────────────────────────────────────────────────────────
 
+/** @deprecated Use formatPrice from @tx-ds/utils */
 const fenToYuan = (fen: number): string =>
   (Math.abs(fen) / 100).toFixed(2);
 

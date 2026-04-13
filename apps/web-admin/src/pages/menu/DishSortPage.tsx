@@ -27,6 +27,7 @@ import {
   SaveOutlined,
   StarFilled,
 } from '@ant-design/icons';
+import { formatPrice } from '@tx-ds/utils';
 
 const { Text } = Typography;
 
@@ -55,7 +56,7 @@ interface DishCategory {
 async function fetchCategories(): Promise<DishCategory[]> {
   try {
     const res = await txFetchData<{ items: DishCategory[] }>('/api/v1/menu/categories');
-    return res.data?.items ?? [];
+    return res?.items ?? [];
   } catch (err) {
     console.error('[DishSortPage] fetchCategories 失败:', err);
     return [];
@@ -67,7 +68,7 @@ async function fetchDishesByCategory(categoryId: string): Promise<DishSortItem[]
     const res = await txFetchData<{ items: DishSortItem[] }>(
       `/api/v1/menu/dishes?category_id=${encodeURIComponent(categoryId)}&include_sort=true&size=200`,
     );
-    return res.data?.items ?? [];
+    return res?.items ?? [];
   } catch (err) {
     console.error('[DishSortPage] fetchDishesByCategory 失败:', err);
     return [];
@@ -83,6 +84,7 @@ async function saveDishSort(items: { id: string; sort_order: number }[]): Promis
 
 // ─── 工具函数 ────────────────────────────────────────────────
 
+/** @deprecated — use formatPrice from @tx-ds/utils */
 function fenToYuan(fen: number) {
   return `¥${(fen / 100).toFixed(2)}`;
 }

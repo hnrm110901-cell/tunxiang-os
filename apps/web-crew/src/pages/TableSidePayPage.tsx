@@ -4,6 +4,7 @@
  */
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { formatPrice } from '@tx-ds/utils';
 import DiscountPreviewSheet, { type DiscountInputItem, type DiscountCalculateResult } from './DiscountPreviewSheet';
 
 
@@ -51,6 +52,7 @@ async function txFetch<T = unknown>(
 
 // ─── 工具函数 ───
 
+/** @deprecated Use formatPrice from @tx-ds/utils */
 function fenToYuan(fen: number): string {
   return (fen / 100).toFixed(2);
 }

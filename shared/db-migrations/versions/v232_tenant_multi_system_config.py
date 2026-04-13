@@ -18,8 +18,8 @@ from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import JSONB
 
-revision = "v232"
-down_revision = "v231"
+revision = "v232c"
+down_revision = "v232b"
 branch_labels = None
 depends_on = None
 
@@ -56,6 +56,11 @@ _CONFIG_SKELETON = """{
 
 
 def upgrade() -> None:
+    conn = op.get_bind()
+    existing = sa.inspect(conn).get_table_names()
+    if 'tenants' not in existing:
+        return  # tenants table not yet created; skip
+
     # ── 1. 新增列（幂等，IF NOT EXISTS） ────────────────────────────
     op.execute("""
         ALTER TABLE tenants

@@ -88,7 +88,7 @@ const columns: ProColumns<AnomalyRow>[] = [
     title: '异常类型', dataIndex: 'anomalyType', width: 90,
     render: (_, r) => <Tag color={anomalyTypeColor[r.anomalyType]}>{r.anomalyType}</Tag>,
   },
-  { title: '异常描述', dataIndex: 'desc',         flex: 1 },
+  { title: '异常描述', dataIndex: 'desc'},
   { title: '影响金额', dataIndex: 'impactAmount', width: 90  },
   { title: 'AI分析',   dataIndex: 'aiAnalysis',   width: 180 },
   {

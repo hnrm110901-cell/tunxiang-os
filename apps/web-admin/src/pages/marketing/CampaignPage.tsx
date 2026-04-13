@@ -330,7 +330,7 @@ function CreateCampaignModal({ open, onClose, onSuccess }: { open: boolean; onCl
 
   const handleSubmit = async () => {
     try {
-      const rule = getRuleConfig() as Record<string, number>;
+      const rule = getRuleConfig() as unknown as Record<string, number>;
       const result = await createCampaign({
         name: form.name,
         type: form.type,

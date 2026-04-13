@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { StatusBar } from '@tx-ds/biz';
+import type { StatusBarItem } from '@tx-ds/biz';
 import { TurnPredictionAlert } from './TurnPredictionAlert';
 
 interface TableLayout {
@@ -366,33 +368,18 @@ export function TableMapView() {
 
       {/* 底部统计栏 */}
       <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-around',
-        padding: '12px 16px',
+        padding: '8px 16px',
         borderTop: '1px solid #1a2a33',
         background: '#0d1f28',
-        gap: 8,
       }}>
-        <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: 20, fontWeight: 700, color: '#FF6B35' }}>{occupiedCount}</div>
-          <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>在台桌数</div>
-        </div>
-        <div style={{ width: 1, height: 32, background: '#1a2a33' }} />
-        <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: 20, fontWeight: 700, color: '#30D158' }}>{freeCount}</div>
-          <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>空台桌数</div>
-        </div>
-        <div style={{ width: 1, height: 32, background: '#1a2a33' }} />
-        <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: 20, fontWeight: 700, color: '#FF9F0A' }}>{turnRate}</div>
-          <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>翻台率</div>
-        </div>
-        <div style={{ width: 1, height: 32, background: '#1a2a33' }} />
-        <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: 20, fontWeight: 700, color: '#1A9BE8' }}>{floorTables.filter(t => t.status === 'reserved').length}</div>
-          <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>预订桌数</div>
-        </div>
+        <StatusBar
+          items={[
+            { label: '在台', value: occupiedCount, color: '#FF6B35' },
+            { label: '空台', value: freeCount, color: '#30D158' },
+            { label: '翻台率', value: turnRate, color: '#FF9F0A' },
+            { label: '预订', value: floorTables.filter(t => t.status === 'reserved').length, color: '#1A9BE8' },
+          ] satisfies StatusBarItem[]}
+        />
       </div>
 
       {/* Phase 3-A: 翻台预测提醒浮动卡 */}

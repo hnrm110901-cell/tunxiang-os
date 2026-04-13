@@ -32,6 +32,7 @@ import {
   PlusCircleOutlined,
   MinusCircleOutlined,
 } from '@ant-design/icons';
+import { formatPrice } from '@tx-ds/utils';
 
 const { Text } = Typography;
 
@@ -56,7 +57,7 @@ interface DishSpec {
 async function fetchDishSpecs(dishId: string): Promise<DishSpec[]> {
   try {
     const res = await txFetchData<{ items: DishSpec[] }>(`/api/v1/menu/dishes/${dishId}/specs`);
-    return res.data?.items ?? [];
+    return res?.items ?? [];
   } catch (err) {
     console.error('[DishSpecPage] fetchDishSpecs 失败:', err);
     return [];
@@ -71,7 +72,7 @@ async function fetchAllSpecs(params: { dish_name?: string; spec_group?: string; 
     query.set('page', String(params.current ?? 1));
     query.set('size', String(params.pageSize ?? 10));
     const res = await txFetchData<{ items: DishSpec[]; total: number }>(`/api/v1/menu/specs?${query.toString()}`);
-    return { data: res.data?.items ?? [], total: res.data?.total ?? 0, success: true };
+    return { data: res?.items ?? [], total: res?.total ?? 0, success: true };
   } catch (err) {
     console.error('[DishSpecPage] fetchAllSpecs 失败:', err);
     return { data: [], total: 0, success: false };
@@ -101,6 +102,7 @@ async function deleteSpec(dishId: string, specId: string): Promise<void> {
 
 // ─── 工具函数 ────────────────────────────────────────────────
 
+/** @deprecated — use formatPrice from @tx-ds/utils */
 function fenToYuan(fen: number): string {
   const yuan = fen / 100;
   return yuan >= 0 ? `+¥${yuan.toFixed(2)}` : `-¥${Math.abs(yuan).toFixed(2)}`;

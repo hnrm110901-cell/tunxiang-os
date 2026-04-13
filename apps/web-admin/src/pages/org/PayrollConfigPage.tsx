@@ -13,6 +13,7 @@
  */
 
 import { useRef, useState } from 'react';
+import { formatPrice } from '@tx-ds/utils';
 import {
   Button,
   Popconfirm,
@@ -80,6 +81,7 @@ const COMMISSION_TYPE_OPTIONS = [
 
 // ─── 金额格式化 ───────────────────────────────────────────────────────────────
 
+/** @deprecated Use formatPrice from @tx-ds/utils */
 const fenToYuan = (fen?: number) =>
   fen == null ? '-' : `¥${(fen / 100).toFixed(2)}`;
 

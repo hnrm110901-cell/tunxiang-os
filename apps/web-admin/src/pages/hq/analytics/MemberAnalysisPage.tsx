@@ -103,18 +103,18 @@ export function MemberAnalysisPage() {
         txFetchData<CLVData>(`/api/v1/member/analytics/clv?period=${p}`),
         txFetchData<ChurnRiskData>(`/api/v1/member/analytics/churn-risk?limit=10`),
       ]);
-      if (overviewRes.status === 'fulfilled' && overviewRes.value.data) {
-        const d = overviewRes.value.data;
+      if (overviewRes.status === 'fulfilled' && overviewRes.value) {
+        const d = overviewRes.value;
         setKpiList(d.kpi ?? []);
         setFunnel(d.funnel ?? []);
         setRepurchase(d.repurchase ?? []);
         setGrowthTrend(d.growth_trend ?? []);
       }
-      if (clvRes.status === 'fulfilled' && clvRes.value.data) {
-        setClvSegments(clvRes.value.data.segments ?? []);
+      if (clvRes.status === 'fulfilled' && clvRes.value) {
+        setClvSegments(clvRes.value.segments ?? []);
       }
-      if (churnRes.status === 'fulfilled' && churnRes.value.data) {
-        setChurnRisks(churnRes.value.data.items ?? []);
+      if (churnRes.status === 'fulfilled' && churnRes.value) {
+        setChurnRisks(churnRes.value.items ?? []);
       }
     } catch {
       // 保持空数据

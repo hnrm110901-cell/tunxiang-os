@@ -1,11 +1,13 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useLang } from '@/i18n/LangContext';
 import { useOrderStore } from '@/store/useOrderStore';
 import { txFetch } from '@/api/index';
 import { fetchCategories, fetchDishes, searchDishes } from '@/api/menuApi';
 import type { Category, DishItem } from '@/api/menuApi';
-import DishCard from '@/components/DishCard';
+import { DishCard, CategoryNav, MenuSearch } from '@tx-ds/biz';
+import type { DishData } from '@tx-ds/biz';
+import { formatPrice } from '@tx-ds/utils';
 
 /* ---- 类型 ---- */
 
@@ -20,10 +22,6 @@ interface WaitlistEntry {
   created_at: string;
 }
 
-interface WaitlistStats {
-  waiting_count: number;
-  estimated_wait_min: number;
-}
 
 interface PreOrderItemData {
   dish_id: string;
@@ -58,14 +56,11 @@ interface LocalCartItem {
 export default function QueuePreOrderPage() {
   const { entryId } = useParams<{ entryId: string }>();
   const navigate = useNavigate();
-  const { t } = useLang();
+  useLang();
   const storeId = useOrderStore((s) => s.storeId);
 
   // ---- 排队状态 ----
   const [entry, setEntry] = useState<WaitlistEntry | null>(null);
-  const [waitingAhead, setWaitingAhead] = useState(0);
-  const [estimatedWait, setEstimatedWait] = useState(0);
-
   // ---- 菜单 ----
   const [categories, setCategories] = useState<Category[]>([]);
   const [activeCat, setActiveCat] = useState('');
@@ -235,6 +230,21 @@ export default function QueuePreOrderPage() {
     }
   };
 
+  // ---- DishItem → DishData 映射 ----
+  const toDishData = useCallback((d: DishItem): DishData => ({
+    id: d.id, name: d.name, category: d.categoryId,
+    priceFen: Math.round(d.price * 100),
+    description: d.description, images: d.images ?? [],
+    tags: d.tags ?? [], allergens: d.allergens ?? [],
+    soldOut: d.soldOut ?? false,
+  }), []);
+
+  // ---- 分类映射给 CategoryNav ----
+  const navCategories = useMemo(() =>
+    categories.map((c) => ({ id: c.id, name: c.name })),
+    [categories],
+  );
+
   // ---- 展示菜品 ----
   const displayDishes = searchResults ?? dishes.filter((d) => !activeCat || d.categoryId === activeCat);
 
@@ -296,73 +306,28 @@ export default function QueuePreOrderPage() {
         </div>
       </div>
 
-      {/* ---- 搜索栏 ---- */}
+      {/* ---- 搜索栏（共享组件） ---- */}
       <div style={{ padding: '10px 16px', flexShrink: 0 }}>
-        <div style={{
-          display: 'flex', alignItems: 'center',
-          background: 'var(--tx-bg-tertiary, #F0EDE6)', borderRadius: 10,
-          padding: '0 12px', height: 44,
-        }}>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0 }}>
-            <circle cx="11" cy="11" r="7" stroke="#999" strokeWidth="2"/>
-            <path d="M20 20l-3.5-3.5" stroke="#999" strokeWidth="2" strokeLinecap="round"/>
-          </svg>
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => handleSearch(e.target.value)}
-            placeholder="搜索菜品"
-            style={{
-              flex: 1, height: '100%', marginLeft: 8,
-              background: 'transparent', color: 'var(--tx-text-primary, #2C2C2A)',
-              fontSize: 14, border: 'none', outline: 'none',
-            }}
-          />
-          {searchQuery && (
-            <button
-              onClick={() => handleSearch('')}
-              style={{
-                background: 'none', border: 'none', cursor: 'pointer',
-                padding: 4, color: '#999', fontSize: 16,
-              }}
-            >
-              x
-            </button>
-          )}
-        </div>
+        <MenuSearch
+          value={searchQuery}
+          onChange={handleSearch}
+          placeholder="搜索菜品"
+        />
       </div>
 
       {/* ---- 主体：左分类 + 右菜品 ---- */}
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
-        {/* 左侧分类导航 */}
+        {/* 左侧分类导航（共享组件） */}
         {!searchResults && (
-          <div style={{
-            width: 80, flexShrink: 0, overflowY: 'auto',
-            background: 'var(--tx-bg-secondary, #F8F7F5)',
-          }}>
-            {categories.map((cat) => (
-              <button
-                key={cat.id}
-                className="tx-pressable"
-                onClick={() => setActiveCat(cat.id)}
-                style={{
-                  width: '100%', padding: '16px 8px', border: 'none', cursor: 'pointer',
-                  textAlign: 'center', fontSize: 13,
-                  color: activeCat === cat.id ? 'var(--tx-brand, #FF6B35)' : 'var(--tx-text-secondary, #5F5E5A)',
-                  fontWeight: activeCat === cat.id ? 700 : 400,
-                  background: activeCat === cat.id ? 'var(--tx-bg-primary, #FFFFFF)' : 'transparent',
-                  borderLeft: activeCat === cat.id ? '3px solid var(--tx-brand, #FF6B35)' : '3px solid transparent',
-                  transition: 'all 0.2s',
-                }}
-              >
-                {cat.icon && <div style={{ fontSize: 20, marginBottom: 4 }}>{cat.icon}</div>}
-                {cat.name}
-              </button>
-            ))}
-          </div>
+          <CategoryNav
+            categories={navCategories}
+            activeId={activeCat}
+            layout="sidebar"
+            onSelect={setActiveCat}
+          />
         )}
 
-        {/* 右侧菜品列表 */}
+        {/* 右侧菜品列表（共享 DishCard） */}
         <div style={{
           flex: 1, overflowY: 'auto', padding: '0 12px 140px 12px',
           WebkitOverflowScrolling: 'touch',
@@ -385,7 +350,8 @@ export default function QueuePreOrderPage() {
             displayDishes.map((dish) => (
               <DishCard
                 key={dish.id}
-                dish={dish}
+                dish={toDishData(dish)}
+                variant="horizontal"
                 quantity={getLocalQuantity(dish.id)}
                 onAdd={() => addToLocalCart(dish)}
                 onTap={() => navigate(`/dish/${dish.id}`)}
@@ -420,7 +386,7 @@ export default function QueuePreOrderPage() {
               fontSize: 20, fontWeight: 700,
               color: 'var(--tx-brand, #FF6B35)',
             }}>
-              &#165;{localCartTotalYuan.toFixed(2)}
+              {formatPrice(Math.round(localCartTotalYuan * 100))}
             </div>
           </div>
 

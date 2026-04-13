@@ -3,6 +3,7 @@
  * 考勤 + 请假 + 薪资 三合一管理视图
  */
 import { useEffect, useState, useCallback } from 'react';
+import { formatPrice } from '@tx-ds/utils';
 import { txFetchData } from '../../../api';
 
 // ─── 类型定义 ───
@@ -77,6 +78,7 @@ interface PayrollSummary {
 
 // ─── 工具函数 ───
 
+/** @deprecated Use formatPrice from @tx-ds/utils */
 function fenToYuan(fen: number): string {
   return (fen / 100).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }

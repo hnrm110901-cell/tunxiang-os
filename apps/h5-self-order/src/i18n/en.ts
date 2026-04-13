@@ -99,6 +99,21 @@ export const en: Record<keyof typeof zh, string> = {
   payResultViewOrder: 'View Order',
   payResultContinue: 'Continue Ordering',
 
+  addMoreTitle: 'Add More',
+  addMoreExisting: 'Existing',
+  addMoreDishUnit: ' dishes',
+  addMoreBadge: 'New',
+  addMoreSubmit: 'Add to order',
+
+  orderConfirmTitle: 'Confirm Order',
+  orderConfirmItemCount: 'items',
+  orderConfirmItems: 'Selected dishes',
+  orderConfirmDelete: 'Remove',
+  orderConfirmPoints: 'Points redemption',
+  orderConfirmSubtotal: 'Subtotal',
+  orderConfirmDiscount: 'Discount',
+  orderConfirmPayable: 'Payable',
+
   demoMode: 'Demo Mode',
   demoWelcome: 'Welcome',
   demoLoadingHint: 'Entering menu...',

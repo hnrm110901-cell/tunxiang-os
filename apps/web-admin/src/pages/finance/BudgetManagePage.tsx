@@ -46,11 +46,13 @@ import {
   listAnnualBudgets,
 } from '../../api/budgetApi';
 import { txFetchData } from '../../api';
+import { formatPrice } from '@tx-ds/utils';
 
 const { Title, Text, Paragraph } = Typography;
 
 // ─── 工具函数 ──────────────────────────────────────────────────────────────────
 
+/** @deprecated Use formatPrice from @tx-ds/utils */
 function fenToYuan(fen: number | null | undefined): string {
   if (fen == null) return '-';
   return (fen / 100).toFixed(2);
@@ -149,7 +151,7 @@ function BudgetPlanTab({
   interface MonthRow extends MonthlyBudget { month: number; }
   const tableData: MonthRow[] = MONTHS.map((m) => {
     const period = `${year}-${String(m).padStart(2, '0')}`;
-    return { month: m, period, ...(budgetMap[period] ?? { revenue_target_fen: null, cost_budget_fen: null, labor_budget_fen: null, status: null }) };
+    return { month: m, ...(budgetMap[period] ?? { period, revenue_target_fen: null, cost_budget_fen: null, labor_budget_fen: null, status: null }) };
   });
 
   const columns: ColumnsType<MonthRow> = [

@@ -1,0 +1,486 @@
+/* OrderTicketCard — KDS/Crew 共享出餐工单卡片 */
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--tx-bg-card, #112B36);
+  border: 2px solid var(--tx-border, #1E3A47);
+  cursor: pointer;
+  transition: border-color 0.15s;
+  min-width: 200px;
+}
+
+.card:hover {
+  border-color: var(--tx-primary, #FF6B35);
+}
+
+.compact {
+  padding: 8px 10px;
+  gap: 4px;
+  min-width: 160px;
+}
+
+/* KDS large display variant */
+.kds {
+  padding: 14px;
+  gap: 8px;
+  border-radius: 12px;
+  border-width: 2px;
+  border-left-width: 6px;
+}
+
+.overtime {
+  border-color: var(--tx-danger, #DC2626);
+  animation: pulseOvertime 2s ease-in-out infinite;
+}
+
+.kds.overtime {
+  background: #1a0505;
+  border-color: #A32D2D;
+  animation: kdsBorderFlash 1.5s infinite;
+}
+
+.rush {
+  border-color: var(--tx-warning, #D97706);
+}
+
+.vip {
+  border-color: #9333EA;
+}
+
+.flashing {
+  animation: kdsRushFlash 1s infinite;
+}
+
+.paused {
+  opacity: 0.85;
+}
+
+@keyframes pulseOvertime {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0); }
+  50% { box-shadow: 0 0 8px 2px rgba(220, 38, 38, 0.3); }
+}
+
+@keyframes kdsBorderFlash {
+  0%, 100% { border-color: #A32D2D; }
+  50% { border-color: #ff4d4f; }
+}
+
+@keyframes kdsRushFlash {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 77, 79, 0); }
+  50% { box-shadow: 0 0 16px 4px rgba(255, 77, 79, 0.6); }
+}
+
+/* Header */
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.headerLeft {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.headerRight {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tableNo {
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--tx-text-primary, #E0E0E0);
+  letter-spacing: 0.5px;
+}
+
+.compact .tableNo {
+  font-size: 16px;
+}
+
+.kds .tableNo {
+  font-size: 26px;
+}
+
+.channelBadge {
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgba(59, 130, 246, 0.15);
+  color: #3B82F6;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.priorityBadge {
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.priorityRush {
+  background: rgba(217, 119, 6, 0.15);
+  color: #D97706;
+}
+
+.priorityVip {
+  background: rgba(147, 51, 234, 0.15);
+  color: #9333EA;
+}
+
+/* Status badges */
+
+.statusBadge {
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.statusPending {
+  background: rgba(100, 116, 139, 0.15);
+  color: #94A3B8;
+}
+
+.statusCooking {
+  background: rgba(217, 119, 6, 0.15);
+  color: #F59E0B;
+}
+
+.statusDone {
+  background: rgba(15, 110, 86, 0.15);
+  color: #10B981;
+}
+
+.statusTimeout {
+  background: rgba(220, 38, 38, 0.15);
+  color: #EF4444;
+}
+
+.statusCancelled {
+  background: rgba(100, 116, 139, 0.1);
+  color: #64748B;
+}
+
+/* Timer */
+
+.timer {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--tx-text-secondary, #94A3B8);
+  font-variant-numeric: tabular-nums;
+  font-family: 'JetBrains Mono', 'SF Mono', monospace;
+}
+
+/* Time level colors */
+.timeNormal { color: #0F6E56; }
+.timeWarning { color: #BA7517; }
+.timeCritical { color: #A32D2D; }
+
+.timerOvertime {
+  color: #EF4444;
+}
+
+.compact .timer {
+  font-size: 12px;
+}
+
+.kds .timer {
+  font-size: 28px;
+}
+
+/* Order number row */
+
+.orderNoRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.orderNo {
+  font-size: 12px;
+  color: var(--tx-text-tertiary, #64748B);
+  font-variant-numeric: tabular-nums;
+}
+
+.guestCount {
+  font-size: 12px;
+  color: var(--tx-text-tertiary, #64748B);
+}
+
+.progress {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--tx-text-tertiary, #64748B);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Dish list */
+
+.dishList {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.dishRow {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 2px 0;
+}
+
+.dishServed {
+  opacity: 0.4;
+  text-decoration: line-through;
+}
+
+.dishQty {
+  flex-shrink: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--tx-primary, #FF6B35);
+  min-width: 24px;
+}
+
+.compact .dishQty {
+  font-size: 12px;
+}
+
+.kds .dishQty {
+  font-size: 22px;
+  min-width: 50px;
+  text-align: right;
+}
+
+.dishName {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--tx-text-primary, #E0E0E0);
+}
+
+.compact .dishName {
+  font-size: 12px;
+}
+
+.kds .dishName {
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.dishSpec {
+  font-size: 11px;
+  color: var(--tx-info, #3B82F6);
+  background: rgba(59, 130, 246, 0.1);
+  padding: 0 4px;
+  border-radius: 3px;
+}
+
+.dishRemark {
+  font-size: 11px;
+  color: var(--tx-warning, #D97706);
+}
+
+/* Ticket remark */
+
+.ticketRemark {
+  font-size: 12px;
+  color: var(--tx-warning, #D97706);
+  background: rgba(217, 119, 6, 0.08);
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+
+.remarkIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--tx-warning, #D97706);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  margin-right: 4px;
+  vertical-align: middle;
+}
+
+/* Actions */
+
+.actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.actionBtn {
+  flex: 1;
+  padding: 8px 6px;
+  border-radius: 6px;
+  border: none;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  min-height: 36px;
+  transition: opacity 0.15s;
+}
+
+.actionBtn:active {
+  opacity: 0.8;
+}
+
+.compact .actionBtn {
+  padding: 6px 4px;
+  font-size: 12px;
+  min-height: 28px;
+}
+
+.rushBtn {
+  background: rgba(217, 119, 6, 0.15);
+  color: #D97706;
+}
+
+.startBtn {
+  background: var(--tx-primary, #FF6B35);
+  color: #fff;
+}
+
+.completeBtn {
+  background: var(--tx-success, #0F6E56);
+  color: #fff;
+}
+
+.grabBtn {
+  background: var(--tx-primary, #FF6B35);
+  color: #fff;
+}
+
+.pauseBtn {
+  flex: 0 0 auto;
+  width: 36px;
+  background: rgba(100, 116, 139, 0.15);
+  color: #94A3B8;
+}
+
+.pauseBtnActive {
+  background: rgba(15, 110, 86, 0.15);
+  color: #10B981;
+}
+
+/* KDS action overrides — larger touch targets */
+.kds .actionBtn {
+  min-height: 56px;
+  font-size: 20px;
+  border-radius: 8px;
+}
+
+.kds .pauseBtn {
+  width: 56px;
+  font-size: 22px;
+}
+
+.kds .dishRemark {
+  font-size: 16px;
+}
+
+.kds .dishSpec {
+  font-size: 14px;
+  padding: 1px 6px;
+}
+
+/* Paused banner */
+.pausedBanner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 4px;
+  background: rgba(217, 119, 6, 0.12);
+  color: #D97706;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.kds .pausedBanner {
+  padding: 10px 14px;
+  font-size: 18px;
+  border-radius: 6px;
+}
+
+.kds .ticketRemark {
+  font-size: 16px;
+  padding: 8px 12px;
+}
+
+.kds .remarkIcon {
+  width: 20px;
+  height: 20px;
+  font-size: 13px;
+}
+
+.kds .orderNo {
+  font-size: 16px;
+}
+
+.kds .guestCount,
+.kds .progress {
+  font-size: 16px;
+}
+
+.kds .channelBadge,
+.kds .priorityBadge {
+  font-size: 14px;
+  padding: 2px 8px;
+}
+
+.kds .statusBadge {
+  font-size: 14px;
+  padding: 3px 10px;
+}
+
+/* Swipe gesture support */
+
+.swipeWrapper {
+  position: relative;
+  overflow: hidden;
+  border-radius: 12px;
+}
+
+.swipeReveal {
+  position: absolute;
+  inset: 0;
+  background: var(--tx-success, #0F6E56);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding-right: 20px;
+}
+
+.swipeRevealText {
+  color: #fff;
+  font-size: 28px;
+  font-weight: 700;
+}
+
+.swipeHint {
+  text-align: center;
+  margin-top: 4px;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.2);
+}
+
+.kds .swipeHint {
+  font-size: 15px;
+  margin-top: 8px;
+}

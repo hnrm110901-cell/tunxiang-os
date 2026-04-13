@@ -6,6 +6,7 @@ import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { txFetchData } from '../api';
+import { formatPrice } from '@tx-ds/utils';
 
 // ─── 类型 ───
 
@@ -98,6 +99,7 @@ function generateMockData(): HomeData {
 
 // ─── 工具函数 ───
 
+/** @deprecated Use formatPrice from @tx-ds/utils */
 const fen2yuan = (fen: number): string => `¥${(fen / 100).toLocaleString('zh-CN', { minimumFractionDigits: 0 })}`;
 
 function calcChange(today: number, yesterday: number): { text: string; color: string; arrow: string } {

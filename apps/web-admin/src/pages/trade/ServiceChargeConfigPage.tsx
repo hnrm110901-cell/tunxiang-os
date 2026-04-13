@@ -45,6 +45,7 @@ import {
   setChargeConfig,
 } from '../../api/serviceChargeApi';
 import type { ServiceChargeConfig, ServiceChargeTemplate } from '../../api/serviceChargeApi';
+import { formatPrice } from '@tx-ds/utils';
 
 const { Title, Text } = Typography;
 
@@ -91,6 +92,7 @@ const MEMBER_LEVELS = [
 
 // ─── 工具函数 ───
 
+/** @deprecated Use formatPrice from @tx-ds/utils */
 function fenToYuan(fen: number): string {
   return (fen / 100).toFixed(2);
 }

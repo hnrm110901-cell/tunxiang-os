@@ -11,6 +11,7 @@
  *       失败时降级到演示Mock响应
  */
 import { useState, useRef, useEffect, useCallback } from 'react';
+import DOMPurify from 'dompurify';
 import {
   Card, Input, Button, Tag, Space, Timeline, Badge, Typography,
   Spin, Divider, Row, Col,
@@ -476,7 +477,9 @@ export function ChiefAgentPage() {
                       </Space>
                     ) : msg.role === 'assistant' ? (
                       <div
-                        dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.content) }}
+                        dangerouslySetInnerHTML={{
+                          __html: DOMPurify.sanitize(renderMarkdown(msg.content)),
+                        }}
                         style={{ whiteSpace: 'pre-wrap' }}
                       />
                     ) : (

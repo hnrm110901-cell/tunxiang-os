@@ -17,6 +17,7 @@
  *   热区      ≥ 48px
  */
 import { useState, useEffect, useCallback } from 'react';
+import { formatPrice } from '@tx-ds/utils';
 
 // ─── 类型 ───────────────────────────────────────────────────────────────────
 
@@ -69,8 +70,9 @@ export interface DiscountPreviewSheetProps {
 
 // ─── 工具函数 ────────────────────────────────────────────────────────────────
 
+/** @deprecated Use formatPrice from @tx-ds/utils */
 function fenToYuan(fen: number): string {
-  return (fen / 100).toFixed(2);
+  return formatPrice(fen).replace('¥', '');
 }
 
 function typeLabel(type: string): string {

@@ -55,6 +55,7 @@ import {
   CalculatorOutlined,
 } from '@ant-design/icons';
 import { txFetchData } from '../../api';
+import { formatPrice } from '@tx-ds/utils';
 
 const { Text, Title } = Typography;
 
@@ -114,6 +115,7 @@ const EMPTY_DISH_LIST: DishOption[] = [];
 
 // ─── 工具函数 ──────────────────────────────────────────────────
 
+/** @deprecated — use formatPrice from @tx-ds/utils */
 function fenToYuan(fen: number): string {
   return (fen / 100).toFixed(2);
 }
@@ -144,7 +146,7 @@ interface DishListResponse { items: DishOption[]; total: number; }
 async function fetchBomList(page = 1): Promise<BomRecord[]> {
   try {
     const res = await txFetchData<BomListResponse>(`/api/v1/supply/recipes?page=${page}`);
-    return res.data?.items ?? EMPTY_BOM_LIST;
+    return res?.items ?? EMPTY_BOM_LIST;
   } catch (err) {
     console.error('[BOMPage] fetchBomList 失败:', err);
     return EMPTY_BOM_LIST;
@@ -154,7 +156,7 @@ async function fetchBomList(page = 1): Promise<BomRecord[]> {
 async function fetchBomDetail(id: string): Promise<BomRecord | null> {
   try {
     const res = await txFetchData<BomRecord>(`/api/v1/supply/recipes/${id}`);
-    return res.data ?? null;
+    return res ?? null;
   } catch (err) {
     console.error('[BOMPage] fetchBomDetail 失败:', err);
     return null;
@@ -164,7 +166,7 @@ async function fetchBomDetail(id: string): Promise<BomRecord | null> {
 async function fetchIngredients(): Promise<IngredientOption[]> {
   try {
     const res = await txFetchData<IngredientListResponse>('/api/v1/menu/ingredients?page=1&size=500');
-    return res.data?.items ?? EMPTY_INGREDIENT_LIST;
+    return res?.items ?? EMPTY_INGREDIENT_LIST;
   } catch (err) {
     console.error('[BOMPage] fetchIngredients 失败:', err);
     return EMPTY_INGREDIENT_LIST;
@@ -174,7 +176,7 @@ async function fetchIngredients(): Promise<IngredientOption[]> {
 async function fetchDishes(): Promise<DishOption[]> {
   try {
     const res = await txFetchData<DishListResponse>('/api/v1/menu/dishes?page=1&size=200');
-    return res.data?.items ?? EMPTY_DISH_LIST;
+    return res?.items ?? EMPTY_DISH_LIST;
   } catch (err) {
     console.error('[BOMPage] fetchDishes 失败:', err);
     return EMPTY_DISH_LIST;
@@ -187,7 +189,7 @@ async function createBom(payload: { dish_id: string; ingredients: BomIngredient[
       method: 'POST',
       body: JSON.stringify(payload),
     });
-    return res.data ?? null;
+    return res ?? null;
   } catch (err) {
     console.error('[BOMPage] createBom 失败:', err);
     throw err;
@@ -226,7 +228,7 @@ async function calculateBomCost(recipeId: string, targetQty: number): Promise<{ 
         body: JSON.stringify({ recipe_id: recipeId, target_qty: targetQty }),
       },
     );
-    return res.data ?? null;
+    return res ?? null;
   } catch (err) {
     console.error('[BOMPage] calculateBomCost 失败:', err);
     return null;

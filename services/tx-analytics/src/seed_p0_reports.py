@@ -1,10 +1,11 @@
-"""P0 报表种子数据 — 20张核心经营报表
+"""P0 报表种子数据 — 25张核心经营报表
 
 分类：
   财务(7): 营业汇总/营业明细/支付对账/收银员统计/CRM对账/押金统计/日结监控
   经营(6): 门店对比/时段分析/菜品排行/菜品毛利/折扣统计/退单分析
   会员(4): 新增会员/消费排行/储值余额/复购率
   人力(3): 考勤汇总/薪资明细/人效分析
+  补全(5): 经营指标走势/月营业汇总/存酒台账/挂账对账单/供应链库存
 
 SQL模板均基于已有数据库表结构（orders/order_items/payments/customers/employees/
 store_daily_settlements/refunds/daily_attendance/payroll_items 等）。
@@ -786,6 +787,200 @@ ORDER BY revenue_per_staff_fen DESC
         "filters": [
             {"name": "start_date", "label": "开始日期", "field_type": "date", "required": True, "default": "2026-04-01"},
             {"name": "end_date", "label": "结束日期", "field_type": "date", "required": True, "default": "2026-04-09"},
+        ],
+    },
+    # ════════════════════════ 补全(5) — 对标天财25张P0清单 ════════════════════════
+    {
+        "id": "p0_ops_trend",
+        "name": "经营指标走势",
+        "description": "近30天营收/客单价/订单量趋势折线图数据",
+        "category": "operations",
+        "sql_template": """
+SELECT
+    d.biz_date,
+    d.gross_revenue_fen,
+    d.net_revenue_fen,
+    d.total_orders,
+    CASE WHEN d.total_guests > 0
+         THEN d.gross_revenue_fen / d.total_guests
+         ELSE 0 END AS avg_per_guest_fen
+FROM store_daily_settlements d
+JOIN stores s ON s.id = d.store_id
+WHERE d.tenant_id = :tenant_id
+  AND d.biz_date BETWEEN :start_date AND :end_date
+  AND (:store_id IS NULL OR d.store_id = :store_id::UUID)
+ORDER BY d.biz_date ASC
+""",
+        "default_params": {"start_date": "2026-03-13", "end_date": "2026-04-12"},
+        "dimensions": [{"name": "biz_date", "label": "日期"}],
+        "metrics": [
+            {"name": "gross_revenue_fen", "label": "总营收(分)", "unit": "fen", "is_money_fen": True},
+            {"name": "total_orders", "label": "订单数", "unit": "笔", "is_money_fen": False},
+            {"name": "avg_per_guest_fen", "label": "客单价(分)", "unit": "fen", "is_money_fen": True},
+        ],
+        "filters": [
+            {"name": "start_date", "label": "开始日期", "field_type": "date", "required": True, "default": "2026-03-13"},
+            {"name": "end_date", "label": "结束日期", "field_type": "date", "required": True, "default": "2026-04-12"},
+            {"name": "store_id", "label": "门店", "field_type": "store_select", "required": False},
+        ],
+    },
+    {
+        "id": "p0_fin_monthly_summary",
+        "name": "月营业汇总",
+        "description": "按月汇总各门店营收、折扣、订单量，对标天财#53",
+        "category": "finance",
+        "sql_template": """
+SELECT
+    TO_CHAR(d.biz_date, 'YYYY-MM') AS biz_month,
+    s.store_name,
+    SUM(d.gross_revenue_fen) AS gross_revenue_fen,
+    SUM(d.net_revenue_fen) AS net_revenue_fen,
+    SUM(d.total_orders) AS total_orders,
+    SUM(d.total_guests) AS total_guests,
+    SUM(d.discount_amount_fen) AS discount_amount_fen
+FROM store_daily_settlements d
+JOIN stores s ON s.id = d.store_id
+WHERE d.tenant_id = :tenant_id
+  AND d.biz_date BETWEEN :start_date AND :end_date
+  AND (:store_id IS NULL OR d.store_id = :store_id::UUID)
+GROUP BY biz_month, s.store_name
+ORDER BY biz_month DESC, s.store_name
+""",
+        "default_params": {"start_date": "2026-01-01", "end_date": "2026-04-30"},
+        "dimensions": [{"name": "biz_month", "label": "月份"}, {"name": "store_name", "label": "门店"}],
+        "metrics": [
+            {"name": "gross_revenue_fen", "label": "总营收(分)", "unit": "fen", "is_money_fen": True},
+            {"name": "total_orders", "label": "订单数", "unit": "笔", "is_money_fen": False},
+            {"name": "discount_amount_fen", "label": "折扣金额(分)", "unit": "fen", "is_money_fen": True},
+        ],
+        "filters": [
+            {"name": "start_date", "label": "开始日期", "field_type": "date", "required": True, "default": "2026-01-01"},
+            {"name": "end_date", "label": "结束日期", "field_type": "date", "required": True, "default": "2026-04-30"},
+            {"name": "store_id", "label": "门店", "field_type": "store_select", "required": False},
+        ],
+    },
+    {
+        "id": "p0_wine_ledger",
+        "name": "存酒台账",
+        "description": "会员存酒记录：存入/支取/剩余/有效期，对标天财存酒模块",
+        "category": "finance",
+        "sql_template": """
+SELECT
+    wb.id,
+    m.name AS member_name,
+    m.phone,
+    wb.wine_name,
+    wb.spec,
+    wb.quantity_in,
+    wb.quantity_out,
+    (wb.quantity_in - wb.quantity_out) AS quantity_remain,
+    wb.registered_at,
+    wb.expires_at,
+    wb.status,
+    s.store_name
+FROM wine_bottles wb
+JOIN members m ON m.id = wb.member_id
+JOIN stores s ON s.id = wb.store_id
+WHERE wb.tenant_id = :tenant_id
+  AND (:store_id IS NULL OR wb.store_id = :store_id::UUID)
+  AND wb.registered_at::date BETWEEN :start_date AND :end_date
+  AND wb.is_deleted = FALSE
+ORDER BY wb.registered_at DESC
+""",
+        "default_params": {"start_date": "2026-04-01", "end_date": "2026-04-30"},
+        "dimensions": [
+            {"name": "member_name", "label": "会员姓名"},
+            {"name": "wine_name", "label": "酒品名称"},
+            {"name": "store_name", "label": "门店"},
+        ],
+        "metrics": [
+            {"name": "quantity_in", "label": "存入数量", "unit": "瓶", "is_money_fen": False},
+            {"name": "quantity_out", "label": "支取数量", "unit": "瓶", "is_money_fen": False},
+            {"name": "quantity_remain", "label": "剩余数量", "unit": "瓶", "is_money_fen": False},
+        ],
+        "filters": [
+            {"name": "start_date", "label": "开始日期", "field_type": "date", "required": True, "default": "2026-04-01"},
+            {"name": "end_date", "label": "结束日期", "field_type": "date", "required": True, "default": "2026-04-30"},
+            {"name": "store_id", "label": "门店", "field_type": "store_select", "required": False},
+        ],
+    },
+    {
+        "id": "p0_credit_statement",
+        "name": "挂账对账单",
+        "description": "协议单位挂账明细：签单人/金额/状态/还款进度，对标天财协议挂账",
+        "category": "finance",
+        "sql_template": """
+SELECT
+    au.name AS unit_name,
+    ab.id AS bill_id,
+    asn.name AS signer_name,
+    ab.amount_fen,
+    ab.repaid_amount_fen,
+    (ab.amount_fen - ab.repaid_amount_fen) AS outstanding_fen,
+    ab.status,
+    ab.created_at::date AS sign_date,
+    s.store_name
+FROM agreement_bills ab
+JOIN agreement_units au ON au.id = ab.unit_id
+LEFT JOIN agreement_signers asn ON asn.id = ab.signer_id
+JOIN stores s ON s.id = ab.store_id
+WHERE ab.tenant_id = :tenant_id
+  AND ab.created_at::date BETWEEN :start_date AND :end_date
+  AND (:store_id IS NULL OR ab.store_id = :store_id::UUID)
+  AND ab.is_deleted = FALSE
+ORDER BY ab.created_at DESC
+""",
+        "default_params": {"start_date": "2026-04-01", "end_date": "2026-04-30"},
+        "dimensions": [
+            {"name": "unit_name", "label": "协议单位"},
+            {"name": "signer_name", "label": "签单人"},
+            {"name": "store_name", "label": "门店"},
+        ],
+        "metrics": [
+            {"name": "amount_fen", "label": "挂账金额(分)", "unit": "fen", "is_money_fen": True},
+            {"name": "repaid_amount_fen", "label": "已还金额(分)", "unit": "fen", "is_money_fen": True},
+            {"name": "outstanding_fen", "label": "待还金额(分)", "unit": "fen", "is_money_fen": True},
+        ],
+        "filters": [
+            {"name": "start_date", "label": "开始日期", "field_type": "date", "required": True, "default": "2026-04-01"},
+            {"name": "end_date", "label": "结束日期", "field_type": "date", "required": True, "default": "2026-04-30"},
+            {"name": "store_id", "label": "门店", "field_type": "store_select", "required": False},
+        ],
+    },
+    {
+        "id": "p0_supply_inventory",
+        "name": "供应链库存报表",
+        "description": "库存盘点/进货/损耗综合报表，覆盖天财#70/71/72三张表",
+        "category": "supply",
+        "sql_template": """
+SELECT
+    i.ingredient_name,
+    i.unit,
+    i.current_stock_qty,
+    i.safety_stock_qty,
+    CASE WHEN i.current_stock_qty < i.safety_stock_qty THEN TRUE ELSE FALSE END AS is_below_safety,
+    i.last_purchase_price_fen,
+    i.updated_at::date AS as_of_date,
+    s.store_name
+FROM ingredient_inventory i
+JOIN stores s ON s.id = i.store_id
+WHERE i.tenant_id = :tenant_id
+  AND (:store_id IS NULL OR i.store_id = :store_id::UUID)
+  AND i.is_deleted = FALSE
+ORDER BY is_below_safety DESC, i.ingredient_name
+""",
+        "default_params": {},
+        "dimensions": [
+            {"name": "ingredient_name", "label": "食材名称"},
+            {"name": "store_name", "label": "门店"},
+        ],
+        "metrics": [
+            {"name": "current_stock_qty", "label": "当前库存", "unit": "单位", "is_money_fen": False},
+            {"name": "safety_stock_qty", "label": "安全库存", "unit": "单位", "is_money_fen": False},
+            {"name": "last_purchase_price_fen", "label": "最近进价(分)", "unit": "fen", "is_money_fen": True},
+        ],
+        "filters": [
+            {"name": "store_id", "label": "门店", "field_type": "store_select", "required": False},
         ],
     },
 ]

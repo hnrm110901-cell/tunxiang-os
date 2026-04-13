@@ -125,7 +125,7 @@ export default function MentorshipSupervisePage() {
     setStatsLoading(true);
     try {
       const resp = await txFetchData<StatisticsData>('/api/v1/mentorships/statistics');
-      setStats(resp.data);
+      setStats(resp);
     } catch (err) {
       console.error('Failed to load statistics', err);
     } finally {
@@ -138,7 +138,7 @@ export default function MentorshipSupervisePage() {
     setLeaderboardLoading(true);
     try {
       const resp = await txFetchData<LeaderboardItem[]>('/api/v1/mentorships/leaderboard?top=10');
-      setLeaderboard(resp.data ?? []);
+      setLeaderboard(resp ?? []);
     } catch (err) {
       console.error('Failed to load leaderboard', err);
     } finally {
@@ -445,8 +445,8 @@ export default function MentorshipSupervisePage() {
               `/api/v1/mentorships?page=${current}&size=${pageSize}${status ? '&status=' + status : ''}${store_id ? '&store_id=' + store_id : ''}`,
             );
             return {
-              data: res.data?.items || [],
-              total: res.data?.total || 0,
+              data: res?.items || [],
+              total: res?.total || 0,
               success: true,
             };
           } catch {

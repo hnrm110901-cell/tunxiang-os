@@ -116,9 +116,9 @@ export function CustomerPoolPage() {
       }
       const qs = new URLSearchParams(params).toString();
       const resp = await txFetchData<CustomerListResp>(`/api/v1/member/customers?${qs}`);
-      if (resp.data) {
-        setCustomers(resp.data.items);
-        setTotal(resp.data.total);
+      if (resp) {
+        setCustomers(resp.items);
+        setTotal(resp.total);
       }
     } catch (err) {
       console.error('fetch customers error', err);

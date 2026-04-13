@@ -474,8 +474,8 @@ function RecordsTab({ plans }: RecordsTabProps) {
       if (qualifiedFilter !== null) {
         params.set('is_qualified', String(qualifiedFilter));
       }
-      const data = await txFetchData<{ items?: unknown[] }>(`/api/v1/ops/haccp/records?${params.toString()}`);
-      setRecords((data as { items?: unknown[] }).items ?? (data as unknown[]) ?? []);
+      const data = await txFetchData<{ items?: HACCPRecord[] } | HACCPRecord[]>(`/api/v1/ops/haccp/records?${params.toString()}`);
+      setRecords((Array.isArray(data) ? data : (data as { items?: HACCPRecord[] }).items) ?? []);
     } catch {
       setError('加载执行记录失败，请稍后重试');
     } finally {
@@ -873,8 +873,8 @@ export function HACCPPage() {
     setPlansLoading(true);
     setPlansError(null);
     try {
-      const data = await txFetchData<{ items?: unknown[] }>('/api/v1/ops/haccp/plans');
-      setPlans((data as { items?: unknown[] }).items ?? (data as unknown[]) ?? []);
+      const data = await txFetchData<{ items?: HACCPPlan[] } | HACCPPlan[]>('/api/v1/ops/haccp/plans');
+      setPlans((Array.isArray(data) ? data : (data as { items?: HACCPPlan[] }).items) ?? []);
     } catch {
       setPlansError('加载检查计划失败，请稍后重试');
     } finally {

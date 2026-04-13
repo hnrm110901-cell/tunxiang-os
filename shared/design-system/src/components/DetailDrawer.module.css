@@ -1,0 +1,175 @@
+/* ── Drawer overlay (no mask, transparent) ─── */
+
+.drawerOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  pointer-events: none;
+}
+
+/* ── Panel ──────────────────────────────────── */
+
+.drawerPanel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--tx-bg, #fff);
+  box-shadow: -4px 0 16px rgba(0,0,0,0.08);
+  pointer-events: auto;
+  animation: slideInRight 0.24s ease-out;
+}
+
+@keyframes slideInRight {
+  from { transform: translateX(100%); }
+  to   { transform: translateX(0); }
+}
+
+/* ── Header bar ────────────────────────────── */
+
+.drawerHeaderBar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 16px 20px 12px;
+  border-bottom: 1px solid var(--divider-color, rgba(0,0,0,0.04));
+  flex-shrink: 0;
+}
+
+.closeBtn {
+  background: none;
+  border: none;
+  font-size: 20px;
+  color: var(--text-tertiary, #999);
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.closeBtn:hover {
+  background: var(--surface-hover, rgba(0,0,0,0.04));
+  color: var(--text-primary, #333);
+}
+
+.drawerHeader {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.titleRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+  line-height: 1.4;
+  letter-spacing: -0.01em;
+}
+
+.subtitle {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  margin-top: 2px;
+}
+
+.extra {
+  margin-top: 6px;
+}
+
+/* ── Body ───────────────────────────────────────────────── */
+
+.body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* ── Metrics row ────────────────────────────────────────── */
+
+.metricsRow {
+  display: flex;
+  border-bottom: 1px solid var(--divider-color, rgba(0,0,0,0.04));
+  background: var(--surface-hover, rgba(0,0,0,0.02));
+}
+
+.metricCell {
+  flex: 1;
+  padding: 16px 18px;
+  border-right: 1px solid var(--divider-color, rgba(0,0,0,0.04));
+  text-align: center;
+}
+
+.metricCell:last-child {
+  border-right: none;
+}
+
+.metricValue {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.metricLabel {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  margin-top: 4px;
+}
+
+/* ── Scroll area ────────────────────────────────────────── */
+
+.scrollArea {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 20px;
+}
+
+/* ── Sections ───────────────────────────────────────────── */
+
+.section {
+  padding: 16px 0;
+  border-bottom: 1px solid var(--divider-color, rgba(0,0,0,0.04));
+}
+
+.section:last-child {
+  border-bottom: none;
+}
+
+.sectionTitle {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  margin-bottom: 10px;
+}
+
+.sectionContent {
+  font-size: 13px;
+  color: var(--text-primary);
+  line-height: 1.6;
+}
+
+/* ── Footer actions ─────────────────────────────────────── */
+
+.footer {
+  padding: 14px 20px;
+  border-top: 1px solid var(--divider-color, rgba(0,0,0,0.04));
+  background: var(--surface-hover, rgba(0,0,0,0.02));
+  flex-shrink: 0;
+}

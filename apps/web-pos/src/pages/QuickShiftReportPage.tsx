@@ -21,6 +21,7 @@
  */
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { formatPrice } from '@tx-ds/utils';
 
 // ─── Design Tokens ────────────────────────────────────────────────────────────
 const T = {
@@ -43,6 +44,7 @@ const T = {
 
 // ─── 工具函数 ─────────────────────────────────────────────────────────────────
 
+/** @deprecated Use formatPrice from @tx-ds/utils */
 const fen2yuan = (fen: number): string => `¥${(fen / 100).toFixed(2)}`;
 
 function getBase(): string {

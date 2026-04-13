@@ -134,7 +134,7 @@ export function JourneyAttributionPage() {
       const resp = await txFetchData<{ items: TouchExecution[]; total: number }>(
         `/api/v1/growth/touch-executions?${qs}`
       );
-      if (resp.data) setExecutions(resp.data.items);
+      if (resp) setExecutions(resp.items);
     } catch (err) {
       console.error('fetch executions error', err);
     } finally {
@@ -153,7 +153,7 @@ export function JourneyAttributionPage() {
       const resp = await txFetchData<{ items: JourneyEnrollmentDetail[]; total: number }>(
         `/api/v1/growth/journey-enrollments?journey_template_id=${templateId}&size=20`
       );
-      if (resp.data) setDrawerData(resp.data.items);
+      if (resp) setDrawerData(resp.items);
     } catch (err) {
       console.error('fetch enrollment detail error', err);
       setDrawerData([]);

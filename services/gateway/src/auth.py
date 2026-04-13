@@ -14,7 +14,7 @@
     - 验证 session_token + TOTP码 → 返回 access_token + refresh_token
 
 向后兼容：
-  - DEMO_USERS 仍然有效（明文密码，仅供开发/演示）
+  - DEMO_USERS 可在非生产环境用于演示（明文密码）；生产默认关闭，见环境变量 TX_ENABLE_DEMO_AUTH
   - GET /api/v1/auth/verify 兼容旧版内存 token（如现有服务依赖）
 """
 
@@ -215,6 +215,98 @@ def _user_info_from_demo(username: str, user: dict) -> dict:
     }
 
 
+def _demo_auth_enabled() -> bool:
+    """是否允许回退到 DEMO_USERS（开发/演示账号）。
+
+    - 显式设置 TX_ENABLE_DEMO_AUTH：1/true/yes/on 为启用，否则关闭。
+    - 未设置时：ENVIRONMENT/ENV 为 production 或 prod 则关闭，其余环境默认启用。
+    """
+    explicit = os.getenv("TX_ENABLE_DEMO_AUTH")
+    if explicit is not None:
+        return explicit.strip().lower() in ("1", "true", "yes", "on")
+    env = (os.getenv("ENVIRONMENT") or os.getenv("ENV") or "").strip().lower()
+    return env not in ("production", "prod")
+
+
+async def _load_user_dict_by_username(username: str) -> Optional[dict]:
+    """从 users 表加载活跃用户（与 login 成功路径字段一致，供 MFA 等使用）。"""
+    try:
+        async with async_session_factory() as db:
+            result = await db.execute(
+                text("""
+                    SELECT id, tenant_id, username, name, role,
+                           mfa_enabled, mfa_secret_enc, mfa_backup_codes
+                    FROM users
+                    WHERE username = :username AND is_deleted = FALSE AND is_active = TRUE
+                    LIMIT 1
+                """),
+                {"username": username},
+            )
+            row = result.mappings().first()
+    except Exception as exc:
+        logger.warning("user_db_lookup_failed", username=username, error=str(exc))
+        return None
+    if row is None:
+        return None
+    backup_codes_raw = row.get("mfa_backup_codes")
+    if isinstance(backup_codes_raw, str):
+        try:
+            backup_codes_raw = json.loads(backup_codes_raw)
+        except (ValueError, TypeError):
+            backup_codes_raw = []
+    return {
+        "user_id": str(row["id"]),
+        "tenant_id": str(row["tenant_id"]),
+        "username": row["username"],
+        "name": row.get("name") or username,
+        "role": row.get("role", "staff"),
+        "merchant": "",
+        "mfa_enabled": bool(row.get("mfa_enabled")),
+        "mfa_secret_enc": row.get("mfa_secret_enc"),
+        "mfa_backup_codes": backup_codes_raw or [],
+    }
+
+
+async def _load_user_dict_by_id(user_id: str) -> Optional[dict]:
+    """按用户主键从 users 表加载（供 MFA 设置、JWT 兼容校验等）。"""
+    try:
+        async with async_session_factory() as db:
+            result = await db.execute(
+                text("""
+                    SELECT id, tenant_id, username, name, role,
+                           mfa_enabled, mfa_secret_enc, mfa_backup_codes
+                    FROM users
+                    WHERE id = :user_id AND is_deleted = FALSE AND is_active = TRUE
+                    LIMIT 1
+                """),
+                {"user_id": user_id},
+            )
+            row = result.mappings().first()
+    except Exception as exc:
+        logger.warning("user_db_lookup_failed", user_id=user_id, error=str(exc))
+        return None
+    if row is None:
+        return None
+    uname = row["username"]
+    backup_codes_raw = row.get("mfa_backup_codes")
+    if isinstance(backup_codes_raw, str):
+        try:
+            backup_codes_raw = json.loads(backup_codes_raw)
+        except (ValueError, TypeError):
+            backup_codes_raw = []
+    return {
+        "user_id": str(row["id"]),
+        "tenant_id": str(row["tenant_id"]),
+        "username": uname,
+        "name": row.get("name") or uname,
+        "role": row.get("role", "staff"),
+        "merchant": "",
+        "mfa_enabled": bool(row.get("mfa_enabled")),
+        "mfa_secret_enc": row.get("mfa_secret_enc"),
+        "mfa_backup_codes": backup_codes_raw or [],
+    }
+
+
 async def _issue_tokens(
     user_id: str,
     tenant_id: str,
@@ -365,8 +457,8 @@ async def login(body: LoginBody, request: Request):
                 "mfa_secret_enc": db_user_row.get("mfa_secret_enc"),
                 "mfa_backup_codes": backup_codes_raw or [],
             }
-    if user is None:
-        # 回退到 DEMO_USERS（开发/演示环境）
+    if user is None and _demo_auth_enabled():
+        # 回退到 DEMO_USERS（仅开发/演示；生产默认关闭）
         demo = DEMO_USERS.get(username)
         if demo and demo.get("password") and demo["password"] == body.password:
             password_ok = True
@@ -490,7 +582,9 @@ async def mfa_verify(body: MFAVerifyBody, request: Request):
         return err("验证码已超时，请重新登录", code="MFA_SESSION_EXPIRED", status_code=401)
 
     username = session["username"]
-    user = DEMO_USERS.get(username)
+    user = await _load_user_dict_by_username(username)
+    if user is None and _demo_auth_enabled():
+        user = DEMO_USERS.get(username)
     if not user:
         _mfa_sessions.pop(body.session_token, None)
         return err("用户不存在", code="USER_NOT_FOUND", status_code=401)
@@ -692,7 +786,7 @@ async def refresh_token(body: RefreshBody, request: Request):
     except Exception as exc:
         logger.warning("refresh_user_db_lookup_failed", user_id=user_id, error=str(exc))
 
-    if user is None:
+    if user is None and _demo_auth_enabled():
         # 回退到 DEMO_USERS
         for uname, udata in DEMO_USERS.items():
             if udata["user_id"] == user_id:
@@ -841,7 +935,7 @@ async def me(request: Request):
         except Exception as exc:
             logger.warning("me_db_lookup_failed", user_id=user_id, error=str(exc))
 
-        if user_info_result is None:
+        if user_info_result is None and _demo_auth_enabled():
             # 回退到 DEMO_USERS
             for uname, udata in DEMO_USERS.items():
                 if udata["user_id"] == user_id:
@@ -883,13 +977,16 @@ async def mfa_setup(request: Request):
         return err("Token无效或已过期", code="UNAUTHORIZED", status_code=401)
 
     user_id = payload.get("sub", "")
+    user = await _load_user_dict_by_id(user_id)
     username = None
-    user = None
-    for uname, udata in DEMO_USERS.items():
-        if udata["user_id"] == user_id:
-            user = udata
-            username = uname
-            break
+    if user:
+        username = user["username"]
+    elif _demo_auth_enabled():
+        for uname, udata in DEMO_USERS.items():
+            if udata["user_id"] == user_id:
+                user = udata
+                username = uname
+                break
 
     if not user:
         return err("用户不存在", code="USER_NOT_FOUND", status_code=401)
@@ -903,7 +1000,7 @@ async def mfa_setup(request: Request):
     encrypted_secret = _mfa_service.encrypt_secret(raw_secret)
     user["_pending_mfa_secret_enc"] = encrypted_secret  # 临时存储
 
-    totp_uri = _mfa_service.get_totp_uri(encrypted_secret, username)
+    totp_uri = _mfa_service.get_totp_uri(encrypted_secret, username or "")
 
     logger.info("mfa_setup_initiated", user_id=user_id)
     return ok({
@@ -927,13 +1024,16 @@ async def mfa_enable(body: MFASetupEnableBody, request: Request):
         return err("Token无效或已过期", code="UNAUTHORIZED", status_code=401)
 
     user_id = payload.get("sub", "")
-    user = None
+    user = await _load_user_dict_by_id(user_id)
     username = None
-    for uname, udata in DEMO_USERS.items():
-        if udata["user_id"] == user_id:
-            user = udata
-            username = uname
-            break
+    if user:
+        username = user["username"]
+    elif _demo_auth_enabled():
+        for uname, udata in DEMO_USERS.items():
+            if udata["user_id"] == user_id:
+                user = udata
+                username = uname
+                break
 
     if not user:
         return err("用户不存在", code="USER_NOT_FOUND", status_code=401)
@@ -1034,13 +1134,22 @@ async def verify_token(request: Request):
     payload = _jwt_service.verify_access_token(token)
     if payload:
         user_id = payload.get("sub", "")
-        for username, user in DEMO_USERS.items():
-            if user["user_id"] == user_id:
-                return ok({
-                    "valid": True,
-                    "user": _user_info_from_demo(username, user),
-                    "mfa_verified": payload.get("mfa_verified", False),
-                })
+        db_user = await _load_user_dict_by_id(user_id)
+        if db_user:
+            uname = db_user["username"]
+            return ok({
+                "valid": True,
+                "user": _user_info_from_demo(uname, db_user),
+                "mfa_verified": payload.get("mfa_verified", False),
+            })
+        if _demo_auth_enabled():
+            for username, user in DEMO_USERS.items():
+                if user["user_id"] == user_id:
+                    return ok({
+                        "valid": True,
+                        "user": _user_info_from_demo(username, user),
+                        "mfa_verified": payload.get("mfa_verified", False),
+                    })
         return ok({"valid": False, "user": None})
 
     # 回退：旧版内存 token

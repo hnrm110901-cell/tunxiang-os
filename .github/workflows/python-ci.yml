@@ -8,6 +8,7 @@ on:
       - 'edge/**'
       - 'shared/ontology/**'
       - 'shared/events/**'
+      - 'scripts/gateway-import-smoke.sh'
       - 'pyproject.toml'
       - '.github/workflows/python-ci.yml'
   pull_request:
@@ -17,6 +18,7 @@ on:
       - 'edge/**'
       - 'shared/ontology/**'
       - 'shared/events/**'
+      - 'scripts/gateway-import-smoke.sh'
       - 'pyproject.toml'
 
 permissions:
@@ -100,12 +102,22 @@ jobs:
             pip install -r "services/${{ matrix.service }}/requirements.txt"
           fi
 
+      # Gateway：须用仓库根 PYTHONPATH 才能 import services.gateway.src.main；与全量 pytest 分开避免重复
+      - name: Gateway import smoke
+        if: matrix.service == 'gateway'
+        run: bash scripts/gateway-import-smoke.sh
+
       - name: Run tests
         run: |
           cd "services/${{ matrix.service }}"
           if [ -d "src/tests" ] && [ "$(find src/tests -name 'test_*.py' | head -1)" ]; then
+            IGNORE_SMOKE=""
+            if [ "${{ matrix.service }}" = "gateway" ]; then
+              IGNORE_SMOKE="--ignore=src/tests/test_main_import_smoke.py"
+            fi
             PYTHONPATH=src:../../ python -m pytest src/tests/ \
               --tb=short -q \
+              $IGNORE_SMOKE \
               --cov=src \
               --cov-report=term-missing \
               --cov-report=xml:coverage.xml \
@@ -195,12 +207,14 @@ jobs:
             echo "No hardcoded secrets detected"
           fi
 
+      # 失败时见 Job 状态（continue-on-error）；修复依赖后可改为阻断合并
       - name: Pip audit (dependency vulnerabilities)
+        continue-on-error: true
         run: |
-          # 收集所有 requirements.txt 并审计
+          set -e
           for req in services/*/requirements.txt; do
             if [ -f "$req" ]; then
               echo "=== Auditing: $req ==="
-              pip-audit -r "$req" --desc || true
+              pip-audit -r "$req" --desc
             fi
           done

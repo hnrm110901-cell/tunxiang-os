@@ -68,6 +68,7 @@ from .api.prediction_routes import router as prediction_router
 
 # 打印模板：活鲜称重单 / 宴席通知单 / 企业挂账单
 from .api.print_template_routes import router as print_template_router
+from .api.print_manager_routes import router as print_manager_router  # 模块4.2 打印管理可视化中心
 from .api.printer_config_routes import router as printer_config_router
 from .api.printer_routes import router as printer_router
 from .api.proactive_service_routes import router as proactive_service_router
@@ -277,7 +278,15 @@ app.include_router(delivery_orders_router)
 from .api.kds_banquet_routes import router as kds_banquet_router
 
 app.include_router(kds_banquet_router)
+
+# 模块4.1：宴会KDS出品 + 宴会定金抵扣
+from .api.banquet_kds_routes import router as banquet_kds_router
+from .api.banquet_deposit_routes import router as banquet_deposit_router
+
+app.include_router(banquet_kds_router)
+app.include_router(banquet_deposit_router)
 app.include_router(print_template_router)
+app.include_router(print_manager_router)  # 模块4.2 打印管理可视化中心（/api/v1/print/tasks...）
 app.include_router(dish_dept_mapping_router)
 
 # ── 快餐模式：快餐收银 + 叫号屏 ──
@@ -335,6 +344,24 @@ from .api.group_order_routes import router as group_order_router
 
 app.include_router(min_consumption_router)
 app.include_router(group_order_router)
+
+# ── v238: 账单规则引擎（最低消费/服务费，对标天财商龙模块1.4）──
+from .api.billing_rules_routes import router as billing_rules_router
+
+app.include_router(billing_rules_router)
+
+# ── 模块2.4: 外卖平台闭环 — 菜单/估清双向同步 + 线上接单 ──
+from .api.omni_sync_routes import router as omni_sync_router
+
+app.include_router(omni_sync_router)
+
+
+try:
+    from .api.table_card_api import router as table_card_router
+    app.include_router(table_card_router)
+except Exception as e:
+    import logging as _logging
+    _logging.getLogger(__name__).warning(f"table_card_router load failed: {e}")
 
 
 @app.get("/health")

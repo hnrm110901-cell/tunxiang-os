@@ -7,7 +7,7 @@ import { ko } from './ko';
 export type Lang = 'zh' | 'en' | 'ja' | 'ko';
 type Translations = typeof zh;
 
-const dictMap: Record<Lang, Translations> = { zh, en, ja, ko };
+const dictMap = { zh, en, ja, ko } as Record<Lang, Record<keyof Translations, string>>;
 
 interface LangContextValue {
   lang: Lang;

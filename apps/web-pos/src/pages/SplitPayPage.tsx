@@ -6,7 +6,9 @@ import { useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useOrderStore } from '../store/orderStore';
 import { createPayment } from '../api/tradeApi';
+import { formatPrice } from '@tx-ds/utils';
 
+/** @deprecated Use formatPrice from @tx-ds/utils */
 const fen2yuan = (fen: number) => `¥${(fen / 100).toFixed(2)}`;
 
 const PAYMENT_METHODS = [

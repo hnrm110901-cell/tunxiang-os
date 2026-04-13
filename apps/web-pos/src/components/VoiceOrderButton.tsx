@@ -19,6 +19,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { formatPrice } from '@tx-ds/utils';
 
 // ─── Design Tokens（Store 终端 CSS Variables）───
 
@@ -65,6 +66,7 @@ interface VoiceOrderButtonProps {
 
 // ─── 工具函数 ───
 
+/** @deprecated Use formatPrice from @tx-ds/utils */
 /** 将分转为元字符串，保留两位小数 */
 const fenToYuan = (fen: number): string => (fen / 100).toFixed(2);
 

@@ -7,6 +7,7 @@
  */
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { formatPrice } from '@tx-ds/utils';
 import { fetchStoreLive, rushDish } from '../../api/storeLiveApi';
 import type { StoreLiveData, SlowDish } from '../../api/storeLiveApi';
 
@@ -42,6 +43,7 @@ const cardStyle: React.CSSProperties = {
   marginBottom: 12,
 };
 
+/** @deprecated Use formatPrice from @tx-ds/utils */
 const fen2yuan = (fen: number) => `¥${(fen / 100).toFixed(0)}`;
 const pct = (v: number) => `${(v * 100).toFixed(0)}%`;
 

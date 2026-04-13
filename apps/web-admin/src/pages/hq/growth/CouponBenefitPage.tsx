@@ -5,6 +5,7 @@
  * 数据来源: GET/POST /api/v1/member/coupons, /points, /stored-value, /gift-cards
  */
 import { useState, useEffect, useCallback } from 'react';
+import { formatPrice } from '@tx-ds/utils';
 import { txFetchData } from '../../../api/client';
 import type {
   Coupon, CouponType, CouponStatus, CouponStats, CreateCouponPayload,
@@ -46,6 +47,7 @@ const STATUS_MAP: Record<CouponStatus, { label: string; color: string }> = {
 };
 
 // ---- 工具函数 ----
+/** @deprecated Use formatPrice from @tx-ds/utils */
 function fenToYuan(fen: number): string {
   return (fen / 100).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }

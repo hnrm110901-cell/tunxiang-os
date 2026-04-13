@@ -218,8 +218,8 @@ export function ApprovalTemplatePage() {
       const res = await txFetchData<TemplateListResponse>(
         `/api/v1/ops/approval-templates?page=${p}&size=20`,
       );
-      setTemplates(res.data?.items ?? []);
-      setTotal(res.data?.total ?? 0);
+      setTemplates(res?.items ?? []);
+      setTotal(res?.total ?? 0);
     } catch {
       // API 失败时保持空列表
       setTemplates([]);

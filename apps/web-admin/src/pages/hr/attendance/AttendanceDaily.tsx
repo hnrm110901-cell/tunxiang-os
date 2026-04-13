@@ -66,7 +66,7 @@ export default function AttendanceDaily() {
     (async () => {
       try {
         const res = await txFetchData<{ store_id: string; store_name: string }[]>('/api/v1/org/stores');
-        const list = res.data ?? [];
+        const list = res ?? [];
         setStores(list);
         if (list.length > 0) setStoreId(list[0].store_id);
       } catch {
@@ -134,8 +134,8 @@ export default function AttendanceDaily() {
               `/api/v1/attendance/daily?store_id=${storeId}&date=${date.format('YYYY-MM-DD')}&page=${params.current ?? 1}&size=${params.pageSize ?? 20}`,
             );
             return {
-              data: res.data?.items ?? [],
-              total: res.data?.total ?? 0,
+              data: res?.items ?? [],
+              total: res?.total ?? 0,
               success: true,
             };
           }}

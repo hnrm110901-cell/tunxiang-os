@@ -68,7 +68,7 @@ const columns: ProColumns<TurnoverRow>[] = [
       />
     ),
   },
-  { title: 'AI建议',   dataIndex: 'aiSuggestion', flex: 1 },
+  { title: 'AI建议',   dataIndex: 'aiSuggestion'},
   {
     title: '操作', valueType: 'option', width: 80,
     render: () => [<a key="detail" style={{ color: '#FF6B35' }}>查看详情</a>],

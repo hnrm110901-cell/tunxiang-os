@@ -14,3 +14,4 @@ export { tradeRoutes } from './hq-trade';
 export { menuRoutes } from './hq-menu';
 export { storeRoutes } from './hq-store';
 export { mobileRoutes } from './mobile';
+export { knowledgeRoutes } from './hq-knowledge';

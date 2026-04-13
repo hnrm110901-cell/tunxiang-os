@@ -87,7 +87,7 @@ export function GrowthJourneyTemplatePage() {
       if (filterType) params.journey_type = filterType;
       const qs = Object.keys(params).length > 0 ? '?' + new URLSearchParams(params).toString() : '';
       const resp = await txFetchData<{ items: JourneyTemplate[]; total: number }>(`/api/v1/growth/journey-templates${qs}`);
-      if (resp.data) setTemplates(resp.data.items);
+      if (resp) setTemplates(resp.items);
     } catch (err) {
       console.error('fetch templates error', err);
     } finally {
@@ -104,7 +104,7 @@ export function GrowthJourneyTemplatePage() {
       setDetailLoading(true);
       try {
         const resp = await txFetchData<JourneyTemplate>(`/api/v1/growth/journey-templates/${tpl.id}`);
-        if (resp.data) setSelectedTemplate(resp.data);
+        if (resp) setSelectedTemplate(resp);
       } catch (err) {
         console.error('fetch template detail error', err);
       } finally {
@@ -124,9 +124,9 @@ export function GrowthJourneyTemplatePage() {
         txFetchData<ExperimentSelectResult>(`/api/v1/growth/experiments/${templateId}/select-variant`),
         txFetchData<ExperimentAutoPauseResult>(`/api/v1/growth/experiments/${templateId}/auto-pause-check?min_samples=30`),
       ]);
-      if (summaryResp.data) setExpSummary(summaryResp.data);
-      if (selectResp.data) setExpSelectResult(selectResp.data);
-      if (pauseResp.data) setExpAutoPause(pauseResp.data);
+      if (summaryResp) setExpSummary(summaryResp);
+      if (selectResp) setExpSelectResult(selectResp);
+      if (pauseResp) setExpAutoPause(pauseResp);
     } catch (fetchErr) {
       console.error('fetch experiment data error', fetchErr);
     } finally {
@@ -219,7 +219,7 @@ export function GrowthJourneyTemplatePage() {
                   <Tag color={JOURNEY_TYPE_COLORS[tpl.journey_type] || 'default'}>
                     {JOURNEY_TYPE_LABELS[tpl.journey_type] || tpl.journey_type}
                   </Tag>
-                  <Tag color={MECHANISM_COLORS[tpl.mechanism_family] || 'default'}>
+                  <Tag color={(tpl.mechanism_family ? MECHANISM_COLORS[tpl.mechanism_family] : undefined) || 'default'}>
                     {tpl.mechanism_family}
                   </Tag>
                 </Space>
@@ -245,7 +245,7 @@ export function GrowthJourneyTemplatePage() {
                   <span style={{ color: TEXT_SECONDARY, fontSize: 11 }}>
                     创建于 {tpl.created_at?.slice(0, 10)}
                   </span>
-                  {(tpl as Record<string, unknown>).ab_test_id && (
+                  {!!(tpl as unknown as Record<string, unknown>).ab_test_id && (
                     <Button
                       size="small"
                       icon={<ExperimentOutlined />}
@@ -280,7 +280,7 @@ export function GrowthJourneyTemplatePage() {
               <Tag color={JOURNEY_TYPE_COLORS[selectedTemplate.journey_type] || 'default'}>
                 {JOURNEY_TYPE_LABELS[selectedTemplate.journey_type] || selectedTemplate.journey_type}
               </Tag>
-              <Tag color={MECHANISM_COLORS[selectedTemplate.mechanism_family] || 'default'}>
+              <Tag color={(selectedTemplate.mechanism_family ? MECHANISM_COLORS[selectedTemplate.mechanism_family] : undefined) || 'default'}>
                 {selectedTemplate.mechanism_family}
               </Tag>
               <Tag>{selectedTemplate.is_active ? '启用中' : '已停用'}</Tag>
