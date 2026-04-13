@@ -255,7 +255,7 @@ def upgrade() -> None:
         op.create_index(
             "ix_contract_alerts_tenant_type_date",
             "contract_alerts",
-            ["tenant_id", "alert_type", sa.text("created_at::date")],
+            ["tenant_id", "alert_type", "created_at"],
         )
 
         # RLS

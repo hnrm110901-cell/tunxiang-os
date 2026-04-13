@@ -33,6 +33,11 @@ _RLS_COND = "tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::UUI
 
 
 def upgrade() -> None:
+    conn = op.get_bind()
+    existing = sa.inspect(conn).get_table_names()
+    if 'expense_applications' in existing:
+        return
+
     # ──────────────────────────────────────────────────────────────────
     # expense_applications — 费用申请主表
     # ──────────────────────────────────────────────────────────────────

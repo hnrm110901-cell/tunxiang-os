@@ -54,7 +54,7 @@ def upgrade() -> None:
                 comment="本次版本变更摘要（人工填写或自动生成）",
             ),
             sa.Column(
-                "snapshot_json", JSONB(), nullable=False, server_default="'[]'::jsonb",
+                "snapshot_json", JSONB(), nullable=False, server_default=sa.text("'[]'::jsonb"),
                 comment="发布时的完整菜品列表快照，用于回滚",
             ),
             sa.Column(
@@ -103,7 +103,7 @@ def upgrade() -> None:
                 comment="下发的版本号（NULL 表示初次下发，未创建版本快照时）",
             ),
             sa.Column(
-                "status", sa.String(20), nullable=False, server_default="'success'",
+                "status", sa.String(20), nullable=False, server_default=sa.text("'success'"),
                 comment="下发状态：success / failed / pending",
             ),
             sa.Column("error_message", sa.Text(), nullable=True, comment="下发失败时的错误信息"),
