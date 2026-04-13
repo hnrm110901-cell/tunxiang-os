@@ -67,8 +67,24 @@ class HRAgentScheduler:
             name="Daily Contribution Recalculation",
             replace_existing=True,
         )
+        # 加盟费逾期自动标记: 每日 02:05（在合规扫描之后，避免资源争用）
+        self.scheduler.add_job(
+            self._run_mark_overdue_fees,
+            CronTrigger(hour=2, minute=5),
+            id="franchise_daily_mark_overdue",
+            name="Daily Franchise Fee Mark Overdue",
+            replace_existing=True,
+        )
+        # Agent ROI 指标采集: 每日 05:00（贡献度重算 04:00 完成后）
+        self.scheduler.add_job(
+            self._run_roi_collect,
+            CronTrigger(hour=5, minute=0),
+            id="agent_roi_daily_collect",
+            name="Daily Agent ROI Metrics Collect",
+            replace_existing=True,
+        )
         self.scheduler.start()
-        log.info("hr_agent_scheduler_started", jobs=4)
+        log.info("hr_agent_scheduler_started", jobs=6)
 
     def stop(self) -> None:
         """关停调度器"""
@@ -176,3 +192,163 @@ class HRAgentScheduler:
                 )
         except httpx.HTTPError as exc:
             log.error("contribution_recalc_failed", error=str(exc))
+
+    async def _get_active_tenant_ids(self) -> list[str]:
+        """查询所有活跃租户 ID（BYPASSRLS 会话，跨租户读取）。
+
+        降级链：DB查询 → DEFAULT_TENANT_ID 环境变量 → 返回空列表。
+        """
+        import os as _os
+        from sqlalchemy import text as _text
+        from shared.ontology.src.database import get_db_no_rls
+
+        try:
+            async for db in get_db_no_rls():
+                result = await db.execute(
+                    _text("""
+                        SELECT DISTINCT tenant_id::text
+                        FROM stores
+                        WHERE is_deleted = FALSE
+                        ORDER BY 1
+                    """)
+                )
+                tenant_ids = [row[0] for row in result.fetchall()]
+                if tenant_ids:
+                    return tenant_ids
+                log.warning("hr_scheduler_stores_table_empty")
+        except Exception as exc:  # noqa: BLE001
+            log.error(
+                "hr_scheduler_tenant_query_failed",
+                error=str(exc),
+                exc_info=True,
+            )
+
+        default_tenant = _os.environ.get("DEFAULT_TENANT_ID")
+        if default_tenant:
+            log.warning(
+                "hr_scheduler_fallback_to_default_tenant",
+                tenant_id=default_tenant,
+            )
+            return [default_tenant]
+
+        log.warning("hr_scheduler_no_tenant_configured")
+        return []
+
+    async def _run_mark_overdue_fees(self) -> None:
+        """将逾期未付的加盟费批量标记为 overdue（多租户）
+
+        调用 POST /api/v1/franchise/fees/mark-overdue（每租户一次，携带 X-Tenant-ID）
+        幂等操作：只将 due_date < 今日 且 status='pending' 的记录标记为 'overdue'。
+        每日 02:05 执行，运行在合规扫描（02:00）之后避免资源争用。
+        """
+        import httpx
+
+        tenant_ids = await self._get_active_tenant_ids()
+        if not tenant_ids:
+            log.warning("franchise_mark_overdue_no_tenants")
+            return
+
+        total_marked = 0
+        errors: list[str] = []
+
+        async with httpx.AsyncClient(timeout=60) as client:
+            for tid in tenant_ids:
+                try:
+                    resp = await client.post(
+                        f"{self.base_url}/api/v1/franchise/fees/mark-overdue",
+                        headers={"X-Tenant-ID": tid},
+                    )
+                    if resp.status_code == 200:
+                        data = resp.json()
+                        marked = data.get("data", {}).get("marked_count", 0)
+                        total_marked += marked
+                        log.info(
+                            "franchise_mark_overdue_tenant_done",
+                            tenant_id=tid,
+                            marked_count=marked,
+                        )
+                    else:
+                        log.warning(
+                            "franchise_mark_overdue_unexpected_status",
+                            tenant_id=tid,
+                            status=resp.status_code,
+                            body=resp.text[:200],
+                        )
+                        errors.append(tid)
+                except httpx.HTTPError as exc:
+                    log.error(
+                        "franchise_mark_overdue_tenant_failed",
+                        tenant_id=tid,
+                        error=str(exc),
+                    )
+                    errors.append(tid)
+
+        log.info(
+            "franchise_mark_overdue_completed",
+            total_marked=total_marked,
+            tenant_count=len(tenant_ids),
+            error_count=len(errors),
+            as_of=date.today().isoformat(),
+        )
+
+    async def _run_roi_collect(self) -> None:
+        """触发 Agent ROI 指标每日采集（多租户）
+
+        调用 POST /api/v1/agent/roi/collect（每租户一次，携带 X-Tenant-ID）
+        采集来源：orders.discount_amount_fen + agent_auto_executions 执行计数
+        幂等：同日已存在记录则跳过。每日 05:00 执行（贡献度重算 04:00 之后）。
+        """
+        import httpx
+
+        tenant_ids = await self._get_active_tenant_ids()
+        if not tenant_ids:
+            log.warning("roi_collect_no_tenants")
+            return
+
+        total_inserted = 0
+        skipped = 0
+        errors: list[str] = []
+
+        async with httpx.AsyncClient(timeout=120) as client:
+            for tid in tenant_ids:
+                try:
+                    resp = await client.post(
+                        f"{self.base_url}/api/v1/agent/roi/collect",
+                        headers={"X-Tenant-ID": tid},
+                    )
+                    if resp.status_code == 200:
+                        data = resp.json().get("data", {})
+                        if data.get("skipped"):
+                            skipped += 1
+                        else:
+                            total_inserted += data.get("inserted_count", 0)
+                        log.info(
+                            "roi_collect_tenant_done",
+                            tenant_id=tid,
+                            inserted=data.get("inserted_count", 0),
+                            skipped=data.get("skipped", False),
+                        )
+                    else:
+                        log.warning(
+                            "roi_collect_unexpected_status",
+                            tenant_id=tid,
+                            status=resp.status_code,
+                            body=resp.text[:200],
+                        )
+                        errors.append(tid)
+                except httpx.HTTPError as exc:
+                    log.error(
+                        "roi_collect_tenant_failed",
+                        tenant_id=tid,
+                        error=str(exc),
+                    )
+                    errors.append(tid)
+
+        log.info(
+            "roi_collect_completed",
+            total_inserted=total_inserted,
+            tenants_skipped=skipped,
+            tenant_count=len(tenant_ids),
+            error_count=len(errors),
+            as_of=date.today().isoformat(),
+        )
