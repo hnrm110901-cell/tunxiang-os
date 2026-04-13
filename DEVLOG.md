@@ -1,3 +1,17 @@
+## 2026-04-13 (续3) insights演示数据+agent_kpi估算值清零
+
+### 今日完成
+- [tx-analytics] insights_routes: /store-insights 接入 mv_store_pnl+orders，删除6个硬编码演示门店；/period-analysis 接入 orders+order_items 餐段分组，删除全部 demo_periods 数据
+- [tx-agent] agent_kpi_routes: smart_dispatch(kds_tasks平均出餐秒数+准时率) / store_patrol.patrol_response_time(compliance_alerts已解决响应时间) / inventory_alert.stockout_rate(dishes停售比率) 三组新增真实DB查询
+
+### 数据变化
+- 消灭 target×factor 估算KPI：3个（smart_dispatch×2, store_patrol×1, inventory_alert×1）
+- 消灭演示门店数据：insights_routes 两个端点全量DB化
+
+### 遗留问题
+- agent_kpi 剩余估算KPI：clv_growth_rate / waste_rate / anomaly_detection_rate / cost_variance / menu_optimization_revenue_rate / resolution_rate / campaign_conversion_rate（共6个，需专属跟踪表成熟后接入）
+- mv_store_pnl 仍为空表（需投影器运行后填充，fallback 路径为 orders 直查）
+
 ## 2026-04-13 (续2) members/governance/ck_recipe 全量DB化
 
 ### 今日完成
