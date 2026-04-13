@@ -16,6 +16,18 @@ def upgrade() -> None:
     conn = op.get_bind()
     existing = sa.inspect(conn).get_table_names()
 
+    def _add_rls(table: str, prefix: str) -> None:
+        op.execute(f"ALTER TABLE {table} ENABLE ROW LEVEL SECURITY")
+        op.execute(f"ALTER TABLE {table} FORCE ROW LEVEL SECURITY")
+        op.execute(f"""
+            DO $$ BEGIN
+                IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = '{table}' AND policyname = '{prefix}_tenant') THEN
+                    EXECUTE 'CREATE POLICY {prefix}_tenant ON {table}
+                        USING (tenant_id = NULLIF(current_setting(''app.tenant_id'', true), '''')::UUID)
+                        WITH CHECK (tenant_id = NULLIF(current_setting(''app.tenant_id'', true), '''')::UUID)';
+                END IF;
+            END$$;
+        """)
 
     # ── 活鲜批次表 ──
 
@@ -95,15 +107,6 @@ def upgrade() -> None:
         )
         op.create_index("ix_sml_tenant", "seafood_mortality_logs", ["tenant_id", "store_id"])
         _add_rls("seafood_mortality_logs", "sml")
-
-    def _add_rls(table: str, prefix: str) -> None:
-        op.execute(f"ALTER TABLE {table} ENABLE ROW LEVEL SECURITY")
-        op.execute(f"ALTER TABLE {table} FORCE ROW LEVEL SECURITY")
-        op.execute(f"""
-            CREATE POLICY {prefix}_tenant ON {table}
-            USING (tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::UUID)
-            WITH CHECK (tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::UUID)
-        """)
 
 
 def downgrade() -> None:
