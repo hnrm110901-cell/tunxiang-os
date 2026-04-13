@@ -174,19 +174,19 @@ export default function RevenueScheduleDashboard() {
       const monthStr = weekStart.format('YYYY-MM');
 
       const [planRes, analysisRes, savingsRes] = await Promise.allSettled([
-        txFetchData(`/api/v1/revenue-schedule/optimal-plan?store_id=${storeId}&week_start=${weekStr}`),
-        txFetchData(`/api/v1/revenue-schedule/analysis?store_id=${storeId}&weeks=4`),
-        txFetchData(`/api/v1/revenue-schedule/savings-estimate?store_id=${storeId}&month=${monthStr}`),
+        txFetchData<WeeklyPlan>(`/api/v1/revenue-schedule/optimal-plan?store_id=${storeId}&week_start=${weekStr}`),
+        txFetchData<AnalysisData>(`/api/v1/revenue-schedule/analysis?store_id=${storeId}&weeks=4`),
+        txFetchData<SavingsData>(`/api/v1/revenue-schedule/savings-estimate?store_id=${storeId}&month=${monthStr}`),
       ]);
 
-      if (planRes.status === 'fulfilled' && planRes.value?.ok) {
-        setPlan(planRes.value.data);
+      if (planRes.status === 'fulfilled' && planRes.value) {
+        setPlan(planRes.value);
       }
-      if (analysisRes.status === 'fulfilled' && analysisRes.value?.ok) {
-        setAnalysis(analysisRes.value.data);
+      if (analysisRes.status === 'fulfilled' && analysisRes.value) {
+        setAnalysis(analysisRes.value);
       }
-      if (savingsRes.status === 'fulfilled' && savingsRes.value?.ok) {
-        setSavings(savingsRes.value.data);
+      if (savingsRes.status === 'fulfilled' && savingsRes.value) {
+        setSavings(savingsRes.value);
       }
     } catch (err) {
       console.error('Revenue schedule fetch failed:', err);
@@ -218,7 +218,7 @@ export default function RevenueScheduleDashboard() {
       onOk: async () => {
         setApplying(true);
         try {
-          const res = await txFetchData('/api/v1/revenue-schedule/apply-plan', {
+          const res = await txFetchData<{ inserted_count?: number }>('/api/v1/revenue-schedule/apply-plan', {
             method: 'POST',
             body: JSON.stringify({
               store_id: storeId,
@@ -226,12 +226,8 @@ export default function RevenueScheduleDashboard() {
               operator_id: 'admin', // TODO: from auth context
             }),
           });
-          if (res?.ok) {
-            message.success(`已生成${res.data.inserted_count}条排班草稿，30分钟内可回滚`);
-            fetchAll();
-          } else {
-            message.error(res?.error?.message || '生成失败');
-          }
+          message.success(`已生成${res?.inserted_count ?? 0}条排班草稿，30分钟内可回滚`);
+          fetchAll();
         } catch {
           message.error('请求失败');
         } finally {

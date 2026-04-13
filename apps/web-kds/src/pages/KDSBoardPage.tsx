@@ -20,6 +20,13 @@ import { fetchTicketQueue, startTicket, completeTicket } from '../api/kdsOpsApi'
 import { warmUpAudio, playNewOrder, playTimeout } from '../utils/audio';
 import { OrderTicketCard } from '@tx-ds/biz';
 import type { OrderTicketData } from '@tx-ds/biz';
+import { useKDSRules } from '../hooks/useKDSRules';
+import {
+  getTimeLevelFromRules,
+  getTimerColorFromLevel,
+  getChannelColor,
+  type KDSRuleConfig,
+} from '../api/kdsRulesApi';
 
 
 // ─── CSS Variables ──────────────────────────────────────
@@ -63,6 +70,14 @@ interface DemoTicket {
   priority: 'normal' | 'rush' | 'vip';
   timeLimit: number; // minutes
   startedAt?: number;
+  /** 渠道：dine_in / takeout / pickup */
+  channel?: string;
+  /** 是否赠菜工单 */
+  isGift?: boolean;
+  /** 是否退菜工单 */
+  isReturn?: boolean;
+  /** 客位数 */
+  guestSeat?: number;
 }
 
 /** Grouped dish entry for by-dish view */
@@ -75,6 +90,32 @@ interface GroupedDish {
 
 type ViewMode = 'scroll' | 'paged';
 type GroupMode = 'by-table' | 'by-dish';
+
+type TimeStatus = 'normal' | 'warning' | 'overtime';
+
+/**
+ * 根据KDS规则配置计算时间状态（优先使用规则，回退到原有timeLimit逻辑）
+ */
+function getTimeStatusFromRules(
+  createdAt: number,
+  timeLimit: number,
+  rules: KDSRuleConfig,
+): TimeStatus {
+  const elapsedMin = (Date.now() - createdAt) / 60000;
+  const level = getTimeLevelFromRules(elapsedMin, rules);
+  if (level === 'urgent') return 'overtime';
+  if (level === 'warning') return 'warning';
+  // 兜底：如果 timeLimit 到期也算超时
+  if (elapsedMin >= timeLimit) return 'overtime';
+  return 'normal';
+}
+
+function formatElapsed(createdAt: number): string {
+  const totalSec = Math.floor((Date.now() - createdAt) / 1000);
+  const m = Math.floor(totalSec / 60);
+  const s = totalSec % 60;
+  return `${m}:${String(s).padStart(2, '0')}`;
+}
 
 // ─── 门店配置 ─────────────────────────────────────────
 
@@ -130,16 +171,21 @@ function buildMockTickets(): DemoTicket[] {
   return [
     makeTicket({ createdAtOffsetMin: 25, status: 'cooking', priority: 'normal', tableNo: 'A01',
       items: [{ name: '剁椒鱼头', qty: 1, notes: '少辣' }, { name: '小炒肉', qty: 1, notes: '' }],
-      startedAt: Date.now() - 22 * 60 * 1000 }), // 超时
+      startedAt: Date.now() - 22 * 60 * 1000,
+      channel: 'dine_in', guestSeat: 4 }), // 超时
     makeTicket({ createdAtOffsetMin: 12, status: 'cooking', priority: 'vip', tableNo: 'B01',
       items: [{ name: '口味虾', qty: 2, notes: '中辣' }, { name: '米饭', qty: 4, notes: '' }],
-      startedAt: Date.now() - 10 * 60 * 1000 }), // 即将超时
-    makeTicket({ createdAtOffsetMin: 5, status: 'pending', priority: 'normal', tableNo: 'A03',
-      items: [{ name: '蒜蓉西兰花', qty: 1, notes: '' }, { name: '酸菜鱼', qty: 1, notes: '微辣' }] }),
+      startedAt: Date.now() - 10 * 60 * 1000,
+      channel: 'dine_in', guestSeat: 6 }), // 即将超时
+    makeTicket({ createdAtOffsetMin: 5, status: 'pending', priority: 'normal', tableNo: '外卖001',
+      items: [{ name: '蒜蓉西兰花', qty: 1, notes: '' }, { name: '酸菜鱼', qty: 1, notes: '微辣' }],
+      channel: 'takeout' }),
     makeTicket({ createdAtOffsetMin: 3, status: 'pending', priority: 'rush', tableNo: 'C01',
-      items: [{ name: '外婆鸡', qty: 1, notes: '' }] }),
-    makeTicket({ createdAtOffsetMin: 1, status: 'pending', priority: 'normal', tableNo: 'D02',
-      items: [{ name: '番茄炒蛋', qty: 2, notes: '' }, { name: '土豆丝', qty: 1, notes: '' }] }),
+      items: [{ name: '外婆鸡', qty: 1, notes: '' }],
+      channel: 'dine_in', isGift: true, guestSeat: 2 }),
+    makeTicket({ createdAtOffsetMin: 1, status: 'pending', priority: 'normal', tableNo: '自取003',
+      items: [{ name: '番茄炒蛋', qty: 2, notes: '' }, { name: '土豆丝', qty: 1, notes: '' }],
+      channel: 'pickup' }),
   ];
 }
 
@@ -181,6 +227,9 @@ export function KDSBoardPage() {
   const isDemo = searchParams.get('demo') === 'true';
   const storeId = searchParams.get('store') || 'wh';
   const storeName = STORE_MAP[storeId] || '未知门店';
+
+  // 加载门店KDS规则配置（超时颜色/渠道色/标识开关）
+  const { rules } = useKDSRules(storeId);
 
   const [tickets, setTickets] = useState<DemoTicket[]>(() => buildMockTickets());
   const [now, setNow] = useState(() => Date.now());
@@ -407,7 +456,7 @@ export function KDSBoardPage() {
   const pendingCount = activeTickets.filter((t) => t.status === 'pending').length;
   const cookingCount = activeTickets.filter((t) => t.status === 'cooking').length;
   const overtimeCount = activeTickets.filter(
-    (t) => isOvertime(t.createdAt, t.timeLimit),
+    (t) => getTimeStatusFromRules(t.createdAt, t.timeLimit, rules) === 'overtime',
   ).length;
 
   // ─── Pagination (paged mode) ──────────────────────
@@ -832,6 +881,9 @@ function ToggleButton({ active, label, onClick }: { active: boolean; label: stri
     </button>
   );
 }
+
+// (KDSTicketCard removed — now uses shared OrderTicketCard from @tx-ds/biz)
+// KDS rules utility functions (getTimeStatusFromRules, formatElapsed) are kept above for overtime counting.
 
 // ─── 分页导航按钮 ────────────────────────────────────
 

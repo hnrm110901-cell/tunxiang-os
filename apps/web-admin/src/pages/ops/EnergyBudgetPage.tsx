@@ -148,8 +148,8 @@ function BudgetTab({ stores }: BudgetTabProps) {
     setError(null);
     try {
       const params = new URLSearchParams({ year: String(year), month: String(month), store_id: storeId });
-      const json = await txFetchData(`/api/v1/ops/energy/budget-vs-actual?${params}`);
-      setData((json as Record<string, unknown>) ?? null);
+      const json = await txFetchData<BudgetVsActual>(`/api/v1/ops/energy/budget-vs-actual?${params}`);
+      setData(json ?? null);
     } catch {
       setError('加载预算对比数据失败，请稍后重试');
     } finally {
@@ -395,8 +395,8 @@ function AlertRulesTab() {
     setLoading(true);
     setError(null);
     try {
-      const data = await txFetchData<{ items?: unknown[] }>('/api/v1/ops/energy/alert-rules');
-      setRules((data as { items?: unknown[] }).items ?? (data as unknown[]) ?? []);
+      const data = await txFetchData<{ items?: AlertRule[] } | AlertRule[]>('/api/v1/ops/energy/alert-rules');
+      setRules((Array.isArray(data) ? data : (data as { items?: AlertRule[] }).items) ?? []);
     } catch {
       setError('加载告警规则失败，请稍后重试');
     } finally {
@@ -622,8 +622,8 @@ function HistoryTab({ stores }: HistoryTabProps) {
     try {
       const params = new URLSearchParams({ year: String(queryYear) });
       if (storeId) params.set('store_id', storeId);
-      const data = await txFetchData<{ items?: unknown[] }>(`/api/v1/ops/energy/budgets?${params}`);
-      setBudgets((data as { items?: unknown[] }).items ?? (data as unknown[]) ?? []);
+      const data = await txFetchData<{ items?: EnergyBudget[] } | EnergyBudget[]>(`/api/v1/ops/energy/budgets?${params}`);
+      setBudgets((Array.isArray(data) ? data : (data as { items?: EnergyBudget[] }).items) ?? []);
     } catch {
       setError('加载历史预算失败，请稍后重试');
     } finally {
@@ -722,8 +722,8 @@ export function EnergyBudgetPage() {
   const fetchStores = async () => {
     setStoresLoading(true);
     try {
-      const data = await txFetchData<{ items?: unknown[] }>('/api/v1/org/stores');
-      setStores((data as { items?: unknown[] }).items ?? (data as unknown[]) ?? []);
+      const data = await txFetchData<{ items?: Store[] } | Store[]>('/api/v1/org/stores');
+      setStores((Array.isArray(data) ? data : (data as { items?: Store[] }).items) ?? []);
     } catch {
       message.warning('门店列表加载失败，部分功能可能受限');
     } finally {

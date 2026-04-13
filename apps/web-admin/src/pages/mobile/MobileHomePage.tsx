@@ -125,7 +125,7 @@ export function MobileHomePage() {
 
     txFetchData<DashboardStats>('/api/v1/analytics/dashboard-stats')
       .then(res => {
-        if (!cancelled) setData(res.data ?? MOCK);
+        if (!cancelled) setData(res ?? MOCK);
       })
       .catch(() => {
         if (!cancelled) setData(MOCK);

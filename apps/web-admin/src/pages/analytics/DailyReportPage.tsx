@@ -47,7 +47,7 @@ import {
   DollarOutlined,
   TableOutlined,
 } from '@ant-design/icons';
-import ProTable from '@ant-design/pro-components';
+import { ProTable } from '@ant-design/pro-components';
 import type { ProColumns } from '@ant-design/pro-components';
 import dayjs, { Dayjs } from 'dayjs';
 import { formatPrice } from '@tx-ds/utils';

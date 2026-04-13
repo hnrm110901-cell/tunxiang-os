@@ -1,0 +1,32 @@
+name: expense_summary
+description: "费控申请汇总：按门店/品牌/时段统计申请数量和金额"
+version: "1.0"
+trigger_phrases:
+  - "费用申请汇总"
+  - "报销统计"
+  - "费控概览"
+  - "申请金额"
+parameters:
+  - name: store_id
+    type: string
+    required: false
+    description: "门店ID，不传则返回当前租户汇总"
+  - name: date_from
+    type: string
+    required: false
+    description: "起始日期 YYYY-MM-DD"
+  - name: date_to
+    type: string
+    required: false
+    description: "结束日期 YYYY-MM-DD"
+  - name: tenant_id
+    type: string
+    required: true
+    description: "租户ID"
+handler: services.expense_application_service.get_stats
+response_template: |
+  费控申请汇总：
+  - 申请总数：{total_count} 笔
+  - 申请总金额：{total_amount_yuan} 元
+  - 待审批：{pending_approval_count} 笔
+  - 按状态分布：{by_status}

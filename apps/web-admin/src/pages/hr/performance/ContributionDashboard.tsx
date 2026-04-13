@@ -142,8 +142,8 @@ export default function ContributionDashboard() {
   // 加载员工趋势
   const loadTrend = useCallback(async (employeeId: string) => {
     try {
-      const res = await txFetchData(`/api/v1/contribution/trend/${employeeId}?periods=6`);
-      if (res.ok) setTrendData(res.data);
+      const res = await txFetchData<TrendPoint[]>(`/api/v1/contribution/trend/${employeeId}?periods=6`);
+      if (res) setTrendData(res);
     } catch { /* ignore */ }
   }, []);
 
@@ -356,14 +356,14 @@ export default function ContributionDashboard() {
               if (!storeId) return { data: [], total: 0, success: true };
               const [ps, pe] = getDateRange();
               try {
-                const res = await txFetchData(
+                const res = await txFetchData<{ stats?: unknown; rankings?: RankingItem[] }>(
                   `/api/v1/contribution/rankings?store_id=${storeId}&period_start=${ps}&period_end=${pe}`,
                 );
-                if (res.ok) {
-                  setStats(res.data.stats || stats);
+                if (res) {
+                  if (res.stats) setStats(res.stats as typeof stats);
                   return {
-                    data: res.data.rankings || [],
-                    total: (res.data.rankings || []).length,
+                    data: res.rankings || [],
+                    total: (res.rankings || []).length,
                     success: true,
                   };
                 }

@@ -81,6 +81,10 @@ def upgrade() -> None:
             sa.Column('balance_status', sa.VARCHAR(20), nullable=False, server_default='unpaid'))
         _add_col_if_missing('payment_status',
             sa.Column('payment_status', sa.VARCHAR(20), nullable=False, server_default='unpaid'))
+        _add_col_if_missing('banquet_date',
+            sa.Column('banquet_date', sa.DATE(), nullable=True))
+        _add_col_if_missing('banquet_time',
+            sa.Column('banquet_time', sa.TIME(), nullable=True))
         _add_col_if_missing('cancel_reason',
             sa.Column('cancel_reason', sa.TEXT(), nullable=True))
         _add_col_if_missing('cancelled_at',
@@ -124,8 +128,15 @@ def upgrade() -> None:
         ON banquet_orders(tenant_id)
     """)
     op.execute("""
-        CREATE INDEX IF NOT EXISTS idx_banquet_orders_date
-        ON banquet_orders(tenant_id, banquet_date)
+        DO $$ BEGIN
+            IF EXISTS (
+                SELECT 1 FROM information_schema.columns
+                WHERE table_name='banquet_orders' AND column_name='banquet_date'
+            ) THEN
+                CREATE INDEX IF NOT EXISTS idx_banquet_orders_date
+                ON banquet_orders(tenant_id, banquet_date);
+            END IF;
+        END$$;
     """)
     op.execute("""
         CREATE INDEX IF NOT EXISTS idx_banquet_orders_status

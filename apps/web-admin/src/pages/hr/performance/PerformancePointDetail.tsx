@@ -12,7 +12,7 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
-import { Card, Col, Row, Statistic, Tag, Typography } from 'antd';
+import { Card, Col, Row, Space, Statistic, Tag, Typography } from 'antd';
 import { UserOutlined, StarOutlined } from '@ant-design/icons';
 import { ProColumns, ProTable } from '@ant-design/pro-components';
 import type { ActionType } from '@ant-design/pro-components';

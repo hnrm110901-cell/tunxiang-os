@@ -67,6 +67,7 @@ import FoodCourtManagePage from './pages/store/FoodCourtManagePage';  // TC-P2-1
 import { AgentDashboardPage } from './pages/agent/AgentDashboardPage';
 // ─── Phase1-4 新增页面 ───────────────────────────────────────────────────────
 import MenuSchemePage from './pages/menu/MenuSchemePage';
+import MenuPlanPage from './pages/menu/MenuPlanPage';  // 模块3.4 菜谱方案批量下发+门店差异化
 import { WineStoragePage } from './pages/finance/WineStoragePage';
 import { DepositManagePage } from './pages/finance/DepositManagePage';
 import { CostManagePage } from './pages/finance/CostManagePage';
@@ -147,12 +148,16 @@ import SCRMAgentPage from './pages/growth/SCRMAgentPage';
 import OmniOrderCenterPage from './pages/trade/OmniOrderCenterPage';
 // ─── OR-02: 员工培训管理 ───────────────────────────────────────────────────────
 import EmployeeTrainingPage from './pages/org/EmployeeTrainingPage';
+// ─── 模块3.2: 加盟商管理闭环 ──────────────────────────────────────────────────
+import FranchiseManagePage from './pages/org/FranchiseManagePage';
 // ─── Y-H1/Y-H2: 多品牌管理统一 + 多区域管理 ────────────────────────────────────
 import BrandRegionPage from './pages/org/BrandRegionPage';
 // ─── Y-I2: 抖音团购管理 ───────────────────────────────────────────────────────
 import DouyinVoucherPage from './pages/trade/DouyinVoucherPage';
 // ─── AI经营合伙人 ─────────────────────────────────────────────────────────────
 import { ChiefAgentPage } from './pages/agent/ChiefAgentPage';
+// ─── 模块4.4: Agent KPI仪表盘 ────────────────────────────────────────────────
+import AgentKPIDashboard from './pages/AgentKPIDashboard';
 // ─── Sprint 1: AI 中枢 ────────────────────────────────────────────────────────
 import { AgentHubPage as HQAgentHubPage } from './pages/hq/agent/AgentHubPage';
 import { AgentCommandCenterPage } from './pages/hq/agent/AgentCommandCenterPage';
@@ -191,11 +196,16 @@ import PeakGuardPage from './pages/hr/PeakGuardPage';
 import CoachSessionPage from './pages/hr/CoachSessionPage';
 import AlertAggregationPage from './pages/hr/AlertAggregationPage';
 import HRHubOverviewPage from './pages/hr/HRHubOverviewPage';
+import { CommissionV3Page } from './pages/hr/CommissionV3Page';  // 计件提成3.0 模块2.6
 // ─── AI营销驾驶舱 ─────────────────────────────────────────────────────────────
 import AiMarketingDashboardPage from './pages/marketing/AiMarketingDashboardPage';
+// ─── 促销规则引擎 V2（模块2.5）────────────────────────────────────────────────
+import PromotionRulesV2Page from './pages/marketing/PromotionRulesV2Page';
 // ─── P3: HQ总部管控看板 ────────────────────────────────────────────────────────
 import { BrandOverview } from './pages/analytics/hq/BrandOverview';
 import { StorePerformanceMatrix } from './pages/analytics/hq/StorePerformanceMatrix';
+// ─── 模块4.4: Agent KPI 绑定仪表盘 ────────────────────────────────────────────
+import AgentKPIDashboard from './pages/AgentKPIDashboard';
 
 function App() {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
@@ -258,6 +268,8 @@ function App() {
           <Route path="/hq/supply/suppliers" element={<SupplierPortalPage />} />
           <Route path="/agent/dashboard" element={<AgentDashboardPage />} />
           <Route path="/agent/chief" element={<ChiefAgentPage />} />
+          {/* ─── 模块4.4: Agent KPI绑定仪表盘 ─── */}
+          <Route path="/agent/kpi-dashboard" element={<AgentKPIDashboard />} />
           {/* ─── Phase1: 财务刚需 ─── */}
           <Route path="/finance/wine-storage" element={<WineStoragePage />} />
           <Route path="/finance/deposits" element={<DepositManagePage />} />
@@ -278,6 +290,8 @@ function App() {
           <Route path="/analytics/reports" element={<ReportCenterPage />} />
           {/* ─── Phase4: 菜谱方案 ─── */}
           <Route path="/menu/schemes" element={<MenuSchemePage />} />
+          {/* ─── 模块3.4: 菜谱方案批量下发+门店差异化+版本管理 ─── */}
+          <Route path="/menu/plans" element={<MenuPlanPage />} />
           {/* ─── Sprint 0-8: 人力中枢 ─── */}
           <Route path="/hr" element={<HRHubPage />} />
           {/* 员工主数据 */}
@@ -315,6 +329,7 @@ function App() {
           <Route path="/hr/payroll/labor-cost" element={<PayrollLaborCostPage />} />
           <Route path="/hr/payroll/approval" element={<PayrollApprovalPage />} />
           <Route path="/hr/payroll/summary" element={<PayrollSummaryPage />} />
+          <Route path="/hr/commission-v3" element={<CommissionV3Page />} />  {/* 计件提成3.0 模块2.6 */}
           {/* 合规中心 */}
           <Route path="/hr/compliance" element={<ComplianceDashboardPage />} />
           <Route path="/hr/compliance/alerts" element={<ComplianceAlertsPage />} />
@@ -387,6 +402,8 @@ function App() {
           <Route path="/trade/omni-orders" element={<OmniOrderCenterPage />} />
           {/* ─── OR-02: 员工培训管理 ─── */}
           <Route path="/org/training" element={<EmployeeTrainingPage />} />
+          {/* ─── 模块3.2: 加盟商管理闭环 ─── */}
+          <Route path="/org/franchise" element={<FranchiseManagePage />} />
           {/* ─── Y-H1/Y-H2: 多品牌管理统一 + 多区域管理 ─── */}
           <Route path="/org/brands" element={<BrandRegionPage />} />
           {/* ─── Y-I2: 抖音团购管理 ─── */}
@@ -399,6 +416,8 @@ function App() {
           <Route path="/hq/growth/customer-brain"      element={<CustomerBrainPage />} />
           {/* ─── AI营销驾驶舱 ─── */}
           <Route path="/hq/growth/ai-marketing" element={<AiMarketingDashboardPage />} />
+          {/* ─── 模块2.5: 促销规则引擎V2 ─── */}
+          <Route path="/marketing/promotions-v2" element={<PromotionRulesV2Page />} />
           {/* ─── P3: HQ总部管控看板 ─── */}
           <Route path="/analytics/hq/overview" element={<BrandOverview />} />
           <Route path="/analytics/hq/stores"   element={<StorePerformanceMatrix />} />
@@ -410,6 +429,8 @@ function App() {
           <Route path="/trade/delivery" element={<DeliveryDispatchPage />} />
           {/* ─── Y-A9: 企业客户管理（团餐） ─── */}
           <Route path="/trade/corporate" element={<CorporateCustomerPage />} />
+          {/* ─── 模块4.4: Agent KPI 绑定仪表盘 ─── */}
+          <Route path="/agent/kpi" element={<AgentKPIDashboard />} />
         </Routes>
       </ShellHQ>
     </BrowserRouter>

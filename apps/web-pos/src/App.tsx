@@ -32,9 +32,15 @@ import { BarCounterPage } from './pages/BarCounterPage';
 import { QuickShiftReportPage } from './pages/QuickShiftReportPage';
 import FoodCourtPage from './pages/FoodCourtPage';  // TC-P2-12 智慧商街档口收银
 import { OmniChannelOrders } from './pages/OmniChannelOrders';  // 外卖聚合接单
+import { OnlineOrdersPage } from './pages/OnlineOrdersPage';  // 模块2.4: 外卖平台闭环
 import { TrainingModePage } from './pages/TrainingModePage';
 import { TrainingModeBanner } from './components/TrainingModeBanner';
 import { useTrainingMode } from './hooks/useTrainingMode';
+import { FastFoodPage } from './pages/fastfood/FastFoodPage';
+import { CallNumberScreen } from './pages/fastfood/CallNumberScreen';
+import { FastFoodKDSView } from './pages/fastfood/FastFoodKDSView';
+import { PrintManagerPage } from './pages/PrintManagerPage';  // 模块4.2 打印管理可视化中心
+import { BanquetDepositPage } from './pages/BanquetDepositPage';  // 模块4.1 宴会定金管理
 
 const STORE_ID: string =
   (window as unknown as Record<string, unknown>).__STORE_ID__ as string || '';
@@ -93,8 +99,18 @@ function AppLayout() {
         <Route path="/food-court" element={<FoodCourtPage />} />
         {/* ─── Phase 2B: 外卖聚合接单 ─── */}
         <Route path="/delivery" element={<OmniChannelOrders />} />
+        {/* ─── 模块2.4: 外卖平台闭环 — 菜单/估清/线上接单 ─── */}
+        <Route path="/online-orders" element={<OnlineOrdersPage />} />
         {/* ─── 训练/演示模式入口 ─── */}
         <Route path="/training" element={<TrainingModePage />} />
+        {/* ─── 模块3.1: 快餐平行流程 ─── */}
+        <Route path="/fastfood" element={<FastFoodPage />} />
+        <Route path="/fastfood/call-screen" element={<CallNumberScreen />} />
+        <Route path="/fastfood/kds" element={<FastFoodKDSView />} />
+        {/* ─── 模块4.1: 宴会定金管理 ─── */}
+        <Route path="/banquet-deposit" element={<BanquetDepositPage />} />
+        {/* ─── 模块4.2: 打印管理可视化中心 ─── */}
+        <Route path="/print-manager" element={<PrintManagerPage />} />
       </Routes>
     </div>
   );

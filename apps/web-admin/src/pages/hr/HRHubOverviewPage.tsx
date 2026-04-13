@@ -86,7 +86,7 @@ export default function HRHubOverviewPage() {
     (async () => {
       try {
         const res = await txFetchData<HubOverview>('/api/v1/alert-aggregation/hub-overview');
-        if (!cancelled && res.data) setData(res.data);
+        if (!cancelled && res) setData(res);
       } catch (err) {
         console.error('Failed to load hub overview', err);
       } finally {

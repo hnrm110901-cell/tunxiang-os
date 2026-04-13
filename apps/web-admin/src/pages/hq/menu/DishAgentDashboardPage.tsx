@@ -113,7 +113,7 @@ const healthColumns: ProColumns<HealthRow>[] = [
       </span>
     ),
   },
-  { title: 'AI建议', dataIndex: 'aiSuggestion', flex: 1 },
+  { title: 'AI建议', dataIndex: 'aiSuggestion'},
 ];
 
 const newDishColumns: ProColumns<NewDishRow>[] = [
@@ -154,7 +154,7 @@ const soldOutColumns: ProColumns<SoldOutRow>[] = [
 const kitchenColumns: ProColumns<KitchenRow>[] = [
   { title: '时段',       dataIndex: 'timeSlot',      width: 180 },
   { title: '预计客流',   dataIndex: 'expectedFlow',  width: 90, render: (_, r) => `${r.expectedFlow}人次` },
-  { title: '需求菜品TOP5', dataIndex: 'topDishes',   flex: 1 },
+  { title: '需求菜品TOP5', dataIndex: 'topDishes'},
   { title: '建议厨师配置', dataIndex: 'suggestConfig', width: 110 },
   { title: '当前配置',   dataIndex: 'currentConfig', width: 90  },
   {

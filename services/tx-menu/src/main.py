@@ -57,6 +57,8 @@ from .api.menu_display_routes import router as menu_display_router
 app.include_router(menu_display_router)  # 菜单展示（POS/H5/Crew/TV通用）+ SpecSheet + 批量沽清
 from .api.menu_recommendation_routes import router as menu_recommendation_router
 app.include_router(menu_recommendation_router)  # AI智能排菜推荐（四象限/库存/季节/毛利优化）
+from .api.menu_plan_routes import router as menu_plan_router
+app.include_router(menu_plan_router)  # 模块3.4 菜谱方案版本管理+下发日志+门店差异化+批量操作
 
 @app.get("/health")
 async def health():

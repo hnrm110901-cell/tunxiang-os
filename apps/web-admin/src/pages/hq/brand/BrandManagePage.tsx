@@ -321,7 +321,7 @@ export function BrandManagePage() {
               </thead>
               <tbody>
                 {compareMetrics.map(metric => {
-                  const values = selectedBrands.map(b => (b as Record<string, number>)[metric.key] as number);
+                  const values = selectedBrands.map(b => (b as unknown as Record<string, number>)[metric.key] as number);
                   const maxVal = Math.max(...values);
                   return (
                     <tr key={metric.key} style={{ borderBottom: '1px solid #F0EDE6' }}>

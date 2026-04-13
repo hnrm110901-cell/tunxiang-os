@@ -22,10 +22,6 @@ interface WaitlistEntry {
   created_at: string;
 }
 
-interface WaitlistStats {
-  waiting_count: number;
-  estimated_wait_min: number;
-}
 
 interface PreOrderItemData {
   dish_id: string;
@@ -60,14 +56,11 @@ interface LocalCartItem {
 export default function QueuePreOrderPage() {
   const { entryId } = useParams<{ entryId: string }>();
   const navigate = useNavigate();
-  const { t } = useLang();
+  useLang();
   const storeId = useOrderStore((s) => s.storeId);
 
   // ---- 排队状态 ----
   const [entry, setEntry] = useState<WaitlistEntry | null>(null);
-  const [waitingAhead, setWaitingAhead] = useState(0);
-  const [estimatedWait, setEstimatedWait] = useState(0);
-
   // ---- 菜单 ----
   const [categories, setCategories] = useState<Category[]>([]);
   const [activeCat, setActiveCat] = useState('');

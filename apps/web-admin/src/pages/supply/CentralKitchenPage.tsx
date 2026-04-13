@@ -670,7 +670,7 @@ function ProductionPlansTab() {
   const updatePlanItem = (idx: number, field: keyof PlanItem, value: unknown) => {
     setPlanItems((prev) => {
       const next = [...prev];
-      (next[idx] as Record<string, unknown>)[field] = value;
+      (next[idx] as unknown as Record<string, unknown>)[field] = value;
       return next;
     });
   };

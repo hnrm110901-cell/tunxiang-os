@@ -19,7 +19,7 @@ jobs:
           python-version: '3.11'
       - name: Install dependencies
         run: |
-          pip install ruff pytest pytest-asyncio structlog
+          pip install ruff pytest pytest-asyncio structlog httpx fastapi pydantic
           if [ -f "services/${{ matrix.service }}/requirements.txt" ]; then
             pip install -r "services/${{ matrix.service }}/requirements.txt"
           fi
@@ -27,8 +27,19 @@ jobs:
         run: ruff check "services/${{ matrix.service }}/src/" --ignore E501
       - name: Test
         run: |
+          if [ "${{ matrix.service }}" = "gateway" ]; then
+            bash scripts/gateway-import-smoke.sh
+          fi
           cd "services/${{ matrix.service }}"
-          python -m pytest src/tests/ -v --tb=short || echo "No tests yet"
+          IGNORE_SMOKE=""
+          if [ "${{ matrix.service }}" = "gateway" ]; then
+            IGNORE_SMOKE="--ignore=src/tests/test_main_import_smoke.py"
+          fi
+          if [ -d "src/tests" ] && [ "$(find src/tests -name 'test_*.py' 2>/dev/null | head -1)" ]; then
+            PYTHONPATH=src:../../ python -m pytest src/tests/ -v --tb=short $IGNORE_SMOKE
+          else
+            echo "::notice::No tests in services/${{ matrix.service }}"
+          fi
 
   frontend-build:
     runs-on: ubuntu-latest

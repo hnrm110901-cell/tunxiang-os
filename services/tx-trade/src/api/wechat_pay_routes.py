@@ -10,8 +10,11 @@ from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
+from sqlalchemy.exc import SQLAlchemyError
 
 from shared.integrations.wechat_pay import get_wechat_pay_service
+
+from ..services.wechat_pay_notify_service import apply_wechat_pay_notify_success
 
 logger = logging.getLogger(__name__)
 
@@ -134,11 +137,25 @@ async def wechat_pay_callback(request: Request):
         )
 
         if trade_state == "SUCCESS":
-            # TODO: 更新订单状态为已支付（写入 DB）
-            # TODO: 发送支付成功事件（Redis Streams / PG LISTEN/NOTIFY）
-            logger.info(
-                "wechat_pay_callback: 订单 %s 支付成功，待写入 DB", out_trade_no
-            )
+            try:
+                notify_result = await apply_wechat_pay_notify_success(result)
+                logger.info(
+                    "wechat_pay_callback: notify_result=%s",
+                    notify_result,
+                )
+                if not notify_result.get("ok", True):
+                    return {
+                        "code": "FAIL",
+                        "message": notify_result.get("message", "notify_failed"),
+                    }
+            except SQLAlchemyError as exc:
+                logger.error(
+                    "wechat_pay_callback: 落库失败 order=%s err=%s",
+                    out_trade_no,
+                    exc,
+                    exc_info=True,
+                )
+                return {"code": "FAIL", "message": "database_error"}
         else:
             logger.warning(
                 "wechat_pay_callback: 订单 %s 状态为 %s",

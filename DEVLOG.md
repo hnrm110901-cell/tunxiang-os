@@ -1,3 +1,24 @@
+## 2026-04-13 (续)
+
+### 今日完成
+- [docs] 门店全流程演示导播手册 v1.0 — 8阶段60分钟脚本+三商户差异演示要点+4种异常备选脚本
+- [tx-analytics] 商户交付评分卡 API — GET /delivery-scorecard/{merchant_code}，4维评分+GO/NO-GO判定
+- [tx-member] members.py: list_customers/create_member 全量接入真实 DB + emit MemberEventType
+- [tx-org] governance_routes.py: 治理层级路由补全 DB 查询
+- [tx-supply] ck_recipe_routes.py: 中央厨房配方 API 全面 DB 化（~1100行重构）
+
+### 数据变化
+- 新增 API 模块：2个（delivery-scorecard + demo-playbook doc）
+- 新增文档：1份（docs/demo-playbook-store-fullflow.md）
+
+### 遗留问题
+- 异常演示备选脚本已内嵌于导播手册，无单独文件
+- KPI 中 serve_dispatch / inventory_agent / finance_audit 仍用估算值
+
+### 明日计划
+- Week 4 五月差距关闭计划文档
+- 三商户部署准备清单（Docker Compose per-merchant 配置核查）
+
 # 屯象OS — 每日开发日志
 
 > 最新记录在最上方。格式：完成内容 / 数据变化 / 遗留问题 / 明日计划。
@@ -260,6 +281,1036 @@
 - QueueTicket 集成到 web-reception QueuePage 页面
 - 逐步替换 fenToYuan call sites 为直接调用 formatPrice
 - miniapp-customer-v2 组件独立重构（Taro 兼容版 DishCard/CartBar）
+
+---
+
+## 2026-04-13 人力中枢能力补齐 — 8大模块全栈开发（对标乐才/I人事替换能力）
+
+### 今日完成
+- **[P0] 钉钉/企微SDK实接**: WeComSDK+DingTalkSDK封装、IM回调handler、预警推送到IM、IMSyncSettingsPage
+- **[P0] 薪资项目库**: v250迁移、7大类71项薪资项、DB持久化CRUD、SalaryItemLibraryPage
+- **[P0] 借调成本分摊**: v251迁移(2表)、TransferCostEngine、8个API端点、TransferListPage+CostReportPage
+- **[P1] 电子签约**: v252迁移(2表)、ESignatureService全流程、e_sign_sdk Mock、12个API端点、3个前端页面
+- **[P1] 积分赛马**: v253迁移(4表)、积分全套CRUD+赛马赛季、PointsAdvisorAgent(3 actions)、3个前端页面
+- **[P1] 绩效打分**: v254迁移(2表)、评审周期+多人打分+校准、10个API端点、3个前端页面
+- **[P2] 薪税申报**: v256迁移、TaxBureauSDK Mock、TaxFilingService、7个API端点、TaxFilingPage
+- **[P2] 考勤合规**: v255迁移、GPS/同设备/加班超时/代打卡检测、AttendanceComplianceAgent、9个API端点、ComplianceAuditPage
+- **[infra]** 新增6个OrgFlags Feature Flags
+
+### 数据变化
+- 迁移版本：v249 → v256（新增7个迁移，13张DB表）
+- 新增SDK：4个（wecom/dingtalk/e_sign/tax_bureau）
+- 新增Agent：2个（points_advisor/attendance_compliance）
+- 新增API端点：~65个 | 新增前端页面：~18个
+
+### 遗留问题
+- SDK需客户提供凭证才能真实调通（企微/钉钉/电子签章/薪税申报）
+- 考勤合规依赖attendance_records扩展GPS/device_id字段
+
+---
+
+## 2026-04-13 员工积分+赛马机制 — DB持久化+赛马赛季+积分兑换+Agent+前端
+
+### 今日完成
+- [shared/db-migrations/v253] 新增4张表：`point_transactions`（积分流水）、`point_rewards`（兑换商品）、`horse_race_seasons`（赛马赛季）、`point_redemptions`（兑换记录），全部含RLS+索引
+- [tx-org/employee_points_service.py] 扩展v253 DB持久化方法：
+  - `award_points_v2` / `deduct_points_v2` — 写入point_transactions表
+  - `get_employee_balance_v2` / `get_points_history_v2` — 余额+流水查询
+  - `get_leaderboard_v2` — 积分排行榜（支持scope过滤）
+  - `redeem_reward` — 积分兑换（余额校验+库存扣减+流水记录）
+  - 兑换商品CRUD：`list_rewards` / `create_reward` / `toggle_reward`
+  - 赛马赛季CRUD：`create_horse_race_season` / `list_horse_race_seasons` / `get_horse_race_season_ranking` / `update_horse_race_status`
+  - `get_points_stats` — 积分统计概览
+- [tx-org/api/points_routes.py] 新增14个API端点（积分发放/扣减/余额/流水/排行/兑换/商品/统计/赛马CRUD）
+- [tx-agent/skills/points_advisor.py] 新增积分激励Agent（PointsAdvisorAgent）：
+  - `auto_award_monthly` — 月度自动积分发放（全勤扫描）
+  - `generate_race_report` — 赛马周报（排名变化+亮点+风险）
+  - `suggest_incentive` — 激励策略建议（低积分关注+不活跃预警）
+- [web-admin] 新增3个前端页面：
+  - `PointsLeaderboardPage` — 积分排行榜（TOP50+统计卡+范围筛选）
+  - `HorseRacePage` — 赛马管理（赛季列表+创建+排名Drawer+状态操作）
+  - `PointsRewardsPage` — 积分兑换商品（CRUD+上下架Switch+兑换统计）
+- [web-admin/api/pointsApi.ts] 新增积分API客户端（14个函数+完整TypeScript类型）
+- 路由注册：tx-org/main.py + hq-hr.tsx + master.py（含intent路由）
+
+### 数据变化
+- 迁移版本：v252 → v253
+- 新增DB表：4个（point_transactions + point_rewards + horse_race_seasons + point_redemptions）
+- 新增API端点：14个（tx-org服务）
+- 新增Agent：1个（points_advisor，3个actions）
+- 新增前端页面：3个 + 1个API客户端
+
+### 遗留问题
+- 赛马赛季目前仅支持积分维度排名，营收/服务评分维度需对接tx-trade和tx-analytics
+- 兑换审批流程（approved_by字段）暂未与审批引擎对接
+- 月度自动积分发放需接入HR Agent Scheduler定时任务
+
+### 明日计划
+- 接入HR Agent Scheduler实现月度自动积分发放
+- 赛马赛季多维度排名对接
+
+---
+
+## 2026-04-13 subscription_routes 内存→DB + WechatPay 接入（v255 member_subscriptions 表）
+
+### 今日完成
+- [shared/db-migrations/v255] 新增 member_subscriptions 表（月卡/季卡/年卡，含 out_trade_no/prepay_id）
+- [tx-member/subscription_routes.py] 移除 _subscriptions 内存 dict，全量接入 DB：
+  - create_subscription：INSERT member_subscriptions + 调用 WechatPayService.create_prepay
+  - get_my_subscription：SELECT active 订阅
+  - cancel_subscription：UPDATE auto_renew=FALSE
+- 微信支付：由 mock 字符串改为 WechatPayService（mock_mode 自动处理非生产环境）
+
+### 数据变化
+- 迁移版本：v253 → v255（独立分支，与 v254 平行）
+- 新增表：member_subscriptions
+
+### 遗留问题
+- openid 需前端从微信小程序登录获取后传入，未传时支付降级为空 paySign
+
+### 明日计划
+- 推进下一待排模块
+
+---
+
+## 2026-04-13 invoice_service 内存存储→DB 持久化（v254 invoice_requests 表）
+
+### 今日完成
+- [shared/db-migrations/v254] 新增 invoice_requests 表（顾客开票申请，与 v238 费控 invoices 表独立）
+- [tx-trade/services/invoice_service.py] 移除 _invoices/_invoice_queue 内存存储，全量接入 invoice_requests DB
+  - create_invoice_request：INSERT RETURNING
+  - submit_to_tax_platform：UPDATE 状态+税控编码（mock 标注待替换）
+  - get_invoice_status：SELECT by id
+  - get_invoice_ledger：SELECT by tenant+日期范围
+  - generate_qrcode_data：token 无需持久化，TTL 改为30天
+
+### 数据变化
+- 迁移版本：v253 → v254
+- 新增表：invoice_requests
+
+### 遗留问题
+- 税控平台对接仍为 mock（需采购金税四期 API 凭证后替换）
+
+### 明日计划
+- 推进下一待排模块
+
+## 2026-04-13 table_card_api 重构 + DB 接入（6端点从 stub 变为真实查询）
+
+### 今日完成
+- [tx-trade/table_card_api.py] 工厂模式→标准 APIRouter，Depends(lambda:None)→真实 DB 注入
+- list_tables / get_table_detail / statistics / field-rankings / record_click / update_table_status 6端点接入真实 tables 表
+- [tx-trade/main.py] 注册 table_card_router
+
+### 数据变化
+- 无新迁移（复用 v002 tables 表）
+
+### 遗留问题
+- card_fields 智能推荐字段（context_resolver 依赖）暂返回 []，待业务上线后再接入
+- field_rankings 无 DB 表，暂返回空列表
+
+### 明日计划
+- 推进下一待排模块
+
+## 2026-04-13 指标口径字典 + 演示前一键巡检 API（Week 2/3 P0 交付）
+
+### 今日完成
+- [tx-analytics/metrics_dict_routes.py] 指标口径字典（Week 2 P0 验收物）：
+  - 22个指标定义（9域：营收/毛利/客流/出餐/会员/库存/合规/财务/宴会）
+  - GET /metrics-dict 全量 / GET /metrics-dict/{key} 单指标溯源 / GET /domains 域列表
+  - SLA口径统一：交易类≤5分钟 / 分析类≤15分钟
+- [gateway/api/demo_healthcheck_routes.py] 演示前一键巡检（Week 3 P0）：
+  - GET /api/v1/demo/health-check — 并发探测13个服务+DB+3个关键路径
+  - go/no-go 自动裁决 + 分级修复建议
+
+### 数据变化
+- 无新迁移
+- 新增端点：4个（metrics-dict×3 + demo/health-check×1）
+
+### 遗留问题
+- 演示导播手册文档待输出
+
+### 明日计划
+- Week 4 商户交付评分卡
+
+---
+
+## 2026-04-13 知识库路由全量 DB 接入（upload/list/delete + DB session 修复）
+
+### 今日完成
+- [tx-agent/api/knowledge_routes.py] POST /documents（upload_document）接入真实 DB：
+  - INSERT INTO knowledge_documents（RETURNING id/title/status/created_at），status 初始为 'processing'
+  - 幂等检查：file_hash 已存在（is_deleted=FALSE）时直接返回现有记录并附 idempotent:true
+  - commit 后旁路触发 asyncio.create_task(_process_document_task)，失败只 log.warning 不影响主流程
+  - 异步任务通过独立 TenantSession 调用 DocumentProcessor.process_document 完成分块/向量化/写入
+  - SQLAlchemyError → rollback + log.error(exc_info=True) + raise HTTPException(500)
+- [tx-agent/api/knowledge_routes.py] GET /documents（list_documents）接入真实 DB：
+  - SELECT FROM knowledge_documents WHERE tenant_id AND is_deleted=FALSE
+  - 支持 collection / status query param 动态过滤
+  - 分页：page/size（默认 size=20），ORDER BY created_at DESC
+  - 先 COUNT(*) 查总数，再分页查详情，返回 {items, total, page, size}
+- [tx-agent/api/knowledge_routes.py] DELETE /documents/{doc_id}（delete_document）接入真实 DB：
+  - 软删除：UPDATE SET is_deleted=TRUE, updated_at=NOW() WHERE id AND tenant_id AND is_deleted=FALSE
+  - 未找到时返回 404；knowledge_chunks 通过 DB ON DELETE CASCADE 自动清理
+- [tx-agent/api/knowledge_routes.py] 新增 created_by Form 参数（写入 DB）
+- [tx-agent/services/knowledge_retrieval.py] _search_hybrid_v2 接入真实 DB session：
+  - 通过 TenantSession 上下文管理器注入 AsyncSession
+  - 调用 HybridSearchEngine.search + RerankerService.rerank
+  - 失败时 Fallback 到 Qdrant 路径（降级而非报错）
+- [tx-agent/services/knowledge_retrieval.py] _index_to_pgvector 接入真实 DB session：
+  - 通过 TenantSession 注入 db，调用 EmbeddingService.embed_text + PgVectorStore.upsert_chunks
+  - 移除 placeholder log，改为成功/失败各自有效日志
+- [tx-agent/services/knowledge_retrieval.py] 新增 _format_hybrid_results 辅助函数：
+  - 统一 HybridSearchEngine / RerankerService 输出格式与 Qdrant 路径一致（doc_id/score/text/metadata）
+
+### 数据变化
+- 无新迁移（复用 v232 knowledge_documents + v233 knowledge_chunks）
+
+### 遗留问题
+- get_document（GET /documents/{document_id}）和 list_chunks、reprocess_document 仍为 stub，待后续接入
+- HybridSearchEngine / RerankerService 接口签名依赖 shared/knowledge_store 实现，如接口变更需同步调整
+
+### 明日计划
+- 推进下一待排模块
+
+---
+
+## 2026-04-13 集团驾驶舱全量 DB 接入（group_dashboard_routes mock→真实查询）
+
+### 今日完成
+- [tx-analytics/group_dashboard_routes.py] 移除全部 mock 数据，替换为真实 DB 查询：
+  - L85 门店列表：`SELECT id, store_name, brand_id FROM stores WHERE tenant_id=:tid AND is_deleted=FALSE`，支持可选 brand_id 过滤
+  - L99 实时快照（/today）：查 orders 今日 completed 订单汇总（SUM final_amount_fen / COUNT），SQLAlchemyError 降级返回空汇总
+  - L173-174 /today brand_id 过滤：brand_id 改为可选 Query param，先查 stores 获取 store_id 列表再聚合 orders
+  - L220/234 趋势聚合（/trend）：优先查 mv_daily_settlement 物化视图（用 information_schema 检查存在性），不存在降级查 orders 原表按日 GROUP BY；brand_id 同样可选过滤
+  - L282 告警列表（/alerts）：`SELECT ... FROM analytics_alerts WHERE tenant_id=:tid AND status IN ('open','acknowledged') ORDER BY created_at DESC LIMIT 50`，支持 brand_id 过滤；SQLAlchemyError 降级返回空列表
+- 统一使用 AsyncSession + text() + get_db_with_tenant 依赖注入（与项目其他路由一致）
+- 每次查询前执行 `set_config('app.tenant_id', :tid, true)` 确保 RLS 生效
+- 所有金额单位保持分（fen），日期/datetime 转 isoformat() 后放入响应
+- level → severity 映射：critical/error→danger, warning→warning, info→info
+- 全部路由保证"永远可用"：核心路径 SQLAlchemyError → rollback + log.warning + 降级空数据，不 500
+
+### 数据变化
+- 无新迁移（复用 orders/stores/analytics_alerts/mv_store_pnl/mv_daily_settlement）
+
+### 遗留问题
+- table_turnover / occupied_tables / current_diners / avg_serve_time_min 暂填 0，需接桌台系统（KDS/tables 表）后补充
+- revenue_vs_yesterday_pct 暂填 0，需昨日同时段对比逻辑（待日后补充）
+
+### 明日计划
+- 推进下一待排模块
+
+## 2026-04-13 AI 经营周报/月报 + 三商户 KPI 权重配置（Week 2 P0 交付项）
+
+### 今日完成
+- [tx-analytics/weekly_brief_routes.py] 新增 AI 周报端点：
+  - `GET /api/v1/analytics/weekly-brief/{store_id}` — 单店周报（本周指标 vs 上周/去年同期 + 结构性问题诊断 + 下周3条策略建议）
+  - `GET /api/v1/analytics/weekly-brief/group` — 集团多店周报汇总（门店营收排名 + 总体 vs 上周对比）
+  - 结构性问题自动识别：营收连续下滑/毛利偏低/同比衰退/菜单集中度高
+  - 下周策略自动生成：基于营收/毛利/品项/会员4个维度规则引擎
+- [tx-analytics/monthly_brief_routes.py] 新增 AI 月报端点：
+  - `GET /api/v1/analytics/monthly-brief/{store_id}` — 单店月报（经营体检8项评分 + 投入产出建议）
+  - `GET /api/v1/analytics/monthly-brief/group` — 集团月报汇总（各店毛利率/客单/排名）
+  - 经营体检8项：营收增长/毛利健康/客单趋势/会员复购/折扣纪律/日结合规（含自动评级A/B/C/D）
+  - 投入产出建议3方向：成本端/营收端/运营端各2条可执行建议
+- [tx-analytics/merchant_kpi_config_routes.py] 新增商户 KPI 权重配置：
+  - `GET /api/v1/analytics/merchant-kpi/configs` — 读取 DB 自定义权重（降级内置默认值）
+  - `PUT /api/v1/analytics/merchant-kpi/configs` — UPSERT 商户权重配置（权重和校验）
+  - `GET /api/v1/analytics/merchant-kpi/score/{store_id}` — 按商户权重计算综合评分
+  - 内置三商户预置权重：czyz（翻台优先）/ zqx（客单+复购优先）/ sgc（客单+宴会定金优先）
+- [shared/db-migrations/v253] merchant_kpi_weight_configs 表（JSONB权重 + RLS + 唯一约束）
+- [tx-analytics/main.py] 注册3个新路由
+
+### 数据变化
+- 迁移版本：v252 → v253
+- 新增表：1个（merchant_kpi_weight_configs）
+- 新增端点：7个（周报×2 + 月报×2 + 商户KPI配置×3）
+
+### 对应计划
+- 四月交付计划 Week 2（4/8-4/14）P0 验收项：三商户日/周/月 AI 分析产品化
+
+### 遗留问题
+- serve_dispatch / inventory_agent 等 KPI 仍为估算值（待真实表成熟后接入）
+- 周报/月报翻台率/出餐率暂用估算值（需接 KDS 和桌台真实数据）
+
+### 明日计划
+- 推进 Week 3 演示环境巡检（门店全流程演示导播手册）
+
+---
+
+## 2026-04-13 waitlist 入座预点菜转正式订单 + digital_menu_board 过时注释清理
+
+### 今日完成
+- [tx-trade/waitlist_routes.py] `seat_entry` 实现预点菜转正式订单：
+  - SELECT 新增 `store_id` 字段
+  - 有 `pre_order_items` 时：INSERT orders（order_type='dine_in', status='active'）+ INSERT order_items（逐条，subtotal=qty×price）
+  - `order_no` 格式 `WL-{timestamp}-{entry_id后4位大写}`，`table_number` 来自 `SeatBody.table_id`
+  - 旁路发 `OrderEventType.CREATED` 事件（asyncio.create_task，失败不影响主流程）
+  - 响应新增 `order_id` 字段（无预点菜时为 null）
+  - 移除 `# TODO: 调用 dining_session / order API 创建正式订单` 占位注释
+- [tx-trade/digital_menu_board_router.py] 清理两处过时 TODO 注释：
+  - `get_board_data`：代码已查询 dishes + dish_categories 真实表，删除"TODO: 接入菜品表和库存表"注释
+  - `get_board_config`：代码已查询 stores.config + dish_categories + dishes，删除"TODO: 接入门店配置表"注释
+
+### 数据变化
+- 无新迁移
+- 修复：waitlist 预点菜功能从 logger.info 占位升级为真实订单写入
+
+### 遗留问题
+- serve_dispatch / inventory_agent 等9个 KPI 仍为估算值
+- table_card_api.py 端点未注册（复杂功能，已标记延后）
+
+### 明日计划
+- 推进下一待排模块
+
+---
+
+## 2026-04-13 宴会KDS + 定金 v252 迁移（补写遗留建表）
+
+### 今日完成
+- [shared/db-migrations/v252] 新增 `banquet_kds_dishes` 表：
+  - 字段：tenant_id / session_id / dish_id / dish_name / total_qty / served_qty / serve_status（pending/serving/served）/ called_at / served_at / sequence_no / notes / is_deleted
+  - 索引：(tenant_id, session_id) + (session_id, sequence_no)
+  - RLS：NULLIF(current_setting('app.tenant_id', true), '')::uuid
+- [shared/db-migrations/v252] 新增 `banquet_session_deposits` 表：
+  - 字段：tenant_id / session_id / amount_fen / balance_fen / payment_method / status（active/applied/refunded）/ operator_id / notes / collected_at / applied_at / is_deleted
+  - 索引：(tenant_id, session_id) + (session_id, status)
+  - RLS：同上
+- 幂等建表（`if table not in existing_tables`），downgrade 用 CASCADE DROP
+
+### 数据变化
+- 迁移版本：v251 → v252
+- 新增表：2个（banquet_kds_dishes + banquet_session_deposits）
+- 修复：banquet_kds_routes.py + banquet_deposit_routes.py 依赖的表此前未建，现补齐
+
+### 遗留问题
+- serve_dispatch / inventory_agent 等9个 KPI 仍为估算值
+- agent_auto_executions 仍为空
+
+### 明日计划
+- 推进下一待排模块
+
+---
+
+## 2026-04-13 agent_kpi_snapshots 真实 DB 测量值接入（4个KPI替换占位估算）
+
+### 今日完成
+- [tx-agent/agent_kpi_routes.py] `collect_kpi_snapshots` 前置采集真实业务指标：
+  - `discount_guardian.discount_exception_rate`：查 `orders` 表，当日完成订单中 discount_amount_fen/total_amount_fen > 30% 的比率（%）
+  - `discount_guardian.gross_margin_protection_rate`：100 - discount_exception_rate（联动推导）
+  - `member_insight.member_repurchase_rate`：滚动30日窗口，统计含会员ID的订单中复购2次+的会员比例（%）
+  - `store_inspect.compliance_score`：100 - open compliance_alerts × 5，下限0分
+  - 查询失败时静默降级到估算值（SQLAlchemyError → log.warning，不影响其他KPI）
+  - 真实数据行写入 metadata: '{"source": "real_db"}'，估算行 metadata: null
+  - 其余9个KPI（serve_dispatch/inventory_agent等）保持 target×系数估算，待各业务表成熟后逐步接入
+
+### 数据变化
+- 无新迁移
+- 采集精度提升：13个KPI中4个从估算升为真实DB查询
+
+### 遗留问题
+- serve_dispatch / inventory_agent / finance_audit 等剩余9个KPI仍为估算（待各服务真实表接入）
+- agent_auto_executions 仍为空
+
+### 明日计划
+- 推进下一待排模块
+
+---
+
+## 2026-04-13 企业挂账 v251 全量 DB 迁移（account + billing 完整落库）
+
+### 今日完成
+- [shared/db-migrations/v251] 新增 `enterprise_bills` 表（月结账单 + line_items JSONB + RLS）
+- [shared/db-migrations/v251] 新增 `enterprise_agreement_prices` 表（企业协议菜品价格 + UNIQUE UPSERT index + RLS）
+- [tx-trade/services/enterprise_account.py] 全量 DB 迁移：
+  - 移除 `_enterprises` / `_agreement_prices` / `_sign_records` 内存 dict（及导出）
+  - `create_enterprise`：INSERT RETURNING，rollback on SQLAlchemyError
+  - `update_enterprise`：动态 SET + RETURNING，404 检测
+  - `get_enterprise` / `list_enterprises`：SELECT from enterprise_accounts
+  - `set_agreement_price`：INSERT ... ON CONFLICT DO UPDATE（UPSERT）
+  - `get_agreement_price`：SELECT from enterprise_agreement_prices
+  - `check_credit`：调 `_get_enterprise_row`（DB），不再读内存
+  - `get_sign_records`：SELECT from enterprise_sign_records
+  - `authorize_sign`：保持 v250 DB 原子操作逻辑不变
+- [tx-trade/services/enterprise_billing.py] 全量 DB 迁移：
+  - 移除 `_enterprises` / `_sign_records` 导入及 `_bills` / `_bill_items` 内存 dict
+  - `generate_monthly_bill`：幂等检查 → 查 enterprise_sign_records 当月签单 → INSERT enterprise_bills
+  - `confirm_payment`：UPDATE enterprise_bills + UPDATE enterprise_accounts.used_fen，原子 commit
+  - `generate_statement` / `get_outstanding_bills`：SELECT from enterprise_bills
+  - `get_enterprise_analytics`：聚合 enterprise_sign_records + enterprise_bills（单次 SQL 无 N+1）
+
+### 数据变化
+- 迁移版本：v250 → v251
+- 新增表：2个（enterprise_bills + enterprise_agreement_prices）
+- 修复竞态：`check_credit` 不再读内存 dict（之前 authorize_sign 写 DB 但 check_credit 读内存，逻辑错位）
+
+### 遗留问题
+- agent_kpi_snapshots 测量值仍为占位估算
+- agent_auto_executions 仍为空，ROI 非 discount_guardian 指标待 Agent 实际写入后才有真实数据
+
+### 明日计划
+- 推进下一待排模块
+
+---
+
+## 2026-04-12 微信支付回调落库与幂等
+
+### 今日完成
+- [tx-trade/wechat_pay_notify_service.py] 微信异步通知：`get_db_no_rls` 按 `order_no` 或订单 UUID 查单 → `get_db_with_tenant` 写 `payments`；`transaction_id` 幂等；订单行 `FOR UPDATE` 后二次校验；累计实收 ≥ 应付时 `orders.status=completed`；旁路 `PaymentEventType.CONFIRMED` / `OrderEventType.PAID`
+- [tx-trade/wechat_pay_routes.py] 成功回调调用上述服务；`SQLAlchemyError` 返回 FAIL 以便重试；`notify_result.ok` 为 false 时 FAIL
+- [ontology/database.py] `get_db_no_rls` 文档补充 wechat_pay_notify_service 调用方
+- [tests] `test_wechat_pay_notify_service.py` 金额解析等纯函数
+
+### 数据变化
+- 无新迁移
+
+### 遗留问题
+- 桌台释放、营销归因等仍与店内收银 settle 路径不同，线上小程序全链路需联调验收
+
+---
+
+## 2026-04-13 Agent KPI仪表盘路由注册 + ROI报告 + KPI配置全部接入真实DB
+
+### 今日完成
+- [web-admin/App.tsx] 新增 import `AgentKPIDashboard` + 注册路由 `/agent/kpi-dashboard`
+- [tx-agent/agent_kpi_routes.py] `get_roi_report` 接入真实 DB：
+  - 从 `agent_roi_metrics` 表按月份查询，SUM+COUNT 聚合
+  - 返回 `data_source: "db" | "empty"`（无数据时不再 mock）
+  - DB 失败兜底 logger.warning + exc_info=True
+- [tx-agent/agent_kpi_routes.py] `get_kpi_configs` 接入真实 DB：
+  - 从 `agent_kpi_configs` 读取自定义配置，与内置 AGENT_KPI_DEFAULTS 合并
+  - DB 自定义覆盖同 agent_id+kpi_type 的默认值（source: "custom" vs "default"）
+  - 支持 is_active / agent_id 过滤
+- [tx-agent/agent_kpi_routes.py] `create_kpi_config` 接入真实 DB：
+  - INSERT INTO agent_kpi_configs，commit 成功后返回记录
+  - DB 失败 rollback + 500 + logger.error
+- [tx-agent/agent_kpi_routes.py] `update_kpi_config` 接入真实 DB：
+  - 动态 SET 子句（只更新有值字段）+ RETURNING 验证行存在
+  - 未找到记录返回 404；DB 失败返回 500
+
+### 数据变化
+- 无新迁移（复用 v248 agent_kpi_configs 表、v221 agent_roi_metrics 表）
+- 前端路由：新增 1 个（/agent/kpi-dashboard）
+
+- [tx-agent/agent_kpi_routes.py] `get_kpi_snapshots` 接入真实 DB：
+  - 从 `agent_kpi_snapshots` 分页查询，支持 agent_id / date_from / date_to 过滤
+  - 结果关联 AGENT_KPI_DEFAULTS 补充 label/unit/direction；DB 失败降级返回空列表
+- [tx-agent/agent_kpi_routes.py] `collect_kpi_snapshots` 写入真实 DB：
+  - 批量 INSERT agent_kpi_snapshots，ON CONFLICT DO NOTHING 防重复
+  - 返回 inserted_count / skipped_count；失败 rollback + 500
+
+### 遗留问题
+- agent_roi_metrics 写入仍需各 Agent 主动上报（当前表为空，端点返回 empty）
+- agent_kpi_snapshots 测量值仍为占位估算（生产时需替换为真实业务查询）
+- franchise_v5 mark-overdue 仍为手动 POST，未接 APScheduler 定时任务
+- MonthlyPettyCashWorker / DailyCostAttributionWorker 仍使用 DEFAULT_TENANT_ID
+
+- [tx-org/services/hr_agent_scheduler.py] franchise_v5 `mark-overdue` 接入 APScheduler 定时任务：
+  - 新增 job `franchise_daily_mark_overdue`，CronTrigger(hour=2, minute=5) — 每日 02:05
+  - 新增 `_run_mark_overdue_fees` 方法，httpx POST `/api/v1/franchise/fees/mark-overdue`
+  - 记录 `marked_count` + `as_of` 日志；HTTP 异常降级 log.error 不中断调度器
+  - 调度器 jobs 总数从 4 升至 5
+
+### 数据变化
+- 无新迁移
+
+- [tx-expense/workers/daily_cost_attribution.py] `_get_active_tenant_ids` 改为多租户：
+  - `get_db_no_rls` BYPASSRLS 会话查询 `DISTINCT tenant_id FROM stores WHERE is_deleted=FALSE`
+  - 降级链：DB查询 → `DEFAULT_TENANT_ID` 环境变量 → 返回空列表
+- [tx-expense/workers/monthly_petty_cash.py] 同上改造（MonthlyPettyCashSettlementWorker）
+
+- [tx-org/services/hr_agent_scheduler.py] `_run_mark_overdue_fees` 改为多租户：
+  - 新增 `_get_active_tenant_ids` 方法（与 Worker 同一模式：`get_db_no_rls` BYPASSRLS + DISTINCT tenant_id FROM stores）
+  - 降级链：DB查询 → `DEFAULT_TENANT_ID` 环境变量 → 返回空列表
+  - `_run_mark_overdue_fees` 改为按租户循环，每次调用携带 `X-Tenant-ID` header
+  - 汇总 `total_marked` + `error_count`，完成后 INFO 日志
+
+- [tx-agent/agent_roi_routes.py] `POST /api/v1/agent/roi/collect` 新增每日采集端点：
+  - 幂等检查：同日已有记录则跳过（返回 skipped:true）
+  - discount_guardian：查询 `orders.discount_amount_fen` SUM/COUNT → `intercepted_discount_fen` + `intercept_count`
+  - 其余 8 个 Agent：查询 `agent_auto_executions` 执行计数 → 各自 ROI 指标
+  - 批量 INSERT 到 `agent_roi_metrics`，失败 rollback + 500
+- [tx-org/services/hr_agent_scheduler.py] 新增第 6 个调度任务：
+  - `agent_roi_daily_collect`，CronTrigger(hour=5, minute=0)，每日 05:00
+  - 新增 `_run_roi_collect` 方法：多租户循环，携带 `X-Tenant-ID` header 调用 collect 端点
+  - jobs 总数从 5 升至 6
+
+### 遗留问题
+- agent_kpi_snapshots 测量值仍为占位估算（生产时需替换真实业务查询）
+- agent_auto_executions 仍为空，ROI 非 discount_guardian 指标待 Agent 实际写入后才有真实数据
+
+### 明日计划
+- 推进下一待排模块
+
+---
+
+## 2026-04-13 tx-finance 月度 P&L 三接口（便捷端点/趋势/环比）
+
+### 今日完成
+- [tx-finance/finance_pl_routes.py] 新增 `GET /api/v1/finance/pl/monthly`（YYYY-MM 快捷端点，复用 PLService.get_store_pl）
+- [tx-finance/finance_pl_routes.py] 新增 `GET /api/v1/finance/pl/monthly-trend`（最近 N 个月逐月 P&L 序列，前端折线图数据源）
+- [tx-finance/finance_pl_routes.py] 新增 `GET /api/v1/finance/pl/mom`（月度环比：当月 vs 上月 vs 去年同月，含变化率）
+- 新增工具函数：_month_to_date_range / _prev_month / _same_month_last_year / _pl_summary / _pct_change
+
+### 数据变化
+- 无新迁移（复用现有 PLService）
+- 新增端点：3个（monthly / monthly-trend / mom）
+
+### 遗留问题
+- franchise_v5 mark-overdue 建议接入 APScheduler 定时（当前仅手动 POST）
+- 多租户 Workers 仍为 DEFAULT_TENANT_ID 单租户模式
+
+### 明日计划
+- 推进下一待排模块
+
+---
+
+## 2026-04-13 模块4.4 AI Agent深化绑定业务KPI — 9大Agent指标追踪+ROI仪表盘
+
+### 今日完成
+- [shared/db-migrations/v248] 新增 `agent_kpi_configs` 表（Agent KPI指标配置，含RLS）
+- [shared/db-migrations/v248] 新增 `agent_kpi_snapshots` 表（每日KPI快照归档，含RLS）
+- [tx-agent/api/agent_kpi_routes.py] 新增7个端点：
+  - `GET /api/v1/agent-kpi/configs` — 获取所有Agent KPI配置（内置9大Agent共15个KPI定义）
+  - `POST /api/v1/agent-kpi/configs` — 创建自定义KPI配置
+  - `PUT /api/v1/agent-kpi/configs/{config_id}` — 更新KPI配置
+  - `GET /api/v1/agent-kpi/snapshots` — 获取KPI快照列表（支持日期范围过滤）
+  - `POST /api/v1/agent-kpi/snapshots/collect` — 手动触发快照采集
+  - `GET /api/v1/agent-kpi/dashboard` — KPI总览仪表盘（全局达成率+各Agent卡片+7日趋势）
+  - `GET /api/v1/agent-kpi/roi-report` — ROI报告（节省金额/拦截次数/损耗降低）
+- [tx-agent/main.py] 注册 agent_kpi_router
+- [web-admin/AgentKPIDashboard.tsx] 新增KPI仪表盘前端页面：
+  - 9张Agent KPI卡片（当前值 vs 目标值 + 三色进度条 + 7日趋势迷你图）
+  - ROI汇总区域（本月节省金额/折扣拦截次数/食材损耗降低%）
+  - 30秒自动刷新 + 响应式Tailwind布局
+
+### 数据变化
+- 迁移版本：v247 → v248
+- 新增DB表：2个（agent_kpi_configs + agent_kpi_snapshots）
+- 新增API端点：7个（tx-agent服务）
+- 新增前端页面：1个（AgentKPIDashboard）
+
+### 9大Agent KPI配置
+| Agent | KPI类型 | 目标值 | 单位 |
+|-------|---------|--------|------|
+| 折扣守护 | discount_exception_rate | <2 | % |
+| 折扣守护 | gross_margin_protection_rate | >98 | % |
+| 出餐调度 | avg_dish_time_seconds | <600 | 秒 |
+| 出餐调度 | on_time_rate | >95 | % |
+| 会员洞察 | member_repurchase_rate | >40 | % |
+| 会员洞察 | clv_growth_rate | >10 | % |
+| 库存预警 | waste_rate | <3 | % |
+| 库存预警 | stockout_rate | <1 | % |
+| 财务稽核 | anomaly_detection_rate | >99 | % |
+| 财务稽核 | cost_variance | <5 | % |
+| 巡店质检 | compliance_score | >90 | 分 |
+| 巡店质检 | patrol_response_time | <30 | 分钟 |
+
+### 遗留问题
+- snapshots/collect 当前使用模拟数据；生产接入需各服务暴露指标查询接口
+- agent_kpi_configs 自定义配置未接入真实DB写入（当前返回内存对象）
+- AgentKPIDashboard 未挂载到路由表（需在 App.tsx/router 中注册）
+
+### 明日计划
+- 将 AgentKPIDashboard 注册到 web-admin 路由
+- 考虑从 agent_roi_metrics 表拉取真实ROI数据填充 roi-report
+
+---
+
+## 2026-04-13 tx-analytics 驾驶舱 DB注入 + 趋势图/Top菜品端点
+
+### 今日完成
+- [tx-analytics/dashboard_routes.py] 全部路由从 `db=None` 升级为 `Depends(get_db)` 真实注入（旧代码实际调用均 AttributeError，本次修复）
+- [tx-analytics/sql_queries.py] 新增 `query_revenue_trend`：最近 N 天逐日营收序列（biz_date 分组，升序）
+- [tx-analytics/sql_queries.py] 新增 `query_top_dishes`：Top N 菜品（按销量/营收排序，sort_col 非用户输入，无注入风险）
+- [tx-analytics/dashboard_routes.py] 新增 `GET /dashboard/trend/{store_id}`（days 1-365）
+- [tx-analytics/dashboard_routes.py] 新增 `GET /dashboard/top-dishes/{store_id}`（days/limit/order_by: qty|revenue）
+
+### 数据变化
+- 无新迁移
+- 新增端点：2个（趋势图 + Top菜品）
+- 修复端点：6个（today/stores/ranking/comparison/alerts 全部接通真实DB）
+
+### 遗留问题
+- franchise_v5 mark-overdue 建议接入 APScheduler 定时（当前仅手动 POST）
+- 多租户 Workers 仍为 DEFAULT_TENANT_ID 单租户模式
+
+### 明日计划
+- tx-analytics 驾驶舱趋势图前端联调 或 推进 tx-finance 月度 P&L 接口
+
+---
+
+## 2026-04-12 模块4.1 宴会深度产品化 — KDS场次出品 + 定金抵扣
+
+### 今日完成
+- [tx-trade/banquet_kds_routes.py] 新建：宴会KDS端点（5个）— GET sessions/dishes/progress、POST serve/call，懒加载KDS菜品记录，旁路emit KdsEventType事件
+- [tx-trade/banquet_deposit_routes.py] 新建：宴会定金抵扣端点（4个）— 收定金/查余额/抵扣/退款，先进先出扣减，emit DepositEventType事件
+- [tx-trade/main.py] 注册 banquet_kds_router + banquet_deposit_router
+- [web-kds/BanquetKDSPage.tsx] 新建：宴会KDS出品看板，场次卡片+进度条+菜品状态（灰/橙/绿），10秒自动刷新
+- [web-kds/App.tsx] 注册 /banquet-kds 路由
+- [web-pos/BanquetDepositPage.tsx] 新建：宴会定金管理POS页，收定金/余额抵扣/退定金三Tab
+- [web-pos/App.tsx] 注册 /banquet-deposit 路由
+- [shared/events/event_types.py] DepositEventType 新增 REGISTERED / CONVERTED 枚举值
+
+### 数据变化
+- 新增 API 端点：9个（5个KDS + 4个定金）
+- 新增页面：2个（BanquetKDSPage + BanquetDepositPage）
+
+### 遗留问题
+- banquet_kds_dishes 表、banquet_session_deposits 表需补 Alembic 迁移（vNext）
+
+### 明日计划
+- 补写 Alembic 迁移：banquet_kds_dishes + banquet_session_deposits 建表
+
+---
+
+## 2026-04-12 模块4.2 打印管理可视化中心 + 模块4.3 智慧商街多商户
+
+### 今日完成
+- [tx-trade/print_manager_routes.py] 新建打印管理 API（6个端点）：任务队列分页/重打/取消/测试页/配置导出/配置导入
+- [db-migrations/v247] print_tasks 表（tenant_id+RLS+幂等，若已存在跳过）
+- [web-pos/PrintManagerPage.tsx] Tab3 配置管理：导出 JSON 下载、文件上传导入、覆盖/跳过开关；队列Tab新增待打任务取消按钮
+- [web-pos/App.tsx] 注册路由 `/print-manager`
+- [tx-trade/food_court_routes.py] 新增 `/merchants` 语义别名（GET/POST/PUT）、`/settlement/daily`（按档口日结）、`/settlement/split`（分账汇总含0.5%平台服务费）
+- [web-pos/FoodCourtPage.tsx] 报表Tab升级为日结视图：总汇总条 + 各档口分账明细（应结/服务费/实付/占比条形图）
+
+### 数据变化
+- 迁移版本：v246 → v247（print_tasks 表）
+- 新增 API 端点：9个（print_manager 6 + food_court settlement/merchants 3）
+- 新增路由文件：1个（print_manager_routes.py）
+
+### 遗留问题
+- print_tasks 实际打印执行需对接 print_manager service（当前静默降级）
+- food_court settlement_ratio 目前为 mock 1.0，待接 DB 实际字段
+
+### 明日计划
+- 模块4.4 或其他待排模块
+
+---
+
+## 2026-04-13 cashier_engine 开台/加菜/取消事件接入
+
+### 今日完成
+- [tx-trade/cashier_engine.py] `open_table` 新增 `OrderEventType.CREATED` + `TableEventType.OPENED` 双事件旁路写入
+- [tx-trade/cashier_engine.py] `add_item` 新增 `OrderEventType.ITEM_ADDED` 事件（含菜品/定价/小计信息）
+- [tx-trade/cashier_engine.py] `cancel_order` 新增 `OrderEventType.CANCELLED` 事件（含取消原因/桌台号）
+- import 补充 `TableEventType`
+
+### 数据变化
+- 无新迁移
+- 事件覆盖：收银核心路径全链路打通（开台→加菜→折扣→结算→取消）
+
+### 遗留问题
+- franchise_v5 mark-overdue 建议接入 APScheduler 定时（当前仅手动 POST）
+- 多租户 Workers 仍为 DEFAULT_TENANT_ID 单租户模式
+- tx-analytics 驾驶舱数据接口尚未推进
+
+### 明日计划
+- tx-analytics 驾驶舱核心数据端点（经营总览 / 趋势图 / Top菜品）
+
+---
+
+## 2026-04-13 审计第二阶段：支付/退款/库存扣减链路修复
+
+### 今日完成
+- [tx-trade/refund_routes.py] `submit_refund` 后新增 `emit_event`（OrderEventType.REFUNDED / PARTIAL_REFUNDED 按类型选择），`logger.error` 补充 `exc_info=True`
+- [tx-supply/deduction_routes.py] `rollback_deduction_route` 新增事件：逐条回补食材发 `InventoryEventType.ADJUSTED`（reason=deduction_rollback）
+- [tx-supply/deduction_routes.py] `finalize_stocktake_route` 新增事件：盘点差异逐条发 `InventoryEventType.ADJUSTED`（reason=stocktake_finalize，delta≠0才发）
+- [tx-trade/cashier_api.py] line 710 `except Exception` 的 `logger.warning` 补充 `exc_info=True`
+- billing_rules 测试确认已存在（4个用例，满足≥3审计约束，无需补写）
+
+### 数据变化
+- 无新迁移
+- 事件覆盖率提升：退款/扣料回滚/盘点三条链路接入事件总线
+
+### 遗留问题
+- cashier_api.py：多处核心操作（open_table/add_item/settle/cancel）仍缺 emit_event，工作量较大，列为下一阶段任务
+- webhook_routes.py 空 secret 行为已确认安全（返回 False → 403），无需修复
+
+### 明日计划
+- cashier_api.py 关键结账路径 settle_order 接入 emit_event
+- 或推进 tx-analytics 驾驶舱数据接口
+
+---
+
+## 2026-04-13 franchise_v5 合同上传+逾期标记 + Agent测试 + APScheduler
+
+### 今日完成
+- [shared/integrations/cos_upload.py] ALLOWED_FOLDERS 新增 "contracts"（加盟合同存储目录）
+- [tx-org/franchise_v5_routes.py] 新增 `POST /franchisees/{id}/contract/upload`
+  - 接受 PDF/图片，上传至 COS contracts/ 目录，写回 franchisees.contract_file_url
+  - 文件类型校验（application/pdf, image/jpeg, image/png, image/webp）
+- [tx-org/franchise_v5_routes.py] 新增 `POST /fees/mark-overdue`
+  - 批量将 status='pending' 且 due_date < 今日 的费用标记为 overdue
+  - 幂等，返回 marked_count
+- [tx-expense/tests] 新增 `test_agents_a3_a5.py`（12个测试用例，超审计约束≥3个）
+  - A5 覆盖：同城匹配/别名匹配/跨城/缺城市/事件跳过/缺必填字段
+  - A3 覆盖：城市提取/compliant_with_warning/over_limit_minor/over_limit_major/no_rule
+- [tx-expense/src/main.py] 启用 APScheduler（AsyncIOScheduler，Asia/Shanghai）
+  - 每月25日 00:30 触发 MonthlyPettyCashWorker
+  - 每日 23:00 触发 DailyCostAttributionWorker
+- [tx-expense/requirements.txt] 新增 apscheduler>=3.10.0
+
+### 数据变化
+- 无新迁移（复用现有 franchise_fees / franchisees 表）
+- 新增端点：2个（franchise_v5 合同上传 + 逾期标记）
+- 新增测试：12个（A3×6 + A5×6）
+
+### 遗留问题
+- billing_rules pytest 审计约束 ≥3 个用例
+- franchise_v5 mark-overdue 建议接入 APScheduler 定时（当前仅手动 POST）
+- 多租户 Workers 仍为 DEFAULT_TENANT_ID 单租户模式
+
+### 明日计划
+- 审计第二阶段：支付/退款/日结、库存扣减链路核对
+- billing_rules 测试补写
+
+---
+
+## 2026-04-12 微信支付 Mock 生产门禁
+
+### 今日完成
+- [shared/integrations/wechat_pay.py] `ENVIRONMENT`/`ENV` 为 `production` 或 `prod` 且未配置 `WECHAT_PAY_*` 四项时，`WechatPayService()` 抛 `RuntimeError`，禁止静默 Mock；灰度演练可显式 `TX_WECHAT_PAY_ALLOW_MOCK=1`
+- [tests] `shared/integrations/tests/test_wechat_pay_gate.py`：reload 模块后覆盖三种场景
+
+### 数据变化
+- 无
+
+### 遗留问题
+- （已跟进）`verify_callback` 平台证书验签：见下方同日补充
+
+### 明日计划
+- Wave2：对账/webhook 全链路审计或接入平台证书验签
+
+---
+
+## 2026-04-12 微信支付 V3 回调平台证书验签
+
+### 今日完成
+- [shared/integrations/wechat_pay.py] `verify_callback`：`GET /v3/certificates` 拉取并解密平台证书，按 `Wechatpay-Serial` 缓存公钥；RSA-SHA256（PKCS1v15）验签；时间戳防重放（默认 ±300s，可调 `WECHAT_PAY_CALLBACK_TIMESTAMP_SKEW_SECONDS`）；修复 `dict(request.headers)` 键为小写导致取不到 `Wechatpay-*` 的问题
+- [shared/integrations/wechat_pay.py] `_request` 使用 `WECHAT_PAY_MCH_CERT_SERIAL` / `WECHAT_PAY_SERIAL_NO` / `WECHAT_PAY_MCH_X509_PATH` 替换 `CERT_SERIAL_TODO`
+- [tests] `test_wechat_pay_verify.py`：RSA 验签与 Starlette 头解析
+
+### 数据变化
+- 无
+
+### 遗留问题
+- 回调业务落库、幂等仍为 `wechat_pay_routes` TODO；宴会押金回调仍走独立模型
+
+---
+
+## 2026-04-13 commission_v3 员工姓名冗余 + monthly_settle 完善
+
+### 今日完成
+- [db-migrations] 新增 `v246_commission_employee_name.py`：`commission_records` 增加 `employee_name VARCHAR(100)` 冗余列（幂等升级，含索引）
+- [tx-org/commission_v3_routes.py] `monthly_settle` 端点：批量查询涉及员工姓名（一次 SELECT 避免 N+1），INSERT/UPSERT 同步写入 `employee_name`
+  - 离职后历史结算记录仍可展示员工姓名，不依赖跨服务实时查询
+
+### 数据变化
+- 迁移版本：v245 → v246
+- 变更字段：commission_records.employee_name（nullable, 月结时快照）
+
+### 遗留问题
+- franchise_v5：合同文件上传（OSS）、加盟费逾期自动标记
+- billing_rules pytest 审计约束 ≥3 个用例
+- tx-expense A3/A5 agents 单元测试
+- main.py APScheduler 定时任务注册（费控 workers）
+
+### 明日计划
+- 审计第二阶段：支付/退款/日结、第三方回调、库存扣减链路
+
+---
+
+## 2026-04-13 Gateway 与安全审计第一阶段跟进
+
+### 今日完成
+- [gateway/main.py] 去除双 `FastAPI()` 覆盖；统一中间件栈（Audit → RequestLog → Auth → Tenant → Personalization → CORS），与 Dockerfile `services.gateway.src.main:app` 行为一致
+- [gateway] 删除同目录死文件 `middleware.py`（与 `middleware/` 包冲突且含不可达代码）；`middleware/__init__.py` 改为导出 `tenant_middleware` 增强版
+- [shared/ontology/database.py] `get_db_no_rls` 文档注明已知调用方；合并重复 `_validate_tenant_id`；修复 `get_db_no_rls` finally 日志误引用变量
+- [gateway/auth] `TX_ENABLE_DEMO_AUTH` / 生产 `ENVIRONMENT` 控制 DEMO_USERS；`/mfa/verify`、`/me`、`/verify`、refresh 等优先 `users` 表
+- [web-admin/ChiefAgentPage] 助手消息 `DOMPurify.sanitize(renderMarkdown(...))`
+- [CI] `python-ci.yml` / `pr-check.yml` / 根目录 `ci.yml`：接入 `scripts/gateway-import-smoke.sh`；全量 pytest 对 gateway 使用 `--ignore=test_main_import_smoke.py` 避免重复
+- [tests] `services/gateway/src/tests/test_main_import_smoke.py`：子进程 + 仓库根 `PYTHONPATH` 规避 `src/services` 与根 `services/` 命名冲突；子进程注入测试用 JWT/MFA 环境变量
+- [审计 Wave1 / tx-trade] `refund_routes.py`：强制合法 `X-Tenant-ID`（UUID）；`GET` 查询增加 `tenant_id` 条件，防跨租户读退款单
+
+### 数据变化
+- 迁移：无新增
+
+### 遗留问题
+- 根目录 `ci.yml` 与 `python-ci.yml` 仍存在职责重叠，后续可合并或明确只保留其一为主 CI
+
+### 明日计划
+- 审计第二阶段：支付/退款/日结、第三方回调、库存扣减链路的逐文件核对
+
+---
+
+## 2026-04-13 tx-expense 费控管理系统完善（P3 + 零TODO收尾）
+
+### 今日完成
+- [tx-expense/api] `expense_dashboard.py` — 5个费控看板端点完整实现（540行）
+  - GET /overview：本月/季度费用、预算执行率、待审批、发票状态、环比增长
+  - GET /by-store：按门店汇总（关联成本日报食材成本率/毛利率）
+  - GET /by-category：按科目汇总（含科目占比百分比）
+  - GET /trend：最近N月趋势（含环比增长率，默认6个月）
+  - GET /top-applicants：高频申请人排行（含待审批/已批/被拒统计）
+- [tx-expense/api] `cost_attribution_routes.py` — 6个成本归因端点完整实现（555行）
+  - GET /rules：成本归集配置概览（按门店/成本类型聚合，支持回溯天数）
+  - POST /rules：手工录入成本归集条目
+  - PUT /rules/{rule_id}：更新归集条目（动态字段更新）
+  - POST /calculate：手动触发归因计算（调用Worker / 降级加入队列）
+  - GET /results：成本归集日报分页查询（含关联条目数）
+  - GET /results/{result_id}/breakdown：日报明细（含费控申请来源追溯）
+- [tx-expense/services] `org_integration_service.py` — 新增 `get_approver_by_role()` 函数
+  - 调用 tx-org `/api/v1/org/approvers/by-role` 接口，TTL 5分钟缓存
+  - 失败时返回 None，不抛异常（降级为 uuid5 占位）
+- [tx-expense/services] `approval_engine_service.py` — 修复审批人查询 TODO
+  - 创建审批节点时优先从 tx-org 查询真实员工，失败降级确定性占位
+- [tx-expense/workers] `monthly_petty_cash.py` — 接入 TenantSession，移除 DB session 占位 TODO
+- [tx-expense/workers] `daily_cost_attribution.py` — 接入 TenantSession，移除多租户循环占位 TODO
+- [tx-expense/api] `expense_routes.py` — 附件上传改为腾讯云 COS（invoices 目录），移除 Supabase TODO
+- [tx-expense/api] `invoice_routes.py` — 发票上传改为腾讯云 COS，`_build_storage_path` 替换为 `_upload_invoice_file`
+- [tx-expense/api] `petty_cash_routes.py` — 财务确认接口新增 `require_finance_role` 依赖（X-User-Role header）
+- [tx-expense/agents] `a4_budget_alert.py` — 清理过时 P2 placeholder 注释（预算数据已真实接入）
+
+### 数据变化
+- 迁移版本：v245（无新增迁移，所有实现基于现有表结构）
+- 新增 API 端点：11个（看板5 + 成本归因6）
+- 修复 TODO：全部清零（0处残留）
+- 存储后端：Supabase TODO → 腾讯云 COS（与 gateway 统一）
+
+### 遗留问题
+- main.py startup() 定时任务注册待接入 APScheduler（注释已保留调度入口）
+- 多租户支持：现为单租户 DEFAULT_TENANT_ID 模式，多租户扩展待 tx-org 租户列表接口就绪
+
+### 明日计划
+- tx-expense 前端页面开发（费控申请流程 + 看板）
+- 或推进其他微服务功能完善
+
+---
+
+## 2026-04-12 菜谱方案批量下发与门店差异化（模块3.4）
+
+### 今日完成
+- [shared/events] `event_types.py` 新增 `MenuEventType`（6个事件：PLAN_CREATED/PUBLISHED/DISTRIBUTED/ROLLED_BACK/STORE_OVERRIDE_SET/STORE_OVERRIDE_RESET）
+- [tx-menu] 新增 `menu_plan_routes.py`，13个API端点（版本管理/下发日志/门店差异化/批量操作）
+- [tx-menu] 注册路由到 main.py
+- [web-admin] 新增 `menuPlanApi.ts`（前端API客户端，覆盖所有新端点）
+- [web-admin] 新增 `MenuPlanPage.tsx`（4 Tab：方案列表/批量下发/门店差异化/版本历史）
+- [web-admin] 注册路由 `/menu/plans`
+- [db-migrations] 新增 `v245_menu_plan_versions_distribute_log.py`（2张表）
+
+### 数据变化
+- 迁移版本：v244 → v245
+- 新增表：`menu_plan_versions`（方案版本快照，支持回滚）/ `menu_distribute_log`（下发日志）
+- 两表均含 RLS 策略（app.tenant_id 隔离）
+- 新增API端点：13个（版本CRUD+回滚/下发日志/覆盖管理/重置/待更新通知/分类排序/批量启停/批量指定分类）
+
+### 遗留问题
+- `menu_plan_versions` 的 snapshot_json 需在 publish 端点中自动触发（当前为手动调用 POST /versions）
+- distribute_log 的 status='pending' 目前需手动插入，后续可改为 distribute 时自动写入再异步确认
+
+### 明日计划
+- 在 scheme_routes.py distribute 端点中同步写入 menu_distribute_log
+- 在 publish 端点中自动快照当前菜品到 menu_plan_versions
+
+---
+
+## 2026-04-12 计件提成3.0 对标天财（模块2.6）
+
+### 今日完成
+- [tx-org] 新增 `commission_v3_routes.py`，13个API端点（/api/v1/commission/*）
+- [tx-org] 注册路由到 main.py
+- [web-admin] 新增 `CommissionV3Page.tsx`（4 Tab：方案/规则/员工查询/月结）
+- [web-admin] 注册路由 `/hr/commission-v3`
+- [db-migrations] 新增 `v244_commission_v3.py`（3张表：commission_schemes / commission_rules / commission_records）
+
+### 数据变化
+- 迁移版本：v244 → v244_commission_v3（基于v244）
+- 新增表：commission_schemes / commission_rules / commission_records（含RLS+唯一约束）
+- 新增API端点：13个（方案CRUD+复制/规则配置/计算/汇总/月结/报表）
+
+### 遗留问题
+- commission calculate 端点中 table/time_slot 类型目前使用固定金额，后续需接入实际订单桌台数据
+- 月结 UPSERT ON CONFLICT 依赖 (tenant_id, employee_id, store_id, year_month) 唯一约束，请确认迁移已执行后再调用
+
+### 明日计划
+- 对接 table/time_slot 类型到 tx-trade 桌台订单数据
+- 增加员工姓名冗余存储（commission_records.employee_name）
+
+---
+
+## 2026-04-12 tx-expense 费控管理系统 (第15个微服务 :8015)
+
+### 交付统计
+- 迁移: v234-v244 (11个迁移文件, 27张新表)
+- 服务文件: ~35个Python文件
+- 代码行数: ~18,000行
+- API端点: ~105个
+
+### 核心模块
+- 费控申请 + 审批引擎 (4级金额路由)
+- 备用金管理 (状态机 + POS核销)
+- 发票OCR + 金税四期验证 + 集团去重
+- 差旅管理 + 巡店联动
+- 差标合规检查 (50城市)
+- 合同台账 + 到期预警
+- 采购付款联动 (tx-supply集成)
+- 预算管理 (科目级分配)
+- 成本归集日报 (POS打通)
+- 报表引擎 (三维度汇总)
+
+### 6大AI Agent
+- A1: 备用金守护者 (POS核销+异常检测)
+- A2: 发票核验师 (批量OCR+税务验证)
+- A3: 差标合规官 (50城市4级截断)
+- A4: 预算预警员 (实时执行率监控)
+- A5: 差旅助手 (巡店→差旅自动生成)
+- A6: POS对账员 (日结核销+差异升级)
+
+### 餐饮行业差异化亮点
+- POS数据直接打通成本率计算
+- 督导巡店任务自动生成差旅申请
+- 集团多品牌发票跨租户去重
+- 50城市差旅标准配置
+- 备用金与POS日结自动核销
+
+### P2-S4 收尾交付
+- [tx-expense/scripts] 新建 `seed_expense_demo.py`：DEMO数据初始化脚本
+  - 直接调用 HTTP API，支持 `--base-url` / `--tenant-id` 参数
+  - 覆盖8个模块：科目/差标(50城市)/预算(5个)/备用金(3账户)/申请(10个各状态)/合同(2个)/差旅(1个+2行程)/发票mock
+  - 幂等设计：重复运行自动跳过已存在数据，彩色进度输出（✓/✗）
+- [tx-expense/tests] 新建 `test_expense_flow.py`：端到端集成测试
+  - 6大测试类（23个测试方法）覆盖核心流程
+  - pytest + httpx.AsyncClient，外部服务全 mock
+  - 通过 `EXPENSE_TEST_URL` 环境变量注入服务地址
+  - 服务不可用自动 skip（不强制要求测试环境运行中）
+
+### 迁移链
+v233 → v234(费用基础) → v235(申请审批) → v236(通知+差标)
+→ v237(备用金) → v238(发票) → v239(差旅)
+→ v240(采购付款) → v241(合同台账)
+→ v242(预算系统) → v243(成本归集) → v244(发票去重)
+
+### 数据变化
+- 新增文件: `services/tx-expense/scripts/seed_expense_demo.py`
+- 新增文件: `services/tx-expense/tests/test_expense_flow.py`
+
+### 遗留问题
+- 差标合规 A3 Agent 完整实现 (Task #23) 待续
+- tx-org 集成服务 (Task #24) 待续
+- v239 差旅三表迁移 (Task #25) 待续
+
+### 明日计划
+- 补全 A3/A5 Agent 单元测试 (audit 要求 ≥3 用例)
+- 执行 seed_expense_demo.py 验证端到端 DEMO 流程
+- billing_rules 补充 pytest 用例（审计约束）
+
+---
+
+## 2026-04-12 (加盟商管理闭环 v240 — 模块3.2)
+
+### 今日完成
+- [tx-org] 新建 `franchise_v5_routes.py`，注册 `/api/v1/franchise` 前缀，14 个 API 端点：
+  - 加盟商档案：列表/新建/更新/合同详情（4 个）
+  - 加盟费收缴：应收列表（含逾期天数计算）/标记收款/批量生成本月应收（3 个）
+  - 公共代码：列表/新增/更新/同步到门店（4 个）
+  - 对账报表：营业额汇总/费用收缴汇总（2 个）
+- [db-migrations] 新建 v240 迁移：`franchise_common_codes`（新表+RLS）+ `franchisees`/`franchise_fees` 扩展列
+- [web-admin] 新建 `FranchiseManagePage.tsx`，4-Tab 完整 UI：
+  - Tab1 加盟商档案（列表+新建Modal+合同Drawer+文件上传占位）
+  - Tab2 费用收缴（逾期标红+收款Modal+批量生成本月应收）
+  - Tab3 公共代码（多选+批量同步）
+  - Tab4 对账报表（营业额/费用收缴双表格+月份筛选）
+- [web-admin] 注册路由 `/org/franchise`
+
+### 数据变化
+- 迁移版本：v239 → v240
+- 新增 API 端点：14 个（franchise_v5_routes.py）
+- 新增前端页面：1 个（FranchiseManagePage.tsx）
+
+### 遗留问题
+- 合同文件上传（OSS）占位，待 storage 模块接入
+- 营业额报表 JOIN orders.store_id 字段类型需确认（UUID vs TEXT）
+
+### 明日计划
+- 连通测试：franchise_v5 API + 迁移执行
+- 加盟费自动逾期标记（定时任务/触发器）
+
+## 2026-04-12 (最低消费/服务费规则引擎 v238)
+
+### 今日完成
+- [tx-trade] 新增账单规则引擎（模块1.4，对标天财商龙）
+  - `billing_rules` 表：store_id 维度，支持 min_spend/service_fee 两种规则类型，fixed/per_person/percentage 三种计算方式，JSONB 豁免条件（会员等级/协议单位），带 RLS 策略
+  - `billing_rules_routes.py`：3 个 API 端点（GET 获取/PUT 配置/POST 应用），Repository 模式，structlog 日志，完整 type hints
+  - 事件接入：OrderEventType.BILLING_RULE_APPLIED 写入事件总线（asyncio.create_task 旁路，不阻断主流程）
+- [shared/events] event_types.py 新增 `OrderEventType.BILLING_RULE_APPLIED` 枚举值
+- [web-pos] SettlePage.tsx 集成账单规则引擎
+  - 支付前调用 apply-billing-rules API
+  - 账单展示服务费明细行（含金额）
+  - 未达最低消费时弹出 Toast 提示（本桌消费/最低消费/差额，3秒自动消失）
+
+### 数据变化
+- 迁移版本：v237 → v238（billing_rules 表 + RLS）
+- 新增 API 端点：3 个（GET billing-rules/{store_id} / PUT billing-rules/{store_id} / POST orders/{id}/apply-billing-rules）
+- 修改文件：`services/tx-trade/src/main.py`、`shared/events/src/event_types.py`、`apps/web-pos/src/pages/SettlePage.tsx`
+
+### 遗留问题
+- billing_rules 暂无单元测试，待补充 pytest 用例（≥3个，审计约束）
+
+### 明日计划
+- 为 billing_rules_routes.py 补充测试：apply-billing-rules 服务费计算/最低消费差额/豁免逻辑
+
+---
+
+## 2026-04-12 (tx-finance 缺失路由注册修复)
+
+### 今日完成
+- [tx-finance] 修复 main.py 中 4 个路由模块未注册问题
+
+**新增注册路由：**
+- `budget_routes.py` (v101) — `/api/v1/finance/budgets/*`，8 个预算管理端点（CRUD + 审批 + 执行录入 + 进度查询）
+- `budget_v2_routes.py` (v118) — `/api/v1/finance/budget/*`，3 个面向前端报表的快捷接口（年度列表/月度创建/执行情况）
+- `payroll_routes.py` — `/api/v1/finance/payroll/*`，9 个薪资管理端点（薪资单 CRUD + 审批 + 发薪 + 方案配置 + 历史）
+- `vat_routes.py` (v102) — `/api/v1/finance/vat/*`，9 个企业增值税端点（申报单 + 进项发票 + 税率）
+
+**注意**：`vat_routes`（企业增值税申报）与已有的 `vat_ledger_routes`（增值税台账）是不同模块，两者并存不冲突。
+
+### 数据变化
+- 新增 API 端点：29 个（budgets 8 + budget_v2 3 + payroll 9 + vat 9）
+- 修改文件：`services/tx-finance/src/main.py`
+- [web-admin] 注册 `AgentKPIDashboard` 路由 `/agent/kpi`（模块4.4收尾）
+- [db-migrations] 补充 v249：`banquet_kds_dishes` + `banquet_session_deposits` 两表迁移（含RLS + 索引 + check约束）
+
+### 遗留问题
+- 无
+
+### 明日计划
+- Phase 1-4 全部完成，等待产品验收 / 客户演示
+
+---
+
+## 2026-04-12 (tx-expense 微服务 P0-S1)
+
+### tx-expense 微服务 P0-S1 启动（Sprint 1/8）
+
+**交付内容：**
+- 新建微服务 tx-expense :8015（第15个业务微服务）
+- 数据库迁移 v234_expense_foundation（expense_categories + expense_scenarios，2张表，RLS）
+- 数据库迁移 v235_expense_applications（expense_applications + expense_items + expense_attachments + approval_routing_rules + approval_instances + approval_nodes，6张表，全RLS）
+- ORM 模型层（8个枚举 + 15个事件常量 + 8个SQLAlchemy模型）
+- 服务层：expense_application_service + approval_engine_service
+- API 路由：18个端点（expense 12 + approval 6），占位路由骨架 7个模块
+- docker-compose 集成 + gateway 路由注册
+
+**技术决策：**
+- 审批流采用金额分段路由（<500元店长/500-2000区域/2000-10000品牌财务/>10000 CFO）
+- routing_snapshot 快照机制：审批链在实例创建时固化，规则变更不影响进行中审批
+- 金额统一存分(fen)，与屯象OS全局约定一致
+- 6大费控Agent框架预留（A1-A6），P1阶段实现
+
+**下一Sprint（P0-S2）计划：**
+- 备用金管理模块（v237迁移 + petty_cash_service + petty_cash_routes）
+- POS日结联动（订阅 ops.daily_close.completed 事件）
+- 发票采集基础（v238迁移 + invoice OCR接入）
 
 ---
 

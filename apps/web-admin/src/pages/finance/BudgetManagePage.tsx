@@ -151,7 +151,7 @@ function BudgetPlanTab({
   interface MonthRow extends MonthlyBudget { month: number; }
   const tableData: MonthRow[] = MONTHS.map((m) => {
     const period = `${year}-${String(m).padStart(2, '0')}`;
-    return { month: m, period, ...(budgetMap[period] ?? { revenue_target_fen: null, cost_budget_fen: null, labor_budget_fen: null, status: null }) };
+    return { month: m, ...(budgetMap[period] ?? { period, revenue_target_fen: null, cost_budget_fen: null, labor_budget_fen: null, status: null }) };
   });
 
   const columns: ColumnsType<MonthRow> = [

@@ -571,7 +571,7 @@ export function AlertRuleConfigPage() {
                     placeholder={scopeType === 'region' ? '搜索并选择区域' : '搜索并选择门店'}
                     showSearch
                     filterOption={(input, option) =>
-                      (option?.label as string || '').toLowerCase().includes(input.toLowerCase())
+                      ((option as { label?: string } | undefined)?.label || '').toLowerCase().includes(input.toLowerCase())
                     }
                     options={[]}
                     notFoundContent="暂无数据，请先在组织架构中配置"

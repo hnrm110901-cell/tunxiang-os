@@ -280,7 +280,7 @@ export function MemberTierPage() {
     })),
   ];
 
-  const comparisonData = comparisonRows.map((r) => ({ key: r.key, benefit: r.benefit, ...r }));
+  const comparisonData = comparisonRows.map((r) => ({ ...r }));
 
   // ── Timeline 渲染 ──
   const timelineItems = upgradeLog.map((item) => {

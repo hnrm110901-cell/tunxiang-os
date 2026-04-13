@@ -177,7 +177,7 @@ export default function PeakGuardPage() {
     setDashLoading(true);
     try {
       const res = await txFetchData<DashboardData>('/api/v1/peak-guard/dashboard');
-      if (res.data) setDashboard(res.data);
+      if (res) setDashboard(res);
     } catch {
       message.error('加载仪表板失败');
     } finally {
@@ -188,7 +188,7 @@ export default function PeakGuardPage() {
   const loadAlerts = async () => {
     try {
       const res = await txFetchData<{ items: PeakGuardRecord[] }>('/api/v1/peak-guard/alerts');
-      if (res.data) setAlerts(res.data.items);
+      if (res) setAlerts(res.items);
     } catch {
       /* silent */
     }
@@ -197,7 +197,7 @@ export default function PeakGuardPage() {
   const loadUpcoming = async () => {
     try {
       const res = await txFetchData<{ items: PeakGuardRecord[] }>('/api/v1/peak-guard/upcoming');
-      if (res.data) setUpcoming(res.data.items);
+      if (res) setUpcoming(res.items);
     } catch {
       /* silent */
     }
@@ -221,7 +221,7 @@ export default function PeakGuardPage() {
   const openDetail = async (record: PeakGuardRecord) => {
     try {
       const res = await txFetchData<PeakGuardRecord>(`/api/v1/peak-guard/${record.id}`);
-      setDetailRecord(res.data ?? record);
+      setDetailRecord(res ?? record);
     } catch {
       setDetailRecord(record);
     }
@@ -241,7 +241,7 @@ export default function PeakGuardPage() {
       actionForm.resetFields();
       // 刷新详情
       const res = await txFetchData<PeakGuardRecord>(`/api/v1/peak-guard/${detailRecord.id}`);
-      if (res.data) setDetailRecord(res.data);
+      if (res) setDetailRecord(res);
       refreshAll();
     } catch {
       message.error('追加行动失败');
@@ -272,12 +272,12 @@ export default function PeakGuardPage() {
         },
       );
       message.success('评估完成');
-      if (res.data) setEvalResult(res.data);
+      if (res) setEvalResult(res);
       refreshAll();
       // 刷新详情（如果打开中）
       if (detailRecord?.id === evalRecord.id) {
         const detailRes = await txFetchData<PeakGuardRecord>(`/api/v1/peak-guard/${evalRecord.id}`);
-        if (detailRes.data) setDetailRecord(detailRes.data);
+        if (detailRes) setDetailRecord(detailRes);
       }
     } catch {
       message.error('评估提交失败');
@@ -860,8 +860,8 @@ export default function PeakGuardPage() {
               `/api/v1/peak-guard?${query.toString()}`,
             );
             return {
-              data: res.data?.items ?? [],
-              total: res.data?.total ?? 0,
+              data: res?.items ?? [],
+              total: res?.total ?? 0,
               success: true,
             };
           } catch {

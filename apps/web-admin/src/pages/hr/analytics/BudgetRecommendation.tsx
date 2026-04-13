@@ -110,7 +110,7 @@ export default function BudgetRecommendation() {
   useEffect(() => {
     txFetchData<{ items: { id: string; store_name: string }[] }>('/api/v1/stores?page=1&size=100')
       .then((resp) => {
-        const list = (resp.data?.items || []).map((s) => ({ id: s.id, name: s.store_name }));
+        const list = (resp?.items || []).map((s) => ({ id: s.id, name: s.store_name }));
         setStores(list);
         if (list.length > 0 && !storeId) setStoreId(list[0].id);
       })
@@ -132,7 +132,7 @@ export default function BudgetRecommendation() {
           cuisine_type: cuisineType,
         }),
       });
-      setData(resp.data?.data || resp.data);
+      setData(resp?.data || resp);
     } catch {
       message.error('分析失败');
     } finally {

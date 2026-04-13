@@ -836,7 +836,7 @@ function StatsTab() {
                   subTab === 'store' ? storeData :
                   subTab === 'employee' ? empData :
                   dishData;
-                exportCSV(data as Record<string, unknown>[], `计件统计_${subTab}`);
+                exportCSV(data as unknown as Record<string, unknown>[], `计件统计_${subTab}`);
               }}
             >
               导出 CSV

@@ -82,7 +82,7 @@ export default function AttendanceAnomalies() {
     (async () => {
       try {
         const res = await txFetchData<{ store_id: string; store_name: string }[]>('/api/v1/org/stores');
-        const list = res.data ?? [];
+        const list = res ?? [];
         setStores(list);
         if (list.length > 0) setStoreId(list[0].store_id);
       } catch {
@@ -175,8 +175,8 @@ export default function AttendanceAnomalies() {
               `/api/v1/attendance/anomalies?store_id=${storeId}&start_date=${dateRange[0].format('YYYY-MM-DD')}&end_date=${dateRange[1].format('YYYY-MM-DD')}&page=${params.current ?? 1}&size=${params.pageSize ?? 20}`,
             );
             return {
-              data: res.data?.items ?? [],
-              total: res.data?.total ?? 0,
+              data: res?.items ?? [],
+              total: res?.total ?? 0,
               success: true,
             };
           }}

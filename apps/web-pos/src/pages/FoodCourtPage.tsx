@@ -828,84 +828,180 @@ export default function FoodCourtPage() {
 
         {activeTab === 'reports' && (
           <div style={{ flex: 1, overflowY: 'auto', padding: 16, WebkitOverflowScrolling: 'touch' }}>
-            <div style={{ fontSize: 18, fontWeight: 700, color: TOKEN.textPrimary, marginBottom: 16 }}>
-              档口今日报表
-            </div>
-            {MOCK_OUTLETS.map((outlet) => (
-              <div key={outlet.id} style={{
-                background: TOKEN.bgPrimary,
-                borderRadius: 12,
-                padding: 16,
-                marginBottom: 12,
-                border: `1px solid ${TOKEN.border}`,
-              }}>
+            {/* 日结汇总条 */}
+            {(() => {
+              const totalRevenue = MOCK_OUTLETS.reduce((s, o) => s + o.today_revenue_fen, 0);
+              const totalOrders = MOCK_OUTLETS.reduce((s, o) => s + o.today_order_count, 0);
+              return (
                 <div style={{
+                  background: TOKEN.navy,
+                  borderRadius: 12,
+                  padding: '16px 20px',
+                  marginBottom: 16,
                   display: 'flex',
+                  justifyContent: 'space-between',
                   alignItems: 'center',
-                  gap: 8,
-                  marginBottom: 12,
                 }}>
-                  <span style={{ fontSize: 17, fontWeight: 700, color: TOKEN.textPrimary }}>
-                    {outlet.name}
-                  </span>
-                  <span style={{
-                    fontSize: 12,
-                    padding: '2px 8px',
-                    borderRadius: 4,
-                    background: TOKEN.bgSecondary,
-                    color: TOKEN.textSecondary,
-                    fontWeight: 600,
-                  }}>
-                    {outlet.outlet_code}
-                  </span>
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                  <div style={{
-                    padding: '12px',
-                    background: TOKEN.bgSecondary,
-                    borderRadius: 8,
-                  }}>
-                    <div style={{ fontSize: 13, color: TOKEN.textSecondary }}>营业额</div>
-                    <div style={{ fontSize: 22, fontWeight: 800, color: TOKEN.primary }}>
-                      ¥{fenToYuan(outlet.today_revenue_fen)}
+                  <div>
+                    <div style={{ fontSize: 13, color: '#ffffff66', marginBottom: 2 }}>
+                      {new Date().toLocaleDateString('zh-CN')} · 日结汇总
+                    </div>
+                    <div style={{ fontSize: 28, fontWeight: 800, color: TOKEN.primary }}>
+                      ¥{fenToYuan(totalRevenue)}
+                    </div>
+                    <div style={{ fontSize: 13, color: '#ffffff88', marginTop: 2 }}>
+                      {MOCK_OUTLETS.length} 个档口 · {totalOrders} 单
                     </div>
                   </div>
                   <div style={{
-                    padding: '12px',
-                    background: TOKEN.bgSecondary,
-                    borderRadius: 8,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'flex-end',
+                    gap: 6,
                   }}>
-                    <div style={{ fontSize: 13, color: TOKEN.textSecondary }}>订单数</div>
-                    <div style={{ fontSize: 22, fontWeight: 800, color: TOKEN.textPrimary }}>
-                      {outlet.today_order_count}单
+                    <div style={{ fontSize: 13, color: '#ffffff66' }}>客单价</div>
+                    <div style={{ fontSize: 20, fontWeight: 700, color: '#fff' }}>
+                      ¥{fenToYuan(totalOrders > 0 ? Math.round(totalRevenue / totalOrders) : 0)}
                     </div>
                   </div>
                 </div>
-                {/* 简单条形图 */}
-                <div style={{ marginTop: 12 }}>
-                  <div style={{ fontSize: 12, color: TOKEN.textSecondary, marginBottom: 4 }}>
-                    占广场总额比例
-                  </div>
-                  <div style={{
-                    height: 8,
-                    background: TOKEN.bgSecondary,
-                    borderRadius: 4,
-                    overflow: 'hidden',
+              );
+            })()}
+
+            <div style={{ fontSize: 15, fontWeight: 700, color: TOKEN.textSecondary, marginBottom: 12, paddingLeft: 4 }}>
+              各档口分账明细
+            </div>
+
+            {(() => {
+              const totalRevenue = MOCK_OUTLETS.reduce((s, o) => s + o.today_revenue_fen, 0);
+              return MOCK_OUTLETS.map((outlet) => {
+                const ratio = 1.0; // mock: 100% 结算比例
+                const settlementFen = Math.round(outlet.today_revenue_fen * ratio);
+                const platformFeeFen = Math.round(outlet.today_revenue_fen * 0.005);
+                const netPayoutFen = settlementFen - platformFeeFen;
+                const pct = totalRevenue > 0 ? Math.round(outlet.today_revenue_fen / totalRevenue * 100) : 0;
+
+                return (
+                  <div key={outlet.id} style={{
+                    background: TOKEN.bgPrimary,
+                    borderRadius: 12,
+                    padding: 16,
+                    marginBottom: 12,
+                    border: `1px solid ${TOKEN.border}`,
                   }}>
+                    {/* 标题行 */}
                     <div style={{
-                      height: '100%',
-                      width: `${Math.round(outlet.today_revenue_fen / 640800 * 100)}%`,
-                      background: TOKEN.primary,
-                      borderRadius: 4,
-                      transition: 'width 600ms ease',
-                    }} />
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      marginBottom: 12,
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ fontSize: 17, fontWeight: 700, color: TOKEN.textPrimary }}>
+                          {outlet.name}
+                        </span>
+                        <span style={{
+                          fontSize: 12,
+                          padding: '2px 8px',
+                          borderRadius: 4,
+                          background: TOKEN.bgSecondary,
+                          color: TOKEN.textSecondary,
+                          fontWeight: 600,
+                        }}>
+                          {outlet.outlet_code}
+                        </span>
+                      </div>
+                      <span style={{
+                        fontSize: 13,
+                        padding: '4px 10px',
+                        borderRadius: 6,
+                        background: TOKEN.success + '15',
+                        color: TOKEN.success,
+                        fontWeight: 600,
+                      }}>
+                        已结算
+                      </span>
+                    </div>
+
+                    {/* 营业数据 */}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginBottom: 12 }}>
+                      <div style={{ padding: '10px', background: TOKEN.bgSecondary, borderRadius: 8 }}>
+                        <div style={{ fontSize: 12, color: TOKEN.textSecondary }}>营业额</div>
+                        <div style={{ fontSize: 18, fontWeight: 800, color: TOKEN.primary }}>
+                          ¥{fenToYuan(outlet.today_revenue_fen)}
+                        </div>
+                      </div>
+                      <div style={{ padding: '10px', background: TOKEN.bgSecondary, borderRadius: 8 }}>
+                        <div style={{ fontSize: 12, color: TOKEN.textSecondary }}>订单数</div>
+                        <div style={{ fontSize: 18, fontWeight: 800, color: TOKEN.textPrimary }}>
+                          {outlet.today_order_count}单
+                        </div>
+                      </div>
+                      <div style={{ padding: '10px', background: TOKEN.bgSecondary, borderRadius: 8 }}>
+                        <div style={{ fontSize: 12, color: TOKEN.textSecondary }}>客单价</div>
+                        <div style={{ fontSize: 18, fontWeight: 800, color: TOKEN.textPrimary }}>
+                          ¥{fenToYuan(outlet.today_order_count > 0
+                            ? Math.round(outlet.today_revenue_fen / outlet.today_order_count) : 0)}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* 分账明细 */}
+                    <div style={{
+                      background: TOKEN.bgSecondary,
+                      borderRadius: 8,
+                      padding: '10px 14px',
+                      marginBottom: 10,
+                    }}>
+                      <div style={{ fontSize: 12, color: TOKEN.textSecondary, marginBottom: 6, fontWeight: 600 }}>
+                        分账明细
+                      </div>
+                      {[
+                        { label: '应结金额', value: settlementFen, color: TOKEN.textPrimary },
+                        { label: '平台服务费 (0.5%)', value: -platformFeeFen, color: TOKEN.warning },
+                        { label: '实际打款', value: netPayoutFen, color: TOKEN.success },
+                      ].map(({ label, value, color }) => (
+                        <div key={label} style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          padding: '3px 0',
+                          fontSize: 14,
+                          borderBottom: label === '实际打款' ? 'none' : `1px solid ${TOKEN.border}`,
+                          marginBottom: label === '平台服务费 (0.5%)' ? 4 : 0,
+                        }}>
+                          <span style={{ color: TOKEN.textSecondary }}>{label}</span>
+                          <span style={{ fontWeight: 600, color }}>
+                            {value < 0 ? `-¥${fenToYuan(-value)}` : `¥${fenToYuan(value)}`}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* 占比条形图 */}
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                        <span style={{ fontSize: 12, color: TOKEN.textSecondary }}>占广场总额</span>
+                        <span style={{ fontSize: 12, fontWeight: 600, color: TOKEN.textSecondary }}>{pct}%</span>
+                      </div>
+                      <div style={{
+                        height: 6,
+                        background: TOKEN.bgSecondary,
+                        borderRadius: 3,
+                        overflow: 'hidden',
+                      }}>
+                        <div style={{
+                          height: '100%',
+                          width: `${pct}%`,
+                          background: TOKEN.primary,
+                          borderRadius: 3,
+                          transition: 'width 600ms ease',
+                        }} />
+                      </div>
+                    </div>
                   </div>
-                  <div style={{ fontSize: 12, color: TOKEN.textSecondary, marginTop: 2 }}>
-                    {Math.round(outlet.today_revenue_fen / 640800 * 100)}%
-                  </div>
-                </div>
-              </div>
-            ))}
+                );
+              });
+            })()}
           </div>
         )}
       </div>

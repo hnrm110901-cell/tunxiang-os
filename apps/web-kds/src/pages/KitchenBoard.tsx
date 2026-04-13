@@ -16,6 +16,8 @@ import { pauseTicket, resumeTicket, grabTicket } from '../api/kdsOpsApi';
 import { StatusBar, OrderTicketCard } from '@tx-ds/biz';
 import type { OrderTicketData } from '@tx-ds/biz';
 import { RemakeOverlay } from '../components/RemakeOverlay';
+import { useKDSRules } from '../hooks/useKDSRules';
+import { getTimeLevelFromRules, getChannelColor, type KDSRuleConfig } from '../api/kdsRulesApi';
 
 // ─── KDS 配置（从 localStorage 读取） ───
 
@@ -84,6 +86,10 @@ function sortTickets(tickets: KDSTicket[]): KDSTicket[] {
 export function KitchenBoard() {
   const config = getKdsConfig();
   const wsEnabled = !!config.host;
+
+  // 加载门店KDS规则配置（storeId 从 localStorage 读取，或使用默认）
+  const storeId = localStorage.getItem('kds_store_id') || null;
+  const { rules } = useKDSRules(storeId);
 
   // WebSocket 数据源
   const {
@@ -352,6 +358,7 @@ export function KitchenBoard() {
               isPaused={pausedIds.has(t.id)}
               onStart={() => startCooking(t.id)}
               onGrab={grabMode && operatorId ? () => handleGrab(t.id) : undefined}
+              rules={rules}
             />
           ))}
         </BoardColumn>
@@ -368,6 +375,7 @@ export function KitchenBoard() {
               isPaused={pausedIds.has(t.id)}
               onComplete={() => completeCooking(t.id)}
               onPause={() => togglePause(t.id)}
+              rules={rules}
             />
           ))}
         </BoardColumn>

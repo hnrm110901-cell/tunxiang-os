@@ -649,8 +649,8 @@ export function DepositManagePage() {
                   dataIndex: 'risk',
                   key: 'risk',
                   width: 100,
-                  render: (val: string, row: { risk_color: string }) => (
-                    <Tag color={row.risk_color}>{val}</Tag>
+                  render: (val: string, row: Record<string, unknown>) => (
+                    <Tag color={row.risk_color as string}>{val}</Tag>
                   ),
                 },
               ]}

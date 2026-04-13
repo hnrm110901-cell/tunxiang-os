@@ -138,7 +138,7 @@ function WineSummaryTab() {
   ];
 
   // 明细表
-  const detailColumns: ColumnsType<(typeof detail)['items'][0]> = [
+  const detailColumns: ColumnsType<WineListResponse['items'][0]> = [
     { title: '客户', dataIndex: 'customer_id', key: 'cust', ellipsis: true },
     { title: '酒品', dataIndex: 'wine_name', key: 'wine_name', ellipsis: true },
     {

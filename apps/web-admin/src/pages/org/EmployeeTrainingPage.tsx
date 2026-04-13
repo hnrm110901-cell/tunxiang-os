@@ -430,7 +430,6 @@ function TrainingRecordsTab() {
                     placeholder="输入证书编号"
                     notFoundContent={null}
                     filterOption={false}
-                    mode="combobox"
                   />
                 </Form.Item>
               </Form.Item>

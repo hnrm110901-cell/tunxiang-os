@@ -9,9 +9,10 @@ Create Date: 2026-04-12
 """
 
 from alembic import op
+import sqlalchemy as sa
 
-revision = "v235"
-down_revision = "v234"
+revision = "v235b"
+down_revision = "v235"
 branch_labels = None
 depends_on = None
 
@@ -19,6 +20,11 @@ _SAFE_COND = "tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uu
 
 
 def upgrade() -> None:
+    conn = op.get_bind()
+    existing = sa.inspect(conn).get_table_names()
+    if 'kg_nodes' in existing:
+        return
+
     # ── 确保 pgvector 扩展可用 ────────────────────────────────────────────
     op.execute("CREATE EXTENSION IF NOT EXISTS vector;")
 

@@ -36,7 +36,7 @@ import dayjs, { Dayjs } from 'dayjs';
 import { formatPrice } from '@tx-ds/utils';
 
 const { Title, Text } = Typography;
-const { TabPane } = require('antd').Tabs ?? {};
+// TabPane removed (not used)
 
 // ── 类型定义 ──────────────────────────────────────────────────────────────────
 

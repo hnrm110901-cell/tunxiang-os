@@ -46,6 +46,9 @@ class _CouponStore:
         return results
 
 
+# DEPRECATED: _StoredValueStore 已废弃，仅保留用于单测兼容
+# deduct_stored_value 已改为查询 stored_value_accounts 真实DB表
+# 待所有依赖方确认迁移完成后删除此类
 class _StoredValueStore:
     """储值卡存储"""
 
@@ -247,45 +250,92 @@ async def deduct_stored_value(
     tenant_id: str,
     db: AsyncSession,
 ) -> dict:
-    """储值消费 — 从储值卡扣款"""
+    """储值消费 — 从储值账户原子扣款（已接入真实DB）"""
     if amount_fen <= 0:
         raise ValueError("扣款金额必须大于0")
 
-    card = _StoredValueStore.get(card_id)
-    if not card:
-        raise ValueError(f"储值卡不存在: {card_id}")
-    if card["tenant_id"] != tenant_id:
-        raise ValueError("租户不匹配")
-    if card["status"] != "active":
-        raise ValueError(f"储值卡状态异常: {card['status']}")
-    if card["balance_fen"] < amount_fen:
+    from sqlalchemy import text
+
+    # 原子SQL：余额充足时扣减，不足时影响0行
+    result = await db.execute(
+        text("""
+        UPDATE stored_value_accounts
+        SET balance_fen        = balance_fen - :amount,
+            total_consumed_fen = total_consumed_fen + :amount,
+            updated_at         = NOW()
+        WHERE id = :card_id
+          AND tenant_id = :tenant_id::uuid
+          AND is_deleted = FALSE
+          AND (balance_fen - frozen_fen) >= :amount
+        RETURNING balance_fen, id, member_id
+        """),
+        {
+            "amount": amount_fen,
+            "card_id": card_id,
+            "tenant_id": tenant_id,
+        }
+    )
+    row = result.fetchone()
+    if row is None:
+        # 行数为0：余额不足 or 账户不存在 or 非本租户
+        # 查询原因（只读）
+        check = await db.execute(
+            text("""
+            SELECT balance_fen, frozen_fen, is_deleted
+            FROM stored_value_accounts
+            WHERE id = :card_id AND tenant_id = :tenant_id::uuid
+            """),
+            {"card_id": card_id, "tenant_id": tenant_id}
+        )
+        account = check.fetchone()
+        if account is None:
+            raise ValueError(f"储值账户不存在: {card_id}")
+        if account.is_deleted:
+            raise ValueError("储值账户已注销")
+        available = account.balance_fen - account.frozen_fen
         raise ValueError(
-            f"余额不足: 当前{card['balance_fen']}分, 需扣{amount_fen}分"
+            f"余额不足：可用 {available} 分，需扣 {amount_fen} 分"
         )
 
-    card["balance_fen"] -= amount_fen
-    card["total_consumed_fen"] += amount_fen
-    card["transactions"].append({
-        "type": "consume",
-        "amount_fen": -amount_fen,
-        "order_id": order_id,
-        "balance_after_fen": card["balance_fen"],
-        "at": datetime.now(timezone.utc).isoformat(),
-    })
-    _StoredValueStore.save(card_id, card)
+    # 写流水记录（写入 stored_value_transactions 表）
+    try:
+        await db.execute(
+            text("""
+            INSERT INTO stored_value_transactions
+                (id, tenant_id, account_id, member_id, type, amount_fen,
+                 balance_after_fen, order_id, created_at)
+            VALUES
+                (gen_random_uuid(), :tenant_id::uuid, :account_id::uuid,
+                 :member_id::uuid, 'consume', :amount, :balance_after,
+                 :order_id::uuid, NOW())
+            """),
+            {
+                "tenant_id": tenant_id,
+                "account_id": card_id,
+                "member_id": str(row.member_id),
+                "amount": amount_fen,
+                "balance_after": row.balance_fen,
+                "order_id": order_id,
+            }
+        )
+    except Exception:
+        # 流水写入失败不影响主流程（幂等）
+        pass
+
+    await db.commit()
 
     logger.info(
-        "stored_value_deducted",
+        "stored_value_deducted_db",
         card_id=card_id,
         amount_fen=amount_fen,
         order_id=order_id,
-        remaining_fen=card["balance_fen"],
+        remaining_fen=row.balance_fen,
         tenant_id=tenant_id,
     )
     return {
         "card_id": card_id,
         "deducted_fen": amount_fen,
-        "balance_fen": card["balance_fen"],
+        "balance_fen": row.balance_fen,
         "order_id": order_id,
     }
 

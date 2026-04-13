@@ -136,8 +136,8 @@ export default function JobGrades() {
           const resp = await txFetchData<{ items: JobGrade[]; total: number }>(
             `/api/v1/job-grades?${query.toString()}`,
           );
-          const d = resp.data;
-          return { data: d?.items ?? [], total: d?.total ?? 0, success: resp.ok };
+          const d = resp;
+          return { data: d?.items ?? [], total: d?.total ?? 0, success: true };
         }}
         pagination={{ defaultPageSize: 20 }}
         toolBarRender={() => [
@@ -161,11 +161,11 @@ export default function JobGrades() {
                   }
                 : {}
             }
-            onFinish={async (values) => {
-              const payload = {
+            onFinish={async (values: Record<string, unknown>) => {
+              const payload: Record<string, unknown> = {
                 ...values,
-                salary_min_fen: Math.round((values.salary_range?.[0] ?? 0) * 100),
-                salary_max_fen: Math.round((values.salary_range?.[1] ?? 0) * 100),
+                salary_min_fen: Math.round(((values.salary_range as number[] | undefined)?.[0] ?? 0) * 100),
+                salary_max_fen: Math.round(((values.salary_range as number[] | undefined)?.[1] ?? 0) * 100),
               };
               delete payload.salary_range;
               if (editItem) {

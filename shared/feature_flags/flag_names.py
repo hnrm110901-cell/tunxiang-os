@@ -111,6 +111,24 @@ class OrgFlags:
     # 菜品技能匹配
     HR_SKILL_MATCH = "org.hr.skill_match.enable"
 
+    # 企微/钉钉IM实接同步
+    HR_IM_SYNC = "org.hr.im_sync.enable"
+
+    # 电子签约模块
+    HR_E_SIGNATURE = "org.hr.e_signature.enable"
+
+    # 员工积分赛马机制
+    HR_POINTS_RACE = "org.hr.points_race.enable"
+
+    # 绩效在线打分评审
+    HR_REVIEW_CYCLE = "org.hr.review_cycle.enable"
+
+    # 薪税申报对接
+    HR_TAX_FILING = "org.hr.tax_filing.enable"
+
+    # 考勤深度合规检测
+    HR_ATTENDANCE_COMPLIANCE = "org.hr.attendance_compliance.enable"
+
 
 class MemberFlags:
     """会员CDP域 Flag 名称。"""

@@ -95,7 +95,7 @@ async function apiPatch<T = unknown>(path: string, body?: unknown): Promise<T> {
     method: 'PATCH',
     body: body !== undefined ? JSON.stringify(body) : undefined,
   });
-  return resp.data as T;
+  return resp as T;
 }
 
 function getDaysColor(days: number): string {

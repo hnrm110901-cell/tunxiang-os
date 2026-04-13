@@ -219,8 +219,8 @@ export function ApprovalCenterPage() {
       const res = await txFetchData<InstanceListResponse>(
         `/api/v1/ops/approvals/instances?page=${p}&size=20${statusParam}${kwParam}${bizParam}`,
       );
-      setInstances(res.data?.items ?? []);
-      setTotal(res.data?.total ?? 0);
+      setInstances(res?.items ?? []);
+      setTotal(res?.total ?? 0);
     } catch {
       // API 失败时保持空列表
       setInstances([]);
@@ -259,7 +259,7 @@ export function ApprovalCenterPage() {
     if (!record.steps || record.steps.length === 0) {
       try {
         const full = await txFetchData<ApprovalInstance>(`/api/v1/ops/approvals/instances/${record.id}`);
-        setDetailInstance(full.data ?? record);
+        setDetailInstance(full ?? record);
       } catch {
         /* 使用列表数据 */
       }

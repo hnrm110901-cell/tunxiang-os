@@ -10,11 +10,12 @@ httpx>=0.27.0
 structlog>=24.0.0
 lxml>=5.0.0            # 企微回调 XML 解析（wecom_routes.py）
 # ── 认证 Phase 1a: JWT + TOTP 双因素 ──
-python-jose[cryptography]>=3.3.0  # JWT 签发与验证
+# python-jose 已移除：CVE-2024-33663（算法混淆攻击，CVSS 7.4），停止维护
+# 统一使用 PyJWT（活跃维护，auth.py 已直接 import jwt）
 PyJWT>=2.8.0                      # jwt 模块（auth.py 直接 import jwt）
 passlib[bcrypt]>=1.7.4            # CryptContext 密码哈希
 pyotp>=2.9.0                      # TOTP 双因素认证
-bcrypt>=3.2.0,<4.0.0              # 密码哈希（passlib 不兼容 bcrypt>=4.0.0）
-cryptography>=41.0.0              # AES-256-GCM 字段加密（Phase 2 PII）
+bcrypt>=4.0.0                     # 移除 <4.0.0 上限，获取安全补丁
+cryptography>=42.0.0              # 升级至 42.x（41.x 有已知漏洞），AES-256-GCM 字段加密
 qrcode[pil]>=7.4.0                # MFA 二维码生成（可选，供前端展示）
 prometheus-fastapi-instrumentator>=6.1.0

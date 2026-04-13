@@ -454,7 +454,7 @@ function CostDetailTab({
             placeholder="成本类型（全部）"
             options={[{ value: '', label: '全部类型' }, ...COST_TYPE_OPTIONS]}
             value={costType ?? ''}
-            onChange={(v) => setCostType(v || undefined)}
+            onChange={(v) => setCostType((v || undefined) as CostType | undefined)}
             style={{ width: 160 }}
           />
           <Button

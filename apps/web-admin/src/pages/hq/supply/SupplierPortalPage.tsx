@@ -40,6 +40,7 @@ import {
   InputNumber,
   Divider,
   Table,
+  Form,
 } from 'antd';
 import {
   PlusOutlined,
@@ -738,21 +739,16 @@ function RFQTab() {
                 />
               </Col>
             </Row>
-            <ProFormSelect
+            <Form.Item
               name="expected_delivery_date"
               label="期望交货日期"
-              fieldProps={{
-                children: null,
-              }}
-              // 使用 renderFormItem 放置 DatePicker
-              renderFormItem={() => (
-                <DatePicker
-                  style={{ width: '100%' }}
-                  format="YYYY-MM-DD"
-                  disabledDate={(d) => d.isBefore(dayjs(), 'day')}
-                />
-              )}
-            />
+            >
+              <DatePicker
+                style={{ width: '100%' }}
+                format="YYYY-MM-DD"
+                disabledDate={(d) => d.isBefore(dayjs(), 'day')}
+              />
+            </Form.Item>
             <ProFormSelect
               name="supplier_ids"
               label="询价供应商"

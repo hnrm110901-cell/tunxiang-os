@@ -248,7 +248,6 @@ const OverviewTab = () => {
             <Statistic
               title="本月奖励发放"
               value={stats ? fenToYuan(stats.this_month_issued_fen) : '--'}
-              prefix="¥"
               prefix={<GiftOutlined />}
               valueStyle={{ color: '#FF6B35' }}
             />
@@ -259,7 +258,6 @@ const OverviewTab = () => {
             <Statistic
               title="待发放奖励"
               value={stats ? fenToYuan(stats.pending_reward_fen) : '--'}
-              prefix="¥"
               prefix={<ClockCircleOutlined />}
               valueStyle={{ color: '#BA7517' }}
             />

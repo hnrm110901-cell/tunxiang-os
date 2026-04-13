@@ -566,3 +566,575 @@ async def auto_score_from_data(
         month=month,
     )
     return {"suggested_scores": suggested, "data_sources": data_sources}
+
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# 评审周期管理 (v254 review_cycles + review_scores)
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+VALID_CYCLE_STATUSES = ("draft", "scoring", "calibrating", "completed", "archived")
+CYCLE_STATUS_TRANSITIONS: dict[str, list[str]] = {
+    "draft": ["scoring"],
+    "scoring": ["calibrating"],
+    "calibrating": ["completed"],
+    "completed": ["archived"],
+    "archived": [],
+}
+
+
+async def create_review_cycle(
+    db: AsyncSession,
+    tenant_id: UUID,
+    data: dict[str, Any],
+) -> dict[str, Any]:
+    """创建评审周期。"""
+    await _set_tenant(db, tenant_id)
+    cycle_id = uuid4()
+    dims_json = json.dumps(data.get("dimensions", []), ensure_ascii=False)
+    await db.execute(
+        text("""
+            INSERT INTO review_cycles
+                (id, tenant_id, cycle_name, cycle_type, start_date, end_date,
+                 scoring_deadline, status, scope_type, scope_id, dimensions, created_by)
+            VALUES
+                (:id, :tid, :name, :ctype, :start, :end,
+                 :deadline, 'draft', :scope_type, :scope_id, CAST(:dims AS jsonb), :created_by)
+        """),
+        {
+            "id": cycle_id,
+            "tid": tenant_id,
+            "name": data["cycle_name"],
+            "ctype": data["cycle_type"],
+            "start": data["start_date"],
+            "end": data["end_date"],
+            "deadline": data.get("scoring_deadline"),
+            "scope_type": data.get("scope_type", "brand"),
+            "scope_id": data.get("scope_id"),
+            "dims": dims_json,
+            "created_by": data.get("created_by"),
+        },
+    )
+    log.info("review_cycle_created", tenant_id=str(tenant_id), cycle_id=str(cycle_id))
+    return {
+        "id": str(cycle_id),
+        "cycle_name": data["cycle_name"],
+        "cycle_type": data["cycle_type"],
+        "status": "draft",
+    }
+
+
+async def list_review_cycles(
+    db: AsyncSession,
+    tenant_id: UUID,
+    status: str | None = None,
+    page: int = 1,
+    size: int = 20,
+) -> dict[str, Any]:
+    """列出评审周期。"""
+    await _set_tenant(db, tenant_id)
+    conds = ["tenant_id = :tid", "is_deleted = FALSE"]
+    params: dict[str, Any] = {"tid": tenant_id}
+    if status:
+        conds.append("status = :status")
+        params["status"] = status
+    where = " AND ".join(conds)
+    count_row = await db.execute(
+        text(f"SELECT COUNT(*) FROM review_cycles WHERE {where}"), params,
+    )
+    total = int(count_row.scalar() or 0)
+    offset = (page - 1) * size
+    params["limit"] = size
+    params["offset"] = offset
+    rows = await db.execute(
+        text(f"""
+            SELECT id, cycle_name, cycle_type, start_date, end_date,
+                   scoring_deadline, status, scope_type, scope_id,
+                   dimensions, created_by, created_at
+            FROM review_cycles
+            WHERE {where}
+            ORDER BY created_at DESC
+            LIMIT :limit OFFSET :offset
+        """),
+        params,
+    )
+    items: list[dict[str, Any]] = []
+    for r in rows.mappings().fetchall():
+        row = dict(r)
+        row["id"] = str(row["id"])
+        if row.get("scope_id"):
+            row["scope_id"] = str(row["scope_id"])
+        if row.get("created_by"):
+            row["created_by"] = str(row["created_by"])
+        dims = row.get("dimensions")
+        if isinstance(dims, str):
+            row["dimensions"] = json.loads(dims)
+        for dt_field in ("start_date", "end_date", "scoring_deadline", "created_at"):
+            val = row.get(dt_field)
+            if val is not None and hasattr(val, "isoformat"):
+                row[dt_field] = val.isoformat()
+        items.append(row)
+    return {"items": items, "total": total}
+
+
+async def update_cycle_status(
+    db: AsyncSession,
+    tenant_id: UUID,
+    cycle_id: UUID,
+    new_status: str,
+) -> dict[str, Any]:
+    """更新评审周期状态（状态机校验）。"""
+    if new_status not in VALID_CYCLE_STATUSES:
+        raise ValueError(f"无效状态: {new_status}")
+    await _set_tenant(db, tenant_id)
+    row = await db.execute(
+        text("""
+            SELECT status FROM review_cycles
+            WHERE id = :cid AND tenant_id = :tid AND is_deleted = FALSE
+        """),
+        {"cid": cycle_id, "tid": tenant_id},
+    )
+    current = row.scalar()
+    if current is None:
+        raise ValueError("评审周期不存在")
+    allowed = CYCLE_STATUS_TRANSITIONS.get(current, [])
+    if new_status not in allowed:
+        raise ValueError(f"不能从 {current} 转换到 {new_status}，允许: {allowed}")
+    await db.execute(
+        text("""
+            UPDATE review_cycles
+            SET status = :status, updated_at = NOW()
+            WHERE id = :cid AND tenant_id = :tid
+        """),
+        {"status": new_status, "cid": cycle_id, "tid": tenant_id},
+    )
+    log.info(
+        "review_cycle_status_updated",
+        tenant_id=str(tenant_id),
+        cycle_id=str(cycle_id),
+        old_status=current,
+        new_status=new_status,
+    )
+    return {"cycle_id": str(cycle_id), "old_status": current, "new_status": new_status}
+
+
+async def get_cycle_detail(
+    db: AsyncSession,
+    tenant_id: UUID,
+    cycle_id: UUID,
+) -> dict[str, Any]:
+    """获取评审周期详情。"""
+    await _set_tenant(db, tenant_id)
+    row = await db.execute(
+        text("""
+            SELECT id, cycle_name, cycle_type, start_date, end_date,
+                   scoring_deadline, status, scope_type, scope_id,
+                   dimensions, created_by, created_at, updated_at
+            FROM review_cycles
+            WHERE id = :cid AND tenant_id = :tid AND is_deleted = FALSE
+        """),
+        {"cid": cycle_id, "tid": tenant_id},
+    )
+    r = row.mappings().first()
+    if r is None:
+        raise ValueError("评审周期不存在")
+    d = dict(r)
+    d["id"] = str(d["id"])
+    if d.get("scope_id"):
+        d["scope_id"] = str(d["scope_id"])
+    if d.get("created_by"):
+        d["created_by"] = str(d["created_by"])
+    dims = d.get("dimensions")
+    if isinstance(dims, str):
+        d["dimensions"] = json.loads(dims)
+    for dt_field in ("start_date", "end_date", "scoring_deadline", "created_at", "updated_at"):
+        val = d.get(dt_field)
+        if val is not None and hasattr(val, "isoformat"):
+            d[dt_field] = val.isoformat()
+    # 附加打分统计
+    stats_row = await db.execute(
+        text("""
+            SELECT
+                COUNT(DISTINCT employee_id) AS scored_employees,
+                COUNT(*) AS total_scores
+            FROM review_scores
+            WHERE cycle_id = :cid AND tenant_id = :tid AND is_deleted = FALSE
+                  AND status IN ('submitted', 'calibrated')
+        """),
+        {"cid": cycle_id, "tid": tenant_id},
+    )
+    stats = stats_row.mappings().first()
+    d["scored_employees"] = int(stats["scored_employees"]) if stats else 0
+    d["total_scores"] = int(stats["total_scores"]) if stats else 0
+    return d
+
+
+async def submit_review_score(
+    db: AsyncSession,
+    tenant_id: UUID,
+    cycle_id: UUID,
+    employee_id: UUID,
+    reviewer_id: UUID,
+    dimension_scores: dict[str, Any],
+    comment: str | None = None,
+    reviewer_name: str | None = None,
+    reviewer_role: str | None = None,
+    employee_name: str | None = None,
+    store_id: UUID | None = None,
+) -> dict[str, Any]:
+    """提交评审打分。"""
+    await _set_tenant(db, tenant_id)
+    # 获取周期维度配置
+    cycle_row = await db.execute(
+        text("""
+            SELECT status, dimensions FROM review_cycles
+            WHERE id = :cid AND tenant_id = :tid AND is_deleted = FALSE
+        """),
+        {"cid": cycle_id, "tid": tenant_id},
+    )
+    cycle = cycle_row.mappings().first()
+    if cycle is None:
+        raise ValueError("评审周期不存在")
+    if cycle["status"] != "scoring":
+        raise ValueError(f"当前周期状态为 {cycle['status']}，仅 scoring 状态可打分")
+
+    dims_config = cycle["dimensions"]
+    if isinstance(dims_config, str):
+        dims_config = json.loads(dims_config)
+
+    # 计算总分和加权分
+    total_score = 0.0
+    weighted_score = 0.0
+    total_weight = 0.0
+
+    if dims_config:
+        for dim_cfg in dims_config:
+            dim_name = dim_cfg["name"]
+            max_s = float(dim_cfg.get("max_score", 100))
+            weight = float(dim_cfg.get("weight", 0))
+            s = float(dimension_scores.get(dim_name, 0))
+            if s < 0 or s > max_s:
+                raise ValueError(f"维度 {dim_name} 分值须在 0~{max_s} 之间")
+            total_score += s
+            weighted_score += s * (weight / 100.0)
+            total_weight += weight
+        if total_weight > 0:
+            weighted_score = round(weighted_score * (100.0 / total_weight) if total_weight != 100 else weighted_score, 2)
+        total_score = round(total_score / len(dims_config), 2) if dims_config else 0
+    else:
+        # 无维度配置时取平均
+        vals = [float(v) for v in dimension_scores.values()]
+        total_score = round(sum(vals) / len(vals), 2) if vals else 0
+        weighted_score = total_score
+
+    score_id = uuid4()
+    dim_json = json.dumps(dimension_scores, ensure_ascii=False)
+    await db.execute(
+        text("""
+            INSERT INTO review_scores
+                (id, tenant_id, cycle_id, employee_id, employee_name, store_id,
+                 reviewer_id, reviewer_name, reviewer_role,
+                 dimension_scores, total_score, weighted_score,
+                 comment, status, submitted_at)
+            VALUES
+                (:id, :tid, :cid, :eid, :ename, :sid,
+                 :rid, :rname, :rrole,
+                 CAST(:dims AS jsonb), :total, :weighted,
+                 :comment, 'submitted', NOW())
+            ON CONFLICT (tenant_id, cycle_id, employee_id, reviewer_id)
+                WHERE is_deleted = FALSE
+            DO UPDATE SET
+                dimension_scores = EXCLUDED.dimension_scores,
+                total_score = EXCLUDED.total_score,
+                weighted_score = EXCLUDED.weighted_score,
+                comment = EXCLUDED.comment,
+                status = 'submitted',
+                submitted_at = NOW(),
+                updated_at = NOW()
+        """),
+        {
+            "id": score_id,
+            "tid": tenant_id,
+            "cid": cycle_id,
+            "eid": employee_id,
+            "ename": employee_name,
+            "sid": store_id,
+            "rid": reviewer_id,
+            "rname": reviewer_name,
+            "rrole": reviewer_role,
+            "dims": dim_json,
+            "total": total_score,
+            "weighted": weighted_score,
+            "comment": comment,
+        },
+    )
+    log.info(
+        "review_score_submitted",
+        tenant_id=str(tenant_id),
+        cycle_id=str(cycle_id),
+        employee_id=str(employee_id),
+        reviewer_id=str(reviewer_id),
+        weighted_score=weighted_score,
+    )
+    return {
+        "id": str(score_id),
+        "employee_id": str(employee_id),
+        "reviewer_id": str(reviewer_id),
+        "total_score": total_score,
+        "weighted_score": weighted_score,
+        "status": "submitted",
+    }
+
+
+async def get_employee_scores(
+    db: AsyncSession,
+    tenant_id: UUID,
+    cycle_id: UUID,
+    employee_id: UUID | None = None,
+    page: int = 1,
+    size: int = 50,
+) -> dict[str, Any]:
+    """获取评审周期内的打分记录。支持按 employee_id 过滤。"""
+    await _set_tenant(db, tenant_id)
+    conds = ["tenant_id = :tid", "cycle_id = :cid", "is_deleted = FALSE"]
+    params: dict[str, Any] = {"tid": tenant_id, "cid": cycle_id}
+    if employee_id is not None:
+        conds.append("employee_id = :eid")
+        params["eid"] = employee_id
+    where = " AND ".join(conds)
+    count_row = await db.execute(
+        text(f"SELECT COUNT(*) FROM review_scores WHERE {where}"), params,
+    )
+    total = int(count_row.scalar() or 0)
+    offset = (page - 1) * size
+    params["limit"] = size
+    params["offset"] = offset
+    rows = await db.execute(
+        text(f"""
+            SELECT id, employee_id, employee_name, store_id,
+                   reviewer_id, reviewer_name, reviewer_role,
+                   dimension_scores, total_score, weighted_score,
+                   comment, status, submitted_at,
+                   calibrated_score, calibrated_by, calibrated_at
+            FROM review_scores
+            WHERE {where}
+            ORDER BY submitted_at DESC NULLS LAST
+            LIMIT :limit OFFSET :offset
+        """),
+        params,
+    )
+    items: list[dict[str, Any]] = []
+    for r in rows.mappings().fetchall():
+        row = dict(r)
+        for uid_field in ("id", "employee_id", "store_id", "reviewer_id", "calibrated_by"):
+            if row.get(uid_field) is not None:
+                row[uid_field] = str(row[uid_field])
+        ds = row.get("dimension_scores")
+        if isinstance(ds, str):
+            row["dimension_scores"] = json.loads(ds)
+        for num_field in ("total_score", "weighted_score", "calibrated_score"):
+            if row.get(num_field) is not None:
+                row[num_field] = float(row[num_field])
+        for dt_field in ("submitted_at", "calibrated_at"):
+            val = row.get(dt_field)
+            if val is not None and hasattr(val, "isoformat"):
+                row[dt_field] = val.isoformat()
+        items.append(row)
+    return {"items": items, "total": total}
+
+
+async def aggregate_cycle_scores(
+    db: AsyncSession,
+    tenant_id: UUID,
+    cycle_id: UUID,
+    store_id: UUID | None = None,
+) -> list[dict[str, Any]]:
+    """汇总评审周期所有员工的加权平均分并排名。"""
+    await _set_tenant(db, tenant_id)
+    conds = ["rs.tenant_id = :tid", "rs.cycle_id = :cid", "rs.is_deleted = FALSE",
+             "rs.status IN ('submitted', 'calibrated')"]
+    params: dict[str, Any] = {"tid": tenant_id, "cid": cycle_id}
+    if store_id is not None:
+        conds.append("rs.store_id = :sid")
+        params["sid"] = store_id
+    where = " AND ".join(conds)
+    rows = await db.execute(
+        text(f"""
+            SELECT
+                rs.employee_id,
+                MAX(rs.employee_name) AS employee_name,
+                rs.store_id,
+                AVG(COALESCE(rs.calibrated_score, rs.weighted_score))::numeric(5,2) AS avg_score,
+                COUNT(*) AS reviewer_count
+            FROM review_scores rs
+            WHERE {where}
+            GROUP BY rs.employee_id, rs.store_id
+            ORDER BY avg_score DESC NULLS LAST, rs.employee_id
+        """),
+        params,
+    )
+    items: list[dict[str, Any]] = []
+    rank = 0
+    prev: float | None = None
+    for i, r in enumerate(rows.mappings().fetchall(), start=1):
+        avg_s = float(r["avg_score"]) if r["avg_score"] is not None else 0.0
+        if prev is None or abs(avg_s - prev) > 1e-9:
+            rank = i
+            prev = avg_s
+        items.append({
+            "rank": rank,
+            "employee_id": str(r["employee_id"]),
+            "employee_name": r["employee_name"],
+            "store_id": str(r["store_id"]) if r["store_id"] else None,
+            "avg_score": avg_s,
+            "reviewer_count": int(r["reviewer_count"]),
+        })
+    return items
+
+
+async def calibrate_score(
+    db: AsyncSession,
+    tenant_id: UUID,
+    cycle_id: UUID,
+    employee_id: UUID,
+    calibrated_score: float,
+    calibrator_id: UUID,
+) -> dict[str, Any]:
+    """校准某员工在该周期的所有打分记录。"""
+    if calibrated_score < 0 or calibrated_score > 100:
+        raise ValueError("校准分数须在 0~100 之间")
+    await _set_tenant(db, tenant_id)
+    # 校验周期状态
+    cycle_row = await db.execute(
+        text("""
+            SELECT status FROM review_cycles
+            WHERE id = :cid AND tenant_id = :tid AND is_deleted = FALSE
+        """),
+        {"cid": cycle_id, "tid": tenant_id},
+    )
+    cycle_status = cycle_row.scalar()
+    if cycle_status not in ("calibrating", "scoring"):
+        raise ValueError(f"当前周期状态为 {cycle_status}，仅 calibrating/scoring 状态可校准")
+
+    result = await db.execute(
+        text("""
+            UPDATE review_scores
+            SET calibrated_score = :cscore,
+                calibrated_by = :cby,
+                calibrated_at = NOW(),
+                status = 'calibrated',
+                updated_at = NOW()
+            WHERE tenant_id = :tid AND cycle_id = :cid AND employee_id = :eid
+                  AND is_deleted = FALSE
+            RETURNING id
+        """),
+        {
+            "cscore": calibrated_score,
+            "cby": calibrator_id,
+            "tid": tenant_id,
+            "cid": cycle_id,
+            "eid": employee_id,
+        },
+    )
+    updated_ids = [str(r[0]) for r in result.fetchall()]
+    log.info(
+        "review_score_calibrated",
+        tenant_id=str(tenant_id),
+        cycle_id=str(cycle_id),
+        employee_id=str(employee_id),
+        calibrated_score=calibrated_score,
+        updated_count=len(updated_ids),
+    )
+    return {
+        "employee_id": str(employee_id),
+        "calibrated_score": calibrated_score,
+        "updated_count": len(updated_ids),
+    }
+
+
+async def get_cycle_ranking(
+    db: AsyncSession,
+    tenant_id: UUID,
+    cycle_id: UUID,
+    store_id: UUID | None = None,
+) -> list[dict[str, Any]]:
+    """获取评审周期排名（同 aggregate_cycle_scores 的别名）。"""
+    return await aggregate_cycle_scores(db, tenant_id, cycle_id, store_id)
+
+
+async def get_review_stats(
+    db: AsyncSession,
+    tenant_id: UUID,
+    cycle_id: UUID,
+) -> dict[str, Any]:
+    """获取评审统计概览：已评/未评人数、平均分、分布。"""
+    await _set_tenant(db, tenant_id)
+    # 已评
+    scored_row = await db.execute(
+        text("""
+            SELECT
+                COUNT(DISTINCT employee_id) AS scored_count,
+                AVG(COALESCE(calibrated_score, weighted_score))::numeric(5,2) AS avg_score,
+                MIN(COALESCE(calibrated_score, weighted_score))::numeric(5,2) AS min_score,
+                MAX(COALESCE(calibrated_score, weighted_score))::numeric(5,2) AS max_score,
+                COUNT(*) AS total_score_records
+            FROM review_scores
+            WHERE tenant_id = :tid AND cycle_id = :cid AND is_deleted = FALSE
+                  AND status IN ('submitted', 'calibrated')
+        """),
+        {"tid": tenant_id, "cid": cycle_id},
+    )
+    s = scored_row.mappings().first()
+    scored_count = int(s["scored_count"]) if s else 0
+    avg_score = float(s["avg_score"]) if s and s["avg_score"] is not None else 0.0
+    min_score = float(s["min_score"]) if s and s["min_score"] is not None else 0.0
+    max_score = float(s["max_score"]) if s and s["max_score"] is not None else 0.0
+    total_records = int(s["total_score_records"]) if s else 0
+
+    # 分数分布（按10分段）
+    dist_rows = await db.execute(
+        text("""
+            SELECT
+                CASE
+                    WHEN score >= 90 THEN '90-100'
+                    WHEN score >= 80 THEN '80-89'
+                    WHEN score >= 70 THEN '70-79'
+                    WHEN score >= 60 THEN '60-69'
+                    ELSE '0-59'
+                END AS bucket,
+                COUNT(*) AS cnt
+            FROM (
+                SELECT COALESCE(calibrated_score, weighted_score) AS score
+                FROM review_scores
+                WHERE tenant_id = :tid AND cycle_id = :cid AND is_deleted = FALSE
+                      AND status IN ('submitted', 'calibrated')
+            ) sub
+            GROUP BY bucket
+            ORDER BY bucket DESC
+        """),
+        {"tid": tenant_id, "cid": cycle_id},
+    )
+    distribution: dict[str, int] = {}
+    for dr in dist_rows.mappings().fetchall():
+        distribution[dr["bucket"]] = int(dr["cnt"])
+
+    # draft 状态打分数
+    draft_row = await db.execute(
+        text("""
+            SELECT COUNT(*) AS c FROM review_scores
+            WHERE tenant_id = :tid AND cycle_id = :cid AND is_deleted = FALSE
+                  AND status = 'draft'
+        """),
+        {"tid": tenant_id, "cid": cycle_id},
+    )
+    draft_count = int(draft_row.scalar() or 0)
+
+    return {
+        "cycle_id": str(cycle_id),
+        "scored_employee_count": scored_count,
+        "total_score_records": total_records,
+        "draft_count": draft_count,
+        "avg_score": avg_score,
+        "min_score": min_score,
+        "max_score": max_score,
+        "distribution": distribution,
+    }

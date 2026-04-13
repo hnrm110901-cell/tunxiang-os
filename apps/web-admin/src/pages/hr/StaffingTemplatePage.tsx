@@ -132,7 +132,7 @@ const StaffingTemplatePage: React.FC = () => {
     setSummaryLoading(true);
     try {
       const resp = await txFetchData<StoreSummary[]>('/api/v1/staffing-templates/summary');
-      setSummaryList(resp.data ?? []);
+      setSummaryList(resp ?? []);
     } catch (err) {
       console.error('加载汇总失败', err);
     } finally {
@@ -175,7 +175,7 @@ const StaffingTemplatePage: React.FC = () => {
           target_store_type: copyTarget,
         }),
       });
-      message.success(`复制成功，共复制 ${resp.data?.copied_count ?? 0} 条模板`);
+      message.success(`复制成功，共复制 ${resp?.copied_count ?? 0} 条模板`);
       setCopyOpen(false);
       setCopySource('');
       setCopyTarget('');
@@ -362,7 +362,7 @@ const StaffingTemplatePage: React.FC = () => {
             const resp = await txFetchData<ListResult>(
               `/api/v1/staffing-templates?${query.toString()}`,
             );
-            const list = resp.data;
+            const list = resp;
             return {
               data: list?.items ?? [],
               total: list?.total ?? 0,

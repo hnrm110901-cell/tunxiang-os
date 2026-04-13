@@ -1,15 +1,16 @@
 """Agent 效果量化仪表盘 — 对标 Yum Byte "降缺货85%" 的ROI可视化
 
 端点:
-  GET /api/v1/agent/roi/summary               — Agent整体ROI汇总
-  GET /api/v1/agent/roi/{agent_id}/detail      — 单个Agent效果明细（按日/周/月）
-  GET /api/v1/agent/roi/leaderboard            — Agent效能排行
+  GET  /api/v1/agent/roi/summary               — Agent整体ROI汇总
+  GET  /api/v1/agent/roi/{agent_id}/detail      — 单个Agent效果明细（按日/周/月）
+  GET  /api/v1/agent/roi/leaderboard            — Agent效能排行
+  POST /api/v1/agent/roi/collect               — 每日采集并写入 agent_roi_metrics（由调度器触发）
 
 核心指标:
-  - 折扣守护: 拦截异常折扣金额(月累计)
-  - 库存预警: 减少缺货次数/浪费金额
-  - 排班优化: 节省人力成本小时数
-  - 增长引擎: 召回会员带来的增量营收
+  - 折扣守护: 拦截异常折扣金额(月累计) — 来源: orders.discount_amount_fen
+  - 库存预警: 减少缺货次数/浪费金额 — 来源: agent_auto_executions
+  - 排班优化: 节省人力小时数 — 来源: agent_auto_executions
+  - 增长引擎: 召回会员带来的增量营收 — 来源: agent_auto_executions
 """
 from __future__ import annotations
 
@@ -288,3 +289,155 @@ async def get_agent_leaderboard(
         "period": period,
         "leaderboard": leaderboard,
     }}
+
+
+# ── 每日采集写入 ─────────────────────────────────────────────────────────────
+
+@router.post("/collect")
+async def collect_roi_metrics(
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(_get_db),
+    target_date: date | None = Query(None, description="采集日期，默认昨日 YYYY-MM-DD"),
+) -> dict:
+    """每日采集 Agent ROI 指标并写入 agent_roi_metrics。
+
+    幂等：已存在当日记录的 (agent_id, metric_type) 不重复写入。
+    由调度器每日 05:00 触发（contrib recalc 04:00 之后）。
+
+    数据来源：
+    - discount_guardian: orders.discount_amount_fen（折扣守护实际处理的折扣金额）
+    - 所有 Agent: agent_auto_executions（执行日志计数）
+    """
+    if target_date is None:
+        from datetime import timedelta
+        target_date = date.today() - timedelta(days=1)
+
+    period_start = datetime.combine(target_date, datetime.min.time()).replace(tzinfo=timezone.utc)
+    period_end = datetime.combine(target_date, datetime.max.time()).replace(tzinfo=timezone.utc)
+    target_date_str = target_date.isoformat()
+
+    # ── 幂等检查：若当日已有记录则跳过 ──────────────────────────────────────
+    try:
+        existing = await db.execute(text("""
+            SELECT COUNT(*)::int FROM agent_roi_metrics
+            WHERE tenant_id = :tid AND period_start::date = :d
+        """), {"tid": x_tenant_id, "d": target_date_str})
+        if (existing.scalar() or 0) > 0:
+            return {"ok": True, "data": {
+                "inserted_count": 0,
+                "skipped": True,
+                "reason": f"{target_date_str} 记录已存在，跳过采集",
+            }}
+    except SQLAlchemyError as exc:
+        logger.warning("roi_collect_idempotency_check_failed", error=str(exc), exc_info=True)
+
+    # ── 采集各 Agent 指标 ────────────────────────────────────────────────────
+    metrics: list[dict] = []
+
+    # 1. discount_guardian — 来源: orders 表
+    try:
+        r = await db.execute(text("""
+            SELECT
+                COALESCE(SUM(discount_amount_fen), 0)::bigint AS total_discount_fen,
+                COUNT(*) FILTER (WHERE discount_amount_fen > 0)::int AS discount_order_count
+            FROM orders
+            WHERE tenant_id = :tid
+              AND DATE(created_at AT TIME ZONE 'Asia/Shanghai') = :d
+              AND status = 'completed'
+        """), {"tid": x_tenant_id, "d": target_date_str})
+        row = r.mappings().one()
+        metrics.extend([
+            {
+                "agent_id": "discount_guardian",
+                "metric_type": "intercepted_discount_fen",
+                "value": row["total_discount_fen"],
+            },
+            {
+                "agent_id": "discount_guardian",
+                "metric_type": "intercept_count",
+                "value": row["discount_order_count"],
+            },
+        ])
+    except SQLAlchemyError as exc:
+        logger.warning("roi_collect_discount_guardian_failed", error=str(exc), exc_info=True)
+
+    # 2. 所有 Agent — 来源: agent_auto_executions（执行计数 + 结果聚合）
+    try:
+        r = await db.execute(text("""
+            SELECT
+                agent_id,
+                COUNT(*)::int AS exec_count,
+                COUNT(*) FILTER (WHERE status = 'executed')::int AS success_count,
+                COUNT(*) FILTER (WHERE status = 'failed')::int AS fail_count
+            FROM agent_auto_executions
+            WHERE tenant_id = :tid
+              AND DATE(executed_at AT TIME ZONE 'Asia/Shanghai') = :d
+              AND is_deleted = FALSE
+            GROUP BY agent_id
+        """), {"tid": x_tenant_id, "d": target_date_str})
+        exec_rows = r.mappings().all()
+    except SQLAlchemyError as exc:
+        logger.warning("roi_collect_auto_executions_failed", error=str(exc), exc_info=True)
+        exec_rows = []
+
+    # 将执行日志映射为各 Agent 的 ROI 指标
+    exec_by_agent: dict[str, dict] = {row["agent_id"]: dict(row) for row in exec_rows}
+
+    EXEC_METRIC_MAP: dict[str, list[tuple[str, str]]] = {
+        # agent_id → [(metric_type, exec_field), ...]
+        "inventory_agent":  [("stockout_prevented_count", "success_count")],
+        "scheduling_agent": [("labor_hours_saved", "success_count")],
+        "member_insight":   [("recalled_member_count", "success_count"), ("churn_prevented_count", "exec_count")],
+        "smart_menu":       [("poor_dish_removed_count", "success_count")],
+        "serve_dispatch":   [("overtime_prevented_count", "success_count")],
+        "finance_audit":    [("audit_issue_count", "success_count")],
+        "store_inspect":    [("violation_detected_count", "success_count")],
+        "private_ops":      [("campaign_sent_count", "exec_count")],
+    }
+
+    for agent_id, metric_mappings in EXEC_METRIC_MAP.items():
+        exec_data = exec_by_agent.get(agent_id, {})
+        for metric_type, exec_field in metric_mappings:
+            metrics.append({
+                "agent_id": agent_id,
+                "metric_type": metric_type,
+                "value": exec_data.get(exec_field, 0),
+            })
+
+    # ── 批量写入 ─────────────────────────────────────────────────────────────
+    if not metrics:
+        return {"ok": True, "data": {"inserted_count": 0, "skipped": False}}
+
+    try:
+        for m in metrics:
+            await db.execute(text("""
+                INSERT INTO agent_roi_metrics
+                    (tenant_id, agent_id, metric_type, value, period_start, period_end, metadata)
+                VALUES
+                    (:tid, :agent_id, :metric_type, :value, :period_start, :period_end, :metadata::jsonb)
+            """), {
+                "tid": x_tenant_id,
+                "agent_id": m["agent_id"],
+                "metric_type": m["metric_type"],
+                "value": m["value"],
+                "period_start": period_start.isoformat(),
+                "period_end": period_end.isoformat(),
+                "metadata": '{"source": "daily_collect"}',
+            })
+        await db.commit()
+        logger.info(
+            "roi_collect_completed",
+            tenant_id=x_tenant_id,
+            target_date=target_date_str,
+            inserted_count=len(metrics),
+        )
+        return {"ok": True, "data": {
+            "inserted_count": len(metrics),
+            "skipped": False,
+            "target_date": target_date_str,
+        }}
+    except SQLAlchemyError as exc:
+        await db.rollback()
+        logger.error("roi_collect_insert_failed", error=str(exc), exc_info=True)
+        from fastapi import HTTPException
+        raise HTTPException(status_code=500, detail="ROI 指标写入失败，请重试")

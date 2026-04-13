@@ -122,7 +122,7 @@ export default function MenuSkillMatch() {
           dish_name: dishName || undefined,
         }),
       });
-      setData(resp.data?.data || resp.data);
+      setData(resp?.data || resp);
     } catch {
       message.error('分析失败');
     } finally {
@@ -269,7 +269,7 @@ export default function MenuSkillMatch() {
                   style: { fill: '#fff', fontSize: 12 },
                 }}
                 tooltip={{
-                  formatter: (datum) => ({
+                  formatter: (datum: Record<string, unknown>) => ({
                     name: `${datum.store_name} - ${datum.skill_label}`,
                     value: `${datum.count}人`,
                   }),

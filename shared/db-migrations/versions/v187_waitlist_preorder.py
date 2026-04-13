@@ -9,8 +9,8 @@ Revision: v187
 """
 from alembic import op
 
-revision = "v187"
-down_revision = "v186"
+revision = "v187b"
+down_revision = "v187"
 branch_labels = None
 depends_on = None
 

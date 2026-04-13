@@ -86,7 +86,7 @@ const logColumns: ProColumns<LogRow>[] = [
   { title: '时间',   dataIndex: 'time',         width: 140 },
   { title: 'Agent', dataIndex: 'agent',         width: 120 },
   { title: '操作类型', dataIndex: 'actionType', width: 90 },
-  { title: '内容摘要', dataIndex: 'summary',    flex: 1 },
+  { title: '内容摘要', dataIndex: 'summary'},
   {
     title: '人工审核', dataIndex: 'reviewStatus', width: 90,
     render: (_, r) => <Tag color={reviewColor[r.reviewStatus]}>{r.reviewStatus}</Tag>,

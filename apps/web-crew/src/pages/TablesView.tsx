@@ -2,6 +2,7 @@
  * 桌台状态视图（服务员视角）
  * - 真实 API：fetchTableStatus()
  * - WebSocket 实时推送：/api/v1/tables/ws/layout/{store_id}
+ * - 移动银台Pro模块2.2：实时人均消费 + 简约模式
  */
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -9,6 +10,8 @@ import { TableCard, StatusBar } from '@tx-ds/biz';
 import type { TableCardData, StatusBarItem } from '@tx-ds/biz';
 import { fetchTableStatus } from '../api';
 import type { TableInfo } from '../api';
+import { useCrewStore } from '../store/crewStore';
+import { SlimModeToggle } from '../components/SlimModeToggle';
 
 // ─── 常量 ───────────────────────────────────────────────
 
@@ -91,15 +94,46 @@ function SkeletonCard() {
   );
 }
 
+// ─── 会员等级配置 ────────────────────────────────────────
+
+const MEMBER_LEVEL_COLOR: Record<string, string> = {
+  bronze: '#CD7F32',
+  silver: '#A8A8A8',
+  gold: '#FFD700',
+  diamond: '#B9F2FF',
+};
+
+const MEMBER_LEVEL_LABEL: Record<string, string> = {
+  bronze: '铜卡',
+  silver: '银卡',
+  gold: '金卡',
+  diamond: '钻石卡',
+};
+
+// ─── 会员 / 消费类型 ───────────────────────────────────────
+
+interface MemberInfo {
+  name: string;
+  level: string;
+  visit_count: number;
+}
+
+/** 桌台当前消费金额（分），从订单 API 获取后填充 */
+interface TableSpend {
+  total_fen: number;
+}
 
 // ─── 主视图 ─────────────────────────────────────────────
 
 export function TablesView() {
   const navigate = useNavigate();
+  const { isSlimMode } = useCrewStore();
 
   const [tables, setTables] = useState<TableInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [memberMap, setMemberMap] = useState<Record<string, MemberInfo | null>>({});
+  const [spendMap, setSpendMap] = useState<Record<string, TableSpend | null>>({});
 
   const wsRef = useRef<WebSocket | null>(null);
   const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -112,6 +146,56 @@ export function TablesView() {
     try {
       const result = await fetchTableStatus(STORE_ID);
       setTables(result.items);
+
+      // 并行获取所有 occupied 桌的会员信息 + 消费金额（失败时静默忽略）
+      const occupiedWithOrder = result.items.filter(
+        (t) => t.status === 'occupied' && t.order_id
+      );
+      if (occupiedWithOrder.length > 0) {
+        const tenantId = (window as any).__TENANT_ID__ || '';
+
+        // 会员信息
+        const memberResults = await Promise.allSettled(
+          occupiedWithOrder.map((t) =>
+            fetch(`/api/v1/member/by-order?order_id=${t.order_id}`, {
+              headers: { 'X-Tenant-ID': tenantId },
+            })
+              .then((r) => r.json())
+              .then((res) => ({
+                table_no: t.table_no,
+                member: res.ok ? (res.data as MemberInfo | null) : null,
+              }))
+          )
+        );
+        const map: Record<string, MemberInfo | null> = {};
+        memberResults.forEach((r) => {
+          if (r.status === 'fulfilled' && r.value) {
+            map[r.value.table_no] = r.value.member;
+          }
+        });
+        setMemberMap(map);
+
+        // 消费金额（从订单摘要接口获取 total_fen）
+        const spendResults = await Promise.allSettled(
+          occupiedWithOrder.map((t) =>
+            fetch(`/api/v1/trade/orders/${encodeURIComponent(t.order_id ?? '')}/summary`, {
+              headers: { 'X-Tenant-ID': tenantId },
+            })
+              .then((r) => r.json())
+              .then((res) => ({
+                table_no: t.table_no,
+                spend: res.ok && res.data ? ({ total_fen: (res.data.total_fen ?? res.data.final_amount_fen ?? 0) } as TableSpend) : null,
+              }))
+          )
+        );
+        const sm: Record<string, TableSpend | null> = {};
+        spendResults.forEach((r) => {
+          if (r.status === 'fulfilled' && r.value) {
+            sm[r.value.table_no] = r.value.spend;
+          }
+        });
+        setSpendMap(sm);
+      }
     } catch (err) {
       const msg = err instanceof Error ? err.message : '加载失败';
       setError(msg);
@@ -272,6 +356,7 @@ export function TablesView() {
         </div>
 
         <div style={{ display: 'flex', gap: 8 }}>
+          <SlimModeToggle compact />
           <button
             onClick={() => navigate('/table-map')}
             style={{
@@ -314,6 +399,26 @@ export function TablesView() {
           </button>
         </div>
       </div>
+
+      {/* 简约模式横幅提示 */}
+      {isSlimMode && (
+        <div
+          style={{
+            background: 'rgba(255,107,35,0.12)',
+            borderBottom: '1px solid rgba(255,107,35,0.3)',
+            padding: '6px 16px',
+            fontSize: 13,
+            color: '#FF6B35',
+            fontWeight: 600,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+          }}
+        >
+          <span>⚡</span>
+          <span>简约模式已开启 — 高峰期精简视图</span>
+        </div>
+      )}
 
       {/* 加载 Skeleton */}
       {loading && (
@@ -371,8 +476,8 @@ export function TablesView() {
             <div
               style={{
                 display: 'grid',
-                gridTemplateColumns: '1fr 1fr',
-                gap: 10,
+                gridTemplateColumns: isSlimMode ? 'repeat(3, 1fr)' : '1fr 1fr',
+                gap: isSlimMode ? 8 : 10,
               }}
             >
               {tables.map((t) => (

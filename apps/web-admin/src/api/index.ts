@@ -28,12 +28,15 @@ export * from './dispatchApi';
 export * from './banquetApi';
 export * from './storeHealthApi';
 export * from './hrApi';
+export * from './transferApi';
+export * from './contractApi';
 export * from './enterpriseAdminApi';
 export * from './serviceChargeApi';
 export * from './kdsManageApi';
 export * from './costApi';
 export * from './budgetApi';
 export * from './managerDashboardApi';
+export * from './pointsApi';
 
 // ─── 门店健康 ───
 
@@ -74,3 +77,4 @@ export * from './menuSchemeApi';
 export * from './growthHubApi';
 export * from './integrationHealthApi';
 export * from './memberGrowthApi';
+export * from './hqAnalyticsApi';

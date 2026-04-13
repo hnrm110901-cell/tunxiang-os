@@ -16,7 +16,7 @@ from sqlalchemy import Date, and_, cast, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.events.src.emitter import emit_event
-from shared.events.src.event_types import DiscountEventType, OrderEventType, PaymentEventType
+from shared.events.src.event_types import DiscountEventType, OrderEventType, PaymentEventType, TableEventType
 from shared.ontology.src.entities import Customer, Dish, Order, OrderItem, Store
 from shared.ontology.src.enums import OrderStatus
 
@@ -179,6 +179,37 @@ class CashierEngine:
             guest_count=guest_count,
             tea_charge_fen=tea_charge_fen,
         )
+
+        # ─── Phase 1 平行事件写入：开台 ───
+        asyncio.create_task(emit_event(
+            event_type=OrderEventType.CREATED,
+            tenant_id=self.tenant_id,
+            stream_id=str(order.id),
+            payload={
+                "order_no": order_no,
+                "table_no": table_no,
+                "waiter_id": waiter_id,
+                "guest_count": guest_count,
+                "order_type": order_type,
+                "tea_charge_fen": tea_charge_fen,
+            },
+            store_id=store_id,
+            source_service="tx-trade",
+        ))
+        asyncio.create_task(emit_event(
+            event_type=TableEventType.OPENED,
+            tenant_id=self.tenant_id,
+            stream_id=str(table.id),
+            payload={
+                "order_id": str(order.id),
+                "order_no": order_no,
+                "table_no": table_no,
+                "guest_count": guest_count,
+                "waiter_id": waiter_id,
+            },
+            store_id=store_id,
+            source_service="tx-trade",
+        ))
 
         return {
             "order_id": str(order.id),
@@ -379,6 +410,24 @@ class CashierEngine:
             pricing_mode=pricing_mode,
             subtotal_fen=subtotal_fen,
         )
+
+        # ─── Phase 1 平行事件写入：加菜 ───
+        asyncio.create_task(emit_event(
+            event_type=OrderEventType.ITEM_ADDED,
+            tenant_id=self.tenant_id,
+            stream_id=order_id,
+            payload={
+                "item_id": str(item.id),
+                "dish_id": dish_id,
+                "dish_name": dish_name,
+                "qty": qty,
+                "unit_price_fen": unit_price_fen,
+                "subtotal_fen": subtotal_fen,
+                "pricing_mode": pricing_mode,
+                "order_total_fen": new_total,
+            },
+            source_service="tx-trade",
+        ))
 
         return {
             "item_id": str(item.id),
@@ -882,6 +931,21 @@ class CashierEngine:
 
         await self.db.flush()
         logger.info("order_cancelled", order_no=order.order_no, reason=reason)
+
+        # ─── Phase 1 平行事件写入：取消订单 ───
+        asyncio.create_task(emit_event(
+            event_type=OrderEventType.CANCELLED,
+            tenant_id=self.tenant_id,
+            stream_id=order_id,
+            payload={
+                "order_no": order.order_no,
+                "reason": reason,
+                "table_number": order.table_number,
+            },
+            store_id=str(order.store_id) if order.store_id else None,
+            source_service="tx-trade",
+        ))
+
         return {
             "order_id": order_id,
             "order_no": order.order_no,

@@ -386,13 +386,13 @@ export function DashboardPage() {
 
     try {
       const resp = await txFetchData<DashboardSummary>('/api/v1/dashboard/summary');
-      if (resp.data) {
-        setSummary(resp.data);
+      if (resp) {
+        setSummary(resp);
         // Try to load trend data
         try {
           const trendResp = await txFetchData<{ items: TrendPoint[] }>('/api/v1/dashboard/trend-multi');
-          if (trendResp.data?.items) {
-            setTrendData(trendResp.data.items);
+          if (trendResp?.items) {
+            setTrendData(trendResp.items);
           } else {
             setTrendData(TREND_MOCK);
           }

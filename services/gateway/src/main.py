@@ -7,39 +7,27 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from .middleware import AuthMiddleware, TenantMiddleware, RequestLogMiddleware
-from .proxy import router as proxy_router
 from .api.open_api_routes import router as open_api_router
 from .auth import router as auth_router
+from .gdpr_routes import router as gdpr_router
 from .growth_intel_relay import router as relay_router
 from .hub_api import router as hub_router
-from .middleware import RequestLogMiddleware, TenantMiddleware
+from .middleware import AuthMiddleware, RequestLogMiddleware, TenantMiddleware
 from .middleware.audit_middleware import AuditMiddleware
+from .personalization_middleware import PersonalizationMiddleware
 from .proxy import router as proxy_router
 from .response import ok
+from .sync_scheduler import create_sync_scheduler
+from .sync_scheduler import sync_router as sync_health_router
+from .wecom_bot_routes import router as wecom_bot_router
 from .wecom_group_routes import router as wecom_group_router
 from .wecom_internal import router as wecom_internal_router
 from .wecom_jssdk import router as wecom_jssdk_router
 from .wecom_notify_routes import router as wecom_notify_router
 from .wecom_routes import router as wecom_router
 from .wecom_scrm_routes import router as wecom_scrm_router
-from .wecom_jssdk import router as wecom_jssdk_router
-from .wecom_internal import router as wecom_internal_router
-from .wecom_group_routes import router as wecom_group_router
-from .gdpr_routes import router as gdpr_router
-from .sync_scheduler import create_sync_scheduler, sync_router as sync_health_router
-from .wecom_bot_routes import router as wecom_bot_router
-from .response import ok
+from .api.demo_healthcheck_routes import router as demo_healthcheck_router  # Week 3 演示巡检
 
-app = FastAPI(title="TunxiangOS Gateway", version="3.0.0", description="AI-Native Restaurant Chain Operating System")
-
-from .personalization_middleware import PersonalizationMiddleware
-
-app.add_middleware(RequestLogMiddleware)
-app.add_middleware(PersonalizationMiddleware)  # 千人千面：注入X-User-Segment/Prefs/Subscription
-app.add_middleware(TenantMiddleware)
-app.add_middleware(AuthMiddleware)
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 logger = structlog.get_logger(__name__)
 
 app = FastAPI(
@@ -49,7 +37,22 @@ app = FastAPI(
 )
 
 from prometheus_fastapi_instrumentator import Instrumentator
+
 Instrumentator().instrument(app).expose(app)
+
+# 中间件：先 add 的层更靠近路由；最后 add 的层最先收到请求。
+# 目标入站链：Audit → 日志 → Auth → Tenant → Personalization（文档要求位于 Tenant 后）→ CORS → 路由
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=os.getenv("CORS_ALLOWED_ORIGINS", "http://localhost:5173").split(","),
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+app.add_middleware(PersonalizationMiddleware)
+app.add_middleware(TenantMiddleware)
+app.add_middleware(AuthMiddleware)
+app.add_middleware(RequestLogMiddleware)
+app.add_middleware(AuditMiddleware)
 
 # ── APScheduler 定时任务 ──────────────────────────────────────────
 
@@ -143,18 +146,6 @@ async def _shutdown() -> None:
     _scheduler.shutdown(wait=False)
     logger.info("gateway_scheduler_stopped")
 
-# Middleware（执行顺序：后添加先执行）
-# AuditMiddleware 在 RateLimiter 之后执行（先添加先执行），记录所有敏感路径和4xx/5xx
-app.add_middleware(AuditMiddleware)
-app.add_middleware(RequestLogMiddleware)
-app.add_middleware(TenantMiddleware)
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=os.getenv("CORS_ALLOWED_ORIGINS", "http://localhost:5173").split(","),
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
 # 认证 API（必须在 proxy 之前注册，否则被通配路由拦截）
 app.include_router(auth_router)
 
@@ -187,6 +178,8 @@ app.include_router(wecom_notify_router)
 app.include_router(wecom_bot_router)
 # 品智POS 同步健康检查 API（GET /api/v1/sync/health）
 app.include_router(sync_health_router)
+# 演示前一键巡检 API（GET /api/v1/demo/health-check）— Week 3 P0
+app.include_router(demo_healthcheck_router)
 
 # 域路由代理（通配路由 /api/v1/{domain}/{path}，放最后）
 app.include_router(proxy_router)

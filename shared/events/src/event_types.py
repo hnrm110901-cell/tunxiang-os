@@ -32,6 +32,7 @@ class OrderEventType(str, Enum):
     REFUNDED = "order.refunded"            # 整单退款
     PARTIAL_REFUNDED = "order.partial_refunded"  # 部分退款
     CLOSED = "order.closed"               # 结账关闭
+    BILLING_RULE_APPLIED = "order.billing_rule_applied"  # 账单规则（最低消费/服务费）应用
 
 
 class DiscountEventType(str, Enum):
@@ -304,7 +305,9 @@ class DepositEventType(str, Enum):
     """押金事件"""
 
     COLLECTED = "deposit.collected"                        # 押金收取
+    REGISTERED = "deposit.registered"                      # 宴会定金登记（收取的别名，模块4.1）
     APPLIED = "deposit.applied"                            # 押金抵扣
+    CONVERTED = "deposit.converted"                        # 定金转预收（宴会结账抵扣，模块4.1）
     REFUNDED = "deposit.refunded"                          # 押金退还
     CONVERTED_TO_REVENUE = "deposit.converted_to_revenue"  # 转收入
     EXPIRED = "deposit.expired"                            # 押金过期
@@ -367,6 +370,17 @@ class KnowledgeEventType(str, Enum):
     GRAPH_ENTITY_EXTRACTED = "knowledge.graph.entity_extracted"
     QUERY_ANSWERED = "knowledge.query.answered"
     STALE_ALERT = "knowledge.stale.alert"
+
+
+class MenuEventType(str, Enum):
+    """菜谱方案事件 — 模块3.4 批量下发与门店差异化"""
+
+    PLAN_CREATED = "menu.plan_created"          # 方案创建
+    PLAN_PUBLISHED = "menu.plan_published"      # 方案发布（draft→published）
+    PLAN_DISTRIBUTED = "menu.plan_distributed"  # 方案批量下发到门店
+    PLAN_ROLLED_BACK = "menu.plan_rolled_back"  # 回滚到历史版本
+    STORE_OVERRIDE_SET = "menu.store_override_set"    # 门店微调（价格/状态覆盖）
+    STORE_OVERRIDE_RESET = "menu.store_override_reset"  # 门店覆盖全部重置为集团方案
 
 
 class GrowthEventType(str, Enum):
@@ -432,4 +446,6 @@ ALL_EVENT_ENUMS = (
     KnowledgeEventType,
     # 增长中枢域（v184 新增）
     GrowthEventType,
+    # 菜谱方案域（v245 新增，模块3.4）
+    MenuEventType,
 )

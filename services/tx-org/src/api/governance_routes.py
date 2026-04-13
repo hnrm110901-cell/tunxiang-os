@@ -137,14 +137,36 @@ async def governance_dashboard(
         productivity_per_person_fen = total_rev // max(1, active_emp)
     except (OperationalError, ProgrammingError) as exc:
         log.warning("governance_productivity_failed", error=str(exc))
+        total_rev = 0
         productivity_per_person_fen = 0
+
+    # 人工成本率（近30天薪资合计 / 近30天营收合计）
+    payroll_q = text("""
+        SELECT
+            COALESCE(SUM(ps.total_salary_fen), 0)::bigint AS total_salary_fen
+        FROM payroll_summaries ps
+        WHERE ps.tenant_id = CAST(:tenant_id AS uuid)
+          AND ps.is_deleted = false
+          AND ps.status IN ('confirmed', 'paid')
+          AND (ps.period_year * 100 + ps.period_month) >=
+              (EXTRACT(YEAR FROM CURRENT_DATE - 30)::int * 100 + EXTRACT(MONTH FROM CURRENT_DATE - 30)::int)
+    """)
+    try:
+        payroll_result = await db.execute(payroll_q, {"tenant_id": tenant_id})
+        payroll_row = payroll_result.mappings().first()
+        total_salary_fen = int(payroll_row["total_salary_fen"]) if payroll_row else 0
+    except (OperationalError, ProgrammingError) as exc:
+        log.warning("governance_payroll_failed", error=str(exc))
+        total_salary_fen = 0
+
+    avg_labor_cost_rate = round(total_salary_fen / max(1, total_rev), 4) if total_rev > 0 else 0
 
     return _ok({
         "total_headcount": total_headcount,
         "by_brand": by_brand,
         "by_region": by_region,
         "avg_attendance_rate": avg_attendance_rate,
-        "avg_labor_cost_rate": 0,  # TODO: 接入 payroll 数据计算
+        "avg_labor_cost_rate": avg_labor_cost_rate,
         "productivity_per_person_fen": productivity_per_person_fen,
     })
 
@@ -364,12 +386,41 @@ async def governance_risk_stores(
     except (OperationalError, ProgrammingError) as exc:
         log.warning("governance_risk_alert_failed", error=str(exc))
 
+    # 各门店薪资（近30天，用于计算成本偏差率）
+    store_salary_q = text("""
+        SELECT
+            ps.store_id::text AS store_id,
+            COALESCE(SUM(ps.total_salary_fen), 0)::bigint AS store_salary_fen
+        FROM payroll_summaries ps
+        WHERE ps.tenant_id = CAST(:tenant_id AS uuid)
+          AND ps.is_deleted = false
+          AND ps.status IN ('confirmed', 'paid')
+          AND (ps.period_year * 100 + ps.period_month) >=
+              (EXTRACT(YEAR FROM CURRENT_DATE - 30)::int * 100 + EXTRACT(MONTH FROM CURRENT_DATE - 30)::int)
+        GROUP BY ps.store_id
+    """)
+    salary_map: dict[str, int] = {}
+    try:
+        salary_result = await db.execute(store_salary_q, {"tenant_id": tenant_id})
+        for r in salary_result.mappings():
+            salary_map[str(r["store_id"])] = int(r["store_salary_fen"])
+    except (OperationalError, ProgrammingError) as exc:
+        log.warning("governance_risk_salary_failed", error=str(exc))
+
+    # 计算全集团薪资均值，用于偏差率基准
+    _all_salaries = list(salary_map.values())
+    _avg_salary = sum(_all_salaries) / max(1, len(_all_salaries)) if _all_salaries else 0
+
     stores: list[dict[str, Any]] = []
     for store_id, att in att_rows.items():
         attendance_rate = float(att.get("attendance_rate") or 0)
         late_rate = float(att.get("late_rate") or 0)
         alert_rate = alert_map.get(store_id, 0)
-        cost_deviation = 0  # TODO: 接入薪资模块
+        store_salary = salary_map.get(store_id, 0)
+        cost_deviation = (
+            abs(store_salary - _avg_salary) / max(1, _avg_salary)
+            if _avg_salary > 0 else 0
+        )
 
         # 综合评分（越高越好）
         score = (

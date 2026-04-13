@@ -50,7 +50,7 @@ export default function HRHub() {
 
   useEffect(() => {
     txFetchData<HRDashboardData>('/api/v1/hr/dashboard')
-      .then((resp) => setData(resp.data))
+      .then((resp) => setData(resp))
       .catch(() => message.error('加载人力中枢数据失败'))
       .finally(() => setLoading(false));
   }, []);

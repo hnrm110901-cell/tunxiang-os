@@ -223,7 +223,7 @@ function RecipesTab() {
   const updateIngredientRow = (idx: number, field: keyof RecipeIngredient, value: unknown) => {
     setIngredientRows((prev) => {
       const next = [...prev];
-      (next[idx] as Record<string, unknown>)[field] = value;
+      (next[idx] as unknown as Record<string, unknown>)[field] = value;
       return next;
     });
   };
@@ -787,15 +787,4 @@ export function CentralKitchenPage() {
   );
 }
 
-// 为 TXBridge（安卓 POS JS Bridge）补充类型声明
-declare global {
-  interface Window {
-    TXBridge?: {
-      print: (content: string) => void;
-      openCashBox: () => void;
-      scan: () => void;
-      getDeviceInfo: () => string;
-      getMacMiniUrl: () => string;
-    };
-  }
-}
+// TXBridge 类型已在 bridge/TXBridge.ts 中声明

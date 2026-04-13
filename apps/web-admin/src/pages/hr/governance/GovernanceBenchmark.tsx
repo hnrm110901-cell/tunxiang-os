@@ -46,7 +46,7 @@ export default function GovernanceBenchmark() {
     const resp = await txFetchData<BenchmarkResp>(
       `/api/v1/hr/governance/benchmark?metric=${m}`,
     );
-    setBenchData(resp.data);
+    setBenchData(resp);
   };
 
   useEffect(() => {

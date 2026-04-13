@@ -21,7 +21,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 
 revision = "v231"
-down_revision = "v230"
+down_revision = "v230b"
 branch_labels = None
 depends_on = None
 
