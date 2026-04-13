@@ -13,6 +13,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useKdsWebSocket, type KDSTicket, type RemakeAlert } from '../hooks/useKdsWebSocket';
 import { warmUpAudio } from '../utils/audio';
 import { pauseTicket, resumeTicket, grabTicket } from '../api/kdsOpsApi';
+import { StatusBar } from '@tx-ds/biz';
 
 // ─── KDS 配置（从 localStorage 读取） ───
 
@@ -332,17 +333,11 @@ export function KitchenBoard() {
             </span>
           )}
         </div>
-        <div style={{ display: 'flex', gap: 32, fontSize: 18 }}>
-          <span>
-            待制作 <b style={{ color: '#BA7517', fontSize: 28, fontFamily: 'JetBrains Mono, monospace' }}>{pending.length}</b>
-          </span>
-          <span>
-            制作中 <b style={{ color: '#1890ff', fontSize: 28, fontFamily: 'JetBrains Mono, monospace' }}>{cooking.length}</b>
-          </span>
-          <span>
-            已完成 <b style={{ color: '#0F6E56', fontSize: 28, fontFamily: 'JetBrains Mono, monospace' }}>{done.length}</b>
-          </span>
-        </div>
+        <StatusBar items={[
+          { label: '待制作', value: pending.length, color: '#BA7517' },
+          { label: '制作中', value: cooking.length, color: '#1890ff' },
+          { label: '已完成', value: done.length, color: '#0F6E56' },
+        ]} />
       </header>
 
       {/* 三列看板 */}

@@ -1,0 +1,136 @@
+/* TableCard — 桌台状态卡片 */
+
+.card {
+  padding: 14px 12px;
+  border-radius: 12px;
+  text-align: center;
+  cursor: pointer;
+  border: 2px solid var(--tx-border, #1E3A47);
+  background: var(--tx-bg-card, #112228);
+  color: var(--tx-text-primary, #F0EDE6);
+  min-height: 120px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: transform 150ms ease, border-color 150ms ease, box-shadow 150ms ease;
+  font-family: inherit;
+}
+
+.card:active {
+  transform: scale(0.97);
+}
+
+.card:hover {
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+
+/* Selected state */
+.selected {
+  border-color: var(--tx-primary, #FF6B35) !important;
+  background: rgba(255, 107, 53, 0.08);
+}
+
+/* Status-based border colors */
+.statusFree {
+  border-color: rgba(15, 110, 86, 0.5);
+  background: rgba(15, 110, 86, 0.08);
+}
+
+.statusOccupied {
+  border-color: rgba(24, 95, 165, 0.5);
+  background: rgba(24, 95, 165, 0.08);
+}
+
+.statusOvertime {
+  border-color: rgba(163, 45, 45, 0.6);
+  background: rgba(163, 45, 45, 0.1);
+}
+
+.statusReserved {
+  border-color: rgba(186, 117, 23, 0.5);
+  background: rgba(186, 117, 23, 0.08);
+}
+
+.statusVip {
+  border-color: rgba(114, 46, 209, 0.5);
+  background: rgba(114, 46, 209, 0.08);
+}
+
+.statusCleaning {
+  border-color: rgba(100, 116, 139, 0.4);
+  background: rgba(100, 116, 139, 0.06);
+}
+
+/* Overtime pulse */
+.overtime {
+  animation: overtimePulse 2s ease-in-out infinite;
+}
+
+@keyframes overtimePulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(163, 45, 45, 0); }
+  50% { box-shadow: 0 0 12px 3px rgba(163, 45, 45, 0.25); }
+}
+
+/* Table number */
+.tableNo {
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.5px;
+}
+
+/* Status badge */
+.statusBadge {
+  font-size: 14px;
+  font-weight: 600;
+  padding: 2px 10px;
+  border-radius: 6px;
+}
+
+.statusBadge.statusFree { color: #0F6E56; background: rgba(15, 110, 86, 0.15); }
+.statusBadge.statusOccupied { color: #3B82F6; background: rgba(24, 95, 165, 0.15); }
+.statusBadge.statusOvertime { color: #EF4444; background: rgba(163, 45, 45, 0.15); }
+.statusBadge.statusReserved { color: #D97706; background: rgba(186, 117, 23, 0.15); }
+.statusBadge.statusVip { color: #A855F7; background: rgba(114, 46, 209, 0.15); }
+.statusBadge.statusCleaning { color: #94A3B8; background: rgba(100, 116, 139, 0.1); }
+
+/* Details */
+.details {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 14px;
+  color: var(--tx-text-secondary, #8B9DA5);
+  line-height: 1.4;
+}
+
+.seats {
+  font-size: 14px;
+}
+
+.name {
+  color: var(--tx-text-tertiary, #6B7B85);
+}
+
+.guests {
+  font-size: 14px;
+}
+
+.time {
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.timeOvertime {
+  color: #EF4444;
+  font-weight: 600;
+}
+
+.amount {
+  color: var(--tx-primary, #FF6B35);
+  font-weight: 600;
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+}

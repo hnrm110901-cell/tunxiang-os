@@ -135,7 +135,7 @@ export default function QueueTicket({
               入座
             </button>
           )}
-          {onSkip && ticket.status === 'waiting' && (
+          {onSkip && (ticket.status === 'waiting' || ticket.status === 'called') && (
             <button
               type="button"
               className={cn(styles.actionBtn, styles.skipBtn)}

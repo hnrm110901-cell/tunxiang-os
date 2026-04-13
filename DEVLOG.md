@@ -4,6 +4,51 @@
 
 ---
 
+## 2026-04-13 (续) — 共享组件集成 + 后端AI排菜API
+
+### 今日完成
+
+**共享设计系统新增2个组件（总计16个业务组件）**
+- [design-system/biz] 新增 StatusBar — KPI统计指标条（KDS/reception/POS通用）
+- [design-system/biz] 新增 TableCard — 桌台状态卡片（POS/reception/crew通用）
+
+**共享组件实际集成到业务页面**
+- [web-reception] QueuePage 排队列表接入共享 QueueTicket 组件（421行→358行）
+- [web-reception] QueuePage 顶部统计接入共享 StatusBar 组件
+- [web-pos] TableMapPage 桌台网格接入共享 TableCard 组件（295行→243行）
+- [web-pos] TableMapPage 顶部统计接入共享 StatusBar 组件
+- [web-pos] TableMapPage 移除 deprecated fen2yuan 函数
+- [web-kds] KitchenBoard 顶部统计接入共享 StatusBar 组件
+
+**共享组件功能修正**
+- [design-system/biz] QueueTicket 的 onSkip 按钮现在对 called 状态也可见（标准叫号→过号流程）
+
+**后端API**
+- [tx-menu] 新增 menu_recommendation_routes.py — AI智能排菜推荐API（3个端点）
+  - POST /generate — 生成菜单推荐方案（四象限/库存/季节/毛利优化）
+  - GET  /history  — 获取历史推荐记录
+  - POST /apply    — 应用推荐方案到菜单
+  - Pydantic V2 模型：DishQuadrant/RecommendationAction/SeasonalTag 枚举 + 完整类型定义
+  - Mock数据含6道示例菜品（明星/金牛/问题/瘦狗各象限覆盖）
+
+### 数据变化
+- 新增共享组件：2个（StatusBar + TableCard）→ 总计16个业务组件
+- 新增后端API模块：1个（menu_recommendation_routes.py）
+- 新增API端点：3个（generate/history/apply）
+
+### 遗留问题
+- AI排菜推荐目前为mock数据，需接入tx-brain（Claude API）实现真正的AI推理
+- TableCard 的 cleaning 状态尚无业务页面使用
+- web-crew 巡台页面尚未接入 TableCard 组件
+
+### 明日计划
+- 创建前端 AI排菜推荐管理页面（web-admin）
+- 接入 tx-brain 实现真正的 AI 排菜推理
+- web-crew 巡台页面接入 TableCard 组件
+- 继续优化 H5 自助点餐页面的共享组件接入
+
+---
+
 ## 2026-04-13 (设计系统扩展 + 全端UI统一 + formatPrice迁移)
 
 ### 今日完成

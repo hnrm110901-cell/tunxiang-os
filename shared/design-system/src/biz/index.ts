@@ -1,10 +1,10 @@
 /**
- * @tunxiang/design-system — 业务组件（13个）
+ * @tunxiang/design-system — 业务组件（16个）
  *
  * 菜单：DishCard / CategoryNav / MenuSearch / DishGrid / DishImage / SpecSheet
  * 购物车：CartPanel / AddToCartAnimation
  * 管理：DishManageCard / MenuSchemePreview / AllergenBadge
- * 运营：OrderTicketCard / QueueTicket
+ * 运营：OrderTicketCard / QueueTicket / StatusBar / TableCard
  */
 export { default as DishCard } from './DishCard/DishCard';
 export type { DishCardProps, DishData } from './DishCard/types';
@@ -52,3 +52,7 @@ export type {
   QueueTicketStatus,
   TableSize,
 } from './QueueTicket/QueueTicket';
+export { default as StatusBar } from './StatusBar/StatusBar';
+export type { StatusBarProps, StatusBarItem } from './StatusBar/StatusBar';
+export { default as TableCard } from './TableCard/TableCard';
+export type { TableCardProps, TableCardData, TableCardStatus } from './TableCard/TableCard';

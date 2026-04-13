@@ -1,0 +1,49 @@
+/* StatusBar -- KPI 统计指标条 */
+
+.bar {
+  display: flex;
+  gap: 24px;
+  align-items: center;
+  font-size: 18px;
+  color: var(--tx-text-secondary, #B4B2A9);
+}
+
+.compact {
+  gap: 16px;
+  font-size: 16px;
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.icon {
+  display: flex;
+  align-items: center;
+  font-size: 1.1em;
+}
+
+.label {
+  font-weight: 500;
+}
+
+.value {
+  font-weight: 800;
+  font-size: 1.5em;
+  font-variant-numeric: tabular-nums;
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  color: var(--tx-text-primary, #F0EDE6);
+}
+
+.compact .value {
+  font-size: 1.25em;
+}
+
+.suffix {
+  font-weight: 500;
+  font-size: 0.9em;
+  margin-left: -2px;
+}

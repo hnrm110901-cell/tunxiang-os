@@ -6,7 +6,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { fetchTableStatus, type TableStatus } from '../api/posOpsApi';
 import { OrderActionPanel } from './OrderActionPanel';
-import { formatPrice } from '@tx-ds/utils';
+import { StatusBar, TableCard } from '@tx-ds/biz';
+import type { StatusBarItem, TableCardData } from '@tx-ds/biz';
 
 /* ─── 样式常量 ─── */
 const C = {
@@ -24,16 +25,7 @@ const C = {
   white: '#FFFFFF',
 };
 
-/** 桌台状态 → 颜色映射 */
-const STATUS_COLORS: Record<string, { bg: string; border: string; label: string }> = {
-  free:     { bg: `${C.green}22`, border: C.green, label: '空闲' },
-  occupied: { bg: `${C.blue}22`,  border: C.blue,  label: '就餐中' },
-  overtime: { bg: `${C.red}22`,   border: C.red,   label: '超时' },
-  reserved: { bg: `${C.yellow}22`, border: C.yellow, label: '预订' },
-  vip:      { bg: `${C.purple}22`, border: C.purple, label: 'VIP' },
-};
-
-/** 图例 */
+/** 图例（用于区域过滤旁的可视化说明） */
 const LEGEND = [
   { color: C.green, label: '空闲' },
   { color: C.blue, label: '就餐中' },
@@ -57,14 +49,6 @@ const MOCK_TABLES: TableStatus[] = [
   { table_no: 'C01', area: '露台', seats: 4, status: 'occupied', guest_count: 2, order_id: 'ord_006', order_amount_fen: 24200, dining_minutes: 18, waiter_name: '小陈' },
   { table_no: 'C02', area: '露台', seats: 4, status: 'free', guest_count: 0 },
 ];
-
-/* ─── 工具函数 ─── */
-/** @deprecated Use formatPrice from @tx-ds/utils */
-const fen2yuan = (fen: number) => `¥${(fen / 100).toFixed(0)}`;
-const formatMinutes = (min: number) => {
-  if (min < 60) return `${min}分钟`;
-  return `${Math.floor(min / 60)}时${min % 60}分`;
-};
 
 /* ─── 组件 ─── */
 export function TableMapPage() {
@@ -108,6 +92,18 @@ export function TableMapPage() {
     reserved: tables.filter(t => t.status === 'reserved').length,
   };
 
+  /** TableStatus → TableCardData 映射 */
+  const toCardData = useCallback((t: TableStatus): TableCardData => ({
+    tableNo: t.table_no,
+    area: t.area,
+    seats: t.seats,
+    status: t.status as TableCardData['status'],
+    guestCount: t.guest_count || undefined,
+    diningMinutes: t.dining_minutes || undefined,
+    orderAmountFen: t.order_amount_fen || undefined,
+    waiterName: t.waiter_name || undefined,
+  }), []);
+
   const handleTableClick = (table: TableStatus) => {
     if (table.status === 'free') {
       navigate(`/open-table/${table.table_no}`);
@@ -141,12 +137,15 @@ export function TableMapPage() {
         </div>
 
         {/* 统计 */}
-        <div style={{ display: 'flex', gap: 20, fontSize: 16 }}>
-          <span>总 <b style={{ color: C.white }}>{stats.total}</b></span>
-          <span style={{ color: C.green }}>空 <b>{stats.free}</b></span>
-          <span style={{ color: C.blue }}>用 <b>{stats.occupied}</b></span>
-          <span style={{ color: C.yellow }}>订 <b>{stats.reserved}</b></span>
-        </div>
+        <StatusBar
+          size="compact"
+          items={[
+            { label: '总', value: stats.total, color: C.white },
+            { label: '空', value: stats.free, color: C.green },
+            { label: '用', value: stats.occupied, color: C.blue },
+            { label: '订', value: stats.reserved, color: C.yellow },
+          ] satisfies StatusBarItem[]}
+        />
 
         <div style={{ display: 'flex', gap: 8 }}>
           <button
@@ -218,65 +217,14 @@ export function TableMapPage() {
           gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))',
           gap: 12,
         }}>
-          {filtered.map(table => {
-            const sc = STATUS_COLORS[table.status] || STATUS_COLORS.free;
-            const isSelected = selectedTable?.table_no === table.table_no;
-
-            return (
-              <button
-                key={table.table_no}
-                onClick={() => handleTableClick(table)}
-                style={{
-                  padding: 16, borderRadius: 12, textAlign: 'center',
-                  background: isSelected ? `${C.accent}22` : sc.bg,
-                  border: `2px solid ${isSelected ? C.accent : sc.border}`,
-                  color: C.white, cursor: 'pointer',
-                  transition: 'transform 200ms ease, border-color 200ms ease',
-                  minHeight: 120,
-                  display: 'flex', flexDirection: 'column',
-                  alignItems: 'center', justifyContent: 'center', gap: 6,
-                }}
-                onPointerDown={e => { (e.currentTarget as HTMLElement).style.transform = 'scale(0.97)'; }}
-                onPointerUp={e => { (e.currentTarget as HTMLElement).style.transform = 'scale(1)'; }}
-                onPointerLeave={e => { (e.currentTarget as HTMLElement).style.transform = 'scale(1)'; }}
-              >
-                {/* 桌号 */}
-                <div style={{ fontSize: 24, fontWeight: 700, lineHeight: 1 }}>
-                  {table.table_no}
-                </div>
-
-                {/* 状态标签 */}
-                <div style={{
-                  fontSize: 16, color: sc.border, fontWeight: 600,
-                  padding: '2px 8px', borderRadius: 4,
-                  background: `${sc.border}22`,
-                }}>
-                  {sc.label}
-                </div>
-
-                {/* 详情信息 */}
-                {table.status === 'free' ? (
-                  <div style={{ fontSize: 16, color: C.muted }}>{table.seats}座</div>
-                ) : table.status === 'reserved' ? (
-                  <div style={{ fontSize: 16, color: C.muted }}>{table.seats}座 · 已预订</div>
-                ) : (
-                  <div style={{ fontSize: 16, color: C.muted, lineHeight: 1.4 }}>
-                    <div>{table.guest_count}人 · {table.seats}座</div>
-                    {table.dining_minutes != null && (
-                      <div style={{ color: table.status === 'overtime' ? C.red : C.muted }}>
-                        {formatMinutes(table.dining_minutes)}
-                      </div>
-                    )}
-                    {table.order_amount_fen != null && (
-                      <div style={{ color: C.accent, fontWeight: 600 }}>
-                        {fen2yuan(table.order_amount_fen)}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </button>
-            );
-          })}
+          {filtered.map(table => (
+            <TableCard
+              key={table.table_no}
+              table={toCardData(table)}
+              selected={selectedTable?.table_no === table.table_no}
+              onClick={() => handleTableClick(table)}
+            />
+          ))}
         </div>
       </div>
 
