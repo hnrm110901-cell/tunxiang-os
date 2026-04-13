@@ -32,6 +32,7 @@ def _build_agent_class_map() -> dict[str, type[SkillAgent]]:
     """
     from .skills.ai_marketing_orchestrator import AiMarketingOrchestratorAgent
     from .skills.ai_waiter import AIWaiterAgent
+    from .skills.attendance_compliance_agent import AttendanceComplianceAgent
     from .skills.attendance_recovery import AttendanceRecoveryAgent
     from .skills.audit_trail import AuditTrailAgent
     from .skills.banquet_growth import BanquetGrowthAgent
@@ -77,6 +78,7 @@ def _build_agent_class_map() -> dict[str, type[SkillAgent]]:
     from .skills.trend_discovery import TrendDiscoveryAgent
     from .skills.turnover_risk import TurnoverRiskAgent
     from .skills.voice_order import VoiceOrderAgent
+    from .skills.points_advisor import PointsAdvisorAgent
     from .skills.workforce_planner import WorkforcePlannerAgent
 
     return {
@@ -138,6 +140,8 @@ def _build_agent_class_map() -> dict[str, type[SkillAgent]]:
         "table_dispatch": TableDispatchAgent,
         "turnover_risk": TurnoverRiskAgent,
         "workforce_planner": WorkforcePlannerAgent,
+        "points_advisor": PointsAdvisorAgent,
+        "attendance_compliance": AttendanceComplianceAgent,
     }
 
 
@@ -347,8 +351,12 @@ class MasterAgent:
             "compliance": "compliance_alert",
             "salary": "salary_advisor",
             "attendance": "attendance_recovery",
+            "attendance_compliance": "attendance_compliance",
             "turnover": "turnover_risk",
             "workforce": "workforce_planner",
+            "points": "points_advisor",
+            "incentive": "points_advisor",
+            "race": "points_advisor",
         }
 
         # 从 intent 前缀匹配 agent
