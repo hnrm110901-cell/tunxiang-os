@@ -12,10 +12,9 @@ from datetime import datetime, timedelta, timezone
 import psycopg2
 import psycopg2.extras
 
-DB_URL = os.environ.get(
-    "DATABASE_URL",
-    "postgresql://tunxiang:tunxiang_sgc_2024@localhost:5432/tunxiang_sgc",
-)
+DB_URL = os.environ.get("DATABASE_URL")
+if not DB_URL:
+    raise RuntimeError("DATABASE_URL 环境变量未设置。示例：export DATABASE_URL=postgresql://user:pass@host:5432/dbname")
 
 NAMESPACE = uuid.UUID("00000000-0000-0000-0000-000000000000")
 MERCHANT_CODE = "sgc"

@@ -187,33 +187,29 @@ async def list_evidence_chains(
     if limit < 1 or limit > 100:
         raise HTTPException(status_code=400, detail="limit 范围：1-100")
 
-    # Build dynamic WHERE clause
-    conditions = []
+    # 使用参数化查询构建（避免 f-string 插值到 text()）
+    base_sql = (
+        "SELECT chain_id, merchant_code, conclusion_type, conclusion_text, "
+        "evidence_links, merchant_target_refs, confidence, created_at "
+        "FROM ai_evidence_chains"
+    )
+    conditions_sql: list[str] = []
     params: dict = {"limit": limit}
 
     if merchant_code:
-        conditions.append("merchant_code = :merchant_code")
+        conditions_sql.append("merchant_code = :merchant_code")
         params["merchant_code"] = merchant_code
     if conclusion_type:
-        conditions.append("conclusion_type = :conclusion_type")
+        conditions_sql.append("conclusion_type = :conclusion_type")
         params["conclusion_type"] = conclusion_type
 
-    where_clause = ("WHERE " + " AND ".join(conditions)) if conditions else ""
+    if conditions_sql:
+        base_sql += " WHERE " + " AND ".join(conditions_sql)
+    base_sql += " ORDER BY created_at DESC LIMIT :limit"
 
     try:
         async with async_session_factory() as db:
-            result = await db.execute(
-                text(f"""
-                    SELECT chain_id, merchant_code, conclusion_type, conclusion_text,
-                           evidence_links, merchant_target_refs, confidence,
-                           created_at
-                    FROM ai_evidence_chains
-                    {where_clause}
-                    ORDER BY created_at DESC
-                    LIMIT :limit
-                """),
-                params,
-            )
+            result = await db.execute(text(base_sql), params)
             rows = result.fetchall()
     except SQLAlchemyError as exc:
         logger.error(

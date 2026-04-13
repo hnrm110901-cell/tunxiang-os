@@ -36,6 +36,10 @@ def _add_rls(table: str, policy: str) -> None:
 
 
 def upgrade() -> None:
+    conn = op.get_bind()
+    if "merchant_target_overrides" in sa.inspect(conn).get_table_names():
+        return
+
     # ── 1. 创建 merchant_target_overrides 表 ──
     op.create_table(
         "merchant_target_overrides",

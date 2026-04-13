@@ -103,7 +103,11 @@ async def _load_overrides_from_db() -> None:
                 if rows:
                     base = copy.deepcopy(_DEFAULT_TARGETS[merchant_code])
                     for row in rows:
-                        base["targets"][row.target_key] = float(row.target_value)
+                        # _fen 字段保持整数，其余比率/指标用 float
+                        val = row.target_value
+                        base["targets"][row.target_key] = (
+                            int(val) if row.target_key.endswith("_fen") else float(val)
+                        )
                     _overrides[merchant_code] = base
                     logger.info(
                         "merchant_targets_loaded_from_db",

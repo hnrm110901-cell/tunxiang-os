@@ -9,18 +9,26 @@ POST /api/v1/analytics/go-live-review/{code}/approve  — 手动批准（需填 
 from __future__ import annotations
 
 import asyncio
+import os
 from datetime import datetime, timezone
 from typing import Any
 
 import httpx
 import structlog
-from fastapi import APIRouter, Body
+from fastapi import APIRouter, Body, Header, HTTPException
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
 from ..database import async_session_factory
 
 logger = structlog.get_logger(__name__)
+
+_ANALYTICS_BASE = os.getenv("ANALYTICS_BASE_URL", "http://localhost:8009")
+
+# 允许使用批准端点的操作员名单（生产部署时通过环境变量覆盖，逗号分隔）
+_ALLOWED_APPROVERS: set[str] = set(
+    filter(None, os.getenv("GO_LIVE_APPROVERS", "未了已,admin").split(","))
+)
 
 router = APIRouter(prefix="/api/v1/analytics", tags=["go-live-review"])
 
@@ -97,7 +105,7 @@ async def _fetch_scorecard(code: str) -> dict[str, Any]:
     """从本地 delivery-scorecard 端点获取评分"""
     try:
         async with httpx.AsyncClient(timeout=5.0) as client:
-            r = await client.get(f"http://localhost:8009/api/v1/analytics/delivery-scorecard/{code}")
+            r = await client.get(f"{_ANALYTICS_BASE}/api/v1/analytics/delivery-scorecard/{code}")
             if r.status_code == 200:
                 return r.json().get("data", {})
     except (httpx.TimeoutException, httpx.ConnectError) as exc:
@@ -109,7 +117,7 @@ async def _fetch_data_quality(code: str) -> dict[str, Any]:
     """从本地 data-quality 端点获取数据质量分"""
     try:
         async with httpx.AsyncClient(timeout=5.0) as client:
-            r = await client.get(f"http://localhost:8009/api/v1/analytics/data-quality/{code}")
+            r = await client.get(f"{_ANALYTICS_BASE}/api/v1/analytics/data-quality/{code}")
             if r.status_code == 200:
                 return r.json().get("data", {})
     except (httpx.TimeoutException, httpx.ConnectError) as exc:
@@ -131,8 +139,8 @@ async def _fetch_db_approval(code: str) -> dict[str, Any] | None:
             row = result.fetchone()
             if row:
                 return {"approver": row[0], "notes": row[1], "approved_at": str(row[2])}
-    except SQLAlchemyError:
-        pass  # 表可能不存在，降级到内存
+    except SQLAlchemyError as exc:
+        logger.warning("go_live_approval_db_read_failed", merchant=code, error=str(exc))
     return None
 
 
@@ -264,10 +272,20 @@ async def approve_go_live(
         ...,
         example={"approver": "未了已", "notes": "现场评审通过，sgc宴会数据需上线后持续补充"},
     ),
+    x_operator: str | None = Header(default=None, alias="X-Operator"),
 ):
-    """手动批准上线（适用于评分略低但现场演示通过的情况）"""
+    """手动批准上线（适用于评分略低但现场演示通过的情况）。
+    需在请求头中提供 X-Operator，且必须在允许操作员名单中。"""
     if merchant_code not in _TARGETS:
         return {"ok": False, "error": {"code": "NOT_FOUND", "message": f"Unknown merchant: {merchant_code}"}}
+
+    # 操作员鉴权：必须提供 X-Operator header 且在允许名单中
+    operator = (x_operator or "").strip()
+    if not operator or operator not in _ALLOWED_APPROVERS:
+        raise HTTPException(
+            status_code=403,
+            detail=f"无权限执行批准操作。请提供有效的 X-Operator header（允许: {', '.join(sorted(_ALLOWED_APPROVERS))}）",
+        )
 
     approver = body.get("approver", "")
     notes    = body.get("notes", "")

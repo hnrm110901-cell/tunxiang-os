@@ -178,7 +178,7 @@ import json, sys
 try:
     d = json.loads(sys.argv[1])
     print(d['data']['total_score'])
-except Exception:
+except (json.JSONDecodeError, KeyError, TypeError):
     print(-1)
 " "$DQ_RESP" 2>/dev/null || echo "-1")
             else

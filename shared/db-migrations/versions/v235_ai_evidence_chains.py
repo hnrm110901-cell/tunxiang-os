@@ -36,6 +36,10 @@ def _add_rls(table: str, policy: str) -> None:
 
 
 def upgrade() -> None:
+    conn = op.get_bind()
+    if "ai_evidence_chains" in sa.inspect(conn).get_table_names():
+        return
+
     # ── 1. 创建 ai_evidence_chains 表 ──
     op.create_table(
         "ai_evidence_chains",

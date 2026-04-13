@@ -17,6 +17,7 @@
 """
 from __future__ import annotations
 
+import uuid
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -31,11 +32,10 @@ logger = structlog.get_logger(__name__)
 
 router = APIRouter(prefix="/api/v1/analytics", tags=["data-quality"])
 
-# 演示商户代码 → 租户 ID 映射（非 UUID 格式，演示环境专用）
+# 演示商户代码 → 确定性 UUID（通过 uuid5 派生，与 merchant_targets_routes.py 保持一致）
 _DEMO_TENANTS: dict[str, str] = {
-    "czyz": "czyz-demo-tenant",
-    "zqx": "zqx-demo-tenant",
-    "sgc": "sgc-demo-tenant",
+    code: str(uuid.uuid5(uuid.NAMESPACE_DNS, f"{code}-demo-tenant"))
+    for code in ("czyz", "zqx", "sgc")
 }
 
 # 评分等级阈值
