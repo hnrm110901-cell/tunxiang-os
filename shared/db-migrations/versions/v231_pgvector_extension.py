@@ -9,6 +9,7 @@ Create Date: 2026-04-12
 """
 
 from alembic import op
+import sqlalchemy as sa
 
 revision = "v231b"
 down_revision = "v231"
@@ -17,10 +18,13 @@ depends_on = None
 
 
 def upgrade() -> None:
-    try:
-        op.execute("CREATE EXTENSION IF NOT EXISTS vector;")
-    except Exception:
-        pass  # pgvector not installed on this host; skip and install later
+    conn = op.get_bind()
+    # Only create if the OS package is installed (avoids aborting the transaction)
+    row = conn.execute(sa.text(
+        "SELECT count(*) FROM pg_available_extensions WHERE name = 'vector'"
+    )).scalar()
+    if row:
+        conn.execute(sa.text("CREATE EXTENSION IF NOT EXISTS vector"))
 
 
 def downgrade() -> None:
