@@ -181,9 +181,8 @@ async def create_approval_instance(
     由 submit_application() 完成后调用（路由层负责编排顺序）。
     审批链固化为 routing_snapshot，后续规则变更不影响进行中审批。
 
-    注意：approver_id 在此阶段以 role 占位（实际审批人由 tx-org 服务解析角色对应员工）。
-    当前实现为占位逻辑：approver_id = uuid5(tenant_id, role) 保证确定性但需要
-    在 P0-S2 阶段替换为真实的角色→员工查询。
+    注意：approver_id 优先从 tx-org 按角色查询真实员工，
+    tx-org 不可用或未配置时降级为 uuid5(tenant_id, role) 确定性占位，保证测试幂等性。
     """
     log = logger.bind(tenant_id=str(tenant_id), application_id=str(application_id))
 
@@ -236,18 +235,28 @@ async def create_approval_instance(
     # 创建审批节点（每个角色一个节点，全部初始化为 PENDING）
     nodes = []
     for step in routing_chain:
-        # TODO(P0-S2): 替换为真实角色→员工查询（tx-org 服务）
-        # 当前使用确定性占位 UUID，便于测试
-        placeholder_approver_id = uuid.uuid5(
-            uuid.UUID(str(tenant_id)),
-            f"{brand_id}:{step['role']}"
+        # 从 tx-org 查询该角色对应的真实员工；失败时降级为确定性占位 UUID
+        approver_employee = await org_integration_service.get_approver_by_role(
+            tenant_id=tenant_id,
+            role=step["role"],
+            brand_id=brand_id,
+            store_id=application.store_id,
         )
+        if approver_employee and approver_employee.get("employee_id"):
+            try:
+                approver_id = uuid.UUID(approver_employee["employee_id"])
+            except (ValueError, KeyError):
+                approver_id = uuid.uuid5(uuid.UUID(str(tenant_id)), f"{brand_id}:{step['role']}")
+        else:
+            # tx-org 不可用或未配置该角色 → 确定性占位（保证测试幂等性）
+            approver_id = uuid.uuid5(uuid.UUID(str(tenant_id)), f"{brand_id}:{step['role']}")
+
         node = ApprovalNode(
             id=uuid.uuid4(),
             tenant_id=tenant_id,
             instance_id=instance.id,
             node_index=step["node_index"],
-            approver_id=placeholder_approver_id,
+            approver_id=approver_id,
             approver_role=step["role"],
             status=ApprovalNodeStatus.PENDING.value,
             action=None,

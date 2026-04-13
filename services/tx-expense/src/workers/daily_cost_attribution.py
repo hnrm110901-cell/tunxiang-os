@@ -72,8 +72,8 @@ class DailyCostAttributionWorker:
     async def _get_active_tenant_ids(self) -> list[str]:
         """获取所有活跃租户 ID 列表。
 
-        TODO P3: 从 tx-org 或共享配置获取全部租户列表。
-        当前 P2 阶段使用环境变量 DEFAULT_TENANT_ID 单租户模式。
+        当前使用环境变量 DEFAULT_TENANT_ID 单租户模式。
+        多租户场景可扩展为从 tx-org /api/v1/org/tenants/active 拉取。
         """
         default_tenant = os.environ.get("DEFAULT_TENANT_ID")
         if not default_tenant:
@@ -82,9 +82,9 @@ class DailyCostAttributionWorker:
         return [default_tenant]
 
     async def _get_store_ids(self, tenant_id: UUID, db: AsyncSession) -> list[UUID]:
-        """从本地 DB 查询该租户下所有门店 ID。
+        """从本地 DB 查询该租户下所有门店 ID（费控申请中出现过的门店）。
 
-        TODO P3: 优先从 tx-org 拉取，此处用费控申请中出现过的门店作兜底。
+        多租户扩展时可优先从 tx-org /api/v1/org/stores 拉取，此处作兜底。
         """
         from ..models.expense_application import ExpenseApplication
         from ..models.expense_enums import ExpenseStatus
@@ -511,25 +511,17 @@ class DailyCostAttributionWorker:
             results["total_tenants"] += 1
 
             try:
-                # 每个租户使用独立 DB session
-                # TODO P3: 注入真实 DB session 工厂（参照 monthly_petty_cash.py 方式）
-                # async with get_async_session() as db:
-                #     store_ids = await self._get_store_ids(tenant_id, db)
-                #     for store_id in store_ids:
-                #         store_result = await self._process_store(db, tenant_id, store_id, attribution_date)
-                #         results["total_stores"] += 1
-                #         if "error" in store_result:
-                #             results["errors"].append({**store_result, "tenant_id": tenant_id_str})
-                #         else:
-                #             results["success_count"] += 1
+                from shared.ontology.src.database import TenantSession
 
-                # P2 占位：DB session 待接入后取消注释上方代码块
-                log.info(
-                    "tenant_cost_attribution_queued",
-                    tenant_id=tenant_id_str,
-                    attribution_date=attribution_date.isoformat(),
-                    note="db_session_pending_p3_multi_tenant",
-                )
+                async with TenantSession(tenant_id_str) as db:
+                    store_ids = await self._get_store_ids(tenant_id, db)
+                    for store_id in store_ids:
+                        store_result = await self._process_store(db, tenant_id, store_id, attribution_date)
+                        results["total_stores"] += 1
+                        if "error" in store_result:
+                            results["errors"].append({**store_result, "tenant_id": tenant_id_str})
+                        else:
+                            results["success_count"] += 1
 
             except Exception as exc:  # noqa: BLE001 — 外层兜底，保证其他租户继续
                 log.error(

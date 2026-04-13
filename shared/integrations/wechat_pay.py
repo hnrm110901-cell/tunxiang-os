@@ -6,7 +6,10 @@
   WECHAT_PAY_CERT_PATH   — 商户私钥证书路径（apiclient_key.pem）
   WECHAT_PAY_APPID       — 小程序AppID
 
-当环境变量未配置时，所有方法返回 Mock 成功响应，便于开发调试。
+当环境变量未配置时，非生产环境返回 Mock 成功响应，便于开发调试。
+
+生产环境（ENVIRONMENT/ENV 为 production 或 prod）若未配置四项密钥，默认 **拒绝启动**
+`WechatPayService`（抛 RuntimeError），除非显式设置 `TX_WECHAT_PAY_ALLOW_MOCK=1`（仅限灰度/演练）。
 """
 
 import base64
@@ -35,6 +38,21 @@ def _is_configured() -> bool:
     return bool(_MCH_ID and _API_KEY_V3 and _CERT_PATH and _APPID)
 
 
+def _is_production_env() -> bool:
+    env = (os.environ.get("ENVIRONMENT") or os.environ.get("ENV") or "").strip().lower()
+    return env in ("production", "prod")
+
+
+def _mock_explicitly_allowed() -> bool:
+    """生产环境是否允许 Mock（仅应急演练；须显式开启）。"""
+    return os.environ.get("TX_WECHAT_PAY_ALLOW_MOCK", "").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+        "on",
+    )
+
+
 def _load_private_key() -> Any:
     """加载商户 RSA 私钥（PEM 格式）"""
     from cryptography.hazmat.primitives.serialization import load_pem_private_key
@@ -46,7 +64,7 @@ def _load_private_key() -> Any:
 class WechatPayService:
     """微信支付 V3 服务
 
-    - 未配置环境变量时自动降级为 Mock 模式
+    - 未配置环境变量时：非生产为 Mock；生产默认拒绝实例化（见 __init__）
     - 所有金额单位：分（int）
     - 签名算法：RSA-SHA256（V3 规范）
     - 回调解密：AES-256-GCM
@@ -56,6 +74,12 @@ class WechatPayService:
         self._mock_mode = not _is_configured()
         self._private_key: Any = None
         if self._mock_mode:
+            if _is_production_env() and not _mock_explicitly_allowed():
+                raise RuntimeError(
+                    "生产环境禁止微信支付 Mock：请配置 WECHAT_PAY_MCH_ID / WECHAT_PAY_API_KEY_V3 / "
+                    "WECHAT_PAY_CERT_PATH / WECHAT_PAY_APPID；"
+                    "若仅为灰度演练需 Mock，请显式设置 TX_WECHAT_PAY_ALLOW_MOCK=1"
+                )
             logger.warning(
                 "WechatPayService: 环境变量未配置，进入 Mock 模式。"
                 "请设置 WECHAT_PAY_MCH_ID / WECHAT_PAY_API_KEY_V3 / "

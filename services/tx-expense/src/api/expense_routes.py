@@ -341,7 +341,7 @@ async def add_attachment(
     上传费用申请附件（发票图片/PDF）
 
     - 支持格式：jpg/jpeg/png/pdf
-    - TODO: 实际文件上传到 Supabase Storage，当前版本记录元信息
+    - 文件存储：腾讯云 COS（invoices 目录），Mock 模式下返回本地路径
     - 文件大小限制：10MB
     """
     svc = _get_expense_service()
@@ -361,10 +361,15 @@ async def add_attachment(
         raise HTTPException(status_code=400, detail="文件大小超过限制（最大10MB）")
 
     try:
-        # TODO: 实际上传到 Supabase Storage，获取 file_url
-        # storage_client = get_supabase_storage()
-        # file_url = await storage_client.upload(f"expenses/{tenant_id}/{application_id}/{file.filename}", file_content)
-        file_url = f"TODO://supabase-storage/expenses/{tenant_id}/{application_id}/{file.filename}"
+        from shared.integrations.cos_upload import get_cos_upload_service
+        cos = get_cos_upload_service()
+        upload_result = await cos.upload_file(
+            file_bytes=file_content,
+            filename=file.filename or "attachment",
+            content_type=file.content_type or "application/octet-stream",
+            folder="invoices",
+        )
+        file_url = upload_result["url"]
 
         result = await svc.add_attachment(
             db=db,

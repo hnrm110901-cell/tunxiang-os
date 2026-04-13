@@ -12,8 +12,9 @@ A4 预算预警 Agent
 - 合同到期 ≤30天: 推送合同到期预警
 - 付款逾期: 推送逾期付款提醒
 
-注意：预算数据当前为 placeholder（返回固定值），P2 预算管理系统上线后接入真实数据。
-预警通知逻辑已完整实现，调用 notification_service。
+预算数据来自 BudgetService（v242 budget_system 表）。
+未配置预算时降级返回 is_placeholder: True，不触发预警。
+预警通知通过 notification_service 推送。
 """
 from __future__ import annotations
 
@@ -121,14 +122,14 @@ class A4BudgetAlertAgent:
                 {
                     "category_code": str,
                     "category_name": str,
-                    "budget_fen": int,      # P2 前固定 placeholder
+                    "budget_fen": int,      # 来自 BudgetService，未配置时为 0
                     "actual_fen": int,       # 本月已审批通过的费用金额（分）
                     "rate": float,           # actual / budget，budget=0 时返回 -1
                 }
             ]
 
         Note:
-            budget_fen 当前为 placeholder（固定值），P2 预算管理系统上线后接入真实数据。
+            budget_fen 来自 BudgetService.get_current_budget()，未配置预算时降级返回 is_placeholder: True。
         """
         # ── 查询当月已审批通过的费用，按科目汇总 ──────────────────────────────
         from ..models.expense_application import ExpenseCategory

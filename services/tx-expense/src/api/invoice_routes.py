@@ -70,15 +70,24 @@ class BatchReverifyRequest(BaseModel):
 # 辅助函数
 # ─────────────────────────────────────────────────────────────────────────────
 
-def _build_storage_path(tenant_id: UUID, store_id: UUID, file_name: str) -> str:
+async def _upload_invoice_file(
+    file_bytes: bytes,
+    file_name: str,
+    content_type: str,
+) -> str:
     """
-    构建 Supabase Storage 存储路径。
-    格式：invoices/{tenant_id}/{store_id}/{uuid}_{original_name}
-    TODO P1: 实际上传逻辑对接 Supabase Storage Python SDK
+    上传发票文件到腾讯云 COS（invoices 目录），返回访问 URL。
+    COS_SECRET_ID 未配置时自动进入 Mock 模式，返回本地伪路径。
     """
-    ext = file_name.rsplit(".", 1)[-1] if "." in file_name else "jpg"
-    unique_name = f"{uuid_lib.uuid4().hex[:8]}_{file_name}"
-    return f"invoices/{tenant_id}/{store_id}/{unique_name}"
+    from shared.integrations.cos_upload import get_cos_upload_service
+    cos = get_cos_upload_service()
+    result = await cos.upload_file(
+        file_bytes=file_bytes,
+        filename=file_name,
+        content_type=content_type,
+        folder="invoices",
+    )
+    return result["url"]
 
 
 def _fen_to_yuan_str(fen: Optional[int]) -> Optional[str]:
@@ -138,8 +147,8 @@ async def upload_invoice(
 
     file_name = file.filename or "invoice.jpg"
 
-    # 构建 Supabase Storage 路径（TODO P1: 实际上传）
-    file_url = _build_storage_path(tenant_id, store_id, file_name)
+    # 上传到腾讯云 COS（Mock 模式下返回本地伪路径）
+    file_url = await _upload_invoice_file(file_bytes, file_name, content_type)
 
     log.info(
         "invoice_upload_request",

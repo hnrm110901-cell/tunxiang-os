@@ -59,6 +59,7 @@ ALLOWED_FOLDERS = {
     "store",
     "employee",
     "general",
+    "contracts",
 }
 
 

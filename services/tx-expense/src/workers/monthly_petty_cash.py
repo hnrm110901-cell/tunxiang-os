@@ -31,8 +31,8 @@ class MonthlyPettyCashSettlementWorker:
     async def _get_active_tenant_ids(self) -> list[str]:
         """获取所有活跃租户 ID 列表。
 
-        TODO P1: 从 tx-org 或共享配置中获取所有活跃租户列表，
-        当前用环境变量 DEFAULT_TENANT_ID 作为单租户兜底。
+        当前使用环境变量 DEFAULT_TENANT_ID 单租户模式。
+        多租户场景可扩展为从 tx-org /api/v1/org/tenants/active 拉取。
         """
         default_tenant = os.environ.get("DEFAULT_TENANT_ID")
         if not default_tenant:
@@ -54,24 +54,19 @@ class MonthlyPettyCashSettlementWorker:
         Returns:
             {settlements_generated, accounts_processed, notifications_sent}
         """
+        from shared.ontology.src.database import TenantSession
         from ..agents.a1_petty_cash_guardian import run as a1_run
 
-        # TODO P1: 注入真实 DB session，参照项目 get_async_session 方式
-        # async with get_async_session() as db:
-        #     result = await a1_run(
-        #         db, tenant_id, "monthly_settlement",
-        #         {"settlement_month": settlement_month}
-        #     )
-        #     return result
-
-        # 占位：当 DB session 接入后取消注释上方代码块，删除下方日志行
-        log.info(
-            "tenant_monthly_settlement_queued",
-            tenant_id=str(tenant_id),
-            settlement_month=settlement_month,
-            note="db_session_pending_p1",
-        )
-        return {"settlements_generated": 0, "accounts_processed": 0, "notifications_sent": 0}
+        async with TenantSession(str(tenant_id)) as db:
+            result = await a1_run(
+                db, tenant_id, "monthly_settlement",
+                {"settlement_month": settlement_month},
+            )
+        return {
+            "settlements_generated": result.get("settlements_generated", 0),
+            "accounts_processed": result.get("accounts_processed", 0),
+            "notifications_sent": result.get("notifications_sent", 0),
+        }
 
     async def run(self, settlement_month: str | None = None) -> dict[str, Any]:
         """多租户月末核销批量处理主函数。

@@ -511,6 +511,82 @@ def clear_cache(pattern: Optional[str] = None) -> int:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# 6b. 按角色查找审批人
+# ─────────────────────────────────────────────────────────────────────────────
+
+async def get_approver_by_role(
+    tenant_id: UUID,
+    role: str,
+    brand_id: Optional[UUID] = None,
+    store_id: Optional[UUID] = None,
+) -> Optional[dict]:
+    """
+    根据角色名称从 tx-org 查询对应的审批人员工信息。
+
+    调用路径：
+      GET {TX_ORG_URL}/api/v1/org/approvers/by-role
+          ?role=region_manager&brand_id=...&store_id=...
+
+    返回：
+      {"employee_id": str, "name": str, "email": str, ...}
+      或 None（tx-org 未返回匹配员工时）
+
+    失败时：
+      - 返回 None（降级，调用方用 uuid5 占位）
+      - 不抛出异常，不阻塞主业务
+    """
+    cache_key = f"approver_role:{tenant_id}:{role}:{brand_id}:{store_id}"
+    cached = _cache_get(cache_key)
+    if cached is not None:
+        return cached if cached else None
+
+    url = f"{TX_ORG_URL}/api/v1/org/approvers/by-role"
+    params: dict = {"role": role}
+    if brand_id:
+        params["brand_id"] = str(brand_id)
+    if store_id:
+        params["store_id"] = str(store_id)
+
+    try:
+        async with httpx.AsyncClient(timeout=3.0) as client:
+            resp = await client.get(
+                url,
+                params=params,
+                headers=_make_headers(tenant_id),
+            )
+        if resp.status_code == 200:
+            data = resp.json()
+            # tx-org 返回格式：{"ok": true, "data": {"employee_id": ..., "name": ...}}
+            employee = data.get("data") if isinstance(data, dict) else None
+            if employee and employee.get("employee_id"):
+                _cache_set(cache_key, employee, _TTL_EMPLOYEE)
+                log.debug(
+                    "org_integration.approver_by_role_found",
+                    role=role,
+                    employee_id=employee.get("employee_id"),
+                )
+                return employee
+        # 未找到（404 / 空数据）
+        _cache_set(cache_key, {}, _TTL_EMPLOYEE)
+        log.debug(
+            "org_integration.approver_by_role_not_found",
+            role=role,
+            brand_id=str(brand_id) if brand_id else None,
+            store_id=str(store_id) if store_id else None,
+            status_code=resp.status_code,
+        )
+        return None
+
+    except (httpx.TimeoutException, httpx.RequestError) as exc:
+        log.warning(
+            "org_integration.approver_by_role_failed",
+            role=role,
+            error=str(exc),
+        )
+        return None
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # 7. 服务健康检查
 # ─────────────────────────────────────────────────────────────────────────────
 

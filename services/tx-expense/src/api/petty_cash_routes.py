@@ -12,12 +12,35 @@ from typing import Any, Dict, List, Optional
 from uuid import UUID
 
 import structlog
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
 from src.api.expense_routes import get_current_user, get_tenant_id
+
+# 财务确认操作允许的角色（由 Gateway 注入 X-User-Role header）
+_FINANCE_ROLES = {"brand_finance", "brand_cfo", "hq_finance", "admin"}
+_role_log = structlog.get_logger(__name__)
+
+
+async def require_finance_role(
+    x_user_role: str = Header(default="", alias="X-User-Role"),
+) -> str:
+    """验证调用者具有财务角色（brand_finance / brand_cfo / hq_finance / admin）。
+
+    X-User-Role header 由 API Gateway 在认证后注入。
+    未传入 header 时（内部调用 / 开发环境）降级放行，记录警告日志。
+    """
+    if not x_user_role:
+        _role_log.warning("finance_role_check_skipped_no_header")
+        return x_user_role
+    if x_user_role not in _FINANCE_ROLES:
+        raise HTTPException(
+            status_code=403,
+            detail=f"需要财务角色（brand_finance/brand_cfo/hq_finance），当前角色：{x_user_role}",
+        )
+    return x_user_role
 
 try:
     from src.services import petty_cash_service
@@ -640,7 +663,7 @@ async def generate_monthly_settlement(
     description=(
         "财务人员确认月末核销单（DRAFT/SUBMITTED → CONFIRMED）。"
         "确认后自动将期间内所有未核销流水标记为已核销。"
-        # TODO P1: 应检查调用者是否具有财务角色权限（接入权限体系后启用）
+        "需要财务角色：brand_finance / brand_cfo / hq_finance / admin（通过 X-User-Role header 验证）。"
     ),
 )
 async def confirm_settlement(
@@ -648,6 +671,7 @@ async def confirm_settlement(
     db: AsyncSession = Depends(get_db),
     tenant_id: UUID = Depends(get_tenant_id),
     operator_id: UUID = Depends(get_current_user),
+    _role: str = Depends(require_finance_role),
 ) -> Dict[str, Any]:
     """
     财务确认核销单。
@@ -655,8 +679,7 @@ async def confirm_settlement(
     - **settlement_id**: 要确认的核销单UUID
     - 只有 `draft` 或 `submitted` 状态的核销单才可确认
     - 确认后自动将期间流水的 `is_reconciled` 置为 `True`
-
-    **权限说明**：TODO P1 — 应检查调用者是否具有财务角色，待权限体系接入后启用。
+    - 需要财务角色（X-User-Role: brand_finance / brand_cfo / hq_finance / admin）
     """
     svc = _require_petty_cash_service()
 

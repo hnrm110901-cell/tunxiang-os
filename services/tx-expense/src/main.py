@@ -11,7 +11,10 @@
 - 成本归因 (费用分摊/门店归因)
 - 费控看板 (汇总分析/预算执行率)
 """
+import asyncio
+
 import structlog
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -23,6 +26,9 @@ except ImportError:
     def is_enabled(flag, context=None): return True
 
 logger = structlog.get_logger(__name__)
+
+# 全局 scheduler 实例
+_scheduler = AsyncIOScheduler(timezone="Asia/Shanghai")
 
 # 导入路由
 from .api.expense_routes import router as expense_router
@@ -81,20 +87,44 @@ async def health():
     return {"status": "ok", "service": "tx-expense", "version": "1.0.0"}
 
 
+async def _run_monthly_petty_cash() -> None:
+    from .workers.monthly_petty_cash import MonthlyPettyCashWorker
+    try:
+        await MonthlyPettyCashWorker().run()
+    except Exception as exc:
+        logger.error("scheduler.monthly_petty_cash.failed", error=str(exc), exc_info=True)
+
+
+async def _run_daily_cost_attribution() -> None:
+    from .workers.daily_cost_attribution import DailyCostAttributionWorker
+    try:
+        await DailyCostAttributionWorker().run()
+    except Exception as exc:
+        logger.error("scheduler.daily_cost_attribution.failed", error=str(exc), exc_info=True)
+
+
 @app.on_event("startup")
 async def startup() -> None:
     logger.info("tx_expense_started", service="tx-expense", version="1.0.0")
-    # 定时任务注册（需要 APScheduler，参照项目现有调度方式）
-    # from .workers import monthly_petty_cash, daily_cost_attribution, contract_expiry_watcher
-    # scheduler.add_job(monthly_petty_cash.run_monthly_settlement_for_all_tenants,
-    #                   'cron', day=25, hour=0, minute=30, id='monthly_petty_cash')
-    # scheduler.add_job(daily_cost_attribution.run_daily_cost_attribution,
-    #                   'cron', hour=23, minute=0, id='daily_cost_attribution')
-    # scheduler.add_job(contract_expiry_watcher.run_contract_expiry_check,
-    #                   'cron', hour=8, minute=0, id='contract_expiry_watcher')
-    # ^ 每日 08:00: 合同到期预警 + A4预算预警Agent日检
+
+    # 每月25日 00:30：备用金月结
+    _scheduler.add_job(
+        lambda: asyncio.create_task(_run_monthly_petty_cash()),
+        "cron", day=25, hour=0, minute=30,
+        id="monthly_petty_cash", replace_existing=True,
+    )
+    # 每日 23:00：成本归因日报
+    _scheduler.add_job(
+        lambda: asyncio.create_task(_run_daily_cost_attribution()),
+        "cron", hour=23, minute=0,
+        id="daily_cost_attribution", replace_existing=True,
+    )
+    _scheduler.start()
+    logger.info("expense_scheduler_started",
+                jobs=[j.id for j in _scheduler.get_jobs()])
 
 
 @app.on_event("shutdown")
 async def shutdown() -> None:
+    _scheduler.shutdown(wait=False)
     logger.info("tx_expense_stopped", service="tx-expense", version="1.0.0")
