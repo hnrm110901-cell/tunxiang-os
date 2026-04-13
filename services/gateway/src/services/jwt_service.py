@@ -13,7 +13,8 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 import structlog
-from jose import ExpiredSignatureError, JWTError, jwt
+import jwt
+from jwt.exceptions import ExpiredSignatureError, InvalidTokenError as JWTError
 
 logger = structlog.get_logger(__name__)
 
