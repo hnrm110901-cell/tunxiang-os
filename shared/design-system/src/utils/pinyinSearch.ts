@@ -119,7 +119,7 @@ export function getInitials(text: string): string {
  *
  * Supports:
  *  - Chinese character match: "鱼头" matches "剁椒鱼头"
- *  - Full pinyin match: "duchuanyutou" matches "剁椒鱼头"  (Note: 剁=duo 椒=jiao → "duojiaoyutou")
+ *  - Full pinyin match: "duojiaoyutou" matches "剁椒鱼头"
  *  - Initials match: "djyt" matches "剁椒鱼头"
  *  - Mixed partial: "duo" matches "剁椒鱼头"
  */

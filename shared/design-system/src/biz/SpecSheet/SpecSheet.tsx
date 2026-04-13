@@ -25,7 +25,10 @@ export default function SpecSheet({
   const [selections, setSelections] = useState<Record<string, string[]>>({});
   const [quantity, setQuantity] = useState(initialQuantity);
 
-  // Reset state when sheet opens
+  // Serialize specGroups IDs for stable comparison (avoid reset on reference change)
+  const specGroupsKey = useMemo(() => specGroups.map(g => g.id).join(','), [specGroups]);
+
+  // Reset state when sheet opens or actual spec groups change
   useEffect(() => {
     if (visible) {
       setQuantity(initialQuantity);
@@ -36,7 +39,7 @@ export default function SpecSheet({
       }
       setSelections(initial);
     }
-  }, [visible, initialQuantity, specGroups]);
+  }, [visible, initialQuantity, specGroupsKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Selection handlers ───────────────────────────────────────────────────────
 

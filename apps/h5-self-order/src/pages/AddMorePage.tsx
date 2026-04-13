@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useLang } from '@/i18n/LangContext';
 import { useOrderStore } from '@/store/useOrderStore';
@@ -28,6 +28,8 @@ export default function AddMorePage() {
   // 加菜选择：dishId -> quantity
   const [addItems, setAddItems] = useState<Record<string, number>>({});
   const [submitting, setSubmitting] = useState(false);
+  // 价格缓存：跨分类切换时保留已选菜品的价格
+  const priceCache = useRef<Record<string, number>>({});
 
   // 加载分类
   useEffect(() => {
@@ -57,6 +59,11 @@ export default function AddMorePage() {
       .then(setDishes)
       .catch(() => setDishes([]));
   }, [storeId, activeCat]);
+
+  // 菜品加载后更新价格缓存
+  useEffect(() => {
+    dishes.forEach((d) => { priceCache.current[d.id] = d.price; });
+  }, [dishes]);
 
   // 加载已有订单摘要
   useEffect(() => {
@@ -93,10 +100,9 @@ export default function AddMorePage() {
     });
   }, []);
 
-  // 计算加菜总价
+  // 计算加菜总价（使用价格缓存，避免跨分类切换时丢失价格）
   const addTotal = Object.entries(addItems).reduce((sum, [dishId, qty]) => {
-    const dish = dishes.find((d) => d.id === dishId);
-    return sum + (dish?.price ?? 0) * qty;
+    return sum + (priceCache.current[dishId] ?? 0) * qty;
   }, 0);
 
   const addCount = Object.values(addItems).reduce((sum, qty) => sum + qty, 0);

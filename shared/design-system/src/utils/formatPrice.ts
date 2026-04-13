@@ -13,5 +13,5 @@ export function fenToYuan(fen: number): number {
 }
 
 export function yuanToFen(yuan: number): number {
-  return Math.round(yuan * 100);
+  return Math.round(Number((yuan * 100).toFixed(4)));
 }

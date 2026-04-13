@@ -74,6 +74,8 @@ export default function MenuBrowse() {
   const tableNo = useOrderStore((s) => s.tableNo);
   const cart = useOrderStore((s) => s.cart);
   const addToCart = useOrderStore((s) => s.addToCart);
+  const updateQuantity = useOrderStore((s) => s.updateQuantity);
+  const removeFromCart = useOrderStore((s) => s.removeFromCart);
   const cartCount = useOrderStore((s) => s.cartCount);
   const cartTotal = useOrderStore((s) => s.cartTotal);
 
@@ -177,7 +179,7 @@ export default function MenuBrowse() {
   // ─── Cart items adapted for CartPanel ───
   const cartItems = useMemo(() =>
     cart.map((c) => ({
-      id: `${c.dish.id}-${JSON.stringify(c.specs ?? {})}`,
+      id: c.cartKey,
       dishId: c.dish.id,
       name: c.dish.name,
       quantity: c.quantity,
@@ -185,7 +187,7 @@ export default function MenuBrowse() {
     })),
   [cart]);
 
-  const totalFen = useMemo(() => Math.round(cartTotal() * 100), [cartTotal]);
+  const totalFen = useMemo(() => Math.round(cartTotal() * 100), [cart]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: 'var(--tx-bg-primary)' }}>
@@ -274,8 +276,8 @@ export default function MenuBrowse() {
         mode="bottom-bar"
         items={cartItems}
         totalFen={totalFen}
-        onUpdateQuantity={() => {}}
-        onRemoveItem={() => {}}
+        onUpdateQuantity={(id, qty) => updateQuantity(id, qty)}
+        onRemoveItem={(id) => removeFromCart(id)}
         onSettle={() => navigate('/checkout')}
       />
 

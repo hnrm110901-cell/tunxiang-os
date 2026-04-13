@@ -1,5 +1,5 @@
 /**
- * @tunxiang/design-system — 业务组件（16个）
+ * @tunxiang/design-system — 业务组件（15个）
  *
  * 菜单：DishCard / CategoryNav / MenuSearch / DishGrid / DishImage / SpecSheet
  * 购物车：CartPanel / AddToCartAnimation

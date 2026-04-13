@@ -23,7 +23,7 @@ export default function CartPanel({
   onHold,
   className,
 }: CartPanelProps) {
-  const finalFen = totalFen - discountFen;
+  const finalFen = Math.max(0, totalFen - discountFen);
   const itemCount = items.reduce((sum, i) => sum + i.quantity, 0);
 
   // ── bottom-bar mode ──────────────────────────────────────────────────────────

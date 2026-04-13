@@ -51,7 +51,7 @@ function toCardData(t: TableInfo): TableCardData {
   const diningMinutes = t.seated_at ? calcMinutes(t.seated_at) : undefined;
   return {
     tableNo: t.table_no,
-    seats: 4, // TableInfo 不包含 seats 字段，默认4座
+    seats: (t as any).capacity ?? 4, // TODO: add capacity to TableInfo (available in tablesApi.TableInfo)
     status: mapStatus(t.status, diningMinutes),
     guestCount: t.guest_count || undefined,
     diningMinutes,

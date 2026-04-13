@@ -11,7 +11,7 @@
  *   });
  *   return <div {...swipeHandlers} style={{ transform: `translateX(${swipeOffset}px)` }}>...</div>
  */
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 export interface UseSwipeOptions {
   onSwipeLeft?: () => void;
@@ -44,6 +44,8 @@ export function useSwipe({
   const startYRef = useRef<number | null>(null);
   const isDraggingRef = useRef(false);
   const isMouseRef = useRef(false);
+  const mouseMoveRef = useRef<((ev: MouseEvent) => void) | null>(null);
+  const mouseUpRef = useRef<((ev: MouseEvent) => void) | null>(null);
 
   const [swipeOffset, setSwipeOffset] = useState(0);
   const [isSwiping, setIsSwiping] = useState(false);
@@ -76,10 +78,12 @@ export function useSwipe({
     isDraggingRef.current = true;
     setIsSwiping(true);
 
-    // 只允许向左滑（dx < 0），限制最大偏移
-    const clamped = Math.max(-maxOffset, Math.min(0, dx));
+    // 限制最大偏移：如果提供了 onSwipeRight 则允许双向，否则只允许左滑
+    const clamped = onSwipeRight
+      ? Math.max(-maxOffset, Math.min(maxOffset, dx))
+      : Math.max(-maxOffset, Math.min(0, dx));
     setSwipeOffset(clamped);
-  }, [maxOffset]);
+  }, [maxOffset, onSwipeRight]);
 
   const handleEnd = useCallback((clientX: number) => {
     if (startXRef.current === null) return;
@@ -126,12 +130,28 @@ export function useSwipe({
     const onMouseUp = (ev: MouseEvent) => {
       isMouseRef.current = false;
       handleEnd(ev.clientX);
+      mouseMoveRef.current = null;
+      mouseUpRef.current = null;
       window.removeEventListener('mousemove', onMouseMove);
       window.removeEventListener('mouseup', onMouseUp);
     };
+    mouseMoveRef.current = onMouseMove;
+    mouseUpRef.current = onMouseUp;
     window.addEventListener('mousemove', onMouseMove);
     window.addEventListener('mouseup', onMouseUp);
   }, [handleStart, handleMove, handleEnd]);
+
+  // Cleanup: remove window mouse listeners on unmount
+  useEffect(() => {
+    return () => {
+      if (mouseMoveRef.current) {
+        window.removeEventListener('mousemove', mouseMoveRef.current);
+      }
+      if (mouseUpRef.current) {
+        window.removeEventListener('mouseup', mouseUpRef.current);
+      }
+    };
+  }, []);
 
   return {
     swipeHandlers: { onTouchStart, onTouchMove, onTouchEnd, onMouseDown },

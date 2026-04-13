@@ -52,6 +52,12 @@ export default function DishCard({
       onClick={onTap}
       role={onTap ? 'button' : undefined}
       tabIndex={onTap ? 0 : undefined}
+      onKeyDown={onTap ? (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onTap?.();
+        }
+      } : undefined}
     >
       {/* Image */}
       {shouldShowImage && (

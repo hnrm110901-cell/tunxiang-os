@@ -372,13 +372,24 @@ export function KDSBoardPage() {
     }
   }, [isDemo]);
 
+  const completeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Clean up animation timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (completeTimerRef.current) clearTimeout(completeTimerRef.current);
+    };
+  }, []);
+
   const handleComplete = useCallback(async (id: string) => {
     // 先标记 done，再移除（300ms 动画）
     setTickets((prev) =>
       prev.map((t) => (t.id === id ? { ...t, status: 'done' as const } : t)),
     );
-    setTimeout(() => {
+    if (completeTimerRef.current) clearTimeout(completeTimerRef.current);
+    completeTimerRef.current = setTimeout(() => {
       setTickets((prev) => prev.filter((t) => t.id !== id));
+      completeTimerRef.current = null;
     }, 400);
 
     if (!isDemo) {

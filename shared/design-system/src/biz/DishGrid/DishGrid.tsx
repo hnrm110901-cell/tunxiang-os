@@ -199,9 +199,10 @@ export default function DishGrid({
   virtualThreshold = 50,
   className,
 }: DishGridProps) {
-  const useVirtual = dishes.length > virtualThreshold;
-
-  const Renderer = useVirtual ? VirtualGrid : SimpleGrid;
+  const useVirtualRef = useRef(dishes.length > virtualThreshold);
+  // Only upgrade to virtual, never downgrade
+  if (dishes.length > virtualThreshold) useVirtualRef.current = true;
+  const Renderer = useVirtualRef.current ? VirtualGrid : SimpleGrid;
 
   return (
     <Renderer

@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import styles from './ZDrawer.module.css';
 
 interface ZDrawerProps {
@@ -18,9 +19,19 @@ export default function ZDrawer({ open, onClose, title, children, footer, width 
     return () => document.removeEventListener('keydown', handler);
   }, [open, onClose]);
 
+  // Prevent body scroll while open
+  useEffect(() => {
+    if (open) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => { document.body.style.overflow = ''; };
+  }, [open]);
+
   if (!open) return null;
 
-  return (
+  return createPortal(
     <>
       <div className={styles.overlay} onClick={onClose} />
       <div className={styles.drawer} style={width ? { width } : undefined}>
@@ -33,6 +44,7 @@ export default function ZDrawer({ open, onClose, title, children, footer, width 
         <div className={styles.body}>{children}</div>
         {footer && <div className={styles.footer}>{footer}</div>}
       </div>
-    </>
+    </>,
+    document.body,
   );
 }

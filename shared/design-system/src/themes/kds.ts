@@ -39,9 +39,19 @@ export const kdsTheme = {
   '--tx-danger':          '#EF4444',
   '--tx-info':            '#3B82F6',
 
+  // Warm (high-contrast for KDS)
+  '--tx-sun':             '#FFD566',
+  '--tx-fire':            '#FFB088',
+  '--tx-amber':           '#FFCC80',
+
   // Surface
   '--tx-surface':         '#111111',
   '--tx-surface-hover':   '#1F1F1F',
+
+  // Chart (high-contrast for KDS)
+  '--tx-chart-grid':      'rgba(255,255,255,0.10)',
+  '--tx-chart-axis':      'rgba(255,255,255,0.40)',
+  '--tx-chart-tooltip-bg': '#1A1A1A',
 
   // Shadows (minimal for KDS)
   '--tx-shadow-sm':       '0 1px 2px rgba(0,0,0,0.5)',

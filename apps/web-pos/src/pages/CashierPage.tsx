@@ -279,7 +279,7 @@ export function CashierPage() {
     });
 
     if (orderId) {
-      apiAddItem(orderId, dish.id, dish.name, qty, dish.priceFen).catch(() => {});
+      apiAddItem(orderId, dish.id, dish.name, qty, amountFen).catch(() => {});
     }
   }, [seafoodSheet.dish, orderId, store]); // eslint-disable-line react-hooks/exhaustive-deps
 

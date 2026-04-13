@@ -19,5 +19,8 @@ export * from './utils';
 export { useSwipe } from './hooks/useSwipe';
 export type { UseSwipeOptions, UseSwipeReturn } from './hooks/useSwipe';
 
+// Components
+export * from './components';
+
 // Biz components
 export * from './biz';

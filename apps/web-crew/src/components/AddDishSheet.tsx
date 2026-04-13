@@ -107,6 +107,13 @@ export function AddDishSheet({ visible, onClose, orderId, storeId, onSuccess }: 
   });
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Clean up toast timer on unmount
+  useEffect(() => {
+    return () => {
+      if (toastTimer.current) clearTimeout(toastTimer.current);
+    };
+  }, []);
+
   // Toast 工具
   const showToast = useCallback((text: string, type: 'success' | 'error' = 'success') => {
     if (toastTimer.current) clearTimeout(toastTimer.current);

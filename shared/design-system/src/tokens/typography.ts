@@ -32,8 +32,8 @@ export const fontSize = {
 export const lineHeight = {
   tight:   1.2,   // Display, KPI
   snug:    1.375, // H1-H3
-  base:    1.571, // Body (22/14)
-  relaxed: 1.5,   // Caption (18/12)
+  base:    1.5,   // Body
+  relaxed: 1.571, // Caption (22/14)
   loose:   2.0,
 } as const;
 
