@@ -10,6 +10,7 @@ AI 分析推荐将与每个商户的 KPI 目标基准进行对比，实现目标
 from __future__ import annotations
 
 import copy
+import uuid
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -68,8 +69,53 @@ _DEFAULT_TARGETS: dict[str, dict] = {
     },
 }
 
-# 运行时覆盖存储（PUT 接口写入这里）
+# 运行时覆盖存储（PUT 接口写入这里，同时持久化到 DB）
 _overrides: dict[str, dict] = {}
+
+
+def _tenant_uuid_for_merchant(merchant_code: str) -> uuid.UUID:
+    """将 merchant_code 映射到确定性 UUID（演示环境）。"""
+    tenant_str = f"{merchant_code}-demo-tenant"
+    return uuid.uuid5(uuid.NAMESPACE_DNS, tenant_str)
+
+
+async def _load_overrides_from_db() -> None:
+    """从 merchant_target_overrides 表加载持久化覆盖值到内存缓存。
+    可在应用启动后手动调用，不在模块导入时自动执行。
+    """
+    for merchant_code in _DEFAULT_TARGETS:
+        tenant_uuid = _tenant_uuid_for_merchant(merchant_code)
+        try:
+            async with async_session_factory() as session:
+                await session.execute(
+                    text("SELECT set_config('app.tenant_id', :tid, true)"),
+                    {"tid": str(tenant_uuid)},
+                )
+                result = await session.execute(
+                    text("""
+                        SELECT target_key, target_value
+                        FROM merchant_target_overrides
+                        WHERE tenant_id = :tid AND merchant_code = :mc
+                    """),
+                    {"tid": str(tenant_uuid), "mc": merchant_code},
+                )
+                rows = result.fetchall()
+                if rows:
+                    base = copy.deepcopy(_DEFAULT_TARGETS[merchant_code])
+                    for row in rows:
+                        base["targets"][row.target_key] = float(row.target_value)
+                    _overrides[merchant_code] = base
+                    logger.info(
+                        "merchant_targets_loaded_from_db",
+                        merchant_code=merchant_code,
+                        keys_loaded=len(rows),
+                    )
+        except SQLAlchemyError as exc:
+            logger.warning(
+                "merchant_targets_load_db_failed",
+                merchant_code=merchant_code,
+                error=str(exc),
+            )
 
 # 演示商户 → 租户 ID 映射
 _DEMO_TENANTS: dict[str, str] = {
@@ -319,6 +365,50 @@ async def update_merchant_targets(
 
     _overrides[merchant_code] = base
 
+    # 持久化覆盖值到 DB（UPSERT），失败时仅记录警告，不阻断内存更新
+    updated_targets: dict = payload.get("targets", {}) if isinstance(payload.get("targets"), dict) else {}
+    if updated_targets:
+        tenant_uuid = _tenant_uuid_for_merchant(merchant_code)
+        operator_id: Optional[str] = payload.get("updated_by") if isinstance(payload.get("updated_by"), str) else None
+        try:
+            async with async_session_factory() as session:
+                await session.execute(
+                    text("SELECT set_config('app.tenant_id', :tid, true)"),
+                    {"tid": str(tenant_uuid)},
+                )
+                for key, value in updated_targets.items():
+                    await session.execute(
+                        text("""
+                            INSERT INTO merchant_target_overrides
+                              (tenant_id, merchant_code, target_key, target_value, updated_by)
+                            VALUES (:tid, :mc, :key, :val, :by)
+                            ON CONFLICT (tenant_id, merchant_code, target_key)
+                            DO UPDATE SET
+                              target_value = EXCLUDED.target_value,
+                              updated_at   = NOW(),
+                              updated_by   = EXCLUDED.updated_by
+                        """),
+                        {
+                            "tid": str(tenant_uuid),
+                            "mc": merchant_code,
+                            "key": str(key),
+                            "val": float(value),
+                            "by": operator_id,
+                        },
+                    )
+                await session.commit()
+                logger.info(
+                    "merchant_targets_persisted_to_db",
+                    merchant_code=merchant_code,
+                    keys=list(updated_targets.keys()),
+                )
+        except SQLAlchemyError as exc:
+            logger.warning(
+                "merchant_targets_db_upsert_failed",
+                merchant_code=merchant_code,
+                error=str(exc),
+            )
+
     logger.info("merchant_targets_updated", merchant_code=merchant_code,
                 updated_keys=list(payload.get("targets", {}).keys()))
 
@@ -326,7 +416,7 @@ async def update_merchant_targets(
         "ok": True,
         "data": {
             "merchant_code": merchant_code,
-            "message": "目标配置已更新（内存存储，重启后恢复默认值）",
+            "message": "目标配置已更新",
             **base,
         },
     }

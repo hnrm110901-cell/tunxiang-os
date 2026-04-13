@@ -1,3 +1,24 @@
+## 2026-04-14 (Week 3)
+
+### 今日完成
+- [db-migrations] v235 ai_evidence_chains — AI证据链持久化表（JSONB + RLS）
+- [db-migrations] v236 merchant_target_overrides — 商户KPI目标覆盖配置表
+- [tx-analytics] ai_evidence_chain_routes.py — 内存存储→DB持久化（UPSERT + SQLAlchemyError捕获）
+- [tx-analytics] merchant_targets_routes.py — PUT端点DB持久化 + _load_overrides_from_db()
+- [scripts] load-test.sh — 5场景压测：健康/菜单/数据质量/KPI目标/演示监控，成功率≥90%判定
+
+### 数据变化
+- 迁移版本：v234 → v236
+- 五月技术债务关闭：AIEvidenceChain DB化 ✅、merchant_targets DB化 ✅
+
+### 遗留问题
+- sgc演示就绪度仍需提升（当前评估60分，目标≥85）
+- 压测脚本待在真实环境中运行验证
+
+### 明日计划
+- 五月 Week 4：三商户最终 GO-TO-LIVE 评审
+- 创建 PR 将 claude/friendly-germain 合并到 main
+
 ## 2026-04-14 (续)
 
 ### 今日完成
