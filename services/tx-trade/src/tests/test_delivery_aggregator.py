@@ -13,8 +13,8 @@ from fastapi import FastAPI
 
 from ..api.delivery_aggregator_routes import router as aggregator_router
 from ..api.aggregator_reconcile_routes import router as reconcile_router
-import ..api.delivery_aggregator_routes as agg_mod
-import ..api.aggregator_reconcile_routes as rec_mod
+from ..api import delivery_aggregator_routes as agg_mod
+from ..api import aggregator_reconcile_routes as rec_mod
 
 
 @pytest.fixture(autouse=True)
