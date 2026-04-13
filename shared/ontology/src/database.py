@@ -83,6 +83,7 @@ async def get_db_no_rls() -> AsyncGenerator[AsyncSession, None]:
     生产部署：GRANT BYPASSRLS ON ROLE tunxiang TO tunxiang;
 
     已知调用方（须配合路由层强鉴权）：gateway hub_api、tx-trade banquet_payment_routes、
+    wechat_pay_notify_service（按 out_trade_no 查订单）、
     tx-analytics seed_loader、tx-brain brain_routes（跨租户聚合视图）。
     """
     async with async_session_factory() as session:

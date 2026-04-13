@@ -2,9 +2,12 @@
 
 环境变量:
   WECHAT_PAY_MCH_ID      — 商户号
-  WECHAT_PAY_API_KEY_V3  — APIv3密钥（用于回调解密）
+  WECHAT_PAY_API_KEY_V3  — APIv3密钥（用于回调解密、下载平台证书）
   WECHAT_PAY_CERT_PATH   — 商户私钥证书路径（apiclient_key.pem）
   WECHAT_PAY_APPID       — 小程序AppID
+  WECHAT_PAY_MCH_CERT_SERIAL — 商户 API 证书序列号（调用 /v3/* 与拉取平台证书必填）
+  WECHAT_PAY_SERIAL_NO   — 同上（与 gateway 命名兼容）
+  WECHAT_PAY_MCH_X509_PATH — 可选：商户 apiclient_cert.pem，用于自动解析序列号
 
 当环境变量未配置时，非生产环境返回 Mock 成功响应，便于开发调试。
 
@@ -12,6 +15,7 @@
 `WechatPayService`（抛 RuntimeError），除非显式设置 `TX_WECHAT_PAY_ALLOW_MOCK=1`（仅限灰度/演练）。
 """
 
+import asyncio
 import base64
 import json
 import logging
@@ -61,6 +65,46 @@ def _load_private_key() -> Any:
         return load_pem_private_key(f.read(), password=None)
 
 
+def _normalize_wechat_serial(serial: str) -> str:
+    return serial.strip().upper()
+
+
+def _callback_timestamp_skew_seconds() -> int:
+    raw = os.environ.get("WECHAT_PAY_CALLBACK_TIMESTAMP_SKEW_SECONDS", "300")
+    try:
+        return max(1, int(raw))
+    except ValueError:
+        return 300
+
+
+def _get_wechatpay_header(headers: dict[str, str], suffix: str) -> str:
+    """读取 Wechatpay-* 头。
+
+    FastAPI/Starlette 的 ``dict(request.headers)`` 会将键规范为小写，故此处按不区分大小写匹配。
+    """
+    target = f"wechatpay-{suffix}".lower()
+    for k, v in headers.items():
+        if k.lower() == target:
+            return str(v)
+    return ""
+
+
+def _verify_rsa_sha256_pkcs1v15(public_key: Any, message: bytes, signature_b64: str) -> None:
+    """使用微信平台证书公钥验证回调签名（SHA256 + PKCS1v15）。"""
+    from cryptography.exceptions import InvalidSignature
+    from cryptography.hazmat.primitives import hashes
+    from cryptography.hazmat.primitives.asymmetric import padding
+
+    try:
+        sig = base64.b64decode(signature_b64)
+    except (ValueError, TypeError) as exc:
+        raise ValueError("Wechatpay-Signature 非合法 Base64") from exc
+    try:
+        public_key.verify(sig, message, padding.PKCS1v15(), hashes.SHA256())
+    except InvalidSignature as exc:
+        raise ValueError("微信支付回调签名验证失败") from exc
+
+
 class WechatPayService:
     """微信支付 V3 服务
 
@@ -73,6 +117,9 @@ class WechatPayService:
     def __init__(self) -> None:
         self._mock_mode = not _is_configured()
         self._private_key: Any = None
+        self._merchant_serial_no: str | None = None
+        self._platform_public_keys: dict[str, Any] = {}
+        self._platform_keys_lock = asyncio.Lock()
         if self._mock_mode:
             if _is_production_env() and not _mock_explicitly_allowed():
                 raise RuntimeError(
@@ -87,6 +134,89 @@ class WechatPayService:
             )
         else:
             self._private_key = _load_private_key()
+
+    def _load_merchant_serial_no(self) -> str:
+        """商户 API 证书序列号（请求微信 V3 接口 Authorization 必填）。"""
+        if self._merchant_serial_no is not None:
+            return self._merchant_serial_no
+        serial = (
+            os.environ.get("WECHAT_PAY_MCH_CERT_SERIAL") or os.environ.get("WECHAT_PAY_SERIAL_NO") or ""
+        ).strip()
+        if serial:
+            self._merchant_serial_no = serial
+            return serial
+        x509_path = (
+            os.environ.get("WECHAT_PAY_MCH_X509_PATH") or os.environ.get("WECHAT_PAY_CERT_X509_PATH") or ""
+        ).strip()
+        if x509_path and os.path.isfile(x509_path):
+            from cryptography import x509
+
+            with open(x509_path, "rb") as f:
+                cert = x509.load_pem_x509_certificate(f.read())
+            self._merchant_serial_no = format(cert.serial_number, "X")
+            return self._merchant_serial_no
+        raise ValueError(
+            "微信支付 API 需商户证书序列号：设置 WECHAT_PAY_MCH_CERT_SERIAL（或 WECHAT_PAY_SERIAL_NO），"
+            "或配置 WECHAT_PAY_MCH_X509_PATH 指向 apiclient_cert.pem"
+        )
+
+    def _decrypt_aes_gcm_api_v3(
+        self, nonce: str, ciphertext: str, associated_data: str
+    ) -> bytes:
+        """APIv3 密钥 AES-256-GCM 解密（回调 resource / 平台证书 encrypt_certificate）。"""
+        from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+
+        key = _API_KEY_V3.encode("utf-8")
+        nonce_bytes = nonce.encode("utf-8")
+        aad = associated_data.encode("utf-8") if associated_data else None
+        data = base64.b64decode(ciphertext)
+        aesgcm = AESGCM(key)
+        return aesgcm.decrypt(nonce_bytes, data, aad)
+
+    async def _ensure_platform_public_key(self, serial: str) -> Any:
+        """按序列号解析微信平台证书公钥（带缓存与自动下载）。"""
+        serial_n = _normalize_wechat_serial(serial)
+        if not serial_n:
+            raise ValueError("Wechatpay-Serial 为空")
+        async with self._platform_keys_lock:
+            if serial_n in self._platform_public_keys:
+                return self._platform_public_keys[serial_n]
+            await self._fetch_platform_certificates()
+            if serial_n in self._platform_public_keys:
+                return self._platform_public_keys[serial_n]
+            # 证书轮换：清空后再拉一次
+            self._platform_public_keys.clear()
+            await self._fetch_platform_certificates()
+            if serial_n in self._platform_public_keys:
+                return self._platform_public_keys[serial_n]
+        raise ValueError(f"无法获取微信平台证书公钥，serial={serial_n}")
+
+    async def _fetch_platform_certificates(self) -> None:
+        """GET /v3/certificates，解密并缓存平台证书公钥。"""
+        from cryptography import x509
+
+        resp = await self._request("GET", "/v3/certificates", None)
+        for item in resp.get("data") or []:
+            sn = item.get("serial_no") or ""
+            ec = item.get("encrypt_certificate") or {}
+            if not sn or not ec:
+                continue
+            sn_n = _normalize_wechat_serial(sn)
+            try:
+                pem_bytes = self._decrypt_aes_gcm_api_v3(
+                    ec.get("nonce", ""),
+                    ec.get("ciphertext", ""),
+                    ec.get("associated_data", ""),
+                )
+            except (ValueError, KeyError) as exc:
+                logger.warning("跳过无法解密的平台证书项: serial=%s err=%s", sn_n, exc)
+                continue
+            try:
+                cert = x509.load_pem_x509_certificate(pem_bytes)
+            except ValueError as exc:
+                logger.warning("平台证书 PEM 解析失败: serial=%s err=%s", sn_n, exc)
+                continue
+            self._platform_public_keys[sn_n] = cert.public_key()
 
     # ─── 创建预支付订单 ───
 
@@ -166,23 +296,26 @@ class WechatPayService:
 
         # 1. 验证签名（生产环境需加载微信平台证书公钥验签）
         # TODO: 从微信获取平台证书并验签（需定期下载平台证书）
-        wechat_timestamp = headers.get("Wechatpay-Timestamp", "")
-        wechat_nonce = headers.get("Wechatpay-Nonce", "")
-        wechat_signature = headers.get("Wechatpay-Signature", "")
-        wechat_serial = headers.get("Wechatpay-Serial", "")
+        wechat_timestamp = _get_wechatpay_header(headers, "timestamp")
+        wechat_nonce = _get_wechatpay_header(headers, "nonce")
+        wechat_signature = _get_wechatpay_header(headers, "signature")
+        wechat_serial = _get_wechatpay_header(headers, "serial")
 
         if not all([wechat_timestamp, wechat_nonce, wechat_signature, wechat_serial]):
             raise ValueError("缺少微信支付回调签名头")
 
-        # 签名验证消息：时间戳\n随机串\n请求体\n
         body_str = body.decode("utf-8") if isinstance(body, bytes) else body
-        _sign_msg = f"{wechat_timestamp}\n{wechat_nonce}\n{body_str}\n"
+        try:
+            ts_int = int(str(wechat_timestamp).strip())
+        except ValueError as exc:
+            raise ValueError("Wechatpay-Timestamp 非法") from exc
+        skew = _callback_timestamp_skew_seconds()
+        if abs(int(time.time()) - ts_int) > skew:
+            raise ValueError("微信支付回调时间戳超出允许窗口（防重放）")
 
-        # TODO: 使用微信平台证书公钥验证 wechat_signature
-        # 此处暂信任（生产必须实现验签）
-        logger.warning(
-            "verify_callback: 平台证书验签尚未实现，serial=%s", wechat_serial
-        )
+        sign_msg = f"{wechat_timestamp}\n{wechat_nonce}\n{body_str}\n".encode("utf-8")
+        pub = await self._ensure_platform_public_key(wechat_serial)
+        _verify_rsa_sha256_pkcs1v15(pub, sign_msg, wechat_signature)
 
         # 2. 解密通知内容
         notification = json.loads(body_str)
@@ -339,15 +472,7 @@ class WechatPayService:
         Returns:
             dict: 解密后的 JSON 对象
         """
-        from cryptography.hazmat.primitives.ciphers.aead import AESGCM
-
-        key = _API_KEY_V3.encode("utf-8")
-        nonce_bytes = nonce.encode("utf-8")
-        aad = associated_data.encode("utf-8") if associated_data else None
-        data = base64.b64decode(ciphertext)
-
-        aesgcm = AESGCM(key)
-        plaintext = aesgcm.decrypt(nonce_bytes, data, aad)
+        plaintext = self._decrypt_aes_gcm_api_v3(nonce, ciphertext, associated_data)
         return json.loads(plaintext.decode("utf-8"))
 
     # ─── HTTP 请求（生产模式） ───
@@ -365,11 +490,12 @@ class WechatPayService:
         body_str = json.dumps(body) if body else ""
 
         signature = self._sign_v3(method, url_path, timestamp, nonce, body_str)
+        mch_serial = self._load_merchant_serial_no()
         auth_header = (
             f'WECHATPAY2-SHA256-RSA2048 mchid="{_MCH_ID}",'
             f'nonce_str="{nonce}",'
             f'timestamp="{timestamp}",'
-            f'serial_no="CERT_SERIAL_TODO",'
+            f'serial_no="{mch_serial}",'
             f'signature="{signature}"'
         )
 
