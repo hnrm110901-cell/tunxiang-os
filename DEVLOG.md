@@ -1,3 +1,28 @@
+## 2026-04-14
+
+### 今日完成
+- [tx-analytics] merchant_data_quality_routes.py — 数据质量验收API，7维检查+加权评分，Gap A-01/A-02关闭
+- [scripts] release-gate.sh — 发布闸门：5项CRITICAL+3项WARNING，Gap A-03关闭
+- [scripts] seed_czyz.py — 尝在一起种子数据（12桌/15菜/10会员/30订单/KPI权重）
+- [scripts] seed_zqx.py — 最黔线种子数据（10桌/15菜/15会员/25订单/KPI权重）
+- [scripts] seed_sgc.py — 尚宫厨种子数据（15桌/15菜/8会员/20宴席订单/KPI权重）
+
+### 数据变化
+- 新增 API：1个（GET /api/v1/analytics/data-quality/{merchant_code}）
+- 新增脚本：4个（release-gate.sh + seed_czyz/zqx/sgc.py）
+- 五月差距关闭：A-01 ✅ A-02 ✅ A-03 ✅（3项已关闭）
+
+### 遗留问题
+- B-03 AI分析与分商户目标绑定（待下步：merchant_targets.py config）
+- B-04 AI结论可追溯证据链（待 AIEvidenceChain model）
+- C-03 演示环境数据重置机制
+- C-04 演示监控面板
+
+### 明日计划
+- B-03: merchant_targets.py + AI周报绑定商户KPI目标
+- B-04: AIEvidenceChain — AI结论→events表ID追溯
+- C-03: scripts/demo-reset.sh 数据重置脚本
+
 ## 2026-04-13 (Week 4)
 
 ### 今日完成
