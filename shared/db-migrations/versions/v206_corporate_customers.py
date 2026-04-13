@@ -47,76 +47,94 @@ def upgrade() -> None:
             sa.Column("created_at", sa.DateTime, server_default=sa.text("NOW()")),
             sa.Column("updated_at", sa.DateTime, server_default=sa.text("NOW()")),
         )
-    op.execute("ALTER TABLE corporate_customers ENABLE ROW LEVEL SECURITY;")
-    op.execute("ALTER TABLE corporate_customers FORCE ROW LEVEL SECURITY;")
-    op.execute("""
-        DO $$ BEGIN
-            IF NOT EXISTS (
-                SELECT 1 FROM pg_policies
-                WHERE tablename = 'corporate_customers'
-                AND policyname = 'corporate_customers_tenant'
-            ) THEN
-                EXECUTE 'CREATE POLICY corporate_customers_tenant ON corporate_customers
-                    USING (tenant_id = NULLIF(current_setting(''app.tenant_id'', true), ''''))
-                    WITH CHECK (tenant_id = NULLIF(current_setting(''app.tenant_id'', true), ''''))';
-            END IF;
-        END$$;
-    """)
+        op.execute("ALTER TABLE corporate_customers ENABLE ROW LEVEL SECURITY;")
+        op.execute("ALTER TABLE corporate_customers FORCE ROW LEVEL SECURITY;")
+        op.execute("""
+            DO $$ BEGIN
+                IF NOT EXISTS (
+                    SELECT 1 FROM pg_policies
+                    WHERE tablename = 'corporate_customers'
+                    AND policyname = 'corporate_customers_tenant'
+                ) THEN
+                    EXECUTE 'CREATE POLICY corporate_customers_tenant ON corporate_customers
+                        USING (tenant_id = NULLIF(current_setting(''app.tenant_id'', true), ''''))
+                        WITH CHECK (tenant_id = NULLIF(current_setting(''app.tenant_id'', true), ''''))';
+                END IF;
+            END$$;
+        """)
 
     # ── corporate_orders（企业订单）──
-    op.create_table(
-        "corporate_orders",
-        sa.Column("id", UUID(as_uuid=True), primary_key=True, server_default=sa.text("gen_random_uuid()")),
-        sa.Column("tenant_id", sa.String(50), nullable=False, index=True),
-        sa.Column("store_id", sa.String(50), nullable=False, index=True),
-        sa.Column("corporate_customer_id", UUID(as_uuid=True),
-                  sa.ForeignKey("corporate_customers.id"), nullable=False, index=True),
-        sa.Column("order_no", sa.String(30), nullable=False, unique=True),
-        sa.Column("items", JSONB, nullable=False, server_default="[]"),
-        sa.Column("original_amount_fen", sa.BigInteger, nullable=False),
-        sa.Column("discount_rate", sa.Float, nullable=False),
-        sa.Column("final_amount_fen", sa.BigInteger, nullable=False),
-        sa.Column("covers", sa.Integer, server_default="1"),
-        sa.Column("status", sa.String(20), server_default="'pending'",
-                  comment="pending/confirmed/billed/paid/cancelled"),
-        sa.Column("billed", sa.Boolean, server_default=sa.text("FALSE")),
-        sa.Column("bill_id", UUID(as_uuid=True), nullable=True),
-        sa.Column("ordered_at", sa.DateTime, server_default=sa.text("NOW()")),
-        sa.Column("created_at", sa.DateTime, server_default=sa.text("NOW()")),
-    )
-    op.execute("ALTER TABLE corporate_orders ENABLE ROW LEVEL SECURITY;")
-    op.execute("ALTER TABLE corporate_orders FORCE ROW LEVEL SECURITY;")
-    op.execute("""
-        CREATE POLICY corporate_orders_tenant ON corporate_orders
-        USING (tenant_id = NULLIF(current_setting('app.tenant_id', true), ''))
-        WITH CHECK (tenant_id = NULLIF(current_setting('app.tenant_id', true), ''));
-    """)
+    if 'corporate_orders' not in existing:
+        op.create_table(
+            "corporate_orders",
+            sa.Column("id", UUID(as_uuid=True), primary_key=True, server_default=sa.text("gen_random_uuid()")),
+            sa.Column("tenant_id", sa.String(50), nullable=False, index=True),
+            sa.Column("store_id", sa.String(50), nullable=False, index=True),
+            sa.Column("corporate_customer_id", UUID(as_uuid=True),
+                      sa.ForeignKey("corporate_customers.id"), nullable=False, index=True),
+            sa.Column("order_no", sa.String(30), nullable=False, unique=True),
+            sa.Column("items", JSONB, nullable=False, server_default="[]"),
+            sa.Column("original_amount_fen", sa.BigInteger, nullable=False),
+            sa.Column("discount_rate", sa.Float, nullable=False),
+            sa.Column("final_amount_fen", sa.BigInteger, nullable=False),
+            sa.Column("covers", sa.Integer, server_default="1"),
+            sa.Column("status", sa.String(20), server_default="'pending'",
+                      comment="pending/confirmed/billed/paid/cancelled"),
+            sa.Column("billed", sa.Boolean, server_default=sa.text("FALSE")),
+            sa.Column("bill_id", UUID(as_uuid=True), nullable=True),
+            sa.Column("ordered_at", sa.DateTime, server_default=sa.text("NOW()")),
+            sa.Column("created_at", sa.DateTime, server_default=sa.text("NOW()")),
+        )
+        op.execute("ALTER TABLE corporate_orders ENABLE ROW LEVEL SECURITY;")
+        op.execute("ALTER TABLE corporate_orders FORCE ROW LEVEL SECURITY;")
+        op.execute("""
+            DO $$ BEGIN
+                IF NOT EXISTS (
+                    SELECT 1 FROM pg_policies
+                    WHERE tablename = 'corporate_orders'
+                    AND policyname = 'corporate_orders_tenant'
+                ) THEN
+                    EXECUTE 'CREATE POLICY corporate_orders_tenant ON corporate_orders
+                        USING (tenant_id = NULLIF(current_setting(''app.tenant_id'', true), ''''))
+                        WITH CHECK (tenant_id = NULLIF(current_setting(''app.tenant_id'', true), ''''))';
+                END IF;
+            END$$;
+        """)
 
     # ── corporate_bills（企业账单）──
-    op.create_table(
-        "corporate_bills",
-        sa.Column("id", UUID(as_uuid=True), primary_key=True, server_default=sa.text("gen_random_uuid()")),
-        sa.Column("tenant_id", sa.String(50), nullable=False, index=True),
-        sa.Column("store_id", sa.String(50), nullable=False, index=True),
-        sa.Column("corporate_customer_id", UUID(as_uuid=True),
-                  sa.ForeignKey("corporate_customers.id"), nullable=False),
-        sa.Column("bill_no", sa.String(30), nullable=False, unique=True),
-        sa.Column("period_start", sa.Date, nullable=False),
-        sa.Column("period_end", sa.Date, nullable=False),
-        sa.Column("order_count", sa.Integer, nullable=False),
-        sa.Column("total_amount_fen", sa.BigInteger, nullable=False),
-        sa.Column("status", sa.String(20), server_default="'pending'",
-                  comment="pending/sent/confirmed/paid"),
-        sa.Column("paid_at", sa.DateTime, nullable=True),
-        sa.Column("created_at", sa.DateTime, server_default=sa.text("NOW()")),
-    )
-    op.execute("ALTER TABLE corporate_bills ENABLE ROW LEVEL SECURITY;")
-    op.execute("ALTER TABLE corporate_bills FORCE ROW LEVEL SECURITY;")
-    op.execute("""
-        CREATE POLICY corporate_bills_tenant ON corporate_bills
-        USING (tenant_id = NULLIF(current_setting('app.tenant_id', true), ''))
-        WITH CHECK (tenant_id = NULLIF(current_setting('app.tenant_id', true), ''));
-    """)
+    if 'corporate_bills' not in existing:
+        op.create_table(
+            "corporate_bills",
+            sa.Column("id", UUID(as_uuid=True), primary_key=True, server_default=sa.text("gen_random_uuid()")),
+            sa.Column("tenant_id", sa.String(50), nullable=False, index=True),
+            sa.Column("store_id", sa.String(50), nullable=False, index=True),
+            sa.Column("corporate_customer_id", UUID(as_uuid=True),
+                      sa.ForeignKey("corporate_customers.id"), nullable=False),
+            sa.Column("bill_no", sa.String(30), nullable=False, unique=True),
+            sa.Column("period_start", sa.Date, nullable=False),
+            sa.Column("period_end", sa.Date, nullable=False),
+            sa.Column("order_count", sa.Integer, nullable=False),
+            sa.Column("total_amount_fen", sa.BigInteger, nullable=False),
+            sa.Column("status", sa.String(20), server_default="'pending'",
+                      comment="pending/sent/confirmed/paid"),
+            sa.Column("paid_at", sa.DateTime, nullable=True),
+            sa.Column("created_at", sa.DateTime, server_default=sa.text("NOW()")),
+        )
+        op.execute("ALTER TABLE corporate_bills ENABLE ROW LEVEL SECURITY;")
+        op.execute("ALTER TABLE corporate_bills FORCE ROW LEVEL SECURITY;")
+        op.execute("""
+            DO $$ BEGIN
+                IF NOT EXISTS (
+                    SELECT 1 FROM pg_policies
+                    WHERE tablename = 'corporate_bills'
+                    AND policyname = 'corporate_bills_tenant'
+                ) THEN
+                    EXECUTE 'CREATE POLICY corporate_bills_tenant ON corporate_bills
+                        USING (tenant_id = NULLIF(current_setting(''app.tenant_id'', true), ''''))
+                        WITH CHECK (tenant_id = NULLIF(current_setting(''app.tenant_id'', true), ''''))';
+                END IF;
+            END$$;
+        """)
 
 
 def downgrade() -> None:
