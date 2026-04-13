@@ -5,7 +5,6 @@ from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
 import structlog
-from typing import AsyncGenerator
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
@@ -27,25 +26,16 @@ async_session_factory = async_sessionmaker(engine, class_=AsyncSession, expire_o
 _SET_TENANT_SQL = text("SELECT set_config('app.tenant_id', :tid, true)")
 
 
-def _validate_tenant_id(tenant_id: str) -> str:
-    """校验 tenant_id 非空且为合法 UUID，防止 RLS 绕过。"""
-    if not tenant_id or not tenant_id.strip():
-        raise ValueError("tenant_id must not be empty — RLS requires a valid tenant context")
-    try:
-        uuid.UUID(tenant_id)
-    except ValueError as e:
-        raise ValueError(f"tenant_id must be a valid UUID, got: {tenant_id!r}") from e
-    return tenant_id
-
-
 class TenantIDMissing(Exception):
     pass
+
 
 class TenantIDInvalid(Exception):
     pass
 
 
 def _validate_tenant_id(tenant_id: str) -> str:
+    """校验 tenant_id 非空且为合法 UUID，防止 RLS 绕过。"""
     if not tenant_id or not tenant_id.strip():
         raise TenantIDMissing("tenant_id is required but was empty or None")
     tid = tenant_id.strip()
@@ -91,6 +81,9 @@ async def get_db_no_rls() -> AsyncGenerator[AsyncSession, None]:
 
     要求：DB 用户须持有 BYPASSRLS 权限（或 SUPERUSER）。
     生产部署：GRANT BYPASSRLS ON ROLE tunxiang TO tunxiang;
+
+    已知调用方（须配合路由层强鉴权）：gateway hub_api、tx-trade banquet_payment_routes、
+    tx-analytics seed_loader、tx-brain brain_routes（跨租户聚合视图）。
     """
     async with async_session_factory() as session:
         try:
@@ -104,7 +97,7 @@ async def get_db_no_rls() -> AsyncGenerator[AsyncSession, None]:
             try:
                 await session.execute(text("SELECT set_config('app.tenant_id', '', true)"))
             except Exception:  # noqa: BLE001
-                logger.warning("failed_to_clear_tenant_id", tenant_id=validated_tid)
+                logger.warning("failed_to_clear_tenant_id", context="get_db_no_rls")
 
 
 class TenantSession:
