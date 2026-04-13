@@ -4,6 +4,23 @@
 
 ---
 
+## 2026-04-13 (收尾：Agent KPI 路由注册 + v249 补迁移)
+
+### 今日完成
+- [web-admin] 注册 `AgentKPIDashboard` 路由 `/agent/kpi`（模块4.4最后一步）
+- [db-migrations] 补充 v249：`banquet_kds_dishes` + `banquet_session_deposits` 两表迁移（含RLS + 索引 + check约束）
+
+### 数据变化
+- 迁移版本：v248 → v249
+
+### 遗留问题
+- 无
+
+### 明日计划
+- Phase 1-4 全部完成，等待产品验收 / 客户演示
+
+---
+
 ## 2026-04-12 (P1 Agent OS 能力升级 — Memory + 协调 + Tool Bus + Edge SLM)
 
 ### 今日完成：P1 全量升级（5大模块并行开发）
