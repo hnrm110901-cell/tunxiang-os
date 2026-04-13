@@ -1,3 +1,23 @@
+## 2026-04-13 (Week 4)
+
+### 今日完成
+- [docs] 五月差距关闭计划 v1.0 — 4周计划关闭全部7项差距(A-01/02/03, B-03/04, C-03/04)
+- [scripts] merchant-deploy-check.sh — 部署前就绪度检查脚本，含14服务探活+评分卡+GO/NO-GO
+- [infra/docker] docker-compose.czyz/zqx/sgc.yml — 三商户独立演示环境，端口隔离(+0/+100/+200)
+
+### 数据变化
+- 新增文档：1份（may-gap-closure-plan-2026-05.md）
+- 新增脚本：1份（scripts/merchant-deploy-check.sh）
+- 新增 Docker Compose：3份（czyz/zqx/sgc 独立环境）
+
+### 遗留问题
+- scripts/seed_czyz.py / seed_zqx.py / seed_sgc.py 种子数据脚本待编写
+- 五月计划中 v256-v259 迁移版本待实施
+
+### 明日计划
+- 五月 Week 1 差距关闭：merchant_data_quality_routes.py + release-gate.sh
+- 三商户种子数据脚本 seed_czyz/zqx/sgc.py
+
 # 屯象OS — 每日开发日志
 
 > 最新记录在最上方。格式：完成内容 / 数据变化 / 遗留问题 / 明日计划。

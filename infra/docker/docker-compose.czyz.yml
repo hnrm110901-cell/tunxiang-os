@@ -1,0 +1,274 @@
+# ============================================================
+# 屯象OS — 尝在一起 (czyz) 演示环境
+# 用法: docker compose -f docker-compose.czyz.yml up -d
+# 端口基线: postgres=5432, gateway=8000, web-admin=5173
+# KPI 重点: 翻台率 / 出餐时间 / 座位利用率
+# ============================================================
+
+x-merchant-env: &merchant-env
+  TX_MERCHANT_CODE: "czyz"
+  TX_TENANT_ID: "czyz-demo-tenant"
+  TX_MERCHANT_NAME: "尝在一起"
+
+x-py-common: &py-common
+  image: python:3.11-slim
+  restart: unless-stopped
+  networks:
+    - txos-czyz
+  environment: &common-env
+    DATABASE_URL: postgresql+asyncpg://tunxiang:tunxiang_czyz_2024@postgres:5432/tunxiang_czyz
+    REDIS_URL: redis://redis:6379/0
+    TX_ENV: demo
+    TX_AUTH_ENABLED: "false"
+    TX_RATE_LIMIT_ENABLED: "false"
+    LOG_LEVEL: INFO
+    PYTHONPATH: /app
+    PYTHONUNBUFFERED: "1"
+    TX_MERCHANT_CODE: "czyz"
+    TX_TENANT_ID: "czyz-demo-tenant"
+    TX_MERCHANT_NAME: "尝在一起"
+  depends_on:
+    postgres:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+
+services:
+  # ── 基础设施 ──────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: tunxiang
+      POSTGRES_PASSWORD: tunxiang_czyz_2024
+      POSTGRES_DB: tunxiang_czyz
+    ports:
+      - "5432:5432"
+    volumes:
+      - czyz_pg_data:/var/lib/postgresql/data
+      - ./init-rls.sql:/docker-entrypoint-initdb.d/01-rls.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tunxiang -d tunxiang_czyz"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - txos-czyz
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - txos-czyz
+
+  # ── 数据库迁移（一次性 job）────────────────────────────────
+  migrate:
+    <<: *py-common
+    restart: "no"
+    working_dir: /app
+    command: >
+      sh -c "pip install -q -i https://pypi.tuna.tsinghua.edu.cn/simple
+             alembic asyncpg sqlalchemy psycopg2-binary &&
+             alembic -c shared/db-migrations/alembic.ini upgrade head &&
+             echo '✅ czyz 迁移完成'"
+    volumes:
+      - ../../shared:/app/shared
+      - ../../services:/app/services
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # ── 种子数据（迁移完成后执行）──────────────────────────────
+  seed-data:
+    <<: *py-common
+    restart: "no"
+    command: >
+      sh -c "pip install -q -i https://pypi.tuna.tsinghua.edu.cn/simple
+             sqlalchemy asyncpg psycopg2-binary httpx &&
+             python3 /app/scripts/seed_czyz.py &&
+             echo '✅ czyz 种子数据植入完成'"
+    volumes:
+      - ../../scripts:/app/scripts
+      - ../../shared:/app/shared
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  # ── API Gateway ───────────────────────────────────────────
+  gateway:
+    <<: *py-common
+    working_dir: /app
+    command: >
+      sh -c "pip install -q -i https://pypi.tuna.tsinghua.edu.cn/simple
+             -r services/gateway/requirements.txt &&
+             uvicorn services.gateway.src.main:app
+             --host 0.0.0.0 --port 8000"
+    ports:
+      - "8000:8000"
+    volumes:
+      - ../../services/gateway:/app/services/gateway
+      - ../../shared:/app/shared
+    depends_on:
+      seed-data:
+        condition: service_completed_successfully
+
+  # ── 核心业务微服务 ────────────────────────────────────────
+  tx-trade:
+    <<: *py-common
+    working_dir: /app
+    command: >
+      sh -c "pip install -q -i https://pypi.tuna.tsinghua.edu.cn/simple
+             -r services/tx-trade/requirements.txt &&
+             cd /app/services/tx-trade &&
+             uvicorn src.main:app --host 0.0.0.0 --port 8001"
+    ports:
+      - "8001:8001"
+    volumes:
+      - ../../services/tx-trade:/app/services/tx-trade
+      - ../../shared:/app/shared
+    depends_on:
+      seed-data:
+        condition: service_completed_successfully
+
+  tx-menu:
+    <<: *py-common
+    working_dir: /app
+    command: >
+      sh -c "pip install -q -i https://pypi.tuna.tsinghua.edu.cn/simple
+             -r services/tx-menu/requirements.txt &&
+             cd /app/services/tx-menu &&
+             uvicorn src.main:app --host 0.0.0.0 --port 8002"
+    ports:
+      - "8002:8002"
+    volumes:
+      - ../../services/tx-menu:/app/services/tx-menu
+      - ../../shared:/app/shared
+    depends_on:
+      seed-data:
+        condition: service_completed_successfully
+
+  tx-member:
+    <<: *py-common
+    working_dir: /app
+    command: >
+      sh -c "pip install -q -i https://pypi.tuna.tsinghua.edu.cn/simple
+             -r services/tx-member/requirements.txt &&
+             cd /app/services/tx-member &&
+             uvicorn src.main:app --host 0.0.0.0 --port 8003"
+    ports:
+      - "8003:8003"
+    volumes:
+      - ../../services/tx-member:/app/services/tx-member
+      - ../../shared:/app/shared
+    depends_on:
+      seed-data:
+        condition: service_completed_successfully
+
+  tx-analytics:
+    <<: *py-common
+    working_dir: /app
+    command: >
+      sh -c "pip install -q -i https://pypi.tuna.tsinghua.edu.cn/simple
+             -r services/tx-analytics/requirements.txt &&
+             cd /app/services/tx-analytics &&
+             uvicorn src.main:app --host 0.0.0.0 --port 8009"
+    ports:
+      - "8009:8009"
+    volumes:
+      - ../../services/tx-analytics:/app/services/tx-analytics
+      - ../../shared:/app/shared
+    depends_on:
+      seed-data:
+        condition: service_completed_successfully
+
+  tx-agent:
+    <<: *py-common
+    working_dir: /app
+    command: >
+      sh -c "pip install -q -i https://pypi.tuna.tsinghua.edu.cn/simple
+             -r services/tx-agent/requirements.txt &&
+             cd /app/services/tx-agent &&
+             uvicorn src.main:app --host 0.0.0.0 --port 8008"
+    ports:
+      - "8008:8008"
+    volumes:
+      - ../../services/tx-agent:/app/services/tx-agent
+      - ../../shared:/app/shared
+    depends_on:
+      seed-data:
+        condition: service_completed_successfully
+
+  # ── 前端（Vite Dev Server）────────────────────────────────
+  web-admin:
+    image: node:20-alpine
+    restart: unless-stopped
+    working_dir: /app
+    command: >
+      sh -c "npm config set registry https://registry.npmmirror.com &&
+             npm install && npm run dev -- --host 0.0.0.0 --port 5173"
+    ports:
+      - "5173:5173"
+    volumes:
+      - ../../apps/web-admin:/app
+      - czyz_web_admin_nm:/app/node_modules
+    environment:
+      VITE_API_BASE_URL: http://localhost:8000
+      VITE_MERCHANT_CODE: czyz
+      VITE_TENANT_ID: czyz-demo-tenant
+    networks:
+      - txos-czyz
+
+  web-pos:
+    image: node:20-alpine
+    restart: unless-stopped
+    working_dir: /app
+    command: >
+      sh -c "npm config set registry https://registry.npmmirror.com &&
+             npm install && npm run dev -- --host 0.0.0.0 --port 5174"
+    ports:
+      - "5174:5174"
+    volumes:
+      - ../../apps/web-pos:/app
+      - czyz_web_pos_nm:/app/node_modules
+    environment:
+      VITE_API_BASE_URL: http://localhost:8000
+      VITE_MERCHANT_CODE: czyz
+      VITE_TENANT_ID: czyz-demo-tenant
+    networks:
+      - txos-czyz
+
+  web-kds:
+    image: node:20-alpine
+    restart: unless-stopped
+    working_dir: /app
+    command: >
+      sh -c "npm config set registry https://registry.npmmirror.com &&
+             npm install && npm run dev -- --host 0.0.0.0 --port 5175"
+    ports:
+      - "5175:5175"
+    volumes:
+      - ../../apps/web-kds:/app
+      - czyz_web_kds_nm:/app/node_modules
+    environment:
+      VITE_API_BASE_URL: http://localhost:8000
+      VITE_MERCHANT_CODE: czyz
+      VITE_TENANT_ID: czyz-demo-tenant
+    networks:
+      - txos-czyz
+
+volumes:
+  czyz_pg_data:
+  czyz_web_admin_nm:
+  czyz_web_pos_nm:
+  czyz_web_kds_nm:
+
+networks:
+  txos-czyz:
+    driver: bridge

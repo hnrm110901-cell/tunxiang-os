@@ -1,0 +1,275 @@
+# ============================================================
+# 屯象OS — 尚宫厨 (sgc) 演示环境
+# 用法: docker compose -f docker-compose.sgc.yml up -d
+# 端口偏移: +200 (postgres=5632, gateway=8200, web-admin=5373)
+# KPI 重点: 宴会客单价 / 订金收款率 / 人力成本占比
+# ============================================================
+
+x-merchant-env: &merchant-env
+  TX_MERCHANT_CODE: "sgc"
+  TX_TENANT_ID: "sgc-demo-tenant"
+  TX_MERCHANT_NAME: "尚宫厨"
+
+x-py-common: &py-common
+  image: python:3.11-slim
+  restart: unless-stopped
+  networks:
+    - txos-sgc
+  environment: &common-env
+    DATABASE_URL: postgresql+asyncpg://tunxiang:tunxiang_sgc_2024@postgres:5632/tunxiang_sgc
+    REDIS_URL: redis://redis:6381/0
+    TX_ENV: demo
+    TX_AUTH_ENABLED: "false"
+    TX_RATE_LIMIT_ENABLED: "false"
+    LOG_LEVEL: INFO
+    PYTHONPATH: /app
+    PYTHONUNBUFFERED: "1"
+    TX_MERCHANT_CODE: "sgc"
+    TX_TENANT_ID: "sgc-demo-tenant"
+    TX_MERCHANT_NAME: "尚宫厨"
+  depends_on:
+    postgres:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+
+services:
+  # ── 基础设施 ──────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: tunxiang
+      POSTGRES_PASSWORD: tunxiang_sgc_2024
+      POSTGRES_DB: tunxiang_sgc
+    ports:
+      - "5632:5432"
+    volumes:
+      - sgc_pg_data:/var/lib/postgresql/data
+      - ./init-rls.sql:/docker-entrypoint-initdb.d/01-rls.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tunxiang -d tunxiang_sgc"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - txos-sgc
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "6381:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - txos-sgc
+
+  # ── 数据库迁移（一次性 job）────────────────────────────────
+  migrate:
+    <<: *py-common
+    restart: "no"
+    working_dir: /app
+    command: >
+      sh -c "pip install -q -i https://pypi.tuna.tsinghua.edu.cn/simple
+             alembic asyncpg sqlalchemy psycopg2-binary &&
+             alembic -c shared/db-migrations/alembic.ini upgrade head &&
+             echo '✅ sgc 迁移完成'"
+    volumes:
+      - ../../shared:/app/shared
+      - ../../services:/app/services
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # ── 种子数据（迁移完成后执行）──────────────────────────────
+  # sgc 需额外植入宴会预订数据（5张宴会预订 + 3张已付定金订单）
+  seed-data:
+    <<: *py-common
+    restart: "no"
+    command: >
+      sh -c "pip install -q -i https://pypi.tuna.tsinghua.edu.cn/simple
+             sqlalchemy asyncpg psycopg2-binary httpx &&
+             python3 /app/scripts/seed_sgc.py &&
+             echo '✅ sgc 种子数据植入完成（含宴会数据）'"
+    volumes:
+      - ../../scripts:/app/scripts
+      - ../../shared:/app/shared
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  # ── API Gateway ───────────────────────────────────────────
+  gateway:
+    <<: *py-common
+    working_dir: /app
+    command: >
+      sh -c "pip install -q -i https://pypi.tuna.tsinghua.edu.cn/simple
+             -r services/gateway/requirements.txt &&
+             uvicorn services.gateway.src.main:app
+             --host 0.0.0.0 --port 8200"
+    ports:
+      - "8200:8200"
+    volumes:
+      - ../../services/gateway:/app/services/gateway
+      - ../../shared:/app/shared
+    depends_on:
+      seed-data:
+        condition: service_completed_successfully
+
+  # ── 核心业务微服务 ────────────────────────────────────────
+  tx-trade:
+    <<: *py-common
+    working_dir: /app
+    command: >
+      sh -c "pip install -q -i https://pypi.tuna.tsinghua.edu.cn/simple
+             -r services/tx-trade/requirements.txt &&
+             cd /app/services/tx-trade &&
+             uvicorn src.main:app --host 0.0.0.0 --port 8201"
+    ports:
+      - "8201:8201"
+    volumes:
+      - ../../services/tx-trade:/app/services/tx-trade
+      - ../../shared:/app/shared
+    depends_on:
+      seed-data:
+        condition: service_completed_successfully
+
+  tx-menu:
+    <<: *py-common
+    working_dir: /app
+    command: >
+      sh -c "pip install -q -i https://pypi.tuna.tsinghua.edu.cn/simple
+             -r services/tx-menu/requirements.txt &&
+             cd /app/services/tx-menu &&
+             uvicorn src.main:app --host 0.0.0.0 --port 8202"
+    ports:
+      - "8202:8202"
+    volumes:
+      - ../../services/tx-menu:/app/services/tx-menu
+      - ../../shared:/app/shared
+    depends_on:
+      seed-data:
+        condition: service_completed_successfully
+
+  tx-member:
+    <<: *py-common
+    working_dir: /app
+    command: >
+      sh -c "pip install -q -i https://pypi.tuna.tsinghua.edu.cn/simple
+             -r services/tx-member/requirements.txt &&
+             cd /app/services/tx-member &&
+             uvicorn src.main:app --host 0.0.0.0 --port 8203"
+    ports:
+      - "8203:8203"
+    volumes:
+      - ../../services/tx-member:/app/services/tx-member
+      - ../../shared:/app/shared
+    depends_on:
+      seed-data:
+        condition: service_completed_successfully
+
+  tx-analytics:
+    <<: *py-common
+    working_dir: /app
+    command: >
+      sh -c "pip install -q -i https://pypi.tuna.tsinghua.edu.cn/simple
+             -r services/tx-analytics/requirements.txt &&
+             cd /app/services/tx-analytics &&
+             uvicorn src.main:app --host 0.0.0.0 --port 8209"
+    ports:
+      - "8209:8209"
+    volumes:
+      - ../../services/tx-analytics:/app/services/tx-analytics
+      - ../../shared:/app/shared
+    depends_on:
+      seed-data:
+        condition: service_completed_successfully
+
+  tx-agent:
+    <<: *py-common
+    working_dir: /app
+    command: >
+      sh -c "pip install -q -i https://pypi.tuna.tsinghua.edu.cn/simple
+             -r services/tx-agent/requirements.txt &&
+             cd /app/services/tx-agent &&
+             uvicorn src.main:app --host 0.0.0.0 --port 8208"
+    ports:
+      - "8208:8208"
+    volumes:
+      - ../../services/tx-agent:/app/services/tx-agent
+      - ../../shared:/app/shared
+    depends_on:
+      seed-data:
+        condition: service_completed_successfully
+
+  # ── 前端（Vite Dev Server）────────────────────────────────
+  web-admin:
+    image: node:20-alpine
+    restart: unless-stopped
+    working_dir: /app
+    command: >
+      sh -c "npm config set registry https://registry.npmmirror.com &&
+             npm install && npm run dev -- --host 0.0.0.0 --port 5373"
+    ports:
+      - "5373:5373"
+    volumes:
+      - ../../apps/web-admin:/app
+      - sgc_web_admin_nm:/app/node_modules
+    environment:
+      VITE_API_BASE_URL: http://localhost:8200
+      VITE_MERCHANT_CODE: sgc
+      VITE_TENANT_ID: sgc-demo-tenant
+    networks:
+      - txos-sgc
+
+  web-pos:
+    image: node:20-alpine
+    restart: unless-stopped
+    working_dir: /app
+    command: >
+      sh -c "npm config set registry https://registry.npmmirror.com &&
+             npm install && npm run dev -- --host 0.0.0.0 --port 5374"
+    ports:
+      - "5374:5374"
+    volumes:
+      - ../../apps/web-pos:/app
+      - sgc_web_pos_nm:/app/node_modules
+    environment:
+      VITE_API_BASE_URL: http://localhost:8200
+      VITE_MERCHANT_CODE: sgc
+      VITE_TENANT_ID: sgc-demo-tenant
+    networks:
+      - txos-sgc
+
+  web-kds:
+    image: node:20-alpine
+    restart: unless-stopped
+    working_dir: /app
+    command: >
+      sh -c "npm config set registry https://registry.npmmirror.com &&
+             npm install && npm run dev -- --host 0.0.0.0 --port 5375"
+    ports:
+      - "5375:5375"
+    volumes:
+      - ../../apps/web-kds:/app
+      - sgc_web_kds_nm:/app/node_modules
+    environment:
+      VITE_API_BASE_URL: http://localhost:8200
+      VITE_MERCHANT_CODE: sgc
+      VITE_TENANT_ID: sgc-demo-tenant
+    networks:
+      - txos-sgc
+
+volumes:
+  sgc_pg_data:
+  sgc_web_admin_nm:
+  sgc_web_pos_nm:
+  sgc_web_kds_nm:
+
+networks:
+  txos-sgc:
+    driver: bridge
