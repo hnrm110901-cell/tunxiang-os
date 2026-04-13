@@ -1,3 +1,24 @@
+## 2026-04-13 (续)
+
+### 今日完成
+- [docs] 门店全流程演示导播手册 v1.0 — 8阶段60分钟脚本+三商户差异演示要点+4种异常备选脚本
+- [tx-analytics] 商户交付评分卡 API — GET /delivery-scorecard/{merchant_code}，4维评分+GO/NO-GO判定
+- [tx-member] members.py: list_customers/create_member 全量接入真实 DB + emit MemberEventType
+- [tx-org] governance_routes.py: 治理层级路由补全 DB 查询
+- [tx-supply] ck_recipe_routes.py: 中央厨房配方 API 全面 DB 化（~1100行重构）
+
+### 数据变化
+- 新增 API 模块：2个（delivery-scorecard + demo-playbook doc）
+- 新增文档：1份（docs/demo-playbook-store-fullflow.md）
+
+### 遗留问题
+- 异常演示备选脚本已内嵌于导播手册，无单独文件
+- KPI 中 serve_dispatch / inventory_agent / finance_audit 仍用估算值
+
+### 明日计划
+- Week 4 五月差距关闭计划文档
+- 三商户部署准备清单（Docker Compose per-merchant 配置核查）
+
 # 屯象OS — 每日开发日志
 
 > 最新记录在最上方。格式：完成内容 / 数据变化 / 遗留问题 / 明日计划。

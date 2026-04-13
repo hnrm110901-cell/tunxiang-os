@@ -1,14 +1,18 @@
 """会员管理 API — Golden ID + RFM + 旅程 + 企微 SCRM 绑定"""
-from datetime import datetime
+import asyncio
+from datetime import datetime, timezone
 from typing import Optional
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import structlog
 from fastapi import APIRouter, Header, HTTPException
 from pydantic import BaseModel
 from services.repository import WecomRepository
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy import text
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
+from shared.events.src.emitter import emit_event
+from shared.events.src.event_types import MemberEventType
 from shared.ontology.src.database import get_db_with_tenant
 
 logger = structlog.get_logger()
@@ -24,41 +28,225 @@ class CreateMemberReq(BaseModel):
 
 # Golden ID 会员
 @router.get("/customers")
-async def list_customers(store_id: str, rfm_level: Optional[str] = None, page: int = 1, size: int = 20):
-    return {"ok": True, "data": {"items": [], "total": 0}}
+async def list_customers(
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    store_id: Optional[str] = None,
+    rfm_level: Optional[str] = None,
+    page: int = 1,
+    size: int = 20,
+):
+    try:
+        async with get_db_with_tenant(x_tenant_id) as db:
+            conditions = ["tenant_id = :tid", "is_deleted = false"]
+            params: dict = {"tid": x_tenant_id, "limit": size, "offset": (page - 1) * size}
+
+            if rfm_level:
+                conditions.append("rfm_level = :rfm_level")
+                params["rfm_level"] = rfm_level
+
+            if store_id:
+                conditions.append("first_store_id = :store_id")
+                params["store_id"] = store_id
+
+            where_clause = " AND ".join(conditions)
+
+            count_result = await db.execute(
+                text(f"SELECT COUNT(*) FROM customers WHERE {where_clause}"),
+                params,
+            )
+            total = count_result.scalar() or 0
+
+            rows_result = await db.execute(
+                text(
+                    f"SELECT id, primary_phone, display_name, rfm_level, source, first_store_id, created_at"
+                    f" FROM customers WHERE {where_clause}"
+                    f" ORDER BY created_at DESC LIMIT :limit OFFSET :offset"
+                ),
+                params,
+            )
+            rows = rows_result.mappings().all()
+
+        items = [
+            {
+                "customer_id": str(r["id"]),
+                "phone": r["primary_phone"],
+                "display_name": r["display_name"],
+                "rfm_level": r["rfm_level"],
+                "source": r["source"],
+                "first_store_id": r["first_store_id"],
+                "created_at": r["created_at"].isoformat() if r["created_at"] else None,
+            }
+            for r in rows
+        ]
+        return {"ok": True, "data": {"items": items, "total": total}}
+
+    except SQLAlchemyError as exc:
+        logger.error("list_customers_db_error", error=str(exc), tenant_id=x_tenant_id)
+        return {"ok": True, "data": {"items": [], "total": 0}}
+
 
 @router.post("/customers")
 async def create_customer(
     req: CreateMemberReq,
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
 ):
-    # TODO: 实际创建会员逻辑（当前为占位实现，customer_id 待换为真实 UUID）
-    result = {"ok": True, "data": {"customer_id": "new"}}
+    log = logger.bind(phone=req.phone, tenant_id=x_tenant_id)
 
-    # 发布会员注册事件（不阻塞响应）
-    # 注意：当前 customer_id 为占位值，真实实现时替换为实际 UUID
     try:
-        tenant_uuid = UUID(x_tenant_id)
-        # customer_uuid 在实际实现中应从 DB 插入结果中获取
-        # 此处为占位，真实 UUID 应在会员创建后发布
-        logger.info(
-            "member_registered_event_pending",
-            tenant_id=x_tenant_id,
-            hint="replace customer_id placeholder with real UUID after DB insert",
-        )
-    except ValueError:
-        logger.warning("create_customer_invalid_tenant_id", tenant_id=x_tenant_id)
+        async with get_db_with_tenant(x_tenant_id) as db:
+            # 幂等检查：phone 是否已存在
+            existing = await db.execute(
+                text(
+                    "SELECT id FROM customers"
+                    " WHERE primary_phone = :phone AND tenant_id = :tid AND is_deleted = false"
+                    " LIMIT 1"
+                ),
+                {"phone": req.phone, "tid": x_tenant_id},
+            )
+            row = existing.first()
+            if row:
+                existing_id = str(row[0])
+                log.info("create_customer_idempotent", customer_id=existing_id)
+                return {"ok": True, "data": {"customer_id": existing_id}}
 
-    return result
+            # INSERT 新会员
+            new_id = uuid4()
+            now = datetime.now(tz=timezone.utc)
+            await db.execute(
+                text(
+                    "INSERT INTO customers"
+                    " (id, tenant_id, primary_phone, display_name, source, rfm_level, created_at, updated_at, is_deleted)"
+                    " VALUES (:id, :tid, :phone, :display_name, :source, :rfm_level, :created_at, :updated_at, false)"
+                ),
+                {
+                    "id": new_id,
+                    "tid": x_tenant_id,
+                    "phone": req.phone,
+                    "display_name": req.display_name,
+                    "source": req.source,
+                    "rfm_level": "S3",
+                    "created_at": now,
+                    "updated_at": now,
+                },
+            )
+
+        log.info("create_customer_ok", customer_id=str(new_id))
+
+        # 发布会员注册事件（不阻塞响应）
+        asyncio.create_task(
+            emit_event(
+                event_type=MemberEventType.REGISTERED,
+                tenant_id=x_tenant_id,
+                stream_id=str(new_id),
+                payload={"phone": req.phone, "source": req.source},
+                store_id=None,
+                source_service="tx-member",
+            )
+        )
+
+        return {"ok": True, "data": {"customer_id": str(new_id)}}
+
+    except SQLAlchemyError as exc:
+        log.error("create_customer_db_error", error=str(exc))
+        raise HTTPException(status_code=500, detail="db_error")
+
 
 @router.get("/customers/{customer_id}")
-async def get_customer(customer_id: str):
+async def get_customer(
+    customer_id: str,
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+):
     """Golden ID 360 度画像"""
-    return {"ok": True, "data": None}
+    try:
+        async with get_db_with_tenant(x_tenant_id) as db:
+            result = await db.execute(
+                text(
+                    "SELECT id, primary_phone, display_name, rfm_level, source,"
+                    " first_store_id, total_order_count, total_spend_fen, created_at, updated_at"
+                    " FROM customers"
+                    " WHERE id = :id AND tenant_id = :tid AND is_deleted = false"
+                    " LIMIT 1"
+                ),
+                {"id": customer_id, "tid": x_tenant_id},
+            )
+            row = result.mappings().first()
+
+        if not row:
+            raise HTTPException(status_code=404, detail="customer_not_found")
+
+        return {
+            "ok": True,
+            "data": {
+                "customer_id": str(row["id"]),
+                "phone": row["primary_phone"],
+                "display_name": row["display_name"],
+                "rfm_level": row["rfm_level"],
+                "source": row["source"],
+                "first_store_id": row["first_store_id"],
+                "total_order_count": row["total_order_count"],
+                "total_spend_fen": row["total_spend_fen"],
+                "created_at": row["created_at"].isoformat() if row["created_at"] else None,
+                "updated_at": row["updated_at"].isoformat() if row["updated_at"] else None,
+            },
+        }
+
+    except HTTPException:
+        raise
+    except SQLAlchemyError as exc:
+        logger.error("get_customer_db_error", error=str(exc), customer_id=customer_id)
+        raise HTTPException(status_code=500, detail="db_error")
+
 
 @router.get("/customers/{customer_id}/orders")
-async def get_customer_orders(customer_id: str, page: int = 1, size: int = 20):
-    return {"ok": True, "data": {"items": [], "total": 0}}
+async def get_customer_orders(
+    customer_id: str,
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    page: int = 1,
+    size: int = 20,
+):
+    try:
+        async with get_db_with_tenant(x_tenant_id) as db:
+            count_result = await db.execute(
+                text(
+                    "SELECT COUNT(*) FROM orders"
+                    " WHERE customer_id = :cid AND tenant_id = :tid AND is_deleted = false"
+                ),
+                {"cid": customer_id, "tid": x_tenant_id},
+            )
+            total = count_result.scalar() or 0
+
+            rows_result = await db.execute(
+                text(
+                    "SELECT id, order_no, store_id, order_type, status,"
+                    " total_amount_fen, final_amount_fen, order_time, created_at"
+                    " FROM orders"
+                    " WHERE customer_id = :cid AND tenant_id = :tid AND is_deleted = false"
+                    " ORDER BY created_at DESC"
+                    " LIMIT :limit OFFSET :offset"
+                ),
+                {"cid": customer_id, "tid": x_tenant_id, "limit": size, "offset": (page - 1) * size},
+            )
+            rows = rows_result.mappings().all()
+
+        items = [
+            {
+                "order_id": str(r["id"]),
+                "order_no": r["order_no"],
+                "store_id": str(r["store_id"]),
+                "order_type": r["order_type"],
+                "status": r["status"],
+                "total_amount_fen": r["total_amount_fen"],
+                "final_amount_fen": r["final_amount_fen"],
+                "order_time": r["order_time"].isoformat() if r["order_time"] else None,
+                "created_at": r["created_at"].isoformat() if r["created_at"] else None,
+            }
+            for r in rows
+        ]
+        return {"ok": True, "data": {"items": items, "total": total}}
+
+    except SQLAlchemyError as exc:
+        logger.error("get_customer_orders_db_error", error=str(exc), customer_id=customer_id)
+        return {"ok": True, "data": {"items": [], "total": 0}}
 
 # RFM 分析
 @router.get("/rfm/segments")
