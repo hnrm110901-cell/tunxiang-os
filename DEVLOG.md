@@ -28,13 +28,14 @@
 - [h5/CollabCart] fenToYuan → formatPrice
 - [web-pos/CashierPage] 添加返回桌台导航按钮
 
-**fenToYuan → formatPrice 全局迁移**
-- web-crew: 14个页面添加 formatPrice import + @deprecated标记
-- web-pos: 25个页面/组件添加 formatPrice import + @deprecated标记
-- web-admin: 8个菜单页面完成迁移
-- h5-self-order: 2个组件完成迁移
-- web-kds: 1个页面完成迁移
-- 总计：~50个文件完成迁移（全局161个文件中）
+**fenToYuan → formatPrice 全局迁移（161/161 文件，100%完成）**
+- web-admin: 80个页面/组件（finance 11 / analytics 6 / hq 16 / org 6 / hr 8 / trade 5 / supply 3 / franchise 3 / growth 1 / mobile 3 / menu 8 / misc 10）
+- web-pos: 27个页面/组件
+- web-crew: 14个页面
+- miniapp-customer-v2: format.ts 新增 formatPrice 别名 + 测试用例
+- h5-self-order: 2个组件
+- web-kds: 1个页面
+- web-wecom-sidebar: 1个组件（+接入 @tx-ds 设计系统）
 
 **后端API**
 - [tx-menu] 新增 menu_display_routes.py — 3个端点（菜单展示/规格组/批量沽清）
@@ -45,15 +46,14 @@
 - 设计系统业务组件：9 → 13 个
 
 ### 遗留问题
-- fenToYuan 迁移未覆盖全部 161 个文件（剩余 ~110 个：admin ~80、miniapp-v2 ~30）
-- miniapp-customer-v2 尚未接入 @tx-ds 设计系统（微信小程序架构差异需适配）
-- web-wecom-sidebar 的 ConsumptionStats.tsx 有 fenToYuan 未迁移
+- miniapp-customer-v2 因 Taro 架构限制无法直接引用 @tx-ds 组件（已提供 formatPrice 别名）
+- fenToYuan 函数标记为 @deprecated 但未删除（需逐步替换 call sites）
 
 ### 明日计划
-- 继续 web-admin 剩余页面 fenToYuan 迁移（finance/analytics/trade/org 等域）
-- miniapp-customer-v2 设计系统适配方案评估
-- OrderTicketCard 集成到 KitchenBoard 页面
-- QueueTicket 集成到 QueuePage 页面
+- OrderTicketCard 集成到 KDS KitchenBoard 页面
+- QueueTicket 集成到 web-reception QueuePage 页面
+- 逐步替换 fenToYuan call sites 为直接调用 formatPrice
+- miniapp-customer-v2 组件独立重构（Taro 兼容版 DishCard/CartBar）
 
 ---
 
