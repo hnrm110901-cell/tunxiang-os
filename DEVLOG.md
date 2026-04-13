@@ -1,3 +1,13 @@
+## 2026-04-13 (续4) 个性化菜单+会员洞察 DB化+Claude API
+
+### 今日完成
+- [tx-menu] personalized_menu_routes: 删除 DEMO_DISHES 静态菜品，接入 dishes 表真实查询 + order_items 近90天客户历史偏好 + 近7天热销菜；allergens 从 dishes.allergens 字段读取
+- [tx-member] member_insight_routes: 接入 customers+orders 真实DB；三阶段降级：claude-haiku-4-5 AI洞察 → rule-based（真实字段驱动）→ mock（纯哈希兜底）
+
+### 遗留问题
+- member_insight 需 ANTHROPIC_API_KEY 环境变量，未配置时自动降级 rule-based
+- personalized_menu user_segment/is_subscriber 仍用默认值（Phase 3 中间件注入）
+
 ## 2026-04-13 (续3) insights演示数据+agent_kpi估算值清零
 
 ### 今日完成
