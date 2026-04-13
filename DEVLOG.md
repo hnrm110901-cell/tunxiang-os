@@ -4,6 +4,94 @@
 
 ---
 
+## 2026-04-13 指标口径字典 + 演示前一键巡检 API（Week 2/3 P0 交付）
+
+### 今日完成
+- [tx-analytics/metrics_dict_routes.py] 指标口径字典（Week 2 P0 验收物）：
+  - 22个指标定义（9域：营收/毛利/客流/出餐/会员/库存/合规/财务/宴会）
+  - GET /metrics-dict 全量 / GET /metrics-dict/{key} 单指标溯源 / GET /domains 域列表
+  - SLA口径统一：交易类≤5分钟 / 分析类≤15分钟
+- [gateway/api/demo_healthcheck_routes.py] 演示前一键巡检（Week 3 P0）：
+  - GET /api/v1/demo/health-check — 并发探测13个服务+DB+3个关键路径
+  - go/no-go 自动裁决 + 分级修复建议
+
+### 数据变化
+- 无新迁移
+- 新增端点：4个（metrics-dict×3 + demo/health-check×1）
+
+### 遗留问题
+- 演示导播手册文档待输出
+
+### 明日计划
+- Week 4 商户交付评分卡
+
+---
+
+## 2026-04-13 知识库路由全量 DB 接入（upload/list/delete + DB session 修复）
+
+### 今日完成
+- [tx-agent/api/knowledge_routes.py] POST /documents（upload_document）接入真实 DB：
+  - INSERT INTO knowledge_documents（RETURNING id/title/status/created_at），status 初始为 'processing'
+  - 幂等检查：file_hash 已存在（is_deleted=FALSE）时直接返回现有记录并附 idempotent:true
+  - commit 后旁路触发 asyncio.create_task(_process_document_task)，失败只 log.warning 不影响主流程
+  - 异步任务通过独立 TenantSession 调用 DocumentProcessor.process_document 完成分块/向量化/写入
+  - SQLAlchemyError → rollback + log.error(exc_info=True) + raise HTTPException(500)
+- [tx-agent/api/knowledge_routes.py] GET /documents（list_documents）接入真实 DB：
+  - SELECT FROM knowledge_documents WHERE tenant_id AND is_deleted=FALSE
+  - 支持 collection / status query param 动态过滤
+  - 分页：page/size（默认 size=20），ORDER BY created_at DESC
+  - 先 COUNT(*) 查总数，再分页查详情，返回 {items, total, page, size}
+- [tx-agent/api/knowledge_routes.py] DELETE /documents/{doc_id}（delete_document）接入真实 DB：
+  - 软删除：UPDATE SET is_deleted=TRUE, updated_at=NOW() WHERE id AND tenant_id AND is_deleted=FALSE
+  - 未找到时返回 404；knowledge_chunks 通过 DB ON DELETE CASCADE 自动清理
+- [tx-agent/api/knowledge_routes.py] 新增 created_by Form 参数（写入 DB）
+- [tx-agent/services/knowledge_retrieval.py] _search_hybrid_v2 接入真实 DB session：
+  - 通过 TenantSession 上下文管理器注入 AsyncSession
+  - 调用 HybridSearchEngine.search + RerankerService.rerank
+  - 失败时 Fallback 到 Qdrant 路径（降级而非报错）
+- [tx-agent/services/knowledge_retrieval.py] _index_to_pgvector 接入真实 DB session：
+  - 通过 TenantSession 注入 db，调用 EmbeddingService.embed_text + PgVectorStore.upsert_chunks
+  - 移除 placeholder log，改为成功/失败各自有效日志
+- [tx-agent/services/knowledge_retrieval.py] 新增 _format_hybrid_results 辅助函数：
+  - 统一 HybridSearchEngine / RerankerService 输出格式与 Qdrant 路径一致（doc_id/score/text/metadata）
+
+### 数据变化
+- 无新迁移（复用 v232 knowledge_documents + v233 knowledge_chunks）
+
+### 遗留问题
+- get_document（GET /documents/{document_id}）和 list_chunks、reprocess_document 仍为 stub，待后续接入
+- HybridSearchEngine / RerankerService 接口签名依赖 shared/knowledge_store 实现，如接口变更需同步调整
+
+### 明日计划
+- 推进下一待排模块
+
+---
+
+## 2026-04-13 集团驾驶舱全量 DB 接入（group_dashboard_routes mock→真实查询）
+
+### 今日完成
+- [tx-analytics/group_dashboard_routes.py] 移除全部 mock 数据，替换为真实 DB 查询：
+  - L85 门店列表：`SELECT id, store_name, brand_id FROM stores WHERE tenant_id=:tid AND is_deleted=FALSE`，支持可选 brand_id 过滤
+  - L99 实时快照（/today）：查 orders 今日 completed 订单汇总（SUM final_amount_fen / COUNT），SQLAlchemyError 降级返回空汇总
+  - L173-174 /today brand_id 过滤：brand_id 改为可选 Query param，先查 stores 获取 store_id 列表再聚合 orders
+  - L220/234 趋势聚合（/trend）：优先查 mv_daily_settlement 物化视图（用 information_schema 检查存在性），不存在降级查 orders 原表按日 GROUP BY；brand_id 同样可选过滤
+  - L282 告警列表（/alerts）：`SELECT ... FROM analytics_alerts WHERE tenant_id=:tid AND status IN ('open','acknowledged') ORDER BY created_at DESC LIMIT 50`，支持 brand_id 过滤；SQLAlchemyError 降级返回空列表
+- 统一使用 AsyncSession + text() + get_db_with_tenant 依赖注入（与项目其他路由一致）
+- 每次查询前执行 `set_config('app.tenant_id', :tid, true)` 确保 RLS 生效
+- 所有金额单位保持分（fen），日期/datetime 转 isoformat() 后放入响应
+- level → severity 映射：critical/error→danger, warning→warning, info→info
+- 全部路由保证"永远可用"：核心路径 SQLAlchemyError → rollback + log.warning + 降级空数据，不 500
+
+### 数据变化
+- 无新迁移（复用 orders/stores/analytics_alerts/mv_store_pnl/mv_daily_settlement）
+
+### 遗留问题
+- table_turnover / occupied_tables / current_diners / avg_serve_time_min 暂填 0，需接桌台系统（KDS/tables 表）后补充
+- revenue_vs_yesterday_pct 暂填 0，需昨日同时段对比逻辑（待日后补充）
+
+### 明日计划
+- 推进下一待排模块
+
 ## 2026-04-13 AI 经营周报/月报 + 三商户 KPI 权重配置（Week 2 P0 交付项）
 
 ### 今日完成

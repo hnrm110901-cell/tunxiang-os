@@ -26,6 +26,7 @@ from .wecom_jssdk import router as wecom_jssdk_router
 from .wecom_notify_routes import router as wecom_notify_router
 from .wecom_routes import router as wecom_router
 from .wecom_scrm_routes import router as wecom_scrm_router
+from .api.demo_healthcheck_routes import router as demo_healthcheck_router  # Week 3 演示巡检
 
 logger = structlog.get_logger(__name__)
 
@@ -177,6 +178,8 @@ app.include_router(wecom_notify_router)
 app.include_router(wecom_bot_router)
 # 品智POS 同步健康检查 API（GET /api/v1/sync/health）
 app.include_router(sync_health_router)
+# 演示前一键巡检 API（GET /api/v1/demo/health-check）— Week 3 P0
+app.include_router(demo_healthcheck_router)
 
 # 域路由代理（通配路由 /api/v1/{domain}/{path}，放最后）
 app.include_router(proxy_router)
