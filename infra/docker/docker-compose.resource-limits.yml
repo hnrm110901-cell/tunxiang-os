@@ -1,0 +1,268 @@
+# ============================================================
+# 屯象OS 资源限制配置（Tier 分级）
+#
+# 使用方法：
+#   docker compose \
+#     -f docker-compose.prod.yml \
+#     -f docker-compose.resource-limits.yml \
+#     up -d
+#
+# 服务器：腾讯云 4核/7.4GB
+#
+# 分配原则（微服务部分，不含 PG/Redis/Nginx）：
+#   Tier 1 核心收银   ≈ 4.5GB 内存上限  → 保障资金安全和收银员日常操作
+#   Tier 2 运营效率   ≈ 3.8GB 内存上限  → 标准资源，不与 Tier 1 抢占
+#   Tier 3 辅助展示   ≈ 1.9GB 内存上限  → 严格限制，防止拖垮核心链路
+#   系统 + PG + Redis ≈ 1GB 预留
+#
+# Tier 1（核心收银，资源保障）：gateway / tx-trade / tx-finance / tx-agent
+# Tier 2（运营效率，标准资源）：tx-menu / tx-member / tx-supply / tx-ops / tx-org
+# Tier 3（辅助展示，严格限制）：tx-growth / tx-analytics / tx-brain / tx-intel / tx-civic
+# ============================================================
+
+version: '3.8'
+
+services:
+
+  # ============================================================
+  # Tier 1：核心收银（资源保障）
+  # 影响资金安全 + 收银员日常操作，P99 < 200ms 硬性要求
+  # 4 个服务合计：CPU 上限 5.0 / 内存上限 4.5GB
+  # ============================================================
+
+  gateway:
+    deploy:
+      resources:
+        limits:
+          cpus: '1.5'
+          memory: 1536M
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+      restart_policy:
+        condition: on-failure
+        max_attempts: 3
+        delay: 5s
+
+  tx-trade:
+    deploy:
+      resources:
+        limits:
+          cpus: '1.5'
+          memory: 1536M
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+      restart_policy:
+        condition: on-failure
+        max_attempts: 3
+        delay: 5s
+
+  tx-finance:
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 768M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+      restart_policy:
+        condition: on-failure
+        max_attempts: 3
+        delay: 5s
+
+  tx-agent:
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 768M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+      restart_policy:
+        condition: on-failure
+        max_attempts: 3
+        delay: 5s
+
+  # ============================================================
+  # Tier 2：运营效率（标准资源）
+  # 影响门店运营效率，不涉及直接资金操作
+  # 5 个服务合计：CPU 上限 3.75 / 内存上限 3.84GB
+  # ============================================================
+
+  tx-menu:
+    deploy:
+      resources:
+        limits:
+          cpus: '0.75'
+          memory: 768M
+        reservations:
+          cpus: '0.2'
+          memory: 192M
+      restart_policy:
+        condition: on-failure
+        max_attempts: 3
+
+  tx-member:
+    deploy:
+      resources:
+        limits:
+          cpus: '0.75'
+          memory: 768M
+        reservations:
+          cpus: '0.2'
+          memory: 192M
+      restart_policy:
+        condition: on-failure
+        max_attempts: 3
+
+  tx-supply:
+    deploy:
+      resources:
+        limits:
+          cpus: '0.75'
+          memory: 768M
+        reservations:
+          cpus: '0.2'
+          memory: 192M
+      restart_policy:
+        condition: on-failure
+        max_attempts: 3
+
+  tx-ops:
+    deploy:
+      resources:
+        limits:
+          cpus: '0.75'
+          memory: 768M
+        reservations:
+          cpus: '0.2'
+          memory: 192M
+      restart_policy:
+        condition: on-failure
+        max_attempts: 3
+
+  tx-org:
+    deploy:
+      resources:
+        limits:
+          cpus: '0.75'
+          memory: 768M
+        reservations:
+          cpus: '0.2'
+          memory: 192M
+      restart_policy:
+        condition: on-failure
+        max_attempts: 3
+
+  # ============================================================
+  # Tier 3：辅助展示（严格限制）
+  # 低频操作或报表展示，严格限制防止拖垮 Tier 1 收银链路
+  # 5 个服务合计：CPU 上限 2.0 / 内存上限 1.92GB
+  # 注意：tx-brain 原先被分配 *resource-limits-heavy（2核/1G），
+  #       此 override 将其正确降级到 Tier 3
+  # ============================================================
+
+  tx-growth:
+    deploy:
+      resources:
+        limits:
+          cpus: '0.4'
+          memory: 384M
+        reservations:
+          cpus: '0.1'
+          memory: 96M
+      restart_policy:
+        condition: on-failure
+        max_attempts: 5
+        delay: 10s
+
+  tx-analytics:
+    deploy:
+      resources:
+        limits:
+          cpus: '0.4'
+          memory: 384M
+        reservations:
+          cpus: '0.1'
+          memory: 96M
+      restart_policy:
+        condition: on-failure
+        max_attempts: 5
+        delay: 10s
+
+  tx-brain:
+    deploy:
+      resources:
+        limits:
+          cpus: '0.4'
+          memory: 384M
+        reservations:
+          cpus: '0.1'
+          memory: 96M
+      restart_policy:
+        condition: on-failure
+        max_attempts: 5
+        delay: 10s
+
+  tx-intel:
+    deploy:
+      resources:
+        limits:
+          cpus: '0.4'
+          memory: 384M
+        reservations:
+          cpus: '0.1'
+          memory: 96M
+      restart_policy:
+        condition: on-failure
+        max_attempts: 5
+        delay: 10s
+
+  tx-civic:
+    deploy:
+      resources:
+        limits:
+          cpus: '0.4'
+          memory: 384M
+        reservations:
+          cpus: '0.1'
+          memory: 96M
+      restart_policy:
+        condition: on-failure
+        max_attempts: 5
+        delay: 10s
+
+# ============================================================
+# 资源分配总览（微服务部分，4核/7.4GB 服务器）
+#
+# ┌─────────────────────────────────────────────────────────┐
+# │ Tier │ 服务                  │ CPU上限 │ 内存上限  │ 预留  │
+# ├─────────────────────────────────────────────────────────┤
+# │  T1  │ gateway               │  1.5c   │  1536M   │ 512M  │
+# │  T1  │ tx-trade              │  1.5c   │  1536M   │ 512M  │
+# │  T1  │ tx-finance            │  1.0c   │   768M   │ 256M  │
+# │  T1  │ tx-agent              │  1.0c   │   768M   │ 256M  │
+# │      │ Tier 1 合计           │  5.0c   │  4608M   │       │
+# ├─────────────────────────────────────────────────────────┤
+# │  T2  │ tx-menu               │  0.75c  │   768M   │ 192M  │
+# │  T2  │ tx-member             │  0.75c  │   768M   │ 192M  │
+# │  T2  │ tx-supply             │  0.75c  │   768M   │ 192M  │
+# │  T2  │ tx-ops                │  0.75c  │   768M   │ 192M  │
+# │  T2  │ tx-org                │  0.75c  │   768M   │ 192M  │
+# │      │ Tier 2 合计           │  3.75c  │  3840M   │       │
+# ├─────────────────────────────────────────────────────────┤
+# │  T3  │ tx-growth             │  0.4c   │   384M   │  96M  │
+# │  T3  │ tx-analytics          │  0.4c   │   384M   │  96M  │
+# │  T3  │ tx-brain              │  0.4c   │   384M   │  96M  │
+# │  T3  │ tx-intel              │  0.4c   │   384M   │  96M  │
+# │  T3  │ tx-civic              │  0.4c   │   384M   │  96M  │
+# │      │ Tier 3 合计           │  2.0c   │  1920M   │       │
+# └─────────────────────────────────────────────────────────┘
+#
+# 说明：Docker 资源限制为软上限（容器突发可超出预留，但不超限制）。
+# PG(主/从) + Redis + Nginx + 系统预留约 1GB，整体不超过 7.4GB。
+# Tier 1 内存上限（4.5GB）< 服务器总内存 × 60%，确保核心链路资源保障。
+# ============================================================

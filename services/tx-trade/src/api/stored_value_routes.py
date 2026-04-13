@@ -320,31 +320,46 @@ async def consume(
         text("SET LOCAL app.tenant_id = :tid"), {"tid": tenant_id}
     )
 
+    # 先确保账户存在（只创建，不用于扣款判断）
     account = await _get_or_create_account(db, tenant_id, member_id)
     account_id = str(account["id"])
-    balance_before = account["balance_fen"]
-    available = balance_before - account["frozen_fen"]
 
-    if available < body.amount_fen:
-        insufficient = body.amount_fen - available
-        return _ok({
-            "success": False,
-            "balance_after_fen": balance_before,
-            "insufficient_fen": insufficient,
-        })
-
-    balance_after = balance_before - body.amount_fen
-
-    await db.execute(
+    # ── 原子扣款：WHERE 条件确保余额充足，防止并发超扣 ──────────────────
+    # 使用 RETURNING 同时获取扣款前后余额，避免额外查询
+    upd_result = await db.execute(
         text("""
             UPDATE stored_value_accounts SET
                 balance_fen        = balance_fen - :amt,
                 total_consumed_fen = total_consumed_fen + :amt,
                 updated_at         = NOW()
             WHERE id = :aid
+              AND (balance_fen - frozen_fen) >= :amt
+            RETURNING balance_fen + :amt AS balance_before_fen,
+                      balance_fen        AS balance_after_fen
         """),
         {"amt": body.amount_fen, "aid": account_id},
     )
+    row = upd_result.mappings().first()
+
+    if row is None:
+        # UPDATE 未命中 → 余额不足（并发冲突亦在此处被拦截）
+        # 重新查询当前余额以返回准确的 insufficient_fen
+        cur = await db.execute(
+            text("SELECT balance_fen, frozen_fen FROM stored_value_accounts WHERE id = :aid"),
+            {"aid": account_id},
+        )
+        cur_row = cur.mappings().first()
+        balance_now = cur_row["balance_fen"] if cur_row else account["balance_fen"]
+        frozen_now = cur_row["frozen_fen"] if cur_row else account["frozen_fen"]
+        available = balance_now - frozen_now
+        return _ok({
+            "success": False,
+            "balance_after_fen": balance_now,
+            "insufficient_fen": max(0, body.amount_fen - available),
+        })
+
+    balance_before = row["balance_before_fen"]
+    balance_after = row["balance_after_fen"]
 
     txn_id = await _write_transaction(
         db,

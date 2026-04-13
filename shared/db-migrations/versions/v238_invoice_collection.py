@@ -20,6 +20,11 @@ _RLS_COND = "tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::UUI
 
 
 def upgrade() -> None:
+    conn = op.get_bind()
+    existing = sa.inspect(conn).get_table_names()
+    if 'invoices' in existing:
+        return
+
     # ──────────────────────────────────────────────────────────────────
     # invoices — 发票主档
     # 记录每张发票的 OCR 识别结果、金税四期核验状态及集团级去重信息

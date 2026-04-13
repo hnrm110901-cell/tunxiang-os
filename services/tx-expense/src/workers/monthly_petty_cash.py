@@ -31,14 +31,49 @@ class MonthlyPettyCashSettlementWorker:
     async def _get_active_tenant_ids(self) -> list[str]:
         """获取所有活跃租户 ID 列表。
 
-        当前使用环境变量 DEFAULT_TENANT_ID 单租户模式。
-        多租户场景可扩展为从 tx-org /api/v1/org/tenants/active 拉取。
+        从 stores 表查询所有有效租户（BYPASSRLS 会话，跨租户读取）。
+        查询失败时降级为 DEFAULT_TENANT_ID 环境变量（向后兼容单租户部署）。
         """
-        default_tenant = os.environ.get("DEFAULT_TENANT_ID")
-        if not default_tenant:
-            log.warning("monthly_settlement_no_tenant_configured")
-            return []
-        return [default_tenant]  # P1 扩展为多租户
+        import os as _os
+        from sqlalchemy import text as _text
+        from shared.ontology.src.database import get_db_no_rls
+
+        try:
+            async for db in get_db_no_rls():
+                result = await db.execute(
+                    _text("""
+                        SELECT DISTINCT tenant_id::text
+                        FROM stores
+                        WHERE is_deleted = FALSE
+                        ORDER BY 1
+                    """)
+                )
+                tenant_ids = [row[0] for row in result.fetchall()]
+                if tenant_ids:
+                    log.info(
+                        "monthly_settlement_tenants_loaded",
+                        tenant_count=len(tenant_ids),
+                    )
+                    return tenant_ids
+                log.warning("monthly_settlement_stores_table_empty")
+        except Exception as exc:  # noqa: BLE001
+            log.error(
+                "monthly_settlement_tenant_query_failed",
+                error=str(exc),
+                exc_info=True,
+            )
+
+        # 降级：单租户环境变量
+        default_tenant = _os.environ.get("DEFAULT_TENANT_ID")
+        if default_tenant:
+            log.warning(
+                "monthly_settlement_fallback_to_default_tenant",
+                tenant_id=default_tenant,
+            )
+            return [default_tenant]
+
+        log.warning("monthly_settlement_no_tenant_configured")
+        return []
 
     async def _process_tenant(
         self,

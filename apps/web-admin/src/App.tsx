@@ -156,6 +156,8 @@ import BrandRegionPage from './pages/org/BrandRegionPage';
 import DouyinVoucherPage from './pages/trade/DouyinVoucherPage';
 // ─── AI经营合伙人 ─────────────────────────────────────────────────────────────
 import { ChiefAgentPage } from './pages/agent/ChiefAgentPage';
+// ─── 模块4.4: Agent KPI仪表盘 ────────────────────────────────────────────────
+import AgentKPIDashboard from './pages/AgentKPIDashboard';
 // ─── Sprint 1: AI 中枢 ────────────────────────────────────────────────────────
 import { AgentHubPage as HQAgentHubPage } from './pages/hq/agent/AgentHubPage';
 import { AgentCommandCenterPage } from './pages/hq/agent/AgentCommandCenterPage';
@@ -266,6 +268,8 @@ function App() {
           <Route path="/hq/supply/suppliers" element={<SupplierPortalPage />} />
           <Route path="/agent/dashboard" element={<AgentDashboardPage />} />
           <Route path="/agent/chief" element={<ChiefAgentPage />} />
+          {/* ─── 模块4.4: Agent KPI绑定仪表盘 ─── */}
+          <Route path="/agent/kpi-dashboard" element={<AgentKPIDashboard />} />
           {/* ─── Phase1: 财务刚需 ─── */}
           <Route path="/finance/wine-storage" element={<WineStoragePage />} />
           <Route path="/finance/deposits" element={<DepositManagePage />} />

@@ -3,10 +3,13 @@
 Revision ID: v249
 Revises: v248
 Create Date: 2026-04-13
+
+Fix: schema aligned with banquet_kds_routes.py and banquet_deposit_routes.py
+  - banquet_kds_dishes:  total_qty/served_qty/serve_status/sequence_no/is_deleted/notes
+  - banquet_session_deposits: balance_fen/collected_at/applied_at + status default 'active'
 """
 from alembic import op
 import sqlalchemy as sa
-from sqlalchemy.dialects.postgresql import UUID, JSONB
 
 revision = "v249"
 down_revision = "v248"
@@ -23,12 +26,15 @@ def upgrade() -> None:
             session_id      UUID NOT NULL,
             dish_id         UUID NOT NULL,
             dish_name       VARCHAR(128) NOT NULL,
-            quantity        INTEGER NOT NULL DEFAULT 1,
-            status          VARCHAR(32) NOT NULL DEFAULT 'pending',
-            served_at       TIMESTAMPTZ,
+            total_qty       INTEGER NOT NULL DEFAULT 1,
+            served_qty      INTEGER NOT NULL DEFAULT 0,
+            serve_status    VARCHAR(32) NOT NULL DEFAULT 'pending',
+            sequence_no     INTEGER NOT NULL DEFAULT 0,
+            is_deleted      BOOLEAN NOT NULL DEFAULT FALSE,
             called_at       TIMESTAMPTZ,
+            served_at       TIMESTAMPTZ,
             operator_id     UUID,
-            metadata        JSONB DEFAULT '{}',
+            notes           TEXT,
             created_at      TIMESTAMPTZ DEFAULT NOW(),
             updated_at      TIMESTAMPTZ DEFAULT NOW()
         )
@@ -56,10 +62,10 @@ def upgrade() -> None:
             tenant_id       UUID NOT NULL,
             session_id      UUID NOT NULL,
             amount_fen      INTEGER NOT NULL,
-            remaining_fen   INTEGER NOT NULL,
-            status          VARCHAR(32) NOT NULL DEFAULT 'paid',
-            paid_at         TIMESTAMPTZ DEFAULT NOW(),
-            converted_at    TIMESTAMPTZ,
+            balance_fen     INTEGER NOT NULL,
+            status          VARCHAR(32) NOT NULL DEFAULT 'active',
+            collected_at    TIMESTAMPTZ DEFAULT NOW(),
+            applied_at      TIMESTAMPTZ,
             refunded_at     TIMESTAMPTZ,
             payment_method  VARCHAR(32) DEFAULT 'cash',
             operator_id     UUID,
@@ -68,7 +74,7 @@ def upgrade() -> None:
             created_at      TIMESTAMPTZ DEFAULT NOW(),
             updated_at      TIMESTAMPTZ DEFAULT NOW(),
             CONSTRAINT chk_deposit_amount_positive CHECK (amount_fen > 0),
-            CONSTRAINT chk_deposit_remaining_nonneg CHECK (remaining_fen >= 0)
+            CONSTRAINT chk_deposit_balance_nonneg CHECK (balance_fen >= 0)
         )
     """)
     op.execute("""

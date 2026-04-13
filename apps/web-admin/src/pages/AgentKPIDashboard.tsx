@@ -281,7 +281,7 @@ function RoiSummaryCard({ data }: { data: RoiData }) {
 // ── 主组件 ────────────────────────────────────────────────────────────────────
 
 const API_BASE = '/api/v1/agent-kpi';
-const DEFAULT_TENANT = 'default-tenant';
+const TENANT_ID = localStorage.getItem('tenantId') || '';
 
 export default function AgentKPIDashboard() {
   const [dashboard, setDashboard] = useState<DashboardData | null>(null);
@@ -292,7 +292,7 @@ export default function AgentKPIDashboard() {
 
   const fetchData = useCallback(async () => {
     try {
-      const headers = { 'X-Tenant-ID': DEFAULT_TENANT };
+      const headers = { 'X-Tenant-ID': TENANT_ID };
 
       const [dashRes, roiRes] = await Promise.all([
         fetch(`${API_BASE}/dashboard`, { headers }),

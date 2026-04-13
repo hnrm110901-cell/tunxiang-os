@@ -50,7 +50,7 @@ class DepositCreateRequest(BaseModel):
 
 
 class DepositApplyRequest(BaseModel):
-    apply_amount_fen: int = Field(..., gt=0, description="本次抵扣金额（分），0 = 全额抵扣")
+    apply_amount_fen: int = Field(..., gt=0, description="本次抵扣金额（分）；如需全额抵扣，传入 order_total_fen 值")
     order_total_fen: int = Field(..., gt=0, description="结账总金额（分）")
     operator_id: Optional[str] = Field(None)
 
@@ -233,16 +233,20 @@ async def apply_deposit(
     tenant_id: str = Depends(_tid),
 ):
     """将场次有效定金余额抵扣结账金额，返回抵扣后的剩余应付金额。"""
-    # 获取可用定金余额
-    agg_r = await db.execute(
+    # ── 加 FOR UPDATE 锁，防止并发抵扣同一批定金记录 ────────────────────
+    # 锁定并读取所有 active 定金记录（单次查询，同时用于余额汇总和逐条扣减）
+    active_r = await db.execute(
         text("""
-            SELECT COALESCE(SUM(balance_fen), 0) AS total_balance_fen
-            FROM banquet_session_deposits
-            WHERE session_id = :sid::UUID AND status = 'active'
+            SELECT id, balance_fen FROM banquet_session_deposits
+            WHERE session_id = :sid::UUID AND status = 'active' AND balance_fen > 0
+            ORDER BY collected_at ASC
+            FOR UPDATE
         """),
         {"sid": session_id},
     )
-    total_balance = (agg_r.mappings().first() or {}).get("total_balance_fen", 0)
+    actives = list(active_r.mappings().all())
+
+    total_balance = sum(r["balance_fen"] for r in actives)
 
     if total_balance <= 0:
         raise HTTPException(status_code=400, detail="无可用定金余额")
@@ -251,17 +255,6 @@ async def apply_deposit(
     deduct = min(body.apply_amount_fen, total_balance, body.order_total_fen)
     remaining = body.order_total_fen - deduct
     now = datetime.now(timezone.utc)
-
-    # 按收取时间先进先出地扣减各定金记录
-    active_r = await db.execute(
-        text("""
-            SELECT id, balance_fen FROM banquet_session_deposits
-            WHERE session_id = :sid::UUID AND status = 'active' AND balance_fen > 0
-            ORDER BY collected_at ASC
-        """),
-        {"sid": session_id},
-    )
-    actives = list(active_r.mappings().all())
 
     left_to_deduct = deduct
     for dep_row in actives:
@@ -346,16 +339,20 @@ async def refund_deposit(
     tenant_id: str = Depends(_tid),
 ):
     """退还场次定金余额（取消宴席/顾客申请退款场景）。"""
-    # 获取可退余额
-    agg_r = await db.execute(
+    # ── 加 FOR UPDATE 锁，防止并发退款超出余额 ──────────────────────────
+    # 锁定并读取所有 active 定金记录（单次查询，同时用于余额校验和逐条扣减）
+    active_r = await db.execute(
         text("""
-            SELECT COALESCE(SUM(balance_fen), 0) AS total_balance_fen
-            FROM banquet_session_deposits
-            WHERE session_id = :sid::UUID AND status = 'active'
+            SELECT id, balance_fen FROM banquet_session_deposits
+            WHERE session_id = :sid::UUID AND status = 'active' AND balance_fen > 0
+            ORDER BY collected_at ASC
+            FOR UPDATE
         """),
         {"sid": session_id},
     )
-    total_balance = (agg_r.mappings().first() or {}).get("total_balance_fen", 0)
+    actives = list(active_r.mappings().all())
+
+    total_balance = sum(r["balance_fen"] for r in actives)
 
     if total_balance <= 0:
         raise HTTPException(status_code=400, detail="无可退余额")
@@ -366,17 +363,6 @@ async def refund_deposit(
         )
 
     now = datetime.now(timezone.utc)
-
-    # 按先进先出退定金记录
-    active_r = await db.execute(
-        text("""
-            SELECT id, balance_fen FROM banquet_session_deposits
-            WHERE session_id = :sid::UUID AND status = 'active' AND balance_fen > 0
-            ORDER BY collected_at ASC
-        """),
-        {"sid": session_id},
-    )
-    actives = list(active_r.mappings().all())
 
     left_to_refund = body.refund_amount_fen
     for dep_row in actives:
