@@ -4,6 +4,154 @@
 
 ---
 
+## 2026-04-13 企业挂账 v251 全量 DB 迁移（account + billing 完整落库）
+
+### 今日完成
+- [shared/db-migrations/v251] 新增 `enterprise_bills` 表（月结账单 + line_items JSONB + RLS）
+- [shared/db-migrations/v251] 新增 `enterprise_agreement_prices` 表（企业协议菜品价格 + UNIQUE UPSERT index + RLS）
+- [tx-trade/services/enterprise_account.py] 全量 DB 迁移：
+  - 移除 `_enterprises` / `_agreement_prices` / `_sign_records` 内存 dict（及导出）
+  - `create_enterprise`：INSERT RETURNING，rollback on SQLAlchemyError
+  - `update_enterprise`：动态 SET + RETURNING，404 检测
+  - `get_enterprise` / `list_enterprises`：SELECT from enterprise_accounts
+  - `set_agreement_price`：INSERT ... ON CONFLICT DO UPDATE（UPSERT）
+  - `get_agreement_price`：SELECT from enterprise_agreement_prices
+  - `check_credit`：调 `_get_enterprise_row`（DB），不再读内存
+  - `get_sign_records`：SELECT from enterprise_sign_records
+  - `authorize_sign`：保持 v250 DB 原子操作逻辑不变
+- [tx-trade/services/enterprise_billing.py] 全量 DB 迁移：
+  - 移除 `_enterprises` / `_sign_records` 导入及 `_bills` / `_bill_items` 内存 dict
+  - `generate_monthly_bill`：幂等检查 → 查 enterprise_sign_records 当月签单 → INSERT enterprise_bills
+  - `confirm_payment`：UPDATE enterprise_bills + UPDATE enterprise_accounts.used_fen，原子 commit
+  - `generate_statement` / `get_outstanding_bills`：SELECT from enterprise_bills
+  - `get_enterprise_analytics`：聚合 enterprise_sign_records + enterprise_bills（单次 SQL 无 N+1）
+
+### 数据变化
+- 迁移版本：v250 → v251
+- 新增表：2个（enterprise_bills + enterprise_agreement_prices）
+- 修复竞态：`check_credit` 不再读内存 dict（之前 authorize_sign 写 DB 但 check_credit 读内存，逻辑错位）
+
+### 遗留问题
+- agent_kpi_snapshots 测量值仍为占位估算
+- agent_auto_executions 仍为空，ROI 非 discount_guardian 指标待 Agent 实际写入后才有真实数据
+
+### 明日计划
+- 推进下一待排模块
+
+---
+
+## 2026-04-12 微信支付回调落库与幂等
+
+### 今日完成
+- [tx-trade/wechat_pay_notify_service.py] 微信异步通知：`get_db_no_rls` 按 `order_no` 或订单 UUID 查单 → `get_db_with_tenant` 写 `payments`；`transaction_id` 幂等；订单行 `FOR UPDATE` 后二次校验；累计实收 ≥ 应付时 `orders.status=completed`；旁路 `PaymentEventType.CONFIRMED` / `OrderEventType.PAID`
+- [tx-trade/wechat_pay_routes.py] 成功回调调用上述服务；`SQLAlchemyError` 返回 FAIL 以便重试；`notify_result.ok` 为 false 时 FAIL
+- [ontology/database.py] `get_db_no_rls` 文档补充 wechat_pay_notify_service 调用方
+- [tests] `test_wechat_pay_notify_service.py` 金额解析等纯函数
+
+### 数据变化
+- 无新迁移
+
+### 遗留问题
+- 桌台释放、营销归因等仍与店内收银 settle 路径不同，线上小程序全链路需联调验收
+
+---
+
+## 2026-04-13 Agent KPI仪表盘路由注册 + ROI报告 + KPI配置全部接入真实DB
+
+### 今日完成
+- [web-admin/App.tsx] 新增 import `AgentKPIDashboard` + 注册路由 `/agent/kpi-dashboard`
+- [tx-agent/agent_kpi_routes.py] `get_roi_report` 接入真实 DB：
+  - 从 `agent_roi_metrics` 表按月份查询，SUM+COUNT 聚合
+  - 返回 `data_source: "db" | "empty"`（无数据时不再 mock）
+  - DB 失败兜底 logger.warning + exc_info=True
+- [tx-agent/agent_kpi_routes.py] `get_kpi_configs` 接入真实 DB：
+  - 从 `agent_kpi_configs` 读取自定义配置，与内置 AGENT_KPI_DEFAULTS 合并
+  - DB 自定义覆盖同 agent_id+kpi_type 的默认值（source: "custom" vs "default"）
+  - 支持 is_active / agent_id 过滤
+- [tx-agent/agent_kpi_routes.py] `create_kpi_config` 接入真实 DB：
+  - INSERT INTO agent_kpi_configs，commit 成功后返回记录
+  - DB 失败 rollback + 500 + logger.error
+- [tx-agent/agent_kpi_routes.py] `update_kpi_config` 接入真实 DB：
+  - 动态 SET 子句（只更新有值字段）+ RETURNING 验证行存在
+  - 未找到记录返回 404；DB 失败返回 500
+
+### 数据变化
+- 无新迁移（复用 v248 agent_kpi_configs 表、v221 agent_roi_metrics 表）
+- 前端路由：新增 1 个（/agent/kpi-dashboard）
+
+- [tx-agent/agent_kpi_routes.py] `get_kpi_snapshots` 接入真实 DB：
+  - 从 `agent_kpi_snapshots` 分页查询，支持 agent_id / date_from / date_to 过滤
+  - 结果关联 AGENT_KPI_DEFAULTS 补充 label/unit/direction；DB 失败降级返回空列表
+- [tx-agent/agent_kpi_routes.py] `collect_kpi_snapshots` 写入真实 DB：
+  - 批量 INSERT agent_kpi_snapshots，ON CONFLICT DO NOTHING 防重复
+  - 返回 inserted_count / skipped_count；失败 rollback + 500
+
+### 遗留问题
+- agent_roi_metrics 写入仍需各 Agent 主动上报（当前表为空，端点返回 empty）
+- agent_kpi_snapshots 测量值仍为占位估算（生产时需替换为真实业务查询）
+- franchise_v5 mark-overdue 仍为手动 POST，未接 APScheduler 定时任务
+- MonthlyPettyCashWorker / DailyCostAttributionWorker 仍使用 DEFAULT_TENANT_ID
+
+- [tx-org/services/hr_agent_scheduler.py] franchise_v5 `mark-overdue` 接入 APScheduler 定时任务：
+  - 新增 job `franchise_daily_mark_overdue`，CronTrigger(hour=2, minute=5) — 每日 02:05
+  - 新增 `_run_mark_overdue_fees` 方法，httpx POST `/api/v1/franchise/fees/mark-overdue`
+  - 记录 `marked_count` + `as_of` 日志；HTTP 异常降级 log.error 不中断调度器
+  - 调度器 jobs 总数从 4 升至 5
+
+### 数据变化
+- 无新迁移
+
+- [tx-expense/workers/daily_cost_attribution.py] `_get_active_tenant_ids` 改为多租户：
+  - `get_db_no_rls` BYPASSRLS 会话查询 `DISTINCT tenant_id FROM stores WHERE is_deleted=FALSE`
+  - 降级链：DB查询 → `DEFAULT_TENANT_ID` 环境变量 → 返回空列表
+- [tx-expense/workers/monthly_petty_cash.py] 同上改造（MonthlyPettyCashSettlementWorker）
+
+- [tx-org/services/hr_agent_scheduler.py] `_run_mark_overdue_fees` 改为多租户：
+  - 新增 `_get_active_tenant_ids` 方法（与 Worker 同一模式：`get_db_no_rls` BYPASSRLS + DISTINCT tenant_id FROM stores）
+  - 降级链：DB查询 → `DEFAULT_TENANT_ID` 环境变量 → 返回空列表
+  - `_run_mark_overdue_fees` 改为按租户循环，每次调用携带 `X-Tenant-ID` header
+  - 汇总 `total_marked` + `error_count`，完成后 INFO 日志
+
+- [tx-agent/agent_roi_routes.py] `POST /api/v1/agent/roi/collect` 新增每日采集端点：
+  - 幂等检查：同日已有记录则跳过（返回 skipped:true）
+  - discount_guardian：查询 `orders.discount_amount_fen` SUM/COUNT → `intercepted_discount_fen` + `intercept_count`
+  - 其余 8 个 Agent：查询 `agent_auto_executions` 执行计数 → 各自 ROI 指标
+  - 批量 INSERT 到 `agent_roi_metrics`，失败 rollback + 500
+- [tx-org/services/hr_agent_scheduler.py] 新增第 6 个调度任务：
+  - `agent_roi_daily_collect`，CronTrigger(hour=5, minute=0)，每日 05:00
+  - 新增 `_run_roi_collect` 方法：多租户循环，携带 `X-Tenant-ID` header 调用 collect 端点
+  - jobs 总数从 5 升至 6
+
+### 遗留问题
+- agent_kpi_snapshots 测量值仍为占位估算（生产时需替换真实业务查询）
+- agent_auto_executions 仍为空，ROI 非 discount_guardian 指标待 Agent 实际写入后才有真实数据
+
+### 明日计划
+- 推进下一待排模块
+
+---
+
+## 2026-04-13 tx-finance 月度 P&L 三接口（便捷端点/趋势/环比）
+
+### 今日完成
+- [tx-finance/finance_pl_routes.py] 新增 `GET /api/v1/finance/pl/monthly`（YYYY-MM 快捷端点，复用 PLService.get_store_pl）
+- [tx-finance/finance_pl_routes.py] 新增 `GET /api/v1/finance/pl/monthly-trend`（最近 N 个月逐月 P&L 序列，前端折线图数据源）
+- [tx-finance/finance_pl_routes.py] 新增 `GET /api/v1/finance/pl/mom`（月度环比：当月 vs 上月 vs 去年同月，含变化率）
+- 新增工具函数：_month_to_date_range / _prev_month / _same_month_last_year / _pl_summary / _pct_change
+
+### 数据变化
+- 无新迁移（复用现有 PLService）
+- 新增端点：3个（monthly / monthly-trend / mom）
+
+### 遗留问题
+- franchise_v5 mark-overdue 建议接入 APScheduler 定时（当前仅手动 POST）
+- 多租户 Workers 仍为 DEFAULT_TENANT_ID 单租户模式
+
+### 明日计划
+- 推进下一待排模块
+
+---
+
 ## 2026-04-13 模块4.4 AI Agent深化绑定业务KPI — 9大Agent指标追踪+ROI仪表盘
 
 ### 今日完成
@@ -216,10 +364,25 @@
 - 无
 
 ### 遗留问题
-- `verify_callback` 平台证书验签仍为 TODO，生产回调不可仅依赖当前实现
+- （已跟进）`verify_callback` 平台证书验签：见下方同日补充
 
 ### 明日计划
 - Wave2：对账/webhook 全链路审计或接入平台证书验签
+
+---
+
+## 2026-04-12 微信支付 V3 回调平台证书验签
+
+### 今日完成
+- [shared/integrations/wechat_pay.py] `verify_callback`：`GET /v3/certificates` 拉取并解密平台证书，按 `Wechatpay-Serial` 缓存公钥；RSA-SHA256（PKCS1v15）验签；时间戳防重放（默认 ±300s，可调 `WECHAT_PAY_CALLBACK_TIMESTAMP_SKEW_SECONDS`）；修复 `dict(request.headers)` 键为小写导致取不到 `Wechatpay-*` 的问题
+- [shared/integrations/wechat_pay.py] `_request` 使用 `WECHAT_PAY_MCH_CERT_SERIAL` / `WECHAT_PAY_SERIAL_NO` / `WECHAT_PAY_MCH_X509_PATH` 替换 `CERT_SERIAL_TODO`
+- [tests] `test_wechat_pay_verify.py`：RSA 验签与 Starlette 头解析
+
+### 数据变化
+- 无
+
+### 遗留问题
+- 回调业务落库、幂等仍为 `wechat_pay_routes` TODO；宴会押金回调仍走独立模型
 
 ---
 
