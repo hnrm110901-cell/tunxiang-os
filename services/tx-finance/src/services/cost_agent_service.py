@@ -16,6 +16,7 @@ from typing import Any
 
 import structlog
 from sqlalchemy import and_, desc, select, text
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 log = structlog.get_logger(__name__)
@@ -241,7 +242,7 @@ class CostAgentService:
                 alert_type=alert.get("alert_type"),
                 severity=alert.get("severity"),
             )
-        except Exception as exc:
+        except (SQLAlchemyError, ValueError, RuntimeError) as exc:
             # 预警推送失败不应阻断主流程
             log.warning("cost_agent_service.emit_alert_failed", store_id=store_id, error=str(exc))
 
@@ -269,7 +270,7 @@ class CostAgentService:
             if row:
                 return dict(row)
             return {}
-        except Exception as exc:
+        except SQLAlchemyError as exc:
             log.warning("cost_agent_service._get_daily_pnl_failed", error=str(exc))
             return {}
 
@@ -307,7 +308,7 @@ class CostAgentService:
                 },
             )
             return [dict(row) for row in result.mappings().all()]
-        except Exception as exc:
+        except SQLAlchemyError as exc:
             log.warning("cost_agent_service._get_top_cost_dishes_failed", error=str(exc))
             return []
 
@@ -385,6 +386,6 @@ class CostAgentService:
                         "drift_pct": round(drift_pct, 4),
                     })
             return alerts
-        except Exception as exc:
+        except SQLAlchemyError as exc:
             log.warning("cost_agent_service._detect_price_drift_failed", error=str(exc))
             return []
