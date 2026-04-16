@@ -19,7 +19,7 @@ from datetime import datetime, timezone
 from enum import Enum
 
 import structlog
-from sqlalchemy import select, func as sa_func, and_, update
+from sqlalchemy import select, func as sa_func, and_, update, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from services.tx_supply.src.models.distribution import (
@@ -327,16 +327,35 @@ async def optimize_route(
     trips_result = await db.execute(trips_stmt)
     trips = list(trips_result.scalars().all())
 
-    # 构建门店坐标列表（生产环境应 JOIN stores 表获取坐标，
-    # 这里使用仓库坐标作 fallback）
+    # 批量查询门店坐标和名称
+    store_ids = [trip.store_id for trip in trips]
+    store_lookup: dict[uuid.UUID, dict] = {}
+    if store_ids:
+        stores_result = await db.execute(
+            text(
+                "SELECT id, store_name, latitude, longitude"
+                " FROM stores"
+                " WHERE id = ANY(:ids) AND is_deleted = FALSE"
+            ),
+            {"ids": store_ids},
+        )
+        for row in stores_result.mappings():
+            store_lookup[row["id"]] = {
+                "store_name": row["store_name"] or "",
+                "lat": row["latitude"] if row["latitude"] is not None else wh_lat,
+                "lng": row["longitude"] if row["longitude"] is not None else wh_lng,
+            }
+
+    # 构建门店坐标列表（坐标从 stores 表获取，NULL 时回退仓库坐标）
     stores_to_visit: list[dict] = []
     for trip in trips:
+        info = store_lookup.get(trip.store_id, {})
         stores_to_visit.append({
             "store_id": str(trip.store_id),
             "trip_id": trip.id,
-            "lat": wh_lat,  # TODO: JOIN stores 表获取实际坐标
-            "lng": wh_lng,
-            "store_name": "",
+            "lat": info.get("lat", wh_lat),
+            "lng": info.get("lng", wh_lng),
+            "store_name": info.get("store_name", ""),
         })
 
     # 贪心最近邻排序

@@ -27,6 +27,7 @@ from typing import AsyncGenerator, Dict, Optional, Set
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db_with_tenant
@@ -413,18 +414,31 @@ async def _upsert_reservation(
         return {}  # unreachable, _err always raises
 
 
-def _resolve_store_id(shop_platform_id: Optional[str], tenant_id: str) -> str:
+async def _resolve_store_id(
+    shop_platform_id: Optional[str],
+    tenant_id: str,
+    db: AsyncSession,
+) -> str:
     """通过平台门店 ID 映射到内部 store_id。
-    TODO: 从 store_platform_bindings 配置表查询真实映射。
-    当前 Mock：直接返回占位值，实际部署时替换。
+
+    查询 store_platform_bindings 表获取真实映射（v259 迁移建表）。
+    如果未找到映射记录，返回空字符串，调用方应做相应处理。
     """
-    _ = shop_platform_id  # 参数预留，查询时使用
-    _ = tenant_id
-    # TODO: SELECT store_id FROM store_platform_bindings
-    #       WHERE platform_shop_id = shop_platform_id
-    #       AND   tenant_id = tenant_id
-    #       LIMIT 1
-    return "store_001"
+    if not shop_platform_id or not tenant_id:
+        return ""
+    result = await db.execute(
+        text(
+            "SELECT store_id FROM store_platform_bindings"
+            " WHERE platform_shop_id = :shop_id"
+            "   AND tenant_id = :tid"
+            "   AND is_active = TRUE"
+            "   AND is_deleted = FALSE"
+            " LIMIT 1"
+        ),
+        {"shop_id": shop_platform_id, "tid": tenant_id},
+    )
+    row = result.fetchone()
+    return str(row[0]) if row else ""
 
 
 # ─── Webhook 端点 ─────────────────────────────────────────────────────────────
@@ -453,7 +467,7 @@ async def webhook_meituan(
 
     tenant_id = _get_tenant_id(request)
     normalized = _normalize_meituan(payload)
-    store_id = _resolve_store_id(payload.shop_id, tenant_id)
+    store_id = await _resolve_store_id(payload.shop_id, tenant_id, db)
     result = await _upsert_reservation(normalized, store_id, db, tenant_id)
 
     # 美团要求固定响应格式
@@ -484,7 +498,7 @@ async def webhook_dianping(
 
     tenant_id = _get_tenant_id(request)
     normalized = _normalize_dianping(payload)
-    store_id = _resolve_store_id(payload.poi_id, tenant_id)
+    store_id = await _resolve_store_id(payload.poi_id, tenant_id, db)
     result = await _upsert_reservation(normalized, store_id, db, tenant_id)
 
     # 大众点评要求固定响应格式
