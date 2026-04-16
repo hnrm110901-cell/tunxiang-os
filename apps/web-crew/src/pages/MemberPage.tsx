@@ -4,6 +4,7 @@
  */
 import { useState, useCallback, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
+import { formatPrice } from '@tx-ds/utils';
 import { searchMember, bindMemberToOrder, type MemberInfo } from '../api/index';
 import { MemberInsightCard } from './MemberInsightCard';
 import { getStoredValue, type StoredValueTransaction } from '../api/storedValueApi';
@@ -58,6 +59,7 @@ function txnLabel(type: string): string {
   return map[type] ?? type;
 }
 
+/** @deprecated Use formatPrice from @tx-ds/utils */
 function fen2yuanStr(fen: number): string {
   return (Math.abs(fen) / 100).toFixed(2).replace(/\.00$/, '');
 }

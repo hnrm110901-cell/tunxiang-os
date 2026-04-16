@@ -646,3 +646,287 @@ async def get_performance_stats(
             "kpi_weights": KPI_WEIGHTS,
         },
     }
+
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# 评审周期管理 + 在线打分端点 (v254 review_cycles + review_scores)
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+from services.performance_scoring_service import (
+    create_review_cycle,
+    list_review_cycles,
+    update_cycle_status,
+    get_cycle_detail,
+    submit_review_score,
+    get_employee_scores,
+    aggregate_cycle_scores,
+    calibrate_score as svc_calibrate_score,
+    get_review_stats,
+)
+
+
+class ReviewCycleCreate(BaseModel):
+    cycle_name: str = Field(..., min_length=1, max_length=100, description="周期名称")
+    cycle_type: str = Field(..., description="monthly/quarterly/semi_annual/annual")
+    start_date: date = Field(..., description="开始日期")
+    end_date: date = Field(..., description="结束日期")
+    scoring_deadline: Optional[date] = Field(None, description="打分截止日")
+    scope_type: str = Field(default="brand", description="brand/region/store")
+    scope_id: Optional[str] = Field(None, description="作用域ID")
+    dimensions: list[dict] = Field(
+        default_factory=list,
+        description='评分维度 [{"name":"服务质量","weight":25,"max_score":100}]',
+    )
+    created_by: Optional[str] = Field(None, description="创建人ID")
+
+
+class ReviewCycleStatusUpdate(BaseModel):
+    status: str = Field(..., description="draft/scoring/calibrating/completed/archived")
+
+
+class ReviewScoreSubmit(BaseModel):
+    employee_id: str = Field(..., description="被评员工ID")
+    employee_name: Optional[str] = Field(None, description="员工姓名")
+    store_id: Optional[str] = Field(None, description="所属门店")
+    reviewer_id: str = Field(..., description="评审人ID")
+    reviewer_name: Optional[str] = Field(None, description="评审人姓名")
+    reviewer_role: Optional[str] = Field(None, description="self/manager/peer/subordinate")
+    dimension_scores: dict[str, float] = Field(..., description="各维度分数")
+    comment: Optional[str] = Field(None, description="评语")
+
+
+class CalibrateRequest(BaseModel):
+    employee_id: str = Field(..., description="员工ID")
+    calibrated_score: float = Field(..., ge=0, le=100, description="校准分数")
+    calibrator_id: str = Field(..., description="校准人ID")
+
+
+@router.post("/review-cycles")
+async def create_review_cycle_endpoint(
+    body: ReviewCycleCreate,
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """创建评审周期。"""
+    tid = _parse_tenant(x_tenant_id)
+    await _set_rls(db, tid)
+    try:
+        data = body.model_dump()
+        if data.get("scope_id"):
+            data["scope_id"] = uuid.UUID(data["scope_id"])
+        if data.get("created_by"):
+            data["created_by"] = uuid.UUID(data["created_by"])
+        result = await create_review_cycle(db, uuid.UUID(tid), data)
+        await db.commit()
+        return {"ok": True, "data": result}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+
+@router.get("/review-cycles")
+async def list_review_cycles_endpoint(
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    status: Optional[str] = Query(None, description="按状态过滤"),
+    page: int = Query(1, ge=1),
+    size: int = Query(20, ge=1, le=100),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """评审周期列表。"""
+    tid = _parse_tenant(x_tenant_id)
+    await _set_rls(db, tid)
+    try:
+        result = await list_review_cycles(db, uuid.UUID(tid), status=status, page=page, size=size)
+        return {"ok": True, "data": result}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+
+@router.get("/review-cycles/{cycle_id}")
+async def get_review_cycle_detail_endpoint(
+    cycle_id: str,
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """评审周期详情。"""
+    tid = _parse_tenant(x_tenant_id)
+    await _set_rls(db, tid)
+    try:
+        result = await get_cycle_detail(db, uuid.UUID(tid), uuid.UUID(cycle_id))
+        return {"ok": True, "data": result}
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+
+
+@router.put("/review-cycles/{cycle_id}/status")
+async def update_review_cycle_status_endpoint(
+    cycle_id: str,
+    body: ReviewCycleStatusUpdate,
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """更新评审周期状态。"""
+    tid = _parse_tenant(x_tenant_id)
+    await _set_rls(db, tid)
+    try:
+        result = await update_cycle_status(db, uuid.UUID(tid), uuid.UUID(cycle_id), body.status)
+        await db.commit()
+        return {"ok": True, "data": result}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+
+@router.post("/review-cycles/{cycle_id}/scores")
+async def submit_review_score_endpoint(
+    cycle_id: str,
+    body: ReviewScoreSubmit,
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """提交评审打分。"""
+    tid = _parse_tenant(x_tenant_id)
+    await _set_rls(db, tid)
+    try:
+        result = await submit_review_score(
+            db,
+            tenant_id=uuid.UUID(tid),
+            cycle_id=uuid.UUID(cycle_id),
+            employee_id=uuid.UUID(body.employee_id),
+            reviewer_id=uuid.UUID(body.reviewer_id),
+            dimension_scores=body.dimension_scores,
+            comment=body.comment,
+            reviewer_name=body.reviewer_name,
+            reviewer_role=body.reviewer_role,
+            employee_name=body.employee_name,
+            store_id=uuid.UUID(body.store_id) if body.store_id else None,
+        )
+        await db.commit()
+        return {"ok": True, "data": result}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+
+@router.get("/review-cycles/{cycle_id}/scores")
+async def get_review_scores_endpoint(
+    cycle_id: str,
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    employee_id: Optional[str] = Query(None, description="按员工过滤"),
+    page: int = Query(1, ge=1),
+    size: int = Query(50, ge=1, le=100),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """查看评审打分记录。"""
+    tid = _parse_tenant(x_tenant_id)
+    await _set_rls(db, tid)
+    try:
+        eid = uuid.UUID(employee_id) if employee_id else None
+        result = await get_employee_scores(
+            db, uuid.UUID(tid), uuid.UUID(cycle_id),
+            employee_id=eid, page=page, size=size,
+        )
+        return {"ok": True, "data": result}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+
+@router.get("/review-cycles/{cycle_id}/my-pending")
+async def get_my_pending_reviews(
+    cycle_id: str,
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    reviewer_id: str = Query(..., description="当前评审人ID"),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """获取我待评的员工列表。"""
+    tid = _parse_tenant(x_tenant_id)
+    await _set_rls(db, tid)
+    try:
+        # 查所有在该周期应被评审但尚未被当前评审人评审的员工
+        rows = await db.execute(
+            text("""
+                SELECT e.id AS employee_id, e.emp_name, e.role, e.store_id,
+                       s.store_name,
+                       rs.id AS score_id, rs.status AS score_status
+                FROM employees e
+                LEFT JOIN stores s ON s.id = e.store_id AND s.tenant_id = e.tenant_id
+                    AND s.is_deleted = FALSE
+                LEFT JOIN review_scores rs ON rs.employee_id = e.id
+                    AND rs.cycle_id = :cid AND rs.reviewer_id = :rid
+                    AND rs.tenant_id = :tid AND rs.is_deleted = FALSE
+                WHERE e.tenant_id = :tid AND e.is_deleted = FALSE
+                    AND e.status = 'active'
+                ORDER BY rs.status ASC NULLS FIRST, e.emp_name
+            """),
+            {"tid": tid, "cid": cycle_id, "rid": reviewer_id},
+        )
+        items = []
+        for r in rows.mappings().fetchall():
+            items.append({
+                "employee_id": str(r["employee_id"]),
+                "emp_name": r["emp_name"],
+                "role": r["role"],
+                "store_id": str(r["store_id"]) if r["store_id"] else None,
+                "store_name": r["store_name"],
+                "scored": r["score_id"] is not None,
+                "score_status": r["score_status"],
+            })
+        return {"ok": True, "data": {"items": items, "total": len(items)}}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+
+@router.get("/review-cycles/{cycle_id}/summary")
+async def get_review_cycle_summary(
+    cycle_id: str,
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    store_id: Optional[str] = Query(None, description="按门店过滤"),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """评审周期汇总排名。"""
+    tid = _parse_tenant(x_tenant_id)
+    await _set_rls(db, tid)
+    try:
+        sid = uuid.UUID(store_id) if store_id else None
+        items = await aggregate_cycle_scores(db, uuid.UUID(tid), uuid.UUID(cycle_id), store_id=sid)
+        return {"ok": True, "data": {"items": items, "total": len(items)}}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+
+@router.put("/review-cycles/{cycle_id}/calibrate")
+async def calibrate_review_score_endpoint(
+    cycle_id: str,
+    body: CalibrateRequest,
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """校准员工评审分数。"""
+    tid = _parse_tenant(x_tenant_id)
+    await _set_rls(db, tid)
+    try:
+        result = await svc_calibrate_score(
+            db,
+            tenant_id=uuid.UUID(tid),
+            cycle_id=uuid.UUID(cycle_id),
+            employee_id=uuid.UUID(body.employee_id),
+            calibrated_score=body.calibrated_score,
+            calibrator_id=uuid.UUID(body.calibrator_id),
+        )
+        await db.commit()
+        return {"ok": True, "data": result}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+
+@router.get("/review-cycles/{cycle_id}/stats")
+async def get_review_cycle_stats(
+    cycle_id: str,
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """评审统计概览。"""
+    tid = _parse_tenant(x_tenant_id)
+    await _set_rls(db, tid)
+    try:
+        result = await get_review_stats(db, uuid.UUID(tid), uuid.UUID(cycle_id))
+        return {"ok": True, "data": result}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e

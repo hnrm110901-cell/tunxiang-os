@@ -13,7 +13,7 @@
 7. POST   /api/v1/retail/orders/{id}/refund       退款
 8. GET    /api/v1/retail/stats                    零售统计
 """
-from typing import Any, Optional
+from typing import Optional
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel, Field

@@ -1,0 +1,29 @@
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--tx-surface-hover, rgba(0,0,0,0.05));
+  font-size: 10px;
+  line-height: 1.4;
+  color: var(--tx-text-secondary, #64748b);
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+.md {
+  padding: 2px 8px;
+  font-size: 12px;
+  gap: 3px;
+}
+
+.icon {
+  font-weight: 700;
+  color: var(--tx-warning, #F59E0B);
+  font-size: inherit;
+}
+
+.name {
+  font-weight: 400;
+}

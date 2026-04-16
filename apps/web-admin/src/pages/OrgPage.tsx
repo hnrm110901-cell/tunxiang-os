@@ -7,6 +7,7 @@
  */
 import { useEffect, useState, useCallback } from 'react';
 import { txFetchData } from '../api';
+import { formatPrice } from '@tx-ds/utils';
 
 // ─── 类型定义 ───────────────────────────────────────────────
 
@@ -96,6 +97,7 @@ function getWeekDays(): string[] {
   });
 }
 
+/** @deprecated Use formatPrice from @tx-ds/utils */
 function fen2yuan(fen: number): string {
   return `¥${(fen / 100).toLocaleString('zh-CN', { minimumFractionDigits: 0 })}`;
 }

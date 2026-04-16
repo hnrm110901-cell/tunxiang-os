@@ -5,12 +5,17 @@
  * 2026-04-02 新增：
  *   - 活鲜菜品（pricingMethod='weight'）点击 → LiveSeafoodOrderSheet
  *   - N选M套餐（comboType='flexible'）点击 → ComboSelectorSheet
+ *
+ * 2026-04-12 重构：使用 @tx-ds/biz 共享组件替换内联 UI
  */
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useOrderStore } from '../store/orderStore';
 import { createOrder, addItem as apiAddItem } from '../api/tradeApi';
 import { fetchDishes, type DishItem } from '../api/menuApi';
+import { DishGrid, CategoryNav, MenuSearch, CartPanel } from '@tx-ds/biz';
+import type { DishData, CartItem } from '@tx-ds/biz';
+import { formatPrice } from '@tx-ds/utils';
 import { LiveSeafoodOrderSheet } from '../components/LiveSeafoodOrderSheet';
 import { ComboSelectorSheet } from '../components/ComboSelectorSheet';
 import type { LiveSeafoodOrderSheetProps } from '../components/LiveSeafoodOrderSheet';
@@ -126,8 +131,27 @@ const FALLBACK_DISHES: ExtendedDishItem[] = [
   },
 ];
 
-const fen2yuan = (fen: number) => `¥${(fen / 100).toFixed(2)}`;
 const STORE_ID = import.meta.env.VITE_STORE_ID || '11111111-1111-1111-1111-111111111111';
+
+// ─── 数据转换 ─────────────────────────────────────────────────────────────────
+
+/** ExtendedDishItem → DishData（共享组件接口） */
+function toDishData(d: ExtendedDishItem): DishData {
+  const tags: DishData['tags'] = [];
+  if (d.pricingMethod === 'weight') tags.push({ type: 'seasonal', label: '按重量' });
+  if (d.comboType === 'flexible') tags.push({ type: 'new', label: '套餐' });
+  return {
+    id: d.id,
+    name: d.name,
+    priceFen: d.comboType === 'flexible' && d.comboPriceFen ? d.comboPriceFen : d.priceFen,
+    category: d.category,
+    soldOut: !d.isAvailable,
+    pricingMethod: d.pricingMethod,
+    comboType: d.comboType,
+    kitchenStation: d.kitchenStation,
+    tags,
+  };
+}
 
 // ─── 组件 ─────────────────────────────────────────────────────────────────────
 
@@ -136,9 +160,10 @@ export function CashierPage() {
   const navigate = useNavigate();
   const store = useOrderStore();
   const { items, totalFen, discountFen, orderId } = store;
-  const finalFen = totalFen - discountFen;
   const [loading, setLoading] = useState(false);
   const [dishes, setDishes] = useState<ExtendedDishItem[]>(FALLBACK_DISHES);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [activeCategory, setActiveCategory] = useState('all');
 
   // 活鲜弹层状态
   const [seafoodSheet, setSeafoodSheet] = useState<{
@@ -157,7 +182,6 @@ export function CashierPage() {
     setLoading(true);
     Promise.all([
       fetchDishes(STORE_ID).then((d) => {
-        // API菜品没有扩展字段，保持 fallback 中的活鲜/套餐 mock
         if (d.length > 0) {
           const extended: ExtendedDishItem[] = d.map((item) => ({ ...item, pricingMethod: 'normal' as const }));
           setDishes(extended);
@@ -171,9 +195,33 @@ export function CashierPage() {
     ]).finally(() => setLoading(false));
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // ── 分类列表 ────────────────────────────────────────────────────────────────
+
+  const categories = useMemo(() => {
+    const catSet = new Set(dishes.map((d) => d.category));
+    return [
+      { id: 'all', name: '全部' },
+      ...Array.from(catSet).map((c) => ({ id: c, name: c })),
+    ];
+  }, [dishes]);
+
+  // ── 菜品过滤（分类 + 搜索） ─────────────────────────────────────────────────
+
+  const filteredDishes = useMemo(() => {
+    let result = dishes;
+    if (activeCategory !== 'all') {
+      result = result.filter((d) => d.category === activeCategory);
+    }
+    if (searchQuery.trim()) {
+      const q = searchQuery.trim().toLowerCase();
+      result = result.filter((d) => d.name.toLowerCase().includes(q));
+    }
+    return result;
+  }, [dishes, activeCategory, searchQuery]);
+
   // ── 菜品点击路由 ────────────────────────────────────────────────────────────
 
-  const handleDishPress = (dish: ExtendedDishItem) => {
+  const handleDishPress = useCallback((dish: ExtendedDishItem) => {
     if (!dish.isAvailable) return;
 
     // 活鲜菜品 → 称重弹层
@@ -190,9 +238,9 @@ export function CashierPage() {
 
     // 普通菜品 → 直接加入订单
     handleAddNormalDish(dish);
-  };
+  }, [items, orderId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleAddNormalDish = async (dish: ExtendedDishItem) => {
+  const handleAddNormalDish = useCallback(async (dish: ExtendedDishItem) => {
     const existing = items.find((i) => i.dishId === dish.id);
     if (existing) {
       store.updateQuantity(existing.id, existing.quantity + 1);
@@ -209,11 +257,11 @@ export function CashierPage() {
     if (orderId) {
       apiAddItem(orderId, dish.id, dish.name, 1, dish.priceFen).catch(() => {});
     }
-  };
+  }, [items, orderId, store]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── 活鲜确认回调 ─────────────────────────────────────────────────────────────
 
-  const handleSeafoodConfirm: LiveSeafoodOrderSheetProps['onConfirm'] = (
+  const handleSeafoodConfirm: LiveSeafoodOrderSheetProps['onConfirm'] = useCallback((
     weighRecordId,
     qty,
     amountFen,
@@ -231,13 +279,13 @@ export function CashierPage() {
     });
 
     if (orderId) {
-      apiAddItem(orderId, dish.id, dish.name, qty, dish.priceFen).catch(() => {});
+      apiAddItem(orderId, dish.id, dish.name, qty, amountFen).catch(() => {});
     }
-  };
+  }, [seafoodSheet.dish, orderId, store]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── 套餐确认回调 ─────────────────────────────────────────────────────────────
 
-  const handleComboConfirm: ComboSelectorSheetProps['onConfirm'] = (selections) => {
+  const handleComboConfirm: ComboSelectorSheetProps['onConfirm'] = useCallback((selections) => {
     const dish = comboSheet.dish;
     if (!dish) return;
 
@@ -268,203 +316,141 @@ export function CashierPage() {
         dish.comboPriceFen ?? dish.priceFen,
       ).catch(() => {});
     }
-  };
+  }, [comboSheet.dish, orderId, store]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── 菜品分类颜色 ─────────────────────────────────────────────────────────────
+  // ── orderStore items → CartItem 映射 ─────────────────────────────────────────
 
-  const categoryTagColor = (cat: string): string => {
-    const map: Record<string, string> = {
-      '活鲜': '#0F6E56',
-      '套餐': '#1B5FA8',
-      '热菜': '#8B4513',
-      '凉菜': '#2E6B4A',
-      '主食': '#6B5320',
-      '饮品': '#4A3580',
-    };
-    return map[cat] ?? '#555';
-  };
+  const cartItems: CartItem[] = useMemo(
+    () => items.map((i) => ({
+      id: i.id,
+      dishId: i.dishId,
+      name: i.name,
+      quantity: i.quantity,
+      priceFen: i.priceFen,
+      notes: i.notes,
+      kitchenStation: i.kitchenStation,
+    })),
+    [items],
+  );
 
-  const isDishSpecial = (d: ExtendedDishItem) =>
-    d.pricingMethod === 'weight' || d.pricingMethod === 'count' || d.comboType === 'flexible';
+  // ── 辅助函数 ─────────────────────────────────────────────────────────────────
+
+  const getQuantityForDish = useCallback(
+    (dishId: string) => {
+      const item = items.find((i) => i.dishId === dishId);
+      return item?.quantity ?? 0;
+    },
+    [items],
+  );
+
+  // ── DishGrid 适配 ───────────────────────────────────────────────────────────
+
+  /** dishId → ExtendedDishItem 查找表，用于 DishGrid 回调中还原原始菜品对象 */
+  const dishLookup = useMemo(() => {
+    const map = new Map<string, ExtendedDishItem>();
+    for (const d of dishes) {
+      map.set(d.id, d);
+    }
+    return map;
+  }, [dishes]);
+
+  /** 购物车数量映射：Record<dishId, quantity> */
+  const dishQuantities = useMemo(() => {
+    const rec: Record<string, number> = {};
+    for (const item of items) {
+      rec[item.dishId] = (rec[item.dishId] ?? 0) + item.quantity;
+    }
+    return rec;
+  }, [items]);
+
+  /** DishGrid onAddDish / onTapDish 回调：DishData → ExtendedDishItem → handleDishPress */
+  const handleGridDishAction = useCallback(
+    (dish: DishData) => {
+      const original = dishLookup.get(dish.id);
+      if (original) {
+        handleDishPress(original);
+      }
+    },
+    [dishLookup, handleDishPress],
+  );
 
   // ── 渲染 ─────────────────────────────────────────────────────────────────────
 
   return (
-    <div style={{ display: 'flex', height: '100vh', background: '#0B1A20', color: '#fff', fontFamily: '-apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", sans-serif' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: 'var(--tx-bg, #0B1A20)', color: '#fff', fontFamily: '-apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", sans-serif' }}>
 
-      {/* ── 左侧 — 菜品区 ── */}
-      <div style={{ flex: 1, padding: 16, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-          <h3 style={{ margin: 0, fontSize: 20 }}>桌号: {tableNo}</h3>
-          {loading && <span style={{ color: '#faad14', fontSize: 16 }}>开单中...</span>}
-          {store.orderNo && <span style={{ color: '#52c41a', fontSize: 16 }}>{store.orderNo}</span>}
+      {/* ── 顶部：返回 + 搜索 + 桌号信息 ── */}
+      <div style={{ padding: '12px 16px 0', display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
+        <button
+          type="button"
+          onClick={() => { store.clear(); navigate('/tables'); }}
+          style={{
+            flexShrink: 0, background: 'none', border: 'none', color: '#fff',
+            fontSize: 22, cursor: 'pointer', padding: '4px 8px', borderRadius: 6,
+            display: 'flex', alignItems: 'center',
+          }}
+          aria-label="返回桌台"
+        >
+          ←
+        </button>
+        <div style={{ flex: 1 }}>
+          <MenuSearch
+            value={searchQuery}
+            onChange={setSearchQuery}
+            placeholder="搜索菜品..."
+            enableVoice
+          />
         </div>
-
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(148px, 1fr))', gap: 10 }}>
-          {dishes.map((d) => {
-            const inOrder = items.find((i) => i.dishId === d.id);
-            const special = isDishSpecial(d);
-
-            return (
-              <div
-                key={d.id}
-                role="button"
-                tabIndex={0}
-                aria-label={d.name}
-                onClick={() => handleDishPress(d)}
-                onKeyDown={(e) => e.key === 'Enter' && handleDishPress(d)}
-                style={{
-                  position: 'relative',
-                  padding: 14,
-                  borderRadius: 10,
-                  background: d.isAvailable ? '#1a2a33' : '#111c22',
-                  cursor: d.isAvailable ? 'pointer' : 'not-allowed',
-                  textAlign: 'center',
-                  minHeight: 80,
-                  border: inOrder ? '2px solid #FF6B35' : special ? '1.5px solid rgba(255,107,53,0.4)' : '1.5px solid transparent',
-                  opacity: d.isAvailable ? 1 : 0.5,
-                  transition: 'transform 200ms ease',
-                  userSelect: 'none',
-                  WebkitUserSelect: 'none',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 4,
-                }}
-              >
-                {/* 菜品名 */}
-                <div style={{ fontWeight: 'bold', fontSize: 17, color: '#fff', lineHeight: 1.3 }}>
-                  {d.name}
-                </div>
-
-                {/* 价格 */}
-                <div style={{ color: '#FF6B35', fontSize: 16, fontWeight: 600 }}>
-                  {d.comboType === 'flexible' && d.comboPriceFen
-                    ? fen2yuan(d.comboPriceFen)
-                    : d.pricingMethod === 'weight' || d.pricingMethod === 'count'
-                      ? `${fen2yuan(d.priceFen)}/${d.displayUnit ?? '份'}`
-                      : fen2yuan(d.priceFen)}
-                </div>
-
-                {/* 分类标签 */}
-                <div style={{
-                  display: 'inline-block',
-                  padding: '2px 8px',
-                  borderRadius: 4,
-                  background: categoryTagColor(d.category),
-                  fontSize: 13,
-                  color: '#fff',
-                }}>
-                  {d.category}
-                </div>
-
-                {/* 活鲜/套餐标记 */}
-                {d.pricingMethod === 'weight' && (
-                  <div style={{ fontSize: 12, color: '#52c41a', marginTop: 2 }}>⚖ 按重量</div>
-                )}
-                {d.comboType === 'flexible' && (
-                  <div style={{ fontSize: 12, color: '#1890ff', marginTop: 2 }}>📋 套餐</div>
-                )}
-                {!d.isAvailable && (
-                  <div style={{
-                    position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.6)',
-                    borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: 16, color: '#aaa', fontWeight: 600,
-                  }}>
-                    已沽清
-                  </div>
-                )}
-
-                {/* 已点角标 */}
-                {inOrder && (
-                  <div style={{
-                    position: 'absolute', top: 6, right: 6,
-                    width: 22, height: 22, borderRadius: '50%',
-                    background: '#FF6B35', color: '#fff',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: 13, fontWeight: 700, lineHeight: 1,
-                  }}>
-                    {inOrder.quantity}
-                  </div>
-                )}
-              </div>
-            );
-          })}
+        <div style={{ flexShrink: 0, textAlign: 'right' }}>
+          <div style={{ fontSize: 16, fontWeight: 600 }}>桌号: {tableNo}</div>
+          {loading && <span style={{ color: '#faad14', fontSize: 13 }}>开单中...</span>}
+          {store.orderNo && <span style={{ color: '#52c41a', fontSize: 13 }}>{store.orderNo}</span>}
         </div>
       </div>
 
-      {/* ── 右侧 — 购物车 ── */}
-      <div style={{ width: 320, background: '#112228', padding: 16, display: 'flex', flexDirection: 'column' }}>
-        <h3 style={{ margin: '0 0 12px', fontSize: 20 }}>当前订单</h3>
-        <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
-          {items.length === 0 && (
-            <div style={{ color: '#666', textAlign: 'center', marginTop: 40, fontSize: 16 }}>
-              点击菜品加入订单
+      {/* ── 分类导航 ── */}
+      {!searchQuery && (
+        <div style={{ flexShrink: 0 }}>
+          <CategoryNav
+            categories={categories}
+            activeId={activeCategory}
+            layout="topbar"
+            onSelect={setActiveCategory}
+          />
+        </div>
+      )}
+
+      {/* ── 主体：菜品网格 + 侧边购物车 ── */}
+      <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
+
+        {/* 菜品网格 */}
+        <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch', padding: 12 }}>
+          <DishGrid
+            dishes={filteredDishes.map((d) => toDishData(d))}
+            variant="grid"
+            quantities={dishQuantities}
+            onAddDish={handleGridDishAction}
+            onTapDish={handleGridDishAction}
+          />
+          {filteredDishes.length === 0 && (
+            <div style={{ textAlign: 'center', padding: '40px 0', color: '#64748b', fontSize: 16 }}>
+              {searchQuery ? `未找到"${searchQuery}"相关菜品` : '该分类暂无菜品'}
             </div>
           )}
-          {items.map((item) => (
-            <div key={item.id} style={{ padding: '10px 0', borderBottom: '1px solid #1a2a33' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 17, fontWeight: 600, lineHeight: 1.3 }}>{item.name}</div>
-                  {item.notes && (
-                    <div style={{ fontSize: 14, color: '#999', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {item.notes}
-                    </div>
-                  )}
-                  <div style={{ fontSize: 16, color: '#999', marginTop: 2 }}>
-                    {fen2yuan(item.priceFen)} × {item.quantity}
-                  </div>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-                  <button
-                    type="button"
-                    onClick={() => item.quantity > 1 ? store.updateQuantity(item.id, item.quantity - 1) : store.removeItem(item.id)}
-                    style={btnStyle}
-                  >
-                    -
-                  </button>
-                  <span style={{ fontSize: 18, fontWeight: 600, minWidth: 20, textAlign: 'center' }}>
-                    {item.quantity}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => store.updateQuantity(item.id, item.quantity + 1)}
-                    style={btnStyle}
-                  >
-                    +
-                  </button>
-                </div>
-              </div>
-            </div>
-          ))}
         </div>
 
-        <div style={{ borderTop: '1px solid #333', paddingTop: 12 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 22, fontWeight: 'bold', color: '#FF6B35' }}>
-            <span>应付</span>
-            <span>{fen2yuan(finalFen)}</span>
-          </div>
-        </div>
-
-        <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-          <button
-            type="button"
-            onClick={() => { store.clear(); navigate('/tables'); }}
-            style={{ ...actionBtn, background: '#333' }}
-          >
-            返回
-          </button>
-          <button
-            type="button"
-            onClick={() => items.length > 0 && navigate(`/settle/${orderId ?? 'temp'}`)}
-            disabled={items.length === 0}
-            style={{ ...actionBtn, background: items.length > 0 ? '#FF6B35' : '#444' }}
-          >
-            结算
-          </button>
-        </div>
+        {/* 右侧购物车 */}
+        <CartPanel
+          mode="sidebar"
+          items={cartItems}
+          totalFen={totalFen}
+          discountFen={discountFen}
+          tableNo={tableNo}
+          onUpdateQuantity={(itemId, qty) => store.updateQuantity(itemId, qty)}
+          onRemoveItem={(itemId) => store.removeItem(itemId)}
+          onClear={() => store.clear()}
+          onSettle={() => items.length > 0 && navigate(`/settle/${orderId ?? 'temp'}`)}
+        />
       </div>
 
       {/* ── 活鲜称重弹层 ── */}
@@ -508,30 +494,3 @@ export function CashierPage() {
     </div>
   );
 }
-
-const btnStyle: React.CSSProperties = {
-  width: 36,
-  height: 36,
-  border: 'none',
-  borderRadius: 6,
-  background: '#333',
-  color: '#fff',
-  cursor: 'pointer',
-  fontSize: 18,
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  flexShrink: 0,
-};
-
-const actionBtn: React.CSSProperties = {
-  flex: 1,
-  height: 56,
-  border: 'none',
-  borderRadius: 10,
-  color: '#fff',
-  fontSize: 18,
-  fontWeight: 600,
-  cursor: 'pointer',
-  fontFamily: 'inherit',
-};

@@ -4,7 +4,9 @@
  */
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { formatPrice } from '@tx-ds/utils';
 
+/** @deprecated Use formatPrice from @tx-ds/utils */
 const fen2yuan = (fen: number) => `¥${(fen / 100).toFixed(2)}`;
 
 const INVOICE_TYPES = [

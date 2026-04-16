@@ -12,6 +12,7 @@
  *   PATCH /api/v1/dishes/{dish_id}  { status: 'soldout' }
  */
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import { formatPrice } from '@tx-ds/utils';
 
 // ─── 类型 ───
 
@@ -98,8 +99,9 @@ const QUADRANT_META: Record<Quadrant, {
 
 // ─── 工具函数 ───
 
+/** @deprecated — use formatPrice from @tx-ds/utils */
 function fenToYuan(fen: number): string {
-  return (fen / 100).toFixed(2);
+  return formatPrice(fen);
 }
 
 function pct(v: number): string {

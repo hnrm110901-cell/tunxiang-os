@@ -5,6 +5,7 @@
  * API: GET /api/v1/analytics/period-analysis?store_id=&date=
  */
 import { useEffect, useState } from 'react';
+import { formatPrice } from '@tx-ds/utils';
 import { apiGet } from '../../../api/client';
 
 // ─── 类型 ──────────────────────────────────────────────────────────────────────
@@ -71,6 +72,7 @@ const FALLBACK_PERIODS: PeriodData[] = [
 
 // ─── 辅助 ──────────────────────────────────────────────────────────────────────
 
+/** @deprecated Use formatPrice from @tx-ds/utils */
 const fen2yuan = (fen: number) => `¥${(fen / 100).toLocaleString('zh-CN', { minimumFractionDigits: 0 })}`;
 const pct = (v: number) => `${(v * 100).toFixed(1)}%`;
 

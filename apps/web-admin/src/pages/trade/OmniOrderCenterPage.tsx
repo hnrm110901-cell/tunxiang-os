@@ -39,6 +39,7 @@ import {
 import type { ActionType, ProColumns } from '@ant-design/pro-components';
 import { ProTable, StatisticCard } from '@ant-design/pro-components';
 import dayjs from 'dayjs';
+import { formatPrice } from '@tx-ds/utils';
 
 const { Title, Text } = Typography;
 const { RangePicker } = DatePicker;
@@ -132,6 +133,7 @@ const PAYMENT_LABEL: Record<string, string> = {
 
 // ─── 工具函数 ────────────────────────────────────────────────────────────────
 
+/** @deprecated Use formatPrice from @tx-ds/utils */
 function fenToYuan(fen: number): string {
   return `¥${(fen / 100).toFixed(2)}`;
 }

@@ -42,6 +42,7 @@ import {
   ClockCircleOutlined,
 } from '@ant-design/icons';
 import { txFetchData } from '../../api';
+import { formatPrice } from '@tx-ds/utils';
 
 const { Title, Text } = Typography;
 
@@ -120,6 +121,7 @@ const EMPTY_SUMMARY: PayrollSummary = {
 
 // ─── 辅助函数 ─────────────────────────────────────────────────────────────────
 
+/** @deprecated Use formatPrice from @tx-ds/utils */
 const fenToYuan = (fen: number) => (fen / 100).toFixed(2);
 const fenToWan = (fen: number) => (fen / 1_000_000).toFixed(2);
 

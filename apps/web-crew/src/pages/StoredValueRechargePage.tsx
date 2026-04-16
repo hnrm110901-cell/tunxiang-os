@@ -9,6 +9,7 @@
  */
 import { useState, useCallback } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
+import { formatPrice } from '@tx-ds/utils';
 import { rechargeStoredValue, calcBonus } from '../api/storedValueApi';
 
 // ─── 颜色常量 ───────────────────────────────────────────────────────────
@@ -38,6 +39,7 @@ const PAY_METHODS: { id: PayMethod; label: string; icon: string }[] = [
 ];
 
 // ─── 工具 ───────────────────────────────────────────────────────────────
+/** @deprecated Use formatPrice from @tx-ds/utils */
 function fen2yuan(fen: number): string {
   return (fen / 100).toFixed(0);
 }

@@ -1,4 +1,8 @@
-"""薪税申报对接服务：个税申报数据生成、提交与查询（含 Mock 税局）。"""
+"""薪税申报对接服务：个税申报数据生成、提交与查询。
+
+通过 TaxBureauSDK 对接自然人电子税务局（当前 Mock，后续接入真实 API）。
+申报记录持久化至 tax_declarations 表（v256 迁移）。
+"""
 from __future__ import annotations
 
 import json
@@ -10,7 +14,11 @@ import structlog
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from shared.integrations.tax_bureau_sdk import TaxBureauSDK
+
 log = structlog.get_logger(__name__)
+
+_sdk = TaxBureauSDK()
 
 TAX_FILING_STATUS: dict[str, str] = {
     "draft": "草稿",
@@ -248,17 +256,45 @@ async def submit_to_tax_bureau(
     tenant_id: UUID | str,
     declaration_id: UUID | str,
 ) -> dict[str, Any]:
-    """提交到自然人电子税务局（Mock）。"""
+    """提交到自然人电子税务局（通过 TaxBureauSDK）。"""
     await _set_tenant(db, tenant_id)
     tid = _tid(tenant_id)
     did = str(declaration_id)
-    receipt_no = f"RCP{uuid4().hex[:16].upper()}"
+
+    # 读取申报数据
+    sel = await db.execute(
+        text("""
+            SELECT month, declaration_data, status
+            FROM tax_declarations
+            WHERE tenant_id = CAST(:tenant_id AS uuid)
+              AND id = CAST(:declaration_id AS uuid)
+            LIMIT 1
+        """),
+        {"tenant_id": tid, "declaration_id": did},
+    )
+    row = sel.mappings().one_or_none()
+    if row is None:
+        raise ValueError("申报记录不存在或无权访问")
+    if row["status"] not in ("generated", "rejected"):
+        raise ValueError(f"当前状态 {row['status']} 不可提交")
+
+    decl_data = json.loads(row["declaration_data"]) if row["declaration_data"] else {}
+    employees = decl_data.get("employees", [])
+
+    # 调用 SDK 提交
+    sdk_result = await _sdk.submit_monthly_declaration(
+        period=str(row["month"]),
+        employees=employees,
+    )
+
     now = datetime.now(timezone.utc)
+    receipt_no = sdk_result.get("task_id", f"RCP{uuid4().hex[:16].upper()}")
+    status = "submitted" if sdk_result["status"] == "accepted" else sdk_result["status"]
 
     upd = await db.execute(
         text("""
             UPDATE tax_declarations
-            SET status = 'submitted',
+            SET status = :status,
                 receipt_no = :receipt_no,
                 submitted_at = :submitted_at
             WHERE tenant_id = CAST(:tenant_id AS uuid)
@@ -268,25 +304,28 @@ async def submit_to_tax_bureau(
         {
             "tenant_id": tid,
             "declaration_id": did,
+            "status": status,
             "receipt_no": receipt_no,
             "submitted_at": now,
         },
     )
-    row = upd.scalar_one_or_none()
-    if row is None:
-        raise ValueError("申报记录不存在或无权访问")
+    upd.scalar_one()
 
     log.info(
-        "tax_filing.submitted_mock",
+        "tax_filing.submitted",
         tenant_id=tid,
         declaration_id=did,
         receipt_no=receipt_no,
+        sdk_status=sdk_result["status"],
+        accepted_count=sdk_result.get("accepted_count", 0),
     )
 
     return {
         "declaration_id": did,
-        "status": "submitted",
+        "status": status,
         "receipt_no": receipt_no,
+        "accepted_count": sdk_result.get("accepted_count", 0),
+        "rejected": sdk_result.get("rejected", []),
         "submitted_at": _iso_utc(now) or "",
     }
 
@@ -473,4 +512,107 @@ async def get_annual_summary(
         "total_taxable_fen": total_taxable,
         "total_tax_fen": total_tax,
         "avg_monthly_tax_fen": avg_monthly_tax,
+    }
+
+
+async def retry_filing(
+    db: AsyncSession,
+    tenant_id: UUID | str,
+    declaration_id: UUID | str,
+) -> dict[str, Any]:
+    """重试失败的申报。"""
+    await _set_tenant(db, tenant_id)
+    tid = _tid(tenant_id)
+    did = str(declaration_id)
+
+    sel = await db.execute(
+        text("""
+            SELECT month, declaration_data, status
+            FROM tax_declarations
+            WHERE tenant_id = CAST(:tenant_id AS uuid)
+              AND id = CAST(:declaration_id AS uuid)
+            LIMIT 1
+        """),
+        {"tenant_id": tid, "declaration_id": did},
+    )
+    row = sel.mappings().one_or_none()
+    if row is None:
+        raise ValueError("申报记录不存在或无权访问")
+    if row["status"] not in ("rejected",):
+        raise ValueError(f"当前状态 {row['status']} 不可重试，仅 rejected 状态可重试")
+
+    decl_data = json.loads(row["declaration_data"]) if row["declaration_data"] else {}
+    employees = decl_data.get("employees", [])
+
+    sdk_result = await _sdk.submit_monthly_declaration(
+        period=str(row["month"]),
+        employees=employees,
+    )
+
+    now = datetime.now(timezone.utc)
+    new_status = "submitted" if sdk_result["status"] == "accepted" else sdk_result["status"]
+
+    await db.execute(
+        text("""
+            UPDATE tax_declarations
+            SET status = :status,
+                receipt_no = :receipt_no,
+                submitted_at = :submitted_at
+            WHERE tenant_id = CAST(:tenant_id AS uuid)
+              AND id = CAST(:declaration_id AS uuid)
+        """),
+        {
+            "tenant_id": tid,
+            "declaration_id": did,
+            "status": new_status,
+            "receipt_no": sdk_result.get("task_id", ""),
+            "submitted_at": now,
+        },
+    )
+
+    log.info(
+        "tax_filing.retry",
+        tenant_id=tid,
+        declaration_id=did,
+        new_status=new_status,
+    )
+
+    return {
+        "declaration_id": did,
+        "status": new_status,
+        "accepted_count": sdk_result.get("accepted_count", 0),
+        "rejected": sdk_result.get("rejected", []),
+    }
+
+
+async def get_filing_stats(
+    db: AsyncSession,
+    tenant_id: UUID | str,
+    year: int | None = None,
+) -> dict[str, Any]:
+    """统计：本年已申报月数 / 总税额 / 总人次。"""
+    await _set_tenant(db, tenant_id)
+    tid = _tid(tenant_id)
+    current_year = year or datetime.now(timezone.utc).year
+
+    res = await db.execute(
+        text("""
+            SELECT
+                COUNT(DISTINCT month)      AS filed_months,
+                COALESCE(SUM(total_tax_fen), 0) AS total_tax_fen,
+                COALESCE(SUM(employee_count), 0) AS total_headcount
+            FROM tax_declarations
+            WHERE tenant_id = CAST(:tenant_id AS uuid)
+              AND month LIKE :year_prefix
+              AND status IN ('submitted', 'accepted', 'completed')
+        """),
+        {"tenant_id": tid, "year_prefix": f"{current_year}-%"},
+    )
+    row = res.mappings().one()
+
+    return {
+        "year": current_year,
+        "filed_months": int(row["filed_months"]),
+        "total_tax_fen": int(row["total_tax_fen"]),
+        "total_headcount": int(row["total_headcount"]),
     }

@@ -1,0 +1,58 @@
+/**
+ * @tunxiang/design-system — 业务组件（15个）
+ *
+ * 菜单：DishCard / CategoryNav / MenuSearch / DishGrid / DishImage / SpecSheet
+ * 购物车：CartPanel / AddToCartAnimation
+ * 管理：DishManageCard / MenuSchemePreview / AllergenBadge
+ * 运营：OrderTicketCard / QueueTicket / StatusBar / TableCard
+ */
+export { default as DishCard } from './DishCard/DishCard';
+export type { DishCardProps, DishData } from './DishCard/types';
+export { default as CategoryNav } from './CategoryNav/CategoryNav';
+export type { CategoryNavProps } from './CategoryNav/CategoryNav';
+export { default as MenuSearch } from './MenuSearch/MenuSearch';
+export type { MenuSearchProps } from './MenuSearch/MenuSearch';
+export { default as CartPanel } from './CartPanel/CartPanel';
+export type { CartPanelProps, CartItem } from './CartPanel/types';
+export { default as SpecSheet } from './SpecSheet/SpecSheet';
+export type { SpecSheetProps, SpecGroup, SpecOption } from './SpecSheet/types';
+export { default as DishImage } from './DishImage/DishImage';
+export type { DishImageProps } from './DishImage/DishImage';
+export { default as DishGrid } from './DishGrid/DishGrid';
+export type { DishGridProps } from './DishGrid/DishGrid';
+export { default as AddToCartAnimation } from './AddToCartAnimation/AddToCartAnimation';
+export type {
+  AddToCartAnimationProps,
+  AddToCartAnimationHandle,
+} from './AddToCartAnimation/AddToCartAnimation';
+export { default as AllergenBadge } from './AllergenBadge/AllergenBadge';
+export type { AllergenBadgeProps, Allergen } from './AllergenBadge/AllergenBadge';
+export { default as DishManageCard } from './DishManageCard/DishManageCard';
+export type {
+  DishManageCardProps,
+  DishManageData,
+} from './DishManageCard/DishManageCard';
+export { default as MenuSchemePreview } from './MenuSchemePreview/MenuSchemePreview';
+export type {
+  MenuSchemePreviewProps,
+  MenuSchemeData,
+} from './MenuSchemePreview/MenuSchemePreview';
+export { default as OrderTicketCard } from './OrderTicketCard/OrderTicketCard';
+export type {
+  OrderTicketCardProps,
+  OrderTicketData,
+  TicketDishItem,
+  TicketStatus,
+  TicketPriority,
+} from './OrderTicketCard/OrderTicketCard';
+export { default as QueueTicket } from './QueueTicket/QueueTicket';
+export type {
+  QueueTicketProps,
+  QueueTicketData,
+  QueueTicketStatus,
+  TableSize,
+} from './QueueTicket/QueueTicket';
+export { default as StatusBar } from './StatusBar/StatusBar';
+export type { StatusBarProps, StatusBarItem } from './StatusBar/StatusBar';
+export { default as TableCard } from './TableCard/TableCard';
+export type { TableCardProps, TableCardData, TableCardStatus } from './TableCard/TableCard';

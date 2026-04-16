@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
+import { formatPrice } from '@tx-ds/utils';
 
 // ─── 数据类型 ───
 
@@ -48,8 +49,9 @@ const CALL_TYPE_LABELS: Record<CallType, string> = {
 
 // ─── 工具函数 ───
 
+/** @deprecated Use formatPrice from @tx-ds/utils */
 function fenToYuan(fen: number): string {
-  return (fen / 100).toFixed(2);
+  return formatPrice(fen).replace('¥', '');
 }
 
 function getWsBaseUrl(): string {

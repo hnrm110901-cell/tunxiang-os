@@ -686,7 +686,7 @@ async def get_retail_stats(
     }
 
 
-# ── 후台管理（旧版，已废弃，由上方 create_product/update_product 替代）─────
+# ── 后台管理（旧版，已废弃，由上方 create_product/update_product 替代）─────
 
 VALID_PRODUCT_STATUSES = ("draft", "on_sale", "off_sale")
 

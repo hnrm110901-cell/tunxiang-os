@@ -1,0 +1,267 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   SpecSheet — 规格选择底部上滑面板
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: flex-end;
+}
+
+.backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  animation: fadeIn 150ms ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.sheet {
+  position: relative;
+  width: 100%;
+  background: var(--tx-bg-elevated, #1a2a33);
+  border-radius: 16px 16px 0 0;
+  max-height: 80vh;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  animation: slideUp 300ms cubic-bezier(0.22, 1, 0.36, 1);
+  padding-bottom: calc(16px + var(--safe-area-bottom, 0px));
+}
+
+@keyframes slideUp {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0); }
+}
+
+/* ── Drag handle ────────────────────────────────────────────────────────────── */
+
+.dragHandleWrap {
+  display: flex;
+  justify-content: center;
+  padding: 12px 0 4px;
+}
+
+.dragHandle {
+  width: 40px;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* ── Dish header ────────────────────────────────────────────────────────────── */
+
+.dishHeader {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+}
+
+.dishImage {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+  background: var(--tx-bg-tertiary, rgba(255, 255, 255, 0.06));
+}
+
+.dishInfo {
+  flex: 1;
+  min-width: 0;
+}
+
+.dishName {
+  font-size: var(--tx-font-lg, 20px);
+  font-weight: 700;
+  color: var(--tx-text-primary);
+  line-height: 1.3;
+}
+
+.dishPrice {
+  font-size: var(--tx-font-md, 16px);
+  color: var(--tx-brand, #FF6B2C);
+  font-weight: 600;
+  margin-top: 4px;
+}
+
+/* ── Divider ────────────────────────────────────────────────────────────────── */
+
+.divider {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.06);
+  margin: 0 16px;
+}
+
+/* ── Spec groups ────────────────────────────────────────────────────────────── */
+
+.groupList {
+  padding: 8px 16px;
+}
+
+.group {
+  margin-bottom: 16px;
+}
+
+.group:last-child {
+  margin-bottom: 8px;
+}
+
+.groupName {
+  font-size: var(--tx-font-md, 16px);
+  font-weight: 600;
+  color: var(--tx-text-primary);
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.requiredTag {
+  font-size: var(--tx-font-xs, 12px);
+  font-weight: 400;
+  color: var(--tx-brand, #FF6B2C);
+  background: rgba(255, 107, 44, 0.1);
+  padding: 1px 6px;
+  border-radius: var(--tx-radius-sm, 4px);
+}
+
+.optionList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.optionPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 16px;
+  min-height: 36px;
+  border-radius: var(--tx-radius-full, 18px);
+  border: 1.5px solid rgba(255, 255, 255, 0.12);
+  background: transparent;
+  color: var(--tx-text-primary);
+  font-size: var(--tx-font-sm, 14px);
+  cursor: pointer;
+  transition: border-color 150ms ease, background 150ms ease;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.optionPill:hover {
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+.optionPill.selected {
+  border-color: var(--tx-brand, #FF6B2C);
+  background: rgba(255, 107, 44, 0.1);
+  color: var(--tx-brand, #FF6B2C);
+}
+
+.extraPrice {
+  font-size: var(--tx-font-xs, 12px);
+  color: var(--tx-text-tertiary, #999);
+}
+
+.optionPill.selected .extraPrice {
+  color: var(--tx-brand, #FF6B2C);
+  opacity: 0.8;
+}
+
+/* ── Quantity row ───────────────────────────────────────────────────────────── */
+
+.quantityRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+}
+
+.quantityLabel {
+  font-size: var(--tx-font-md, 16px);
+  font-weight: 600;
+  color: var(--tx-text-primary);
+}
+
+.quantityControls {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.quantityBtn {
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  min-height: 44px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(255, 255, 255, 0.15);
+  background: transparent;
+  color: var(--tx-text-primary);
+  font-size: 20px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 150ms ease, border-color 150ms ease;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.quantityBtn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.quantityBtn:active {
+  background: rgba(255, 255, 255, 0.14);
+  transform: scale(0.95);
+}
+
+.quantityBtn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.quantityValue {
+  font-size: 20px;
+  font-weight: 700;
+  min-width: 28px;
+  text-align: center;
+  color: var(--tx-text-primary);
+}
+
+/* ── Confirm button ─────────────────────────────────────────────────────────── */
+
+.confirmWrap {
+  padding: 12px 16px 0;
+}
+
+.confirmBtn {
+  width: 100%;
+  height: 56px;
+  border-radius: 12px;
+  background: var(--tx-brand, #FF6B2C);
+  color: #fff;
+  font-size: var(--tx-font-lg, 18px);
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  transition: background 150ms ease;
+}
+
+.confirmBtn:hover {
+  background: var(--tx-brand-hover, #e55a1e);
+}
+
+.confirmBtn:active {
+  transform: scale(0.98);
+}

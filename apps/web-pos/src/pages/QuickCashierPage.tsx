@@ -22,6 +22,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { fetchDishes, fetchCategories, type DishItem } from '../api/menuApi';
 import { printReceipt as bridgePrint, openCashBox } from '../bridge/TXBridge';
+import { formatPrice } from '@tx-ds/utils';
 
 // ─── Design Tokens（与 CallingScreenPage 一致） ───
 const C = {
@@ -75,7 +76,8 @@ const MOCK_DISHES: DishItem[] = [
 
 // ─── 工具函数 ───
 
-const fen2yuan = (fen: number) => (fen / 100).toFixed(2);
+/** @deprecated — use formatPrice from @tx-ds/utils */
+const fen2yuan = (fen: number) => formatPrice(fen);
 
 function getBase(): string {
   return (window as unknown as Record<string, unknown>).__API_BASE__ as string || '';

@@ -25,6 +25,7 @@ import AttendanceDailyPage from '../pages/hr/attendance/AttendanceDaily';
 import AttendanceMonthlyPage from '../pages/hr/attendance/AttendanceMonthly';
 import AttendanceAnomaliesPage from '../pages/hr/attendance/AttendanceAnomalies';
 import AttendanceAdjustmentsPage from '../pages/hr/attendance/AttendanceAdjustments';
+import ComplianceAuditPage from '../pages/hr/attendance/ComplianceAuditPage';
 // 请假
 import LeaveRequestsPage from '../pages/hr/leave/LeaveRequests';
 import LeaveDetailPage from '../pages/hr/leave/LeaveDetail';
@@ -36,10 +37,19 @@ import PerformanceRankingsPage from '../pages/hr/performance/PerformanceRankings
 import PerformanceHorseRacePage from '../pages/hr/performance/PerformanceHorseRace';
 import PerformancePointsPage from '../pages/hr/performance/PerformancePoints';
 import PerformancePointDetailPage from '../pages/hr/performance/PerformancePointDetail';
+import ReviewCyclesPage from '../pages/hr/performance/ReviewCyclesPage';
+import OnlineScoringPage from '../pages/hr/performance/OnlineScoringPage';
+import ReviewSummaryPage from '../pages/hr/performance/ReviewSummaryPage';
+// 积分扩展（v253）
+import PointsLeaderboardPage from '../pages/hr/performance/PointsLeaderboardPage';
+import HorseRacePage from '../pages/hr/performance/HorseRacePage';
+import PointsRewardsPage from '../pages/hr/performance/PointsRewardsPage';
 // 薪资
 import PayrollLaborCostPage from '../pages/hr/payroll/PayrollLaborCost';
 import PayrollApprovalPage from '../pages/hr/payroll/PayrollApproval';
 import PayrollSummaryPage from '../pages/hr/payroll/PayrollSummary';
+import SalaryItemLibraryPage from '../pages/hr/payroll/SalaryItemLibraryPage';
+import TaxFilingPage from '../pages/hr/payroll/TaxFilingPage';
 // 合规
 import ComplianceDashboardPage from '../pages/hr/compliance/ComplianceDashboard';
 import ComplianceAlertsPage from '../pages/hr/compliance/ComplianceAlerts';
@@ -64,6 +74,14 @@ import AgentTurnoverRiskPage from '../pages/hr/agents/AgentTurnoverRisk';
 import SettingsRolesPage from '../pages/hr/settings/SettingsRoles';
 import SettingsApprovalWorkflowsPage from '../pages/hr/settings/SettingsApprovalWorkflows';
 import SettingsAuditLogsPage from '../pages/hr/settings/SettingsAuditLogs';
+import IMSyncSettingsPage from '../pages/hr/settings/IMSyncSettingsPage';
+// 借调
+import TransferListPage from '../pages/hr/transfers/TransferListPage';
+import TransferCostReportPage from '../pages/hr/transfers/TransferCostReportPage';
+// 电子签约
+import ContractTemplatesPage from '../pages/hr/contracts/ContractTemplatesPage';
+import ContractSigningPage from '../pages/hr/contracts/ContractSigningPage';
+import ContractArchivePage from '../pages/hr/contracts/ContractArchivePage';
 // 分析
 import LaborMarginDashboardPage from '../pages/hr/analytics/LaborMarginDashboard';
 import BudgetRecommendationPage from '../pages/hr/analytics/BudgetRecommendation';
@@ -106,6 +124,7 @@ export const hrRoutes = (
     <Route path="/hr/attendance/monthly" element={<AttendanceMonthlyPage />} />
     <Route path="/hr/attendance/anomalies" element={<AttendanceAnomaliesPage />} />
     <Route path="/hr/attendance/adjustments" element={<AttendanceAdjustmentsPage />} />
+    <Route path="/hr/attendance/compliance" element={<ComplianceAuditPage />} />
     {/* 请假 */}
     <Route path="/hr/leave-requests" element={<LeaveRequestsPage />} />
     <Route path="/hr/leave-requests/:leaveId" element={<LeaveDetailPage />} />
@@ -117,10 +136,19 @@ export const hrRoutes = (
     <Route path="/hr/performance/horse-race" element={<PerformanceHorseRacePage />} />
     <Route path="/hr/performance/points" element={<PerformancePointsPage />} />
     <Route path="/hr/performance/points/:employeeId" element={<PerformancePointDetailPage />} />
+    <Route path="/hr/performance/review-cycles" element={<ReviewCyclesPage />} />
+    <Route path="/hr/performance/online-scoring" element={<OnlineScoringPage />} />
+    <Route path="/hr/performance/review-summary" element={<ReviewSummaryPage />} />
+    {/* 积分扩展（v253） */}
+    <Route path="/hr/performance/points-leaderboard" element={<PointsLeaderboardPage />} />
+    <Route path="/hr/performance/horse-race-seasons" element={<HorseRacePage />} />
+    <Route path="/hr/performance/points-rewards" element={<PointsRewardsPage />} />
     {/* 薪资 */}
     <Route path="/hr/payroll/labor-cost" element={<PayrollLaborCostPage />} />
     <Route path="/hr/payroll/approval" element={<PayrollApprovalPage />} />
     <Route path="/hr/payroll/summary" element={<PayrollSummaryPage />} />
+    <Route path="/hr/payroll/salary-items" element={<SalaryItemLibraryPage />} />
+    <Route path="/hr/payroll/tax-filing" element={<TaxFilingPage />} />
     {/* 合规 */}
     <Route path="/hr/compliance" element={<ComplianceDashboardPage />} />
     <Route path="/hr/compliance/alerts" element={<ComplianceAlertsPage />} />
@@ -145,10 +173,18 @@ export const hrRoutes = (
     <Route path="/hr/analytics/labor-margin" element={<LaborMarginDashboardPage />} />
     <Route path="/hr/analytics/budget" element={<BudgetRecommendationPage />} />
     <Route path="/hr/analytics/menu-skill" element={<MenuSkillMatchPage />} />
+    {/* 借调 */}
+    <Route path="/hr/transfers" element={<TransferListPage />} />
+    <Route path="/hr/transfers/cost-report" element={<TransferCostReportPage />} />
+    {/* 电子签约 */}
+    <Route path="/hr/contracts/templates" element={<ContractTemplatesPage />} />
+    <Route path="/hr/contracts/signing" element={<ContractSigningPage />} />
+    <Route path="/hr/contracts/archive" element={<ContractArchivePage />} />
     {/* 配置 */}
     <Route path="/hr/settings/roles" element={<SettingsRolesPage />} />
     <Route path="/hr/settings/approval-workflows" element={<SettingsApprovalWorkflowsPage />} />
     <Route path="/hr/settings/audit-logs" element={<SettingsAuditLogsPage />} />
+    <Route path="/hr/settings/im-sync" element={<IMSyncSettingsPage />} />
     {/* /hq/org/* 别名 */}
     <Route path="/hq/org/hr" element={<HRDashboardPage />} />
     <Route path="/hq/org/franchise" element={<FranchiseDashboardPage />} />

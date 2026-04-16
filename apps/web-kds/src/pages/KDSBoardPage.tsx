@@ -16,6 +16,8 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useSwipe } from '../hooks/useSwipe';
 import { fetchTicketQueue, startTicket, completeTicket } from '../api/kdsOpsApi';
 import { warmUpAudio, playNewOrder, playTimeout } from '../utils/audio';
+import { OrderTicketCard } from '@tx-ds/biz';
+import type { OrderTicketData } from '@tx-ds/biz';
 import { useKDSRules } from '../hooks/useKDSRules';
 import {
   getTimeLevelFromRules,

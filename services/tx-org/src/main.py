@@ -14,69 +14,75 @@ except ImportError:
     _FLAG_SDK_AVAILABLE = False
     def is_enabled(flag, context=None): return True  # noqa: E731
 
-from .api.admin_routes import router as admin_router
-from .api.approval_engine_routes import router as approval_engine_router
-from .api.approval_router import router as approval_router
-from .api.attendance_routes import router as attendance_router
-from .api.compliance_alert_routes import router as compliance_alert_router
-from .api.compliance_routes import router as compliance_router
-from .api.device_routes import router as device_router
-from .api.employee_document_routes import router as employee_document_router
-from .api.efficiency import router as efficiency_router
-from .api.employee_depth_routes import router as employee_depth_router
-from .api.employees import router as emp_router
-from .api.franchise_mgmt_routes import router as franchise_mgmt_router
-from .api.job_grade_routes import router as job_grade_router
-from .api.org_structure_routes import router as org_structure_router
-from .api.franchise_router import router as franchise_v2_router
-from .api.franchise_routes import router as franchise_router
-from .api.franchise_settlement_routes import router as franchise_settlement_router
-from .api.im_sync_routes import router as im_sync_router
-from .api.leave_routes import router as leave_router
-from .api.ota_routes import router as ota_router
-from .api.patrol_routes import router as patrol_router
-from .api import payroll_engine_routes as _payroll_engine_mod
-from .api.payroll_engine_routes import router as payroll_engine_v3_router
-from .api.payroll_router import router as payroll_v2_router
-from .api.payroll_routes import router as payroll_router
-from .api.payslip import router as payslip_router
-from .api.performance_routes import router as performance_router
-from .api.permission_routes import role_limits_router
-from .api.permission_routes import router as permission_router
-from .api.role_api import router as role_router
-from .api.salary_items import router as salary_items_router
-from .api.schedule import router as schedule_router
-from .api.franchise_v4_routes import router as franchise_v4_router
-from .api.governance_routes import router as governance_router
-from .api.hr_dashboard_routes import router as hr_dashboard_router
-from .api.schedule_routes import router as schedule_v2_router
-from .api.store_clone_routes import router as store_clone_router
-from .api.store_ops_routes import router as store_ops_router
-from .api.transfers import router as transfer_router
-from .api.contribution_routes import router as contribution_router
-from .api.labor_margin_routes import router as labor_margin_router
-from .api.revenue_schedule_routes import router as revenue_schedule_router
-from .api.unified_schedule_routes import router as unified_schedule_router
-from .api.piecework_routes import router as piecework_router
-from .api.franchise_contract_routes import router as franchise_contract_router
-from .api.franchise_v5_routes import router as franchise_v5_router
-from .api.employee_training_routes import router as employee_training_router
-from .api.performance_scoring_routes import router as performance_scoring_router
-from .api.brand_management_routes import router as brand_management_router
-from .api.region_management_routes import router as region_management_router
-from .api.staffing_template_routes import router as staffing_template_router
-from .api.staffing_analysis_routes import router as staffing_analysis_router
-from .api.dri_workorder_routes import router as dri_workorder_router
-from .api.ai_alert_routes import router as ai_alert_router
-from .api.mentorship_routes import router as mentorship_router
-from .api.onboarding_path_routes import router as onboarding_path_router
-from .api.certification_routes import router as certification_router
-from .api.store_readiness_routes import router as store_readiness_router
-from .api.peak_guard_routes import router as peak_guard_router
-from .api.alert_aggregation_routes import router as alert_aggregation_router
-from .api.coach_session_routes import router as coach_session_router
-from .api.tenant_systems_routes import router as tenant_systems_router
-from .api.commission_v3_routes import router as commission_v3_router
+from api.admin_routes import router as admin_router
+from api.approval_engine_routes import router as approval_engine_router
+from api.approval_router import router as approval_router
+from api.attendance_routes import router as attendance_router
+from api.compliance_alert_routes import router as compliance_alert_router
+from api.compliance_routes import router as compliance_router
+from api.device_routes import router as device_router
+from api.employee_document_routes import router as employee_document_router
+from api.efficiency import router as efficiency_router
+from api.employee_depth_routes import router as employee_depth_router
+from api.employees import router as emp_router
+from api.franchise_mgmt_routes import router as franchise_mgmt_router
+from api.job_grade_routes import router as job_grade_router
+from api.org_structure_routes import router as org_structure_router
+from api.franchise_router import router as franchise_v2_router
+from api.franchise_routes import router as franchise_router
+from api.franchise_settlement_routes import router as franchise_settlement_router
+from api.im_sync_routes import router as im_sync_router
+from api.leave_routes import router as leave_router
+from api.ota_routes import router as ota_router
+from api.patrol_routes import router as patrol_router
+import api.payroll_engine_routes as _payroll_engine_mod
+from api.payroll_engine_routes import router as payroll_engine_v3_router
+from api.payroll_router import router as payroll_v2_router
+from api.payroll_routes import router as payroll_router
+from api.payslip import router as payslip_router
+from api.performance_routes import router as performance_router
+from api.permission_routes import role_limits_router
+from api.permission_routes import router as permission_router
+from api.role_api import router as role_router
+from api.salary_items import router as salary_items_router
+from api.schedule import router as schedule_router
+from api.franchise_v4_routes import router as franchise_v4_router
+from api.governance_routes import router as governance_router
+from api.hr_dashboard_routes import router as hr_dashboard_router
+from api.schedule_routes import router as schedule_v2_router
+from api.store_clone_routes import router as store_clone_router
+from api.store_ops_routes import router as store_ops_router
+from api.transfers import router as transfer_router
+from api.contribution_routes import router as contribution_router
+from api.labor_margin_routes import router as labor_margin_router
+from api.revenue_schedule_routes import router as revenue_schedule_router
+from api.unified_schedule_routes import router as unified_schedule_router
+from api.piecework_routes import router as piecework_router
+from api.franchise_contract_routes import router as franchise_contract_router
+from api.franchise_v5_routes import router as franchise_v5_router
+from api.employee_training_routes import router as employee_training_router
+from api.performance_scoring_routes import router as performance_scoring_router
+from api.brand_management_routes import router as brand_management_router
+from api.region_management_routes import router as region_management_router
+from api.staffing_template_routes import router as staffing_template_router
+from api.staffing_analysis_routes import router as staffing_analysis_router
+from api.dri_workorder_routes import router as dri_workorder_router
+from api.ai_alert_routes import router as ai_alert_router
+from api.mentorship_routes import router as mentorship_router
+from api.onboarding_path_routes import router as onboarding_path_router
+from api.certification_routes import router as certification_router
+from api.store_readiness_routes import router as store_readiness_router
+from api.peak_guard_routes import router as peak_guard_router
+from api.alert_aggregation_routes import router as alert_aggregation_router
+from api.coach_session_routes import router as coach_session_router
+from api.tenant_systems_routes import router as tenant_systems_router
+from api.commission_v3_routes import router as commission_v3_router
+from api.transfer_routes import router as transfer_db_router
+from api.e_signature_routes import router as e_signature_router
+from api.attendance_compliance_routes import router as attendance_compliance_router
+from api.points_routes import router as points_router
+import api.tax_filing_routes as _tax_filing_mod
+from api.tax_filing_routes import router as tax_filing_router
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from shared.ontology.src.database import get_db as _shared_get_db
@@ -86,6 +92,7 @@ from shared.ontology.src.database import get_db as _shared_get_db
 async def lifespan(app: FastAPI):
     # 将真实 get_db 注入到 payroll_engine_routes 模块（覆盖其 stub）
     _payroll_engine_mod.get_db = _shared_get_db
+    _tax_filing_mod.get_db = _shared_get_db
 
     # ── Feature Flag 启动检查 ────────────────────────────────────────
     import structlog as _structlog
@@ -200,6 +207,11 @@ app.include_router(alert_aggregation_router)   # AI预警聚合引擎（聚合�
 app.include_router(coach_session_router)       # 店长教练Agent（v206表）人力中枢S4
 app.include_router(tenant_systems_router)      # 租户多系统配置管理（v232表）三品牌四系统
 app.include_router(commission_v3_router)       # 计件提成3.0（天财对标 v244_commission_v3表）模块2.6
+app.include_router(transfer_db_router)         # 借调管理+成本分摊（v251表）DB持久化版
+app.include_router(e_signature_router)         # 电子签约模块（v252表）合同模板+签署流程
+app.include_router(points_router)              # 员工积分+赛马（v253表）积分流水+兑换+赛季
+app.include_router(tax_filing_router)          # 薪税申报对接（v256表）个税申报生成+提交+查询
+app.include_router(attendance_compliance_router)  # 考勤深度合规审计（v255表）GPS/代打/加班超时
 
 @app.get("/health")
 async def health():

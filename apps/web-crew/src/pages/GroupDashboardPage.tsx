@@ -7,6 +7,7 @@
  */
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { formatPrice } from '@tx-ds/utils';
 import {
   fetchGroupToday,
   fetchGroupTrend,
@@ -33,6 +34,7 @@ const C = {
 };
 
 /* ---------- 工具函数 ---------- */
+/** @deprecated Use formatPrice from @tx-ds/utils */
 function fenToYuan(fen: number): string {
   return (fen / 100).toFixed(2);
 }

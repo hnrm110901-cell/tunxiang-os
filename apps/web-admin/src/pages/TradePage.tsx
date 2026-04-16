@@ -5,6 +5,7 @@
 
 import React, { useEffect, useState, useCallback } from 'react';
 import { txFetchData } from '../api';
+import { formatPrice } from '@tx-ds/utils';
 
 // ─── 类型定义 ───
 
@@ -126,6 +127,7 @@ const errorStyle: React.CSSProperties = {
 
 // ─── 工具函数 ───
 
+/** @deprecated Use formatPrice from @tx-ds/utils */
 function fenToYuan(fen: number): string {
   return '¥' + (fen / 100).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
 }

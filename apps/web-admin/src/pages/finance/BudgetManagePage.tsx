@@ -46,11 +46,13 @@ import {
   listAnnualBudgets,
 } from '../../api/budgetApi';
 import { txFetchData } from '../../api';
+import { formatPrice } from '@tx-ds/utils';
 
 const { Title, Text, Paragraph } = Typography;
 
 // ─── 工具函数 ──────────────────────────────────────────────────────────────────
 
+/** @deprecated Use formatPrice from @tx-ds/utils */
 function fenToYuan(fen: number | null | undefined): string {
   if (fen == null) return '-';
   return (fen / 100).toFixed(2);

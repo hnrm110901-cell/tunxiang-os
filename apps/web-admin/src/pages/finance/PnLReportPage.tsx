@@ -41,6 +41,7 @@ import {
   DownloadOutlined,
 } from '@ant-design/icons';
 import { txFetchData, getTenantId, getToken } from '../../api';
+import { formatPrice } from '@tx-ds/utils';
 
 const { Title, Text } = Typography;
 
@@ -138,6 +139,7 @@ const DEMO_STORE_ID = '00000000-0000-0000-0000-000000000001';
 
 // ─── 工具函数 ─────────────────────────────────────────────────────────────────
 
+/** @deprecated Use formatPrice from @tx-ds/utils */
 function fenToYuan(fen: number): string {
   return (fen / 100).toFixed(2);
 }

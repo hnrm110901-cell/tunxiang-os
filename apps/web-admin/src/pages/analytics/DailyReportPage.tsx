@@ -50,6 +50,7 @@ import {
 import { ProTable } from '@ant-design/pro-components';
 import type { ProColumns } from '@ant-design/pro-components';
 import dayjs, { Dayjs } from 'dayjs';
+import { formatPrice } from '@tx-ds/utils';
 import { txFetchData } from '../../api';
 
 // ─── 常量 ─────────────────────────────────────────────────────────────────────
@@ -167,6 +168,7 @@ function mockAnomalies(seed: number): AnomalyRecord[] {
 
 // ─── 工具函数 ─────────────────────────────────────────────────────────────────
 
+/** @deprecated Use formatPrice from @tx-ds/utils */
 function fenToYuan(fen: number): string {
   return (fen / 100).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }

@@ -1,3 +1,4 @@
+// @deprecated — use AllergenBadge from @tx-ds/biz instead
 import type { Allergen } from '@/api/menuApi';
 import styles from './AllergenBadge.module.css';
 
