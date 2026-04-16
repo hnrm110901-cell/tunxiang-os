@@ -1,3 +1,24 @@
+## 2026-04-13 (续10) mock 消除收尾 — gateway/table_service/workforce_planner
+
+### 今日完成
+- [gateway] auth.py：LoginBruteForceProtection → users.failed_login_count/locked_until DB查询，in-memory降级保留；refresh_tokens → refresh_tokens表(v072)；内存_refresh_store保留为故障降级
+- [tx-trade] table_service.py：5个TODO stub → tables+dining_sessions真实查询（列表/详情/状态更新/统计/区域统计/搜索）
+- [tx-trade] table_card_learning.py：_get_first_click_timestamp → MIN(clicked_at) on table_card_click_logs
+- [tx-agent] workforce_planner.py：删除永远未被调用的_mock_optimization死代码（56行）
+
+### 数据变化
+- 提交：36e079f（table_service+auth.py）、b0e6ce5（workforce_planner清理）
+
+### 遗留问题（已分类为不可操作）
+- 外部第三方API存根（Douyin/微信支付/诺诺SDK/OCR）：等待供应商接入
+- 测试注入参数（auto_procurement/demand_forecast _mock_* 参数）：测试钩子，非生产mock
+- DEMO_USERS（auth.py）：TX_ENABLE_DEMO_AUTH env var控制，生产默认关闭，保留
+- 打印模板预览端点（_mock_live_seafood_receipt/banquet_notice）：模板设计器UX，保留
+- dish_matrix_routes._mock_matrix_data()：空结果降级回退，保留
+
+### 明日计划
+- Mock消除冲刺已完成，转入其他优化任务
+
 ## 2026-04-13 (续5-9) 大规模 mock 消除冲刺 — 全服务 DB 接入
 
 ### 今日完成
