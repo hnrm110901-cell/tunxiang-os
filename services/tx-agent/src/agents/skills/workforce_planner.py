@@ -177,62 +177,6 @@ async def _load_labor_forecast(
     return ideal
 
 
-def _mock_optimization() -> dict[str, Any]:
-    return {
-        "suggestions": [
-            {
-                "slot": "morning",
-                "slot_label": "早班",
-                "action": "reduce",
-                "current": 3,
-                "suggested": 2,
-                "delta": -1,
-                "reason": "早班客流偏低，人力富余1人，建议减班",
-                "estimated_saving_fen": 18000,
-            },
-            {
-                "slot": "dinner_peak",
-                "slot_label": "晚高峰",
-                "action": "increase",
-                "current": 3,
-                "suggested": 5,
-                "delta": 2,
-                "reason": "晚高峰营收占比最高，建议增加2人保障服务",
-                "estimated_saving_fen": -36000,
-            },
-            {
-                "slot": "afternoon",
-                "slot_label": "下午班",
-                "action": "reduce",
-                "current": 3,
-                "suggested": 2,
-                "delta": -1,
-                "reason": "下午客流低谷，可减1人或调为弹性班",
-                "estimated_saving_fen": 18000,
-            },
-        ],
-        "summary": {
-            "total_suggestions": 3,
-            "estimated_net_saving_fen": 0,
-            "optimization_rate": 0.15,
-        },
-        "efficiency_before": {
-            "morning": 93333,
-            "lunch_peak": 163333,
-            "afternoon": 60000,
-            "dinner_peak": 400000,
-            "night": 60000,
-        },
-        "efficiency_after": {
-            "morning": 140000,
-            "lunch_peak": 163333,
-            "afternoon": 90000,
-            "dinner_peak": 240000,
-            "night": 60000,
-        },
-    }
-
-
 # ── Agent 类 ─────────────────────────────────────────────────────────────────
 
 
