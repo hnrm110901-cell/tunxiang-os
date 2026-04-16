@@ -21,6 +21,10 @@ from typing import Any, Optional
 
 import structlog
 from redis.asyncio import Redis
+from sqlalchemy import text
+from sqlalchemy.exc import OperationalError, SQLAlchemyError
+
+from shared.ontology.src.database import async_session_factory
 
 log = structlog.get_logger(__name__)
 
@@ -167,7 +171,40 @@ class HREventConsumer:
             employee_id=employee_id,
             exception_type=exception_type,
         )
-        # TODO: 调用 compliance_alert_service 创建预警记录
+        tenant_id = payload.get("tenant_id", "")
+        try:
+            async with async_session_factory() as db:
+                await db.execute(
+                    text("""
+                        INSERT INTO compliance_alerts
+                            (tenant_id, employee_id, alert_type, severity, title, detail, source)
+                        VALUES
+                            (:tenant_id, :employee_id, 'attendance_exception', 'warning',
+                             :title, :detail, 'agent')
+                    """),
+                    {
+                        "tenant_id": tenant_id,
+                        "employee_id": employee_id or None,
+                        "title": f"考勤异常: {exception_type}",
+                        "detail": json.dumps(
+                            {"employee_id": employee_id, "exception_type": exception_type},
+                            ensure_ascii=False,
+                        ),
+                    },
+                )
+                await db.commit()
+                log.info(
+                    "compliance_alert_created",
+                    alert_type="attendance_exception",
+                    employee_id=employee_id,
+                )
+        except (OperationalError, SQLAlchemyError) as exc:
+            log.warning(
+                "compliance_alert_insert_failed",
+                alert_type="attendance_exception",
+                employee_id=employee_id,
+                error=str(exc),
+            )
 
     async def _handle_leave_approved(self, payload: dict[str, Any]) -> None:
         """请假审批通过 -> 检查排班缺口
@@ -186,7 +223,57 @@ class HREventConsumer:
             leave_start=leave_start,
             leave_end=leave_end,
         )
-        # TODO: 查询该员工在请假期间是否有排班，若有则自动创建缺口
+        conflicting_schedules: list[dict[str, Any]] = []
+        try:
+            async with async_session_factory() as db:
+                result = await db.execute(
+                    text("""
+                        SELECT id, store_id, date
+                        FROM employee_schedules
+                        WHERE employee_id = :eid
+                          AND date BETWEEN :start AND :end
+                          AND is_deleted = FALSE
+                    """),
+                    {"eid": employee_id, "start": leave_start, "end": leave_end},
+                )
+                rows = result.mappings().all()
+                conflicting_schedules = [dict(r) for r in rows]
+        except (OperationalError, SQLAlchemyError) as exc:
+            log.warning(
+                "leave_schedule_query_failed",
+                employee_id=employee_id,
+                error=str(exc),
+            )
+
+        log.info(
+            "leave_schedule_conflicts_found",
+            employee_id=employee_id,
+            conflict_count=len(conflicting_schedules),
+        )
+
+        if conflicting_schedules and self.redis:
+            for sched in conflicting_schedules:
+                sched_store_id = str(sched.get("store_id", store_id))
+                sched_date = str(sched.get("date", ""))
+                gap_event = {
+                    "event_type": "org.shift_gap.opened",
+                    "tenant_id": tenant_id,
+                    "store_id": sched_store_id,
+                    "employee_id": employee_id,
+                    "payload": json.dumps({
+                        "reason": "leave_approved",
+                        "schedule_date": sched_date,
+                        "urgency": "medium",
+                        "auto_created": True,
+                        "schedule_id": str(sched.get("id", "")),
+                    }),
+                }
+                await self.redis.xadd(self.STREAM_KEY, gap_event)
+            log.info(
+                "shift_gaps_created_for_leave",
+                employee_id=employee_id,
+                gap_count=len(conflicting_schedules),
+            )
 
     async def _handle_contract_expiring(self, payload: dict[str, Any]) -> None:
         """合同到期预警 -> 合规Agent
@@ -195,13 +282,48 @@ class HREventConsumer:
         """
         employee_id = payload.get("employee_id", "")
         expiry_date = payload.get("expiry_date", "")
+        tenant_id = payload.get("tenant_id", "")
         log.info(
             "contract_expiring_received",
             employee_id=employee_id,
             expiry_date=expiry_date,
         )
-        # TODO: 调用 compliance_alert_service 创建合同到期预警
-        # TODO: 通过 im_notification_service 发送企微通知
+        try:
+            async with async_session_factory() as db:
+                await db.execute(
+                    text("""
+                        INSERT INTO compliance_alerts
+                            (tenant_id, employee_id, alert_type, severity, title, detail,
+                             due_date, source)
+                        VALUES
+                            (:tenant_id, :employee_id, 'contract_expiry', 'warning',
+                             '员工合同即将到期', :detail, :due_date, 'system')
+                    """),
+                    {
+                        "tenant_id": tenant_id,
+                        "employee_id": employee_id or None,
+                        "detail": json.dumps(
+                            {"employee_id": employee_id, "expiry_date": expiry_date},
+                            ensure_ascii=False,
+                        ),
+                        "due_date": expiry_date or None,
+                    },
+                )
+                await db.commit()
+                log.info(
+                    "compliance_alert_created",
+                    alert_type="contract_expiry",
+                    employee_id=employee_id,
+                    expiry_date=expiry_date,
+                )
+        except (OperationalError, SQLAlchemyError) as exc:
+            log.warning(
+                "compliance_alert_insert_failed",
+                alert_type="contract_expiry",
+                employee_id=employee_id,
+                error=str(exc),
+            )
+        # TODO: 接入 im_notification_service
 
     async def _handle_schedule_cancelled(self, payload: dict[str, Any]) -> None:
         """排班取消 -> 自动创建缺口
@@ -246,14 +368,51 @@ class HREventConsumer:
         schedule_date = payload.get("schedule_date", "")
         urgency = payload.get("urgency", "medium")
 
+        tenant_id = payload.get("tenant_id", "")
         log.info(
             "gap_opened_received",
             store_id=store_id,
             date=schedule_date,
             urgency=urgency,
         )
-        # TODO: 调用 gap_filling_service 查找候选人
-        # TODO: 调用 im_notification_service 发送补位通知
+        candidates: list[dict[str, Any]] = []
+        try:
+            async with async_session_factory() as db:
+                result = await db.execute(
+                    text("""
+                        SELECT id, emp_name, role
+                        FROM employees
+                        WHERE store_id = :sid
+                          AND status = 'active'
+                          AND is_deleted = FALSE
+                          AND id NOT IN (
+                              SELECT employee_id
+                              FROM employee_schedules
+                              WHERE date = :sdate
+                                AND is_deleted = FALSE
+                          )
+                        LIMIT 5
+                    """),
+                    {"sid": store_id, "sdate": schedule_date},
+                )
+                rows = result.mappings().all()
+                candidates = [dict(r) for r in rows]
+        except (OperationalError, SQLAlchemyError) as exc:
+            log.warning(
+                "gap_candidates_query_failed",
+                store_id=store_id,
+                schedule_date=schedule_date,
+                error=str(exc),
+            )
+
+        log.info(
+            "gap_fill_candidates_found",
+            store_id=store_id,
+            schedule_date=schedule_date,
+            candidate_count=len(candidates),
+            candidate_ids=[str(c.get("id", "")) for c in candidates],
+        )
+        # TODO: 接入 im_notification_service
 
     # ── 辅助方法 ─────────────────────────────────────────────────────
 
