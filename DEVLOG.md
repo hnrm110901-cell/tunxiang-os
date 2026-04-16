@@ -1,3 +1,29 @@
+## 2026-04-16 生产TODO消除冲刺 — HR事件/配送路由/预订Webhook/KDS/小红书/AI洞察
+
+### 今日完成
+- [tx-org] hr_event_consumer.py：实现4个TODO handler（考勤异常/请假排班冲突/合同到期→compliance_alerts写入；缺口创建→查可用员工候选人）
+- [tx-supply] distribution.py：配送路线规划批量JOIN stores表获取真实门店lat/lon/name，wh坐标作NULL降级
+- [tx-trade] booking_webhook_routes.py：_resolve_store_id改为async查询store_platform_bindings表；v259迁移（tenant_id+RLS+复合索引）
+- [tx-trade] cooking_scheduler.py：in_progress从硬编码0改为查kds_tasks WHERE status='cooking'
+- [tx-trade] xhs_routes.py：从delivery_platform_configs读取XHS app_id/app_secret；实现webhook事件处理（order_refunded→UPDATE xhs_coupon_verifications）
+- [tx-predict] demand_predictor.py：实现逐菜品MAPE计算（dish_accuracy列表，按MAPE降序）
+- [tx-member] member_insight_routes.py：AI洞察生成后异步写入agent_decision_logs（source=claude_api时confidence=0.9）
+- [gateway] auth.py：清理stale TODO注释（实现已完成）
+- [tx-agent] workforce_planner.py：清理stale TODO docstring
+
+### 数据变化
+- 迁移：v259_store_platform_bindings（新增）
+- 提交：0b8cd44, c2fa07d, 8fee37a, d354495
+
+### 遗留问题（永久不可操作）
+- 外部第三方API（WeChat Pay/Meituan-Eleme通知/沪食安HTTP）：等待供应商接入
+- IM通知（企微/钉钉/飞书）：等待IM SDK集成
+- journey_executor更多条件类型：Phase 3功能预留
+- Redis缓存升级（member_insight/stamp_card）：运维优化，低优先级
+
+### 明日计划
+- 所有actionable TODO已清零，转入其他优化任务（测试覆盖/性能/安全）
+
 ## 2026-04-13 (续10) mock 消除收尾 — gateway/table_service/workforce_planner
 
 ### 今日完成
