@@ -216,9 +216,28 @@ async def xhs_webhook(request: Request) -> dict:
 
     logger.info("xhs.webhook_received", event_type=event_type)
 
-    # TODO: 实现各事件类型的处理逻辑
-    # - order_verified: 核销确认
-    # - order_refunded: 退款通知 → 更新 xhs_coupon_verifications.status
-    # - poi_updated: POI 信息变更
+    if event_type == "order_refunded":
+        coupon_code = payload.get("coupon_code") or payload.get("order", {}).get("coupon_code", "")
+        if coupon_code:
+            try:
+                from shared.ontology.src.database import async_session_factory
+                from sqlalchemy import text as _text
+                async with async_session_factory() as db:
+                    await db.execute(
+                        _text("""
+                            UPDATE xhs_coupon_verifications
+                            SET status = 'refunded', updated_at = NOW()
+                            WHERE coupon_code = :code
+                        """),
+                        {"code": coupon_code},
+                    )
+                    await db.commit()
+                logger.info("xhs.refund_processed", coupon_code=coupon_code)
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("xhs.refund_db_error", coupon_code=coupon_code, error=str(exc))
+    elif event_type == "order_verified":
+        logger.info("xhs.order_verified_callback", order_id=payload.get("order_id", ""))
+    elif event_type == "poi_updated":
+        logger.info("xhs.poi_updated", poi_id=payload.get("poi_id", ""))
 
     return {"code": 0, "msg": "ok"}

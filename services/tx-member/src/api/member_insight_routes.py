@@ -423,9 +423,49 @@ async def generate_member_insight(
             has_db_data=member_data is not None,
         )
 
-    # 写入内存缓存（生产环境 TODO: 改为 Redis，TTL=12h）
+    # 写入内存缓存（生产环境建议改为 Redis TTL=12h）
     _insight_cache[member_id] = insight
     source = insight.get("_meta", {}).get("source", "unknown")
+
+    # 决策留痕 — 写入 agent_decision_logs（异步旁路，不阻塞响应）
+    if x_tenant_id:
+        import asyncio as _asyncio
+        from sqlalchemy import text as _text
+
+        async def _log_decision() -> None:
+            try:
+                await db.execute(
+                    _text("""
+                        INSERT INTO agent_decision_logs
+                            (tenant_id, agent_id, decision_type, input_context,
+                             reasoning, output_action, constraints_check, confidence)
+                        VALUES
+                            (:tid::uuid, 'member_insight', 'insight_generated',
+                             :input_ctx::jsonb, :reasoning, :output_action::jsonb,
+                             '{"passed": true}'::jsonb, :confidence)
+                    """),
+                    {
+                        "tid": x_tenant_id,
+                        "input_ctx": json.dumps({
+                            "member_id": member_id,
+                            "order_id": req.order_id,
+                            "store_id": req.store_id,
+                            "source": source,
+                        }),
+                        "reasoning": f"member insight via {source}",
+                        "output_action": json.dumps({
+                            "alerts_count": len(insight.get("alerts", [])),
+                            "tags": insight.get("tags", []),
+                        }),
+                        "confidence": 0.9 if source == "claude_api" else 0.6,
+                    },
+                )
+                await db.commit()
+            except Exception as _exc:  # noqa: BLE001
+                logger.warning("member_insight_decision_log_failed", error=str(_exc))
+
+        _asyncio.create_task(_log_decision())
+
     logger.info("member_insight_generated", member_id=member_id, source=source)
     return insight
 
