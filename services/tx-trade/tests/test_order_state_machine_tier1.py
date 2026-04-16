@@ -35,27 +35,27 @@ class TestStateMachinePureFunctions:
 
     def test_table_empty_can_transition_to_dining(self):
         """空台可以直接进入用餐中状态（服务员开桌）"""
-        from services.state_machine import can_table_transition
+        from services.tx_trade.src.services.state_machine import can_table_transition
         assert can_table_transition("empty", "dining") is True
 
     def test_table_dining_cannot_jump_to_empty(self):
         """用餐中台位不能直接变为空台（必须先结账、再清台）"""
-        from services.state_machine import can_table_transition
+        from services.tx_trade.src.services.state_machine import can_table_transition
         assert can_table_transition("dining", "empty") is False
 
     def test_table_pending_checkout_to_pending_cleanup(self):
         """结账完成后台位进入待清台状态"""
-        from services.state_machine import can_table_transition
+        from services.tx_trade.src.services.state_machine import can_table_transition
         assert can_table_transition("pending_checkout", "pending_cleanup") is True
 
     def test_table_pending_cleanup_to_empty(self):
         """清台完成后台位恢复空台"""
-        from services.state_machine import can_table_transition
+        from services.tx_trade.src.services.state_machine import can_table_transition
         assert can_table_transition("pending_cleanup", "empty") is True
 
     def test_full_dine_in_cycle(self):
         """完整堂食流程：空台 → 用餐中 → 待结账 → 待清台 → 空台"""
-        from services.state_machine import can_table_transition
+        from services.tx_trade.src.services.state_machine import can_table_transition
         cycle = [
             ("empty", "dining"),
             ("dining", "pending_checkout"),
@@ -69,7 +69,7 @@ class TestStateMachinePureFunctions:
 
     def test_reservation_cycle(self):
         """预订流程：空台 → 已预留 → 待入座 → 用餐中"""
-        from services.state_machine import can_table_transition
+        from services.tx_trade.src.services.state_machine import can_table_transition
         cycle = [
             ("empty", "reserved"),
             ("reserved", "waiting_seat"),
@@ -80,12 +80,12 @@ class TestStateMachinePureFunctions:
 
     def test_reservation_cancellation(self):
         """预订取消：已预留 → 空台"""
-        from services.state_machine import can_table_transition
+        from services.tx_trade.src.services.state_machine import can_table_transition
         assert can_table_transition("reserved", "empty") is True
 
     def test_get_table_next_states_returns_labels(self):
         """get_table_next_states 返回含 state 和 label 字段"""
-        from services.state_machine import get_table_next_states
+        from services.tx_trade.src.services.state_machine import get_table_next_states
         nexts = get_table_next_states("empty")
         assert len(nexts) > 0
         for item in nexts:
@@ -94,7 +94,7 @@ class TestStateMachinePureFunctions:
 
     def test_order_states_defined(self):
         """订单核心状态全部已定义（以 state_machine.py 实际定义为准）"""
-        from services.state_machine import ORDER_STATES
+        from services.tx_trade.src.services.state_machine import ORDER_STATES
         # 以实际 ORDER_STATES 中的9个状态为基准
         expected = {
             "draft", "placed", "preparing",
@@ -153,7 +153,7 @@ class TestOrderStateMachineTier1:
         async def try_open_table():
             try:
                 # TODO: 替换为真实 OrderService.create_order 调用
-                # from services.order_service import OrderService
+                # from services.tx_trade.src.services.order_service import OrderService
                 # svc = OrderService(db, TENANT_ID)
                 # result = await svc.create_order(store_id=STORE_ID, table_no="1号台")
                 # results.append(result)
@@ -185,7 +185,7 @@ class TestOrderStateMachineTier1:
               以及 table_service.py 中的状态回滚方法。
         """
         # 验证状态机中台位待结账可以回退
-        from services.state_machine import can_table_transition
+        from services.tx_trade.src.services.state_machine import can_table_transition
         # 支付超时回滚路径：pending_checkout 应该能回到 dining（或 empty）
         # 当前状态机可能不支持此回退，这是一个已知缺口
         # assert can_table_transition("pending_checkout", "dining") is True
@@ -210,7 +210,7 @@ class TestOrderStateMachineTier1:
         db.execute.return_value.fetchone.return_value = mock_dish_row
 
         # TODO: 接入真实服务后，验证 ValueError 或自定义异常包含「售罄」关键词
-        # from services.order_service import OrderService, DishSoldOutError
+        # from services.tx_trade.src.services.order_service import OrderService, DishSoldOutError
         # svc = OrderService(db, TENANT_ID)
         # with pytest.raises(DishSoldOutError) as exc_info:
         #     await svc.add_item(order_id=uuid.uuid4(), dish_id=uuid.uuid4(), qty=1)
@@ -224,7 +224,7 @@ class TestOrderStateMachineTier1:
         场景：完成结账后台位必须经历清台流程，不能立即被下一桌使用。
         这是食安要求（防止直接复用未清洁台位）。
         """
-        from services.state_machine import can_table_transition
+        from services.tx_trade.src.services.state_machine import can_table_transition
         # 结账完成：台位进入待清台
         assert can_table_transition("pending_checkout", "pending_cleanup") is True
         # 清台完成：台位才变为空台
@@ -242,7 +242,7 @@ class TestOrderStateMachineTier1:
         Tier 1 验收标准：断网4小时重连后无数据丢失。
         """
         # TODO: 接入 OrderService + OfflineSyncService 后实现
-        # from services.order_service import OrderService
+        # from services.tx_trade.src.services.order_service import OrderService
         # from edge.sync_engine.src.offline_sync_service import OfflineSyncService
         #
         # mock_offline_sync = AsyncMock()
@@ -311,7 +311,7 @@ class TestOrderStateMachineTier1:
         import re
         # 直接测试 _gen_order_no 的输出格式
         # TODO: 解决 order_service.py 中重复 __init__ 定义后导入
-        # from services.order_service import _gen_order_no
+        # from services.tx_trade.src.services.order_service import _gen_order_no
         # order_no = _gen_order_no()
         # assert re.match(r"^TX\d{14}[A-F0-9]{4}$", order_no), (
         #     f"订单号格式不符合 TX{{14位时间}}{{4位hex}} 规范: {order_no}"

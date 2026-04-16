@@ -21,7 +21,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
 import pytest
-from services.omni_channel_service import (
+from services.tx_trade.src.services.omni_channel_service import (
     OmniChannelError,
     OmniChannelService,
     UnifiedOrder,

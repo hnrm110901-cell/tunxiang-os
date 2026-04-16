@@ -71,13 +71,11 @@ class CookTimeBaseline(TenantBase):
         Index(
             "ix_cook_time_baselines_lookup",
             "tenant_id", "dish_id", "dept_id", "hour_bucket", "day_type",
-            comment="制作时间基准核心查询索引"
-        ),
+        ),  # 制作时间基准核心查询索引
         Index(
             "ix_cook_time_baselines_dept_computed",
             "tenant_id", "dept_id", "computed_at",
-            comment="按档口查询最新基准时间"
-        ),
+        ),  # 按档口查询最新基准时间
     )
 
     @property

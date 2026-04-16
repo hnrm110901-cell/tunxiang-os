@@ -146,72 +146,72 @@ class TestUtilFunctions:
 
     def test_gbk_len_ascii(self):
         """ASCII 字符 GBK 长度 = 字符数"""
-        from services.print_template_service import _gbk_len
+        from services.tx_trade.src.services.print_template_service import _gbk_len
         assert _gbk_len("hello") == 5
         assert _gbk_len("12345") == 5
 
     def test_gbk_len_chinese(self):
         """中文字符 GBK 长度 = 字符数 × 2"""
-        from services.print_template_service import _gbk_len
+        from services.tx_trade.src.services.print_template_service import _gbk_len
         assert _gbk_len("屯象") == 4   # 2个中文 = 4字节
         assert _gbk_len("活鲜海鲜") == 8
 
     def test_gbk_len_mixed(self):
         """中英混合 GBK 长度正确"""
-        from services.print_template_service import _gbk_len
+        from services.tx_trade.src.services.print_template_service import _gbk_len
         # "A菜" = 1 + 2 = 3字节
         assert _gbk_len("A菜") == 3
 
     def test_fmt_yuan_integer(self):
         """整数金额格式化：18800分 → 含¥的188.00"""
-        from services.print_template_service import _fmt_yuan
+        from services.tx_trade.src.services.print_template_service import _fmt_yuan
         result = _fmt_yuan(18800)
         # \xa5 是 GBK 的 ¥
         assert "188.00" in result
 
     def test_fmt_yuan_zero(self):
         """零金额格式化：0分 → 0.00"""
-        from services.print_template_service import _fmt_yuan
+        from services.tx_trade.src.services.print_template_service import _fmt_yuan
         result = _fmt_yuan(0)
         assert "0.00" in result
 
     def test_fmt_weight_grams_under_500(self):
         """克重 < 500g 显示为克"""
-        from services.print_template_service import _fmt_weight
+        from services.tx_trade.src.services.print_template_service import _fmt_weight
         assert _fmt_weight(300) == "300g"
 
     def test_fmt_weight_grams_over_500(self):
         """克重 >= 500g 显示为 kg"""
-        from services.print_template_service import _fmt_weight
+        from services.tx_trade.src.services.print_template_service import _fmt_weight
         result = _fmt_weight(850)
         assert "kg" in result
         assert "0.850" in result
 
     def test_get_width_58mm(self):
         """58mm 配置返回 32 字符宽度"""
-        from services.print_template_service import _get_width
+        from services.tx_trade.src.services.print_template_service import _get_width
         assert _get_width({"paper_width_mm": 58}) == 32
 
     def test_get_width_80mm(self):
         """80mm 配置返回 48 字符宽度"""
-        from services.print_template_service import _get_width
+        from services.tx_trade.src.services.print_template_service import _get_width
         assert _get_width({"paper_width_mm": 80}) == 48
 
     def test_get_width_default(self):
         """无配置时默认 48 字符（80mm）"""
-        from services.print_template_service import _get_width
+        from services.tx_trade.src.services.print_template_service import _get_width
         assert _get_width(None) == 48
         assert _get_width({}) == 48
 
     def test_two_col_padding(self):
         """两列对齐：左右文本加空格填满指定宽度"""
-        from services.print_template_service import _gbk_len, _two_col
+        from services.tx_trade.src.services.print_template_service import _gbk_len, _two_col
         result = _two_col("时间:2026-04-02", "桌号:A8", 48)
         assert _gbk_len(result) >= 48
 
     def test_line_separator_length(self):
         """分割线长度等于指定宽度"""
-        from services.print_template_service import _line
+        from services.tx_trade.src.services.print_template_service import _line
         result = _line(32, "-")
         assert len(result) == 32
         result80 = _line(48, "=")
@@ -228,7 +228,7 @@ class TestWeighTicket:
 
         ESC/POS 打印机初始化指令，所有票据必须以此开头。
         """
-        from services.print_template_service import generate_weigh_ticket
+        from services.tx_trade.src.services.print_template_service import generate_weigh_ticket
         encoded = generate_weigh_ticket(WEIGH_RECORD_BASE)
         raw = decode_b64_to_bytes(encoded)
         assert raw[:2] == b"\x1b\x40", f"输出应以 ESC_INIT 开头，实际头2字节：{raw[:2].hex()}"
@@ -237,7 +237,7 @@ class TestWeighTicket:
         """输出字符串可被 base64 解码为字节（格式合法性验证）"""
         import binascii
 
-        from services.print_template_service import generate_weigh_ticket
+        from services.tx_trade.src.services.print_template_service import generate_weigh_ticket
         encoded = generate_weigh_ticket(WEIGH_RECORD_BASE)
         try:
             raw = decode_b64_to_bytes(encoded)
@@ -252,7 +252,7 @@ class TestWeighTicket:
         注意：ESC/POS 控制序列本身不计入行宽，仅验证文本内容部分。
         店名行使用双倍宽，但 ESC 指令控制硬件渲染，字节流中字符本身不超宽。
         """
-        from services.print_template_service import _gbk_len, generate_weigh_ticket
+        from services.tx_trade.src.services.print_template_service import _gbk_len, generate_weigh_ticket
         store_config_58mm = {"paper_width_mm": 58}
         encoded = generate_weigh_ticket(WEIGH_RECORD_BASE, store_config_58mm)
         raw = decode_b64_to_bytes(encoded)
@@ -276,7 +276,7 @@ class TestWeighTicket:
 
     def test_weigh_ticket_80mm_line_width(self):
         """80mm 纸宽：每个纯文本行 GBK 字节宽度应 ≤ 48"""
-        from services.print_template_service import _gbk_len, generate_weigh_ticket
+        from services.tx_trade.src.services.print_template_service import _gbk_len, generate_weigh_ticket
         store_config_80mm = {"paper_width_mm": 80}
         encoded = generate_weigh_ticket(WEIGH_RECORD_BASE, store_config_80mm)
         raw = decode_b64_to_bytes(encoded)
@@ -297,7 +297,7 @@ class TestWeighTicket:
 
     def test_weigh_ticket_contains_dish_name(self):
         """称重单应包含菜品名称（GBK编码后可在字节流中找到）"""
-        from services.print_template_service import generate_weigh_ticket
+        from services.tx_trade.src.services.print_template_service import generate_weigh_ticket
         encoded = generate_weigh_ticket(WEIGH_RECORD_BASE)
         raw = decode_b64_to_bytes(encoded)
         dish_name_gbk = "澳洲大龙虾".encode("gbk")
@@ -305,7 +305,7 @@ class TestWeighTicket:
 
     def test_weigh_ticket_contains_amount(self):
         """称重单应包含金额信息（646.00 元）"""
-        from services.print_template_service import generate_weigh_ticket
+        from services.tx_trade.src.services.print_template_service import generate_weigh_ticket
         encoded = generate_weigh_ticket(WEIGH_RECORD_BASE)
         raw = decode_b64_to_bytes(encoded)
         # amount_fen=64600 → 646.00
@@ -317,7 +317,7 @@ class TestWeighTicket:
 
         源码第242行：'顾客确认签字：'
         """
-        from services.print_template_service import generate_weigh_ticket
+        from services.tx_trade.src.services.print_template_service import generate_weigh_ticket
         encoded = generate_weigh_ticket(WEIGH_RECORD_BASE)
         raw = decode_b64_to_bytes(encoded)
         sig_text = "顾客确认签字".encode("gbk")
@@ -325,7 +325,7 @@ class TestWeighTicket:
 
     def test_weigh_ticket_default_no_store_config(self):
         """不传 store_config 时不崩溃，默认使用80mm宽度"""
-        from services.print_template_service import generate_weigh_ticket
+        from services.tx_trade.src.services.print_template_service import generate_weigh_ticket
         # 不传 store_config
         encoded = generate_weigh_ticket(WEIGH_RECORD_BASE)
         raw = decode_b64_to_bytes(encoded)
@@ -339,14 +339,14 @@ class TestBanquetNotice:
 
     def test_banquet_notice_base64_decodable(self):
         """宴席通知单输出可被 base64 解码"""
-        from services.print_template_service import generate_banquet_notice
+        from services.tx_trade.src.services.print_template_service import generate_banquet_notice
         encoded = generate_banquet_notice(BANQUET_SESSION_BASE, BANQUET_SECTIONS_BASE)
         raw = decode_b64_to_bytes(encoded)
         assert isinstance(raw, bytes) and len(raw) > 0
 
     def test_banquet_notice_contains_esc_init(self):
         """宴席通知单以 ESC_INIT 开头"""
-        from services.print_template_service import generate_banquet_notice
+        from services.tx_trade.src.services.print_template_service import generate_banquet_notice
         encoded = generate_banquet_notice(BANQUET_SESSION_BASE, BANQUET_SECTIONS_BASE)
         raw = decode_b64_to_bytes(encoded)
         assert raw[:2] == b"\x1b\x40"
@@ -356,7 +356,7 @@ class TestBanquetNotice:
 
         验证菜品：夫妻肺片、口水鸡、清蒸石斑鱼、蒜蓉粉丝扇贝、佛跳墙
         """
-        from services.print_template_service import generate_banquet_notice
+        from services.tx_trade.src.services.print_template_service import generate_banquet_notice
         encoded = generate_banquet_notice(BANQUET_SESSION_BASE, BANQUET_SECTIONS_BASE)
         raw = decode_b64_to_bytes(encoded)
 
@@ -370,7 +370,7 @@ class TestBanquetNotice:
 
         测试包含特殊中文的场景（如：繁体字、生僻字用 errors='replace' 替代）。
         """
-        from services.print_template_service import generate_banquet_notice
+        from services.tx_trade.src.services.print_template_service import generate_banquet_notice
         session_with_complex_chinese = {
             **BANQUET_SESSION_BASE,
             "customer_name": "谢鑫炜（主办）",
@@ -393,7 +393,7 @@ class TestBanquetNotice:
 
         验证凉菜（sort_order=1）出现在热菜（sort_order=2）之前。
         """
-        from services.print_template_service import generate_banquet_notice
+        from services.tx_trade.src.services.print_template_service import generate_banquet_notice
         encoded = generate_banquet_notice(BANQUET_SESSION_BASE, BANQUET_SECTIONS_BASE)
         raw = decode_b64_to_bytes(encoded)
 
@@ -406,7 +406,7 @@ class TestBanquetNotice:
 
         边界测试：menu_sections 为空列表时应正常生成票据。
         """
-        from services.print_template_service import generate_banquet_notice
+        from services.tx_trade.src.services.print_template_service import generate_banquet_notice
         try:
             encoded = generate_banquet_notice(BANQUET_SESSION_BASE, [])
             raw = decode_b64_to_bytes(encoded)
@@ -416,7 +416,7 @@ class TestBanquetNotice:
 
     def test_empty_dishes_in_section_no_crash(self):
         """分节存在但 dishes=[] 时不崩溃"""
-        from services.print_template_service import generate_banquet_notice
+        from services.tx_trade.src.services.print_template_service import generate_banquet_notice
         sections_with_empty = [
             {
                 "section_type": "cold",
@@ -434,7 +434,7 @@ class TestBanquetNotice:
 
     def test_banquet_notice_contains_contract_no(self):
         """宴席通知单应包含合同号"""
-        from services.print_template_service import generate_banquet_notice
+        from services.tx_trade.src.services.print_template_service import generate_banquet_notice
         encoded = generate_banquet_notice(BANQUET_SESSION_BASE, BANQUET_SECTIONS_BASE)
         raw = decode_b64_to_bytes(encoded)
         contract_gbk = "BQ-2026-0001".encode("gbk")  # ASCII，GBK与UTF8一致
@@ -448,14 +448,14 @@ class TestCreditAccountTicket:
 
     def test_credit_ticket_base64_decodable(self):
         """挂账单输出可被 base64 解码"""
-        from services.print_template_service import generate_credit_account_ticket
+        from services.tx_trade.src.services.print_template_service import generate_credit_account_ticket
         encoded = generate_credit_account_ticket(ORDER_BASE, CREDIT_INFO_BASE)
         raw = decode_b64_to_bytes(encoded)
         assert isinstance(raw, bytes) and len(raw) > 0
 
     def test_credit_ticket_contains_esc_init(self):
         """挂账单以 ESC_INIT 开头"""
-        from services.print_template_service import generate_credit_account_ticket
+        from services.tx_trade.src.services.print_template_service import generate_credit_account_ticket
         encoded = generate_credit_account_ticket(ORDER_BASE, CREDIT_INFO_BASE)
         raw = decode_b64_to_bytes(encoded)
         assert raw[:2] == b"\x1b\x40"
@@ -465,7 +465,7 @@ class TestCreditAccountTicket:
 
         源码第549行：'（签字）                          （日期）'
         """
-        from services.print_template_service import generate_credit_account_ticket
+        from services.tx_trade.src.services.print_template_service import generate_credit_account_ticket
         encoded = generate_credit_account_ticket(ORDER_BASE, CREDIT_INFO_BASE)
         raw = decode_b64_to_bytes(encoded)
         sig_gbk = "签字".encode("gbk")
@@ -473,7 +473,7 @@ class TestCreditAccountTicket:
 
     def test_credit_ticket_contains_company_name(self):
         """挂账单应包含挂账单位名称"""
-        from services.print_template_service import generate_credit_account_ticket
+        from services.tx_trade.src.services.print_template_service import generate_credit_account_ticket
         encoded = generate_credit_account_ticket(ORDER_BASE, CREDIT_INFO_BASE)
         raw = decode_b64_to_bytes(encoded)
         company_gbk = "长沙某科技有限公司".encode("gbk")
@@ -481,7 +481,7 @@ class TestCreditAccountTicket:
 
     def test_credit_ticket_contains_final_amount(self):
         """挂账单应包含挂账金额（364.00元）"""
-        from services.print_template_service import generate_credit_account_ticket
+        from services.tx_trade.src.services.print_template_service import generate_credit_account_ticket
         encoded = generate_credit_account_ticket(ORDER_BASE, CREDIT_INFO_BASE)
         raw = decode_b64_to_bytes(encoded)
         amount_str = "364.00".encode("gbk")
@@ -489,7 +489,7 @@ class TestCreditAccountTicket:
 
     def test_credit_ticket_58mm_width(self):
         """58mm 纸宽挂账单每行不超宽"""
-        from services.print_template_service import _gbk_len, generate_credit_account_ticket
+        from services.tx_trade.src.services.print_template_service import _gbk_len, generate_credit_account_ticket
         store_config_58mm = {"paper_width_mm": 58}
         encoded = generate_credit_account_ticket(ORDER_BASE, CREDIT_INFO_BASE, store_config_58mm)
         raw = decode_b64_to_bytes(encoded)
@@ -509,7 +509,7 @@ class TestCreditAccountTicket:
 
     def test_credit_ticket_no_items_no_crash(self):
         """挂账单 items 为空列表时不崩溃"""
-        from services.print_template_service import generate_credit_account_ticket
+        from services.tx_trade.src.services.print_template_service import generate_credit_account_ticket
         order_no_items = {**ORDER_BASE, "items": []}
         try:
             encoded = generate_credit_account_ticket(order_no_items, CREDIT_INFO_BASE)
@@ -525,7 +525,7 @@ class TestCreditAccountTicket:
         本次挂账：36400分（364元）
         新余额：156400分（1564.00元）
         """
-        from services.print_template_service import generate_credit_account_ticket
+        from services.tx_trade.src.services.print_template_service import generate_credit_account_ticket
         encoded = generate_credit_account_ticket(ORDER_BASE, CREDIT_INFO_BASE)
         raw = decode_b64_to_bytes(encoded)
         # 1200 + 364 = 1564

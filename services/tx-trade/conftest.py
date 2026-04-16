@@ -1,11 +1,49 @@
-"""conftest.py — 将项目根目录和 src 目录加入 Python path"""
+"""conftest.py — 本地测试路径配置
+
+容器路径：/app/services/tx_trade/src/  PYTHONPATH=/app
+本地路径：services/tx-trade/src/       (目录名含 dash)
+
+策略：
+  1. ROOT 加入 path → shared.ontology 等
+  2. SRC 加入 path  → from services.xxx / from api.xxx / from models.xxx 等裸 import
+  3. 创建 services.tx_trade.src 命名空间包 → 支持 from services.tx_trade.src.xxx import
+     (保持和容器一致的全路径 import，相对 import from ..models.xxx 也能正确解析)
+"""
 import os
 import sys
+import types
 
-# 项目根目录（shared/ 所在位置）
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-SRC = os.path.join(os.path.dirname(__file__), "src")
+SVC_DIR = os.path.dirname(__file__)       # services/tx-trade/
+SRC_DIR = os.path.join(SVC_DIR, "src")   # services/tx-trade/src/
 
-for p in [ROOT, SRC]:
+# 1. ROOT 先入 path（shared.ontology 等跨服务包）
+for p in [ROOT, SRC_DIR]:
     if p not in sys.path:
         sys.path.insert(0, p)
+
+# 2. 建立 services.tx_trade / services.tx_trade.src 命名空间包
+#    注意：不注册顶级 "services"，避免覆盖 SRC_DIR/services/ 路径
+#    这样 from services.xxx 走 SRC_DIR/services/xxx.py（正常裸 import）
+#    而 from services.tx_trade.src.services.xxx 走完整容器包路径
+def _ensure_ns(name: str, path: str) -> None:
+    if name not in sys.modules:
+        mod = types.ModuleType(name)
+        mod.__path__ = [path]  # type: ignore[assignment]
+        mod.__package__ = name
+        sys.modules[name] = mod
+    elif not hasattr(sys.modules[name], "__path__"):
+        # 已存在但不是包，替换为命名空间包
+        mod = types.ModuleType(name)
+        mod.__path__ = [path]
+        mod.__package__ = name
+        sys.modules[name] = mod
+
+# tx_trade 包（注意：不动顶级 services，避免冲突）
+_ensure_ns("services.tx_trade",       SVC_DIR)
+_ensure_ns("services.tx_trade.src",   SRC_DIR)
+
+for _sub in ("api", "models", "services", "repositories", "tests", "routers"):
+    _sub_path = os.path.join(SRC_DIR, _sub)
+    if os.path.isdir(_sub_path):
+        _ensure_ns(f"services.tx_trade.src.{_sub}", _sub_path)

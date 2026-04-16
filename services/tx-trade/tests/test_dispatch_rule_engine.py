@@ -119,7 +119,7 @@ def _make_db_with_rules(rules):
 @pytest.mark.asyncio
 async def test_takeaway_kung_pao_routes_to_dept_b():
     """外卖单的宫保鸡丁应路由到B窗口，而非默认A窗口。"""
-    from services.dispatch_rule_engine import DispatchRuleEngine, _rule_cache
+    from services.tx_trade.src.services.dispatch_rule_engine import DispatchRuleEngine, _rule_cache
 
     _rule_cache.clear()
 
@@ -162,7 +162,7 @@ async def test_takeaway_kung_pao_routes_to_dept_b():
 @pytest.mark.asyncio
 async def test_brand_x_routes_to_dedicated_dept():
     """品牌X的订单应路由到X专属档口。"""
-    from services.dispatch_rule_engine import DispatchRuleEngine, _rule_cache
+    from services.tx_trade.src.services.dispatch_rule_engine import DispatchRuleEngine, _rule_cache
 
     _rule_cache.clear()
 
@@ -195,7 +195,7 @@ async def test_brand_x_routes_to_dedicated_dept():
 @pytest.mark.asyncio
 async def test_peak_hour_duck_routes_to_roast_dept():
     """午高峰(11:00-14:00)的烤鸭应路由到专门的烤鸭炉档口。"""
-    from services.dispatch_rule_engine import DispatchRuleEngine, _rule_cache
+    from services.tx_trade.src.services.dispatch_rule_engine import DispatchRuleEngine, _rule_cache
 
     _rule_cache.clear()
 
@@ -228,7 +228,7 @@ async def test_peak_hour_duck_routes_to_roast_dept():
 @pytest.mark.asyncio
 async def test_off_peak_duck_no_rule_match():
     """午高峰以外时段的烤鸭，时段规则不应匹配。"""
-    from services.dispatch_rule_engine import _rule_matches
+    from services.tx_trade.src.services.dispatch_rule_engine import _rule_matches
 
     rule_roast = _make_rule(
         priority=15,
@@ -256,7 +256,7 @@ async def test_off_peak_duck_no_rule_match():
 @pytest.mark.asyncio
 async def test_no_rule_match_fallback_to_dish_dept_mapping():
     """无匹配规则时应fallback到DishDeptMapping默认值。"""
-    from services.dispatch_rule_engine import DispatchRuleEngine, _rule_cache
+    from services.tx_trade.src.services.dispatch_rule_engine import DispatchRuleEngine, _rule_cache
 
     _rule_cache.clear()
 
@@ -324,7 +324,7 @@ async def test_no_rule_match_fallback_to_dish_dept_mapping():
 @pytest.mark.asyncio
 async def test_higher_priority_rule_wins():
     """优先级高的规则应先于低优先级规则匹配。"""
-    from services.dispatch_rule_engine import DispatchRuleEngine, _rule_cache
+    from services.tx_trade.src.services.dispatch_rule_engine import DispatchRuleEngine, _rule_cache
 
     _rule_cache.clear()
 
@@ -359,7 +359,7 @@ async def test_higher_priority_rule_wins():
 @pytest.mark.asyncio
 async def test_tenant_isolation():
     """不同租户的规则列表互不影响（缓存按 tenant_id:store_id 隔离）。"""
-    from services.dispatch_rule_engine import _cache_key, _rule_cache
+    from services.tx_trade.src.services.dispatch_rule_engine import _cache_key, _rule_cache
 
     _rule_cache.clear()
 
@@ -384,7 +384,7 @@ async def test_tenant_isolation():
 
 def test_invalidate_store_cache_clears_only_target():
     """缓存失效只影响目标门店，不影响其他门店。"""
-    from services.dispatch_rule_engine import _cache_key, _rule_cache, invalidate_store_cache
+    from services.tx_trade.src.services.dispatch_rule_engine import _cache_key, _rule_cache, invalidate_store_cache
 
     _rule_cache.clear()
 
@@ -404,7 +404,7 @@ def test_invalidate_store_cache_clears_only_target():
 
 def test_null_conditions_are_wildcards():
     """规则中 None 的匹配条件应视为通配，不阻止匹配。"""
-    from services.dispatch_rule_engine import _rule_matches
+    from services.tx_trade.src.services.dispatch_rule_engine import _rule_matches
 
     # 规则完全无匹配条件（全部NULL），应匹配所有情况
     rule = _make_rule(priority=1, target_dept_id=DEPT_A)
@@ -426,7 +426,7 @@ def test_null_conditions_are_wildcards():
 
 def test_channel_mismatch_skips_rule():
     """渠道条件不匹配时规则不应生效。"""
-    from services.dispatch_rule_engine import _rule_matches
+    from services.tx_trade.src.services.dispatch_rule_engine import _rule_matches
 
     rule = _make_rule(
         priority=10,
@@ -451,7 +451,7 @@ def test_channel_mismatch_skips_rule():
 @pytest.mark.asyncio
 async def test_rule_test_interface_matched():
     """test_rule 接口对匹配的规则返回 matched=True。"""
-    from services.dispatch_rule_engine import DispatchRuleEngine
+    from services.tx_trade.src.services.dispatch_rule_engine import DispatchRuleEngine
 
     engine = DispatchRuleEngine()
 
@@ -482,7 +482,7 @@ async def test_rule_test_interface_matched():
 @pytest.mark.asyncio
 async def test_rule_test_interface_not_matched():
     """test_rule 接口对不匹配的规则返回 matched=False。"""
-    from services.dispatch_rule_engine import DispatchRuleEngine
+    from services.tx_trade.src.services.dispatch_rule_engine import DispatchRuleEngine
 
     engine = DispatchRuleEngine()
 
@@ -512,7 +512,7 @@ async def test_rule_test_interface_not_matched():
 
 def test_cross_midnight_time_window():
     """时段匹配支持跨午夜（如 22:00-02:00）。"""
-    from services.dispatch_rule_engine import _rule_matches
+    from services.tx_trade.src.services.dispatch_rule_engine import _rule_matches
 
     dept_night = uuid.uuid4()
     rule = _make_rule(
@@ -539,7 +539,7 @@ def test_cross_midnight_time_window():
 
 def test_weekday_rule_only_matches_weekday():
     """weekday 规则只在工作日匹配，周末不匹配。"""
-    from services.dispatch_rule_engine import _rule_matches
+    from services.tx_trade.src.services.dispatch_rule_engine import _rule_matches
 
     rule = _make_rule(
         priority=5,

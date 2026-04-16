@@ -36,7 +36,7 @@ class TestInvoiceComplianceTier1:
         金额为0时，拒绝开票并返回明确错误。
         场景：结账时全部使用优惠券，实付金额为0，不应开票。
         """
-        from services.invoice_service import create_invoice_request
+        from services.tx_trade.src.services.invoice_service import create_invoice_request
 
         mock_db = AsyncMock()
 
@@ -59,7 +59,7 @@ class TestInvoiceComplianceTier1:
         同一订单重复申请发票，返回已有发票记录（幂等）。
         场景：收银员手抖点了两次"申请发票"按钮。
         """
-        from services.invoice_service import create_invoice_request
+        from services.tx_trade.src.services.invoice_service import create_invoice_request
 
         mock_db = AsyncMock()
         order_id = str(uuid.uuid4())
@@ -132,7 +132,7 @@ class TestInvoiceComplianceTier1:
         发票状态流转：pending → submitted → completed / failed。
         场景：金税四期平台响应延迟，发票需要异步处理。
         """
-        from services.invoice_service import get_invoice_status
+        from services.tx_trade.src.services.invoice_service import get_invoice_status
 
         mock_db = AsyncMock()
         invoice_id = str(uuid.uuid4())

@@ -54,7 +54,7 @@ class TestProductionDeptCRUD:
     @pytest.mark.asyncio
     async def test_create_dept_success(self):
         """创建档口成功，字段正确持久化"""
-        from services.production_dept_service import create_production_dept
+        from services.tx_trade.src.services.production_dept_service import create_production_dept
 
         # 模拟 DB
         mock_db = AsyncMock()
@@ -97,7 +97,7 @@ class TestProductionDeptCRUD:
     @pytest.mark.asyncio
     async def test_create_dept_duplicate_code_raises(self):
         """dept_code 重复时抛出 ValueError"""
-        from services.production_dept_service import create_production_dept
+        from services.tx_trade.src.services.production_dept_service import create_production_dept
 
         existing_dept = MagicMock()
         existing_dept.id = uuid.UUID(DEPT_COLD)
@@ -120,7 +120,7 @@ class TestProductionDeptCRUD:
     @pytest.mark.asyncio
     async def test_delete_dept_with_mappings_raises(self):
         """有菜品映射时删除档口抛出 RuntimeError"""
-        from services.production_dept_service import delete_production_dept
+        from services.tx_trade.src.services.production_dept_service import delete_production_dept
 
         existing_dept = MagicMock()
         existing_dept.id = uuid.UUID(DEPT_COLD)
@@ -140,7 +140,7 @@ class TestProductionDeptCRUD:
     @pytest.mark.asyncio
     async def test_delete_dept_force_unbinds_dishes(self):
         """force=True 时软删除所有菜品映射后再删档口"""
-        from services.production_dept_service import delete_production_dept
+        from services.tx_trade.src.services.production_dept_service import delete_production_dept
 
         existing_dept = MagicMock()
         existing_dept.id = uuid.UUID(DEPT_COLD)
@@ -172,7 +172,7 @@ class TestDishDeptMapping:
     @pytest.mark.asyncio
     async def test_set_dish_mapping_creates_new(self):
         """为菜品设置新档口映射"""
-        from services.production_dept_service import set_dish_dept_mapping
+        from services.tx_trade.src.services.production_dept_service import set_dish_dept_mapping
 
         dept = MagicMock()
         dept.id = uuid.UUID(DEPT_COLD)
@@ -212,7 +212,7 @@ class TestDishDeptMapping:
     @pytest.mark.asyncio
     async def test_set_primary_demotes_existing_primary(self):
         """设置新主档口时，旧主档口映射自动降级"""
-        from services.production_dept_service import set_dish_dept_mapping
+        from services.tx_trade.src.services.production_dept_service import set_dish_dept_mapping
 
         dept = MagicMock()
         dept.id = uuid.UUID(DEPT_HOT)
@@ -244,7 +244,7 @@ class TestDishDeptMapping:
     @pytest.mark.asyncio
     async def test_batch_set_mappings(self):
         """批量设置菜品映射"""
-        from services.production_dept_service import batch_set_dish_dept_mappings
+        from services.tx_trade.src.services.production_dept_service import batch_set_dish_dept_mappings
 
         mappings_input = [
             {"dish_id": DISH_CUCUMBER, "dept_id": DEPT_COLD, "is_primary": True},
@@ -284,7 +284,7 @@ class TestKdsDispatchRouting:
     @pytest.mark.asyncio
     async def test_two_dept_order_creates_two_kds_tasks(self):
         """订单含2个档口的菜品，应创建2个独立KDS任务组"""
-        from services.kds_dispatch import dispatch_order_to_kds
+        from services.tx_trade.src.services.kds_dispatch import dispatch_order_to_kds
 
         order_id = _uid_str()
         order_items = [
@@ -402,7 +402,7 @@ class TestKdsDispatchRouting:
     @pytest.mark.asyncio
     async def test_unmapped_dish_goes_to_default_dept(self):
         """未配置档口的菜品自动归入默认档口（第一个档口）"""
-        from services.kds_dispatch import dispatch_order_to_kds
+        from services.tx_trade.src.services.kds_dispatch import dispatch_order_to_kds
 
         order_id = _uid_str()
         order_items = [
@@ -460,7 +460,7 @@ class TestKdsDispatchRouting:
     @pytest.mark.asyncio
     async def test_get_kds_tasks_by_dept_returns_pending_cooking(self):
         """按 dept_id 查询任务，默认返回 pending+cooking 状态"""
-        from services.kds_dispatch import get_kds_tasks_by_dept
+        from services.tx_trade.src.services.kds_dispatch import get_kds_tasks_by_dept
 
         task1 = MagicMock()
         task1.id = uuid.uuid4()
@@ -511,7 +511,7 @@ class TestKdsDeviceIdentification:
     @pytest.mark.asyncio
     async def test_get_dept_by_kds_device_id(self):
         """KDS设备按 device_id 识别所属档口"""
-        from services.production_dept_service import get_dept_by_kds_device_id
+        from services.tx_trade.src.services.production_dept_service import get_dept_by_kds_device_id
 
         dept = MagicMock()
         dept.id = uuid.UUID(DEPT_COLD)
@@ -530,7 +530,7 @@ class TestKdsDeviceIdentification:
     @pytest.mark.asyncio
     async def test_get_dept_by_unknown_device_id_returns_none(self):
         """未绑定的KDS设备返回 None"""
-        from services.production_dept_service import get_dept_by_kds_device_id
+        from services.tx_trade.src.services.production_dept_service import get_dept_by_kds_device_id
 
         mock_db = AsyncMock()
         mock_db.execute = AsyncMock(return_value=MagicMock(

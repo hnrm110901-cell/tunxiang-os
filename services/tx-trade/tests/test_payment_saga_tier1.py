@@ -94,7 +94,7 @@ class TestPaymentSagaIdempotency:
         gw = _make_mock_gateway()
         idempotency_key = f"device001-table08-{uuid.uuid4()}"
 
-        from services.payment_saga_service import PaymentSagaService
+        from services.tx_trade.src.services.payment_saga_service import PaymentSagaService
 
         svc = PaymentSagaService(db=db, tenant_id=TENANT_ID, payment_gateway=gw)
 
@@ -156,7 +156,7 @@ class TestPaymentSagaIdempotency:
         async def attempt_payment():
             try:
                 # TODO: 替换为真实调用
-                # from services.payment_saga_service import PaymentSagaService
+                # from services.tx_trade.src.services.payment_saga_service import PaymentSagaService
                 # svc = PaymentSagaService(db=db, tenant_id=TENANT_ID,
                 #                         payment_gateway=_make_mock_gateway())
                 # result = await svc.execute(
@@ -189,7 +189,7 @@ class TestPaymentSagaRollback:
 
         关联：PaymentSagaService.execute() S2 失败分支。
         """
-        from services.payment_saga_service import PaymentSagaService
+        from services.tx_trade.src.services.payment_saga_service import PaymentSagaService
 
         db = _make_mock_db()
         # 模拟幂等查询返回 None（新请求）
@@ -223,7 +223,7 @@ class TestPaymentSagaRollback:
         期望：Saga 检测到 S3 失败，自动调用退款接口，状态变为 compensated。
         这是最关键的补偿路径，防止「已扣款但订单未完成」的死账。
         """
-        from services.payment_saga_service import PaymentSagaService
+        from services.tx_trade.src.services.payment_saga_service import PaymentSagaService
 
         db = _make_mock_db()
 
@@ -304,7 +304,7 @@ class TestPaymentSagaStateTransitions:
 
     def test_saga_step_constants_defined(self):
         """SagaStep 包含所有必要状态常量"""
-        from services.payment_saga_service import SagaStep
+        from services.tx_trade.src.services.payment_saga_service import SagaStep
         required_states = {
             "VALIDATING", "PAYING", "COMPLETING",
             "DONE", "COMPENSATING", "COMPENSATED", "FAILED",
@@ -320,7 +320,7 @@ class TestPaymentSagaStateTransitions:
         若超时时间太短，正常的慢速支付会被误判为失败触发退款。
         若超时时间太长，资金会被占用过久。
         """
-        from services.payment_saga_service import _PENDING_TIMEOUT_MINUTES
+        from services.tx_trade.src.services.payment_saga_service import _PENDING_TIMEOUT_MINUTES
         assert 1 <= _PENDING_TIMEOUT_MINUTES <= 30, (
             f"挂起 Saga 超时阈值应在 1-30 分钟内，实际: {_PENDING_TIMEOUT_MINUTES} 分钟"
         )

@@ -21,7 +21,7 @@ from datetime import date, datetime, time, timedelta
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-from services.shift_report import (
+from services.tx_trade.src.services.shift_report import (
     DeptComparison,
     DeptStats,
     OperatorStats,
