@@ -321,7 +321,7 @@ services:
       context: .
       dockerfile: services/tx-ops/Dockerfile
     command: >
-      celery -A tasks.celery_app worker
+      celery -A services.tx_ops.src.celery_tasks_sync worker
       --loglevel=info
       --concurrency=4
       --queues=default,daily_ops,schedule,notifications
@@ -331,7 +331,7 @@ services:
       CELERY_RESULT_BACKEND: redis://:${REDIS_PASSWORD:-changeme}@redis:6379/2
     <<: *service-defaults
     healthcheck:
-      test: ["CMD-SHELL", "celery -A tasks.celery_app inspect ping --timeout 5"]
+      test: ["CMD-SHELL", "celery -A services.tx_ops.src.celery_tasks_sync inspect ping --timeout 5"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -353,7 +353,7 @@ services:
       context: .
       dockerfile: services/tx-ops/Dockerfile
     command: >
-      celery -A tasks.celery_app beat
+      celery -A services.tx_ops.src.celery_tasks_sync beat
       --loglevel=info
       --schedule=/tmp/celerybeat-schedule
     environment:
