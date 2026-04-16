@@ -198,7 +198,7 @@ class CostEngine:
             try:
                 await self.compute_order_cost(oid, tenant_id, db)
                 success_count += 1
-            except Exception as exc:
+            except (OSError, RuntimeError, ValueError) as exc:
                 error_count += 1
                 log.error(
                     "batch_recompute.order_failed",

@@ -8,6 +8,7 @@ from typing import Optional
 
 import structlog
 from sqlalchemy import text
+from sqlalchemy.exc import OperationalError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .sql_queries import (
@@ -171,7 +172,7 @@ async def calculate_health_score(
         else:
             score += 12  # 基准12分
 
-    except Exception as exc:  # 最外层兜底：保持驾驶舱可用
+    except (OperationalError, SQLAlchemyError) as exc:  # DB兜底：保持驾驶舱可用
         log.warning(
             "calculate_health_score.error",
             store_id=store_id,

@@ -223,8 +223,8 @@ async def calling_screen_ws(
 
     except WebSocketDisconnect:
         pass
-    except Exception as exc:
-        logger.warning("calling_screen_ws_error", store_id=store_id, error=str(exc))
+    except Exception as exc:  # noqa: BLE001  # outermost WebSocket handler
+        logger.warning("calling_screen_ws_error", store_id=store_id, error=str(exc), exc_info=True)
     finally:
         ping_task.cancel()
         _manager.disconnect(store_id, ws)

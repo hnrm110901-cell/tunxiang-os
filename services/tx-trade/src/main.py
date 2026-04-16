@@ -359,7 +359,7 @@ app.include_router(omni_sync_router)
 try:
     from .api.table_card_api import router as table_card_router
     app.include_router(table_card_router)
-except Exception as e:
+except (ImportError, AttributeError) as e:
     import logging as _logging
     _logging.getLogger(__name__).warning(f"table_card_router load failed: {e}")
 

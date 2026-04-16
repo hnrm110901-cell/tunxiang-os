@@ -18,6 +18,7 @@ import uuid
 from typing import Any, Optional
 
 import structlog
+from sqlalchemy.exc import OperationalError, SQLAlchemyError
 
 from shared.feature_flags.flag_client import is_enabled
 from shared.feature_flags.flag_names import KnowledgeFlags
@@ -436,7 +437,7 @@ async def _index_to_pgvector(
             doc_id=doc_id,
             tenant_id=tenant_id,
         )
-    except Exception as exc:
+    except (OperationalError, SQLAlchemyError) as exc:
         logger.warning(
             "index_to_pgvector_error",
             collection=collection,

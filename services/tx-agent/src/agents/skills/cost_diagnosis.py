@@ -1029,5 +1029,5 @@ def _log_model_call() -> None:
                 task_type="anomaly_detection", model=model,
                 input_tokens=0, output_tokens=0, latency_ms=0, success=True,
             )
-        except Exception as exc:
+        except (OSError, RuntimeError, ValueError) as exc:
             log.warning("model_router.log_call_failed", error=str(exc))

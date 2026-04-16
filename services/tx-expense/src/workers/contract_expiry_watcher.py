@@ -15,6 +15,7 @@ from datetime import date, datetime, timedelta, timezone
 from typing import Any
 
 import structlog
+from sqlalchemy.exc import SQLAlchemyError
 
 log = structlog.get_logger(__name__)
 
@@ -148,7 +149,7 @@ class ContractExpiryWatcher:
                 )
                 await db.commit()
 
-        except Exception as exc:
+        except (OSError, RuntimeError, ValueError, SQLAlchemyError) as exc:
             error_msg = f"{type(exc).__name__}: {exc}"
             errors.append(error_msg)
             log.error(

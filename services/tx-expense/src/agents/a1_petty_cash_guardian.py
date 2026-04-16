@@ -195,7 +195,7 @@ async def handle_pos_daily_close(
         )
         return summary
 
-    except Exception as exc:
+    except (OSError, RuntimeError, ValueError, SQLAlchemyError) as exc:
         error_msg = f"{type(exc).__name__}: {exc}"
         summary["error"] = error_msg
         log.error(
@@ -329,7 +329,7 @@ async def handle_employee_departure(
         )
         return summary
 
-    except Exception as exc:
+    except (OSError, RuntimeError, ValueError, SQLAlchemyError) as exc:
         error_msg = f"{type(exc).__name__}: {exc}"
         summary["error"] = error_msg
         log.error(
@@ -469,7 +469,7 @@ async def run_balance_check(
         )
         return summary
 
-    except Exception as exc:
+    except (OSError, RuntimeError, ValueError, SQLAlchemyError) as exc:
         error_msg = f"{type(exc).__name__}: {exc}"
         summary["error"] = error_msg
         log.error(
@@ -621,7 +621,7 @@ async def run_monthly_settlement(
         )
         return summary
 
-    except Exception as exc:
+    except (OSError, RuntimeError, ValueError, SQLAlchemyError) as exc:
         error_msg = f"{type(exc).__name__}: {exc}"
         summary["error"] = error_msg
         log.error(
@@ -806,7 +806,7 @@ async def run(
             )
             return unknown_result
 
-    except Exception as exc:
+    except (ValueError, KeyError, AttributeError, RuntimeError, OSError, SQLAlchemyError) as exc:
         error_msg = f"{type(exc).__name__}: {exc}"
         log.error(
             "a1_agent_run_unhandled_error",

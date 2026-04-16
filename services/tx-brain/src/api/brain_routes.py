@@ -650,7 +650,7 @@ async def energy_analyze(req: EnergyAnalyzeRequest) -> dict[str, Any]:
     try:
         result = await energy_monitor.analyze_from_mv(req.tenant_id, req.store_id)
     except Exception as exc:
-        logger.error("energy_analyze_error", error=str(exc))
+        logger.error("energy_analyze_error", error=str(exc), exc_info=True)
         return {
             "ok": False,
             "error": {"code": "ENERGY_ANALYZE_ERROR", "message": str(exc)},

@@ -14,7 +14,7 @@ from typing import Any, Optional
 
 import structlog
 from sqlalchemy import func, select, text, update
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.exc import OperationalError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -582,7 +582,7 @@ class BudgetService:
             try:
                 await self.take_snapshot(db=db, tenant_id=tenant_id, budget_id=budget.id)
                 count += 1
-            except Exception as exc:
+            except (OperationalError, SQLAlchemyError) as exc:
                 logger.error(
                     "budget_monthly_snapshot_item_failed",
                     tenant_id=str(tenant_id),

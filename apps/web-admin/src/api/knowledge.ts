@@ -23,7 +23,7 @@ interface SearchParams {
 
 export const knowledgeApi = {
   listDocuments: async (params: DocumentListParams) => {
-    const qs = new URLSearchParams(params as Record<string, string>);
+    const qs = new URLSearchParams(params as unknown as Record<string, string>);
     const resp = await fetch(`${API_BASE}/documents?${qs}`);
     return resp.json();
   },

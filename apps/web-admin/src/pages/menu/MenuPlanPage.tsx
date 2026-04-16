@@ -313,7 +313,7 @@ function DistributeTab({ initialScheme, onReset }: DistributeTabProps) {
     setDistributing(true);
     setCurrentStep(2);
     try {
-      const res = await distributeScheme(selectedScheme, { store_ids: storeIdList });
+      const res = await distributeScheme(selectedScheme, storeIdList);
       setResult({ distributed: res.distributed_store_count, total: res.total_requested });
       setCurrentStep(3);
       message.success(`成功下发到 ${res.distributed_store_count} 家门店`);

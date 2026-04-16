@@ -281,7 +281,7 @@ class ThreeWayMatchEngine:
             )
             try:
                 suggestion = await self.suggest_variance_resolution(variance_item, model_router)
-            except Exception as exc:
+            except (OSError, RuntimeError, ValueError) as exc:
                 log.warning("three_way_match.ai_suggestion_failed", error=str(exc))
                 suggestion = None
 

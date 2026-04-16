@@ -332,7 +332,7 @@ async def trigger_calculate(
     except HTTPException:
         raise
     except Exception as e:
-        log.error("cost_attribution_calculate_error", error=str(e), tenant_id=str(tenant_id))
+        log.error("cost_attribution_calculate_error", error=str(e), tenant_id=str(tenant_id), exc_info=True)
         raise HTTPException(status_code=500, detail=f"归因计算失败: {e}")
 
     # Worker 不可用时降级响应

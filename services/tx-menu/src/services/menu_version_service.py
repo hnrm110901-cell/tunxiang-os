@@ -69,12 +69,13 @@ async def _publish_menu_update(tenant_id: str, store_ids: list[str], version_id:
             version_id=version_id,
             store_count=len(store_ids),
         )
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001  # Redis publish失败不阻塞主流程
         log.warning(
             "menu_version.ws_push_failed",
             tenant_id=tenant_id,
             version_id=version_id,
             error=str(exc),
+            exc_info=True,
         )
 
 

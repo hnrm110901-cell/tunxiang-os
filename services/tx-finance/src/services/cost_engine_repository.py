@@ -12,6 +12,7 @@ from typing import Any
 
 import structlog
 from sqlalchemy import text
+from sqlalchemy.exc import OperationalError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = structlog.get_logger(__name__)
@@ -397,7 +398,7 @@ class CostEngineRepository:
                 {"store_id": str(store_id), "tenant_id": str(tenant_id)},
             )
             row = result.fetchone()
-        except Exception as exc:
+        except (OperationalError, SQLAlchemyError) as exc:
             # 列可能尚未通过迁移添加，降级到 config JSONB
             logger.warning(
                 "fetch_store_fixed_cost_config.columns_missing_fallback",
@@ -507,7 +508,7 @@ class CostEngineRepository:
             )
             row = result.fetchone()
             return int(row.labor_cost_fen) if row else 0
-        except Exception as exc:
+        except (OperationalError, SQLAlchemyError) as exc:
             logger.warning(
                 "fetch_monthly_labor_cost.query_failed",
                 store_id=str(store_id),
@@ -567,7 +568,7 @@ class CostEngineRepository:
             )
             row = result.fetchone()
             return int(row.waste_cost_fen) if row else 0
-        except Exception as exc:
+        except (OperationalError, SQLAlchemyError) as exc:
             logger.warning(
                 "fetch_waste_cost.query_failed",
                 store_id=str(store_id),

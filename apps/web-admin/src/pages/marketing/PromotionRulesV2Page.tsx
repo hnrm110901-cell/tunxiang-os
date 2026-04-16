@@ -747,7 +747,7 @@ export default function PromotionRulesV2Page() {
             <div style={{ fontWeight: 700, marginBottom: 8, color: voucherResult.valid ? '#4ade80' : '#f87171' }}>
               {voucherResult.valid ? '核销验证通过' : `验证失败：${voucherResult.reason}`}
             </div>
-            {voucherResult.valid && (
+            {(voucherResult.valid as unknown as boolean) && (
               <>
                 <div style={{ color: C.textSub }}>规则：{String(voucherResult.rule_name || '')}</div>
                 <div style={{ color: C.textSub }}>平台：{String(voucherResult.platform || '—')}</div>

@@ -35,6 +35,7 @@ from uuid import UUID
 import httpx
 import structlog
 from sqlalchemy import text
+from sqlalchemy.exc import OperationalError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..models.expense_enums import AgentType, VerifyStatus
@@ -439,7 +440,7 @@ async def process_single_invoice(
                     {"id": str(row["id"]), "name": row["name"], "code": row.get("code", "")}
                     for row in cats_result.mappings().all()
                 ]
-            except Exception as cat_exc:
+            except (OperationalError, SQLAlchemyError) as cat_exc:
                 log.warning(
                     "a2_fetch_categories_failed",
                     tenant_id=str(tenant_id),
@@ -569,7 +570,7 @@ async def verify_application_invoices(
             },
         )
         all_attachments = list(attachments_result.mappings().all())
-    except Exception as exc:
+    except (OperationalError, SQLAlchemyError) as exc:
         error_msg = f"{type(exc).__name__}: {exc}"
         report["error"] = f"查询附件失败：{error_msg}"
         report["needs_manual_review"] = True
@@ -611,7 +612,7 @@ async def verify_application_invoices(
             {"tenant_id": str(tenant_id), "application_id": str(application_id)},
         )
         app_row = app_result.mappings().one_or_none()
-    except Exception as exc:
+    except (OperationalError, SQLAlchemyError) as exc:
         app_row = None
         log.warning(
             "a2_fetch_application_info_failed",
@@ -720,7 +721,7 @@ async def verify_application_invoices(
             application_id=str(application_id),
             needs_manual_review=report["needs_manual_review"],
         )
-    except Exception as exc:
+    except (OperationalError, SQLAlchemyError) as exc:
         log.warning(
             "a2_metadata_write_failed",
             application_id=str(application_id),

@@ -639,7 +639,7 @@ async def check_application_compliance(
         )
         return summary
 
-    except Exception as exc:
+    except (OSError, RuntimeError, ValueError, SQLAlchemyError) as exc:
         error_msg = f"{type(exc).__name__}: {exc}"
         summary["error"] = error_msg
         summary["status"] = "compliant"           # 异常时放行，不阻断主流程
@@ -892,7 +892,7 @@ async def notify_supervisor_of_repeated_violations(
             consecutive_count=consecutive_count,
         )
 
-    except Exception as exc:
+    except (OSError, RuntimeError, ValueError) as exc:
         # 通知失败不阻断流程，只记录日志
         log.error(
             "a3_notify_supervisor_error",
@@ -1148,7 +1148,7 @@ async def run(
             )
             return unknown_result
 
-    except Exception as exc:
+    except (ValueError, KeyError, AttributeError, RuntimeError, OSError, SQLAlchemyError) as exc:
         error_msg = f"{type(exc).__name__}: {exc}"
         log.error(
             "a3_agent_run_unhandled_error",

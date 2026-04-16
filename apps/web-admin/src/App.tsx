@@ -205,7 +205,7 @@ import PromotionRulesV2Page from './pages/marketing/PromotionRulesV2Page';
 import { BrandOverview } from './pages/analytics/hq/BrandOverview';
 import { StorePerformanceMatrix } from './pages/analytics/hq/StorePerformanceMatrix';
 // ─── 模块4.4: Agent KPI 绑定仪表盘 ────────────────────────────────────────────
-import AgentKPIDashboard from './pages/AgentKPIDashboard';
+// (duplicate import removed - AgentKPIDashboard already imported above)
 
 function App() {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);

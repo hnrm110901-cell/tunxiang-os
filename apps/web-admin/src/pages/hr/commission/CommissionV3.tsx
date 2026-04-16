@@ -188,7 +188,7 @@ function SchemesTab() {
       const resp = await txFetchData(
         `/api/v1/commission/schemes/${copyTarget.id}/copy`,
         { method: 'POST', body: JSON.stringify(payload) },
-      );
+      ) as any;
       message.success(`复制成功，新方案ID：${resp?.data?.id}`);
       copyForm.resetFields();
       setCopyModalOpen(false);
@@ -230,8 +230,8 @@ function SchemesTab() {
       dataIndex: 'is_active',
       width: 80,
       hideInSearch: true,
-      render: (v: boolean) => (
-        <Tag color={v ? 'green' : 'default'}>{v ? '启用' : '停用'}</Tag>
+      render: (_dom: unknown, record: CommissionScheme) => (
+        <Tag color={record.is_active ? 'green' : 'default'}>{record.is_active ? '启用' : '停用'}</Tag>
       ),
     },
     {
@@ -287,7 +287,7 @@ function SchemesTab() {
         request={async (params) => {
           const resp = await txFetchData(
             `/api/v1/commission/schemes?is_active=${params.is_active ?? true}`,
-          );
+          ) as any;
           return {
             data: resp?.data?.items ?? [],
             total: resp?.data?.total ?? 0,
@@ -370,14 +370,14 @@ function RulesTab() {
   const [submitting, setSubmitting] = useState(false);
 
   const loadSchemes = async () => {
-    const resp = await txFetchData('/api/v1/commission/schemes?is_active=true');
+    const resp = await txFetchData('/api/v1/commission/schemes?is_active=true') as any;
     setSchemes(resp?.data?.items ?? []);
   };
 
   const loadRules = async (schemeId: string) => {
     setLoading(true);
     try {
-      const resp = await txFetchData(`/api/v1/commission/schemes/${schemeId}/rules`);
+      const resp = await txFetchData(`/api/v1/commission/schemes/${schemeId}/rules`) as any;
       setRules(resp?.data?.items ?? []);
     } finally {
       setLoading(false);
@@ -619,7 +619,7 @@ function StaffQueryTab() {
       const yearMonth = dayjs(values.year_month).format('YYYY-MM');
       const resp = await txFetchData(
         `/api/v1/commission/staff/${values.employee_id}/detail?year_month=${yearMonth}`,
-      );
+      ) as any;
       setResult(resp?.data ?? null);
     } catch (err: unknown) {
       if (err instanceof Error) message.error(`查询失败：${err.message}`);
@@ -758,7 +758,7 @@ function MonthlySettleTab() {
       const resp = await txFetchData('/api/v1/commission/monthly-settle', {
         method: 'POST',
         body: JSON.stringify(payload),
-      });
+      }) as any;
       const data = resp?.data;
       message.success(
         `结算完成：处理 ${data?.total_processed} 人，成功 ${data?.settled_count} 人，跳过 ${data?.skipped_count} 人`,
@@ -779,7 +779,7 @@ function MonthlySettleTab() {
     try {
       const resp = await txFetchData(
         `/api/v1/commission/monthly-report?year_month=${month}&page=1&size=50`,
-      );
+      ) as any;
       setReport(resp?.data ?? null);
     } catch (err: unknown) {
       if (err instanceof Error) message.error(`加载报表失败：${err.message}`);

@@ -165,7 +165,7 @@ function FranchiseeTab() {
       const params = new URLSearchParams({ page: String(p), size: '20' });
       if (statusFilter) params.set('status', statusFilter);
       if (keyword) params.set('keyword', keyword);
-      const res = await txFetchData(`/api/v1/franchise/franchisees?${params}`);
+      const res = await txFetchData(`/api/v1/franchise/franchisees?${params}`) as any;
       if (res?.data) {
         setItems(res.data.items || []);
         setTotal(res.data.total || 0);
@@ -201,7 +201,7 @@ function FranchiseeTab() {
 
   const viewContract = async (record: Franchisee) => {
     try {
-      const res = await txFetchData(`/api/v1/franchise/franchisees/${record.id}/contract`);
+      const res = await txFetchData(`/api/v1/franchise/franchisees/${record.id}/contract`) as any;
       setContractDrawer({ open: true, data: res?.data || record });
     } catch {
       setContractDrawer({ open: true, data: record });
@@ -217,7 +217,7 @@ function FranchiseeTab() {
       title: '加盟类型',
       dataIndex: 'franchise_type',
       width: 100,
-      render: (v) => ({ standard: '标准加盟', premium: '高级加盟', master: '区域代理' }[v] || v),
+      render: (v: string) => ({ standard: '标准加盟', premium: '高级加盟', master: '区域代理' }[v as 'standard' | 'premium' | 'master'] || v),
     },
     {
       title: '状态',
@@ -423,7 +423,7 @@ function FeeTab() {
     try {
       const params = new URLSearchParams({ page: String(p), size: '20' });
       if (overdueOnly) params.set('overdue_only', 'true');
-      const res = await txFetchData(`/api/v1/franchise/fees?${params}`);
+      const res = await txFetchData(`/api/v1/franchise/fees?${params}`) as any;
       if (res?.data) {
         setItems(res.data.items || []);
         setTotal(res.data.total || 0);
@@ -471,7 +471,7 @@ function FeeTab() {
       const res = await txFetchData('/api/v1/franchise/fees/generate-monthly', {
         method: 'POST',
         body: JSON.stringify(values),
-      });
+      }) as any;
       const d = res?.data;
       message.success(`已生成 ${d?.generated || 0} 条，跳过 ${d?.skipped || 0} 条（已存在）`);
       setGenModal(false);
@@ -672,7 +672,7 @@ function CommonCodeTab() {
     try {
       const params = new URLSearchParams({ page: String(p), size: '20' });
       if (typeFilter) params.set('code_type', typeFilter);
-      const res = await txFetchData(`/api/v1/franchise/common-codes?${params}`);
+      const res = await txFetchData(`/api/v1/franchise/common-codes?${params}`) as any;
       if (res?.data) {
         setItems(res.data.items || []);
         setTotal(res.data.total || 0);
@@ -714,7 +714,7 @@ function CommonCodeTab() {
       const res = await txFetchData('/api/v1/franchise/common-codes/sync', {
         method: 'POST',
         body: JSON.stringify({ code_ids: syncModal.selectedIds, target_store_ids: storeIds }),
-      });
+      }) as any;
       message.success(`已同步 ${res?.data?.synced_count || 0} 条编码到 ${storeIds.length} 家门店`);
       setSyncModal({ open: false, selectedIds: [] });
       syncForm.resetFields();
@@ -876,7 +876,7 @@ function ReportTab() {
     try {
       const params = new URLSearchParams();
       if (yearMonth) params.set('year_month', yearMonth);
-      const res = await txFetchData(`/api/v1/franchise/report/revenue?${params}`);
+      const res = await txFetchData(`/api/v1/franchise/report/revenue?${params}`) as any;
       if (res?.data) {
         setRevenueItems(res.data.items || []);
         setRevenueMeta({ total_revenue_fen: res.data.total_revenue_fen || 0 });
@@ -893,7 +893,7 @@ function ReportTab() {
     try {
       const params = new URLSearchParams();
       if (yearMonth) params.set('year_month', yearMonth);
-      const res = await txFetchData(`/api/v1/franchise/report/fees-summary?${params}`);
+      const res = await txFetchData(`/api/v1/franchise/report/fees-summary?${params}`) as any;
       if (res?.data) {
         setFeeSummaryItems(res.data.items || []);
         setFeeMeta({

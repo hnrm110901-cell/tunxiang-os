@@ -125,7 +125,7 @@ class TableCardLearningEngine:
             )
             return True
 
-        except Exception as e:
+        except (ValueError, TypeError, AttributeError, KeyError) as e:
             logger.error(f"Failed to record click: {e}")
             return False
 

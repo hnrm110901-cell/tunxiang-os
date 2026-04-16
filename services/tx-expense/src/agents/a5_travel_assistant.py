@@ -280,7 +280,7 @@ async def _notify_supervisor_draft_created(
             reason="notification_service_unavailable",
             error=str(exc),
         )
-    except Exception as exc:
+    except (OSError, RuntimeError, ValueError) as exc:
         # 通知失败不影响主流程
         event_log.error(
             "a5_notification_failed",
