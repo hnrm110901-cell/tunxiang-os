@@ -20,6 +20,7 @@ import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Path, Query
 from pydantic import BaseModel
 from sqlalchemy import text
+from sqlalchemy.exc import OperationalError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.events.src.emitter import emit_event
@@ -171,7 +172,7 @@ async def store_wine(
             },
         )
         await db.commit()
-    except Exception as exc:
+    except (OperationalError, SQLAlchemyError) as exc:
         logger.error("store_wine.failed", customer_id=str(body.customer_id),
                      error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="存酒失败") from exc
@@ -237,7 +238,7 @@ async def retrieve_wine(
             {"id": str(sid), "tenant_id": str(tid)},
         )
         storage = fetch.mappings().first()
-    except Exception as exc:
+    except (OperationalError, SQLAlchemyError) as exc:
         logger.error("retrieve_wine.fetch_failed", storage_id=storage_id,
                      error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="查询存酒记录失败") from exc
@@ -303,7 +304,7 @@ async def retrieve_wine(
             },
         )
         await db.commit()
-    except Exception as exc:
+    except (OperationalError, SQLAlchemyError) as exc:
         logger.error("retrieve_wine.update_failed", storage_id=storage_id,
                      error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="取酒失败") from exc
@@ -367,7 +368,7 @@ async def extend_storage(
             {"id": str(sid), "tenant_id": str(tid)},
         )
         storage = fetch.mappings().first()
-    except Exception as exc:
+    except (OperationalError, SQLAlchemyError) as exc:
         logger.error("extend_storage.fetch_failed", storage_id=storage_id,
                      error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="查询存酒记录失败") from exc
@@ -417,7 +418,7 @@ async def extend_storage(
             },
         )
         await db.commit()
-    except Exception as exc:
+    except (OperationalError, SQLAlchemyError) as exc:
         logger.error("extend_storage.update_failed", storage_id=storage_id,
                      error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="续存失败") from exc
@@ -465,7 +466,7 @@ async def get_storage(
             {"id": str(sid), "tenant_id": str(tid)},
         )
         row = result.mappings().first()
-    except Exception as exc:
+    except (OperationalError, SQLAlchemyError) as exc:
         logger.error("get_storage.failed", storage_id=storage_id,
                      error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="查询存酒记录失败") from exc
@@ -486,7 +487,7 @@ async def get_storage(
             {"storage_id": storage_id, "tenant_id": str(tid)},
         )
         logs = [_serialize_row(dict(r)) for r in logs_result.mappings().all()]
-    except Exception as exc:
+    except (OperationalError, SQLAlchemyError) as exc:
         logger.warning("get_storage.logs_failed", storage_id=storage_id, error=str(exc))
         logs = []
 
@@ -541,7 +542,7 @@ async def list_by_customer(
             params,
         )
         items = [_serialize_row(dict(row)) for row in items_result.mappings().all()]
-    except Exception as exc:
+    except (OperationalError, SQLAlchemyError) as exc:
         logger.error("list_wine_by_customer.failed", customer_id=customer_id,
                      error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="查询客户存酒列表失败") from exc
@@ -604,7 +605,7 @@ async def list_by_store(
             params,
         )
         items = [_serialize_row(dict(row)) for row in items_result.mappings().all()]
-    except Exception as exc:
+    except (OperationalError, SQLAlchemyError) as exc:
         logger.error("list_wine_by_store.failed", store_id=store_id,
                      error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="查询门店存酒列表失败") from exc
@@ -655,7 +656,7 @@ async def expiring_report(
             params,
         )
         items = [_serialize_row(dict(row)) for row in result.mappings().all()]
-    except Exception as exc:
+    except (OperationalError, SQLAlchemyError) as exc:
         logger.error("wine_expiring_report.failed", error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="即将到期存酒报表生成失败") from exc
 
@@ -715,7 +716,7 @@ async def summary_report(
             {"tenant_id": str(tid), "store_id": str(sid)},
         )
         totals = _serialize_row(dict(total_result.mappings().first()))
-    except Exception as exc:
+    except (OperationalError, SQLAlchemyError) as exc:
         logger.error("wine_summary_report.failed", store_id=store_id,
                      error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="存酒汇总报表生成失败") from exc

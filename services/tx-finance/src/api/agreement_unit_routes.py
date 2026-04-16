@@ -23,6 +23,7 @@ import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Path, Query
 from pydantic import BaseModel, Field
 from sqlalchemy import text
+from sqlalchemy.exc import OperationalError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db_with_tenant
@@ -201,7 +202,7 @@ async def list_units(
             params,
         )
         items = [_serialize_row(dict(row)) for row in items_result.mappings().all()]
-    except Exception as exc:
+    except (OperationalError, SQLAlchemyError) as exc:
         logger.warning("list_units.db_unavailable", error=str(exc))
         # DB不可用时返回mock数据
         return {
@@ -271,7 +272,7 @@ async def create_unit(
                 """),
                 {"tenant_id": str(tid), "unit_id": unit_id},
             )
-    except Exception as exc:
+    except (OperationalError, SQLAlchemyError) as exc:
         logger.error("create_unit.failed", name=body.name, error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="创建协议单位失败") from exc
 
@@ -339,7 +340,7 @@ async def aging_report(
             {"tenant_id": str(tid)},
         )
         items = [_serialize_row(dict(row)) for row in result.mappings().all()]
-    except Exception as exc:
+    except (OperationalError, SQLAlchemyError) as exc:
         logger.warning("aging_report.db_unavailable", error=str(exc))
         # mock
         items = [
@@ -407,7 +408,7 @@ async def monthly_statement(
         total_repaid = sum(abs(t["amount_fen"]) for t in transactions if t["type"] == "repay")
     except HTTPException:
         raise
-    except Exception as exc:
+    except (OperationalError, SQLAlchemyError) as exc:
         logger.error("monthly_statement.failed", unit_id=unit_id, error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="对账单查询失败") from exc
 
@@ -460,7 +461,7 @@ async def get_unit(
             {"id": str(uid), "tenant_id": str(tid)},
         )
         row = result.mappings().first()
-    except Exception as exc:
+    except (OperationalError, SQLAlchemyError) as exc:
         logger.error("get_unit.failed", unit_id=unit_id, error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="查询协议单位失败") from exc
 
@@ -519,7 +520,7 @@ async def update_unit(
         )
         row = result.mappings().first()
         await db.commit()
-    except Exception as exc:
+    except (OperationalError, SQLAlchemyError) as exc:
         logger.error("update_unit.failed", unit_id=unit_id, error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="更新协议单位失败") from exc
 
@@ -569,7 +570,7 @@ async def toggle_suspend(
         )
         row = result.mappings().first()
         await db.commit()
-    except Exception as exc:
+    except (OperationalError, SQLAlchemyError) as exc:
         logger.error("toggle_suspend.failed", unit_id=unit_id, error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="操作失败") from exc
 
@@ -644,7 +645,7 @@ async def list_transactions(
             params,
         )
         items = [_serialize_row(dict(row)) for row in items_result.mappings().all()]
-    except Exception as exc:
+    except (OperationalError, SQLAlchemyError) as exc:
         logger.warning("list_transactions.db_unavailable", error=str(exc))
         return {
             "ok": True,
@@ -687,7 +688,7 @@ async def manual_charge(
             {"id": str(uid), "tenant_id": str(tid)},
         )
         unit = fetch.mappings().first()
-    except Exception as exc:
+    except (OperationalError, SQLAlchemyError) as exc:
         logger.error("manual_charge.fetch_failed", unit_id=unit_id, error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="查询协议单位失败") from exc
 
@@ -757,7 +758,7 @@ async def manual_charge(
                     "tenant_id": str(tid),
                 },
             )
-    except Exception as exc:
+    except (OperationalError, SQLAlchemyError) as exc:
         logger.error("manual_charge.failed", unit_id=unit_id, error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="手动挂账失败") from exc
 
@@ -834,7 +835,7 @@ async def repay(
             {"id": str(uid), "tenant_id": str(tid)},
         )
         unit = fetch.mappings().first()
-    except Exception as exc:
+    except (OperationalError, SQLAlchemyError) as exc:
         logger.error("repay.fetch_failed", unit_id=unit_id, error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="查询协议单位失败") from exc
 
@@ -874,7 +875,7 @@ async def repay(
                 },
             )
             pay_amount = sum_result.scalar() or 0
-        except Exception as exc:
+        except (OperationalError, SQLAlchemyError) as exc:
             logger.error("repay.sum_specific_failed", error=str(exc), exc_info=True)
             raise HTTPException(status_code=500, detail="计算指定还款金额失败") from exc
 
@@ -929,7 +930,7 @@ async def repay(
                     "tenant_id": str(tid),
                 },
             )
-    except Exception as exc:
+    except (OperationalError, SQLAlchemyError) as exc:
         logger.error("repay.failed", unit_id=unit_id, error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="还款失败") from exc
 
@@ -991,7 +992,7 @@ async def prepaid_recharge(
             {"id": str(uid), "tenant_id": str(tid)},
         )
         unit = fetch.mappings().first()
-    except Exception as exc:
+    except (OperationalError, SQLAlchemyError) as exc:
         logger.error("prepaid_recharge.fetch_failed", error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="查询协议单位失败") from exc
 
@@ -1039,7 +1040,7 @@ async def prepaid_recharge(
                     "tenant_id": str(tid),
                 },
             )
-    except Exception as exc:
+    except (OperationalError, SQLAlchemyError) as exc:
         logger.error("prepaid_recharge.failed", unit_id=unit_id, error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="预付充值失败") from exc
 
@@ -1084,7 +1085,7 @@ async def prepaid_refund(
             {"id": str(uid), "tenant_id": str(tid)},
         )
         unit = fetch.mappings().first()
-    except Exception as exc:
+    except (OperationalError, SQLAlchemyError) as exc:
         logger.error("prepaid_refund.fetch_failed", error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="查询协议单位失败") from exc
 
@@ -1137,7 +1138,7 @@ async def prepaid_refund(
                     "tenant_id": str(tid),
                 },
             )
-    except Exception as exc:
+    except (OperationalError, SQLAlchemyError) as exc:
         logger.error("prepaid_refund.failed", unit_id=unit_id, error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="预付退款失败") from exc
 
@@ -1188,7 +1189,7 @@ async def prepaid_balance(
             {"id": str(uid), "tenant_id": str(tid)},
         )
         row = result.mappings().first()
-    except Exception as exc:
+    except (OperationalError, SQLAlchemyError) as exc:
         logger.error("prepaid_balance.failed", unit_id=unit_id, error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="查询预付余额失败") from exc
 

@@ -21,6 +21,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Path, Query
 from pydantic import BaseModel
 from services.channel_pl_calculator import ChannelPLCalculator
 from sqlalchemy import text
+from sqlalchemy.exc import OperationalError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db_with_tenant
@@ -148,7 +149,7 @@ async def import_bill(
         )
         row = result.mappings().first()
         await db.commit()
-    except Exception as exc:
+    except (OperationalError, SQLAlchemyError) as exc:
         logger.error("import_bill.failed", store_id=body.store_id, platform=body.platform, error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="账单导入失败") from exc
 
@@ -222,7 +223,7 @@ async def list_bills(
             params,
         )
         items = [dict(row) for row in items_result.mappings().all()]
-    except Exception as exc:
+    except (OperationalError, SQLAlchemyError) as exc:
         logger.error("list_bills.failed", error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="查询账单列表失败") from exc
 
@@ -262,7 +263,7 @@ async def get_bill(
             {"bill_id": str(bid), "tenant_id": str(tid)},
         )
         row = result.mappings().first()
-    except Exception as exc:
+    except (OperationalError, SQLAlchemyError) as exc:
         logger.error("get_bill.failed", bill_id=bill_id, error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="查询账单失败") from exc
 
@@ -440,7 +441,7 @@ async def list_discrepancies(
             params,
         )
         items = [dict(row) for row in items_result.mappings().all()]
-    except Exception as exc:
+    except (OperationalError, SQLAlchemyError) as exc:
         logger.error("list_discrepancies.failed", store_id=store_id, error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="查询差异清单失败") from exc
 
@@ -487,7 +488,7 @@ async def resolve_discrepancy(
         )
         row = result.mappings().first()
         await db.commit()
-    except Exception as exc:
+    except (OperationalError, SQLAlchemyError) as exc:
         logger.error("resolve_discrepancy.failed", discrepancy_id=discrepancy_id, error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="标记处理失败") from exc
 

@@ -37,6 +37,7 @@ from uuid import UUID
 
 import structlog
 from sqlalchemy import select, text as sa_text
+from sqlalchemy.exc import OperationalError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..models.expense_application import ExpenseApplication, ExpenseItem
@@ -188,7 +189,7 @@ async def _get_applicant_level(
             level = row[0]
             if level in {e.value for e in StaffLevel}:
                 return level
-    except Exception as exc:
+    except (OperationalError, SQLAlchemyError) as exc:
         log.warning(
             "a3_fallback_level_query_failed",
             tenant_id=str(tenant_id),
@@ -789,7 +790,7 @@ async def _check_historical_compliance_rate(
             "total_count": total,
         }
 
-    except Exception as exc:
+    except (OperationalError, SQLAlchemyError) as exc:
         log.warning(
             "a3_check_historical_compliance_rate_error",
             tenant_id=str(tenant_id),
@@ -990,7 +991,7 @@ async def pre_check_before_submit(
                 "message": result["message"],
             })
 
-        except Exception as exc:
+        except (OperationalError, SQLAlchemyError, ValueError) as exc:
             log.warning(
                 "a3_pre_check_item_error",
                 idx=idx,

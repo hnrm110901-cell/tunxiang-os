@@ -586,7 +586,7 @@ def _serialize_request(request: Any, with_relations: bool = False) -> Dict[str, 
                 }
                 for a in (request.allocations or [])
             ]
-        except Exception:
+        except (AttributeError, TypeError):
             # 关系懒加载可能未初始化，安全降级
             data["itineraries"] = []
             data["allocations"] = []

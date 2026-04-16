@@ -30,6 +30,7 @@ from uuid import UUID
 import httpx
 import structlog
 from sqlalchemy import select, text
+from sqlalchemy.exc import OperationalError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..models.expense_enums import InvoiceType, OcrProvider, OcrStatus, VerifyStatus
@@ -548,7 +549,7 @@ async def check_duplicate(
     try:
         result = await db.execute(text(query), params)
         row = result.mappings().one_or_none()
-    except Exception as exc:
+    except (OperationalError, SQLAlchemyError) as exc:
         log.warning("check_duplicate_db_error", error=str(exc), dedup_hash=dedup_hash)
         return None
 
@@ -843,7 +844,7 @@ async def process_invoice_upload(
             },
         )
         await db.flush()
-    except Exception as exc:
+    except (OperationalError, SQLAlchemyError) as exc:
         log.error("invoice_create_db_error", error=str(exc), invoice_id=str(invoice_id), exc_info=True)
         return {
             "invoice_id": str(invoice_id),
@@ -945,7 +946,7 @@ async def process_invoice_upload(
             },
         )
         await db.flush()
-    except Exception as exc:
+    except (OperationalError, SQLAlchemyError) as exc:
         log.error("invoice_update_ocr_error", error=str(exc), invoice_id=str(invoice_id), exc_info=True)
         compliance_issues.append(f"OCR结果写入失败：{exc}")
         needs_manual_review = True
@@ -1000,7 +1001,7 @@ async def process_invoice_upload(
                 invoice_type=invoice_type,
                 existing_categories=categories,
             )
-    except Exception as exc:
+    except (OSError, RuntimeError, ValueError) as exc:
         log.warning("suggest_category_error", error=str(exc), invoice_id=str(invoice_id))
 
     # ── Step 7: 发票日期合规性 ───────────────────────────────────────────────
@@ -1051,7 +1052,7 @@ async def process_invoice_upload(
             },
         )
         await db.flush()
-    except Exception as exc:
+    except (OperationalError, SQLAlchemyError) as exc:
         log.warning("invoice_update_final_status_error", error=str(exc), invoice_id=str(invoice_id))
 
     # ── Step 9: 写入 InvoiceItem 明细 ────────────────────────────────────────
@@ -1096,7 +1097,7 @@ async def process_invoice_upload(
                         },
                     )
                     await db.flush()
-                except Exception as exc:
+                except (OperationalError, SQLAlchemyError) as exc:
                     log.error(
                         "invoice_group_dedup_note_update_error",
                         error=str(exc),
@@ -1106,7 +1107,7 @@ async def process_invoice_upload(
 
                 compliance_issues.append(warning_note)
                 needs_manual_review = True
-        except Exception as exc:
+        except (OperationalError, SQLAlchemyError, ValueError) as exc:
             # 集团去重失败不阻断主流程，降级处理
             log.error(
                 "invoice_group_dedup_check_error",
@@ -1174,7 +1175,7 @@ async def reverify_invoices(
     try:
         result = await db.execute(query, {"tenant_id": str(tenant_id)})
         rows = result.mappings().all()
-    except Exception as exc:
+    except (OperationalError, SQLAlchemyError) as exc:
         log.error("reverify_invoices_query_error", error=str(exc), exc_info=True)
         return {"success": 0, "failed": len(invoice_ids), "skipped": 0}
 
@@ -1227,7 +1228,7 @@ async def reverify_invoices(
 
                 log.info("reverify_one_done", invoice_id=str(iid), new_status=new_status)
 
-            except Exception as exc:
+            except (OperationalError, SQLAlchemyError, OSError, RuntimeError) as exc:
                 failed_count += 1
                 log.error("reverify_one_error", invoice_id=str(iid), error=str(exc), exc_info=True)
 
@@ -1260,7 +1261,7 @@ async def _update_invoice_field(db: AsyncSession, invoice_id: UUID, field: str, 
             {field: value, "invoice_id": str(invoice_id)},
         )
         await db.flush()
-    except Exception as exc:
+    except (OperationalError, SQLAlchemyError) as exc:
         log.warning("update_invoice_field_error", field=field, invoice_id=str(invoice_id), error=str(exc))
 
 
@@ -1279,7 +1280,7 @@ async def _fetch_categories(db: AsyncSession, tenant_id: UUID) -> list[dict]:
             {"tenant_id": str(tenant_id)},
         )
         return [{"id": row["id"], "name": row["name"], "code": row["code"]} for row in result.mappings().all()]
-    except Exception as exc:
+    except (OperationalError, SQLAlchemyError) as exc:
         log.warning("fetch_categories_error", error=str(exc), tenant_id=str(tenant_id))
         return []
 
@@ -1315,7 +1316,7 @@ async def _create_invoice_items(
                     "tax_rate": item.get("tax_rate"),
                 },
             )
-        except Exception as exc:
+        except (OperationalError, SQLAlchemyError) as exc:
             log.warning(
                 "create_invoice_item_error",
                 invoice_id=str(invoice_id),
@@ -1324,5 +1325,5 @@ async def _create_invoice_items(
             )
     try:
         await db.flush()
-    except Exception as exc:
+    except (OperationalError, SQLAlchemyError) as exc:
         log.warning("create_invoice_items_flush_error", invoice_id=str(invoice_id), error=str(exc))

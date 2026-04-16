@@ -25,6 +25,7 @@ from typing import Optional
 
 import structlog
 from sqlalchemy import select
+from sqlalchemy.exc import OperationalError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..models.expense_enums import (
@@ -292,7 +293,7 @@ async def handle_employee_departure(
                     ),
                 )
 
-            except Exception as freeze_exc:
+            except (OperationalError, SQLAlchemyError, ValueError) as freeze_exc:
                 log.error(
                     "a1_freeze_account_error",
                     tenant_id=str(tenant_id),
@@ -432,7 +433,7 @@ async def run_balance_check(
                     ),
                 )
                 summary["alerted"] += 1
-            except Exception as notify_exc:
+            except (OSError, RuntimeError, ValueError) as notify_exc:
                 log.error(
                     "a1_balance_alert_notify_error",
                     tenant_id=str(tenant_id),
@@ -450,7 +451,7 @@ async def run_balance_check(
                     operator_id=account.keeper_id,
                 )
                 summary["drafted_replenishment"] += 1
-            except Exception as draft_exc:
+            except (OperationalError, SQLAlchemyError, ValueError) as draft_exc:
                 log.error(
                     "a1_balance_draft_replenishment_error",
                     tenant_id=str(tenant_id),
@@ -584,7 +585,7 @@ async def run_monthly_settlement(
                             ),
                         )
                         summary["reminders_sent"] += 1
-                    except Exception as notify_exc:
+                    except (OSError, RuntimeError, ValueError) as notify_exc:
                         log.error(
                             "a1_monthly_settlement_remind_error",
                             tenant_id=str(tenant_id),
@@ -593,7 +594,7 @@ async def run_monthly_settlement(
                             exc_info=True,
                         )
 
-            except Exception as settle_exc:
+            except (OperationalError, SQLAlchemyError, ValueError) as settle_exc:
                 log.error(
                     "a1_generate_settlement_error",
                     tenant_id=str(tenant_id),
@@ -715,7 +716,7 @@ async def detect_transaction_anomaly(
             "message": message,
         }
 
-    except Exception as exc:
+    except (OperationalError, SQLAlchemyError) as exc:
         log.error(
             "a1_detect_transaction_anomaly_error",
             tenant_id=str(tenant_id),

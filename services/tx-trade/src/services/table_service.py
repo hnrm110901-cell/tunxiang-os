@@ -233,7 +233,7 @@ class TableCardService:
                 total_count=0,
             )
         except Exception as e:
-            logger.error(f"Failed to fetch tables: {e}")
+            logger.error(f"Failed to fetch tables: {e}", exc_info=True)
             raise
 
     async def get_table_detail(
@@ -332,7 +332,7 @@ class TableCardService:
             logger.error(f"DB error fetching table detail {table_id}: {e}", exc_info=True)
             raise
         except Exception as e:
-            logger.error(f"Failed to fetch table detail: {e}")
+            logger.error(f"Failed to fetch table detail: {e}", exc_info=True)
             raise
 
     async def update_table_status(
@@ -394,7 +394,7 @@ class TableCardService:
             await self.db.rollback()
             return False
         except Exception as e:
-            logger.error(f"Failed to update table status: {e}")
+            logger.error(f"Failed to update table status: {e}", exc_info=True)
             return False
 
     async def get_table_statistics(
@@ -453,7 +453,7 @@ class TableCardService:
             logger.error(f"DB error fetching table statistics: {e}", exc_info=True)
             return TableStatistics()
         except Exception as e:
-            logger.error(f"Failed to fetch table statistics: {e}")
+            logger.error(f"Failed to fetch table statistics: {e}", exc_info=True)
             raise
 
     async def batch_update_table_status(
@@ -557,7 +557,7 @@ class TableCardService:
             logger.error(f"DB error fetching area statistics: {e}", exc_info=True)
             return {}
         except Exception as e:
-            logger.error(f"Failed to fetch area statistics: {e}")
+            logger.error(f"Failed to fetch area statistics: {e}", exc_info=True)
             raise
 
     async def search_tables(
@@ -624,7 +624,7 @@ class TableCardService:
             logger.error(f"DB error searching tables: {e}", exc_info=True)
             return []
         except Exception as e:
-            logger.error(f"Failed to search tables: {e}")
+            logger.error(f"Failed to search tables: {e}", exc_info=True)
             raise
 
     async def export_table_snapshot(
@@ -671,7 +671,7 @@ class TableCardService:
             return str(response)
 
         except Exception as e:
-            logger.error(f"Failed to export table snapshot: {e}")
+            logger.error(f"Failed to export table snapshot: {e}", exc_info=True)
             raise
 
     async def get_tables_by_status(
@@ -724,5 +724,5 @@ class TableCardService:
             return urgent
 
         except Exception as e:
-            logger.error(f"Failed to get tables needing attention: {e}")
+            logger.error(f"Failed to get tables needing attention: {e}", exc_info=True)
             raise

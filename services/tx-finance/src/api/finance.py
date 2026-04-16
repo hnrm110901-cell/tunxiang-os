@@ -16,6 +16,7 @@ from services.revenue_engine import RevenueEngine
 from services.store_pnl import StorePnLService
 from services.voucher_service import format_for_kingdee, generate_voucher_from_settlement
 from sqlalchemy import func, select, text
+from sqlalchemy.exc import OperationalError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db_with_tenant
@@ -560,7 +561,7 @@ async def forecast_cashflow(
             .order_by(text("1"))
         )
         hist = [{"date": str(r.day.date()), "revenue_fen": int(r.revenue)} for r in hist_rows.all()]
-    except Exception as exc:
+    except (OperationalError, SQLAlchemyError) as exc:
         logger.error("forecast_cashflow.history_query_failed", store_id=store_id, error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="现金流预测查询失败") from exc
 

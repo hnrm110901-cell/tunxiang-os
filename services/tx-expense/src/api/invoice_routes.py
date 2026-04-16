@@ -18,6 +18,7 @@ import structlog
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
 from pydantic import BaseModel, Field
 from sqlalchemy import text
+from sqlalchemy.exc import OperationalError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
@@ -219,7 +220,7 @@ async def verify_invoice(
             {"id": str(invoice_id), "tenant_id": str(tenant_id)},
         )
         row = result.mappings().one_or_none()
-    except Exception as exc:
+    except (OperationalError, SQLAlchemyError) as exc:
         log.error("verify_invoice_query_error", invoice_id=str(invoice_id), error=str(exc), exc_info=True)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="查询发票信息失败，请稍后重试。")
 
@@ -241,7 +242,7 @@ async def verify_invoice(
             total_amount_fen=row.get("total_amount") or 0,
             buyer_tax_id=row.get("buyer_tax_id"),
         )
-    except Exception as exc:
+    except (OSError, RuntimeError, ValueError) as exc:
         log.error("verify_invoice_api_error", invoice_id=str(invoice_id), error=str(exc), exc_info=True)
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="金税核验接口调用失败，请稍后重试。")
 
@@ -264,7 +265,7 @@ async def verify_invoice(
             },
         )
         await db.commit()
-    except Exception as exc:
+    except (OperationalError, SQLAlchemyError) as exc:
         log.error("verify_invoice_update_error", invoice_id=str(invoice_id), error=str(exc), exc_info=True)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="核验状态更新失败，请稍后重试。")
 
@@ -333,7 +334,7 @@ async def get_invoice_stats(
             params,
         )
         row = stats_result.mappings().one()
-    except Exception as exc:
+    except (OperationalError, SQLAlchemyError) as exc:
         log.error("get_invoice_stats_error", error=str(exc), exc_info=True)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="统计查询失败，请稍后重试。")
 
@@ -394,7 +395,7 @@ async def duplicate_check(
             tenant_id=tenant_id,
             dedup_hash=dedup_hash,
         )
-    except Exception as exc:
+    except (OperationalError, SQLAlchemyError) as exc:
         log.error("duplicate_check_error", error=str(exc), exc_info=True)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="去重检查失败，请稍后重试。")
 
@@ -485,7 +486,7 @@ async def list_invoices(
             params,
         )
         rows = rows_result.mappings().all()
-    except Exception as exc:
+    except (OperationalError, SQLAlchemyError) as exc:
         log.error("list_invoices_error", error=str(exc), exc_info=True)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="查询发票列表失败，请稍后重试。")
 
@@ -562,7 +563,7 @@ async def get_invoice(
             {"id": str(invoice_id), "tenant_id": str(tenant_id)},
         )
         row = result.mappings().one_or_none()
-    except Exception as exc:
+    except (OperationalError, SQLAlchemyError) as exc:
         log.error("get_invoice_error", invoice_id=str(invoice_id), error=str(exc), exc_info=True)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="查询发票详情失败，请稍后重试。")
 
@@ -627,7 +628,7 @@ async def get_invoice(
                 {"id": str(duplicate_id), "tenant_id": str(tenant_id)},
             )
             dup_row = dup_result.mappings().one_or_none()
-        except Exception as exc:
+        except (OperationalError, SQLAlchemyError) as exc:
             log.warning("get_invoice_dup_query_error", error=str(exc))
             dup_row = None
 
@@ -691,7 +692,7 @@ async def update_invoice_category(
             {"id": str(invoice_id), "tenant_id": str(tenant_id)},
         )
         row = result.mappings().one_or_none()
-    except Exception as exc:
+    except (OperationalError, SQLAlchemyError) as exc:
         log.error("update_category_query_error", invoice_id=str(invoice_id), error=str(exc), exc_info=True)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="查询发票失败，请稍后重试。")
 
@@ -715,7 +716,7 @@ async def update_invoice_category(
                 "notes": body.notes,
             },
         )
-    except Exception as exc:
+    except (OperationalError, SQLAlchemyError) as exc:
         log.error("update_category_update_error", invoice_id=str(invoice_id), error=str(exc), exc_info=True)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="更新科目失败，请稍后重试。")
 
@@ -738,7 +739,7 @@ async def update_invoice_category(
                     "category_id": str(body.confirmed_category_id),
                 },
             )
-        except Exception as exc:
+        except (OperationalError, SQLAlchemyError) as exc:
             # expense_item 更新失败不阻断主流程，仅记录日志
             log.warning(
                 "update_category_expense_item_error",
@@ -763,7 +764,7 @@ async def update_invoice_category(
             {"id": str(invoice_id), "tenant_id": str(tenant_id)},
         )
         updated_row = updated_result.mappings().one_or_none()
-    except Exception as exc:
+    except (OperationalError, SQLAlchemyError) as exc:
         log.warning("update_category_fetch_updated_error", error=str(exc))
         updated_row = None
 

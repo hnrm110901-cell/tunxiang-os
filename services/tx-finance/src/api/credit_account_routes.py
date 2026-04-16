@@ -19,6 +19,7 @@ import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Path, Query
 from pydantic import BaseModel, Field
 from sqlalchemy import text
+from sqlalchemy.exc import OperationalError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.events.src.emitter import emit_event
@@ -150,7 +151,7 @@ async def create_agreement(
         )
         row = result.mappings().first()
         await db.commit()
-    except Exception as exc:
+    except (OperationalError, SQLAlchemyError) as exc:
         logger.error("create_agreement.failed", company_name=body.company_name,
                      error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="创建挂账协议失败") from exc
@@ -253,7 +254,7 @@ async def list_agreements(
             params,
         )
         items = [_serialize_row(dict(row)) for row in items_result.mappings().all()]
-    except Exception as exc:
+    except (OperationalError, SQLAlchemyError) as exc:
         logger.error("list_agreements.failed", error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="查询协议列表失败") from exc
 
@@ -292,7 +293,7 @@ async def get_agreement(
             {"id": str(aid), "tenant_id": str(tid)},
         )
         row = result.mappings().first()
-    except Exception as exc:
+    except (OperationalError, SQLAlchemyError) as exc:
         logger.error("get_agreement.failed", agreement_id=agreement_id,
                      error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="查询协议失败") from exc
@@ -331,7 +332,7 @@ async def charge_credit(
             {"id": str(aid), "tenant_id": str(tid)},
         )
         agreement = fetch.mappings().first()
-    except Exception as exc:
+    except (OperationalError, SQLAlchemyError) as exc:
         logger.error("charge_credit.fetch_failed", agreement_id=agreement_id,
                      error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="查询协议失败") from exc
@@ -392,7 +393,7 @@ async def charge_credit(
         )
         charge_row = charge_result.mappings().first()
         await db.commit()
-    except Exception as exc:
+    except (OperationalError, SQLAlchemyError) as exc:
         logger.error("charge_credit.failed", agreement_id=agreement_id,
                      error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="挂账消费失败") from exc
@@ -488,7 +489,7 @@ async def suspend_agreement(
         )
         row = result.mappings().first()
         await db.commit()
-    except Exception as exc:
+    except (OperationalError, SQLAlchemyError) as exc:
         logger.error("suspend_agreement.failed", agreement_id=agreement_id,
                      error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="暂停协议失败") from exc
@@ -570,7 +571,7 @@ async def list_bills(
             params,
         )
         items = [_serialize_row(dict(row)) for row in items_result.mappings().all()]
-    except Exception as exc:
+    except (OperationalError, SQLAlchemyError) as exc:
         logger.error("list_bills.failed", agreement_id=agreement_id,
                      error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="查询账单列表失败") from exc
@@ -609,7 +610,7 @@ async def pay_bill(
             {"id": str(bid), "tenant_id": str(tid)},
         )
         bill = fetch.mappings().first()
-    except Exception as exc:
+    except (OperationalError, SQLAlchemyError) as exc:
         logger.error("pay_bill.fetch_failed", bill_id=bill_id,
                      error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="查询账单失败") from exc
@@ -665,7 +666,7 @@ async def pay_bill(
             },
         )
         await db.commit()
-    except Exception as exc:
+    except (OperationalError, SQLAlchemyError) as exc:
         logger.error("pay_bill.failed", bill_id=bill_id,
                      error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="账单还款失败") from exc
@@ -807,7 +808,7 @@ async def get_statement(
         summary = dict(summary_result.mappings().first())
     except HTTPException:
         raise
-    except Exception as exc:
+    except (OperationalError, SQLAlchemyError) as exc:
         logger.error("get_statement.failed", agreement_id=agreement_id,
                      error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="对账单查询失败") from exc

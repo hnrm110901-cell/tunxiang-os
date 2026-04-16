@@ -366,7 +366,7 @@ async def _load_user_dict_by_username(username: str) -> Optional[dict]:
                 {"username": username},
             )
             row = result.mappings().first()
-    except Exception as exc:
+    except (OperationalError, SQLAlchemyError) as exc:
         logger.warning("user_db_lookup_failed", username=username, error=str(exc))
         return None
     if row is None:
@@ -405,7 +405,7 @@ async def _load_user_dict_by_id(user_id: str) -> Optional[dict]:
                 {"user_id": user_id},
             )
             row = result.mappings().first()
-    except Exception as exc:
+    except (OperationalError, SQLAlchemyError) as exc:
         logger.warning("user_db_lookup_failed", user_id=user_id, error=str(exc))
         return None
     if row is None:
@@ -468,7 +468,7 @@ async def _issue_tokens(
                 },
             )
             await db.commit()
-    except Exception as exc:  # DB写入失败时回退到内存存储，保证业务不中断
+    except (OperationalError, SQLAlchemyError) as exc:  # DB写入失败时回退到内存存储，保证业务不中断
         logger.warning("refresh_token_db_write_failed", jti=jti, error=str(exc))
 
     _refresh_store[jti] = {
@@ -548,7 +548,7 @@ async def login(body: LoginBody, request: Request):
                 {"username": username},
             )
             db_user_row = result.mappings().first()
-    except Exception as exc:
+    except (OperationalError, SQLAlchemyError) as exc:
         logger.warning("login_db_lookup_failed", username=username, error=str(exc))
 
     password_ok = False
@@ -612,7 +612,7 @@ async def login(body: LoginBody, request: Request):
                     db,
                 )
                 await db.commit()
-        except Exception as audit_exc:
+        except (OperationalError, SQLAlchemyError) as audit_exc:
             logger.warning("audit_log_write_failed", error=str(audit_exc))
         return err("用户名或密码错误", code="AUTH_FAILED", status_code=401)
 
@@ -673,7 +673,7 @@ async def login(body: LoginBody, request: Request):
                 db,
             )
             await db.commit()
-    except Exception as audit_exc:
+    except (OperationalError, SQLAlchemyError) as audit_exc:
         logger.warning("audit_log_write_failed", error=str(audit_exc))
 
     return ok({
@@ -750,7 +750,7 @@ async def mfa_verify(body: MFAVerifyBody, request: Request):
                         },
                     )
                     await db.commit()
-            except Exception as exc:
+            except (OperationalError, SQLAlchemyError) as exc:
                 logger.warning("mfa_backup_code_db_update_failed", username=username, error=str(exc))
 
     if not verified:
@@ -816,7 +816,7 @@ async def mfa_verify(body: MFAVerifyBody, request: Request):
                 db,
             )
             await db.commit()
-    except Exception as audit_exc:
+    except (OperationalError, SQLAlchemyError) as audit_exc:
         logger.warning("audit_log_write_failed", error=str(audit_exc))
 
     return ok({
@@ -857,7 +857,7 @@ async def refresh_token(body: RefreshBody, request: Request):
                 {"jti": jti},
             )
             db_token_row = result.mappings().first()
-    except Exception as exc:
+    except (OperationalError, SQLAlchemyError) as exc:
         logger.warning("refresh_token_db_lookup_failed", jti=jti, error=str(exc))
 
     if db_token_row is not None:
@@ -906,7 +906,7 @@ async def refresh_token(body: RefreshBody, request: Request):
                     "mfa_enabled": bool(row.get("mfa_enabled")),
                 }
                 username = row["username"]
-    except Exception as exc:
+    except (OperationalError, SQLAlchemyError) as exc:
         logger.warning("refresh_user_db_lookup_failed", user_id=user_id, error=str(exc))
 
     if user is None and _demo_auth_enabled():
@@ -929,7 +929,7 @@ async def refresh_token(body: RefreshBody, request: Request):
                 {"jti": jti},
             )
             await db.commit()
-    except Exception as exc:
+    except (OperationalError, SQLAlchemyError) as exc:
         logger.warning("refresh_token_revoke_db_failed", jti=jti, error=str(exc))
     if jti in _refresh_store:
         _refresh_store[jti]["revoked"] = True
@@ -975,7 +975,7 @@ async def logout(request: Request, body: Optional[RefreshBody] = None):
                         {"jti": jti},
                     )
                     await db.commit()
-            except Exception as exc:
+            except (OperationalError, SQLAlchemyError) as exc:
                 logger.warning("logout_db_revoke_failed", jti=jti, error=str(exc))
             # 同时更新内存存储
             if jti in _refresh_store:
@@ -998,7 +998,7 @@ async def logout(request: Request, body: Optional[RefreshBody] = None):
                         db,
                     )
                     await db.commit()
-            except Exception as audit_exc:
+            except (OperationalError, SQLAlchemyError) as audit_exc:
                 logger.warning("audit_log_write_failed", error=str(audit_exc))
 
     # 清理旧版内存 token（向后兼容）
@@ -1053,7 +1053,7 @@ async def me(request: Request):
                         "mfa_verified": payload.get("mfa_verified", False),
                         "token_expires_at": payload.get("exp"),
                     }
-        except Exception as exc:
+        except (OperationalError, SQLAlchemyError) as exc:
             logger.warning("me_db_lookup_failed", user_id=user_id, error=str(exc))
 
         if user_info_result is None and _demo_auth_enabled():
@@ -1199,7 +1199,7 @@ async def mfa_enable(body: MFASetupEnableBody, request: Request):
                 },
             )
             await db.commit()
-    except Exception as exc:
+    except (OperationalError, SQLAlchemyError) as exc:
         logger.warning("mfa_enable_db_write_failed", user_id=user_id, error=str(exc))
 
     user["mfa_enabled"] = True
@@ -1226,7 +1226,7 @@ async def mfa_enable(body: MFASetupEnableBody, request: Request):
                 db,
             )
             await db.commit()
-    except Exception as audit_exc:
+    except (OperationalError, SQLAlchemyError) as audit_exc:
         logger.warning("audit_log_write_failed", error=str(audit_exc))
 
     return ok({

@@ -27,6 +27,7 @@ from typing import Any, Optional
 import structlog
 import httpx
 from sqlalchemy import func, select
+from sqlalchemy.exc import OperationalError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..models.expense_application import ExpenseApplication, ExpenseItem
@@ -174,7 +175,7 @@ class A4BudgetAlertAgent:
                 budget_type="expense",
                 store_id=None,  # 集团级预算
             )
-        except Exception as exc:
+        except (OperationalError, SQLAlchemyError, ValueError) as exc:
             logger.error(
                 "a4_budget_lookup_failed",
                 tenant_id=str(tenant_id),
@@ -297,14 +298,14 @@ class A4BudgetAlertAgent:
                         rate=rate,
                     )
 
-        except Exception as exc:
+        except (OperationalError, SQLAlchemyError, ValueError) as exc:
             log.error("a4_expense_rate_check_failed", error=str(exc), exc_info=True)
 
         # ── 2. 合同预警检查 ─────────────────────────────────────────────────
         try:
             contract_alerts = await self.check_contract_alerts(db=db, tenant_id=tenant_id)
             contract_alerts_count = len(contract_alerts)
-        except Exception as exc:
+        except (OperationalError, SQLAlchemyError, ValueError) as exc:
             log.error("a4_contract_check_failed", error=str(exc), exc_info=True)
 
         result = {
@@ -375,7 +376,7 @@ class A4BudgetAlertAgent:
                         rate=rate,
                     )
 
-        except Exception as exc:
+        except (OperationalError, SQLAlchemyError, ValueError) as exc:
             log.error("a4_handle_expense_approved_failed", error=str(exc), exc_info=True)
 
     async def check_contract_alerts(
