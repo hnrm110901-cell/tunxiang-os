@@ -10,6 +10,7 @@ from typing import Optional
 
 import structlog
 from sqlalchemy import select
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.entities import Customer, Order
@@ -318,7 +319,7 @@ async def deduct_stored_value(
                 "order_id": order_id,
             }
         )
-    except Exception:
+    except SQLAlchemyError:
         # 流水写入失败不影响主流程（幂等）
         pass
 

@@ -20,6 +20,7 @@ from typing import Any
 
 import structlog
 from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 log: structlog.stdlib.BoundLogger = structlog.get_logger(__name__)
@@ -481,7 +482,7 @@ async def auto_detect_gaps(
             {"tid": tenant_id, "store_id": store_id, "d": target_date},
         )
         requirements = [dict(r) for r in req_result.mappings().fetchall()]
-    except Exception as exc:
+    except SQLAlchemyError as exc:
         # 编制需求表可能尚未创建，降级处理
         if "does not exist" in str(exc) or "UndefinedTable" in type(exc).__name__:
             log.warning("staffing_requirements_table_missing", store_id=store_id)
@@ -711,7 +712,7 @@ async def get_fill_suggestions(
                     "source_store_id": str(row["source_store_id"]),
                 })
                 existing_ids.add(eid)
-    except Exception as exc:
+    except SQLAlchemyError as exc:
         log.warning("nearby_store_query_failed", error=str(exc))
 
     log.info("fill_suggestions_svc", gap_id=gap_id, suggestion_count=len(suggestions))

@@ -18,6 +18,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Path, Query, Requ
 from fastapi import status as http_status
 from pydantic import BaseModel, Field
 from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db_with_tenant
@@ -100,7 +101,7 @@ async def _record_metric(db: AsyncSession, tenant_id: str, platform: str, succes
             text("INSERT INTO aggregator_metrics (tenant_id, platform, success, duration_ms, error_code) VALUES (:tid, :p, :s, :d, :e)"),
             {"tid": tenant_id, "p": platform, "s": success, "d": duration_ms, "e": error_code},
         )
-    except Exception as exc:
+    except SQLAlchemyError as exc:
         logger.warning("aggregator.metric_write_failed", error=str(exc))
 
 

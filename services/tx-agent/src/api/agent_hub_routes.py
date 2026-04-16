@@ -15,6 +15,7 @@ from typing import Literal
 import structlog
 from fastapi import APIRouter, Depends, Header, Query
 from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db_with_tenant
@@ -148,7 +149,7 @@ async def get_hub_status(
         """), {"tenant_id": x_tenant_id, "today": today})
         rows = result.fetchall()
         stats = {r.agent_id: r for r in rows}
-    except Exception as exc:
+    except SQLAlchemyError as exc:
         logger.warning("agent_hub_status_query_failed", error=str(exc))
         stats = {}
 
@@ -229,7 +230,7 @@ async def get_pending_actions(
                 for r in rows
             ],
         }
-    except Exception as exc:
+    except SQLAlchemyError as exc:
         logger.warning("agent_hub_actions_query_failed", error=str(exc))
         return {"ok": True, "data": []}
 
@@ -249,7 +250,7 @@ async def confirm_action(
         """), {"id": action_id, "tenant_id": x_tenant_id})
         await db.commit()
         return {"ok": True, "message": "action confirmed"}
-    except Exception as exc:
+    except SQLAlchemyError as exc:
         logger.warning("confirm_action_failed", error=str(exc))
         return {"ok": False, "error": str(exc)}
 
@@ -269,7 +270,7 @@ async def dismiss_action(
         """), {"id": action_id, "tenant_id": x_tenant_id})
         await db.commit()
         return {"ok": True, "message": "action dismissed"}
-    except Exception as exc:
+    except SQLAlchemyError as exc:
         logger.warning("dismiss_action_failed", error=str(exc))
         return {"ok": False, "error": str(exc)}
 
@@ -316,6 +317,6 @@ async def get_action_log(
                 for r in rows
             ],
         }
-    except Exception as exc:
+    except SQLAlchemyError as exc:
         logger.warning("agent_hub_log_query_failed", error=str(exc))
         return {"ok": True, "data": []}

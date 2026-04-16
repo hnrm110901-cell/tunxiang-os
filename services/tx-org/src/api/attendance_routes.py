@@ -24,6 +24,7 @@ import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
@@ -678,7 +679,7 @@ async def list_attendance_records(
             params,
         )
         rows = [dict(r) for r in result.mappings().fetchall()]
-    except Exception as exc:
+    except SQLAlchemyError as exc:
         if "UndefinedTable" in type(exc).__name__ or "does not exist" in str(exc):
             return {
                 "ok": False,
@@ -753,7 +754,7 @@ async def get_employee_attendance_summary(
             {"tid": tenant_id, "employee_id": employee_id, "month": month_str},
         )
         row = result.mappings().first()
-    except Exception as exc:
+    except SQLAlchemyError as exc:
         if "UndefinedTable" in type(exc).__name__ or "does not exist" in str(exc):
             return {
                 "ok": False,
@@ -832,7 +833,7 @@ async def adjust_attendance_record(
             {"record_id": record_id, "tid": tenant_id},
         )
         existing = existing_result.mappings().first()
-    except Exception as exc:
+    except SQLAlchemyError as exc:
         if "UndefinedTable" in type(exc).__name__ or "does not exist" in str(exc):
             return {
                 "ok": False,
@@ -885,7 +886,7 @@ async def adjust_attendance_record(
                 "tid": tenant_id,
             },
         )
-    except Exception as exc:
+    except SQLAlchemyError as exc:
         if "UndefinedTable" in type(exc).__name__ or "does not exist" in str(exc):
             return {
                 "ok": False,
@@ -966,7 +967,7 @@ async def get_today_store_attendance(
             {"tid": tenant_id, "store_id": store_id, "today": today},
         )
         da_rows = [dict(r) for r in da_result.mappings().fetchall()]
-    except Exception as exc:
+    except SQLAlchemyError as exc:
         if "UndefinedTable" in type(exc).__name__ or "does not exist" in str(exc):
             return {
                 "ok": False,
@@ -1036,7 +1037,7 @@ async def get_today_store_attendance(
                         if row.get("shift_end_time") else None
                     ),
                 })
-    except Exception as exc:
+    except SQLAlchemyError as exc:
         # employee_schedules 表不存在时降级：only report clocked/not-clocked from DA
         if "UndefinedTable" in type(exc).__name__ or "does not exist" in str(exc):
             log.warning(

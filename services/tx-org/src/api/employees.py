@@ -36,6 +36,7 @@ import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
@@ -405,7 +406,7 @@ async def batch_import_employees(
                 "now": now,
             })
             created_ids.append(employee_id)
-        except Exception as exc:
+        except (SQLAlchemyError, ValueError, TypeError) as exc:
             log.warning("batch_import_row_error", index=idx, name=emp.emp_name, error=str(exc))
             errors.append({"index": idx, "name": emp.emp_name, "error": str(exc)})
 

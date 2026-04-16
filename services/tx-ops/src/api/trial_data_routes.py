@@ -22,6 +22,7 @@ import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db_with_tenant
@@ -68,7 +69,7 @@ async def _verify_clear_permission(
         if result is None:
             return False
         return result[0] == "super_admin"
-    except Exception as exc:
+    except SQLAlchemyError as exc:
         logger.warning("permission_check_db_error", exc=str(exc))
         # 降级：DB不可用时拒绝（安全默认值）
         return False
@@ -92,7 +93,7 @@ async def _check_cooldown(
             {"tid": tenant_id, "sid": store_id, "cutoff": cutoff},
         )
         return row.fetchone() is not None
-    except Exception as exc:
+    except SQLAlchemyError as exc:
         logger.warning("cooldown_check_db_error", exc=str(exc))
         # 降级：DB不可用时放行（不阻止申请流程）
         return False
@@ -114,7 +115,7 @@ async def _get_store_name(
         )
         result = row.fetchone()
         return result[0] if result else None
-    except Exception as exc:
+    except SQLAlchemyError as exc:
         logger.warning("get_store_name_db_error", exc=str(exc))
         return None
 
@@ -183,7 +184,7 @@ async def request_clear(
             },
         )
         await db.commit()
-    except Exception as exc:
+    except SQLAlchemyError as exc:
         await db.rollback()
         logger.error("trial_clear_request_db_error", exc=str(exc))
         raise HTTPException(status_code=500, detail="申请提交失败，请稍后重试") from exc
@@ -227,7 +228,7 @@ async def get_clear_status(
             {"tid": x_tenant_id, "sid": store_id},
         )
         result = row.fetchone()
-    except Exception as exc:
+    except SQLAlchemyError as exc:
         logger.error("trial_clear_status_db_error", exc=str(exc))
         raise HTTPException(status_code=500, detail="查询失败") from exc
 
@@ -285,7 +286,7 @@ async def execute_clear(
             {"rid": body.approved_request_id, "tid": x_tenant_id},
         )
         req = row.fetchone()
-    except Exception as exc:
+    except SQLAlchemyError as exc:
         logger.error("trial_clear_approve_check_error", exc=str(exc))
         raise HTTPException(status_code=500, detail="审批状态查询失败") from exc
 
@@ -366,7 +367,7 @@ async def execute_clear(
 
         await db.commit()
 
-    except Exception as exc:
+    except SQLAlchemyError as exc:
         await db.rollback()
         logger.error(
             "trial_clear_execute_error",

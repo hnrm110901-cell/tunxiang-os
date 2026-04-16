@@ -13,6 +13,7 @@ from datetime import datetime, timezone
 import structlog
 from fastapi import APIRouter, Depends, Header, Query
 from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db_with_tenant
@@ -66,7 +67,7 @@ async def get_today_anomalies(
             }
             for r in rows
         ]
-    except Exception as exc:
+    except SQLAlchemyError as exc:
         logger.warning("anomaly_today_query_failed", error=str(exc))
         anomalies = []
 
@@ -103,7 +104,7 @@ async def mark_handling(
         """), {"id": anomaly_id, "tenant_id": x_tenant_id})
         await db.commit()
         return {"ok": True}
-    except Exception as exc:
+    except SQLAlchemyError as exc:
         return {"ok": False, "error": str(exc)}
 
 
@@ -121,5 +122,5 @@ async def mark_resolved(
         """), {"id": anomaly_id, "tenant_id": x_tenant_id})
         await db.commit()
         return {"ok": True}
-    except Exception as exc:
+    except SQLAlchemyError as exc:
         return {"ok": False, "error": str(exc)}

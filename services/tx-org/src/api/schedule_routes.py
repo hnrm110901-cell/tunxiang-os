@@ -41,6 +41,7 @@ import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
@@ -179,7 +180,7 @@ async def get_week_schedule(
             {"tid": tenant_id, "store_id": store_id, "week_start": week_start, "week_end": week_end},
         )
         rows = [dict(r) for r in result.mappings().fetchall()]
-    except Exception as exc:
+    except SQLAlchemyError as exc:
         if _is_table_missing(exc):
             return _table_not_ready()
         raise
@@ -257,7 +258,7 @@ async def create_schedule(
             },
         )
         row = result.mappings().first()
-    except Exception as exc:
+    except SQLAlchemyError as exc:
         if _is_table_missing(exc):
             return _table_not_ready()
         raise
@@ -341,7 +342,7 @@ async def batch_create_schedules(
                     inserted += 1
                 else:
                     skipped += 1
-            except Exception as exc:
+            except SQLAlchemyError as exc:
                 if _is_table_missing(exc):
                     return _table_not_ready()
                 raise
@@ -434,7 +435,7 @@ async def update_schedule(
             params,
         )
         row = result.mappings().first()
-    except Exception as exc:
+    except SQLAlchemyError as exc:
         if _is_table_missing(exc):
             return _table_not_ready()
         raise
@@ -491,7 +492,7 @@ async def delete_schedule(
             {"schedule_id": schedule_id, "tid": tenant_id},
         )
         row = result.mappings().first()
-    except Exception as exc:
+    except SQLAlchemyError as exc:
         if _is_table_missing(exc):
             return _table_not_ready()
         raise
@@ -565,7 +566,7 @@ async def get_schedule_conflicts(
             {"tid": tenant_id, "store_id": store_id, "week_start": week_start, "week_end": week_end},
         )
         rows = [dict(r) for r in result.mappings().fetchall()]
-    except Exception as exc:
+    except SQLAlchemyError as exc:
         if _is_table_missing(exc):
             return _table_not_ready()
         raise

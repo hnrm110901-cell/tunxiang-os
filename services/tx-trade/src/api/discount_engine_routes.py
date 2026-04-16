@@ -430,9 +430,9 @@ async def calculate_discount(
     except SQLAlchemyError as e:
         await db.rollback()
         _err(f"折扣计算失败: {e}", 500)
-    except Exception as e:
+    except Exception as e:  # outermost: non-DB errors (ValueError, etc.)
         await db.rollback()
-        _err(f"折扣计算异常: {e}", 500)
+        _err(f"折扣计算异常: {e}", 500)  # noqa: BLE001
 
 
 # ─── 端点：新建规则（管理员）────────────────────────────────────────────────
