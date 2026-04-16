@@ -231,10 +231,28 @@ class TableCardLearningEngine:
         In production, this would query the database.
         For now, returns None (fallback to no decay).
         """
-        # TODO: Implement actual DB query
-        # SELECT MIN(clicked_at) FROM table_card_click_logs
-        # WHERE tenant_id = ? AND store_id = ? AND field_key = ? AND meal_period = ?
-        return None
+        try:
+            from sqlalchemy import text
+            result = await self.db.execute(
+                text("""
+                    SELECT MIN(clicked_at)
+                    FROM table_card_click_logs
+                    WHERE tenant_id = :tenant_id
+                      AND store_id = :store_id
+                      AND field_key = :field_key
+                      AND meal_period = :meal_period
+                """),
+                {
+                    "tenant_id": tenant_id,
+                    "store_id": store_id,
+                    "field_key": field_key,
+                    "meal_period": meal_period,
+                },
+            )
+            row = result.one_or_none()
+            return row[0] if row and row[0] else None
+        except Exception:  # noqa: BLE001 — decay is optional, never block on it
+            return None
 
     async def decay_scores(
         self,

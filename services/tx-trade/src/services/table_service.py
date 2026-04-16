@@ -12,7 +12,8 @@ from datetime import datetime
 from enum import Enum
 
 from pydantic import BaseModel, Field, ConfigDict
-from sqlalchemy import select, and_, func
+from sqlalchemy import select, and_, func, text, update
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
@@ -130,18 +131,107 @@ class TableCardService:
             TableListResponse with tables and statistics
         """
         try:
-            # TODO: Implement actual database queries
-            # For now, return empty response structure
+            # Build WHERE conditions
+            conditions = [
+                "t.store_id = :store_id",
+                "t.is_deleted = FALSE",
+            ]
+            params: Dict[str, Any] = {"store_id": filters.store_id}
+
+            if filters.is_active:
+                conditions.append("t.is_active = TRUE")
+
+            if filters.area:
+                conditions.append("t.area = :area")
+                params["area"] = filters.area
+
+            if filters.status:
+                conditions.append("t.status = :status")
+                params["status"] = filters.status
+
+            where_clause = " AND ".join(conditions)
+
+            # Fetch tables with optional active dining session guest_count
+            result = await self.db.execute(
+                text(f"""
+                    SELECT
+                        t.id, t.table_no, t.area, t.seats, t.status,
+                        t.config, t.updated_at,
+                        ds.guest_count
+                    FROM tables t
+                    LEFT JOIN LATERAL (
+                        SELECT guest_count
+                        FROM dining_sessions ds2
+                        WHERE ds2.table_id   = t.id
+                          AND ds2.is_deleted = FALSE
+                          AND ds2.status NOT IN ('paid', 'clearing', 'disabled')
+                        ORDER BY ds2.opened_at DESC
+                        LIMIT 1
+                    ) ds ON TRUE
+                    WHERE {where_clause}
+                    ORDER BY t.area, t.table_no
+                    LIMIT :limit OFFSET :offset
+                """),
+                {**params, "limit": filters.limit, "offset": filters.offset},
+            )
+            rows = result.mappings().all()
+
+            # Total count without pagination
+            count_result = await self.db.execute(
+                text(f"SELECT COUNT(*) FROM tables t WHERE {where_clause}"),
+                params,
+            )
+            total_count = count_result.scalar_one()
+
+            # Aggregate stats for the store (all active, non-deleted tables)
+            stats = await self.get_table_statistics(
+                store_id=filters.store_id,
+                tenant_id="",  # store_id-scoped query; tenant_id not needed here
+            )
+
             tables = []
-            stats = TableStatistics()
+            for row in rows:
+                config = row["config"] or {}
+                layout = config.get("layout") if isinstance(config, dict) else None
+                card = ResolvedTableCard(
+                    table_id=str(row["id"]),
+                    table_no=row["table_no"],
+                    area=row["area"] or "",
+                    seats=row["seats"],
+                    status=row["status"],
+                    guest_count=row["guest_count"],
+                    layout=layout,
+                    card_fields=[],
+                    updated_at=row["updated_at"],
+                )
+                tables.append(card)
+
+            # Derive meal period from current UTC hour (simple heuristic)
+            hour = datetime.utcnow().hour
+            if hour < 11:
+                meal_period = "breakfast"
+            elif hour < 14:
+                meal_period = "lunch"
+            elif hour < 17:
+                meal_period = "teatime"
+            else:
+                meal_period = "dinner"
 
             return TableListResponse(
                 summary=stats,
-                meal_period="dinner",
+                meal_period=meal_period,
                 tables=tables,
-                total_count=0,
+                total_count=total_count,
             )
 
+        except SQLAlchemyError as e:
+            logger.error(f"DB error fetching tables: {e}", exc_info=True)
+            return TableListResponse(
+                summary=TableStatistics(),
+                meal_period="dinner",
+                tables=[],
+                total_count=0,
+            )
         except Exception as e:
             logger.error(f"Failed to fetch tables: {e}")
             raise
@@ -164,49 +254,83 @@ class TableCardService:
             TableDetailResponse with full context
         """
         try:
-            # TODO: Implement actual database query
-            # Query table, orders, customer, reservation in parallel
+            # Fetch table row
+            table_result = await self.db.execute(
+                text("""
+                    SELECT id, table_no, area, seats, status, config, updated_at
+                    FROM tables
+                    WHERE id        = :table_id
+                      AND store_id  = :store_id
+                      AND tenant_id = :tenant_id
+                      AND is_deleted = FALSE
+                """),
+                {"table_id": table_id, "store_id": store_id, "tenant_id": tenant_id},
+            )
+            row = table_result.mappings().one_or_none()
+            if row is None:
+                raise ValueError(f"Table {table_id} not found")
 
-            table_data = {
-                "table_id": table_id,
-                "table_no": "A01",
-                "area": "å¤§å",
-                "seats": 4,
-                "status": "dining",
-                "layout": {"pos_x": 45, "pos_y": 30},
-            }
-
-            order_summary = {
-                "items_count": 5,
-                "items_pending": 2,
-                "amount": 680.00,
-                "duration_minutes": 45,
-            }
-
-            customer_info = {
-                "customer_id": "cust_001",
-                "name": "ææ»",
-                "rfm_level": "S1",
-                "visit_count": 25,
-            }
+            config = row["config"] or {}
+            layout = config.get("layout") if isinstance(config, dict) else None
 
             card = ResolvedTableCard(
-                table_id=table_id,
-                table_no=table_data["table_no"],
-                area=table_data["area"],
-                seats=table_data["seats"],
-                status=table_data["status"],
-                layout=table_data["layout"],
+                table_id=str(row["id"]),
+                table_no=row["table_no"],
+                area=row["area"] or "",
+                seats=row["seats"],
+                status=row["status"],
+                layout=layout,
                 card_fields=[],
-                updated_at=datetime.utcnow(),
+                updated_at=row["updated_at"],
             )
+
+            # Fetch current active dining session + aggregate order summary
+            session_result = await self.db.execute(
+                text("""
+                    SELECT
+                        ds.id              AS session_id,
+                        ds.guest_count,
+                        ds.total_amount_fen,
+                        EXTRACT(EPOCH FROM (NOW() - ds.opened_at)) / 60 AS dining_minutes,
+                        (
+                            SELECT COUNT(*)
+                            FROM orders o
+                            WHERE o.table_id  = ds.table_id
+                              AND o.tenant_id = ds.tenant_id
+                              AND o.status NOT IN ('cancelled')
+                        ) AS items_count
+                    FROM dining_sessions ds
+                    WHERE ds.table_id   = :table_id
+                      AND ds.tenant_id  = :tenant_id
+                      AND ds.is_deleted = FALSE
+                      AND ds.status NOT IN ('paid', 'clearing', 'disabled')
+                    ORDER BY ds.opened_at DESC
+                    LIMIT 1
+                """),
+                {"table_id": table_id, "tenant_id": tenant_id},
+            )
+            session_row = session_result.mappings().one_or_none()
+
+            order_summary: Optional[Dict[str, Any]] = None
+            if session_row:
+                card.guest_count = session_row["guest_count"]
+                order_summary = {
+                    "session_id": str(session_row["session_id"]),
+                    "items_count": int(session_row["items_count"] or 0),
+                    "amount_fen": int(session_row["total_amount_fen"] or 0),
+                    "duration_minutes": int(session_row["dining_minutes"] or 0),
+                }
 
             return TableDetailResponse(
                 table=card,
                 order_summary=order_summary,
-                customer_info=customer_info,
+                customer_info=None,
+                reservation_info=None,
             )
 
+        except SQLAlchemyError as e:
+            logger.error(f"DB error fetching table detail {table_id}: {e}", exc_info=True)
+            raise
         except Exception as e:
             logger.error(f"Failed to fetch table detail: {e}")
             raise
@@ -226,19 +350,49 @@ class TableCardService:
             table_id: Table ID
             store_id: Store ID
             tenant_id: Tenant ID
-            new_status: New status value (empty, dining, reserved, etc.)
+            new_status: New status value (free, occupied, reserved, cleaning, etc.)
             metadata: Optional metadata for status change
 
         Returns:
             True if update successful
         """
         try:
-            # TODO: Implement actual status update
-            # UPDATE tables SET status = ?, updated_at = ? WHERE id = ? AND store_id = ? AND tenant_id = ?
+            result = await self.db.execute(
+                text("""
+                    UPDATE tables
+                    SET status     = :new_status,
+                        updated_at = NOW()
+                    WHERE id        = :table_id
+                      AND store_id  = :store_id
+                      AND tenant_id = :tenant_id
+                      AND is_deleted = FALSE
+                """),
+                {
+                    "new_status": new_status,
+                    "table_id": table_id,
+                    "store_id": store_id,
+                    "tenant_id": tenant_id,
+                },
+            )
+            await self.db.commit()
+            updated = result.rowcount > 0
+            if updated:
+                logger.info(
+                    f"Updated table {table_id} status to {new_status}",
+                    extra={"table_id": table_id, "new_status": new_status},
+                )
+            else:
+                logger.warning(
+                    f"update_table_status: table {table_id} not found or not modified"
+                )
+            return updated
 
-            logger.info(f"Updated table {table_id} status to {new_status}")
-            return True
-
+        except SQLAlchemyError as e:
+            logger.error(
+                f"DB error updating table {table_id} status: {e}", exc_info=True
+            )
+            await self.db.rollback()
+            return False
         except Exception as e:
             logger.error(f"Failed to update table status: {e}")
             return False
@@ -259,15 +413,31 @@ class TableCardService:
             TableStatistics with counts by status
         """
         try:
-            # TODO: Implement actual statistics query
-            # SELECT status, COUNT(*) FROM tables WHERE store_id = ? AND tenant_id = ? GROUP BY status
+            result = await self.db.execute(
+                text("""
+                    SELECT status, COUNT(*) AS cnt
+                    FROM tables
+                    WHERE store_id  = :store_id
+                      AND is_active  = TRUE
+                      AND is_deleted = FALSE
+                    GROUP BY status
+                """),
+                {"store_id": store_id},
+            )
+            rows = result.mappings().all()
+
+            # Map DB status values to TableStatistics fields
+            # DB statuses: free, occupied, reserved, cleaning
+            # TableStatistics fields: empty_count, dining_count, reserved_count,
+            #                         pending_checkout_count, pending_cleanup_count
+            counts: Dict[str, int] = {row["status"]: int(row["cnt"]) for row in rows}
 
             stats = TableStatistics(
-                empty_count=8,
-                dining_count=12,
-                reserved_count=3,
-                pending_checkout_count=2,
-                pending_cleanup_count=1,
+                empty_count=counts.get("free", 0) + counts.get("empty", 0),
+                dining_count=counts.get("occupied", 0) + counts.get("dining", 0),
+                reserved_count=counts.get("reserved", 0),
+                pending_checkout_count=counts.get("pending_checkout", 0),
+                pending_cleanup_count=counts.get("cleaning", 0) + counts.get("pending_cleanup", 0),
             )
             stats.total_occupied = (
                 stats.dining_count
@@ -279,6 +449,9 @@ class TableCardService:
 
             return stats
 
+        except SQLAlchemyError as e:
+            logger.error(f"DB error fetching table statistics: {e}", exc_info=True)
+            return TableStatistics()
         except Exception as e:
             logger.error(f"Failed to fetch table statistics: {e}")
             raise
@@ -336,26 +509,53 @@ class TableCardService:
             Dict mapping area name -> TableStatistics
         """
         try:
-            # TODO: Implement actual area statistics query
-            # SELECT area, status, COUNT(*) FROM tables WHERE store_id = ? AND tenant_id = ? GROUP BY area, status
+            result = await self.db.execute(
+                text("""
+                    SELECT area, status, COUNT(*) AS cnt
+                    FROM tables
+                    WHERE store_id  = :store_id
+                      AND is_active  = TRUE
+                      AND is_deleted = FALSE
+                    GROUP BY area, status
+                    ORDER BY area, status
+                """),
+                {"store_id": store_id},
+            )
+            rows = result.mappings().all()
 
-            return {
-                "å¤§å": TableStatistics(
-                    empty_count=5,
-                    dining_count=8,
-                    reserved_count=2,
-                ),
-                "åé´": TableStatistics(
-                    empty_count=2,
-                    dining_count=3,
-                    reserved_count=1,
-                ),
-                "å§å°": TableStatistics(
-                    empty_count=1,
-                    dining_count=1,
-                ),
-            }
+            # Aggregate per-area counts into TableStatistics objects
+            area_counts: Dict[str, Dict[str, int]] = {}
+            for row in rows:
+                area = row["area"] or ""
+                status = row["status"]
+                cnt = int(row["cnt"])
+                if area not in area_counts:
+                    area_counts[area] = {}
+                area_counts[area][status] = cnt
 
+            area_stats: Dict[str, TableStatistics] = {}
+            for area, counts in area_counts.items():
+                s = TableStatistics(
+                    empty_count=counts.get("free", 0) + counts.get("empty", 0),
+                    dining_count=counts.get("occupied", 0) + counts.get("dining", 0),
+                    reserved_count=counts.get("reserved", 0),
+                    pending_checkout_count=counts.get("pending_checkout", 0),
+                    pending_cleanup_count=counts.get("cleaning", 0) + counts.get("pending_cleanup", 0),
+                )
+                s.total_occupied = (
+                    s.dining_count
+                    + s.reserved_count
+                    + s.pending_checkout_count
+                    + s.pending_cleanup_count
+                )
+                s.total_available = s.empty_count
+                area_stats[area] = s
+
+            return area_stats
+
+        except SQLAlchemyError as e:
+            logger.error(f"DB error fetching area statistics: {e}", exc_info=True)
+            return {}
         except Exception as e:
             logger.error(f"Failed to fetch area statistics: {e}")
             raise
@@ -378,11 +578,51 @@ class TableCardService:
             List of matching ResolvedTableCard
         """
         try:
-            # TODO: Implement actual search
-            # SELECT * FROM tables WHERE store_id = ? AND tenant_id = ? AND (table_no ILIKE ? OR area ILIKE ?)
+            search_pattern = f"%{query}%"
+            result = await self.db.execute(
+                text("""
+                    SELECT id, table_no, area, seats, status, config, updated_at
+                    FROM tables
+                    WHERE store_id  = :store_id
+                      AND tenant_id = :tenant_id
+                      AND is_deleted = FALSE
+                      AND is_active  = TRUE
+                      AND (
+                          table_no ILIKE :pattern
+                          OR area  ILIKE :pattern
+                      )
+                    ORDER BY area, table_no
+                    LIMIT 50
+                """),
+                {
+                    "store_id": store_id,
+                    "tenant_id": tenant_id,
+                    "pattern": search_pattern,
+                },
+            )
+            rows = result.mappings().all()
 
+            cards = []
+            for row in rows:
+                config = row["config"] or {}
+                layout = config.get("layout") if isinstance(config, dict) else None
+                cards.append(
+                    ResolvedTableCard(
+                        table_id=str(row["id"]),
+                        table_no=row["table_no"],
+                        area=row["area"] or "",
+                        seats=row["seats"],
+                        status=row["status"],
+                        layout=layout,
+                        card_fields=[],
+                        updated_at=row["updated_at"],
+                    )
+                )
+            return cards
+
+        except SQLAlchemyError as e:
+            logger.error(f"DB error searching tables: {e}", exc_info=True)
             return []
-
         except Exception as e:
             logger.error(f"Failed to search tables: {e}")
             raise

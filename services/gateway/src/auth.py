@@ -30,6 +30,7 @@ import structlog
 from fastapi import APIRouter, Request
 from pydantic import BaseModel, Field
 from sqlalchemy import text
+from sqlalchemy.exc import OperationalError, SQLAlchemyError
 
 from shared.ontology.src.database import async_session_factory
 from shared.tenant_registry import MERCHANT_CODE_TO_TENANT_UUID
@@ -139,36 +140,158 @@ _brute_force: dict[str, dict] = {}
 
 
 class LoginBruteForceProtection:
-    """内存版暴力破解防护。生产环境替换为 Redis 实现。"""
+    """DB-backed 暴力破解防护（查询 users.failed_login_count / users.locked_until）。
 
-    def is_locked(self, username: str) -> bool:
+    所有方法均为 async。DB 操作失败时自动降级到内存字典，保证业务不中断。
+    """
+
+    async def is_locked(self, username: str) -> bool:
+        """检查账户是否处于锁定状态。优先查 DB，失败降级到内存。"""
+        try:
+            async with async_session_factory() as db:
+                result = await db.execute(
+                    text("""
+                        SELECT locked_until, failed_login_count
+                        FROM users
+                        WHERE username = :username AND is_deleted = FALSE AND is_active = TRUE
+                        LIMIT 1
+                    """),
+                    {"username": username},
+                )
+                row = result.mappings().first()
+            if row is None:
+                # 用户不在 DB 中（可能是 DEMO 用户），检查内存
+                return self._mem_is_locked(username)
+            locked_until = row.get("locked_until")
+            if locked_until is None:
+                return False
+            # locked_until 是 TIMESTAMPTZ，可能带 tzinfo 也可能不带
+            if hasattr(locked_until, "tzinfo") and locked_until.tzinfo is None:
+                locked_until = locked_until.replace(tzinfo=timezone.utc)
+            return datetime.now(timezone.utc) < locked_until
+        except (OperationalError, SQLAlchemyError) as exc:
+            logger.warning("brute_force_db_check_failed", username=username, error=str(exc))
+            return self._mem_is_locked(username)
+
+    async def record_failure(self, username: str) -> None:
+        """记录一次登录失败；失败次数达到阈值时自动锁定账户。"""
+        try:
+            async with async_session_factory() as db:
+                # 先递增计数
+                await db.execute(
+                    text("""
+                        UPDATE users
+                        SET failed_login_count = failed_login_count + 1,
+                            updated_at = NOW()
+                        WHERE username = :username AND is_deleted = FALSE
+                    """),
+                    {"username": username},
+                )
+                # 查询最新计数以决定是否锁定
+                result = await db.execute(
+                    text("""
+                        SELECT failed_login_count FROM users
+                        WHERE username = :username AND is_deleted = FALSE
+                        LIMIT 1
+                    """),
+                    {"username": username},
+                )
+                row = result.mappings().first()
+                if row and (row.get("failed_login_count") or 0) >= _MAX_LOGIN_FAILS:
+                    await db.execute(
+                        text("""
+                            UPDATE users
+                            SET locked_until = NOW() + INTERVAL '15 minutes',
+                                updated_at = NOW()
+                            WHERE username = :username AND is_deleted = FALSE
+                        """),
+                        {"username": username},
+                    )
+                    logger.warning(
+                        "login_account_locked_db",
+                        username=username,
+                        locked_seconds=_LOCKOUT_SECONDS,
+                    )
+                await db.commit()
+            # 同步内存（保持一致）
+            self._mem_record_failure(username)
+        except (OperationalError, SQLAlchemyError) as exc:
+            logger.warning("brute_force_db_record_failed", username=username, error=str(exc))
+            self._mem_record_failure(username)
+
+    async def record_success(self, username: str) -> None:
+        """登录成功后重置失败计数和锁定状态。"""
+        try:
+            async with async_session_factory() as db:
+                await db.execute(
+                    text("""
+                        UPDATE users
+                        SET failed_login_count = 0,
+                            locked_until = NULL,
+                            last_login_at = NOW(),
+                            updated_at = NOW()
+                        WHERE username = :username AND is_deleted = FALSE
+                    """),
+                    {"username": username},
+                )
+                await db.commit()
+            # 清内存备份
+            _brute_force.pop(username, None)
+        except (OperationalError, SQLAlchemyError) as exc:
+            logger.warning("brute_force_db_reset_failed", username=username, error=str(exc))
+            _brute_force.pop(username, None)
+
+    async def remaining_lockout(self, username: str) -> int:
+        """返回锁定剩余秒数（0 表示未锁定）。优先查 DB，失败降级到内存。"""
+        try:
+            async with async_session_factory() as db:
+                result = await db.execute(
+                    text("""
+                        SELECT locked_until FROM users
+                        WHERE username = :username AND is_deleted = FALSE AND is_active = TRUE
+                        LIMIT 1
+                    """),
+                    {"username": username},
+                )
+                row = result.mappings().first()
+            if row is None:
+                return self._mem_remaining_lockout(username)
+            locked_until = row.get("locked_until")
+            if locked_until is None:
+                return 0
+            if hasattr(locked_until, "tzinfo") and locked_until.tzinfo is None:
+                locked_until = locked_until.replace(tzinfo=timezone.utc)
+            remaining = (locked_until - datetime.now(timezone.utc)).total_seconds()
+            return max(0, int(remaining))
+        except (OperationalError, SQLAlchemyError) as exc:
+            logger.warning("brute_force_db_remaining_failed", username=username, error=str(exc))
+            return self._mem_remaining_lockout(username)
+
+    # ── 内存降级辅助方法 ──────────────────────────────────────────
+
+    def _mem_is_locked(self, username: str) -> bool:
         state = _brute_force.get(username)
         if not state:
             return False
         locked_until = state.get("locked_until", 0)
         if locked_until and time.time() < locked_until:
             return True
-        # 锁定已过期，清除
         if locked_until and time.time() >= locked_until:
             _brute_force.pop(username, None)
         return False
 
-    def record_failure(self, username: str) -> None:
+    def _mem_record_failure(self, username: str) -> None:
         state = _brute_force.setdefault(username, {"failed_count": 0, "locked_until": 0})
         state["failed_count"] = state.get("failed_count", 0) + 1
         if state["failed_count"] >= _MAX_LOGIN_FAILS:
             state["locked_until"] = time.time() + _LOCKOUT_SECONDS
             logger.warning(
-                "login_account_locked",
+                "login_account_locked_mem",
                 username=username,
                 locked_seconds=_LOCKOUT_SECONDS,
             )
 
-    def record_success(self, username: str) -> None:
-        _brute_force.pop(username, None)
-
-    def remaining_lockout(self, username: str) -> int:
-        """返回锁定剩余秒数。"""
+    def _mem_remaining_lockout(self, username: str) -> int:
         state = _brute_force.get(username)
         if not state:
             return 0
@@ -400,8 +523,8 @@ async def login(body: LoginBody, request: Request):
     ua = request.headers.get("User-Agent", "")
 
     # 1. 账户锁定检查
-    if _brute_force_guard.is_locked(username):
-        remaining = _brute_force_guard.remaining_lockout(username)
+    if await _brute_force_guard.is_locked(username):
+        remaining = await _brute_force_guard.remaining_lockout(username)
         logger.warning("login_blocked_locked", username=username, ip=ip)
         return err(
             f"账户已锁定，请 {remaining} 秒后重试",
@@ -465,7 +588,7 @@ async def login(body: LoginBody, request: Request):
             user = dict(demo)
 
     if not password_ok or user is None:
-        _brute_force_guard.record_failure(username)
+        await _brute_force_guard.record_failure(username)
         logger.warning(
             "login_failed",
             username=username,
@@ -494,7 +617,7 @@ async def login(body: LoginBody, request: Request):
         return err("用户名或密码错误", code="AUTH_FAILED", status_code=401)
 
     # 3. 登录成功，重置暴力破解计数
-    _brute_force_guard.record_success(username)
+    await _brute_force_guard.record_success(username)
     user_info = _user_info_from_demo(username, user)
 
     # 4. 检查是否启用MFA
@@ -833,8 +956,6 @@ async def refresh_token(body: RefreshBody, request: Request):
 # ─────────────────────────────────────────────────────────────────
 
 @router.post("/logout")
-async def logout(request: Request):
-    logger.info("logout", user_id=getattr(request.state, "user_id", None))
 async def logout(request: Request, body: Optional[RefreshBody] = None):
     """撤销 refresh_token，使会话失效。
 
