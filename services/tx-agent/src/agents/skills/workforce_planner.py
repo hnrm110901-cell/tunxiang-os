@@ -123,10 +123,7 @@ async def _load_revenue_by_slot(
     store_id: str,
     lookback_days: int = 28,
 ) -> dict[str, int]:
-    """从历史订单聚合各时段营收（降级为mock）。
-
-    TODO: 接入 tx-trade 订单表后替换为真实查询。
-    """
+    """从历史订单聚合各时段营收；DB不可达时降级为零值。"""
     # 尝试从 mv_store_pnl 或 orders 聚合，失败则降级
     try:
         q = text("""

@@ -14,7 +14,7 @@ import uuid
 from datetime import datetime, timedelta, timezone
 
 import structlog
-from sqlalchemy import and_, func, select
+from sqlalchemy import and_, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.entities import Dish, Order, OrderItem
@@ -627,9 +627,18 @@ async def get_dept_load(dept_id: str, db: AsyncSession) -> dict:
     avg_result = await db.execute(avg_stmt)
     avg_wait = avg_result.scalar() or 0.0
 
+    cooking_result = await db.execute(
+        text("""
+            SELECT COUNT(*) FROM kds_tasks
+            WHERE dept_id = :dept_id AND status = 'cooking' AND is_deleted = FALSE
+        """),
+        {"dept_id": dept_id},
+    )
+    in_progress_count = int(cooking_result.scalar() or 0)
+
     load = {
         "pending": pending_count,
-        "in_progress": 0,  # TODO: 需 KDS 任务表区分 cooking 状态
+        "in_progress": in_progress_count,
         "avg_wait_seconds": round(float(avg_wait), 1),
     }
 

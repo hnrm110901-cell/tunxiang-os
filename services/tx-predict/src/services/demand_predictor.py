@@ -327,22 +327,46 @@ class DemandPredictor:
             )
             actual_rows = actual_result.fetchall()
 
-            # 计算 MAPE（简化版，整体）
-            total_predicted = 0
+            # 汇总实际销量（按菜品）
+            actual_by_dish: dict[str, int] = {}
             total_actual = 0
             for row in actual_rows:
-                total_actual += int(row[2] or 0)
+                dish_id = str(row[0]) if row[0] else ""
+                qty = int(row[2] or 0)
+                actual_by_dish[dish_id] = actual_by_dish.get(dish_id, 0) + qty
+                total_actual += qty
 
-            # 从缓存的预测结果中汇总预测值
+            # 汇总预测值（按菜品）
+            predicted_by_dish: dict[str, int] = {}
+            total_predicted = 0
             for prow in prediction_rows:
                 data = prow[0] or {}
-                for _dish_id, qty in data.items():
-                    total_predicted += int(qty) if isinstance(qty, (int, float)) else 0
+                for dish_id, qty in data.items():
+                    v = int(qty) if isinstance(qty, (int, float)) else 0
+                    predicted_by_dish[str(dish_id)] = predicted_by_dish.get(str(dish_id), 0) + v
+                    total_predicted += v
 
+            # 整体 MAPE
             if total_actual > 0:
                 mape = abs(total_predicted - total_actual) / total_actual * 100
             else:
                 mape = None
+
+            # 逐菜品 MAPE
+            dish_accuracy = []
+            all_dish_ids = set(actual_by_dish) | set(predicted_by_dish)
+            for dish_id in all_dish_ids:
+                act = actual_by_dish.get(dish_id, 0)
+                pred = predicted_by_dish.get(dish_id, 0)
+                if act > 0:
+                    dish_mape = abs(pred - act) / act * 100
+                    dish_accuracy.append({
+                        "dish_id": dish_id,
+                        "actual": act,
+                        "predicted": pred,
+                        "mape": round(dish_mape, 1),
+                    })
+            dish_accuracy.sort(key=lambda x: x["mape"], reverse=True)
 
             return {
                 "store_id": store_id,
@@ -350,7 +374,7 @@ class DemandPredictor:
                 "overall_mape": round(mape, 1) if mape is not None else None,
                 "total_predicted": total_predicted,
                 "total_actual": total_actual,
-                "dish_accuracy": [],  # TODO: 逐菜品MAPE
+                "dish_accuracy": dish_accuracy,
             }
 
         except (AttributeError, TypeError, KeyError) as exc:

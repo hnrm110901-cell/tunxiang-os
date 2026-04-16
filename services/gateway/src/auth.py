@@ -52,7 +52,7 @@ _audit_log_service = AuditLogService()
 
 # ─────────────────────────────────────────────────────────────────
 # Demo 用户（向后兼容，明文密码仅供开发/演示环境）
-# 生产环境: TODO — 改为查询 users 表，使用 bcrypt 验证
+# 生产环境默认关闭，见环境变量 TX_ENABLE_DEMO_AUTH；users 表查询已实现
 # ─────────────────────────────────────────────────────────────────
 DEMO_USERS: dict[str, dict] = {
     "admin": {
@@ -114,7 +114,7 @@ DEMO_USERS: dict[str, dict] = {
 
 # ─────────────────────────────────────────────────────────────────
 # 内存存储（开发/演示用）
-# 生产环境: TODO — refresh_tokens 改为查询 refresh_tokens 数据库表
+# refresh_tokens 数据库表查询已实现（优先DB，_refresh_store保留为降级缓冲）
 # ─────────────────────────────────────────────────────────────────
 
 # 旧版内存 token（向后兼容 /api/v1/auth/verify）
@@ -127,11 +127,11 @@ _MFA_SESSION_TTL_SECONDS = 300  # 5分钟
 _MFA_SESSION_MAX_FAILS = 3
 
 # refresh_token 内存存储: jti → {user_id, expires_at, revoked}
-# 生产环境 TODO: 改为 DB 表 refresh_tokens
+# 故障降级缓冲：DB不可达时保证 token 操作不中断（正常路径走 refresh_tokens 表）
 _refresh_store: dict[str, dict] = {}
 
 # ─────────────────────────────────────────────────────────────────
-# 暴力破解保护（内存，生产环境 TODO: 改为 Redis）
+# 暴力破解保护（DB主路径 users.failed_login_count/locked_until，内存作降级）
 # ─────────────────────────────────────────────────────────────────
 _MAX_LOGIN_FAILS = 5
 _LOCKOUT_SECONDS = 900  # 15分钟

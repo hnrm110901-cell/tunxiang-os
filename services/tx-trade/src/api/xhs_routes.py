@@ -58,8 +58,24 @@ async def verify_coupon(
     """扫码核销小红书团购券"""
     from shared.adapters.xiaohongshu.src.xhs_coupon_adapter import XHSCouponAdapter
 
-    # TODO: 从配置或 DB 读取 app_id/app_secret
-    adapter = XHSCouponAdapter(app_id="", app_secret="")
+    await db.execute(
+        text("SELECT set_config('app.tenant_id', :tid, true)"),
+        {"tid": x_tenant_id},
+    )
+    cred_result = await db.execute(
+        text("""
+            SELECT app_id, app_secret FROM delivery_platform_configs
+            WHERE tenant_id = :tid::uuid AND store_id = :sid::uuid
+              AND platform = 'xiaohongshu' AND is_active = TRUE
+            LIMIT 1
+        """),
+        {"tid": x_tenant_id, "sid": body.store_id},
+    )
+    cred_row = cred_result.mappings().first()
+    xhs_app_id = (cred_row["app_id"] if cred_row else None) or ""
+    xhs_app_secret = (cred_row["app_secret"] if cred_row else None) or ""
+
+    adapter = XHSCouponAdapter(app_id=xhs_app_id, app_secret=xhs_app_secret)
     try:
         result = await adapter.verify_and_record(
             coupon_code=body.coupon_code,
@@ -89,7 +105,24 @@ async def list_verifications(
 ) -> dict:
     from shared.adapters.xiaohongshu.src.xhs_coupon_adapter import XHSCouponAdapter
 
-    adapter = XHSCouponAdapter(app_id="", app_secret="")
+    await db.execute(
+        text("SELECT set_config('app.tenant_id', :tid, true)"),
+        {"tid": x_tenant_id},
+    )
+    cred_result = await db.execute(
+        text("""
+            SELECT app_id, app_secret FROM delivery_platform_configs
+            WHERE tenant_id = :tid::uuid AND store_id = :sid::uuid
+              AND platform = 'xiaohongshu' AND is_active = TRUE
+            LIMIT 1
+        """),
+        {"tid": x_tenant_id, "sid": store_id},
+    )
+    cred_row = cred_result.mappings().first()
+    adapter = XHSCouponAdapter(
+        app_id=(cred_row["app_id"] if cred_row else None) or "",
+        app_secret=(cred_row["app_secret"] if cred_row else None) or "",
+    )
     result = await adapter.list_verifications(
         store_id=store_id, tenant_id=x_tenant_id, db=db,
         status=status, page=page, size=size,
