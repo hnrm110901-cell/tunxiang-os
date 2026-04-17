@@ -857,6 +857,26 @@ celery_app.conf.update(
             "args": (),
             "options": {"queue": "default", "priority": 7},
         },
+        # D11 Must-Fix P0: 每日 08:00 健康证到期扫描（30/15/7/1 天分级 + 到期自动停岗）
+        "scan-health-certs-daily": {
+            "task": "src.tasks.health_cert_tasks.scan_health_certs_daily",
+            "schedule": crontab(
+                hour=int(os.getenv("HEALTH_CERT_SCAN_HOUR", "8")),
+                minute=int(os.getenv("HEALTH_CERT_SCAN_MINUTE", "0")),
+            ),
+            "args": (),
+            "options": {"queue": "default", "priority": 9},
+        },
+        # D9 Must-Fix P0: 每日 08:10 劳动合同到期扫描（60/30/15 天分级）
+        "scan-labor-contracts-daily": {
+            "task": "src.tasks.labor_contract_tasks.scan_labor_contracts_daily",
+            "schedule": crontab(
+                hour=int(os.getenv("LABOR_CONTRACT_SCAN_HOUR", "8")),
+                minute=int(os.getenv("LABOR_CONTRACT_SCAN_MINUTE", "10")),
+            ),
+            "args": (),
+            "options": {"queue": "default", "priority": 9},
+        },
         # P2: 每日凌晨 03:00 发券 ROI 日汇总
         "aggregate-coupon-roi-daily": {
             "task": "src.core.celery_tasks.aggregate_coupon_roi_daily",
@@ -868,7 +888,14 @@ celery_app.conf.update(
 )
 
 # 自动发现任务
-celery_app.autodiscover_tasks(["src.core"])
+celery_app.autodiscover_tasks(["src.core", "src.tasks"])
+
+# D11+D9 合规 Must-Fix P0 — 直接导入任务模块，确保 @celery_app.task 装饰器被加载
+try:
+    from src.tasks import health_cert_tasks as _hct  # noqa: F401
+    from src.tasks import labor_contract_tasks as _lct  # noqa: F401
+except Exception as _e:  # noqa: BLE001
+    logger.warning("celery.tasks_import_failed", error=str(_e))
 
 logger.info(
     "Celery应用初始化完成",

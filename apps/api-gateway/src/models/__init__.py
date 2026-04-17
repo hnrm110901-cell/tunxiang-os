@@ -114,6 +114,30 @@ from .notification import Notification, NotificationPreference, NotificationPrio
 from .ontology_action import ActionPriority, ActionStatus, OntologyAction
 from .ops import OpsAsset, OpsAssetType, OpsEvent, OpsEventSeverity, OpsEventStatus, OpsMaintenancePlan, OpsMaintenancePriority
 from .order import Order, OrderItem
+from .pos_core import (
+    AuthLevel,
+    Bill,
+    BillItem,
+    BillItemStatus,
+    BillStatus,
+    CashierShift,
+    DailySettlement,
+    DiscountApplied,
+    DiscountRule,
+    DiscountType,
+    Payment,
+    PaymentMethod,
+    PaymentStatus,
+    Reversal,
+    ReversalReason,
+    ReversalStatus,
+    ReversalType,
+    SettlementStatus,
+    ShiftStatus,
+    ShiftType,
+    TableSession,
+    TableSessionStatus,
+)
 from .payment_reconciliation import MatchStatus, PaymentChannel, PaymentRecord, ReconciliationBatch, ReconciliationDiff
 from .private_domain import (
     JourneyStatus,
@@ -435,6 +459,13 @@ __all__ = [
     "CouponDistribution",
     "CouponRedemption",
     "CouponRoiDaily",
+    # KDS (Kitchen Display System)
+    "KDSStation",
+    "KDSOrderItem",
+    "KDSTimeoutRule",
+    "KDSDisplayMode",
+    "KDSItemStatus",
+    "KDSMealPeriod",
     # P3 — 营销任务体系
     "MarketingTask",
     "MarketingTaskTarget",
@@ -523,6 +554,19 @@ from .floor_plan import TableDefinition, TableShape, TableStatus
 from .hall_showcase import HallShowcase
 from .hr_business_rule import HRBusinessRule
 from .ingredient_master import IngredientMaster
+
+# KDS (Kitchen Display System)
+from .kds import (
+    KDSDisplayMode,
+    KDSItemStatus,
+    KDSMealPeriod,
+    KDSOrderItem,
+    KDSStation,
+    KDSTimeoutRule,
+)
+# Combo (套餐组合)
+from .combo import ComboDefinition, ComboStatus, ComboType
+
 from .inventory_ext import InventoryBatch, InventoryCount
 from .invitation import Invitation, InvitationRSVP, InvitationTemplate, RSVPStatus
 from .leave import (
@@ -585,10 +629,29 @@ from .sensitive_audit_log import SensitiveDataAuditLog
 
 # HR W2-2 — 离职结算
 from .settlement import CompensationType, SeparationType, SettlementRecord, SettlementStatus
-from .social_insurance import EmployeeSocialInsurance, SocialInsuranceConfig
+from .social_insurance import (
+    EmployeeSocialInsurance,
+    InsuranceType,
+    PayrollSIRecord,
+    SocialInsuranceConfig,
+)
+
+# D12 合规 — 个税累计预扣 + 专项附加扣除
+from .tax import (
+    PersonalTaxRecord,
+    SpecialAdditionalDeduction,
+    SpecialDeductionType,
+)
+
+# D12 合规 — 银行代发批次
+from .payroll_disbursement import (
+    DisbursementBank,
+    DisbursementStatus,
+    SalaryDisbursement,
+)
 
 # HR Phase 4 — 培训认证/师徒制
-from .training import ExamAttempt, TrainingCourse, TrainingEnrollment, TrainingExam
+from .training import ExamAttempt, TrainingCourse, TrainingEnrollment, TrainingExam, TrainingMaterial
 
 # HR架构重构 M1 — Person-Assignment-Contract + 知识OS层
 from .person import Person
@@ -615,3 +678,88 @@ from .marketing_task import (
 # P0-P2 智能提升（屯象OS）
 from .weight_learning import DecisionWeightConfig
 from .signal_routing_rule import SignalRoutingRule
+
+# D3-P0 — 储值卡引擎
+from .stored_value import (
+    CardStatus,
+    CardType,
+    StoredValueCard,
+    StoredValuePlan,
+    StoredValueTransaction,
+    SVPlanStatus,
+    SVTxnType,
+)
+
+# D3-P1 — 积分引擎
+from .points import (
+    PointsAccount,
+    PointsAccountStatus,
+    PointsRule,
+    PointsRuleStatus,
+    PointsTransaction,
+    PointsTxnType,
+)
+
+# D3-P1 — 集印卡/签到引擎
+from .stamp_card import (
+    MemberStampCard,
+    StampCardTemplate,
+    StampRewardType,
+    StampTemplateStatus,
+    StampTriggerType,
+)
+
+# D1-P2 — 打印日志
+from .print_log import PrintLog, PrintStatus, PrintType
+
+# D1-P3 — 电子小票短码
+from .receipt_short_code import ReceiptShortCode
+
+# D1-P3 — 快餐订单
+from .fast_food import DiningMode, FastFoodOrder, FastFoodOrderStatus
+
+# D3-P2 — 存酒管理
+from .wine_storage import (
+    WineStorageItem,
+    WineStorageStatus,
+    WineStorageTransaction,
+    WineTxnType,
+)
+
+# D3-P2 — 押金管理
+from .deposit import (
+    DepositPaymentMethod,
+    DepositRecord,
+    DepositStatus,
+    DepositTransaction,
+    DepositTxnType,
+    DepositType,
+)
+
+# D1-P2 — 挂账/协议账户
+from .credit_account import (
+    CreditAccount,
+    CreditAccountStatus,
+    CreditAccountType,
+    CreditTransaction,
+    CreditTxnType,
+    SettlementCycle,
+)
+
+# D4-P1 — 活鲜称重管理
+from .live_seafood import (
+    LiveSeafoodItem,
+    SeafoodPricingMode,
+    SeafoodStatus,
+    SeafoodWeighingRecord,
+)
+
+# D4-P1 — 渠道菜单同步
+from .channel_menu import (
+    ChannelMenuItem,
+    ChannelMenuSyncLog,
+    ChannelSyncLogStatus,
+    ChannelSyncStatus,
+    ChannelSyncType,
+    MenuChannel,
+)

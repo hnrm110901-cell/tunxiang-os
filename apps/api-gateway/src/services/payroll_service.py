@@ -515,6 +515,106 @@ class PayrollService(BaseService):
         )
         return record
 
+    async def run_full_monthly_pipeline(
+        self,
+        db: AsyncSession,
+        store_id: str,
+        pay_month: str,
+        generate_disbursement_bank: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        D12 合规：月度工资一条龙 = 批量算薪 → 社保 → 个税 → (可选)生成银行代发文件。
+
+        步骤:
+          1) 批量调用 calculate_payroll（生成 PayrollRecord，含初版 social/housing/tax）
+          2) SocialInsuranceService.calc_monthly_si_batch — 写入 payroll_si_records
+          3) PersonalTaxService 逐人重算 — 写入 personal_tax_records
+          4) 回写 PayrollRecord.tax_fen = 累计预扣法本月税额，并刷新 net_salary_fen
+          5) 可选生成银行代发文件（icbc/ccb/generic）
+        """
+        # 延迟导入，避免模块级循环依赖
+        from src.services.bank_disbursement_service import BankDisbursementService
+        from src.services.personal_tax_service import PersonalTaxService
+        from src.services.social_insurance_service import SocialInsuranceService
+
+        # 1) 批量算薪
+        payroll_summary = await self.batch_calculate(db, store_id, pay_month)
+
+        # 2) 社保
+        si_service = SocialInsuranceService(store_id=store_id)
+        si_summary = await si_service.calc_monthly_si_batch(db, store_id, pay_month)
+
+        # 3+4) 个税 + 回写
+        tax_service = PersonalTaxService(store_id=store_id)
+        records_result = await db.execute(
+            select(PayrollRecord).where(
+                and_(
+                    PayrollRecord.store_id == store_id,
+                    PayrollRecord.pay_month == pay_month,
+                )
+            )
+        )
+        records = records_result.scalars().all()
+        total_tax_fen = 0
+        for r in records:
+            si_personal = (r.social_insurance_fen or 0) + (r.housing_fund_fen or 0)
+            gross = r.gross_salary_fen or 0
+            # 应税收入 = 应发 - 已扣的缺勤/迟到/罚款（与原 _calculate_monthly_tax 对齐）
+            taxable = max(
+                0,
+                gross
+                - (r.absence_deduction_fen or 0)
+                - (r.late_deduction_fen or 0)
+                - (r.penalty_fen or 0),
+            )
+            tax_detail = await tax_service.calc_monthly_tax(
+                db,
+                employee_id=r.employee_id,
+                pay_month=pay_month,
+                gross_fen=taxable,
+                si_personal_fen=si_personal,
+            )
+            new_tax = tax_detail["current_month_tax_fen"]
+            # 回写
+            r.tax_fen = new_tax
+            r.total_deduction_fen = (
+                (r.absence_deduction_fen or 0)
+                + (r.late_deduction_fen or 0)
+                + (r.penalty_fen or 0)
+                + (r.social_insurance_fen or 0)
+                + (r.housing_fund_fen or 0)
+                + new_tax
+            )
+            r.net_salary_fen = gross - r.total_deduction_fen
+            total_tax_fen += new_tax
+
+        await db.flush()
+
+        # 5) 可选代发文件
+        disbursement: Optional[Dict[str, Any]] = None
+        if generate_disbursement_bank:
+            bank = generate_disbursement_bank.lower()
+            bank_service = BankDisbursementService(store_id=store_id)
+            if bank == "icbc":
+                disbursement = await bank_service.generate_icbc_file(db, pay_month, store_id)
+            elif bank == "ccb":
+                disbursement = await bank_service.generate_ccb_file(db, pay_month, store_id)
+            elif bank == "generic":
+                disbursement = await bank_service.generate_generic_csv(db, pay_month, store_id)
+
+        return {
+            "store_id": store_id,
+            "pay_month": pay_month,
+            "payroll_summary": payroll_summary,
+            "si_summary": si_summary,
+            "tax_summary": {
+                "total_tax_fen": total_tax_fen,
+                "total_tax_yuan": round(total_tax_fen / 100, 2),
+                "employee_count": len(records),
+            },
+            "disbursement": disbursement,
+        }
+
     async def batch_calculate(self, db: AsyncSession, store_id: str, pay_month: str) -> Dict[str, Any]:
         """批量算薪：为门店所有在职员工计算指定月份工资"""
         result = await db.execute(

@@ -80,9 +80,12 @@ from src.api import (
     compliance,
     compliance_engine,
     cross_store_insights,
+    cashier_shift,
     customer360,
+    kds,
     customer_risk,
     daily_hub,
+    daily_settlement,
     dashboard,
     dashboard_preferences,
     data_security,
@@ -551,6 +554,22 @@ app.include_router(analytics.router, tags=["analytics"])
 app.include_router(audit.router, prefix="/api/v1/audit", tags=["audit"])
 app.include_router(multi_store.router, prefix="/api/v1/multi-store", tags=["multi_store"])
 app.include_router(finance.router, prefix="/api/v1/finance", tags=["finance"])
+app.include_router(cashier_shift.router, prefix="/api/v1/cashier-shift", tags=["pos"])
+app.include_router(kds.router, prefix="/api/v1/kds", tags=["pos"])
+app.include_router(daily_settlement.router, prefix="/api/v1/daily-settlement", tags=["pos"])
+
+# D1 桌台会话（开台/合台/转台/拆台/清台）
+from src.api import table_session
+app.include_router(table_session.router, prefix="/api/v1/table-session", tags=["pos"])
+
+# D1-P0-4 点菜录入+称重+做法规格
+from src.api import order_entry
+app.include_router(order_entry.router, prefix="/api/v1/order-entry", tags=["pos"])
+
+# D4 套餐组合定价
+from src.api import combo
+app.include_router(combo.router, prefix="/api/v1/combos", tags=["menu"])
+
 app.include_router(members.router, prefix="/api/v1/members", tags=["members"])
 app.include_router(blindbox.router, prefix="/api/v1", tags=["blindbox"])
 app.include_router(customer360.router, tags=["customer360"])
@@ -996,6 +1015,58 @@ app.include_router(signal_routing.router, tags=["signal_routing"])
 from src.api import data_lineage_api
 app.include_router(data_lineage_api.router, tags=["data_lineage"])
 
+# D3-P0 — 储值卡引擎（开卡/充值/消费/退款/转账/储值方案）
+from src.api import stored_value
+app.include_router(stored_value.router, prefix="/api/v1/stored-value", tags=["crm"])
+
+# D3-P1 — 积分引擎 + 集印卡/签到
+from src.api import points_and_stamps
+app.include_router(points_and_stamps.router, prefix="/api/v1", tags=["crm"])
+
+# D1-P1 — 支付流程引擎（单笔/混合支付/退款/冲红/结算）
+from src.api import payment
+app.include_router(payment.router, prefix="/api/v1/payment", tags=["pos"])
+
+# D1-P2 — 打印服务（预结单/结账小票/厨房菜票/发票/重打/日志）
+from src.api import print as print_api
+app.include_router(print_api.router, prefix="/api/v1/print", tags=["pos"])
+
+# 硬件管理 API（热敏打印机注册/测试/钱箱）
+from src.api import hardware as hardware_api
+app.include_router(hardware_api.router, prefix="/api/v1/hardware", tags=["hardware"])
+
+# D1-P2 — 挂账/协议账户引擎（开户/挂账/还款/调额/核销/冻结/账龄）
+from src.api import credit_account
+app.include_router(credit_account.router, prefix="/api/v1/credit", tags=["pos"])
+
+# D7-P0 Must-Fix — AR/AP 应收应付台账（含账龄报表）
+from src.api import ar_ap as ar_ap_api
+app.include_router(ar_ap_api.router, prefix="/api/v1/ar-ap", tags=["finance"])
+
+# D3-P2 — 存酒管理
+from src.api import wine_storage
+app.include_router(wine_storage.router, prefix="/api/v1/wine-storage", tags=["crm"])
+
+# D3-P2 — 押金管理
+from src.api import deposit as deposit_api
+app.include_router(deposit_api.router, prefix="/api/v1/deposits", tags=["crm"])
+
+# D1-P3 — 快餐模式
+from src.api import fast_food
+app.include_router(fast_food.router, prefix="/api/v1/fast-food", tags=["pos"])
+
+# D1-P3 — 电子小票H5查询
+from src.api import e_receipt
+app.include_router(e_receipt.router, prefix="/api/v1/e-receipt", tags=["pos"])
+
+# D4-P1 — 活鲜称重管理（品类/称重/池存量/损耗分析）
+from src.api import live_seafood
+app.include_router(live_seafood.router, prefix="/api/v1/live-seafood", tags=["menu"])
+
+# D4-P1 — 渠道菜单同步（堂食/美团/饿了么/抖音/微信小程序/外卖自营）
+from src.api import channel_menu
+app.include_router(channel_menu.router, prefix="/api/v1/channel-menu", tags=["menu"])
+
 # v2.0 MVP — 决策中枢（Top3 + 手动推送 + 场景识别）
 from src.api import decision_hub, monthly_report
 
@@ -1017,8 +1088,12 @@ from src.api import hr_attendance
 from src.api import hr_dashboard as hr_dashboard_api
 from src.api import hr_employee, hr_leave, hr_performance, hr_recruitment
 from src.api import payroll as payroll_api
+from src.api import payroll_compliance as payroll_compliance_api
 
 app.include_router(payroll_api.router, prefix="/api/v1", tags=["payroll"])
+app.include_router(
+    payroll_compliance_api.router, prefix="/api/v1", tags=["payroll-compliance"]
+)
 app.include_router(hr_leave.router, prefix="/api/v1", tags=["hr_leave"])
 app.include_router(hr_recruitment.router, prefix="/api/v1", tags=["hr_recruitment"])
 app.include_router(hr_performance.router, prefix="/api/v1", tags=["hr_performance"])
@@ -1098,6 +1173,13 @@ app.include_router(payment_reconciliation.router, prefix="/api/v1", tags=["payme
 app.include_router(douyin.router, prefix="/api/v1", tags=["douyin"])
 app.include_router(food_safety.router, tags=["food-safety"])
 app.include_router(health_certificates.router, prefix="/api/v1", tags=["health-certs"])
+
+# D11+D9 合规证照 Must-Fix P0 — 健康证扫描 / 劳动合同预警 / 培训课程 CRUD
+from src.api import hr_health_cert_scan, hr_labor_contract, training_course  # noqa: E402
+
+app.include_router(hr_health_cert_scan.router, prefix="/api/v1", tags=["hr-health-cert-scan"])
+app.include_router(hr_labor_contract.router, prefix="/api/v1", tags=["hr-labor-contract"])
+app.include_router(training_course.router, prefix="/api/v1", tags=["hr-training-course"])
 # Month 3 (P1+P2) — 供应商B2B / 大众点评 / 银行对账
 app.include_router(supplier_b2b.router, prefix="/api/v1", tags=["supplier-b2b"])
 app.include_router(dianping.router, prefix="/api/v1", tags=["dianping"])

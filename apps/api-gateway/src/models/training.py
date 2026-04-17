@@ -96,3 +96,26 @@ class ExamAttempt(Base, TimestampMixin):
 
     def __repr__(self):
         return f"<ExamAttempt(exam='{self.exam_id}', score={self.score})>"
+
+
+class TrainingMaterial(Base, TimestampMixin):
+    """培训课件/资料（视频/PDF/文本） — D11 Must-Fix P0 补齐存储基础"""
+
+    __tablename__ = "training_materials"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    course_id = Column(UUID(as_uuid=True), ForeignKey("training_courses.id"), nullable=False, index=True)
+
+    # 课件基础属性
+    title = Column(String(200), nullable=False)
+    material_type = Column(String(20), nullable=False, default="video")  # video/pdf/ppt/image/text/link
+    file_url = Column(String(500), nullable=True)  # OSS/对象存储URL
+    file_size_bytes = Column(Integer, nullable=True)  # 文件大小（字节）
+    duration_seconds = Column(Integer, nullable=True)  # 时长（秒，视频/音频用）
+    text_content = Column(Text, nullable=True)  # 纯文本/富文本内容
+    sort_order = Column(Integer, default=0, nullable=False)  # 章节排序
+    is_required = Column(Boolean, default=True, nullable=False)  # 是否必学
+    is_active = Column(Boolean, default=True, nullable=False)
+
+    def __repr__(self):
+        return f"<TrainingMaterial(title='{self.title}', type='{self.material_type}')>"

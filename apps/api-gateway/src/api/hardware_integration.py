@@ -378,6 +378,44 @@ async def acknowledge_edge_node_command(
     }
 
 
+@router.get("/edge-node/{node_id}/commands")
+async def poll_edge_node_commands(
+    node_id: str,
+    limit: int = 10,
+    current_user=Depends(get_edge_node_or_user),
+):
+    """边缘节点主动拉取待执行命令。"""
+    service = get_raspberry_pi_edge_service()
+    commands = await service.poll_commands(node_id=node_id, limit=limit)
+    return {
+        "success": True,
+        "node_id": node_id,
+        "commands": [command.model_dump() for command in commands],
+    }
+
+
+@router.post("/edge-node/{node_id}/commands/{command_id}/ack")
+async def acknowledge_edge_node_command(
+    node_id: str,
+    command_id: str,
+    body: EdgeCommandAckRequest,
+    current_user=Depends(get_edge_node_or_user),
+):
+    """边缘节点回执命令执行结果。"""
+    service = get_raspberry_pi_edge_service()
+    command = await service.acknowledge_command(
+        node_id=node_id,
+        command_id=command_id,
+        status=body.status,
+        result=body.result,
+        last_error=body.last_error,
+    )
+    return {
+        "success": True,
+        "command": command.model_dump(),
+    }
+
+
 @router.post("/edge-node/{node_id}/rotate-secret")
 async def rotate_edge_node_secret(node_id: str, current_user: User = Depends(get_current_user)):
     """轮换边缘节点 device_secret。"""

@@ -2,6 +2,7 @@
 企业集成API端点测试
 Tests for Enterprise Integration API Endpoints
 """
+import asyncio
 import hashlib
 import os
 for _k, _v in {
@@ -602,6 +603,57 @@ class TestHardwareIntegrationAPI:
         assert data["bootstrap_token_configured"] is True
         assert data["credential_status"]["device_secret_active"] is True
         assert data["credential_status"]["pending_status_queue"] == 0
+
+    def test_edge_node_command_poll_and_ack(self):
+        service = RaspberryPiEdgeService()
+
+        with patch("src.api.hardware_integration.get_raspberry_pi_edge_service", return_value=service), \
+             patch("src.api.hardware_integration.settings.EDGE_BOOTSTRAP_TOKEN", "edge-bootstrap-token"):
+            register_response = client.post(
+                "/api/v1/hardware/edge-node/register",
+                params={
+                    "store_id": "STORE001",
+                    "device_name": "store001-rpi5",
+                    "ip_address": "192.168.1.50",
+                    "mac_address": "aa:bb:cc:dd:ee:56",
+                },
+                headers={"Authorization": "Bearer edge-bootstrap-token"},
+            )
+            register_data = register_response.json()
+            node_id = register_data["node"]["node_id"]
+            device_secret = register_data["device_secret"]
+
+            command = asyncio.run(
+                service.enqueue_command(
+                    node_id=node_id,
+                    command_type="voice_output",
+                    payload={"device_id": "shokz-1", "text": "催菜提醒", "priority": "high"},
+                )
+            )
+
+            poll_response = client.get(
+                f"/api/v1/hardware/edge-node/{node_id}/commands",
+                params={"limit": 10},
+                headers={"X-Edge-Node-Secret": device_secret},
+            )
+
+            assert poll_response.status_code == 200
+            commands = poll_response.json()["commands"]
+            assert len(commands) == 1
+            assert commands[0]["command_id"] == command.command_id
+            assert commands[0]["status"] == "in_progress"
+
+            ack_response = client.post(
+                f"/api/v1/hardware/edge-node/{node_id}/commands/{command.command_id}/ack",
+                json={
+                    "status": "completed",
+                    "result": {"success": True},
+                },
+                headers={"X-Edge-Node-Secret": device_secret},
+            )
+
+        assert ack_response.status_code == 200
+        assert ack_response.json()["command"]["status"] == "completed"
 
     def test_edge_node_store_list_includes_credential_summary(self):
         service = RaspberryPiEdgeService()

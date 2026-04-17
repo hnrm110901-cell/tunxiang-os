@@ -8,10 +8,22 @@ import uuid
 
 from sqlalchemy import Boolean, Column, Date
 from sqlalchemy import Enum as SAEnum
-from sqlalchemy import ForeignKey, Integer, Numeric, String, Text, UniqueConstraint
+from sqlalchemy import ForeignKey, Index, Integer, Numeric, String, Text, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSON, UUID
 
 from .base import Base, TimestampMixin
+
+
+# ── D12 合规：险种枚举 ─────────────────────────────────────────────
+class InsuranceType(str, enum.Enum):
+    """六险一金险种类型"""
+
+    PENSION = "pension"  # 养老
+    MEDICAL = "medical"  # 医疗
+    UNEMPLOYMENT = "unemployment"  # 失业
+    INJURY = "injury"  # 工伤
+    MATERNITY = "maternity"  # 生育
+    HOUSING_FUND = "housing_fund"  # 住房公积金
 
 
 class SocialInsuranceConfig(Base, TimestampMixin):
@@ -98,3 +110,69 @@ class EmployeeSocialInsurance(Base, TimestampMixin):
 
     def __repr__(self):
         return f"<EmployeeSocialInsurance(employee='{self.employee_id}', " f"base={self.personal_base_fen / 100:.0f}yuan)>"
+
+
+# ── D12 合规：月度缴费明细记账表 ─────────────────────────────────────
+class PayrollSIRecord(Base, TimestampMixin):
+    """
+    月度社保公积金缴费明细（每人每月每险种一行）。
+
+    用于：
+      - 社保/公积金审计（月底出具明细表）
+      - 财务做账（按险种科目归集企业缴费）
+      - 员工查询历史缴费记录
+    """
+
+    __tablename__ = "payroll_si_records"
+    __table_args__ = (
+        UniqueConstraint(
+            "employee_id", "pay_month", "insurance_type", name="uq_payroll_si_emp_month_type"
+        ),
+        Index("ix_payroll_si_store_month", "store_id", "pay_month"),
+    )
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    store_id = Column(String(50), nullable=False, index=True)
+    employee_id = Column(String(50), ForeignKey("employees.id"), nullable=False, index=True)
+    pay_month = Column(String(7), nullable=False, index=True)  # YYYY-MM
+
+    insurance_type = Column(
+        SAEnum(InsuranceType, name="insurance_type"),
+        nullable=False,
+    )
+
+    # 缴费基数（分），已应用上下限裁剪
+    base_fen = Column(Integer, nullable=False, default=0)
+
+    # 企业缴费（分）
+    employer_amount_fen = Column(Integer, nullable=False, default=0)
+    # 个人缴费（分）
+    employee_amount_fen = Column(Integer, nullable=False, default=0)
+
+    # 适用费率（%）— 审计溯源
+    employer_rate_pct = Column(Numeric(5, 2), nullable=True)
+    employee_rate_pct = Column(Numeric(5, 2), nullable=True)
+
+    # 参保城市 — 审计
+    region_code = Column(String(20), nullable=True)
+
+    remark = Column(Text, nullable=True)
+
+    def __repr__(self):
+        return (
+            f"<PayrollSIRecord(emp='{self.employee_id}', month='{self.pay_month}', "
+            f"type='{self.insurance_type}', employer={self.employer_amount_fen/100:.2f}, "
+            f"employee={self.employee_amount_fen/100:.2f})>"
+        )
+
+    @property
+    def employer_amount_yuan(self) -> float:
+        return round(self.employer_amount_fen / 100, 2)
+
+    @property
+    def employee_amount_yuan(self) -> float:
+        return round(self.employee_amount_fen / 100, 2)
+
+    @property
+    def base_yuan(self) -> float:
+        return round(self.base_fen / 100, 2)

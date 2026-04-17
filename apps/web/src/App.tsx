@@ -188,6 +188,7 @@ const CDPMonitorPage = lazy(() => import('./pages/CDPMonitorPage'));
 // 替换易订 — R1 客户自助预订H5 / R3 桌台平面图 / R4 AI邀请函
 const BookingH5 = lazy(() => import('./pages/public/BookingH5'));
 const BookingLookup = lazy(() => import('./pages/public/BookingLookup'));
+const ReceiptLookup = lazy(() => import('./pages/public/ReceiptLookup'));
 const FloorPlanPage = lazy(() => import('./pages/FloorPlanPage'));
 const InvitationView = lazy(() => import('./pages/public/InvitationView'));
 const InvitationManagerPage = lazy(() => import('./pages/InvitationManagerPage'));
@@ -197,6 +198,7 @@ const ReservationAnalyticsPage = lazy(() => import('./pages/ReservationAnalytics
 // Role-based views (Phase 1 — Store Manager /sm)
 const StoreManagerLayout = lazy(() => import('./layouts/StoreManagerLayout'));
 const SmHome      = lazy(() => import('./pages/sm/Home'));
+const SmManagementHub = lazy(() => import('./pages/sm/ManagementHub'));
 const SmShifts    = lazy(() => import('./pages/sm/Shifts'));
 const SmTasks     = lazy(() => import('./pages/sm/Tasks'));
 const SmBusiness  = lazy(() => import('./pages/sm/Business'));
@@ -289,6 +291,7 @@ const OrgStructurePage = lazy(() => import('./pages/hr/OrgStructurePage'));
 const ComplianceDashboard = lazy(() => import('./pages/hr/ComplianceDashboard'));
 const HRTrainingPage = lazy(() => import('./pages/hr/TrainingPage'));
 const TrainingDashboard = lazy(() => import('./pages/hr/TrainingDashboard'));
+const TrainingCoursesPage = lazy(() => import('./pages/hr/TrainingCourses'));
 const MentorshipPage = lazy(() => import('./pages/hr/MentorshipPage'));
 const HRMonthlyReportPage = lazy(() => import('./pages/hr/MonthlyReportPage'));
 const HRApprovalManagementPage = lazy(() => import('./pages/hr/ApprovalManagementPage'));
@@ -310,7 +313,23 @@ const FloorQueue      = lazy(() => import('./pages/floor/Queue'));
 const FloorReservations = lazy(() => import('./pages/floor/Reservations'));
 const FloorTables    = lazy(() => import('./pages/floor/Tables'));
 const FloorCheckout  = lazy(() => import('./pages/floor/Checkout'));
+const FloorCashier   = lazy(() => import('./pages/floor/Cashier'));
+const FloorManage    = lazy(() => import('./pages/floor/FloorManage'));
 const FloorKitchen   = lazy(() => import('./pages/floor/Kitchen'));
+const KdsDisplay     = lazy(() => import('./pages/kds/KdsDisplay'));
+const KdsDashboard   = lazy(() => import('./pages/kds/KdsDashboard'));
+// CRM 管理页
+const StoredValueCards = lazy(() => import('./pages/crm/StoredValueCards'));
+const PointsManagement = lazy(() => import('./pages/crm/PointsManagement'));
+const CreditAccountsPage = lazy(() => import('./pages/crm/CreditAccounts'));
+const WineStoragePage = lazy(() => import('./pages/crm/WineStorage'));
+const DepositsPage = lazy(() => import('./pages/crm/Deposits'));
+const KdsMobile = lazy(() => import('./pages/kds/KdsMobile'));
+// 楼面 — 快餐叫号大屏
+const FloorQueueBoard = lazy(() => import('./pages/floor/QueueBoard'));
+// 菜单管理页
+const LiveSeafoodPage  = lazy(() => import('./pages/menu/LiveSeafoodPage'));
+const ChannelMenuPage  = lazy(() => import('./pages/menu/ChannelMenuPage'));
 const HQLayout        = lazy(() => import('./layouts/HQLayout'));
 const HQHome          = lazy(() => import('./pages/hq/Home'));
 const HQStores        = lazy(() => import('./pages/hq/Stores'));
@@ -395,6 +414,9 @@ const AppContent: React.FC = () => {
                 <Route path="/book" element={<BookingH5 />} />
                 <Route path="/my-booking" element={<BookingLookup />} />
                 <Route path="/invitation/:token" element={<InvitationView />} />
+                {/* 电子小票H5公开查询 — D1-P3 */}
+                <Route path="/r/:code" element={<ReceiptLookup />} />
+                <Route path="/receipt" element={<ReceiptLookup />} />
                 <Route path="/mobile" element={
                   <ProtectedRoute>
                     <MobileApp />
@@ -934,6 +956,9 @@ const AppContent: React.FC = () => {
                   <Route path="training-dashboard" element={
                     <ProtectedRoute requiredRole="admin"><TrainingDashboard /></ProtectedRoute>
                   } />
+                  <Route path="hr/training/courses" element={
+                    <ProtectedRoute requiredRole="admin"><TrainingCoursesPage /></ProtectedRoute>
+                  } />
                   <Route path="mentorship" element={
                     <ProtectedRoute requiredRole="admin"><MentorshipPage /></ProtectedRoute>
                   } />
@@ -1050,6 +1075,7 @@ const AppContent: React.FC = () => {
                 }>
                   <Route index element={<SmHome />} />
                   <Route path="home"      element={<SmHome />} />
+                  <Route path="management" element={<SmManagementHub />} />
                   <Route path="shifts"    element={<SmShifts />} />
                   <Route path="tasks"     element={<SmTasks />} />
                   <Route path="business"  element={<SmBusiness />} />
@@ -1098,8 +1124,71 @@ const AppContent: React.FC = () => {
                   <Route path="queue"        element={<FloorQueue />} />
                   <Route path="reservations" element={<FloorReservations />} />
                   <Route path="checkout"     element={<FloorCheckout />} />
+                  <Route path="cashier"      element={<FloorCashier />} />
+                  <Route path="manage"       element={<FloorManage />} />
                   <Route path="kitchen"      element={<FloorKitchen />} />
                 </Route>
+
+                {/* KDS — 厨房显示屏（大屏 + 驾驶舱） */}
+                <Route path="/kds/display" element={
+                  <ProtectedRoute>
+                    <KdsDisplay />
+                  </ProtectedRoute>
+                } />
+                <Route path="/kds/dashboard" element={
+                  <ProtectedRoute>
+                    <KdsDashboard />
+                  </ProtectedRoute>
+                } />
+
+                {/* CRM 管理页 — 储值卡 / 积分 */}
+                <Route path="/crm/stored-value" element={
+                  <ProtectedRoute>
+                    <StoredValueCards />
+                  </ProtectedRoute>
+                } />
+                <Route path="/crm/points" element={
+                  <ProtectedRoute>
+                    <PointsManagement />
+                  </ProtectedRoute>
+                } />
+                <Route path="/crm/credit-accounts" element={
+                  <ProtectedRoute>
+                    <CreditAccountsPage />
+                  </ProtectedRoute>
+                } />
+                <Route path="/floor/queue-board" element={
+                  <ProtectedRoute>
+                    <FloorQueueBoard />
+                  </ProtectedRoute>
+                } />
+                <Route path="/crm/wine-storage" element={
+                  <ProtectedRoute>
+                    <WineStoragePage />
+                  </ProtectedRoute>
+                } />
+                <Route path="/crm/deposits" element={
+                  <ProtectedRoute>
+                    <DepositsPage />
+                  </ProtectedRoute>
+                } />
+                <Route path="/kds/mobile" element={
+                  <ProtectedRoute>
+                    <KdsMobile />
+                  </ProtectedRoute>
+                } />
+
+                {/* 菜单管理页 — 活鲜称重 / 渠道菜单 */}
+                <Route path="/menu/live-seafood" element={
+                  <ProtectedRoute>
+                    <LiveSeafoodPage />
+                  </ProtectedRoute>
+                } />
+                <Route path="/menu/channel-menu" element={
+                  <ProtectedRoute>
+                    <ChannelMenuPage />
+                  </ProtectedRoute>
+                } />
 
                 {/* ── Level 3: 商户经营决策中心 /hq (桌面) ── */}
                 <Route path="/hq" element={
