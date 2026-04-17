@@ -775,3 +775,7 @@ from .goods_receipt import GoodsReceipt, GoodsReceiptItem, QCStatus, ReceiptStat
 # D10 多打卡方式 + 换班审批 Should-Fix P1
 from .attendance_punch import AttendancePunch, PunchDirection, PunchMethod
 from .shift_swap import ShiftSwapRequest, ShiftSwapStatus
+
+# D5 跨店权限边界 + D7 月结/年结 Nice-to-Have
+from .user_store_scope import UserStoreScope
+from .month_close import MonthCloseLog, TrialBalanceSnapshot

@@ -21,29 +21,39 @@ sys.modules.setdefault("src.core.config", MagicMock(settings=MagicMock()))
 
 import pytest  # noqa: E402
 
+from src.models.schedule import Shift  # noqa: E402
 from src.models.shift_swap import ShiftSwapRequest, ShiftSwapStatus  # noqa: E402
 from src.services.shift_swap_service import ShiftSwapService  # noqa: E402
 
 
 class FakeShift:
+    """走位 Shift 实例（只保留 service 用到的字段），测试中按 Shift 类名登记到 FakeDB。"""
+
     def __init__(self, id, employee_id):
         self.id = id
         self.employee_id = employee_id
 
 
 class FakeDB:
-    """最小 async db mock，只覆盖本 service 使用的方法"""
+    """最小 async db mock，只覆盖本 service 使用的方法。
+
+    关键修复点：
+      - service 里 `db.get(Shift, ...)` / `db.get(ShiftSwapRequest, ...)` 两个 model 名不同，
+        需按 *传入的 model 类* 查；FakeShift 以 Shift 类名登记，避免类名不匹配导致 get 返回 None。
+      - `execute` 默认返回空，request_swap 的 pending 查重走这里，返回 None 代表无重复。
+    """
 
     def __init__(self):
-        self.store = {}
-        self.added = []
+        self.store: dict = {}
+        self.added: list = []
         self.committed = False
 
     async def get(self, model, pk):
         return self.store.get((model.__name__, str(pk)))
 
-    def put(self, obj):
-        self.store[(obj.__class__.__name__, str(obj.id))] = obj
+    def put(self, obj, as_model=None):
+        cls_name = as_model.__name__ if as_model else obj.__class__.__name__
+        self.store[(cls_name, str(obj.id))] = obj
 
     def add(self, obj):
         self.added.append(obj)
@@ -78,8 +88,9 @@ def db():
 def shifts(db):
     s1 = FakeShift(uuid.uuid4(), "E001")
     s2 = FakeShift(uuid.uuid4(), "E002")
-    db.put(s1)
-    db.put(s2)
+    # 以 Shift 类名登记，确保 service 里的 db.get(Shift, ...) 能命中
+    db.put(s1, as_model=Shift)
+    db.put(s2, as_model=Shift)
     return s1, s2
 
 

@@ -1003,6 +1003,11 @@ from src.api import bff_coupon
 
 app.include_router(bff_coupon.router, tags=["BFF-发券"])
 
+# BFF 考试中心（HR 培训：pending / in_progress / completed 三列聚合）
+from src.api import bff_exam_center
+
+app.include_router(bff_exam_center.router, tags=["BFF-考试中心"])
+
 # 统一门店健康指数 — Single Source of Truth（替代分散的 4 套健康分引擎）
 from src.api import store_health_index
 app.include_router(store_health_index.router, tags=["store_health_index"])
@@ -1184,6 +1189,10 @@ app.include_router(training_course.router, prefix="/api/v1", tags=["hr-training-
 # D11 Should-Fix P1 — 考试题库/试卷/证书
 from src.api import exam as hr_exam  # noqa: E402
 app.include_router(hr_exam.router, prefix="/api/v1", tags=["hr-exam"])
+# D11 Nice-to-Have — 证书 PDF + 二维码 + 公开验证
+from src.api import certificate_public  # noqa: E402
+app.include_router(certificate_public.router, prefix="/api/v1", tags=["hr-cert-pdf"])
+app.include_router(certificate_public.public_router, tags=["public-cert-verify"])
 # Month 3 (P1+P2) — 供应商B2B / 大众点评 / 银行对账
 app.include_router(supplier_b2b.router, prefix="/api/v1", tags=["supplier-b2b"])
 app.include_router(dianping.router, prefix="/api/v1", tags=["dianping"])
@@ -1211,6 +1220,10 @@ app.include_router(_purchase_approval.router, prefix="/api/v1", tags=["purchase-
 app.include_router(_goods_receipt.router, prefix="/api/v1", tags=["goods-receipt"])
 app.include_router(_attendance_punch.router, prefix="/api/v1", tags=["attendance-punch"])
 app.include_router(_shift_swap.router, prefix="/api/v1", tags=["shift-swap"])
+
+# D7 Nice-to-Have — 月结/年结流程
+from src.api import month_close as _month_close  # noqa: E402
+app.include_router(_month_close.router, tags=["month-close"])
 
 # 业财税资金一体化（FCT）
 if getattr(settings, "FCT_ENABLED", False):

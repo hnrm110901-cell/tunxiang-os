@@ -514,13 +514,22 @@ class ExamService:
             cert_no=cert_no,
             issued_at=now,
             expire_at=expire_at,
-            pdf_url=None,  # Should-Fix P1 先不生成 PDF
+            pdf_url=None,
             status="active",
         )
         session.add(cert)
         await session.flush()
         logger.info("exam.cert.issued", cert_no=cert_no, employee_id=employee_id)
-        return {"id": str(cert.id), "cert_no": cert_no, "renewed": False, "expire_at": expire_at.isoformat()}
+
+        # D11 Nice-to-Have：发证后异步生成 PDF（失败容错，不影响发证）
+        try:
+            from .certificate_pdf_service import generate_certificate_pdf
+
+            await generate_certificate_pdf(session, str(cert.id), write_pdf_url=True)
+        except Exception as e:  # pragma: no cover
+            logger.warning("cert.pdf.post_issue.failed", cert_no=cert_no, error=str(e))
+
+        return {"id": str(cert.id), "cert_no": cert_no, "renewed": False, "expire_at": expire_at.isoformat(), "pdf_url": cert.pdf_url}
 
     @staticmethod
     async def list_my_certificates(session: AsyncSession, employee_id: str) -> List[Dict[str, Any]]:

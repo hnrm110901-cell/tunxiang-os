@@ -72,6 +72,133 @@ async def _safe(coro, default=None):
         return default
 
 
+# ── GET /api/v1/bff/ops ───────────────────────────────────────────────────────
+
+
+@router.get("/ops", summary="运维控制台聚合数据")
+async def ops_bff(
+    refresh: bool = Query(default=False, description="强制刷新缓存"),
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    运维控制台首屏聚合：
+    - edge_summary: EdgeHub 总览（Hub在线数/设备在线率/今日告警）
+    - pipeline_status: 数据管道同步状态（各门店最近同步时间）
+    - agent_okr: Agent OKR 摘要（采纳率/预测误差/响应时效）
+    - open_alerts: 最新 10 条开放告警
+    """
+    cache_key = "bff:ops:dashboard"
+    if not refresh:
+        cached = await _cache_get(cache_key)
+        if cached:
+            return {**cached, "_from_cache": True}
+
+    edge_summary, pipeline_status, agent_okr, open_alerts = await asyncio.gather(
+        _safe(_fetch_ops_edge_summary(db), default=None),
+        _safe(_fetch_ops_pipeline_status(db), default=[]),
+        _safe(_fetch_ops_agent_okr(db), default=None),
+        _safe(_fetch_ops_open_alerts(db), default=[]),
+    )
+
+    payload = {
+        "as_of": datetime.utcnow().isoformat(),
+        "edge_summary": edge_summary,
+        "pipeline_status": pipeline_status,
+        "agent_okr": agent_okr,
+        "open_alerts": open_alerts,
+    }
+    await _cache_set(cache_key, payload)
+    return {**payload, "_from_cache": False}
+
+
+async def _fetch_ops_edge_summary(db: AsyncSession) -> Dict:
+    from sqlalchemy import select, func
+    from src.models.edge_hub import EdgeHub, EdgeDevice, EdgeAlert, HubStatus, DeviceStatus, AlertStatus
+
+    total_hubs = (await db.execute(select(func.count(EdgeHub.id)))).scalar_one()
+    online_hubs = (await db.execute(
+        select(func.count(EdgeHub.id)).where(EdgeHub.status == HubStatus.ONLINE)
+    )).scalar_one()
+    total_devices = (await db.execute(select(func.count(EdgeDevice.id)))).scalar_one()
+    online_devices = (await db.execute(
+        select(func.count(EdgeDevice.id)).where(EdgeDevice.status == DeviceStatus.ONLINE)
+    )).scalar_one()
+    since = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+    today_alerts = (await db.execute(
+        select(func.count(EdgeAlert.id)).where(EdgeAlert.created_at >= since)
+    )).scalar_one()
+    open_count = (await db.execute(
+        select(func.count(EdgeAlert.id)).where(EdgeAlert.status == AlertStatus.OPEN)
+    )).scalar_one()
+
+    hub_rate = round(online_hubs / total_hubs * 100, 1) if total_hubs else 0.0
+    device_rate = round(online_devices / total_devices * 100, 1) if total_devices else 0.0
+    return {
+        "total_hubs": total_hubs,
+        "online_hubs": online_hubs,
+        "hub_online_rate": hub_rate,
+        "total_devices": total_devices,
+        "online_devices": online_devices,
+        "device_online_rate": device_rate,
+        "today_alerts": today_alerts,
+        "open_alerts": open_count,
+        "status": "normal" if hub_rate >= 95 and device_rate >= 90 else "warning" if hub_rate >= 80 else "critical",
+    }
+
+
+async def _fetch_ops_pipeline_status(db: AsyncSession) -> List[Dict]:
+    from sqlalchemy import select, func
+    from src.models.integration import SyncLog
+
+    rows = (await db.execute(
+        select(
+            SyncLog.store_id,
+            func.max(SyncLog.completed_at).label("last_sync"),
+            func.count(SyncLog.id).label("today_count"),
+        )
+        .where(SyncLog.completed_at >= datetime.utcnow().replace(hour=0, minute=0, second=0))
+        .group_by(SyncLog.store_id)
+        .order_by(func.max(SyncLog.completed_at).desc())
+        .limit(20)
+    )).all()
+    return [
+        {
+            "store_id": r[0],
+            "last_sync": r[1].isoformat() if r[1] else None,
+            "today_syncs": r[2],
+        }
+        for r in rows
+    ]
+
+
+async def _fetch_ops_agent_okr(db: AsyncSession) -> Dict:
+    from src.services.agent_okr_service import AgentOKRService
+    return await AgentOKRService.get_summary(db=db)
+
+
+async def _fetch_ops_open_alerts(db: AsyncSession) -> List[Dict]:
+    from sqlalchemy import select
+    from src.models.edge_hub import EdgeAlert, AlertStatus
+
+    rows = (await db.execute(
+        select(EdgeAlert)
+        .where(EdgeAlert.status == AlertStatus.OPEN)
+        .order_by(EdgeAlert.created_at.desc())
+        .limit(10)
+    )).scalars().all()
+    return [
+        {
+            "id": str(r.id),
+            "store_id": r.store_id,
+            "level": r.level,
+            "message": r.message,
+            "created_at": r.created_at.isoformat() if r.created_at else None,
+        }
+        for r in rows
+    ]
+
+
 # ── GET /api/v1/bff/sm/{store_id} ─────────────────────────────────────────────
 
 
@@ -1314,6 +1441,102 @@ async def hr_bff(
         "pending_leaves": overview.get("pending_leave_requests", 0) if overview else 0,
         "active_jobs": overview.get("active_job_postings", 0) if overview else 0,
         "recent_changes": changes,
+    }
+    await _cache_set(cache_key, payload)
+    return {**payload, "_from_cache": False}
+
+
+# ── GET /api/v1/bff/hr/certificates/overview/{store_id} ─────────────────────
+# D11 Nice-to-Have：培训证书合规聚合（用于 ManagementHub 人事合规板块）
+
+
+@router.get("/hr/certificates/overview/{store_id}", summary="培训证书合规聚合")
+async def hr_certificates_overview(
+    store_id: str,
+    refresh: bool = Query(default=False, description="强制刷新缓存"),
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """证书合规总览：总数 / 30 天到期 / 已过期 / 按课程分布。"""
+    from sqlalchemy import text as _text
+
+    cache_key = f"bff:hr:certs:overview:{store_id}"
+    if not refresh:
+        cached = await _cache_get(cache_key)
+        if cached:
+            return {**cached, "_from_cache": True}
+
+    now = datetime.utcnow()
+    cutoff = now + timedelta(days=30)
+
+    # 该门店员工范围
+    emp_res = await db.execute(
+        _text("SELECT id FROM employees WHERE store_id = :sid AND is_active = true"),
+        {"sid": store_id},
+    )
+    emp_ids = [r[0] for r in emp_res.all()]
+
+    if not emp_ids:
+        payload = {
+            "store_id": store_id,
+            "as_of": now.isoformat(),
+            "total": 0,
+            "expiring_30d": 0,
+            "expired": 0,
+            "by_course": [],
+        }
+        await _cache_set(cache_key, payload)
+        return {**payload, "_from_cache": False}
+
+    # 总数 / 即将到期 / 已过期
+    stats_res = await db.execute(
+        _text(
+            """
+            SELECT
+                COUNT(*) AS total,
+                COUNT(*) FILTER (
+                    WHERE status = 'active' AND expire_at IS NOT NULL
+                      AND expire_at > :now AND expire_at <= :cutoff
+                ) AS expiring_30d,
+                COUNT(*) FILTER (
+                    WHERE expire_at IS NOT NULL AND expire_at <= :now
+                ) AS expired
+            FROM exam_certificates
+            WHERE employee_id = ANY(:emp_ids)
+            """
+        ),
+        {"now": now, "cutoff": cutoff, "emp_ids": emp_ids},
+    )
+    row = stats_res.mappings().first() or {}
+
+    # 按课程分布
+    by_course_res = await db.execute(
+        _text(
+            """
+            SELECT ec.course_id, COALESCE(tc.title, '未知课程') AS course_title,
+                   COUNT(*) AS cnt
+            FROM exam_certificates ec
+            LEFT JOIN training_courses tc ON tc.id = ec.course_id
+            WHERE ec.employee_id = ANY(:emp_ids)
+            GROUP BY ec.course_id, tc.title
+            ORDER BY cnt DESC
+            LIMIT 20
+            """
+        ),
+        {"emp_ids": emp_ids},
+    )
+    by_course = [
+        {"course_id": str(r["course_id"]), "course_title": r["course_title"], "count": int(r["cnt"])}
+        for r in by_course_res.mappings().all()
+    ]
+
+    payload = {
+        "store_id": store_id,
+        "as_of": now.isoformat(),
+        "total": int(row.get("total", 0) or 0),
+        "expiring_30d": int(row.get("expiring_30d", 0) or 0),
+        "expired": int(row.get("expired", 0) or 0),
+        "by_course": by_course,
     }
     await _cache_set(cache_key, payload)
     return {**payload, "_from_cache": False}

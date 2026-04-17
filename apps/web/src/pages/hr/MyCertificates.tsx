@@ -1,9 +1,9 @@
 /**
- * 我的证书 — D11 Should-Fix P1
+ * 我的证书 — D11 Should-Fix P1 + Nice-to-Have（PDF 下载 / 二维码预览）
  * 路由：/hr/my-certificates
  */
 import React, { useEffect, useState } from 'react';
-import { Card, Row, Col, Tag, Empty, Input, Space, Button } from 'antd';
+import { Card, Row, Col, Tag, Empty, Input, Space, Button, Modal, message } from 'antd';
 import apiClient from '../../services/api';
 
 interface Cert {
@@ -22,6 +22,7 @@ export default function MyCertificates() {
   const [employeeId, setEmployeeId] = useState<string>(localStorage.getItem('employee_id') || 'E001');
   const [certs, setCerts] = useState<Cert[]>([]);
   const [loading, setLoading] = useState(false);
+  const [qrModal, setQrModal] = useState<{ open: boolean; cert?: Cert }>({ open: false });
 
   const load = async () => {
     if (!employeeId) return;
@@ -42,8 +43,30 @@ export default function MyCertificates() {
 
   const levelColor = (lv: string) => (lv === 'red' ? '#ff4d4f' : lv === 'yellow' ? '#faad14' : '#52c41a');
 
-  // 简单的"二维码"占位：证书编号的验证链接
-  const verifyUrl = (certNo: string) => `${window.location.origin}/verify?cert=${certNo}`;
+  // 公开验证页地址
+  const verifyUrl = (certNo: string) => `${window.location.origin}/public/cert/verify/${certNo}`;
+
+  // 下载 PDF（走需登录端点，通过 apiClient 带 token）
+  const handleDownloadPdf = async (cert: Cert) => {
+    try {
+      const resp = await apiClient.get(`/api/v1/hr/training/exam/certificates/${cert.id}/pdf`, {
+        responseType: 'blob',
+      });
+      const blob = new Blob([resp.data], { type: 'application/pdf' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${cert.cert_no}.pdf`;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      message.error('PDF 下载失败');
+    }
+  };
+
+  // 二维码图片 URL（走 apiClient baseURL）
+  const qrImgSrc = (cert: Cert) =>
+    `${apiClient.defaults.baseURL || ''}/api/v1/hr/training/exam/certificates/${cert.id}/qrcode.png?size=320`;
 
   return (
     <div style={{ padding: 16 }}>
@@ -84,21 +107,45 @@ export default function MyCertificates() {
                     </Tag>
                   )}
                 </p>
-                <div style={{ marginTop: 12, fontSize: 12, color: '#666' }}>
-                  <a href={verifyUrl(c.cert_no)} target="_blank" rel="noreferrer">
-                    扫码验证 / 复制验证链接
-                  </a>
-                </div>
-                {c.pdf_url && (
-                  <Button type="link" href={c.pdf_url} target="_blank" style={{ padding: 0 }}>
+                <Space style={{ marginTop: 8 }} wrap>
+                  <Button size="small" type="primary" onClick={() => handleDownloadPdf(c)}>
                     下载 PDF
                   </Button>
-                )}
+                  <Button size="small" onClick={() => setQrModal({ open: true, cert: c })}>
+                    查看二维码
+                  </Button>
+                  <a href={verifyUrl(c.cert_no)} target="_blank" rel="noreferrer" style={{ fontSize: 12 }}>
+                    验证链接
+                  </a>
+                </Space>
               </Card>
             </Col>
           ))}
         </Row>
       )}
+
+      <Modal
+        open={qrModal.open}
+        title={qrModal.cert ? `证书二维码 · ${qrModal.cert.cert_no}` : '证书二维码'}
+        onCancel={() => setQrModal({ open: false })}
+        footer={null}
+        centered
+        width={400}
+      >
+        {qrModal.cert && (
+          <div style={{ textAlign: 'center' }}>
+            <img
+              src={qrImgSrc(qrModal.cert)}
+              alt="证书二维码"
+              style={{ width: 320, height: 320, objectFit: 'contain' }}
+            />
+            <p style={{ marginTop: 12, color: '#666' }}>微信扫一扫验证</p>
+            <p style={{ fontSize: 12, color: '#999', wordBreak: 'break-all' }}>
+              {verifyUrl(qrModal.cert.cert_no)}
+            </p>
+          </div>
+        )}
+      </Modal>
     </div>
   );
 }

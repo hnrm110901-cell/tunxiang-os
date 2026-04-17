@@ -81,3 +81,7 @@ tenacity==8.2.3
 python-escpos>=3.1
 pyusb>=1.2           # USB 打印机
 pyserial>=3.5        # 串口打印机
+
+# D11 培训证书 PDF + 二维码
+reportlab>=4.0.0
+qrcode[pil]>=7.4.0

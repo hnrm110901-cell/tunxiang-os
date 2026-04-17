@@ -191,6 +191,7 @@ const BookingLookup = lazy(() => import('./pages/public/BookingLookup'));
 const ReceiptLookup = lazy(() => import('./pages/public/ReceiptLookup'));
 const FloorPlanPage = lazy(() => import('./pages/FloorPlanPage'));
 const InvitationView = lazy(() => import('./pages/public/InvitationView'));
+const CertVerify = lazy(() => import('./pages/public/CertVerify'));
 const InvitationManagerPage = lazy(() => import('./pages/InvitationManagerPage'));
 // 预订数据分析仪表板
 const ReservationAnalyticsPage = lazy(() => import('./pages/ReservationAnalyticsPage'));
@@ -420,6 +421,8 @@ const AppContent: React.FC = () => {
                 {/* 电子小票H5公开查询 — D1-P3 */}
                 <Route path="/r/:code" element={<ReceiptLookup />} />
                 <Route path="/receipt" element={<ReceiptLookup />} />
+                {/* 证书公开验证（D11 Nice-to-Have）— 无需登录，扫码直达 */}
+                <Route path="/public/cert/verify/:certNo" element={<CertVerify />} />
                 <Route path="/mobile" element={
                   <ProtectedRoute>
                     <MobileApp />

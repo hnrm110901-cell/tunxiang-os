@@ -147,9 +147,12 @@ class TestSubmitAttempt:
         attempt.employee_id = "E001"
 
         course_id = _u.uuid4()
-        q1 = _mock_question("q1", "single", "A", 50)
-        q2 = _mock_question("q2", "judge", True, 50)
-        paper = _mock_paper(attempt.paper_id, course_id, ["q1", "q2"], pass_score=60)
+        # UUID 统一走 str(uuid4()) —— service 内部 uuid.UUID(qid) 需要合法十六进制 UUID 串
+        q1_id = str(_u.uuid4())
+        q2_id = str(_u.uuid4())
+        q1 = _mock_question(q1_id, "single", "A", 50)
+        q2 = _mock_question(q2_id, "judge", True, 50)
+        paper = _mock_paper(attempt.paper_id, course_id, [q1_id, q2_id], pass_score=60)
 
         session = MagicMock()
         # 1) attempt 查询  2) paper 查询  3) questions 查询
@@ -168,7 +171,7 @@ class TestSubmitAttempt:
         out = await ExamService.submit_attempt(
             session,
             str(attempt.id),
-            {"q1": "A", "q2": True},
+            {q1_id: "A", q2_id: True},
         )
         assert out["passed"] is True
         assert out["score"] == 100
@@ -187,9 +190,11 @@ class TestSubmitAttempt:
         attempt.answers = {}
         attempt.employee_id = "E002"
 
-        q1 = _mock_question("q1", "single", "A", 50)
-        q2 = _mock_question("q2", "single", "B", 50)
-        paper = _mock_paper(attempt.paper_id, _u.uuid4(), ["q1", "q2"], pass_score=60)
+        q1_id = str(_u.uuid4())
+        q2_id = str(_u.uuid4())
+        q1 = _mock_question(q1_id, "single", "A", 50)
+        q2 = _mock_question(q2_id, "single", "B", 50)
+        paper = _mock_paper(attempt.paper_id, _u.uuid4(), [q1_id, q2_id], pass_score=60)
 
         session = MagicMock()
         session.execute = _ResultQueue(
@@ -198,7 +203,7 @@ class TestSubmitAttempt:
         session.add = MagicMock()
         session.flush = AsyncMock()
 
-        out = await ExamService.submit_attempt(session, str(attempt.id), {"q1": "A", "q2": "C"})
+        out = await ExamService.submit_attempt(session, str(attempt.id), {q1_id: "A", q2_id: "C"})
         assert out["passed"] is False
         assert out["score"] == 50
         assert out["certificate"] is None
@@ -214,9 +219,11 @@ class TestSubmitAttempt:
         attempt.answers = {}
         attempt.employee_id = "E003"
 
-        q1 = _mock_question("q1", "single", "A", 40)
-        q2 = _mock_question("q2", "essay", None, 60)
-        paper = _mock_paper(attempt.paper_id, _u.uuid4(), ["q1", "q2"], pass_score=60)
+        q1_id = str(_u.uuid4())
+        q2_id = str(_u.uuid4())
+        q1 = _mock_question(q1_id, "single", "A", 40)
+        q2 = _mock_question(q2_id, "essay", None, 60)
+        paper = _mock_paper(attempt.paper_id, _u.uuid4(), [q1_id, q2_id], pass_score=60)
 
         session = MagicMock()
         session.execute = _ResultQueue(
@@ -225,13 +232,13 @@ class TestSubmitAttempt:
         session.add = MagicMock()
         session.flush = AsyncMock()
 
-        out = await ExamService.submit_attempt(session, str(attempt.id), {"q1": "A", "q2": "答题内容"})
+        out = await ExamService.submit_attempt(session, str(attempt.id), {q1_id: "A", q2_id: "答题内容"})
         assert out["status"] == "submitted"  # 未判卷完
         assert out["has_pending_essay"] is True
         assert out["certificate"] is None
         # per_item 的 essay 项 pending_review=True
         per = attempt.answers["per_item"]
-        assert per["q2"]["pending_review"] is True
+        assert per[q2_id]["pending_review"] is True
 
 
 @pytest.mark.asyncio
