@@ -38,6 +38,12 @@ class Settings(BaseSettings):
     LLM_MAX_TOKENS: int = 2000
     LLM_ENABLED: bool = True  # 是否启用LLM（默认启用DeepSeek）
 
+    # LLM 网关降级链（D6 Should-Fix P1）
+    # priority 顺序决定 fallback 尝试顺序，任一成功即返回
+    LLM_PROVIDER_PRIORITY: str = "claude,deepseek,openai"
+    LLM_FALLBACK_ENABLED: bool = True
+    LLM_TIMEOUT_SEC: float = 5.0
+
     # Legacy OpenAI config (for backward compatibility)
     OPENAI_API_KEY: str = ""
     OPENAI_API_BASE: str = "https://api.openai.com/v1"
@@ -179,6 +185,30 @@ class Settings(BaseSettings):
         "Accept",
         "Accept-Language",
     ]
+
+    # ─────────────────────────────────────────────────────────────
+    # 支付网关配置 (真对接)
+    # ─────────────────────────────────────────────────────────────
+    # 微信支付 v3
+    WECHAT_MCHID: str = ""
+    WECHAT_APPID: str = ""
+    WECHAT_CERT_SERIAL_NO: str = ""
+    WECHAT_PRIVATE_KEY: str = ""  # PEM 私钥内容（字符串）
+    WECHAT_APIV3_KEY: str = ""
+    WECHAT_CERT_DIR: str = "/app/certs/wechat"
+    # 支付宝开放平台
+    ALIPAY_APPID: str = ""
+    ALIPAY_PRIVATE_KEY: str = ""
+    ALIPAY_PUBLIC_KEY: str = ""
+    # 对外可达的服务基地址（用于回调通知 URL 拼接）
+    SERVICE_BASE_URL: str = "http://localhost:8000"
+
+    # 电子发票配置
+    EINVOICE_PLATFORM: str = "baiwang"  # baiwang | aisino | nuonuo | leqi
+    BAIWANG_APPID: str = ""
+    BAIWANG_APPSECRET: str = ""
+    BAIWANG_CERT_PATH: str = "/app/certs/baiwang"
+    BAIWANG_API_BASE: str = "https://open.baiwang.com"
 
     # 业财税资金一体化扩展（FCT）
     FCT_ENABLED: bool = True

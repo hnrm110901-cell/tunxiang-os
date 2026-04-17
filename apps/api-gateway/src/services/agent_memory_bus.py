@@ -188,6 +188,158 @@ class AgentMemoryBus:
         except Exception:
             return 0
 
+    # ─────────────────────────────────────────────────────────────────────
+    # D6 Should-Fix P1: 三级持久化记忆
+    #   hot(Redis, TTL 1h) → warm(PostgreSQL, 7天) → cold(归档，永久)
+    # ─────────────────────────────────────────────────────────────────────
+
+    HOT_TTL_SEC = 3600  # hot 层 TTL 1 小时
+    WARM_DAYS = 7  # warm 层保留 7 天
+
+    def _mem_key(self, agent_id: str, session_id: str, key: str) -> str:
+        """hot 层 Redis key 规范：agent:mem:{agent_id}:{session_id}:{key}"""
+        return f"agent:mem:{agent_id}:{session_id}:{key}"
+
+    async def save_memory(
+        self,
+        agent_id: str,
+        session_id: str,
+        key: str,
+        value: Any,
+        level: str = "hot",
+    ) -> bool:
+        """
+        保存记忆到指定层级
+
+        Args:
+            level: 'hot' (Redis TTL 1h) | 'warm' (PG 7d) | 'cold' (PG 永久)
+        """
+        try:
+            if level == "hot":
+                r = await self._get_redis()
+                redis_key = self._mem_key(agent_id, session_id, key)
+                await r.set(redis_key, json.dumps(value, ensure_ascii=False), ex=self.HOT_TTL_SEC)
+                return True
+
+            # warm / cold 写 PG
+            from datetime import timedelta
+
+            from sqlalchemy import select
+            from sqlalchemy.dialects.postgresql import insert
+
+            from ..core.database import async_session_maker
+            from ..models.agent_memory import AgentMemory
+
+            expires_at = None
+            if level == "warm":
+                expires_at = now_utc() + timedelta(days=self.WARM_DAYS)
+
+            async with async_session_maker() as session:
+                # upsert on (agent_id, session_id, key)
+                stmt = insert(AgentMemory).values(
+                    agent_id=agent_id,
+                    session_id=session_id,
+                    key=key,
+                    value_json=value,
+                    level=level,
+                    expires_at=expires_at,
+                )
+                stmt = stmt.on_conflict_do_update(
+                    constraint="uq_agent_memory_key",
+                    set_={
+                        "value_json": value,
+                        "level": level,
+                        "expires_at": expires_at,
+                        "updated_at": now_utc(),
+                    },
+                )
+                await session.execute(stmt)
+                await session.commit()
+            return True
+
+        except Exception as e:
+            logger.warning("agent_memory_save_failed", agent_id=agent_id, key=key, error=str(e))
+            return False
+
+    async def load_memory(
+        self,
+        agent_id: str,
+        session_id: str,
+        key: str,
+    ) -> Optional[Any]:
+        """
+        读取记忆。hot 未命中自动 promote warm→hot
+        """
+        # 1) hot
+        try:
+            r = await self._get_redis()
+            raw = await r.get(self._mem_key(agent_id, session_id, key))
+            if raw:
+                return json.loads(raw)
+        except Exception as e:
+            logger.debug("agent_memory_hot_miss", error=str(e))
+
+        # 2) warm / cold — 读 PG
+        try:
+            from sqlalchemy import select
+
+            from ..core.database import async_session_maker
+            from ..models.agent_memory import AgentMemory
+
+            async with async_session_maker() as session:
+                result = await session.execute(
+                    select(AgentMemory).where(
+                        AgentMemory.agent_id == agent_id,
+                        AgentMemory.session_id == session_id,
+                        AgentMemory.key == key,
+                    )
+                )
+                row = result.scalar_one_or_none()
+                if row is None:
+                    return None
+                # promote warm→hot（cold 也 promote，让高频访问自动暖）
+                try:
+                    r = await self._get_redis()
+                    await r.set(
+                        self._mem_key(agent_id, session_id, key),
+                        json.dumps(row.value_json, ensure_ascii=False),
+                        ex=self.HOT_TTL_SEC,
+                    )
+                except Exception:
+                    pass
+                return row.value_json
+
+        except Exception as e:
+            logger.warning("agent_memory_load_failed", agent_id=agent_id, key=key, error=str(e))
+            return None
+
+    async def evict_expired(self) -> int:
+        """
+        降级 warm 层已过期记忆到 cold（level='cold', expires_at=NULL）
+        返回降级条数。
+        """
+        try:
+            from sqlalchemy import update
+
+            from ..core.database import async_session_maker
+            from ..models.agent_memory import AgentMemory
+
+            async with async_session_maker() as session:
+                result = await session.execute(
+                    update(AgentMemory)
+                    .where(
+                        AgentMemory.level == "warm",
+                        AgentMemory.expires_at.isnot(None),
+                        AgentMemory.expires_at < now_utc(),
+                    )
+                    .values(level="cold", expires_at=None)
+                )
+                await session.commit()
+                return result.rowcount or 0
+        except Exception as e:
+            logger.warning("agent_memory_evict_failed", error=str(e))
+            return 0
+
 
 # Singleton
 agent_memory_bus = AgentMemoryBus()

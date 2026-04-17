@@ -85,6 +85,8 @@ const SECTIONS: Section[] = [
     tag: 'D9/D11',
     tiles: [
       { name: '培训课程', desc: '课程/课件/报名/进度', icon: '🎓', to: '/hr/training/courses', isNew: true },
+      { name: '考试中心', desc: '题库/试卷/答题/判卷', icon: '📝', to: '/hr/exam-center', isNew: true },
+      { name: '我的证书', desc: '证书列表/到期提醒', icon: '🏅', to: '/hr/my-certificates', isNew: true },
       { name: '健康证扫描', desc: '30/15/7/1天分级预警', icon: '🩺', to: '/compliance', isNew: true },
       { name: '劳动合同', desc: '60/30/15天到期预警', icon: '📝', to: '/contract-management', isNew: true },
     ],

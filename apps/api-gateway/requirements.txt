@@ -23,6 +23,8 @@ langgraph==0.0.20
 llama-index==0.9.48
 # Anthropic Claude SDK — Tool Use + 流式输出
 anthropic>=0.40.0
+# OpenAI SDK — D6 LLM Gateway 兜底 provider + DeepSeek（OpenAI 兼容）
+openai>=1.40.0
 
 # Vector Database & Embeddings
 qdrant-client==1.7.3
@@ -74,3 +76,8 @@ mypy==1.8.0
 # Utilities
 python-dotenv==1.0.0
 tenacity==8.2.3
+
+# Hardware — 热敏打印机驱动 (ESC/POS)
+python-escpos>=3.1
+pyusb>=1.2           # USB 打印机
+pyserial>=3.5        # 串口打印机

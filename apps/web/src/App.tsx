@@ -292,6 +292,9 @@ const ComplianceDashboard = lazy(() => import('./pages/hr/ComplianceDashboard'))
 const HRTrainingPage = lazy(() => import('./pages/hr/TrainingPage'));
 const TrainingDashboard = lazy(() => import('./pages/hr/TrainingDashboard'));
 const TrainingCoursesPage = lazy(() => import('./pages/hr/TrainingCourses'));
+const ExamCenterPage = lazy(() => import('./pages/hr/ExamCenter'));
+const ExamTakePage = lazy(() => import('./pages/hr/ExamTake'));
+const MyCertificatesPage = lazy(() => import('./pages/hr/MyCertificates'));
 const MentorshipPage = lazy(() => import('./pages/hr/MentorshipPage'));
 const HRMonthlyReportPage = lazy(() => import('./pages/hr/MonthlyReportPage'));
 const HRApprovalManagementPage = lazy(() => import('./pages/hr/ApprovalManagementPage'));
@@ -958,6 +961,15 @@ const AppContent: React.FC = () => {
                   } />
                   <Route path="hr/training/courses" element={
                     <ProtectedRoute requiredRole="admin"><TrainingCoursesPage /></ProtectedRoute>
+                  } />
+                  <Route path="hr/exam-center" element={
+                    <ProtectedRoute requiredRole="admin"><ExamCenterPage /></ProtectedRoute>
+                  } />
+                  <Route path="hr/exam/take/:paperId" element={
+                    <ProtectedRoute requiredRole="admin"><ExamTakePage /></ProtectedRoute>
+                  } />
+                  <Route path="hr/my-certificates" element={
+                    <ProtectedRoute requiredRole="admin"><MyCertificatesPage /></ProtectedRoute>
                   } />
                   <Route path="mentorship" element={
                     <ProtectedRoute requiredRole="admin"><MentorshipPage /></ProtectedRoute>

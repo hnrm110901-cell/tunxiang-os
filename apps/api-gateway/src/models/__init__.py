@@ -7,6 +7,10 @@ from .action_plan import ActionOutcome, ActionPlan, DispatchStatus
 from .ai_model import AIModel, DataContributionRecord, ModelLevel, ModelPurchaseRecord, ModelStatus, ModelType, PurchaseStatus
 from .audit_log import AuditAction, AuditLog, ResourceType
 
+# D6 Should-Fix P1 — LLM 治理 + Agent 记忆持久化
+from .agent_memory import AgentMemory  # noqa: E402
+from .prompt_audit_log import PromptAuditLog  # noqa: E402
+
 # Batch 3 — 自动化闭环层
 from .auto_procurement import ProcurementExecution, ProcurementRule
 from .backup_job import BackupJob, BackupStatus, BackupType
@@ -763,3 +767,11 @@ from .channel_menu import (
     ChannelSyncType,
     MenuChannel,
 )
+
+# D8 采购审批 + 收货质检 Should-Fix P1
+from .purchase_approval import ApprovalAction, ApprovalLevel, PurchaseApprovalLog
+from .goods_receipt import GoodsReceipt, GoodsReceiptItem, QCStatus, ReceiptStatus
+
+# D10 多打卡方式 + 换班审批 Should-Fix P1
+from .attendance_punch import AttendancePunch, PunchDirection, PunchMethod
+from .shift_swap import ShiftSwapRequest, ShiftSwapStatus

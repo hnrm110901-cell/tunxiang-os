@@ -1180,6 +1180,10 @@ from src.api import hr_health_cert_scan, hr_labor_contract, training_course  # n
 app.include_router(hr_health_cert_scan.router, prefix="/api/v1", tags=["hr-health-cert-scan"])
 app.include_router(hr_labor_contract.router, prefix="/api/v1", tags=["hr-labor-contract"])
 app.include_router(training_course.router, prefix="/api/v1", tags=["hr-training-course"])
+
+# D11 Should-Fix P1 — 考试题库/试卷/证书
+from src.api import exam as hr_exam  # noqa: E402
+app.include_router(hr_exam.router, prefix="/api/v1", tags=["hr-exam"])
 # Month 3 (P1+P2) — 供应商B2B / 大众点评 / 银行对账
 app.include_router(supplier_b2b.router, prefix="/api/v1", tags=["supplier-b2b"])
 app.include_router(dianping.router, prefix="/api/v1", tags=["dianping"])
@@ -1196,6 +1200,17 @@ app.include_router(compliance_engine.router, tags=["compliance-engine"])
 app.include_router(auto_procurement.router, prefix="/api/v1", tags=["auto-procurement"])
 app.include_router(financial_closing.router, tags=["financial-closing"])
 app.include_router(command_center.router, tags=["command-center"])
+
+# D8 供应链 + D10 排班考勤 Should-Fix P1
+from src.api import purchase_approval as _purchase_approval  # noqa: E402
+from src.api import goods_receipt as _goods_receipt  # noqa: E402
+from src.api import attendance_punch as _attendance_punch  # noqa: E402
+from src.api import shift_swap as _shift_swap  # noqa: E402
+
+app.include_router(_purchase_approval.router, prefix="/api/v1", tags=["purchase-approval"])
+app.include_router(_goods_receipt.router, prefix="/api/v1", tags=["goods-receipt"])
+app.include_router(_attendance_punch.router, prefix="/api/v1", tags=["attendance-punch"])
+app.include_router(_shift_swap.router, prefix="/api/v1", tags=["shift-swap"])
 
 # 业财税资金一体化（FCT）
 if getattr(settings, "FCT_ENABLED", False):

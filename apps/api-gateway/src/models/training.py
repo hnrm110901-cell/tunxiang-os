@@ -81,21 +81,93 @@ class TrainingExam(Base, TimestampMixin):
 
 
 class ExamAttempt(Base, TimestampMixin):
-    """考试记录"""
+    """考试记录 — D11 Should-Fix P1 扩展：paper_id / 计时 / 状态"""
 
     __tablename__ = "exam_attempts"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    exam_id = Column(UUID(as_uuid=True), ForeignKey("training_exams.id"), nullable=False, index=True)
+    # 兼容历史：exam_id 保留可空；新考试流程统一走 paper_id
+    exam_id = Column(UUID(as_uuid=True), ForeignKey("training_exams.id"), nullable=True, index=True)
+    paper_id = Column(UUID(as_uuid=True), ForeignKey("exam_papers.id"), nullable=True, index=True)
     employee_id = Column(String(50), nullable=False, index=True)
     store_id = Column(String(50), nullable=False, index=True)
-    answers = Column(JSON, nullable=True)
+    answers = Column(JSON, nullable=True)  # {"q1":"A","q2":["A","B"],"meta":{"leave_count":0}}
     score = Column(Integer, nullable=False, default=0)
     passed = Column(Boolean, nullable=False, default=False)
     attempted_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
+    # Should-Fix P1 新增
+    started_at = Column(DateTime, nullable=True)
+    submitted_at = Column(DateTime, nullable=True)
+    duration_sec = Column(Integer, nullable=True)
+    # in_progress / submitted / graded / expired
+    status = Column(String(20), nullable=False, default="in_progress")
+
     def __repr__(self):
-        return f"<ExamAttempt(exam='{self.exam_id}', score={self.score})>"
+        return f"<ExamAttempt(paper='{self.paper_id}', score={self.score}, status='{self.status}')>"
+
+
+class ExamQuestion(Base, TimestampMixin):
+    """考试题库题目 — D11 Should-Fix P1"""
+
+    __tablename__ = "exam_questions"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    course_id = Column(UUID(as_uuid=True), ForeignKey("training_courses.id"), nullable=False, index=True)
+    # single / multi / judge / fill / essay
+    type = Column(String(20), nullable=False, default="single")
+    stem = Column(Text, nullable=False)  # 题干
+    options_json = Column(JSON, nullable=True)  # [{"key":"A","text":"..."}]；填空/主观可空
+    correct_answer_json = Column(JSON, nullable=True)  # 单:"A" 多:["A","B"] 判:true 填:"xxx" 主观:null
+    score = Column(Integer, nullable=False, default=5)
+    difficulty = Column(Integer, nullable=False, default=3)  # 1-5
+    explanation = Column(Text, nullable=True)  # 答案解析
+    is_active = Column(Boolean, default=True, nullable=False)
+
+    def __repr__(self):
+        return f"<ExamQuestion(type='{self.type}', score={self.score})>"
+
+
+class ExamPaper(Base, TimestampMixin):
+    """试卷 — 题目集合快照 + 及格线 + 考试时长"""
+
+    __tablename__ = "exam_papers"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    course_id = Column(UUID(as_uuid=True), ForeignKey("training_courses.id"), nullable=False, index=True)
+    title = Column(String(200), nullable=False)
+    total_score = Column(Integer, nullable=False, default=100)
+    pass_score = Column(Integer, nullable=False, default=60)
+    duration_min = Column(Integer, nullable=False, default=30)
+    question_count = Column(Integer, nullable=False, default=0)
+    question_ids_json = Column(JSON, nullable=False)  # ["uuid1","uuid2",...]
+    is_random = Column(Boolean, default=False, nullable=False)  # 是否随机题序
+    created_by = Column(String(50), nullable=True)
+    is_active = Column(Boolean, default=True, nullable=False)
+
+    def __repr__(self):
+        return f"<ExamPaper(title='{self.title}', q_count={self.question_count})>"
+
+
+class ExamCertificate(Base, TimestampMixin):
+    """考试通过后颁发的证书（PDF 留待后续实现）"""
+
+    __tablename__ = "exam_certificates"
+    __table_args__ = (UniqueConstraint("employee_id", "course_id", "cert_no", name="uq_exam_cert"),)
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    employee_id = Column(String(50), nullable=False, index=True)
+    course_id = Column(UUID(as_uuid=True), ForeignKey("training_courses.id"), nullable=False, index=True)
+    attempt_id = Column(UUID(as_uuid=True), ForeignKey("exam_attempts.id"), nullable=True)
+    cert_no = Column(String(64), nullable=False, index=True)  # 形如 COURSE+YYYYMM+序号
+    issued_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    expire_at = Column(DateTime, nullable=True)  # 默认 1 年
+    pdf_url = Column(String(500), nullable=True)  # 先占位，暂不生成
+    # active / expired / revoked
+    status = Column(String(20), nullable=False, default="active")
+
+    def __repr__(self):
+        return f"<ExamCertificate(cert_no='{self.cert_no}', status='{self.status}')>"
 
 
 class TrainingMaterial(Base, TimestampMixin):
