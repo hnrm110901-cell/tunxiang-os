@@ -8,11 +8,13 @@
 
 ## 产品定位
 
-屯象OS 是面向连锁餐饮品牌的 **AI 驱动经营决策 SaaS 平台**。通过 10 大 AI Agent 将门店运营决策（排班、库存、菜单、营销、财务）自动化，帮助连锁老板每年多赚 30 万+（成本率降低 2 个百分点）。
+屯象OS 是面向连锁餐饮品牌的 **AI 驱动经营决策 SaaS 平台**。通过 15+ AI Agent 将门店运营决策（排班、库存、菜单、营销、财务、合规）自动化，帮助连锁老板每年多赚 30 万+（成本率降低 2 个百分点）。
 
 **核心指标**：续费率 ≥ 95%
 
-**首批客户**：尝在一起、最黔线、尚宫厨、徐记海鲜
+**首批客户**：尝在一起（品智 POS）、徐记海鲜（奥琦玮）、最黔线、尚宫厨
+
+**当前版本**：v3.0 · D1-D12 全域覆盖 · 合规/财务/薪酬生产级闭环
 
 ---
 
@@ -45,20 +47,27 @@
 
 ## 核心能力
 
-### 10 大 AI Agent
+### 15+ AI Agent
 
 | 层级 | Agent | 能力 |
 |------|-------|------|
 | 增长层 | **经营智能体** BusinessIntel | KPI 异常检测、经营日报、CEO/CFO 驾驶舱 |
-| 增长层 | **营销智能体** Marketing | 私域运营、会员 RFM 分层、企微自动触发 |
+| 增长层 | **营销智能体** PrivateDomain | 私域运营、会员 RFM 分层、企微自动触发 |
 | 增长层 | **宴会智能体** Banquet | 7 阶段销售漏斗、宴会全生命周期管理 |
 | 运营层 | **运营流程体** OpsFlow | 出品链联动、损耗推理、三源对账 |
 | 运营层 | **人员智能体** People | 智能排班、员工绩效、人力成本分析 |
 | 运营层 | **菜品研发** DishRd | BOM 配方管理、菜品成本分析、新品研发 |
-| 底座层 | **合规智能体** Compliance | 质量管理、食品安全、审计追踪 |
+| 底座层 | **合规智能体** Compliance | 质量管理、食品安全、审计追踪、健康证/合同到期扫描 |
 | 底座层 | **IT 运维** Ops | 系统健康、适配器监控、Edge 节点管理 |
 | 底座层 | **财务智能体** FCT | 利润分析、预算管理、结算风控、财务预测 |
 | 底座层 | **供应商智能体** Supplier | 供应链管理、采购协同、库存预警 |
+
+### LLM 生产级治理（v3.0 新增）
+
+- **三级降级链**：Claude → DeepSeek → OpenAI（5s 超时 + 3 次指数退避，全挂抛异常不静默）
+- **安全网关**：sanitize_input（prompt injection 检测）+ scrub_pii（手机/身份证/邮箱）+ filter_output（API_KEY/SECRET 泄露）
+- **Agent 记忆总线**：hot(Redis 1h) → warm(PG 7天) → cold(PG 永久) 三级存储
+- **审计日志**：`prompt_audit_logs` 表记录 request_id / input_hash / risk_score / tokens / cost_fen
 
 ### 4 角色工作台
 
@@ -83,10 +92,26 @@ L3  内容区       面包屑 · KPI 卡片 · AI 建议卡 · 数据钻取
 |--------|------|------|
 | 品智 Pinzhi | 尝在一起 | 订单同步、日结汇总、菜品明细、Celery 每日 01:30 自动拉取 |
 | 天财商龙 | 最黔线 | 订单查询、门店汇总 |
-| 奥琦韦 | — | 排班、预订、订单 |
+| 奥琦玮 | 徐记海鲜 | 排班、预订、订单 |
 | 客如云 | — | 订单、会员 |
 | 易订 | — | 预订管理 |
-| 美团 SaaS | — | 排队、外卖 |
+| 美团 SaaS | — | 排队、外卖、等位 Webhook |
+
+### 企业级合规能力（v3.0 新增）
+
+| 领域 | 能力 |
+|------|------|
+| 会计凭证 | 借贷平衡强校验、储值卡/挂账/发票自动生成凭证（1002↔220301↔6001）|
+| AR/AP 应收应付 | 台账 + 0-30/31-60/61-90/90+ 账龄报表 |
+| 电子发票 | 结算 post-hook 自动开票 + 7 位短码自助填写链接 |
+| 月结/年结 | 试算平衡快照 + 利润表/资产负债表 + 损益结转 |
+| 六险一金 | 基数上下限裁剪 + 单险种禁用 + 公积金覆写 |
+| 累计预扣个税 | 7 级税率表（对照国税总局公式）+ 专项附加扣除 |
+| 银行代发 | 工行 TXT / 建行 TXT / 通用 CSV |
+| 健康证到期扫描 | 30/15/7/1 天分级预警 + 过期自动停岗 |
+| 劳动合同预警 | 60/30/15 天分级 + 状态回写 |
+| 在线考试 | 5 题型自动判卷（单选/多选/判断/填空/主观）+ 证书 PDF + 公开验证页 |
+| 跨店权限 | 5 角色矩阵（admin/finance/store_manager/head_chef/staff）+ 财务资源二级权限 |
 
 ---
 
@@ -131,23 +156,27 @@ L3  内容区       面包屑 · KPI 卡片 · AI 建议卡 · 数据钻取
 ## 项目结构
 
 ```
-zhilian-os/
+tunxiang-os/
 ├── apps/
-│   ├── web/                    # 管理后台 (React + Vite)
+│   ├── web/                    # 管理后台 (React 19 + Vite 7)
 │   │   ├── src/layouts/        # MainLayout(三层导航) + 角色 Layout
-│   │   ├── src/pages/          # 100+ 页面
-│   │   ├── src/pages/sm/       # 店长移动端 (8 页面)
-│   │   ├── src/pages/chef/     # 厨师长 (4 页面)
-│   │   ├── src/pages/hq/       # 总部驾驶舱 (6 页面)
+│   │   ├── src/pages/          # 240+ 页面
+│   │   ├── src/pages/sm/       # 店长移动端（含 ManagementHub 功能聚合页）
+│   │   ├── src/pages/chef/     # 厨师长
+│   │   ├── src/pages/hq/       # 总部驾驶舱
+│   │   ├── src/pages/hr/       # 培训课程/考试中心/我的证书 (v3.0)
+│   │   ├── src/pages/public/   # 公开页（证书验证 /public/cert/verify）
 │   │   ├── src/design-system/  # Design Token + Z 组件库
 │   │   └── src/components/     # 全局搜索 · 通知中心 · 推荐卡片
 │   └── api-gateway/            # API 网关 (FastAPI)
-│       ├── src/api/            # 40+ API 路由模块
-│       ├── src/services/       # 100+ Service 文件
-│       ├── src/models/         # SQLAlchemy ORM 模型
-│       ├── src/core/           # 安全 · 数据库 · Celery · 配置
-│       ├── src/middleware/      # CORS · GZip · 认证 · 限流 · 租户
-│       └── alembic/            # 数据库迁移 (多租户)
+│       ├── src/api/            # 60+ API 路由模块
+│       ├── src/services/       # 220+ Service 文件
+│       │   └── llm_gateway/    # LLM 三级降级+安全网关 (v3.0)
+│       ├── src/models/         # 90+ SQLAlchemy ORM 模型
+│       ├── src/tasks/          # Celery 定时任务（健康证/合同扫描）
+│       ├── src/core/           # 安全 · 数据库 · Celery · 配置 · 权限依赖
+│       ├── src/middleware/     # CORS · GZip · 认证 · 限流 · 租户
+│       └── alembic/            # 数据库迁移（z60→z65 链路）
 ├── packages/
 │   ├── agents/                 # 15 个 AI Agent
 │   │   ├── schedule/           # 智能排班
@@ -195,8 +224,8 @@ zhilian-os/
 
 ```bash
 # 1. 克隆
-git clone https://github.com/hnrm110901-cell/zhilian-os.git
-cd zhilian-os
+git clone https://github.com/hnrm110901-cell/tunxiang-os.git
+cd tunxiang-os
 
 # 2. 启动基础设施
 docker-compose up -d   # PostgreSQL, Redis, Qdrant, Neo4j
@@ -206,7 +235,16 @@ cd apps/api-gateway
 pip install -r requirements.txt
 cp .env.example .env   # 编辑环境变量
 alembic upgrade head   # 数据库迁移
+
+# 跑会计科目 + 社保配置种子
+python scripts/seed_chart_of_accounts.py
+python scripts/seed_si_config.py
+
 uvicorn src.main:app --reload --port 8000
+
+# 启动 Celery Worker + Beat（健康证/合同定时扫描）
+celery -A src.core.celery_app.celery_app worker -Q default,high_priority,low_priority -l info &
+celery -A src.core.celery_app.celery_app beat -l info &
 
 # 4. 前端
 cd apps/web
@@ -221,8 +259,21 @@ pnpm dev               # http://localhost:5173
 | `DATABASE_URL` | PostgreSQL 连接串 |
 | `REDIS_URL` | Redis 连接串 |
 | `JWT_SECRET_KEY` | JWT 签名密钥 |
-| `OPENAI_API_KEY` | LLM API 密钥 |
+| `ANTHROPIC_API_KEY` | Claude API Key（优先） |
+| `DEEPSEEK_API_KEY` | DeepSeek Key（二级降级） |
+| `OPENAI_API_KEY` | OpenAI Key（三级兜底） |
+| `LLM_PROVIDER_PRIORITY` | `claude,deepseek,openai`（默认） |
+| `LLM_FALLBACK_ENABLED` | `true` 启用三级降级 |
 | `PINZHI_TOKEN` | 品智 POS Token |
+| `PUBLIC_DOMAIN` | 证书二维码验证域名（如 `https://zlsjos.cn`） |
+
+### Docker 生产镜像注意事项
+
+PDF 证书生成依赖中文字体，Dockerfile 必须安装：
+```dockerfile
+RUN apt-get update && apt-get install -y fonts-noto-cjk && rm -rf /var/lib/apt/lists/*
+```
+否则证书上的中文将显示为方块。
 
 ### 生产部署
 
