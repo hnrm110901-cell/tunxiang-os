@@ -19,14 +19,25 @@ from __future__ import annotations
 from datetime import datetime
 from enum import Enum
 from typing import Optional
+from uuid import UUID
 
 import structlog
-from fastapi import APIRouter, Header, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel, Field
 
 logger = structlog.get_logger()
 
 router = APIRouter(prefix="/api/v1/menu/recommendation", tags=["menu-recommendation"])
+
+
+# ─── 鉴权依赖 ────────────────────────────────────────────────
+
+async def get_current_user(x_user_id: str = Header(..., alias="X-User-ID")) -> UUID:
+    """从请求头提取当前用户，写操作必须鉴权。"""
+    try:
+        return UUID(x_user_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="无效的用户ID格式")
 
 
 # ─── Enums ────────────────────────────────────────────────────────────────────
@@ -99,18 +110,6 @@ class GenerateRequest(BaseModel):
     budget_constraint_fen: Optional[int] = None
 
 
-class RecommendationPlan(BaseModel):
-    """推荐方案"""
-    plan_id: str
-    store_id: str
-    generated_at: str
-    target_date: str
-    meal_period: str
-    optimization_goal: str
-    dishes: list[DishRecommendation]
-    summary: RecommendationSummary
-
-
 class RecommendationSummary(BaseModel):
     """方案摘要"""
     total_dishes: int
@@ -124,6 +123,18 @@ class RecommendationSummary(BaseModel):
     estimated_turnover_change_pct: float = 0.0
     ai_confidence: float = 0.0
     key_insights: list[str] = Field(default_factory=list)
+
+
+class RecommendationPlan(BaseModel):
+    """推荐方案"""
+    plan_id: str
+    store_id: str
+    generated_at: str
+    target_date: str
+    meal_period: str
+    optimization_goal: str
+    dishes: list[DishRecommendation]
+    summary: RecommendationSummary
 
 
 class ApplyRequest(BaseModel):
@@ -276,6 +287,7 @@ _MOCK_HISTORY: list[HistoryItem] = [
 async def generate_recommendation(
     req: GenerateRequest,
     x_tenant_id: str = Header(alias="X-Tenant-ID"),
+    current_user: UUID = Depends(get_current_user),
 ):
     """生成AI排菜推荐方案
 
@@ -299,8 +311,8 @@ async def generate_recommendation(
         plan = _mock_recommendation(req.store_id, req.optimization_goal)
         return {"ok": True, "data": plan.model_dump()}
     except Exception as e:
-        logger.error("menu_recommendation.generate_failed", error=str(e))
-        raise HTTPException(status_code=500, detail=f"推荐方案生成失败: {e}")
+        logger.error("menu_recommendation.generate_failed", error=str(e), exc_info=True)
+        raise HTTPException(status_code=500, detail="推荐方案生成失败，请稍后重试")
 
 
 @router.get("/history")
@@ -330,6 +342,7 @@ async def get_recommendation_history(
 async def apply_recommendation(
     req: ApplyRequest,
     x_tenant_id: str = Header(alias="X-Tenant-ID"),
+    current_user: UUID = Depends(get_current_user),
 ):
     """应用推荐方案到菜单
 

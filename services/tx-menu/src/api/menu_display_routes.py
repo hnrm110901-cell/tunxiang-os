@@ -7,6 +7,7 @@ POST /api/v1/menu/dishes/batch-soldout   — 批量沽清/恢复
 所有操作带 X-Tenant-ID 多租户隔离。
 """
 from typing import Optional, List
+from uuid import UUID
 
 import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
@@ -19,6 +20,16 @@ from shared.ontology.src.database import get_db
 
 log = structlog.get_logger(__name__)
 router = APIRouter(prefix="/api/v1/menu", tags=["menu-display"])
+
+
+# ─── 鉴权依赖 ────────────────────────────────────────────────
+
+async def get_current_user(x_user_id: str = Header(..., alias="X-User-ID")) -> UUID:
+    """从请求头提取当前用户，写操作必须鉴权。"""
+    try:
+        return UUID(x_user_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="无效的用户ID格式")
 
 
 # ─── Pydantic 模型 ─────────────────────────────────────────────
@@ -85,6 +96,12 @@ async def get_menu_display(
         elif channel == "crew":
             channel_filter = " AND d.show_on_crew = true"
 
+        store_filter = ""
+        params: dict = {"tid": x_tenant_id}
+        if store_id:
+            store_filter = " AND d.store_id = :store_id::uuid"
+            params["store_id"] = store_id
+
         dish_result = await db.execute(
             text(f"""
                 SELECT d.id, d.name, d.category_id, d.price_fen, d.member_price_fen,
@@ -97,9 +114,10 @@ async def get_menu_display(
                 WHERE d.tenant_id = :tid::uuid
                   AND d.is_deleted = false
                   {channel_filter}
+                  {store_filter}
                 ORDER BY d.sort_order, d.name
             """),
-            {"tid": x_tenant_id},
+            params,
         )
         dishes_raw = dish_result.mappings().all()
 
@@ -303,6 +321,7 @@ async def get_dish_spec_sheet(
 async def batch_soldout(
     req: BatchSoldOutRequest,
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    current_user: UUID = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict:
     """批量标记/恢复菜品沽清状态（POS SoldOutPage 使用）。
