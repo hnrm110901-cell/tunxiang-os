@@ -18,7 +18,7 @@ function getCurrentIndex(steps: ProgressStep[]): number {
   return firstPending === -1 ? steps.length - 1 : firstPending
 }
 
-const BRAND = '#FF6B2C'
+const BRAND = '#FF6B35'
 const GREY  = '#2A4050'
 const GREY_TEXT = '#6B8A96'
 
@@ -68,7 +68,7 @@ const OrderProgress: React.FC<OrderProgressProps> = ({ status: _status, steps })
                   flexShrink: 0,
                   marginTop: '4rpx',
                   // Glow for current step
-                  boxShadow: isCurrent ? `0 0 0 6rpx rgba(255,107,44,0.22)` : 'none',
+                  boxShadow: isCurrent ? `0 0 0 6rpx rgba(255,107,53,0.22)` : 'none',
                 }}
               >
                 {/* Inner check for done */}

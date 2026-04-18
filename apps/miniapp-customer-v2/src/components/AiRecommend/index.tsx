@@ -177,7 +177,7 @@ const RecommendCard: React.FC<RecommendCardProps> = ({ item, onAdd }) => (
       >
         <Text
           style={{
-            color: '#FF6B2C',
+            color: '#FF6B35',
             fontSize: '30rpx',
             fontWeight: '700',
           }}
@@ -186,7 +186,7 @@ const RecommendCard: React.FC<RecommendCardProps> = ({ item, onAdd }) => (
         </Text>
         <View
           style={{
-            background: '#FF6B2C',
+            background: '#FF6B35',
             borderRadius: '28rpx',
             width: '64rpx',
             height: '64rpx',
@@ -218,7 +218,7 @@ const AiRecommend: React.FC<AiRecommendProps> = ({ recommendations, onAdd, loadi
         borderRadius: '24rpx',
         padding: '24rpx 0 24rpx 24rpx',
         marginBottom: '16rpx',
-        border: '1rpx solid rgba(255,107,44,0.15)',
+        border: '1rpx solid rgba(255,107,53,0.15)',
       }}
     >
       {/* Header */}
@@ -244,12 +244,12 @@ const AiRecommend: React.FC<AiRecommendProps> = ({ recommendations, onAdd, loadi
         <View
           style={{
             marginLeft: '12rpx',
-            background: 'rgba(255,107,44,0.15)',
+            background: 'rgba(255,107,53,0.15)',
             borderRadius: '8rpx',
             padding: '4rpx 12rpx',
           }}
         >
-          <Text style={{ color: '#FF6B2C', fontSize: '20rpx', fontWeight: '600' }}>
+          <Text style={{ color: '#FF6B35', fontSize: '20rpx', fontWeight: '600' }}>
             {loading ? '分析中...' : `${recommendations.length}道好菜`}
           </Text>
         </View>

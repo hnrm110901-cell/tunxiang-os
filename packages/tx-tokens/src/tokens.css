@@ -1,0 +1,118 @@
+/**
+ * 屯象OS 统一 Design Token
+ * 所有终端共享同一套品牌设计语言
+ * 主品牌色：#FF6B35（暖橙色）
+ */
+
+:root {
+  /* ===== 品牌色 ===== */
+  --tx-primary: #FF6B35;
+  --tx-primary-hover: #FF8555;
+  --tx-primary-active: #E55A28;
+  --tx-primary-light: #FFF3ED;
+  --tx-primary-dark: #CC4A1A;
+
+  /* ===== 辅助色 ===== */
+  --tx-navy: #1E2A3A;
+  --tx-navy-light: #2C3E50;
+  --tx-navy-dark: #141E2A;
+
+  /* ===== 语义色 ===== */
+  --tx-success: #0F6E56;
+  --tx-success-light: #E8F5F0;
+  --tx-success-dark: #0A5040;
+
+  --tx-warning: #BA7517;
+  --tx-warning-light: #FEF3E2;
+  --tx-warning-dark: #8A5510;
+
+  --tx-danger: #A32D2D;
+  --tx-danger-light: #FDEAEA;
+  --tx-danger-dark: #7A2020;
+
+  --tx-info: #185FA5;
+  --tx-info-light: #E8F0FB;
+  --tx-info-dark: #104580;
+
+  /* ===== 中性色 ===== */
+  --tx-text-1: #2C2C2A;
+  --tx-text-2: #5F5E5A;
+  --tx-text-3: #B4B2A9;
+  --tx-text-disabled: #D4D2C9;
+
+  --tx-bg-1: #FFFFFF;
+  --tx-bg-2: #F8F7F5;
+  --tx-bg-3: #F0EDE6;
+  --tx-bg-4: #E8E6E1;
+
+  --tx-border: #E8E6E1;
+  --tx-border-strong: #D4D2C9;
+
+  /* ===== 圆角 ===== */
+  --tx-radius-xs: 4px;
+  --tx-radius-sm: 8px;
+  --tx-radius-md: 12px;
+  --tx-radius-lg: 16px;
+  --tx-radius-xl: 24px;
+  --tx-radius-full: 9999px;
+
+  /* ===== 阴影 ===== */
+  --tx-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --tx-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
+  --tx-shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.12);
+  --tx-shadow-xl: 0 16px 40px rgba(0, 0, 0, 0.16);
+
+  /* ===== 间距 ===== */
+  --tx-space-1: 4px;
+  --tx-space-2: 8px;
+  --tx-space-3: 12px;
+  --tx-space-4: 16px;
+  --tx-space-5: 20px;
+  --tx-space-6: 24px;
+  --tx-space-8: 32px;
+  --tx-space-10: 40px;
+  --tx-space-12: 48px;
+
+  /* ===== Admin 终端字号 ===== */
+  --tx-admin-h1: 24px;
+  --tx-admin-h2: 20px;
+  --tx-admin-h3: 16px;
+  --tx-admin-body: 14px;
+  --tx-admin-caption: 12px;
+
+  /* ===== Store 终端字号（触控场景，最小16px）===== */
+  --tx-store-h1: 32px;
+  --tx-store-h2: 24px;
+  --tx-store-h3: 20px;
+  --tx-store-body: 18px;
+  --tx-store-caption: 16px;
+  --tx-store-kds-timer: 32px;   /* KDS 倒计时 */
+
+  /* ===== 触控安全区（Store 终端）===== */
+  --tx-tap-min: 48px;
+  --tx-tap-rec: 56px;
+  --tx-tap-lg: 72px;
+  --tx-tap-gap: 12px;
+
+  /* ===== 动画 ===== */
+  --tx-transition-fast: 150ms ease;
+  --tx-transition-base: 200ms ease;
+  --tx-transition-slow: 300ms ease-out;
+
+  /* ===== Layout（Admin 终端）===== */
+  --tx-rail-w: 56px;
+  --tx-sidebar-w: 220px;
+  --tx-topbar-h: 48px;
+  --tx-context-w: 340px;
+
+  /* ===== Z-Index ===== */
+  --tx-z-base: 1;
+  --tx-z-dropdown: 100;
+  --tx-z-sticky: 200;
+  --tx-z-modal: 500;
+  --tx-z-toast: 800;
+  --tx-z-agent-alert: 9999;
+
+  /* ===== Agent 预警条（TXAgentAlert 运行时动态写入实际高度）===== */
+  --agent-alert-height: 0px;
+}

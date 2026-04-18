@@ -81,7 +81,7 @@ const PointsBalance: React.FC<PointsBalanceProps> = ({
           width: '280rpx',
           height: '280rpx',
           borderRadius: '140rpx',
-          background: 'rgba(255,107,44,0.06)',
+          background: 'rgba(255,107,53,0.06)',
           pointerEvents: 'none',
         }}
       />
@@ -103,7 +103,7 @@ const PointsBalance: React.FC<PointsBalanceProps> = ({
             flexDirection: 'row',
             alignItems: 'center',
             gap: '8rpx',
-            background: 'rgba(255,107,44,0.15)',
+            background: 'rgba(255,107,53,0.15)',
             borderRadius: '32rpx',
             padding: '6rpx 20rpx',
           }}
@@ -111,7 +111,7 @@ const PointsBalance: React.FC<PointsBalanceProps> = ({
           <Text style={{ fontSize: '26rpx', lineHeight: '1' }}>✦</Text>
           <Text
             style={{
-              color: '#FF6B2C',
+              color: '#FF6B35',
               fontSize: '26rpx',
               fontWeight: '600',
             }}
@@ -134,7 +134,7 @@ const PointsBalance: React.FC<PointsBalanceProps> = ({
         >
           <Text
             style={{
-              color: '#FF6B2C',
+              color: '#FF6B35',
               fontSize: '28rpx',
               fontWeight: '600',
             }}
@@ -143,7 +143,7 @@ const PointsBalance: React.FC<PointsBalanceProps> = ({
           </Text>
           <Text
             style={{
-              color: '#FF6B2C',
+              color: '#FF6B35',
               fontSize: '28rpx',
               lineHeight: '1',
             }}
@@ -219,7 +219,7 @@ const PointsBalance: React.FC<PointsBalanceProps> = ({
         <Text style={{ color: '#9EB5C0', fontSize: '26rpx' }}>可兑换</Text>
         <Text
           style={{
-            color: '#FF6B2C',
+            color: '#FF6B35',
             fontSize: '26rpx',
             fontWeight: '600',
           }}
@@ -250,7 +250,7 @@ const PointsBalance: React.FC<PointsBalanceProps> = ({
               }}
             >
               还需{' '}
-              <Text style={{ color: '#FF6B2C', fontWeight: '600' }}>
+              <Text style={{ color: '#FF6B35', fontWeight: '600' }}>
                 {remaining?.toLocaleString()}
               </Text>{' '}
               积分
@@ -272,7 +272,7 @@ const PointsBalance: React.FC<PointsBalanceProps> = ({
               style={{
                 height: '12rpx',
                 width: `${progressPct}%`,
-                background: 'linear-gradient(90deg, #FF6B2C 0%, #FF9F0A 100%)',
+                background: 'linear-gradient(90deg, #FF6B35 0%, #FF9F0A 100%)',
                 borderRadius: '6rpx',
                 transition: 'width 0.5s ease',
               }}

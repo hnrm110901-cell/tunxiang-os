@@ -1,0 +1,37 @@
+.container {
+  /* 触控惯性滚动 */
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+
+/* ─── 垂直滚动 ─── */
+.vertical {
+  overflow-y: auto;
+  overflow-x: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ─── 水平滚动（用于KDS工单） ─── */
+.horizontal {
+  overflow-x: auto;
+  overflow-y: hidden;
+  display: flex;
+  flex-direction: row;
+  gap: 12px;
+  padding-bottom: 4px; /* 给 scrollbar 留空间（部分设备可见） */
+  /* 隐藏滚动条但保留滚动功能 */
+  scrollbar-width: none;
+}
+
+.horizontal::-webkit-scrollbar {
+  display: none;
+}
+
+.vertical .item {
+  flex-shrink: 0;
+}
+
+.horizontal .item {
+  flex-shrink: 0;
+}

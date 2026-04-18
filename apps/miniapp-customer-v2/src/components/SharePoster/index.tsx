@@ -33,7 +33,7 @@ const CANVAS_ID = 'share-poster-canvas'
 // Brand colours
 const BG_COLOR = '#0B1A20'
 const CARD_COLOR = '#132029'
-const BRAND_COLOR = '#FF6B2C'
+const BRAND_COLOR = '#FF6B35'
 
 // ─── Drawing helpers ──────────────────────────────────────────────────────────
 

@@ -1,0 +1,59 @@
+/*
+ * TXTouch · 触控优化 CSS Reset
+ * 消除300ms点击延迟、误触文字选中、系统高亮色
+ */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+/* 防止300ms点击延迟，同时保留原生双指缩放 */
+html {
+  touch-action: manipulation;
+}
+
+/* 防止误触时选中文字（Store终端全局关闭，按需开启） */
+body {
+  -webkit-tap-highlight-color: transparent;
+  -webkit-text-size-adjust: 100%;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* 需要选中文字的输入框恢复选中能力 */
+input,
+textarea {
+  user-select: text;
+  -webkit-user-select: text;
+  touch-action: auto;
+}
+
+/* 所有元素继承字体 */
+* {
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue",
+    "Microsoft YaHei", sans-serif;
+}
+
+/* 统一按钮基础样式 */
+button {
+  border: none;
+  background: none;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+  font-family: inherit;
+  -webkit-tap-highlight-color: transparent;
+}
+
+button:focus-visible {
+  outline: 2px solid var(--tx-primary, #FF6B35);
+  outline-offset: 2px;
+}
+
+/* 图片自适应 */
+img {
+  max-width: 100%;
+  display: block;
+}

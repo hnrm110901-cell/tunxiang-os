@@ -21,7 +21,7 @@ import { txRequest } from '../../utils/request'
 // ─── Brand tokens ─────────────────────────────────────────────────────────────
 
 const C = {
-  primary: '#FF6B2C',
+  primary: '#FF6B35',
   primaryDark: '#E55A1F',
   bgDeep: '#0B1A20',
   bgCard: '#132029',
@@ -180,7 +180,7 @@ function StampGrid({ total, earned }: StampGridProps) {
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              boxShadow: isEarned ? `0 4rpx 16rpx rgba(255,107,44,0.4)` : 'none',
+              boxShadow: isEarned ? `0 4rpx 16rpx rgba(255,107,53,0.4)` : 'none',
               transition: 'background 0.3s',
             }}
           >
@@ -444,10 +444,10 @@ export default function StampCardPage() {
                   {/* Progress badge */}
                   <View
                     style={{
-                      background: 'rgba(255,107,44,0.15)',
+                      background: 'rgba(255,107,53,0.15)',
                       borderRadius: '12rpx',
                       padding: '8rpx 20rpx',
-                      border: `1rpx solid rgba(255,107,44,0.3)`,
+                      border: `1rpx solid rgba(255,107,53,0.3)`,
                     }}
                   >
                     <Text style={{ color: C.primary, fontSize: '26rpx', fontWeight: '700' }}>
@@ -521,7 +521,7 @@ export default function StampCardPage() {
                 </Text>
                 <View
                   style={{
-                    background: 'rgba(255,107,44,0.08)',
+                    background: 'rgba(255,107,53,0.08)',
                     borderRadius: '12rpx',
                     padding: '20rpx 24rpx',
                   }}
@@ -570,10 +570,10 @@ export default function StampCardPage() {
                     flexDirection: 'row',
                     alignItems: 'center',
                     gap: '16rpx',
-                    background: `linear-gradient(90deg, rgba(255,107,44,0.12), rgba(255,107,44,0.04))`,
+                    background: `linear-gradient(90deg, rgba(255,107,53,0.12), rgba(255,107,53,0.04))`,
                     borderRadius: '12rpx',
                     padding: '20rpx 24rpx',
-                    border: `1rpx solid rgba(255,107,44,0.2)`,
+                    border: `1rpx solid rgba(255,107,53,0.2)`,
                   }}
                 >
                   <Text style={{ fontSize: '40rpx', lineHeight: '1', flexShrink: 0 }}>🏆</Text>

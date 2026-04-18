@@ -40,7 +40,7 @@ const C = {
   bg:      '#0B1A20',
   card:    '#132029',
   nav:     '#0D2030',
-  primary: '#FF6B2C',
+  primary: '#FF6B35',
   text1:   '#E8F4F8',
   text2:   '#9EB5C0',
   divider: 'rgba(255,255,255,0.06)',
@@ -166,7 +166,7 @@ function DishCustomizeSheet({ dish, visible, onClose, onConfirm }: DishCustomize
                 {group.required && (
                   <View
                     style={{
-                      background: 'rgba(255,107,44,0.15)',
+                      background: 'rgba(255,107,53,0.15)',
                       borderRadius: '8rpx',
                       padding: '2rpx 10rpx',
                     }}

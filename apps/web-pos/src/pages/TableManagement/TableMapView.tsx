@@ -1,62 +1,36 @@
 /**
- * æºè½æ¡å°å°å¾è§å¾
- * ä½¿ç¨Canvas/SVGæ¸²æé¤åå¹³é¢å¾
+ * 桌台地图视图
+ * 使用 Canvas/SVG 渲染餐厅平面图
+ * Spin/Tag 已替换为原生实现
  * @module pages/TableManagement/TableMapView
  */
 
 import React, { useEffect, useRef, useCallback, useMemo } from 'react';
-import { Spin, Tag } from 'antd';
 import {
   TableCardData,
   TableStatus,
+  TableLayout,
   CardField,
 } from '../../types/table-card';
 import { useTableStore } from '../../stores/tableStore';
+import { getStatusText, getStatusColor } from './tableStatusUtils';
 import styles from './TableManagement.module.css';
 
 /**
- * å°å¾è§å¾Props
+ * 地图视图Props
  */
 export interface TableMapViewProps {
-  /** æ¡å°åè¡¨ */
+  /** 桌台列表 */
   tables: TableCardData[];
-  /** é¨åºID */
+  /** 门店ID */
   storeId: string;
-  /** å è½½ä¸­ç¶æ */
+  /** 加载中状态 */
   loading?: boolean;
 }
 
 /**
- * è·åç¶æå¯¹åºçå¡«åè²
- */
-const getStatusColor = (status: TableStatus): string => {
-  const colorMap: Record<TableStatus, string> = {
-    [TableStatus.Empty]: '#52c41a',
-    [TableStatus.Dining]: '#1890ff',
-    [TableStatus.Reserved]: '#faad14',
-    [TableStatus.PendingCheckout]: '#ff4d4f',
-    [TableStatus.PendingCleanup]: '#d9d9d9',
-  };
-  return colorMap[status];
-};
-
-/**
- * è·åç¶ææ¾ç¤ºææ¬
- */
-const getStatusText = (status: TableStatus): string => {
-  const statusMap: Record<TableStatus, string> = {
-    [TableStatus.Empty]: 'ç©ºå°',
-    [TableStatus.Dining]: 'ç¨é¤ä¸­',
-    [TableStatus.Reserved]: 'å·²é¢è®¢',
-    [TableStatus.PendingCheckout]: 'å¾ç»è´¦',
-    [TableStatus.PendingCleanup]: 'å¾æ¸å°',
-  };
-  return statusMap[status];
-};
-
-/**
- * å°å¾è¡¨æ ¼ç»ä»¶
- * ä½¿ç¨Canvasç»å¶é¤åå¹³é¢å¾
+ * 地图表格组件
+ * 使用Canvas绘制餐厅平面图
  */
 const MapCanvas: React.FC<{
   tables: TableCardData[];
@@ -68,21 +42,21 @@ const MapCanvas: React.FC<{
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
 
-  // é¼ æ æ¬åçæ¡å°
+  // 鼠标悬停的桌台
   const [hoveredTableNo, setHoveredTableNo] = React.useState<string | null>(null);
   const [tooltipPos, setTooltipPos] = React.useState<{ x: number; y: number } | null>(null);
 
-  // è®¡ç®ç¼©æ¾å å­ï¼å°ç¾åæ¯åæ è½¬æ¢ä¸ºåç´ ï¼
-  const _scale = {
+  // 计算缩放因子（将百分比坐标转换为像素）
+  const scale = {
     x: width / 100,
     y: height / 100,
-  }; void _scale;
+  };
 
   const padding = 40;
   const drawableWidth = width - padding * 2;
   const drawableHeight = height - padding * 2;
 
-  // ç»å¶Canvas
+  // 绘制Canvas
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -90,17 +64,17 @@ const MapCanvas: React.FC<{
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // æ¸ç©ºç»å¸
-    ctx.fillStyle = '#ffffff';
+    // 清空画布
+    ctx.fillStyle = '#0B1A20';
     ctx.fillRect(0, 0, width, height);
 
-    // ç»å¶è¾¹æ¡åç½æ ¼èæ¯
-    ctx.strokeStyle = '#d9d9d9';
+    // 绘制边框和网格背景
+    ctx.strokeStyle = 'rgba(255,255,255,0.10)';
     ctx.lineWidth = 1;
     ctx.strokeRect(padding, padding, drawableWidth, drawableHeight);
 
-    // ç»å¶ç½æ ¼çº¿ï¼å¯éï¼
-    ctx.strokeStyle = '#f0f0f0';
+    // 绘制网格线（可选）
+    ctx.strokeStyle = 'rgba(255,255,255,0.04)';
     const gridSpacing = 50;
     for (let x = padding; x <= padding + drawableWidth; x += gridSpacing) {
       ctx.beginPath();
@@ -115,7 +89,7 @@ const MapCanvas: React.FC<{
       ctx.stroke();
     }
 
-    // ç»å¶æ¯å¼ æ¡å°
+    // 绘制每张桌台
     tables.forEach((table) => {
       const layout = table.layout;
       const x = padding + (layout.pos_x / 100) * drawableWidth;
@@ -126,10 +100,10 @@ const MapCanvas: React.FC<{
       const isHovered = hoveredTableNo === table.table_no;
       const statusColor = getStatusColor(table.status);
 
-      // ç»å¶æ¡å°å½¢ç¶
+      // 绘制桌台形状
       ctx.fillStyle = statusColor;
       ctx.globalAlpha = isHovered ? 0.9 : 0.7;
-      ctx.strokeStyle = statusColor;
+      ctx.strokeStyle = isHovered ? '#FF6B35' : statusColor;
       ctx.lineWidth = isHovered ? 3 : 2;
 
       if (layout.shape === 'rect') {
@@ -145,21 +119,21 @@ const MapCanvas: React.FC<{
 
       ctx.globalAlpha = 1;
 
-      // ç»å¶æ¡å·
+      // 绘制桌号
       ctx.fillStyle = '#ffffff';
       ctx.font = 'bold 14px Arial';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(table.table_no, x, y - 8);
 
-      // ç»å¶åº§ä½æ°
+      // 绘制座位数
       ctx.fillStyle = '#ffffff';
       ctx.font = '12px Arial';
-      ctx.fillText(`${table.seats}åº§`, x, y + 8);
+      ctx.fillText(`${table.seats}座`, x, y + 8);
     });
   }, [tables, width, height, hoveredTableNo, drawableWidth, drawableHeight]);
 
-  // å¤çé¼ æ ç§»å¨
+  // 处理鼠标移动
   const handleMouseMove = useCallback(
     (e: React.MouseEvent<HTMLCanvasElement>) => {
       if (!canvasRef.current) return;
@@ -170,7 +144,7 @@ const MapCanvas: React.FC<{
 
       let hovered: TableCardData | null = null;
 
-      // æ£æµé¼ æ æ¯å¦æ¬åå¨æå¼ æ¡å°ä¸
+      // 检测鼠标是否悬停在某张桌台上
       for (const table of tables) {
         const layout = table.layout;
         const tableX = padding + (layout.pos_x / 100) * drawableWidth;
@@ -207,7 +181,7 @@ const MapCanvas: React.FC<{
     [tables, drawableWidth, drawableHeight]
   );
 
-  // å¤çç¹å»
+  // 处理点击
   const handleCanvasClick = useCallback(
     (e: React.MouseEvent<HTMLCanvasElement>) => {
       if (!canvasRef.current) return;
@@ -216,7 +190,7 @@ const MapCanvas: React.FC<{
       const x = e.clientX - rect.left;
       const y = e.clientY - rect.top;
 
-      // æ¥æ¾è¢«ç¹å»çæ¡å°
+      // 查找被点击的桌台
       for (const table of tables) {
         const layout = table.layout;
         const tableX = padding + (layout.pos_x / 100) * drawableWidth;
@@ -239,7 +213,7 @@ const MapCanvas: React.FC<{
         }
 
         if (isClicked && table.card_fields.length > 0) {
-          // ç¹å»æ¡å°ï¼è§¦åç¬¬ä¸ä¸ªå­æ®µçç¹å»äºä»¶
+          // 点击桌台，触发第一个字段的点击事件
           const topField = table.card_fields.sort((a, b) => b.priority - a.priority)[0];
           onTableClick(table, topField);
           break;
@@ -249,7 +223,7 @@ const MapCanvas: React.FC<{
     [tables, drawableWidth, drawableHeight, onTableClick]
   );
 
-  // è·åæ¬åæ¡å°çä¿¡æ¯
+  // 获取悬停桌台的信息
   const hoveredTable = useMemo(
     () => tables.find((t) => t.table_no === hoveredTableNo),
     [tables, hoveredTableNo]
@@ -267,6 +241,7 @@ const MapCanvas: React.FC<{
         onClick={handleCanvasClick}
         style={{ cursor: hoveredTableNo ? 'pointer' : 'crosshair' }}
       />
+      {/* Tooltip（替代 antd Tag 悬停提示） */}
       {hoveredTable && tooltipPos && (
         <div
           ref={tooltipRef}
@@ -274,27 +249,37 @@ const MapCanvas: React.FC<{
             position: 'absolute',
             left: `${tooltipPos.x + 10}px`,
             top: `${tooltipPos.y + 10}px`,
-            background: 'white',
-            border: '1px solid #d9d9d9',
-            borderRadius: '4px',
+            background: '#1E2A3A',
+            border: '1px solid rgba(255,255,255,0.15)',
+            borderRadius: 8,
             padding: '8px 12px',
             zIndex: 1000,
-            fontSize: '12px',
+            fontSize: 14,
             whiteSpace: 'nowrap',
-            boxShadow: '0 3px 6px rgba(0, 0, 0, 0.15)',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
             pointerEvents: 'none',
+            color: '#fff',
           }}
         >
-          <div style={{ fontWeight: '600', marginBottom: '4px' }}>
+          <div style={{ fontWeight: 600, marginBottom: 4, fontSize: 16 }}>
             {hoveredTable.table_no}
           </div>
-          <div style={{ color: '#595959', marginBottom: '4px' }}>
-            {hoveredTable.area} Â· {hoveredTable.seats} åº§
+          <div style={{ color: 'rgba(255,255,255,0.65)', marginBottom: 4 }}>
+            {hoveredTable.area} · {hoveredTable.seats} 座
           </div>
           <div>
-            <Tag color={getStatusColor(hoveredTable.status)}>
+            {/* 状态标签（替代 antd Tag） */}
+            <span style={{
+              display: 'inline-block',
+              padding: '3px 8px',
+              borderRadius: 6,
+              background: getStatusColor(hoveredTable.status),
+              color: '#fff',
+              fontSize: 13,
+              fontWeight: 600,
+            }}>
               {getStatusText(hoveredTable.status)}
-            </Tag>
+            </span>
           </div>
         </div>
       )}
@@ -303,7 +288,7 @@ const MapCanvas: React.FC<{
 };
 
 /**
- * å°å¾è§å¾ç»ä»¶
+ * 地图视图组件
  */
 export const TableMapView: React.FC<TableMapViewProps> = ({
   tables,
@@ -314,7 +299,7 @@ export const TableMapView: React.FC<TableMapViewProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = React.useState({ width: 800, height: 500 });
 
-  // çå¬å®¹å¨å¤§å°åå
+  // 监听容器大小变化
   useEffect(() => {
     const updateDimensions = () => {
       if (containerRef.current) {
@@ -351,10 +336,12 @@ export const TableMapView: React.FC<TableMapViewProps> = ({
           alignItems: 'center',
           height: '100%',
           gap: '16px',
+          color: 'rgba(255,255,255,0.65)',
+          fontSize: 16,
         }}
       >
-        <Spin />
-        <span>å è½½ä¸­...</span>
+        <span style={{ fontSize: 24 }}>⟳</span>
+        <span>加载中...</span>
       </div>
     );
   }
@@ -369,11 +356,12 @@ export const TableMapView: React.FC<TableMapViewProps> = ({
           justifyContent: 'center',
           height: '100%',
           gap: '16px',
-          color: '#595959',
+          color: 'rgba(255,255,255,0.45)',
+          fontSize: 16,
         }}
       >
-        <div style={{ fontSize: '48px', opacity: 0.4 }}>ðºï¸</div>
-        <div>ææ æ¡å°æ°æ®</div>
+        <div style={{ fontSize: '48px', opacity: 0.4 }}>🗺️</div>
+        <div>暂无桌台数据</div>
       </div>
     );
   }
@@ -391,43 +379,23 @@ export const TableMapView: React.FC<TableMapViewProps> = ({
           />
         </div>
 
-        {/* å¾ä¾ */}
+        {/* 图例（替代 antd Tag 色块） */}
         <div className={styles.mapTableLegend}>
-          <div className={styles.legendItem}>
-            <div
-              className={styles.legendColor}
-              style={{ backgroundColor: '#52c41a' }}
-            />
-            <span>ç©ºå°</span>
-          </div>
-          <div className={styles.legendItem}>
-            <div
-              className={styles.legendColor}
-              style={{ backgroundColor: '#1890ff' }}
-            />
-            <span>ç¨é¤ä¸­</span>
-          </div>
-          <div className={styles.legendItem}>
-            <div
-              className={styles.legendColor}
-              style={{ backgroundColor: '#faad14' }}
-            />
-            <span>å·²é¢è®¢</span>
-          </div>
-          <div className={styles.legendItem}>
-            <div
-              className={styles.legendColor}
-              style={{ backgroundColor: '#ff4d4f' }}
-            />
-            <span>å¾ç»è´¦</span>
-          </div>
-          <div className={styles.legendItem}>
-            <div
-              className={styles.legendColor}
-              style={{ backgroundColor: '#d9d9d9' }}
-            />
-            <span>å¾æ¸å°</span>
-          </div>
+          {[
+            { color: '#0F6E56', label: '空台' },
+            { color: '#185FA5', label: '用餐中' },
+            { color: '#BA7517', label: '已预订' },
+            { color: '#A32D2D', label: '待结账' },
+            { color: '#555', label: '待清台' },
+          ].map(({ color, label }) => (
+            <div key={label} className={styles.legendItem}>
+              <div
+                className={styles.legendColor}
+                style={{ backgroundColor: color }}
+              />
+              <span style={{ color: 'rgba(255,255,255,0.65)', fontSize: 14 }}>{label}</span>
+            </div>
+          ))}
         </div>
       </div>
     </div>

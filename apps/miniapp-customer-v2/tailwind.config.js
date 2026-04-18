@@ -3,8 +3,10 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        brand: '#FF6B2C',
-        'brand-dark': '#E55A1C',
+        brand: '#FF6B35',
+        'brand-active': '#E55A28',
+        'brand-light': '#FFF3ED',
+        'brand-dark': '#E55A28',
         'app-bg': '#0B1A20',
         'card-bg': '#132029',
         'text-primary': '#FFFFFF',

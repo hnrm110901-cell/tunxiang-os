@@ -70,7 +70,7 @@ const QueueTicket: React.FC<QueueTicketProps> = ({
   const pulseOpacity = usePulse(isCalled)
 
   // Colour configuration per status
-  const ticketColor = isCalled ? '#34C759' : isExpired ? '#3A4E5A' : '#FF6B2C'
+  const ticketColor = isCalled ? '#34C759' : isExpired ? '#3A4E5A' : '#FF6B35'
   const cardBg = isExpired ? '#0F1C24' : '#132029'
   const overallOpacity = isExpired ? 0.6 : 1
 
@@ -264,7 +264,7 @@ const QueueTicket: React.FC<QueueTicketProps> = ({
                   预计等待{' '}
                   <Text
                     style={{
-                      color: '#FF6B2C',
+                      color: '#FF6B35',
                       fontWeight: '700',
                     }}
                   >

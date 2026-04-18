@@ -1,0 +1,43 @@
+// 屯象OS MiniApp Design Token
+// 来源：packages/tx-tokens/src/miniapp.scss
+// 用于微信/抖音小程序 (Taro + React)
+// 通过 Taro sass.resource 全局注入，所有 .scss 文件无需 import 即可直接使用
+
+// ─── 品牌色 ───────────────────────────────────────────────────────────────────
+$tx-primary: #FF6B35;
+$tx-primary-active: #E55A28;
+$tx-primary-light: #FFF3ED;
+$tx-navy: #1E2A3A;
+
+// ─── 语义色 ───────────────────────────────────────────────────────────────────
+$tx-success: #0F6E56;
+$tx-warning: #BA7517;
+$tx-danger: #A32D2D;
+$tx-info: #185FA5;
+
+// ─── 中性色 ───────────────────────────────────────────────────────────────────
+$tx-text-1: #2C2C2A;
+$tx-text-2: #5F5E5A;
+$tx-text-3: #B4B2A9;
+$tx-bg-1: #FFFFFF;
+$tx-bg-2: #F8F7F5;
+$tx-border: #E8E6E1;
+
+// ─── 字号（rpx） ──────────────────────────────────────────────────────────────
+$tx-h1: 44rpx;
+$tx-h2: 36rpx;
+$tx-h3: 32rpx;
+$tx-body: 28rpx;
+$tx-caption: 24rpx;
+
+// ─── 间距（rpx） ──────────────────────────────────────────────────────────────
+$tx-space-xs: 8rpx;
+$tx-space-sm: 16rpx;
+$tx-space-md: 24rpx;
+$tx-space-lg: 32rpx;
+$tx-space-xl: 48rpx;
+
+// ─── 圆角（rpx） ──────────────────────────────────────────────────────────────
+$tx-radius-sm: 8rpx;
+$tx-radius-md: 16rpx;
+$tx-radius-lg: 24rpx;

@@ -22,8 +22,8 @@ import { fenToYuanDisplay } from '../../../utils/format'
 // ─── Brand tokens ─────────────────────────────────────────────────────────────
 
 const C = {
-  primary:     '#FF6B2C',
-  primaryDim:  'rgba(255,107,44,0.15)',
+  primary:     '#FF6B35',
+  primaryDim:  'rgba(255,107,53,0.15)',
   bgDeep:      '#0B1A20',
   bgCard:      '#132029',
   border:      '#1E3040',
@@ -681,7 +681,7 @@ interface ActionBtnProps {
 }
 
 const C_BTN: Record<string, { bg: string; text: string; border?: string }> = {
-  primary: { bg: '#FF6B2C',                        text: '#fff' },
+  primary: { bg: '#FF6B35',                        text: '#fff' },
   ghost:   { bg: 'transparent',                    text: '#E8F4F8', border: '#1E3040' },
   danger:  { bg: 'rgba(229,57,53,0.15)',            text: '#E53935' },
 }

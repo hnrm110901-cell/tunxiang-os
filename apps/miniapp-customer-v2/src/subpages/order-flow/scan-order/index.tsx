@@ -18,7 +18,7 @@ import { useStoreInfo } from '../../../store/useStoreInfo'
 
 // ─── Brand tokens ─────────────────────────────────────────────────────────────
 const C = {
-  primary: '#FF6B2C',
+  primary: '#FF6B35',
   bgDeep: '#0B1A20',
   bgCard: '#132029',
   bgOverlay: 'rgba(11,26,32,0.75)',
@@ -723,7 +723,7 @@ export default function ScanOrderPage() {
         {/* Torch toggle */}
         <View
           style={{
-            background: torchOn ? 'rgba(255,107,44,0.8)' : 'rgba(0,0,0,0.4)',
+            background: torchOn ? 'rgba(255,107,53,0.8)' : 'rgba(0,0,0,0.4)',
             borderRadius: '32rpx',
             padding: '12rpx 24rpx',
           }}

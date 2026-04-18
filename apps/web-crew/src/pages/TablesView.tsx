@@ -8,6 +8,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { TableCard, StatusBar } from '@tx-ds/biz';
 import type { TableCardData, StatusBarItem } from '@tx-ds/biz';
+import { TXCard, TXButton } from '@tx/touch';
 import { fetchTableStatus } from '../api';
 import type { TableInfo } from '../api';
 import { useCrewStore } from '../store/crewStore';
@@ -357,46 +358,24 @@ export function TablesView() {
 
         <div style={{ display: 'flex', gap: 8 }}>
           <SlimModeToggle compact />
-          <button
-            onClick={() => navigate('/table-map')}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 6,
-              minHeight: 48,
-              padding: '0 16px',
-              background: 'transparent',
-              border: '1.5px solid var(--tx-primary, #FF6B35)',
-              borderRadius: 8,
-              color: 'var(--tx-primary, #FF6B35)',
-              fontSize: 16,
-              fontWeight: 600,
-              cursor: 'pointer',
-              WebkitTapHighlightColor: 'transparent',
-            }}
+          {/* TXButton secondary — 地图视图 */}
+          <TXButton
+            variant="secondary"
+            size="normal"
+            onPress={() => navigate('/table-map')}
+            style={{ padding: '0 16px', fontSize: 16 }}
           >
             🗺️ 地图视图
-          </button>
-          <button
-            onClick={handleScanQR}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 6,
-              minHeight: 48,
-              padding: '0 16px',
-              background: 'var(--tx-primary, #FF6B35)',
-              border: 'none',
-              borderRadius: 8,
-              color: '#ffffff',
-              fontSize: 16,
-              fontWeight: 600,
-              cursor: 'pointer',
-              WebkitTapHighlightColor: 'transparent',
-            }}
+          </TXButton>
+          {/* TXButton primary — 扫码开台 */}
+          <TXButton
+            variant="primary"
+            size="normal"
+            onPress={handleScanQR}
+            style={{ padding: '0 16px', fontSize: 16 }}
           >
             📷 扫码开台
-          </button>
+          </TXButton>
         </div>
       </div>
 
@@ -446,22 +425,15 @@ export function TablesView() {
         >
           <div style={{ fontSize: 40, marginBottom: 12 }}>⚠️</div>
           <div style={{ fontSize: 16, marginBottom: 20 }}>{error}</div>
-          <button
-            onClick={loadTables}
-            style={{
-              minHeight: 48,
-              padding: '0 32px',
-              background: 'var(--tx-primary, #FF6B35)',
-              border: 'none',
-              borderRadius: 8,
-              color: '#fff',
-              fontSize: 16,
-              fontWeight: 600,
-              cursor: 'pointer',
-            }}
+          {/* TXButton primary — 重试加载 */}
+          <TXButton
+            variant="primary"
+            size="normal"
+            onPress={loadTables}
+            style={{ padding: '0 32px', fontSize: 16 }}
           >
             重试
-          </button>
+          </TXButton>
         </div>
       )}
 

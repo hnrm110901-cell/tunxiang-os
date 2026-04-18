@@ -5,6 +5,10 @@
 import { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useAuthStore } from './store/authStore';
+import { ConfigProvider } from 'antd';
+import zhCN from 'antd/locale/zh_CN';
+import { txAdminTheme } from '@tx/tokens';
+import { getToken, clearAuth, isTokenExpired } from './api/client';
 import { ShellHQ } from './shell/ShellHQ';
 import { LoginPage } from './pages/LoginPage';
 import { DashboardPage } from './pages/DashboardPage';
@@ -214,9 +218,16 @@ function App() {
 
   useEffect(() => { restore(); }, [restore]);
 
-  if (!isAuthenticated) { return <LoginPage onLogin={() => {}} />; }
+  if (!isAuthenticated) {
+    return (
+      <ConfigProvider theme={txAdminTheme} locale={zhCN}>
+        <LoginPage onLogin={() => {}} />
+      </ConfigProvider>
+    );
+  }
 
   return (
+    <ConfigProvider theme={txAdminTheme} locale={zhCN}>
     <BrowserRouter>
       <ShellHQ onLogout={logout}>
         <Routes>
@@ -434,6 +445,7 @@ function App() {
         </Routes>
       </ShellHQ>
     </BrowserRouter>
+    </ConfigProvider>
   );
 }
 

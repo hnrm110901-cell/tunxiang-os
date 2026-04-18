@@ -4,9 +4,10 @@
 
 /* Brand CSS custom properties */
 :root {
-  --color-brand: #FF6B2C;
-  --color-brand-dark: #E55A1C;
-  --color-brand-light: #FF8F5E;
+  --color-brand: #FF6B35;
+  --color-brand-active: #E55A28;
+  --color-brand-dark: #E55A28;
+  --color-brand-light: #FFF3ED;
 
   --color-app-bg: #0B1A20;
   --color-card-bg: #132029;
@@ -73,7 +74,7 @@ page {
   }
 
   .btn-ghost:active {
-    background-color: rgba(255, 107, 44, 0.1);
+    background-color: rgba(255, 107, 53, 0.1);
   }
 
   .section-title {

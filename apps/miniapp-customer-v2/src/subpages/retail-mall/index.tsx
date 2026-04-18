@@ -20,9 +20,9 @@ import { txRequest } from '../../utils/request'
 
 // ─── Brand tokens ─────────────────────────────────────────────────────────────
 const C = {
-  primary:    '#FF6B2C',
+  primary:    '#FF6B35',
   primaryDk:  '#E55A1F',
-  primaryBg:  'rgba(255,107,44,0.12)',
+  primaryBg:  'rgba(255,107,53,0.12)',
   bgDeep:     '#0B1A20',
   bgCard:     '#132029',
   bgHover:    '#1A2E38',
@@ -713,8 +713,8 @@ export default function RetailMallPage() {
       {/* ─── Delivery banner ─── */}
       <View
         style={{
-          background: 'rgba(255,107,44,0.08)',
-          borderBottom: `1rpx solid rgba(255,107,44,0.15)`,
+          background: 'rgba(255,107,53,0.08)',
+          borderBottom: `1rpx solid rgba(255,107,53,0.15)`,
           padding: '18rpx 32rpx',
           display: 'flex',
           flexDirection: 'row',

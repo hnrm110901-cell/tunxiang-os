@@ -25,7 +25,7 @@ import { usePayment, PaymentMethod } from '../../../hooks/usePayment'
 
 // ─── Brand tokens ─────────────────────────────────────────────────────────────
 const C = {
-  primary: '#FF6B2C',
+  primary: '#FF6B35',
   primaryDark: '#E55A1F',
   bgDeep: '#0B1A20',
   bgCard: '#132029',
@@ -94,7 +94,7 @@ function CouponSheet({
           display: 'flex',
           flexDirection: 'row',
           alignItems: 'center',
-          background: isSelected ? 'rgba(255,107,44,0.12)' : C.bgDeep,
+          background: isSelected ? 'rgba(255,107,53,0.12)' : C.bgDeep,
           border: `2rpx solid ${isSelected ? C.primary : C.border}`,
           borderRadius: '16rpx',
           padding: '20rpx 24rpx',
@@ -595,7 +595,7 @@ export default function CheckoutPage() {
                   borderRadius: '16rpx',
                   border: `2rpx solid ${dineMode === mode.value ? C.primary : C.border}`,
                   background:
-                    dineMode === mode.value ? 'rgba(255,107,44,0.12)' : C.bgDeep,
+                    dineMode === mode.value ? 'rgba(255,107,53,0.12)' : C.bgDeep,
                   display: 'flex',
                   flexDirection: 'column',
                   alignItems: 'center',

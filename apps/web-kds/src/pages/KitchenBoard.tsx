@@ -1,16 +1,14 @@
 /**
  * KitchenBoard -- 档口任务看板（核心页面）
  *
- * 三列布局：待制作 | 制作中 | 已完成
- * 每张卡片：桌号 + 菜名 + 数量 + 等待时间 + VIP标记 + 备注
- * 按优先级排序，催菜标红，超时闪烁
- * 深色背景，触控优化（最小48x48按钮，最小16px字体）
- *
+ * 布局：预警条 + 统计栏 / 水平滚动工单卡片区（240px/张，gap≥12px）
+ * 使用 TXKDSTicket 组件：倒计时实时更新，超时整卡红底白字，左滑完成
  * WebSocket 实时推送：连接 Mac mini /ws/kds/{stationId}
- * 替代旧版 setInterval 轮询
+ * 深色背景，触控优化（最小48px按钮，最小20px菜品字体）
  */
-import { useState, useEffect, useCallback } from 'react';
-import { useKdsWebSocket, type KDSTicket } from '../hooks/useKdsWebSocket';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { TXKDSTicket, type TXKDSTicketItem } from '@tx/touch/components/TXKDSTicket';
+import { useKdsWebSocket, type KDSTicket, type RemakeAlert } from '../hooks/useKdsWebSocket';
 import { warmUpAudio } from '../utils/audio';
 import { pauseTicket, resumeTicket, grabTicket } from '../api/kdsOpsApi';
 import { StatusBar, OrderTicketCard } from '@tx-ds/biz';
@@ -84,7 +82,8 @@ function sortTickets(tickets: KDSTicket[]): KDSTicket[] {
 // ─── Component ───
 
 export function KitchenBoard() {
-  const config = getKdsConfig();
+  // localStorage 读取只在 mount 时执行一次
+  const [config] = useState(getKdsConfig);
   const wsEnabled = !!config.host;
 
   // 加载门店KDS规则配置（storeId 从 localStorage 读取，或使用默认）
@@ -103,10 +102,12 @@ export function KitchenBoard() {
     dismissTimeoutAlert,
   } = useKdsWebSocket(config);
 
-  // 本地 tickets state（无 WS 时用 mock 数据，有 WS 时同步 WS 数据）
-  const [tickets, setTickets] = useState<KDSTicket[]>(() =>
-    wsEnabled ? [] : MOCK_TICKETS,
+  // 单一数据源：WS 数据或离线 mock
+  const [offlineTickets, setOfflineTickets] = useState<KDSTicket[]>(
+    () => wsEnabled ? [] : MOCK_TICKETS,
   );
+  const tickets = wsEnabled ? wsTickets : offlineTickets;
+  const setTickets = wsEnabled ? setWsTickets : setOfflineTickets;
 
   // 当 WS 数据更新时同步到本地
   useEffect(() => {
@@ -115,7 +116,7 @@ export function KitchenBoard() {
     }
   }, [wsEnabled, wsTickets]);
 
-  const [tick, setTick] = useState(0);
+  // 注意：倒计时由 TXKDSTicket 内部每秒更新，无需外部 tick
   const [now, setNow] = useState(Date.now());
   const [selectedDept, setSelectedDept] = useState<string>('all');
   const [audioWarmed, setAudioWarmed] = useState(false);
@@ -132,10 +133,9 @@ export function KitchenBoard() {
   // 当前操作员ID（实际应从登录信息获取）
   const operatorId = (window as any).__OPERATOR_ID__ as string | undefined;
 
-  // 每秒刷新倒计时
+  // 每秒刷新倒计时（TXKDSTicket 内部也有独立更新）
   useEffect(() => {
     const timer = setInterval(() => {
-      setTick(t => t + 1);
       setNow(Date.now());
     }, 1000);
     return () => clearInterval(timer);
@@ -151,11 +151,8 @@ export function KitchenBoard() {
 
   // 开始制作
   const startCooking = useCallback((id: string) => {
-    const update = (prev: KDSTicket[]) =>
-      prev.map(t => t.id === id ? { ...t, status: 'cooking' as const, startedAt: Date.now() } : t);
-    setTickets(update);
-    if (wsEnabled) setWsTickets(update);
-  }, [wsEnabled, setWsTickets]);
+    setTickets(prev => prev.map(t => t.id === id ? { ...t, status: 'cooking' as const, startedAt: Date.now() } : t));
+  }, [setTickets]);
 
   // 停菜/恢复
   const togglePause = useCallback(async (id: string) => {
@@ -187,23 +184,17 @@ export function KitchenBoard() {
     if (!operatorId) return;
     try {
       await grabTicket(id, operatorId);
-      const update = (prev: KDSTicket[]) =>
-        prev.map(t => t.id === id ? { ...t, status: 'cooking' as const, startedAt: Date.now() } : t);
-      setTickets(update);
-      if (wsEnabled) setWsTickets(update);
+      setTickets(prev => prev.map(t => t.id === id ? { ...t, status: 'cooking' as const, startedAt: Date.now() } : t));
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : '抢单失败';
       alert(msg);
     }
-  }, [operatorId, wsEnabled, setWsTickets]);
+  }, [operatorId, setTickets]);
 
   // 完成出品
   const completeCooking = useCallback((id: string) => {
-    const update = (prev: KDSTicket[]) =>
-      prev.map(t => t.id === id ? { ...t, status: 'done' as const, completedAt: Date.now() } : t);
-    setTickets(update);
-    if (wsEnabled) setWsTickets(update);
-  }, [wsEnabled, setWsTickets]);
+    setTickets(prev => prev.map(t => t.id === id ? { ...t, status: 'done' as const, completedAt: Date.now() } : t));
+  }, [setTickets]);
 
   // 按档口过滤
   const filtered = selectedDept === 'all' ? tickets : tickets.filter(t => t.deptId === selectedDept);
@@ -214,12 +205,27 @@ export function KitchenBoard() {
     .sort((a, b) => (b.completedAt || 0) - (a.completedAt || 0))
     .slice(0, 10);
 
-  // 催单中的 ticket IDs（最近 5 分钟）
-  const rushTicketIds = new Set(
-    rushAlerts
-      .filter(a => Date.now() - a.timestamp < 5 * 60 * 1000)
-      .map(a => a.ticketId),
+  // 催单中的 ticket IDs（最近 5 分钟），rushAlerts 变化时才重建 Set
+  const rushTicketIds = useMemo(
+    () => new Set(rushAlerts.filter(a => Date.now() - a.timestamp < 5 * 60 * 1000).map(a => a.ticketId)),
+    [rushAlerts],
   );
+
+  // 平均出餐时间（已完成工单的总时长均值，单位：分钟）
+  const avgCookMin = useMemo(() => {
+    if (done.length === 0) return 0;
+    const valid = done.filter(t => t.completedAt);
+    if (valid.length === 0) return 0;
+    return Math.round(
+      valid.reduce((sum, t) => sum + (t.completedAt! - t.createdAt) / 60000, 0) / valid.length,
+    );
+  }, [done]);
+
+  // 活跃工单（pending + cooking）按水平滚动排列，只在依赖变化时重算
+  const activeTickets = useMemo(() => [
+    ...sortTickets(pending.map(t => ({ ...t, _col: 'pending' as const }))),
+    ...sortTickets(cooking.map(t => ({ ...t, _col: 'cooking' as const }))),
+  ], [pending, cooking]);
 
   return (
     <div
@@ -328,7 +334,7 @@ export function KitchenBoard() {
               cursor: 'pointer',
             }}
           >
-            {batchView ? '合并视图' : '合并视图'}
+            合并视图
           </button>
 
           {!wsEnabled && (
@@ -342,50 +348,156 @@ export function KitchenBoard() {
           { label: '制作中', value: cooking.length, color: '#1890ff' },
           { label: '已完成', value: done.length, color: '#0F6E56' },
         ]} />
+        {/* 统计栏：待出单数 + 平均出餐时间 */}
+        <div style={{ display: 'flex', gap: 32, fontSize: 18, alignItems: 'center' }}>
+          <span>
+            待出 <b style={{ color: '#BA7517', fontSize: 28, fontFamily: 'JetBrains Mono, monospace' }}>{pending.length + cooking.length}</b> 单
+          </span>
+          <span>
+            平均出餐 <b style={{ color: '#0F6E56', fontSize: 28, fontFamily: 'JetBrains Mono, monospace' }}>{avgCookMin}</b> 分钟
+          </span>
+          <span>
+            已完成 <b style={{ color: '#555', fontSize: 24, fontFamily: 'JetBrains Mono, monospace' }}>{done.length}</b>
+          </span>
+        </div>
       </header>
 
-      {/* 三列看板 */}
-      <div style={{ flex: 1, display: 'flex', gap: 2, overflow: 'hidden' }}>
-        {/* 待制作 */}
-        <BoardColumn title="待制作" count={pending.length} color="#BA7517" bgColor="#1a1a00">
-          {pending.map(t => (
-            <OrderTicketCard
-              key={t.id}
-              ticket={toTicketData(t)}
-              kds
-              now={now}
-              isFlashing={rushTicketIds.has(t.id)}
-              isPaused={pausedIds.has(t.id)}
-              onStart={() => startCooking(t.id)}
-              onGrab={grabMode && operatorId ? () => handleGrab(t.id) : undefined}
-              rules={rules}
-            />
-          ))}
-        </BoardColumn>
+      {/* KDS 工单区：水平滚动，每张卡片 240px，gap 16px */}
+      <div style={{
+        flex: 1, overflowX: 'auto', overflowY: 'hidden',
+        display: 'flex', flexDirection: 'row', alignItems: 'flex-start',
+        gap: 16, padding: '16px 20px',
+        WebkitOverflowScrolling: 'touch',
+      }}>
+        {activeTickets.length === 0 && (
+          <div style={{
+            flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 24, color: '#555',
+          }}>
+            暂无工单
+          </div>
+        )}
+        {activeTickets.map(t => {
+          const isPending = t._col === 'pending';
+          const isPaused = pausedIds.has(t.id);
+          // 将 KDSTicket.items 映射为 TXKDSTicketItem
+          const txItems: TXKDSTicketItem[] = t.items.map(item => ({
+            name: item.name,
+            qty: item.qty,
+            spec: item.notes || undefined,
+            priority: (rushTicketIds.has(t.id) || t.priority === 'rush') ? 'rush' : 'normal',
+          }));
+          return (
+            <div key={t.id} style={{ display: 'flex', flexDirection: 'column', gap: 8, flexShrink: 0 }}>
+              {/* TXKDSTicket 卡片：倒计时、超时红底、左滑完成 */}
+              <TXKDSTicket
+                orderId={t.orderNo}
+                tableNo={t.tableNo}
+                items={txItems}
+                createdAt={t.createdAt}
+                timeLimit={config.timeoutMinutes}
+                isVip={t.priority === 'vip'}
+                onComplete={() => isPending ? startCooking(t.id) : completeCooking(t.id)}
+                onRush={() => grabMode && operatorId ? handleGrab(t.id) : startCooking(t.id)}
+              />
+              {/* 状态标签 + 停菜/操作按钮（卡片外补充） */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, width: 240 }}>
+                {/* 状态徽章 */}
+                <div style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  padding: '4px 0', borderRadius: 6,
+                  background: isPending ? '#1a1a00' : '#001a1a',
+                  fontSize: 16, fontWeight: 'bold',
+                  color: isPending ? '#BA7517' : '#4A9EFF',
+                  border: `1px solid ${isPending ? '#BA7517' : '#4A9EFF'}`,
+                }}>
+                  {isPending ? '待制作' : '制作中'}
+                </div>
 
-        {/* 制作中 */}
-        <BoardColumn title="制作中" count={cooking.length} color="#1890ff" bgColor="#001a1a">
-          {cooking.map(t => (
-            <OrderTicketCard
-              key={t.id}
-              ticket={toTicketData(t)}
-              kds
-              now={now}
-              isFlashing={rushTicketIds.has(t.id)}
-              isPaused={pausedIds.has(t.id)}
-              onComplete={() => completeCooking(t.id)}
-              onPause={() => togglePause(t.id)}
-              rules={rules}
-            />
-          ))}
-        </BoardColumn>
+                {/* 停菜标记 */}
+                {isPaused && (
+                  <div style={{
+                    background: '#2A2A00', border: '1px solid #666600',
+                    borderRadius: 6, padding: '4px 10px',
+                    fontSize: 16, color: '#CCCC00', fontWeight: 600, textAlign: 'center',
+                  }}>
+                    已停菜
+                  </div>
+                )}
 
-        {/* 已完成 */}
-        <BoardColumn title="已完成" count={done.length} color="#0F6E56" bgColor="#001a00">
-          {done.map(t => (
-            <DoneCard key={t.id} ticket={t} />
-          ))}
-        </BoardColumn>
+                {/* 操作按钮 */}
+                <div style={{ display: 'flex', gap: 8 }}>
+                  {isPending && grabMode && operatorId ? (
+                    <button
+                      onClick={() => handleGrab(t.id)}
+                      style={{
+                        flex: 1, padding: '14px 0', border: 'none', borderRadius: 8,
+                        background: '#FF6B35', color: '#fff',
+                        fontSize: 20, fontWeight: 'bold', cursor: 'pointer', minHeight: 56,
+                      }}
+                      onTouchStart={e => (e.currentTarget.style.transform = 'scale(0.97)')}
+                      onTouchEnd={e => (e.currentTarget.style.transform = 'scale(1)')}
+                    >
+                      抢单
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => isPending ? startCooking(t.id) : completeCooking(t.id)}
+                      disabled={isPaused}
+                      style={{
+                        flex: 1, padding: '14px 0', border: 'none', borderRadius: 8,
+                        background: isPaused ? '#2A2A2A' : isPending ? '#4A9EFF' : '#0F6E56',
+                        color: '#fff', fontSize: 20, fontWeight: 'bold',
+                        cursor: isPaused ? 'not-allowed' : 'pointer',
+                        opacity: isPaused ? 0.5 : 1, minHeight: 56,
+                      }}
+                      onTouchStart={e => !isPaused && (e.currentTarget.style.transform = 'scale(0.97)')}
+                      onTouchEnd={e => (e.currentTarget.style.transform = 'scale(1)')}
+                    >
+                      {isPending ? '开始制作' : '完成出品'}
+                    </button>
+                  )}
+                  {/* 停菜/恢复（仅制作中） */}
+                  {!isPending && (
+                    <button
+                      onClick={() => togglePause(t.id)}
+                      style={{
+                        padding: '14px 14px', border: `1px solid ${isPaused ? '#666600' : '#333'}`,
+                        borderRadius: 8,
+                        background: isPaused ? '#2A2A00' : '#1A1A1A',
+                        color: isPaused ? '#CCCC00' : '#666',
+                        fontSize: 20, fontWeight: 'bold',
+                        cursor: 'pointer', minHeight: 56, minWidth: 56,
+                      } as React.CSSProperties}
+                      onTouchStart={e => (e.currentTarget.style.transform = 'scale(0.97)')}
+                      onTouchEnd={e => (e.currentTarget.style.transform = 'scale(1)')}
+                      title={isPaused ? '恢复出品' : '停菜'}
+                    >
+                      {isPaused ? '▶' : '⏸'}
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+
+        {/* 已完成区域：分隔线 + 简化卡片 */}
+        {done.length > 0 && (
+          <>
+            <div style={{
+              width: 2, alignSelf: 'stretch', background: '#222', flexShrink: 0, margin: '0 4px',
+            }} />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, flexShrink: 0 }}>
+              <div style={{ fontSize: 18, color: '#555', fontWeight: 'bold', textAlign: 'center', padding: '4px 0' }}>
+                已完成 ({done.length})
+              </div>
+              <div style={{ display: 'flex', gap: 12 }}>
+                {done.map(t => <DoneCard key={t.id} ticket={t} />)}
+              </div>
+            </div>
+          </>
+        )}
       </div>
 
       {/* 动画 CSS（kds-border-flash / kds-rush-flash 已迁移到 OrderTicketCard.module.css） */}
@@ -404,6 +516,7 @@ export function KitchenBoard() {
 }
 
 // ─── 档口选项卡 ───
+// (BoardColumn and TicketCard replaced by TXKDSTicket from @tx/touch)
 
 const DEPT_OPTIONS = [
   { id: 'all', label: '全部' },
@@ -438,34 +551,7 @@ function DeptTabs({ selected, onChange }: { selected: string; onChange: (id: str
   );
 }
 
-// ─── 看板列 ───
-
-function BoardColumn({ title, count, color, bgColor, children }: {
-  title: string; count: number; color: string; bgColor: string; children: React.ReactNode;
-}) {
-  return (
-    <div style={{
-      flex: 1, display: 'flex', flexDirection: 'column',
-      background: bgColor, overflow: 'hidden',
-    }}>
-      <div style={{
-        textAlign: 'center', padding: '10px 0', fontSize: 20,
-        fontWeight: 'bold', color, borderBottom: `3px solid ${color}`,
-      }}>
-        {title} ({count})
-      </div>
-      <div style={{
-        flex: 1, overflowY: 'auto', padding: 10, display: 'flex',
-        flexDirection: 'column', gap: 10,
-        WebkitOverflowScrolling: 'touch',
-      }}>
-        {children}
-      </div>
-    </div>
-  );
-}
-
-// (TicketCard removed — now uses shared OrderTicketCard from @tx-ds/biz)
+// (BoardColumn and TicketCard replaced by TXKDSTicket horizontal layout)
 
 // ─── 已完成卡片（简化） ───
 

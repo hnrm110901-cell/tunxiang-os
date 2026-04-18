@@ -12,6 +12,11 @@ export default defineConfig<'webpack5'>({
   sourceRoot: 'src',
   outputRoot: 'dist',
   plugins: ['@tarojs/plugin-tailwind'],
+  sass: {
+    // 全局注入 Design Token 变量，所有 .scss 文件可直接使用 $tx-* 变量，无需 import
+    resource: ['src/styles/tokens.scss'],
+    projectDirectory: __dirname,
+  },
   defineConstants: {
     TARO_APP_API_BASE: JSON.stringify(
       process.env.TARO_APP_API_BASE || 'http://localhost:8000'

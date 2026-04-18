@@ -1,6 +1,6 @@
 .card {
-  background: linear-gradient(135deg, rgba(10,175,154,0.04) 0%, rgba(10,175,154,0.01) 100%);
-  border-left: 3px solid #0AAF9A;
+  background: linear-gradient(135deg, rgba(255,107,53,0.04) 0%, rgba(255,107,53,0.01) 100%);
+  border-left: 3px solid #FF6B35;
   border-radius: var(--radius-md, 12px);
   padding: 14px 16px;
   display: flex;

@@ -24,7 +24,8 @@
  * />
  */
 import React from 'react';
-import { Drawer, Space } from 'antd';
+// TODO: 迁移至 TXTouch — Drawer 使用 ZDrawer 替代 antd Drawer
+import ZDrawer from './ZDrawer';
 import ZBadge from './ZBadge';
 import ZButton from './ZButton';
 import styles from './DetailDrawer.module.css';
@@ -93,33 +94,51 @@ const DetailDrawer: React.FC<DetailDrawerProps> = ({
   actions = [],
   width = 480,
 }) => {
+  const footer = actions.length > 0 ? (
+    <div className={styles.footer}>
+      <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+        {actions.map((a, i) => (
+          <ZButton
+            key={a.key ?? i}
+            variant={a.type === 'primary' ? 'primary' : a.type === 'danger' ? 'danger' : 'secondary'}
+            onClick={a.onClick}
+            disabled={a.disabled}
+            loading={a.loading}
+            size="md"
+          >
+            {a.label}
+          </ZButton>
+        ))}
+      </div>
+    </div>
+  ) : undefined;
+
+  const titleNode = (
+    <div className={styles.drawerHeader}>
+      <div className={styles.titleRow}>
+        <span className={styles.title}>{title}</span>
+        {status && (
+          <ZBadge type={status.type} label={status.label} />
+        )}
+      </div>
+      {subtitle && (
+        <div className={styles.subtitle}>{subtitle}</div>
+      )}
+      {extra && (
+        <div className={styles.extra}>{extra}</div>
+      )}
+    </div>
+  );
+
   return (
-    <Drawer
+    <ZDrawer
       open={open}
       onClose={onClose}
-      placement="right"
+      title={typeof title === 'string' ? title : undefined}
       width={width}
-      mask={false}
-      closable={true}
-      style={{ boxShadow: '-4px 0 16px rgba(0,0,0,0.08)' }}
-      styles={{ body: { padding: 0, display: 'flex', flexDirection: 'column', height: '100%' } }}
-      title={
-        <div className={styles.drawerHeader}>
-          <div className={styles.titleRow}>
-            <span className={styles.title}>{title}</span>
-            {status && (
-              <ZBadge type={status.type} label={status.label} />
-            )}
-          </div>
-          {subtitle && (
-            <div className={styles.subtitle}>{subtitle}</div>
-          )}
-          {extra && (
-            <div className={styles.extra}>{extra}</div>
-          )}
-        </div>
-      }
+      footer={footer}
     >
+      {titleNode}
       <div className={styles.body}>
         {/* ── 指标行 ──────────────────────────────────────────────── */}
         {metrics.length > 0 && (
@@ -148,27 +167,7 @@ const DetailDrawer: React.FC<DetailDrawerProps> = ({
           ))}
         </div>
       </div>
-
-      {/* ── 底部操作区 ────────────────────────────────────────────── */}
-      {actions.length > 0 && (
-        <div className={styles.footer}>
-          <Space size={8} style={{ width: '100%', justifyContent: 'flex-end' }}>
-            {actions.map((a, i) => (
-              <ZButton
-                key={a.key ?? i}
-                variant={a.type === 'primary' ? 'primary' : a.type === 'danger' ? 'danger' : 'secondary'}
-                onClick={a.onClick}
-                disabled={a.disabled}
-                loading={a.loading}
-                size="md"
-              >
-                {a.label}
-              </ZButton>
-            ))}
-          </Space>
-        </div>
-      )}
-    </Drawer>
+    </ZDrawer>
   );
 };
 

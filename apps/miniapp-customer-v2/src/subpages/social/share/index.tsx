@@ -19,7 +19,7 @@ import { truncate } from '../../../utils/format'
 // ─── Brand tokens ─────────────────────────────────────────────────────────────
 
 const C = {
-  primary: '#FF6B2C',
+  primary: '#FF6B35',
   primaryDark: '#E55A1F',
   bgDeep: '#0B1A20',
   bgCard: '#132029',
@@ -112,7 +112,7 @@ function DishPicker({ dishes, selectedId, onSelect }: DishPickerProps) {
                   width: '120rpx',
                   height: '120rpx',
                   borderRadius: '16rpx',
-                  background: active ? `rgba(255,107,44,0.15)` : C.bgCard,
+                  background: active ? `rgba(255,107,53,0.15)` : C.bgCard,
                   border: `2rpx solid ${active ? C.primary : C.border}`,
                   display: 'flex',
                   alignItems: 'center',
@@ -169,7 +169,7 @@ function StoreSelector({ stores, selectedId, onSelect }: StoreSelectorProps) {
               display: 'flex',
               flexDirection: 'row',
               alignItems: 'center',
-              background: active ? `rgba(255,107,44,0.08)` : C.bgCard,
+              background: active ? `rgba(255,107,53,0.08)` : C.bgCard,
               borderRadius: '16rpx',
               padding: '20rpx 24rpx',
               marginBottom: '12rpx',
@@ -428,7 +428,7 @@ const QUICK_SHARE_OPTIONS: QuickShareOption[] = [
     icon: '🎫',
     label: '分享优惠',
     desc: '好友领券立享折扣',
-    color: '#FF6B2C',
+    color: '#FF6B35',
     buildShare: () => ({
       title: '屯象OS优惠券，限时领取！',
       path: '/pages/coupon/claim/index',

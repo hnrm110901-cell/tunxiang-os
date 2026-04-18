@@ -24,8 +24,8 @@ import { View, Text } from '@tarojs/components'
 
 // ─── Brand tokens ─────────────────────────────────────────────────────────────
 const C = {
-  primary:   '#FF6B2C',
-  primaryBg: 'rgba(255,107,44,0.12)',
+  primary:   '#FF6B35',
+  primaryBg: 'rgba(255,107,53,0.12)',
   bgDeep:    '#0B1A20',
   bgCard:    '#132029',
   border:    '#1E3040',
@@ -179,7 +179,7 @@ export default function ErrorPage() {
           width: '240rpx',
           height: '240rpx',
           borderRadius: '50%',
-          background: `radial-gradient(circle at 40% 40%, rgba(255,107,44,0.08), transparent 70%)`,
+          background: `radial-gradient(circle at 40% 40%, rgba(255,107,53,0.08), transparent 70%)`,
           border: `2rpx solid ${C.border}`,
           display: 'flex',
           alignItems: 'center',
