@@ -4,6 +4,60 @@
 
 ---
 
+## 2026-04-18 18:40 Sprint F1 / PR F：14 适配器事件总线接入基类 + pinzhi 参考实现
+
+### 本次会话目标
+Sprint F1 的剩余 P0 技术债：14 个旧系统适配器（品智/奥琦玮/天财/美团/饿了么/抖音/微信/物流/科脉/微生活/宜鼎/诺诺/小红书/ERP）全部**未接入 v147 事件总线**（`grep -rn "emit_event" shared/adapters/` 返 0）。
+
+本 PR 交付"最低改动面的统一接入基类"，让 Squad Owner 后续填 7 维评分卡时可以仅改 3-5 行代码补齐 emit 打点。
+
+Tier 级别：Tier 2（不涉及资金链路直接修改，但影响所有 POS/外卖渠道的可观测性）。
+
+### 完成状态
+- [x] **AdapterEventType 枚举** — `shared/events/src/event_types.py` 新增 11 种事件（SYNC_STARTED / FINISHED / FAILED / ORDER_INGESTED / MENU_SYNCED / MEMBER_SYNCED / INVENTORY_SYNCED / STATUS_PUSHED / WEBHOOK_RECEIVED / RECONNECTED / CREDENTIAL_EXPIRED），注册到 `DOMAIN_STREAM_MAP["adapter"]="tx_adapter_events"` + `DOMAIN_STREAM_TYPE_MAP["adapter"]="adapter"` + `ALL_EVENT_ENUMS`。
+- [x] **`emit_adapter_event` 函数式接口** — `shared/adapters/base/src/event_bus.py`：校验 adapter_name 非空且 ≤32 字符；自动构造 `stream_id="{adapter_name}:{scope}"`、`source_service="adapter:{adapter_name}"`；payload/metadata 注入 adapter_name；透传 store_id/correlation_id。
+- [x] **AdapterEventMixin + `track_sync` 异步上下文管理器** — fire-and-forget 发 SYNC_STARTED；块内业务赋 `track.ingested` / `track.pushed`；成功出块发 SYNC_FINISHED（含 duration_ms），失败 **await** 发 SYNC_FAILED（保留 error_code + ingested_count）后原样抛出。correlation_id 贯穿同一次 sync。
+- [x] **Mixin 辅助方法** — `emit_reconnected(downtime_seconds)` / `emit_credential_expired(expires_at)` / `emit_webhook_received(webhook_type, source_id, payload)` 各覆盖 1 种特殊事件，直接 await 保证落库。
+- [x] **pinzhi_adapter.py 参考改造** — `PinzhiPOSAdapter` 继承 `AdapterEventMixin`，类变量 `adapter_name="pinzhi"`；`sync_orders` 签名向后兼容地加 `tenant_id: Optional[UUID|str]=None`、`store_id` 同；传入 tenant_id 时走 `track_sync`，否则保持原逻辑；实际 I/O 下沉到私有 `_do_sync_orders`。
+- [x] **`__init__.py` 导出** — `shared/adapters/base/src/__init__.py` 加 `AdapterEventMixin / SyncTrack / emit_adapter_event` 导出到 `__all__`。
+- [x] **TDD 10 条测试全绿** — `shared/adapters/base/tests/test_event_bus.py`：基础 emit / 自定义 stream_id / 空名拒 / 超长名拒 / 成功路径 / 失败路径 + reraise / correlation_id 共享 / emit_reconnected / emit_credential_expired / emit_webhook_received。`monkeypatch setattr` 替换模块局部 `emit_event` 绑定，避开 Redis/PG 实际连接。
+- [x] **ruff 全部干净** — 3 个新文件 + 3 个修改文件 `All checks passed!`（含自动修正的 import sorting）。
+- [x] **docs/adapters/review/README.md §7 新章节** — 函数式 vs Mixin 两种用法代码示例、11 种事件类型对照表、pinzhi 参考实现指引、事件总线维度 DoD（≥3/4 + 必覆盖 ORDER_INGESTED + SYNC_FAILED + payload 必带 adapter_name/source_id/amount_fen）。
+
+### 关键决策
+- **Mixin 而非 BaseAdapter 继承链强制** — 现有 14 适配器继承结构高度异构（PinzhiPOSAdapter 不继承 BaseAdapter，MeituanAdapter 继承 BaseAdapter，ElemeAdapter 直接继承 object 等），Mixin 允许增量接入。
+- **SYNC_FAILED 用 `await` 而非 `create_task`** — 异常传播前必须保证失败事件落库；SYNC_STARTED / FINISHED 则用 `create_task` 保持"绝不阻塞业务"的承诺。这和 `shared/events/src/emitter.py` 既有的 fire-and-forget 语义互补。
+- **`track.ingested` 默认 0，失败时保留** — Squad Owner 在块内失败前哪怕只 `track.ingested = 5`，也会随 SYNC_FAILED payload 落库，便于回溯"失败前已经处理了多少条"。
+- **adapter_name 限制 ≤32 字符** — 既是防脏数据，也匹配 metadata 表的 `VARCHAR(32)` 惯例；empty 同样拒。
+- **参考实现选 pinzhi 而非 meituan** — pinzhi 虽已评分 3.0（最高），但改动面清晰（4 个 sync 方法），更易示范 track_sync 的"仅改 3-5 行"目标。meituan/eleme/douyin 涉及 CHANNEL 事件双轨（CHANNEL.ORDER_SYNCED + ADAPTER.ORDER_INGESTED），留待 Squad 补分时的 fix-PR 决定。
+- **sync_orders 签名默认 tenant_id=None** — 所有现有调用方零改动，新调用方传入后自动享受埋点。向后兼容是本 PR 的硬约束。
+
+### 交付清单
+```
+新增：
+  shared/adapters/base/src/event_bus.py                 270 行（emit_adapter_event + Mixin + 4 辅助方法）
+  shared/adapters/base/tests/test_event_bus.py          220 行（10 tests all green）
+
+修改：
+  shared/events/src/event_types.py                      +35 行（AdapterEventType + 2 域映射 + ALL_EVENT_ENUMS）
+  shared/adapters/base/src/__init__.py                  +3 export
+  shared/adapters/pinzhi_adapter.py                     +40 行（继承 Mixin + sync_orders 包装 + _do_sync_orders 拆分）
+  docs/adapters/review/README.md                        +65 行（§7 事件总线接入基类）
+```
+
+### 下一步（由用户授权后）
+1. **Squad Owner 批量 fix-PR** — 13 个剩余适配器按 7 维评分卡 Owner 填分 → 对照 pinzhi 参考补 `track_sync` 埋点（预期 3-5 行/适配器）。
+2. **`mv_adapter_health` 物化视图** — 订阅 `tx_adapter_events` 流，按 adapter_name + scope 聚合成功率/P95 延迟，给 Grafana 驾驶舱。
+3. **独立验证会话（§XIX）** — 涉及 6 文件 + 事件总线基础设施，建议审查 pinzhi 向后兼容（旧调用方是否确实零改动）+ track_sync 异常路径的异常语义对齐。
+4. **Sprint D1 批次 1 编码**（阻塞中）— `docs/sprint-plans/sprint-d1-constraint-context-design.md` 已就绪，等用户授权启动。
+
+### 已知风险
+- **pinzhi_adapter 其他三个同步方法（menu/members/inventory）未接入** — 本 PR 只示范 sync_orders，避免一次改太多；Squad Owner 按相同模式补足（约 15 行/方法）。
+- **adapter_name 的命名收敛需要治理** — 目前 pinzhi 是唯一实装；其他 13 个接入时要统一如 "meituan"（而非 "meituan_takeaway" 或 "mt"），否则 Grafana 聚合会分散。建议在 `shared/adapters/registry.py` 加 canonical names 表。
+- **pinzhi_adapter 既有的 `timedelta` / `typing.List` F401 未清理** — pre-existing，非本 PR 引入；不在 ruff 扫描范围里（被 .ruffignore 忽略或 pre-existing 豁免）。
+
+---
+
 ## 2026-04-18 18:00 Sprint A2 / PR E：断网收银 E2E + toxiproxy CI（Week 8 DEMO 硬门禁）
 
 ### 本次会话目标

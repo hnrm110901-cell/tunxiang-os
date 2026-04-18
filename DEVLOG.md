@@ -1,3 +1,33 @@
+## 2026-04-18 Sprint F1 — 14 适配器事件总线接入基类 + pinzhi 参考（PR F）
+
+### 今日完成
+- [shared/events/src/event_types.py] AdapterEventType 11 种枚举（SYNC_STARTED/FINISHED/FAILED + ORDER_INGESTED + MENU/MEMBER/INVENTORY_SYNCED + STATUS_PUSHED + WEBHOOK_RECEIVED + RECONNECTED + CREDENTIAL_EXPIRED）；注册 DOMAIN_STREAM_MAP["adapter"]="tx_adapter_events" + STREAM_TYPE_MAP + ALL_EVENT_ENUMS
+- [shared/adapters/base/src/event_bus.py] emit_adapter_event 函数（空名/>32 字符校验，自动 stream_id + source_service 前缀）+ AdapterEventMixin（track_sync 异步上下文管理器 fire-and-forget STARTED/FINISHED、await SYNC_FAILED 保证落库、correlation_id 贯穿）+ emit_reconnected / emit_credential_expired / emit_webhook_received 三个辅助方法
+- [shared/adapters/base/tests/test_event_bus.py] 10 条 TDD 测试全绿：基础 emit / 自定义 stream_id / 空名拒 / 超长名拒 / 成功路径双发 / 失败路径 reraise + ingested 保留 / correlation_id 共享 / 三个辅助方法各一条
+- [shared/adapters/base/src/__init__.py] 导出 AdapterEventMixin / SyncTrack / emit_adapter_event
+- [shared/adapters/pinzhi_adapter.py] PinzhiPOSAdapter 继承 AdapterEventMixin + adapter_name="pinzhi"；sync_orders 向后兼容地加 Optional tenant_id/store_id；传 tenant_id 时走 track_sync，否则保持原逻辑；I/O 下沉到私有 _do_sync_orders
+- [docs/adapters/review/README.md] §7 事件总线接入基类：函数式 vs Mixin 代码示例 + 11 事件对照表 + pinzhi 参考实现 + DoD（≥3/4 + 必覆盖 ORDER_INGESTED+SYNC_FAILED + adapter_name/source_id/amount_fen）
+
+### 数据变化
+- 迁移版本：无（纯 Python 基类 + 事件枚举注册）
+- 新增文件：2（event_bus.py / test_event_bus.py）
+- 修改文件：4（event_types.py / adapters/base/__init__ / pinzhi_adapter / docs README）
+- 新增测试：10（全绿）
+- ruff 状态：All checks passed!
+
+### 遗留问题
+- 13 个剩余适配器（aoqiwei/tiancai-shanglong/meituan/eleme/douyin/wechat/logistics/keruyun/weishenghuo/yiding/nuonuo/xiaohongshu/erp/delivery_factory）尚未接入 — 由 Squad Owner 填 7 维评分卡时对照 pinzhi 模板补齐（预期 3-5 行/适配器）
+- pinzhi 的 menu/members/inventory 三个同步方法未接入，只示范了 sync_orders
+- adapter_name canonical 表未建 — Grafana 聚合一致性靠治理
+- mv_adapter_health 物化视图未建 — 配套的看板下个 PR
+
+### 明日计划
+- 等 CI 绿后合入 PR F
+- 启动 Sprint D1 批次 1 编码（context.py + base.py 强化 + 3 个 Skill 接入）
+- Squad Owner 批量 fix-PR（13 个适配器接入 track_sync）
+
+---
+
 ## 2026-04-18 Sprint A2 — 断网收银 E2E + toxiproxy CI（PR E / P0-2 Week 8 硬门禁）
 
 ### 今日完成

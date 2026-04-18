@@ -90,4 +90,67 @@ Sprint F1（W3-4）交付门槛：**14 个非品智适配器**逐一通过 7 维
 
 ---
 
+## 7. 事件总线接入基类（Sprint F1 / PR F 交付）
+
+PR F 为所有 14 个适配器统一交付接入事件总线的基础设施，路径 `shared/adapters/base/src/event_bus.py`。Squad Owner 在补缺口时只需改 3-5 行代码。
+
+### 两种接入方式
+
+**函数式（最小侵入）**：
+
+```python
+from shared.adapters.base.src.event_bus import emit_adapter_event
+from shared.events.src.event_types import AdapterEventType
+
+asyncio.create_task(emit_adapter_event(
+    adapter_name="meituan",
+    event_type=AdapterEventType.ORDER_INGESTED,
+    tenant_id=tenant_id,
+    scope="orders",
+    payload={"source_id": raw["order_id"], "amount_fen": raw["total_price"] * 100},
+))
+```
+
+**Mixin 继承（推荐新适配器）**：
+
+```python
+from shared.adapters.base.src.event_bus import AdapterEventMixin
+
+class MeituanAdapter(AdapterEventMixin):
+    adapter_name = "meituan"
+
+    async def sync_orders(self, since, tenant_id):
+        async with self.track_sync(tenant_id=tenant_id, scope="orders") as track:
+            raw = await self._fetch_orders(since)
+            track.ingested = len(raw)
+            return raw
+```
+
+`track_sync` 自动发 `SYNC_STARTED` → `SYNC_FINISHED` / `SYNC_FAILED`，失败原样抛出。
+
+### AdapterEventType 11 种事件
+
+| 事件 | 用途 |
+|---|---|
+| `SYNC_STARTED` / `SYNC_FINISHED` / `SYNC_FAILED` | 同步三元事件（由 `track_sync` 自动发） |
+| `ORDER_INGESTED` | 单条三方订单入库 |
+| `MENU_SYNCED` / `MEMBER_SYNCED` / `INVENTORY_SYNCED` | 按实体分流的批次事件 |
+| `STATUS_PUSHED` | 状态回写三方（并行运行期） |
+| `WEBHOOK_RECEIVED` | 三方 webhook 回调入口（外卖退单/票据回执） |
+| `RECONNECTED` | 长时故障首次恢复（触发 Agent 重算、SRE P0） |
+| `CREDENTIAL_EXPIRED` | Token/AccessKey 过期 |
+
+### 参考实现
+
+`shared/adapters/pinzhi_adapter.py` `PinzhiPOSAdapter.sync_orders` 已接入 `track_sync`，其余 13 个适配器在填 7 维评分卡后的 fix-PR 中逐一接入，Owner 可对照此模式改造。
+
+### 验收门槛
+
+- [ ] 适配器 `emit_event` 维度得分 ≥ 3/4（即"主要事件+关键异常打点"）
+- [ ] 至少覆盖 `ORDER_INGESTED` + `SYNC_FAILED` 两类事件
+- [ ] payload 含 `adapter_name` + `source_id` + `amount_fen`（如涉及金额）
+- [ ] `shared/adapters/base/tests/test_event_bus.py` 10/10 绿（PR F 已全绿）
+
+---
+
 骨架文档列表：见同目录 `<code>.md`（14 份）。每份骨架的 "7 维评分" 留 `?/4`，由 Squad Owner 在 W3 填写并提交 PR。

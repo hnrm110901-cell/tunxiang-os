@@ -15,7 +15,6 @@ from __future__ import annotations
 
 from enum import Enum
 
-
 # ──────────────────────────────────────────────────────────────────────
 # 核心业务域（七条因果链直接关联）
 # ──────────────────────────────────────────────────────────────────────
@@ -259,6 +258,8 @@ DOMAIN_STREAM_MAP: dict[str, str] = {
     "growth":       "tx_growth_events",
     # 知识库域
     "knowledge":    "tx_knowledge_events",
+    # 旧系统适配器域（Sprint F1 / PR F，14 个 POS / 外卖 / 物流 / 财税适配器统一入口）
+    "adapter":      "tx_adapter_events",
     # 兼容旧域
     "trade":        "trade_events",
     "supply":       "supply_events",
@@ -295,6 +296,8 @@ DOMAIN_STREAM_TYPE_MAP: dict[str, str] = {
     "growth":       "growth",
     # 知识库域
     "knowledge":    "knowledge",
+    # 旧系统适配器域（Sprint F1 / PR F）
+    "adapter":      "adapter",
 }
 
 # ──────────────────────────────────────────────────────────────────────
@@ -383,6 +386,35 @@ class MenuEventType(str, Enum):
     STORE_OVERRIDE_RESET = "menu.store_override_reset"  # 门店覆盖全部重置为集团方案
 
 
+class AdapterEventType(str, Enum):
+    """旧系统适配器事件 — 14 个 POS / 外卖 / 物流 / 财税适配器统一留痕（Sprint F1 / PR F）
+
+    因果链：14 适配器（品智/奥琦玮/天财/美团/饿了么/抖音/微信/物流/科脉/微生活/
+    宜鼎/诺诺/小红书/ERP）与屯象事件总线的唯一接入面。所有抓取/推送/回写/
+    webhook 回调都通过本类型枚举进入 tx_adapter_events 流，下游 Agent 和
+    SRE 驾驶舱按 adapter_name 维度看健康度。
+
+    设计原则：
+      - SYNC_STARTED/FINISHED 成对（便于算耗时与成功率）
+      - ORDER_INGESTED / MENU_SYNCED / MEMBER_SYNCED / INVENTORY_SYNCED 按实体分流
+      - SYNC_FAILED 携带 error_code 便于 Grafana 按 code 聚类
+      - RECONNECTED 监测长期故障后首次恢复（P0 告警触发条件）
+      - WEBHOOK_RECEIVED 作为三方回调链路的入口事件（外卖退单、异议、票据回执）
+    """
+
+    SYNC_STARTED = "adapter.sync_started"           # 同步开始（按 scope=orders/menu/members/inventory 区分）
+    SYNC_FINISHED = "adapter.sync_finished"         # 同步成功结束
+    SYNC_FAILED = "adapter.sync_failed"             # 同步失败（需 payload.error_code）
+    ORDER_INGESTED = "adapter.order_ingested"       # 单条外卖/POS 订单入库
+    MENU_SYNCED = "adapter.menu_synced"             # 菜品同步批次
+    MEMBER_SYNCED = "adapter.member_synced"         # 会员同步批次
+    INVENTORY_SYNCED = "adapter.inventory_synced"   # 库存同步批次
+    STATUS_PUSHED = "adapter.status_pushed"         # 状态回写三方（并行运行期关键事件）
+    WEBHOOK_RECEIVED = "adapter.webhook_received"   # 三方 webhook 回调入口
+    RECONNECTED = "adapter.reconnected"             # 长时故障后首次恢复（触发 Agent 重算）
+    CREDENTIAL_EXPIRED = "adapter.credential_expired"  # Token/AccessKey 到期
+
+
 class GrowthEventType(str, Enum):
     """增长中枢事件 — 私域复购链路"""
 
@@ -448,4 +480,6 @@ ALL_EVENT_ENUMS = (
     GrowthEventType,
     # 菜谱方案域（v245 新增，模块3.4）
     MenuEventType,
+    # 旧系统适配器域（Sprint F1 / PR F）
+    AdapterEventType,
 )

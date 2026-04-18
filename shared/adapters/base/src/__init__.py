@@ -1,6 +1,7 @@
 """API适配器基础模块"""
 try:
     from .adapter import BaseAdapter, APIError
+    from .event_bus import AdapterEventMixin, SyncTrack, emit_adapter_event
     from .mapper import DataMapper
     from .registry import (
         POS_REGISTRY,
@@ -21,6 +22,9 @@ try:
     __all__ = [
         "BaseAdapter",
         "APIError",
+        "AdapterEventMixin",
+        "SyncTrack",
+        "emit_adapter_event",
         "DataMapper",
         "POS_REGISTRY",
         "RESERVATION_REGISTRY",
