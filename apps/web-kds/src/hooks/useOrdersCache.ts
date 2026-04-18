@@ -1,13 +1,16 @@
 /**
- * useOrdersCache — KDS 本地订单缓存 Hook（C1）
+ * useOrdersCache — KDS 本地订单缓存 Hook（C1 + C2 自动降级）
  *
  * 职责：
  *   - mount 时从 IDB hydrate 到内存
  *   - 对外暴露 upsert / getLastN / stats
- *   - 只读模式（断网健康检查尚未接入前手动控制，C2 将接 WebSocket health）
+ *   - 只读模式：
+ *       * 手动 setReadOnly 仍保留（单元测试与覆盖场景使用）
+ *       * 挂载了 ConnectionProvider 时，health !== 'online' 自动 readOnly=true，
+ *         health=online 自动 readOnly=false；手动 setReadOnly 优先级最高
  *
  * 不在本次范围：
- *   - WebSocket 订阅 / 增量同步（留给 C2/C3）
+ *   - WebSocket 增量同步（留给 C3）
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
@@ -18,6 +21,7 @@ import {
   type CacheStats,
 } from '../db/kdsOrdersDB';
 import { isFeatureEnabled } from '../config/featureFlags';
+import { useConnection } from '../contexts/ConnectionContext';
 
 export interface UseOrdersCacheReturn {
   orders: KdsCachedOrder[];
@@ -34,9 +38,21 @@ export function useOrdersCache(): UseOrdersCacheReturn {
   const enabled = isFeatureEnabled('edge.kds.local_cache.enable');
   const [orders, setOrders] = useState<KdsCachedOrder[]>([]);
   const [hydrating, setHydrating] = useState(true);
-  const [readOnly, setReadOnly] = useState(false);
+  // 手动 override：undefined 表示跟随连接健康；true/false 为强制覆盖
+  const [manualReadOnly, setManualReadOnly] = useState<boolean | undefined>(
+    undefined,
+  );
   const [stats, setStats] = useState<CacheStats | null>(null);
   const mountedRef = useRef(true);
+
+  // 来自 ConnectionProvider 的健康状态（未挂载时默认 online）
+  const { health } = useConnection();
+  const autoReadOnly = health !== 'online';
+  const readOnly = manualReadOnly !== undefined ? manualReadOnly : autoReadOnly;
+
+  const setReadOnly = useCallback((v: boolean) => {
+    setManualReadOnly(v);
+  }, []);
 
   const refresh = useCallback(async () => {
     if (!enabled) return;
