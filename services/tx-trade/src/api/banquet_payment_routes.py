@@ -28,7 +28,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db_no_rls, get_db_with_tenant
 
+from ..security.rbac import UserContext, require_role
 from ..services.banquet_payment_service import BanquetPaymentService
+from ..services.trade_audit_log import write_audit
 
 logger = structlog.get_logger()
 router = APIRouter(prefix="/api/v1/banquet", tags=["banquet-payment"])
@@ -111,16 +113,30 @@ async def create_deposit(
     banquet_id: UUID,
     body: CreateDepositReq,
     request: Request,
-    svc: BanquetPaymentService = Depends(_svc),
+    db: AsyncSession = Depends(_get_db),
+    user: UserContext = Depends(require_role("store_manager", "admin")),
 ):
-    """创建定金记录（初始状态 pending）"""
+    """创建定金记录（初始状态 pending；仅店长/管理员）"""
     try:
         tenant_id = UUID(_get_tenant_id(request))
+        svc = BanquetPaymentService(tenant_id=str(tenant_id), db=db)
         deposit = await svc.create_deposit(
             banquet_id=banquet_id,
             tenant_id=tenant_id,
             total_deposit_fen=body.total_deposit_fen,
             due_date=body.due_date,
+        )
+        await write_audit(
+            db,
+            tenant_id=str(tenant_id),
+            store_id=user.store_id,
+            user_id=user.user_id,
+            user_role=user.role,
+            action="banquet.deposit.create",
+            target_type="banquet",
+            target_id=str(banquet_id),
+            amount_fen=body.total_deposit_fen,
+            client_ip=user.client_ip,
         )
         return _ok(deposit.model_dump(mode="json"))
     except ValueError as exc:
@@ -149,15 +165,17 @@ async def initiate_wechat_pay(
     banquet_id: UUID,
     body: WechatPayReq,
     request: Request,
-    svc: BanquetPaymentService = Depends(_svc),
+    db: AsyncSession = Depends(_get_db),
+    user: UserContext = Depends(require_role("store_manager", "admin")),
 ):
-    """发起微信小程序支付（JSAPI模式）
+    """发起微信小程序支付（JSAPI模式；仅店长/管理员）
 
     先调用 POST /{banquet_id}/deposit 创建定金记录，获取 deposit_id，
     再调用本接口发起支付，前端使用返回的 jsapi_params 调起微信支付。
     """
     try:
         tenant_id = UUID(_get_tenant_id(request))
+        svc = BanquetPaymentService(tenant_id=str(tenant_id), db=db)
         # 取该宴席最新定金记录 id
         deposit = await svc.get_deposit(banquet_id=banquet_id, tenant_id=tenant_id)
         if deposit is None:
@@ -168,6 +186,18 @@ async def initiate_wechat_pay(
             tenant_id=tenant_id,
             openid=body.openid,
             notify_url=body.notify_url,
+        )
+        await write_audit(
+            db,
+            tenant_id=str(tenant_id),
+            store_id=user.store_id,
+            user_id=user.user_id,
+            user_role=user.role,
+            action="banquet.deposit.wechat_pay",
+            target_type="banquet_deposit",
+            target_id=str(deposit.id),
+            amount_fen=getattr(deposit, "total_deposit_fen", None),
+            client_ip=user.client_ip,
         )
         return _ok(result.model_dump(mode="json"))
     except ValueError as exc:
@@ -253,9 +283,10 @@ async def create_confirmation(
     banquet_id: UUID,
     body: CreateConfirmationReq,
     request: Request,
-    svc: BanquetPaymentService = Depends(_svc),
+    db: AsyncSession = Depends(_get_db),
+    user: UserContext = Depends(require_role("store_manager", "admin")),
 ):
-    """创建电子确认单
+    """创建电子确认单（仅店长/管理员）
 
     menu_items 格式：
     [{"dish_id": "...", "dish_name": "...", "quantity": 2,
@@ -263,6 +294,7 @@ async def create_confirmation(
     """
     try:
         tenant_id = UUID(_get_tenant_id(request))
+        svc = BanquetPaymentService(tenant_id=str(tenant_id), db=db)
         confirmation = await svc.create_confirmation(
             banquet_id=banquet_id,
             tenant_id=tenant_id,
@@ -271,6 +303,18 @@ async def create_confirmation(
             confirmed_by_name=body.confirmed_by_name,
             confirmed_by_phone=body.confirmed_by_phone,
             special_requirements=body.special_requirements,
+        )
+        await write_audit(
+            db,
+            tenant_id=str(tenant_id),
+            store_id=user.store_id,
+            user_id=user.user_id,
+            user_role=user.role,
+            action="banquet.confirmation.create",
+            target_type="banquet",
+            target_id=str(banquet_id),
+            amount_fen=None,
+            client_ip=user.client_ip,
         )
         return _ok(confirmation.model_dump(mode="json"))
     except ValueError as exc:
@@ -301,11 +345,13 @@ async def sign_confirmation(
     banquet_id: UUID,
     body: SignConfirmationReq,
     request: Request,
-    svc: BanquetPaymentService = Depends(_svc),
+    db: AsyncSession = Depends(_get_db),
+    user: UserContext = Depends(require_role("store_manager", "admin")),
 ):
-    """顾客确认签字，将确认单状态更新为 confirmed"""
+    """顾客确认签字，将确认单状态更新为 confirmed（仅店长/管理员代签）"""
     try:
         tenant_id = UUID(_get_tenant_id(request))
+        svc = BanquetPaymentService(tenant_id=str(tenant_id), db=db)
         # 取最新确认单 id
         confirmation = await svc.get_confirmation(
             banquet_id=banquet_id, tenant_id=tenant_id
@@ -317,6 +363,18 @@ async def sign_confirmation(
             confirmation_id=confirmation.id,
             tenant_id=tenant_id,
             signature_data=body.signature_data,
+        )
+        await write_audit(
+            db,
+            tenant_id=str(tenant_id),
+            store_id=user.store_id,
+            user_id=user.user_id,
+            user_role=user.role,
+            action="banquet.confirmation.sign",
+            target_type="banquet_confirmation",
+            target_id=str(confirmation.id),
+            amount_fen=None,
+            client_ip=user.client_ip,
         )
         return _ok(signed.model_dump(mode="json"))
     except ValueError as exc:

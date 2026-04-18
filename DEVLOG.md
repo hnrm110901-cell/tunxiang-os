@@ -1,3 +1,32 @@
+## 2026-04-18 Sprint A4 — tx-trade RBAC 统一装饰器 + 审计日志（Follow-up PR D）
+
+### 今日完成
+- [shared/db-migrations] v261_trade_audit_logs：按月分区 + RLS（app.tenant_id）+ 3 索引，预建 2026-04/05/06 分区，upgrade/downgrade 可回滚
+- [services/tx-trade/src/services/trade_audit_log.py] `write_audit(...)` 审计写入器：set_config + INSERT；SQLAlchemyError rollback 不抛；最外层 except Exception（§XIV 例外）+ exc_info=True 兜底，审计永不阻塞业务
+- [services/tx-trade/src/security/rbac.py] UserContext + require_role(*roles) + require_mfa(*roles) + extract_user_context；与 gateway/src/middleware/rbac.py 同语义；TX_AUTH_ENABLED=false 时 dev bypass
+- [services/tx-trade/src/api] 9 个路由文件（payment_direct/refund/discount_engine/discount_audit/scan_pay/banquet_payment/platform_coupon/enterprise_meal/douyin_voucher）共 33/52 端点接入 `Depends(require_role(...))` + `write_audit(...)` 留痕；discount_engine 对 > ¥100 manual_discount 强制 store_manager+MFA
+- [services/tx-trade/src/tests] TDD 15 条新测试全绿：`test_trade_audit_log.py`（6）+ `test_rbac_decorator.py`（5）+ `test_rbac_integration.py`（4 端到端）
+
+### 数据变化
+- 迁移版本：v260 → **v261**（trade_audit_logs 按月分区）
+- 新增 API 模块：0（仅给现有 9 个路由加拦截 + 审计）
+- 新增测试：15（audit_log 6 + rbac 5 + integration 4）
+- 新增文件：6（v261 迁移 / rbac.py / trade_audit_log.py / 3 个 test\_\*.py）
+- 修改文件：11（9 个路由 + 2 个 baseline 测试加 TX_AUTH_ENABLED）
+
+### 遗留问题
+- 19/52 端点未接入 RBAC（读路径为主）：banquet_payment 3 读 / enterprise_meal 3 读 / douyin_voucher 5 读 / 其他服务域 0 覆盖
+- `test_douyin_voucher.py` 3 条既有 bug（data["ok"] 期望值不匹配）pre-existing，非本 PR 回归
+- `scan_pay_routes.py` 顶部 `datetime/timezone` pre-existing F401（非本 PR 引入）
+- tx-trade 以外服务（tx-member/tx-finance/tx-supply）的资金敏感路由同样 0 RBAC，待下个 PR
+
+### 明日计划
+- 独立验证会话（CLAUDE.md §19）：Tier 1 路径 + 多文件改动，新 session 审查支付/退款流程
+- Follow-up PR D.2：补齐 19 个读端点 RBAC
+- Follow-up PR D.3：rbac 提升到 shared/security/，tx-member/tx-finance/tx-supply 共用
+
+---
+
 ## 2026-04-18 Sprint 启动 — 主规划 V1.0 + A1 前端 TDD + F1 适配器评审骨架
 
 ### 今日完成

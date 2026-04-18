@@ -19,6 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
 
+from ..security.rbac import UserContext, require_role
 from ..services.discount_audit_service import DiscountAuditService
 
 router = APIRouter(prefix="/api/v1/discount", tags=["discount-audit"])
@@ -47,8 +48,9 @@ async def get_audit_log(
     page: int = Query(1, ge=1),
     size: int = Query(20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
+    user: UserContext = Depends(require_role("admin", "tenant_admin", "auditor", "audit_admin")),
 ):
-    """GET /api/v1/discount/audit-log — 折扣审计记录列表（manager/owner only）"""
+    """GET /api/v1/discount/audit-log — 折扣审计记录列表（管理员/审计员）"""
     tenant_id = _get_tenant_id(request)
     svc = DiscountAuditService(db, tenant_id)
 
@@ -76,6 +78,7 @@ async def get_audit_summary(
     store_id: Optional[str] = Query(None),
     period: str = Query("today", pattern="^(today|week|month)$"),
     db: AsyncSession = Depends(get_db),
+    user: UserContext = Depends(require_role("admin", "tenant_admin", "auditor", "audit_admin")),
 ):
     """GET /api/v1/discount/audit-log/summary — 按操作员汇总折扣统计"""
     from datetime import timedelta, timezone
@@ -131,6 +134,7 @@ async def get_high_risk(
     page: int = Query(1, ge=1),
     size: int = Query(20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
+    user: UserContext = Depends(require_role("admin", "tenant_admin", "auditor", "audit_admin")),
 ):
     """GET /api/v1/discount/audit-log/high-risk — 折扣率超过阈值的记录列表"""
     from decimal import Decimal

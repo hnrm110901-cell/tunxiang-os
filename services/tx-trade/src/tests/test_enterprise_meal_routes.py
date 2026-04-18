@@ -13,6 +13,9 @@
 import os
 import sys
 
+# Sprint A4：RBAC 装饰器在 TX_AUTH_ENABLED=false 时注入 mock 用户
+os.environ["TX_AUTH_ENABLED"] = "false"
+
 # ─── 路径准备 ─────────────────────────────────────────────────────────────────
 _TESTS_DIR = os.path.dirname(__file__)
 _SRC_DIR   = os.path.abspath(os.path.join(_TESTS_DIR, ".."))

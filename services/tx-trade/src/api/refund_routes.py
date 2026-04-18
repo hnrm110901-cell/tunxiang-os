@@ -19,6 +19,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
 
+from ..security.rbac import UserContext, require_role
+from ..services.trade_audit_log import write_audit
+
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/v1/trade/refunds", tags=["refund"])
 
@@ -57,8 +60,9 @@ async def submit_refund(
     req: SubmitRefundRequest,
     x_tenant_id: Optional[str] = Header(None, alias="X-Tenant-ID"),
     db: AsyncSession = Depends(get_db),
+    user: UserContext = Depends(require_role("store_manager", "admin")),
 ):
-    """提交退款申请，写入 refund_requests 表"""
+    """提交退款申请，写入 refund_requests 表（仅店长/管理员）"""
     if req.refund_amount_fen <= 0:
         raise HTTPException(status_code=400, detail="退款金额必须大于0")
 
@@ -120,6 +124,20 @@ async def submit_refund(
             ))
         except Exception:  # noqa: BLE001 — 事件写入失败不阻断主流程
             pass
+
+        # ─── Sprint A4 RBAC 审计留痕 ───
+        await write_audit(
+            db,
+            tenant_id=tenant_id,
+            store_id=user.store_id,
+            user_id=user.user_id,
+            user_role=user.role,
+            action="refund.apply",
+            target_type="order",
+            target_id=str(req.order_id),
+            amount_fen=req.refund_amount_fen,
+            client_ip=user.client_ip,
+        )
 
         return {
             "ok": True,

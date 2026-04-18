@@ -15,14 +15,31 @@ import sys
 import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../../../../.."))
 
+# Sprint A4：RBAC 装饰器在 TX_AUTH_ENABLED=false 时注入 mock 用户，
+# 使现有测试无需手动构造 JWT / UserContext。强制写入以覆盖其他测试模块的设置。
+os.environ["TX_AUTH_ENABLED"] = "false"
+
 from services.tx_trade.src.api.douyin_voucher_routes import router, _RETRY_QUEUE, _AUTHORIZED_STORES
+from shared.ontology.src.database import get_db
+from unittest.mock import AsyncMock
 
 # ──────────────────────────────────────────────────────────────────────────────
 # 测试 App
 # ──────────────────────────────────────────────────────────────────────────────
 
+async def _mock_get_db():
+    """Mock DB：Sprint A4 新增 write_audit 需要 db session，但本测试套件
+    不真正验证审计写入。提供 AsyncMock 即可吞掉 set_config/INSERT。"""
+    db = AsyncMock()
+    db.execute = AsyncMock()
+    db.commit = AsyncMock()
+    db.rollback = AsyncMock()
+    yield db
+
+
 app = FastAPI()
 app.include_router(router)
+app.dependency_overrides[get_db] = _mock_get_db
 client = TestClient(app, raise_server_exceptions=False)
 
 TENANT_HEADER = {"X-Tenant-ID": "test-tenant-001"}

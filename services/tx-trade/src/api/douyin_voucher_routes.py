@@ -19,12 +19,18 @@ from __future__ import annotations
 import asyncio
 import uuid
 from datetime import date, datetime, timezone
-from typing import Optional, List
+from typing import List, Optional
 
 import structlog
 from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, Query
 from fastapi import status as http_status
 from pydantic import BaseModel, Field
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from shared.ontology.src.database import get_db
+
+from ..security.rbac import UserContext, require_role
+from ..services.trade_audit_log import write_audit
 
 logger = structlog.get_logger(__name__)
 
@@ -188,6 +194,8 @@ class AuthorizeStoreRequest(BaseModel):
 async def verify_voucher(
     body: VerifyVoucherRequest,
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
+    user: UserContext = Depends(require_role("cashier", "store_manager", "admin")),
 ) -> dict:
     """
     核销团购券
@@ -288,6 +296,19 @@ async def verify_voucher(
         verify_time=verify_time.isoformat(),
     )
 
+    await write_audit(
+        db,
+        tenant_id=x_tenant_id,
+        store_id=body.store_id,
+        user_id=user.user_id,
+        user_role=user.role,
+        action="douyin_voucher.verify",
+        target_type="voucher",
+        target_id=None,
+        amount_fen=voucher_info.get("amount_fen"),
+        client_ip=user.client_ip,
+    )
+
     return {
         "ok": True,
         "success": True,
@@ -307,6 +328,8 @@ async def verify_voucher(
 async def batch_verify_vouchers(
     body: BatchVerifyRequest,
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
+    user: UserContext = Depends(require_role("cashier", "store_manager", "admin")),
 ) -> dict:
     """批量核销（最多50张）"""
     results = []
@@ -354,6 +377,19 @@ async def batch_verify_vouchers(
         success=success_count,
         failed=fail_count,
         tenant_id=x_tenant_id,
+    )
+
+    await write_audit(
+        db,
+        tenant_id=x_tenant_id,
+        store_id=user.store_id,
+        user_id=user.user_id,
+        user_role=user.role,
+        action="douyin_voucher.batch_verify",
+        target_type="voucher_batch",
+        target_id=None,
+        amount_fen=None,
+        client_ip=user.client_ip,
     )
 
     return {
@@ -551,8 +587,10 @@ async def list_retry_queue(
 async def manual_retry(
     task_id: str,
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
+    user: UserContext = Depends(require_role("store_manager", "admin")),
 ) -> dict:
-    """手动重试失败核销"""
+    """手动重试失败核销（仅店长/管理员）"""
     task = _RETRY_QUEUE.get(task_id)
     if task is None:
         raise HTTPException(
@@ -582,6 +620,18 @@ async def manual_retry(
             voucher_code=task["voucher_code"],
             retry_count=task["retry_count"] + 1,
             tenant_id=x_tenant_id,
+        )
+        await write_audit(
+            db,
+            tenant_id=x_tenant_id,
+            store_id=task.get("store_id"),
+            user_id=user.user_id,
+            user_role=user.role,
+            action="douyin_voucher.retry.manual",
+            target_type="retry_task",
+            target_id=None,
+            amount_fen=None,
+            client_ip=user.client_ip,
         )
         return {
             "ok": True,
@@ -625,8 +675,10 @@ async def manual_retry(
 async def auto_retry_queue(
     background_tasks: BackgroundTasks,
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
+    user: UserContext = Depends(require_role("store_manager", "admin")),
 ) -> dict:
-    """触发批量自动重试（最大3次）"""
+    """触发批量自动重试（最大3次；仅店长/管理员）"""
     pending_tasks = [
         t for t in _RETRY_QUEUE.values()
         if t["status"] == "pending" and t["retry_count"] < MAX_RETRY_TIMES
@@ -668,6 +720,19 @@ async def auto_retry_queue(
         tenant_id=x_tenant_id,
     )
 
+    await write_audit(
+        db,
+        tenant_id=x_tenant_id,
+        store_id=user.store_id,
+        user_id=user.user_id,
+        user_role=user.role,
+        action="douyin_voucher.retry.auto",
+        target_type="retry_queue",
+        target_id=None,
+        amount_fen=None,
+        client_ip=user.client_ip,
+    )
+
     return {
         "ok": True,
         "data": {
@@ -701,8 +766,10 @@ async def authorize_store(
     store_id: str,
     body: AuthorizeStoreRequest,
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
+    user: UserContext = Depends(require_role("admin", "tenant_admin")),
 ) -> dict:
-    """门店授权（绑定抖音商户ID）"""
+    """门店授权（绑定抖音商户ID；仅 admin/tenant_admin）"""
     if store_id in _AUTHORIZED_STORES:
         existing = _AUTHORIZED_STORES[store_id]
         logger.info(
@@ -727,6 +794,19 @@ async def authorize_store(
         "authorized_at": _now_str(),
         "status": "active",
     }
+
+    await write_audit(
+        db,
+        tenant_id=x_tenant_id,
+        store_id=store_id,
+        user_id=user.user_id,
+        user_role=user.role,
+        action="douyin_voucher.store.authorize",
+        target_type="store",
+        target_id=None,
+        amount_fen=None,
+        client_ip=user.client_ip,
+    )
 
     return {
         "ok": True,

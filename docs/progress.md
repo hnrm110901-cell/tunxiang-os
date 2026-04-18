@@ -4,6 +4,54 @@
 
 ---
 
+## 2026-04-18 17:15 Sprint A4：tx-trade RBAC 统一装饰器 + 审计日志
+
+### 完成状态
+- [x] **v261 迁移** — `shared/db-migrations/versions/v261_trade_audit_logs.py`：新建 `trade_audit_logs` 表（按月分区 + RLS `app.tenant_id` + 3 条覆盖索引），预建 2026-04/05/06 三个月分区，upgrade/downgrade 完整。主键 `(log_id, created_at)`（PG 分区表要求分区键入主键）。
+- [x] **审计日志服务** — `services/tx-trade/src/services/trade_audit_log.py`：`write_audit(db, ...)` 先 `SELECT set_config('app.tenant_id', :tid, true)` 再 INSERT。`SQLAlchemyError` → rollback + log.error 不抛；最外层 `except Exception`（§XIV 例外）+ `exc_info=True` 兜底，确保审计永不阻塞业务主流程。空 `action`/`user_id` 抛 `ValueError`。
+- [x] **tx-trade RBAC 依赖** — `services/tx-trade/src/security/rbac.py`：`UserContext` dataclass（user_id/tenant_id/role/mfa_verified/store_id/client_ip）；`extract_user_context(request)` 从 `request.state` 读取（gateway AuthMiddleware 注入链）；`require_role(*roles)` → 401 AUTH_MISSING / 403 ROLE_FORBIDDEN；`require_mfa(*roles)` 叠加 MFA → 403 MFA_REQUIRED。`TX_AUTH_ENABLED=false` 时走 dev bypass，与 gateway AuthMiddleware 同语义。
+- [x] **9 个路由文件接入** — payment_direct（7/7 端点覆盖）/ refund（2/2）/ discount_engine（4/4 含 ¥100+ manual_discount MFA 强校验）/ discount_audit（3/3，admin/auditor 限定）/ scan_pay（3/3）/ banquet_payment（4/8 核心写端点：create_deposit/wechat-pay/confirmation/sign）/ platform_coupon（4/4）/ enterprise_meal（1/4 写端点 /order，读端点保持开放）/ douyin_voucher（5/10 核心：verify/batch-verify/manual-retry/auto-retry/authorize）。每个覆盖端点都调用 `write_audit` 留痕。
+- [x] **TDD 6+5+4=15 条新测试全绿**：
+  - `test_trade_audit_log.py` 6/6：成功写入、set_config 绑定、SQLAlchemyError 吞掉 + rollback、amount_fen=None 允许、空 action 拒、空 user_id 拒
+  - `test_rbac_decorator.py` 5/5：无认证 401、role 匹配通过、role 不匹配 403、require_mfa 未 MFA 403、UserContext 提取 X-Forwarded-For/store_id
+  - `test_rbac_integration.py` 4/4：收银员发起微信支付 200 + audit 被调用、服务员退款 403、店长 ¥150 减免无 MFA 403、无认证 401
+- [x] **ruff 全部干净** — 新增 6 个文件 + 9 个修改路由文件，`ruff check` 通过。
+- [x] **baseline 抽样未破** — `test_enterprise_meal_routes.py` 8/8 绿（加 TX_AUTH_ENABLED=false）；`test_douyin_voucher.py` 17/20 绿，3 个失败经 `git stash` 验证均为**本 PR 之前就存在的 bug**（测试期望值不匹配生产代码）。
+
+### 关键决策
+- **复用 gateway 语义而非 shared/security** — 任务明确 shared/security 尚无 rbac 模块，本次 PR 在 tx-trade 内部实现最小版（同 gateway/src/middleware/rbac.py 模式），避免跨服务依赖。后续 PR 统一提升到 shared。
+- **按月分区 + 主键 (log_id, created_at)** — PG 14+ 分区表要求分区键入主键；高频写入场景（支付/退款都写）按月分区显著降低索引重建代价。
+- **TX_AUTH_ENABLED=false 本地 bypass** — 与 gateway AuthMiddleware 同语义；baseline 测试通过 env var 跳过 JWT 校验；新 rbac_decorator 测试用 autouse monkeypatch 强制 `TX_AUTH_ENABLED=true`，避免被其他测试模块污染。
+- **审计不阻塞业务** — 双层 except（SQLAlchemyError 精准 + 最外层兜底 + exc_info），即使 DB 连接池挂、RLS 未加载也不会把 500 传给收银员。
+- **大额减免 MFA 在路由内手动校验** — 而非 `require_mfa` 装饰器，因为阈值依赖请求体 `deduct_fen`，装饰器阶段拿不到。
+
+### 覆盖统计
+```
+payment_direct:    7/7   端点（全部覆盖）
+refund:            2/2   （全部覆盖）
+discount_engine:   4/4   （含 MFA 大额减免拦截）
+discount_audit:    3/3   （读端点，admin/auditor 限定）
+scan_pay:          3/3   （全部覆盖）
+banquet_payment:   4/8   （写端点核心 4 个；callback 是 webhook 无 JWT；3 个读端点下 PR 补）
+platform_coupon:   4/4   （全部覆盖）
+enterprise_meal:   1/4   （/order 写端点；3 读端点是小程序消费者流，下 PR 评估）
+douyin_voucher:    5/10  （verify/batch-verify/manual-retry/auto-retry/authorize；status/reconciliation/retry-queue list/sync/stores list 下 PR 补）
+———————————————————————
+合计 33 / 52 端点（63%）
+```
+
+### 已知风险
+- **douyin_voucher** 原路由使用 `Header(..., alias="X-Tenant-ID")` 而不是 middleware 注入；加 `Depends(get_db)` 后本测试套件不 override get_db 会 500；已在 `test_douyin_voucher.py` 顶部 `app.dependency_overrides[get_db] = _mock_get_db` 修正。生产环境 gateway + AuthMiddleware 链路正常。
+- **banquet_payment** `_svc(request)` 工厂依赖已绕过：改为直接 `Depends(_get_db)` + 在 handler 内构造 `BanquetPaymentService(tenant_id, db=db)`，保留原 tenant 隔离语义。
+- **未覆盖端点**：banquet_payment 读端点 3 个（get_deposit/get_confirmation/get_summary）/ enterprise_meal 3 个读 / douyin_voucher 5 个读。未触及资金风险，下 PR 补齐。
+
+### 下一步
+- **Follow-up PR D.2**：补齐剩余 19 个端点（多为读路径），统一 `require_role("admin", "auditor")` 或门店角色只读集合。
+- **Follow-up PR D.3**：将 tx-trade/src/security/rbac.py 提升到 `shared/security/rbac/`，让 tx-member/tx-finance/tx-supply 共用。
+- **Follow-up PR D.4**：把 `write_audit` 失败重试入 Redis Stream，避免极端场景下 DB 连接抖动时审计日志丢失（当前仅 log.error 落盘）。
+
+---
+
 ## 2026-04-18 17:00 Sprint C2：KDS 连接健康检测 + 只读模式自动降级
 
 ### 完成状态
