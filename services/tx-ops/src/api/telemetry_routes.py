@@ -1,0 +1,177 @@
+"""POS 遥测路由 — 前端崩溃上报
+
+端点:
+  POST /api/v1/telemetry/pos-crash   接收 apps/web-pos ErrorBoundary 上报
+
+限流维度 device_id：每 60 秒最多 1 条。理由是崩溃后 ErrorBoundary 常在同一渲染
+循环内重复触发，若不节流会瞬间淹没入库链路，真实高价值样本反被稀释。
+
+§XIV 审计约束：
+  - 禁 broad except，统一捕获 SQLAlchemyError / ValueError / KeyError。
+  - RLS 通过 set_config('app.tenant_id', ..., true) 隔离租户。
+
+统一响应: {"ok": bool, "data": {}, "error": {}}
+"""
+from __future__ import annotations
+
+import time
+import uuid
+from typing import Any, Dict, Optional
+
+import structlog
+from fastapi import APIRouter, Depends, Header, HTTPException
+from pydantic import BaseModel, Field
+from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from shared.ontology.src.database import get_db
+
+router = APIRouter(prefix="/api/v1/telemetry", tags=["telemetry"])
+log = structlog.get_logger(__name__)
+
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+#  限流：per-device_id 进程内 TTL 字典
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# 进程级去重足够，因为 POS 主机数量有限、单实例即可覆盖；跨实例重复 <1% 可接受。
+# 若未来切 Redis，仅替换 _rate_limit_check 实现即可，调用点保持不变。
+
+_RATE_LIMIT_WINDOW_SEC = 60
+_rate_limit_cache: Dict[str, float] = {}
+
+
+def _rate_limit_check(device_id: str) -> bool:
+    """返回 True 表示通过，False 表示被限流。副作用：写入时间戳。"""
+    now = time.monotonic()
+    last = _rate_limit_cache.get(device_id)
+    if last is not None and (now - last) < _RATE_LIMIT_WINDOW_SEC:
+        return False
+    _rate_limit_cache[device_id] = now
+    # 粗略 GC：当缓存超过 10k 条时丢弃过期项，避免长期内存膨胀
+    if len(_rate_limit_cache) > 10000:
+        cutoff = now - _RATE_LIMIT_WINDOW_SEC
+        stale = [k for k, v in _rate_limit_cache.items() if v < cutoff]
+        for k in stale:
+            _rate_limit_cache.pop(k, None)
+    return True
+
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+#  请求模型
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+_MAX_STACK_LEN = 8192  # 防止日志炸库；超长前端已截断，后端再兜一层
+_MAX_FIELD_LEN = 512
+
+
+class PosCrashReport(BaseModel):
+    device_id: str = Field(..., min_length=1, max_length=_MAX_FIELD_LEN,
+                           description="POS 设备指纹或商米 SN")
+    route: Optional[str] = Field(None, max_length=_MAX_FIELD_LEN,
+                                 description="崩溃时前端路由")
+    error_stack: Optional[str] = Field(None, max_length=_MAX_STACK_LEN,
+                                       description="前端捕获的错误堆栈")
+    user_action: Optional[str] = Field(None, max_length=_MAX_FIELD_LEN,
+                                       description="崩溃前最后用户动作摘要")
+    store_id: Optional[str] = Field(None, max_length=64,
+                                    description="门店 UUID（登录前可空）")
+
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+#  端点
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+
+async def _set_rls(db: AsyncSession, tenant_id: str) -> None:
+    await db.execute(
+        text("SELECT set_config('app.tenant_id', :tid, true)"),
+        {"tid": tenant_id},
+    )
+
+
+@router.post("/pos-crash")
+async def report_pos_crash(
+    body: PosCrashReport,
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
+) -> Dict[str, Any]:
+    """接收 POS 前端崩溃上报。
+
+    出于 §XIV 审计合规，500 场景仅返回通用提示，不把 SQLAlchemy 错误原文回显。
+    """
+    device_id = body.device_id.strip()
+    if not device_id:
+        raise HTTPException(
+            status_code=400,
+            detail={"code": "INVALID_PAYLOAD", "message": "device_id 不能为空"},
+        )
+
+    if not _rate_limit_check(device_id):
+        raise HTTPException(
+            status_code=429,
+            detail={
+                "code": "RATE_LIMITED",
+                "message": f"同设备 {_RATE_LIMIT_WINDOW_SEC}s 内仅允许 1 次上报",
+            },
+        )
+
+    # store_id 合法性：前端若传了必须是 UUID，否则落库会报 22P02
+    store_uuid: Optional[str] = None
+    if body.store_id:
+        try:
+            store_uuid = str(uuid.UUID(body.store_id))
+        except ValueError:
+            raise HTTPException(
+                status_code=400,
+                detail={"code": "INVALID_PAYLOAD", "message": "store_id 必须是合法 UUID"},
+            )
+
+    # tenant_id 合法性：Header 若不是 UUID，RLS set_config 会在后续 ::uuid 转换失败
+    try:
+        uuid.UUID(x_tenant_id)
+    except ValueError:
+        raise HTTPException(
+            status_code=400,
+            detail={"code": "INVALID_PAYLOAD", "message": "X-Tenant-ID 必须是合法 UUID"},
+        )
+
+    report_id = str(uuid.uuid4())
+
+    try:
+        await _set_rls(db, x_tenant_id)
+        await db.execute(
+            text(
+                """
+                INSERT INTO pos_crash_reports
+                    (report_id, tenant_id, store_id, device_id, route,
+                     error_stack, user_action)
+                VALUES
+                    (:rid::uuid, :tid::uuid, :sid, :did, :route,
+                     :stack, :action)
+                """
+            ),
+            {
+                "rid": report_id,
+                "tid": x_tenant_id,
+                "sid": store_uuid,
+                "did": device_id,
+                "route": body.route,
+                "stack": body.error_stack,
+                "action": body.user_action,
+            },
+        )
+        await db.commit()
+    except SQLAlchemyError as exc:
+        await db.rollback()
+        log.error("pos_crash_report_db_error",
+                  error=str(exc), tenant_id=x_tenant_id, device_id=device_id)
+        raise HTTPException(
+            status_code=500,
+            detail={"code": "INTERNAL_ERROR", "message": "上报暂时不可用，请稍后重试"},
+        )
+
+    log.info("pos_crash_reported",
+             report_id=report_id, tenant_id=x_tenant_id,
+             device_id=device_id, route=body.route)
+    return {"ok": True, "data": {"report_id": report_id}}
