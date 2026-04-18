@@ -46,6 +46,9 @@ from .smart_menu import SmartMenuAgent
 from .smart_service import SmartServiceAgent
 from .stockout_alert import StockoutAlertAgent
 from .store_inspect import StoreInspectAgent
+
+# Sprint D1 / PR H 批次 2：出餐体验（experience）
+from .table_dispatch import TableDispatchAgent
 from .trend_discovery import TrendDiscoveryAgent
 
 # 语音点菜 + AI服务员
@@ -100,6 +103,10 @@ ALL_SKILL_AGENTS = [
     # Sprint D1 / PR G 批次 1
     GrowthAttributionAgent,
     StockoutAlertAgent,
+    # Sprint D1 / PR H 批次 2（serve_dispatch / ai_waiter / voice_order /
+    # smart_service / queue_seating / kitchen_overtime 已在上方注册；
+    # 本行新增 table_dispatch）
+    TableDispatchAgent,
 ]
 
 

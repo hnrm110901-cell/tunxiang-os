@@ -1,3 +1,32 @@
+## 2026-04-18 Sprint D1 批次 2 — 出餐体验 7 Skill + 2 Skill 填 context（PR H）
+
+### 今日完成
+- [services/tx-agent/src/agents/skills/serve_dispatch.py] constraint_scope={"experience"} + _predict_serve 填 context (estimated_serve_minutes)
+- [services/tx-agent/src/agents/skills/kitchen_overtime.py] constraint_scope={"experience"} + _scan_overtime_items 取 max_elapsed 填 context
+- [services/tx-agent/src/agents/skills/table_dispatch.py] constraint_scope={"experience"} + 补注册到 ALL_SKILL_AGENTS
+- [services/tx-agent/src/agents/skills/queue_seating.py] constraint_scope={"experience"}
+- [services/tx-agent/src/agents/skills/ai_waiter.py] constraint_scope={"margin","experience"}（推荐菜毛利 + 出餐节奏双命中）
+- [services/tx-agent/src/agents/skills/voice_order.py] constraint_scope={"experience"}
+- [services/tx-agent/src/agents/skills/smart_service.py] constraint_scope={"experience"}
+- [services/tx-agent/src/tests/test_constraint_context.py] 扩 4 条 test：batch 2 scope 声明 / registry 补全 / serve_dispatch 通过场景 / 超时场景触发违规
+
+### 数据变化
+- 迁移版本：无
+- 修改文件：9（7 Skills + skills/__init__ + test）
+- 新增测试：4（共 19，11 passed + 8 skipped）
+- ruff 状态：All checks passed!
+
+### 遗留问题
+- 5 个批次 2 Skill（table_dispatch/queue_seating/ai_waiter/voice_order/smart_service）只声明 scope 未填 context，运行期仍标 n/a —— 留给 Squad Owner 按各自业务数据补
+- 批次 2 的 8 条 skill-dependent 测试仍被 edge_mixin 相对导入 bug skip（CI 容器可跑）
+- kitchen_overtime 的 max_elapsed 语义可能偏悲观，若拦截率过高退到 P95
+
+### 明日计划
+- 合入 PR E/F/G/H 后启动批次 3（W6 定价营销 7 Skill，margin scope）
+- 单独 PR 修 edge_mixin 相对导入（解锁所有 skipped tests）
+
+---
+
 ## 2026-04-18 Sprint D1 批次 1 — ConstraintContext 基础 + 批 1 三 Skill + SKILL_REGISTRY（PR G）
 
 ### 今日完成

@@ -245,3 +245,80 @@ def test_skill_registry_has_no_duplicate_agent_ids():
         assert aid not in seen, f"agent_id 冲突: {aid}"
         seen.add(aid)
     assert seen <= set(SKILL_REGISTRY.keys())
+
+
+# ──────────────────────────────────────────────────────────────────────
+# 7. 批次 2（PR H / W5 出餐体验）
+# ──────────────────────────────────────────────────────────────────────
+
+def test_batch_2_experience_skills_declare_scope():
+    _import_skills_or_skip()
+    from agents.skills.ai_waiter import AIWaiterAgent
+    from agents.skills.kitchen_overtime import KitchenOvertimeAgent
+    from agents.skills.queue_seating import QueueSeatingAgent
+    from agents.skills.serve_dispatch import ServeDispatchAgent
+    from agents.skills.smart_service import SmartServiceAgent
+    from agents.skills.table_dispatch import TableDispatchAgent
+    from agents.skills.voice_order import VoiceOrderAgent
+
+    # experience-only skills
+    assert ServeDispatchAgent.constraint_scope == {"experience"}
+    assert TableDispatchAgent.constraint_scope == {"experience"}
+    assert QueueSeatingAgent.constraint_scope == {"experience"}
+    assert KitchenOvertimeAgent.constraint_scope == {"experience"}
+    assert VoiceOrderAgent.constraint_scope == {"experience"}
+    assert SmartServiceAgent.constraint_scope == {"experience"}
+    # ai_waiter 触碰体验（出餐节奏）+ 毛利（推高毛利菜），双 scope
+    assert AIWaiterAgent.constraint_scope == {"margin", "experience"}
+
+
+def test_batch_2_registry_contains_table_dispatch():
+    _import_skills_or_skip()
+    from agents.skills import SKILL_REGISTRY
+
+    assert "table_dispatch" in SKILL_REGISTRY
+    # 其他 6 个批次 2 Skills 在 PR G 之前已在 ALL_SKILL_AGENTS 内
+    for aid in ("serve_dispatch", "queue_seating", "kitchen_overtime",
+                "ai_waiter", "voice_order", "smart_service"):
+        assert aid in SKILL_REGISTRY, f"{aid} 未注册"
+
+
+@pytest.mark.asyncio
+async def test_serve_dispatch_fills_experience_context():
+    """验证 predict_serve_time 填入结构化 context，experience 约束真实生效"""
+    skills_pkg = _import_skills_or_skip()
+    _ = skills_pkg
+    from agents.skills.serve_dispatch import ServeDispatchAgent
+
+    agent = ServeDispatchAgent(tenant_id="t1")
+    result = await agent.run("predict_serve_time", {
+        "dish_count": 3,
+        "has_complex_dish": False,
+        "kitchen_queue_size": 0,
+    })
+
+    # 已填 estimated_serve_minutes → scope 不再是 n/a
+    assert result.constraints_detail["scope"] == "experience"
+    assert "experience" in result.constraints_detail["scopes_checked"]
+    # 3 道普通菜 + 无队列：base = 5 + 3*2.5 = 12.5 → 13 分钟，< 30 阈值应通过
+    assert result.constraints_passed is True
+    assert result.constraints_detail["experience_check"]["actual_minutes"] == 13
+
+
+@pytest.mark.asyncio
+async def test_serve_dispatch_experience_violation_blocks_decision():
+    """当 predict 出的时间超过 max_serve_minutes(30)，约束应 fail"""
+    skills_pkg = _import_skills_or_skip()
+    _ = skills_pkg
+    from agents.skills.serve_dispatch import ServeDispatchAgent
+
+    agent = ServeDispatchAgent(tenant_id="t1")
+    # 10 道菜 + 6 复杂 + 队列 20：base=5+25+8=38，queue_delay=30 → ~68 分钟
+    result = await agent.run("predict_serve_time", {
+        "dish_count": 10,
+        "has_complex_dish": True,
+        "kitchen_queue_size": 20,
+    })
+    assert result.constraints_detail["scope"] == "experience"
+    assert result.constraints_passed is False
+    assert any("客户体验违规" in v for v in result.constraints_detail["violations"])

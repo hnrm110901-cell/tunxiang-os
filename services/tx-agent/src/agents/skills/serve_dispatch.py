@@ -10,6 +10,7 @@ import statistics
 from typing import Any
 
 from ..base import AgentResult, SkillAgent
+from ..context import ConstraintContext
 from ..memory_bus import Finding, MemoryBus
 
 
@@ -19,6 +20,9 @@ class ServeDispatchAgent(SkillAgent):
     description = "出餐时间预测、排班优化、客流分析、链式告警、工作量平衡"
     priority = "P1"
     run_location = "edge"
+
+    # Sprint D1 / PR H 批次 2：出餐调度核心即 estimated_serve_minutes
+    constraint_scope = {"experience"}
 
     def get_supported_actions(self) -> list[str]:
         return [
@@ -57,6 +61,12 @@ class ServeDispatchAgent(SkillAgent):
                   "queue_delay_minutes": round(queue_delay), "has_complex_dish": has_complex},
             reasoning=f"预计出餐 {estimated} 分钟（{dish_count}道菜，队列{current_queue}单）",
             confidence=0.85, inference_layer="edge",
+            # Sprint D1 / PR H 批次 2：填结构化 context 让 experience 约束真实生效
+            # （checker 会验证 estimated <= max_serve_minutes 否则决策被拦截）
+            context=ConstraintContext(
+                estimated_serve_minutes=float(estimated),
+                constraint_scope={"experience"},
+            ),
         )
 
     async def _optimize_schedule(self, params: dict) -> AgentResult:
