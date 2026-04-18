@@ -207,7 +207,6 @@ export function SettlePage() {
         // 兼容同步调用点：payRes.data 是 {payment_id, payment_no}，本分支不依赖
         // 仅当非 queued 才触达这里
         // （无需额外操作）
-        void payRes;
       }
 
       // 2. 结算订单

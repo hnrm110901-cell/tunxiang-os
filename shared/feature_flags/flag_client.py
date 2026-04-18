@@ -117,6 +117,7 @@ class FeatureFlagClient:
                     if not name:
                         continue
                     # 同名 Flag 后加载的覆盖先加载的（支持环境覆盖文件）
+                    flag_def["_source_file"] = str(yaml_file)
                     self._flag_cache[name] = flag_def
                     loaded_count += 1
 
@@ -192,7 +193,7 @@ class FeatureFlagClient:
     def list_by_domain(self, domain: str) -> list[str]:
         """列出指定业务域下的所有 Flag 名称。
 
-        扫描 `flags/{domain}/*.yaml` 目录下所有注册的 Flag 名称（加载阶段已缓存）。
+        从 `_flag_cache` 中过滤属于 `flags/{domain}/` 目录的 Flag 名称。
         用于 GET /api/v1/flags?domain=xxx 端点按 domain 过滤评估。
 
         Args:
@@ -206,30 +207,16 @@ class FeatureFlagClient:
         if not domain_dir.exists() or not domain_dir.is_dir():
             return []
 
-        domain_flags: set[str] = set()
-        yaml_files = list(domain_dir.rglob("*.yaml")) + list(
-            domain_dir.rglob("*.yml")
-        )
-        for yaml_file in yaml_files:
-            try:
-                with open(yaml_file, "r", encoding="utf-8") as f:
-                    data = yaml.safe_load(f)
-                if not isinstance(data, dict):
-                    continue
-                flags = data.get("flags", [])
-                if not isinstance(flags, list):
-                    continue
-                for flag_def in flags:
-                    if not isinstance(flag_def, dict):
-                        continue
-                    name = flag_def.get("name")
-                    if name:
-                        domain_flags.add(name)
-            except (OSError, yaml.YAMLError) as exc:
-                logger.error(
-                    "feature_flags_list_by_domain_error",
-                    extra={"file": str(yaml_file), "error": str(exc)},
-                )
+        # 从已加载的缓存中过滤，避免重复解析 YAML
+        domain_prefix = str(domain_dir) + "/"
+        domain_flags: list[str] = []
+        for name, flag_def in self._flag_cache.items():
+            source = flag_def.get("_source_file", "")
+            if source.startswith(domain_prefix):
+                domain_flags.append(name)
+            elif name.startswith(f"{domain}."):
+                # 回退：按 flag 名称前缀匹配 domain
+                domain_flags.append(name)
         return sorted(domain_flags)
 
     def list_all_domains(self) -> list[str]:

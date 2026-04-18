@@ -147,7 +147,7 @@ async def report_pos_crash(
                     (report_id, tenant_id, store_id, device_id, route,
                      error_stack, user_action)
                 VALUES
-                    (:rid::uuid, :tid::uuid, :sid, :did, :route,
+                    (:rid::uuid, :tid::uuid, :sid::uuid, :did, :route,
                      :stack, :action)
                 """
             ),
