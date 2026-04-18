@@ -189,6 +189,58 @@ class FeatureFlagClient:
         """获取所有 Flag 的当前值（无 context 评估）。"""
         return {name: self.is_enabled(name) for name in self._flag_cache}
 
+    def list_by_domain(self, domain: str) -> list[str]:
+        """列出指定业务域下的所有 Flag 名称。
+
+        扫描 `flags/{domain}/*.yaml` 目录下所有注册的 Flag 名称（加载阶段已缓存）。
+        用于 GET /api/v1/flags?domain=xxx 端点按 domain 过滤评估。
+
+        Args:
+            domain: 业务域名称，对应 `flags/` 下的子目录名
+                    （trade / agents / edge / growth / member / org / supply）
+
+        Returns:
+            该域下所有 Flag 名称列表（按字母序），未知 domain 返回空列表。
+        """
+        domain_dir = self.flags_dir / domain
+        if not domain_dir.exists() or not domain_dir.is_dir():
+            return []
+
+        domain_flags: set[str] = set()
+        yaml_files = list(domain_dir.rglob("*.yaml")) + list(
+            domain_dir.rglob("*.yml")
+        )
+        for yaml_file in yaml_files:
+            try:
+                with open(yaml_file, "r", encoding="utf-8") as f:
+                    data = yaml.safe_load(f)
+                if not isinstance(data, dict):
+                    continue
+                flags = data.get("flags", [])
+                if not isinstance(flags, list):
+                    continue
+                for flag_def in flags:
+                    if not isinstance(flag_def, dict):
+                        continue
+                    name = flag_def.get("name")
+                    if name:
+                        domain_flags.add(name)
+            except (OSError, yaml.YAMLError) as exc:
+                logger.error(
+                    "feature_flags_list_by_domain_error",
+                    extra={"file": str(yaml_file), "error": str(exc)},
+                )
+        return sorted(domain_flags)
+
+    def list_all_domains(self) -> list[str]:
+        """列出 `flags/` 目录下所有业务域名称（子目录）。"""
+        if not self.flags_dir.exists():
+            return []
+        return sorted(
+            p.name for p in self.flags_dir.iterdir()
+            if p.is_dir() and not p.name.startswith(".")
+        )
+
     # ------------------------------------------------------------------
     # 内部：评估辅助方法
     # ------------------------------------------------------------------

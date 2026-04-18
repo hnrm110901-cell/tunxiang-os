@@ -1,3 +1,32 @@
+## 2026-04-18 (续) Follow-up PR B — GET /api/v1/flags 远程灰度下发端点
+
+### 今日完成
+- [services/gateway] 新增 `src/api/flags_routes.py`（228 行）— `GET /api/v1/flags?domain={trade|agents|edge|growth|member|org|supply|all}`，返回 `{ok, data:{flags: Dict[str,bool]}, error, request_id}`。进程内 60s TTL LRU 缓存（256 条上限，key = `domain:tenant_id:role_code`），X-Request-Id UUID v4 双写 body + header，400/401/500 错误码齐全，零 broad except（§XIV 合规）。
+- [services/gateway] `main.py` 注册 `flags_router`，Gateway 路由数 75 → 77，冷启动 smoke 测试通过。
+- [shared/feature_flags] `flag_client.py` 新增 `list_by_domain(domain)` 和 `list_all_domains()` 两个方法（additive only，向后兼容），支持按目录枚举 flag 名称。
+- [services/gateway/src/tests] 新增 `test_flags_routes.py` 7 条全绿：A1 三件套存在 / 401 AUTH_MISSING / 400 INVALID_DOMAIN / 不同 tenant 缓存独立分桶 / request_id UUID v4 / 缓存命中 P95 < 100ms / domain=all 跨域聚合。httpx AsyncClient + ASGITransport，隔离 Gateway 全链路 middleware。
+
+### 数据变化
+- 无新迁移（纯 API 层）
+- 新增 API 模块：1 个（gateway/flags_routes.py）
+- 新增测试：7 条（services/gateway/src/tests/test_flags_routes.py）
+- 新增/修改文件：
+  - 新增 `services/gateway/src/api/flags_routes.py`（228 行）
+  - 新增 `services/gateway/src/tests/test_flags_routes.py`（222 行）
+  - 修改 `services/gateway/src/main.py`（+2 行：import + include_router）
+  - 修改 `shared/feature_flags/flag_client.py`（+51 行：list_by_domain + list_all_domains）
+
+### 遗留问题
+- 前端 `apps/web-pos/src/config/featureFlags.ts` 在 staging 的 404 → 200 切换冒烟尚未执行（主会话/后续 PR 完成）。
+- 紧急关停（env var `FEATURE_*=false`）在缓存 TTL 内仍有最多 60s 延迟，如需 <5s 生效需增加 /api/v1/flags/invalidate 端点（待需求确认）。
+- FlagClient 全局单例 `get_flag_client()` 首次加载会扫描整个 `flags/` 目录；若后续域目录规模增长到上百个 yaml 可考虑 lazy-load per domain。
+
+### 明日计划
+- 前端 staging 冒烟：GET /api/v1/flags?domain=trade 从 404 → 200，验证 DEFAULTS 覆盖路径生效。
+- 如需 <60s 紧急关停：设计 POST /api/v1/flags/invalidate 端点 + Redis pub/sub 多 Gateway 实例广播。
+
+---
+
 ## 2026-04-18 Sprint 启动 — 主规划 V1.0 + A1 前端 TDD + F1 适配器评审骨架
 
 ### 今日完成
