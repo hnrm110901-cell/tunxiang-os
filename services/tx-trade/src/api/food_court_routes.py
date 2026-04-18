@@ -793,6 +793,21 @@ async def pay_food_court_order(
     kds_tasks = []
     today = now.date()
 
+    # 批量加载当日所有档口的 pending 结算记录（避免 N+1）
+    all_vendor_uuids = [UUID(vid) for vid in vendor_items]
+    batch_result = await db.execute(
+        select(FoodCourtVendorSettlement).where(
+            FoodCourtVendorSettlement.vendor_id.in_(all_vendor_uuids),
+            FoodCourtVendorSettlement.food_court_id == UUID(fc_id),
+            FoodCourtVendorSettlement.tenant_id == UUID(tenant_id),
+            FoodCourtVendorSettlement.settlement_date == today,
+            FoodCourtVendorSettlement.status == "pending",
+        )
+    )
+    settlement_by_vendor: dict[str, FoodCourtVendorSettlement] = {
+        str(s.vendor_id): s for s in batch_result.scalars().all()
+    }
+
     for vid, (vendor, items) in vendor_items.items():
         vendor_gross = sum(i.subtotal_fen for i in items)
         vendor_item_count = sum(i.quantity for i in items)
@@ -801,16 +816,7 @@ async def pay_food_court_order(
         net_amount_fen = vendor_gross - commission_fen
 
         # 当日已存在 pending 记录则累加，否则新建
-        existing_result = await db.execute(
-            select(FoodCourtVendorSettlement).where(
-                FoodCourtVendorSettlement.vendor_id == vendor.id,
-                FoodCourtVendorSettlement.food_court_id == UUID(fc_id),
-                FoodCourtVendorSettlement.tenant_id == UUID(tenant_id),
-                FoodCourtVendorSettlement.settlement_date == today,
-                FoodCourtVendorSettlement.status == "pending",
-            )
-        )
-        existing = existing_result.scalar_one_or_none()
+        existing = settlement_by_vendor.get(vid)
 
         if existing:
             existing.order_count += 1
