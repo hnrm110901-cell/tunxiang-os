@@ -250,11 +250,13 @@ async def _handle_draw(
     winners: list[dict] = []
 
     # 每个奖项做一次数据库端随机采样，避免全量拉取到 Python 内存
+    # 使用 SELECT ... FOR UPDATE 防止并发开奖抽到同一人
     for prize in prizes:
         prize_count = min(prize.get("winner_count", 1), total_entries - len(winners))
         if prize_count <= 0:
             continue
         try:
+            exclude_ids = [uuid.UUID(w["entry_id"]) for w in winners] if winners else []
             rows_res = await db.execute(
                 text("""
                     SELECT id, customer_id FROM campaign_report_entries
@@ -263,14 +265,15 @@ async def _handle_draw(
                       AND is_winner = false
                       AND drawn_at IS NULL
                       AND is_deleted = false
-                      AND id NOT IN :exclude_ids
+                      AND NOT (id = ANY(:exclude_ids))
                     ORDER BY random()
                     LIMIT :limit
+                    FOR UPDATE SKIP LOCKED
                 """),
                 {
                     "tenant_id": uuid.UUID(tenant_id),
                     "campaign_id": campaign_id,
-                    "exclude_ids": tuple(uuid.UUID(w["entry_id"]) for w in winners) or (uuid.UUID(int=0),),
+                    "exclude_ids": exclude_ids,
                     "limit": prize_count,
                 },
             )
@@ -280,29 +283,27 @@ async def _handle_draw(
             log.error("report_draw.sample_entries_failed", error=str(exc), exc_info=True)
             return {"success": False, "reason": "数据库随机抽取失败"}
 
-    # 批量 UPDATE 中奖记录（单次 SQL，不循环）
+    # 批量 UPDATE 中奖记录 — 逐条参数化更新，避免 SQL 注入
     if winners:
-        winner_ids = [uuid.UUID(w["entry_id"]) for w in winners]
-        prize_map = {w["entry_id"]: json.dumps(w["prize"], ensure_ascii=False) for w in winners}
         try:
-            # 按 entry_id 逐条 prize 不同，使用 VALUES 子查询批量更新
-            values_sql = ", ".join(
-                f"('{w['entry_id']}'::uuid, '{prize_map[w['entry_id']]}'::jsonb)"
-                for w in winners
-            )
-            await db.execute(
-                text(f"""
-                    UPDATE campaign_report_entries AS t
-                    SET is_winner = true,
-                        prize = v.prize,
-                        drawn_at = NOW(),
-                        updated_at = NOW()
-                    FROM (VALUES {values_sql}) AS v(id, prize)
-                    WHERE t.id = v.id
-                      AND t.tenant_id = :tenant_id
-                """),
-                {"tenant_id": uuid.UUID(tenant_id)},
-            )
+            for w in winners:
+                prize_json = json.dumps(w["prize"], ensure_ascii=False)
+                await db.execute(
+                    text("""
+                        UPDATE campaign_report_entries
+                        SET is_winner = true,
+                            prize = :prize::jsonb,
+                            drawn_at = NOW(),
+                            updated_at = NOW()
+                        WHERE id = :entry_id
+                          AND tenant_id = :tenant_id
+                    """),
+                    {
+                        "entry_id": uuid.UUID(w["entry_id"]),
+                        "prize": prize_json,
+                        "tenant_id": uuid.UUID(tenant_id),
+                    },
+                )
             await db.commit()
         except SQLAlchemyError as exc:
             await db.rollback()
