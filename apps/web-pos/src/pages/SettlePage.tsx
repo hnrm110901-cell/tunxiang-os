@@ -14,7 +14,12 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useOrderStore } from '../store/orderStore';
-import { settleOrder, createPayment, printReceipt as apiPrintReceipt } from '../api/tradeApi';
+import {
+  printReceipt as apiPrintReceipt,
+  settleOrderOffline,
+  createPaymentOffline,
+} from '../api/tradeApi';
+import { showToast } from '../hooks/useToast';
 import { printReceipt as bridgePrint, openCashBox } from '../bridge/TXBridge';
 import { DiscountPreviewSheet, type DiscountParams } from '../components/DiscountPreviewSheet';
 import CustomerBrainPanel from '../components/CustomerBrainPanel';
@@ -184,12 +189,39 @@ export function SettlePage() {
       // 1. 创建支付记录（含服务费）
       const totalWithFees = billingRules ? finalFen + billingRules.service_fee_fen : finalFen;
       if (orderId) {
-        await createPayment(orderId, method, totalWithFees);
+        // P0-1：离线友好。断网时自动入本地队列返回 queued:true，不抛"支付失败"
+        const payRes = await createPaymentOffline(orderId, method, totalWithFees);
+        if (payRes.ok && payRes.data && (payRes.data as { queued?: boolean }).queued) {
+          showToast('已加入离线队列，网络恢复后自动上传', 'offline');
+          clear();
+          navigate('/tables');
+          return;
+        }
+        if (!payRes.ok) {
+          // 业务拒绝（如订单已支付）→ 红色 Toast，收银员明确感知而不是 alert 阻塞
+          showToast(`支付未完成: ${payRes.error?.message ?? '未知错误'}`, 'error');
+          return;
+        }
+        // 在线成功：继续走结算
+        // 兼容同步调用点：payRes.data 是 {payment_id, payment_no}，本分支不依赖
+        // 仅当非 queued 才触达这里
+        // （无需额外操作）
+        void payRes;
       }
 
       // 2. 结算订单
       if (orderId) {
-        await settleOrder(orderId);
+        const settleRes = await settleOrderOffline(orderId);
+        if (settleRes.ok && settleRes.data && (settleRes.data as { queued?: boolean }).queued) {
+          showToast('结算已加入离线队列，网络恢复后自动上传', 'offline');
+          clear();
+          navigate('/tables');
+          return;
+        }
+        if (!settleRes.ok) {
+          showToast(`结算失败: ${settleRes.error?.message ?? '未知错误'}`, 'error');
+          return;
+        }
       }
 
       // 3. 打印小票
@@ -207,10 +239,12 @@ export function SettlePage() {
         try { await openCashBox(); } catch { /* ignore */ }
       }
 
+      showToast('支付成功', 'success');
       clear();
       navigate('/tables');
     } catch (e) {
-      alert(`支付失败: ${e instanceof Error ? e.message : '未知错误'}`);
+      // 未预期异常：保留 Toast 兜底，不再用 alert 阻塞（P0-1）
+      showToast(`支付异常: ${e instanceof Error ? e.message : '未知错误'}`, 'error');
     } finally {
       setPaying(false);
     }
