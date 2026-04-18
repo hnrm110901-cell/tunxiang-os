@@ -6,7 +6,11 @@ import structlog
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from prometheus_fastapi_instrumentator import Instrumentator
 
+from .api.config_health_routes import router as config_health_router
+from .api.migration_routes import router as migration_router
+from .api.onboarding_routes import router as onboarding_router
 from .api.open_api_routes import router as open_api_router
 from .auth import router as auth_router
 from .gdpr_routes import router as gdpr_router
@@ -36,8 +40,6 @@ app = FastAPI(
     version="3.0.0",
     description="AI-Native Restaurant Chain Operating System",
 )
-
-from prometheus_fastapi_instrumentator import Instrumentator
 
 Instrumentator().instrument(app).expose(app)
 
@@ -188,6 +190,15 @@ app.include_router(flags_router)
 # C-04: 演示监控面板
 from .api.demo_monitor_routes import router as demo_monitor_router
 app.include_router(demo_monitor_router)  # C-04: 演示监控面板
+
+# 上线交付 API（DeliveryAgent 20问 + 配置包导入）
+app.include_router(onboarding_router)
+
+# 配置健康度检查 API（上线前门控，score ≥ 90 才允许上线）
+app.include_router(config_health_router)
+
+# 天财商龙迁移 API（菜品/会员/配置映射 + 储值审核）
+app.include_router(migration_router)
 
 # 域路由代理（通配路由 /api/v1/{domain}/{path}，放最后）
 app.include_router(proxy_router)
