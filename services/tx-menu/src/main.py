@@ -59,6 +59,8 @@ from .api.menu_recommendation_routes import router as menu_recommendation_router
 app.include_router(menu_recommendation_router)  # AI智能排菜推荐（四象限/库存/季节/毛利优化）
 from .api.menu_plan_routes import router as menu_plan_router
 app.include_router(menu_plan_router)  # 模块3.4 菜谱方案版本管理+下发日志+门店差异化+批量操作
+from .api.menu_plan_v2_routes import router as menu_plan_v2_router
+app.include_router(menu_plan_v2_router)  # 菜谱方案批量下发V2+门店Override（天财对齐版）
 
 @app.get("/health")
 async def health():

@@ -6,6 +6,7 @@
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useOrderStore } from '../store/orderStore';
+import { WineStorageQuickView } from '../components/WineStorageQuickView';
 
 const CATEGORIES = ['推荐', '招牌菜', '热菜', '凉菜', '汤羹', '主食', '饮品'];
 
@@ -46,7 +47,8 @@ const DISH_DATA: Record<string, { id: string; name: string; price: number; tags?
 };
 
 export function OpenTablePage() {
-  const { tableNo } = useParams();
+  // tableNo = 台位展示编号（如 "A03"），tableId = 台位 UUID（用于存酒快查）
+  const { tableNo, tableId } = useParams<{ tableNo?: string; tableId?: string }>();
   const navigate = useNavigate();
   const store = useOrderStore();
   const [activeCat, setActiveCat] = useState('推荐');
@@ -82,6 +84,15 @@ export function OpenTablePage() {
 
       {/* 中栏：菜品网格 */}
       <div style={{ flex: 1, padding: 12, overflowY: 'auto' }}>
+        {/* 存酒快查角标：若台位有存酒记录则显示橙色提示 */}
+        {tableId && (
+          <div style={{ marginBottom: 10 }}>
+            <WineStorageQuickView
+              tableId={tableId}
+              tableName={tableNo || '本台'}
+            />
+          </div>
+        )}
         <div style={{ fontSize: 11, color: '#666', marginBottom: 8 }}>
           桌号 {tableNo} · {activeCat} · {dishes.length} 道
         </div>

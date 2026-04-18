@@ -15,6 +15,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { txFetch } from '../api/index';
+import { useKeyboardShortcuts, POS_SHORTCUTS } from '../hooks/useKeyboardShortcuts';
+import { KeyboardShortcutHelp, KeyboardHelpTrigger } from '../components/KeyboardShortcutHelp';
+import { ShortcutOverlay } from '../components/ShortcutOverlay';
 
 /* ─── Design tokens (deep dark theme for POS tablet) ─── */
 const T = {
@@ -445,6 +448,47 @@ function StoreDashboard({ store }: { store: typeof STORES[0] }) {
   const [adoptPressing, setAdoptPressing] = useState(false);
   const [ignorePressing, setIgnorePressing] = useState(false);
   const [loadingKpi, setLoadingKpi] = useState(false);
+  const [showHelpPanel, setShowHelpPanel] = useState(false);
+
+  /* ── 全局快捷键（仅键盘设备激活）── */
+  const { altPressed, shortcuts, activeKey } = useKeyboardShortcuts([
+    {
+      key: POS_SHORTCUTS.TABLE_MAP.key,
+      label: POS_SHORTCUTS.TABLE_MAP.description,
+      handler: () => navigate('/tables'),
+    },
+    {
+      key: POS_SHORTCUTS.SHIFT_HANDOVER.key,
+      label: POS_SHORTCUTS.SHIFT_HANDOVER.description,
+      handler: () => navigate('/shift'),
+    },
+    {
+      key: POS_SHORTCUTS.MEMBER_LOOKUP.key,
+      label: POS_SHORTCUTS.MEMBER_LOOKUP.description,
+      handler: () => navigate('/settings'),
+    },
+    {
+      key: POS_SHORTCUTS.PRINT.key,
+      label: POS_SHORTCUTS.PRINT.description,
+      handler: () => navigate('/reports'),
+    },
+    {
+      key: POS_SHORTCUTS.HELP.key,
+      label: POS_SHORTCUTS.HELP.description,
+      handler: () => setShowHelpPanel((v) => !v),
+    },
+    {
+      key: POS_SHORTCUTS.FULLSCREEN.key,
+      label: POS_SHORTCUTS.FULLSCREEN.description,
+      handler: () => {
+        if (!document.fullscreenElement) {
+          document.documentElement.requestFullscreen().catch(() => {});
+        } else {
+          document.exitFullscreen().catch(() => {});
+        }
+      },
+    },
+  ], { activeContext: 'dashboard' });
 
   /* ── 拉取今日KPI（有后端则用真实数据，否则保持mock）── */
   const loadKpi = useCallback(async () => {
@@ -521,6 +565,17 @@ function StoreDashboard({ store }: { store: typeof STORES[0] }) {
   const revenueUnit = adoptedRevenue > 0 ? `元 +${fmt.yuan(adoptedRevenue)}元(预测)` : '元';
 
   return (
+    <>
+      {/* Alt键快捷键浮层（兼容旧版，松开Alt自动关闭）*/}
+      <ShortcutOverlay visible={altPressed} shortcuts={shortcuts} />
+
+      {/* Ctrl+/ 快捷键帮助面板 */}
+      <KeyboardShortcutHelp
+        visible={showHelpPanel}
+        onClose={() => setShowHelpPanel(false)}
+        activeKey={activeKey}
+      />
+
     <div
       style={{
         height: '100vh',
@@ -552,17 +607,21 @@ function StoreDashboard({ store }: { store: typeof STORES[0] }) {
             </span>
           )}
         </h1>
-        <div style={{ textAlign: 'right' }}>
-          <div
-            style={{
-              fontSize: 18,
-              fontWeight: 600,
-              color: T.primary,
-            }}
-          >
-            尝在一起
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          {/* 快捷键帮助触发按钮（键盘设备可见）*/}
+          <KeyboardHelpTrigger onClick={() => setShowHelpPanel((v) => !v)} />
+          <div style={{ textAlign: 'right' }}>
+            <div
+              style={{
+                fontSize: 18,
+                fontWeight: 600,
+                color: T.primary,
+              }}
+            >
+              尝在一起
+            </div>
+            <div style={{ fontSize: 16, color: T.text2 }}>{store.name}</div>
           </div>
-          <div style={{ fontSize: 16, color: T.text2 }}>{store.name}</div>
         </div>
       </div>
 
@@ -913,6 +972,7 @@ function StoreDashboard({ store }: { store: typeof STORES[0] }) {
         />
       </div>
     </div>
+    </>
   );
 }
 

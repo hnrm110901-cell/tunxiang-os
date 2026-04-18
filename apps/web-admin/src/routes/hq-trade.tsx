@@ -79,9 +79,11 @@ export const tradeRoutes = (
     <Route path="/finance/pnl-report" element={<PnLReportPage />} />
     <Route path="/finance/wine-storage" element={<WineStoragePage />} />
     <Route path="/finance/deposits" element={<DepositManagePage />} />
+    <Route path="/deposit-management" element={<DepositManagePage />} />
     <Route path="/finance/costs" element={<CostManagePage />} />
     <Route path="/finance/budgets" element={<BudgetManagePage />} />
     <Route path="/finance/agreement-units" element={<AgreementUnitPage />} />
+    <Route path="/agreement-units" element={<AgreementUnitPage />} />
     <Route path="/finance/invoices" element={<CostManagePage />} />
     {/* 会员 legacy */}
     <Route path="/member/insight" element={<MemberInsightPage />} />

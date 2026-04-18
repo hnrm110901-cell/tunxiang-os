@@ -1,1091 +1,1384 @@
-"""智慧商街/档口管理路由
+"""智慧商街多商户POS — API 路由
 
-美食广场多档口并行收银 + 独立核算（TC-P2-12）
+核心场景：美食广场/食堂多档口并行运营，统一收银，按档口分账独立核算。
 
-DB 表（v189）：outlets / outlet_orders
+端点清单：
+  ── 商街管理（总部后台） ──────────────────────────────────────────────────────
+  POST   /api/v1/food-courts                                  — 创建商街
+  GET    /api/v1/food-courts                                  — 商街列表（按store_id过滤）
+  GET    /api/v1/food-courts/{fc_id}                          — 商街详情（含档口列表）
+  PUT    /api/v1/food-courts/{fc_id}                          — 更新商街信息
+
+  POST   /api/v1/food-courts/{fc_id}/vendors                  — 新增档口
+  GET    /api/v1/food-courts/{fc_id}/vendors                  — 档口列表
+  PUT    /api/v1/food-courts/{fc_id}/vendors/{v_id}           — 更新档口信息
+  POST   /api/v1/food-courts/{fc_id}/vendors/{v_id}/suspend   — 暂停档口营业
+
+  ── POS收银（统一收银台） ─────────────────────────────────────────────────────
+  GET    /api/v1/food-courts/{fc_id}/menu                     — 获取所有档口菜品（按vendor分组）
+  POST   /api/v1/food-courts/{fc_id}/orders                   — 创建商街订单（含多档口菜品）
+  GET    /api/v1/food-courts/{fc_id}/orders/{order_id}        — 订单详情
+  POST   /api/v1/food-courts/{fc_id}/orders/{order_id}/pay    — 统一结账（触发KDS+分账）
+  POST   /api/v1/food-courts/{fc_id}/orders/{order_id}/cancel — 取消订单
+
+  ── 档口KDS（各档口独立屏幕） ────────────────────────────────────────────────
+  GET    /api/v1/food-courts/vendor/{v_id}/queue              — 当前档口待出餐列表
+  POST   /api/v1/food-courts/vendor/{v_id}/items/{item_id}/ready  — 标记已出餐
+  GET    /api/v1/food-courts/vendor/{v_id}/stats              — 档口今日营业数据
+
+  ── 结算（总部财务） ──────────────────────────────────────────────────────────
+  GET    /api/v1/food-courts/{fc_id}/settlements              — 结算记录列表
+  POST   /api/v1/food-courts/{fc_id}/settlements/generate     — 生成指定日期结算单
+  POST   /api/v1/food-courts/{fc_id}/settlements/{s_id}/confirm — 确认结算
+  GET    /api/v1/food-courts/{fc_id}/settlements/summary      — 结算汇总报表
+
+统一响应格式：{"ok": bool, "data": {}, "error": {}}
+所有接口需要 X-Tenant-ID header。
+金额全部用分（整数）。
 """
-import json
-import uuid
-from datetime import date, datetime, timedelta, timezone
+import asyncio
+from datetime import date, datetime, timezone
 from typing import Optional
+from uuid import UUID, uuid4
 
 import structlog
-from fastapi import APIRouter, Depends, Header, HTTPException, Query
-from pydantic import BaseModel, Field
-from sqlalchemy import text
-from sqlalchemy.exc import SQLAlchemyError
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from sqlalchemy import select, text, func as sa_func
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from shared.events.src.emitter import emit_event
+from shared.events.src.event_types import OrderEventType
 from shared.ontology.src.database import get_db
 
-logger = structlog.get_logger()
-router = APIRouter(prefix="/api/v1/food-court", tags=["food-court"])
+from ..models.food_court import (
+    FoodCourt,
+    FoodCourtVendor,
+    FoodCourtOrder,
+    FoodCourtOrderItem,
+    FoodCourtVendorSettlement,
+    CreateFoodCourtReq,
+    UpdateFoodCourtReq,
+    CreateVendorReq,
+    UpdateVendorReq,
+    CreateFoodCourtOrderReq,
+    PayFoodCourtOrderReq,
+    GenerateSettlementReq,
+)
+
+logger = structlog.get_logger(__name__)
+
+router = APIRouter(prefix="/api/v1/food-courts", tags=["food-court"])
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# RLS 辅助
-# ─────────────────────────────────────────────────────────────────────────────
+# ─── 工具函数 ────────────────────────────────────────────────────────────────
 
-async def _set_rls(db: AsyncSession, tenant_id: str) -> None:
-    await db.execute(
-        text("SELECT set_config('app.tenant_id', :tid, true)"),
-        {"tid": tenant_id},
+
+def _get_tenant_id(request: Request) -> str:
+    tid = getattr(request.state, "tenant_id", None) or request.headers.get("X-Tenant-ID", "")
+    if not tid:
+        raise HTTPException(status_code=400, detail="X-Tenant-ID header required")
+    return tid
+
+
+def _ok(data: dict | list) -> dict:
+    return {"ok": True, "data": data, "error": None}
+
+
+def _err(msg: str, code: int = 400) -> None:
+    raise HTTPException(
+        status_code=code,
+        detail={"ok": False, "data": None, "error": {"message": msg}},
     )
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Pydantic 模型
-# ─────────────────────────────────────────────────────────────────────────────
-
-class OutletCreateRequest(BaseModel):
-    store_id: str = Field(..., description="所属美食广场门店ID")
-    name: str = Field(..., min_length=1, max_length=100, description="档口名称")
-    outlet_code: Optional[str] = Field(None, max_length=20, description="档口编号")
-    location: Optional[str] = Field(None, max_length=100, description="区位描述")
-    owner_name: Optional[str] = Field(None, max_length=50, description="负责人姓名")
-    owner_phone: Optional[str] = Field(None, max_length=20, description="负责人电话")
-    settlement_ratio: Optional[float] = Field(1.0, ge=0.0, le=1.0, description="结算分成比例")
+def _gen_order_no() -> str:
+    """生成商街订单号：FC{YYYYMMDD}{6位随机}"""
+    today = datetime.now(timezone.utc).strftime("%Y%m%d")
+    suffix = uuid4().hex[:6].upper()
+    return f"FC{today}{suffix}"
 
 
-class OutletUpdateRequest(BaseModel):
-    name: Optional[str] = Field(None, max_length=100)
-    outlet_code: Optional[str] = Field(None, max_length=20)
-    location: Optional[str] = Field(None, max_length=100)
-    owner_name: Optional[str] = Field(None, max_length=50)
-    owner_phone: Optional[str] = Field(None, max_length=20)
-    status: Optional[str] = Field(None, pattern='^(active|inactive|suspended)$')
-    settlement_ratio: Optional[float] = Field(None, ge=0.0, le=1.0)
+def _fc_row_to_dict(fc: FoodCourt) -> dict:
+    return {
+        "id": str(fc.id),
+        "store_id": str(fc.store_id),
+        "name": fc.name,
+        "description": fc.description,
+        "status": fc.status,
+        "unified_cashier": fc.unified_cashier,
+        "config": fc.config or {},
+        "created_at": fc.created_at.isoformat() if fc.created_at else None,
+        "updated_at": fc.updated_at.isoformat() if fc.updated_at else None,
+    }
 
 
-class FoodCourtOrderCreateRequest(BaseModel):
-    outlet_id: str = Field(..., description="开单档口ID")
-    store_id: str = Field(..., description="门店ID")
-    items: list[dict] = Field(default_factory=list, description="品项列表")
-    table_no: Optional[str] = Field(None, description="桌号（可选）")
-    notes: Optional[str] = Field(None, description="备注")
+def _vendor_row_to_dict(v: FoodCourtVendor) -> dict:
+    return {
+        "id": str(v.id),
+        "food_court_id": str(v.food_court_id),
+        "vendor_code": v.vendor_code,
+        "vendor_name": v.vendor_name,
+        "category": v.category,
+        "owner_name": v.owner_name,
+        "contact_phone": v.contact_phone,
+        "commission_rate": float(v.commission_rate) if v.commission_rate is not None else None,
+        "kds_station_id": v.kds_station_id,
+        "status": v.status,
+        "display_order": v.display_order,
+        "settlement_account": v.settlement_account or {},
+        "created_at": v.created_at.isoformat() if v.created_at else None,
+    }
 
 
-class AddItemsRequest(BaseModel):
-    outlet_id: str = Field(..., description="品项所属档口ID")
-    items: list[dict] = Field(..., description="追加品项列表")
+def _order_row_to_dict(o: FoodCourtOrder) -> dict:
+    return {
+        "id": str(o.id),
+        "food_court_id": str(o.food_court_id),
+        "order_no": o.order_no,
+        "total_amount_fen": o.total_amount_fen,
+        "status": o.status,
+        "payment_method": o.payment_method,
+        "paid_at": o.paid_at.isoformat() if o.paid_at else None,
+        "cashier_id": o.cashier_id,
+        "notes": o.notes,
+        "created_at": o.created_at.isoformat() if o.created_at else None,
+    }
 
 
-class CheckoutRequest(BaseModel):
-    payment_method: str = Field(..., description="支付方式: cash/wechat/alipay/card")
-    amount_tendered_fen: Optional[int] = Field(None, description="实收金额（分），现金支付时必填")
+def _item_row_to_dict(i: FoodCourtOrderItem) -> dict:
+    return {
+        "id": str(i.id),
+        "order_id": str(i.order_id),
+        "vendor_id": str(i.vendor_id),
+        "dish_name": i.dish_name,
+        "dish_id": i.dish_id,
+        "quantity": i.quantity,
+        "unit_price_fen": i.unit_price_fen,
+        "subtotal_fen": i.subtotal_fen,
+        "notes": i.notes,
+        "status": i.status,
+        "ready_at": i.ready_at.isoformat() if i.ready_at else None,
+    }
 
 
-class SettlementSplitRequest(BaseModel):
-    store_id: str = Field(..., description="门店ID")
-    settlement_date: Optional[date] = Field(None, description="结算日期，默认今日")
-    outlet_ids: Optional[list[str]] = Field(None, description="指定档口ID列表，默认全部")
+def _settlement_row_to_dict(s: FoodCourtVendorSettlement) -> dict:
+    return {
+        "id": str(s.id),
+        "vendor_id": str(s.vendor_id),
+        "food_court_id": str(s.food_court_id),
+        "settlement_date": s.settlement_date.isoformat() if s.settlement_date else None,
+        "order_count": s.order_count,
+        "item_count": s.item_count,
+        "gross_amount_fen": s.gross_amount_fen,
+        "commission_fen": s.commission_fen,
+        "net_amount_fen": s.net_amount_fen,
+        "status": s.status,
+        "settled_at": s.settled_at.isoformat() if s.settled_at else None,
+        "operator_id": s.operator_id,
+        "details": s.details or {},
+    }
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# 档口管理端点（DB 真实接入）
-# ─────────────────────────────────────────────────────────────────────────────
-
-@router.get("/outlets")
-async def list_outlets(
-    store_id: Optional[str] = Query(None, description="按门店过滤"),
-    status: Optional[str] = Query(None, description="按状态过滤"),
-    page: int = Query(1, ge=1),
-    size: int = Query(20, ge=1, le=100),
-    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
-    db: AsyncSession = Depends(get_db),
-):
-    """获取档口列表（含今日营业额统计）"""
+async def _push_kds_event(
+    tenant_id: str,
+    vendor: FoodCourtVendor,
+    items: list,
+    order_no: str,
+) -> None:
+    """支付后按 vendor 推送 Redis Streams KDS事件，各档口只收到自己的菜品"""
     try:
-        await _set_rls(db, x_tenant_id)
-
-        conditions = ["o.tenant_id = :tid", "o.is_deleted = FALSE"]
-        params: dict = {"tid": x_tenant_id, "offset": (page - 1) * size, "limit": size}
-
-        if store_id:
-            conditions.append("o.store_id = :store_id")
-            params["store_id"] = store_id
-        if status:
-            conditions.append("o.status = :status")
-            params["status"] = status
-
-        where = " AND ".join(conditions)
-
-        count_res = await db.execute(
-            text(f"SELECT COUNT(*) FROM outlets o WHERE {where}"), params
-        )
-        total = count_res.scalar() or 0
-
-        rows = await db.execute(
-            text(f"""
-                SELECT o.id::text, o.tenant_id::text, o.store_id::text,
-                       o.name, o.outlet_code, o.location,
-                       o.owner_name, o.owner_phone, o.status,
-                       o.settlement_ratio::float,
-                       o.is_deleted, o.created_at, o.updated_at,
-                       COALESCE(s.revenue_fen, 0)  AS today_revenue_fen,
-                       COALESCE(s.order_count, 0)  AS today_order_count,
-                       COALESCE(s.avg_order_fen, 0) AS today_avg_order_fen
-                FROM outlets o
-                LEFT JOIN (
-                    SELECT outlet_id,
-                           SUM(subtotal_fen)::bigint            AS revenue_fen,
-                           COUNT(DISTINCT order_id)::int        AS order_count,
-                           (CASE WHEN COUNT(DISTINCT order_id) > 0
-                                 THEN SUM(subtotal_fen) / COUNT(DISTINCT order_id)
-                                 ELSE 0 END)::bigint            AS avg_order_fen
-                    FROM outlet_orders
-                    WHERE tenant_id = :tid
-                      AND DATE(created_at AT TIME ZONE 'Asia/Shanghai') = CURRENT_DATE
-                      AND status = 'completed'
-                    GROUP BY outlet_id
-                ) s ON s.outlet_id = o.id
-                WHERE {where}
-                ORDER BY o.created_at DESC
-                LIMIT :limit OFFSET :offset
-            """),
-            params,
-        )
-
-        items = [dict(r) for r in rows.mappings().all()]
-        for item in items:
-            if item.get("created_at"):
-                item["created_at"] = item["created_at"].isoformat()
-            if item.get("updated_at"):
-                item["updated_at"] = item["updated_at"].isoformat()
-
-        return {"ok": True, "data": {"items": items, "total": total, "page": page, "size": size}}
-
-    except SQLAlchemyError as exc:
-        logger.error("list_outlets_db_error", error=str(exc), exc_info=True)
-        raise HTTPException(status_code=500, detail="查询档口列表失败") from exc
-
-
-@router.get("/outlets/{outlet_id}")
-async def get_outlet(
-    outlet_id: str,
-    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
-    db: AsyncSession = Depends(get_db),
-):
-    """获取档口详情"""
-    try:
-        await _set_rls(db, x_tenant_id)
-        row = await db.execute(
-            text("""
-                SELECT id::text, tenant_id::text, store_id::text,
-                       name, outlet_code, location,
-                       owner_name, owner_phone, status,
-                       settlement_ratio::float, is_deleted,
-                       created_at, updated_at
-                FROM outlets
-                WHERE id = :oid AND tenant_id = :tid AND is_deleted = FALSE
-            """),
-            {"oid": outlet_id, "tid": x_tenant_id},
-        )
-        outlet = row.mappings().first()
-        if not outlet:
-            raise HTTPException(status_code=404, detail=f"档口 {outlet_id} 不存在")
-
-        data = dict(outlet)
-        for k in ("created_at", "updated_at"):
-            if data.get(k):
-                data[k] = data[k].isoformat()
-
-        return {"ok": True, "data": data}
-
-    except HTTPException:
-        raise
-    except SQLAlchemyError as exc:
-        logger.error("get_outlet_db_error", outlet_id=outlet_id, error=str(exc), exc_info=True)
-        raise HTTPException(status_code=500, detail="查询档口详情失败") from exc
-
-
-@router.post("/outlets")
-async def create_outlet(
-    req: OutletCreateRequest,
-    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
-    db: AsyncSession = Depends(get_db),
-):
-    """创建档口（验证outlet_code唯一性）"""
-    try:
-        await _set_rls(db, x_tenant_id)
-
-        # outlet_code 唯一性校验（同门店内）
-        if req.outlet_code:
-            dup = await db.execute(
-                text("""
-                    SELECT 1 FROM outlets
-                    WHERE tenant_id = :tid
-                      AND store_id  = :sid
-                      AND outlet_code = :code
-                      AND is_deleted = FALSE
-                    LIMIT 1
-                """),
-                {"tid": x_tenant_id, "sid": req.store_id, "code": req.outlet_code},
-            )
-            if dup.first():
-                raise HTTPException(
-                    status_code=422,
-                    detail=f"档口编号 {req.outlet_code} 在该门店已存在",
-                )
-
-        new_id = str(uuid.uuid4())
-        now = datetime.now(timezone.utc)
-        await db.execute(
-            text("""
-                INSERT INTO outlets
-                    (id, tenant_id, store_id, name, outlet_code, location,
-                     owner_name, owner_phone, status, settlement_ratio,
-                     is_deleted, created_at, updated_at)
-                VALUES
-                    (:id, :tid, :sid, :name, :code, :location,
-                     :owner_name, :owner_phone, 'active', :ratio,
-                     FALSE, :now, :now)
-            """),
-            {
-                "id": new_id,
-                "tid": x_tenant_id,
-                "sid": req.store_id,
-                "name": req.name,
-                "code": req.outlet_code,
-                "location": req.location,
-                "owner_name": req.owner_name,
-                "owner_phone": req.owner_phone,
-                "ratio": req.settlement_ratio or 1.0,
-                "now": now,
+        await emit_event(
+            event_type=OrderEventType.PAID,
+            tenant_id=tenant_id,
+            stream_id=str(vendor.id),
+            payload={
+                "event_subtype": "food_court_kds_push",
+                "vendor_id": str(vendor.id),
+                "vendor_name": vendor.vendor_name,
+                "kds_station_id": vendor.kds_station_id,
+                "order_no": order_no,
+                "items": [
+                    {
+                        "item_id": str(i.id),
+                        "dish_name": i.dish_name,
+                        "quantity": i.quantity,
+                        "notes": i.notes,
+                    }
+                    for i in items
+                ],
             },
+            source_service="tx-trade",
+            metadata={"channel": "food_court_kds"},
         )
-        await db.commit()
-
-        logger.info("outlet_created", outlet_id=new_id, name=req.name, tenant_id=x_tenant_id)
-        return {"ok": True, "data": {
-            "id": new_id, "tenant_id": x_tenant_id, "store_id": req.store_id,
-            "name": req.name, "outlet_code": req.outlet_code, "location": req.location,
-            "owner_name": req.owner_name, "owner_phone": req.owner_phone,
-            "status": "active", "settlement_ratio": req.settlement_ratio or 1.0,
-            "is_deleted": False, "created_at": now.isoformat(), "updated_at": now.isoformat(),
-        }}
-
-    except HTTPException:
-        raise
-    except SQLAlchemyError as exc:
-        await db.rollback()
-        logger.error("create_outlet_db_error", error=str(exc), exc_info=True)
-        raise HTTPException(status_code=500, detail="创建档口失败") from exc
+    except Exception as exc:  # noqa: BLE001 — 网络/Redis故障不影响支付主流程
+        logger.warning("food_court_kds_push_failed", vendor_id=str(vendor.id), error=str(exc))
 
 
-@router.put("/outlets/{outlet_id}")
-async def update_outlet(
-    outlet_id: str,
-    req: OutletUpdateRequest,
-    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+# ─── 商街管理端点（总部后台） ─────────────────────────────────────────────────
+
+
+@router.post("")
+async def create_food_court(
+    req: CreateFoodCourtReq,
+    request: Request,
     db: AsyncSession = Depends(get_db),
-):
+) -> dict:
+    """创建商街/美食广场"""
+    tenant_id = _get_tenant_id(request)
+
+    fc = FoodCourt(
+        id=uuid4(),
+        tenant_id=UUID(tenant_id),
+        store_id=UUID(req.store_id),
+        name=req.name,
+        description=req.description,
+        status="active",
+        unified_cashier=req.unified_cashier,
+        config=req.config or {},
+    )
+    db.add(fc)
+    await db.commit()
+    await db.refresh(fc)
+
+    logger.info("food_court_created", fc_id=str(fc.id), tenant_id=tenant_id, name=fc.name)
+    return _ok(_fc_row_to_dict(fc))
+
+
+@router.get("")
+async def list_food_courts(
+    request: Request,
+    store_id: Optional[str] = Query(default=None, description="按门店过滤"),
+    status: Optional[str] = Query(default=None),
+    page: int = Query(default=1, ge=1),
+    size: int = Query(default=20, ge=1, le=100),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """商街列表"""
+    tenant_id = _get_tenant_id(request)
+
+    q = select(FoodCourt).where(
+        FoodCourt.tenant_id == UUID(tenant_id),
+        FoodCourt.is_deleted == False,
+    )
+    if store_id:
+        q = q.where(FoodCourt.store_id == UUID(store_id))
+    if status:
+        q = q.where(FoodCourt.status == status)
+
+    count_q = select(sa_func.count()).select_from(q.subquery())
+    total_result = await db.execute(count_q)
+    total = total_result.scalar_one()
+
+    q = q.order_by(FoodCourt.created_at.desc()).offset((page - 1) * size).limit(size)
+    result = await db.execute(q)
+    items = result.scalars().all()
+
+    return _ok({"items": [_fc_row_to_dict(fc) for fc in items], "total": total})
+
+
+@router.get("/{fc_id}")
+async def get_food_court(
+    fc_id: str,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """商街详情（含档口列表）"""
+    tenant_id = _get_tenant_id(request)
+
+    result = await db.execute(
+        select(FoodCourt).where(
+            FoodCourt.id == UUID(fc_id),
+            FoodCourt.tenant_id == UUID(tenant_id),
+            FoodCourt.is_deleted == False,
+        )
+    )
+    fc = result.scalar_one_or_none()
+    if not fc:
+        _err("商街不存在", 404)
+
+    vendors_result = await db.execute(
+        select(FoodCourtVendor).where(
+            FoodCourtVendor.food_court_id == UUID(fc_id),
+            FoodCourtVendor.tenant_id == UUID(tenant_id),
+            FoodCourtVendor.is_deleted == False,
+        ).order_by(FoodCourtVendor.display_order)
+    )
+    vendors = vendors_result.scalars().all()
+
+    data = _fc_row_to_dict(fc)
+    data["vendors"] = [_vendor_row_to_dict(v) for v in vendors]
+    data["vendor_count"] = len(vendors)
+    return _ok(data)
+
+
+@router.put("/{fc_id}")
+async def update_food_court(
+    fc_id: str,
+    req: UpdateFoodCourtReq,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """更新商街信息"""
+    tenant_id = _get_tenant_id(request)
+
+    result = await db.execute(
+        select(FoodCourt).where(
+            FoodCourt.id == UUID(fc_id),
+            FoodCourt.tenant_id == UUID(tenant_id),
+            FoodCourt.is_deleted == False,
+        )
+    )
+    fc = result.scalar_one_or_none()
+    if not fc:
+        _err("商街不存在", 404)
+
+    if req.name is not None:
+        fc.name = req.name
+    if req.description is not None:
+        fc.description = req.description
+    if req.unified_cashier is not None:
+        fc.unified_cashier = req.unified_cashier
+    if req.status is not None:
+        fc.status = req.status
+    if req.config is not None:
+        fc.config = req.config
+
+    await db.commit()
+    await db.refresh(fc)
+    return _ok(_fc_row_to_dict(fc))
+
+
+# ─── 档口管理端点 ─────────────────────────────────────────────────────────────
+
+
+@router.post("/{fc_id}/vendors")
+async def create_vendor(
+    fc_id: str,
+    req: CreateVendorReq,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """在商街下新增档口"""
+    tenant_id = _get_tenant_id(request)
+
+    fc_result = await db.execute(
+        select(FoodCourt).where(
+            FoodCourt.id == UUID(fc_id),
+            FoodCourt.tenant_id == UUID(tenant_id),
+            FoodCourt.is_deleted == False,
+        )
+    )
+    if not fc_result.scalar_one_or_none():
+        _err("商街不存在", 404)
+
+    # 同一商街内档口编号唯一校验
+    dup_result = await db.execute(
+        select(FoodCourtVendor).where(
+            FoodCourtVendor.food_court_id == UUID(fc_id),
+            FoodCourtVendor.vendor_code == req.vendor_code,
+            FoodCourtVendor.tenant_id == UUID(tenant_id),
+            FoodCourtVendor.is_deleted == False,
+        )
+    )
+    if dup_result.scalar_one_or_none():
+        _err(f"档口编号 {req.vendor_code} 在本商街已存在")
+
+    from decimal import Decimal
+    vendor = FoodCourtVendor(
+        id=uuid4(),
+        tenant_id=UUID(tenant_id),
+        food_court_id=UUID(fc_id),
+        vendor_code=req.vendor_code,
+        vendor_name=req.vendor_name,
+        category=req.category,
+        owner_name=req.owner_name,
+        contact_phone=req.contact_phone,
+        commission_rate=Decimal(str(req.commission_rate)) if req.commission_rate is not None else None,
+        kds_station_id=req.kds_station_id,
+        status="active",
+        settlement_account=req.settlement_account or {},
+        display_order=req.display_order,
+    )
+    db.add(vendor)
+    await db.commit()
+    await db.refresh(vendor)
+
+    logger.info("food_court_vendor_created", vendor_id=str(vendor.id), fc_id=fc_id, name=vendor.vendor_name)
+    return _ok(_vendor_row_to_dict(vendor))
+
+
+@router.get("/{fc_id}/vendors")
+async def list_vendors(
+    fc_id: str,
+    request: Request,
+    status: Optional[str] = Query(default=None),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """商街档口列表"""
+    tenant_id = _get_tenant_id(request)
+
+    q = select(FoodCourtVendor).where(
+        FoodCourtVendor.food_court_id == UUID(fc_id),
+        FoodCourtVendor.tenant_id == UUID(tenant_id),
+        FoodCourtVendor.is_deleted == False,
+    )
+    if status:
+        q = q.where(FoodCourtVendor.status == status)
+    q = q.order_by(FoodCourtVendor.display_order)
+
+    result = await db.execute(q)
+    vendors = result.scalars().all()
+    return _ok({"items": [_vendor_row_to_dict(v) for v in vendors], "total": len(vendors)})
+
+
+@router.put("/{fc_id}/vendors/{v_id}")
+async def update_vendor(
+    fc_id: str,
+    v_id: str,
+    req: UpdateVendorReq,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> dict:
     """更新档口信息"""
-    try:
-        await _set_rls(db, x_tenant_id)
+    tenant_id = _get_tenant_id(request)
 
-        updates = {k: v for k, v in req.model_dump().items() if v is not None}
-        if not updates:
-            raise HTTPException(status_code=400, detail="没有提供任何更新字段")
-
-        # outlet_code 唯一性校验
-        if "outlet_code" in updates:
-            dup = await db.execute(
-                text("""
-                    SELECT 1 FROM outlets o
-                    JOIN outlets me ON me.id = :oid AND me.tenant_id = :tid
-                    WHERE o.tenant_id  = :tid
-                      AND o.store_id   = me.store_id
-                      AND o.outlet_code = :code
-                      AND o.id        != :oid
-                      AND o.is_deleted = FALSE
-                    LIMIT 1
-                """),
-                {"tid": x_tenant_id, "oid": outlet_id, "code": updates["outlet_code"]},
-            )
-            if dup.first():
-                raise HTTPException(
-                    status_code=422,
-                    detail=f"档口编号 {updates['outlet_code']} 在该门店已存在",
-                )
-
-        set_parts = ", ".join(f"{col} = :{col}" for col in updates)
-        params = {**updates, "id": outlet_id, "tid": x_tenant_id,
-                  "updated_at": datetime.now(timezone.utc)}
-
-        result = await db.execute(
-            text(f"""
-                UPDATE outlets
-                SET {set_parts}, updated_at = :updated_at
-                WHERE id = :id AND tenant_id = :tid AND is_deleted = FALSE
-                RETURNING id::text, name, status, settlement_ratio::float, updated_at
-            """),
-            params,
+    result = await db.execute(
+        select(FoodCourtVendor).where(
+            FoodCourtVendor.id == UUID(v_id),
+            FoodCourtVendor.food_court_id == UUID(fc_id),
+            FoodCourtVendor.tenant_id == UUID(tenant_id),
+            FoodCourtVendor.is_deleted == False,
         )
-        row = result.mappings().first()
-        await db.commit()
+    )
+    vendor = result.scalar_one_or_none()
+    if not vendor:
+        _err("档口不存在", 404)
 
-        if not row:
-            raise HTTPException(status_code=404, detail=f"档口 {outlet_id} 不存在")
+    from decimal import Decimal
+    if req.vendor_name is not None:
+        vendor.vendor_name = req.vendor_name
+    if req.category is not None:
+        vendor.category = req.category
+    if req.owner_name is not None:
+        vendor.owner_name = req.owner_name
+    if req.contact_phone is not None:
+        vendor.contact_phone = req.contact_phone
+    if req.commission_rate is not None:
+        vendor.commission_rate = Decimal(str(req.commission_rate))
+    if req.kds_station_id is not None:
+        vendor.kds_station_id = req.kds_station_id
+    if req.settlement_account is not None:
+        vendor.settlement_account = req.settlement_account
+    if req.display_order is not None:
+        vendor.display_order = req.display_order
+    if req.status is not None:
+        vendor.status = req.status
 
-        logger.info("outlet_updated", outlet_id=outlet_id, tenant_id=x_tenant_id)
-        r = dict(row)
-        if r.get("updated_at"):
-            r["updated_at"] = r["updated_at"].isoformat()
-        return {"ok": True, "data": r}
-
-    except HTTPException:
-        raise
-    except SQLAlchemyError as exc:
-        await db.rollback()
-        logger.error("update_outlet_db_error", outlet_id=outlet_id, error=str(exc), exc_info=True)
-        raise HTTPException(status_code=500, detail="更新档口失败") from exc
+    await db.commit()
+    await db.refresh(vendor)
+    return _ok(_vendor_row_to_dict(vendor))
 
 
-@router.delete("/outlets/{outlet_id}")
-async def deactivate_outlet(
-    outlet_id: str,
-    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+@router.post("/{fc_id}/vendors/{v_id}/suspend")
+async def suspend_vendor(
+    fc_id: str,
+    v_id: str,
+    request: Request,
     db: AsyncSession = Depends(get_db),
-):
-    """停用档口（软删除）"""
-    try:
-        await _set_rls(db, x_tenant_id)
-        result = await db.execute(
-            text("""
-                UPDATE outlets
-                SET is_deleted = TRUE, status = 'inactive', updated_at = NOW()
-                WHERE id = :id AND tenant_id = :tid AND is_deleted = FALSE
-                RETURNING id
-            """),
-            {"id": outlet_id, "tid": x_tenant_id},
+) -> dict:
+    """暂停档口营业（suspended 状态，保留数据）"""
+    tenant_id = _get_tenant_id(request)
+
+    result = await db.execute(
+        select(FoodCourtVendor).where(
+            FoodCourtVendor.id == UUID(v_id),
+            FoodCourtVendor.food_court_id == UUID(fc_id),
+            FoodCourtVendor.tenant_id == UUID(tenant_id),
+            FoodCourtVendor.is_deleted == False,
         )
-        if not result.first():
-            raise HTTPException(status_code=404, detail=f"档口 {outlet_id} 不存在")
-        await db.commit()
+    )
+    vendor = result.scalar_one_or_none()
+    if not vendor:
+        _err("档口不存在", 404)
+    if vendor.status == "suspended":
+        _err("档口已处于暂停状态")
 
-        logger.info("outlet_deactivated", outlet_id=outlet_id, tenant_id=x_tenant_id)
-        return {"ok": True, "data": {"outlet_id": outlet_id, "status": "deactivated"}}
+    vendor.status = "suspended"
+    await db.commit()
 
-    except HTTPException:
-        raise
-    except SQLAlchemyError as exc:
-        await db.rollback()
-        logger.error("deactivate_outlet_db_error", outlet_id=outlet_id, error=str(exc), exc_info=True)
-        raise HTTPException(status_code=500, detail="停用档口失败") from exc
+    logger.info("food_court_vendor_suspended", vendor_id=v_id, fc_id=fc_id)
+    return _ok({"vendor_id": v_id, "status": "suspended"})
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# 商户别名端点（/merchants → /outlets 语义别名）
-# ─────────────────────────────────────────────────────────────────────────────
+# ─── POS收银端点（统一收银台） ────────────────────────────────────────────────
 
-@router.get("/merchants")
-async def list_merchants(
-    store_id: Optional[str] = Query(None),
-    status: Optional[str] = Query(None),
-    page: int = Query(1, ge=1),
-    size: int = Query(20, ge=1, le=100),
-    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+
+@router.get("/{fc_id}/menu")
+async def get_food_court_menu(
+    fc_id: str,
+    request: Request,
     db: AsyncSession = Depends(get_db),
-):
-    """获取商户（档口）列表 —— /outlets GET 的语义别名。"""
-    return await list_outlets(store_id=store_id, status=status, page=page, size=size,
-                               x_tenant_id=x_tenant_id, db=db)
+) -> dict:
+    """获取商街所有活跃档口（统一收银台选菜用，菜品从 tx-menu 服务拉取）"""
+    tenant_id = _get_tenant_id(request)
 
+    vendors_result = await db.execute(
+        select(FoodCourtVendor).where(
+            FoodCourtVendor.food_court_id == UUID(fc_id),
+            FoodCourtVendor.tenant_id == UUID(tenant_id),
+            FoodCourtVendor.status == "active",
+            FoodCourtVendor.is_deleted == False,
+        ).order_by(FoodCourtVendor.display_order)
+    )
+    vendors = vendors_result.scalars().all()
 
-@router.post("/merchants")
-async def create_merchant(
-    req: OutletCreateRequest,
-    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
-    db: AsyncSession = Depends(get_db),
-):
-    """新建档口商户 —— /outlets POST 的语义别名。"""
-    return await create_outlet(req=req, x_tenant_id=x_tenant_id, db=db)
-
-
-@router.put("/merchants/{merchant_id}")
-async def update_merchant(
-    merchant_id: str,
-    req: OutletUpdateRequest,
-    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
-    db: AsyncSession = Depends(get_db),
-):
-    """更新档口商户信息 —— /outlets PUT 的语义别名。"""
-    return await update_outlet(outlet_id=merchant_id, req=req,
-                                x_tenant_id=x_tenant_id, db=db)
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# 报表统计端点（DB 真实接入）
-# ─────────────────────────────────────────────────────────────────────────────
-
-@router.get("/stats/daily")
-async def get_daily_stats(
-    store_id: Optional[str] = Query(None, description="门店ID"),
-    stat_date: Optional[date] = Query(None, description="统计日期，默认今日"),
-    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
-    db: AsyncSession = Depends(get_db),
-):
-    """当日各档口汇总（营业额/订单数/客单价）"""
-    try:
-        await _set_rls(db, x_tenant_id)
-        target_date = stat_date or date.today()
-
-        outlet_filter = "AND o.store_id = :store_id" if store_id else ""
-        params: dict = {"tid": x_tenant_id, "date": target_date}
-        if store_id:
-            params["store_id"] = store_id
-
-        rows = await db.execute(
-            text(f"""
-                SELECT o.id::text   AS outlet_id,
-                       o.name       AS outlet_name,
-                       o.outlet_code,
-                       o.location,
-                       o.status,
-                       COALESCE(s.revenue_fen, 0)   AS revenue_fen,
-                       COALESCE(s.order_count, 0)   AS order_count,
-                       COALESCE(s.item_count, 0)    AS item_count,
-                       COALESCE(s.avg_order_fen, 0) AS avg_order_fen
-                FROM outlets o
-                LEFT JOIN (
-                    SELECT oo.outlet_id,
-                           SUM(oo.subtotal_fen)::bigint          AS revenue_fen,
-                           COUNT(DISTINCT oo.order_id)::int      AS order_count,
-                           SUM(oo.item_count)::int               AS item_count,
-                           (CASE WHEN COUNT(DISTINCT oo.order_id) > 0
-                                 THEN SUM(oo.subtotal_fen) / COUNT(DISTINCT oo.order_id)
-                                 ELSE 0 END)::bigint             AS avg_order_fen
-                    FROM outlet_orders oo
-                    WHERE oo.tenant_id = :tid
-                      AND DATE(oo.created_at AT TIME ZONE 'Asia/Shanghai') = :date
-                      AND oo.status = 'completed'
-                    GROUP BY oo.outlet_id
-                ) s ON s.outlet_id = o.id
-                WHERE o.tenant_id = :tid AND o.is_deleted = FALSE
-                {outlet_filter}
-                ORDER BY revenue_fen DESC
-            """),
-            params,
-        )
-        stats = [dict(r) for r in rows.mappings().all()]
-        total_revenue = sum(r["revenue_fen"] for r in stats)
-        total_orders = sum(r["order_count"] for r in stats)
-
-        return {"ok": True, "data": {
-            "stat_date": str(target_date),
-            "store_id": store_id,
-            "total_revenue_fen": total_revenue,
-            "total_order_count": total_orders,
-            "outlet_count": len(stats),
-            "outlets": stats,
-        }}
-
-    except SQLAlchemyError as exc:
-        logger.error("daily_stats_db_error", error=str(exc), exc_info=True)
-        raise HTTPException(status_code=500, detail="查询日统计失败") from exc
-
-
-@router.get("/stats/compare")
-async def get_outlet_compare(
-    store_id: Optional[str] = Query(None, description="门店ID"),
-    start_date: Optional[date] = Query(None, description="开始日期"),
-    end_date: Optional[date] = Query(None, description="结束日期"),
-    outlet_ids: Optional[str] = Query(None, description="档口ID列表，逗号分隔"),
-    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
-    db: AsyncSession = Depends(get_db),
-):
-    """档口对比报表（日期范围内各档口营业额趋势）"""
-    try:
-        await _set_rls(db, x_tenant_id)
-        _start = start_date or date.today()
-        _end = end_date or date.today()
-        days = min((_end - _start).days + 1, 30)
-
-        outlet_id_list = [oid.strip() for oid in outlet_ids.split(",")] if outlet_ids else []
-
-        # 查询范围内逐日逐档口汇总
-        outlet_filter = ""
-        params: dict = {"tid": x_tenant_id, "start": _start, "end": _end}
-        if store_id:
-            outlet_filter += " AND o.store_id = :store_id"
-            params["store_id"] = store_id
-        if outlet_id_list:
-            outlet_filter += " AND oo.outlet_id = ANY(:outlet_ids)"
-            params["outlet_ids"] = outlet_id_list
-
-        rows = await db.execute(
-            text(f"""
-                SELECT DATE(oo.created_at AT TIME ZONE 'Asia/Shanghai') AS biz_date,
-                       oo.outlet_id::text,
-                       o.name AS outlet_name,
-                       o.outlet_code,
-                       SUM(oo.subtotal_fen)::bigint         AS revenue_fen,
-                       COUNT(DISTINCT oo.order_id)::int     AS order_count
-                FROM outlet_orders oo
-                JOIN outlets o ON o.id = oo.outlet_id AND o.is_deleted = FALSE
-                WHERE oo.tenant_id = :tid
-                  AND DATE(oo.created_at AT TIME ZONE 'Asia/Shanghai')
-                        BETWEEN :start AND :end
-                  AND oo.status = 'completed'
-                  {outlet_filter}
-                GROUP BY biz_date, oo.outlet_id, o.name, o.outlet_code
-                ORDER BY biz_date, oo.outlet_id
-            """),
-            params,
-        )
-        db_rows = rows.mappings().all()
-
-        # 构建趋势结构
-        outlet_meta: dict[str, dict] = {}
-        trend_map: dict[str, dict] = {}
-        for r in db_rows:
-            oid = r["outlet_id"]
-            outlet_meta[oid] = {"outlet_name": r["outlet_name"], "outlet_code": r["outlet_code"]}
-            day_str = str(r["biz_date"])
-            if day_str not in trend_map:
-                trend_map[day_str] = {"date": day_str}
-            trend_map[day_str][oid] = {
-                "revenue_fen": r["revenue_fen"],
-                "order_count": r["order_count"],
-                "outlet_name": r["outlet_name"],
-            }
-
-        trend_data = [trend_map[str(_start + timedelta(days=i))]
-                      for i in range(days)
-                      if str(_start + timedelta(days=i)) in trend_map]
-
-        compare_summary = [
+    return _ok({
+        "food_court_id": fc_id,
+        "vendors": [
             {
-                "outlet_id": oid,
-                "outlet_name": meta["outlet_name"],
-                "outlet_code": meta["outlet_code"],
-                "total_revenue_fen": sum(
-                    d.get(oid, {}).get("revenue_fen", 0) for d in trend_data
-                ),
-                "total_order_count": sum(
-                    d.get(oid, {}).get("order_count", 0) for d in trend_data
-                ),
+                **_vendor_row_to_dict(v),
+                # 前端凭此 URL 调 tx-menu 服务拉取各档口菜单
+                "menu_url": f"/api/v1/dishes?store_id={v.kds_station_id}" if v.kds_station_id else None,
             }
-            for oid, meta in outlet_meta.items()
-        ]
-        for item in compare_summary:
-            item["avg_daily_revenue_fen"] = (
-                item["total_revenue_fen"] // days if days > 0 else 0
-            )
-
-        return {"ok": True, "data": {
-            "start_date": str(_start), "end_date": str(_end), "days": days,
-            "outlets": compare_summary, "trend": trend_data,
-        }}
-
-    except SQLAlchemyError as exc:
-        logger.error("outlet_compare_db_error", error=str(exc), exc_info=True)
-        raise HTTPException(status_code=500, detail="查询对比报表失败") from exc
+            for v in vendors
+        ],
+        "vendor_count": len(vendors),
+    })
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# 日结结算端点（DB 真实接入）
-# ─────────────────────────────────────────────────────────────────────────────
-
-@router.get("/settlement/daily")
-async def get_daily_settlement(
-    store_id: Optional[str] = Query(None, description="门店ID"),
-    settlement_date: Optional[date] = Query(None, description="结算日期，默认今日"),
-    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
-    db: AsyncSession = Depends(get_db),
-):
-    """按档口拆分日结（各商户营业额/订单数/应结金额）"""
-    try:
-        await _set_rls(db, x_tenant_id)
-        target_date = settlement_date or date.today()
-
-        store_filter = "AND o.store_id = :store_id" if store_id else ""
-        params: dict = {"tid": x_tenant_id, "date": target_date}
-        if store_id:
-            params["store_id"] = store_id
-
-        rows = await db.execute(
-            text(f"""
-                SELECT o.id::text      AS outlet_id,
-                       o.name          AS outlet_name,
-                       o.outlet_code,
-                       o.location,
-                       o.owner_name,
-                       o.status,
-                       o.settlement_ratio::float,
-                       COALESCE(s.revenue_fen, 0)  AS revenue_fen,
-                       COALESCE(s.order_count, 0)  AS order_count
-                FROM outlets o
-                LEFT JOIN (
-                    SELECT oo.outlet_id,
-                           SUM(oo.subtotal_fen)::bigint       AS revenue_fen,
-                           COUNT(DISTINCT oo.order_id)::int   AS order_count
-                    FROM outlet_orders oo
-                    WHERE oo.tenant_id = :tid
-                      AND DATE(oo.created_at AT TIME ZONE 'Asia/Shanghai') = :date
-                      AND oo.status = 'completed'
-                    GROUP BY oo.outlet_id
-                ) s ON s.outlet_id = o.id
-                WHERE o.tenant_id = :tid AND o.is_deleted = FALSE
-                {store_filter}
-                ORDER BY revenue_fen DESC
-            """),
-            params,
-        )
-
-        settlement_items: list[dict] = []
-        total_revenue = total_orders = total_settlement = 0
-
-        for r in rows.mappings().all():
-            revenue = r["revenue_fen"]
-            order_count = r["order_count"]
-            ratio = float(r["settlement_ratio"] or 1.0)
-            settlement_amount = int(revenue * ratio)
-
-            total_revenue += revenue
-            total_orders += order_count
-            total_settlement += settlement_amount
-
-            settlement_items.append({
-                "outlet_id": r["outlet_id"],
-                "outlet_name": r["outlet_name"],
-                "outlet_code": r["outlet_code"],
-                "location": r["location"],
-                "owner_name": r["owner_name"],
-                "revenue_fen": revenue,
-                "order_count": order_count,
-                "avg_order_fen": revenue // order_count if order_count > 0 else 0,
-                "settlement_ratio": ratio,
-                "settlement_amount_fen": settlement_amount,
-                "status": r["status"],
-            })
-
-        return {"ok": True, "data": {
-            "settlement_date": str(target_date),
-            "store_id": store_id,
-            "total_revenue_fen": total_revenue,
-            "total_order_count": total_orders,
-            "total_settlement_fen": total_settlement,
-            "outlet_count": len(settlement_items),
-            "outlets": settlement_items,
-        }}
-
-    except SQLAlchemyError as exc:
-        logger.error("daily_settlement_db_error", error=str(exc), exc_info=True)
-        raise HTTPException(status_code=500, detail="查询日结失败") from exc
-
-
-@router.post("/settlement/split")
-async def settlement_split(
-    req: SettlementSplitRequest,
-    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
-    db: AsyncSession = Depends(get_db),
-):
-    """日结时按商户分账汇总（基于 outlets.settlement_ratio 真实字段）。"""
-    try:
-        await _set_rls(db, x_tenant_id)
-        target_date = req.settlement_date or date.today()
-
-        outlet_filter = ""
-        params: dict = {"tid": x_tenant_id, "date": target_date}
-        if req.outlet_ids:
-            outlet_filter = "AND o.id = ANY(:outlet_ids)"
-            params["outlet_ids"] = req.outlet_ids
-        if req.store_id:
-            outlet_filter += " AND o.store_id = :store_id"
-            params["store_id"] = req.store_id
-
-        rows = await db.execute(
-            text(f"""
-                SELECT o.id::text      AS outlet_id,
-                       o.name          AS outlet_name,
-                       o.outlet_code,
-                       o.owner_name,
-                       o.owner_phone,
-                       o.settlement_ratio::float,
-                       COALESCE(s.revenue_fen, 0)  AS revenue_fen,
-                       COALESCE(s.order_count, 0)  AS order_count
-                FROM outlets o
-                LEFT JOIN (
-                    SELECT oo.outlet_id,
-                           SUM(oo.subtotal_fen)::bigint       AS revenue_fen,
-                           COUNT(DISTINCT oo.order_id)::int   AS order_count
-                    FROM outlet_orders oo
-                    WHERE oo.tenant_id = :tid
-                      AND DATE(oo.created_at AT TIME ZONE 'Asia/Shanghai') = :date
-                      AND oo.status = 'completed'
-                    GROUP BY oo.outlet_id
-                ) s ON s.outlet_id = o.id
-                WHERE o.tenant_id = :tid AND o.is_deleted = FALSE
-                {outlet_filter}
-                ORDER BY revenue_fen DESC
-            """),
-            params,
-        )
-
-        split_results: list[dict] = []
-        grand_total_fen = 0
-
-        for r in rows.mappings().all():
-            revenue = r["revenue_fen"]
-            ratio = float(r["settlement_ratio"] or 1.0)
-            settlement_amount = int(revenue * ratio)
-            platform_fee = int(revenue * 0.005)  # 0.5% 平台服务费
-            net_payout = settlement_amount - platform_fee
-            grand_total_fen += net_payout
-
-            split_results.append({
-                "outlet_id": r["outlet_id"],
-                "outlet_name": r["outlet_name"],
-                "outlet_code": r["outlet_code"],
-                "owner_name": r["owner_name"],
-                "owner_phone": r["owner_phone"],
-                "settlement_date": str(target_date),
-                "revenue_fen": revenue,
-                "order_count": r["order_count"],
-                "settlement_ratio": ratio,
-                "gross_settlement_fen": settlement_amount,
-                "platform_fee_fen": platform_fee,
-                "net_payout_fen": net_payout,
-                "status": "settled",
-                "settled_at": datetime.now(timezone.utc).isoformat(),
-            })
-
-        logger.info(
-            "settlement_split_completed",
-            store_id=req.store_id,
-            outlet_count=len(split_results),
-            grand_total_fen=grand_total_fen,
-            date=str(target_date),
-        )
-
-        return {"ok": True, "data": {
-            "store_id": req.store_id,
-            "settlement_date": str(target_date),
-            "outlet_count": len(split_results),
-            "grand_total_payout_fen": grand_total_fen,
-            "split_details": split_results,
-            "generated_at": datetime.now(timezone.utc).isoformat(),
-        }}
-
-    except SQLAlchemyError as exc:
-        logger.error("settlement_split_db_error", error=str(exc), exc_info=True)
-        raise HTTPException(status_code=500, detail="分账结算失败") from exc
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# 档口订单查询（DB 真实接入）
-# ─────────────────────────────────────────────────────────────────────────────
-
-@router.get("/orders")
-async def list_outlet_orders(
-    outlet_id: Optional[str] = Query(None, description="按档口过滤"),
-    order_date: Optional[date] = Query(None, description="按日期过滤"),
-    status: Optional[str] = Query(None, description="按状态过滤"),
-    page: int = Query(1, ge=1),
-    size: int = Query(20, ge=1, le=100),
-    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
-    db: AsyncSession = Depends(get_db),
-):
-    """档口订单查询（outlet_orders 表，支持多条件过滤+分页）"""
-    try:
-        await _set_rls(db, x_tenant_id)
-
-        conditions = ["oo.tenant_id = :tid"]
-        params: dict = {"tid": x_tenant_id, "offset": (page - 1) * size, "limit": size}
-
-        if outlet_id:
-            conditions.append("oo.outlet_id = :outlet_id")
-            params["outlet_id"] = outlet_id
-        if status:
-            conditions.append("oo.status = :status")
-            params["status"] = status
-        if order_date:
-            conditions.append("DATE(oo.created_at AT TIME ZONE 'Asia/Shanghai') = :order_date")
-            params["order_date"] = order_date
-
-        where = " AND ".join(conditions)
-
-        count_res = await db.execute(
-            text(f"SELECT COUNT(*) FROM outlet_orders oo WHERE {where}"), params
-        )
-        total = count_res.scalar() or 0
-
-        rows = await db.execute(
-            text(f"""
-                SELECT oo.id::text, oo.outlet_id::text, oo.order_id::text,
-                       oo.subtotal_fen, oo.item_count, oo.status, oo.notes,
-                       oo.created_at, oo.updated_at,
-                       o.name AS outlet_name, o.outlet_code
-                FROM outlet_orders oo
-                LEFT JOIN outlets o ON o.id = oo.outlet_id
-                WHERE {where}
-                ORDER BY oo.created_at DESC
-                LIMIT :limit OFFSET :offset
-            """),
-            params,
-        )
-
-        items = []
-        for r in rows.mappings().all():
-            row = dict(r)
-            for k in ("created_at", "updated_at"):
-                if row.get(k):
-                    row[k] = row[k].isoformat()
-            items.append(row)
-
-        return {"ok": True, "data": {"items": items, "total": total, "page": page, "size": size}}
-
-    except SQLAlchemyError as exc:
-        logger.error("list_outlet_orders_db_error", error=str(exc), exc_info=True)
-        raise HTTPException(status_code=500, detail="查询档口订单失败") from exc
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# 档口收银端点（TODO: 待与 cashier_engine 深度集成）
-# 当前实现为轻量占位，创建真实 outlet_orders 记录但不创建完整 orders 行
-# ─────────────────────────────────────────────────────────────────────────────
-
-@router.post("/orders")
+@router.post("/{fc_id}/orders")
 async def create_food_court_order(
-    req: FoodCourtOrderCreateRequest,
-    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    fc_id: str,
+    req: CreateFoodCourtOrderReq,
+    request: Request,
     db: AsyncSession = Depends(get_db),
-):
-    """档口开单（写入 outlet_orders，正式 orders 行由 cashier_engine 创建）"""
-    try:
-        await _set_rls(db, x_tenant_id)
+) -> dict:
+    """创建商街订单（含多档口菜品）"""
+    tenant_id = _get_tenant_id(request)
 
-        # 校验档口存在且活跃
-        outlet_row = await db.execute(
+    fc_result = await db.execute(
+        select(FoodCourt).where(
+            FoodCourt.id == UUID(fc_id),
+            FoodCourt.tenant_id == UUID(tenant_id),
+            FoodCourt.status == "active",
+            FoodCourt.is_deleted == False,
+        )
+    )
+    if not fc_result.scalar_one_or_none():
+        _err("商街不存在或已停用", 404)
+
+    # 校验所有 vendor_id 合法且属于此商街
+    vendor_ids = list({UUID(item.vendor_id) for item in req.items})
+    vendors_result = await db.execute(
+        select(FoodCourtVendor).where(
+            FoodCourtVendor.id.in_(vendor_ids),
+            FoodCourtVendor.food_court_id == UUID(fc_id),
+            FoodCourtVendor.tenant_id == UUID(tenant_id),
+            FoodCourtVendor.status == "active",
+            FoodCourtVendor.is_deleted == False,
+        )
+    )
+    vendors = {v.id: v for v in vendors_result.scalars().all()}
+    for vid in vendor_ids:
+        if vid not in vendors:
+            _err(f"档口 {vid} 不存在或未营业")
+
+    total_amount_fen = sum(item.quantity * item.unit_price_fen for item in req.items)
+
+    order_id = uuid4()
+    order = FoodCourtOrder(
+        id=order_id,
+        tenant_id=UUID(tenant_id),
+        food_court_id=UUID(fc_id),
+        order_no=_gen_order_no(),
+        total_amount_fen=total_amount_fen,
+        status="pending",
+        cashier_id=req.cashier_id,
+        notes=req.notes,
+    )
+    db.add(order)
+
+    order_items = []
+    for item_req in req.items:
+        subtotal = item_req.quantity * item_req.unit_price_fen
+        item = FoodCourtOrderItem(
+            id=uuid4(),
+            tenant_id=UUID(tenant_id),
+            order_id=order_id,
+            vendor_id=UUID(item_req.vendor_id),
+            dish_name=item_req.dish_name,
+            dish_id=item_req.dish_id,
+            quantity=item_req.quantity,
+            unit_price_fen=item_req.unit_price_fen,
+            subtotal_fen=subtotal,
+            notes=item_req.notes,
+            status="pending",
+        )
+        db.add(item)
+        order_items.append(item)
+
+    await db.commit()
+    await db.refresh(order)
+
+    logger.info(
+        "food_court_order_created",
+        order_id=str(order_id),
+        order_no=order.order_no,
+        fc_id=fc_id,
+        total_fen=total_amount_fen,
+        vendor_count=len(vendor_ids),
+    )
+
+    data = _order_row_to_dict(order)
+    data["items"] = [_item_row_to_dict(i) for i in order_items]
+    return _ok(data)
+
+
+@router.get("/{fc_id}/orders/{order_id}")
+async def get_food_court_order(
+    fc_id: str,
+    order_id: str,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """订单详情（含各档口菜品明细，按档口分组）"""
+    tenant_id = _get_tenant_id(request)
+
+    order_result = await db.execute(
+        select(FoodCourtOrder).where(
+            FoodCourtOrder.id == UUID(order_id),
+            FoodCourtOrder.food_court_id == UUID(fc_id),
+            FoodCourtOrder.tenant_id == UUID(tenant_id),
+        )
+    )
+    order = order_result.scalar_one_or_none()
+    if not order:
+        _err("订单不存在", 404)
+
+    items_result = await db.execute(
+        select(FoodCourtOrderItem).where(
+            FoodCourtOrderItem.order_id == UUID(order_id),
+            FoodCourtOrderItem.tenant_id == UUID(tenant_id),
+        ).order_by(FoodCourtOrderItem.vendor_id, FoodCourtOrderItem.created_at)
+    )
+    items = items_result.scalars().all()
+
+    # 按档口分组
+    vendor_groups: dict[str, list] = {}
+    for item in items:
+        vid = str(item.vendor_id)
+        vendor_groups.setdefault(vid, []).append(_item_row_to_dict(item))
+
+    data = _order_row_to_dict(order)
+    data["items"] = [_item_row_to_dict(i) for i in items]
+    data["vendor_groups"] = vendor_groups
+    data["vendor_count"] = len(vendor_groups)
+    return _ok(data)
+
+
+@router.post("/{fc_id}/orders/{order_id}/pay")
+async def pay_food_court_order(
+    fc_id: str,
+    order_id: str,
+    req: PayFoodCourtOrderReq,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """统一结账
+
+    关键业务流程：
+    1. FOR UPDATE 悲观锁防并发重复支付
+    2. 幂等键检查
+    3. 金额校验（实付 >= 应付）
+    4. 标记订单 paid，更新支付方式和时间
+    5. 更新所有订单行状态为 preparing
+    6. 按 vendor 分组异步推送 Redis Streams KDS 事件（各档口只收自己的菜）
+    7. 按 vendor 生成/累加 pending 结算记录（不立即结算，等日结触发）
+    8. 发送统一事件总线 ORDER.PAID
+    """
+    tenant_id = _get_tenant_id(request)
+
+    # ── 1. FOR UPDATE 锁定订单，防并发重复支付 ──────────────────────────────
+    order_result = await db.execute(
+        text("""
+            SELECT id, food_court_id, order_no, total_amount_fen, status
+            FROM food_court_orders
+            WHERE id = :order_id
+              AND food_court_id = :fc_id
+              AND tenant_id = :tenant_id
+            FOR UPDATE
+        """),
+        {"order_id": order_id, "fc_id": fc_id, "tenant_id": tenant_id},
+    )
+    row = order_result.fetchone()
+    if not row:
+        _err("订单不存在", 404)
+    if row.status == "paid":
+        _err("订单已支付，请勿重复提交", 409)
+    if row.status == "cancelled":
+        _err("订单已取消，无法支付")
+    if row.status != "pending":
+        _err(f"订单当前状态 {row.status} 不支持支付")
+
+    # ── 2. 幂等键检查 ─────────────────────────────────────────────────────────
+    if req.idempotency_key:
+        dup = await db.execute(
             text("""
-                SELECT id::text, name, status
-                FROM outlets
-                WHERE id = :oid AND tenant_id = :tid AND is_deleted = FALSE
+                SELECT id FROM food_court_orders
+                WHERE idempotency_key = :key
+                  AND tenant_id = :tenant_id
+                  AND id != :order_id
             """),
-            {"oid": req.outlet_id, "tid": x_tenant_id},
+            {"key": req.idempotency_key, "tenant_id": tenant_id, "order_id": order_id},
         )
-        outlet = outlet_row.mappings().first()
-        if not outlet:
-            raise HTTPException(status_code=404, detail=f"档口 {req.outlet_id} 不存在或已停用")
-        if outlet["status"] != "active":
-            raise HTTPException(
-                status_code=422,
-                detail=f"档口 {outlet['name']} 当前状态为 {outlet['status']}，无法开单",
+        if dup.fetchone():
+            _err("幂等键已使用，疑似重复请求", 409)
+
+    # ── 3. 金额校验 ───────────────────────────────────────────────────────────
+    if req.amount_fen < row.total_amount_fen:
+        _err(f"实付金额({req.amount_fen}分) < 应付金额({row.total_amount_fen}分)")
+
+    # ── 4. 标记订单已支付 ─────────────────────────────────────────────────────
+    now = datetime.now(timezone.utc)
+    await db.execute(
+        text("""
+            UPDATE food_court_orders
+            SET status = 'paid',
+                payment_method = :method,
+                paid_at = :paid_at,
+                idempotency_key = :idem_key,
+                updated_at = :now
+            WHERE id = :order_id AND tenant_id = :tenant_id
+        """),
+        {
+            "method": req.payment_method,
+            "paid_at": now,
+            "idem_key": req.idempotency_key,
+            "now": now,
+            "order_id": order_id,
+            "tenant_id": tenant_id,
+        },
+    )
+
+    # ── 5. 更新所有订单行为 preparing ─────────────────────────────────────────
+    await db.execute(
+        text("""
+            UPDATE food_court_order_items
+            SET status = 'preparing', updated_at = :now
+            WHERE order_id = :order_id AND tenant_id = :tenant_id
+        """),
+        {"order_id": order_id, "now": now, "tenant_id": tenant_id},
+    )
+
+    # ── 6. 查询订单行，按 vendor 分组 ────────────────────────────────────────
+    items_result = await db.execute(
+        select(FoodCourtOrderItem, FoodCourtVendor).join(
+            FoodCourtVendor, FoodCourtOrderItem.vendor_id == FoodCourtVendor.id
+        ).where(
+            FoodCourtOrderItem.order_id == UUID(order_id),
+            FoodCourtOrderItem.tenant_id == UUID(tenant_id),
+        )
+    )
+    rows = items_result.all()
+
+    vendor_items: dict[str, tuple] = {}  # vendor_id -> (vendor, [items])
+    for item, vendor in rows:
+        vid = str(vendor.id)
+        if vid not in vendor_items:
+            vendor_items[vid] = (vendor, [])
+        vendor_items[vid][1].append(item)
+
+    # ── 7. 生成各档口 pending 结算记录 ───────────────────────────────────────
+    settlement_ids = []
+    kds_tasks = []
+    today = now.date()
+
+    for vid, (vendor, items) in vendor_items.items():
+        vendor_gross = sum(i.subtotal_fen for i in items)
+        vendor_item_count = sum(i.quantity for i in items)
+        commission_rate = float(vendor.commission_rate) if vendor.commission_rate else 0.0
+        commission_fen = int(vendor_gross * commission_rate)
+        net_amount_fen = vendor_gross - commission_fen
+
+        # 当日已存在 pending 记录则累加，否则新建
+        existing_result = await db.execute(
+            select(FoodCourtVendorSettlement).where(
+                FoodCourtVendorSettlement.vendor_id == vendor.id,
+                FoodCourtVendorSettlement.food_court_id == UUID(fc_id),
+                FoodCourtVendorSettlement.tenant_id == UUID(tenant_id),
+                FoodCourtVendorSettlement.settlement_date == today,
+                FoodCourtVendorSettlement.status == "pending",
             )
-
-        order_id = str(uuid.uuid4())
-        outlet_order_id = str(uuid.uuid4())
-        subtotal_fen = sum(
-            item.get("price_fen", 0) * item.get("qty", 1) for item in req.items
         )
-        item_count = sum(item.get("qty", 1) for item in req.items)
-        now = datetime.now(timezone.utc)
+        existing = existing_result.scalar_one_or_none()
 
-        await db.execute(
+        if existing:
+            existing.order_count += 1
+            existing.item_count += vendor_item_count
+            existing.gross_amount_fen += vendor_gross
+            existing.commission_fen += commission_fen
+            existing.net_amount_fen += net_amount_fen
+            settlement_ids.append(str(existing.id))
+        else:
+            new_s = FoodCourtVendorSettlement(
+                id=uuid4(),
+                tenant_id=UUID(tenant_id),
+                vendor_id=vendor.id,
+                food_court_id=UUID(fc_id),
+                settlement_date=today,
+                order_count=1,
+                item_count=vendor_item_count,
+                gross_amount_fen=vendor_gross,
+                commission_fen=commission_fen,
+                net_amount_fen=net_amount_fen,
+                status="pending",
+            )
+            db.add(new_s)
+            settlement_ids.append(str(new_s.id))
+
+        kds_tasks.append((vendor, items))
+
+    await db.commit()
+
+    # ── 8. DB提交后异步推送各档口 KDS（失败不回滚支付）──────────────────────
+    for vendor, items in kds_tasks:
+        asyncio.create_task(_push_kds_event(tenant_id, vendor, items, row.order_no))
+
+    # ── 9. 统一事件总线 ORDER.PAID ────────────────────────────────────────────
+    asyncio.create_task(emit_event(
+        event_type=OrderEventType.PAID,
+        tenant_id=tenant_id,
+        stream_id=order_id,
+        payload={
+            "order_no": row.order_no,
+            "total_fen": row.total_amount_fen,
+            "payment_method": req.payment_method,
+            "fc_id": fc_id,
+            "vendor_count": len(vendor_items),
+        },
+        source_service="tx-trade",
+        metadata={"channel": "food_court"},
+    ))
+
+    logger.info(
+        "food_court_order_paid",
+        order_id=order_id,
+        order_no=row.order_no,
+        amount_fen=req.amount_fen,
+        method=req.payment_method,
+        vendor_count=len(vendor_items),
+        tenant_id=tenant_id,
+    )
+
+    return _ok({
+        "order_id": order_id,
+        "order_no": row.order_no,
+        "status": "paid",
+        "paid_at": now.isoformat(),
+        "total_amount_fen": row.total_amount_fen,
+        "payment_method": req.payment_method,
+        "kds_pushed_vendors": len(vendor_items),
+        "settlement_records": settlement_ids,
+    })
+
+
+@router.post("/{fc_id}/orders/{order_id}/cancel")
+async def cancel_food_court_order(
+    fc_id: str,
+    order_id: str,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """取消订单（仅限 pending 状态）"""
+    tenant_id = _get_tenant_id(request)
+
+    order_result = await db.execute(
+        select(FoodCourtOrder).where(
+            FoodCourtOrder.id == UUID(order_id),
+            FoodCourtOrder.food_court_id == UUID(fc_id),
+            FoodCourtOrder.tenant_id == UUID(tenant_id),
+        )
+    )
+    order = order_result.scalar_one_or_none()
+    if not order:
+        _err("订单不存在", 404)
+    if order.status != "pending":
+        _err(f"订单状态 {order.status} 不可取消（仅 pending 订单可取消）")
+
+    now = datetime.now(timezone.utc)
+    order.status = "cancelled"
+    await db.execute(
+        text("""
+            UPDATE food_court_order_items
+            SET status = 'served', updated_at = :now
+            WHERE order_id = :order_id AND tenant_id = :tenant_id
+        """),
+        {"order_id": order_id, "now": now, "tenant_id": tenant_id},
+    )
+    await db.commit()
+
+    logger.info("food_court_order_cancelled", order_id=order_id, fc_id=fc_id)
+    return _ok({"order_id": order_id, "status": "cancelled"})
+
+
+# ─── 档口KDS端点（各档口独立屏幕） ───────────────────────────────────────────
+
+
+@router.get("/vendor/{v_id}/queue")
+async def get_vendor_kds_queue(
+    v_id: str,
+    request: Request,
+    limit: int = Query(default=50, ge=1, le=200),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """当前档口待出餐列表（KDS主视图，先进先出排序）"""
+    tenant_id = _get_tenant_id(request)
+
+    result = await db.execute(
+        select(FoodCourtOrderItem, FoodCourtOrder).join(
+            FoodCourtOrder, FoodCourtOrderItem.order_id == FoodCourtOrder.id
+        ).where(
+            FoodCourtOrderItem.vendor_id == UUID(v_id),
+            FoodCourtOrderItem.tenant_id == UUID(tenant_id),
+            FoodCourtOrderItem.status.in_(["pending", "preparing"]),
+            FoodCourtOrder.status.in_(["paid"]),
+        ).order_by(FoodCourtOrder.paid_at.asc()).limit(limit)
+    )
+    rows = result.all()
+
+    queue = []
+    for item, order in rows:
+        d = _item_row_to_dict(item)
+        d["order_no"] = order.order_no
+        d["order_paid_at"] = order.paid_at.isoformat() if order.paid_at else None
+        queue.append(d)
+
+    return _ok({
+        "vendor_id": v_id,
+        "queue": queue,
+        "pending_count": sum(1 for item, _ in rows if item.status == "pending"),
+        "preparing_count": sum(1 for item, _ in rows if item.status == "preparing"),
+    })
+
+
+@router.post("/vendor/{v_id}/items/{item_id}/ready")
+async def mark_item_ready(
+    v_id: str,
+    item_id: str,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """档口标记菜品已出餐（KDS操作：preparing → ready）"""
+    tenant_id = _get_tenant_id(request)
+
+    result = await db.execute(
+        select(FoodCourtOrderItem).where(
+            FoodCourtOrderItem.id == UUID(item_id),
+            FoodCourtOrderItem.vendor_id == UUID(v_id),
+            FoodCourtOrderItem.tenant_id == UUID(tenant_id),
+        )
+    )
+    item = result.scalar_one_or_none()
+    if not item:
+        _err("菜品不存在", 404)
+    if item.status not in ("pending", "preparing"):
+        _err(f"菜品状态 {item.status} 无法标记出餐")
+
+    now = datetime.now(timezone.utc)
+    item.status = "ready"
+    item.ready_at = now
+    await db.commit()
+
+    # 检查同一订单该档口所有菜品是否全部出餐
+    all_items_result = await db.execute(
+        select(FoodCourtOrderItem).where(
+            FoodCourtOrderItem.order_id == item.order_id,
+            FoodCourtOrderItem.vendor_id == UUID(v_id),
+            FoodCourtOrderItem.tenant_id == UUID(tenant_id),
+        )
+    )
+    all_items = all_items_result.scalars().all()
+    all_ready = all(i.status in ("ready", "served") for i in all_items)
+
+    logger.info(
+        "food_court_item_ready",
+        item_id=item_id,
+        vendor_id=v_id,
+        order_id=str(item.order_id),
+        all_vendor_items_ready=all_ready,
+    )
+
+    return _ok({
+        "item_id": item_id,
+        "status": "ready",
+        "ready_at": now.isoformat(),
+        "all_vendor_items_ready": all_ready,
+    })
+
+
+@router.get("/vendor/{v_id}/stats")
+async def get_vendor_stats(
+    v_id: str,
+    request: Request,
+    stats_date: Optional[str] = Query(default=None, description="查询日期 YYYY-MM-DD，默认今日"),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """档口今日营业统计（KDS右上角看板数据）"""
+    tenant_id = _get_tenant_id(request)
+
+    if stats_date:
+        try:
+            query_date = date.fromisoformat(stats_date)
+        except ValueError:
+            _err("日期格式错误，请使用 YYYY-MM-DD")
+    else:
+        query_date = datetime.now(timezone.utc).date()
+
+    settlement_result = await db.execute(
+        select(FoodCourtVendorSettlement).where(
+            FoodCourtVendorSettlement.vendor_id == UUID(v_id),
+            FoodCourtVendorSettlement.tenant_id == UUID(tenant_id),
+            FoodCourtVendorSettlement.settlement_date == query_date,
+        )
+    )
+    settlement = settlement_result.scalar_one_or_none()
+
+    ready_count_result = await db.execute(
+        text("""
+            SELECT COUNT(*) FROM food_court_order_items fci
+            JOIN food_court_orders fco ON fci.order_id = fco.id
+            WHERE fci.vendor_id = :v_id
+              AND fci.tenant_id = :tenant_id
+              AND fci.status = 'ready'
+              AND fco.paid_at::date = :query_date
+        """),
+        {"v_id": v_id, "tenant_id": tenant_id, "query_date": query_date},
+    )
+    ready_count = ready_count_result.scalar_one()
+
+    pending_count_result = await db.execute(
+        text("""
+            SELECT COUNT(*) FROM food_court_order_items fci
+            JOIN food_court_orders fco ON fci.order_id = fco.id
+            WHERE fci.vendor_id = :v_id
+              AND fci.tenant_id = :tenant_id
+              AND fci.status IN ('pending', 'preparing')
+              AND fco.status = 'paid'
+        """),
+        {"v_id": v_id, "tenant_id": tenant_id},
+    )
+    pending_in_queue = pending_count_result.scalar_one()
+
+    return _ok({
+        "vendor_id": v_id,
+        "date": query_date.isoformat(),
+        "order_count": settlement.order_count if settlement else 0,
+        "item_count": settlement.item_count if settlement else 0,
+        "gross_amount_fen": settlement.gross_amount_fen if settlement else 0,
+        "commission_fen": settlement.commission_fen if settlement else 0,
+        "net_amount_fen": settlement.net_amount_fen if settlement else 0,
+        "settlement_status": settlement.status if settlement else "no_data",
+        "queue_pending": pending_in_queue,
+        "items_ready_today": ready_count,
+    })
+
+
+# ─── 结算端点（总部财务） ─────────────────────────────────────────────────────
+
+
+@router.get("/{fc_id}/settlements")
+async def list_settlements(
+    fc_id: str,
+    request: Request,
+    vendor_id: Optional[str] = Query(default=None),
+    status: Optional[str] = Query(default=None, description="pending/settled"),
+    start_date: Optional[str] = Query(default=None, description="YYYY-MM-DD"),
+    end_date: Optional[str] = Query(default=None, description="YYYY-MM-DD"),
+    page: int = Query(default=1, ge=1),
+    size: int = Query(default=20, ge=1, le=100),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """结算记录列表"""
+    tenant_id = _get_tenant_id(request)
+
+    q = select(FoodCourtVendorSettlement).where(
+        FoodCourtVendorSettlement.food_court_id == UUID(fc_id),
+        FoodCourtVendorSettlement.tenant_id == UUID(tenant_id),
+    )
+    if vendor_id:
+        q = q.where(FoodCourtVendorSettlement.vendor_id == UUID(vendor_id))
+    if status:
+        q = q.where(FoodCourtVendorSettlement.status == status)
+    if start_date:
+        q = q.where(FoodCourtVendorSettlement.settlement_date >= date.fromisoformat(start_date))
+    if end_date:
+        q = q.where(FoodCourtVendorSettlement.settlement_date <= date.fromisoformat(end_date))
+
+    count_q = select(sa_func.count()).select_from(q.subquery())
+    total_result = await db.execute(count_q)
+    total = total_result.scalar_one()
+
+    q = q.order_by(FoodCourtVendorSettlement.settlement_date.desc()).offset((page - 1) * size).limit(size)
+    result = await db.execute(q)
+    items = result.scalars().all()
+
+    return _ok({"items": [_settlement_row_to_dict(s) for s in items], "total": total})
+
+
+@router.post("/{fc_id}/settlements/generate")
+async def generate_settlements(
+    fc_id: str,
+    req: GenerateSettlementReq,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """生成指定日期结算单（日结触发）
+
+    按每个档口汇总当日已付订单 → 计算抽成 → 生成/覆盖 pending 结算记录。
+    已 settled 的不重算，支持重新生成 pending 记录（纠错场景）。
+    """
+    tenant_id = _get_tenant_id(request)
+
+    try:
+        settlement_date = date.fromisoformat(req.settlement_date)
+    except ValueError:
+        _err("日期格式错误，请使用 YYYY-MM-DD")
+
+    vendor_q = select(FoodCourtVendor).where(
+        FoodCourtVendor.food_court_id == UUID(fc_id),
+        FoodCourtVendor.tenant_id == UUID(tenant_id),
+        FoodCourtVendor.is_deleted == False,
+    )
+    if req.vendor_ids:
+        vendor_q = vendor_q.where(FoodCourtVendor.id.in_([UUID(vid) for vid in req.vendor_ids]))
+
+    vendors_result = await db.execute(vendor_q)
+    vendors = vendors_result.scalars().all()
+    if not vendors:
+        _err("没有找到需要结算的档口")
+
+    generated = []
+    for vendor in vendors:
+        agg_result = await db.execute(
             text("""
-                INSERT INTO outlet_orders
-                    (id, tenant_id, outlet_id, order_id, subtotal_fen,
-                     item_count, status, notes, created_at, updated_at)
-                VALUES
-                    (:id, :tid, :outlet_id, :order_id, :subtotal_fen,
-                     :item_count, 'pending', :notes, :now, :now)
+                SELECT
+                    COUNT(DISTINCT fco.id) AS order_count,
+                    COALESCE(SUM(fci.quantity), 0) AS item_count,
+                    COALESCE(SUM(fci.subtotal_fen), 0) AS gross_amount_fen
+                FROM food_court_order_items fci
+                JOIN food_court_orders fco ON fci.order_id = fco.id
+                WHERE fci.vendor_id = :vendor_id
+                  AND fci.tenant_id = :tenant_id
+                  AND fco.status IN ('paid', 'completed')
+                  AND fco.paid_at::date = :settlement_date
             """),
             {
-                "id": outlet_order_id,
-                "tid": x_tenant_id,
-                "outlet_id": req.outlet_id,
-                "order_id": order_id,
-                "subtotal_fen": subtotal_fen,
-                "item_count": item_count,
-                "notes": req.notes,
-                "now": now,
+                "vendor_id": str(vendor.id),
+                "tenant_id": tenant_id,
+                "settlement_date": settlement_date,
             },
         )
-        await db.commit()
+        agg = agg_result.fetchone()
 
-        logger.info("food_court_order_created", order_id=order_id, outlet_id=req.outlet_id)
-        return {"ok": True, "data": {
-            "order_id": order_id,
-            "outlet_order_id": outlet_order_id,
-            "outlet_id": req.outlet_id,
-            "outlet_name": outlet["name"],
-            "store_id": req.store_id,
-            "table_no": req.table_no,
-            "items": req.items,
-            "subtotal_fen": subtotal_fen,
-            "total_fen": subtotal_fen,
-            "status": "pending",
-            "created_at": now.isoformat(),
-        }}
+        gross_amount_fen = agg.gross_amount_fen if agg else 0
+        order_count = agg.order_count if agg else 0
+        item_count = agg.item_count if agg else 0
+        commission_rate = float(vendor.commission_rate) if vendor.commission_rate else 0.0
+        commission_fen = int(gross_amount_fen * commission_rate)
+        net_amount_fen = gross_amount_fen - commission_fen
 
-    except HTTPException:
-        raise
-    except SQLAlchemyError as exc:
-        await db.rollback()
-        logger.error("create_food_court_order_db_error", error=str(exc), exc_info=True)
-        raise HTTPException(status_code=500, detail="开单失败") from exc
-
-
-@router.post("/orders/{order_id}/add-items")
-async def add_items_to_order(
-    order_id: str,
-    req: AddItemsRequest,
-    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
-    db: AsyncSession = Depends(get_db),
-):
-    """追加品项（更新或新增对应档口的 outlet_order 记录）"""
-    try:
-        await _set_rls(db, x_tenant_id)
-
-        outlet_row = await db.execute(
-            text("SELECT id::text, name FROM outlets WHERE id = :oid AND tenant_id = :tid AND is_deleted = FALSE"),
-            {"oid": req.outlet_id, "tid": x_tenant_id},
-        )
-        outlet = outlet_row.mappings().first()
-        if not outlet:
-            raise HTTPException(status_code=404, detail=f"档口 {req.outlet_id} 不存在")
-
-        added_subtotal = sum(item.get("price_fen", 0) * item.get("qty", 1) for item in req.items)
-        added_count = sum(item.get("qty", 1) for item in req.items)
-
-        # 查找该订单中是否已有该档口的 outlet_order
-        existing = await db.execute(
-            text("""
-                SELECT id, subtotal_fen, item_count FROM outlet_orders
-                WHERE order_id = :oid AND outlet_id = :outlet_id AND tenant_id = :tid
-                LIMIT 1
-            """),
-            {"oid": order_id, "outlet_id": req.outlet_id, "tid": x_tenant_id},
-        )
-        existing_row = existing.mappings().first()
-
-        if existing_row:
-            new_subtotal = existing_row["subtotal_fen"] + added_subtotal
-            new_count = (existing_row["item_count"] or 0) + added_count
-            await db.execute(
-                text("""
-                    UPDATE outlet_orders
-                    SET subtotal_fen = :sub, item_count = :cnt, updated_at = NOW()
-                    WHERE id = :id AND tenant_id = :tid
-                """),
-                {"sub": new_subtotal, "cnt": new_count, "id": existing_row["id"], "tid": x_tenant_id},
+        existing_result = await db.execute(
+            select(FoodCourtVendorSettlement).where(
+                FoodCourtVendorSettlement.vendor_id == vendor.id,
+                FoodCourtVendorSettlement.food_court_id == UUID(fc_id),
+                FoodCourtVendorSettlement.tenant_id == UUID(tenant_id),
+                FoodCourtVendorSettlement.settlement_date == settlement_date,
             )
+        )
+        existing = existing_result.scalar_one_or_none()
+
+        if existing:
+            if existing.status == "settled":
+                generated.append({
+                    "vendor_id": str(vendor.id),
+                    "vendor_name": vendor.vendor_name,
+                    "action": "skipped_already_settled",
+                    "settlement_id": str(existing.id),
+                })
+                continue
+            # 覆盖更新 pending 记录
+            existing.order_count = order_count
+            existing.item_count = item_count
+            existing.gross_amount_fen = gross_amount_fen
+            existing.commission_fen = commission_fen
+            existing.net_amount_fen = net_amount_fen
+            generated.append({
+                "vendor_id": str(vendor.id),
+                "vendor_name": vendor.vendor_name,
+                "action": "updated",
+                "settlement_id": str(existing.id),
+                "gross_amount_fen": gross_amount_fen,
+                "net_amount_fen": net_amount_fen,
+            })
         else:
-            await db.execute(
-                text("""
-                    INSERT INTO outlet_orders
-                        (id, tenant_id, outlet_id, order_id, subtotal_fen,
-                         item_count, status, created_at, updated_at)
-                    VALUES
-                        (:id, :tid, :outlet_id, :order_id, :sub, :cnt, 'pending', NOW(), NOW())
-                """),
-                {
-                    "id": str(uuid.uuid4()),
-                    "tid": x_tenant_id,
-                    "outlet_id": req.outlet_id,
-                    "order_id": order_id,
-                    "sub": added_subtotal,
-                    "cnt": added_count,
-                },
+            new_s = FoodCourtVendorSettlement(
+                id=uuid4(),
+                tenant_id=UUID(tenant_id),
+                vendor_id=vendor.id,
+                food_court_id=UUID(fc_id),
+                settlement_date=settlement_date,
+                order_count=order_count,
+                item_count=item_count,
+                gross_amount_fen=gross_amount_fen,
+                commission_fen=commission_fen,
+                net_amount_fen=net_amount_fen,
+                status="pending",
             )
+            db.add(new_s)
+            generated.append({
+                "vendor_id": str(vendor.id),
+                "vendor_name": vendor.vendor_name,
+                "action": "created",
+                "gross_amount_fen": gross_amount_fen,
+                "net_amount_fen": net_amount_fen,
+            })
 
-        await db.commit()
+    await db.commit()
 
-        logger.info("items_added_to_order", order_id=order_id, outlet_id=req.outlet_id, count=added_count)
-        return {"ok": True, "data": {
-            "order_id": order_id,
-            "outlet_id": req.outlet_id,
-            "outlet_name": outlet["name"],
-            "added_items": req.items,
-            "added_subtotal_fen": added_subtotal,
-        }}
+    logger.info(
+        "food_court_settlements_generated",
+        fc_id=fc_id,
+        settlement_date=str(settlement_date),
+        vendor_count=len(vendors),
+        tenant_id=tenant_id,
+    )
 
-    except HTTPException:
-        raise
-    except SQLAlchemyError as exc:
-        await db.rollback()
-        logger.error("add_items_db_error", order_id=order_id, error=str(exc), exc_info=True)
-        raise HTTPException(status_code=500, detail="追加品项失败") from exc
+    return _ok({
+        "settlement_date": req.settlement_date,
+        "generated_count": len(generated),
+        "results": generated,
+    })
 
 
-@router.post("/orders/{order_id}/checkout")
-async def checkout_food_court_order(
-    order_id: str,
-    req: CheckoutRequest,
-    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+@router.post("/{fc_id}/settlements/{s_id}/confirm")
+async def confirm_settlement(
+    fc_id: str,
+    s_id: str,
+    request: Request,
+    operator_id: Optional[str] = Query(default=None, description="财务操作人ID"),
     db: AsyncSession = Depends(get_db),
-):
-    """统一结算（将该订单所有 outlet_orders 标记为 completed）"""
-    try:
-        await _set_rls(db, x_tenant_id)
+) -> dict:
+    """确认结算（标记已打款到档口账户）"""
+    tenant_id = _get_tenant_id(request)
 
-        # 查询该订单所有档口子单
-        rows = await db.execute(
-            text("""
-                SELECT oo.id, oo.outlet_id::text, oo.subtotal_fen, oo.item_count,
-                       o.name AS outlet_name, o.outlet_code
-                FROM outlet_orders oo
-                LEFT JOIN outlets o ON o.id = oo.outlet_id
-                WHERE oo.order_id = :oid AND oo.tenant_id = :tid
-            """),
-            {"oid": order_id, "tid": x_tenant_id},
+    result = await db.execute(
+        select(FoodCourtVendorSettlement).where(
+            FoodCourtVendorSettlement.id == UUID(s_id),
+            FoodCourtVendorSettlement.food_court_id == UUID(fc_id),
+            FoodCourtVendorSettlement.tenant_id == UUID(tenant_id),
         )
-        oo_rows = rows.mappings().all()
-        if not oo_rows:
-            raise HTTPException(status_code=404, detail=f"订单 {order_id} 无对应档口记录")
+    )
+    settlement = result.scalar_one_or_none()
+    if not settlement:
+        _err("结算记录不存在", 404)
+    if settlement.status == "settled":
+        _err("结算记录已确认，无需重复操作", 409)
+    if settlement.status != "pending":
+        _err(f"结算状态 {settlement.status} 不可确认")
 
-        total_fen = sum(r["subtotal_fen"] for r in oo_rows)
-        if not total_fen:
-            raise HTTPException(status_code=422, detail="订单金额为0，无法结算")
+    now = datetime.now(timezone.utc)
+    settlement.status = "settled"
+    settlement.settled_at = now
+    settlement.operator_id = operator_id
+    await db.commit()
 
-        change_fen = 0
-        if req.payment_method == "cash":
-            if not req.amount_tendered_fen:
-                raise HTTPException(status_code=422, detail="现金支付必须提供实收金额")
-            if req.amount_tendered_fen < total_fen:
-                raise HTTPException(
-                    status_code=422,
-                    detail=f"实收金额 {req.amount_tendered_fen} 分不足，应收 {total_fen} 分",
-                )
-            change_fen = req.amount_tendered_fen - total_fen
+    logger.info("food_court_settlement_confirmed", s_id=s_id, fc_id=fc_id, operator_id=operator_id)
+    return _ok(_settlement_row_to_dict(settlement))
 
-        await db.execute(
-            text("""
-                UPDATE outlet_orders
-                SET status = 'completed', updated_at = NOW()
-                WHERE order_id = :oid AND tenant_id = :tid
-            """),
-            {"oid": order_id, "tid": x_tenant_id},
-        )
-        await db.commit()
 
-        outlet_breakdown = [
-            {
-                "outlet_id": r["outlet_id"],
-                "outlet_name": r["outlet_name"],
-                "outlet_code": r["outlet_code"],
-                "subtotal_fen": r["subtotal_fen"],
-                "item_count": r["item_count"],
-            }
-            for r in oo_rows
-        ]
+@router.get("/{fc_id}/settlements/summary")
+async def get_settlement_summary(
+    fc_id: str,
+    request: Request,
+    start_date: Optional[str] = Query(default=None, description="YYYY-MM-DD"),
+    end_date: Optional[str] = Query(default=None, description="YYYY-MM-DD"),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """结算汇总报表（总部财务视角）
 
-        logger.info("food_court_checkout_completed", order_id=order_id, total_fen=total_fen)
-        return {"ok": True, "data": {
-            "order_id": order_id,
-            "total_fen": total_fen,
-            "payment_method": req.payment_method,
-            "amount_tendered_fen": req.amount_tendered_fen,
-            "change_fen": change_fen,
-            "outlet_breakdown": outlet_breakdown,
-            "paid_at": datetime.now(timezone.utc).isoformat(),
-        }}
+    各档口指定时间段：总营收/总抽成/已结算/未结算拆分。
+    """
+    tenant_id = _get_tenant_id(request)
 
-    except HTTPException:
-        raise
-    except SQLAlchemyError as exc:
-        await db.rollback()
-        logger.error("checkout_db_error", order_id=order_id, error=str(exc), exc_info=True)
-        raise HTTPException(status_code=500, detail="结算失败") from exc
+    params: dict = {"fc_id": fc_id, "tenant_id": tenant_id}
+    date_filter = ""
+    if start_date:
+        date_filter += " AND fcvs.settlement_date >= :start_date"
+        params["start_date"] = date.fromisoformat(start_date)
+    if end_date:
+        date_filter += " AND fcvs.settlement_date <= :end_date"
+        params["end_date"] = date.fromisoformat(end_date)
+
+    summary_result = await db.execute(
+        text(f"""
+            SELECT
+                fcv.id               AS vendor_id,
+                fcv.vendor_code,
+                fcv.vendor_name,
+                fcv.category,
+                COUNT(fcvs.id)       AS settlement_days,
+                COALESCE(SUM(fcvs.order_count), 0)     AS total_orders,
+                COALESCE(SUM(fcvs.item_count), 0)      AS total_items,
+                COALESCE(SUM(fcvs.gross_amount_fen), 0) AS total_gross_fen,
+                COALESCE(SUM(fcvs.commission_fen), 0)  AS total_commission_fen,
+                COALESCE(SUM(fcvs.net_amount_fen), 0)  AS total_net_fen,
+                COALESCE(SUM(CASE WHEN fcvs.status = 'settled' THEN fcvs.net_amount_fen ELSE 0 END), 0) AS settled_fen,
+                COALESCE(SUM(CASE WHEN fcvs.status = 'pending' THEN fcvs.net_amount_fen ELSE 0 END), 0) AS pending_fen
+            FROM food_court_vendors fcv
+            LEFT JOIN food_court_vendor_settlements fcvs
+                ON fcv.id = fcvs.vendor_id
+               AND fcvs.tenant_id = :tenant_id
+               {date_filter}
+            WHERE fcv.food_court_id = :fc_id
+              AND fcv.tenant_id = :tenant_id
+              AND fcv.is_deleted = FALSE
+            GROUP BY fcv.id, fcv.vendor_code, fcv.vendor_name, fcv.category, fcv.display_order
+            ORDER BY fcv.display_order
+        """),
+        params,
+    )
+    rows = summary_result.fetchall()
+
+    vendor_summaries = [
+        {
+            "vendor_id": str(r.vendor_id),
+            "vendor_code": r.vendor_code,
+            "vendor_name": r.vendor_name,
+            "category": r.category,
+            "settlement_days": r.settlement_days,
+            "total_orders": r.total_orders,
+            "total_items": r.total_items,
+            "total_gross_fen": r.total_gross_fen,
+            "total_commission_fen": r.total_commission_fen,
+            "total_net_fen": r.total_net_fen,
+            "settled_fen": r.settled_fen,
+            "pending_fen": r.pending_fen,
+        }
+        for r in rows
+    ]
+
+    fc_totals = {
+        "total_gross_fen": sum(v["total_gross_fen"] for v in vendor_summaries),
+        "total_commission_fen": sum(v["total_commission_fen"] for v in vendor_summaries),
+        "total_net_fen": sum(v["total_net_fen"] for v in vendor_summaries),
+        "settled_fen": sum(v["settled_fen"] for v in vendor_summaries),
+        "pending_fen": sum(v["pending_fen"] for v in vendor_summaries),
+        "total_orders": sum(v["total_orders"] for v in vendor_summaries),
+    }
+
+    return _ok({
+        "food_court_id": fc_id,
+        "period": {"start_date": start_date, "end_date": end_date},
+        "fc_totals": fc_totals,
+        "vendors": vendor_summaries,
+    })

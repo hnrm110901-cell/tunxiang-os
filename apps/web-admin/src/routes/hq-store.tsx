@@ -10,6 +10,7 @@ import { BusinessDayConfigPage } from '../pages/store/BusinessDayConfigPage';
 import { DispatchRuleConfigPage } from '../pages/kds/DispatchRuleConfigPage';
 import { DispatchCodePage } from '../pages/kds/DispatchCodePage';
 import { StoreHealthPage } from '../pages/StoreHealthPage';
+import { WineStoragePage } from '../pages/store/WineStoragePage';
 
 export const storeRoutes = (
   <>
@@ -28,5 +29,7 @@ export const storeRoutes = (
     <Route path="/store/market-sessions" element={<MarketSessionPage />} />
     <Route path="/store/food-court" element={<FoodCourtManagePage />} />
     <Route path="/store-health" element={<StoreHealthPage />} />
+    <Route path="/wine-storage" element={<WineStoragePage />} />
+    <Route path="/hq/wine-storage" element={<WineStoragePage />} />
   </>
 );

@@ -212,6 +212,8 @@ app.include_router(e_signature_router)         # 电子签约模块（v252表）
 app.include_router(points_router)              # 员工积分+赛马（v253表）积分流水+兑换+赛季
 app.include_router(tax_filing_router)          # 薪税申报对接（v256表）个税申报生成+提交+查询
 app.include_router(attendance_compliance_router)  # 考勤深度合规审计（v255表）GPS/代打/加班超时
+from api.franchise_fee_routes import router as franchise_fee_router
+app.include_router(franchise_fee_router)           # 加盟收费闭环（天财对标）账单/收款/出账规则/报表
 
 @app.get("/health")
 async def health():

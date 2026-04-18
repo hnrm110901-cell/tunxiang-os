@@ -8,6 +8,9 @@ import { fetchTableStatus, type TableStatus } from '../api/posOpsApi';
 import { OrderActionPanel } from './OrderActionPanel';
 import { StatusBar, TableCard } from '@tx-ds/biz';
 import type { StatusBarItem, TableCardData } from '@tx-ds/biz';
+import { useKeyboardShortcuts, POS_SHORTCUTS } from '../hooks/useKeyboardShortcuts';
+import { KeyboardShortcutHelp, KeyboardHelpTrigger } from '../components/KeyboardShortcutHelp';
+import { ShortcutOverlay } from '../components/ShortcutOverlay';
 
 /* ─── 样式常量 ─── */
 const C = {
@@ -57,6 +60,38 @@ export function TableMapPage() {
   const [selectedTable, setSelectedTable] = useState<TableStatus | null>(null);
   const [filterArea, setFilterArea] = useState<string>('全部');
   const [showPanel, setShowPanel] = useState(false);
+  const [showHelpPanel, setShowHelpPanel] = useState(false);
+
+  /* ── 键盘快捷键（桌台地图）── */
+  const { altPressed, shortcuts, activeKey } = useKeyboardShortcuts([
+    {
+      key: POS_SHORTCUTS.NEW_ORDER.key,     // F1
+      label: POS_SHORTCUTS.NEW_ORDER.description,
+      handler: () => navigate('/open-table/new'),
+    },
+    {
+      key: POS_SHORTCUTS.TABLE_MAP.key,     // F5
+      label: '刷新桌台状态',
+      handler: loadTables,
+    },
+    {
+      key: POS_SHORTCUTS.SHIFT_HANDOVER.key, // F9
+      label: POS_SHORTCUTS.SHIFT_HANDOVER.description,
+      handler: () => navigate('/shift'),
+    },
+    {
+      key: POS_SHORTCUTS.ESCAPE.key,        // Escape
+      label: POS_SHORTCUTS.ESCAPE.description,
+      handler: () => {
+        if (showPanel) { setShowPanel(false); setSelectedTable(null); }
+      },
+    },
+    {
+      key: POS_SHORTCUTS.HELP.key,          // Ctrl+/
+      label: POS_SHORTCUTS.HELP.description,
+      handler: () => setShowHelpPanel((v) => !v),
+    },
+  ], { activeContext: 'table-map' });
 
   /** 从后端加载桌台状态 */
   const loadTables = useCallback(async () => {
@@ -116,6 +151,16 @@ export function TableMapPage() {
   };
 
   return (
+    <>
+      {/* Alt键快捷键浮层 */}
+      <ShortcutOverlay visible={altPressed} shortcuts={shortcuts} />
+      {/* Ctrl+/ 快捷键帮助面板 */}
+      <KeyboardShortcutHelp
+        visible={showHelpPanel}
+        onClose={() => setShowHelpPanel(false)}
+        activeKey={activeKey}
+      />
+
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: C.bg, color: C.text }}>
       {/* 顶部栏 */}
       <div style={{
@@ -147,7 +192,9 @@ export function TableMapPage() {
           ] satisfies StatusBarItem[]}
         />
 
-        <div style={{ display: 'flex', gap: 8 }}>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          {/* 快捷键帮助按钮（F5=刷新、Escape=关闭面板 等快捷键提示）*/}
+          <KeyboardHelpTrigger onClick={() => setShowHelpPanel((v) => !v)} />
           <button
             onClick={() => navigate('/quick-cashier')}
             style={{
@@ -166,7 +213,7 @@ export function TableMapPage() {
               color: C.text, fontSize: 16, cursor: 'pointer',
             }}
           >
-            刷新
+            刷新 [F5]
           </button>
         </div>
       </div>
@@ -238,5 +285,6 @@ export function TableMapPage() {
         />
       )}
     </div>
+    </>
   );
 }
