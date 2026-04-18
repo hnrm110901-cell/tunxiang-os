@@ -1,3 +1,33 @@
+## 2026-04-18 Sprint 启动 — 主规划 V1.0 + A1 前端 TDD + F1 适配器评审骨架
+
+### 今日完成
+- [docs] docs/sprint-plan-2026Q2-unified.md V1.0 发布（合并 V4/V6，10 周 8 Sprint，W8 徐记 DEMO 10 门禁）
+- [docs] docs/progress.md 建立，按 CLAUDE.md §18 规范声明会话目标+边界+DoD
+- [apps/web-pos] Sprint A1 前端 TDD：ErrorBoundary + Toast + ToastContainer + useToast + featureFlags + txFetchTrade 3s 超时 + 5 类错误码映射 + X-Request-Id；vitest 18/18 PASS；Flag: trade.pos.settle.hardening/toast.enable/errorBoundary.enable；顶层 main.tsx 包 ErrorBoundary
+- [docs/adapters/review] Sprint F1 骨架：README 索引 + 14 适配器骨架（aoqiwei/tiancai-shanglong/keruyun/weishenghuo/meituan/eleme/douyin/yiding/nuonuo/xiaohongshu/erp/logistics/delivery_factory/wechat_delivery）；7 维评分卡模板就位；grep 实测全部 14 个未接 emit_event
+
+### 数据变化
+- 无新迁移（A1 前端子项零 DB 改动；B/D2 含迁移留待决策点签字）
+- 新增测试：18（ErrorBoundary 6 / Toast 6 / tradeApi 6）
+- 新增文档：2 份主规划 + 15 份适配器评审
+
+### 遗留问题
+- Sprint A1 后端子任务（`POST /api/v1/telemetry/pos-crash` + v260 pos_crash_reports 迁移）未启动
+- Sprint C/A2-A4/D/E/G/H 未启动
+- 5 个决策点未签字：D2 ROI 列 / E1 小红书 channel / B1 Override 签名 / B2 红冲阈值 / E4 异议阈值
+- 合规需求 workshop（法务+HR+财务）未启动
+- 供应商采购（诺诺全电/腾讯+阿里 OCR/湘食通/沪食安）未启动
+- F1 14 份骨架的 `?/4` 评分待 Owner Squad W3 Day1 填充
+- CLAUDE.md §19 独立验证触发：A1 修改 3+ 文件+Tier 1 路径，需开新会话重检
+
+### 明日计划
+- 独立验证会话：验证 A1 改动在 200 桌并发 + Tier 1 场景下无副作用
+- 启动 A1 后端子任务（telemetry 端点）
+- 启动 C1 KDS 本地缓存（与 A1 前端无文件冲突）
+- 推动创始人会议签字 5 决策点
+
+---
+
 ## 2026-04-16 生产TODO消除冲刺 — HR事件/配送路由/预订Webhook/KDS/小红书/AI洞察
 
 ### 今日完成
