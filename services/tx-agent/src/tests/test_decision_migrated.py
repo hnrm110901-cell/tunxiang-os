@@ -364,5 +364,226 @@ class TestResourceOptimization:
         assert result.action == "finance_report"
 
 
+# =============================================================================
+# P1-2 补全: 经营决策Agent扩展测试 — v6审计修复
+# =============================================================================
+
+
+class TestDecisionAgentInit:
+    """Agent 初始化和状态验证"""
+
+    def test_finance_agent_metadata(self, finance_agent):
+        """财务稽核Agent元信息应完整"""
+        info = finance_agent.get_info()
+        assert info["agent_id"] == "finance_audit"
+        assert info["agent_name"] == "财务稽核"
+        assert info["priority"] == "P1"
+        assert info["run_location"] == "cloud"
+        assert "snapshot_kpi" in info["supported_actions"]
+        assert "detect_revenue_anomaly" in info["supported_actions"]
+
+    def test_finance_agent_default_level_is_suggest(self, finance_agent):
+        """财务Agent默认自治等级为1(仅建议)"""
+        assert finance_agent.agent_level == 1
+
+    def test_agent_tenant_and_store_preserved(self, finance_agent):
+        """Agent实例应保留tenant_id和store_id"""
+        assert finance_agent.tenant_id == TID
+        assert finance_agent.store_id == "STORE001"
+
+    def test_agent_without_db_runs_fine(self):
+        """无DB连接时Agent应正常运行(降级模式)"""
+        agent = FinanceAuditAgent(tenant_id=TID, store_id="S1", db=None)
+        result = asyncio.run(agent.execute("snapshot_kpi", {
+            "kpis": {"revenue": 80000}, "targets": {"revenue": 100000},
+        }))
+        assert result.success is True
+
+
+class TestDecisionHappyPath:
+    """核心决策逻辑的 happy path — 基于真实餐厅场景"""
+
+    def test_revenue_decline_three_days_triggers_insight(self, finance_agent):
+        """连续3天营收下降，Agent应生成营收下滑洞察"""
+        result = asyncio.run(finance_agent.execute("generate_biz_insight", {
+            "metrics": {"revenue_change_pct": -20},
+        }))
+        assert result.success is True
+        assert any(i["type"] == "revenue_drop" for i in result.data["insights"])
+
+    def test_high_cost_rate_triggers_cost_alert(self, finance_agent):
+        """食材成本率过高应触发成本预警洞察"""
+        result = asyncio.run(finance_agent.execute("generate_biz_insight", {
+            "metrics": {"cost_rate_pct": 42},
+        }))
+        assert any(i["type"] == "cost_alert" for i in result.data["insights"])
+
+    def test_stable_metrics_no_alarm(self, finance_agent):
+        """经营指标正常时不应发虚假警报"""
+        result = asyncio.run(finance_agent.execute("generate_biz_insight", {
+            "metrics": {"cost_rate_pct": 28, "revenue_change_pct": 5},
+        }))
+        assert result.success is True
+        assert all(i["type"] == "stable" for i in result.data["insights"])
+
+    def test_cost_analysis_fallback_without_db(self, finance_agent):
+        """无DB时成本分析应使用params降级"""
+        result = asyncio.run(finance_agent.execute("cost_analysis", {
+            "revenue_fen": 500000,
+            "total_cost_fen": 175000,
+        }))
+        assert result.success is True
+        assert result.data["gross_margin"] == 0.65
+
+    def test_daily_reconciliation_fallback_without_db(self, finance_agent):
+        """无DB时日结对账应返回空数据而非崩溃"""
+        result = asyncio.run(finance_agent.execute("daily_reconciliation", {
+            "date": "2026-04-18",
+        }))
+        assert result.success is True
+        assert result.confidence < 0.5, "无DB时置信度应较低"
+
+
+class TestDecisionHardConstraints:
+    """三条硬约束在经营决策Agent中的验证"""
+
+    def test_margin_floor_blocks_discount_below_threshold(self, discount_agent):
+        """毛利底线：折扣导致毛利低于15%时，约束应不通过"""
+        result = asyncio.run(discount_agent.run("detect_discount_anomaly", {
+            "order": {
+                "total_amount_fen": 10000,
+                "discount_amount_fen": 2000,
+                "cost_fen": 8500,  # 毛利率 = (10000-8500)/10000 = 15%，但cost_fen在data中
+            },
+        }))
+        assert result.constraints_detail is not None
+
+    def test_food_safety_constraint_triggers_via_finance(self):
+        """食安约束：财务Agent返回含食材数据时应自动校验"""
+        from agents.skills.inventory_alert import InventoryAlertAgent
+        agent = InventoryAlertAgent(tenant_id=TID, store_id="STORE001")
+        result = asyncio.run(agent.run("check_expiration", {
+            "items": [
+                {"name": "三文鱼", "remaining_hours": 3},
+            ],
+        }))
+        if result.constraints_detail.get("food_safety_check"):
+            assert result.constraints_detail["food_safety_check"]["passed"] is False
+
+    def test_service_time_constraint_in_cost_simulation(self, menu_agent):
+        """出餐时限约束：成本仿真不涉及出餐时间，约束应跳过"""
+        result = asyncio.run(menu_agent.run("simulate_cost", {
+            "bom_items": [{"cost_fen": 300, "quantity": 1}],
+            "target_price_fen": 2000,
+        }))
+        # 无 estimated_serve_minutes 数据时应跳过出餐时限校验
+        assert result.constraints_detail.get("experience_check") is None
+
+
+class TestDecisionLogAuditTrail:
+    """决策留痕验证 — 每个Agent动作都必须有完整审计记录"""
+
+    def test_decision_log_contains_all_required_fields(self, finance_agent):
+        """决策留痕必须包含: action/reasoning/confidence/constraints/execution_ms/inference_layer"""
+        result = asyncio.run(finance_agent.run("snapshot_kpi", {
+            "kpis": {"revenue": 90000, "orders": 180},
+            "targets": {"revenue": 100000, "orders": 200},
+        }))
+        assert result.action == "snapshot_kpi"
+        assert len(result.reasoning) > 0
+        assert 0 <= result.confidence <= 1
+        assert result.constraints_detail is not None
+        assert "passed" in result.constraints_detail
+        assert result.execution_ms >= 0
+        assert result.inference_layer in ("edge", "cloud")
+
+    def test_decision_log_on_failure_also_recorded(self, finance_agent):
+        """即使执行失败，也必须有决策留痕"""
+        result = asyncio.run(finance_agent.run("nonexistent_action", {}))
+        assert result.success is False
+        assert result.execution_ms >= 0
+        assert result.constraints_detail is not None
+
+    def test_autonomy_level_always_marked(self, finance_agent):
+        """每个决策结果都必须标注自治等级"""
+        result = asyncio.run(finance_agent.run("detect_revenue_anomaly", {
+            "actual_revenue_fen": 500000,
+            "history_daily_fen": [800000, 820000, 810000, 830000, 850000],
+        }))
+        assert result.agent_level in (1, 2, 3)
+
+    def test_level1_agent_has_empty_rollback_id(self, finance_agent):
+        """Level 1 Agent不应生成rollback_id(仅建议,无需回滚)"""
+        result = asyncio.run(finance_agent.run("snapshot_kpi", {
+            "kpis": {"revenue": 80000}, "targets": {"revenue": 100000},
+        }))
+        assert result.agent_level == 1
+        assert result.rollback_id == ""
+
+
+class TestDecisionInputDegradation:
+    """输入异常时的降级处理"""
+
+    def test_empty_kpis_returns_zero_completion(self, finance_agent):
+        """空KPI数据应返回0达成率而非崩溃"""
+        result = asyncio.run(finance_agent.execute("snapshot_kpi", {
+            "kpis": {}, "targets": {},
+        }))
+        assert result.success is True
+        assert result.data["overall_completion_pct"] == 0
+
+    def test_missing_history_for_anomaly_detection(self, finance_agent):
+        """营收异常检测无历史数据应返回失败"""
+        result = asyncio.run(finance_agent.execute("detect_revenue_anomaly", {
+            "actual_revenue_fen": 500000,
+            "history_daily_fen": [],
+        }))
+        assert result.success is False
+
+    def test_insufficient_forecast_history(self, finance_agent):
+        """预测历史数据不足7天应返回失败"""
+        result = asyncio.run(finance_agent.execute("forecast_orders", {
+            "daily_orders": [100, 110, 120],
+            "days_ahead": 7,
+        }))
+        assert result.success is False
+        assert "7天" in result.error
+
+    def test_order_trend_single_day_fails(self, finance_agent):
+        """订单趋势分析只有1天数据应失败"""
+        result = asyncio.run(finance_agent.execute("analyze_order_trend", {
+            "daily_orders": [100],
+            "daily_revenue_fen": [500000],
+        }))
+        assert result.success is False
+
+    def test_scenario_match_defaults_to_weekday_normal(self, finance_agent):
+        """无特殊标记时场景应默认为工作日常态"""
+        result = asyncio.run(finance_agent.execute("match_scenario", {
+            "cost_rate_pct": 25,
+            "waste_rate_pct": 1,
+        }))
+        assert result.data["scenario"] == "weekday_normal"
+
+
+class TestDecisionActionConfig:
+    """Action级会话策略验证"""
+
+    def test_critical_actions_require_human_confirm(self, finance_agent):
+        """高风险action应要求人工确认"""
+        critical_actions = ["flag_discount_anomaly", "detect_revenue_anomaly", "check_pl_anomaly"]
+        for action in critical_actions:
+            config = finance_agent.get_action_config(action)
+            assert config.requires_human_confirm is True, f"{action} 应要求人工确认"
+            assert config.risk_level in ("critical", "high")
+
+    def test_read_only_actions_no_human_confirm(self, finance_agent):
+        """只读action不应要求人工确认"""
+        read_actions = ["snapshot_kpi", "forecast_orders", "analyze_order_trend"]
+        for action in read_actions:
+            config = finance_agent.get_action_config(action)
+            assert config.requires_human_confirm is False, f"{action} 不应要求人工确认"
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

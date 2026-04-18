@@ -68,6 +68,7 @@ import {
   listDepositsByStore,
   refundDeposit,
   applyDeposit,
+  convertDeposit,
   collectDeposit,
   getDepositLedger,
   getDepositAging,
@@ -611,6 +612,32 @@ export function DepositManagePage() {
           >
             退还
           </Button>,
+          canOperate ? (
+            <Button
+              key="convert"
+              size="small"
+              type="link"
+              onClick={() => {
+                Modal.confirm({
+                  title: '确认转押？',
+                  content: `将把剩余押金 ¥${fen2yuan(record.remaining_fen)} 转为台位押金，不可撤销。`,
+                  icon: <ExclamationCircleOutlined />,
+                  onOk: async () => {
+                    try {
+                      await convertDeposit(record.id, '转押操作');
+                      message.success('转押成功');
+                      actionRef.current?.reload();
+                      if (storeId) void loadStats(storeId);
+                    } catch (err) {
+                      message.error(err instanceof Error ? err.message : '转押失败');
+                    }
+                  },
+                });
+              }}
+            >
+              转押
+            </Button>
+          ) : null,
           record.reservation_id ? (
             <Button
               key="banquet"
