@@ -1,3 +1,36 @@
+## 2026-04-18 v6审计Gate2/3推进 — 异常层级+except收窄+POS/Agent测试补全
+
+### 今日完成
+- [gateway] exceptions.py：新增11个异常类（XiaohongshuAPIError/MeituanAPIError/ElemeAPIError/DouyinAPIError/WechatPayError/AlipayError/InventoryError/ScheduleConflictError/CeleryTaskError/AgentDecisionError/BanquetSyncError），总计26个异常类覆盖全域
+- [tx-finance] reconciliation_routes.py：3处 except Exception → ThreeWayMatchError/SQLAlchemyError
+- [tx-expense] a6_pos_reconciliation.py：3处 except Exception → SQLAlchemyError/ValueError/ConnectionError
+- [tx-member] member_insight/rfm/subscription/lifecycle：4处 except Exception → 具体异常类型
+- [shared/adapters/pinzhi] test_pinzhi_adapter_full.py：+19新测试（菜品映射/网络异常/多门店并发隔离/同步集成）
+- [shared/adapters/aoqiwei] test_aoqiwei_adapter_full.py：+22新测试（Token隔离/分页/POST端点/报表/边界情况/资源管理）+ 修复2个原有测试bug
+- [tx-agent] test_decision_migrated.py：+23新测试（初始化/Happy Path/三条硬约束/决策留痕/输入降级/自治级别）
+- [tx-agent] test_inventory_migrated.py：+25新测试（食安阻断/废弃物分析/合同风险/高风险操作确认）
+- [tx-agent] test_performance_migrated.py：+22新测试（多维KPI/出餐时限/边缘推理/工作量平衡）
+- [tx-agent] test_schedule_migrated.py：+23新测试（高峰覆盖/预算超支/客诉链/未知事件降级）
+
+### 数据变化
+- 提交：ea9b7114
+- 新增测试用例：134个（POS适配器41 + Agent包93）
+- 异常层级：15→26个异常类
+- broad except 收窄：9处（TIER1财务6处 + TIER2会员3处）
+
+### v6审计Gate进度
+- Gate 2: 品智适配器测试 ≥8 ✅（56个）/ 关键路径except收窄 🟡（TIER1/2完成，TIER3已无需处理）
+- Gate 3: 异常层级体系 ✅ / pre-commit ✅（已存在）/ ModelRouter ✅（已存在）
+
+### 遗留问题
+- broad except 仍有 ~388 处（多数为最外层兜底+Celery任务安全，需逐步按模块收窄）
+- Agent测试依赖项目内部模块，完整pytest运行需容器环境
+
+### 明日计划
+- 继续TIER剩余模块except收窄
+- 等保三级生产部署5步骤评估
+- PR #34 天财差距补齐合入main
+
 ## 2026-04-16 生产TODO消除冲刺 — HR事件/配送路由/预订Webhook/KDS/小红书/AI洞察
 
 ### 今日完成
