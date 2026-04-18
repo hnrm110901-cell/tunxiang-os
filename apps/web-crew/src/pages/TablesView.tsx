@@ -6,6 +6,9 @@
  */
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { TableCard, StatusBar } from '@tx-ds/biz';
+import type { TableCardData, StatusBarItem } from '@tx-ds/biz';
+import { TXCard, TXButton } from '@tx/touch';
 import { fetchTableStatus } from '../api';
 import type { TableInfo } from '../api';
 import { useCrewStore } from '../store/crewStore';
@@ -23,22 +26,6 @@ function buildWsUrl(storeId: string): string {
   return `${base}/api/v1/tables/ws/layout/${encodeURIComponent(storeId)}`;
 }
 
-// ─── 状态颜色 & 标签 ────────────────────────────────────
-
-const STATUS_COLOR: Record<string, string> = {
-  idle: '#52c41a',
-  occupied: 'var(--tx-primary, #FF6B35)',
-  reserved: '#faad14',
-  cleaning: '#8c8c8c',
-};
-
-const STATUS_LABEL: Record<string, string> = {
-  idle: '空闲',
-  occupied: '在座',
-  reserved: '预定',
-  cleaning: '清台',
-};
-
 // ─── 工具函数 ───────────────────────────────────────────
 
 /** 计算在座分钟数 */
@@ -47,10 +34,32 @@ function calcMinutes(seatedAt: string | null): number {
   return Math.max(0, Math.floor((Date.now() - new Date(seatedAt).getTime()) / 60000));
 }
 
-/** 格式化分钟 → "35分" / "1h20分" */
-function formatDuration(min: number): string {
-  if (min < 60) return `${min}分`;
-  return `${Math.floor(min / 60)}h${min % 60}分`;
+/** 将 TableInfo 状态映射到共享组件状态 */
+function mapStatus(status: TableInfo['status'], diningMinutes?: number): TableCardData['status'] {
+  switch (status) {
+    case 'idle':
+      return 'free';
+    case 'occupied':
+      return diningMinutes != null && diningMinutes > 45 ? 'overtime' : 'occupied';
+    case 'reserved':
+      return 'reserved';
+    case 'cleaning':
+      return 'cleaning';
+    default:
+      return 'free';
+  }
+}
+
+/** 将 TableInfo 转换为共享 TableCardData */
+function toCardData(t: TableInfo): TableCardData {
+  const diningMinutes = t.seated_at ? calcMinutes(t.seated_at) : undefined;
+  return {
+    tableNo: t.table_no,
+    seats: (t as any).capacity ?? 4, // TODO: add capacity to TableInfo (available in tablesApi.TableInfo)
+    status: mapStatus(t.status, diningMinutes),
+    guestCount: t.guest_count || undefined,
+    diningMinutes,
+  };
 }
 
 // ─── Skeleton（加载占位） ───────────────────────────────
@@ -102,7 +111,7 @@ const MEMBER_LEVEL_LABEL: Record<string, string> = {
   diamond: '钻石卡',
 };
 
-// ─── 台位卡片 ───────────────────────────────────────────
+// ─── 会员 / 消费类型 ───────────────────────────────────────
 
 interface MemberInfo {
   name: string;
@@ -113,160 +122,6 @@ interface MemberInfo {
 /** 桌台当前消费金额（分），从订单 API 获取后填充 */
 interface TableSpend {
   total_fen: number;
-}
-
-interface TableCardProps {
-  table: TableInfo;
-  onTap: (t: TableInfo) => void;
-  member?: MemberInfo | null;
-  spend?: TableSpend | null;
-  isSlimMode?: boolean;
-}
-
-function TableCard({ table, onTap, member, spend, isSlimMode }: TableCardProps) {
-  const [pressed, setPressed] = useState(false);
-  const mins = calcMinutes(table.seated_at);
-  const color = STATUS_COLOR[table.status] || '#8c8c8c';
-  const label = STATUS_LABEL[table.status] || table.status;
-
-  // ── 人均消费计算 ──
-  const totalYuan = spend ? spend.total_fen / 100 : 0;
-  const perPersonYuan =
-    spend && table.guest_count > 0
-      ? spend.total_fen / 100 / table.guest_count
-      : 0;
-
-  // 超时判断：在座超过45分钟视为超时（可根据实际阈值调整）
-  const isOvertime = table.status === 'occupied' && mins > 45;
-  // 催单判断：在座超过30分钟视为催单场景
-  const needsUrge = table.status === 'occupied' && mins > 30;
-  // 推荐甜品：正常用餐但超过30分钟
-  const suggestDessert = table.status === 'occupied' && mins > 30 && !isOvertime;
-
-  return (
-    <div
-      onClick={() => onTap(table)}
-      onPointerDown={() => setPressed(true)}
-      onPointerUp={() => setPressed(false)}
-      onPointerCancel={() => setPressed(false)}
-      style={{
-        position: 'relative',
-        borderRadius: 10,
-        background: '#112228',
-        borderLeft: `4px solid ${color}`,
-        padding: isSlimMode ? '12px 14px' : '14px 16px',
-        cursor: 'pointer',
-        WebkitTapHighlightColor: 'transparent',
-        transform: pressed ? 'scale(0.97)' : 'scale(1)',
-        transition: 'transform 0.1s ease',
-        userSelect: 'none',
-        minHeight: 48,
-        display: 'flex',
-        flexDirection: 'column',
-        gap: isSlimMode ? 4 : 6,
-        ...(isOvertime ? { animation: 'txPulse 1.8s ease-in-out infinite' } : {}),
-      }}
-    >
-      {/* 催单角标 */}
-      {needsUrge && (
-        <span style={{
-          position: 'absolute', top: 4, right: 4,
-          background: 'rgba(15,110,86,.2)', color: '#0F6E56',
-          fontSize: 10, padding: '1px 5px', borderRadius: 3, fontWeight: 700,
-        }}>🤖 已催单</span>
-      )}
-
-      {/* 行1：桌号 + 状态 tag */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <span style={{ fontSize: isSlimMode ? 22 : 18, fontWeight: 700, color: '#fff' }}>
-          {table.table_no}
-        </span>
-        <span
-          style={{
-            fontSize: 12,
-            fontWeight: 600,
-            color: color,
-            border: `1px solid ${color}`,
-            borderRadius: 4,
-            padding: '1px 6px',
-          }}
-        >
-          {label}
-        </span>
-      </div>
-
-      {/* 行2：人数 + 时长 + 人均消费 */}
-      {table.status !== 'idle' && (
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 4 }}>
-          <div style={{ fontSize: 14, color: '#aaa' }}>
-            {table.guest_count > 0 ? `${table.guest_count}人` : ''}
-            {table.status === 'occupied' && table.seated_at
-              ? `${table.guest_count > 0 ? ' · ' : ''}${formatDuration(mins)}`
-              : ''}
-          </div>
-
-          {/* 人均消费（有金额时显示） */}
-          {table.status === 'occupied' && spend && spend.total_fen > 0 && (
-            <div style={{ textAlign: 'right', flexShrink: 0 }}>
-              <span
-                style={{
-                  fontSize: isSlimMode ? 15 : 13,
-                  color: '#FF6B35',
-                  fontWeight: 600,
-                }}
-              >
-                ¥{totalYuan.toFixed(0)}
-              </span>
-              {table.guest_count > 0 && (
-                <span
-                  style={{
-                    display: 'block',
-                    fontSize: 11,
-                    color: '#888',
-                    lineHeight: 1.3,
-                  }}
-                >
-                  ¥{perPersonYuan.toFixed(0)}/人
-                </span>
-              )}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* 行3：会员标识（occupied 且有绑定会员时显示，简约模式下隐藏） */}
-      {!isSlimMode && table.status === 'occupied' && member && (
-        <div
-          style={{
-            fontSize: 16,
-            color: MEMBER_LEVEL_COLOR[member.level] || '#FF6B35',
-            marginTop: 4,
-          }}
-        >
-          👤 {member.name} · {MEMBER_LEVEL_LABEL[member.level] || member.level} · 第{member.visit_count}次
-        </div>
-      )}
-
-      {/* 行4：空闲提示 或 占座金额占位 */}
-      {table.status === 'idle' && (
-        <div style={{ fontSize: 14, color: STATUS_COLOR.idle }}>空闲 &rsaquo;</div>
-      )}
-
-      {/* AI 状态行（简约模式下隐藏） */}
-      {!isSlimMode && isOvertime && (
-        <div style={{ fontSize: 12, color: '#A32D2D', fontWeight: 600, marginTop: 2 }}>
-          ⏰ 预计5分钟出品
-        </div>
-      )}
-
-      {/* AI 状态行：建议推荐甜品（简约模式下隐藏） */}
-      {!isSlimMode && suggestDessert && (
-        <div style={{ fontSize: 12, color: '#6D3EA8', fontWeight: 600, marginTop: 2 }}>
-          🍮 建议推荐甜品
-        </div>
-      )}
-    </div>
-  );
 }
 
 // ─── 主视图 ─────────────────────────────────────────────
@@ -456,7 +311,16 @@ export function TablesView() {
   // ── 汇总统计 ──────────────────────────────────────────
 
   const idleCount = tables.filter((t) => t.status === 'idle').length;
+  const occupiedCount = tables.filter((t) => t.status === 'occupied').length;
+  const reservedCount = tables.filter((t) => t.status === 'reserved').length;
   const total = tables.length;
+
+  const statsItems: StatusBarItem[] = [
+    { label: '空闲', value: idleCount, suffix: '台', color: '#52c41a' },
+    { label: '在座', value: occupiedCount, suffix: '台', color: 'var(--tx-primary, #FF6B35)' },
+    { label: '预定', value: reservedCount, suffix: '台', color: '#faad14' },
+    { label: '总计', value: total, suffix: '台' },
+  ];
 
   // ── 渲染 ─────────────────────────────────────────────
 
@@ -488,57 +352,30 @@ export function TablesView() {
         <div>
           <h3 style={{ margin: 0, fontSize: 18, color: '#fff' }}>桌台状态</h3>
           {!loading && !error && total > 0 && (
-            <div style={{ fontSize: 13, color: '#aaa', marginTop: 2 }}>
-              空闲{' '}
-              <span style={{ color: STATUS_COLOR.idle, fontWeight: 700 }}>{idleCount}</span>
-              {' / '}总{' '}
-              <span style={{ color: '#fff', fontWeight: 700 }}>{total}</span> 台
-            </div>
+            <StatusBar size="compact" items={statsItems} />
           )}
         </div>
 
         <div style={{ display: 'flex', gap: 8 }}>
           <SlimModeToggle compact />
-          <button
-            onClick={() => navigate('/table-map')}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 6,
-              minHeight: 48,
-              padding: '0 16px',
-              background: 'transparent',
-              border: '1.5px solid var(--tx-primary, #FF6B35)',
-              borderRadius: 8,
-              color: 'var(--tx-primary, #FF6B35)',
-              fontSize: 16,
-              fontWeight: 600,
-              cursor: 'pointer',
-              WebkitTapHighlightColor: 'transparent',
-            }}
+          {/* TXButton secondary — 地图视图 */}
+          <TXButton
+            variant="secondary"
+            size="normal"
+            onPress={() => navigate('/table-map')}
+            style={{ padding: '0 16px', fontSize: 16 }}
           >
             🗺️ 地图视图
-          </button>
-          <button
-            onClick={handleScanQR}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 6,
-              minHeight: 48,
-              padding: '0 16px',
-              background: 'var(--tx-primary, #FF6B35)',
-              border: 'none',
-              borderRadius: 8,
-              color: '#ffffff',
-              fontSize: 16,
-              fontWeight: 600,
-              cursor: 'pointer',
-              WebkitTapHighlightColor: 'transparent',
-            }}
+          </TXButton>
+          {/* TXButton primary — 扫码开台 */}
+          <TXButton
+            variant="primary"
+            size="normal"
+            onPress={handleScanQR}
+            style={{ padding: '0 16px', fontSize: 16 }}
           >
             📷 扫码开台
-          </button>
+          </TXButton>
         </div>
       </div>
 
@@ -588,22 +425,15 @@ export function TablesView() {
         >
           <div style={{ fontSize: 40, marginBottom: 12 }}>⚠️</div>
           <div style={{ fontSize: 16, marginBottom: 20 }}>{error}</div>
-          <button
-            onClick={loadTables}
-            style={{
-              minHeight: 48,
-              padding: '0 32px',
-              background: 'var(--tx-primary, #FF6B35)',
-              border: 'none',
-              borderRadius: 8,
-              color: '#fff',
-              fontSize: 16,
-              fontWeight: 600,
-              cursor: 'pointer',
-            }}
+          {/* TXButton primary — 重试加载 */}
+          <TXButton
+            variant="primary"
+            size="normal"
+            onPress={loadTables}
+            style={{ padding: '0 32px', fontSize: 16 }}
           >
             重试
-          </button>
+          </TXButton>
         </div>
       )}
 
@@ -625,11 +455,11 @@ export function TablesView() {
               {tables.map((t) => (
                 <TableCard
                   key={t.table_no}
-                  table={t}
-                  onTap={handleTableTap}
-                  member={memberMap[t.table_no]}
-                  spend={spendMap[t.table_no]}
-                  isSlimMode={isSlimMode}
+                  table={toCardData(t)}
+                  onClick={(card) => {
+                    const original = tables.find((tb) => tb.table_no === card.tableNo);
+                    if (original) handleTableTap(original);
+                  }}
                 />
               ))}
             </div>

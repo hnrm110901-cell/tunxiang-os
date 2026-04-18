@@ -109,7 +109,7 @@ export default function ComplianceAuditPage() {
   const [stores, setStores] = useState<{ store_id: string; store_name: string }[]>([]);
   const [stats, setStats] = useState<ComplianceStats | null>(null);
   const [scanning, setScanning] = useState(false);
-  const [dismissReason, setDismissReason] = useState('');
+  const [dismissReasonMap, setDismissReasonMap] = useState<Record<string, string>>({});
 
   // 加载门店列表
   useEffect(() => {
@@ -159,10 +159,15 @@ export default function ComplianceAuditPage() {
 
   // 确认违规
   const handleConfirm = async (id: string) => {
+    const userId = localStorage.getItem('tx_user_id');
+    if (!userId) {
+      message.error('无法获取当前用户ID，请重新登录');
+      return;
+    }
     try {
       await txFetchData(`/api/v1/attendance-compliance/violations/${id}/confirm`, {
         method: 'PUT',
-        body: JSON.stringify({ confirmer_id: 'current-user' }),
+        body: JSON.stringify({ confirmer_id: userId }),
       });
       message.success('已确认违规');
       actionRef.current?.reload();
@@ -173,17 +178,22 @@ export default function ComplianceAuditPage() {
 
   // 驳回违规
   const handleDismiss = async (id: string) => {
-    if (!dismissReason.trim()) {
+    const reason = (dismissReasonMap[id] || '').trim();
+    if (!reason) {
       message.warning('请输入驳回原因');
       return;
     }
     try {
       await txFetchData(`/api/v1/attendance-compliance/violations/${id}/dismiss`, {
         method: 'PUT',
-        body: JSON.stringify({ reason: dismissReason }),
+        body: JSON.stringify({ reason }),
       });
       message.success('已驳回');
-      setDismissReason('');
+      setDismissReasonMap((prev) => {
+        const next = { ...prev };
+        delete next[id];
+        return next;
+      });
       actionRef.current?.reload();
     } catch {
       message.error('操作失败');
@@ -283,13 +293,22 @@ export default function ComplianceAuditPage() {
                   <div style={{ marginBottom: 8 }}>驳回原因：</div>
                   <Input.TextArea
                     rows={2}
-                    value={dismissReason}
-                    onChange={(e) => setDismissReason(e.target.value)}
+                    value={dismissReasonMap[r.id] || ''}
+                    onChange={(e) =>
+                      setDismissReasonMap((prev) => ({ ...prev, [r.id]: e.target.value }))
+                    }
                     placeholder="请输入驳回原因"
                   />
                 </div>
               }
               onConfirm={() => handleDismiss(r.id)}
+              onCancel={() =>
+                setDismissReasonMap((prev) => {
+                  const next = { ...prev };
+                  delete next[r.id];
+                  return next;
+                })
+              }
               okText="确定驳回"
               cancelText="取消"
             >

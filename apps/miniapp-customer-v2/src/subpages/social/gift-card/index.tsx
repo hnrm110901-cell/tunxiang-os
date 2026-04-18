@@ -17,7 +17,7 @@ import { useUserStore } from '../../../store/useUserStore'
 // ─── Brand tokens ─────────────────────────────────────────────────────────────
 
 const C = {
-  primary: '#FF6B2C',
+  primary: '#FF6B35',
   primaryDark: '#E55A1F',
   bgDeep: '#0B1A20',
   bgCard: '#132029',
@@ -218,7 +218,7 @@ function BuyTab() {
               width: '200rpx',
               height: '200rpx',
               borderRadius: '50%',
-              background: 'rgba(255,107,44,0.08)',
+              background: 'rgba(255,107,53,0.08)',
             }}
           />
           <View
@@ -229,7 +229,7 @@ function BuyTab() {
               width: '240rpx',
               height: '240rpx',
               borderRadius: '50%',
-              background: 'rgba(255,107,44,0.05)',
+              background: 'rgba(255,107,53,0.05)',
             }}
           />
           <Text style={{ fontSize: '64rpx', marginBottom: '12rpx' }}>{activeDesign.emoji}</Text>
@@ -266,7 +266,7 @@ function BuyTab() {
                 width: 'calc(50% - 8rpx)',
                 padding: '24rpx 0',
                 textAlign: 'center',
-                background: active ? `rgba(255,107,44,0.12)` : C.bgCard,
+                background: active ? `rgba(255,107,53,0.12)` : C.bgCard,
                 borderRadius: '16rpx',
                 border: `2rpx solid ${active ? C.primary : C.border}`,
               }}
@@ -330,7 +330,7 @@ function BuyTab() {
                 flex: 1,
                 padding: '20rpx 0',
                 textAlign: 'center',
-                background: active ? `rgba(255,107,44,0.12)` : C.bgCard,
+                background: active ? `rgba(255,107,53,0.12)` : C.bgCard,
                 borderRadius: '16rpx',
                 border: `2rpx solid ${active ? C.primary : C.border}`,
               }}

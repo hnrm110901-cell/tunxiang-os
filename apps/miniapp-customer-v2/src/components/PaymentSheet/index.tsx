@@ -210,8 +210,8 @@ const PaymentSheet: React.FC<PaymentSheetProps> = ({
                   display: 'flex',
                   flexDirection: 'row',
                   alignItems: 'center',
-                  background: isSelected ? 'rgba(255,107,44,0.12)' : '#1A2E38',
-                  border: `2rpx solid ${isSelected ? '#FF6B2C' : '#1E3340'}`,
+                  background: isSelected ? 'rgba(255,107,53,0.12)' : '#1A2E38',
+                  border: `2rpx solid ${isSelected ? '#FF6B35' : '#1E3340'}`,
                   borderRadius: '24rpx',
                   padding: '28rpx 32rpx',
                   minHeight: '96rpx',
@@ -228,7 +228,7 @@ const PaymentSheet: React.FC<PaymentSheetProps> = ({
                     width: '72rpx',
                     height: '72rpx',
                     borderRadius: '16rpx',
-                    background: opt.method === 'wechat' ? '#07C160' : '#FF6B2C',
+                    background: opt.method === 'wechat' ? '#07C160' : '#FF6B35',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -297,8 +297,8 @@ const PaymentSheet: React.FC<PaymentSheetProps> = ({
                     width: '44rpx',
                     height: '44rpx',
                     borderRadius: '22rpx',
-                    border: `3rpx solid ${isSelected ? '#FF6B2C' : '#2A4558'}`,
-                    background: isSelected ? '#FF6B2C' : 'transparent',
+                    border: `3rpx solid ${isSelected ? '#FF6B35' : '#2A4558'}`,
+                    background: isSelected ? '#FF6B35' : 'transparent',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -328,13 +328,13 @@ const PaymentSheet: React.FC<PaymentSheetProps> = ({
         <View style={{ padding: '32rpx 32rpx 16rpx' }}>
           <View
             style={{
-              background: '#FF6B2C',
+              background: '#FF6B35',
               borderRadius: '44rpx',
               height: '96rpx',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              boxShadow: '0 4rpx 24rpx rgba(255,107,44,0.35)',
+              boxShadow: '0 4rpx 24rpx rgba(255,107,53,0.35)',
             }}
             onClick={handleConfirm}
           >

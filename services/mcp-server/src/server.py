@@ -1,4 +1,4 @@
-"""TunxiangOS MCP Server - exposes all Agent actions as MCP tools.
+"""TunxiangOS MCP Server - exposes all Agent actions + Payment Nexus as MCP tools.
 
 Runs as a stdio-based MCP server. Any MCP-compatible client (Claude Desktop,
 VS Code Copilot, etc.) can invoke these agent capabilities.
@@ -34,6 +34,9 @@ SERVER_VERSION = "0.1.0"
 
 # Agent backend base URL (Mac mini local API or cloud gateway)
 AGENT_API_BASE = os.environ.get("TX_AGENT_API_BASE", "http://localhost:8000")
+
+# tx-pay backend URL (支付中枢)
+TX_PAY_API_BASE = os.environ.get("TX_PAY_API_BASE", "http://localhost:8013")
 
 # ---------------------------------------------------------------------------
 # Bootstrap Agent runtime (in-process for local dev, HTTP for production)
@@ -145,6 +148,51 @@ def _stub_result(agent_id: str, action: str, arguments: dict) -> str:
 # Tool execution router
 # ---------------------------------------------------------------------------
 
+async def _execute_payment_tool(action: str, arguments: dict) -> str:
+    """Route payment_nexus tool calls to tx-pay service via HTTP."""
+    import httpx
+
+    # action → (HTTP method, path)
+    _PAYMENT_ROUTES: dict[str, tuple[str, str]] = {
+        "query_status": ("POST", "/api/v1/pay/query"),
+        "daily_summary": ("GET", "/api/v1/pay/daily-summary"),
+        "list_channels": ("GET", "/api/v1/pay/admin/channels"),
+        "list_pending_agent_payments": ("GET", "/api/v1/pay/agent/pending"),
+        "prepare": ("POST", "/api/v1/pay/agent/prepare"),
+        "confirm_agent": ("POST", "/api/v1/pay/agent/confirm"),
+        "refund": ("POST", "/api/v1/pay/refund"),
+    }
+
+    route = _PAYMENT_ROUTES.get(action)
+    if route is None:
+        return json.dumps({"error": f"Unknown payment action: {action}"})
+
+    method, path = route
+    url = f"{TX_PAY_API_BASE}{path}"
+    tenant_id = arguments.get("tenant_id", os.environ.get("TX_TENANT_ID", "default"))
+    # Create a copy without tenant_id to avoid sending it as a request param
+    call_args = {k: v for k, v in arguments.items() if k != "tenant_id"}
+    headers = {"X-Tenant-ID": tenant_id}
+
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            if method == "GET":
+                resp = await client.get(url, params=call_args, headers=headers)
+            else:
+                resp = await client.post(url, json=call_args, headers=headers)
+        return resp.text
+    except httpx.ConnectError:
+        return json.dumps({
+            "success": False,
+            "error": "tx-pay service unreachable",
+            "stub": True,
+            "action": action,
+            "agent_id": "payment_nexus",
+        }, ensure_ascii=False)
+    except httpx.TimeoutException:
+        return json.dumps({"error": "tx-pay 服务超时", "action": action})
+
+
 async def _execute_tool(tool_name: str, arguments: dict) -> str:
     """Route a tool call to the appropriate agent and return serialised result."""
     entry = get_tool_entry(tool_name)
@@ -240,6 +288,10 @@ async def _execute_tool(tool_name: str, arguments: dict) -> str:
         if action == "get_all_event_types":
             types = _event_bus.get_all_event_types()
             return json.dumps({"event_types": types})
+
+    # --- Payment Nexus actions (tx-pay:8013 via HTTP) ---
+    elif agent_id == "payment_nexus":
+        return await _execute_payment_tool(action, arguments)
 
     # --- Skill Agent actions (the 73 core tools) ---
     else:

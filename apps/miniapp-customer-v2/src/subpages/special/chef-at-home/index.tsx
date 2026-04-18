@@ -16,9 +16,9 @@ import { txRequest } from '../../../utils/request'
 
 // ─── Brand tokens ─────────────────────────────────────────────────────────────
 const C = {
-  primary: '#FF6B2C',
+  primary: '#FF6B35',
   primaryDark: '#E55A1F',
-  primaryFaint: 'rgba(255,107,44,0.12)',
+  primaryFaint: 'rgba(255,107,53,0.12)',
   bgDeep: '#0B1A20',
   bgCard: '#132029',
   bgHover: '#1A2E38',
@@ -356,7 +356,7 @@ function ChefCard({
         onClick={onExpand}
       >
         <Image
-          src={chef.avatarUrl || 'https://placehold.co/80x80/132029/FF6B2C?text=厨'}
+          src={chef.avatarUrl || 'https://placehold.co/80x80/132029/FF6B35?text=厨'}
           style={{
             width: '96rpx',
             height: '96rpx',
@@ -628,7 +628,7 @@ function BookingStep({
         }}
       >
         <Image
-          src={chef.avatarUrl || 'https://placehold.co/64x64/132029/FF6B2C?text=厨'}
+          src={chef.avatarUrl || 'https://placehold.co/64x64/132029/FF6B35?text=厨'}
           style={{ width: '64rpx', height: '64rpx', borderRadius: '32rpx' }}
           lazyLoad
         />
@@ -969,7 +969,7 @@ function ConfirmStep({
       <Section title="大厨信息">
         <View style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: '20rpx' }}>
           <Image
-            src={chef.avatarUrl || 'https://placehold.co/80x80/132029/FF6B2C?text=厨'}
+            src={chef.avatarUrl || 'https://placehold.co/80x80/132029/FF6B35?text=厨'}
             style={{ width: '80rpx', height: '80rpx', borderRadius: '40rpx' }}
             lazyLoad
           />

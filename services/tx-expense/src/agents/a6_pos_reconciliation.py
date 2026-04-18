@@ -24,6 +24,7 @@ from uuid import UUID
 
 import structlog
 from sqlalchemy import select, update
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 log = structlog.get_logger(__name__)
@@ -125,7 +126,7 @@ class A6POSReconciliationAgent:
                 diff_fen=reconcile_result["diff"],
             )
 
-        except Exception as exc:  # noqa: BLE001 — 对账失败不阻断成本报告更新
+        except (SQLAlchemyError, ValueError, KeyError) as exc:  # 对账失败不阻断成本报告更新
             log.error(
                 "a6_reconcile_failed",
                 tenant_id=str(tenant_id),
@@ -189,7 +190,7 @@ class A6POSReconciliationAgent:
                     pos_source=pos_source,
                 )
                 result["cost_report_updated"] = updated
-            except Exception as exc:  # noqa: BLE001
+            except SQLAlchemyError as exc:
                 log.error(
                     "a6_cost_report_update_failed",
                     tenant_id=str(tenant_id),
@@ -337,7 +338,7 @@ class A6POSReconciliationAgent:
                 "a6_notification_service_not_available",
                 note="Notification service not available; discrepancy logged only.",
             )
-        except Exception as exc:  # noqa: BLE001
+        except (ConnectionError, TimeoutError, RuntimeError, SQLAlchemyError) as exc:
             log.error(
                 "a6_notification_failed",
                 tenant_id=str(tenant_id),

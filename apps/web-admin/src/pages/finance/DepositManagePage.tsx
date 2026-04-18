@@ -68,12 +68,16 @@ import {
   listDepositsByStore,
   refundDeposit,
   applyDeposit,
+  convertDeposit,
   collectDeposit,
   getDepositLedger,
   getDepositAging,
   getDepositShiftSummary,
 } from '../../api/depositApi';
 import { txFetchData } from '../../api';
+import dayjs from 'dayjs';
+import type { Dayjs } from 'dayjs';
+import { formatPrice } from '@tx-ds/utils';
 
 const { Title, Text } = Typography;
 const { RangePicker } = DatePicker;
@@ -215,6 +219,29 @@ function StatCard({ title, value, prefix, suffix, valueColor, icon, extra, warni
       {extra && <div style={{ marginTop: 8 }}>{extra}</div>}
     </Card>
   );
+}
+
+const STATUS_COLOR: Record<DepositStatus, string> = {
+  collected: 'orange',
+  partially_applied: 'gold',
+  fully_applied: 'blue',
+  refunded: 'green',
+  converted: 'purple',
+  written_off: 'default',
+};
+
+const STATUS_OPTIONS = [
+  { value: '', label: '全部状态' },
+  { value: 'collected', label: '待退' },
+  { value: 'partially_applied', label: '部分抵扣' },
+  { value: 'fully_applied', label: '已抵扣' },
+  { value: 'refunded', label: '已退' },
+  { value: 'converted', label: '已转收入' },
+];
+
+/** @deprecated Use formatPrice from @tx-ds/utils */
+function fenToYuan(fen: number): string {
+  return (fen / 100).toFixed(2);
 }
 
 // ─── 主页面 ──────────────────────────────────────────────────────────────────
@@ -611,6 +638,32 @@ export function DepositManagePage() {
           >
             退还
           </Button>,
+          canOperate ? (
+            <Button
+              key="convert"
+              size="small"
+              type="link"
+              onClick={() => {
+                Modal.confirm({
+                  title: '确认转押？',
+                  content: `将把剩余押金 ¥${fen2yuan(record.remaining_fen)} 转为台位押金，不可撤销。`,
+                  icon: <ExclamationCircleOutlined />,
+                  onOk: async () => {
+                    try {
+                      await convertDeposit(record.id, '转押操作');
+                      message.success('转押成功');
+                      actionRef.current?.reload();
+                      if (storeId) void loadStats(storeId);
+                    } catch (err) {
+                      message.error(err instanceof Error ? err.message : '转押失败');
+                    }
+                  },
+                });
+              }}
+            >
+              转押
+            </Button>
+          ) : null,
           record.reservation_id ? (
             <Button
               key="banquet"

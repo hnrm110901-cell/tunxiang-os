@@ -14,6 +14,7 @@ from typing import Any
 import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from sqlalchemy import func, select, text
+from sqlalchemy.exc import ProgrammingError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 from workers.rfm_updater import RFMUpdater
 
@@ -233,7 +234,7 @@ async def get_rfm_changes(
             for row in rows_result.all()
         ]
 
-    except Exception:  # noqa: BLE001 — 表不存在时降级，此处为兜底
+    except (ProgrammingError, SQLAlchemyError):  # 表不存在时降级
         # rfm_change_logs 表不存在时，返回今日已更新 RFM 的会员列表
         logger.warning(
             "rfm_change_logs_unavailable",

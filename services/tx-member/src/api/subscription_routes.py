@@ -156,7 +156,7 @@ async def create_subscription(
             openid=req.openid or "",
             notify_url="https://api.tunxiang.com/api/v1/member/subscriptions/notify",
         )
-    except Exception as e:  # noqa: BLE001 — 兜底：支付参数生成失败不阻断订单创建
+    except (ConnectionError, TimeoutError, ValueError, OSError) as e:  # 支付参数生成失败不阻断订单创建
         logger.warning("wechat_prepay_failed", error=str(e))
         # 降级：返回占位参数（生产环境需保证 WechatPayService 配置正确）
         payment_params = {

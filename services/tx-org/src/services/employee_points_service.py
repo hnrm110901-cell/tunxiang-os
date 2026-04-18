@@ -846,12 +846,13 @@ async def redeem_reward(
     rid = _parse_uuid(reward_id, "reward_id")
     await _set_tenant(db, tenant_id)
 
-    # 查询商品
+    # 查询商品（FOR UPDATE 锁定行，防止并发兑换竞态）
     rr = await db.execute(
         text(f"""
             SELECT id, reward_name, reward_type, points_cost, stock, is_active
             FROM {POINT_REWARDS_TABLE}
             WHERE tenant_id = :tid AND id = :rid AND is_deleted = FALSE
+            FOR UPDATE
         """),
         {"tid": tid, "rid": rid},
     )
@@ -867,8 +868,17 @@ async def redeem_reward(
     if stock == 0:
         raise ValueError("商品库存不足")
 
-    # 检查余额
-    balance = await _get_pt_balance(db, tid, eid)
+    # 检查余额（锁定员工积分流水行，防止并发扣减）
+    bal_r = await db.execute(
+        text(f"""
+            SELECT COALESCE(SUM(points), 0) AS bal
+            FROM {POINT_TX_TABLE}
+            WHERE tenant_id = :tid AND employee_id = :eid AND is_deleted = FALSE
+            FOR UPDATE
+        """),
+        {"tid": tid, "eid": eid},
+    )
+    balance = int(bal_r.scalar_one() or 0)
     if balance < cost:
         raise ValueError(f"积分不足，当前余额 {balance}，需要 {cost}")
 
@@ -878,7 +888,7 @@ async def redeem_reward(
             text(f"""
                 UPDATE {POINT_REWARDS_TABLE}
                 SET stock = stock - 1, updated_at = NOW()
-                WHERE id = :rid AND tenant_id = :tid
+                WHERE id = :rid AND tenant_id = :tid AND stock > 0
             """),
             {"rid": rid, "tid": tid},
         )

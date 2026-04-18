@@ -102,7 +102,7 @@ function dishToCard(d: Dish): MockDish {
 const C = {
   bg:       '#0B1A20',
   card:     '#132029',
-  primary:  '#FF6B2C',
+  primary:  '#FF6B35',
   text1:    '#E8F4F8',
   text2:    '#9EB5C0',
 }
@@ -240,7 +240,7 @@ export default function IndexPage() {
           </Text>
           <View
             style={{
-              background: 'rgba(255,107,44,0.12)',
+              background: 'rgba(255,107,53,0.12)',
               borderRadius: '20rpx',
               padding: '8rpx 22rpx',
             }}
@@ -445,7 +445,7 @@ export default function IndexPage() {
                           <View
                             style={{
                               display: 'inline-block',
-                              background: 'rgba(255,107,44,0.15)',
+                              background: 'rgba(255,107,53,0.15)',
                               borderRadius: '8rpx',
                               padding: '4rpx 12rpx',
                               marginBottom: '8rpx',

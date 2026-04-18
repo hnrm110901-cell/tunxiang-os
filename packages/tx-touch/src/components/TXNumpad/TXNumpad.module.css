@@ -1,0 +1,118 @@
+.numpad {
+  background: var(--tx-bg-2);
+  border-radius: var(--tx-radius-md);
+  overflow: hidden;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ─── 显示区域 ─── */
+.display {
+  background: var(--tx-bg-1);
+  padding: 12px 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  border-bottom: 1px solid var(--tx-border);
+  min-height: 64px;
+  justify-content: center;
+}
+
+.label {
+  font-size: 13px;
+  color: var(--tx-text-3);
+  margin-bottom: 4px;
+}
+
+.displayValue {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--tx-text-1);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+}
+
+/* ─── 网格区域 ─── */
+.grid {
+  display: grid;
+  grid-template-columns: 3fr 1fr;
+}
+
+.keys {
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--tx-border);
+}
+
+.row {
+  display: flex;
+  border-bottom: 1px solid var(--tx-border);
+}
+
+.row:last-child {
+  border-bottom: none;
+}
+
+/* ─── 数字键 ─── */
+.key {
+  flex: 1;
+  height: 56px;
+  font-size: 28px;
+  font-weight: 500;
+  color: var(--tx-text-1);
+  background: var(--tx-bg-1);
+  border: none;
+  border-right: 1px solid var(--tx-border);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  -webkit-tap-highlight-color: transparent;
+  transition: background 150ms ease;
+  font-variant-numeric: tabular-nums;
+}
+
+.key:last-child {
+  border-right: none;
+}
+
+.key:active {
+  background: var(--tx-bg-3);
+  transform: scale(0.96);
+}
+
+.keyDisabled {
+  opacity: 0.3;
+  pointer-events: none;
+}
+
+.delIcon {
+  font-size: 22px;
+  color: var(--tx-text-2);
+}
+
+/* ─── 确认键（双倍高度） ─── */
+.confirmKey {
+  grid-row: 1 / 5;
+  background: var(--tx-primary);
+  color: #fff;
+  font-size: 20px;
+  font-weight: 700;
+  border: none;
+  cursor: pointer;
+  writing-mode: vertical-rl;
+  letter-spacing: 0.1em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  -webkit-tap-highlight-color: transparent;
+  min-height: 112px;
+  transition: filter 150ms ease;
+  /* override grid placement to span all 4 rows */
+  grid-column: 2;
+}
+
+.confirmKey:active {
+  filter: brightness(0.88);
+  transform: scale(0.97);
+}

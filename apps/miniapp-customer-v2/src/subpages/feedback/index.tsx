@@ -18,7 +18,7 @@ import { txRequest } from '../../utils/request'
 
 // ─── Brand tokens ─────────────────────────────────────────────────────────────
 const C = {
-  primary: '#FF6B2C',
+  primary: '#FF6B35',
   primaryDark: '#E55A1F',
   bgDeep: '#0B1A20',
   bgCard: '#132029',
@@ -66,7 +66,7 @@ const TABS: FeedbackTab[] = [
 ]
 
 const STATUS_MAP: Record<string, { label: string; color: string; bg: string }> = {
-  pending: { label: '处理中', color: C.primary, bg: 'rgba(255,107,44,0.12)' },
+  pending: { label: '处理中', color: C.primary, bg: 'rgba(255,107,53,0.12)' },
   replied: { label: '已回复', color: C.success, bg: 'rgba(76,175,80,0.12)' },
 }
 
@@ -302,8 +302,8 @@ function ReplyDetailModal({
         {record.reply ? (
           <View
             style={{
-              background: 'rgba(255,107,44,0.08)',
-              border: `1rpx solid rgba(255,107,44,0.3)`,
+              background: 'rgba(255,107,53,0.08)',
+              border: `1rpx solid rgba(255,107,53,0.3)`,
               borderRadius: '16rpx',
               padding: '28rpx',
             }}

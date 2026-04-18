@@ -21,7 +21,7 @@ import { useUserStore } from '../../store/useUserStore'
 // ─── Brand tokens ─────────────────────────────────────────────────────────────
 
 const C = {
-  primary: '#FF6B2C',
+  primary: '#FF6B35',
   primaryDark: '#E55A1F',
   bgDeep: '#0B1A20',
   bgCard: '#132029',
@@ -520,10 +520,10 @@ export default function PointsMallPage() {
 
           <View
             style={{
-              background: 'rgba(255,107,44,0.15)',
+              background: 'rgba(255,107,53,0.15)',
               borderRadius: '48rpx',
               padding: '16rpx 28rpx',
-              border: `1rpx solid rgba(255,107,44,0.3)`,
+              border: `1rpx solid rgba(255,107,53,0.3)`,
             }}
             onClick={() => Taro.navigateTo({ url: '/subpackages/member/points/index' })}
           >
@@ -606,10 +606,10 @@ export default function PointsMallPage() {
             <View
               key={opt.key}
               style={{
-                background: isActive ? 'rgba(255,107,44,0.15)' : 'transparent',
+                background: isActive ? 'rgba(255,107,53,0.15)' : 'transparent',
                 borderRadius: '8rpx',
                 padding: '8rpx 20rpx',
-                border: `1rpx solid ${isActive ? 'rgba(255,107,44,0.4)' : C.border}`,
+                border: `1rpx solid ${isActive ? 'rgba(255,107,53,0.4)' : C.border}`,
               }}
               onClick={() => setSortKey(opt.key)}
             >

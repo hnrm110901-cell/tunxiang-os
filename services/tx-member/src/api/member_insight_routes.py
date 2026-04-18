@@ -461,7 +461,7 @@ async def generate_member_insight(
                     },
                 )
                 await db.commit()
-            except Exception as _exc:  # noqa: BLE001
+            except SQLAlchemyError as _exc:
                 logger.warning("member_insight_decision_log_failed", error=str(_exc))
 
         _asyncio.create_task(_log_decision())

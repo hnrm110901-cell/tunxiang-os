@@ -1,0 +1,207 @@
+.ticket {
+  width: 240px;
+  flex-shrink: 0;
+  background: var(--tx-bg-1);
+  border-radius: var(--tx-radius-md);
+  box-shadow: var(--tx-shadow-md);
+  border: 1px solid var(--tx-border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  transition: background 300ms ease;
+}
+
+/* ─── 超时态：整张卡片红色背景 ─── */
+.overdue {
+  background: var(--tx-danger);
+  border-color: var(--tx-danger);
+  animation: tx-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes tx-pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.85; }
+}
+
+/* ─── 头部 ─── */
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px 4px;
+}
+
+.tableNo {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--tx-text-1);
+}
+
+.overdue .tableNo {
+  color: #fff;
+}
+
+.headerRight {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.vipBadge {
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: #D4AF37;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+}
+
+.rushBtn {
+  padding: 4px 10px;
+  border-radius: var(--tx-radius-sm);
+  background: var(--tx-danger);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  min-height: var(--tx-tap-min);
+  display: flex;
+  align-items: center;
+}
+
+.overdue .rushBtn {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.rushBtn:active {
+  opacity: 0.75;
+}
+
+/* ─── 倒计时 ─── */
+.countdown {
+  font-size: 32px;
+  font-weight: 800;
+  line-height: 1;
+  text-align: center;
+  padding: 6px 14px 8px;
+  color: var(--tx-success);
+  font-variant-numeric: tabular-nums;
+}
+
+.countdownUrgent {
+  color: var(--tx-warning);
+}
+
+.countdownOverdue {
+  color: #fff;
+}
+
+/* ─── 菜品列表 ─── */
+.items {
+  list-style: none;
+  margin: 0;
+  padding: 4px 14px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+}
+
+.item {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.itemName {
+  font-size: 20px;
+  font-weight: 500;
+  color: var(--tx-text-1);
+  line-height: 1.3;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 1;
+}
+
+.overdue .itemName {
+  color: #fff;
+}
+
+.itemSpec {
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--tx-text-2);
+  margin-left: 4px;
+}
+
+.overdue .itemSpec {
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.rushIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--tx-danger);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 900;
+  flex-shrink: 0;
+}
+
+.overdue .rushIcon {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.itemQty {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--tx-text-2);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.overdue .itemQty {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+/* ─── 底部 ─── */
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 14px 12px;
+  border-top: 1px solid var(--tx-border);
+}
+
+.overdue .footer {
+  border-top-color: rgba(255, 255, 255, 0.2);
+}
+
+.swipeHint {
+  font-size: 13px;
+  color: var(--tx-text-3);
+}
+
+.overdue .swipeHint {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.orderId {
+  font-size: 13px;
+  color: var(--tx-text-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.overdue .orderId {
+  color: rgba(255, 255, 255, 0.7);
+}

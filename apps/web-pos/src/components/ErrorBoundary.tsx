@@ -130,11 +130,22 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
 
 export function reportCrashToTelemetry(report: ErrorReport): void {
   const base = import.meta.env.VITE_API_BASE_URL || '';
+  const deviceId =
+    (window as any).TXBridge?.getDeviceInfo?.() || navigator.userAgent;
+  const tenantId = localStorage.getItem('tenant_id') || '';
   try {
     void fetch(`${base}/api/v1/telemetry/pos-crash`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(report),
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Tenant-ID': tenantId,
+      },
+      body: JSON.stringify({
+        device_id: deviceId,
+        route: window.location.pathname,
+        error_stack: report.error.stack ?? `${report.error.name}: ${report.error.message}`,
+        store_id: localStorage.getItem('store_id') || undefined,
+      }),
       keepalive: true,
     }).catch(() => {});
   } catch {

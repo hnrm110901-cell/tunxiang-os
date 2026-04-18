@@ -17,7 +17,7 @@ import { txRequest } from '../../utils/request'
 
 // ─── Brand tokens ─────────────────────────────────────────────────────────────
 const C = {
-  primary: '#FF6B2C',
+  primary: '#FF6B35',
   bgDeep: '#0B1A20',
   bgCard: '#132029',
   bgHover: '#1A2E38',
@@ -490,7 +490,7 @@ export default function SettingsPage() {
                         <View
                           style={{
                             padding: '4rpx 14rpx',
-                            background: 'rgba(255,107,44,0.12)',
+                            background: 'rgba(255,107,53,0.12)',
                             borderRadius: '8rpx',
                           }}
                         >

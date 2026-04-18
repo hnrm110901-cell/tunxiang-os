@@ -1,7 +1,7 @@
 /**
  * 屯象OS Design Tokens
  * 品牌: 屯象 TUN XIANG · 餐饮人的好伙伴
- * v2 设计系统 — 深色主题 + Mint #0AAF9A 主色
+ * v2 设计系统 — 深色主题 + 暖橙 #FF6B35 主色（已从 Mint #0AAF9A 更新）
  *
  * 使用方式:
  *   import { colors, typography, spacing } from '@/design-system/tokens';
@@ -72,12 +72,12 @@ export function injectTokens() {
     '--text-tertiary':   dark.t3,         // 38%
     // 边框
     '--border':          dark.border,     // 8%
-    // 语义色 (Mint accent)
-    '--accent':          brand[500],      // #0AAF9A
-    '--accent-soft':     'rgba(10,175,154,0.15)',
+    // 语义色 (暖橙 accent #FF6B35)
+    '--accent':          brand[500],      // #FF6B35
+    '--accent-soft':     'rgba(255,107,53,0.15)',
     '--accent-hover':    brand[400],
     '--accent-active':   brand[300],
-    '--accent-bg':       'rgba(10,175,154,0.10)',
+    '--accent-bg':       'rgba(255,107,53,0.10)',
     '--green':           '#34D399',
     '--red':             '#F87171',
     '--yellow':          '#FBBF24',

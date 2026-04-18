@@ -148,33 +148,38 @@
 
 ## 2026-04-18 Sprint 启动 — 主规划 V1.0 + A1 前端 TDD + F1 适配器评审骨架
 
+## 2026-04-18 v6审计Gate2/3推进 — 异常层级+except收窄+POS/Agent测试补全
+
 ### 今日完成
-- [docs] docs/sprint-plan-2026Q2-unified.md V1.0 发布（合并 V4/V6，10 周 8 Sprint，W8 徐记 DEMO 10 门禁）
-- [docs] docs/progress.md 建立，按 CLAUDE.md §18 规范声明会话目标+边界+DoD
-- [apps/web-pos] Sprint A1 前端 TDD：ErrorBoundary + Toast + ToastContainer + useToast + featureFlags + txFetchTrade 3s 超时 + 5 类错误码映射 + X-Request-Id；vitest 18/18 PASS；Flag: trade.pos.settle.hardening/toast.enable/errorBoundary.enable；顶层 main.tsx 包 ErrorBoundary
-- [docs/adapters/review] Sprint F1 骨架：README 索引 + 14 适配器骨架（aoqiwei/tiancai-shanglong/keruyun/weishenghuo/meituan/eleme/douyin/yiding/nuonuo/xiaohongshu/erp/logistics/delivery_factory/wechat_delivery）；7 维评分卡模板就位；grep 实测全部 14 个未接 emit_event
+- [gateway] exceptions.py：新增11个异常类（XiaohongshuAPIError/MeituanAPIError/ElemeAPIError/DouyinAPIError/WechatPayError/AlipayError/InventoryError/ScheduleConflictError/CeleryTaskError/AgentDecisionError/BanquetSyncError），总计26个异常类覆盖全域
+- [tx-finance] reconciliation_routes.py：3处 except Exception → ThreeWayMatchError/SQLAlchemyError
+- [tx-expense] a6_pos_reconciliation.py：3处 except Exception → SQLAlchemyError/ValueError/ConnectionError
+- [tx-member] member_insight/rfm/subscription/lifecycle：4处 except Exception → 具体异常类型
+- [shared/adapters/pinzhi] test_pinzhi_adapter_full.py：+19新测试（菜品映射/网络异常/多门店并发隔离/同步集成）
+- [shared/adapters/aoqiwei] test_aoqiwei_adapter_full.py：+22新测试（Token隔离/分页/POST端点/报表/边界情况/资源管理）+ 修复2个原有测试bug
+- [tx-agent] test_decision_migrated.py：+23新测试（初始化/Happy Path/三条硬约束/决策留痕/输入降级/自治级别）
+- [tx-agent] test_inventory_migrated.py：+25新测试（食安阻断/废弃物分析/合同风险/高风险操作确认）
+- [tx-agent] test_performance_migrated.py：+22新测试（多维KPI/出餐时限/边缘推理/工作量平衡）
+- [tx-agent] test_schedule_migrated.py：+23新测试（高峰覆盖/预算超支/客诉链/未知事件降级）
 
 ### 数据变化
-- 无新迁移（A1 前端子项零 DB 改动；B/D2 含迁移留待决策点签字）
-- 新增测试：18（ErrorBoundary 6 / Toast 6 / tradeApi 6）
-- 新增文档：2 份主规划 + 15 份适配器评审
+- 提交：ea9b7114
+- 新增测试用例：134个（POS适配器41 + Agent包93）
+- 异常层级：15→26个异常类
+- broad except 收窄：9处（TIER1财务6处 + TIER2会员3处）
+
+### v6审计Gate进度
+- Gate 2: 品智适配器测试 ≥8 ✅（56个）/ 关键路径except收窄 🟡（TIER1/2完成，TIER3已无需处理）
+- Gate 3: 异常层级体系 ✅ / pre-commit ✅（已存在）/ ModelRouter ✅（已存在）
 
 ### 遗留问题
-- Sprint A1 后端子任务（`POST /api/v1/telemetry/pos-crash` + v260 pos_crash_reports 迁移）未启动
-- Sprint C/A2-A4/D/E/G/H 未启动
-- 5 个决策点未签字：D2 ROI 列 / E1 小红书 channel / B1 Override 签名 / B2 红冲阈值 / E4 异议阈值
-- 合规需求 workshop（法务+HR+财务）未启动
-- 供应商采购（诺诺全电/腾讯+阿里 OCR/湘食通/沪食安）未启动
-- F1 14 份骨架的 `?/4` 评分待 Owner Squad W3 Day1 填充
-- CLAUDE.md §19 独立验证触发：A1 修改 3+ 文件+Tier 1 路径，需开新会话重检
+- broad except 仍有 ~388 处（多数为最外层兜底+Celery任务安全，需逐步按模块收窄）
+- Agent测试依赖项目内部模块，完整pytest运行需容器环境
 
 ### 明日计划
-- 独立验证会话：验证 A1 改动在 200 桌并发 + Tier 1 场景下无副作用
-- 启动 A1 后端子任务（telemetry 端点）
-- 启动 C1 KDS 本地缓存（与 A1 前端无文件冲突）
-- 推动创始人会议签字 5 决策点
-
----
+- 继续TIER剩余模块except收窄
+- 等保三级生产部署5步骤评估
+- PR #34 天财差距补齐合入main
 
 ## 2026-04-16 生产TODO消除冲刺 — HR事件/配送路由/预订Webhook/KDS/小红书/AI洞察
 
@@ -316,6 +321,332 @@
 # 屯象OS — 每日开发日志
 
 > 最新记录在最上方。格式：完成内容 / 数据变化 / 遗留问题 / 明日计划。
+
+---
+
+## 2026-04-13 (续5)
+
+### 今日完成
+- [shared/design-system] 新增 `useSwipe` 共享 hook（`shared/design-system/src/hooks/useSwipe.ts`），从 web-kds 提取
+- [shared/design-system] OrderTicketCard 新增滑动手势：`swipeable` / `onSwipeComplete` / `swipeLabel`，含滑动底层绿色"完成"提示
+- [shared/design-system] OrderTicketCard.module.css 新增 `.swipeWrapper` / `.swipeReveal` / `.swipeHint` 样式
+- [web-kds] **KDSBoardPage.tsx 完成 OrderTicketCard 集成**（1233→912 行，-26%）：
+  - 删除内联 KDSTicketCard（~160行）+ ActionButton（~45行）+ 时间辅助函数（~25行）
+  - 删除重复的 CSS 动画定义（kds-border-flash / kds-warn-flash / kds-card-in）
+  - 新增 `toTicketData()` mapper + `isOvertime()` 辅助函数
+  - 滚动视图 + 分页视图均已接入共享组件 + 左滑手势
+- [h5-self-order] **AddMorePage.tsx 重构**（340→254 行，-25%）：
+  - 内联分类侧边栏（~20行）→ 共享 `CategoryNav layout="sidebar"`
+  - 内联菜品卡片（~70行 × N 个）→ 共享 `DishCard variant="horizontal"`
+  - 新增 `toDishData()` mapper（DishItem → DishData）
+
+### 全量共享组件集成状态审计
+| 页面 | 组件 | 状态 |
+|------|------|------|
+| web-kds/KitchenBoard | OrderTicketCard | ✅ 已集成 |
+| web-kds/ZoneKitchenBoard | OrderTicketCard | ✅ 已集成 |
+| web-kds/KDSBoardPage | OrderTicketCard + swipe | ✅ 本次集成 |
+| web-pos/CashierPage | DishGrid+CategoryNav+MenuSearch+CartPanel | ✅ 已集成 |
+| web-pos/TableMapPage | TableCard+StatusBar | ✅ 已集成 |
+| web-crew/AddDishSheet | DishGrid+CategoryNav+MenuSearch | ✅ 已集成 |
+| web-crew/CrewOrderPage | CategoryNav+DishCard | ✅ 已集成 |
+| web-crew/TablesView | TableCard+StatusBar | ✅ 已集成 |
+| web-reception/QueuePage | QueueTicket+StatusBar | ✅ 已集成 |
+| h5/MenuBrowse | DishGrid+CategoryNav+MenuSearch+CartPanel+SpecSheet | ✅ 已集成 |
+| h5/AddMorePage | CategoryNav+DishCard | ✅ 本次集成 |
+| Phase 5: pinyinSearch | 工具函数 | ✅ 已实现 |
+| Phase 5: AddToCartAnimation | 抛物线动效 | ✅ 已实现 |
+| Phase 5: DishImage | 渐进加载 | ✅ 已实现 |
+| Phase 5: DishGrid 虚拟滚动 | 自定义 IntersectionObserver | ✅ 已实现 |
+
+### 评估后跳过的集成（数据模型/范式不匹配）
+- web-crew/ActiveOrdersView: 只有 item_count，无菜品列表，交互不同（催菜+加菜）
+- web-kds/DigitalMenuBoardPage: 展示屏 DishCard 无交互，斜角售罄标签等独有样式
+- web-kds/CallingQueue: 等叫上桌（菜品级），非排队叫号（顾客级），与 QueueTicket 业务场景完全不同
+- web-kds/DispatchBoard: 调度级简版卡（只有菜品总数），无详细菜品列表
+- web-kds/SwimLaneBoard: 工序级任务卡（每卡=1个工序步骤），非订单级
+- web-admin/DishBatch+DishSort: Ant Design 表格范式，与 DishManageCard 卡片范式不兼容
+
+### 数据变化
+- 新增文件：1 个（shared hooks/useSwipe.ts）
+- 修改文件：5 个（OrderTicketCard.tsx/css、KDSBoardPage.tsx、AddMorePage.tsx、shared index.ts）
+- 共享组件已覆盖 11 个核心页面，Phase 1-5 全部完成
+
+### 明日计划
+- 后端 AI 排菜推荐 API（tx-brain 集成 Claude API）
+- web-admin 菜品四象限分析页面（利用 DishManageCard quadrant 字段）
+- 考虑提取 KDS 专用组件（CallingTaskCard、BanquetSessionCard）为共享组件
+
+---
+
+## 2026-04-13 (续4)
+
+### 今日完成
+- [shared/design-system] 新增 `useSwipe` 通用触控滑动 hook（`shared/design-system/src/hooks/useSwipe.ts`），从 web-kds 提取并共享化
+- [shared/design-system] OrderTicketCard 新增滑动手势支持：`swipeable` / `onSwipeComplete` / `swipeLabel` 三个可选 props
+- [shared/design-system] OrderTicketCard.module.css 新增 `.swipeWrapper` / `.swipeReveal` / `.swipeHint` 滑动相关样式
+- [web-kds] **KDSBoardPage.tsx 完成 OrderTicketCard 集成**（1233→912 行，削减 26%）：
+  - 移除内联 `KDSTicketCard` 组件（~160 行）和 `ActionButton`（~45 行）
+  - 移除 `getTimeStatus` / `getTimeColor` / `formatElapsed` 时间辅助函数（~25 行）
+  - 移除 `kds-border-flash` / `kds-warn-flash` / `kds-card-in` 重复动画定义
+  - 新增 `toTicketData()` mapper（DemoTicket → OrderTicketData）
+  - 滚动视图 + 分页视图均使用共享 OrderTicketCard + 左滑手势
+  - 保留：DishGroupCard（按菜品聚合视图）、EmptyState、StatItem、ToggleButton、PageNavButton
+- [web-kds] useSwipe.ts 改为从共享包 re-export（兼容层）
+
+### 数据变化
+- 新增文件：1 个（shared hooks/useSwipe.ts）
+- 修改文件：4 个（OrderTicketCard.tsx、OrderTicketCard.module.css、KDSBoardPage.tsx、web-kds useSwipe.ts）
+- 共享 OrderTicketCard 已集成页面：KitchenBoard / ZoneKitchenBoard / KDSBoardPage（3/3 核心 KDS 页面）
+
+### 遗留问题
+- DispatchBoard / SwimLaneBoard 数据模型与 OrderTicketCard 差异较大（调度级/工序级卡片），暂不强制集成
+- KDSBoardPage 的 DishGroupCard（按菜品聚合视图）仍使用内联样式，可考虑提取为独立组件
+
+### 明日计划
+- 提取 DishGroupCard 为共享组件（KDS 按菜品聚合视图）
+- 继续 Phase 4 其余终端页面优化（web-reception 排队页、web-pos 桌台页等）
+
+---
+
+## 2026-04-13 (续3) — OrderTicketCard KDS集成 + 三页面共享组件替换
+
+### 今日完成
+- [shared/design-system] OrderTicketCard.module.css 补全 KDS 样式：`.grabBtn`、`.pauseBtn`/`.pauseBtnActive`、`.pausedBanner`、`.kds .actionBtn`（56px触控）、`.kds .dishRemark/.dishSpec/.orderNo/.channelBadge/.priorityBadge/.statusBadge` 放大字号
+- [web-kds] KitchenBoard.tsx 集成共享 OrderTicketCard（737→564行，减少173行）
+  - 新增 `toTicketData` mapper：KDSTicket（numeric createdAt）→ OrderTicketData（ISO string）
+  - 移除内联 TicketCard 组件（~160行 inline styles + 操作按钮逻辑）
+  - 移除内联 `@keyframes kds-border-flash / kds-rush-flash`（已在 CSS Module）
+  - 移除冗余时间工具函数（`formatElapsed`, `getTimeLevel`, `elapsedMin`, `TIME_COLORS`）
+  - 新增 `now` 状态（每秒更新，传递给 OrderTicketCard 驱动倒计时）
+- [web-kds] ZoneKitchenBoard.tsx 同步集成共享 OrderTicketCard
+  - 用 `channel` 字段传递区域标签（包厢/大厅），替代内联 ZoneTag
+  - 移除内联 ZoneTicketCard（~100行）
+  - 保留 ZoneTag（header统计 + DoneCard 仍需用）
+  - 移除冗余 `@keyframes zkb-border-flash / zkb-rush-flash`
+
+### 数据变化
+- 删除代码：~270行（KitchenBoard 173行 + ZoneKitchenBoard ~100行内联卡片）
+- 共享 CSS 新增：~60行 KDS 样式覆盖
+
+### 遗留问题
+- KDSBoardPage.tsx 的 KDSTicketCard 使用 DemoTicket 类型 + useSwipe 手势，需要额外适配才能用共享组件替换
+- OrderTicketCard 暂不支持 swipe-to-complete 手势（KDSBoardPage 特有）
+
+### 明日计划
+- 考虑给 OrderTicketCard 添加 swipe 手势支持，统一 KDSBoardPage
+- 继续 Phase 4 其他页面接入
+
+---
+
+## 2026-04-13 (续2) — MenuOptimizePage升级 + crew桌台集成 + DishGrid全面集成
+
+### 今日完成
+
+**web-admin AI排菜推荐页面全面升级**
+- [web-admin] MenuOptimizePage 重写：接入新 `/api/v1/menu/recommendation/*` API
+- [web-admin] 新增双Tab布局：AI推荐方案 + 历史记录
+- [web-admin] 推荐方案Tab：KPI摘要卡片 + 关键洞察 + ProTable（四象限/动作/毛利/置信度）
+- [web-admin] 历史记录Tab：ProTable 展示历史方案 + 应用状态
+- [web-admin] 支持"全部应用"/"选择性应用"推荐方案
+
+**web-crew 服务员桌台视图集成共享组件**
+- [web-crew] TablesView 接入共享 TableCard 组件（546行→395行，减少28%）
+- [web-crew] TablesView 接入共享 StatusBar 组件替代内联统计
+- [web-crew] 新增 mapStatus() — idle→free，occupied>45min→overtime
+- [web-crew] 移除内联 TableCard/STATUS_COLOR/STATUS_LABEL/MEMBER_LEVEL 等冗余代码
+- [web-crew] TableMapView 底部统计栏接入共享 StatusBar 组件
+- [web-crew] AddDishSheet 菜品列表接入共享 DishGrid（compact变体）
+
+**DishGrid 组件增强 + 全面集成（4端复用）**
+- [design-system] DishGrid 新增 compact 变体支持
+- [design-system] DishGrid 新增 showTags / showAllergens 透传 props
+- [web-pos] CashierPage 接入 DishGrid（grid变体 + 自动虚拟滚动）
+- [h5-self-order] MenuBrowse 接入 DishGrid（horizontal变体）
+- [web-crew] AddDishSheet 接入 DishGrid（compact变体）
+
+### 数据变化
+- 共享组件复用统计：
+  - TableCard：3端（POS/reception/crew）
+  - StatusBar：5端（KDS/POS/reception/crew-tables/crew-map）
+  - DishGrid：3端（POS/h5/crew），首次实现菜品网格统一渲染
+  - DishCard：通过 DishGrid 间接在3端复用
+
+### 遗留问题
+- web-crew TablesView 的会员信息展示暂移除（待 TableCard 组件支持扩展插槽）
+- MenuOptimizePage 当前对接 mock 数据，待 tx-brain Claude API 接入
+- TableMapView 的位置布局卡片仍为内联实现（position-based grid 与 card-based TableCard 职责不同）
+
+### 明日计划
+- web-crew CrewOrderPage 接入 DishGrid（如有内联菜品渲染）
+- 推进 tx-brain 接入实现真实 AI 推理
+- 考虑添加 DishGrid empty state 支持
+- KDS TicketCard 提取为共享组件
+
+---
+
+## 2026-04-13 (续) — 共享组件集成 + 后端AI排菜API
+
+### 今日完成
+
+**共享设计系统新增2个组件（总计16个业务组件）**
+- [design-system/biz] 新增 StatusBar — KPI统计指标条（KDS/reception/POS通用）
+- [design-system/biz] 新增 TableCard — 桌台状态卡片（POS/reception/crew通用）
+
+**共享组件实际集成到业务页面**
+- [web-reception] QueuePage 排队列表接入共享 QueueTicket 组件（421行→358行）
+- [web-reception] QueuePage 顶部统计接入共享 StatusBar 组件
+- [web-pos] TableMapPage 桌台网格接入共享 TableCard 组件（295行→243行）
+- [web-pos] TableMapPage 顶部统计接入共享 StatusBar 组件
+- [web-pos] TableMapPage 移除 deprecated fen2yuan 函数
+- [web-kds] KitchenBoard 顶部统计接入共享 StatusBar 组件
+
+**共享组件功能修正**
+- [design-system/biz] QueueTicket 的 onSkip 按钮现在对 called 状态也可见（标准叫号→过号流程）
+
+**后端API**
+- [tx-menu] 新增 menu_recommendation_routes.py — AI智能排菜推荐API（3个端点）
+  - POST /generate — 生成菜单推荐方案（四象限/库存/季节/毛利优化）
+  - GET  /history  — 获取历史推荐记录
+  - POST /apply    — 应用推荐方案到菜单
+  - Pydantic V2 模型：DishQuadrant/RecommendationAction/SeasonalTag 枚举 + 完整类型定义
+  - Mock数据含6道示例菜品（明星/金牛/问题/瘦狗各象限覆盖）
+
+### 数据变化
+- 新增共享组件：2个（StatusBar + TableCard）→ 总计16个业务组件
+- 新增后端API模块：1个（menu_recommendation_routes.py）
+- 新增API端点：3个（generate/history/apply）
+
+### 遗留问题
+- AI排菜推荐目前为mock数据，需接入tx-brain（Claude API）实现真正的AI推理
+- TableCard 的 cleaning 状态尚无业务页面使用
+- web-crew 巡台页面尚未接入 TableCard 组件
+
+### 明日计划
+- 创建前端 AI排菜推荐管理页面（web-admin）
+- 接入 tx-brain 实现真正的 AI 排菜推理
+- web-crew 巡台页面接入 TableCard 组件
+- 继续优化 H5 自助点餐页面的共享组件接入
+
+---
+
+## 2026-04-13 (设计系统扩展 + 全端UI统一 + formatPrice迁移)
+
+### 今日完成
+
+**共享设计系统扩展（13个业务组件）**
+- [design-system/biz] 新增 DishManageCard — 管理端菜品卡片（四象限/成本率/库存/操作）
+- [design-system/biz] 新增 MenuSchemePreview — 菜谱方案预览卡片（状态/门店覆盖/版本）
+- [design-system/biz] 新增 OrderTicketCard — KDS/服务员共享出餐工单卡片（超时/催单/状态流）
+- [design-system/biz] 新增 QueueTicket — 排队号牌卡片（叫号/入座/过号/等待时长）
+- [design-system/biz] 已有组件修复：DetailDrawer移除antd依赖 / AddToCartAnimation修复useEffect清理 / SpecSheet必选规格校验
+
+**多端设计系统接入**
+- [web-admin] 接入 @tx-ds 设计系统 + 8个菜单页面迁移formatPrice
+- [web-tv-menu] 接入 @tx-ds + MenuDisplayPage/SpecialDisplayPage使用formatPrice
+- [web-hub] 接入 @tx-ds（配置完成）
+- [web-reception] 接入 @tx-ds（配置完成）
+
+**页面重构**
+- [web-crew/CrewOrderPage] 使用共享 CategoryNav + DishCard + formatPrice
+- [web-kds/DigitalMenuBoardPage] fenToYuan → formatPrice
+- [h5/QueuePreOrderPage] 使用共享 DishCard + CategoryNav + MenuSearch
+- [h5/CollabCart] fenToYuan → formatPrice
+- [web-pos/CashierPage] 添加返回桌台导航按钮
+
+**fenToYuan → formatPrice 全局迁移（161/161 文件，100%完成）**
+- web-admin: 80个页面/组件（finance 11 / analytics 6 / hq 16 / org 6 / hr 8 / trade 5 / supply 3 / franchise 3 / growth 1 / mobile 3 / menu 8 / misc 10）
+- web-pos: 27个页面/组件
+- web-crew: 14个页面
+- miniapp-customer-v2: format.ts 新增 formatPrice 别名 + 测试用例
+- h5-self-order: 2个组件
+- web-kds: 1个页面
+- web-wecom-sidebar: 1个组件（+接入 @tx-ds 设计系统）
+
+**后端API**
+- [tx-menu] 新增 menu_display_routes.py — 3个端点（菜单展示/规格组/批量沽清）
+
+### 数据变化
+- 新增组件：4个（DishManageCard / MenuSchemePreview / OrderTicketCard / QueueTicket）
+- 新增 API 模块：1个（menu_display_routes）
+- 设计系统业务组件：9 → 13 个
+
+### 遗留问题
+- miniapp-customer-v2 因 Taro 架构限制无法直接引用 @tx-ds 组件（已提供 formatPrice 别名）
+- fenToYuan 函数标记为 @deprecated 但未删除（需逐步替换 call sites）
+
+### 明日计划
+- OrderTicketCard 集成到 KDS KitchenBoard 页面
+- QueueTicket 集成到 web-reception QueuePage 页面
+- 逐步替换 fenToYuan call sites 为直接调用 formatPrice
+- miniapp-customer-v2 组件独立重构（Taro 兼容版 DishCard/CartBar）
+
+---
+
+## 2026-04-13 人力中枢能力补齐 — 8大模块全栈开发（对标乐才/I人事替换能力）
+
+### 今日完成
+- **[P0] 钉钉/企微SDK实接**: WeComSDK+DingTalkSDK封装、IM回调handler、预警推送到IM、IMSyncSettingsPage
+- **[P0] 薪资项目库**: v250迁移、7大类71项薪资项、DB持久化CRUD、SalaryItemLibraryPage
+- **[P0] 借调成本分摊**: v251迁移(2表)、TransferCostEngine、8个API端点、TransferListPage+CostReportPage
+- **[P1] 电子签约**: v252迁移(2表)、ESignatureService全流程、e_sign_sdk Mock、12个API端点、3个前端页面
+- **[P1] 积分赛马**: v253迁移(4表)、积分全套CRUD+赛马赛季、PointsAdvisorAgent(3 actions)、3个前端页面
+- **[P1] 绩效打分**: v254迁移(2表)、评审周期+多人打分+校准、10个API端点、3个前端页面
+- **[P2] 薪税申报**: v256迁移、TaxBureauSDK Mock、TaxFilingService、7个API端点、TaxFilingPage
+- **[P2] 考勤合规**: v255迁移、GPS/同设备/加班超时/代打卡检测、AttendanceComplianceAgent、9个API端点、ComplianceAuditPage
+- **[infra]** 新增6个OrgFlags Feature Flags
+
+### 数据变化
+- 迁移版本：v249 → v256（新增7个迁移，13张DB表）
+- 新增SDK：4个（wecom/dingtalk/e_sign/tax_bureau）
+- 新增Agent：2个（points_advisor/attendance_compliance）
+- 新增API端点：~65个 | 新增前端页面：~18个
+
+### 遗留问题
+- SDK需客户提供凭证才能真实调通（企微/钉钉/电子签章/薪税申报）
+- 考勤合规依赖attendance_records扩展GPS/device_id字段
+
+---
+
+## 2026-04-13 员工积分+赛马机制 — DB持久化+赛马赛季+积分兑换+Agent+前端
+
+### 今日完成
+- [shared/db-migrations/v253] 新增4张表：`point_transactions`（积分流水）、`point_rewards`（兑换商品）、`horse_race_seasons`（赛马赛季）、`point_redemptions`（兑换记录），全部含RLS+索引
+- [tx-org/employee_points_service.py] 扩展v253 DB持久化方法：
+  - `award_points_v2` / `deduct_points_v2` — 写入point_transactions表
+  - `get_employee_balance_v2` / `get_points_history_v2` — 余额+流水查询
+  - `get_leaderboard_v2` — 积分排行榜（支持scope过滤）
+  - `redeem_reward` — 积分兑换（余额校验+库存扣减+流水记录）
+  - 兑换商品CRUD：`list_rewards` / `create_reward` / `toggle_reward`
+  - 赛马赛季CRUD：`create_horse_race_season` / `list_horse_race_seasons` / `get_horse_race_season_ranking` / `update_horse_race_status`
+  - `get_points_stats` — 积分统计概览
+- [tx-org/api/points_routes.py] 新增14个API端点（积分发放/扣减/余额/流水/排行/兑换/商品/统计/赛马CRUD）
+- [tx-agent/skills/points_advisor.py] 新增积分激励Agent（PointsAdvisorAgent）：
+  - `auto_award_monthly` — 月度自动积分发放（全勤扫描）
+  - `generate_race_report` — 赛马周报（排名变化+亮点+风险）
+  - `suggest_incentive` — 激励策略建议（低积分关注+不活跃预警）
+- [web-admin] 新增3个前端页面：
+  - `PointsLeaderboardPage` — 积分排行榜（TOP50+统计卡+范围筛选）
+  - `HorseRacePage` — 赛马管理（赛季列表+创建+排名Drawer+状态操作）
+  - `PointsRewardsPage` — 积分兑换商品（CRUD+上下架Switch+兑换统计）
+- [web-admin/api/pointsApi.ts] 新增积分API客户端（14个函数+完整TypeScript类型）
+- 路由注册：tx-org/main.py + hq-hr.tsx + master.py（含intent路由）
+
+### 数据变化
+- 迁移版本：v252 → v253
+- 新增DB表：4个（point_transactions + point_rewards + horse_race_seasons + point_redemptions）
+- 新增API端点：14个（tx-org服务）
+- 新增Agent：1个（points_advisor，3个actions）
+- 新增前端页面：3个 + 1个API客户端
+
+### 遗留问题
+- 赛马赛季目前仅支持积分维度排名，营收/服务评分维度需对接tx-trade和tx-analytics
+- 兑换审批流程（approved_by字段）暂未与审批引擎对接
+- 月度自动积分发放需接入HR Agent Scheduler定时任务
+
+### 明日计划
+- 接入HR Agent Scheduler实现月度自动积分发放
+- 赛马赛季多维度排名对接
 
 ---
 

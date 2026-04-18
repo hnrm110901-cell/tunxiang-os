@@ -369,6 +369,17 @@ except (ImportError, AttributeError) as e:
     _logging.getLogger(__name__).warning(f"table_card_router load failed: {e}")
 
 
+# ── 演示/训练模式（Redis状态管理，不影响真实数据）──
+from .api.training_mode_routes import router as training_mode_router
+
+app.include_router(training_mode_router)
+
+# ── 速点快速点单终端（Kiosk/速点）──
+from .api.kiosk_routes import router as kiosk_router
+
+app.include_router(kiosk_router)
+
+
 @app.get("/health")
 async def health():
     return {"ok": True, "data": {"service": "tx-trade", "version": "4.0.0"}}

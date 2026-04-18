@@ -270,6 +270,39 @@ douyin_voucher:    5/10  （verify/batch-verify/manual-retry/auto-retry/authoriz
 - **Follow-up PR D.3**：将 tx-trade/src/security/rbac.py 提升到 `shared/security/rbac/`，让 tx-member/tx-finance/tx-supply 共用。
 - **Follow-up PR D.4**：把 `write_audit` 失败重试入 Redis Stream，避免极端场景下 DB 连接抖动时审计日志丢失（当前仅 log.error 落盘）。
 
+## 2026-04-18 18:00 Follow-up PR B：GET /api/v1/flags 远程灰度下发端点
+
+### 完成状态
+- [x] **新增 `services/gateway/src/api/flags_routes.py`**（228 行）— `GET /api/v1/flags?domain={trade|agents|edge|growth|member|org|supply|all}`，返回 `{ok, data:{flags: Dict[str,bool]}, error, request_id}`。FlagContext 从 `request.state.tenant_id`（TenantMiddleware 注入）兜底到 `X-Tenant-ID` header，role_code 从 `request.state.role` 或 `X-User-Role` header 取。
+- [x] **进程内 TTL LRU 缓存**（60s / 256 条）— `_TTLCache` 类零第三方依赖，key = `{domain}:{tenant_id}:{role_code}`，存/取均 deepcopy 副本防污染。
+- [x] **错误码**：400 INVALID_DOMAIN / 401 AUTH_MISSING / 500 INTERNAL_ERROR（捕获具体 `yaml.YAMLError / FileNotFoundError / OSError / KeyError`，§XIV 合规无 broad except）。
+- [x] **X-Request-Id UUID v4** 同时放 body 和 `X-Request-Id` header。
+- [x] **FeatureFlagClient 扩展** — `shared/feature_flags/flag_client.py` 新增 `list_by_domain(domain)` + `list_all_domains()` 两个方法（向后兼容，未改现有 API）。
+- [x] **`main.py` 注册路由** — `app.include_router(flags_router)`；Gateway 总路由数从 75 → 77。
+- [x] **TDD 测试 7 条全绿**：`test_flags_routes.py`
+  - domain=trade 含 3 个 A1 flag（pos.settle.hardening/toast/errorBoundary.enable）
+  - 未带 X-Tenant-ID → 401 AUTH_MISSING
+  - domain=unknown → 400 INVALID_DOMAIN
+  - 不同 tenant 缓存独立分桶（key 隔离验证）
+  - request_id 符合 UUID v4 正则 + 响应 header 存在
+  - 缓存命中后 5 次请求 P95 < 100ms（实测单次均 < 10ms）
+  - domain=all 聚合跨域（验证 trade + agent 前缀同时出现）
+- [x] **Ruff 通过** — `ruff check services/gateway/src/api/flags_routes.py services/gateway/src/tests/test_flags_routes.py` All checks passed。pre-existing 错误（main.py I001 + flag_client.py F401 `field`）与本次无关。
+- [x] **Gateway 冷启动 smoke** — `test_main_import_smoke.py` PASSED；新端点 `/api/v1/flags` 正确出现在 `app.routes`。
+
+### 关键决策
+- **不强依赖 Gateway middleware**：路由内手动提取 `tenant_id`（先 state 后 header），使测试不需要拉起完整 middleware 链，也让端点在 `TX_AUTH_ENABLED=false` 的 dev/staging 环境能独立工作。
+- **缓存 key 只含 tenant_id + role_code**：store_id/brand_id 对 A1 三件套无影响（rules 为空列表）。未来若某 flag 需要基于 store_id 灰度，需将 key 升级为包含 store_id 的形态（留 TODO）。
+- **domain=all 聚合**：前端启动时可一次拉取所有域，减少启动 N 次 HTTP 的开销（featureFlags.ts 本期可继续按 domain=trade 调用，但 KDS/admin 扩展时可直接用 all）。
+
+### 下一步
+- 前端 `apps/web-pos/src/config/featureFlags.ts` 的 `/api/v1/flags?domain=trade` 调用在 staging 冒烟，确认 404 降级逻辑不再触发（Follow-up PR B 验收标准）。
+- 计划把 `list_by_domain` 行为加入 `shared/feature_flags` README 接口清单。
+
+### 已知风险
+- **非 Tier 1**：该端点不影响资金路径；但若返回结果错误会导致前端整体功能降级。为此加了严格的 domain 白名单 + UUID v4 request_id + 结构化日志（便于灰度异常追溯）。
+- **缓存一致性**：60s TTL 在紧急关停场景（env var `FEATURE_*=false`）下仍有最多 60s 延迟；紧急关停需额外重启 Gateway 或等缓存自然过期。
+
 ---
 
 ## 2026-04-18 17:00 Sprint C2：KDS 连接健康检测 + 只读模式自动降级

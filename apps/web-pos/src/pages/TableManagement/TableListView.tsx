@@ -1,78 +1,35 @@
 /**
- * æºè½æ¡å°åè¡¨è§å¾
- * ä½¿ç¨Ant Design Tableç»ä»¶å±ç¤ºè¯¦ç»ä¿¡æ¯
+ * 桌台列表视图
+ * 使用 TXScrollList + TXCard 替代 antd Table/Tag/Collapse/Spin
  * @module pages/TableManagement/TableListView
  */
 
-import React, { useMemo, useCallback } from 'react';
+import React, { useMemo, useCallback, useState } from 'react';
 import { Table, Tag, Collapse, Spin } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
+import { TXCard, TXScrollList } from '@tx/touch';
 import {
   CardField,
   TableCardData,
-  TableStatus,
 } from '../../types/table-card';
 import { useTableStore } from '../../stores/tableStore';
+import { getStatusText, getStatusColor, getAlertBgColor } from './tableStatusUtils';
 import styles from './TableManagement.module.css';
 
 /**
- * åè¡¨è§å¾Props
+ * 列表视图Props
  */
 export interface TableListViewProps {
-  /** æ¡å°åè¡¨ */
+  /** 桌台列表 */
   tables: TableCardData[];
-  /** é¨åºID */
+  /** 门店ID */
   storeId: string;
-  /** å è½½ä¸­ç¶æ */
+  /** 加载中状态 */
   loading?: boolean;
 }
 
 /**
- * è·åç¶æå¯¹åºçTagé¢è²
- */
-const getStatusTagColor = (status: TableStatus): string => {
-  const colorMap: Record<TableStatus, string> = {
-    [TableStatus.Empty]: '#52c41a',
-    [TableStatus.Dining]: '#1890ff',
-    [TableStatus.Reserved]: '#faad14',
-    [TableStatus.PendingCheckout]: '#ff4d4f',
-    [TableStatus.PendingCleanup]: '#d9d9d9',
-  };
-  return colorMap[status];
-};
-
-/**
- * è·åç¶ææ¾ç¤ºææ¬
- */
-const getStatusText = (status: TableStatus): string => {
-  const statusMap: Record<TableStatus, string> = {
-    [TableStatus.Empty]: 'ç©ºå°',
-    [TableStatus.Dining]: 'ç¨é¤ä¸­',
-    [TableStatus.Reserved]: 'å·²é¢è®¢',
-    [TableStatus.PendingCheckout]: 'å¾ç»è´¦',
-    [TableStatus.PendingCleanup]: 'å¾æ¸å°',
-  };
-  return statusMap[status];
-};
-
-/**
- * è·ååè­¦çº§å«å¯¹åºçèæ¯è²
- */
-const getAlertColor = (alert: string): string => {
-  switch (alert) {
-    case 'critical':
-      return '#fff2f0';
-    case 'warning':
-      return '#fffbe6';
-    case 'info':
-      return '#e6f7ff';
-    default:
-      return 'transparent';
-  }
-};
-
-/**
- * ç¡®å®è¡çåè­¦çº§å«ï¼critical > warning > info > normalï¼
+ * 确定行的预警级别（critical > warning > info > normal）
  */
 const getRowAlertLevel = (fields: CardField[]): string => {
   const alerts = fields.map((f) => f.alert);
@@ -83,48 +40,158 @@ const getRowAlertLevel = (fields: CardField[]): string => {
 };
 
 /**
- * å­æ®µå±ç¤ºå¡çç»ä»¶
+ * 区域折叠面板（替代 antd Collapse）
  */
-const FieldCard: React.FC<{
-  field: CardField;
-  onFieldClick: (field: CardField) => void;
-}> = ({ field, onFieldClick }) => (
-  <div
-    style={{
-      padding: '12px',
-      borderRadius: '4px',
-      background: getAlertColor(field.alert),
-      border: '1px solid #d9d9d9',
-      cursor: 'pointer',
-      transition: 'all 0.2s ease',
-    }}
-    onClick={() => onFieldClick(field)}
-    role="button"
-    tabIndex={0}
-    onKeyDown={(e) => {
-      if (e.key === 'Enter' || e.key === ' ') {
-        onFieldClick(field);
-      }
-    }}
-    onMouseEnter={(e) => {
-      e.currentTarget.style.boxShadow = '0 3px 6px rgba(0, 0, 0, 0.1)';
-    }}
-    onMouseLeave={(e) => {
-      e.currentTarget.style.boxShadow = 'none';
-    }}
-  >
-    <div style={{ fontSize: '12px', color: '#595959', marginBottom: '4px' }}>
-      {field.label}
+const AreaPanel: React.FC<{
+  area: string;
+  tables: TableCardData[];
+  onFieldClick: (tableNo: string, field: CardField) => void;
+}> = ({ area, tables, onFieldClick }) => {
+  const [expanded, setExpanded] = useState(true);
+
+  return (
+    <div style={{ marginBottom: 12, borderRadius: 8, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.10)' }}>
+      {/* 折叠标题 */}
+      <button
+        type="button"
+        onClick={() => setExpanded((v) => !v)}
+        style={{
+          width: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 12,
+          padding: '12px 16px',
+          background: 'rgba(255,255,255,0.04)',
+          border: 'none',
+          cursor: 'pointer',
+          textAlign: 'left',
+          minHeight: 56,
+          fontFamily: 'inherit',
+        }}
+      >
+        <span style={{ fontWeight: 600, fontSize: 16, color: '#fff' }}>{area}</span>
+        <span style={{
+          padding: '2px 10px',
+          borderRadius: 12,
+          background: 'rgba(255,107,53,0.18)',
+          color: '#FF6B35',
+          fontSize: 14,
+          fontWeight: 600,
+        }}>
+          {tables.length} 桌
+        </span>
+        <span style={{ marginLeft: 'auto', color: 'rgba(255,255,255,0.45)', fontSize: 18 }}>
+          {expanded ? '▲' : '▼'}
+        </span>
+      </button>
+
+      {/* 展开内容 — 桌台行列表 */}
+      {expanded && (
+        <div>
+          {/* 表头 */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: '80px 100px 60px 120px 1fr',
+            gap: 8,
+            padding: '8px 16px',
+            background: 'rgba(255,255,255,0.02)',
+            borderBottom: '1px solid rgba(255,255,255,0.06)',
+            fontSize: 14,
+            color: 'rgba(255,255,255,0.45)',
+            fontWeight: 600,
+          }}>
+            <span>桌号</span>
+            <span>区域</span>
+            <span>座位</span>
+            <span>状态</span>
+            <span>关键字段</span>
+          </div>
+          <TXScrollList
+            data={tables}
+            keyExtractor={(t) => t.table_no}
+            renderItem={(table) => {
+              const alertLevel = getRowAlertLevel(table.card_fields);
+              const rowBg = alertLevel === 'critical'
+                ? 'rgba(163,45,45,0.10)'
+                : alertLevel === 'warning'
+                  ? 'rgba(186,117,23,0.10)'
+                  : alertLevel === 'info'
+                    ? 'rgba(24,95,165,0.10)'
+                    : 'transparent';
+
+              const topFields = [...table.card_fields]
+                .sort((a, b) => b.priority - a.priority)
+                .slice(0, 3);
+
+              return (
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: '80px 100px 60px 120px 1fr',
+                  gap: 8,
+                  padding: '12px 16px',
+                  borderBottom: '1px solid rgba(255,255,255,0.05)',
+                  background: rowBg,
+                  alignItems: 'center',
+                  minHeight: 56,
+                }}>
+                  <span style={{ fontWeight: 600, fontSize: 16, color: '#fff' }}>
+                    {table.table_no}
+                  </span>
+                  <span style={{ fontSize: 16, color: 'rgba(255,255,255,0.65)' }}>
+                    {table.area}
+                  </span>
+                  <span style={{ fontSize: 16, color: 'rgba(255,255,255,0.65)' }}>
+                    {table.seats} 座
+                  </span>
+                  {/* 状态标签（替代 antd Tag） */}
+                  <span style={{
+                    display: 'inline-block',
+                    padding: '4px 10px',
+                    borderRadius: 6,
+                    background: getStatusColor(table.status),
+                    color: '#fff',
+                    fontSize: 14,
+                    fontWeight: 600,
+                    textAlign: 'center',
+                  }}>
+                    {getStatusText(table.status)}
+                  </span>
+                  {/* 关键字段标签组（替代 antd Tag） */}
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                    {topFields.map((field) => (
+                      <button
+                        key={field.key}
+                        type="button"
+                        onClick={() => onFieldClick(table.table_no, field)}
+                        style={{
+                          padding: '4px 10px',
+                          borderRadius: 6,
+                          background: getAlertBgColor(field.alert),
+                          border: '1px solid rgba(255,255,255,0.12)',
+                          cursor: 'pointer',
+                          fontSize: 13,
+                          color: '#fff',
+                          fontFamily: 'inherit',
+                          minHeight: 32,
+                        }}
+                      >
+                        {field.label}: {field.value}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              );
+            }}
+          />
+        </div>
+      )}
     </div>
-    <div style={{ fontSize: '16px', fontWeight: '600', color: '#262626' }}>
-      {field.value}
-    </div>
-  </div>
-);
+  );
+};
 
 /**
- * åè¡¨è§å¾ç»ä»¶
- * ä½¿ç¨Ant Design Tableå±ç¤ºæ¡å°åè¡¨ï¼æ¯æå±å¼æ¥çè¯¦æ
+ * 列表视图组件
+ * 使用 TXScrollList + 原生折叠面板替代 antd Table/Collapse
  */
 export const TableListView: React.FC<TableListViewProps> = ({
   tables,
@@ -140,7 +207,7 @@ export const TableListView: React.FC<TableListViewProps> = ({
     [storeId, trackFieldClick]
   );
 
-  // æåºååç»
+  // 按区域分组
   const groupedTables = useMemo(() => {
     const groups = new Map<string, TableCardData[]>();
     tables.forEach((table) => {
@@ -152,108 +219,6 @@ export const TableListView: React.FC<TableListViewProps> = ({
     return groups;
   }, [tables]);
 
-  // å®ä¹è¡¨æ ¼å
-  const columns: ColumnsType<TableCardData> = useMemo(
-    () => [
-      {
-        title: 'æ¡å·',
-        dataIndex: 'table_no',
-        key: 'table_no',
-        width: 80,
-        render: (text) => <span style={{ fontWeight: '600', fontSize: '16px' }}>{text}</span>,
-      },
-      {
-        title: 'åºå',
-        dataIndex: 'area',
-        key: 'area',
-        width: 100,
-      },
-      {
-        title: 'åº§ä½',
-        dataIndex: 'seats',
-        key: 'seats',
-        width: 60,
-        render: (seats) => `${seats} åº§`,
-      },
-      {
-        title: 'ç¶æ',
-        dataIndex: 'status',
-        key: 'status',
-        width: 100,
-        render: (status: TableStatus) => (
-          <Tag
-            color={getStatusTagColor(status)}
-            style={{ margin: 0, borderRadius: '4px', padding: '4px 8px' }}
-          >
-            {getStatusText(status)}
-          </Tag>
-        ),
-      },
-      {
-        title: 'å³é®å­æ®µ',
-        dataIndex: 'card_fields',
-        key: 'card_fields',
-        render: (fields: CardField[]) => {
-          // æ¾ç¤ºå3ä¸ªä¼åçº§æé«çå­æ®µ
-          const topFields = fields
-            .sort((a, b) => b.priority - a.priority)
-            .slice(0, 3);
-          return (
-            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-              {topFields.map((field) => (
-                <Tag
-                  key={field.key}
-                  style={{
-                    background: getAlertColor(field.alert),
-                    border: `1px solid #d9d9d9`,
-                    cursor: 'pointer',
-                    borderRadius: '4px',
-                    padding: '4px 8px',
-                    margin: 0,
-                  }}
-                  onClick={() => handleFieldClick(fields[0].key, field)}
-                >
-                  <span style={{ fontSize: '12px', color: '#262626' }}>
-                    {field.label}: {field.value}
-                  </span>
-                </Tag>
-              ))}
-            </div>
-          );
-        },
-      },
-    ],
-    [handleFieldClick]
-  );
-
-  // è¡å±å¼åå®¹
-  const expandedRowRender = (record: TableCardData) => {
-    const sortedFields = record.card_fields.sort((a, b) => b.priority - a.priority);
-    return (
-      <div className={styles.expandedRow}>
-        {sortedFields.map((field) => (
-          <FieldCard
-            key={field.key}
-            field={field}
-            onFieldClick={() => handleFieldClick(record.table_no, field)}
-          />
-        ))}
-      </div>
-    );
-  };
-
-  // è¡classNameå¤ç
-  const rowClassName = (record: TableCardData) => {
-    const alertLevel = getRowAlertLevel(record.card_fields);
-    const alertClassName = {
-      critical: styles.criticalAlert,
-      warning: styles.warningAlert,
-      info: styles.infoAlert,
-      normal: styles.normalAlert,
-    };
-    return `${styles.tableRow} ${alertClassName[alertLevel as keyof typeof alertClassName]}`;
-  };
-
   if (loading) {
     return (
       <div
@@ -263,10 +228,12 @@ export const TableListView: React.FC<TableListViewProps> = ({
           alignItems: 'center',
           height: '100%',
           gap: '16px',
+          color: 'rgba(255,255,255,0.65)',
+          fontSize: 16,
         }}
       >
-        <Spin />
-        <span>å è½½ä¸­...</span>
+        <span style={{ fontSize: 24 }}>⟳</span>
+        <span>加载中...</span>
       </div>
     );
   }
@@ -281,46 +248,28 @@ export const TableListView: React.FC<TableListViewProps> = ({
           justifyContent: 'center',
           height: '100%',
           gap: '16px',
-          color: '#595959',
+          color: 'rgba(255,255,255,0.45)',
+          fontSize: 16,
         }}
       >
-        <div style={{ fontSize: '48px', opacity: 0.4 }}>ð</div>
-        <div>ææ æ¡å°æ°æ®</div>
+        <div style={{ fontSize: '48px', opacity: 0.4 }}>🪑</div>
+        <div>暂无桌台数据</div>
       </div>
     );
   }
 
   return (
     <div className={styles.listViewContainer}>
-      {groupedTables.size > 0 ? (
-        <Collapse
-          items={Array.from(groupedTables.entries()).map(([area, areaTables]) => ({
-            key: area,
-            label: (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <span style={{ fontWeight: '600', fontSize: '14px' }}>{area}</span>
-                <Tag>{areaTables.length} å¼ </Tag>
-              </div>
-            ),
-            children: (
-              <Table
-                columns={columns}
-                dataSource={areaTables}
-                rowKey="table_no"
-                pagination={false}
-                expandable={{
-                  expandedRowRender,
-                  defaultExpandedRowKeys: [],
-                }}
-                rowClassName={rowClassName}
-                style={{ marginBottom: 0 }}
-                size="small"
-              />
-            ),
-          }))}
-          accordion
-        />
-      ) : null}
+      {groupedTables.size > 0
+        ? Array.from(groupedTables.entries()).map(([area, areaTables]) => (
+            <AreaPanel
+              key={area}
+              area={area}
+              tables={areaTables}
+              onFieldClick={handleFieldClick}
+            />
+          ))
+        : null}
     </div>
   );
 };

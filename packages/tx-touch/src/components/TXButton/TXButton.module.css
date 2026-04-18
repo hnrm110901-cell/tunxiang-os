@@ -1,0 +1,113 @@
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+  font-weight: 600;
+  font-size: 17px;
+  border-radius: var(--tx-radius-md);
+  transition: transform 200ms ease, filter 200ms ease, opacity 200ms ease;
+  white-space: nowrap;
+  position: relative;
+  /* 防止文字选中误触 */
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  /* 默认高度：符合触控安全区 */
+  min-height: var(--tx-tap-rec); /* 56px */
+  padding: 0 24px;
+  letter-spacing: 0.01em;
+}
+
+/* ─── 按压反馈（触控设备核心交互，无hover） ─── */
+.btn:not(:disabled):active {
+  transform: scale(0.97);
+  filter: brightness(0.92);
+}
+
+/* ─── 禁用态 ─── */
+.btn:disabled {
+  opacity: 0.4;
+  pointer-events: none;
+  cursor: not-allowed;
+}
+
+/* ─── Sizes ─── */
+.normal {
+  min-height: var(--tx-tap-rec); /* 56px */
+  font-size: 17px;
+}
+
+.large {
+  min-height: var(--tx-tap-lg); /* 72px */
+  font-size: 18px;
+  padding: 0 32px;
+}
+
+.fullwidth {
+  min-height: var(--tx-tap-rec); /* 56px */
+  width: 100%;
+  font-size: 17px;
+}
+
+/* ─── Variants ─── */
+.primary {
+  background: var(--tx-primary);
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(255, 107, 53, 0.3);
+}
+
+.secondary {
+  background: var(--tx-bg-1);
+  color: var(--tx-primary);
+  border: 2px solid var(--tx-primary);
+}
+
+.danger {
+  background: var(--tx-danger);
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(163, 45, 45, 0.25);
+}
+
+.ghost {
+  background: transparent;
+  color: #fff;
+  border: 2px solid rgba(255, 255, 255, 0.85);
+}
+
+/* ─── 加载中圆圈 ─── */
+.loadingIcon {
+  width: 20px;
+  height: 20px;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: tx-btn-spin 600ms linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes tx-btn-spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+/* ─── 角标 badge ─── */
+.badge {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border-radius: 10px;
+  background: var(--tx-danger);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 20px;
+  text-align: center;
+  pointer-events: none;
+}

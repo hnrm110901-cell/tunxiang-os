@@ -61,7 +61,7 @@ const CartBar: React.FC<CartBarProps> = ({ totalFen, count, onViewCart, onChecko
                 width: '64rpx',
                 height: '64rpx',
                 borderRadius: '32rpx',
-                background: '#FF6B2C',
+                background: '#FF6B35',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -105,7 +105,7 @@ const CartBar: React.FC<CartBarProps> = ({ totalFen, count, onViewCart, onChecko
           <View>
             <Text
               style={{
-                color: '#FF6B2C',
+                color: '#FF6B35',
                 fontSize: '36rpx',
                 fontWeight: '700',
               }}
@@ -127,7 +127,7 @@ const CartBar: React.FC<CartBarProps> = ({ totalFen, count, onViewCart, onChecko
         {/* Right: checkout button */}
         <View
           style={{
-            background: canCheckout ? '#FF6B2C' : '#2A4050',
+            background: canCheckout ? '#FF6B35' : '#2A4050',
             borderRadius: '44rpx',
             height: '88rpx',
             minWidth: '216rpx',

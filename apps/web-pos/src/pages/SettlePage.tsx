@@ -26,6 +26,7 @@ import CustomerBrainPanel from '../components/CustomerBrainPanel';
 import { CouponEligibleSheet } from '../components/CouponEligibleSheet';
 import { useCouponEligibility } from '../hooks/useCouponEligibility';
 import { formatPrice } from '@tx-ds/utils';
+import { useKeyboardShortcuts, POS_SHORTCUTS } from '../hooks/useKeyboardShortcuts';
 
 // ── 账单规则类型 ──────────────────────────────────────────────────────────────
 
@@ -206,7 +207,6 @@ export function SettlePage() {
         // 兼容同步调用点：payRes.data 是 {payment_id, payment_no}，本分支不依赖
         // 仅当非 queued 才触达这里
         // （无需额外操作）
-        void payRes;
       }
 
       // 2. 结算订单
@@ -249,6 +249,34 @@ export function SettlePage() {
       setPaying(false);
     }
   };
+
+  /* ── 键盘快捷键（结账页）── */
+  useKeyboardShortcuts([
+    {
+      key: POS_SHORTCUTS.ESCAPE.key,        // Escape — 返回点餐
+      label: '返回点餐页面',
+      handler: () => navigate(-1),
+      disabled: paying,
+    },
+    {
+      key: POS_SHORTCUTS.QUICK_CASH.key,    // Ctrl+Enter — 快速现金结账
+      label: POS_SHORTCUTS.QUICK_CASH.description,
+      handler: () => { if (!paying && finalFen > 0) { void handlePay('cash'); } },
+      disabled: paying || finalFen <= 0,
+    },
+    {
+      key: POS_SHORTCUTS.PRINT.key,         // F8 — 打印账单
+      label: POS_SHORTCUTS.PRINT.description,
+      handler: () => {
+        if (orderId) {
+          apiPrintReceipt(orderId)
+            .then(({ content_base64 }) => bridgePrint(content_base64))
+            .catch(() => {});
+        }
+      },
+      disabled: !orderId,
+    },
+  ], { activeContext: 'settle' });
 
   return (
     <div style={{ display: 'flex', height: '100vh', background: '#0B1A20', color: '#fff' }}>

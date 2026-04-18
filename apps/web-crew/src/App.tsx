@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, Link, useLocation } from 'react-router-dom';
 import { getStoreToken } from './api/index';
 import { CrewLoginPage } from './pages/CrewLoginPage';
+import { TXAgentAlert, type TXAgentAlertProps } from '@tx/touch';
 import { TablesView } from './pages/TablesView';
 import { QuickOrderView } from './pages/QuickOrderView';
 import { ActiveOrdersView } from './pages/ActiveOrdersView';
@@ -87,47 +88,103 @@ import { PatrolExecutionPage } from './pages/manager/PatrolExecutionPage';
 import { MobilePurchasePage } from './pages/supply/MobilePurchasePage';
 import { MobileStocktakePage } from './pages/supply/MobileStocktakePage';
 
+// ─── Agent 预警数据结构（后续接 WebSocket 推送，暂用 mock 空数组）───────────
+interface AgentAlert extends TXAgentAlertProps {
+  id: string;
+}
+
+// ─── Tab 图标（Unicode emoji / 文字符号）────────────────────────────────────
 const tabs = [
-  { path: '/tables',   label: '桌台',   icon: 'T' },
-  { path: '/order',    label: '点餐',   icon: 'O' },
-  { path: '/active',   label: '进行中', icon: 'A' },
-  { path: '/schedule', label: '排班',   icon: 'S' },
-  { path: '/cruise',   label: '巡航',   icon: 'C' },
-  { path: '/delivery', label: '外卖',   icon: 'D' },
-  { path: '/profile',  label: '我的',   icon: 'P' },
+  { path: '/tables',   label: '桌台',   icon: '🏠' },
+  { path: '/order',    label: '点餐',   icon: '📋' },
+  { path: '/active',   label: '进行中', icon: '⚡' },
+  { path: '/schedule', label: '排班',   icon: '📅' },
+  { path: '/cruise',   label: '巡航',   icon: '🚶' },
+  { path: '/delivery', label: '外卖',   icon: '🛵' },
+  { path: '/profile',  label: '我的',   icon: '👤' },
 ];
 
+/**
+ * BottomTab — 底部导航栏（固定，高度56px，图标触控区48×48px）
+ * 单手拇指可达，7个Tab，不超出屏幕宽度
+ */
 function BottomTab() {
   const loc = useLocation();
   // 在全屏子页面中隐藏底栏
-  const hiddenPaths = ['/open-table', '/order-full', '/rush', '/table-ops', '/member', '/complaint', '/service-confirm', '/peak-alert', '/order-status', '/table-detail', '/table-side-pay', '/seat-split', '/crew-stats', '/manager-app', '/receiving', '/stocktake', '/handover', '/route-optimize', '/shift-schedule', '/dish-recognize', '/shift-summary', '/self-pay-link', '/discount-request', '/scan-pay', '/stored-value-recharge', '/printer-settings', '/waitlist', '/member-level-config', '/group-dashboard', '/store-detail', '/live-seafood', '/reservations', '/daily-settlement', '/shift-handover', '/issue-report', '/member-lookup', '/member-points', '/member/', '/approvals', '/manager-dashboard', '/manager/', '/urge', '/schedule-clock', '/me', '/store/', '/supply/'];
+  const hiddenPaths = [
+    '/open-table', '/order-full', '/rush', '/table-ops', '/member', '/complaint',
+    '/service-confirm', '/peak-alert', '/order-status', '/table-detail', '/table-side-pay',
+    '/seat-split', '/crew-stats', '/manager-app', '/receiving', '/stocktake', '/handover',
+    '/route-optimize', '/shift-schedule', '/dish-recognize', '/shift-summary', '/self-pay-link',
+    '/discount-request', '/scan-pay', '/stored-value-recharge', '/printer-settings', '/waitlist',
+    '/member-level-config', '/group-dashboard', '/store-detail', '/live-seafood', '/reservations',
+    '/daily-settlement', '/shift-handover', '/issue-report', '/member-lookup', '/member-points',
+    '/member/', '/approvals', '/manager-dashboard', '/manager/', '/urge', '/schedule-clock',
+    '/me', '/store/', '/supply/',
+  ];
   const shouldHide = hiddenPaths.some(p => loc.pathname.startsWith(p));
   if (shouldHide) return null;
 
   return (
-    <nav style={{
-      position: 'fixed', bottom: 0, left: 0, right: 0, display: 'flex',
-      background: '#112228', borderTop: '1px solid #1a2a33', padding: '8px 0',
-      zIndex: 50,
-    }}>
+    <nav
+      role="tablist"
+      style={{
+        position: 'fixed',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        display: 'flex',
+        background: '#112228',
+        borderTop: '1px solid #1a2a33',
+        // 56px 内容区 + iOS safe area
+        paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+        zIndex: 50,
+        WebkitTapHighlightColor: 'transparent',
+      }}
+    >
       {tabs.map(t => {
-        const isActive = loc.pathname === t.path;
+        const isActive = loc.pathname === t.path || loc.pathname.startsWith(t.path + '/');
         return (
-          <Link key={t.path} to={t.path} style={{
-            flex: 1, textAlign: 'center', textDecoration: 'none',
-            fontSize: 16, color: isActive ? '#FF6B2C' : '#64748b',
-            display: 'flex', flexDirection: 'column', alignItems: 'center',
-            gap: 2, minHeight: 48, justifyContent: 'center',
-          }}>
-            <span style={{
-              width: 28, height: 28, borderRadius: 6,
-              background: isActive ? 'rgba(255,107,44,0.15)' : 'transparent',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 16, fontWeight: 700,
-            }}>
+          <Link
+            key={t.path}
+            to={t.path}
+            role="tab"
+            aria-selected={isActive}
+            style={{
+              flex: 1,
+              textAlign: 'center',
+              textDecoration: 'none',
+              color: isActive ? 'var(--tx-primary, #FF6B35)' : '#64748b',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              // 总高度56px（图标24px + gap4px + 文字16px + padding各4px = 52px → min 56px）
+              minHeight: 56,
+              paddingTop: 6,
+              paddingBottom: 6,
+              gap: 2,
+            }}
+          >
+            {/* 图标触控区 ≥ 48×48px */}
+            <span
+              style={{
+                width: 48,
+                height: 28,
+                borderRadius: 8,
+                background: isActive ? 'rgba(255,107,53,0.15)' : 'transparent',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: 20,
+                lineHeight: 1,
+              }}
+            >
               {t.icon}
             </span>
-            <span style={{ fontSize: 16 }}>{t.label}</span>
+            <span style={{ fontSize: 16, fontWeight: isActive ? 600 : 400, lineHeight: 1 }}>
+              {t.label}
+            </span>
           </Link>
         );
       })}
@@ -137,6 +194,8 @@ function BottomTab() {
 
 export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(() => !!getStoreToken());
+  // Agent 预警条状态（暂用空数组，后续接 WebSocket 推送替换为 useState）
+  const agentAlerts: AgentAlert[] = [];
 
   if (!isLoggedIn) {
     return <CrewLoginPage onLogin={() => setIsLoggedIn(true)} />;
@@ -145,6 +204,16 @@ export default function App() {
   return (
     <BrowserRouter>
       <div style={{ background: '#0B1A20', minHeight: '100vh', color: '#fff', paddingBottom: 64 }}>
+        {/* Agent 预警条（有预警时显示在最顶部，高度动态，推送来源：折扣守护/出餐调度等） */}
+        {agentAlerts.length > 0 && (
+          <TXAgentAlert
+            agentName={agentAlerts[0].agentName}
+            message={agentAlerts[0].message}
+            severity={agentAlerts[0].severity}
+            onAction={agentAlerts[0].onAction}
+            actionLabel={agentAlerts[0].actionLabel}
+          />
+        )}
         {/* 传菜员全桌上齐通知（固定顶部横幅，WebSocket实时推送） */}
         <TableServedNotice />
         {/* 服务铃实时响应（固定右下角悬浮角标） */}

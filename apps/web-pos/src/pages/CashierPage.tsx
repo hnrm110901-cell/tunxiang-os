@@ -20,6 +20,9 @@ import { LiveSeafoodOrderSheet } from '../components/LiveSeafoodOrderSheet';
 import { ComboSelectorSheet } from '../components/ComboSelectorSheet';
 import type { LiveSeafoodOrderSheetProps } from '../components/LiveSeafoodOrderSheet';
 import type { ComboSelectorSheetProps } from '../components/ComboSelectorSheet';
+import { useKeyboardShortcuts, POS_SHORTCUTS } from '../hooks/useKeyboardShortcuts';
+import { KeyboardShortcutHelp } from '../components/KeyboardShortcutHelp';
+import { ShortcutOverlay } from '../components/ShortcutOverlay';
 
 // ─── 扩展菜品类型（增加活鲜/套餐字段）────────────────────────────────────────
 
@@ -164,6 +167,7 @@ export function CashierPage() {
   const [dishes, setDishes] = useState<ExtendedDishItem[]>(FALLBACK_DISHES);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState('all');
+  const [showHelpPanel, setShowHelpPanel] = useState(false);
 
   // 活鲜弹层状态
   const [seafoodSheet, setSeafoodSheet] = useState<{
@@ -176,6 +180,56 @@ export function CashierPage() {
     visible: boolean;
     dish: ExtendedDishItem | null;
   }>({ visible: false, dish: null });
+
+  /* ── 键盘快捷键（收银页面）── */
+  const { altPressed, shortcuts, activeKey } = useKeyboardShortcuts([
+    {
+      key: POS_SHORTCUTS.CHECKOUT.key,      // F2
+      label: POS_SHORTCUTS.CHECKOUT.description,
+      handler: () => items.length > 0 ? navigate(`/settle/${orderId ?? 'temp'}`) : undefined,
+      disabled: items.length === 0,
+    },
+    {
+      key: POS_SHORTCUTS.VOID_ORDER.key,    // F3
+      label: POS_SHORTCUTS.VOID_ORDER.description,
+      handler: () => { store.clear(); navigate('/tables'); },
+    },
+    {
+      key: POS_SHORTCUTS.TABLE_MAP.key,     // F5
+      label: '返回桌台地图',
+      handler: () => { store.clear(); navigate('/tables'); },
+    },
+    {
+      key: POS_SHORTCUTS.SEARCH_DISH.key,   // Ctrl+F
+      label: POS_SHORTCUTS.SEARCH_DISH.description,
+      handler: () => {
+        // 聚焦搜索框（MenuSearch内部input）
+        const input = document.querySelector<HTMLInputElement>('input[placeholder*="搜索"]');
+        input?.focus();
+        input?.select();
+      },
+    },
+    {
+      key: POS_SHORTCUTS.QUICK_CASH.key,    // Ctrl+Enter
+      label: POS_SHORTCUTS.QUICK_CASH.description,
+      handler: () => items.length > 0 ? navigate(`/settle/${orderId ?? 'temp'}`) : undefined,
+      disabled: items.length === 0,
+    },
+    {
+      key: POS_SHORTCUTS.HELP.key,          // Ctrl+/
+      label: POS_SHORTCUTS.HELP.description,
+      handler: () => setShowHelpPanel((v) => !v),
+    },
+    {
+      key: POS_SHORTCUTS.ESCAPE.key,        // Escape
+      label: POS_SHORTCUTS.ESCAPE.description,
+      handler: () => {
+        if (seafoodSheet.visible) { setSeafoodSheet({ visible: false, dish: null }); return; }
+        if (comboSheet.visible) { setComboSheet({ visible: false, dish: null }); return; }
+        if (searchQuery) { setSearchQuery(''); return; }
+      },
+    },
+  ], { activeContext: 'cashier' });
 
   // 加载菜品（API优先，失败回退 mock）+ 自动开单
   useEffect(() => {
@@ -377,6 +431,15 @@ export function CashierPage() {
   // ── 渲染 ─────────────────────────────────────────────────────────────────────
 
   return (
+    <>
+      {/* Alt键快捷键浮层 */}
+      <ShortcutOverlay visible={altPressed} shortcuts={shortcuts} />
+      {/* Ctrl+/ 快捷键帮助面板 */}
+      <KeyboardShortcutHelp
+        visible={showHelpPanel}
+        onClose={() => setShowHelpPanel(false)}
+        activeKey={activeKey}
+      />
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: 'var(--tx-bg, #0B1A20)', color: '#fff', fontFamily: '-apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", sans-serif' }}>
 
       {/* ── 顶部：返回 + 搜索 + 桌号信息 ── */}
@@ -492,5 +555,6 @@ export function CashierPage() {
         />
       )}
     </div>
+    </>
   );
 }

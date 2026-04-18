@@ -1,7 +1,7 @@
 /**
  * 协议单位管理
  * 路由：/finance/agreement-units
- * 5个Tab：单位档案 / 挂账还款 / 还款记录 / 预付管理 / 账龄分析
+ * 6个Tab：单位档案 / 挂账还款 / 还款记录 / 预付管理 / 月结对账 / 账龄分析
  *
  * 技术栈：Ant Design 5.x + ProComponents（Admin终端规范）
  */
@@ -31,6 +31,7 @@ import {
 import {
   CheckCircleOutlined,
   DollarOutlined,
+  DownloadOutlined,
   ExclamationCircleOutlined,
   MinusCircleOutlined,
   PauseCircleOutlined,
@@ -124,7 +125,7 @@ const txnTypeTag = (type: string) => {
 
 // ─── 主页面 ───────────────────────────────────────────────────────────────────
 
-type TabKey = 'units' | 'charge-repay' | 'repay-records' | 'prepaid' | 'aging';
+type TabKey = 'units' | 'charge-repay' | 'repay-records' | 'prepaid' | 'monthly-reconcile' | 'aging';
 
 export function AgreementUnitPage() {
   const [activeTab, setActiveTab] = useState<TabKey>('units');
@@ -134,6 +135,7 @@ export function AgreementUnitPage() {
     { key: 'charge-repay', label: '挂账还款' },
     { key: 'repay-records', label: '还款记录' },
     { key: 'prepaid', label: '预付管理' },
+    { key: 'monthly-reconcile', label: '月结对账' },
     { key: 'aging', label: '账龄分析' },
   ];
 
@@ -178,6 +180,7 @@ export function AgreementUnitPage() {
       {activeTab === 'charge-repay' && <ChargeRepayTab />}
       {activeTab === 'repay-records' && <RepayRecordsTab />}
       {activeTab === 'prepaid' && <PrepaidTab />}
+      {activeTab === 'monthly-reconcile' && <MonthlyReconciliationTab />}
       {activeTab === 'aging' && <AgingTab />}
     </div>
   );
@@ -1056,6 +1059,36 @@ function RepayRecordsTab() {
       }}
       search={{ labelWidth: 'auto' }}
       pagination={{ defaultPageSize: 20 }}
+      toolBarRender={() => [
+        <Button
+          key="export"
+          icon={<DownloadOutlined />}
+          onClick={() => {
+            // 触发 ProTable 内置导出（将所有数据拼成 CSV 后下载）
+            const timestamp = new Date().toISOString().slice(0, 10);
+            const filename = `还款记录_${timestamp}.csv`;
+            fetch('/api/v1/agreement-units/report/repay-export', { headers: HEADERS })
+              .then((res) => {
+                if (!res.ok) throw new Error('导出失败');
+                return res.blob();
+              })
+              .then((blob) => {
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                a.click();
+                URL.revokeObjectURL(url);
+              })
+              .catch(() => {
+                // 后端导出接口不可用时，降级为客户端 CSV 导出提示
+                message.info('导出功能需要后端支持，请联系管理员配置导出接口');
+              });
+          }}
+        >
+          导出 Excel
+        </Button>,
+      ]}
     />
   );
 }
@@ -1378,6 +1411,356 @@ function AgingTab() {
         }}
       />
     </>
+  );
+}
+
+// ─── Tab 5: 月结对账 ──────────────────────────────────────────────────────────
+
+interface MonthlyBillItem {
+  unit_id: string;
+  unit_name: string;
+  contact_name?: string;
+  month: string;
+  total_consumed_fen: number;
+  paid_fen: number;
+  unpaid_fen: number;
+  status: 'pending' | 'partial' | 'settled';
+}
+
+function MonthlyReconciliationTab() {
+  const actionRef = useRef<ActionType>();
+  const [selectedMonth, setSelectedMonth] = useState<string>(
+    new Date().toISOString().slice(0, 7),
+  );
+  const [selectedUnitId, setSelectedUnitId] = useState<string>('');
+  const [units, setUnits] = useState<{ value: string; label: string }[]>([]);
+  const [summaryTotals, setSummaryTotals] = useState({
+    total_consumed_fen: 0,
+    paid_fen: 0,
+    unpaid_fen: 0,
+  });
+
+  // 加载单位列表（用于筛选下拉）
+  useState(() => {
+    fetch('/api/v1/agreement-units?size=200', { headers: HEADERS })
+      .then((r) => r.json())
+      .then((json) => {
+        const items: AgreementUnit[] = json.data?.items ?? [];
+        setUnits([
+          { value: '', label: '全部单位' },
+          ...items.map((u) => ({ value: u.id, label: u.name })),
+        ]);
+      })
+      .catch(() => {});
+  });
+
+  const billStatusTag = (status: string) => {
+    const map: Record<string, { color: string; label: string }> = {
+      pending: { color: 'orange', label: '待结清' },
+      partial: { color: 'gold', label: '部分结清' },
+      settled: { color: 'green', label: '已结清' },
+    };
+    const s = map[status] ?? { color: 'default', label: status };
+    return <Tag color={s.color}>{s.label}</Tag>;
+  };
+
+  const columns: ProColumns<MonthlyBillItem>[] = [
+    {
+      title: '企业名称',
+      dataIndex: 'unit_name',
+      fixed: 'left' as const,
+      render: (_, r) => (
+        <Space direction="vertical" size={0}>
+          <Text strong>{r.unit_name}</Text>
+          {r.contact_name && (
+            <Text type="secondary" style={{ fontSize: 12 }}>{r.contact_name}</Text>
+          )}
+        </Space>
+      ),
+    },
+    {
+      title: '本月消费',
+      dataIndex: 'total_consumed_fen',
+      search: false,
+      render: (_, r) => (
+        <Text strong style={{ color: '#2C2C2A' }}>
+          {fen2yuan(r.total_consumed_fen)}
+        </Text>
+      ),
+      sorter: (a, b) => a.total_consumed_fen - b.total_consumed_fen,
+    },
+    {
+      title: '已结金额',
+      dataIndex: 'paid_fen',
+      search: false,
+      render: (_, r) => (
+        <Text style={{ color: '#0F6E56' }}>{fen2yuan(r.paid_fen)}</Text>
+      ),
+    },
+    {
+      title: '待结金额',
+      dataIndex: 'unpaid_fen',
+      search: false,
+      render: (_, r) => (
+        <Text strong style={{ color: r.unpaid_fen > 0 ? '#A32D2D' : '#B4B2A9' }}>
+          {fen2yuan(r.unpaid_fen)}
+        </Text>
+      ),
+      sorter: (a, b) => a.unpaid_fen - b.unpaid_fen,
+    },
+    {
+      title: '结算状态',
+      dataIndex: 'status',
+      search: false,
+      render: (_, r) => billStatusTag(r.status),
+    },
+    {
+      title: '操作',
+      valueType: 'option',
+      fixed: 'right' as const,
+      render: (_, r) => [
+        <Button
+          key="statement"
+          size="small"
+          icon={<PrinterOutlined />}
+          onClick={async () => {
+            try {
+              const res = await fetch(
+                `/api/v1/enterprise/accounts/${r.unit_id}/statement?month=${selectedMonth}`,
+                { headers: HEADERS },
+              );
+              const json = await res.json();
+              if (!json.ok) throw new Error(json.error?.message ?? '获取失败');
+              Modal.info({
+                title: `${r.unit_name} · ${selectedMonth} 对账单`,
+                width: 600,
+                content: (
+                  <div>
+                    <p>总消费：{fen2yuan(r.total_consumed_fen)}</p>
+                    <p>已结清：{fen2yuan(r.paid_fen)}</p>
+                    <p>待结清：{fen2yuan(r.unpaid_fen)}</p>
+                    <pre style={{ background: '#F8F7F5', padding: 12, borderRadius: 6,
+                      fontSize: 12, maxHeight: 300, overflow: 'auto' }}>
+                      {JSON.stringify(json.data, null, 2)}
+                    </pre>
+                  </div>
+                ),
+              });
+            } catch (e) {
+              message.error(e instanceof Error ? e.message : '生成对账单失败');
+            }
+          }}
+        >
+          生成对账单
+        </Button>,
+        r.status !== 'settled' && r.unpaid_fen > 0 ? (
+          <Button
+            key="settle"
+            size="small"
+            type="primary"
+            style={{ background: '#0F6E56', borderColor: '#0F6E56' }}
+            onClick={() => {
+              Modal.confirm({
+                title: `确认标记「${r.unit_name}」${selectedMonth} 已结清？`,
+                content: `待结金额 ${fen2yuan(r.unpaid_fen)} 将标记为已结清。`,
+                icon: <ExclamationCircleOutlined />,
+                onOk: async () => {
+                  try {
+                    const res = await fetch(
+                      `/api/v1/enterprise/accounts/${r.unit_id}/bills/settle`,
+                      {
+                        method: 'POST',
+                        headers: HEADERS,
+                        body: JSON.stringify({ month: selectedMonth }),
+                      },
+                    );
+                    const json = await res.json();
+                    if (!json.ok) throw new Error(json.error?.message ?? '标记失败');
+                    message.success('已标记结清');
+                    actionRef.current?.reload();
+                  } catch (e) {
+                    message.error(e instanceof Error ? e.message : '操作失败');
+                  }
+                },
+              });
+            }}
+          >
+            标记结清
+          </Button>
+        ) : null,
+      ].filter(Boolean),
+    },
+  ];
+
+  return (
+    <div>
+      {/* 筛选栏 */}
+      <Card size="small" style={{ marginBottom: 16 }}>
+        <Space wrap>
+          <span style={{ color: '#5F5E5A' }}>月份：</span>
+          <DatePicker
+            picker="month"
+            value={dayjs(selectedMonth)}
+            onChange={(d) => {
+              if (d) {
+                setSelectedMonth(d.format('YYYY-MM'));
+                setTimeout(() => actionRef.current?.reload(), 0);
+              }
+            }}
+            allowClear={false}
+            style={{ width: 140 }}
+          />
+          <span style={{ color: '#5F5E5A' }}>企业：</span>
+          <Select
+            options={units}
+            value={selectedUnitId}
+            onChange={(v) => {
+              setSelectedUnitId(v);
+              setTimeout(() => actionRef.current?.reload(), 0);
+            }}
+            style={{ width: 200 }}
+            showSearch
+            filterOption={(input, opt) =>
+              String(opt?.label ?? '').toLowerCase().includes(input.toLowerCase())
+            }
+          />
+        </Space>
+      </Card>
+
+      {/* 汇总卡片 */}
+      <Row gutter={16} style={{ marginBottom: 16 }}>
+        <Col flex="1">
+          <Card styles={{ body: { padding: '16px 20px' } }}>
+            <Statistic
+              title={<span style={{ color: '#5F5E5A', fontSize: 13 }}>总消费</span>}
+              value={fen2yuan(summaryTotals.total_consumed_fen)}
+              prefix="¥"
+              valueStyle={{ color: '#2C2C2A', fontWeight: 700 }}
+            />
+          </Card>
+        </Col>
+        <Col flex="1">
+          <Card styles={{ body: { padding: '16px 20px' } }}>
+            <Statistic
+              title={<span style={{ color: '#5F5E5A', fontSize: 13 }}>已结清</span>}
+              value={fen2yuan(summaryTotals.paid_fen)}
+              prefix="¥"
+              valueStyle={{ color: '#0F6E56', fontWeight: 700 }}
+            />
+          </Card>
+        </Col>
+        <Col flex="1">
+          <Card styles={{ body: { padding: '16px 20px' } }}>
+            <Statistic
+              title={<span style={{ color: '#5F5E5A', fontSize: 13 }}>待结清</span>}
+              value={fen2yuan(summaryTotals.unpaid_fen)}
+              prefix="¥"
+              valueStyle={{
+                color: summaryTotals.unpaid_fen > 0 ? '#A32D2D' : '#B4B2A9',
+                fontWeight: 700,
+              }}
+            />
+          </Card>
+        </Col>
+      </Row>
+
+      {/* 明细表 */}
+      <ProTable<MonthlyBillItem>
+        actionRef={actionRef}
+        columns={columns}
+        rowKey="unit_id"
+        search={false}
+        scroll={{ x: 900 }}
+        request={async () => {
+          try {
+            const qs = new URLSearchParams({ month: selectedMonth });
+            if (selectedUnitId) qs.set('unit_id', selectedUnitId);
+            const res = await fetch(
+              `/api/v1/agreement-units/report/monthly?${qs}`,
+              { headers: HEADERS },
+            );
+            const json = await res.json();
+            const items: MonthlyBillItem[] = json.data?.items ?? [];
+
+            // 计算汇总
+            setSummaryTotals({
+              total_consumed_fen: items.reduce((s, i) => s + i.total_consumed_fen, 0),
+              paid_fen: items.reduce((s, i) => s + i.paid_fen, 0),
+              unpaid_fen: items.reduce((s, i) => s + i.unpaid_fen, 0),
+            });
+
+            return { data: items, total: items.length, success: true };
+          } catch {
+            return { data: [], total: 0, success: false };
+          }
+        }}
+        toolBarRender={() => [
+          <Button
+            key="export"
+            icon={<DownloadOutlined />}
+            onClick={() => {
+              const filename = `月结对账_${selectedMonth}.csv`;
+              fetch(
+                `/api/v1/agreement-units/report/monthly-export?month=${selectedMonth}`,
+                { headers: HEADERS },
+              )
+                .then((r) => {
+                  if (!r.ok) throw new Error('导出失败');
+                  return r.blob();
+                })
+                .then((blob) => {
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = filename;
+                  a.click();
+                  URL.revokeObjectURL(url);
+                })
+                .catch(() => {
+                  message.info('导出功能需要后端支持，请联系管理员');
+                });
+            }}
+          >
+            导出 Excel
+          </Button>,
+          <Button
+            key="refresh"
+            icon={<ReloadOutlined />}
+            onClick={() => actionRef.current?.reload()}
+          >
+            刷新
+          </Button>,
+        ]}
+        pagination={{ defaultPageSize: 20, showTotal: (t) => `共 ${t} 家单位` }}
+        summary={(data) => {
+          const totalConsumed = data.reduce((s, r) => s + r.total_consumed_fen, 0);
+          const totalPaid = data.reduce((s, r) => s + r.paid_fen, 0);
+          const totalUnpaid = data.reduce((s, r) => s + r.unpaid_fen, 0);
+          return (
+            <ProTable.Summary fixed>
+              <ProTable.Summary.Row>
+                <ProTable.Summary.Cell index={0}>
+                  <Text strong>合计（{data.length} 家）</Text>
+                </ProTable.Summary.Cell>
+                <ProTable.Summary.Cell index={1}>
+                  <Text strong>{fen2yuan(totalConsumed)}</Text>
+                </ProTable.Summary.Cell>
+                <ProTable.Summary.Cell index={2}>
+                  <Text strong style={{ color: '#0F6E56' }}>{fen2yuan(totalPaid)}</Text>
+                </ProTable.Summary.Cell>
+                <ProTable.Summary.Cell index={3}>
+                  <Text strong style={{ color: totalUnpaid > 0 ? '#A32D2D' : '#B4B2A9' }}>
+                    {fen2yuan(totalUnpaid)}
+                  </Text>
+                </ProTable.Summary.Cell>
+                <ProTable.Summary.Cell index={4} />
+                <ProTable.Summary.Cell index={5} />
+              </ProTable.Summary.Row>
+            </ProTable.Summary>
+          );
+        }}
+      />
+    </div>
   );
 }
 

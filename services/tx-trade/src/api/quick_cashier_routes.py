@@ -748,3 +748,825 @@ async def _allocate_call_number(
     seq = result.scalar()
     call_number = f"{prefix}{str(seq).zfill(3)}"
     return call_number
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# A1: 档口管理（Counter Management）
+# 数据表：quick_cashier_counters
+#   id, tenant_id, store_id, name, status(open/closed), display_order,
+#   operator_id, queue_length, max_queue_size, opened_at, closed_at,
+#   created_at, updated_at
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+@router.get("/counters")
+async def list_counters(
+    store_id: str = Query(..., description="门店ID"),
+    request: Request = None,  # type: ignore[assignment]
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """获取档口列表，含状态/队列长度/负责人。"""
+    tenant_id = _get_tenant_id(request)  # type: ignore[arg-type]
+
+    rows = await db.execute(
+        text(
+            """
+            SELECT
+                c.id, c.name, c.status, c.display_order,
+                c.queue_length, c.max_queue_size,
+                c.operator_id, e.employee_name AS operator_name,
+                c.opened_at, c.closed_at, c.created_at, c.updated_at
+            FROM quick_cashier_counters c
+            LEFT JOIN employees e
+                   ON e.id::text = c.operator_id
+                  AND e.tenant_id = c.tenant_id
+                  AND e.is_deleted = FALSE
+            WHERE c.tenant_id = :tenant_id
+              AND c.store_id = :store_id
+              AND c.is_deleted = FALSE
+            ORDER BY c.display_order ASC
+            """
+        ),
+        {"tenant_id": tenant_id, "store_id": store_id},
+    )
+    items = [dict(r) for r in rows.mappings()]
+    return _ok({"items": items, "total": len(items)})
+
+
+@router.post("/counters")
+async def create_counter(
+    req: CreateCounterReq,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """创建档口。"""
+    tenant_id = _get_tenant_id(request)
+    now = datetime.now(timezone.utc)
+    counter_id = uuid4()
+
+    await db.execute(
+        text(
+            """
+            INSERT INTO quick_cashier_counters
+              (id, tenant_id, store_id, name, status, display_order,
+               operator_id, queue_length, max_queue_size,
+               is_deleted, created_at, updated_at)
+            VALUES
+              (:id, :tenant_id, :store_id, :name, 'closed', :display_order,
+               :operator_id, 0, :max_queue_size,
+               FALSE, :now, :now)
+            """
+        ),
+        {
+            "id": str(counter_id),
+            "tenant_id": tenant_id,
+            "store_id": req.store_id,
+            "name": req.name,
+            "display_order": req.display_order,
+            "operator_id": req.operator_id,
+            "max_queue_size": req.max_queue_size,
+            "now": now,
+        },
+    )
+    await db.commit()
+
+    logger.info("counter_created", counter_id=str(counter_id), store_id=req.store_id)
+    return _ok({"counter_id": str(counter_id), "name": req.name, "status": "closed", "created_at": now.isoformat()})
+
+
+@router.put("/counters/{counter_id}")
+async def update_counter(
+    counter_id: str,
+    req: UpdateCounterReq,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """更新档口配置（字段级PATCH语义）。"""
+    tenant_id = _get_tenant_id(request)
+    now = datetime.now(timezone.utc)
+
+    # 动态构建 SET 子句，只更新传入的字段
+    set_parts = ["updated_at = :now"]
+    params: dict = {"id": counter_id, "tenant_id": tenant_id, "now": now}
+    if req.name is not None:
+        set_parts.append("name = :name")
+        params["name"] = req.name
+    if req.display_order is not None:
+        set_parts.append("display_order = :display_order")
+        params["display_order"] = req.display_order
+    if req.operator_id is not None:
+        set_parts.append("operator_id = :operator_id")
+        params["operator_id"] = req.operator_id
+    if req.max_queue_size is not None:
+        set_parts.append("max_queue_size = :max_queue_size")
+        params["max_queue_size"] = req.max_queue_size
+
+    row = await db.execute(
+        text(
+            f"""
+            UPDATE quick_cashier_counters
+            SET {', '.join(set_parts)}
+            WHERE id = :id AND tenant_id = :tenant_id AND is_deleted = FALSE
+            RETURNING id, name, status, display_order, operator_id, max_queue_size, updated_at
+            """
+        ),
+        params,
+    )
+    updated = row.mappings().first()
+    await db.commit()
+
+    if not updated:
+        _err(f"档口不存在: {counter_id}", code=404)
+        return {}
+
+    return _ok(dict(updated))
+
+
+@router.post("/counters/{counter_id}/open")
+async def open_counter(
+    counter_id: str,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """开档：closed → open，记录开档时间。"""
+    tenant_id = _get_tenant_id(request)
+    now = datetime.now(timezone.utc)
+
+    row = await db.execute(
+        text(
+            """
+            UPDATE quick_cashier_counters
+            SET status = 'open', opened_at = :now, updated_at = :now
+            WHERE id = :id AND tenant_id = :tenant_id AND status = 'closed'
+              AND is_deleted = FALSE
+            RETURNING id, name, status, opened_at
+            """
+        ),
+        {"id": counter_id, "tenant_id": tenant_id, "now": now},
+    )
+    updated = row.mappings().first()
+    await db.commit()
+
+    if not updated:
+        _err(f"档口不存在或已处于开档状态: {counter_id}", code=404)
+        return {}
+
+    logger.info("counter_opened", counter_id=counter_id)
+    return _ok({"counter_id": counter_id, "status": "open", "opened_at": now.isoformat()})
+
+
+@router.post("/counters/{counter_id}/close")
+async def close_counter(
+    counter_id: str,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """关档：open → closed，记录关档时间。"""
+    tenant_id = _get_tenant_id(request)
+    now = datetime.now(timezone.utc)
+
+    row = await db.execute(
+        text(
+            """
+            UPDATE quick_cashier_counters
+            SET status = 'closed', closed_at = :now, updated_at = :now
+            WHERE id = :id AND tenant_id = :tenant_id AND status = 'open'
+              AND is_deleted = FALSE
+            RETURNING id, name, status, closed_at
+            """
+        ),
+        {"id": counter_id, "tenant_id": tenant_id, "now": now},
+    )
+    updated = row.mappings().first()
+    await db.commit()
+
+    if not updated:
+        _err(f"档口不存在或已处于关档状态: {counter_id}", code=404)
+        return {}
+
+    logger.info("counter_closed", counter_id=counter_id)
+    return _ok({"counter_id": counter_id, "status": "closed", "closed_at": now.isoformat()})
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# A2: 并行结账队列（Multi-queue Checkout）
+# 数据表：quick_cashier_queue
+#   id, tenant_id, store_id, counter_id, queue_number, member_id,
+#   operator_id, party_size, status(waiting/processing/done/left),
+#   joined_at, processed_at, done_at
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+@router.post("/queue")
+async def join_queue(
+    req: JoinQueueReq,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """加入结账队列。
+
+    若未指定 counter_id，自动选取当前 open 且队列最短的档口。
+    返回排队号和当前等待人数。
+    """
+    tenant_id = _get_tenant_id(request)
+    now = datetime.now(timezone.utc)
+
+    # 确定档口：指定 or 自动选最短队列
+    counter_id = req.counter_id
+    if not counter_id:
+        auto_row = await db.execute(
+            text(
+                """
+                SELECT id FROM quick_cashier_counters
+                WHERE tenant_id = :tenant_id
+                  AND store_id  = :store_id
+                  AND status    = 'open'
+                  AND is_deleted = FALSE
+                  AND queue_length < max_queue_size
+                ORDER BY queue_length ASC, display_order ASC
+                LIMIT 1
+                """
+            ),
+            {"tenant_id": tenant_id, "store_id": req.store_id},
+        )
+        auto = auto_row.scalar()
+        if not auto:
+            _err("当前无可用开放档口，或所有档口已满")
+            return {}
+        counter_id = str(auto)
+
+    # 原子性递增队列号
+    seq_row = await db.execute(
+        text(
+            """
+            UPDATE quick_cashier_counters
+            SET queue_length = queue_length + 1, updated_at = :now
+            WHERE id = :counter_id AND tenant_id = :tenant_id
+              AND status = 'open' AND queue_length < max_queue_size
+            RETURNING queue_length, name
+            """
+        ),
+        {"counter_id": counter_id, "tenant_id": tenant_id, "now": now},
+    )
+    counter_state = seq_row.mappings().first()
+    if not counter_state:
+        _err("档口已满或已关闭，无法加入队列")
+        return {}
+
+    queue_id = uuid4()
+    queue_number = counter_state["queue_length"]
+
+    await db.execute(
+        text(
+            """
+            INSERT INTO quick_cashier_queue
+              (id, tenant_id, store_id, counter_id, queue_number,
+               member_id, operator_id, party_size, status, joined_at)
+            VALUES
+              (:id, :tenant_id, :store_id, :counter_id, :queue_number,
+               :member_id, :operator_id, :party_size, 'waiting', :now)
+            """
+        ),
+        {
+            "id": str(queue_id),
+            "tenant_id": tenant_id,
+            "store_id": req.store_id,
+            "counter_id": counter_id,
+            "queue_number": queue_number,
+            "member_id": req.member_id,
+            "operator_id": req.operator_id,
+            "party_size": req.party_size,
+            "now": now,
+        },
+    )
+    await db.commit()
+
+    logger.info("queue_joined", queue_id=str(queue_id), counter_id=counter_id, queue_number=queue_number)
+    return _ok({
+        "queue_id": str(queue_id),
+        "counter_id": counter_id,
+        "counter_name": counter_state["name"],
+        "queue_number": queue_number,
+        "status": "waiting",
+        "joined_at": now.isoformat(),
+    })
+
+
+@router.get("/queue/status")
+async def get_queue_status(
+    store_id: str = Query(..., description="门店ID"),
+    request: Request = None,  # type: ignore[assignment]
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """各档口当前排队状态：待处理数量/状态/负责人。"""
+    tenant_id = _get_tenant_id(request)  # type: ignore[arg-type]
+
+    rows = await db.execute(
+        text(
+            """
+            SELECT
+                c.id AS counter_id,
+                c.name,
+                c.status,
+                c.queue_length,
+                c.max_queue_size,
+                c.operator_id,
+                COUNT(q.id) FILTER (WHERE q.status = 'waiting')  AS waiting_count,
+                COUNT(q.id) FILTER (WHERE q.status = 'processing') AS processing_count
+            FROM quick_cashier_counters c
+            LEFT JOIN quick_cashier_queue q
+                   ON q.counter_id = c.id AND q.tenant_id = c.tenant_id
+                  AND q.status IN ('waiting', 'processing')
+            WHERE c.tenant_id = :tenant_id
+              AND c.store_id = :store_id
+              AND c.is_deleted = FALSE
+            GROUP BY c.id, c.name, c.status, c.queue_length, c.max_queue_size, c.operator_id
+            ORDER BY c.display_order ASC
+            """
+        ),
+        {"tenant_id": tenant_id, "store_id": store_id},
+    )
+    counters = [dict(r) for r in rows.mappings()]
+    total_waiting = sum(c.get("waiting_count") or 0 for c in counters)
+    return _ok({"counters": counters, "total_waiting": total_waiting})
+
+
+@router.post("/queue/{queue_id}/process")
+async def process_queue_item(
+    queue_id: str,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """开始处理队列项：waiting → processing，转入结账流程。"""
+    tenant_id = _get_tenant_id(request)
+    now = datetime.now(timezone.utc)
+
+    row = await db.execute(
+        text(
+            """
+            UPDATE quick_cashier_queue
+            SET status = 'processing', processed_at = :now
+            WHERE id = :id AND tenant_id = :tenant_id AND status = 'waiting'
+            RETURNING id, counter_id, queue_number, member_id, party_size, processed_at
+            """
+        ),
+        {"id": queue_id, "tenant_id": tenant_id, "now": now},
+    )
+    updated = row.mappings().first()
+
+    if not updated:
+        await db.commit()
+        _err(f"队列项不存在或状态不允许处理: {queue_id}", code=404)
+        return {}
+
+    # 减少档口队列计数（从 waiting 离开队列）
+    await db.execute(
+        text(
+            """
+            UPDATE quick_cashier_counters
+            SET queue_length = GREATEST(queue_length - 1, 0), updated_at = :now
+            WHERE id = :counter_id AND tenant_id = :tenant_id
+            """
+        ),
+        {"counter_id": str(updated["counter_id"]), "tenant_id": tenant_id, "now": now},
+    )
+    await db.commit()
+
+    return _ok({
+        "queue_id": queue_id,
+        "counter_id": str(updated["counter_id"]),
+        "queue_number": updated["queue_number"],
+        "member_id": updated["member_id"],
+        "party_size": updated["party_size"],
+        "status": "processing",
+        "processed_at": now.isoformat(),
+    })
+
+
+@router.delete("/queue/{queue_id}")
+async def leave_queue(
+    queue_id: str,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """顾客离队：将队列项标记为 left，并减少档口队列计数。"""
+    tenant_id = _get_tenant_id(request)
+    now = datetime.now(timezone.utc)
+
+    # 标记离队
+    row = await db.execute(
+        text(
+            """
+            UPDATE quick_cashier_queue
+            SET status = 'left', done_at = :now
+            WHERE id = :id AND tenant_id = :tenant_id AND status = 'waiting'
+            RETURNING id, counter_id
+            """
+        ),
+        {"id": queue_id, "tenant_id": tenant_id, "now": now},
+    )
+    updated = row.mappings().first()
+
+    if not updated:
+        _err(f"队列项不存在或已不在等待状态: {queue_id}", code=404)
+        return {}
+
+    # 减少档口排队计数
+    await db.execute(
+        text(
+            """
+            UPDATE quick_cashier_counters
+            SET queue_length = GREATEST(queue_length - 1, 0), updated_at = :now
+            WHERE id = :counter_id AND tenant_id = :tenant_id
+            """
+        ),
+        {"counter_id": str(updated["counter_id"]), "tenant_id": tenant_id, "now": now},
+    )
+    await db.commit()
+
+    logger.info("queue_left", queue_id=queue_id)
+    return _ok({"queue_id": queue_id, "status": "left", "left_at": now.isoformat()})
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# A3: 叫号高级配置
+# 数据表：quick_cashier_calling_configs
+#   id, tenant_id, store_id, prefix, number_start, number_end,
+#   broadcast_mode, recall_times, skip_after_seconds, daily_reset,
+#   created_at, updated_at
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+@router.get("/calling/config/{store_id}")
+async def get_calling_config(
+    store_id: str,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """获取门店叫号高级配置，不存在时返回默认值。"""
+    tenant_id = _get_tenant_id(request)
+
+    row = await db.execute(
+        text(
+            """
+            SELECT id, prefix, number_start, number_end,
+                   broadcast_mode, recall_times, skip_after_seconds,
+                   daily_reset, created_at, updated_at
+            FROM quick_cashier_calling_configs
+            WHERE tenant_id = :tenant_id AND store_id = :store_id
+            LIMIT 1
+            """
+        ),
+        {"tenant_id": tenant_id, "store_id": store_id},
+    )
+    config = row.mappings().first()
+
+    if not config:
+        return _ok({
+            "store_id": store_id,
+            "prefix": "A",
+            "number_start": 1,
+            "number_end": 999,
+            "broadcast_mode": "screen",
+            "recall_times": 3,
+            "skip_after_seconds": 120,
+            "daily_reset": True,
+            "configured": False,
+        })
+
+    return _ok({"store_id": store_id, **dict(config), "configured": True})
+
+
+@router.put("/calling/config/{store_id}")
+async def save_calling_config(
+    store_id: str,
+    req: CallingAdvancedConfigReq,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """创建或更新叫号高级配置（UPSERT）。"""
+    tenant_id = _get_tenant_id(request)
+
+    if req.broadcast_mode not in ("screen", "voice", "both"):
+        _err("broadcast_mode 必须是 screen / voice / both")
+
+    if req.number_start >= req.number_end:
+        _err("number_start 必须小于 number_end")
+
+    now = datetime.now(timezone.utc)
+    await db.execute(
+        text(
+            """
+            INSERT INTO quick_cashier_calling_configs
+              (id, tenant_id, store_id, prefix, number_start, number_end,
+               broadcast_mode, recall_times, skip_after_seconds, daily_reset,
+               created_at, updated_at)
+            VALUES
+              (gen_random_uuid(), :tenant_id, :store_id, :prefix, :number_start, :number_end,
+               :broadcast_mode, :recall_times, :skip_after_seconds, :daily_reset,
+               :now, :now)
+            ON CONFLICT (tenant_id, store_id)
+            DO UPDATE SET
+              prefix               = EXCLUDED.prefix,
+              number_start         = EXCLUDED.number_start,
+              number_end           = EXCLUDED.number_end,
+              broadcast_mode       = EXCLUDED.broadcast_mode,
+              recall_times         = EXCLUDED.recall_times,
+              skip_after_seconds   = EXCLUDED.skip_after_seconds,
+              daily_reset          = EXCLUDED.daily_reset,
+              updated_at           = EXCLUDED.updated_at
+            """
+        ),
+        {
+            "tenant_id": tenant_id,
+            "store_id": store_id,
+            "prefix": req.prefix,
+            "number_start": req.number_start,
+            "number_end": req.number_end,
+            "broadcast_mode": req.broadcast_mode,
+            "recall_times": req.recall_times,
+            "skip_after_seconds": req.skip_after_seconds,
+            "daily_reset": req.daily_reset,
+            "now": now,
+        },
+    )
+    await db.commit()
+
+    logger.info("calling_config_saved", store_id=store_id, broadcast_mode=req.broadcast_mode)
+    return _ok({
+        "store_id": store_id,
+        "prefix": req.prefix,
+        "number_start": req.number_start,
+        "number_end": req.number_end,
+        "broadcast_mode": req.broadcast_mode,
+        "recall_times": req.recall_times,
+        "skip_after_seconds": req.skip_after_seconds,
+        "daily_reset": req.daily_reset,
+        "updated_at": now.isoformat(),
+    })
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# A4: 快餐会员快结
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+@router.post("/member-quick-pay")
+async def member_quick_pay(
+    req: MemberQuickPayReq,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """会员扫码快速结账。
+
+    流程：
+      1. 通过 scan_code 识别会员（会员码 or 聚合付款码）
+      2. 查询会员等级，自动应用会员价/折扣
+      3. 查询会员余额，优先使用余额支付
+      4. 标记订单已支付，发放积分
+    """
+    tenant_id = _get_tenant_id(request)
+    now = datetime.now(timezone.utc)
+
+    # ── Step 1: 查询快餐订单（加锁防并发重复支付） ──
+    order_row = await db.execute(
+        text(
+            """
+            SELECT id, call_number, status, store_id
+            FROM quick_orders
+            WHERE id = :id AND tenant_id = :tenant_id
+            FOR UPDATE
+            """
+        ),
+        {"id": req.quick_order_id, "tenant_id": tenant_id},
+    )
+    quick_order = order_row.mappings().first()
+    if not quick_order:
+        _err(f"快餐订单不存在: {req.quick_order_id}", code=404)
+        return {}
+    if quick_order["status"] != "pending":
+        _err(f"订单状态不允许支付，当前状态: {quick_order['status']}")
+
+    # ── Step 2: 通过扫码识别会员（加锁防余额竞态） ──
+    member_row = await db.execute(
+        text(
+            """
+            SELECT id, member_code, level_name, balance_fen,
+                   discount_rate, points_balance
+            FROM members
+            WHERE tenant_id = :tenant_id
+              AND (member_code = :scan_code OR pay_code = :scan_code)
+              AND is_deleted = FALSE
+            LIMIT 1
+            FOR UPDATE
+            """
+        ),
+        {"tenant_id": tenant_id, "scan_code": req.scan_code},
+    )
+    member = member_row.mappings().first()
+    if not member:
+        _err("会员码或付款码无效，请核实后重试")
+        return {}
+
+    # ── Step 3: 计算实际应付金额（应用会员折扣） ──
+    discount_rate = float(member["discount_rate"] or 1.0)
+    discounted_amount_fen = int(req.amount_fen * discount_rate)
+    discount_amount_fen = req.amount_fen - discounted_amount_fen
+
+    # ── Step 4: 检查余额是否充足 ──
+    balance_fen = int(member["balance_fen"] or 0)
+    if balance_fen < discounted_amount_fen:
+        _err(
+            f"会员余额不足。余额：{balance_fen / 100:.2f} 元，"
+            f"需支付：{discounted_amount_fen / 100:.2f} 元"
+        )
+
+    # ── Step 5: 扣减余额 + 标记订单支付 + 发放积分 ──
+    points_earned = discounted_amount_fen // 100  # 每消费1元积1分
+
+    balance_result = await db.execute(
+        text(
+            """
+            UPDATE members
+            SET balance_fen    = balance_fen - :amount,
+                points_balance = points_balance + :points,
+                updated_at     = :now
+            WHERE id = :member_id AND tenant_id = :tenant_id
+              AND balance_fen >= :amount
+            """
+        ),
+        {
+            "amount": discounted_amount_fen,
+            "points": points_earned,
+            "member_id": str(member["id"]),
+            "tenant_id": tenant_id,
+            "now": now,
+        },
+    )
+    if balance_result.rowcount == 0:
+        await db.rollback()
+        _err("会员余额不足（并发扣减），请重试")
+
+    await db.execute(
+        text(
+            """
+            UPDATE quick_orders
+            SET status = 'paid', updated_at = :now
+            WHERE id = :id AND tenant_id = :tenant_id
+            """
+        ),
+        {"id": req.quick_order_id, "tenant_id": tenant_id, "now": now},
+    )
+    await db.commit()
+
+    asyncio.create_task(
+        emit_event(
+            event_type=OrderEventType.PAID,
+            tenant_id=tenant_id,
+            stream_id=req.quick_order_id,
+            payload={
+                "method": "member_balance",
+                "amount_fen": discounted_amount_fen,
+                "discount_amount_fen": discount_amount_fen,
+                "member_id": str(member["id"]),
+                "points_earned": points_earned,
+                "call_number": quick_order["call_number"],
+            },
+            store_id=req.store_id,
+            source_service="tx-trade",
+            metadata={"paid_at": now.isoformat(), "operator_id": req.operator_id or ""},
+        )
+    )
+
+    logger.info(
+        "member_quick_pay_success",
+        quick_order_id=req.quick_order_id,
+        member_id=str(member["id"]),
+        discounted_amount_fen=discounted_amount_fen,
+        points_earned=points_earned,
+    )
+
+    return _ok({
+        "quick_order_id": req.quick_order_id,
+        "call_number": quick_order["call_number"],
+        "member_id": str(member["id"]),
+        "member_level": member["level_name"],
+        "original_amount_fen": req.amount_fen,
+        "discount_rate": discount_rate,
+        "discount_amount_fen": discount_amount_fen,
+        "paid_amount_fen": discounted_amount_fen,
+        "remaining_balance_fen": balance_fen - discounted_amount_fen,
+        "points_earned": points_earned,
+        "method": "member_balance",
+        "status": "pending",
+        "paid_at": now.isoformat(),
+    })
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# A5: 分时段限流配置
+# 数据表：quick_cashier_flow_controls
+#   id, tenant_id, store_id, is_enabled, rules (JSONB), created_at, updated_at
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+@router.get("/flow-control/{store_id}")
+async def get_flow_control(
+    store_id: str,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """获取门店分时段限流配置，不存在时返回默认（不限流）。"""
+    tenant_id = _get_tenant_id(request)
+
+    row = await db.execute(
+        text(
+            """
+            SELECT id, is_enabled, rules, created_at, updated_at
+            FROM quick_cashier_flow_controls
+            WHERE tenant_id = :tenant_id AND store_id = :store_id
+            LIMIT 1
+            """
+        ),
+        {"tenant_id": tenant_id, "store_id": store_id},
+    )
+    config = row.mappings().first()
+
+    if not config:
+        return _ok({
+            "store_id": store_id,
+            "is_enabled": False,
+            "rules": [],
+            "configured": False,
+        })
+
+    return _ok({
+        "store_id": store_id,
+        "is_enabled": config["is_enabled"],
+        "rules": config["rules"] or [],
+        "created_at": config["created_at"].isoformat() if config["created_at"] else None,
+        "updated_at": config["updated_at"].isoformat() if config["updated_at"] else None,
+        "configured": True,
+    })
+
+
+@router.put("/flow-control/{store_id}")
+async def save_flow_control(
+    store_id: str,
+    req: FlowControlConfigReq,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """创建或更新分时段限流配置（UPSERT）。
+
+    rules 存储为 JSONB 数组，每条规则含 time_from/time_to/max_concurrent_orders/label。
+    """
+    tenant_id = _get_tenant_id(request)
+
+    import json
+
+    # 校验时间格式
+    for rule in req.rules:
+        try:
+            from datetime import time as dtime
+            dtime.fromisoformat(rule.time_from)
+            dtime.fromisoformat(rule.time_to)
+        except ValueError:
+            _err(f"时间格式非法: {rule.time_from} 或 {rule.time_to}，需 HH:MM 格式")
+        if rule.time_from >= rule.time_to:
+            _err(f"time_from ({rule.time_from}) 必须早于 time_to ({rule.time_to})")
+
+    now = datetime.now(timezone.utc)
+    rules_json = json.dumps([r.model_dump() for r in req.rules], ensure_ascii=False)
+
+    await db.execute(
+        text(
+            """
+            INSERT INTO quick_cashier_flow_controls
+              (id, tenant_id, store_id, is_enabled, rules, created_at, updated_at)
+            VALUES
+              (gen_random_uuid(), :tenant_id, :store_id, :is_enabled, :rules::jsonb, :now, :now)
+            ON CONFLICT (tenant_id, store_id)
+            DO UPDATE SET
+              is_enabled = EXCLUDED.is_enabled,
+              rules      = EXCLUDED.rules,
+              updated_at = EXCLUDED.updated_at
+            """
+        ),
+        {
+            "tenant_id": tenant_id,
+            "store_id": store_id,
+            "is_enabled": req.is_enabled,
+            "rules": rules_json,
+            "now": now,
+        },
+    )
+    await db.commit()
+
+    logger.info("flow_control_saved", store_id=store_id, is_enabled=req.is_enabled, rule_count=len(req.rules))
+    return _ok({
+        "store_id": store_id,
+        "is_enabled": req.is_enabled,
+        "rules": [r.model_dump() for r in req.rules],
+        "updated_at": now.isoformat(),
+    })

@@ -12,6 +12,21 @@ GET /api/v1/reports/booking/items       预定品项统计
   ?format=csv                   返回 CSV 文件
 
 响应格式：{"code": 0, "data": {...}, "message": "ok"}
+
+数据来源：
+  bookings (id, tenant_id, store_id, booking_no, contact_name, contact_phone,
+            table_size, booking_time, arrived_at, cancelled_at,
+            deposit_amount_fen, status, created_at)
+  booking_order_items (id, booking_id, dish_id, dish_name, quantity,
+                       unit_price_fen)
+
+查询说明：
+  - summary:    COUNT(*)/COUNT(arrived)/COUNT(cancelled)/SUM(deposit_amount_fen)
+                按 booking_time BETWEEN d_from AND d_to 过滤
+  - proportion: GROUP BY 时段（早/午/晚/夜）和 table_size
+  - trend:      DATE_TRUNC(:granularity, booking_time) GROUP BY 聚合
+  - items:      JOIN booking_order_items，GROUP BY dish_id 统计各菜品
+  所有查询均包含 tenant_id + store_id 过滤。
 """
 from __future__ import annotations
 
@@ -21,8 +36,12 @@ from datetime import date
 from typing import Literal, Optional
 
 import structlog
-from fastapi import APIRouter, Header, HTTPException, Query
+from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from fastapi.responses import StreamingResponse
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from shared.ontology.src.database import get_db
 
 log = structlog.get_logger()
 router = APIRouter(prefix="/api/v1/reports/booking", tags=["booking-reports"])
@@ -87,21 +106,56 @@ async def api_booking_summary(
     date_to: Optional[str] = Query(None, description="截止日期 YYYY-MM-DD，默认今日"),
     format: Optional[str] = Query(None, description="format=csv 返回CSV文件"),
     x_tenant_id: Optional[str] = Header(None, alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ):
-    """预定汇总 — 预定量/到店率/取消率/人均消费/定金总额"""
-    _require_tenant(x_tenant_id)
+    """预定汇总 — 预定量/到店率/取消率/爽约率/定金总额"""
+    tenant_id = _require_tenant(x_tenant_id)
     _require_store(store_id)
     d_from = _parse_date(date_from)
     d_to = _parse_date(date_to)
 
-    # TODO: 接入真实数据库查询
+    row = await db.execute(
+        text(
+            """
+            SELECT
+                COUNT(*)                                                            AS total_bookings,
+                COUNT(*) FILTER (WHERE status = 'arrived')                         AS arrived_count,
+                COUNT(*) FILTER (WHERE status = 'cancelled')                       AS cancelled_count,
+                COUNT(*) FILTER (WHERE status = 'no_show')                         AS no_show_count,
+                ROUND(
+                    100.0 * COUNT(*) FILTER (WHERE status = 'arrived')
+                    / NULLIF(COUNT(*), 0),
+                    1
+                )::float                                                            AS arrival_rate_pct,
+                ROUND(
+                    100.0 * COUNT(*) FILTER (WHERE status = 'cancelled')
+                    / NULLIF(COUNT(*), 0),
+                    1
+                )::float                                                            AS cancel_rate_pct,
+                COALESCE(SUM(deposit_amount_fen), 0)                               AS total_deposit_fen
+            FROM bookings
+            WHERE tenant_id  = :tenant_id
+              AND store_id   = :store_id
+              AND booking_time BETWEEN :d_from AND :d_to + INTERVAL '1 day'
+            """
+        ),
+        {
+            "tenant_id": tenant_id,
+            "store_id": store_id,
+            "d_from": str(d_from),
+            "d_to": str(d_to),
+        },
+    )
+    r = row.mappings().first()
+
     data = {
-        "total_bookings": 0,
-        "arrived_count": 0,
-        "cancelled_count": 0,
-        "arrival_rate": 0.0,
-        "avg_spend_per_head": 0.0,
-        "total_deposit": 0.0,
+        "total_bookings": int(r["total_bookings"] or 0) if r else 0,
+        "arrived_count": int(r["arrived_count"] or 0) if r else 0,
+        "cancelled_count": int(r["cancelled_count"] or 0) if r else 0,
+        "no_show_count": int(r["no_show_count"] or 0) if r else 0,
+        "arrival_rate_pct": float(r["arrival_rate_pct"] or 0.0) if r else 0.0,
+        "cancel_rate_pct": float(r["cancel_rate_pct"] or 0.0) if r else 0.0,
+        "total_deposit_fen": int(r["total_deposit_fen"] or 0) if r else 0,
     }
 
     if format == "csv":
@@ -120,19 +174,100 @@ async def api_booking_proportion(
     date_to: Optional[str] = Query(None, description="截止日期 YYYY-MM-DD，默认今日"),
     format: Optional[str] = Query(None, description="format=csv 返回CSV文件"),
     x_tenant_id: Optional[str] = Header(None, alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ):
-    """预定占比分析 — 预定 vs 散客比例/时段分布/桌型分布"""
-    _require_tenant(x_tenant_id)
+    """预定占比分析 — 时段分布（早/午/下午/晚）/桌型分布"""
+    tenant_id = _require_tenant(x_tenant_id)
     _require_store(store_id)
     d_from = _parse_date(date_from)
     d_to = _parse_date(date_to)
 
-    # TODO: 接入真实数据库查询
-    by_time_slot: list[dict] = []
-    by_table_size: list[dict] = []
+    base_params = {
+        "tenant_id": tenant_id,
+        "store_id": store_id,
+        "d_from": str(d_from),
+        "d_to": str(d_to),
+    }
+
+    # 时段分布：早(<11:00) / 午(11:00-14:00) / 下午(14:00-17:00) / 晚(>=17:00)
+    slot_rows = await db.execute(
+        text(
+            """
+            SELECT
+                CASE
+                    WHEN EXTRACT(HOUR FROM booking_time) < 11  THEN '早餐'
+                    WHEN EXTRACT(HOUR FROM booking_time) < 14  THEN '午餐'
+                    WHEN EXTRACT(HOUR FROM booking_time) < 17  THEN '下午'
+                    ELSE '晚餐'
+                END                                                             AS time_slot,
+                COUNT(*)                                                        AS booking_count,
+                COUNT(*) FILTER (WHERE status = 'arrived')                     AS arrived_count,
+                ROUND(
+                    100.0 * COUNT(*) FILTER (WHERE status = 'arrived')
+                    / NULLIF(COUNT(*), 0),
+                    1
+                )::float                                                        AS arrival_rate_pct
+            FROM bookings
+            WHERE tenant_id  = :tenant_id
+              AND store_id   = :store_id
+              AND booking_time BETWEEN :d_from AND :d_to + INTERVAL '1 day'
+            GROUP BY
+                CASE
+                    WHEN EXTRACT(HOUR FROM booking_time) < 11  THEN '早餐'
+                    WHEN EXTRACT(HOUR FROM booking_time) < 14  THEN '午餐'
+                    WHEN EXTRACT(HOUR FROM booking_time) < 17  THEN '下午'
+                    ELSE '晚餐'
+                END
+            ORDER BY MIN(EXTRACT(HOUR FROM booking_time))
+            """
+        ),
+        base_params,
+    )
+    by_time_slot = [dict(r) for r in slot_rows.mappings()]
+
+    # 桌位规格分布
+    table_rows = await db.execute(
+        text(
+            """
+            SELECT
+                CASE
+                    WHEN table_size <= 2  THEN '2人桌'
+                    WHEN table_size <= 4  THEN '4人桌'
+                    WHEN table_size <= 6  THEN '6人桌'
+                    WHEN table_size <= 8  THEN '8人桌'
+                    ELSE '10人以上'
+                END                                                             AS table_category,
+                COUNT(*)                                                        AS booking_count,
+                ROUND(
+                    100.0 * COUNT(*)
+                    / NULLIF(SUM(COUNT(*)) OVER (), 0),
+                    1
+                )::float                                                        AS proportion_pct
+            FROM bookings
+            WHERE tenant_id  = :tenant_id
+              AND store_id   = :store_id
+              AND booking_time BETWEEN :d_from AND :d_to + INTERVAL '1 day'
+            GROUP BY
+                CASE
+                    WHEN table_size <= 2  THEN '2人桌'
+                    WHEN table_size <= 4  THEN '4人桌'
+                    WHEN table_size <= 6  THEN '6人桌'
+                    WHEN table_size <= 8  THEN '8人桌'
+                    ELSE '10人以上'
+                END
+            ORDER BY MIN(table_size)
+            """
+        ),
+        base_params,
+    )
+    by_table_size = [dict(r) for r in table_rows.mappings()]
+
+    total_bookings = sum(r.get("booking_count") or 0 for r in by_time_slot)
+    arrived_total = sum(r.get("arrived_count") or 0 for r in by_time_slot)
+    arrival_rate = round(100.0 * arrived_total / total_bookings, 1) if total_bookings else 0.0
+
     data = {
-        "booking_vs_walkin_ratio": 0.0,
-        "arrival_rate": 0.0,
+        "arrival_rate_pct": arrival_rate,
         "by_time_slot": by_time_slot,
         "by_table_size": by_table_size,
     }
@@ -155,16 +290,48 @@ async def api_booking_trend(
     granularity: str = Query("day", description="汇总粒度 day|week|month"),
     format: Optional[str] = Query(None, description="format=csv 返回CSV文件"),
     x_tenant_id: Optional[str] = Header(None, alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ):
     """预定走势 — 按粒度展示预定量/到店/取消/定金趋势"""
-    _require_tenant(x_tenant_id)
+    tenant_id = _require_tenant(x_tenant_id)
     _require_store(store_id)
     d_from = _parse_date(date_from)
     d_to = _parse_date(date_to)
 
-    # TODO: 接入真实数据库查询
-    # 返回格式: [{date, booking_count, arrived_count, cancelled_count, deposit_amount}]
-    items: list[dict] = []
+    # 校验粒度参数，防注入
+    if granularity not in ("day", "week", "month"):
+        raise HTTPException(status_code=422, detail="granularity must be day, week or month")
+
+    rows = await db.execute(
+        text(
+            f"""
+            SELECT
+                DATE_TRUNC('{granularity}', booking_time)::date          AS period,
+                COUNT(*)                                                  AS booking_count,
+                COUNT(*) FILTER (WHERE status = 'arrived')               AS arrived_count,
+                COUNT(*) FILTER (WHERE status = 'cancelled')             AS cancelled_count,
+                COUNT(*) FILTER (WHERE status = 'no_show')               AS no_show_count,
+                COALESCE(SUM(deposit_amount_fen), 0)                     AS deposit_amount_fen
+            FROM bookings
+            WHERE tenant_id  = :tenant_id
+              AND store_id   = :store_id
+              AND booking_time BETWEEN :d_from AND :d_to + INTERVAL '1 day'
+            GROUP BY DATE_TRUNC('{granularity}', booking_time)
+            ORDER BY period
+            """
+        ),
+        {
+            "tenant_id": tenant_id,
+            "store_id": store_id,
+            "d_from": str(d_from),
+            "d_to": str(d_to),
+        },
+    )
+    items = [dict(r) for r in rows.mappings()]
+    # 将 period 转为字符串以保证 JSON 可序列化
+    for item in items:
+        if item.get("period") is not None:
+            item["period"] = str(item["period"])
 
     if format == "csv":
         return _csv_response(items, f"booking_trend_{d_from}_{d_to}.csv")
@@ -182,16 +349,44 @@ async def api_booking_items(
     date_to: Optional[str] = Query(None, description="截止日期 YYYY-MM-DD，默认今日"),
     format: Optional[str] = Query(None, description="format=csv 返回CSV文件"),
     x_tenant_id: Optional[str] = Header(None, alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ):
     """预定品项统计 — 预订菜品数量/金额/占比"""
-    _require_tenant(x_tenant_id)
+    tenant_id = _require_tenant(x_tenant_id)
     _require_store(store_id)
     d_from = _parse_date(date_from)
     d_to = _parse_date(date_to)
 
-    # TODO: 接入真实数据库查询
-    # 返回格式: [{dish_id, dish_name, pre_order_count, amount, proportion}]
-    items: list[dict] = []
+    rows = await db.execute(
+        text(
+            """
+            SELECT
+                boi.dish_id,
+                boi.dish_name,
+                SUM(boi.quantity)                                               AS pre_order_count,
+                SUM(boi.quantity * boi.unit_price_fen)                          AS total_amount_fen,
+                ROUND(
+                    100.0 * SUM(boi.quantity * boi.unit_price_fen)
+                    / NULLIF(SUM(SUM(boi.quantity * boi.unit_price_fen)) OVER (), 0),
+                    2
+                )::float                                                        AS proportion_pct
+            FROM booking_order_items boi
+            JOIN bookings b ON boi.booking_id = b.id
+            WHERE b.tenant_id  = :tenant_id
+              AND b.store_id   = :store_id
+              AND b.booking_time BETWEEN :d_from AND :d_to + INTERVAL '1 day'
+            GROUP BY boi.dish_id, boi.dish_name
+            ORDER BY total_amount_fen DESC
+            """
+        ),
+        {
+            "tenant_id": tenant_id,
+            "store_id": store_id,
+            "d_from": str(d_from),
+            "d_to": str(d_to),
+        },
+    )
+    items = [dict(r) for r in rows.mappings()]
 
     if format == "csv":
         return _csv_response(items, f"booking_items_{d_from}_{d_to}.csv")

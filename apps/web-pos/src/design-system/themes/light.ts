@@ -1,6 +1,6 @@
 /**
  * 屯象OS · Light Theme Token Map
- * v2 设计系统 — 浅色备选主题（Mint #0AAF9A 主色）
+ * v2 设计系统 — 浅色备选主题（暖橙 #FF6B35 主色）
  */
 import { brand, neutral, semantic, warm, navy } from '../tokens/colors';
 
@@ -23,12 +23,12 @@ export const lightTheme = {
   '--tx-border-light':    neutral[100],
   '--tx-divider':         neutral[100],
 
-  // Accent (Mint)
-  '--tx-accent':          brand[500],     // #0AAF9A
-  '--tx-accent-hover':    brand[600],     // #099987
-  '--tx-accent-active':   brand[700],     // #078070
-  '--tx-accent-soft':     'rgba(10,175,154,0.08)',
-  '--tx-accent-bg':       brand[50],      // #E6F7F5
+  // Accent (暖橙 #FF6B35)
+  '--tx-accent':          brand[500],     // #FF6B35
+  '--tx-accent-hover':    brand[600],     // #E55A28
+  '--tx-accent-active':   brand[700],     // #CC4A1A
+  '--tx-accent-soft':     'rgba(255,107,53,0.08)',
+  '--tx-accent-bg':       brand[50],      // #FFF3ED
 
   // Semantic
   '--tx-success':         semantic.success,
