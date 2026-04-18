@@ -706,7 +706,7 @@ async def kiosk_place_order(
     queue_number = f"K{seq_result[0]:03d}" if seq_result else "K001"
 
     order_id = str(uuid4())
-    order_no = f"KO{store_id[:4].upper()}{now.strftime('%m%d%H%M%S')}"
+    order_no = f"KO{store_id[:4].upper()}{now.strftime('%m%d%H%M%S')}{uuid4().hex[:4].upper()}"
 
     try:
         await db.execute(
@@ -877,9 +877,9 @@ async def kiosk_scan_pay(
         await db.execute(
             text("""
                 UPDATE kiosk_orders SET status = 'paying', updated_at = :now
-                WHERE id = :order_id
+                WHERE id = :order_id AND tenant_id = :tenant_id
             """),
-            {"order_id": order_id, "now": datetime.now(timezone.utc)},
+            {"order_id": order_id, "tenant_id": tenant_id, "now": datetime.now(timezone.utc)},
         )
         await db.commit()
     except Exception as exc:
@@ -955,8 +955,8 @@ async def kiosk_qr_pay(
             },
         )
         await db.execute(
-            text("UPDATE kiosk_orders SET status = 'paying', updated_at = :now WHERE id = :order_id"),
-            {"order_id": order_id, "now": datetime.now(timezone.utc)},
+            text("UPDATE kiosk_orders SET status = 'paying', updated_at = :now WHERE id = :order_id AND tenant_id = :tenant_id"),
+            {"order_id": order_id, "tenant_id": tenant_id, "now": datetime.now(timezone.utc)},
         )
         await db.commit()
     except Exception as exc:

@@ -916,7 +916,7 @@ async def cancel_food_court_order(
     await db.execute(
         text("""
             UPDATE food_court_order_items
-            SET status = 'served', updated_at = :now
+            SET status = 'cancelled', updated_at = :now
             WHERE order_id = :order_id AND tenant_id = :tenant_id
         """),
         {"order_id": order_id, "now": now, "tenant_id": tenant_id},

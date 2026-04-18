@@ -423,8 +423,8 @@ async def create_voice_count_session(
     params: dict = {"tenant_id": x_tenant_id, "store_id": req.store_id}
     category_filter_sql = ""
     if req.category_filter:
-        category_filter_sql = "AND category IN :categories"
-        params["categories"] = tuple(req.category_filter)
+        category_filter_sql = "AND category = ANY(:categories)"
+        params["categories"] = list(req.category_filter)
 
     warehouse_filter_sql = ""
     if req.warehouse_id:
@@ -1033,9 +1033,9 @@ async def submit_voice_count(
             text("""
                 UPDATE voice_count_sessions
                 SET status = 'submitted', updated_at = :now
-                WHERE id = :session_id
+                WHERE id = :session_id AND tenant_id = :tenant_id
             """),
-            {"session_id": session_id, "now": now},
+            {"session_id": session_id, "tenant_id": tenant_id, "now": now},
         )
         await db.commit()
     except Exception as exc:

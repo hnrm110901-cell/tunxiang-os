@@ -1113,11 +1113,24 @@ async def process_queue_item(
         {"id": queue_id, "tenant_id": tenant_id, "now": now},
     )
     updated = row.mappings().first()
-    await db.commit()
 
     if not updated:
+        await db.commit()
         _err(f"队列项不存在或状态不允许处理: {queue_id}", code=404)
         return {}
+
+    # 减少档口队列计数（从 waiting 离开队列）
+    await db.execute(
+        text(
+            """
+            UPDATE quick_cashier_counters
+            SET queue_length = GREATEST(queue_length - 1, 0), updated_at = :now
+            WHERE id = :counter_id AND tenant_id = :tenant_id
+            """
+        ),
+        {"counter_id": str(updated["counter_id"]), "tenant_id": tenant_id, "now": now},
+    )
+    await db.commit()
 
     return _ok({
         "queue_id": queue_id,
@@ -1315,13 +1328,14 @@ async def member_quick_pay(
     tenant_id = _get_tenant_id(request)
     now = datetime.now(timezone.utc)
 
-    # ── Step 1: 查询快餐订单 ──
+    # ── Step 1: 查询快餐订单（加锁防并发重复支付） ──
     order_row = await db.execute(
         text(
             """
             SELECT id, call_number, status, store_id
             FROM quick_orders
             WHERE id = :id AND tenant_id = :tenant_id
+            FOR UPDATE
             """
         ),
         {"id": req.quick_order_id, "tenant_id": tenant_id},
@@ -1333,7 +1347,7 @@ async def member_quick_pay(
     if quick_order["status"] != "pending":
         _err(f"订单状态不允许支付，当前状态: {quick_order['status']}")
 
-    # ── Step 2: 通过扫码识别会员 ──
+    # ── Step 2: 通过扫码识别会员（加锁防余额竞态） ──
     member_row = await db.execute(
         text(
             """
@@ -1344,6 +1358,7 @@ async def member_quick_pay(
               AND (member_code = :scan_code OR pay_code = :scan_code)
               AND is_deleted = FALSE
             LIMIT 1
+            FOR UPDATE
             """
         ),
         {"tenant_id": tenant_id, "scan_code": req.scan_code},
@@ -1369,7 +1384,7 @@ async def member_quick_pay(
     # ── Step 5: 扣减余额 + 标记订单支付 + 发放积分 ──
     points_earned = discounted_amount_fen // 100  # 每消费1元积1分
 
-    await db.execute(
+    balance_result = await db.execute(
         text(
             """
             UPDATE members
@@ -1377,6 +1392,7 @@ async def member_quick_pay(
                 points_balance = points_balance + :points,
                 updated_at     = :now
             WHERE id = :member_id AND tenant_id = :tenant_id
+              AND balance_fen >= :amount
             """
         ),
         {
@@ -1387,12 +1403,15 @@ async def member_quick_pay(
             "now": now,
         },
     )
+    if balance_result.rowcount == 0:
+        await db.rollback()
+        _err("会员余额不足（并发扣减），请重试")
 
     await db.execute(
         text(
             """
             UPDATE quick_orders
-            SET status = 'pending', updated_at = :now
+            SET status = 'paid', updated_at = :now
             WHERE id = :id AND tenant_id = :tenant_id
             """
         ),

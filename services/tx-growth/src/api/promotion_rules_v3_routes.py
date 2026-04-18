@@ -1124,10 +1124,16 @@ async def reset_rule_usage(
             f"tx:promo:usage:total:{rule_id}",
             f"tx:promo:budget:{rule_id}",
         )
-        # 注意：per_member keys 用通配符批量删除
-        member_keys = await redis.keys(f"tx:promo:usage:member:{rule_id}:*")
-        if member_keys:
-            await redis.delete(*member_keys)
+        # 注意：per_member keys 用 SCAN 迭代删除（避免 KEYS 阻塞 Redis）
+        cursor = 0
+        while True:
+            cursor, member_keys = await redis.scan(
+                cursor=cursor, match=f"tx:promo:usage:member:{rule_id}:*", count=100
+            )
+            if member_keys:
+                await redis.delete(*member_keys)
+            if cursor == 0:
+                break
 
     logger.info("promo_v3_usage_reset", rule_id=rule_id)
     return _ok({"rule_id": rule_id, "message": "使用计数已重置"})
