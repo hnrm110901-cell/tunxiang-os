@@ -168,6 +168,11 @@ const WorkforcePage = lazy(() => import('./pages/WorkforcePage'));
 const DecisionStatisticsDashboard = lazy(() => import('./pages/DecisionStatisticsDashboard'));
 const ProfitDashboard = lazy(() => import('./pages/ProfitDashboard'));
 const AlertThresholdsPage = lazy(() => import('./pages/AlertThresholdsPage'));
+// D14 — 应用市场
+const AppMarketplace = lazy(() => import('./pages/marketplace/AppMarketplace'));
+const AppDetail = lazy(() => import('./pages/marketplace/AppDetail'));
+const MyApps = lazy(() => import('./pages/marketplace/MyApps'));
+const Billing = lazy(() => import('./pages/marketplace/Billing'));
 const MonthlyReportPage = lazy(() => import('./pages/MonthlyReportPage'));
 const OnboardingPage = lazy(() => import('./pages/onboarding/OnboardingPage'));
 const DynamicPricingPage = lazy(() => import('./pages/DynamicPricingPage'));
@@ -877,6 +882,19 @@ const AppContent: React.FC = () => {
                   } />
                   <Route path="alert-thresholds" element={
                     <ProtectedRoute requiredRole="store_manager"><AlertThresholdsPage /></ProtectedRoute>
+                  } />
+                  {/* D14 应用市场 */}
+                  <Route path="marketplace" element={
+                    <ProtectedRoute requiredRole="admin"><AppMarketplace /></ProtectedRoute>
+                  } />
+                  <Route path="marketplace/apps/:id" element={
+                    <ProtectedRoute requiredRole="admin"><AppDetail /></ProtectedRoute>
+                  } />
+                  <Route path="marketplace/my-apps" element={
+                    <ProtectedRoute requiredRole="admin"><MyApps /></ProtectedRoute>
+                  } />
+                  <Route path="marketplace/billing" element={
+                    <ProtectedRoute requiredRole="admin"><Billing /></ProtectedRoute>
                   } />
                   <Route path="monthly-report" element={
                     <ProtectedRoute requiredRole="admin"><MonthlyReportPage /></ProtectedRoute>

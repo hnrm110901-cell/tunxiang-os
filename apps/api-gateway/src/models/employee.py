@@ -72,6 +72,10 @@ class Employee(Base, TimestampMixin):
     bank_account = Column(String(200), nullable=True)  # 银行卡号（AES-256-GCM 加密存储）
     bank_branch = Column(String(200), nullable=True)
 
+    # ── 多语言/多时区（v3.3 出海）──
+    timezone = Column(String(50), default="Asia/Shanghai", nullable=False)  # IANA tz: Asia/Hong_Kong / Asia/Singapore
+    locale_code = Column(String(10), default="zh-CN", nullable=False)  # 员工首选语种
+
     # ── 工作相关 ──
     daily_wage_standard_fen = Column(Integer, nullable=True)  # 日薪标准（分）
     work_hour_type = Column(String(30), nullable=True)  # 标准工时/综合工时/不定时

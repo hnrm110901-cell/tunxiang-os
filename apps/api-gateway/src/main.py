@@ -187,6 +187,7 @@ from src.api import (
 from src.api.phase5_apis import i18n_router, industry_router, platform_router, supply_chain_router
 from src.core.config import settings
 from src.middleware.audit_log import AuditLogMiddleware
+from src.middleware.locale_middleware import LocaleMiddleware
 from src.middleware.hr_operation_audit import HROperationAuditMiddleware
 from src.middleware.monitoring import MonitoringMiddleware
 from src.middleware.rate_limit import RateLimitMiddleware
@@ -440,6 +441,9 @@ app.add_middleware(StoreAccessMiddleware)
 # 添加监控中间件
 app.add_middleware(MonitoringMiddleware)
 
+# v3.3 出海：Locale 识别中间件（注入 request.state.locale）
+app.add_middleware(LocaleMiddleware)
+
 # ==================== Prometheus指标 ====================
 # 使用独立Registry，避免测试进程中重复导入导致默认Registry重复注册
 METRICS_REGISTRY = CollectorRegistry()
@@ -595,6 +599,15 @@ app.include_router(supply_chain_router, tags=["supply_chain"])
 app.include_router(i18n_router, tags=["internationalization"])
 # app.include_router(i18n_router, tags=["internationalization"])
 
+# v3.3 出海基础设施: i18n / GDPR / 多国合规
+from src.api import i18n as i18n_v2_api  # noqa: E402
+from src.api import gdpr as gdpr_api  # noqa: E402
+from src.api import country_compliance as country_compliance_api  # noqa: E402
+
+app.include_router(i18n_v2_api.router, tags=["i18n-v2"])
+app.include_router(gdpr_api.router, tags=["gdpr"])
+app.include_router(country_compliance_api.router, tags=["country-compliance"])
+
 # Embedding Model (嵌入模型)
 app.include_router(embedding.router, tags=["embedding"])
 
@@ -671,6 +684,15 @@ app.include_router(hq_briefing_api.router, tags=["hq_briefing"])
 from src.api import hr_assistant as hr_assistant_api
 
 app.include_router(hr_assistant_api.router, tags=["hr-assistant"])
+
+# D14 — 应用市场 / AI 增值工厂 / 行业方案
+from src.api import app_marketplace as _app_marketplace_api  # noqa: E402
+from src.api import ai_agents as _ai_agents_api  # noqa: E402
+from src.api import industry_solutions as _industry_solutions_api  # noqa: E402
+
+app.include_router(_app_marketplace_api.router, tags=["marketplace"])
+app.include_router(_ai_agents_api.router, tags=["ai-agents"])
+app.include_router(_industry_solutions_api.router, tags=["industry-solutions"])
 app.include_router(ops.router, prefix="/api/v1/ops", tags=["ops"])
 app.include_router(daily_hub.router, tags=["daily_hub"])
 app.include_router(workforce.router, tags=["workforce"])

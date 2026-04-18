@@ -803,3 +803,12 @@ from .pulse_survey import (
     PulseSurveyResponse,
     PulseSurveyTemplate,
 )
+
+# D14 z70 — 应用市场 / AI 增值工厂 / 行业方案
+from .app_marketplace import (
+    Application,
+    AppBillingRecord,
+    AppInstallation,
+    AppPricingTier,
+    AppReview,
+)

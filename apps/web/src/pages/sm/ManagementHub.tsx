@@ -32,6 +32,7 @@ const SECTIONS: Section[] = [
       { name: '快餐叫号屏', desc: '烹饪中/待取餐大屏', icon: '📢', to: '/floor/queue-board' },
       { name: '收银日结', desc: '班次汇总/现金差异', icon: '📅', to: '/floor/checkout' },
       { name: 'KPI预警阈值', desc: '成本率/损耗告警配置', icon: '⚠️', to: '/alert-thresholds' },
+      { name: '应用市场', desc: 'AI 数智员工/行业方案/按需订阅', icon: '🛒', to: '/marketplace' },
     ],
   },
   {
