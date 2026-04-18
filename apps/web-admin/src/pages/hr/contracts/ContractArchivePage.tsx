@@ -287,7 +287,7 @@ export default function ContractArchivePage() {
             </Descriptions.Item>
             {detailData.content_snapshot && (
               <Descriptions.Item label="合同内容快照">
-                <div
+                <pre
                   style={{
                     maxHeight: 300,
                     overflow: 'auto',
@@ -295,9 +295,14 @@ export default function ContractArchivePage() {
                     background: '#fafafa',
                     border: '1px solid #f0f0f0',
                     borderRadius: 4,
+                    whiteSpace: 'pre-wrap',
+                    wordBreak: 'break-word',
+                    fontFamily: 'inherit',
+                    margin: 0,
                   }}
-                  dangerouslySetInnerHTML={{ __html: detailData.content_snapshot }}
-                />
+                >
+                  {detailData.content_snapshot}
+                </pre>
               </Descriptions.Item>
             )}
           </Descriptions>

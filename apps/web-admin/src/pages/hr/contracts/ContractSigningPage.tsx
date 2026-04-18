@@ -178,9 +178,12 @@ export default function ContractSigningPage() {
               icon={<CheckCircleOutlined />}
               style={{ background: TX_PRIMARY, borderColor: TX_PRIMARY }}
               onClick={async () => {
+                const signerId = localStorage.getItem('tx_user_id');
+                if (!signerId) {
+                  message.error('无法获取当前用户ID，请重新登录后再操作');
+                  return;
+                }
                 try {
-                  // TODO: 从用户上下文获取真实 signer_id，当前使用占位值
-                  const signerId = localStorage.getItem('tx_user_id') || '00000000-0000-0000-0000-000000000001';
                   await companySignContract(record.id, signerId);
                   message.success('企业盖章完成，合同已生效');
                   reloadAll();
