@@ -4,6 +4,97 @@
 
 ---
 
+## 2026-04-18 17:00 Sprint C2：KDS 连接健康检测 + 只读模式自动降级
+
+### 完成状态
+- [x] **新增 Hook** — `apps/web-kds/src/hooks/useConnectionHealth.ts`（180 行）聚合 WebSocket message/close 与 `navigator.onLine` 两路信号，输出三态 `health: 'online' | 'degraded' | 'offline'` + `offlineDurationMs` + `reconnect()`。状态机：OPEN 且最近 15s 内有消息 → online；15s 未收到心跳 → degraded；30s 无心跳或 ws 关闭或 navigator.onLine=false → offline。
+- [x] **Context + Provider** — `apps/web-kds/src/contexts/ConnectionContext.tsx`（54 行）App 根节点挂载 `<ConnectionProvider>`，全树共享 `{ health, offlineDurationMs, reconnect }`。未挂载时 `useConnection()` 退化返回 online（测试/孤立渲染兼容）。
+- [x] **顶栏 Banner** — `apps/web-kds/src/components/OfflineBanner.tsx`（68 行）`sticky top-0` + zIndex 9999；offline=橙色 `#F97316` "离线只读 · 已断线 MM:SS"；degraded=黄色 `#F59E0B` "连接不稳定"；online=return null。点击不可关闭（强制提示）。
+- [x] **useOrdersCache 联动** — 改造为 `manualReadOnly + autoReadOnly(=health≠'online')` 双层合成。手动 `setReadOnly` 仍然最高优先级（保留 C1 既有 5 条测试通过），未手动覆盖时跟随 `health` 自动切换。
+- [x] **App 接入** — `App.tsx` 根包 `ConnectionProvider`，`ConnectionBannerHost` 独立层渲染顶栏 banner（读 context）。
+- [x] **Tier1 guard** — `KDSBoardPage` 的 `handleStart/handleComplete` 两个写操作 handler 前置 `isReadOnly` 检查，`health !== 'online'` 时 `console.warn` + `alert` 兜底并直接 return。未引入 toast 依赖（C3 再做）。
+- [x] **TDD 测试** — 新增 9 条，全部绿：
+  - `useConnectionHealth.test.tsx` 5 条（正常/降级/关闭/navigator.onLine 独立/状态回调）
+  - `OfflineBanner.test.tsx` 4 条（online 不渲/offline 橙色计时/degraded 黄色/不可关闭）
+- [x] **baseline 无回归** — web-kds vitest 总 **20/20 绿**（11 baseline + 9 新增，含 `useOrdersCache` 5 条手动 setReadOnly 场景）。
+- [x] **typecheck** — 本次改动 0 错（`useConnectionHealth.ts` / `OfflineBanner.tsx` / `ConnectionContext.tsx` / `useOrdersCache.ts` / `App.tsx` 全干净）；`KDSBoardPage.tsx` 的 3 条 TS6133 为 Sprint C1 之前就存在的未使用 import，与本次改动无关。
+
+### 关键决策
+- **Provider 不持有 WebSocket**：KDS 多个页面各自有 ws 主循环（`useKdsWebSocket` / `KDSBoardPage` 内联 ws），强行集中会扩散到无关页面。Provider 先只用 `navigator.onLine` 驱动，C3 增量同步时再把页面级 wsRef 接入 Provider 的 `useConnectionHealth({ wsRef })`。
+- **manualReadOnly 保留手动优先级**：C1 既有测试 `result.current.setReadOnly(true)` 依赖手动置位后 upsert 被拦截。改成"健康驱动"但保留 manual override，C1 测试全部不需改动；同时 Provider 在线/离线自动切换仍然有效。
+- **orange `#F97316` 非 tailwind class**：web-kds 未引入 Tailwind runtime（仅 inline style），banner 用 inline style 直接着色，但给 wrapper 打 `tx-kds-banner-orange` / `tx-kds-banner-yellow` 类名方便 DOM 断言与未来样式 hook。
+- **未改 `useKdsWebSocket`**：按任务硬边界，只读状态，不动 WS 核心逻辑。
+- **alert 兜底而非 toast**：避免新增 npm 依赖；C3 再引入统一 toast 时会替换这 2 处。
+
+### 下一步（C3 增量同步衔接）
+- Provider 内置一个"注册 wsRef"的 API，让 `KDSBoardPage` / `useKdsWebSocket` 把活跃 ws 交给 Provider，使 degraded 识别精准到 ws-level（目前 navigator.onLine 只能识别系统断网，USB 线断、路由断但 STA 仍连的场景识别不到）。
+- offline 期间的写操作进 outbox（IDB），online 恢复时 replay；replay 完成后自动回写服务端并去重。
+- 将 alert 兜底替换为 antd 的 `message.warning` 或轻量 toast 组件。
+
+### 已知风险
+- 旁路 handler 装饰：`useConnectionHealth` 会包装 `ws.onmessage/onclose/onopen/onerror`。如果页面本身后续重新赋值这些 handler（不经过 Hook），装饰链会丢。目前只有 `useKdsWebSocket` 会反复 assign，Hook 未对其挂载（wsRef 可选），无风险；C3 集成时需注意顺序：先设置页面 handler，再 mount `useConnectionHealth`。
+- 无 Provider 退化：`useOrdersCache` 在单测环境 `useConnection()` 返回 online，所有既有 upsert 测试正常。生产环境 App 根已挂 Provider，不会走退化路径。
+
+### 改动文件清单
+```
+新增：
+  apps/web-kds/src/hooks/useConnectionHealth.ts                        (~180 行)
+  apps/web-kds/src/components/OfflineBanner.tsx                        (~68 行)
+  apps/web-kds/src/contexts/ConnectionContext.tsx                      (~54 行)
+  apps/web-kds/src/hooks/__tests__/useConnectionHealth.test.tsx        (~130 行, 5 tests)
+  apps/web-kds/src/components/__tests__/OfflineBanner.test.tsx         (~60 行, 4 tests)
+修改：
+  apps/web-kds/src/hooks/useOrdersCache.ts                             (+10/-3)
+  apps/web-kds/src/App.tsx                                             (+12/-3)
+  apps/web-kds/src/pages/KDSBoardPage.tsx                              (+24/-5)
+```
+
+---
+
+## 2026-04-18 17:00 Sprint A1 P1-4：Feature Flag 远程下发通道落地
+
+### 完成状态
+- [x] **yaml 注册** — `flags/trade/trade_flags.yaml` 追加 3 条 flag：`trade.pos.settle.hardening.enable` / `trade.pos.toast.enable` / `trade.pos.errorBoundary.enable`。环境默认值：dev/test/uat/pilot = true，prod = false（灰度拉起路径 pilot→prod）。targeting_rules 按 store_id 维度预留空数组，后续灰度时追加门店 ID 到 pilot/prod。tag 打 `sprint-a1` / `tier1`。
+- [x] **前端改造** — `apps/web-pos/src/config/featureFlags.ts` 重写：三层优先级（`setFlagOverride > remoteValues > DEFAULTS`）+ `fetchFlagsFromRemote({timeoutMs, baseUrl, fetchFn, domain})` + `initFeatureFlags()` 启动入口 + `subscribe(listener)` 订阅模式。`isEnabled(key)` 对未知 key 返回 false 并 log debug，与 `shared/feature_flags/flag_client.py` 行为一致。保留兼容别名 `trade.pos.settle.hardening` → `trade.pos.settle.hardening.enable`，老调用点零改动。
+- [x] **main.tsx 接入** — 启动时 `initFeatureFlags().catch(noop)`，不 await、不阻塞首屏；`Root` 组件用 `subscribe` 在远程下发到达后触发重渲染（boundary 状态可热切换）。
+- [x] **TDD 测试** — `apps/web-pos/src/config/__tests__/featureFlags.test.ts` 新增 6 条，全部绿：(1) DEFAULTS 命中 (2) 远程成功覆盖 (3) 404 降级+警告 (4) 5s 超时+AbortController (5) override 优先级 (6) unknown flag 返回 false + debug log。
+- [x] **baseline 无回归** — web-pos vitest 总 **37/37 绿**（31 baseline + 6 新增）。
+- [x] **yaml 双向校验** — (a) `python -c "yaml.safe_load(...)"` 通过 (b) `shared/feature_flags/flag_client.py` 读取验证：pilot 环境 3 flag 全开，prod 环境 3 flag 全关，与 yaml 预期一致。
+
+### 关键决策
+- **保留兼容别名**：`trade.pos.settle.hardening`（无 `.enable` 后缀）已散落在 `tradeApi.ts` 两处调用，改 key 会扩散到无关 PR；用 ALIASES 映射表一次性解决，避免碎片化。
+- **未在 gateway 新建 /api/v1/flags 端点**：任务边界明确不新建后端服务；前端已就位降级逻辑——404/网络错误静默回退 DEFAULTS 并 log 警告（标注 TODO）。后端补端点后前端无需二次改动。
+- **订阅模式而非 Zustand**：3 个 flag 的轻量场景，Set<Listener> + `subscribe()` 足够；引入 Zustand 会在 package.json 新增依赖（被任务禁止），且 bundle 代价不划算。
+- **为什么用 `subscribe` 在 Root 重渲染**：顶层 ErrorBoundary 的开关从远程切换时需要重建组件树；局部 `isEnabled` 调用点（ToastContainer / tradeApi）每次渲染/请求都会重新读值，无需订阅即自动生效。
+
+### 后端端点契约建议（待后端补）
+```
+GET /api/v1/flags?domain=trade
+Header: X-Tenant-ID: <tenant_uuid>
+Response: {
+  "ok": true,
+  "data": {
+    "flags": {
+      "trade.pos.settle.hardening.enable": true,
+      "trade.pos.toast.enable": true,
+      "trade.pos.errorBoundary.enable": false
+    }
+  },
+  "request_id": "..."
+}
+```
+实现建议：挂到 `services/gateway/src/api/flags_routes.py`，复用 `shared/feature_flags/flag_client.FeatureFlagClient` 的 `FlagContext`（tenant_id/brand_id/store_id/role_code 从 JWT + Header 派生）。
+
+### 下一步
+- **后端 `/api/v1/flags`** — 按上述契约落地（接入 `FeatureFlagClient` + RLS 上下文），并补 gateway 路由测试；前端上线前不需此端点（已降级）。
+- **灰度拉起** — yaml 里 `pilot.store_id.values` 追加徐记海鲜首批灰度门店 ID；prod 保持全 false 直至 pilot 跑满 24h 错误率 < 0.1%。
+
+### 已知风险
+- **后端端点未就绪**：当前前端只能读 yaml DEFAULTS + setFlagOverride，无法做真正租户维度下发；上线若需按 tenant/store 关闭 flag，只能走 CLI 发版覆盖 DEFAULTS（contingency，CI/CD 可操作）。
+- **旧 key 仍存在**：`tradeApi.ts` 两处用 `trade.pos.settle.hardening`（无 `.enable`）。当前用别名兼容，后续独立 PR 可一次性收敛。
+
+---
+
 ## 2026-04-18 16:00 Sprint A1 前端：独立审查 5 阻断修复（P0-1 / P1-3 / P1-5）
 
 ### 完成状态

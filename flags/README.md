@@ -124,7 +124,7 @@ async def handler(request: Request):
 |---|---|
 | `growth/growth_hub_flags.yaml` | 增长中枢（8个Flag） |
 | `agents/agent_flags.yaml` | Agent体系（10个Flag） |
-| `trade/trade_flags.yaml` | 交易履约（5个Flag） |
+| `trade/trade_flags.yaml` | 交易履约（8个Flag，含 Sprint A1 三件套） |
 | `org/hr_flags.yaml` | 人力组织（5个Flag） |
 | `member/member_flags.yaml` | 会员CDP（4个Flag） |
 | `edge/edge_flags.yaml` | 边缘计算（4个Flag） |
@@ -144,3 +144,16 @@ async def handler(request: Request):
 1. 提交审批单（Approval Service）
 2. 指定 targeting_rules 范围（不允许全量prod开启）
 3. 观察24小时后方可扩大范围
+
+---
+
+## Sprint A1 POS 收银硬化三件套（2026-04-18）
+
+| Flag | 作用 | 关闭回滚行为 |
+|---|---|---|
+| `trade.pos.settle.hardening.enable` | `txFetchTrade` 超时分级（SETTLE 8s / QUERY 3s）+ 离线自动入队 + 5 类错误码 | 回退到无超时分级、直接 throw 的旧行为 |
+| `trade.pos.toast.enable` | `<ToastContainer>` 统一提示替代 alert() | 降级到 window.alert |
+| `trade.pos.errorBoundary.enable` | 顶层 + `/settle/:id` `/order/:id` 路由级 ErrorBoundary | 崩溃白屏（但仍可通过其他链路采集崩溃） |
+
+**灰度路径**：pilot (5%) → pilot (50%) → prod (100%)，回滚阈值错误率 > 0.1%
+**前端读取**：`apps/web-pos` 启动时 `initFeatureFlags()` 调 `GET /api/v1/flags?domain=trade` 覆盖本地 DEFAULTS；端点未就绪时静默回退到 yaml defaultValue。

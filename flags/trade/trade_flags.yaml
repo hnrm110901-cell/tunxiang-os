@@ -97,3 +97,74 @@ flags:
         - dimension: tenant_id
           values: []
     tags: [trade, split, payment, settlement]
+
+  # ──────────────────────────────────────────────────────────────
+  # Sprint A1（2026-04-18）POS 收银结算硬化三件套
+  # 灰度路径：pilot(5%) → pilot(50%) → prod(100%)，回滚阈值错误率 > 0.1%
+  # 前端 apps/web-pos 启动时通过 GET /api/v1/flags?domain=trade 拉取覆盖默认值
+  # ──────────────────────────────────────────────────────────────
+  - identifier: trade_pos_settle_hardening_enable
+    name: trade.pos.settle.hardening.enable
+    description: >
+      POS 结算硬化（Sprint A1）：8s 超时分级（TIMEOUT_SETTLE）+ 离线自动入队 +
+      幂等键防重复 + 5 类错误码映射。影响 tradeApi.txFetchTrade / txFetchOffline。
+      回滚：关闭后 settle/payment 路径回退到无超时分级、直接 throw 的旧行为。
+    defaultValue: true
+    environments:
+      dev: true
+      test: true
+      uat: true
+      pilot: true
+      prod: false
+    targeting_rules:
+      pilot:
+        - dimension: store_id
+          values: []
+      prod:
+        - dimension: store_id
+          values: []
+    tags: [trade, pos, settle, hardening, sprint-a1, tier1]
+
+  - identifier: trade_pos_toast_enable
+    name: trade.pos.toast.enable
+    description: >
+      POS Toast 统一提示组件（Sprint A1）：替代 alert() 弹窗，支持 success/error/info/warning/offline 5 类样式，
+      支持自动消失 + 手动关闭 + 队列管理。影响 SettlePage/CashierPage 等收银页的错误与离线提示。
+      回滚：关闭后降级到 window.alert（收银员仍可操作，但交互体验降级）。
+    defaultValue: true
+    environments:
+      dev: true
+      test: true
+      uat: true
+      pilot: true
+      prod: false
+    targeting_rules:
+      pilot:
+        - dimension: store_id
+          values: []
+      prod:
+        - dimension: store_id
+          values: []
+    tags: [trade, pos, ui, toast, sprint-a1]
+
+  - identifier: trade_pos_error_boundary_enable
+    name: trade.pos.errorBoundary.enable
+    description: >
+      POS ErrorBoundary 顶层 + 结算路由级（Sprint A1）：React 组件崩溃时捕获并展示降级 UI，
+      同时上报 /api/v1/telemetry/pos-crash。双层：顶层中性文案 + /settle /order 路由"结账失败，请扫桌重试"专属。
+      回滚：关闭后 React 组件崩溃会导致白屏（但崩溃遥测端点仍可通过其他方式接入）。
+    defaultValue: true
+    environments:
+      dev: true
+      test: true
+      uat: true
+      pilot: true
+      prod: false
+    targeting_rules:
+      pilot:
+        - dimension: store_id
+          values: []
+      prod:
+        - dimension: store_id
+          values: []
+    tags: [trade, pos, ui, error-boundary, sprint-a1, tier1]
