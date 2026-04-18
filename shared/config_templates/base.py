@@ -211,9 +211,11 @@ class BaseTemplate(ABC):
             pkg.store_name = v
         if v := answers.get("store_address"):
             pkg.store_address = v
-        if v := answers.get("table_count"):
+        v = answers.get("table_count")
+        if v is not None:
             pkg.table_count = int(v)
-        if v := answers.get("vip_room_count"):
+        v = answers.get("vip_room_count")
+        if v is not None:
             pkg.vip_room_count = int(v)
 
         # KDS 分区（覆写）
@@ -225,17 +227,22 @@ class BaseTemplate(ABC):
             pkg.printers = [PrinterConfig(**p) for p in printers]
 
         # 折扣守护阈值
-        if v := answers.get("employee_max_discount"):
+        v = answers.get("employee_max_discount")
+        if v is not None:
             pkg.agent_policies.discount_guard.employee_max_discount = float(v)
-        if v := answers.get("manager_max_discount"):
+        v = answers.get("manager_max_discount")
+        if v is not None:
             pkg.agent_policies.discount_guard.manager_max_discount = float(v)
-        if v := answers.get("min_gross_margin"):
+        v = answers.get("min_gross_margin")
+        if v is not None:
             pkg.agent_policies.discount_guard.min_gross_margin = float(v)
 
         # 最低消费 / 服务费
-        if v := answers.get("min_spend_yuan"):
+        v = answers.get("min_spend_yuan")
+        if v is not None:
             pkg.billing_rules.min_spend_fen = int(float(v) * 100)
-        if v := answers.get("service_fee_rate"):
+        v = answers.get("service_fee_rate")
+        if v is not None:
             pkg.billing_rules.service_fee_rate = float(v)
 
         # 渠道
@@ -247,9 +254,11 @@ class BaseTemplate(ABC):
             pkg.payment_methods = v if isinstance(v, list) else [v]
 
         # 会员积分
-        if v := answers.get("point_rate"):
+        v = answers.get("point_rate")
+        if v is not None:
             pkg.point_rate = float(v)
-        if v := answers.get("point_redeem_rate"):
+        v = answers.get("point_redeem_rate")
+        if v is not None:
             pkg.point_redeem_rate = float(v)
 
         # 员工角色

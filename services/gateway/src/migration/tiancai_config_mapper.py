@@ -357,8 +357,11 @@ async def run_tiancai_migration(
 
     返回迁移摘要，供 MigrationDashboard 展示。
     """
-    from shared.adapters.tiancai_shanglong.src.menu_sync import TiancaiMenuSync
-    from shared.adapters.tiancai_shanglong.src.member_sync import TiancaiMemberSync
+    import importlib
+    _menu_mod = importlib.import_module("shared.adapters.tiancai-shanglong.src.menu_sync")
+    TiancaiMenuSync = _menu_mod.TiancaiMenuSync
+    _member_mod = importlib.import_module("shared.adapters.tiancai-shanglong.src.member_sync")
+    TiancaiMemberSync = _member_mod.TiancaiMemberSync
 
     summary: dict = {
         "tenant_id": tenant_id,

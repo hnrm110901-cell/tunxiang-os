@@ -428,8 +428,11 @@ def _build_adapter(tenant_id: str, config: Optional[dict] = None):
     生产环境从 tenant_agent_configs 或环境变量中读取凭证；
     config 参数可覆写（用于多商户切换场景）。
     """
+    import importlib
     import os
-    from shared.adapters.tiancai_shanglong.src.adapter import TiancaiShanglongAdapter
+
+    _mod = importlib.import_module("shared.adapters.tiancai-shanglong.src.adapter")
+    TiancaiShanglongAdapter = _mod.TiancaiShanglongAdapter
 
     final_config = {
         "appid": os.getenv("TIANCAI_APPID", ""),

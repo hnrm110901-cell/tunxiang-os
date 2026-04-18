@@ -621,6 +621,6 @@ async def _do_import(tenant_id: str, pkg: dict) -> dict:
 
         return {"status": "success", "items": results}
 
-    except Exception as exc:  # noqa: BLE001 — 最外层兜底，记录并返回错误
+    except Exception as exc:  # noqa: BLE001 — 最外层兜底，记录并抛出500
         logger.error("onboarding_import_failed", error=str(exc), exc_info=True)
-        return {"status": "error", "error": str(exc)}
+        raise HTTPException(status_code=500, detail=f"配置导入失败: {exc}")

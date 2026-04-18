@@ -21,7 +21,7 @@
 from __future__ import annotations
 
 import structlog
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Header, HTTPException, Request
 from pydantic import BaseModel
 
 from ..response import ok as ok_response
@@ -292,12 +292,18 @@ async def _check_employee_exists(tenant_id: str, db) -> CheckResult:
 
 
 @router.get("/health/{tenant_id}")
-async def get_health_report(tenant_id: str) -> dict:
+async def get_health_report(
+    tenant_id: str,
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+) -> dict:
     """
     运行全量配置健康度检查，返回详细报告。
 
     score ≥ 90 且 critical_fails 为空 → go_live_ready = true
     """
+    if x_tenant_id != tenant_id:
+        raise HTTPException(status_code=403, detail="X-Tenant-ID 与路径 tenant_id 不匹配")
+
     from datetime import datetime, timezone
 
     checks = await _run_all_checks(tenant_id)
@@ -345,12 +351,18 @@ async def get_health_report(tenant_id: str) -> dict:
 
 
 @router.get("/health/{tenant_id}/summary")
-async def get_health_summary(tenant_id: str) -> dict:
+async def get_health_summary(
+    tenant_id: str,
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+) -> dict:
     """
     轻量健康度摘要（给前端「立即上线」按钮使用）。
 
     返回：{ go_live_ready, score, blocking_issues }
     """
+    if x_tenant_id != tenant_id:
+        raise HTTPException(status_code=403, detail="X-Tenant-ID 与路径 tenant_id 不匹配")
+
     checks = await _run_all_checks(tenant_id)
     total_earned = sum(c.score_earned for c in checks)
     total_max = sum(c.score_max for c in checks)
