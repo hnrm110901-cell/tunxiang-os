@@ -19,6 +19,8 @@ import { warmUpAudio, playNewOrder, playTimeout } from '../utils/audio';
 import { OrderTicketCard } from '@tx-ds/biz';
 import type { OrderTicketData } from '@tx-ds/biz';
 import { useKDSRules } from '../hooks/useKDSRules';
+import { useOrdersCache } from '../hooks/useOrdersCache';
+import { installCacheDiagnostics } from '../utils/cacheStats';
 import {
   getTimeLevelFromRules,
   getTimerColorFromLevel,
@@ -205,6 +207,17 @@ export function KDSBoardPage() {
 
   // 加载门店KDS规则配置（超时颜色/渠道色/标识开关）
   const { rules } = useKDSRules(storeId);
+
+  // C1: 本地 last-100-orders 缓存（旁路挂载，不改 WebSocket 主路径）
+  const ordersCache = useOrdersCache();
+  useEffect(() => {
+    installCacheDiagnostics();
+  }, []);
+  useEffect(() => {
+    if (!ordersCache.hydrating && ordersCache.stats) {
+      console.log('[KDS-Cache] stats', ordersCache.stats);
+    }
+  }, [ordersCache.hydrating, ordersCache.stats]);
 
   const [tickets, setTickets] = useState<DemoTicket[]>(() => buildMockTickets());
   const [tick, setTick] = useState(0); // 每秒刷新倒计时
