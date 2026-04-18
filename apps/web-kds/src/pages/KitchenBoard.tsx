@@ -10,7 +10,7 @@
  * 替代旧版 setInterval 轮询
  */
 import { useState, useEffect, useCallback } from 'react';
-import { useKdsWebSocket, type KDSTicket, type RemakeAlert } from '../hooks/useKdsWebSocket';
+import { useKdsWebSocket, type KDSTicket } from '../hooks/useKdsWebSocket';
 import { warmUpAudio } from '../utils/audio';
 import { pauseTicket, resumeTicket, grabTicket } from '../api/kdsOpsApi';
 import { StatusBar, OrderTicketCard } from '@tx-ds/biz';
@@ -44,6 +44,27 @@ function getTimeoutThresholds() {
   };
 }
 
+// ─── KDSTicket → OrderTicketData 转换 ───
+
+function toTicketData(t: KDSTicket): OrderTicketData {
+  return {
+    id: t.id,
+    orderNo: t.orderNo,
+    tableNo: t.tableNo,
+    status: t.status,
+    priority: t.priority,
+    createdAt: new Date(t.createdAt).toISOString(),
+    timeoutMinutes: getTimeoutThresholds().critical,
+    items: t.items.map((item, i) => ({
+      id: `${t.id}-${i}`,
+      name: item.name,
+      qty: item.qty,
+      spec: item.spec,
+      remark: item.notes || undefined,
+    })),
+  };
+}
+
 // ─── 优先级排序权重 ───
 
 function priorityWeight(p: string): number {
@@ -59,35 +80,6 @@ function sortTickets(tickets: KDSTicket[]): KDSTicket[] {
     return a.createdAt - b.createdAt;
   });
 }
-
-// ─── 时间格式 ───
-
-function elapsedMin(ts: number): number {
-  return Math.floor((Date.now() - ts) / 60000);
-}
-
-function formatElapsed(ts: number): string {
-  const total = Math.floor((Date.now() - ts) / 1000);
-  const m = Math.floor(total / 60);
-  const s = total % 60;
-  return `${m}:${String(s).padStart(2, '0')}`;
-}
-
-type TimeLevel = 'normal' | 'warning' | 'critical';
-
-function getTimeLevel(ts: number): TimeLevel {
-  const { warn, critical } = getTimeoutThresholds();
-  const m = elapsedMin(ts);
-  if (m >= critical) return 'critical';
-  if (m >= warn) return 'warning';
-  return 'normal';
-}
-
-const TIME_COLORS: Record<TimeLevel, string> = {
-  normal: '#0F6E56',
-  warning: '#BA7517',
-  critical: '#A32D2D',
-};
 
 // ─── Component ───
 
@@ -124,6 +116,7 @@ export function KitchenBoard() {
   }, [wsEnabled, wsTickets]);
 
   const [tick, setTick] = useState(0);
+  const [now, setNow] = useState(Date.now());
   const [selectedDept, setSelectedDept] = useState<string>('all');
   const [audioWarmed, setAudioWarmed] = useState(false);
 
@@ -141,7 +134,10 @@ export function KitchenBoard() {
 
   // 每秒刷新倒计时
   useEffect(() => {
-    const timer = setInterval(() => setTick(t => t + 1), 1000);
+    const timer = setInterval(() => {
+      setTick(t => t + 1);
+      setNow(Date.now());
+    }, 1000);
     return () => clearInterval(timer);
   }, []);
 
@@ -341,17 +337,11 @@ export function KitchenBoard() {
             </span>
           )}
         </div>
-        <div style={{ display: 'flex', gap: 32, fontSize: 18 }}>
-          <span>
-            待制作 <b style={{ color: '#BA7517', fontSize: 28, fontFamily: 'JetBrains Mono, monospace' }}>{pending.length}</b>
-          </span>
-          <span>
-            制作中 <b style={{ color: '#1890ff', fontSize: 28, fontFamily: 'JetBrains Mono, monospace' }}>{cooking.length}</b>
-          </span>
-          <span>
-            已完成 <b style={{ color: '#0F6E56', fontSize: 28, fontFamily: 'JetBrains Mono, monospace' }}>{done.length}</b>
-          </span>
-        </div>
+        <StatusBar items={[
+          { label: '待制作', value: pending.length, color: '#BA7517' },
+          { label: '制作中', value: cooking.length, color: '#1890ff' },
+          { label: '已完成', value: done.length, color: '#0F6E56' },
+        ]} />
       </header>
 
       {/* 三列看板 */}
@@ -359,15 +349,14 @@ export function KitchenBoard() {
         {/* 待制作 */}
         <BoardColumn title="待制作" count={pending.length} color="#BA7517" bgColor="#1a1a00">
           {pending.map(t => (
-            <TicketCard
+            <OrderTicketCard
               key={t.id}
-              ticket={t}
-              actionLabel="开始制作"
-              actionColor="#1890ff"
-              onAction={() => startCooking(t.id)}
-              tick={tick}
+              ticket={toTicketData(t)}
+              kds
+              now={now}
               isFlashing={rushTicketIds.has(t.id)}
               isPaused={pausedIds.has(t.id)}
+              onStart={() => startCooking(t.id)}
               onGrab={grabMode && operatorId ? () => handleGrab(t.id) : undefined}
               rules={rules}
             />
@@ -377,15 +366,14 @@ export function KitchenBoard() {
         {/* 制作中 */}
         <BoardColumn title="制作中" count={cooking.length} color="#1890ff" bgColor="#001a1a">
           {cooking.map(t => (
-            <TicketCard
+            <OrderTicketCard
               key={t.id}
-              ticket={t}
-              actionLabel="完成出品"
-              actionColor="#0F6E56"
-              onAction={() => completeCooking(t.id)}
-              tick={tick}
+              ticket={toTicketData(t)}
+              kds
+              now={now}
               isFlashing={rushTicketIds.has(t.id)}
               isPaused={pausedIds.has(t.id)}
+              onComplete={() => completeCooking(t.id)}
               onPause={() => togglePause(t.id)}
               rules={rules}
             />
@@ -400,84 +388,17 @@ export function KitchenBoard() {
         </BoardColumn>
       </div>
 
-      {/* 动画 CSS */}
+      {/* 动画 CSS（kds-border-flash / kds-rush-flash 已迁移到 OrderTicketCard.module.css） */}
       <style>{`
         @keyframes kds-pulse {
           0%, 100% { opacity: 1; }
           50% { opacity: 0.7; }
-        }
-        @keyframes kds-border-flash {
-          0%, 100% { border-color: #A32D2D; }
-          50% { border-color: #ff4d4f; }
-        }
-        @keyframes kds-rush-flash {
-          0%, 100% { box-shadow: 0 0 0 0 rgba(255, 77, 79, 0); }
-          50% { box-shadow: 0 0 16px 4px rgba(255, 77, 79, 0.6); }
         }
         @keyframes kds-slide-in {
           from { opacity: 0; transform: translateY(-12px); }
           to { opacity: 1; transform: translateY(0); }
         }
       `}</style>
-    </div>
-  );
-}
-
-// ─── 重做弹窗 ───
-
-function RemakeOverlay({ alerts, onDismiss }: {
-  alerts: RemakeAlert[];
-  onDismiss: (taskId: string) => void;
-}) {
-  return (
-    <div style={{
-      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)',
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      zIndex: 1000,
-    }}>
-      <div style={{
-        background: '#1a1a1a', borderRadius: 16, padding: 28,
-        border: '3px solid #A32D2D', maxWidth: 480, width: '90%',
-        animation: 'kds-slide-in 0.3s ease-out',
-      }}>
-        <div style={{
-          fontSize: 28, fontWeight: 'bold', color: '#ff4d4f',
-          marginBottom: 20, textAlign: 'center',
-        }}>
-          重做通知
-        </div>
-        {alerts.map(a => (
-          <div key={a.taskId} style={{
-            background: '#222', borderRadius: 12, padding: 16,
-            marginBottom: 12, borderLeft: '6px solid #A32D2D',
-          }}>
-            <div style={{ fontSize: 22, fontWeight: 'bold', color: '#fff', marginBottom: 8 }}>
-              {a.tableNumber && `${a.tableNumber} - `}{a.dishName}
-              {a.remakeCount > 1 && (
-                <span style={{ fontSize: 18, color: '#ff4d4f', marginLeft: 8 }}>
-                  (第{a.remakeCount}次)
-                </span>
-              )}
-            </div>
-            <div style={{ fontSize: 18, color: '#BA7517', marginBottom: 12 }}>
-              原因: {a.reason}
-            </div>
-            <button
-              onClick={() => onDismiss(a.taskId)}
-              style={{
-                width: '100%', padding: '14px 0', background: '#A32D2D',
-                color: '#fff', border: 'none', borderRadius: 8,
-                fontSize: 20, fontWeight: 'bold', cursor: 'pointer',
-                minHeight: 56,
-              }}
-              onTouchStart={e => (e.currentTarget.style.transform = 'scale(0.97)')}
-              onTouchEnd={e => (e.currentTarget.style.transform = 'scale(1)')}
-            >
-              收到，立即重做
-            </button>
-          </div>
-        ))}
-      </div>
     </div>
   );
 }
@@ -544,199 +465,7 @@ function BoardColumn({ title, count, color, bgColor, children }: {
   );
 }
 
-// ─── 工单卡片 ───
-
-function TicketCard({ ticket: t, actionLabel, actionColor, onAction, tick: _tick, isFlashing, isPaused, onPause, onGrab, rules }: {
-  ticket: KDSTicket; actionLabel: string; actionColor: string;
-  onAction: () => void; tick: number; isFlashing?: boolean;
-  isPaused?: boolean;
-  onPause?: () => void;
-  onGrab?: () => void;
-  rules: KDSRuleConfig;
-}) {
-  const elapsedMinutes = (Date.now() - t.createdAt) / 60000;
-  const ruleLevel = getTimeLevelFromRules(elapsedMinutes, rules);
-  const level = getTimeLevel(t.createdAt);
-  const elapsed = formatElapsed(t.createdAt);
-  const isRush = t.priority === 'rush';
-  const isVip = t.priority === 'vip';
-  const isCritical = level === 'critical';
-
-  // 使用规则配置的颜色（优先），回退到默认色
-  const urgentColor = rules.urgent_color;
-  const warnColor = rules.warn_color;
-
-  const borderColor = ruleLevel === 'urgent'
-    ? urgentColor
-    : ruleLevel === 'warning'
-      ? warnColor
-      : isRush ? '#BA7517' : isVip ? '#722ed1' : '#333';
-
-  // channel 标识（KDSTicket 扩展字段，若存在则显示）
-  const channelTag = (t as unknown as { channel?: string }).channel as string | undefined;
-  const channelColor = channelTag ? getChannelColor(channelTag, rules) : null;
-  const channelLabel: Record<string, string> = {
-    dine_in: '堂食', takeout: '外卖', pickup: '自取',
-  };
-
-  // 催单闪烁：来自 WebSocket rush_order 的最近告警
-  const rushFlashing = isFlashing || isRush;
-
-  return (
-    <div style={{
-      background: ruleLevel === 'urgent' ? '#1a0505' : '#111',
-      borderRadius: 12, padding: 14,
-      borderLeft: `6px solid ${borderColor}`,
-      border: ruleLevel === 'urgent' ? `2px solid ${urgentColor}` : undefined,
-      borderLeftWidth: 6, borderLeftStyle: 'solid', borderLeftColor: borderColor,
-      animation: ruleLevel === 'urgent'
-        ? 'kds-border-flash 1.5s infinite'
-        : rushFlashing
-          ? 'kds-rush-flash 1s infinite'
-          : undefined,
-    }}>
-      {/* 头部：桌号 + 标签 + 时间 */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-          <span style={{ fontSize: 26, fontWeight: 'bold', color: '#fff' }}>{t.tableNo}</span>
-          <span style={{ fontSize: 16, color: '#666' }}>#{t.orderNo}</span>
-          {/* 渠道标识（受规则开关控制） */}
-          {rules.show_channel_badge && channelColor && channelTag && (
-            <span style={{
-              display: 'inline-flex', alignItems: 'center', gap: 3,
-              fontSize: 13, padding: '1px 7px', borderRadius: 5,
-              background: channelColor + '33',
-              border: `1px solid ${channelColor}`,
-              color: channelColor, fontWeight: 600,
-            }}>
-              <span style={{
-                width: 7, height: 7, borderRadius: '50%',
-                background: channelColor, display: 'inline-block',
-              }} />
-              {channelLabel[channelTag] ?? channelTag}
-            </span>
-          )}
-          {isRush && (
-            <span style={{
-              fontSize: 16, padding: '2px 10px', borderRadius: 6,
-              background: '#A32D2D', color: '#fff', fontWeight: 'bold',
-              animation: 'kds-pulse 1s infinite',
-            }}>
-              催
-            </span>
-          )}
-          {isVip && (
-            <span style={{
-              fontSize: 16, padding: '2px 10px', borderRadius: 6,
-              background: 'linear-gradient(135deg, #C5A347, #E8D48B)', color: '#1a1a00', fontWeight: 'bold',
-            }}>
-              VIP
-            </span>
-          )}
-        </div>
-        <div style={{
-          fontSize: 28, fontWeight: 'bold',
-          color: ruleLevel === 'urgent' ? urgentColor : ruleLevel === 'warning' ? warnColor : TIME_COLORS[level],
-          fontFamily: 'JetBrains Mono, monospace',
-        }}>
-          {elapsed}
-        </div>
-      </div>
-
-      {/* 菜品列表 */}
-      {t.items.map((item, i) => (
-        <div key={i} style={{
-          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-          padding: '4px 0', fontSize: 20, fontWeight: 'bold',
-        }}>
-          <span style={{ flex: 1 }}>
-            {item.name}
-            {item.notes && (
-              <span style={{ fontSize: 16, color: '#A32D2D', marginLeft: 6, fontWeight: 'normal' }}>
-                ({item.notes})
-              </span>
-            )}
-          </span>
-          <span style={{ color: '#FF6B35', fontSize: 22, minWidth: 50, textAlign: 'right' }}>
-            x{item.qty}
-          </span>
-        </div>
-      ))}
-
-      {/* 停菜标记 */}
-      {isPaused && (
-        <div style={{
-          background: '#2A2A00', border: '1px solid #666600',
-          borderRadius: 6, padding: '4px 10px', marginTop: 8,
-          fontSize: 14, color: '#CCCC00', fontWeight: 600,
-        }}>
-          ⏸ 已停菜 — 暂缓出品
-        </div>
-      )}
-
-      {/* 操作按钮区 */}
-      <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
-        {/* 抢单按钮（仅 pending + 抢单模式） */}
-        {onGrab && (
-          <button
-            onClick={onGrab}
-            style={{
-              flex: 1, padding: '14px 0', border: 'none', borderRadius: 8,
-              background: '#FF6B35', color: '#fff',
-              fontSize: 20, fontWeight: 'bold', cursor: 'pointer', minHeight: 56,
-              transition: 'transform 200ms ease',
-            }}
-            onTouchStart={e => (e.currentTarget.style.transform = 'scale(0.97)')}
-            onTouchEnd={e => (e.currentTarget.style.transform = 'scale(1)')}
-          >
-            🏃 抢单
-          </button>
-        )}
-
-        {/* 主操作按钮（无抢单模式时展示） */}
-        {!onGrab && (
-          <button
-            onClick={onAction}
-            disabled={isPaused}
-            style={{
-              flex: 1, padding: '14px 0', border: 'none', borderRadius: 8,
-              background: isPaused ? '#2A2A2A' : actionColor, color: '#fff',
-              fontSize: 20, fontWeight: 'bold',
-              cursor: isPaused ? 'not-allowed' : 'pointer',
-              opacity: isPaused ? 0.5 : 1,
-              minHeight: 56, transition: 'transform 200ms ease',
-            }}
-            onTouchStart={e => !isPaused && (e.currentTarget.style.transform = 'scale(0.97)')}
-            onTouchEnd={e => (e.currentTarget.style.transform = 'scale(1)')}
-          >
-            {actionLabel}
-          </button>
-        )}
-
-        {/* 停菜/恢复按钮（cooking 状态才显示） */}
-        {onPause && (
-          <button
-            onClick={onPause}
-            style={{
-              padding: '14px 14px', borderRadius: 8,
-              background: isPaused ? '#2A2A00' : '#1A1A1A',
-              color: isPaused ? '#CCCC00' : '#666',
-              fontSize: 18, fontWeight: 'bold',
-              cursor: 'pointer', minHeight: 56, minWidth: 72,
-              border: `1px solid ${isPaused ? '#666600' : '#333'}`,
-              transition: 'transform 200ms ease',
-            } as React.CSSProperties}
-            onTouchStart={e => (e.currentTarget.style.transform = 'scale(0.97)')}
-            onTouchEnd={e => (e.currentTarget.style.transform = 'scale(1)')}
-            title={isPaused ? '恢复出品' : '停菜'}
-          >
-            {isPaused ? '▶' : '⏸'}
-          </button>
-        )}
-      </div>
-    </div>
-  );
-}
+// (TicketCard removed — now uses shared OrderTicketCard from @tx-ds/biz)
 
 // ─── 已完成卡片（简化） ───
 
@@ -768,17 +497,17 @@ function DoneCard({ ticket: t }: { ticket: KDSTicket }) {
 
 // ─── Mock Data（离线/未配置时使用） ───
 
-const now = Date.now();
+const MOCK_NOW = Date.now();
 const min = (m: number) => m * 60 * 1000;
 
 const MOCK_TICKETS: KDSTicket[] = [
-  { id: 't1', orderNo: '001', tableNo: 'A01', items: [{ name: '剁椒鱼头', qty: 1, notes: '少辣' }, { name: '小炒肉', qty: 1, notes: '' }], createdAt: now - min(8), status: 'pending', priority: 'rush', deptId: 'hot' },
-  { id: 't2', orderNo: '002', tableNo: 'A03', items: [{ name: '口味虾', qty: 2, notes: '中辣' }, { name: '炒青菜', qty: 1, notes: '' }], createdAt: now - min(5), status: 'pending', priority: 'normal', deptId: 'hot' },
-  { id: 't3', orderNo: '003', tableNo: 'B01', items: [{ name: '鱼头', qty: 2, notes: '' }, { name: '米饭', qty: 6, notes: '' }], createdAt: now - min(18), status: 'cooking', priority: 'vip', deptId: 'hot', startedAt: now - min(10) },
-  { id: 't4', orderNo: '004', tableNo: 'B02', items: [{ name: '外婆鸡', qty: 1, notes: '多放辣' }], createdAt: now - min(3), status: 'pending', priority: 'normal', deptId: 'steam' },
-  { id: 't5', orderNo: '005', tableNo: 'A05', items: [{ name: '凉拌黄瓜', qty: 2, notes: '' }], createdAt: now - min(32), status: 'cooking', priority: 'rush', deptId: 'cold', startedAt: now - min(28) },
-  { id: 't6', orderNo: '006', tableNo: 'C01', items: [{ name: '蒜蓉西兰花', qty: 1, notes: '' }], createdAt: now - min(12), status: 'cooking', priority: 'normal', deptId: 'hot', startedAt: now - min(8) },
-  { id: 't7', orderNo: '007', tableNo: 'A02', items: [{ name: '酸菜鱼', qty: 1, notes: '微辣' }, { name: '辣椒炒肉', qty: 1, notes: '' }], createdAt: now - min(2), status: 'pending', priority: 'vip', deptId: 'hot' },
-  { id: 't8', orderNo: '008', tableNo: 'B03', items: [{ name: '红烧肉', qty: 1, notes: '' }], createdAt: now - min(1), status: 'done', priority: 'normal', deptId: 'hot', startedAt: now - min(15), completedAt: now - min(1) },
-  { id: 't9', orderNo: '009', tableNo: 'C02', items: [{ name: '蒸鲈鱼', qty: 1, notes: '' }], createdAt: now - min(20), status: 'done', priority: 'normal', deptId: 'steam', startedAt: now - min(18), completedAt: now - min(2) },
+  { id: 't1', orderNo: '001', tableNo: 'A01', items: [{ name: '剁椒鱼头', qty: 1, notes: '少辣' }, { name: '小炒肉', qty: 1, notes: '' }], createdAt: MOCK_NOW - min(8), status: 'pending', priority: 'rush', deptId: 'hot' },
+  { id: 't2', orderNo: '002', tableNo: 'A03', items: [{ name: '口味虾', qty: 2, notes: '中辣' }, { name: '炒青菜', qty: 1, notes: '' }], createdAt: MOCK_NOW - min(5), status: 'pending', priority: 'normal', deptId: 'hot' },
+  { id: 't3', orderNo: '003', tableNo: 'B01', items: [{ name: '鱼头', qty: 2, notes: '' }, { name: '米饭', qty: 6, notes: '' }], createdAt: MOCK_NOW - min(18), status: 'cooking', priority: 'vip', deptId: 'hot', startedAt: MOCK_NOW - min(10) },
+  { id: 't4', orderNo: '004', tableNo: 'B02', items: [{ name: '外婆鸡', qty: 1, notes: '多放辣' }], createdAt: MOCK_NOW - min(3), status: 'pending', priority: 'normal', deptId: 'steam' },
+  { id: 't5', orderNo: '005', tableNo: 'A05', items: [{ name: '凉拌黄瓜', qty: 2, notes: '' }], createdAt: MOCK_NOW - min(32), status: 'cooking', priority: 'rush', deptId: 'cold', startedAt: MOCK_NOW - min(28) },
+  { id: 't6', orderNo: '006', tableNo: 'C01', items: [{ name: '蒜蓉西兰花', qty: 1, notes: '' }], createdAt: MOCK_NOW - min(12), status: 'cooking', priority: 'normal', deptId: 'hot', startedAt: MOCK_NOW - min(8) },
+  { id: 't7', orderNo: '007', tableNo: 'A02', items: [{ name: '酸菜鱼', qty: 1, notes: '微辣' }, { name: '辣椒炒肉', qty: 1, notes: '' }], createdAt: MOCK_NOW - min(2), status: 'pending', priority: 'vip', deptId: 'hot' },
+  { id: 't8', orderNo: '008', tableNo: 'B03', items: [{ name: '红烧肉', qty: 1, notes: '' }], createdAt: MOCK_NOW - min(1), status: 'done', priority: 'normal', deptId: 'hot', startedAt: MOCK_NOW - min(15), completedAt: MOCK_NOW - min(1) },
+  { id: 't9', orderNo: '009', tableNo: 'C02', items: [{ name: '蒸鲈鱼', qty: 1, notes: '' }], createdAt: MOCK_NOW - min(20), status: 'done', priority: 'normal', deptId: 'steam', startedAt: MOCK_NOW - min(18), completedAt: MOCK_NOW - min(2) },
 ];
