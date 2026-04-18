@@ -703,8 +703,8 @@ async def confirm_entry(
             },
         )
         await db.execute(
-            text("UPDATE voice_count_sessions SET updated_at = :now WHERE id = :session_id"),
-            {"session_id": session_id, "now": now},
+            text("UPDATE voice_count_sessions SET updated_at = :now WHERE id = :session_id AND tenant_id = :tenant_id"),
+            {"session_id": session_id, "tenant_id": tenant_id, "now": now},
         )
         await db.commit()
     except Exception as exc:
