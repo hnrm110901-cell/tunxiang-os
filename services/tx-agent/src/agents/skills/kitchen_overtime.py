@@ -17,6 +17,7 @@ from typing import Any
 import structlog
 
 from ..base import AgentResult, SkillAgent
+from ..context import ConstraintContext
 
 logger = structlog.get_logger()
 
@@ -28,6 +29,9 @@ class KitchenOvertimeAgent(SkillAgent):
     priority = "P1"
     run_location = "edge"  # 边缘实时监控，低延迟
     agent_level = 2  # 自动催菜 + 回滚（取消催菜）
+
+    # Sprint D1 / PR H 批次 2：后厨超时监控直接对应客户体验上限
+    constraint_scope = {"experience"}
 
     def get_supported_actions(self) -> list[str]:
         return [
@@ -68,6 +72,9 @@ class KitchenOvertimeAgent(SkillAgent):
             elif elapsed >= warn_threshold:
                 warning.append({**item, "severity": "warning", "remaining_minutes": threshold_minutes - elapsed})
 
+        # Sprint D1 / PR H 批次 2：取队列中最长已耗时作为体验校验基准
+        # （checker 会验证 max_elapsed <= max_serve_minutes）
+        max_elapsed = max((item.get("elapsed_minutes", 0) for item in pending_items), default=0)
         return AgentResult(
             success=True, action="scan_overtime_items",
             data={
@@ -80,6 +87,10 @@ class KitchenOvertimeAgent(SkillAgent):
             reasoning=f"扫描{len(pending_items)}个待出品项：{len(overtime)}个超时，{len(warning)}个预警",
             confidence=0.95,
             inference_layer="edge",
+            context=ConstraintContext(
+                estimated_serve_minutes=float(max_elapsed),
+                constraint_scope={"experience"},
+            ),
         )
 
     async def _analyze_overtime_cause(self, params: dict) -> AgentResult:

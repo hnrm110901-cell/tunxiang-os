@@ -29,6 +29,9 @@ class QueueSeatingAgent(SkillAgent):
     run_location = "edge+cloud"
     agent_level = 2  # 自动叫号 + 30分钟回滚（跳号可恢复）
 
+    # Sprint D1 / PR H 批次 2：排队叫号核心是等位时间
+    constraint_scope = {"experience"}
+
     def get_supported_actions(self) -> list[str]:
         return [
             "predict_wait_time",

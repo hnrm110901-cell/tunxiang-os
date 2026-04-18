@@ -1,3 +1,153 @@
+## 2026-04-18 Sprint D1 批次 2 — 出餐体验 7 Skill + 2 Skill 填 context（PR H）
+
+### 今日完成
+- [services/tx-agent/src/agents/skills/serve_dispatch.py] constraint_scope={"experience"} + _predict_serve 填 context (estimated_serve_minutes)
+- [services/tx-agent/src/agents/skills/kitchen_overtime.py] constraint_scope={"experience"} + _scan_overtime_items 取 max_elapsed 填 context
+- [services/tx-agent/src/agents/skills/table_dispatch.py] constraint_scope={"experience"} + 补注册到 ALL_SKILL_AGENTS
+- [services/tx-agent/src/agents/skills/queue_seating.py] constraint_scope={"experience"}
+- [services/tx-agent/src/agents/skills/ai_waiter.py] constraint_scope={"margin","experience"}（推荐菜毛利 + 出餐节奏双命中）
+- [services/tx-agent/src/agents/skills/voice_order.py] constraint_scope={"experience"}
+- [services/tx-agent/src/agents/skills/smart_service.py] constraint_scope={"experience"}
+- [services/tx-agent/src/tests/test_constraint_context.py] 扩 4 条 test：batch 2 scope 声明 / registry 补全 / serve_dispatch 通过场景 / 超时场景触发违规
+
+### 数据变化
+- 迁移版本：无
+- 修改文件：9（7 Skills + skills/__init__ + test）
+- 新增测试：4（共 19，11 passed + 8 skipped）
+- ruff 状态：All checks passed!
+
+### 遗留问题
+- 5 个批次 2 Skill（table_dispatch/queue_seating/ai_waiter/voice_order/smart_service）只声明 scope 未填 context，运行期仍标 n/a —— 留给 Squad Owner 按各自业务数据补
+- 批次 2 的 8 条 skill-dependent 测试仍被 edge_mixin 相对导入 bug skip（CI 容器可跑）
+- kitchen_overtime 的 max_elapsed 语义可能偏悲观，若拦截率过高退到 P95
+
+### 明日计划
+- 合入 PR E/F/G/H 后启动批次 3（W6 定价营销 7 Skill，margin scope）
+- 单独 PR 修 edge_mixin 相对导入（解锁所有 skipped tests）
+
+---
+
+## 2026-04-18 Sprint D1 批次 1 — ConstraintContext 基础 + 批 1 三 Skill + SKILL_REGISTRY（PR G）
+
+### 今日完成
+- [services/tx-agent/src/agents/context.py] ConstraintContext dataclass（price_fen/cost_fen/ingredients/estimated_serve_minutes/scope/waived_reason）+ IngredientSnapshot + from_data() 兼容旧 data 两套字段命名
+- [services/tx-agent/src/agents/constraints.py] check_all(ctx_or_data, scope=None) 双入参：dict/context 都走统一结构化校验；ConstraintResult 加 scopes_checked/scopes_skipped/scope 3 字段；@deprecated 兼容旧 check_margin/check_food_safety/check_experience dict API
+- [services/tx-agent/src/agents/base.py] AgentResult.context + SkillAgent.constraint_scope ClassVar + constraint_waived_reason ClassVar；run() 三分支：空 scope 豁免 / 调 checker / 结果标签（margin/safety/experience/mixed/n/a）
+- [services/tx-agent/src/agents/skills/__init__.py] 新增 GrowthAttributionAgent + StockoutAlertAgent import；SKILL_REGISTRY 按 agent_id 去重聚合
+- [services/tx-agent/src/agents/skills/growth_attribution.py] constraint_scope = {"margin"}
+- [services/tx-agent/src/agents/skills/closing_agent.py] constraint_scope = {"margin","safety"}
+- [services/tx-agent/src/agents/skills/stockout_alert.py] constraint_scope = {"margin","safety"}
+- [services/tx-agent/src/tests/test_constraint_context.py] 15 TDD 测试：11 passed + 4 skipped（skill 导入依赖 pre-existing edge_mixin bug，CI PYTHONPATH 正确时运行）
+
+### 数据变化
+- 迁移版本：无（纯 Python 基类扩展）
+- 新增文件：2（context.py / test_constraint_context.py）
+- 修改文件：6（base/constraints/skills-init + 3 skills）
+- 新增测试：15（11 passed + 4 skip by design）
+- ruff 状态：All checks passed!
+
+### 遗留问题
+- pre-existing edge_mixin 相对导入 bug 阻塞 skills 包本地导入 —— out-of-scope 留独立 PR
+- 批次 1 三 Skill 只声明了 scope，没填实际 price_fen/ingredients 数据（设计稿覆盖率表承诺"实装=16"是渐进，本 PR 第一步把 3 个从 unknown 升到 n/a）
+- waived_reason 长度+黑名单 CI 校验 延到批次 5/6 统一上
+- CI 门禁 test_constraint_coverage.py 延到批次 3-4 覆盖率过半时上（避免单 PR 全挂红）
+
+### 明日计划
+- 等 CI 绿后合入 PR G
+- 启动批次 2（W5 出餐体验）：7 个 Skill 填 estimated_serve_minutes + scope={"experience"}
+- out-of-scope 修 edge_mixin 相对导入
+
+---
+
+## 2026-04-18 Sprint F1 — 14 适配器事件总线接入基类 + pinzhi 参考（PR F）
+
+### 今日完成
+- [shared/events/src/event_types.py] AdapterEventType 11 种枚举（SYNC_STARTED/FINISHED/FAILED + ORDER_INGESTED + MENU/MEMBER/INVENTORY_SYNCED + STATUS_PUSHED + WEBHOOK_RECEIVED + RECONNECTED + CREDENTIAL_EXPIRED）；注册 DOMAIN_STREAM_MAP["adapter"]="tx_adapter_events" + STREAM_TYPE_MAP + ALL_EVENT_ENUMS
+- [shared/adapters/base/src/event_bus.py] emit_adapter_event 函数（空名/>32 字符校验，自动 stream_id + source_service 前缀）+ AdapterEventMixin（track_sync 异步上下文管理器 fire-and-forget STARTED/FINISHED、await SYNC_FAILED 保证落库、correlation_id 贯穿）+ emit_reconnected / emit_credential_expired / emit_webhook_received 三个辅助方法
+- [shared/adapters/base/tests/test_event_bus.py] 10 条 TDD 测试全绿：基础 emit / 自定义 stream_id / 空名拒 / 超长名拒 / 成功路径双发 / 失败路径 reraise + ingested 保留 / correlation_id 共享 / 三个辅助方法各一条
+- [shared/adapters/base/src/__init__.py] 导出 AdapterEventMixin / SyncTrack / emit_adapter_event
+- [shared/adapters/pinzhi_adapter.py] PinzhiPOSAdapter 继承 AdapterEventMixin + adapter_name="pinzhi"；sync_orders 向后兼容地加 Optional tenant_id/store_id；传 tenant_id 时走 track_sync，否则保持原逻辑；I/O 下沉到私有 _do_sync_orders
+- [docs/adapters/review/README.md] §7 事件总线接入基类：函数式 vs Mixin 代码示例 + 11 事件对照表 + pinzhi 参考实现 + DoD（≥3/4 + 必覆盖 ORDER_INGESTED+SYNC_FAILED + adapter_name/source_id/amount_fen）
+
+### 数据变化
+- 迁移版本：无（纯 Python 基类 + 事件枚举注册）
+- 新增文件：2（event_bus.py / test_event_bus.py）
+- 修改文件：4（event_types.py / adapters/base/__init__ / pinzhi_adapter / docs README）
+- 新增测试：10（全绿）
+- ruff 状态：All checks passed!
+
+### 遗留问题
+- 13 个剩余适配器（aoqiwei/tiancai-shanglong/meituan/eleme/douyin/wechat/logistics/keruyun/weishenghuo/yiding/nuonuo/xiaohongshu/erp/delivery_factory）尚未接入 — 由 Squad Owner 填 7 维评分卡时对照 pinzhi 模板补齐（预期 3-5 行/适配器）
+- pinzhi 的 menu/members/inventory 三个同步方法未接入，只示范了 sync_orders
+- adapter_name canonical 表未建 — Grafana 聚合一致性靠治理
+- mv_adapter_health 物化视图未建 — 配套的看板下个 PR
+
+### 明日计划
+- 等 CI 绿后合入 PR F
+- 启动 Sprint D1 批次 1 编码（context.py + base.py 强化 + 3 个 Skill 接入）
+- Squad Owner 批量 fix-PR（13 个适配器接入 track_sync）
+
+---
+
+## 2026-04-18 Sprint A2 — 断网收银 E2E + toxiproxy CI（PR E / P0-2 Week 8 硬门禁）
+
+### 今日完成
+- [e2e/tests/offline-cashier.spec.ts] 4 场景：断网结账入队 / 幂等不重入 / 重连 flush / 服务端 503 降级；用 `page.context().setOffline()` 控 `navigator.onLine`
+- [e2e/tests/offline-helpers.ts] `installTradeMocks` 按 `X-Request-Id` 去重模拟 tx-trade 幂等；`readOfflineQueueLength` 直读 IndexedDB；`OFFLINE_HOURS` env clamp [0.0003, 4]
+- [infra/docker/docker-compose.toxiproxy.yml] + `toxiproxy/proxies.json` + `e2e/scripts/toxiproxy-inject.sh`（down/up/latency/slow_close/reset）— nightly 长时马拉松脚手架
+- [e2e/playwright.config.ts] 新增 `offline` project（timeout 90s，POS_BASE_URL 可覆盖）；`e2e/package.json` 新增 `test:offline` + `test:offline:marathon`
+- [.github/workflows/offline-e2e.yml] PR 触发（OFFLINE_HOURS=0.01，20min 超时）+ nightly cron（UTC 18:00，OFFLINE_HOURS=4，300min 超时）+ workflow_dispatch；失败自动上传日志 + Playwright 报告
+- [e2e/README.md] 4 场景表 + 本地跑法 + nightly 马拉松 + toxiproxy 组合 + CI 策略
+
+### 数据变化
+- 迁移版本：无（纯 E2E + CI 基础设施）
+- 新增文件：7（offline-cashier.spec.ts / offline-helpers.ts / README.md / toxiproxy-inject.sh / docker-compose.toxiproxy.yml / proxies.json / offline-e2e.yml）
+- 修改文件：2（playwright.config.ts / package.json）
+- CI 新工作流：1（offline-e2e.yml，覆盖 PR + nightly + manual）
+
+### 遗留问题
+- 场景 3（重连 flush）timing-sensitive：`useOffline` online→syncQueue→IDB clear 毫秒级时序，CI 若现 >5% flake 需把 waitForFunction timeout 放宽
+- toxiproxy 脚手架已到位，但 spec 用 `page.route` mock 自闭环；真正接 toxiproxy 的长时 marathon spec 留给 A2 后续 PR
+- 首次 CI 跑要装 2GB+ Playwright 浏览器内核（~90s）
+
+### 明日计划
+- 等 CI 绿后合入 PR E；若 Week 8 DEMO 硬门禁相关的 nightly 连跑 3 晚全绿即视为通过
+- 启动 PR F：Sprint F1 14 适配器 `emit_adapter_event` 基类
+- 启动 Sprint D1 批次 1 编码（按设计稿 `docs/sprint-plans/sprint-d1-constraint-context-design.md`）
+
+---
+
+## 2026-04-18 Sprint A4 — tx-trade RBAC 统一装饰器 + 审计日志（Follow-up PR D）
+
+### 今日完成
+- [shared/db-migrations] v261_trade_audit_logs：按月分区 + RLS（app.tenant_id）+ 3 索引，预建 2026-04/05/06 分区，upgrade/downgrade 可回滚
+- [services/tx-trade/src/services/trade_audit_log.py] `write_audit(...)` 审计写入器：set_config + INSERT；SQLAlchemyError rollback 不抛；最外层 except Exception（§XIV 例外）+ exc_info=True 兜底，审计永不阻塞业务
+- [services/tx-trade/src/security/rbac.py] UserContext + require_role(*roles) + require_mfa(*roles) + extract_user_context；与 gateway/src/middleware/rbac.py 同语义；TX_AUTH_ENABLED=false 时 dev bypass
+- [services/tx-trade/src/api] 9 个路由文件（payment_direct/refund/discount_engine/discount_audit/scan_pay/banquet_payment/platform_coupon/enterprise_meal/douyin_voucher）共 33/52 端点接入 `Depends(require_role(...))` + `write_audit(...)` 留痕；discount_engine 对 > ¥100 manual_discount 强制 store_manager+MFA
+- [services/tx-trade/src/tests] TDD 15 条新测试全绿：`test_trade_audit_log.py`（6）+ `test_rbac_decorator.py`（5）+ `test_rbac_integration.py`（4 端到端）
+
+### 数据变化
+- 迁移版本：v260 → **v261**（trade_audit_logs 按月分区）
+- 新增 API 模块：0（仅给现有 9 个路由加拦截 + 审计）
+- 新增测试：15（audit_log 6 + rbac 5 + integration 4）
+- 新增文件：6（v261 迁移 / rbac.py / trade_audit_log.py / 3 个 test\_\*.py）
+- 修改文件：11（9 个路由 + 2 个 baseline 测试加 TX_AUTH_ENABLED）
+
+### 遗留问题
+- 19/52 端点未接入 RBAC（读路径为主）：banquet_payment 3 读 / enterprise_meal 3 读 / douyin_voucher 5 读 / 其他服务域 0 覆盖
+- `test_douyin_voucher.py` 3 条既有 bug（data["ok"] 期望值不匹配）pre-existing，非本 PR 回归
+- `scan_pay_routes.py` 顶部 `datetime/timezone` pre-existing F401（非本 PR 引入）
+- tx-trade 以外服务（tx-member/tx-finance/tx-supply）的资金敏感路由同样 0 RBAC，待下个 PR
+
+### 明日计划
+- 独立验证会话（CLAUDE.md §19）：Tier 1 路径 + 多文件改动，新 session 审查支付/退款流程
+- Follow-up PR D.2：补齐 19 个读端点 RBAC
+- Follow-up PR D.3：rbac 提升到 shared/security/，tx-member/tx-finance/tx-supply 共用
+
+---
+
+## 2026-04-18 Sprint 启动 — 主规划 V1.0 + A1 前端 TDD + F1 适配器评审骨架
+
 ## 2026-04-18 v6审计Gate2/3推进 — 异常层级+except收窄+POS/Agent测试补全
 
 ### 今日完成

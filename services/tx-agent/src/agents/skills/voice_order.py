@@ -120,6 +120,9 @@ class VoiceOrderAgent(SkillAgent):
     priority = "P1"
     run_location = "edge+cloud"
 
+    # Sprint D1 / PR H 批次 2：语音点菜影响点单速度体验
+    constraint_scope = {"experience"}
+
     def get_supported_actions(self) -> list[str]:
         return [
             "transcribe", "parse_order_intent", "match_dishes",

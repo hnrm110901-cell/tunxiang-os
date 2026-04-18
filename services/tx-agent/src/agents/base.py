@@ -10,10 +10,12 @@ import time
 import uuid
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Any, Optional
+from typing import Any, ClassVar, Optional
 
 import structlog
 from sqlalchemy.exc import SQLAlchemyError
+
+from .context import ConstraintContext
 
 logger = structlog.get_logger()
 
@@ -34,6 +36,8 @@ class AgentResult:
     agent_level: int = 1  # 1=suggest, 2=auto+rollback, 3=fully_autonomous
     rollback_window_min: int = 30  # Level 2: minutes before auto-commit
     rollback_id: str = ""  # For Level 2 rollback tracking
+    # Sprint D1 / PR G：结构化约束输入。优先级：result.context > result.data 组装 > 类级 scope
+    context: Optional[ConstraintContext] = None
 
 
 @dataclass
@@ -57,6 +61,13 @@ class SkillAgent(ABC):
     priority: str = "P2"  # P0/P1/P2
     run_location: str = "cloud"  # "edge", "cloud", "edge+cloud"
     agent_level: int = 1  # 1=suggest, 2=auto+rollback, 3=fully_autonomous
+
+    # Sprint D1 / PR G：三条硬约束作用域声明
+    #   默认校验全部三条（与旧行为等价）。
+    #   只读 / 纯 ETL / 内容生成 Skill 可设为 set()，配合 constraint_waived_reason 解释
+    #   迁移期兼容：result.context 优先；否则从 result.data 自动组装；最后用本类级 scope
+    constraint_scope: ClassVar[set[str]] = {"margin", "safety", "experience"}
+    constraint_waived_reason: ClassVar[Optional[str]] = None
 
     def __init__(
         self,
@@ -100,20 +111,60 @@ class SkillAgent(ABC):
             result.rollback_id = str(uuid.uuid4())
             result.rollback_window_min = 30
 
-        # 三条硬约束校验
+        # 三条硬约束校验（Sprint D1 / PR G：引入 scope 声明 + 显式豁免 + N/A 标记）
         from .constraints import ConstraintChecker
         checker = ConstraintChecker()
-        constraint_result = checker.check_all(result.data)
-        result.constraints_passed = constraint_result.passed
-        result.constraints_detail = constraint_result.to_dict()
 
-        if not constraint_result.passed:
-            logger.warning(
-                "constraint_violation",
-                agent=self.agent_id,
-                action=action,
-                violations=constraint_result.violations,
-            )
+        # 显式豁免：Skill 类级 constraint_scope=set() 表示不适用任何约束
+        if not self.constraint_scope:
+            if not self.constraint_waived_reason:
+                logger.error(
+                    "constraint_waiver_missing_reason",
+                    agent=self.agent_id,
+                    action=action,
+                    hint="声明 constraint_scope=set() 时必须同时填 constraint_waived_reason (≥30字符)",
+                )
+            result.constraints_passed = True
+            result.constraints_detail = {
+                "passed": True,
+                "scope": "waived",
+                "waived_reason": self.constraint_waived_reason,
+                "scopes_checked": [],
+                "scopes_skipped": [],
+                "violations": [],
+            }
+        else:
+            # 优先级：result.context > result.data 组装 > 类级 scope
+            ctx = result.context or ConstraintContext.from_data(result.data)
+            constraint_result = checker.check_all(ctx, scope=self.constraint_scope)
+
+            # 决定 scope 标签（n/a / 单 scope / mixed）
+            if not constraint_result.scopes_checked and constraint_result.scopes_skipped:
+                # 该校验的都没数据 —— 标 "n/a"，CI 后续可按此统计
+                constraint_result.scope = "n/a"
+                logger.warning(
+                    "constraint_scope_na",
+                    agent=self.agent_id,
+                    action=action,
+                    declared_scope=sorted(self.constraint_scope),
+                    skipped=constraint_result.scopes_skipped,
+                    hint="Skill 声明需要校验，但 context/data 中没有必要字段",
+                )
+            elif len(constraint_result.scopes_checked) == 1:
+                constraint_result.scope = constraint_result.scopes_checked[0]
+            else:
+                constraint_result.scope = "mixed"
+
+            result.constraints_passed = constraint_result.passed
+            result.constraints_detail = constraint_result.to_dict()
+
+            if not constraint_result.passed:
+                logger.warning(
+                    "constraint_violation",
+                    agent=self.agent_id,
+                    action=action,
+                    violations=constraint_result.violations,
+                )
 
         # ── Session 事件记录（当 DB 可用时）──
         if self._db is not None:

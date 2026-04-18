@@ -1,0 +1,105 @@
+name: Offline E2E (Sprint A2 P0-2)
+
+# 触发时机：
+#   pull_request: 改动到 web-pos 离线相关代码时 PR 门禁（快速版，~90s）
+#   schedule:     每日 UTC 18:00（北京时间 02:00）跑 4h 断网马拉松
+#   workflow_dispatch: 手动触发 + 可选 OFFLINE_HOURS 输入
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'apps/web-pos/**'
+      - 'e2e/**'
+      - 'infra/docker/docker-compose.toxiproxy.yml'
+      - 'infra/docker/toxiproxy/**'
+      - '.github/workflows/offline-e2e.yml'
+  schedule:
+    # nightly 马拉松：北京时间 02:00 开始，最长 4.5h 后自动终止
+    - cron: '0 18 * * *'
+  workflow_dispatch:
+    inputs:
+      offline_hours:
+        description: '模拟断网时长（小时，0.01-4）'
+        default: '0.01'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  offline-e2e:
+    name: web-pos offline cashier
+    runs-on: ubuntu-latest
+    timeout-minutes: ${{ (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && 300 || 20 }}
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: pnpm/action-setup@v5
+        with:
+          version: 8
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: 'pnpm'
+
+      - name: Install workspace dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright browsers
+        run: pnpm --dir e2e exec playwright install --with-deps chromium
+
+      # ── 启动 web-pos dev server（后台） ───────────────────────────────
+      - name: Start web-pos dev server
+        run: |
+          cd apps/web-pos
+          pnpm dev --port 5174 --host 0.0.0.0 > /tmp/web-pos.log 2>&1 &
+          echo $! > /tmp/web-pos.pid
+          # 等待端口可用
+          for i in $(seq 1 30); do
+            if curl -sSf http://localhost:5174 >/dev/null 2>&1; then
+              echo "web-pos ready after ${i}s"
+              break
+            fi
+            sleep 1
+          done
+          curl -sSf http://localhost:5174 >/dev/null || { tail -200 /tmp/web-pos.log; exit 1; }
+
+      # ── 运行 offline project ──────────────────────────────────────────
+      - name: Run offline E2E
+        env:
+          # PR 用 0.01h（36s），nightly 用 4h，workflow_dispatch 用用户输入
+          OFFLINE_HOURS: >-
+            ${{
+              github.event_name == 'schedule' && '4'
+              || (github.event_name == 'workflow_dispatch' && inputs.offline_hours || '0.01')
+            }}
+          POS_BASE_URL: http://localhost:5174
+        run: pnpm --dir e2e run test:offline
+
+      # ── 失败时收集日志 ────────────────────────────────────────────────
+      - name: Upload web-pos log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-pos-log
+          path: /tmp/web-pos.log
+          retention-days: 7
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-${{ github.run_id }}
+          path: e2e/playwright-report/
+          retention-days: 7
+
+      - name: Stop dev server
+        if: always()
+        run: |
+          if [ -f /tmp/web-pos.pid ]; then
+            kill "$(cat /tmp/web-pos.pid)" 2>/dev/null || true
+          fi

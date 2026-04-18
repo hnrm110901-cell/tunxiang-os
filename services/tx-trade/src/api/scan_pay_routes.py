@@ -18,6 +18,9 @@ from shared.events.src.emitter import emit_event
 from shared.events.src.event_types import PaymentEventType
 from shared.ontology.src.database import get_db
 
+from ..security.rbac import UserContext, require_role
+from ..services.trade_audit_log import write_audit
+
 router = APIRouter(prefix="/api/v1/payments", tags=["scan-pay"])
 
 
@@ -56,6 +59,7 @@ async def scan_pay(
     body: ScanPayRequest,
     request: Request,
     db: AsyncSession = Depends(get_db),
+    user: UserContext = Depends(require_role("cashier", "store_manager", "admin")),
 ):
     """扫码收款 — 写入 scan_pay_transactions，模拟调用第三方支付（异步）。"""
     tenant_id = _get_tenant_id(request)
@@ -98,6 +102,20 @@ async def scan_pay(
 
         # 异步模拟支付结果（实际应调用微信/支付宝 API）
         asyncio.create_task(_simulate_payment(payment_id, tenant_id, body.store_id, body.amount_fen, channel))
+
+        # Sprint A4 审计留痕
+        await write_audit(
+            db,
+            tenant_id=tenant_id,
+            store_id=body.store_id,
+            user_id=user.user_id,
+            user_role=user.role,
+            action="payment.scan_pay.create",
+            target_type="payment",
+            target_id=None,
+            amount_fen=body.amount_fen,
+            client_ip=user.client_ip,
+        )
 
         return _ok({
             "payment_id": payment_id,
@@ -154,6 +172,7 @@ async def get_payment_status(
     payment_id: str,
     request: Request,
     db: AsyncSession = Depends(get_db),
+    user: UserContext = Depends(require_role("cashier", "store_manager", "admin")),
 ):
     """查询支付状态。"""
     tenant_id = _get_tenant_id(request)
@@ -191,6 +210,7 @@ async def cancel_payment(
     payment_id: str,
     request: Request,
     db: AsyncSession = Depends(get_db),
+    user: UserContext = Depends(require_role("cashier", "store_manager", "admin")),
 ):
     """取消支付（仅限 pending 状态）。"""
     tenant_id = _get_tenant_id(request)
@@ -212,6 +232,18 @@ async def cancel_payment(
         if not row:
             raise HTTPException(status_code=400, detail="支付记录不存在或已非 pending 状态")
         await db.commit()
+        await write_audit(
+            db,
+            tenant_id=tenant_id,
+            store_id=user.store_id,
+            user_id=user.user_id,
+            user_role=user.role,
+            action="payment.scan_pay.cancel",
+            target_type="payment",
+            target_id=None,
+            amount_fen=None,
+            client_ip=user.client_ip,
+        )
         return _ok({"payment_id": payment_id, "status": "cancelled"})
     except HTTPException:
         raise

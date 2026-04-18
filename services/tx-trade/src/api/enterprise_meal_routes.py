@@ -14,6 +14,8 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..db import get_db
+from ..security.rbac import UserContext, require_role
+from ..services.trade_audit_log import write_audit
 
 router = APIRouter(
     prefix="/api/v1/trade/enterprise",
@@ -140,8 +142,9 @@ async def get_enterprise_account(
 async def create_enterprise_meal_order(
     req: CreateEnterpriseMealOrderReq,
     db: AsyncSession = Depends(get_db),
+    user: UserContext = Depends(require_role("store_manager", "admin", "cashier")),
 ):
-    """提交企业订餐订单，写入 enterprise_meal_orders"""
+    """提交企业订餐订单，写入 enterprise_meal_orders（店长/管理员/收银员）"""
     meal_date = req.meal_date or date.today().isoformat()
     dish_ids = json.dumps([item.dish_id for item in req.items])
 
@@ -168,6 +171,18 @@ async def create_enterprise_meal_order(
         await db.commit()
         row = result.first()
         order_id = str(row[0]) if row else "EMO" + datetime.now().strftime("%Y%m%d%H%M%S")
+        await write_audit(
+            db,
+            tenant_id=req.company_id,
+            store_id=req.store_id or None,
+            user_id=user.user_id,
+            user_role=user.role,
+            action="enterprise_meal.order.create",
+            target_type="order",
+            target_id=order_id,
+            amount_fen=req.total_fen,
+            client_ip=user.client_ip,
+        )
         return _ok({
             "order_id": order_id,
             "status": "accepted",

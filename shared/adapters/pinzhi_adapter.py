@@ -21,9 +21,11 @@ from __future__ import annotations
 import os
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
+from uuid import UUID
 
 import structlog
 
+from .base.src.event_bus import AdapterEventMixin
 from .pinzhi.src.adapter import PinzhiAdapter
 from .pinzhi.src.order_sync import PinzhiOrderSync
 from .pinzhi.src.dish_sync import PinzhiDishSync
@@ -49,18 +51,24 @@ TUNXIANG_TO_PINZHI_STATUS: Dict[str, int] = {
 }
 
 
-class PinzhiPOSAdapter:
+class PinzhiPOSAdapter(AdapterEventMixin):
     """品智POS旧系统适配器 -- 用于数据迁移和并行运行期
 
     封装品智POS的全量数据同步能力，包括订单、菜品、会员、库存。
     并行运行期间支持双向状态同步（屯象 -> 品智回写）。
 
+    Sprint F1 / PR F：接入事件总线（AdapterEventMixin）。当调用方传入
+    `tenant_id` 时，自动发射 SYNC_STARTED / SYNC_FINISHED / SYNC_FAILED
+    三元事件到 tx_adapter_events 流。向后兼容：不传 tenant_id 时保持原逻辑。
+
     使用示例：
         async with PinzhiPOSAdapter() as adapter:
-            orders = await adapter.sync_orders(since=yesterday)
+            orders = await adapter.sync_orders(since=yesterday, tenant_id=TID)
             menu = await adapter.sync_menu(store_id="OGN001")
             members = await adapter.sync_members(since=last_week)
     """
+
+    adapter_name = "pinzhi"
 
     def __init__(
         self,
@@ -115,17 +123,40 @@ class PinzhiPOSAdapter:
 
     # -- 订单同步 ---------------------------------------------------
 
-    async def sync_orders(self, since: datetime) -> list[dict]:
+    async def sync_orders(
+        self,
+        since: datetime,
+        tenant_id: Optional[UUID | str] = None,
+        store_id: Optional[UUID | str] = None,
+    ) -> list[dict]:
         """从品智POS拉取订单，转换为屯象格式
 
         按天遍历 [since, today] 区间，拉取所有订单并映射为屯象标准格式。
 
         Args:
             since: 起始时间
+            tenant_id: 租户 UUID（可选）。传入时自动发射 SYNC_STARTED/FINISHED/FAILED
+                       到 tx_adapter_events 流；不传时保持向后兼容行为
+            store_id: 门店 UUID（可选）
 
         Returns:
             屯象统一订单格式列表
         """
+        if tenant_id is None:
+            return await self._do_sync_orders(since)
+
+        async with self.track_sync(
+            tenant_id=tenant_id,
+            scope="orders",
+            store_id=store_id,
+            metadata={"since": since.isoformat()},
+        ) as track:
+            mapped = await self._do_sync_orders(since)
+            track.ingested = len(mapped)
+            return mapped
+
+    async def _do_sync_orders(self, since: datetime) -> list[dict]:
+        """实际的订单同步逻辑（不带事件埋点）。"""
         if self.mock_mode:
             return self._mock_orders(since)
 

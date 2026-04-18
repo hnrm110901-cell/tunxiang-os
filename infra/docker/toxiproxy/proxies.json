@@ -1,0 +1,20 @@
+[
+  {
+    "name": "tx-trade",
+    "listen": "0.0.0.0:18001",
+    "upstream": "tx-trade:8001",
+    "enabled": true
+  },
+  {
+    "name": "tx-menu",
+    "listen": "0.0.0.0:18002",
+    "upstream": "tx-menu:8002",
+    "enabled": true
+  },
+  {
+    "name": "tx-agent",
+    "listen": "0.0.0.0:18008",
+    "upstream": "tx-agent:8008",
+    "enabled": true
+  }
+]

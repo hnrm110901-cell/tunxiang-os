@@ -36,6 +36,9 @@ class SmartServiceAgent(SkillAgent):
     priority = "P2"
     run_location = "cloud"
 
+    # Sprint D1 / PR H 批次 2：投诉处理源于体验缺陷，改进建议闭环到出餐时长
+    constraint_scope = {"experience"}
+
     def get_supported_actions(self) -> list[str]:
         return [
             "analyze_feedback", "handle_complaint", "generate_improvements",

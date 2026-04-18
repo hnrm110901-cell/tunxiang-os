@@ -5,7 +5,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
 
+from ..security.rbac import UserContext, require_role
 from ..services import coupon_platform_service as cps
+from ..services.trade_audit_log import write_audit
 
 router = APIRouter(
     prefix="/api/v1/trade/platform-coupon",
@@ -57,6 +59,7 @@ async def verify_platform_coupon(
     body: VerifyReq,
     request: Request,
     db: AsyncSession = Depends(get_db),
+    user: UserContext = Depends(require_role("cashier", "store_manager", "admin")),
 ):
     """聚合验证 — 扫码自动识别平台并验证"""
     tenant_id = _get_tenant_id(request)
@@ -66,6 +69,18 @@ async def verify_platform_coupon(
         tenant_id=tenant_id,
         db=db,
     )
+    await write_audit(
+        db,
+        tenant_id=tenant_id,
+        store_id=body.store_id,
+        user_id=user.user_id,
+        user_role=user.role,
+        action="platform_coupon.verify",
+        target_type="coupon",
+        target_id=None,
+        amount_fen=None,
+        client_ip=user.client_ip,
+    )
     return {"ok": True, "data": result}
 
 
@@ -74,6 +89,7 @@ async def redeem_platform_coupon(
     body: RedeemReq,
     request: Request,
     db: AsyncSession = Depends(get_db),
+    user: UserContext = Depends(require_role("cashier", "store_manager", "admin")),
 ):
     """核销 — 关联 order_id"""
     tenant_id = _get_tenant_id(request)
@@ -84,6 +100,18 @@ async def redeem_platform_coupon(
             order_id=body.order_id,
             tenant_id=tenant_id,
             db=db,
+        )
+        await write_audit(
+            db,
+            tenant_id=tenant_id,
+            store_id=user.store_id,
+            user_id=user.user_id,
+            user_role=user.role,
+            action="platform_coupon.redeem",
+            target_type="order",
+            target_id=body.order_id,
+            amount_fen=None,
+            client_ip=user.client_ip,
         )
         return {"ok": True, "data": result}
     except ValueError as e:
@@ -97,8 +125,9 @@ async def get_redemption_report(
     end_date: str,
     request: Request,
     db: AsyncSession = Depends(get_db),
+    user: UserContext = Depends(require_role("store_manager", "admin", "auditor", "audit_admin")),
 ):
-    """核销报告 — 按平台/日期汇总"""
+    """核销报告 — 按平台/日期汇总（只读）"""
     tenant_id = _get_tenant_id(request)
     result = await cps.get_redemption_report(
         store_id=store_id,
@@ -114,6 +143,7 @@ async def reconcile_platform(
     body: ReconcileReq,
     request: Request,
     db: AsyncSession = Depends(get_db),
+    user: UserContext = Depends(require_role("store_manager", "admin")),
 ):
     """平台对账 — 平台金额 vs 系统金额"""
     tenant_id = _get_tenant_id(request)
@@ -123,5 +153,17 @@ async def reconcile_platform(
         date_str=body.date,
         tenant_id=tenant_id,
         db=db,
+    )
+    await write_audit(
+        db,
+        tenant_id=tenant_id,
+        store_id=body.store_id,
+        user_id=user.user_id,
+        user_role=user.role,
+        action="platform_coupon.reconcile",
+        target_type="reconcile",
+        target_id=None,
+        amount_fen=None,
+        client_ip=user.client_ip,
     )
     return {"ok": True, "data": result}

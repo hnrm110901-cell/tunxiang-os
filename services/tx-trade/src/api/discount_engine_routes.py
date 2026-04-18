@@ -31,7 +31,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
 
+from ..security.rbac import UserContext, require_role
+from ..services.trade_audit_log import write_audit
+
 router = APIRouter(prefix="/api/v1/discount", tags=["discount-engine"])
+
+# Sprint A4：大额减免 MFA 阈值（分），>= 此值要求 MFA 验证
+LARGE_DISCOUNT_THRESHOLD_FEN = 10000  # ¥100
 
 # ─── 常量 ───────────────────────────────────────────────────────────────────
 
@@ -334,6 +340,7 @@ async def get_discount_rules(
     request: Request,
     store_id: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
+    user: UserContext = Depends(require_role("cashier", "store_manager", "admin")),
 ):
     """GET /api/v1/discount/rules — 返回门店激活规则列表（按 priority 排序）"""
     tenant_id = _get_tenant_id(request)
@@ -357,8 +364,12 @@ async def calculate_discount(
     req: CalculateRequest,
     request: Request,
     db: AsyncSession = Depends(get_db),
+    user: UserContext = Depends(require_role("cashier", "store_manager", "admin")),
 ):
     """POST /api/v1/discount/calculate — 多优惠叠加计算
+
+    Sprint A4：> ¥100 的 manual_discount 减免要求 MFA。其他优惠（会员价/平台券/满减）
+    属于规则驱动，不需要 MFA。
 
     引擎逻辑：
       1. 查询门店 discount_rules，按 priority 排序
@@ -373,6 +384,17 @@ async def calculate_discount(
     for d in req.discounts:
         if d.type not in VALID_TYPES:
             _err(f"无效的优惠类型: {d.type}，有效值: {', '.join(VALID_TYPES)}")
+
+    # Sprint A4：大额 manual_discount 要求 MFA（店长/管理员 + MFA 才能过）
+    max_manual_deduct = max(
+        (d.deduct_fen or 0 for d in req.discounts if d.type == "manual_discount"),
+        default=0,
+    )
+    if max_manual_deduct >= LARGE_DISCOUNT_THRESHOLD_FEN:
+        if user.role not in {"store_manager", "admin"}:
+            raise HTTPException(status_code=403, detail="ROLE_FORBIDDEN")
+        if not user.mfa_verified:
+            raise HTTPException(status_code=403, detail="MFA_REQUIRED")
 
     try:
         # 1. 查询规则
@@ -416,6 +438,20 @@ async def calculate_discount(
             log_id = None
             await db.rollback()
 
+        # Sprint A4 RBAC 审计留痕
+        await write_audit(
+            db,
+            tenant_id=tenant_id,
+            store_id=user.store_id,
+            user_id=user.user_id,
+            user_role=user.role,
+            action="discount.apply",
+            target_type="order",
+            target_id=req.order_id,
+            amount_fen=total_saved_fen or None,
+            client_ip=user.client_ip,
+        )
+
         return _ok({
             "base_amount_fen": req.base_amount_fen,
             "applied_steps": applied_steps,
@@ -443,6 +479,7 @@ async def create_discount_rule(
     req: CreateRuleRequest,
     request: Request,
     db: AsyncSession = Depends(get_db),
+    user: UserContext = Depends(require_role("admin")),
 ):
     """POST /api/v1/discount/rules — 新建折扣规则（需管理员权限）"""
     tenant_id = _get_tenant_id(request)
@@ -482,6 +519,18 @@ async def create_discount_rule(
             },
         )
         await db.commit()
+        await write_audit(
+            db,
+            tenant_id=tenant_id,
+            store_id=user.store_id,
+            user_id=user.user_id,
+            user_role=user.role,
+            action="discount.rule.create",
+            target_type="discount_rule",
+            target_id=rule_id,
+            amount_fen=None,
+            client_ip=user.client_ip,
+        )
         return _ok({"rule_id": rule_id, "message": "规则创建成功"})
     except SQLAlchemyError as e:
         await db.rollback()
@@ -497,6 +546,7 @@ async def update_discount_rule(
     req: UpdateRuleRequest,
     request: Request,
     db: AsyncSession = Depends(get_db),
+    user: UserContext = Depends(require_role("admin")),
 ):
     """PUT /api/v1/discount/rules/{rule_id} — 更新折扣规则（需管理员权限）"""
     tenant_id = _get_tenant_id(request)
@@ -549,6 +599,18 @@ async def update_discount_rule(
             _err("规则不存在或无权限修改", 404)
 
         await db.commit()
+        await write_audit(
+            db,
+            tenant_id=tenant_id,
+            store_id=user.store_id,
+            user_id=user.user_id,
+            user_role=user.role,
+            action="discount.rule.update",
+            target_type="discount_rule",
+            target_id=rule_id,
+            amount_fen=None,
+            client_ip=user.client_ip,
+        )
         return _ok({"rule_id": rule_id, "message": "规则更新成功"})
     except HTTPException:
         raise

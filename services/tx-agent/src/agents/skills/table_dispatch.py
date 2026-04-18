@@ -36,6 +36,9 @@ class TableDispatchAgent(SkillAgent):
     priority = "P1"
     run_location = "cloud"
 
+    # Sprint D1 / PR H 批次 2：桌台调度影响等位/翻台体验
+    constraint_scope = {"experience"}
+
     def get_supported_actions(self) -> list[str]:
         return ["suggest_seating", "analyze_utilization", "predict_wait"]
 

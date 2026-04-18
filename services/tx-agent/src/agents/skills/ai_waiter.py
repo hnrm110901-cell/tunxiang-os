@@ -70,6 +70,9 @@ class AIWaiterAgent(SkillAgent):
     priority = "P1"
     run_location = "cloud"
 
+    # Sprint D1 / PR H 批次 2：点菜推荐影响整桌出餐节奏（体验）+ 毛利最大化（推高毛利菜）
+    constraint_scope = {"margin", "experience"}
+
     def get_supported_actions(self) -> list[str]:
         return ["suggest_dishes", "answer_question", "upsell_suggestion"]
 
