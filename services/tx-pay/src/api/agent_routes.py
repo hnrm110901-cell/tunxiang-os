@@ -137,7 +137,10 @@ async def confirm_payment(
 
 
 @router.post("/reject")
-async def reject_payment(req: RejectReq):
+async def reject_payment(
+    req: RejectReq,
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+):
     """人类拒绝 Agent 发起的支付"""
     protocol = _get_protocol()
     await protocol.reject_payment(
@@ -148,7 +151,10 @@ async def reject_payment(req: RejectReq):
 
 
 @router.get("/pending")
-async def list_pending(agent_id: Optional[str] = None):
+async def list_pending(
+    agent_id: Optional[str] = None,
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+):
     """列出待确认的 Agent 支付"""
     protocol = _get_protocol()
     pending = await protocol.list_pending(agent_id=agent_id)

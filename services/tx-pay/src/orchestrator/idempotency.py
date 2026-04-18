@@ -8,6 +8,7 @@
 """
 from __future__ import annotations
 
+import json
 from typing import Optional
 
 import structlog
@@ -95,7 +96,7 @@ class IdempotencyGuard:
                 "status": status,
                 "trade_no": trade_no,
                 "amount_fen": amount_fen,
-                "channel_data": str(channel_data or {}),
+                "channel_data": json.dumps(channel_data or {}, ensure_ascii=False),
             },
         )
         await self._db.flush()

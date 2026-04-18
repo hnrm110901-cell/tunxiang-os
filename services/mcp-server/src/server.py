@@ -169,23 +169,25 @@ async def _execute_payment_tool(action: str, arguments: dict) -> str:
 
     method, path = route
     url = f"{TX_PAY_API_BASE}{path}"
-    tenant_id = arguments.pop("tenant_id", os.environ.get("TX_TENANT_ID", "default"))
+    tenant_id = arguments.get("tenant_id", os.environ.get("TX_TENANT_ID", "default"))
+    # Create a copy without tenant_id to avoid sending it as a request param
+    call_args = {k: v for k, v in arguments.items() if k != "tenant_id"}
     headers = {"X-Tenant-ID": tenant_id}
 
     try:
         async with httpx.AsyncClient(timeout=10) as client:
             if method == "GET":
-                resp = await client.get(url, params=arguments, headers=headers)
+                resp = await client.get(url, params=call_args, headers=headers)
             else:
-                resp = await client.post(url, json=arguments, headers=headers)
+                resp = await client.post(url, json=call_args, headers=headers)
         return resp.text
     except httpx.ConnectError:
         return json.dumps({
-            "success": True,
+            "success": False,
+            "error": "tx-pay service unreachable",
+            "stub": True,
             "action": action,
             "agent_id": "payment_nexus",
-            "data": {"stub": True, "message": f"tx-pay 服务不可达，返回 stub 响应"},
-            "input_params": arguments,
         }, ensure_ascii=False)
     except httpx.TimeoutException:
         return json.dumps({"error": "tx-pay 服务超时", "action": action})

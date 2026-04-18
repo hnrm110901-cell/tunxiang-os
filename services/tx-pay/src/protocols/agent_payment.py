@@ -96,8 +96,13 @@ class AgentPaymentProtocol:
 
     def __init__(self, payment_service: object) -> None:
         self._svc = payment_service
-        # 内存存储准备好的支付（生产环境应持久化到 DB）
+        # KNOWN LIMITATION: 内存存储准备好的支付，服务重启后所有待确认支付丢失。
+        # TODO: 持久化到 DB（payment_agent_prepared 表），需配合迁移脚本。
         self._prepared: dict[str, PreparedPayment] = {}
+        logger.warning(
+            "agent_payment_in_memory_storage",
+            msg="AgentPaymentProtocol 使用内存存储，重启将丢失所有待确认支付",
+        )
 
     async def prepare_payment(
         self,

@@ -8,6 +8,7 @@
 """
 from __future__ import annotations
 
+import json
 from typing import Optional
 from uuid import UUID
 
@@ -127,7 +128,7 @@ async def upsert_config(
             "channel_name": req.channel_name,
             "priority": req.priority,
             "is_active": req.is_active,
-            "config_data": str(req.config_data),
+            "config_data": json.dumps(req.config_data, ensure_ascii=False),
         },
     )
     await db.commit()
