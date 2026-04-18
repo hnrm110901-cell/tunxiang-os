@@ -1,7 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState, ReactNode } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { getStoreToken } from './api/index';
 import { fetchTrainingModeStatus } from './api/trainingModeApi';
+import { ErrorBoundary, reportCrashToTelemetry } from './components/ErrorBoundary';
+import { isEnabled } from './config/featureFlags';
+import { registerOfflineEnqueue } from './api/tradeApi';
+import { useOffline } from './hooks/useOffline';
 import { PosLoginPage } from './pages/PosLoginPage';
 import { InventoryAlertBanner } from './pages/InventoryAlertBanner';
 import { CashierPage } from './pages/CashierPage';
@@ -46,6 +50,35 @@ import { BanquetDepositPage } from './pages/BanquetDepositPage';  // 模块4.1 �
 const STORE_ID: string =
   (window as unknown as Record<string, unknown>).__STORE_ID__ as string || '';
 
+/**
+ * 结算专属 ErrorBoundary —— Sprint A1 审查收窄：
+ * 顶层 ErrorBoundary 文案改为中性，结算相关路由（/settle /order）在内层用
+ * "结账失败，请扫桌重试" 的专属降级 UI，避免收银员在非结算页崩溃时看到"结账失败"误导。
+ */
+function CashierBoundary({ children }: { children: ReactNode }): JSX.Element {
+  if (!isEnabled('trade.pos.errorBoundary.enable')) {
+    return <>{children}</>;
+  }
+  return (
+    <ErrorBoundary onReport={reportCrashToTelemetry}>
+      {children}
+    </ErrorBoundary>
+  );
+}
+
+/**
+ * 离线队列桥接 —— 把 useOffline.enqueue 注册给 tradeApi.txFetchOffline 使用。
+ * 不新增 UI、不改 useOffline 内部逻辑。
+ */
+function OfflineBridge(): null {
+  const { enqueue } = useOffline();
+  useEffect(() => {
+    registerOfflineEnqueue(async (op) => enqueue(op));
+    return () => registerOfflineEnqueue(null);
+  }, [enqueue]);
+  return null;
+}
+
 /** 内层布局组件（必须在 BrowserRouter 内，InventoryAlertBanner 需要 useNavigate） */
 function AppLayout() {
   const { isTrainingMode, currentScenario, startedAt, exitTrainingMode } = useTrainingMode();
@@ -79,6 +112,7 @@ function AppLayout() {
 
   return (
     <div style={{ minHeight: '100vh', background: '#111827' }}>
+      <OfflineBridge />
       {/* 训练模式橙色横幅 — 训练模式激活时固定在顶部 */}
       {isTrainingMode && (
         <TrainingModeBanner
@@ -101,8 +135,8 @@ function AppLayout() {
         <Route path="/reservations" element={<ReservationPage />} />
         <Route path="/open-table/:tableNo" element={<OpenTablePage />} />
         <Route path="/cashier/:tableNo" element={<CashierPage />} />
-        <Route path="/order/:orderId" element={<OrderPage />} />
-        <Route path="/settle/:orderId" element={<SettlePage />} />
+        <Route path="/order/:orderId" element={<CashierBoundary><OrderPage /></CashierBoundary>} />
+        <Route path="/settle/:orderId" element={<CashierBoundary><SettlePage /></CashierBoundary>} />
         <Route path="/credit-pay/:orderId" element={<CreditPayPage />} />
         <Route path="/reverse-settle" element={<ReverseSettlePage />} />
         <Route path="/split-pay/:orderId" element={<SplitPayPage />} />

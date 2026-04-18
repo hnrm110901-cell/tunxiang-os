@@ -26,6 +26,8 @@
 import { useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { getStoreToken } from './api/index';
+import { ConnectionProvider, useConnection } from './contexts/ConnectionContext';
+import { OfflineBanner } from './components/OfflineBanner';
 import { KdsLoginPage } from './pages/KdsLoginPage';
 import { KDSBoardPage } from './pages/KDSBoardPage';
 import { StoreSelectPage } from './pages/StoreSelectPage';
@@ -63,8 +65,10 @@ export default function App() {
   }
 
   return (
-    <BrowserRouter>
-      <Routes>
+    <ConnectionProvider>
+      <ConnectionBannerHost />
+      <BrowserRouter>
+        <Routes>
         {/* 默认跳转到门店选择页 */}
         <Route path="/" element={<Navigate to="/select" replace />} />
 
@@ -104,7 +108,17 @@ export default function App() {
         <Route path="/stats" element={<StatsPage />} />
         <Route path="/config" element={<KDSConfigPage />} />
         <Route path="/alerts" element={<AlertsPage />} />
-      </Routes>
-    </BrowserRouter>
+        </Routes>
+      </BrowserRouter>
+    </ConnectionProvider>
   );
+}
+
+/**
+ * ConnectionBannerHost — 顶层固定的连接降级提示条。
+ * 独立一层，让 useConnection() 能读到 ConnectionProvider 的值。
+ */
+function ConnectionBannerHost() {
+  const { health, offlineDurationMs } = useConnection();
+  return <OfflineBanner health={health} offlineDurationMs={offlineDurationMs} />;
 }

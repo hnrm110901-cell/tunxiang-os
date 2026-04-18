@@ -19,6 +19,9 @@ import { warmUpAudio, playNewOrder, playTimeout } from '../utils/audio';
 import { OrderTicketCard } from '@tx-ds/biz';
 import type { OrderTicketData } from '@tx-ds/biz';
 import { useKDSRules } from '../hooks/useKDSRules';
+import { useOrdersCache } from '../hooks/useOrdersCache';
+import { useConnection } from '../contexts/ConnectionContext';
+import { installCacheDiagnostics } from '../utils/cacheStats';
 import {
   getTimeLevelFromRules,
   getTimerColorFromLevel,
@@ -206,6 +209,20 @@ export function KDSBoardPage() {
   // 加载门店KDS规则配置（超时颜色/渠道色/标识开关）
   const { rules } = useKDSRules(storeId);
 
+  // C1: 本地 last-100-orders 缓存（旁路挂载，不改 WebSocket 主路径）
+  const ordersCache = useOrdersCache();
+  // C2: 连接健康 → 写操作 guard
+  const { health } = useConnection();
+  const isReadOnly = health !== 'online';
+  useEffect(() => {
+    installCacheDiagnostics();
+  }, []);
+  useEffect(() => {
+    if (!ordersCache.hydrating && ordersCache.stats) {
+      console.log('[KDS-Cache] stats', ordersCache.stats);
+    }
+  }, [ordersCache.hydrating, ordersCache.stats]);
+
   const [tickets, setTickets] = useState<DemoTicket[]>(() => buildMockTickets());
   const [tick, setTick] = useState(0); // 每秒刷新倒计时
   const [clock, setClock] = useState(() => formatClock());
@@ -375,7 +392,19 @@ export function KDSBoardPage() {
 
   // ─── 操作 ─────────────────────────────────────────
 
+  const warnReadOnly = useCallback(() => {
+    console.warn('[KDS] 离线只读，网络恢复后再试');
+    if (typeof window !== 'undefined' && typeof window.alert === 'function') {
+      // 无 toast 组件：用 alert 兜底，C3 再引入 toast
+      window.alert('离线只读，网络恢复后再试');
+    }
+  }, []);
+
   const handleStart = useCallback(async (id: string) => {
+    if (isReadOnly) {
+      warnReadOnly();
+      return;
+    }
     // 乐观更新
     setTickets((prev) =>
       prev.map((t) =>
@@ -385,13 +414,18 @@ export function KDSBoardPage() {
     if (!isDemo) {
       try {
         await startTicket(id);
-      } catch {
-        // 忽略，乐观更新已显示
+      } catch (err) {
+        // 乐观更新已显示，网络失败不回滚（下一轮 poll 会覆盖）
+        console.warn('[KDS] startTicket 失败，乐观保留', err);
       }
     }
-  }, [isDemo]);
+  }, [isDemo, isReadOnly, warnReadOnly]);
 
   const handleComplete = useCallback(async (id: string) => {
+    if (isReadOnly) {
+      warnReadOnly();
+      return;
+    }
     // 先标记 done，再移除（300ms 动画）
     setTickets((prev) =>
       prev.map((t) => (t.id === id ? { ...t, status: 'done' as const } : t)),
@@ -403,11 +437,11 @@ export function KDSBoardPage() {
     if (!isDemo) {
       try {
         await completeTicket(id);
-      } catch {
-        // 忽略
+      } catch (err) {
+        console.warn('[KDS] completeTicket 失败，乐观保留', err);
       }
     }
-  }, [isDemo]);
+  }, [isDemo, isReadOnly, warnReadOnly]);
 
   // ─── 统计 ────────────────────────────────────────
 

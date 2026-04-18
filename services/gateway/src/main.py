@@ -27,6 +27,7 @@ from .wecom_notify_routes import router as wecom_notify_router
 from .wecom_routes import router as wecom_router
 from .wecom_scrm_routes import router as wecom_scrm_router
 from .api.demo_healthcheck_routes import router as demo_healthcheck_router  # Week 3 演示巡检
+from .api.flags_routes import router as flags_router  # Follow-up PR B — 灰度配置下发
 
 logger = structlog.get_logger(__name__)
 
@@ -180,6 +181,9 @@ app.include_router(wecom_bot_router)
 app.include_router(sync_health_router)
 # 演示前一键巡检 API（GET /api/v1/demo/health-check）— Week 3 P0
 app.include_router(demo_healthcheck_router)
+
+# Feature Flags 下发 API（GET /api/v1/flags?domain=xxx）— Follow-up PR B
+app.include_router(flags_router)
 
 # C-04: 演示监控面板
 from .api.demo_monitor_routes import router as demo_monitor_router
