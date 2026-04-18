@@ -1,0 +1,47 @@
+# ============================================================
+# 屯象OS 故障注入环境（Sprint A2 / PR E）
+#
+# 用途：
+#   - Playwright E2E 离线/弱网场景的服务端代理
+#   - 夜跑 4 小时断网马拉松（nightly offline-e2e）
+#
+# 用法：
+#   docker compose -f infra/docker/docker-compose.toxiproxy.yml up -d
+#   pnpm --dir e2e run test:offline
+#
+# toxiproxy 监听：
+#   8474/tcp   管理 API（POST /proxies, /proxies/{name}/toxics）
+#   18001/tcp  → tx-trade:8001  （默认直通，脚本按场景注入 toxic）
+#   18002/tcp  → tx-menu:8002
+#   18008/tcp  → tx-agent:8008
+#
+# 注：toxiproxy 只影响经过 proxy 的 TCP 流量。浏览器端 `navigator.onLine`
+# 由 Playwright 的 context.setOffline(true) 控制，不依赖 toxiproxy。
+# 两者在 CI 中组合使用：先 setOffline 确保前端走离线队列，再用 toxiproxy
+# 模拟"服务端仍在运转但链路慢/丢包"的场景。
+# ============================================================
+
+services:
+  toxiproxy:
+    image: ghcr.io/shopify/toxiproxy:2.9.0
+    container_name: tx-toxiproxy
+    ports:
+      - "8474:8474"        # 管理 API
+      - "18001:18001"      # tx-trade 代理
+      - "18002:18002"      # tx-menu 代理
+      - "18008:18008"      # tx-agent 代理
+    command: ["-host", "0.0.0.0", "-config", "/config/proxies.json"]
+    volumes:
+      - ./toxiproxy/proxies.json:/config/proxies.json:ro
+    networks:
+      - txos-dev
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8474/version"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+networks:
+  txos-dev:
+    external: true
+    name: docker_txos-dev

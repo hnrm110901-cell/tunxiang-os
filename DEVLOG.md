@@ -1,3 +1,31 @@
+## 2026-04-18 Sprint A2 — 断网收银 E2E + toxiproxy CI（PR E / P0-2 Week 8 硬门禁）
+
+### 今日完成
+- [e2e/tests/offline-cashier.spec.ts] 4 场景：断网结账入队 / 幂等不重入 / 重连 flush / 服务端 503 降级；用 `page.context().setOffline()` 控 `navigator.onLine`
+- [e2e/tests/offline-helpers.ts] `installTradeMocks` 按 `X-Request-Id` 去重模拟 tx-trade 幂等；`readOfflineQueueLength` 直读 IndexedDB；`OFFLINE_HOURS` env clamp [0.0003, 4]
+- [infra/docker/docker-compose.toxiproxy.yml] + `toxiproxy/proxies.json` + `e2e/scripts/toxiproxy-inject.sh`（down/up/latency/slow_close/reset）— nightly 长时马拉松脚手架
+- [e2e/playwright.config.ts] 新增 `offline` project（timeout 90s，POS_BASE_URL 可覆盖）；`e2e/package.json` 新增 `test:offline` + `test:offline:marathon`
+- [.github/workflows/offline-e2e.yml] PR 触发（OFFLINE_HOURS=0.01，20min 超时）+ nightly cron（UTC 18:00，OFFLINE_HOURS=4，300min 超时）+ workflow_dispatch；失败自动上传日志 + Playwright 报告
+- [e2e/README.md] 4 场景表 + 本地跑法 + nightly 马拉松 + toxiproxy 组合 + CI 策略
+
+### 数据变化
+- 迁移版本：无（纯 E2E + CI 基础设施）
+- 新增文件：7（offline-cashier.spec.ts / offline-helpers.ts / README.md / toxiproxy-inject.sh / docker-compose.toxiproxy.yml / proxies.json / offline-e2e.yml）
+- 修改文件：2（playwright.config.ts / package.json）
+- CI 新工作流：1（offline-e2e.yml，覆盖 PR + nightly + manual）
+
+### 遗留问题
+- 场景 3（重连 flush）timing-sensitive：`useOffline` online→syncQueue→IDB clear 毫秒级时序，CI 若现 >5% flake 需把 waitForFunction timeout 放宽
+- toxiproxy 脚手架已到位，但 spec 用 `page.route` mock 自闭环；真正接 toxiproxy 的长时 marathon spec 留给 A2 后续 PR
+- 首次 CI 跑要装 2GB+ Playwright 浏览器内核（~90s）
+
+### 明日计划
+- 等 CI 绿后合入 PR E；若 Week 8 DEMO 硬门禁相关的 nightly 连跑 3 晚全绿即视为通过
+- 启动 PR F：Sprint F1 14 适配器 `emit_adapter_event` 基类
+- 启动 Sprint D1 批次 1 编码（按设计稿 `docs/sprint-plans/sprint-d1-constraint-context-design.md`）
+
+---
+
 ## 2026-04-18 Sprint A4 — tx-trade RBAC 统一装饰器 + 审计日志（Follow-up PR D）
 
 ### 今日完成

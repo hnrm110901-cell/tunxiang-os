@@ -6,6 +6,8 @@
     "test:headed": "playwright test --headed",
     "test:admin": "playwright test --project=web-admin",
     "test:pos": "playwright test --project=web-pos",
+    "test:offline": "playwright test --project=offline",
+    "test:offline:marathon": "OFFLINE_HOURS=4 playwright test --project=offline",
     "report": "playwright show-report"
   },
   "devDependencies": {

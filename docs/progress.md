@@ -4,6 +4,60 @@
 
 ---
 
+## 2026-04-18 18:00 Sprint A2 / PR E：断网收银 E2E + toxiproxy CI（Week 8 DEMO 硬门禁）
+
+### 本次会话目标
+补齐独立验证时识别的 **P0-2 A2 阻断项**（`docs/progress.md` 2026-04-18 15:30 条下的 "延至 A2"）：
+- Playwright 4h 断网马拉松 E2E（PR 门禁快速版 + nightly 4h 马拉松版）
+- toxiproxy 故障注入脚手架（跨服务长时场景）
+- GitHub Actions `offline-e2e.yml` CI 工作流
+
+Tier 级别：Tier 1（直接支撑 CLAUDE.md §XXII Week 8 DEMO 门槛的"断网恢复 4 小时内无数据丢失"）。
+
+### 完成状态
+- [x] **Playwright 离线 spec** — `e2e/tests/offline-cashier.spec.ts` 4 场景：断网结账入队 / 幂等不重入队 / 网络恢复自动 flush / 服务端 503 降级。`page.context().setOffline()` 控浏览器 `navigator.onLine`；`installTradeMocks` 用 `page.route` 按 `X-Request-Id` 去重模拟后端真实幂等。
+- [x] **断网辅助模块** — `e2e/tests/offline-helpers.ts`：`createMockTradeState` / `installTradeMocks` / `readOfflineQueueLength`（IndexedDB 直读）/ `clearOfflineQueue` / `OFFLINE_DURATION_MS`（env `OFFLINE_HOURS` 0.01-4h clamp）。
+- [x] **toxiproxy 脚手架** — `infra/docker/docker-compose.toxiproxy.yml` + `infra/docker/toxiproxy/proxies.json`（tx-trade/menu/agent 三代理）+ `e2e/scripts/toxiproxy-inject.sh`（down/up/latency/slow_close/reset 五个操作）。
+- [x] **Playwright config 扩展** — 新增 `offline` project，timeout 90s，`POS_BASE_URL` 环境变量可覆盖。`package.json` 新增 `test:offline` + `test:offline:marathon`。
+- [x] **GitHub Actions CI** — `.github/workflows/offline-e2e.yml`：PR 触发（OFFLINE_HOURS=0.01，20min 超时）+ nightly cron（UTC 18:00，OFFLINE_HOURS=4，300min 超时）+ `workflow_dispatch` 手动触发。失败自动上传 web-pos 日志 + Playwright 报告。
+- [x] **文档** — `e2e/README.md`：结构说明、四场景表、本地跑法、nightly 马拉松、toxiproxy 组合用法、CI 策略对照表。
+
+### 关键决策
+- **浏览器离线用 `context.setOffline`、跨服务故障用 toxiproxy** — 两者正交：`setOffline` 控 `navigator.onLine` 让前端走离线队列；toxiproxy 在 TCP 层模拟"服务端仍在但链路降级"。PR E 的 spec 只用前者（足够覆盖 Tier1 4 场景），toxiproxy 作为 nightly 长时马拉松的脚手架。
+- **Mock API 按 `X-Request-Id` 去重** — `offline-helpers.ts` 的 `handleSettle` / `handlePayment` 维护 `seenRequestIds` set，完整模拟 tx-trade 幂等中间件，让 E2E 能真正断言"重连 flush 后服务端只收到 1 次"。
+- **`OFFLINE_HOURS` 环境变量** — PR 门禁 `0.01h≈36s` 足以触发 `useOffline` 的 online 事件与 syncQueue；nightly 4h 跑真实时长马拉松；workflow_dispatch 让 QA 手动指定任意值（clamp [0.0003, 4]）。
+- **`test.skip(!dishVisible)` 防 dev server 未就绪** — 遵循 `cashier.spec.ts` 已有的防御式 pattern；CI 里通过 `curl -sSf http://localhost:5174` 在 30s 内轮询就绪，确保 skip 只在真正兜底触发。
+- **测试使用 FALLBACK_DISHES 免后端** — `page.route('**/api/v1/menu/**', 503)` 让 CashierPage 降级到内置 6 道菜，完全脱离后端微服务，E2E 可在纯 frontend dev server 上跑。
+
+### 交付清单
+```
+新增：
+  e2e/tests/offline-cashier.spec.ts        149 行（4 test 场景）
+  e2e/tests/offline-helpers.ts             170+ 行
+  e2e/README.md                            135 行
+  e2e/scripts/toxiproxy-inject.sh          75 行（5 action）
+  infra/docker/docker-compose.toxiproxy.yml  50 行
+  infra/docker/toxiproxy/proxies.json        20 行
+  .github/workflows/offline-e2e.yml         95 行
+
+修改：
+  e2e/playwright.config.ts                 新增 offline project
+  e2e/package.json                         +2 scripts
+```
+
+### 下一步（由用户明确授权后）
+1. **独立验证会话（§XIX 触发）**：涉及 6+ 新文件 + CI 改动 + Tier 1 路径。建议用"代码审查者"视角检查四场景对真实餐厅行为的覆盖完整性（尤其场景 3 的 flush 时序在 200 桌并发下是否稳定）。
+2. **PR F：Sprint F1 14 适配器 `emit_adapter_event` 基类**（与本 PR 正交，可并行推进）。
+3. **Sprint D1 批次 1 编码**：按 `docs/sprint-plans/sprint-d1-constraint-context-design.md` 实装 `context.py` + base.py 强化 + 3 个 Skill 接入 + CI 门禁。
+4. **5 个创始人决策点**（阻塞 B/D2/E）：D2 6 列 / E1 小红书 / B1 Override / B2 红冲阈值 / E4 异议上限。
+
+### 已知风险
+- **场景 3 timing-sensitive** — `useOffline` 的 online 事件触发→syncQueue→IDB clear 有毫秒级时序，CI 跑 5-10 次可能会偶发 flake。若 PR E 合入后发现 nightly 失败率 >5%，建议把 `waitForFunction` 的 timeout 从 10s 放宽到 30s。
+- **toxiproxy 代理未被本 PR 的 spec 使用** — 脚手架到位但 spec 用的是 `page.route` mock。真正接 toxiproxy 的长时场景（含后端 tx-trade 运行）留给独立的 `offline-marathon.spec.ts`（A2 后续 PR）。
+- **CI 首跑需要 install 2GB+ Playwright 浏览器内核** — 已通过 `pnpm cache` 半加速，首次执行仍约 90s 安装时间。
+
+---
+
 ## 2026-04-18 17:15 Sprint A4：tx-trade RBAC 统一装饰器 + 审计日志
 
 ### 完成状态
