@@ -27,6 +27,7 @@ from services.three_way_match_engine import (
     ThreeWayMatchError,
     VarianceItem,
 )
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db_with_tenant
@@ -237,7 +238,7 @@ async def get_variance_report(
             db=db,
             period_days=days,
         )
-    except Exception as exc:
+    except (ThreeWayMatchError, SQLAlchemyError) as exc:
         logger.error(
             "api.get_variance_report.failed",
             tenant_id=tenant_id,
@@ -322,7 +323,7 @@ async def resolve_variance(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=str(exc),
         ) from exc
-    except Exception as exc:
+    except (SQLAlchemyError, RuntimeError) as exc:
         logger.error(
             "api.resolve_variance.failed",
             variance_id=variance_id,
@@ -365,7 +366,7 @@ async def auto_approve_small_variances(
             max_amount_fen=max_amount_fen,
         )
         await db.commit()
-    except Exception as exc:
+    except (ThreeWayMatchError, SQLAlchemyError) as exc:
         logger.error(
             "api.auto_approve.failed",
             tenant_id=tenant_id,

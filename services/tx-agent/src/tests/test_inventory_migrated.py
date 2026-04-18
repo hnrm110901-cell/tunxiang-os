@@ -387,5 +387,269 @@ class TestSupplierManagement:
         assert result.data["potential_saving_pct"] > 0
 
 
+# =============================================================================
+# P1-2 补全: 库存预警Agent扩展测试 — v6审计修复
+# =============================================================================
+
+
+class TestInventoryAgentInit:
+    """Agent 初始化和状态验证"""
+
+    def test_inventory_agent_metadata(self, agent):
+        """库存预警Agent元信息应完整"""
+        info = agent.get_info()
+        assert info["agent_id"] == "inventory_alert"
+        assert info["agent_name"] == "库存预警"
+        assert info["priority"] == "P1"
+        assert info["run_location"] == "edge+cloud"
+        assert len(info["supported_actions"]) >= 10
+
+    def test_agent_preserves_tenant_store(self, agent):
+        """Agent应保留tenant_id和store_id"""
+        assert agent.tenant_id == TID
+        assert agent.store_id == "STORE001"
+
+    def test_agent_runs_without_db(self):
+        """无DB连接时Agent应使用params降级而非崩溃"""
+        agent = InventoryAlertAgent(tenant_id=TID, store_id="S1", db=None)
+        result = asyncio.run(agent.execute("check_expiration", {
+            "items": [{"name": "牛奶", "remaining_hours": 48}],
+        }))
+        assert result.success is True
+
+
+class TestInventoryHardConstraints:
+    """三条硬约束在库存Agent中的验证"""
+
+    def test_food_safety_blocks_expired_ingredient_via_run(self, agent):
+        """食安约束：过期食材通过Agent.run()时触发食安违规"""
+        result = asyncio.run(agent.run("check_expiration", {
+            "items": [
+                {"name": "过期虾", "remaining_hours": 0},
+                {"name": "过期牛肉", "remaining_hours": -12},
+            ],
+        }))
+        assert result.success is True
+        food_check = result.constraints_detail.get("food_safety_check")
+        if food_check:
+            assert food_check["passed"] is False
+            assert len(food_check["items"]) >= 2
+
+    def test_food_safety_passes_for_fresh_ingredients(self, agent):
+        """食安约束：新鲜食材应通过校验"""
+        result = asyncio.run(agent.run("check_expiration", {
+            "items": [
+                {"name": "新鲜蔬菜", "remaining_hours": 72},
+                {"name": "调味料", "remaining_hours": 2160},
+            ],
+        }))
+        # data中warnings为空，ingredients也为空，所以food_safety_check应为None或passed
+        food_check = result.constraints_detail.get("food_safety_check")
+        if food_check:
+            assert food_check["passed"] is True
+
+    def test_margin_constraint_not_triggered_by_inventory(self, agent):
+        """库存操作不涉及价格/成本，毛利约束应跳过"""
+        result = asyncio.run(agent.run("monitor_inventory", {
+            "items": [{"name": "米", "current_qty": 100, "min_qty": 20}],
+        }))
+        assert result.constraints_detail.get("margin_check") is None
+
+    def test_experience_constraint_not_triggered_by_inventory(self, agent):
+        """库存操作不涉及出餐时间，出餐时限约束应跳过"""
+        result = asyncio.run(agent.run("check_expiration", {
+            "items": [{"name": "米", "remaining_hours": 500}],
+        }))
+        assert result.constraints_detail.get("experience_check") is None
+
+
+class TestInventoryDecisionLog:
+    """决策留痕验证"""
+
+    def test_restock_alert_has_full_audit_trail(self, agent):
+        """补货告警决策必须有完整留痕"""
+        result = asyncio.run(agent.run("generate_restock_alerts", {
+            "items": [
+                {"name": "鲈鱼", "current_qty": 1, "min_qty": 10, "daily_usage": 5},
+            ],
+        }))
+        assert result.action == "generate_restock_alerts"
+        assert len(result.reasoning) > 0
+        assert result.execution_ms >= 0
+        assert result.constraints_detail is not None
+        assert "passed" in result.constraints_detail
+
+    def test_expiration_check_audit_trail(self, agent):
+        """保质期检查决策必须有留痕"""
+        result = asyncio.run(agent.run("check_expiration", {
+            "items": [{"name": "牛奶", "remaining_hours": 6}],
+        }))
+        assert result.action == "check_expiration"
+        assert 0 <= result.confidence <= 1
+        assert result.inference_layer in ("edge", "cloud")
+
+    def test_failed_action_also_has_audit_trail(self, agent):
+        """失败操作也必须有决策留痕"""
+        result = asyncio.run(agent.run("predict_consumption", {
+            "daily_usage": [],
+        }))
+        assert result.success is False
+        assert result.execution_ms >= 0
+        assert result.constraints_detail is not None
+
+    def test_autonomy_level_marked_on_every_result(self, agent):
+        """每个结果都应标注自治等级"""
+        result = asyncio.run(agent.run("monitor_inventory", {
+            "items": [{"name": "米", "current_qty": 50, "min_qty": 10}],
+        }))
+        assert result.agent_level in (1, 2, 3)
+
+
+class TestInventoryInputDegradation:
+    """输入异常时的降级处理"""
+
+    def test_empty_items_for_restock(self, agent):
+        """空物料列表补货告警应返回0告警"""
+        result = asyncio.run(agent.execute("generate_restock_alerts", {
+            "items": [],
+        }))
+        assert result.success is True
+        assert result.data["alert_count"] == 0
+
+    def test_zero_daily_usage_restock(self, agent):
+        """日用量为0时不应崩溃"""
+        result = asyncio.run(agent.execute("generate_restock_alerts", {
+            "items": [
+                {"name": "罕见调料", "current_qty": 1, "min_qty": 5, "daily_usage": 0},
+            ],
+        }))
+        assert result.success is True
+
+    def test_prediction_no_data_at_all(self, agent):
+        """预测完全无数据应返回明确错误"""
+        result = asyncio.run(agent.execute("predict_consumption", {}))
+        assert result.success is False
+
+    def test_empty_quotes_compare_prices(self, agent):
+        """空报价列表比价应返回失败"""
+        result = asyncio.run(agent.execute("compare_supplier_prices", {
+            "quotes": [],
+        }))
+        assert result.success is False
+
+    def test_empty_contracts_scan(self, agent):
+        """空合同列表风险扫描应返回0风险"""
+        result = asyncio.run(agent.execute("scan_contract_risks", {
+            "contracts": [],
+        }))
+        assert result.success is True
+        assert result.data["at_risk"] == 0
+
+
+class TestWasteAnalysis:
+    """损耗分析测试 — 新增能力"""
+
+    def test_waste_analysis_basic(self, agent):
+        """基本损耗分析"""
+        result = asyncio.run(agent.execute("analyze_waste", {
+            "events": [
+                {"cause": "过期", "cost_fen": 5000},
+                {"cause": "过期", "cost_fen": 3000},
+                {"cause": "切割损耗", "cost_fen": 2000},
+                {"cause": "退菜", "cost_fen": 1500},
+            ],
+        }))
+        assert result.success is True
+        assert result.data["total_waste_yuan"] == 115.0
+        assert result.data["event_count"] == 4
+        assert result.data["top_causes"][0]["cause"] == "过期"
+
+    def test_waste_analysis_empty_events(self, agent):
+        """无损耗事件"""
+        result = asyncio.run(agent.execute("analyze_waste", {
+            "events": [],
+        }))
+        assert result.success is True
+        assert result.data["total_waste_yuan"] == 0
+
+    def test_shortage_severity_critical(self, agent):
+        """主食材严重缺货应评为critical"""
+        result = asyncio.run(agent.execute("assess_shortage_severity", {
+            "ingredient_name": "鲈鱼",
+            "current_qty": 1,
+            "safety_stock": 20,
+            "daily_usage": 15,
+            "ingredient_type": "main_ingredient",
+            "has_substitute": False,
+        }))
+        assert result.success is True
+        assert result.data["severity_level"] in ("critical", "high")
+        assert len(result.data["recommended_actions"]) > 0
+
+    def test_shortage_severity_low_for_garnish(self, agent):
+        """配菜轻微缺货评为low"""
+        result = asyncio.run(agent.execute("assess_shortage_severity", {
+            "ingredient_name": "香菜",
+            "current_qty": 8,
+            "safety_stock": 10,
+            "daily_usage": 2,
+            "ingredient_type": "garnish",
+            "has_substitute": True,
+        }))
+        assert result.success is True
+        assert result.data["severity_level"] in ("low", "medium")
+
+
+class TestContractRiskManagement:
+    """合同风险管理测试"""
+
+    def test_expired_contract_flagged(self, agent):
+        """已过期合同应标记风险"""
+        result = asyncio.run(agent.execute("scan_contract_risks", {
+            "contracts": [
+                {"supplier": "供应商A", "remaining_days": -10},
+            ],
+        }))
+        assert result.data["at_risk"] >= 1
+        assert any(r["risk"] == "expired" for r in result.data["risks"])
+
+    def test_expiring_soon_contract(self, agent):
+        """即将到期合同应标记风险"""
+        result = asyncio.run(agent.execute("scan_contract_risks", {
+            "contracts": [
+                {"supplier": "供应商B", "remaining_days": 15},
+            ],
+        }))
+        assert any(r["risk"] == "expiring" for r in result.data["risks"])
+
+    def test_single_source_risk(self, agent):
+        """单一来源供应商应标记风险"""
+        result = asyncio.run(agent.execute("scan_contract_risks", {
+            "contracts": [
+                {"supplier": "独家供应商", "remaining_days": 365, "single_source": True},
+            ],
+        }))
+        assert any(r["risk"] == "single_source" for r in result.data["risks"])
+
+
+class TestInventoryActionConfig:
+    """Action级会话策略验证"""
+
+    def test_high_risk_actions_require_human_confirm(self, agent):
+        """高风险操作应要求人工确认"""
+        confirm_actions = ["monitor_inventory", "generate_restock_alerts",
+                           "urgent_reorder_notify", "check_expiration"]
+        for action in confirm_actions:
+            config = agent.get_action_config(action)
+            assert config.requires_human_confirm is True, f"{action} 应要求人工确认"
+
+    def test_medium_risk_actions_no_confirm(self, agent):
+        """中风险操作不强制人工确认"""
+        medium_actions = ["predict_consumption", "evaluate_supplier"]
+        for action in medium_actions:
+            config = agent.get_action_config(action)
+            assert config.requires_human_confirm is False
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

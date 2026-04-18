@@ -51,6 +51,30 @@ class PaymentGatewayError(ExternalAPIError):
     """支付通道异常（微信支付 / 支付宝 / 银联）。"""
 
 
+class XiaohongshuAPIError(ExternalAPIError):
+    """小红书平台 API 异常（内容发布 / 笔记同步 / 数据拉取）。"""
+
+
+class MeituanAPIError(ExternalAPIError):
+    """美团平台 API 异常（外卖订单 / 评价 / 门店管理）。"""
+
+
+class ElemeAPIError(ExternalAPIError):
+    """饿了么平台 API 异常（外卖订单 / 门店管理）。"""
+
+
+class DouyinAPIError(ExternalAPIError):
+    """抖音平台 API 异常（团购核销 / 直播 / 短视频）。"""
+
+
+class WechatPayError(ExternalAPIError):
+    """微信支付异常（JSAPI / 小程序支付 / 退款 / 对账）。"""
+
+
+class AlipayError(ExternalAPIError):
+    """支付宝异常（当面付 / 退款 / 对账）。"""
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # 数据异常
 # ─────────────────────────────────────────────────────────────────────────────
@@ -99,6 +123,30 @@ class ServiceTimeoutError(BusinessRuleError):
     """出餐时限违规——出餐时间超过门店设定上限（硬约束③）。"""
 
 
+class InventoryError(BusinessRuleError):
+    """库存异常——超卖、负库存、批次不足等。"""
+
+
+class ScheduleConflictError(BusinessRuleError):
+    """排班冲突——同一员工在同一时段被安排多个班次。"""
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Agent / 任务异常
+# ─────────────────────────────────────────────────────────────────────────────
+
+class CeleryTaskError(TunxiangBaseError):
+    """Celery 异步任务执行失败（超时、重试耗尽、序列化错误等）。"""
+
+
+class AgentDecisionError(TunxiangBaseError):
+    """Agent 决策异常——推理失败、置信度不足、约束校验未通过等。"""
+
+
+class BanquetSyncError(TunxiangBaseError):
+    """宴席同步出品异常——多桌宴席菜品同步下发 / 进度追踪失败。"""
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # 基础设施异常
 # ─────────────────────────────────────────────────────────────────────────────
@@ -121,12 +169,18 @@ class EdgeSyncError(TunxiangBaseError):
 
 __all__ = [
     "TunxiangBaseError",
-    # 外部 API
+    # 外部 API / 适配器
     "ExternalAPIError",
     "POSAdapterError",
     "WeComWebhookError",
     "DeliveryPlatformError",
     "PaymentGatewayError",
+    "XiaohongshuAPIError",
+    "MeituanAPIError",
+    "ElemeAPIError",
+    "DouyinAPIError",
+    "WechatPayError",
+    "AlipayError",
     # 数据
     "DataValidationError",
     "ReconciliationMismatchError",
@@ -134,11 +188,17 @@ __all__ = [
     # 安全
     "TenantIsolationError",
     "PermissionDeniedError",
-    # 业务规则（三条硬约束）
+    # 业务规则（三条硬约束 + 扩展）
     "BusinessRuleError",
     "MarginViolationError",
     "FoodSafetyError",
     "ServiceTimeoutError",
+    "InventoryError",
+    "ScheduleConflictError",
+    # Agent / 任务
+    "CeleryTaskError",
+    "AgentDecisionError",
+    "BanquetSyncError",
     # 基础设施
     "CacheConnectionError",
     "DatabaseError",

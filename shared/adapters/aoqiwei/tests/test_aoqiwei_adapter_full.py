@@ -166,7 +166,7 @@ class TestAuthenticationFailure:
 
     @pytest.mark.asyncio
     async def test_invalid_appkey_raises_business_error(self, adapter):
-        """appkey无效时，query_goods 内部捕获业务错误并降级返回空结果"""
+        """appkey无效时，_request 抛出业务异常（query_goods 只捕获网络异常，业务异常透传）"""
         mock_response_data = {
             "success": False,
             "code": 40001,
@@ -174,13 +174,12 @@ class TestAuthenticationFailure:
         }
         adapter._client.get = AsyncMock(return_value=_mock_response(mock_response_data))
 
-        # query_goods 内部 try/except 会捕获业务错误，返回安全默认值
-        result = await adapter.query_goods()
-        assert result == {"list": [], "total": 0}
+        with pytest.raises(Exception, match="奥琦玮API业务错误.*appkey不存在"):
+            await adapter.query_goods()
 
     @pytest.mark.asyncio
     async def test_invalid_sign_raises_error(self, adapter):
-        """签名错误时，query_shops 内部捕获业务错误并降级返回空列表"""
+        """签名错误时，_request 抛出业务异常（query_shops 只捕获网络异常，业务异常透传）"""
         mock_response_data = {
             "success": False,
             "code": 40002,
@@ -188,9 +187,8 @@ class TestAuthenticationFailure:
         }
         adapter._client.get = AsyncMock(return_value=_mock_response(mock_response_data))
 
-        # query_shops 内部 try/except 会捕获业务错误，降级返回空列表
-        result = await adapter.query_shops()
-        assert result == []
+        with pytest.raises(Exception, match="奥琦玮API业务错误.*签名验证失败"):
+            await adapter.query_shops()
 
     @pytest.mark.asyncio
     async def test_http_401_raises_error(self, adapter):
@@ -433,3 +431,378 @@ class TestNetworkErrors:
 
         result = await adapter.query_stock(depot_code="D001")
         assert result == []
+
+
+# ---------------------------------------------------------------------------
+# P1-1: 多门店Token隔离测试
+# ---------------------------------------------------------------------------
+
+class TestMultiStoreTokenIsolation:
+    """验证不同门店/客户适配器的凭证隔离"""
+
+    def test_different_app_keys_produce_different_signs(self):
+        """不同app_key/app_secret的适配器生成不同签名"""
+        adapter_a = AoqiweiAdapter({
+            "base_url": "https://openapi.acescm.cn",
+            "app_key": "key_xuji",
+            "app_secret": "secret_xuji",
+        })
+        adapter_b = AoqiweiAdapter({
+            "base_url": "https://openapi.acescm.cn",
+            "app_key": "key_changzai",
+            "app_secret": "secret_changzai",
+        })
+
+        params = {"shopCode": "SH001"}
+        sign_a = adapter_a._sign(params)
+        sign_b = adapter_b._sign(params)
+
+        assert sign_a != sign_b
+
+    def test_adapters_have_isolated_credentials(self):
+        """两个适配器实例的凭证完全隔离"""
+        adapter_a = AoqiweiAdapter({
+            "base_url": "https://a.acescm.cn",
+            "app_key": "key_a",
+            "app_secret": "secret_a",
+        })
+        adapter_b = AoqiweiAdapter({
+            "base_url": "https://b.acescm.cn",
+            "app_key": "key_b",
+            "app_secret": "secret_b",
+        })
+
+        assert adapter_a.app_key != adapter_b.app_key
+        assert adapter_a.app_secret != adapter_b.app_secret
+        assert adapter_a.base_url != adapter_b.base_url
+
+    @pytest.mark.asyncio
+    async def test_concurrent_fetch_different_stores(self):
+        """两个门店同时拉取数据，结果互不干扰"""
+        import asyncio
+
+        adapter_a = AoqiweiAdapter({
+            "base_url": "https://openapi.acescm.cn",
+            "app_key": "key_a", "app_secret": "sec_a",
+            "timeout": 5, "retry_times": 1,
+        })
+        adapter_b = AoqiweiAdapter({
+            "base_url": "https://openapi.acescm.cn",
+            "app_key": "key_b", "app_secret": "sec_b",
+            "timeout": 5, "retry_times": 1,
+        })
+
+        response_a = {"success": True, "code": 0, "data": [{"shopCode": "SH_A", "shopName": "徐记总店"}]}
+        response_b = {"success": True, "code": 0, "data": [{"shopCode": "SH_B", "shopName": "尝在一起"}]}
+
+        adapter_a._client.get = AsyncMock(return_value=_mock_response(response_a))
+        adapter_b._client.get = AsyncMock(return_value=_mock_response(response_b))
+
+        result_a, result_b = await asyncio.gather(
+            adapter_a.query_shops(),
+            adapter_b.query_shops(),
+        )
+
+        assert result_a[0]["shopCode"] == "SH_A"
+        assert result_b[0]["shopCode"] == "SH_B"
+
+    def test_to_order_store_brand_injection_isolation(self, adapter):
+        """to_order 不同 store_id/brand_id 参数不会互相污染"""
+        raw = {
+            "orderId": "ISO_AQ001", "orderNo": "ISO-001",
+            "totalAmount": 5000, "discountAmount": 0,
+            "orderStatus": "2", "items": [],
+        }
+
+        order_a = adapter.to_order(raw, store_id="XUJI_01", brand_id="XUJI")
+        order_b = adapter.to_order(raw, store_id="CZ_01", brand_id="CHANGZAI")
+
+        assert order_a.store_id == "XUJI_01"
+        assert order_a.brand_id == "XUJI"
+        assert order_b.store_id == "CZ_01"
+        assert order_b.brand_id == "CHANGZAI"
+
+
+# ---------------------------------------------------------------------------
+# P1-1: 分页处理测试
+# ---------------------------------------------------------------------------
+
+class TestPaginationHandling:
+    """分页查询处理测试"""
+
+    @pytest.mark.asyncio
+    async def test_query_goods_pagination_params(self, adapter):
+        """验证分页参数正确传递到请求"""
+        mock_response_data = {
+            "success": True, "code": 0,
+            "data": {"list": [{"goodCode": "G001"}], "total": 1},
+        }
+        adapter._client.get = AsyncMock(return_value=_mock_response(mock_response_data))
+
+        result = await adapter.query_goods(page=3, page_size=50)
+
+        assert result["total"] == 1
+        call_kwargs = adapter._client.get.call_args
+        sent_params = call_kwargs.kwargs.get("params", call_kwargs[1].get("params", {}))
+        assert sent_params["page"] == 3
+        assert sent_params["pageSize"] == 50
+
+    @pytest.mark.asyncio
+    async def test_query_purchase_orders_pagination(self, adapter):
+        """采购入库单分页查询"""
+        page1_data = {
+            "success": True, "code": 0,
+            "data": {
+                "list": [{"orderNo": f"PO{i:03d}"} for i in range(1, 51)],
+                "total": 80,
+            },
+        }
+        adapter._client.get = AsyncMock(return_value=_mock_response(page1_data))
+
+        result = await adapter.query_purchase_orders(
+            start_date="2024-01-01",
+            end_date="2024-01-31",
+            page=1,
+            page_size=50,
+        )
+
+        assert result["total"] == 80
+        assert len(result["list"]) == 50
+
+    @pytest.mark.asyncio
+    async def test_empty_list_returns_empty_not_error(self, adapter):
+        """返回空数据时正常返回空列表/字典，不报错"""
+        mock_response_data = {
+            "success": True, "code": 0,
+            "data": {"list": [], "total": 0},
+        }
+        adapter._client.get = AsyncMock(return_value=_mock_response(mock_response_data))
+
+        result = await adapter.query_goods()
+
+        assert result["list"] == []
+        assert result["total"] == 0
+
+
+# ---------------------------------------------------------------------------
+# P1-1: POST接口测试（配送/采购/POS上传）
+# ---------------------------------------------------------------------------
+
+class TestPostEndpoints:
+    """POST类型接口测试"""
+
+    @pytest.mark.asyncio
+    async def test_create_delivery_apply_success(self, adapter):
+        """配送申请单创建成功"""
+        mock_response_data = {
+            "success": True, "code": 0,
+            "data": {"applyNo": "AP20240101001", "status": "submitted"},
+        }
+        adapter._client.post = AsyncMock(return_value=_mock_response(mock_response_data))
+
+        result = await adapter.create_delivery_apply({
+            "shopCode": "SH001",
+            "items": [{"goodCode": "G001", "qty": 100}],
+        })
+
+        assert result["applyNo"] == "AP20240101001"
+
+    @pytest.mark.asyncio
+    async def test_pos_upload_order_success(self, adapter):
+        """POS订单上传成功"""
+        mock_response_data = {"success": True, "code": 0, "data": {"received": True}}
+        adapter._client.post = AsyncMock(return_value=_mock_response(mock_response_data))
+
+        result = await adapter.pos_upload_order({
+            "orderNo": "POS20240101001",
+            "shopCode": "SH001",
+            "totalAmount": 15000,
+        })
+
+        assert result["received"] is True
+
+    @pytest.mark.asyncio
+    async def test_pos_day_done_success(self, adapter):
+        """POS日结成功"""
+        mock_response_data = {"success": True, "code": 0, "data": {"done": True}}
+        adapter._client.post = AsyncMock(return_value=_mock_response(mock_response_data))
+
+        result = await adapter.pos_day_done(shop_code="SH001", date="2024-01-01")
+
+        assert result["done"] is True
+
+    @pytest.mark.asyncio
+    async def test_pos_upload_order_failure_degrades(self, adapter):
+        """POS订单上传失败时降级返回失败状态"""
+        adapter._client.post = AsyncMock(
+            side_effect=httpx.ConnectTimeout("timeout")
+        )
+
+        result = await adapter.pos_upload_order({"orderNo": "FAIL001"})
+        assert result["success"] is False
+        assert "message" in result
+
+    @pytest.mark.asyncio
+    async def test_confirm_delivery_in_success(self, adapter):
+        """配送入库确认成功"""
+        mock_response_data = {"success": True, "code": 0, "data": {"confirmed": True}}
+        adapter._client.post = AsyncMock(return_value=_mock_response(mock_response_data))
+
+        result = await adapter.confirm_delivery_in({
+            "orderNo": "DO001", "shopCode": "SH001",
+        })
+
+        assert result["confirmed"] is True
+
+
+# ---------------------------------------------------------------------------
+# P1-1: 报表接口测试
+# ---------------------------------------------------------------------------
+
+class TestReportEndpoints:
+    """报表接口测试"""
+
+    @pytest.mark.asyncio
+    async def test_query_inventory_report_success(self, adapter):
+        """进销存报表查询成功"""
+        mock_response_data = {
+            "success": True, "code": 0,
+            "data": {
+                "list": [
+                    {"goodCode": "G001", "beginQty": 100, "inQty": 50, "outQty": 30, "endQty": 120},
+                ],
+                "total": 1,
+            },
+        }
+        adapter._client.get = AsyncMock(return_value=_mock_response(mock_response_data))
+
+        result = await adapter.query_inventory_report(
+            start_date="2024-01-01",
+            end_date="2024-01-31",
+        )
+
+        assert result["total"] == 1
+        assert result["list"][0]["endQty"] == 120
+
+    @pytest.mark.asyncio
+    async def test_query_inventory_report_fallback_on_error(self, adapter):
+        """进销存报表查询失败时降级返回空"""
+        adapter._client.get = AsyncMock(
+            side_effect=httpx.ConnectTimeout("timeout")
+        )
+
+        result = await adapter.query_inventory_report(
+            start_date="2024-01-01",
+            end_date="2024-01-31",
+        )
+
+        assert result == {"list": [], "total": 0}
+
+    @pytest.mark.asyncio
+    async def test_good_diff_analysis_success(self, adapter):
+        """货品差异分析查询成功"""
+        mock_response_data = {
+            "success": True, "code": 0,
+            "data": {"list": [{"goodCode": "G001", "diffQty": -5}]},
+        }
+        adapter._client.get = AsyncMock(return_value=_mock_response(mock_response_data))
+
+        result = await adapter.query_good_diff_analysis(
+            start_date="2024-01-01",
+            end_date="2024-01-31",
+        )
+
+        assert result["list"][0]["diffQty"] == -5
+
+
+# ---------------------------------------------------------------------------
+# P1-1: to_order 边界场景补充
+# ---------------------------------------------------------------------------
+
+class TestToOrderEdgeCases:
+    """to_order 边界场景补充测试"""
+
+    def test_order_with_no_items_key(self, adapter):
+        """原始数据缺少 items 字段时默认空列表"""
+        raw = {
+            "orderId": "NOITEMS",
+            "orderNo": "NI-001",
+            "orderStatus": "2",
+            "totalAmount": 10000,
+            "discountAmount": 0,
+        }
+        order = adapter.to_order(raw, "S1", "B1")
+        assert order.items == []
+
+    def test_order_subtotal_calculation(self, adapter):
+        """subtotal = total + discount"""
+        raw = {
+            "orderId": "SUB001", "orderNo": "SUB-001",
+            "orderStatus": "2",
+            "totalAmount": 18000,
+            "discountAmount": 2000,
+            "items": [],
+        }
+        order = adapter.to_order(raw, "S1", "B1")
+        assert order.subtotal == Decimal("200.00")  # (18000+2000)/100
+        assert order.total == Decimal("180.00")
+        assert order.discount == Decimal("20.00")
+
+    def test_order_unknown_status_defaults_pending(self, adapter):
+        """未知状态码默认映射为 PENDING"""
+        from schemas.restaurant_standard_schema import OrderStatus
+        raw = {
+            "orderId": "UNK001", "orderNo": "UNK-001",
+            "orderStatus": "99",
+            "totalAmount": 5000, "discountAmount": 0, "items": [],
+        }
+        order = adapter.to_order(raw, "S1", "B1")
+        assert order.order_status == OrderStatus.PENDING
+
+    def test_item_quantity_fallback(self, adapter):
+        """订单项缺少 qty 时使用 quantity 字段"""
+        raw = {
+            "orderId": "QTY001", "orderNo": "QTY-001",
+            "orderStatus": "2",
+            "totalAmount": 5000, "discountAmount": 0,
+            "items": [
+                {"goodCode": "G001", "goodName": "菜A", "quantity": 3, "price": 5000},
+            ],
+        }
+        order = adapter.to_order(raw, "S1", "B1")
+        assert order.items[0].quantity == 3
+
+    def test_item_special_requirements(self, adapter):
+        """订单项备注映射到 special_requirements"""
+        raw = {
+            "orderId": "RMK001", "orderNo": "RMK-001",
+            "orderStatus": "2",
+            "totalAmount": 5000, "discountAmount": 0,
+            "items": [
+                {"goodCode": "G001", "goodName": "菜A", "qty": 1, "price": 5000, "remark": "不要葱"},
+            ],
+        }
+        order = adapter.to_order(raw, "S1", "B1")
+        assert order.items[0].special_requirements == "不要葱"
+
+
+# ---------------------------------------------------------------------------
+# P1-1: 异步资源管理测试
+# ---------------------------------------------------------------------------
+
+class TestAsyncResourceManagement:
+    """异步资源管理测试"""
+
+    @pytest.mark.asyncio
+    async def test_aclose_releases_client(self, adapter):
+        """aclose() 释放 HTTP 客户端"""
+        adapter._client.aclose = AsyncMock()
+        await adapter.aclose()
+        adapter._client.aclose.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_aexit_calls_aclose(self, adapter):
+        """__aexit__ 调用 aclose"""
+        adapter._client.aclose = AsyncMock()
+        await adapter.__aexit__(None, None, None)
+        adapter._client.aclose.assert_called_once()

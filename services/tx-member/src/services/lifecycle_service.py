@@ -13,6 +13,7 @@ from datetime import datetime, timezone
 from typing import Any, Optional
 
 import structlog
+from sqlalchemy.exc import SQLAlchemyError
 
 logger = structlog.get_logger(__name__)
 
@@ -312,7 +313,7 @@ class LifecycleService:
                 action_taken = await self._handle_reactivated(
                     member_id, tenant_id, config, db
                 )
-        except Exception as exc:  # noqa: BLE001 — 营销失败兜底，记录日志不阻塞
+        except (SQLAlchemyError, ConnectionError, TimeoutError, ValueError) as exc:  # 营销失败兜底，记录日志不阻塞
             error_msg = str(exc)
             action_taken = "none"
             logger.warning(
