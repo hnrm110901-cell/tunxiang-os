@@ -26,6 +26,10 @@ class StockoutAlertAgent(SkillAgent):
     priority = "P1"
     run_location = "edge+cloud"
 
+    # Sprint D1 / PR G 批次 1：沽清预警核心是食材（临期/不足），兼顾替代菜品的毛利
+    # 与出餐时长无关（这里判断是否该上某道菜，非出餐调度）
+    constraint_scope = {"margin", "safety"}
+
     def get_supported_actions(self) -> list[str]:
         return [
             "predict_stockout",

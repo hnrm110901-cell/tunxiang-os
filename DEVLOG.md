@@ -1,3 +1,35 @@
+## 2026-04-18 Sprint D1 批次 1 — ConstraintContext 基础 + 批 1 三 Skill + SKILL_REGISTRY（PR G）
+
+### 今日完成
+- [services/tx-agent/src/agents/context.py] ConstraintContext dataclass（price_fen/cost_fen/ingredients/estimated_serve_minutes/scope/waived_reason）+ IngredientSnapshot + from_data() 兼容旧 data 两套字段命名
+- [services/tx-agent/src/agents/constraints.py] check_all(ctx_or_data, scope=None) 双入参：dict/context 都走统一结构化校验；ConstraintResult 加 scopes_checked/scopes_skipped/scope 3 字段；@deprecated 兼容旧 check_margin/check_food_safety/check_experience dict API
+- [services/tx-agent/src/agents/base.py] AgentResult.context + SkillAgent.constraint_scope ClassVar + constraint_waived_reason ClassVar；run() 三分支：空 scope 豁免 / 调 checker / 结果标签（margin/safety/experience/mixed/n/a）
+- [services/tx-agent/src/agents/skills/__init__.py] 新增 GrowthAttributionAgent + StockoutAlertAgent import；SKILL_REGISTRY 按 agent_id 去重聚合
+- [services/tx-agent/src/agents/skills/growth_attribution.py] constraint_scope = {"margin"}
+- [services/tx-agent/src/agents/skills/closing_agent.py] constraint_scope = {"margin","safety"}
+- [services/tx-agent/src/agents/skills/stockout_alert.py] constraint_scope = {"margin","safety"}
+- [services/tx-agent/src/tests/test_constraint_context.py] 15 TDD 测试：11 passed + 4 skipped（skill 导入依赖 pre-existing edge_mixin bug，CI PYTHONPATH 正确时运行）
+
+### 数据变化
+- 迁移版本：无（纯 Python 基类扩展）
+- 新增文件：2（context.py / test_constraint_context.py）
+- 修改文件：6（base/constraints/skills-init + 3 skills）
+- 新增测试：15（11 passed + 4 skip by design）
+- ruff 状态：All checks passed!
+
+### 遗留问题
+- pre-existing edge_mixin 相对导入 bug 阻塞 skills 包本地导入 —— out-of-scope 留独立 PR
+- 批次 1 三 Skill 只声明了 scope，没填实际 price_fen/ingredients 数据（设计稿覆盖率表承诺"实装=16"是渐进，本 PR 第一步把 3 个从 unknown 升到 n/a）
+- waived_reason 长度+黑名单 CI 校验 延到批次 5/6 统一上
+- CI 门禁 test_constraint_coverage.py 延到批次 3-4 覆盖率过半时上（避免单 PR 全挂红）
+
+### 明日计划
+- 等 CI 绿后合入 PR G
+- 启动批次 2（W5 出餐体验）：7 个 Skill 填 estimated_serve_minutes + scope={"experience"}
+- out-of-scope 修 edge_mixin 相对导入
+
+---
+
 ## 2026-04-18 Sprint F1 — 14 适配器事件总线接入基类 + pinzhi 参考（PR F）
 
 ### 今日完成

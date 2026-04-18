@@ -29,6 +29,10 @@ class ClosingAgent(SkillAgent):
     run_location = "edge"
     agent_level = 2  # 自动发提醒 + 可撤回
 
+    # Sprint D1 / PR G 批次 1：闭店流程触碰食安（当日剩余食材处理）+ 毛利（日结金额）
+    # 不涉及出餐时长，experience 维度留空
+    constraint_scope = {"margin", "safety"}
+
     def get_supported_actions(self) -> list[str]:
         return [
             "pre_closing_check",

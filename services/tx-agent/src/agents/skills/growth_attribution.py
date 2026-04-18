@@ -48,6 +48,10 @@ class GrowthAttributionAgent(SkillAgent):
     priority = "P1"
     run_location = "cloud"
 
+    # Sprint D1 / PR G 批次 1：预算分配上游决策，只需校验毛利
+    # 不涉及食材批次、也不直接决定出餐链路
+    constraint_scope = {"margin"}
+
     def get_supported_actions(self) -> list[str]:
         return [
             "attribute",

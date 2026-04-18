@@ -1,7 +1,10 @@
 from .ai_marketing_orchestrator import AiMarketingOrchestratorAgent
 from .ai_waiter import AIWaiterAgent
 from .banquet_growth import BanquetGrowthAgent
-from .cost_diagnosis import CostDiagnosisAgent
+
+# 专项运营Agent (Phase 6)
+from .billing_anomaly import BillingAnomalyAgent
+from .closing_agent import ClosingAgent
 
 # Intel Agents (情报Agent)
 from .competitor_watch import CompetitorWatchAgent
@@ -9,13 +12,18 @@ from .competitor_watch import CompetitorWatchAgent
 # HR Agent (人力Agent)
 from .compliance_alert import ComplianceAlertAgent
 from .content_generation import ContentGenerationAgent
+from .cost_diagnosis import CostDiagnosisAgent
 from .discount_guard import DiscountGuardAgent
 from .dormant_recall import DormantRecallAgent
 from .finance_audit import FinanceAuditAgent
+
+# Sprint D1 / PR G 批次 1：接入 ConstraintContext
+from .growth_attribution import GrowthAttributionAgent
 from .high_value_member import HighValueMemberAgent
 from .ingredient_radar import IngredientRadarAgent
 from .intel_reporter import IntelReporterAgent
 from .inventory_alert import InventoryAlertAgent
+from .kitchen_overtime import KitchenOvertimeAgent
 from .member_insight import MemberInsightAgent
 from .menu_advisor import MenuAdvisorAgent
 
@@ -23,8 +31,12 @@ from .menu_advisor import MenuAdvisorAgent
 from .new_customer_convert import NewCustomerConvertAgent
 from .new_product_scout import NewProductScoutAgent
 from .off_peak_traffic import OffPeakTrafficAgent
+
+# 千人千面个性化Agent
+from .personalization_agent import PersonalizationAgent
 from .pilot_recommender import PilotRecommenderAgent
 from .private_ops import PrivateOpsAgent
+from .queue_seating import QueueSeatingAgent
 from .referral_growth import ReferralGrowthAgent
 from .review_insight import ReviewInsightAgent
 from .salary_advisor import SalaryAdvisorAgent
@@ -32,17 +44,9 @@ from .seasonal_campaign import SeasonalCampaignAgent
 from .serve_dispatch import ServeDispatchAgent
 from .smart_menu import SmartMenuAgent
 from .smart_service import SmartServiceAgent
+from .stockout_alert import StockoutAlertAgent
 from .store_inspect import StoreInspectAgent
 from .trend_discovery import TrendDiscoveryAgent
-
-# 千人千面个性化Agent
-from .personalization_agent import PersonalizationAgent
-
-# 专项运营Agent (Phase 6)
-from .billing_anomaly import BillingAnomalyAgent
-from .closing_agent import ClosingAgent
-from .kitchen_overtime import KitchenOvertimeAgent
-from .queue_seating import QueueSeatingAgent
 
 # 语音点菜 + AI服务员
 from .voice_order import VoiceOrderAgent
@@ -93,4 +97,28 @@ ALL_SKILL_AGENTS = [
     AiMarketingOrchestratorAgent,
     # 成本核算Agent (P1)
     CostDiagnosisAgent,
+    # Sprint D1 / PR G 批次 1
+    GrowthAttributionAgent,
+    StockoutAlertAgent,
 ]
+
+
+# ──────────────────────────────────────────────────────────────────────
+# Sprint D1 / PR G：SKILL_REGISTRY（agent_id → Skill class）
+#
+# 供 CI 门禁 test_constraint_coverage.py 遍历 Skills，逐一验证 constraint_scope
+# 声明完备性。批次推进时在 ALL_SKILL_AGENTS 追加条目即可自动进入注册表。
+# ──────────────────────────────────────────────────────────────────────
+
+SKILL_REGISTRY: dict[str, type] = {}
+for _cls in ALL_SKILL_AGENTS:
+    _agent_id = getattr(_cls, "agent_id", None)
+    if not _agent_id or _agent_id == "base":
+        # base 或未设 agent_id 的骨架 Skill 不入注册表
+        continue
+    if _agent_id in SKILL_REGISTRY:
+        raise RuntimeError(
+            f"SKILL_REGISTRY agent_id 冲突: {_agent_id} 同时被 "
+            f"{SKILL_REGISTRY[_agent_id].__name__} 和 {_cls.__name__} 声明"
+        )
+    SKILL_REGISTRY[_agent_id] = _cls
