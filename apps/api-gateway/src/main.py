@@ -1103,6 +1103,15 @@ app.include_router(hr_leave.router, prefix="/api/v1", tags=["hr_leave"])
 app.include_router(hr_recruitment.router, prefix="/api/v1", tags=["hr_recruitment"])
 app.include_router(hr_performance.router, prefix="/api/v1", tags=["hr_performance"])
 app.include_router(hr_dashboard_api.router, prefix="/api/v1", tags=["hr_dashboard"])
+
+# z66: 成本中心 / 九宫格人才盘点 / 1-on-1 面谈
+from src.api import cost_center as cost_center_api
+from src.api import one_on_one as one_on_one_api
+from src.api import talent as talent_api
+
+app.include_router(cost_center_api.router, prefix="/api/v1", tags=["hr_cost_center"])
+app.include_router(talent_api.router, prefix="/api/v1", tags=["hr_talent"])
+app.include_router(one_on_one_api.router, prefix="/api/v1", tags=["hr_1on1"])
 app.include_router(hr_employee.router, prefix="/api/v1", tags=["hr_employee"])
 app.include_router(hr_attendance.router, prefix="/api/v1", tags=["hr_attendance"])
 from src.api import hr_schedule
@@ -1224,6 +1233,10 @@ app.include_router(_shift_swap.router, prefix="/api/v1", tags=["shift-swap"])
 # D7 Nice-to-Have — 月结/年结流程
 from src.api import month_close as _month_close  # noqa: E402
 app.include_router(_month_close.router, tags=["month-close"])
+
+# D12 z66 — 薪资项目库 + payroll_engine_v3
+from src.api import salary_item as _salary_item  # noqa: E402
+app.include_router(_salary_item.router, tags=["payroll-salary-items"])
 
 # 业财税资金一体化（FCT）
 if getattr(settings, "FCT_ENABLED", False):

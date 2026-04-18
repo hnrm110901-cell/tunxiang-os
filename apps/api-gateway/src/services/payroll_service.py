@@ -590,7 +590,18 @@ class PayrollService(BaseService):
 
         await db.flush()
 
-        # 5) 可选代发文件
+        # 5) 成本中心分摊（算薪后自动把人力成本分摊到各成本中心）
+        cost_allocation: Optional[Dict[str, Any]] = None
+        try:
+            from src.services.cost_center_service import CostCenterService
+
+            cost_allocation = await CostCenterService(db).compute_cost_allocation(
+                pay_month=pay_month, store_id=store_id
+            )
+        except Exception as e:  # noqa: BLE001
+            logger.warning("cost_center_allocation_failed", store_id=store_id, pay_month=pay_month, error=str(e))
+
+        # 6) 可选代发文件
         disbursement: Optional[Dict[str, Any]] = None
         if generate_disbursement_bank:
             bank = generate_disbursement_bank.lower()
@@ -613,6 +624,7 @@ class PayrollService(BaseService):
                 "employee_count": len(records),
             },
             "disbursement": disbursement,
+            "cost_allocation": cost_allocation,
         }
 
     async def batch_calculate(self, db: AsyncSession, store_id: str, pay_month: str) -> Dict[str, Any]:

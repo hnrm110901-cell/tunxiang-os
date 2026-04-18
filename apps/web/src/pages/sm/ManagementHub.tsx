@@ -89,6 +89,7 @@ const SECTIONS: Section[] = [
       { name: '我的证书', desc: '证书列表/到期提醒', icon: '🏅', to: '/hr/my-certificates', isNew: true },
       { name: '健康证扫描', desc: '30/15/7/1天分级预警', icon: '🩺', to: '/compliance', isNew: true },
       { name: '劳动合同', desc: '60/30/15天到期预警', icon: '📝', to: '/contract-management', isNew: true },
+      { name: '九宫格人才盘点', desc: '业绩×潜力二维矩阵', icon: '🎯', to: '/hr/talent/nine-box', isNew: true },
     ],
   },
   {

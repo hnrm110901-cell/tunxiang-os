@@ -625,7 +625,12 @@ from .reservation_channel import ChannelType, ReservationChannel
 # P0 补齐 — 预排菜模型
 from .reservation_pre_order import PreOrderStatus, ReservationPreOrder
 from .reward_penalty import RewardPenaltyRecord
-from .salary_item import SalaryItemDefinition, SalaryItemRecord
+from .salary_item import (
+    EmployeeSalaryItem,
+    PayslipLine,
+    SalaryItemDefinition,
+    SalaryItemRecord,
+)
 from .schedule_demand import StoreStaffingDemand
 
 # HR W1-2 — 敏感数据审计日志
@@ -779,3 +784,8 @@ from .shift_swap import ShiftSwapRequest, ShiftSwapStatus
 # D5 跨店权限边界 + D7 月结/年结 Nice-to-Have
 from .user_store_scope import UserStoreScope
 from .month_close import MonthCloseLog, TrialBalanceSnapshot
+
+# D9 成本中心 + 九宫格人才盘点 + 1-on-1 面谈 (z66)
+from .cost_center import CostCenter, CostCenterBudget, EmployeeCostCenter
+from .talent_assessment import SuccessionPlan, TalentAssessment, TalentPool
+from .one_on_one import OneOnOneFollowUp, OneOnOneMeeting, OneOnOneTemplate

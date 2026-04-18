@@ -286,6 +286,7 @@ const CommissionPage = lazy(() => import('./pages/hr/CommissionPage'));
 const RewardPenaltyPage = lazy(() => import('./pages/hr/RewardPenaltyPage'));
 const SocialInsurancePage = lazy(() => import('./pages/hr/SocialInsurancePage'));
 const EmployeeGrowthPage = lazy(() => import('./pages/hr/EmployeeGrowthPage'));
+const NineBoxMatrix = lazy(() => import('./pages/hr/NineBoxMatrix'));
 const IMConfigPage = lazy(() => import('./pages/hr/IMConfigPage'));
 const RosterImportPage = lazy(() => import('./pages/hr/RosterImportPage'));
 const OrgStructurePage = lazy(() => import('./pages/hr/OrgStructurePage'));
@@ -943,6 +944,9 @@ const AppContent: React.FC = () => {
                   } />
                   <Route path="employee-growth" element={
                     <ProtectedRoute requiredRole="admin"><EmployeeGrowthPage /></ProtectedRoute>
+                  } />
+                  <Route path="hr/talent/nine-box" element={
+                    <ProtectedRoute requiredRole="admin"><NineBoxMatrix /></ProtectedRoute>
                   } />
                   <Route path="im-config" element={
                     <ProtectedRoute requiredRole="admin"><IMConfigPage /></ProtectedRoute>
