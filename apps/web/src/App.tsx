@@ -277,6 +277,9 @@ const LeaveManagementPage = lazy(() => import('./pages/hr/LeaveManagementPage'))
 const RecruitmentHRPage = lazy(() => import('./pages/hr/RecruitmentPage'));
 const PerformanceReviewPage = lazy(() => import('./pages/hr/PerformanceReviewPage'));
 const ContractManagementPage = lazy(() => import('./pages/hr/ContractManagementPage'));
+const LegalEntitiesPage = lazy(() => import('./pages/hr/LegalEntities'));
+const ESignatureEnvelopesPage = lazy(() => import('./pages/hr/ESignatureEnvelopes'));
+const ESignatureSignPage = lazy(() => import('./pages/hr/ESignatureSign'));
 const HRDashboardPage = lazy(() => import('./pages/hr/HRDashboardPage'));
 const EmployeeRosterPage = lazy(() => import('./pages/hr/EmployeeRosterPage'));
 const EmployeeLifecyclePage = lazy(() => import('./pages/hr/EmployeeLifecyclePage'));
@@ -295,6 +298,7 @@ const HRTrainingPage = lazy(() => import('./pages/hr/TrainingPage'));
 const TrainingDashboard = lazy(() => import('./pages/hr/TrainingDashboard'));
 const TrainingCoursesPage = lazy(() => import('./pages/hr/TrainingCourses'));
 const ExamCenterPage = lazy(() => import('./pages/hr/ExamCenter'));
+const HRAssistantPage = lazy(() => import('./pages/hr/HRAssistant'));
 const ExamTakePage = lazy(() => import('./pages/hr/ExamTake'));
 const MyCertificatesPage = lazy(() => import('./pages/hr/MyCertificates'));
 const MentorshipPage = lazy(() => import('./pages/hr/MentorshipPage'));
@@ -305,6 +309,11 @@ const PayslipManagementPage = lazy(() => import('./pages/hr/PayslipManagementPag
 const BusinessRulesPage = lazy(() => import('./pages/hr/BusinessRulesPage'));
 const ShiftTemplatePage = lazy(() => import('./pages/hr/ShiftTemplatePage'));
 const AttendanceRulePage = lazy(() => import('./pages/hr/AttendanceRulePage'));
+// D11 z68 — OKR / 学习地图 / 脉搏调研
+const OKRDashboardPage = lazy(() => import('./pages/hr/OKRDashboard'));
+const LearningMapPage = lazy(() => import('./pages/hr/LearningMap'));
+const LearningLeaderboardPage = lazy(() => import('./pages/hr/LearningLeaderboard'));
+const PulseSurveyPage = lazy(() => import('./pages/hr/PulseSurvey'));
 
 // Role-based views (Phase 2 — Chef /chef, Floor /floor, HQ /hq)
 const ChefLayout      = lazy(() => import('./layouts/ChefLayout'));
@@ -924,6 +933,15 @@ const AppContent: React.FC = () => {
                   <Route path="contract-management" element={
                     <ProtectedRoute requiredRole="admin"><ContractManagementPage /></ProtectedRoute>
                   } />
+                  <Route path="legal-entities" element={
+                    <ProtectedRoute requiredRole="admin"><LegalEntitiesPage /></ProtectedRoute>
+                  } />
+                  <Route path="e-signature/envelopes" element={
+                    <ProtectedRoute requiredRole="admin"><ESignatureEnvelopesPage /></ProtectedRoute>
+                  } />
+                  <Route path="e-signature/sign/:envelopeId" element={
+                    <ProtectedRoute requiredRole="store_manager"><ESignatureSignPage /></ProtectedRoute>
+                  } />
                   <Route path="employee-roster" element={
                     <ProtectedRoute requiredRole="store_manager"><EmployeeRosterPage /></ProtectedRoute>
                   } />
@@ -969,6 +987,19 @@ const AppContent: React.FC = () => {
                   <Route path="hr/training/courses" element={
                     <ProtectedRoute requiredRole="admin"><TrainingCoursesPage /></ProtectedRoute>
                   } />
+                  {/* D11 z68 — OKR / 学习地图 / 脉搏调研 */}
+                  <Route path="hr/okr" element={
+                    <ProtectedRoute><OKRDashboardPage /></ProtectedRoute>
+                  } />
+                  <Route path="hr/learning/map" element={
+                    <ProtectedRoute><LearningMapPage /></ProtectedRoute>
+                  } />
+                  <Route path="hr/learning/leaderboard" element={
+                    <ProtectedRoute><LearningLeaderboardPage /></ProtectedRoute>
+                  } />
+                  <Route path="hr/pulse" element={
+                    <ProtectedRoute><PulseSurveyPage /></ProtectedRoute>
+                  } />
                   <Route path="hr/exam-center" element={
                     <ProtectedRoute requiredRole="admin"><ExamCenterPage /></ProtectedRoute>
                   } />
@@ -977,6 +1008,10 @@ const AppContent: React.FC = () => {
                   } />
                   <Route path="hr/my-certificates" element={
                     <ProtectedRoute requiredRole="admin"><MyCertificatesPage /></ProtectedRoute>
+                  } />
+                  {/* HR 数字人助手 — 员工自然语言查询（所有员工可访问） */}
+                  <Route path="hr/assistant" element={
+                    <ProtectedRoute><HRAssistantPage /></ProtectedRoute>
                   } />
                   <Route path="mentorship" element={
                     <ProtectedRoute requiredRole="admin"><MentorshipPage /></ProtectedRoute>

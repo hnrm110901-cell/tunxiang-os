@@ -151,3 +151,62 @@ class LaborContractAlertService:
             lines.append(f"⚪ 60 天内到期 {len(scan_result['notice_60d'])} 份")
         lines.append("👉 查看详情：/hr/contracts/expiring")
         return "\n".join(lines)
+
+    @staticmethod
+    async def auto_create_renewal_envelopes(
+        session: AsyncSession,
+        store_id: Optional[str] = None,
+        days_ahead: int = 30,
+    ) -> Dict[str, Any]:
+        """
+        合同到期 30 天前自动创建续签电子签信封（status=draft，待 HR 审核发送）。
+
+        集成点：z68 电子签约模块
+        - 查询 warning_30d + urgent_15d 分档
+        - 每份合同生成一个草稿信封（signer: HR + 员工）
+        - 关联 related_contract_id / related_entity_type=employee_contract
+        """
+        from src.models.employee_contract import EmployeeContract
+        from src.services.e_signature_service import ESignatureService
+
+        scan = await LaborContractAlertService.scan_expiring_contracts(
+            session, days_ahead=days_ahead, store_id=store_id
+        )
+
+        created: List[Dict[str, Any]] = []
+        for tier in ("urgent_15d", "warning_30d"):
+            for item in scan.get(tier, []):
+                contract_id = item.get("contract_id") or item.get("id")
+                employee_id = item.get("employee_id")
+                employee_name = item.get("employee_name") or employee_id
+                if not contract_id or not employee_id:
+                    continue
+                try:
+                    env = await ESignatureService.prepare_envelope(
+                        session,
+                        template_id=None,
+                        signer_list=[
+                            {"signer_id": "HR", "role": "hr", "name": "HR", "order": 1},
+                            {"signer_id": str(employee_id), "role": "employee",
+                             "name": employee_name, "order": 2},
+                        ],
+                        subject=f"劳动合同续签 - {employee_name}",
+                        initiator_id="system",
+                        related_contract_id=contract_id if isinstance(contract_id, __import__('uuid').UUID) else None,
+                        related_entity_type="employee_contract",
+                        expires_in_days=14,
+                    )
+                    created.append({
+                        "envelope_id": str(env.id),
+                        "envelope_no": env.envelope_no,
+                        "contract_id": str(contract_id),
+                        "employee_id": str(employee_id),
+                        "tier": tier,
+                    })
+                except Exception as exc:  # pragma: no cover
+                    logger.warning(
+                        "labor_contract.renewal_envelope_failed",
+                        contract_id=str(contract_id),
+                        error=str(exc),
+                    )
+        return {"created": created, "total": len(created)}

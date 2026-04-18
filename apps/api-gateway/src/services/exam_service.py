@@ -521,6 +521,20 @@ class ExamService:
         await session.flush()
         logger.info("exam.cert.issued", cert_no=cert_no, employee_id=employee_id)
 
+        # D11 z68 — 发证同时发放学习积分（exam_pass），失败不影响发证
+        try:
+            from src.services.learning_points_service import learning_points_service
+
+            await learning_points_service.award(
+                session,
+                employee_id=employee_id,
+                event_type="exam_pass",
+                source_id=str(cert.id),
+                remark=f"cert {cert_no}",
+            )
+        except Exception as _e:  # noqa: BLE001
+            logger.warning("learning_points_award_failed", error=str(_e))
+
         # D11 Nice-to-Have：发证后异步生成 PDF（失败容错，不影响发证）
         try:
             from .certificate_pdf_service import generate_certificate_pdf
@@ -529,7 +543,36 @@ class ExamService:
         except Exception as e:  # pragma: no cover
             logger.warning("cert.pdf.post_issue.failed", cert_no=cert_no, error=str(e))
 
-        return {"id": str(cert.id), "cert_no": cert_no, "renewed": False, "expire_at": expire_at.isoformat(), "pdf_url": cert.pdf_url}
+        # D9 z68：可选联动电子签（培训完成确认书，学员签字）
+        esign_envelope_id: Optional[str] = None
+        try:
+            from .e_signature_service import ESignatureService
+
+            env = await ESignatureService.prepare_envelope(
+                session,
+                template_id=None,
+                signer_list=[
+                    {"signer_id": str(employee_id), "role": "employee",
+                     "name": employee_id, "order": 1},
+                ],
+                subject=f"培训完成确认书 - 证书 {cert_no}",
+                initiator_id="system",
+                related_contract_id=cert.id,
+                related_entity_type="exam_certificate",
+                expires_in_days=30,
+            )
+            esign_envelope_id = str(env.id)
+        except Exception as e:  # pragma: no cover
+            logger.warning("cert.esign.envelope_failed", cert_no=cert_no, error=str(e))
+
+        return {
+            "id": str(cert.id),
+            "cert_no": cert_no,
+            "renewed": False,
+            "expire_at": expire_at.isoformat(),
+            "pdf_url": cert.pdf_url,
+            "esign_envelope_id": esign_envelope_id,
+        }
 
     @staticmethod
     async def list_my_certificates(session: AsyncSession, employee_id: str) -> List[Dict[str, Any]]:

@@ -789,3 +789,17 @@ from .month_close import MonthCloseLog, TrialBalanceSnapshot
 from .cost_center import CostCenter, CostCenterBudget, EmployeeCostCenter
 from .talent_assessment import SuccessionPlan, TalentAssessment, TalentPool
 from .one_on_one import OneOnOneFollowUp, OneOnOneMeeting, OneOnOneTemplate
+
+# D11 z68 — OKR / 学习地图 / 脉搏调研
+from .okr import KeyResult, Objective, OKRAlignment, OKRUpdate
+from .learning_path import (
+    LearningAchievement,
+    LearningPath,
+    LearningPathEnrollment,
+    LearningPoints,
+)
+from .pulse_survey import (
+    PulseSurveyInstance,
+    PulseSurveyResponse,
+    PulseSurveyTemplate,
+)

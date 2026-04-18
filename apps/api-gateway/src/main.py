@@ -667,6 +667,10 @@ app.include_router(briefing_api.router, tags=["briefing"])
 from src.api import hq_briefing_api
 
 app.include_router(hq_briefing_api.router, tags=["hq_briefing"])
+# HR 数字人助手（Hermes Agent-N）— 员工自然语言查询 HR 数据
+from src.api import hr_assistant as hr_assistant_api
+
+app.include_router(hr_assistant_api.router, tags=["hr-assistant"])
 app.include_router(ops.router, prefix="/api/v1/ops", tags=["ops"])
 app.include_router(daily_hub.router, tags=["daily_hub"])
 app.include_router(workforce.router, tags=["workforce"])
@@ -1237,6 +1241,20 @@ app.include_router(_month_close.router, tags=["month-close"])
 # D12 z66 — 薪资项目库 + payroll_engine_v3
 from src.api import salary_item as _salary_item  # noqa: E402
 app.include_router(_salary_item.router, tags=["payroll-salary-items"])
+
+# D11 z68 — OKR / E-learning 学习地图 / 脉搏调研
+from src.api import okr as _okr_api  # noqa: E402
+from src.api import learning as _learning_api  # noqa: E402
+from src.api import pulse_survey as _pulse_api  # noqa: E402
+app.include_router(_okr_api.router, tags=["hr-okr"])
+app.include_router(_learning_api.router, tags=["hr-learning"])
+app.include_router(_pulse_api.router, tags=["hr-pulse-survey"])
+
+# D9 z68 — 电子签约完整模块 + 多主体管理
+from src.api import legal_entity as _legal_entity  # noqa: E402
+from src.api import e_signature as _e_signature  # noqa: E402
+app.include_router(_legal_entity.router, tags=["hr-legal-entity"])
+app.include_router(_e_signature.router, tags=["hr-e-signature"])
 
 # 业财税资金一体化（FCT）
 if getattr(settings, "FCT_ENABLED", False):
