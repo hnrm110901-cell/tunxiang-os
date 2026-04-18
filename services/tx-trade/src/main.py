@@ -355,6 +355,11 @@ from .api.omni_sync_routes import router as omni_sync_router
 
 app.include_router(omni_sync_router)
 
+# ── 存酒管理：台位/会员存酒全生命周期（存入/取酒/续存/转台/核销）──
+from .api.wine_storage_routes import router as wine_storage_router
+
+app.include_router(wine_storage_router)
+
 
 try:
     from .api.table_card_api import router as table_card_router

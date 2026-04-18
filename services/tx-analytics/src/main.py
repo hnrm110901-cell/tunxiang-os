@@ -40,6 +40,10 @@ from .api.merchant_targets_routes import router as merchant_targets_router   # M
 from .api.ai_evidence_chain_routes import router as ai_evidence_chain_router  # May W2: B-04
 from .api.merchant_delivery_scorecard_routes import router as delivery_scorecard_router  # W4: 交付评分卡
 from .api.go_live_review_routes import router as go_live_review_router  # May W4: GO-TO-LIVE 评审
+from .api.kitchen_report_routes import router as kitchen_report_router      # 厨房管理报表（8端点）
+from .api.delivery_report_routes import router as delivery_report_router    # 外卖报表（4端点）
+from .api.booking_report_routes import router as booking_report_router      # 预定报表（4端点）
+from .api.special_ops_report_routes import router as special_ops_report_router  # 特殊操作报表（14端点）
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
@@ -94,6 +98,10 @@ app.include_router(merchant_targets_router)   # May W2: B-03 分商户目标
 app.include_router(ai_evidence_chain_router)  # May W2: B-04 证据链
 app.include_router(delivery_scorecard_router)  # W4: 商户交付评分卡
 app.include_router(go_live_review_router)      # May W4: GO-TO-LIVE 最终评审
+app.include_router(kitchen_report_router)      # 厨房管理报表：8端点
+app.include_router(delivery_report_router)     # 外卖报表：4端点
+app.include_router(booking_report_router)      # 预定报表：4端点
+app.include_router(special_ops_report_router)  # 特殊操作报表：14端点
 
 @app.get("/health")
 async def health():

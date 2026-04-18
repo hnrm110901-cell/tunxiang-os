@@ -12,6 +12,30 @@
   GET  /api/v1/quick-cashier/config/{store_id}  — 获取快餐模式配置
   PUT  /api/v1/quick-cashier/config/{store_id}  — 保存快餐模式配置
   GET  /api/v1/quick-cashier/sequence/next/{store_id} — 获取下一个取餐号
+
+  ── A1: 档口管理 ──────────────────────────────────────────────────────────────
+  GET  /api/v1/quick-cashier/counters                        — 档口列表
+  POST /api/v1/quick-cashier/counters                        — 创建档口
+  PUT  /api/v1/quick-cashier/counters/{counter_id}           — 更新档口配置
+  POST /api/v1/quick-cashier/counters/{counter_id}/open      — 开档
+  POST /api/v1/quick-cashier/counters/{counter_id}/close     — 关档
+
+  ── A2: 并行结账队列 ───────────────────────────────────────────────────────────
+  POST /api/v1/quick-cashier/queue                           — 加入队列（返回排队号）
+  GET  /api/v1/quick-cashier/queue/status                    — 队列状态（各档口待处理数）
+  POST /api/v1/quick-cashier/queue/{queue_id}/process        — 开始处理（转结账流程）
+  DELETE /api/v1/quick-cashier/queue/{queue_id}              — 离队
+
+  ── A3: 叫号高级配置 ──────────────────────────────────────────────────────────
+  GET  /api/v1/quick-cashier/calling/config/{store_id}       — 获取叫号配置
+  PUT  /api/v1/quick-cashier/calling/config/{store_id}       — 更新叫号配置
+
+  ── A4: 会员快结 ──────────────────────────────────────────────────────────────
+  POST /api/v1/quick-cashier/member-quick-pay                — 会员扫码快速结账
+
+  ── A5: 分时段限流 ────────────────────────────────────────────────────────────
+  GET  /api/v1/quick-cashier/flow-control/{store_id}         — 查看限流配置
+  PUT  /api/v1/quick-cashier/flow-control/{store_id}         — 设置各时段最大并发订单数
 """
 import asyncio
 from datetime import date, datetime, timezone
@@ -98,6 +122,77 @@ class QuickCashierConfigReq(BaseModel):
     daily_reset: bool = True
     max_number: int = Field(default=999, ge=1, le=9999)
     auto_print_receipt: bool = True
+
+
+# ── A1: 档口管理请求模型 ─────────────────────────────────────────────────────
+
+
+class CreateCounterReq(BaseModel):
+    store_id: str
+    name: str = Field(max_length=50, description="档口名称，如：档口A / 1号档口")
+    display_order: int = Field(default=1, ge=1)
+    operator_id: Optional[str] = Field(default=None, description="负责人员工ID")
+    max_queue_size: int = Field(default=50, ge=1, le=500, description="最大排队人数上限")
+
+
+class UpdateCounterReq(BaseModel):
+    name: Optional[str] = Field(default=None, max_length=50)
+    display_order: Optional[int] = Field(default=None, ge=1)
+    operator_id: Optional[str] = None
+    max_queue_size: Optional[int] = Field(default=None, ge=1, le=500)
+
+
+# ── A2: 并行队列请求模型 ─────────────────────────────────────────────────────
+
+
+class JoinQueueReq(BaseModel):
+    store_id: str
+    counter_id: Optional[str] = Field(default=None, description="指定档口，不传则系统自动分配最短队列")
+    member_id: Optional[str] = Field(default=None, description="会员ID（扫码进队）")
+    operator_id: Optional[str] = Field(default=None, description="收银员操作时填写")
+    party_size: int = Field(default=1, ge=1, le=50, description="人数")
+
+
+# ── A3: 叫号高级配置请求模型 ─────────────────────────────────────────────────
+
+
+class CallingAdvancedConfigReq(BaseModel):
+    prefix: str = Field(default="A", max_length=5, description="叫号前缀，如 A/B/C")
+    number_start: int = Field(default=1, ge=1, description="叫号起始号")
+    number_end: int = Field(default=999, ge=1, le=9999, description="叫号结束号")
+    broadcast_mode: str = Field(
+        default="screen",
+        description="广播方式：screen=仅屏幕 / voice=仅语音 / both=双屏+语音",
+    )
+    recall_times: int = Field(default=3, ge=0, le=10, description="过号重叫次数")
+    skip_after_seconds: int = Field(default=120, ge=30, le=600, description="过号后自动跳过等待秒数")
+    daily_reset: bool = Field(default=True, description="每日自动重置叫号")
+
+
+# ── A4: 会员快结请求模型 ─────────────────────────────────────────────────────
+
+
+class MemberQuickPayReq(BaseModel):
+    store_id: str
+    quick_order_id: str = Field(description="待支付的快餐订单ID")
+    scan_code: str = Field(description="会员扫码内容（会员码 / 付款码）")
+    amount_fen: int = Field(ge=1, description="应付金额（分）")
+    operator_id: Optional[str] = None
+
+
+# ── A5: 分时段限流请求模型 ────────────────────────────────────────────────────
+
+
+class TimeSlotFlowRule(BaseModel):
+    time_from: str = Field(description="时段起始 HH:MM，如 11:00")
+    time_to: str = Field(description="时段结束 HH:MM，如 13:30")
+    max_concurrent_orders: int = Field(ge=1, le=9999, description="该时段最大并发订单数")
+    label: Optional[str] = Field(default=None, max_length=20, description="时段标签，如：午高峰")
+
+
+class FlowControlConfigReq(BaseModel):
+    is_enabled: bool = Field(default=True)
+    rules: list[TimeSlotFlowRule] = Field(description="分时段规则列表（允许空列表，表示不限流）")
 
 
 # ─── 1. 创建快餐订单 ─────────────────────────────────────────────────────────
