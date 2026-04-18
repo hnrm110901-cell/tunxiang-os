@@ -174,6 +174,73 @@
 
 ---
 
+## 2026-04-13 人力中枢能力补齐 — 8大模块全栈开发（对标乐才/I人事替换能力）
+
+### 今日完成
+- **[P0] 钉钉/企微SDK实接**: WeComSDK+DingTalkSDK封装、IM回调handler、预警推送到IM、IMSyncSettingsPage
+- **[P0] 薪资项目库**: v250迁移、7大类71项薪资项、DB持久化CRUD、SalaryItemLibraryPage
+- **[P0] 借调成本分摊**: v251迁移(2表)、TransferCostEngine、8个API端点、TransferListPage+CostReportPage
+- **[P1] 电子签约**: v252迁移(2表)、ESignatureService全流程、e_sign_sdk Mock、12个API端点、3个前端页面
+- **[P1] 积分赛马**: v253迁移(4表)、积分全套CRUD+赛马赛季、PointsAdvisorAgent(3 actions)、3个前端页面
+- **[P1] 绩效打分**: v254迁移(2表)、评审周期+多人打分+校准、10个API端点、3个前端页面
+- **[P2] 薪税申报**: v256迁移、TaxBureauSDK Mock、TaxFilingService、7个API端点、TaxFilingPage
+- **[P2] 考勤合规**: v255迁移、GPS/同设备/加班超时/代打卡检测、AttendanceComplianceAgent、9个API端点、ComplianceAuditPage
+- **[infra]** 新增6个OrgFlags Feature Flags
+
+### 数据变化
+- 迁移版本：v249 → v256（新增7个迁移，13张DB表）
+- 新增SDK：4个（wecom/dingtalk/e_sign/tax_bureau）
+- 新增Agent：2个（points_advisor/attendance_compliance）
+- 新增API端点：~65个 | 新增前端页面：~18个
+
+### 遗留问题
+- SDK需客户提供凭证才能真实调通（企微/钉钉/电子签章/薪税申报）
+- 考勤合规依赖attendance_records扩展GPS/device_id字段
+
+---
+
+## 2026-04-13 员工积分+赛马机制 — DB持久化+赛马赛季+积分兑换+Agent+前端
+
+### 今日完成
+- [shared/db-migrations/v253] 新增4张表：`point_transactions`（积分流水）、`point_rewards`（兑换商品）、`horse_race_seasons`（赛马赛季）、`point_redemptions`（兑换记录），全部含RLS+索引
+- [tx-org/employee_points_service.py] 扩展v253 DB持久化方法：
+  - `award_points_v2` / `deduct_points_v2` — 写入point_transactions表
+  - `get_employee_balance_v2` / `get_points_history_v2` — 余额+流水查询
+  - `get_leaderboard_v2` — 积分排行榜（支持scope过滤）
+  - `redeem_reward` — 积分兑换（余额校验+库存扣减+流水记录）
+  - 兑换商品CRUD：`list_rewards` / `create_reward` / `toggle_reward`
+  - 赛马赛季CRUD：`create_horse_race_season` / `list_horse_race_seasons` / `get_horse_race_season_ranking` / `update_horse_race_status`
+  - `get_points_stats` — 积分统计概览
+- [tx-org/api/points_routes.py] 新增14个API端点（积分发放/扣减/余额/流水/排行/兑换/商品/统计/赛马CRUD）
+- [tx-agent/skills/points_advisor.py] 新增积分激励Agent（PointsAdvisorAgent）：
+  - `auto_award_monthly` — 月度自动积分发放（全勤扫描）
+  - `generate_race_report` — 赛马周报（排名变化+亮点+风险）
+  - `suggest_incentive` — 激励策略建议（低积分关注+不活跃预警）
+- [web-admin] 新增3个前端页面：
+  - `PointsLeaderboardPage` — 积分排行榜（TOP50+统计卡+范围筛选）
+  - `HorseRacePage` — 赛马管理（赛季列表+创建+排名Drawer+状态操作）
+  - `PointsRewardsPage` — 积分兑换商品（CRUD+上下架Switch+兑换统计）
+- [web-admin/api/pointsApi.ts] 新增积分API客户端（14个函数+完整TypeScript类型）
+- 路由注册：tx-org/main.py + hq-hr.tsx + master.py（含intent路由）
+
+### 数据变化
+- 迁移版本：v252 → v253
+- 新增DB表：4个（point_transactions + point_rewards + horse_race_seasons + point_redemptions）
+- 新增API端点：14个（tx-org服务）
+- 新增Agent：1个（points_advisor，3个actions）
+- 新增前端页面：3个 + 1个API客户端
+
+### 遗留问题
+- 赛马赛季目前仅支持积分维度排名，营收/服务评分维度需对接tx-trade和tx-analytics
+- 兑换审批流程（approved_by字段）暂未与审批引擎对接
+- 月度自动积分发放需接入HR Agent Scheduler定时任务
+
+### 明日计划
+- 接入HR Agent Scheduler实现月度自动积分发放
+- 赛马赛季多维度排名对接
+
+---
+
 ## 2026-04-13 subscription_routes 内存→DB + WechatPay 接入（v255 member_subscriptions 表）
 
 ### 今日完成
