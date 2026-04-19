@@ -83,6 +83,7 @@ from api.attendance_compliance_routes import router as attendance_compliance_rou
 from api.points_routes import router as points_router
 import api.tax_filing_routes as _tax_filing_mod
 from api.tax_filing_routes import router as tax_filing_router
+from api.ai_salary_advisor_routes import router as ai_salary_advisor_router
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from shared.ontology.src.database import get_db as _shared_get_db
@@ -212,6 +213,7 @@ app.include_router(e_signature_router)         # 电子签约模块（v252表）
 app.include_router(points_router)              # 员工积分+赛马（v253表）积分流水+兑换+赛季
 app.include_router(tax_filing_router)          # 薪税申报对接（v256表）个税申报生成+提交+查询
 app.include_router(attendance_compliance_router)  # 考勤深度合规审计（v255表）GPS/代打/加班超时
+app.include_router(ai_salary_advisor_router)   # AI 薪资推荐（v257）岗位档位+区域系数+工龄曲线
 from api.franchise_fee_routes import router as franchise_fee_router
 app.include_router(franchise_fee_router)           # 加盟收费闭环（天财对标）账单/收款/出账规则/报表
 
