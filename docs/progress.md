@@ -4,6 +4,59 @@
 
 ---
 
+## 2026-04-19 PR-W2.D：红冲 UNIQUE 升级防孤儿（v276 迁移）
+
+### 本次会话目标
+Wave 2 Batch 1 **收尾 PR**。响应 §19 DBA P1-5：W1.5 红冲双 flush 场景下若 flush #2 前连接断 + 外层 txn 误 commit，会产生"一张原凭证被两张红字凭证指向"的孤儿。
+
+Tier 级别：🔴 **Tier 1**。
+
+### 完成状态
+- [x] **v276 migration**（幂等）：
+  - DROP INDEX CONCURRENTLY IF EXISTS 老 `ix_fv_red_flush_of`（非 UNIQUE）
+  - CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS 新 UNIQUE partial
+  - 与 `uq_fv_red_flushed_by` (v272) 对称：一对一红冲关系 DB 层兜死
+- [x] **service 层双层防护**：
+  - pre-check: 写新红字前 SELECT 是否已有红字指向 original → 拒（应用层早拒，消息清晰）
+  - IntegrityError 捕获: 并发场景 UNIQUE 触发 → "并发红冲冲突" 消息
+- [x] **测试**：
+  - `TestW2DRedFlushOrphanProtection`: 2 场景（pre-check 拒孤儿 / DB UNIQUE 并发拒）
+  - `TestV276RedFlushOfUniqueMigration`: 5 断言（revision / DROP+CREATE / CONCURRENTLY / autocommit_block / docstring 关联 §19）
+  - 更新 `_service_with_voucher` helper + 9 处现有测试加 pre-check miss mock
+  - 更新 `test_red_flush_with_explicit_tenant_scoped_load`: 2 次 execute side_effect
+- [x] **全 Wave 1+2 Batch 1 回归**：**260 passed**（W1 214 + B 12 + W2.B 8 + W2.C 1 + W2.E 5 + W2.G 12 + W2.D 7 + 1 helper 调整）
+
+### 关键决策
+- **双层防护** — 应用层 pre-check（命中明确错误）+ DB UNIQUE（并发兜底）双保险。pre-check 更贴近业务消息，UNIQUE 是硬底线。
+- **Runbook 预检 SQL** — 上线前必跑查询发现重复。W1.5 上线时间短概率极低，但必须验证。
+- **downgrade 降级为普通 index** — 仅紧急撤销用，会失去 UNIQUE 保护。
+
+### 已知风险
+- 生产上线前必须跑预检 SQL（见 v276 docstring）。若已有重复，UNIQUE 创建会失败，DBA 手工 dedup 后重试。
+- W1.5 孤儿场景（flush #2 失败）本身是应用层 bug，W2.D 是 DB 层兜底。真正修复需 outbox pattern（Wave 2 后续）。
+
+---
+
+## Wave 2 Batch 1 完成（5 个 PR 全部合入前就绪）
+
+| PR | 主题 | 测试 | 状态 |
+|---|---|---|---|
+| [#53](https://github.com/hnrm110901-cell/tunxiang-os/pull/53) | **W2.B** 外卖 T+N webhook 不丢单 | 8 | ✅ 开 |
+| [#54](https://github.com/hnrm110901-cell/tunxiang-os/pull/54) | **W2.C** ensure_period SAVEPOINT | 1+3 | ✅ 开 |
+| [#55](https://github.com/hnrm110901-cell/tunxiang-os/pull/55) | **W2.E** session.get Oracle 攻击修复 | 5 | ✅ 开 |
+| [#56](https://github.com/hnrm110901-cell/tunxiang-os/pull/56) | **W2.G** v274 erp_push_log RLS | 12 | ✅ 开 |
+| **#57** | **W2.D** v276 red_flush UNIQUE | 7 | ✅ 开 |
+| **合计** | | **260 passed** | |
+
+**下一步 Batch 2**（合规核心 + 审计完整）:
+- W2.A: 跨月漏账 "以前年度损益调整" 科目 6901 语义（Plan 已预警：ACCOUNT_MAPPING 缺 6901）
+- W2.F: red_flush operator_id / reason 入 DB（审计字段）
+- W2.H: backfill tenant_id=None 加 BYPASS 参数校验
+- W2.I: void + red_flush 组合卡死（红字凭证 voided 后释放原凭证 red_flushed_by）
+- W2.O: 红冲 voucher_date 语义（原日期 vs 当前日期）
+
+---
+
 ## 2026-04-19 PR-W2.G：erp_push_log 补 RLS（v274 迁移）
 
 ### 本次会话目标
