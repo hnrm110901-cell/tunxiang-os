@@ -12,6 +12,7 @@ from typing import Any
 import structlog
 
 from ..base import ActionConfig, AgentResult, SkillAgent
+from ..context import ConstraintContext
 
 logger = structlog.get_logger()
 
@@ -152,6 +153,13 @@ class SmartMenuAgent(SkillAgent):
                   "pricing_scenarios": scenarios, "stress_test": stress},
             reasoning=f"BOM成本 ¥{total_cost/100:.2f}，毛利率 {margin:.1%}",
             confidence=0.9,
+            # Sprint D1 / PR 批次 3：填 context 让 margin 约束真实生效
+            # （checker 会验证 (price-cost)/price >= min_margin_rate）
+            context=ConstraintContext(
+                price_fen=target_price_fen if target_price_fen > 0 else None,
+                cost_fen=total_cost if target_price_fen > 0 else None,
+                constraint_scope={"margin"},
+            ),
         )
 
     async def _recommend_pilots(self, params: dict) -> AgentResult:

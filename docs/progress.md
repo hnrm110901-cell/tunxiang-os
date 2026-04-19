@@ -4,6 +4,56 @@
 
 ---
 
+## 2026-04-19 14:10 Sprint D1 批次 3：定价营销 smart_menu + menu_advisor 填 margin context + points_advisor 补注册
+
+### 本次会话目标
+按设计稿 §3.4 推进 W6 批 3：smart_menu / menu_advisor / points_advisor / seasonal_campaign / personalization / new_customer_convert / referral_growth 七个 Skill 的 margin 约束接入。
+
+**协同发现**：开工时 commit `9e6f99d7`（pzlichun-a11y 于本地 main 上由另一个 Claude Opus 4.6 agent 推进）已为 7 个 Skill 追加 `constraint_scope = {"margin"}` 声明。本 PR 在此基础上补完：(1) PointsAdvisorAgent 的 SKILL_REGISTRY 注册缺失；(2) smart_menu 和 menu_advisor 的 ConstraintContext 填充（让 margin 约束从"仅声明"升到"真实生效"）。
+
+Tier 级别：Tier 2（定价/营销逻辑，间接影响资金但不在支付链路）。
+
+### 完成状态
+- [x] **验证 7 Skill scope 已在 main** — `9e6f99d7` commit 已为 smart_menu/menu_advisor/points_advisor/seasonal_campaign/personalization_agent/new_customer_convert/referral_growth 追加 `constraint_scope={"margin"}`
+- [x] **PointsAdvisorAgent 入注册表** — skills/__init__.py 新增 import + `ALL_SKILL_AGENTS` 追加；SKILL_REGISTRY 构造期自动去重
+- [x] **smart_menu `_simulate_cost` 填 context** —
+  `context=ConstraintContext(price_fen=target_price_fen, cost_fen=total_cost, scope={"margin"})`
+  让 BOM 成本仿真的毛利结果真的被 checker 校验（低于 15% 阈值拦截）
+- [x] **menu_advisor `_optimize_pricing` 填 context** — 扫描所有入参 dishes 找出"最低毛利"菜品作为校验基准（checker 按最严防线）
+- [x] **TDD 扩 5 条**（共 24：11 passed + 13 skipped by pre-existing edge_mixin bug）：
+  - `test_batch_3_pricing_skills_declare_scope`：7 Skill scope 声明对齐
+  - `test_batch_3_registry_contains_points_advisor`：注册补全验证
+  - `test_smart_menu_simulate_cost_fills_margin_context`：成本 40%/售价 100%（毛利 60%）通过
+  - `test_smart_menu_low_margin_blocks_decision`：成本 90%/售价 100%（毛利 10%） → 违规拦截
+  - `test_menu_advisor_optimize_pricing_picks_worst_margin_as_basis`：两菜一健康一危险，按最差 5% 拦截
+- [x] **ruff 全绿** — 4 个修改文件 All checks passed
+
+### 关键决策
+- **最差毛利作 menu_advisor 校验基准而非平均** — 定价建议是批量输出，任一道菜低于 15% 就应整份建议被拦截。平均会把 1 道 3% 毛利的危险菜稀释掉，失去意义
+- **不改 `9e6f99d7` 带来的 7 行声明** — 内容与设计稿一致，只补"注册表 + 2 个 context 填充"这两块缺失
+- **PointsAdvisorAgent 放 PersonalizationAgent 后** — 保持 import 块按"千人千面"分组聚拢
+- **7 个批次 3 Skill 里只让 2 个填 context** — 其余 5 个（points_advisor/seasonal_campaign/personalization/new_customer_convert/referral_growth）需要各自的业务数据（积分成本/活动预算/单客 LTV/首单奖励金额/裂变奖励），留给 Squad Owner 按真实业务补。设计稿 §2.3 的覆盖率表 "W6 批 3 实装 30/51" 隐含了这种渐进推进
+
+### 交付清单
+```
+修改：
+  services/tx-agent/src/agents/skills/__init__.py           +5 行（PointsAdvisorAgent import + 列表追加）
+  services/tx-agent/src/agents/skills/smart_menu.py         +10 行（import + simulate_cost context）
+  services/tx-agent/src/agents/skills/menu_advisor.py       +15 行（import + optimize_pricing 取最差 + context）
+  services/tx-agent/src/tests/test_constraint_context.py    +75 行（5 tests）
+```
+
+### 下一步
+1. **批次 4（W7 库存原料）** —— inventory_alert / new_product_scout / trend_discovery / pilot_recommender / banquet_growth / enterprise_activation / private_ops，主 scope = `{"safety"}` + IngredientSnapshot 填充
+2. **out-of-scope 修 `edge_mixin` 相对导入** —— 解锁所有 skipped tests
+3. **批次 3 剩余 5 Skill 补 context** —— 等 Squad Owner 按业务需求补（积分/活动/奖励金额等）
+
+### 已知风险
+- **`personalization_agent.py` 有 4 个 pre-existing ruff F541 告警**（空 f-string）—— 非本 PR 引入，作为清理项 out-of-scope
+- **menu_advisor 的"取最差"可能导致整份定价建议被 1 道极端菜品误拦**，但这是 margin 约束"绝对底线"的要求 —— 若拦截率过高，后续可在 UI 层把"违规菜"标红单独提示而非整单阻塞
+
+---
+
 ## 2026-04-18 20:05 Sprint D1 批次 2 / PR H：出餐体验 7 Skill scope 声明 + 2 Skill 填 context
 
 ### 本次会话目标

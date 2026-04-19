@@ -35,6 +35,9 @@ from .off_peak_traffic import OffPeakTrafficAgent
 # 千人千面个性化Agent
 from .personalization_agent import PersonalizationAgent
 from .pilot_recommender import PilotRecommenderAgent
+
+# Sprint D1 / PR 批次 3：定价营销（margin）
+from .points_advisor import PointsAdvisorAgent
 from .private_ops import PrivateOpsAgent
 from .queue_seating import QueueSeatingAgent
 from .referral_growth import ReferralGrowthAgent
@@ -107,6 +110,10 @@ ALL_SKILL_AGENTS = [
     # smart_service / queue_seating / kitchen_overtime 已在上方注册；
     # 本行新增 table_dispatch）
     TableDispatchAgent,
+    # Sprint D1 / PR 批次 3：定价营销（smart_menu / menu_advisor /
+    # seasonal_campaign / personalization / new_customer_convert /
+    # referral_growth 已在上方注册；本行新增 points_advisor）
+    PointsAdvisorAgent,
 ]
 
 
