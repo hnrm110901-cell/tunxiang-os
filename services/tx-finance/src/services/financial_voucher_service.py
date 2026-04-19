@@ -475,9 +475,32 @@ class FinancialVoucherService:
         ]
 
         # ── 3. 双向 link ──────────────────────────────────────────────
+        # [W2.D] pre-check: 若已有红字凭证指向 original (孤儿场景), 拒绝再建
+        # 配合 v276 UNIQUE partial 索引 (DB 层兜底). 应用层早拒消息更清晰.
+        pre_check_stmt = select(FinancialVoucher).where(
+            FinancialVoucher.red_flush_of_voucher_id == original.id,
+        ).limit(1)
+        pre_check_result = await session.execute(pre_check_stmt)
+        existing_red = pre_check_result.scalar_one_or_none()
+        if existing_red is not None:
+            raise ValueError(
+                f"凭证 {original.voucher_no} 已有红字凭证 {existing_red.voucher_no} "
+                f"指向它 (可能是 W1.5 孤儿: 原凭证 red_flushed_by_voucher_id "
+                f"= NULL 但红字凭证仍在 DB). 需 DBA 手工修复 original."
+            )
+
         red.red_flush_of_voucher_id = original.id
         session.add(red)
-        await session.flush()  # 先 flush 拿到 red.id
+        try:
+            await session.flush()  # 先 flush 拿到 red.id
+        except IntegrityError as exc:
+            # [W2.D DB 兜底] v276 UNIQUE partial 防并发红冲
+            if "ix_fv_red_flush_of" in str(exc.orig):
+                raise ValueError(
+                    f"并发红冲冲突: 凭证 {original.voucher_no} 已被另一进程红冲. "
+                    f"请 refetch 原凭证并重试 (has_been_red_flushed 应为 True)."
+                ) from exc
+            raise
 
         original.red_flushed_by_voucher_id = red.id
         # 作废原因冗余写入原凭证 voided_reason 以明确 (不改 voided=TRUE —

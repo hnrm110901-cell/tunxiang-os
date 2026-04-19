@@ -628,7 +628,12 @@ class TestW2ETenantScopedLoad:
 
     @pytest.mark.asyncio
     async def test_red_flush_with_explicit_tenant_scoped_load(self):
-        """red_flush 也用 _load_voucher_tenant_scoped (与 void 一致)."""
+        """red_flush 也用 _load_voucher_tenant_scoped (与 void 一致).
+
+        [W2.D 后] red_flush 内 2 次 execute:
+        1. _load_voucher_tenant_scoped 返 voucher
+        2. pre-check red_flush_of 返 None (无孤儿)
+        """
         svc = FinancialVoucherService()
         session = AsyncMock()
 
@@ -639,9 +644,12 @@ class TestW2ETenantScopedLoad:
             entries=[], voided=False,
         )
         voucher.lines = []
-        mock_result = MagicMock()
-        mock_result.scalar_one_or_none = MagicMock(return_value=voucher)
-        session.execute = AsyncMock(return_value=mock_result)
+        # 2 次 execute: [load voucher hit, pre-check miss]
+        load_hit = MagicMock()
+        load_hit.scalar_one_or_none = MagicMock(return_value=voucher)
+        pre_miss = MagicMock()
+        pre_miss.scalar_one_or_none = MagicMock(return_value=None)
+        session.execute = AsyncMock(side_effect=[load_hit, pre_miss])
         session.flush = AsyncMock()
 
         await svc.red_flush(
@@ -649,8 +657,9 @@ class TestW2ETenantScopedLoad:
             session=session, tenant_id=voucher.tenant_id,
         )
 
-        session.execute.assert_awaited()
-        # 不走 session.get
+        # 走 2 次 execute: 加载 + pre-check
+        assert session.execute.await_count == 2
+        # 不走 session.get (W2.E 显式 tenant 路径)
         session.get.assert_not_called()
 
     @pytest.mark.asyncio
