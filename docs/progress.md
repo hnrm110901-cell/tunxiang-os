@@ -4,6 +4,87 @@
 
 ---
 
+## 2026-04-19 PR-W1.4：accounting_periods 账期表 + 状态机
+
+### 本次会话目标
+W1.4: 引入 `accounting_periods` 会计账期元数据表 + 三状态机 `open/closed/locked`。解决：
+- 2026-03 月结后，不应再允许 2026-03-XX 凭证写入（审计红线）
+- 年结（12 月全 closed 后）需跟随 `locked` 状态，**不可重开**，只能追加红冲凭证
+
+Tier 级别：🔴 **Tier 1**（资金安全 / 金税四期审计红线）。
+
+### 不得触碰的边界
+- [x] 不改 `FinancialVoucherService` — period 校验接入留给 W1.4b 独立 PR
+- [x] 不回填历史 period — 应用层懒初始化（ensure_period 首次写时创建）
+- [x] 不做 period 跨月聚合（W2 月结报表独立）
+
+### 涉及范围
+- 新迁移 `v270_accounting_periods.py`（down_revision=v268）
+- 新 ORM `services/tx-finance/src/models/accounting_period.py`
+- 新 service `services/tx-finance/src/services/accounting_period_service.py`
+- 新测试 `services/tx-finance/src/tests/test_accounting_periods_tier1.py`
+- Tier 级别：Tier 1
+
+### 完成状态
+- [x] **v270 migration**
+  - CREATE TABLE accounting_periods（15 列：id/tenant_id/year/month/start/end/status + 3 组审计）
+  - 7 CHECK 约束：status 枚举 / month 1-12 / year 2020-2100 / end≥start / closed 审计一致 / locked 审计一致
+  - UNIQUE (tenant_id, period_year, period_month)
+  - 2 索引：`ix_ap_tenant_open` partial WHERE status='open'（快速找 open 账期）/ `ix_ap_tenant_date_range` (tenant_id, period_start, period_end)（按 voucher_date 查所属）
+  - RLS：`app.tenant_id` policy
+- [x] **AccountingPeriod ORM** 镜像 schema + 3 个状态机方法 + `is_open` / `is_writable` / `contains_date` 辅助
+  - `close(operator, reason)`：open → closed，reason 强制非空
+  - `reopen(operator, reason)`：closed → open；locked 直接拒绝
+  - `lock(operator, reason)`：closed → locked（必须先月结才能年结锁）
+  - `month_range(year, month)` 工具函数（闰年/12 月跨年边界）
+- [x] **AccountingPeriodService**
+  - `ensure_period(tenant, year, month)` — 懒初始化 + 并发 refetch
+  - `close_period` / `reopen_period` / `lock_period` — 转发 ORM 状态机 + flush
+  - `lock_year(tenant, year)` — 原子锁定 12 张 period（前置校验全 closed）
+  - `find_period_for_date(tenant, biz_date)` — 按日期查所属 period
+  - `list_open_periods(tenant)` — 列所有 open（W1.4b voucher 写路径用）
+  - `is_date_writable(tenant, biz_date, *, auto_ensure=False)` — 对外 API
+- [x] **Tier 1 测试** `src/tests/test_accounting_periods_tier1.py`（**48 passed / 0.25s**）
+  - month_range 边界：正常/31 日/闰年/非闰年/12 月无跨年溢出/非法月份
+  - ORM 状态机：open/close/reopen/lock 状态转换 + reason 必填 + 审计留痕不清除
+  - contains_date：range 内/边界首末/range 外
+  - Service ensure_period：创建/复用/并发 race refetch
+  - Service close/reopen/lock：转换、not_found、lock_year 前置校验
+  - Service lookup：find_period_for_date + is_date_writable + auto_ensure 流程
+  - 迁移结构：revision/down_revision/7 CHECK/closed+locked 审计 CHECK/UNIQUE/partial index/RLS
+- [x] **全 Wave 1 回归**：21 W1.0 + 19 W1.1 + 24 W1.2 + 25 W1.3 + 48 W1.4 = **137 passed / 0.33s**
+- [x] **DEV Postgres 端到端**（真实 asyncpg + AsyncSession，非 mock）
+  - #1 ensure_period(2026, 4) → 创建 open ✅
+  - #2 close_period: open → closed，DB 层 status/closed_by/reason 3 字段落盘 ✅
+  - #3 **CHECK 拒**: 手工 INSERT status='closed' 缺 closed_at → IntegrityError ✅
+  - #4 reopen: closed → open，reopened_* 留痕，closed_* 不清除 ✅ (审计铁律)
+  - #5 lock_year(2027): 12 月全 closed → 全 locked ✅（原子）
+  - #6 locked 后 reopen → ValueError "已年结锁定, 不可重开" ✅
+  - #7 find_period_for_date(2026-04-15) 命中 2026-04 ✅
+  - #8 is_date_writable(2099-01-15, auto_ensure=True) 懒创建 + 返回 True ✅
+
+### 关键决策
+- **三状态 open/closed/locked** — 不用两状态（open/closed）因为年结与月结语义不同。year_close 后"重开补录"会破坏税务申报一致性，必须 DB 层兜死。
+- **reopen 不清除 closed_* 字段** — 审计留痕铁律。每次"关了又开"都作为独立事件追加；reopen 只设 reopened_*。未来可加 `reopen_count` 或独立审计表（W2+）。
+- **lock_year 原子 + 12 月全 closed 前置** — 拒绝"部分锁"避免半状态。任一月未 closed 就 ValueError。
+- **ensure_period 懒初始化** — 不预建所有 period。首次写 voucher 时按需建 open。避免大量 NULL 行 + 支持未来"非标准账期"（如跨年度财报 2026-01 到 2027-06）扩展。
+- **is_date_writable auto_ensure 参数** — 控制接入 W1.4b 时行为。`auto_ensure=False`（默认）向前兼容未接入路径；W1.4b 改 `True`。
+- **跳 v269 编号** — 留给并行会话（evidence_bundles）。
+
+### 下一步
+- CLAUDE.md §19 独立验证（CFO + DBA 两轮，W1.4 引入状态机+year lock 是 Wave 1 复杂度峰值）
+- **PR-W1.4b**: 把 `FinancialVoucherService.create` 加上 period 校验（写 voucher 前 `is_date_writable(voucher_date, auto_ensure=True)`；false 拒绝）
+- **PR-W1.5**: 红冲/作废 API（含 red_flush 字段）— 解锁 exported/locked 凭证的唯一合法路径
+- **PR-W1.6**: 历史 entries → lines 回填
+
+### 已知风险
+- **lock_year 不是事务原子操作** — 每个 `p.lock()` 纯 ORM 设值，12 次完成后单次 flush。若 session 失败一半，应用层拿到部分 locked 状态。建议调用方在外层用 begin()/commit() 包裹（文档已提示）。
+- **partial index `WHERE status='open'` 随 status 变动失效** — PG 会自动从 index 中移除 non-matching 行，不用显式维护。但如果 status 更新很频繁，index 重建会增加 write amplification。W1.4 场景 status 变更极少（每月一次），不成问题。
+- **period 跨年场景缺失** — 当前只支持自然月。企业跨自然月的 fiscal year（如 4 月到次年 3 月）需 period_type 字段扩展（W2+）。
+- **并发 close_period 两个操作员** — 后者覆盖前者 audit。DB 层没拦，应用层靠 RBAC。W1.5 PR 可能加 `version` 列做乐观锁。
+
+---
+
 ## 2026-04-19 PR-W1.3：FinancialVoucherService 持久化入口（双写 + 幂等）
 
 ### 本次会话目标
