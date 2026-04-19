@@ -4,6 +4,81 @@
 
 ---
 
+## 2026-04-19 PR-W1.3：FinancialVoucherService 持久化入口（双写 + 幂等）
+
+### 本次会话目标
+W1.3: 建立 `financial_vouchers` + `lines` 子表的**唯一写入入口** `FinancialVoucherService`，整合 W1.0/W1.1/W1.2 的 schema 能力（fen SSOT / lines / event_id 幂等 / voided 状态机）。
+
+**发现的结构性问题**：tx-finance 里原 `voucher_service.py`（纯函数式 dict 生成）和 `voucher_generator.py`（生成 ERPVoucher pydantic 推 ERP）都**不写 financial_vouchers 表** — FinancialVoucher ORM 至今是孤岛。W1.3 补上这个缺口。
+
+Tier 级别：🔴 **Tier 1**（资金安全 / 金税四期）。
+
+### 不得触碰的边界
+- [x] 不改 `voucher_service.py` / `voucher_generator.py` — 它们是 ERP 推送层，边界清晰
+- [x] 不切调用方（另起 PR，W1.3a 建 service，W1.3b 切调用）
+- [x] 不做 DB GENERATED 列（W2 考虑）
+- [x] 不改报表层（仍读 entries JSONB — 双写保兼容）
+
+### 涉及范围
+- 新文件：`services/tx-finance/src/services/financial_voucher_service.py`
+- 新测试：`services/tx-finance/src/tests/test_financial_voucher_service_tier1.py`
+- Tier 级别：Tier 1
+- 无迁移（完全基于 W1.0-W1.2 已建 schema）
+
+### 完成状态
+- [x] **FinancialVoucherService** 核心三方法
+  - `create(payload, *, session) → FinancialVoucher` — 幂等 + 双写 entries+lines 单事务
+  - `void(voucher_id, *, operator_id, reason, session, voided_at?) → FinancialVoucher` — ORM.void() 转发 + flush
+  - `get_by_event(tenant_id, event_type, event_id, *, session) → FinancialVoucher | None` — 幂等查询
+- [x] **数据契约** `VoucherLineInput` + `VoucherCreateInput` dataclass
+  - Line 层 `__post_init__` 守借贷互斥非负（DB CHECK 前置到应用层，UX 提前反馈）
+  - Create 层延迟到 service 里跑借贷平衡校验（应用层零容忍）
+- [x] **幂等策略三层**
+  1. `event_id=None`: 跳过幂等（voucher_no UNIQUE 兜底，文档标注不推荐）
+  2. `event_id` 非空: 先 SELECT 预查 → 命中返回现有（最优路径）
+  3. 并发场景: SELECT miss → add → flush 撞 partial UNIQUE `uq_fv_tenant_event` → rollback + refetch 返回 winner
+- [x] **双写契约**
+  - `entries` JSONB: 与历史 ERP 推送契约一致（元为单位）
+  - `lines` 子表: fen SSOT（借贷互斥非负 DB CHECK 兜底）
+  - 同 ORM flush 事务，原子性
+- [x] **Tier 1 测试** `src/tests/test_financial_voucher_service_tier1.py`（**25 passed / 0.25s**）
+  - dataclass 前置校验：6 测试（正常/借贷互斥/非负三场景）
+  - 幂等：5 测试（无 event_id / 命中 / 未命中 / 并发 race / 非幂等 IntegrityError 上抛）
+  - 双写：5 测试（entries/lines 一致 / total_amount_fen 合计 / line_no 递增 / tenant_id 同步 / is_balanced_from_lines）
+  - 借贷平衡：3 测试（不平衡 / 空 lines / 全 0 双保险）
+  - void：4 测试（draft/不存在/exported/自定义时间戳）
+  - 查询：2 测试（命中 / 未命中）
+- [x] **全 Wave 1 回归**：21 W1.0 + 19 W1.1 + 24 W1.2 + 25 W1.3 = **89 passed / 0.28s**
+- [x] **DEV Postgres 端到端**（真实 asyncpg + AsyncSession + ORM 写入，非 mock）
+  - #1 双写 entries + lines 单事务 ✅（DB 4 行 lines 全入）
+  - #2 幂等预查: 同 event_id 第二次返回同一 voucher_id ✅
+  - #3 **asyncio.gather 并发**: 两 worker 同 event_id → 都返回同一 ID，DB 只有 1 条 ✅
+  - #4 void: draft→voided，DB 层 voided/voided_at/voided_by/voided_reason 4 字段落盘 ✅
+  - #5 CASCADE: 删 voucher → lines 从 4 → 0 ✅
+
+### 关键决策
+- **事务边界由调用方持有** — service 只 flush 不 commit。日结 Celery 可能一次写多张凭证 + settlement 状态，需要外层原子性。
+- **session 不重复 SET app.tenant_id** — 避免污染跨 service 事务。调用方负责 RLS 前置（网关中间件或路由层）。
+- **IntegrityError 靠字符串匹配识别 uq_fv_tenant_event** — 不优雅但实用。SQLAlchemy 不直接暴露"哪个约束冲突"，`exc.orig` 字符串是 PG 错误消息唯一可靠线索。
+- **entries JSONB 继续双写** — 向后兼容报表层（ProfitDashboard / hq_briefing）。W1.6 历史回填后，W2 考虑 drop entries 或改 GENERATED。
+- **voucher_no 由调用方生成** — service 不掺业务编号规则（V{store_short}{YYYYMMDD}{SEQ}）。防循环依赖 tx-finance 调用 store 服务查 short_code。
+- **测试策略用 AsyncMock 为主** — tx-finance 惯例（见 test_voucher_generator.py）。DB 层行为另起 DEV Postgres 端到端脚本验证。
+
+### 下一步
+- CLAUDE.md §19 独立验证（建议 CFO + DBA 视角，W1.3 是 service 层复杂度峰值）
+- **PR-W1.3b**（切调用方）：把 voucher_generator 的 daily_revenue 路径改为先调 `FinancialVoucherService.create` 再推 ERP
+- **PR-W1.4**: accounting_periods 月结/年结表
+- **PR-W1.5**: 红冲/作废 API（含 red_flush 字段 + 状态机）
+- **PR-W1.6**: 历史 entries → lines 回填
+
+### 已知风险
+- **异步 partial UNIQUE race 在 asyncio 内难以触发** — asyncio.gather 里两 task 间隔很小但 commit 有序。真正触发 refetch 分支需要多进程或 pytest 的 flush 时序控制。已由单元测试（TestCreateIdempotency.test_concurrent_race_catches_unique_violation_and_refetches）覆盖，但真实生产 race 是跨 Celery worker，只能监控告警兜底。
+- **voucher_no 并发冲突** — 幂等预查命中后 caller 的 voucher_no 被"丢弃"（拿到的是 winner 的）。如果调用方 voucher_no 已与其他系统（如打印小票）绑定，可能产生轻微不一致。W1.3 不解决此问题，文档已说明应由调用方先看 `get_by_event` 再决定是否生成 voucher_no。
+- **entries JSONB 与 lines 长期漂移** — W1.3 只保新写路径双写。历史凭证 entries 存在但 lines 为空，`is_balanced_from_lines()` 会返回 True（0==0，误导）。W1.6 历史回填 + W2 `is_balanced_from_lines` 增加"lines 存在性"前置检查。
+- **event_type 命名仍无 DB 约束** — 'order.paid' vs 'order_paid' vs 'ORDER.PAID' 视为 3 个不同事件。W1.3 docstring 已提示，W1.4/W1.5 PR 补应用层枚举。
+
+---
+
 ## 2026-04-19 PR-W1.2：财务凭证幂等字段 + 作废状态机
 
 ### 本次会话目标
