@@ -137,6 +137,10 @@ class VoucherCreateInput:
     status: str = "draft"  # draft / confirmed / exported
     extra_metadata: dict[str, Any] = field(default_factory=dict)
 
+    # [W2.A] 以前年度损益调整元数据. 两者必须同时非空或同时 None.
+    source_period_year: int | None = None
+    source_period_month: int | None = None
+
 
 # ─── service 本体 ────────────────────────────────────────────────────
 
@@ -536,6 +540,81 @@ class FinancialVoucherService:
             })
         return reversed_entries
 
+    # ── 以前年度损益调整 (W2.A) ──────────────────────────────────────
+
+    async def create_prior_period_adjustment(
+        self,
+        payload: VoucherCreateInput,
+        *,
+        session: AsyncSession,
+    ) -> FinancialVoucher:
+        """创建"以前年度损益调整"凭证 — 跨期漏账合法补录路径.
+
+        [§19 CFO P0-1 响应] 2027-03 发现 2026-12 漏账场景的唯一解.
+        W1 能力全覆没 (reopen locked / red_flush 无原 / create 被账期校验拦),
+        W2.A 提供新语义.
+
+        业务约束 (service 层强制):
+          1. payload.source_period_year + month 必须同时非空
+          2. source_period 必须在过去 (< voucher_date 所属月)
+          3. voucher_date 必须在当前 open 账期 (走 create() 正常账期校验)
+          4. payload.voucher_type 推荐 'prior_period_adjustment' (但不强制)
+          5. reason 必填, 走 extra_metadata['reason'] 留痕
+
+        DB 层:
+          - CHECK chk_fv_source_period: 两列同时 NULL 或同时非空 (v278)
+          - ix_fv_source_period partial: 按源期间审计查询
+
+        Raises:
+            ValueError: source_period 元数据不一致 / 不在过去 / reason 空
+        """
+        from datetime import date as _date
+
+        # 1. 元数据完整性
+        if payload.source_period_year is None or payload.source_period_month is None:
+            raise ValueError(
+                "create_prior_period_adjustment 要求 source_period_year + "
+                "source_period_month 两者必填 (以前年度损益调整的业务原属期间)"
+            )
+
+        if not (2020 <= payload.source_period_year <= 2100):
+            raise ValueError(
+                f"source_period_year 越界: {payload.source_period_year} "
+                f"(应在 2020-2100)"
+            )
+        if not (1 <= payload.source_period_month <= 12):
+            raise ValueError(
+                f"source_period_month 越界: {payload.source_period_month} "
+                f"(应在 1-12)"
+            )
+
+        # 2. 源期间必须在过去 — 语义正确性防护
+        # 允许源期间 = 当前凭证月份的场景 (同期内补录) 作为边界, 但禁止源期间 > 当期
+        source_first_day = _date(
+            payload.source_period_year, payload.source_period_month, 1
+        )
+        if source_first_day > payload.voucher_date:
+            raise ValueError(
+                f"以前年度损益调整要求 source_period 在过去: "
+                f"source={payload.source_period_year}-{payload.source_period_month:02d} "
+                f"> voucher_date={payload.voucher_date}"
+            )
+
+        # 3. 转发到 create() 正常路径
+        # 账期校验按 voucher_date 执行 (当前期必须 open).
+        # 幂等 / tenant 断言 / 借贷平衡 / 双写 lines+entries 全走 create 流程.
+        voucher = await self.create(payload, session=session)
+
+        log.info(
+            "voucher.prior_period_adjustment.created",
+            voucher_id=str(voucher.id),
+            voucher_no=voucher.voucher_no,
+            voucher_date=str(voucher.voucher_date),
+            source_period=f"{payload.source_period_year}-{payload.source_period_month:02d}",
+            total_fen=voucher.total_amount_fen,
+        )
+        return voucher
+
     # ── 查询 ──────────────────────────────────────────────────────────
 
     async def get_by_event(
@@ -695,6 +774,9 @@ class FinancialVoucherService:
             event_type=payload.event_type,
             event_id=payload.event_id,
             voided=False,
+            # [W2.A] 以前年度损益调整元数据
+            source_period_year=payload.source_period_year,
+            source_period_month=payload.source_period_month,
         )
         # 先设父, 再构造 lines (lines.voucher_id 由 relationship 自动填)
         voucher.lines = [

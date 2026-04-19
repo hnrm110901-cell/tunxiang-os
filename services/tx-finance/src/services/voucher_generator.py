@@ -73,6 +73,17 @@ ACCOUNT_MAPPING: dict[str, dict[str, dict[str, str]]] = {
         "debit":  {"code": "5401", "name": "主营业务成本"},
         "credit": {"code": "1403", "name": "原材料"},
     },
+    # [W2.A] 以前年度损益调整 (6901 科目)
+    # 场景: locked 期发现漏账, 当期补录, 用 6901 作为跨期调整 anchor 科目.
+    # 借贷方向取决于具体调整: 借 6901 代表"冲减以前年度利润"(即历史少计费用),
+    #                     贷 6901 代表"增加以前年度利润"(即历史少计收入).
+    # 这里 debit 配置是 "补录少计费用" 典型场景 (如补录 2026-12 采购):
+    #   借: 1403 原材料       (现在才挂账, 真实库存 2026 已入库)
+    #   贷: 6901 以前年度损益  (冲减以前年度利润, 本质是补认历史费用)
+    "prior_period_adjustment": {
+        "debit":  {"code": "1403", "name": "原材料"},
+        "credit": {"code": "6901", "name": "以前年度损益调整"},
+    },
 }
 
 # W1.7 VoucherType (中文 ERP 约定) → financial_vouchers.voucher_type (英文 DB 约定)

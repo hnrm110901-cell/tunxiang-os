@@ -107,8 +107,8 @@ class FinancialVoucher(Base):
         comment="凭证日期(业务日期). v264 起 nullable, 应用层仍要求新建凭证必填."
     )
     voucher_type: Mapped[str] = mapped_column(
-        String(20), nullable=False,
-        comment="凭证类型: sales/cost/payment/receipt"
+        String(40), nullable=False,
+        comment="凭证类型: sales/cost/payment/receipt/prior_period_adjustment (W2.A)"
     )
 
     # 金额
@@ -148,6 +148,19 @@ class FinancialVoucher(Base):
     event_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
         comment="事件去重 UUID. 同 (tenant, event_type, event_id) 唯一."
+    )
+
+    # v278 以前年度损益调整 (W2.A). 跨期调账的元数据.
+    # 场景: 2027-03 发现 2026-12 漏账, voucher_date=2027-03-XX (当期 open),
+    # source_period_year=2026, source_period_month=12, 配合科目 6901.
+    # CHECK: 两列同时 NULL 或同时非空.
+    source_period_year: Mapped[int | None] = mapped_column(
+        Integer,
+        comment="以前年度损益调整 — 业务原属年份 (NULL 为当期凭证)."
+    )
+    source_period_month: Mapped[int | None] = mapped_column(
+        Integer,
+        comment="以前年度损益调整 — 业务原属月份."
     )
 
     # 状态
@@ -229,6 +242,16 @@ class FinancialVoucher(Base):
             "red_flush_of_voucher_id IS NULL OR red_flushed_by_voucher_id IS NULL",
             name="chk_voucher_red_flush_exclusive",
         ),
+        # v278 CHECK: source_period 两列同时 NULL 或同时非空 (跨期调账元数据一致性)
+        # 显式 IS NOT NULL 防 SQL 三值逻辑 NULL 穿透 (NULL BETWEEN ... = NULL, CHECK pass)
+        CheckConstraint(
+            "(source_period_year IS NULL AND source_period_month IS NULL) "
+            "OR (source_period_year IS NOT NULL "
+            "AND source_period_month IS NOT NULL "
+            "AND source_period_year BETWEEN 2020 AND 2100 "
+            "AND source_period_month BETWEEN 1 AND 12)",
+            name="chk_fv_source_period",
+        ),
     )
 
     def is_balanced(self) -> bool:
@@ -261,6 +284,12 @@ class FinancialVoucher(Base):
     def is_balanced_from_lines(self) -> bool:
         """基于 lines 子表判定借贷平衡 (W1.3 切换后成为主判定)."""
         return self.total_debit_fen_from_lines() == self.total_credit_fen_from_lines()
+
+    # ── W2.A: 以前年度损益调整判定 ──
+    @property
+    def is_prior_period_adjustment(self) -> bool:
+        """凭证是否属于跨期调账 (source_period_year 非空)."""
+        return self.source_period_year is not None
 
     # ── W1.5: 红冲判定 (纯属性, 状态机在 FinancialVoucherService.red_flush) ──
     @property
@@ -368,6 +397,10 @@ class FinancialVoucher(Base):
             ),
             "is_red_flush_voucher": self.is_red_flush_voucher,
             "has_been_red_flushed": self.has_been_red_flushed,
+            # v278: 以前年度损益调整
+            "source_period_year": self.source_period_year,
+            "source_period_month": self.source_period_month,
+            "is_prior_period_adjustment": self.is_prior_period_adjustment,
         }
 
 
