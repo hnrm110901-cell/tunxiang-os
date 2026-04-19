@@ -267,10 +267,16 @@ class TestValidationOrder:
         period_service.is_date_writable.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_period_check_rejects_before_idempotency_fetch(self):
-        """账期 closed 时, 即便有 event_id, 幂等预查 (DB SELECT) 也不执行.
+    async def test_period_check_runs_after_idempotency_miss(self):
+        """[W2.B 顺序反转] 原名 test_period_check_rejects_before_idempotency_fetch.
 
-        B5 后 tenant 断言会调 1 次 execute (在 period 校验之前), 但幂等 _find_by_event 不调用.
+        W1.4b 当时的断言: "账期 closed 时幂等预查不执行" (账期先于幂等).
+        W2.B 修复后反转: event_id 非空必须先走幂等预查.
+          - 命中: 返回既存凭证 (外卖 T+N webhook 不丢单)
+          - miss: 继续账期校验, 新凭证写 closed 期仍拒
+
+        本测试验证 miss 路径: ValueError + 幂等预查确实跑了 + 账期校验也跑了.
+        命中路径由 TestW2BIdempotencyBeforePeriodCheck (下方) 覆盖.
         """
         period_service = AsyncMock(spec=AccountingPeriodService)
         period_service.is_date_writable = AsyncMock(return_value=False)
@@ -280,19 +286,23 @@ class TestValidationOrder:
 
         svc = FinancialVoucherService(period_service=period_service)
         session = AsyncMock()
-        # B5 tenant 断言豁免 (scalar 返 None)
+
+        # 2 次 execute: B5 tenant 断言豁免 + 幂等预查 miss → 继续走 period_service 账期校验
         tenant_mock = MagicMock()
         tenant_mock.scalar = MagicMock(return_value=None)
-        session.execute = AsyncMock(return_value=tenant_mock)
+        idempotency_miss = MagicMock()
+        idempotency_miss.scalar_one_or_none = MagicMock(return_value=None)
+        session.execute = AsyncMock(side_effect=[tenant_mock, idempotency_miss])
 
-        payload = _balanced_payload(event_id=uuid.uuid4())  # 有 event_id
+        payload = _balanced_payload(event_id=uuid.uuid4())  # 有 event_id 但 miss
 
         with pytest.raises(ValueError, match="账期"):
             await svc.create(payload, session=session)
 
-        # 账期 closed 直接 raise, 幂等预查 (_find_by_event) 不执行.
-        # execute 只调 1 次 (B5 tenant 断言), 没走第二次 (幂等查).
-        assert session.execute.await_count == 1
+        # 幂等预查 miss (2 次 execute: tenant 断言 + _find_by_event)
+        assert session.execute.await_count == 2
+        # 账期校验走到了 (miss 后继续执行)
+        period_service.is_date_writable.assert_awaited_once()
 
     @pytest.mark.asyncio
     async def test_empty_lines_rejected_before_period_check(self):
@@ -356,3 +366,381 @@ class TestVoidNotAffectedByPeriodCheck:
 
         assert result.voided is True
         period_service.is_date_writable.assert_not_called()
+
+
+# ─── W2.B: 幂等预查优先于账期校验 ─────────────────────────────────────
+#
+# 业务背景 (徐记海鲜 × 美团外卖):
+#   4/30 下单 → 5/2 美团 T+2 到账 webhook. 如果 2026-04 已月结 (closed),
+#   原 W1 代码先走账期校验直接 raise, 外卖流水年化百万级丢单.
+#
+# W2.B 修复: event_id 非空时先做幂等预查.
+#   - 命中 (该凭证在 open 期已写入): 返回既存凭证, 跳过账期校验 ✅
+#   - miss  (全新 event_id):         继续账期校验, closed 仍拒 ✅
+#   - event_id=None (手工凭证):      跳过幂等, 直接账期校验, closed 仍拒 ✅
+
+
+def _meituan_payload(
+    tenant_id: uuid.UUID,
+    event_id: uuid.UUID,
+    voucher_date: date,
+    voucher_no: str = "V_MT_TEST",
+) -> VoucherCreateInput:
+    """美团外卖 T+N webhook 场景凭证 — event_type='order.paid' 明确业务语义."""
+    return VoucherCreateInput(
+        tenant_id=tenant_id,
+        store_id=uuid.uuid4(),
+        voucher_no=voucher_no,
+        voucher_date=voucher_date,
+        voucher_type="sales",
+        event_type="order.paid",
+        event_id=event_id,
+        lines=[
+            VoucherLineInput(account_code="1002", account_name="美团代收款",
+                             debit_fen=8800),
+            VoucherLineInput(account_code="6001", account_name="外卖收入",
+                             credit_fen=8800),
+        ],
+    )
+
+
+def _b5_exempt_execute() -> MagicMock:
+    """B5 tenant 断言豁免: execute 返回 scalar()=None (视为特权路径, 跳过断言)."""
+    r = MagicMock()
+    r.scalar = MagicMock(return_value=None)
+    return r
+
+
+def _idempotent_hit_execute(existing: FinancialVoucher) -> MagicMock:
+    """幂等命中: execute 返回 scalar_one_or_none()=existing (已处理过本 event_id)."""
+    r = MagicMock()
+    r.scalar_one_or_none = MagicMock(return_value=existing)
+    return r
+
+
+def _idempotent_miss_execute() -> MagicMock:
+    """幂等 miss: execute 返回 scalar_one_or_none()=None (首次处理)."""
+    r = MagicMock()
+    r.scalar_one_or_none = MagicMock(return_value=None)
+    return r
+
+
+def _existing_voucher(tenant_id: uuid.UUID) -> FinancialVoucher:
+    """模拟 4/30 在 open 期已成功写入的外卖凭证."""
+    return FinancialVoucher(
+        id=uuid.uuid4(),
+        tenant_id=tenant_id,
+        voucher_no="V_MT_20260430_001",
+        voucher_type="sales",
+        status="confirmed",
+        entries=[],
+        voided=False,
+    )
+
+
+class TestW2BIdempotencyBeforePeriodCheck:
+    """W2.B: 幂等预查在账期校验之前 — 外卖 T+N webhook 月结后不再丢单.
+
+    场景全部基于徐记海鲜 × 美团外卖真实业务路径.
+    每个测试独立, 不依赖执行顺序.
+    """
+
+    # ── 场景 1: 美团 webhook 重发, 账期已关, 命中幂等返回既存凭证 ──────
+
+    @pytest.mark.asyncio
+    async def test_webhook_retry_in_closed_period_returns_existing_voucher(self):
+        """4/30 外卖凭证已写入, 5/2 美团重发 webhook 时账期 2026-04 已 closed.
+        幂等命中 → 返回既存凭证, is_date_writable 从未被调用."""
+        tenant_id = uuid.UUID("11111111-1111-1111-1111-111111111111")
+        event_id = uuid.UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
+        existing = _existing_voucher(tenant_id)
+
+        period_service = AsyncMock(spec=AccountingPeriodService)
+        period_service.is_date_writable = AsyncMock(
+            side_effect=AssertionError("账期校验不应被调用 — 幂等命中应提前 return")
+        )
+
+        svc = FinancialVoucherService(period_service=period_service)
+        session = AsyncMock()
+        # B5 execute → 豁免; _find_by_event execute → 命中
+        session.execute = AsyncMock(side_effect=[
+            _b5_exempt_execute(),
+            _idempotent_hit_execute(existing),
+        ])
+
+        payload = _meituan_payload(
+            tenant_id=tenant_id,
+            event_id=event_id,
+            voucher_date=date(2026, 4, 30),
+        )
+        result = await svc.create(payload, session=session)
+
+        assert result is existing
+        period_service.is_date_writable.assert_not_called()
+        session.add.assert_not_called()
+        session.flush.assert_not_called()
+
+    # ── 场景 2: 全新 event_id + 账期 closed → 账期保护仍然生效 ─────────
+
+    @pytest.mark.asyncio
+    async def test_new_event_id_in_closed_period_still_rejected(self):
+        """全新 event_id (幂等 miss), voucher_date 在已 closed 的 2026-04.
+        账期保护仍然生效 — ValueError '账期 2026-04 状态=closed'."""
+        tenant_id = uuid.UUID("22222222-2222-2222-2222-222222222222")
+        event_id = uuid.UUID("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")
+
+        period_service = AsyncMock(spec=AccountingPeriodService)
+        period_service.is_date_writable = AsyncMock(return_value=False)
+        period_service.find_period_for_date = AsyncMock(
+            return_value=_period(year=2026, month=4, status=STATUS_CLOSED,
+                                 tenant_id=tenant_id)
+        )
+
+        svc = FinancialVoucherService(period_service=period_service)
+        session = AsyncMock()
+        # B5 豁免; _find_by_event miss (全新 event_id)
+        session.execute = AsyncMock(side_effect=[
+            _b5_exempt_execute(),
+            _idempotent_miss_execute(),
+        ])
+
+        payload = _meituan_payload(
+            tenant_id=tenant_id,
+            event_id=event_id,
+            voucher_date=date(2026, 4, 30),
+        )
+
+        with pytest.raises(ValueError) as exc_info:
+            await svc.create(payload, session=session)
+
+        msg = str(exc_info.value)
+        assert "2026-04" in msg
+        assert "closed" in msg
+        session.add.assert_not_called()
+
+    # ── 场景 3: event_id=None 手工凭证 + closed → 幂等 skip, 账期拒 ──
+
+    @pytest.mark.asyncio
+    async def test_manual_voucher_event_id_none_in_closed_period_rejected(self):
+        """手工凭证 event_id=None, 账期 closed.
+        跳过幂等预查, 直接走账期校验, ValueError."""
+        tenant_id = uuid.UUID("33333333-3333-3333-3333-333333333333")
+
+        period_service = AsyncMock(spec=AccountingPeriodService)
+        period_service.is_date_writable = AsyncMock(return_value=False)
+        period_service.find_period_for_date = AsyncMock(
+            return_value=_period(year=2026, month=4, status=STATUS_CLOSED,
+                                 tenant_id=tenant_id)
+        )
+
+        svc = FinancialVoucherService(period_service=period_service)
+        session = AsyncMock()
+        # event_id=None: 只有 B5 的 1 次 execute, 不走幂等预查
+        session.execute = AsyncMock(return_value=_b5_exempt_execute())
+
+        payload = VoucherCreateInput(
+            tenant_id=tenant_id,
+            store_id=uuid.uuid4(),
+            voucher_no="V_MANUAL_001",
+            voucher_date=date(2026, 4, 15),
+            voucher_type="cost",
+            event_type=None,
+            event_id=None,  # 手工凭证
+            lines=[
+                VoucherLineInput(account_code="5401", account_name="原材料成本",
+                                 debit_fen=50000),
+                VoucherLineInput(account_code="1001", account_name="现金",
+                                 credit_fen=50000),
+            ],
+        )
+
+        with pytest.raises(ValueError) as exc_info:
+            await svc.create(payload, session=session)
+
+        assert "2026-04" in str(exc_info.value)
+        # execute 只调 1 次 (B5), 没有第 2 次幂等预查
+        assert session.execute.await_count == 1
+
+    # ── 场景 4: 账期 open + event_id 命中 → 正常幂等 (W2.B 排序下验证) ──
+
+    @pytest.mark.asyncio
+    async def test_webhook_retry_in_open_period_returns_existing(self):
+        """账期 open + event_id 命中 — W2.B 排序变化后, 正常幂等路径仍然正确."""
+        tenant_id = uuid.UUID("44444444-4444-4444-4444-444444444444")
+        event_id = uuid.UUID("cccccccc-cccc-cccc-cccc-cccccccccccc")
+        existing = _existing_voucher(tenant_id)
+
+        period_service = AsyncMock(spec=AccountingPeriodService)
+        period_service.is_date_writable = AsyncMock(
+            side_effect=AssertionError("幂等命中不应走账期校验")
+        )
+
+        svc = FinancialVoucherService(period_service=period_service)
+        session = AsyncMock()
+        session.execute = AsyncMock(side_effect=[
+            _b5_exempt_execute(),
+            _idempotent_hit_execute(existing),
+        ])
+
+        payload = _meituan_payload(
+            tenant_id=tenant_id,
+            event_id=event_id,
+            voucher_date=date(2026, 5, 2),
+        )
+        result = await svc.create(payload, session=session)
+
+        assert result is existing
+        period_service.is_date_writable.assert_not_called()
+
+    # ── 场景 5: 账期 locked (年结) + webhook 重发 → 幂等命中返回既存 ──
+
+    @pytest.mark.asyncio
+    async def test_webhook_retry_in_locked_period_also_returns_existing(self):
+        """账期 2026-12 年结 locked, 历史外卖凭证 webhook 重发.
+        幂等命中 → 返回既存, 年结后历史凭证不因重发变'账面新增'."""
+        tenant_id = uuid.UUID("55555555-5555-5555-5555-555555555555")
+        event_id = uuid.UUID("dddddddd-dddd-dddd-dddd-dddddddddddd")
+        existing = _existing_voucher(tenant_id)
+
+        period_service = AsyncMock(spec=AccountingPeriodService)
+        period_service.is_date_writable = AsyncMock(
+            side_effect=AssertionError("年结 locked, 幂等命中不应走账期校验")
+        )
+
+        svc = FinancialVoucherService(period_service=period_service)
+        session = AsyncMock()
+        session.execute = AsyncMock(side_effect=[
+            _b5_exempt_execute(),
+            _idempotent_hit_execute(existing),
+        ])
+
+        payload = _meituan_payload(
+            tenant_id=tenant_id,
+            event_id=event_id,
+            voucher_date=date(2026, 12, 30),
+        )
+        result = await svc.create(payload, session=session)
+
+        assert result is existing
+        period_service.is_date_writable.assert_not_called()
+
+    # ── 场景 6: 调用顺序验证 — execute 在 is_date_writable 之前 ─────────
+
+    @pytest.mark.asyncio
+    async def test_idempotency_check_uses_execute_before_period_service(self):
+        """验证调用顺序: session.execute (幂等预查) 在 is_date_writable 之前.
+        通过 call_order 列表验证因果顺序."""
+        tenant_id = uuid.UUID("66666666-6666-6666-6666-666666666666")
+        event_id = uuid.UUID("eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee")
+
+        call_order: list[str] = []
+
+        async def _execute_spy(stmt):
+            call_order.append("execute")
+            r = MagicMock()
+            # 第 1 次: B5 豁免; 第 2 次: 幂等 miss → 继续走账期校验
+            if len(call_order) == 1:
+                r.scalar = MagicMock(return_value=None)
+            else:
+                r.scalar_one_or_none = MagicMock(return_value=None)
+            return r
+
+        async def _is_date_writable_spy(**_kwargs):
+            call_order.append("is_date_writable")
+            return True
+
+        period_service = AsyncMock(spec=AccountingPeriodService)
+        period_service.is_date_writable = AsyncMock(
+            side_effect=_is_date_writable_spy
+        )
+
+        svc = FinancialVoucherService(period_service=period_service)
+        session = AsyncMock()
+        session.execute = AsyncMock(side_effect=_execute_spy)
+        session.flush = AsyncMock()
+
+        payload = _meituan_payload(
+            tenant_id=tenant_id,
+            event_id=event_id,
+            voucher_date=date(2026, 5, 15),
+        )
+        await svc.create(payload, session=session)
+
+        # execute 调 2 次 (B5 + 幂等预查), 两次均在 is_date_writable 之前
+        execute_indices = [i for i, v in enumerate(call_order) if v == "execute"]
+        writable_indices = [i for i, v in enumerate(call_order) if v == "is_date_writable"]
+        assert execute_indices, "execute 应被调用"
+        assert writable_indices, "is_date_writable 应被调用 (幂等 miss 路径)"
+        assert max(execute_indices) < min(writable_indices), (
+            f"幂等预查 execute 应在账期校验之前, 实际调用顺序: {call_order}"
+        )
+
+    # ── 场景 7: event_id miss + 账期 open → INSERT 路径全走到 ─────────
+
+    @pytest.mark.asyncio
+    async def test_new_event_id_miss_then_open_period_succeeds(self):
+        """全新 event_id + 账期 open → 幂等 miss → 账期通过 → INSERT 成功.
+        验证: is_date_writable 调用, session.add 调用, session.flush 调用."""
+        tenant_id = uuid.UUID("77777777-7777-7777-7777-777777777777")
+        event_id = uuid.UUID("ffffffff-ffff-ffff-ffff-ffffffffffff")
+
+        period_service = AsyncMock(spec=AccountingPeriodService)
+        period_service.is_date_writable = AsyncMock(return_value=True)
+
+        svc = FinancialVoucherService(period_service=period_service)
+        session = AsyncMock()
+        session.execute = AsyncMock(side_effect=[
+            _b5_exempt_execute(),
+            _idempotent_miss_execute(),
+        ])
+        session.flush = AsyncMock()
+
+        payload = _meituan_payload(
+            tenant_id=tenant_id,
+            event_id=event_id,
+            voucher_date=date(2026, 5, 2),
+        )
+        result = await svc.create(payload, session=session)
+
+        period_service.is_date_writable.assert_awaited_once()
+        assert period_service.is_date_writable.call_args.kwargs["auto_ensure"] is True
+        session.add.assert_called_once()
+        session.flush.assert_awaited_once()
+        assert isinstance(result, FinancialVoucher)
+
+    # ── 场景 8: event_id miss + closed → ValueError, DB 不写入 ──────────
+
+    @pytest.mark.asyncio
+    async def test_event_id_miss_and_period_closed_rejects_without_db_write(self):
+        """event_id miss (全新凭证) + 账期 closed → ValueError, session.add 从不调用.
+        fail-fast: 账期拒绝后不执行任何 DB 写入操作."""
+        tenant_id = uuid.UUID("88888888-8888-8888-8888-888888888888")
+        event_id = uuid.UUID("12345678-1234-1234-1234-123456789012")
+
+        period_service = AsyncMock(spec=AccountingPeriodService)
+        period_service.is_date_writable = AsyncMock(return_value=False)
+        period_service.find_period_for_date = AsyncMock(
+            return_value=_period(year=2026, month=4, status=STATUS_CLOSED,
+                                 tenant_id=tenant_id)
+        )
+
+        svc = FinancialVoucherService(period_service=period_service)
+        session = AsyncMock()
+        session.execute = AsyncMock(side_effect=[
+            _b5_exempt_execute(),
+            _idempotent_miss_execute(),
+        ])
+
+        payload = _meituan_payload(
+            tenant_id=tenant_id,
+            event_id=event_id,
+            voucher_date=date(2026, 4, 28),
+            voucher_no="V_MT_NEW_CLOSED",
+        )
+
+        with pytest.raises(ValueError) as exc_info:
+            await svc.create(payload, session=session)
+
+        assert "closed" in str(exc_info.value)
+        session.add.assert_not_called()
+        session.flush.assert_not_called()

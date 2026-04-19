@@ -230,12 +230,40 @@ class FinancialVoucherService:
         if total_debit_fen == 0:
             raise ValueError("凭证借贷总额均为 0, 无会计意义")
 
-        # 2. 账期校验 (W1.4b, period_service 注入时启用) ──────────────
-        # 为什么先于幂等预查: 账期 closed 时, 即便幂等命中也应拒绝 —
-        # 防止历史事件重放误写已关月份. 若幂等命中的凭证已存在, 它必定
-        # 是在账期 open 时写入的 (因为当时能写), 所以也允许返回该凭证.
-        # 严格来说"幂等返回已存在凭证"不算新写入, 不破坏账期语义.
-        # 但保守起见: 账期 closed 一律拒, 让 caller 先 reopen 或走红冲.
+        # 2. 幂等预查 (先于账期校验) ─────────────────────────────────
+        # [W2.B 修复] 原顺序: 账期校验 → 幂等预查. 导致外卖 T+N webhook
+        # 月结后重发被拒: 美团 T+2 到账, 月结在 T+1 关了, payload.event_id
+        # 是之前成功写入的凭证. 但账期校验在幂等预查前, 直接 raise,
+        # 调用方收到 ValueError 记为"失败", 生产流水年化百万级损失.
+        #
+        # 新顺序: event_id 非空 → 先查是否已处理过本事件.
+        # - 命中: 返回既存凭证 (该凭证写入时账期必是 open, 不影响账期语义)
+        # - 未命中: 下沉到账期校验 (真正写新凭证时才拦)
+        #
+        # 账期 closed 场景:
+        # - webhook 重发 (event_id 命中): 返回既存 ✅ (T+N 订单不再丢)
+        # - 全新 event_id 但 voucher_date 在 closed 期: 拒 ✅ (账期保护仍在)
+        # - event_id=NULL (手工) + closed: 沿着幂等 skip 走到账期校验, 拒 ✅
+        if payload.event_id is not None:
+            existing = await self._find_by_event(
+                session=session,
+                tenant_id=payload.tenant_id,
+                event_type=payload.event_type,
+                event_id=payload.event_id,
+            )
+            if existing is not None:
+                log.info(
+                    "voucher.create.idempotent_hit",
+                    voucher_id=str(existing.id),
+                    event_type=payload.event_type,
+                    event_id=str(payload.event_id),
+                )
+                return existing
+
+        # 3. 账期校验 (W1.4b, period_service 注入时启用) ──────────────
+        # [W2.B 修复] 只对"新凭证"校验. 幂等命中的已在上面 return existing,
+        # 永远不会走到这里 — 自然允许 T+N webhook 重发.
+        # closed/locked 时 raise, 引导 reopen 或红冲.
         if self._period_service is not None:
             writable = await self._period_service.is_date_writable(
                 tenant_id=payload.tenant_id,
@@ -256,23 +284,6 @@ class FinancialVoucherService:
                     f"状态={status}, 凭证写入被拒 "
                     f"(请走红冲 red_flush 或先重开账期)"
                 )
-
-        # 3. 幂等预查 ─────────────────────────────────────────────────
-        if payload.event_id is not None:
-            existing = await self._find_by_event(
-                session=session,
-                tenant_id=payload.tenant_id,
-                event_type=payload.event_type,
-                event_id=payload.event_id,
-            )
-            if existing is not None:
-                log.info(
-                    "voucher.create.idempotent_hit",
-                    voucher_id=str(existing.id),
-                    event_type=payload.event_type,
-                    event_id=str(payload.event_id),
-                )
-                return existing
 
         # 4. 构造 ORM (双写 entries + lines, 单事务) ──────────────────
         voucher = self._build_orm_voucher(payload, total_debit_fen)
@@ -565,7 +576,12 @@ class FinancialVoucherService:
         event_type: str | None,
         event_id: uuid.UUID,
     ) -> FinancialVoucher | None:
-        """按 (tenant, event_type, event_id) 查现有凭证 (幂等预查)."""
+        """按 (tenant, event_type, event_id) 查现有凭证 (幂等预查).
+
+        event_type=None 时查询退化为 (tenant_id, event_id), 不带 event_type 过滤.
+        此路径仅供 get_by_event() 公开查询使用; create() 内部调用时 event_type
+        保证非空 (由 step 1 "event_id 非空 ⇒ event_type 必填" 校验).
+        """
         stmt = select(FinancialVoucher).where(
             FinancialVoucher.tenant_id == tenant_id,
             FinancialVoucher.event_id == event_id,
