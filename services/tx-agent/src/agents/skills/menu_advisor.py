@@ -6,6 +6,7 @@
 from typing import Any
 
 from ..base import AgentResult, SkillAgent
+from ..context import ConstraintContext
 
 # 四象限定义
 QUADRANTS = {
@@ -214,6 +215,17 @@ class MenuAdvisorAgent(SkillAgent):
 
         suggestions.sort(key=lambda x: abs(x["change_pct"]), reverse=True)
 
+        # Sprint D1 / PR 批次 3：取最低毛利建议项作 margin 校验基准
+        # （若 checker 对此组合判 fail，整份定价建议都会被拦截）
+        worst = None
+        for d in dishes:
+            cp = d.get("price_fen", 0)
+            cc = d.get("cost_fen", 0)
+            if cp > 0 and cc >= 0:
+                m = (cp - cc) / cp
+                if worst is None or m < worst[2]:
+                    worst = (cp, cc, m)
+
         return AgentResult(
             success=True,
             action="optimize_pricing",
@@ -226,6 +238,11 @@ class MenuAdvisorAgent(SkillAgent):
             },
             reasoning=f"定价优化: {len(suggestions)} 道菜需调价，提价 {sum(1 for s in suggestions if s['direction'] == '提价')} 道",
             confidence=0.8,
+            context=ConstraintContext(
+                price_fen=worst[0] if worst else None,
+                cost_fen=worst[1] if worst else None,
+                constraint_scope={"margin"},
+            ),
         )
 
     async def _suggest_changes(self, params: dict) -> AgentResult:

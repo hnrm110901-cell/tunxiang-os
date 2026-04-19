@@ -1,3 +1,30 @@
+## 2026-04-19 Sprint D1 批次 3 — 定价营销 margin context + points_advisor 注册补全（PR I）
+
+### 今日完成
+- [services/tx-agent/src/agents/skills/__init__.py] PointsAdvisorAgent import + ALL_SKILL_AGENTS 追加（批次 3 其他 6 个已在注册表）
+- [services/tx-agent/src/agents/skills/smart_menu.py] _simulate_cost 填 ConstraintContext(price_fen, cost_fen, scope={margin})
+- [services/tx-agent/src/agents/skills/menu_advisor.py] _optimize_pricing 扫描 dishes 找最差毛利作 margin 校验基准
+- [services/tx-agent/src/tests/test_constraint_context.py] 5 TDD：batch 3 scope 声明 / points_advisor 注册 / smart_menu 通过场景 / smart_menu 违规场景 / menu_advisor 按最差毛利拦截
+
+### 数据变化
+- 迁移版本：无
+- 修改文件：4（skills/__init__.py + 2 Skills + test）
+- 新增测试：5（共 24：11 passed + 13 skipped）
+- ruff 状态：All checks passed
+
+### 协同备注
+- commit 9e6f99d7（pzlichun-a11y 本地 main，另一 Claude Opus 4.6 agent 推进）已为批次 3 全部 7 个 Skill 追加 constraint_scope={margin} 声明
+- 本 PR 只补"注册表 + context 填充"两块缺失，不重复声明
+
+### 遗留问题
+- 批次 3 剩余 5 个 Skill 只声明 scope 未填 context（需 Squad Owner 按业务数据补）
+- personalization_agent.py 4 个 pre-existing F541（空 f-string）未修，out-of-scope
+
+### 明日计划
+- 启动批次 4（W7 库存原料 7 Skill，safety scope）
+
+---
+
 ## 2026-04-18 Sprint D1 批次 2 — 出餐体验 7 Skill + 2 Skill 填 context（PR H）
 
 ### 今日完成
