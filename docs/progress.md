@@ -4,6 +4,44 @@
 
 ---
 
+## 2026-04-19 PR-W2.C：ensure_period SAVEPOINT 隔离（不破坏外层事务）
+
+### 本次会话目标
+Wave 2 Batch 1 第 2 个 PR。响应 §19 CFO P0-2 风险：`ensure_period` race 分支调用 `session.rollback()`，会把调用方前置写入全部清空，早高峰 ~5% 并发场景丢单。
+
+Tier 级别：🔴 **Tier 1**。
+
+### 修复（~20 行核心）
+`AccountingPeriodService.ensure_period()` 的 race 分支：
+- 原：`try: add+flush except IntegrityError: session.rollback()` → 外层事务全丢
+- 新：`async with session.begin_nested(): add+flush` → SAVEPOINT 自动 ROLLBACK TO SAVEPOINT，外层事务完整
+
+### 完成状态
+- [x] service 改 SAVEPOINT 模式，注释明确标注"外层事务完整保留"业务价值
+- [x] 4 测试（3 更新 + 1 新）：
+  - `test_ensure_creates_when_missing` 加 `begin_nested` mock
+  - `test_ensure_refetches_on_concurrent_race` 核心断言反转：从"rollback 被调"→"rollback 不应被调"
+  - `test_ensure_race_does_not_rollback_outer_transaction` 新增业务价值测试
+  - `test_is_date_writable_auto_ensure_creates_period` 加 `begin_nested` mock
+  - `_FakeSavepoint` helper 模拟 async context manager
+- [x] 全回归：Wave 1 214 + B 12 + W2.B 8 + W2.C +1 = **235 passed**
+- [x] DEV Postgres 端到端（真实 asyncio.gather 并发 + PG SAVEPOINT）：
+  - #1 外层事务前置 marker + race → commit 后 marker 保留 ✅
+  - #2 DB 验证 marker 存在（外层事务未被污染）✅
+  - #3 race 后 period 只 1 条（UNIQUE 兜底）✅
+  - #4 5 worker 并发 ensure 同 period → 全返同 id，DB 只 1 条 ✅
+
+### 关键决策
+- **`begin_nested()` 而非 `ON CONFLICT DO NOTHING`** — Plan agent 推荐 savepoint 方案。ON CONFLICT 需要手写 SQL 绕过 ORM，且 race 后仍需 refetch，实际代码量相当。savepoint 更"ORM 原生"。
+- **外层事务不调 `session.rollback()`** — 核心修复点。测试里 `assert_not_called()` 是 W2.C 价值的关键断言。
+- **不加 retry 重试** — race 发生后 refetch 立即拿到 winner，无需重试。
+
+### 已知风险
+- SQLAlchemy SAVEPOINT 仅在已有外层 transaction 时生效。如果 caller 没用 `async with session.begin()`，`begin_nested()` 会降级为普通 transaction（测试 AsyncMock 场景等效）。Runbook 提醒 caller 必须显式 begin。
+- DEV PG 测试依赖真 PG 的 SAVEPOINT 行为（不是 AsyncMock 模拟）。Mock 测试覆盖 side_effect 路径，真 PG 测试覆盖端到端。
+
+---
+
 ## 2026-04-19 PR-W2.B：外卖 T+N webhook 月结后丢单修复
 
 ### 本次会话目标
