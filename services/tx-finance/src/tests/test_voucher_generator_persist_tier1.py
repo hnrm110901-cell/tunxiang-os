@@ -221,6 +221,69 @@ class TestPersistToDb:
 # ─── persist_and_push 端到端编排 ─────────────────────────────────
 
 
+class TestRecordPushResultNoCommit:
+    """[BLOCKER-B1]: _record_push_result 不能调 db.commit() 破坏事务边界."""
+
+    @pytest.mark.asyncio
+    async def test_record_push_result_does_not_commit(self):
+        """直接调 _record_push_result 不应触发 session.commit().
+
+        原 bug: 内部 db.commit() 把调用方事务提前提交, 后续 persist_and_push
+        的 "改 status=exported" flush 失败时造成 DB/ERP 永久分裂.
+        """
+        gen = VoucherGenerator()
+        session = AsyncMock()
+        session.execute = AsyncMock()
+        session.commit = AsyncMock()
+        session.flush = AsyncMock()
+
+        erp = _build_erp_voucher()
+        result = ERPPushResult(
+            voucher_id=erp.voucher_id,
+            status=PushStatus.SUCCESS,
+            erp_type=ERPType.KINGDEE,
+            erp_voucher_id="kingdee_001",
+            pushed_at=datetime.now(timezone.utc),
+        )
+
+        await gen._record_push_result(erp, result, session)
+
+        # 铁律: _record_push_result 不调 commit (破坏事务边界)
+        session.commit.assert_not_called()
+        # 应改为 flush (保原子性, 事务边界交还调用方)
+        session.flush.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_source_code_does_not_contain_db_commit_in_record_push(self):
+        """静态验证: voucher_generator.py 中 _record_push_result 函数体无 db.commit() 调用.
+
+        防回归: 防止后续重构误加回去.
+        只检实际 await 调用, 注释里提到 "db.commit" 不算.
+        """
+        import inspect as _inspect
+        import re as _re
+
+        from services.voucher_generator import VoucherGenerator as _VG  # type: ignore
+
+        source = _inspect.getsource(_VG._record_push_result)
+        # 去掉 # 开头的注释行 (Python 行注释)
+        code_only_lines = [
+            line for line in source.splitlines()
+            if not line.strip().startswith("#")
+        ]
+        code_only = "\n".join(code_only_lines)
+
+        # 检查: 实际调用 (await db.commit() / await session.commit() 等)
+        assert not _re.search(
+            r"await\s+(?:db|session)\.commit\s*\(", code_only
+        ), "_record_push_result 代码体不应 await db.commit() (破坏事务边界)"
+
+        # 应改为 flush
+        assert _re.search(
+            r"await\s+(?:db|session)\.flush\s*\(", code_only
+        ), "_record_push_result 应用 await db.flush() 替代 commit"
+
+
 class TestPersistAndPush:
     @pytest.mark.asyncio
     async def test_persist_and_push_success_path_marks_exported(self):
