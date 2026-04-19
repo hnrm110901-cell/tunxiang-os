@@ -13,6 +13,7 @@
   - 基于 updated_at 时间戳的增量追踪
   - 不阻塞业务（异步运行）
 """
+
 from __future__ import annotations
 
 import asyncio

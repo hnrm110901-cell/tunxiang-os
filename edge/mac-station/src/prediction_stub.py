@@ -13,6 +13,7 @@ TODO: 真正集成后替换为 Core ML 模型调用：
   from prediction_stub import router as prediction_stub_router
   app.include_router(prediction_stub_router)
 """
+
 from __future__ import annotations
 
 import random
@@ -27,14 +28,14 @@ router = APIRouter(prefix="/predict", tags=["prediction-stub"])
 
 # ─── 菜品基准时间（秒），Core ML 集成后替换 ───
 _DISH_BASE_SECONDS: dict[str, float] = {
-    "default":       600.0,   # 10分钟
-    "mock_dish_1":   480.0,   # 8分钟
-    "mock_dish_2":   720.0,   # 12分钟
-    "noodle":        300.0,   # 5分钟
-    "stew":          900.0,   # 15分钟
-    "cold_dish":     120.0,   # 2分钟
-    "soup":          540.0,   # 9分钟
-    "rice":          180.0,   # 3分钟
+    "default": 600.0,  # 10分钟
+    "mock_dish_1": 480.0,  # 8分钟
+    "mock_dish_2": 720.0,  # 12分钟
+    "noodle": 300.0,  # 5分钟
+    "stew": 900.0,  # 15分钟
+    "cold_dish": 120.0,  # 2分钟
+    "soup": 540.0,  # 9分钟
+    "rice": 180.0,  # 3分钟
 }
 
 # ─── 桌台平均就餐分钟数（按座位数） ───

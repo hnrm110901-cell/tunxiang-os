@@ -5,6 +5,7 @@
 - 增量同步：每 5 分钟拉取 updated_at > watermark 的变更
 - 仅同步 status='published' 的文档
 """
+
 from __future__ import annotations
 
 from datetime import datetime, timezone
