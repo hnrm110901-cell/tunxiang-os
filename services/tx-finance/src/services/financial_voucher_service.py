@@ -335,15 +335,24 @@ class FinancialVoucherService:
         reason: str,
         session: AsyncSession,
         voided_at: datetime | None = None,
+        tenant_id: uuid.UUID | None = None,
     ) -> FinancialVoucher:
         """作废凭证 (调用 ORM 层 void() 方法 + flush).
 
+        [W2.E 修复] 加 tenant_id 显式过滤, 防 Oracle 攻击.
+
+        Args:
+            tenant_id: 调用方声明的租户 (可选, 但推荐传).
+                传入时: 走 SELECT WHERE id + tenant_id, 显式过滤.
+                不传: 降级为 session.get(PK), 依赖 RLS. 为兼容现有 caller 保留.
+
         Raises:
-            ValueError: 凭证不存在 / 已作废 / status=exported (需红冲)
+            ValueError: "凭证不存在或无权限" (统一消息, 不区分 "不存在"/"跨租户",
+                防 Oracle 攻击通过错误消息差异探测 UUID 存在性).
         """
-        voucher = await session.get(FinancialVoucher, voucher_id)
-        if voucher is None:
-            raise ValueError(f"凭证不存在: {voucher_id}")
+        voucher = await self._load_voucher_tenant_scoped(
+            session=session, voucher_id=voucher_id, tenant_id=tenant_id,
+        )
 
         # ORM 层方法已内置所有守护 (is_voidable 检查)
         voucher.void(
@@ -371,6 +380,7 @@ class FinancialVoucherService:
         reason: str,
         session: AsyncSession,
         new_voucher_no: str | None = None,
+        tenant_id: uuid.UUID | None = None,
     ) -> FinancialVoucher:
         """红冲凭证 — 对 exported 凭证的唯一合法纠错路径.
 
@@ -398,9 +408,10 @@ class FinancialVoucherService:
             ValueError: 原凭证不存在 / 非 exported / 已被红冲 / 本身是红冲 / 已作废
         """
         # ── 1. 前置校验 ────────────────────────────────────────────────
-        original = await session.get(FinancialVoucher, voucher_id)
-        if original is None:
-            raise ValueError(f"凭证不存在: {voucher_id}")
+        # [W2.E] tenant 作用域加载, 统一错误消息防 Oracle 攻击
+        original = await self._load_voucher_tenant_scoped(
+            session=session, voucher_id=voucher_id, tenant_id=tenant_id,
+        )
 
         if not reason or not reason.strip():
             raise ValueError("红冲原因必填 (审计留痕)")
@@ -567,6 +578,48 @@ class FinancialVoucherService:
                 payload_tenant=payload_tenant_id,
                 session_tenant=str(session_tid),
             )
+
+    async def _load_voucher_tenant_scoped(
+        self,
+        *,
+        session: AsyncSession,
+        voucher_id: uuid.UUID,
+        tenant_id: uuid.UUID | None,
+    ) -> FinancialVoucher:
+        """[W2.E] 按 (id, tenant_id) 加载凭证, 防 Oracle 攻击 + 错误消息统一.
+
+        原 session.get(FinancialVoucher, voucher_id) 的问题 (安全 P1-1):
+          - PK 直查, 依赖 RLS 拦截. 若 app.tenant_id 未 SET 或错配:
+            跨租户的 voucher_id 查到 None, 同租户查到 business error.
+            攻击者通过 "不存在" vs "已作废" 的错误差异探测 UUID 存在性.
+
+        修复:
+          - tenant_id 显式传入时: SELECT WHERE id AND tenant_id, 明确过滤
+          - tenant_id=None (向前兼容老 caller): 降级 session.get + RLS 兜底
+          - 找不到统一消息 "凭证不存在或无权限" (不区分跨租户/不存在)
+
+        Raises:
+            ValueError: 统一 "凭证不存在或无权限: {voucher_id}"
+        """
+        from sqlalchemy import select as _select
+
+        if tenant_id is not None:
+            # 显式 tenant 过滤 — 主路径
+            stmt = _select(FinancialVoucher).where(
+                FinancialVoucher.id == voucher_id,
+                FinancialVoucher.tenant_id == tenant_id,
+            ).limit(1)
+            result = await session.execute(stmt)
+            voucher = result.scalar_one_or_none()
+        else:
+            # 兼容路径: PK 直查, RLS 兜底
+            voucher = await session.get(FinancialVoucher, voucher_id)
+
+        if voucher is None:
+            raise ValueError(
+                f"凭证不存在或无权限: {voucher_id}"
+            )
+        return voucher
 
     async def _find_by_event(
         self,

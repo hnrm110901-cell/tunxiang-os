@@ -553,6 +553,122 @@ class TestEventIdRequiresEventType:
         assert isinstance(result, FinancialVoucher)
 
 
+class TestW2ETenantScopedLoad:
+    """[W2.E] void / red_flush 通过 _load_voucher_tenant_scoped 防 Oracle 攻击."""
+
+    @pytest.mark.asyncio
+    async def test_void_with_explicit_tenant_uses_select_not_session_get(self):
+        """显式传 tenant_id → 走 select WHERE id + tenant_id, 不用 session.get."""
+        svc = FinancialVoucherService()
+        session = AsyncMock()
+
+        voucher = FinancialVoucher(
+            id=uuid.uuid4(), tenant_id=uuid.uuid4(),
+            voucher_no="V_SCOPED", voucher_type="sales",
+            status="draft", entries=[], voided=False,
+        )
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none = MagicMock(return_value=voucher)
+        session.execute = AsyncMock(return_value=mock_result)
+        session.flush = AsyncMock()
+        session.get = AsyncMock()  # 不应被调
+
+        await svc.void(
+            voucher.id, operator_id=uuid.uuid4(), reason="test",
+            session=session, tenant_id=voucher.tenant_id,  # 显式传
+        )
+
+        # 走 execute (SELECT WHERE), 不走 session.get
+        session.execute.assert_awaited_once()
+        session.get.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_void_unified_error_message_for_nonexistent_and_cross_tenant(self):
+        """[W2.E 核心] 凭证不存在 / 跨租户 都返回 '凭证不存在或无权限'.
+
+        防 Oracle 攻击: 攻击者无法通过错误消息差异探测 UUID 是否存在.
+        """
+        svc = FinancialVoucherService()
+        session = AsyncMock()
+
+        # select 返 None (无论是因为不存在还是 RLS 过滤)
+        mock_miss = MagicMock()
+        mock_miss.scalar_one_or_none = MagicMock(return_value=None)
+        session.execute = AsyncMock(return_value=mock_miss)
+
+        with pytest.raises(ValueError, match="凭证不存在或无权限"):
+            await svc.void(
+                uuid.uuid4(), operator_id=uuid.uuid4(), reason="test",
+                session=session, tenant_id=uuid.uuid4(),
+            )
+
+    @pytest.mark.asyncio
+    async def test_void_without_tenant_id_backward_compat_uses_session_get(self):
+        """不传 tenant_id (向前兼容) → 降级到 session.get + RLS 兜底.
+
+        兼容现有 W1.2 调用方 (它们没传 tenant_id).
+        """
+        svc = FinancialVoucherService()
+        session = AsyncMock()
+
+        voucher = FinancialVoucher(
+            id=uuid.uuid4(), tenant_id=uuid.uuid4(),
+            voucher_no="V_COMPAT", voucher_type="sales",
+            status="draft", entries=[], voided=False,
+        )
+        session.get = AsyncMock(return_value=voucher)
+        session.flush = AsyncMock()
+
+        await svc.void(
+            voucher.id, operator_id=uuid.uuid4(), reason="test",
+            session=session,  # 不传 tenant_id
+        )
+
+        session.get.assert_awaited_once_with(FinancialVoucher, voucher.id)
+
+    @pytest.mark.asyncio
+    async def test_red_flush_with_explicit_tenant_scoped_load(self):
+        """red_flush 也用 _load_voucher_tenant_scoped (与 void 一致)."""
+        svc = FinancialVoucherService()
+        session = AsyncMock()
+
+        voucher = FinancialVoucher(
+            id=uuid.uuid4(), tenant_id=uuid.uuid4(),
+            voucher_no="V_RED_SCOPED", voucher_type="sales",
+            total_amount_fen=10000, status="exported",
+            entries=[], voided=False,
+        )
+        voucher.lines = []
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none = MagicMock(return_value=voucher)
+        session.execute = AsyncMock(return_value=mock_result)
+        session.flush = AsyncMock()
+
+        await svc.red_flush(
+            voucher.id, operator_id=uuid.uuid4(), reason="test",
+            session=session, tenant_id=voucher.tenant_id,
+        )
+
+        session.execute.assert_awaited()
+        # 不走 session.get
+        session.get.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_red_flush_cross_tenant_unified_message(self):
+        """red_flush 跨租户 / 不存在 → 统一 '凭证不存在或无权限'."""
+        svc = FinancialVoucherService()
+        session = AsyncMock()
+        mock_miss = MagicMock()
+        mock_miss.scalar_one_or_none = MagicMock(return_value=None)
+        session.execute = AsyncMock(return_value=mock_miss)
+
+        with pytest.raises(ValueError, match="凭证不存在或无权限"):
+            await svc.red_flush(
+                uuid.uuid4(), operator_id=uuid.uuid4(), reason="test",
+                session=session, tenant_id=uuid.uuid4(),
+            )
+
+
 class TestBalanceValidation:
     """借贷不平衡在 service 层前置拦截 (比 DB CHECK 更早, UX 更好)."""
 
