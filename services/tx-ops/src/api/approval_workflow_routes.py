@@ -16,6 +16,7 @@
 
 统一响应格式：{"ok": bool, "data": {}}
 """
+
 from __future__ import annotations
 
 import uuid
@@ -82,7 +83,9 @@ class CreateInstanceRequest(BaseModel):
     initiator_id: str = Field(..., max_length=100)
     initiator_name: str = Field(..., max_length=100)
     deadline_hours: Optional[int] = Field(
-        None, ge=1, le=720,
+        None,
+        ge=1,
+        le=720,
         description="超时自动关闭小时数（1-720），不填则无 deadline",
     )
 
@@ -238,6 +241,7 @@ async def create_instance(
     # 若指定了 deadline_hours，补充写入 deadline_at
     if body.deadline_hours is not None:
         from datetime import timedelta
+
         deadline = datetime.now(tz=timezone.utc) + timedelta(hours=body.deadline_hours)
         await db.execute(
             text("UPDATE approval_instances SET deadline_at = :dl WHERE id = :id"),
@@ -257,9 +261,7 @@ async def pending_mine(
     """查询待我审批的实例列表。"""
     from ..services.approval_engine import approval_engine
 
-    items = await approval_engine.get_pending_for_approver(
-        db=db, tenant_id=x_tenant_id, approver_id=approver_id
-    )
+    items = await approval_engine.get_pending_for_approver(db=db, tenant_id=x_tenant_id, approver_id=approver_id)
     return {"ok": True, "data": {"items": items, "total": len(items)}}
 
 

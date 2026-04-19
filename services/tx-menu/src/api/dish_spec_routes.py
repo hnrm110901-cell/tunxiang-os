@@ -3,13 +3,14 @@
 接入 dish_spec_groups + dish_spec_options 表（v131 迁移创建）。
 所有操作带 X-Tenant-ID 多租户隔离，RLS tenant context。
 """
+
 import uuid
-from typing import Optional, List
+from typing import List, Optional
 
 import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel
-from sqlalchemy import delete, select, text, update
+from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -20,6 +21,7 @@ router = APIRouter(prefix="/api/v1/menu/specs", tags=["menu-specs"])
 
 
 # ─── Pydantic 模型 ──────────────────────────────────────────────
+
 
 class SpecOption(BaseModel):
     name: str
@@ -48,6 +50,7 @@ class SpecGroupUpdate(BaseModel):
 
 
 # ─── 辅助 ───────────────────────────────────────────────────────
+
 
 async def _set_rls(db: AsyncSession, tenant_id: str) -> None:
     await db.execute(
@@ -110,6 +113,7 @@ async def _get_group_with_options(db: AsyncSession, group_id: str, tenant_id: st
 
 # ─── 路由 ────────────────────────────────────────────────────────
 
+
 @router.get("")
 async def list_specs(
     dish_id: Optional[str] = None,
@@ -165,26 +169,28 @@ async def list_specs(
                 {"gid": gid, "tid": x_tenant_id},
             )
             opts = opts_result.mappings().all()
-            items.append({
-                "id": gid,
-                "dish_id": str(g["dish_id"]),
-                "spec_group_name": g["group_name"],
-                "is_required": g["is_required"],
-                "min_select": g["min_select"],
-                "max_select": g["max_select"],
-                "sort_order": g["sort_order"],
-                "options": [
-                    {
-                        "id": str(o["id"]),
-                        "name": o["name"],
-                        "price_delta_fen": o["price_delta_fen"],
-                        "is_default": o["is_default"],
-                        "sort_order": o["sort_order"],
-                        "stock_status": o["stock_status"],
-                    }
-                    for o in opts
-                ],
-            })
+            items.append(
+                {
+                    "id": gid,
+                    "dish_id": str(g["dish_id"]),
+                    "spec_group_name": g["group_name"],
+                    "is_required": g["is_required"],
+                    "min_select": g["min_select"],
+                    "max_select": g["max_select"],
+                    "sort_order": g["sort_order"],
+                    "options": [
+                        {
+                            "id": str(o["id"]),
+                            "name": o["name"],
+                            "price_delta_fen": o["price_delta_fen"],
+                            "is_default": o["is_default"],
+                            "sort_order": o["sort_order"],
+                            "stock_status": o["stock_status"],
+                        }
+                        for o in opts
+                    ],
+                }
+            )
         log.info("list_specs", tenant_id=x_tenant_id, dish_id=dish_id, total=total)
         return {
             "ok": True,
@@ -388,13 +394,17 @@ async def patch_spec(
         if set_clauses:
             set_clauses.append("updated_at = now()")
             await db.execute(
-                text(f"UPDATE dish_spec_groups SET {', '.join(set_clauses)} WHERE id = :id::uuid AND tenant_id = :tid::uuid AND is_deleted = false"),
+                text(
+                    f"UPDATE dish_spec_groups SET {', '.join(set_clauses)} WHERE id = :id::uuid AND tenant_id = :tid::uuid AND is_deleted = false"
+                ),
                 params,
             )
 
         if body.options is not None:
             await db.execute(
-                text("UPDATE dish_spec_options SET is_deleted = true WHERE group_id = :gid::uuid AND tenant_id = :tid::uuid"),
+                text(
+                    "UPDATE dish_spec_options SET is_deleted = true WHERE group_id = :gid::uuid AND tenant_id = :tid::uuid"
+                ),
                 {"gid": spec_id, "tid": x_tenant_id},
             )
             for opt in body.options:

@@ -15,15 +15,13 @@
     cd /Users/lichun/tunxiang-os/services/tx-finance
     pytest src/tests/test_split_routes.py -v
 """
+
 from __future__ import annotations
 
 import sys
 import types
 import uuid
-from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
-
-import pytest
 
 # ─── 存根工具 ────────────────────────────────────────────────────────────────
 
@@ -38,9 +36,7 @@ def _make_stub(name: str, **attrs) -> types.ModuleType:
 # ── structlog 存根 ────────────────────────────────────────────────────────────
 if "structlog" not in sys.modules:
     _stub_log = MagicMock()
-    _stub_log.get_logger.return_value = MagicMock(
-        info=MagicMock(), error=MagicMock(), warning=MagicMock()
-    )
+    _stub_log.get_logger.return_value = MagicMock(info=MagicMock(), error=MagicMock(), warning=MagicMock())
     sys.modules["structlog"] = _stub_log
 
 # ── sqlalchemy 系列存根 ───────────────────────────────────────────────────────
@@ -95,11 +91,12 @@ sys.modules.setdefault("src.services", _make_stub("src.services"))
 sys.modules["src.services.split_engine"] = _split_engine_stub
 sys.modules["src.services.split_notify_security"] = _split_notify_stub
 
+# 直接导入，避免相对导入问题
+import importlib.util
+import pathlib
+
 from fastapi import FastAPI  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
-
-# 直接导入，避免相对导入问题
-import importlib.util, pathlib
 
 _routes_path = pathlib.Path(__file__).parent.parent / "api" / "split_routes.py"
 _spec = importlib.util.spec_from_file_location("split_routes_mod", _routes_path)
@@ -144,27 +141,17 @@ def _build_engine_mock(
     apply_channel_notification_val=None,
 ):
     eng = AsyncMock()
-    eng.upsert_rule = AsyncMock(
-        return_value=upsert_rule_val or {"id": RULE_ID, "name": "测试规则", "is_active": True}
-    )
-    eng.list_rules = AsyncMock(
-        return_value=list_rules_val or [{"id": RULE_ID, "name": "测试规则"}]
-    )
+    eng.upsert_rule = AsyncMock(return_value=upsert_rule_val or {"id": RULE_ID, "name": "测试规则", "is_active": True})
+    eng.list_rules = AsyncMock(return_value=list_rules_val or [{"id": RULE_ID, "name": "测试规则"}])
     eng.deactivate_rule = AsyncMock(return_value=deactivate_rule_val)
     eng.execute_split = AsyncMock(
-        return_value=execute_split_val
-        or [{"id": RECORD_ID, "split_amount_fen": 500, "recipient_type": "brand"}]
+        return_value=execute_split_val or [{"id": RECORD_ID, "split_amount_fen": 500, "recipient_type": "brand"}]
     )
     eng.settle_records = AsyncMock(return_value=settle_records_val)
-    eng.list_split_records = AsyncMock(
-        return_value=list_split_records_val or {"items": [], "total": 0}
-    )
-    eng.get_settlement_summary = AsyncMock(
-        return_value=get_settlement_summary_val or {"items": [], "total_fen": 0}
-    )
+    eng.list_split_records = AsyncMock(return_value=list_split_records_val or {"items": [], "total": 0})
+    eng.get_settlement_summary = AsyncMock(return_value=get_settlement_summary_val or {"items": [], "total_fen": 0})
     eng.apply_channel_notification = AsyncMock(
-        return_value=apply_channel_notification_val
-        or {"updated": 1, "skipped": 0}
+        return_value=apply_channel_notification_val or {"updated": 1, "skipped": 0}
     )
     return eng
 
@@ -415,9 +402,7 @@ class TestSplitRoutes:
         app = self._build_app(db)
 
         with patch.object(_split_routes, "SplitEngine", return_value=eng_mock):
-            with patch.object(
-                _split_routes, "verify_split_channel_notify_signature", return_value=None
-            ):
+            with patch.object(_split_routes, "verify_split_channel_notify_signature", return_value=None):
                 client = TestClient(app)
                 resp = client.post(
                     "/api/v1/finance/splits/channel-notify",

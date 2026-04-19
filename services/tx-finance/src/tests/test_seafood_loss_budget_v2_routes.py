@@ -10,6 +10,7 @@
 
 Mock 路径：shared.ontology.src.database.get_db_with_tenant
 """
+
 import sys
 import types
 import uuid
@@ -20,8 +21,10 @@ _shared_ontology = types.ModuleType("shared.ontology")
 _shared_ontology_src = types.ModuleType("shared.ontology.src")
 _shared_ontology_src_database = types.ModuleType("shared.ontology.src.database")
 
+
 async def _fake_get_db_with_tenant(tenant_id):
     yield None
+
 
 _shared_ontology_src_database.get_db_with_tenant = _fake_get_db_with_tenant
 
@@ -33,17 +36,27 @@ sys.modules.setdefault("shared.ontology.src.database", _shared_ontology_src_data
 # ── Mock structlog ──────────────────────────────────────────────────────────
 _structlog = types.ModuleType("structlog")
 
+
 class _FakeLogger:
-    def info(self, *a, **kw): pass
-    def error(self, *a, **kw): pass
-    def warning(self, *a, **kw): pass
-    def debug(self, *a, **kw): pass
+    def info(self, *a, **kw):
+        pass
+
+    def error(self, *a, **kw):
+        pass
+
+    def warning(self, *a, **kw):
+        pass
+
+    def debug(self, *a, **kw):
+        pass
+
 
 _structlog.get_logger = lambda *a, **kw: _FakeLogger()
 sys.modules.setdefault("structlog", _structlog)
 
 # ── Imports ─────────────────────────────────────────────────────────────────
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
+
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
@@ -58,12 +71,15 @@ HEADERS = {"X-Tenant-ID": TENANT_ID}
 # seafood_loss_routes tests
 # ───────────────────────────────────────────────────────────────────────────
 
+
 def _make_seafood_client(mock_db):
     """Build app with a mocked DB session injected via dependency override."""
     import importlib
+
     # Re-register the fake get_db_with_tenant each time
     _shared_ontology_src_database.get_db_with_tenant = _fake_get_db_with_tenant
     import services.tx_finance.src.api.seafood_loss_routes as sl_mod
+
     importlib.reload(sl_mod)
 
     app = FastAPI()
@@ -95,15 +111,15 @@ def _make_fake_db_for_list(total=2, rows=None):
     if rows is None:
         fake_row = (
             uuid.UUID(COST_ITEM_ID),  # id
-            "2026-04-01",             # cost_date
-            "大黄鱼自然死亡",            # description
-            3000,                     # amount_fen
-            1.5,                      # quantity
-            "kg",                     # unit
-            2000,                     # unit_cost_fen
-            uuid.UUID(DISH_ID),       # reference_id
-            "2026-04-01T08:00:00",    # created_at
-            "大黄鱼",                  # dish_name
+            "2026-04-01",  # cost_date
+            "大黄鱼自然死亡",  # description
+            3000,  # amount_fen
+            1.5,  # quantity
+            "kg",  # unit
+            2000,  # unit_cost_fen
+            uuid.UUID(DISH_ID),  # reference_id
+            "2026-04-01T08:00:00",  # created_at
+            "大黄鱼",  # dish_name
         )
         rows = [fake_row]
 
@@ -142,6 +158,7 @@ def _make_fake_db_for_analysis(daily_rows=None, dish_rows=None, ratio_rows=None)
 
 # ── Test 1: POST /seafood-loss/record — happy path ───────────────────────────
 
+
 def test_record_seafood_loss_happy_path():
     db = _make_fake_db_for_record()
     client = _make_seafood_client(db)
@@ -167,6 +184,7 @@ def test_record_seafood_loss_happy_path():
 
 # ── Test 2: POST /seafood-loss/record — invalid unit returns 422 ─────────────
 
+
 def test_record_seafood_loss_invalid_unit():
     db = _make_fake_db_for_record()
     client = _make_seafood_client(db)
@@ -189,6 +207,7 @@ def test_record_seafood_loss_invalid_unit():
 
 # ── Test 3: POST /seafood-loss/record — invalid store_id returns 400 ─────────
 
+
 def test_record_seafood_loss_invalid_store_id():
     db = _make_fake_db_for_record()
     client = _make_seafood_client(db)
@@ -210,6 +229,7 @@ def test_record_seafood_loss_invalid_store_id():
 
 
 # ── Test 4: POST /seafood-loss/record — with optional tank_zone_id ───────────
+
 
 def test_record_seafood_loss_with_tank_zone():
     db = _make_fake_db_for_record()
@@ -238,6 +258,7 @@ def test_record_seafood_loss_with_tank_zone():
 
 # ── Test 5: GET /seafood-loss — happy path ────────────────────────────────────
 
+
 def test_get_seafood_loss_records_happy_path():
     db = _make_fake_db_for_list(total=1)
     client = _make_seafood_client(db)
@@ -256,6 +277,7 @@ def test_get_seafood_loss_records_happy_path():
 
 # ── Test 6: GET /seafood-loss — pagination parameters ────────────────────────
 
+
 def test_get_seafood_loss_records_pagination():
     db = _make_fake_db_for_list(total=50, rows=[])
     client = _make_seafood_client(db)
@@ -272,6 +294,7 @@ def test_get_seafood_loss_records_pagination():
 
 # ── Test 7: GET /seafood-loss — "today" keyword ───────────────────────────────
 
+
 def test_get_seafood_loss_records_today_keyword():
     db = _make_fake_db_for_list(total=0, rows=[])
     client = _make_seafood_client(db)
@@ -285,6 +308,7 @@ def test_get_seafood_loss_records_today_keyword():
 
 
 # ── Test 8: GET /seafood-loss/analysis — happy path ──────────────────────────
+
 
 def test_get_seafood_loss_analysis_happy_path():
     db = _make_fake_db_for_analysis()
@@ -305,6 +329,7 @@ def test_get_seafood_loss_analysis_happy_path():
 
 # ── Test 9: GET /seafood-loss/analysis — empty data ──────────────────────────
 
+
 def test_get_seafood_loss_analysis_empty():
     db = _make_fake_db_for_analysis(daily_rows=[], dish_rows=[], ratio_rows=[])
     client = _make_seafood_client(db)
@@ -320,6 +345,7 @@ def test_get_seafood_loss_analysis_empty():
 
 
 # ── Test 10: GET /seafood-loss/analysis — days param validation ───────────────
+
 
 def test_get_seafood_loss_analysis_days_out_of_range():
     db = _make_fake_db_for_analysis()
@@ -337,9 +363,12 @@ def test_get_seafood_loss_analysis_days_out_of_range():
 # budget_v2_routes tests
 # ───────────────────────────────────────────────────────────────────────────
 
+
 def _make_budget_client(mock_db):
     import importlib
+
     import services.tx_finance.src.api.budget_v2_routes as bv2_mod
+
     importlib.reload(bv2_mod)
 
     app = FastAPI()
@@ -417,13 +446,12 @@ def _make_fake_db_for_execution(budget_rows=None, rev=500000, labor=200000, food
     food_result = MagicMock()
     food_result.scalar.return_value = food
 
-    db.execute = AsyncMock(
-        side_effect=[budget_result, rev_result, labor_result, food_result]
-    )
+    db.execute = AsyncMock(side_effect=[budget_result, rev_result, labor_result, food_result])
     return db
 
 
 # ── Test 11: GET /budget — happy path ────────────────────────────────────────
+
 
 def test_list_annual_budgets_happy_path():
     db = _make_fake_db_for_list_budgets()
@@ -442,6 +470,7 @@ def test_list_annual_budgets_happy_path():
 
 # ── Test 12: GET /budget — empty result ──────────────────────────────────────
 
+
 def test_list_annual_budgets_empty():
     db = _make_fake_db_for_list_budgets(rows=[])
     client = _make_budget_client(db)
@@ -455,6 +484,7 @@ def test_list_annual_budgets_empty():
 
 
 # ── Test 13: POST /budget — happy path ───────────────────────────────────────
+
 
 def test_create_monthly_budget_happy_path():
     db = _make_fake_db_for_create_budget()
@@ -481,6 +511,7 @@ def test_create_monthly_budget_happy_path():
 
 # ── Test 14: POST /budget — invalid store_id returns 422 ─────────────────────
 
+
 def test_create_monthly_budget_invalid_store_id():
     db = _make_fake_db_for_create_budget()
     client = _make_budget_client(db)
@@ -501,6 +532,7 @@ def test_create_monthly_budget_invalid_store_id():
 
 
 # ── Test 15: POST /budget — with optional note ───────────────────────────────
+
 
 def test_create_monthly_budget_with_note():
     db = _make_fake_db_for_create_budget()
@@ -525,6 +557,7 @@ def test_create_monthly_budget_with_note():
 
 # ── Test 16: GET /budget/execution — happy path ───────────────────────────────
 
+
 def test_get_budget_execution_happy_path():
     db = _make_fake_db_for_execution()
     client = _make_budget_client(db)
@@ -544,6 +577,7 @@ def test_get_budget_execution_happy_path():
 
 
 # ── Test 17: GET /budget/execution — execution_status logic ──────────────────
+
 
 def test_get_budget_execution_status_on_track():
     # revenue_target=1000000, actual=980000 → rate=0.98 → on_track
@@ -569,6 +603,7 @@ def test_get_budget_execution_status_on_track():
 
 # ── Test 18: GET /budget/execution — no budget → has_budget=False ─────────────
 
+
 def test_get_budget_execution_no_budget():
     db = _make_fake_db_for_execution(budget_rows=[], rev=300000, labor=0, food=0)
     client = _make_budget_client(db)
@@ -585,6 +620,7 @@ def test_get_budget_execution_no_budget():
 
 # ── Test 19: GET /budget/execution — month out of range returns 422 ───────────
 
+
 def test_get_budget_execution_bad_month():
     db = _make_fake_db_for_execution()
     client = _make_budget_client(db)
@@ -597,6 +633,7 @@ def test_get_budget_execution_bad_month():
 
 
 # ── Test 20: GET /budget/execution — critical execution_status ───────────────
+
 
 def test_get_budget_execution_status_critical():
     # rate = 400000 / 1000000 = 0.4 → critical

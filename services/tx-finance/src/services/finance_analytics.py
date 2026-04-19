@@ -2,6 +2,7 @@
 
 所有金额单位：分(fen)。
 """
+
 from __future__ import annotations
 
 import uuid
@@ -38,6 +39,7 @@ async def _set_tenant(db: AsyncSession, tenant_id: str) -> None:
 
 # ── 1. 营收构成分析 ──────────────────────────────────────────
 
+
 async def revenue_composition(
     store_id: str,
     date_range: tuple[str, str],
@@ -58,7 +60,10 @@ async def revenue_composition(
     sid = _to_uuid(store_id)
     start_dt = datetime.fromisoformat(date_range[0]).replace(tzinfo=timezone.utc)
     end_dt = datetime.fromisoformat(date_range[1]).replace(
-        hour=23, minute=59, second=59, tzinfo=timezone.utc,
+        hour=23,
+        minute=59,
+        second=59,
+        tzinfo=timezone.utc,
     )
 
     # 按订单类型（来源）分组
@@ -156,6 +161,7 @@ async def revenue_composition(
 
 # ── 2. 折扣结构分析 ──────────────────────────────────────────
 
+
 async def discount_structure(
     store_id: str,
     date_range: tuple[str, str],
@@ -172,7 +178,10 @@ async def discount_structure(
     sid = _to_uuid(store_id)
     start_dt = datetime.fromisoformat(date_range[0]).replace(tzinfo=timezone.utc)
     end_dt = datetime.fromisoformat(date_range[1]).replace(
-        hour=23, minute=59, second=59, tzinfo=timezone.utc,
+        hour=23,
+        minute=59,
+        second=59,
+        tzinfo=timezone.utc,
     )
 
     # 总营收和总折扣
@@ -243,13 +252,15 @@ async def discount_structure(
     )
     gift_cost_fen = int(gift_result.scalar() or 0)
     if gift_cost_fen > 0:
-        by_type.append({
-            "type": "赠菜",
-            "discount_key": "gift",
-            "amount_fen": gift_cost_fen,
-            "order_count": 0,
-            "ratio": _safe_ratio(gift_cost_fen, total_discount_fen + gift_cost_fen),
-        })
+        by_type.append(
+            {
+                "type": "赠菜",
+                "discount_key": "gift",
+                "amount_fen": gift_cost_fen,
+                "order_count": 0,
+                "ratio": _safe_ratio(gift_cost_fen, total_discount_fen + gift_cost_fen),
+            }
+        )
 
     logger.info(
         "discount_structure_analyzed",
@@ -272,6 +283,7 @@ async def discount_structure(
 
 # ── 3. 优惠券成本分析 ────────────────────────────────────────
 
+
 async def coupon_cost_analysis(
     store_id: str,
     date_range: tuple[str, str],
@@ -288,7 +300,10 @@ async def coupon_cost_analysis(
     sid = _to_uuid(store_id)
     start_dt = datetime.fromisoformat(date_range[0]).replace(tzinfo=timezone.utc)
     end_dt = datetime.fromisoformat(date_range[1]).replace(
-        hour=23, minute=59, second=59, tzinfo=timezone.utc,
+        hour=23,
+        minute=59,
+        second=59,
+        tzinfo=timezone.utc,
     )
 
     # 优惠券相关订单：discount_type = 'coupon' 或 'promotion'
@@ -363,6 +378,7 @@ async def coupon_cost_analysis(
 
 # ── 4. 门店利润分析 ──────────────────────────────────────────
 
+
 async def store_profit_analysis(
     store_id: str,
     date_range: tuple[str, str],
@@ -379,7 +395,10 @@ async def store_profit_analysis(
     sid = _to_uuid(store_id)
     start_dt = datetime.fromisoformat(date_range[0]).replace(tzinfo=timezone.utc)
     end_dt = datetime.fromisoformat(date_range[1]).replace(
-        hour=23, minute=59, second=59, tzinfo=timezone.utc,
+        hour=23,
+        minute=59,
+        second=59,
+        tzinfo=timezone.utc,
     )
 
     # 营收
@@ -408,11 +427,7 @@ async def store_profit_analysis(
     food_cost_fen = int(food_cost_result.scalar() or 0)
 
     # 门店配置中的固定成本（从 Store 表读取目标值作为预算基准）
-    store_result = await db.execute(
-        select(Store)
-        .where(Store.id == sid)
-        .where(Store.tenant_id == tid)
-    )
+    store_result = await db.execute(select(Store).where(Store.id == sid).where(Store.tenant_id == tid))
     store = store_result.scalar_one_or_none()
 
     # 人工/租金等按月度目标估算（实际部署应从财务模块获取）
@@ -458,6 +473,7 @@ async def store_profit_analysis(
 
 # ── 5. 财务稽核视图 ──────────────────────────────────────────
 
+
 async def financial_audit_view(
     store_id: str,
     audit_date: str,
@@ -473,10 +489,16 @@ async def financial_audit_view(
     tid = _to_uuid(tenant_id)
     sid = _to_uuid(store_id)
     day_start = datetime.fromisoformat(audit_date).replace(
-        hour=0, minute=0, second=0, tzinfo=timezone.utc,
+        hour=0,
+        minute=0,
+        second=0,
+        tzinfo=timezone.utc,
     )
     day_end = datetime.fromisoformat(audit_date).replace(
-        hour=23, minute=59, second=59, tzinfo=timezone.utc,
+        hour=23,
+        minute=59,
+        second=59,
+        tzinfo=timezone.utc,
     )
 
     # 订单汇总

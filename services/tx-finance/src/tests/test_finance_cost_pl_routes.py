@@ -11,6 +11,7 @@
 
 Mock 路径：shared.ontology.src.database.get_db_with_tenant
 """
+
 import sys
 import types
 import uuid
@@ -21,8 +22,10 @@ _shared_ontology = types.ModuleType("shared.ontology")
 _shared_ontology_src = types.ModuleType("shared.ontology.src")
 _shared_ontology_src_database = types.ModuleType("shared.ontology.src.database")
 
+
 async def _fake_get_db_with_tenant(tenant_id):
     yield None
+
 
 _shared_ontology_src_database.get_db_with_tenant = _fake_get_db_with_tenant
 
@@ -34,11 +37,20 @@ sys.modules.setdefault("shared.ontology.src.database", _shared_ontology_src_data
 # ── Mock structlog ──────────────────────────────────────────────────────────
 _structlog = types.ModuleType("structlog")
 
+
 class _FakeLogger:
-    def info(self, *a, **kw): pass
-    def error(self, *a, **kw): pass
-    def warning(self, *a, **kw): pass
-    def debug(self, *a, **kw): pass
+    def info(self, *a, **kw):
+        pass
+
+    def error(self, *a, **kw):
+        pass
+
+    def warning(self, *a, **kw):
+        pass
+
+    def debug(self, *a, **kw):
+        pass
+
 
 _structlog.get_logger = lambda *a, **kw: _FakeLogger()
 sys.modules.setdefault("structlog", _structlog)
@@ -48,12 +60,8 @@ _services = types.ModuleType("services")
 _services_txf = types.ModuleType("services.tx_finance")
 _services_txf_src = types.ModuleType("services.tx_finance.src")
 _services_txf_src_services = types.ModuleType("services.tx_finance.src.services")
-_services_txf_src_services_ces = types.ModuleType(
-    "services.tx_finance.src.services.cost_engine_service"
-)
-_services_txf_src_services_pls = types.ModuleType(
-    "services.tx_finance.src.services.pl_service"
-)
+_services_txf_src_services_ces = types.ModuleType("services.tx_finance.src.services.cost_engine_service")
+_services_txf_src_services_pls = types.ModuleType("services.tx_finance.src.services.pl_service")
 
 sys.modules.setdefault("services", _services)
 sys.modules.setdefault("services.tx_finance", _services_txf)
@@ -69,7 +77,8 @@ sys.modules.setdefault(
 )
 
 # ── Now import route modules with patched stubs ─────────────────────────────
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
+
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
@@ -82,11 +91,14 @@ HEADERS = {"X-Tenant-ID": TENANT_ID}
 # finance_cost_routes tests
 # ───────────────────────────────────────────────────────────────────────────
 
+
 def _make_cost_client(mock_svc):
     """Build a TestClient with a fresh FastAPI app that uses the mocked service."""
     _services_txf_src_services_ces.CostEngineService = lambda: mock_svc
     import importlib
+
     import services.tx_finance.src.api.finance_cost_routes as cost_mod
+
     importlib.reload(cost_mod)
     app = FastAPI()
     app.include_router(cost_mod.router)
@@ -118,13 +130,12 @@ def _fake_daily_report():
 
 def _fake_breakdown_report():
     rpt = MagicMock()
-    rpt.to_dict.return_value = {
-        "items": [{"dish_name": "大黄鱼", "cost_ratio": 0.15, "total_cost_fen": 4200}]
-    }
+    rpt.to_dict.return_value = {"items": [{"dish_name": "大黄鱼", "cost_ratio": 0.15, "total_cost_fen": 4200}]}
     return rpt
 
 
 # ── Test 1: GET /cost/daily — happy path ────────────────────────────────────
+
 
 def test_get_daily_cost_happy_path():
     svc = MagicMock()
@@ -143,6 +154,7 @@ def test_get_daily_cost_happy_path():
 
 # ── Test 2: GET /cost/daily — invalid store_id returns 400 ──────────────────
 
+
 def test_get_daily_cost_invalid_store_id():
     svc = MagicMock()
     svc.get_daily_cost_report = AsyncMock(return_value=_fake_daily_report())
@@ -157,6 +169,7 @@ def test_get_daily_cost_invalid_store_id():
 
 # ── Test 3: GET /cost/daily — "today" keyword works ─────────────────────────
 
+
 def test_get_daily_cost_today_keyword():
     svc = MagicMock()
     svc.get_daily_cost_report = AsyncMock(return_value=_fake_daily_report())
@@ -170,6 +183,7 @@ def test_get_daily_cost_today_keyword():
 
 
 # ── Test 4: GET /cost/breakdown — happy path ────────────────────────────────
+
 
 def test_get_cost_breakdown_happy_path():
     svc = MagicMock()
@@ -186,6 +200,7 @@ def test_get_cost_breakdown_happy_path():
 
 # ── Test 5: GET /cost/breakdown — start > end returns 400 ───────────────────
 
+
 def test_get_cost_breakdown_date_order_error():
     svc = MagicMock()
     svc.get_cost_breakdown = AsyncMock(return_value=_fake_breakdown_report())
@@ -200,6 +215,7 @@ def test_get_cost_breakdown_date_order_error():
 
 
 # ── Test 6: GET /health/cost-rate — happy path ──────────────────────────────
+
 
 def test_get_cost_health_happy_path():
     svc = MagicMock()
@@ -219,6 +235,7 @@ def test_get_cost_health_happy_path():
 
 
 # ── Test 7: GET /store-cost-config — happy path ─────────────────────────────
+
 
 def test_get_store_cost_config_happy_path():
     svc = MagicMock()
@@ -240,6 +257,7 @@ def test_get_store_cost_config_happy_path():
 
 
 # ── Test 8: PUT /store-cost-config — happy path ─────────────────────────────
+
 
 def test_update_store_cost_config_happy_path():
     svc = MagicMock()
@@ -268,19 +286,21 @@ def test_update_store_cost_config_happy_path():
 
 # ── Test 9: PUT /store-cost-config — invalid body returns 422 ───────────────
 
+
 def test_update_store_cost_config_missing_fields():
     svc = MagicMock()
     client = _make_cost_client(svc)
 
     resp = client.put(
         "/store-cost-config",
-        json={"store_id": STORE_ID},   # missing required fields
+        json={"store_id": STORE_ID},  # missing required fields
         headers=HEADERS,
     )
     assert resp.status_code == 422
 
 
 # ── Test 10: GET /cost/daily — bad date format returns 400 ──────────────────
+
 
 def test_get_daily_cost_bad_date_format():
     svc = MagicMock()
@@ -298,10 +318,13 @@ def test_get_daily_cost_bad_date_format():
 # finance_pl_routes tests
 # ───────────────────────────────────────────────────────────────────────────
 
+
 def _make_pl_client(mock_svc):
     _services_txf_src_services_pls.PLService = lambda: mock_svc
     import importlib
+
     import services.tx_finance.src.api.finance_pl_routes as pl_mod
+
     importlib.reload(pl_mod)
     app = FastAPI()
     app.include_router(pl_mod.router)
@@ -330,6 +353,7 @@ def _fake_brand_pl():
 
 # ── Test 11: GET /pl/store — happy path ─────────────────────────────────────
 
+
 def test_get_store_pl_happy_path():
     svc = MagicMock()
     svc.get_store_pl = AsyncMock(return_value=_fake_store_pl())
@@ -345,6 +369,7 @@ def test_get_store_pl_happy_path():
 
 # ── Test 12: GET /pl/store — start_date > end_date returns 400 ──────────────
 
+
 def test_get_store_pl_date_order_error():
     svc = MagicMock()
     client = _make_pl_client(svc)
@@ -357,6 +382,7 @@ def test_get_store_pl_date_order_error():
 
 
 # ── Test 13: GET /pl/store — date range > 366 days returns 400 ──────────────
+
 
 def test_get_store_pl_range_too_large():
     svc = MagicMock()
@@ -371,6 +397,7 @@ def test_get_store_pl_range_too_large():
 
 # ── Test 14: GET /pl/store — invalid store_id returns 400 ───────────────────
 
+
 def test_get_store_pl_invalid_store_id():
     svc = MagicMock()
     client = _make_pl_client(svc)
@@ -383,6 +410,7 @@ def test_get_store_pl_invalid_store_id():
 
 
 # ── Test 15: GET /pl/brand — happy path ─────────────────────────────────────
+
 
 def test_get_brand_pl_happy_path():
     svc = MagicMock()
@@ -398,6 +426,7 @@ def test_get_brand_pl_happy_path():
 
 
 # ── Test 16: GET /pl/brand — bad month format returns 400 ───────────────────
+
 
 def test_get_brand_pl_bad_month_format():
     svc = MagicMock()

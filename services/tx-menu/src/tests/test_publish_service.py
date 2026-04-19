@@ -1,4 +1,5 @@
 """发布方案纯函数测试 — >=6 个测试用例"""
+
 import os
 import sys
 
@@ -12,6 +13,7 @@ from services.publish_service import (
 )
 
 # ---------- create_publish_plan ----------
+
 
 class TestCreatePublishPlan:
     def test_basic_creation(self):
@@ -52,6 +54,7 @@ class TestCreatePublishPlan:
 
 # ---------- execute_publish ----------
 
+
 class TestExecutePublish:
     def test_basic_execution(self):
         result = execute_publish(
@@ -77,6 +80,7 @@ class TestExecutePublish:
 
 
 # ---------- create_price_adjustment ----------
+
 
 class TestCreatePriceAdjustment:
     def test_time_period_adjustment(self):

@@ -1,4 +1,5 @@
 """菜品三级发布方案 — 纯函数实现（不依赖DB）"""
+
 import asyncio
 import uuid
 from datetime import datetime
@@ -87,11 +88,13 @@ def execute_publish(
         dish_results = []
         for dish in dish_data:
             dish_id = dish.get("dish_id", "unknown")
-            dish_results.append({
-                "dish_id": dish_id,
-                "status": "published",
-                "published_at": datetime.utcnow().isoformat(),
-            })
+            dish_results.append(
+                {
+                    "dish_id": dish_id,
+                    "status": "published",
+                    "published_at": datetime.utcnow().isoformat(),
+                }
+            )
 
         results[store_id] = {
             "store_id": store_id,
@@ -113,14 +116,16 @@ def execute_publish(
 
     if tenant_id and success_count > 0:
         dish_ids = [d.get("dish_id") for d in dish_data if d.get("dish_id")]
-        asyncio.create_task(UniversalPublisher.publish(
-            event_type=MenuEventType.DISH_PUBLISHED,
-            tenant_id=uuid.UUID(tenant_id),
-            store_id=None,
-            entity_id=uuid.UUID(dish_ids[0]) if dish_ids else None,
-            event_data={"dish_ids": dish_ids, "store_ids": list(target_stores), "effective_date": effective_date},
-            source_service="tx-menu",
-        ))
+        asyncio.create_task(
+            UniversalPublisher.publish(
+                event_type=MenuEventType.DISH_PUBLISHED,
+                tenant_id=uuid.UUID(tenant_id),
+                store_id=None,
+                entity_id=uuid.UUID(dish_ids[0]) if dish_ids else None,
+                event_data={"dish_ids": dish_ids, "store_ids": list(target_stores), "effective_date": effective_date},
+                source_service="tx-menu",
+            )
+        )
 
     return execution_result
 
@@ -144,9 +149,7 @@ def create_price_adjustment(
     if not store_id:
         raise ValueError("store_id 不能为空")
     if adjustment_type not in VALID_ADJUSTMENT_TYPES:
-        raise ValueError(
-            f"adjustment_type 必须为 {VALID_ADJUSTMENT_TYPES} 之一，收到: {adjustment_type!r}"
-        )
+        raise ValueError(f"adjustment_type 必须为 {VALID_ADJUSTMENT_TYPES} 之一，收到: {adjustment_type!r}")
     if not rules:
         raise ValueError("rules 不能为空列表")
 
@@ -162,11 +165,13 @@ def create_price_adjustment(
         if not isinstance(modifier, (int, float)):
             raise ValueError(f"rules[{idx}].price_modifier 必须为数值，收到: {type(modifier).__name__}")
 
-        validated_rules.append({
-            "condition": rule["condition"],
-            "price_modifier": int(modifier),
-            **{k: v for k, v in rule.items() if k not in ("condition", "price_modifier")},
-        })
+        validated_rules.append(
+            {
+                "condition": rule["condition"],
+                "price_modifier": int(modifier),
+                **{k: v for k, v in rule.items() if k not in ("condition", "price_modifier")},
+            }
+        )
 
     adjustment_id = str(uuid.uuid4())
     now = datetime.utcnow().isoformat()

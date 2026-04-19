@@ -7,6 +7,7 @@
 - 同比/环比计算
 - 凭证列表查询
 """
+
 import uuid
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
@@ -21,12 +22,14 @@ logger = structlog.get_logger(__name__)
 
 # ─── 数据类 ──────────────────────────────────────────────────────────────────
 
+
 @dataclass
 class PLReport:
     """P&L报表数据结构
 
     金额单位：分（fen）
     """
+
     store_id: uuid.UUID
     start_date: date
     end_date: date
@@ -88,6 +91,7 @@ class PLReport:
 
 
 # ─── PLReportService ─────────────────────────────────────────────────────────
+
 
 class PLReportService:
     """P&L报表服务
@@ -156,9 +160,7 @@ class PLReportService:
             tenant_id=str(tenant_id),
         )
 
-        daily_rows = await self._fetch_period_daily_rows(
-            store_id, start_date, end_date, tenant_id, db
-        )
+        daily_rows = await self._fetch_period_daily_rows(store_id, start_date, end_date, tenant_id, db)
 
         total_revenue = sum(r.get("revenue_fen", 0) for r in daily_rows)
         total_raw_cost = sum(r.get("raw_cost_fen", 0) for r in daily_rows)
@@ -195,14 +197,16 @@ class PLReportService:
         results = []
         for row in rows:
             sid = row["store_id"] if isinstance(row["store_id"], uuid.UUID) else uuid.UUID(str(row["store_id"]))
-            results.append(PLReport(
-                store_id=sid,
-                start_date=biz_date,
-                end_date=biz_date,
-                revenue_fen=int(row.get("revenue_fen", 0)),
-                raw_material_cost_fen=int(row.get("raw_cost_fen", 0)),
-                period_days=1,
-            ))
+            results.append(
+                PLReport(
+                    store_id=sid,
+                    start_date=biz_date,
+                    end_date=biz_date,
+                    revenue_fen=int(row.get("revenue_fen", 0)),
+                    raw_material_cost_fen=int(row.get("raw_cost_fen", 0)),
+                    period_days=1,
+                )
+            )
 
         results.sort(key=lambda r: r.gross_margin_rate, reverse=True)
         return results
@@ -225,17 +229,13 @@ class PLReportService:
           mom = month-over-month（环比：上个自然月）
         """
         # 当期
-        current_rows = await self._fetch_period_daily_rows(
-            store_id, start_date, end_date, tenant_id, db
-        )
+        current_rows = await self._fetch_period_daily_rows(store_id, start_date, end_date, tenant_id, db)
         current_rev = sum(r.get("revenue_fen", 0) for r in current_rows)
         current_cost = sum(r.get("raw_cost_fen", 0) for r in current_rows)
 
         # 对比期
         prior_start, prior_end = self._calc_prior_period(start_date, end_date, comparison)
-        prior_rows = await self._fetch_period_daily_rows(
-            store_id, prior_start, prior_end, tenant_id, db
-        )
+        prior_rows = await self._fetch_period_daily_rows(store_id, prior_start, prior_end, tenant_id, db)
         prior_rev = sum(r.get("revenue_fen", 0) for r in prior_rows)
         prior_cost = sum(r.get("raw_cost_fen", 0) for r in prior_rows)
 
@@ -260,10 +260,8 @@ class PLReportService:
                 "raw_material_cost_fen": prior_cost,
                 "gross_profit_fen": prior_rev - prior_cost,
             },
-            "revenue_yoy_rate" if comparison == "yoy" else "revenue_mom_rate":
-                _safe_rate(current_rev, prior_rev),
-            "cost_yoy_rate" if comparison == "yoy" else "cost_mom_rate":
-                _safe_rate(current_cost, prior_cost),
+            "revenue_yoy_rate" if comparison == "yoy" else "revenue_mom_rate": _safe_rate(current_rev, prior_rev),
+            "cost_yoy_rate" if comparison == "yoy" else "cost_mom_rate": _safe_rate(current_cost, prior_cost),
         }
         return result
 
@@ -296,8 +294,7 @@ class PLReportService:
         end_dt = datetime.combine(biz_date, datetime.max.time()).replace(tzinfo=timezone.utc)
 
         result = await db.execute(
-            select(func.coalesce(func.sum(Order.final_amount_fen), 0))
-            .where(
+            select(func.coalesce(func.sum(Order.final_amount_fen), 0)).where(
                 and_(
                     Order.store_id == store_id,
                     Order.tenant_id == tenant_id,
@@ -355,8 +352,7 @@ class PLReportService:
         from shared.ontology.src.entities import Store
 
         result = await db.execute(
-            select(Store.config)
-            .where(
+            select(Store.config).where(
                 and_(
                     Store.id == store_id,
                     Store.tenant_id == tenant_id,

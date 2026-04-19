@@ -19,6 +19,7 @@
 
 统一响应格式: {"ok": bool, "data": {}, "error": {}}
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -48,6 +49,7 @@ log = structlog.get_logger(__name__)
 
 class EnergyReadingReq(BaseModel):
     """能耗抄表请求（IoT电表/燃气表/水表上报或人工录入）"""
+
     store_id: str = Field(..., description="门店ID")
     meter_id: str = Field(..., description="仪表编号（电表/燃气表/水表）")
     meter_type: str = Field(..., description="仪表类型：electricity/gas/water")
@@ -61,6 +63,7 @@ class EnergyReadingReq(BaseModel):
 
 class EnergyBenchmarkReq(BaseModel):
     """能耗基准线设置"""
+
     store_id: str = Field(..., description="门店ID")
     meter_type: str = Field(..., description="仪表类型：electricity/gas/water")
     daily_limit: float = Field(..., description="日用量上限（kWh / m³）")
@@ -70,6 +73,7 @@ class EnergyBenchmarkReq(BaseModel):
 
 class EnergyBudgetReq(BaseModel):
     """月度能耗预算设置（UPSERT by tenant+store+year+month）"""
+
     store_id: str = Field(..., description="门店ID")
     budget_year: int = Field(..., description="预算年份")
     budget_month: int = Field(..., ge=1, le=12, description="预算月份（1-12）")
@@ -81,6 +85,7 @@ class EnergyBudgetReq(BaseModel):
 
 class EnergyAlertRuleReq(BaseModel):
     """能耗告警规则创建"""
+
     store_id: str = Field(..., description="门店ID")
     rule_name: str = Field(..., max_length=100, description="规则名称")
     metric: str = Field(
@@ -99,8 +104,8 @@ class EnergyAlertRuleReq(BaseModel):
 #  异常检测阈值（简化规则，投影器中有更完整的统计逻辑）
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-_ANOMALY_RATIO_THRESHOLD = 0.15   # 能耗/营收比超过 15% 判定为异常
-_ANOMALY_DELTA_MULTIPLIER = 3.0   # 增量超过基准 3 倍判定为异常
+_ANOMALY_RATIO_THRESHOLD = 0.15  # 能耗/营收比超过 15% 判定为异常
+_ANOMALY_DELTA_MULTIPLIER = 3.0  # 增量超过基准 3 倍判定为异常
 
 _VALID_METRICS = {"electricity_kwh", "gas_m3", "water_ton", "cost_fen", "ratio"}
 _VALID_THRESHOLD_TYPES = {"absolute", "budget_pct", "yoy_pct"}
@@ -137,13 +142,9 @@ async def capture_energy_reading(
 
     # 能耗/营收比
     revenue_fen = req.revenue_fen or 0
-    energy_revenue_ratio = (
-        req.delta_value / (revenue_fen / 100) if revenue_fen > 0 else None
-    )
+    energy_revenue_ratio = req.delta_value / (revenue_fen / 100) if revenue_fen > 0 else None
 
-    is_anomaly = (
-        energy_revenue_ratio is not None and energy_revenue_ratio > _ANOMALY_RATIO_THRESHOLD
-    )
+    is_anomaly = energy_revenue_ratio is not None and energy_revenue_ratio > _ANOMALY_RATIO_THRESHOLD
 
     # 按仪表类型映射到投影器期望的字段名
     _meter_field = {
@@ -157,39 +158,43 @@ async def capture_energy_reading(
         "reading_id": reading_id,
         "meter_id": req.meter_id,
         "meter_type": req.meter_type,
-        energy_field: req.delta_value,       # EnergyEfficiencyProjector 读取此字段
-        "delta_value": req.delta_value,      # 保留原值便于审计
+        energy_field: req.delta_value,  # EnergyEfficiencyProjector 读取此字段
+        "delta_value": req.delta_value,  # 保留原值便于审计
         "unit": req.unit,
-        "cost_fen": 0,                       # IoT 侧暂不传成本，由管理后台录入
+        "cost_fen": 0,  # IoT 侧暂不传成本，由管理后台录入
         "revenue_fen": revenue_fen,
         "energy_revenue_ratio": energy_revenue_ratio,
         "source": req.source,
         "recorded_at": recorded_at.isoformat(),
     }
 
-    asyncio.create_task(emit_event(
-        event_type=EnergyEventType.READING_CAPTURED,
-        tenant_id=x_tenant_id,
-        stream_id=reading_id,
-        payload=payload,
-        store_id=req.store_id,
-        source_service="tx-ops",
-        metadata={"stat_date": stat_date.isoformat(), "meter_type": req.meter_type},
-    ))
-
-    if is_anomaly:
-        asyncio.create_task(emit_event(
-            event_type=EnergyEventType.ANOMALY_DETECTED,
+    asyncio.create_task(
+        emit_event(
+            event_type=EnergyEventType.READING_CAPTURED,
             tenant_id=x_tenant_id,
             stream_id=reading_id,
-            payload={
-                **payload,
-                "anomaly_reason": f"能耗/营收比 {energy_revenue_ratio:.2%} 超过阈值 {_ANOMALY_RATIO_THRESHOLD:.0%}",
-            },
+            payload=payload,
             store_id=req.store_id,
             source_service="tx-ops",
-            metadata={"stat_date": stat_date.isoformat(), "severity": "warning"},
-        ))
+            metadata={"stat_date": stat_date.isoformat(), "meter_type": req.meter_type},
+        )
+    )
+
+    if is_anomaly:
+        asyncio.create_task(
+            emit_event(
+                event_type=EnergyEventType.ANOMALY_DETECTED,
+                tenant_id=x_tenant_id,
+                stream_id=reading_id,
+                payload={
+                    **payload,
+                    "anomaly_reason": f"能耗/营收比 {energy_revenue_ratio:.2%} 超过阈值 {_ANOMALY_RATIO_THRESHOLD:.0%}",
+                },
+                store_id=req.store_id,
+                source_service="tx-ops",
+                metadata={"stat_date": stat_date.isoformat(), "severity": "warning"},
+            )
+        )
 
     log.info(
         "energy_reading_captured",
@@ -228,21 +233,23 @@ async def set_energy_benchmark(
     benchmark_id = str(uuid.uuid4())
     effective_date = req.effective_date or date.today()
 
-    asyncio.create_task(emit_event(
-        event_type=EnergyEventType.BENCHMARK_SET,
-        tenant_id=x_tenant_id,
-        stream_id=benchmark_id,
-        payload={
-            "benchmark_id": benchmark_id,
-            "meter_type": req.meter_type,
-            "daily_limit": req.daily_limit,
-            "revenue_ratio_limit": req.revenue_ratio_limit,
-            "effective_date": effective_date.isoformat(),
-        },
-        store_id=req.store_id,
-        source_service="tx-ops",
-        metadata={"meter_type": req.meter_type},
-    ))
+    asyncio.create_task(
+        emit_event(
+            event_type=EnergyEventType.BENCHMARK_SET,
+            tenant_id=x_tenant_id,
+            stream_id=benchmark_id,
+            payload={
+                "benchmark_id": benchmark_id,
+                "meter_type": req.meter_type,
+                "daily_limit": req.daily_limit,
+                "revenue_ratio_limit": req.revenue_ratio_limit,
+                "effective_date": effective_date.isoformat(),
+            },
+            store_id=req.store_id,
+            source_service="tx-ops",
+            metadata={"meter_type": req.meter_type},
+        )
+    )
 
     log.info(
         "energy_benchmark_set",
@@ -296,10 +303,7 @@ async def get_energy_snapshot(
 
         ratio = float(data.get("energy_revenue_ratio") or 0)
         data["efficiency_level"] = (
-            "优秀" if ratio <= 0.05 else
-            "良好" if ratio <= 0.08 else
-            "警告" if ratio <= 0.12 else
-            "超标"
+            "优秀" if ratio <= 0.05 else "良好" if ratio <= 0.08 else "警告" if ratio <= 0.12 else "超标"
         )
         return {"ok": True, "data": data}
 
@@ -450,18 +454,20 @@ async def set_energy_budget(
         log.error("energy_budget_set_error", error=str(exc))
         raise HTTPException(status_code=500, detail="保存能耗预算失败") from exc
 
-    asyncio.create_task(emit_event(
-        event_type=EnergyEventType.BUDGET_SET,
-        tenant_id=x_tenant_id,
-        stream_id=budget_id,
-        payload=budget_record,
-        store_id=req.store_id,
-        source_service="tx-ops",
-        metadata={
-            "budget_year": req.budget_year,
-            "budget_month": req.budget_month,
-        },
-    ))
+    asyncio.create_task(
+        emit_event(
+            event_type=EnergyEventType.BUDGET_SET,
+            tenant_id=x_tenant_id,
+            stream_id=budget_id,
+            payload=budget_record,
+            store_id=req.store_id,
+            source_service="tx-ops",
+            metadata={
+                "budget_year": req.budget_year,
+                "budget_month": req.budget_month,
+            },
+        )
+    )
 
     log.info(
         "energy_budget_set",
@@ -611,15 +617,17 @@ async def create_energy_alert_rule(
         log.error("energy_alert_rule_create_error", error=str(exc))
         raise HTTPException(status_code=500, detail="创建告警规则失败") from exc
 
-    asyncio.create_task(emit_event(
-        event_type=EnergyEventType.ALERT_RULE_CREATED,
-        tenant_id=x_tenant_id,
-        stream_id=rule_id,
-        payload=rule_record,
-        store_id=req.store_id,
-        source_service="tx-ops",
-        metadata={"metric": req.metric, "severity": req.severity},
-    ))
+    asyncio.create_task(
+        emit_event(
+            event_type=EnergyEventType.ALERT_RULE_CREATED,
+            tenant_id=x_tenant_id,
+            stream_id=rule_id,
+            payload=rule_record,
+            store_id=req.store_id,
+            source_service="tx-ops",
+            metadata={"metric": req.metric, "severity": req.severity},
+        )
+    )
 
     log.info(
         "energy_alert_rule_created",

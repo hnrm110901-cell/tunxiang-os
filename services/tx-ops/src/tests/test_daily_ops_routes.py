@@ -15,6 +15,7 @@
   - daily_ops.py 内联 import services，patch 对应函数
   - 无真实 DB（daily_ops.py 不使用 get_db）
 """
+
 from __future__ import annotations
 
 import sys
@@ -46,8 +47,10 @@ _ensure_stub("shared.ontology")
 _ensure_stub("shared.ontology.src")
 _db_mod = _ensure_stub("shared.ontology.src.database")
 if not hasattr(_db_mod, "get_db"):
+
     async def _placeholder_get_db():  # pragma: no cover
         yield None
+
     _db_mod.get_db = _placeholder_get_db
 
 # structlog 存根
@@ -63,15 +66,9 @@ _daily_svc = _ensure_stub("src.services.daily_ops_service")
 _daily_svc.compute_flow_progress = MagicMock(
     return_value={"completed": 0, "total": 8, "percentage": 0, "status": "not_started", "current_node": "E1"}
 )
-_daily_svc.get_flow_timeline = MagicMock(
-    return_value=[{"node": f"E{i}", "status": "pending"} for i in range(1, 9)]
-)
-_daily_svc.get_node_definition = MagicMock(
-    return_value={"name": "开店准备", "check_items": []}
-)
-_daily_svc.compute_node_check_result = MagicMock(
-    return_value={"passed": True, "score": 100}
-)
+_daily_svc.get_flow_timeline = MagicMock(return_value=[{"node": f"E{i}", "status": "pending"} for i in range(1, 9)])
+_daily_svc.get_node_definition = MagicMock(return_value={"name": "开店准备", "check_items": []})
+_daily_svc.compute_node_check_result = MagicMock(return_value={"passed": True, "score": 100})
 
 # ── 导入路由 ────────────────────────────────────────────────────────────────────
 from ..api.daily_ops import router as daily_ops_router  # noqa: E402
@@ -95,11 +92,13 @@ class TestGetDailyFlow:
 
     def test_get_daily_flow_success(self):
         """正常返回当日流程状态。"""
-        with patch("src.services.daily_ops_service.compute_flow_progress",
-                   return_value={"completed": 3, "total": 8, "status": "in_progress", "current_node": "E4"}
-                   ) as mock_progress, \
-             patch("src.services.daily_ops_service.get_flow_timeline",
-                   return_value=[]) as mock_timeline:
+        with (
+            patch(
+                "src.services.daily_ops_service.compute_flow_progress",
+                return_value={"completed": 3, "total": 8, "status": "in_progress", "current_node": "E4"},
+            ) as mock_progress,
+            patch("src.services.daily_ops_service.get_flow_timeline", return_value=[]) as mock_timeline,
+        ):
             resp = client.get(f"/api/v1/ops/daily/{STORE}")
         assert resp.status_code == 200
         body = resp.json()
@@ -134,8 +133,10 @@ class TestStartNode:
 
     def test_start_node_success(self):
         """已知节点 E1，正常返回 in_progress 状态。"""
-        with patch("src.services.daily_ops_service.get_node_definition",
-                   return_value={"name": "开店准备", "check_items": [{"id": "c1", "label": "检查"}]}):
+        with patch(
+            "src.services.daily_ops_service.get_node_definition",
+            return_value={"name": "开店准备", "check_items": [{"id": "c1", "label": "检查"}]},
+        ):
             resp = client.post(f"/api/v1/ops/daily/{STORE}/nodes/E1/start")
         assert resp.status_code == 200
         body = resp.json()
@@ -154,8 +155,9 @@ class TestStartNode:
 
     def test_start_node_with_operator_id(self):
         """带 operator_id 参数仍正常返回。"""
-        with patch("src.services.daily_ops_service.get_node_definition",
-                   return_value={"name": "营业巡航", "check_items": []}):
+        with patch(
+            "src.services.daily_ops_service.get_node_definition", return_value={"name": "营业巡航", "check_items": []}
+        ):
             resp = client.post(f"/api/v1/ops/daily/{STORE}/nodes/E2/start?operator_id=op-001")
         assert resp.status_code == 200
         assert resp.json()["ok"] is True
@@ -172,8 +174,9 @@ class TestCompleteNode:
     def test_complete_node_success(self):
         """提交检查结果，返回 completed 状态及 check_result。"""
         payload = [{"item_id": "c1", "passed": True}]
-        with patch("src.services.daily_ops_service.compute_node_check_result",
-                   return_value={"passed": True, "score": 100}):
+        with patch(
+            "src.services.daily_ops_service.compute_node_check_result", return_value={"passed": True, "score": 100}
+        ):
             resp = client.post(
                 f"/api/v1/ops/daily/{STORE}/nodes/E1/complete",
                 json=payload,
@@ -186,8 +189,9 @@ class TestCompleteNode:
 
     def test_complete_node_empty_results(self):
         """空检查结果列表仍可提交成功。"""
-        with patch("src.services.daily_ops_service.compute_node_check_result",
-                   return_value={"passed": False, "score": 0}):
+        with patch(
+            "src.services.daily_ops_service.compute_node_check_result", return_value={"passed": False, "score": 0}
+        ):
             resp = client.post(f"/api/v1/ops/daily/{STORE}/nodes/E3/complete", json=[])
         assert resp.status_code == 200
         assert resp.json()["ok"] is True

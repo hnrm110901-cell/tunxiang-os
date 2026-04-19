@@ -5,6 +5,7 @@
 
 统一响应格式: {"ok": bool, "data": {}, "error": {}}
 """
+
 from __future__ import annotations
 
 from datetime import datetime, timezone
@@ -289,8 +290,13 @@ async def take_action(
             },
         )
 
-        log.info("approval_action_taken", id=approval_id, action=body.action,
-                 approver_id=body.approver_id, tenant_id=x_tenant_id)
+        log.info(
+            "approval_action_taken",
+            id=approval_id,
+            action=body.action,
+            approver_id=body.approver_id,
+            tenant_id=x_tenant_id,
+        )
 
         return {
             "ok": True,
@@ -352,9 +358,7 @@ async def batch_action(
                 continue
 
             await db.execute(
-                text(
-                    "UPDATE approval_instances SET status = :status, updated_at = :now WHERE id = :id"
-                ),
+                text("UPDATE approval_instances SET status = :status, updated_at = :now WHERE id = :id"),
                 {"status": new_status, "now": now, "id": aid},
             )
             await db.execute(

@@ -28,6 +28,7 @@
 统一响应格式: {"ok": bool, "data": {}, "error": {}}
 所有接口需 X-Tenant-ID header。
 """
+
 from datetime import date, datetime, time
 from typing import Optional
 
@@ -48,8 +49,8 @@ router = APIRouter(prefix="/api/v1/menu", tags=["brand-publish"])
 # ─── 依赖注入占位（由 main.py 的 app.dependency_overrides 注入）───
 
 
-
 # ─── 辅助 ───
+
 
 def _err(status: int, msg: str):
     raise HTTPException(
@@ -154,18 +155,14 @@ class CreatePublishPlanReq(BaseModel):
         pattern="^(all_stores|region|stores)$",
         description="all_stores | region | stores",
     )
-    target_ids: Optional[list[str]] = Field(
-        None, description="区域名列表（region）或门店 ID 列表（stores）"
-    )
+    target_ids: Optional[list[str]] = Field(None, description="区域名列表（region）或门店 ID 列表（stores）")
     brand_id: Optional[str] = None
     created_by: Optional[str] = None
 
 
 class PlanItemReq(BaseModel):
     dish_id: str
-    override_price_fen: Optional[int] = Field(
-        None, ge=0, description="可选覆盖价（分），NULL=使用品牌标准价"
-    )
+    override_price_fen: Optional[int] = Field(None, ge=0, description="可选覆盖价（分），NULL=使用品牌标准价")
     is_available: bool = True
 
 
@@ -203,9 +200,7 @@ async def list_publish_plans(
     db: AsyncSession = Depends(get_db),
 ):
     """列出发布方案（支持按 brand_id / status 筛选）。"""
-    result = await _svc(db, x_tenant_id).list_publish_plans(
-        page=page, size=size, brand_id=brand_id, status=status
-    )
+    result = await _svc(db, x_tenant_id).list_publish_plans(page=page, size=size, brand_id=brand_id, status=status)
     return {"ok": True, "data": result}
 
 
@@ -265,9 +260,7 @@ async def execute_publish_plan(
 
 
 class StoreDishOverrideReq(BaseModel):
-    local_price_fen: Optional[int] = Field(
-        None, ge=0, description="门店售价（分），NULL=使用品牌/方案价"
-    )
+    local_price_fen: Optional[int] = Field(None, ge=0, description="门店售价（分），NULL=使用品牌/方案价")
     local_name: Optional[str] = Field(None, max_length=200)
     local_description: Optional[str] = None
     local_image_url: Optional[str] = Field(None, max_length=500)
@@ -360,15 +353,9 @@ class CreatePriceRuleReq(BaseModel):
     time_end: Optional[time] = Field(None, description="时段结束（HH:MM）")
     date_start: Optional[date] = None
     date_end: Optional[date] = None
-    weekdays: Optional[list[int]] = Field(
-        None, description="生效星期 [1-7]，1=周一，7=周日"
-    )
-    adjustment_type: str = Field(
-        ..., pattern="^(percentage|fixed_add|fixed_price)$"
-    )
-    adjustment_value: float = Field(
-        ..., description="百分比（10=+10%）/ 固定加减金额（分）/ 固定价格（分）"
-    )
+    weekdays: Optional[list[int]] = Field(None, description="生效星期 [1-7]，1=周一，7=周日")
+    adjustment_type: str = Field(..., pattern="^(percentage|fixed_add|fixed_price)$")
+    adjustment_value: float = Field(..., description="百分比（10=+10%）/ 固定加减金额（分）/ 固定价格（分）")
     priority: int = Field(0, ge=0, description="优先级，值越大越先命中")
     is_active: bool = True
 
@@ -421,9 +408,7 @@ async def list_price_rules(
     db: AsyncSession = Depends(get_db),
 ):
     """列出调价规则（?store_id=xxx 可过滤门店+品牌级规则）。"""
-    rules = await _svc(db, x_tenant_id).list_price_rules(
-        store_id=store_id, is_active=is_active
-    )
+    rules = await _svc(db, x_tenant_id).list_price_rules(store_id=store_id, is_active=is_active)
     return {"ok": True, "data": {"rules": rules, "total": len(rules)}}
 
 
@@ -452,9 +437,7 @@ async def bind_dishes_to_rule(
 ):
     """将菜品绑定到调价规则（支持批量）。"""
     try:
-        result = await _svc(db, x_tenant_id).bind_dishes_to_rule(
-            rule_id=rule_id, dish_ids=req.dish_ids
-        )
+        result = await _svc(db, x_tenant_id).bind_dishes_to_rule(rule_id=rule_id, dish_ids=req.dish_ids)
         return {"ok": True, "data": {"rule_id": rule_id, "bindings": result, "count": len(result)}}
     except ValueError as exc:
         _err(400, str(exc))

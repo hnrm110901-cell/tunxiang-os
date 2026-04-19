@@ -1,4 +1,5 @@
 """分账通道通知 — HMAC 验签单元测试（不依赖 DB）。"""
+
 import hashlib
 import hmac
 import os

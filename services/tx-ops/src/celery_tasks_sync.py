@@ -21,12 +21,12 @@ Celery Beat Schedule 示例（在 celeryconfig.py 或 app.conf.beat_schedule 中
   - 任务异常捕获具体类型，禁止 except Exception 作为唯一兜底
   - 任务结果写入 operation_logs（由 MultiSystemSyncService 内部处理）
 """
+
 from __future__ import annotations
 
 import asyncio
-import logging
 import os
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 import structlog
 
@@ -55,7 +55,7 @@ try:
         timezone="Asia/Shanghai",
         enable_utc=True,
         task_track_started=True,
-        task_acks_late=True,           # 任务完成后再 ack，防止意外丢失
+        task_acks_late=True,  # 任务完成后再 ack，防止意外丢失
         worker_prefetch_multiplier=1,  # 防止大任务积压
     )
 
@@ -68,12 +68,12 @@ try:
         },
         "sync-aoqiwei-members-hourly": {
             "task": "sync.aoqiwei_members_hourly",
-            "schedule": crontab(minute=0),     # 每小时整点
+            "schedule": crontab(minute=0),  # 每小时整点
             "options": {"expires": 55 * 60},
         },
         "sync-aoqiwei-inventory-hourly": {
             "task": "sync.aoqiwei_inventory_hourly",
-            "schedule": crontab(minute=5),     # 每小时05分（错开CRM任务）
+            "schedule": crontab(minute=5),  # 每小时05分（错开CRM任务）
             "options": {"expires": 55 * 60},
         },
         "sync-yiding-reservations-5min": {
@@ -115,6 +115,7 @@ def _get_engine():
 
 def _get_sync_service():
     from .services.multi_system_sync_service import MultiSystemSyncService
+
     return MultiSystemSyncService(_get_engine())
 
 
@@ -156,11 +157,13 @@ async def _fetch_sync_enabled_stores() -> List[Dict[str, Any]]:
                         systems = _json.loads(row.sync_systems_json)
                     except (ValueError, TypeError):
                         systems = None
-                result.append({
-                    "tenant_id": str(row.tenant_id),
-                    "store_id": str(row.store_id),
-                    "systems": systems,
-                })
+                result.append(
+                    {
+                        "tenant_id": str(row.tenant_id),
+                        "store_id": str(row.store_id),
+                        "systems": systems,
+                    }
+                )
             return result
     except Exception as exc:  # noqa: BLE001  # 查询失败时返回空列表，任务自然退出
         logger.error("fetch_sync_enabled_stores_failed", error=str(exc), exc_info=True)
@@ -178,14 +181,15 @@ if _CELERY_AVAILABLE:
         bind=True,
         max_retries=2,
         default_retry_delay=60,
-        soft_time_limit=600,   # 10分钟软超时
-        time_limit=720,        # 12分钟硬超时
+        soft_time_limit=600,  # 10分钟软超时
+        time_limit=720,  # 12分钟硬超时
     )
     def sync_pinzhi_orders_task(self) -> Dict[str, Any]:
         """每15分钟同步品智订单
 
         遍历所有 sync_enabled=True 且包含 'pinzhi' 的租户门店。
         """
+
         async def _run():
             stores = await _fetch_sync_enabled_stores()
             svc = _get_sync_service()

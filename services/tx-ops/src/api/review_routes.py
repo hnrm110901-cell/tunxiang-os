@@ -2,6 +2,7 @@
 
 10 个端点覆盖周/月复盘、问题追踪、知识库。
 """
+
 from __future__ import annotations
 
 from datetime import date
@@ -12,6 +13,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
+
 from ..services import (
     issue_tracker,
     knowledge_base,

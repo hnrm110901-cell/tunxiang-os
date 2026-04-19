@@ -12,6 +12,7 @@
 
 统一响应格式: {"ok": bool, "data": {}, "error": {}}
 """
+
 from __future__ import annotations
 
 from datetime import datetime, timezone
@@ -117,6 +118,7 @@ def _build_degraded_integration(intg_id: str) -> Dict[str, Any]:
 #  DB 查询助手
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 async def _fetch_integration_stats(
     db: AsyncSession,
     tenant_id: str,
@@ -158,9 +160,7 @@ async def _fetch_integration_stats(
             """),
             {
                 "tenant_id": tenant_id,
-                "source_service": _ADAPTER_META.get(
-                    f"intg-{channel}", {}
-                ).get("source_service", "tx-trade"),
+                "source_service": _ADAPTER_META.get(f"intg-{channel}", {}).get("source_service", "tx-trade"),
                 "channel": channel,
             },
         )
@@ -236,20 +236,22 @@ async def get_integrations_health(
         error_count = stats["error_count_24h"] or 0
         derived_status = _derive_status(error_count, stats["uptime_pct"])
 
-        integrations.append({
-            "id": intg_id,
-            "name": meta["name"],
-            "type": meta["type"],
-            "icon": meta["icon"],
-            "status": derived_status,
-            "uptime_pct": stats["uptime_pct"],
-            "latency_ms": stats["latency_ms"],
-            "last_sync_at": stats["last_sync_at"],
-            "sync_interval_seconds": meta["sync_interval_seconds"],
-            "error_count_24h": error_count,
-            "warning_count_24h": stats["warning_count_24h"] or 0,
-            "orders_synced_today": stats["orders_synced_today"],
-        })
+        integrations.append(
+            {
+                "id": intg_id,
+                "name": meta["name"],
+                "type": meta["type"],
+                "icon": meta["icon"],
+                "status": derived_status,
+                "uptime_pct": stats["uptime_pct"],
+                "latency_ms": stats["latency_ms"],
+                "last_sync_at": stats["last_sync_at"],
+                "sync_interval_seconds": meta["sync_interval_seconds"],
+                "error_count_24h": error_count,
+                "warning_count_24h": stats["warning_count_24h"] or 0,
+                "orders_synced_today": stats["orders_synced_today"],
+            }
+        )
 
     status_counts: Dict[str, int] = {}
     for intg in integrations:

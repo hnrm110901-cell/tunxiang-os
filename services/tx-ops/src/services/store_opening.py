@@ -2,6 +2,7 @@
 
 从 check_item_templates 加载模板，结合 workflow_engine 状态机。
 """
+
 from __future__ import annotations
 
 import uuid
@@ -17,22 +18,22 @@ log = structlog.get_logger(__name__)
 # ─── 开店检查项分类 ───
 
 OPENING_CATEGORIES = [
-    "hygiene",       # 卫生检查
-    "equipment",     # 设备开机
-    "ingredient",    # 食材验收
-    "stockout",      # 沽清确认
-    "staff",         # 人员到岗
-    "table",         # 桌台就绪
+    "hygiene",  # 卫生检查
+    "equipment",  # 设备开机
+    "ingredient",  # 食材验收
+    "stockout",  # 沽清确认
+    "staff",  # 人员到岗
+    "table",  # 桌台就绪
 ]
 
 # 模板项到分类的映射（关键词匹配）
 _CATEGORY_KEYWORDS: Dict[str, List[str]] = {
-    "hygiene":    ["卫生", "清洁", "仪容", "布置", "整洁", "灯光空调"],
-    "equipment":  ["POS", "KDS", "打印机", "开机", "设备", "点餐机", "灯箱"],
+    "hygiene": ["卫生", "清洁", "仪容", "布置", "整洁", "灯光空调"],
+    "equipment": ["POS", "KDS", "打印机", "开机", "设备", "点餐机", "灯箱"],
     "ingredient": ["食材", "到货", "签收", "温度", "冰鲜", "冷藏", "海鲜池水温"],
-    "stockout":   ["沽清", "补货", "备料", "库存"],
-    "staff":      ["服务员", "人员", "仪容仪表", "晨会"],
-    "table":      ["桌椅", "台面", "包间", "座位", "桌台", "预订"],
+    "stockout": ["沽清", "补货", "备料", "库存"],
+    "staff": ["服务员", "人员", "仪容仪表", "晨会"],
+    "table": ["桌椅", "台面", "包间", "座位", "桌台", "预订"],
 }
 
 
@@ -79,18 +80,20 @@ async def create_opening_checklist(
     checklist_id = f"chk_{store_id}_{date_.isoformat()}_{uuid.uuid4().hex[:8]}"
     items = []
     for idx, tpl_item in enumerate(node_def.get("check_items", [])):
-        items.append({
-            "item_id": f"{checklist_id}_item_{idx:03d}",
-            "seq": idx,
-            "text": tpl_item["item"],
-            "required": tpl_item.get("required", False),
-            "category": _classify_item(tpl_item["item"]),
-            "status": "pending",      # pending / checked / skipped
-            "result": None,           # pass / fail / na
-            "checked_by": None,
-            "checked_at": None,
-            "note": None,
-        })
+        items.append(
+            {
+                "item_id": f"{checklist_id}_item_{idx:03d}",
+                "seq": idx,
+                "text": tpl_item["item"],
+                "required": tpl_item.get("required", False),
+                "category": _classify_item(tpl_item["item"]),
+                "status": "pending",  # pending / checked / skipped
+                "result": None,  # pass / fail / na
+                "checked_by": None,
+                "checked_at": None,
+                "note": None,
+            }
+        )
 
     checklist = {
         "checklist_id": checklist_id,
@@ -269,8 +272,7 @@ async def approve_opening(
     if not status["can_open"]:
         blocked = status["blocked"]
         raise ValueError(
-            f"Cannot approve opening: {blocked} required item(s) blocked. "
-            f"Checked {status['checked']}/{status['total']}"
+            f"Cannot approve opening: {blocked} required item(s) blocked. Checked {status['checked']}/{status['total']}"
         )
 
     approved_at = datetime.utcnow().isoformat()

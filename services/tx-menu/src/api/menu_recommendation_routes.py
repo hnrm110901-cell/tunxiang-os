@@ -14,6 +14,7 @@ AI排菜决策因子:
   4. 销售数据驱动 — 基于近7/30天销量趋势调整上架/下架
   5. 客群匹配     — 门店客群画像匹配菜品定位
 """
+
 from __future__ import annotations
 
 from datetime import datetime
@@ -32,6 +33,7 @@ router = APIRouter(prefix="/api/v1/menu/recommendation", tags=["menu-recommendat
 
 # ─── 鉴权依赖 ────────────────────────────────────────────────
 
+
 async def get_current_user(x_user_id: str = Header(..., alias="X-User-ID")) -> UUID:
     """从请求头提取当前用户，写操作必须鉴权。"""
     try:
@@ -42,28 +44,32 @@ async def get_current_user(x_user_id: str = Header(..., alias="X-User-ID")) -> U
 
 # ─── Enums ────────────────────────────────────────────────────────────────────
 
+
 class DishQuadrant(str, Enum):
     """菜品四象限分类"""
-    STAR = "star"           # 明星：高销量+高毛利
-    CASH_COW = "cash_cow"   # 金牛：低销量+高毛利
-    QUESTION = "question"   # 问题：高销量+低毛利
-    DOG = "dog"             # 瘦狗：低销量+低毛利
+
+    STAR = "star"  # 明星：高销量+高毛利
+    CASH_COW = "cash_cow"  # 金牛：低销量+高毛利
+    QUESTION = "question"  # 问题：高销量+低毛利
+    DOG = "dog"  # 瘦狗：低销量+低毛利
 
 
 class RecommendationAction(str, Enum):
     """推荐动作"""
-    KEEP = "keep"               # 保持不变
-    PROMOTE = "promote"         # 提升推荐位
-    DEMOTE = "demote"           # 降低排序
-    ADD = "add"                 # 新增上架
-    REMOVE = "remove"           # 建议下架
-    PRICE_UP = "price_up"       # 建议涨价
-    PRICE_DOWN = "price_down"   # 建议降价
-    COMBO = "combo"             # 建议组合套餐
+
+    KEEP = "keep"  # 保持不变
+    PROMOTE = "promote"  # 提升推荐位
+    DEMOTE = "demote"  # 降低排序
+    ADD = "add"  # 新增上架
+    REMOVE = "remove"  # 建议下架
+    PRICE_UP = "price_up"  # 建议涨价
+    PRICE_DOWN = "price_down"  # 建议降价
+    COMBO = "combo"  # 建议组合套餐
 
 
 class SeasonalTag(str, Enum):
     """季节标签"""
+
     SPRING = "spring"
     SUMMER = "summer"
     AUTUMN = "autumn"
@@ -75,8 +81,10 @@ class SeasonalTag(str, Enum):
 
 # ─── Models ────────────────────────────────────────────────────────────────────
 
+
 class DishRecommendation(BaseModel):
     """单个菜品推荐"""
+
     dish_id: str
     dish_name: str
     category: str
@@ -98,20 +106,19 @@ class DishRecommendation(BaseModel):
 
 class GenerateRequest(BaseModel):
     """排菜推荐请求"""
+
     store_id: str
-    target_date: Optional[str] = None       # 目标日期，默认明天
-    meal_period: Optional[str] = None       # lunch/dinner/all
+    target_date: Optional[str] = None  # 目标日期，默认明天
+    meal_period: Optional[str] = None  # lunch/dinner/all
     max_dishes: int = Field(default=80, ge=10, le=200)
-    optimization_goal: str = Field(
-        default="balanced",
-        description="balanced|margin|turnover|inventory"
-    )
+    optimization_goal: str = Field(default="balanced", description="balanced|margin|turnover|inventory")
     exclude_categories: list[str] = Field(default_factory=list)
     budget_constraint_fen: Optional[int] = None
 
 
 class RecommendationSummary(BaseModel):
     """方案摘要"""
+
     total_dishes: int
     keep_count: int
     promote_count: int
@@ -127,6 +134,7 @@ class RecommendationSummary(BaseModel):
 
 class RecommendationPlan(BaseModel):
     """推荐方案"""
+
     plan_id: str
     store_id: str
     generated_at: str
@@ -139,17 +147,16 @@ class RecommendationPlan(BaseModel):
 
 class ApplyRequest(BaseModel):
     """应用方案请求"""
+
     plan_id: str
     store_id: str
-    apply_actions: list[str] = Field(
-        default_factory=list,
-        description="要应用的dish_id列表，为空则全部应用"
-    )
+    apply_actions: list[str] = Field(default_factory=list, description="要应用的dish_id列表，为空则全部应用")
     effective_at: Optional[str] = None
 
 
 class HistoryItem(BaseModel):
     """历史推荐记录"""
+
     plan_id: str
     store_id: str
     generated_at: str
@@ -163,63 +170,101 @@ class HistoryItem(BaseModel):
 
 # ─── Mock Data ──────────────────────────────────────────────────────────────────
 
+
 def _mock_recommendation(store_id: str, goal: str) -> RecommendationPlan:
     """生成 mock 推荐方案（真实逻辑需接入 tx-brain/Claude API）"""
     import uuid
+
     now = datetime.now()
     plan_id = f"plan_{uuid.uuid4().hex[:8]}"
 
     dishes = [
         DishRecommendation(
-            dish_id="dish_001", dish_name="剁椒鱼头",
-            category="招牌菜", current_price_fen=12800,
-            quadrant=DishQuadrant.STAR, action=RecommendationAction.KEEP,
-            confidence=0.92, reasoning="销量稳定增长，毛利率68%，保持当前排序",
+            dish_id="dish_001",
+            dish_name="剁椒鱼头",
+            category="招牌菜",
+            current_price_fen=12800,
+            quadrant=DishQuadrant.STAR,
+            action=RecommendationAction.KEEP,
+            confidence=0.92,
+            reasoning="销量稳定增长，毛利率68%，保持当前排序",
             factors=["高销量", "高毛利", "食材充足"],
-            sales_7d=156, sales_30d=623, gross_margin_pct=0.68,
+            sales_7d=156,
+            sales_30d=623,
+            gross_margin_pct=0.68,
         ),
         DishRecommendation(
-            dish_id="dish_002", dish_name="酸菜鱼",
-            category="热门菜", current_price_fen=6800,
-            quadrant=DishQuadrant.QUESTION, action=RecommendationAction.PRICE_UP,
-            confidence=0.78, reasoning="销量高但毛利仅38%，建议调价至¥78",
+            dish_id="dish_002",
+            dish_name="酸菜鱼",
+            category="热门菜",
+            current_price_fen=6800,
+            quadrant=DishQuadrant.QUESTION,
+            action=RecommendationAction.PRICE_UP,
+            confidence=0.78,
+            reasoning="销量高但毛利仅38%，建议调价至¥78",
             suggested_price_fen=7800,
             factors=["高销量", "低毛利", "鱼价上涨"],
-            sales_7d=189, sales_30d=812, gross_margin_pct=0.38,
+            sales_7d=189,
+            sales_30d=812,
+            gross_margin_pct=0.38,
         ),
         DishRecommendation(
-            dish_id="dish_003", dish_name="松茸汽锅鸡",
-            category="汤品", current_price_fen=16800,
-            quadrant=DishQuadrant.CASH_COW, action=RecommendationAction.PROMOTE,
-            confidence=0.85, reasoning="毛利75%但销量偏低，建议提升推荐位+首页展示",
+            dish_id="dish_003",
+            dish_name="松茸汽锅鸡",
+            category="汤品",
+            current_price_fen=16800,
+            quadrant=DishQuadrant.CASH_COW,
+            action=RecommendationAction.PROMOTE,
+            confidence=0.85,
+            reasoning="毛利75%但销量偏低，建议提升推荐位+首页展示",
             factors=["高毛利", "低销量", "季节应季"],
-            sales_7d=23, sales_30d=89, gross_margin_pct=0.75,
+            sales_7d=23,
+            sales_30d=89,
+            gross_margin_pct=0.75,
             inventory_days=5.2,
         ),
         DishRecommendation(
-            dish_id="dish_004", dish_name="清炒时蔬",
-            category="蔬菜", current_price_fen=2800,
-            quadrant=DishQuadrant.DOG, action=RecommendationAction.REMOVE,
-            confidence=0.71, reasoning="连续30天日均销量<3，替换为'有机菜心'",
+            dish_id="dish_004",
+            dish_name="清炒时蔬",
+            category="蔬菜",
+            current_price_fen=2800,
+            quadrant=DishQuadrant.DOG,
+            action=RecommendationAction.REMOVE,
+            confidence=0.71,
+            reasoning="连续30天日均销量<3，替换为'有机菜心'",
             factors=["极低销量", "低毛利", "可替换"],
-            sales_7d=5, sales_30d=18, gross_margin_pct=0.42,
+            sales_7d=5,
+            sales_30d=18,
+            gross_margin_pct=0.42,
         ),
         DishRecommendation(
-            dish_id="dish_005", dish_name="小龙虾拌面",
-            category="面食", current_price_fen=4800,
-            quadrant=DishQuadrant.STAR, action=RecommendationAction.COMBO,
-            confidence=0.88, reasoning="与'冰粉'关联购买率62%，建议组合套餐",
+            dish_id="dish_005",
+            dish_name="小龙虾拌面",
+            category="面食",
+            current_price_fen=4800,
+            quadrant=DishQuadrant.STAR,
+            action=RecommendationAction.COMBO,
+            confidence=0.88,
+            reasoning="与'冰粉'关联购买率62%，建议组合套餐",
             factors=["高关联度", "夏季热销", "套餐提升客单价"],
-            sales_7d=134, sales_30d=520, gross_margin_pct=0.55,
+            sales_7d=134,
+            sales_30d=520,
+            gross_margin_pct=0.55,
             combo_with=["dish_010"],
         ),
         DishRecommendation(
-            dish_id="dish_006", dish_name="香煎三文鱼",
-            category="海鲜", current_price_fen=8800,
-            quadrant=DishQuadrant.CASH_COW, action=RecommendationAction.ADD,
-            confidence=0.82, reasoning="新品上市，预测毛利72%，建议周末限定上架",
+            dish_id="dish_006",
+            dish_name="香煎三文鱼",
+            category="海鲜",
+            current_price_fen=8800,
+            quadrant=DishQuadrant.CASH_COW,
+            action=RecommendationAction.ADD,
+            confidence=0.82,
+            reasoning="新品上市，预测毛利72%，建议周末限定上架",
             factors=["高毛利预测", "新品试销", "食材新鲜到货"],
-            sales_7d=0, sales_30d=0, gross_margin_pct=0.72,
+            sales_7d=0,
+            sales_30d=0,
+            gross_margin_pct=0.72,
             inventory_days=2.0,
         ),
     ]
@@ -282,6 +327,7 @@ _MOCK_HISTORY: list[HistoryItem] = [
 
 
 # ─── Routes ──────────────────────────────────────────────────────────────────
+
 
 @router.post("/generate")
 async def generate_recommendation(

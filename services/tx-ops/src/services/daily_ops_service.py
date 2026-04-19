@@ -131,6 +131,7 @@ NODE_DEFINITIONS = {
 
 # ─── 纯函数 ───
 
+
 def get_node_definition(node_code: str) -> dict:
     """获取节点定义"""
     return NODE_DEFINITIONS.get(node_code, {})
@@ -191,15 +192,15 @@ def get_flow_timeline(node_statuses: dict[str, str]) -> list[dict]:
     for code in ["E1", "E2", "E3", "E4", "E5", "E6", "E7", "E8"]:
         defn = NODE_DEFINITIONS.get(code, {})
         status = node_statuses.get(code, "pending")
-        timeline.append({
-            "code": code,
-            "name": defn.get("name", code),
-            "status": status,
-            "check_count": len(defn.get("check_items", [])),
-            "estimated_minutes": defn.get("estimated_minutes", 0),
-            "is_current": status in ("pending", "in_progress") and all(
-                node_statuses.get(f"E{i}") in ("completed", "skipped")
-                for i in range(1, int(code[1]))
-            ),
-        })
+        timeline.append(
+            {
+                "code": code,
+                "name": defn.get("name", code),
+                "status": status,
+                "check_count": len(defn.get("check_items", [])),
+                "estimated_minutes": defn.get("estimated_minutes", 0),
+                "is_current": status in ("pending", "in_progress")
+                and all(node_statuses.get(f"E{i}") in ("completed", "skipped") for i in range(1, int(code[1]))),
+            }
+        )
     return timeline

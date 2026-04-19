@@ -17,6 +17,7 @@ tx-org 集成服务
   TX_ORG_URL: tx-org 服务地址，默认 http://tx-org:8012
   INTERNAL_SERVICE_KEY: 服务间认证密钥
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -34,8 +35,8 @@ TX_ORG_URL = os.environ.get("TX_ORG_URL", "http://tx-org:8012")
 INTERNAL_SERVICE_KEY = os.environ.get("INTERNAL_SERVICE_KEY", "")
 
 # 缓存 TTL（秒）
-_TTL_EMPLOYEE = 300    # 5 分钟
-_TTL_STORE = 600       # 10 分钟
+_TTL_EMPLOYEE = 300  # 5 分钟
+_TTL_STORE = 600  # 10 分钟
 _TTL_SUPERVISOR = 900  # 15 分钟
 
 # 内存缓存（进程级，服务重启后重新加载）
@@ -45,6 +46,7 @@ _cache: dict = {}
 # ─────────────────────────────────────────────────────────────────────────────
 # 内部缓存工具
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 def _cache_get(key: str) -> Optional[dict]:
     """获取缓存，过期返回 None。"""
@@ -75,6 +77,7 @@ def _make_headers(tenant_id: UUID) -> dict[str, str]:
 # ─────────────────────────────────────────────────────────────────────────────
 # 1. 员工基础信息
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 def _employee_fallback(employee_id: UUID, fallback: bool = True) -> dict:
     """返回员工信息 fallback 结构。"""
@@ -235,6 +238,7 @@ def _infer_staff_level(raw: dict) -> str:
 # 2. 批量员工信息
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 async def get_employees_batch(
     tenant_id: UUID,
     employee_ids: list[UUID],
@@ -275,6 +279,7 @@ async def get_employees_batch(
 # ─────────────────────────────────────────────────────────────────────────────
 # 3. 门店信息
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 def _store_fallback(store_id: UUID) -> dict:
     """返回门店信息 fallback 结构。"""
@@ -339,11 +344,7 @@ async def get_store_info(tenant_id: UUID, store_id: UUID) -> dict:
 
                 info: dict = {
                     "store_id": raw.get("store_id") or raw.get("id") or str(store_id),
-                    "store_name": (
-                        raw.get("store_name")
-                        or raw.get("name")
-                        or f"门店{str(store_id)[:6]}"
-                    ),
+                    "store_name": (raw.get("store_name") or raw.get("name") or f"门店{str(store_id)[:6]}"),
                     "brand_id": raw.get("brand_id"),
                     "brand_name": raw.get("brand_name"),
                     "region_id": raw.get("region_id"),
@@ -409,6 +410,7 @@ async def get_store_info(tenant_id: UUID, store_id: UUID) -> dict:
 # 4. 获取员工的直属主管
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 async def get_supervisor(tenant_id: UUID, employee_id: UUID) -> Optional[dict]:
     """
     获取员工直属主管信息。
@@ -455,6 +457,7 @@ async def get_supervisor(tenant_id: UUID, employee_id: UUID) -> Optional[dict]:
 # 5. 通知上下文富化
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 async def enrich_notification_context(
     tenant_id: UUID,
     applicant_id: UUID,
@@ -488,6 +491,7 @@ async def enrich_notification_context(
 # 6. 缓存管理（管理端）
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def clear_cache(pattern: Optional[str] = None) -> int:
     """
     清除缓存。pattern=None 清全部，否则清匹配前缀的 key。
@@ -513,6 +517,7 @@ def clear_cache(pattern: Optional[str] = None) -> int:
 # ─────────────────────────────────────────────────────────────────────────────
 # 6b. 按角色查找审批人
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 async def get_approver_by_role(
     tenant_id: UUID,
@@ -589,6 +594,7 @@ async def get_approver_by_role(
 # ─────────────────────────────────────────────────────────────────────────────
 # 7. 服务健康检查
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 async def health_check() -> dict:
     """

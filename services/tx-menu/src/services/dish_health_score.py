@@ -8,6 +8,7 @@
 权重通过 ScoreWeights 配置，可按业务需要调整。
 所有操作强制 tenant_id 租户隔离。
 """
+
 from __future__ import annotations
 
 import uuid
@@ -26,9 +27,10 @@ log = structlog.get_logger(__name__)
 @dataclass
 class ScoreWeights:
     """评分权重配置（三维合计必须 == 100）"""
-    margin: float = 40.0          # 毛利率维度满分
-    sales_rank: float = 30.0      # 销量排名维度满分
-    review: float = 30.0          # 点评维度满分
+
+    margin: float = 40.0  # 毛利率维度满分
+    sales_rank: float = 30.0  # 销量排名维度满分
+    review: float = 30.0  # 点评维度满分
 
     def __post_init__(self) -> None:
         total = self.margin + self.sales_rank + self.review
@@ -37,8 +39,8 @@ class ScoreWeights:
 
 
 # 毛利率评分边界
-MARGIN_FULL_SCORE_RATE = 0.30      # 毛利率 >= 30% → 满分
-MARGIN_ZERO_SCORE_RATE = 0.15      # 毛利率 <= 15% → 0分
+MARGIN_FULL_SCORE_RATE = 0.30  # 毛利率 >= 30% → 满分
+MARGIN_ZERO_SCORE_RATE = 0.15  # 毛利率 <= 15% → 0分
 
 
 # ─── 数据模型 ─────────────────────────────────────────────────────────────────
@@ -47,18 +49,19 @@ MARGIN_ZERO_SCORE_RATE = 0.15      # 毛利率 <= 15% → 0分
 @dataclass
 class DishHealthScore:
     """菜品健康评分结果"""
+
     dish_id: str
     tenant_id: str
     store_id: str
-    total_score: float                  # 综合评分 0-100
-    margin_score: float                 # 毛利率维度得分
-    sales_rank_score: float             # 销量排名维度得分
-    review_score: float                 # 点评维度得分
-    margin_rate: float                  # 实际毛利率
-    sales_percentile: float             # 销量百分位（0-1）
-    return_rate: float                  # 退菜率（0-1）
-    weights: ScoreWeights               # 使用的权重配置
-    status: str                         # healthy / needs_attention / critical
+    total_score: float  # 综合评分 0-100
+    margin_score: float  # 毛利率维度得分
+    sales_rank_score: float  # 销量排名维度得分
+    review_score: float  # 点评维度得分
+    margin_rate: float  # 实际毛利率
+    sales_percentile: float  # 销量百分位（0-1）
+    return_rate: float  # 退菜率（0-1）
+    weights: ScoreWeights  # 使用的权重配置
+    status: str  # healthy / needs_attention / critical
     calculated_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
     def to_dict(self) -> dict:
@@ -85,7 +88,7 @@ class DishHealthScore:
 
 # ─── 内存测试存储（与 dish_intelligence.py 同样模式） ─────────────────────────
 
-_dish_data: dict[str, dict] = {}        # key: "{tenant_id}:{dish_id}"
+_dish_data: dict[str, dict] = {}  # key: "{tenant_id}:{dish_id}"
 _store_dish_index: dict[str, list[str]] = {}  # key: "{tenant_id}:{store_id}" → [dish_id, ...]
 
 
@@ -141,9 +144,7 @@ class DishHealthScoreEngine:
             return self.weights.margin
         if margin_rate <= MARGIN_ZERO_SCORE_RATE:
             return 0.0
-        ratio = (margin_rate - MARGIN_ZERO_SCORE_RATE) / (
-            MARGIN_FULL_SCORE_RATE - MARGIN_ZERO_SCORE_RATE
-        )
+        ratio = (margin_rate - MARGIN_ZERO_SCORE_RATE) / (MARGIN_FULL_SCORE_RATE - MARGIN_ZERO_SCORE_RATE)
         return round(ratio * self.weights.margin, 4)
 
     def _calc_sales_rank_score(self, sales_percentile: float) -> float:
@@ -196,10 +197,7 @@ class DishHealthScoreEngine:
         # 销量百分位
         store_key = f"{tenant_id}:{store_id}"
         dish_ids = _store_dish_index.get(store_key, [])
-        all_sales = [
-            _dish_data.get(f"{tenant_id}:{did}", {}).get("total_sales", 0)
-            for did in dish_ids
-        ]
+        all_sales = [_dish_data.get(f"{tenant_id}:{did}", {}).get("total_sales", 0) for did in dish_ids]
         my_sales = data.get("total_sales", 0)
         if all_sales:
             sales_percentile = sum(1 for s in all_sales if s <= my_sales) / len(all_sales)
@@ -319,16 +317,22 @@ class DishHealthScoreEngine:
         )
 
         # 基础价格与成本
-        dish_row = (await db.execute(
-            text("""
+        dish_row = (
+            (
+                await db.execute(
+                    text("""
                 SELECT price_fen, cost_fen, total_sales
                 FROM dishes
                 WHERE id = :dish_id
                   AND tenant_id = :tenant_id
                   AND is_deleted = false
             """),
-            {"dish_id": dish_uuid, "tenant_id": tenant_uuid},
-        )).mappings().first()
+                    {"dish_id": dish_uuid, "tenant_id": tenant_uuid},
+                )
+            )
+            .mappings()
+            .first()
+        )
 
         if not dish_row:
             log.warning("dish_not_found_for_score", dish_id=dish_id, tenant_id=tenant_id)
@@ -351,15 +355,13 @@ class DishHealthScoreEngine:
             {"tenant_id": tenant_uuid},
         )
         all_sales = [int(r[0] or 0) for r in all_sales_result.fetchall()]
-        sales_percentile = (
-            sum(1 for s in all_sales if s <= my_sales) / len(all_sales)
-            if all_sales
-            else 0.5
-        )
+        sales_percentile = sum(1 for s in all_sales if s <= my_sales) / len(all_sales) if all_sales else 0.5
 
         # 退菜率（近30天退菜次数 / 总订单行数）
-        return_row = (await db.execute(
-            text("""
+        return_row = (
+            (
+                await db.execute(
+                    text("""
                 SELECT
                     COUNT(*) FILTER (WHERE oi.is_returned = true) AS return_count,
                     COUNT(*) AS total_count
@@ -368,8 +370,12 @@ class DishHealthScoreEngine:
                   AND oi.tenant_id = :tenant_id
                   AND oi.created_at >= NOW() - INTERVAL '30 days'
             """),
-            {"dish_id": dish_uuid, "tenant_id": tenant_uuid},
-        )).mappings().first()
+                    {"dish_id": dish_uuid, "tenant_id": tenant_uuid},
+                )
+            )
+            .mappings()
+            .first()
+        )
 
         return_count = int(return_row["return_count"] or 0) if return_row else 0
         total_orders = int(return_row["total_count"] or 0) if return_row else 0

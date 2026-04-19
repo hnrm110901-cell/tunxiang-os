@@ -5,6 +5,7 @@ E5 闭店检查 → E6 日结对账 → E7 复盘归因 → E8 整改跟踪
 
 每个节点有：状态(pending/in_progress/completed/skipped) + 检查项 + 责任人 + 时间戳
 """
+
 import uuid
 from datetime import date
 
@@ -17,6 +18,7 @@ from shared.ontology.src.base import TenantBase
 
 class DailyOpsFlow(TenantBase):
     """日清日结主流程（每店每天一条）"""
+
     __tablename__ = "daily_ops_flows"
 
     store_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("stores.id"), nullable=False, index=True)
@@ -42,12 +44,17 @@ class DailyOpsFlow(TenantBase):
 
 class DailyOpsNode(TenantBase):
     """日清日结节点明细"""
+
     __tablename__ = "daily_ops_nodes"
 
-    flow_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("daily_ops_flows.id"), nullable=False, index=True)
+    flow_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("daily_ops_flows.id"), nullable=False, index=True
+    )
     node_code: Mapped[str] = mapped_column(String(10), nullable=False, comment="E1-E8")
     node_name: Mapped[str] = mapped_column(String(50), nullable=False)
-    status: Mapped[str] = mapped_column(String(20), default="pending", comment="pending/in_progress/completed/skipped/abnormal")
+    status: Mapped[str] = mapped_column(
+        String(20), default="pending", comment="pending/in_progress/completed/skipped/abnormal"
+    )
 
     # 检查项
     check_items: Mapped[dict | None] = mapped_column(JSON, default=list, comment="[{item, required, checked, result}]")

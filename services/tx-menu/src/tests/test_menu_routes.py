@@ -7,12 +7,12 @@
 
 路径约定: 从 tx-menu 目录导入 src.api.menu_routes（避免相对导入问题）。
 """
+
 import os
 import sys
 import uuid
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
@@ -40,6 +40,7 @@ HEADERS = {"X-Tenant-ID": TENANT}
 
 # ─── 辅助函数 ──────────────────────────────────────────────────────────────────
 
+
 def _make_app(db_override=None) -> FastAPI:
     """构建带路由的测试用 FastAPI app，可选注入 DB mock。"""
     app = FastAPI()
@@ -60,14 +61,17 @@ def _mock_db_session():
 
 def _async_dep(session):
     """把 mock session 包装成 FastAPI 异步依赖生成器。"""
+
     async def _dep():
         yield session
+
     return _dep
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # 测试 1 & 2：创建菜品
 # ═══════════════════════════════════════════════════════════════════════════════
+
 
 def test_create_dish_success():
     """POST /v2/dishes — 成功创建菜品，返回 ok=True 及菜品数据。"""
@@ -113,6 +117,7 @@ def test_create_dish_value_error_returns_400():
 # 测试 3 & 4：查询菜品
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 def test_get_dish_found():
     """GET /v2/dishes/{dish_id} — 菜品存在时返回 200 和菜品详情。"""
     dish_data = {"dish_id": DISH_ID, "dish_name": "麻婆豆腐", "tenant_id": TENANT}
@@ -137,6 +142,7 @@ def test_get_dish_not_found_returns_404():
 # ═══════════════════════════════════════════════════════════════════════════════
 # 测试 5 & 6：更新菜品
 # ═══════════════════════════════════════════════════════════════════════════════
+
 
 def test_update_dish_success():
     """PATCH /v2/dishes/{dish_id} — 正常更新返回最新菜品数据。"""
@@ -168,6 +174,7 @@ def test_update_dish_service_error_returns_400():
 # ═══════════════════════════════════════════════════════════════════════════════
 # 测试 7 & 8：创建菜单模板（有 DB 依赖）
 # ═══════════════════════════════════════════════════════════════════════════════
+
 
 def test_create_template_success():
     """POST /templates — 正常创建模板，db.commit 被调用一次。"""
@@ -221,6 +228,7 @@ def test_create_template_value_error_returns_400():
 # 测试 9：沽清标记
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 def test_mark_sold_out_success():
     """POST /stockout/mark — 成功标记沽清，返回沽清记录。"""
     record = {
@@ -245,6 +253,7 @@ def test_mark_sold_out_success():
 # ═══════════════════════════════════════════════════════════════════════════════
 # 测试 10：门店沽清清单
 # ═══════════════════════════════════════════════════════════════════════════════
+
 
 def test_get_sold_out_list_returns_items():
     """GET /stores/{store_id}/stockout — 返回沽清清单，total 与列表长度一致。"""

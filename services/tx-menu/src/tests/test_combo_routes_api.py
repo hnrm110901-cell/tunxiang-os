@@ -5,11 +5,12 @@
 - 对 DishCombo ORM 查询结果使用 MagicMock 对象
 - 覆盖 9 个端点的主要成功/失败路径
 """
+
 import os
 import sys
 import types
 import uuid
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 # ─── Mock 模块前置注入 ─────────────────────────────────────────────────────────
 fake_db_mod = types.ModuleType("src.db")
@@ -69,7 +70,6 @@ for _p in [_tx_menu_dir, _repo_root]:
     if _p not in sys.path:
         sys.path.insert(0, _p)
 
-import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
@@ -85,6 +85,7 @@ HEADERS = {"X-Tenant-ID": TENANT}
 
 # ─── 辅助 ──────────────────────────────────────────────────────────────────────
 
+
 def _make_mock_session():
     session = AsyncMock()
     session.execute = AsyncMock()
@@ -98,11 +99,20 @@ def _make_mock_session():
 def _async_dep(session):
     async def _dep():
         yield session
+
     return _dep
 
 
-def _make_combo_orm(combo_id=None, name="家庭套餐", price=8800, orig=12000,
-                    is_active=True, store_id=None, description=None, image_url=None):
+def _make_combo_orm(
+    combo_id=None,
+    name="家庭套餐",
+    price=8800,
+    orig=12000,
+    is_active=True,
+    store_id=None,
+    description=None,
+    image_url=None,
+):
     c = MagicMock()
     c.id = uuid.UUID(combo_id) if combo_id else uuid.uuid4()
     c.tenant_id = uuid.UUID(TENANT)
@@ -125,13 +135,16 @@ sys.modules["src.models.dish_combo"].DishCombo = _DishCombo_mock  # type: ignore
 
 # sqlalchemy.select stub
 import sqlalchemy as _sa_mod
-_sa_mod.select = MagicMock(return_value=MagicMock(
-    where=MagicMock(return_value=MagicMock(
-        order_by=MagicMock(return_value=MagicMock(
-            offset=MagicMock(return_value=MagicMock(limit=MagicMock()))
-        ))
-    ))
-))
+
+_sa_mod.select = MagicMock(
+    return_value=MagicMock(
+        where=MagicMock(
+            return_value=MagicMock(
+                order_by=MagicMock(return_value=MagicMock(offset=MagicMock(return_value=MagicMock(limit=MagicMock()))))
+            )
+        )
+    )
+)
 _sa_mod.text = MagicMock(return_value=MagicMock())
 
 from src.api.combo_routes import get_db, router  # noqa: E402
@@ -150,6 +163,7 @@ def _make_app(db_override=None) -> FastAPI:
 # ═══════════════════════════════════════════════════════════════════════════════
 # 1. GET /api/v1/menu/combos — 列出套餐（无门店过滤）
 # ═══════════════════════════════════════════════════════════════════════════════
+
 
 def test_list_combos_success():
     """成功列出套餐，返回 ok=True 及 items 列表。"""
@@ -201,6 +215,7 @@ def test_list_combos_with_store_filter():
 # 2. POST /api/v1/menu/combos — 创建套餐
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 def test_create_combo_success():
     """POST /combos — 成功创建套餐。"""
     session = _make_mock_session()
@@ -242,6 +257,7 @@ def test_create_combo_missing_tenant():
 # 3. GET /api/v1/menu/combos/{combo_id}/detail — 套餐详情
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 def test_get_combo_detail_success():
     """GET /combos/{id}/detail — 套餐存在时返回详情（含空分组）。"""
     combo = _make_combo_orm(combo_id=COMBO_ID, description="家庭装", image_url="http://x.com/img.png")
@@ -280,6 +296,7 @@ def test_get_combo_detail_not_found():
 # ═══════════════════════════════════════════════════════════════════════════════
 # 4. POST /api/v1/menu/combos/{combo_id}/order — 点套餐
 # ═══════════════════════════════════════════════════════════════════════════════
+
 
 def test_order_combo_success():
     """POST /combos/{id}/order — 点套餐成功展开为 OrderItem。"""
@@ -329,6 +346,7 @@ def test_order_combo_not_found():
 # 5. GET /api/v1/menu/combos/{combo_id}/groups — 获取分组列表
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 def test_list_combo_groups_success():
     """GET /combos/{id}/groups — 返回 N选M 分组列表（空列表）。"""
     session = _make_mock_session()
@@ -346,13 +364,12 @@ def test_list_combo_groups_success():
 # 6. POST /api/v1/menu/combos/{combo_id}/groups — 创建分组
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 def test_create_combo_group_success():
     """POST /combos/{id}/groups — 成功创建 N选M 分组。"""
     session = _make_mock_session()
     insert_result = MagicMock()
-    insert_result.fetchone.return_value = (
-        uuid.UUID(GROUP_ID), "主食选择", 1, 2, True, 0
-    )
+    insert_result.fetchone.return_value = (uuid.UUID(GROUP_ID), "主食选择", 1, 2, True, 0)
     session.execute.return_value = insert_result
 
     app = _make_app(_async_dep(session))
@@ -371,6 +388,7 @@ def test_create_combo_group_success():
 # ═══════════════════════════════════════════════════════════════════════════════
 # 7. POST /api/v1/menu/combos/{combo_id}/groups/{group_id}/items — 添加菜品到分组
 # ═══════════════════════════════════════════════════════════════════════════════
+
 
 def test_add_item_to_group():
     """POST /combos/{id}/groups/{gid}/items — 添加菜品到套餐分组。"""
@@ -400,6 +418,7 @@ def test_add_item_to_group():
 # 8. DELETE /api/v1/menu/combos/{combo_id}/groups/{group_id}/items/{item_id}
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 def test_remove_item_from_group():
     """DELETE /combos/{id}/groups/{gid}/items/{iid} — 移除套餐分组菜品。"""
     session = _make_mock_session()
@@ -420,6 +439,7 @@ def test_remove_item_from_group():
 # 9. POST /api/v1/menu/combos/{combo_id}/validate-selection
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 def test_validate_selection_valid():
     """POST /combos/{id}/validate-selection — 合法选择通过校验。"""
     session = _make_mock_session()
@@ -433,11 +453,7 @@ def test_validate_selection_valid():
 
     app = _make_app(_async_dep(session))
     client = TestClient(app)
-    payload = {
-        "selections": [
-            {"group_id": GROUP_ID, "item_ids": [DISH_ID]}
-        ]
-    }
+    payload = {"selections": [{"group_id": GROUP_ID, "item_ids": [DISH_ID]}]}
     resp = client.post(
         f"/api/v1/menu/combos/{COMBO_ID}/validate-selection",
         json=payload,

@@ -3,6 +3,7 @@
 支持渠道: wecom(企业微信) / feishu(飞书) / sms(短信) / push(推送) / in_app(应用内)
 当前为 mock 实现, 不发送真实消息, 但接口完整可替换。
 """
+
 from __future__ import annotations
 
 import uuid
@@ -53,9 +54,7 @@ async def send_notification(
         ValueError: 无效的通知渠道
     """
     if channel not in VALID_CHANNELS:
-        raise ValueError(
-            f"Invalid channel '{channel}'. Valid channels: {', '.join(VALID_CHANNELS)}"
-        )
+        raise ValueError(f"Invalid channel '{channel}'. Valid channels: {', '.join(VALID_CHANNELS)}")
 
     notification_id = f"notif_{uuid.uuid4().hex[:8]}"
     sent_at = datetime.utcnow().isoformat()
@@ -138,17 +137,9 @@ async def send_alert_notification(
     summary = alert.get("summary", "")
     task_id = alert.get("task_id", "")
 
-    severity_label = {"urgent": "[紧急]", "severe": "[严重]", "normal": ""}.get(
-        severity, ""
-    )
+    severity_label = {"urgent": "[紧急]", "severe": "[严重]", "normal": ""}.get(severity, "")
     title = f"{severity_label}运营预警 - {alert_type}"
-    content = (
-        f"门店: {store_id}\n"
-        f"类型: {alert_type}\n"
-        f"详情: {summary}\n"
-        f"任务编号: {task_id}\n"
-        f"请尽快处理。"
-    )
+    content = f"门店: {store_id}\n类型: {alert_type}\n详情: {summary}\n任务编号: {task_id}\n请尽快处理。"
 
     results: List[Dict[str, Any]] = []
 
@@ -217,11 +208,7 @@ async def get_notification_history(
     """
     all_records = history if history is not None else _notification_history
 
-    items = [
-        r for r in all_records
-        if r.get("recipient_id") == recipient_id
-        and r.get("tenant_id") == tenant_id
-    ]
+    items = [r for r in all_records if r.get("recipient_id") == recipient_id and r.get("tenant_id") == tenant_id]
 
     # 按发送时间倒序
     items.sort(key=lambda x: x.get("sent_at", ""), reverse=True)

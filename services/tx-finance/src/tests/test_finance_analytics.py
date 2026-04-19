@@ -1,4 +1,5 @@
 """财务分析服务 (D5) 测试 — API 冒烟 + 服务逻辑单元测试"""
+
 import os
 import sys
 
@@ -16,6 +17,7 @@ client = TestClient(app)
 
 
 # ── API 冒烟测试 ──────────────────────────────────────────────
+
 
 class TestRevenueCompositionAPI:
     def test_revenue_composition_ok(self):
@@ -124,20 +126,24 @@ class TestAuditViewAPI:
 
 # ── 服务层单元测试（纯函数逻辑） ───────────────────────────────
 
+
 class TestSafeRatio:
     def test_zero_denominator(self):
         from services.finance_analytics import _safe_ratio
+
         assert _safe_ratio(100, 0) == 0.0
         assert _safe_ratio(0, 0) == 0.0
 
     def test_normal_ratio(self):
         from services.finance_analytics import _safe_ratio
+
         assert _safe_ratio(1, 4) == 0.25
         assert _safe_ratio(350, 1000) == 0.35
 
     def test_profit_rate_calculation(self):
         """验证利润率计算：profit / revenue"""
         from services.finance_analytics import _safe_ratio
+
         revenue = 100000  # 1000元
         food_cost = 35000
         labor = 25000

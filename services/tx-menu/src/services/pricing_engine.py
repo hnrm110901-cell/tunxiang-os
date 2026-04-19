@@ -6,6 +6,7 @@
 金额单位: 分(fen), int 类型。
 重量单位: 克(g), int 类型。
 """
+
 import asyncio
 import uuid
 from datetime import datetime
@@ -359,13 +360,15 @@ class PricingEngine:
             subtotal = unit_price * quantity
             original_total_fen += subtotal
 
-            items.append({
-                "dish_id": dish_id,
-                "dish_name": row["dish_name"],
-                "quantity": quantity,
-                "unit_price_fen": unit_price,
-                "subtotal_fen": subtotal,
-            })
+            items.append(
+                {
+                    "dish_id": dish_id,
+                    "dish_name": row["dish_name"],
+                    "quantity": quantity,
+                    "unit_price_fen": unit_price,
+                    "subtotal_fen": subtotal,
+                }
+            )
 
         combo_price_fen = int(round(original_total_fen * discount_rate))
         saving_fen = original_total_fen - combo_price_fen
@@ -781,18 +784,20 @@ class PricingEngine:
             new_price_fen=int(row["new_price_fen"]),
         )
 
-        asyncio.create_task(UniversalPublisher.publish(
-            event_type=MenuEventType.DISH_PRICE_CHANGED,
-            tenant_id=self._tenant_uuid,
-            store_id=None,
-            entity_id=row["dish_id"],
-            event_data={
-                "dish_id": str(row["dish_id"]),
-                "old_price_fen": int(row["old_price_fen"]) if row["old_price_fen"] is not None else None,
-                "new_price_fen": int(row["new_price_fen"]),
-            },
-            source_service="tx-menu",
-        ))
+        asyncio.create_task(
+            UniversalPublisher.publish(
+                event_type=MenuEventType.DISH_PRICE_CHANGED,
+                tenant_id=self._tenant_uuid,
+                store_id=None,
+                entity_id=row["dish_id"],
+                event_data={
+                    "dish_id": str(row["dish_id"]),
+                    "old_price_fen": int(row["old_price_fen"]) if row["old_price_fen"] is not None else None,
+                    "new_price_fen": int(row["new_price_fen"]),
+                },
+                source_service="tx-menu",
+            )
+        )
 
         return {
             "change_id": change_id,

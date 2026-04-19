@@ -10,6 +10,7 @@
 
 所有 DB 交互通过 AsyncMock 模拟，纯函数逻辑独立测试。
 """
+
 import os
 
 # ─── 导入被测服务和 Repository ───
@@ -166,9 +167,7 @@ class TestCreatePublishPlan:
         svc = _make_svc(db)
         expected_plan = _fake_plan(target_type="all_stores", target_ids=None)
 
-        with patch.object(
-            BrandPublishRepository, "create_publish_plan", AsyncMock(return_value=expected_plan)
-        ):
+        with patch.object(BrandPublishRepository, "create_publish_plan", AsyncMock(return_value=expected_plan)):
             plan = await svc.create_publish_plan(
                 plan_name="全门店发布",
                 target_type="all_stores",
@@ -183,9 +182,7 @@ class TestCreatePublishPlan:
         svc = _make_svc(db)
         expected_plan = _fake_plan()
 
-        with patch.object(
-            BrandPublishRepository, "create_publish_plan", AsyncMock(return_value=expected_plan)
-        ):
+        with patch.object(BrandPublishRepository, "create_publish_plan", AsyncMock(return_value=expected_plan)):
             plan = await svc.create_publish_plan(
                 plan_name="品牌发布方案",
                 target_type="stores",
@@ -207,9 +204,10 @@ class TestAddPlanItems:
         svc = _make_svc(db)
         published_plan = _fake_plan(status="published")
 
-        with patch.object(
-            BrandPublishRepository, "get_publish_plan", AsyncMock(return_value=published_plan)
-        ), pytest.raises(ValueError, match="状态"):
+        with (
+            patch.object(BrandPublishRepository, "get_publish_plan", AsyncMock(return_value=published_plan)),
+            pytest.raises(ValueError, match="状态"),
+        ):
             await svc.add_items_to_plan(
                 plan_id=PLAN_ID,
                 items=[{"dish_id": DISH_ID_1}],
@@ -221,9 +219,10 @@ class TestAddPlanItems:
         svc = _make_svc(db)
         draft_plan = _fake_plan(status="draft")
 
-        with patch.object(
-            BrandPublishRepository, "get_publish_plan", AsyncMock(return_value=draft_plan)
-        ), pytest.raises(ValueError, match="items"):
+        with (
+            patch.object(BrandPublishRepository, "get_publish_plan", AsyncMock(return_value=draft_plan)),
+            pytest.raises(ValueError, match="items"),
+        ):
             await svc.add_items_to_plan(plan_id=PLAN_ID, items=[])
 
     @pytest.mark.asyncio
@@ -232,9 +231,10 @@ class TestAddPlanItems:
         svc = _make_svc(db)
         draft_plan = _fake_plan(status="draft")
 
-        with patch.object(
-            BrandPublishRepository, "get_publish_plan", AsyncMock(return_value=draft_plan)
-        ), pytest.raises(ValueError, match="override_price_fen"):
+        with (
+            patch.object(BrandPublishRepository, "get_publish_plan", AsyncMock(return_value=draft_plan)),
+            pytest.raises(ValueError, match="override_price_fen"),
+        ):
             await svc.add_items_to_plan(
                 plan_id=PLAN_ID,
                 items=[{"dish_id": DISH_ID_1, "override_price_fen": -100}],
@@ -248,10 +248,8 @@ class TestAddPlanItems:
         expected_items = [_fake_item(DISH_ID_1, 3500), _fake_item(DISH_ID_2)]
 
         with (
-            patch.object(BrandPublishRepository, "get_publish_plan",
-                         AsyncMock(return_value=draft_plan)),
-            patch.object(BrandPublishRepository, "add_plan_items",
-                         AsyncMock(return_value=expected_items)),
+            patch.object(BrandPublishRepository, "get_publish_plan", AsyncMock(return_value=draft_plan)),
+            patch.object(BrandPublishRepository, "add_plan_items", AsyncMock(return_value=expected_items)),
         ):
             result = await svc.add_items_to_plan(
                 plan_id=PLAN_ID,
@@ -276,9 +274,10 @@ class TestExecutePublishPlan:
         svc = _make_svc(db)
         archived = _fake_plan(status="archived")
 
-        with patch.object(
-            BrandPublishRepository, "get_publish_plan", AsyncMock(return_value=archived)
-        ), pytest.raises(ValueError, match="归档"):
+        with (
+            patch.object(BrandPublishRepository, "get_publish_plan", AsyncMock(return_value=archived)),
+            pytest.raises(ValueError, match="归档"),
+        ):
             await svc.execute_publish_plan(PLAN_ID)
 
     @pytest.mark.asyncio
@@ -288,12 +287,10 @@ class TestExecutePublishPlan:
         draft_plan = _fake_plan(status="draft")
 
         with (
-            patch.object(BrandPublishRepository, "get_publish_plan",
-                         AsyncMock(return_value=draft_plan)),
-            patch.object(BrandPublishRepository, "get_target_store_ids",
-                         AsyncMock(return_value=[STORE_ID])),
-            patch.object(BrandPublishRepository, "get_plan_items",
-                         AsyncMock(return_value=[])),pytest.raises(ValueError, match="菜品")
+            patch.object(BrandPublishRepository, "get_publish_plan", AsyncMock(return_value=draft_plan)),
+            patch.object(BrandPublishRepository, "get_target_store_ids", AsyncMock(return_value=[STORE_ID])),
+            patch.object(BrandPublishRepository, "get_plan_items", AsyncMock(return_value=[])),
+            pytest.raises(ValueError, match="菜品"),
         ):
             await svc.execute_publish_plan(PLAN_ID)
 
@@ -310,18 +307,12 @@ class TestExecutePublishPlan:
         upsert_mock = AsyncMock(return_value=new_override)
 
         with (
-            patch.object(BrandPublishRepository, "get_publish_plan",
-                         AsyncMock(return_value=draft_plan)),
-            patch.object(BrandPublishRepository, "get_target_store_ids",
-                         AsyncMock(return_value=[STORE_ID])),
-            patch.object(BrandPublishRepository, "get_plan_items",
-                         AsyncMock(return_value=items)),
-            patch.object(BrandPublishRepository, "get_store_dish_override",
-                         AsyncMock(return_value=None)),  # 无已有记录
-            patch.object(BrandPublishRepository, "upsert_store_dish_override",
-                         upsert_mock),
-            patch.object(BrandPublishRepository, "update_plan_status",
-                         AsyncMock(return_value=updated_plan)),
+            patch.object(BrandPublishRepository, "get_publish_plan", AsyncMock(return_value=draft_plan)),
+            patch.object(BrandPublishRepository, "get_target_store_ids", AsyncMock(return_value=[STORE_ID])),
+            patch.object(BrandPublishRepository, "get_plan_items", AsyncMock(return_value=items)),
+            patch.object(BrandPublishRepository, "get_store_dish_override", AsyncMock(return_value=None)),  # 无已有记录
+            patch.object(BrandPublishRepository, "upsert_store_dish_override", upsert_mock),
+            patch.object(BrandPublishRepository, "update_plan_status", AsyncMock(return_value=updated_plan)),
         ):
             result = await svc.execute_publish_plan(PLAN_ID)
 
@@ -345,18 +336,12 @@ class TestExecutePublishPlan:
         upsert_mock = AsyncMock(return_value=existing_override)
 
         with (
-            patch.object(BrandPublishRepository, "get_publish_plan",
-                         AsyncMock(return_value=draft_plan)),
-            patch.object(BrandPublishRepository, "get_target_store_ids",
-                         AsyncMock(return_value=[STORE_ID])),
-            patch.object(BrandPublishRepository, "get_plan_items",
-                         AsyncMock(return_value=items)),
-            patch.object(BrandPublishRepository, "get_store_dish_override",
-                         AsyncMock(return_value=existing_override)),
-            patch.object(BrandPublishRepository, "upsert_store_dish_override",
-                         upsert_mock),
-            patch.object(BrandPublishRepository, "update_plan_status",
-                         AsyncMock(return_value=updated_plan)),
+            patch.object(BrandPublishRepository, "get_publish_plan", AsyncMock(return_value=draft_plan)),
+            patch.object(BrandPublishRepository, "get_target_store_ids", AsyncMock(return_value=[STORE_ID])),
+            patch.object(BrandPublishRepository, "get_plan_items", AsyncMock(return_value=items)),
+            patch.object(BrandPublishRepository, "get_store_dish_override", AsyncMock(return_value=existing_override)),
+            patch.object(BrandPublishRepository, "upsert_store_dish_override", upsert_mock),
+            patch.object(BrandPublishRepository, "update_plan_status", AsyncMock(return_value=updated_plan)),
         ):
             result = await svc.execute_publish_plan(PLAN_ID)
 
@@ -381,18 +366,12 @@ class TestExecutePublishPlan:
         upsert_mock = AsyncMock(return_value=existing_override)
 
         with (
-            patch.object(BrandPublishRepository, "get_publish_plan",
-                         AsyncMock(return_value=draft_plan)),
-            patch.object(BrandPublishRepository, "get_target_store_ids",
-                         AsyncMock(return_value=[STORE_ID])),
-            patch.object(BrandPublishRepository, "get_plan_items",
-                         AsyncMock(return_value=items)),
-            patch.object(BrandPublishRepository, "get_store_dish_override",
-                         AsyncMock(return_value=existing_override)),
-            patch.object(BrandPublishRepository, "upsert_store_dish_override",
-                         upsert_mock),
-            patch.object(BrandPublishRepository, "update_plan_status",
-                         AsyncMock(return_value=updated_plan)),
+            patch.object(BrandPublishRepository, "get_publish_plan", AsyncMock(return_value=draft_plan)),
+            patch.object(BrandPublishRepository, "get_target_store_ids", AsyncMock(return_value=[STORE_ID])),
+            patch.object(BrandPublishRepository, "get_plan_items", AsyncMock(return_value=items)),
+            patch.object(BrandPublishRepository, "get_store_dish_override", AsyncMock(return_value=existing_override)),
+            patch.object(BrandPublishRepository, "upsert_store_dish_override", upsert_mock),
+            patch.object(BrandPublishRepository, "update_plan_status", AsyncMock(return_value=updated_plan)),
         ):
             await svc.execute_publish_plan(PLAN_ID)
 
@@ -434,10 +413,7 @@ class TestStoreDishOverride:
         svc = _make_svc(db)
         expected = _fake_override(local_price=4200)
 
-        with patch.object(
-            BrandPublishRepository, "upsert_store_dish_override",
-            AsyncMock(return_value=expected)
-        ):
+        with patch.object(BrandPublishRepository, "upsert_store_dish_override", AsyncMock(return_value=expected)):
             result = await svc.override_store_dish(
                 store_id=STORE_ID,
                 dish_id=DISH_ID_1,
@@ -462,10 +438,7 @@ class TestStoreDishOverride:
         db = _mock_db()
         svc = _make_svc(db)
 
-        with patch.object(
-            BrandPublishRepository, "batch_toggle_availability",
-            AsyncMock(return_value=2)
-        ):
+        with patch.object(BrandPublishRepository, "batch_toggle_availability", AsyncMock(return_value=2)):
             result = await svc.batch_toggle_dishes(
                 store_id=STORE_ID,
                 dish_ids=[DISH_ID_1, DISH_ID_2],
@@ -486,49 +459,57 @@ class TestPriceRuleValidation:
         db = _mock_db()
         svc = _make_svc(db)
         with pytest.raises(ValueError, match="rule_type"):
-            await svc.create_price_rule({
-                "rule_name": "午市",
-                "rule_type": "invalid",
-                "adjustment_type": "percentage",
-                "adjustment_value": 10,
-            })
+            await svc.create_price_rule(
+                {
+                    "rule_name": "午市",
+                    "rule_type": "invalid",
+                    "adjustment_type": "percentage",
+                    "adjustment_value": 10,
+                }
+            )
 
     @pytest.mark.asyncio
     async def test_invalid_adjustment_type_raises(self):
         db = _mock_db()
         svc = _make_svc(db)
         with pytest.raises(ValueError, match="adjustment_type"):
-            await svc.create_price_rule({
-                "rule_name": "午市",
-                "rule_type": "time_period",
-                "adjustment_type": "bad_type",
-                "adjustment_value": 10,
-            })
+            await svc.create_price_rule(
+                {
+                    "rule_name": "午市",
+                    "rule_type": "time_period",
+                    "adjustment_type": "bad_type",
+                    "adjustment_value": 10,
+                }
+            )
 
     @pytest.mark.asyncio
     async def test_empty_rule_name_raises(self):
         db = _mock_db()
         svc = _make_svc(db)
         with pytest.raises(ValueError, match="rule_name"):
-            await svc.create_price_rule({
-                "rule_name": "",
-                "rule_type": "time_period",
-                "adjustment_type": "percentage",
-                "adjustment_value": 10,
-            })
+            await svc.create_price_rule(
+                {
+                    "rule_name": "",
+                    "rule_type": "time_period",
+                    "adjustment_type": "percentage",
+                    "adjustment_value": 10,
+                }
+            )
 
     @pytest.mark.asyncio
     async def test_invalid_channel_raises(self):
         db = _mock_db()
         svc = _make_svc(db)
         with pytest.raises(ValueError, match="channel"):
-            await svc.create_price_rule({
-                "rule_name": "外卖加价",
-                "rule_type": "channel",
-                "channel": "meituan",  # 不在允许列表
-                "adjustment_type": "percentage",
-                "adjustment_value": 5,
-            })
+            await svc.create_price_rule(
+                {
+                    "rule_name": "外卖加价",
+                    "rule_type": "channel",
+                    "channel": "meituan",  # 不在允许列表
+                    "adjustment_type": "percentage",
+                    "adjustment_value": 5,
+                }
+            )
 
     @pytest.mark.asyncio
     async def test_create_time_period_rule_success(self):
@@ -545,19 +526,18 @@ class TestPriceRuleValidation:
             "is_active": True,
         }
 
-        with patch.object(
-            BrandPublishRepository, "create_price_rule",
-            AsyncMock(return_value=expected_rule)
-        ):
-            rule = await svc.create_price_rule({
-                "rule_name": "午市优惠",
-                "rule_type": "time_period",
-                "time_start": time(11, 0),
-                "time_end": time(14, 0),
-                "adjustment_type": "percentage",
-                "adjustment_value": -10.0,
-                "priority": 5,
-            })
+        with patch.object(BrandPublishRepository, "create_price_rule", AsyncMock(return_value=expected_rule)):
+            rule = await svc.create_price_rule(
+                {
+                    "rule_name": "午市优惠",
+                    "rule_type": "time_period",
+                    "time_start": time(11, 0),
+                    "time_end": time(14, 0),
+                    "adjustment_type": "percentage",
+                    "adjustment_value": -10.0,
+                    "priority": 5,
+                }
+            )
         assert rule["adjustment_value"] == -10.0
         assert rule["rule_type"] == "time_period"
 
@@ -572,10 +552,10 @@ class TestPriceRuleValidation:
     async def test_bind_dishes_rule_not_found_raises(self):
         db = _mock_db()
         svc = _make_svc(db)
-        with patch.object(
-            BrandPublishRepository, "get_price_rule",
-            AsyncMock(return_value=None)
-        ), pytest.raises(ValueError, match="调价规则不存在"):
+        with (
+            patch.object(BrandPublishRepository, "get_price_rule", AsyncMock(return_value=None)),
+            pytest.raises(ValueError, match="调价规则不存在"),
+        ):
             await svc.bind_dishes_to_rule(
                 rule_id=RULE_ID,
                 dish_ids=[DISH_ID_1],
@@ -642,7 +622,6 @@ def _make_db_with_dish(price_fen: int = 3800) -> AsyncMock:
 
 
 class TestGetEffectivePrice:
-
     @pytest.mark.asyncio
     async def test_invalid_channel_raises(self):
         db = _mock_db()
@@ -662,12 +641,9 @@ class TestGetEffectivePrice:
 
         with (
             patch.object(BrandPublishRepository, "_set_tenant", AsyncMock()),
-            patch.object(BrandPublishRepository, "get_plan_override_for_dish",
-                         AsyncMock(return_value=None)),
-            patch.object(BrandPublishRepository, "get_store_dish_override",
-                         AsyncMock(return_value=None)),
-            patch.object(BrandPublishRepository, "get_active_rules_for_dish",
-                         AsyncMock(return_value=[])),
+            patch.object(BrandPublishRepository, "get_plan_override_for_dish", AsyncMock(return_value=None)),
+            patch.object(BrandPublishRepository, "get_store_dish_override", AsyncMock(return_value=None)),
+            patch.object(BrandPublishRepository, "get_active_rules_for_dish", AsyncMock(return_value=[])),
         ):
             result = await svc.get_effective_price(
                 dish_id=DISH_ID_1,
@@ -686,16 +662,15 @@ class TestGetEffectivePrice:
 
         with (
             patch.object(BrandPublishRepository, "_set_tenant", AsyncMock()),
-            patch.object(BrandPublishRepository, "get_plan_override_for_dish",
-                         AsyncMock(return_value={"override_price_fen": 3500, "plan_name": "促销方案"})),
-            patch.object(BrandPublishRepository, "get_store_dish_override",
-                         AsyncMock(return_value=None)),
-            patch.object(BrandPublishRepository, "get_active_rules_for_dish",
-                         AsyncMock(return_value=[])),
+            patch.object(
+                BrandPublishRepository,
+                "get_plan_override_for_dish",
+                AsyncMock(return_value={"override_price_fen": 3500, "plan_name": "促销方案"}),
+            ),
+            patch.object(BrandPublishRepository, "get_store_dish_override", AsyncMock(return_value=None)),
+            patch.object(BrandPublishRepository, "get_active_rules_for_dish", AsyncMock(return_value=[])),
         ):
-            result = await svc.get_effective_price(
-                dish_id=DISH_ID_1, store_id=STORE_ID, channel="dine_in"
-            )
+            result = await svc.get_effective_price(dish_id=DISH_ID_1, store_id=STORE_ID, channel="dine_in")
 
         assert result["effective_price_fen"] == 3500
         assert result["price_source"] == "publish_plan"
@@ -708,16 +683,17 @@ class TestGetEffectivePrice:
 
         with (
             patch.object(BrandPublishRepository, "_set_tenant", AsyncMock()),
-            patch.object(BrandPublishRepository, "get_plan_override_for_dish",
-                         AsyncMock(return_value={"override_price_fen": 3500})),
-            patch.object(BrandPublishRepository, "get_store_dish_override",
-                         AsyncMock(return_value={"local_price_fen": 4200})),  # 门店自行调价更高
-            patch.object(BrandPublishRepository, "get_active_rules_for_dish",
-                         AsyncMock(return_value=[])),
+            patch.object(
+                BrandPublishRepository,
+                "get_plan_override_for_dish",
+                AsyncMock(return_value={"override_price_fen": 3500}),
+            ),
+            patch.object(
+                BrandPublishRepository, "get_store_dish_override", AsyncMock(return_value={"local_price_fen": 4200})
+            ),  # 门店自行调价更高
+            patch.object(BrandPublishRepository, "get_active_rules_for_dish", AsyncMock(return_value=[])),
         ):
-            result = await svc.get_effective_price(
-                dish_id=DISH_ID_1, store_id=STORE_ID, channel="dine_in"
-            )
+            result = await svc.get_effective_price(dish_id=DISH_ID_1, store_id=STORE_ID, channel="dine_in")
 
         assert result["effective_price_fen"] == 4200
         assert result["price_source"] == "store_override"
@@ -738,15 +714,16 @@ class TestGetEffectivePrice:
 
         with (
             patch.object(BrandPublishRepository, "_set_tenant", AsyncMock()),
-            patch.object(BrandPublishRepository, "get_plan_override_for_dish",
-                         AsyncMock(return_value=None)),
-            patch.object(BrandPublishRepository, "get_store_dish_override",
-                         AsyncMock(return_value={"local_price_fen": 4200})),
-            patch.object(BrandPublishRepository, "get_active_rules_for_dish",
-                         AsyncMock(return_value=[lunch_rule])),
+            patch.object(BrandPublishRepository, "get_plan_override_for_dish", AsyncMock(return_value=None)),
+            patch.object(
+                BrandPublishRepository, "get_store_dish_override", AsyncMock(return_value={"local_price_fen": 4200})
+            ),
+            patch.object(BrandPublishRepository, "get_active_rules_for_dish", AsyncMock(return_value=[lunch_rule])),
         ):
             result = await svc.get_effective_price(
-                dish_id=DISH_ID_1, store_id=STORE_ID, channel="dine_in",
+                dish_id=DISH_ID_1,
+                store_id=STORE_ID,
+                channel="dine_in",
                 at_datetime=datetime(2026, 3, 31, 12, 0, 0),
             )
 
@@ -770,16 +747,11 @@ class TestGetEffectivePrice:
 
         with (
             patch.object(BrandPublishRepository, "_set_tenant", AsyncMock()),
-            patch.object(BrandPublishRepository, "get_plan_override_for_dish",
-                         AsyncMock(return_value=None)),
-            patch.object(BrandPublishRepository, "get_store_dish_override",
-                         AsyncMock(return_value=None)),
-            patch.object(BrandPublishRepository, "get_active_rules_for_dish",
-                         AsyncMock(return_value=[delivery_rule])),
+            patch.object(BrandPublishRepository, "get_plan_override_for_dish", AsyncMock(return_value=None)),
+            patch.object(BrandPublishRepository, "get_store_dish_override", AsyncMock(return_value=None)),
+            patch.object(BrandPublishRepository, "get_active_rules_for_dish", AsyncMock(return_value=[delivery_rule])),
         ):
-            result = await svc.get_effective_price(
-                dish_id=DISH_ID_1, store_id=STORE_ID, channel="delivery"
-            )
+            result = await svc.get_effective_price(dish_id=DISH_ID_1, store_id=STORE_ID, channel="delivery")
 
         assert result["effective_price_fen"] == 4000  # 3800 + 200
         assert result["price_source"] == "adjustment_rule"
@@ -815,10 +787,7 @@ class TestMultiTenantIsolation:
         svc = _make_svc(db)
         expected_plan = _fake_plan()
 
-        with patch.object(
-            BrandPublishRepository, "create_publish_plan",
-            AsyncMock(return_value=expected_plan)
-        ):
+        with patch.object(BrandPublishRepository, "create_publish_plan", AsyncMock(return_value=expected_plan)):
             await svc.create_publish_plan(
                 plan_name="隔离测试方案",
                 target_type="stores",

@@ -12,6 +12,7 @@
   GET   /api/v1/finance/discrepancies/summary      — 差异汇总统计
   GET   /api/v1/finance/forecast/receivable        — 未来30天到账预测
 """
+
 import uuid
 from datetime import date
 from typing import Optional
@@ -35,11 +36,12 @@ _calculator = ChannelPLCalculator()
 
 # ─── 请求模型 ─────────────────────────────────────────────────────────────────
 
+
 class BillImportRequest(BaseModel):
     store_id: str
-    platform: str                   # meituan / eleme / douyin
-    bill_period: str                # 如 2026-03
-    bill_type: str = "monthly"      # monthly / weekly / daily
+    platform: str  # meituan / eleme / douyin
+    bill_period: str  # 如 2026-03
+    bill_type: str = "monthly"  # monthly / weekly / daily
     total_orders: int = 0
     gross_amount_fen: int = 0
     commission_fen: int = 0
@@ -47,7 +49,7 @@ class BillImportRequest(BaseModel):
     other_deductions_fen: int = 0
     actual_receive_fen: int = 0
     bill_file_url: Optional[str] = None
-    orders: list[dict] = []         # [{platform_order_id, amount_fen}, ...]
+    orders: list[dict] = []  # [{platform_order_id, amount_fen}, ...]
 
 
 class ResolveRequest(BaseModel):
@@ -55,6 +57,7 @@ class ResolveRequest(BaseModel):
 
 
 # ─── 依赖注入 ─────────────────────────────────────────────────────────────────
+
 
 async def _get_tenant_db(x_tenant_id: str = Header(..., alias="X-Tenant-ID")):
     async for session in get_db_with_tenant(x_tenant_id):
@@ -76,6 +79,7 @@ def _parse_date(val: str, field_name: str) -> date:
 
 
 # ─── POST /bills/import ───────────────────────────────────────────────────────
+
 
 @router.post("/bills/import", summary="导入平台账单")
 async def import_bill(
@@ -101,6 +105,7 @@ async def import_bill(
     sid = _parse_uuid(body.store_id, "store_id")
 
     import json
+
     raw_data = json.dumps({"orders": body.orders}, ensure_ascii=False)
 
     try:
@@ -150,7 +155,9 @@ async def import_bill(
         row = result.mappings().first()
         await db.commit()
     except (OperationalError, SQLAlchemyError) as exc:
-        logger.error("import_bill.failed", store_id=body.store_id, platform=body.platform, error=str(exc), exc_info=True)
+        logger.error(
+            "import_bill.failed", store_id=body.store_id, platform=body.platform, error=str(exc), exc_info=True
+        )
         raise HTTPException(status_code=500, detail="账单导入失败") from exc
 
     logger.info("bill_imported", bill_id=str(row["id"]), platform=body.platform, bill_period=body.bill_period)
@@ -167,6 +174,7 @@ async def import_bill(
 
 
 # ─── GET /bills ───────────────────────────────────────────────────────────────
+
 
 @router.get("/bills", summary="账单列表")
 async def list_bills(
@@ -240,6 +248,7 @@ async def list_bills(
 
 # ─── GET /bills/{id} ─────────────────────────────────────────────────────────
 
+
 @router.get("/bills/{bill_id}", summary="账单详情")
 async def get_bill(
     bill_id: str = Path(..., description="账单ID"),
@@ -282,6 +291,7 @@ async def get_bill(
 
 # ─── POST /bills/{id}/reconcile ──────────────────────────────────────────────
 
+
 @router.post("/bills/{bill_id}/reconcile", summary="触发自动核对")
 async def reconcile_bill(
     bill_id: str = Path(..., description="账单ID"),
@@ -304,6 +314,7 @@ async def reconcile_bill(
 
 
 # ─── GET /pl/channel ─────────────────────────────────────────────────────────
+
 
 @router.get("/pl/channel", summary="渠道P&L报表")
 async def get_channel_pl(
@@ -340,6 +351,7 @@ async def get_channel_pl(
 
 
 # ─── GET /pl/summary ─────────────────────────────────────────────────────────
+
 
 @router.get("/pl/summary", summary="所有渠道P&L汇总")
 async def get_pl_summary(
@@ -385,6 +397,7 @@ async def get_pl_summary(
 
 
 # ─── GET /discrepancies ───────────────────────────────────────────────────────
+
 
 @router.get("/discrepancies", summary="差异清单")
 async def list_discrepancies(
@@ -457,6 +470,7 @@ async def list_discrepancies(
 
 # ─── POST /discrepancies/{id}/resolve ────────────────────────────────────────
 
+
 @router.post("/discrepancies/{discrepancy_id}/resolve", summary="标记差异已处理")
 async def resolve_discrepancy(
     discrepancy_id: str = Path(..., description="差异记录ID"),
@@ -508,6 +522,7 @@ async def resolve_discrepancy(
 
 # ─── GET /discrepancies/summary ──────────────────────────────────────────────
 
+
 @router.get("/discrepancies/summary", summary="差异汇总统计")
 async def get_discrepancy_summary(
     store_id: str = Query(..., description="门店ID"),
@@ -534,6 +549,7 @@ async def get_discrepancy_summary(
 
 
 # ─── GET /forecast/receivable ────────────────────────────────────────────────
+
 
 @router.get("/forecast/receivable", summary="未来到账预测")
 async def get_receivable_forecast(

@@ -5,16 +5,16 @@
   2. test_deposit_refund_status_change     — 退押金后 status 变为 refunded
   3. test_shift_summary_calculation        — 结班汇总：收 N 笔 - 退 M 笔 = 净留存
 """
+
 from __future__ import annotations
 
 import uuid
-from datetime import date, datetime, timezone
-from unittest.mock import AsyncMock, MagicMock, patch
+from datetime import datetime, timezone
 
 import pytest
 
-
 # ─── 工具：构造模拟 deposit 行 ─────────────────────────────────────────────────
+
 
 def _make_deposit(
     amount_fen: int = 10000,
@@ -35,6 +35,7 @@ def _make_deposit(
 
 
 # ─── Test 1: 押金台账按状态分组统计 ──────────────────────────────────────────
+
 
 class TestDepositLedgerStatusGrouping:
     """台账报表：按时间段汇总金额应与各笔明细一致。"""
@@ -88,15 +89,12 @@ class TestDepositLedgerStatusGrouping:
             refunded_fen=2000,
             status="converted",
         )
-        converted = (
-            deposit["amount_fen"]
-            - deposit["applied_amount_fen"]
-            - deposit["refunded_amount_fen"]
-        )
+        converted = deposit["amount_fen"] - deposit["applied_amount_fen"] - deposit["refunded_amount_fen"]
         assert converted == 10000
 
 
 # ─── Test 2: 退押金后 status 变更 ────────────────────────────────────────────
+
 
 class TestDepositRefundStatusChange:
     """退押金操作后，状态应正确更新。"""
@@ -109,11 +107,7 @@ class TestDepositRefundStatusChange:
         # 模拟退款逻辑（与 deposit_routes.py refund_deposit 保持一致）
         refund_amount = 10000
         new_refunded = deposit["refunded_amount_fen"] + refund_amount
-        new_remaining = (
-            deposit["amount_fen"]
-            - deposit["applied_amount_fen"]
-            - new_refunded
-        )
+        new_remaining = deposit["amount_fen"] - deposit["applied_amount_fen"] - new_refunded
         new_status = "refunded" if new_remaining == 0 else deposit["status"]
 
         assert new_status == "refunded"
@@ -126,11 +120,7 @@ class TestDepositRefundStatusChange:
 
         refund_amount = 4000  # 只退一半
         new_refunded = deposit["refunded_amount_fen"] + refund_amount
-        new_remaining = (
-            deposit["amount_fen"]
-            - deposit["applied_amount_fen"]
-            - new_refunded
-        )
+        new_remaining = deposit["amount_fen"] - deposit["applied_amount_fen"] - new_refunded
         new_status = "refunded" if new_remaining == 0 else deposit["status"]
 
         assert new_status == "collected"
@@ -145,11 +135,7 @@ class TestDepositRefundStatusChange:
             status="partially_applied",
         )
 
-        remaining_before = (
-            deposit["amount_fen"]
-            - deposit["applied_amount_fen"]
-            - deposit["refunded_amount_fen"]
-        )
+        remaining_before = deposit["amount_fen"] - deposit["applied_amount_fen"] - deposit["refunded_amount_fen"]
         assert remaining_before == 6000
 
         refund_amount = 6000
@@ -176,6 +162,7 @@ class TestDepositRefundStatusChange:
 
 # ─── Test 3: 结班汇总计算 ─────────────────────────────────────────────────────
 
+
 class TestShiftSummaryCalculation:
     """结班汇总：收 N 笔 - 退 M 笔 = 净留存。"""
 
@@ -186,15 +173,8 @@ class TestShiftSummaryCalculation:
         shift_end: datetime,
     ) -> dict:
         """模拟 shift_summary_report 的核心计算逻辑。"""
-        received = [
-            d for d in deposits
-            if shift_start <= d["collected_at"] <= shift_end
-        ]
-        refunded = [
-            d for d in deposits
-            if d["refunded_amount_fen"] > 0
-            and shift_start <= d["updated_at"] <= shift_end
-        ]
+        received = [d for d in deposits if shift_start <= d["collected_at"] <= shift_end]
+        refunded = [d for d in deposits if d["refunded_amount_fen"] > 0 and shift_start <= d["updated_at"] <= shift_end]
 
         received_fen = sum(d["amount_fen"] for d in received)
         refunded_fen = sum(d["refunded_amount_fen"] for d in refunded)
@@ -215,9 +195,11 @@ class TestShiftSummaryCalculation:
         deposits = [
             {**_make_deposit(amount_fen=10000), "collected_at": shift_start, "updated_at": shift_start},
             {**_make_deposit(amount_fen=20000), "collected_at": shift_start, "updated_at": shift_start},
-            {**_make_deposit(amount_fen=5000, refunded_fen=5000),
-             "collected_at": datetime(2026, 4, 5, 10, 0, 0, tzinfo=timezone.utc),  # 上一班收
-             "updated_at": shift_start},  # 本班退
+            {
+                **_make_deposit(amount_fen=5000, refunded_fen=5000),
+                "collected_at": datetime(2026, 4, 5, 10, 0, 0, tzinfo=timezone.utc),  # 上一班收
+                "updated_at": shift_start,
+            },  # 本班退
         ]
 
         summary = self._compute_shift_summary(deposits, shift_start, shift_end)
@@ -237,11 +219,9 @@ class TestShiftSummaryCalculation:
 
         deposits = [
             # 昨天的押金：收取和退还都在昨天
-            {**_make_deposit(amount_fen=8000, refunded_fen=8000),
-             "collected_at": yesterday, "updated_at": yesterday},
+            {**_make_deposit(amount_fen=8000, refunded_fen=8000), "collected_at": yesterday, "updated_at": yesterday},
             # 今天的押金
-            {**_make_deposit(amount_fen=12000),
-             "collected_at": today_start, "updated_at": today_start},
+            {**_make_deposit(amount_fen=12000), "collected_at": today_start, "updated_at": today_start},
         ]
 
         summary = self._compute_shift_summary(deposits, today_start, today_end)

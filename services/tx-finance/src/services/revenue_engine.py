@@ -3,6 +3,7 @@
 所有金额单位：分（fen）。金额 /100 转元仅在展示层做。
 依赖 RLS + 显式 tenant_id 双重隔离，禁止跨租户访问。
 """
+
 from __future__ import annotations
 
 import uuid
@@ -34,11 +35,13 @@ def _day_window(biz_date: date) -> tuple[datetime, datetime]:
 
 # ─── 数据类 ──────────────────────────────────────────────────────────────────
 
+
 @dataclass
 class PaymentBreakdown:
     """按支付方式分类的营收明细"""
-    method: str           # cash/wechat/alipay/unionpay/credit/member_balance/unknown
-    label: str            # 中文标签
+
+    method: str  # cash/wechat/alipay/unionpay/credit/member_balance/unknown
+    label: str  # 中文标签
     amount_fen: int
     order_count: int
     ratio: float = 0.0
@@ -47,12 +50,13 @@ class PaymentBreakdown:
 @dataclass
 class DailyRevenue:
     """日营收汇总"""
+
     store_id: uuid.UUID
     biz_date: date
-    gross_revenue_fen: int             # 含折扣前金额
-    total_discount_fen: int            # 折扣总额
-    refund_fen: int                    # 退款金额（退菜 subtotal 之和）
-    net_revenue_fen: int               # 净营收 = gross - discount - refund
+    gross_revenue_fen: int  # 含折扣前金额
+    total_discount_fen: int  # 折扣总额
+    refund_fen: int  # 退款金额（退菜 subtotal 之和）
+    net_revenue_fen: int  # 净营收 = gross - discount - refund
     order_count: int
     payment_breakdown: list[PaymentBreakdown] = field(default_factory=list)
 
@@ -64,6 +68,7 @@ class DailyRevenue:
 @dataclass
 class CategoryRevenue:
     """按菜品分类的营收明细"""
+
     category_id: uuid.UUID | None
     category_name: str
     revenue_fen: int
@@ -75,8 +80,9 @@ class CategoryRevenue:
 @dataclass
 class ChannelRevenue:
     """按渠道（堂食/外卖/宴席）的营收明细"""
-    channel: str          # dine_in/takeaway/delivery/banquet/other
-    label: str            # 中文标签
+
+    channel: str  # dine_in/takeaway/delivery/banquet/other
+    label: str  # 中文标签
     revenue_fen: int
     order_count: int
     ratio: float = 0.0
@@ -85,22 +91,22 @@ class ChannelRevenue:
 # ─── RevenueEngine ──────────────────────────────────────────────────────────
 
 _PAYMENT_LABELS: dict[str, str] = {
-    "cash":           "现金",
-    "wechat":         "微信",
-    "alipay":         "支付宝",
-    "unionpay":       "银联",
-    "credit":         "挂账",
+    "cash": "现金",
+    "wechat": "微信",
+    "alipay": "支付宝",
+    "unionpay": "银联",
+    "credit": "挂账",
     "member_balance": "会员余额",
-    "unknown":        "未知",
+    "unknown": "未知",
 }
 
 _ORDER_TYPE_LABELS: dict[str, str] = {
-    "dine_in":  "堂食",
+    "dine_in": "堂食",
     "takeaway": "外带",
     "delivery": "外卖",
-    "banquet":  "宴席",
+    "banquet": "宴席",
     "catering": "团餐",
-    "retail":   "零售",
+    "retail": "零售",
 }
 
 _COMPLETED_STATUSES = ["completed", "settled", "paid"]
@@ -142,8 +148,7 @@ class RevenueEngine:
                 func.coalesce(func.sum(Order.total_amount_fen), 0).label("gross"),
                 func.coalesce(func.sum(Order.discount_amount_fen), 0).label("discount"),
                 func.count(Order.id).label("cnt"),
-            )
-            .where(
+            ).where(
                 and_(
                     Order.tenant_id == tenant_id,
                     Order.store_id == store_id,
@@ -160,15 +165,11 @@ class RevenueEngine:
         order_count = int(agg.cnt)
 
         # ── 2. 按支付方式分类 ────────────────────────────────
-        payment_breakdown = await self._payment_breakdown(
-            tenant_id, store_id, start_dt, end_dt, gross_revenue_fen, db
-        )
+        payment_breakdown = await self._payment_breakdown(tenant_id, store_id, start_dt, end_dt, gross_revenue_fen, db)
 
         # ── 3. 退菜金额 ──────────────────────────────────────
         refund_result = await db.execute(
-            select(
-                func.coalesce(func.sum(OrderItem.subtotal_fen), 0)
-            )
+            select(func.coalesce(func.sum(OrderItem.subtotal_fen), 0))
             .join(Order, OrderItem.order_id == Order.id)
             .where(
                 and_(

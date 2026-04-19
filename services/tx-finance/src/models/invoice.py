@@ -26,6 +26,7 @@ CREATE TABLE invoices (
 -- CREATE POLICY invoices_tenant_isolation ON invoices
 --     USING (tenant_id = current_setting('app.tenant_id')::uuid);
 """
+
 import uuid
 from datetime import datetime
 from decimal import Decimal
@@ -81,12 +82,7 @@ class Invoice(Base):
     issued_at: Optional[datetime] = Column(DateTime(timezone=True))
     failed_reason: Optional[str] = Column(Text)
 
-    created_at: datetime = Column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False
-    )
+    created_at: datetime = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     def __repr__(self) -> str:
-        return (
-            f"<Invoice id={self.id} order_id={self.order_id} "
-            f"status={self.status} amount={self.amount}>"
-        )
+        return f"<Invoice id={self.id} order_id={self.order_id} status={self.status} amount={self.amount}>"

@@ -9,6 +9,7 @@
 
 金额约定：所有金额参数和存储均为分(fen)。
 """
+
 from __future__ import annotations
 
 import uuid
@@ -37,6 +38,7 @@ def _today() -> date:
 # ─────────────────────────────────────────────────────────────────────────────
 # 城市→级别映射
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 async def get_city_tier(
     db: AsyncSession,
@@ -72,6 +74,7 @@ async def get_city_tier(
     if row is None:
         # 模糊匹配：LIKE %city_name%
         from sqlalchemy import func
+
         fuzzy_stmt = (
             select(StandardCityTier)
             .where(
@@ -94,6 +97,7 @@ async def get_city_tier(
 # ─────────────────────────────────────────────────────────────────────────────
 # 三维度差标查询
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 async def find_standard(
     db: AsyncSession,
@@ -132,7 +136,8 @@ async def find_standard(
         ]
 
     async def _query(sl: str, ct: str, et: str) -> Optional[ExpenseStandard]:
-        from sqlalchemy import or_, and_
+        from sqlalchemy import or_
+
         where = _base_where(sl, ct, et)
         # effective_to IS NULL（长期有效）或 effective_to >= today
         where.append(
@@ -176,6 +181,7 @@ async def find_standard(
 # 实时合规检查（提交前调用，必须 <100ms）
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 async def check_compliance(
     db: AsyncSession,
     tenant_id: uuid.UUID,
@@ -217,9 +223,7 @@ async def check_compliance(
     city_tier = await get_city_tier(db, tenant_id, destination_city)
 
     # 2. 查找差标
-    standard = await find_standard(
-        db, tenant_id, brand_id, staff_level, city_tier, expense_type
-    )
+    standard = await find_standard(db, tenant_id, brand_id, staff_level, city_tier, expense_type)
 
     # 3. 无差标 → 自动通过
     if standard is None:
@@ -278,10 +282,7 @@ async def check_compliance(
             "city_tier": city_tier,
             "staff_level": staff_level,
             "standard_name": standard.name,
-            "message": (
-                f"金额超出{limit_label}（{limit_yuan:.0f}元）{over_pct_str}，"
-                "轻微超标，请确认金额无误"
-            ),
+            "message": (f"金额超出{limit_label}（{limit_yuan:.0f}元）{over_pct_str}，轻微超标，请确认金额无误"),
             "action_required": "none",
         }
     elif over_rate <= 0.50:
@@ -295,10 +296,7 @@ async def check_compliance(
             "city_tier": city_tier,
             "staff_level": staff_level,
             "standard_name": standard.name,
-            "message": (
-                f"金额超出{limit_label}（{limit_yuan:.0f}元）{over_pct_str}，"
-                "请在备注中填写超标说明"
-            ),
+            "message": (f"金额超出{limit_label}（{limit_yuan:.0f}元）{over_pct_str}，请在备注中填写超标说明"),
             "action_required": "add_note",
         }
     else:
@@ -323,6 +321,7 @@ async def check_compliance(
 # ─────────────────────────────────────────────────────────────────────────────
 # 差标 CRUD（管理端）
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 async def create_standard(
     db: AsyncSession,
@@ -361,20 +360,18 @@ async def create_standard(
     try:
         # 查找同维度已有的活跃规则
         from sqlalchemy import or_
-        existing_stmt = (
-            select(ExpenseStandard)
-            .where(
-                ExpenseStandard.tenant_id == tenant_id,
-                ExpenseStandard.brand_id == brand_id,
-                ExpenseStandard.staff_level == staff_level,
-                ExpenseStandard.city_tier == city_tier,
-                ExpenseStandard.expense_type == expense_type,
-                ExpenseStandard.is_active == True,  # noqa: E712
-                or_(
-                    ExpenseStandard.effective_to.is_(None),
-                    ExpenseStandard.effective_to >= today,
-                ),
-            )
+
+        existing_stmt = select(ExpenseStandard).where(
+            ExpenseStandard.tenant_id == tenant_id,
+            ExpenseStandard.brand_id == brand_id,
+            ExpenseStandard.staff_level == staff_level,
+            ExpenseStandard.city_tier == city_tier,
+            ExpenseStandard.expense_type == expense_type,
+            ExpenseStandard.is_active == True,  # noqa: E712
+            or_(
+                ExpenseStandard.effective_to.is_(None),
+                ExpenseStandard.effective_to >= today,
+            ),
         )
         existing_result = await db.execute(existing_stmt)
         existing_rules = list(existing_result.scalars().all())
@@ -468,6 +465,7 @@ async def list_standards(
 # 连锁品牌差标继承
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 async def init_brand_standards(
     db: AsyncSession,
     tenant_id: uuid.UUID,
@@ -485,13 +483,10 @@ async def init_brand_standards(
     today = _today()
 
     # 查询 source 品牌所有活跃差标
-    source_stmt = (
-        select(ExpenseStandard)
-        .where(
-            ExpenseStandard.tenant_id == tenant_id,
-            ExpenseStandard.brand_id == source_brand_id,
-            ExpenseStandard.is_active == True,  # noqa: E712
-        )
+    source_stmt = select(ExpenseStandard).where(
+        ExpenseStandard.tenant_id == tenant_id,
+        ExpenseStandard.brand_id == source_brand_id,
+        ExpenseStandard.is_active == True,  # noqa: E712
     )
     source_result = await db.execute(source_stmt)
     source_standards = list(source_result.scalars().all())
@@ -542,6 +537,7 @@ async def init_brand_standards(
 # 餐饮行业默认差标模板
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 async def get_default_city_tiers_template() -> list[dict]:
     """返回50个主要城市的城市级别映射模板（硬编码业务数据）。
 
@@ -555,57 +551,55 @@ async def get_default_city_tiers_template() -> list[dict]:
     """
     return [
         # ── 一线城市（4个）─────────────────────────────────────────────────────
-        {"city_name": "北京", "province": "北京市",   "city_code": "110000", "tier": CityTier.TIER1.value},
-        {"city_name": "上海", "province": "上海市",   "city_code": "310000", "tier": CityTier.TIER1.value},
-        {"city_name": "广州", "province": "广东省",   "city_code": "440100", "tier": CityTier.TIER1.value},
-        {"city_name": "深圳", "province": "广东省",   "city_code": "440300", "tier": CityTier.TIER1.value},
-
+        {"city_name": "北京", "province": "北京市", "city_code": "110000", "tier": CityTier.TIER1.value},
+        {"city_name": "上海", "province": "上海市", "city_code": "310000", "tier": CityTier.TIER1.value},
+        {"city_name": "广州", "province": "广东省", "city_code": "440100", "tier": CityTier.TIER1.value},
+        {"city_name": "深圳", "province": "广东省", "city_code": "440300", "tier": CityTier.TIER1.value},
         # ── 新一线城市（15个）──────────────────────────────────────────────────
-        {"city_name": "成都", "province": "四川省",   "city_code": "510100", "tier": CityTier.TIER2.value},
-        {"city_name": "杭州", "province": "浙江省",   "city_code": "330100", "tier": CityTier.TIER2.value},
-        {"city_name": "重庆", "province": "重庆市",   "city_code": "500000", "tier": CityTier.TIER2.value},
-        {"city_name": "武汉", "province": "湖北省",   "city_code": "420100", "tier": CityTier.TIER2.value},
-        {"city_name": "西安", "province": "陕西省",   "city_code": "610100", "tier": CityTier.TIER2.value},
-        {"city_name": "苏州", "province": "江苏省",   "city_code": "320500", "tier": CityTier.TIER2.value},
-        {"city_name": "天津", "province": "天津市",   "city_code": "120000", "tier": CityTier.TIER2.value},
-        {"city_name": "南京", "province": "江苏省",   "city_code": "320100", "tier": CityTier.TIER2.value},
-        {"city_name": "长沙", "province": "湖南省",   "city_code": "430100", "tier": CityTier.TIER2.value},
-        {"city_name": "郑州", "province": "河南省",   "city_code": "410100", "tier": CityTier.TIER2.value},
-        {"city_name": "东莞", "province": "广东省",   "city_code": "441900", "tier": CityTier.TIER2.value},
-        {"city_name": "青岛", "province": "山东省",   "city_code": "370200", "tier": CityTier.TIER2.value},
-        {"city_name": "沈阳", "province": "辽宁省",   "city_code": "210100", "tier": CityTier.TIER2.value},
-        {"city_name": "宁波", "province": "浙江省",   "city_code": "330200", "tier": CityTier.TIER2.value},
-        {"city_name": "昆明", "province": "云南省",   "city_code": "530100", "tier": CityTier.TIER2.value},
-
+        {"city_name": "成都", "province": "四川省", "city_code": "510100", "tier": CityTier.TIER2.value},
+        {"city_name": "杭州", "province": "浙江省", "city_code": "330100", "tier": CityTier.TIER2.value},
+        {"city_name": "重庆", "province": "重庆市", "city_code": "500000", "tier": CityTier.TIER2.value},
+        {"city_name": "武汉", "province": "湖北省", "city_code": "420100", "tier": CityTier.TIER2.value},
+        {"city_name": "西安", "province": "陕西省", "city_code": "610100", "tier": CityTier.TIER2.value},
+        {"city_name": "苏州", "province": "江苏省", "city_code": "320500", "tier": CityTier.TIER2.value},
+        {"city_name": "天津", "province": "天津市", "city_code": "120000", "tier": CityTier.TIER2.value},
+        {"city_name": "南京", "province": "江苏省", "city_code": "320100", "tier": CityTier.TIER2.value},
+        {"city_name": "长沙", "province": "湖南省", "city_code": "430100", "tier": CityTier.TIER2.value},
+        {"city_name": "郑州", "province": "河南省", "city_code": "410100", "tier": CityTier.TIER2.value},
+        {"city_name": "东莞", "province": "广东省", "city_code": "441900", "tier": CityTier.TIER2.value},
+        {"city_name": "青岛", "province": "山东省", "city_code": "370200", "tier": CityTier.TIER2.value},
+        {"city_name": "沈阳", "province": "辽宁省", "city_code": "210100", "tier": CityTier.TIER2.value},
+        {"city_name": "宁波", "province": "浙江省", "city_code": "330200", "tier": CityTier.TIER2.value},
+        {"city_name": "昆明", "province": "云南省", "city_code": "530100", "tier": CityTier.TIER2.value},
         # ── 二线城市（31个）───────────────────────────────────────────────────
-        {"city_name": "合肥", "province": "安徽省",   "city_code": "340100", "tier": CityTier.TIER3.value},
-        {"city_name": "福州", "province": "福建省",   "city_code": "350100", "tier": CityTier.TIER3.value},
-        {"city_name": "无锡", "province": "江苏省",   "city_code": "320200", "tier": CityTier.TIER3.value},
-        {"city_name": "厦门", "province": "福建省",   "city_code": "350200", "tier": CityTier.TIER3.value},
+        {"city_name": "合肥", "province": "安徽省", "city_code": "340100", "tier": CityTier.TIER3.value},
+        {"city_name": "福州", "province": "福建省", "city_code": "350100", "tier": CityTier.TIER3.value},
+        {"city_name": "无锡", "province": "江苏省", "city_code": "320200", "tier": CityTier.TIER3.value},
+        {"city_name": "厦门", "province": "福建省", "city_code": "350200", "tier": CityTier.TIER3.value},
         {"city_name": "哈尔滨", "province": "黑龙江省", "city_code": "230100", "tier": CityTier.TIER3.value},
-        {"city_name": "济南", "province": "山东省",   "city_code": "370100", "tier": CityTier.TIER3.value},
-        {"city_name": "温州", "province": "浙江省",   "city_code": "330300", "tier": CityTier.TIER3.value},
-        {"city_name": "南昌", "province": "江西省",   "city_code": "360100", "tier": CityTier.TIER3.value},
-        {"city_name": "长春", "province": "吉林省",   "city_code": "220100", "tier": CityTier.TIER3.value},
-        {"city_name": "泉州", "province": "福建省",   "city_code": "350500", "tier": CityTier.TIER3.value},
-        {"city_name": "石家庄", "province": "河北省",  "city_code": "130100", "tier": CityTier.TIER3.value},
-        {"city_name": "贵阳", "province": "贵州省",   "city_code": "520100", "tier": CityTier.TIER3.value},
-        {"city_name": "太原", "province": "山西省",   "city_code": "140100", "tier": CityTier.TIER3.value},
+        {"city_name": "济南", "province": "山东省", "city_code": "370100", "tier": CityTier.TIER3.value},
+        {"city_name": "温州", "province": "浙江省", "city_code": "330300", "tier": CityTier.TIER3.value},
+        {"city_name": "南昌", "province": "江西省", "city_code": "360100", "tier": CityTier.TIER3.value},
+        {"city_name": "长春", "province": "吉林省", "city_code": "220100", "tier": CityTier.TIER3.value},
+        {"city_name": "泉州", "province": "福建省", "city_code": "350500", "tier": CityTier.TIER3.value},
+        {"city_name": "石家庄", "province": "河北省", "city_code": "130100", "tier": CityTier.TIER3.value},
+        {"city_name": "贵阳", "province": "贵州省", "city_code": "520100", "tier": CityTier.TIER3.value},
+        {"city_name": "太原", "province": "山西省", "city_code": "140100", "tier": CityTier.TIER3.value},
         {"city_name": "南宁", "province": "广西壮族自治区", "city_code": "450100", "tier": CityTier.TIER3.value},
-        {"city_name": "常州", "province": "江苏省",   "city_code": "320400", "tier": CityTier.TIER3.value},
-        {"city_name": "扬州", "province": "江苏省",   "city_code": "321000", "tier": CityTier.TIER3.value},
-        {"city_name": "南通", "province": "江苏省",   "city_code": "320600", "tier": CityTier.TIER3.value},
-        {"city_name": "嘉兴", "province": "浙江省",   "city_code": "330400", "tier": CityTier.TIER3.value},
-        {"city_name": "珠海", "province": "广东省",   "city_code": "440400", "tier": CityTier.TIER3.value},
-        {"city_name": "惠州", "province": "广东省",   "city_code": "441300", "tier": CityTier.TIER3.value},
-        {"city_name": "中山", "province": "广东省",   "city_code": "442000", "tier": CityTier.TIER3.value},
-        {"city_name": "湖州", "province": "浙江省",   "city_code": "330500", "tier": CityTier.TIER3.value},
-        {"city_name": "台州", "province": "浙江省",   "city_code": "331000", "tier": CityTier.TIER3.value},
-        {"city_name": "徐州", "province": "江苏省",   "city_code": "320300", "tier": CityTier.TIER3.value},
-        {"city_name": "烟台", "province": "山东省",   "city_code": "370600", "tier": CityTier.TIER3.value},
-        {"city_name": "潍坊", "province": "山东省",   "city_code": "370700", "tier": CityTier.TIER3.value},
-        {"city_name": "兰州", "province": "甘肃省",   "city_code": "620100", "tier": CityTier.TIER3.value},
-        {"city_name": "海口", "province": "海南省",   "city_code": "460100", "tier": CityTier.TIER3.value},
+        {"city_name": "常州", "province": "江苏省", "city_code": "320400", "tier": CityTier.TIER3.value},
+        {"city_name": "扬州", "province": "江苏省", "city_code": "321000", "tier": CityTier.TIER3.value},
+        {"city_name": "南通", "province": "江苏省", "city_code": "320600", "tier": CityTier.TIER3.value},
+        {"city_name": "嘉兴", "province": "浙江省", "city_code": "330400", "tier": CityTier.TIER3.value},
+        {"city_name": "珠海", "province": "广东省", "city_code": "440400", "tier": CityTier.TIER3.value},
+        {"city_name": "惠州", "province": "广东省", "city_code": "441300", "tier": CityTier.TIER3.value},
+        {"city_name": "中山", "province": "广东省", "city_code": "442000", "tier": CityTier.TIER3.value},
+        {"city_name": "湖州", "province": "浙江省", "city_code": "330500", "tier": CityTier.TIER3.value},
+        {"city_name": "台州", "province": "浙江省", "city_code": "331000", "tier": CityTier.TIER3.value},
+        {"city_name": "徐州", "province": "江苏省", "city_code": "320300", "tier": CityTier.TIER3.value},
+        {"city_name": "烟台", "province": "山东省", "city_code": "370600", "tier": CityTier.TIER3.value},
+        {"city_name": "潍坊", "province": "山东省", "city_code": "370700", "tier": CityTier.TIER3.value},
+        {"city_name": "兰州", "province": "甘肃省", "city_code": "620100", "tier": CityTier.TIER3.value},
+        {"city_name": "海口", "province": "海南省", "city_code": "460100", "tier": CityTier.TIER3.value},
         {"city_name": "呼和浩特", "province": "内蒙古自治区", "city_code": "150100", "tier": CityTier.TIER3.value},
         {"city_name": "银川", "province": "宁夏回族自治区", "city_code": "640100", "tier": CityTier.TIER3.value},
     ]
@@ -645,10 +639,14 @@ async def init_tenant_city_tiers(
         if city_name in existing_names:
             if not skip_existing:
                 # 查出记录并更新 tier
-                upd_stmt = select(StandardCityTier).where(
-                    StandardCityTier.tenant_id == tenant_id,
-                    StandardCityTier.city_name == city_name,
-                ).limit(1)
+                upd_stmt = (
+                    select(StandardCityTier)
+                    .where(
+                        StandardCityTier.tenant_id == tenant_id,
+                        StandardCityTier.city_name == city_name,
+                    )
+                    .limit(1)
+                )
                 upd_result = await db.execute(upd_stmt)
                 row = upd_result.scalar_one_or_none()
                 if row is not None:
@@ -691,57 +689,213 @@ async def get_default_standards_template() -> list[dict]:
     """
     return [
         # ── 门店员工 ──────────────────────────────────────────────────────
-        {"staff_level": "store_staff", "city_tier": "tier1", "expense_type": "accommodation", "daily_limit": 25000},   # 250元
-        {"staff_level": "store_staff", "city_tier": "tier1", "expense_type": "meal",          "daily_limit": 6000},    # 60元
-        {"staff_level": "store_staff", "city_tier": "tier1", "expense_type": "transport",     "daily_limit": 10000},   # 100元
-        {"staff_level": "store_staff", "city_tier": "tier2", "expense_type": "accommodation", "daily_limit": 18000},   # 180元
-        {"staff_level": "store_staff", "city_tier": "tier2", "expense_type": "meal",          "daily_limit": 5000},    # 50元
-        {"staff_level": "store_staff", "city_tier": "tier2", "expense_type": "transport",     "daily_limit": 8000},    # 80元
-        {"staff_level": "store_staff", "city_tier": "tier3", "expense_type": "accommodation", "daily_limit": 12600},   # 126元（≈180×0.7）
-        {"staff_level": "store_staff", "city_tier": "tier3", "expense_type": "meal",          "daily_limit": 3500},    # 35元（≈50×0.7）
-        {"staff_level": "store_staff", "city_tier": "tier3", "expense_type": "transport",     "daily_limit": 5600},    # 56元（≈80×0.7）
-
+        {
+            "staff_level": "store_staff",
+            "city_tier": "tier1",
+            "expense_type": "accommodation",
+            "daily_limit": 25000,
+        },  # 250元
+        {"staff_level": "store_staff", "city_tier": "tier1", "expense_type": "meal", "daily_limit": 6000},  # 60元
+        {
+            "staff_level": "store_staff",
+            "city_tier": "tier1",
+            "expense_type": "transport",
+            "daily_limit": 10000,
+        },  # 100元
+        {
+            "staff_level": "store_staff",
+            "city_tier": "tier2",
+            "expense_type": "accommodation",
+            "daily_limit": 18000,
+        },  # 180元
+        {"staff_level": "store_staff", "city_tier": "tier2", "expense_type": "meal", "daily_limit": 5000},  # 50元
+        {"staff_level": "store_staff", "city_tier": "tier2", "expense_type": "transport", "daily_limit": 8000},  # 80元
+        {
+            "staff_level": "store_staff",
+            "city_tier": "tier3",
+            "expense_type": "accommodation",
+            "daily_limit": 12600,
+        },  # 126元（≈180×0.7）
+        {
+            "staff_level": "store_staff",
+            "city_tier": "tier3",
+            "expense_type": "meal",
+            "daily_limit": 3500,
+        },  # 35元（≈50×0.7）
+        {
+            "staff_level": "store_staff",
+            "city_tier": "tier3",
+            "expense_type": "transport",
+            "daily_limit": 5600,
+        },  # 56元（≈80×0.7）
         # ── 店长 ──────────────────────────────────────────────────────────
-        {"staff_level": "store_manager", "city_tier": "tier1", "expense_type": "accommodation", "daily_limit": 40000},  # 400元
-        {"staff_level": "store_manager", "city_tier": "tier1", "expense_type": "meal",          "daily_limit": 10000},  # 100元
-        {"staff_level": "store_manager", "city_tier": "tier1", "expense_type": "transport",     "daily_limit": 20000},  # 200元
-        {"staff_level": "store_manager", "city_tier": "tier2", "expense_type": "accommodation", "daily_limit": 30000},  # 300元
-        {"staff_level": "store_manager", "city_tier": "tier2", "expense_type": "meal",          "daily_limit": 8000},   # 80元
-        {"staff_level": "store_manager", "city_tier": "tier2", "expense_type": "transport",     "daily_limit": 15000},  # 150元
-        {"staff_level": "store_manager", "city_tier": "tier3", "expense_type": "accommodation", "daily_limit": 21000},  # 210元（≈300×0.7）
-        {"staff_level": "store_manager", "city_tier": "tier3", "expense_type": "meal",          "daily_limit": 5600},   # 56元（≈80×0.7）
-        {"staff_level": "store_manager", "city_tier": "tier3", "expense_type": "transport",     "daily_limit": 10500},  # 105元（≈150×0.7）
-
+        {
+            "staff_level": "store_manager",
+            "city_tier": "tier1",
+            "expense_type": "accommodation",
+            "daily_limit": 40000,
+        },  # 400元
+        {"staff_level": "store_manager", "city_tier": "tier1", "expense_type": "meal", "daily_limit": 10000},  # 100元
+        {
+            "staff_level": "store_manager",
+            "city_tier": "tier1",
+            "expense_type": "transport",
+            "daily_limit": 20000,
+        },  # 200元
+        {
+            "staff_level": "store_manager",
+            "city_tier": "tier2",
+            "expense_type": "accommodation",
+            "daily_limit": 30000,
+        },  # 300元
+        {"staff_level": "store_manager", "city_tier": "tier2", "expense_type": "meal", "daily_limit": 8000},  # 80元
+        {
+            "staff_level": "store_manager",
+            "city_tier": "tier2",
+            "expense_type": "transport",
+            "daily_limit": 15000,
+        },  # 150元
+        {
+            "staff_level": "store_manager",
+            "city_tier": "tier3",
+            "expense_type": "accommodation",
+            "daily_limit": 21000,
+        },  # 210元（≈300×0.7）
+        {
+            "staff_level": "store_manager",
+            "city_tier": "tier3",
+            "expense_type": "meal",
+            "daily_limit": 5600,
+        },  # 56元（≈80×0.7）
+        {
+            "staff_level": "store_manager",
+            "city_tier": "tier3",
+            "expense_type": "transport",
+            "daily_limit": 10500,
+        },  # 105元（≈150×0.7）
         # ── 区域经理 ──────────────────────────────────────────────────────
-        {"staff_level": "region_manager", "city_tier": "tier1", "expense_type": "accommodation", "daily_limit": 60000},  # 600元
-        {"staff_level": "region_manager", "city_tier": "tier1", "expense_type": "meal",          "daily_limit": 15000},  # 150元
-        {"staff_level": "region_manager", "city_tier": "tier1", "expense_type": "transport",     "daily_limit": 30000},  # 300元
-        {"staff_level": "region_manager", "city_tier": "tier2", "expense_type": "accommodation", "daily_limit": 45000},  # 450元
-        {"staff_level": "region_manager", "city_tier": "tier2", "expense_type": "meal",          "daily_limit": 12000},  # 120元
-        {"staff_level": "region_manager", "city_tier": "tier2", "expense_type": "transport",     "daily_limit": 20000},  # 200元
-        {"staff_level": "region_manager", "city_tier": "tier3", "expense_type": "accommodation", "daily_limit": 31500},  # 315元（≈450×0.7）
-        {"staff_level": "region_manager", "city_tier": "tier3", "expense_type": "meal",          "daily_limit": 8400},   # 84元（≈120×0.7）
-        {"staff_level": "region_manager", "city_tier": "tier3", "expense_type": "transport",     "daily_limit": 14000},  # 140元（≈200×0.7）
-
+        {
+            "staff_level": "region_manager",
+            "city_tier": "tier1",
+            "expense_type": "accommodation",
+            "daily_limit": 60000,
+        },  # 600元
+        {"staff_level": "region_manager", "city_tier": "tier1", "expense_type": "meal", "daily_limit": 15000},  # 150元
+        {
+            "staff_level": "region_manager",
+            "city_tier": "tier1",
+            "expense_type": "transport",
+            "daily_limit": 30000,
+        },  # 300元
+        {
+            "staff_level": "region_manager",
+            "city_tier": "tier2",
+            "expense_type": "accommodation",
+            "daily_limit": 45000,
+        },  # 450元
+        {"staff_level": "region_manager", "city_tier": "tier2", "expense_type": "meal", "daily_limit": 12000},  # 120元
+        {
+            "staff_level": "region_manager",
+            "city_tier": "tier2",
+            "expense_type": "transport",
+            "daily_limit": 20000,
+        },  # 200元
+        {
+            "staff_level": "region_manager",
+            "city_tier": "tier3",
+            "expense_type": "accommodation",
+            "daily_limit": 31500,
+        },  # 315元（≈450×0.7）
+        {
+            "staff_level": "region_manager",
+            "city_tier": "tier3",
+            "expense_type": "meal",
+            "daily_limit": 8400,
+        },  # 84元（≈120×0.7）
+        {
+            "staff_level": "region_manager",
+            "city_tier": "tier3",
+            "expense_type": "transport",
+            "daily_limit": 14000,
+        },  # 140元（≈200×0.7）
         # ── 品牌运营总监 ──────────────────────────────────────────────────
-        {"staff_level": "brand_manager", "city_tier": "tier1", "expense_type": "accommodation", "daily_limit": 80000},  # 800元
-        {"staff_level": "brand_manager", "city_tier": "tier1", "expense_type": "meal",          "daily_limit": 20000},  # 200元
-        {"staff_level": "brand_manager", "city_tier": "tier1", "expense_type": "transport",     "daily_limit": 40000},  # 400元
-        {"staff_level": "brand_manager", "city_tier": "tier2", "expense_type": "accommodation", "daily_limit": 60000},  # 600元
-        {"staff_level": "brand_manager", "city_tier": "tier2", "expense_type": "meal",          "daily_limit": 15000},  # 150元
-        {"staff_level": "brand_manager", "city_tier": "tier2", "expense_type": "transport",     "daily_limit": 30000},  # 300元
-        {"staff_level": "brand_manager", "city_tier": "tier3", "expense_type": "accommodation", "daily_limit": 42000},  # 420元（≈600×0.7）
-        {"staff_level": "brand_manager", "city_tier": "tier3", "expense_type": "meal",          "daily_limit": 10500},  # 105元（≈150×0.7）
-        {"staff_level": "brand_manager", "city_tier": "tier3", "expense_type": "transport",     "daily_limit": 21000},  # 210元（≈300×0.7）
-
+        {
+            "staff_level": "brand_manager",
+            "city_tier": "tier1",
+            "expense_type": "accommodation",
+            "daily_limit": 80000,
+        },  # 800元
+        {"staff_level": "brand_manager", "city_tier": "tier1", "expense_type": "meal", "daily_limit": 20000},  # 200元
+        {
+            "staff_level": "brand_manager",
+            "city_tier": "tier1",
+            "expense_type": "transport",
+            "daily_limit": 40000,
+        },  # 400元
+        {
+            "staff_level": "brand_manager",
+            "city_tier": "tier2",
+            "expense_type": "accommodation",
+            "daily_limit": 60000,
+        },  # 600元
+        {"staff_level": "brand_manager", "city_tier": "tier2", "expense_type": "meal", "daily_limit": 15000},  # 150元
+        {
+            "staff_level": "brand_manager",
+            "city_tier": "tier2",
+            "expense_type": "transport",
+            "daily_limit": 30000,
+        },  # 300元
+        {
+            "staff_level": "brand_manager",
+            "city_tier": "tier3",
+            "expense_type": "accommodation",
+            "daily_limit": 42000,
+        },  # 420元（≈600×0.7）
+        {
+            "staff_level": "brand_manager",
+            "city_tier": "tier3",
+            "expense_type": "meal",
+            "daily_limit": 10500,
+        },  # 105元（≈150×0.7）
+        {
+            "staff_level": "brand_manager",
+            "city_tier": "tier3",
+            "expense_type": "transport",
+            "daily_limit": 21000,
+        },  # 210元（≈300×0.7）
         # ── 高管（CFO/CEO）────────────────────────────────────────────────
-        {"staff_level": "executive", "city_tier": "tier1", "expense_type": "accommodation", "daily_limit": 100000},  # 1000元
-        {"staff_level": "executive", "city_tier": "tier1", "expense_type": "meal",          "daily_limit": 30000},   # 300元
-        {"staff_level": "executive", "city_tier": "tier1", "expense_type": "transport",     "daily_limit": 60000},   # 600元
-        {"staff_level": "executive", "city_tier": "tier2", "expense_type": "accommodation", "daily_limit": 80000},   # 800元
-        {"staff_level": "executive", "city_tier": "tier2", "expense_type": "meal",          "daily_limit": 25000},   # 250元
-        {"staff_level": "executive", "city_tier": "tier2", "expense_type": "transport",     "daily_limit": 50000},   # 500元
-        {"staff_level": "executive", "city_tier": "tier3", "expense_type": "accommodation", "daily_limit": 56000},   # 560元（≈800×0.7）
-        {"staff_level": "executive", "city_tier": "tier3", "expense_type": "meal",          "daily_limit": 17500},   # 175元（≈250×0.7）
-        {"staff_level": "executive", "city_tier": "tier3", "expense_type": "transport",     "daily_limit": 35000},   # 350元（≈500×0.7）
+        {
+            "staff_level": "executive",
+            "city_tier": "tier1",
+            "expense_type": "accommodation",
+            "daily_limit": 100000,
+        },  # 1000元
+        {"staff_level": "executive", "city_tier": "tier1", "expense_type": "meal", "daily_limit": 30000},  # 300元
+        {"staff_level": "executive", "city_tier": "tier1", "expense_type": "transport", "daily_limit": 60000},  # 600元
+        {
+            "staff_level": "executive",
+            "city_tier": "tier2",
+            "expense_type": "accommodation",
+            "daily_limit": 80000,
+        },  # 800元
+        {"staff_level": "executive", "city_tier": "tier2", "expense_type": "meal", "daily_limit": 25000},  # 250元
+        {"staff_level": "executive", "city_tier": "tier2", "expense_type": "transport", "daily_limit": 50000},  # 500元
+        {
+            "staff_level": "executive",
+            "city_tier": "tier3",
+            "expense_type": "accommodation",
+            "daily_limit": 56000,
+        },  # 560元（≈800×0.7）
+        {
+            "staff_level": "executive",
+            "city_tier": "tier3",
+            "expense_type": "meal",
+            "daily_limit": 17500,
+        },  # 175元（≈250×0.7）
+        {
+            "staff_level": "executive",
+            "city_tier": "tier3",
+            "expense_type": "transport",
+            "daily_limit": 35000,
+        },  # 350元（≈500×0.7）
     ]

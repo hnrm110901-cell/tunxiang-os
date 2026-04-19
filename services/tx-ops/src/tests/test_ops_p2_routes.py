@@ -26,20 +26,21 @@ inspection_routes（4个）
   - 每个 mock result 支持 fetchone / fetchall / scalar_one / mappings()
   - 相对导入问题通过 sys.modules 注入存根解决（shared.ontology.src.database）
 """
+
 from __future__ import annotations
 
 import sys
 import types
 import uuid
 from typing import AsyncGenerator
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
-import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from sqlalchemy.exc import SQLAlchemyError
 
 # ── sys.modules 存根注入（隔离 shared 包） ─────────────────────────────────────
+
 
 def _ensure_stub(module_path: str, attrs: dict | None = None) -> types.ModuleType:
     """确保 module_path 在 sys.modules 中存在（若已存在则不覆盖），返回模块对象。"""
@@ -76,10 +77,11 @@ if "structlog" not in sys.modules:
 
 # ── 导入路由（必须在存根注入之后） ────────────────────────────────────────────
 
-from ..api.performance_routes import router as perf_router  # noqa: E402
-from ..api.issues_routes import router as issues_router  # noqa: E402
-from ..api.inspection_routes import router as inspect_router  # noqa: E402
 from shared.ontology.src.database import get_db  # noqa: E402
+
+from ..api.inspection_routes import router as inspect_router  # noqa: E402
+from ..api.issues_routes import router as issues_router  # noqa: E402
+from ..api.performance_routes import router as perf_router  # noqa: E402
 
 # ── 全局常量 ──────────────────────────────────────────────────────────────────
 
@@ -156,11 +158,7 @@ def _make_result(
     mapping_mock.one_or_none = MagicMock(return_value=mappings_one_or_none)
     mapping_mock.all = MagicMock(return_value=mappings_all or [])
     # 支持 for r in rows_result.mappings() 迭代（list_issues 路径）
-    _iter_items = mappings_all or (
-        [mappings_one] if mappings_one else (
-            [mappings_first] if mappings_first else []
-        )
-    )
+    _iter_items = mappings_all or ([mappings_one] if mappings_one else ([mappings_first] if mappings_first else []))
     mapping_mock.__iter__ = MagicMock(return_value=iter(_iter_items))
     result.mappings = MagicMock(return_value=mapping_mock)
 
@@ -196,33 +194,60 @@ class TestListPerformance:
     def test_list_performance_success(self):
         """mock _set_tenant + COUNT + SELECT，返回 2 条记录 → 200。"""
         keys = [
-            "id", "tenant_id", "store_id", "stat_date",
-            "employee_id", "employee_name", "role",
-            "orders_handled", "revenue_generated_fen",
-            "dishes_completed", "tables_served",
-            "avg_service_score", "base_commission_fen",
-            "created_at", "updated_at",
+            "id",
+            "tenant_id",
+            "store_id",
+            "stat_date",
+            "employee_id",
+            "employee_name",
+            "role",
+            "orders_handled",
+            "revenue_generated_fen",
+            "dishes_completed",
+            "tables_served",
+            "avg_service_score",
+            "base_commission_fen",
+            "created_at",
+            "updated_at",
         ]
         row1 = (
-            str(uuid.uuid4()), TENANT_ID, STORE_ID, "2026-04-04",
-            str(uuid.uuid4()), "张三", "cashier",
-            10, 50000,
-            0, 0,
-            None, 50,
-            "2026-04-04T08:00:00", "2026-04-04T08:00:00",
+            str(uuid.uuid4()),
+            TENANT_ID,
+            STORE_ID,
+            "2026-04-04",
+            str(uuid.uuid4()),
+            "张三",
+            "cashier",
+            10,
+            50000,
+            0,
+            0,
+            None,
+            50,
+            "2026-04-04T08:00:00",
+            "2026-04-04T08:00:00",
         )
         row2 = (
-            str(uuid.uuid4()), TENANT_ID, STORE_ID, "2026-04-04",
-            str(uuid.uuid4()), "李四", "chef",
-            0, 0,
-            8, 0,
-            None, 4000,
-            "2026-04-04T08:00:00", "2026-04-04T08:00:00",
+            str(uuid.uuid4()),
+            TENANT_ID,
+            STORE_ID,
+            "2026-04-04",
+            str(uuid.uuid4()),
+            "李四",
+            "chef",
+            0,
+            0,
+            8,
+            0,
+            None,
+            4000,
+            "2026-04-04T08:00:00",
+            "2026-04-04T08:00:00",
         )
 
-        tenant_result = _make_result()                         # _set_tenant
-        count_result = _make_result(scalar_one_value=2)        # COUNT
-        list_result = _make_result(                            # SELECT
+        tenant_result = _make_result()  # _set_tenant
+        count_result = _make_result(scalar_one_value=2)  # COUNT
+        list_result = _make_result(  # SELECT
             keys_list=keys,
             fetchall_rows=[row1, row2],
         )
@@ -251,25 +276,43 @@ class TestPerformanceRanking:
     def test_performance_ranking_success(self):
         """mock COUNT + SELECT ranking → 200，data 含 ranking 列表（含 rank 字段）。"""
         keys = [
-            "id", "tenant_id", "store_id", "stat_date",
-            "employee_id", "employee_name", "role",
-            "orders_handled", "revenue_generated_fen",
-            "dishes_completed", "tables_served",
-            "avg_service_score", "base_commission_fen",
-            "created_at", "updated_at",
+            "id",
+            "tenant_id",
+            "store_id",
+            "stat_date",
+            "employee_id",
+            "employee_name",
+            "role",
+            "orders_handled",
+            "revenue_generated_fen",
+            "dishes_completed",
+            "tables_served",
+            "avg_service_score",
+            "base_commission_fen",
+            "created_at",
+            "updated_at",
         ]
         row = (
-            str(uuid.uuid4()), TENANT_ID, STORE_ID, "2026-04-04",
-            str(uuid.uuid4()), "王五", "waiter",
-            0, 0,
-            0, 5,
-            4.8, 5000,
-            "2026-04-04T08:00:00", "2026-04-04T08:00:00",
+            str(uuid.uuid4()),
+            TENANT_ID,
+            STORE_ID,
+            "2026-04-04",
+            str(uuid.uuid4()),
+            "王五",
+            "waiter",
+            0,
+            0,
+            0,
+            5,
+            4.8,
+            5000,
+            "2026-04-04T08:00:00",
+            "2026-04-04T08:00:00",
         )
 
-        tenant_result = _make_result()                         # _set_tenant
-        count_result = _make_result(scalar_one_value=1)        # COUNT
-        rank_result = _make_result(                            # SELECT ranking
+        tenant_result = _make_result()  # _set_tenant
+        count_result = _make_result(scalar_one_value=1)  # COUNT
+        rank_result = _make_result(  # SELECT ranking
             keys_list=keys,
             fetchall_rows=[row],
         )
@@ -384,8 +427,8 @@ class TestCreateIssue:
         """mock _set_tenant + INSERT RETURNING mappings().one() → 201，data 含 id。"""
         row = _issue_row(ISSUE_ID)
 
-        tenant_result = _make_result()                              # _set_tenant
-        insert_result = _make_result(mappings_one=row)             # INSERT RETURNING
+        tenant_result = _make_result()  # _set_tenant
+        insert_result = _make_result(mappings_one=row)  # INSERT RETURNING
 
         db = _make_db([tenant_result, insert_result])
         app.dependency_overrides[get_db] = _override(db)
@@ -418,9 +461,9 @@ class TestListIssues:
         """mock _set_tenant + COUNT + SELECT → 200，data.items 长度 > 0。"""
         row = _issue_row()
 
-        tenant_result = _make_result()                             # _set_tenant
-        count_result = _make_result(scalar_one_value=1)            # COUNT
-        list_result = _make_result(mappings_all=[row])             # SELECT
+        tenant_result = _make_result()  # _set_tenant
+        count_result = _make_result(scalar_one_value=1)  # COUNT
+        list_result = _make_result(mappings_all=[row])  # SELECT
 
         db = _make_db([tenant_result, count_result, list_result])
         app.dependency_overrides[get_db] = _override(db)
@@ -447,9 +490,9 @@ class TestResolveIssue:
         check_row = {"id": ISSUE_ID, "status": "open"}
         updated_row = {**_issue_row(ISSUE_ID), "status": "resolved"}
 
-        tenant_result = _make_result()                                    # _set_tenant
-        check_result = _make_result(mappings_first=check_row)             # SELECT check
-        update_result = _make_result(mappings_first=updated_row)          # UPDATE RETURNING
+        tenant_result = _make_result()  # _set_tenant
+        check_result = _make_result(mappings_first=check_row)  # SELECT check
+        update_result = _make_result(mappings_first=updated_row)  # UPDATE RETURNING
 
         db = _make_db([tenant_result, check_result, update_result])
         app.dependency_overrides[get_db] = _override(db)
@@ -473,8 +516,8 @@ class TestResolveIssue:
 
     def test_resolve_issue_not_found(self):
         """mock _set_tenant + SELECT 返回 None → 404。"""
-        tenant_result = _make_result()                                    # _set_tenant
-        check_result = _make_result(mappings_first=None)                  # SELECT 找不到
+        tenant_result = _make_result()  # _set_tenant
+        check_result = _make_result(mappings_first=None)  # SELECT 找不到
 
         db = _make_db([tenant_result, check_result])
         app.dependency_overrides[get_db] = _override(db)
@@ -530,8 +573,8 @@ class TestCreateInspectionReport:
         """mock _set_tenant + INSERT RETURNING mappings().one() → 201，data 含 id。"""
         row = _inspect_row(REPORT_ID)
 
-        tenant_result = _make_result()                             # _set_tenant
-        insert_result = _make_result(mappings_one=row)             # INSERT RETURNING
+        tenant_result = _make_result()  # _set_tenant
+        insert_result = _make_result(mappings_one=row)  # INSERT RETURNING
 
         db = _make_db([tenant_result, insert_result])
         app.dependency_overrides[get_db] = _override(db)
@@ -567,9 +610,9 @@ class TestListInspectionReports:
         """mock _set_tenant + COUNT + SELECT → 200，data 含 items 和 total。"""
         row = _inspect_row()
 
-        tenant_result = _make_result()                             # _set_tenant
-        count_result = _make_result(scalar_one_value=1)            # COUNT
-        list_result = _make_result(mappings_all=[row])             # SELECT
+        tenant_result = _make_result()  # _set_tenant
+        count_result = _make_result(scalar_one_value=1)  # COUNT
+        list_result = _make_result(mappings_all=[row])  # SELECT
 
         db = _make_db([tenant_result, count_result, list_result])
         app.dependency_overrides[get_db] = _override(db)
@@ -596,8 +639,8 @@ class TestGetInspectionReport:
         """mock _set_tenant + SELECT mappings().one_or_none() → 200。"""
         row = _inspect_row(REPORT_ID)
 
-        tenant_result = _make_result()                                      # _set_tenant
-        select_result = _make_result(mappings_one_or_none=row)              # SELECT
+        tenant_result = _make_result()  # _set_tenant
+        select_result = _make_result(mappings_one_or_none=row)  # SELECT
 
         db = _make_db([tenant_result, select_result])
         app.dependency_overrides[get_db] = _override(db)
@@ -623,9 +666,9 @@ class TestSubmitInspectionReport:
         check_row = {"status": "draft"}
         updated_row = {**_inspect_row(REPORT_ID), "status": "submitted"}
 
-        tenant_result = _make_result()                                       # _set_tenant
-        check_result = _make_result(mappings_one_or_none=check_row)          # SELECT check
-        update_result = _make_result(mappings_one=updated_row)               # UPDATE RETURNING
+        tenant_result = _make_result()  # _set_tenant
+        check_result = _make_result(mappings_one_or_none=check_row)  # SELECT check
+        update_result = _make_result(mappings_one=updated_row)  # UPDATE RETURNING
 
         db = _make_db([tenant_result, check_result, update_result])
         app.dependency_overrides[get_db] = _override(db)

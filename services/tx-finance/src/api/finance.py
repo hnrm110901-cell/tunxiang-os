@@ -2,28 +2,25 @@
 
 所有金额单位：分（fen）。展示时 /100 转元。
 """
+
 import uuid as _uuid
 from datetime import date, datetime, timedelta, timezone
 from typing import Optional
 
 import structlog
-from fastapi import APIRouter, Depends, Header, Query
-from pydantic import BaseModel, Field
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
+from pydantic import BaseModel, Field
 from services.pnl_engine import PnLEngine
 from services.report_engine import ReportEngine
 from services.revenue_engine import RevenueEngine
 from services.store_pnl import StorePnLService
 from services.voucher_service import format_for_kingdee, generate_voucher_from_settlement
 from sqlalchemy import func, select, text
-from sqlalchemy.exc import OperationalError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db_with_tenant
 from shared.ontology.src.entities import Order, OrderItem, Store
 
-from services.store_pnl import StorePnLService
-from services.voucher_service import generate_voucher_from_settlement, format_for_kingdee
 from ..services.budget_service import BudgetService
 
 logger = structlog.get_logger()
@@ -51,6 +48,7 @@ async def _get_tenant_db(x_tenant_id: str = Header(..., alias="X-Tenant-ID")):
 
 
 # ── 日营收 ────────────────────────────────────────────────────
+
 
 @router.get("/daily-revenue")
 async def get_daily_revenue(
@@ -99,6 +97,7 @@ async def get_daily_revenue(
 
 
 # ── 日利润快报 ────────────────────────────────────────────────
+
 
 @router.get("/daily-profit")
 async def get_daily_profit(
@@ -160,6 +159,7 @@ async def get_daily_profit(
 
 # ── 成本率 ────────────────────────────────────────────────────
 
+
 @router.get("/cost-rate")
 async def get_cost_rate(
     store_id: str,
@@ -216,10 +216,7 @@ async def get_cost_rate(
         .group_by(text("1"))
         .order_by(text("1"))
     )
-    trend = [
-        {"date": str(r.day.date()) if r.day else "", "revenue_fen": int(r.rev or 0)}
-        for r in daily_result.all()
-    ]
+    trend = [{"date": str(r.day.date()) if r.day else "", "revenue_fen": int(r.rev or 0)} for r in daily_result.all()]
 
     return {
         "ok": True,
@@ -264,18 +261,21 @@ async def get_cost_rate_ranking(
         rev = int(r.revenue or 0)
         cost = int(r.cost or 0)
         rate = round(cost / rev, 4) if rev > 0 else 0.0
-        rankings.append({
-            "store_id": str(r.store_id),
-            "revenue_fen": rev,
-            "cost_fen": cost,
-            "cost_rate": rate,
-        })
+        rankings.append(
+            {
+                "store_id": str(r.store_id),
+                "revenue_fen": rev,
+                "cost_fen": cost,
+                "cost_rate": rate,
+            }
+        )
     rankings.sort(key=lambda x: x["cost_rate"])
 
     return {"ok": True, "data": {"rankings": rankings, "period": f"{start} ~ {today}"}}
 
 
 # ── P&L 报表 ──────────────────────────────────────────────────
+
 
 @router.get("/pnl/{store_id}")
 async def get_store_pnl(
@@ -316,9 +316,7 @@ async def get_store_pnl(
     )
     food_cost = int(cost_result.scalar_one())
 
-    store_row = await db.execute(
-        select(Store.seats, Store.config).where(Store.id == sid)
-    )
+    store_row = await db.execute(select(Store.seats, Store.config).where(Store.id == sid))
     store = store_row.first()
     seats = store.seats if store else 0
     config = store.config if store else {}
@@ -337,6 +335,7 @@ async def get_store_pnl(
 
 
 # ── 预算 Pydantic 请求模型 ───────────────────────────────────
+
 
 class CreateBudgetRequest(BaseModel):
     store_id: str
@@ -362,6 +361,7 @@ class ApproveBudgetRequest(BaseModel):
 
 
 # ── 预算 ──────────────────────────────────────────────────────
+
 
 @router.get("/budget")
 async def list_budgets(
@@ -478,7 +478,10 @@ async def get_budget_execution(
     tid = _uuid.UUID(x_tenant_id)
     sid = _uuid.UUID(store_id)
     summaries = await budget_service.get_budget_execution(
-        db=db, tenant_id=tid, store_id=sid, category=category,
+        db=db,
+        tenant_id=tid,
+        store_id=sid,
+        category=category,
     )
     return {"ok": True, "data": {"execution": summaries}}
 
@@ -516,6 +519,7 @@ async def record_budget_execution(
 
 # ── 现金流 ────────────────────────────────────────────────────
 
+
 @router.get("/cashflow/forecast")
 async def forecast_cashflow(
     store_id: str,
@@ -527,12 +531,16 @@ async def forecast_cashflow(
     tid = _uuid.UUID(x_tenant_id)
     sid = _uuid.UUID(store_id)
     forecast = await budget_service.get_cashflow_forecast(
-        db=db, tenant_id=tid, store_id=sid, days=days,
+        db=db,
+        tenant_id=tid,
+        store_id=sid,
+        days=days,
     )
     return {"ok": True, "data": {"forecast": forecast, "days": days, "store_id": store_id}}
 
 
 # ── 月度报告 ──────────────────────────────────────────────────
+
 
 @router.get("/reports/monthly/{store_id}")
 async def get_monthly_report(
@@ -607,6 +615,7 @@ async def get_monthly_report_html(store_id: str, month: Optional[str] = None):
 
 
 # ── P0 日报表 ─────────────────────────────────────────────────
+
 
 @router.get("/reports/daily/revenue-summary")
 async def get_daily_revenue_summary(
@@ -753,6 +762,7 @@ async def get_realtime_store_stats(
 
 # ── 凭证 ──────────────────────────────────────────────────────
 
+
 @router.post("/voucher/generate")
 async def generate_voucher(settlement: dict):
     """从日结数据生成会计凭证"""
@@ -769,6 +779,7 @@ async def export_kingdee_voucher(settlement: dict):
 
 
 # ── 电子发票 ──────────────────────────────────────────────────
+
 
 @router.post("/invoice")
 async def create_invoice(order_id: str, buyer_info: dict):

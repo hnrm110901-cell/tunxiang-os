@@ -11,16 +11,15 @@
   - TestClient + app.dependency_overrides[get_db_with_tenant] + AsyncMock
   - 全部 mock，不需要真实 DB
 """
+
 from __future__ import annotations
 
 import sys
 import types
 import uuid
-from datetime import datetime, timedelta, timezone
 from typing import AsyncGenerator
 from unittest.mock import AsyncMock, MagicMock
 
-import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
@@ -47,8 +46,10 @@ _ensure_stub("shared.ontology.src")
 _db_mod = _ensure_stub("shared.ontology.src.database")
 
 if not hasattr(_db_mod, "get_db_with_tenant"):
+
     async def _placeholder_get_db_with_tenant():  # pragma: no cover
         yield None
+
     _db_mod.get_db_with_tenant = _placeholder_get_db_with_tenant
 
 # shared.events 存根
@@ -64,8 +65,9 @@ if "structlog" not in sys.modules:
     sys.modules["structlog"] = _sl
 
 # ── 导入路由 ────────────────────────────────────────────────────────────────────
-from ..api.trial_data_routes import router as trial_data_router  # noqa: E402
 from shared.ontology.src.database import get_db_with_tenant  # noqa: E402
+
+from ..api.trial_data_routes import router as trial_data_router  # noqa: E402
 
 # ── FastAPI 应用 ─────────────────────────────────────────────────────────────────
 app = FastAPI()
@@ -91,10 +93,13 @@ STAFF_HEADERS = {
 
 # ── 辅助 ─────────────────────────────────────────────────────────────────────────
 
+
 def _override(db_mock: AsyncMock):
     """构造 FastAPI 依赖覆盖函数。"""
+
     async def _dep() -> AsyncGenerator:
         yield db_mock
+
     return _dep
 
 
@@ -117,6 +122,7 @@ def _row(value):
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 #  测试 1：门店名不匹配时拒绝执行
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 class TestConfirmNameMismatchRejected:
     """confirm_store_name 与实际门店名不一致，execute 端点必须返回 422。"""
@@ -168,6 +174,7 @@ class TestConfirmNameMismatchRejected:
 #  测试 2：30天冷却期防止重复清除
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 class TestCooldownPreventsDoubleClear:
     """30天内已有清除记录时，request 端点必须返回 429。"""
 
@@ -206,6 +213,7 @@ class TestCooldownPreventsDoubleClear:
 #  测试 3：清除范围说明不包含档案数据（菜品/员工）
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 class TestClearScopePreservesMasterData:
     """GET /scope 返回的清除范围中，菜品档案和员工档案必须在 will_keep 列表中，
     且 will_clear 不包含 dishes / employees / employees 相关字段。"""
@@ -238,6 +246,7 @@ class TestClearScopePreservesMasterData:
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 #  测试 4：非超级管理员调用返回 403
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 class TestSuperAdminRequired:
     """非 super_admin 角色调用 /request 和 /execute 端点必须返回 403。"""

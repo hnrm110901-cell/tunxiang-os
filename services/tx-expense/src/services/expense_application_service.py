@@ -5,6 +5,7 @@
 
 金额约定：所有金额存储为分(fen)，入参/出参统一用分，展示层负责转换。
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -13,12 +14,12 @@ from datetime import datetime, timezone
 from typing import Any, Optional
 
 import structlog
-from sqlalchemy import func, select, update
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from shared.events.src.emitter import emit_event
+
 from ..agents import a3_standard_compliance as _a3_agent
 from ..models.expense_application import (
     ExpenseApplication,
@@ -27,10 +28,9 @@ from ..models.expense_application import (
     ExpenseItem,
     ExpenseScenario,
 )
-from ..models.expense_enums import ExpenseScenarioCode, ExpenseStatus
+from ..models.expense_enums import ExpenseStatus
 from ..models.expense_events import (
     EXPENSE_APPLICATION_SUBMITTED,
-    ExpenseApplicationSubmittedPayload,
 )
 
 logger = structlog.get_logger(__name__)
@@ -39,6 +39,7 @@ logger = structlog.get_logger(__name__)
 # ─────────────────────────────────────────────────────────────────────────────
 # 辅助
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 def _now_utc() -> datetime:
     return datetime.now(tz=timezone.utc)
@@ -53,6 +54,7 @@ def _assert_tenant(obj: Any, tenant_id: uuid.UUID, label: str = "resource") -> N
 # ─────────────────────────────────────────────────────────────────────────────
 # 费用申请 CRUD
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 async def create_application(
     db: AsyncSession,
@@ -332,9 +334,7 @@ async def submit_application(
         item_results: list[dict] = compliance_result.get("items", [])
 
         # 遍历每个明细行，执行截断 / 校验说明 / 记录警告
-        items_need_explanation: list[int] = compliance_result.get(
-            "required_explanation_items", []
-        )
+        items_need_explanation: list[int] = compliance_result.get("required_explanation_items", [])
 
         # 先处理 >50% 截断项（over_limit_major）——无论 can_submit，直接截断
         for item_result in item_results:
@@ -361,12 +361,9 @@ async def submit_application(
                     continue
 
                 # 定位 expense_item 并截断金额
-                stmt = (
-                    select(ExpenseItem)
-                    .where(
-                        ExpenseItem.id == item_uuid,
-                        ExpenseItem.tenant_id == tenant_id,
-                    )
+                stmt = select(ExpenseItem).where(
+                    ExpenseItem.id == item_uuid,
+                    ExpenseItem.tenant_id == tenant_id,
                 )
                 result = await db.execute(stmt)
                 expense_item = result.scalar_one_or_none()
@@ -388,9 +385,7 @@ async def submit_application(
 
                 expense_item.amount = limit_fen
                 existing_notes = expense_item.notes or ""
-                expense_item.notes = (
-                    f"{existing_notes}；{truncation_note}" if existing_notes else truncation_note
-                )
+                expense_item.notes = f"{existing_notes}；{truncation_note}" if existing_notes else truncation_note
 
                 log.info(
                     "a3_item_truncated",
@@ -420,11 +415,7 @@ async def submit_application(
             # 将说明追加到申请备注
             existing_app_notes = application.notes or ""
             explanation_note = f"[超标说明] {compliance_explanation.strip()}"
-            application.notes = (
-                f"{existing_app_notes}；{explanation_note}"
-                if existing_app_notes
-                else explanation_note
-            )
+            application.notes = f"{existing_app_notes}；{explanation_note}" if existing_app_notes else explanation_note
             log.info(
                 "a3_compliance_explanation_recorded",
                 items_need_explanation=items_need_explanation,
@@ -585,6 +576,7 @@ async def delete_application(
 # 个人视图
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 async def get_my_applications(
     db: AsyncSession,
     tenant_id: uuid.UUID,
@@ -607,6 +599,7 @@ async def get_my_applications(
 # ─────────────────────────────────────────────────────────────────────────────
 # 统计
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 async def get_stats(
     db: AsyncSession,
@@ -705,6 +698,7 @@ async def get_stats(
 # ─────────────────────────────────────────────────────────────────────────────
 # 场景 & 科目
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 async def list_scenarios(
     db: AsyncSession,

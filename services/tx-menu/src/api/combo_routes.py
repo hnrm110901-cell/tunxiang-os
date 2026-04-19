@@ -12,6 +12,7 @@ N选M分组管理（新增）：
 - DELETE /api/v1/menu/combos/{combo_id}/groups/{group_id}/items/{item_id}  从分组移除菜品
 - POST /api/v1/menu/combos/{combo_id}/validate-selection            验证顾客选择是否满足规则
 """
+
 import uuid
 from typing import Optional
 
@@ -45,6 +46,7 @@ def _ok(data: dict | list) -> dict:
 
 # ─── 请求模型 ───
 
+
 class ComboItemReq(BaseModel):
     dish_id: str
     dish_name: str
@@ -71,6 +73,7 @@ class OrderComboReq(BaseModel):
 
 # ─── 端点 ───
 
+
 @router.get("/combos")
 async def list_combos(
     request: Request,
@@ -93,11 +96,7 @@ async def list_combos(
         conditions.append(DishCombo.store_id == uuid.UUID(store_id))
 
     result = await db.execute(
-        select(DishCombo)
-        .where(*conditions)
-        .order_by(DishCombo.created_at.desc())
-        .offset((page - 1) * size)
-        .limit(size)
+        select(DishCombo).where(*conditions).order_by(DishCombo.created_at.desc()).offset((page - 1) * size).limit(size)
     )
     combos = result.scalars().all()
 
@@ -162,14 +161,16 @@ async def create_combo(
         items_count=len(items_json),
     )
 
-    return _ok({
-        "combo_id": str(combo.id),
-        "combo_name": req.combo_name,
-        "combo_price_fen": req.combo_price_fen,
-        "original_price_fen": req.original_price_fen,
-        "saving_fen": req.original_price_fen - req.combo_price_fen,
-        "items_count": len(items_json),
-    })
+    return _ok(
+        {
+            "combo_id": str(combo.id),
+            "combo_name": req.combo_name,
+            "combo_price_fen": req.combo_price_fen,
+            "original_price_fen": req.original_price_fen,
+            "saving_fen": req.original_price_fen - req.combo_price_fen,
+            "items_count": len(items_json),
+        }
+    )
 
 
 @router.get("/combos/{combo_id}/detail")
@@ -243,15 +244,17 @@ async def get_combo_detail(
                     "items": [],
                 }
             if row["item_id"]:
-                groups_map[gid]["items"].append({
-                    "item_id": row["item_id"],
-                    "dish_id": row["dish_id"],
-                    "dish_name": row["dish_name"],
-                    "extra_price_fen": row["extra_price_fen"] or 0,
-                    "is_default": row["is_default"] or False,
-                    "image_url": None,
-                    "sold_out": False,
-                })
+                groups_map[gid]["items"].append(
+                    {
+                        "item_id": row["item_id"],
+                        "dish_id": row["dish_id"],
+                        "dish_name": row["dish_name"],
+                        "extra_price_fen": row["extra_price_fen"] or 0,
+                        "is_default": row["is_default"] or False,
+                        "image_url": None,
+                        "sold_out": False,
+                    }
+                )
         groups = list(groups_map.values())
     except SQLAlchemyError as exc:
         logger.warning(
@@ -261,15 +264,17 @@ async def get_combo_detail(
         )
         groups = []
 
-    return _ok({
-        "combo_id": str(combo.id),
-        "combo_name": combo.combo_name,
-        "price_fen": combo.combo_price_fen,
-        "description": getattr(combo, "description", None) or "",
-        "min_person": getattr(combo, "min_person", None),
-        "image_url": getattr(combo, "image_url", None),
-        "groups": groups,
-    })
+    return _ok(
+        {
+            "combo_id": str(combo.id),
+            "combo_name": combo.combo_name,
+            "price_fen": combo.combo_price_fen,
+            "description": getattr(combo, "description", None) or "",
+            "min_person": getattr(combo, "min_person", None),
+            "image_url": getattr(combo, "image_url", None),
+            "groups": groups,
+        }
+    )
 
 
 @router.post("/combos/{combo_id}/order")
@@ -345,9 +350,7 @@ async def order_combo(
         food_cost_fen = None
         gross_margin = None
         if dish_uuid:
-            dish_result = await db.execute(
-                select(Dish).where(Dish.id == dish_uuid)
-            )
+            dish_result = await db.execute(select(Dish).where(Dish.id == dish_uuid))
             dish = dish_result.scalar_one_or_none()
             if dish and dish.cost_fen:
                 food_cost_fen = dish.cost_fen * ci_qty
@@ -370,13 +373,15 @@ async def order_combo(
             pricing_mode="fixed",
         )
         db.add(item)
-        created_items.append({
-            "item_id": str(item.id),
-            "dish_name": ci.get("dish_name"),
-            "qty": ci_qty,
-            "unit_price_fen": allocated_unit,
-            "subtotal_fen": subtotal,
-        })
+        created_items.append(
+            {
+                "item_id": str(item.id),
+                "dish_name": ci.get("dish_name"),
+                "qty": ci_qty,
+                "unit_price_fen": allocated_unit,
+                "subtotal_fen": subtotal,
+            }
+        )
 
     # 更新订单总额
     combo_subtotal = combo.combo_price_fen * req.qty
@@ -396,15 +401,17 @@ async def order_combo(
         combo_subtotal_fen=combo_subtotal,
     )
 
-    return _ok({
-        "combo_id": combo_id,
-        "combo_name": combo.combo_name,
-        "qty": req.qty,
-        "combo_subtotal_fen": combo_subtotal,
-        "items_expanded": created_items,
-        "order_total_fen": order.total_amount_fen,
-        "order_final_fen": order.final_amount_fen,
-    })
+    return _ok(
+        {
+            "combo_id": combo_id,
+            "combo_name": combo.combo_name,
+            "qty": req.qty,
+            "combo_subtotal_fen": combo_subtotal,
+            "items_expanded": created_items,
+            "order_total_fen": order.total_amount_fen,
+            "order_final_fen": order.final_amount_fen,
+        }
+    )
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -426,30 +433,31 @@ async def _rls_menu(db: AsyncSession, tid: str) -> None:
 
 def _row_to_group(row) -> dict:
     return {
-        "id":          str(row.id),
-        "combo_id":    str(row.combo_id),
-        "group_name":  row.group_name,
-        "min_select":  row.min_select,
-        "max_select":  row.max_select,
+        "id": str(row.id),
+        "combo_id": str(row.combo_id),
+        "group_name": row.group_name,
+        "min_select": row.min_select,
+        "max_select": row.max_select,
         "is_required": row.is_required,
-        "sort_order":  row.sort_order,
+        "sort_order": row.sort_order,
     }
 
 
 def _row_to_group_item(row) -> dict:
     return {
-        "id":              str(row.id),
-        "group_id":        str(row.group_id),
-        "dish_id":         str(row.dish_id) if row.dish_id else None,
-        "dish_name":       row.dish_name,
-        "quantity":        row.quantity,
+        "id": str(row.id),
+        "group_id": str(row.group_id),
+        "dish_id": str(row.dish_id) if row.dish_id else None,
+        "dish_name": row.dish_name,
+        "quantity": row.quantity,
         "extra_price_fen": row.extra_price_fen,
-        "is_default":      row.is_default,
-        "sort_order":      row.sort_order,
+        "is_default": row.is_default,
+        "sort_order": row.sort_order,
     }
 
 
 # ─── 请求模型（N选M） ──────────────────────────────────────────────────────────
+
 
 class CreateGroupReq(BaseModel):
     group_name: str = Field(..., description="分组名称，如「主食选一款」")
@@ -478,6 +486,7 @@ class ValidateSelectionReq(BaseModel):
 
 
 # ─── GET /combos/{combo_id}/groups ────────────────────────────────────────────
+
 
 @router.get("/combos/{combo_id}/groups", summary="获取套餐N选M分组列表（含每组可选菜品）")
 async def list_combo_groups(
@@ -511,10 +520,13 @@ async def list_combo_groups(
           AND is_deleted = false
         ORDER BY sort_order ASC, created_at ASC
     """)
-    groups_result = await db.execute(groups_sql, {
-        "combo_id":  combo_id,
-        "tenant_id": tenant_id,
-    })
+    groups_result = await db.execute(
+        groups_sql,
+        {
+            "combo_id": combo_id,
+            "tenant_id": tenant_id,
+        },
+    )
     group_rows = groups_result.fetchall()
 
     if not group_rows:
@@ -549,15 +561,18 @@ async def list_combo_groups(
         g_dict["items"] = items_by_group.get(str(g.id), [])
         groups_out.append(g_dict)
 
-    return _ok({
-        "combo_id":    combo_id,
-        "combo_name":  combo.combo_name,
-        "groups":      groups_out,
-        "total_groups": len(groups_out),
-    })
+    return _ok(
+        {
+            "combo_id": combo_id,
+            "combo_name": combo.combo_name,
+            "groups": groups_out,
+            "total_groups": len(groups_out),
+        }
+    )
 
 
 # ─── POST /combos/{combo_id}/groups ───────────────────────────────────────────
+
 
 @router.post("/combos/{combo_id}/groups", summary="创建套餐N选M分组")
 async def create_combo_group(
@@ -594,16 +609,19 @@ async def create_combo_group(
         RETURNING id, combo_id, group_name, min_select, max_select,
                   is_required, sort_order
     """)
-    result = await db.execute(insert_sql, {
-        "id":          new_id,
-        "tenant_id":   tenant_id,
-        "combo_id":    combo_id,
-        "group_name":  req.group_name,
-        "min_select":  req.min_select,
-        "max_select":  req.max_select,
-        "is_required": req.is_required,
-        "sort_order":  req.sort_order,
-    })
+    result = await db.execute(
+        insert_sql,
+        {
+            "id": new_id,
+            "tenant_id": tenant_id,
+            "combo_id": combo_id,
+            "group_name": req.group_name,
+            "min_select": req.min_select,
+            "max_select": req.max_select,
+            "is_required": req.is_required,
+            "sort_order": req.sort_order,
+        },
+    )
     row = result.fetchone()
     await db.commit()
 
@@ -614,6 +632,7 @@ async def create_combo_group(
 
 
 # ─── POST /combos/{combo_id}/groups/{group_id}/items ──────────────────────────
+
 
 @router.post("/combos/{combo_id}/groups/{group_id}/items", summary="添加菜品到套餐分组")
 async def add_item_to_combo_group(
@@ -634,11 +653,14 @@ async def add_item_to_combo_group(
           AND tenant_id = :tenant_id
           AND is_deleted = false
     """)
-    check_result = await db.execute(check_sql, {
-        "group_id":  group_id,
-        "combo_id":  combo_id,
-        "tenant_id": tenant_id,
-    })
+    check_result = await db.execute(
+        check_sql,
+        {
+            "group_id": group_id,
+            "combo_id": combo_id,
+            "tenant_id": tenant_id,
+        },
+    )
     if not check_result.fetchone():
         raise HTTPException(status_code=404, detail="分组不存在或不属于该套餐")
 
@@ -653,17 +675,20 @@ async def add_item_to_combo_group(
         RETURNING id, group_id, dish_id, dish_name, quantity,
                   extra_price_fen, is_default, sort_order
     """)
-    result = await db.execute(insert_sql, {
-        "id":              new_id,
-        "tenant_id":       tenant_id,
-        "group_id":        group_id,
-        "dish_id":         req.dish_id,
-        "dish_name":       req.dish_name,
-        "quantity":        req.quantity,
-        "extra_price_fen": req.extra_price_fen,
-        "is_default":      req.is_default,
-        "sort_order":      req.sort_order,
-    })
+    result = await db.execute(
+        insert_sql,
+        {
+            "id": new_id,
+            "tenant_id": tenant_id,
+            "group_id": group_id,
+            "dish_id": req.dish_id,
+            "dish_name": req.dish_name,
+            "quantity": req.quantity,
+            "extra_price_fen": req.extra_price_fen,
+            "is_default": req.is_default,
+            "sort_order": req.sort_order,
+        },
+    )
     row = result.fetchone()
     await db.commit()
 
@@ -678,6 +703,7 @@ async def add_item_to_combo_group(
 
 
 # ─── DELETE /combos/{combo_id}/groups/{group_id}/items/{item_id} ──────────────
+
 
 @router.delete(
     "/combos/{combo_id}/groups/{group_id}/items/{item_id}",
@@ -703,12 +729,15 @@ async def remove_item_from_combo_group(
           AND i.tenant_id = :tenant_id
           AND i.is_deleted = false
     """)
-    check_result = await db.execute(check_sql, {
-        "item_id":   item_id,
-        "group_id":  group_id,
-        "combo_id":  combo_id,
-        "tenant_id": tenant_id,
-    })
+    check_result = await db.execute(
+        check_sql,
+        {
+            "item_id": item_id,
+            "group_id": group_id,
+            "combo_id": combo_id,
+            "tenant_id": tenant_id,
+        },
+    )
     if not check_result.fetchone():
         raise HTTPException(status_code=404, detail="菜品不存在于该分组")
 
@@ -725,6 +754,7 @@ async def remove_item_from_combo_group(
 
 
 # ─── POST /combos/{combo_id}/validate-selection ───────────────────────────────
+
 
 @router.post("/combos/{combo_id}/validate-selection", summary="验证顾客套餐N选M选择是否合规")
 async def validate_combo_selection(
@@ -750,10 +780,13 @@ async def validate_combo_selection(
           AND tenant_id  = :tenant_id
           AND is_deleted = false
     """)
-    groups_result = await db.execute(groups_sql, {
-        "combo_id":  combo_id,
-        "tenant_id": tenant_id,
-    })
+    groups_result = await db.execute(
+        groups_sql,
+        {
+            "combo_id": combo_id,
+            "tenant_id": tenant_id,
+        },
+    )
     groups = {str(r.id): r for r in groups_result.fetchall()}
 
     if not groups:
@@ -781,11 +814,14 @@ async def validate_combo_selection(
               AND i.tenant_id = :tenant_id
               AND i.is_deleted = false
         """)
-        valid_result = await db.execute(valid_sql, {
-            "combo_id":  combo_id,
-            "tenant_id": tenant_id,
-            **id_params,
-        })
+        valid_result = await db.execute(
+            valid_sql,
+            {
+                "combo_id": combo_id,
+                "tenant_id": tenant_id,
+                **id_params,
+            },
+        )
         for vr in valid_result.fetchall():
             valid_item_ids.add(str(vr.id))
 
@@ -802,11 +838,14 @@ async def validate_combo_selection(
               AND i.tenant_id = :tenant_id
               AND i.is_deleted = false
         """)
-        item_group_result = await db.execute(item_group_sql, {
-            "combo_id":  combo_id,
-            "tenant_id": tenant_id,
-            **id_params_2,
-        })
+        item_group_result = await db.execute(
+            item_group_sql,
+            {
+                "combo_id": combo_id,
+                "tenant_id": tenant_id,
+                **id_params_2,
+            },
+        )
         for igr in item_group_result.fetchall():
             item_group_map[str(igr.id)] = str(igr.group_id)
 
@@ -850,12 +889,14 @@ async def validate_combo_selection(
         # 防御3 兜底: 仍有无效 id（上面按分组校验后还剩余的）
         invalid_ids = [iid for iid in selected_ids if iid not in valid_item_ids]
         if invalid_ids:
-            errors.append({
-                "group_id":   group_id,
-                "group_name": group.group_name,
-                "message":    f"「{group.group_name}」包含无效菜品选项：{invalid_ids}",
-                "code":       "COMBO_VALIDATION_ERROR",
-            })
+            errors.append(
+                {
+                    "group_id": group_id,
+                    "group_name": group.group_name,
+                    "message": f"「{group.group_name}」包含无效菜品选项：{invalid_ids}",
+                    "code": "COMBO_VALIDATION_ERROR",
+                }
+            )
             continue
 
         # 防御1: 超选 — selected_count > group.max_select
@@ -868,12 +909,14 @@ async def validate_combo_selection(
 
         # 非必选但选了又不够 min_select（理论上 min_select>0 且 is_required=False 很少见）
         if not group.is_required and count > 0 and count < group.min_select:
-            errors.append({
-                "group_id":   group_id,
-                "group_name": group.group_name,
-                "message":    f"「{group.group_name}」至少需要选 {group.min_select} 个，当前选了 {count} 个",
-                "code":       "COMBO_VALIDATION_ERROR",
-            })
+            errors.append(
+                {
+                    "group_id": group_id,
+                    "group_name": group.group_name,
+                    "message": f"「{group.group_name}」至少需要选 {group.min_select} 个，当前选了 {count} 个",
+                    "code": "COMBO_VALIDATION_ERROR",
+                }
+            )
 
     valid = len(errors) == 0
     logger.info(

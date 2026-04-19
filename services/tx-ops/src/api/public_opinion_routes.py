@@ -13,6 +13,7 @@
 新增舆情和处理舆情通过 asyncio.create_task(emit_event(...)) 旁路写入事件，不阻塞接口。
 统一响应格式: {"ok": bool, "data": {}, "error": {}}
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -146,7 +147,7 @@ async def list_mentions(
             for k, v in m.items():
                 if isinstance(v, datetime):
                     m[k] = v.isoformat()
-                elif hasattr(v, '__str__') and type(v).__name__ == 'UUID':
+                elif hasattr(v, "__str__") and type(v).__name__ == "UUID":
                     m[k] = str(v)
 
         return {"ok": True, "data": {"mentions": mentions, "total": total, "page": page, "page_size": page_size}}
@@ -186,49 +187,73 @@ async def create_mention(
                 false, :now, :now
             )
         """)
-        await db.execute(insert_sql, {
-            "id": mention_id,
-            "tenant_id": tenant_id,
-            "store_id": req.store_id,
-            "platform": req.platform,
-            "content": req.content,
-            "sentiment": req.sentiment,
-            "sentiment_score": req.sentiment_score,
-            "rating": req.rating,
-            "author_name": req.author_name,
-            "author_id": req.author_id,
-            "published_at": published_at,
-            "source_url": req.source_url,
-            "tags": req.tags or [],
-            "now": now,
-        })
+        await db.execute(
+            insert_sql,
+            {
+                "id": mention_id,
+                "tenant_id": tenant_id,
+                "store_id": req.store_id,
+                "platform": req.platform,
+                "content": req.content,
+                "sentiment": req.sentiment,
+                "sentiment_score": req.sentiment_score,
+                "rating": req.rating,
+                "author_name": req.author_name,
+                "author_id": req.author_id,
+                "published_at": published_at,
+                "source_url": req.source_url,
+                "tags": req.tags or [],
+                "now": now,
+            },
+        )
         await db.commit()
 
         # 旁路事件，不阻塞响应
-        asyncio.create_task(emit_event(
-            event_type=OpinionEventType.MENTION_CAPTURED,
+        asyncio.create_task(
+            emit_event(
+                event_type=OpinionEventType.MENTION_CAPTURED,
+                tenant_id=tenant_id,
+                stream_id=mention_id,
+                payload={
+                    "mention_id": mention_id,
+                    "platform": req.platform,
+                    "sentiment": req.sentiment,
+                    "sentiment_score": float(req.sentiment_score or 0),
+                    "rating": float(req.rating or 0),
+                },
+                store_id=req.store_id,
+                source_service="tx-ops",
+            )
+        )
+
+        log.info(
+            "opinion_mention_created",
+            mention_id=mention_id,
+            platform=req.platform,
+            sentiment=req.sentiment,
             tenant_id=tenant_id,
-            stream_id=mention_id,
-            payload={
+        )
+        return {
+            "ok": True,
+            "data": {
                 "mention_id": mention_id,
                 "platform": req.platform,
                 "sentiment": req.sentiment,
-                "sentiment_score": float(req.sentiment_score or 0),
-                "rating": float(req.rating or 0),
+                "created_at": now.isoformat(),
             },
-            store_id=req.store_id,
-            source_service="tx-ops",
-        ))
-
-        log.info("opinion_mention_created", mention_id=mention_id, platform=req.platform,
-                 sentiment=req.sentiment, tenant_id=tenant_id)
-        return {"ok": True, "data": {"mention_id": mention_id, "platform": req.platform,
-                                      "sentiment": req.sentiment, "created_at": now.isoformat()}}
+        }
     except SQLAlchemyError as exc:
         await db.rollback()
         log.error("opinion_create_db_error", tenant_id=tenant_id, error=str(exc), exc_info=True)
-        return {"ok": True, "data": {"mention_id": mention_id, "platform": req.platform,
-                                      "sentiment": req.sentiment, "created_at": now.isoformat()}}
+        return {
+            "ok": True,
+            "data": {
+                "mention_id": mention_id,
+                "platform": req.platform,
+                "sentiment": req.sentiment,
+                "created_at": now.isoformat(),
+            },
+        }
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -263,13 +288,12 @@ async def get_mention(
         for k, v in mention.items():
             if isinstance(v, datetime):
                 mention[k] = v.isoformat()
-            elif hasattr(v, '__str__') and type(v).__name__ == 'UUID':
+            elif hasattr(v, "__str__") and type(v).__name__ == "UUID":
                 mention[k] = str(v)
 
         return {"ok": True, "data": {"mention": mention}}
     except SQLAlchemyError as exc:
-        log.error("opinion_get_db_error", mention_id=mention_id, tenant_id=tenant_id,
-                  error=str(exc), exc_info=True)
+        log.error("opinion_get_db_error", mention_id=mention_id, tenant_id=tenant_id, error=str(exc), exc_info=True)
         return {"ok": True, "data": {"mention": None}}
 
 
@@ -308,39 +332,41 @@ async def resolve_mention(
                 updated_at = :now
             WHERE id = :mention_id AND {_SAFE_TENANT}
         """)
-        await db.execute(update_sql, {
-            "mention_id": mention_id,
-            "resolution_note": req.resolution_note,
-            "resolver_id": req.resolver_id,
-            "now": now,
-            "tid": tenant_id,
-        })
-        await db.commit()
-
-        store_id = str(record["store_id"]) if record["store_id"] else ""
-        asyncio.create_task(emit_event(
-            event_type=OpinionEventType.RESOLVED,
-            tenant_id=tenant_id,
-            stream_id=mention_id,
-            payload={
+        await db.execute(
+            update_sql,
+            {
                 "mention_id": mention_id,
                 "resolution_note": req.resolution_note,
                 "resolver_id": req.resolver_id,
-                "resolved_at": now.isoformat(),
+                "now": now,
+                "tid": tenant_id,
             },
-            store_id=store_id,
-            source_service="tx-ops",
-        ))
+        )
+        await db.commit()
+
+        store_id = str(record["store_id"]) if record["store_id"] else ""
+        asyncio.create_task(
+            emit_event(
+                event_type=OpinionEventType.RESOLVED,
+                tenant_id=tenant_id,
+                stream_id=mention_id,
+                payload={
+                    "mention_id": mention_id,
+                    "resolution_note": req.resolution_note,
+                    "resolver_id": req.resolver_id,
+                    "resolved_at": now.isoformat(),
+                },
+                store_id=store_id,
+                source_service="tx-ops",
+            )
+        )
 
         log.info("opinion_mention_resolved", mention_id=mention_id, tenant_id=tenant_id)
-        return {"ok": True, "data": {"mention_id": mention_id, "is_resolved": True,
-                                      "resolved_at": now.isoformat()}}
+        return {"ok": True, "data": {"mention_id": mention_id, "is_resolved": True, "resolved_at": now.isoformat()}}
     except SQLAlchemyError as exc:
         await db.rollback()
-        log.error("opinion_resolve_db_error", mention_id=mention_id, tenant_id=tenant_id,
-                  error=str(exc), exc_info=True)
-        return {"ok": True, "data": {"mention_id": mention_id, "is_resolved": True,
-                                      "resolved_at": now.isoformat()}}
+        log.error("opinion_resolve_db_error", mention_id=mention_id, tenant_id=tenant_id, error=str(exc), exc_info=True)
+        return {"ok": True, "data": {"mention_id": mention_id, "is_resolved": True, "resolved_at": now.isoformat()}}
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -386,8 +412,8 @@ async def get_stats(
             # 数值序列化
             for s in stats:
                 for k, v in s.items():
-                    if v is not None and type(v).__name__ in ('Decimal', 'UUID'):
-                        s[k] = float(v) if type(v).__name__ == 'Decimal' else str(v)
+                    if v is not None and type(v).__name__ in ("Decimal", "UUID"):
+                        s[k] = float(v) if type(v).__name__ == "Decimal" else str(v)
             return {"ok": True, "data": {"stats": stats, "source": "mv_public_opinion"}}
         except SQLAlchemyError:
             # 视图不存在时降级到明细表聚合
@@ -410,8 +436,8 @@ async def get_stats(
         stats = [dict(r._mapping) for r in rows]
         for s in stats:
             for k, v in s.items():
-                if v is not None and type(v).__name__ in ('Decimal', 'UUID'):
-                    s[k] = float(v) if type(v).__name__ == 'Decimal' else str(v)
+                if v is not None and type(v).__name__ in ("Decimal", "UUID"):
+                    s[k] = float(v) if type(v).__name__ == "Decimal" else str(v)
         return {"ok": True, "data": {"stats": stats, "source": "fallback"}}
     except SQLAlchemyError as exc:
         log.error("opinion_stats_db_error", tenant_id=tenant_id, error=str(exc), exc_info=True)
@@ -520,15 +546,31 @@ async def get_top_complaints(
             """)
             content_rows = await db.execute(content_sql, {k: v for k, v in params.items() if k != "limit"})
             keyword_map: dict[str, int] = {}
-            common_keywords = ["服务", "态度", "味道", "价格", "等待", "分量", "卫生",
-                               "环境", "速度", "质量", "口感", "食材", "出餐", "冷", "咸"]
+            common_keywords = [
+                "服务",
+                "态度",
+                "味道",
+                "价格",
+                "等待",
+                "分量",
+                "卫生",
+                "环境",
+                "速度",
+                "质量",
+                "口感",
+                "食材",
+                "出餐",
+                "冷",
+                "咸",
+            ]
             for row in content_rows:
                 for kw in common_keywords:
                     if kw in (row.content or ""):
                         keyword_map[kw] = keyword_map.get(kw, 0) + 1
             keywords = sorted(
                 [{"keyword": k, "frequency": v} for k, v in keyword_map.items()],
-                key=lambda x: x["frequency"], reverse=True,
+                key=lambda x: x["frequency"],
+                reverse=True,
             )[:limit]
 
         return {"ok": True, "data": {"keywords": keywords}}
@@ -572,40 +614,44 @@ async def batch_capture(
                 )
                 ON CONFLICT DO NOTHING
             """)
-            await db.execute(insert_sql, {
-                "id": mention_id,
-                "tenant_id": tenant_id,
-                "store_id": item.store_id,
-                "platform": item.platform,
-                "content": item.content,
-                "sentiment": item.sentiment,
-                "sentiment_score": item.sentiment_score,
-                "rating": item.rating,
-                "author_name": item.author_name,
-                "published_at": published_at,
-                "source_url": item.source_url,
-                "tags": item.tags or [],
-                "now": now,
-            })
+            await db.execute(
+                insert_sql,
+                {
+                    "id": mention_id,
+                    "tenant_id": tenant_id,
+                    "store_id": item.store_id,
+                    "platform": item.platform,
+                    "content": item.content,
+                    "sentiment": item.sentiment,
+                    "sentiment_score": item.sentiment_score,
+                    "rating": item.rating,
+                    "author_name": item.author_name,
+                    "published_at": published_at,
+                    "source_url": item.source_url,
+                    "tags": item.tags or [],
+                    "now": now,
+                },
+            )
             inserted_ids.append(mention_id)
 
-            asyncio.create_task(emit_event(
-                event_type=OpinionEventType.MENTION_CAPTURED,
-                tenant_id=tenant_id,
-                stream_id=mention_id,
-                payload={
-                    "mention_id": mention_id,
-                    "platform": item.platform,
-                    "sentiment": item.sentiment,
-                    "sentiment_score": float(item.sentiment_score or 0),
-                    "rating": float(item.rating or 0),
-                },
-                store_id=item.store_id,
-                source_service="tx-ops",
-            ))
+            asyncio.create_task(
+                emit_event(
+                    event_type=OpinionEventType.MENTION_CAPTURED,
+                    tenant_id=tenant_id,
+                    stream_id=mention_id,
+                    payload={
+                        "mention_id": mention_id,
+                        "platform": item.platform,
+                        "sentiment": item.sentiment,
+                        "sentiment_score": float(item.sentiment_score or 0),
+                        "rating": float(item.rating or 0),
+                    },
+                    store_id=item.store_id,
+                    source_service="tx-ops",
+                )
+            )
         except SQLAlchemyError as exc:
-            log.warning("batch_capture_item_error", idx=idx, tenant_id=tenant_id,
-                        error=str(exc), exc_info=True)
+            log.warning("batch_capture_item_error", idx=idx, tenant_id=tenant_id, error=str(exc), exc_info=True)
             failed.append(idx)
 
     try:
@@ -613,13 +659,14 @@ async def batch_capture(
     except SQLAlchemyError as exc:
         await db.rollback()
         log.error("batch_capture_commit_error", tenant_id=tenant_id, error=str(exc), exc_info=True)
-        return {"ok": True, "data": {"inserted": 0, "failed": list(range(len(req.mentions))),
-                                      "mention_ids": []}}
+        return {"ok": True, "data": {"inserted": 0, "failed": list(range(len(req.mentions))), "mention_ids": []}}
 
-    log.info("batch_capture_done", inserted=len(inserted_ids), failed=len(failed),
-             tenant_id=tenant_id)
-    return {"ok": True, "data": {
-        "inserted": len(inserted_ids),
-        "failed_indices": failed,
-        "mention_ids": inserted_ids,
-    }}
+    log.info("batch_capture_done", inserted=len(inserted_ids), failed=len(failed), tenant_id=tenant_id)
+    return {
+        "ok": True,
+        "data": {
+            "inserted": len(inserted_ids),
+            "failed_indices": failed,
+            "mention_ids": inserted_ids,
+        },
+    }

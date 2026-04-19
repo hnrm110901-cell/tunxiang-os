@@ -6,16 +6,15 @@
 幂等约定：generate_alerts 按 (tenant_id, contract_id, alert_type, 日期) 去重，
          同一天不重复创建同类型预警记录。
 """
+
 from __future__ import annotations
 
 import uuid
 from calendar import monthrange
 from datetime import date, datetime, timedelta, timezone
-from typing import Any, Optional
 
 import structlog
-from sqlalchemy import and_, extract, func, select, update
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -35,6 +34,7 @@ def _today() -> date:
 # ─────────────────────────────────────────────────────────────────────────────
 # ContractLedgerService
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class ContractLedgerService:
     """合同台账服务：12个方法覆盖合同全生命周期。"""
@@ -150,13 +150,13 @@ class ContractLedgerService:
             base_where.append(Contract.store_id == filters["store_id"])
         if filters.get("expiring_within_days") is not None:
             today = _today()
-            cutoff = today + timedelta(
-                days=int(filters["expiring_within_days"])
+            cutoff = today + timedelta(days=int(filters["expiring_within_days"]))
+            base_where.extend(
+                [
+                    Contract.end_date >= today,
+                    Contract.end_date <= cutoff,
+                ]
             )
-            base_where.extend([
-                Contract.end_date >= today,
-                Contract.end_date <= cutoff,
-            ])
 
         stmt = (
             select(Contract)
@@ -180,11 +180,21 @@ class ContractLedgerService:
             raise ValueError("已终止的合同不允许更新，请使用 terminate_contract")
 
         updatable_fields = {
-            "contract_no", "contract_name", "contract_type",
-            "counterparty_name", "counterparty_contact",
-            "total_amount", "start_date", "end_date",
-            "auto_renew", "renewal_notice_days", "status",
-            "store_id", "responsible_person", "file_url", "notes",
+            "contract_no",
+            "contract_name",
+            "contract_type",
+            "counterparty_name",
+            "counterparty_contact",
+            "total_amount",
+            "start_date",
+            "end_date",
+            "auto_renew",
+            "renewal_notice_days",
+            "status",
+            "store_id",
+            "responsible_person",
+            "file_url",
+            "notes",
         }
         for field in updatable_fields:
             if field in data:
@@ -367,11 +377,7 @@ class ContractLedgerService:
         contracts = list(result.scalars().all())
 
         # 精细过滤：只返回距 end_date <= renewal_notice_days 的合同
-        return [
-            c for c in contracts
-            if c.end_date is not None
-            and (c.end_date - today).days <= c.renewal_notice_days
-        ]
+        return [c for c in contracts if c.end_date is not None and (c.end_date - today).days <= c.renewal_notice_days]
 
     async def get_overdue_payments(
         self,
@@ -417,9 +423,7 @@ class ContractLedgerService:
         )
         existing_result = await db.execute(existing_stmt)
         existing_today = existing_result.scalars().all()
-        existing_keys = {
-            (str(a.contract_id), a.alert_type) for a in existing_today
-        }
+        existing_keys = {(str(a.contract_id), a.alert_type) for a in existing_today}
 
         # ── 2. 即将到期 & 自动续约预警 ──────────────────────────────────────────
         expiring = await self.check_expiring_contracts(db, tenant_id)
@@ -602,14 +606,16 @@ class ContractLedgerService:
             day_key = p.due_date.isoformat()
             if day_key not in days:
                 days[day_key] = []
-            days[day_key].append({
-                "payment_id": str(p.id),
-                "contract_id": str(p.contract_id),
-                "period_name": p.period_name,
-                "planned_amount": p.planned_amount,
-                "actual_amount": p.actual_amount,
-                "status": p.status,
-            })
+            days[day_key].append(
+                {
+                    "payment_id": str(p.id),
+                    "contract_id": str(p.contract_id),
+                    "period_name": p.period_name,
+                    "planned_amount": p.planned_amount,
+                    "actual_amount": p.actual_amount,
+                    "status": p.status,
+                }
+            )
             total_planned += p.planned_amount
             if p.status == "paid" and p.actual_amount:
                 total_paid += p.actual_amount
@@ -656,15 +662,10 @@ class ContractLedgerService:
 
         # 按状态分组
         by_status_stmt = (
-            select(Contract.status, func.count().label("count"))
-            .where(*base_where)
-            .group_by(Contract.status)
+            select(Contract.status, func.count().label("count")).where(*base_where).group_by(Contract.status)
         )
         by_status_result = await db.execute(by_status_stmt)
-        by_status = {
-            row["status"]: int(row["count"])
-            for row in by_status_result.mappings().all()
-        }
+        by_status = {row["status"]: int(row["count"]) for row in by_status_result.mappings().all()}
 
         # 按类型分组
         by_type_stmt = (
@@ -673,30 +674,35 @@ class ContractLedgerService:
             .group_by(Contract.contract_type)
         )
         by_type_result = await db.execute(by_type_stmt)
-        by_type = {
-            (row["contract_type"] or "unknown"): int(row["count"])
-            for row in by_type_result.mappings().all()
-        }
+        by_type = {(row["contract_type"] or "unknown"): int(row["count"]) for row in by_type_result.mappings().all()}
 
         # 30天内到期
         today = _today()
         cutoff_30 = today + timedelta(days=30)
-        expiring_30_stmt = select(func.count()).select_from(Contract).where(
-            Contract.tenant_id == tenant_id,
-            Contract.is_deleted == False,  # noqa: E712
-            Contract.status == "active",
-            Contract.end_date >= today,
-            Contract.end_date <= cutoff_30,
+        expiring_30_stmt = (
+            select(func.count())
+            .select_from(Contract)
+            .where(
+                Contract.tenant_id == tenant_id,
+                Contract.is_deleted == False,  # noqa: E712
+                Contract.status == "active",
+                Contract.end_date >= today,
+                Contract.end_date <= cutoff_30,
+            )
         )
         expiring_30_result = await db.execute(expiring_30_stmt)
         expiring_30 = int(expiring_30_result.scalar_one())
 
         # 逾期未付笔数
-        overdue_stmt = select(func.count()).select_from(ContractPayment).where(
-            ContractPayment.tenant_id == tenant_id,
-            ContractPayment.is_deleted == False,  # noqa: E712
-            ContractPayment.status == "pending",
-            ContractPayment.due_date < today,
+        overdue_stmt = (
+            select(func.count())
+            .select_from(ContractPayment)
+            .where(
+                ContractPayment.tenant_id == tenant_id,
+                ContractPayment.is_deleted == False,  # noqa: E712
+                ContractPayment.status == "pending",
+                ContractPayment.due_date < today,
+            )
         )
         overdue_result = await db.execute(overdue_stmt)
         overdue_count = int(overdue_result.scalar_one())

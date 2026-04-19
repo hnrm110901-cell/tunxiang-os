@@ -6,17 +6,17 @@
 
 金额约定：所有金额字段单位为分(fen)，1元=100分，展示层负责转换。
 """
+
 from __future__ import annotations
 
-import os
 from datetime import date, datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 from uuid import UUID
 
 import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
 from pydantic import BaseModel, Field
-from sqlalchemy import select, func
+from sqlalchemy import func, select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -31,6 +31,7 @@ router = APIRouter()
 # 依赖注入
 # ---------------------------------------------------------------------------
 
+
 async def get_tenant_id(x_tenant_id: str = Header(..., alias="X-Tenant-ID")) -> UUID:
     try:
         return UUID(x_tenant_id)
@@ -42,8 +43,10 @@ async def get_tenant_id(x_tenant_id: str = Header(..., alias="X-Tenant-ID")) -> 
 # Pydantic Schema
 # ---------------------------------------------------------------------------
 
+
 class DailyCostReportResponse(BaseModel):
     """日报响应 Schema"""
+
     id: UUID
     tenant_id: UUID
     store_id: UUID
@@ -70,6 +73,7 @@ class DailyCostReportResponse(BaseModel):
 
 class ManualAdjustRequest(BaseModel):
     """手工调整日报请求 Schema"""
+
     food_cost_fen: Optional[int] = Field(None, ge=0, description="食材成本（分）")
     labor_cost_fen: Optional[int] = Field(None, ge=0, description="人力成本（分）")
     other_cost_fen: Optional[int] = Field(None, ge=0, description="其他费用（分）")
@@ -79,6 +83,7 @@ class ManualAdjustRequest(BaseModel):
 
 class CostAttributionItemResponse(BaseModel):
     """归集明细响应 Schema"""
+
     id: UUID
     tenant_id: UUID
     report_id: Optional[UUID] = None
@@ -96,7 +101,8 @@ class CostAttributionItemResponse(BaseModel):
 
 class CostTrendItem(BaseModel):
     """成本趋势月度数据项"""
-    month: str                              # YYYY-MM
+
+    month: str  # YYYY-MM
     store_id: UUID
     total_revenue_fen: int
     total_cost_fen: int
@@ -106,11 +112,12 @@ class CostTrendItem(BaseModel):
     avg_food_cost_rate: Optional[float] = None
     avg_labor_cost_rate: Optional[float] = None
     avg_gross_margin_rate: Optional[float] = None
-    report_days: int                        # 当月有数据的天数
+    report_days: int  # 当月有数据的天数
 
 
 class RunAttributionRequest(BaseModel):
     """手动触发成本归集请求 Schema"""
+
     store_id: UUID = Field(..., description="门店UUID")
     target_date: Optional[date] = Field(None, description="归集日期，默认当日")
 
@@ -118,6 +125,7 @@ class RunAttributionRequest(BaseModel):
 # ---------------------------------------------------------------------------
 # 端点1：GET /costs/daily-reports — 日报列表
 # ---------------------------------------------------------------------------
+
 
 @router.get(
     "/daily-reports",
@@ -191,6 +199,7 @@ async def list_daily_reports(
 # 端点2：GET /costs/daily-reports/{date}/{store_id} — 某日某店日报
 # ---------------------------------------------------------------------------
 
+
 @router.get(
     "/daily-reports/{report_date}/{store_id}",
     response_model=Dict[str, Any],
@@ -240,6 +249,7 @@ async def get_daily_report(
 # 端点3：POST /costs/daily-reports/{date}/{store_id}/adjust — 手工调整
 # ---------------------------------------------------------------------------
 
+
 @router.post(
     "/daily-reports/{report_date}/{store_id}/adjust",
     response_model=Dict[str, Any],
@@ -255,7 +265,6 @@ async def adjust_daily_report(
 ) -> Dict[str, Any]:
     try:
         from ..models.cost_report import DailyCostReport
-        from decimal import Decimal
 
         stmt = select(DailyCostReport).where(
             DailyCostReport.tenant_id == tenant_id,
@@ -320,6 +329,7 @@ async def adjust_daily_report(
 # ---------------------------------------------------------------------------
 # 端点4：GET /costs/attribution-items — 归集明细
 # ---------------------------------------------------------------------------
+
 
 @router.get(
     "/attribution-items",
@@ -394,6 +404,7 @@ async def list_attribution_items(
 # 端点5：GET /costs/trends — 成本趋势（月度）
 # ---------------------------------------------------------------------------
 
+
 @router.get(
     "/trends",
     response_model=Dict[str, Any],
@@ -407,10 +418,9 @@ async def get_cost_trends(
     db: AsyncSession = Depends(get_db),
 ) -> Dict[str, Any]:
     try:
-        from ..models.cost_report import DailyCostReport
-        from sqlalchemy import cast, String, extract
-        from sqlalchemy.sql.expression import label
         import sqlalchemy as sa
+
+        from ..models.cost_report import DailyCostReport
 
         # 按月聚合
         month_expr = sa.func.to_char(DailyCostReport.report_date, "YYYY-MM").label("month")
@@ -448,19 +458,21 @@ async def get_cost_trends(
 
         trend_items = []
         for row in rows:
-            trend_items.append({
-                "month": row.month,
-                "store_id": str(row.store_id),
-                "total_revenue_fen": int(row.total_revenue_fen or 0),
-                "total_cost_fen": int(row.total_cost_fen or 0),
-                "food_cost_fen": int(row.food_cost_fen or 0),
-                "labor_cost_fen": int(row.labor_cost_fen or 0),
-                "other_cost_fen": int(row.other_cost_fen or 0),
-                "avg_food_cost_rate": float(row.avg_food_cost_rate) if row.avg_food_cost_rate else None,
-                "avg_labor_cost_rate": float(row.avg_labor_cost_rate) if row.avg_labor_cost_rate else None,
-                "avg_gross_margin_rate": float(row.avg_gross_margin_rate) if row.avg_gross_margin_rate else None,
-                "report_days": int(row.report_days),
-            })
+            trend_items.append(
+                {
+                    "month": row.month,
+                    "store_id": str(row.store_id),
+                    "total_revenue_fen": int(row.total_revenue_fen or 0),
+                    "total_cost_fen": int(row.total_cost_fen or 0),
+                    "food_cost_fen": int(row.food_cost_fen or 0),
+                    "labor_cost_fen": int(row.labor_cost_fen or 0),
+                    "other_cost_fen": int(row.other_cost_fen or 0),
+                    "avg_food_cost_rate": float(row.avg_food_cost_rate) if row.avg_food_cost_rate else None,
+                    "avg_labor_cost_rate": float(row.avg_labor_cost_rate) if row.avg_labor_cost_rate else None,
+                    "avg_gross_margin_rate": float(row.avg_gross_margin_rate) if row.avg_gross_margin_rate else None,
+                    "report_days": int(row.report_days),
+                }
+            )
 
         return {"ok": True, "data": {"items": trend_items, "total": len(trend_items)}}
 
@@ -478,14 +490,12 @@ async def get_cost_trends(
 # 端点6：POST /costs/run-attribution — 手动触发归集（调试用）
 # ---------------------------------------------------------------------------
 
+
 @router.post(
     "/run-attribution",
     response_model=Dict[str, Any],
     summary="手动触发成本归集（调试/补录）",
-    description=(
-        "手动为指定门店指定日期触发成本归集。通常由 Worker 自动执行，此端点仅用于调试或"
-        "补录缺漏数据。"
-    ),
+    description=("手动为指定门店指定日期触发成本归集。通常由 Worker 自动执行，此端点仅用于调试或补录缺漏数据。"),
     status_code=status.HTTP_202_ACCEPTED,
 )
 async def run_attribution_manually(
@@ -541,6 +551,7 @@ async def run_attribution_manually(
 # ---------------------------------------------------------------------------
 # 工具函数
 # ---------------------------------------------------------------------------
+
 
 def _report_to_dict(report: Any) -> Dict[str, Any]:
     """将 DailyCostReport ORM 对象转为可序列化 dict。"""

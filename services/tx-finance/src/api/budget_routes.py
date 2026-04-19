@@ -10,6 +10,7 @@
 7. GET    /api/v1/finance/budgets/summary      门店期间预算汇总
 8. GET    /api/v1/finance/budgets/categories   查看支持的科目列表
 """
+
 from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Path, Query
@@ -30,12 +31,14 @@ router = APIRouter(prefix="/api/v1/finance/budgets", tags=["budget_management"])
 
 # ─── DB 依赖 ──────────────────────────────────────────────────────────────────
 
+
 async def _get_tenant_db(x_tenant_id: str = Header(..., alias="X-Tenant-ID")):
     async for session in get_db_with_tenant(x_tenant_id):
         yield session
 
 
 # ─── 请求模型 ─────────────────────────────────────────────────────────────────
+
 
 class UpsertBudgetRequest(BaseModel):
     store_id: str = Field(..., description="门店 ID")
@@ -73,6 +76,7 @@ class RecordExecutionRequest(BaseModel):
 
 # ─── 1. 创建/更新预算计划 ─────────────────────────────────────────────────────
 
+
 @router.post("", summary="创建或更新预算计划", status_code=201)
 async def upsert_budget(
     body: UpsertBudgetRequest,
@@ -102,6 +106,7 @@ async def upsert_budget(
 
 # ─── 2. 查询预算计划列表 ──────────────────────────────────────────────────────
 
+
 @router.get("", summary="预算计划列表")
 async def list_budgets(
     store_id: Optional[str] = Query(None, description="按门店过滤"),
@@ -126,6 +131,7 @@ async def list_budgets(
 
 # ─── 3. 预算计划详情 ──────────────────────────────────────────────────────────
 
+
 @router.get("/{plan_id}", summary="预算计划详情")
 async def get_budget(
     plan_id: str = Path(..., description="预算计划 ID"),
@@ -141,6 +147,7 @@ async def get_budget(
 
 
 # ─── 4. 审批预算计划 ──────────────────────────────────────────────────────────
+
 
 @router.post("/{plan_id}/approve", summary="审批预算计划")
 async def approve_budget(
@@ -160,6 +167,7 @@ async def approve_budget(
 
 
 # ─── 5. 录入执行金额 ──────────────────────────────────────────────────────────
+
 
 @router.post("/{plan_id}/execute", summary="录入实际执行金额")
 async def record_execution(
@@ -189,6 +197,7 @@ async def record_execution(
 
 # ─── 6. 执行进度 ──────────────────────────────────────────────────────────────
 
+
 @router.get("/{plan_id}/progress", summary="预算执行进度")
 async def get_execution_progress(
     plan_id: str = Path(..., description="预算计划 ID"),
@@ -205,6 +214,7 @@ async def get_execution_progress(
 
 
 # ─── 7. 门店期间汇总 ──────────────────────────────────────────────────────────
+
 
 @router.get("/summary", summary="门店期间预算汇总")
 async def get_budget_summary(
@@ -228,6 +238,7 @@ async def get_budget_summary(
 
 
 # ─── 8. 科目列表 ──────────────────────────────────────────────────────────────
+
 
 @router.get("/categories", summary="支持的预算科目列表")
 async def list_categories(

@@ -13,6 +13,7 @@
   GET  /pl/vouchers?store_id=&date=        - 凭证列表
   POST /pl/vouchers/generate               - 生成凭证
 """
+
 import uuid
 from datetime import date
 from typing import Optional
@@ -33,16 +34,18 @@ _pl_service = PLReportService()
 
 # ─── 请求模型 ─────────────────────────────────────────────────────────────────
 
+
 class VoucherGenerateRequest(BaseModel):
     store_id: str
     biz_date: str
-    voucher_type: str = "sales"      # sales/cost/payment/receipt
+    voucher_type: str = "sales"  # sales/cost/payment/receipt
     source_type: Optional[str] = None
     source_id: Optional[str] = None
-    entries: list[dict] = []         # 可选：手动指定分录；空则自动生成
+    entries: list[dict] = []  # 可选：手动指定分录；空则自动生成
 
 
 # ─── 依赖注入 ─────────────────────────────────────────────────────────────────
+
 
 async def _get_tenant_db(x_tenant_id: str = Header(..., alias="X-Tenant-ID")):
     async for session in get_db_with_tenant(x_tenant_id):
@@ -66,6 +69,7 @@ def _parse_uuid(val: str, field_name: str) -> uuid.UUID:
 
 
 # ─── GET /pl/daily ────────────────────────────────────────────────────────────
+
 
 @router.get("/daily", summary="日P&L报表")
 async def get_daily_pl(
@@ -98,6 +102,7 @@ async def get_daily_pl(
 
 
 # ─── GET /pl/period ───────────────────────────────────────────────────────────
+
 
 @router.get("/period", summary="期间P&L报表")
 async def get_period_pl(
@@ -140,6 +145,7 @@ async def get_period_pl(
 
 # ─── GET /pl/stores ───────────────────────────────────────────────────────────
 
+
 @router.get("/stores", summary="多店P&L对比")
 async def get_stores_pl_comparison(
     date: str = Query("today", description="业务日期 YYYY-MM-DD 或 today"),
@@ -161,9 +167,8 @@ async def get_stores_pl_comparison(
         from sqlalchemy import select
 
         from shared.ontology.src.entities import Store
-        result = await db.execute(
-            select(Store.id).where(Store.tenant_id == tid).where(Store.is_deleted == False)
-        )
+
+        result = await db.execute(select(Store.id).where(Store.tenant_id == tid).where(Store.is_deleted == False))
         sid_list = [row[0] for row in result.all()]
 
     if not sid_list:
@@ -187,6 +192,7 @@ async def get_stores_pl_comparison(
 
 # ─── GET /pl/vouchers ────────────────────────────────────────────────────────
 
+
 @router.get("/vouchers", summary="凭证列表")
 async def list_vouchers(
     store_id: str = Query(..., description="门店ID"),
@@ -206,10 +212,7 @@ async def list_vouchers(
 
     valid_statuses = {"draft", "confirmed", "exported"}
     if status and status not in valid_statuses:
-        raise HTTPException(
-            status_code=400,
-            detail=f"status 必须是: {', '.join(valid_statuses)}"
-        )
+        raise HTTPException(status_code=400, detail=f"status 必须是: {', '.join(valid_statuses)}")
 
     try:
         vouchers = await _pl_service.get_vouchers(sid, biz_date, tid, db, status)
@@ -230,6 +233,7 @@ async def list_vouchers(
 
 # ─── POST /pl/vouchers/generate ──────────────────────────────────────────────
 
+
 @router.post("/vouchers/generate", summary="生成财务凭证")
 async def generate_voucher(
     body: VoucherGenerateRequest,
@@ -249,10 +253,7 @@ async def generate_voucher(
 
     valid_types = {"sales", "cost", "payment", "receipt"}
     if body.voucher_type not in valid_types:
-        raise HTTPException(
-            status_code=400,
-            detail=f"voucher_type 必须是: {', '.join(valid_types)}"
-        )
+        raise HTTPException(status_code=400, detail=f"voucher_type 必须是: {', '.join(valid_types)}")
 
     try:
         voucher_data = await _generate_voucher_internal(
