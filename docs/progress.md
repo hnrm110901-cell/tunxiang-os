@@ -4,6 +4,83 @@
 
 ---
 
+## 2026-04-19 PR-W1.5：红冲 API（red_flush 字段 + 状态机）
+
+### 本次会话目标
+W1.5: 建立红冲（red_flush）能力。已推 ERP 的凭证（status='exported' 且 closed/locked 账期）**唯一合法修正路径**就是红冲——金税四期红线，不能删改，必须生成反向分录入账。
+
+Tier 级别：🔴 **Tier 1**（资金安全 / 金税四期审计红线）。
+
+### 不得触碰的边界
+- [x] 不改 void 语义（void 和 red_flush 是两条独立状态机）
+- [x] 不破 v266 lines CHECK（debit/credit 仍正，互斥；金额取负在凭证级）
+- [x] 不改现有 entries JSONB 格式（ERP 推送兼容）
+
+### 涉及范围
+- 新迁移 v272（跳 v271）
+- `services/tx-finance/src/models/voucher.py` — 2 新字段 + ORM CHECK 镜像 + 2 属性 + to_dict
+- `services/tx-finance/src/services/financial_voucher_service.py` — `red_flush()` 方法 + `_reverse_entries_jsonb` 辅助
+- 新测试 `test_red_flush_tier1.py`
+
+### 完成状态
+- [x] **v272 migration**
+  - ADD 2 列: `red_flush_of_voucher_id` / `red_flushed_by_voucher_id` (UUID)
+  - 2 FK: 都 ON DELETE RESTRICT（防误删切断审计链）
+  - CHECK `chk_voucher_red_flush_exclusive`: `red_flush_of IS NULL OR red_flushed_by IS NULL`（防红冲链递归）
+  - UNIQUE partial index `uq_fv_red_flushed_by` WHERE NOT NULL（一张凭证最多被红冲一次）
+  - Partial index `ix_fv_red_flush_of` WHERE NOT NULL（查"原凭证是否被红冲"）
+  - 索引全 CONCURRENTLY + autocommit_block
+- [x] **ORM 更新**
+  - `red_flush_of_voucher_id` / `red_flushed_by_voucher_id` 字段 + FK
+  - ORM `CheckConstraint` 镜像 DB（flush 前校验）
+  - `@property is_red_flush_voucher` / `@property has_been_red_flushed`
+  - `to_dict()` 暴露 4 新字段
+- [x] **Service `red_flush(voucher_id, *, operator_id, reason, session, new_voucher_no=None)`**
+  - 前置校验：凭证存在 / `status=='exported'` / `not voided` / `not has_been_red_flushed` / `not is_red_flush_voucher` / reason 非空
+  - 构造红字凭证：借贷对调 + 凭证级 `total_amount_fen` 取负 + 分录级保持正
+  - entries JSONB 也借贷对调（ERP 推送契约一致）
+  - 双向 link: `red.red_flush_of = original.id` + `original.red_flushed_by = red.id`
+  - 默认 voucher_no = `{原}-R`，支持自定义
+  - `status='draft'`（红字凭证重新走 ERP 推送流程）
+  - `event_type='red_flush.voucher'`, `event_id=None`（手工操作不走事件幂等）
+  - **绕过账期校验**：`red_flush()` 内部不调 `is_date_writable`，让 closed/locked 凭证有合法修正路径
+- [x] **Tier 1 测试** `src/tests/test_red_flush_tier1.py`（**29 passed / 0.25s**）
+  - ORM 属性（3）
+  - 红字凭证生成（8）：反向分录 / entries JSONB 对调 / 摘要前缀 / 双向 link / 编号 / custom / draft 状态 / event_type
+  - 拒绝路径（7）：draft/confirmed 应走 void / 不存在 / reason 空 / 已作废 / 已被红冲 / 本身是红冲 / 递归防
+  - 账期绕过（1）：即便 period_service 会 raise 也不调用
+  - 迁移结构（10）：revision/FK RESTRICT/CHECK 互斥/UNIQUE partial/ix partial/CONCURRENTLY 全/ORM 镜像
+- [x] **全 Wave 1 回归**：21 + 19 + 24 + 25 + 48 + 10 + 29 = **176 passed / 0.43s**
+- [x] **DEV Postgres 端到端**（真实 asyncpg）
+  - #1 红冲绕过 closed 账期 → 生成反向凭证 `total_amount_fen=-10000` ✅
+  - DB 双向 link 验证：原.red_flushed_by == 红.id；红.red_flush_of == 原.id ✅
+  - #2 CHECK 互斥：手工 UPDATE 同时设两字段 → `IntegrityError` ✅
+  - #3 UNIQUE partial：另一凭证 red_flushed_by 指向同红字凭证 → `IntegrityError` ✅
+  - #4 FK RESTRICT：删红字凭证被原凭证引用阻止 → `IntegrityError` ✅
+  - #5 应用层防：重复红冲 → `ValueError "已被红冲 (→ uuid), 不可重复"` ✅
+
+### 关键决策
+- **借贷对调 + 凭证级金额取负 + 分录级保持正** — 不破 v266 lines CHECK (debit/credit 互斥且非负)。红字显示靠凭证级 `total_amount_fen < 0` 识别，分录层面干净。
+- **绕过账期校验** — 金税四期红线：闭账后发现错账，只能通过红冲修正。若账期校验拦红冲，错账将永久无法纠正。
+- **FK ON DELETE RESTRICT 双向** — 防误删切断审计链。如果原凭证被删，红冲凭证的 red_flush_of 悬空；反之亦然。RESTRICT 确保先解链才能删。
+- **UNIQUE partial on red_flushed_by** — 一张凭证最多被红冲一次。重复红冲语义不清（红字的红字？不符合会计实务）。
+- **CHECK 互斥防红冲链递归** — 一张凭证不能既是红冲又被红冲。避免"红冲的红冲的红冲..."这种 corner case。
+- **event_id=None 不走幂等** — 红冲是手工操作，每次调用都应生成新凭证。如果设 event_id 还可能被误复用。
+- **默认 voucher_no 加 `-R` 后缀** — 语义显式，便于财务人员直观识别。
+
+### 下一步
+- CLAUDE.md §19 独立验证
+- **PR-W1.6**: 历史 entries → lines 回填（本 PR 依赖 W1.5？实际不依赖，可并行）
+- **PR-W1.7**: voucher_generator 接入 FinancialVoucherService
+
+### 已知风险
+- **红冲凭证本身需要再推 ERP** — W1.5 只管生成红字凭证（status='draft'），推 ERP 是另外的 VoucherGenerator 职责。如果未推成功，账上就有 draft 状态的红字凭证等着，需要监控告警兜底。
+- **operator_id 未写入凭证字段** — 只在 log 里留痕。DB 层没字段存"谁操作了红冲"。W1.2 有 voided_by，W1.5 可借 voided_by + voided_reason 复用但语义错乱。W2 加独立 `red_flushed_by_operator` 字段。
+- **reason 未入库** — 同上，只日志。审计要求在 DB 层留痕，W2 PR 加 `red_flush_reason` 字段。
+- **事务内 flush 两次** — red_flush 先 flush 拿 red.id，再设 original 反向 link flush。若第一次后连接断开，原凭证没被标红冲，红字凭证成了"孤儿"。生产 caller 必须在外层 txn 包裹。
+
+---
+
 ## 2026-04-19 PR-W1.4b：FinancialVoucherService 接入账期校验
 
 ### 本次会话目标
