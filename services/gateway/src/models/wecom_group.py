@@ -6,6 +6,7 @@ WecomGroupMessage — 群消息发送历史记录
 注意：使用 Base（非 TenantBase），因为群运营是跨租户配置，
 但仍包含 tenant_id 字段，RLS 由迁移文件配置。
 """
+
 from __future__ import annotations
 
 import uuid
@@ -210,8 +211,5 @@ class WecomGroupMessage(Base):
 
     def __repr__(self) -> str:
         return (
-            f"<WecomGroupMessage id={self.id} "
-            f"group={self.group_chat_id!r} "
-            f"type={self.sop_type!r} "
-            f"status={self.status}>"
+            f"<WecomGroupMessage id={self.id} group={self.group_chat_id!r} type={self.sop_type!r} status={self.status}>"
         )

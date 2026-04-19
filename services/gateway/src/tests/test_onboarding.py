@@ -9,13 +9,13 @@
   5. POST /{sid}/confirm — 确认（缺必填时应报错）
   6. DeliveryAgent 20问覆盖度检查
 """
+
 from __future__ import annotations
 
-import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from ..api.onboarding_routes import router, DELIVERY_QUESTIONS, REQUIRED_KEYS
+from ..api.onboarding_routes import DELIVERY_QUESTIONS, REQUIRED_KEYS, router
 
 # ── 测试应用 ──────────────────────────────────────────────────────────
 
@@ -75,10 +75,13 @@ def test_list_templates_has_required_fields():
 
 
 def test_start_session_new_customer():
-    resp = client.post("/api/v1/onboarding/start", json={
-        "tenant_id": TENANT_ID,
-        "migration_source": "new",
-    })
+    resp = client.post(
+        "/api/v1/onboarding/start",
+        json={
+            "tenant_id": TENANT_ID,
+            "migration_source": "new",
+        },
+    )
     assert resp.status_code == 200
     data = resp.json()["data"]
     assert "session_id" in data
@@ -89,15 +92,18 @@ def test_start_session_new_customer():
 
 def test_start_session_with_prefilled():
     """天财迁移：传入 prefilled_answers 应跳过已知问题"""
-    resp = client.post("/api/v1/onboarding/start", json={
-        "tenant_id": TENANT_ID,
-        "migration_source": "tiancai",
-        "prefilled_answers": {
-            "restaurant_type": "casual_dining",
-            "store_name": "天财切换门店",
-            "table_count": 25,
+    resp = client.post(
+        "/api/v1/onboarding/start",
+        json={
+            "tenant_id": TENANT_ID,
+            "migration_source": "tiancai",
+            "prefilled_answers": {
+                "restaurant_type": "casual_dining",
+                "store_name": "天财切换门店",
+                "table_count": 25,
+            },
         },
-    })
+    )
     assert resp.status_code == 200
     data = resp.json()["data"]
     assert data["answered_count"] == 3
@@ -120,10 +126,13 @@ def _create_session() -> str:
 
 def test_answer_single_question():
     sid = _create_session()
-    resp = client.post(f"/api/v1/onboarding/{sid}/answer", json={
-        "key": "restaurant_type",
-        "value": "hot_pot",
-    })
+    resp = client.post(
+        f"/api/v1/onboarding/{sid}/answer",
+        json={
+            "key": "restaurant_type",
+            "value": "hot_pot",
+        },
+    )
     assert resp.status_code == 200
     data = resp.json()["data"]
     assert data["answered_count"] == 1
@@ -131,21 +140,28 @@ def test_answer_single_question():
 
 def test_answer_batch_questions():
     sid = _create_session()
-    resp = client.post(f"/api/v1/onboarding/{sid}/answer", json={
-        "answers": {
-            "restaurant_type": "banquet",
-            "store_name": "宴席大酒楼",
-            "table_count": 30,
+    resp = client.post(
+        f"/api/v1/onboarding/{sid}/answer",
+        json={
+            "answers": {
+                "restaurant_type": "banquet",
+                "store_name": "宴席大酒楼",
+                "table_count": 30,
+            },
         },
-    })
+    )
     assert resp.status_code == 200
     assert resp.json()["data"]["answered_count"] == 3
 
 
 def test_answer_nonexistent_session_returns_404():
-    resp = client.post("/api/v1/onboarding/nonexistent-id/answer", json={
-        "key": "restaurant_type", "value": "casual_dining",
-    })
+    resp = client.post(
+        "/api/v1/onboarding/nonexistent-id/answer",
+        json={
+            "key": "restaurant_type",
+            "value": "casual_dining",
+        },
+    )
     assert resp.status_code == 404
 
 
@@ -160,9 +176,12 @@ def test_answer_requires_key_or_answers():
 
 def test_preview_returns_config_package():
     sid = _create_session()
-    client.post(f"/api/v1/onboarding/{sid}/answer", json={
-        "answers": {"restaurant_type": "casual_dining"},
-    })
+    client.post(
+        f"/api/v1/onboarding/{sid}/answer",
+        json={
+            "answers": {"restaurant_type": "casual_dining"},
+        },
+    )
     resp = client.get(f"/api/v1/onboarding/{sid}/preview")
     assert resp.status_code == 200
     data = resp.json()["data"]
@@ -183,9 +202,13 @@ def test_preview_shows_unanswered_required():
 def test_confirm_fails_without_required_answers():
     sid = _create_session()
     # 只回答了一个非必填问题
-    client.post(f"/api/v1/onboarding/{sid}/answer", json={
-        "key": "vip_room_count", "value": 2,
-    })
+    client.post(
+        f"/api/v1/onboarding/{sid}/answer",
+        json={
+            "key": "vip_room_count",
+            "value": 2,
+        },
+    )
     resp = client.post(f"/api/v1/onboarding/{sid}/confirm")
     assert resp.status_code == 422
 
@@ -207,9 +230,13 @@ def test_confirm_locks_session():
     client.post(f"/api/v1/onboarding/{sid}/answer", json={"answers": FULL_ANSWERS})
     client.post(f"/api/v1/onboarding/{sid}/confirm")
 
-    resp = client.post(f"/api/v1/onboarding/{sid}/answer", json={
-        "key": "store_name", "value": "尝试修改",
-    })
+    resp = client.post(
+        f"/api/v1/onboarding/{sid}/answer",
+        json={
+            "key": "store_name",
+            "value": "尝试修改",
+        },
+    )
     assert resp.status_code == 409
 
 
@@ -228,15 +255,15 @@ def test_twenty_questions_coverage():
     """20问中必须覆盖关键配置域"""
     all_keys = {q["key"] for q in DELIVERY_QUESTIONS}
     critical_domains = {
-        "restaurant_type",     # 业态
-        "table_count",         # 桌台
-        "printer_count",       # 打印机
+        "restaurant_type",  # 业态
+        "table_count",  # 桌台
+        "printer_count",  # 打印机
         "employee_max_discount",  # 折扣守护
-        "payment_methods",     # 支付
-        "channels_enabled",    # 外卖
-        "shifts",              # 营业时段
-        "employee_roles",      # 员工
-        "point_rate",          # 积分
+        "payment_methods",  # 支付
+        "channels_enabled",  # 外卖
+        "shifts",  # 营业时段
+        "employee_roles",  # 员工
+        "point_rate",  # 积分
     }
     missing = critical_domains - all_keys
     assert not missing, f"20问缺少关键配置域：{missing}"
@@ -251,6 +278,4 @@ def test_required_questions_have_hint():
     """必填问题必须有 hint，方便引导商户"""
     for q in DELIVERY_QUESTIONS:
         if q.get("required"):
-            assert q.get("hint") or q.get("example"), (
-                f"必填问题 {q['key']} 缺少 hint 或 example"
-            )
+            assert q.get("hint") or q.get("example"), f"必填问题 {q['key']} 缺少 hint 或 example"

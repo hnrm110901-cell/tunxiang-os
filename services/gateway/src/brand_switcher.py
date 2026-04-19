@@ -3,6 +3,7 @@
 支持集团下多品牌管理，品牌切换时菜单/门店/会员数据联动。
 积分可跨品牌通用。
 """
+
 from __future__ import annotations
 
 import uuid
@@ -21,6 +22,7 @@ _cross_brand_benefits: dict[str, list[dict]] = {}  # tenant_id -> [benefit_rule]
 
 
 # ── 工具函数 ──────────────────────────────────────────────────
+
 
 def _now_utc() -> datetime:
     return datetime.now(timezone.utc)
@@ -42,23 +44,22 @@ async def list_brands(
     Returns:
         {"tenant_id", "brands", "total"}
     """
-    brands = [
-        b for b in _brands.values()
-        if b.get("tenant_id") == tenant_id and not b.get("is_deleted", False)
-    ]
+    brands = [b for b in _brands.values() if b.get("tenant_id") == tenant_id and not b.get("is_deleted", False)]
     brands.sort(key=lambda b: b.get("sort_order", 0))
 
     brand_list = []
     for b in brands:
-        brand_list.append({
-            "brand_id": b["brand_id"],
-            "name": b["name"],
-            "logo_url": b.get("logo_url", ""),
-            "theme_color": b.get("theme_color", "#FF6B2C"),
-            "business_type": b.get("business_type", ""),
-            "store_count": b.get("store_count", 0),
-            "status": b.get("status", "active"),
-        })
+        brand_list.append(
+            {
+                "brand_id": b["brand_id"],
+                "name": b["name"],
+                "logo_url": b.get("logo_url", ""),
+                "theme_color": b.get("theme_color", "#FF6B2C"),
+                "business_type": b.get("business_type", ""),
+                "store_count": b.get("store_count", 0),
+                "status": b.get("status", "active"),
+            }
+        )
 
     logger.info(
         "brand.list",
@@ -199,11 +200,13 @@ async def get_cross_brand_benefits(
         brand_data = _brands.get(brand_id, {})
         specific_benefits = brand_data.get("specific_benefits", [])
         if specific_benefits:
-            brand_specific.append({
-                "brand_id": brand_id,
-                "brand_name": b["name"],
-                "benefits": specific_benefits,
-            })
+            brand_specific.append(
+                {
+                    "brand_id": brand_id,
+                    "brand_name": b["name"],
+                    "benefits": specific_benefits,
+                }
+            )
 
     logger.info(
         "brand.cross_benefits",

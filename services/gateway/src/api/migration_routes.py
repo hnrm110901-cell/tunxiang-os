@@ -18,9 +18,9 @@
   Week 3: 财务逐一 approve pending-members（储值安全迁移）
   Week 4: 配置健康度达到 ≥90 后，切换商米POS到屯象收银
 """
+
 from __future__ import annotations
 
-import asyncio
 from typing import Any, Optional
 
 import structlog
@@ -86,10 +86,12 @@ async def start_tiancai_migration(req: TiancaiMigrationStartRequest) -> dict:
         member_fetched=summary.get("steps", {}).get("member_migration", {}).get("total_fetched"),
     )
 
-    return ok({
-        "migration_summary": summary,
-        "next_steps": _build_next_steps(summary, req.dry_run),
-    })
+    return ok(
+        {
+            "migration_summary": summary,
+            "next_steps": _build_next_steps(summary, req.dry_run),
+        }
+    )
 
 
 @router.get("/tiancai/prefilled")
@@ -120,13 +122,15 @@ async def get_tiancai_prefilled(
     mapper = TiancaiConfigMapper(adapter)
     prefilled = await mapper.extract_prefilled_answers()
 
-    return ok({
-        "tenant_id": tenant_id,
-        "prefilled_answers": prefilled,
-        "prefilled_count": len(prefilled),
-        "remaining_questions": max(0, 20 - len(prefilled)),
-        "note": "将 prefilled_answers 传入 POST /api/v1/onboarding/start 可跳过已知配置",
-    })
+    return ok(
+        {
+            "tenant_id": tenant_id,
+            "prefilled_answers": prefilled,
+            "prefilled_count": len(prefilled),
+            "remaining_questions": max(0, 20 - len(prefilled)),
+            "note": "将 prefilled_answers 传入 POST /api/v1/onboarding/start 可跳过已知配置",
+        }
+    )
 
 
 @router.get("/pending-members/summary")
@@ -142,13 +146,15 @@ async def get_pending_members_summary(
     """
     tenant_id = x_tenant_id
     try:
-        from shared.ontology.src.database import async_session_factory
         from sqlalchemy import text
+
+        from shared.ontology.src.database import async_session_factory
 
         async with async_session_factory() as db:
             await db.execute(text("SET app.tenant_id = :tid"), {"tid": tenant_id})
 
-            result = await db.execute(text("""
+            result = await db.execute(
+                text("""
                 SELECT
                     COUNT(*)                          AS total_count,
                     COALESCE(SUM(stored_value_fen), 0) AS total_balance_fen,
@@ -159,26 +165,30 @@ async def get_pending_members_summary(
                 WHERE tenant_id = :tid
                   AND status = 'pending_review'
                   AND is_deleted = FALSE
-            """), {"tid": tenant_id})
+            """),
+                {"tid": tenant_id},
+            )
 
             row = result.fetchone()
             total_count = int(row[0] or 0)
             total_balance_fen = int(row[1] or 0)
 
-            return ok({
-                "tenant_id": tenant_id,
-                "pending_count": total_count,
-                "total_balance_yuan": round(total_balance_fen / 100, 2),
-                "distribution": {
-                    "0_100_yuan": int(row[2] or 0),
-                    "100_1000_yuan": int(row[3] or 0),
-                    "1000_plus_yuan": int(row[4] or 0),
-                },
-                "warning": (
-                    "以上储值余额需财务负责人逐一核实后批准迁移。"
-                    "请对照天财系统的储值余额台账确认无误后再执行 approve。"
-                ),
-            })
+            return ok(
+                {
+                    "tenant_id": tenant_id,
+                    "pending_count": total_count,
+                    "total_balance_yuan": round(total_balance_fen / 100, 2),
+                    "distribution": {
+                        "0_100_yuan": int(row[2] or 0),
+                        "100_1000_yuan": int(row[3] or 0),
+                        "1000_plus_yuan": int(row[4] or 0),
+                    },
+                    "warning": (
+                        "以上储值余额需财务负责人逐一核实后批准迁移。"
+                        "请对照天财系统的储值余额台账确认无误后再执行 approve。"
+                    ),
+                }
+            )
 
     except Exception as exc:
         logger.error("pending_members_summary_failed", error=str(exc), exc_info=True)
@@ -205,13 +215,15 @@ async def list_pending_members(
     }.get(order_by, "stored_value_fen DESC")
 
     try:
-        from shared.ontology.src.database import async_session_factory
         from sqlalchemy import text
+
+        from shared.ontology.src.database import async_session_factory
 
         async with async_session_factory() as db:
             await db.execute(text("SET app.tenant_id = :tid"), {"tid": tenant_id})
 
-            rows = await db.execute(text(f"""
+            rows = await db.execute(
+                text(f"""
                 SELECT id, phone, display_name, external_id_tiancai,
                        stored_value_fen, points, tier_name, status,
                        reviewed_by, reviewed_at, review_notes, created_at
@@ -221,12 +233,17 @@ async def list_pending_members(
                   AND is_deleted = FALSE
                 ORDER BY {order_sql}
                 LIMIT :size OFFSET :offset
-            """), {"tid": tenant_id, "status": status, "size": size, "offset": offset})
+            """),
+                {"tid": tenant_id, "status": status, "size": size, "offset": offset},
+            )
 
-            total_row = await db.execute(text("""
+            total_row = await db.execute(
+                text("""
                 SELECT COUNT(*) FROM member_migration_pending
                 WHERE tenant_id = :tid AND status = :status AND is_deleted = FALSE
-            """), {"tid": tenant_id, "status": status})
+            """),
+                {"tid": tenant_id, "status": status},
+            )
             total = int(total_row.scalar() or 0)
 
             items = [
@@ -247,12 +264,14 @@ async def list_pending_members(
                 for r in rows.fetchall()
             ]
 
-            return ok({
-                "items": items,
-                "total": total,
-                "page": page,
-                "size": size,
-            })
+            return ok(
+                {
+                    "items": items,
+                    "total": total,
+                    "page": page,
+                    "size": size,
+                }
+            )
 
     except Exception as exc:
         logger.error("list_pending_members_failed", error=str(exc), exc_info=True)
@@ -278,18 +297,22 @@ async def approve_pending_member(
     now = datetime.now(tz=timezone.utc)
 
     try:
-        from shared.ontology.src.database import async_session_factory
         from sqlalchemy import text
+
+        from shared.ontology.src.database import async_session_factory
 
         async with async_session_factory() as db:
             await db.execute(text("SET app.tenant_id = :tid"), {"tid": tenant_id})
 
             # 读取 pending 记录
-            row = await db.execute(text("""
+            row = await db.execute(
+                text("""
                 SELECT id, phone, display_name, stored_value_fen, points, status
                 FROM member_migration_pending
                 WHERE id = :rid AND tenant_id = :tid AND is_deleted = FALSE
-            """), {"rid": record_id, "tid": tenant_id})
+            """),
+                {"rid": record_id, "tid": tenant_id},
+            )
             record = row.fetchone()
 
             if not record:
@@ -305,21 +328,25 @@ async def approve_pending_member(
             points = int(record[4] or 0)
 
             # 将储值余额写入 customers 表（仅更新储值字段）
-            await db.execute(text("""
+            await db.execute(
+                text("""
                 UPDATE customers
                 SET stored_value_fen = stored_value_fen + :balance,
                     points           = points + :pts,
                     updated_at       = NOW()
                 WHERE tenant_id = :tid AND phone = :phone AND is_deleted = FALSE
-            """), {
-                "tid": tenant_id,
-                "phone": phone,
-                "balance": stored_value_fen,
-                "pts": points,
-            })
+            """),
+                {
+                    "tid": tenant_id,
+                    "phone": phone,
+                    "balance": stored_value_fen,
+                    "pts": points,
+                },
+            )
 
             # 更新 pending 状态
-            await db.execute(text("""
+            await db.execute(
+                text("""
                 UPDATE member_migration_pending
                 SET status       = 'migrated',
                     reviewed_by  = :reviewer,
@@ -328,13 +355,15 @@ async def approve_pending_member(
                     migrated_at  = :now,
                     updated_at   = :now
                 WHERE id = :rid AND tenant_id = :tid
-            """), {
-                "rid": record_id,
-                "tid": tenant_id,
-                "reviewer": action.reviewed_by,
-                "now": now,
-                "notes": action.review_notes or "审核通过",
-            })
+            """),
+                {
+                    "rid": record_id,
+                    "tid": tenant_id,
+                    "reviewer": action.reviewed_by,
+                    "now": now,
+                    "notes": action.review_notes or "审核通过",
+                },
+            )
 
             await db.commit()
 
@@ -347,13 +376,15 @@ async def approve_pending_member(
             reviewed_by=action.reviewed_by,
         )
 
-        return ok({
-            "record_id": record_id,
-            "phone": phone,
-            "migrated_balance_yuan": round(stored_value_fen / 100, 2),
-            "status": "migrated",
-            "message": f"储值 ¥{stored_value_fen/100:.2f} 已迁移到会员账户",
-        })
+        return ok(
+            {
+                "record_id": record_id,
+                "phone": phone,
+                "migrated_balance_yuan": round(stored_value_fen / 100, 2),
+                "status": "migrated",
+                "message": f"储值 ¥{stored_value_fen / 100:.2f} 已迁移到会员账户",
+            }
+        )
 
     except HTTPException:
         raise
@@ -377,13 +408,15 @@ async def reject_pending_member(
     now = datetime.now(tz=timezone.utc)
 
     try:
-        from shared.ontology.src.database import async_session_factory
         from sqlalchemy import text
+
+        from shared.ontology.src.database import async_session_factory
 
         async with async_session_factory() as db:
             await db.execute(text("SET app.tenant_id = :tid"), {"tid": tenant_id})
 
-            result = await db.execute(text("""
+            result = await db.execute(
+                text("""
                 UPDATE member_migration_pending
                 SET status       = 'rejected',
                     reviewed_by  = :reviewer,
@@ -394,24 +427,28 @@ async def reject_pending_member(
                   AND status = 'pending_review'
                   AND is_deleted = FALSE
                 RETURNING id, phone
-            """), {
-                "rid": record_id,
-                "tid": tenant_id,
-                "reviewer": action.reviewed_by,
-                "now": now,
-                "notes": action.review_notes or "审核拒绝",
-            })
+            """),
+                {
+                    "rid": record_id,
+                    "tid": tenant_id,
+                    "reviewer": action.reviewed_by,
+                    "now": now,
+                    "notes": action.review_notes or "审核拒绝",
+                },
+            )
             row = result.fetchone()
             if not row:
                 raise HTTPException(status_code=404, detail="记录不存在或状态不符")
             await db.commit()
 
-        return ok({
-            "record_id": record_id,
-            "phone": row[1],
-            "status": "rejected",
-            "message": "已拒绝迁移，该会员储值保留在天财系统中",
-        })
+        return ok(
+            {
+                "record_id": record_id,
+                "phone": row[1],
+                "status": "rejected",
+                "message": "已拒绝迁移，该会员储值保留在天财系统中",
+            }
+        )
 
     except HTTPException:
         raise
@@ -458,10 +495,7 @@ def _build_next_steps(summary: dict, dry_run: bool) -> list[str]:
     config = summary.get("steps", {}).get("config_mapping", {})
 
     if menu.get("success_rate", 0) < 99.5:
-        steps.append(
-            f"⚠️  菜品迁移成功率 {menu.get('success_rate')}% 未达标（≥99.5%），"
-            "请检查错误日志后重新执行"
-        )
+        steps.append(f"⚠️  菜品迁移成功率 {menu.get('success_rate')}% 未达标（≥99.5%），请检查错误日志后重新执行")
 
     if member.get("pending_review", 0) > 0:
         balance = member.get("pending_balance_yuan", 0)
@@ -476,7 +510,7 @@ def _build_next_steps(summary: dict, dry_run: bool) -> list[str]:
             f"✅ 已自动读取 {config.get('prefilled_count', 0)} 项天财配置。"
             f"仅需回答 {remaining} 个关键问题 → "
             f"POST /api/v1/onboarding/start "
-            f'(migration_source=tiancai, prefilled_answers=<见 summary>)'
+            f"(migration_source=tiancai, prefilled_answers=<见 summary>)"
         )
 
     steps.append("最后：运行 GET /api/v1/config/health/{tenant_id}，score ≥ 90 后正式上线")

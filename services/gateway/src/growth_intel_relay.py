@@ -5,6 +5,7 @@ Growth Hub 试点结果反馈到 Intel 模型，形成数据闭环。
 
 数据持久化：opportunity_relays + pilot_feedbacks 表（v258 迁移）。
 """
+
 import uuid
 from datetime import datetime, timezone
 from typing import Optional
@@ -22,8 +23,10 @@ logger = structlog.get_logger()
 
 # ---- 数据模型 ----
 
+
 class OpportunityRelay(BaseModel):
     """情报机会 -> 增长活动草稿"""
+
     relay_id: str = Field(default_factory=lambda: f"relay-{uuid.uuid4().hex[:8]}")
     opportunity_id: str
     opportunity_type: str  # 新品机会 / 竞对防御 / 需求趋势 / 原料机会
@@ -42,6 +45,7 @@ class OpportunityRelay(BaseModel):
 
 class PilotFeedback(BaseModel):
     """增长试点结果 -> 情报模型反馈"""
+
     feedback_id: str = Field(default_factory=lambda: f"fb-{uuid.uuid4().hex[:6]}")
     pilot_id: str
     relay_id: str
@@ -52,6 +56,7 @@ class PilotFeedback(BaseModel):
 
 
 # ---- 内部 DB 工具函数 ----
+
 
 async def _get_session(tenant_id: str) -> AsyncSession:
     """获取设置了 RLS tenant_id 的数据库会话（调用方负责关闭）。"""
@@ -96,6 +101,7 @@ async def _row_to_feedback(row) -> dict:
 
 # ---- 接力服务 ----
 
+
 class GrowthIntelRelayService:
     """情报->增长自动接力 — 从发现机会到执行动作的闭环"""
 
@@ -127,8 +133,7 @@ class GrowthIntelRelayService:
 
             if existing_row and existing_row["status"] != "pending":
                 relay = await _row_to_relay(existing_row)
-                logger.info("relay_already_exists",
-                            relay_id=relay["relay_id"], status=relay["status"])
+                logger.info("relay_already_exists", relay_id=relay["relay_id"], status=relay["status"])
                 return relay
 
             campaign_type_map = {
@@ -185,6 +190,7 @@ class GrowthIntelRelayService:
             else:
                 # 插入新记录
                 import json
+
                 await session.execute(
                     text("""
                         INSERT INTO opportunity_relays (
@@ -231,15 +237,14 @@ class GrowthIntelRelayService:
                 "updated_at": now.isoformat(),
             }
 
-            logger.info("relay_created", relay_id=relay_id,
-                        opportunity_id=opportunity_id,
-                        campaign_draft_id=campaign_draft_id)
+            logger.info(
+                "relay_created", relay_id=relay_id, opportunity_id=opportunity_id, campaign_draft_id=campaign_draft_id
+            )
             return relay
 
         except SQLAlchemyError as exc:
             await session.rollback()
-            logger.error("relay_opportunity_to_campaign_failed",
-                         opportunity_id=opportunity_id, error=str(exc))
+            logger.error("relay_opportunity_to_campaign_failed", opportunity_id=opportunity_id, error=str(exc))
             raise
         finally:
             await session.close()
@@ -254,6 +259,7 @@ class GrowthIntelRelayService:
         4. 记录 pilot_feedbacks
         """
         import json
+
         session = await _get_session(self._tenant_id)
         try:
             # 通过 pilot_id 在 campaign_draft_id 中匹配接力记录
@@ -323,8 +329,7 @@ class GrowthIntelRelayService:
                 "created_at": now.isoformat(),
             }
 
-            logger.info("pilot_feedback_recorded", feedback_id=feedback_id,
-                        pilot_id=pilot_id, relay_id=relay_id)
+            logger.info("pilot_feedback_recorded", feedback_id=feedback_id, pilot_id=pilot_id, relay_id=relay_id)
             return feedback
 
         except SQLAlchemyError as exc:
@@ -437,9 +442,12 @@ class GrowthIntelRelayService:
         except SQLAlchemyError as exc:
             logger.error("get_relay_stats_failed", error=str(exc))
             return {
-                "total_relays": 0, "active_relays": 0,
-                "completed_relays": 0, "rejected_relays": 0,
-                "total_feedbacks": 0, "by_status": {},
+                "total_relays": 0,
+                "active_relays": 0,
+                "completed_relays": 0,
+                "rejected_relays": 0,
+                "total_feedbacks": 0,
+                "by_status": {},
             }
         finally:
             await session.close()
@@ -447,7 +455,7 @@ class GrowthIntelRelayService:
 
 # ---- FastAPI 路由 ----
 
-from fastapi import APIRouter, Header, Query
+from fastapi import APIRouter, Header
 
 router = APIRouter(prefix="/api/v1/growth-intel-relay", tags=["growth-intel-relay"])
 

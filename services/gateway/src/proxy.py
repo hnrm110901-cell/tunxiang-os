@@ -3,6 +3,7 @@
 M4a: Gateway 路由 100% 切换到 tunxiang-os 域微服务。
 旧 tunxiang 单体作为 fallback 保留，可通过 LEGACY_API_URL 配置。
 """
+
 import os
 
 import httpx
@@ -74,7 +75,11 @@ async def _proxy(request: Request, target_url: str) -> JSONResponse:
     if not target_url:
         return JSONResponse(
             status_code=503,
-            content={"ok": False, "data": None, "error": {"code": "SERVICE_UNAVAILABLE", "message": "Target service not configured"}},
+            content={
+                "ok": False,
+                "data": None,
+                "error": {"code": "SERVICE_UNAVAILABLE", "message": "Target service not configured"},
+            },
         )
 
     try:
@@ -103,7 +108,11 @@ async def _proxy(request: Request, target_url: str) -> JSONResponse:
         logger.warning("proxy_timeout", target=target_url, path=request.url.path, error=str(e))
         return JSONResponse(
             status_code=504,
-            content={"ok": False, "data": None, "error": {"code": "PROXY_TIMEOUT", "message": "Upstream service timeout"}},
+            content={
+                "ok": False,
+                "data": None,
+                "error": {"code": "PROXY_TIMEOUT", "message": "Upstream service timeout"},
+            },
         )
     except httpx.HTTPError as e:
         logger.error("proxy_http_error", target=target_url, error=str(e))

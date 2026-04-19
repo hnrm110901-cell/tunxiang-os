@@ -18,10 +18,11 @@
   GET  /api/v1/config/health/{tenant_id}/summary — 摘要（给前端上线按钮用）
   POST /api/v1/config/health/{tenant_id}/fix-hint — 返回修复建议
 """
+
 from __future__ import annotations
 
 import structlog
-from fastapi import APIRouter, Header, HTTPException, Request
+from fastapi import APIRouter, Header, HTTPException
 from pydantic import BaseModel
 
 from ..response import ok as ok_response
@@ -33,11 +34,12 @@ router = APIRouter(prefix="/api/v1/config", tags=["config-health"])
 
 # ── 检查项定义 ────────────────────────────────────────────────────────
 
+
 class CheckResult(BaseModel):
     check_id: str
     name: str
-    severity: str          # critical | important | advisory
-    status: str            # pass | fail | warn | skip
+    severity: str  # critical | important | advisory
+    status: str  # pass | fail | warn | skip
     score_earned: int
     score_max: int
     message: str
@@ -46,8 +48,8 @@ class CheckResult(BaseModel):
 
 class HealthReport(BaseModel):
     tenant_id: str
-    overall_score: int      # 0-100
-    go_live_ready: bool     # score ≥ 90 且无 critical fail
+    overall_score: int  # 0-100
+    go_live_ready: bool  # score ≥ 90 且无 critical fail
     checks: list[CheckResult]
     critical_fails: list[str]
     warnings: list[str]
@@ -62,10 +64,13 @@ async def _check_printer_configured(tenant_id: str, db) -> CheckResult:
     """至少配置一台收银打印机"""
     from sqlalchemy import text
 
-    result = await db.execute(text(
-        "SELECT COUNT(*) FROM printer_configs "
-        "WHERE tenant_id = :tid AND printer_type = 'receipt' AND is_deleted = FALSE"
-    ), {"tid": tenant_id})
+    result = await db.execute(
+        text(
+            "SELECT COUNT(*) FROM printer_configs "
+            "WHERE tenant_id = :tid AND printer_type = 'receipt' AND is_deleted = FALSE"
+        ),
+        {"tid": tenant_id},
+    )
     count = result.scalar() or 0
     ok = count >= 1
     return CheckResult(
@@ -84,10 +89,9 @@ async def _check_shift_configured(tenant_id: str, db) -> CheckResult:
     """至少配置一个营业班次"""
     from sqlalchemy import text
 
-    result = await db.execute(text(
-        "SELECT COUNT(*) FROM shift_configs "
-        "WHERE tenant_id = :tid AND is_deleted = FALSE"
-    ), {"tid": tenant_id})
+    result = await db.execute(
+        text("SELECT COUNT(*) FROM shift_configs WHERE tenant_id = :tid AND is_deleted = FALSE"), {"tid": tenant_id}
+    )
     count = result.scalar() or 0
     ok = count >= 1
     return CheckResult(
@@ -135,9 +139,9 @@ async def _check_kds_zone(tenant_id: str, db, *, tenant_config=None) -> CheckRes
             message="快餐业态：KDS分区可选，跳过检查",
         )
 
-    result2 = await db.execute(text(
-        "SELECT COUNT(*) FROM kds_display_rules WHERE tenant_id = :tid AND is_deleted = FALSE"
-    ), {"tid": tenant_id})
+    result2 = await db.execute(
+        text("SELECT COUNT(*) FROM kds_display_rules WHERE tenant_id = :tid AND is_deleted = FALSE"), {"tid": tenant_id}
+    )
     count = result2.scalar() or 0
     ok = count >= 1
 
@@ -173,9 +177,9 @@ async def _check_member_tier(tenant_id: str, db) -> CheckResult:
     """会员体系已配置"""
     from sqlalchemy import text
 
-    result = await db.execute(text(
-        "SELECT COUNT(*) FROM member_tiers WHERE tenant_id = :tid AND is_deleted = FALSE"
-    ), {"tid": tenant_id})
+    result = await db.execute(
+        text("SELECT COUNT(*) FROM member_tiers WHERE tenant_id = :tid AND is_deleted = FALSE"), {"tid": tenant_id}
+    )
     count = result.scalar() or 0
     ok = count >= 1
     return CheckResult(
@@ -194,9 +198,9 @@ async def _check_menu_exists(tenant_id: str, db) -> CheckResult:
     """菜品库非空（至少有1道菜）"""
     from sqlalchemy import text
 
-    result = await db.execute(text(
-        "SELECT COUNT(*) FROM dishes WHERE tenant_id = :tid AND is_deleted = FALSE"
-    ), {"tid": tenant_id})
+    result = await db.execute(
+        text("SELECT COUNT(*) FROM dishes WHERE tenant_id = :tid AND is_deleted = FALSE"), {"tid": tenant_id}
+    )
     count = result.scalar() or 0
     ok = count >= 1
     return CheckResult(
@@ -215,9 +219,9 @@ async def _check_store_configured(tenant_id: str, db) -> CheckResult:
     """门店主数据已配置"""
     from sqlalchemy import text
 
-    result = await db.execute(text(
-        "SELECT COUNT(*) FROM stores WHERE tenant_id = :tid AND is_deleted = FALSE"
-    ), {"tid": tenant_id})
+    result = await db.execute(
+        text("SELECT COUNT(*) FROM stores WHERE tenant_id = :tid AND is_deleted = FALSE"), {"tid": tenant_id}
+    )
     count = result.scalar() or 0
     ok = count >= 1
     return CheckResult(
@@ -249,9 +253,9 @@ async def _check_table_configured(tenant_id: str, db, *, tenant_config=None) -> 
             message="快餐业态：桌台配置可选，跳过检查",
         )
 
-    result2 = await db.execute(text(
-        "SELECT COUNT(*) FROM tables WHERE tenant_id = :tid AND is_deleted = FALSE"
-    ), {"tid": tenant_id})
+    result2 = await db.execute(
+        text("SELECT COUNT(*) FROM tables WHERE tenant_id = :tid AND is_deleted = FALSE"), {"tid": tenant_id}
+    )
     count = result2.scalar() or 0
     ok = count >= 1
 
@@ -271,9 +275,9 @@ async def _check_employee_exists(tenant_id: str, db) -> CheckResult:
     """至少有一名员工账号"""
     from sqlalchemy import text
 
-    result = await db.execute(text(
-        "SELECT COUNT(*) FROM employees WHERE tenant_id = :tid AND is_deleted = FALSE"
-    ), {"tid": tenant_id})
+    result = await db.execute(
+        text("SELECT COUNT(*) FROM employees WHERE tenant_id = :tid AND is_deleted = FALSE"), {"tid": tenant_id}
+    )
     count = result.scalar() or 0
     ok = count >= 1
     return CheckResult(
@@ -313,18 +317,9 @@ async def get_health_report(
     # 对100分制做归一化
     overall_score = round(total_earned / total_max * 100) if total_max > 0 else 0
 
-    critical_fails = [
-        c.name for c in checks
-        if c.severity == "critical" and c.status == "fail"
-    ]
-    warnings = [
-        c.message for c in checks
-        if c.status in ("fail", "warn") and c.severity != "critical"
-    ]
-    advice = [
-        c.fix_hint for c in checks
-        if c.fix_hint and c.status in ("fail", "warn")
-    ]
+    critical_fails = [c.name for c in checks if c.severity == "critical" and c.status == "fail"]
+    warnings = [c.message for c in checks if c.status in ("fail", "warn") and c.severity != "critical"]
+    advice = [c.fix_hint for c in checks if c.fix_hint and c.status in ("fail", "warn")]
 
     go_live_ready = overall_score >= 90 and len(critical_fails) == 0
 
@@ -369,17 +364,17 @@ async def get_health_summary(
     overall_score = round(total_earned / total_max * 100) if total_max > 0 else 0
 
     blocking = [
-        {"check": c.name, "fix_hint": c.fix_hint}
-        for c in checks
-        if c.severity == "critical" and c.status == "fail"
+        {"check": c.name, "fix_hint": c.fix_hint} for c in checks if c.severity == "critical" and c.status == "fail"
     ]
 
-    return ok_response({
-        "tenant_id": tenant_id,
-        "score": overall_score,
-        "go_live_ready": overall_score >= 90 and len(blocking) == 0,
-        "blocking_issues": blocking,
-    })
+    return ok_response(
+        {
+            "tenant_id": tenant_id,
+            "score": overall_score,
+            "go_live_ready": overall_score >= 90 and len(blocking) == 0,
+            "blocking_issues": blocking,
+        }
+    )
 
 
 # ── 检查执行器 ────────────────────────────────────────────────────────
@@ -399,29 +394,42 @@ ALL_CHECKS = [
 ]
 
 
-_CHECKS_USING_TENANT_CONFIG = {"_check_payment_methods", "_check_agent_policy", "_check_kds_zone", "_check_table_configured"}
+_CHECKS_USING_TENANT_CONFIG = {
+    "_check_payment_methods",
+    "_check_agent_policy",
+    "_check_kds_zone",
+    "_check_table_configured",
+}
 
 
 async def _run_all_checks(tenant_id: str) -> list[CheckResult]:
     """执行所有检查项，DB 不可用时返回跳过结果。"""
     try:
-        from shared.ontology.src.database import async_session_factory
         from sqlalchemy import text
+
+        from shared.ontology.src.database import async_session_factory
 
         async with async_session_factory() as db:
             await db.execute(text("SET app.tenant_id = :tid"), {"tid": tenant_id})
 
             # 预取 tenant_agent_configs（4 个检查项共用，避免重复查询）
-            tac_row = await db.execute(text(
-                "SELECT restaurant_type, agent_policies, billing_rules "
-                "FROM tenant_agent_configs WHERE tenant_id = :tid LIMIT 1"
-            ), {"tid": tenant_id})
+            tac_row = await db.execute(
+                text(
+                    "SELECT restaurant_type, agent_policies, billing_rules "
+                    "FROM tenant_agent_configs WHERE tenant_id = :tid LIMIT 1"
+                ),
+                {"tid": tenant_id},
+            )
             tac = tac_row.fetchone()
-            tenant_config = {
-                "restaurant_type": tac[0],
-                "agent_policies": tac[1],
-                "billing_rules": tac[2],
-            } if tac else None
+            tenant_config = (
+                {
+                    "restaurant_type": tac[0],
+                    "agent_policies": tac[1],
+                    "billing_rules": tac[2],
+                }
+                if tac
+                else None
+            )
 
             results = []
             for check_fn in ALL_CHECKS:
@@ -436,15 +444,17 @@ async def _run_all_checks(tenant_id: str) -> list[CheckResult]:
                         check=check_fn.__name__,
                         error=str(exc),
                     )
-                    results.append(CheckResult(
-                        check_id=check_fn.__name__,
-                        name=check_fn.__name__,
-                        severity="advisory",
-                        status="skip",
-                        score_earned=0,
-                        score_max=4,
-                        message=f"检查执行失败: {exc}",
-                    ))
+                    results.append(
+                        CheckResult(
+                            check_id=check_fn.__name__,
+                            name=check_fn.__name__,
+                            severity="advisory",
+                            status="skip",
+                            score_earned=0,
+                            score_max=4,
+                            message=f"检查执行失败: {exc}",
+                        )
+                    )
             return results
 
     except Exception as exc:  # noqa: BLE001 — DB 不可用时全部跳过

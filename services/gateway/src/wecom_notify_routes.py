@@ -11,6 +11,7 @@ GET  /api/v1/wecom/status              企微连接状态
 - 调用企微开放API（httpx 异步）
 - 无企微配置时返回 {ok: true, data: {skipped: true, reason: "企微未配置"}}，不抛异常
 """
+
 from __future__ import annotations
 
 import os
@@ -35,11 +36,7 @@ router = APIRouter(prefix="/api/v1/wecom", tags=["wecom-notify"])
 
 def _wecom_configured() -> bool:
     """检查企微必要环境变量是否已配置"""
-    return bool(
-        os.getenv("WECOM_CORP_ID")
-        and os.getenv("WECOM_AGENT_ID")
-        and os.getenv("WECOM_SECRET")
-    )
+    return bool(os.getenv("WECOM_CORP_ID") and os.getenv("WECOM_AGENT_ID") and os.getenv("WECOM_SECRET"))
 
 
 def _get_sdk() -> WecomSDK:
@@ -64,9 +61,7 @@ class CreateGroupRequest(BaseModel):
 
 
 class SendGroupMessageRequest(BaseModel):
-    msgtype: Literal["text", "textcard", "news", "markdown"] = Field(
-        default="text", description="消息类型"
-    )
+    msgtype: Literal["text", "textcard", "news", "markdown"] = Field(default="text", description="消息类型")
     content: dict[str, Any] = Field(
         ...,
         description=(
@@ -81,9 +76,7 @@ class SendGroupMessageRequest(BaseModel):
 
 class NotifyRequest(BaseModel):
     touser: str = Field(..., description="接收人企微 userid，多人用 | 分隔，全员用 @all")
-    msgtype: Literal["text", "textcard", "news", "markdown"] = Field(
-        default="text", description="消息类型"
-    )
+    msgtype: Literal["text", "textcard", "news", "markdown"] = Field(default="text", description="消息类型")
     content: dict[str, Any] = Field(..., description="消息内容体（同 SendGroupMessageRequest.content）")
 
 
@@ -148,11 +141,13 @@ async def create_wecom_group(
     chatid: str = result.get("chatid", "")
     log.info("wecom_create_group_ok", chatid=chatid)
 
-    return ok({
-        "chatid": chatid,
-        "name": req.name,
-        "member_count": len(req.member_userids),
-    })
+    return ok(
+        {
+            "chatid": chatid,
+            "name": req.name,
+            "member_count": len(req.member_userids),
+        }
+    )
 
 
 # ── 2. 群组列表 ──────────────────────────────────────────────────
@@ -366,13 +361,15 @@ async def get_wecom_status(
 
     if not _wecom_configured():
         logger.info("wecom_status_not_configured", tenant_id=x_tenant_id)
-        return ok({
-            "configured": False,
-            "corp_id": corp_id or None,
-            "agent_id": agent_id or None,
-            "token_ok": False,
-            "reason": "企微未配置（WECOM_CORP_ID / WECOM_AGENT_ID / WECOM_SECRET 缺失）",
-        })
+        return ok(
+            {
+                "configured": False,
+                "corp_id": corp_id or None,
+                "agent_id": agent_id or None,
+                "token_ok": False,
+                "reason": "企微未配置（WECOM_CORP_ID / WECOM_AGENT_ID / WECOM_SECRET 缺失）",
+            }
+        )
 
     sdk = _get_sdk()
     token_ok = False
@@ -391,10 +388,12 @@ async def get_wecom_status(
         error_detail = f"http_{exc.response.status_code}"
         logger.warning("wecom_status_token_http_error", status=exc.response.status_code)
 
-    return ok({
-        "configured": True,
-        "corp_id": corp_id,
-        "agent_id": agent_id,
-        "token_ok": token_ok,
-        "error": error_detail,
-    })
+    return ok(
+        {
+            "configured": True,
+            "corp_id": corp_id,
+            "agent_id": agent_id,
+            "token_ok": token_ok,
+            "error": error_detail,
+        }
+    )

@@ -358,16 +358,19 @@ class BrandManagementService:
 
         now = datetime.now(timezone.utc).isoformat()
 
-        member_profile = self._members.get(member_id, {
-            "member_id": member_id,
-            "linked_brands": [],
-            "points_by_brand": {},
-            "visit_count_by_brand": {},
-            "spend_by_brand_fen": {},
-            "total_points": 0,
-            "total_spend_fen": 0,
-            "linked_at": now,
-        })
+        member_profile = self._members.get(
+            member_id,
+            {
+                "member_id": member_id,
+                "linked_brands": [],
+                "points_by_brand": {},
+                "visit_count_by_brand": {},
+                "spend_by_brand_fen": {},
+                "total_points": 0,
+                "total_spend_fen": 0,
+                "linked_at": now,
+            },
+        )
 
         # 合并品牌关联
         existing_brands = set(member_profile.get("linked_brands", []))
@@ -502,16 +505,18 @@ class BrandManagementService:
             line_total = int(total_qty * unit_price)
             total_fen += line_total
 
-            processed_items.append({
-                "ingredient_id": item.get("ingredient_id"),
-                "name": item.get("name"),
-                "unit": item.get("unit", "kg"),
-                "total_quantity": total_qty,
-                "demands": demands,
-                "demand_count": len(demands),
-                "estimated_unit_price_fen": unit_price,
-                "line_total_fen": line_total,
-            })
+            processed_items.append(
+                {
+                    "ingredient_id": item.get("ingredient_id"),
+                    "name": item.get("name"),
+                    "unit": item.get("unit", "kg"),
+                    "total_quantity": total_qty,
+                    "demands": demands,
+                    "demand_count": len(demands),
+                    "estimated_unit_price_fen": unit_price,
+                    "line_total_fen": line_total,
+                }
+            )
 
         plan = {
             "plan_id": plan_id,
@@ -557,14 +562,16 @@ class BrandManagementService:
                     }
 
                 line_fen = int(demand["quantity"] * item.get("estimated_unit_price_fen", 0))
-                store_deliveries[store_id]["items"].append({
-                    "ingredient_id": item["ingredient_id"],
-                    "name": item["name"],
-                    "unit": item.get("unit", "kg"),
-                    "quantity": demand["quantity"],
-                    "unit_price_fen": item.get("estimated_unit_price_fen", 0),
-                    "line_total_fen": line_fen,
-                })
+                store_deliveries[store_id]["items"].append(
+                    {
+                        "ingredient_id": item["ingredient_id"],
+                        "name": item["name"],
+                        "unit": item.get("unit", "kg"),
+                        "quantity": demand["quantity"],
+                        "unit_price_fen": item.get("estimated_unit_price_fen", 0),
+                        "line_total_fen": line_fen,
+                    }
+                )
                 store_deliveries[store_id]["total_fen"] += line_fen
 
         return list(store_deliveries.values())
@@ -653,13 +660,15 @@ class BrandManagementService:
             for m in metrics:
                 metric_values[m] = brand_data.get(m, 0)
 
-            comparison.append({
-                "brand_id": bid,
-                "brand_name": brand["brand_name"],
-                "business_type": brand["business_type"],
-                "store_count": brand.get("store_count", 0),
-                "metrics": metric_values,
-            })
+            comparison.append(
+                {
+                    "brand_id": bid,
+                    "brand_name": brand["brand_name"],
+                    "business_type": brand["business_type"],
+                    "store_count": brand.get("store_count", 0),
+                    "metrics": metric_values,
+                }
+            )
 
         # 计算集团平均值
         group_avg = {}
@@ -698,13 +707,15 @@ class BrandManagementService:
             brand_data = self._brand_metrics.get(bid, {})
             value = brand_data.get(metric, 0)
 
-            ranked.append({
-                "brand_id": bid,
-                "brand_name": brand["brand_name"],
-                "metric": metric,
-                "value": value,
-                "period": period,
-            })
+            ranked.append(
+                {
+                    "brand_id": bid,
+                    "brand_name": brand["brand_name"],
+                    "metric": metric,
+                    "value": value,
+                    "period": period,
+                }
+            )
 
         ranked.sort(key=lambda x: x["value"], reverse=True)
 
@@ -749,17 +760,19 @@ class BrandManagementService:
             for brand, val in values:
                 if val < threshold and val > 0:
                     deviation = round((avg - val) / avg * 100, 1)
-                    anomalies.append({
-                        "brand_id": brand["brand_id"],
-                        "brand_name": brand["brand_name"],
-                        "metric": metric,
-                        "value": val,
-                        "group_average": round(avg, 2),
-                        "deviation_pct": deviation,
-                        "severity": "critical" if val < avg * 0.5 else "warning",
-                        "suggestion": f"品牌 {brand['brand_name']} 的 {metric} "
-                                      f"低于集团平均 {deviation}%，建议重点关注",
-                    })
+                    anomalies.append(
+                        {
+                            "brand_id": brand["brand_id"],
+                            "brand_name": brand["brand_name"],
+                            "metric": metric,
+                            "value": val,
+                            "group_average": round(avg, 2),
+                            "deviation_pct": deviation,
+                            "severity": "critical" if val < avg * 0.5 else "warning",
+                            "suggestion": f"品牌 {brand['brand_name']} 的 {metric} "
+                            f"低于集团平均 {deviation}%，建议重点关注",
+                        }
+                    )
 
         anomalies.sort(key=lambda x: x["deviation_pct"], reverse=True)
         return anomalies
@@ -800,24 +813,28 @@ class BrandManagementService:
             total_employees += employees
             total_members += members
 
-            brand_breakdown.append({
-                "brand_id": bid,
-                "brand_name": brand["brand_name"],
-                "revenue_fen": revenue,
-                "store_count": stores,
-                "employee_count": employees,
-                "member_count": members,
-                "profit_margin": metrics.get("profit_margin", 0),
-            })
+            brand_breakdown.append(
+                {
+                    "brand_id": bid,
+                    "brand_name": brand["brand_name"],
+                    "revenue_fen": revenue,
+                    "store_count": stores,
+                    "employee_count": employees,
+                    "member_count": members,
+                    "profit_margin": metrics.get("profit_margin", 0),
+                }
+            )
 
             # 风险提示
             if metrics.get("profit_margin", 100) < 15:
-                risk_alerts.append({
-                    "brand_id": bid,
-                    "brand_name": brand["brand_name"],
-                    "alert_type": "low_profit_margin",
-                    "message": f"{brand['brand_name']} 毛利率 {metrics.get('profit_margin', 0)}% 低于15%警戒线",
-                })
+                risk_alerts.append(
+                    {
+                        "brand_id": bid,
+                        "brand_name": brand["brand_name"],
+                        "alert_type": "low_profit_margin",
+                        "message": f"{brand['brand_name']} 毛利率 {metrics.get('profit_margin', 0)}% 低于15%警戒线",
+                    }
+                )
 
         # 排名：按营收排序前5
         brand_breakdown.sort(key=lambda x: x["revenue_fen"], reverse=True)
@@ -848,6 +865,4 @@ class BrandManagementService:
         """设置会员积分（测试辅助方法）"""
         if member_id in self._members:
             self._members[member_id]["points_by_brand"][brand_id] = points
-            self._members[member_id]["total_points"] = sum(
-                self._members[member_id]["points_by_brand"].values()
-            )
+            self._members[member_id]["total_points"] = sum(self._members[member_id]["points_by_brand"].values())
