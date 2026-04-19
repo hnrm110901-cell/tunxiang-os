@@ -8,6 +8,7 @@ Y-H1 + Y-H2
 3. test_region_tree_structure    — tree=true 返回含 children，level=1 节点在最顶层
 4. test_region_tax_rate_update   — PUT /tax-rate 设置0.09，GET 验证 tax_rate=0.09
 """
+
 from __future__ import annotations
 
 import json
@@ -15,7 +16,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from fastapi import FastAPI
-from httpx import AsyncClient, ASGITransport
+from httpx import ASGITransport, AsyncClient
 
 # ── 测试 App 构建 ─────────────────────────────────────────────────────────────
 
@@ -57,6 +58,7 @@ def _mock_row(mapping: dict):
 
 # ── Test 1: 品牌列表走DB路径，无内存存储关键字 ──────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_brand_list_db_path():
     """品牌列表：返回含 brand_code/brand_type 字段，无 '_memory_store' 关键字（验证非内存路径）"""
@@ -72,9 +74,11 @@ async def test_brand_list_db_path():
             call_count += 1
             if call_count == 1:
                 # RLS set_config
-                return MagicMock(scalar=MagicMock(return_value=None),
-                                 fetchone=MagicMock(return_value=None),
-                                 fetchall=MagicMock(return_value=[]))
+                return MagicMock(
+                    scalar=MagicMock(return_value=None),
+                    fetchone=MagicMock(return_value=None),
+                    fetchall=MagicMock(return_value=[]),
+                )
             if call_count == 2:
                 # COUNT(*)
                 result = MagicMock()
@@ -82,36 +86,40 @@ async def test_brand_list_db_path():
                 return result
             # 品牌列表查询
             rows = [
-                _mock_row({
-                    "brand_id": "brand-001",
-                    "name": "徐记海鲜",
-                    "brand_code": "XJ",
-                    "brand_type": "seafood",
-                    "logo_url": None,
-                    "primary_color": "#FF6B35",
-                    "description": None,
-                    "status": "active",
-                    "hq_store_id": None,
-                    "strategy_config": {},
-                    "created_at": None,
-                    "updated_at": None,
-                    "store_count": 12,
-                }),
-                _mock_row({
-                    "brand_id": "brand-002",
-                    "name": "尝在一起",
-                    "brand_code": "CZ",
-                    "brand_type": "canteen",
-                    "logo_url": None,
-                    "primary_color": "#FF6B35",
-                    "description": None,
-                    "status": "active",
-                    "hq_store_id": None,
-                    "strategy_config": {},
-                    "created_at": None,
-                    "updated_at": None,
-                    "store_count": 8,
-                }),
+                _mock_row(
+                    {
+                        "brand_id": "brand-001",
+                        "name": "徐记海鲜",
+                        "brand_code": "XJ",
+                        "brand_type": "seafood",
+                        "logo_url": None,
+                        "primary_color": "#FF6B35",
+                        "description": None,
+                        "status": "active",
+                        "hq_store_id": None,
+                        "strategy_config": {},
+                        "created_at": None,
+                        "updated_at": None,
+                        "store_count": 12,
+                    }
+                ),
+                _mock_row(
+                    {
+                        "brand_id": "brand-002",
+                        "name": "尝在一起",
+                        "brand_code": "CZ",
+                        "brand_type": "canteen",
+                        "logo_url": None,
+                        "primary_color": "#FF6B35",
+                        "description": None,
+                        "status": "active",
+                        "hq_store_id": None,
+                        "strategy_config": {},
+                        "created_at": None,
+                        "updated_at": None,
+                        "store_count": 8,
+                    }
+                ),
             ]
             return MagicMock(
                 scalar=MagicMock(return_value=2),
@@ -149,11 +157,11 @@ async def test_brand_list_db_path():
     # 验证响应体字符串中不含内存存储关键字
     raw_text = resp.text
     assert "_memory_store" not in raw_text, "响应中不应含 _memory_store（内存路径泄漏）"
-    assert "degraded" not in raw_text or body["data"].get("degraded") is None, \
-        "DB可用时不应返回 degraded 标记"
+    assert "degraded" not in raw_text or body["data"].get("degraded") is None, "DB可用时不应返回 degraded 标记"
 
 
 # ── Test 2: 策略配置 JSONB 完整性 ─────────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_brand_strategy_config():
@@ -178,14 +186,11 @@ async def test_brand_strategy_config():
 
             # RLS set_config
             if "set_config" in sql_str:
-                return MagicMock(fetchone=MagicMock(return_value=None),
-                                 fetchall=MagicMock(return_value=[]))
+                return MagicMock(fetchone=MagicMock(return_value=None), fetchall=MagicMock(return_value=[]))
 
             # PUT 存在性检查
             if "SELECT id FROM brands" in sql_str and params and params.get("bid") == brand_id:
-                return MagicMock(
-                    fetchone=MagicMock(return_value=_mock_row({"id": brand_id}))
-                )
+                return MagicMock(fetchone=MagicMock(return_value=_mock_row({"id": brand_id})))
 
             # PUT UPDATE
             if "UPDATE brands" in sql_str and "strategy_config" in sql_str:
@@ -246,63 +251,70 @@ async def test_brand_strategy_config():
 
 # ── Test 3: 区域树形结构 ──────────────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_region_tree_structure():
     """区域树：tree=true 返回含 children 字段，level=1 的节点在最顶层"""
     app = _make_app()
 
     mock_rows = [
-        _mock_row({
-            "region_id": "region-001",
-            "parent_id": None,
-            "name": "华中大区",
-            "region_code": "HZ",
-            "level": 1,
-            "brand_id": None,
-            "manager_id": None,
-            "tax_rate": "0.0600",
-            "freight_template": {},
-            "is_active": True,
-            "created_at": None,
-            "updated_at": None,
-            "manager_name": None,
-            "store_count": 15,
-            "child_count": 2,
-        }),
-        _mock_row({
-            "region_id": "region-011",
-            "parent_id": "region-001",
-            "name": "湖南省",
-            "region_code": "HN",
-            "level": 2,
-            "brand_id": None,
-            "manager_id": None,
-            "tax_rate": "0.0600",
-            "freight_template": {},
-            "is_active": True,
-            "created_at": None,
-            "updated_at": None,
-            "manager_name": None,
-            "store_count": 10,
-            "child_count": 2,
-        }),
-        _mock_row({
-            "region_id": "region-111",
-            "parent_id": "region-011",
-            "name": "长沙市",
-            "region_code": "CS",
-            "level": 3,
-            "brand_id": None,
-            "manager_id": None,
-            "tax_rate": "0.0600",
-            "freight_template": {},
-            "is_active": True,
-            "created_at": None,
-            "updated_at": None,
-            "manager_name": None,
-            "store_count": 8,
-            "child_count": 0,
-        }),
+        _mock_row(
+            {
+                "region_id": "region-001",
+                "parent_id": None,
+                "name": "华中大区",
+                "region_code": "HZ",
+                "level": 1,
+                "brand_id": None,
+                "manager_id": None,
+                "tax_rate": "0.0600",
+                "freight_template": {},
+                "is_active": True,
+                "created_at": None,
+                "updated_at": None,
+                "manager_name": None,
+                "store_count": 15,
+                "child_count": 2,
+            }
+        ),
+        _mock_row(
+            {
+                "region_id": "region-011",
+                "parent_id": "region-001",
+                "name": "湖南省",
+                "region_code": "HN",
+                "level": 2,
+                "brand_id": None,
+                "manager_id": None,
+                "tax_rate": "0.0600",
+                "freight_template": {},
+                "is_active": True,
+                "created_at": None,
+                "updated_at": None,
+                "manager_name": None,
+                "store_count": 10,
+                "child_count": 2,
+            }
+        ),
+        _mock_row(
+            {
+                "region_id": "region-111",
+                "parent_id": "region-011",
+                "name": "长沙市",
+                "region_code": "CS",
+                "level": 3,
+                "brand_id": None,
+                "manager_id": None,
+                "tax_rate": "0.0600",
+                "freight_template": {},
+                "is_active": True,
+                "created_at": None,
+                "updated_at": None,
+                "manager_name": None,
+                "store_count": 8,
+                "child_count": 0,
+            }
+        ),
     ]
 
     def _make_region_db():
@@ -311,8 +323,7 @@ async def test_region_tree_structure():
         async def side_effect(*args, **kwargs):
             sql_str = str(args[0]) if args else ""
             if "set_config" in sql_str:
-                return MagicMock(fetchone=MagicMock(return_value=None),
-                                 fetchall=MagicMock(return_value=[]))
+                return MagicMock(fetchone=MagicMock(return_value=None), fetchall=MagicMock(return_value=[]))
             return MagicMock(
                 scalar=MagicMock(return_value=len(mock_rows)),
                 fetchone=MagicMock(return_value=mock_rows[0]),
@@ -355,6 +366,7 @@ async def test_region_tree_structure():
 
 # ── Test 4: 区域税率更新 ──────────────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_region_tax_rate_update():
     """税率更新：PUT /regions/{id}/tax-rate 设置0.09，GET 验证 tax_rate=0.09"""
@@ -370,16 +382,11 @@ async def test_region_tax_rate_update():
             sql_str = str(stmt)
 
             if "set_config" in sql_str:
-                return MagicMock(fetchone=MagicMock(return_value=None),
-                                 fetchall=MagicMock(return_value=[]))
+                return MagicMock(fetchone=MagicMock(return_value=None), fetchall=MagicMock(return_value=[]))
 
             # PUT 存在性检查
             if "SELECT id, name FROM regions" in sql_str and params and params.get("rid") == region_id:
-                return MagicMock(
-                    fetchone=MagicMock(
-                        return_value=_mock_row({"id": region_id, "name": "华中大区"})
-                    )
-                )
+                return MagicMock(fetchone=MagicMock(return_value=_mock_row({"id": region_id, "name": "华中大区"})))
 
             # PUT UPDATE tax_rate
             if "UPDATE regions" in sql_str and "tax_rate" in sql_str:
@@ -390,24 +397,26 @@ async def test_region_tax_rate_update():
 
             # GET detail
             if "SELECT" in sql_str and "tax_rate" in sql_str:
-                row = _mock_row({
-                    "region_id": region_id,
-                    "parent_id": None,
-                    "name": "华中大区",
-                    "region_code": "HZ",
-                    "level": 1,
-                    "brand_id": None,
-                    "manager_id": None,
-                    "tax_rate": str(stored_tax_rate["value"]),
-                    "freight_template": {},
-                    "is_active": True,
-                    "created_at": None,
-                    "updated_at": None,
-                    "manager_name": None,
-                    "parent_name": None,
-                    "store_count": 15,
-                    "child_count": 2,
-                })
+                row = _mock_row(
+                    {
+                        "region_id": region_id,
+                        "parent_id": None,
+                        "name": "华中大区",
+                        "region_code": "HZ",
+                        "level": 1,
+                        "brand_id": None,
+                        "manager_id": None,
+                        "tax_rate": str(stored_tax_rate["value"]),
+                        "freight_template": {},
+                        "is_active": True,
+                        "created_at": None,
+                        "updated_at": None,
+                        "manager_name": None,
+                        "parent_name": None,
+                        "store_count": 15,
+                        "child_count": 2,
+                    }
+                )
                 return MagicMock(fetchone=MagicMock(return_value=row))
 
             return MagicMock(
@@ -450,5 +459,4 @@ async def test_region_tax_rate_update():
             assert get_body["ok"] is True
 
             returned_tax = get_body["data"]["tax_rate"]
-            assert abs(float(returned_tax) - 0.09) < 1e-6, \
-                f"GET返回的 tax_rate 应为0.09，实际={returned_tax}"
+            assert abs(float(returned_tax) - 0.09) < 1e-6, f"GET返回的 tax_rate 应为0.09，实际={returned_tax}"

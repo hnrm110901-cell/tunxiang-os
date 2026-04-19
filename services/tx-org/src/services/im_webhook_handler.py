@@ -3,6 +3,7 @@
 处理来自 IM 平台的事件推送（员工入职/离职/部门变更），
 映射为员工状态更新操作。
 """
+
 from __future__ import annotations
 
 from typing import Any
@@ -66,9 +67,7 @@ async def handle_wecom_callback(data: dict[str, Any]) -> dict[str, Any]:
     return {"handled": False, "event": event, "change_type": change_type}
 
 
-async def _handle_wecom_contact_change(
-    change_type: str, data: dict[str, Any]
-) -> dict[str, Any]:
+async def _handle_wecom_contact_change(change_type: str, data: dict[str, Any]) -> dict[str, Any]:
     """处理企微通讯录变更事件。"""
 
     if change_type == WECOM_EVENT_CREATE_USER:
@@ -100,11 +99,7 @@ async def _handle_wecom_contact_change(
             "handled": True,
             "action": "employee_update",
             "im_userid": user_id,
-            "fields": {
-                k: v
-                for k, v in data.items()
-                if k not in ("Event", "ChangeType", "ToUserName", "FromUserName")
-            },
+            "fields": {k: v for k, v in data.items() if k not in ("Event", "ChangeType", "ToUserName", "FromUserName")},
         }
 
     if change_type == WECOM_EVENT_DELETE_USER:

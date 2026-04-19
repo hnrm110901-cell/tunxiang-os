@@ -22,6 +22,7 @@
 
 迁移版本：v244_commission_v3（commission_schemes / commission_rules / commission_records）
 """
+
 from __future__ import annotations
 
 import json
@@ -46,6 +47,7 @@ router = APIRouter(prefix="/api/v1/commission", tags=["commission-v3"])
 # ──────────────────────────────────────────────────────────────────────────────
 # 工具函数
 # ──────────────────────────────────────────────────────────────────────────────
+
 
 def _ok(data: Any) -> dict[str, Any]:
     return {"ok": True, "data": data}
@@ -82,6 +84,7 @@ def _serialize_row(row: Any) -> dict[str, Any]:
 # ──────────────────────────────────────────────────────────────────────────────
 # Pydantic 模型
 # ──────────────────────────────────────────────────────────────────────────────
+
 
 class SchemeCreate(BaseModel):
     name: str = Field(..., max_length=100, description="方案名称")
@@ -152,6 +155,7 @@ class MonthlySettleRequest(BaseModel):
 # ──────────────────────────────────────────────────────────────────────────────
 # 方案管理
 # ──────────────────────────────────────────────────────────────────────────────
+
 
 @router.get("/schemes")
 async def list_schemes(
@@ -417,6 +421,7 @@ async def deactivate_scheme(
 # 提成维度配置（规则）
 # ──────────────────────────────────────────────────────────────────────────────
 
+
 @router.get("/schemes/{scheme_id}/rules")
 async def list_rules(
     scheme_id: uuid.UUID,
@@ -514,6 +519,7 @@ async def create_rule(
 # 提成计算
 # ──────────────────────────────────────────────────────────────────────────────
 
+
 @router.post("/calculate")
 async def calculate_commission(
     body: CalculateRequest,
@@ -586,12 +592,14 @@ async def calculate_commission(
                     earned = 0
 
                 if earned > 0:
-                    breakdown.append({
-                        "rule_id": str(rule.rule_id),
-                        "rule_type": rule_type,
-                        "description": f"品项提成 qty={qty}",
-                        "earned_fen": earned,
-                    })
+                    breakdown.append(
+                        {
+                            "rule_id": str(rule.rule_id),
+                            "rule_type": rule_type,
+                            "description": f"品项提成 qty={qty}",
+                            "earned_fen": earned,
+                        }
+                    )
                     total_fen += earned
 
             elif rule_type == "revenue_tier":
@@ -626,12 +634,14 @@ async def calculate_commission(
                         matched_tier = tier
                         break
                 if earned > 0:
-                    breakdown.append({
-                        "rule_id": str(rule.rule_id),
-                        "rule_type": rule_type,
-                        "description": f"营收阶梯 revenue={revenue_fen}分 tier={matched_tier}",
-                        "earned_fen": earned,
-                    })
+                    breakdown.append(
+                        {
+                            "rule_id": str(rule.rule_id),
+                            "rule_type": rule_type,
+                            "description": f"营收阶梯 revenue={revenue_fen}分 tier={matched_tier}",
+                            "earned_fen": earned,
+                        }
+                    )
                     total_fen += earned
 
             elif rule_type == "table":
@@ -665,15 +675,16 @@ async def calculate_commission(
                 table_count = int(table_count_row.fetchone().table_count or 0)
                 earned = table_count * amount_fen
                 if earned > 0:
-                    breakdown.append({
-                        "rule_id": str(rule.rule_id),
-                        "rule_type": "table",
-                        "description": (
-                            f"桌型提成 table_type={target_table_type or '全部'} "
-                            f"桌次={table_count} × {amount_fen}分"
-                        ),
-                        "earned_fen": earned,
-                    })
+                    breakdown.append(
+                        {
+                            "rule_id": str(rule.rule_id),
+                            "rule_type": "table",
+                            "description": (
+                                f"桌型提成 table_type={target_table_type or '全部'} 桌次={table_count} × {amount_fen}分"
+                            ),
+                            "earned_fen": earned,
+                        }
+                    )
                     total_fen += earned
 
             elif rule_type == "time_slot":
@@ -707,15 +718,17 @@ async def calculate_commission(
                 base = slot_count * amount_fen
                 earned = int(base * multiplier)
                 if earned > 0:
-                    breakdown.append({
-                        "rule_id": str(rule.rule_id),
-                        "rule_type": "time_slot",
-                        "description": (
-                            f"时段提成 {start_time_str}~{end_time_str} "
-                            f"桌次={slot_count} × {amount_fen}分 × {multiplier}"
-                        ),
-                        "earned_fen": earned,
-                    })
+                    breakdown.append(
+                        {
+                            "rule_id": str(rule.rule_id),
+                            "rule_type": "time_slot",
+                            "description": (
+                                f"时段提成 {start_time_str}~{end_time_str} "
+                                f"桌次={slot_count} × {amount_fen}分 × {multiplier}"
+                            ),
+                            "earned_fen": earned,
+                        }
+                    )
                     total_fen += earned
 
     except HTTPException:
@@ -724,14 +737,16 @@ async def calculate_commission(
         logger.error("commission.calculate.db_error", error=str(exc))
         raise _err(f"提成计算失败：{exc}", 500) from exc
 
-    return _ok({
-        "employee_id": str(body.employee_id),
-        "store_id": str(body.store_id),
-        "start_date": str(body.start_date),
-        "end_date": str(body.end_date),
-        "total_commission_fen": total_fen,
-        "breakdown": breakdown,
-    })
+    return _ok(
+        {
+            "employee_id": str(body.employee_id),
+            "store_id": str(body.store_id),
+            "start_date": str(body.start_date),
+            "end_date": str(body.end_date),
+            "total_commission_fen": total_fen,
+            "breakdown": breakdown,
+        }
+    )
 
 
 @router.get("/summary")
@@ -771,13 +786,15 @@ async def commission_summary(
         raise _err(f"查询汇总失败：{exc}", 500) from exc
 
     grand_total = sum(i.get("total_commission_fen", 0) for i in items)
-    return _ok({
-        "year_month": year_month,
-        "store_id": str(store_id) if store_id else None,
-        "items": items,
-        "total": len(items),
-        "grand_total_commission_fen": grand_total,
-    })
+    return _ok(
+        {
+            "year_month": year_month,
+            "store_id": str(store_id) if store_id else None,
+            "items": items,
+            "total": len(items),
+            "grand_total_commission_fen": grand_total,
+        }
+    )
 
 
 @router.get("/staff/{employee_id}/detail")
@@ -813,12 +830,14 @@ async def staff_commission_detail(
         raise _err(f"查询员工提成明细失败：{exc}", 500) from exc
 
     total = sum(i.get("total_commission_fen", 0) for i in items)
-    return _ok({
-        "employee_id": str(employee_id),
-        "year_month": year_month,
-        "records": items,
-        "total_commission_fen": total,
-    })
+    return _ok(
+        {
+            "employee_id": str(employee_id),
+            "year_month": year_month,
+            "records": items,
+            "total_commission_fen": total,
+        }
+    )
 
 
 @router.post("/monthly-settle")
@@ -831,6 +850,7 @@ async def monthly_settle(
     year, month = body.year_month.split("-")
     start_date = date(int(year), int(month), 1)
     import calendar
+
     last_day = calendar.monthrange(int(year), int(month))[1]
     end_date = date(int(year), int(month), last_day)
 
@@ -841,9 +861,7 @@ async def monthly_settle(
         await _set_rls(db, x_tenant_id)
 
         # 查询月内所有员工+门店的计件汇总
-        store_filter = (
-            "AND store_id = ANY(:store_ids::uuid[])" if body.store_ids else ""
-        )
+        store_filter = "AND store_id = ANY(:store_ids::uuid[])" if body.store_ids else ""
         agg_rows = await db.execute(
             text(f"""
                 SELECT
@@ -883,11 +901,15 @@ async def monthly_settle(
         for row in agg_list:
             record_id = uuid.uuid4()
             total_fen = int(row.total_fee_fen or 0)
-            breakdown_json = json.dumps([{
-                "source": "piecework_records",
-                "total_fen": total_fen,
-                "period": f"{start_date} ~ {end_date}",
-            }])
+            breakdown_json = json.dumps(
+                [
+                    {
+                        "source": "piecework_records",
+                        "total_fen": total_fen,
+                        "period": f"{start_date} ~ {end_date}",
+                    }
+                ]
+            )
             emp_name = employee_names.get(str(row.employee_id), "")
 
             # UPSERT：已结算的不覆盖
@@ -938,12 +960,14 @@ async def monthly_settle(
         logger.error("commission.monthly_settle.failed", error=str(exc))
         raise _err(f"月度结算失败：{exc}", 500) from exc
 
-    return _ok({
-        "year_month": body.year_month,
-        "settled_count": settled_count,
-        "skipped_count": skipped_count,
-        "total_processed": len(agg_list),
-    })
+    return _ok(
+        {
+            "year_month": body.year_month,
+            "settled_count": settled_count,
+            "skipped_count": skipped_count,
+            "total_processed": len(agg_list),
+        }
+    )
 
 
 @router.get("/monthly-report")
@@ -1004,11 +1028,13 @@ async def monthly_report(
         logger.error("commission.monthly_report.db_error", error=str(exc))
         raise _err(f"查询月报失败：{exc}", 500) from exc
 
-    return _ok({
-        "year_month": year_month,
-        "page": page,
-        "size": size,
-        "total": total,
-        "grand_total_commission_fen": grand_total_fen,
-        "items": items,
-    })
+    return _ok(
+        {
+            "year_month": year_month,
+            "page": page,
+            "size": size,
+            "total": total,
+            "grand_total_commission_fen": grand_total_fen,
+            "items": items,
+        }
+    )

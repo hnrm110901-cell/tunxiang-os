@@ -9,6 +9,7 @@
 
 维护视图：mv_store_pnl
 """
+
 from __future__ import annotations
 
 from datetime import datetime
@@ -19,7 +20,6 @@ from ..projector import ProjectorBase
 
 
 class StorePnlProjector(ProjectorBase):
-
     name = "store_pnl"
     event_types = {
         "order.paid",
@@ -50,7 +50,9 @@ class StorePnlProjector(ProjectorBase):
             VALUES ($1, $2, $3, NOW())
             ON CONFLICT (tenant_id, store_id, stat_date) DO NOTHING
             """,
-            self.tenant_id, UUID(str(store_id)), stat_date,
+            self.tenant_id,
+            UUID(str(store_id)),
+            stat_date,
         )
 
         if event_type == "order.paid":
@@ -68,7 +70,9 @@ class StorePnlProjector(ProjectorBase):
                     updated_at         = NOW()
                 WHERE tenant_id = $1 AND store_id = $2 AND stat_date = $3
                 """,
-                self.tenant_id, UUID(str(store_id)), stat_date,
+                self.tenant_id,
+                UUID(str(store_id)),
+                stat_date,
                 final_fen,
                 1 if customer_id else 0,
                 UUID(str(event["event_id"])),
@@ -86,8 +90,11 @@ class StorePnlProjector(ProjectorBase):
                     updated_at           = NOW()
                 WHERE tenant_id = $1 AND store_id = $2 AND stat_date = $3
                 """,
-                self.tenant_id, UUID(str(store_id)), stat_date,
-                amount_fen + gift_fen, UUID(str(event["event_id"])),
+                self.tenant_id,
+                UUID(str(store_id)),
+                stat_date,
+                amount_fen + gift_fen,
+                UUID(str(event["event_id"])),
             )
 
         elif event_type == "settlement.advance_consumed":
@@ -100,8 +107,11 @@ class StorePnlProjector(ProjectorBase):
                     updated_at                = NOW()
                 WHERE tenant_id = $1 AND store_id = $2 AND stat_date = $3
                 """,
-                self.tenant_id, UUID(str(store_id)), stat_date,
-                amount_fen, UUID(str(event["event_id"])),
+                self.tenant_id,
+                UUID(str(store_id)),
+                stat_date,
+                amount_fen,
+                UUID(str(event["event_id"])),
             )
 
         elif event_type == "channel.commission_calc":
@@ -115,8 +125,11 @@ class StorePnlProjector(ProjectorBase):
                     updated_at       = NOW()
                 WHERE tenant_id = $1 AND store_id = $2 AND stat_date = $3
                 """,
-                self.tenant_id, UUID(str(store_id)), stat_date,
-                commission_fen, UUID(str(event["event_id"])),
+                self.tenant_id,
+                UUID(str(store_id)),
+                stat_date,
+                commission_fen,
+                UUID(str(event["event_id"])),
             )
             await _recalc_pnl_rates(conn, self.tenant_id, UUID(str(store_id)), stat_date)
 
@@ -138,5 +151,7 @@ async def _recalc_pnl_rates(conn: object, tenant_id: UUID, store_id: UUID, stat_
             END
         WHERE tenant_id = $1 AND store_id = $2 AND stat_date = $3
         """,
-        tenant_id, store_id, stat_date,
+        tenant_id,
+        store_id,
+        stat_date,
     )

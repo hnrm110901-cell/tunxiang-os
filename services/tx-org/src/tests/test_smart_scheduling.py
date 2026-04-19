@@ -7,18 +7,17 @@
   4. TestApplyNonExistent         — 应用不存在的排班返回404
   5. TestLaborForecast            — 集团级人力需求预测返回多门店汇总
 """
+
 from __future__ import annotations
 
 import uuid
-from datetime import date, datetime, timezone
+from datetime import date
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
+from api.smart_scheduling_routes import router
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-
-from api.smart_scheduling_routes import router
 
 TENANT_ID = "11111111-1111-1111-1111-111111111111"
 STORE_ID = "22222222-2222-2222-2222-222222222222"
@@ -61,6 +60,7 @@ def _make_db_mock() -> AsyncMock:
 # Test 1: 生成排班建议基本流程
 # ──────────────────────────────────────────────────────────────────────────────
 
+
 class TestSuggestionBasic:
     def test_suggestion_returns_slots(self) -> None:
         """排班建议应返回时段分配方案（含人数和成本）。"""
@@ -73,10 +73,8 @@ class TestSuggestionBasic:
 
         # 模拟员工列表
         emp_rows = [
-            _MockRow({"id": "emp-1", "name": "张三", "role": "waiter",
-                       "hourly_rate_fen": 2500}),
-            _MockRow({"id": "emp-2", "name": "李四", "role": "chef",
-                       "hourly_rate_fen": 3000}),
+            _MockRow({"id": "emp-1", "name": "张三", "role": "waiter", "hourly_rate_fen": 2500}),
+            _MockRow({"id": "emp-2", "name": "李四", "role": "chef", "hourly_rate_fen": 3000}),
         ]
         emp_result = MagicMock()
         emp_result.__iter__ = MagicMock(return_value=iter(emp_rows))
@@ -104,6 +102,7 @@ class TestSuggestionBasic:
         with patch("api.smart_scheduling_routes.get_db", return_value=mock_db):
             app.dependency_overrides[router.dependencies] = lambda: mock_db
             from shared.ontology.src.database import get_db
+
             app.dependency_overrides[get_db] = lambda: mock_db
 
             client = TestClient(app)
@@ -129,6 +128,7 @@ class TestSuggestionBasic:
 # Test 2: 日期范围校验
 # ──────────────────────────────────────────────────────────────────────────────
 
+
 class TestSuggestionDateRange:
     def test_end_before_start_returns_400(self) -> None:
         """end_date 早于 start_date 应返回400。"""
@@ -136,6 +136,7 @@ class TestSuggestionDateRange:
         mock_db = _make_db_mock()
 
         from shared.ontology.src.database import get_db
+
         app.dependency_overrides[get_db] = lambda: mock_db
 
         client = TestClient(app)
@@ -151,26 +152,31 @@ class TestSuggestionDateRange:
 # Test 3: 应用排班建议
 # ──────────────────────────────────────────────────────────────────────────────
 
+
 class TestApplySchedule:
     def test_apply_draft_schedule(self) -> None:
         """应用draft状态的排班建议应成功。"""
         app = _make_app()
         mock_db = _make_db_mock()
 
-        schedule_row = _MockRow({
-            "id": str(uuid.uuid4()),
-            "schedule_date": date(2026, 4, 10),
-            "status": "draft",
-        })
+        schedule_row = _MockRow(
+            {
+                "id": str(uuid.uuid4()),
+                "schedule_date": date(2026, 4, 10),
+                "status": "draft",
+            }
+        )
         schedule_result = MagicMock()
         schedule_result.fetchone.return_value = schedule_row
 
         slot_rows = [
-            _MockRow({
-                "time_slot": "11:00-13:00",
-                "required_headcount": 3,
-                "assigned_employee_ids": ["emp-1", "emp-2"],
-            }),
+            _MockRow(
+                {
+                    "time_slot": "11:00-13:00",
+                    "required_headcount": 3,
+                    "assigned_employee_ids": ["emp-1", "emp-2"],
+                }
+            ),
         ]
         slots_result = MagicMock()
         slots_result.fetchall.return_value = slot_rows
@@ -194,6 +200,7 @@ class TestApplySchedule:
         mock_db.execute = AsyncMock(side_effect=side_effect)
 
         from shared.ontology.src.database import get_db
+
         app.dependency_overrides[get_db] = lambda: mock_db
 
         client = TestClient(app)
@@ -214,6 +221,7 @@ class TestApplySchedule:
 # Test 4: 应用不存在的排班
 # ──────────────────────────────────────────────────────────────────────────────
 
+
 class TestApplyNonExistent:
     def test_apply_missing_schedule_returns_404(self) -> None:
         """应用不存在的排班建议应返回404。"""
@@ -221,6 +229,7 @@ class TestApplyNonExistent:
         mock_db = _make_db_mock()
 
         from shared.ontology.src.database import get_db
+
         app.dependency_overrides[get_db] = lambda: mock_db
 
         client = TestClient(app)
@@ -235,6 +244,7 @@ class TestApplyNonExistent:
 # ──────────────────────────────────────────────────────────────────────────────
 # Test 5: 集团人力需求预测
 # ──────────────────────────────────────────────────────────────────────────────
+
 
 class TestLaborForecast:
     def test_labor_forecast_returns_stores(self) -> None:
@@ -268,6 +278,7 @@ class TestLaborForecast:
         mock_db.execute = AsyncMock(side_effect=side_effect)
 
         from shared.ontology.src.database import get_db
+
         app.dependency_overrides[get_db] = lambda: mock_db
 
         client = TestClient(app)

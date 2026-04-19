@@ -12,6 +12,7 @@
 注意：本模块与 franchise_v4_routes.py（前缀 /api/v1/franchise/v4）平行存在。
       v5 提供完整 RESTful 路径，v4 保持向下兼容。
 """
+
 from datetime import date, datetime, timezone
 from typing import Any, Optional
 from uuid import uuid4
@@ -31,6 +32,7 @@ router = APIRouter(prefix="/api/v1/franchise", tags=["franchise-v5"])
 
 # ─── RLS 辅助 ─────────────────────────────────────────────────────────────────
 
+
 async def _set_rls(db: AsyncSession, tenant_id: str) -> None:
     await db.execute(
         text("SELECT set_config('app.tenant_id', :tid, true)"),
@@ -40,20 +42,21 @@ async def _set_rls(db: AsyncSession, tenant_id: str) -> None:
 
 # ─── Pydantic Models ──────────────────────────────────────────────────────────
 
+
 class FranchiseeCreateV5(BaseModel):
-    name: str                                   # 加盟商名称/法人姓名
+    name: str  # 加盟商名称/法人姓名
     company_name: Optional[str] = None
     contact_phone: str
     contact_email: Optional[str] = None
-    region: str                                 # 省市区
+    region: str  # 省市区
     store_name: str
     store_address: str
     brand_id: Optional[str] = None
-    join_date: Optional[str] = None             # YYYY-MM-DD
-    franchise_type: str = "standard"            # standard/premium/master
+    join_date: Optional[str] = None  # YYYY-MM-DD
+    franchise_type: str = "standard"  # standard/premium/master
     contract_no: Optional[str] = None
-    contract_start_date: Optional[str] = None   # YYYY-MM-DD
-    contract_end_date: Optional[str] = None     # YYYY-MM-DD
+    contract_start_date: Optional[str] = None  # YYYY-MM-DD
+    contract_end_date: Optional[str] = None  # YYYY-MM-DD
     contract_file_url: Optional[str] = None
     notes: Optional[str] = None
 
@@ -62,7 +65,7 @@ class FranchiseeUpdateV5(BaseModel):
     name: Optional[str] = None
     contact_phone: Optional[str] = None
     contact_email: Optional[str] = None
-    status: Optional[str] = None               # active/suspended/terminated
+    status: Optional[str] = None  # active/suspended/terminated
     contract_start_date: Optional[str] = None
     contract_end_date: Optional[str] = None
     contract_file_url: Optional[str] = None
@@ -71,15 +74,15 @@ class FranchiseeUpdateV5(BaseModel):
 
 class FeeCollectBody(BaseModel):
     paid_amount_fen: int = Field(..., gt=0, description="实收金额（分）")
-    paid_at: Optional[str] = None               # 收款时间 ISO8601，空则取当前时间
-    payment_method: str = "transfer"            # transfer/cash/wechat/alipay
+    paid_at: Optional[str] = None  # 收款时间 ISO8601，空则取当前时间
+    payment_method: str = "transfer"  # transfer/cash/wechat/alipay
     receipt_no: Optional[str] = None
     operator: Optional[str] = None
 
 
 class GenerateMonthlyFeesBody(BaseModel):
     year_month: str = Field(..., description="目标月份 YYYY-MM")
-    fee_type: str = "royalty"                   # royalty/management/brand/training
+    fee_type: str = "royalty"  # royalty/management/brand/training
     amount_fen: int = Field(..., gt=0, description="每家应收金额（分）")
     due_day: int = Field(default=15, ge=1, le=28, description="当月几号为截止日")
     notes: Optional[str] = None
@@ -92,8 +95,7 @@ class CommonCodeCreate(BaseModel):
     description: Optional[str] = None
     unit: Optional[str] = None
     price_fen: Optional[int] = None
-    applicable_stores: list[str] = Field(default_factory=list,
-                                          description="适用门店ID列表，空=全部")
+    applicable_stores: list[str] = Field(default_factory=list, description="适用门店ID列表，空=全部")
 
 
 class CommonCodeUpdate(BaseModel):
@@ -111,6 +113,7 @@ class CommonCodeSyncBody(BaseModel):
 
 
 # ─── 加盟商档案 ───────────────────────────────────────────────────────────────
+
 
 @router.get("/franchisees")
 async def list_franchisees_v5(
@@ -150,8 +153,7 @@ async def list_franchisees_v5(
         params["offset"] = (page - 1) * size
         params["limit"] = size
         list_sql = (
-            f"SELECT * FROM franchisees WHERE {where_clause} "
-            "ORDER BY created_at DESC LIMIT :limit OFFSET :offset"
+            f"SELECT * FROM franchisees WHERE {where_clause} ORDER BY created_at DESC LIMIT :limit OFFSET :offset"
         )
         result = await db.execute(text(list_sql), params)
         items = [dict(r._mapping) for r in result.fetchall()]
@@ -216,11 +218,15 @@ async def update_franchisee_v5(
         set_clauses = ", ".join(f"{k} = :{k}" for k in updates)
         updates["franchisee_id"] = franchisee_id
         await db.execute(
-            text(f"UPDATE franchisees SET {set_clauses}, updated_at = NOW() WHERE id = :franchisee_id AND is_deleted = false"),
+            text(
+                f"UPDATE franchisees SET {set_clauses}, updated_at = NOW() WHERE id = :franchisee_id AND is_deleted = false"
+            ),
             updates,
         )
         await db.commit()
-        log.info("franchise_v5.update", franchisee_id=franchisee_id, fields=list(body.model_dump(exclude_none=True).keys()))
+        log.info(
+            "franchise_v5.update", franchisee_id=franchisee_id, fields=list(body.model_dump(exclude_none=True).keys())
+        )
         return {"ok": True, "data": {"id": franchisee_id, **body.model_dump(exclude_none=True)}}
     except HTTPException:
         raise
@@ -281,6 +287,7 @@ async def get_franchisee_contract(
 
 # ─── 加盟费收缴 ───────────────────────────────────────────────────────────────
 
+
 @router.get("/fees")
 async def list_fees_v5(
     franchisee_id: Optional[str] = Query(None),
@@ -318,9 +325,7 @@ async def list_fees_v5(
 
         where_clause = " AND ".join(conditions)
 
-        count_res = await db.execute(
-            text(f"SELECT COUNT(*) FROM franchise_fees ff WHERE {where_clause}"), params
-        )
+        count_res = await db.execute(text(f"SELECT COUNT(*) FROM franchise_fees ff WHERE {where_clause}"), params)
         total = int(count_res.scalar() or 0)
 
         params["offset"] = (page - 1) * size
@@ -345,7 +350,7 @@ async def list_fees_v5(
         items = [dict(r._mapping) for r in result.fetchall()]
 
         # 汇总统计
-        stats_sql = f"""
+        stats_sql = """
             SELECT
                 COALESCE(SUM(amount_fen) FILTER (WHERE status IN ('pending','overdue')), 0) AS receivable_fen,
                 COALESCE(SUM(amount_fen) FILTER (WHERE status = 'paid'), 0) AS collected_fen,
@@ -377,8 +382,14 @@ async def list_fees_v5(
         return {
             "ok": True,
             "data": {
-                "items": [], "total": 0, "page": page, "size": size,
-                "receivable_fen": 0, "collected_fen": 0, "overdue_count": 0, "overdue_fen": 0,
+                "items": [],
+                "total": 0,
+                "page": page,
+                "size": size,
+                "receivable_fen": 0,
+                "collected_fen": 0,
+                "overdue_count": 0,
+                "overdue_fen": 0,
             },
         }
 
@@ -493,8 +504,13 @@ async def generate_monthly_fees(
             generated += 1
 
         await db.commit()
-        log.info("franchise_v5.fees.generate_monthly",
-                 generated=generated, skipped=skipped, year_month=body.year_month, tenant_id=x_tenant_id)
+        log.info(
+            "franchise_v5.fees.generate_monthly",
+            generated=generated,
+            skipped=skipped,
+            year_month=body.year_month,
+            tenant_id=x_tenant_id,
+        )
         return {"ok": True, "data": {"generated": generated, "skipped": skipped, "year_month": body.year_month}}
     except SQLAlchemyError as exc:
         log.error("franchise_v5.fees.generate_monthly.db_error", error=str(exc), tenant_id=x_tenant_id)
@@ -503,6 +519,7 @@ async def generate_monthly_fees(
 
 
 # ─── 公共代码管理 ─────────────────────────────────────────────────────────────
+
 
 @router.get("/common-codes")
 async def list_common_codes(
@@ -531,15 +548,15 @@ async def list_common_codes(
             params["kw"] = f"%{keyword}%"
 
         where_clause = " AND ".join(conditions)
-        count_res = await db.execute(
-            text(f"SELECT COUNT(*) FROM franchise_common_codes WHERE {where_clause}"), params
-        )
+        count_res = await db.execute(text(f"SELECT COUNT(*) FROM franchise_common_codes WHERE {where_clause}"), params)
         total = int(count_res.scalar() or 0)
 
         params["offset"] = (page - 1) * size
         params["limit"] = size
         result = await db.execute(
-            text(f"SELECT * FROM franchise_common_codes WHERE {where_clause} ORDER BY code_type, code_no LIMIT :limit OFFSET :offset"),
+            text(
+                f"SELECT * FROM franchise_common_codes WHERE {where_clause} ORDER BY code_type, code_no LIMIT :limit OFFSET :offset"
+            ),
             params,
         )
         items = [dict(r._mapping) for r in result.fetchall()]
@@ -557,6 +574,7 @@ async def create_common_code(
 ) -> dict[str, Any]:
     """新增公共代码"""
     import json
+
     new_id = str(uuid4())
     try:
         await _set_rls(db, x_tenant_id)
@@ -599,6 +617,7 @@ async def update_common_code(
 ) -> dict[str, Any]:
     """更新公共代码"""
     import json
+
     try:
         await _set_rls(db, x_tenant_id)
         updates = body.model_dump(exclude_none=True)
@@ -616,7 +635,9 @@ async def update_common_code(
         set_clause = ", ".join(set_parts)
         updates["code_id"] = code_id
         await db.execute(
-            text(f"UPDATE franchise_common_codes SET {set_clause}, updated_at = NOW() WHERE id = :code_id AND is_deleted = false"),
+            text(
+                f"UPDATE franchise_common_codes SET {set_clause}, updated_at = NOW() WHERE id = :code_id AND is_deleted = false"
+            ),
             updates,
         )
         await db.commit()
@@ -638,6 +659,7 @@ async def sync_common_codes(
 ) -> dict[str, Any]:
     """将公共代码同步到指定加盟门店（标记 is_synced + 更新 applicable_stores）"""
     import json
+
     synced_count = 0
     try:
         await _set_rls(db, x_tenant_id)
@@ -665,9 +687,16 @@ async def sync_common_codes(
             )
             synced_count += 1
         await db.commit()
-        log.info("franchise_v5.common_code.sync",
-                 synced=synced_count, stores=len(body.target_store_ids), tenant_id=x_tenant_id)
-        return {"ok": True, "data": {"synced_count": synced_count, "target_stores": len(body.target_store_ids), "synced_at": synced_at}}
+        log.info(
+            "franchise_v5.common_code.sync",
+            synced=synced_count,
+            stores=len(body.target_store_ids),
+            tenant_id=x_tenant_id,
+        )
+        return {
+            "ok": True,
+            "data": {"synced_count": synced_count, "target_stores": len(body.target_store_ids), "synced_at": synced_at},
+        }
     except SQLAlchemyError as exc:
         log.error("franchise_v5.common_code.sync.db_error", error=str(exc))
         await db.rollback()
@@ -675,6 +704,7 @@ async def sync_common_codes(
 
 
 # ─── 对账报表 ─────────────────────────────────────────────────────────────────
+
 
 @router.get("/report/revenue")
 async def report_revenue(
@@ -809,14 +839,18 @@ async def report_fees_summary(
         return {
             "ok": True,
             "data": {
-                "items": [], "total": 0,
-                "grand_receivable_fen": 0, "grand_collected_fen": 0,
-                "grand_overdue_fen": 0, "collection_rate": 0.0,
+                "items": [],
+                "total": 0,
+                "grand_receivable_fen": 0,
+                "grand_collected_fen": 0,
+                "grand_overdue_fen": 0,
+                "collection_rate": 0.0,
             },
         }
 
 
 # ─── 合同文件上传 ─────────────────────────────────────────────────────────────
+
 
 @router.post("/franchisees/{franchisee_id}/contract/upload")
 async def upload_contract_file(
@@ -826,7 +860,7 @@ async def upload_contract_file(
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
     """上传加盟合同文件（PDF/图片），存储至 COS，并将 URL 写回加盟商档案。"""
-    from shared.integrations.cos_upload import get_cos_upload_service, COSUploadError
+    from shared.integrations.cos_upload import COSUploadError, get_cos_upload_service
 
     # 校验文件类型（仅允许 PDF 和常见图片）
     allowed_mime = {
@@ -891,6 +925,7 @@ async def upload_contract_file(
 
 
 # ─── 加盟费逾期自动标记 ───────────────────────────────────────────────────────
+
 
 @router.post("/fees/mark-overdue")
 async def mark_overdue_fees(

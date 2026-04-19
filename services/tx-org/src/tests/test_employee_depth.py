@@ -4,6 +4,7 @@
       manage_training, get_training_progress, get_employee_scorecard,
       以及5个API端点
 """
+
 import os
 import sys
 

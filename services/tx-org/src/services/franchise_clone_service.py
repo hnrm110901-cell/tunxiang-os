@@ -94,12 +94,8 @@ async def clone_store(
             )
             if resp.status_code == 200:
                 body = resp.json()
-                cloned_items["menu_categories"] = (
-                    body.get("data", {}).get("categories_cloned", 0)
-                )
-                cloned_items["menu_items"] = (
-                    body.get("data", {}).get("items_cloned", 0)
-                )
+                cloned_items["menu_categories"] = body.get("data", {}).get("categories_cloned", 0)
+                cloned_items["menu_items"] = body.get("data", {}).get("items_cloned", 0)
                 log.info(
                     "franchise_clone.menu_done",
                     categories=cloned_items["menu_categories"],
@@ -123,9 +119,7 @@ async def clone_store(
             )
             if resp.status_code == 200:
                 body = resp.json()
-                cloned_items["kds_mappings"] = (
-                    body.get("data", {}).get("mappings_cloned", 0)
-                )
+                cloned_items["kds_mappings"] = body.get("data", {}).get("mappings_cloned", 0)
                 log.info(
                     "franchise_clone.kds_done",
                     mappings=cloned_items["kds_mappings"],
@@ -148,9 +142,7 @@ async def clone_store(
             )
             if resp.status_code == 200:
                 body = resp.json()
-                cloned_items["sales_channels"] = (
-                    body.get("data", {}).get("channels_cloned", 0)
-                )
+                cloned_items["sales_channels"] = body.get("data", {}).get("channels_cloned", 0)
                 log.info(
                     "franchise_clone.channels_done",
                     channels=cloned_items["sales_channels"],

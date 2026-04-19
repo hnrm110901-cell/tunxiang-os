@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import asyncio
 import json
-from datetime import date, datetime
+from datetime import date
 from typing import Any, Optional
 
 import structlog
@@ -61,7 +61,10 @@ class HREventConsumer:
         # 创建消费组（幂等）
         try:
             await self.redis.xgroup_create(
-                self.STREAM_KEY, self.GROUP_NAME, id="0", mkstream=True,
+                self.STREAM_KEY,
+                self.GROUP_NAME,
+                id="0",
+                mkstream=True,
             )
         except Exception:  # noqa: BLE001 — 组已存在时 Redis 抛 BUSYGROUP
             pass
@@ -149,12 +152,14 @@ class HREventConsumer:
                 "tenant_id": tenant_id,
                 "store_id": store_id,
                 "employee_id": employee_id,
-                "payload": json.dumps({
-                    "reason": "absence",
-                    "schedule_date": schedule_date,
-                    "urgency": "high",
-                    "auto_created": True,
-                }),
+                "payload": json.dumps(
+                    {
+                        "reason": "absence",
+                        "schedule_date": schedule_date,
+                        "urgency": "high",
+                        "auto_created": True,
+                    }
+                ),
             }
             await self.redis.xadd(self.STREAM_KEY, gap_event)
             log.info("shift_gap_auto_created", store_id=store_id, date=schedule_date)
@@ -260,13 +265,15 @@ class HREventConsumer:
                     "tenant_id": tenant_id,
                     "store_id": sched_store_id,
                     "employee_id": employee_id,
-                    "payload": json.dumps({
-                        "reason": "leave_approved",
-                        "schedule_date": sched_date,
-                        "urgency": "medium",
-                        "auto_created": True,
-                        "schedule_id": str(sched.get("id", "")),
-                    }),
+                    "payload": json.dumps(
+                        {
+                            "reason": "leave_approved",
+                            "schedule_date": sched_date,
+                            "urgency": "medium",
+                            "auto_created": True,
+                            "schedule_id": str(sched.get("id", "")),
+                        }
+                    ),
                 }
                 await self.redis.xadd(self.STREAM_KEY, gap_event)
             log.info(
@@ -346,12 +353,14 @@ class HREventConsumer:
                 "tenant_id": tenant_id,
                 "store_id": store_id,
                 "employee_id": payload.get("employee_id", ""),
-                "payload": json.dumps({
-                    "reason": "schedule_cancelled",
-                    "schedule_date": schedule_date,
-                    "urgency": "medium",
-                    "auto_created": True,
-                }),
+                "payload": json.dumps(
+                    {
+                        "reason": "schedule_cancelled",
+                        "schedule_date": schedule_date,
+                        "urgency": "medium",
+                        "auto_created": True,
+                    }
+                ),
             }
             await self.redis.xadd(self.STREAM_KEY, gap_event)
 

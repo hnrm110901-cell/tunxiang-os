@@ -9,8 +9,8 @@
 from __future__ import annotations
 
 import math
-from datetime import date, datetime, timedelta
-from typing import Any, Dict, List, Optional, Tuple
+from datetime import date, timedelta
+from typing import Any, Dict, List, Tuple
 
 import structlog
 from sqlalchemy import text
@@ -24,19 +24,19 @@ logger = structlog.get_logger(__name__)
 TIME_SLOTS: List[Tuple[str, str, str, str]] = [
     # (slot_key, slot_name, start_time, end_time)
     ("early_morning", "早班前", "06:00", "09:00"),
-    ("lunch_peak",    "午高峰", "11:00", "13:30"),
-    ("lunch_valley",  "午低谷", "13:30", "17:00"),
-    ("dinner_peak",   "晚高峰", "17:00", "20:30"),
+    ("lunch_peak", "午高峰", "11:00", "13:30"),
+    ("lunch_valley", "午低谷", "13:30", "17:00"),
+    ("dinner_peak", "晚高峰", "17:00", "20:30"),
     ("dinner_valley", "晚低谷", "20:30", "22:00"),
-    ("night",         "夜班",   "22:00", "02:00"),
+    ("night", "夜班", "22:00", "02:00"),
 ]
 
 # 行业基准：每万元营收需要的人力时数
 LABOR_HOURS_PER_10K_REVENUE: Dict[str, float] = {
-    "前厅": 2.5,   # 服务员
-    "后厨": 2.0,   # 厨师
-    "收银": 0.8,   # 收银
-    "清洁": 0.5,   # 清洁
+    "前厅": 2.5,  # 服务员
+    "后厨": 2.0,  # 厨师
+    "收银": 0.8,  # 收银
+    "清洁": 0.5,  # 清洁
 }
 
 # 各岗位默认时薪（分）
@@ -50,19 +50,19 @@ _DEFAULT_HOURLY_RATE_FEN: Dict[str, int] = {
 # 各时段营收占比默认值（用于从日营收推算时段营收）
 _SLOT_REVENUE_RATIO: Dict[str, float] = {
     "early_morning": 0.05,
-    "lunch_peak":    0.35,
-    "lunch_valley":  0.08,
-    "dinner_peak":   0.40,
+    "lunch_peak": 0.35,
+    "lunch_valley": 0.08,
+    "dinner_peak": 0.40,
     "dinner_valley": 0.08,
-    "night":         0.04,
+    "night": 0.04,
 }
 
 # 星期几修正因子（周末客流高）
 _WEEKDAY_FACTOR: Dict[int, float] = {
-    0: 1.0,   # 周一
+    0: 1.0,  # 周一
     1: 0.95,  # 周二
     2: 0.95,  # 周三
-    3: 1.0,   # 周四
+    3: 1.0,  # 周四
     4: 1.15,  # 周五
     5: 1.30,  # 周六
     6: 1.25,  # 周日
@@ -137,15 +137,11 @@ class RevenueScheduleService:
         )
 
         # 方案A：从 mv_store_pnl 读日营收，再按时段占比拆分
-        daily_revenues = await self._load_daily_revenue_from_mv(
-            db, tenant_id, store_id, weeks
-        )
+        daily_revenues = await self._load_daily_revenue_from_mv(db, tenant_id, store_id, weeks)
 
         if not daily_revenues:
             # 方案B：直接从 orders 按小时聚合
-            hourly_data = await self._load_hourly_revenue_from_orders(
-                db, tenant_id, store_id, weeks
-            )
+            hourly_data = await self._load_hourly_revenue_from_orders(db, tenant_id, store_id, weeks)
             if hourly_data:
                 return self._aggregate_hourly_to_slots(hourly_data)
 
@@ -177,10 +173,13 @@ class RevenueScheduleService:
                   AND stat_date >= CURRENT_DATE - :days * INTERVAL '1 day'
                 ORDER BY stat_date
             """)
-            result = await db.execute(q, {
-                "store_id": store_id,
-                "days": weeks * 7,
-            })
+            result = await db.execute(
+                q,
+                {
+                    "store_id": store_id,
+                    "days": weeks * 7,
+                },
+            )
             rows = [dict(r) for r in result.mappings()]
             if rows:
                 logger.info(
@@ -221,11 +220,14 @@ class RevenueScheduleService:
                          EXTRACT(DOW FROM created_at)
                 ORDER BY order_date, hour
             """)
-            result = await db.execute(q, {
-                "tid": tenant_id,
-                "store_id": store_id,
-                "days": weeks * 7,
-            })
+            result = await db.execute(
+                q,
+                {
+                    "tid": tenant_id,
+                    "store_id": store_id,
+                    "days": weeks * 7,
+                },
+            )
             rows = [dict(r) for r in result.mappings()]
             if rows:
                 logger.info(
@@ -241,9 +243,7 @@ class RevenueScheduleService:
             )
             return []
 
-    def _aggregate_hourly_to_slots(
-        self, hourly_data: List[Dict[str, Any]]
-    ) -> Dict[str, Any]:
+    def _aggregate_hourly_to_slots(self, hourly_data: List[Dict[str, Any]]) -> Dict[str, Any]:
         """将小时级数据聚合为时段级统计。"""
         from collections import defaultdict
 
@@ -262,9 +262,7 @@ class RevenueScheduleService:
 
         return self._compute_slot_stats(slot_daily)
 
-    def _split_daily_to_slots(
-        self, daily_revenues: List[Dict[str, Any]]
-    ) -> Dict[str, Any]:
+    def _split_daily_to_slots(self, daily_revenues: List[Dict[str, Any]]) -> Dict[str, Any]:
         """从日营收按时段占比拆分为时段统计。"""
         from collections import defaultdict
 
@@ -277,9 +275,7 @@ class RevenueScheduleService:
 
         return self._compute_slot_stats(slot_daily)
 
-    def _compute_slot_stats(
-        self, slot_daily: Dict[str, List[int]]
-    ) -> Dict[str, Any]:
+    def _compute_slot_stats(self, slot_daily: Dict[str, List[int]]) -> Dict[str, Any]:
         """从每日时段营收列表计算统计值。"""
         slots_result: List[Dict[str, Any]] = []
         for key, name, start, end in TIME_SLOTS:
@@ -293,16 +289,18 @@ class RevenueScheduleService:
             variance = sum((v - mean) ** 2 for v in values) / len(values)
             std_dev = int(math.sqrt(variance))
 
-            slots_result.append({
-                "slot_key": key,
-                "slot_name": name,
-                "start_time": start,
-                "end_time": end,
-                "avg_revenue_fen": avg_rev,
-                "peak_revenue_fen": peak_rev,
-                "std_dev_fen": std_dev,
-                "sample_days": len(values),
-            })
+            slots_result.append(
+                {
+                    "slot_key": key,
+                    "slot_name": name,
+                    "start_time": start,
+                    "end_time": end,
+                    "avg_revenue_fen": avg_rev,
+                    "peak_revenue_fen": peak_rev,
+                    "std_dev_fen": std_dev,
+                    "sample_days": len(values),
+                }
+            )
 
         total_avg = sum(s["avg_revenue_fen"] for s in slots_result)
         return {
@@ -315,16 +313,18 @@ class RevenueScheduleService:
         """无历史数据时的降级响应（所有时段返回零值）。"""
         slots = []
         for key, name, start, end in TIME_SLOTS:
-            slots.append({
-                "slot_key": key,
-                "slot_name": name,
-                "start_time": start,
-                "end_time": end,
-                "avg_revenue_fen": 0,
-                "peak_revenue_fen": 0,
-                "std_dev_fen": 0,
-                "sample_days": 0,
-            })
+            slots.append(
+                {
+                    "slot_key": key,
+                    "slot_name": name,
+                    "start_time": start,
+                    "end_time": end,
+                    "avg_revenue_fen": 0,
+                    "peak_revenue_fen": 0,
+                    "std_dev_fen": 0,
+                    "sample_days": 0,
+                }
+            )
         return {
             "slots": slots,
             "total_avg_daily_revenue_fen": 0,
@@ -366,9 +366,7 @@ class RevenueScheduleService:
         weekday_factor = _WEEKDAY_FACTOR.get(dow, 1.0)
 
         # 3. 预订数据加成
-        reservation_boost = await self.get_reservation_boost(
-            db, tenant_id, store_id, target_date
-        )
+        reservation_boost = await self.get_reservation_boost(db, tenant_id, store_id, target_date)
 
         # 4. 计算各时段各岗位最优人数
         slot_plans: List[Dict[str, Any]] = []
@@ -384,9 +382,7 @@ class RevenueScheduleService:
             optimal_staff: Dict[str, int] = {}
             for position, hours_per_10k in LABOR_HOURS_PER_10K_REVENUE.items():
                 revenue_10k = adjusted_rev / 100000  # 分→万元
-                slot_hours = _slot_duration_hours(
-                    slot_info["start_time"], slot_info["end_time"]
-                )
+                slot_hours = _slot_duration_hours(slot_info["start_time"], slot_info["end_time"])
                 needed_hours = revenue_10k * hours_per_10k
                 needed_people = max(1, math.ceil(needed_hours / slot_hours)) if slot_hours > 0 else 1
                 optimal_staff[position] = needed_people
@@ -397,19 +393,19 @@ class RevenueScheduleService:
                 if large_parties > 0:
                     optimal_staff["前厅"] += large_parties  # 每桌大桌+1服务员
 
-            slot_plans.append({
-                "slot_key": slot_key,
-                "slot_name": slot_info["slot_name"],
-                "start_time": slot_info["start_time"],
-                "end_time": slot_info["end_time"],
-                "predicted_revenue_fen": adjusted_rev,
-                "optimal_staff": optimal_staff,
-            })
+            slot_plans.append(
+                {
+                    "slot_key": slot_key,
+                    "slot_name": slot_info["slot_name"],
+                    "start_time": slot_info["start_time"],
+                    "end_time": slot_info["end_time"],
+                    "predicted_revenue_fen": adjusted_rev,
+                    "optimal_staff": optimal_staff,
+                }
+            )
 
         # 5. 查当前排班对比
-        current_staffing = await self._load_current_slot_staffing(
-            db, tenant_id, store_id, target_date
-        )
+        current_staffing = await self._load_current_slot_staffing(db, tenant_id, store_id, target_date)
 
         # 6. 计算差值
         for plan in slot_plans:
@@ -453,11 +449,14 @@ class RevenueScheduleService:
                   AND COALESCE(us.is_deleted, false) = false
                 GROUP BY us.start_time, us.role
             """)
-            result = await db.execute(q, {
-                "tid": tenant_id,
-                "store_id": store_id,
-                "target_date": target_date,
-            })
+            result = await db.execute(
+                q,
+                {
+                    "tid": tenant_id,
+                    "store_id": store_id,
+                    "target_date": target_date,
+                },
+            )
             rows = [dict(r) for r in result.mappings()]
         except (OperationalError, ProgrammingError) as exc:
             logger.warning(
@@ -468,6 +467,7 @@ class RevenueScheduleService:
 
         # 按时段聚合
         from collections import defaultdict
+
         slot_staff: Dict[str, Dict[str, int]] = defaultdict(lambda: defaultdict(int))
         for row in rows:
             st = str(row.get("start_time", "09:00"))
@@ -525,9 +525,7 @@ class RevenueScheduleService:
         )
 
         # 获取可用员工
-        employees = await self._load_available_employees(
-            db, tenant_id, store_id
-        )
+        employees = await self._load_available_employees(db, tenant_id, store_id)
 
         daily_plans: List[Dict[str, Any]] = []
         total_labor_current_fen = 0
@@ -535,21 +533,15 @@ class RevenueScheduleService:
 
         for day_offset in range(7):
             target_date = week_start_date + timedelta(days=day_offset)
-            day_result = await self.calculate_optimal_staffing(
-                db, tenant_id, store_id, target_date
-            )
+            day_result = await self.calculate_optimal_staffing(db, tenant_id, store_id, target_date)
 
             # 为每个缺人时段推荐员工
             for plan in day_result["slot_plans"]:
-                suggested = self._suggest_employees_for_slot(
-                    employees, plan, target_date
-                )
+                suggested = self._suggest_employees_for_slot(employees, plan, target_date)
                 plan["suggested_employees"] = suggested
 
                 # 估算成本
-                slot_hours = _slot_duration_hours(
-                    plan["start_time"], plan["end_time"]
-                )
+                slot_hours = _slot_duration_hours(plan["start_time"], plan["end_time"])
                 for pos, cnt in plan.get("current_staff", {}).items():
                     rate = _DEFAULT_HOURLY_RATE_FEN.get(pos, 2200)
                     total_labor_current_fen += int(cnt * slot_hours * rate)
@@ -557,21 +549,17 @@ class RevenueScheduleService:
                     rate = _DEFAULT_HOURLY_RATE_FEN.get(pos, 2200)
                     total_labor_optimal_fen += int(cnt * slot_hours * rate)
 
-            daily_plans.append({
-                "date": target_date.isoformat(),
-                "weekday": target_date.weekday(),
-                "weekday_name": ["周一", "周二", "周三", "周四", "周五", "周六", "周日"][
-                    target_date.weekday()
-                ],
-                "slots": day_result["slot_plans"],
-            })
+            daily_plans.append(
+                {
+                    "date": target_date.isoformat(),
+                    "weekday": target_date.weekday(),
+                    "weekday_name": ["周一", "周二", "周三", "周四", "周五", "周六", "周日"][target_date.weekday()],
+                    "slots": day_result["slot_plans"],
+                }
+            )
 
         savings_fen = total_labor_current_fen - total_labor_optimal_fen
-        savings_pct = (
-            round(savings_fen / total_labor_current_fen * 100, 1)
-            if total_labor_current_fen > 0
-            else 0.0
-        )
+        savings_pct = round(savings_fen / total_labor_current_fen * 100, 1) if total_labor_current_fen > 0 else 0.0
 
         return {
             "store_id": store_id,
@@ -609,10 +597,13 @@ class RevenueScheduleService:
                   AND COALESCE(e.is_deleted, false) = false
                 ORDER BY e.emp_name
             """)
-            result = await db.execute(q, {
-                "tid": tenant_id,
-                "store_id": store_id,
-            })
+            result = await db.execute(
+                q,
+                {
+                    "tid": tenant_id,
+                    "store_id": store_id,
+                },
+            )
             return [dict(r) for r in result.mappings()]
         except (OperationalError, ProgrammingError) as exc:
             logger.warning(
@@ -635,17 +626,16 @@ class RevenueScheduleService:
             if need <= 0:
                 continue  # 不缺人
             # 找该岗位的可用员工
-            matching = [
-                e for e in employees
-                if self._map_role_to_position(e.get("position", "")) == position
-            ]
+            matching = [e for e in employees if self._map_role_to_position(e.get("position", "")) == position]
             for emp in matching[:need]:
-                suggestions.append({
-                    "employee_id": emp["employee_id"],
-                    "name": emp["emp_name"],
-                    "position": position,
-                    "reason": "本周工时有余量",
-                })
+                suggestions.append(
+                    {
+                        "employee_id": emp["employee_id"],
+                        "name": emp["emp_name"],
+                        "position": position,
+                        "reason": "本周工时有余量",
+                    }
+                )
 
         return suggestions
 
@@ -678,11 +668,14 @@ class RevenueScheduleService:
                   AND reservation_date = :target_date
                   AND status IN ('confirmed', 'seated')
             """)
-            result = await db.execute(q, {
-                "tid": tenant_id,
-                "store_id": store_id,
-                "target_date": target_date,
-            })
+            result = await db.execute(
+                q,
+                {
+                    "tid": tenant_id,
+                    "store_id": store_id,
+                    "target_date": target_date,
+                },
+            )
             row = result.mappings().first()
             if row:
                 large = int(row.get("large_parties", 0))
@@ -733,9 +726,7 @@ class RevenueScheduleService:
 
         # 简化：取该月第一周的数据 × 周数估算
         week_start = first_day - timedelta(days=first_day.weekday())
-        plan = await self.generate_weekly_plan(
-            db, tenant_id, store_id, week_start
-        )
+        plan = await self.generate_weekly_plan(db, tenant_id, store_id, week_start)
 
         weeks_in_month = days_in_month / 7.0
         summary = plan["summary"]
@@ -746,12 +737,8 @@ class RevenueScheduleService:
             "weekly_current_fen": summary["total_labor_cost_current_fen"],
             "weekly_optimal_fen": summary["total_labor_cost_optimal_fen"],
             "weekly_savings_fen": summary["savings_fen"],
-            "monthly_current_fen": int(
-                summary["total_labor_cost_current_fen"] * weeks_in_month
-            ),
-            "monthly_optimal_fen": int(
-                summary["total_labor_cost_optimal_fen"] * weeks_in_month
-            ),
+            "monthly_current_fen": int(summary["total_labor_cost_current_fen"] * weeks_in_month),
+            "monthly_optimal_fen": int(summary["total_labor_cost_optimal_fen"] * weeks_in_month),
             "monthly_savings_fen": int(summary["savings_fen"] * weeks_in_month),
             "savings_pct": summary["savings_pct"],
         }
@@ -779,9 +766,7 @@ class RevenueScheduleService:
             week_start=week_start_date.isoformat(),
         )
 
-        plan = await self.generate_weekly_plan(
-            db, tenant_id, store_id, week_start_date
-        )
+        plan = await self.generate_weekly_plan(db, tenant_id, store_id, week_start_date)
 
         inserted_count = 0
         inserted_ids: List[str] = []
@@ -803,16 +788,19 @@ class RevenueScheduleService:
                                  :notes, NOW(), NOW())
                             RETURNING id::text
                         """)
-                        result = await db.execute(q, {
-                            "tid": tenant_id,
-                            "store_id": store_id,
-                            "emp_id": emp["employee_id"],
-                            "shift_date": shift_date,
-                            "start_time": slot["start_time"],
-                            "end_time": slot["end_time"],
-                            "role": emp["position"],
-                            "notes": f"营收驱动排班自动生成 | 操作人:{operator_id}",
-                        })
+                        result = await db.execute(
+                            q,
+                            {
+                                "tid": tenant_id,
+                                "store_id": store_id,
+                                "emp_id": emp["employee_id"],
+                                "shift_date": shift_date,
+                                "start_time": slot["start_time"],
+                                "end_time": slot["end_time"],
+                                "role": emp["position"],
+                                "notes": f"营收驱动排班自动生成 | 操作人:{operator_id}",
+                            },
+                        )
                         row = result.mappings().first()
                         if row:
                             inserted_ids.append(str(row["id"]))

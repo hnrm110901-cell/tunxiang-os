@@ -56,9 +56,7 @@ class FranchiseeDashboard:
         if self.prev_month_revenue_fen == 0:
             return None
         return round(
-            (self.current_month_revenue_fen - self.prev_month_revenue_fen)
-            / self.prev_month_revenue_fen
-            * 100,
+            (self.current_month_revenue_fen - self.prev_month_revenue_fen) / self.prev_month_revenue_fen * 100,
             2,
         )
 
@@ -197,18 +195,14 @@ class RoyaltyCalculator:
         period_end = date(year, month, calendar.monthrange(year, month)[1])
 
         # Step 1: 查询所有 active 加盟商
-        active_franchisees: List[Franchisee] = await RoyaltyCalculator._fetch_active_franchisees(
-            tenant_id, db
-        )
+        active_franchisees: List[Franchisee] = await RoyaltyCalculator._fetch_active_franchisees(tenant_id, db)
 
         bills: List[RoyaltyBill] = []
         today = date.today()
 
         for franchisee in active_franchisees:
             # Step 2: 汇总该加盟商门店当月营业额
-            store_ids = await RoyaltyCalculator._fetch_franchisee_store_ids(
-                franchisee.id, tenant_id, db
-            )
+            store_ids = await RoyaltyCalculator._fetch_franchisee_store_ids(franchisee.id, tenant_id, db)
             total_revenue_fen: int = await RoyaltyCalculator._sum_store_revenue_fen(
                 store_ids, period_start, period_end, tenant_id, db
             )
@@ -334,19 +328,13 @@ class RoyaltyCalculator:
 
         # 去年同月区间
         prev_year_start = date(year - 1, month, 1)
-        prev_year_end = date(
-            year - 1, month, calendar.monthrange(year - 1, month)[1]
-        )
+        prev_year_end = date(year - 1, month, calendar.monthrange(year - 1, month)[1])
 
         # 获取该加盟商旗下门店
-        store_ids = await RoyaltyCalculator._fetch_franchisee_store_ids(
-            franchisee_id, tenant_id, db
-        )
+        store_ids = await RoyaltyCalculator._fetch_franchisee_store_ids(franchisee_id, tenant_id, db)
 
         # 汇总营收（分）
-        current_fen = await RoyaltyCalculator._sum_store_revenue_fen(
-            store_ids, period_start, period_end, tenant_id, db
-        )
+        current_fen = await RoyaltyCalculator._sum_store_revenue_fen(store_ids, period_start, period_end, tenant_id, db)
         prev_month_fen = await RoyaltyCalculator._sum_store_revenue_fen(
             store_ids, prev_month_start, prev_month_end, tenant_id, db
         )
@@ -355,20 +343,14 @@ class RoyaltyCalculator:
         )
 
         # 待缴费用（pending + overdue 账单 total_due_fen 合计）
-        pending_due_fen = await RoyaltyCalculator._sum_pending_due_fen(
-            franchisee_id, tenant_id, db
-        )
+        pending_due_fen = await RoyaltyCalculator._sum_pending_due_fen(franchisee_id, tenant_id, db)
 
         # 门店数量
         store_count = len(store_ids)
-        active_store_count = await RoyaltyCalculator._count_active_stores(
-            franchisee_id, tenant_id, db
-        )
+        active_store_count = await RoyaltyCalculator._count_active_stores(franchisee_id, tenant_id, db)
 
         # 近 3 次审计分数
-        recent_scores = await RoyaltyCalculator._fetch_recent_audit_scores(
-            franchisee_id, tenant_id, db, limit=3
-        )
+        recent_scores = await RoyaltyCalculator._fetch_recent_audit_scores(franchisee_id, tenant_id, db, limit=3)
 
         return FranchiseeDashboard(
             franchisee_id=franchisee_id,
@@ -426,9 +408,7 @@ class RoyaltyCalculator:
         return result
 
     @staticmethod
-    async def _fetch_franchisee_store_ids(
-        franchisee_id: UUID, tenant_id: UUID, db: Any
-    ) -> List[UUID]:
+    async def _fetch_franchisee_store_ids(franchisee_id: UUID, tenant_id: UUID, db: Any) -> List[UUID]:
         """查询加盟商旗下所有 active 门店 ID。"""
         if db is None:
             return []

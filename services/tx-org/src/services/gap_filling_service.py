@@ -9,16 +9,13 @@
 
 from __future__ import annotations
 
-import asyncio
 import uuid
-from datetime import date, datetime, time, timezone
-from typing import Any, Dict, List, Optional, Tuple
+from datetime import date, time
+from typing import Any, Dict, List, Tuple
 
 import structlog
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
-
-from shared.events import OrgEventType, UniversalPublisher
 
 log: structlog.stdlib.BoundLogger = structlog.get_logger(__name__)
 
@@ -81,13 +78,16 @@ async def find_available_employees(
                 AND us2.end_time > :time_start
           )
     """)
-    result1 = await db.execute(sql_with_schedule, {
-        "tid": tenant_id,
-        "store_id": store_id,
-        "target_date": target_date,
-        "time_start": time_start,
-        "time_end": time_end,
-    })
+    result1 = await db.execute(
+        sql_with_schedule,
+        {
+            "tid": tenant_id,
+            "store_id": store_id,
+            "target_date": target_date,
+            "time_start": time_start,
+            "time_end": time_end,
+        },
+    )
     rows_on_shift = result1.mappings().all()
 
     # ── 优先级2：本店在职但今日无排班 ──
@@ -119,32 +119,39 @@ async def find_available_employees(
                 AND lr.end_date >= :target_date
           )
     """)
-    result2 = await db.execute(sql_no_schedule, {
-        "tid": tenant_id,
-        "store_id": store_id,
-        "target_date": target_date,
-    })
+    result2 = await db.execute(
+        sql_no_schedule,
+        {
+            "tid": tenant_id,
+            "store_id": store_id,
+            "target_date": target_date,
+        },
+    )
     rows_off_duty = result2.mappings().all()
 
     candidates: List[Dict[str, Any]] = []
     for row in rows_on_shift:
-        candidates.append({
-            "employee_id": str(row["employee_id"]),
-            "emp_name": row["emp_name"],
-            "role": row["role"],
-            "skills": row["skills"] or [],
-            "skill_tags": row["skill_tags"] if row["skill_tags"] else [],
-            "availability": row["availability"],
-        })
+        candidates.append(
+            {
+                "employee_id": str(row["employee_id"]),
+                "emp_name": row["emp_name"],
+                "role": row["role"],
+                "skills": row["skills"] or [],
+                "skill_tags": row["skill_tags"] if row["skill_tags"] else [],
+                "availability": row["availability"],
+            }
+        )
     for row in rows_off_duty:
-        candidates.append({
-            "employee_id": str(row["employee_id"]),
-            "emp_name": row["emp_name"],
-            "role": row["role"],
-            "skills": row["skills"] or [],
-            "skill_tags": row["skill_tags"] if row["skill_tags"] else [],
-            "availability": row["availability"],
-        })
+        candidates.append(
+            {
+                "employee_id": str(row["employee_id"]),
+                "emp_name": row["emp_name"],
+                "role": row["role"],
+                "skills": row["skills"] or [],
+                "skill_tags": row["skill_tags"] if row["skill_tags"] else [],
+                "availability": row["availability"],
+            }
+        )
     return candidates
 
 
@@ -246,10 +253,13 @@ async def create_fill_schedule(
             WHERE id = CAST(:tmpl_id AS uuid)
               AND tenant_id = CAST(:tid AS uuid)
         """)
-        tmpl_result = await db.execute(tmpl_sql, {
-            "tmpl_id": str(gap_row["shift_template_id"]),
-            "tid": tenant_id,
-        })
+        tmpl_result = await db.execute(
+            tmpl_sql,
+            {
+                "tmpl_id": str(gap_row["shift_template_id"]),
+                "tid": tenant_id,
+            },
+        )
         tmpl_row = tmpl_result.mappings().first()
         if tmpl_row:
             start_time = tmpl_row["start_time"]
@@ -276,19 +286,22 @@ async def create_fill_schedule(
         "overtime": "fill_overtime",
     }.get(fill_type, "fill_manual")
 
-    await db.execute(insert_sql, {
-        "id": schedule_id,
-        "tid": tenant_id,
-        "store_id": str(gap_row["store_id"]),
-        "emp_id": employee_id,
-        "schedule_date": gap_row["schedule_date"],
-        "tmpl_id": str(gap_row["shift_template_id"]) if gap_row["shift_template_id"] else None,
-        "start_time": start_time,
-        "end_time": end_time,
-        "position": gap_row["position"],
-        "source": source_label,
-        "notes": f"补位(gap={gap_id}, type={fill_type})",
-    })
+    await db.execute(
+        insert_sql,
+        {
+            "id": schedule_id,
+            "tid": tenant_id,
+            "store_id": str(gap_row["store_id"]),
+            "emp_id": employee_id,
+            "schedule_date": gap_row["schedule_date"],
+            "tmpl_id": str(gap_row["shift_template_id"]) if gap_row["shift_template_id"] else None,
+            "start_time": start_time,
+            "end_time": end_time,
+            "position": gap_row["position"],
+            "source": source_label,
+            "notes": f"补位(gap={gap_id}, type={fill_type})",
+        },
+    )
 
     # 更新缺口状态
     update_gap_sql = text("""
@@ -299,11 +312,14 @@ async def create_fill_schedule(
         WHERE id = CAST(:gap_id AS uuid)
           AND tenant_id = CAST(:tid AS uuid)
     """)
-    await db.execute(update_gap_sql, {
-        "emp_id": employee_id,
-        "gap_id": gap_id,
-        "tid": tenant_id,
-    })
+    await db.execute(
+        update_gap_sql,
+        {
+            "emp_id": employee_id,
+            "gap_id": gap_id,
+            "tid": tenant_id,
+        },
+    )
 
     await db.commit()
 

@@ -14,6 +14,7 @@ CRUD 端点：
   - 创建角色时，level 不能高于操作人自身级别
   - 只有 Level 10 管理员可创建 Level 10 角色
 """
+
 import uuid
 from typing import Optional
 from uuid import UUID
@@ -118,9 +119,7 @@ async def list_roles(
     total_result = await db.execute(count_sql, {"tenant_id": str(tenant_id)})
     total = total_result.scalar_one()
 
-    items_result = await db.execute(
-        items_sql, {"tenant_id": str(tenant_id), "size": size, "offset": offset}
-    )
+    items_result = await db.execute(items_sql, {"tenant_id": str(tenant_id), "size": size, "offset": offset})
     rows = items_result.mappings().all()
 
     items = [
@@ -197,22 +196,25 @@ async def create_role(
     else:
         data_query_limit_legacy = "7d"
 
-    result = await db.execute(sql, {
-        "id": role_id,
-        "tenant_id": str(tenant_id),
-        "role_name": req.role_name,
-        "role_code": req.role_code,
-        "level": req.level,
-        "max_discount_rate": req.max_discount_rate,
-        "max_wipeoff_fen": req.max_wipeoff_fen,
-        "max_gift_fen": req.max_gift_fen,
-        "data_query_days": req.data_query_days,
-        "can_void_order": req.can_void_order,
-        "can_modify_price": req.can_modify_price,
-        "can_override_discount": req.can_override_discount,
-        "max_discount_pct_legacy": int(req.max_discount_rate),
-        "data_query_limit_legacy": data_query_limit_legacy,
-    })
+    result = await db.execute(
+        sql,
+        {
+            "id": role_id,
+            "tenant_id": str(tenant_id),
+            "role_name": req.role_name,
+            "role_code": req.role_code,
+            "level": req.level,
+            "max_discount_rate": req.max_discount_rate,
+            "max_wipeoff_fen": req.max_wipeoff_fen,
+            "max_gift_fen": req.max_gift_fen,
+            "data_query_days": req.data_query_days,
+            "can_void_order": req.can_void_order,
+            "can_modify_price": req.can_modify_price,
+            "can_override_discount": req.can_override_discount,
+            "max_discount_pct_legacy": int(req.max_discount_rate),
+            "data_query_limit_legacy": data_query_limit_legacy,
+        },
+    )
     await db.commit()
     row = result.mappings().first()
 
@@ -223,11 +225,13 @@ async def create_role(
         level=req.level,
     )
 
-    return _ok({
-        "id": str(row["id"]),
-        "role_name": row["role_name"],
-        "level": row["level"],
-    })
+    return _ok(
+        {
+            "id": str(row["id"]),
+            "role_name": row["role_name"],
+            "level": row["level"],
+        }
+    )
 
 
 @router.get("/roles/{role_id}")
@@ -253,21 +257,23 @@ async def get_role(
     if row is None:
         raise HTTPException(status_code=404, detail="角色不存在")
 
-    return _ok({
-        "id": str(row["id"]),
-        "role_name": row["role_name"],
-        "role_code": row["role_code"],
-        "level": row["level"],
-        "max_discount_rate": float(row["max_discount_rate"]),
-        "max_wipeoff_fen": int(row["max_wipeoff_fen"]),
-        "max_gift_fen": int(row["max_gift_fen"]),
-        "data_query_days": int(row["data_query_days"]),
-        "can_void_order": bool(row["can_void_order"]),
-        "can_modify_price": bool(row["can_modify_price"]),
-        "can_override_discount": bool(row["can_override_discount"]),
-        "created_at": row["created_at"].isoformat() if row["created_at"] else None,
-        "updated_at": row["updated_at"].isoformat() if row["updated_at"] else None,
-    })
+    return _ok(
+        {
+            "id": str(row["id"]),
+            "role_name": row["role_name"],
+            "role_code": row["role_code"],
+            "level": row["level"],
+            "max_discount_rate": float(row["max_discount_rate"]),
+            "max_wipeoff_fen": int(row["max_wipeoff_fen"]),
+            "max_gift_fen": int(row["max_gift_fen"]),
+            "data_query_days": int(row["data_query_days"]),
+            "can_void_order": bool(row["can_void_order"]),
+            "can_modify_price": bool(row["can_modify_price"]),
+            "can_override_discount": bool(row["can_override_discount"]),
+            "created_at": row["created_at"].isoformat() if row["created_at"] else None,
+            "updated_at": row["updated_at"].isoformat() if row["updated_at"] else None,
+        }
+    )
 
 
 @router.patch("/roles/{role_id}")
@@ -285,9 +291,7 @@ async def patch_role(
         SELECT level FROM role_configs
         WHERE id = :role_id AND tenant_id = :tenant_id AND is_deleted = FALSE
     """)
-    check_result = await db.execute(
-        check_sql, {"role_id": str(role_id), "tenant_id": str(tenant_id)}
-    )
+    check_result = await db.execute(check_sql, {"role_id": str(role_id), "tenant_id": str(tenant_id)})
     target_row = check_result.mappings().first()
     if target_row is None:
         raise HTTPException(status_code=404, detail="角色不存在")
@@ -364,12 +368,14 @@ async def patch_role(
         updates=list(updates.keys()),
     )
 
-    return _ok({
-        "id": str(updated_row["id"]),
-        "role_name": updated_row["role_name"],
-        "level": updated_row["level"],
-        "updated": True,
-    })
+    return _ok(
+        {
+            "id": str(updated_row["id"]),
+            "role_name": updated_row["role_name"],
+            "level": updated_row["level"],
+            "updated": True,
+        }
+    )
 
 
 @router.delete("/roles/{role_id}")
@@ -387,9 +393,7 @@ async def delete_role(
         SELECT level FROM role_configs
         WHERE id = :role_id AND tenant_id = :tenant_id AND is_deleted = FALSE
     """)
-    check_result = await db.execute(
-        check_sql, {"role_id": str(role_id), "tenant_id": str(tenant_id)}
-    )
+    check_result = await db.execute(check_sql, {"role_id": str(role_id), "tenant_id": str(tenant_id)})
     target_row = check_result.mappings().first()
     if target_row is None:
         raise HTTPException(status_code=404, detail="角色不存在")

@@ -15,6 +15,7 @@
 - Redis 不可用时降级（记录日志，不抛异常，不影响主业务）
 - Stream MAXLEN ~ 100_000，自动修剪旧事件
 """
+
 from __future__ import annotations
 
 import json
@@ -82,9 +83,7 @@ class MemberEventPublisher:
 
             fields: dict[str, str] = {
                 "event_id": str(uuid4()),
-                "event_type": event_type.value
-                if hasattr(event_type, "value")
-                else str(event_type),
+                "event_type": event_type.value if hasattr(event_type, "value") else str(event_type),
                 "tenant_id": str(tenant_id),
                 "customer_id": str(customer_id),
                 "event_data": json.dumps(event_data, ensure_ascii=False),

@@ -23,9 +23,7 @@ VALID_BUSINESS_TYPES: frozenset[str] = frozenset(
     ["leave", "purchase", "discount", "price_change", "refund", "expense", "custom"]
 )
 
-BusinessType = Literal[
-    "leave", "purchase", "discount", "price_change", "refund", "expense", "custom"
-]
+BusinessType = Literal["leave", "purchase", "discount", "price_change", "refund", "expense", "custom"]
 
 NodeType = Literal["role_level", "specific_role", "specific_person", "auto"]
 
@@ -74,9 +72,7 @@ def eval_condition(condition: dict[str, Any] | None, ctx: dict[str, Any]) -> boo
     return result_map.get(op, False)
 
 
-def eval_trigger_conditions(
-    trigger_conditions: dict[str, Any], ctx: dict[str, Any]
-) -> bool:
+def eval_trigger_conditions(trigger_conditions: dict[str, Any], ctx: dict[str, Any]) -> bool:
     """
     评估模板触发条件是否满足（ALL 语义，每个字段条件都要满足）。
 
@@ -108,26 +104,12 @@ class CreateNodeReq(BaseModel):
     node_order: int = Field(..., ge=1, description="节点序号，从 1 开始")
     node_name: str = Field(..., max_length=100, description="节点名称，如'直属上级'")
     node_type: NodeType
-    approver_role_level: Optional[int] = Field(
-        None, ge=1, le=10,
-        description="node_type='role_level' 时的最低角色等级"
-    )
-    approver_role_id: Optional[UUID] = Field(
-        None, description="node_type='specific_role' 时的角色配置 ID"
-    )
-    approver_employee_id: Optional[UUID] = Field(
-        None, description="node_type='specific_person' 时的员工 ID"
-    )
-    approve_type: ApproveType = Field(
-        default="any_one",
-        description="多人审批时：any_one=任一通过, all_must=全部通过"
-    )
-    auto_approve_condition: Optional[NodeConditionSchema] = Field(
-        None, description="节点自动审批条件，满足时自动通过"
-    )
-    timeout_hours: Optional[int] = Field(
-        None, ge=1, description="超时小时数，NULL 表示不超时"
-    )
+    approver_role_level: Optional[int] = Field(None, ge=1, le=10, description="node_type='role_level' 时的最低角色等级")
+    approver_role_id: Optional[UUID] = Field(None, description="node_type='specific_role' 时的角色配置 ID")
+    approver_employee_id: Optional[UUID] = Field(None, description="node_type='specific_person' 时的员工 ID")
+    approve_type: ApproveType = Field(default="any_one", description="多人审批时：any_one=任一通过, all_must=全部通过")
+    auto_approve_condition: Optional[NodeConditionSchema] = Field(None, description="节点自动审批条件，满足时自动通过")
+    timeout_hours: Optional[int] = Field(None, ge=1, description="超时小时数，NULL 表示不超时")
     timeout_action: Optional[TimeoutAction] = None
 
 
@@ -136,10 +118,7 @@ class CreateTemplateReq(BaseModel):
 
     template_name: str = Field(..., max_length=100)
     business_type: BusinessType
-    trigger_conditions: dict[str, Any] = Field(
-        default_factory=dict,
-        description="触发条件 JSONB，为空则始终触发审批"
-    )
+    trigger_conditions: dict[str, Any] = Field(default_factory=dict, description="触发条件 JSONB，为空则始终触发审批")
     nodes: list[CreateNodeReq] = Field(default_factory=list)
 
 
@@ -160,10 +139,7 @@ class CreateInstanceReq(BaseModel):
     initiator_id: UUID = Field(..., description="发起人员工 ID")
     store_id: UUID = Field(..., description="门店 ID，用于查找审批人")
     title: str = Field(..., max_length=200, description="审批标题，如'张三请年假3天'")
-    summary: dict[str, Any] = Field(
-        default_factory=dict,
-        description="业务摘要，如 {amount: 5000, days: 3}"
-    )
+    summary: dict[str, Any] = Field(default_factory=dict, description="业务摘要，如 {amount: 5000, days: 3}")
 
 
 class ApproveReq(BaseModel):

@@ -44,6 +44,7 @@ router = APIRouter(
 
 # ── 辅助函数 ─────────────────────────────────────────────────────────────────
 
+
 def _tenant_id(request: Request) -> str:
     tid = request.headers.get("X-Tenant-ID", "")
     if not tid:
@@ -52,6 +53,7 @@ def _tenant_id(request: Request) -> str:
 
 
 # ── Pydantic Models ──────────────────────────────────────────────────────────
+
 
 class ScanRequest(BaseModel):
     date: str = Field(default_factory=lambda: date.today().isoformat(), description="检测日期 YYYY-MM-DD")
@@ -83,6 +85,7 @@ class DismissRequest(BaseModel):
 
 
 # ── 路由 ─────────────────────────────────────────────────────────────────────
+
 
 @router.post("/scan")
 async def scan_full(

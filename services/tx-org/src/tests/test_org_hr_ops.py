@@ -120,6 +120,7 @@ sys.modules["tx_org.services.attendance_repository"] = _att_repo
 # 辅助：用 importlib 加载路由文件（指定 __package__ = 'tx_org.api'）
 # ──────────────────────────────────────────────────────────────────────────────
 
+
 def _load_router(filename: str, module_name: str):
     """从 api/ 目录加载路由文件，强制设置 __package__ = 'tx_org.api'。"""
     path = os.path.join(_SRC, "api", filename)
@@ -145,6 +146,7 @@ _gov_mod = _load_router("governance_routes.py", "tx_org.api.governance_routes")
 import pytest
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
+
 from shared.ontology.src.database import get_db
 
 app_att = FastAPI()
@@ -167,6 +169,7 @@ HEADERS = {"X-Tenant-ID": TENANT_ID}
 # 辅助函数
 # ──────────────────────────────────────────────────────────────────────────────
 
+
 def _mock_db() -> AsyncMock:
     return AsyncMock()
 
@@ -174,6 +177,7 @@ def _mock_db() -> AsyncMock:
 def _override_db(mock_session: AsyncMock):
     async def _inner():
         yield mock_session
+
     return _inner
 
 
@@ -191,6 +195,7 @@ def _mappings_result(rows: list) -> MagicMock:
 # ══════════════════════════════════════════════════════════════════════════════
 # Part 1 — attendance_routes.py
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 @pytest.mark.anyio
 async def test_attendance_clock_in_ok():
@@ -212,9 +217,7 @@ async def test_attendance_clock_in_ok():
     ):
         app_att.dependency_overrides[get_db] = _override_db(mock_db)
         try:
-            async with AsyncClient(
-                transport=ASGITransport(app=app_att), base_url="http://test"
-            ) as ac:
+            async with AsyncClient(transport=ASGITransport(app=app_att), base_url="http://test") as ac:
                 resp = await ac.post(
                     "/api/v1/attendance/clock-in",
                     headers=HEADERS,
@@ -241,9 +244,7 @@ async def test_attendance_clock_in_invalid_method():
 
     app_att.dependency_overrides[get_db] = _override_db(mock_db)
     try:
-        async with AsyncClient(
-            transport=ASGITransport(app=app_att), base_url="http://test"
-        ) as ac:
+        async with AsyncClient(transport=ASGITransport(app=app_att), base_url="http://test") as ac:
             resp = await ac.post(
                 "/api/v1/attendance/clock-in",
                 headers=HEADERS,
@@ -266,16 +267,12 @@ async def test_attendance_daily_ok():
     mock_db = _mock_db()
 
     set_cfg = MagicMock()
-    rows_result = _mappings_result(
-        [{"employee_id": str(uuid4()), "status": "normal", "work_hours": 8.0}]
-    )
+    rows_result = _mappings_result([{"employee_id": str(uuid4()), "status": "normal", "work_hours": 8.0}])
     mock_db.execute = AsyncMock(side_effect=[set_cfg, rows_result])
 
     app_att.dependency_overrides[get_db] = _override_db(mock_db)
     try:
-        async with AsyncClient(
-            transport=ASGITransport(app=app_att), base_url="http://test"
-        ) as ac:
+        async with AsyncClient(transport=ASGITransport(app=app_att), base_url="http://test") as ac:
             resp = await ac.get(
                 "/api/v1/attendance/daily",
                 headers=HEADERS,
@@ -301,9 +298,7 @@ async def test_attendance_anomalies_missing_tenant():
 
     app_att.dependency_overrides[get_db] = _override_db(mock_db)
     try:
-        async with AsyncClient(
-            transport=ASGITransport(app=app_att), base_url="http://test"
-        ) as ac:
+        async with AsyncClient(transport=ASGITransport(app=app_att), base_url="http://test") as ac:
             resp = await ac.get(
                 "/api/v1/attendance/anomalies",
                 # 不带 X-Tenant-ID，但带齐必填参数
@@ -324,6 +319,7 @@ async def test_attendance_anomalies_missing_tenant():
 # Part 2 — device_routes.py
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 @pytest.mark.anyio
 async def test_device_list_ok():
     """[5] GET /api/v1/org/devices — 正常分页设备列表。
@@ -338,10 +334,8 @@ async def test_device_list_ok():
         return_value=MagicMock(
             all=MagicMock(
                 return_value=[
-                    {"device_id": str(uuid4()), "store_id": str(uuid4()),
-                     "device_type": "pos", "status": "online"},
-                    {"device_id": str(uuid4()), "store_id": str(uuid4()),
-                     "device_type": "kds", "status": "online"},
+                    {"device_id": str(uuid4()), "store_id": str(uuid4()), "device_type": "pos", "status": "online"},
+                    {"device_id": str(uuid4()), "store_id": str(uuid4()), "device_type": "kds", "status": "online"},
                 ]
             )
         )
@@ -355,9 +349,7 @@ async def test_device_list_ok():
 
     app_dev.dependency_overrides[get_db] = _override_db(mock_db)
     try:
-        async with AsyncClient(
-            transport=ASGITransport(app=app_dev), base_url="http://test"
-        ) as ac:
+        async with AsyncClient(transport=ASGITransport(app=app_dev), base_url="http://test") as ac:
             resp = await ac.get(
                 "/api/v1/org/devices",
                 headers=HEADERS,
@@ -385,8 +377,10 @@ async def test_device_offline_list_ok():
             all=MagicMock(
                 return_value=[
                     {
-                        "device_id": str(uuid4()), "store_id": str(uuid4()),
-                        "device_type": "pos", "last_heartbeat_at": "2026-04-05T08:00:00Z",
+                        "device_id": str(uuid4()),
+                        "store_id": str(uuid4()),
+                        "device_type": "pos",
+                        "last_heartbeat_at": "2026-04-05T08:00:00Z",
                         "offline_seconds": 600,
                     }
                 ]
@@ -400,9 +394,7 @@ async def test_device_offline_list_ok():
 
     app_dev.dependency_overrides[get_db] = _override_db(mock_db)
     try:
-        async with AsyncClient(
-            transport=ASGITransport(app=app_dev), base_url="http://test"
-        ) as ac:
+        async with AsyncClient(transport=ASGITransport(app=app_dev), base_url="http://test") as ac:
             resp = await ac.get("/api/v1/org/devices/offline", headers=HEADERS)
     finally:
         app_dev.dependency_overrides.pop(get_db, None)
@@ -422,23 +414,15 @@ async def test_device_stats_ok():
 
     overall_r = MagicMock()
     overall_r.mappings = MagicMock(
-        return_value=MagicMock(
-            first=MagicMock(
-                return_value={"total": 10, "online": 8, "offline": 2, "maintenance": 0}
-            )
-        )
+        return_value=MagicMock(first=MagicMock(return_value={"total": 10, "online": 8, "offline": 2, "maintenance": 0}))
     )
     empty_rows = _mappings_result([])
 
-    mock_db.execute = AsyncMock(
-        side_effect=[overall_r, empty_rows, empty_rows, empty_rows]
-    )
+    mock_db.execute = AsyncMock(side_effect=[overall_r, empty_rows, empty_rows, empty_rows])
 
     app_dev.dependency_overrides[get_db] = _override_db(mock_db)
     try:
-        async with AsyncClient(
-            transport=ASGITransport(app=app_dev), base_url="http://test"
-        ) as ac:
+        async with AsyncClient(transport=ASGITransport(app=app_dev), base_url="http://test") as ac:
             resp = await ac.get("/api/v1/org/devices/stats", headers=HEADERS)
     finally:
         app_dev.dependency_overrides.pop(get_db, None)
@@ -451,6 +435,7 @@ async def test_device_stats_ok():
 # Part 3 — employee_document_routes.py
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 @pytest.mark.anyio
 async def test_doc_expiring_ok():
     """[8] GET /api/v1/employee-documents/expiring — 正常返回到期证照列表。
@@ -458,18 +443,22 @@ async def test_doc_expiring_ok():
     expiring 端点使用 result.fetchall()，每行通过 row._mapping 读取。
     """
     from datetime import date as _date
+
     mock_db = _mock_db()
 
     set_cfg = MagicMock()
 
     # 构造带 _mapping 的行
     _row_data = {
-        "employee_id": str(uuid4()), "emp_name": "张三",
-        "cert_type": "health_cert", "cert_type_name": "健康证",
+        "employee_id": str(uuid4()),
+        "emp_name": "张三",
+        "cert_type": "health_cert",
+        "cert_type_name": "健康证",
         "cert_number": "HC20230101",
         "expiry_date": _date(2026, 4, 20),
         "days_remaining": 15,
-        "store_id": str(uuid4()), "department_id": None,
+        "store_id": str(uuid4()),
+        "department_id": None,
     }
     _cert_row = MagicMock()
     _cert_row._mapping = _row_data
@@ -480,9 +469,7 @@ async def test_doc_expiring_ok():
 
     app_doc.dependency_overrides[get_db] = _override_db(mock_db)
     try:
-        async with AsyncClient(
-            transport=ASGITransport(app=app_doc), base_url="http://test"
-        ) as ac:
+        async with AsyncClient(transport=ASGITransport(app=app_doc), base_url="http://test") as ac:
             resp = await ac.get(
                 "/api/v1/employee-documents/expiring",
                 headers=HEADERS,
@@ -509,13 +496,20 @@ async def test_doc_statistics_ok():
 
     # 构造带 _mapping 的 fetchone() 返回
     _stats_data = {
-        "health_cert_total": 50, "health_cert_valid": 45,
-        "health_cert_expiring": 3, "health_cert_expired": 2,
-        "food_cert_total": 50, "food_cert_valid": 48,
-        "food_cert_expiring": 1, "food_cert_expired": 1,
-        "contract_total": 50, "contract_valid": 47,
-        "contract_expiring": 2, "contract_expired": 1,
-        "no_health_cert": 5, "no_food_cert": 2,
+        "health_cert_total": 50,
+        "health_cert_valid": 45,
+        "health_cert_expiring": 3,
+        "health_cert_expired": 2,
+        "food_cert_total": 50,
+        "food_cert_valid": 48,
+        "food_cert_expiring": 1,
+        "food_cert_expired": 1,
+        "contract_total": 50,
+        "contract_valid": 47,
+        "contract_expiring": 2,
+        "contract_expired": 1,
+        "no_health_cert": 5,
+        "no_food_cert": 2,
     }
     _fake_row = MagicMock()
     _fake_row._mapping = _stats_data
@@ -526,9 +520,7 @@ async def test_doc_statistics_ok():
 
     app_doc.dependency_overrides[get_db] = _override_db(mock_db)
     try:
-        async with AsyncClient(
-            transport=ASGITransport(app=app_doc), base_url="http://test"
-        ) as ac:
+        async with AsyncClient(transport=ASGITransport(app=app_doc), base_url="http://test") as ac:
             resp = await ac.get("/api/v1/employee-documents/statistics", headers=HEADERS)
     finally:
         app_doc.dependency_overrides.pop(get_db, None)
@@ -544,14 +536,17 @@ async def test_doc_get_employee_docs_ok():
     /{employee_id} 端点使用 result.fetchone() 获取原始行，再通过 row._mapping 读取数据。
     """
     from datetime import date as _date
+
     mock_db = _mock_db()
     emp_id = str(uuid4())
 
     set_cfg = MagicMock()
 
     _emp_data = {
-        "employee_id": emp_id, "emp_name": "李四",
-        "store_id": str(uuid4()), "department_id": None,
+        "employee_id": emp_id,
+        "emp_name": "李四",
+        "store_id": str(uuid4()),
+        "department_id": None,
         "health_cert_number": "HC2024001",
         "health_cert_expiry": _date(2027, 1, 1),
         "food_safety_cert": "FS2024001",
@@ -570,9 +565,7 @@ async def test_doc_get_employee_docs_ok():
 
     app_doc.dependency_overrides[get_db] = _override_db(mock_db)
     try:
-        async with AsyncClient(
-            transport=ASGITransport(app=app_doc), base_url="http://test"
-        ) as ac:
+        async with AsyncClient(transport=ASGITransport(app=app_doc), base_url="http://test") as ac:
             resp = await ac.get(
                 f"/api/v1/employee-documents/{emp_id}",
                 headers=HEADERS,
@@ -600,9 +593,7 @@ async def test_doc_update_employee_not_found():
 
     app_doc.dependency_overrides[get_db] = _override_db(mock_db)
     try:
-        async with AsyncClient(
-            transport=ASGITransport(app=app_doc), base_url="http://test"
-        ) as ac:
+        async with AsyncClient(transport=ASGITransport(app=app_doc), base_url="http://test") as ac:
             resp = await ac.put(
                 f"/api/v1/employee-documents/{uuid4()}",
                 headers=HEADERS,
@@ -617,6 +608,7 @@ async def test_doc_update_employee_not_found():
 # ══════════════════════════════════════════════════════════════════════════════
 # Part 4 — governance_routes.py
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 @pytest.mark.anyio
 async def test_governance_dashboard_ok():
@@ -633,39 +625,29 @@ async def test_governance_dashboard_ok():
     # headcount_q: mappings() 迭代返回品牌/区域/人数
     headcount_r = MagicMock()
     headcount_r.mappings = MagicMock(
-        return_value=iter([
-            {"brand": "品牌A", "region": "长沙", "headcount": 30},
-            {"brand": "品牌B", "region": "北京", "headcount": 20},
-        ])
+        return_value=iter(
+            [
+                {"brand": "品牌A", "region": "长沙", "headcount": 30},
+                {"brand": "品牌B", "region": "北京", "headcount": 20},
+            ]
+        )
     )
 
     # attendance_q: mappings().first() 返回出勤率
     att_r = MagicMock()
-    att_r.mappings = MagicMock(
-        return_value=MagicMock(
-            first=MagicMock(return_value={"avg_attendance_rate": 0.95})
-        )
-    )
+    att_r.mappings = MagicMock(return_value=MagicMock(first=MagicMock(return_value={"avg_attendance_rate": 0.95})))
 
     # productivity_q: mappings().first() 返回收入和人数
     prod_r = MagicMock()
     prod_r.mappings = MagicMock(
-        return_value=MagicMock(
-            first=MagicMock(
-                return_value={"total_revenue_fen": 2000000, "active_employees": 50}
-            )
-        )
+        return_value=MagicMock(first=MagicMock(return_value={"total_revenue_fen": 2000000, "active_employees": 50}))
     )
 
-    mock_db.execute = AsyncMock(
-        side_effect=[set_cfg, headcount_r, att_r, prod_r]
-    )
+    mock_db.execute = AsyncMock(side_effect=[set_cfg, headcount_r, att_r, prod_r])
 
     app_gov.dependency_overrides[get_db] = _override_db(mock_db)
     try:
-        async with AsyncClient(
-            transport=ASGITransport(app=app_gov), base_url="http://test"
-        ) as ac:
+        async with AsyncClient(transport=ASGITransport(app=app_gov), base_url="http://test") as ac:
             resp = await ac.get("/api/v1/hr/governance/dashboard", headers=HEADERS)
     finally:
         app_gov.dependency_overrides.pop(get_db, None)
@@ -692,32 +674,28 @@ async def test_governance_risk_stores_ok():
     # att_q: mappings() 可迭代
     att_rows = MagicMock()
     att_rows.mappings = MagicMock(
-        return_value=iter([
-            {
-                "store_id": store_id_val,
-                "store_name": "危险门店1",
-                "total_records": 100,
-                "attendance_rate": 0.75,
-                "late_rate": 0.15,
-            }
-        ])
+        return_value=iter(
+            [
+                {
+                    "store_id": store_id_val,
+                    "store_name": "危险门店1",
+                    "total_records": 100,
+                    "attendance_rate": 0.75,
+                    "late_rate": 0.15,
+                }
+            ]
+        )
     )
 
     # alert_q: mappings() 可迭代
     alert_rows = MagicMock()
-    alert_rows.mappings = MagicMock(
-        return_value=iter([
-            {"store_id": store_id_val, "alert_rate": 0.20}
-        ])
-    )
+    alert_rows.mappings = MagicMock(return_value=iter([{"store_id": store_id_val, "alert_rate": 0.20}]))
 
     mock_db.execute = AsyncMock(side_effect=[set_cfg, att_rows, alert_rows])
 
     app_gov.dependency_overrides[get_db] = _override_db(mock_db)
     try:
-        async with AsyncClient(
-            transport=ASGITransport(app=app_gov), base_url="http://test"
-        ) as ac:
+        async with AsyncClient(transport=ASGITransport(app=app_gov), base_url="http://test") as ac:
             resp = await ac.get("/api/v1/hr/governance/risk-stores", headers=HEADERS)
     finally:
         app_gov.dependency_overrides.pop(get_db, None)
@@ -732,9 +710,7 @@ async def test_governance_risk_stores_ok():
 @pytest.mark.anyio
 async def test_governance_benchmark_missing_tenant():
     """[14] GET /api/v1/hr/governance/benchmark — 缺少 X-Tenant-ID → 400。"""
-    async with AsyncClient(
-        transport=ASGITransport(app=app_gov), base_url="http://test"
-    ) as ac:
+    async with AsyncClient(transport=ASGITransport(app=app_gov), base_url="http://test") as ac:
         resp = await ac.get("/api/v1/hr/governance/benchmark")
 
     assert resp.status_code == 400

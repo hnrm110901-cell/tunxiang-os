@@ -3,6 +3,7 @@
 菜单域所有跨服务事件均通过 MenuEvent 传递，事件类型由 MenuEventType 枚举定义。
 Redis Stream key: menu_events
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -20,13 +21,13 @@ class MenuEventType(str, Enum):
     """
 
     # ── 菜品类 ─────────────────────────────────────────────────────
-    DISH_PUBLISHED = "menu.dish.published"              # 菜品发布
-    DISH_SOLDOUT = "menu.dish.soldout"                  # 菜品售罄
-    DISH_PRICE_CHANGED = "menu.dish.price_changed"      # 菜品改价
-    DISH_DEACTIVATED = "menu.dish.deactivated"          # 菜品下架
+    DISH_PUBLISHED = "menu.dish.published"  # 菜品发布
+    DISH_SOLDOUT = "menu.dish.soldout"  # 菜品售罄
+    DISH_PRICE_CHANGED = "menu.dish.price_changed"  # 菜品改价
+    DISH_DEACTIVATED = "menu.dish.deactivated"  # 菜品下架
 
     # ── 品类类 ─────────────────────────────────────────────────────
-    CATEGORY_REORDERED = "menu.category.reordered"      # 品类排序调整
+    CATEGORY_REORDERED = "menu.category.reordered"  # 品类排序调整
 
     # ── 发布计划类 ─────────────────────────────────────────────────
     PUBLISH_PLAN_APPROVED = "menu.publish_plan.approved"  # 发布计划审批通过
@@ -53,7 +54,5 @@ class MenuEvent:
     dish_id: Optional[UUID]
     event_data: dict
     event_id: str = field(default_factory=lambda: str(uuid4()))
-    occurred_at: datetime = field(
-        default_factory=lambda: datetime.now(timezone.utc)
-    )
+    occurred_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     source_service: str = "tx-menu"

@@ -1,4 +1,5 @@
 """tx-org 考勤深度合规服务。"""
+
 from __future__ import annotations
 
 import json
@@ -746,7 +747,9 @@ class AttendanceComplianceLogService:
 
         if store_id:
             scan_result = await scan_all_compliance(
-                self._db, self._tenant_id, store_id,
+                self._db,
+                self._tenant_id,
+                store_id,
                 (check_date, check_date),
             )
         else:
@@ -898,7 +901,8 @@ class AttendanceComplianceLogService:
         """)
         try:
             result = await self._db.execute(
-                q, {"log_id": log_id, "tenant_id": self._tenant_id},
+                q,
+                {"log_id": log_id, "tenant_id": self._tenant_id},
             )
             row = result.mappings().first()
         except (OperationalError, ProgrammingError) as exc:
@@ -1046,16 +1050,19 @@ class AttendanceComplianceLogService:
                  :violation_type, :severity, CAST(:detail AS jsonb), 'pending')
         """)
         try:
-            await self._db.execute(q, {
-                "tenant_id": self._tenant_id,
-                "employee_id": employee_id,
-                "employee_name": employee_name,
-                "store_id": store_id,
-                "check_date": check_date,
-                "violation_type": violation_type,
-                "severity": severity,
-                "detail": json.dumps(detail, ensure_ascii=False, default=str),
-            })
+            await self._db.execute(
+                q,
+                {
+                    "tenant_id": self._tenant_id,
+                    "employee_id": employee_id,
+                    "employee_name": employee_name,
+                    "store_id": store_id,
+                    "check_date": check_date,
+                    "violation_type": violation_type,
+                    "severity": severity,
+                    "detail": json.dumps(detail, ensure_ascii=False, default=str),
+                },
+            )
         except (OperationalError, ProgrammingError) as exc:
             logger.warning(
                 "insert_compliance_log_failed",

@@ -56,9 +56,7 @@ class StoreSetupRequest(BaseModel):
     store_name: str = Field(..., description='新门店名称，如 "尝在一起·芙蓉店"')
     brand_id: str = Field(..., description="品牌 ID")
     address: str = Field(default="", description="门店地址")
-    clone_from_store_id: Optional[str] = Field(
-        None, description="源门店 ID（不填则创建空白门店）"
-    )
+    clone_from_store_id: Optional[str] = Field(None, description="源门店 ID（不填则创建空白门店）")
     clone_items: Optional[List[str]] = Field(
         None,
         description="克隆配置项（None = 全量克隆，空列表 = 不克隆）",
@@ -77,13 +75,13 @@ class CloneItemInfo(BaseModel):
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 _ITEM_META: dict[str, dict[str, str]] = {
-    "tables":             {"display_name": "桌台布局",   "description": "桌号/区域/座位数/最低消费"},
-    "production_depts":   {"display_name": "出品部门",   "description": "档口名称/编码/排序"},
-    "receipt_templates":  {"display_name": "小票模板",   "description": "收银小票和厨房单模板"},
-    "attendance_rules":   {"display_name": "考勤规则",   "description": "迟到扣款/全勤奖/打卡方式"},
-    "shift_configs":      {"display_name": "班次配置",   "description": "早班/晚班/全天班时间设置"},
-    "dispatch_rules":     {"display_name": "档口路由规则","description": "菜品→档口路由匹配规则"},
-    "store_push_configs": {"display_name": "出单模式",   "description": "即时出单/付款后出单"},
+    "tables": {"display_name": "桌台布局", "description": "桌号/区域/座位数/最低消费"},
+    "production_depts": {"display_name": "出品部门", "description": "档口名称/编码/排序"},
+    "receipt_templates": {"display_name": "小票模板", "description": "收银小票和厨房单模板"},
+    "attendance_rules": {"display_name": "考勤规则", "description": "迟到扣款/全勤奖/打卡方式"},
+    "shift_configs": {"display_name": "班次配置", "description": "早班/晚班/全天班时间设置"},
+    "dispatch_rules": {"display_name": "档口路由规则", "description": "菜品→档口路由匹配规则"},
+    "store_push_configs": {"display_name": "出单模式", "description": "即时出单/付款后出单"},
 }
 
 

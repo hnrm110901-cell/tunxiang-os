@@ -36,9 +36,7 @@ router = APIRouter(prefix="/api/v1/employee-documents", tags=["employee-document
 
 
 def _get_tenant_id(request: Request) -> str:
-    tid = getattr(request.state, "tenant_id", None) or request.headers.get(
-        "X-Tenant-ID", ""
-    )
+    tid = getattr(request.state, "tenant_id", None) or request.headers.get("X-Tenant-ID", "")
     if not tid:
         raise HTTPException(status_code=400, detail="X-Tenant-ID header required")
     return tid
@@ -180,7 +178,7 @@ async def get_expiring_documents(
 
     total = len(all_items)
     offset = (page - 1) * size
-    paged_items = all_items[offset: offset + size]
+    paged_items = all_items[offset : offset + size]
 
     # 分级统计
     severity_counts = {"critical": 0, "high": 0, "medium": 0, "low": 0}
@@ -190,14 +188,16 @@ async def get_expiring_documents(
             severity_counts[sev] += 1
 
     log.info("get_expiring_documents", tenant_id=tenant_id, total=total, threshold=threshold_days)
-    return _ok({
-        "items": paged_items,
-        "total": total,
-        "page": page,
-        "size": size,
-        "severity_counts": severity_counts,
-        "scanned_at": datetime.now(timezone.utc).isoformat(),
-    })
+    return _ok(
+        {
+            "items": paged_items,
+            "total": total,
+            "page": page,
+            "size": size,
+            "severity_counts": severity_counts,
+            "scanned_at": datetime.now(timezone.utc).isoformat(),
+        }
+    )
 
 
 @router.get("/statistics")
@@ -247,31 +247,33 @@ async def get_document_statistics(
         row[key] = int(row[key] or 0)
 
     log.info("document_statistics", tenant_id=tenant_id)
-    return _ok({
-        "health_cert": {
-            "total": row["health_cert_total"],
-            "valid": row["health_cert_valid"],
-            "expiring_30d": row["health_cert_expiring"],
-            "expired": row["health_cert_expired"],
-        },
-        "food_safety_cert": {
-            "total": row["food_cert_total"],
-            "valid": row["food_cert_valid"],
-            "expiring_30d": row["food_cert_expiring"],
-            "expired": row["food_cert_expired"],
-        },
-        "contract": {
-            "total": row["contract_total"],
-            "valid": row["contract_valid"],
-            "expiring_30d": row["contract_expiring"],
-            "expired": row["contract_expired"],
-        },
-        "missing": {
-            "no_health_cert": row["no_health_cert"],
-            "no_food_safety_cert": row["no_food_cert"],
-        },
-        "scanned_at": datetime.now(timezone.utc).isoformat(),
-    })
+    return _ok(
+        {
+            "health_cert": {
+                "total": row["health_cert_total"],
+                "valid": row["health_cert_valid"],
+                "expiring_30d": row["health_cert_expiring"],
+                "expired": row["health_cert_expired"],
+            },
+            "food_safety_cert": {
+                "total": row["food_cert_total"],
+                "valid": row["food_cert_valid"],
+                "expiring_30d": row["food_cert_expiring"],
+                "expired": row["food_cert_expired"],
+            },
+            "contract": {
+                "total": row["contract_total"],
+                "valid": row["contract_valid"],
+                "expiring_30d": row["contract_expiring"],
+                "expired": row["contract_expired"],
+            },
+            "missing": {
+                "no_health_cert": row["no_health_cert"],
+                "no_food_safety_cert": row["no_food_cert"],
+            },
+            "scanned_at": datetime.now(timezone.utc).isoformat(),
+        }
+    )
 
 
 @router.get("/{employee_id}")
@@ -313,47 +315,67 @@ async def get_employee_documents(
 
     if data.get("health_cert_number") or data.get("health_cert_expiry"):
         days_remaining = (data["health_cert_expiry"] - today).days if data.get("health_cert_expiry") else None
-        documents.append({
-            "cert_type": "health_cert",
-            "cert_type_name": "健康证",
-            "cert_number": data.get("health_cert_number"),
-            "expiry_date": str(data["health_cert_expiry"]) if data.get("health_cert_expiry") else None,
-            "days_remaining": days_remaining,
-            "severity": _classify_severity(days_remaining) if days_remaining is not None else "unknown",
-            "status": "expired" if days_remaining is not None and days_remaining < 0 else "valid" if days_remaining and days_remaining > 0 else "unknown",
-        })
+        documents.append(
+            {
+                "cert_type": "health_cert",
+                "cert_type_name": "健康证",
+                "cert_number": data.get("health_cert_number"),
+                "expiry_date": str(data["health_cert_expiry"]) if data.get("health_cert_expiry") else None,
+                "days_remaining": days_remaining,
+                "severity": _classify_severity(days_remaining) if days_remaining is not None else "unknown",
+                "status": "expired"
+                if days_remaining is not None and days_remaining < 0
+                else "valid"
+                if days_remaining and days_remaining > 0
+                else "unknown",
+            }
+        )
 
     if data.get("food_safety_cert") or data.get("food_safety_cert_expiry"):
         days_remaining = (data["food_safety_cert_expiry"] - today).days if data.get("food_safety_cert_expiry") else None
-        documents.append({
-            "cert_type": "food_safety_cert",
-            "cert_type_name": "食品安全证",
-            "cert_number": data.get("food_safety_cert"),
-            "expiry_date": str(data["food_safety_cert_expiry"]) if data.get("food_safety_cert_expiry") else None,
-            "days_remaining": days_remaining,
-            "severity": _classify_severity(days_remaining) if days_remaining is not None else "unknown",
-            "status": "expired" if days_remaining is not None and days_remaining < 0 else "valid" if days_remaining and days_remaining > 0 else "unknown",
-        })
+        documents.append(
+            {
+                "cert_type": "food_safety_cert",
+                "cert_type_name": "食品安全证",
+                "cert_number": data.get("food_safety_cert"),
+                "expiry_date": str(data["food_safety_cert_expiry"]) if data.get("food_safety_cert_expiry") else None,
+                "days_remaining": days_remaining,
+                "severity": _classify_severity(days_remaining) if days_remaining is not None else "unknown",
+                "status": "expired"
+                if days_remaining is not None and days_remaining < 0
+                else "valid"
+                if days_remaining and days_remaining > 0
+                else "unknown",
+            }
+        )
 
     if data.get("contract_start_date") or data.get("contract_end_date"):
         days_remaining = (data["contract_end_date"] - today).days if data.get("contract_end_date") else None
-        documents.append({
-            "cert_type": "contract",
-            "cert_type_name": "劳动合同",
-            "cert_number": None,
-            "start_date": str(data["contract_start_date"]) if data.get("contract_start_date") else None,
-            "expiry_date": str(data["contract_end_date"]) if data.get("contract_end_date") else None,
-            "days_remaining": days_remaining,
-            "severity": _classify_severity(days_remaining) if days_remaining is not None else "unknown",
-            "status": "expired" if days_remaining is not None and days_remaining < 0 else "valid" if days_remaining and days_remaining > 0 else "unknown",
-        })
+        documents.append(
+            {
+                "cert_type": "contract",
+                "cert_type_name": "劳动合同",
+                "cert_number": None,
+                "start_date": str(data["contract_start_date"]) if data.get("contract_start_date") else None,
+                "expiry_date": str(data["contract_end_date"]) if data.get("contract_end_date") else None,
+                "days_remaining": days_remaining,
+                "severity": _classify_severity(days_remaining) if days_remaining is not None else "unknown",
+                "status": "expired"
+                if days_remaining is not None and days_remaining < 0
+                else "valid"
+                if days_remaining and days_remaining > 0
+                else "unknown",
+            }
+        )
 
     log.info("get_employee_documents", tenant_id=tenant_id, employee_id=employee_id, doc_count=len(documents))
-    return _ok({
-        "employee_id": data["employee_id"],
-        "emp_name": data["emp_name"],
-        "documents": documents,
-    })
+    return _ok(
+        {
+            "employee_id": data["employee_id"],
+            "emp_name": data["emp_name"],
+            "documents": documents,
+        }
+    )
 
 
 @router.put("/{employee_id}")
@@ -534,9 +556,11 @@ async def scan_expiry(
         created=created_alerts,
         skipped=skipped_alerts,
     )
-    return _ok({
-        "scanned_records": len(rows),
-        "created_alerts": created_alerts,
-        "skipped_existing": skipped_alerts,
-        "scanned_at": now.isoformat(),
-    })
+    return _ok(
+        {
+            "scanned_records": len(rows),
+            "created_alerts": created_alerts,
+            "skipped_existing": skipped_alerts,
+            "scanned_at": now.isoformat(),
+        }
+    )

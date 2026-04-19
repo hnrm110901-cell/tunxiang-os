@@ -185,12 +185,29 @@ async def update_employee(
     """更新员工字段（动态 SET）"""
     # 白名单可更新字段
     allowed = {
-        "emp_name", "phone", "email", "role", "skills", "hire_date",
-        "employment_status", "employment_type", "is_active",
-        "probation_end_date", "grade_level", "gender", "birth_date",
-        "education", "health_cert_expiry", "daily_wage_standard_fen",
-        "work_hour_type", "bank_name", "bank_account",
-        "emergency_contact", "emergency_phone", "org_id", "preferences",
+        "emp_name",
+        "phone",
+        "email",
+        "role",
+        "skills",
+        "hire_date",
+        "employment_status",
+        "employment_type",
+        "is_active",
+        "probation_end_date",
+        "grade_level",
+        "gender",
+        "birth_date",
+        "education",
+        "health_cert_expiry",
+        "daily_wage_standard_fen",
+        "work_hour_type",
+        "bank_name",
+        "bank_account",
+        "emergency_contact",
+        "emergency_phone",
+        "org_id",
+        "preferences",
     }
     set_parts: list[str] = ["updated_at = NOW()"]
     params: dict[str, Any] = {"eid": emp_id, "tid": tenant_id}
@@ -280,12 +297,14 @@ async def get_org_hierarchy(
         row = dict(r)
         count = int(row["employee_count"])
         total_employees += count
-        stores.append({
-            "store_id": str(row["store_id"]) if row["store_id"] else None,
-            "store_name": row["store_name"],
-            "employee_count": count,
-            "roles": row.get("roles") or [],
-        })
+        stores.append(
+            {
+                "store_id": str(row["store_id"]) if row["store_id"] else None,
+                "store_name": row["store_name"],
+                "employee_count": count,
+                "roles": row.get("roles") or [],
+            }
+        )
 
     return {
         "stores": stores,
@@ -392,14 +411,16 @@ async def get_labor_cost_ranking(
     rankings = []
     for idx, r in enumerate(result.mappings().fetchall(), 1):
         row = dict(r)
-        rankings.append({
-            "rank": idx,
-            "store_id": str(row["store_id"]) if row["store_id"] else None,
-            "store_name": row["store_name"],
-            "employee_count": int(row["emp_count"]),
-            "daily_total_fen": int(row["daily_total_fen"]),
-            "monthly_estimate_fen": int(row["daily_total_fen"]) * 26,
-        })
+        rankings.append(
+            {
+                "rank": idx,
+                "store_id": str(row["store_id"]) if row["store_id"] else None,
+                "store_name": row["store_name"],
+                "employee_count": int(row["emp_count"]),
+                "daily_total_fen": int(row["daily_total_fen"]),
+                "monthly_estimate_fen": int(row["daily_total_fen"]) * 26,
+            }
+        )
     return rankings
 
 
@@ -436,12 +457,14 @@ async def get_turnover_risk(
     )
     for r in prob_result.mappings().fetchall():
         row = dict(r)
-        at_risk.append({
-            "employee_id": str(row["id"]),
-            "emp_name": row["emp_name"],
-            "role": row["role"],
-            "risk_level": "attention",
-            "reason": f"试用期将于 {row['probation_end_date']} 到期",
-        })
+        at_risk.append(
+            {
+                "employee_id": str(row["id"]),
+                "emp_name": row["emp_name"],
+                "role": row["role"],
+                "risk_level": "attention",
+                "reason": f"试用期将于 {row['probation_end_date']} 到期",
+            }
+        )
 
     return at_risk

@@ -3,6 +3,7 @@
 所有金额单位：分(fen)。
 提成计算: 基础提成 + 推菜提成 + 开瓶提成 + 加单提成
 """
+
 from __future__ import annotations
 
 import uuid
@@ -18,16 +19,17 @@ from shared.ontology.src.entities import Employee, Order, OrderItem
 logger = structlog.get_logger(__name__)
 
 # ── 提成比例常量（分） ────────────────────────────────────────
-COMMISSION_BASE_RATE = 0.005         # 基础提成: 服务订单金额的 0.5%
-COMMISSION_RECOMMEND_RATE = 0.02     # 推菜提成: 推荐菜品金额的 2%
-COMMISSION_BOTTLE_FEN = 500          # 开瓶提成: 每瓶 500 分(5元)
-COMMISSION_UPSELL_RATE = 0.03        # 加单提成: 加单金额的 3%
+COMMISSION_BASE_RATE = 0.005  # 基础提成: 服务订单金额的 0.5%
+COMMISSION_RECOMMEND_RATE = 0.02  # 推菜提成: 推荐菜品金额的 2%
+COMMISSION_BOTTLE_FEN = 500  # 开瓶提成: 每瓶 500 分(5元)
+COMMISSION_UPSELL_RATE = 0.03  # 加单提成: 加单金额的 3%
 
 # ── 培训状态 ─────────────────────────────────────────────────
 TRAINING_STATUS_PENDING = "pending"
 TRAINING_STATUS_IN_PROGRESS = "in_progress"
 TRAINING_STATUS_COMPLETED = "completed"
 TRAINING_STATUS_FAILED = "failed"
+
 
 def _to_uuid(val: str) -> uuid.UUID:
     return uuid.UUID(val)
@@ -62,7 +64,10 @@ async def calculate_performance_attribution(
     tid = _to_uuid(tenant_id)
     start_dt = datetime.fromisoformat(date_range[0]).replace(tzinfo=timezone.utc)
     end_dt = datetime.fromisoformat(date_range[1]).replace(
-        hour=23, minute=59, second=59, tzinfo=timezone.utc,
+        hour=23,
+        minute=59,
+        second=59,
+        tzinfo=timezone.utc,
     )
 
     # 该员工服务的订单
@@ -232,10 +237,7 @@ async def calculate_commission(
     upsell_commission_fen = int(upsell_amount_fen * COMMISSION_UPSELL_RATE)
 
     total_commission_fen = (
-        base_commission_fen
-        + recommend_commission_fen
-        + bottle_commission_fen
-        + upsell_commission_fen
+        base_commission_fen + recommend_commission_fen + bottle_commission_fen + upsell_commission_fen
     )
 
     logger.info(
@@ -325,9 +327,13 @@ async def manage_training(
             },
         )
         await db.flush()
-        logger.info("training_assigned", employee_id=employee_id,
-                    training_id=str(training_id), course_name=course_name,
-                    tenant_id=tenant_id)
+        logger.info(
+            "training_assigned",
+            employee_id=employee_id,
+            training_id=str(training_id),
+            course_name=course_name,
+            tenant_id=tenant_id,
+        )
         return {
             "training_id": str(training_id),
             "status": TRAINING_STATUS_PENDING,
@@ -371,16 +377,11 @@ async def manage_training(
                 SET status = :status, score = :score, completed_at = :now, updated_at = :now
                 WHERE id = :id AND tenant_id = :tid
             """),
-            {"status": new_status, "score": score, "now": now,
-             "id": existing.id, "tid": tid},
+            {"status": new_status, "score": score, "now": now, "id": existing.id, "tid": tid},
         )
         # 更新 Employee 的 training_completed 列表
         if new_status == TRAINING_STATUS_COMPLETED:
-            emp_result = await db.execute(
-                select(Employee)
-                .where(Employee.id == eid)
-                .where(Employee.tenant_id == tid)
-            )
+            emp_result = await db.execute(select(Employee).where(Employee.id == eid).where(Employee.tenant_id == tid))
             emp = emp_result.scalar_one_or_none()
             if emp:
                 completed = list(emp.training_completed or [])
@@ -388,10 +389,14 @@ async def manage_training(
                     completed.append(course_id)
                     emp.training_completed = completed
         await db.flush()
-        logger.info("training_completed", employee_id=employee_id,
-                    course_id=course_id, score=score,
-                    passed=new_status == TRAINING_STATUS_COMPLETED,
-                    tenant_id=tenant_id)
+        logger.info(
+            "training_completed",
+            employee_id=employee_id,
+            course_id=course_id,
+            score=score,
+            passed=new_status == TRAINING_STATUS_COMPLETED,
+            tenant_id=tenant_id,
+        )
         return {"training_id": training_id_str, "status": new_status, "message": msg}
 
     elif action == "certify":
@@ -405,8 +410,13 @@ async def manage_training(
             {"cert_id": cert_id, "now": now, "id": existing.id, "tid": tid},
         )
         await db.flush()
-        logger.info("training_certified", employee_id=employee_id,
-                    course_id=course_id, certificate_id=cert_id, tenant_id=tenant_id)
+        logger.info(
+            "training_certified",
+            employee_id=employee_id,
+            course_id=course_id,
+            certificate_id=cert_id,
+            tenant_id=tenant_id,
+        )
         return {
             "training_id": training_id_str,
             "status": TRAINING_STATUS_COMPLETED,
@@ -484,9 +494,14 @@ async def get_training_progress(
         if t["status"] == TRAINING_STATUS_COMPLETED:
             by_category[cat]["completed"] += 1
 
-    logger.info("training_progress_queried", employee_id=employee_id,
-                total=total, completed=cnt_completed,
-                completion_rate=completion_rate, tenant_id=tenant_id)
+    logger.info(
+        "training_progress_queried",
+        employee_id=employee_id,
+        total=total,
+        completed=cnt_completed,
+        completion_rate=completion_rate,
+        tenant_id=tenant_id,
+    )
 
     return {
         "employee_id": employee_id,
@@ -530,10 +545,7 @@ async def get_employee_scorecard(
 
     # 获取员工信息
     emp_result = await db.execute(
-        select(Employee)
-        .where(Employee.id == eid)
-        .where(Employee.tenant_id == tid)
-        .where(Employee.is_deleted == False)  # noqa: E712
+        select(Employee).where(Employee.id == eid).where(Employee.tenant_id == tid).where(Employee.is_deleted == False)  # noqa: E712
     )
     employee = emp_result.scalar_one_or_none()
     if not employee:
@@ -542,6 +554,7 @@ async def get_employee_scorecard(
     now = datetime.now(timezone.utc)
     # 近30天数据
     from datetime import timedelta
+
     start_30d = now - timedelta(days=30)
 
     # ── 维度1: 服务量 ──
@@ -617,18 +630,20 @@ async def get_employee_scorecard(
 
     # ── 综合得分 ──
     dimensions = {
-        "service_volume": {"score": service_score, "label": "服务量",
-                           "detail": f"桌数{table_count_30d}/订单{order_count_30d}"},
-        "revenue": {"score": revenue_score, "label": "营收贡献",
-                     "detail": f"总额{revenue_30d_fen}分"},
-        "satisfaction": {"score": satisfaction_score, "label": "客户满意",
-                          "detail": f"投诉{complaint_count}单"},
-        "efficiency": {"score": efficiency_score, "label": "效率",
-                        "detail": f"平均出餐{avg_serve_min or 'N/A'}分钟"},
-        "skill_growth": {"score": skill_score, "label": "技能成长",
-                          "detail": f"完成率{training_data['completion_rate']*100:.0f}%"},
-        "attendance": {"score": attendance_score, "label": "出勤",
-                        "detail": employee.employment_status},
+        "service_volume": {
+            "score": service_score,
+            "label": "服务量",
+            "detail": f"桌数{table_count_30d}/订单{order_count_30d}",
+        },
+        "revenue": {"score": revenue_score, "label": "营收贡献", "detail": f"总额{revenue_30d_fen}分"},
+        "satisfaction": {"score": satisfaction_score, "label": "客户满意", "detail": f"投诉{complaint_count}单"},
+        "efficiency": {"score": efficiency_score, "label": "效率", "detail": f"平均出餐{avg_serve_min or 'N/A'}分钟"},
+        "skill_growth": {
+            "score": skill_score,
+            "label": "技能成长",
+            "detail": f"完成率{training_data['completion_rate'] * 100:.0f}%",
+        },
+        "attendance": {"score": attendance_score, "label": "出勤", "detail": employee.employment_status},
     }
 
     scores = [d["score"] for d in dimensions.values()]
