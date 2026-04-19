@@ -4,6 +4,43 @@
 
 ---
 
+## 2026-04-19 PR-W2.G：erp_push_log 补 RLS（v274 迁移）
+
+### 本次会话目标
+Wave 2 Batch 1 第 4 个 PR（也是 Wave 2 **首个迁移**）。响应 §19 安全 P1-2：`erp_push_log` 表无 RLS POLICY，跨租户可见商业情报 + 错误消息 + source_id。
+
+Tier 级别：🔴 **Tier 1**（数据合规）。
+
+### 完成状态
+- [x] **v274 migration**（幂等）：
+  - `CREATE TABLE IF NOT EXISTS erp_push_log`（12 列 + 3 索引）
+  - `ENABLE ROW LEVEL SECURITY`
+  - `DROP POLICY IF EXISTS` + `CREATE POLICY USING + WITH CHECK` 双声明
+- [x] 3 索引：`(tenant_id, pushed_at DESC)` / `(voucher_id)` / partial `WHERE status='failed'`
+- [x] **Tier 1 测试** 12 passed（迁移结构断言）
+- [x] **DEV Postgres 端到端** 5 场景：
+  - #1 superuser 看全 6 条（BYPASS RLS）✅
+  - #2 普通 role + tenant_A → 只看 A 的 3 条 ✅
+  - #3 切 tenant_B → 只看 B 的 3 条 ✅
+  - #4 **WITH CHECK**: tenant_A 身份写 tenant_B 的行 → 拒（ProgrammingError）✅
+  - #5 空 tenant_id → 看 0 行 ✅
+
+### 关键决策
+- **幂等 CREATE TABLE IF NOT EXISTS** — 生产表可能已存在（voucher_generator 早就 INSERT），迁移保兼容。
+- **`USING + WITH CHECK` 双声明** — 与 Blockers B2 一致的策略形式。
+- **downgrade 不 DROP TABLE** — 历史推送日志必须保留（审计追溯）。
+- **partial index `WHERE status='failed'`** — 失败重试队列常查，小索引效率高。
+
+### 已知风险
+- 生产 erp_push_log 可能已有历史行 `tenant_id=NULL`（遗留脏数据），RLS 启用后看不到。需离线修复。
+- 表之前无 RLS 的**历史数据泄露窗口**已无法追溯（属于 §19 审计识别的历史债）。
+
+### 下一步
+- **W2.D**: 红冲双 flush UNIQUE 升级（v276，Batch 1 收尾）
+- Batch 2 启动：W2.A（跨月漏账 6901 科目）+ W2.F + W2.H + W2.I + W2.O
+
+---
+
 ## 2026-04-19 PR-W2.E：session.get() Oracle 攻击修复（显式 tenant 过滤）
 
 ### 本次会话目标
