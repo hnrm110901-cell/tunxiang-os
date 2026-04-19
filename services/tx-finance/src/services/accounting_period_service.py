@@ -59,7 +59,22 @@ class AccountingPeriodService:
     ) -> AccountingPeriod:
         """确保 (tenant, year, month) 的 period 存在, 不存在则按 open 创建.
 
-        并发安全: UNIQUE (tenant_id, year, month) + refetch 模式.
+        [W2.C 修复] 并发 race 用 SAVEPOINT 隔离, 不污染外层事务.
+
+        原问题 (CFO P0-2): race 分支走 session.rollback() 会把**调用方**的
+        所有前置写入全部回滚. 典型场景:
+          1. FinancialVoucherService.create() 调用链:
+             幂等预查 → ensure_period(auto_ensure) → [race 发生 → rollback]
+                                                   ↓
+             整个 create() 事务被清空, 调用方拿到"静默失败"
+          2. 早高峰 200 店同日首单并发写 → 5% 遇到 race → 5 分钟几十单丢失
+
+        SAVEPOINT 修复:
+          - session.begin_nested() 创建 SAVEPOINT
+          - 只有 INSERT 的 flush 阶段回滚到 SAVEPOINT, 前置写入保留
+          - 外层事务状态完整, caller 可继续操作
+
+        并发安全: UNIQUE (tenant_id, year, month) + SAVEPOINT 回滚 + refetch.
         """
         existing = await self._find_period(
             session=session,
@@ -80,14 +95,24 @@ class AccountingPeriodService:
             period_end=end,
             status=STATUS_OPEN,
         )
-        session.add(period)
 
+        # [W2.C] SAVEPOINT 隔离 INSERT 失败 — 不影响外层事务
+        # begin_nested() 创建 SAVEPOINT, __aexit__ 时:
+        # - 正常退出: RELEASE SAVEPOINT (INSERT 保留)
+        # - 异常退出: ROLLBACK TO SAVEPOINT (仅撤 INSERT, 外层事务保留)
         try:
-            await session.flush()
+            async with session.begin_nested():
+                session.add(period)
+                await session.flush()
         except IntegrityError as exc:
             if "uq_ap_tenant_year_month" in str(exc.orig):
-                # 并发: 另一 worker 先 INSERT 成功, refetch
-                await session.rollback()
+                # 并发: 另一 worker 先 INSERT 成功. SAVEPOINT 已自动回滚 INSERT,
+                # refetch 拿到 winner. **外层事务保持完整.**
+                log.info(
+                    "accounting_period.ensure.race_refetch",
+                    tenant_id=str(tenant_id),
+                    period=f"{year}-{month:02d}",
+                )
                 winner = await self._find_period(
                     session=session,
                     tenant_id=tenant_id,
