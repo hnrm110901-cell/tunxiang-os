@@ -268,7 +268,10 @@ class TestValidationOrder:
 
     @pytest.mark.asyncio
     async def test_period_check_rejects_before_idempotency_fetch(self):
-        """账期 closed 时, 即便有 event_id, 幂等预查 (DB SELECT) 也不执行."""
+        """账期 closed 时, 即便有 event_id, 幂等预查 (DB SELECT) 也不执行.
+
+        B5 后 tenant 断言会调 1 次 execute (在 period 校验之前), 但幂等 _find_by_event 不调用.
+        """
         period_service = AsyncMock(spec=AccountingPeriodService)
         period_service.is_date_writable = AsyncMock(return_value=False)
         period_service.find_period_for_date = AsyncMock(
@@ -277,15 +280,19 @@ class TestValidationOrder:
 
         svc = FinancialVoucherService(period_service=period_service)
         session = AsyncMock()
-        session.execute = AsyncMock()  # 幂等预查用
+        # B5 tenant 断言豁免 (scalar 返 None)
+        tenant_mock = MagicMock()
+        tenant_mock.scalar = MagicMock(return_value=None)
+        session.execute = AsyncMock(return_value=tenant_mock)
 
         payload = _balanced_payload(event_id=uuid.uuid4())  # 有 event_id
 
         with pytest.raises(ValueError, match="账期"):
             await svc.create(payload, session=session)
 
-        # 账期 closed 直接 raise, execute (SELECT 幂等) 不调用
-        session.execute.assert_not_called()
+        # 账期 closed 直接 raise, 幂等预查 (_find_by_event) 不执行.
+        # execute 只调 1 次 (B5 tenant 断言), 没走第二次 (幂等查).
+        assert session.execute.await_count == 1
 
     @pytest.mark.asyncio
     async def test_empty_lines_rejected_before_period_check(self):
