@@ -4,6 +4,69 @@
 
 ---
 
+## 2026-04-19 PR-W2.B：外卖 T+N webhook 月结后丢单修复
+
+### 本次会话目标
+Wave 2 Batch 1 首个 PR。响应 §19 CFO P0-4 风险：美团 T+2 到账 webhook 在月结后被账期校验直接拒，年化百万级流水损失。
+
+Tier 级别：🔴 **Tier 1**（资金安全 / 合规）。
+
+### 开发流程（超级智能体团队协作）
+1. **Plan agent** 规划 Wave 2 整体（4 Batch × 5 PR，依赖图，迁移号策略）
+2. **Explore agent** 探索 tx-finance 账务域（6901 科目缺失 / voucher_type 无 DB CHECK / auto_ensure 机制）
+3. **我主力实现**：30 行核心改动 + 注释增强
+4. **test-suite-architect agent** 扩 8 个 Tier 1 测试 + 指出 W1.4b 旧测试需反转
+5. **strict-code-reviewer agent** review → **没 BLOCKER**，3 条 NIT（文字）
+6. 我修 NIT-1 和 NIT-3，记 NIT-2 为 follow-up
+7. 回归 + DEV PG 5 场景端到端
+
+### 涉及范围
+- 1 核心文件：`services/tx-finance/src/services/financial_voucher_service.py`（create 方法顺序交换）
+- 2 测试文件：`test_voucher_period_check_tier1.py`（新 class 8 tests + 更新 W1.4b 1 test）
+- 无迁移，无 ORM 变更，无新依赖
+
+### 完成状态
+- [x] **create() 方法校验顺序反转**（~30 行 + 注释）：
+  - **原**：前置 → tenant 断言 → 账期校验 → 幂等预查 → 构造 ORM
+  - **新**：前置 → tenant 断言 → **幂等预查** → **账期校验** → 构造 ORM
+  - event_id 命中：返回既存凭证（不走账期校验，T+N 不丢单）
+  - event_id miss：继续账期校验（新凭证仍拦 closed/locked）
+- [x] **新测试** `TestW2BIdempotencyBeforePeriodCheck`（8 passed）：
+  - closed 期 webhook 重发 → 返回既存 ✅
+  - closed 期全新 event_id → 拒 ✅
+  - event_id=None 手工 + closed → 拒 ✅
+  - open 期幂等 hit / miss 分支
+  - locked 期幂等命中（年结后仍支持 T+N）
+  - 调用顺序验证（execute 在 is_date_writable 之前）
+  - 空 session.add 断言（fail-fast）
+- [x] **W1.4b 测试更新** `test_period_check_runs_after_idempotency_miss`（原名 `..._before_idempotency_fetch`，W2.B 刻意反转原行为，测试注释/断言同步更新）
+- [x] **回归**：W1 214 + B1-B5 12 + W2.B 8 = **234 passed / 0.74s**
+- [x] **DEV Postgres 端到端** 5 场景（真实 asyncpg + 徐记海鲜 美团订单场景）：
+  - #1 2026-04 open 首推写入 ✅
+  - #2 T+1 月结后 webhook 重发同 event_id → 返回既存凭证（DB 只有 1 条） ✅
+  - #3 closed 期全新 event_id → `ValueError "账期 2026-04 状态=closed"` ✅
+  - #4 2027 年结 locked 后 webhook 重发 → 返回既存凭证 ✅
+  - #5 手工凭证 event_id=None + closed → 跳过幂等，账期校验拒 ✅
+
+### 关键决策
+- **顺序反转而非 opt-in 参数**（Plan agent 推荐）— 默认行为就该"幂等优先"，不需要 caller 记得传 flag。幂等命中本就等价于"无新写入"，绕过账期校验语义正确。
+- **closed 期幂等命中仍返回 existing** — 该凭证当初写入时账期必是 open，现在返回它不是"新增账面"，审计视角等同于"查询既存数据"。
+- **locked 期同样允许幂等命中** — 年结后历史凭证不可改，但 T+N webhook 重发的"幂等查询"不改 DB。
+- **NIT-2 并发 race + close 窗口记 follow-up** — Worker A miss→open→flush 后 B miss，但 B 的 session 看不到 A 的写入，若中间 close，B 会拒。正确行为但未测试文档化。不阻断合入。
+
+### 下一步（Batch 1 剩余）
+- **W2.C**: `ensure_period` 并发 race 改 savepoint
+- **W2.E**: `session.get()` Oracle 攻击修复
+- **W2.G**: `erp_push_log` 补 RLS（v274 迁移）
+- **W2.D**: 红冲双 flush UNIQUE 升级（v276 迁移）
+
+### 已知风险
+- **W2.B 改了 step 2-3 顺序**，对调用方完全透明（行为改善，无破坏性）。
+- **follow-up NIT-2**：并发两 worker miss + 中间 close 场景未测试文档化（行为正确，但需 W2.C 配合后补 race 测试）。
+- **W1.4b 测试反转**：`test_period_check_rejects_before_idempotency_fetch` → `test_period_check_runs_after_idempotency_miss`。旧名强调"先于"，新名强调"miss 后才跑"。语义完全反了，但更安全。
+
+---
+
 ## 2026-04-19 PR-W1.BLOCKERS：Wave 1 §19 独立验证响应（B1-B5）
 
 ### 本次会话目标
