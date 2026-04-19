@@ -4,6 +4,67 @@
 
 ---
 
+## 2026-04-19 PR-W1.6：历史 entries JSONB → lines 回填服务
+
+### 本次会话目标
+W1.6: 建立 `VoucherBackfillService`，把 v266 之前的历史凭证 `entries` JSONB 解析生成 `financial_voucher_lines` 子表行。为 W2 drop entries 扫清数据。
+
+Tier 级别：🔴 **Tier 1**（资金安全，不触 schema 但扫全表数据）。
+
+### 涉及范围
+- 新服务 `services/voucher_backfill_service.py`
+- 新测试 `test_voucher_backfill_tier1.py`
+- 无迁移，无 ORM 改动
+
+### 完成状态
+- [x] **VoucherBackfillService.backfill_batch**
+  - `FOR UPDATE SKIP LOCKED` 并行安全
+  - `WHERE NOT EXISTS (lines)` 幂等 pre-check (重跑不产生重复)
+  - `jsonb_array_length > 0` 过滤空 entries 凭证
+  - `ORDER BY created_at ASC` 稳定顺序（便于 batch 重跑对齐）
+  - 可选 `tenant_id` 过滤（多租户按域回填）
+  - `batch_size` 可调（默认 500）
+  - `dry_run=True` 只解析不 INSERT（预检）
+  - `strict=False`（默认）单张失败跳过 + 记 errors；True 时 raise
+- [x] **`_parse_entries_to_fen_pairs` 多格式兼容**
+  - 格式 A（W1.0 `voucher_service.py` 风格）: `{direction, account_code, amount_fen, amount_yuan}`
+    - `amount_fen` 缺失时回退 `amount_yuan * 100`（`round` 避 IEEE 754）
+    - **折扣负金额**: `direction=credit, amount_fen=-1000` 自动 flip 为 `direction=debit, amount_fen=+1000`
+  - 格式 B（W1.3+ `FinancialVoucherService` 风格）: `{account_code, debit, credit}` 元
+  - 失败容忍：account_code 缺 / 借贷都 0 / 都非零（污染）/ 负数 → 跳过该行不爆
+- [x] **BackfillReport dataclass**
+  - `total_scanned` / `backfilled` / `skipped_existing` / `skipped_empty` / `skipped_unbalanced` / `errors` / `dry_run`
+  - `.summary()` 一行字符串输出（log 友好）
+- [x] **Tier 1 测试** `src/tests/test_voucher_backfill_tier1.py`（**20 passed / 0.25s**）
+  - 解析器（12）：格式 A/B/混合 / IEEE 754 / 负金额 flip / account_name 回退 / 边界污染
+  - 批处理（8）：正常 / dry_run / 非 strict 跳过 / strict raise / 空跳过 / summary / tenant 过滤 / 空批次
+- [x] **全 Wave 1 回归**：21 + 19 + 24 + 25 + 48 + 10 + 29 + 20 = **196 passed / 0.59s**
+- [x] **DEV Postgres 端到端**（真实 asyncpg，塞 4 种历史凭证数据）
+  - #1 dry_run 预检：DB 不变动，report 正确（2 backfilled + 1 unbalanced）✅
+  - #2 真实回填：DB 层 lines 与 entries 金额方向一一对应（10000/5000 fen）✅
+  - #3 lines 结构验证：`V_FMT_A` 2 行（借 10000 现金 + 贷 10000 收入）/ `V_FMT_B` 2 行（借 5000 应收 + 贷 5000 收入）/ `V_UNBAL` 0 行（跳过）✅
+  - #4 幂等二跑：已回填凭证 SQL 层直接过滤，只扫 V_UNBAL（仍跳）✅
+  - #5 格式 A 折扣负金额场景：`credit=-1000` 被 flip 为 `debit=1000`，凭证级借贷平衡（10000=10000）✅
+
+### 关键决策
+- **`FOR UPDATE SKIP LOCKED`** — 多 worker 并行回填不争锁。单 worker 运维脚本也安全。
+- **`NOT EXISTS (lines)` 幂等** — 扫 SQL 层过滤而非应用层，单次 `LIMIT N` 批次有效数始终等于未回填数。
+- **格式 A/B 兼容 + 负金额 flip** — 历史 entries 格式混乱（W1.0 的 `voucher_service` 用 direction-based，W1.3 用 debit/credit 二元）。解析器都兼容。折扣 `credit=-1000` 在会计实务等于 `debit=+1000`（折扣抵减主营收入的反向分录），flip 让生成的 lines 符合 DB CHECK 非负约束。
+- **借贷不平衡默认跳过 + 记 errors** — `strict=False` 让大批次不被个别问题凭证拖垮。运维脚本先跑一遍看 report.errors 列表，再手工核对。
+- **零金额 entries 跳过** — v266 CHECK 拒 debit=0 AND credit=0，预过滤避免 IntegrityError 中断批次。
+- **不加 backfill_logs 表** — 过度设计。`structlog` 日志 + report 足以追踪。W2 若需审计增设。
+
+### 下一步
+- **PR-W1.7**: voucher_generator 接入 FinancialVoucherService（切调用方，Wave 1 收尾）
+- 运维脚本：调 `backfill_batch` 循环至 `total_scanned == 0`（admin API 留给 W2）
+
+### 已知风险
+- **不平衡历史凭证需手工修正** — backfill 只回填平衡的。不平衡凭证（历史脏数据）要财务人员手工核对。report.errors 列表给 caller 处理。
+- **多格式解析可能有未知格式** — 测试覆盖了 A/B，若生产数据有 C 格式（如遗留旧迁移的 column 残留），解析器会跳过该行。运维上线前先 `dry_run` 扫全表看 `skipped_empty` 异常值。
+- **同一 voucher 被扫多次风险** — `FOR UPDATE SKIP LOCKED` + `NOT EXISTS` 双保险。理论上先提交的 worker 插入 lines 后，后提交的 worker 的 NOT EXISTS 扫到那就是最新状态。但极端场景下（比如第一次 flush 还没 commit 就被第二个 worker 扫到），可能有并发插入冲突。建议运维单 worker 跑。
+
+---
+
 ## 2026-04-19 PR-W1.5：红冲 API（red_flush 字段 + 状态机）
 
 ### 本次会话目标
