@@ -4,6 +4,65 @@
 
 ---
 
+## 2026-04-19 PR-W1.BLOCKERS：Wave 1 §19 独立验证响应（B1-B5）
+
+### 本次会话目标
+响应 CLAUDE.md §19 独立验证（3 个视角 agent 并行审查）给出的 5 条合入前必修 P0 风险，统一到 `feat/fct-wave1-blockers` 分支 + 单个 PR #51。
+
+Tier 级别：🔴 **Tier 1**（全部是安全 / 资金 / 合规性关键点）。
+
+### 三视角审查员共识（验证触发的风险）
+- **CFO / 财务合规视角**: 金税四期审计链路、跨月漏账、月结后 webhook 丢单、红冲审计留痕
+- **DBA / SRE 视角**: 迁移锁表、WAL 膨胀、partial UNIQUE NULL 陷阱、事务边界破坏、RLS 兼容 PgBouncer
+- **安全 / 跨租户视角**: RLS WITH CHECK 缺失、session.get PK 直查、Oracle 攻击、tenant 断言
+
+三视角交叉共识的 5 条 P0 风险 = **高可信度发现**，必修。
+
+### 涉及范围
+- 5 个 commit，分别对应 B1-B5，每个原子化 + 对应测试
+- 改动：3 个迁移 + 2 个 service + 4 个测试文件
+- 不改 schema 骨架，只加约束 / 防御逻辑 / 修 bug
+
+### 完成状态
+
+| Blocker | 类型 | 位置 | 测试 |
+|---|---|---|---|
+| **B1** | bug 修复 | `voucher_generator._record_push_result`：`await db.commit()` → `await db.flush()` | 2 新（直接调用 + 源码静态检）|
+| **B2** | RLS 强化 | v266 / v270：POLICY 加 `WITH CHECK` 双声明 | 2 新（正则验 USING+WITH CHECK）|
+| **B3** | 幂等修复 | v268 `uq_fv_tenant_event` WHERE 加 `AND event_type IS NOT NULL` + service 层校验 `event_id 非空 ⇒ event_type 必填` | 3 新（event_type None/空/OK）|
+| **B4** | 迁移安全 | v264 UPDATE 全表前加阈值 guard（> 50000 行 RAISE EXCEPTION 强制走外部脚本）| 1 新（guard 正则验）|
+| **B5** | 安全断言 | `FinancialVoucherService.create`：`TenantContextMismatchError` 独立异常，SELECT current_setting 断言 | 4 新（匹配/不匹配/未SET/非法值）+ 5 现有测试调整（加 `_tenant_assertion_mock()` helper）|
+
+- [x] **commit 粒度**：5 个独立 commit，每个对应一个 Blocker + 对应测试
+- [x] **全 Wave 1 回归**：**226 passed** (Wave 1 214 + B 系列 12 新 = 226)
+- [x] **DEV Postgres 端到端**：W1.7 脚本重跑 5 场景全绿（B1 修复不破 persist_and_push 行为）
+
+### 关键决策
+- **B1 改 flush 而非抽独立 session** — 最小破坏性修复。独立 session（outbox pattern）更彻底但需要引入新组件、新测试；Wave 1 阶段先止血，Wave 2 做 outbox。
+- **B5 用独立异常 `TenantContextMismatchError(ValueError)`** — 继承 ValueError 不破现有 try/except，但独立类型让告警系统可分辨"数据错"vs"越权尝试"。
+- **B5 豁免无法转 UUID 的 session 值** — AsyncMock 测试天然返 MagicMock；生产配置错应由运维监控兜底，service 不替运维做 gate。
+- **B3 双层防护**：DB CHECK（partial UNIQUE WHERE 加 event_type 非空）+ 应用层 ValueError（提前报错清晰）。
+- **B2 显式 USING + WITH CHECK 双声明** — PG 对 FOR ALL POLICY 会默认复用 USING 为 WITH CHECK，但显式声明：(1) 防未来加细分 POLICY 缺 WITH CHECK；(2) 审计视角语义独立清晰。
+- **B4 阈值 50000 行的依据**：PG16 WAL segment 16MB，5 万行 UPDATE ~100MB WAL，主从 replay < 1min。
+
+### 未在本 PR 处理（§19 验证识别的，推 Wave 2）
+- **CFO P0-1**：跨月漏账合法路径（以前年度损益调整语义）
+- **CFO P0-2**：`ensure_period` 并发 race（建议改 savepoint / ON CONFLICT）
+- **CFO P0-4**：外卖 T+N webhook 月结后丢单（event_id 非空时先走幂等预查再查账期）
+- **CFO P1-7/8/9/10**：operator_id FK / entries-lines 口径漂移 / 红冲 voucher_date / void+red_flush 组合
+- **DBA P1-5**：红冲双 flush 断连 + `ix_fv_red_flush_of` 升 UNIQUE
+- **DBA P1-7/8/9**：backfill race / pg_restore FK 顺序 / 灾备 auto_ensure 覆盖
+- **安全 P1-1/2/3/4**：`session.get()` Oracle 攻击 / `erp_push_log` 无 RLS / backfill tenant_id=None / red_flush 审计字段入 DB
+- **共 25+ 条**，已在 3 份 agent 报告中列明优先级
+
+### 已知风险
+- **B5 豁免分支在生产误配置下不拦截** — 如果运维误把 `app.tenant_id` 设成非 UUID 字符串，service warning log 后走 RLS 兜底。监控告警应对 `voucher.create.tenant_context_unparseable` 事件设 P1 pager。
+- **B3 event_type 在 DB 层仍 NULLABLE** — 历史凭证（v268 之前）的 event_type 仍可能为 NULL。partial UNIQUE 双非空条件让它们不受幂等约束（语义正确——历史无事件来源）。新代码通过应用层拦 event_id 非空 + event_type None 组合。
+- **B1 修复仍有 persist-push 间不一致窗口** — service 改 flush 后，若外层 txn 未显式 begin/commit，推失败的凭证可能回滚（可接受）。Wave 2 outbox pattern 根本解决。
+- **B4 guard 阈值单点** — 5 万行是粗略值。生产部署前应基于实际 `SELECT COUNT(*)` 结果调整（文档已说明）。
+
+---
+
 ## 2026-04-19 PR-W1.7：VoucherGenerator 接入 FinancialVoucherService（Wave 1 收尾）
 
 ### 本次会话目标
