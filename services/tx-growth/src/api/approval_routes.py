@@ -12,6 +12,7 @@
   POST /api/v1/growth/approvals/workflows          创建审批流模板
   POST /api/v1/growth/approvals/workflows/seed     插入内置默认模板（租户初始化用）
 """
+
 import uuid
 from typing import Any, Optional
 
@@ -123,21 +124,23 @@ async def list_workflows(
     result = await db.execute(stmt)
     workflows = result.scalars().all()
 
-    return ok_response({
-        "items": [
-            {
-                "workflow_id": str(wf.id),
-                "name": wf.name,
-                "trigger_conditions": wf.trigger_conditions,
-                "steps": wf.steps,
-                "is_active": wf.is_active,
-                "priority": wf.priority,
-                "created_at": wf.created_at.isoformat() if wf.created_at else None,
-            }
-            for wf in workflows
-        ],
-        "total": len(workflows),
-    })
+    return ok_response(
+        {
+            "items": [
+                {
+                    "workflow_id": str(wf.id),
+                    "name": wf.name,
+                    "trigger_conditions": wf.trigger_conditions,
+                    "steps": wf.steps,
+                    "is_active": wf.is_active,
+                    "priority": wf.priority,
+                    "created_at": wf.created_at.isoformat() if wf.created_at else None,
+                }
+                for wf in workflows
+            ],
+            "total": len(workflows),
+        }
+    )
 
 
 @router.post("/workflows")
@@ -168,12 +171,14 @@ async def create_workflow(
         name=wf.name,
         tenant_id=x_tenant_id,
     )
-    return ok_response({
-        "workflow_id": str(wf.id),
-        "name": wf.name,
-        "is_active": wf.is_active,
-        "priority": wf.priority,
-    })
+    return ok_response(
+        {
+            "workflow_id": str(wf.id),
+            "name": wf.name,
+            "is_active": wf.is_active,
+            "priority": wf.priority,
+        }
+    )
 
 
 @router.post("/workflows/seed")
@@ -223,11 +228,13 @@ async def list_pending_approvals(
     result = await db.execute(stmt)
     requests = result.scalars().all()
 
-    return ok_response({
-        "items": [_serialize_request(r) for r in requests],
-        "page": page,
-        "size": size,
-    })
+    return ok_response(
+        {
+            "items": [_serialize_request(r) for r in requests],
+            "page": page,
+            "size": size,
+        }
+    )
 
 
 @router.get("/my-requests")
@@ -261,11 +268,13 @@ async def list_my_requests(
     result = await db.execute(stmt)
     requests = result.scalars().all()
 
-    return ok_response({
-        "items": [_serialize_request(r) for r in requests],
-        "page": page,
-        "size": size,
-    })
+    return ok_response(
+        {
+            "items": [_serialize_request(r) for r in requests],
+            "page": page,
+            "size": size,
+        }
+    )
 
 
 @router.get("/{request_id}")

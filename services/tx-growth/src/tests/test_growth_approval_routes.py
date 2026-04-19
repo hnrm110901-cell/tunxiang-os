@@ -20,6 +20,7 @@
 17. POST /api/v1/growth/approvals/{id}/cancel        — 撤销成功
 18. POST /api/v1/growth/approvals/{id}/cancel        — 服务返回 ok=False → 400
 """
+
 import os
 import sys
 
@@ -30,7 +31,6 @@ import uuid
 from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
 from fastapi import FastAPI, Request
 from fastapi.testclient import TestClient
 
@@ -48,6 +48,7 @@ sys.modules["models.approval"] = _approval_mod
 # services.approval_service — stub，防止 httpx/structlog import 链
 _svc_mod = _types.ModuleType("services.approval_service")
 
+
 class _FakeApprovalService:
     async def seed_default_workflows(self, tenant_id, db):
         return {"inserted": 2}
@@ -60,6 +61,7 @@ class _FakeApprovalService:
 
     async def cancel(self, request_id, requester_id, tenant_id, db):
         return {"ok": True, "status": "cancelled"}
+
 
 _svc_mod.ApprovalService = _FakeApprovalService
 sys.modules.setdefault("services", _types.ModuleType("services"))
@@ -77,6 +79,7 @@ sys.modules["shared.ontology.src.base"] = _ont_base
 
 # sqlalchemy stubs
 import sqlalchemy as _sa
+
 sys.modules.setdefault("sqlalchemy", _sa)
 
 # ── 导入被测路由 ────────────────────────────────────────────────────────────
@@ -118,6 +121,7 @@ _NOW = datetime(2026, 4, 6, 10, 0, tzinfo=timezone.utc)
 
 
 # ── 辅助：构造 mock ApprovalWorkflow 对象 ──────────────────────────────────
+
 
 def _make_workflow_obj():
     wf = MagicMock()
@@ -178,6 +182,7 @@ def _make_db_with_scalar_one_or_none(value):
 # 场景 1: GET /workflows — 正常返回工作流列表
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_list_workflows_ok():
     """正常返回工作流列表，包含 items 和 total"""
     wf = _make_workflow_obj()
@@ -197,6 +202,7 @@ def test_list_workflows_ok():
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 场景 2: GET /workflows — is_active 过滤，无数据时返回空列表
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 def test_list_workflows_is_active_filter_empty():
     """过滤 is_active=false 时无数据，返回 total=0"""
@@ -219,6 +225,7 @@ def test_list_workflows_is_active_filter_empty():
 # 场景 3: GET /workflows — X-Tenant-ID 格式错误
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_list_workflows_bad_tenant_id():
     """X-Tenant-ID 非合法 UUID 时，路由内 uuid.UUID() 抛 ValueError，返回 5xx"""
     _mock_db_holder["db"] = AsyncMock()
@@ -232,6 +239,7 @@ def test_list_workflows_bad_tenant_id():
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 场景 4: POST /workflows — 正常创建工作流
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 def test_create_workflow_ok():
     """正常创建审批流模板，返回 workflow_id 和字段"""
@@ -268,6 +276,7 @@ def test_create_workflow_ok():
 # 场景 5: POST /workflows — name 为空字符串 → 422
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_create_workflow_empty_name():
     """name 为空字符串时 Pydantic validator 拒绝，返回 422"""
     payload = {
@@ -282,6 +291,7 @@ def test_create_workflow_empty_name():
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 场景 6: POST /workflows — steps 为空列表 → 422
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 def test_create_workflow_empty_steps():
     """steps 为空列表时 Pydantic validator 拒绝，返回 422"""
@@ -298,6 +308,7 @@ def test_create_workflow_empty_steps():
 # 场景 7: POST /workflows — steps 缺少 step/role 字段 → 422
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_create_workflow_steps_missing_required_fields():
     """steps 中元素缺少 step 或 role 时 Pydantic validator 拒绝，返回 422"""
     payload = {
@@ -312,6 +323,7 @@ def test_create_workflow_steps_missing_required_fields():
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 场景 8: POST /workflows/seed — 正常 seed 默认模板
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 def test_seed_default_workflows_ok():
     """调用 seed_default_workflows，返回 inserted 数"""
@@ -335,6 +347,7 @@ def test_seed_default_workflows_ok():
 # 场景 9: GET /approvals — 正常返回待审批列表
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_list_pending_approvals_ok():
     """返回 pending 状态审批列表"""
     req_obj = _make_request_obj(status="pending")
@@ -355,6 +368,7 @@ def test_list_pending_approvals_ok():
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 场景 10: GET /my-requests — 正常返回我提交的审批列表
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 def test_list_my_requests_ok():
     """requester_id 过滤，返回该申请人的审批列表"""
@@ -378,6 +392,7 @@ def test_list_my_requests_ok():
 # 场景 11: GET /{id} — 审批单存在时返回详情（含 approval_history）
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_get_approval_detail_ok():
     """审批单存在时，返回完整详情含 approval_history"""
     req_obj = _make_request_obj()
@@ -396,6 +411,7 @@ def test_get_approval_detail_ok():
 # 场景 12: GET /{id} — 审批单不存在时返回 404
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_get_approval_detail_not_found():
     """审批单不存在时返回 404"""
     _mock_db_holder["db"] = _make_db_with_scalar_one_or_none(None)
@@ -408,6 +424,7 @@ def test_get_approval_detail_not_found():
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 场景 13: POST /{id}/approve — 审批通过成功
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 def test_approve_request_ok():
     """调用审批通过，返回 status=approved"""
@@ -437,6 +454,7 @@ def test_approve_request_ok():
 # 场景 14: POST /{id}/approve — 服务抛 ValueError → 404
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_approve_request_not_found():
     """ApprovalService.approve 抛 ValueError 时路由返回 404"""
     mock_db = AsyncMock()
@@ -459,6 +477,7 @@ def test_approve_request_not_found():
 # 场景 15: POST /{id}/reject — 审批拒绝成功
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_reject_request_ok():
     """审批拒绝成功，返回 status=rejected 和原因"""
     mock_db = AsyncMock()
@@ -466,9 +485,7 @@ def test_reject_request_ok():
     _mock_db_holder["db"] = mock_db
 
     with patch("api.approval_routes._svc") as mock_svc:
-        mock_svc.reject = AsyncMock(
-            return_value={"ok": True, "status": "rejected", "reason": "折扣过高"}
-        )
+        mock_svc.reject = AsyncMock(return_value={"ok": True, "status": "rejected", "reason": "折扣过高"})
 
         resp = client.post(
             f"/api/v1/growth/approvals/{REQUEST_ID}/reject",
@@ -487,6 +504,7 @@ def test_reject_request_ok():
 # 场景 16: POST /{id}/reject — reason 为空字符串 → 422
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_reject_request_empty_reason():
     """拒绝原因为空字符串时 Pydantic validator 拒绝，返回 422"""
     resp = client.post(
@@ -500,6 +518,7 @@ def test_reject_request_empty_reason():
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 场景 17: POST /{id}/cancel — 撤销成功
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 def test_cancel_request_ok():
     """申请人撤销审批单成功，返回 status=cancelled"""
@@ -527,6 +546,7 @@ def test_cancel_request_ok():
 # 场景 18: POST /{id}/cancel — 服务返回 ok=False → 400
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_cancel_request_not_allowed():
     """服务返回 ok=False 时（非申请人撤销），路由返回 400"""
     mock_db = AsyncMock()
@@ -534,9 +554,7 @@ def test_cancel_request_not_allowed():
     _mock_db_holder["db"] = mock_db
 
     with patch("api.approval_routes._svc") as mock_svc:
-        mock_svc.cancel = AsyncMock(
-            return_value={"ok": False, "reason": "只有申请人可撤销审批单"}
-        )
+        mock_svc.cancel = AsyncMock(return_value={"ok": False, "reason": "只有申请人可撤销审批单"})
 
         resp = client.post(
             f"/api/v1/growth/approvals/{REQUEST_ID}/cancel",

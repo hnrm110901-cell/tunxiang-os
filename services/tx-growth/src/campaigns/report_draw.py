@@ -5,6 +5,7 @@
 
 持久化: campaign_report_entries 表（v207 迁移创建）
 """
+
 import json
 import uuid
 from typing import Any
@@ -12,6 +13,7 @@ from typing import Any
 import structlog
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
+
 from shared.ontology.src.database import _set_tenant_on_session
 
 log = structlog.get_logger()

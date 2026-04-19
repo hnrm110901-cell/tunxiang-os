@@ -35,7 +35,11 @@ ORDER BY total_guest_count DESC
 
 DIMENSIONS = ["area"]
 METRICS = [
-    "used_table_count", "order_count", "total_guest_count",
-    "avg_guest_per_table", "total_amount_fen", "per_capita_fen",
+    "used_table_count",
+    "order_count",
+    "total_guest_count",
+    "avg_guest_per_table",
+    "total_amount_fen",
+    "per_capita_fen",
 ]
 FILTERS = ["start_date", "end_date", "store_id"]

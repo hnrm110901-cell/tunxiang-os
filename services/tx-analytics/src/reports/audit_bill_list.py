@@ -54,11 +54,22 @@ ORDER BY o.created_at DESC
 """
 
 DIMENSIONS = [
-    "store_name", "biz_date", "order_no", "order_type",
-    "table_number", "status", "discount_type", "channel_id",
+    "store_name",
+    "biz_date",
+    "order_no",
+    "order_type",
+    "table_number",
+    "status",
+    "discount_type",
+    "channel_id",
 ]
 METRICS = [
-    "total_amount_fen", "discount_fen", "actual_fen",
-    "guest_count", "total_qty", "cost_fen", "margin_rate",
+    "total_amount_fen",
+    "discount_fen",
+    "actual_fen",
+    "guest_count",
+    "total_qty",
+    "cost_fen",
+    "margin_rate",
 ]
 FILTERS = ["start_date", "end_date", "store_id"]

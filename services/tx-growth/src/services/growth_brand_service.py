@@ -3,8 +3,8 @@
 V2.2 Sprint F: 多品牌架构
 金额单位：分(fen)
 """
+
 import json
-from datetime import datetime, timezone
 from typing import Optional
 from uuid import UUID, uuid4
 
@@ -32,9 +32,7 @@ class GrowthBrandService:
     # 品牌配置 CRUD
     # ------------------------------------------------------------------
 
-    async def get_brand_config(
-        self, brand_id: UUID, tenant_id: str, db: AsyncSession
-    ) -> Optional[dict]:
+    async def get_brand_config(self, brand_id: UUID, tenant_id: str, db: AsyncSession) -> Optional[dict]:
         """获取品牌增长配置，不存在返回 None"""
         await self._set_tenant(db, tenant_id)
 
@@ -79,9 +77,7 @@ class GrowthBrandService:
             "updated_at": row[16].isoformat() if row[16] else None,
         }
 
-    async def upsert_brand_config(
-        self, brand_id: UUID, data: dict, tenant_id: str, db: AsyncSession
-    ) -> dict:
+    async def upsert_brand_config(self, brand_id: UUID, data: dict, tenant_id: str, db: AsyncSession) -> dict:
         """创建或更新品牌配置（INSERT ... ON CONFLICT UPDATE）"""
         await self._set_tenant(db, tenant_id)
 
@@ -92,14 +88,11 @@ class GrowthBrandService:
         monthly_offer_budget_fen = data.get("monthly_offer_budget_fen", 1000000)
         max_touch_day = data.get("max_touch_per_customer_day", 2)
         max_touch_week = data.get("max_touch_per_customer_week", 5)
-        enabled_channels = json.dumps(
-            data.get("enabled_channels", ["wecom", "miniapp", "sms"])
-        )
+        enabled_channels = json.dumps(data.get("enabled_channels", ["wecom", "miniapp", "sms"]))
         enabled_journey_types = json.dumps(
             data.get(
                 "enabled_journey_types",
-                ["first_to_second", "reactivation", "service_repair",
-                 "stored_value", "banquet", "channel_reflow"],
+                ["first_to_second", "reactivation", "service_repair", "stored_value", "banquet", "channel_reflow"],
             )
         )
         auto_approve_low = data.get("auto_approve_low_risk", False)
@@ -172,9 +165,7 @@ class GrowthBrandService:
             "updated_at": row[2].isoformat() if row[2] else None,
         }
 
-    async def list_brand_configs(
-        self, tenant_id: str, db: AsyncSession
-    ) -> dict:
+    async def list_brand_configs(self, tenant_id: str, db: AsyncSession) -> dict:
         """列出该租户所有品牌配置"""
         await self._set_tenant(db, tenant_id)
 
@@ -194,32 +185,32 @@ class GrowthBrandService:
         rows = result.fetchall()
         items = []
         for row in rows:
-            items.append({
-                "id": str(row[0]),
-                "brand_id": str(row[1]),
-                "brand_name": row[2],
-                "growth_enabled": row[3],
-                "daily_touch_budget": row[4],
-                "monthly_offer_budget_fen": row[5],
-                "max_touch_per_customer_day": row[6],
-                "max_touch_per_customer_week": row[7],
-                "enabled_channels": row[8],
-                "enabled_journey_types": row[9],
-                "auto_approve_low_risk": row[10],
-                "auto_approve_medium_risk": row[11],
-                "margin_floor_pct": row[12],
-                "created_at": row[13].isoformat() if row[13] else None,
-                "updated_at": row[14].isoformat() if row[14] else None,
-            })
+            items.append(
+                {
+                    "id": str(row[0]),
+                    "brand_id": str(row[1]),
+                    "brand_name": row[2],
+                    "growth_enabled": row[3],
+                    "daily_touch_budget": row[4],
+                    "monthly_offer_budget_fen": row[5],
+                    "max_touch_per_customer_day": row[6],
+                    "max_touch_per_customer_week": row[7],
+                    "enabled_channels": row[8],
+                    "enabled_journey_types": row[9],
+                    "auto_approve_low_risk": row[10],
+                    "auto_approve_medium_risk": row[11],
+                    "margin_floor_pct": row[12],
+                    "created_at": row[13].isoformat() if row[13] else None,
+                    "updated_at": row[14].isoformat() if row[14] else None,
+                }
+            )
         return {"items": items, "total": len(items)}
 
     # ------------------------------------------------------------------
     # 预算检查
     # ------------------------------------------------------------------
 
-    async def check_brand_budget(
-        self, brand_id: UUID, tenant_id: str, db: AsyncSession
-    ) -> dict:
+    async def check_brand_budget(self, brand_id: UUID, tenant_id: str, db: AsyncSession) -> dict:
         """检查品牌今日触达量 / 本月offer金额 vs 配置上限
 
         返回:

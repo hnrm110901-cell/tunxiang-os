@@ -4,6 +4,7 @@
 
 七大引擎协同驱动连锁餐饮品牌的精细化增长。
 """
+
 import asyncio
 from contextlib import asynccontextmanager
 from typing import Any, Optional
@@ -15,6 +16,7 @@ from pydantic import BaseModel
 from services.audience_segmentation import AudienceSegmentationService
 from services.brand_strategy import BrandStrategyService
 from services.journey_orchestrator import JourneyOrchestratorService
+
 # ChannelEngine / ContentEngine / OfferEngine: v144 DB化，已移至各自路由文件
 from services.roi_attribution import ROIAttributionService
 from workers.journey_executor import JourneyEventListener, JourneyExecutor
@@ -89,26 +91,28 @@ from engine.journey_engine import JourneyEngine as _JourneyEngine
 from services.approval_service import ApprovalService as _ApprovalService
 
 from .api.ab_test_routes import router as ab_test_router
+from .api.ai_marketing_routes import router as ai_marketing_router  # AI营销自动化（v207）
 from .api.approval_routes import router as approval_router
 from .api.attribution_routes import router as attribution_router
 from .api.brand_strategy_routes import router as brand_strategy_router
-from .api.campaign_routes import router as campaign_router
-from .api.channel_routes import router as channel_router        # v144 DB化
-from .api.content_routes import router as content_router        # v144 DB化
-from .api.coupon_routes import router as coupon_router
-from .api.growth_campaign_routes import router as growth_campaign_router
-from .api.journey_routes import router as journey_router
-from .api.offer_routes import router as offer_router            # v144 DB化
 from .api.campaign_engine_db_routes import router as campaign_engine_db_router  # v193 活动引擎持久化
+from .api.campaign_routes import router as campaign_router
+from .api.channel_routes import router as channel_router  # v144 DB化
+from .api.content_routes import router as content_router  # v144 DB化
+from .api.coupon_routes import router as coupon_router
 from .api.distribution_routes import router as distribution_router  # v191 三级分销
+from .api.growth_campaign_routes import router as growth_campaign_router
+from .api.growth_hub_routes import router as growth_hub_router
+from .api.journey_routes import router as journey_router
+from .api.offer_routes import router as offer_router  # v144 DB化
+from .api.promotion_rules_v2_routes import router as promotion_rules_v2_router  # 模块2.5 促销规则引擎V2
+from .api.promotion_rules_v3_routes import (
+    router as promotion_rules_v3_router,  # 模块2.6 促销规则引擎V3（互斥组/执行顺序/总量限制/新类型）
+)
 from .api.referral_routes import router as referral_router
 from .api.segmentation_routes import router as segmentation_router
-from .api.growth_hub_routes import router as growth_hub_router
 from .api.touch_attribution_routes import router as touch_attribution_router
 from .api.wecom_scrm_agent_routes import router as wecom_scrm_agent_router  # P3-05 企微SCRM私域Agent
-from .api.ai_marketing_routes import router as ai_marketing_router           # AI营销自动化（v207）
-from .api.promotion_rules_v2_routes import router as promotion_rules_v2_router  # 模块2.5 促销规则引擎V2
-from .api.promotion_rules_v3_routes import router as promotion_rules_v3_router  # 模块2.6 促销规则引擎V3（互斥组/执行顺序/总量限制/新类型）
 
 _approval_service = _ApprovalService()
 
@@ -173,11 +177,10 @@ async def _run_approval_expiry_check() -> None:
     logger.info("approval_expiry_check_started")
     # 先查出所有活跃租户（用无 RLS 连接查 DISTINCT tenant_id）
     from sqlalchemy import text as _text
+
     async with async_session_factory() as probe_db:
         try:
-            result = await probe_db.execute(
-                _text("SELECT DISTINCT tenant_id FROM stores WHERE is_active = true")
-            )
+            result = await probe_db.execute(_text("SELECT DISTINCT tenant_id FROM stores WHERE is_active = true"))
             tenant_ids = [str(row[0]) for row in result.fetchall()]
         except (OSError, RuntimeError, ValueError) as exc:
             logger.error("approval_expiry_fetch_tenants_error", error=str(exc), exc_info=True)
@@ -226,13 +229,15 @@ def _on_approval_expiry_done(task: asyncio.Task) -> None:
 # APScheduler — Growth Journey V2 tick（每60秒）
 # ---------------------------------------------------------------------------
 
-from services.growth_journey_service import GrowthJourneyService as _GrowthJourneyService
 from services.growth_brand_service import GrowthBrandService as _GrowthBrandService
+from services.growth_journey_service import GrowthJourneyService as _GrowthJourneyService
 
 # Feature Flag SDK — 控制 Growth Journey V2 / 沉默召回 等 cron 任务
 try:
-    from shared.feature_flags import FlagContext, is_enabled as _ff_is_enabled
+    from shared.feature_flags import FlagContext
+    from shared.feature_flags import is_enabled as _ff_is_enabled
     from shared.feature_flags.flag_names import GrowthFlags as _GrowthFlags
+
     _FEATURE_FLAGS_AVAILABLE = True
 except ImportError:
     _FEATURE_FLAGS_AVAILABLE = False
@@ -260,9 +265,7 @@ async def _run_growth_journey_tick() -> None:
     # 查出所有活跃租户
     async with async_session_factory() as probe_db:
         try:
-            result = await probe_db.execute(
-                _text("SELECT DISTINCT tenant_id FROM stores WHERE is_active = true")
-            )
+            result = await probe_db.execute(_text("SELECT DISTINCT tenant_id FROM stores WHERE is_active = true"))
             tenant_ids = [str(row[0]) for row in result.fetchall()]
         except (OSError, RuntimeError, ValueError) as exc:
             logger.error("growth_journey_v2_fetch_tenants_error", error=str(exc), exc_info=True)
@@ -285,11 +288,13 @@ async def _run_growth_journey_tick() -> None:
                 await db.rollback()
                 logger.error("growth_journey_v2_tick_tenant_error", tenant_id=tid, error=str(exc), exc_info=True)
 
-    logger.info("growth_journey_v2_tick_done",
-                tenant_count=len(tenant_ids),
-                scanned=total_scanned,
-                advanced=total_advanced,
-                failed=total_failed)
+    logger.info(
+        "growth_journey_v2_tick_done",
+        tenant_count=len(tenant_ids),
+        scanned=total_scanned,
+        advanced=total_advanced,
+        failed=total_failed,
+    )
 
 
 def _schedule_growth_journey_tick() -> None:
@@ -328,11 +333,10 @@ async def _run_silent_detection() -> None:
 
     logger.info("growth_silent_detection_started")
     from sqlalchemy import text as _text
+
     async with async_session_factory() as probe_db:
         try:
-            result = await probe_db.execute(
-                _text("SELECT DISTINCT tenant_id FROM stores WHERE is_active = true")
-            )
+            result = await probe_db.execute(_text("SELECT DISTINCT tenant_id FROM stores WHERE is_active = true"))
             tenant_ids = [str(row[0]) for row in result.fetchall()]
         except (OSError, RuntimeError, ValueError) as exc:
             logger.error("silent_detection_fetch_tenants_error", error=str(exc), exc_info=True)
@@ -378,11 +382,10 @@ async def _run_p1_field_computation() -> None:
 
     logger.info("p1_field_computation_started")
     from sqlalchemy import text as _text
+
     async with async_session_factory() as probe_db:
         try:
-            result = await probe_db.execute(
-                _text("SELECT DISTINCT tenant_id FROM stores WHERE is_active = true")
-            )
+            result = await probe_db.execute(_text("SELECT DISTINCT tenant_id FROM stores WHERE is_active = true"))
             tenant_ids = [str(row[0]) for row in result.fetchall()]
         except (OSError, RuntimeError, ValueError) as exc:
             logger.error("p1_computation_fetch_tenants_error", error=str(exc), exc_info=True)
@@ -428,9 +431,7 @@ async def _run_auto_iterate() -> None:
 
     async with async_session_factory() as probe_db:
         try:
-            result = await probe_db.execute(
-                _text("SELECT DISTINCT tenant_id FROM stores WHERE is_active = true")
-            )
+            result = await probe_db.execute(_text("SELECT DISTINCT tenant_id FROM stores WHERE is_active = true"))
             tenant_ids = [str(row[0]) for row in result.fetchall()]
         except (OSError, RuntimeError, ValueError) as exc:
             logger.error("auto_iterate_fetch_tenants_error", error=str(exc), exc_info=True)
@@ -544,7 +545,7 @@ async def lifespan(app: FastAPI):
         seconds=60,
         id="journey_executor",
         replace_existing=True,
-        max_instances=1,        # 防止并发 tick 重叠
+        max_instances=1,  # 防止并发 tick 重叠
         misfire_grace_time=30,  # 系统繁忙时延迟30秒内可补发
     )
 
@@ -662,6 +663,7 @@ async def lifespan(app: FastAPI):
     # 停止 EventBridge
     try:
         from engine.event_bridge import _bridge_instance as _eb
+
         if _eb is not None:
             await _eb.stop()
             logger.info("journey_event_bridge_stopped")
@@ -674,11 +676,12 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="TunxiangOS tx-growth", version="3.0.0", lifespan=lifespan)
 
 from prometheus_fastapi_instrumentator import Instrumentator
+
 Instrumentator().instrument(app).expose(app)
 
 app.include_router(campaign_router)
-app.include_router(coupon_router)           # /api/v1/growth/coupons（优惠券核销）
-app.include_router(growth_campaign_router)      # /api/v1/growth/campaigns（新标准路径）
+app.include_router(coupon_router)  # /api/v1/growth/coupons（优惠券核销）
+app.include_router(growth_campaign_router)  # /api/v1/growth/campaigns（新标准路径）
 app.include_router(campaign_engine_db_router)  # /api/v1/growth/campaigns-v2（v193 持久化引擎）
 app.include_router(segmentation_router)
 app.include_router(referral_router)
@@ -690,12 +693,12 @@ app.include_router(approval_router)
 app.include_router(brand_strategy_router)
 app.include_router(journey_router)
 # v144 DB化路由（替换下方旧的内存版端点）
-app.include_router(offer_router)            # /api/v1/offers — offers/offer_redemptions 表
-app.include_router(content_router)          # /api/v1/content — content_templates 表
-app.include_router(channel_router)          # /api/v1/channels — channel_configs/message_send_logs 表
-app.include_router(growth_hub_router)       # /api/v1/growth — 增长中枢V2
+app.include_router(offer_router)  # /api/v1/offers — offers/offer_redemptions 表
+app.include_router(content_router)  # /api/v1/content — content_templates 表
+app.include_router(channel_router)  # /api/v1/channels — channel_configs/message_send_logs 表
+app.include_router(growth_hub_router)  # /api/v1/growth — 增长中枢V2
 app.include_router(wecom_scrm_agent_router)  # P3-05 企微SCRM私域Agent
-app.include_router(ai_marketing_router)      # /api/v1/growth/ai-marketing/* — AI营销自动化（v207）（生日/沉睡/回访）
+app.include_router(ai_marketing_router)  # /api/v1/growth/ai-marketing/* — AI营销自动化（v207）（生日/沉睡/回访）
 app.include_router(promotion_rules_v2_router)  # /api/v1/promotions/* — 促销规则引擎V2（模块2.5）
 app.include_router(promotion_rules_v3_router)  # /api/v1/promotions/v3/* — 促销规则引擎V3（模块2.6）
 
@@ -712,6 +715,7 @@ roi_svc = ROIAttributionService()
 # 统一响应格式
 # ---------------------------------------------------------------------------
 
+
 def ok_response(data: Any) -> dict:
     return {"ok": True, "data": data}
 
@@ -724,6 +728,7 @@ def error_response(msg: str) -> dict:
 # Health
 # ---------------------------------------------------------------------------
 
+
 @app.get("/health")
 async def health() -> dict:
     return {"ok": True, "data": {"service": "tx-growth", "version": "3.0.0"}}
@@ -732,6 +737,7 @@ async def health() -> dict:
 # ---------------------------------------------------------------------------
 # 品牌策略 API
 # ---------------------------------------------------------------------------
+
 
 class BrandStrategyRequest(BaseModel):
     brand_id: str
@@ -822,6 +828,7 @@ async def get_strategy_card(brand_id: str) -> dict:
 # 客户分群 API
 # ---------------------------------------------------------------------------
 
+
 class SegmentRequest(BaseModel):
     name: str
     rules: dict
@@ -890,6 +897,7 @@ async def get_lifecycle_distribution() -> dict:
 # 旅程编排 API
 # ---------------------------------------------------------------------------
 
+
 class JourneyRequest(BaseModel):
     name: str
     journey_type: str
@@ -910,9 +918,7 @@ class ExecuteNodeRequest(BaseModel):
 
 @app.post("/api/v1/journeys")
 async def create_journey(req: JourneyRequest) -> dict:
-    result = journey_svc.create_journey(
-        req.name, req.journey_type, req.trigger, req.nodes, req.target_segment_id
-    )
+    result = journey_svc.create_journey(req.name, req.journey_type, req.trigger, req.nodes, req.target_segment_id)
     return ok_response(result)
 
 
@@ -990,6 +996,7 @@ async def simulate_journey(journey_id: str) -> dict:
 # ---------------------------------------------------------------------------
 # ROI 归因 API
 # ---------------------------------------------------------------------------
+
 
 class TouchpointRequest(BaseModel):
     user_id: str

@@ -2,6 +2,7 @@
 
 8 个端点：积分获取、消耗、获取规则、消耗规则、倍数设置、成长值、余额、明细、跨店结算
 """
+
 from fastapi import APIRouter, Header, Query
 from pydantic import BaseModel, Field
 
@@ -9,6 +10,7 @@ router = APIRouter(prefix="/api/v1/member/points", tags=["member-points"])
 
 
 # ── 请求模型 ──────────────────────────────────────────────────
+
 
 class EarnPointsRequest(BaseModel):
     card_id: str
@@ -42,6 +44,7 @@ class ManageGrowthValueRequest(BaseModel):
 
 # ── 1. 积分获取 ───────────────────────────────────────────────
 
+
 @router.post("/earn")
 async def earn_points(
     body: EarnPointsRequest,
@@ -60,6 +63,7 @@ async def earn_points(
 
 
 # ── 2. 积分消耗 ───────────────────────────────────────────────
+
 
 @router.post("/spend")
 async def spend_points(
@@ -80,6 +84,7 @@ async def spend_points(
 
 # ── 3. 设置获取规则 ───────────────────────────────────────────
 
+
 @router.put("/types/{card_type_id}/earn-rules")
 async def set_earn_rules(
     card_type_id: str,
@@ -98,6 +103,7 @@ async def set_earn_rules(
 
 # ── 4. 设置消耗规则 ───────────────────────────────────────────
 
+
 @router.put("/types/{card_type_id}/spend-rules")
 async def set_spend_rules(
     card_type_id: str,
@@ -115,6 +121,7 @@ async def set_spend_rules(
 
 
 # ── 5. 积分倍数设置 ───────────────────────────────────────────
+
 
 @router.put("/types/{card_type_id}/multiplier")
 async def set_multiplier(
@@ -135,6 +142,7 @@ async def set_multiplier(
 
 # ── 6. 成长值管理 ─────────────────────────────────────────────
 
+
 @router.post("/cards/{card_id}/growth-value")
 async def manage_growth_value(
     card_id: str,
@@ -153,6 +161,7 @@ async def manage_growth_value(
 
 
 # ── 7. 积分余额 + 明细 ───────────────────────────────────────
+
 
 @router.get("/cards/{card_id}/balance")
 async def get_points_balance(
@@ -191,6 +200,7 @@ async def get_points_history(
 
 
 # ── 8. 跨店积分结算 ──────────────────────────────────────────
+
 
 @router.get("/settlement/{month}")
 async def cross_store_settlement(

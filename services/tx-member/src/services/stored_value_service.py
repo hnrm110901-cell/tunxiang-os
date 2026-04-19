@@ -14,6 +14,7 @@ v2 新增：
 - list_recharge_plans：查询有效套餐列表
 - create_recharge_plan：新建套餐
 """
+
 from __future__ import annotations
 
 import uuid
@@ -45,6 +46,7 @@ class TransferNotAllowedError(Exception):
 
 class CardNotFoundError(ValueError):
     """储值卡不存在（ValueError 子类，兼容现有 except ValueError 捕获）"""
+
     pass
 
 
@@ -240,18 +242,20 @@ class StoredValueService:
         from shared.events.event_publisher import MemberEventPublisher
         from shared.events.member_events import MemberEventType
 
-        asyncio.create_task(MemberEventPublisher.publish(
-            MemberEventType.STORED_VALUE_RECHARGED,
-            tenant_id=tenant_id,
-            customer_id=card.customer_id,
-            event_data={
-                "amount_fen": plan.recharge_amount_fen,
-                "gift_fen": plan.gift_amount_fen,
-                "card_id": str(card.id),
-                "plan_id": str(plan_id),
-            },
-            source_service="tx-member",
-        ))
+        asyncio.create_task(
+            MemberEventPublisher.publish(
+                MemberEventType.STORED_VALUE_RECHARGED,
+                tenant_id=tenant_id,
+                customer_id=card.customer_id,
+                event_data={
+                    "amount_fen": plan.recharge_amount_fen,
+                    "gift_fen": plan.gift_amount_fen,
+                    "card_id": str(card.id),
+                    "plan_id": str(plan_id),
+                },
+                source_service="tx-member",
+            )
+        )
 
         return _txn_to_dict(txn)
 
@@ -307,18 +311,20 @@ class StoredValueService:
         from shared.events.event_publisher import MemberEventPublisher
         from shared.events.member_events import MemberEventType
 
-        asyncio.create_task(MemberEventPublisher.publish(
-            MemberEventType.STORED_VALUE_RECHARGED,
-            tenant_id=card.tenant_id,
-            customer_id=card.customer_id,
-            event_data={
-                "amount_fen": amount_fen,
-                "gift_fen": gift_fen,
-                "card_id": str(card.id),
-                "card_no": card_no,
-            },
-            source_service="tx-member",
-        ))
+        asyncio.create_task(
+            MemberEventPublisher.publish(
+                MemberEventType.STORED_VALUE_RECHARGED,
+                tenant_id=card.tenant_id,
+                customer_id=card.customer_id,
+                event_data={
+                    "amount_fen": amount_fen,
+                    "gift_fen": gift_fen,
+                    "card_id": str(card.id),
+                    "card_no": card_no,
+                },
+                source_service="tx-member",
+            )
+        )
 
         return {
             "card_no": card_no,
@@ -352,9 +358,7 @@ class StoredValueService:
         _check_card_active_and_not_expired(card)
 
         if card.balance_fen < amount_fen:
-            raise InsufficientBalanceError(
-                f"余额不足：可用{card.balance_fen / 100:.2f}元，需{amount_fen / 100:.2f}元"
-            )
+            raise InsufficientBalanceError(f"余额不足：可用{card.balance_fen / 100:.2f}元，需{amount_fen / 100:.2f}元")
 
         gift_deduct = min(card.gift_balance_fen, amount_fen)
         principal_deduct = amount_fen - gift_deduct
@@ -412,9 +416,7 @@ class StoredValueService:
         _check_card_active_and_not_expired(card)
 
         if card.balance_fen < amount_fen:
-            raise InsufficientBalanceError(
-                f"余额不足：可用{card.balance_fen / 100:.2f}元，需{amount_fen / 100:.2f}元"
-            )
+            raise InsufficientBalanceError(f"余额不足：可用{card.balance_fen / 100:.2f}元，需{amount_fen / 100:.2f}元")
 
         gift_deduct = min(card.gift_balance_fen, amount_fen)
         principal_deduct = amount_fen - gift_deduct
@@ -524,9 +526,7 @@ class StoredValueService:
 
         orig_amount = abs(orig_txn.amount_fen)
         if refund_amount_fen > orig_amount:
-            raise ValueError(
-                f"退款金额({refund_amount_fen / 100:.2f}元)超过原始消费额({orig_amount / 100:.2f}元)"
-            )
+            raise ValueError(f"退款金额({refund_amount_fen / 100:.2f}元)超过原始消费额({orig_amount / 100:.2f}元)")
 
         # 加锁查卡
         card = await self._get_card_by_id_for_update(db, orig_txn.card_id, tenant_id)
@@ -565,14 +565,16 @@ class StoredValueService:
     # ──────────────────────────────────────────────────────────────
 
     async def get_transactions(
-        self, db: AsyncSession, card_no: str, limit: int = 20, offset: int = 0,
+        self,
+        db: AsyncSession,
+        card_no: str,
+        limit: int = 20,
+        offset: int = 0,
     ) -> dict:
         """查询储值卡流水（按卡号，v1 兼容）"""
         from models.stored_value import StoredValueCard, StoredValueTransaction
 
-        card_result = await db.execute(
-            select(StoredValueCard.id).where(StoredValueCard.card_no == card_no)
-        )
+        card_result = await db.execute(select(StoredValueCard.id).where(StoredValueCard.card_no == card_no))
         card_id = card_result.scalar_one_or_none()
         if not card_id:
             raise ValueError(f"储值卡不存在: {card_no}")
@@ -672,8 +674,7 @@ class StoredValueService:
         return [
             _plan_to_dict(p)
             for p in plans
-            if (p.valid_from is None or p.valid_from <= now)
-            and (p.valid_until is None or p.valid_until >= now)
+            if (p.valid_from is None or p.valid_from <= now) and (p.valid_until is None or p.valid_until >= now)
         ]
 
     async def create_recharge_plan(
@@ -751,8 +752,7 @@ class StoredValueService:
 
         total_fen = amount_fen + gift_amount_fen
         auto_remark = remark or (
-            f"充值{amount_fen / 100:.2f}元"
-            + (f"，赠送{gift_amount_fen / 100:.2f}元" if gift_amount_fen else "")
+            f"充值{amount_fen / 100:.2f}元" + (f"，赠送{gift_amount_fen / 100:.2f}元" if gift_amount_fen else "")
         )
 
         txn = StoredValueTransaction(
@@ -890,8 +890,7 @@ class StoredValueService:
 
         if from_card.main_balance_fen < amount_fen:
             raise InsufficientBalanceError(
-                f"本金余额不足以转赠：可用{from_card.main_balance_fen / 100:.2f}元"
-                f"，需{amount_fen / 100:.2f}元"
+                f"本金余额不足以转赠：可用{from_card.main_balance_fen / 100:.2f}元，需{amount_fen / 100:.2f}元"
             )
 
         # 扣出
@@ -1222,10 +1221,7 @@ class StoredValueService:
 
         amount_fen = points // points_to_fen_ratio
         if amount_fen <= 0:
-            raise ValueError(
-                f"积分不足以兑换（需至少 {points_to_fen_ratio} 积分兑换 1 分钱，"
-                f"当前 {points} 积分）"
-            )
+            raise ValueError(f"积分不足以兑换（需至少 {points_to_fen_ratio} 积分兑换 1 分钱，当前 {points} 积分）")
 
         # 1. 查找会员 active 储值卡（customer_id = member_id）
         card_result = await db.execute(
@@ -1242,9 +1238,7 @@ class StoredValueService:
         )
         card = card_result.scalar_one_or_none()
         if not card:
-            raise CardNotFoundError(
-                f"会员 {member_id} 没有有效的储值卡，请先开卡"
-            )
+            raise CardNotFoundError(f"会员 {member_id} 没有有效的储值卡，请先开卡")
 
         # 2. 从 member_cards 扣积分（raw SQL，兼容现有积分体系）
         deduct_result = await db.execute(
@@ -1264,9 +1258,7 @@ class StoredValueService:
         )
         row = deduct_result.fetchone()
         if not row:
-            raise InsufficientBalanceError(
-                f"积分余额不足（需 {points} 积分）或会员卡不存在"
-            )
+            raise InsufficientBalanceError(f"积分余额不足（需 {points} 积分）或会员卡不存在")
 
         # 3. 充入储值卡（仅充本金）
         balance_before = card.balance_fen
@@ -1348,7 +1340,10 @@ class StoredValueService:
         return card
 
     async def _match_recharge_gift(
-        self, db: AsyncSession, amount_fen: int, store_id: str | None,
+        self,
+        db: AsyncSession,
+        amount_fen: int,
+        store_id: str | None,
     ) -> int:
         """匹配充值赠送规则，返回赠送金额（v1 兼容）"""
         from models.stored_value import RechargeRule
@@ -1377,6 +1372,7 @@ class StoredValueService:
 # ──────────────────────────────────────────────────────────────────
 # 序列化辅助函数
 # ──────────────────────────────────────────────────────────────────
+
 
 def _card_to_dict(card) -> dict:
     return {

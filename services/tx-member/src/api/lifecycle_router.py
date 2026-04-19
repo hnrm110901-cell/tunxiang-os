@@ -5,6 +5,7 @@ GET  /api/v1/members/lifecycle/at-risk        流失风险会员列表
 POST /api/v1/members/lifecycle/batch-update   触发批量更新
 GET  /api/v1/members/{id}/lifecycle           单个会员生命周期详情
 """
+
 from __future__ import annotations
 
 import uuid
@@ -177,9 +178,7 @@ async def get_at_risk_members(
         last_order_at_tz = last_order_at
         if last_order_at_tz and last_order_at_tz.tzinfo is None:
             last_order_at_tz = last_order_at_tz.replace(tzinfo=timezone.utc)
-        days_since_last = (
-            (now - last_order_at_tz).days if last_order_at_tz else None
-        )
+        days_since_last = (now - last_order_at_tz).days if last_order_at_tz else None
 
         # 推荐触达方式：流失>90天用企微消息，30-90天用优惠券
         if days_since_last is not None and days_since_last > 90:
@@ -189,17 +188,19 @@ async def get_at_risk_members(
         else:
             recommended_action = "coupon"
 
-        items.append({
-            "member_id": str(member_id),
-            "display_name": display_name,
-            "primary_phone": phone,
-            "lifecycle_stage": stage,
-            "last_order_at": last_order_at.isoformat() if last_order_at else None,
-            "days_since_last_order": days_since_last,
-            "total_order_count": order_count,
-            "rfm_level": rfm,
-            "recommended_action": recommended_action,
-        })
+        items.append(
+            {
+                "member_id": str(member_id),
+                "display_name": display_name,
+                "primary_phone": phone,
+                "lifecycle_stage": stage,
+                "last_order_at": last_order_at.isoformat() if last_order_at else None,
+                "days_since_last_order": days_since_last,
+                "total_order_count": order_count,
+                "rfm_level": rfm,
+                "recommended_action": recommended_action,
+            }
+        )
 
     logger.info(
         "lifecycle_at_risk_queried",
@@ -238,9 +239,7 @@ async def batch_update_lifecycle_stages(
     logger.info("lifecycle_batch_update_triggered", tenant_id=str(tenant_id))
 
     t0 = time.monotonic()
-    result = await _service.batch_reclassify(
-        tenant_id=str(tenant_id), db=db
-    )
+    result = await _service.batch_reclassify(tenant_id=str(tenant_id), db=db)
     elapsed = round(time.monotonic() - t0, 3)
 
     logger.info(
@@ -306,9 +305,15 @@ async def get_member_lifecycle(
         raise HTTPException(status_code=404, detail="会员不存在")
 
     (
-        cid, display_name, phone, stage,
-        first_order_at, last_order_at,
-        order_count, rfm_level, created_at,
+        cid,
+        display_name,
+        phone,
+        stage,
+        first_order_at,
+        last_order_at,
+        order_count,
+        rfm_level,
+        created_at,
     ) = row
 
     now = datetime.now(timezone.utc)

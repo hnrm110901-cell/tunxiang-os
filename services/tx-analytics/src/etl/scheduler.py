@@ -7,6 +7,7 @@
 
 为三个租户（尝在一起、最黔线、尚宫厨）循环执行同步。
 """
+
 from __future__ import annotations
 
 import uuid
@@ -21,9 +22,9 @@ from apscheduler.triggers.interval import IntervalTrigger
 from .pipeline import ETLPipeline
 from .tenant_config import (
     PinzhiTenantConfig,
-    load_tenant_configs,
     get_tenant_config_by_id,
     init_tenant_registry,
+    load_tenant_configs,
 )
 
 logger = structlog.get_logger()
@@ -45,11 +46,15 @@ class SyncLogEntry:
 
     def to_dict(self) -> dict[str, Any]:
         return {
-            "job_id": self.job_id, "tenant_id": self.tenant_id,
-            "tenant_name": self.tenant_name, "sync_type": self.sync_type,
-            "status": self.status, "started_at": self.started_at.isoformat(),
+            "job_id": self.job_id,
+            "tenant_id": self.tenant_id,
+            "tenant_name": self.tenant_name,
+            "sync_type": self.sync_type,
+            "status": self.status,
+            "started_at": self.started_at.isoformat(),
             "finished_at": self.finished_at.isoformat() if self.finished_at else None,
-            "result": self.result, "error": self.error,
+            "result": self.result,
+            "error": self.error,
         }
 
 
@@ -68,12 +73,25 @@ class ETLScheduler:
     def init(self) -> None:
         init_tenant_registry()
         self.tenant_configs = load_tenant_configs()
-        logger.info("etl_scheduler_init", tenant_count=len(self.tenant_configs),
-                     tenants=[cfg.tenant_name for cfg in self.tenant_configs])
-        self.scheduler.add_job(self._daily_full_sync, trigger=CronTrigger(hour=2, minute=0),
-                               id="daily_full_sync", name="每日全量同步", replace_existing=True)
-        self.scheduler.add_job(self._incremental_sync, trigger=IntervalTrigger(hours=4),
-                               id="incremental_sync_4h", name="4小时增量同步", replace_existing=True)
+        logger.info(
+            "etl_scheduler_init",
+            tenant_count=len(self.tenant_configs),
+            tenants=[cfg.tenant_name for cfg in self.tenant_configs],
+        )
+        self.scheduler.add_job(
+            self._daily_full_sync,
+            trigger=CronTrigger(hour=2, minute=0),
+            id="daily_full_sync",
+            name="每日全量同步",
+            replace_existing=True,
+        )
+        self.scheduler.add_job(
+            self._incremental_sync,
+            trigger=IntervalTrigger(hours=4),
+            id="incremental_sync_4h",
+            name="4小时增量同步",
+            replace_existing=True,
+        )
 
     def start(self) -> None:
         if not self._is_running:
@@ -111,7 +129,9 @@ class ETLScheduler:
             results.append(result)
         return results
 
-    async def trigger_tenant_sync(self, tenant_id: str, start_date: str | None = None, end_date: str | None = None) -> dict[str, Any]:
+    async def trigger_tenant_sync(
+        self, tenant_id: str, start_date: str | None = None, end_date: str | None = None
+    ) -> dict[str, Any]:
         cfg = get_tenant_config_by_id(tenant_id)
         if cfg is None:
             return {"ok": False, "error": f"租户 {tenant_id} 未找到"}
@@ -121,12 +141,23 @@ class ETLScheduler:
             end_date = start_date
         return await self._run_tenant_sync(cfg, "manual_single", start_date, end_date)
 
-    async def _run_tenant_sync(self, cfg: PinzhiTenantConfig, sync_type: str, start_date: str, end_date: str) -> dict[str, Any]:
+    async def _run_tenant_sync(
+        self, cfg: PinzhiTenantConfig, sync_type: str, start_date: str, end_date: str
+    ) -> dict[str, Any]:
         job_id = str(uuid.uuid4())[:8]
-        log_entry = SyncLogEntry(job_id=job_id, tenant_id=str(cfg.tenant_id), tenant_name=cfg.tenant_name, sync_type=sync_type)
+        log_entry = SyncLogEntry(
+            job_id=job_id, tenant_id=str(cfg.tenant_id), tenant_name=cfg.tenant_name, sync_type=sync_type
+        )
         self.sync_logs.append(log_entry)
         self._trim_logs()
-        logger.info("tenant_sync_started", job_id=job_id, tenant=cfg.tenant_name, sync_type=sync_type, start_date=start_date, end_date=end_date)
+        logger.info(
+            "tenant_sync_started",
+            job_id=job_id,
+            tenant=cfg.tenant_name,
+            sync_type=sync_type,
+            start_date=start_date,
+            end_date=end_date,
+        )
         pipeline = ETLPipeline(cfg)
         try:
             result = await pipeline.run_full_sync(start_date, end_date)
@@ -134,12 +165,24 @@ class ETLScheduler:
             log_entry.result = result
             self._last_sync_times[str(cfg.tenant_id)] = datetime.now(timezone.utc)
             logger.info("tenant_sync_completed", job_id=job_id, tenant=cfg.tenant_name, result=result)
-            return {"ok": True, "job_id": job_id, "tenant_id": str(cfg.tenant_id), "tenant_name": cfg.tenant_name, "result": result}
+            return {
+                "ok": True,
+                "job_id": job_id,
+                "tenant_id": str(cfg.tenant_id),
+                "tenant_name": cfg.tenant_name,
+                "result": result,
+            }
         except (ConnectionError, TimeoutError, RuntimeError, ValueError) as exc:
             log_entry.status = "failed"
             log_entry.error = str(exc)
             logger.error("tenant_sync_failed", job_id=job_id, tenant=cfg.tenant_name, error=str(exc))
-            return {"ok": False, "job_id": job_id, "tenant_id": str(cfg.tenant_id), "tenant_name": cfg.tenant_name, "error": str(exc)}
+            return {
+                "ok": False,
+                "job_id": job_id,
+                "tenant_id": str(cfg.tenant_id),
+                "tenant_name": cfg.tenant_name,
+                "error": str(exc),
+            }
         finally:
             log_entry.finished_at = datetime.now(timezone.utc)
             await pipeline.close()
@@ -149,12 +192,30 @@ class ETLScheduler:
         for cfg in self.tenant_configs:
             tid = str(cfg.tenant_id)
             last_sync = self._last_sync_times.get(tid)
-            tenant_statuses.append({"tenant_id": tid, "tenant_name": cfg.tenant_name, "last_sync_at": last_sync.isoformat() if last_sync else None, "store_count": len(cfg.store_ognids)})
+            tenant_statuses.append(
+                {
+                    "tenant_id": tid,
+                    "tenant_name": cfg.tenant_name,
+                    "last_sync_at": last_sync.isoformat() if last_sync else None,
+                    "store_count": len(cfg.store_ognids),
+                }
+            )
         scheduled_jobs = []
         if self._is_running:
             for job in self.scheduler.get_jobs():
-                scheduled_jobs.append({"job_id": job.id, "name": str(job.name), "next_run_time": job.next_run_time.isoformat() if job.next_run_time else None})
-        return {"scheduler_running": self._is_running, "tenant_count": len(self.tenant_configs), "tenants": tenant_statuses, "scheduled_jobs": scheduled_jobs}
+                scheduled_jobs.append(
+                    {
+                        "job_id": job.id,
+                        "name": str(job.name),
+                        "next_run_time": job.next_run_time.isoformat() if job.next_run_time else None,
+                    }
+                )
+        return {
+            "scheduler_running": self._is_running,
+            "tenant_count": len(self.tenant_configs),
+            "tenants": tenant_statuses,
+            "scheduled_jobs": scheduled_jobs,
+        }
 
     def get_logs(self, limit: int = 50, tenant_id: str | None = None) -> list[dict[str, Any]]:
         logs = self.sync_logs
@@ -164,7 +225,7 @@ class ETLScheduler:
 
     def _trim_logs(self) -> None:
         if len(self.sync_logs) > self.MAX_LOG_ENTRIES:
-            self.sync_logs = self.sync_logs[-self.MAX_LOG_ENTRIES:]
+            self.sync_logs = self.sync_logs[-self.MAX_LOG_ENTRIES :]
 
 
 _scheduler: ETLScheduler | None = None

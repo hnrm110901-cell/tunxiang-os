@@ -15,6 +15,7 @@
   POST /orders/{id}/cancel     取消订单
   GET  /stats                  商城统计（管理端）
 """
+
 from __future__ import annotations
 
 from datetime import datetime
@@ -45,6 +46,7 @@ router = APIRouter(prefix="/api/v1/member/points-mall", tags=["points-mall"])
 
 
 # ── 工具函数 ──────────────────────────────────────────────────
+
 
 def _require_tenant(x_tenant_id: str) -> str:
     if not x_tenant_id:
@@ -115,6 +117,7 @@ class CancelOrderReq(BaseModel):
 
 # ── 1. 商品列表（会员端）────────────────────────────────────
 
+
 @router.get("/products")
 async def api_list_products(
     customer_id: Optional[str] = Query(None, description="顾客 UUID，用于查询已兑次数"),
@@ -142,6 +145,7 @@ async def api_list_products(
 
 # ── 2. 商品详情 ──────────────────────────────────────────────
 
+
 @router.get("/products/{product_id}")
 async def api_get_product(
     product_id: str,
@@ -166,6 +170,7 @@ async def api_get_product(
 
 
 # ── 3. 新增商品（管理端）────────────────────────────────────
+
 
 @router.post("/products")
 async def api_create_product(
@@ -199,6 +204,7 @@ async def api_create_product(
 
 
 # ── 4. 更新商品（管理端）────────────────────────────────────
+
 
 @router.put("/products/{product_id}")
 async def api_update_product(
@@ -236,6 +242,7 @@ async def api_update_product(
 
 
 # ── 5. 积分兑换 ──────────────────────────────────────────────
+
 
 @router.post("/redeem")
 async def api_redeem(
@@ -280,6 +287,7 @@ async def api_redeem(
 
 # ── 6. 我的兑换记录 ──────────────────────────────────────────
 
+
 @router.get("/orders")
 async def api_get_customer_orders(
     customer_id: str = Query(..., description="顾客 UUID"),
@@ -305,6 +313,7 @@ async def api_get_customer_orders(
 
 # ── 7. 订单详情 ──────────────────────────────────────────────
 
+
 @router.get("/orders/{order_id}")
 async def api_get_order_detail(
     order_id: str,
@@ -327,6 +336,7 @@ async def api_get_order_detail(
 
 
 # ── 8. 核销订单（门店）──────────────────────────────────────
+
 
 @router.post("/orders/{order_id}/fulfill")
 async def api_fulfill_order(
@@ -353,6 +363,7 @@ async def api_fulfill_order(
 
 # ── 9. 取消订单 ──────────────────────────────────────────────
 
+
 @router.post("/orders/{order_id}/cancel")
 async def api_cancel_order(
     order_id: str,
@@ -377,6 +388,7 @@ async def api_cancel_order(
 
 
 # ── 10. 商城统计（管理端）───────────────────────────────────
+
 
 @router.get("/stats")
 async def api_get_order_stats(

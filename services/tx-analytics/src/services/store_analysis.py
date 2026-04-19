@@ -5,6 +5,7 @@
 
 复用 table_analytics.py 翻台基础能力。
 """
+
 import uuid
 from datetime import date, datetime, timedelta, timezone
 from decimal import ROUND_HALF_UP, Decimal
@@ -40,9 +41,7 @@ def _pct(numerator: float, denominator: float) -> Decimal:
     """计算百分比，保留两位小数"""
     if denominator <= 0:
         return Decimal("0.00")
-    return Decimal(str(numerator / denominator * 100)).quantize(
-        Decimal("0.01"), rounding=ROUND_HALF_UP
-    )
+    return Decimal(str(numerator / denominator * 100)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
 
 def _determine_meal_period(hour: int) -> str:
@@ -315,20 +314,20 @@ async def turnover_deep_analysis(
         """),
         {"store_id": store_id, "tenant_id": tenant_id},
     )
-    area_table_counts = {
-        r["area"]: int(r["cnt"]) for r in area_tables_result.mappings().all()
-    }
+    area_table_counts = {r["area"]: int(r["cnt"]) for r in area_tables_result.mappings().all()}
 
     by_area = []
     for r in area_rows:
         area_name = r["area"] or "default"
         table_count = area_table_counts.get(area_name, 1)
         area_rate = round(int(r["order_count"]) / (table_count * total_days), 2) if table_count > 0 else 0.0
-        by_area.append({
-            "area": area_name,
-            "rate": area_rate,
-            "avg_duration_minutes": round(float(r["avg_dur"] or 0), 1),
-        })
+        by_area.append(
+            {
+                "area": area_name,
+                "rate": area_rate,
+                "avg_duration_minutes": round(float(r["avg_dur"] or 0), 1),
+            }
+        )
 
     # 高峰时段翻台
     peak_result = await db.execute(
@@ -574,14 +573,8 @@ async def peak_hour_analysis(
     )
     hourly_rows = hourly_result.mappings().all()
 
-    hourly_revenue = [
-        {"hour": int(r["hour"]), "revenue_fen": int(r["revenue_fen"])}
-        for r in hourly_rows
-    ]
-    hourly_orders = [
-        {"hour": int(r["hour"]), "order_count": int(r["order_count"])}
-        for r in hourly_rows
-    ]
+    hourly_revenue = [{"hour": int(r["hour"]), "revenue_fen": int(r["revenue_fen"])} for r in hourly_rows]
+    hourly_orders = [{"hour": int(r["hour"]), "order_count": int(r["order_count"])} for r in hourly_rows]
 
     # 构建 hour -> revenue_fen 映射
     hour_rev_map = {int(r["hour"]): int(r["revenue_fen"]) for r in hourly_rows}
@@ -722,10 +715,7 @@ async def shift_analysis(
         """),
         params,
     )
-    staff_map = {
-        r["shift"]: int(r["staff_count"])
-        for r in staff_result.mappings().all()
-    }
+    staff_map = {r["shift"]: int(r["staff_count"]) for r in staff_result.mappings().all()}
 
     by_shift = []
     for r in shift_rows:
@@ -736,14 +726,16 @@ async def shift_analysis(
         staff_count = staff_map.get(shift_name, 0)
         per_capita_revenue = revenue_fen // staff_count if staff_count > 0 else 0
 
-        by_shift.append({
-            "shift": shift_name,
-            "revenue_fen": revenue_fen,
-            "orders": orders,
-            "avg_ticket_fen": avg_ticket,
-            "staff_count": staff_count,
-            "per_capita_revenue_fen": per_capita_revenue,
-        })
+        by_shift.append(
+            {
+                "shift": shift_name,
+                "revenue_fen": revenue_fen,
+                "orders": orders,
+                "avg_ticket_fen": avg_ticket,
+                "staff_count": staff_count,
+                "per_capita_revenue_fen": per_capita_revenue,
+            }
+        )
 
     logger.info(
         "shift_analysis_completed",
@@ -845,10 +837,7 @@ async def store_comparison(
         """),
         {"store_ids": store_id_strs, "tenant_id": tenant_id},
     )
-    table_counts = {
-        str(r["store_id"]): int(r["cnt"])
-        for r in tables_result.mappings().all()
-    }
+    table_counts = {str(r["store_id"]): int(r["cnt"]) for r in tables_result.mappings().all()}
 
     # 构建门店数据
     stores_data = []
@@ -872,12 +861,14 @@ async def store_comparison(
         # 只保留请求的指标
         filtered_values = {m: values[m] for m in metrics}
 
-        stores_data.append({
-            "store_id": sid,
-            "store_name": r["store_name"],
-            "values": filtered_values,
-            "ranks": {},  # 下面计算
-        })
+        stores_data.append(
+            {
+                "store_id": sid,
+                "store_name": r["store_name"],
+                "values": filtered_values,
+                "ranks": {},  # 下面计算
+            }
+        )
 
     # 计算排名
     for m in metrics:

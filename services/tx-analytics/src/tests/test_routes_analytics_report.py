@@ -25,11 +25,11 @@
     GET  /api/v1/reports/{report_id}/export
     POST /api/v1/reports/schedule
 """
+
 import sys
 import types
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
@@ -142,15 +142,13 @@ _SCHEDULE_CONFIG_MOCK.is_active = True
 # ─── 导入路由（在 stub 设置后）──────────────────────────────────────────────
 
 # analytics.py 需要 AnalyticsRepository, compose_brief, classify_health
-with (
-    patch.dict(
-        "sys.modules",
-        {
-            "src.services.repository": MagicMock(),
-            "src.services.narrative_engine": MagicMock(),
-            "src.services.store_health_service": MagicMock(),
-        },
-    )
+with patch.dict(
+    "sys.modules",
+    {
+        "src.services.repository": MagicMock(),
+        "src.services.narrative_engine": MagicMock(),
+        "src.services.store_health_service": MagicMock(),
+    },
 ):
     # 在导入之前设置好 sys.modules 中的 services
     _fake_repo_mod = types.ModuleType("src.services.repository")
@@ -318,7 +316,7 @@ class TestAnalyticsStoreHealth:
             _PatchedRepo,
         ):
             resp = self.client.get(
-                f"/api/v1/analytics/stores/health?store_id=nonexistent",
+                "/api/v1/analytics/stores/health?store_id=nonexistent",
                 headers=_HEADERS,
             )
         assert resp.status_code == 200
@@ -333,9 +331,7 @@ class TestAnalyticsKpiAlerts:
         self.client = _make_client(analytics_router)
 
     def test_missing_tenant_returns_400(self):
-        resp = self.client.get(
-            f"/api/v1/analytics/kpi/alerts?store_id={_STORE_ID}"
-        )
+        resp = self.client.get(f"/api/v1/analytics/kpi/alerts?store_id={_STORE_ID}")
         assert resp.status_code == 400
 
     def test_missing_store_id_returns_422(self):
@@ -388,9 +384,7 @@ class TestAnalyticsDailyReport:
         self.client = _make_client(analytics_router)
 
     def test_missing_tenant_returns_400(self):
-        resp = self.client.get(
-            f"/api/v1/analytics/reports/daily?store_id={_STORE_ID}"
-        )
+        resp = self.client.get(f"/api/v1/analytics/reports/daily?store_id={_STORE_ID}")
         assert resp.status_code == 400
 
     def test_valid_request_returns_200(self):
@@ -458,9 +452,7 @@ class TestReportsList:
         assert "total" in body["data"]
 
     def test_category_filter_param_accepted(self):
-        resp = self.client.get(
-            "/api/v1/reports?category=revenue", headers=_HEADERS
-        )
+        resp = self.client.get("/api/v1/reports?category=revenue", headers=_HEADERS)
         assert resp.status_code == 200
 
 
@@ -482,9 +474,7 @@ class TestReportMetadata:
         assert body["data"]["report_id"] == "daily_revenue"
 
     def test_not_found_report_returns_404(self):
-        _fake_engine_inst.get_report_metadata = AsyncMock(
-            side_effect=_ReportNotFoundError("not found")
-        )
+        _fake_engine_inst.get_report_metadata = AsyncMock(side_effect=_ReportNotFoundError("not found"))
         resp = self.client.get("/api/v1/reports/nonexistent", headers=_HEADERS)
         assert resp.status_code == 404
         # 恢复正常状态
@@ -531,9 +521,7 @@ class TestReportExecute:
         assert resp.status_code == 200
 
     def test_report_not_found_returns_404(self):
-        _fake_engine_inst.execute_report = AsyncMock(
-            side_effect=_ReportNotFoundError("not found")
-        )
+        _fake_engine_inst.execute_report = AsyncMock(side_effect=_ReportNotFoundError("not found"))
         resp = self.client.post(
             "/api/v1/reports/nonexistent/execute",
             headers=_HEADERS,
@@ -543,9 +531,7 @@ class TestReportExecute:
         _fake_engine_inst.execute_report = AsyncMock(return_value=_REPORT_RESULT_MOCK)
 
     def test_inactive_report_returns_403(self):
-        _fake_engine_inst.execute_report = AsyncMock(
-            side_effect=_ReportInactiveError("inactive")
-        )
+        _fake_engine_inst.execute_report = AsyncMock(side_effect=_ReportInactiveError("inactive"))
         resp = self.client.post(
             "/api/v1/reports/inactive_report/execute",
             headers=_HEADERS,

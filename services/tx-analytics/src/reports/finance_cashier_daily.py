@@ -43,7 +43,13 @@ ORDER BY biz_date DESC, cashier_name, shift
 
 DIMENSIONS = ["store_name", "biz_date", "cashier_name", "cashier_no", "shift"]
 METRICS = [
-    "order_count", "total_amount_fen", "discount_fen",
-    "actual_fen", "refund_fen", "cancel_count", "refund_count", "avg_ticket_fen",
+    "order_count",
+    "total_amount_fen",
+    "discount_fen",
+    "actual_fen",
+    "refund_fen",
+    "cancel_count",
+    "refund_count",
+    "avg_ticket_fen",
 ]
 FILTERS = ["start_date", "end_date", "store_id"]

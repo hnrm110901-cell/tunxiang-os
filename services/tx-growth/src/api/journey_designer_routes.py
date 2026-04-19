@@ -9,6 +9,7 @@
   PUT   /{journey_id}          — 更新旅程
   PATCH /{journey_id}/status   — 启动/暂停/结束
 """
+
 from __future__ import annotations
 
 import json
@@ -31,6 +32,7 @@ router = APIRouter(prefix="/api/v1/growth/journeys", tags=["journey-designer"])
 
 
 # ─── 请求模型 ────────────────────────────────────────────────
+
 
 class JourneyNodeConfig(BaseModel):
     node_id: str = Field(..., description="节点唯一ID")
@@ -62,6 +64,7 @@ class StatusChangeRequest(BaseModel):
 
 
 # ─── 辅助函数 ────────────────────────────────────────────────
+
 
 def _require_tenant(x_tenant_id: Optional[str]) -> uuid.UUID:
     if not x_tenant_id:
@@ -153,6 +156,7 @@ _JOURNEY_GROUP = """
 
 # ─── 端点 ────────────────────────────────────────────────────
 
+
 @router.get("/")
 async def list_journeys(
     status: Optional[str] = Query(None, description="状态筛选: draft/running/paused/stopped"),
@@ -185,9 +189,7 @@ async def list_journeys(
             conditions = ["d.is_deleted = true"]
 
         if keyword:
-            conditions.append(
-                "(d.name ILIKE :keyword OR d.description ILIKE :keyword)"
-            )
+            conditions.append("(d.name ILIKE :keyword OR d.description ILIKE :keyword)")
             params["keyword"] = f"%{keyword}%"
 
         where_clause = " AND ".join(conditions)
@@ -209,9 +211,7 @@ async def list_journeys(
 
         count_row = (
             await db.execute(
-                text(
-                    f"SELECT COUNT(*) AS cnt FROM journey_definitions d WHERE {where_clause}"
-                ),
+                text(f"SELECT COUNT(*) AS cnt FROM journey_definitions d WHERE {where_clause}"),
                 {k: v for k, v in params.items() if k not in ("size", "offset")},
             )
         ).fetchone()
@@ -324,9 +324,20 @@ async def create_journey(
             pass
 
         fake = _FakeRow()
-        for col in ("id", "name", "description", "is_active", "is_deleted",
-                    "trigger_event", "trigger_conditions", "steps",
-                    "target_segment", "version", "created_at", "updated_at"):
+        for col in (
+            "id",
+            "name",
+            "description",
+            "is_active",
+            "is_deleted",
+            "trigger_event",
+            "trigger_conditions",
+            "steps",
+            "target_segment",
+            "version",
+            "created_at",
+            "updated_at",
+        ):
             setattr(fake, col, getattr(row, col))
         fake.enrolled_count = 0  # type: ignore[attr-defined]
         fake.completed_count = 0  # type: ignore[attr-defined]
@@ -390,24 +401,20 @@ async def update_journey(
             set_parts.append("trigger_event = :trigger_event")
             set_parts.append("trigger_conditions = :trigger_conditions::jsonb")
             params["trigger_event"] = body.trigger.get("event", "manual")
-            params["trigger_conditions"] = json.dumps(
-                body.trigger.get("conditions", []), ensure_ascii=False
-            )
+            params["trigger_conditions"] = json.dumps(body.trigger.get("conditions", []), ensure_ascii=False)
         if body.target_segment is not None:
             set_parts.append("target_segment = :target_segment")
             params["target_segment"] = body.target_segment
         if body.nodes is not None:
             set_parts.append("steps = :steps::jsonb")
-            params["steps"] = json.dumps(
-                [n.model_dump() for n in body.nodes], ensure_ascii=False
-            )
+            params["steps"] = json.dumps([n.model_dump() for n in body.nodes], ensure_ascii=False)
 
         row = (
             await db.execute(
                 text(
                     f"""
                     UPDATE journey_definitions
-                    SET {', '.join(set_parts)}
+                    SET {", ".join(set_parts)}
                     WHERE id = :jid::uuid AND is_deleted = false
                     RETURNING id, name, description, is_active, is_deleted,
                               trigger_event, trigger_conditions, steps, target_segment,
@@ -443,9 +450,20 @@ async def update_journey(
             pass
 
         fake = _FakeRow()
-        for col in ("id", "name", "description", "is_active", "is_deleted",
-                    "trigger_event", "trigger_conditions", "steps",
-                    "target_segment", "version", "created_at", "updated_at"):
+        for col in (
+            "id",
+            "name",
+            "description",
+            "is_active",
+            "is_deleted",
+            "trigger_event",
+            "trigger_conditions",
+            "steps",
+            "target_segment",
+            "version",
+            "created_at",
+            "updated_at",
+        ):
             setattr(fake, col, getattr(row, col))
         fake.enrolled_count = enroll_row.enrolled_count if enroll_row else 0  # type: ignore[attr-defined]
         fake.completed_count = enroll_row.completed_count if enroll_row else 0  # type: ignore[attr-defined]
@@ -496,10 +514,7 @@ async def change_journey_status(
 
         current = (
             await db.execute(
-                text(
-                    "SELECT id, is_active, is_deleted FROM journey_definitions "
-                    "WHERE id = :jid::uuid"
-                ),
+                text("SELECT id, is_active, is_deleted FROM journey_definitions WHERE id = :jid::uuid"),
                 {"jid": journey_id},
             )
         ).fetchone()
@@ -520,8 +535,7 @@ async def change_journey_status(
             raise HTTPException(
                 status_code=422,
                 detail=(
-                    f"当前状态 {current_status} 不允许执行 {body.action}，"
-                    f"要求状态: {', '.join(sorted(allowed_from))}"
+                    f"当前状态 {current_status} 不允许执行 {body.action}，要求状态: {', '.join(sorted(allowed_from))}"
                 ),
             )
 

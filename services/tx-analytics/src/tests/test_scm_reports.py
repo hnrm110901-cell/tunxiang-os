@@ -9,6 +9,7 @@
 6. list_scm_reports() 返回 15 条
 7. 各报表 SQL_TEMPLATE 不为空
 """
+
 import os
 import sys
 

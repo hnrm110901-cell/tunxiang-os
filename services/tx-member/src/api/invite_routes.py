@@ -58,12 +58,14 @@ _INVITEE_POINTS = 50
 
 # ── 请求模型 ──────────────────────────────────────────────────
 
+
 class ClaimInviteRequest(BaseModel):
     invite_code: str = Field(..., description="邀请码")
     new_member_id: str = Field(..., description="新注册会员ID（UUID）")
 
 
 # ── 辅助函数 ──────────────────────────────────────────────────
+
 
 async def _set_rls(db: AsyncSession, tenant_id: str) -> None:
     await db.execute(
@@ -84,6 +86,7 @@ def _generate_code(member_id: str) -> str:
 
 
 # ── 端点 ──────────────────────────────────────────────────────
+
 
 @router.get("/my-code")
 async def get_my_invite_code(

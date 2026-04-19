@@ -14,6 +14,7 @@
   GET  /api/v1/brand/content-brief               生成内容简报
        ?channel=wechat&segment=高价值常客&purpose=复购召回
 """
+
 from __future__ import annotations
 
 import uuid
@@ -41,6 +42,7 @@ _svc = BrandStrategyDbService()
 # ---------------------------------------------------------------------------
 # 辅助函数
 # ---------------------------------------------------------------------------
+
 
 def ok_response(data: Any) -> dict:
     return {"ok": True, "data": data}
@@ -72,6 +74,7 @@ async def get_tenant_db(
 # ---------------------------------------------------------------------------
 # 品牌档案
 # ---------------------------------------------------------------------------
+
 
 @router.get("/profile")
 async def get_active_profile(
@@ -123,6 +126,7 @@ async def update_profile(
 # 营销日历
 # ---------------------------------------------------------------------------
 
+
 @router.get("/calendar")
 async def list_calendar(
     brand_profile_id: Optional[uuid.UUID] = Query(default=None, description="按品牌档案 ID 过滤"),
@@ -152,6 +156,7 @@ async def add_calendar_entry(
 # 内容约束规则
 # ---------------------------------------------------------------------------
 
+
 @router.get("/constraints")
 async def list_constraints(
     brand_profile_id: Optional[uuid.UUID] = Query(default=None, description="按品牌档案 ID 过滤"),
@@ -180,6 +185,7 @@ async def add_constraint(
 # ---------------------------------------------------------------------------
 # 内容简报（核心端点）
 # ---------------------------------------------------------------------------
+
 
 @router.get("/content-brief")
 async def get_content_brief(

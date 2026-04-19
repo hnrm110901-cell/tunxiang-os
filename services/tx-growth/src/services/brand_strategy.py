@@ -6,6 +6,7 @@
 金额单位：分(fen)
 存储层：PostgreSQL brand_strategies 表（v162 迁移创建）
 """
+
 import json
 import re
 from datetime import datetime, timezone
@@ -21,6 +22,7 @@ logger = structlog.get_logger(__name__)
 # ---------------------------------------------------------------------------
 # BrandStrategyService
 # ---------------------------------------------------------------------------
+
 
 class BrandStrategyService:
     """品牌策略引擎 — 把品牌定位变成系统可调用的策略资产"""
@@ -149,13 +151,22 @@ class BrandStrategyService:
         )
 
         allowed_fields = {
-            "positioning", "tone", "target_audience", "price_range",
-            "signature_dishes", "seasonal_plans", "promo_boundaries",
+            "positioning",
+            "tone",
+            "target_audience",
+            "price_range",
+            "signature_dishes",
+            "seasonal_plans",
+            "promo_boundaries",
             "forbidden_expressions",
         }
         jsonb_fields = {
-            "target_audience", "price_range", "signature_dishes",
-            "seasonal_plans", "promo_boundaries", "forbidden_expressions",
+            "target_audience",
+            "price_range",
+            "signature_dishes",
+            "seasonal_plans",
+            "promo_boundaries",
+            "forbidden_expressions",
         }
 
         set_clauses = ["updated_at = NOW()"]
@@ -240,15 +251,17 @@ class BrandStrategyService:
 
         calendar: list[dict] = []
         for plan in strategy.get("seasonal_plans") or []:
-            calendar.append({
-                "brand_id": brand_id,
-                "season": plan.get("season", ""),
-                "theme": plan.get("theme", ""),
-                "dishes": plan.get("dishes", []),
-                "start_date": plan.get("start_date", ""),
-                "end_date": plan.get("end_date", ""),
-                "marketing_focus": plan.get("marketing_focus", ""),
-            })
+            calendar.append(
+                {
+                    "brand_id": brand_id,
+                    "season": plan.get("season", ""),
+                    "theme": plan.get("theme", ""),
+                    "dishes": plan.get("dishes", []),
+                    "start_date": plan.get("start_date", ""),
+                    "end_date": plan.get("end_date", ""),
+                    "marketing_focus": plan.get("marketing_focus", ""),
+                }
+            )
         return calendar
 
     async def validate_content_against_brand(
@@ -358,7 +371,7 @@ def _get_current_season_plan(strategy: dict) -> Optional[dict]:
             current_season = season
             break
 
-    for plan in (strategy.get("seasonal_plans") or []):
+    for plan in strategy.get("seasonal_plans") or []:
         if plan.get("season") == current_season:
             return {
                 "season": current_season,

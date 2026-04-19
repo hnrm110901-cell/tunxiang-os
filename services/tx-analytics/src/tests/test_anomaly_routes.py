@@ -6,12 +6,14 @@
   POST /api/v1/anomaly/{id}/handle    — 返回 ok:True
   POST /api/v1/anomaly/{id}/resolve   — 返回 ok:True
 """
+
 import sys
 import types
 from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock
 
 # ─── 预置假模块 ───
+
 
 def _make_row(
     id: str = "uuid-001",
@@ -56,9 +58,12 @@ def _setup_sys_modules(rows=None):
 
     if "structlog" not in sys.modules:
         sl = types.ModuleType("structlog")
-        sl.get_logger = MagicMock(return_value=MagicMock(
-            warning=MagicMock(), info=MagicMock(),
-        ))
+        sl.get_logger = MagicMock(
+            return_value=MagicMock(
+                warning=MagicMock(),
+                info=MagicMock(),
+            )
+        )
         sys.modules["structlog"] = sl
 
 
@@ -71,10 +76,9 @@ _svc_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if _svc_root not in sys.path:
     sys.path.insert(0, _svc_root)
 
+import api.anomaly_routes as _anomaly_mod
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-
-import api.anomaly_routes as _anomaly_mod
 
 _app = FastAPI()
 _app.include_router(_anomaly_mod.router)
@@ -87,6 +91,7 @@ HEADERS = {"X-Tenant-ID": TENANT}
 # ═══════════════════════════════════════
 # GET /api/v1/anomaly/today
 # ═══════════════════════════════════════
+
 
 class TestGetTodayAnomalies:
     def test_returns_ok_true(self):
@@ -176,6 +181,7 @@ class TestGetTodayAnomalies:
 # POST /api/v1/anomaly/{id}/handle
 # ═══════════════════════════════════════
 
+
 class TestMarkHandling:
     def test_returns_ok_true(self):
         """handle 操作返回 ok:True"""
@@ -208,6 +214,7 @@ class TestMarkHandling:
 # ═══════════════════════════════════════
 # POST /api/v1/anomaly/{id}/resolve
 # ═══════════════════════════════════════
+
 
 class TestMarkResolved:
     def test_returns_ok_true(self):

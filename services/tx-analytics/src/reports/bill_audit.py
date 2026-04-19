@@ -77,7 +77,10 @@ ORDER BY biz_date DESC, created_at DESC
 
 DIMENSIONS = ["order_no", "store_name", "biz_date", "anomaly_type", "status"]
 METRICS = [
-    "total_amount_fen", "discount_fen", "actual_fen",
-    "return_item_count", "refund_count",
+    "total_amount_fen",
+    "discount_fen",
+    "actual_fen",
+    "return_item_count",
+    "refund_count",
 ]
 FILTERS = ["start_date", "end_date", "store_id"]

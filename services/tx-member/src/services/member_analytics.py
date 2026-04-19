@@ -4,6 +4,7 @@
 RFM: R(最近消费天数) F(消费频次) M(消费金额) 各1-5分。
 流失预警: >60天未消费=高风险, 30-60天=中风险。
 """
+
 from __future__ import annotations
 
 import uuid
@@ -52,6 +53,7 @@ async def _set_tenant(db: AsyncSession, tenant_id: str) -> None:
 
 # ── 1. 会员增长分析 ──────────────────────────────────────────
 
+
 async def member_growth(
     tenant_id: str,
     date_range: tuple[str, str],
@@ -71,7 +73,10 @@ async def member_growth(
     tid = _to_uuid(tenant_id)
     start_dt = datetime.fromisoformat(date_range[0]).replace(tzinfo=timezone.utc)
     end_dt = datetime.fromisoformat(date_range[1]).replace(
-        hour=23, minute=59, second=59, tzinfo=timezone.utc,
+        hour=23,
+        minute=59,
+        second=59,
+        tzinfo=timezone.utc,
     )
 
     # 期间新增会员数
@@ -133,6 +138,7 @@ async def member_growth(
 
 # ── 2. 活跃度分析 ─────────────────────────────────────────────
 
+
 async def activity_analysis(
     tenant_id: str,
     date_range: tuple[str, str],
@@ -147,7 +153,10 @@ async def activity_analysis(
     tid = _to_uuid(tenant_id)
     start_dt = datetime.fromisoformat(date_range[0]).replace(tzinfo=timezone.utc)
     end_dt = datetime.fromisoformat(date_range[1]).replace(
-        hour=23, minute=59, second=59, tzinfo=timezone.utc,
+        hour=23,
+        minute=59,
+        second=59,
+        tzinfo=timezone.utc,
     )
 
     # 总会员数
@@ -223,6 +232,7 @@ async def activity_analysis(
 
 # ── 3. 复购分析 ───────────────────────────────────────────────
 
+
 async def repurchase_analysis(
     tenant_id: str,
     date_range: tuple[str, str],
@@ -237,7 +247,10 @@ async def repurchase_analysis(
     tid = _to_uuid(tenant_id)
     start_dt = datetime.fromisoformat(date_range[0]).replace(tzinfo=timezone.utc)
     end_dt = datetime.fromisoformat(date_range[1]).replace(
-        hour=23, minute=59, second=59, tzinfo=timezone.utc,
+        hour=23,
+        minute=59,
+        second=59,
+        tzinfo=timezone.utc,
     )
 
     # 每位会员在期间内的消费次数
@@ -255,18 +268,12 @@ async def repurchase_analysis(
     ).subquery()
 
     # 总消费会员数
-    total_result = await db.execute(
-        select(func.count()).select_from(freq_sub)
-    )
+    total_result = await db.execute(select(func.count()).select_from(freq_sub))
     total_buyers = total_result.scalar() or 0
 
     # 复购会员数（消费 >= 2 次）
     repurchase_result = await db.execute(
-        select(func.count()).select_from(
-            select(freq_sub.c.customer_id)
-            .where(freq_sub.c.order_count >= 2)
-            .subquery()
-        )
+        select(func.count()).select_from(select(freq_sub.c.customer_id).where(freq_sub.c.order_count >= 2).subquery())
     )
     repurchase_count = repurchase_result.scalar() or 0
     repurchase_rate = _safe_ratio(repurchase_count, total_buyers)
@@ -293,11 +300,13 @@ async def repurchase_analysis(
             )
         )
         cnt = band_result.scalar() or 0
-        by_frequency_band.append({
-            "band": label,
-            "count": cnt,
-            "ratio": _safe_ratio(cnt, total_buyers),
-        })
+        by_frequency_band.append(
+            {
+                "band": label,
+                "count": cnt,
+                "ratio": _safe_ratio(cnt, total_buyers),
+            }
+        )
 
     logger.info(
         "repurchase_analyzed",
@@ -317,6 +326,7 @@ async def repurchase_analysis(
 
 
 # ── 4. 流失预警 ───────────────────────────────────────────────
+
 
 async def churn_prediction(
     tenant_id: str,
@@ -365,9 +375,9 @@ async def churn_prediction(
         if days_since > CHURN_HIGH_RISK_DAYS:
             risk_score = min(0.7 + (days_since - CHURN_HIGH_RISK_DAYS) * 0.003, 1.0)
         elif days_since > CHURN_MEDIUM_RISK_DAYS:
-            risk_score = 0.4 + (days_since - CHURN_MEDIUM_RISK_DAYS) / (
-                CHURN_HIGH_RISK_DAYS - CHURN_MEDIUM_RISK_DAYS
-            ) * 0.3
+            risk_score = (
+                0.4 + (days_since - CHURN_MEDIUM_RISK_DAYS) / (CHURN_HIGH_RISK_DAYS - CHURN_MEDIUM_RISK_DAYS) * 0.3
+            )
         else:
             risk_score = days_since / CHURN_MEDIUM_RISK_DAYS * 0.4
 
@@ -382,19 +392,21 @@ async def churn_prediction(
 
         # 只返回中风险以上
         if days_since >= CHURN_MEDIUM_RISK_DAYS:
-            predictions.append({
-                "customer_id": str(c.id),
-                "display_name": c.display_name,
-                "primary_phone": c.primary_phone,
-                "risk_score": risk_score,
-                "last_visit": last_visit.isoformat(),
-                "days_since": days_since,
-                "predicted_churn_prob": predicted_churn_prob,
-                "risk_level": "high" if days_since > CHURN_HIGH_RISK_DAYS else "medium",
-                "rfm_level": c.rfm_level,
-                "total_order_count": c.total_order_count,
-                "total_order_amount_fen": c.total_order_amount_fen,
-            })
+            predictions.append(
+                {
+                    "customer_id": str(c.id),
+                    "display_name": c.display_name,
+                    "primary_phone": c.primary_phone,
+                    "risk_score": risk_score,
+                    "last_visit": last_visit.isoformat(),
+                    "days_since": days_since,
+                    "predicted_churn_prob": predicted_churn_prob,
+                    "risk_level": "high" if days_since > CHURN_HIGH_RISK_DAYS else "medium",
+                    "rfm_level": c.rfm_level,
+                    "total_order_count": c.total_order_count,
+                    "total_order_amount_fen": c.total_order_amount_fen,
+                }
+            )
 
     # 按风险分降序
     predictions.sort(key=lambda x: x["risk_score"], reverse=True)
@@ -412,6 +424,7 @@ async def churn_prediction(
 
 # ── 5. 偏好洞察 ───────────────────────────────────────────────
 
+
 async def preference_insight(
     customer_id: str,
     tenant_id: str,
@@ -428,10 +441,7 @@ async def preference_insight(
 
     # 会员基础信息
     cust_result = await db.execute(
-        select(Customer)
-        .where(Customer.id == cid)
-        .where(Customer.tenant_id == tid)
-        .where(Customer.is_deleted == False)  # noqa: E712
+        select(Customer).where(Customer.id == cid).where(Customer.tenant_id == tid).where(Customer.is_deleted == False)  # noqa: E712
     )
     customer = cust_result.scalar_one_or_none()
     if not customer:
@@ -452,10 +462,7 @@ async def preference_insight(
         .order_by(func.sum(OrderItem.quantity).desc())
         .limit(10)
     )
-    favorite_dishes = [
-        {"name": row[0], "total_qty": int(row[1]), "order_times": row[2]}
-        for row in dish_result.all()
-    ]
+    favorite_dishes = [{"name": row[0], "total_qty": int(row[1]), "order_times": row[2]} for row in dish_result.all()]
 
     # 到店时段分布
     time_result = await db.execute(

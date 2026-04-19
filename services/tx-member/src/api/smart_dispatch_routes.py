@@ -2,6 +2,7 @@
 
 7 个端点：个性化首页、等级菜单、排队调度、个性化优惠、预订调度、应用等级权益、升级机会
 """
+
 from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -23,6 +24,7 @@ router = APIRouter(prefix="/api/v1/member/dispatch", tags=["member-dispatch"])
 
 # ── 请求模型 ──────────────────────────────────────────────────
 
+
 class ReservationRequest(BaseModel):
     customer_id: str
     store_id: str
@@ -39,6 +41,7 @@ class ApplyBenefitsRequest(BaseModel):
 
 # ── 1. 个性化首页 ────────────────────────────────────────────
 
+
 @router.get("/home/{customer_id}")
 async def get_personalized_home_route(
     customer_id: str,
@@ -54,6 +57,7 @@ async def get_personalized_home_route(
 
 
 # ── 2. 等级菜单 ──────────────────────────────────────────────
+
 
 @router.get("/menu/{customer_id}/{store_id}")
 async def get_level_menu(
@@ -72,6 +76,7 @@ async def get_level_menu(
 
 # ── 3. 排队调度 ──────────────────────────────────────────────
 
+
 @router.get("/queue/{customer_id}/{store_id}")
 async def get_queue_dispatch(
     customer_id: str,
@@ -89,6 +94,7 @@ async def get_queue_dispatch(
 
 # ── 4. 个性化优惠 ────────────────────────────────────────────
 
+
 @router.get("/offers/{customer_id}")
 async def get_personalized_offers(
     customer_id: str,
@@ -104,6 +110,7 @@ async def get_personalized_offers(
 
 
 # ── 5. 预订调度 ──────────────────────────────────────────────
+
 
 @router.post("/reservation")
 async def create_reservation_dispatch(
@@ -126,6 +133,7 @@ async def create_reservation_dispatch(
 
 # ── 6. 应用等级权益 ──────────────────────────────────────────
 
+
 @router.post("/apply-benefits")
 async def apply_benefits(
     body: ApplyBenefitsRequest,
@@ -141,6 +149,7 @@ async def apply_benefits(
 
 
 # ── 7. 升级机会 ──────────────────────────────────────────────
+
 
 @router.get("/upgrade/{customer_id}")
 async def get_upgrade_opportunity_route(

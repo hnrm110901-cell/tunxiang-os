@@ -10,16 +10,16 @@
   GET  /api/v1/member/points-rules               — 积分规则列表
   POST /api/v1/member/points-rules               — 创建积分规则
 """
-import json
+
 from datetime import date, datetime, timezone
 from typing import Literal, Optional
 
 import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel, Field
+from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import text
 
 from shared.ontology.src.database import get_db_with_tenant
 
@@ -36,6 +36,7 @@ EarnType = Literal["consumption", "birthday", "signup", "referral", "checkin"]
 
 
 # ─── Pydantic 模型 ──────────────────────────────────────────────────────────
+
 
 class LevelConfigOut(BaseModel):
     id: str
@@ -140,6 +141,7 @@ class PointsRuleCreate(BaseModel):
 
 # ─── 工具函数 ───────────────────────────────────────────────────────────────
 
+
 def _now_iso() -> str:
     return datetime.now(tz=timezone.utc).isoformat()
 
@@ -150,6 +152,7 @@ async def _get_tenant_db(x_tenant_id: str = Header(..., alias="X-Tenant-ID")):
 
 
 # ─── 等级配置端点 ────────────────────────────────────────────────────────────
+
 
 @router.get("/api/v1/member/level-configs")
 async def list_level_configs(
@@ -317,6 +320,7 @@ async def update_level_config(
 
 # ─── 升降级检查端点 ───────────────────────────────────────────────────────────
 
+
 @router.post("/api/v1/members/{member_id}/check-upgrade")
 async def check_upgrade(
     member_id: str,
@@ -336,10 +340,7 @@ async def check_upgrade(
     try:
         # 查积分余额
         pts_row = await db.execute(
-            text(
-                "SELECT points FROM member_points_balance "
-                "WHERE tenant_id = :tid AND member_id = :mid"
-            ),
+            text("SELECT points FROM member_points_balance WHERE tenant_id = :tid AND member_id = :mid"),
             {"tid": x_tenant_id, "mid": member_id},
         )
         pts_record = pts_row.fetchone()
@@ -374,10 +375,7 @@ async def check_upgrade(
 
         eligible_level: Optional[str] = None
         for cfg in configs:
-            if (
-                current_points >= cfg["min_points"]
-                and current_annual_spend_fen >= cfg["min_annual_spend_fen"]
-            ):
+            if current_points >= cfg["min_points"] and current_annual_spend_fen >= cfg["min_annual_spend_fen"]:
                 eligible_level = cfg["level_code"]
                 break
         # 兜底：最低等级（min_points 最小，即列表末尾）
@@ -403,10 +401,7 @@ async def check_upgrade(
             # 更新 customers 等级
             try:
                 await db.execute(
-                    text(
-                        "UPDATE customers SET level = :new_level "
-                        "WHERE id = :mid AND tenant_id = :tid"
-                    ),
+                    text("UPDATE customers SET level = :new_level WHERE id = :mid AND tenant_id = :tid"),
                     {"new_level": eligible_level, "mid": member_id, "tid": x_tenant_id},
                 )
             except SQLAlchemyError:
@@ -495,6 +490,7 @@ async def get_level_history(
 
 # ─── 积分入账端点 ─────────────────────────────────────────────────────────────
 
+
 @router.post("/api/v1/members/{member_id}/points/earn")
 async def earn_points(
     member_id: str,
@@ -580,6 +576,7 @@ async def earn_points(
 
 
 # ─── 积分规则端点 ─────────────────────────────────────────────────────────────
+
 
 @router.get("/api/v1/member/points-rules")
 async def list_points_rules(

@@ -10,6 +10,7 @@
 金额单位：分(fen)，所有金额字段为整数。
 所有查询带 tenant_id（RLS 保障）。
 """
+
 from __future__ import annotations
 
 import json
@@ -19,7 +20,7 @@ from uuid import UUID
 
 import structlog
 from sqlalchemy import text
-from sqlalchemy.exc import NoResultFound, SQLAlchemyError
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = structlog.get_logger(__name__)
@@ -31,15 +32,16 @@ _HEALTH_MARGIN_WEIGHT = 0.40
 _HEALTH_ACTIVE_STORE_WEIGHT = 0.20
 
 # 健康分满分基准：营收达成率≥120%→40分，毛利率≥65%→40分，活跃门店100%→20分
-_REVENUE_ACH_FULL_THRESHOLD = 1.20    # 达成率 >= 此值得满分
-_MARGIN_FULL_THRESHOLD = 0.65         # 毛利率 >= 此值得满分
+_REVENUE_ACH_FULL_THRESHOLD = 1.20  # 达成率 >= 此值得满分
+_MARGIN_FULL_THRESHOLD = 0.65  # 毛利率 >= 此值得满分
 
 # 趋势判断阈值（环比当周 vs 上周）
-_TREND_UP_THRESHOLD = 0.03            # +3% 以上为 up
-_TREND_DOWN_THRESHOLD = -0.03         # -3% 以下为 down
+_TREND_UP_THRESHOLD = 0.03  # +3% 以上为 up
+_TREND_DOWN_THRESHOLD = -0.03  # -3% 以下为 down
 
 
 # ─── 日期范围解析 ──────────────────────────────────────────────────────────
+
 
 def _resolve_date_range(date_range: str) -> tuple[date, date]:
     """将 today/week/month 转为 (start_date, end_date)（含两端）。"""
@@ -192,10 +194,7 @@ class HQBrandAnalyticsService:
 
             revenue_fen = int(orow["revenue_fen"] or 0)
             prev_rev = int(prow.get("prev_revenue_fen") or 0)
-            revenue_wow_pct = (
-                round((revenue_fen - prev_rev) / prev_rev, 4)
-                if prev_rev > 0 else 0.0
-            )
+            revenue_wow_pct = round((revenue_fen - prev_rev) / prev_rev, 4) if prev_rev > 0 else 0.0
 
             order_count = int(orow["order_count"] or 0)
             avg_order_fen = int(float(orow["avg_order_fen"] or 0))
@@ -213,20 +212,23 @@ class HQBrandAnalyticsService:
                     revenue_ach_rate * _HEALTH_REVENUE_WEIGHT
                     + margin_score * _HEALTH_MARGIN_WEIGHT
                     + active_ratio * _HEALTH_ACTIVE_STORE_WEIGHT
-                ) * 100
+                )
+                * 100
             )
             health_score = max(0, min(100, health_score))
 
-            results.append({
-                "brand_id": brand_id_str,
-                "revenue_fen": revenue_fen,
-                "revenue_wow_pct": revenue_wow_pct,
-                "order_count": order_count,
-                "avg_order_fen": avg_order_fen,
-                "store_count": store_count,
-                "active_stores": active_stores,
-                "health_score": health_score,
-            })
+            results.append(
+                {
+                    "brand_id": brand_id_str,
+                    "revenue_fen": revenue_fen,
+                    "revenue_wow_pct": revenue_wow_pct,
+                    "order_count": order_count,
+                    "avg_order_fen": avg_order_fen,
+                    "store_count": store_count,
+                    "active_stores": active_stores,
+                    "health_score": health_score,
+                }
+            )
 
         logger.info(
             "hq_brand_analytics.get_brands_overview.ok",
@@ -351,9 +353,7 @@ class HQBrandAnalyticsService:
 
             revenue_fen = int(m.get("avg_daily_revenue_fen") or 0)
             target_fen = target_map.get(store_id_str, 0)
-            revenue_achievement_pct = (
-                round(revenue_fen / target_fen, 4) if target_fen > 0 else 0.0
-            )
+            revenue_achievement_pct = round(revenue_fen / target_fen, 4) if target_fen > 0 else 0.0
 
             # 毛利率：order 快照中的 avg_gross_margin（store 快照可能不含，降级为 0）
             gross_margin_pct = round(float(m.get("avg_gross_margin") or 0.0), 4)
@@ -377,19 +377,23 @@ class HQBrandAnalyticsService:
             else:
                 trend = "flat"
 
-            items.append({
-                "store_id": store_id_str,
-                "revenue_fen": revenue_fen,
-                "revenue_target_fen": target_fen,
-                "revenue_achievement_pct": revenue_achievement_pct,
-                "gross_margin_pct": gross_margin_pct,
-                "labor_cost_ratio": labor_cost_ratio,
-                "alert_count": alert_count,
-                "trend": trend,
-            })
+            items.append(
+                {
+                    "store_id": store_id_str,
+                    "revenue_fen": revenue_fen,
+                    "revenue_target_fen": target_fen,
+                    "revenue_achievement_pct": revenue_achievement_pct,
+                    "gross_margin_pct": gross_margin_pct,
+                    "labor_cost_ratio": labor_cost_ratio,
+                    "alert_count": alert_count,
+                    "trend": trend,
+                }
+            )
 
         # 排序
-        sort_key = sort_by if sort_by in ("revenue_fen", "revenue_achievement_pct", "gross_margin_pct") else "revenue_fen"
+        sort_key = (
+            sort_by if sort_by in ("revenue_fen", "revenue_achievement_pct", "gross_margin_pct") else "revenue_fen"
+        )
         items.sort(key=lambda x: x[sort_key], reverse=True)
 
         # 注入排名
@@ -397,7 +401,7 @@ class HQBrandAnalyticsService:
             item["rank"] = idx + 1
 
         total = len(items)
-        paged_items = items[offset: offset + size]
+        paged_items = items[offset : offset + size]
 
         logger.info(
             "hq_brand_analytics.get_brand_store_performance.ok",
@@ -512,7 +516,9 @@ class HQBrandAnalyticsService:
             raise
 
         agg_rows = {str(r["brand_id"]): r for r in agg_result.mappings().all()}
-        store_count_map = {str(r["brand_id"]): int(float(r["store_count"] or 1)) for r in store_count_result.mappings().all()}
+        store_count_map = {
+            str(r["brand_id"]): int(float(r["store_count"] or 1)) for r in store_count_result.mappings().all()
+        }
 
         if not agg_rows:
             return {"dimensions": [], "trend": {"dates": [], "brands": {}}}
@@ -523,13 +529,15 @@ class HQBrandAnalyticsService:
             sc = store_count_map.get(brand_id_str, 1)
             rev = int(row["revenue_fen"] or 0)
             per_store = rev // sc if sc > 0 else 0
-            brand_data.append({
-                "brand_id": brand_id_str,
-                "revenue": rev,
-                "gross_margin": round(float(row["avg_gross_margin"] or 0.0), 4),
-                "avg_order": int(float(row["avg_order_fen"] or 0)),
-                "per_store_revenue": per_store,
-            })
+            brand_data.append(
+                {
+                    "brand_id": brand_id_str,
+                    "revenue": rev,
+                    "gross_margin": round(float(row["avg_gross_margin"] or 0.0), 4),
+                    "avg_order": int(float(row["avg_order_fen"] or 0)),
+                    "per_store_revenue": per_store,
+                }
+            )
 
         def _rank_dimension(key: str) -> list[dict[str, Any]]:
             sorted_items = sorted(brand_data, key=lambda x: x[key], reverse=True)
@@ -546,10 +554,7 @@ class HQBrandAnalyticsService:
         ]
 
         # ── 趋势数据 ──────────────────────────────────────────────────────────
-        dates: list[str] = [
-            (trend_start + timedelta(days=i)).isoformat()
-            for i in range(7)
-        ]
+        dates: list[str] = [(trend_start + timedelta(days=i)).isoformat() for i in range(7)]
         brands_trend: dict[str, list[int]] = {str(b): [0] * 7 for b in brand_ids}
         date_index = {d: idx for idx, d in enumerate(dates)}
 
@@ -602,6 +607,7 @@ class HQBrandAnalyticsService:
 
         # 月份起止日期
         import calendar
+
         _, last_day = calendar.monthrange(year, month)
         start_date = date(year, month, 1)
         end_date = date(year, month, last_day)
@@ -695,15 +701,17 @@ class HQBrandAnalyticsService:
             s_rev = int(sdr["revenue_fen"] or 0)
             s_gp = int(sdr["gross_profit_fen"] or 0)
             s_np = int(sdr["net_profit_fen"] or 0)
-            stores.append({
-                "store_id": str(sdr["store_id"]),
-                "revenue_fen": s_rev,
-                "cost_fen": int(sdr["cost_fen"] or 0),
-                "gross_profit_fen": s_gp,
-                "gross_margin_pct": round(float(sdr["gross_margin_rate"] or 0.0), 4),
-                "net_profit_fen": s_np,
-                "net_margin_pct": round(s_np / s_rev, 4) if s_rev > 0 else 0.0,
-            })
+            stores.append(
+                {
+                    "store_id": str(sdr["store_id"]),
+                    "revenue_fen": s_rev,
+                    "cost_fen": int(sdr["cost_fen"] or 0),
+                    "gross_profit_fen": s_gp,
+                    "gross_margin_pct": round(float(sdr["gross_margin_rate"] or 0.0), 4),
+                    "net_profit_fen": s_np,
+                    "net_margin_pct": round(s_np / s_rev, 4) if s_rev > 0 else 0.0,
+                }
+            )
 
         logger.info(
             "hq_brand_analytics.get_brand_pnl.ok",

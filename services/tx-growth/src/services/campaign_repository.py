@@ -11,6 +11,7 @@
   - check_eligibility 的参与次数限制通过 COUNT(campaign_participants) 实现
   - TriggerEngine 的活动匹配通过 campaign_type + status 索引查询实现
 """
+
 import json
 import uuid
 from datetime import datetime, timezone
@@ -85,8 +86,9 @@ class CampaignRepository:
             },
         )
         await self.db.flush()
-        log.info("campaign.created", campaign_id=str(campaign_id),
-                 campaign_type=campaign_type, tenant_id=self.tenant_id)
+        log.info(
+            "campaign.created", campaign_id=str(campaign_id), campaign_type=campaign_type, tenant_id=self.tenant_id
+        )
         result = await self.get_campaign(str(campaign_id))
         return result  # type: ignore[return-value]
 
@@ -179,9 +181,7 @@ class CampaignRepository:
     # 参与次数限制
     # ══════════════════════════════════════════════════════
 
-    async def count_customer_participations(
-        self, campaign_id: str, customer_id: str
-    ) -> int:
+    async def count_customer_participations(self, campaign_id: str, customer_id: str) -> int:
         """统计某客户在某活动的参与次数"""
         await self._set_tenant()
         result = await self.db.execute(

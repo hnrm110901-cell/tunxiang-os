@@ -29,6 +29,7 @@
 防刷：track-click 使用 Redis 对 (touch_id, client_ip) 去重，TTL 60s。
 响应格式：{"ok": bool, "data": {}, "error": {}}
 """
+
 import uuid
 from datetime import date, datetime, timezone
 from typing import Any, Optional
@@ -61,6 +62,7 @@ async def _get_redis() -> Optional[Any]:
         import os
 
         import redis.asyncio as aioredis  # type: ignore
+
         _redis = aioredis.from_url(
             os.getenv("REDIS_URL", "redis://localhost:6379/0"),
             decode_responses=True,
@@ -97,9 +99,7 @@ def _parse_date(s: str, field_name: str) -> date:
     try:
         return date.fromisoformat(s)
     except ValueError as exc:
-        raise HTTPException(
-            status_code=422, detail=f"{field_name} 日期格式无效（YYYY-MM-DD）: {exc}"
-        ) from exc
+        raise HTTPException(status_code=422, detail=f"{field_name} 日期格式无效（YYYY-MM-DD）: {exc}") from exc
 
 
 # ---------------------------------------------------------------------------
@@ -109,6 +109,7 @@ def _parse_date(s: str, field_name: str) -> date:
 
 class RecordTouchRequest(BaseModel):
     """记录营销触达请求体"""
+
     channel: str
     customer_id: str
     content_type: str
@@ -137,6 +138,7 @@ class RecordTouchRequest(BaseModel):
 
 class AttributeConversionRequest(BaseModel):
     """触发归因检查请求体"""
+
     customer_id: str
     conversion_type: str
     conversion_id: str
@@ -204,12 +206,14 @@ async def track_click(
             await db.commit()
             if event is None:
                 return ok({"touch_id": touch_id, "counted": False, "reason": "not_found"})
-            return ok({
-                "touch_id": event.touch_id,
-                "click_count": event.click_count,
-                "clicked_at": event.clicked_at.isoformat() if event.clicked_at else None,
-                "counted": True,
-            })
+            return ok(
+                {
+                    "touch_id": event.touch_id,
+                    "click_count": event.click_count,
+                    "clicked_at": event.clicked_at.isoformat() if event.clicked_at else None,
+                    "counted": True,
+                }
+            )
         except (ValueError, KeyError) as exc:
             await db.rollback()
             log.warning("track_click_error", touch_id=touch_id, error=str(exc))
@@ -273,9 +277,7 @@ async def list_touches(
 
     async with async_session_factory() as db:
         try:
-            count_row = await db.execute(
-                f"SELECT COUNT(*) AS cnt FROM touch_events WHERE {where}", bind
-            )
+            count_row = await db.execute(f"SELECT COUNT(*) AS cnt FROM touch_events WHERE {where}", bind)
             total = int((count_row.fetchone() or [0])[0])
 
             rows = await db.execute(
@@ -364,9 +366,7 @@ async def list_conversions(
 
     async with async_session_factory() as db:
         try:
-            count_row = await db.execute(
-                f"SELECT COUNT(*) AS cnt FROM attribution_conversions WHERE {where}", bind
-            )
+            count_row = await db.execute(f"SELECT COUNT(*) AS cnt FROM attribution_conversions WHERE {where}", bind)
             total = int((count_row.fetchone() or [0])[0])
 
             rows = await db.execute(
@@ -452,31 +452,31 @@ async def get_campaign_summary(
             cached = cache_row.fetchone()
 
             if cached:
-                return ok({
-                    "source": "cache",
-                    "campaign_id": campaign_id,
-                    "campaign_name": cached.campaign_name,
-                    "period": {"start": str(start_date), "end": str(end_date)},
-                    "funnel": {
-                        "total_touches": cached.total_touches,
-                        "delivered_count": cached.delivered_count,
-                        "clicked_count": cached.clicked_count,
-                    },
-                    "conversions": {
-                        "reservations": cached.reservations_attributed,
-                        "orders": cached.orders_attributed,
-                        "revenue": float(cached.revenue_attributed),
-                    },
-                    "metrics": {
-                        "cac": float(cached.cac),
-                        "roi": float(cached.roi),
-                        "click_rate": round(
-                            cached.clicked_count / max(1, cached.delivered_count), 4
-                        ),
-                    },
-                    "top_segments": cached.top_segments or [],
-                    "updated_at": cached.updated_at.isoformat() if cached.updated_at else None,
-                })
+                return ok(
+                    {
+                        "source": "cache",
+                        "campaign_id": campaign_id,
+                        "campaign_name": cached.campaign_name,
+                        "period": {"start": str(start_date), "end": str(end_date)},
+                        "funnel": {
+                            "total_touches": cached.total_touches,
+                            "delivered_count": cached.delivered_count,
+                            "clicked_count": cached.clicked_count,
+                        },
+                        "conversions": {
+                            "reservations": cached.reservations_attributed,
+                            "orders": cached.orders_attributed,
+                            "revenue": float(cached.revenue_attributed),
+                        },
+                        "metrics": {
+                            "cac": float(cached.cac),
+                            "roi": float(cached.roi),
+                            "click_rate": round(cached.clicked_count / max(1, cached.delivered_count), 4),
+                        },
+                        "top_segments": cached.top_segments or [],
+                        "updated_at": cached.updated_at.isoformat() if cached.updated_at else None,
+                    }
+                )
 
             # 无缓存：实时计算
             summary = await _aggregator.compute_campaign_summary(
@@ -487,29 +487,31 @@ async def get_campaign_summary(
                 campaign_id=campaign_uuid,
             )
 
-            return ok({
-                "source": "realtime",
-                "campaign_id": campaign_id,
-                "campaign_name": summary.campaign_name,
-                "period": {"start": str(start_date), "end": str(end_date)},
-                "funnel": {
-                    "total_touches": summary.total_touches,
-                    "delivered_count": summary.delivered_count,
-                    "clicked_count": summary.clicked_count,
-                    "click_rate": summary.click_rate,
-                    "delivery_rate": summary.delivery_rate,
-                },
-                "conversions": {
-                    "reservations": summary.reservations_attributed,
-                    "orders": summary.orders_attributed,
-                    "revenue": summary.revenue_attributed,
-                },
-                "metrics": {
-                    "cac": summary.cac,
-                    "roi": summary.roi,
-                },
-                "top_segments": summary.top_segments,
-            })
+            return ok(
+                {
+                    "source": "realtime",
+                    "campaign_id": campaign_id,
+                    "campaign_name": summary.campaign_name,
+                    "period": {"start": str(start_date), "end": str(end_date)},
+                    "funnel": {
+                        "total_touches": summary.total_touches,
+                        "delivered_count": summary.delivered_count,
+                        "clicked_count": summary.clicked_count,
+                        "click_rate": summary.click_rate,
+                        "delivery_rate": summary.delivery_rate,
+                    },
+                    "conversions": {
+                        "reservations": summary.reservations_attributed,
+                        "orders": summary.orders_attributed,
+                        "revenue": summary.revenue_attributed,
+                    },
+                    "metrics": {
+                        "cac": summary.cac,
+                        "roi": summary.roi,
+                    },
+                    "top_segments": summary.top_segments,
+                }
+            )
         except (ValueError, KeyError) as exc:
             log.warning(
                 "campaign_summary_error",
@@ -545,25 +547,27 @@ async def get_channel_performance(
                 period_end=end_date,
                 db=db,
             )
-            return ok({
-                "items": [
-                    {
-                        "channel": r.channel,
-                        "total_touches": r.total_touches,
-                        "delivered_count": r.delivered_count,
-                        "clicked_count": r.clicked_count,
-                        "click_rate": r.click_rate,
-                        "click_rate_pct": round(r.click_rate * 100, 1),
-                        "conversions": r.conversions,
-                        "revenue": r.revenue,
-                        "conversion_rate": r.conversion_rate,
-                        "conversion_rate_pct": round(r.conversion_rate * 100, 1),
-                    }
-                    for r in results
-                ],
-                "total": len(results),
-                "period": {"start": str(start_date), "end": str(end_date)},
-            })
+            return ok(
+                {
+                    "items": [
+                        {
+                            "channel": r.channel,
+                            "total_touches": r.total_touches,
+                            "delivered_count": r.delivered_count,
+                            "clicked_count": r.clicked_count,
+                            "click_rate": r.click_rate,
+                            "click_rate_pct": round(r.click_rate * 100, 1),
+                            "conversions": r.conversions,
+                            "revenue": r.revenue,
+                            "conversion_rate": r.conversion_rate,
+                            "conversion_rate_pct": round(r.conversion_rate * 100, 1),
+                        }
+                        for r in results
+                    ],
+                    "total": len(results),
+                    "period": {"start": str(start_date), "end": str(end_date)},
+                }
+            )
         except (ValueError, KeyError) as exc:
             log.warning("channel_performance_error", error=str(exc), tenant_id=str(tenant_id))
             raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -594,22 +598,24 @@ async def get_segment_performance(
                 period_end=end_date,
                 db=db,
             )
-            return ok({
-                "items": [
-                    {
-                        "segment_name": r.segment_name,
-                        "total_touches": r.total_touches,
-                        "conversions": r.conversions,
-                        "revenue": r.revenue,
-                        "conversion_rate": r.conversion_rate,
-                        "conversion_rate_pct": round(r.conversion_rate * 100, 1),
-                        "avg_order_value": r.avg_order_value,
-                    }
-                    for r in results
-                ],
-                "total": len(results),
-                "period": {"start": str(start_date), "end": str(end_date)},
-            })
+            return ok(
+                {
+                    "items": [
+                        {
+                            "segment_name": r.segment_name,
+                            "total_touches": r.total_touches,
+                            "conversions": r.conversions,
+                            "revenue": r.revenue,
+                            "conversion_rate": r.conversion_rate,
+                            "conversion_rate_pct": round(r.conversion_rate * 100, 1),
+                            "avg_order_value": r.avg_order_value,
+                        }
+                        for r in results
+                    ],
+                    "total": len(results),
+                    "period": {"start": str(start_date), "end": str(end_date)},
+                }
+            )
         except (ValueError, KeyError) as exc:
             log.warning("segment_performance_error", error=str(exc), tenant_id=str(tenant_id))
             raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -655,9 +661,7 @@ async def record_touch(
         try:
             sent_at = datetime.fromisoformat(req.sent_at.replace("Z", "+00:00"))
         except ValueError as exc:
-            raise HTTPException(
-                status_code=422, detail=f"sent_at 格式无效（ISO 8601）: {exc}"
-            ) from exc
+            raise HTTPException(status_code=422, detail=f"sent_at 格式无效（ISO 8601）: {exc}") from exc
 
     async with async_session_factory() as db:
         try:
@@ -674,15 +678,17 @@ async def record_touch(
                 db=db,
             )
             await db.commit()
-            return ok({
-                "touch_id": event.touch_id,
-                "customer_id": str(event.customer_id),
-                "channel": event.channel,
-                "sent_at": event.sent_at.isoformat(),
-                "tracked_url_example": TouchTracker.generate_tracked_url(
-                    event.touch_id, req.content.get("landing_url", "https://example.com")
-                ),
-            })
+            return ok(
+                {
+                    "touch_id": event.touch_id,
+                    "customer_id": str(event.customer_id),
+                    "channel": event.channel,
+                    "sent_at": event.sent_at.isoformat(),
+                    "tracked_url_example": TouchTracker.generate_tracked_url(
+                        event.touch_id, req.content.get("landing_url", "https://example.com")
+                    ),
+                }
+            )
         except (ValueError, KeyError) as exc:
             await db.rollback()
             log.warning("record_touch_error", error=str(exc), tenant_id=str(tenant_id))
@@ -717,9 +723,7 @@ async def attribute_conversion(
         try:
             converted_at = datetime.fromisoformat(req.converted_at.replace("Z", "+00:00"))
         except ValueError as exc:
-            raise HTTPException(
-                status_code=422, detail=f"converted_at 格式无效（ISO 8601）: {exc}"
-            ) from exc
+            raise HTTPException(status_code=422, detail=f"converted_at 格式无效（ISO 8601）: {exc}") from exc
 
     async with async_session_factory() as db:
         try:
@@ -737,20 +741,24 @@ async def attribute_conversion(
             await db.commit()
 
             if result is None:
-                return ok({
-                    "attributed": False,
-                    "reason": "no_touch_in_window",
-                    "conversion_id": req.conversion_id,
-                })
+                return ok(
+                    {
+                        "attributed": False,
+                        "reason": "no_touch_in_window",
+                        "conversion_id": req.conversion_id,
+                    }
+                )
 
-            return ok({
-                "attributed": True,
-                "touch_id": result.touch_id,
-                "conversion_type": result.conversion_type,
-                "conversion_value": result.conversion_value,
-                "is_first_conversion": result.is_first_conversion,
-                "attributed_at": result.created_at.isoformat(),
-            })
+            return ok(
+                {
+                    "attributed": True,
+                    "touch_id": result.touch_id,
+                    "conversion_type": result.conversion_type,
+                    "conversion_value": result.conversion_value,
+                    "is_first_conversion": result.is_first_conversion,
+                    "attributed_at": result.created_at.isoformat(),
+                }
+            )
         except (ValueError, KeyError) as exc:
             await db.rollback()
             log.warning(

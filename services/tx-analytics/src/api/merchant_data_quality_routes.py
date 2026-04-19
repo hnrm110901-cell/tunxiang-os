@@ -15,6 +15,7 @@
   桌台数据完整率      10%  — tables ≥5行
   主键一致性          10%  — orders.store_id 全部在 stores 中
 """
+
 from __future__ import annotations
 
 import uuid
@@ -34,8 +35,7 @@ router = APIRouter(prefix="/api/v1/analytics", tags=["data-quality"])
 
 # 演示商户代码 → 确定性 UUID（通过 uuid5 派生，与 merchant_targets_routes.py 保持一致）
 _DEMO_TENANTS: dict[str, str] = {
-    code: str(uuid.uuid5(uuid.NAMESPACE_DNS, f"{code}-demo-tenant"))
-    for code in ("czyz", "zqx", "sgc")
+    code: str(uuid.uuid5(uuid.NAMESPACE_DNS, f"{code}-demo-tenant")) for code in ("czyz", "zqx", "sgc")
 }
 
 # 评分等级阈值
@@ -46,7 +46,7 @@ _GRADE_TABLE = [
     (80, "B"),
     (70, "C+"),
     (60, "C"),
-    (0,  "D"),
+    (0, "D"),
 ]
 
 
@@ -111,12 +111,14 @@ async def _run_quality_checks(tenant_id: str) -> list[dict]:
                 score = int(complete / total * 100)
                 status = "⚠️"
                 detail = f"{total} 家门店，{complete} 家字段完整"
-            checks.append({"check": "门店数据完整率", "weight": 0.20, "score": score,
-                           "status": status, "detail": detail})
+            checks.append(
+                {"check": "门店数据完整率", "weight": 0.20, "score": score, "status": status, "detail": detail}
+            )
         except SQLAlchemyError as exc:
             logger.warning("data_quality_check_failed", check="stores", error=str(exc))
-            checks.append({"check": "门店数据完整率", "weight": 0.20, "score": 0,
-                           "status": "❌", "detail": f"查询失败: {exc}"})
+            checks.append(
+                {"check": "门店数据完整率", "weight": 0.20, "score": 0, "status": "❌", "detail": f"查询失败: {exc}"}
+            )
 
         # ── 2. 菜品数据完整率 (20%) ──────────────────────────────────────────
         DISH_MIN = 10
@@ -155,12 +157,20 @@ async def _run_quality_checks(tenant_id: str) -> list[dict]:
                 else:
                     status = "❌"
                 detail = f"{total} 道菜品，{complete} 道字段完整"
-            checks.append({"check": "菜品数据完整率", "weight": 0.20, "score": min(score, 100),
-                           "status": status, "detail": detail})
+            checks.append(
+                {
+                    "check": "菜品数据完整率",
+                    "weight": 0.20,
+                    "score": min(score, 100),
+                    "status": status,
+                    "detail": detail,
+                }
+            )
         except SQLAlchemyError as exc:
             logger.warning("data_quality_check_failed", check="dishes", error=str(exc))
-            checks.append({"check": "菜品数据完整率", "weight": 0.20, "score": 0,
-                           "status": "❌", "detail": f"查询失败: {exc}"})
+            checks.append(
+                {"check": "菜品数据完整率", "weight": 0.20, "score": 0, "status": "❌", "detail": f"查询失败: {exc}"}
+            )
 
         # ── 3. 会员数据完整率 (15%) ──────────────────────────────────────────
         MEMBER_MIN = 5
@@ -178,12 +188,14 @@ async def _run_quality_checks(tenant_id: str) -> list[dict]:
                 score = min(int(total / MEMBER_MIN * 100), 100)
                 status = "✅" if total >= MEMBER_MIN else "⚠️"
                 detail = f"{total} 位会员"
-            checks.append({"check": "会员数据完整率", "weight": 0.15, "score": score,
-                           "status": status, "detail": detail})
+            checks.append(
+                {"check": "会员数据完整率", "weight": 0.15, "score": score, "status": status, "detail": detail}
+            )
         except SQLAlchemyError as exc:
             logger.warning("data_quality_check_failed", check="members", error=str(exc))
-            checks.append({"check": "会员数据完整率", "weight": 0.15, "score": 0,
-                           "status": "❌", "detail": f"查询失败: {exc}"})
+            checks.append(
+                {"check": "会员数据完整率", "weight": 0.15, "score": 0, "status": "❌", "detail": f"查询失败: {exc}"}
+            )
 
         # ── 4. 历史订单数据 (15%) ────────────────────────────────────────────
         ORDER_MIN = 20
@@ -207,12 +219,12 @@ async def _run_quality_checks(tenant_id: str) -> list[dict]:
                 score = min(int(total / ORDER_MIN * 100), 100)
                 status = "✅" if total >= ORDER_MIN else "⚠️"
                 detail = f"近90天 {total} 条订单"
-            checks.append({"check": "历史订单数据", "weight": 0.15, "score": score,
-                           "status": status, "detail": detail})
+            checks.append({"check": "历史订单数据", "weight": 0.15, "score": score, "status": status, "detail": detail})
         except SQLAlchemyError as exc:
             logger.warning("data_quality_check_failed", check="orders", error=str(exc))
-            checks.append({"check": "历史订单数据", "weight": 0.15, "score": 0,
-                           "status": "❌", "detail": f"查询失败: {exc}"})
+            checks.append(
+                {"check": "历史订单数据", "weight": 0.15, "score": 0, "status": "❌", "detail": f"查询失败: {exc}"}
+            )
 
         # ── 5. KPI 权重已配置 (10%) ──────────────────────────────────────────
         try:
@@ -233,12 +245,20 @@ async def _run_quality_checks(tenant_id: str) -> list[dict]:
                 score = 0
                 status = "❌"
                 detail = "未找到 KPI 权重配置"
-            checks.append({"check": "KPI权重已配置", "weight": 0.10, "score": score,
-                           "status": status, "detail": detail})
+            checks.append(
+                {"check": "KPI权重已配置", "weight": 0.10, "score": score, "status": status, "detail": detail}
+            )
         except SQLAlchemyError as exc:
             logger.warning("data_quality_check_failed", check="kpi_weights", error=str(exc))
-            checks.append({"check": "KPI权重已配置", "weight": 0.10, "score": 0,
-                           "status": "⚠️", "detail": f"表不存在或查询失败: {exc}"})
+            checks.append(
+                {
+                    "check": "KPI权重已配置",
+                    "weight": 0.10,
+                    "score": 0,
+                    "status": "⚠️",
+                    "detail": f"表不存在或查询失败: {exc}",
+                }
+            )
 
         # ── 6. 桌台数据完整率 (10%) ──────────────────────────────────────────
         TABLE_MIN = 5
@@ -256,12 +276,14 @@ async def _run_quality_checks(tenant_id: str) -> list[dict]:
                 score = min(int(total / TABLE_MIN * 100), 100)
                 status = "✅" if total >= TABLE_MIN else "⚠️"
                 detail = f"{total} 张桌台"
-            checks.append({"check": "桌台数据完整率", "weight": 0.10, "score": score,
-                           "status": status, "detail": detail})
+            checks.append(
+                {"check": "桌台数据完整率", "weight": 0.10, "score": score, "status": status, "detail": detail}
+            )
         except SQLAlchemyError as exc:
             logger.warning("data_quality_check_failed", check="tables", error=str(exc))
-            checks.append({"check": "桌台数据完整率", "weight": 0.10, "score": 0,
-                           "status": "❌", "detail": f"查询失败: {exc}"})
+            checks.append(
+                {"check": "桌台数据完整率", "weight": 0.10, "score": 0, "status": "❌", "detail": f"查询失败: {exc}"}
+            )
 
         # ── 7. 主键一致性 (10%) ──────────────────────────────────────────────
         try:
@@ -289,12 +311,12 @@ async def _run_quality_checks(tenant_id: str) -> list[dict]:
                 score = 0
                 status = "❌"
                 detail = f"{orphans} 条订单的 store_id 在 stores 中不存在"
-            checks.append({"check": "主键一致性", "weight": 0.10, "score": score,
-                           "status": status, "detail": detail})
+            checks.append({"check": "主键一致性", "weight": 0.10, "score": score, "status": status, "detail": detail})
         except SQLAlchemyError as exc:
             logger.warning("data_quality_check_failed", check="pk_consistency", error=str(exc))
-            checks.append({"check": "主键一致性", "weight": 0.10, "score": 0,
-                           "status": "❌", "detail": f"查询失败: {exc}"})
+            checks.append(
+                {"check": "主键一致性", "weight": 0.10, "score": 0, "status": "❌", "detail": f"查询失败: {exc}"}
+            )
 
     return checks
 
@@ -322,6 +344,7 @@ def _compute_report(merchant_code: str, tenant_id: str, checks: list[dict]) -> d
 
 # ── 1. 单商户完整质量报告 ─────────────────────────────────────────────────────
 
+
 @router.get("/data-quality/{merchant_code}", summary="单商户数据质量报告")
 async def get_merchant_data_quality(
     merchant_code: str,
@@ -342,6 +365,7 @@ async def get_merchant_data_quality(
 
 # ── 2. 三商户汇总概览 ─────────────────────────────────────────────────────────
 
+
 @router.get("/data-quality", summary="所有演示商户数据质量汇总")
 async def get_all_merchants_data_quality() -> dict:
     """返回三个演示商户（czyz/zqx/sgc）的数据质量汇总。"""
@@ -352,12 +376,14 @@ async def get_all_merchants_data_quality() -> dict:
             checks = await _run_quality_checks(tenant_id)
         except SQLAlchemyError as exc:
             logger.warning("data_quality_summary_skip", merchant_code=code, error=str(exc))
-            summary.append({
-                "merchant_code": code,
-                "total_score": 0.0,
-                "grade": "D",
-                "top_gap": f"数据库查询失败: {exc}",
-            })
+            summary.append(
+                {
+                    "merchant_code": code,
+                    "total_score": 0.0,
+                    "grade": "D",
+                    "top_gap": f"数据库查询失败: {exc}",
+                }
+            )
             continue
 
         report = _compute_report(code, tenant_id, checks)
@@ -365,17 +391,15 @@ async def get_all_merchants_data_quality() -> dict:
         # 取得分最低的 gap 项作为 top_gap
         failing = [c for c in checks if c["score"] < 100]
         failing.sort(key=lambda c: c["score"])
-        top_gap = (
-            f"{failing[0]['check']}: {failing[0]['detail']}"
-            if failing
-            else "全部检查通过"
-        )
+        top_gap = f"{failing[0]['check']}: {failing[0]['detail']}" if failing else "全部检查通过"
 
-        summary.append({
-            "merchant_code": code,
-            "total_score": report["total_score"],
-            "grade": report["grade"],
-            "top_gap": top_gap,
-        })
+        summary.append(
+            {
+                "merchant_code": code,
+                "total_score": report["total_score"],
+                "grade": report["grade"],
+                "top_gap": top_gap,
+            }
+        )
 
     return {"ok": True, "data": summary}

@@ -16,6 +16,7 @@ GET /api/v1/analytics/daily-summary              日汇总（供经营诊断 Age
 
 响应格式：{ok: bool, data: {}}
 """
+
 from __future__ import annotations
 
 from datetime import date, timedelta
@@ -34,6 +35,7 @@ _p0 = P0Reports()
 # ──────────────────────────────────────────────
 # 公共辅助
 # ──────────────────────────────────────────────
+
 
 def _require_tenant(tenant_id: Optional[str]) -> str:
     if not tenant_id:
@@ -73,6 +75,7 @@ def _require_store(store_id: Optional[str]) -> str:
 # 1. 营业收入汇总
 # ──────────────────────────────────────────────
 
+
 @router.get("/api/v1/analytics/reports/daily-revenue")
 async def api_daily_revenue(
     date: Optional[str] = Query(None, description="业务日期 YYYY-MM-DD，默认今日"),
@@ -105,6 +108,7 @@ async def api_daily_revenue(
 # ──────────────────────────────────────────────
 # 2. 付款折扣表
 # ──────────────────────────────────────────────
+
 
 @router.get("/api/v1/analytics/reports/payment-discount")
 async def api_payment_discount(
@@ -139,6 +143,7 @@ async def api_payment_discount(
 # 3. 收款分门店
 # ──────────────────────────────────────────────
 
+
 @router.get("/api/v1/analytics/reports/cashflow-by-store")
 async def api_cashflow_by_store(
     date: Optional[str] = Query(None, description="业务日期 YYYY-MM-DD，默认今日"),
@@ -169,6 +174,7 @@ async def api_cashflow_by_store(
 # ──────────────────────────────────────────────
 # 4. 菜品销售统计
 # ──────────────────────────────────────────────
+
 
 @router.get("/api/v1/analytics/reports/dish-sales")
 async def api_dish_sales(
@@ -203,6 +209,7 @@ async def api_dish_sales(
 # 5. 账单稽核
 # ──────────────────────────────────────────────
 
+
 @router.get("/api/v1/analytics/reports/billing-audit")
 async def api_billing_audit(
     store_id: Optional[str] = Query(None, description="门店ID"),
@@ -236,6 +243,7 @@ async def api_billing_audit(
 # 6. 实时营业统计
 # ──────────────────────────────────────────────
 
+
 @router.get("/api/v1/analytics/reports/realtime")
 async def api_realtime_stats(
     store_id: Optional[str] = Query(None, description="门店ID"),
@@ -264,6 +272,7 @@ async def api_realtime_stats(
 # ──────────────────────────────────────────────
 # 7. 日现金流
 # ──────────────────────────────────────────────
+
 
 @router.get("/api/v1/analytics/reports/daily-cashflow")
 async def api_daily_cashflow(
@@ -297,6 +306,7 @@ async def api_daily_cashflow(
 # ──────────────────────────────────────────────
 # 8. 日汇总（供经营诊断 Agent 调用）
 # ──────────────────────────────────────────────
+
 
 @router.get("/api/v1/analytics/daily-summary")
 async def api_daily_summary(

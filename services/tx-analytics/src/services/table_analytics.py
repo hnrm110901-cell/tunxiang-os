@@ -3,6 +3,7 @@
 为 tx-analytics 域G 提供桌台经营分析能力。
 金额单位统一为分(fen)。
 """
+
 import uuid
 from datetime import date, datetime, timedelta, timezone
 
@@ -165,10 +166,7 @@ async def get_table_heatmap(
         tables_map[table_no][hour] = cnt
         hourly_totals[hour] += cnt
 
-    tables_data = [
-        {"table_no": tn, "usage": usage}
-        for tn, usage in sorted(tables_map.items())
-    ]
+    tables_data = [{"table_no": tn, "usage": usage} for tn, usage in sorted(tables_map.items())]
 
     logger.info(
         "table_heatmap_generated",
@@ -272,15 +270,17 @@ async def get_room_revenue_analysis(
         # 利用率 = 有订单天数占比（简化：order_count / total_days，封顶1.0）
         utilization = min(round(order_count / total_days, 2), 1.0) if total_days > 0 else 0.0
 
-        rooms.append({
-            "table_no": row["table_no"],
-            "area": row["area"],
-            "total_revenue_fen": revenue_fen,
-            "order_count": order_count,
-            "avg_per_order_fen": avg_fen,
-            "minimum_charge_fen": int(row["min_consume_fen"] or 0),
-            "utilization_rate": utilization,
-        })
+        rooms.append(
+            {
+                "table_no": row["table_no"],
+                "area": row["area"],
+                "total_revenue_fen": revenue_fen,
+                "order_count": order_count,
+                "avg_per_order_fen": avg_fen,
+                "minimum_charge_fen": int(row["min_consume_fen"] or 0),
+                "utilization_rate": utilization,
+            }
+        )
 
         total_revenue += revenue_fen
         total_orders += order_count

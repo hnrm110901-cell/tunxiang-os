@@ -9,6 +9,7 @@
 
 金额单位：分(fen)
 """
+
 import os
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -140,6 +141,7 @@ def _match_workflow(workflow: ApprovalWorkflow, object_type: str, object_data: d
 # ApprovalService
 # ---------------------------------------------------------------------------
 
+
 class ApprovalService:
     """营销审批流服务"""
 
@@ -166,13 +168,17 @@ class ApprovalService:
             (True, workflow_id)  — 需要审批
             (False, None)        — 无需审批
         """
-        stmt = select(ApprovalWorkflow).where(
-            and_(
-                ApprovalWorkflow.tenant_id == tenant_id,
-                ApprovalWorkflow.is_active == True,  # noqa: E712
-                ApprovalWorkflow.is_deleted == False,  # noqa: E712
+        stmt = (
+            select(ApprovalWorkflow)
+            .where(
+                and_(
+                    ApprovalWorkflow.tenant_id == tenant_id,
+                    ApprovalWorkflow.is_active == True,  # noqa: E712
+                    ApprovalWorkflow.is_deleted == False,  # noqa: E712
+                )
             )
-        ).order_by(ApprovalWorkflow.priority.desc())
+            .order_by(ApprovalWorkflow.priority.desc())
+        )
 
         result = await db.execute(stmt)
         workflows: list[ApprovalWorkflow] = list(result.scalars().all())
@@ -418,10 +424,7 @@ class ApprovalService:
         obj_name = request.object_summary.get("name", request.object_id)
         await self._notify_requester(
             request=request,
-            message=(
-                f"您的 {request.object_type}「{obj_name}」审批被拒绝，"
-                f"原因：{reason}。请修改后重新提交。"
-            ),
+            message=(f"您的 {request.object_type}「{obj_name}」审批被拒绝，原因：{reason}。请修改后重新提交。"),
             tenant_id=tenant_id,
         )
 
@@ -542,10 +545,7 @@ class ApprovalService:
                 obj_name = req.object_summary.get("name", req.object_id)
                 await self._notify_requester(
                     request=req,
-                    message=(
-                        f"您的 {req.object_type}「{obj_name}」审批已超时，"
-                        "请重新提交审批申请。"
-                    ),
+                    message=(f"您的 {req.object_type}「{obj_name}」审批已超时，请重新提交审批申请。"),
                     tenant_id=tenant_id,
                 )
 
@@ -689,14 +689,9 @@ class ApprovalService:
         obj_name = request.object_summary.get("name", request.object_id)
         title = f"【待审批】{request.object_type} - {obj_name}"
         description = (
-            f"申请人：{request.requester_name}\n"
-            f"类型：{request.object_type}\n"
-            f"摘要：{obj_name}\n"
-            f"请在审批截止前处理"
+            f"申请人：{request.requester_name}\n类型：{request.object_type}\n摘要：{obj_name}\n请在审批截止前处理"
         )
-        detail_url = (
-            f"{self.FRONTEND_BASE_URL}/approval/{request.id}"
-        )
+        detail_url = f"{self.FRONTEND_BASE_URL}/approval/{request.id}"
 
         for wecom_id in approver_wecom_ids:
             await self._notify_approver(

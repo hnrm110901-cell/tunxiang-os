@@ -5,6 +5,7 @@ card_type:
   count_card  — 购买N次使用权，每次到店核销1次
   period_card — 按月/季/年计费，持有期享固定权益
 """
+
 from __future__ import annotations
 
 import json
@@ -20,6 +21,7 @@ logger = structlog.get_logger(__name__)
 
 
 # ── 工具函数 ──────────────────────────────────────────────────
+
 
 def _now_utc() -> datetime:
     return datetime.now(timezone.utc)
@@ -49,6 +51,7 @@ def _period_end(start: date, period_type: str) -> date:
         except ValueError:
             # 月末边界处理（如 1月31日 → 2月28日）
             import calendar
+
             last_day = calendar.monthrange(y, m)[1]
             return date(y, m, last_day)
     elif period_type == "quarterly":
@@ -59,6 +62,7 @@ def _period_end(start: date, period_type: str) -> date:
             return date(y, m, start.day) - timedelta(days=1)
         except ValueError:
             import calendar
+
             last_day = calendar.monthrange(y, m)[1]
             return date(y, m, last_day)
     elif period_type == "yearly":
@@ -121,6 +125,7 @@ ANNUAL_PLANS = {
 
 # ── 等级联动 ──────────────────────────────────────────────────
 
+
 async def _sync_member_level(
     customer_id: str,
     tenant_id: str,
@@ -171,6 +176,7 @@ async def _sync_member_level(
 
 
 # ── 模板管理 ──────────────────────────────────────────────────
+
 
 async def list_templates(
     tenant_id: str,
@@ -309,6 +315,7 @@ async def create_template(
 
 # ── 购卡 ──────────────────────────────────────────────────────
 
+
 async def purchase_card(
     customer_id: str,
     template_id: str,
@@ -370,10 +377,7 @@ async def purchase_card(
         period_end = _period_end(today, period_type)
         next_renewal_at = period_end + timedelta(days=1)
         # 周期卡有效期 = 第一个周期的结束日（续费后延长）
-        expires_at = datetime(
-            period_end.year, period_end.month, period_end.day,
-            23, 59, 59, tzinfo=timezone.utc
-        )
+        expires_at = datetime(period_end.year, period_end.month, period_end.day, 23, 59, 59, tzinfo=timezone.utc)
 
     benefits_json = tpl["benefits"] or "[]"
 
@@ -446,6 +450,7 @@ async def purchase_card(
 
 
 # ── 次卡核销 ──────────────────────────────────────────────────
+
 
 async def use_count_card(
     card_id: str,
@@ -603,6 +608,7 @@ async def use_count_card(
 
 # ── 周期权益检查 ──────────────────────────────────────────────
 
+
 async def check_benefit(
     card_id: str,
     benefit_type: str,
@@ -676,6 +682,7 @@ async def check_benefit(
 
 
 # ── 使用周期权益 ──────────────────────────────────────────────
+
 
 async def use_benefit(
     card_id: str,
@@ -787,6 +794,7 @@ async def use_benefit(
 
 # ── 周期卡续费 ────────────────────────────────────────────────
 
+
 async def renew_period(
     card_id: str,
     tenant_id: str,
@@ -837,8 +845,7 @@ async def renew_period(
     new_period_end = _period_end(new_period_start, period_type)
     new_next_renewal = new_period_end + timedelta(days=1)
     new_expires_at = datetime(
-        new_period_end.year, new_period_end.month, new_period_end.day,
-        23, 59, 59, tzinfo=timezone.utc
+        new_period_end.year, new_period_end.month, new_period_end.day, 23, 59, 59, tzinfo=timezone.utc
     )
 
     await db.execute(
@@ -915,6 +922,7 @@ async def renew_period(
 
 # ── 查询即将到期 ──────────────────────────────────────────────
 
+
 async def get_expiring_cards(
     days_ahead: int,
     tenant_id: str,
@@ -987,6 +995,7 @@ async def get_expiring_cards(
 
 # ── 会员持有的卡列表 ──────────────────────────────────────────
 
+
 async def list_customer_cards(
     customer_id: str,
     tenant_id: str,
@@ -1045,6 +1054,7 @@ async def list_customer_cards(
 
 # ── 卡详情 ────────────────────────────────────────────────────
 
+
 async def get_card_detail(
     card_id: str,
     tenant_id: str,
@@ -1086,6 +1096,7 @@ async def get_card_detail(
 
 
 # ── 使用历史 ──────────────────────────────────────────────────
+
 
 async def get_card_usage_history(
     card_id: str,
@@ -1133,6 +1144,7 @@ async def get_card_usage_history(
 
 
 # ── 旧版兼容函数（保留不删）────────────────────────────────────
+
 
 async def list_annual_plans(
     tenant_id: str,
@@ -1286,9 +1298,14 @@ async def gift_card(
                     :price, :code, 'pending', :now, :now, false)
         """),
         {
-            "id": gift_id, "tid": tenant_id, "sid": sender_id,
-            "phone": receiver_phone, "pid": plan_id,
-            "price": plan["price_fen"], "code": redeem_code, "now": now,
+            "id": gift_id,
+            "tid": tenant_id,
+            "sid": sender_id,
+            "phone": receiver_phone,
+            "pid": plan_id,
+            "price": plan["price_fen"],
+            "code": redeem_code,
+            "now": now,
         },
     )
     await db.flush()

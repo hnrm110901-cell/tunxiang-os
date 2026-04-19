@@ -41,7 +41,11 @@ ORDER BY biz_date DESC, margin_rate DESC
 
 DIMENSIONS = ["store_name", "biz_date"]
 METRICS = [
-    "order_count", "revenue_fen", "cost_fen", "margin_fen",
-    "margin_rate", "avg_ticket_fen",
+    "order_count",
+    "revenue_fen",
+    "cost_fen",
+    "margin_fen",
+    "margin_rate",
+    "avg_ticket_fen",
 ]
 FILTERS = ["start_date", "end_date", "store_id"]

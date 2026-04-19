@@ -3,6 +3,7 @@
 提供库存周转率、原料涨跌监控、损耗排行、盘点差异、采购偏差、
 菜品成本偏差、活鲜损耗专项、食安风险图谱等分析能力。
 """
+
 import uuid
 from datetime import datetime, timezone
 
@@ -96,6 +97,7 @@ async def inventory_turnover(
 
     # 计算天数
     from datetime import date as date_type
+
     d_start = date_type.fromisoformat(start_date) if isinstance(start_date, str) else start_date
     d_end = date_type.fromisoformat(end_date) if isinstance(end_date, str) else end_date
     days = max((d_end - d_start).days, 1)
@@ -454,18 +456,20 @@ async def procurement_variance(
         cost_variance = actual_cost - planned_cost
         variance_pct = round(cost_variance / planned_cost * 100, 1) if planned_cost > 0 else 0
 
-        items.append({
-            "ingredient_id": str(r["ingredient_id"]),
-            "ingredient_name": r["ingredient_name"],
-            "unit": r["unit"],
-            "total_planned_qty": float(r["total_planned"]),
-            "total_actual_qty": float(r["total_actual"]),
-            "planned_cost_fen": planned_cost,
-            "actual_cost_fen": actual_cost,
-            "cost_variance_fen": cost_variance,
-            "variance_pct": variance_pct,
-            "order_count": r["order_count"],
-        })
+        items.append(
+            {
+                "ingredient_id": str(r["ingredient_id"]),
+                "ingredient_name": r["ingredient_name"],
+                "unit": r["unit"],
+                "total_planned_qty": float(r["total_planned"]),
+                "total_actual_qty": float(r["total_actual"]),
+                "planned_cost_fen": planned_cost,
+                "actual_cost_fen": actual_cost,
+                "cost_variance_fen": cost_variance,
+                "variance_pct": variance_pct,
+                "order_count": r["order_count"],
+            }
+        )
 
     total_planned = sum(i["planned_cost_fen"] for i in items)
     total_actual = sum(i["actual_cost_fen"] for i in items)
@@ -582,16 +586,18 @@ async def dish_cost_variance_deep(
             for dd in detail_rows
         ]
 
-        dishes.append({
-            "dish_id": str(dr["dish_id"]),
-            "dish_name": dr["dish_name"],
-            "total_sold": int(dr["total_sold"]) if dr["total_sold"] else 0,
-            "theoretical_cost_fen": theoretical,
-            "actual_cost_fen": actual,
-            "variance_fen": variance,
-            "variance_pct": variance_pct,
-            "ingredients": ingredients_detail,
-        })
+        dishes.append(
+            {
+                "dish_id": str(dr["dish_id"]),
+                "dish_name": dr["dish_name"],
+                "total_sold": int(dr["total_sold"]) if dr["total_sold"] else 0,
+                "theoretical_cost_fen": theoretical,
+                "actual_cost_fen": actual,
+                "variance_fen": variance,
+                "variance_pct": variance_pct,
+                "ingredients": ingredients_detail,
+            }
+        )
 
     log.info(
         "dish_cost_variance_deep_analyzed",
@@ -846,8 +852,7 @@ async def food_safety_risk_graph(
     near_expiry_count = sum(1 for e in expiry_risks if e["status"] == "near_expiry")
 
     # 综合风险评分 (0-100, 越高越危险)
-    risk_score = min(100, expired_count * 20 + near_expiry_count * 5
-                     + len(temp_alerts) * 10 + len(high_risk_items) * 3)
+    risk_score = min(100, expired_count * 20 + near_expiry_count * 5 + len(temp_alerts) * 10 + len(high_risk_items) * 3)
 
     log.info(
         "food_safety_risk_graph_generated",

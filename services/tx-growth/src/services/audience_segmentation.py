@@ -13,6 +13,7 @@
 
 金额单位：分(fen)
 """
+
 from __future__ import annotations
 
 import os
@@ -41,46 +42,61 @@ _CACHE_TTL_SECONDS: int = 300  # 5 分钟
 BUILTIN_SEGMENTS: dict[str, dict[str, Any]] = {
     # ── RFM 8象限 ───────────────────────────────────────────────────────────
     "rfm_champions": {
-        "r": [4, 5], "f": [4, 5], "m": [4, 5],
+        "r": [4, 5],
+        "f": [4, 5],
+        "m": [4, 5],
         "name": "冠军客户",
         "description": "近期消费、高频、高额的最优质客户",
     },
     "rfm_loyal": {
-        "r": [2, 5], "f": [3, 5], "m": [3, 5],
+        "r": [2, 5],
+        "f": [3, 5],
+        "m": [3, 5],
         "name": "忠诚客户",
         "description": "消费频次高、金额高的长期客户",
     },
     "rfm_potential": {
-        "r": [3, 5], "f": [1, 3], "m": [1, 3],
+        "r": [3, 5],
+        "f": [1, 3],
+        "m": [1, 3],
         "name": "潜力客户",
         "description": "近期活跃但频次和消费额有待提升",
     },
     "rfm_new": {
-        "r": [4, 5], "f": [1, 1], "m": [1, 5],
+        "r": [4, 5],
+        "f": [1, 1],
+        "m": [1, 5],
         "name": "新客户",
         "description": "最近消费但仅一次的新会员",
     },
     "rfm_at_risk": {
-        "r": [2, 3], "f": [2, 5], "m": [2, 5],
+        "r": [2, 3],
+        "f": [2, 5],
+        "m": [2, 5],
         "name": "流失风险",
         "description": "曾经活跃但近期消费减少",
     },
     "rfm_cant_lose": {
-        "r": [1, 2], "f": [4, 5], "m": [4, 5],
+        "r": [1, 2],
+        "f": [4, 5],
+        "m": [4, 5],
         "name": "不能失去",
         "description": "高价值高频但已较长时间未消费，亟需召回",
     },
     "rfm_hibernating": {
-        "r": [1, 2], "f": [1, 2], "m": [1, 2],
+        "r": [1, 2],
+        "f": [1, 2],
+        "m": [1, 2],
         "name": "休眠客户",
         "description": "各维度评分均低，处于半休眠状态",
     },
     "rfm_lost": {
-        "r": [1, 1], "f": [1, 5], "m": [1, 5],
+        "r": [1, 1],
+        "f": [1, 5],
+        "m": [1, 5],
         "name": "已流失",
         "description": "最近度极低，基本可认定为流失",
     },
-
     # ── 时间分群 ────────────────────────────────────────────────────────────
     "silent_90d": {
         "last_order_days_min": 90,
@@ -107,7 +123,6 @@ BUILTIN_SEGMENTS: dict[str, dict[str, Any]] = {
         "name": "30天内活跃",
         "description": "30天内有消费",
     },
-
     # ── 消费时段分群 ────────────────────────────────────────────────────────
     "lunch_regulars": {
         "preferred_time_range": ["11:00", "14:00"],
@@ -129,7 +144,6 @@ BUILTIN_SEGMENTS: dict[str, dict[str, Any]] = {
         "name": "工作日族",
         "description": "主要在工作日消费",
     },
-
     # ── 生命周期分群 ────────────────────────────────────────────────────────
     "new_7d": {
         "registered_days_max": 7,
@@ -151,7 +165,6 @@ BUILTIN_SEGMENTS: dict[str, dict[str, Any]] = {
         "name": "高流失风险",
         "description": "流失风险评分 ≥ 0.7 的客户",
     },
-
     # ── 宴席相关 ────────────────────────────────────────────────────────────
     "banquet_prospects": {
         "tags_include": ["宴席意向"],
@@ -179,6 +192,7 @@ _count_cache: dict[str, dict[str, Any]] = {}
 # ---------------------------------------------------------------------------
 # 工具函数
 # ---------------------------------------------------------------------------
+
 
 def _cache_key(tenant_id: UUID, segment_id: str) -> str:
     return f"{tenant_id}:{segment_id}"
@@ -241,15 +255,35 @@ def _build_builtin_params(segment_id: str, seg_def: dict[str, Any]) -> dict[str,
     return params
 
 
-_SUPPORTED_FIELDS = frozenset({
-    "rfm_level", "r_score", "f_score", "m_score", "risk_score",
-    "last_order_at", "total_order_count", "total_order_amount_fen",
-    "tags", "store_id", "source",
-})
+_SUPPORTED_FIELDS = frozenset(
+    {
+        "rfm_level",
+        "r_score",
+        "f_score",
+        "m_score",
+        "risk_score",
+        "last_order_at",
+        "total_order_count",
+        "total_order_amount_fen",
+        "tags",
+        "store_id",
+        "source",
+    }
+)
 
-_SUPPORTED_OPS = frozenset({
-    "eq", "ne", "gt", "gte", "lt", "lte", "in", "contains", "between",
-})
+_SUPPORTED_OPS = frozenset(
+    {
+        "eq",
+        "ne",
+        "gt",
+        "gte",
+        "lt",
+        "lte",
+        "in",
+        "contains",
+        "between",
+    }
+)
 
 
 def _build_custom_params(rules: list[dict[str, Any]]) -> dict[str, Any]:
@@ -352,6 +386,7 @@ def _build_custom_params(rules: list[dict[str, Any]]) -> dict[str, Any]:
 # AudienceSegmentationService
 # ---------------------------------------------------------------------------
 
+
 class AudienceSegmentationService:
     """客户分群引擎 — 内置分群 + 自定义规则分群 + 5分钟人数缓存"""
 
@@ -439,8 +474,7 @@ class AudienceSegmentationService:
             "count": total,
             "expires_at": time.monotonic() + _CACHE_TTL_SECONDS,
         }
-        logger.info("segment_count_refreshed", tenant_id=str(tenant_id),
-                    segment_id=segment_id, count=total)
+        logger.info("segment_count_refreshed", tenant_id=str(tenant_id), segment_id=segment_id, count=total)
         return total
 
     async def create_custom_segment(
@@ -484,8 +518,9 @@ class AudienceSegmentationService:
         ck = _cache_key(tenant_id, segment_id)
         _custom_segments[ck] = segment
 
-        logger.info("custom_segment_created", tenant_id=str(tenant_id),
-                    segment_id=segment_id, name=name, rule_count=len(rules))
+        logger.info(
+            "custom_segment_created", tenant_id=str(tenant_id), segment_id=segment_id, name=name, rule_count=len(rules)
+        )
         return segment
 
     async def list_segments(self, tenant_id: UUID) -> list[dict[str, Any]]:
@@ -500,13 +535,15 @@ class AudienceSegmentationService:
             ck = _cache_key(tenant_id, seg_id)
             cached = _count_cache.get(ck)
             cached_count = cached["count"] if (cached and cached["expires_at"] > time.monotonic()) else None
-            result.append({
-                "segment_id": seg_id,
-                "name": seg_def["name"],
-                "description": seg_def.get("description", ""),
-                "segment_type": "builtin",
-                "total": cached_count,
-            })
+            result.append(
+                {
+                    "segment_id": seg_id,
+                    "name": seg_def["name"],
+                    "description": seg_def.get("description", ""),
+                    "segment_type": "builtin",
+                    "total": cached_count,
+                }
+            )
 
         # 自定义分群（当前租户）
         prefix = f"{tenant_id}:"
@@ -515,16 +552,20 @@ class AudienceSegmentationService:
                 continue
             seg_id = seg["segment_id"]
             count_cache = _count_cache.get(ck)
-            cached_count = count_cache["count"] if (count_cache and count_cache["expires_at"] > time.monotonic()) else None
-            result.append({
-                "segment_id": seg_id,
-                "name": seg["name"],
-                "description": "",
-                "segment_type": "custom",
-                "rules": seg["rules"],
-                "total": cached_count,
-                "created_at": seg["created_at"],
-            })
+            cached_count = (
+                count_cache["count"] if (count_cache and count_cache["expires_at"] > time.monotonic()) else None
+            )
+            result.append(
+                {
+                    "segment_id": seg_id,
+                    "name": seg["name"],
+                    "description": "",
+                    "segment_type": "custom",
+                    "rules": seg["rules"],
+                    "total": cached_count,
+                    "created_at": seg["created_at"],
+                }
+            )
 
         return result
 
@@ -571,12 +612,12 @@ class AudienceSegmentationService:
                 details[seg_id] = count
                 refreshed += 1
             except (httpx.HTTPError, ValueError) as exc:
-                logger.warning("segment_cache_refresh_failed",
-                               segment_id=seg_id, tenant_id=str(tenant_id), error=str(exc))
+                logger.warning(
+                    "segment_cache_refresh_failed", segment_id=seg_id, tenant_id=str(tenant_id), error=str(exc)
+                )
                 failed += 1
 
-        logger.info("segment_cache_refresh_complete",
-                    tenant_id=str(tenant_id), refreshed=refreshed, failed=failed)
+        logger.info("segment_cache_refresh_complete", tenant_id=str(tenant_id), refreshed=refreshed, failed=failed)
         return {"refreshed": refreshed, "failed": failed, "details": details}
 
     # ------------------------------------------------------------------

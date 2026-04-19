@@ -10,6 +10,7 @@
   POST /api/v1/growth/ab-tests/{id}/apply-winner 应用获胜变体
   GET  /api/v1/growth/ab-tests/{id}/results      详细统计结果
 """
+
 import uuid
 from typing import Any, Optional
 
@@ -30,6 +31,7 @@ _ab_svc = ABTestService()
 # 统一响应格式
 # ---------------------------------------------------------------------------
 
+
 def _ok(data: Any) -> dict:
     return {"ok": True, "data": data}
 
@@ -42,6 +44,7 @@ def _err(msg: str) -> dict:
 # 依赖：解析 X-Tenant-ID
 # ---------------------------------------------------------------------------
 
+
 async def get_tenant_id(x_tenant_id: str = Header(..., alias="X-Tenant-ID")) -> uuid.UUID:
     try:
         return uuid.UUID(x_tenant_id)
@@ -53,6 +56,7 @@ async def get_tenant_id(x_tenant_id: str = Header(..., alias="X-Tenant-ID")) -> 
 # 依赖：DB Session
 # ---------------------------------------------------------------------------
 
+
 async def get_db() -> AsyncSession:  # type: ignore[return]
     async with async_session_factory() as session:
         yield session
@@ -62,20 +66,21 @@ async def get_db() -> AsyncSession:  # type: ignore[return]
 # Request Models
 # ---------------------------------------------------------------------------
 
+
 class VariantItem(BaseModel):
-    variant: str              # "A" 或 "B"
-    name: str                 # "控制组" / "实验组"
-    weight: int               # 流量占比，所有变体 weight 之和须为 100
-    content: dict[str, Any]   # {"title": ..., "description": ..., "offer_fen": ...}
+    variant: str  # "A" 或 "B"
+    name: str  # "控制组" / "实验组"
+    weight: int  # 流量占比，所有变体 weight 之和须为 100
+    content: dict[str, Any]  # {"title": ..., "description": ..., "offer_fen": ...}
 
 
 class CreateABTestRequest(BaseModel):
     name: str
     campaign_id: Optional[str] = None
     journey_id: Optional[str] = None
-    split_type: str = "random"          # random | rfm_based | store_based
+    split_type: str = "random"  # random | rfm_based | store_based
     variants: list[VariantItem]
-    primary_metric: str = "conversion_rate"   # conversion_rate | revenue | click_rate
+    primary_metric: str = "conversion_rate"  # conversion_rate | revenue | click_rate
     min_sample_size: int = 100
     confidence_level: float = 0.95
 
@@ -98,12 +103,13 @@ class CreateABTestRequest(BaseModel):
 
 
 class ConcludeRequest(BaseModel):
-    winner_variant: Optional[str] = None   # None 表示"无结论"，"A"/"B" 表示手动指定
+    winner_variant: Optional[str] = None  # None 表示"无结论"，"A"/"B" 表示手动指定
 
 
 # ---------------------------------------------------------------------------
 # 端点实现
 # ---------------------------------------------------------------------------
+
 
 @router.post("", summary="创建AB测试")
 async def create_ab_test(
@@ -122,12 +128,14 @@ async def create_ab_test(
         test = await _ab_svc.create_test(test_data, tenant_id, db)
         await db.commit()
         log.info("api.ab_test.created", test_id=str(test.id), tenant_id=str(tenant_id))
-        return _ok({
-            "test_id": str(test.id),
-            "name": test.name,
-            "status": test.status,
-            "split_type": test.split_type,
-        })
+        return _ok(
+            {
+                "test_id": str(test.id),
+                "name": test.name,
+                "status": test.status,
+                "split_type": test.split_type,
+            }
+        )
     except ValueError as exc:
         return _err(str(exc))
 
@@ -166,7 +174,13 @@ async def start_ab_test(
     try:
         test = await _ab_svc.start_test(test_id, tenant_id, db)
         await db.commit()
-        return _ok({"test_id": str(test.id), "status": test.status, "started_at": test.started_at.isoformat() if test.started_at else None})
+        return _ok(
+            {
+                "test_id": str(test.id),
+                "status": test.status,
+                "started_at": test.started_at.isoformat() if test.started_at else None,
+            }
+        )
     except ValueError as exc:
         return _err(str(exc))
 
@@ -198,16 +212,16 @@ async def conclude_ab_test(
     若未指定 winner_variant，则表示"无结论"（两组差异不显著，均不推广）。
     """
     try:
-        test = await _ab_svc.conclude_test(
-            test_id, tenant_id, req.winner_variant, db
-        )
+        test = await _ab_svc.conclude_test(test_id, tenant_id, req.winner_variant, db)
         await db.commit()
-        return _ok({
-            "test_id": str(test.id),
-            "status": test.status,
-            "winner_variant": test.winner_variant,
-            "ended_at": test.ended_at.isoformat() if test.ended_at else None,
-        })
+        return _ok(
+            {
+                "test_id": str(test.id),
+                "status": test.status,
+                "winner_variant": test.winner_variant,
+                "ended_at": test.ended_at.isoformat() if test.ended_at else None,
+            }
+        )
     except ValueError as exc:
         return _err(str(exc))
 

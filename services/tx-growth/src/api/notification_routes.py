@@ -4,6 +4,7 @@
 1. POST /api/v1/growth/notifications/send-campaign   发送营销推送（创建异步任务）
 2. GET  /api/v1/growth/notifications/tasks           查询发送任务列表及状态
 """
+
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Optional
@@ -28,6 +29,7 @@ _VALID_CHANNELS = {"sms", "wechat_template", "miniapp_push"}
 # 统一响应
 # ---------------------------------------------------------------------------
 
+
 def ok_response(data: Any) -> dict:
     return {"ok": True, "data": data}
 
@@ -40,16 +42,18 @@ def error_response(code: str, message: str) -> dict:
 # 请求模型
 # ---------------------------------------------------------------------------
 
+
 class SendCampaignRequest(BaseModel):
     campaign_id: str
-    channel: str                          # sms|wechat_template|miniapp_push
+    channel: str  # sms|wechat_template|miniapp_push
     message_template: str
-    target_customer_ids: list[str]        # 目标客户 ID 列表
+    target_customer_ids: list[str]  # 目标客户 ID 列表
 
 
 # ---------------------------------------------------------------------------
 # 内部工具
 # ---------------------------------------------------------------------------
+
 
 def _is_table_missing(exc: SQLAlchemyError) -> bool:
     msg = str(exc).lower()
@@ -74,6 +78,7 @@ def _row_to_task(row) -> dict:
 # ---------------------------------------------------------------------------
 # 端点
 # ---------------------------------------------------------------------------
+
 
 @router.post("/send-campaign")
 async def send_campaign_notification(
@@ -160,14 +165,16 @@ async def send_campaign_notification(
             total_count=total,
             tenant_id=x_tenant_id,
         )
-        return ok_response({
-            "task_id": str(task_id),
-            "campaign_id": str(campaign_id),
-            "channel": req.channel,
-            "status": "pending",
-            "total_count": total,
-            "_note": "发送任务已创建，实际投递由后台异步执行，请通过 GET /tasks 查询进度",
-        })
+        return ok_response(
+            {
+                "task_id": str(task_id),
+                "campaign_id": str(campaign_id),
+                "channel": req.channel,
+                "status": "pending",
+                "total_count": total,
+                "_note": "发送任务已创建，实际投递由后台异步执行，请通过 GET /tasks 查询进度",
+            }
+        )
 
     except ValueError as exc:
         return error_response("INVALID_PARAM", f"参数格式错误: {exc}")
@@ -220,14 +227,16 @@ async def send_campaign_notification(
                     original_error=str(exc),
                 )
                 await db.rollback()
-            return ok_response({
-                "task_id": str(task_id),
-                "campaign_id": req.campaign_id,
-                "channel": req.channel,
-                "status": "pending",
-                "total_count": len(req.target_customer_ids),
-                "_note": "TABLE_NOT_READY: notification_tasks 表尚未创建，已降级写入 hub_notifications",
-            })
+            return ok_response(
+                {
+                    "task_id": str(task_id),
+                    "campaign_id": req.campaign_id,
+                    "channel": req.channel,
+                    "status": "pending",
+                    "total_count": len(req.target_customer_ids),
+                    "_note": "TABLE_NOT_READY: notification_tasks 表尚未创建，已降级写入 hub_notifications",
+                }
+            )
         logger.error("notification.send_campaign_error", error=str(exc), exc_info=True)
         return error_response("DB_ERROR", "创建发送任务失败")
 

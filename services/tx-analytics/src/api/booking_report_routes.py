@@ -28,12 +28,13 @@ GET /api/v1/reports/booking/items       预定品项统计
   - items:      JOIN booking_order_items，GROUP BY dish_id 统计各菜品
   所有查询均包含 tenant_id + store_id 过滤。
 """
+
 from __future__ import annotations
 
 import csv
 import io
 from datetime import date
-from typing import Literal, Optional
+from typing import Optional
 
 import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
@@ -50,6 +51,7 @@ router = APIRouter(prefix="/api/v1/reports/booking", tags=["booking-reports"])
 # ──────────────────────────────────────────────
 # 公共辅助
 # ──────────────────────────────────────────────
+
 
 def _require_store(store_id: Optional[str]) -> str:
     if not store_id:
@@ -98,6 +100,7 @@ def _csv_response(rows: list[dict], filename: str) -> StreamingResponse:
 # ──────────────────────────────────────────────
 # 1. 预定汇总
 # ──────────────────────────────────────────────
+
 
 @router.get("/summary")
 async def api_booking_summary(
@@ -166,6 +169,7 @@ async def api_booking_summary(
 # ──────────────────────────────────────────────
 # 2. 预定占比分析
 # ──────────────────────────────────────────────
+
 
 @router.get("/proportion")
 async def api_booking_proportion(
@@ -282,6 +286,7 @@ async def api_booking_proportion(
 # 3. 预定走势
 # ──────────────────────────────────────────────
 
+
 @router.get("/trend")
 async def api_booking_trend(
     store_id: Optional[str] = Query(None, description="门店ID"),
@@ -341,6 +346,7 @@ async def api_booking_trend(
 # ──────────────────────────────────────────────
 # 4. 预定品项统计
 # ──────────────────────────────────────────────
+
 
 @router.get("/items")
 async def api_booking_items(

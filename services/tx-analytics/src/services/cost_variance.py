@@ -8,6 +8,7 @@
 
 金额单位: 分(fen), int
 """
+
 import uuid
 from datetime import date
 from decimal import ROUND_HALF_UP, Decimal
@@ -41,6 +42,7 @@ ACTION_TEMPLATES = {
 
 # ─── 纯函数 ───
 
+
 def compute_dish_variance(
     dish_name: str,
     theoretical_cost_fen: int,
@@ -62,9 +64,9 @@ def compute_dish_variance(
     """
     variance_fen = actual_cost_fen - theoretical_cost_fen
     if theoretical_cost_fen > 0:
-        variance_rate = (
-            Decimal(variance_fen) / Decimal(theoretical_cost_fen) * 100
-        ).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        variance_rate = (Decimal(variance_fen) / Decimal(theoretical_cost_fen) * 100).quantize(
+            Decimal("0.01"), rounding=ROUND_HALF_UP
+        )
     else:
         variance_rate = Decimal("0.00")
 
@@ -107,11 +109,13 @@ def generate_actions(causes: list[str]) -> list[dict]:
         if cause in seen:
             continue
         seen.add(cause)
-        actions.append({
-            "cause": cause,
-            "cause_label": VARIANCE_CAUSES.get(cause, cause),
-            "action": ACTION_TEMPLATES.get(cause, "进一步分析"),
-        })
+        actions.append(
+            {
+                "cause": cause,
+                "cause_label": VARIANCE_CAUSES.get(cause, cause),
+                "action": ACTION_TEMPLATES.get(cause, "进一步分析"),
+            }
+        )
     return actions
 
 
@@ -126,9 +130,9 @@ def build_variance_report(
     """纯函数：组装偏差分析报告"""
     total_variance = total_actual_fen - total_theoretical_fen
     if total_theoretical_fen > 0:
-        overall_variance_rate = (
-            Decimal(total_variance) / Decimal(total_theoretical_fen) * 100
-        ).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        overall_variance_rate = (Decimal(total_variance) / Decimal(total_theoretical_fen) * 100).quantize(
+            Decimal("0.01"), rounding=ROUND_HALF_UP
+        )
     else:
         overall_variance_rate = Decimal("0.00")
 
@@ -164,6 +168,7 @@ def build_variance_report(
 
 
 # ─── 业务函数 ───
+
 
 def analyze_cost_variance(
     store_id: uuid.UUID,
@@ -220,6 +225,7 @@ def analyze_cost_variance(
 
 # ─── DB 访问与计算 ───
 
+
 def _calculate_dish_level_variances(
     store_id: uuid.UUID,
     target_date: date,
@@ -270,7 +276,8 @@ def _calculate_ingredient_level_variances(
         from sqlalchemy import text
 
         # 取当日实际消耗
-        result = db.execute(text("""
+        result = db.execute(
+            text("""
             SELECT it.ingredient_id,
                    i.ingredient_name,
                    SUM(ABS(it.quantity)) as actual_qty,
@@ -284,7 +291,9 @@ def _calculate_ingredient_level_variances(
               AND DATE(it.transaction_time) = :target_date
               AND it.is_deleted = FALSE
             GROUP BY it.ingredient_id, i.ingredient_name
-        """), {"store_id": store_id, "tenant_id": tenant_id, "target_date": target_date})
+        """),
+            {"store_id": store_id, "tenant_id": tenant_id, "target_date": target_date},
+        )
 
         variances = []
         for row in result.mappings().all():
@@ -297,15 +306,17 @@ def _calculate_ingredient_level_variances(
                 variance_rate_pct=Decimal("5.26") if theoretical_fen > 0 else Decimal("0"),
             )
 
-            variances.append({
-                "ingredient_id": str(row["ingredient_id"]),
-                "ingredient_name": row.get("ingredient_name", ""),
-                "theoretical_fen": theoretical_fen,
-                "actual_fen": actual_fen,
-                "variance_fen": variance_fen,
-                "cause": cause,
-                "cause_label": VARIANCE_CAUSES.get(cause, cause),
-            })
+            variances.append(
+                {
+                    "ingredient_id": str(row["ingredient_id"]),
+                    "ingredient_name": row.get("ingredient_name", ""),
+                    "theoretical_fen": theoretical_fen,
+                    "actual_fen": actual_fen,
+                    "variance_fen": variance_fen,
+                    "cause": cause,
+                    "cause_label": VARIANCE_CAUSES.get(cause, cause),
+                }
+            )
         return variances
 
     except (ImportError, AttributeError):
@@ -323,7 +334,9 @@ def _get_daily_sold_with_costs(
         return []
     try:
         from sqlalchemy import text
-        result = db.execute(text("""
+
+        result = db.execute(
+            text("""
             SELECT oi.dish_id, d.dish_name,
                    SUM(oi.quantity) as quantity_sold,
                    AVG(oi.food_cost_fen) as theoretical_cost_fen,
@@ -338,18 +351,22 @@ def _get_daily_sold_with_costs(
               AND o.is_deleted = FALSE
               AND oi.is_deleted = FALSE
             GROUP BY oi.dish_id, d.dish_name, d.cost_fen
-        """), {"store_id": store_id, "tenant_id": tenant_id, "target_date": target_date})
+        """),
+            {"store_id": store_id, "tenant_id": tenant_id, "target_date": target_date},
+        )
         rows = []
         for row in result.mappings().all():
-            rows.append({
-                "dish_id": row["dish_id"],
-                "dish_name": row.get("dish_name", ""),
-                "quantity_sold": int(row.get("quantity_sold", 0)),
-                "theoretical_cost_fen": int(row.get("theoretical_cost_fen") or row.get("dish_base_cost_fen") or 0),
-                "actual_cost_fen": int(row.get("dish_base_cost_fen") or row.get("theoretical_cost_fen") or 0),
-                "price_changed": False,
-                "waste_above_target": False,
-            })
+            rows.append(
+                {
+                    "dish_id": row["dish_id"],
+                    "dish_name": row.get("dish_name", ""),
+                    "quantity_sold": int(row.get("quantity_sold", 0)),
+                    "theoretical_cost_fen": int(row.get("theoretical_cost_fen") or row.get("dish_base_cost_fen") or 0),
+                    "actual_cost_fen": int(row.get("dish_base_cost_fen") or row.get("theoretical_cost_fen") or 0),
+                    "price_changed": False,
+                    "waste_above_target": False,
+                }
+            )
         return rows
     except (ImportError, AttributeError):
         return []

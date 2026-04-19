@@ -1,18 +1,19 @@
 """营销方案 API — 计算、创建、列出方案"""
+
 import json
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Header
 from pydantic import BaseModel, Field
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import text
-from sqlalchemy.exc import SQLAlchemyError
-
-from shared.ontology.src.database import get_db
 from services.marketing_engine import (
     SCHEME_TYPES,
     apply_schemes_in_order,
 )
+from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from shared.ontology.src.database import get_db
 
 router = APIRouter(prefix="/api/v1/member/marketing-schemes", tags=["marketing"])
 
@@ -20,6 +21,7 @@ router = APIRouter(prefix="/api/v1/member/marketing-schemes", tags=["marketing"]
 # ---------------------------------------------------------------------------
 # Request / Response Models
 # ---------------------------------------------------------------------------
+
 
 class OrderItem(BaseModel):
     dish_id: str
@@ -61,6 +63,7 @@ class CreateSchemeReq(BaseModel):
 # 辅助函数
 # ---------------------------------------------------------------------------
 
+
 async def _set_tenant(db: AsyncSession, tenant_id: str) -> None:
     """设置当前会话的 tenant_id，用于 RLS 隔离"""
     await db.execute(text("SELECT set_config('app.tenant_id', :tid, TRUE)"), {"tid": tenant_id})
@@ -69,6 +72,7 @@ async def _set_tenant(db: AsyncSession, tenant_id: str) -> None:
 # ---------------------------------------------------------------------------
 # Endpoints
 # ---------------------------------------------------------------------------
+
 
 @router.get("")
 async def list_schemes(

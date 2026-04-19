@@ -12,6 +12,7 @@
 
 金额单位：元（conversion_value 使用 NUMERIC(12,2)）
 """
+
 import secrets
 import uuid
 from dataclasses import dataclass

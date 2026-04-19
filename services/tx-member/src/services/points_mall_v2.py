@@ -18,6 +18,7 @@
 金额单位全部为分（fen），积分为正整数。
 禁止 except Exception，所有捕获指定具体类型。
 """
+
 from __future__ import annotations
 
 import json
@@ -43,6 +44,7 @@ AUTO_FULFILL_TYPES = frozenset({"coupon", "stored_value"})
 
 
 # ── 工具函数 ──────────────────────────────────────────────────
+
 
 def _now_utc() -> datetime:
     return datetime.now(timezone.utc)

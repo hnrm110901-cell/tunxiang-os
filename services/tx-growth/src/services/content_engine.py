@@ -5,6 +5,7 @@
 
 v144 DB 化：移除内存存储，改为 async SQLAlchemy + content_templates 表
 """
+
 import json
 import os
 import uuid
@@ -41,7 +42,15 @@ _BUILTIN_TEMPLATES: dict[str, dict] = {
         "name": "朋友圈时令推广",
         "content_type": "moments",
         "body_template": "🌿 {season_theme}\n{dish_name} | {dish_description}\n主厨说：「{chef_quote}」\n📍 {store_name}·{store_address}\n🎁 {benefit_text}",
-        "variables": ["season_theme", "dish_name", "dish_description", "chef_quote", "store_name", "store_address", "benefit_text"],
+        "variables": [
+            "season_theme",
+            "dish_name",
+            "dish_description",
+            "chef_quote",
+            "store_name",
+            "store_address",
+            "benefit_text",
+        ],
     },
     "sms_reactivation": {
         "name": "短信召回",
@@ -77,7 +86,15 @@ _BUILTIN_TEMPLATES: dict[str, dict] = {
         "name": "宴会邀请",
         "content_type": "banquet_invite",
         "body_template": "尊敬的{customer_name}：\n\n{brand_name}诚邀您参加{event_name}。\n\n📅 时间：{event_date}\n📍 地点：{venue}\n🍽️ 菜单亮点：{menu_highlight}\n\n{benefit_text}\n\n期待您的光临！",
-        "variables": ["customer_name", "brand_name", "event_name", "event_date", "venue", "menu_highlight", "benefit_text"],
+        "variables": [
+            "customer_name",
+            "brand_name",
+            "event_name",
+            "event_date",
+            "venue",
+            "menu_highlight",
+            "benefit_text",
+        ],
     },
 }
 
@@ -86,13 +103,21 @@ _BUILTIN_TEMPLATES: dict[str, dict] = {
 # ContentEngine
 # ---------------------------------------------------------------------------
 
+
 class ContentEngine:
     """内容生成引擎 — 基于品牌策略与人群特征生成内容"""
 
     CONTENT_TYPES = [
-        "wecom_chat", "moments", "miniapp_banner", "sms",
-        "dish_story", "new_dish_promo", "seasonal_event",
-        "referral_invite", "store_manager_script", "banquet_invite",
+        "wecom_chat",
+        "moments",
+        "miniapp_banner",
+        "sms",
+        "dish_story",
+        "new_dish_promo",
+        "seasonal_event",
+        "referral_invite",
+        "store_manager_script",
+        "banquet_invite",
     ]
 
     # ------------------------------------------------------------------
@@ -509,12 +534,15 @@ class ContentEngine:
             },
         }
 
-        return generators.get(content_type, {
-            "title": f"{content_type}内容",
-            "body": f"为{target_segment}生成的{content_type}内容",
-            "call_to_action": "了解更多",
-            "recommended_image_tags": ["通用"],
-        })
+        return generators.get(
+            content_type,
+            {
+                "title": f"{content_type}内容",
+                "body": f"为{target_segment}生成的{content_type}内容",
+                "call_to_action": "了解更多",
+                "recommended_image_tags": ["通用"],
+            },
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -602,9 +630,7 @@ class PersonalizedContentEngine:
         customer = await self._fetch_customer(customer_id, tenant_id)
         vars_dict = self._build_template_vars(customer, extra_vars or {})
         actual_key = self._select_template_variant(template_key, customer)
-        template = self.CONTENT_TEMPLATES.get(
-            actual_key, self.CONTENT_TEMPLATES["generic"]
-        )
+        template = self.CONTENT_TEMPLATES.get(actual_key, self.CONTENT_TEMPLATES["generic"])
         return {
             "title": self._safe_format(template["title"], vars_dict),
             "description": self._safe_format(template["description"], vars_dict),
@@ -630,9 +656,7 @@ class PersonalizedContentEngine:
             days_since = 999
 
         favorite_dishes: list = customer.get("favorite_dishes", [])
-        favorite: str = (
-            favorite_dishes[0]["name"] if favorite_dishes else "招牌菜"
-        )
+        favorite: str = favorite_dishes[0]["name"] if favorite_dishes else "招牌菜"
 
         base: dict = {
             "display_name": customer.get("display_name") or "亲",
@@ -672,6 +696,7 @@ class PersonalizedContentEngine:
             return template_str.format(**vars_dict)
         except KeyError:
             import re
+
             result = template_str
             for key in re.findall(r"\{(\w+)\}", template_str):
                 result = result.replace(f"{{{key}}}", vars_dict.get(key, ""))

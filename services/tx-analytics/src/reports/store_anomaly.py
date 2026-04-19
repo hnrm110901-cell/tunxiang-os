@@ -36,7 +36,11 @@ ORDER BY anomaly_count DESC
 
 DIMENSIONS = ["anomaly_type", "severity"]
 METRICS = [
-    "anomaly_count", "affected_days", "affected_order_count",
-    "total_amount_fen", "avg_amount_fen", "type_pct",
+    "anomaly_count",
+    "affected_days",
+    "affected_order_count",
+    "total_amount_fen",
+    "avg_amount_fen",
+    "type_pct",
 ]
 FILTERS = ["start_date", "end_date", "store_id"]
