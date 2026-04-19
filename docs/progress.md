@@ -4,6 +4,73 @@
 
 ---
 
+## 2026-04-19 PR-W1.4b：FinancialVoucherService 接入账期校验
+
+### 本次会话目标
+W1.4b: 把 W1.4 的 `AccountingPeriodService` 注入 `FinancialVoucherService`，写凭证前校验 `voucher_date` 所属 period 必须 open。closed/locked 直接拒绝（引导红冲）。
+
+无新迁移、无新表 — 纯 service 层集成 + 新测试。
+
+Tier 级别：🔴 **Tier 1**（资金安全 / 金税四期审计红线）。
+
+### 不得触碰的边界
+- [x] 向前兼容: 不传 period_service 的构造必须保持 W1.3 行为（零破坏）
+- [x] 不改 void 路径 — 作废是审计操作，不受账期影响
+- [x] 不改迁移 — 本 PR 零 DDL
+
+### 涉及范围
+- 改动：`services/tx-finance/src/services/financial_voucher_service.py` — 注入 + create() period 校验
+- 新测试：`services/tx-finance/src/tests/test_voucher_period_check_tier1.py`
+- Tier 级别：Tier 1
+
+### 完成状态
+- [x] **依赖注入** `FinancialVoucherService.__init__(period_service: AccountingPeriodService | None = None)`
+  - 默认 None 保留 W1.3 行为（旧调用方无感）
+  - 非 None 时启用账期校验
+- [x] **create() 校验加入** 位置：借贷平衡校验后、幂等预查前
+  - 原因：账期失败走最便宜路径（避免 DB SELECT）
+  - 使用 `is_date_writable(biz_date, auto_ensure=True)` 自动懒建未来 period
+  - 失败时用 `find_period_for_date` 查具体状态，错误消息带 `red_flush` 引导
+- [x] **Tier 1 测试** `src/tests/test_voucher_period_check_tier1.py`（**10 passed / 0.25s**）
+  - 向前兼容：未注入 period_service 时 skip 校验
+  - 账期 open：校验通过，add + flush 正常
+  - 账期 closed：ValueError，消息含 "2026-04 状态=closed" + "red_flush"
+  - 账期 locked：ValueError，消息含 "locked"
+  - 账期 None + not writable：兜底 status='unknown' 消息
+  - auto_ensure：未来月份（2099-01）自动懒建 open
+  - 校验顺序：借贷不平衡 → 优先出错（账期检查不跑）
+  - 校验顺序：空 lines → 优先出错
+  - 校验顺序：账期 closed → 即便有 event_id 也不走幂等预查（不浪费 DB SELECT）
+  - void 路径不受影响：period_service.is_date_writable 不被调用
+- [x] **全 Wave 1 回归**：21 W1.0 + 19 W1.1 + 24 W1.2 + 25 W1.3 + 48 W1.4 + 10 W1.4b = **147 passed / 0.35s**
+- [x] **DEV Postgres 端到端**（真实 asyncpg + AsyncSession，非 mock）
+  - #1 账期 open → create 成功 ✅
+  - #2 月结 2026-04 后 → 2026-04-XX 凭证被拒，DB 验证 V_CLOSED_001 未入库 ✅
+  - #3 年结锁定 2027 后 → 2027-06 凭证被拒，消息 "locked" ✅
+  - #4 2099-01 账期不存在 + auto_ensure → 懒建 open + 写入成功 ✅
+  - #5 未注入 period_service（W1.3 行为）→ 跳过校验，即便 closed 月也写入 ✅
+
+### 关键决策
+- **period_service 通过构造注入而非 method 参数** — 一个 `FinancialVoucherService` 实例生命周期内的账期校验行为是固定的（由 DI 决定）。method 参数每次传会增加调用方复杂度，且容易忘记。
+- **auto_ensure=True 硬编码** — service 内部决定，不开放给调用方。理由：caller 不该有"要不要懒建 period"的选项，这是 service 的职责。
+- **校验放在借贷平衡后、幂等预查前** — 正确的失败路径优先级：ValueError（零成本）→ 账期 SELECT（一次 SELECT）→ 幂等 SELECT（另一次 SELECT）→ 真写入。
+- **账期 closed 连幂等命中也拒** — 保守策略。理论上"返回已存在的凭证"不算新写入，但账期 closed 后调用方本就不该再拿这张历史凭证做任何"确认性"操作。
+- **void 不受账期校验** — 作废是审计操作，不引入新分录。即便账期 closed/locked，误录凭证仍应可审计作废（但 exported 已经走 red_flush 了，也不会走 void）。
+- **错误消息引导 red_flush** — "请走红冲 red_flush 或先重开账期" 显式告诉调用方下一步。
+
+### 下一步
+- CLAUDE.md §19 独立验证（建议开新会话跑 CFO + DBA）
+- **PR-W1.5**: 红冲 API（red_flush 字段 + 状态机） — 解锁 closed/locked 凭证写入的唯一合法路径
+- **PR-W1.6**: 历史 entries → lines 回填
+- **PR-W1.7**: voucher_generator 接入 FinancialVoucherService（切调用方）
+
+### 已知风险
+- **period_service 注入是单例模式** — 如果 caller 共享 service 实例, 切换 tenant 场景下 period_service 的 session 上下文可能串. 但当前所有方法都接收 session 参数, session 里已含 RLS 上下文, 实际安全. 文档已说明.
+- **auto_ensure=True 默认隐含副作用** — 写凭证会"偶然"创建 period. 若外层事务回滚, period 也跟着回滚（同事务），行为正确但可能令监控告警看到短暂的 "period 存在又消失"。
+- **closed → reopen → write 流程需 caller 自管** — service 不提供原子 "reopen + write" 组合。caller 应在同事务先 reopen，再调 create。
+
+---
+
 ## 2026-04-19 PR-W1.4：accounting_periods 账期表 + 状态机
 
 ### 本次会话目标
