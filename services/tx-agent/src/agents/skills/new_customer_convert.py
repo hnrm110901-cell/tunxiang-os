@@ -34,6 +34,9 @@ class NewCustomerConvertAgent(SkillAgent):
     priority = "P0"
     run_location = "cloud"
 
+    # Sprint D1 / PR 批次 3：新客权益 = 让利成本，需 margin 校验避免首单深度亏损
+    constraint_scope = {"margin"}
+
     def get_supported_actions(self) -> list[str]:
         return [
             "identify_new_customers",

@@ -22,6 +22,9 @@ class MenuAdvisorAgent(SkillAgent):
     priority = "P1"
     run_location = "cloud"
 
+    # Sprint D1 / PR 批次 3：定价优化/上下架直接影响毛利
+    constraint_scope = {"margin"}
+
     def get_supported_actions(self) -> list[str]:
         return [
             "analyze_dish_quadrant",

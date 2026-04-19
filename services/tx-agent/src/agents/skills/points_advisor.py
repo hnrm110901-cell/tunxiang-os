@@ -310,6 +310,9 @@ class PointsAdvisorAgent(SkillAgent):
     description = "月度自动积分发放、赛马排名周报生成、员工激励策略推荐"
     priority = "P2"
     run_location = "cloud"
+
+    # Sprint D1 / PR 批次 3：积分激励 = 员工奖金成本（人力毛利维度）
+    constraint_scope = {"margin"}
     agent_level = 3  # 全自主
 
     def get_supported_actions(self) -> list[str]:

@@ -47,6 +47,9 @@ class SeasonalCampaignAgent(SkillAgent):
     priority = "P1"
     run_location = "cloud"
 
+    # Sprint D1 / PR 批次 3：节气活动折扣/让利直接冲击毛利
+    constraint_scope = {"margin"}
+
     def get_supported_actions(self) -> list[str]:
         return [
             "get_seasonal_calendar",

@@ -30,6 +30,9 @@ class SmartMenuAgent(SkillAgent):
     priority = "P0"
     run_location = "cloud"
 
+    # Sprint D1 / PR 批次 3：菜品研发核心是成本/毛利仿真（simulate_cost 动作直接算 margin）
+    constraint_scope = {"margin"}
+
     def get_supported_actions(self) -> list[str]:
         return [
             "simulate_cost", "recommend_pilot_stores", "run_dish_review",

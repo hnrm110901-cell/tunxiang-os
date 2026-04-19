@@ -25,6 +25,9 @@ class PersonalizationAgent(SkillAgent):
     run_location = "cloud"
     agent_level = 3  # 完全自主（生成文案无需审批）
 
+    # Sprint D1 / PR 批次 3：个性化推荐倾向推高毛利菜品，需 margin 校验避免推销滞销低毛利品
+    constraint_scope = {"margin"}
+
     def get_supported_actions(self) -> list[str]:
         return [
             "generate_dish_reason",

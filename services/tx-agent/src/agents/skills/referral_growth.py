@@ -29,6 +29,9 @@ class ReferralGrowthAgent(SkillAgent):
     priority = "P1"
     run_location = "cloud"
 
+    # Sprint D1 / PR 批次 3：裂变奖励 = 单位获客成本，需 margin 校验避免奖励超过 LTV
+    constraint_scope = {"margin"}
+
     def get_supported_actions(self) -> list[str]:
         return [
             "design_referral_campaign",
