@@ -4,6 +4,62 @@
 
 ---
 
+## 2026-04-19 PR-W2.A：以前年度损益调整（v278 + 6901 科目，最棘手合规场景）
+
+### 本次会话目标
+Wave 2 Batch 2 **首 PR**，最高优先级（CFO P0-1，年化千万级）。2027-03 发现 2026-12 漏账 ¥15,000：
+- reopen 2026-12？已 locked 不可重开
+- red_flush？需要原凭证存在（本就没有）
+- create 2026-12-XX？账期校验直接拒
+→ **Wave 1+2 全军覆没，W2.A 提供新语义**。
+
+Tier 级别：🔴 **Tier 1**（最棘手合规场景）。
+
+### 完成状态
+- [x] **v278 migration**:
+  - ALTER `voucher_type` VARCHAR(20) → 40（腾空间给 'prior_period_adjustment' 25 字符）
+  - ADD 2 列: `source_period_year` / `source_period_month`（NULLABLE）
+  - CHECK `chk_fv_source_period` 两列同时 NULL 或同时非空 + 范围 CHECK（**显式 IS NOT NULL 防 SQL 三值逻辑穿透**）
+  - Partial index `ix_fv_source_period WHERE source_period_year IS NOT NULL`（审计查询）
+- [x] **ORM**: 2 字段 + `is_prior_period_adjustment` 属性 + CheckConstraint 镜像 + to_dict 暴露
+- [x] **VoucherCreateInput**: 加 `source_period_year / source_period_month` 字段
+- [x] **Service `create_prior_period_adjustment`**:
+  - 前置校验：两列同时非空 / 范围 / source_period 必须 ≤ voucher_date 月
+  - 转发到 `create()` 正常路径（账期校验 / 幂等 / tenant 断言 / 双写 lines+entries 全复用）
+- [x] **ACCOUNT_MAPPING 补 `prior_period_adjustment`** → 借 1403 原材料 / 贷 6901 以前年度损益调整
+- [x] **Tier 1 测试** 20 passed:
+  - 7 测试覆盖 service 路径（成功/source 缺/越界/未来/同期边界）
+  - 3 测试覆盖 ORM 属性 + to_dict
+  - 2 测试覆盖 ACCOUNT_MAPPING 6901
+  - 8 测试覆盖 v278 migration 结构
+- [x] 全回归：Wave 1+B+W2 = **280 passed**
+- [x] **DEV Postgres 端到端** 6 场景：
+  - #1 原路径尝试 2026-12 → 拒 ✅
+  - #2 W2.A 新路径 2027-03-10 补录 2026-12 → 成功 ✅
+  - #3 DB 层字段 + 源期间元数据 ✅
+  - #4 **CHECK 兜底**：单填一列 → IntegrityError（修复 SQL NULL 三值陷阱后）✅
+  - #5 审计查询: 按 source_period_year=2026 查跨期调整列表 ✅
+  - #6 service 层：source_period 未来 → ValueError ✅
+
+### 关键决策
+- **CHECK 显式 IS NOT NULL** — 原写法 `(year BETWEEN 2020..) AND (month BETWEEN 1..)` 在 month=NULL 时返 NULL，`FALSE OR NULL = NULL`，CHECK pass。陷阱只在 DEV PG 端到端时才暴露，ORM 镜像也必须显式 IS NOT NULL。
+- **voucher_type VARCHAR(20) → (40)** — 'prior_period_adjustment' 25 字符，VARCHAR(20) 存不下。扩 TYPE 是必改的。
+- **转发到 create() 而非独立写路径** — 账期校验 / 幂等 / tenant 断言 / 双写全复用 W1-B1-W2.B/C/E 积累的能力。service 路径的差异只在"前置校验 source_period"。
+- **6901 科目贷方默认** — "冲减以前年度利润"是补录少计费用最常见场景。业务场景不同时，caller 传自己的科目到 lines，ACCOUNT_MAPPING 只是兜底默认。
+- **source_period 允许 = 当期月** — 边界：2027-03 补录 2027-03 初的凭证（早月末才发现漏账），允许。只禁未来。
+
+### 已知风险
+- 业务逻辑: **借/贷方向取决于具体调整语义**（补录少计费用 vs 少计收入方向相反）。当前 ACCOUNT_MAPPING 只给默认，caller 必须理解 6901 借贷语义。Wave 2 后续可加"场景模板"封装。
+- 与红冲的边界: 如果历史凭证存在但**金额错**，走 red_flush（生成反向+重开正确凭证）。如果历史凭证**根本没生成过**，走 W2.A。service 文档已说清。
+
+### 下一步 Batch 2 剩余
+- **W2.F**: red_flush operator_id / reason 入 DB（审计字段补齐）
+- **W2.H**: backfill tenant_id=None BYPASS 校验
+- **W2.I**: void + red_flush 组合卡死
+- **W2.O**: 红冲 voucher_date 语义
+
+---
+
 ## 2026-04-19 PR-W2.D：红冲 UNIQUE 升级防孤儿（v276 迁移）
 
 ### 本次会话目标
