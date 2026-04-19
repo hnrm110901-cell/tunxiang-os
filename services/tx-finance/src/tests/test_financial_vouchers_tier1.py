@@ -330,3 +330,24 @@ class TestV264MigrationFileStructure:
             "大表回填方案必须指向外部脚本"
         assert "SKIP LOCKED" in migration_source or "独立事务" in migration_source, \
             "外部脚本方案必须说明每批独立事务"
+
+    def test_backfill_has_inline_threshold_guard(self, migration_source):
+        """[BLOCKER-B4 独立验证响应]: UPDATE 全表前必须预检行数阈值.
+
+        原风险 (DBA P0-1): 百万级 UPDATE 在 alembic 主事务内 → WAL 爆炸 + 主从 lag.
+        修复: 迁移里预查 COUNT(*), 超阈值 RAISE EXCEPTION 强制走外部脚本.
+        """
+        # 预检查要求: 能找到 "RAISE EXCEPTION" + 阈值 (50000 或 BACKFILL_INLINE_THRESHOLD)
+        assert "RAISE EXCEPTION" in migration_source, (
+            "step 3 UPDATE 前必须 RAISE EXCEPTION guard"
+        )
+        # 阈值要有硬编码 or 变量声明
+        assert re.search(
+            r"(threshold.{0,30}50000|BACKFILL_INLINE_THRESHOLD|null_rows\s*>\s*threshold)",
+            migration_source, re.I,
+        ), "必须有阈值比较逻辑 (默认 5 万行)"
+        # Exception 消息必须引导外部脚本
+        assert re.search(
+            r"backfill_voucher_date\.sh|external.*script|外部.*脚本",
+            migration_source, re.I,
+        ), "Exception 消息必须提示外部脚本路径"
