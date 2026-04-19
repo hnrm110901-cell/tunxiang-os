@@ -4,6 +4,68 @@
 
 ---
 
+## 2026-04-19 PR-W1.7：VoucherGenerator 接入 FinancialVoucherService（Wave 1 收尾）
+
+### 本次会话目标
+W1.7: 把 `voucher_generator` 的 ERP 推送前生成能力对接到 W1.3 `FinancialVoucherService`。让"生成 ERPVoucher → 写 DB SSOT → 推 ERP → 标 exported"成为端到端编排，收尾 Wave 1。
+
+Tier 级别：🔴 **Tier 1**。
+
+### 涉及范围
+- `services/tx-finance/src/services/voucher_generator.py` — 新增 `_VOUCHER_TYPE_ERP_TO_DB` + `persist_to_db()` + `persist_and_push()` + `_looks_like_uuid()`
+- 新测试 `test_voucher_generator_persist_tier1.py`
+- 无迁移，无 schema 变更
+
+### 完成状态
+- [x] **VoucherType 中英映射** 常量表（收→receipt / 付→payment / 记→cost / 转→cost）
+- [x] **`persist_to_db(erp_voucher, *, voucher_service, session, voucher_no=None, event_type=None, event_id=None)`**
+  - 把 `ERPVoucher` pydantic 转换为 `VoucherCreateInput` dataclass
+  - 调用 `FinancialVoucherService.create()`（含幂等 / 账期校验 / 双写 entries+lines）
+  - `voucher_no` 默认 `AUTO_{erp_voucher.voucher_id[:8]}`（生产应传业务编号）
+  - `source_id` 非 UUID 字符串时自动置 `None`（防 `UUID()` 报错 — 常见场景如 `"S001_2026-04-19"`）
+- [x] **`persist_and_push(erp_voucher, *, voucher_service, erp_type, session, ...)`**
+  - 三步编排：persist_to_db（DB 先写）→ push_to_erp（推 ERP）→ 推成功时 `status='exported' + exported_at`
+  - DB 写失败 → ERP 推送不执行（测试覆盖）
+  - 推 FAILED / QUEUED → `status` 不变（仍 draft，可重推）
+  - 推 SUCCESS 才标 exported
+- [x] **`_looks_like_uuid(s)` 辅助** 静态方法 — 字符串是否 UUID 格式
+- [x] **Tier 1 测试** `src/tests/test_voucher_generator_persist_tier1.py`（**18 passed / 3.81s**）
+  - VoucherType 映射（4）
+  - persist_to_db 字段转换 + voucher_no / source_id / 幂等（5）
+  - persist_and_push 成功/失败/QUEUED/顺序（4）
+  - 账期校验集成（1）— closed 月 ERPVoucher 被 FinancialVoucherService 拒
+  - `_looks_like_uuid` 辅助（4）
+- [x] **全 Wave 1 回归**：21 + 19 + 24 + 25 + 48 + 10 + 29 + 20 + 18 = **214 passed / 0.73s**
+- [x] **DEV Postgres 端到端**（真实 asyncpg，完整链路）
+  - #1 ERPVoucher (RECEIPT) → DB 写 financial_vouchers `voucher_type='receipt'` + 2 lines ✅
+  - #2 中英映射：PAYMENT→payment / MEMO→cost ✅
+  - #3 persist_and_push 成功：DB `status='exported', exported_at` 落盘，push_result.status=SUCCESS ✅
+  - #4 persist_and_push 失败：DB `status='draft'`（可重推），凭证已持久化 ✅
+  - #5 event_id 幂等：两次 persist 同 event_id → 同 DB voucher，DB 中只 1 条 ✅
+
+### 关键决策
+- **持久化在推送之前** — DB 是 SSOT，ERP 推送是异步同步行为。即便推 ERP 失败，凭证已持久化，可重推/运维处理。
+- **推送 SUCCESS 才标 exported** — FAILED/QUEUED 保持 draft，下次运维 drain / 重推时走"非 exported → 推成功 → 标 exported"正常流程。
+- **source_id 非 UUID 置 None** — 历史 `voucher_generator` 用 `f"{store_id}_{date_str}"` 作 source_id，新 ORM 要求 UUID。保守转换防报错。
+- **voucher_no 默认 AUTO_ 前缀** — 明确标记"生成器默认号"，与业务编号 V_XJ_... 区分。生产调用方应传真实 voucher_no。
+- **VoucherType 中英映射** — ERP 侧用"收/付/记/转"（金蝶/用友通用叫法），DB 侧用 sales/cost/payment/receipt。映射放常量表，W2 易扩展。
+
+### 下一步
+- CLAUDE.md §19 独立验证（建议 CFO + DBA）— **Wave 1 完整链路独立验证**
+- **Wave 1 完成，可开始 Wave 2**:
+  - W2.1: DB GENERATED 列（total_amount 从 total_amount_fen 派生）
+  - W2.2: operator_id / red_flush_reason / voided_reason 入审计表（独立 `voucher_audit_logs`）
+  - W2.3: POS 适配器接入 FinancialVoucherService（tx-trade 的 cashier_engine 写 voucher）
+  - W2.4: voucher_generator 改 `generate_from_daily_revenue` 直接返回 `persist_and_push`（破坏性，需切 caller）
+
+### 已知风险
+- **`persist_and_push` 不是原子事务** — DB 写成功后 push 失败，凭证成了"孤儿 draft"。需监控告警（可查 `status='draft' AND created_at < NOW() - interval '1 hour'`）。
+- **`voucher_no` 默认 AUTO_ 前缀冲突** — 多张 ERPVoucher 的 voucher_id 前 8 位理论上可能撞（生日悖论 ~2^16 次后碰撞概率 >50%）。生产务必传真实 voucher_no。
+- **`source_id` 丢失字符串信息** — 非 UUID 的 source_id 被置 None，与原 ERPVoucher.source_id 有差异。ERP 推送仍能带原 source_id（在 ERPVoucher pydantic 里）。W2 加独立 `source_ref VARCHAR` 字段容纳任意字符串。
+- **VoucherType.TRANSFER → 'cost' 不精确** — 转账凭证在会计实务上独立，但当前 DB 只支持 4 枚举。W2 扩 `voucher_type` 枚举加 `transfer`。
+
+---
+
 ## 2026-04-19 PR-W1.6：历史 entries JSONB → lines 回填服务
 
 ### 本次会话目标
