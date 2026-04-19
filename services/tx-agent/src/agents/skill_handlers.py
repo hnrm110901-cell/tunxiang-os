@@ -7,6 +7,7 @@ SkillEventConsumer 路由到这里的 handler，职责：
 
 设计原则：handler 必须是幂等的，失败不影响主业务流程。
 """
+
 import os
 
 import httpx
@@ -17,9 +18,7 @@ logger = structlog.get_logger(__name__)
 _ORG_URL = os.getenv("TX_ORG_SERVICE_URL", "http://tx-org:8012")
 
 
-async def handle_order_skill_events(
-    skill_name: str, event_type: str, payload: dict
-) -> None:
+async def handle_order_skill_events(skill_name: str, event_type: str, payload: dict) -> None:
     """处理 order-core Skill 的事件。
 
     监听事件：
@@ -83,9 +82,7 @@ async def handle_order_skill_events(
         )
 
 
-async def handle_member_skill_events(
-    skill_name: str, event_type: str, payload: dict
-) -> None:
+async def handle_member_skill_events(skill_name: str, event_type: str, payload: dict) -> None:
     """处理 member-core Skill 的事件。
 
     监听事件：
@@ -150,9 +147,7 @@ async def handle_member_skill_events(
         )
 
 
-async def handle_inventory_skill_events(
-    skill_name: str, event_type: str, payload: dict
-) -> None:
+async def handle_inventory_skill_events(skill_name: str, event_type: str, payload: dict) -> None:
     """处理 inventory-core Skill 的事件。
 
     监听事件：
@@ -210,9 +205,7 @@ async def handle_inventory_skill_events(
         )
 
 
-async def handle_safety_skill_events(
-    skill_name: str, event_type: str, payload: dict
-) -> None:
+async def handle_safety_skill_events(skill_name: str, event_type: str, payload: dict) -> None:
     """处理 safety-compliance Skill 的事件。
 
     监听事件：
@@ -270,9 +263,7 @@ async def handle_safety_skill_events(
         )
 
 
-async def handle_finance_skill_events(
-    skill_name: str, event_type: str, payload: dict
-) -> None:
+async def handle_finance_skill_events(skill_name: str, event_type: str, payload: dict) -> None:
     """处理财务类 Skill 的事件（deposit/wine_storage/credit）。
 
     监听事件：
@@ -350,9 +341,7 @@ async def handle_finance_skill_events(
         )
 
 
-async def handle_approval_skill_events(
-    skill_name: str, event_type: str, payload: dict
-) -> None:
+async def handle_approval_skill_events(skill_name: str, event_type: str, payload: dict) -> None:
     """处理 approval-flow Skill 的事件。
 
     监听事件：

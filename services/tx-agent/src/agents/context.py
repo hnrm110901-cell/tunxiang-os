@@ -50,6 +50,7 @@ class IntelReporterAgent(SkillAgent):
 CI 门禁强制 `waived_reason` 长度 ≥30 字符，禁用 ["N/A","不适用","跳过"]
 类空洞说辞（Sprint D1 后续批次的 CI 规则，本 PR 仅落基础结构）。
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -90,9 +91,7 @@ class ConstraintContext:
     cost_fen: Optional[int] = None
     ingredients: Optional[list[IngredientSnapshot]] = None
     estimated_serve_minutes: Optional[float] = None
-    constraint_scope: set[ConstraintScopeName] = field(
-        default_factory=lambda: {"margin", "safety", "experience"}
-    )
+    constraint_scope: set[ConstraintScopeName] = field(default_factory=lambda: {"margin", "safety", "experience"})
     waived_reason: Optional[str] = None
 
     @classmethod

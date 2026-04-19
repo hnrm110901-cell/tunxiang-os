@@ -66,25 +66,163 @@ SEED_CATEGORIES = [
 SEED_SUPPLIERS = [
     {"id": "sup-fish", "name": "湘江水产", "tenant_id": SEED_TENANT_ID, "category": "水产", "price_increased": True},
     {"id": "sup-meat", "name": "宁乡牧业", "tenant_id": SEED_TENANT_ID, "category": "肉类", "price_increased": False},
-    {"id": "sup-veg", "name": "浏阳蔬菜基地", "tenant_id": SEED_TENANT_ID, "category": "蔬菜", "price_increased": False},
-    {"id": "sup-seasoning", "name": "湘味调料厂", "tenant_id": SEED_TENANT_ID, "category": "调料", "price_increased": False},
+    {
+        "id": "sup-veg",
+        "name": "浏阳蔬菜基地",
+        "tenant_id": SEED_TENANT_ID,
+        "category": "蔬菜",
+        "price_increased": False,
+    },
+    {
+        "id": "sup-seasoning",
+        "name": "湘味调料厂",
+        "tenant_id": SEED_TENANT_ID,
+        "category": "调料",
+        "price_increased": False,
+    },
 ]
 
 SEED_INGREDIENTS = [
-    {"id": "ing-luyu", "name": "鲈鱼", "tenant_id": SEED_TENANT_ID, "unit": "kg", "price_per_kg_fen": 3800, "price_change_pct": 20.0, "seasonal": False, "supplier_id": "sup-fish"},
-    {"id": "ing-duojiao", "name": "剁椒", "tenant_id": SEED_TENANT_ID, "unit": "kg", "price_per_kg_fen": 2400, "price_change_pct": 5.0, "seasonal": False, "supplier_id": "sup-seasoning"},
-    {"id": "ing-jiang", "name": "姜", "tenant_id": SEED_TENANT_ID, "unit": "kg", "price_per_kg_fen": 1200, "price_change_pct": 0.0, "seasonal": False, "supplier_id": "sup-veg"},
-    {"id": "ing-suan", "name": "蒜", "tenant_id": SEED_TENANT_ID, "unit": "kg", "price_per_kg_fen": 1600, "price_change_pct": 0.0, "seasonal": False, "supplier_id": "sup-veg"},
-    {"id": "ing-douchi", "name": "豆豉", "tenant_id": SEED_TENANT_ID, "unit": "kg", "price_per_kg_fen": 3000, "price_change_pct": 0.0, "seasonal": False, "supplier_id": "sup-seasoning"},
-    {"id": "ing-conghua", "name": "葱花", "tenant_id": SEED_TENANT_ID, "unit": "kg", "price_per_kg_fen": 800, "price_change_pct": 0.0, "seasonal": False, "supplier_id": "sup-veg"},
-    {"id": "ing-huangniurou", "name": "黄牛肉", "tenant_id": SEED_TENANT_ID, "unit": "kg", "price_per_kg_fen": 8500, "price_change_pct": 3.0, "seasonal": False, "supplier_id": "sup-meat"},
-    {"id": "ing-lajiao", "name": "辣椒", "tenant_id": SEED_TENANT_ID, "unit": "kg", "price_per_kg_fen": 1000, "price_change_pct": 0.0, "seasonal": True, "supplier_id": "sup-veg"},
-    {"id": "ing-suantai", "name": "蒜苔", "tenant_id": SEED_TENANT_ID, "unit": "kg", "price_per_kg_fen": 1400, "price_change_pct": 0.0, "seasonal": True, "supplier_id": "sup-veg"},
-    {"id": "ing-caoyu", "name": "草鱼", "tenant_id": SEED_TENANT_ID, "unit": "kg", "price_per_kg_fen": 2200, "price_change_pct": 0.0, "seasonal": False, "supplier_id": "sup-fish"},
-    {"id": "ing-suancai", "name": "酸菜", "tenant_id": SEED_TENANT_ID, "unit": "kg", "price_per_kg_fen": 1800, "price_change_pct": 40.0, "seasonal": True, "supplier_id": "sup-veg"},
-    {"id": "ing-huajiao", "name": "花椒", "tenant_id": SEED_TENANT_ID, "unit": "kg", "price_per_kg_fen": 12000, "price_change_pct": 0.0, "seasonal": False, "supplier_id": "sup-seasoning"},
-    {"id": "ing-ganlajiao", "name": "干辣椒", "tenant_id": SEED_TENANT_ID, "unit": "kg", "price_per_kg_fen": 4000, "price_change_pct": 0.0, "seasonal": False, "supplier_id": "sup-seasoning"},
-    {"id": "ing-douya", "name": "豆芽", "tenant_id": SEED_TENANT_ID, "unit": "kg", "price_per_kg_fen": 400, "price_change_pct": 0.0, "seasonal": False, "supplier_id": "sup-veg"},
+    {
+        "id": "ing-luyu",
+        "name": "鲈鱼",
+        "tenant_id": SEED_TENANT_ID,
+        "unit": "kg",
+        "price_per_kg_fen": 3800,
+        "price_change_pct": 20.0,
+        "seasonal": False,
+        "supplier_id": "sup-fish",
+    },
+    {
+        "id": "ing-duojiao",
+        "name": "剁椒",
+        "tenant_id": SEED_TENANT_ID,
+        "unit": "kg",
+        "price_per_kg_fen": 2400,
+        "price_change_pct": 5.0,
+        "seasonal": False,
+        "supplier_id": "sup-seasoning",
+    },
+    {
+        "id": "ing-jiang",
+        "name": "姜",
+        "tenant_id": SEED_TENANT_ID,
+        "unit": "kg",
+        "price_per_kg_fen": 1200,
+        "price_change_pct": 0.0,
+        "seasonal": False,
+        "supplier_id": "sup-veg",
+    },
+    {
+        "id": "ing-suan",
+        "name": "蒜",
+        "tenant_id": SEED_TENANT_ID,
+        "unit": "kg",
+        "price_per_kg_fen": 1600,
+        "price_change_pct": 0.0,
+        "seasonal": False,
+        "supplier_id": "sup-veg",
+    },
+    {
+        "id": "ing-douchi",
+        "name": "豆豉",
+        "tenant_id": SEED_TENANT_ID,
+        "unit": "kg",
+        "price_per_kg_fen": 3000,
+        "price_change_pct": 0.0,
+        "seasonal": False,
+        "supplier_id": "sup-seasoning",
+    },
+    {
+        "id": "ing-conghua",
+        "name": "葱花",
+        "tenant_id": SEED_TENANT_ID,
+        "unit": "kg",
+        "price_per_kg_fen": 800,
+        "price_change_pct": 0.0,
+        "seasonal": False,
+        "supplier_id": "sup-veg",
+    },
+    {
+        "id": "ing-huangniurou",
+        "name": "黄牛肉",
+        "tenant_id": SEED_TENANT_ID,
+        "unit": "kg",
+        "price_per_kg_fen": 8500,
+        "price_change_pct": 3.0,
+        "seasonal": False,
+        "supplier_id": "sup-meat",
+    },
+    {
+        "id": "ing-lajiao",
+        "name": "辣椒",
+        "tenant_id": SEED_TENANT_ID,
+        "unit": "kg",
+        "price_per_kg_fen": 1000,
+        "price_change_pct": 0.0,
+        "seasonal": True,
+        "supplier_id": "sup-veg",
+    },
+    {
+        "id": "ing-suantai",
+        "name": "蒜苔",
+        "tenant_id": SEED_TENANT_ID,
+        "unit": "kg",
+        "price_per_kg_fen": 1400,
+        "price_change_pct": 0.0,
+        "seasonal": True,
+        "supplier_id": "sup-veg",
+    },
+    {
+        "id": "ing-caoyu",
+        "name": "草鱼",
+        "tenant_id": SEED_TENANT_ID,
+        "unit": "kg",
+        "price_per_kg_fen": 2200,
+        "price_change_pct": 0.0,
+        "seasonal": False,
+        "supplier_id": "sup-fish",
+    },
+    {
+        "id": "ing-suancai",
+        "name": "酸菜",
+        "tenant_id": SEED_TENANT_ID,
+        "unit": "kg",
+        "price_per_kg_fen": 1800,
+        "price_change_pct": 40.0,
+        "seasonal": True,
+        "supplier_id": "sup-veg",
+    },
+    {
+        "id": "ing-huajiao",
+        "name": "花椒",
+        "tenant_id": SEED_TENANT_ID,
+        "unit": "kg",
+        "price_per_kg_fen": 12000,
+        "price_change_pct": 0.0,
+        "seasonal": False,
+        "supplier_id": "sup-seasoning",
+    },
+    {
+        "id": "ing-ganlajiao",
+        "name": "干辣椒",
+        "tenant_id": SEED_TENANT_ID,
+        "unit": "kg",
+        "price_per_kg_fen": 4000,
+        "price_change_pct": 0.0,
+        "seasonal": False,
+        "supplier_id": "sup-seasoning",
+    },
+    {
+        "id": "ing-douya",
+        "name": "豆芽",
+        "tenant_id": SEED_TENANT_ID,
+        "unit": "kg",
+        "price_per_kg_fen": 400,
+        "price_change_pct": 0.0,
+        "seasonal": False,
+        "supplier_id": "sup-veg",
+    },
 ]
 
 SEED_DISHES = [
@@ -208,9 +346,7 @@ class OntologyBootstrap:
             supplier_id = ing.pop("supplier_id", None)
             self.repo.create_node("Ingredient", ing)
             if supplier_id:
-                self.repo.create_relationship(
-                    "Ingredient", ing["id"], "SUPPLIED_BY", "Supplier", supplier_id
-                )
+                self.repo.create_relationship("Ingredient", ing["id"], "SUPPLIED_BY", "Supplier", supplier_id)
         counts["ingredients"] = len(SEED_INGREDIENTS)
 
         # Dishes + BOM + Store→Dish
@@ -229,7 +365,11 @@ class OntologyBootstrap:
         for dish_id, bom_entries in SEED_BOM.items():
             for ing_id, quantity_g, yield_rate in bom_entries:
                 self.repo.create_relationship(
-                    "Dish", dish_id, "USES_INGREDIENT", "Ingredient", ing_id,
+                    "Dish",
+                    dish_id,
+                    "USES_INGREDIENT",
+                    "Ingredient",
+                    ing_id,
                     {"quantity_g": quantity_g, "unit": "g", "yield_rate": yield_rate},
                 )
                 bom_count += 1
@@ -241,7 +381,11 @@ class OntologyBootstrap:
             self.repo.create_node("Employee", emp)
             if store_id:
                 self.repo.create_relationship(
-                    "Employee", emp["id"], "WORKS_AT", "Store", store_id,
+                    "Employee",
+                    emp["id"],
+                    "WORKS_AT",
+                    "Store",
+                    store_id,
                     {"role": emp["role"], "since": "2024-01-01"},
                 )
         counts["employees"] = len(SEED_EMPLOYEES)

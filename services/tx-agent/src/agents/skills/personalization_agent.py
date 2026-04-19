@@ -8,6 +8,7 @@
 
 成本：Haiku ¥0.002/次，日5万次=¥100/日
 """
+
 from typing import Any
 
 import structlog
@@ -76,14 +77,15 @@ class PersonalizationAgent(SkillAgent):
         if not ai_reason:
             fallback_map = {
                 "history": f"您常点的{dish_name}",
-                "hot": f"本时段热销",
-                "association": f"和您的菜搭配更好",
-                "margin": f"主厨推荐",
+                "hot": "本时段热销",
+                "association": "和您的菜搭配更好",
+                "margin": "主厨推荐",
             }
-            ai_reason = fallback_map.get(reason_type, f"推荐尝试")
+            ai_reason = fallback_map.get(reason_type, "推荐尝试")
 
         return AgentResult(
-            success=True, action="generate_dish_reason",
+            success=True,
+            action="generate_dish_reason",
             data={"dish_name": dish_name, "reason": ai_reason, "source": "ai" if self._router else "rule"},
             reasoning=f"为{dish_name}生成理由: {ai_reason}",
             confidence=0.85 if self._router else 0.6,
@@ -131,10 +133,12 @@ class PersonalizationAgent(SkillAgent):
                 reasons[name] = f"推荐尝试{name}"
 
         return AgentResult(
-            success=True, action="generate_batch_reasons",
+            success=True,
+            action="generate_batch_reasons",
             data={"reasons": reasons, "count": len(reasons), "source": "ai" if self._router else "rule"},
             reasoning=f"批量生成{len(reasons)}条推荐理由",
-            confidence=0.8, inference_layer="cloud" if self._router else "edge",
+            confidence=0.8,
+            inference_layer="cloud" if self._router else "edge",
         )
 
     async def _generate_greeting(self, params: dict) -> AgentResult:
@@ -153,9 +157,12 @@ class PersonalizationAgent(SkillAgent):
                 resp = await self._router.complete(prompt=prompt, max_tokens=40, task_type="quick_classification")
                 if resp:
                     return AgentResult(
-                        success=True, action="generate_greeting",
+                        success=True,
+                        action="generate_greeting",
                         data={"greeting": resp.strip(), "source": "ai"},
-                        reasoning=f"AI问候: {resp.strip()}", confidence=0.9, inference_layer="cloud",
+                        reasoning=f"AI问候: {resp.strip()}",
+                        confidence=0.9,
+                        inference_layer="cloud",
                     )
             except (ValueError, RuntimeError, ConnectionError, TimeoutError):
                 pass
@@ -166,9 +173,12 @@ class PersonalizationAgent(SkillAgent):
         greeting = f"{time_g}，{nickname}！" + (f"上次的{last_dish}还满意吗？" if last_dish else "欢迎光临！")
 
         return AgentResult(
-            success=True, action="generate_greeting",
+            success=True,
+            action="generate_greeting",
             data={"greeting": greeting, "source": "rule"},
-            reasoning=f"规则问候: {greeting}", confidence=0.6, inference_layer="edge",
+            reasoning=f"规则问候: {greeting}",
+            confidence=0.6,
+            inference_layer="edge",
         )
 
     async def _select_banner(self, params: dict) -> AgentResult:
@@ -185,10 +195,12 @@ class PersonalizationAgent(SkillAgent):
             matched = available_banners  # 无定向Banner则展示全部
 
         return AgentResult(
-            success=True, action="select_banner",
+            success=True,
+            action="select_banner",
             data={"selected": matched[:3], "segment": segment, "total_available": len(available_banners)},
             reasoning=f"为{segment}用户选择{len(matched[:3])}个Banner",
-            confidence=0.9, inference_layer="edge",
+            confidence=0.9,
+            inference_layer="edge",
         )
 
     async def _generate_reorder_prompt(self, params: dict) -> AgentResult:
@@ -207,8 +219,11 @@ class PersonalizationAgent(SkillAgent):
                 resp = await self._router.complete(prompt=prompt, max_tokens=40, task_type="quick_classification")
                 if resp:
                     return AgentResult(
-                        success=True, action="generate_reorder_prompt",
-                        data={"prompt": resp.strip(), "source": "ai"}, confidence=0.85, inference_layer="cloud",
+                        success=True,
+                        action="generate_reorder_prompt",
+                        data={"prompt": resp.strip(), "source": "ai"},
+                        confidence=0.85,
+                        inference_layer="cloud",
                     )
             except (ValueError, RuntimeError, ConnectionError, TimeoutError):
                 pass
@@ -218,6 +233,9 @@ class PersonalizationAgent(SkillAgent):
         prompt_text = f"{days_ago}天前在{store_name}点了{top_dish}，再来一单？"
 
         return AgentResult(
-            success=True, action="generate_reorder_prompt",
-            data={"prompt": prompt_text, "source": "rule"}, confidence=0.6, inference_layer="edge",
+            success=True,
+            action="generate_reorder_prompt",
+            data={"prompt": prompt_text, "source": "rule"},
+            confidence=0.6,
+            inference_layer="edge",
         )

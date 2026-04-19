@@ -3,6 +3,7 @@
 POST /api/v1/orchestrate          — 提交意图或结构化事件，启动编排
 GET  /api/v1/orchestrate/{plan_id} — 查询执行计划历史（预留，暂返回 404）
 """
+
 import asyncio
 from typing import Any, Optional
 
@@ -30,21 +31,24 @@ async def _get_db_with_tenant(
 # Request / Response schemas
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 class OrchestrateRequest(BaseModel):
     """编排请求体
 
     intent 与 trigger_event 二选一（或同时提供，intent 优先）。
     """
-    intent: Optional[str] = None           # 自然语言意图
-    trigger_event: Optional[dict] = None   # 结构化 AgentEvent 数据
+
+    intent: Optional[str] = None  # 自然语言意图
+    trigger_event: Optional[dict] = None  # 结构化 AgentEvent 数据
     context: dict = {}
     store_id: Optional[str] = None
-    tenant_id: str = "default"             # 生产环境由 X-Tenant-ID header 注入
+    tenant_id: str = "default"  # 生产环境由 X-Tenant-ID header 注入
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Endpoints
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @router.post("")
 async def start_orchestration(

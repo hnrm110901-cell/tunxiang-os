@@ -4,6 +4,7 @@ GET  /api/v1/daily-review/today        — 获取今日日清状态
 POST /api/v1/daily-review/complete-node — 手动标记节点完成
 GET  /api/v1/daily-review/multi-store  — 多门店日清汇总
 """
+
 from __future__ import annotations
 
 from typing import Optional

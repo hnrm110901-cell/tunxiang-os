@@ -6,6 +6,7 @@
 3. 降级感知：离线时自动跳过 offline.can_operate=False 的 Skill
 4. 依赖验证：执行前检查 Skill 的强依赖是否满足
 """
+
 from __future__ import annotations
 
 import os
@@ -13,7 +14,7 @@ from typing import Optional
 
 import structlog
 
-from shared.skill_registry import SkillRegistry, OntologyRegistry
+from shared.skill_registry import OntologyRegistry, SkillRegistry
 from shared.skill_registry.src.mcp_bridge import MCPToolDef, SkillMCPBridge
 
 logger = structlog.get_logger(__name__)
@@ -107,9 +108,7 @@ class SkillAwareOrchestrator:
         for skill in registry.list_skills():
             # 离线模式：跳过不支持离线的 Skill
             if not is_online:
-                offline_config = getattr(
-                    getattr(skill, "degradation", None), "offline", None
-                )
+                offline_config = getattr(getattr(skill, "degradation", None), "offline", None)
                 if offline_config is not None and not offline_config.can_operate:
                     logger.debug(
                         "skill_skipped_offline",
@@ -185,9 +184,7 @@ class SkillAwareOrchestrator:
         for dep in skill.dependencies.required or []:
             dep_skill = registry.get(dep.skill)
             if dep_skill is None:
-                missing_required.append(
-                    f"{dep.skill} >= {dep.min_version} ({dep.reason})"
-                )
+                missing_required.append(f"{dep.skill} >= {dep.min_version} ({dep.reason})")
 
         for dep in skill.dependencies.optional or []:
             dep_skill = registry.get(dep.skill)

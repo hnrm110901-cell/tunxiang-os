@@ -9,23 +9,24 @@
   6. 营销健康评分
   7. 流失拯救（降低优惠力度重试）
 """
+
 from __future__ import annotations
 
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
 from ..agents.skills.ai_marketing_orchestrator import (
-    AiMarketingOrchestratorAgent,
     MARKETING_COOLDOWN_RULES,
+    AiMarketingOrchestratorAgent,
     _fallback_content,
 )
-
 
 # ─────────────────────────────────────────────────────────────────────────────
 # fixtures
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @pytest.fixture
 def agent() -> AiMarketingOrchestratorAgent:
@@ -42,6 +43,7 @@ def _default_brand_voice() -> dict[str, Any]:
 # ─────────────────────────────────────────────────────────────────────────────
 # 测试 1: 下单后触达 — 正常路径
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_post_order_touch_success(agent: AiMarketingOrchestratorAgent) -> None:
@@ -78,6 +80,7 @@ async def test_post_order_touch_success(agent: AiMarketingOrchestratorAgent) -> 
 # 测试 2: 冷却期内跳过触达
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_cooldown_respected(agent: AiMarketingOrchestratorAgent) -> None:
     """冷却期内不触达，返回 skipped=True"""
@@ -99,6 +102,7 @@ async def test_cooldown_respected(agent: AiMarketingOrchestratorAgent) -> None:
 # ─────────────────────────────────────────────────────────────────────────────
 # 测试 3: 毛利底线阻断深度折扣
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_margin_constraint_blocks_deep_discount(agent: AiMarketingOrchestratorAgent) -> None:
@@ -124,6 +128,7 @@ async def test_margin_constraint_blocks_deep_discount(agent: AiMarketingOrchestr
 # ─────────────────────────────────────────────────────────────────────────────
 # 测试 4: 新客欢迎旅程
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_welcome_journey_new_member(agent: AiMarketingOrchestratorAgent) -> None:
@@ -153,6 +158,7 @@ async def test_welcome_journey_new_member(agent: AiMarketingOrchestratorAgent) -
 # ─────────────────────────────────────────────────────────────────────────────
 # 测试 5: 沉默用户唤醒 — 30天未到店
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_winback_journey_silent_member(agent: AiMarketingOrchestratorAgent) -> None:
@@ -184,6 +190,7 @@ async def test_winback_journey_silent_member(agent: AiMarketingOrchestratorAgent
 # 测试 6: 营销健康评分
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_marketing_health_score(agent: AiMarketingOrchestratorAgent) -> None:
     """营销健康评分返回合法的0-100分值"""
@@ -210,6 +217,7 @@ async def test_marketing_health_score(agent: AiMarketingOrchestratorAgent) -> No
 # 测试 7: 不支持的 action 返回 failure
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_unsupported_action(agent: AiMarketingOrchestratorAgent) -> None:
     """未知 action 应返回 success=False，不抛异常"""
@@ -221,6 +229,7 @@ async def test_unsupported_action(agent: AiMarketingOrchestratorAgent) -> None:
 # ─────────────────────────────────────────────────────────────────────────────
 # 测试 8: 降级内容生成
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 def test_fallback_content_structure() -> None:
     """ContentHub 不可用时降级内容格式正确"""
@@ -243,11 +252,17 @@ def test_fallback_content_structure() -> None:
 # 测试 9: 冷却规则配置完整
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def test_cooldown_rules_completeness() -> None:
     """所有触发场景都有对应的冷却规则"""
     expected_actions = [
-        "post_order_touch", "welcome_journey", "winback_journey",
-        "birthday_care", "holiday_campaign", "upgrade_celebration", "churn_rescue",
+        "post_order_touch",
+        "welcome_journey",
+        "winback_journey",
+        "birthday_care",
+        "holiday_campaign",
+        "upgrade_celebration",
+        "churn_rescue",
     ]
     for action in expected_actions:
         assert action in MARKETING_COOLDOWN_RULES, f"冷却规则缺少 {action}"

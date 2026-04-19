@@ -1,4 +1,5 @@
 """决策反馈服务测试 — 效果计算 + 评分 + 学习上下文 + 统计"""
+
 import os
 import sys
 
@@ -123,11 +124,13 @@ class TestEffectivenessScore:
 
     def test_score_from_metrics_delta(self):
         """从 metrics_delta 计算"""
-        score = svc.compute_effectiveness_score({
-            "metrics_delta": {
-                "sales": {"before": 100, "after": 150, "change": 50, "pct": 50},
+        score = svc.compute_effectiveness_score(
+            {
+                "metrics_delta": {
+                    "sales": {"before": 100, "after": 150, "change": 50, "pct": 50},
+                }
             }
-        })
+        )
         assert score == 100.0  # 50 + 50 = 100
 
     def test_score_empty_data(self):
@@ -159,10 +162,7 @@ class TestLearningContext:
 
     def test_limit_applied(self):
         """limit 参数生效"""
-        decisions = [
-            {"title": f"决策{i}", "outcome_summary": "ok", "outcome_score": 70}
-            for i in range(20)
-        ]
+        decisions = [{"title": f"决策{i}", "outcome_summary": "ok", "outcome_score": 70} for i in range(20)]
         context = svc.generate_learning_context(decisions, limit=3)
         assert "3." in context
         assert "4." not in context

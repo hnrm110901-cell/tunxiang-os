@@ -10,8 +10,9 @@ P1-5 升级（2026-04-12）：
   集成 EdgeAwareMixin — 补货告警使用边缘客流预测增强缺货预判
   边缘客流预测提供需求预估，Agent 用于补货量计算
 """
+
 import statistics
-from datetime import date as date_cls, datetime, timezone
+from datetime import datetime, timezone
 from typing import Any
 
 import structlog
@@ -43,7 +44,7 @@ class InventoryAlertAgent(EdgeAwareMixin, SkillAgent):
             "assess_shortage_severity",
             "urgent_reorder_notify",
             "plan_usage",
-            "get_bom_loss_snapshot",   # Phase 3: 读 mv_inventory_bom
+            "get_bom_loss_snapshot",  # Phase 3: 读 mv_inventory_bom
         ]
 
     def get_action_config(self, action: str) -> ActionConfig:
@@ -146,8 +147,10 @@ class InventoryAlertAgent(EdgeAwareMixin, SkillAgent):
 
         if self._db and ingredient_id:
             from sqlalchemy import text
+
             # 查询过去30天的消耗记录（从库存变动日志或order_items中推算）
-            rows = await self._db.execute(text("""
+            rows = await self._db.execute(
+                text("""
                 SELECT DATE(oi.created_at) as date,
                        SUM(oi.quantity * COALESCE(bi.quantity_per_dish, 1)) as daily_consumption
                 FROM order_items oi
@@ -159,8 +162,9 @@ class InventoryAlertAgent(EdgeAwareMixin, SkillAgent):
                   AND o.status = 'completed'
                 GROUP BY DATE(oi.created_at)
                 ORDER BY date DESC
-            """), {"ingredient_id": ingredient_id, "tenant_id": self.tenant_id,
-                   "store_id": store_id})
+            """),
+                {"ingredient_id": ingredient_id, "tenant_id": self.tenant_id, "store_id": store_id},
+            )
 
             daily_data = [dict(r) for r in rows.mappings()]
 
@@ -170,7 +174,8 @@ class InventoryAlertAgent(EdgeAwareMixin, SkillAgent):
                 predicted_total = avg_daily * days_ahead
 
                 return AgentResult(
-                    success=True, action="predict_consumption",
+                    success=True,
+                    action="predict_consumption",
                     data={
                         "ingredient_id": ingredient_id,
                         "days_ahead": days_ahead,
@@ -187,15 +192,19 @@ class InventoryAlertAgent(EdgeAwareMixin, SkillAgent):
         # 降级：使用params中传入的历史数据（兼容原有4算法逻辑）
         history = params.get("history") or params.get("daily_usage", [])
         if not history:
-            return AgentResult(success=False, action="predict_consumption",
-                               error="缺少历史消耗数据，且无法查询DB")
+            return AgentResult(success=False, action="predict_consumption", error="缺少历史消耗数据，且无法查询DB")
 
         avg = statistics.mean(history)
         predicted = avg * days_ahead
         return AgentResult(
-            success=True, action="predict_consumption",
-            data={"predicted_total": round(predicted, 2), "avg_daily": round(avg, 2),
-                  "days_ahead": days_ahead, "algorithm": "simple_average"},
+            success=True,
+            action="predict_consumption",
+            data={
+                "predicted_total": round(predicted, 2),
+                "avg_daily": round(avg, 2),
+                "days_ahead": days_ahead,
+                "algorithm": "simple_average",
+            },
             reasoning=f"日均消耗{avg:.2f}，预测{days_ahead}天消耗{predicted:.2f}",
             confidence=0.8,
         )
@@ -267,6 +276,7 @@ class InventoryAlertAgent(EdgeAwareMixin, SkillAgent):
         if store_id:
             # 使用东八区本地时间（中国门店）
             from zoneinfo import ZoneInfo
+
             local_now = datetime.now(ZoneInfo("Asia/Shanghai"))
             traffic_forecast = await self.get_edge_prediction(
                 "traffic",
@@ -293,7 +303,9 @@ class InventoryAlertAgent(EdgeAwareMixin, SkillAgent):
 
         if self._db and store_id:
             from sqlalchemy import text
-            rows = await self._db.execute(text("""
+
+            rows = await self._db.execute(
+                text("""
                 SELECT i.id, i.name, i.unit,
                        COALESCE(il.quantity, 0) as current_qty,
                        COALESCE(i.safety_stock_qty, 0) as safety_stock,
@@ -306,28 +318,34 @@ class InventoryAlertAgent(EdgeAwareMixin, SkillAgent):
                   AND COALESCE(il.quantity, 0) < COALESCE(i.safety_stock_qty, 1)
                 ORDER BY (COALESCE(i.safety_stock_qty, 1) - COALESCE(il.quantity, 0)) DESC
                 LIMIT 15
-            """), {"tenant_id": self.tenant_id, "store_id": store_id})
+            """),
+                {"tenant_id": self.tenant_id, "store_id": store_id},
+            )
 
             for row in rows.mappings():
                 d = dict(row)
                 base_gap = d["safety_stock"] - d["current_qty"]
                 # 边缘客流预测增强：高峰期自动放大补货量
                 gap = int(base_gap * demand_multiplier)
-                alerts.append({
-                    "ingredient_id": str(d["id"]),
-                    "name": d["name"],
-                    "current_qty": d["current_qty"],
-                    "safety_stock": d["safety_stock"],
-                    "gap": gap,
-                    "unit": d.get("unit", ""),
-                    "estimated_cost_fen": gap * (d.get("last_purchase_price_fen") or 0),
-                })
+                alerts.append(
+                    {
+                        "ingredient_id": str(d["id"]),
+                        "name": d["name"],
+                        "current_qty": d["current_qty"],
+                        "safety_stock": d["safety_stock"],
+                        "gap": gap,
+                        "unit": d.get("unit", ""),
+                        "estimated_cost_fen": gap * (d.get("last_purchase_price_fen") or 0),
+                    }
+                )
 
             if alerts:
-                db_data = "\n".join([
-                    f"- {a['name']}: 现有{a['current_qty']}{a['unit']}，安全库存{a['safety_stock']}{a['unit']}，缺口{a['gap']}{a['unit']}"
-                    for a in alerts[:8]
-                ])
+                db_data = "\n".join(
+                    [
+                        f"- {a['name']}: 现有{a['current_qty']}{a['unit']}，安全库存{a['safety_stock']}{a['unit']}，缺口{a['gap']}{a['unit']}"
+                        for a in alerts[:8]
+                    ]
+                )
         else:
             alerts = params.get("low_stock_items", [])
 
@@ -339,8 +357,12 @@ class InventoryAlertAgent(EdgeAwareMixin, SkillAgent):
                     tenant_id=self.tenant_id,
                     task_type="standard_analysis",
                     system="你是餐饮供应链专家，根据缺货清单生成今日采购建议，用简洁中文表述，控制在150字内。",
-                    messages=[{"role": "user", "content":
-                        f"以下食材库存不足，请给出采购优先级和注意事项：\n{db_data or str(alerts[:5])}"}],
+                    messages=[
+                        {
+                            "role": "user",
+                            "content": f"以下食材库存不足，请给出采购优先级和注意事项：\n{db_data or str(alerts[:5])}",
+                        }
+                    ],
                     max_tokens=300,
                     db=self._db,
                 )
@@ -350,7 +372,8 @@ class InventoryAlertAgent(EdgeAwareMixin, SkillAgent):
         total_est = sum(a.get("estimated_cost_fen", 0) for a in alerts)
 
         return AgentResult(
-            success=True, action="generate_restock_alerts",
+            success=True,
+            action="generate_restock_alerts",
             data={
                 "alerts": alerts,
                 "alert_count": len(alerts),
@@ -358,7 +381,7 @@ class InventoryAlertAgent(EdgeAwareMixin, SkillAgent):
                 "suggestion": suggestion,
                 "store_id": store_id,
             },
-            reasoning=f"{len(alerts)}种食材需补货，预计采购成本{total_est/100:.0f}元。{suggestion[:40] if suggestion else ''}",
+            reasoning=f"{len(alerts)}种食材需补货，预计采购成本{total_est / 100:.0f}元。{suggestion[:40] if suggestion else ''}",
             confidence=0.95 if suggestion else 0.85,
             inference_layer="cloud" if suggestion else "edge",
         )
@@ -406,7 +429,7 @@ class InventoryAlertAgent(EdgeAwareMixin, SkillAgent):
         avg = statistics.mean(history)
         std = statistics.stdev(history)
 
-        safety_stock = round(avg * lead_days + 1.65 * std * (lead_days ** 0.5), 1)  # 95%服务水平
+        safety_stock = round(avg * lead_days + 1.65 * std * (lead_days**0.5), 1)  # 95%服务水平
         min_stock = round(safety_stock + avg * lead_days, 1)
         max_stock = round(min_stock + avg * 7, 1)  # 最大=最小+7天用量
 
@@ -421,8 +444,7 @@ class InventoryAlertAgent(EdgeAwareMixin, SkillAgent):
                 "usage_std": round(std, 2),
                 "lead_days": lead_days,
             },
-            reasoning=f"日均用量 {avg:.1f}±{std:.1f}，采购提前期 {lead_days} 天，"
-                      f"建议安全库存 {safety_stock}",
+            reasoning=f"日均用量 {avg:.1f}±{std:.1f}，采购提前期 {lead_days} 天，建议安全库存 {safety_stock}",
             confidence=0.85,
         )
 
@@ -442,8 +464,7 @@ class InventoryAlertAgent(EdgeAwareMixin, SkillAgent):
         response_score = max(0, 100 - response_hours * 2)  # 50小时响应=0分
 
         # 加权综合分
-        total = (on_time_score * 0.3 + quality_score * 0.3 +
-                 price_score * 0.2 + response_score * 0.2)
+        total = on_time_score * 0.3 + quality_score * 0.3 + price_score * 0.2 + response_score * 0.2
 
         grade = "A" if total >= 85 else "B" if total >= 70 else "C" if total >= 50 else "D"
 
@@ -470,8 +491,10 @@ class InventoryAlertAgent(EdgeAwareMixin, SkillAgent):
 
         if self._db and store_id:
             from sqlalchemy import text
+
             # 查询库存不足和临期食材
-            rows = await self._db.execute(text("""
+            rows = await self._db.execute(
+                text("""
                 SELECT i.id, i.name, i.unit,
                        COALESCE(il.quantity, 0) as current_qty,
                        i.safety_stock_qty,
@@ -483,13 +506,16 @@ class InventoryAlertAgent(EdgeAwareMixin, SkillAgent):
                   AND i.is_deleted = false
                 ORDER BY current_qty ASC
                 LIMIT 50
-            """), {"tenant_id": self.tenant_id, "store_id": store_id})
+            """),
+                {"tenant_id": self.tenant_id, "store_id": store_id},
+            )
 
             items = []
             low_stock = []
             expiring_soon = []
 
             from datetime import datetime, timezone
+
             now = datetime.now(timezone.utc)
 
             for row in rows.mappings():
@@ -500,27 +526,32 @@ class InventoryAlertAgent(EdgeAwareMixin, SkillAgent):
                 safety = item.get("safety_stock_qty") or 0
                 current = item.get("current_qty", 0)
                 if safety > 0 and current < safety:
-                    low_stock.append({
-                        "name": item["name"],
-                        "current": current,
-                        "safety": safety,
-                        "unit": item.get("unit", ""),
-                        "gap": safety - current,
-                    })
+                    low_stock.append(
+                        {
+                            "name": item["name"],
+                            "current": current,
+                            "safety": safety,
+                            "unit": item.get("unit", ""),
+                            "gap": safety - current,
+                        }
+                    )
 
                 # 临期（3天内）
                 expiry = item.get("expiry_date")
                 if expiry:
-                    days_remaining = (expiry - now.date()).days if hasattr(expiry, 'year') else 999
+                    days_remaining = (expiry - now.date()).days if hasattr(expiry, "year") else 999
                     if 0 <= days_remaining <= 3:
-                        expiring_soon.append({
-                            "name": item["name"],
-                            "expiry_date": str(expiry),
-                            "days_remaining": days_remaining,
-                        })
+                        expiring_soon.append(
+                            {
+                                "name": item["name"],
+                                "expiry_date": str(expiry),
+                                "days_remaining": days_remaining,
+                            }
+                        )
 
             return AgentResult(
-                success=True, action="monitor_inventory",
+                success=True,
+                action="monitor_inventory",
                 data={
                     "low_stock": low_stock,
                     "expiring_soon": expiring_soon,
@@ -537,7 +568,8 @@ class InventoryAlertAgent(EdgeAwareMixin, SkillAgent):
         items = params.get("items", [])
         low_stock = [i for i in items if i.get("current_qty", 0) < i.get("safety_stock", 1)]
         return AgentResult(
-            success=True, action="monitor_inventory",
+            success=True,
+            action="monitor_inventory",
             data={"low_stock": low_stock, "total_items": len(items), "alert_count": len(low_stock)},
             reasoning=f"{len(low_stock)}/{len(items)} 库存不足",
             confidence=0.9,
@@ -552,11 +584,18 @@ class InventoryAlertAgent(EdgeAwareMixin, SkillAgent):
         cheapest = sorted_q[0]
         avg_price = sum(q["price_fen"] for q in quotes) / len(quotes)
         saving = round((avg_price - cheapest["price_fen"]) / avg_price * 100, 1) if avg_price > 0 else 0
-        return AgentResult(success=True, action="compare_supplier_prices",
-                         data={"cheapest": cheapest, "all_quotes": sorted_q,
-                               "avg_price_fen": round(avg_price), "potential_saving_pct": saving},
-                         reasoning=f"最低价 {cheapest.get('supplier', '')} ¥{cheapest['price_fen']/100:.2f}，可节省 {saving}%",
-                         confidence=0.85)
+        return AgentResult(
+            success=True,
+            action="compare_supplier_prices",
+            data={
+                "cheapest": cheapest,
+                "all_quotes": sorted_q,
+                "avg_price_fen": round(avg_price),
+                "potential_saving_pct": saving,
+            },
+            reasoning=f"最低价 {cheapest.get('supplier', '')} ¥{cheapest['price_fen'] / 100:.2f}，可节省 {saving}%",
+            confidence=0.85,
+        )
 
     async def _scan_contracts(self, params: dict) -> AgentResult:
         """合同风险扫描"""
@@ -570,9 +609,13 @@ class InventoryAlertAgent(EdgeAwareMixin, SkillAgent):
                 risks.append({"supplier": c.get("supplier", ""), "risk": "expiring", "days": remaining_days})
             if c.get("single_source"):
                 risks.append({"supplier": c.get("supplier", ""), "risk": "single_source"})
-        return AgentResult(success=True, action="scan_contract_risks",
-                         data={"risks": risks, "total_contracts": len(contracts), "at_risk": len(risks)},
-                         reasoning=f"扫描 {len(contracts)} 份合同，{len(risks)} 个风险", confidence=0.85)
+        return AgentResult(
+            success=True,
+            action="scan_contract_risks",
+            data={"risks": risks, "total_contracts": len(contracts), "at_risk": len(risks)},
+            reasoning=f"扫描 {len(contracts)} 份合同，{len(risks)} 个风险",
+            confidence=0.85,
+        )
 
     async def _analyze_waste(self, params: dict) -> AgentResult:
         """损耗分析"""
@@ -583,10 +626,17 @@ class InventoryAlertAgent(EdgeAwareMixin, SkillAgent):
             cause = e.get("cause", "unknown")
             by_cause[cause] = by_cause.get(cause, 0) + e.get("cost_fen", 0)
         top_causes = sorted(by_cause.items(), key=lambda x: -x[1])[:5]
-        return AgentResult(success=True, action="analyze_waste",
-                         data={"total_waste_yuan": round(total_fen / 100, 2), "event_count": len(waste_events),
-                               "top_causes": [{"cause": c, "cost_yuan": round(v/100, 2)} for c, v in top_causes]},
-                         reasoning=f"总损耗 ¥{total_fen/100:.0f}，{len(waste_events)} 个事件", confidence=0.8)
+        return AgentResult(
+            success=True,
+            action="analyze_waste",
+            data={
+                "total_waste_yuan": round(total_fen / 100, 2),
+                "event_count": len(waste_events),
+                "top_causes": [{"cause": c, "cost_yuan": round(v / 100, 2)} for c, v in top_causes],
+            },
+            reasoning=f"总损耗 ¥{total_fen / 100:.0f}，{len(waste_events)} 个事件",
+            confidence=0.8,
+        )
 
     # ─── 事件驱动：评估库存短缺程度 ───
 
@@ -619,7 +669,7 @@ class InventoryAlertAgent(EdgeAwareMixin, SkillAgent):
 
         # 关键程度权重
         criticality_map = {
-            "main_ingredient": 1.0,   # 主食材：最高
+            "main_ingredient": 1.0,  # 主食材：最高
             "general": 0.7,
             "seasoning": 0.4,
             "garnish": 0.2,
@@ -630,10 +680,13 @@ class InventoryAlertAgent(EdgeAwareMixin, SkillAgent):
         severity_score = min(1.0, shortage_pct * criticality * (1 - 0.3 * has_substitute))
 
         severity_level = (
-            "critical" if severity_score >= 0.7 or hours_remaining < 2 else
-            "high" if severity_score >= 0.5 or hours_remaining < 4 else
-            "medium" if severity_score >= 0.3 or hours_remaining < 8 else
-            "low"
+            "critical"
+            if severity_score >= 0.7 or hours_remaining < 2
+            else "high"
+            if severity_score >= 0.5 or hours_remaining < 4
+            else "medium"
+            if severity_score >= 0.3 or hours_remaining < 8
+            else "low"
         )
 
         # 建议动作
@@ -718,7 +771,7 @@ class InventoryAlertAgent(EdgeAwareMixin, SkillAgent):
                 f"门店 {store_id} 的 {ingredient_name} 库存已归零，"
                 f"需立即补货 {suggested_order_qty}{unit}。"
                 f"建议供应商：{preferred_supplier_name or '联系默认供应商'}，"
-                f"预估采购成本 ¥{estimated_cost_fen/100:.0f}。"
+                f"预估采购成本 ¥{estimated_cost_fen / 100:.0f}。"
             ),
             "notify_targets": notify_targets,
             "triggered_at": datetime.now(timezone.utc).isoformat(),
@@ -756,7 +809,7 @@ class InventoryAlertAgent(EdgeAwareMixin, SkillAgent):
             },
             reasoning=(
                 f"紧急补货通知：{ingredient_name} 库存归零，"
-                f"建议补货{suggested_order_qty}{unit}，预估¥{estimated_cost_fen/100:.0f}"
+                f"建议补货{suggested_order_qty}{unit}，预估¥{estimated_cost_fen / 100:.0f}"
             ),
             confidence=0.9,
         )
@@ -792,28 +845,34 @@ class InventoryAlertAgent(EdgeAwareMixin, SkillAgent):
         # 1. 菜单推广
         if related_dishes:
             push_dishes = [d.get("dish_name", "") for d in related_dishes[:3]]
-            usage_strategies.append({
-                "type": "menu_push",
-                "action": f"提升菜单推荐权重：{', '.join(push_dishes)}",
-                "expected_consumption_per_day": daily_min_usage * 0.5,
-            })
+            usage_strategies.append(
+                {
+                    "type": "menu_push",
+                    "action": f"提升菜单推荐权重：{', '.join(push_dishes)}",
+                    "expected_consumption_per_day": daily_min_usage * 0.5,
+                }
+            )
 
         # 2. 特价促销（剩余天数 ≤2 天时更激进）
         discount_pct = 20 if days_to_expiry <= 2 else 10
-        usage_strategies.append({
-            "type": "price_promotion",
-            "action": f"对含{ingredient_name}菜品推出{discount_pct}%折扣特价",
-            "expected_consumption_per_day": daily_min_usage * 0.3,
-            "estimated_discount_cost_fen": int(total_cost_fen * discount_pct / 100 * 0.5),
-        })
+        usage_strategies.append(
+            {
+                "type": "price_promotion",
+                "action": f"对含{ingredient_name}菜品推出{discount_pct}%折扣特价",
+                "expected_consumption_per_day": daily_min_usage * 0.3,
+                "estimated_discount_cost_fen": int(total_cost_fen * discount_pct / 100 * 0.5),
+            }
+        )
 
         # 3. 员工餐处理（最后手段）
         if days_to_expiry <= 1:
-            usage_strategies.append({
-                "type": "staff_meal",
-                "action": f"今日员工餐优先消耗{ingredient_name}",
-                "expected_consumption_per_day": min(daily_min_usage * 0.3, 5),
-            })
+            usage_strategies.append(
+                {
+                    "type": "staff_meal",
+                    "action": f"今日员工餐优先消耗{ingredient_name}",
+                    "expected_consumption_per_day": min(daily_min_usage * 0.3, 5),
+                }
+            )
 
         # 预计可避免损耗
         avoidable_waste_pct = min(0.8, 0.3 * len(usage_strategies))
@@ -848,9 +907,9 @@ class InventoryAlertAgent(EdgeAwareMixin, SkillAgent):
             },
             reasoning=(
                 f"用料计划：{ingredient_name} 还剩{days_to_expiry}天到期，"
-                f"当前库存{current_qty}{unit}（价值¥{total_cost_fen/100:.0f}），"
+                f"当前库存{current_qty}{unit}（价值¥{total_cost_fen / 100:.0f}），"
                 f"制定{len(usage_strategies)}条用料策略，"
-                f"可避免损耗¥{avoidable_cost_fen/100:.0f}"
+                f"可避免损耗¥{avoidable_cost_fen / 100:.0f}"
             ),
             confidence=0.8,
         )
@@ -872,17 +931,20 @@ class InventoryAlertAgent(EdgeAwareMixin, SkillAgent):
 
         if not store_id:
             return AgentResult(
-                success=False, action="get_bom_loss_snapshot",
+                success=False,
+                action="get_bom_loss_snapshot",
                 error="缺少 store_id",
             )
 
         if not self._db:
             return AgentResult(
-                success=False, action="get_bom_loss_snapshot",
+                success=False,
+                action="get_bom_loss_snapshot",
                 error="无DB连接，无法读取物化视图",
             )
 
-        rows = await self._db.execute(text("""
+        rows = await self._db.execute(
+            text("""
             SELECT
                 ingredient_id, ingredient_name,
                 theoretical_g, actual_g,
@@ -895,11 +957,13 @@ class InventoryAlertAgent(EdgeAwareMixin, SkillAgent):
               AND stat_date = :stat_date
             ORDER BY loss_cost_fen DESC
             LIMIT 50
-        """), {
-            "tenant_id": self.tenant_id,
-            "store_id": store_id,
-            "stat_date": stat_date,
-        })
+        """),
+            {
+                "tenant_id": self.tenant_id,
+                "store_id": store_id,
+                "stat_date": stat_date,
+            },
+        )
 
         items = [dict(r) for r in rows.mappings()]
         for item in items:
@@ -910,7 +974,8 @@ class InventoryAlertAgent(EdgeAwareMixin, SkillAgent):
         high_loss = [i for i in items if float(i.get("loss_rate") or 0) > 0.15]
 
         return AgentResult(
-            success=True, action="get_bom_loss_snapshot",
+            success=True,
+            action="get_bom_loss_snapshot",
             data={
                 "store_id": store_id,
                 "stat_date": stat_date.isoformat() if hasattr(stat_date, "isoformat") else str(stat_date),
@@ -923,7 +988,7 @@ class InventoryAlertAgent(EdgeAwareMixin, SkillAgent):
             },
             reasoning=(
                 f"BOM损耗快照（{stat_date}）：{len(items)}种食材，"
-                f"总损耗成本¥{total_loss_cost_fen/100:.0f}，"
+                f"总损耗成本¥{total_loss_cost_fen / 100:.0f}，"
                 f"{len(high_loss)}种高损耗（>15%）食材"
             ),
             confidence=0.95,

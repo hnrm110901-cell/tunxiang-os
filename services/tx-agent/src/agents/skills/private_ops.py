@@ -5,6 +5,7 @@
 
 迁移自 tunxiang V2.x people_agent/agent.py + reservation/agent.py + banquet/agent.py
 """
+
 import os
 from datetime import datetime, timezone
 from typing import Any
@@ -35,9 +36,17 @@ class PrivateOpsAgent(SkillAgent):
 
     def get_supported_actions(self) -> list[str]:
         return [
-            "get_private_domain_dashboard", "trigger_campaign", "advance_journey",
-            "optimize_shift", "score_performance", "analyze_labor_cost", "warn_attendance",
-            "create_reservation", "manage_banquet", "generate_beo", "allocate_seating",
+            "get_private_domain_dashboard",
+            "trigger_campaign",
+            "advance_journey",
+            "optimize_shift",
+            "score_performance",
+            "analyze_labor_cost",
+            "warn_attendance",
+            "create_reservation",
+            "manage_banquet",
+            "generate_beo",
+            "allocate_seating",
             "check_journey_trigger",
         ]
 
@@ -89,7 +98,8 @@ class PrivateOpsAgent(SkillAgent):
         commission_fen = round(base_salary_fen * commission_rate)
 
         return AgentResult(
-            success=True, action="score_performance",
+            success=True,
+            action="score_performance",
             data={
                 "role": role,
                 "total_score": round(total, 1),
@@ -99,7 +109,7 @@ class PrivateOpsAgent(SkillAgent):
                 "commission_fen": commission_fen,
                 "commission_yuan": round(commission_fen / 100, 2),
             },
-            reasoning=f"{role} 绩效 {total:.0f} 分，提成 ¥{commission_fen/100:.0f}",
+            reasoning=f"{role} 绩效 {total:.0f} 分，提成 ¥{commission_fen / 100:.0f}",
             confidence=0.9,
         )
 
@@ -115,7 +125,8 @@ class PrivateOpsAgent(SkillAgent):
         over_budget_fen = max(0, total_wage_fen - int(revenue_fen * target_rate))
 
         return AgentResult(
-            success=True, action="analyze_labor_cost",
+            success=True,
+            action="analyze_labor_cost",
             data={
                 "labor_cost_rate": round(labor_rate, 4),
                 "labor_cost_rate_pct": round(labor_rate * 100, 1),
@@ -126,7 +137,7 @@ class PrivateOpsAgent(SkillAgent):
                 "over_budget_yuan": round(over_budget_fen / 100, 2),
                 "status": "critical" if labor_rate > 0.35 else "warning" if labor_rate > target_rate else "ok",
             },
-            reasoning=f"人力成本率 {labor_rate*100:.1f}%，目标 {target_rate*100:.0f}%",
+            reasoning=f"人力成本率 {labor_rate * 100:.1f}%，目标 {target_rate * 100:.0f}%",
             confidence=0.9,
         )
 
@@ -151,18 +162,21 @@ class PrivateOpsAgent(SkillAgent):
             else:
                 continue
 
-            warnings.append({
-                "employee": emp_name,
-                "level": level,
-                "late": late_count,
-                "absent": absent_count,
-                "early_leave": early_leave,
-                "issue_score": total_issues,
-            })
+            warnings.append(
+                {
+                    "employee": emp_name,
+                    "level": level,
+                    "late": late_count,
+                    "absent": absent_count,
+                    "early_leave": early_leave,
+                    "issue_score": total_issues,
+                }
+            )
 
         warnings.sort(key=lambda w: w["issue_score"], reverse=True)
         return AgentResult(
-            success=True, action="warn_attendance",
+            success=True,
+            action="warn_attendance",
             data={"warnings": warnings, "total": len(warnings)},
             reasoning=f"发现 {len(warnings)} 个出勤异常",
             confidence=0.9,
@@ -195,7 +209,8 @@ class PrivateOpsAgent(SkillAgent):
         best = candidates[0]
 
         return AgentResult(
-            success=True, action="allocate_seating",
+            success=True,
+            action="allocate_seating",
             data={
                 "table_no": best.get("table_no"),
                 "area": best.get("area"),
@@ -234,9 +249,10 @@ class PrivateOpsAgent(SkillAgent):
         }
 
         return AgentResult(
-            success=True, action="generate_beo",
+            success=True,
+            action="generate_beo",
             data=beo,
-            reasoning=f"宴会执行单：{event_name}，{guest_count}人，¥{total_cost_fen/100:.0f}",
+            reasoning=f"宴会执行单：{event_name}，{guest_count}人，¥{total_cost_fen / 100:.0f}",
             confidence=0.9,
         )
 
@@ -289,29 +305,50 @@ class PrivateOpsAgent(SkillAgent):
         except httpx.ConnectError as e:
             logger.warning("pd_dashboard_connect_error", error=str(e))
             return AgentResult(
-                success=True, action="get_private_domain_dashboard",
-                data={"degraded": True, "reason": "service_unavailable",
-                      "total_members": 0, "active_pct": 0.0,
-                      "churn_risk_count": 0, "active_journeys": 0},
-                reasoning="内部服务连接失败，返回降级数据", confidence=0.3,
+                success=True,
+                action="get_private_domain_dashboard",
+                data={
+                    "degraded": True,
+                    "reason": "service_unavailable",
+                    "total_members": 0,
+                    "active_pct": 0.0,
+                    "churn_risk_count": 0,
+                    "active_journeys": 0,
+                },
+                reasoning="内部服务连接失败，返回降级数据",
+                confidence=0.3,
             )
         except httpx.TimeoutException as e:
             logger.warning("pd_dashboard_timeout", error=str(e))
             return AgentResult(
-                success=True, action="get_private_domain_dashboard",
-                data={"degraded": True, "reason": "timeout",
-                      "total_members": 0, "active_pct": 0.0,
-                      "churn_risk_count": 0, "active_journeys": 0},
-                reasoning="内部服务请求超时，返回降级数据", confidence=0.3,
+                success=True,
+                action="get_private_domain_dashboard",
+                data={
+                    "degraded": True,
+                    "reason": "timeout",
+                    "total_members": 0,
+                    "active_pct": 0.0,
+                    "churn_risk_count": 0,
+                    "active_journeys": 0,
+                },
+                reasoning="内部服务请求超时，返回降级数据",
+                confidence=0.3,
             )
         except httpx.HTTPStatusError as e:
             logger.warning("pd_dashboard_http_error", status=e.response.status_code, error=str(e))
             return AgentResult(
-                success=True, action="get_private_domain_dashboard",
-                data={"degraded": True, "reason": f"http_{e.response.status_code}",
-                      "total_members": 0, "active_pct": 0.0,
-                      "churn_risk_count": 0, "active_journeys": 0},
-                reasoning=f"内部服务返回 HTTP {e.response.status_code}，返回降级数据", confidence=0.3,
+                success=True,
+                action="get_private_domain_dashboard",
+                data={
+                    "degraded": True,
+                    "reason": f"http_{e.response.status_code}",
+                    "total_members": 0,
+                    "active_pct": 0.0,
+                    "churn_risk_count": 0,
+                    "active_journeys": 0,
+                },
+                reasoning=f"内部服务返回 HTTP {e.response.status_code}，返回降级数据",
+                confidence=0.3,
             )
 
         growth_data = growth_resp.json().get("data", {})
@@ -334,7 +371,8 @@ class PrivateOpsAgent(SkillAgent):
         )
 
         return AgentResult(
-            success=True, action="get_private_domain_dashboard",
+            success=True,
+            action="get_private_domain_dashboard",
             data={
                 "total_members": total_members,
                 "active_pct": active_pct,
@@ -371,29 +409,36 @@ class PrivateOpsAgent(SkillAgent):
         except httpx.ConnectError as e:
             logger.warning("trigger_campaign_connect_error", error=str(e))
             return AgentResult(
-                success=False, action="trigger_campaign",
+                success=False,
+                action="trigger_campaign",
                 data={"degraded": True, "reason": "service_unavailable"},
-                error="tx-growth 服务不可用", confidence=0.0,
+                error="tx-growth 服务不可用",
+                confidence=0.0,
             )
         except httpx.TimeoutException as e:
             logger.warning("trigger_campaign_timeout", error=str(e))
             return AgentResult(
-                success=False, action="trigger_campaign",
+                success=False,
+                action="trigger_campaign",
                 data={"degraded": True, "reason": "timeout"},
-                error="tx-growth 服务请求超时", confidence=0.0,
+                error="tx-growth 服务请求超时",
+                confidence=0.0,
             )
         except httpx.HTTPStatusError as e:
             logger.warning("trigger_campaign_http_error", status=e.response.status_code, error=str(e))
             return AgentResult(
-                success=False, action="trigger_campaign",
+                success=False,
+                action="trigger_campaign",
                 data={"degraded": True, "reason": f"http_{e.response.status_code}"},
-                error=f"tx-growth 返回 HTTP {e.response.status_code}", confidence=0.0,
+                error=f"tx-growth 返回 HTTP {e.response.status_code}",
+                confidence=0.0,
             )
 
         data = resp.json().get("data", {})
         logger.info("trigger_campaign_success", tenant_id=tenant_id, campaign_id=campaign_id)
         return AgentResult(
-            success=True, action="trigger_campaign",
+            success=True,
+            action="trigger_campaign",
             data={"ok": True, "campaign": data},
             reasoning=f"营销活动{'激活' if campaign_id else '创建'}成功",
             confidence=0.85,
@@ -409,8 +454,10 @@ class PrivateOpsAgent(SkillAgent):
 
         if not journey_id:
             return AgentResult(
-                success=False, action="advance_journey",
-                error="缺少必要参数: journey_id", confidence=0.0,
+                success=False,
+                action="advance_journey",
+                error="缺少必要参数: journey_id",
+                confidence=0.0,
             )
 
         try:
@@ -425,31 +472,38 @@ class PrivateOpsAgent(SkillAgent):
         except httpx.ConnectError as e:
             logger.warning("advance_journey_connect_error", journey_id=journey_id, error=str(e))
             return AgentResult(
-                success=False, action="advance_journey",
+                success=False,
+                action="advance_journey",
                 data={"degraded": True, "reason": "service_unavailable"},
-                error="tx-growth 服务不可用", confidence=0.0,
+                error="tx-growth 服务不可用",
+                confidence=0.0,
             )
         except httpx.TimeoutException as e:
             logger.warning("advance_journey_timeout", journey_id=journey_id, error=str(e))
             return AgentResult(
-                success=False, action="advance_journey",
+                success=False,
+                action="advance_journey",
                 data={"degraded": True, "reason": "timeout"},
-                error="tx-growth 服务请求超时", confidence=0.0,
+                error="tx-growth 服务请求超时",
+                confidence=0.0,
             )
         except httpx.HTTPStatusError as e:
-            logger.warning("advance_journey_http_error", journey_id=journey_id,
-                          status=e.response.status_code, error=str(e))
+            logger.warning(
+                "advance_journey_http_error", journey_id=journey_id, status=e.response.status_code, error=str(e)
+            )
             return AgentResult(
-                success=False, action="advance_journey",
+                success=False,
+                action="advance_journey",
                 data={"degraded": True, "reason": f"http_{e.response.status_code}"},
-                error=f"tx-growth 返回 HTTP {e.response.status_code}", confidence=0.0,
+                error=f"tx-growth 返回 HTTP {e.response.status_code}",
+                confidence=0.0,
             )
 
         data = resp.json().get("data", {})
-        logger.info("advance_journey_success", tenant_id=tenant_id,
-                    journey_id=journey_id, customer_id=customer_id)
+        logger.info("advance_journey_success", tenant_id=tenant_id, journey_id=journey_id, customer_id=customer_id)
         return AgentResult(
-            success=True, action="advance_journey",
+            success=True,
+            action="advance_journey",
             data=data,
             reasoning=f"旅程 {journey_id} 推进成功",
             confidence=0.9,
@@ -458,27 +512,47 @@ class PrivateOpsAgent(SkillAgent):
     async def _optimize_shift(self, params: dict) -> AgentResult:
         employees = params.get("employees", [])
         forecast = params.get("traffic_forecast", [50] * 12)
-        return AgentResult(success=True, action="optimize_shift",
-                         data={"schedule": [{"employee": e.get("name", ""), "shift": "09:00-17:00"} for e in employees[:10]],
-                               "staff_count": len(employees), "peak_staff": max(1, max(forecast) // 15)},
-                         reasoning=f"为 {len(employees)} 人优化排班", confidence=0.75)
+        return AgentResult(
+            success=True,
+            action="optimize_shift",
+            data={
+                "schedule": [{"employee": e.get("name", ""), "shift": "09:00-17:00"} for e in employees[:10]],
+                "staff_count": len(employees),
+                "peak_staff": max(1, max(forecast) // 15),
+            },
+            reasoning=f"为 {len(employees)} 人优化排班",
+            confidence=0.75,
+        )
 
     async def _create_reservation(self, params: dict) -> AgentResult:
         guest_count = params.get("guest_count", 2)
         date = params.get("date", "")
         name = params.get("customer_name", "")
-        return AgentResult(success=True, action="create_reservation",
-                         data={"reservation_id": "new", "guest_count": guest_count, "date": date,
-                               "customer_name": name, "status": "confirmed"},
-                         reasoning=f"预订已创建: {name} {guest_count}人 {date}", confidence=0.95)
+        return AgentResult(
+            success=True,
+            action="create_reservation",
+            data={
+                "reservation_id": "new",
+                "guest_count": guest_count,
+                "date": date,
+                "customer_name": name,
+                "status": "confirmed",
+            },
+            reasoning=f"预订已创建: {name} {guest_count}人 {date}",
+            confidence=0.95,
+        )
 
     async def _manage_banquet(self, params: dict) -> AgentResult:
         event_name = params.get("event_name", "")
         stage = params.get("stage", "lead")
         next_stage = {"lead": "confirmed", "confirmed": "executing", "executing": "review"}.get(stage, "completed")
-        return AgentResult(success=True, action="manage_banquet",
-                         data={"event_name": event_name, "current_stage": stage, "next_stage": next_stage},
-                         reasoning=f"宴会 {event_name}: {stage} → {next_stage}", confidence=0.9)
+        return AgentResult(
+            success=True,
+            action="manage_banquet",
+            data={"event_name": event_name, "current_stage": stage, "next_stage": next_stage},
+            reasoning=f"宴会 {event_name}: {stage} → {next_stage}",
+            confidence=0.9,
+        )
 
     # ─── 事件驱动：订单支付后检查私域旅程触发条件 ───
 
@@ -502,7 +576,9 @@ class PrivateOpsAgent(SkillAgent):
         # 若有 DB，从会员历史补充缺失字段
         if self._db and customer_id:
             from sqlalchemy import text
-            row = await self._db.execute(text("""
+
+            row = await self._db.execute(
+                text("""
                 SELECT
                     COUNT(DISTINCT o.id) as order_count,
                     EXTRACT(DAY FROM NOW() - MAX(o.completed_at)) as days_since_last,
@@ -513,7 +589,9 @@ class PrivateOpsAgent(SkillAgent):
                   AND o.customer_id = :customer_id
                   AND o.status = 'completed'
                 GROUP BY c.birth_date
-            """), {"tenant_id": self.tenant_id, "customer_id": customer_id})
+            """),
+                {"tenant_id": self.tenant_id, "customer_id": customer_id},
+            )
             r = dict(row.mappings().first() or {})
             if r:
                 order_count = int(r.get("order_count") or order_count)
@@ -524,32 +602,40 @@ class PrivateOpsAgent(SkillAgent):
         triggered_journeys: list[dict] = []
 
         if order_count == 1:
-            triggered_journeys.append({
-                "journey_type": "new_customer",
-                "reason": "首次消费，启动欢迎旅程",
-                "priority": 1,
-            })
+            triggered_journeys.append(
+                {
+                    "journey_type": "new_customer",
+                    "reason": "首次消费，启动欢迎旅程",
+                    "priority": 1,
+                }
+            )
 
         if days_since_last >= 30 and order_count > 1:
-            triggered_journeys.append({
-                "journey_type": "reactivation",
-                "reason": f"沉默{int(days_since_last)}天后再消费，触发召回旅程",
-                "priority": 2,
-            })
+            triggered_journeys.append(
+                {
+                    "journey_type": "reactivation",
+                    "reason": f"沉默{int(days_since_last)}天后再消费，触发召回旅程",
+                    "priority": 2,
+                }
+            )
 
         if order_amount_fen >= 50000:  # ≥500元
-            triggered_journeys.append({
-                "journey_type": "vip_retention",
-                "reason": f"高价值订单 ¥{order_amount_fen/100:.0f}，触发VIP维护旅程",
-                "priority": 3,
-            })
+            triggered_journeys.append(
+                {
+                    "journey_type": "vip_retention",
+                    "reason": f"高价值订单 ¥{order_amount_fen / 100:.0f}，触发VIP维护旅程",
+                    "priority": 3,
+                }
+            )
 
         if is_birthday_month:
-            triggered_journeys.append({
-                "journey_type": "birthday",
-                "reason": "生日月消费，触发生日关怀旅程",
-                "priority": 4,
-            })
+            triggered_journeys.append(
+                {
+                    "journey_type": "birthday",
+                    "reason": "生日月消费，触发生日关怀旅程",
+                    "priority": 4,
+                }
+            )
 
         # 取最高优先级旅程（优先级数字越小越高）
         best_journey = min(triggered_journeys, key=lambda j: j["priority"]) if triggered_journeys else None
@@ -575,8 +661,6 @@ class PrivateOpsAgent(SkillAgent):
                 "order_count": order_count,
                 "days_since_last": days_since_last,
             },
-            reasoning=(
-                f"检查旅程触发：{'触发 ' + best_journey['journey_type'] if best_journey else '无需触发旅程'}"
-            ),
+            reasoning=(f"检查旅程触发：{'触发 ' + best_journey['journey_type'] if best_journey else '无需触发旅程'}"),
             confidence=0.88,
         )

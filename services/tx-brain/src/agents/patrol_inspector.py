@@ -6,6 +6,7 @@
 3. Claude失败时降级为纯Python规则兜底
 4. 结构化返回风险等级、违规明细、整改建议
 """
+
 from __future__ import annotations
 
 import json
@@ -157,28 +158,25 @@ class PatrolInspector:
         self._log_decision(tenant_id, store_id, overall_score, result)
         return result
 
-    def _pre_calculate(
-        self, checklist_items: list[dict], overall_score: float, previous_score: float
-    ) -> dict:
+    def _pre_calculate(self, checklist_items: list[dict], overall_score: float, previous_score: float) -> dict:
         """Python预计算业务规则，生成约束校验和预警标志。"""
         food_safety_fails = [
-            item for item in checklist_items
+            item
+            for item in checklist_items
             if item.get("category") == CATEGORY_FOOD_SAFETY and item.get("result") == "fail"
         ]
         fire_safety_fails = [
-            item for item in checklist_items
+            item
+            for item in checklist_items
             if item.get("category") == CATEGORY_FIRE_SAFETY and item.get("result") == "fail"
         ]
 
         # 卫生通过率
         hygiene_items = [
-            item for item in checklist_items
-            if item.get("category") == CATEGORY_HYGIENE and item.get("result") != "na"
+            item for item in checklist_items if item.get("category") == CATEGORY_HYGIENE and item.get("result") != "na"
         ]
         hygiene_pass = [item for item in hygiene_items if item.get("result") == "pass"]
-        hygiene_pass_rate = (
-            len(hygiene_pass) / len(hygiene_items) if hygiene_items else 1.0
-        )
+        hygiene_pass_rate = len(hygiene_pass) / len(hygiene_items) if hygiene_items else 1.0
 
         # 约束校验
         food_safety_ok = len(food_safety_fails) == 0
@@ -228,9 +226,7 @@ class PatrolInspector:
             "fire_safety_fails": fire_safety_fails,
         }
 
-    def _build_context(
-        self, payload: dict, pre_calc: dict, fail_items: list[dict]
-    ) -> str:
+    def _build_context(self, payload: dict, pre_calc: dict, fail_items: list[dict]) -> str:
         store_id = payload.get("store_id", "")
         patrol_date = payload.get("patrol_date", "")
         inspector_name = payload.get("inspector_name", "")
@@ -279,8 +275,8 @@ class PatrolInspector:
 - 巡检日期：{patrol_date}
 - 巡检员：{inspector_name}
 - 本次综合评分：{overall_score:.1f}分
-- 上次综合评分：{previous_score:.1f}分（{pre_calc['score_trend']}）
-- 风险等级（系统预判）：{pre_calc['risk_level']}
+- 上次综合评分：{previous_score:.1f}分（{pre_calc["score_trend"]}）
+- 风险等级（系统预判）：{pre_calc["risk_level"]}
 
 检查概况：
 - 有效检查项：{total_items}项
@@ -348,14 +344,16 @@ class PatrolInspector:
                 severity = "minor"
                 deadline_days = DEADLINE_MINOR
 
-            violations.append({
-                "category": category,
-                "item": item_name,
-                "severity": severity,
-                "description": f"{item_name}检查不达标，请整改",
-                "required_action": f"针对{item_name}进行整改，确保达到标准要求",
-                "deadline_days": deadline_days,
-            })
+            violations.append(
+                {
+                    "category": category,
+                    "item": item_name,
+                    "severity": severity,
+                    "description": f"{item_name}检查不达标，请整改",
+                    "required_action": f"针对{item_name}进行整改，确保达到标准要求",
+                    "deadline_days": deadline_days,
+                }
+            )
 
         fail_count = len(fail_items)
         improvement_suggestions = [
@@ -375,9 +373,7 @@ class PatrolInspector:
             source="fallback",
         )
 
-    def _log_decision(
-        self, tenant_id: str, store_id: str, overall_score: float, result: dict
-    ) -> None:
+    def _log_decision(self, tenant_id: str, store_id: str, overall_score: float, result: dict) -> None:
         """记录决策留痕。"""
         logger.info(
             "patrol_inspector_decision",
@@ -393,7 +389,6 @@ class PatrolInspector:
             hygiene_ok=result.get("constraints_check", {}).get("hygiene_ok"),
             source=result.get("source"),
         )
-
 
     async def analyze_from_mv(self, payload: dict, db) -> dict:
         """基于物化视图的增强分析入口。

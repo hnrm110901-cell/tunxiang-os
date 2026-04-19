@@ -3,6 +3,7 @@
 识别周边企业客户，设计企业套餐，追踪企业客户生命周期。
 通过 ModelRouter (MODERATE) 调用 LLM 生成企业套餐方案。
 """
+
 import uuid
 from typing import Any
 
@@ -115,18 +116,18 @@ class EnterpriseActivationAgent(SkillAgent):
                 enterprise_types.append("conference_meal")
 
             score = min(1.0, score)
-            prospects.append({
-                "company_id": company_id,
-                "company_name": company.get("company_name", ""),
-                "employee_count": employee_count,
-                "distance_km": distance_km,
-                "industry": industry,
-                "prospect_score": round(score, 2),
-                "potential_types": enterprise_types,
-                "estimated_monthly_revenue_fen": _estimate_monthly_revenue(
-                    employee_count, enterprise_types
-                ),
-            })
+            prospects.append(
+                {
+                    "company_id": company_id,
+                    "company_name": company.get("company_name", ""),
+                    "employee_count": employee_count,
+                    "distance_km": distance_km,
+                    "industry": industry,
+                    "prospect_score": round(score, 2),
+                    "potential_types": enterprise_types,
+                    "estimated_monthly_revenue_fen": _estimate_monthly_revenue(employee_count, enterprise_types),
+                }
+            )
 
         prospects.sort(key=lambda x: x["prospect_score"], reverse=True)
         high_value = sum(1 for p in prospects if p["prospect_score"] >= 0.6)
@@ -187,14 +188,16 @@ class EnterpriseActivationAgent(SkillAgent):
             for dish in sorted_dishes[:count]:
                 dish_price = dish.get("price_fen", 0)
                 dish_cost = dish.get("cost_fen", 0)
-                package_dishes.append({
-                    "dish_id": dish.get("dish_id"),
-                    "name": dish.get("name"),
-                    "category": dish.get("category"),
-                    "price_fen": dish_price,
-                    "cost_fen": dish_cost,
-                    "quantity": 1,
-                })
+                package_dishes.append(
+                    {
+                        "dish_id": dish.get("dish_id"),
+                        "name": dish.get("name"),
+                        "category": dish.get("category"),
+                        "price_fen": dish_price,
+                        "cost_fen": dish_cost,
+                        "quantity": 1,
+                    }
+                )
                 total_price_fen += dish_price
                 total_cost_fen += dish_cost
 
@@ -242,8 +245,7 @@ class EnterpriseActivationAgent(SkillAgent):
             reasoning=(
                 f"为{type_config['label']}设计 {pax} 人套餐，"
                 f"人均 {total_price_fen / max(1, pax) / 100:.0f} 元，"
-                f"毛利率 {margin_rate:.1%}"
-                + (f"（警告: {margin_warning}）" if margin_warning else "")
+                f"毛利率 {margin_rate:.1%}" + (f"（警告: {margin_warning}）" if margin_warning else "")
             ),
             confidence=0.75 if margin_safe else 0.5,
         )

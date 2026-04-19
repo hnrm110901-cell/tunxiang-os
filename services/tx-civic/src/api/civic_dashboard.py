@@ -1,13 +1,12 @@
 from __future__ import annotations
 
-from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
 
@@ -26,10 +25,15 @@ async def _set_tenant(db: AsyncSession, tenant_id: str) -> None:
 # Helper: fetch aggregated data for dashboard
 # ---------------------------------------------------------------------------
 
+
 async def _get_expiring_licenses_count(db: AsyncSession, tenant_id: str, store_id: Optional[str] = None) -> int:
-    conditions = ["tenant_id = :tid", "is_deleted = FALSE", "expiry_date IS NOT NULL",
-                   "expiry_date <= CURRENT_DATE + 30 * INTERVAL '1 day'",
-                   "expiry_date >= CURRENT_DATE"]
+    conditions = [
+        "tenant_id = :tid",
+        "is_deleted = FALSE",
+        "expiry_date IS NOT NULL",
+        "expiry_date <= CURRENT_DATE + 30 * INTERVAL '1 day'",
+        "expiry_date >= CURRENT_DATE",
+    ]
     params: Dict[str, Any] = {"tid": tenant_id}
     if store_id:
         conditions.append("store_id = :sid")
@@ -81,7 +85,9 @@ async def _get_compliance_score(db: AsyncSession, tenant_id: str, store_id: Opti
     where = " AND ".join(conditions)
 
     result = await db.execute(
-        text(f"SELECT store_id, score, risk_level, updated_at FROM civic_compliance_scores WHERE {where} ORDER BY score ASC"),
+        text(
+            f"SELECT store_id, score, risk_level, updated_at FROM civic_compliance_scores WHERE {where} ORDER BY score ASC"
+        ),
         params,
     )
     rows = [dict(r._mapping) for r in result]
@@ -100,6 +106,7 @@ async def _get_compliance_score(db: AsyncSession, tenant_id: str, store_id: Opti
 # ---------------------------------------------------------------------------
 # Endpoints
 # ---------------------------------------------------------------------------
+
 
 @router.get("/dashboard")
 async def get_dashboard(
@@ -276,16 +283,11 @@ async def list_compliance_scores(
         params["limit"] = size
         params["offset"] = offset
 
-        count_result = await db.execute(
-            text(f"SELECT COUNT(*) FROM civic_compliance_scores WHERE {where}"), params
-        )
+        count_result = await db.execute(text(f"SELECT COUNT(*) FROM civic_compliance_scores WHERE {where}"), params)
         total = count_result.scalar() or 0
 
         rows = await db.execute(
-            text(
-                f"SELECT * FROM civic_compliance_scores WHERE {where} "
-                f"ORDER BY score ASC LIMIT :limit OFFSET :offset"
-            ),
+            text(f"SELECT * FROM civic_compliance_scores WHERE {where} ORDER BY score ASC LIMIT :limit OFFSET :offset"),
             params,
         )
         items = [dict(r._mapping) for r in rows]

@@ -7,6 +7,7 @@ Endpoints:
   POST /api/v1/voice/session      — Create session
   GET  /api/v1/voice/session/{id} — Get session state
 """
+
 from __future__ import annotations
 
 from typing import Any
@@ -97,10 +98,13 @@ async def voice_command(
     sm = get_session_manager()
     sm.add_turn(session_id, "user", result["transcription"]["text"])
     sm.add_turn(session_id, "system", result["response_text"])
-    sm.update_context(session_id, {
-        "last_intent": result["intent"],
-        "entities": result["entities"],
-    })
+    sm.update_context(
+        session_id,
+        {
+            "last_intent": result["intent"],
+            "entities": result["entities"],
+        },
+    )
 
     return {"ok": True, "data": result}
 
@@ -112,9 +116,14 @@ async def transcribe_audio(
 ) -> dict[str, Any]:
     """POST /api/v1/voice/transcribe — ASR only (语音转文字)"""
     allowed_types = {
-        "audio/wav", "audio/x-wav", "audio/wave",
-        "audio/mp3", "audio/mpeg",
-        "audio/m4a", "audio/x-m4a", "audio/mp4",
+        "audio/wav",
+        "audio/x-wav",
+        "audio/wave",
+        "audio/mp3",
+        "audio/mpeg",
+        "audio/m4a",
+        "audio/x-m4a",
+        "audio/mp4",
         "application/octet-stream",
     }
     content_type = file.content_type or "application/octet-stream"

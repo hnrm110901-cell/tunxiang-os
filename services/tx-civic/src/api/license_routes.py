@@ -1,15 +1,15 @@
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import date
 from typing import Any, Dict, List, Optional
 from uuid import uuid4
 
 import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel, Field
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
 
@@ -30,6 +30,7 @@ async def _set_tenant(db: AsyncSession, tenant_id: str) -> None:
 # ---------------------------------------------------------------------------
 # Pydantic Models
 # ---------------------------------------------------------------------------
+
 
 class LicenseCreate(BaseModel):
     store_id: str
@@ -62,6 +63,7 @@ class RenewalUpdate(BaseModel):
 # ---------------------------------------------------------------------------
 # License Endpoints
 # ---------------------------------------------------------------------------
+
 
 @router.post("")
 async def create_license(
@@ -181,11 +183,7 @@ async def mark_renewal(
     await _set_tenant(db, x_tenant_id)
     try:
         result = await db.execute(
-            text(
-                "UPDATE civic_licenses SET "
-                "status = :status, updated_at = NOW() "
-                "WHERE id = :id AND tenant_id = :tid"
-            ),
+            text("UPDATE civic_licenses SET status = :status, updated_at = NOW() WHERE id = :id AND tenant_id = :tid"),
             {"id": license_id, "tid": x_tenant_id, "status": body.renewal_status},
         )
         if result.rowcount == 0:
@@ -205,6 +203,7 @@ async def mark_renewal(
 # ---------------------------------------------------------------------------
 # Health Certificate Endpoints
 # ---------------------------------------------------------------------------
+
 
 @health_router.post("")
 async def create_health_cert(

@@ -5,6 +5,7 @@ GET  /api/v1/inventory/dashboard      — 库存总览（缺货/临期/正常数
 POST /api/v1/inventory/restock-plan   — 生成 AI 补货计划（调用 inventory_alert agent）
 GET  /api/v1/inventory/restock-plan   — 获取最新补货计划（从 DB 缓存）
 """
+
 import structlog
 from fastapi import APIRouter, Depends, Header
 from sqlalchemy import text
@@ -81,24 +82,24 @@ async def get_inventory_dashboard(
             "ok": True,
             "data": {
                 "summary": {
-                    "out_of_stock":  row.out_of_stock  if row else 0,
-                    "critical":      row.critical      if row else 0,
-                    "low_stock":     row.low_stock     if row else 0,
-                    "normal":        row.normal        if row else 0,
+                    "out_of_stock": row.out_of_stock if row else 0,
+                    "critical": row.critical if row else 0,
+                    "low_stock": row.low_stock if row else 0,
+                    "normal": row.normal if row else 0,
                     "expiring_soon": row.expiring_soon if row else 0,
-                    "expired":       row.expired       if row else 0,
+                    "expired": row.expired if row else 0,
                 },
                 "low_items": [
                     {
-                        "id":                 r.id,
-                        "name":               r.name,
-                        "current_qty":        float(r.current_qty),
-                        "unit":               r.unit,
-                        "safety_stock_qty":   float(r.safety_stock_qty) if r.safety_stock_qty else 0.0,
-                        "status":             r.status,
-                        "expiry_date":        r.expiry_date.isoformat() if r.expiry_date else None,
+                        "id": r.id,
+                        "name": r.name,
+                        "current_qty": float(r.current_qty),
+                        "unit": r.unit,
+                        "safety_stock_qty": float(r.safety_stock_qty) if r.safety_stock_qty else 0.0,
+                        "status": r.status,
+                        "expiry_date": r.expiry_date.isoformat() if r.expiry_date else None,
                         "preferred_supplier": r.preferred_supplier,
-                        "last_price_fen":     int(r.last_price_fen),
+                        "last_price_fen": int(r.last_price_fen),
                     }
                     for r in low_items
                 ],
@@ -156,12 +157,12 @@ async def generate_restock_plan(
         return {
             "ok": True,
             "data": {
-                "restock_alerts":  alert_result.data    if alert_result.success    else [],
-                "severity":        severity_result.data if severity_result.success else {},
-                "ai_reasoning":    alert_result.reasoning,
-                "confidence":      alert_result.confidence,
-                "constraints_ok":  alert_result.constraints_passed,
-                "execution_ms":    alert_result.execution_ms,
+                "restock_alerts": alert_result.data if alert_result.success else [],
+                "severity": severity_result.data if severity_result.success else {},
+                "ai_reasoning": alert_result.reasoning,
+                "confidence": alert_result.confidence,
+                "constraints_ok": alert_result.constraints_passed,
+                "execution_ms": alert_result.execution_ms,
             },
         }
 
@@ -210,10 +211,10 @@ async def get_latest_restock_plan(
         return {
             "ok": True,
             "data": {
-                "plan_id":      row.id,
-                "plan":         row.output_action,
-                "reasoning":    row.reasoning,
-                "confidence":   float(row.confidence) if row.confidence else 0.0,
+                "plan_id": row.id,
+                "plan": row.output_action,
+                "reasoning": row.reasoning,
+                "confidence": float(row.confidence) if row.confidence else 0.0,
                 "generated_at": row.created_at.isoformat() if row.created_at else None,
             },
         }

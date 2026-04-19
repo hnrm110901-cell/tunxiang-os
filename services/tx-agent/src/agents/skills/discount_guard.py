@@ -12,10 +12,11 @@ P1-5 升级（2026-04-12）：
   集成 EdgeAwareMixin — 折扣异常检测优先使用边缘 Core ML 推理
   边缘高置信度（>0.8）时直接使用边缘结果，节省 Claude API 成本
 """
+
 import asyncio
 import os
-from datetime import datetime, date, timezone
-from typing import Any, Optional
+from datetime import date, datetime, timezone
+from typing import Any
 
 import httpx
 import structlog
@@ -41,7 +42,7 @@ class DiscountGuardAgent(EdgeAwareMixin, SkillAgent):
     def get_supported_actions(self) -> list[str]:
         return [
             "detect_discount_anomaly",
-            "get_daily_discount_health",   # Phase 3: 直接读物化视图
+            "get_daily_discount_health",  # Phase 3: 直接读物化视图
             "scan_store_licenses",
             "scan_all_licenses",
             "get_financial_report",
@@ -126,6 +127,7 @@ class DiscountGuardAgent(EdgeAwareMixin, SkillAgent):
         # 若有 order_id 且 DB 可用，从 DB 查真实数据；否则降级到 params 中的 order 字典
         if order_id and self._db:
             from sqlalchemy import text
+
             row = await self._db.execute(
                 text(
                     "SELECT total_amount_fen, discount_amount_fen, status, store_id "
@@ -171,7 +173,8 @@ class DiscountGuardAgent(EdgeAwareMixin, SkillAgent):
             )
 
             return AgentResult(
-                success=True, action="detect_discount_anomaly",
+                success=True,
+                action="detect_discount_anomaly",
                 data={
                     "is_anomaly": is_anomaly,
                     "discount_rate": round(discount_rate, 4),
@@ -217,9 +220,13 @@ class DiscountGuardAgent(EdgeAwareMixin, SkillAgent):
                     tenant_id=self.tenant_id,
                     task_type="standard_analysis",
                     system="你是餐饮收银审计专家，分析折扣异常风险并给出处理建议。用中文回复，控制在100字内。",
-                    messages=[{"role": "user", "content":
-                        f"订单金额{total/100:.2f}元，折扣{discount/100:.2f}元（折扣率{discount_rate:.1%}），"
-                        f"风险因素：{risk_factors}。请评估风险等级并给出建议。"}],
+                    messages=[
+                        {
+                            "role": "user",
+                            "content": f"订单金额{total / 100:.2f}元，折扣{discount / 100:.2f}元（折扣率{discount_rate:.1%}），"
+                            f"风险因素：{risk_factors}。请评估风险等级并给出建议。",
+                        }
+                    ],
                     max_tokens=200,
                     db=self._db,
                 )
@@ -227,7 +234,8 @@ class DiscountGuardAgent(EdgeAwareMixin, SkillAgent):
                 logger.warning("discount_guard_llm_fallback", error=str(exc))
 
         return AgentResult(
-            success=True, action="detect_discount_anomaly",
+            success=True,
+            action="detect_discount_anomaly",
             data={
                 "is_anomaly": is_anomaly,
                 "discount_rate": round(discount_rate, 4),
@@ -260,22 +268,20 @@ class DiscountGuardAgent(EdgeAwareMixin, SkillAgent):
 
         if not store_id:
             return AgentResult(
-                success=False, action="get_daily_discount_health",
+                success=False,
+                action="get_daily_discount_health",
                 error="store_id 必传",
             )
 
         if not self._db:
             return AgentResult(
-                success=False, action="get_daily_discount_health",
+                success=False,
+                action="get_daily_discount_health",
                 error="DB 未注入，无法读取物化视图",
             )
 
         try:
-            stat_date: date = (
-                date.fromisoformat(stat_date_str)
-                if stat_date_str
-                else date.today()
-            )
+            stat_date: date = date.fromisoformat(stat_date_str) if stat_date_str else date.today()
 
             row = await self._db.execute(
                 text("""
@@ -303,7 +309,8 @@ class DiscountGuardAgent(EdgeAwareMixin, SkillAgent):
 
             if not health:
                 return AgentResult(
-                    success=True, action="get_daily_discount_health",
+                    success=True,
+                    action="get_daily_discount_health",
                     data={
                         "store_id": store_id,
                         "stat_date": stat_date.isoformat(),
@@ -318,11 +325,7 @@ class DiscountGuardAgent(EdgeAwareMixin, SkillAgent):
             discount_rate = float(health.get("discount_rate", 0))
             unauthorized = int(health.get("unauthorized_count", 0))
             threshold_breaches = int(health.get("threshold_breaches", 0))
-            is_alert = (
-                discount_rate > threshold
-                or unauthorized > 0
-                or threshold_breaches > 0
-            )
+            is_alert = discount_rate > threshold or unauthorized > 0 or threshold_breaches > 0
 
             # 风险等级
             if discount_rate > 0.5 or threshold_breaches > 3:
@@ -343,11 +346,14 @@ class DiscountGuardAgent(EdgeAwareMixin, SkillAgent):
                         tenant_id=self.tenant_id,
                         task_type="standard_analysis",
                         system="你是餐饮收银审计专家，分析折扣健康数据并给出处理建议。用中文，80字以内。",
-                        messages=[{"role": "user", "content":
-                            f"今日折扣率{discount_rate:.1%}（阈值{threshold:.1%}），"
-                            f"未授权折扣{unauthorized}次，超毛利底线{threshold_breaches}次，"
-                            f"泄漏类型：{leak_types}。请评估风险并给出具体处理建议。"
-                        }],
+                        messages=[
+                            {
+                                "role": "user",
+                                "content": f"今日折扣率{discount_rate:.1%}（阈值{threshold:.1%}），"
+                                f"未授权折扣{unauthorized}次，超毛利底线{threshold_breaches}次，"
+                                f"泄漏类型：{leak_types}。请评估风险并给出具体处理建议。",
+                            }
+                        ],
                         max_tokens=150,
                         db=self._db,
                     )
@@ -391,7 +397,8 @@ class DiscountGuardAgent(EdgeAwareMixin, SkillAgent):
                 exc_info=True,
             )
             return AgentResult(
-                success=False, action="get_daily_discount_health",
+                success=False,
+                action="get_daily_discount_health",
                 error=f"读取物化视图失败: {exc}",
             )
 
@@ -414,9 +421,15 @@ class DiscountGuardAgent(EdgeAwareMixin, SkillAgent):
                 valid.append({"name": name, "expiry": expiry, "days": remaining_days})
 
         return AgentResult(
-            success=True, action="scan_store_licenses",
-            data={"expired": expired, "expiring_soon": expiring, "valid": valid,
-                  "total": len(licenses), "issues": len(expired) + len(expiring)},
+            success=True,
+            action="scan_store_licenses",
+            data={
+                "expired": expired,
+                "expiring_soon": expiring,
+                "valid": valid,
+                "total": len(licenses),
+                "issues": len(expired) + len(expiring),
+            },
             reasoning=f"{len(expired)} 张过期，{len(expiring)} 张即将过期，{len(valid)} 张有效",
             confidence=1.0,
         )
@@ -434,7 +447,8 @@ class DiscountGuardAgent(EdgeAwareMixin, SkillAgent):
                 store_results.append({"store_name": store.get("name", ""), "issues": issues})
 
         return AgentResult(
-            success=True, action="scan_all_licenses",
+            success=True,
+            action="scan_all_licenses",
             data={"stores_with_issues": store_results, "total_issues": total_issues, "stores_scanned": len(stores)},
             reasoning=f"扫描 {len(stores)} 家门店，{total_issues} 个证照问题",
             confidence=1.0,
@@ -444,13 +458,14 @@ class DiscountGuardAgent(EdgeAwareMixin, SkillAgent):
         """财务报表（7种类型）"""
         report_type = params.get("report_type", "period_summary")
         if report_type not in REPORT_TYPES:
-            return AgentResult(success=False, action="get_financial_report",
-                             error=f"未知报表类型，可选: {REPORT_TYPES}")
+            return AgentResult(
+                success=False, action="get_financial_report", error=f"未知报表类型，可选: {REPORT_TYPES}"
+            )
 
         return AgentResult(
-            success=True, action="get_financial_report",
-            data={"report_type": report_type, "generated": True,
-                  "summary": f"{report_type} 报表已生成"},
+            success=True,
+            action="get_financial_report",
+            data={"report_type": report_type, "generated": True, "summary": f"{report_type} 报表已生成"},
             reasoning=f"生成 {report_type} 报表",
             confidence=0.9,
         )
@@ -462,7 +477,8 @@ class DiscountGuardAgent(EdgeAwareMixin, SkillAgent):
 
         if not self._router:
             return AgentResult(
-                success=False, action="explain_voucher",
+                success=False,
+                action="explain_voucher",
                 error="model_router 未注入，无法调用 Claude API",
             )
 
@@ -477,7 +493,8 @@ class DiscountGuardAgent(EdgeAwareMixin, SkillAgent):
         )
 
         return AgentResult(
-            success=True, action="explain_voucher",
+            success=True,
+            action="explain_voucher",
             data={"voucher_id": voucher_id, "explanation": explanation},
             reasoning="Claude财务专家解释",
             confidence=0.9,
@@ -488,9 +505,9 @@ class DiscountGuardAgent(EdgeAwareMixin, SkillAgent):
         """对账状态"""
         date = params.get("date", "today")
         return AgentResult(
-            success=True, action="reconciliation_status",
-            data={"date": date, "status": "matched", "discrepancies": [],
-                  "total_transactions": 0, "matched_count": 0},
+            success=True,
+            action="reconciliation_status",
+            data={"date": date, "status": "matched", "discrepancies": [], "total_transactions": 0, "matched_count": 0},
             reasoning=f"{date} 对账完成",
             confidence=0.85,
         )
@@ -521,10 +538,13 @@ class DiscountGuardAgent(EdgeAwareMixin, SkillAgent):
 
         # 违规严重程度评估
         severity = (
-            "critical" if discount_rate > 0.7 or discount_amount_fen > 50000 else
-            "high" if discount_rate > 0.5 or discount_amount_fen > 20000 else
-            "medium" if discount_rate > 0.3 else
-            "low"
+            "critical"
+            if discount_rate > 0.7 or discount_amount_fen > 50000
+            else "high"
+            if discount_rate > 0.5 or discount_amount_fen > 20000
+            else "medium"
+            if discount_rate > 0.3
+            else "low"
         )
 
         # 建议处理动作
@@ -571,7 +591,7 @@ class DiscountGuardAgent(EdgeAwareMixin, SkillAgent):
             data=violation_record,
             reasoning=(
                 f"折扣违规记录：{violation_type}，折扣率{discount_rate:.1%}，"
-                f"金额¥{discount_amount_fen/100:.0f}，严重度={severity}"
+                f"金额¥{discount_amount_fen / 100:.0f}，严重度={severity}"
             ),
             confidence=0.95,
         )

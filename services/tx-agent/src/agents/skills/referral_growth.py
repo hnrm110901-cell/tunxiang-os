@@ -2,6 +2,7 @@
 
 裂变活动设计、裂变海报生成、裂变链路追踪、奖励结算、裂变效果分析、种子用户筛选。
 """
+
 import uuid
 from typing import Any
 
@@ -9,16 +10,21 @@ from ..base import AgentResult, SkillAgent
 
 # 裂变活动模板
 REFERRAL_TEMPLATES = {
-    "invite_reward": {"name": "邀请有礼", "desc": "老客邀请新客，双方各得优惠券",
-                      "referrer_reward_fen": 2000, "invitee_reward_fen": 1500},
-    "group_buy": {"name": "拼团优惠", "desc": "3人成团享7折",
-                  "min_group_size": 3, "discount_rate": 0.7},
-    "share_coupon": {"name": "分享领券", "desc": "分享到朋友圈领取优惠券",
-                     "coupon_fen": 1000, "max_claims": 100},
-    "lucky_draw": {"name": "助力抽奖", "desc": "邀请好友助力解锁抽奖机会",
-                   "assists_needed": 5, "prize_pool": ["免单券", "半价券", "甜品券"]},
-    "member_day": {"name": "会员日裂变", "desc": "会员日当天分享可获得双倍积分",
-                   "points_multiplier": 2},
+    "invite_reward": {
+        "name": "邀请有礼",
+        "desc": "老客邀请新客，双方各得优惠券",
+        "referrer_reward_fen": 2000,
+        "invitee_reward_fen": 1500,
+    },
+    "group_buy": {"name": "拼团优惠", "desc": "3人成团享7折", "min_group_size": 3, "discount_rate": 0.7},
+    "share_coupon": {"name": "分享领券", "desc": "分享到朋友圈领取优惠券", "coupon_fen": 1000, "max_claims": 100},
+    "lucky_draw": {
+        "name": "助力抽奖",
+        "desc": "邀请好友助力解锁抽奖机会",
+        "assists_needed": 5,
+        "prize_pool": ["免单券", "半价券", "甜品券"],
+    },
+    "member_day": {"name": "会员日裂变", "desc": "会员日当天分享可获得双倍积分", "points_multiplier": 2},
 }
 
 
@@ -76,7 +82,8 @@ class ReferralGrowthAgent(SkillAgent):
         max_affordable = int(budget_fen / max(1, cost_per_new))
 
         return AgentResult(
-            success=True, action="design_referral_campaign",
+            success=True,
+            action="design_referral_campaign",
             data={
                 "campaign_id": campaign_id,
                 "template": template_key,
@@ -91,7 +98,7 @@ class ReferralGrowthAgent(SkillAgent):
                 "rules": template,
             },
             reasoning=f"设计「{template['name']}」裂变活动，单客成本 ¥{cost_per_new / 100:.0f}，"
-                      f"预算可覆盖 {max_affordable} 人",
+            f"预算可覆盖 {max_affordable} 人",
             confidence=0.85,
         )
 
@@ -107,7 +114,8 @@ class ReferralGrowthAgent(SkillAgent):
         qr_code_url = f"https://mp.tunxiang.com/r/{campaign_id}/{referrer_id}"
 
         return AgentResult(
-            success=True, action="generate_referral_poster",
+            success=True,
+            action="generate_referral_poster",
             data={
                 "poster_id": poster_id,
                 "campaign_id": campaign_id,
@@ -149,7 +157,8 @@ class ReferralGrowthAgent(SkillAgent):
         viral_coefficient = round(total_invitees / max(1, len(referrer_counts)), 2)
 
         return AgentResult(
-            success=True, action="track_referral_chain",
+            success=True,
+            action="track_referral_chain",
             data={
                 "campaign_id": campaign_id,
                 "total_referrers": len(referrer_counts),
@@ -160,7 +169,7 @@ class ReferralGrowthAgent(SkillAgent):
                 "is_viral": viral_coefficient >= 1.0,
             },
             reasoning=f"裂变链路: {len(referrer_counts)} 个推荐人带来 {total_invitees} 个新客，"
-                      f"K因子 {viral_coefficient}",
+            f"K因子 {viral_coefficient}",
             confidence=0.85,
         )
 
@@ -182,7 +191,8 @@ class ReferralGrowthAgent(SkillAgent):
                 pending_count += 1
 
         return AgentResult(
-            success=True, action="settle_referral_rewards",
+            success=True,
+            action="settle_referral_rewards",
             data={
                 "campaign_id": campaign_id,
                 "total_records": len(reward_records),
@@ -210,7 +220,8 @@ class ReferralGrowthAgent(SkillAgent):
         viral_k = round(total_invitees / max(1, total_referrers), 2)
 
         return AgentResult(
-            success=True, action="analyze_referral_effect",
+            success=True,
+            action="analyze_referral_effect",
             data={
                 "campaign_id": campaign_id,
                 "total_referrers": total_referrers,
@@ -221,7 +232,13 @@ class ReferralGrowthAgent(SkillAgent):
                 "roi": roi,
                 "viral_k": viral_k,
                 "invitee_revenue_yuan": round(invitee_revenue_fen / 100, 2),
-                "effectiveness": "爆发" if viral_k >= 1.5 else "良好" if viral_k >= 1.0 else "一般" if viral_k >= 0.5 else "较差",
+                "effectiveness": "爆发"
+                if viral_k >= 1.5
+                else "良好"
+                if viral_k >= 1.0
+                else "一般"
+                if viral_k >= 0.5
+                else "较差",
             },
             reasoning=f"裂变K因子 {viral_k}，转化率 {conversion_rate}%，ROI {roi}",
             confidence=0.8,
@@ -243,19 +260,22 @@ class ReferralGrowthAgent(SkillAgent):
             social_score += min(15, m.get("visit_count", 0) * 1.5)
             social_score += min(15, m.get("avg_rating", 0) * 3)
 
-            scored.append({
-                "customer_id": m.get("customer_id"),
-                "name": m.get("name", ""),
-                "seed_score": round(social_score, 1),
-                "past_referrals": m.get("past_referrals", 0),
-                "social_influence": "高" if social_score >= 60 else "中" if social_score >= 35 else "低",
-            })
+            scored.append(
+                {
+                    "customer_id": m.get("customer_id"),
+                    "name": m.get("name", ""),
+                    "seed_score": round(social_score, 1),
+                    "past_referrals": m.get("past_referrals", 0),
+                    "social_influence": "高" if social_score >= 60 else "中" if social_score >= 35 else "低",
+                }
+            )
 
         scored.sort(key=lambda x: x["seed_score"], reverse=True)
         selected = scored[:top_n]
 
         return AgentResult(
-            success=True, action="select_seed_users",
+            success=True,
+            action="select_seed_users",
             data={
                 "seed_users": selected,
                 "total_candidates": len(members),
@@ -263,6 +283,6 @@ class ReferralGrowthAgent(SkillAgent):
                 "avg_seed_score": round(sum(s["seed_score"] for s in selected) / max(1, len(selected)), 1),
             },
             reasoning=f"从 {len(members)} 人中筛选 {len(selected)} 位种子用户，"
-                      f"平均社交影响力分 {sum(s['seed_score'] for s in selected) / max(1, len(selected)):.1f}",
+            f"平均社交影响力分 {sum(s['seed_score'] for s in selected) / max(1, len(selected)):.1f}",
             confidence=0.75,
         )

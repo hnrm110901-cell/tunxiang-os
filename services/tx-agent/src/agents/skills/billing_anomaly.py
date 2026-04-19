@@ -12,6 +12,7 @@
 - PAYMENT.CONFIRMED → 支付完成后异常扫描
 - SHIFT.CLOSED → 班结时现金差异检测
 """
+
 from typing import Any
 
 import structlog
@@ -82,7 +83,7 @@ class BillingAnomalyAgent(SkillAgent):
             try:
                 resp = await self._router.complete(
                     prompt=f"收银员反结账异常：今日第{reverse_count_today}次反结账，金额¥{reverse_amount_fen / 100:.2f}。"
-                           f"请分析可能的原因和建议措施（50字以内）。",
+                    f"请分析可能的原因和建议措施（50字以内）。",
                     max_tokens=80,
                 )
                 if resp:
@@ -91,12 +92,18 @@ class BillingAnomalyAgent(SkillAgent):
                 pass
 
         if risk_level == "high":
-            logger.warning("billing_anomaly_detected",
-                          operator=operator_id, order=order_id, risk=risk_level,
-                          count=reverse_count_today, amount_fen=reverse_amount_fen)
+            logger.warning(
+                "billing_anomaly_detected",
+                operator=operator_id,
+                order=order_id,
+                risk=risk_level,
+                count=reverse_count_today,
+                amount_fen=reverse_amount_fen,
+            )
 
         return AgentResult(
-            success=True, action="detect_reverse_settle_anomaly",
+            success=True,
+            action="detect_reverse_settle_anomaly",
             data={
                 "risk_level": risk_level,
                 "alerts": alerts,
@@ -117,11 +124,15 @@ class BillingAnomalyAgent(SkillAgent):
         occupied_tables = params.get("occupied_tables", [])
         active_orders = params.get("active_order_table_nos", [])
 
-        missing = [t for t in occupied_tables if t.get("table_no") not in active_orders
-                   and t.get("status") in ("opened", "dining", "serving")]
+        missing = [
+            t
+            for t in occupied_tables
+            if t.get("table_no") not in active_orders and t.get("status") in ("opened", "dining", "serving")
+        ]
 
         return AgentResult(
-            success=True, action="scan_missing_orders",
+            success=True,
+            action="scan_missing_orders",
             data={
                 "missing_count": len(missing),
                 "missing_tables": missing,
@@ -154,7 +165,8 @@ class BillingAnomalyAgent(SkillAgent):
                 anomalies.append({"type": "overpayment", "detail": f"实付超过应付{ratio:.0%}，请核实"})
 
         return AgentResult(
-            success=True, action="detect_payment_anomaly",
+            success=True,
+            action="detect_payment_anomaly",
             data={
                 "anomaly_count": len(anomalies),
                 "anomalies": anomalies,
@@ -174,7 +186,8 @@ class BillingAnomalyAgent(SkillAgent):
         total_overdue_fen = sum(o.get("outstanding_fen", 0) for o in overdue)
 
         return AgentResult(
-            success=True, action="check_overdue_credit",
+            success=True,
+            action="check_overdue_credit",
             data={
                 "overdue_count": len(overdue),
                 "total_overdue_fen": total_overdue_fen,
@@ -202,7 +215,8 @@ class BillingAnomalyAgent(SkillAgent):
             risk_level = "medium"
 
         return AgentResult(
-            success=True, action="analyze_shift_variance",
+            success=True,
+            action="analyze_shift_variance",
             data={
                 "expected_cash_fen": expected_cash_fen,
                 "actual_cash_fen": actual_cash_fen,
@@ -211,8 +225,8 @@ class BillingAnomalyAgent(SkillAgent):
                 "risk_level": risk_level,
                 "operator_name": operator_name,
             },
-            reasoning=f"{operator_name}班次现金差异: {'+'if variance_fen > 0 else ''}¥{variance_fen / 100:.2f} "
-                      f"(差异率{variance_rate:.1%})，风险等级: {risk_level}",
+            reasoning=f"{operator_name}班次现金差异: {'+' if variance_fen > 0 else ''}¥{variance_fen / 100:.2f} "
+            f"(差异率{variance_rate:.1%})，风险等级: {risk_level}",
             confidence=0.95,
             inference_layer="edge",
         )
@@ -220,7 +234,8 @@ class BillingAnomalyAgent(SkillAgent):
     async def _get_risk_summary(self, params: dict) -> AgentResult:
         """获取今日收银风险汇总"""
         return AgentResult(
-            success=True, action="get_risk_summary",
+            success=True,
+            action="get_risk_summary",
             data={
                 "date": params.get("date", ""),
                 "reverse_settle_count": params.get("reverse_settle_count", 0),

@@ -12,6 +12,7 @@
   - 排班优化: 节省人力小时数 — 来源: agent_auto_executions
   - 增长引擎: 召回会员带来的增量营收 — 来源: agent_auto_executions
 """
+
 from __future__ import annotations
 
 from datetime import date, datetime, timezone
@@ -34,7 +35,12 @@ AGENT_ROI_DEFINITIONS: dict[str, dict] = {
     "discount_guardian": {
         "name": "折扣守护",
         "metrics": [
-            {"type": "intercepted_discount_fen", "label": "拦截异常折扣金额(分)", "unit": "分", "direction": "higher_better"},
+            {
+                "type": "intercepted_discount_fen",
+                "label": "拦截异常折扣金额(分)",
+                "unit": "分",
+                "direction": "higher_better",
+            },
             {"type": "intercept_count", "label": "拦截次数", "unit": "次", "direction": "higher_better"},
             {"type": "false_positive_rate", "label": "误拦截率", "unit": "%", "direction": "lower_better"},
         ],
@@ -66,15 +72,30 @@ AGENT_ROI_DEFINITIONS: dict[str, dict] = {
     "smart_menu": {
         "name": "智能排菜",
         "metrics": [
-            {"type": "menu_optimization_revenue_fen", "label": "排菜优化增收(分)", "unit": "分", "direction": "higher_better"},
+            {
+                "type": "menu_optimization_revenue_fen",
+                "label": "排菜优化增收(分)",
+                "unit": "分",
+                "direction": "higher_better",
+            },
             {"type": "poor_dish_removed_count", "label": "下架低效菜品数", "unit": "个", "direction": "higher_better"},
         ],
     },
     "serve_dispatch": {
         "name": "出餐调度",
         "metrics": [
-            {"type": "avg_serve_time_reduction_sec", "label": "平均出餐时间缩短(秒)", "unit": "秒", "direction": "higher_better"},
-            {"type": "overtime_prevented_count", "label": "避免超时出餐次数", "unit": "次", "direction": "higher_better"},
+            {
+                "type": "avg_serve_time_reduction_sec",
+                "label": "平均出餐时间缩短(秒)",
+                "unit": "秒",
+                "direction": "higher_better",
+            },
+            {
+                "type": "overtime_prevented_count",
+                "label": "避免超时出餐次数",
+                "unit": "次",
+                "direction": "higher_better",
+            },
         ],
     },
     "finance_audit": {
@@ -103,6 +124,7 @@ AGENT_ROI_DEFINITIONS: dict[str, dict] = {
 
 # ── DB 依赖 ──────────────────────────────────────────────────────────────────
 
+
 async def _get_db(
     x_tenant_id: str = Header("default", alias="X-Tenant-ID"),
 ) -> AsyncSession:
@@ -111,6 +133,7 @@ async def _get_db(
 
 
 # ── 端点 ─────────────────────────────────────────────────────────────────────
+
 
 @router.get("/summary")
 async def get_roi_summary(
@@ -126,7 +149,8 @@ async def get_roi_summary(
     }[period]
 
     try:
-        result = await db.execute(text(f"""
+        result = await db.execute(
+            text(f"""
             SELECT
                 agent_id,
                 metric_type,
@@ -136,7 +160,9 @@ async def get_roi_summary(
             WHERE tenant_id = :tenant_id AND {period_filter}
             GROUP BY agent_id, metric_type
             ORDER BY agent_id, metric_type
-        """), {"tenant_id": x_tenant_id})
+        """),
+            {"tenant_id": x_tenant_id},
+        )
         rows = result.mappings().all()
     except (SQLAlchemyError, ConnectionError):
         rows = []
@@ -174,12 +200,15 @@ async def get_roi_summary(
     # 总计
     total_value_fen = sum(a["total_value_fen"] for a in agent_data.values())
 
-    return {"ok": True, "data": {
-        "period": period,
-        "total_value_fen": total_value_fen,
-        "total_value_yuan": round(total_value_fen / 100, 2),
-        "agents": list(agent_data.values()),
-    }}
+    return {
+        "ok": True,
+        "data": {
+            "period": period,
+            "total_value_fen": total_value_fen,
+            "total_value_yuan": round(total_value_fen / 100, 2),
+            "agents": list(agent_data.values()),
+        },
+    }
 
 
 @router.get("/{agent_id}/detail")
@@ -217,7 +246,8 @@ async def get_agent_roi_detail(
     params["offset"] = offset
 
     try:
-        result = await db.execute(text(f"""
+        result = await db.execute(
+            text(f"""
             SELECT
                 date_trunc(:trunc, period_start) AS period,
                 metric_type,
@@ -227,18 +257,23 @@ async def get_agent_roi_detail(
             GROUP BY period, metric_type
             ORDER BY period DESC, metric_type
             LIMIT :limit OFFSET :offset
-        """), {**params, "trunc": trunc})
+        """),
+            {**params, "trunc": trunc},
+        )
         rows = result.mappings().all()
     except (SQLAlchemyError, ConnectionError):
         rows = []
 
-    return {"ok": True, "data": {
-        "agent_id": agent_id,
-        "agent_name": defn["name"],
-        "metric_definitions": defn["metrics"],
-        "granularity": granularity,
-        "items": [dict(r) for r in rows],
-    }}
+    return {
+        "ok": True,
+        "data": {
+            "agent_id": agent_id,
+            "agent_name": defn["name"],
+            "metric_definitions": defn["metrics"],
+            "granularity": granularity,
+            "items": [dict(r) for r in rows],
+        },
+    }
 
 
 @router.get("/leaderboard")
@@ -255,7 +290,8 @@ async def get_agent_leaderboard(
     }[period]
 
     try:
-        result = await db.execute(text(f"""
+        result = await db.execute(
+            text(f"""
             SELECT
                 agent_id,
                 SUM(value)::float AS total_value,
@@ -267,7 +303,9 @@ async def get_agent_leaderboard(
               AND metric_type LIKE '%%_fen'
             GROUP BY agent_id
             ORDER BY total_value DESC
-        """), {"tenant_id": x_tenant_id})
+        """),
+            {"tenant_id": x_tenant_id},
+        )
         rows = result.mappings().all()
     except (SQLAlchemyError, ConnectionError):
         rows = []
@@ -275,23 +313,29 @@ async def get_agent_leaderboard(
     leaderboard = []
     for i, row in enumerate(rows, 1):
         defn = AGENT_ROI_DEFINITIONS.get(row["agent_id"], {"name": row["agent_id"]})
-        leaderboard.append({
-            "rank": i,
-            "agent_id": row["agent_id"],
-            "agent_name": defn["name"],
-            "total_value_fen": int(row["total_value"]),
-            "total_value_yuan": round(row["total_value"] / 100, 2),
-            "metric_count": row["metric_count"],
-            "data_points": row["data_points"],
-        })
+        leaderboard.append(
+            {
+                "rank": i,
+                "agent_id": row["agent_id"],
+                "agent_name": defn["name"],
+                "total_value_fen": int(row["total_value"]),
+                "total_value_yuan": round(row["total_value"] / 100, 2),
+                "metric_count": row["metric_count"],
+                "data_points": row["data_points"],
+            }
+        )
 
-    return {"ok": True, "data": {
-        "period": period,
-        "leaderboard": leaderboard,
-    }}
+    return {
+        "ok": True,
+        "data": {
+            "period": period,
+            "leaderboard": leaderboard,
+        },
+    }
 
 
 # ── 每日采集写入 ─────────────────────────────────────────────────────────────
+
 
 @router.post("/collect")
 async def collect_roi_metrics(
@@ -310,6 +354,7 @@ async def collect_roi_metrics(
     """
     if target_date is None:
         from datetime import timedelta
+
         target_date = date.today() - timedelta(days=1)
 
     period_start = datetime.combine(target_date, datetime.min.time()).replace(tzinfo=timezone.utc)
@@ -318,16 +363,22 @@ async def collect_roi_metrics(
 
     # ── 幂等检查：若当日已有记录则跳过 ──────────────────────────────────────
     try:
-        existing = await db.execute(text("""
+        existing = await db.execute(
+            text("""
             SELECT COUNT(*)::int FROM agent_roi_metrics
             WHERE tenant_id = :tid AND period_start::date = :d
-        """), {"tid": x_tenant_id, "d": target_date_str})
+        """),
+            {"tid": x_tenant_id, "d": target_date_str},
+        )
         if (existing.scalar() or 0) > 0:
-            return {"ok": True, "data": {
-                "inserted_count": 0,
-                "skipped": True,
-                "reason": f"{target_date_str} 记录已存在，跳过采集",
-            }}
+            return {
+                "ok": True,
+                "data": {
+                    "inserted_count": 0,
+                    "skipped": True,
+                    "reason": f"{target_date_str} 记录已存在，跳过采集",
+                },
+            }
     except SQLAlchemyError as exc:
         logger.warning("roi_collect_idempotency_check_failed", error=str(exc), exc_info=True)
 
@@ -336,7 +387,8 @@ async def collect_roi_metrics(
 
     # 1. discount_guardian — 来源: orders 表
     try:
-        r = await db.execute(text("""
+        r = await db.execute(
+            text("""
             SELECT
                 COALESCE(SUM(discount_amount_fen), 0)::bigint AS total_discount_fen,
                 COUNT(*) FILTER (WHERE discount_amount_fen > 0)::int AS discount_order_count
@@ -344,26 +396,31 @@ async def collect_roi_metrics(
             WHERE tenant_id = :tid
               AND DATE(created_at AT TIME ZONE 'Asia/Shanghai') = :d
               AND status = 'completed'
-        """), {"tid": x_tenant_id, "d": target_date_str})
+        """),
+            {"tid": x_tenant_id, "d": target_date_str},
+        )
         row = r.mappings().one()
-        metrics.extend([
-            {
-                "agent_id": "discount_guardian",
-                "metric_type": "intercepted_discount_fen",
-                "value": row["total_discount_fen"],
-            },
-            {
-                "agent_id": "discount_guardian",
-                "metric_type": "intercept_count",
-                "value": row["discount_order_count"],
-            },
-        ])
+        metrics.extend(
+            [
+                {
+                    "agent_id": "discount_guardian",
+                    "metric_type": "intercepted_discount_fen",
+                    "value": row["total_discount_fen"],
+                },
+                {
+                    "agent_id": "discount_guardian",
+                    "metric_type": "intercept_count",
+                    "value": row["discount_order_count"],
+                },
+            ]
+        )
     except SQLAlchemyError as exc:
         logger.warning("roi_collect_discount_guardian_failed", error=str(exc), exc_info=True)
 
     # 2. 所有 Agent — 来源: agent_auto_executions（执行计数 + 结果聚合）
     try:
-        r = await db.execute(text("""
+        r = await db.execute(
+            text("""
             SELECT
                 agent_id,
                 COUNT(*)::int AS exec_count,
@@ -374,7 +431,9 @@ async def collect_roi_metrics(
               AND DATE(executed_at AT TIME ZONE 'Asia/Shanghai') = :d
               AND is_deleted = FALSE
             GROUP BY agent_id
-        """), {"tid": x_tenant_id, "d": target_date_str})
+        """),
+            {"tid": x_tenant_id, "d": target_date_str},
+        )
         exec_rows = r.mappings().all()
     except SQLAlchemyError as exc:
         logger.warning("roi_collect_auto_executions_failed", error=str(exc), exc_info=True)
@@ -385,24 +444,26 @@ async def collect_roi_metrics(
 
     EXEC_METRIC_MAP: dict[str, list[tuple[str, str]]] = {
         # agent_id → [(metric_type, exec_field), ...]
-        "inventory_agent":  [("stockout_prevented_count", "success_count")],
+        "inventory_agent": [("stockout_prevented_count", "success_count")],
         "scheduling_agent": [("labor_hours_saved", "success_count")],
-        "member_insight":   [("recalled_member_count", "success_count"), ("churn_prevented_count", "exec_count")],
-        "smart_menu":       [("poor_dish_removed_count", "success_count")],
-        "serve_dispatch":   [("overtime_prevented_count", "success_count")],
-        "finance_audit":    [("audit_issue_count", "success_count")],
-        "store_inspect":    [("violation_detected_count", "success_count")],
-        "private_ops":      [("campaign_sent_count", "exec_count")],
+        "member_insight": [("recalled_member_count", "success_count"), ("churn_prevented_count", "exec_count")],
+        "smart_menu": [("poor_dish_removed_count", "success_count")],
+        "serve_dispatch": [("overtime_prevented_count", "success_count")],
+        "finance_audit": [("audit_issue_count", "success_count")],
+        "store_inspect": [("violation_detected_count", "success_count")],
+        "private_ops": [("campaign_sent_count", "exec_count")],
     }
 
     for agent_id, metric_mappings in EXEC_METRIC_MAP.items():
         exec_data = exec_by_agent.get(agent_id, {})
         for metric_type, exec_field in metric_mappings:
-            metrics.append({
-                "agent_id": agent_id,
-                "metric_type": metric_type,
-                "value": exec_data.get(exec_field, 0),
-            })
+            metrics.append(
+                {
+                    "agent_id": agent_id,
+                    "metric_type": metric_type,
+                    "value": exec_data.get(exec_field, 0),
+                }
+            )
 
     # ── 批量写入 ─────────────────────────────────────────────────────────────
     if not metrics:
@@ -410,20 +471,23 @@ async def collect_roi_metrics(
 
     try:
         for m in metrics:
-            await db.execute(text("""
+            await db.execute(
+                text("""
                 INSERT INTO agent_roi_metrics
                     (tenant_id, agent_id, metric_type, value, period_start, period_end, metadata)
                 VALUES
                     (:tid, :agent_id, :metric_type, :value, :period_start, :period_end, :metadata::jsonb)
-            """), {
-                "tid": x_tenant_id,
-                "agent_id": m["agent_id"],
-                "metric_type": m["metric_type"],
-                "value": m["value"],
-                "period_start": period_start.isoformat(),
-                "period_end": period_end.isoformat(),
-                "metadata": '{"source": "daily_collect"}',
-            })
+            """),
+                {
+                    "tid": x_tenant_id,
+                    "agent_id": m["agent_id"],
+                    "metric_type": m["metric_type"],
+                    "value": m["value"],
+                    "period_start": period_start.isoformat(),
+                    "period_end": period_end.isoformat(),
+                    "metadata": '{"source": "daily_collect"}',
+                },
+            )
         await db.commit()
         logger.info(
             "roi_collect_completed",
@@ -431,13 +495,17 @@ async def collect_roi_metrics(
             target_date=target_date_str,
             inserted_count=len(metrics),
         )
-        return {"ok": True, "data": {
-            "inserted_count": len(metrics),
-            "skipped": False,
-            "target_date": target_date_str,
-        }}
+        return {
+            "ok": True,
+            "data": {
+                "inserted_count": len(metrics),
+                "skipped": False,
+                "target_date": target_date_str,
+            },
+        }
     except SQLAlchemyError as exc:
         await db.rollback()
         logger.error("roi_collect_insert_failed", error=str(exc), exc_info=True)
         from fastapi import HTTPException
+
         raise HTTPException(status_code=500, detail="ROI 指标写入失败，请重试")

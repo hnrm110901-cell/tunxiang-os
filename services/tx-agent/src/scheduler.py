@@ -10,6 +10,7 @@
 - 20:30 晚推回顾
 - 22:00 收集决策效果
 """
+
 import time
 import uuid
 from typing import Any, Optional
@@ -22,6 +23,7 @@ logger = structlog.get_logger()
 try:
     from shared.feature_flags import is_enabled as _ff_is_enabled
     from shared.feature_flags.flag_names import AgentFlags as _AgentFlags
+
     _FEATURE_FLAGS_AVAILABLE = True
 except ImportError:
     _FEATURE_FLAGS_AVAILABLE = False
@@ -174,12 +176,14 @@ def get_schedule_timeline(schedules: dict[str, dict] | None = None) -> list[dict
     schedules = schedules or AGENT_SCHEDULES
     timeline = []
     for name, config in schedules.items():
-        timeline.append({
-            "name": name,
-            "time": f"{config['hour']:02d}:{config['minute']:02d}",
-            "task": config["task"],
-            "description": config.get("description", ""),
-        })
+        timeline.append(
+            {
+                "name": name,
+                "time": f"{config['hour']:02d}:{config['minute']:02d}",
+                "task": config["task"],
+                "description": config.get("description", ""),
+            }
+        )
     timeline.sort(key=lambda x: x["time"])
     return timeline
 
@@ -200,7 +204,9 @@ def generate_daily_plans_for_all_stores(
     """
     # Feature Flag 检查：AgentFlags.HR_SHIFT_SUGGEST
     # 关闭时跳过排班建议生成，降级为仅记录日志，不影响其他计划生成逻辑
-    if not _agent_flag_enabled(_AgentFlags.HR_SHIFT_SUGGEST if _FEATURE_FLAGS_AVAILABLE else "agent.hr.shift_suggest.enable"):
+    if not _agent_flag_enabled(
+        _AgentFlags.HR_SHIFT_SUGGEST if _FEATURE_FLAGS_AVAILABLE else "agent.hr.shift_suggest.enable"
+    ):
         logger.info(
             "hr_shift_suggest_agent_disabled",
             reason="feature_flag_disabled",
@@ -261,7 +267,9 @@ def auto_execute_approved_plans(
     # Feature Flag 检查：AgentFlags.HR_SHIFT_AUTO_EXECUTE（高风险 — L2自治级别）
     # 关闭时跳过自动执行，计划停留在 approved 状态等待人工处理
     # 注意：此Flag默认关闭，仅L2级别门店经三级审批后方可开启
-    if not _agent_flag_enabled(_AgentFlags.HR_SHIFT_AUTO_EXECUTE if _FEATURE_FLAGS_AVAILABLE else "agent.hr.shift_suggest.auto_execute"):
+    if not _agent_flag_enabled(
+        _AgentFlags.HR_SHIFT_AUTO_EXECUTE if _FEATURE_FLAGS_AVAILABLE else "agent.hr.shift_suggest.auto_execute"
+    ):
         logger.info(
             "hr_shift_auto_execute_disabled",
             reason="feature_flag_disabled",
@@ -337,6 +345,7 @@ def collect_decision_outcomes(
 
 
 # ─── 任务注册表 ───
+
 
 async def collect_pilot_metrics_for_all_tenants(
     active_tenant_ids: list[str],

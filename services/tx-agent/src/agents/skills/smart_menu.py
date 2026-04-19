@@ -5,6 +5,7 @@
 
 全部 8 个 action 已实现。
 """
+
 import statistics
 from datetime import datetime, timezone
 from typing import Any
@@ -35,11 +36,18 @@ class SmartMenuAgent(SkillAgent):
 
     def get_supported_actions(self) -> list[str]:
         return [
-            "simulate_cost", "recommend_pilot_stores", "run_dish_review",
-            "check_launch_readiness", "scan_dish_risks", "inspect_dish_quality",
-            "classify_quadrant", "optimize_menu",
-            "suggest_alternatives", "mark_sold_out",
-            "push_expiry_specials", "flag_high_cost_dishes",
+            "simulate_cost",
+            "recommend_pilot_stores",
+            "run_dish_review",
+            "check_launch_readiness",
+            "scan_dish_risks",
+            "inspect_dish_quality",
+            "classify_quadrant",
+            "optimize_menu",
+            "suggest_alternatives",
+            "mark_sold_out",
+            "push_expiry_specials",
+            "flag_high_cost_dishes",
         ]
 
     def get_action_config(self, action: str) -> ActionConfig:
@@ -146,11 +154,18 @@ class SmartMenuAgent(SkillAgent):
             stress.append({"cost_increase_pct": pct, "new_cost_fen": new_cost, "new_margin": round(new_margin, 4)})
 
         return AgentResult(
-            success=True, action="simulate_cost",
-            data={"total_cost_fen": total_cost, "target_price_fen": target_price_fen,
-                  "margin_rate": round(margin, 4), "cost_fen": total_cost, "price_fen": target_price_fen,
-                  "pricing_scenarios": scenarios, "stress_test": stress},
-            reasoning=f"BOM成本 ¥{total_cost/100:.2f}，毛利率 {margin:.1%}",
+            success=True,
+            action="simulate_cost",
+            data={
+                "total_cost_fen": total_cost,
+                "target_price_fen": target_price_fen,
+                "margin_rate": round(margin, 4),
+                "cost_fen": total_cost,
+                "price_fen": target_price_fen,
+                "pricing_scenarios": scenarios,
+                "stress_test": stress,
+            },
+            reasoning=f"BOM成本 ¥{total_cost / 100:.2f}，毛利率 {margin:.1%}",
             confidence=0.9,
         )
 
@@ -174,9 +189,14 @@ class SmartMenuAgent(SkillAgent):
         recommended = scored[:3]
 
         return AgentResult(
-            success=True, action="recommend_pilot_stores",
-            data={"recommended": recommended, "total_evaluated": len(stores),
-                  "suggested_duration_weeks": 2, "suggested_sample_size": min(50, max(20, len(stores) * 5))},
+            success=True,
+            action="recommend_pilot_stores",
+            data={
+                "recommended": recommended,
+                "total_evaluated": len(stores),
+                "suggested_duration_weeks": 2,
+                "suggested_sample_size": min(50, max(20, len(stores) * 5)),
+            },
             reasoning=f"从 {len(stores)} 家门店中推荐 {len(recommended)} 家试点",
             confidence=0.8,
         )
@@ -206,10 +226,18 @@ class SmartMenuAgent(SkillAgent):
             action = "继续观察2周，关注退菜率趋势"
 
         return AgentResult(
-            success=True, action="run_dish_review",
-            data={"verdict": verdict, "suggested_action": action,
-                  "metrics": {"sales": sales, "return_rate_pct": round(return_rate, 1),
-                              "bad_review_pct": round(bad_rate, 1), "margin_rate": margin_rate}},
+            success=True,
+            action="run_dish_review",
+            data={
+                "verdict": verdict,
+                "suggested_action": action,
+                "metrics": {
+                    "sales": sales,
+                    "return_rate_pct": round(return_rate, 1),
+                    "bad_review_pct": round(bad_rate, 1),
+                    "margin_rate": margin_rate,
+                },
+            },
             reasoning=f"复盘结论：{verdict} — {action}",
             confidence=0.85,
         )
@@ -221,10 +249,15 @@ class SmartMenuAgent(SkillAgent):
         ready = len(missing) == 0
 
         return AgentResult(
-            success=True, action="check_launch_readiness",
-            data={"ready": ready, "completed": completed, "missing": missing,
-                  "completion_pct": round(len(completed) / len(LAUNCH_CHECKLIST) * 100, 1),
-                  "checklist": LAUNCH_CHECKLIST},
+            success=True,
+            action="check_launch_readiness",
+            data={
+                "ready": ready,
+                "completed": completed,
+                "missing": missing,
+                "completion_pct": round(len(completed) / len(LAUNCH_CHECKLIST) * 100, 1),
+                "checklist": LAUNCH_CHECKLIST,
+            },
             reasoning=f"就绪度 {len(completed)}/{len(LAUNCH_CHECKLIST)}，{'可上市' if ready else '缺少: ' + ', '.join(missing[:3])}",
             confidence=0.95,
         )
@@ -251,7 +284,8 @@ class SmartMenuAgent(SkillAgent):
 
         risks.sort(key=lambda r: r["risk_count"], reverse=True)
         return AgentResult(
-            success=True, action="scan_dish_risks",
+            success=True,
+            action="scan_dish_risks",
             data={"risks": risks, "total_scanned": len(dishes), "at_risk": len(risks)},
             reasoning=f"扫描 {len(dishes)} 道菜品，{len(risks)} 道有风险",
             confidence=0.85,
@@ -268,9 +302,15 @@ class SmartMenuAgent(SkillAgent):
         passed = score >= threshold
 
         return AgentResult(
-            success=True, action="inspect_dish_quality",
-            data={"dish_name": dish_name, "quality_score": score, "threshold": threshold,
-                  "passed": passed, "issues": [] if passed else ["摆盘不规范"]},
+            success=True,
+            action="inspect_dish_quality",
+            data={
+                "dish_name": dish_name,
+                "quality_score": score,
+                "threshold": threshold,
+                "passed": passed,
+                "issues": [] if passed else ["摆盘不规范"],
+            },
             reasoning=f"{dish_name} 质检 {score} 分，{'合格' if passed else '不合格'}",
             confidence=0.7,
         )
@@ -284,14 +324,21 @@ class SmartMenuAgent(SkillAgent):
 
         high_sales = sales >= avg_sales
         high_margin = margin >= avg_margin
-        quadrant = ("star" if high_sales and high_margin else
-                    "cash_cow" if not high_sales and high_margin else
-                    "question" if high_sales and not high_margin else "dog")
+        quadrant = (
+            "star"
+            if high_sales and high_margin
+            else "cash_cow"
+            if not high_sales and high_margin
+            else "question"
+            if high_sales and not high_margin
+            else "dog"
+        )
 
         actions = {"star": "重点推广", "cash_cow": "保持品质", "question": "优化成本或提价", "dog": "考虑下架或改良"}
 
         return AgentResult(
-            success=True, action="classify_quadrant",
+            success=True,
+            action="classify_quadrant",
             data={"quadrant": quadrant, "sales": sales, "margin_rate": margin, "suggested_action": actions[quadrant]},
             reasoning=f"销量{'高' if high_sales else '低'}+毛利{'高' if high_margin else '低'} → {quadrant}",
             confidence=0.85,
@@ -306,6 +353,7 @@ class SmartMenuAgent(SkillAgent):
         db_dishes: list[dict] = []
         if self._db and store_id:
             from sqlalchemy import text
+
             rows = await self._db.execute(
                 text("""
                     SELECT oi.dish_id, oi.dish_name,
@@ -338,16 +386,22 @@ class SmartMenuAgent(SkillAgent):
             sales = d.get("total_qty") or d.get("total_sales", 0)
             margin = d.get("margin_rate", 0)
             name = d.get("dish_name") or d.get("name", "")
-            avg_s = statistics.mean(
-                [(x.get("total_qty") or x.get("total_sales", 0)) for x in working_dishes]
-            ) if working_dishes else 1
-            avg_m = statistics.mean(
-                [x.get("margin_rate", 0) for x in working_dishes]
-            ) if working_dishes else 0.3
+            avg_s = (
+                statistics.mean([(x.get("total_qty") or x.get("total_sales", 0)) for x in working_dishes])
+                if working_dishes
+                else 1
+            )
+            avg_m = statistics.mean([x.get("margin_rate", 0) for x in working_dishes]) if working_dishes else 0.3
 
-            q = ("star" if sales >= avg_s and margin >= avg_m else
-                 "cash_cow" if sales < avg_s and margin >= avg_m else
-                 "question" if sales >= avg_s and margin < avg_m else "dog")
+            q = (
+                "star"
+                if sales >= avg_s and margin >= avg_m
+                else "cash_cow"
+                if sales < avg_s and margin >= avg_m
+                else "question"
+                if sales >= avg_s and margin < avg_m
+                else "dog"
+            )
             quadrants[q].append(name)
 
         # 规则引擎基础建议
@@ -374,11 +428,15 @@ class SmartMenuAgent(SkillAgent):
                     tenant_id=self.tenant_id,
                     task_type="standard_analysis",
                     system="你是连锁餐饮菜单运营专家，根据近30天销量数据给出菜单优化建议，重点关注盈利改善和客户满意度，用中文回复200字以内。",
-                    messages=[{"role": "user", "content":
-                        f"以下是门店近30天菜品销售数据：\n{dish_summary}\n\n"
-                        f"四象限分布：明星{len(quadrants['star'])}道，现金牛{len(quadrants['cash_cow'])}道，"
-                        f"问题{len(quadrants['question'])}道，瘦狗{len(quadrants['dog'])}道。\n"
-                        f"请给出具体的菜单优化建议。"}],
+                    messages=[
+                        {
+                            "role": "user",
+                            "content": f"以下是门店近30天菜品销售数据：\n{dish_summary}\n\n"
+                            f"四象限分布：明星{len(quadrants['star'])}道，现金牛{len(quadrants['cash_cow'])}道，"
+                            f"问题{len(quadrants['question'])}道，瘦狗{len(quadrants['dog'])}道。\n"
+                            f"请给出具体的菜单优化建议。",
+                        }
+                    ],
                     max_tokens=400,
                     db=self._db,
                 )
@@ -389,7 +447,8 @@ class SmartMenuAgent(SkillAgent):
             suggestions.append(f"AI深度分析: {llm_suggestions}")
 
         return AgentResult(
-            success=True, action="optimize_menu",
+            success=True,
+            action="optimize_menu",
             data={
                 "quadrant_distribution": {k: len(v) for k, v in quadrants.items()},
                 "suggestions": suggestions,
@@ -398,7 +457,7 @@ class SmartMenuAgent(SkillAgent):
                 "store_id": store_id,
             },
             reasoning=f"菜单分析：明星{len(quadrants['star'])}道，瘦狗{len(quadrants['dog'])}道"
-                      f"{'（AI增强）' if llm_suggestions else '（规则引擎）'}",
+            f"{'（AI增强）' if llm_suggestions else '（规则引擎）'}",
             confidence=0.8 if not llm_suggestions else 0.92,
             inference_layer="cloud" if llm_suggestions else "edge",
         )
@@ -428,7 +487,8 @@ class SmartMenuAgent(SkillAgent):
 
         # 从可用菜品中筛选替代候选
         candidates = [
-            d for d in all_available_dishes
+            d
+            for d in all_available_dishes
             if d.get("dish_id") not in affected_dish_ids
             and d.get("category") in affected_categories
             and d.get("is_available", True)
@@ -438,8 +498,10 @@ class SmartMenuAgent(SkillAgent):
         db_candidates: list[dict] = []
         if self._db and store_id and affected_categories:
             from sqlalchemy import text
+
             categories_str = ",".join(f"'{c}'" for c in affected_categories[:5])
-            rows = await self._db.execute(text(f"""
+            rows = await self._db.execute(
+                text(f"""
                 SELECT d.id, d.name, d.category, d.sell_price_fen,
                        COALESCE(d.cost_price_fen, 0) as cost_price_fen,
                        COUNT(oi.id) as recent_orders
@@ -456,10 +518,12 @@ class SmartMenuAgent(SkillAgent):
                 GROUP BY d.id, d.name, d.category, d.sell_price_fen, d.cost_price_fen
                 ORDER BY recent_orders DESC
                 LIMIT 8
-            """), {
-                "tenant_id": self.tenant_id,
-                "affected_ids": list(affected_dish_ids) or ["00000000-0000-0000-0000-000000000000"],
-            })
+            """),
+                {
+                    "tenant_id": self.tenant_id,
+                    "affected_ids": list(affected_dish_ids) or ["00000000-0000-0000-0000-000000000000"],
+                },
+            )
             db_candidates = [dict(r) for r in rows.mappings()]
 
         working = db_candidates if db_candidates else candidates
@@ -526,7 +590,9 @@ class SmartMenuAgent(SkillAgent):
         dishes_to_mark: list[dict] = []
         if self._db and ingredient_id:
             from sqlalchemy import text
-            rows = await self._db.execute(text("""
+
+            rows = await self._db.execute(
+                text("""
                 SELECT DISTINCT d.id, d.name, d.category, d.sell_price_fen
                 FROM dishes d
                 JOIN bom_recipe_items bri ON bri.dish_id = d.id
@@ -534,13 +600,14 @@ class SmartMenuAgent(SkillAgent):
                   AND bri.ingredient_id = :ingredient_id
                   AND d.is_deleted = false
                   AND d.is_available = true
-            """), {"tenant_id": self.tenant_id, "ingredient_id": ingredient_id})
+            """),
+                {"tenant_id": self.tenant_id, "ingredient_id": ingredient_id},
+            )
             dishes_to_mark = [dict(r) for r in rows.mappings()]
         else:
             # 降级：使用 params 传入的数据
             dishes_to_mark = [
-                {"id": d.get("dish_id", ""), "name": d.get("dish_name", ""),
-                 "category": d.get("category", "")}
+                {"id": d.get("dish_id", ""), "name": d.get("dish_name", ""), "category": d.get("category", "")}
                 for d in affected_dishes
             ]
 
@@ -572,10 +639,7 @@ class SmartMenuAgent(SkillAgent):
                 "action_required": "update_dish_availability",  # 通知 tx-menu service
                 "marked_at": datetime.now(timezone.utc).isoformat(),
             },
-            reasoning=(
-                f"售罄标记：{ingredient_name} 库存归零，"
-                f"需下架{marked_count}道菜品"
-            ),
+            reasoning=(f"售罄标记：{ingredient_name} 库存归零，需下架{marked_count}道菜品"),
             confidence=0.95 if self._db else 0.75,
         )
 
@@ -599,25 +663,23 @@ class SmartMenuAgent(SkillAgent):
         unit = params.get("unit") or event_data.get("unit", "")
 
         # 定价策略（临期越近折扣越大）
-        discount_pct = (
-            30 if days_to_expiry <= 1 else
-            20 if days_to_expiry <= 2 else
-            10
-        )
+        discount_pct = 30 if days_to_expiry <= 1 else 20 if days_to_expiry <= 2 else 10
 
         # 生成特价菜推送内容
         specials: list[dict] = []
         for dish in related_dishes[:4]:
             original_price_fen = dish.get("sell_price_fen") or dish.get("price_fen", 0)
             special_price_fen = int(original_price_fen * (1 - discount_pct / 100))
-            specials.append({
-                "dish_id": dish.get("dish_id") or dish.get("id", ""),
-                "dish_name": dish.get("dish_name") or dish.get("name", ""),
-                "original_price_fen": original_price_fen,
-                "special_price_fen": special_price_fen,
-                "discount_pct": discount_pct,
-                "highlight": f"今日特惠 {discount_pct}% OFF",
-            })
+            specials.append(
+                {
+                    "dish_id": dish.get("dish_id") or dish.get("id", ""),
+                    "dish_name": dish.get("dish_name") or dish.get("name", ""),
+                    "original_price_fen": original_price_fen,
+                    "special_price_fen": special_price_fen,
+                    "discount_pct": discount_pct,
+                    "highlight": f"今日特惠 {discount_pct}% OFF",
+                }
+            )
 
         # 服务员推销话术
         waiter_script = (
@@ -627,10 +689,7 @@ class SmartMenuAgent(SkillAgent):
         )
 
         # 菜单 Banner 文案
-        banner_text = (
-            f"今日{ingredient_name}特鲜特惠！"
-            f"{discount_pct}% OFF 限时优惠"
-        )
+        banner_text = f"今日{ingredient_name}特鲜特惠！{discount_pct}% OFF 限时优惠"
 
         push_channels = [
             {"channel": "menu_banner", "content": banner_text, "priority": 1},
@@ -687,7 +746,9 @@ class SmartMenuAgent(SkillAgent):
         db_dishes: list[dict] = []
         if self._db and store_id:
             from sqlalchemy import text
-            rows = await self._db.execute(text("""
+
+            rows = await self._db.execute(
+                text("""
                 SELECT d.id, d.name, d.category,
                        d.sell_price_fen,
                        COALESCE(d.cost_price_fen, 0) as cost_fen,
@@ -707,14 +768,20 @@ class SmartMenuAgent(SkillAgent):
                              ELSE 0 END > :threshold
                 ORDER BY cost_rate DESC
                 LIMIT 20
-            """), {"tenant_id": self.tenant_id, "threshold": target_cost_rate})
+            """),
+                {"tenant_id": self.tenant_id, "threshold": target_cost_rate},
+            )
             db_dishes = [dict(r) for r in rows.mappings()]
 
-        working = db_dishes if db_dishes else [
-            d for d in dishes
-            if d.get("price_fen", 0) > 0
-            and d.get("cost_fen", 0) / d.get("price_fen", 1) > target_cost_rate
-        ]
+        working = (
+            db_dishes
+            if db_dishes
+            else [
+                d
+                for d in dishes
+                if d.get("price_fen", 0) > 0 and d.get("cost_fen", 0) / d.get("price_fen", 1) > target_cost_rate
+            ]
+        )
 
         # 评分：成本率越高 + 销量越大 = 优化优先级越高
         flagged: list[dict] = []
@@ -736,16 +803,18 @@ class SmartMenuAgent(SkillAgent):
             if not suggestions:
                 suggestions.append("列入下次菜品成本复盘")
 
-            flagged.append({
-                "dish_id": str(d.get("id") or d.get("dish_id", "")),
-                "dish_name": d.get("name") or d.get("dish_name", ""),
-                "category": d.get("category", ""),
-                "cost_rate": round(cost_rate, 4),
-                "over_target": round(over_target, 4),
-                "sales_count": sales,
-                "optimization_priority": "high" if over_target > 0.1 and sales > 30 else "medium",
-                "suggestions": suggestions,
-            })
+            flagged.append(
+                {
+                    "dish_id": str(d.get("id") or d.get("dish_id", "")),
+                    "dish_name": d.get("name") or d.get("dish_name", ""),
+                    "category": d.get("category", ""),
+                    "cost_rate": round(cost_rate, 4),
+                    "over_target": round(over_target, 4),
+                    "sales_count": sales,
+                    "optimization_priority": "high" if over_target > 0.1 and sales > 30 else "medium",
+                    "suggestions": suggestions,
+                }
+            )
 
         flagged.sort(key=lambda x: (-x["over_target"], -x["sales_count"]))
 

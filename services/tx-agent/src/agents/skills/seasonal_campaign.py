@@ -2,6 +2,7 @@
 
 节气日历管理、节气活动策划、节气菜品推荐、活动效果预测、活动执行跟踪、历史活动复盘。
 """
+
 import uuid
 from typing import Any
 
@@ -83,18 +84,21 @@ class SeasonalCampaignAgent(SkillAgent):
         for key, info in SEASONAL_CALENDAR.items():
             if month and info["month"] != month:
                 continue
-            events.append({
-                "event_id": key,
-                "name": info["name"],
-                "month": info["month"],
-                "type": info["type"],
-                "heat_score": info["heat"],
-                "recommended_prep_days": 14 if info["heat"] >= 8 else 7,
-            })
+            events.append(
+                {
+                    "event_id": key,
+                    "name": info["name"],
+                    "month": info["month"],
+                    "type": info["type"],
+                    "heat_score": info["heat"],
+                    "recommended_prep_days": 14 if info["heat"] >= 8 else 7,
+                }
+            )
 
         events.sort(key=lambda x: (x["month"], -x["heat_score"]))
         return AgentResult(
-            success=True, action="get_seasonal_calendar",
+            success=True,
+            action="get_seasonal_calendar",
             data={"events": events, "total": len(events)},
             reasoning=f"返回 {len(events)} 个节气/节日活动",
             confidence=0.95,
@@ -125,7 +129,8 @@ class SeasonalCampaignAgent(SkillAgent):
             discount_rate = 0.05
 
         return AgentResult(
-            success=True, action="plan_seasonal_campaign",
+            success=True,
+            action="plan_seasonal_campaign",
             data={
                 "campaign_id": campaign_id,
                 "event_id": event_id,
@@ -159,25 +164,30 @@ class SeasonalCampaignAgent(SkillAgent):
         recommendations = []
         for dish in seasonal_items:
             in_menu = dish in existing_menu
-            recommendations.append({
-                "dish_name": dish,
-                "already_in_menu": in_menu,
-                "action": "主推" if in_menu else "新增",
-                "expected_order_increase_pct": 30 if in_menu else 50,
-            })
+            recommendations.append(
+                {
+                    "dish_name": dish,
+                    "already_in_menu": in_menu,
+                    "action": "主推" if in_menu else "新增",
+                    "expected_order_increase_pct": 30 if in_menu else 50,
+                }
+            )
 
         # 补充套餐建议
         if len(seasonal_items) >= 3:
-            recommendations.append({
-                "dish_name": f"{event_name}限定套餐",
-                "already_in_menu": False,
-                "action": "新增套餐",
-                "expected_order_increase_pct": 40,
-                "includes": seasonal_items[:4],
-            })
+            recommendations.append(
+                {
+                    "dish_name": f"{event_name}限定套餐",
+                    "already_in_menu": False,
+                    "action": "新增套餐",
+                    "expected_order_increase_pct": 40,
+                    "includes": seasonal_items[:4],
+                }
+            )
 
         return AgentResult(
-            success=True, action="recommend_seasonal_dishes",
+            success=True,
+            action="recommend_seasonal_dishes",
             data={
                 "event_id": event_id,
                 "event_name": event_name,
@@ -209,7 +219,8 @@ class SeasonalCampaignAgent(SkillAgent):
         roi = round(incremental_revenue_fen / max(1, budget_fen), 2)
 
         return AgentResult(
-            success=True, action="predict_campaign_effect",
+            success=True,
+            action="predict_campaign_effect",
             data={
                 "event_id": event_id,
                 "predicted_lift_pct": round(predicted_lift, 1),
@@ -239,7 +250,8 @@ class SeasonalCampaignAgent(SkillAgent):
         blockers = [t for t in tasks if t.get("is_blocked")]
 
         return AgentResult(
-            success=True, action="track_campaign_execution",
+            success=True,
+            action="track_campaign_execution",
             data={
                 "campaign_id": campaign_id,
                 "total_tasks": total,
@@ -264,21 +276,28 @@ class SeasonalCampaignAgent(SkillAgent):
             predicted_lift = c.get("predicted_lift_pct", 0)
             accuracy = round(100 - abs(actual_lift - predicted_lift), 1)
 
-            reviews.append({
-                "campaign_id": c.get("campaign_id"),
-                "event_name": c.get("event_name"),
-                "actual_lift_pct": actual_lift,
-                "predicted_lift_pct": predicted_lift,
-                "prediction_accuracy": accuracy,
-                "revenue_yuan": round(c.get("revenue_fen", 0) / 100, 2),
-                "roi": c.get("roi", 0),
-                "rating": "优秀" if actual_lift >= predicted_lift else "达标" if actual_lift >= predicted_lift * 0.8 else "未达标",
-            })
+            reviews.append(
+                {
+                    "campaign_id": c.get("campaign_id"),
+                    "event_name": c.get("event_name"),
+                    "actual_lift_pct": actual_lift,
+                    "predicted_lift_pct": predicted_lift,
+                    "prediction_accuracy": accuracy,
+                    "revenue_yuan": round(c.get("revenue_fen", 0) / 100, 2),
+                    "roi": c.get("roi", 0),
+                    "rating": "优秀"
+                    if actual_lift >= predicted_lift
+                    else "达标"
+                    if actual_lift >= predicted_lift * 0.8
+                    else "未达标",
+                }
+            )
 
         avg_accuracy = round(sum(r["prediction_accuracy"] for r in reviews) / max(1, len(reviews)), 1)
 
         return AgentResult(
-            success=True, action="review_past_campaigns",
+            success=True,
+            action="review_past_campaigns",
             data={
                 "campaigns": reviews,
                 "total": len(reviews),

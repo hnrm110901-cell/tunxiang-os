@@ -7,6 +7,7 @@
 - GET /api/v1/skills/route/{event_type}  → 给定事件类型，返回会被哪些 Skill 处理
 - GET /api/v1/skills/health              → 所有 Skill 健康状态
 """
+
 import os
 
 from fastapi import APIRouter, HTTPException
@@ -54,14 +55,9 @@ async def list_skills() -> dict:
                     "category": s.meta.category,
                     "sub_category": s.meta.sub_category,
                     "event_triggers": [t.type for t in (s.triggers.events or [])],
-                    "emitted_events": (
-                        [e.type for e in s.data.emitted_events]
-                        if s.data else []
-                    ),
+                    "emitted_events": ([e.type for e in s.data.emitted_events] if s.data else []),
                     "offline_capable": (
-                        s.degradation.offline.can_operate
-                        if s.degradation and s.degradation.offline
-                        else False
+                        s.degradation.offline.can_operate if s.degradation and s.degradation.offline else False
                     ),
                 }
                 for s in skills
@@ -81,9 +77,7 @@ async def skill_health() -> dict:
             "version": s.meta.version,
             "status": "healthy",
             "offline_capable": (
-                s.degradation.offline.can_operate
-                if s.degradation and s.degradation.offline
-                else False
+                s.degradation.offline.can_operate if s.degradation and s.degradation.offline else False
             ),
         }
         for s in skills
@@ -106,7 +100,7 @@ async def ontology_report() -> dict:
     ontology = OntologyRegistry(registry)
 
     entity_owner = registry.get_all_owned_entities()  # {entity_name: skill_name}
-    emitted_events = registry.get_emitted_events()     # {event_type: skill_name}
+    emitted_events = registry.get_emitted_events()  # {event_type: skill_name}
     issues = ontology.validate()
 
     return {
@@ -177,26 +171,18 @@ async def get_skill(skill_name: str) -> dict:
                 for t in (manifest.triggers.events or [])
             ],
             "emitted_events": (
-                [
-                    {"type": e.type, "payload_schema": e.payload_schema}
-                    for e in manifest.data.emitted_events
-                ]
-                if manifest.data else []
+                [{"type": e.type, "payload_schema": e.payload_schema} for e in manifest.data.emitted_events]
+                if manifest.data
+                else []
             ),
             "owned_entities": (
-                [
-                    {"name": e.name, "table": e.table}
-                    for e in manifest.data.owned_entities
-                ]
-                if manifest.data else []
+                [{"name": e.name, "table": e.table} for e in manifest.data.owned_entities] if manifest.data else []
             ),
             "offline_capable": (
                 manifest.degradation.offline.can_operate
                 if manifest.degradation and manifest.degradation.offline
                 else False
             ),
-            "scope_levels": (
-                manifest.scope.levels if manifest.scope else []
-            ),
+            "scope_levels": (manifest.scope.levels if manifest.scope else []),
         },
     }

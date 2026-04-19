@@ -18,6 +18,7 @@
   - 使用 patch 直接替换模块级 client.messages.create
   - AsyncMock 替代 AsyncSession
 """
+
 from __future__ import annotations
 
 import json
@@ -297,9 +298,7 @@ async def test_finance_auditor_fallback_on_connection_error():
 
     with patch(
         _FA_CREATE,
-        new=AsyncMock(
-            side_effect=anthropic.APIConnectionError(request=MagicMock())
-        ),
+        new=AsyncMock(side_effect=anthropic.APIConnectionError(request=MagicMock())),
     ):
         result = await auditor.analyze(_finance_payload())
 
@@ -324,7 +323,7 @@ async def test_finance_auditor_python_overrides_constraints_check():
             "anomalies": [],
             "audit_suggestions": ["正常"],
             "constraints_check": {
-                "margin_ok": True,   # 错误 — 应被 Python 覆盖
+                "margin_ok": True,  # 错误 — 应被 Python 覆盖
                 "void_rate_ok": True,
                 "cash_diff_ok": True,
             },
@@ -391,7 +390,7 @@ async def test_write_decision_log_skips_empty_tenant_id():
 
     await auditor._write_decision_log(
         db,
-        _finance_payload(tenant_id=""),   # 无 tenant_id
+        _finance_payload(tenant_id=""),  # 无 tenant_id
         _finance_metrics(),
         _finance_result(),
         execution_ms=5,

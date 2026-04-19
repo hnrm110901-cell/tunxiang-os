@@ -9,6 +9,7 @@
   6. 批次 1 三个 Skill 声明的 scope 符合设计
   7. SKILL_REGISTRY 至少包含批次 1 三个 agent_id，且无 agent_id 冲突
 """
+
 from __future__ import annotations
 
 import os
@@ -25,6 +26,7 @@ from agents.context import ConstraintContext, IngredientSnapshot
 # ──────────────────────────────────────────────────────────────────────
 # 1. ConstraintContext
 # ──────────────────────────────────────────────────────────────────────
+
 
 def test_context_defaults_full_scope():
     ctx = ConstraintContext()
@@ -62,6 +64,7 @@ def test_context_from_data_handles_final_amount_alias():
 # 2. check_all 双入参
 # ──────────────────────────────────────────────────────────────────────
 
+
 def test_check_all_accepts_dict_and_context_equivalently():
     checker = ConstraintChecker()
     data = {"price_fen": 10000, "cost_fen": 5000}
@@ -79,6 +82,7 @@ def test_check_all_rejects_bad_input_type():
 # ──────────────────────────────────────────────────────────────────────
 # 3. scope 过滤
 # ──────────────────────────────────────────────────────────────────────
+
 
 def test_scope_filter_only_checks_declared_subset():
     checker = ConstraintChecker()
@@ -116,8 +120,10 @@ def test_scope_skipped_when_data_missing():
 # 4. base.py::run 流程（skill → constraints_detail.scope）
 # ──────────────────────────────────────────────────────────────────────
 
+
 class _NAStubSkill(SkillAgent):
     """声明需要校验但不提供任何数据 —— 应被标 scope='n/a'"""
+
     agent_id = "na_stub"
     constraint_scope = {"margin", "safety", "experience"}
 
@@ -163,9 +169,7 @@ async def test_run_single_scope_is_labeled():
 class _WaivedSkill(SkillAgent):
     agent_id = "waived_stub"
     constraint_scope = set()
-    constraint_waived_reason = (
-        "纯数据汇总 Skill，不触发业务决策；毛利/食安/体验维度均不适用，仅用于报表生成"
-    )
+    constraint_waived_reason = "纯数据汇总 Skill，不触发业务决策；毛利/食安/体验维度均不适用，仅用于报表生成"
 
     async def execute(self, action, params):
         return AgentResult(success=True, action=action, data={})
@@ -198,6 +202,7 @@ def _import_skills_or_skip():
     """尝试导入 agents.skills 包；失败则 skip（pre-existing edge_mixin bug 兼容）。"""
     try:
         import agents.skills as skills_pkg  # noqa: F401
+
         return skills_pkg
     except ImportError as exc:
         pytest.skip(f"agents.skills 无法导入（pre-existing edge_mixin bug）: {exc}")
@@ -251,6 +256,7 @@ def test_skill_registry_has_no_duplicate_agent_ids():
 # 7. 批次 2（PR H / W5 出餐体验）
 # ──────────────────────────────────────────────────────────────────────
 
+
 def test_batch_2_experience_skills_declare_scope():
     _import_skills_or_skip()
     from agents.skills.ai_waiter import AIWaiterAgent
@@ -278,8 +284,7 @@ def test_batch_2_registry_contains_table_dispatch():
 
     assert "table_dispatch" in SKILL_REGISTRY
     # 其他 6 个批次 2 Skills 在 PR G 之前已在 ALL_SKILL_AGENTS 内
-    for aid in ("serve_dispatch", "queue_seating", "kitchen_overtime",
-                "ai_waiter", "voice_order", "smart_service"):
+    for aid in ("serve_dispatch", "queue_seating", "kitchen_overtime", "ai_waiter", "voice_order", "smart_service"):
         assert aid in SKILL_REGISTRY, f"{aid} 未注册"
 
 
@@ -291,11 +296,14 @@ async def test_serve_dispatch_fills_experience_context():
     from agents.skills.serve_dispatch import ServeDispatchAgent
 
     agent = ServeDispatchAgent(tenant_id="t1")
-    result = await agent.run("predict_serve_time", {
-        "dish_count": 3,
-        "has_complex_dish": False,
-        "kitchen_queue_size": 0,
-    })
+    result = await agent.run(
+        "predict_serve_time",
+        {
+            "dish_count": 3,
+            "has_complex_dish": False,
+            "kitchen_queue_size": 0,
+        },
+    )
 
     # 已填 estimated_serve_minutes → scope 不再是 n/a
     assert result.constraints_detail["scope"] == "experience"
@@ -314,11 +322,14 @@ async def test_serve_dispatch_experience_violation_blocks_decision():
 
     agent = ServeDispatchAgent(tenant_id="t1")
     # 10 道菜 + 6 复杂 + 队列 20：base=5+25+8=38，queue_delay=30 → ~68 分钟
-    result = await agent.run("predict_serve_time", {
-        "dish_count": 10,
-        "has_complex_dish": True,
-        "kitchen_queue_size": 20,
-    })
+    result = await agent.run(
+        "predict_serve_time",
+        {
+            "dish_count": 10,
+            "has_complex_dish": True,
+            "kitchen_queue_size": 20,
+        },
+    )
     assert result.constraints_detail["scope"] == "experience"
     assert result.constraints_passed is False
     assert any("客户体验违规" in v for v in result.constraints_detail["violations"])

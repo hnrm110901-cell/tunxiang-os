@@ -13,6 +13,7 @@
 
 使用长沙真实餐饮数据。
 """
+
 from __future__ import annotations
 
 import os
@@ -52,6 +53,7 @@ from services.store_pnl import StorePnLService
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 #  FIXTURES
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 @pytest.fixture
 def live_service():
@@ -94,20 +96,20 @@ def _changsha_daily_pnl_data(
         },
         "cogs": {
             "food_cost": food_cost,
-            "beverage_cost": 25_000,   # 250 元饮品成本
+            "beverage_cost": 25_000,  # 250 元饮品成本
             "waste_spoilage": 18_000,  # 180 元损耗
         },
         "opex": {
-            "labor": 380_000,       # 3800 元/日人力
-            "rent": 166_667,        # 5 万/月 ÷ 30
-            "utilities": 50_000,    # 500 元/日水电气
-            "marketing": 30_000,    # 300 元/日
+            "labor": 380_000,  # 3800 元/日人力
+            "rent": 166_667,  # 5 万/月 ÷ 30
+            "utilities": 50_000,  # 500 元/日水电气
+            "marketing": 30_000,  # 300 元/日
             "platform_commission": int(delivery * 0.20),  # 外送平台 20%
-            "payment_processing": int(total_rev * 0.006), # 支付手续费 0.6%
-            "supplies": 15_000,     # 耗材 150 元/日
+            "payment_processing": int(total_rev * 0.006),  # 支付手续费 0.6%
+            "supplies": 15_000,  # 耗材 150 元/日
         },
         "other": {
-            "depreciation": 33_333,      # 100 万设备 / 30 月 / 30 天
+            "depreciation": 33_333,  # 100 万设备 / 30 月 / 30 天
             "admin_allocation": 20_000,  # 总部管理费分摊
         },
         "meta": {
@@ -120,6 +122,7 @@ def _changsha_daily_pnl_data(
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 #  1. Agent 三级自治机制
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 class TestAgentLevels:
     """三级自治: Level 1=suggest, Level 2=auto+rollback, Level 3=autonomous"""
@@ -205,13 +208,16 @@ class TestAgentResultLevels:
         agent = DiscountGuardAgent(tenant_id="t1", store_id="s1")
         agent.agent_level = 2
 
-        result = await agent.run("detect_discount_anomaly", {
-            "order": {
-                "total_amount_fen": 10000,
-                "discount_amount_fen": 2000,
-                "cost_fen": 3000,
+        result = await agent.run(
+            "detect_discount_anomaly",
+            {
+                "order": {
+                    "total_amount_fen": 10000,
+                    "discount_amount_fen": 2000,
+                    "cost_fen": 3000,
+                },
             },
-        })
+        )
 
         assert result.agent_level == 2
         assert result.rollback_window_min == 30
@@ -223,13 +229,16 @@ class TestAgentResultLevels:
         agent = DiscountGuardAgent(tenant_id="t1", store_id="s1")
         agent.agent_level = 1
 
-        result = await agent.run("detect_discount_anomaly", {
-            "order": {
-                "total_amount_fen": 10000,
-                "discount_amount_fen": 2000,
-                "cost_fen": 3000,
+        result = await agent.run(
+            "detect_discount_anomaly",
+            {
+                "order": {
+                    "total_amount_fen": 10000,
+                    "discount_amount_fen": 2000,
+                    "cost_fen": 3000,
+                },
             },
-        })
+        )
 
         assert result.agent_level == 1
         assert result.rollback_id == ""
@@ -238,6 +247,7 @@ class TestAgentResultLevels:
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 #  2. discount_guard live 执行
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 class TestDiscountGuardLive:
     """discount_guard 上线 — 真实订单数据"""
@@ -250,9 +260,9 @@ class TestDiscountGuardLive:
             action="detect_discount_anomaly",
             params={
                 "order": {
-                    "total_amount_fen": 38800,   # 388 元（长沙4人均消费）
+                    "total_amount_fen": 38800,  # 388 元（长沙4人均消费）
                     "discount_amount_fen": 7760,  # 20% 折扣
-                    "cost_fen": 12424,            # 32% 食材成本
+                    "cost_fen": 12424,  # 32% 食材成本
                 },
             },
             store_id="store_cs_001",
@@ -269,7 +279,7 @@ class TestDiscountGuardLive:
             action="detect_discount_anomaly",
             params={
                 "order": {
-                    "total_amount_fen": 88000,    # 880 元
+                    "total_amount_fen": 88000,  # 880 元
                     "discount_amount_fen": 66000,  # 75% 折扣
                     "cost_fen": 28160,
                     "waiter_discount_count": 8,
@@ -301,6 +311,7 @@ class TestDiscountGuardLive:
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 #  3. 回滚机制
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 class TestRollback:
     """Level 2 回滚 — 30分钟窗口"""
@@ -371,6 +382,7 @@ class TestRollback:
 #  4. Agent 升级条件
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 class TestAgentUpgrade:
     """升级条件：100+ Level-1 决策，采纳率 > 80%"""
 
@@ -388,19 +400,21 @@ class TestAgentUpgrade:
         # 注入 120 条决策，其中 70 条被采纳（58.3%）
         decisions = []
         for i in range(120):
-            decisions.append({
-                "decision_id": f"d_{i}",
-                "agent_id": "discount_guard",
-                "action": "detect_discount_anomaly",
-                "params": {},
-                "store_id": "store_cs_001",
-                "level": 1,
-                "rollback_id": "",
-                "created_at": time.time(),
-                "rolled_back": False,
-                "result": {"success": True, "confidence": 0.9, "data": {}},
-                "status": "executed" if i < 70 else "ignored",
-            })
+            decisions.append(
+                {
+                    "decision_id": f"d_{i}",
+                    "agent_id": "discount_guard",
+                    "action": "detect_discount_anomaly",
+                    "params": {},
+                    "store_id": "store_cs_001",
+                    "level": 1,
+                    "rollback_id": "",
+                    "created_at": time.time(),
+                    "rolled_back": False,
+                    "result": {"success": True, "confidence": 0.9, "data": {}},
+                    "status": "executed" if i < 70 else "ignored",
+                }
+            )
         live_service._inject_decisions(decisions)
 
         readiness = live_service.get_agent_readiness("discount_guard")
@@ -413,19 +427,21 @@ class TestAgentUpgrade:
         # 注入 110 条决策，其中 95 条被采纳（86.4%）
         decisions = []
         for i in range(110):
-            decisions.append({
-                "decision_id": f"d_{i}",
-                "agent_id": "discount_guard",
-                "action": "detect_discount_anomaly",
-                "params": {},
-                "store_id": "store_cs_001",
-                "level": 1,
-                "rollback_id": "",
-                "created_at": time.time(),
-                "rolled_back": False,
-                "result": {"success": True, "confidence": 0.92, "data": {}},
-                "status": "executed" if i < 95 else "ignored",
-            })
+            decisions.append(
+                {
+                    "decision_id": f"d_{i}",
+                    "agent_id": "discount_guard",
+                    "action": "detect_discount_anomaly",
+                    "params": {},
+                    "store_id": "store_cs_001",
+                    "level": 1,
+                    "rollback_id": "",
+                    "created_at": time.time(),
+                    "rolled_back": False,
+                    "result": {"success": True, "confidence": 0.92, "data": {}},
+                    "status": "executed" if i < 95 else "ignored",
+                }
+            )
         live_service._inject_decisions(decisions)
 
         readiness = live_service.get_agent_readiness("discount_guard")
@@ -441,6 +457,7 @@ class TestAgentUpgrade:
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 #  5. 企微推送
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 class TestWeComPush:
     """企业微信推送"""
@@ -483,6 +500,7 @@ class TestWeComPush:
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 #  6. 门店 P&L
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 class TestStorePnL:
     """门店 P&L 自动生成 — 长沙湘菜馆数据"""
@@ -591,7 +609,7 @@ class TestStorePnL:
         # 构造高成本低利润场景
         data = _changsha_daily_pnl_data()
         data["opex"]["labor"] = 600_000  # 6000 元/日人力，明显偏高
-        data["opex"]["rent"] = 300_000   # 3000 元/日租金
+        data["opex"]["rent"] = 300_000  # 3000 元/日租金
         pnl = pnl_service.generate_daily_pnl("store_cs_001", "2026-03-26", data)
 
         anomalies = pnl_service.detect_pnl_anomalies(pnl)
@@ -648,6 +666,7 @@ class TestStorePnL:
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 #  7. 离职结算
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 class TestSeparationSettlement:
     """离职结算 — 经济补偿金"""

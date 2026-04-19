@@ -58,6 +58,7 @@ REQUIRED_LICENSES: dict[str, list[str]] = {
 # 纯函数
 # ---------------------------------------------------------------------------
 
+
 def classify_renewal_urgency(expiry_date: date | str, today: date | None = None) -> str:
     """续办紧急程度: valid / expiring_soon(30天内) / expired。"""
     if isinstance(expiry_date, str):
@@ -96,6 +97,7 @@ def calculate_coverage_score(
 # ---------------------------------------------------------------------------
 # 业务服务
 # ---------------------------------------------------------------------------
+
 
 async def register_license(
     tenant_id: str,
@@ -200,7 +202,9 @@ async def get_expiring_licenses(tenant_id: str, days: int = 30) -> list[dict]:
         for r in rows.mappings().all():
             row = dict(r)
             row["renewal_urgency"] = classify_renewal_urgency(row["expiry_date"])
-            row["days_remaining"] = (row["expiry_date"] - date.today()).days if isinstance(row["expiry_date"], date) else None
+            row["days_remaining"] = (
+                (row["expiry_date"] - date.today()).days if isinstance(row["expiry_date"], date) else None
+            )
             results.append(row)
 
     logger.info("expiring_licenses_checked", tenant_id=tenant_id, count=len(results))
@@ -289,7 +293,9 @@ async def get_expiring_health_certs(tenant_id: str, days: int = 30) -> list[dict
         for r in rows.mappings().all():
             row = dict(r)
             row["renewal_urgency"] = classify_renewal_urgency(row["expiry_date"])
-            row["days_remaining"] = (row["expiry_date"] - date.today()).days if isinstance(row["expiry_date"], date) else None
+            row["days_remaining"] = (
+                (row["expiry_date"] - date.today()).days if isinstance(row["expiry_date"], date) else None
+            )
             results.append(row)
 
     logger.info("expiring_health_certs_checked", tenant_id=tenant_id, count=len(results))
@@ -301,10 +307,7 @@ async def get_license_coverage(tenant_id: str, store_id: str) -> dict:
     async with TenantSession(tenant_id) as db:
         # 获取门店业态
         store_row = await db.execute(
-            text(
-                "SELECT business_type FROM stores "
-                "WHERE tenant_id = :tenant_id AND id = :store_id"
-            ),
+            text("SELECT business_type FROM stores WHERE tenant_id = :tenant_id AND id = :store_id"),
             {"tenant_id": tenant_id, "store_id": store_id},
         )
         store = store_row.mappings().first()

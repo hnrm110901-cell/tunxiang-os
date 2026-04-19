@@ -6,6 +6,7 @@
 3. 记录决策日志（留痕）
 4. 返回：推荐菜品/重点推广/临期消耗/套餐建议/菜单调整
 """
+
 from __future__ import annotations
 
 import json
@@ -126,29 +127,16 @@ class MenuOptimizer:
         dish_performance = payload.get("dish_performance", [])
 
         # 找出临期食材（expiry_days ≤ 3）
-        expiring_ingredients = [
-            item for item in inventory
-            if item.get("expiry_days", 999) <= EXPIRY_THRESHOLD_DAYS
-        ]
-        expiring_ingredient_ids = {
-            item.get("ingredient_id") for item in expiring_ingredients
-        }
+        expiring_ingredients = [item for item in inventory if item.get("expiry_days", 999) <= EXPIRY_THRESHOLD_DAYS]
+        expiring_ingredient_ids = {item.get("ingredient_id") for item in expiring_ingredients}
 
         # 统计菜品分类数量（用于多样性检查）
-        categories = {
-            d.get("category", "未知")
-            for d in dish_performance
-            if d.get("is_available", True)
-        }
+        categories = {d.get("category", "未知") for d in dish_performance if d.get("is_available", True)}
 
         # 可用菜品的平均毛利率
-        available_dishes = [
-            d for d in dish_performance if d.get("is_available", True)
-        ]
+        available_dishes = [d for d in dish_performance if d.get("is_available", True)]
         avg_margin = (
-            sum(d.get("margin_rate", 0) for d in available_dishes) / len(available_dishes)
-            if available_dishes
-            else 0.0
+            sum(d.get("margin_rate", 0) for d in available_dishes) / len(available_dishes) if available_dishes else 0.0
         )
 
         return {
@@ -165,11 +153,15 @@ class MenuOptimizer:
         expiring = pre_calc.get("expiring_ingredients", [])
 
         # 格式化临期食材
-        expiring_text = "无" if not expiring else "\n".join(
-            f"  - {item.get('name')} {item.get('quantity')}{item.get('unit')} "
-            f"还有{item.get('expiry_days')}天到期 "
-            f"成本{item.get('cost_per_unit_fen', 0) / 100:.2f}元/{item.get('unit')}"
-            for item in expiring
+        expiring_text = (
+            "无"
+            if not expiring
+            else "\n".join(
+                f"  - {item.get('name')} {item.get('quantity')}{item.get('unit')} "
+                f"还有{item.get('expiry_days')}天到期 "
+                f"成本{item.get('cost_per_unit_fen', 0) / 100:.2f}元/{item.get('unit')}"
+                for item in expiring
+            )
         )
 
         # 格式化菜品表现（按日均销量降序，最多20条）
@@ -188,9 +180,9 @@ class MenuOptimizer:
         )
 
         return f"""餐厅排菜请求：
-门店：{payload.get('store_id')} 租户：{payload.get('tenant_id')}
-日期：{payload.get('date')} 餐段：{payload.get('meal_period')}
-天气：{payload.get('weather', '未知')} 日期类型：{payload.get('day_type', '未知')}
+门店：{payload.get("store_id")} 租户：{payload.get("tenant_id")}
+日期：{payload.get("date")} 餐段：{payload.get("meal_period")}
+天气：{payload.get("weather", "未知")} 日期类型：{payload.get("day_type", "未知")}
 
 临期食材（≤{EXPIRY_THRESHOLD_DAYS}天，必须消耗）：
 {expiring_text}
@@ -200,11 +192,11 @@ class MenuOptimizer:
 
 预计算结果：
 - 临期食材数量：{len(expiring)}种
-- 可售菜品总数：{pre_calc.get('available_dish_count')}道
-- 菜品分类数：{pre_calc.get('category_count')}个
-- 可售菜品平均毛利率：{pre_calc.get('avg_margin_rate', 0):.1%}
+- 可售菜品总数：{pre_calc.get("available_dish_count")}道
+- 菜品分类数：{pre_calc.get("category_count")}个
+- 可售菜品平均毛利率：{pre_calc.get("avg_margin_rate", 0):.1%}
 
-请根据以上数据，生成今日{payload.get('meal_period')}的最优排菜方案。"""
+请根据以上数据，生成今日{payload.get("meal_period")}的最优排菜方案。"""
 
     def _parse_response(self, response_text: str) -> dict | None:
         """解析Claude响应，提取JSON，失败返回None。"""
@@ -226,9 +218,7 @@ class MenuOptimizer:
         dish_performance = payload.get("dish_performance", [])
 
         # 可售菜品按毛利率降序
-        available_dishes = [
-            d for d in dish_performance if d.get("is_available", True)
-        ]
+        available_dishes = [d for d in dish_performance if d.get("is_available", True)]
         sorted_by_margin = sorted(
             available_dishes,
             key=lambda d: d.get("margin_rate", 0),
@@ -261,15 +251,8 @@ class MenuOptimizer:
         food_safety_ok = len(expiring) == 0 or len(dishes_to_deplete) > 0
 
         # margin_ok：featured菜品平均毛利率≥40%
-        featured_margins = [
-            sorted_by_margin[i].get("margin_rate", 0)
-            for i in range(min(3, len(sorted_by_margin)))
-        ]
-        margin_ok = (
-            sum(featured_margins) / len(featured_margins) >= MIN_MARGIN_RATE
-            if featured_margins
-            else False
-        )
+        featured_margins = [sorted_by_margin[i].get("margin_rate", 0) for i in range(min(3, len(sorted_by_margin)))]
+        margin_ok = sum(featured_margins) / len(featured_margins) >= MIN_MARGIN_RATE if featured_margins else False
 
         return {
             "featured_dishes": featured_dishes,
@@ -284,7 +267,6 @@ class MenuOptimizer:
             },
         }
 
-
     async def analyze_from_mv(self, tenant_id: str, store_id: str | None = None) -> dict:
         """从 mv_inventory_bom 快速读取 BOM 损耗数据，辅助菜单优化，<5ms，无 Claude 调用。
 
@@ -293,6 +275,7 @@ class MenuOptimizer:
         """
         from sqlalchemy import text
         from sqlalchemy.exc import SQLAlchemyError
+
         from shared.ontology.src.database import get_db
 
         try:

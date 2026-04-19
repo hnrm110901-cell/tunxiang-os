@@ -11,6 +11,7 @@
   - SQLAlchemyError 注入模拟 DB 故障
   - analyze() fallback 通过 patch.object 隔离，不调用真实 Claude API
 """
+
 from __future__ import annotations
 
 import uuid
@@ -68,8 +69,8 @@ def _make_energy_mv_row() -> MagicMock:
         "electricity_kwh": Decimal("185.500"),
         "gas_m3": Decimal("42.300"),
         "water_ton": Decimal("8.200"),
-        "energy_cost_fen": 3600,          # 36.00 元
-        "revenue_fen": 80000,             # 800.00 元
+        "energy_cost_fen": 3600,  # 36.00 元
+        "revenue_fen": 80000,  # 800.00 元
         "energy_revenue_ratio": Decimal("0.0450"),  # 4.5% — 优秀
         "anomaly_count": 0,
         "off_hours_anomalies": "[]",
@@ -176,12 +177,13 @@ class TestEnergyMonitorAnalyzeFromMV:
 
         fallback_result = _make_fallback_analyze_result()
 
-        with patch(
-            "services.tx_brain.src.agents.energy_monitor.get_db",
-            return_value=_fake_get_db(db_session),
-        ), patch.object(
-            agent, "analyze", new=AsyncMock(return_value=fallback_result)
-        ) as mock_analyze:
+        with (
+            patch(
+                "services.tx_brain.src.agents.energy_monitor.get_db",
+                return_value=_fake_get_db(db_session),
+            ),
+            patch.object(agent, "analyze", new=AsyncMock(return_value=fallback_result)) as mock_analyze,
+        ):
             result = await agent.analyze_from_mv(TENANT_ID, STORE_ID)
 
         # analyze() 被调用一次
@@ -215,12 +217,13 @@ class TestEnergyMonitorAnalyzeFromMV:
         fallback_result["efficiency_level"] = "警告"
         fallback_result["anomaly_summary"] = "DB不可用，降级为规则分析"
 
-        with patch(
-            "services.tx_brain.src.agents.energy_monitor.get_db",
-            return_value=_fake_get_db(db_session),
-        ), patch.object(
-            agent, "analyze", new=AsyncMock(return_value=fallback_result)
-        ) as mock_analyze:
+        with (
+            patch(
+                "services.tx_brain.src.agents.energy_monitor.get_db",
+                return_value=_fake_get_db(db_session),
+            ),
+            patch.object(agent, "analyze", new=AsyncMock(return_value=fallback_result)) as mock_analyze,
+        ):
             # 不应抛出任何异常
             result = await agent.analyze_from_mv(TENANT_ID, STORE_ID)
 

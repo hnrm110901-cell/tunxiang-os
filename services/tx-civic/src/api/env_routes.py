@@ -1,15 +1,15 @@
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import date
 from typing import Any, Dict, List, Optional
 from uuid import uuid4
 
 import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel, Field
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
 
@@ -27,6 +27,7 @@ async def _set_tenant(db: AsyncSession, tenant_id: str) -> None:
 # ---------------------------------------------------------------------------
 # Pydantic Models
 # ---------------------------------------------------------------------------
+
 
 class EmissionRecordCreate(BaseModel):
     store_id: str
@@ -53,6 +54,7 @@ class WasteDisposalCreate(BaseModel):
 # ---------------------------------------------------------------------------
 # Endpoints
 # ---------------------------------------------------------------------------
+
 
 @router.post("/emission")
 async def create_emission_record(
@@ -254,9 +256,7 @@ async def get_env_compliance(
         emission_row = emission_result.fetchone()
         emission_total = emission_row.total if emission_row else 0
         emission_compliant = emission_row.compliant if emission_row else 0
-        emission_rate = round(
-            (emission_compliant / emission_total * 100) if emission_total > 0 else 0, 2
-        )
+        emission_rate = round((emission_compliant / emission_total * 100) if emission_total > 0 else 0, 2)
 
         # Waste disposal compliance: check if disposal records exist for last 7 days
         waste_result = await db.execute(
@@ -268,7 +268,7 @@ async def get_env_compliance(
             """),
             {"tid": x_tenant_id, "sid": store_id},
         )
-        waste_days = (waste_result.scalar() or 0)
+        waste_days = waste_result.scalar() or 0
         waste_rate = round(waste_days / 7 * 100, 2)
 
         overall = round((emission_rate + waste_rate) / 2, 2)

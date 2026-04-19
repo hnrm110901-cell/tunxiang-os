@@ -1,4 +1,5 @@
 """决策推送纯函数测试"""
+
 import os
 import sys
 
@@ -16,9 +17,31 @@ from services.decision_push import (
 )
 
 SAMPLE_DECISIONS = [
-    {"title": "减少鲈鱼采购30%", "action": "联系供应商调整下周采购量", "expected_saving_yuan": 1200, "confidence": 0.85, "difficulty": "easy", "source": "inventory"},
-    {"title": "下架低毛利菜品3道", "action": "从菜单移除瘦狗象限菜品", "expected_saving_yuan": 650, "confidence": 0.72, "difficulty": "medium", "source": "menu"},
-    {"title": "周末增加2名服务员", "action": "安排临时工周六日上岗", "expected_saving_yuan": 800, "confidence": 0.78, "difficulty": "hard", "source": "schedule", "urgency_hours": 3},
+    {
+        "title": "减少鲈鱼采购30%",
+        "action": "联系供应商调整下周采购量",
+        "expected_saving_yuan": 1200,
+        "confidence": 0.85,
+        "difficulty": "easy",
+        "source": "inventory",
+    },
+    {
+        "title": "下架低毛利菜品3道",
+        "action": "从菜单移除瘦狗象限菜品",
+        "expected_saving_yuan": 650,
+        "confidence": 0.72,
+        "difficulty": "medium",
+        "source": "menu",
+    },
+    {
+        "title": "周末增加2名服务员",
+        "action": "安排临时工周六日上岗",
+        "expected_saving_yuan": 800,
+        "confidence": 0.78,
+        "difficulty": "hard",
+        "source": "schedule",
+        "urgency_hours": 3,
+    },
 ]
 
 
@@ -40,8 +63,12 @@ class TestMorningCard:
 class TestNoonAnomaly:
     def test_critical_waste(self):
         result = format_noon_anomaly(
-            {"waste_rate_pct": 6.5, "waste_cost_yuan": 850, "waste_rate_status": "critical",
-             "top5": [{"item_name": "鲈鱼", "waste_cost_yuan": 320, "action": "调整备餐量"}]},
+            {
+                "waste_rate_pct": 6.5,
+                "waste_cost_yuan": 850,
+                "waste_rate_status": "critical",
+                "top5": [{"item_name": "鲈鱼", "waste_cost_yuan": 320, "action": "调整备餐量"}],
+            },
             SAMPLE_DECISIONS,
         )
         assert "🔴" in result

@@ -3,6 +3,7 @@
 供前端实时接收长文本分析（经营报告/P&L解读/库存分析等）。
 使用 Server-Sent Events，前端通过 EventSource 连接。
 """
+
 from __future__ import annotations
 
 import json
@@ -22,9 +23,10 @@ router = APIRouter(prefix="/api/v1/stream", tags=["stream"])
 
 class StreamAnalysisRequest(BaseModel):
     """流式分析请求"""
-    prompt: str                           # 分析指令（用户自然语言）
-    context: dict = {}                    # 业务上下文数据（如 P&L 数据、库存数据等）
-    task_type: str = "auto"              # 任务类型（auto=自动检测）
+
+    prompt: str  # 分析指令（用户自然语言）
+    context: dict = {}  # 业务上下文数据（如 P&L 数据、库存数据等）
+    task_type: str = "auto"  # 任务类型（auto=自动检测）
     store_id: Optional[str] = None
 
 

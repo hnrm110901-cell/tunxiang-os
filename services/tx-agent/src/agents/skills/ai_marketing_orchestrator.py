@@ -19,6 +19,7 @@
 
 升级自 PrivateOpsAgent(P2) → AiMarketingOrchestratorAgent(P1)
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -48,12 +49,12 @@ GROWTH_SERVICE_URL = os.getenv("GROWTH_SERVICE_URL", "http://tx-growth:8004")
 # 营销冷却规则（小时）— 防止骚扰用户
 MARKETING_COOLDOWN_RULES: dict[str, int] = {
     "post_order_touch": 48,
-    "welcome_journey": 0,       # 立即触发
+    "welcome_journey": 0,  # 立即触发
     "winback_journey": 72,
-    "birthday_care": 72,        # 生日前3天发一次
-    "holiday_campaign": 120,    # 节日前5天发一次
-    "upgrade_celebration": 1,   # 升级后立即
-    "churn_rescue": 168,        # 每周最多一次
+    "birthday_care": 72,  # 生日前3天发一次
+    "holiday_campaign": 120,  # 节日前5天发一次
+    "upgrade_celebration": 1,  # 升级后立即
+    "churn_rescue": 168,  # 每周最多一次
 }
 
 # 默认毛利底线（百分比）
@@ -67,20 +68,21 @@ ATTRIBUTABLE_STATUSES = ("sent", "delivered", "clicked", "queued")
 
 # 渠道优先级（按场景）
 CHANNEL_PRIORITY: dict[str, list[str]] = {
-    "post_order_touch":     ["wechat_subscribe", "wecom_chat"],
-    "welcome_journey":      ["wechat_subscribe", "wecom_chat", "sms"],
-    "winback_journey":      ["wecom_chat", "sms", "wechat_subscribe"],
-    "birthday_care":        ["wechat_subscribe", "wecom_chat"],
-    "holiday_campaign":     ["wechat_oa", "wecom_chat", "sms", "xiaohongshu_note"],
-    "upgrade_celebration":  ["wechat_subscribe", "wecom_chat"],
-    "churn_rescue":         ["sms", "wecom_chat", "wechat_subscribe"],
-    "brand_content":        ["xiaohongshu_note", "douyin_content", "wecom_chat"],
+    "post_order_touch": ["wechat_subscribe", "wecom_chat"],
+    "welcome_journey": ["wechat_subscribe", "wecom_chat", "sms"],
+    "winback_journey": ["wecom_chat", "sms", "wechat_subscribe"],
+    "birthday_care": ["wechat_subscribe", "wecom_chat"],
+    "holiday_campaign": ["wechat_oa", "wecom_chat", "sms", "xiaohongshu_note"],
+    "upgrade_celebration": ["wechat_subscribe", "wecom_chat"],
+    "churn_rescue": ["sms", "wecom_chat", "wechat_subscribe"],
+    "brand_content": ["xiaohongshu_note", "douyin_content", "wecom_chat"],
 }
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Agent 实现
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class AiMarketingOrchestratorAgent(SkillAgent):
     """AI营销编排 Agent
@@ -113,15 +115,15 @@ class AiMarketingOrchestratorAgent(SkillAgent):
         start_ms = int(time.time() * 1000)
 
         dispatch = {
-            "execute_post_order_touch":    self._post_order_touch,
-            "execute_welcome_journey":     self._welcome_journey,
-            "execute_winback_journey":     self._winback_journey,
-            "execute_birthday_care":       self._birthday_care,
-            "execute_holiday_campaign":    self._holiday_campaign,
+            "execute_post_order_touch": self._post_order_touch,
+            "execute_welcome_journey": self._welcome_journey,
+            "execute_winback_journey": self._winback_journey,
+            "execute_birthday_care": self._birthday_care,
+            "execute_holiday_campaign": self._holiday_campaign,
             "execute_upgrade_celebration": self._upgrade_celebration,
-            "execute_churn_rescue":        self._churn_rescue,
-            "get_marketing_health_score":  self._marketing_health_score,
-            "update_order_attribution":    self._update_order_attribution,
+            "execute_churn_rescue": self._churn_rescue,
+            "get_marketing_health_score": self._marketing_health_score,
+            "update_order_attribution": self._update_order_attribution,
         }
 
         handler = dispatch.get(action)
@@ -272,9 +274,11 @@ class AiMarketingOrchestratorAgent(SkillAgent):
         cooldown = await self._check_cooldown(member_id, "winback_journey")
         if not cooldown["ok"]:
             return AgentResult(
-                success=True, action="execute_winback_journey",
+                success=True,
+                action="execute_winback_journey",
                 data={"skipped": True, "reason": "冷却期内"},
-                reasoning=cooldown["reason"], confidence=1.0,
+                reasoning=cooldown["reason"],
+                confidence=1.0,
             )
 
         constraints = await self._check_marketing_constraints(
@@ -284,8 +288,10 @@ class AiMarketingOrchestratorAgent(SkillAgent):
         )
         if not constraints["passed"]:
             return AgentResult(
-                success=False, action="execute_winback_journey",
-                constraints_passed=False, constraints_detail=constraints,
+                success=False,
+                action="execute_winback_journey",
+                constraints_passed=False,
+                constraints_detail=constraints,
                 reasoning=f"唤醒券约束失败: {constraints['violations']}",
             )
 
@@ -307,11 +313,13 @@ class AiMarketingOrchestratorAgent(SkillAgent):
         )
 
         return AgentResult(
-            success=True, action="execute_winback_journey",
+            success=True,
+            action="execute_winback_journey",
             data={"member_id": member_id, "days_inactive": days_inactive, "send_result": send_result},
             reasoning=f"会员 {days_inactive} 天未到店（{rfm_tier} 层），发送唤醒券 {winback_offer_fen} 分",
             confidence=0.87,
-            constraints_passed=True, constraints_detail=constraints,
+            constraints_passed=True,
+            constraints_detail=constraints,
         )
 
     # ─── 场景4：生日关怀 ──────────────────────────────────────────────────────
@@ -326,16 +334,25 @@ class AiMarketingOrchestratorAgent(SkillAgent):
 
         cooldown = await self._check_cooldown(member_id, "birthday_care")
         if not cooldown["ok"]:
-            return AgentResult(success=True, action="execute_birthday_care",
-                               data={"skipped": True}, reasoning="今年生日已发送", confidence=1.0)
+            return AgentResult(
+                success=True,
+                action="execute_birthday_care",
+                data={"skipped": True},
+                reasoning="今年生日已发送",
+                confidence=1.0,
+            )
 
         constraints = await self._check_marketing_constraints(
             member_id=member_id, discount_fen=birthday_gift_fen, action_type="birthday_care"
         )
         if not constraints["passed"]:
-            return AgentResult(success=False, action="execute_birthday_care",
-                               constraints_passed=False, constraints_detail=constraints,
-                               reasoning=f"生日礼券约束失败: {constraints['violations']}")
+            return AgentResult(
+                success=False,
+                action="execute_birthday_care",
+                constraints_passed=False,
+                constraints_detail=constraints,
+                reasoning=f"生日礼券约束失败: {constraints['violations']}",
+            )
 
         content_pkg = await self._generate_content(
             campaign_type="birthday_care",
@@ -347,15 +364,21 @@ class AiMarketingOrchestratorAgent(SkillAgent):
         )
 
         send_result = await self._dispatch_message(
-            member_id=member_id, channels=CHANNEL_PRIORITY["birthday_care"],
-            content=content_pkg, campaign_type="birthday_care", ref_id=member_id,
+            member_id=member_id,
+            channels=CHANNEL_PRIORITY["birthday_care"],
+            content=content_pkg,
+            campaign_type="birthday_care",
+            ref_id=member_id,
         )
 
         return AgentResult(
-            success=True, action="execute_birthday_care",
+            success=True,
+            action="execute_birthday_care",
             data={"member_id": member_id, "birthday_date": birthday_date, "send_result": send_result},
             reasoning=f"生日 {birthday_date} 前3天，发送生日关怀礼包 {birthday_gift_fen} 分",
-            confidence=0.96, constraints_passed=True, constraints_detail=constraints,
+            confidence=0.96,
+            constraints_passed=True,
+            constraints_detail=constraints,
         )
 
     # ─── 场景5：节假日营销包 ──────────────────────────────────────────────────
@@ -382,20 +405,22 @@ class AiMarketingOrchestratorAgent(SkillAgent):
         async def _send_one(mid: str) -> dict:
             async with sem:
                 return await self._dispatch_message(
-                    member_id=mid, channels=CHANNEL_PRIORITY["holiday_campaign"],
-                    content=content_pkg, campaign_type="holiday_campaign",
+                    member_id=mid,
+                    channels=CHANNEL_PRIORITY["holiday_campaign"],
+                    content=content_pkg,
+                    campaign_type="holiday_campaign",
                     ref_id=f"{holiday_name}_{mid}",
                 )
 
-        send_results = list(
-            await asyncio.gather(*[_send_one(mid) for mid in member_ids[:200]])
-        )
+        send_results = list(await asyncio.gather(*[_send_one(mid) for mid in member_ids[:200]]))
 
         return AgentResult(
-            success=True, action="execute_holiday_campaign",
+            success=True,
+            action="execute_holiday_campaign",
             data={"holiday": holiday_name, "sent_count": len(send_results), "results": send_results[:5]},
             reasoning=f"{holiday_name} 节日营销包，向 {len(member_ids)} 位会员发送",
-            confidence=0.88, constraints_passed=True,
+            confidence=0.88,
+            constraints_passed=True,
         )
 
     # ─── 场景6：升级庆祝 ──────────────────────────────────────────────────────
@@ -417,15 +442,20 @@ class AiMarketingOrchestratorAgent(SkillAgent):
         )
 
         send_result = await self._dispatch_message(
-            member_id=member_id, channels=CHANNEL_PRIORITY["upgrade_celebration"],
-            content=content_pkg, campaign_type="upgrade_celebration", ref_id=member_id,
+            member_id=member_id,
+            channels=CHANNEL_PRIORITY["upgrade_celebration"],
+            content=content_pkg,
+            campaign_type="upgrade_celebration",
+            ref_id=member_id,
         )
 
         return AgentResult(
-            success=True, action="execute_upgrade_celebration",
+            success=True,
+            action="execute_upgrade_celebration",
             data={"member_id": member_id, "new_tier": new_tier, "send_result": send_result},
             reasoning=f"会员升级至 {new_tier}，发送升级庆祝 + 专属权益说明",
-            confidence=0.94, constraints_passed=True,
+            confidence=0.94,
+            constraints_passed=True,
         )
 
     # ─── 场景7：流失拯救 ──────────────────────────────────────────────────────
@@ -440,8 +470,13 @@ class AiMarketingOrchestratorAgent(SkillAgent):
 
         cooldown = await self._check_cooldown(member_id, "churn_rescue")
         if not cooldown["ok"]:
-            return AgentResult(success=True, action="execute_churn_rescue",
-                               data={"skipped": True}, reasoning="本周已触达", confidence=1.0)
+            return AgentResult(
+                success=True,
+                action="execute_churn_rescue",
+                data={"skipped": True},
+                reasoning="本周已触达",
+                confidence=1.0,
+            )
 
         constraints = await self._check_marketing_constraints(
             member_id=member_id, discount_fen=rescue_offer_fen, action_type="churn_rescue"
@@ -454,9 +489,13 @@ class AiMarketingOrchestratorAgent(SkillAgent):
             )
 
         if not constraints["passed"]:
-            return AgentResult(success=False, action="execute_churn_rescue",
-                               constraints_passed=False, constraints_detail=constraints,
-                               reasoning="即便降低优惠力度，毛利约束仍不满足")
+            return AgentResult(
+                success=False,
+                action="execute_churn_rescue",
+                constraints_passed=False,
+                constraints_detail=constraints,
+                reasoning="即便降低优惠力度，毛利约束仍不满足",
+            )
 
         content_pkg = await self._generate_content(
             campaign_type="churn_recovery",
@@ -468,16 +507,21 @@ class AiMarketingOrchestratorAgent(SkillAgent):
         )
 
         send_result = await self._dispatch_message(
-            member_id=member_id, channels=CHANNEL_PRIORITY["churn_rescue"],
-            content=content_pkg, campaign_type="churn_rescue", ref_id=member_id,
+            member_id=member_id,
+            channels=CHANNEL_PRIORITY["churn_rescue"],
+            content=content_pkg,
+            campaign_type="churn_rescue",
+            ref_id=member_id,
         )
 
         return AgentResult(
-            success=True, action="execute_churn_rescue",
+            success=True,
+            action="execute_churn_rescue",
             data={"member_id": member_id, "churn_prob": churn_probability, "send_result": send_result},
             reasoning=f"流失概率 {churn_probability:.0%}，发送高强度挽留券 {rescue_offer_fen} 分",
             confidence=churn_probability,
-            constraints_passed=True, constraints_detail=constraints,
+            constraints_passed=True,
+            constraints_detail=constraints,
         )
 
     # ─── 营销健康评分 ─────────────────────────────────────────────────────────
@@ -487,7 +531,7 @@ class AiMarketingOrchestratorAgent(SkillAgent):
         store_id = params.get("store_id", "")
 
         # 评分维度（示例逻辑，生产环境读真实 DB）
-        channel_coverage = params.get("channel_count", 2) / 6 * 35       # 渠道覆盖率 35分
+        channel_coverage = params.get("channel_count", 2) / 6 * 35  # 渠道覆盖率 35分
         touch_frequency = min(params.get("monthly_touches_per_member", 0) / 4, 1) * 25  # 触达频率 25分
         content_quality = params.get("avg_open_rate", 0.08) / 0.15 * 25  # 内容质量 25分
         attribution_rate = params.get("attributed_order_pct", 0.3) * 15  # 归因率 15分
@@ -498,7 +542,8 @@ class AiMarketingOrchestratorAgent(SkillAgent):
         grade = "A" if total_score >= 80 else "B" if total_score >= 60 else "C" if total_score >= 40 else "D"
 
         return AgentResult(
-            success=True, action="get_marketing_health_score",
+            success=True,
+            action="get_marketing_health_score",
             data={
                 "store_id": store_id,
                 "total_score": total_score,
@@ -629,7 +674,7 @@ class AiMarketingOrchestratorAgent(SkillAgent):
                 },
                 reasoning=(
                     f"订单 {order_id[:8]}... 成功归因到 [{touch_row.campaign_type}] "
-                    f"渠道 [{touch_row.channel}]，归因收入 {order_amount_fen/100:.1f}元"
+                    f"渠道 [{touch_row.channel}]，归因收入 {order_amount_fen / 100:.1f}元"
                 ),
                 confidence=0.9,
             )
@@ -716,9 +761,7 @@ class AiMarketingOrchestratorAgent(SkillAgent):
                 )
             max_discount = int(avg_order_fen * (1 - margin_floor_pct))
             if discount_fen > max_discount:
-                violations.append(
-                    f"折扣 {discount_fen/100:.1f}元 超过毛利底线允许上限 {max_discount/100:.1f}元"
-                )
+                violations.append(f"折扣 {discount_fen / 100:.1f}元 超过毛利底线允许上限 {max_discount / 100:.1f}元")
 
         # 约束2: 客户体验（生产环境查询投诉记录）
         # 当前 mock 实现：始终通过
@@ -870,6 +913,7 @@ class AiMarketingOrchestratorAgent(SkillAgent):
 # 工具函数
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def _fallback_content(
     campaign_type: str,
     channels: list[str],
@@ -898,10 +942,7 @@ def _fallback_content(
         "cached": False,
         "fallback": True,
         "preview": body[:30],
-        "contents": [
-            {"channel": ch, "body": body, "subject": campaign_type, "cta": "立即前往"}
-            for ch in channels
-        ],
+        "contents": [{"channel": ch, "body": body, "subject": campaign_type, "cta": "立即前往"} for ch in channels],
     }
 
 

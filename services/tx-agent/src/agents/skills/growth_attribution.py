@@ -8,6 +8,7 @@ v088 新增：
   - get_campaign_roi           — 活动 ROI（从 campaign_summaries 读取）
   - get_attribution_report     — 租户级归因汇总报告
 """
+
 import statistics
 from typing import Any
 
@@ -97,11 +98,7 @@ class GrowthAttributionAgent(SkillAgent):
 
         # 总增长
         growth_fen = current_revenue_fen - previous_revenue_fen
-        growth_rate = (
-            round(growth_fen / max(1, previous_revenue_fen), 4)
-            if previous_revenue_fen
-            else 0
-        )
+        growth_rate = round(growth_fen / max(1, previous_revenue_fen), 4) if previous_revenue_fen else 0
 
         # 归因拆解
         attributions = {}
@@ -112,27 +109,17 @@ class GrowthAttributionAgent(SkillAgent):
             "label": "新客贡献",
             "revenue_fen": new_customer_contribution,
             "revenue_yuan": round(new_customer_contribution / 100, 2),
-            "share_pct": round(
-                new_customer_contribution / max(1, abs(growth_fen)) * 100, 1
-            )
-            if growth_fen != 0
-            else 0,
+            "share_pct": round(new_customer_contribution / max(1, abs(growth_fen)) * 100, 1) if growth_fen != 0 else 0,
         }
 
         # 复购贡献
-        repeat_contribution = repeat_revenue_fen - max(
-            0, previous_revenue_fen - new_customer_revenue_fen
-        )
+        repeat_contribution = repeat_revenue_fen - max(0, previous_revenue_fen - new_customer_revenue_fen)
         repeat_contribution = max(0, repeat_contribution)
         attributions["repeat_purchase"] = {
             "label": "复购提升",
             "revenue_fen": repeat_contribution,
             "revenue_yuan": round(repeat_contribution / 100, 2),
-            "share_pct": round(
-                repeat_contribution / max(1, abs(growth_fen)) * 100, 1
-            )
-            if growth_fen != 0
-            else 0,
+            "share_pct": round(repeat_contribution / max(1, abs(growth_fen)) * 100, 1) if growth_fen != 0 else 0,
         }
 
         # 客单提升
@@ -143,11 +130,7 @@ class GrowthAttributionAgent(SkillAgent):
             "avg_ticket_change_fen": ticket_diff,
             "revenue_fen": ticket_contribution_fen,
             "revenue_yuan": round(ticket_contribution_fen / 100, 2),
-            "share_pct": round(
-                ticket_contribution_fen / max(1, abs(growth_fen)) * 100, 1
-            )
-            if growth_fen != 0
-            else 0,
+            "share_pct": round(ticket_contribution_fen / max(1, abs(growth_fen)) * 100, 1) if growth_fen != 0 else 0,
         }
 
         # 渠道增长
@@ -196,9 +179,7 @@ class GrowthAttributionAgent(SkillAgent):
                 "growth_rate_pct": round(growth_rate * 100, 1),
                 "attributions": attributions,
                 "primary_source": primary_source,
-                "primary_source_label": GROWTH_SOURCES.get(primary_source, {}).get(
-                    "label", primary_source
-                ),
+                "primary_source_label": GROWTH_SOURCES.get(primary_source, {}).get("label", primary_source),
             },
             reasoning=(
                 f"营收{'增长' if growth_fen >= 0 else '下降'} "
@@ -225,9 +206,7 @@ class GrowthAttributionAgent(SkillAgent):
 
         # ROI计算
         if campaign_cost_fen > 0:
-            roi = round(
-                (incremental_revenue_fen - campaign_cost_fen) / campaign_cost_fen, 2
-            )
+            roi = round((incremental_revenue_fen - campaign_cost_fen) / campaign_cost_fen, 2)
         else:
             roi = 0.0
 
@@ -239,15 +218,11 @@ class GrowthAttributionAgent(SkillAgent):
                 break
 
         # 转化漏斗
-        redemption_rate = round(
-            coupons_redeemed / max(1, coupons_issued) * 100, 1
-        )
+        redemption_rate = round(coupons_redeemed / max(1, coupons_issued) * 100, 1)
         conversion_rate = round(order_count / max(1, reach_count) * 100, 1)
 
         # 获客成本
-        cac_fen = (
-            int(campaign_cost_fen / max(1, new_customers)) if new_customers else 0
-        )
+        cac_fen = int(campaign_cost_fen / max(1, new_customers)) if new_customers else 0
 
         return AgentResult(
             success=True,
@@ -303,51 +278,57 @@ class GrowthAttributionAgent(SkillAgent):
             # 识别该门店的增长/下降驱动因素
             factors = []
             if store.get("new_customer_growth_pct", 0) > 10:
-                factors.append({
-                    "factor": "new_customer",
-                    "label": "新客增长",
-                    "impact_pct": store.get("new_customer_growth_pct", 0),
-                })
+                factors.append(
+                    {
+                        "factor": "new_customer",
+                        "label": "新客增长",
+                        "impact_pct": store.get("new_customer_growth_pct", 0),
+                    }
+                )
             if store.get("repeat_rate_change_pct", 0) > 5:
-                factors.append({
-                    "factor": "repeat_rate",
-                    "label": "复购率提升",
-                    "impact_pct": store.get("repeat_rate_change_pct", 0),
-                })
+                factors.append(
+                    {
+                        "factor": "repeat_rate",
+                        "label": "复购率提升",
+                        "impact_pct": store.get("repeat_rate_change_pct", 0),
+                    }
+                )
             if store.get("avg_ticket_change_pct", 0) > 5:
-                factors.append({
-                    "factor": "ticket_size",
-                    "label": "客单价提升",
-                    "impact_pct": store.get("avg_ticket_change_pct", 0),
-                })
+                factors.append(
+                    {
+                        "factor": "ticket_size",
+                        "label": "客单价提升",
+                        "impact_pct": store.get("avg_ticket_change_pct", 0),
+                    }
+                )
             if store.get("campaign_contribution_pct", 0) > 10:
-                factors.append({
-                    "factor": "campaign",
-                    "label": "营销活动",
-                    "impact_pct": store.get("campaign_contribution_pct", 0),
-                })
+                factors.append(
+                    {
+                        "factor": "campaign",
+                        "label": "营销活动",
+                        "impact_pct": store.get("campaign_contribution_pct", 0),
+                    }
+                )
             if store.get("seasonal_impact_pct", 0) > 10:
-                factors.append({
-                    "factor": "seasonal",
-                    "label": "季节效应",
-                    "impact_pct": store.get("seasonal_impact_pct", 0),
-                })
+                factors.append(
+                    {
+                        "factor": "seasonal",
+                        "label": "季节效应",
+                        "impact_pct": store.get("seasonal_impact_pct", 0),
+                    }
+                )
 
             if factors:
-                drivers.append({
-                    "store_id": store_id,
-                    "store_name": store.get("store_name", ""),
-                    "growth_fen": growth_fen,
-                    "growth_yuan": round(growth_fen / 100, 2),
-                    "drivers": sorted(
-                        factors, key=lambda x: x["impact_pct"], reverse=True
-                    ),
-                    "primary_driver": max(factors, key=lambda x: x["impact_pct"])[
-                        "label"
-                    ]
-                    if factors
-                    else "未知",
-                })
+                drivers.append(
+                    {
+                        "store_id": store_id,
+                        "store_name": store.get("store_name", ""),
+                        "growth_fen": growth_fen,
+                        "growth_yuan": round(growth_fen / 100, 2),
+                        "drivers": sorted(factors, key=lambda x: x["impact_pct"], reverse=True),
+                        "primary_driver": max(factors, key=lambda x: x["impact_pct"])["label"] if factors else "未知",
+                    }
+                )
 
         # 全局驱动因素统计
         driver_freq: dict[str, int] = {}
@@ -367,9 +348,7 @@ class GrowthAttributionAgent(SkillAgent):
                 "growing_stores": growing_stores,
                 "declining_stores": declining_stores,
                 "store_drivers": drivers,
-                "top_drivers": [
-                    {"driver": d[0], "store_count": d[1]} for d in top_drivers[:5]
-                ],
+                "top_drivers": [{"driver": d[0], "store_count": d[1]} for d in top_drivers[:5]],
             },
             reasoning=(
                 f"分析 {len(stores_data)} 家门店：增长 {growing_stores} 家、"
@@ -397,9 +376,7 @@ class GrowthAttributionAgent(SkillAgent):
         x_mean = (n - 1) / 2
         y_mean = statistics.mean(historical_revenue)
 
-        numerator = sum(
-            (i - x_mean) * (y - y_mean) for i, y in enumerate(historical_revenue)
-        )
+        numerator = sum((i - x_mean) * (y - y_mean) for i, y in enumerate(historical_revenue))
         denominator = sum((i - x_mean) ** 2 for i in range(n))
 
         slope = numerator / max(1, denominator)
@@ -410,11 +387,13 @@ class GrowthAttributionAgent(SkillAgent):
         for m in range(1, months + 1):
             predicted = int(slope * (n - 1 + m) + intercept)
             predicted = max(0, predicted)  # 收入不能为负
-            predictions.append({
-                "month_offset": m,
-                "predicted_revenue_fen": predicted,
-                "predicted_revenue_yuan": round(predicted / 100, 2),
-            })
+            predictions.append(
+                {
+                    "month_offset": m,
+                    "predicted_revenue_fen": predicted,
+                    "predicted_revenue_yuan": round(predicted / 100, 2),
+                }
+            )
 
         # 增长趋势判断
         if slope > 0:
@@ -431,10 +410,7 @@ class GrowthAttributionAgent(SkillAgent):
 
         # 置信度基于数据波动性
         if n >= 6:
-            residuals = [
-                abs(y - (slope * i + intercept))
-                for i, y in enumerate(historical_revenue)
-            ]
+            residuals = [abs(y - (slope * i + intercept)) for i, y in enumerate(historical_revenue)]
             avg_residual = statistics.mean(residuals)
             fit_quality = max(0.3, 1.0 - avg_residual / max(1, y_mean))
         else:
@@ -455,9 +431,7 @@ class GrowthAttributionAgent(SkillAgent):
                 "avg_revenue_yuan": round(y_mean / 100, 2),
             },
             reasoning=(
-                f"门店营收趋势: {trend_label}，"
-                f"月均增长率 {monthly_growth_rate:.1%}，"
-                f"预测未来 {months} 个月营收走势"
+                f"门店营收趋势: {trend_label}，月均增长率 {monthly_growth_rate:.1%}，预测未来 {months} 个月营收走势"
             ),
             confidence=round(fit_quality, 2),
         )
@@ -640,28 +614,16 @@ class GrowthAttributionAgent(SkillAgent):
         total_orders = sum(c.get("orders_attributed", 0) for c in campaigns)
         total_reservations = sum(c.get("reservations_attributed", 0) for c in campaigns)
 
-        overall_conversion_rate = round(
-            (total_orders + total_reservations) / max(1, total_touches), 4
-        )
+        overall_conversion_rate = round((total_orders + total_reservations) / max(1, total_touches), 4)
 
         # Top 活动（按归因收入）
-        top_campaigns = sorted(
-            campaigns, key=lambda x: x.get("revenue_attributed", 0), reverse=True
-        )[:5]
+        top_campaigns = sorted(campaigns, key=lambda x: x.get("revenue_attributed", 0), reverse=True)[:5]
 
         # 最佳渠道
-        best_channel = (
-            max(channel_perf, key=lambda x: x.get("conversion_rate", 0))
-            if channel_perf
-            else None
-        )
+        best_channel = max(channel_perf, key=lambda x: x.get("conversion_rate", 0)) if channel_perf else None
 
         # 最佳人群
-        best_segment = (
-            max(segment_perf, key=lambda x: x.get("conversion_rate", 0))
-            if segment_perf
-            else None
-        )
+        best_segment = max(segment_perf, key=lambda x: x.get("conversion_rate", 0)) if segment_perf else None
 
         return AgentResult(
             success=True,

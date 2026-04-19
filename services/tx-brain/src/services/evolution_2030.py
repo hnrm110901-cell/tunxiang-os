@@ -6,6 +6,7 @@
 3. Multi-currency — 国际化预留（CNY/HKD/SGD/USD）
 4. Agent Level Registry — 放权追踪（Level 0-3 自主等级）
 """
+
 from __future__ import annotations
 
 import time
@@ -74,12 +75,12 @@ STORE_TYPE_FEATURES: dict[str, dict[str, bool]] = {
 
 EXCHANGE_RATES: dict[str, float] = {
     "CNY": 1.0,
-    "HKD": 1.0806,    # 1 CNY = 1.0806 HKD
-    "SGD": 0.1867,    # 1 CNY = 0.1867 SGD
-    "USD": 0.1389,    # 1 CNY = 0.1389 USD
-    "JPY": 21.41,     # 1 CNY = 21.41 JPY
-    "THB": 4.861,     # 1 CNY = 4.861 THB
-    "MYR": 0.6234,    # 1 CNY = 0.6234 MYR
+    "HKD": 1.0806,  # 1 CNY = 1.0806 HKD
+    "SGD": 0.1867,  # 1 CNY = 0.1867 SGD
+    "USD": 0.1389,  # 1 CNY = 0.1389 USD
+    "JPY": 21.41,  # 1 CNY = 21.41 JPY
+    "THB": 4.861,  # 1 CNY = 4.861 THB
+    "MYR": 0.6234,  # 1 CNY = 0.6234 MYR
 }
 
 # ─── Agent自主等级定义 ──────────────────────────────────────────────
@@ -136,9 +137,7 @@ class Evolution2030Service:
             "total_features": len(features),
         }
 
-    def set_feature_flag(
-        self, store_id: str, feature: str, enabled: bool
-    ) -> dict[str, Any]:
+    def set_feature_flag(self, store_id: str, feature: str, enabled: bool) -> dict[str, Any]:
         """设置门店功能标志。
 
         Args:
@@ -150,9 +149,7 @@ class Evolution2030Service:
             {ok, store_id, feature, enabled, previous}
         """
         if store_id not in self._store_features:
-            self._store_features[store_id] = dict(
-                STORE_TYPE_FEATURES.get("大店Pro", {})
-            )
+            self._store_features[store_id] = dict(STORE_TYPE_FEATURES.get("大店Pro", {}))
 
         previous = self._store_features[store_id].get(feature)
         self._store_features[store_id][feature] = enabled
@@ -173,9 +170,7 @@ class Evolution2030Service:
             "previous": previous,
         }
 
-    def init_store_by_type(
-        self, store_id: str, store_type: str
-    ) -> dict[str, Any]:
+    def init_store_by_type(self, store_id: str, store_type: str) -> dict[str, Any]:
         """按业态初始化门店功能集。
 
         Args:
@@ -207,10 +202,7 @@ class Evolution2030Service:
         best_score = -1
 
         for stype, template in STORE_TYPE_FEATURES.items():
-            score = sum(
-                1 for k, v in template.items()
-                if features.get(k) == v
-            )
+            score = sum(1 for k, v in template.items() if features.get(k) == v)
             if score > best_score:
                 best_score = score
                 best_match = stype
@@ -249,9 +241,7 @@ class Evolution2030Service:
 
         return config
 
-    def set_region_policy(
-        self, region_id: str, policy: dict[str, Any]
-    ) -> dict[str, Any]:
+    def set_region_policy(self, region_id: str, policy: dict[str, Any]) -> dict[str, Any]:
         """设置区域策略。
 
         Args:
@@ -361,9 +351,7 @@ class Evolution2030Service:
             "description": level_info["description"],
         }
 
-    def set_agent_level(
-        self, agent_id: str, level: int, reason: str = ""
-    ) -> dict[str, Any]:
+    def set_agent_level(self, agent_id: str, level: int, reason: str = "") -> dict[str, Any]:
         """设置Agent自主等级（含历史记录）。
 
         Args:
@@ -387,13 +375,15 @@ class Evolution2030Service:
         if agent_id not in self._agent_level_history:
             self._agent_level_history[agent_id] = []
 
-        self._agent_level_history[agent_id].append({
-            "timestamp": time.time(),
-            "previous_level": previous,
-            "new_level": level,
-            "reason": reason,
-            "change_id": f"ALC-{uuid.uuid4().hex[:8].upper()}",
-        })
+        self._agent_level_history[agent_id].append(
+            {
+                "timestamp": time.time(),
+                "previous_level": previous,
+                "new_level": level,
+                "reason": reason,
+                "change_id": f"ALC-{uuid.uuid4().hex[:8].upper()}",
+            }
+        )
 
         logger.info(
             "agent_level_changed",
@@ -444,9 +434,7 @@ class Evolution2030Service:
             total_features_enabled += sum(1 for v in store_features.values() if v)
             total_features_possible += len(store_features)
         feature_coverage = (
-            _safe_ratio(total_features_enabled, total_features_possible)
-            if total_features_possible > 0
-            else 0.5
+            _safe_ratio(total_features_enabled, total_features_possible) if total_features_possible > 0 else 0.5
         )
         feature_score = round(feature_coverage * 20, 1)
 

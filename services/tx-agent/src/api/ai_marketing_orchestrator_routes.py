@@ -8,6 +8,7 @@
 
 所有接口需要 X-Tenant-ID 请求头。
 """
+
 from __future__ import annotations
 
 import uuid
@@ -33,18 +34,21 @@ async def _get_db(
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
 ):
     from shared.ontology.src.database import get_db_with_tenant
+
     async for session in get_db_with_tenant(x_tenant_id):
         yield session
 
 
 def _get_agent(tenant_id: str, store_id: Optional[str] = None) -> Any:
     from ..agents.skills.ai_marketing_orchestrator import AiMarketingOrchestratorAgent
+
     return AiMarketingOrchestratorAgent(tenant_id=tenant_id, store_id=store_id)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 请求模型
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class TriggerBody(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -77,6 +81,7 @@ class AttributeOrderBody(BaseModel):
 # ─────────────────────────────────────────────────────────────────────────────
 # 路由
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @router.post("/trigger")
 async def trigger_marketing_action(
@@ -283,6 +288,7 @@ async def attribute_order_to_touch(
     - 手动归因修正
     """
     from ..agents.skills.ai_marketing_orchestrator import AiMarketingOrchestratorAgent
+
     agent = AiMarketingOrchestratorAgent(
         tenant_id=tenant_id,
         store_id=body.store_id,
