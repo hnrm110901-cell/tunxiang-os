@@ -4,6 +4,47 @@
 
 ---
 
+## 2026-04-19 PR-W2.E：session.get() Oracle 攻击修复（显式 tenant 过滤）
+
+### 本次会话目标
+Wave 2 Batch 1 第 3 个 PR。响应 §19 安全 P1-1 风险：`session.get(FinancialVoucher, voucher_id)` PK 直查依赖 RLS，攻击者通过错误消息差异（"不存在" vs "已作废"）可探测跨租户 UUID 存在性。
+
+Tier 级别：🔴 **Tier 1**（安全 / RLS 加固）。
+
+### 修复（~40 行，新 helper + 2 方法调用切换）
+- 新增 `_load_voucher_tenant_scoped(session, voucher_id, tenant_id)`：
+  - `tenant_id` 显式传入：`SELECT WHERE id AND tenant_id`，明确过滤
+  - `tenant_id=None`（向前兼容）：降级 `session.get(PK)` + RLS 兜底
+  - 统一错误消息 `"凭证不存在或无权限: {voucher_id}"`（防 Oracle 攻击）
+- `void()` / `red_flush()` 签名加可选 `tenant_id: uuid.UUID | None`
+- `void()` 和 `red_flush()` 内部 `session.get()` 换成 `_load_voucher_tenant_scoped`
+
+### 完成状态
+- [x] 实现（service）：`_load_voucher_tenant_scoped` helper + void/red_flush 切换
+- [x] **向前兼容**：`tenant_id=None` 时降级 `session.get`，W1 现有调用方不破
+- [x] 5 新测试 `TestW2ETenantScopedLoad`:
+  - 显式 tenant → 走 select WHERE
+  - 跨租户 / 不存在 → 统一消息 `"凭证不存在或无权限"`
+  - 不传 tenant → 降级 session.get
+  - red_flush 同路径
+  - red_flush 跨租户统一消息
+- [x] 全回归：W1 214 + B 12 + W2.B 8 + W2.C 1 + W2.E 5 = **240 passed / 0.64s**
+
+### 关键决策
+- **`tenant_id` 可选而非必填** — 向前兼容 W1 所有调用方。推荐生产路由层统一传入，逐步迁移。
+- **消息统一为 "凭证不存在或无权限"** — 不区分"不存在 / 已作废 / 跨租户"，Oracle 攻击面堵死。
+- **不强制 SELECT WHERE** — `tenant_id=None` 降级路径让 B1-B5 现有测试（都不传 tenant_id）天然过，减少测试重构成本。
+
+### 已知风险
+- **W1 调用方未升级前仍用 session.get 路径**：只有 RLS 兜底，session.get 若 RLS 未 SET 会返 None → `ValueError("不存在或无权限")`。不是漏洞但消息改变。
+- **错误消息变化**：`"凭证不存在: {id}"` → `"凭证不存在或无权限: {id}"`。调用方 `except ValueError` 后 `match` 字符串的逻辑可能需要调整（但本 repo 里没这种 pattern）。
+
+### 下一步
+- W2.G: `erp_push_log` 补 RLS（v274 迁移，Wave 2 首个迁移 PR）
+- W2.D: 红冲 UNIQUE 升级（v276 迁移）
+
+---
+
 ## 2026-04-19 PR-W2.C：ensure_period SAVEPOINT 隔离（不破坏外层事务）
 
 ### 本次会话目标
