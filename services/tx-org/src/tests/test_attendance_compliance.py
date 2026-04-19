@@ -11,6 +11,7 @@
 
 使用 AsyncMock 模拟 AsyncSession，无真实 DB 依赖。
 """
+
 from __future__ import annotations
 
 import os
@@ -56,8 +57,7 @@ def _make_db() -> AsyncMock:
     return db
 
 
-def _mk_result(rows: list[dict] | None = None, first: dict | None = None,
-               scalar_value=None) -> MagicMock:
+def _mk_result(rows: list[dict] | None = None, first: dict | None = None, scalar_value=None) -> MagicMock:
     """构造 SQLAlchemy Result mock"""
     result = MagicMock()
     mappings = MagicMock()
@@ -147,8 +147,11 @@ def test_shift_bounds_cross_midnight():
 def test_compliance_rules_keys():
     """5 条合规规则存在"""
     for k in (
-        "overtime_weekly_limit", "overtime_daily_limit",
-        "rest_between_shifts", "consecutive_work_days", "minor_worker_hours",
+        "overtime_weekly_limit",
+        "overtime_daily_limit",
+        "rest_between_shifts",
+        "consecutive_work_days",
+        "minor_worker_hours",
     ):
         assert k in COMPLIANCE_RULES
 
@@ -220,7 +223,11 @@ async def test_check_same_device_no_conflict():
     db = _make_db()
     db.execute.side_effect = [MagicMock(), _mk_result(rows=[])]
     out = await check_same_device(
-        db, TENANT_ID, EMP_ID, "dev-fp-001", "2026-04-01T09:00:00Z",
+        db,
+        TENANT_ID,
+        EMP_ID,
+        "dev-fp-001",
+        "2026-04-01T09:00:00Z",
     )
     assert out["is_suspicious"] is False
 
@@ -235,7 +242,11 @@ async def test_check_same_device_conflict_found():
     ]
     db.execute.side_effect = [MagicMock(), _mk_result(rows=conflict_rows)]
     out = await check_same_device(
-        db, TENANT_ID, EMP_ID, "dev-fp-001", "2026-04-01T09:00:00Z",
+        db,
+        TENANT_ID,
+        EMP_ID,
+        "dev-fp-001",
+        "2026-04-01T09:00:00Z",
     )
     assert out["is_suspicious"] is True
     assert len(out["same_device_clocks"]) == 1
@@ -266,8 +277,10 @@ async def test_check_overtime_weekly_exceed():
     ]
     name_rows = [{"employee_id": EMP_ID, "emp_name": "张三", "birth_date": date(1990, 1, 1)}]
     db.execute.side_effect = [
-        MagicMock(), _mk_result(rows=weekly_rows),
-        _mk_result(rows=daily_rows), _mk_result(rows=name_rows),
+        MagicMock(),
+        _mk_result(rows=weekly_rows),
+        _mk_result(rows=daily_rows),
+        _mk_result(rows=name_rows),
     ]
     out = await check_overtime_compliance(db, TENANT_ID, STORE_ID, "2026-03-30")
     assert len(out) >= 1
@@ -287,8 +300,10 @@ async def test_check_overtime_minor_worker():
     # 17 岁（2008 年出生，2026 年时 17 岁）
     name_rows = [{"employee_id": EMP_ID, "emp_name": "小明", "birth_date": date(2008, 12, 1)}]
     db.execute.side_effect = [
-        MagicMock(), _mk_result(rows=weekly_rows),
-        _mk_result(rows=daily_rows), _mk_result(rows=name_rows),
+        MagicMock(),
+        _mk_result(rows=weekly_rows),
+        _mk_result(rows=daily_rows),
+        _mk_result(rows=name_rows),
     ]
     out = await check_overtime_compliance(db, TENANT_ID, STORE_ID, "2026-03-30")
     minor_violations = [v for v in out if "未成年" in v["rule"]]
@@ -306,17 +321,23 @@ async def test_check_rest_sufficient_no_violation():
     db = _make_db()
     schedule_rows = [
         {
-            "employee_id": EMP_ID, "work_date": date(2026, 3, 31),
-            "shift_start_time": time(9, 0), "shift_end_time": time(18, 0),
+            "employee_id": EMP_ID,
+            "work_date": date(2026, 3, 31),
+            "shift_start_time": time(9, 0),
+            "shift_end_time": time(18, 0),
         },
         {
-            "employee_id": EMP_ID, "work_date": date(2026, 4, 1),
-            "shift_start_time": time(9, 0), "shift_end_time": time(18, 0),
+            "employee_id": EMP_ID,
+            "work_date": date(2026, 4, 1),
+            "shift_start_time": time(9, 0),
+            "shift_end_time": time(18, 0),
         },
     ]
     name_rows = [{"employee_id": EMP_ID, "emp_name": "张三"}]
     db.execute.side_effect = [
-        MagicMock(), _mk_result(rows=schedule_rows), _mk_result(rows=name_rows),
+        MagicMock(),
+        _mk_result(rows=schedule_rows),
+        _mk_result(rows=name_rows),
     ]
     out = await check_rest_compliance(db, TENANT_ID, STORE_ID, "2026-04-01")
     assert out == []
@@ -329,17 +350,23 @@ async def test_check_rest_insufficient_violation():
     # 前一天 18-22, 次日 6:00 上班 -> 间隔仅 8 小时
     schedule_rows = [
         {
-            "employee_id": EMP_ID, "work_date": date(2026, 3, 31),
-            "shift_start_time": time(18, 0), "shift_end_time": time(22, 0),
+            "employee_id": EMP_ID,
+            "work_date": date(2026, 3, 31),
+            "shift_start_time": time(18, 0),
+            "shift_end_time": time(22, 0),
         },
         {
-            "employee_id": EMP_ID, "work_date": date(2026, 4, 1),
-            "shift_start_time": time(6, 0), "shift_end_time": time(14, 0),
+            "employee_id": EMP_ID,
+            "work_date": date(2026, 4, 1),
+            "shift_start_time": time(6, 0),
+            "shift_end_time": time(14, 0),
         },
     ]
     name_rows = [{"employee_id": EMP_ID, "emp_name": "张三"}]
     db.execute.side_effect = [
-        MagicMock(), _mk_result(rows=schedule_rows), _mk_result(rows=name_rows),
+        MagicMock(),
+        _mk_result(rows=schedule_rows),
+        _mk_result(rows=name_rows),
     ]
     out = await check_rest_compliance(db, TENANT_ID, STORE_ID, "2026-04-01")
     assert len(out) == 1

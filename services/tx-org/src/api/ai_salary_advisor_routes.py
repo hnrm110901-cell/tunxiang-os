@@ -20,7 +20,6 @@ from typing import Any, List, Optional
 import structlog
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, ConfigDict, Field, field_validator
-
 from services.ai_salary_advisor_service import (
     batch_recommend,
     get_region_factors_catalog,
@@ -194,13 +193,15 @@ async def get_seniority() -> dict:
 async def health() -> dict:
     """模块健康检查 (用于 K8s liveness probe)。"""
 
-    return _ok({
-        "module": "ai_salary_advisor",
-        "version": "v257",
-        "status": "ok",
-        "features": {
-            "deterministic_recommendation": True,
-            "batch_budget_check": True,
-            "llm_enhanced_reasoning": False,  # Phase2 启用
-        },
-    })
+    return _ok(
+        {
+            "module": "ai_salary_advisor",
+            "version": "v257",
+            "status": "ok",
+            "features": {
+                "deterministic_recommendation": True,
+                "batch_budget_check": True,
+                "llm_enhanced_reasoning": False,  # Phase2 启用
+            },
+        }
+    )

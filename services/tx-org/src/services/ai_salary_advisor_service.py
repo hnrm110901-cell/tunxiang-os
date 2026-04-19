@@ -21,10 +21,9 @@ AI 薪资项目推荐服务 -- 餐饮连锁行业智能薪酬建议（v257）
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
-from typing import Any, Dict, List, Literal, Optional
+from typing import Any, Dict, List, Optional
 
 import structlog
-
 from services.labor_efficiency_service import INDUSTRY_BENCHMARKS
 from services.salary_item_library import SalaryItem, get_item_by_code
 
@@ -74,7 +73,7 @@ ROLE_TIERS: Dict[str, Dict[str, Any]] = {
         "label": "门店管理岗",
         "base_salary_fen_baseline": 8_000_00,  # 8000元
         "position_bonus_fen": 2_000_00,
-        "commission_pct": 0.010,           # 营收分成比例较低但基数大
+        "commission_pct": 0.010,  # 营收分成比例较低但基数大
         "performance_bonus_pct": 0.15,
         "roles": ["店长", "副店长", "营运经理"],
     },
@@ -82,7 +81,7 @@ ROLE_TIERS: Dict[str, Dict[str, Any]] = {
         "label": "区域管理岗",
         "base_salary_fen_baseline": 15_000_00,  # 15000元 (tier2 基准)
         "position_bonus_fen": 3_000_00,
-        "commission_pct": 0.003,             # 多店分成比例
+        "commission_pct": 0.003,  # 多店分成比例
         "performance_bonus_pct": 0.20,
         # 注意:"督导" 专属 L4_supervisor,此档仅限纯区域/片区管理岗,
         # 避免与 L4 语义冲突(参见 code-review 审计 BLOCKER-2)。
@@ -129,11 +128,11 @@ REGION_FACTORS: Dict[str, Dict[str, Any]] = {
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 SENIORITY_CURVE: List[Dict[str, Any]] = [
-    {"years_min": 0, "years_max": 1,  "factor": 1.00, "label": "新员工"},
-    {"years_min": 1, "years_max": 3,  "factor": 1.10, "label": "熟练"},
-    {"years_min": 3, "years_max": 5,  "factor": 1.20, "label": "骨干"},
+    {"years_min": 0, "years_max": 1, "factor": 1.00, "label": "新员工"},
+    {"years_min": 1, "years_max": 3, "factor": 1.10, "label": "熟练"},
+    {"years_min": 3, "years_max": 5, "factor": 1.20, "label": "骨干"},
     {"years_min": 5, "years_max": 10, "factor": 1.30, "label": "资深"},
-    {"years_min": 10, "years_max": 99,"factor": 1.40, "label": "元老"},  # 上限 1.40x
+    {"years_min": 10, "years_max": 99, "factor": 1.40, "label": "元老"},  # 上限 1.40x
 ]
 
 
@@ -209,8 +208,7 @@ def get_role_tier(role: str) -> tuple[str, Dict[str, Any], str]:
         tier_info = ROLE_TIERS[tier_code]
         for known_role in tier_info["roles"]:
             if known_role in normalized or normalized in known_role:
-                logger.info("ai_salary_advisor.fuzzy_match",
-                            input_role=normalized, matched=known_role, tier=tier_code)
+                logger.info("ai_salary_advisor.fuzzy_match", input_role=normalized, matched=known_role, tier=tier_code)
                 return tier_code, tier_info, "fuzzy"
 
     logger.warning("ai_salary_advisor.role_unknown_fallback_L1", role=normalized)
@@ -321,29 +319,35 @@ def _compose_salary_items(
     # 注意:切勿使用 SUB_006,该编码在 salary_item_library 中是"夜班补贴"。
     # 通过 _build_item 走库查名,确保台账字段一致,防止数据污染。
     if seniority_subsidy_fen > 0:
-        items.append(_build_item(
-            "SUB_001",
-            seniority_subsidy_fen,
-            "每满 1 年 50 元,10 年封顶",
-        ))
+        items.append(
+            _build_item(
+                "SUB_001",
+                seniority_subsidy_fen,
+                "每满 1 年 50 元,10 年封顶",
+            )
+        )
     # 提成类 COM_001 (按比例,实际发放需结合营收)
     if commission_pct > 0:
-        items.append({
-            "item_code": "COM_001",
-            "item_name": "营业额提成",
-            "amount_fen": 0,  # 按实际营收计算,此处占位
-            "note": f"建议比例 {commission_pct*100:.1f}% (按门店营业额计)",
-        })
+        items.append(
+            {
+                "item_code": "COM_001",
+                "item_name": "营业额提成",
+                "amount_fen": 0,  # 按实际营收计算,此处占位
+                "note": f"建议比例 {commission_pct * 100:.1f}% (按门店营业额计)",
+            }
+        )
     # 绩效奖金 PERF_001 (按比例,按季度/月度考核发放)
     if performance_bonus_pct > 0:
         gross_base = base_salary_fen + position_bonus_fen
         perf_budget = int(round(gross_base * performance_bonus_pct))
-        items.append({
-            "item_code": "PERF_001",
-            "item_name": "绩效奖金",
-            "amount_fen": perf_budget,
-            "note": f"基数 {gross_base} 分 × 比例 {performance_bonus_pct*100:.0f}%",
-        })
+        items.append(
+            {
+                "item_code": "PERF_001",
+                "item_name": "绩效奖金",
+                "amount_fen": perf_budget,
+                "note": f"基数 {gross_base} 分 × 比例 {performance_bonus_pct * 100:.0f}%",
+            }
+        )
 
     return items
 
@@ -404,7 +408,7 @@ def _generate_reasoning(
 
     fen_to_yuan = f"{estimated_total_fen / 100:.2f}"
     return (
-        f"岗位「{role}」归入 {tier_info['label']} ({tier_info['base_salary_fen_baseline']/100:.0f}元基准) | "
+        f"岗位「{role}」归入 {tier_info['label']} ({tier_info['base_salary_fen_baseline'] / 100:.0f}元基准) | "
         f"区域「{region_label}」应用系数 {region_factor:.2f}× | "
         f"工龄 {seniority_label} 系数 {seniority_factor:.2f}× | "
         f"综合推荐月薪约 {fen_to_yuan} 元 (不含营收提成,按行业基准估算)"
@@ -468,7 +472,8 @@ def recommend_salary_structure(
     within_budget: Optional[bool] = None
     if store_monthly_revenue_fen is not None and store_monthly_revenue_fen > 0:
         ratio_estimated, within_budget = estimate_labor_cost_ratio(
-            total_gross_fen, store_monthly_revenue_fen,
+            total_gross_fen,
+            store_monthly_revenue_fen,
         )
 
     # 置信度:精确命中 0.90 / 模糊命中 0.75 / 完全未知回落 0.60
@@ -513,9 +518,13 @@ def recommend_salary_structure(
 
     logger.info(
         "ai_salary_advisor.recommend",
-        role=role, tier=tier_code, region=region_code,
-        years=years_of_service, total_fen=total_gross_fen,
-        within_budget=within_budget, confidence=confidence,
+        role=role,
+        tier=tier_code,
+        region=region_code,
+        years=years_of_service,
+        total_fen=total_gross_fen,
+        within_budget=within_budget,
+        confidence=confidence,
     )
 
     return rec
@@ -572,7 +581,9 @@ def batch_recommend(
         except (ValueError, TypeError) as e:
             logger.warning(
                 "ai_salary_advisor.batch_skip_bad_record",
-                index=idx, emp=emp, error=str(e),
+                index=idx,
+                emp=emp,
+                error=str(e),
             )
             skipped.append({"index": idx, "input": dict(emp), "error": str(e)})
             continue
@@ -609,7 +620,7 @@ def batch_recommend(
                 summary["suggested_adjustment"] = {
                     "action": "reduce",
                     "pct": suggested_cut_pct,
-                    "note": f"建议整体下调 {suggested_cut_pct}% 以回归目标 {target*100:.0f}%",
+                    "note": f"建议整体下调 {suggested_cut_pct}% 以回归目标 {target * 100:.0f}%",
                 }
             else:
                 # 分母用 benchmark min 而非 ratio 本身,避免极小 ratio 导致百分比虚高后被硬 clamp。
@@ -625,7 +636,8 @@ def batch_recommend(
 
     logger.info(
         "ai_salary_advisor.batch_done",
-        headcount=len(recs), total_fen=total_gross_fen,
+        headcount=len(recs),
+        total_fen=total_gross_fen,
         ratio=summary.get("labor_cost_ratio"),
     )
 

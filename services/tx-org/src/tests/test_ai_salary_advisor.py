@@ -16,7 +16,6 @@ import sys
 # 确保 src 目录在 import path 中
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-import pytest
 
 from services.ai_salary_advisor_service import (
     REGION_FACTORS,
@@ -35,7 +34,6 @@ from services.ai_salary_advisor_service import (
     get_seniority_factor,
     recommend_salary_structure,
 )
-
 
 # ── 岗位分档 ─────────────────────────────────────────────────────
 
@@ -206,10 +204,10 @@ def test_base_salary_unknown_tier_fallback():
 
 def test_seniority_subsidy_linear_curve():
     assert compute_seniority_subsidy_fen(0) == 0
-    assert compute_seniority_subsidy_fen(1) == 50_00   # 50元
+    assert compute_seniority_subsidy_fen(1) == 50_00  # 50元
     assert compute_seniority_subsidy_fen(5) == 250_00  # 250元
-    assert compute_seniority_subsidy_fen(10) == 500_00 # 500元 封顶
-    assert compute_seniority_subsidy_fen(20) == 500_00 # 超限仍 500
+    assert compute_seniority_subsidy_fen(10) == 500_00  # 500元 封顶
+    assert compute_seniority_subsidy_fen(20) == 500_00  # 超限仍 500
 
 
 # ── 完整推荐流程 ─────────────────────────────────────────────────
@@ -242,7 +240,9 @@ def test_recommend_store_manager_with_seniority():
 def test_recommend_with_budget_check_below_lower_bound():
     """推荐低价岗位 + 高营收 —— 占比应低于行业 20% 下限,within_budget=False"""
     rec = recommend_salary_structure(
-        role="服务员", region="tier2", years_of_service=0,
+        role="服务员",
+        region="tier2",
+        years_of_service=0,
         store_monthly_revenue_fen=50_000_00,  # 5万元营收
     )
     assert rec.labor_cost_ratio_estimated is not None
@@ -254,7 +254,9 @@ def test_recommend_with_budget_check_below_lower_bound():
 def test_recommend_with_budget_check_over():
     """推荐一个高价岗位,配合低营收门店,应超预算"""
     rec = recommend_salary_structure(
-        role="店长", region="tier1", years_of_service=10,
+        role="店长",
+        region="tier1",
+        years_of_service=10,
         store_monthly_revenue_fen=30_000_00,  # 3 万元营收 (极低)
     )
     assert rec.labor_cost_ratio_estimated is not None
@@ -364,9 +366,9 @@ def test_batch_recommend_dirty_data_isolated_not_fatal():
     employees = [
         {"role": "服务员", "region": "tier2", "years": 0},
         {"role": "厨师", "region": "tier2", "years": "bad_string"},  # 脏 years
-        {"role": "店长", "region": "tier2", "years": -5},            # 脏负数
-        {"role": "厨师长", "region": "tier2", "years": 100},          # 越界
-        {"role": "主管", "region": "tier2", "years": 2},             # 正常
+        {"role": "店长", "region": "tier2", "years": -5},  # 脏负数
+        {"role": "厨师长", "region": "tier2", "years": 100},  # 越界
+        {"role": "主管", "region": "tier2", "years": 2},  # 正常
     ]
     result = batch_recommend(employees=employees)
     # 2 条成功(服务员 0 / 主管 2),3 条 skipped(bad_string / -5 / 100)
@@ -484,6 +486,7 @@ def test_seniority_curve_monotonic():
 
 def test_recommendation_to_dict_is_json_serializable():
     import json
+
     rec = recommend_salary_structure(role="服务员", region="tier2", years_of_service=0)
     d = rec.to_dict()
     # to_dict 应返回纯 dict (dataclass asdict)

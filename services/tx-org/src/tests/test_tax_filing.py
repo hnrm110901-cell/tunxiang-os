@@ -10,6 +10,7 @@
 
 通过 AsyncMock 模拟 AsyncSession + monkeypatch 替换 _sdk，无真实 DB 依赖。
 """
+
 from __future__ import annotations
 
 import os
@@ -22,7 +23,6 @@ from uuid import uuid4
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 import pytest
-from services import tax_filing_service as tfs
 from services.tax_filing_service import (
     TAX_FILING_STATUS,
     _iso_utc,
@@ -36,6 +36,8 @@ from services.tax_filing_service import (
     retry_filing,
     submit_to_tax_bureau,
 )
+
+from services import tax_filing_service as tfs
 
 TENANT_ID = str(uuid4())
 STORE_ID = str(uuid4())
@@ -145,23 +147,31 @@ async def test_generate_tax_declaration_success():
     # 一条 payroll：gross=10000 net=7000 social=2000 hf=500 => tax = 500
     payroll_rows = [
         {
-            "employee_id": uuid4(), "emp_name": "张三", "id_card_no": "110101199001011234",
-            "gross_salary_fen": 10000, "month_tax_fen": 500,
-            "cum_gross_fen": 10000, "cum_tax_fen": 500,
+            "employee_id": uuid4(),
+            "emp_name": "张三",
+            "id_card_no": "110101199001011234",
+            "gross_salary_fen": 10000,
+            "month_tax_fen": 500,
+            "cum_gross_fen": 10000,
+            "cum_tax_fen": 500,
         },
         {
-            "employee_id": uuid4(), "emp_name": "李四", "id_card_no": "110101199202022345",
-            "gross_salary_fen": 20000, "month_tax_fen": 1500,
-            "cum_gross_fen": 20000, "cum_tax_fen": 1500,
+            "employee_id": uuid4(),
+            "emp_name": "李四",
+            "id_card_no": "110101199202022345",
+            "gross_salary_fen": 20000,
+            "month_tax_fen": 1500,
+            "cum_gross_fen": 20000,
+            "cum_tax_fen": 1500,
         },
     ]
     insert_result = MagicMock()
     insert_result.scalar_one = MagicMock(return_value=DECL_ID)
     db.execute.side_effect = [
-        MagicMock(),                                # set_config
-        _mk_result(one_or_none=store_row),          # 查门店
-        _mk_result(all_rows=payroll_rows),          # 查 payroll
-        insert_result,                              # INSERT RETURNING id
+        MagicMock(),  # set_config
+        _mk_result(one_or_none=store_row),  # 查门店
+        _mk_result(all_rows=payroll_rows),  # 查 payroll
+        insert_result,  # INSERT RETURNING id
     ]
     out = await generate_tax_declaration(db, TENANT_ID, STORE_ID, "2026-04")
     assert out["declaration_id"] == DECL_ID
@@ -212,10 +222,12 @@ async def test_submit_success(monkeypatch):
 
     # Mock SDK
     fake_sdk_result = {
-        "status": "accepted", "task_id": "T12345", "accepted_count": 1, "rejected": [],
+        "status": "accepted",
+        "task_id": "T12345",
+        "accepted_count": 1,
+        "rejected": [],
     }
-    monkeypatch.setattr(tfs._sdk, "submit_monthly_declaration",
-                        AsyncMock(return_value=fake_sdk_result))
+    monkeypatch.setattr(tfs._sdk, "submit_monthly_declaration", AsyncMock(return_value=fake_sdk_result))
     out = await submit_to_tax_bureau(db, TENANT_ID, DECL_ID)
     assert out["status"] == "submitted"
     assert out["receipt_no"] == "T12345"
@@ -269,13 +281,21 @@ async def test_get_filing_history_returns_list():
     db = _make_db()
     rows = [
         {
-            "declaration_id": uuid4(), "month": "2026-04", "store_name": "一店",
-            "employee_count": 10, "total_tax_fen": 50000, "status": "submitted",
+            "declaration_id": uuid4(),
+            "month": "2026-04",
+            "store_name": "一店",
+            "employee_count": 10,
+            "total_tax_fen": 50000,
+            "status": "submitted",
             "submitted_at": datetime(2026, 4, 20, tzinfo=timezone.utc),
         },
         {
-            "declaration_id": uuid4(), "month": "2026-03", "store_name": "一店",
-            "employee_count": 9, "total_tax_fen": 40000, "status": "completed",
+            "declaration_id": uuid4(),
+            "month": "2026-03",
+            "store_name": "一店",
+            "employee_count": 9,
+            "total_tax_fen": 40000,
+            "status": "completed",
             "submitted_at": datetime(2026, 3, 22, tzinfo=timezone.utc),
         },
     ]
@@ -316,12 +336,18 @@ async def test_get_annual_summary_fills_12_months():
     # 仅 2 个月有数据
     payroll_rows = [
         {
-            "period_month": 1, "gross_salary_fen": 10000, "net_salary_fen": 7000,
-            "social_insurance_fen": 2000, "housing_fund_fen": 500,
+            "period_month": 1,
+            "gross_salary_fen": 10000,
+            "net_salary_fen": 7000,
+            "social_insurance_fen": 2000,
+            "housing_fund_fen": 500,
         },  # tax = 500
         {
-            "period_month": 3, "gross_salary_fen": 20000, "net_salary_fen": 15000,
-            "social_insurance_fen": 3500, "housing_fund_fen": 1000,
+            "period_month": 3,
+            "gross_salary_fen": 20000,
+            "net_salary_fen": 15000,
+            "social_insurance_fen": 3500,
+            "housing_fund_fen": 1000,
         },  # tax = 500
     ]
     db.execute.side_effect = [

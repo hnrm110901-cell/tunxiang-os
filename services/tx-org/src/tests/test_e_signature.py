@@ -10,6 +10,7 @@
 
 使用 AsyncMock 模拟 AsyncSession，无真实 DB 依赖。
 """
+
 from __future__ import annotations
 
 import os
@@ -161,9 +162,16 @@ async def test_get_template_returns_detail():
     """模板存在时返回详情"""
     db = _make_db()
     row = {
-        "id": TPL_ID, "template_name": "劳动合同", "contract_type": "labor",
-        "content_html": "<p></p>", "variables": [], "is_active": True, "version": 2,
-        "created_by": None, "created_at": None, "updated_at": None,
+        "id": TPL_ID,
+        "template_name": "劳动合同",
+        "contract_type": "labor",
+        "content_html": "<p></p>",
+        "variables": [],
+        "is_active": True,
+        "version": 2,
+        "created_by": None,
+        "created_at": None,
+        "updated_at": None,
     }
     db.execute.side_effect = [MagicMock(), _mk_result(one_or_none=row)]
     svc = ESignatureService(db, TENANT_ID)
@@ -233,15 +241,17 @@ async def test_initiate_signing_success_returns_pending():
     """成功发起签署 -> 状态 pending_sign，生成合同编号"""
     db = _make_db()
     tpl_row = {
-        "template_name": "劳动合同", "contract_type": "labor",
-        "content_html": "欢迎 {{name}} 加入", "variables": [],
+        "template_name": "劳动合同",
+        "contract_type": "labor",
+        "content_html": "欢迎 {{name}} 加入",
+        "variables": [],
     }
     emp_row = {"emp_name": "张三"}
     db.execute.side_effect = [
-        MagicMock(),                          # set_config
-        _mk_result(one_or_none=tpl_row),      # 查模板
-        _mk_result(one_or_none=emp_row),      # 查员工
-        MagicMock(),                          # INSERT
+        MagicMock(),  # set_config
+        _mk_result(one_or_none=tpl_row),  # 查模板
+        _mk_result(one_or_none=emp_row),  # 查员工
+        MagicMock(),  # INSERT
     ]
     svc = ESignatureService(db, TENANT_ID)
     out = await svc.initiate_signing(
@@ -351,8 +361,12 @@ async def test_get_contract_stats_returns_counts():
     """统计概览：返回各状态的数量"""
     db = _make_db()
     stats_row = {
-        "total": 10, "completed": 6, "pending": 2,
-        "terminated": 1, "expired": 1, "expiring_30d": 3,
+        "total": 10,
+        "completed": 6,
+        "pending": 2,
+        "terminated": 1,
+        "expired": 1,
+        "expiring_30d": 3,
     }
     db.execute.side_effect = [MagicMock(), _mk_result(one=stats_row)]
     svc = ESignatureService(db, TENANT_ID)
@@ -376,7 +390,12 @@ def test_contract_types_contains_five_categories():
 def test_status_labels_coverage():
     """7 种状态标签全部存在"""
     for k in (
-        "draft", "pending_sign", "employee_signed",
-        "company_signed", "completed", "expired", "terminated",
+        "draft",
+        "pending_sign",
+        "employee_signed",
+        "company_signed",
+        "completed",
+        "expired",
+        "terminated",
     ):
         assert k in STATUS_LABELS
