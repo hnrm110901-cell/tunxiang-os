@@ -4,6 +4,74 @@
 
 ---
 
+## 2026-04-19 PR-W1.1：financial_voucher_lines 子表 — 分录 SSOT
+
+### 本次会话目标
+W1.1: 建立 `financial_voucher_lines` 子表，取代 `financial_vouchers.entries` JSONB，作为会计分录 SSOT。DB 层加 CHECK 借贷互斥/非负，CASCADE 删，tenant_id + RLS，3 索引。
+
+Tier 级别：🔴 **Tier 1**（资金安全 / 金税四期链路）。
+
+### 不得触碰的边界
+- [x] 不改 v264 已应用的迁移（已在 PR #42 线上 review）
+- [x] 不动 entries JSONB 的读/写路径（W1.3 PR 才切）
+- [x] 不回填历史数据（W1.6 PR 才跑）
+- [x] 不改 FinancialVoucher.is_balanced() 现有实现（仍读 entries 以保兼容；新增 is_balanced_from_lines() 作并行判定）
+
+### 涉及范围
+- 服务：`services/tx-finance` + `shared/db-migrations`
+- 迁移版本：v264 → v266（跳 v265 — 并行会话占用，链式分叉由单独 P0 PR 治理）
+- Tier 级别：Tier 1
+
+### 完成状态
+- [x] **v266 migration** `shared/db-migrations/versions/v266_financial_voucher_lines.py`
+  - CREATE TABLE financial_voucher_lines（11 列，id/tenant_id/voucher_id/line_no/account_code/account_name/debit_fen/credit_fen/summary/created_at/updated_at）
+  - CHECK `chk_fvl_debit_credit_exclusive`：`(debit_fen=0 AND credit_fen>0) OR (debit_fen>0 AND credit_fen=0)`（借贷互斥 + 非负 + 至少一方非零三合一）
+  - CHECK `chk_fvl_non_negative`：`debit_fen >= 0 AND credit_fen >= 0`（冗余防御）
+  - UNIQUE `uq_fvl_voucher_line_no` (voucher_id, line_no)
+  - FK `fk_fvl_voucher_id` ON DELETE CASCADE
+  - 3 索引：`ix_fvl_voucher_id` / `ix_fvl_tenant_account` / `ix_fvl_tenant_created`
+  - RLS：`ALTER TABLE ... ENABLE ROW LEVEL SECURITY` + `CREATE POLICY ... USING (tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid)`
+  - 4 步 RAISE NOTICE 可观测性标记
+  - downgrade 带 W1.6 回填告警（> 24h 视为不可降级）
+- [x] **ORM 对齐** `services/tx-finance/src/models/voucher.py`
+  - 新增 `FinancialVoucherLine(Base)` 类（与 migration schema 1:1）
+  - `FinancialVoucher.lines` relationship（`cascade="all, delete-orphan"`, `order_by=line_no`, `lazy="selectin"`）
+  - 新增辅助方法：`total_debit_fen_from_lines()` / `total_credit_fen_from_lines()` / `is_balanced_from_lines()`（W1.3 切换后取代 `is_balanced()`）
+- [x] **Tier 1 测试** `src/tests/test_financial_voucher_lines_tier1.py`（19 测试，0.21s 全绿）
+  - 场景：销售 2 分录 fen 存储 / 3 分录支付凭证 / 不平衡检出 / fen 整数零容忍
+  - DB 结构：CHECK 借贷互斥 + 非负 / UNIQUE line_no / FK CASCADE
+  - RLS：表启用 + 策略用 `app.tenant_id` / tenant_id NOT NULL 防 RLS 绕过
+  - 迁移骨架：revision=v266 / down_revision=v264 / 3 索引 / RAISE NOTICE / downgrade 非空 + W1.6 告警 / 不用 CONCURRENTLY（新空表）
+- [x] **DEV Postgres SQL 验证**（绕过破损的 alembic 链，手动 `docker exec` psql）
+  - #1-4 结构元数据：11 列 + 5 索引 + 5 约束 + RLS policy 全吻合
+  - #5 正常 INSERT（借 10000 / 贷 0）OK
+  - #6 借贷都非零（10000/10000）→ `violates check constraint chk_fvl_debit_credit_exclusive` ✅
+  - #7 借贷都为 0 → 同样被互斥约束拒 ✅（证实互斥表达式蕴含"至少一方非零"）
+  - #8 负数 debit → CHECK 拒 ✅
+  - #9 UNIQUE line_no 重复 → `duplicate key value violates unique constraint` ✅
+  - #10 CASCADE：删 voucher 后 lines 从 1 → 0 ✅
+  - #11 RLS：`SET ROLE app_user` + `SET app.tenant_id` → tenant_A 只见 A 的 1 行 / tenant_B 只见 B 的 1 行 / 空 tenant 见 0 行 ✅
+  - #12-13 DROP TABLE 后表 / 策略 / 索引全清 ✅
+
+### 关键决策
+- **CHECK 互斥表达式合并"非零"与"互斥"** — 原方案 3 约束（互斥/非负/至少一方非零）被合并为 1 个 CHECK（两分支都含 `> 0`），等价但少 DDL 表面积。
+- **子表冗余 tenant_id** — 不纯靠 voucher_id JOIN 父表。双保险：防恶意租户伪造 voucher_id 绕过 RLS；科目总账 `(tenant_id, account_code)` 索引扫描比 JOIN 快 10x+。
+- **金额只留 fen，不保元兼容字段** — 新表无历史负担，lines 是 W1.3 之后的 SSOT；元字段只在父表过渡期双写（与 v264 策略保持）。
+- **不用 CONCURRENTLY** — 新空表 CREATE INDEX 秒级，CONCURRENTLY 只是给已有 TB 级数据的老表用。写了结构化测试禁止这点以防未来回归。
+- **v266 down_revision=v264，跳 v265** — 并行 FCT-2.0 会话占用 v265 且 down_revision 也是 v263，已是预存在的链式分叉。由单独 P0 PR（fix/alembic-chain-dedup）治理，本 PR 只保自身链连续。
+
+### 下一步
+- PR-W1.2：幂等字段（event_type / event_id）+ 红冲/作废状态机
+- CLAUDE.md §19 独立验证（CFO 视角 + DBA 视角，建议开新会话跑）
+- 等 W1.3 再改 voucher_service 双写路径（本 PR 只建新结构，不改现有写路径）
+
+### 已知风险
+- **Alembic 链式分叉（pre-existing）**：v264 与 v265 都 down_revision=v263，v266 选 down_revision=v264。生产部署前必须先跑 `fix/alembic-chain-dedup` P0 PR，否则 `alembic upgrade head` 会报多 heads 错误。
+- **ORM tenant_id 应用层赋值**：新 `FinancialVoucherLine` 的 tenant_id 由应用层（W1.3 的 voucher_service）赋值，与父 voucher.tenant_id 同步。W1.3 PR 需加 service 层一致性校验 + 可考虑 DB 层 trigger 兜底。
+- **历史 entries 与 lines 不一致窗口**：W1.1 到 W1.6 之间，是不是"每条 entries 都有对应 lines"不被保证（W1.3 只保证新写双写）。报表层（ProfitDashboard / hq_briefing）读 entries，不会立即受益。
+
+---
+
 ## 2026-04-18 20:05 Sprint D1 批次 2 / PR H：出餐体验 7 Skill scope 声明 + 2 Skill 填 context
 
 ### 本次会话目标
