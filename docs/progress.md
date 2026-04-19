@@ -4,6 +4,76 @@
 
 ---
 
+## 2026-04-19 PR-W1.2：财务凭证幂等字段 + 作废状态机
+
+### 本次会话目标
+W1.2: 在 `financial_vouchers` 上加幂等键 `(tenant_id, event_type, event_id)` 与作废状态机 `voided / voided_at / voided_by / voided_reason`。解决：
+- **幂等缺失**：order.paid 事件重试 / Celery 重跑 / 操作员重复点击 生成重复凭证
+- **作废无状态机**：误生成凭证只能硬删（违反金税四期审计要求）
+
+Tier 级别：🔴 **Tier 1**（资金安全 / 金税四期审计留痕）。
+
+### 不得触碰的边界
+- [x] 不加红冲字段（留 W1.5 — 红冲 ≠ 作废，独立状态机）
+- [x] 不改 W1.1 lines 子表 / W1.0 金额 schema
+- [x] 不加实际幂等写路径（留 W1.3 voucher_service 双写）
+
+### 涉及范围
+- 服务：`services/tx-finance` + `shared/db-migrations`
+- 迁移版本：v266 → v268（跳 v267 — 留给并行会话 evidence_bundles）
+- Tier 级别：Tier 1
+
+### 完成状态
+- [x] **v268 migration** `shared/db-migrations/versions/v268_financial_vouchers_idempotency_void.py`
+  - ADD 6 列：event_type / event_id / voided / voided_at / voided_by / voided_reason
+  - CHECK `chk_voucher_void_consistency`: `voided=TRUE → voided_at + voided_by 必填`
+  - **Partial UNIQUE** `uq_fv_tenant_event (tenant_id, event_type, event_id) WHERE event_id IS NOT NULL`
+  - **Partial index** `ix_fv_voided_at (tenant_id, voided_at) WHERE voided=TRUE`（作废审计快查）
+  - **Partial index** `ix_fv_event (tenant_id, event_type) WHERE event_type IS NOT NULL`
+  - 所有索引走 `CONCURRENTLY + autocommit_block()`（老表刚需）
+  - 5 步 RAISE NOTICE 分步可观测性
+- [x] **ORM** `services/tx-finance/src/models/voucher.py`
+  - 新增 6 字段 + `__table_args__` 加 CheckConstraint 镜像 DB
+  - 新增 `void(operator_id, reason, voided_at=None)` 状态机方法
+  - 新增 `@property is_voidable` / `@property is_active`
+  - `to_dict()` 暴露新字段（ERP 推送 + 审计消费）
+- [x] **Tier 1 测试** `src/tests/test_financial_vouchers_idempotency_void_tier1.py`（**24 passed / 0.21s**）
+  - 场景：event 字段 OK / nullable / to_dict 输出
+  - 状态机：draft/confirmed 可 void / exported 禁止 / 已 voided 不可重复
+  - 审计：void() 设 4 字段 / reason trim / 空 reason 拒 / 自定义时间戳
+  - 迁移骨架：6 列 / CHECK / partial UNIQUE / CONCURRENTLY 全索引 / autocommit_block / downgrade 告警
+- [x] **全 Wave 1 回归**：21 W1.0 + 19 W1.1 + 24 W1.2 = **64 passed / 0.26s**
+- [x] **DEV Postgres SQL 验证**（docker exec）
+  - #1-3 结构元数据吻合
+  - #4 同 event_id 重复 → `duplicate key value violates unique constraint "uq_fv_tenant_event"` ✅
+  - #5 event_id=NULL 多条允许（3 条全过）✅
+  - #6 不同 tenant 同 event_id 允许 ✅
+  - #7 同 tenant 不同 event_type 同 event_id 允许 ✅
+  - #9-10 voided=TRUE 缺 voided_at/by → CHECK 拒 ✅
+  - #11 voided=TRUE + at + by → OK ✅
+  - #12 **UPDATE** 路径也拦（重要：CHECK 约束 INSERT + UPDATE 双路径生效）✅
+
+### 关键决策
+- **Partial UNIQUE (WHERE event_id IS NOT NULL)** — 允许手工录入 / 历史凭证 event_id=NULL 多行并存，同时新事件型凭证强制去重。PG partial UNIQUE 是教科书级合适场景。
+- **CHECK voided=TRUE → 审计字段必填** — 应用层可以忘设 voided_at/by，DB 层兜底拦。
+- **voided_reason 允许 DB NULL，应用层强制** — DB 层容忍历史脏数据；新代码由 `void(reason=...)` 强制非空（已加 reason.strip() + ValueError）。
+- **不加红冲字段** — red_flush 是 exported 后的反向分录 + 双向 link，状态机复杂度远超 void，强行绑在一起会模糊审计 ownership。W1.5 PR 专门处理。
+- **跳 v267 编号** — 留给并行会话 evidence_bundles，避免 alembic head 再次分叉。
+
+### 下一步
+- CLAUDE.md §19 独立验证（建议 CFO + DBA 两轮，合并前必做）
+- **PR-W1.3**: voucher_service + voucher_generator 双写重构（lines 成为 SSOT + event_id 幂等写路径）
+- **PR-W1.4**: accounting_periods 月结/年结表
+- **PR-W1.5**: 红冲/作废 API（含 red_flush 字段 + 状态机）
+- **FCT-2.0 并行**: v265 rebase 目标现在明确：**rebase 到 v268**（最末节点），最终链 `v263 → v264 → v266 → v268 → v265 → v267`
+
+### 已知风险
+- **alembic 链分叉累积**：现在有 3 个从 v263 分叉的 head（v264 / v265 / v267 并行 + v266 / v268 我）。`fix/alembic-chain-dedup` P0 PR 治理范围扩大，必须在 Wave 1 全部合入主干前跑。
+- **CHECK 不能防跨行一致**：如 "voided_by 必须是有效操作员" 需要 FK / 应用层校验。本 PR 只保证 voided=TRUE 时字段非空，不保证语义。
+- **event_type 命名不受 DB 约束**：'order.paid' / 'order_paid' / 'ORDER.PAID' 在 DB 层是三个不同事件。W1.3 需加应用层枚举 + lint 规则。
+
+---
+
 ## 2026-04-19 PR-W1.1：financial_voucher_lines 子表 — 分录 SSOT
 
 ### 本次会话目标
