@@ -178,6 +178,17 @@ class FinancialVoucherService:
         if not payload.lines:
             raise ValueError("凭证必须含至少一条分录")
 
+        # [BLOCKER-B3] event_id 非空时 event_type 必填
+        # 理由: uq_fv_tenant_event partial UNIQUE 的 WHERE 条件要求两者都非空,
+        # 应用层显式校验比 DB 层错误消息更友好 + 防误用.
+        if payload.event_id is not None and (
+            payload.event_type is None or not str(payload.event_type).strip()
+        ):
+            raise ValueError(
+                "event_id 非空时 event_type 必填 "
+                "(幂等键需要 (tenant_id, event_type, event_id) 完整三元组)"
+            )
+
         total_debit_fen = sum(l.debit_fen for l in payload.lines)
         total_credit_fen = sum(l.credit_fen for l in payload.lines)
         if total_debit_fen != total_credit_fen:

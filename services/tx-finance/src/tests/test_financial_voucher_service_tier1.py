@@ -355,6 +355,82 @@ class TestDoubleWrite:
 # ─── 借贷平衡前置校验 ──────────────────────────────────────────────
 
 
+class TestEventIdRequiresEventType:
+    """[BLOCKER-B3]: event_id 非空时 event_type 必填 (幂等键完整性)."""
+
+    @pytest.mark.asyncio
+    async def test_event_id_without_event_type_rejected(self):
+        """event_id 非空但 event_type=None → ValueError, 不调 DB."""
+        svc = FinancialVoucherService()
+        session = AsyncMock()
+
+        payload = VoucherCreateInput(
+            tenant_id=uuid.uuid4(),
+            voucher_no="V_NO_ETYPE",
+            voucher_date=date(2026, 4, 19),
+            voucher_type="sales",
+            event_type=None,           # 未填
+            event_id=uuid.uuid4(),     # 但 event_id 非空
+            lines=[
+                VoucherLineInput(account_code="1001", account_name="现金",
+                                 debit_fen=10000),
+                VoucherLineInput(account_code="6001", account_name="收入",
+                                 credit_fen=10000),
+            ],
+        )
+        with pytest.raises(ValueError, match="event_id 非空时 event_type 必填"):
+            await svc.create(payload, session=session)
+
+        session.add.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_event_id_with_empty_event_type_rejected(self):
+        """event_type='' 或纯空白同样拒 (strip 后空)."""
+        svc = FinancialVoucherService()
+        session = AsyncMock()
+
+        payload = VoucherCreateInput(
+            tenant_id=uuid.uuid4(),
+            voucher_no="V_BLANK_ETYPE",
+            voucher_date=date(2026, 4, 19),
+            voucher_type="sales",
+            event_type="   ",          # 纯空白
+            event_id=uuid.uuid4(),
+            lines=[
+                VoucherLineInput(account_code="1001", debit_fen=10000,
+                                 account_name="现金"),
+                VoucherLineInput(account_code="6001", credit_fen=10000,
+                                 account_name="收入"),
+            ],
+        )
+        with pytest.raises(ValueError, match="event_id 非空时 event_type 必填"):
+            await svc.create(payload, session=session)
+
+    @pytest.mark.asyncio
+    async def test_event_id_none_with_event_type_ok(self):
+        """event_id=None 时 event_type 任何值都可 (手工凭证场景)."""
+        svc = FinancialVoucherService()
+        session = AsyncMock()
+        session.flush = AsyncMock()
+
+        payload = VoucherCreateInput(
+            tenant_id=uuid.uuid4(),
+            voucher_no="V_MANUAL_OK",
+            voucher_date=date(2026, 4, 19),
+            voucher_type="sales",
+            event_type=None,
+            event_id=None,
+            lines=[
+                VoucherLineInput(account_code="1001", debit_fen=10000,
+                                 account_name="现金"),
+                VoucherLineInput(account_code="6001", credit_fen=10000,
+                                 account_name="收入"),
+            ],
+        )
+        result = await svc.create(payload, session=session)
+        assert isinstance(result, FinancialVoucher)
+
+
 class TestBalanceValidation:
     """借贷不平衡在 service 层前置拦截 (比 DB CHECK 更早, UX 更好)."""
 

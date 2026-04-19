@@ -230,14 +230,22 @@ class TestV268MigrationFileStructure:
         ), "CHECK 表达式必须强制 voided=TRUE 时 voided_at + voided_by 非空"
 
     def test_partial_unique_idempotency_index(self):
-        """UNIQUE (tenant_id, event_type, event_id) WHERE event_id IS NOT NULL."""
+        """UNIQUE (tenant_id, event_type, event_id) WHERE 双非空.
+
+        [BLOCKER-B3 修复]: WHERE 必须同时要求 event_id IS NOT NULL
+        AND event_type IS NOT NULL. 否则 PG 对多 NULL 按 "都不相等" 处理,
+        两条 event_id=同 UUID + event_type=None 都会落盘, 幂等失效.
+        """
         assert "uq_fv_tenant_event" in self.migration_src
-        # 必须是 partial 索引
+        # 必须是 partial 索引 + 双非空条件
         assert re.search(
             r"CREATE\s+UNIQUE\s+INDEX\s+CONCURRENTLY.*?uq_fv_tenant_event"
-            r".*?WHERE\s+event_id\s+IS\s+NOT\s+NULL",
+            r".*?WHERE\s+event_id\s+IS\s+NOT\s+NULL\s+AND\s+event_type\s+IS\s+NOT\s+NULL",
             self.migration_src, re.S | re.I,
-        ), "uq_fv_tenant_event 必须是 partial UNIQUE INDEX WHERE event_id IS NOT NULL"
+        ), (
+            "uq_fv_tenant_event 必须是 partial WHERE "
+            "event_id IS NOT NULL AND event_type IS NOT NULL (防 NULL 幂等失效)"
+        )
 
     def test_concurrently_used_for_all_indexes(self):
         """老表索引必须 CONCURRENTLY (不阻塞日结 DML)."""
