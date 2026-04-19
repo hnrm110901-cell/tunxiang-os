@@ -19,6 +19,7 @@
 
 统一响应格式: {"ok": bool, "data": {}, "error": {}}
 """
+
 from __future__ import annotations
 
 from datetime import date as dt_date
@@ -33,20 +34,19 @@ log = structlog.get_logger(__name__)
 
 # ─── 租户ID提取 ───
 
+
 def _get_tenant_id(request: Request) -> str:
-    return (
-        getattr(request.state, "tenant_id", None)
-        or request.headers.get("X-Tenant-ID", "")
-        or "default"
-    )
+    return getattr(request.state, "tenant_id", None) or request.headers.get("X-Tenant-ID", "") or "default"
 
 
 # ─── 数据库依赖（软依赖，无DB时降级Mock） ───
+
 
 async def _try_get_db():
     """尝试获取数据库会话。返回 None 时降级到 Mock 规则引擎。"""
     try:
         from shared.ontology.src.database import async_session_factory  # type: ignore[import]
+
         async with async_session_factory() as session:
             yield session
     except (ImportError, RuntimeError, Exception):  # noqa: BLE001 — 最外层兜底，DB不可用时返回None
@@ -54,6 +54,7 @@ async def _try_get_db():
 
 
 # ─── 路由 ───
+
 
 @router.get("/dish-time/{dish_id}")
 async def get_dish_time_prediction(
@@ -105,6 +106,7 @@ async def get_order_completion_prediction(
     db = None
     try:
         from shared.ontology.src.database import async_session_factory  # type: ignore[import]
+
         async with async_session_factory() as session:
             result = await predict_order_completion(
                 order_id=order_id,
@@ -147,6 +149,7 @@ async def get_table_turn_prediction(
     db = None
     try:
         from shared.ontology.src.database import async_session_factory  # type: ignore[import]
+
         async with async_session_factory() as session:
             result = await predict_table_turn(
                 table_no=table_no,
@@ -197,6 +200,7 @@ async def get_busy_periods(
     periods: list = []
     try:
         from shared.ontology.src.database import async_session_factory  # type: ignore[import]
+
         async with async_session_factory() as session:
             periods = await get_busy_period_forecast(
                 store_id=store_id or "default",

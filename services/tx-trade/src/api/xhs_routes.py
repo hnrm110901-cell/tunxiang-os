@@ -6,6 +6,7 @@
 4. GET    /api/v1/xhs/poi/{store_id}            查询POI绑定
 5. POST   /webhook/xhs                          小红书回调（订单/退款通知）
 """
+
 from __future__ import annotations
 
 import uuid
@@ -34,6 +35,7 @@ def error_response(msg: str) -> dict:
 
 # ── 请求模型 ──────────────────────────────────────────────────
 
+
 class VerifyCouponReq(BaseModel):
     coupon_code: str
     store_id: str
@@ -48,6 +50,7 @@ class BindPOIReq(BaseModel):
 
 
 # ── 1. 团购券核销 ────────────────────────────────────────────
+
 
 @router.post("/api/v1/xhs/verify")
 async def verify_coupon(
@@ -94,6 +97,7 @@ async def verify_coupon(
 
 # ── 2. 核销记录列表 ─────────────────────────────────────────
 
+
 @router.get("/api/v1/xhs/verifications")
 async def list_verifications(
     store_id: str = Query(...),
@@ -124,13 +128,18 @@ async def list_verifications(
         app_secret=(cred_row["app_secret"] if cred_row else None) or "",
     )
     result = await adapter.list_verifications(
-        store_id=store_id, tenant_id=x_tenant_id, db=db,
-        status=status, page=page, size=size,
+        store_id=store_id,
+        tenant_id=x_tenant_id,
+        db=db,
+        status=status,
+        page=page,
+        size=size,
     )
     return ok_response(result)
 
 
 # ── 3. 绑定门店 POI ─────────────────────────────────────────
+
 
 @router.post("/api/v1/xhs/poi/bind")
 async def bind_poi(
@@ -160,21 +169,25 @@ async def bind_poi(
                 updated_at = NOW()
         """),
         {
-            "id": uuid.uuid4(), "tid": tid,
+            "id": uuid.uuid4(),
+            "tid": tid,
             "sid": uuid.UUID(body.store_id),
             "poi": body.xhs_poi_id,
             "sname": body.xhs_shop_name,
         },
     )
     await db.commit()
-    return ok_response({
-        "store_id": body.store_id,
-        "xhs_poi_id": body.xhs_poi_id,
-        "status": "bound",
-    })
+    return ok_response(
+        {
+            "store_id": body.store_id,
+            "xhs_poi_id": body.xhs_poi_id,
+            "status": "bound",
+        }
+    )
 
 
 # ── 4. 查询POI绑定 ──────────────────────────────────────────
+
 
 @router.get("/api/v1/xhs/poi/{store_id}")
 async def get_poi_binding(
@@ -197,16 +210,19 @@ async def get_poi_binding(
     mapping = row.fetchone()
     if not mapping:
         return error_response("poi_not_bound")
-    return ok_response({
-        "store_id": store_id,
-        "xhs_poi_id": mapping.xhs_poi_id,
-        "xhs_shop_name": mapping.xhs_shop_name,
-        "sync_status": mapping.sync_status,
-        "last_synced_at": mapping.last_synced_at.isoformat() if mapping.last_synced_at else None,
-    })
+    return ok_response(
+        {
+            "store_id": store_id,
+            "xhs_poi_id": mapping.xhs_poi_id,
+            "xhs_shop_name": mapping.xhs_shop_name,
+            "sync_status": mapping.sync_status,
+            "last_synced_at": mapping.last_synced_at.isoformat() if mapping.last_synced_at else None,
+        }
+    )
 
 
 # ── 5. 小红书 Webhook ────────────────────────────────────────
+
 
 @router.post("/webhook/xhs")
 async def xhs_webhook(request: Request) -> dict:
@@ -220,8 +236,10 @@ async def xhs_webhook(request: Request) -> dict:
         coupon_code = payload.get("coupon_code") or payload.get("order", {}).get("coupon_code", "")
         if coupon_code:
             try:
-                from shared.ontology.src.database import async_session_factory
                 from sqlalchemy import text as _text
+
+                from shared.ontology.src.database import async_session_factory
+
                 async with async_session_factory() as db:
                     await db.execute(
                         _text("""

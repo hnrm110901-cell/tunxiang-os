@@ -14,6 +14,7 @@
 11. POST /board-announcement   — 正常路径：公告写入 + 广播
 12. POST /board-announcement   — 空公告字符串返回 400
 """
+
 import os
 import sys
 
@@ -28,6 +29,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy.exc import OperationalError
 
 # ─── 工具类 ────────────────────────────────────────────────
+
 
 def _uid() -> str:
     return str(uuid.uuid4())
@@ -47,6 +49,7 @@ class FakeRow:
 
 class FakeMappingsResult:
     """模拟 result.mappings().all() 或 .one_or_none()"""
+
     def __init__(self, rows=None, single=None):
         self._rows = rows or []
         self._single = single  # 用于 one_or_none()
@@ -60,6 +63,7 @@ class FakeMappingsResult:
 
 class FakeExecuteResult:
     """模拟 result.all() 行列表 / .one_or_none() / .mappings()"""
+
     def __init__(self, rows=None, single=None, mapping_rows=None, mapping_single=None):
         self._rows = rows or []
         self._single = single
@@ -90,6 +94,7 @@ def _seq_db(*results):
 # ─── 加载路由 ──────────────────────────────────────────────
 
 from api.digital_menu_board_router import router
+
 from shared.ontology.src.database import get_db
 
 app = FastAPI()
@@ -99,12 +104,14 @@ app.include_router(router)
 def _override(db):
     def _dep():
         return db
+
     return _dep
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 场景 1: GET /board-data — 正常路径，菜品列表
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 @pytest.mark.asyncio
 async def test_board_data_returns_dish_list():
@@ -162,6 +169,7 @@ async def test_board_data_returns_dish_list():
 # 场景 2: GET /board-data — 空菜单
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 @pytest.mark.asyncio
 async def test_board_data_empty_menu():
     """无菜品时返回空列表，ok=True"""
@@ -182,6 +190,7 @@ async def test_board_data_empty_menu():
 # 场景 3: GET /board-data — 缺少 X-Tenant-ID → 422
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_board_data_missing_tenant_header():
     db = AsyncMock()
     app.dependency_overrides[get_db] = _override(db)
@@ -193,6 +202,7 @@ def test_board_data_missing_tenant_header():
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 场景 4: GET /board-config — store 存在
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 @pytest.mark.asyncio
 async def test_board_config_with_store():
@@ -220,12 +230,13 @@ async def test_board_config_with_store():
 # 场景 5: GET /board-config — store 不存在时默认值
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 @pytest.mark.asyncio
 async def test_board_config_store_not_found_uses_defaults():
     """门店不存在时 store_name 返回 '屯象餐厅'"""
     set_cfg = AsyncMock()
-    store_result = FakeExecuteResult(single=None)        # one_or_none() → None
-    cat_result = FakeExecuteResult(rows=[])               # 无分类
+    store_result = FakeExecuteResult(single=None)  # one_or_none() → None
+    cat_result = FakeExecuteResult(rows=[])  # 无分类
     special_result = FakeExecuteResult(rows=[])
     featured_result = FakeExecuteResult(rows=[])
 
@@ -245,6 +256,7 @@ async def test_board_config_store_not_found_uses_defaults():
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 场景 6: GET /digital-menu/dishes — 正常路径
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 @pytest.mark.asyncio
 async def test_digital_menu_dishes_normal():
@@ -287,12 +299,13 @@ async def test_digital_menu_dishes_normal():
 # 第 2 次 execute（实际查询）再抛 OperationalError，才能触发 fallback。
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 @pytest.mark.asyncio
 async def test_digital_menu_dishes_db_error_fallback():
     """DB 查询异常时 graceful 返回空列表，ok=True"""
     db = _seq_db(
-        AsyncMock(),                                                # set_config 正常
-        OperationalError("stmt", {}, Exception("timeout")),        # 实际查询抛异常
+        AsyncMock(),  # set_config 正常
+        OperationalError("stmt", {}, Exception("timeout")),  # 实际查询抛异常
     )
     app.dependency_overrides[get_db] = _override(db)
     client = TestClient(app)
@@ -307,6 +320,7 @@ async def test_digital_menu_dishes_db_error_fallback():
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 场景 8: GET /digital-menu/config — store 存在
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 @pytest.mark.asyncio
 async def test_digital_menu_config_with_store():
@@ -326,9 +340,7 @@ async def test_digital_menu_config_with_store():
     app.dependency_overrides[get_db] = _override(db)
     client = TestClient(app)
 
-    resp = client.get(
-        f"/api/v1/menu/digital-menu/config?store_id={STORE_ID}", headers=_HEADERS
-    )
+    resp = client.get(f"/api/v1/menu/digital-menu/config?store_id={STORE_ID}", headers=_HEADERS)
 
     assert resp.status_code == 200
     data = resp.json()["data"]
@@ -342,6 +354,7 @@ async def test_digital_menu_config_with_store():
 # 场景 9: GET /digital-menu/config — store 不存在，默认配置
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 @pytest.mark.asyncio
 async def test_digital_menu_config_store_not_found():
     """store 不存在时返回默认 store_name 和 theme_color"""
@@ -352,9 +365,7 @@ async def test_digital_menu_config_store_not_found():
     app.dependency_overrides[get_db] = _override(db)
     client = TestClient(app)
 
-    resp = client.get(
-        f"/api/v1/menu/digital-menu/config?store_id={STORE_ID}", headers=_HEADERS
-    )
+    resp = client.get(f"/api/v1/menu/digital-menu/config?store_id={STORE_ID}", headers=_HEADERS)
 
     assert resp.status_code == 200
     data = resp.json()["data"]
@@ -368,19 +379,18 @@ async def test_digital_menu_config_store_not_found():
 # 注：同场景 7，set_config（第 1 次）正常，第 2 次查询抛异常
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 @pytest.mark.asyncio
 async def test_digital_menu_config_db_error_fallback():
     """DB 查询异常时返回默认配置，不抛错"""
     db = _seq_db(
-        AsyncMock(),                                                # set_config 正常
-        OperationalError("stmt", {}, Exception("conn refused")),   # 查询抛异常
+        AsyncMock(),  # set_config 正常
+        OperationalError("stmt", {}, Exception("conn refused")),  # 查询抛异常
     )
     app.dependency_overrides[get_db] = _override(db)
     client = TestClient(app)
 
-    resp = client.get(
-        f"/api/v1/menu/digital-menu/config?store_id={STORE_ID}", headers=_HEADERS
-    )
+    resp = client.get(f"/api/v1/menu/digital-menu/config?store_id={STORE_ID}", headers=_HEADERS)
 
     assert resp.status_code == 200
     data = resp.json()["data"]
@@ -391,6 +401,7 @@ async def test_digital_menu_config_db_error_fallback():
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 场景 11: POST /board-announcement — 正常路径
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 @pytest.mark.asyncio
 async def test_update_board_announcement_success():
@@ -425,6 +436,7 @@ async def test_update_board_announcement_success():
 # 场景 12: POST /board-announcement — 空内容 → 400
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_update_board_announcement_empty_body():
     """公告内容为空字符串时返回 400"""
     db = AsyncMock()
@@ -433,7 +445,7 @@ def test_update_board_announcement_empty_body():
 
     resp = client.post(
         "/api/v1/menu/board-announcement",
-        json={"store_id": STORE_ID, "announcement": "   "},   # 全空白
+        json={"store_id": STORE_ID, "announcement": "   "},  # 全空白
         headers=_HEADERS,
     )
     assert resp.status_code == 400

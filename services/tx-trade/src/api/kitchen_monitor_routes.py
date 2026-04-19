@@ -13,6 +13,7 @@
 # from .api.kitchen_monitor_routes import router as kitchen_monitor_router
 # app.include_router(kitchen_monitor_router, prefix="/api/v1/kitchen-monitor")
 """
+
 from __future__ import annotations
 
 from datetime import datetime, timezone
@@ -30,7 +31,6 @@ log = structlog.get_logger(__name__)
 
 
 # ─── 数据库依赖占位 ───
-
 
 
 def _get_tenant_id(request: Request) -> str:
@@ -78,9 +78,7 @@ async def _get_shortage_alerts(store_id: str, tenant_id: str, db: Any) -> List[d
     """查询今日沽清告警（按菜品聚合，统计次数）。"""
     from sqlalchemy import text
 
-    today_start = datetime.now(timezone.utc).replace(
-        hour=0, minute=0, second=0, microsecond=0
-    )
+    today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
 
     await db.execute(
         text("SELECT set_config('app.tenant_id', :tid, TRUE)"),
@@ -125,9 +123,7 @@ async def _get_remake_tasks(store_id: str, tenant_id: str, db: Any) -> List[dict
     """查询今日退菜（重做）工单。"""
     from sqlalchemy import text
 
-    today_start = datetime.now(timezone.utc).replace(
-        hour=0, minute=0, second=0, microsecond=0
-    )
+    today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
 
     await db.execute(
         text("SELECT set_config('app.tenant_id', :tid, TRUE)"),
@@ -177,9 +173,7 @@ async def _get_hourly_trend(store_id: str, tenant_id: str, db: Any) -> List[dict
     """
     from sqlalchemy import text
 
-    today_start = datetime.now(timezone.utc).replace(
-        hour=0, minute=0, second=0, microsecond=0
-    )
+    today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
     current_hour = datetime.now(timezone.utc).hour
 
     await db.execute(
@@ -272,6 +266,7 @@ async def _get_hourly_trend(store_id: str, tenant_id: str, db: Any) -> List[dict
 #  综合监控面板
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 @router.get("/dashboard/{store_id}")
 async def get_dashboard(
     store_id: str,
@@ -328,6 +323,7 @@ async def get_dashboard(
 #  GET /overtime/{store_id}
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 @router.get("/overtime/{store_id}")
 async def get_overtime(
     store_id: str,
@@ -357,6 +353,7 @@ async def get_overtime(
 #  GET /shortage/{store_id}
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 @router.get("/shortage/{store_id}")
 async def get_shortage(
     store_id: str,
@@ -383,6 +380,7 @@ async def get_shortage(
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 #  GET /remake/{store_id}
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 @router.get("/remake/{store_id}")
 async def get_remake(
@@ -411,6 +409,7 @@ async def get_remake(
 #  GET /trend/{store_id}
 #  今日各类异常数量趋势（按小时分桶）
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 @router.get("/trend/{store_id}")
 async def get_trend(

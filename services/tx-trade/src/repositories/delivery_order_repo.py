@@ -5,6 +5,7 @@
   - 不直接 import 路由层任何模块（单向依赖）
   - 金额字段统一使用 int（分），严禁 float
 """
+
 from __future__ import annotations
 
 import uuid
@@ -97,13 +98,9 @@ class DeliveryOrderRepository:
         if status is not None:
             conditions.append(DeliveryOrderModel.status == status)
         if target_date is not None:
-            conditions.append(
-                func.date(DeliveryOrderModel.created_at) == target_date
-            )
+            conditions.append(func.date(DeliveryOrderModel.created_at) == target_date)
 
-        count_stmt = select(func.count()).select_from(DeliveryOrderModel).where(
-            and_(*conditions)
-        )
+        count_stmt = select(func.count()).select_from(DeliveryOrderModel).where(and_(*conditions))
         total: int = (await db.execute(count_stmt)).scalar_one()
 
         data_stmt = (
@@ -123,12 +120,16 @@ class DeliveryOrderRepository:
         tenant_id: UUID,
     ) -> int:
         """统计当前活跃（待接/接单/备餐）订单数量，用于自动接单并发限制"""
-        stmt = select(func.count()).select_from(DeliveryOrderModel).where(
-            and_(
-                DeliveryOrderModel.store_id == store_id,
-                DeliveryOrderModel.tenant_id == tenant_id,
-                DeliveryOrderModel.status.in_(_ACTIVE_STATUSES),
-                DeliveryOrderModel.is_deleted.is_(False),
+        stmt = (
+            select(func.count())
+            .select_from(DeliveryOrderModel)
+            .where(
+                and_(
+                    DeliveryOrderModel.store_id == store_id,
+                    DeliveryOrderModel.tenant_id == tenant_id,
+                    DeliveryOrderModel.status.in_(_ACTIVE_STATUSES),
+                    DeliveryOrderModel.is_deleted.is_(False),
+                )
             )
         )
         return (await db.execute(stmt)).scalar_one()
@@ -302,15 +303,10 @@ class DeliveryOrderRepository:
             OrderModel.tenant_id == tenant_id,
             OrderModel.store_id == store_id,
             OrderModel.is_deleted.is_(False),
-            OrderModel.order_metadata["omni"]["platform_order_id"].astext
-            == platform_order_id,
+            OrderModel.order_metadata["omni"]["platform_order_id"].astext == platform_order_id,
         ]
 
-        stmt_strict = (
-            select(OrderModel.id)
-            .where(and_(*base_conds, OrderModel.sales_channel_id == platform))
-            .limit(2)
-        )
+        stmt_strict = select(OrderModel.id).where(and_(*base_conds, OrderModel.sales_channel_id == platform)).limit(2)
         strict_rows = list((await db.execute(stmt_strict)).scalars().all())
         if len(strict_rows) == 1:
             return strict_rows[0]
@@ -334,9 +330,7 @@ class DeliveryOrderRepository:
         """外卖单行写入 ``internal_order_id``。要求：外卖单存在、尚未关联、内部订单同租户且未删除。"""
         from shared.ontology.src.entities import Order as OrderModel
 
-        delivery = await DeliveryOrderRepository.get_by_id(
-            db, delivery_order_id, tenant_id
-        )
+        delivery = await DeliveryOrderRepository.get_by_id(db, delivery_order_id, tenant_id)
         if delivery is None or delivery.internal_order_id is not None:
             return False
 
@@ -529,9 +523,7 @@ class DeliveryAutoAcceptRuleRepository:
         excluded_platforms: Optional[list] = None,
     ) -> DeliveryAutoAcceptRule:
         """创建或更新自动接单规则"""
-        existing = await DeliveryAutoAcceptRuleRepository.get_by_store(
-            db, store_id, tenant_id
-        )
+        existing = await DeliveryAutoAcceptRuleRepository.get_by_store(db, store_id, tenant_id)
         if existing is None:
             rule = DeliveryAutoAcceptRule(
                 id=uuid.uuid4(),

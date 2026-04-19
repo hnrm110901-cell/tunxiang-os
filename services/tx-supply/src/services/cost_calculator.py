@@ -3,6 +3,7 @@
 基于当前激活 BOM 版本 x 各原料最新采购价，计算菜品理论成本。
 金额单位: 分(fen), int 类型。
 """
+
 import uuid
 
 import structlog
@@ -133,14 +134,16 @@ class CostCalculator:
 
             raw_total_fen += line_cost_fen
 
-            cost_items.append({
-                "ingredient_id": str(row["ingredient_id"]),
-                "standard_qty": standard_qty,
-                "unit": row["unit"],
-                "unit_cost_fen": unit_cost,
-                "line_cost_fen": line_cost_fen,
-                "waste_factor": waste_factor,
-            })
+            cost_items.append(
+                {
+                    "ingredient_id": str(row["ingredient_id"]),
+                    "standard_qty": standard_qty,
+                    "unit": row["unit"],
+                    "unit_cost_fen": unit_cost,
+                    "line_cost_fen": line_cost_fen,
+                    "waste_factor": waste_factor,
+                }
+            )
 
         # 除以出成率得到理论成本
         if yield_rate > 0:
@@ -198,12 +201,14 @@ class CostCalculator:
             subtotal_fen = unit_cost_fen * quantity
             total_cost_fen += subtotal_fen
 
-            per_item_results.append({
-                "dish_id": dish_id,
-                "quantity": quantity,
-                "unit_cost_fen": unit_cost_fen,
-                "subtotal_cost_fen": subtotal_fen,
-            })
+            per_item_results.append(
+                {
+                    "dish_id": dish_id,
+                    "quantity": quantity,
+                    "unit_cost_fen": unit_cost_fen,
+                    "subtotal_cost_fen": subtotal_fen,
+                }
+            )
 
         log.info(
             "order_cost_calculated",
@@ -244,15 +249,17 @@ class CostCalculator:
         breakdown = []
         for item in dish_cost["items"]:
             ratio = item["line_cost_fen"] / total if total > 0 else 0.0
-            breakdown.append({
-                "ingredient_id": item["ingredient_id"],
-                "standard_qty": item["standard_qty"],
-                "unit": item["unit"],
-                "unit_cost_fen": item["unit_cost_fen"],
-                "line_cost_fen": item["line_cost_fen"],
-                "cost_ratio": round(ratio, 4),
-                "waste_factor": item["waste_factor"],
-            })
+            breakdown.append(
+                {
+                    "ingredient_id": item["ingredient_id"],
+                    "standard_qty": item["standard_qty"],
+                    "unit": item["unit"],
+                    "unit_cost_fen": item["unit_cost_fen"],
+                    "line_cost_fen": item["line_cost_fen"],
+                    "cost_ratio": round(ratio, 4),
+                    "waste_factor": item["waste_factor"],
+                }
+            )
 
         # 按占比降序
         breakdown.sort(key=lambda x: x["line_cost_fen"], reverse=True)

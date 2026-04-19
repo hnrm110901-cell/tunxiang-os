@@ -2,6 +2,7 @@
 
 使用 SQLite 内存数据库模拟 PostgreSQL。
 """
+
 import uuid
 from datetime import date
 from unittest.mock import MagicMock
@@ -103,17 +104,32 @@ async def test_track_live_status_transition(db_session, sample_seafood):
     ing_id = str(sample_seafood.id)
 
     await live_seafood_v2.track_live_status(
-        ing_id, STORE_ID, "alive", 1500.0, TENANT_ID, db_session,
+        ing_id,
+        STORE_ID,
+        "alive",
+        1500.0,
+        TENANT_ID,
+        db_session,
     )
 
     result2 = await live_seafood_v2.track_live_status(
-        ing_id, STORE_ID, "weak", 1480.0, TENANT_ID, db_session,
+        ing_id,
+        STORE_ID,
+        "weak",
+        1480.0,
+        TENANT_ID,
+        db_session,
     )
     assert result2["status"] == "weak"
     assert result2["previous_status"] == "alive"
 
     result3 = await live_seafood_v2.track_live_status(
-        ing_id, STORE_ID, "dead", 1460.0, TENANT_ID, db_session,
+        ing_id,
+        STORE_ID,
+        "dead",
+        1460.0,
+        TENANT_ID,
+        db_session,
     )
     assert result3["status"] == "dead"
     assert result3["previous_status"] == "weak"
@@ -125,12 +141,22 @@ async def test_track_live_status_irreversible(db_session, sample_seafood):
     ing_id = str(sample_seafood.id)
 
     await live_seafood_v2.track_live_status(
-        ing_id, STORE_ID, "weak", 1500.0, TENANT_ID, db_session,
+        ing_id,
+        STORE_ID,
+        "weak",
+        1500.0,
+        TENANT_ID,
+        db_session,
     )
 
     with pytest.raises(ValueError, match="不可逆转"):
         await live_seafood_v2.track_live_status(
-            ing_id, STORE_ID, "alive", 1500.0, TENANT_ID, db_session,
+            ing_id,
+            STORE_ID,
+            "alive",
+            1500.0,
+            TENANT_ID,
+            db_session,
         )
 
 
@@ -139,7 +165,12 @@ async def test_track_live_status_invalid_status(db_session, sample_seafood):
     """测试无效状态"""
     with pytest.raises(ValueError, match="无效的活鲜状态"):
         await live_seafood_v2.track_live_status(
-            str(sample_seafood.id), STORE_ID, "zombie", 1000.0, TENANT_ID, db_session,
+            str(sample_seafood.id),
+            STORE_ID,
+            "zombie",
+            1000.0,
+            TENANT_ID,
+            db_session,
         )
 
 
@@ -148,7 +179,12 @@ async def test_track_live_status_negative_weight(db_session, sample_seafood):
     """测试负重量"""
     with pytest.raises(ValueError, match="重量不能为负数"):
         await live_seafood_v2.track_live_status(
-            str(sample_seafood.id), STORE_ID, "alive", -100.0, TENANT_ID, db_session,
+            str(sample_seafood.id),
+            STORE_ID,
+            "alive",
+            -100.0,
+            TENANT_ID,
+            db_session,
         )
 
 
@@ -161,15 +197,28 @@ async def test_calculate_live_loss_with_dead(db_session, sample_seafood):
     ing_id = str(sample_seafood.id)
 
     await live_seafood_v2.track_live_status(
-        ing_id, STORE_ID, "alive", 1500.0, TENANT_ID, db_session,
+        ing_id,
+        STORE_ID,
+        "alive",
+        1500.0,
+        TENANT_ID,
+        db_session,
     )
     await live_seafood_v2.track_live_status(
-        ing_id, STORE_ID, "dead", 1500.0, TENANT_ID, db_session,
+        ing_id,
+        STORE_ID,
+        "dead",
+        1500.0,
+        TENANT_ID,
+        db_session,
     )
 
     today = date.today()
     result = await live_seafood_v2.calculate_live_loss(
-        STORE_ID, (today, today), TENANT_ID, db_session,
+        STORE_ID,
+        (today, today),
+        TENANT_ID,
+        db_session,
     )
     assert result["dead_loss_g"] == 1500.0
     assert result["total_loss_value_fen"] > 0
@@ -181,7 +230,10 @@ async def test_calculate_live_loss_empty(db_session):
     """测试无损耗"""
     today = date.today()
     result = await live_seafood_v2.calculate_live_loss(
-        STORE_ID, (today, today), TENANT_ID, db_session,
+        STORE_ID,
+        (today, today),
+        TENANT_ID,
+        db_session,
     )
     assert result["dead_loss_g"] == 0
     assert result["weak_loss_g"] == 0
@@ -202,9 +254,15 @@ async def test_get_tank_inventory_empty(db_session):
 async def test_get_tank_inventory_with_data(db_session):
     """测试有数据的鱼缸库存"""
     live_seafood_v2.register_tank(
-        store_id=STORE_ID, tank_id="TANK-A1", species="lobster",
-        tenant_id=TENANT_ID, alive_count=5, alive_weight_g=7500.0,
-        weak_count=1, weak_weight_g=1200.0, price_per_g_fen=28,
+        store_id=STORE_ID,
+        tank_id="TANK-A1",
+        species="lobster",
+        tenant_id=TENANT_ID,
+        alive_count=5,
+        alive_weight_g=7500.0,
+        weak_count=1,
+        weak_weight_g=1200.0,
+        price_per_g_fen=28,
         temperature=15.0,
     )
 
@@ -222,11 +280,17 @@ async def test_get_tank_inventory_with_data(db_session):
 async def test_price_by_weight_market_price(db_session, sample_seafood):
     """测试时价定价"""
     live_seafood_v2.set_market_price(
-        str(sample_seafood.id), STORE_ID, TENANT_ID, 50,
+        str(sample_seafood.id),
+        STORE_ID,
+        TENANT_ID,
+        50,
     )
 
     result = await live_seafood_v2.price_by_weight(
-        str(sample_seafood.id), 1200.0, TENANT_ID, db_session,
+        str(sample_seafood.id),
+        1200.0,
+        TENANT_ID,
+        db_session,
     )
     assert result["unit_price_fen_per_g"] == 50
     assert result["total_price_fen"] == 60000
@@ -237,7 +301,10 @@ async def test_price_by_weight_market_price(db_session, sample_seafood):
 async def test_price_by_weight_cost_fallback(db_session, sample_seafood):
     """测试成本加成定价回退"""
     result = await live_seafood_v2.price_by_weight(
-        str(sample_seafood.id), 1000.0, TENANT_ID, db_session,
+        str(sample_seafood.id),
+        1000.0,
+        TENANT_ID,
+        db_session,
     )
     assert result["pricing_method"] == "cost_plus_margin"
     assert result["total_price_fen"] > 0
@@ -248,7 +315,10 @@ async def test_price_by_weight_zero_weight(db_session, sample_seafood):
     """测试零重量"""
     with pytest.raises(ValueError, match="称重必须大于0"):
         await live_seafood_v2.price_by_weight(
-            str(sample_seafood.id), 0, TENANT_ID, db_session,
+            str(sample_seafood.id),
+            0,
+            TENANT_ID,
+            db_session,
         )
 
 
@@ -273,8 +343,13 @@ async def test_get_seafood_dashboard(db_session, sample_seafood):
 async def test_get_warehouse_stock(db_session):
     """测试仓库库存查询"""
     live_seafood_v2.register_warehouse_item(
-        STORE_ID, "store", TENANT_ID,
-        "ing-001", "鲈鱼", 5000.0, 20000,
+        STORE_ID,
+        "store",
+        TENANT_ID,
+        "ing-001",
+        "鲈鱼",
+        5000.0,
+        20000,
     )
 
     result = await live_seafood_v2.get_warehouse_stock(STORE_ID, "store", TENANT_ID, db_session)
@@ -294,8 +369,13 @@ async def test_get_warehouse_stock_invalid_type(db_session):
 async def test_transfer_between_locations(db_session):
     """测试仓库到档口领料"""
     live_seafood_v2.register_warehouse_item(
-        STORE_ID, "store", TENANT_ID,
-        "ing-001", "鲈鱼", 5000.0, 20000,
+        STORE_ID,
+        "store",
+        TENANT_ID,
+        "ing-001",
+        "鲈鱼",
+        5000.0,
+        20000,
     )
 
     result = await live_seafood_v2.transfer_between_locations(
@@ -313,8 +393,13 @@ async def test_transfer_between_locations(db_session):
 async def test_transfer_insufficient_stock(db_session):
     """测试调拨库存不足"""
     live_seafood_v2.register_warehouse_item(
-        STORE_ID, "store", TENANT_ID,
-        "ing-002", "石斑鱼", 1000.0, 30000,
+        STORE_ID,
+        "store",
+        TENANT_ID,
+        "ing-002",
+        "石斑鱼",
+        1000.0,
+        30000,
     )
 
     with pytest.raises(ValueError, match="库存不足"):

@@ -13,6 +13,7 @@
   - rush_handled  处理催菜次数
   - remake_count  返工次数（负绩效参考）
 """
+
 import uuid
 from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
@@ -41,30 +42,34 @@ async def record_dish_completed(
     today = date.today()
 
     # PostgreSQL UPSERT：冲突时累加字段
-    stmt = pg_insert(ChefPerformanceDaily).values(
-        tenant_id=uuid.UUID(tenant_id),
-        store_id=uuid.UUID(store_id),
-        dept_id=uuid.UUID(dept_id),
-        operator_id=uuid.UUID(operator_id),
-        perf_date=today,
-        dish_count=1,
-        dish_amount=dish_amount,
-        avg_cook_sec=cook_sec,
-        rush_handled=0,
-        remake_count=0,
-    ).on_conflict_do_update(
-        constraint="uq_chef_perf_daily",
-        set_={
-            # 累加菜品数和金额
-            "dish_count": ChefPerformanceDaily.dish_count + 1,
-            "dish_amount": ChefPerformanceDaily.dish_amount + dish_amount,
-            # 滚动平均制作时长
-            "avg_cook_sec": (
-                (ChefPerformanceDaily.avg_cook_sec * ChefPerformanceDaily.dish_count + cook_sec)
-                / (ChefPerformanceDaily.dish_count + 1)
-            ).cast(type_=type(ChefPerformanceDaily.avg_cook_sec.type)),
-            "updated_at": datetime.now(timezone.utc),
-        }
+    stmt = (
+        pg_insert(ChefPerformanceDaily)
+        .values(
+            tenant_id=uuid.UUID(tenant_id),
+            store_id=uuid.UUID(store_id),
+            dept_id=uuid.UUID(dept_id),
+            operator_id=uuid.UUID(operator_id),
+            perf_date=today,
+            dish_count=1,
+            dish_amount=dish_amount,
+            avg_cook_sec=cook_sec,
+            rush_handled=0,
+            remake_count=0,
+        )
+        .on_conflict_do_update(
+            constraint="uq_chef_perf_daily",
+            set_={
+                # 累加菜品数和金额
+                "dish_count": ChefPerformanceDaily.dish_count + 1,
+                "dish_amount": ChefPerformanceDaily.dish_amount + dish_amount,
+                # 滚动平均制作时长
+                "avg_cook_sec": (
+                    (ChefPerformanceDaily.avg_cook_sec * ChefPerformanceDaily.dish_count + cook_sec)
+                    / (ChefPerformanceDaily.dish_count + 1)
+                ).cast(type_=type(ChefPerformanceDaily.avg_cook_sec.type)),
+                "updated_at": datetime.now(timezone.utc),
+            },
+        )
     )
     await db.execute(stmt)
     # 注意：调用方负责 commit

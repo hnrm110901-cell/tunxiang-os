@@ -4,6 +4,7 @@
 
 持久化层: PostgreSQL (SQLAlchemy async) + RLS 租户隔离
 """
+
 from __future__ import annotations
 
 import math
@@ -12,15 +13,14 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 import structlog
-from sqlalchemy import select, text, and_
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from services.tx_supply.src.models.central_kitchen import (
     DeliveryItemORM,
     DeliveryTripORM,
     ProductionPlanORM,
     ProductionTaskORM,
 )
+from sqlalchemy import and_, select, text
+from sqlalchemy.ext.asyncio import AsyncSession
 
 log = structlog.get_logger(__name__)
 
@@ -175,7 +175,6 @@ def _item_to_dict(item: DeliveryItemORM) -> Dict[str, Any]:
 
 
 class ProductionPlanService:
-
     async def generate_plan(
         self,
         kitchen_id: str,
@@ -235,9 +234,7 @@ class ProductionPlanService:
                 capacity_kg=capacity_kg,
                 tenant_id=tenant_id,
             )
-            raise ValueError(
-                f"需求总量 {total_kg:.1f} kg 超出中央厨房产能上限 {capacity_kg:.1f} kg"
-            )
+            raise ValueError(f"需求总量 {total_kg:.1f} kg 超出中央厨房产能上限 {capacity_kg:.1f} kg")
 
         # 3. 创建生产计划
         tenant_uuid = uuid.UUID(tenant_id)
@@ -297,20 +294,15 @@ class ProductionPlanService:
         tenant_uuid = uuid.UUID(tenant_id)
         kitchen_uuid = uuid.UUID(kitchen_id)
 
-        stmt = (
-            select(ProductionPlanORM)
-            .where(
-                and_(
-                    ProductionPlanORM.tenant_id == tenant_uuid,
-                    ProductionPlanORM.kitchen_id == kitchen_uuid,
-                    ProductionPlanORM.is_deleted == False,  # noqa: E712
-                )
+        stmt = select(ProductionPlanORM).where(
+            and_(
+                ProductionPlanORM.tenant_id == tenant_uuid,
+                ProductionPlanORM.kitchen_id == kitchen_uuid,
+                ProductionPlanORM.is_deleted == False,  # noqa: E712
             )
         )
         if plan_date:
-            stmt = stmt.where(
-                ProductionPlanORM.plan_date == datetime.strptime(plan_date, "%Y-%m-%d").date()
-            )
+            stmt = stmt.where(ProductionPlanORM.plan_date == datetime.strptime(plan_date, "%Y-%m-%d").date())
 
         result = await db.execute(stmt)
         plans = result.scalars().all()
@@ -416,9 +408,7 @@ class ProductionPlanService:
         if str(plan.tenant_id) != tenant_id:
             raise ValueError(f"生产计划 {plan_id} 不属于当前租户")
         if plan.status not in ("in_progress", "confirmed"):
-            raise ValueError(
-                f"计划状态为 {plan.status}，需要 confirmed 或 in_progress 才能生成配送任务"
-            )
+            raise ValueError(f"计划状态为 {plan.status}，需要 confirmed 或 in_progress 才能生成配送任务")
 
         # 收集各门店对应的配送明细
         store_item_map: Dict[str, List[Dict[str, Any]]] = {}
@@ -431,20 +421,20 @@ class ProductionPlanService:
                     if d["ingredient_id"] == str(task.ingredient_id):
                         if store_id not in store_item_map:
                             store_item_map[store_id] = []
-                        store_item_map[store_id].append({
-                            "ingredient_id": str(task.ingredient_id),
-                            "planned_qty": float(d.get("quantity", 0)),
-                            "unit": task.unit,
-                        })
+                        store_item_map[store_id].append(
+                            {
+                                "ingredient_id": str(task.ingredient_id),
+                                "planned_qty": float(d.get("quantity", 0)),
+                                "unit": task.unit,
+                            }
+                        )
 
         if not store_item_map:
             raise ValueError("未找到任何门店配送需求，请先注入门店需求数据")
 
         # 按地理位置聚类分组
         route_svc = _DeliveryRouteHelper()
-        store_groups = route_svc.cluster_stores_by_region(
-            list(store_item_map.keys()), tenant_id
-        )
+        store_groups = route_svc.cluster_stores_by_region(list(store_item_map.keys()), tenant_id)
 
         tenant_uuid = uuid.UUID(tenant_id)
         plan_uuid = uuid.UUID(plan_id)
@@ -533,14 +523,11 @@ class ProductionPlanService:
             raise ValueError(f"生产计划 {plan_id} 不属于当前租户")
 
         # 查询该计划下所有配送行程及明细
-        stmt = (
-            select(DeliveryTripORM)
-            .where(
-                and_(
-                    DeliveryTripORM.plan_id == uuid.UUID(plan_id),
-                    DeliveryTripORM.tenant_id == uuid.UUID(tenant_id),
-                    DeliveryTripORM.is_deleted == False,  # noqa: E712
-                )
+        stmt = select(DeliveryTripORM).where(
+            and_(
+                DeliveryTripORM.plan_id == uuid.UUID(plan_id),
+                DeliveryTripORM.tenant_id == uuid.UUID(tenant_id),
+                DeliveryTripORM.is_deleted == False,  # noqa: E712
             )
         )
         result = await db.execute(stmt)
@@ -552,20 +539,20 @@ class ProductionPlanService:
             for item in trip.items:
                 if item.received_qty is not None:
                     variance = float(item.received_qty) - float(item.planned_qty)
-                    variance_pct = (
-                        variance / float(item.planned_qty) * 100 if float(item.planned_qty) else 0
+                    variance_pct = variance / float(item.planned_qty) * 100 if float(item.planned_qty) else 0
+                    variance_lines.append(
+                        {
+                            "trip_id": str(trip.id),
+                            "trip_no": trip.trip_no,
+                            "store_id": str(item.store_id),
+                            "ingredient_id": str(item.ingredient_id),
+                            "planned_qty": float(item.planned_qty),
+                            "received_qty": float(item.received_qty),
+                            "variance_qty": round(variance, 3),
+                            "variance_pct": round(variance_pct, 2),
+                            "status": item.status,
+                        }
                     )
-                    variance_lines.append({
-                        "trip_id": str(trip.id),
-                        "trip_no": trip.trip_no,
-                        "store_id": str(item.store_id),
-                        "ingredient_id": str(item.ingredient_id),
-                        "planned_qty": float(item.planned_qty),
-                        "received_qty": float(item.received_qty),
-                        "variance_qty": round(variance, 3),
-                        "variance_pct": round(variance_pct, 2),
-                        "status": item.status,
-                    })
                     if item.status == "disputed":
                         disputed_count += 1
 
@@ -608,12 +595,10 @@ class _DeliveryRouteHelper:
 
         stores_with_geo.sort(key=lambda x: (round(x[1], 1), x[2]))
         grouped_with_geo = [
-            [s[0] for s in stores_with_geo[i : i + max_per_trip]]
-            for i in range(0, len(stores_with_geo), max_per_trip)
+            [s[0] for s in stores_with_geo[i : i + max_per_trip]] for i in range(0, len(stores_with_geo), max_per_trip)
         ]
         grouped_without_geo = [
-            stores_without_geo[i : i + max_per_trip]
-            for i in range(0, len(stores_without_geo), max_per_trip)
+            stores_without_geo[i : i + max_per_trip] for i in range(0, len(stores_without_geo), max_per_trip)
         ]
         return grouped_with_geo + grouped_without_geo
 
@@ -656,10 +641,7 @@ class _DeliveryRouteHelper:
                 c_geo = geo_map.get(candidate)
                 if not c_geo:
                     continue
-                dist = math.sqrt(
-                    (last_geo["lat"] - c_geo["lat"]) ** 2
-                    + (last_geo["lng"] - c_geo["lng"]) ** 2
-                )
+                dist = math.sqrt((last_geo["lat"] - c_geo["lat"]) ** 2 + (last_geo["lng"] - c_geo["lng"]) ** 2)
                 if dist < nearest_dist:
                     nearest_dist = dist
                     nearest = candidate

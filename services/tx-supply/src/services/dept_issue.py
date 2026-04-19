@@ -4,6 +4,7 @@
 部门间调拨: 发起 → 确认
 出料率抽检: 实际产出量 / 理论产出量
 """
+
 from __future__ import annotations
 
 import uuid
@@ -55,9 +56,7 @@ async def create_issue_order(
     issue_id = _gen_id("iss")
     now = _now_iso()
     total_qty = sum(i.get("quantity", 0) for i in items)
-    total_cost_fen = sum(
-        i.get("quantity", 0) * i.get("unit_cost_fen", 0) for i in items
-    )
+    total_cost_fen = sum(i.get("quantity", 0) * i.get("unit_cost_fen", 0) for i in items)
 
     record: Dict[str, Any] = {
         "issue_id": issue_id,
@@ -125,10 +124,7 @@ async def create_return_order(
             ret_qty = ret_item.get("quantity", 0)
             issued_qty = issued_map.get(iid, 0)
             if ret_qty > issued_qty:
-                raise ValueError(
-                    f"退回数量({ret_qty})不能超过领用数量({issued_qty}), "
-                    f"商品: {iid}"
-                )
+                raise ValueError(f"退回数量({ret_qty})不能超过领用数量({issued_qty}), 商品: {iid}")
 
     return_id = _gen_id("iret")
     now = _now_iso()
@@ -305,23 +301,23 @@ async def sales_to_inventory(
     for sale in data:
         dish_qty = sale.get("quantity", 0)
         for ing in sale.get("ingredients", []):
-            deduction_items.append({
-                "ingredient_id": ing.get("ingredient_id"),
-                "name": ing.get("name", ""),
-                "quantity": round(ing.get("qty_per_dish", 0) * dish_qty, 4),
-                "unit": ing.get("unit", ""),
-                "source_dish_id": sale.get("dish_id"),
-                "source_dish_name": sale.get("dish_name", ""),
-            })
+            deduction_items.append(
+                {
+                    "ingredient_id": ing.get("ingredient_id"),
+                    "name": ing.get("name", ""),
+                    "quantity": round(ing.get("qty_per_dish", 0) * dish_qty, 4),
+                    "unit": ing.get("unit", ""),
+                    "source_dish_id": sale.get("dish_id"),
+                    "source_dish_name": sale.get("dish_name", ""),
+                }
+            )
 
     # 合并相同原料
     merged: Dict[str, Dict[str, Any]] = {}
     for item in deduction_items:
         iid = item["ingredient_id"]
         if iid in merged:
-            merged[iid]["quantity"] = round(
-                merged[iid]["quantity"] + item["quantity"], 4
-            )
+            merged[iid]["quantity"] = round(merged[iid]["quantity"] + item["quantity"], 4)
         else:
             merged[iid] = {**item}
 
@@ -337,9 +333,7 @@ async def sales_to_inventory(
         "sales_count": len(data),
         "deduction_items": merged_list,
         "deduction_item_count": len(merged_list),
-        "total_deduction_qty": round(
-            sum(i["quantity"] for i in merged_list), 4
-        ),
+        "total_deduction_qty": round(sum(i["quantity"] for i in merged_list), 4),
         "created_at": _now_iso(),
     }
 
@@ -443,9 +437,7 @@ async def get_monthly_summary(
             dept_summary[dept] = {"dept_id": dept, "order_count": 0, "total_cost_fen": 0, "total_qty": 0}
         dept_summary[dept]["order_count"] += 1
         dept_summary[dept]["total_cost_fen"] += order.get("total_cost_fen", 0)
-        dept_summary[dept]["total_qty"] = round(
-            dept_summary[dept]["total_qty"] + order.get("total_qty", 0), 2
-        )
+        dept_summary[dept]["total_qty"] = round(dept_summary[dept]["total_qty"] + order.get("total_qty", 0), 2)
 
     log.info(
         "monthly_summary_queried",

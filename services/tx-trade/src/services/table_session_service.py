@@ -2,6 +2,7 @@
 
 同桌多人扫码 → 加入同一 table_session → 实时同步 cart_items → 提交厨房
 """
+
 import secrets
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -355,10 +356,7 @@ class TableSessionService:
         dish_id_str = str(dish_id)
 
         # 只允许删除自己加的菜品
-        new_cart = [
-            c for c in cart
-            if not (str(c["dish_id"]) == dish_id_str and c.get("added_by_openid") == openid)
-        ]
+        new_cart = [c for c in cart if not (str(c["dish_id"]) == dish_id_str and c.get("added_by_openid") == openid)]
 
         if len(new_cart) == len(cart):
             raise ValueError(f"菜品 {dish_id_str} 不存在或不属于当前用户")
@@ -420,6 +418,7 @@ class TableSessionService:
 
         # 生成订单号
         from ..services.order_service import _gen_order_no
+
         order_no = _gen_order_no()
         order_id = uuid.uuid4()
         now = _now_utc()

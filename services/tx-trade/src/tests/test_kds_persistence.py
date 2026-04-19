@@ -6,6 +6,7 @@
 3. Mac mini重启场景：从DB恢复pending/cooking任务
 4. tenant_id隔离：不同租户看不到彼此的任务
 """
+
 import os
 import sys
 
@@ -18,6 +19,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 # ─── 工具 ───
+
 
 def _uid() -> str:
     return str(uuid.uuid4())
@@ -59,8 +61,8 @@ def _fake_db():
 
 # ─── 场景1: 创建任务后能从DB查询到 ───
 
-class TestTaskCreation:
 
+class TestTaskCreation:
     @pytest.mark.asyncio
     async def test_start_cooking_writes_db(self):
         """开始制作时同步写入kds_tasks表"""
@@ -124,8 +126,8 @@ class TestTaskCreation:
 
 # ─── 场景2: 状态变更后DB记录更新 ───
 
-class TestStateTransition:
 
+class TestStateTransition:
     @pytest.mark.asyncio
     async def test_invalid_transition_rejected(self):
         """非法状态流转被拒绝（done -> cooking）"""
@@ -172,8 +174,8 @@ class TestStateTransition:
 
 # ─── 场景3: Mac mini重启恢复 ───
 
-class TestRecoveryOnRestart:
 
+class TestRecoveryOnRestart:
     @pytest.mark.asyncio
     async def test_recover_active_tasks_from_db(self):
         """从DB恢复pending/cooking任务（模拟重启后内存为空）"""
@@ -226,8 +228,8 @@ class TestRecoveryOnRestart:
 
 # ─── 场景4: tenant_id隔离 ───
 
-class TestTenantIsolation:
 
+class TestTenantIsolation:
     @pytest.mark.asyncio
     async def test_tenant_a_cannot_access_tenant_b_task(self):
         """租户A无法访问租户B的任务"""

@@ -1,4 +1,5 @@
 """座位点单 Service"""
+
 import math
 import secrets
 from decimal import Decimal
@@ -15,6 +16,7 @@ log = structlog.get_logger(__name__)
 
 
 # ─── Pydantic 模型 ───
+
 
 class OrderSeat(BaseModel):
     id: UUID
@@ -55,6 +57,7 @@ class SplitBill(BaseModel):
 
 # ─── 函数 ───
 
+
 async def init_seats(
     order_id: UUID,
     seat_count: int,
@@ -85,11 +88,18 @@ async def init_seats(
             )
             row = result.fetchone()
             if row:
-                rows.append(OrderSeat(
-                    id=row[0], tenant_id=row[1], order_id=row[2],
-                    seat_no=row[3], seat_label=row[4],
-                    sub_total=row[5], paid_amount=row[6], payment_status=row[7],
-                ))
+                rows.append(
+                    OrderSeat(
+                        id=row[0],
+                        tenant_id=row[1],
+                        order_id=row[2],
+                        seat_no=row[3],
+                        seat_label=row[4],
+                        sub_total=row[5],
+                        paid_amount=row[6],
+                        payment_status=row[7],
+                    )
+                )
         except IntegrityError as exc:
             log.warning("seat_already_exists", order_id=str(order_id), seat_no=no, error=str(exc))
 
@@ -194,7 +204,8 @@ async def get_seat_summary(
                 price=i[3],
                 seat_no=i[4],
             )
-            for i in all_items if i[4] == seat_no
+            for i in all_items
+            if i[4] == seat_no
         ]
 
         shared = []
@@ -203,27 +214,31 @@ async def get_seat_summary(
             for i in shared_items:
                 total_price = i[2] * i[3]
                 per_seat = Decimal(math.ceil(float(total_price) / total_seats * 100)) / 100
-                shared.append(SeatItem(
-                    item_id=str(i[0]),
-                    name=i[1],
-                    qty=i[2],
-                    price=i[3],
-                    seat_no=None,
-                    share_count=total_seats,
-                    share_amount=per_seat,
-                ))
+                shared.append(
+                    SeatItem(
+                        item_id=str(i[0]),
+                        name=i[1],
+                        qty=i[2],
+                        price=i[3],
+                        seat_no=None,
+                        share_count=total_seats,
+                        share_amount=per_seat,
+                    )
+                )
                 shared_contribution += per_seat
 
         computed_total = sum(it.price * it.qty for it in seat_specific) + shared_contribution
 
-        summaries.append(SeatSummary(
-            seat_no=seat_no,
-            seat_label=seat_label,
-            items=seat_specific + shared,
-            sub_total=computed_total,
-            paid_amount=paid_amount,
-            payment_status=payment_status,
-        ))
+        summaries.append(
+            SeatSummary(
+                seat_no=seat_no,
+                seat_label=seat_label,
+                items=seat_specific + shared,
+                sub_total=computed_total,
+                paid_amount=paid_amount,
+                payment_status=payment_status,
+            )
+        )
 
     return summaries
 
@@ -262,8 +277,7 @@ async def calculate_split(
                     seen_shared.add(it.item_id)
                     all_items_flat.append(it)
         grand_total = sum(
-            (it.share_amount if it.seat_no is None and it.share_amount else it.price * it.qty)
-            for it in all_items_flat
+            (it.share_amount if it.seat_no is None and it.share_amount else it.price * it.qty) for it in all_items_flat
         )
         per_person = Decimal(math.ceil(float(grand_total) / len(summaries) * 100)) / 100 if summaries else Decimal("0")
         return [
@@ -299,12 +313,14 @@ async def calculate_split(
                     if it.share_amount:
                         group_total += it.share_amount * len(group)
         label = "+".join(str(sno) for sno in group) + "号"
-        bills.append(SplitBill(
-            group_label=label,
-            seat_nos=group,
-            items=group_items,
-            total_amount=group_total,
-        ))
+        bills.append(
+            SplitBill(
+                group_label=label,
+                seat_nos=group,
+                items=group_items,
+                total_amount=group_total,
+            )
+        )
     return bills
 
 

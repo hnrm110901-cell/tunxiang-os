@@ -5,6 +5,7 @@
 
 金额单位: 分(fen), int
 """
+
 import uuid
 from datetime import date, datetime, timezone
 from decimal import Decimal
@@ -16,6 +17,7 @@ log = structlog.get_logger()
 
 
 # ─── 纯函数：单菜品理论成本 ───
+
 
 def get_dish_theoretical_cost(
     dish_id: uuid.UUID,
@@ -132,13 +134,15 @@ def batch_calculate_daily_costs(
         line_total = unit_cost * quantity_sold
         grand_total += line_total
 
-        dish_costs.append({
-            "dish_id": str(dish_id),
-            "dish_name": dish_name,
-            "quantity_sold": quantity_sold,
-            "unit_cost_fen": unit_cost,
-            "total_cost_fen": line_total,
-        })
+        dish_costs.append(
+            {
+                "dish_id": str(dish_id),
+                "dish_name": dish_name,
+                "quantity_sold": quantity_sold,
+                "unit_cost_fen": unit_cost,
+                "total_cost_fen": line_total,
+            }
+        )
 
     # 按成本降序排列
     dish_costs.sort(key=lambda x: x["total_cost_fen"], reverse=True)
@@ -159,6 +163,7 @@ def batch_calculate_daily_costs(
 
 
 # ─── 纯函数：BOM 成本汇总 ───
+
 
 def _sum_bom_item_costs(items: list[dict]) -> int:
     """汇总 BOM 行项的理论成本
@@ -186,6 +191,7 @@ def compute_dish_theoretical_cost_from_bom(bom_items: list[dict]) -> int:
 
 # ─── DB 访问桩（实际项目中由 Repository 层实现） ───
 
+
 def _find_active_bom(
     dish_id: uuid.UUID,
     tenant_id: uuid.UUID,
@@ -206,7 +212,9 @@ def _find_active_bom(
         return None
     try:
         from sqlalchemy import text
-        result = db.execute(text("""
+
+        result = db.execute(
+            text("""
             SELECT id, dish_id, version, yield_rate
             FROM bom_templates
             WHERE dish_id = :dish_id AND tenant_id = :tenant_id
@@ -214,7 +222,9 @@ def _find_active_bom(
               AND effective_date <= :now
               AND (expiry_date IS NULL OR expiry_date > :now)
             ORDER BY effective_date DESC LIMIT 1
-        """), {"dish_id": dish_id, "tenant_id": tenant_id, "now": now})
+        """),
+            {"dish_id": dish_id, "tenant_id": tenant_id, "now": now},
+        )
         row = result.mappings().first()
         return dict(row) if row else None
     except (ImportError, AttributeError):
@@ -227,13 +237,17 @@ def _get_bom_items(bom_id: uuid.UUID, tenant_id: uuid.UUID, db) -> list[dict]:
         return []
     try:
         from sqlalchemy import text
-        result = db.execute(text("""
+
+        result = db.execute(
+            text("""
             SELECT ingredient_id, standard_qty, unit, unit_cost_fen,
                    waste_factor, is_optional, item_action
             FROM bom_items
             WHERE bom_id = :bom_id AND tenant_id = :tenant_id
               AND is_deleted = FALSE AND item_action != 'REMOVE'
-        """), {"bom_id": bom_id, "tenant_id": tenant_id})
+        """),
+            {"bom_id": bom_id, "tenant_id": tenant_id},
+        )
         return [dict(row) for row in result.mappings().all()]
     except (ImportError, AttributeError):
         return []
@@ -245,12 +259,16 @@ def _get_order_items(order_id: uuid.UUID, tenant_id: uuid.UUID, db) -> list[dict
         return []
     try:
         from sqlalchemy import text
-        result = db.execute(text("""
+
+        result = db.execute(
+            text("""
             SELECT dish_id, item_name, quantity, unit_price_fen, subtotal_fen
             FROM order_items
             WHERE order_id = :order_id AND tenant_id = :tenant_id
               AND is_deleted = FALSE
-        """), {"order_id": order_id, "tenant_id": tenant_id})
+        """),
+            {"order_id": order_id, "tenant_id": tenant_id},
+        )
         return [dict(row) for row in result.mappings().all()]
     except (ImportError, AttributeError):
         return []
@@ -279,7 +297,9 @@ def _get_daily_sold_dishes(
         return []
     try:
         from sqlalchemy import text
-        result = db.execute(text("""
+
+        result = db.execute(
+            text("""
             SELECT oi.dish_id, d.dish_name, SUM(oi.quantity) as quantity_sold
             FROM order_items oi
             JOIN orders o ON oi.order_id = o.id
@@ -291,7 +311,9 @@ def _get_daily_sold_dishes(
               AND o.is_deleted = FALSE
               AND oi.is_deleted = FALSE
             GROUP BY oi.dish_id, d.dish_name
-        """), {"store_id": store_id, "tenant_id": tenant_id, "target_date": target_date})
+        """),
+            {"store_id": store_id, "tenant_id": tenant_id, "target_date": target_date},
+        )
         return [dict(row) for row in result.mappings().all()]
     except (ImportError, AttributeError):
         return []

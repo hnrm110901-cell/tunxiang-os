@@ -9,6 +9,7 @@
   收货：transaction_type='transfer_in'，to_store 增加
   运输损耗：shipped - received 部分记入 waste
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -40,6 +41,7 @@ logger = structlog.get_logger(__name__)
 
 # ─── 内部工具 ─────────────────────────────────────────────
 
+
 class InsufficientStockError(ValueError):
     """库存不足错误"""
 
@@ -54,6 +56,7 @@ def _now() -> datetime:
 
 async def _set_tenant(db: AsyncSession, tenant_id: str) -> None:
     from sqlalchemy import text
+
     await db.execute(
         text("SELECT set_config('app.tenant_id', :tid, true)"),
         {"tid": str(tenant_id)},
@@ -231,9 +234,7 @@ async def list_transfer_orders(
         elif role == "to":
             filters.append(TransferOrder.to_store_id == sid)
         else:
-            filters.append(
-                (TransferOrder.from_store_id == sid) | (TransferOrder.to_store_id == sid)
-            )
+            filters.append((TransferOrder.from_store_id == sid) | (TransferOrder.to_store_id == sid))
     if status:
         filters.append(TransferOrder.status == status)
 
@@ -377,13 +378,10 @@ async def _check_transfer_feasibility(
         )
         ing = result.scalar_one_or_none()
         if ing is None:
-            raise InsufficientStockError(
-                f"调出门店没有食材 {item.ingredient_name}（id={item.ingredient_id}）"
-            )
+            raise InsufficientStockError(f"调出门店没有食材 {item.ingredient_name}（id={item.ingredient_id}）")
         if ing.current_quantity < float(qty_needed):
             raise InsufficientStockError(
-                f"{item.ingredient_name} 调出门店库存不足："
-                f"现有 {ing.current_quantity}{ing.unit}，需要 {qty_needed}"
+                f"{item.ingredient_name} 调出门店库存不足：现有 {ing.current_quantity}{ing.unit}，需要 {qty_needed}"
             )
 
 
@@ -444,13 +442,10 @@ async def ship_transfer_order(
             item.batch_no = batch_no
 
         # 扣减 from_store 库存
-        ing = await _get_ingredient(
-            db, str(item.ingredient_id), str(order.from_store_id), tenant_id
-        )
+        ing = await _get_ingredient(db, str(item.ingredient_id), str(order.from_store_id), tenant_id)
         if ing.current_quantity < float(ship_qty):
             raise InsufficientStockError(
-                f"{item.ingredient_name} 库存不足: "
-                f"现有 {ing.current_quantity}{ing.unit}，发货需要 {ship_qty}"
+                f"{item.ingredient_name} 库存不足: 现有 {ing.current_quantity}{ing.unit}，发货需要 {ship_qty}"
             )
 
         qty_before = ing.current_quantity
@@ -475,14 +470,16 @@ async def ship_transfer_order(
             notes=f"调拨至门店 {order.to_store_id}",
         )
         db.add(tx)
-        inventory_results.append({
-            "ingredient_id": str(item.ingredient_id),
-            "ingredient_name": item.ingredient_name,
-            "shipped_quantity": float(ship_qty),
-            "qty_before": qty_before,
-            "qty_after": qty_after,
-            "transaction_id": str(tx.id),
-        })
+        inventory_results.append(
+            {
+                "ingredient_id": str(item.ingredient_id),
+                "ingredient_name": item.ingredient_name,
+                "shipped_quantity": float(ship_qty),
+                "qty_before": qty_before,
+                "qty_after": qty_after,
+                "transaction_id": str(tx.id),
+            }
+        )
 
     order.status = TransferOrderStatus.shipped.value
     order.shipped_at = now
@@ -535,9 +532,7 @@ async def receive_transfer_order(
     if order.status != TransferOrderStatus.shipped.value:
         raise ValueError(f"调拨单状态为 {order.status}，必须先发货才能确认收货")
 
-    received_map = {
-        i["item_id"]: Decimal(str(i["received_quantity"])) for i in received_items
-    }
+    received_map = {i["item_id"]: Decimal(str(i["received_quantity"])) for i in received_items}
 
     now = _now()
     inventory_results = []
@@ -555,9 +550,7 @@ async def receive_transfer_order(
         if recv_qty < 0:
             raise ValueError(f"收货数量不能为负：{item.ingredient_name}")
         if recv_qty > shipped_qty:
-            raise ValueError(
-                f"{item.ingredient_name} 收货数量({recv_qty}) 超过发货数量({shipped_qty})"
-            )
+            raise ValueError(f"{item.ingredient_name} 收货数量({recv_qty}) 超过发货数量({shipped_qty})")
 
         item.received_quantity = recv_qty_dec
 
@@ -574,9 +567,7 @@ async def receive_transfer_order(
             )
             to_ing = ing_result.scalar_one_or_none()
             if to_ing is None:
-                raise ValueError(
-                    f"调入门店没有食材 {item.ingredient_name}，请先建立门店食材台账"
-                )
+                raise ValueError(f"调入门店没有食材 {item.ingredient_name}，请先建立门店食材台账")
 
             qty_before = to_ing.current_quantity
             qty_after = qty_before + recv_qty
@@ -608,25 +599,29 @@ async def receive_transfer_order(
                 notes=f"来自门店 {order.from_store_id} 调拨",
             )
             db.add(tx_in)
-            inventory_results.append({
-                "ingredient_id": str(to_ing.id),
-                "ingredient_name": item.ingredient_name,
-                "received_quantity": recv_qty,
-                "qty_before": qty_before,
-                "qty_after": qty_after,
-                "transaction_id": str(tx_in.id),
-            })
+            inventory_results.append(
+                {
+                    "ingredient_id": str(to_ing.id),
+                    "ingredient_name": item.ingredient_name,
+                    "received_quantity": recv_qty,
+                    "qty_before": qty_before,
+                    "qty_after": qty_after,
+                    "transaction_id": str(tx_in.id),
+                }
+            )
 
         # 运输损耗
         loss = shipped_qty - recv_qty
         if loss > 0.001:
-            loss_results.append({
-                "ingredient_id": str(item.ingredient_id),
-                "ingredient_name": item.ingredient_name,
-                "shipped": shipped_qty,
-                "received": recv_qty,
-                "loss": loss,
-            })
+            loss_results.append(
+                {
+                    "ingredient_id": str(item.ingredient_id),
+                    "ingredient_name": item.ingredient_name,
+                    "shipped": shipped_qty,
+                    "received": recv_qty,
+                    "loss": loss,
+                }
+            )
             logger.warning(
                 "transfer_transit_loss",
                 order_id=order_id,
@@ -650,18 +645,20 @@ async def receive_transfer_order(
     )
 
     # ── 事件总线：门店调拨完成 ──────────────────────────────
-    asyncio.create_task(UniversalPublisher.publish(
-        event_type=SupplyEventType.TRANSFER_COMPLETED,
-        tenant_id=_uuid(tenant_id),
-        store_id=order.to_store_id,
-        entity_id=order.id,
-        event_data={
-            "from_store_id": str(order.from_store_id),
-            "to_store_id": str(order.to_store_id),
-            "items_count": len(inventory_results),
-        },
-        source_service="tx-supply",
-    ))
+    asyncio.create_task(
+        UniversalPublisher.publish(
+            event_type=SupplyEventType.TRANSFER_COMPLETED,
+            tenant_id=_uuid(tenant_id),
+            store_id=order.to_store_id,
+            entity_id=order.id,
+            event_data={
+                "from_store_id": str(order.from_store_id),
+                "to_store_id": str(order.to_store_id),
+                "items_count": len(inventory_results),
+            },
+            source_service="tx-supply",
+        )
+    )
 
     return {
         "order_id": order_id,
@@ -777,17 +774,19 @@ async def get_brand_ingredient_overview(
     overview = []
     for ing in all_rows:
         days_of_stock = None
-        overview.append({
-            "store_id": str(ing.store_id),
-            "ingredient_id": str(ing.id),
-            "ingredient_name": ing.ingredient_name,
-            "quantity": ing.current_quantity,
-            "unit": ing.unit,
-            "min_quantity": ing.min_quantity,
-            "status": ing.status,
-            "unit_price_fen": ing.unit_price_fen,
-            "days_of_stock": days_of_stock,
-        })
+        overview.append(
+            {
+                "store_id": str(ing.store_id),
+                "ingredient_id": str(ing.id),
+                "ingredient_name": ing.ingredient_name,
+                "quantity": ing.current_quantity,
+                "unit": ing.unit,
+                "min_quantity": ing.min_quantity,
+                "status": ing.status,
+                "unit_price_fen": ing.unit_price_fen,
+                "days_of_stock": days_of_stock,
+            }
+        )
 
     # 按库存量降序
     overview.sort(key=lambda x: x["quantity"], reverse=True)
@@ -803,30 +802,36 @@ async def get_brand_low_stock_alert(
     tid = _uuid(tenant_id)
 
     result = await db.execute(
-        select(Ingredient).where(
+        select(Ingredient)
+        .where(
             Ingredient.tenant_id == tid,
             Ingredient.is_deleted == False,  # noqa: E712
-            Ingredient.status.in_([
-                InventoryStatus.low.value,
-                InventoryStatus.critical.value,
-                InventoryStatus.out_of_stock.value,
-            ])
-        ).order_by(Ingredient.status, Ingredient.ingredient_name)
+            Ingredient.status.in_(
+                [
+                    InventoryStatus.low.value,
+                    InventoryStatus.critical.value,
+                    InventoryStatus.out_of_stock.value,
+                ]
+            ),
+        )
+        .order_by(Ingredient.status, Ingredient.ingredient_name)
     )
     rows = result.scalars().all()
 
     alerts = []
     for ing in rows:
-        alerts.append({
-            "store_id": str(ing.store_id),
-            "ingredient_id": str(ing.id),
-            "ingredient_name": ing.ingredient_name,
-            "category": ing.category,
-            "quantity": ing.current_quantity,
-            "min_quantity": ing.min_quantity,
-            "unit": ing.unit,
-            "status": ing.status,
-            "unit_price_fen": ing.unit_price_fen,
-        })
+        alerts.append(
+            {
+                "store_id": str(ing.store_id),
+                "ingredient_id": str(ing.id),
+                "ingredient_name": ing.ingredient_name,
+                "category": ing.category,
+                "quantity": ing.current_quantity,
+                "min_quantity": ing.min_quantity,
+                "unit": ing.unit,
+                "status": ing.status,
+                "unit_price_fen": ing.unit_price_fen,
+            }
+        )
 
     return alerts

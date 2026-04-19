@@ -10,6 +10,7 @@
 - 多租户隔离（不同 tenant 的门店不能互调）
 - 同门店调拨报错
 """
+
 from __future__ import annotations
 
 import os
@@ -148,8 +149,7 @@ class TestCreateTransferOrder:
                 tenant_id=TENANT_ID,
                 from_store_id=STORE_A,
                 to_store_id=STORE_A,
-                items=[{"ingredient_id": ING_A_ID, "ingredient_name": "鲈鱼",
-                        "requested_quantity": 1.0, "unit": "kg"}],
+                items=[{"ingredient_id": ING_A_ID, "ingredient_name": "鲈鱼", "requested_quantity": 1.0, "unit": "kg"}],
                 db=db_session,
             )
 
@@ -206,9 +206,7 @@ class TestApproveTransfer:
     async def test_approve_insufficient_stock_raises(self, db_session, draft_order):
         """库存不足时审批应抛出 InsufficientStockError"""
         # 先修改门店A库存为0
-        ing = (await db_session.execute(
-            select(Ingredient).where(Ingredient.id == uuid.UUID(ING_A_ID))
-        )).scalar_one()
+        ing = (await db_session.execute(select(Ingredient).where(Ingredient.id == uuid.UUID(ING_A_ID)))).scalar_one()
         ing.current_quantity = 0.0
         await db_session.flush()
 
@@ -243,9 +241,7 @@ class TestShipTransfer:
             items=items,
             db=db_session,
         )
-        detail = await get_transfer_order(
-            order_id=order_info["order_id"], tenant_id=TENANT_ID, db=db_session
-        )
+        detail = await get_transfer_order(order_id=order_info["order_id"], tenant_id=TENANT_ID, db=db_session)
         await approve_transfer_order(
             order_id=order_info["order_id"],
             tenant_id=TENANT_ID,
@@ -271,9 +267,7 @@ class TestShipTransfer:
         assert len(result["inventory_results"]) == 1
 
         # 门店A：50 - 15 = 35
-        ing_a = (await db_session.execute(
-            select(Ingredient).where(Ingredient.id == uuid.UUID(ING_A_ID))
-        )).scalar_one()
+        ing_a = (await db_session.execute(select(Ingredient).where(Ingredient.id == uuid.UUID(ING_A_ID)))).scalar_one()
         assert ing_a.current_quantity == 35.0
 
     @pytest.mark.asyncio
@@ -288,12 +282,18 @@ class TestShipTransfer:
             shipped_items=[{"item_id": item_id, "shipped_quantity": 15.0}],
         )
 
-        txns = (await db_session.execute(
-            select(IngredientTransaction).where(
-                IngredientTransaction.transaction_type == TransactionType.transfer_out.value,
-                IngredientTransaction.tenant_id == uuid.UUID(TENANT_ID),
+        txns = (
+            (
+                await db_session.execute(
+                    select(IngredientTransaction).where(
+                        IngredientTransaction.transaction_type == TransactionType.transfer_out.value,
+                        IngredientTransaction.tenant_id == uuid.UUID(TENANT_ID),
+                    )
+                )
             )
-        )).scalars().all()
+            .scalars()
+            .all()
+        )
         assert len(txns) == 1
         assert txns[0].quantity == 15.0
 
@@ -303,9 +303,7 @@ class TestShipTransfer:
         order_id, item_id = approved_order
 
         # 手动把库存调低
-        ing_a = (await db_session.execute(
-            select(Ingredient).where(Ingredient.id == uuid.UUID(ING_A_ID))
-        )).scalar_one()
+        ing_a = (await db_session.execute(select(Ingredient).where(Ingredient.id == uuid.UUID(ING_A_ID)))).scalar_one()
         ing_a.current_quantity = 1.0
         await db_session.flush()
 
@@ -339,9 +337,7 @@ class TestReceiveTransfer:
             items=items,
             db=db_session,
         )
-        detail = await get_transfer_order(
-            order_id=order_info["order_id"], tenant_id=TENANT_ID, db=db_session
-        )
+        detail = await get_transfer_order(order_id=order_info["order_id"], tenant_id=TENANT_ID, db=db_session)
         item_id = detail["items"][0]["item_id"]
 
         await approve_transfer_order(
@@ -375,9 +371,7 @@ class TestReceiveTransfer:
         assert len(result["inventory_results"]) == 1
 
         # 门店B：5 + 15 = 20
-        ing_b = (await db_session.execute(
-            select(Ingredient).where(Ingredient.id == uuid.UUID(ING_B_ID))
-        )).scalar_one()
+        ing_b = (await db_session.execute(select(Ingredient).where(Ingredient.id == uuid.UUID(ING_B_ID)))).scalar_one()
         assert ing_b.current_quantity == 20.0
 
     @pytest.mark.asyncio
@@ -397,9 +391,7 @@ class TestReceiveTransfer:
         assert result["transit_losses"][0]["loss"] == 2.0
 
         # 门店B：5 + 13 = 18（不是15）
-        ing_b = (await db_session.execute(
-            select(Ingredient).where(Ingredient.id == uuid.UUID(ING_B_ID))
-        )).scalar_one()
+        ing_b = (await db_session.execute(select(Ingredient).where(Ingredient.id == uuid.UUID(ING_B_ID)))).scalar_one()
         assert ing_b.current_quantity == 18.0
 
     @pytest.mark.asyncio
@@ -414,12 +406,18 @@ class TestReceiveTransfer:
             received_items=[{"item_id": item_id, "received_quantity": 15.0}],
         )
 
-        txns = (await db_session.execute(
-            select(IngredientTransaction).where(
-                IngredientTransaction.transaction_type == TransactionType.transfer_in.value,
-                IngredientTransaction.tenant_id == uuid.UUID(TENANT_ID),
+        txns = (
+            (
+                await db_session.execute(
+                    select(IngredientTransaction).where(
+                        IngredientTransaction.transaction_type == TransactionType.transfer_in.value,
+                        IngredientTransaction.tenant_id == uuid.UUID(TENANT_ID),
+                    )
+                )
             )
-        )).scalars().all()
+            .scalars()
+            .all()
+        )
         assert len(txns) == 1
         assert txns[0].quantity == 15.0
 
@@ -471,9 +469,7 @@ class TestCancelTransfer:
             items=items,
             db=db_session,
         )
-        detail = await get_transfer_order(
-            order_id=order_info["order_id"], tenant_id=TENANT_ID, db=db_session
-        )
+        detail = await get_transfer_order(order_id=order_info["order_id"], tenant_id=TENANT_ID, db=db_session)
         item_id = detail["items"][0]["item_id"]
 
         await approve_transfer_order(

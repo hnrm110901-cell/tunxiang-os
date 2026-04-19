@@ -3,6 +3,7 @@
 面向消费者小程序 enterprise-meal / enterprise-orders 页面。
 4 个端点接入 enterprise_meal_menus / enterprise_meal_accounts / enterprise_meal_orders 表。
 """
+
 import json
 from datetime import date, datetime
 from typing import Optional
@@ -127,10 +128,12 @@ async def get_enterprise_account(
         row = result.mappings().first()
         if row is None:
             return _ok(empty)
-        return _ok({
-            "balance_fen": row["balance_fen"],
-            "meal_count_remaining": row["meal_count_remaining"],
-        })
+        return _ok(
+            {
+                "balance_fen": row["balance_fen"],
+                "meal_count_remaining": row["meal_count_remaining"],
+            }
+        )
     except SQLAlchemyError:
         return _ok(empty)
 
@@ -159,15 +162,18 @@ async def create_enterprise_meal_order(
                  :dish_ids::JSONB, :amount_fen, 'account', 'confirmed')
             RETURNING id
         """)
-        result = await db.execute(sql, {
-            "tid": req.company_id,
-            "sid": req.store_id or req.company_id,
-            "eid": req.employee_id or req.company_id,
-            "md": meal_date,
-            "mt": req.meal_type,
-            "dish_ids": dish_ids,
-            "amount_fen": req.total_fen,
-        })
+        result = await db.execute(
+            sql,
+            {
+                "tid": req.company_id,
+                "sid": req.store_id or req.company_id,
+                "eid": req.employee_id or req.company_id,
+                "md": meal_date,
+                "mt": req.meal_type,
+                "dish_ids": dish_ids,
+                "amount_fen": req.total_fen,
+            },
+        )
         await db.commit()
         row = result.first()
         order_id = str(row[0]) if row else "EMO" + datetime.now().strftime("%Y%m%d%H%M%S")
@@ -183,21 +189,25 @@ async def create_enterprise_meal_order(
             amount_fen=req.total_fen,
             client_ip=user.client_ip,
         )
-        return _ok({
-            "order_id": order_id,
-            "status": "accepted",
-            "total_fen": req.total_fen,
-            "items_count": len(req.items),
-        })
+        return _ok(
+            {
+                "order_id": order_id,
+                "status": "accepted",
+                "total_fen": req.total_fen,
+                "items_count": len(req.items),
+            }
+        )
     except SQLAlchemyError:
         await db.rollback()
         order_id = "EMO" + datetime.now().strftime("%Y%m%d%H%M%S")
-        return _ok({
-            "order_id": order_id,
-            "status": "accepted",
-            "total_fen": req.total_fen,
-            "items_count": len(req.items),
-        })
+        return _ok(
+            {
+                "order_id": order_id,
+                "status": "accepted",
+                "total_fen": req.total_fen,
+                "items_count": len(req.items),
+            }
+        )
 
 
 # ─── 4. 获取企业订餐历史 ───
@@ -239,13 +249,17 @@ async def get_enterprise_meal_orders(
                 "id": str(row["id"]),
                 "store_id": str(row["store_id"]),
                 "employee_id": str(row["employee_id"]),
-                "meal_date": row["meal_date"].isoformat() if hasattr(row["meal_date"], "isoformat") else str(row["meal_date"]),
+                "meal_date": row["meal_date"].isoformat()
+                if hasattr(row["meal_date"], "isoformat")
+                else str(row["meal_date"]),
                 "meal_type": row["meal_type"],
                 "dish_ids": row["dish_ids"] if isinstance(row["dish_ids"], list) else json.loads(row["dish_ids"]),
                 "amount_fen": row["amount_fen"],
                 "payment_method": row["payment_method"],
                 "status": row["status"],
-                "created_at": row["created_at"].isoformat() if hasattr(row["created_at"], "isoformat") else str(row["created_at"]),
+                "created_at": row["created_at"].isoformat()
+                if hasattr(row["created_at"], "isoformat")
+                else str(row["created_at"]),
             }
             for row in rows
         ]

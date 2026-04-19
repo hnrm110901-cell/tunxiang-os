@@ -1,4 +1,5 @@
 """平台团购核销 API — 聚合核销(美团/抖音/口碑/广发银行)"""
+
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -16,10 +17,7 @@ router = APIRouter(
 
 
 def _get_tenant_id(request: Request) -> str:
-    tid = (
-        getattr(request.state, "tenant_id", None)
-        or request.headers.get("X-Tenant-ID", "")
-    )
+    tid = getattr(request.state, "tenant_id", None) or request.headers.get("X-Tenant-ID", "")
     if not tid:
         raise HTTPException(status_code=400, detail="X-Tenant-ID header required")
     return tid

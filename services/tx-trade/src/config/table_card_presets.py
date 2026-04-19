@@ -5,20 +5,23 @@ Module: services/tx-trade/src/config/table_card_presets.py
 Business type configurations (PRO, STANDARD, LITE) with field visibility and feature settings.
 """
 
-from typing import Dict, List, Optional, Any
 from enum import Enum
-from pydantic import BaseModel, Field, ConfigDict
+from typing import Any, Dict, List, Optional
+
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class BusinessType(str, Enum):
     """Business type classification."""
-    PRO = "pro"               # å°å®«å¨ - Full-featured restaurants
-    STANDARD = "standard"     # å°å¨ä¸èµ· - Standard restaurants
-    LITE = "lite"             # æé»çº¿ - Fast-casual/quick service
+
+    PRO = "pro"  # å°å®«å¨ - Full-featured restaurants
+    STANDARD = "standard"  # å°å¨ä¸èµ· - Standard restaurants
+    LITE = "lite"  # æé»çº¿ - Fast-casual/quick service
 
 
 class PresetConfig(BaseModel):
     """Configuration preset for a business type."""
+
     model_config = ConfigDict(from_attributes=True)
 
     business_type: BusinessType
@@ -96,25 +99,25 @@ PRO_PRESET = PresetConfig(
     },
     refresh_interval_ms=2000,
     features_enabled=[
-        "vip_tracking",           # Track and highlight VIP customers
-        "order_monitoring",       # Real-time order monitoring
-        "overtime_alerts",        # Alert on table occupancy time
-        "dish_tracking",          # Track dish status in kitchen
-        "payment_tracking",       # Monitor payment methods
-        "reservation_management", # Full reservation features
-        "team_management",        # Waiter assignment and tracking
-        "analytics_export",       # Export capabilities
-        "custom_rules",           # Allow custom business rules
+        "vip_tracking",  # Track and highlight VIP customers
+        "order_monitoring",  # Real-time order monitoring
+        "overtime_alerts",  # Alert on table occupancy time
+        "dish_tracking",  # Track dish status in kitchen
+        "payment_tracking",  # Monitor payment methods
+        "reservation_management",  # Full reservation features
+        "team_management",  # Waiter assignment and tracking
+        "analytics_export",  # Export capabilities
+        "custom_rules",  # Allow custom business rules
         "learning_optimization",  # Field importance learning
-        "multi_language",         # Multi-language support
+        "multi_language",  # Multi-language support
     ],
     custom_rules={
         "vip_auto_alert": True,
-        "overtime_threshold_normal": 120,      # 2 hours
-        "overtime_threshold_vip": 180,         # 3 hours
-        "pending_dishes_warning": 20,          # 20 minutes
-        "checkout_timeout_threshold": 10,      # 10 minutes
-        "cleanup_emergency_threshold": 30,     # 30 minutes before next reservation
+        "overtime_threshold_normal": 120,  # 2 hours
+        "overtime_threshold_vip": 180,  # 3 hours
+        "pending_dishes_warning": 20,  # 20 minutes
+        "checkout_timeout_threshold": 10,  # 10 minutes
+        "cleanup_emergency_threshold": 30,  # 30 minutes before next reservation
         "enable_dish_image_preview": True,
         "enable_customer_history": True,
         "enable_room_management": True,
@@ -331,8 +334,7 @@ def get_preset_by_name(business_type_name: str) -> PresetConfig:
         return get_preset(business_type)
     except ValueError:
         raise ValueError(
-            f"Unknown business type: {business_type_name}. "
-            f"Valid values: {', '.join([bt.value for bt in BusinessType])}"
+            f"Unknown business type: {business_type_name}. Valid values: {', '.join([bt.value for bt in BusinessType])}"
         )
 
 
@@ -420,6 +422,7 @@ def validate_preset_fields(
 # Preset Comparison and Migration
 # ============================================================================
 
+
 def compare_presets(
     business_type1: BusinessType,
     business_type2: BusinessType,
@@ -484,11 +487,7 @@ def get_migration_path(
         "preserved_fields": list(from_visible & to_visible),
         "warning_data_loss": len(will_be_hidden) > 0,
         "feature_changes": {
-            "features_will_be_disabled": list(
-                set(from_preset.features_enabled) - set(to_preset.features_enabled)
-            ),
-            "features_will_be_enabled": list(
-                set(to_preset.features_enabled) - set(from_preset.features_enabled)
-            ),
+            "features_will_be_disabled": list(set(from_preset.features_enabled) - set(to_preset.features_enabled)),
+            "features_will_be_enabled": list(set(to_preset.features_enabled) - set(from_preset.features_enabled)),
         },
     }

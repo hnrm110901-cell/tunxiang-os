@@ -19,9 +19,9 @@
   - 所有写操作同时创建 WineStorageTransaction 记录
   - 所有查询强制包含 tenant_id 过滤（RLS 安全）
 """
+
 import uuid
 from datetime import date, datetime, timezone
-from decimal import Decimal
 from typing import Optional
 
 import structlog
@@ -45,6 +45,7 @@ router = APIRouter(prefix="/api/v1/wine-storage", tags=["存酒管理"])
 
 # ─── 依赖注入 ────────────────────────────────────────────────────────────────
 
+
 async def _get_tenant_db(x_tenant_id: str = Header(..., alias="X-Tenant-ID")):
     async for session in get_db_with_tenant(x_tenant_id):
         yield session
@@ -55,6 +56,7 @@ def _tid(x_tenant_id: str = Header(..., alias="X-Tenant-ID")) -> str:
 
 
 # ─── 工具函数 ─────────────────────────────────────────────────────────────────
+
 
 def _calc_expiry_fields(expiry_date: Optional[date]) -> tuple[Optional[int], bool]:
     """计算距到期天数和到期预警标志。返回 (days_until_expiry, expiry_warning)"""
@@ -83,14 +85,20 @@ def _serialize_record(row: dict, transactions: Optional[list] = None) -> dict:
         "quantity": row["quantity"],
         "remaining_quantity": row["remaining_quantity"],
         "unit": row["unit"],
-        "storage_date": row["storage_date"].isoformat() if isinstance(row["storage_date"], date) else row["storage_date"],
+        "storage_date": row["storage_date"].isoformat()
+        if isinstance(row["storage_date"], date)
+        else row["storage_date"],
         "expiry_date": expiry_date.isoformat() if isinstance(expiry_date, date) else expiry_date,
         "status": row["status"],
         "storage_price": str(row["storage_price"]) if row.get("storage_price") is not None else None,
         "notes": row.get("notes"),
         "created_by": row.get("created_by"),
-        "created_at": row["created_at"].isoformat() if isinstance(row.get("created_at"), datetime) else row.get("created_at"),
-        "updated_at": row["updated_at"].isoformat() if isinstance(row.get("updated_at"), datetime) else row.get("updated_at"),
+        "created_at": row["created_at"].isoformat()
+        if isinstance(row.get("created_at"), datetime)
+        else row.get("created_at"),
+        "updated_at": row["updated_at"].isoformat()
+        if isinstance(row.get("updated_at"), datetime)
+        else row.get("updated_at"),
         "days_until_expiry": days_until_expiry,
         "expiry_warning": expiry_warning,
     }
@@ -109,14 +117,19 @@ def _serialize_transaction(row: dict) -> dict:
         "table_id": row.get("table_id"),
         "order_id": row.get("order_id"),
         "operated_by": row.get("operated_by"),
-        "operated_at": row["operated_at"].isoformat() if isinstance(row.get("operated_at"), datetime) else row.get("operated_at"),
+        "operated_at": row["operated_at"].isoformat()
+        if isinstance(row.get("operated_at"), datetime)
+        else row.get("operated_at"),
         "approved_by": row.get("approved_by"),
         "notes": row.get("notes"),
-        "created_at": row["created_at"].isoformat() if isinstance(row.get("created_at"), datetime) else row.get("created_at"),
+        "created_at": row["created_at"].isoformat()
+        if isinstance(row.get("created_at"), datetime)
+        else row.get("created_at"),
     }
 
 
 # ─── 存酒入库 ─────────────────────────────────────────────────────────────────
+
 
 @router.post("", summary="存酒入库")
 async def store_wine(
@@ -221,6 +234,7 @@ async def store_wine(
 
 # ─── 存酒列表 ─────────────────────────────────────────────────────────────────
 
+
 @router.get("", summary="存酒列表（分页+多维过滤）")
 async def list_wine_storage(
     store_id: Optional[str] = Query(None, description="按门店过滤"),
@@ -273,12 +287,18 @@ async def list_wine_storage(
     if expiry_warning_only:
         today = datetime.now(timezone.utc).date()
         conditions.append("expiry_date IS NOT NULL AND expiry_date <= :warning_date")
-        params["warning_date"] = today.replace(day=today.day + 7) if today.day <= 24 else (
-            date(today.year, today.month + 1 if today.month < 12 else 1,
-                 today.day + 7 - 28) if today.month < 12 else date(today.year + 1, 1, today.day + 7 - 28)
+        params["warning_date"] = (
+            today.replace(day=today.day + 7)
+            if today.day <= 24
+            else (
+                date(today.year, today.month + 1 if today.month < 12 else 1, today.day + 7 - 28)
+                if today.month < 12
+                else date(today.year + 1, 1, today.day + 7 - 28)
+            )
         )
         # 使用更简洁的方式计算 7 天后
         from datetime import timedelta
+
         params["warning_date"] = today + timedelta(days=7)
 
     where_clause = " AND ".join(conditions)
@@ -319,6 +339,7 @@ async def list_wine_storage(
 
 
 # ─── 存酒详情 ─────────────────────────────────────────────────────────────────
+
 
 @router.get("/stats/summary", summary="存酒台账统计（总量/总价值/即将过期数量）")
 async def wine_storage_stats(
@@ -510,6 +531,7 @@ async def get_wine_storage_detail(
 
 # ─── 取酒 ─────────────────────────────────────────────────────────────────────
 
+
 @router.post("/{record_id}/take", summary="取酒")
 async def take_wine(
     record_id: str,
@@ -605,6 +627,7 @@ async def take_wine(
 
 # ─── 续存 ─────────────────────────────────────────────────────────────────────
 
+
 @router.post("/{record_id}/extend", summary="续存（延长到期日）")
 async def extend_wine_storage(
     record_id: str,
@@ -687,7 +710,9 @@ async def extend_wine_storage(
         "data": {
             "record_id": record_id,
             "wine_name": row["wine_name"],
-            "old_expiry_date": row["expiry_date"].isoformat() if isinstance(row.get("expiry_date"), date) else row.get("expiry_date"),
+            "old_expiry_date": row["expiry_date"].isoformat()
+            if isinstance(row.get("expiry_date"), date)
+            else row.get("expiry_date"),
             "new_expiry_date": body.new_expiry_date.isoformat(),
             "days_until_expiry": days_until_expiry,
             "expiry_warning": expiry_warning,
@@ -697,6 +722,7 @@ async def extend_wine_storage(
 
 
 # ─── 转台 ─────────────────────────────────────────────────────────────────────
+
 
 @router.post("/{record_id}/transfer", summary="转台（变更关联台位）")
 async def transfer_wine(
@@ -810,6 +836,7 @@ async def transfer_wine(
 
 
 # ─── 核销 ─────────────────────────────────────────────────────────────────────
+
 
 @router.post("/{record_id}/write-off", summary="核销存酒（管理员操作）")
 async def write_off_wine(

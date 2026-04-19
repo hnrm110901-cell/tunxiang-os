@@ -18,14 +18,15 @@ kds_soldout_routes（使用 src.db.get_db）：
 11. GET  /api/v1/kds/soldout?store_id=xxx                       — 查询沽清列表（空列表）
 12. POST /api/v1/kds/soldout                                    — 缺少必填字段 → 422
 """
+
 import os
 import sys
 import types
 
 # ─── 路径准备 ─────────────────────────────────────────────────────────────────
 _TESTS_DIR = os.path.dirname(__file__)
-_SRC_DIR   = os.path.abspath(os.path.join(_TESTS_DIR, ".."))
-_ROOT_DIR  = os.path.abspath(os.path.join(_TESTS_DIR, "..", "..", "..", ".."))
+_SRC_DIR = os.path.abspath(os.path.join(_TESTS_DIR, ".."))
+_ROOT_DIR = os.path.abspath(os.path.join(_TESTS_DIR, "..", "..", "..", ".."))
 
 for _p in [_SRC_DIR, _ROOT_DIR]:
     if _p not in sys.path:
@@ -33,6 +34,7 @@ for _p in [_SRC_DIR, _ROOT_DIR]:
 
 
 # ─── 建立 src 包层级 ──────────────────────────────────────────────────────────
+
 
 def _ensure_pkg(name: str, path: str) -> None:
     if name not in sys.modules:
@@ -42,13 +44,14 @@ def _ensure_pkg(name: str, path: str) -> None:
         sys.modules[name] = mod
 
 
-_ensure_pkg("src",          _SRC_DIR)
-_ensure_pkg("src.api",      os.path.join(_SRC_DIR, "api"))
+_ensure_pkg("src", _SRC_DIR)
+_ensure_pkg("src.api", os.path.join(_SRC_DIR, "api"))
 _ensure_pkg("src.services", os.path.join(_SRC_DIR, "services"))
-_ensure_pkg("src.models",   os.path.join(_SRC_DIR, "models"))
+_ensure_pkg("src.models", os.path.join(_SRC_DIR, "models"))
 
 
 # ─── stub helper ──────────────────────────────────────────────────────────────
+
 
 def _stub_module(full_name: str, **attrs):
     """注入一个最小存根模块，避免真实导入失败。"""
@@ -80,37 +83,35 @@ _stub_module(
 )
 
 # ─── 正式导入 ──────────────────────────────────────────────────────────────────
-import json as _json
 import uuid
-from datetime import date, datetime, timezone
+from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from src.api.kds_prep_routes import router as prep_router          # type: ignore[import]
-from src.api.kds_soldout_routes import router as soldout_router    # type: ignore[import]
-from src.db import get_db as src_get_db                            # type: ignore[import]
-
+from src.api.kds_prep_routes import router as prep_router  # type: ignore[import]
+from src.api.kds_soldout_routes import router as soldout_router  # type: ignore[import]
+from src.db import get_db as src_get_db  # type: ignore[import]
 
 # ─── 常量 ─────────────────────────────────────────────────────────────────────
 
 TENANT_ID = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
-STORE_ID  = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
-DEPT_ID   = "cccccccc-cccc-cccc-cccc-cccccccccccc"
-DISH_ID   = "dddddddd-dddd-dddd-dddd-dddddddddddd"
+STORE_ID = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+DEPT_ID = "cccccccc-cccc-cccc-cccc-cccccccccccc"
+DISH_ID = "dddddddd-dddd-dddd-dddd-dddddddddddd"
 
 HEADERS = {"X-Tenant-ID": TENANT_ID}
 
 
 # ─── 工具函数 ──────────────────────────────────────────────────────────────────
 
+
 def _make_mock_db() -> AsyncMock:
     db = AsyncMock()
-    db.commit   = AsyncMock()
+    db.commit = AsyncMock()
     db.rollback = AsyncMock()
-    db.execute  = AsyncMock(return_value=MagicMock())
+    db.execute = AsyncMock(return_value=MagicMock())
     return db
 
 
@@ -139,6 +140,7 @@ def _make_soldout_app(db: AsyncMock) -> FastAPI:
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 场景 1: GET /recommendations?store_id=xxx — 正常返回全店推荐
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 def test_prep_recommendations_all_depts():
     """全店备料推荐：不传 dept_id，返回所有档口所有菜品的推荐份数。"""
@@ -172,6 +174,7 @@ def test_prep_recommendations_all_depts():
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 场景 2: GET /recommendations?store_id=xxx&dept_id=xxx — 按档口过滤
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 def test_prep_recommendations_filtered_by_dept():
     """按档口过滤备料推荐：传入 dept_id，服务层接收到正确参数。"""
@@ -210,6 +213,7 @@ def test_prep_recommendations_filtered_by_dept():
 # 场景 3: GET /recommendations?store_id=xxx&target_date=xxx — 指定目标日期
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_prep_recommendations_with_target_date():
     """指定目标日期：返回的 target_date 与请求参数一致。"""
     db = _make_mock_db()
@@ -239,6 +243,7 @@ def test_prep_recommendations_with_target_date():
 # 场景 4: GET /recommendations — 缺少 X-Tenant-ID → 422
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_prep_recommendations_missing_tenant_id():
     """X-Tenant-ID 是必填 Header（alias），缺少时 FastAPI 返回 422。"""
     db = _make_mock_db()
@@ -257,6 +262,7 @@ def test_prep_recommendations_missing_tenant_id():
 # 场景 5: GET /recommendations — 缺少 store_id → 422
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_prep_recommendations_missing_store_id():
     """store_id 是必填查询参数，缺少时 FastAPI 返回 422。"""
     db = _make_mock_db()
@@ -274,6 +280,7 @@ def test_prep_recommendations_missing_store_id():
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 场景 6: POST /soldout — 标记沽清成功
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 def test_mark_soldout_success():
     """标记菜品沽清：返回 ok=True 及 soldout_id、synced_at 等字段。"""
@@ -316,6 +323,7 @@ def test_mark_soldout_success():
 # 场景 7: POST /soldout — ValueError → 400
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_mark_soldout_already_soldout():
     """菜品已经沽清，重复标记时服务层抛 ValueError，端点透传 400。"""
     db = _make_mock_db()
@@ -345,6 +353,7 @@ def test_mark_soldout_already_soldout():
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 场景 8: DELETE /soldout — 恢复沽清成功
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 def test_restore_soldout_success():
     """恢复沽清：菜品重新可售，全链路同步恢复，返回 ok=True。"""
@@ -380,6 +389,7 @@ def test_restore_soldout_success():
 # 场景 9: DELETE /soldout — ValueError → 400
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_restore_soldout_not_found():
     """恢复沽清：菜品不在沽清状态时服务层抛 ValueError，端点返回 400。"""
     db = _make_mock_db()
@@ -406,6 +416,7 @@ def test_restore_soldout_not_found():
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 场景 10: GET /soldout?store_id=xxx — 查询沽清列表（有数据）
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 def test_get_active_soldout_with_items():
     """沽清列表：当前有 2 道菜沽清，返回 items 和 total=2。"""
@@ -449,6 +460,7 @@ def test_get_active_soldout_with_items():
 # 场景 11: GET /soldout?store_id=xxx — 查询沽清列表（空列表）
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_get_active_soldout_empty():
     """沽清列表：当前无沽清菜品，返回空 items 和 total=0。"""
     db = _make_mock_db()
@@ -474,6 +486,7 @@ def test_get_active_soldout_empty():
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 场景 12: POST /soldout — 缺少必填字段 → 422
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 def test_mark_soldout_missing_required_field():
     """MarkSoldoutRequest 中 dish_name 是必填字段，缺少时 FastAPI 返回 422。"""

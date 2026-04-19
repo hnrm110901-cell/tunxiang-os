@@ -11,6 +11,7 @@
 统一响应格式: {"ok": bool, "data": {}, "error": {}}
 所有 HTTP 接口需 X-Tenant-ID header。
 """
+
 from __future__ import annotations
 
 import uuid
@@ -94,9 +95,7 @@ async def api_get_floor_layout(
     """获取指定楼层布局"""
     tenant_id = _get_tenant_id(request)
     svc = TableLayoutService(db)
-    layout = await svc.get_layout(
-        store_id=store_id, tenant_id=tenant_id, floor_no=floor_no
-    )
+    layout = await svc.get_layout(store_id=store_id, tenant_id=tenant_id, floor_no=floor_no)
     if layout is None:
         _err(f"楼层 {floor_no} 布局不存在", 404)
     return _ok(layout.model_dump())

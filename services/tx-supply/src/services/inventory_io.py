@@ -4,6 +4,7 @@ FIFO 先进先出扣料。金额单位：分（fen）。
 批次通过 purchase 类型的 IngredientTransaction 记录跟踪，
 reference_id 存批次号，notes 存 JSON 扩展信息（含 expiry_date）。
 """
+
 import asyncio
 import json
 import uuid
@@ -36,7 +37,10 @@ async def _set_tenant(db: AsyncSession, tenant_id: str) -> None:
 
 
 async def _get_ingredient(
-    db: AsyncSession, ingredient_id: str, store_id: str, tenant_id: str,
+    db: AsyncSession,
+    ingredient_id: str,
+    store_id: str,
+    tenant_id: str,
 ) -> Ingredient:
     """获取原料记录，不存在则抛出 ValueError"""
     result = await db.execute(
@@ -167,7 +171,10 @@ async def receive_stock(
 
 
 async def _get_batch_remaining(
-    db: AsyncSession, ingredient_id: str, tenant_id: str, store_id: str,
+    db: AsyncSession,
+    ingredient_id: str,
+    tenant_id: str,
+    store_id: str,
 ) -> list[dict]:
     """获取各批次剩余数量，按入库时间升序（FIFO）
 
@@ -219,9 +226,7 @@ async def _get_batch_remaining(
         .group_by(IngredientTransaction.reference_id)
     )
     out_result = await db.execute(out_q)
-    out_map: dict[str, float] = {
-        row.reference_id: float(row.out_total) for row in out_result.all()
-    }
+    out_map: dict[str, float] = {row.reference_id: float(row.out_total) for row in out_result.all()}
 
     batches = []
     for p in purchases:
@@ -232,13 +237,15 @@ async def _get_batch_remaining(
             notes_data = _parse_batch_notes(p.notes)
             expiry_str = notes_data.get("expiry_date")
             expiry = date.fromisoformat(expiry_str) if expiry_str else None
-            batches.append({
-                "batch_no": batch_no,
-                "remaining": remaining,
-                "unit_cost_fen": p.unit_cost_fen,
-                "expiry_date": expiry,
-                "created_at": p.created_at,
-            })
+            batches.append(
+                {
+                    "batch_no": batch_no,
+                    "remaining": remaining,
+                    "unit_cost_fen": p.unit_cost_fen,
+                    "expiry_date": expiry,
+                    "created_at": p.created_at,
+                }
+            )
     return batches
 
 
@@ -269,9 +276,7 @@ async def issue_stock(
     ingredient = await _get_ingredient(db, ingredient_id, store_id, tenant_id)
 
     if ingredient.current_quantity < quantity:
-        raise ValueError(
-            f"库存不足: 当前 {ingredient.current_quantity}, 需求 {quantity}"
-        )
+        raise ValueError(f"库存不足: 当前 {ingredient.current_quantity}, 需求 {quantity}")
 
     batches = await _get_batch_remaining(db, ingredient_id, tenant_id, store_id)
     if not batches:
@@ -305,12 +310,14 @@ async def issue_stock(
         )
         ingredient.current_quantity -= deduct
         db.add(tx)
-        transactions.append({
-            "transaction_id": str(tx.id),
-            "batch_no": batch["batch_no"],
-            "deducted": deduct,
-            "unit_cost_fen": batch["unit_cost_fen"],
-        })
+        transactions.append(
+            {
+                "transaction_id": str(tx.id),
+                "batch_no": batch["batch_no"],
+                "deducted": deduct,
+                "unit_cost_fen": batch["unit_cost_fen"],
+            }
+        )
 
     await db.flush()
     status = _update_status(ingredient)
@@ -328,19 +335,21 @@ async def issue_stock(
 
     # ── 事件总线：出库后库存触底检测 ────────────────────────
     if status in (InventoryStatus.low.value, InventoryStatus.critical.value, InventoryStatus.out_of_stock.value):
-        asyncio.create_task(UniversalPublisher.publish(
-            event_type=SupplyEventType.STOCK_LOW,
-            tenant_id=_uuid(tenant_id),
-            store_id=_uuid(store_id),
-            entity_id=_uuid(ingredient_id),
-            event_data={
-                "ingredient_id": ingredient_id,
-                "current_qty": ingredient.current_quantity,
-                "threshold_qty": ingredient.min_quantity,
-                "unit": ingredient.unit,
-            },
-            source_service="tx-supply",
-        ))
+        asyncio.create_task(
+            UniversalPublisher.publish(
+                event_type=SupplyEventType.STOCK_LOW,
+                tenant_id=_uuid(tenant_id),
+                store_id=_uuid(store_id),
+                entity_id=_uuid(ingredient_id),
+                event_data={
+                    "ingredient_id": ingredient_id,
+                    "current_qty": ingredient.current_quantity,
+                    "threshold_qty": ingredient.min_quantity,
+                    "unit": ingredient.unit,
+                },
+                source_service="tx-supply",
+            )
+        )
 
     return {
         "transactions": transactions,
@@ -376,9 +385,7 @@ async def adjust_stock(
     qty_after = qty_before + quantity
 
     if qty_after < 0:
-        raise ValueError(
-            f"调整后库存为负: {qty_before} + ({quantity}) = {qty_after}"
-        )
+        raise ValueError(f"调整后库存为负: {qty_before} + ({quantity}) = {qty_after}")
 
     ingredient.current_quantity = qty_after
     status = _update_status(ingredient)
@@ -439,12 +446,14 @@ async def get_stock_balance(
     total_cost = 0
     total_qty = 0.0
     for b in batches:
-        batch_list.append({
-            "batch_no": b["batch_no"],
-            "qty": b["remaining"],
-            "expiry": b["expiry_date"].isoformat() if b["expiry_date"] else None,
-            "unit_cost_fen": b["unit_cost_fen"],
-        })
+        batch_list.append(
+            {
+                "batch_no": b["batch_no"],
+                "qty": b["remaining"],
+                "expiry": b["expiry_date"].isoformat() if b["expiry_date"] else None,
+                "unit_cost_fen": b["unit_cost_fen"],
+            }
+        )
         total_qty += b["remaining"]
         total_cost += (b["unit_cost_fen"] or 0) * b["remaining"]
 
@@ -486,28 +495,26 @@ async def get_store_inventory(
     total = (await db.execute(count_q)).scalar() or 0
 
     items_q = (
-        select(Ingredient)
-        .where(base_filter)
-        .order_by(Ingredient.ingredient_name)
-        .offset((page - 1) * size)
-        .limit(size)
+        select(Ingredient).where(base_filter).order_by(Ingredient.ingredient_name).offset((page - 1) * size).limit(size)
     )
     result = await db.execute(items_q)
     ingredients = result.scalars().all()
 
     items = []
     for ing in ingredients:
-        items.append({
-            "id": str(ing.id),
-            "ingredient_name": ing.ingredient_name,
-            "category": ing.category,
-            "unit": ing.unit,
-            "current_quantity": ing.current_quantity,
-            "min_quantity": ing.min_quantity,
-            "max_quantity": ing.max_quantity,
-            "unit_price_fen": ing.unit_price_fen,
-            "status": ing.status,
-            "supplier_name": ing.supplier_name,
-        })
+        items.append(
+            {
+                "id": str(ing.id),
+                "ingredient_name": ing.ingredient_name,
+                "category": ing.category,
+                "unit": ing.unit,
+                "current_quantity": ing.current_quantity,
+                "min_quantity": ing.min_quantity,
+                "max_quantity": ing.max_quantity,
+                "unit_price_fen": ing.unit_price_fen,
+                "status": ing.status,
+                "supplier_name": ing.supplier_name,
+            }
+        )
 
     return {"items": items, "total": total}

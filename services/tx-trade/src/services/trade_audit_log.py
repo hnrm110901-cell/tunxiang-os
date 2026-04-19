@@ -12,6 +12,7 @@
 
 迁移：v261_trade_audit_logs（按月分区 + RLS + 3 条覆盖索引）
 """
+
 from __future__ import annotations
 
 import structlog

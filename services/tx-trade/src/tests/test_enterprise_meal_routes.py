@@ -10,6 +10,7 @@
 7. GET  /api/v1/trade/enterprise/meal-orders — 返回2条订单，data.items 长度=2
 8. GET  /api/v1/trade/enterprise/meal-orders — 返回空列表，data.items=[]
 """
+
 import os
 import sys
 
@@ -18,8 +19,8 @@ os.environ["TX_AUTH_ENABLED"] = "false"
 
 # ─── 路径准备 ─────────────────────────────────────────────────────────────────
 _TESTS_DIR = os.path.dirname(__file__)
-_SRC_DIR   = os.path.abspath(os.path.join(_TESTS_DIR, ".."))
-_ROOT_DIR  = os.path.abspath(os.path.join(_TESTS_DIR, "..", "..", "..", ".."))
+_SRC_DIR = os.path.abspath(os.path.join(_TESTS_DIR, ".."))
+_ROOT_DIR = os.path.abspath(os.path.join(_TESTS_DIR, "..", "..", "..", ".."))
 
 for _p in [_SRC_DIR, _ROOT_DIR]:
     if _p not in sys.path:
@@ -39,8 +40,8 @@ def _ensure_pkg(pkg_name: str, pkg_path: str) -> None:
         sys.modules[pkg_name] = mod
 
 
-_ensure_pkg("src",      _SRC_DIR)
-_ensure_pkg("src.api",  os.path.join(_SRC_DIR, "api"))
+_ensure_pkg("src", _SRC_DIR)
+_ensure_pkg("src.api", os.path.join(_SRC_DIR, "api"))
 
 # ─── 在导入路由之前，先把 shared.ontology.src.database 装入 sys.modules，
 #     再创建 src.db 存根指向同一个 get_db，满足 `from ..db import get_db` ────────
@@ -52,12 +53,10 @@ _db_stub.get_db = get_db  # type: ignore[attr-defined]
 sys.modules["src.db"] = _db_stub
 
 # ─── 正式导入 ─────────────────────────────────────────────────────────────────
-import json
 import uuid
 from datetime import date, datetime, timezone
 from unittest.mock import AsyncMock, MagicMock
 
-import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from sqlalchemy.exc import SQLAlchemyError
@@ -111,6 +110,7 @@ def make_mock_db() -> AsyncMock:
 def _override_db(db: AsyncMock):
     def _dep():
         return db
+
     return _dep
 
 
@@ -123,18 +123,20 @@ def _make_app(db: AsyncMock) -> FastAPI:
 
 # ─── 菜单行工厂 ───────────────────────────────────────────────────────────────
 
+
 def _menu_row(weekday: int = 1) -> dict:
     return {
         "id": uuid.uuid4(),
         "store_id": uuid.UUID(STORE_ID),
         "weekday": weekday,
         "meal_type": "lunch",
-        "dish_ids": ["dish-001", "dish-002"],   # 已是 list，无需 json.loads
+        "dish_ids": ["dish-001", "dish-002"],  # 已是 list，无需 json.loads
         "is_published": True,
     }
 
 
 # ─── 订单行工厂 ───────────────────────────────────────────────────────────────
+
 
 def _order_row() -> dict:
     return {
@@ -143,7 +145,7 @@ def _order_row() -> dict:
         "employee_id": uuid.UUID(EMPLOYEE_ID),
         "meal_date": date(2026, 3, 31),
         "meal_type": "lunch",
-        "dish_ids": ["dish-001"],               # 已是 list
+        "dish_ids": ["dish-001"],  # 已是 list
         "amount_fen": 2800,
         "payment_method": "account",
         "status": "confirmed",
@@ -154,6 +156,7 @@ def _order_row() -> dict:
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 场景 1: GET /weekly-menu — SELECT 返回2条记录，data.days 长度=2
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 def test_get_weekly_menu_success():
     """SELECT 返回2条 menu 记录 → 200，data.menu.days 长度为2"""
@@ -169,10 +172,7 @@ def test_get_weekly_menu_success():
 
     app = _make_app(db)
     client = TestClient(app)
-    resp = client.get(
-        f"/api/v1/trade/enterprise/weekly-menu"
-        f"?company_id={TENANT}&store_id={STORE_ID}&week={WEEK_START}"
-    )
+    resp = client.get(f"/api/v1/trade/enterprise/weekly-menu?company_id={TENANT}&store_id={STORE_ID}&week={WEEK_START}")
 
     assert resp.status_code == 200
     body = resp.json()
@@ -188,6 +188,7 @@ def test_get_weekly_menu_success():
 # 场景 2: GET /weekly-menu — SELECT 返回空列表，data.days=[]
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_get_weekly_menu_empty():
     """SELECT 返回空 → 200，data.menu.days=[]"""
     set_cfg_result = MagicMock()
@@ -198,10 +199,7 @@ def test_get_weekly_menu_empty():
 
     app = _make_app(db)
     client = TestClient(app)
-    resp = client.get(
-        f"/api/v1/trade/enterprise/weekly-menu"
-        f"?company_id={TENANT}&week={WEEK_START}"
-    )
+    resp = client.get(f"/api/v1/trade/enterprise/weekly-menu?company_id={TENANT}&week={WEEK_START}")
 
     assert resp.status_code == 200
     body = resp.json()
@@ -213,6 +211,7 @@ def test_get_weekly_menu_empty():
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 场景 3: GET /account — SELECT 返回账户记录，data 含 balance_fen
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 def test_get_account_success():
     """SELECT 返回账户行 → 200，data.balance_fen=5000, data.meal_count_remaining=10"""
@@ -226,10 +225,7 @@ def test_get_account_success():
 
     app = _make_app(db)
     client = TestClient(app)
-    resp = client.get(
-        f"/api/v1/trade/enterprise/account"
-        f"?company_id={TENANT}&member_id={EMPLOYEE_ID}"
-    )
+    resp = client.get(f"/api/v1/trade/enterprise/account?company_id={TENANT}&member_id={EMPLOYEE_ID}")
 
     assert resp.status_code == 200
     body = resp.json()
@@ -244,20 +240,18 @@ def test_get_account_success():
 # 场景 4: GET /account — SELECT 返回空（账户不存在）→ 200，data.balance_fen=0
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_get_account_not_exists():
     """账户不存在时返回零值对象，不返回 404"""
     set_cfg_result = MagicMock()
-    main_result = _make_result_first(None)   # row is None → 走 empty 分支
+    main_result = _make_result_first(None)  # row is None → 走 empty 分支
 
     db = make_mock_db()
     db.execute = AsyncMock(side_effect=[set_cfg_result, main_result])
 
     app = _make_app(db)
     client = TestClient(app)
-    resp = client.get(
-        f"/api/v1/trade/enterprise/account"
-        f"?company_id={TENANT}&member_id={EMPLOYEE_ID}"
-    )
+    resp = client.get(f"/api/v1/trade/enterprise/account?company_id={TENANT}&member_id={EMPLOYEE_ID}")
 
     assert resp.status_code == 200
     body = resp.json()
@@ -270,6 +264,7 @@ def test_get_account_not_exists():
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 场景 5: POST /order — INSERT RETURNING id 成功，data 含 order_id 字段
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 def test_post_order_success():
     """正常下单：INSERT RETURNING 返回 id → 200，data.order_id 非空"""
@@ -321,15 +316,14 @@ def test_post_order_success():
 # 场景 6: POST /order — DB 抛 SQLAlchemyError，路由兜底返回 ok=True + 调用 rollback
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_post_order_db_error():
     """INSERT 抛 SQLAlchemyError → 路由 except 兜底，仍返回 200/ok=True，并调用 rollback"""
     set_cfg_result = MagicMock()
 
     db = make_mock_db()
     # 第一次 execute（_set_tenant）成功，第二次（INSERT）抛异常
-    db.execute = AsyncMock(
-        side_effect=[set_cfg_result, SQLAlchemyError("connection lost")]
-    )
+    db.execute = AsyncMock(side_effect=[set_cfg_result, SQLAlchemyError("connection lost")])
 
     payload = {
         "company_id": TENANT,
@@ -371,6 +365,7 @@ def test_post_order_db_error():
 # 场景 7: GET /meal-orders — SELECT 返回2条订单，data.items 长度=2
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_get_meal_orders_success():
     """SELECT 返回2条订单 → 200，data.items 长度为2"""
     row1 = _order_row()
@@ -384,10 +379,7 @@ def test_get_meal_orders_success():
 
     app = _make_app(db)
     client = TestClient(app)
-    resp = client.get(
-        f"/api/v1/trade/enterprise/meal-orders"
-        f"?company_id={TENANT}&member_id={EMPLOYEE_ID}&month=2026-03"
-    )
+    resp = client.get(f"/api/v1/trade/enterprise/meal-orders?company_id={TENANT}&member_id={EMPLOYEE_ID}&month=2026-03")
 
     assert resp.status_code == 200
     body = resp.json()
@@ -408,6 +400,7 @@ def test_get_meal_orders_success():
 # 场景 8: GET /meal-orders — SELECT 返回空列表，data.items=[]
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_get_meal_orders_empty():
     """SELECT 返回空 → 200，data.items=[]，data.total=0"""
     set_cfg_result = MagicMock()
@@ -418,10 +411,7 @@ def test_get_meal_orders_empty():
 
     app = _make_app(db)
     client = TestClient(app)
-    resp = client.get(
-        f"/api/v1/trade/enterprise/meal-orders"
-        f"?company_id={TENANT}&month=2026-03"
-    )
+    resp = client.get(f"/api/v1/trade/enterprise/meal-orders?company_id={TENANT}&month=2026-03")
 
     assert resp.status_code == 200
     body = resp.json()

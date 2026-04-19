@@ -14,6 +14,7 @@
 
 所有端点需要 X-Tenant-ID header。
 """
+
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -28,6 +29,7 @@ router = APIRouter(tags=["kds-config"])
 
 # ─── 公共依赖 ───
 
+
 def _get_tenant_id(request: Request) -> str:
     tid = getattr(request.state, "tenant_id", None) or request.headers.get("X-Tenant-ID", "")
     if not tid:
@@ -37,11 +39,13 @@ def _get_tenant_id(request: Request) -> str:
 
 # ─── 请求 / 响应 Schemas ───
 
+
 class SetPushModeReq(BaseModel):
     mode: OrderPushMode
 
 
 # ─── 等叫队列 ───
+
 
 @router.get("/calling/{store_id}")
 async def api_get_calling_tasks(
@@ -65,8 +69,7 @@ async def api_get_calling_tasks(
             "status": t.status,
             "dept_id": str(t.dept_id) if t.dept_id else None,
             "order_item_id": str(t.order_item_id),
-            "called_at": getattr(t, "called_at", None).isoformat()
-            if getattr(t, "called_at", None) else None,
+            "called_at": getattr(t, "called_at", None).isoformat() if getattr(t, "called_at", None) else None,
             "call_count": getattr(t, "call_count", 0),
             "created_at": t.created_at.isoformat() if t.created_at else None,
         }
@@ -76,6 +79,7 @@ async def api_get_calling_tasks(
 
 
 # ─── 标记等叫 ───
+
 
 @router.post("/task/{task_id}/call")
 async def api_mark_calling(
@@ -99,14 +103,14 @@ async def api_mark_calling(
         "data": {
             "task_id": str(task.id),
             "status": task.status,
-            "called_at": getattr(task, "called_at", None).isoformat()
-            if getattr(task, "called_at", None) else None,
+            "called_at": getattr(task, "called_at", None).isoformat() if getattr(task, "called_at", None) else None,
             "call_count": getattr(task, "call_count", 0),
         },
     }
 
 
 # ─── 确认上桌 ───
+
 
 @router.post("/task/{task_id}/serve")
 async def api_confirm_served(
@@ -130,13 +134,13 @@ async def api_confirm_served(
         "data": {
             "task_id": str(task.id),
             "status": task.status,
-            "served_at": getattr(task, "served_at", None).isoformat()
-            if getattr(task, "served_at", None) else None,
+            "served_at": getattr(task, "served_at", None).isoformat() if getattr(task, "served_at", None) else None,
         },
     }
 
 
 # ─── 等叫统计 ───
+
 
 @router.get("/calling/{store_id}/stats")
 async def api_calling_stats(
@@ -162,6 +166,7 @@ async def api_calling_stats(
 
 # ─── 出单模式查询 ───
 
+
 @router.get("/push-mode/{store_id}")
 async def api_get_push_mode(
     store_id: str,
@@ -186,6 +191,7 @@ async def api_get_push_mode(
 
 
 # ─── 出单模式设置 ───
+
 
 @router.put("/push-mode/{store_id}")
 async def api_set_push_mode(

@@ -4,6 +4,7 @@ POST /api/v1/orders/{order_id}/self-pay-link  — 生成自助付款 token（JWT
 GET  /api/v1/orders/{order_id}/payment-status — 查询支付状态
 POST /api/v1/pay/self/{token}                 — 顾客端提交支付（验证 token，更新订单）
 """
+
 from __future__ import annotations
 
 import os
@@ -33,6 +34,7 @@ _TOKEN_TTL_MINUTES = 15
 #  Helpers
 # ──────────────────────────────────────────────
 
+
 def _ok(data: dict) -> dict:
     return {"ok": True, "data": data, "error": None}
 
@@ -60,12 +62,15 @@ def _decode_token(token: str) -> dict:
     try:
         return jwt.decode(token, _SECRET_KEY, algorithms=[_ALGORITHM])
     except JWTError as exc:
-        raise HTTPException(status_code=401, detail={"ok": False, "error": {"message": f"无效或已过期的付款链接: {exc}"}}) from exc
+        raise HTTPException(
+            status_code=401, detail={"ok": False, "error": {"message": f"无效或已过期的付款链接: {exc}"}}
+        ) from exc
 
 
 # ──────────────────────────────────────────────
 #  请求模型
 # ──────────────────────────────────────────────
+
 
 class SelfPayLinkReq(BaseModel):
     split_count: Optional[int] = None  # None = 全单; >=2 = 按人分摊
@@ -79,6 +84,7 @@ class GuestPayReq(BaseModel):
 # ──────────────────────────────────────────────
 #  1. 生成自助付款 token
 # ──────────────────────────────────────────────
+
 
 @router.post("/orders/{order_id}/self-pay-link")
 async def create_self_pay_link(
@@ -117,20 +123,23 @@ async def create_self_pay_link(
 
     log.info("self_pay_link_created", order_id=order_id, split_count=split_count, amount_fen=per_person_fen)
 
-    return _ok({
-        "order_id": order_id,
-        "token": token,
-        "total_amount_fen": total_fen,
-        "per_person_amount_fen": per_person_fen,
-        "split_count": split_count,
-        "deep_link": f"txos://pay/{order_id}?amount={amount_yuan:.2f}&token={token}",
-        "expires_in_seconds": _TOKEN_TTL_MINUTES * 60,
-    })
+    return _ok(
+        {
+            "order_id": order_id,
+            "token": token,
+            "total_amount_fen": total_fen,
+            "per_person_amount_fen": per_person_fen,
+            "split_count": split_count,
+            "deep_link": f"txos://pay/{order_id}?amount={amount_yuan:.2f}&token={token}",
+            "expires_in_seconds": _TOKEN_TTL_MINUTES * 60,
+        }
+    )
 
 
 # ──────────────────────────────────────────────
 #  2. 查询支付状态
 # ──────────────────────────────────────────────
+
 
 @router.get("/orders/{order_id}/payment-status")
 async def get_payment_status(
@@ -155,18 +164,21 @@ async def get_payment_status(
         raise HTTPException(status_code=404, detail={"ok": False, "error": {"message": "订单不存在"}})
 
     paid = order["status"] == "paid"
-    return _ok({
-        "order_id": order_id,
-        "status": order["status"],
-        "paid": paid,
-        "amount_fen": order["final_amount_fen"] or order["total_amount_fen"] or 0,
-        "completed_at": order["completed_at"].isoformat() if paid and order["completed_at"] else None,
-    })
+    return _ok(
+        {
+            "order_id": order_id,
+            "status": order["status"],
+            "paid": paid,
+            "amount_fen": order["final_amount_fen"] or order["total_amount_fen"] or 0,
+            "completed_at": order["completed_at"].isoformat() if paid and order["completed_at"] else None,
+        }
+    )
 
 
 # ──────────────────────────────────────────────
 #  3. 顾客端提交支付
 # ──────────────────────────────────────────────
+
 
 @router.post("/pay/self/{token}")
 async def guest_submit_payment(
@@ -183,11 +195,7 @@ async def guest_submit_payment(
     now = datetime.now(timezone.utc)
 
     row = await db.execute(
-        text(
-            "SELECT id, status FROM orders "
-            "WHERE id = :oid AND tenant_id = :tid "
-            "FOR UPDATE"
-        ),
+        text("SELECT id, status FROM orders WHERE id = :oid AND tenant_id = :tid FOR UPDATE"),
         {"oid": order_id, "tid": tenant_id},
     )
     order = row.mappings().first()
@@ -235,10 +243,12 @@ async def guest_submit_payment(
 
     log.info("guest_self_pay_success", order_id=order_id, amount_fen=amount_fen, method=req.payment_method)
 
-    return _ok({
-        "order_id": order_id,
-        "status": "paid",
-        "paid_at": now.isoformat(),
-        "payment_no": payment_no,
-        "amount_fen": amount_fen,
-    })
+    return _ok(
+        {
+            "order_id": order_id,
+            "status": "paid",
+            "paid_at": now.isoformat(),
+            "payment_no": payment_no,
+            "amount_fen": amount_fen,
+        }
+    )

@@ -12,6 +12,7 @@
 纸宽: 80mm = 48 ASCII 字符 = 24 中文字符。
 编码: GBK。
 """
+
 from datetime import datetime
 
 import structlog
@@ -166,7 +167,7 @@ class ReceiptTemplate:
         buf += "谢谢惠顾 欢迎再次光临".encode("gbk", errors="replace") + LF
         buf += ESC_ALIGN_LEFT
 
-        buf += ESC_FEED + b'\x03' + GS_CUT_PARTIAL
+        buf += ESC_FEED + b"\x03" + GS_CUT_PARTIAL
         return bytes(buf)
 
     @staticmethod
@@ -211,7 +212,7 @@ class ReceiptTemplate:
         if seq > 0:
             info += f"  #{seq}"
         buf += info.encode("gbk", errors="replace") + LF
-        buf += (b'-' * LINE_WIDTH) + LF
+        buf += (b"-" * LINE_WIDTH) + LF
 
         # ── 菜品列表 ──
         for item in order_items:
@@ -235,10 +236,10 @@ class ReceiptTemplate:
                 buf += ESC_BOLD_OFF
 
         # ── 下单时间 ──
-        buf += (b'-' * LINE_WIDTH) + LF
+        buf += (b"-" * LINE_WIDTH) + LF
         buf += f"下单: {_now_str()}".encode("gbk", errors="replace") + LF
 
-        buf += LF + ESC_FEED + b'\x02' + GS_CUT_FULL
+        buf += LF + ESC_FEED + b"\x02" + GS_CUT_FULL
         return bytes(buf)
 
     @staticmethod
@@ -267,7 +268,7 @@ class ReceiptTemplate:
         buf += GS_SIZE_NORMAL + ESC_BOLD_OFF
         buf += store_name.encode("gbk", errors="replace") + LF
         buf += ESC_ALIGN_LEFT
-        buf += (b'=' * LINE_WIDTH) + LF
+        buf += (b"=" * LINE_WIDTH) + LF
 
         # ── 订单信息 ──
         buf += f"单号: {order.get('order_no', '')}".encode("gbk", errors="replace") + LF
@@ -293,7 +294,7 @@ class ReceiptTemplate:
             amount = _fen_to_yuan(item.get("subtotal_fen", 0))
             buf += _pad_three_columns(name, qty, amount, LINE_WIDTH).encode("gbk", errors="replace") + LF
 
-        buf += (b'=' * LINE_WIDTH) + LF
+        buf += (b"=" * LINE_WIDTH) + LF
 
         # ── 金额汇总 ──
         total = _fen_to_yuan(order.get("total_amount_fen", 0))
@@ -327,7 +328,7 @@ class ReceiptTemplate:
         buf += "谢谢惠顾 欢迎再次光临".encode("gbk", errors="replace") + LF
         buf += ESC_ALIGN_LEFT
 
-        buf += ESC_FEED + b'\x03' + GS_CUT_PARTIAL
+        buf += ESC_FEED + b"\x03" + GS_CUT_PARTIAL
         return bytes(buf)
 
     @staticmethod
@@ -351,7 +352,7 @@ class ReceiptTemplate:
         buf += "交 接 班 报 表".encode("gbk", errors="replace") + LF
         buf += GS_SIZE_NORMAL + ESC_BOLD_OFF
         buf += ESC_ALIGN_LEFT
-        buf += (b'=' * LINE_WIDTH) + LF
+        buf += (b"=" * LINE_WIDTH) + LF
 
         # ── 基本信息 ──
         buf += f"日期: {shift_data.get('settlement_date', '')}".encode("gbk", errors="replace") + LF
@@ -421,13 +422,13 @@ class ReceiptTemplate:
             diff = shift_data.get("cash_diff_fen", 0)
             buf += f"  差异:     {_fen_to_yuan(diff)}".encode("gbk", errors="replace") + LF
 
-        buf += (b'=' * LINE_WIDTH) + LF
+        buf += (b"=" * LINE_WIDTH) + LF
         buf += ESC_ALIGN_CENTER
         buf += "交班确认签字: __________".encode("gbk", errors="replace") + LF
         buf += "接班确认签字: __________".encode("gbk", errors="replace") + LF
         buf += ESC_ALIGN_LEFT
 
-        buf += ESC_FEED + b'\x03' + GS_CUT_PARTIAL
+        buf += ESC_FEED + b"\x03" + GS_CUT_PARTIAL
         return bytes(buf)
 
     @staticmethod
@@ -499,7 +500,7 @@ class ReceiptTemplate:
         buf += "日 结 报 表".encode("gbk", errors="replace") + LF
         buf += GS_SIZE_NORMAL + ESC_BOLD_OFF
         buf += ESC_ALIGN_LEFT
-        buf += (b'=' * LINE_WIDTH) + LF
+        buf += (b"=" * LINE_WIDTH) + LF
 
         # ── 日期 ──
         buf += f"日期: {daily_data.get('date', '')}".encode("gbk", errors="replace") + LF
@@ -545,12 +546,12 @@ class ReceiptTemplate:
                 amount = _fen_to_yuan(dish.get("amount_fen", 0))
                 buf += _pad_three_columns(name, qty, amount, LINE_WIDTH).encode("gbk", errors="replace") + LF
 
-        buf += (b'=' * LINE_WIDTH) + LF
+        buf += (b"=" * LINE_WIDTH) + LF
         buf += ESC_ALIGN_CENTER
         buf += f"打印时间: {_now_str()}".encode("gbk", errors="replace") + LF
         buf += ESC_ALIGN_LEFT
 
-        buf += ESC_FEED + b'\x03' + GS_CUT_PARTIAL
+        buf += ESC_FEED + b"\x03" + GS_CUT_PARTIAL
         return bytes(buf)
 
 
@@ -569,15 +570,15 @@ def _build_qrcode(data: str, size: int = 6) -> bytes:
 
     buf = bytearray()
     # QR Code Model 2
-    buf += b'\x1d\x28\x6b\x04\x00\x31\x41\x32\x00'
+    buf += b"\x1d\x28\x6b\x04\x00\x31\x41\x32\x00"
     # 大小
     size = max(1, min(16, size))
-    buf += b'\x1d\x28\x6b\x03\x00\x31\x43' + bytes([size])
+    buf += b"\x1d\x28\x6b\x03\x00\x31\x43" + bytes([size])
     # 纠错等级 M
-    buf += b'\x1d\x28\x6b\x03\x00\x31\x45\x31'
+    buf += b"\x1d\x28\x6b\x03\x00\x31\x45\x31"
     # 存储数据
-    buf += b'\x1d\x28\x6b' + bytes([pL, pH]) + b'\x31\x50\x30' + encoded
+    buf += b"\x1d\x28\x6b" + bytes([pL, pH]) + b"\x31\x50\x30" + encoded
     # 打印
-    buf += b'\x1d\x28\x6b\x03\x00\x31\x51\x30'
+    buf += b"\x1d\x28\x6b\x03\x00\x31\x51\x30"
     buf += LF
     return bytes(buf)

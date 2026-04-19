@@ -11,6 +11,7 @@
 所有接口需 X-Tenant-ID header。
 金额单位：分（int）。
 """
+
 from __future__ import annotations
 
 import uuid
@@ -21,7 +22,7 @@ import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from fastapi import status as http_status
 from pydantic import BaseModel, Field
-from sqlalchemy.exc import OperationalError, ProgrammingError, InterfaceError
+from sqlalchemy.exc import InterfaceError, OperationalError, ProgrammingError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql import text
 
@@ -104,9 +105,7 @@ async def edi_order_push(
         edi_id = str(uuid.uuid4())
 
         items_json = [item.model_dump() for item in body.items]
-        total_amount_fen = sum(
-            int(item.qty * item.unit_price_fen) for item in body.items
-        )
+        total_amount_fen = sum(int(item.qty * item.unit_price_fen) for item in body.items)
 
         await db.execute(
             text("""
@@ -147,9 +146,15 @@ async def edi_order_push(
         )
         row = dict(result.mappings().first())
 
-        logger.info("edi_order_pushed", tenant_id=x_tenant_id, edi_id=edi_id,
-                     edi_no=edi_no, supplier_id=body.supplier_id,
-                     store_id=body.store_id, total_amount_fen=total_amount_fen)
+        logger.info(
+            "edi_order_pushed",
+            tenant_id=x_tenant_id,
+            edi_id=edi_id,
+            edi_no=edi_no,
+            supplier_id=body.supplier_id,
+            store_id=body.store_id,
+            total_amount_fen=total_amount_fen,
+        )
         return {"ok": True, "data": row}
 
     except HTTPException:
@@ -157,8 +162,7 @@ async def edi_order_push(
     except (OperationalError, InterfaceError, ProgrammingError) as exc:
         await db.rollback()
         logger.error("edi_order_push_db_error", error=str(exc), tenant_id=x_tenant_id)
-        raise HTTPException(status_code=http_status.HTTP_503_SERVICE_UNAVAILABLE,
-                            detail=_db_unavailable_response())
+        raise HTTPException(status_code=http_status.HTTP_503_SERVICE_UNAVAILABLE, detail=_db_unavailable_response())
 
 
 @router.post("/delivery-confirm")
@@ -226,19 +230,21 @@ async def edi_delivery_confirm(
         )
         row = dict(updated.mappings().first())
 
-        logger.info("edi_delivery_confirmed", tenant_id=x_tenant_id,
-                     edi_order_id=body.edi_order_id, edi_no=order["edi_no"],
-                     tracking_no=body.tracking_no)
+        logger.info(
+            "edi_delivery_confirmed",
+            tenant_id=x_tenant_id,
+            edi_order_id=body.edi_order_id,
+            edi_no=order["edi_no"],
+            tracking_no=body.tracking_no,
+        )
         return {"ok": True, "data": row}
 
     except HTTPException:
         raise
     except (OperationalError, InterfaceError, ProgrammingError) as exc:
         await db.rollback()
-        logger.error("edi_delivery_confirm_db_error", error=str(exc),
-                     edi_order_id=body.edi_order_id)
-        raise HTTPException(status_code=http_status.HTTP_503_SERVICE_UNAVAILABLE,
-                            detail=_db_unavailable_response())
+        logger.error("edi_delivery_confirm_db_error", error=str(exc), edi_order_id=body.edi_order_id)
+        raise HTTPException(status_code=http_status.HTTP_503_SERVICE_UNAVAILABLE, detail=_db_unavailable_response())
 
 
 @router.post("/receive-confirm")
@@ -301,26 +307,24 @@ async def edi_receive_confirm(
         )
         row = dict(updated.mappings().first())
 
-        logger.info("edi_receive_confirmed", tenant_id=x_tenant_id,
-                     edi_order_id=body.edi_order_id, edi_no=order["edi_no"])
+        logger.info(
+            "edi_receive_confirmed", tenant_id=x_tenant_id, edi_order_id=body.edi_order_id, edi_no=order["edi_no"]
+        )
         return {"ok": True, "data": row}
 
     except HTTPException:
         raise
     except (OperationalError, InterfaceError, ProgrammingError) as exc:
         await db.rollback()
-        logger.error("edi_receive_confirm_db_error", error=str(exc),
-                     edi_order_id=body.edi_order_id)
-        raise HTTPException(status_code=http_status.HTTP_503_SERVICE_UNAVAILABLE,
-                            detail=_db_unavailable_response())
+        logger.error("edi_receive_confirm_db_error", error=str(exc), edi_order_id=body.edi_order_id)
+        raise HTTPException(status_code=http_status.HTTP_503_SERVICE_UNAVAILABLE, detail=_db_unavailable_response())
 
 
 @router.get("/order-status")
 async def edi_order_status(
     supplier_id: Optional[str] = Query(default=None),
     store_id: Optional[str] = Query(default=None),
-    status: Optional[str] = Query(default=None,
-                                   description="pushed/supplier_confirmed/shipped/received/cancelled"),
+    status: Optional[str] = Query(default=None, description="pushed/supplier_confirmed/shipped/received/cancelled"),
     edi_no: Optional[str] = Query(default=None),
     page: int = Query(default=1, ge=1),
     size: int = Query(default=20, ge=1, le=100),
@@ -382,9 +386,12 @@ async def edi_order_status(
         )
         status_summary = [dict(r) for r in summary_result.mappings().all()]
 
-        logger.info("edi_order_status_queried", tenant_id=x_tenant_id,
-                     total=total, filters={"supplier_id": supplier_id, "store_id": store_id,
-                                           "status": status})
+        logger.info(
+            "edi_order_status_queried",
+            tenant_id=x_tenant_id,
+            total=total,
+            filters={"supplier_id": supplier_id, "store_id": store_id, "status": status},
+        )
         return {
             "ok": True,
             "data": {
@@ -398,5 +405,4 @@ async def edi_order_status(
 
     except (OperationalError, InterfaceError, ProgrammingError) as exc:
         logger.error("edi_order_status_db_error", error=str(exc), tenant_id=x_tenant_id)
-        raise HTTPException(status_code=http_status.HTTP_503_SERVICE_UNAVAILABLE,
-                            detail=_db_unavailable_response())
+        raise HTTPException(status_code=http_status.HTTP_503_SERVICE_UNAVAILABLE, detail=_db_unavailable_response())

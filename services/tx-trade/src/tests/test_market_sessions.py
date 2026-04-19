@@ -7,6 +7,7 @@
 4. test_store_override                — 门店覆盖模板后 current 接口返回门店配置
 5. test_market_session_binding_on_open_table — 开台时自动关联 market_session_id
 """
+
 from __future__ import annotations
 
 from datetime import time
@@ -15,6 +16,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 # ─── 辅助函数 ─────────────────────────────────────────────────────────────────
+
 
 def _t(hh: int, mm: int) -> time:
     """创建 time 对象的简写"""
@@ -30,6 +32,7 @@ def _is_time_in_session(current: time, start: time, end: time) -> bool:
 
 
 # ─── 场景 1：08:00 命中早市 ───────────────────────────────────────────────────
+
 
 class TestCurrentSessionMorning:
     """08:00 应落在早市（06:00-11:00）区间内"""
@@ -61,6 +64,7 @@ class TestCurrentSessionMorning:
 
 
 # ─── 场景 2：23:30 命中夜宵（跨夜市别） ─────────────────────────────────────
+
 
 class TestCurrentSessionLateNight:
     """夜宵 21:00-02:00 是跨夜市别，23:30 和 01:30 都应命中"""
@@ -98,6 +102,7 @@ class TestCurrentSessionLateNight:
 
 # ─── 场景 3：模板 CRUD 全链路 ─────────────────────────────────────────────────
 
+
 class TestSessionTemplateCrud:
     """模拟 HTTP 调用测试模板创建/查询/更新"""
 
@@ -116,7 +121,7 @@ class TestSessionTemplateCrud:
             mock_db.execute = AsyncMock()
             mock_db.commit = AsyncMock()
 
-            from ..api.market_session_routes import create_template, MarketSessionTemplateCreateReq
+            from ..api.market_session_routes import MarketSessionTemplateCreateReq, create_template
 
             body = MarketSessionTemplateCreateReq(
                 name="早市",
@@ -159,6 +164,7 @@ class TestSessionTemplateCrud:
     async def test_update_template_not_found(self):
         """更新不存在的模板应返回 404"""
         import uuid
+
         from fastapi import HTTPException
 
         mock_db = AsyncMock()
@@ -170,7 +176,7 @@ class TestSessionTemplateCrud:
         mock_db.execute = AsyncMock(return_value=mock_result)
         mock_db.commit = AsyncMock()
 
-        from ..api.market_session_routes import update_template, MarketSessionTemplateUpdateReq
+        from ..api.market_session_routes import MarketSessionTemplateUpdateReq, update_template
 
         body = MarketSessionTemplateUpdateReq(name="新名称")
         with pytest.raises(HTTPException) as exc_info:
@@ -180,6 +186,7 @@ class TestSessionTemplateCrud:
 
 
 # ─── 场景 4：门店覆盖模板后 current 接口返回门店配置 ──────────────────────────
+
 
 class TestStoreOverride:
     """门店配置了自定义时间段时，current 接口应优先返回门店配置"""
@@ -232,10 +239,10 @@ class TestStoreOverride:
         """凌晨 04:00 无任何市别时应返回 data: null，不报错"""
         current = _t(4, 0)
         sessions = [
-            (_t(6, 0), _t(11, 0)),   # 早市
-            (_t(11, 0), _t(14, 30)), # 午市
+            (_t(6, 0), _t(11, 0)),  # 早市
+            (_t(11, 0), _t(14, 30)),  # 午市
             (_t(17, 0), _t(21, 0)),  # 晚市
-            (_t(21, 0), _t(2, 0)),   # 夜宵
+            (_t(21, 0), _t(2, 0)),  # 夜宵
         ]
         matched = any(_is_time_in_session(current, s, e) for s, e in sessions)
         # 04:00 在夜宵 21:00-02:00 之外（02:00 已结束），不应匹配
@@ -243,6 +250,7 @@ class TestStoreOverride:
 
 
 # ─── 场景 5：开台时自动关联 market_session_id ─────────────────────────────────
+
 
 class TestMarketSessionBindingOnOpenTable:
     """验证 _bind_market_session 的关联逻辑"""

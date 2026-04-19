@@ -1,4 +1,5 @@
 """排队叫号模型 — 6状态机，支持VIP优先与美团同步"""
+
 import uuid
 
 from sqlalchemy import Boolean, Index, Integer, String
@@ -12,17 +13,25 @@ from .enums import QueueSource, QueueStatus
 
 class QueueEntry(TenantBase):
     """排队记录"""
+
     __tablename__ = "queue_entries"
 
     queue_id: Mapped[str] = mapped_column(
-        String(20), unique=True, nullable=False, index=True,
+        String(20),
+        unique=True,
+        nullable=False,
+        index=True,
         comment="业务ID如Q-XXXXXXXXXXXX",
     )
     store_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), nullable=False, index=True,
+        UUID(as_uuid=True),
+        nullable=False,
+        index=True,
     )
     queue_number: Mapped[str] = mapped_column(
-        String(10), nullable=False, comment="排队号如A001",
+        String(10),
+        nullable=False,
+        comment="排队号如A001",
     )
     prefix: Mapped[str] = mapped_column(String(1), nullable=False, comment="桌型前缀A/B/C")
     seq: Mapped[int] = mapped_column(Integer, nullable=False, comment="序号")
@@ -32,16 +41,23 @@ class QueueEntry(TenantBase):
     party_size: Mapped[int] = mapped_column(Integer, nullable=False)
 
     source: Mapped[str] = mapped_column(
-        String(20), nullable=False, default=QueueSource.walk_in.value,
+        String(20),
+        nullable=False,
+        default=QueueSource.walk_in.value,
     )
     vip_priority: Mapped[bool] = mapped_column(Boolean, default=False)
     reservation_id: Mapped[str | None] = mapped_column(String(20), comment="关联预订业务ID")
 
     status: Mapped[str] = mapped_column(
-        String(20), nullable=False, default=QueueStatus.waiting.value, index=True,
+        String(20),
+        nullable=False,
+        default=QueueStatus.waiting.value,
+        index=True,
     )
     priority_ts: Mapped[str] = mapped_column(
-        String(50), nullable=False, comment="优先级时间戳(VIP前移)",
+        String(50),
+        nullable=False,
+        comment="优先级时间戳(VIP前移)",
     )
 
     # 时间线
@@ -105,10 +121,13 @@ class QueueEntry(TenantBase):
 
 class QueueCounter(TenantBase):
     """排队号计数器 — 按门店+日期+前缀记录当日最大序号"""
+
     __tablename__ = "queue_counters"
 
     store_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), nullable=False, index=True,
+        UUID(as_uuid=True),
+        nullable=False,
+        index=True,
     )
     date: Mapped[str] = mapped_column(String(10), nullable=False, comment="YYYY-MM-DD")
     prefix: Mapped[str] = mapped_column(String(1), nullable=False, comment="A/B/C")

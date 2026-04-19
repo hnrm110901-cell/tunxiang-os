@@ -15,6 +15,7 @@
   POST   /{banquet_id}/confirmation/sign        — 顾客确认签字
   GET    /{banquet_id}/confirmation/summary     — 确认单摘要（PDF导出用）
 """
+
 from __future__ import annotations
 
 from datetime import date, datetime
@@ -37,6 +38,7 @@ router = APIRouter(prefix="/api/v1/banquet", tags=["banquet-payment"])
 
 
 # ─── 工具 ───────────────────────────────────────────────────────────────────
+
 
 def _ok(data: object) -> dict:
     return {"ok": True, "data": data, "error": None}
@@ -74,6 +76,7 @@ def _svc(request: Request, db: AsyncSession = Depends(_get_db)) -> BanquetPaymen
 
 # ─── Request Models ──────────────────────────────────────────────────────────
 
+
 class CreateDepositReq(BaseModel):
     total_deposit_fen: int = Field(..., gt=0, description="应付定金总额（分）")
     due_date: Optional[date] = None
@@ -107,6 +110,7 @@ class SignConfirmationReq(BaseModel):
 
 
 # ─── 定金支付端点 ────────────────────────────────────────────────────────────
+
 
 @router.post("/{banquet_id}/deposit")
 async def create_deposit(
@@ -231,11 +235,9 @@ async def wechat_payment_callback(
 
     # 步骤2：跨租户查询 tenant_id（db 已跳过 RLS）
     from sqlalchemy import text as _text
+
     row = await db.execute(
-        _text(
-            "SELECT tenant_id FROM banquet_deposits "
-            "WHERE payment_no = :pno LIMIT 1"
-        ),
+        _text("SELECT tenant_id FROM banquet_deposits WHERE payment_no = :pno LIMIT 1"),
         {"pno": body.payment_no},
     )
     record = row.mappings().first()
@@ -277,6 +279,7 @@ async def wechat_payment_callback(
 
 
 # ─── 电子确认单端点 ──────────────────────────────────────────────────────────
+
 
 @router.post("/{banquet_id}/confirmation")
 async def create_confirmation(
@@ -330,9 +333,7 @@ async def get_confirmation(
     """获取确认单"""
     try:
         tenant_id = UUID(_get_tenant_id(request))
-        confirmation = await svc.get_confirmation(
-            banquet_id=banquet_id, tenant_id=tenant_id
-        )
+        confirmation = await svc.get_confirmation(banquet_id=banquet_id, tenant_id=tenant_id)
         if confirmation is None:
             return _err("确认单不存在", "NOT_FOUND")
         return _ok(confirmation.model_dump(mode="json"))
@@ -353,9 +354,7 @@ async def sign_confirmation(
         tenant_id = UUID(_get_tenant_id(request))
         svc = BanquetPaymentService(tenant_id=str(tenant_id), db=db)
         # 取最新确认单 id
-        confirmation = await svc.get_confirmation(
-            banquet_id=banquet_id, tenant_id=tenant_id
-        )
+        confirmation = await svc.get_confirmation(banquet_id=banquet_id, tenant_id=tenant_id)
         if confirmation is None:
             return _err("确认单不存在", "NOT_FOUND")
 
@@ -391,9 +390,7 @@ async def get_confirmation_summary(
     try:
         tenant_id = UUID(_get_tenant_id(request))
         # 取最新确认单 id
-        confirmation = await svc.get_confirmation(
-            banquet_id=banquet_id, tenant_id=tenant_id
-        )
+        confirmation = await svc.get_confirmation(banquet_id=banquet_id, tenant_id=tenant_id)
         if confirmation is None:
             return _err("确认单不存在", "NOT_FOUND")
 

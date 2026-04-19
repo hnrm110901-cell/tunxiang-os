@@ -11,12 +11,14 @@
   POST   /api/v1/supply/distribution/stores/{store_id}/geo
   POST   /api/v1/supply/distribution/drivers/{driver_id}
 """
+
 from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel, Field
+from services.tx_supply.src.services import distribution
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from services.tx_supply.src.services import distribution
 from shared.ontology.src.database import get_db
+
 from ..services.distribution_repository import DistributionRepository
 
 router = APIRouter(prefix="/api/v1/supply/distribution", tags=["distribution"])

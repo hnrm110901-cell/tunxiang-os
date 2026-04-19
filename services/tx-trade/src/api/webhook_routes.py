@@ -2,6 +2,7 @@
 
 接收美团/饿了么/抖音外卖订单推送，验签后解析订单并持久化到数据库。
 """
+
 import asyncio
 import hashlib
 import hmac as hmac_mod
@@ -15,6 +16,7 @@ from pydantic import BaseModel
 
 from shared.events.src.emitter import emit_event
 from shared.events.src.event_types import ChannelEventType
+
 from ..services.delivery_adapter import DeliveryPlatformAdapter
 
 logger = structlog.get_logger()
@@ -54,6 +56,7 @@ def _verify_meituan_callback_sign(params: dict[str, Any], sign: str) -> bool:
     expected = hashlib.md5(raw.encode("utf-8")).hexdigest().lower()
     return hmac_mod.compare_digest(expected, sign.lower())
 
+
 router = APIRouter(prefix="/api/v1/webhook", tags=["webhook"])
 
 
@@ -65,6 +68,7 @@ class MeituanOrderPushReq(BaseModel):
 
     美团推送的字段远多于此，这里仅建模必须字段，其余从 raw body 提取。
     """
+
     order_id: str
     app_poi_code: str = ""
     day_seq: str = ""
@@ -80,6 +84,7 @@ class MeituanOrderPushReq(BaseModel):
 
 class WebhookResp(BaseModel):
     """统一 Webhook 响应"""
+
     ok: bool
     data: dict[str, Any] = {}
     error: dict[str, Any] | None = None
@@ -126,13 +131,15 @@ def _parse_meituan_items(detail_str: str) -> list[dict[str, Any]]:
 
     items: list[dict[str, Any]] = []
     for item in items_raw:
-        items.append({
-            "name": item.get("food_name", ""),
-            "quantity": int(item.get("quantity", 1)),
-            "price_fen": int(item.get("price", 0)),
-            "sku_id": item.get("app_food_code", ""),
-            "notes": item.get("food_property", ""),
-        })
+        items.append(
+            {
+                "name": item.get("food_name", ""),
+                "quantity": int(item.get("quantity", 1)),
+                "price_fen": int(item.get("price", 0)),
+                "sku_id": item.get("app_food_code", ""),
+                "notes": item.get("food_property", ""),
+            }
+        )
     return items
 
 
@@ -226,21 +233,23 @@ async def meituan_order_push(request: Request) -> WebhookResp:
     )
 
     # ─── Phase 1 平行事件写入：渠道订单同步 ───
-    asyncio.create_task(emit_event(
-        event_type=ChannelEventType.ORDER_SYNCED,
-        tenant_id=tenant_id,
-        stream_id=order_id,
-        payload={
-            "platform_order_id": order_id,
-            "channel": "meituan",
-            "amount_fen": total_fen,
-            "item_count": len(items),
-            "internal_order_id": result.get("order_id"),
-        },
-        store_id=store_id,
-        source_service="tx-trade",
-        metadata={"webhook": "meituan"},
-    ))
+    asyncio.create_task(
+        emit_event(
+            event_type=ChannelEventType.ORDER_SYNCED,
+            tenant_id=tenant_id,
+            stream_id=order_id,
+            payload={
+                "platform_order_id": order_id,
+                "channel": "meituan",
+                "amount_fen": total_fen,
+                "item_count": len(items),
+                "internal_order_id": result.get("order_id"),
+            },
+            store_id=store_id,
+            source_service="tx-trade",
+            metadata={"webhook": "meituan"},
+        )
+    )
 
     return WebhookResp(ok=True, data=result)
 
@@ -316,13 +325,15 @@ async def eleme_order_push(request: Request) -> WebhookResp:
     # 解析菜品
     items: list[dict[str, Any]] = []
     for item in order_data.get("food_list", order_data.get("items", [])):
-        items.append({
-            "name": item.get("food_name", item.get("name", "")),
-            "quantity": int(item.get("quantity", item.get("count", 1))),
-            "price_fen": int(item.get("price", 0)),
-            "sku_id": item.get("food_id", item.get("sku_id", "")),
-            "notes": item.get("remark", ""),
-        })
+        items.append(
+            {
+                "name": item.get("food_name", item.get("name", "")),
+                "quantity": int(item.get("quantity", item.get("count", 1))),
+                "price_fen": int(item.get("price", 0)),
+                "sku_id": item.get("food_id", item.get("sku_id", "")),
+                "notes": item.get("remark", ""),
+            }
+        )
 
     adapter = DeliveryPlatformAdapter(
         store_id=store_id,
@@ -352,21 +363,23 @@ async def eleme_order_push(request: Request) -> WebhookResp:
     )
 
     # ─── Phase 1 平行事件写入：渠道订单同步 ───
-    asyncio.create_task(emit_event(
-        event_type=ChannelEventType.ORDER_SYNCED,
-        tenant_id=tenant_id,
-        stream_id=order_id,
-        payload={
-            "platform_order_id": order_id,
-            "channel": "eleme",
-            "amount_fen": total_fen,
-            "item_count": len(items),
-            "internal_order_id": result.get("order_id"),
-        },
-        store_id=store_id,
-        source_service="tx-trade",
-        metadata={"webhook": "eleme"},
-    ))
+    asyncio.create_task(
+        emit_event(
+            event_type=ChannelEventType.ORDER_SYNCED,
+            tenant_id=tenant_id,
+            stream_id=order_id,
+            payload={
+                "platform_order_id": order_id,
+                "channel": "eleme",
+                "amount_fen": total_fen,
+                "item_count": len(items),
+                "internal_order_id": result.get("order_id"),
+            },
+            store_id=store_id,
+            source_service="tx-trade",
+            metadata={"webhook": "eleme"},
+        )
+    )
 
     return WebhookResp(ok=True, data=result)
 
@@ -440,13 +453,15 @@ async def douyin_order_push(request: Request) -> WebhookResp:
 
     items: list[dict[str, Any]] = []
     for item in order_data.get("item_list", order_data.get("items", [])):
-        items.append({
-            "name": item.get("product_name", item.get("name", "")),
-            "quantity": int(item.get("count", item.get("quantity", 1))),
-            "price_fen": int(item.get("origin_amount", item.get("price", 0))),
-            "sku_id": item.get("product_id", item.get("sku_id", "")),
-            "notes": item.get("remark", ""),
-        })
+        items.append(
+            {
+                "name": item.get("product_name", item.get("name", "")),
+                "quantity": int(item.get("count", item.get("quantity", 1))),
+                "price_fen": int(item.get("origin_amount", item.get("price", 0))),
+                "sku_id": item.get("product_id", item.get("sku_id", "")),
+                "notes": item.get("remark", ""),
+            }
+        )
 
     adapter = DeliveryPlatformAdapter(
         store_id=store_id,
@@ -475,20 +490,22 @@ async def douyin_order_push(request: Request) -> WebhookResp:
         platform_order_id=order_id,
     )
 
-    asyncio.create_task(emit_event(
-        event_type=ChannelEventType.ORDER_SYNCED,
-        tenant_id=tenant_id,
-        stream_id=order_id,
-        payload={
-            "platform_order_id": order_id,
-            "channel": "douyin",
-            "amount_fen": total_fen,
-            "item_count": len(items),
-            "internal_order_id": result.get("order_id"),
-        },
-        store_id=store_id,
-        source_service="tx-trade",
-        metadata={"webhook": "douyin"},
-    ))
+    asyncio.create_task(
+        emit_event(
+            event_type=ChannelEventType.ORDER_SYNCED,
+            tenant_id=tenant_id,
+            stream_id=order_id,
+            payload={
+                "platform_order_id": order_id,
+                "channel": "douyin",
+                "amount_fen": total_fen,
+                "item_count": len(items),
+                "internal_order_id": result.get("order_id"),
+            },
+            store_id=store_id,
+            source_service="tx-trade",
+            metadata={"webhook": "douyin"},
+        )
+    )
 
     return WebhookResp(ok=True, data=result)

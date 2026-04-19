@@ -2,6 +2,7 @@
 
 测试数据基于徐记海鲜典型海鲜池场景。
 """
+
 import pytest
 
 from ..services.live_seafood_service import (
@@ -68,6 +69,7 @@ def _intake_king_crab(svc: LiveSeafoodService, batch_id: str = "BATCH-KC-001") -
 
 # ─── 1. 进货入池 ───
 
+
 class TestIntake:
     def test_record_lobster_intake(self, svc: LiveSeafoodService):
         result = _intake_lobster(svc)
@@ -128,6 +130,7 @@ class TestIntake:
 
 
 # ─── 2. 海鲜池管理 ───
+
 
 class TestTankManagement:
     def test_update_tank_status(self, svc: LiveSeafoodService):
@@ -205,6 +208,7 @@ class TestTankManagement:
 
 # ─── 3. 日常巡检 ───
 
+
 class TestInspection:
     def test_record_inspection(self, svc: LiveSeafoodService):
         _intake_lobster(svc)
@@ -276,6 +280,7 @@ class TestInspection:
 
 
 # ─── 4. 时价管理 ───
+
 
 class TestMarketPrice:
     def test_update_market_price(self, svc: LiveSeafoodService):
@@ -350,6 +355,7 @@ class TestMarketPrice:
 
 # ─── 5. 称重售卖 ───
 
+
 class TestSale:
     def test_record_sale(self, svc: LiveSeafoodService):
         _intake_lobster(svc)
@@ -365,7 +371,7 @@ class TestSale:
         assert sale["sale_id"].startswith("SALE-")
         assert sale["weight_kg"] == 2.5
         assert sale["sale_amount_fen"] == 145000  # 2.5 * 58000
-        assert sale["cost_amount_fen"] == 70000   # 2.5 * 28000
+        assert sale["cost_amount_fen"] == 70000  # 2.5 * 28000
         assert sale["margin_fen"] == 75000
         assert sale["margin_rate"] == pytest.approx(0.5172, abs=0.01)
         assert sale["cooking_method"] == "蒜蓉蒸"
@@ -422,6 +428,7 @@ class TestSale:
 
 # ─── 6. 全链路溯源 ───
 
+
 class TestTraceability:
     def test_trace_item(self, svc: LiveSeafoodService):
         _intake_lobster(svc)
@@ -469,6 +476,7 @@ class TestTraceability:
 
 # ─── 7. 食安合规 ───
 
+
 class TestCompliance:
     def test_check_compliance_all_good(self, svc: LiveSeafoodService):
         _intake_lobster(svc)
@@ -513,21 +521,39 @@ class TestCompliance:
 
 # ─── 8. 物种数据库完整性 ───
 
+
 class TestSpeciesDatabase:
     def test_all_required_species_present(self):
         required = [
-            "lobster", "grouper", "abalone", "king_crab",
-            "boston_lobster", "geoduck", "leopard_coral_grouper", "australian_lobster",
+            "lobster",
+            "grouper",
+            "abalone",
+            "king_crab",
+            "boston_lobster",
+            "geoduck",
+            "leopard_coral_grouper",
+            "australian_lobster",
         ]
         for sp in required:
             assert sp in SPECIES_DATABASE, f"Missing species: {sp}"
 
     def test_species_have_required_fields(self):
         required_fields = [
-            "name_cn", "name_en", "category", "temp_min", "temp_max",
-            "salinity_min", "salinity_max", "ph_min", "ph_max",
-            "max_density_kg_per_sqm", "typical_mortality_rate",
-            "shelf_life_days", "default_margin", "yield_rate", "cooking_methods",
+            "name_cn",
+            "name_en",
+            "category",
+            "temp_min",
+            "temp_max",
+            "salinity_min",
+            "salinity_max",
+            "ph_min",
+            "ph_max",
+            "max_density_kg_per_sqm",
+            "typical_mortality_rate",
+            "shelf_life_days",
+            "default_margin",
+            "yield_rate",
+            "cooking_methods",
         ]
         for sp_key, sp in SPECIES_DATABASE.items():
             for field in required_fields:
@@ -552,6 +578,7 @@ class TestSpeciesDatabase:
 
 
 # ─── 9. 端到端流程 ───
+
 
 class TestEndToEnd:
     def test_full_seafood_lifecycle(self, svc: LiveSeafoodService):

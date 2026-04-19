@@ -9,6 +9,7 @@
 强制 TX_AUTH_ENABLED=true，因为 rbac.py 在 false 时会走 dev bypass，
 绕过测试覆盖的拦截分支。其他集成/路由测试在 TX_AUTH_ENABLED=false 下运行。
 """
+
 from __future__ import annotations
 
 from types import SimpleNamespace

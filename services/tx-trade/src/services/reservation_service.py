@@ -15,6 +15,7 @@
   - [PAGINATION] list_reservations 增加分页
   - [VALIDATION] phone 空字符串校验
 """
+
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Optional
@@ -56,8 +57,16 @@ _DEFAULT_ROOM_CONFIG: dict[str, dict] = {
     "梅花厅": {"capacity": (4, 8), "features": ["独立空调", "投影"], "min_spend_fen": 80000},
     "兰花厅": {"capacity": (6, 12), "features": ["独立空调", "投影", "KTV"], "min_spend_fen": 120000},
     "竹韵阁": {"capacity": (8, 16), "features": ["独立空调", "投影", "KTV", "独立卫生间"], "min_spend_fen": 200000},
-    "菊香苑": {"capacity": (10, 20), "features": ["独立空调", "投影", "KTV", "独立卫生间", "休息区"], "min_spend_fen": 300000},
-    "牡丹厅": {"capacity": (20, 40), "features": ["独立空调", "LED屏", "音响", "舞台", "独立卫生间"], "min_spend_fen": 500000},
+    "菊香苑": {
+        "capacity": (10, 20),
+        "features": ["独立空调", "投影", "KTV", "独立卫生间", "休息区"],
+        "min_spend_fen": 300000,
+    },
+    "牡丹厅": {
+        "capacity": (20, 40),
+        "features": ["独立空调", "LED屏", "音响", "舞台", "独立卫生间"],
+        "min_spend_fen": 500000,
+    },
 }
 
 # 默认时段配置 — 实际应从 store 配置表读取
@@ -168,18 +177,15 @@ class ReservationService:
 
         # 检查时段冲突
         conflicts = await self.check_conflicts(
-            store_id, date, time,
+            store_id,
+            date,
+            time,
             duration_min=self._dining_duration_min,
             room_name=assigned_room["room_name"] if assigned_room else None,
         )
         if conflicts:
-            conflict_info = [
-                f"{c['confirmation_code']}({c['time']}, {c['customer_name']})"
-                for c in conflicts
-            ]
-            raise ValueError(
-                f"Time slot conflict detected: {', '.join(conflict_info)}"
-            )
+            conflict_info = [f"{c['confirmation_code']}({c['time']}, {c['customer_name']})" for c in conflicts]
+            raise ValueError(f"Time slot conflict detected: {', '.join(conflict_info)}")
 
         reservation_id = f"RSV-{_gen_id()}"
         confirmation_code = _gen_confirmation_code()
@@ -623,8 +629,12 @@ class ReservationService:
         """
         offset = (page - 1) * size
         records, total = await self._repo.list_by_store_paged(
-            store_id, date=date, status=status, type=type,
-            offset=offset, limit=size,
+            store_id,
+            date=date,
+            status=status,
+            type=type,
+            offset=offset,
+            limit=size,
         )
         return {
             "items": [r.to_dict() for r in records],
@@ -666,7 +676,9 @@ class ReservationService:
 
                 # 检查该时段是否有冲突
                 conflicts = await self.check_conflicts(
-                    store_id, date, time_str,
+                    store_id,
+                    date,
+                    time_str,
                     duration_min=self._dining_duration_min,
                 )
 
@@ -675,14 +687,16 @@ class ReservationService:
                 if not available:
                     reason = f"已有{len(conflicts)}个预订"
 
-                slots.append({
-                    "time": time_str,
-                    "meal": meal,
-                    "label": f"{config['label']} {time_str}",
-                    "available": available,
-                    "conflict_count": len(conflicts),
-                    "reason": reason,
-                })
+                slots.append(
+                    {
+                        "time": time_str,
+                        "meal": meal,
+                        "label": f"{config['label']} {time_str}",
+                        "available": available,
+                        "conflict_count": len(conflicts),
+                        "reason": reason,
+                    }
+                )
 
                 current += timedelta(minutes=30)
 
@@ -799,17 +813,19 @@ class ReservationService:
 
             # 判断是否有重叠
             if target_start < existing_end and target_end > existing_start:
-                conflicts.append({
-                    "reservation_id": r.reservation_id,
-                    "confirmation_code": r.confirmation_code,
-                    "customer_name": r.customer_name,
-                    "time": r.time,
-                    "estimated_end_time": r.estimated_end_time,
-                    "party_size": r.party_size,
-                    "type": r.type,
-                    "room_name": r.room_name,
-                    "status": r.status,
-                })
+                conflicts.append(
+                    {
+                        "reservation_id": r.reservation_id,
+                        "confirmation_code": r.confirmation_code,
+                        "customer_name": r.customer_name,
+                        "time": r.time,
+                        "estimated_end_time": r.estimated_end_time,
+                        "party_size": r.party_size,
+                        "type": r.type,
+                        "room_name": r.room_name,
+                        "status": r.status,
+                    }
+                )
 
         return conflicts
 
@@ -846,9 +862,7 @@ class ReservationService:
                 raise ValueError(f"Unknown room: {room_name}. Available: {list(self._room_config.keys())}")
             min_cap, max_cap = room["capacity"]
             if party_size > max_cap:
-                raise ValueError(
-                    f"Room {room_name} max capacity is {max_cap}, but party_size is {party_size}"
-                )
+                raise ValueError(f"Room {room_name} max capacity is {max_cap}, but party_size is {party_size}")
             return {
                 "room_name": room_name,
                 "capacity": room["capacity"],
@@ -864,18 +878,18 @@ class ReservationService:
                 # 检查冲突
                 conflicts = await self.check_conflicts(store_id, date, time, room_name=name)
                 if not conflicts:
-                    candidates.append({
-                        "room_name": name,
-                        "capacity": config["capacity"],
-                        "features": config["features"],
-                        "min_spend_fen": config["min_spend_fen"],
-                        "size_diff": max_cap - party_size,
-                    })
+                    candidates.append(
+                        {
+                            "room_name": name,
+                            "capacity": config["capacity"],
+                            "features": config["features"],
+                            "min_spend_fen": config["min_spend_fen"],
+                            "size_diff": max_cap - party_size,
+                        }
+                    )
 
         if not candidates:
-            raise ValueError(
-                f"No available room for party_size={party_size} on {date} {time}"
-            )
+            raise ValueError(f"No available room for party_size={party_size} on {date} {time}")
 
         # 选最匹配的（容量最接近的）
         candidates.sort(key=lambda c: c["size_diff"])

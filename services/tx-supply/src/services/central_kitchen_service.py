@@ -3,6 +3,7 @@
 构造：CentralKitchenService(db: AsyncSession, tenant_id: str)
 所有方法委托给 CentralKitchenRepository，返回 Pydantic 响应模型。
 """
+
 from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
@@ -108,7 +109,7 @@ class KitchenDashboard(BaseModel):
     plan_count: int
     plans: List[Dict[str, Any]]
     production_order_summary: Dict[str, int]  # status -> count
-    distribution_summary: Dict[str, int]      # status -> count
+    distribution_summary: Dict[str, int]  # status -> count
 
 
 class DishForecast(BaseModel):
@@ -129,6 +130,7 @@ class DemandForecast(BaseModel):
 
 
 # ─── 核心服务 ───────────────────────────────────────────────────────────────
+
 
 class CentralKitchenService:
     """中央厨房核心业务服务（DB 化）
@@ -258,9 +260,7 @@ class CentralKitchenService:
         items: List[Dict[str, Any]],
         notes: Optional[str] = None,
     ) -> StoreReceivingConfirmation:
-        d = await self._repo.confirm_receiving(
-            distribution_order_id, store_id, confirmed_by, items, notes
-        )
+        d = await self._repo.confirm_receiving(distribution_order_id, store_id, confirmed_by, items, notes)
         return StoreReceivingConfirmation(**d)
 
     # ── 看板与预测 ────────────────────────────────────────────────────

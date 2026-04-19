@@ -5,6 +5,7 @@
 
 由 tx-trade lifespan 启动。
 """
+
 from __future__ import annotations
 
 import asyncio

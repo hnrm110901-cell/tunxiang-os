@@ -5,6 +5,7 @@
 
 核心指标：每降低 1% 食材损耗 = 直接利润提升。
 """
+
 from typing import Optional
 
 # ─── 根因 → 行动建议映射表 ───
@@ -22,6 +23,7 @@ ROOT_CAUSE_ACTIONS: dict[str, str] = {
 
 
 # ─── 纯函数 ───
+
 
 def action_for_causes(root_causes: list[dict]) -> str:
     """根据根因列表返回最优先的行动建议"""

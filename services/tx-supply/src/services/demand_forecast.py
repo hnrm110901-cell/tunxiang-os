@@ -7,6 +7,7 @@
 
 金额单位：分（fen）。
 """
+
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
@@ -83,16 +84,13 @@ class DemandForecastService:
             return _uuid_mod.UUID(str(val))
 
         since = datetime.now(timezone.utc) - timedelta(days=days)
-        q = (
-            select(func.coalesce(func.sum(IngredientTransaction.quantity), 0))
-            .where(
-                IngredientTransaction.tenant_id == _uuid(tenant_id),
-                IngredientTransaction.ingredient_id == _uuid(ingredient_id),
-                IngredientTransaction.store_id == _uuid(store_id),
-                IngredientTransaction.transaction_type == TransactionType.usage.value,
-                IngredientTransaction.is_deleted == False,  # noqa: E712
-                IngredientTransaction.created_at >= since,
-            )
+        q = select(func.coalesce(func.sum(IngredientTransaction.quantity), 0)).where(
+            IngredientTransaction.tenant_id == _uuid(tenant_id),
+            IngredientTransaction.ingredient_id == _uuid(ingredient_id),
+            IngredientTransaction.store_id == _uuid(store_id),
+            IngredientTransaction.transaction_type == TransactionType.usage.value,
+            IngredientTransaction.is_deleted == False,  # noqa: E712
+            IngredientTransaction.created_at >= since,
         )
         result = await db.execute(q)
         total = float(result.scalar() or 0)

@@ -35,6 +35,7 @@ def _get_tenant_id(request: Request) -> str:
 
 # ─── 请求模型 ───
 
+
 class SyncOrdersReq(BaseModel):
     store_id: str
 
@@ -81,6 +82,7 @@ class AutoAcceptRulesReq(BaseModel):
 
 # ─── 端点 1: 同步美团订单 ───
 
+
 @router.post("/sync/meituan")
 async def api_sync_meituan_orders(
     req: SyncOrdersReq,
@@ -99,6 +101,7 @@ async def api_sync_meituan_orders(
 
 # ─── 端点 2: 同步饿了么订单 ───
 
+
 @router.post("/sync/eleme")
 async def api_sync_eleme_orders(
     req: SyncOrdersReq,
@@ -116,6 +119,7 @@ async def api_sync_eleme_orders(
 
 
 # ─── 端点 3: 接单 ───
+
 
 @router.post("/accept")
 async def api_accept_order(
@@ -138,6 +142,7 @@ async def api_accept_order(
 
 
 # ─── 端点 4: 拒单 ───
+
 
 @router.post("/reject")
 async def api_reject_order(
@@ -162,6 +167,7 @@ async def api_reject_order(
 
 # ─── 端点 5: 沽清同步 ───
 
+
 @router.post("/stockout/sync")
 async def api_sync_stockout(
     req: StockoutSyncReq,
@@ -180,6 +186,7 @@ async def api_sync_stockout(
 
 
 # ─── 端点 6: 配送状态更新 ───
+
 
 @router.put("/delivery/status")
 async def api_update_delivery_status(
@@ -203,6 +210,7 @@ async def api_update_delivery_status(
 
 # ─── 端点 7: 外卖仪表盘 ───
 
+
 @router.get("/dashboard/{store_id}")
 async def api_get_dashboard(
     store_id: str,
@@ -220,6 +228,7 @@ async def api_get_dashboard(
 
 
 # ─── 端点 8: 平台对账 ───
+
 
 @router.get("/reconciliation/{store_id}/{platform}/{date}")
 async def api_get_reconciliation(
@@ -246,6 +255,7 @@ async def api_get_reconciliation(
 
 # ─── 端点 9: 外卖菜品上下架 ───
 
+
 @router.post("/menu/manage")
 async def api_manage_menu(
     req: ManageMenuReq,
@@ -268,6 +278,7 @@ async def api_manage_menu(
 
 
 # ─── 端点 10: 自动接单规则 ───
+
 
 @router.post("/auto-accept/rules")
 async def api_set_auto_accept_rules(

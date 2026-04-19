@@ -3,6 +3,7 @@
 所有金额单位：分(fen)。
 SELECT FOR UPDATE 防超卖，退款恢复库存。
 """
+
 from __future__ import annotations
 
 import uuid
@@ -10,10 +11,10 @@ from datetime import datetime, timezone
 from typing import Any, Optional
 
 import structlog
-from sqlalchemy import select, func, update
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..models.retail_mall import RetailProduct, RetailOrder, RetailOrderItem
+from ..models.retail_mall import RetailOrder, RetailOrderItem, RetailProduct
 
 logger = structlog.get_logger(__name__)
 
@@ -81,11 +82,7 @@ async def list_products(
 
     # 查询商品列表
     query_stmt = (
-        select(RetailProduct)
-        .where(*base_filter)
-        .order_by(RetailProduct.created_at.desc())
-        .offset(offset)
-        .limit(size)
+        select(RetailProduct).where(*base_filter).order_by(RetailProduct.created_at.desc()).offset(offset).limit(size)
     )
     rows = await db.execute(query_stmt)
     products = rows.scalars().all()
@@ -204,13 +201,10 @@ async def update_product(
     tid = uuid.UUID(tenant_id)
     pid = uuid.UUID(product_id)
 
-    stmt = (
-        select(RetailProduct)
-        .where(
-            RetailProduct.id == pid,
-            RetailProduct.tenant_id == tid,
-            RetailProduct.is_deleted.is_(False),
-        )
+    stmt = select(RetailProduct).where(
+        RetailProduct.id == pid,
+        RetailProduct.tenant_id == tid,
+        RetailProduct.is_deleted.is_(False),
     )
     result = await db.execute(stmt)
     product = result.scalar_one_or_none()
@@ -219,8 +213,16 @@ async def update_product(
 
     # 校验可更新字段
     allowed_fields = {
-        "name", "sku", "category", "price_fen", "cost_fen",
-        "stock_qty", "min_stock", "image_url", "status", "is_weighable",
+        "name",
+        "sku",
+        "category",
+        "price_fen",
+        "cost_fen",
+        "stock_qty",
+        "min_stock",
+        "image_url",
+        "status",
+        "is_weighable",
     }
     for key, value in data.items():
         if key not in allowed_fields:
@@ -326,10 +328,7 @@ async def create_retail_order(
             raise ValueError(f"product_not_found:{item['product_id']}")
 
         if product.stock_qty < qty:
-            raise ValueError(
-                f"insufficient_stock:{product.name},"
-                f"available={product.stock_qty},requested={qty}"
-            )
+            raise ValueError(f"insufficient_stock:{product.name},available={product.stock_qty},requested={qty}")
 
         # 扣减库存
         product.stock_qty -= qty
@@ -340,13 +339,15 @@ async def create_retail_order(
         subtotal = product.price_fen * qty
         total_fen += subtotal
 
-        order_items_data.append({
-            "product_id": pid,
-            "product_name": product.name,
-            "quantity": qty,
-            "unit_price_fen": product.price_fen,
-            "subtotal_fen": subtotal,
-        })
+        order_items_data.append(
+            {
+                "product_id": pid,
+                "product_name": product.name,
+                "quantity": qty,
+                "unit_price_fen": product.price_fen,
+                "subtotal_fen": subtotal,
+            }
+        )
 
     # 创建订单主记录
     order = RetailOrder(
@@ -376,13 +377,15 @@ async def create_retail_order(
             subtotal_fen=oi_data["subtotal_fen"],
         )
         db.add(order_item)
-        result_items.append({
-            "product_id": str(oi_data["product_id"]),
-            "product_name": oi_data["product_name"],
-            "quantity": oi_data["quantity"],
-            "unit_price_fen": oi_data["unit_price_fen"],
-            "subtotal_fen": oi_data["subtotal_fen"],
-        })
+        result_items.append(
+            {
+                "product_id": str(oi_data["product_id"]),
+                "product_name": oi_data["product_name"],
+                "quantity": oi_data["quantity"],
+                "unit_price_fen": oi_data["unit_price_fen"],
+                "subtotal_fen": oi_data["subtotal_fen"],
+            }
+        )
 
     await db.flush()
 
@@ -433,13 +436,10 @@ async def get_retail_order(
     tid = uuid.UUID(tenant_id)
     oid = uuid.UUID(order_id)
 
-    stmt = (
-        select(RetailOrder)
-        .where(
-            RetailOrder.id == oid,
-            RetailOrder.tenant_id == tid,
-            RetailOrder.is_deleted.is_(False),
-        )
+    stmt = select(RetailOrder).where(
+        RetailOrder.id == oid,
+        RetailOrder.tenant_id == tid,
+        RetailOrder.is_deleted.is_(False),
     )
     result = await db.execute(stmt)
     order = result.scalar_one_or_none()
@@ -447,13 +447,10 @@ async def get_retail_order(
         raise ValueError("order_not_found")
 
     # 查询订单明细
-    items_stmt = (
-        select(RetailOrderItem)
-        .where(
-            RetailOrderItem.order_id == oid,
-            RetailOrderItem.tenant_id == tid,
-            RetailOrderItem.is_deleted.is_(False),
-        )
+    items_stmt = select(RetailOrderItem).where(
+        RetailOrderItem.order_id == oid,
+        RetailOrderItem.tenant_id == tid,
+        RetailOrderItem.is_deleted.is_(False),
     )
     items_result = await db.execute(items_stmt)
     order_items = items_result.scalars().all()
@@ -536,13 +533,10 @@ async def refund_retail_order(
         raise ValueError(f"order_cannot_refund:status={order.status}")
 
     # 查询订单明细并恢复库存
-    items_stmt = (
-        select(RetailOrderItem)
-        .where(
-            RetailOrderItem.order_id == oid,
-            RetailOrderItem.tenant_id == tid,
-            RetailOrderItem.is_deleted.is_(False),
-        )
+    items_stmt = select(RetailOrderItem).where(
+        RetailOrderItem.order_id == oid,
+        RetailOrderItem.tenant_id == tid,
+        RetailOrderItem.is_deleted.is_(False),
     )
     items_result = await db.execute(items_stmt)
     order_items = items_result.scalars().all()
@@ -612,29 +606,23 @@ async def get_retail_stats(
     sid = uuid.UUID(store_id)
 
     # GMV 和订单量（仅 paid 订单）
-    gmv_stmt = (
-        select(
-            func.coalesce(func.sum(RetailOrder.final_fen), 0).label("gmv_fen"),
-            func.count(RetailOrder.id).label("paid_count"),
-        )
-        .where(
-            RetailOrder.tenant_id == tid,
-            RetailOrder.store_id == sid,
-            RetailOrder.status == "paid",
-            RetailOrder.is_deleted.is_(False),
-        )
+    gmv_stmt = select(
+        func.coalesce(func.sum(RetailOrder.final_fen), 0).label("gmv_fen"),
+        func.count(RetailOrder.id).label("paid_count"),
+    ).where(
+        RetailOrder.tenant_id == tid,
+        RetailOrder.store_id == sid,
+        RetailOrder.status == "paid",
+        RetailOrder.is_deleted.is_(False),
     )
     gmv_result = await db.execute(gmv_stmt)
     gmv_row = gmv_result.one()
 
     # 总订单量（含所有状态）
-    total_stmt = (
-        select(func.count(RetailOrder.id))
-        .where(
-            RetailOrder.tenant_id == tid,
-            RetailOrder.store_id == sid,
-            RetailOrder.is_deleted.is_(False),
-        )
+    total_stmt = select(func.count(RetailOrder.id)).where(
+        RetailOrder.tenant_id == tid,
+        RetailOrder.store_id == sid,
+        RetailOrder.is_deleted.is_(False),
     )
     total_result = await db.execute(total_stmt)
     total_count = total_result.scalar() or 0
@@ -712,6 +700,7 @@ async def _legacy_create_product(
         raise ValueError(f"invalid_category:{category}, valid: {RETAIL_CATEGORIES}")
 
     import json as _json
+
     product_id = uuid.uuid4()
     now = _now_utc()
 
@@ -727,12 +716,18 @@ async def _legacy_create_product(
                  'draft', :now, :now)
         """),
         {
-            "id": product_id, "tid": uuid.UUID(tenant_id),
-            "name": name, "cat": category,
-            "cover": cover_image, "desc": description,
-            "price": price_fen, "orig_price": original_price_fen or price_fen,
-            "stock": stock, "tags": _json.dumps(tags),
-            "origin": origin, "shelf": shelf_life,
+            "id": product_id,
+            "tid": uuid.UUID(tenant_id),
+            "name": name,
+            "cat": category,
+            "cover": cover_image,
+            "desc": description,
+            "price": price_fen,
+            "orig_price": original_price_fen or price_fen,
+            "stock": stock,
+            "tags": _json.dumps(tags),
+            "origin": origin,
+            "shelf": shelf_life,
             "now": now,
         },
     )

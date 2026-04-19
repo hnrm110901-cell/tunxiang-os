@@ -9,6 +9,7 @@
 3. 为每个档口生成 ESC/POS 厨打单并发送到对应网络打印机
 4. 通过 WebSocket 推送新票据到 KDS 终端
 """
+
 import uuid
 from datetime import datetime, timezone
 
@@ -108,10 +109,7 @@ async def dispatch_order_to_kds(
                     if printer_id is not None:
                         printer_overrides[dish_uuid] = printer_id
             except (ValueError, AttributeError) as exc:
-                log.warning(
-                    "kds_dispatch.rule_engine_failed",
-                    dish_id=raw_dish_id, error=str(exc)
-                )
+                log.warning("kds_dispatch.rule_engine_failed", dish_id=raw_dish_id, error=str(exc))
     elif dish_ids:
         # 无规则引擎时沿用原DishDeptMapping查询
         stmt = select(DishDeptMapping.dish_id, DishDeptMapping.production_dept_id).where(
@@ -130,12 +128,16 @@ async def dispatch_order_to_kds(
     depts: dict[uuid.UUID, dict] = {}
 
     # 也查询默认档口（用于未映射菜品）
-    all_dept_stmt = select(ProductionDept).where(
-        and_(
-            ProductionDept.tenant_id == tid,
-            ProductionDept.is_deleted == False,  # noqa: E712
+    all_dept_stmt = (
+        select(ProductionDept)
+        .where(
+            and_(
+                ProductionDept.tenant_id == tid,
+                ProductionDept.is_deleted == False,  # noqa: E712
+            )
         )
-    ).order_by(ProductionDept.sort_order)
+        .order_by(ProductionDept.sort_order)
+    )
     all_dept_result = await db.execute(all_dept_stmt)
     all_depts = all_dept_result.scalars().all()
 
@@ -188,37 +190,43 @@ async def dispatch_order_to_kds(
     dept_tasks = []
     for dept_id_str, items in dept_items.items():
         dept_info = depts.get(uuid.UUID(dept_id_str), {})
-        dept_tasks.append({
-            "dept_id": dept_id_str,
-            "dept_name": dept_info.get("dept_name", "未知档口"),
-            "printer_address": dept_info.get("printer_address"),
-            "items": items,
-            "priority": dept_info.get("sort_order", 99),
-        })
+        dept_tasks.append(
+            {
+                "dept_id": dept_id_str,
+                "dept_name": dept_info.get("dept_name", "未知档口"),
+                "printer_address": dept_info.get("printer_address"),
+                "items": items,
+                "priority": dept_info.get("sort_order", 99),
+            }
+        )
 
     # 未映射菜品归入默认档口
     if unmapped_items:
         if default_dept:
-            dept_tasks.append({
-                "dept_id": default_dept["dept_id"],
-                "dept_name": default_dept["dept_name"],
-                "printer_address": default_dept.get("printer_address"),
-                "items": unmapped_items,
-                "priority": 999,
-            })
+            dept_tasks.append(
+                {
+                    "dept_id": default_dept["dept_id"],
+                    "dept_name": default_dept["dept_name"],
+                    "printer_address": default_dept.get("printer_address"),
+                    "items": unmapped_items,
+                    "priority": 999,
+                }
+            )
             # 未映射菜品也回写 kds_station 到默认档口
             for item in unmapped_items:
                 oii = item.get("order_item_id")
                 if oii:
                     item_dept_map[oii] = default_dept["dept_id"]
         else:
-            dept_tasks.append({
-                "dept_id": "default",
-                "dept_name": "默认档口",
-                "printer_address": None,
-                "items": unmapped_items,
-                "priority": 999,
-            })
+            dept_tasks.append(
+                {
+                    "dept_id": "default",
+                    "dept_name": "默认档口",
+                    "printer_address": None,
+                    "items": unmapped_items,
+                    "priority": 999,
+                }
+            )
 
     # 按优先级排序
     dept_tasks.sort(key=lambda x: x["priority"])
@@ -324,6 +332,7 @@ async def dispatch_order_to_kds(
     if auto_print:
         # 延迟导入避免循环依赖
         from .kitchen_print_service import print_kitchen_tickets_for_dispatch
+
         _tbl = table_number
         _ono = order_no
 
@@ -460,22 +469,24 @@ async def get_dept_queue(
 
     queue = []
     for item, order_no, table_no in rows:
-        queue.append({
-            "task_id": None,
-            "order_item_id": str(item.id),
-            "order_id": str(item.order_id),
-            "order_no": order_no,
-            "table_number": table_no,
-            "dish_id": str(item.dish_id) if item.dish_id else None,
-            "dish_name": item.item_name,
-            "quantity": item.quantity,
-            "notes": item.notes or "",
-            "status": TASK_STATUS_PENDING,
-            "priority": "normal",
-            "dept_id": dept_id,
-            "created_at": item.created_at.isoformat() if item.created_at else None,
-            "started_at": None,
-        })
+        queue.append(
+            {
+                "task_id": None,
+                "order_item_id": str(item.id),
+                "order_id": str(item.order_id),
+                "order_no": order_no,
+                "table_number": table_no,
+                "dish_id": str(item.dish_id) if item.dish_id else None,
+                "dish_name": item.item_name,
+                "quantity": item.quantity,
+                "notes": item.notes or "",
+                "status": TASK_STATUS_PENDING,
+                "priority": "normal",
+                "dept_id": dept_id,
+                "created_at": item.created_at.isoformat() if item.created_at else None,
+                "started_at": None,
+            }
+        )
 
     log.info("kds_dispatch.get_dept_queue", source="order_items_fallback", queue_size=len(queue))
     return queue
@@ -516,9 +527,7 @@ async def get_kds_tasks_by_dept(
     if status:
         conditions.append(KDSTask.status == status)
     else:
-        conditions.append(
-            KDSTask.status.in_([TASK_STATUS_PENDING, TASK_STATUS_COOKING])
-        )
+        conditions.append(KDSTask.status.in_([TASK_STATUS_PENDING, TASK_STATUS_COOKING]))
 
     count_stmt = select(func.count()).select_from(KDSTask).where(and_(*conditions))
     total = (await db.execute(count_stmt)).scalar() or 0
@@ -571,12 +580,16 @@ async def get_store_kds_overview(
     log = logger.bind(store_id=store_id, tenant_id=tenant_id)
 
     # 查询该门店所有档口
-    stmt = select(ProductionDept).where(
-        and_(
-            ProductionDept.tenant_id == tid,
-            ProductionDept.is_deleted == False,  # noqa: E712
+    stmt = (
+        select(ProductionDept)
+        .where(
+            and_(
+                ProductionDept.tenant_id == tid,
+                ProductionDept.is_deleted == False,  # noqa: E712
+            )
         )
-    ).order_by(ProductionDept.sort_order)
+        .order_by(ProductionDept.sort_order)
+    )
     result = await db.execute(stmt)
     depts = result.scalars().all()
 
@@ -587,28 +600,33 @@ async def get_store_kds_overview(
         dept_id_str = str(dept.id)
 
         # 统计待出品数量（kds_station 匹配且 sent_to_kds_flag = True）
-        pending_stmt = select(func.count()).select_from(OrderItem).join(
-            Order, OrderItem.order_id == Order.id
-        ).where(
-            and_(
-                Order.tenant_id == tid,
-                Order.store_id == uuid.UUID(store_id),
-                OrderItem.kds_station == dept_id_str,
-                OrderItem.sent_to_kds_flag == True,  # noqa: E712
-                Order.is_deleted == False,  # noqa: E712
+        pending_stmt = (
+            select(func.count())
+            .select_from(OrderItem)
+            .join(Order, OrderItem.order_id == Order.id)
+            .where(
+                and_(
+                    Order.tenant_id == tid,
+                    Order.store_id == uuid.UUID(store_id),
+                    OrderItem.kds_station == dept_id_str,
+                    OrderItem.sent_to_kds_flag == True,  # noqa: E712
+                    Order.is_deleted == False,  # noqa: E712
+                )
             )
         )
         pending_result = await db.execute(pending_stmt)
         pending_count = pending_result.scalar() or 0
 
-        overview.append({
-            "dept_id": dept_id_str,
-            "dept_name": dept.dept_name,
-            "dept_code": dept.dept_code,
-            "printer_address": dept.printer_address,
-            "pending": pending_count,
-            "sort_order": dept.sort_order,
-        })
+        overview.append(
+            {
+                "dept_id": dept_id_str,
+                "dept_name": dept.dept_name,
+                "dept_code": dept.dept_code,
+                "printer_address": dept.printer_address,
+                "pending": pending_count,
+                "sort_order": dept.sort_order,
+            }
+        )
 
     log.info("kds_dispatch.store_overview", store_id=store_id, dept_count=len(overview))
     return overview
@@ -626,14 +644,11 @@ async def resolve_dept_for_dish(
     """
     tid = uuid.UUID(tenant_id)
 
-    stmt = (
-        select(DishDeptMapping.production_dept_id)
-        .where(
-            and_(
-                DishDeptMapping.tenant_id == tid,
-                DishDeptMapping.dish_id == uuid.UUID(dish_id),
-                DishDeptMapping.is_deleted == False,  # noqa: E712
-            )
+    stmt = select(DishDeptMapping.production_dept_id).where(
+        and_(
+            DishDeptMapping.tenant_id == tid,
+            DishDeptMapping.dish_id == uuid.UUID(dish_id),
+            DishDeptMapping.is_deleted == False,  # noqa: E712
         )
     )
     result = await db.execute(stmt)

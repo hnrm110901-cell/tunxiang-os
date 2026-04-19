@@ -4,6 +4,7 @@
   POST /api/v1/trade/refunds        — 提交退款申请
   GET  /api/v1/trade/refunds/{id}   — 查询退款状态
 """
+
 import asyncio
 import json
 import logging
@@ -102,26 +103,24 @@ async def submit_refund(
             from shared.events.src.emitter import emit_event
             from shared.events.src.event_types import OrderEventType
 
-            _evt = (
-                OrderEventType.REFUNDED
-                if req.refund_type == "full"
-                else OrderEventType.PARTIAL_REFUNDED
+            _evt = OrderEventType.REFUNDED if req.refund_type == "full" else OrderEventType.PARTIAL_REFUNDED
+            asyncio.create_task(
+                emit_event(
+                    event_type=_evt,
+                    tenant_id=tenant_id,
+                    stream_id=str(req.order_id),
+                    payload={
+                        "refund_id": refund_id,
+                        "order_id": str(req.order_id),
+                        "refund_type": req.refund_type,
+                        "refund_amount_fen": req.refund_amount_fen,
+                        "reasons": req.reasons,
+                        "status": "pending",
+                    },
+                    source_service="tx-trade",
+                    causation_id=str(req.order_id),
+                )
             )
-            asyncio.create_task(emit_event(
-                event_type=_evt,
-                tenant_id=tenant_id,
-                stream_id=str(req.order_id),
-                payload={
-                    "refund_id": refund_id,
-                    "order_id": str(req.order_id),
-                    "refund_type": req.refund_type,
-                    "refund_amount_fen": req.refund_amount_fen,
-                    "reasons": req.reasons,
-                    "status": "pending",
-                },
-                source_service="tx-trade",
-                causation_id=str(req.order_id),
-            ))
         except Exception:  # noqa: BLE001 — 事件写入失败不阻断主流程
             pass
 

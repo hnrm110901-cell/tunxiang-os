@@ -9,6 +9,7 @@
   - [VALIDATION] phone 空字符串校验 (Pydantic min_length)
   - [RETURN] _err() 之后不再有 unreachable code
 """
+
 from typing import AsyncGenerator, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
@@ -25,6 +26,7 @@ router = APIRouter(prefix="/api/v1", tags=["booking"])
 
 
 # ─── 通用辅助 ───
+
 
 def _get_tenant_id(request: Request) -> str:
     tid = getattr(request.state, "tenant_id", None) or request.headers.get("X-Tenant-ID", "")
@@ -60,6 +62,7 @@ def _err(msg: str, code: int = 400) -> None:
 # ═══════════════════════════════════════════════════════════
 # 预订 Reservation
 # ═══════════════════════════════════════════════════════════
+
 
 class CreateReservationReq(BaseModel):
     store_id: str
@@ -136,8 +139,10 @@ async def update_reservation_status(
             # v149：预订入座 → 自动开台（创建 dining_session）
             # 异步执行，不阻断预订流程
             import asyncio
-            from ..services.dining_session_service import DiningSessionService
+
             from sqlalchemy import text as _text
+
+            from ..services.dining_session_service import DiningSessionService
 
             async def _auto_open_from_booking() -> None:
                 try:
@@ -161,9 +166,7 @@ async def update_reservation_status(
 
                     ds_svc = DiningSessionService(db, tenant_id)
                     # 检查是否已有活跃会话（避免重复开台）
-                    existing = await ds_svc.get_active_session_by_table(
-                        bk_row["store_id"], bk_row["table_id"]
-                    )
+                    existing = await ds_svc.get_active_session_by_table(bk_row["store_id"], bk_row["table_id"])
                     if existing:
                         return
 
@@ -178,6 +181,7 @@ async def update_reservation_status(
                     )
                 except Exception:  # noqa: BLE001 — 异步后台任务，捕获所有异常防止崩溃
                     import structlog
+
                     structlog.get_logger().warning(
                         "booking_auto_open_table_failed",
                         reservation_id=reservation_id,
@@ -221,8 +225,12 @@ async def list_reservations(
     tenant_id = _get_tenant_id(request)
     svc = ReservationService(db=db, tenant_id=tenant_id, store_id=store_id)
     result = await svc.list_reservations(
-        store_id=store_id, date=date, status=status, type=type,
-        page=page, size=size,
+        store_id=store_id,
+        date=date,
+        status=status,
+        type=type,
+        page=page,
+        size=size,
     )
     return _ok(result)
 
@@ -260,6 +268,7 @@ async def get_reservation_stats(
 # ═══════════════════════════════════════════════════════════
 # 排队 Queue
 # ═══════════════════════════════════════════════════════════
+
 
 class TakeNumberReq(BaseModel):
     store_id: str
@@ -436,6 +445,7 @@ async def sync_meituan_queue(
 # 宴会 Banquet
 # ═══════════════════════════════════════════════════════════
 
+
 class CreateLeadReq(BaseModel):
     store_id: str
     customer_name: str
@@ -503,6 +513,7 @@ class ArchiveCaseReq(BaseModel):
 
 # ─── Lead endpoints ───
 
+
 @router.post("/banquet/leads")
 async def create_banquet_lead(req: CreateLeadReq, request: Request):
     """创建宴会线索"""
@@ -556,6 +567,7 @@ async def add_followup(lead_id: str, req: AddFollowupReq, request: Request):
 
 # ─── Proposal & Quotation endpoints ───
 
+
 @router.post("/banquet/leads/{lead_id}/proposal")
 async def generate_proposal(lead_id: str, request: Request):
     """AI生成宴会方案"""
@@ -585,6 +597,7 @@ async def create_quotation(lead_id: str, req: CreateQuotationReq, request: Reque
 
 
 # ─── Contract & Deposit endpoints ───
+
 
 @router.post("/banquet/leads/{lead_id}/contract")
 async def create_contract(lead_id: str, req: CreateContractReq, request: Request):
@@ -621,6 +634,7 @@ async def collect_deposit(contract_id: str, req: CollectDepositReq, request: Req
 
 
 # ─── Menu & Preparation endpoints ───
+
 
 @router.post("/banquet/contracts/{contract_id}/confirm-menu")
 async def confirm_menu(contract_id: str, req: ConfirmMenuReq, request: Request):
@@ -664,6 +678,7 @@ async def update_checklist_item(item_id: str, req: UpdateChecklistReq, request: 
 
 # ─── Execution endpoints ───
 
+
 @router.post("/banquet/contracts/{contract_id}/execute")
 async def start_execution(contract_id: str, request: Request):
     """开始执行宴会"""
@@ -677,6 +692,7 @@ async def start_execution(contract_id: str, request: Request):
 
 
 # ─── Settlement & Feedback endpoints ───
+
 
 @router.post("/banquet/contracts/{contract_id}/settle")
 async def settle_banquet(contract_id: str, req: SettleBanquetReq, request: Request):
@@ -729,6 +745,7 @@ async def archive_as_case(contract_id: str, req: ArchiveCaseReq, request: Reques
 
 
 # ─── Analytics endpoints ───
+
 
 @router.get("/banquet/pipeline")
 async def get_pipeline(

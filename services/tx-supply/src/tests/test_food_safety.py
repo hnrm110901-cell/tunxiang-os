@@ -1,4 +1,5 @@
 """食安合规与追溯中心 -- 纯函数 + 温控 + 留样 + 合规检查表测试"""
+
 import os
 import sys
 from datetime import date, datetime, timedelta
@@ -88,8 +89,12 @@ class TestRecordSample:
     def test_retention_48_hours(self):
         sample_time = datetime.now()
         result = record_sample(
-            store_id="s1", dish_id="d1", sample_time=sample_time,
-            photo_url="url", operator_id="op1", tenant_id="t1",
+            store_id="s1",
+            dish_id="d1",
+            sample_time=sample_time,
+            photo_url="url",
+            operator_id="op1",
+            tenant_id="t1",
         )
         retention_until = datetime.fromisoformat(result["retention_until"])
         expected = sample_time + timedelta(hours=48)
@@ -99,8 +104,12 @@ class TestRecordSample:
     def test_old_sample_expired(self):
         sample_time = datetime.now() - timedelta(hours=50)
         result = record_sample(
-            store_id="s1", dish_id="d1", sample_time=sample_time,
-            photo_url="url", operator_id="op1", tenant_id="t1",
+            store_id="s1",
+            dish_id="d1",
+            sample_time=sample_time,
+            photo_url="url",
+            operator_id="op1",
+            tenant_id="t1",
         )
         assert result["is_within_retention"] is False
 
@@ -149,7 +158,9 @@ class TestGetComplianceChecklist:
 
     def test_checklist_has_key_items(self):
         result = get_compliance_checklist(
-            store_id="s1", check_date=date.today(), tenant_id="t1",
+            store_id="s1",
+            check_date=date.today(),
+            tenant_id="t1",
         )
         item_names = [i["item"] for i in result["items"]]
         assert "晨检" in item_names
@@ -159,7 +170,9 @@ class TestGetComplianceChecklist:
 
     def test_checklist_structure(self):
         result = get_compliance_checklist(
-            store_id="s1", check_date=date.today(), tenant_id="t1",
+            store_id="s1",
+            check_date=date.today(),
+            tenant_id="t1",
         )
         for item in result["items"]:
             assert "item" in item

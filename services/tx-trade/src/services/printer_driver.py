@@ -16,6 +16,7 @@
   - GP-SD80S: 支持USB+网口, 打印速度200mm/s, 自动切刀
   - 两款均100%兼容ESC/POS, 无需额外适配
 """
+
 import asyncio
 from enum import Enum
 from typing import Optional
@@ -26,32 +27,32 @@ logger = structlog.get_logger()
 
 # ─── ESC/POS 指令常量 ───
 
-ESC_INIT = b'\x1b\x40'
+ESC_INIT = b"\x1b\x40"
 
-ESC_ALIGN_LEFT = b'\x1b\x61\x00'
-ESC_ALIGN_CENTER = b'\x1b\x61\x01'
-ESC_ALIGN_RIGHT = b'\x1b\x61\x02'
+ESC_ALIGN_LEFT = b"\x1b\x61\x00"
+ESC_ALIGN_CENTER = b"\x1b\x61\x01"
+ESC_ALIGN_RIGHT = b"\x1b\x61\x02"
 
-ESC_BOLD_ON = b'\x1b\x45\x01'
-ESC_BOLD_OFF = b'\x1b\x45\x00'
+ESC_BOLD_ON = b"\x1b\x45\x01"
+ESC_BOLD_OFF = b"\x1b\x45\x00"
 
-GS_SIZE_NORMAL = b'\x1d\x21\x00'
-GS_SIZE_DOUBLE_WIDTH = b'\x1d\x21\x10'
-GS_SIZE_DOUBLE_HEIGHT = b'\x1d\x21\x01'
-GS_SIZE_DOUBLE_BOTH = b'\x1d\x21\x11'
+GS_SIZE_NORMAL = b"\x1d\x21\x00"
+GS_SIZE_DOUBLE_WIDTH = b"\x1d\x21\x10"
+GS_SIZE_DOUBLE_HEIGHT = b"\x1d\x21\x01"
+GS_SIZE_DOUBLE_BOTH = b"\x1d\x21\x11"
 
-GS_CUT_PARTIAL = b'\x1d\x56\x01'
-GS_CUT_FULL = b'\x1d\x56\x00'
+GS_CUT_PARTIAL = b"\x1d\x56\x01"
+GS_CUT_FULL = b"\x1d\x56\x00"
 
-ESC_OPEN_DRAWER = b'\x1b\x70\x00\x19\xfa'
-ESC_FEED = b'\x1b\x64'
+ESC_OPEN_DRAWER = b"\x1b\x70\x00\x19\xfa"
+ESC_FEED = b"\x1b\x64"
 
-ESC_CHINESE_ON = b'\x1c\x26'
+ESC_CHINESE_ON = b"\x1c\x26"
 
-LF = b'\x0a'
+LF = b"\x0a"
 
 # 蜂鸣: ESC B n t (n=次数, t=持续时间)
-ESC_BEEP = b'\x1b\x42'
+ESC_BEEP = b"\x1b\x42"
 
 # 80mm纸宽 = 48个ASCII字符
 LINE_WIDTH = 48
@@ -225,9 +226,7 @@ class ESCPOSPrinter:
         line = _pad_two_columns(left, right, LINE_WIDTH)
         await self._send(line.encode("gbk", errors="replace") + LF)
 
-    async def print_three_columns(
-        self, left: str, center: str, right: str
-    ) -> None:
+    async def print_three_columns(self, left: str, center: str, right: str) -> None:
         """打印三列文本（菜品 | 数量 | 金额）。"""
         line = _pad_three_columns(left, center, right, LINE_WIDTH)
         await self._send(line.encode("gbk", errors="replace") + LF)
@@ -265,23 +264,21 @@ class ESCPOSPrinter:
         pH = (data_len >> 8) & 0xFF
 
         # QR Code Model 2
-        buf += b'\x1d\x28\x6b\x04\x00\x31\x41\x32\x00'
+        buf += b"\x1d\x28\x6b\x04\x00\x31\x41\x32\x00"
         # 设置大小
         size = max(1, min(16, size))
-        buf += b'\x1d\x28\x6b\x03\x00\x31\x43' + bytes([size])
+        buf += b"\x1d\x28\x6b\x03\x00\x31\x43" + bytes([size])
         # 纠错等级 M
-        buf += b'\x1d\x28\x6b\x03\x00\x31\x45\x31'
+        buf += b"\x1d\x28\x6b\x03\x00\x31\x45\x31"
         # 存储数据
-        buf += b'\x1d\x28\x6b' + bytes([pL, pH]) + b'\x31\x50\x30' + encoded
+        buf += b"\x1d\x28\x6b" + bytes([pL, pH]) + b"\x31\x50\x30" + encoded
         # 打印
-        buf += b'\x1d\x28\x6b\x03\x00\x31\x51\x30'
+        buf += b"\x1d\x28\x6b\x03\x00\x31\x51\x30"
 
         buf += ESC_ALIGN_LEFT + LF
         await self._send(bytes(buf))
 
-    async def print_barcode(
-        self, data: str, barcode_type: str = "CODE128"
-    ) -> None:
+    async def print_barcode(self, data: str, barcode_type: str = "CODE128") -> None:
         """打印条形码。
 
         Args:
@@ -294,19 +291,19 @@ class ESCPOSPrinter:
         buf = bytearray()
         buf += ESC_ALIGN_CENTER
         # 设置条形码高度 80 点
-        buf += b'\x1d\x68\x50'
+        buf += b"\x1d\x68\x50"
         # 设置条形码宽度 2
-        buf += b'\x1d\x77\x02'
+        buf += b"\x1d\x77\x02"
         # HRI 字符在条形码下方
-        buf += b'\x1d\x48\x02'
+        buf += b"\x1d\x48\x02"
 
         encoded = data.encode("ascii", errors="replace")
         if code == 73:
             # CODE128 使用 GS k m n d1...dn
-            buf += b'\x1d\x6b' + bytes([code, len(encoded)]) + encoded
+            buf += b"\x1d\x6b" + bytes([code, len(encoded)]) + encoded
         else:
             # 其他类型使用 GS k m d1...dn NUL
-            buf += b'\x1d\x6b' + bytes([code]) + encoded + b'\x00'
+            buf += b"\x1d\x6b" + bytes([code]) + encoded + b"\x00"
 
         buf += ESC_ALIGN_LEFT + LF
         await self._send(bytes(buf))
@@ -340,7 +337,7 @@ class ESCPOSPrinter:
         try:
             # DLE EOT 1 — 查询打印机状态
             async with self._lock:
-                self._writer.write(b'\x10\x04\x01')
+                self._writer.write(b"\x10\x04\x01")
                 await self._writer.drain()
                 data = await asyncio.wait_for(
                     self._reader.read(1),  # type: ignore[union-attr]
@@ -358,7 +355,7 @@ class ESCPOSPrinter:
 
             # DLE EOT 4 — 查询纸张状态
             async with self._lock:
-                self._writer.write(b'\x10\x04\x04')
+                self._writer.write(b"\x10\x04\x04")
                 await self._writer.drain()
                 data = await asyncio.wait_for(
                     self._reader.read(1),
@@ -404,9 +401,7 @@ def _pad_two_columns(left: str, right: str, width: int = LINE_WIDTH) -> str:
     return left + " " * spaces + right
 
 
-def _pad_three_columns(
-    left: str, center: str, right: str, width: int = LINE_WIDTH
-) -> str:
+def _pad_three_columns(left: str, center: str, right: str, width: int = LINE_WIDTH) -> str:
     """三列对齐（菜品 | 数量 | 金额）。"""
     col1_width = width // 2
     col3_width = 10
@@ -451,20 +446,20 @@ def build_escpos_commands() -> dict[str, bytes]:
 
 
 # ── 反色/高亮打印 ──────────────────────────────────────────────
-GS_INVERT_ON  = b'\x1d\x42\x01'   # GS B 1 — 开启白底黑字反色
-GS_INVERT_OFF = b'\x1d\x42\x00'   # GS B 0 — 关闭反色
+GS_INVERT_ON = b"\x1d\x42\x01"  # GS B 1 — 开启白底黑字反色
+GS_INVERT_OFF = b"\x1d\x42\x00"  # GS B 0 — 关闭反色
 
 # ── 下划线 ─────────────────────────────────────────────────────
-ESC_UNDERLINE_ON  = b'\x1b\x2d\x01'  # ESC - 1
-ESC_UNDERLINE_OFF = b'\x1b\x2d\x00'  # ESC - 0
+ESC_UNDERLINE_ON = b"\x1b\x2d\x01"  # ESC - 1
+ESC_UNDERLINE_OFF = b"\x1b\x2d\x00"  # ESC - 0
 
 # ── 位图打印（光栅模式）─────────────────────────────────────────
 # GS v 0 m xL xH yL yH d1...dk
 # 用于打印1位深度位图（Logo图片）
-GS_RASTER_IMAGE_HEADER = b'\x1d\x76\x30\x00'  # mode=0（正常）
+GS_RASTER_IMAGE_HEADER = b"\x1d\x76\x30\x00"  # mode=0（正常）
 
 # ── 走纸 ────────────────────────────────────────────────────────
-ESC_FEED_N = lambda n: b'\x1b\x64' + bytes([n])  # ESC d n — 走n行
+ESC_FEED_N = lambda n: b"\x1b\x64" + bytes([n])  # ESC d n — 走n行
 
 
 def image_to_escpos_raster(img_bytes: bytes, max_width_dots: int = 384) -> bytes:
@@ -499,7 +494,7 @@ def image_to_escpos_raster(img_bytes: bytes, max_width_dots: int = 384) -> bytes
     # 每行字节数（向上取整到8的倍数）
     byte_width = (w + 7) // 8
 
-    buf = b''
+    buf = b""
     # GS v 0 0 xL xH yL yH
     xL = byte_width & 0xFF
     xH = (byte_width >> 8) & 0xFF

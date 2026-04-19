@@ -9,6 +9,7 @@
 
 共 20 个测试用例，全部使用 mock DB，不依赖真实数据库。
 """
+
 import uuid
 from typing import Optional
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -89,9 +90,7 @@ async def _build_gateway_with_mock_db(
         retry_mapping.first.return_value = existing_payment_mapping
         retry_result.mappings.return_value = retry_mapping
         # 第3次 execute = 并发冲突后的重查
-        db.execute = AsyncMock(
-            side_effect=[order_result, idempotency_result, retry_result]
-        )
+        db.execute = AsyncMock(side_effect=[order_result, idempotency_result, retry_result])
     else:
         db.flush = AsyncMock()
         db.rollback = AsyncMock()
@@ -160,9 +159,7 @@ class TestIdempotencyHit:
     async def test_idempotent_hit_preserves_payment_no(self):
         """TC-04: 幂等命中返回原 payment_no，不生成新 payment_no"""
         original_no = "PAY20260331000000ORIG"
-        existing = _make_existing_payment_mapping(
-            status="paid", payment_no=original_no
-        )
+        existing = _make_existing_payment_mapping(status="paid", payment_no=original_no)
         gateway, db = await _build_gateway_with_mock_db(existing_payment_mapping=existing)
 
         result = await gateway.create_payment(
@@ -338,12 +335,8 @@ class TestCrossTenantIsolation:
         # tenant_b 没有该 key 的记录
         gw_b, db_b = await make_gateway_for_tenant(tenant_b, None)
 
-        result_a = await gw_a.create_payment(
-            order_id=ORDER_ID, method="cash", amount_fen=100, idempotency_key=IKEY
-        )
-        result_b = await gw_b.create_payment(
-            order_id=ORDER_ID, method="cash", amount_fen=100, idempotency_key=IKEY
-        )
+        result_a = await gw_a.create_payment(order_id=ORDER_ID, method="cash", amount_fen=100, idempotency_key=IKEY)
+        result_b = await gw_b.create_payment(order_id=ORDER_ID, method="cash", amount_fen=100, idempotency_key=IKEY)
 
         # tenant_a 命中幂等
         assert result_a["idempotent"] is True
@@ -501,6 +494,7 @@ class TestCashierApiIntegration:
         app = FastAPI()
 
         from ..api.cashier_api import router
+
         app.include_router(router)
 
         captured_kwargs = {}
@@ -536,6 +530,7 @@ class TestCashierApiIntegration:
         # 无法真正执行路由（需完整 DB 依赖），仅验证请求模型接受 idempotency_key
         # 此测试重点是确认字段存在且能解析
         from ..api.cashier_api import PayCheckoutRequest
+
         req = PayCheckoutRequest(method="cash", amount_fen=10000, idempotency_key=IKEY)
         assert req.idempotency_key == IKEY
 

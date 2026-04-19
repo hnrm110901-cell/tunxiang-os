@@ -28,15 +28,14 @@ import types
 import uuid
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 # ─── 路径 ──────────────────────────────────────────────────────────────────────
 
 _TESTS_DIR = os.path.dirname(__file__)
-_SRC_DIR   = os.path.abspath(os.path.join(_TESTS_DIR, ".."))
-_ROOT_DIR  = os.path.abspath(os.path.join(_TESTS_DIR, "..", "..", "..", ".."))
+_SRC_DIR = os.path.abspath(os.path.join(_TESTS_DIR, ".."))
+_ROOT_DIR = os.path.abspath(os.path.join(_TESTS_DIR, "..", "..", "..", ".."))
 
 for _p in [_SRC_DIR, _ROOT_DIR]:
     if _p not in sys.path:
@@ -44,6 +43,7 @@ for _p in [_SRC_DIR, _ROOT_DIR]:
 
 
 # ─── 确保 src 包层级，使相对导入正常工作 ────────────────────────────────────────
+
 
 def _ensure_pkg(pkg_name: str, pkg_path: str) -> None:
     if pkg_name not in sys.modules:
@@ -53,42 +53,46 @@ def _ensure_pkg(pkg_name: str, pkg_path: str) -> None:
         sys.modules[pkg_name] = mod
 
 
-_ensure_pkg("src",          _SRC_DIR)
-_ensure_pkg("src.api",      os.path.join(_SRC_DIR, "api"))
+_ensure_pkg("src", _SRC_DIR)
+_ensure_pkg("src.api", os.path.join(_SRC_DIR, "api"))
 _ensure_pkg("src.services", os.path.join(_SRC_DIR, "services"))
-_ensure_pkg("src.models",   os.path.join(_SRC_DIR, "models"))
+_ensure_pkg("src.models", os.path.join(_SRC_DIR, "models"))
 
 # ─── 工具常量 ───────────────────────────────────────────────────────────────────
 
 TENANT_ID = str(uuid.uuid4())
-ORDER_ID  = str(uuid.uuid4())
-DISH_ID   = str(uuid.uuid4())
-STORE_ID  = "store-test-001"
+ORDER_ID = str(uuid.uuid4())
+DISH_ID = str(uuid.uuid4())
+STORE_ID = "store-test-001"
 
 _BASE_HEADERS = {"X-Tenant-ID": TENANT_ID}
 
 
 # ─── 通用 mock DB ───────────────────────────────────────────────────────────────
 
+
 def _make_db() -> AsyncMock:
     db = AsyncMock()
     db.execute = AsyncMock(return_value=AsyncMock())
-    db.commit  = AsyncMock()
+    db.commit = AsyncMock()
     db.refresh = AsyncMock()
-    db.add     = MagicMock()
+    db.add = MagicMock()
     return db
 
 
 def _db_override(db: AsyncMock):
     """返回一个同步可调用的依赖覆盖函数（供 dependency_overrides 使用）"""
+
     def _dep():
         return db
+
     return _dep
 
 
 # ══════════════════════════════════════════════════════════════════════════════
 # booking_api.py 测试（场景 1-5）
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 def _make_booking_app(db: AsyncMock) -> FastAPI:
     """构建挂载 booking_api.router 的 FastAPI，并注入 mock DB。
@@ -111,6 +115,7 @@ def _make_booking_app(db: AsyncMock) -> FastAPI:
 
 # ─── 场景 1: POST /api/v1/reservations — 正常创建预订 ─────────────────────────
 
+
 def test_booking_create_reservation_ok():
     """正常创建预订，ReservationService.create_reservation 返回 reservation_id"""
     db = _make_db()
@@ -127,12 +132,12 @@ def test_booking_create_reservation_ok():
         resp = client.post(
             "/api/v1/reservations",
             json={
-                "store_id":    STORE_ID,
+                "store_id": STORE_ID,
                 "customer_name": "张三",
-                "phone":       "13800138000",
-                "date":        "2026-06-01",
-                "time":        "18:30",
-                "party_size":  4,
+                "phone": "13800138000",
+                "date": "2026-06-01",
+                "time": "18:30",
+                "party_size": 4,
             },
             headers=_BASE_HEADERS,
         )
@@ -144,6 +149,7 @@ def test_booking_create_reservation_ok():
 
 
 # ─── 场景 2: GET /api/v1/reservations — 带分页参数查询列表 ─────────────────────
+
 
 def test_booking_list_reservations_pagination():
     """list_reservations 支持 page/size 分页参数，正常返回 ok=True"""
@@ -167,9 +173,9 @@ def test_booking_list_reservations_pagination():
             "/api/v1/reservations",
             params={
                 "store_id": STORE_ID,
-                "date":     "2026-06-01",
-                "page":     1,
-                "size":     10,
+                "date": "2026-06-01",
+                "page": 1,
+                "size": 10,
             },
             headers=_BASE_HEADERS,
         )
@@ -182,6 +188,7 @@ def test_booking_list_reservations_pagination():
 
 
 # ─── 场景 3: GET /api/v1/reservations/time-slots — 查询可用时段 ────────────────
+
 
 def test_booking_get_time_slots_ok():
     """get_time_slots 被调用并返回可用时段列表"""
@@ -199,8 +206,8 @@ def test_booking_get_time_slots_ok():
         resp = client.get(
             "/api/v1/reservations/time-slots",
             params={
-                "store_id":   STORE_ID,
-                "date":       "2026-06-01",
+                "store_id": STORE_ID,
+                "date": "2026-06-01",
                 "party_size": 2,
             },
             headers=_BASE_HEADERS,
@@ -215,6 +222,7 @@ def test_booking_get_time_slots_ok():
 
 # ─── 场景 4: POST /api/v1/queues — 取排队号 ────────────────────────────────────
 
+
 def test_booking_take_queue_number_ok():
     """QueueService.take_number 被调用，返回 queue_no"""
     db = _make_db()
@@ -222,7 +230,7 @@ def test_booking_take_queue_number_ok():
     fake_result = {
         "queue_id": str(uuid.uuid4()),
         "queue_no": "A001",
-        "status":   "waiting",
+        "status": "waiting",
     }
 
     with patch("api.booking_api.QueueService") as MockSvc:
@@ -235,11 +243,11 @@ def test_booking_take_queue_number_ok():
         resp = client.post(
             "/api/v1/queues",
             json={
-                "store_id":      STORE_ID,
+                "store_id": STORE_ID,
                 "customer_name": "李四",
-                "phone":         "13900139000",
-                "party_size":    2,
-                "source":        "walk_in",
+                "phone": "13900139000",
+                "party_size": 2,
+                "source": "walk_in",
             },
             headers=_BASE_HEADERS,
         )
@@ -252,14 +260,15 @@ def test_booking_take_queue_number_ok():
 
 # ─── 场景 5: GET /api/v1/queues/board — 排队看板 ───────────────────────────────
 
+
 def test_booking_get_queue_board_ok():
     """QueueService.get_queue_board 被调用并返回等候列表"""
     db = _make_db()
 
     fake_board = {
         "waiting_count": 3,
-        "calling":       ["A001"],
-        "seated":        ["Z010"],
+        "calling": ["A001"],
+        "seated": ["Z010"],
     }
 
     with patch("api.booking_api.QueueService") as MockSvc:
@@ -286,6 +295,7 @@ def test_booking_get_queue_board_ok():
 # mobile_ops_routes.py 测试（场景 6-10）
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 def _make_mobile_app(db: AsyncMock) -> FastAPI:
     """构建挂载 mobile_ops_routes.router 的 FastAPI，并注入 mock DB。"""
     import api.mobile_ops_routes as mobile_mod  # type: ignore[import]
@@ -301,6 +311,7 @@ def _make_mobile_app(db: AsyncMock) -> FastAPI:
 
 
 # ─── 场景 6: PUT /mobile/orders/{id}/table-info — 正常更新开台信息 ─────────────
+
 
 def test_mobile_update_table_info_ok():
     """CashierEngine.update_table_info 返回成功结果，响应 ok=True"""
@@ -318,14 +329,15 @@ def test_mobile_update_table_info_ok():
     mock_engine_instance = mock_engine_cls.return_value
     mock_engine_instance.update_table_info = AsyncMock(return_value=fake_result)
 
-    with patch.dict("sys.modules", {
-        "src.services.cashier_engine": types.SimpleNamespace(CashierEngine=mock_engine_cls),
-    }):
+    with patch.dict(
+        "sys.modules",
+        {
+            "src.services.cashier_engine": types.SimpleNamespace(CashierEngine=mock_engine_cls),
+        },
+    ):
         # 同时 patch 相对导入路径 (api 包内相对导入 ..services.cashier_engine)
         with patch("api.mobile_ops_routes.CashierEngine", mock_engine_cls, create=True):
             # 直接在模块命名空间 patch（因为动态导入发生在函数体内）
-            import importlib
-            import api.mobile_ops_routes as mobile_mod  # type: ignore[import]
 
             app = _make_mobile_app(db)
             client = TestClient(app)
@@ -333,8 +345,11 @@ def test_mobile_update_table_info_ok():
             # patch 函数内部的动态 import
             with patch(
                 "importlib.import_module",
-                side_effect=lambda name: types.SimpleNamespace(CashierEngine=mock_engine_cls)
-                if "cashier_engine" in name else __import__(name),
+                side_effect=lambda name: (
+                    types.SimpleNamespace(CashierEngine=mock_engine_cls)
+                    if "cashier_engine" in name
+                    else __import__(name)
+                ),
             ):
                 resp = client.put(
                     f"/api/v1/mobile/orders/{ORDER_ID}/table-info",
@@ -348,6 +363,7 @@ def test_mobile_update_table_info_ok():
 
 # ─── 场景 7: PUT /mobile/dishes/{id}/availability — 沽清/上架 ─────────────────
 
+
 def test_mobile_set_dish_availability_soldout():
     """available=False 时 DB execute+commit 应被调用，返回 ok=True 且 available=False"""
     db = _make_db()
@@ -359,14 +375,16 @@ def test_mobile_set_dish_availability_soldout():
     stub_dish.tenant_id = TENANT_ID
     stub_dish.sold_out = False
 
-    with patch.dict("sys.modules", {
-        "shared.ontology.src.entities": types.SimpleNamespace(
-            Dish=stub_dish,
-            Order=MagicMock(),
-            OrderItem=MagicMock(),
-        )
-    }):
-        import api.mobile_ops_routes as mobile_mod  # type: ignore[import]
+    with patch.dict(
+        "sys.modules",
+        {
+            "shared.ontology.src.entities": types.SimpleNamespace(
+                Dish=stub_dish,
+                Order=MagicMock(),
+                OrderItem=MagicMock(),
+            )
+        },
+    ):
         app = _make_mobile_app(db)
         client = TestClient(app)
 
@@ -386,19 +404,23 @@ def test_mobile_set_dish_availability_soldout():
 
 # ─── 场景 8: PUT /mobile/dishes/{id}/daily-limit — 限量设置 ───────────────────
 
+
 def test_mobile_set_dish_daily_limit_ok():
     """设置每日限量为 50，DB execute+commit 被调用，返回 daily_limit=50"""
     db = _make_db()
 
     stub_dish = MagicMock()
 
-    with patch.dict("sys.modules", {
-        "shared.ontology.src.entities": types.SimpleNamespace(
-            Dish=stub_dish,
-            Order=MagicMock(),
-            OrderItem=MagicMock(),
-        )
-    }):
+    with patch.dict(
+        "sys.modules",
+        {
+            "shared.ontology.src.entities": types.SimpleNamespace(
+                Dish=stub_dish,
+                Order=MagicMock(),
+                OrderItem=MagicMock(),
+            )
+        },
+    ):
         app = _make_mobile_app(db)
         client = TestClient(app)
 
@@ -418,19 +440,23 @@ def test_mobile_set_dish_daily_limit_ok():
 
 # ─── 场景 9: PUT /mobile/orders/{id}/waiter — 修改点菜员 ─────────────────────
 
+
 def test_mobile_update_order_waiter_ok():
     """update_order_waiter 正常执行：返回 waiter_id=new_staff_002，DB commit 被调用"""
     db = _make_db()
 
     stub_order = MagicMock()
 
-    with patch.dict("sys.modules", {
-        "shared.ontology.src.entities": types.SimpleNamespace(
-            Dish=MagicMock(),
-            Order=stub_order,
-            OrderItem=MagicMock(),
-        )
-    }):
+    with patch.dict(
+        "sys.modules",
+        {
+            "shared.ontology.src.entities": types.SimpleNamespace(
+                Dish=MagicMock(),
+                Order=stub_order,
+                OrderItem=MagicMock(),
+            )
+        },
+    ):
         app = _make_mobile_app(db)
         client = TestClient(app)
 
@@ -450,21 +476,22 @@ def test_mobile_update_order_waiter_ok():
 
 # ─── 场景 10: GET /mobile/dishes/status — 批量菜品状态 ────────────────────────
 
+
 def test_mobile_refresh_dish_status_returns_items():
     """refresh_dish_status 从 DB 查询后返回 items 列表和 total"""
     db = _make_db()
 
     # 构造 fake 查询行
     fake_row1 = MagicMock()
-    fake_row1.id              = DISH_ID
-    fake_row1.sold_out        = False
-    fake_row1.daily_limit     = 100
+    fake_row1.id = DISH_ID
+    fake_row1.sold_out = False
+    fake_row1.daily_limit = 100
     fake_row1.daily_sold_count = 30
 
     fake_row2 = MagicMock()
-    fake_row2.id              = str(uuid.uuid4())
-    fake_row2.sold_out        = True
-    fake_row2.daily_limit     = 0
+    fake_row2.id = str(uuid.uuid4())
+    fake_row2.sold_out = True
+    fake_row2.daily_limit = 0
     fake_row2.daily_sold_count = 0
 
     # db.execute 返回的结果对象，.all() 返回两行
@@ -474,13 +501,16 @@ def test_mobile_refresh_dish_status_returns_items():
 
     stub_dish = MagicMock()
 
-    with patch.dict("sys.modules", {
-        "shared.ontology.src.entities": types.SimpleNamespace(
-            Dish=stub_dish,
-            Order=MagicMock(),
-            OrderItem=MagicMock(),
-        )
-    }):
+    with patch.dict(
+        "sys.modules",
+        {
+            "shared.ontology.src.entities": types.SimpleNamespace(
+                Dish=stub_dish,
+                Order=MagicMock(),
+                OrderItem=MagicMock(),
+            )
+        },
+    ):
         app = _make_mobile_app(db)
         client = TestClient(app)
 

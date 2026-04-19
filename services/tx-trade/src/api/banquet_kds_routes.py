@@ -7,6 +7,7 @@
   POST /api/v1/banquet/kds/{session_id}/call                 — 叫菜（通知厨房）
   GET  /api/v1/banquet/kds/{session_id}/progress             — 出品进度汇总
 """
+
 import asyncio
 import json
 import uuid
@@ -20,7 +21,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.events.src.emitter import emit_event
-from shared.events.src.event_types import KdsEventType, ReservationEventType
+from shared.events.src.event_types import KdsEventType
 from shared.ontology.src.database import get_db_with_tenant
 
 logger = structlog.get_logger(__name__)
@@ -28,6 +29,7 @@ router = APIRouter(prefix="/api/v1/banquet/kds", tags=["宴会KDS"])
 
 
 # ─── 依赖注入 ────────────────────────────────────────────────────────────────
+
 
 async def _get_tenant_db(x_tenant_id: str = Header(..., alias="X-Tenant-ID")):
     async for session in get_db_with_tenant(x_tenant_id):
@@ -40,6 +42,7 @@ def _tid(x_tenant_id: str = Header(..., alias="X-Tenant-ID")) -> str:
 
 # ─── 请求模型 ─────────────────────────────────────────────────────────────────
 
+
 class ServeRequest(BaseModel):
     served_qty: int = Field(1, ge=1, description="出品数量")
     notes: Optional[str] = Field(None, max_length=200)
@@ -51,6 +54,7 @@ class CallKitchenRequest(BaseModel):
 
 
 # ─── 工具函数 ─────────────────────────────────────────────────────────────────
+
 
 def _serialize(d: dict) -> dict:
     """将 UUID/datetime/date 转为 str，用于 JSON 序列化。"""
@@ -66,6 +70,7 @@ def _serialize(d: dict) -> dict:
 
 
 # ─── KDS 场次列表 ─────────────────────────────────────────────────────────────
+
 
 @router.get("/sessions", summary="KDS待出品场次列表（含出品进度）")
 async def kds_sessions(
@@ -89,9 +94,7 @@ async def kds_sessions(
 
     w = " AND ".join(wheres)
 
-    count_r = await db.execute(
-        text(f"SELECT COUNT(*) FROM banquet_sessions bs WHERE {w}"), params
-    )
+    count_r = await db.execute(text(f"SELECT COUNT(*) FROM banquet_sessions bs WHERE {w}"), params)
     total = count_r.scalar() or 0
 
     result = await db.execute(
@@ -129,6 +132,7 @@ async def kds_sessions(
 
 
 # ─── 场次排菜出品状态 ─────────────────────────────────────────────────────────
+
 
 @router.get("/{session_id}/dishes", summary="场次排菜出品状态")
 async def session_dishes(
@@ -175,9 +179,7 @@ async def session_dishes(
     return {"ok": True, "data": {"session_id": session_id, "dishes": items}}
 
 
-async def _init_kds_dishes_from_plan(
-    db: AsyncSession, session_id: str, tenant_id: str
-) -> list[dict]:
+async def _init_kds_dishes_from_plan(db: AsyncSession, session_id: str, tenant_id: str) -> list[dict]:
     """从排菜方案初始化 KDS 菜品记录（懒加载）。"""
     sess_r = await db.execute(
         text("""
@@ -222,6 +224,7 @@ async def _init_kds_dishes_from_plan(
 
 
 # ─── 标记出品 ────────────────────────────────────────────────────────────────
+
 
 @router.post("/{session_id}/dishes/{dish_id}/serve", summary="标记出品（更新状态+事件）")
 async def serve_dish(
@@ -309,6 +312,7 @@ async def serve_dish(
 
 # ─── 叫菜 ────────────────────────────────────────────────────────────────────
 
+
 @router.post("/{session_id}/call", summary="叫菜（通知厨房）")
 async def call_kitchen(
     session_id: str,
@@ -359,10 +363,7 @@ async def call_kitchen(
             """),
             {"now": now, "sid": session_id},
         )
-        called_dishes = [
-            {"id": str(row["id"]), "dish_name": row["dish_name"]}
-            for row in r.mappings().all()
-        ]
+        called_dishes = [{"id": str(row["id"]), "dish_name": row["dish_name"]} for row in r.mappings().all()]
 
     await db.commit()
 
@@ -393,6 +394,7 @@ async def call_kitchen(
 
 
 # ─── 出品进度汇总 ────────────────────────────────────────────────────────────
+
 
 @router.get("/{session_id}/progress", summary="出品进度汇总（已出N/总M）")
 async def session_progress(

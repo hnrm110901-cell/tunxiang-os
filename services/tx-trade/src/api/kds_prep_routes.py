@@ -1,4 +1,5 @@
 """预制量智能推荐 API 路由"""
+
 from datetime import date
 from typing import Optional
 

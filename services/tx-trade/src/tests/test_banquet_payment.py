@@ -8,6 +8,7 @@ Y-A8 宴席支付闭环测试 — 定金/尾款状态机
 4. test_full_payment_flow — 完整流程：创建→定金→尾款→fully_paid
 5. test_refund_deposit_only — 退定金：deposit_paid 可退；fully_paid 时禁止仅退定金
 """
+
 from __future__ import annotations
 
 import pytest
@@ -18,12 +19,14 @@ from fastapi.testclient import TestClient
 TENANT_ID = "t-test-banquet-001"
 STORE_ID = "s-test-store-001"
 
+
 # 每个测试独立的 app 实例，避免 mock 数据污染
 @pytest.fixture()
 def client():
     """为每个测试创建独立的 FastAPI 应用实例，MOCK 数据清空。"""
     from fastapi import FastAPI
-    from ..api.banquet_order_routes import router, MOCK_BANQUET_ORDERS, MOCK_PAYMENTS
+
+    from ..api.banquet_order_routes import MOCK_BANQUET_ORDERS, MOCK_PAYMENTS, router
 
     # 每次测试前清空 mock 存储
     MOCK_BANQUET_ORDERS.clear()
@@ -40,6 +43,7 @@ def headers():
 
 
 # ─── 辅助函数 ────────────────────────────────────────────────────────────────
+
 
 def create_test_order(
     client: TestClient,
@@ -71,6 +75,7 @@ def create_test_order(
 
 
 # ─── 1. 创建宴席预订 ──────────────────────────────────────────────────────────
+
 
 class TestCreateBanquetOrder:
     def test_deposit_calculation_30pct(self, client: TestClient, headers: dict):
@@ -121,6 +126,7 @@ class TestCreateBanquetOrder:
 
 
 # ─── 2. 支付定金流程 ──────────────────────────────────────────────────────────
+
 
 class TestPayDepositFlow:
     def test_pay_exact_deposit(self, client: TestClient, headers: dict):
@@ -222,6 +228,7 @@ class TestPayDepositFlow:
 
 # ─── 3. 尾款前置检查 ──────────────────────────────────────────────────────────
 
+
 class TestPayBalanceRequiresDeposit:
     def test_balance_fails_when_deposit_unpaid(self, client: TestClient, headers: dict):
         """定金未支付时尝试支付尾款 → 400。"""
@@ -237,9 +244,7 @@ class TestPayBalanceRequiresDeposit:
             },
             headers=headers,
         )
-        assert resp.status_code == 400, (
-            f"定金未付时应拒绝收尾款（期望 400，实际 {resp.status_code}）"
-        )
+        assert resp.status_code == 400, f"定金未付时应拒绝收尾款（期望 400，实际 {resp.status_code}）"
 
     def test_balance_succeeds_after_deposit(self, client: TestClient, headers: dict):
         """定金已付后支付尾款 → 200，payment_status=fully_paid。"""
@@ -286,10 +291,9 @@ class TestPayBalanceRequiresDeposit:
 
 # ─── 4. 完整支付流程 ──────────────────────────────────────────────────────────
 
+
 class TestFullPaymentFlow:
-    def test_create_pay_deposit_pay_balance_fully_paid(
-        self, client: TestClient, headers: dict
-    ):
+    def test_create_pay_deposit_pay_balance_fully_paid(self, client: TestClient, headers: dict):
         """完整流程：创建 → 付定金 → 付尾款 → fully_paid。"""
         # Step 1: 创建
         order = create_test_order(client, headers, total_fen=1000000, deposit_rate=0.30)
@@ -351,10 +355,9 @@ class TestFullPaymentFlow:
 
 # ─── 5. 退定金逻辑 ──────────────────────────────────────────────────────────
 
+
 class TestRefundDepositOnly:
-    def test_refund_deposit_when_deposit_paid_balance_unpaid(
-        self, client: TestClient, headers: dict
-    ):
+    def test_refund_deposit_when_deposit_paid_balance_unpaid(self, client: TestClient, headers: dict):
         """deposit_paid 且 balance_status=unpaid 时可退定金。"""
         order = create_test_order(client, headers, total_fen=500000)
         order_id = order["id"]
@@ -383,9 +386,7 @@ class TestRefundDepositOnly:
         assert body["data"]["order"]["deposit_status"] == "unpaid"
         assert body["data"]["order"]["payment_status"] == "refunded"
 
-    def test_cannot_refund_deposit_only_when_fully_paid(
-        self, client: TestClient, headers: dict
-    ):
+    def test_cannot_refund_deposit_only_when_fully_paid(self, client: TestClient, headers: dict):
         """已全额支付时禁止仅退定金（应走 full 退款）→ 400。"""
         order = create_test_order(client, headers, total_fen=500000)
         order_id = order["id"]
@@ -415,9 +416,7 @@ class TestRefundDepositOnly:
             },
             headers=headers,
         )
-        assert resp.status_code == 400, (
-            f"全额支付后不允许仅退定金（期望 400，实际 {resp.status_code}）"
-        )
+        assert resp.status_code == 400, f"全额支付后不允许仅退定金（期望 400，实际 {resp.status_code}）"
 
     def test_full_refund_when_fully_paid(self, client: TestClient, headers: dict):
         """fully_paid 状态可申请全额退款 → payment_status=refunded。"""
@@ -450,9 +449,7 @@ class TestRefundDepositOnly:
         assert body["data"]["order"]["deposit_status"] == "unpaid"
         assert body["data"]["order"]["balance_status"] == "unpaid"
 
-    def test_cannot_refund_deposit_when_deposit_not_paid(
-        self, client: TestClient, headers: dict
-    ):
+    def test_cannot_refund_deposit_when_deposit_not_paid(self, client: TestClient, headers: dict):
         """定金未付时申请退定金 → 400。"""
         order = create_test_order(client, headers, total_fen=400000)
         order_id = order["id"]

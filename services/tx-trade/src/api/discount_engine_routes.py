@@ -17,6 +17,7 @@ PUT  /api/v1/discount/rules/{rule_id}   — 更新规则（管理员）
 
 RLS: NULLIF(current_setting('app.tenant_id', true), '')::uuid
 """
+
 from __future__ import annotations
 
 import itertools
@@ -69,6 +70,7 @@ def _err(msg: str, code: int = 400) -> None:
 
 class DiscountInput(BaseModel):
     """单个优惠输入"""
+
     type: str = Field(..., description="member_discount | platform_coupon | manual_discount | full_reduction")
     # 会员折扣
     member_id: Optional[str] = None
@@ -179,13 +181,15 @@ def _build_steps(
     current = base_fen
     for d in sorted_chosen:
         after = _apply_single_discount(current, d)
-        steps.append({
-            "type": d.type,
-            "before": current,
-            "after": after,
-            "saved": current - after,
-            "description": _describe_discount(d, current),
-        })
+        steps.append(
+            {
+                "type": d.type,
+                "before": current,
+                "after": after,
+                "saved": current - after,
+                "description": _describe_discount(d, current),
+            }
+        )
         current = after
     return steps
 
@@ -254,17 +258,21 @@ def _resolve_conflicts(
     excluded_types = {d.type for d in discounts} - {d.type for d in best_combo}
     conflicts = []
     for pair in conflict_pairs:
-        conflicts.append({
-            "type_a": pair[0],
-            "type_b": pair[1],
-            "reason": f"{pair[0]} 与 {pair[1]} 互斥，已自动选择最优组合",
-        })
+        conflicts.append(
+            {
+                "type_a": pair[0],
+                "type_b": pair[1],
+                "reason": f"{pair[0]} 与 {pair[1]} 互斥，已自动选择最优组合",
+            }
+        )
 
     if excluded_types:
-        conflicts.append({
-            "excluded_types": list(excluded_types),
-            "message": "已自动为您选择最优优惠组合",
-        })
+        conflicts.append(
+            {
+                "excluded_types": list(excluded_types),
+                "message": "已自动为您选择最优优惠组合",
+            }
+        )
 
     return best_combo, conflicts
 
@@ -308,6 +316,7 @@ async def _insert_discount_log(
 ) -> str:
     """写入 checkout_discount_log，返回 log id"""
     import json
+
     log_id = str(uuid.uuid4())
     await db.execute(
         text("""
@@ -410,9 +419,7 @@ async def calculate_discount(
                 }
 
         # 2 & 3. 冲突检测 + 选最优组合
-        chosen, conflicts = _resolve_conflicts(
-            req.base_amount_fen, req.discounts, rule_map
-        )
+        chosen, conflicts = _resolve_conflicts(req.base_amount_fen, req.discounts, rule_map)
 
         # 4. 按 apply_order 构建详细步骤
         applied_steps = _build_steps(req.base_amount_fen, chosen, rule_map)
@@ -452,14 +459,16 @@ async def calculate_discount(
             client_ip=user.client_ip,
         )
 
-        return _ok({
-            "base_amount_fen": req.base_amount_fen,
-            "applied_steps": applied_steps,
-            "total_saved_fen": total_saved_fen,
-            "final_amount_fen": final_amount_fen,
-            "conflicts": conflicts,
-            "log_id": log_id,
-        })
+        return _ok(
+            {
+                "base_amount_fen": req.base_amount_fen,
+                "applied_steps": applied_steps,
+                "total_saved_fen": total_saved_fen,
+                "final_amount_fen": final_amount_fen,
+                "conflicts": conflicts,
+                "log_id": log_id,
+            }
+        )
 
     except HTTPException:
         raise
@@ -588,7 +597,7 @@ async def update_discount_rule(
         result = await db.execute(
             text(f"""  # noqa: S608 — mock SQL, not user input
                 UPDATE discount_rules
-                SET {', '.join(set_clauses)}
+                SET {", ".join(set_clauses)}
                 WHERE id = :rule_id::uuid
                   AND tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid
                 RETURNING id

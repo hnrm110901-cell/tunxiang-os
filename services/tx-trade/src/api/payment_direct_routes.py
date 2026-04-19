@@ -5,6 +5,7 @@
 
 Sprint A4：所有写操作均加 require_role 拦截 + write_audit 留痕。
 """
+
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request

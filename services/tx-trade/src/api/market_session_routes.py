@@ -12,6 +12,7 @@
 统一响应格式: {"ok": bool, "data": {}, "error": {}}
 所有接口需 X-Tenant-ID header。
 """
+
 from __future__ import annotations
 
 import uuid
@@ -78,6 +79,7 @@ _DEFAULT_TEMPLATES = [
 
 # ─── 通用工具 ────────────────────────────────────────────────────────────────
 
+
 def _get_tenant_id(request: Request) -> str:
     tid = getattr(request.state, "tenant_id", None) or request.headers.get("X-Tenant-ID", "")
     if not tid:
@@ -110,6 +112,7 @@ def _is_time_in_session(current: time, start: time, end: time) -> bool:
 
 # ─── Pydantic 模型 ────────────────────────────────────────────────────────────
 
+
 class MarketSessionTemplateCreateReq(BaseModel):
     name: str = Field(max_length=50, description="市别名称，如早市")
     code: str = Field(max_length=20, description="代码，如 breakfast/lunch/dinner/late_night")
@@ -141,6 +144,7 @@ class StoreMarketSessionCreateReq(BaseModel):
 
 # ─── 辅助：当前市别查询 ────────────────────────────────────────────────────────
 
+
 async def _get_current_market_session_id(
     db: AsyncSession,
     tenant_id: str,
@@ -163,14 +167,21 @@ async def _get_current_market_session_id(
     rows = result.fetchall()
 
     for row in rows:
-        start = row.start_time if isinstance(row.start_time, time) else datetime.strptime(str(row.start_time), "%H:%M:%S").time()
-        end = row.end_time if isinstance(row.end_time, time) else datetime.strptime(str(row.end_time), "%H:%M:%S").time()
+        start = (
+            row.start_time
+            if isinstance(row.start_time, time)
+            else datetime.strptime(str(row.start_time), "%H:%M:%S").time()
+        )
+        end = (
+            row.end_time if isinstance(row.end_time, time) else datetime.strptime(str(row.end_time), "%H:%M:%S").time()
+        )
         if _is_time_in_session(now_time, start, end):
             return str(row.id)
     return None
 
 
 # ─── 路由 ─────────────────────────────────────────────────────────────────────
+
 
 @router.get("/current/{store_id}", summary="获取当前进行中市别")
 async def get_current_session(
@@ -208,20 +219,28 @@ async def get_current_session(
     store_rows = store_result.fetchall()
 
     for row in store_rows:
-        start = row.start_time if isinstance(row.start_time, time) else datetime.strptime(str(row.start_time), "%H:%M:%S").time()
-        end = row.end_time if isinstance(row.end_time, time) else datetime.strptime(str(row.end_time), "%H:%M:%S").time()
+        start = (
+            row.start_time
+            if isinstance(row.start_time, time)
+            else datetime.strptime(str(row.start_time), "%H:%M:%S").time()
+        )
+        end = (
+            row.end_time if isinstance(row.end_time, time) else datetime.strptime(str(row.end_time), "%H:%M:%S").time()
+        )
         if _is_time_in_session(now_time, start, end):
             log.info("market_session_matched", source="store", session_id=str(row.id))
-            return _ok({
-                "id": str(row.id),
-                "name": row.name,
-                "start_time": str(row.start_time),
-                "end_time": str(row.end_time),
-                "template_id": str(row.template_id) if row.template_id else None,
-                "menu_plan_id": str(row.menu_plan_id) if row.menu_plan_id else None,
-                "source": "store",
-                "current_time": now_str,
-            })
+            return _ok(
+                {
+                    "id": str(row.id),
+                    "name": row.name,
+                    "start_time": str(row.start_time),
+                    "end_time": str(row.end_time),
+                    "template_id": str(row.template_id) if row.template_id else None,
+                    "menu_plan_id": str(row.menu_plan_id) if row.menu_plan_id else None,
+                    "source": "store",
+                    "current_time": now_str,
+                }
+            )
 
     # 2. 回落到集团模板
     tmpl_result = await db.execute(
@@ -237,19 +256,27 @@ async def get_current_session(
     tmpl_rows = tmpl_result.fetchall()
 
     for row in tmpl_rows:
-        start = row.start_time if isinstance(row.start_time, time) else datetime.strptime(str(row.start_time), "%H:%M:%S").time()
-        end = row.end_time if isinstance(row.end_time, time) else datetime.strptime(str(row.end_time), "%H:%M:%S").time()
+        start = (
+            row.start_time
+            if isinstance(row.start_time, time)
+            else datetime.strptime(str(row.start_time), "%H:%M:%S").time()
+        )
+        end = (
+            row.end_time if isinstance(row.end_time, time) else datetime.strptime(str(row.end_time), "%H:%M:%S").time()
+        )
         if _is_time_in_session(now_time, start, end):
             log.info("market_session_matched", source="template", session_id=str(row.id))
-            return _ok({
-                "id": str(row.id),
-                "name": row.name,
-                "code": row.code,
-                "start_time": str(row.start_time),
-                "end_time": str(row.end_time),
-                "source": "template",
-                "current_time": now_str,
-            })
+            return _ok(
+                {
+                    "id": str(row.id),
+                    "name": row.name,
+                    "code": row.code,
+                    "start_time": str(row.start_time),
+                    "end_time": str(row.end_time),
+                    "source": "template",
+                    "current_time": now_str,
+                }
+            )
 
     log.info("market_session_no_match", reason="no_session_covers_current_time")
     return _ok(None)

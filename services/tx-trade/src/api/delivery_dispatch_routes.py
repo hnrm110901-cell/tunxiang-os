@@ -4,13 +4,14 @@
 
 路由前缀: /api/v1/delivery/self
 """
+
 import uuid
 from datetime import datetime, timezone
 from enum import Enum
 from typing import List, Optional
 
 import structlog
-from fastapi import APIRouter, Depends, Header, HTTPException, Query
+from fastapi import APIRouter, Header, HTTPException, Query
 from pydantic import BaseModel, Field
 
 logger = structlog.get_logger()
@@ -18,6 +19,7 @@ router = APIRouter(prefix="/api/v1/delivery/self", tags=["delivery-dispatch"])
 
 
 # ─── 枚举 & 常量 ────────────────────────────────────────────────────────────
+
 
 class ProviderEnum(str, Enum):
     DADA = "dada"
@@ -57,6 +59,7 @@ _provider_configs: list[dict] = []
 
 # ─── 工具函数 ─────────────────────────────────────────────────────────────────
 
+
 def _ok(data: dict | list | None = None) -> dict:
     return {"ok": True, "data": data, "error": None}
 
@@ -74,10 +77,9 @@ def _find_dispatch(dispatch_id: str) -> dict | None:
 
 def _find_configs_for_store(tenant_id: str, store_id: str) -> list[dict]:
     return [
-        c for c in _provider_configs
-        if c["tenant_id"] == tenant_id
-        and c["store_id"] == store_id
-        and not c.get("is_deleted")
+        c
+        for c in _provider_configs
+        if c["tenant_id"] == tenant_id and c["store_id"] == store_id and not c.get("is_deleted")
     ]
 
 
@@ -105,8 +107,7 @@ async def _call_provider_api(provider: str, action: str, payload: dict) -> dict:
     调用三方配送商API（达达/顺丰）
     生产环境替换为真实HTTP调用
     """
-    logger.info("delivery_dispatch.provider_api_call",
-                provider=provider, action=action)
+    logger.info("delivery_dispatch.provider_api_call", provider=provider, action=action)
     # Mock: 模拟三方API返回
     return {
         "success": True,
@@ -117,6 +118,7 @@ async def _call_provider_api(provider: str, action: str, payload: dict) -> dict:
 
 # ─── 请求/响应模型 ──────────────────────────────────────────────────────────
 
+
 class CreateDispatchReq(BaseModel):
     order_id: str = Field(..., description="关联交易订单ID")
     store_id: str = Field(..., description="门店ID")
@@ -126,8 +128,7 @@ class CreateDispatchReq(BaseModel):
     distance_meters: int = Field(default=0, ge=0, description="配送距离(米)")
     delivery_fee_fen: int = Field(default=0, ge=0, description="配送费(分)")
     tip_fen: int = Field(default=0, ge=0, description="小费(分)")
-    preferred_provider: Optional[ProviderEnum] = Field(
-        None, description="指定配送商，为空则自动选择")
+    preferred_provider: Optional[ProviderEnum] = Field(None, description="指定配送商，为空则自动选择")
 
 
 class CancelDispatchReq(BaseModel):
@@ -148,8 +149,7 @@ class ProviderConfigReq(BaseModel):
 
 class UpdateProviderConfigReq(BaseModel):
     store_id: str = Field(..., description="门店ID")
-    configs: List[ProviderConfigReq] = Field(..., min_length=1, max_length=3,
-                                              description="配送商配置列表")
+    configs: List[ProviderConfigReq] = Field(..., min_length=1, max_length=3, description="配送商配置列表")
 
 
 class TrackInfo(BaseModel):
@@ -166,6 +166,7 @@ class TrackInfo(BaseModel):
 
 
 # ─── 1. 创建配送单（自动选择配送商）──────────────────────────────────────────
+
 
 @router.post("/dispatch", summary="创建配送单（自动选择达达/顺丰/骑手）", status_code=201)
 async def create_dispatch(
@@ -195,15 +196,19 @@ async def create_dispatch(
     now_iso = datetime.now(timezone.utc).isoformat()
 
     # 调用三方API
-    api_result = await _call_provider_api(provider, "create_order", {
-        "order_id": req.order_id,
-        "store_id": req.store_id,
-        "address": req.delivery_address,
-        "lat": req.delivery_lat,
-        "lng": req.delivery_lng,
-        "distance_meters": req.distance_meters,
-        "estimated_minutes": estimated_minutes,
-    })
+    api_result = await _call_provider_api(
+        provider,
+        "create_order",
+        {
+            "order_id": req.order_id,
+            "store_id": req.store_id,
+            "address": req.delivery_address,
+            "lat": req.delivery_lat,
+            "lng": req.delivery_lng,
+            "distance_meters": req.distance_meters,
+            "estimated_minutes": estimated_minutes,
+        },
+    )
 
     dispatch: dict = {
         "id": dispatch_id,
@@ -240,16 +245,19 @@ async def create_dispatch(
     }
     _dispatches.append(dispatch)
 
-    logger.info("delivery_dispatch.created",
-                dispatch_id=dispatch_id,
-                provider=provider,
-                order_id=req.order_id,
-                estimated_minutes=estimated_minutes)
+    logger.info(
+        "delivery_dispatch.created",
+        dispatch_id=dispatch_id,
+        provider=provider,
+        order_id=req.order_id,
+        estimated_minutes=estimated_minutes,
+    )
 
     return _ok(dispatch)
 
 
 # ─── 2. 骑手位置追踪 ─────────────────────────────────────────────────────────
+
 
 @router.get("/dispatch/{dispatch_id}/track", summary="骑手位置追踪")
 async def track_dispatch(
@@ -270,17 +278,20 @@ async def track_dispatch(
     # 对于三方配送商，尝试拉取最新位置（Mock）
     if dispatch["provider"] in (ProviderEnum.DADA.value, ProviderEnum.SHUNFENG.value):  # type: ignore[index]
         provider_result = await _call_provider_api(
-            dispatch["provider"], "query_location",  # type: ignore[index]
+            dispatch["provider"],
+            "query_location",  # type: ignore[index]
             {"provider_order_id": dispatch["provider_order_id"]},  # type: ignore[index]
         )
         # Mock: 模拟骑手位置更新
         if dispatch["status"] in ("accepted", "picked_up", "delivering"):  # type: ignore[index]
             now_iso = datetime.now(timezone.utc).isoformat()
-            dispatch.update({  # type: ignore[union-attr]
-                "rider_lat": 28.2282 + (hash(dispatch_id) % 100) * 0.0001,
-                "rider_lng": 112.9388 + (hash(dispatch_id) % 100) * 0.0001,
-                "rider_updated_at": now_iso,
-            })
+            dispatch.update(
+                {  # type: ignore[union-attr]
+                    "rider_lat": 28.2282 + (hash(dispatch_id) % 100) * 0.0001,
+                    "rider_lng": 112.9388 + (hash(dispatch_id) % 100) * 0.0001,
+                    "rider_updated_at": now_iso,
+                }
+            )
 
     track = TrackInfo(
         dispatch_id=dispatch["id"],  # type: ignore[index]
@@ -299,6 +310,7 @@ async def track_dispatch(
 
 
 # ─── 3. 取消配送 ─────────────────────────────────────────────────────────────
+
 
 @router.post("/dispatch/{dispatch_id}/cancel", summary="取消配送")
 async def cancel_dispatch(
@@ -325,7 +337,8 @@ async def cancel_dispatch(
     # 调用三方取消API
     if dispatch["provider"] in (ProviderEnum.DADA.value, ProviderEnum.SHUNFENG.value):  # type: ignore[index]
         await _call_provider_api(
-            dispatch["provider"], "cancel_order",  # type: ignore[index]
+            dispatch["provider"],
+            "cancel_order",  # type: ignore[index]
             {
                 "provider_order_id": dispatch["provider_order_id"],  # type: ignore[index]
                 "reason": req.reason,
@@ -333,21 +346,22 @@ async def cancel_dispatch(
         )
 
     now_iso = datetime.now(timezone.utc).isoformat()
-    dispatch.update({  # type: ignore[union-attr]
-        "status": DispatchStatus.CANCELLED.value,
-        "cancelled_at": now_iso,
-        "cancel_reason": req.reason,
-        "updated_at": now_iso,
-    })
+    dispatch.update(
+        {  # type: ignore[union-attr]
+            "status": DispatchStatus.CANCELLED.value,
+            "cancelled_at": now_iso,
+            "cancel_reason": req.reason,
+            "updated_at": now_iso,
+        }
+    )
 
-    logger.info("delivery_dispatch.cancelled",
-                dispatch_id=dispatch_id,
-                reason=req.reason)
+    logger.info("delivery_dispatch.cancelled", dispatch_id=dispatch_id, reason=req.reason)
 
     return _ok(dispatch)
 
 
 # ─── 4. 获取配送商配置 ───────────────────────────────────────────────────────
+
 
 @router.get("/config", summary="获取配送商配置（达达/顺丰/自有骑手）")
 async def get_provider_config(
@@ -364,17 +378,19 @@ async def get_provider_config(
     if not configs:
         defaults = []
         for p in ProviderEnum:
-            defaults.append({
-                "provider": p.value,
-                "enabled": False,
-                "priority": 99,
-                "app_key": None,
-                "app_secret": None,
-                "merchant_id": None,
-                "shop_no": None,
-                "callback_url": None,
-                "extra_config": {},
-            })
+            defaults.append(
+                {
+                    "provider": p.value,
+                    "enabled": False,
+                    "priority": 99,
+                    "app_key": None,
+                    "app_secret": None,
+                    "merchant_id": None,
+                    "shop_no": None,
+                    "callback_url": None,
+                    "extra_config": {},
+                }
+            )
         return _ok({"store_id": store_id, "configs": defaults})
 
     # 脱敏 app_secret
@@ -390,6 +406,7 @@ async def get_provider_config(
 
 
 # ─── 5. 更新配送商配置 ───────────────────────────────────────────────────────
+
 
 @router.put("/config", summary="更新配送商配置")
 async def update_provider_config(
@@ -415,24 +432,28 @@ async def update_provider_config(
         # 查找现有配置
         existing = None
         for c in _provider_configs:
-            if (c["tenant_id"] == tenant_id
-                    and c["store_id"] == store_id
-                    and c["provider"] == cfg.provider.value
-                    and not c.get("is_deleted")):
+            if (
+                c["tenant_id"] == tenant_id
+                and c["store_id"] == store_id
+                and c["provider"] == cfg.provider.value
+                and not c.get("is_deleted")
+            ):
                 existing = c
                 break
 
         if existing:
             # 更新已有配置
-            existing.update({
-                "enabled": cfg.enabled,
-                "priority": cfg.priority,
-                "merchant_id": cfg.merchant_id,
-                "shop_no": cfg.shop_no,
-                "callback_url": cfg.callback_url,
-                "extra_config": cfg.extra_config or {},
-                "updated_at": now_iso,
-            })
+            existing.update(
+                {
+                    "enabled": cfg.enabled,
+                    "priority": cfg.priority,
+                    "merchant_id": cfg.merchant_id,
+                    "shop_no": cfg.shop_no,
+                    "callback_url": cfg.callback_url,
+                    "extra_config": cfg.extra_config or {},
+                    "updated_at": now_iso,
+                }
+            )
             # 敏感字段仅在显式提供时更新
             if cfg.app_key is not None:
                 existing["app_key"] = cfg.app_key
@@ -461,8 +482,8 @@ async def update_provider_config(
             _provider_configs.append(new_config)
             updated_configs.append(new_config)
 
-    logger.info("delivery_dispatch.config_updated",
-                store_id=store_id,
-                providers=[c["provider"] for c in updated_configs])
+    logger.info(
+        "delivery_dispatch.config_updated", store_id=store_id, providers=[c["provider"] for c in updated_configs]
+    )
 
     return _ok({"store_id": store_id, "configs": updated_configs})

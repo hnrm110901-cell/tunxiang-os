@@ -11,6 +11,7 @@
   - [VALIDATION] phone 空字符串校验
   - [STATS] get_queue_history 改用 SQL 聚合统计，避免二次全表扫描
 """
+
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Optional
@@ -40,6 +41,7 @@ def _today_str() -> str:
 # ─── 排队号前缀规则 ───
 # A系列：1-4人小桌  B系列：5-8人中桌  C系列：9+人大桌
 
+
 def _size_prefix(party_size: int) -> str:
     if party_size <= 4:
         return "A"
@@ -67,8 +69,8 @@ _DEFAULT_AVG_DINING_DURATION: dict[str, int] = {
 # 各桌型典型门店桌数默认配置
 _DEFAULT_TABLE_COUNTS: dict[str, int] = {
     "A": 15,  # 小桌15张
-    "B": 8,   # 中桌8张
-    "C": 4,   # 大桌4张
+    "B": 8,  # 中桌8张
+    "C": 4,  # 大桌4张
 }
 
 
@@ -210,9 +212,7 @@ class QueueService:
         if not record:
             raise ValueError(f"Queue record not found: {queue_id}")
         if record.status != "waiting":
-            raise ValueError(
-                f"Cannot call queue {queue_id}: current status is '{record.status}', expected 'waiting'"
-            )
+            raise ValueError(f"Cannot call queue {queue_id}: current status is '{record.status}', expected 'waiting'")
 
         now = _now_iso()
         record.status = "called"
@@ -258,9 +258,7 @@ class QueueService:
             "party_size": record.party_size,
             "called_at": now,
             "notification_sent": True,
-            "auto_skip_at": (
-                datetime.fromisoformat(now) + timedelta(minutes=10)
-            ).isoformat(),
+            "auto_skip_at": (datetime.fromisoformat(now) + timedelta(minutes=10)).isoformat(),
         }
 
     # ─── 顾客到店 ───
@@ -379,8 +377,7 @@ class QueueService:
             raise ValueError(f"Queue record not found: {queue_id}")
         if record.status not in ("waiting", "called"):
             raise ValueError(
-                f"Cannot skip queue {queue_id}: "
-                f"current status is '{record.status}', expected 'waiting' or 'called'"
+                f"Cannot skip queue {queue_id}: current status is '{record.status}', expected 'waiting' or 'called'"
             )
 
         now = _now_iso()
@@ -421,9 +418,7 @@ class QueueService:
         if not record:
             raise ValueError(f"Queue record not found: {queue_id}")
         if record.status in ("seated", "skipped", "cancelled"):
-            raise ValueError(
-                f"Cannot cancel queue {queue_id}: already in terminal status '{record.status}'"
-            )
+            raise ValueError(f"Cannot cancel queue {queue_id}: already in terminal status '{record.status}'")
 
         now = _now_iso()
         record.status = "cancelled"
@@ -471,18 +466,18 @@ class QueueService:
             # 计算该桌型平均等位时间
             avg_wait = self._calculate_wait_time(prefix, len(prefix_waiting))
 
-            groups.append({
-                "prefix": prefix,
-                "size_category": SIZE_CATEGORY_LABELS[prefix],
-                "waiting_count": len(prefix_waiting),
-                "called_count": len(prefix_called),
-                "avg_wait_min": avg_wait["estimated_wait_min"],
-                "next_queue_numbers": [
-                    q.queue_number for q in sorted(
-                        prefix_waiting, key=lambda x: x.priority_ts
-                    )[:3]
-                ],
-            })
+            groups.append(
+                {
+                    "prefix": prefix,
+                    "size_category": SIZE_CATEGORY_LABELS[prefix],
+                    "waiting_count": len(prefix_waiting),
+                    "called_count": len(prefix_called),
+                    "avg_wait_min": avg_wait["estimated_wait_min"],
+                    "next_queue_numbers": [
+                        q.queue_number for q in sorted(prefix_waiting, key=lambda x: x.priority_ts)[:3]
+                    ],
+                }
+            )
 
         return {
             "store_id": store_id,
@@ -660,9 +655,7 @@ class QueueService:
 
     # ─── 内部辅助方法 ───
 
-    def _calculate_wait_time(
-        self, prefix: str, ahead_count: int
-    ) -> dict:
+    def _calculate_wait_time(self, prefix: str, ahead_count: int) -> dict:
         """计算预估等位时间
 
         算法：
@@ -688,6 +681,7 @@ class QueueService:
 
 
 # ─── 模块级便捷函数（兼容 reservation_flow.py 的调用风格） ───
+
 
 async def take_queue_number(
     db: AsyncSession,

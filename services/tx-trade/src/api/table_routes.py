@@ -3,6 +3,7 @@
 统一响应格式: {"ok": bool, "data": {}, "error": {}}
 所有接口需 X-Tenant-ID header。
 """
+
 import uuid
 from typing import Optional
 
@@ -228,6 +229,7 @@ async def api_table_analytics(
             return
     else:
         from datetime import datetime, timezone
+
         target_date = datetime.now(timezone.utc).date()
 
     # 快速桌态统计（复用看板数据）
@@ -246,13 +248,15 @@ async def api_table_analytics(
     )
     rooms_occupied = sum(1 for r in rooms if r["status"] == "occupied")
 
-    return _ok({
-        "store_id": str(store_id),
-        "date": str(target_date),
-        "table_stats": stats,
-        "room_summary": {
-            "total": len(rooms),
-            "occupied": rooms_occupied,
-            "utilization_rate": round(rooms_occupied / len(rooms), 4) if rooms else 0.0,
-        },
-    })
+    return _ok(
+        {
+            "store_id": str(store_id),
+            "date": str(target_date),
+            "table_stats": stats,
+            "room_summary": {
+                "total": len(rooms),
+                "occupied": rooms_occupied,
+                "utilization_rate": round(rooms_occupied / len(rooms), 4) if rooms else 0.0,
+            },
+        }
+    )

@@ -6,6 +6,7 @@
   3. set_dish_allergens()         — 设置菜品过敏原标签（后台管理用）
   4. get_allergen_summary()       — 获取所有过敏原代码和中文标签
 """
+
 from __future__ import annotations
 
 import uuid
@@ -23,20 +24,20 @@ logger = structlog.get_logger(__name__)
 # ──────────────────────────────────────────────────────────────────────────────
 
 ALLERGEN_CATALOG: dict[str, str] = {
-    "peanut":    "花生",
+    "peanut": "花生",
     "shellfish": "贝壳海鲜",
-    "fish":      "鱼",
-    "egg":       "鸡蛋",
-    "milk":      "牛奶",
-    "soy":       "大豆",
-    "wheat":     "小麦/面筋",
-    "sesame":    "芝麻",
-    "tree_nut":  "坚果",
-    "pork":      "猪肉",
-    "beef":      "牛肉",
-    "spicy":     "辣",
-    "msg":       "味精",
-    "sulfite":   "亚硫酸盐",
+    "fish": "鱼",
+    "egg": "鸡蛋",
+    "milk": "牛奶",
+    "soy": "大豆",
+    "wheat": "小麦/面筋",
+    "sesame": "芝麻",
+    "tree_nut": "坚果",
+    "pork": "猪肉",
+    "beef": "牛肉",
+    "spicy": "辣",
+    "msg": "味精",
+    "sulfite": "亚硫酸盐",
 }
 
 # 忌口偏好类（非真性过敏，severity=warning）
@@ -84,10 +85,7 @@ class AllergenService:
         """从 members 表读取 allergens JSONB 字段"""
         try:
             row = await self.db.execute(
-                text(
-                    "SELECT allergens FROM members "
-                    "WHERE id = :mid AND tenant_id = :tid AND is_deleted = FALSE"
-                ),
+                text("SELECT allergens FROM members WHERE id = :mid AND tenant_id = :tid AND is_deleted = FALSE"),
                 {"mid": uuid.UUID(member_id), "tid": self.tenant_id},
             )
             result = row.fetchone()
@@ -221,10 +219,7 @@ class AllergenService:
         """设置菜品过敏原标签（全量替换）。供后台管理调用。"""
         invalid_codes = [c for c in allergen_codes if c not in ALLERGEN_CATALOG]
         if invalid_codes:
-            raise ValueError(
-                f"无效的过敏原代码: {invalid_codes}。"
-                f"支持的代码: {sorted(ALLERGEN_CATALOG.keys())}"
-            )
+            raise ValueError(f"无效的过敏原代码: {invalid_codes}。支持的代码: {sorted(ALLERGEN_CATALOG.keys())}")
 
         dish_uuid = uuid.UUID(dish_id)
 
@@ -312,18 +307,20 @@ class AllergenService:
                 member_id=member_id,
             )
             if alerts:
-                results.append({
-                    "dish_id": dish_id,
-                    "dish_name": dish_name,
-                    "alerts": [
-                        {
-                            "allergen_code": a.allergen_code,
-                            "allergen_label": a.allergen_label,
-                            "severity": a.severity,
-                        }
-                        for a in alerts
-                    ],
-                })
+                results.append(
+                    {
+                        "dish_id": dish_id,
+                        "dish_name": dish_name,
+                        "alerts": [
+                            {
+                                "allergen_code": a.allergen_code,
+                                "allergen_label": a.allergen_label,
+                                "severity": a.severity,
+                            }
+                            for a in alerts
+                        ],
+                    }
+                )
         return results
 
     @staticmethod

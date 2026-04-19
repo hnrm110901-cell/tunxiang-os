@@ -11,10 +11,11 @@
   GET  /api/v1/banquet/sessions/{id}/bills     — 各席账单
   GET  /api/v1/banquet/analytics              — 宴席经营分析
 """
+
 import json
 import uuid
-from datetime import date, datetime, timezone
-from typing import Any, Dict, List, Optional
+from datetime import date, datetime
+from typing import Optional
 
 import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
@@ -39,6 +40,7 @@ def _tid(x_tenant_id: str = Header(..., alias="X-Tenant-ID")) -> str:
 
 
 # ─── 请求模型 ──
+
 
 class MenuPlanCreate(BaseModel):
     name: str = Field(..., max_length=100)
@@ -72,6 +74,7 @@ class SplitBillRequest(BaseModel):
 
 # ─── 排菜方案 ──
 
+
 @router.post("/menu-plan", summary="创建排菜方案")
 async def create_menu_plan(
     body: MenuPlanCreate,
@@ -89,32 +92,44 @@ async def create_menu_plan(
             VALUES (:tid::UUID, :name, :gc, :budget, :dishes::JSONB, :cost, :price, :margin)
             RETURNING id, created_at
         """),
-        {"tid": tenant_id, "name": body.name, "gc": body.guest_count,
-         "budget": body.budget_fen, "dishes": json.dumps(body.dishes),
-         "cost": total_cost, "price": total_price, "margin": margin},
+        {
+            "tid": tenant_id,
+            "name": body.name,
+            "gc": body.guest_count,
+            "budget": body.budget_fen,
+            "dishes": json.dumps(body.dishes),
+            "cost": total_cost,
+            "price": total_price,
+            "margin": margin,
+        },
     )
     row = result.mappings().first()
     await db.commit()
 
-    return {"ok": True, "data": {"id": str(row["id"]), "name": body.name,
-            "total_price_fen": total_price, "margin_rate": margin}}
+    return {
+        "ok": True,
+        "data": {"id": str(row["id"]), "name": body.name, "total_price_fen": total_price, "margin_rate": margin},
+    }
 
 
 @router.get("/menu-plans", summary="排菜方案列表")
 async def list_menu_plans(
-    page: int = Query(1, ge=1), size: int = Query(20, ge=1, le=100),
-    db: AsyncSession = Depends(_get_tenant_db), tenant_id: str = Depends(_tid),
+    page: int = Query(1, ge=1),
+    size: int = Query(20, ge=1, le=100),
+    db: AsyncSession = Depends(_get_tenant_db),
+    tenant_id: str = Depends(_tid),
 ):
-    count_r = await db.execute(text(
-        "SELECT COUNT(*) FROM banquet_menu_plans WHERE is_deleted=FALSE"
-    ))
+    count_r = await db.execute(text("SELECT COUNT(*) FROM banquet_menu_plans WHERE is_deleted=FALSE"))
     total = count_r.scalar() or 0
 
-    result = await db.execute(text("""
+    result = await db.execute(
+        text("""
         SELECT id, name, guest_count, budget_fen, total_price_fen, margin_rate, status, created_at
         FROM banquet_menu_plans WHERE is_deleted=FALSE
         ORDER BY created_at DESC LIMIT :lim OFFSET :off
-    """), {"lim": size, "off": (page - 1) * size})
+    """),
+        {"lim": size, "off": (page - 1) * size},
+    )
     items = [dict(r) for r in result.mappings().all()]
     for item in items:
         for k, v in item.items():
@@ -128,11 +143,16 @@ async def list_menu_plans(
 
 @router.get("/menu-plans/{plan_id}", summary="方案详情")
 async def get_menu_plan(
-    plan_id: str, db: AsyncSession = Depends(_get_tenant_db), tenant_id: str = Depends(_tid),
+    plan_id: str,
+    db: AsyncSession = Depends(_get_tenant_db),
+    tenant_id: str = Depends(_tid),
 ):
-    result = await db.execute(text("""
+    result = await db.execute(
+        text("""
         SELECT * FROM banquet_menu_plans WHERE id = :pid::UUID AND is_deleted=FALSE
-    """), {"pid": plan_id})
+    """),
+        {"pid": plan_id},
+    )
     row = result.mappings().first()
     if not row:
         raise HTTPException(status_code=404, detail="方案不存在")
@@ -147,10 +167,12 @@ async def get_menu_plan(
 
 # ─── 场次管理 ──
 
+
 @router.post("/sessions", summary="创建宴席场次")
 async def create_session(
     body: SessionCreate,
-    db: AsyncSession = Depends(_get_tenant_db), tenant_id: str = Depends(_tid),
+    db: AsyncSession = Depends(_get_tenant_db),
+    tenant_id: str = Depends(_tid),
 ):
     result = await db.execute(
         text("""
@@ -162,25 +184,36 @@ async def create_session(
                     :rooms::JSONB, :tc, :gc, :cn, :cp, :dep, :notes)
             RETURNING id, created_at
         """),
-        {"tid": tenant_id, "sid": body.store_id,
-         "mpid": body.menu_plan_id, "sdate": body.session_date,
-         "slot": body.time_slot, "rooms": json.dumps(body.room_ids),
-         "tc": body.table_count, "gc": body.guest_count,
-         "cn": body.contact_name, "cp": body.contact_phone,
-         "dep": body.deposit_fen, "notes": body.notes},
+        {
+            "tid": tenant_id,
+            "sid": body.store_id,
+            "mpid": body.menu_plan_id,
+            "sdate": body.session_date,
+            "slot": body.time_slot,
+            "rooms": json.dumps(body.room_ids),
+            "tc": body.table_count,
+            "gc": body.guest_count,
+            "cn": body.contact_name,
+            "cp": body.contact_phone,
+            "dep": body.deposit_fen,
+            "notes": body.notes,
+        },
     )
     row = result.mappings().first()
     await db.commit()
-    return {"ok": True, "data": {"id": str(row["id"]), "session_date": body.session_date,
-            "status": "confirmed"}}
+    return {"ok": True, "data": {"id": str(row["id"]), "session_date": body.session_date, "status": "confirmed"}}
 
 
 @router.get("/sessions", summary="场次列表")
 async def list_sessions(
-    start_date: Optional[str] = None, end_date: Optional[str] = None,
-    status: Optional[str] = None, store_id: Optional[str] = None,
-    page: int = Query(1, ge=1), size: int = Query(20, ge=1, le=100),
-    db: AsyncSession = Depends(_get_tenant_db), tenant_id: str = Depends(_tid),
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    status: Optional[str] = None,
+    store_id: Optional[str] = None,
+    page: int = Query(1, ge=1),
+    size: int = Query(20, ge=1, le=100),
+    db: AsyncSession = Depends(_get_tenant_db),
+    tenant_id: str = Depends(_tid),
 ):
     wheres = ["is_deleted=FALSE"]
     params: dict = {"lim": size, "off": (page - 1) * size}
@@ -201,12 +234,15 @@ async def list_sessions(
     count_r = await db.execute(text(f"SELECT COUNT(*) FROM banquet_sessions WHERE {w}"), params)
     total = count_r.scalar() or 0
 
-    result = await db.execute(text(f"""
+    result = await db.execute(
+        text(f"""
         SELECT id, store_id, session_date, time_slot, table_count, guest_count,
                contact_name, status, total_amount_fen, deposit_fen, created_at
         FROM banquet_sessions WHERE {w}
         ORDER BY session_date DESC, created_at DESC LIMIT :lim OFFSET :off
-    """), params)
+    """),
+        params,
+    )
     items = []
     for r in result.mappings().all():
         d = dict(r)
@@ -222,8 +258,10 @@ async def list_sessions(
 
 @router.put("/sessions/{session_id}/status", summary="场次状态流转")
 async def update_session_status(
-    session_id: str, body: StatusUpdate,
-    db: AsyncSession = Depends(_get_tenant_db), tenant_id: str = Depends(_tid),
+    session_id: str,
+    body: StatusUpdate,
+    db: AsyncSession = Depends(_get_tenant_db),
+    tenant_id: str = Depends(_tid),
 ):
     valid_transitions = {
         "confirmed": ["preparing", "cancelled"],
@@ -231,9 +269,9 @@ async def update_session_status(
         "serving": ["completed"],
     }
     # 查当前状态
-    cur = await db.execute(text(
-        "SELECT status FROM banquet_sessions WHERE id = :sid::UUID AND is_deleted=FALSE"
-    ), {"sid": session_id})
+    cur = await db.execute(
+        text("SELECT status FROM banquet_sessions WHERE id = :sid::UUID AND is_deleted=FALSE"), {"sid": session_id}
+    )
     row = cur.mappings().first()
     if not row:
         raise HTTPException(status_code=404, detail="场次不存在")
@@ -241,28 +279,34 @@ async def update_session_status(
     current = row["status"]
     allowed = valid_transitions.get(current, [])
     if body.status not in allowed:
-        raise HTTPException(status_code=400,
-                            detail=f"不允许从 {current} 转到 {body.status}，允许: {allowed}")
+        raise HTTPException(status_code=400, detail=f"不允许从 {current} 转到 {body.status}，允许: {allowed}")
 
-    await db.execute(text("""
+    await db.execute(
+        text("""
         UPDATE banquet_sessions SET status = :st, updated_at = now()
         WHERE id = :sid::UUID
-    """), {"st": body.status, "sid": session_id})
+    """),
+        {"st": body.status, "sid": session_id},
+    )
     await db.commit()
     return {"ok": True, "data": {"session_id": session_id, "status": body.status}}
 
 
 # ─── 分席结账 ──
 
+
 @router.post("/sessions/{session_id}/split-bill", summary="分席结账")
 async def split_bill(
-    session_id: str, body: SplitBillRequest,
-    db: AsyncSession = Depends(_get_tenant_db), tenant_id: str = Depends(_tid),
+    session_id: str,
+    body: SplitBillRequest,
+    db: AsyncSession = Depends(_get_tenant_db),
+    tenant_id: str = Depends(_tid),
 ):
     # 查场次总金额
-    sess = await db.execute(text(
-        "SELECT total_amount_fen, table_count FROM banquet_sessions WHERE id=:sid::UUID AND is_deleted=FALSE"
-    ), {"sid": session_id})
+    sess = await db.execute(
+        text("SELECT total_amount_fen, table_count FROM banquet_sessions WHERE id=:sid::UUID AND is_deleted=FALSE"),
+        {"sid": session_id},
+    )
     s = sess.mappings().first()
     if not s:
         raise HTTPException(status_code=404, detail="场次不存在")
@@ -278,12 +322,21 @@ async def split_bill(
         else:
             amount = t.get("amount_fen", 0)
 
-        r = await db.execute(text("""
+        r = await db.execute(
+            text("""
             INSERT INTO banquet_split_bills (tenant_id, session_id, table_no, split_mode, ratio, amount_fen)
             VALUES (:tid::UUID, :sid::UUID, :tn, :mode, :ratio, :amt)
             RETURNING id
-        """), {"tid": tenant_id, "sid": session_id, "tn": table_no,
-               "mode": body.split_mode, "ratio": t.get("ratio"), "amt": amount})
+        """),
+            {
+                "tid": tenant_id,
+                "sid": session_id,
+                "tn": table_no,
+                "mode": body.split_mode,
+                "ratio": t.get("ratio"),
+                "amt": amount,
+            },
+        )
         bill_row = r.mappings().first()
         bills.append({"id": str(bill_row["id"]), "table_no": table_no, "amount_fen": amount})
 
@@ -294,14 +347,18 @@ async def split_bill(
 @router.get("/sessions/{session_id}/bills", summary="各席账单")
 async def get_session_bills(
     session_id: str,
-    db: AsyncSession = Depends(_get_tenant_db), tenant_id: str = Depends(_tid),
+    db: AsyncSession = Depends(_get_tenant_db),
+    tenant_id: str = Depends(_tid),
 ):
-    result = await db.execute(text("""
+    result = await db.execute(
+        text("""
         SELECT id, table_no, split_mode, ratio, amount_fen, paid, paid_at, payment_method
         FROM banquet_split_bills
         WHERE session_id = :sid::UUID AND is_deleted=FALSE
         ORDER BY table_no
-    """), {"sid": session_id})
+    """),
+        {"sid": session_id},
+    )
     items = []
     for r in result.mappings().all():
         d = dict(r)
@@ -316,11 +373,14 @@ async def get_session_bills(
 
 # ─── 宴席经营分析 ──
 
+
 @router.get("/analytics", summary="宴席经营分析")
 async def banquet_analytics(
-    start_date: Optional[str] = None, end_date: Optional[str] = None,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
     store_id: Optional[str] = None,
-    db: AsyncSession = Depends(_get_tenant_db), tenant_id: str = Depends(_tid),
+    db: AsyncSession = Depends(_get_tenant_db),
+    tenant_id: str = Depends(_tid),
 ):
     wheres = ["is_deleted=FALSE", "status != 'cancelled'"]
     params: dict = {}
@@ -335,7 +395,8 @@ async def banquet_analytics(
         params["sid"] = store_id
     w = " AND ".join(wheres)
 
-    result = await db.execute(text(f"""
+    result = await db.execute(
+        text(f"""
         SELECT
             COUNT(*) AS session_count,
             COALESCE(SUM(total_amount_fen), 0) AS total_revenue_fen,
@@ -347,11 +408,14 @@ async def banquet_analytics(
                  THEN SUM(total_amount_fen) / COUNT(*)
                  ELSE 0 END AS avg_per_session_fen
         FROM banquet_sessions WHERE {w}
-    """), params)
+    """),
+        params,
+    )
     stats = dict(result.mappings().first())
 
     # TOP5排菜方案
-    top_plans = await db.execute(text(f"""
+    top_plans = await db.execute(
+        text(f"""
         SELECT mp.name, COUNT(bs.id) AS usage_count,
                COALESCE(SUM(bs.total_amount_fen), 0) AS revenue_fen
         FROM banquet_sessions bs
@@ -360,7 +424,9 @@ async def banquet_analytics(
         {"AND bs.session_date >= :sd::DATE" if start_date else ""}
         {"AND bs.session_date <= :ed::DATE" if end_date else ""}
         GROUP BY mp.name ORDER BY usage_count DESC LIMIT 5
-    """), params)
+    """),
+        params,
+    )
     top = [dict(r) for r in top_plans.mappings().all()]
 
     return {"ok": True, "data": {**stats, "top_menu_plans": top}}

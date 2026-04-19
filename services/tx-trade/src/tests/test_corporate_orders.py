@@ -7,18 +7,19 @@ Y-A9
 2. test_credit_limit_exceeded               — 授信超限返回 400
 3. test_bulk_billing                        — 批量出账生成 bill_id + 订单标记 billed
 """
-from datetime import date, datetime, timezone
+
+from datetime import date
 from decimal import ROUND_HALF_UP, Decimal
 
 import pytest
-from fastapi.testclient import TestClient
 from fastapi import FastAPI
+from fastapi.testclient import TestClient
 
 from ..api.corporate_order_routes import (
-    router,
-    MOCK_CORPORATE_CUSTOMERS,
-    _MOCK_ORDERS,
     _MOCK_BILLS,
+    _MOCK_ORDERS,
+    MOCK_CORPORATE_CUSTOMERS,
+    router,
 )
 
 # ─── 测试 App ─────────────────────────────────────────────────────────────────
@@ -29,6 +30,7 @@ client = TestClient(_app)
 
 
 # ─── 辅助函数 ─────────────────────────────────────────────────────────────────
+
 
 def _reset_mock_state() -> None:
     """测试前重置 mock 订单、账单状态，恢复企业客户授信。"""
@@ -45,6 +47,7 @@ def _reset_mock_state() -> None:
 
 # ─── Test 1: 企业订单应用折扣 ────────────────────────────────────────────────
 
+
 class TestCreateCorporateOrderWithDiscount:
     """企业订单应用 discount_rate=0.95，实际金额 = 原始金额 × 0.95"""
 
@@ -54,22 +57,20 @@ class TestCreateCorporateOrderWithDiscount:
     def test_discount_applied_correctly(self) -> None:
         """订单金额 × 0.95 四舍五入到整数分"""
         payload = {
-            "corporate_customer_id": "corp-001",   # discount_rate=0.95
+            "corporate_customer_id": "corp-001",  # discount_rate=0.95
             "store_id": "store-aaa",
             "items": [
                 {"dish_id": "dish-001", "dish_name": "红烧肉", "qty": 2, "unit_price_fen": 3800},
-                {"dish_id": "dish-002", "dish_name": "米饭",   "qty": 5, "unit_price_fen": 200},
+                {"dish_id": "dish-002", "dish_name": "米饭", "qty": 5, "unit_price_fen": 200},
             ],
         }
         resp = client.post("/api/v1/trade/corporate/orders", json=payload)
         assert resp.status_code == 201, resp.text
 
         data = resp.json()["data"]
-        original = 2 * 3800 + 5 * 200   # = 8600
+        original = 2 * 3800 + 5 * 200  # = 8600
         expected_discounted = int(
-            (Decimal(str(original)) * Decimal("0.95")).to_integral_value(
-                rounding=ROUND_HALF_UP
-            )
+            (Decimal(str(original)) * Decimal("0.95")).to_integral_value(rounding=ROUND_HALF_UP)
         )  # = 8170
 
         assert data["original_amount_fen"] == original
@@ -80,19 +81,25 @@ class TestCreateCorporateOrderWithDiscount:
     def test_no_discount_rate_one(self) -> None:
         """discount_rate=1.000 时折扣金额 == 原始金额"""
         # 临时创建一个无折扣的企业客户
-        create_resp = client.post("/api/v1/trade/corporate/customers", json={
-            "company_name": "测试无折扣公司",
-            "credit_limit_fen": 10_000_000,
-            "discount_rate": 1.0,
-        })
+        create_resp = client.post(
+            "/api/v1/trade/corporate/customers",
+            json={
+                "company_name": "测试无折扣公司",
+                "credit_limit_fen": 10_000_000,
+                "discount_rate": 1.0,
+            },
+        )
         assert create_resp.status_code == 201
         cid = create_resp.json()["data"]["id"]
 
-        order_resp = client.post("/api/v1/trade/corporate/orders", json={
-            "corporate_customer_id": cid,
-            "store_id": "store-bbb",
-            "items": [{"dish_id": "dish-x", "qty": 1, "unit_price_fen": 5000}],
-        })
+        order_resp = client.post(
+            "/api/v1/trade/corporate/orders",
+            json={
+                "corporate_customer_id": cid,
+                "store_id": "store-bbb",
+                "items": [{"dish_id": "dish-x", "qty": 1, "unit_price_fen": 5000}],
+            },
+        )
         assert order_resp.status_code == 201
         odata = order_resp.json()["data"]
         assert odata["original_amount_fen"] == odata["discounted_amount_fen"]
@@ -117,6 +124,7 @@ class TestCreateCorporateOrderWithDiscount:
 
 
 # ─── Test 2: 授信超限返回 400 ────────────────────────────────────────────────
+
 
 class TestCreditLimitExceeded:
     """used + amount > limit → 必须返回 400，不能静默通过"""
@@ -176,20 +184,23 @@ class TestCreditLimitExceeded:
 
 # ─── Test 3: 批量出账 ─────────────────────────────────────────────────────────
 
+
 class TestBulkBilling:
     """批量出账：调用后返回 bill_id，相关订单标记 billed"""
 
     def setup_method(self) -> None:
         _reset_mock_state()
 
-    def _create_order(self, customer_id: str = "corp-001",
-                      amount_fen: int = 5_000) -> str:
+    def _create_order(self, customer_id: str = "corp-001", amount_fen: int = 5_000) -> str:
         """便捷创建一条企业订单，返回 order_id"""
-        resp = client.post("/api/v1/trade/corporate/orders", json={
-            "corporate_customer_id": customer_id,
-            "store_id": "store-bill-test",
-            "items": [{"dish_id": "dish-bill", "qty": 1, "unit_price_fen": amount_fen}],
-        })
+        resp = client.post(
+            "/api/v1/trade/corporate/orders",
+            json={
+                "corporate_customer_id": customer_id,
+                "store_id": "store-bill-test",
+                "items": [{"dish_id": "dish-bill", "qty": 1, "unit_price_fen": amount_fen}],
+            },
+        )
         assert resp.status_code == 201, resp.text
         return resp.json()["data"]["order_id"]
 
@@ -199,11 +210,14 @@ class TestBulkBilling:
         self._create_order()
         self._create_order()
 
-        resp = client.post("/api/v1/trade/corporate/orders/bulk-bill", json={
-            "corporate_customer_id": "corp-001",
-            "billing_period_start": today,
-            "billing_period_end": today,
-        })
+        resp = client.post(
+            "/api/v1/trade/corporate/orders/bulk-bill",
+            json={
+                "corporate_customer_id": "corp-001",
+                "billing_period_start": today,
+                "billing_period_end": today,
+            },
+        )
         assert resp.status_code == 200, resp.text
 
         data = resp.json()["data"]
@@ -226,11 +240,14 @@ class TestBulkBilling:
         assert order_id in unbilled_ids
 
         # 批量出账
-        client.post("/api/v1/trade/corporate/orders/bulk-bill", json={
-            "corporate_customer_id": "corp-001",
-            "billing_period_start": today,
-            "billing_period_end": today,
-        })
+        client.post(
+            "/api/v1/trade/corporate/orders/bulk-bill",
+            json={
+                "corporate_customer_id": "corp-001",
+                "billing_period_start": today,
+                "billing_period_end": today,
+            },
+        )
 
         # 出账后订单状态应为 billed
         billed_resp = client.get(
@@ -242,11 +259,14 @@ class TestBulkBilling:
 
     def test_no_unbilled_orders_returns_400(self) -> None:
         """无可出账订单时返回 400"""
-        resp = client.post("/api/v1/trade/corporate/orders/bulk-bill", json={
-            "corporate_customer_id": "corp-001",
-            "billing_period_start": "2020-01-01",
-            "billing_period_end": "2020-01-31",
-        })
+        resp = client.post(
+            "/api/v1/trade/corporate/orders/bulk-bill",
+            json={
+                "corporate_customer_id": "corp-001",
+                "billing_period_start": "2020-01-01",
+                "billing_period_end": "2020-01-31",
+            },
+        )
         assert resp.status_code == 400
         assert "未找到" in resp.json()["detail"]
 

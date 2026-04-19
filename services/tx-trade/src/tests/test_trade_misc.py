@@ -14,14 +14,15 @@
   场景 9: POST /api/v1/banquet/{id}/confirmation   — 创建确认单成功
   场景 10: POST /api/v1/banquet/{id}/confirmation/sign — 顾客签字成功，status=confirmed
 """
+
 import os
 import sys
 import types
 
 # ─── 路径准备 ─────────────────────────────────────────────────────────────────
 _TESTS_DIR = os.path.dirname(__file__)
-_SRC_DIR   = os.path.join(_TESTS_DIR, "..")
-_ROOT_DIR  = os.path.abspath(os.path.join(_TESTS_DIR, "..", "..", "..", ".."))
+_SRC_DIR = os.path.join(_TESTS_DIR, "..")
+_ROOT_DIR = os.path.abspath(os.path.join(_TESTS_DIR, "..", "..", "..", ".."))
 
 for _p in [_SRC_DIR, _ROOT_DIR]:
     if _p not in sys.path:
@@ -29,6 +30,7 @@ for _p in [_SRC_DIR, _ROOT_DIR]:
 
 
 # ─── sys.modules 存根：防止重型依赖导入失败 ──────────────────────────────────
+
 
 def _stub(name: str, **attrs):
     """注入一个空模块存根（仅当尚未存在时）。"""
@@ -49,23 +51,28 @@ def _ensure_pkg(name: str, path: str) -> None:
 
 
 # 建立包层级
-_ensure_pkg("src",          _SRC_DIR)
-_ensure_pkg("src.api",      os.path.join(_SRC_DIR, "api"))
+_ensure_pkg("src", _SRC_DIR)
+_ensure_pkg("src.api", os.path.join(_SRC_DIR, "api"))
 _ensure_pkg("src.services", os.path.join(_SRC_DIR, "services"))
 
 # shared.events 存根
 _stub("shared")
 _stub("shared.events")
 _stub("shared.events.src")
+
+
 async def _fake_emit_event(*_args, **_kwargs):
     pass
 
-_stub("shared.events.src.emitter",    emit_event=_fake_emit_event)
-import enum as _enum                                        # noqa: E402 (used before final imports)
+
+_stub("shared.events.src.emitter", emit_event=_fake_emit_event)
+import enum as _enum  # noqa: E402 (used before final imports)
+
 
 class _OrderEventType(_enum.Enum):
     PAID = "ORDER.PAID"
     CREATED = "ORDER.CREATED"
+
 
 _stub("shared.events.src.event_types", OrderEventType=_OrderEventType)
 
@@ -73,36 +80,36 @@ _stub("shared.events.src.event_types", OrderEventType=_OrderEventType)
 _stub("shared.ontology")
 _stub("shared.ontology.src")
 
-import asyncio                                           # noqa: E402
-from datetime import datetime, timezone                  # noqa: E402
-from uuid import UUID, uuid4                             # noqa: E402
-from unittest.mock import AsyncMock, MagicMock, patch   # noqa: E402
-
-from fastapi import FastAPI                              # noqa: E402
-from fastapi.testclient import TestClient                # noqa: E402
-
 # ─── 注入 shared.ontology.src.database 存根（含真实 get_db 占位符） ──────────
+import types as _types  # noqa: E402
+from datetime import datetime, timezone  # noqa: E402
+from unittest.mock import AsyncMock, MagicMock, patch  # noqa: E402
+from uuid import UUID  # noqa: E402
 
-import types as _types                                   # noqa: E402
+from fastapi import FastAPI  # noqa: E402
+from fastapi.testclient import TestClient  # noqa: E402
 
 _db_mod = _types.ModuleType("shared.ontology.src.database")
+
 
 # get_db 占位符（会被 dependency_overrides 覆盖）
 async def _get_db_placeholder():
     yield None  # pragma: no cover
 
-_db_mod.get_db              = _get_db_placeholder
-_db_mod.get_db_with_tenant  = _get_db_placeholder
-_db_mod.get_db_no_rls       = _get_db_placeholder
+
+_db_mod.get_db = _get_db_placeholder
+_db_mod.get_db_with_tenant = _get_db_placeholder
+_db_mod.get_db_no_rls = _get_db_placeholder
 sys.modules["shared.ontology.src.database"] = _db_mod
 
 # ─── 导入被测路由 ─────────────────────────────────────────────────────────────
 
-from src.api.quick_cashier_routes import router as qc_router   # type: ignore[import]  # noqa: E402
-from shared.ontology.src.database import get_db                  # noqa: E402
+from shared.ontology.src.database import get_db  # noqa: E402
+from src.api.quick_cashier_routes import router as qc_router  # type: ignore[import]  # noqa: E402
 
 # banquet_payment_routes 需要 BanquetPaymentService；先给 services 包注册存根
 _svc_mod = _types.ModuleType("src.services.banquet_payment_service")
+
 
 class _FakeBanquetDeposit:
     def model_dump(self, **_kw):
@@ -116,8 +123,10 @@ class _FakeBanquetDeposit:
             "paid_at": None,
         }
 
+
 class _FakeBanquetConfirmation:
     id = UUID("cccc0000-0000-0000-0000-000000000003")
+
     def model_dump(self, **_kw):
         return {
             "id": str(self.id),
@@ -131,6 +140,7 @@ class _FakeBanquetConfirmation:
             "expires_at": None,
         }
 
+
 class _FakeSignedConfirmation:
     def model_dump(self, **_kw):
         return {
@@ -138,6 +148,7 @@ class _FakeSignedConfirmation:
             "status": "confirmed",
             "confirmed_at": "2026-04-04T10:00:00+00:00",
         }
+
 
 _svc_mod.BanquetPaymentService = MagicMock
 
@@ -159,14 +170,15 @@ if _src_api_mod is not None:
     _src_api_mod.__package__ = "src.api"
 
 # 直接从文件加载 banquet_payment_routes（使用正确的 package 上下文）
-import importlib.util as _ilu                            # noqa: E402
+import importlib.util as _ilu  # noqa: E402
+
 _bp_spec = _ilu.spec_from_file_location(
     "src.api.banquet_payment_routes",
     os.path.join(_SRC_DIR, "api", "banquet_payment_routes.py"),
     submodule_search_locations=[],
 )
 _bp_mod = _ilu.module_from_spec(_bp_spec)
-_bp_mod.__package__ = "src.api"   # 告知解释器此模块属于 src.api 包
+_bp_mod.__package__ = "src.api"  # 告知解释器此模块属于 src.api 包
 try:
     _bp_spec.loader.exec_module(_bp_mod)
     sys.modules["src.api.banquet_payment_routes"] = _bp_mod
@@ -177,6 +189,7 @@ try:
 except Exception as _exc:
     # 如果相对导入失败则跳过宴席路由测试（用 None 占位）
     import traceback as _tb
+
     print(f"[test_trade_misc] banquet_payment_routes 加载失败: {_exc}")
     _tb.print_exc()
     bp_router = None
@@ -187,10 +200,10 @@ except Exception as _exc:
 
 # ─── 常量 ─────────────────────────────────────────────────────────────────────
 
-TENANT_ID  = "11111111-1111-1111-1111-111111111111"
-STORE_ID   = "22222222-2222-2222-2222-222222222222"
+TENANT_ID = "11111111-1111-1111-1111-111111111111"
+STORE_ID = "22222222-2222-2222-2222-222222222222"
 BANQUET_ID = "33333333-3333-3333-3333-333333333333"
-HEADERS    = {"X-Tenant-ID": TENANT_ID}
+HEADERS = {"X-Tenant-ID": TENANT_ID}
 
 # ─── 工具函数 ──────────────────────────────────────────────────────────────────
 
@@ -198,7 +211,7 @@ HEADERS    = {"X-Tenant-ID": TENANT_ID}
 def _make_mock_db() -> AsyncMock:
     """创建最小化的 mock AsyncSession。"""
     db = AsyncMock()
-    db.commit   = AsyncMock()
+    db.commit = AsyncMock()
     db.rollback = AsyncMock()
     return db
 
@@ -250,6 +263,7 @@ def _make_bp_app(mock_svc: MagicMock) -> FastAPI:
 
 # ─── 场景 1: POST /order — 正常创建快餐订单 ───────────────────────────────────
 
+
 def test_create_quick_order_success():
     """正常提交一笔快餐订单，DB UPSERT + INSERT 均成功，返回 call_number 和 status=pending。"""
     db = _make_mock_db()
@@ -257,20 +271,20 @@ def test_create_quick_order_success():
     # _allocate_call_number: config SELECT → seq UPSERT RETURNING current_seq
     config_result = _fake_mappings_first({"prefix": "A", "max_number": 99, "daily_reset": True})
     seq_result = MagicMock()
-    seq_result.scalar.return_value = 1          # current_seq = 1 → call_number = "A001"
-    insert_order = MagicMock()                  # quick_orders INSERT
-    db.execute = AsyncMock(side_effect=[
-        config_result,   # config SELECT（_allocate_call_number）
-        seq_result,      # seq UPSERT RETURNING
-        insert_order,    # quick_orders INSERT
-    ])
+    seq_result.scalar.return_value = 1  # current_seq = 1 → call_number = "A001"
+    insert_order = MagicMock()  # quick_orders INSERT
+    db.execute = AsyncMock(
+        side_effect=[
+            config_result,  # config SELECT（_allocate_call_number）
+            seq_result,  # seq UPSERT RETURNING
+            insert_order,  # quick_orders INSERT
+        ]
+    )
 
     payload = {
         "store_id": STORE_ID,
         "order_type": "dine_in",
-        "items": [
-            {"dish_id": "d001", "dish_name": "红烧肉", "qty": 2, "unit_price_fen": 3800}
-        ],
+        "items": [{"dish_id": "d001", "dish_name": "红烧肉", "qty": 2, "unit_price_fen": 3800}],
     }
 
     with patch("src.api.quick_cashier_routes.asyncio.create_task"):
@@ -290,6 +304,7 @@ def test_create_quick_order_success():
 
 # ─── 场景 2: POST /order — order_type 非法 → 400 ─────────────────────────────
 
+
 def test_create_quick_order_invalid_order_type():
     """order_type='invalid' 不在允许列表中，应返回 400 且不写 DB。"""
     db = _make_mock_db()
@@ -297,9 +312,7 @@ def test_create_quick_order_invalid_order_type():
     payload = {
         "store_id": STORE_ID,
         "order_type": "invalid",
-        "items": [
-            {"dish_id": "d001", "dish_name": "测试菜", "qty": 1, "unit_price_fen": 1000}
-        ],
+        "items": [{"dish_id": "d001", "dish_name": "测试菜", "qty": 1, "unit_price_fen": 1000}],
     }
 
     # _allocate_call_number 在 order_type 校验之后，所以 config SELECT 可能被调用，
@@ -316,6 +329,7 @@ def test_create_quick_order_invalid_order_type():
 
 
 # ─── 场景 3: POST /{id}/call — 叫号成功 ──────────────────────────────────────
+
 
 def test_call_number_success():
     """UPDATE RETURNING 返回行，叫号成功，响应 status=calling。"""
@@ -344,6 +358,7 @@ def test_call_number_success():
 
 # ─── 场景 4: POST /{id}/complete — 取餐完成 ──────────────────────────────────
 
+
 def test_complete_order_success():
     """UPDATE RETURNING 返回行，取餐完成，响应 status=completed。"""
     db = _make_mock_db()
@@ -371,6 +386,7 @@ def test_complete_order_success():
 
 # ─── 场景 5: GET /config/{store_id} — 无配置时返回默认值 ─────────────────────
 
+
 def test_get_config_returns_default_when_not_configured():
     """quick_cashier_configs 中无记录，应返回 is_enabled=False 的默认配置。"""
     db = _make_mock_db()
@@ -395,12 +411,13 @@ def test_get_config_returns_default_when_not_configured():
 # ── 文件二：banquet_payment_routes ────────────────────────────────────────────
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-import pytest                                            # noqa: E402
+import pytest  # noqa: E402
 
 _BP_AVAILABLE = bp_router is not None
 
 
 # ─── 场景 6: POST /{id}/deposit — 创建定金成功 ───────────────────────────────
+
 
 @pytest.mark.skipif(not _BP_AVAILABLE, reason="banquet_payment_routes 加载失败，跳过")
 def test_create_deposit_success():
@@ -426,6 +443,7 @@ def test_create_deposit_success():
 
 # ─── 场景 7: POST /{id}/deposit — 缺少 X-Tenant-ID → 400 ────────────────────
 
+
 @pytest.mark.skipif(not _BP_AVAILABLE, reason="banquet_payment_routes 加载失败，跳过")
 def test_create_deposit_missing_tenant_id():
     """不传 X-Tenant-ID header，_get_tenant_id 应抛 HTTPException(400)。"""
@@ -444,6 +462,7 @@ def test_create_deposit_missing_tenant_id():
 
 # ─── 场景 8: GET /{id}/deposit — 定金记录不存在 → ok=False ───────────────────
 
+
 @pytest.mark.skipif(not _BP_AVAILABLE, reason="banquet_payment_routes 加载失败，跳过")
 def test_get_deposit_not_found():
     """get_deposit 返回 None，路由封装为 ok=False, error.code=NOT_FOUND。"""
@@ -456,13 +475,14 @@ def test_get_deposit_not_found():
         headers=HEADERS,
     )
 
-    assert resp.status_code == 200   # HTTP 200，业务错误在 body
+    assert resp.status_code == 200  # HTTP 200，业务错误在 body
     body = resp.json()
     assert body["ok"] is False
     assert body["error"]["code"] == "NOT_FOUND"
 
 
 # ─── 场景 9: POST /{id}/confirmation — 创建确认单成功 ────────────────────────
+
 
 @pytest.mark.skipif(not _BP_AVAILABLE, reason="banquet_payment_routes 加载失败，跳过")
 def test_create_confirmation_success():
@@ -475,8 +495,13 @@ def test_create_confirmation_success():
         f"/api/v1/banquet/{BANQUET_ID}/confirmation",
         json={
             "menu_items": [
-                {"dish_id": "dish-001", "dish_name": "佛跳墙",
-                 "quantity": 2, "unit_price_fen": 49800, "subtotal_fen": 99600}
+                {
+                    "dish_id": "dish-001",
+                    "dish_name": "佛跳墙",
+                    "quantity": 2,
+                    "unit_price_fen": 49800,
+                    "subtotal_fen": 99600,
+                }
             ],
             "guest_count": 20,
             "confirmed_by_name": "张三",
@@ -496,6 +521,7 @@ def test_create_confirmation_success():
 
 
 # ─── 场景 10: POST /{id}/confirmation/sign — 顾客签字成功 ────────────────────
+
 
 @pytest.mark.skipif(not _BP_AVAILABLE, reason="banquet_payment_routes 加载失败，跳过")
 def test_sign_confirmation_success():

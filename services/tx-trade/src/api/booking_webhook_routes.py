@@ -11,6 +11,7 @@ WS推送: 内存级连接管理（生产环境用 Redis Pub/Sub 替代）。
 
 Revision: 2026-04-02
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -130,10 +131,12 @@ async def _verify_webhook_signature(
             detail={"ok": False, "data": None, "error": {"code": "INVALID_SIGNATURE"}},
         )
 
+
 router = APIRouter(prefix="/api/v1/booking", tags=["booking-webhook"])
 
 
 # ─── WebSocket 连接管理器 ─────────────────────────────────────────────────────
+
 
 class ReservationWSManager:
     """内存级 WebSocket 连接管理器。
@@ -183,6 +186,7 @@ reservation_ws_manager = ReservationWSManager()
 
 # ─── WebSocket 端点 ───────────────────────────────────────────────────────────
 
+
 @router.websocket("/ws/{store_id}")
 async def reservation_ws(store_id: str, websocket: WebSocket) -> None:
     """预订实时推送 WebSocket 端点。
@@ -208,6 +212,7 @@ async def reservation_ws(store_id: str, websocket: WebSocket) -> None:
 
 
 # ─── DB 会话辅助 ──────────────────────────────────────────────────────────────
+
 
 def _get_tenant_id(request: Request) -> str:
     tid = getattr(request.state, "tenant_id", None) or request.headers.get("X-Tenant-ID", "")
@@ -235,49 +240,54 @@ def _err(msg: str, code: int = 400) -> None:
 
 # ─── 平台 Payload 模型 ────────────────────────────────────────────────────────
 
+
 class MeituanBookingPayload(BaseModel):
     """美团预订平台推送格式（Mock 对接，真实需对接美团开放平台）"""
-    order_id: str                          # 美团订单号
-    shop_id: str                           # 美团门店ID
+
+    order_id: str  # 美团订单号
+    shop_id: str  # 美团门店ID
     customer_name: str
     customer_phone: str
     party_size: int
-    arrive_time: str                       # ISO 格式，如 2026-04-02T18:30:00
-    table_type: str = "大厅"               # 大厅 / 包厢
+    arrive_time: str  # ISO 格式，如 2026-04-02T18:30:00
+    table_type: str = "大厅"  # 大厅 / 包厢
     special_request: str = ""
-    status: str = "confirmed"              # confirmed / cancelled
+    status: str = "confirmed"  # confirmed / cancelled
     created_at: str
 
 
 class DianpingBookingPayload(BaseModel):
     """大众点评预订平台推送格式"""
-    deal_id: str                           # 大众点评订单号
-    poi_id: str                            # POI 门店 ID
+
+    deal_id: str  # 大众点评订单号
+    poi_id: str  # POI 门店 ID
     user_name: str
     user_phone: str
     guest_num: int
-    visit_time: str                        # ISO 格式
-    room_type: str = "大厅"               # 大厅 / 包厢 / 靠窗
+    visit_time: str  # ISO 格式
+    room_type: str = "大厅"  # 大厅 / 包厢 / 靠窗
     remark: str = ""
-    order_status: str = "CONFIRMED"        # CONFIRMED / CANCELLED / COMPLETED
+    order_status: str = "CONFIRMED"  # CONFIRMED / CANCELLED / COMPLETED
     create_time: str
 
 
 class WechatBookingPayload(BaseModel):
     """微信小程序预订推送格式（来自 miniapp-customer）"""
-    booking_id: str                        # 小程序端生成的预订ID
-    openid: str                            # 用户 openid
+
+    booking_id: str  # 小程序端生成的预订ID
+    openid: str  # 用户 openid
     customer_name: str
     customer_phone: str
     party_size: int
-    arrive_time: str                       # ISO 格式
-    table_preference: str = "大厅"        # 大厅 / 包厢 / 靠窗
+    arrive_time: str  # ISO 格式
+    table_preference: str = "大厅"  # 大厅 / 包厢 / 靠窗
     notes: str = ""
-    store_id: str                          # 内部门店 ID（小程序已绑定）
+    store_id: str  # 内部门店 ID（小程序已绑定）
     status: str = "confirmed"
 
 
 # ─── 内部归一化 ───────────────────────────────────────────────────────────────
+
 
 def _normalize_meituan(payload: MeituanBookingPayload) -> dict:
     """将美团格式映射到内部 reservation 字段"""
@@ -322,7 +332,7 @@ def _normalize_wechat(payload: WechatBookingPayload) -> dict:
     return {
         "source_channel": "wechat",
         "platform_order_id": payload.booking_id,
-        "shop_platform_id": None,          # 小程序直接传 store_id
+        "shop_platform_id": None,  # 小程序直接传 store_id
         "store_id_direct": payload.store_id,
         "customer_name": payload.customer_name,
         "phone": payload.customer_phone,
@@ -402,12 +412,15 @@ async def _upsert_reservation(
                 },
             )
             # 实时推送：新预订广播给该门店所有已连接前端
-            await reservation_ws_manager.broadcast_to_store(store_id, {
-                "type": "new_reservation",
-                "reservation": result,
-                "source": str(normalized["source_channel"]),
-                "timestamp": datetime.utcnow().isoformat(),
-            })
+            await reservation_ws_manager.broadcast_to_store(
+                store_id,
+                {
+                    "type": "new_reservation",
+                    "reservation": result,
+                    "source": str(normalized["source_channel"]),
+                    "timestamp": datetime.utcnow().isoformat(),
+                },
+            )
             return result
     except ValueError as e:
         _err(str(e))
@@ -442,6 +455,7 @@ async def _resolve_store_id(
 
 
 # ─── Webhook 端点 ─────────────────────────────────────────────────────────────
+
 
 @router.post("/webhook/meituan")
 async def webhook_meituan(
@@ -628,8 +642,10 @@ async def mock_new_reservation(
 
     result = await _upsert_reservation(normalized, store_id, db, tenant_id)
 
-    return _ok({
-        "mock_channel": channel,
-        "mock_order_id": mock_order_id,
-        "reservation": result,
-    })
+    return _ok(
+        {
+            "mock_channel": channel,
+            "mock_order_id": mock_order_id,
+            "reservation": result,
+        }
+    )

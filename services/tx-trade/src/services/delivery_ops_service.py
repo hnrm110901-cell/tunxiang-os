@@ -9,6 +9,7 @@ Pydantic 模型:
   PlatformHealth       — 单平台健康度
   HealthDashboard      — 多平台健康度看板
 """
+
 from __future__ import annotations
 
 import uuid
@@ -166,9 +167,7 @@ class DeliveryOpsService:
         sid = uuid.UUID(str(store_id))
         tid = uuid.UUID(str(tenant_id))
 
-        await db.execute(
-            text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tid)}
-        )
+        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tid)})
 
         stmt = (
             select(_DeliveryStoreConfigRow.__table__)
@@ -218,18 +217,14 @@ class DeliveryOpsService:
         sid = uuid.UUID(str(store_id))
         tid = uuid.UUID(str(tenant_id))
 
-        await db.execute(
-            text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tid)}
-        )
+        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tid)})
 
         # 确保配置存在
         row = await self._fetch_config_row(sid, platform, tid, db)
         if row is None:
             row = await self._create_default_config(sid, platform, tid, db)
 
-        safe_update = {
-            k: v for k, v in config_update.items() if k in _UPDATABLE_FIELDS
-        }
+        safe_update = {k: v for k, v in config_update.items() if k in _UPDATABLE_FIELDS}
         if not safe_update:
             return self._row_to_config(row)
 
@@ -271,9 +266,7 @@ class DeliveryOpsService:
         sid = uuid.UUID(str(store_id))
         tid = uuid.UUID(str(tenant_id))
 
-        await db.execute(
-            text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tid)}
-        )
+        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tid)})
 
         now = datetime.now(tz=timezone.utc)
         auto_off = now + timedelta(minutes=duration_minutes)
@@ -326,15 +319,11 @@ class DeliveryOpsService:
         sid = uuid.UUID(str(store_id))
         tid = uuid.UUID(str(tenant_id))
 
-        await db.execute(
-            text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tid)}
-        )
+        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tid)})
 
         row = await self._fetch_config_row(sid, platform, tid, db)
         if row is None:
-            raise ConfigNotFoundError(
-                f"Config not found: store={store_id} platform={platform}"
-            )
+            raise ConfigNotFoundError(f"Config not found: store={store_id} platform={platform}")
 
         now = datetime.now(tz=timezone.utc)
         stmt = (
@@ -358,9 +347,7 @@ class DeliveryOpsService:
         updated = result.mappings().one()
         await db.flush()
 
-        logger.bind(store_id=str(sid), platform=platform).info(
-            "delivery_ops.busy_mode_disabled"
-        )
+        logger.bind(store_id=str(sid), platform=platform).info("delivery_ops.busy_mode_disabled")
         return self._row_to_config(dict(updated))
 
     async def get_current_prep_time(
@@ -416,9 +403,7 @@ class DeliveryOpsService:
         sid = uuid.UUID(str(store_id))
         tid = uuid.UUID(str(tenant_id))
 
-        await db.execute(
-            text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tid)}
-        )
+        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tid)})
 
         rating = int(review_data.get("rating", 5))
         reviewed_at = review_data.get("reviewed_at") or datetime.now(tz=timezone.utc)
@@ -440,11 +425,7 @@ class DeliveryOpsService:
             "reviewed_at": reviewed_at,
         }
 
-        stmt = (
-            _DeliveryReviewRow.__table__.insert()
-            .values(**insert_values)
-            .returning(*_DeliveryReviewRow.__table__.c)
-        )
+        stmt = _DeliveryReviewRow.__table__.insert().values(**insert_values).returning(*_DeliveryReviewRow.__table__.c)
         result = await db.execute(stmt)
         row = result.mappings().one()
         await db.flush()
@@ -477,17 +458,13 @@ class DeliveryOpsService:
         rid = uuid.UUID(str(review_id))
         tid = uuid.UUID(str(tenant_id))
 
-        await db.execute(
-            text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tid)}
-        )
+        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tid)})
 
         row = await self._fetch_review_row(rid, tid, db)
         if row is None:
             raise ReviewNotFoundError(f"Review not found: {review_id}")
         if not row.get("is_negative"):
-            logger.bind(review_id=str(rid)).info(
-                "delivery_ops.alert_skip_not_negative"
-            )
+            logger.bind(review_id=str(rid)).info("delivery_ops.alert_skip_not_negative")
             return self._review_row_to_model(row)
 
         logger.bind(
@@ -548,9 +525,7 @@ class DeliveryOpsService:
         sid = uuid.UUID(str(store_id))
         tid = uuid.UUID(str(tenant_id))
 
-        await db.execute(
-            text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tid)}
-        )
+        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tid)})
 
         cutoff = datetime.now(tz=timezone.utc) - timedelta(days=days)
         tbl = _DeliveryReviewRow.__table__
@@ -593,9 +568,7 @@ class DeliveryOpsService:
         rid = uuid.UUID(str(review_id))
         tid = uuid.UUID(str(tenant_id))
 
-        await db.execute(
-            text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tid)}
-        )
+        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tid)})
 
         row = await self._fetch_review_row(rid, tid, db)
         if row is None:
@@ -632,17 +605,19 @@ class DeliveryOpsService:
         sid = uuid.UUID(str(store_id))
         tid = uuid.UUID(str(tenant_id))
 
-        await db.execute(
-            text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tid)}
-        )
+        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tid)})
 
         tbl = _DeliveryReviewRow.__table__
-        stmt = select(func.count()).select_from(tbl).where(
-            and_(
-                tbl.c.tenant_id == tid,
-                tbl.c.store_id == sid,
-                tbl.c.is_negative.is_(True),
-                tbl.c.alert_sent.is_(False),
+        stmt = (
+            select(func.count())
+            .select_from(tbl)
+            .where(
+                and_(
+                    tbl.c.tenant_id == tid,
+                    tbl.c.store_id == sid,
+                    tbl.c.is_negative.is_(True),
+                    tbl.c.alert_sent.is_(False),
+                )
             )
         )
         result = await db.execute(stmt)
@@ -662,9 +637,7 @@ class DeliveryOpsService:
         sid = uuid.UUID(str(store_id))
         tid = uuid.UUID(str(tenant_id))
 
-        await db.execute(
-            text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tid)}
-        )
+        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tid)})
 
         platform_healths: list[PlatformHealth] = []
 
@@ -705,10 +678,7 @@ class DeliveryOpsService:
         sid = uuid.UUID(str(store_id))
         tid = uuid.UUID(str(tenant_id))
 
-        await db.execute(
-            text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tid)}
-        )
-
+        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tid)})
 
         cutoff = datetime.now(tz=timezone.utc).date() - timedelta(days=days)
         tbl = _PlatformHealthSnapshotRow.__table__
@@ -721,11 +691,7 @@ class DeliveryOpsService:
         if platform:
             conditions.append(tbl.c.platform == platform)
 
-        stmt = (
-            select(tbl)
-            .where(and_(*conditions))
-            .order_by(tbl.c.platform, tbl.c.snapshot_date.asc())
-        )
+        stmt = select(tbl).where(and_(*conditions)).order_by(tbl.c.platform, tbl.c.snapshot_date.asc())
         result = await db.execute(stmt)
         rows = result.mappings().all()
         return [dict(r) for r in rows]
@@ -746,9 +712,7 @@ class DeliveryOpsService:
         sid = uuid.UUID(str(store_id))
         tid = uuid.UUID(str(tenant_id))
 
-        await db.execute(
-            text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tid)}
-        )
+        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tid)})
 
         tbl = _PlatformHealthSnapshotRow.__table__
         values = {
@@ -770,7 +734,9 @@ class DeliveryOpsService:
             .values(**values)
             .on_conflict_do_update(
                 index_elements=["tenant_id", "store_id", "platform", "snapshot_date"],
-                set_={k: v for k, v in values.items() if k not in ("tenant_id", "store_id", "platform", "snapshot_date")},
+                set_={
+                    k: v for k, v in values.items() if k not in ("tenant_id", "store_id", "platform", "snapshot_date")
+                },
             )
             .returning(*tbl.c)
         )
@@ -790,9 +756,7 @@ class DeliveryOpsService:
     ) -> Optional[dict[str, Any]]:
         from sqlalchemy import text  # noqa: PLC0415
 
-        await db.execute(
-            text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)}
-        )
+        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
         tbl = _DeliveryStoreConfigRow.__table__
         stmt = select(tbl).where(
             and_(
@@ -889,11 +853,7 @@ class DeliveryOpsService:
             if now >= auto_off:
                 busy = False  # 逻辑过期，下次 disable_busy_mode 写库清除
 
-        current_prep = (
-            int(row.get("busy_mode_prep_time_min", 40))
-            if busy
-            else int(row.get("normal_prep_time_min", 25))
-        )
+        current_prep = int(row.get("busy_mode_prep_time_min", 40)) if busy else int(row.get("normal_prep_time_min", 25))
         return DeliveryStoreConfig(
             id=row["id"],
             store_id=row["store_id"],
@@ -937,6 +897,7 @@ class DeliveryOpsService:
 
 class _DeliveryStoreConfigRow:
     """Table accessor — maps to delivery_store_configs DDL in v039 migration"""
+
     from sqlalchemy import (  # noqa: PLC0415
         Boolean,
         Column,
@@ -954,11 +915,13 @@ class _DeliveryStoreConfigRow:
 
 class _DeliveryReviewRow:
     """Table accessor — maps to delivery_reviews DDL in v039 migration"""
+
     __table__ = None
 
 
 class _PlatformHealthSnapshotRow:
     """Table accessor — maps to platform_health_snapshots DDL in v039 migration"""
+
     __table__ = None
 
 

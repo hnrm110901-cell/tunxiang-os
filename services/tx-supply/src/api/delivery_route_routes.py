@@ -11,6 +11,7 @@
   POST /{route_id}/progress              更新配送进度（departed/arrived/delivered）
   POST /{route_id}/optimize              重新优化已有配送单路线
 """
+
 from __future__ import annotations
 
 from typing import List, Optional
@@ -33,6 +34,7 @@ def _get_svc():
     global _svc
     if _svc is None:
         from ..services.delivery_route_service import DeliveryRouteService
+
         _svc = DeliveryRouteService()
     return _svc
 
@@ -45,9 +47,7 @@ class PlanRouteRequest(BaseModel):
 
     kitchen_id: str = Field(..., description="中央厨房 ID（出发点）")
     store_ids: List[str] = Field(..., min_length=1, description="目标门店 ID 列表")
-    plan_date: Optional[str] = Field(
-        default=None, description="配送日期（YYYY-MM-DD），留空取今日"
-    )
+    plan_date: Optional[str] = Field(default=None, description="配送日期（YYYY-MM-DD），留空取今日")
 
 
 class UpdateProgressRequest(BaseModel):

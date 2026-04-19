@@ -14,10 +14,11 @@
 统一响应格式: {"ok": bool, "data": {}, "error": {}}
 所有接口需 X-Tenant-ID header。
 """
+
 from __future__ import annotations
 
 import uuid
-from datetime import date, datetime
+from datetime import date
 from typing import Optional
 
 import structlog
@@ -65,6 +66,7 @@ def _err(msg: str, code: int = 400):
 
 class RuleItem(BaseModel):
     """单条最低消费规则"""
+
     type: str = Field(..., description="规则类型: room / per_person / time_based")
     room_type: Optional[str] = Field(None, description="包间类型（type=room 时必填）")
     min_amount_fen: Optional[int] = Field(None, ge=0, description="最低消费金额（分）")
@@ -76,18 +78,21 @@ class RuleItem(BaseModel):
 
 class WaiveConditions(BaseModel):
     """豁免条件"""
+
     vip_level_gte: Optional[int] = Field(None, ge=0, description="VIP等级>=此值可豁免")
     group_size_gte: Optional[int] = Field(None, ge=1, description="人数>=此值可豁免")
 
 
 class SetConfigReq(BaseModel):
     """设置最低消费规则"""
+
     rules: list[RuleItem] = Field(..., min_length=1, description="规则列表")
     waive_conditions: Optional[WaiveConditions] = Field(default=None, description="豁免条件")
 
 
 class CalculateReq(BaseModel):
     """计算最低消费请求"""
+
     store_id: str = Field(..., description="门店ID")
     dining_session_id: str = Field(..., description="堂食会话ID")
     order_amount_fen: int = Field(..., ge=0, description="当前订单金额（分）")
@@ -108,33 +113,39 @@ async def get_config(
 ) -> dict:
     """获取指定门店的最低消费规则配置。无配置时返回空默认值。"""
     tenant_id = _get_tenant_id(request)
-    row = (await db.execute(
-        text("""
+    row = (
+        await db.execute(
+            text("""
             SELECT id, store_id, rules, waive_conditions, is_active,
                    created_at, updated_at
             FROM minimum_consumption_configs
             WHERE tenant_id = :tid AND store_id = :sid AND is_deleted = false
         """),
-        {"tid": tenant_id, "sid": store_id},
-    )).fetchone()
+            {"tid": tenant_id, "sid": store_id},
+        )
+    ).fetchone()
 
     if row is None:
-        return _ok({
-            "store_id": store_id,
-            "rules": [],
-            "waive_conditions": {},
-            "is_active": False,
-        })
+        return _ok(
+            {
+                "store_id": store_id,
+                "rules": [],
+                "waive_conditions": {},
+                "is_active": False,
+            }
+        )
 
-    return _ok({
-        "id": str(row.id),
-        "store_id": str(row.store_id),
-        "rules": row.rules,
-        "waive_conditions": row.waive_conditions,
-        "is_active": row.is_active,
-        "created_at": row.created_at.isoformat() if row.created_at else None,
-        "updated_at": row.updated_at.isoformat() if row.updated_at else None,
-    })
+    return _ok(
+        {
+            "id": str(row.id),
+            "store_id": str(row.store_id),
+            "rules": row.rules,
+            "waive_conditions": row.waive_conditions,
+            "is_active": row.is_active,
+            "created_at": row.created_at.isoformat() if row.created_at else None,
+            "updated_at": row.updated_at.isoformat() if row.updated_at else None,
+        }
+    )
 
 
 @router.put("/config/{store_id}", summary="设置门店最低消费规则")
@@ -171,13 +182,15 @@ async def set_config(
     waive_json = body.waive_conditions.model_dump(exclude_none=True) if body.waive_conditions else {}
 
     # UPSERT: 利用唯一索引 (tenant_id, store_id)
-    existing = (await db.execute(
-        text("""
+    existing = (
+        await db.execute(
+            text("""
             SELECT id FROM minimum_consumption_configs
             WHERE tenant_id = :tid AND store_id = :sid AND is_deleted = false
         """),
-        {"tid": tenant_id, "sid": store_id},
-    )).fetchone()
+            {"tid": tenant_id, "sid": store_id},
+        )
+    ).fetchone()
 
     if existing:
         await db.execute(
@@ -218,13 +231,15 @@ async def set_config(
         rules_count=len(body.rules),
     )
 
-    return _ok({
-        "id": config_id,
-        "store_id": store_id,
-        "rules": rules_json,
-        "waive_conditions": waive_json,
-        "is_active": True,
-    })
+    return _ok(
+        {
+            "id": config_id,
+            "store_id": store_id,
+            "rules": rules_json,
+            "waive_conditions": waive_json,
+            "is_active": True,
+        }
+    )
 
 
 @router.post("/calculate", summary="计算是否满足最低消费")
@@ -246,25 +261,29 @@ async def calculate(
     tenant_id = _get_tenant_id(request)
 
     # 获取门店规则配置
-    config_row = (await db.execute(
-        text("""
+    config_row = (
+        await db.execute(
+            text("""
             SELECT rules, waive_conditions
             FROM minimum_consumption_configs
             WHERE tenant_id = :tid AND store_id = :sid
               AND is_active = true AND is_deleted = false
         """),
-        {"tid": tenant_id, "sid": body.store_id},
-    )).fetchone()
+            {"tid": tenant_id, "sid": body.store_id},
+        )
+    ).fetchone()
 
     if config_row is None:
-        return _ok({
-            "satisfied": True,
-            "shortfall_fen": 0,
-            "matched_rule": None,
-            "waived": False,
-            "surcharge_fen": 0,
-            "message": "该门店未配置最低消费规则",
-        })
+        return _ok(
+            {
+                "satisfied": True,
+                "shortfall_fen": 0,
+                "matched_rule": None,
+                "waived": False,
+                "surcharge_fen": 0,
+                "message": "该门店未配置最低消费规则",
+            }
+        )
 
     rules: list[dict] = config_row.rules or []
     waive_conditions: dict = config_row.waive_conditions or {}
@@ -306,14 +325,16 @@ async def calculate(
             break
 
     if matched_rule is None:
-        return _ok({
-            "satisfied": True,
-            "shortfall_fen": 0,
-            "matched_rule": None,
-            "waived": False,
-            "surcharge_fen": 0,
-            "message": "未命中任何最低消费规则",
-        })
+        return _ok(
+            {
+                "satisfied": True,
+                "shortfall_fen": 0,
+                "matched_rule": None,
+                "waived": False,
+                "surcharge_fen": 0,
+                "message": "未命中任何最低消费规则",
+            }
+        )
 
     shortfall_fen = max(0, min_required_fen - body.order_amount_fen)
     satisfied = shortfall_fen == 0 or waived
@@ -347,20 +368,19 @@ async def calculate(
         )
         await db.commit()
 
-    return _ok({
-        "satisfied": satisfied,
-        "shortfall_fen": shortfall_fen,
-        "matched_rule": matched_rule,
-        "waived": waived,
-        "waive_reason": waive_reason,
-        "surcharge_fen": surcharge_fen,
-        "min_required_fen": min_required_fen,
-        "order_amount_fen": body.order_amount_fen,
-        "message": (
-            "已满足最低消费" if satisfied
-            else f"未达最低消费，差额 {shortfall_fen / 100:.2f} 元"
-        ),
-    })
+    return _ok(
+        {
+            "satisfied": satisfied,
+            "shortfall_fen": shortfall_fen,
+            "matched_rule": matched_rule,
+            "waived": waived,
+            "waive_reason": waive_reason,
+            "surcharge_fen": surcharge_fen,
+            "min_required_fen": min_required_fen,
+            "order_amount_fen": body.order_amount_fen,
+            "message": ("已满足最低消费" if satisfied else f"未达最低消费，差额 {shortfall_fen / 100:.2f} 元"),
+        }
+    )
 
 
 @router.get("/report", summary="最低消费补齐统计报表")
@@ -384,8 +404,9 @@ async def surcharge_report(
     tenant_id = _get_tenant_id(request)
 
     # 汇总统计
-    summary_row = (await db.execute(
-        text("""
+    summary_row = (
+        await db.execute(
+            text("""
             SELECT
                 COUNT(*)                                       AS total_count,
                 COALESCE(SUM(surcharge_fen), 0)                AS total_surcharge_fen,
@@ -397,20 +418,22 @@ async def surcharge_report(
               AND created_at >= :start AND created_at < :end::date + 1
               AND is_deleted = false
         """),
-        {
-            "tid": tenant_id,
-            "sid": store_id,
-            "start": start_date.isoformat(),
-            "end": end_date.isoformat(),
-        },
-    )).fetchone()
+            {
+                "tid": tenant_id,
+                "sid": store_id,
+                "start": start_date.isoformat(),
+                "end": end_date.isoformat(),
+            },
+        )
+    ).fetchone()
 
     total_count = summary_row.total_count if summary_row else 0
 
     # 分页明细
     offset = (page - 1) * size
-    rows = (await db.execute(
-        text("""
+    rows = (
+        await db.execute(
+            text("""
             SELECT s.id, s.dining_session_id, s.rule_type,
                    s.min_amount_fen, s.actual_amount_fen, s.surcharge_fen,
                    s.waived, s.waive_reason, s.created_at
@@ -421,15 +444,16 @@ async def surcharge_report(
             ORDER BY s.created_at DESC
             LIMIT :limit OFFSET :offset
         """),
-        {
-            "tid": tenant_id,
-            "sid": store_id,
-            "start": start_date.isoformat(),
-            "end": end_date.isoformat(),
-            "limit": size,
-            "offset": offset,
-        },
-    )).fetchall()
+            {
+                "tid": tenant_id,
+                "sid": store_id,
+                "start": start_date.isoformat(),
+                "end": end_date.isoformat(),
+                "limit": size,
+                "offset": offset,
+            },
+        )
+    ).fetchall()
 
     items = [
         {
@@ -446,19 +470,21 @@ async def surcharge_report(
         for r in rows
     ]
 
-    return _ok({
-        "items": items,
-        "total": total_count,
-        "page": page,
-        "size": size,
-        "summary": {
-            "total_count": summary_row.total_count if summary_row else 0,
-            "total_surcharge_fen": summary_row.total_surcharge_fen if summary_row else 0,
-            "effective_surcharge_fen": summary_row.effective_surcharge_fen if summary_row else 0,
-            "waived_count": summary_row.waived_count if summary_row else 0,
-            "charged_count": summary_row.charged_count if summary_row else 0,
-        },
-    })
+    return _ok(
+        {
+            "items": items,
+            "total": total_count,
+            "page": page,
+            "size": size,
+            "summary": {
+                "total_count": summary_row.total_count if summary_row else 0,
+                "total_surcharge_fen": summary_row.total_surcharge_fen if summary_row else 0,
+                "effective_surcharge_fen": summary_row.effective_surcharge_fen if summary_row else 0,
+                "waived_count": summary_row.waived_count if summary_row else 0,
+                "charged_count": summary_row.charged_count if summary_row else 0,
+            },
+        }
+    )
 
 
 # ─── 内部工具 ─────────────────────────────────────────────────────────────────
@@ -467,4 +493,5 @@ async def surcharge_report(
 def _jsonb(obj) -> str:
     """将 Python 对象序列化为 JSON 字符串，供 ::jsonb 参数使用。"""
     import json
+
     return json.dumps(obj, ensure_ascii=False)

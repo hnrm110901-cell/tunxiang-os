@@ -1,4 +1,5 @@
 """中央仓配送调度测试 -- 计划 / 路线优化 / 派车 / 签收 / 看板"""
+
 import os
 import sys
 
@@ -24,38 +25,58 @@ WAREHOUSE_ID = "wh-central-001"
 
 def _setup_warehouse_and_stores():
     """注入仓库 + 3个门店地理信息"""
-    inject_warehouse(WAREHOUSE_ID, TENANT, {
-        "warehouse_name": "长沙中央仓",
-        "lat": 28.2280,
-        "lng": 112.9388,
-        "address": "长沙市岳麓区中央仓库",
-        "capacity": 10000,
-    })
-    inject_store_geo("store-a", TENANT, {
-        "store_name": "五一广场店",
-        "lat": 28.1978,
-        "lng": 112.9762,
-        "address": "长沙市五一广场",
-    })
-    inject_store_geo("store-b", TENANT, {
-        "store_name": "橘子洲店",
-        "lat": 28.2104,
-        "lng": 112.9539,
-        "address": "长沙市橘子洲",
-    })
-    inject_store_geo("store-c", TENANT, {
-        "store_name": "星沙店",
-        "lat": 28.2455,
-        "lng": 113.0802,
-        "address": "长沙县星沙",
-    })
-    inject_driver("driver-001", TENANT, {
-        "driver_name": "刘师傅",
-        "phone": "139****5678",
-        "vehicle_no": "湘A12345",
-        "vehicle_type": "冷藏车",
-        "capacity_kg": 2000,
-    })
+    inject_warehouse(
+        WAREHOUSE_ID,
+        TENANT,
+        {
+            "warehouse_name": "长沙中央仓",
+            "lat": 28.2280,
+            "lng": 112.9388,
+            "address": "长沙市岳麓区中央仓库",
+            "capacity": 10000,
+        },
+    )
+    inject_store_geo(
+        "store-a",
+        TENANT,
+        {
+            "store_name": "五一广场店",
+            "lat": 28.1978,
+            "lng": 112.9762,
+            "address": "长沙市五一广场",
+        },
+    )
+    inject_store_geo(
+        "store-b",
+        TENANT,
+        {
+            "store_name": "橘子洲店",
+            "lat": 28.2104,
+            "lng": 112.9539,
+            "address": "长沙市橘子洲",
+        },
+    )
+    inject_store_geo(
+        "store-c",
+        TENANT,
+        {
+            "store_name": "星沙店",
+            "lat": 28.2455,
+            "lng": 113.0802,
+            "address": "长沙县星沙",
+        },
+    )
+    inject_driver(
+        "driver-001",
+        TENANT,
+        {
+            "driver_name": "刘师傅",
+            "phone": "139****5678",
+            "vehicle_no": "湘A12345",
+            "vehicle_type": "冷藏车",
+            "capacity_kg": 2000,
+        },
+    )
 
 
 def _create_test_plan():
@@ -232,16 +253,31 @@ class TestConfirmDelivery:
         pid = plan["plan_id"]
         dispatch_delivery(pid, "driver-001", TENANT)
 
-        confirm_delivery(pid, "store-a", [
-            {"item_id": "item-1", "received_quantity": 20, "status": "accepted"},
-            {"item_id": "item-2", "received_quantity": 10, "status": "accepted"},
-        ], TENANT)
-        confirm_delivery(pid, "store-b", [
-            {"item_id": "item-3", "received_quantity": 100, "status": "accepted"},
-        ], TENANT)
-        result = confirm_delivery(pid, "store-c", [
-            {"item_id": "item-4", "received_quantity": 50, "status": "accepted"},
-        ], TENANT)
+        confirm_delivery(
+            pid,
+            "store-a",
+            [
+                {"item_id": "item-1", "received_quantity": 20, "status": "accepted"},
+                {"item_id": "item-2", "received_quantity": 10, "status": "accepted"},
+            ],
+            TENANT,
+        )
+        confirm_delivery(
+            pid,
+            "store-b",
+            [
+                {"item_id": "item-3", "received_quantity": 100, "status": "accepted"},
+            ],
+            TENANT,
+        )
+        result = confirm_delivery(
+            pid,
+            "store-c",
+            [
+                {"item_id": "item-4", "received_quantity": 50, "status": "accepted"},
+            ],
+            TENANT,
+        )
 
         assert result["plan_status"] == DistributionStatus.delivered.value
 

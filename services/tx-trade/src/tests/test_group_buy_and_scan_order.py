@@ -29,6 +29,7 @@
     17. POST /checkout              — 请求结账 happy path
     18. GET  /stats                 — 统计 happy path
 """
+
 import os
 import sys
 import types
@@ -36,8 +37,8 @@ import uuid
 
 # ─── sys.path 准备 ───────────────────────────────────────────────────────────
 _TESTS_DIR = os.path.dirname(__file__)
-_SRC_DIR   = os.path.join(_TESTS_DIR, "..")
-_ROOT_DIR  = os.path.abspath(os.path.join(_TESTS_DIR, "..", "..", "..", ".."))
+_SRC_DIR = os.path.join(_TESTS_DIR, "..")
+_ROOT_DIR = os.path.abspath(os.path.join(_TESTS_DIR, "..", "..", "..", ".."))
 
 for _p in [_SRC_DIR, _ROOT_DIR]:
     if _p not in sys.path:
@@ -52,21 +53,23 @@ def _ensure_pkg(name: str, path: str) -> None:
         sys.modules[name] = mod
 
 
-_ensure_pkg("src",          _SRC_DIR)
-_ensure_pkg("src.api",      os.path.join(_SRC_DIR, "api"))
+_ensure_pkg("src", _SRC_DIR)
+_ensure_pkg("src.api", os.path.join(_SRC_DIR, "api"))
 _ensure_pkg("src.services", os.path.join(_SRC_DIR, "services"))
 
 # ─── shared.ontology mock（scan_order_api 使用 shared.ontology.src.database） ─
-_shared_pkg     = types.ModuleType("shared")
+_shared_pkg = types.ModuleType("shared")
 _shared_pkg.__path__ = [os.path.join(_ROOT_DIR, "shared")]
 sys.modules.setdefault("shared", _shared_pkg)
 
 for _mod in ("shared.ontology", "shared.ontology.src", "shared.ontology.src.database"):
     sys.modules.setdefault(_mod, types.ModuleType(_mod))
 
+
 # 向 shared.ontology.src.database 注入 get_db
 async def _fake_get_db():  # type: ignore[return]
     yield None
+
 
 _db_mod = sys.modules["shared.ontology.src.database"]
 _db_mod.get_db = _fake_get_db  # type: ignore[attr-defined]
@@ -81,6 +84,7 @@ sys.modules.setdefault("src.services.scan_order_service", _scan_svc)
 
 # ─── structlog mock ──────────────────────────────────────────────────────────
 import types as _types
+
 _structlog = _types.ModuleType("structlog")
 _structlog.get_logger = lambda: _types.SimpleNamespace(  # type: ignore[attr-defined]
     info=lambda *a, **k: None,
@@ -90,29 +94,29 @@ _structlog.get_logger = lambda: _types.SimpleNamespace(  # type: ignore[attr-def
 sys.modules.setdefault("structlog", _structlog)
 
 # ─── 正式 import ─────────────────────────────────────────────────────────────
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
-import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from src.api.group_buy_routes import router as gb_router  # type: ignore[import]
-from src.api.group_buy_routes import get_db as gb_get_db  # type: ignore[import]
-from src.api import scan_order_api  # type: ignore[import]
-from src.api.scan_order_api import router as so_router  # type: ignore[import]
 from shared.ontology.src.database import get_db as shared_get_db  # type: ignore[import]
+from src.api import scan_order_api  # type: ignore[import]
+from src.api.group_buy_routes import get_db as gb_get_db  # type: ignore[import]
+from src.api.group_buy_routes import router as gb_router  # type: ignore[import]
+from src.api.scan_order_api import router as so_router  # type: ignore[import]
 
 # ─── 常量 ────────────────────────────────────────────────────────────────────
 TENANT = "tenant-abc"
-STORE  = "store-001"
+STORE = "store-001"
 ACTIVITY_ID = str(uuid.uuid4())
-TEAM_ID     = str(uuid.uuid4())
-ORDER_ID    = str(uuid.uuid4())
+TEAM_ID = str(uuid.uuid4())
+ORDER_ID = str(uuid.uuid4())
 
 _BASE_HEADERS = {"X-Tenant-ID": TENANT}
 
 
 # ─── 工具函数 ─────────────────────────────────────────────────────────────────
+
 
 def _make_db() -> AsyncMock:
     db = AsyncMock()
@@ -139,6 +143,7 @@ def _make_so_app(db: AsyncMock) -> FastAPI:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 # ── 1. POST /activities — happy path ─────────────────────────────────────────
+
 
 def test_create_activity_happy_path():
     db = _make_db()
@@ -167,6 +172,7 @@ def test_create_activity_happy_path():
 
 # ── 2. POST /activities — ValueError ─────────────────────────────────────────
 
+
 def test_create_activity_value_error():
     db = _make_db()
     with patch(
@@ -193,6 +199,7 @@ def test_create_activity_value_error():
 
 # ── 3. GET /activities — 列表 ────────────────────────────────────────────────
 
+
 def test_list_activities_happy_path():
     db = _make_db()
     list_data = {"items": [{"id": ACTIVITY_ID}], "total": 1}
@@ -212,6 +219,7 @@ def test_list_activities_happy_path():
 
 
 # ── 4. POST /teams — 发起拼团 happy path ─────────────────────────────────────
+
 
 def test_create_team_happy_path():
     db = _make_db()
@@ -234,6 +242,7 @@ def test_create_team_happy_path():
 
 # ── 5. POST /teams — ValueError ──────────────────────────────────────────────
 
+
 def test_create_team_value_error():
     db = _make_db()
     with patch(
@@ -251,6 +260,7 @@ def test_create_team_value_error():
 
 
 # ── 6. POST /teams/{id}/join — happy path ────────────────────────────────────
+
 
 def test_join_team_happy_path():
     db = _make_db()
@@ -273,6 +283,7 @@ def test_join_team_happy_path():
 
 # ── 7. POST /teams/{id}/join — ValueError ────────────────────────────────────
 
+
 def test_join_team_value_error():
     db = _make_db()
     with patch(
@@ -292,6 +303,7 @@ def test_join_team_value_error():
 
 
 # ── 8. GET /teams/{id} — 拼团详情 happy path ─────────────────────────────────
+
 
 def test_get_team_detail_happy_path():
     db = _make_db()
@@ -313,6 +325,7 @@ def test_get_team_detail_happy_path():
 
 # ── 9. GET /teams/{id} — team not found ──────────────────────────────────────
 
+
 def test_get_team_detail_not_found():
     db = _make_db()
     with patch(
@@ -331,6 +344,7 @@ def test_get_team_detail_not_found():
 
 
 # ── 10. POST /expire-check — happy path ──────────────────────────────────────
+
 
 def test_expire_check_happy_path():
     db = _make_db()
@@ -356,6 +370,7 @@ def test_expire_check_happy_path():
 
 # ── 11. POST /qrcode/generate — happy path ────────────────────────────────────
 
+
 def test_generate_qrcode_happy_path():
     db = _make_db()
     qr_data = {"code": "TX:store001:T03:abc123", "miniapp_path": "/pages/menu/index?code=abc123"}
@@ -373,6 +388,7 @@ def test_generate_qrcode_happy_path():
 
 
 # ── 12. POST /qrcode/parse — happy path ──────────────────────────────────────
+
 
 def test_parse_qrcode_happy_path():
     db = _make_db()
@@ -392,6 +408,7 @@ def test_parse_qrcode_happy_path():
 
 # ── 13. POST /qrcode/parse — ValueError → 400 ────────────────────────────────
 
+
 def test_parse_qrcode_invalid():
     db = _make_db()
     with patch.object(scan_order_api, "parse_qrcode", side_effect=ValueError("invalid_qrcode_format")):
@@ -406,12 +423,11 @@ def test_parse_qrcode_invalid():
 
 # ── 14. POST /create — 扫码下单 happy path ────────────────────────────────────
 
+
 def test_create_scan_order_happy_path():
     db = _make_db()
     order_data = {"order_id": ORDER_ID, "status": "open", "items_count": 2}
-    with patch.object(
-        scan_order_api, "create_scan_order", new=AsyncMock(return_value=order_data)
-    ):
+    with patch.object(scan_order_api, "create_scan_order", new=AsyncMock(return_value=order_data)):
         client = TestClient(_make_so_app(db))
         resp = client.post(
             "/api/v1/scan-order/create",
@@ -433,12 +449,11 @@ def test_create_scan_order_happy_path():
 
 # ── 15. POST /add-items — 加菜 happy path ─────────────────────────────────────
 
+
 def test_add_items_happy_path():
     db = _make_db()
     result = {"order_id": ORDER_ID, "added_items": 1, "total_items": 3}
-    with patch.object(
-        scan_order_api, "add_items_to_order", new=AsyncMock(return_value=result)
-    ):
+    with patch.object(scan_order_api, "add_items_to_order", new=AsyncMock(return_value=result)):
         client = TestClient(_make_so_app(db))
         resp = client.post(
             "/api/v1/scan-order/add-items",
@@ -456,12 +471,11 @@ def test_add_items_happy_path():
 
 # ── 16. GET /table-order — 查看当桌订单 ──────────────────────────────────────
 
+
 def test_get_table_order_happy_path():
     db = _make_db()
     table_order = {"order_id": ORDER_ID, "status": "open", "items": []}
-    with patch.object(
-        scan_order_api, "get_table_order", new=AsyncMock(return_value=table_order)
-    ):
+    with patch.object(scan_order_api, "get_table_order", new=AsyncMock(return_value=table_order)):
         client = TestClient(_make_so_app(db))
         resp = client.get(
             "/api/v1/scan-order/table-order",
@@ -476,12 +490,11 @@ def test_get_table_order_happy_path():
 
 # ── 17. POST /checkout — 请求结账 ─────────────────────────────────────────────
 
+
 def test_request_checkout_happy_path():
     db = _make_db()
     checkout_data = {"order_id": ORDER_ID, "status": "checkout_requested"}
-    with patch.object(
-        scan_order_api, "request_checkout", new=AsyncMock(return_value=checkout_data)
-    ):
+    with patch.object(scan_order_api, "request_checkout", new=AsyncMock(return_value=checkout_data)):
         client = TestClient(_make_so_app(db))
         resp = client.post(
             "/api/v1/scan-order/checkout",
@@ -496,12 +509,11 @@ def test_request_checkout_happy_path():
 
 # ── 18. GET /stats — 统计 happy path ─────────────────────────────────────────
 
+
 def test_get_stats_happy_path():
     db = _make_db()
     stats = {"total_orders": 42, "total_revenue_fen": 168000, "avg_table_size": 2.3}
-    with patch.object(
-        scan_order_api, "get_scan_order_stats", new=AsyncMock(return_value=stats)
-    ):
+    with patch.object(scan_order_api, "get_scan_order_stats", new=AsyncMock(return_value=stats)):
         client = TestClient(_make_so_app(db))
         resp = client.get(
             "/api/v1/scan-order/stats",

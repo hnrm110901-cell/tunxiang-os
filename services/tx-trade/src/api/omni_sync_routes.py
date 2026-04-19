@@ -21,6 +21,7 @@
   - 适配器通过 delivery_factory.get_delivery_adapter() 获取，Mock 模式下不调真实 API
   - 三条硬约束检查点：接单时毛利底线检查占位（Agent 异步校验）
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -92,6 +93,7 @@ def _err(message: str, status_code: int = 400) -> HTTPException:
 
 class MenuPushRequest(BaseModel):
     """菜单推送请求"""
+
     platforms: Optional[list[str]] = Field(
         default=None,
         description="目标平台列表，不传则推送到全部平台（meituan/eleme/douyin）",
@@ -109,6 +111,7 @@ class MenuPushRequest(BaseModel):
 
 class SoldOutSyncRequest(BaseModel):
     """估清同步请求（POS 沽清 → 平台下架）"""
+
     store_id: str = Field(min_length=1, max_length=100)
     dish_id: str = Field(min_length=1, max_length=100, description="POS 内部菜品ID")
     dish_name: str = Field(min_length=1, max_length=200)
@@ -121,6 +124,7 @@ class SoldOutSyncRequest(BaseModel):
 
 class SoldOutRestoreRequest(BaseModel):
     """估清恢复请求（补货 → 平台上架）"""
+
     store_id: str = Field(min_length=1, max_length=100)
     dish_id: str = Field(min_length=1, max_length=100)
     dish_name: str = Field(min_length=1, max_length=200)
@@ -129,12 +133,14 @@ class SoldOutRestoreRequest(BaseModel):
 
 class AcceptOrderRequest(BaseModel):
     """接单请求"""
+
     estimated_minutes: int = Field(default=20, ge=1, le=120, description="预计出餐分钟数")
     trigger_print: bool = Field(default=True, description="是否触发厨房单打印（前端接收后执行）")
 
 
 class RejectOrderRequest(BaseModel):
     """拒单请求"""
+
     reason_code: int = Field(
         default=1,
         description="拒单原因码：1=暂时无法接单，2=已打烊，3=食材不足，4=超出配送范围，9=其他",
@@ -144,6 +150,7 @@ class RejectOrderRequest(BaseModel):
 
 class RefundOrderRequest(BaseModel):
     """退单请求"""
+
     refund_amount_fen: int = Field(ge=0, description="退款金额（分），0=全额退款")
     reason: str = Field(min_length=1, max_length=200, description="退单原因")
 
@@ -237,15 +244,17 @@ async def push_menu_to_platforms(
                 exc_info=True,
             )
 
-        results.append({
-            "platform": platform,
-            "platform_label": PLATFORM_LABELS[platform],
-            "task_id": task_id,
-            "status": status,
-            "synced": platform_result.get("synced", 0),
-            "failed": platform_result.get("failed", 0),
-            "errors": platform_result.get("errors", []),
-        })
+        results.append(
+            {
+                "platform": platform,
+                "platform_label": PLATFORM_LABELS[platform],
+                "task_id": task_id,
+                "status": status,
+                "synced": platform_result.get("synced", 0),
+                "failed": platform_result.get("failed", 0),
+                "errors": platform_result.get("errors", []),
+            }
+        )
 
     await db.commit()
 
@@ -256,13 +265,15 @@ async def push_menu_to_platforms(
         platforms=target_platforms,
     )
 
-    return _ok({
-        "store_id": store_id,
-        "dish_count": len(body.dishes),
-        "sync_mode": body.sync_mode,
-        "platform_results": results,
-        "pushed_at": _now().isoformat(),
-    })
+    return _ok(
+        {
+            "store_id": store_id,
+            "dish_count": len(body.dishes),
+            "sync_mode": body.sync_mode,
+            "platform_results": results,
+            "pushed_at": _now().isoformat(),
+        }
+    )
 
 
 # ── 2. 估清同步（POS 沽清 → 平台下架） ────────────────────────────────────────
@@ -349,12 +360,14 @@ async def sync_sold_out(
                 exc_info=True,
             )
 
-        results.append({
-            "platform": platform,
-            "platform_label": PLATFORM_LABELS[platform],
-            "success": success,
-            "error": error_msg,
-        })
+        results.append(
+            {
+                "platform": platform,
+                "platform_label": PLATFORM_LABELS[platform],
+                "success": success,
+                "error": error_msg,
+            }
+        )
 
     await db.commit()
 
@@ -365,14 +378,16 @@ async def sync_sold_out(
         platforms=target_platforms,
     )
 
-    return _ok({
-        "store_id": body.store_id,
-        "dish_id": body.dish_id,
-        "dish_name": body.dish_name,
-        "action": "soldout",
-        "platform_results": results,
-        "synced_at": _now().isoformat(),
-    })
+    return _ok(
+        {
+            "store_id": body.store_id,
+            "dish_id": body.dish_id,
+            "dish_name": body.dish_name,
+            "action": "soldout",
+            "platform_results": results,
+            "synced_at": _now().isoformat(),
+        }
+    )
 
 
 # ── 3. 估清恢复（补货 → 平台上架） ────────────────────────────────────────────
@@ -457,12 +472,14 @@ async def restore_sold_out(
                 exc_info=True,
             )
 
-        results.append({
-            "platform": platform,
-            "platform_label": PLATFORM_LABELS[platform],
-            "success": success,
-            "error": error_msg,
-        })
+        results.append(
+            {
+                "platform": platform,
+                "platform_label": PLATFORM_LABELS[platform],
+                "success": success,
+                "error": error_msg,
+            }
+        )
 
     await db.commit()
 
@@ -473,14 +490,16 @@ async def restore_sold_out(
         platforms=target_platforms,
     )
 
-    return _ok({
-        "store_id": body.store_id,
-        "dish_id": body.dish_id,
-        "dish_name": body.dish_name,
-        "action": "restore",
-        "platform_results": results,
-        "synced_at": _now().isoformat(),
-    })
+    return _ok(
+        {
+            "store_id": body.store_id,
+            "dish_id": body.dish_id,
+            "dish_name": body.dish_name,
+            "action": "restore",
+            "platform_results": results,
+            "synced_at": _now().isoformat(),
+        }
+    )
 
 
 # ── 4. 线上待处理订单列表 ─────────────────────────────────────────────────────
@@ -571,26 +590,30 @@ async def list_online_orders(
         else:
             items = []
 
-        orders.append({
-            "order_id": row["order_id"],
-            "platform": row["platform"] or "",
-            "platform_label": PLATFORM_LABELS.get(row["platform"] or "", row["platform"] or ""),
-            "platform_order_id": row["platform_order_id"] or "",
-            "status": row["status"],
-            "total_fen": row["total_fen"] or 0,
-            "items": items,
-            "customer_phone": row["customer_phone"] or "",
-            "delivery_address": row["delivery_address"] or "",
-            "notes": row["notes"] or "",
-            "created_at": row["created_at"].isoformat() if row["created_at"] else None,
-        })
+        orders.append(
+            {
+                "order_id": row["order_id"],
+                "platform": row["platform"] or "",
+                "platform_label": PLATFORM_LABELS.get(row["platform"] or "", row["platform"] or ""),
+                "platform_order_id": row["platform_order_id"] or "",
+                "status": row["status"],
+                "total_fen": row["total_fen"] or 0,
+                "items": items,
+                "customer_phone": row["customer_phone"] or "",
+                "delivery_address": row["delivery_address"] or "",
+                "notes": row["notes"] or "",
+                "created_at": row["created_at"].isoformat() if row["created_at"] else None,
+            }
+        )
 
-    return _ok({
-        "items": orders,
-        "total": total,
-        "page": page,
-        "size": size,
-    })
+    return _ok(
+        {
+            "items": orders,
+            "total": total,
+            "page": page,
+            "size": size,
+        }
+    )
 
 
 # ── 5. 接单 ───────────────────────────────────────────────────────────────────
@@ -736,26 +759,28 @@ async def accept_online_order(
     else:
         items = []
 
-    return _ok({
-        "order_id": order_id,
-        "platform": platform,
-        "platform_label": PLATFORM_LABELS.get(platform, platform),
-        "platform_order_id": row["platform_order_id"],
-        "status": "confirmed",
-        "estimated_minutes": body.estimated_minutes,
-        "trigger_print": body.trigger_print,
-        "print_data": {
-            "title": f"【{PLATFORM_LABELS.get(platform, platform)}】外卖单",
+    return _ok(
+        {
             "order_id": order_id,
+            "platform": platform,
+            "platform_label": PLATFORM_LABELS.get(platform, platform),
             "platform_order_id": row["platform_order_id"],
-            "total_fen": total_fen,
-            "items": items,
-            "notes": row["notes"] or "",
-            "delivery_address": row["delivery_address"] or "",
-            "customer_phone": row["customer_phone_masked"] or "",
-            "accepted_at": _now().isoformat(),
-        },
-    })
+            "status": "confirmed",
+            "estimated_minutes": body.estimated_minutes,
+            "trigger_print": body.trigger_print,
+            "print_data": {
+                "title": f"【{PLATFORM_LABELS.get(platform, platform)}】外卖单",
+                "order_id": order_id,
+                "platform_order_id": row["platform_order_id"],
+                "total_fen": total_fen,
+                "items": items,
+                "notes": row["notes"] or "",
+                "delivery_address": row["delivery_address"] or "",
+                "customer_phone": row["customer_phone_masked"] or "",
+                "accepted_at": _now().isoformat(),
+            },
+        }
+    )
 
 
 # ── 6. 拒单 ───────────────────────────────────────────────────────────────────
@@ -845,15 +870,17 @@ async def reject_online_order(
         reason_code=body.reason_code,
     )
 
-    return _ok({
-        "order_id": order_id,
-        "platform": platform,
-        "platform_label": PLATFORM_LABELS.get(platform, platform),
-        "status": "rejected",
-        "reason_code": body.reason_code,
-        "reason_desc": body.reason_desc,
-        "rejected_at": _now().isoformat(),
-    })
+    return _ok(
+        {
+            "order_id": order_id,
+            "platform": platform,
+            "platform_label": PLATFORM_LABELS.get(platform, platform),
+            "status": "rejected",
+            "reason_code": body.reason_code,
+            "reason_desc": body.reason_desc,
+            "rejected_at": _now().isoformat(),
+        }
+    )
 
 
 # ── 7. 退单 ───────────────────────────────────────────────────────────────────
@@ -972,13 +999,15 @@ async def refund_online_order(
         total_fen=total_fen,
     )
 
-    return _ok({
-        "order_id": order_id,
-        "platform": platform,
-        "platform_label": PLATFORM_LABELS.get(platform, platform),
-        "status": "refunded",
-        "refund_amount_fen": refund_fen,
-        "original_amount_fen": total_fen,
-        "reason": body.reason,
-        "refunded_at": _now().isoformat(),
-    })
+    return _ok(
+        {
+            "order_id": order_id,
+            "platform": platform,
+            "platform_label": PLATFORM_LABELS.get(platform, platform),
+            "status": "refunded",
+            "refund_amount_fen": refund_fen,
+            "original_amount_fen": total_fen,
+            "reason": body.reason,
+            "refunded_at": _now().isoformat(),
+        }
+    )

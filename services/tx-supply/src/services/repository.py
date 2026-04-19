@@ -2,6 +2,7 @@
 
 封装 Ingredient / IngredientTransaction 的查询与库存调整。
 """
+
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Optional
@@ -81,11 +82,13 @@ class InventoryRepository:
             .where(Ingredient.store_id == store_uuid)
             .where(Ingredient.is_deleted == False)  # noqa: E712
             .where(
-                Ingredient.status.in_([
-                    InventoryStatus.low.value,
-                    InventoryStatus.critical.value,
-                    InventoryStatus.out_of_stock.value,
-                ])
+                Ingredient.status.in_(
+                    [
+                        InventoryStatus.low.value,
+                        InventoryStatus.critical.value,
+                        InventoryStatus.out_of_stock.value,
+                    ]
+                )
             )
             .order_by(
                 case(
@@ -107,9 +110,11 @@ class InventoryRepository:
                 "min_quantity": i.min_quantity,
                 "unit": i.unit,
                 "status": i.status,
-                "alert_type": "out_of_stock" if i.status == InventoryStatus.out_of_stock.value
-                    else "critical" if i.status == InventoryStatus.critical.value
-                    else "low",
+                "alert_type": "out_of_stock"
+                if i.status == InventoryStatus.out_of_stock.value
+                else "critical"
+                if i.status == InventoryStatus.critical.value
+                else "low",
             }
             for i in rows
         ]
@@ -189,9 +194,7 @@ class InventoryRepository:
                 Ingredient.category,
                 Ingredient.unit,
                 func.sum(IngredientTransaction.quantity).label("total_waste_qty"),
-                func.sum(
-                    IngredientTransaction.quantity * IngredientTransaction.unit_cost_fen
-                ).label("total_waste_fen"),
+                func.sum(IngredientTransaction.quantity * IngredientTransaction.unit_cost_fen).label("total_waste_fen"),
             )
             .join(IngredientTransaction, IngredientTransaction.ingredient_id == Ingredient.id)
             .where(Ingredient.tenant_id == self._tenant_uuid)
@@ -199,9 +202,7 @@ class InventoryRepository:
             .where(IngredientTransaction.transaction_type == TransactionType.waste.value)
             .where(IngredientTransaction.created_at >= since)
             .group_by(Ingredient.ingredient_name, Ingredient.category, Ingredient.unit)
-            .order_by(func.sum(
-                IngredientTransaction.quantity * IngredientTransaction.unit_cost_fen
-            ).desc())
+            .order_by(func.sum(IngredientTransaction.quantity * IngredientTransaction.unit_cost_fen).desc())
             .limit(5)
         )
         rows = result.all()

@@ -12,6 +12,7 @@
 # from .api.procurement_recommend_routes import router as procurement_recommend_router
 # app.include_router(procurement_recommend_router, prefix="/api/v1/procurement")
 """
+
 from __future__ import annotations
 
 from typing import List
@@ -169,10 +170,13 @@ async def get_supplier_scores(
               AND tenant_id = :tenant_id
               AND is_deleted = FALSE
         """)
-        result = await db.execute(sql, {
-            "ingredient_id": ingredient_id,
-            "tenant_id": x_tenant_id,
-        })
+        result = await db.execute(
+            sql,
+            {
+                "ingredient_id": ingredient_id,
+                "tenant_id": x_tenant_id,
+            },
+        )
         suppliers = result.fetchall()
     except Exception as exc:  # noqa: BLE001 — suppliers表可能未建立，降级为空列表
         logger.warning("procurement_recommend.supplier_query_failed", ingredient_id=ingredient_id, error=str(exc))
@@ -192,15 +196,17 @@ async def get_supplier_scores(
             quality_rate=score_data["quality_rate"],
             price_score=score_data["price_score"],
         )
-        scores.append({
-            "supplier_id": supplier_id,
-            "supplier_name": getattr(row, "supplier_name", ""),
-            "on_time_rate": round(score_data["on_time_rate"], 3),
-            "quality_rate": round(score_data["quality_rate"], 3),
-            "price_score": round(score_data["price_score"], 3),
-            "composite_score": round(composite_score, 3),
-            "total_deliveries": score_data["total_deliveries"],
-        })
+        scores.append(
+            {
+                "supplier_id": supplier_id,
+                "supplier_name": getattr(row, "supplier_name", ""),
+                "on_time_rate": round(score_data["on_time_rate"], 3),
+                "quality_rate": round(score_data["quality_rate"], 3),
+                "price_score": round(score_data["price_score"], 3),
+                "composite_score": round(composite_score, 3),
+                "total_deliveries": score_data["total_deliveries"],
+            }
+        )
 
     # 按综合评分降序
     scores.sort(key=lambda s: s["composite_score"], reverse=True)

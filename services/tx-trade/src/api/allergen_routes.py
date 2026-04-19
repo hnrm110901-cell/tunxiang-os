@@ -18,6 +18,7 @@ GET  /api/v1/dishes/{dish_id}/allergens
 统一响应格式: {"ok": bool, "data": {}, "error": {}}
 所有接口需 X-Tenant-ID header。
 """
+
 from __future__ import annotations
 
 from typing import Optional
@@ -38,6 +39,7 @@ router = APIRouter(tags=["allergens"])
 # 辅助函数
 # ──────────────────────────────────────────────────────────────────────────────
 
+
 def _get_tenant_id(request: Request) -> str:
     tid = getattr(request.state, "tenant_id", None) or request.headers.get("X-Tenant-ID", "")
     if not tid:
@@ -57,6 +59,7 @@ def _err(message: str, code: str = "ALLERGEN_ERROR") -> dict:
 # 请求模型
 # ──────────────────────────────────────────────────────────────────────────────
 
+
 class CheckAllergensReq(BaseModel):
     dish_ids: list[str]
     member_id: str
@@ -70,6 +73,7 @@ class SetDishAllergensReq(BaseModel):
 # ──────────────────────────────────────────────────────────────────────────────
 # 路由
 # ──────────────────────────────────────────────────────────────────────────────
+
 
 @router.get("/api/v1/allergens/codes")
 async def get_allergen_codes(request: Request):

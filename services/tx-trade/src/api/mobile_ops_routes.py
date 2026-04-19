@@ -13,6 +13,7 @@
 统一响应格式: {"ok": bool, "data": {}, "error": {}}
 所有接口需 X-Tenant-ID header，通过 RLS 实现租户隔离。
 """
+
 import json
 from typing import Optional
 
@@ -96,6 +97,7 @@ async def update_table_info(
 
     try:
         from ..services.cashier_engine import CashierEngine
+
         engine = CashierEngine(db, tenant_id)
         result = await engine.update_table_info(
             order_id=order_id,
@@ -130,9 +132,7 @@ async def set_dish_availability(
         from shared.ontology.src.entities import Dish
 
         await db.execute(
-            update(Dish)
-            .where(Dish.id == dish_id, Dish.tenant_id == tenant_id)
-            .values(sold_out=not body.available)
+            update(Dish).where(Dish.id == dish_id, Dish.tenant_id == tenant_id).values(sold_out=not body.available)
         )
         await db.commit()
         log.info("dish_availability_updated", available=body.available)
@@ -162,9 +162,7 @@ async def set_dish_daily_limit(
         from shared.ontology.src.entities import Dish
 
         await db.execute(
-            update(Dish)
-            .where(Dish.id == dish_id, Dish.tenant_id == tenant_id)
-            .values(daily_limit=body.limit)
+            update(Dish).where(Dish.id == dish_id, Dish.tenant_id == tenant_id).values(daily_limit=body.limit)
         )
         await db.commit()
         log.info("dish_daily_limit_updated", limit=body.limit)
@@ -194,9 +192,7 @@ async def update_order_waiter(
         from shared.ontology.src.entities import Order
 
         await db.execute(
-            update(Order)
-            .where(Order.id == order_id, Order.tenant_id == tenant_id)
-            .values(waiter_id=body.new_waiter_id)
+            update(Order).where(Order.id == order_id, Order.tenant_id == tenant_id).values(waiter_id=body.new_waiter_id)
         )
         await db.commit()
         log.info("order_waiter_updated", new_waiter_id=body.new_waiter_id)
@@ -241,6 +237,7 @@ async def copy_dishes_from_order(
         copied_count = 0
         for item in source_items:
             import uuid
+
             new_item = OrderItem(
                 id=str(uuid.uuid4()),
                 order_id=order_id,
@@ -295,12 +292,14 @@ async def refresh_dish_status(
 
         items = []
         for row in rows:
-            items.append({
-                "dish_id": row.id,
-                "sold_out": row.sold_out,
-                "daily_limit": getattr(row, "daily_limit", 0) or 0,
-                "daily_sold_count": getattr(row, "daily_sold_count", 0) or 0,
-            })
+            items.append(
+                {
+                    "dish_id": row.id,
+                    "sold_out": row.sold_out,
+                    "daily_limit": getattr(row, "daily_limit", 0) or 0,
+                    "daily_sold_count": getattr(row, "daily_sold_count", 0) or 0,
+                }
+            )
 
         return _ok({"items": items, "total": len(items)})
     except ValueError as exc:
@@ -356,9 +355,7 @@ async def pre_bill(
 
         from shared.ontology.src.entities import Order, OrderItem
 
-        order_result = await db.execute(
-            select(Order).where(Order.id == order_id, Order.tenant_id == tenant_id)
-        )
+        order_result = await db.execute(select(Order).where(Order.id == order_id, Order.tenant_id == tenant_id))
         order = order_result.scalar_one_or_none()
         if not order:
             raise ValueError("订单不存在")
@@ -378,31 +375,35 @@ async def pre_bill(
                 continue
             line_total = item.subtotal_fen or (item.unit_price_fen * item.quantity)
             subtotal_fen += line_total
-            bill_items.append({
-                "item_name": item.item_name,
-                "quantity": item.quantity,
-                "unit_price_fen": item.unit_price_fen,
-                "subtotal_fen": line_total,
-                "notes": item.notes,
-                "is_gift": item.is_gift,
-            })
+            bill_items.append(
+                {
+                    "item_name": item.item_name,
+                    "quantity": item.quantity,
+                    "unit_price_fen": item.unit_price_fen,
+                    "subtotal_fen": line_total,
+                    "notes": item.notes,
+                    "is_gift": item.is_gift,
+                }
+            )
 
         discount_fen = order.discount_amount_fen or 0
         service_charge_fen = order.service_charge_fen or 0
         total_fen = subtotal_fen - discount_fen + service_charge_fen
 
         log.info("pre_bill_generated", item_count=len(bill_items), total_fen=total_fen)
-        return _ok({
-            "order_id": order_id,
-            "order_no": order.order_no,
-            "table_no": order.table_number,
-            "items": bill_items,
-            "subtotal_fen": subtotal_fen,
-            "discount_fen": discount_fen,
-            "service_charge_fen": service_charge_fen,
-            "total_fen": total_fen,
-            "guest_count": order.guest_count,
-        })
+        return _ok(
+            {
+                "order_id": order_id,
+                "order_no": order.order_no,
+                "table_no": order.table_number,
+                "items": bill_items,
+                "subtotal_fen": subtotal_fen,
+                "discount_fen": discount_fen,
+                "service_charge_fen": service_charge_fen,
+                "total_fen": total_fen,
+                "guest_count": order.guest_count,
+            }
+        )
     except ValueError as exc:
         log.warning("pre_bill_fail", error=str(exc))
         raise HTTPException(status_code=400, detail=str(exc))
@@ -428,9 +429,7 @@ async def fire_to_kitchen(
 
         from ..services.kds_dispatch import dispatch_order_to_kds
 
-        order_result = await db.execute(
-            select(Order).where(Order.id == order_id, Order.tenant_id == tenant_id)
-        )
+        order_result = await db.execute(select(Order).where(Order.id == order_id, Order.tenant_id == tenant_id))
         order = order_result.scalar_one_or_none()
         if not order:
             raise ValueError("订单不存在")
@@ -471,20 +470,19 @@ async def fire_to_kitchen(
 
         # 标记已发送KDS
         from sqlalchemy import update
+
         for item in pending_items:
-            await db.execute(
-                update(OrderItem)
-                .where(OrderItem.id == item.id)
-                .values(sent_to_kds_flag=True)
-            )
+            await db.execute(update(OrderItem).where(OrderItem.id == item.id).values(sent_to_kds_flag=True))
         await db.commit()
 
         log.info("fire_to_kitchen_ok", fired_count=len(pending_items))
-        return _ok({
-            "order_id": order_id,
-            "fired_count": len(pending_items),
-            "items": [i["item_name"] for i in items_data],
-        })
+        return _ok(
+            {
+                "order_id": order_id,
+                "fired_count": len(pending_items),
+                "items": [i["item_name"] for i in items_data],
+            }
+        )
     except ValueError as exc:
         log.warning("fire_to_kitchen_fail", error=str(exc))
         raise HTTPException(status_code=400, detail=str(exc))
@@ -523,24 +521,23 @@ async def mark_item_served(
 
         # 使用 customizations JSON 字段存储 served_at
         from datetime import datetime, timezone
+
         now = datetime.now(timezone.utc).isoformat()
         customs = item.customizations or {}
         customs["served_at"] = now
 
-        await db.execute(
-            update(OrderItem)
-            .where(OrderItem.id == item_id)
-            .values(customizations=customs)
-        )
+        await db.execute(update(OrderItem).where(OrderItem.id == item_id).values(customizations=customs))
         await db.commit()
 
         log.info("item_marked_served", item_name=item.item_name)
-        return _ok({
-            "order_id": order_id,
-            "item_id": item_id,
-            "item_name": item.item_name,
-            "served_at": now,
-        })
+        return _ok(
+            {
+                "order_id": order_id,
+                "item_id": item_id,
+                "item_name": item.item_name,
+                "served_at": now,
+            }
+        )
     except ValueError as exc:
         log.warning("mark_served_fail", error=str(exc))
         raise HTTPException(status_code=400, detail=str(exc))
@@ -600,15 +597,16 @@ async def override_item_price(
         )
         all_items = all_items_result.scalars().all()
         new_total = sum(
-            (body.new_price_fen * item.quantity if str(i.id) == item_id
-             else (i.subtotal_fen or i.unit_price_fen * i.quantity))
+            (
+                body.new_price_fen * item.quantity
+                if str(i.id) == item_id
+                else (i.subtotal_fen or i.unit_price_fen * i.quantity)
+            )
             for i in all_items
         )
 
         await db.execute(
-            update(Order)
-            .where(Order.id == order_id, Order.tenant_id == tenant_id)
-            .values(total_amount_fen=new_total)
+            update(Order).where(Order.id == order_id, Order.tenant_id == tenant_id).values(total_amount_fen=new_total)
         )
         await db.commit()
 
@@ -619,15 +617,17 @@ async def override_item_price(
             new_price_fen=body.new_price_fen,
             reason=body.reason,
         )
-        return _ok({
-            "order_id": order_id,
-            "item_id": item_id,
-            "item_name": item.item_name,
-            "old_price_fen": old_price_fen,
-            "new_price_fen": body.new_price_fen,
-            "new_subtotal_fen": new_subtotal,
-            "new_order_total_fen": new_total,
-        })
+        return _ok(
+            {
+                "order_id": order_id,
+                "item_id": item_id,
+                "item_name": item.item_name,
+                "old_price_fen": old_price_fen,
+                "new_price_fen": body.new_price_fen,
+                "new_subtotal_fen": new_subtotal,
+                "new_order_total_fen": new_total,
+            }
+        )
     except ValueError as exc:
         log.warning("price_override_fail", error=str(exc))
         raise HTTPException(status_code=400, detail=str(exc))
@@ -700,9 +700,7 @@ async def transfer_single_item(
         db.add(new_item)
 
         # 从源订单删除
-        await db.execute(
-            delete(OrderItem).where(OrderItem.id == item_id)
-        )
+        await db.execute(delete(OrderItem).where(OrderItem.id == item_id))
 
         # 重算两个订单总额
         for oid in [order_id, target_order_id]:
@@ -714,14 +712,9 @@ async def transfer_single_item(
                 )
             )
             order_items = items_result.scalars().all()
-            new_total = sum(
-                (i.subtotal_fen or i.unit_price_fen * i.quantity)
-                for i in order_items
-            )
+            new_total = sum((i.subtotal_fen or i.unit_price_fen * i.quantity) for i in order_items)
             await db.execute(
-                update(Order)
-                .where(Order.id == oid, Order.tenant_id == tenant_id)
-                .values(total_amount_fen=new_total)
+                update(Order).where(Order.id == oid, Order.tenant_id == tenant_id).values(total_amount_fen=new_total)
             )
 
         await db.commit()
@@ -730,13 +723,15 @@ async def transfer_single_item(
             item_name=item.item_name,
             target_table=body.target_table_no,
         )
-        return _ok({
-            "order_id": order_id,
-            "item_id": item_id,
-            "item_name": item.item_name,
-            "target_table_no": body.target_table_no,
-            "target_order_id": target_order_id,
-        })
+        return _ok(
+            {
+                "order_id": order_id,
+                "item_id": item_id,
+                "item_name": item.item_name,
+                "target_table_no": body.target_table_no,
+                "target_order_id": target_order_id,
+            }
+        )
     except ValueError as exc:
         log.warning("transfer_item_fail", error=str(exc))
         raise HTTPException(status_code=400, detail=str(exc))
@@ -762,9 +757,7 @@ async def print_order_receipt(
 
         from ..services.receipt_service import ReceiptService
 
-        order_result = await db.execute(
-            select(Order).where(Order.id == order_id, Order.tenant_id == tenant_id)
-        )
+        order_result = await db.execute(select(Order).where(Order.id == order_id, Order.tenant_id == tenant_id))
         order = order_result.scalar_one_or_none()
         if not order:
             raise ValueError("订单不存在")
@@ -802,12 +795,14 @@ async def print_order_receipt(
         # 通过 Mac mini WebSocket 转发打印指令到安卓POS打印机
         # 实际生产中通过 ws://mac-mini:8000/ws/print 推送
         log.info("print_receipt_ok", order_no=order.order_no)
-        return _ok({
-            "order_id": order_id,
-            "order_no": order.order_no,
-            "printed": True,
-            "receipt_size_bytes": len(receipt_bytes),
-        })
+        return _ok(
+            {
+                "order_id": order_id,
+                "order_no": order.order_no,
+                "printed": True,
+                "receipt_size_bytes": len(receipt_bytes),
+            }
+        )
     except ValueError as exc:
         log.warning("print_receipt_fail", error=str(exc))
         raise HTTPException(status_code=400, detail=str(exc))
@@ -843,19 +838,26 @@ async def send_kitchen_message(
         try:
             r = await UniversalPublisher.get_redis()
             payload = json.dumps(
-                {"event": "kitchen_message", "message_id": message_id,
-                 "message": body.message, "table_no": body.table_no, "sent_at": now},
+                {
+                    "event": "kitchen_message",
+                    "message_id": message_id,
+                    "message": body.message,
+                    "table_no": body.table_no,
+                    "sent_at": now,
+                },
                 ensure_ascii=False,
             )
             await r.publish(f"kds:{tenant_id}:messages", payload)
         except (OSError, RuntimeError) as exc:
             log.warning("kitchen_message_redis_failed", error=str(exc))
-        return _ok({
-            "message_id": message_id,
-            "message": body.message,
-            "table_no": body.table_no,
-            "sent_at": now,
-        })
+        return _ok(
+            {
+                "message_id": message_id,
+                "message": body.message,
+                "table_no": body.table_no,
+                "sent_at": now,
+            }
+        )
     except ValueError as exc:
         log.warning("kitchen_message_fail", error=str(exc))
         raise HTTPException(status_code=400, detail=str(exc))
@@ -889,15 +891,14 @@ async def transfer_payment(
 
         # 验证源订单和目标订单都存在
         for oid, label in [(body.source_order_id, "源"), (body.target_order_id, "目标")]:
-            result = await db.execute(
-                select(Order).where(Order.id == oid, Order.tenant_id == tenant_id)
-            )
+            result = await db.execute(select(Order).where(Order.id == oid, Order.tenant_id == tenant_id))
             if not result.scalar_one_or_none():
                 raise ValueError(f"{label}订单不存在: {oid}")
 
         # 注: Payment 表若存在则直接修改 order_id
         # 当前 entities.py 未定义 Payment 模型, 使用原始SQL
         from sqlalchemy import text
+
         result = await db.execute(
             text(
                 "UPDATE payments SET order_id = :target_id "
@@ -916,12 +917,14 @@ async def transfer_payment(
 
         await db.commit()
         log.info("payment_transferred")
-        return _ok({
-            "payment_id": body.payment_id,
-            "source_order_id": body.source_order_id,
-            "target_order_id": body.target_order_id,
-            "transferred": True,
-        })
+        return _ok(
+            {
+                "payment_id": body.payment_id,
+                "source_order_id": body.source_order_id,
+                "target_order_id": body.target_order_id,
+                "transferred": True,
+            }
+        )
     except ValueError as exc:
         log.warning("payment_transfer_fail", error=str(exc))
         raise HTTPException(status_code=400, detail=str(exc))
