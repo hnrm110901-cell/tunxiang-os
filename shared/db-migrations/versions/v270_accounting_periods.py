@@ -225,9 +225,12 @@ def upgrade() -> None:
     op.execute(
         "DROP POLICY IF EXISTS accounting_periods_tenant ON accounting_periods;"
     )
+    # [BLOCKER-B2 独立验证响应 — DBA P0-4 / 安全 P0-1]:
+    # 显式 WITH CHECK, 同 v266 策略 (防御性编程).
     op.execute("""
         CREATE POLICY accounting_periods_tenant ON accounting_periods
-            USING (tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid);
+            USING (tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid)
+            WITH CHECK (tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid);
     """)
 
     # ── step 3/3: 表注释 ──────────────────────────────────────────────
