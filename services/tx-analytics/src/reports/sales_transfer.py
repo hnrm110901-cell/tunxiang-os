@@ -74,7 +74,11 @@ ORDER BY sb.biz_date DESC, variance_rate_pct DESC
 
 DIMENSIONS = ["store_name", "store_code", "biz_date", "variance_status"]
 METRICS = [
-    "total_dish_qty", "bom_cost_fen", "actual_outbound_fen",
-    "txn_count", "variance_fen", "variance_rate_pct",
+    "total_dish_qty",
+    "bom_cost_fen",
+    "actual_outbound_fen",
+    "txn_count",
+    "variance_fen",
+    "variance_rate_pct",
 ]
 FILTERS = ["start_date", "end_date", "store_id"]

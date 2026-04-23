@@ -9,6 +9,7 @@
   银卡(silver):  会员价+积分加速+生日券                         年消费≥5000元
   普通(normal):  标准服务+积分累计
 """
+
 from __future__ import annotations
 
 import uuid
@@ -28,9 +29,9 @@ LEVEL_NAMES_CN = {"diamond": "钻石会员", "gold": "金卡会员", "silver": "
 
 # 年消费升级阈值（单位：分 fen）
 UPGRADE_THRESHOLDS_FEN = {
-    "diamond": 5_000_000,   # 50000元
-    "gold": 2_000_000,      # 20000元
-    "silver": 500_000,      # 5000元
+    "diamond": 5_000_000,  # 50000元
+    "gold": 2_000_000,  # 20000元
+    "silver": 500_000,  # 5000元
     "normal": 0,
 }
 
@@ -50,6 +51,7 @@ NOTIFICATION_CHANNELS = {
 
 
 # ── 工具函数 ──────────────────────────────────────────────────
+
 
 def _now_utc() -> datetime:
     return datetime.now(timezone.utc)
@@ -72,6 +74,7 @@ def _rank_to_level(rank: int) -> str:
 
 
 # ── 核心: 获取会员等级 ────────────────────────────────────────
+
 
 async def get_member_level(customer_id: str, tenant_id: str, db: AsyncSession) -> str:
     """获取会员等级: diamond/gold/silver/normal
@@ -105,6 +108,7 @@ async def get_member_level(customer_id: str, tenant_id: str, db: AsyncSession) -
 
 # ── 1. 预订调度 ──────────────────────────────────────────────
 
+
 async def dispatch_reservation(
     customer_id: str,
     request: dict,
@@ -131,34 +135,42 @@ async def dispatch_reservation(
     }
 
     if level == "diamond":
-        dispatch_result.update({
-            "room_type": "vip_private",
-            "priority": "immediate_confirm",
-            "free_upgrade": True,
-            "perks": ["VIP包厢", "优先确认", "免费升包", "欢迎果盘"],
-        })
+        dispatch_result.update(
+            {
+                "room_type": "vip_private",
+                "priority": "immediate_confirm",
+                "free_upgrade": True,
+                "perks": ["VIP包厢", "优先确认", "免费升包", "欢迎果盘"],
+            }
+        )
     elif level == "gold":
-        dispatch_result.update({
-            "room_type": "private_optional",
-            "priority": "priority_confirm",
-            "free_upgrade": False,
-            "perks": ["优先确认", "包厢可选"],
-        })
+        dispatch_result.update(
+            {
+                "room_type": "private_optional",
+                "priority": "priority_confirm",
+                "free_upgrade": False,
+                "perks": ["优先确认", "包厢可选"],
+            }
+        )
     elif level == "silver":
-        dispatch_result.update({
-            "room_type": "standard",
-            "priority": "normal",
-            "free_upgrade": False,
-            "perks": ["正常排期"],
-        })
+        dispatch_result.update(
+            {
+                "room_type": "standard",
+                "priority": "normal",
+                "free_upgrade": False,
+                "perks": ["正常排期"],
+            }
+        )
     else:
-        dispatch_result.update({
-            "room_type": "standard",
-            "priority": "normal",
-            "free_upgrade": False,
-            "perks": ["正常排期", "包厢需加收"],
-            "room_surcharge": True,
-        })
+        dispatch_result.update(
+            {
+                "room_type": "standard",
+                "priority": "normal",
+                "free_upgrade": False,
+                "perks": ["正常排期", "包厢需加收"],
+                "room_surcharge": True,
+            }
+        )
 
     logger.info(
         "reservation_dispatched",
@@ -172,6 +184,7 @@ async def dispatch_reservation(
 
 
 # ── 2. 排队调度 ──────────────────────────────────────────────
+
 
 async def dispatch_queue(
     customer_id: str,
@@ -197,33 +210,41 @@ async def dispatch_queue(
     }
 
     if level == "diamond":
-        result.update({
-            "queue_type": "skip",
-            "estimated_wait_minutes": 0,
-            "message": "尊敬的钻石会员，已为您安排免排队直接入座",
-            "perks": ["免排队", "优先选座", "专属等候区"],
-        })
+        result.update(
+            {
+                "queue_type": "skip",
+                "estimated_wait_minutes": 0,
+                "message": "尊敬的钻石会员，已为您安排免排队直接入座",
+                "perks": ["免排队", "优先选座", "专属等候区"],
+            }
+        )
     elif level == "gold":
-        result.update({
-            "queue_type": "vip_fast",
-            "estimated_wait_minutes": 5,
-            "message": "尊贵的金卡会员，已为您开通VIP快速通道",
-            "perks": ["VIP快速通道", "专属等候区"],
-        })
+        result.update(
+            {
+                "queue_type": "vip_fast",
+                "estimated_wait_minutes": 5,
+                "message": "尊贵的金卡会员，已为您开通VIP快速通道",
+                "perks": ["VIP快速通道", "专属等候区"],
+            }
+        )
     elif level == "silver":
-        result.update({
-            "queue_type": "normal",
-            "estimated_wait_minutes": 15,
-            "message": "银卡会员您好，已为您取号",
-            "perks": ["正常排队"],
-        })
+        result.update(
+            {
+                "queue_type": "normal",
+                "estimated_wait_minutes": 15,
+                "message": "银卡会员您好，已为您取号",
+                "perks": ["正常排队"],
+            }
+        )
     else:
-        result.update({
-            "queue_type": "normal",
-            "estimated_wait_minutes": 20,
-            "message": "您好，已为您取号，请耐心等候",
-            "perks": ["正常排队"],
-        })
+        result.update(
+            {
+                "queue_type": "normal",
+                "estimated_wait_minutes": 20,
+                "message": "您好，已为您取号，请耐心等候",
+                "perks": ["正常排队"],
+            }
+        )
 
     logger.info(
         "queue_dispatched",
@@ -237,6 +258,7 @@ async def dispatch_queue(
 
 
 # ── 3. 菜单调度 ──────────────────────────────────────────────
+
 
 async def dispatch_menu(
     customer_id: str,
@@ -263,37 +285,45 @@ async def dispatch_menu(
     }
 
     if level == "diamond":
-        result.update({
-            "menu_type": "diamond_exclusive",
-            "price_tag": "diamond_price",
-            "sections": ["hidden_chef_special", "limited_seasonal", "standard"],
-            "show_diamond_badge": True,
-            "perks": ["专属隐藏菜单", "钻石专属价", "限量菜品优先预订"],
-        })
+        result.update(
+            {
+                "menu_type": "diamond_exclusive",
+                "price_tag": "diamond_price",
+                "sections": ["hidden_chef_special", "limited_seasonal", "standard"],
+                "show_diamond_badge": True,
+                "perks": ["专属隐藏菜单", "钻石专属价", "限量菜品优先预订"],
+            }
+        )
     elif level == "gold":
-        result.update({
-            "menu_type": "gold_enhanced",
-            "price_tag": "member_price",
-            "sections": ["recommended_premium", "standard"],
-            "show_gold_badge": True,
-            "perks": ["会员价", "高端菜品推荐"],
-        })
+        result.update(
+            {
+                "menu_type": "gold_enhanced",
+                "price_tag": "member_price",
+                "sections": ["recommended_premium", "standard"],
+                "show_gold_badge": True,
+                "perks": ["会员价", "高端菜品推荐"],
+            }
+        )
     elif level == "silver":
-        result.update({
-            "menu_type": "member",
-            "price_tag": "member_price",
-            "sections": ["standard"],
-            "perks": ["会员价"],
-        })
+        result.update(
+            {
+                "menu_type": "member",
+                "price_tag": "member_price",
+                "sections": ["standard"],
+                "perks": ["会员价"],
+            }
+        )
     else:
-        result.update({
-            "menu_type": "standard",
-            "price_tag": "standard",
-            "sections": ["standard"],
-            "show_upgrade_banner": True,
-            "perks": ["标准菜单"],
-            "upgrade_hint": "开通会员即可享受会员价优惠",
-        })
+        result.update(
+            {
+                "menu_type": "standard",
+                "price_tag": "standard",
+                "sections": ["standard"],
+                "show_upgrade_banner": True,
+                "perks": ["标准菜单"],
+                "upgrade_hint": "开通会员即可享受会员价优惠",
+            }
+        )
 
     logger.info(
         "menu_dispatched",
@@ -307,6 +337,7 @@ async def dispatch_menu(
 
 
 # ── 4. 服务调度 ──────────────────────────────────────────────
+
 
 async def dispatch_service(
     customer_id: str,
@@ -330,37 +361,45 @@ async def dispatch_service(
     }
 
     if level == "diamond":
-        result.update({
-            "service_tier": "vip",
-            "assign_senior_waiter": True,
-            "priority_cooking": True,
-            "complimentary_dessert": True,
-            "perks": ["资深服务员专属服务", "优先出餐", "赠送饭后甜品"],
-        })
+        result.update(
+            {
+                "service_tier": "vip",
+                "assign_senior_waiter": True,
+                "priority_cooking": True,
+                "complimentary_dessert": True,
+                "perks": ["资深服务员专属服务", "优先出餐", "赠送饭后甜品"],
+            }
+        )
     elif level == "gold":
-        result.update({
-            "service_tier": "priority",
-            "assign_senior_waiter": False,
-            "priority_cooking": True,
-            "complimentary_dessert": False,
-            "perks": ["优先出餐"],
-        })
+        result.update(
+            {
+                "service_tier": "priority",
+                "assign_senior_waiter": False,
+                "priority_cooking": True,
+                "complimentary_dessert": False,
+                "perks": ["优先出餐"],
+            }
+        )
     elif level == "silver":
-        result.update({
-            "service_tier": "standard",
-            "assign_senior_waiter": False,
-            "priority_cooking": False,
-            "complimentary_dessert": False,
-            "perks": ["标准服务"],
-        })
+        result.update(
+            {
+                "service_tier": "standard",
+                "assign_senior_waiter": False,
+                "priority_cooking": False,
+                "complimentary_dessert": False,
+                "perks": ["标准服务"],
+            }
+        )
     else:
-        result.update({
-            "service_tier": "standard",
-            "assign_senior_waiter": False,
-            "priority_cooking": False,
-            "complimentary_dessert": False,
-            "perks": ["标准服务"],
-        })
+        result.update(
+            {
+                "service_tier": "standard",
+                "assign_senior_waiter": False,
+                "priority_cooking": False,
+                "complimentary_dessert": False,
+                "perks": ["标准服务"],
+            }
+        )
 
     logger.info(
         "service_dispatched",
@@ -374,6 +413,7 @@ async def dispatch_service(
 
 
 # ── 5. 优惠调度 ──────────────────────────────────────────────
+
 
 async def dispatch_offer(
     customer_id: str,
@@ -431,6 +471,7 @@ async def dispatch_offer(
 
 # ── 6. 通知调度 ──────────────────────────────────────────────
 
+
 async def dispatch_notification(
     customer_id: str,
     event_type: str,
@@ -466,6 +507,7 @@ async def dispatch_notification(
 
 
 # ── 7. 个性化首页 ────────────────────────────────────────────
+
 
 async def get_personalized_home(
     customer_id: str,
@@ -524,6 +566,7 @@ async def get_personalized_home(
 
 # ── 8. 升级机会检测 ──────────────────────────────────────────
 
+
 async def check_upgrade_opportunity(
     customer_id: str,
     tenant_id: str,
@@ -570,6 +613,7 @@ async def check_upgrade_opportunity(
 
 # ── 9. 自动应用等级权益到订单 ─────────────────────────────────
 
+
 async def apply_level_benefits(
     customer_id: str,
     order_id: str,
@@ -591,36 +635,44 @@ async def apply_level_benefits(
     # 1. 会员价
     if level in ("diamond", "gold", "silver"):
         price_tag = "diamond_price" if level == "diamond" else "member_price"
-        applied_benefits.append({
-            "type": "member_price",
-            "price_tag": price_tag,
-            "description": f"{'钻石专属价' if level == 'diamond' else '会员价'}已自动应用",
-        })
+        applied_benefits.append(
+            {
+                "type": "member_price",
+                "price_tag": price_tag,
+                "description": f"{'钻石专属价' if level == 'diamond' else '会员价'}已自动应用",
+            }
+        )
 
     # 2. 积分加速
     multiplier = POINTS_MULTIPLIER.get(level, 1.0)
     if multiplier > 1.0:
-        applied_benefits.append({
-            "type": "points_multiplier",
-            "multiplier": multiplier,
-            "description": f"积分{multiplier}倍加速",
-        })
+        applied_benefits.append(
+            {
+                "type": "points_multiplier",
+                "multiplier": multiplier,
+                "description": f"积分{multiplier}倍加速",
+            }
+        )
 
     # 3. 钻石专属: 赠送甜品
     if level == "diamond":
-        applied_benefits.append({
-            "type": "complimentary_item",
-            "item": "dessert",
-            "description": "钻石会员专属饭后甜品",
-        })
+        applied_benefits.append(
+            {
+                "type": "complimentary_item",
+                "item": "dessert",
+                "description": "钻石会员专属饭后甜品",
+            }
+        )
 
     # 4. 金卡: 免费停车
     if level == "gold":
-        applied_benefits.append({
-            "type": "free_parking",
-            "hours": 2,
-            "description": "金卡会员免费停车2小时",
-        })
+        applied_benefits.append(
+            {
+                "type": "free_parking",
+                "hours": 2,
+                "description": "金卡会员免费停车2小时",
+            }
+        )
 
     result: dict[str, Any] = {
         "customer_id": customer_id,
@@ -643,6 +695,7 @@ async def apply_level_benefits(
 
 
 # ── 内部辅助函数 ──────────────────────────────────────────────
+
 
 def _calc_upgrade_progress(current_level: str, current_spend_fen: int) -> dict[str, Any]:
     """计算升级进度"""

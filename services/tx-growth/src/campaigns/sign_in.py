@@ -3,6 +3,7 @@
 典型场景: 每日签到送积分, 连续签到7天送大额优惠券
 支持普通签到和连续签到两种奖励模式。
 """
+
 from typing import Any
 
 import structlog

@@ -3,6 +3,7 @@
 典型场景: 2人拼团享5折, 3人拼团享3折, 限时24小时成团
 支持普通拼团和阶梯拼团（人越多越便宜）。
 """
+
 from typing import Any
 
 import structlog

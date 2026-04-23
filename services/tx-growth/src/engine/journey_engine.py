@@ -138,20 +138,20 @@ class JourneyEngine:
             journey_name = row[3]
 
             # 评估触发条件
-            conditions_met = await self.evaluate_trigger_conditions(
-                trigger_conditions, merged_context
-            )
+            conditions_met = await self.evaluate_trigger_conditions(trigger_conditions, merged_context)
             if not conditions_met:
                 log.info(
                     "journey_conditions_not_met",
                     journey_def_id=str(journey_def_id),
                 )
-                details.append({
-                    "journey_def_id": str(journey_def_id),
-                    "journey_name": journey_name,
-                    "enrolled": False,
-                    "reason": "conditions_not_met",
-                })
+                details.append(
+                    {
+                        "journey_def_id": str(journey_def_id),
+                        "journey_name": journey_name,
+                        "enrolled": False,
+                        "reason": "conditions_not_met",
+                    }
+                )
                 continue
 
             # 检查是否已有 active enrollment（防重入）
@@ -176,12 +176,14 @@ class JourneyEngine:
                     journey_def_id=str(journey_def_id),
                     customer_id=str(customer_id),
                 )
-                details.append({
-                    "journey_def_id": str(journey_def_id),
-                    "journey_name": journey_name,
-                    "enrolled": False,
-                    "reason": "already_active",
-                })
+                details.append(
+                    {
+                        "journey_def_id": str(journey_def_id),
+                        "journey_name": journey_name,
+                        "enrolled": False,
+                        "reason": "already_active",
+                    }
+                )
                 continue
 
             # 创建 enrollment
@@ -197,12 +199,14 @@ class JourneyEngine:
                 db=db,
             )
             enrollments_created += 1
-            details.append({
-                "journey_def_id": str(journey_def_id),
-                "journey_name": journey_name,
-                "enrolled": True,
-                "enrollment_id": str(enrollment["id"]),
-            })
+            details.append(
+                {
+                    "journey_def_id": str(journey_def_id),
+                    "journey_name": journey_name,
+                    "enrolled": True,
+                    "enrollment_id": str(enrollment["id"]),
+                }
+            )
             log.info(
                 "journey_enrollment_created",
                 journey_def_id=str(journey_def_id),
@@ -386,10 +390,7 @@ class JourneyEngine:
         if not row:
             return {"status": "not_found", "enrollment_id": str(enrollment_id)}
 
-        (
-            enroll_id, tenant_id, jd_id, customer_id,
-            current_step_id, status, context_data, phone, steps
-        ) = row
+        (enroll_id, tenant_id, jd_id, customer_id, current_step_id, status, context_data, phone, steps) = row
 
         # 找到当前步骤
         steps_list: list[dict] = steps or []
@@ -781,7 +782,9 @@ class JourneyEngine:
 # 工具函数
 # ---------------------------------------------------------------------------
 
+
 def _json_dumps(data: Any) -> str:
     """将 dict 序列化为 JSON 字符串（供 JSONB 参数使用）。"""
     import json
+
     return json.dumps(data, ensure_ascii=False, default=str)

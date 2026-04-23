@@ -11,6 +11,7 @@ AI 调用约束（CLAUDE.md）：
   - 所有 AI 调用通过 ModelRouter.complete(task_type, prompt)
   - 无预警且营业额变化 ≤ 15% 时跳过 AI 调用，节省成本
 """
+
 from __future__ import annotations
 
 from datetime import datetime, timedelta
@@ -46,9 +47,7 @@ class GroupKPISnapshot(BaseModel):
     gross_margin_pct: float = Field(ge=0.0, le=100.0, description="集团平均毛利率（%）")
     active_store_count: int = Field(ge=0, description="今日有营业记录的门店数")
     alert_count: int = Field(ge=0, description="今日预警门店数")
-    revenue_wow_pct: Optional[float] = Field(
-        default=None, description="营业额周同比变化（%），无上期数据时为 None"
-    )
+    revenue_wow_pct: Optional[float] = Field(default=None, description="营业额周同比变化（%），无上期数据时为 None")
 
 
 class BrandPerformance(BaseModel):
@@ -61,9 +60,7 @@ class BrandPerformance(BaseModel):
     order_count: int = Field(ge=0, description="区间内总订单数")
     avg_ticket_fen: int = Field(ge=0, description="平均客单价（分）")
     store_count: int = Field(ge=1, description="品牌下门店数")
-    revenue_wow_pct: Optional[float] = Field(
-        default=None, description="环比增长率（%），无上期数据时为 None"
-    )
+    revenue_wow_pct: Optional[float] = Field(default=None, description="环比增长率（%），无上期数据时为 None")
 
 
 class StoreAlert(BaseModel):
@@ -229,11 +226,7 @@ class GroupDashboardService:
             turnover_rate = round(sessions / tables, 2) if tables > 0 else 0.0
 
             total_cost = int(margin_data["total_cost_fen"]) if margin_data else 0
-            margin_pct = (
-                round((total_revenue - total_cost) / total_revenue * 100, 1)
-                if total_revenue > 0
-                else 0.0
-            )
+            margin_pct = round((total_revenue - total_cost) / total_revenue * 100, 1) if total_revenue > 0 else 0.0
 
             wow_revenue = int(wow_data["revenue_fen"]) if wow_data else 0
             revenue_wow = _calc_deviation_pct(total_revenue, wow_revenue)
@@ -345,9 +338,7 @@ class GroupDashboardService:
                 """),
                 {"tenant_id": tenant_id, "prev_start": prev_start, "prev_end": prev_end},
             )
-            prev_map: dict[str, int] = {
-                r["brand_id"]: int(r["revenue_fen"]) for r in prev_row.mappings().all()
-            }
+            prev_map: dict[str, int] = {r["brand_id"]: int(r["revenue_fen"]) for r in prev_row.mappings().all()}
 
             results = []
             for idx, brand in enumerate(current_brands, start=1):
@@ -527,16 +518,11 @@ class GroupDashboardService:
         # 构建 prompt
         revenue_yuan = kpi.total_revenue_fen / 100
         ticket_yuan = kpi.avg_ticket_fen / 100
-        wow_str = (
-            f"{kpi.revenue_wow_pct:+.1f}%" if kpi.revenue_wow_pct is not None else "N/A"
-        )
+        wow_str = f"{kpi.revenue_wow_pct:+.1f}%" if kpi.revenue_wow_pct is not None else "N/A"
 
         alert_lines = []
         for a in alerts[:5]:  # 最多展示前 5 条预警
-            alert_lines.append(
-                f"- 门店【{a.store_name}】{a.metric_name} 偏差 {a.deviation_pct:+.1f}%"
-                f"（{a.severity}）"
-            )
+            alert_lines.append(f"- 门店【{a.store_name}】{a.metric_name} 偏差 {a.deviation_pct:+.1f}%（{a.severity}）")
 
         prompt = (
             f"请为集团今日经营情况生成一份简洁的中文执行摘要（150字内），"

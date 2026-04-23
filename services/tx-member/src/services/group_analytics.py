@@ -7,6 +7,7 @@
 
 金额单位：分（fen）。
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -26,7 +27,11 @@ logger = structlog.get_logger(__name__)
 
 # RFM 等级优先级排序（S1 最高价值）
 _RFM_PRIORITY: dict[str, int] = {
-    "S1": 1, "S2": 2, "S3": 3, "S4": 4, "S5": 5,
+    "S1": 1,
+    "S2": 2,
+    "S3": 3,
+    "S4": 4,
+    "S5": 5,
 }
 
 CHURN_HIGH_RISK_DAYS = 60
@@ -145,10 +150,7 @@ class GroupAnalyticsService:
             }
 
         # 并发查询各品牌
-        tasks = [
-            _query_customer_by_phone(phone, tid, db)
-            for tid in brand_tenant_ids
-        ]
+        tasks = [_query_customer_by_phone(phone, tid, db) for tid in brand_tenant_ids]
         results: list[Customer | None] = await asyncio.gather(*tasks)
 
         brand_profiles: list[dict] = []
@@ -160,19 +162,21 @@ class GroupAnalyticsService:
             if customer.last_order_at is not None:
                 last_order_str = customer.last_order_at.isoformat()
 
-            brand_profiles.append({
-                "tenant_id": tenant_id,
-                "brand_name": None,          # 品牌名称由上层调用方填充（或接入 tx-org 获取）
-                "member_level": customer.rfm_level,
-                "total_amount_fen": customer.total_order_amount_fen,
-                "total_orders": customer.total_order_count,
-                "last_order_at": last_order_str,
-                "rfm_level": customer.rfm_level,
-                "r_score": customer.r_score,
-                "f_score": customer.f_score,
-                "m_score": customer.m_score,
-                "tags": customer.tags or [],
-            })
+            brand_profiles.append(
+                {
+                    "tenant_id": tenant_id,
+                    "brand_name": None,  # 品牌名称由上层调用方填充（或接入 tx-org 获取）
+                    "member_level": customer.rfm_level,
+                    "total_amount_fen": customer.total_order_amount_fen,
+                    "total_orders": customer.total_order_count,
+                    "last_order_at": last_order_str,
+                    "rfm_level": customer.rfm_level,
+                    "r_score": customer.r_score,
+                    "f_score": customer.f_score,
+                    "m_score": customer.m_score,
+                    "tags": customer.tags or [],
+                }
+            )
 
         group_total_amount_fen = sum(b["total_amount_fen"] for b in brand_profiles)
         group_total_orders = sum(b["total_orders"] for b in brand_profiles)
@@ -223,10 +227,7 @@ class GroupAnalyticsService:
             }
 
         # 并发查询各品牌所有客户
-        tasks = [
-            _query_brand_customers(tid, brand_name="", db=db)
-            for tid in brand_tenant_ids
-        ]
+        tasks = [_query_brand_customers(tid, brand_name="", db=db) for tid in brand_tenant_ids]
         brand_customers_lists: list[list[Customer]] = await asyncio.gather(*tasks)
 
         brands_summary: list[dict] = []
@@ -245,20 +246,20 @@ class GroupAnalyticsService:
                     phone_rfm_map[c.primary_phone].append(lvl)
                     phone_brand_count[c.primary_phone] += 1
 
-            brands_summary.append({
-                "tenant_id": tenant_id,
-                "brand_name": None,          # 调用方从 tx-org 填充品牌名
-                "total_members": len(customers),
-                **rfm_counts,
-            })
+            brands_summary.append(
+                {
+                    "tenant_id": tenant_id,
+                    "brand_name": None,  # 调用方从 tx-org 填充品牌名
+                    "total_members": len(customers),
+                    **rfm_counts,
+                }
+            )
 
         # 去重总会员数
         group_total_members = len(phone_rfm_map)
 
         # 跨品牌消费人数（在 2 个以上品牌出现）
-        cross_brand_members = sum(
-            1 for cnt in phone_brand_count.values() if cnt >= 2
-        )
+        cross_brand_members = sum(1 for cnt in phone_brand_count.values() if cnt >= 2)
 
         # 集团 RFM 分布：每个手机号取最高等级（S1 最优先）
         group_rfm_dist: dict[str, int] = {f"S{i}": 0 for i in range(1, 6)}
@@ -307,10 +308,7 @@ class GroupAnalyticsService:
         group = await _fetch_brand_group(group_id, group_tenant_id, db)
         brand_tenant_ids: list[str] = [str(t) for t in group.brand_tenant_ids]
 
-        tasks = [
-            _query_brand_customers(tid, brand_name="", db=db)
-            for tid in brand_tenant_ids
-        ]
+        tasks = [_query_brand_customers(tid, brand_name="", db=db) for tid in brand_tenant_ids]
         brand_customers_lists: list[list[Customer]] = await asyncio.gather(*tasks)
 
         brands_risk: list[dict] = []
@@ -334,8 +332,7 @@ class GroupAnalyticsService:
                     # 去重：手机号相同时保留消费金额更高的记录
                     phone = c.primary_phone
                     if phone not in high_risk_phones or (
-                        c.total_order_amount_fen
-                        > high_risk_phones[phone]["total_order_amount_fen"]
+                        c.total_order_amount_fen > high_risk_phones[phone]["total_order_amount_fen"]
                     ):
                         high_risk_phones[phone] = {
                             "customer_id": str(c.id),
@@ -350,12 +347,14 @@ class GroupAnalyticsService:
                 elif days_since > CHURN_MEDIUM_RISK_DAYS:
                     med_cnt += 1
 
-            brands_risk.append({
-                "tenant_id": tenant_id,
-                "brand_name": None,
-                "high_risk_count": high_cnt,
-                "medium_risk_count": med_cnt,
-            })
+            brands_risk.append(
+                {
+                    "tenant_id": tenant_id,
+                    "brand_name": None,
+                    "high_risk_count": high_cnt,
+                    "medium_risk_count": med_cnt,
+                }
+            )
 
         # TOP 20 最有价值高风险客户（按历史消费金额降序）
         top_at_risk = sorted(
@@ -409,10 +408,7 @@ class GroupAnalyticsService:
             "group_id": str(group_id),
             "stored_value_interop": interop,
             "brand_count": len(group.brand_tenant_ids),
-            "note": (
-                "集团配置已更新。各品牌储值卡 scope_type 需通过异步任务同步，"
-                "请确认 Redis Stream 事件已发送。"
-            ),
+            "note": ("集团配置已更新。各品牌储值卡 scope_type 需通过异步任务同步，请确认 Redis Stream 事件已发送。"),
         }
 
     async def find_cross_brand_customers(
@@ -448,10 +444,7 @@ class GroupAnalyticsService:
         group = await _fetch_brand_group(group_id, group_tenant_id, db)
         brand_tenant_ids: list[str] = [str(t) for t in group.brand_tenant_ids]
 
-        tasks = [
-            _query_brand_customers(tid, brand_name="", db=db)
-            for tid in brand_tenant_ids
-        ]
+        tasks = [_query_brand_customers(tid, brand_name="", db=db) for tid in brand_tenant_ids]
         brand_customers_lists: list[list[Customer]] = await asyncio.gather(*tasks)
 
         # phone -> [{tenant_id, customer}]
@@ -464,14 +457,16 @@ class GroupAnalyticsService:
                     if c.last_order_at is not None:
                         last_order_str = c.last_order_at.isoformat()
 
-                    phone_brand_map[c.primary_phone].append({
-                        "tenant_id": tenant_id,
-                        "customer_id": str(c.id),
-                        "total_amount_fen": c.total_order_amount_fen,
-                        "total_orders": c.total_order_count,
-                        "rfm_level": c.rfm_level,
-                        "last_order_at": last_order_str,
-                    })
+                    phone_brand_map[c.primary_phone].append(
+                        {
+                            "tenant_id": tenant_id,
+                            "customer_id": str(c.id),
+                            "total_amount_fen": c.total_order_amount_fen,
+                            "total_orders": c.total_order_count,
+                            "rfm_level": c.rfm_level,
+                            "last_order_at": last_order_str,
+                        }
+                    )
 
         # 筛选出现 >= min_brands 的客户
         cross_brand_customers: list[dict] = []
@@ -482,13 +477,15 @@ class GroupAnalyticsService:
             group_total_amount = sum(b["total_amount_fen"] for b in brand_entries)
             group_total_orders = sum(b["total_orders"] for b in brand_entries)
 
-            cross_brand_customers.append({
-                "phone": phone,
-                "brand_count": len(brand_entries),
-                "group_total_amount_fen": group_total_amount,
-                "group_total_orders": group_total_orders,
-                "brands": brand_entries,
-            })
+            cross_brand_customers.append(
+                {
+                    "phone": phone,
+                    "brand_count": len(brand_entries),
+                    "group_total_amount_fen": group_total_amount,
+                    "group_total_orders": group_total_orders,
+                    "brands": brand_entries,
+                }
+            )
 
         # 按集团总消费金额降序
         cross_brand_customers.sort(

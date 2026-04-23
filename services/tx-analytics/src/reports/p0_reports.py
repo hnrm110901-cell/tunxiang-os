@@ -6,6 +6,7 @@
 - DB 不可用时抛 RuntimeError（不返回空数据掩盖故障）
 - 金额字段统一以「分(fen)」存储，接口层按需转元
 """
+
 from __future__ import annotations
 
 from datetime import date, datetime, timezone
@@ -23,8 +24,10 @@ log = structlog.get_logger()
 # 1. 营业收入汇总表 — DailyRevenueSummary
 # ──────────────────────────────────────────────
 
+
 class StoreRevenueLine(BaseModel):
     """单店单日营收明细行"""
+
     store_id: str
     store_name: str
     biz_date: date
@@ -39,6 +42,7 @@ class StoreRevenueLine(BaseModel):
 
 class DailyRevenueSummary(BaseModel):
     """营业收入汇总表（P0）"""
+
     tenant_id: str
     biz_date: date
     generated_at: datetime
@@ -51,8 +55,10 @@ class DailyRevenueSummary(BaseModel):
 # 2. 付款折扣表 — PaymentDiscountReport
 # ──────────────────────────────────────────────
 
+
 class DiscountLine(BaseModel):
     """折扣明细行"""
+
     discount_type: str = Field(description="折扣类型：member/employee/activity/manual/none")
     discount_label: str
     use_count: int
@@ -63,6 +69,7 @@ class DiscountLine(BaseModel):
 
 class PaymentDiscountReport(BaseModel):
     """门店付款折扣表（P0）"""
+
     tenant_id: str
     store_id: str
     store_name: str
@@ -76,8 +83,10 @@ class PaymentDiscountReport(BaseModel):
 # 3. 门店日现金流 — CashflowByStore / DailyCashflow
 # ──────────────────────────────────────────────
 
+
 class CashflowLine(BaseModel):
     """支付方式现金流明细行"""
+
     store_id: str
     store_name: str
     payment_method: str
@@ -88,6 +97,7 @@ class CashflowLine(BaseModel):
 
 class CashflowByStore(BaseModel):
     """门店日现金流报表 — 多店汇总（P0）"""
+
     tenant_id: str
     biz_date: date
     generated_at: datetime
@@ -99,6 +109,7 @@ class CashflowByStore(BaseModel):
 
 class DailyCashflow(BaseModel):
     """门店日现金流报表 — 单店详情（P0，含找零/备用金）"""
+
     tenant_id: str
     store_id: str
     store_name: str
@@ -118,8 +129,10 @@ class DailyCashflow(BaseModel):
 # 4. 菜品销售统计表 — DishSalesStats
 # ──────────────────────────────────────────────
 
+
 class DishSalesLine(BaseModel):
     """菜品销售明细行"""
+
     dish_name: str
     category_name: Optional[str] = None
     price_fen: int = Field(description="标准售价（分）")
@@ -133,6 +146,7 @@ class DishSalesLine(BaseModel):
 
 class DishSalesStats(BaseModel):
     """菜品销售统计表（P0）"""
+
     tenant_id: str
     store_id: str
     biz_date: date
@@ -146,8 +160,10 @@ class DishSalesStats(BaseModel):
 # 5. 账单稽核表 — BillingAudit
 # ──────────────────────────────────────────────
 
+
 class AnomalyLine(BaseModel):
     """异常订单行"""
+
     order_no: str
     table_label: Optional[str] = None
     total_amount_fen: int
@@ -160,6 +176,7 @@ class AnomalyLine(BaseModel):
 
 class BillingAudit(BaseModel):
     """账单稽核表（P0）"""
+
     tenant_id: str
     store_id: str
     biz_date: date
@@ -173,8 +190,10 @@ class BillingAudit(BaseModel):
 # 6. 实时营业统计 — RealtimeStoreStats
 # ──────────────────────────────────────────────
 
+
 class RealtimeStoreStats(BaseModel):
     """门店实时营业统计（P0，今日截至当前）"""
+
     tenant_id: str
     store_id: str
     store_name: str
@@ -194,8 +213,10 @@ class RealtimeStoreStats(BaseModel):
 # 7. 每日收款分门店统计表 — StoreRevenue (list)
 # ──────────────────────────────────────────────
 
+
 class StoreRevenue(BaseModel):
     """单店收款汇总行"""
+
     store_id: str
     store_name: str
     biz_date: date
@@ -222,8 +243,7 @@ def _require_db(db: Optional[AsyncSession]) -> AsyncSession:
     """校验 DB 会话可用，不可用时抛明确错误（不返回空数据掩盖故障）"""
     if db is None:
         raise RuntimeError(
-            "Database session is required for P0 reports. "
-            "Ensure db is injected via dependency injection."
+            "Database session is required for P0 reports. Ensure db is injected via dependency injection."
         )
     return db
 
@@ -250,14 +270,11 @@ class P0Reports:
         log.info("p0.daily_revenue_summary", tenant_id=tenant_id, date=str(target_date))
 
         from datetime import timedelta
+
         yesterday = target_date - timedelta(days=1)
         last_week = target_date - timedelta(days=7)
 
-        store_filter = (
-            "AND o.store_id = ANY(:store_ids)"
-            if store_ids
-            else ""
-        )
+        store_filter = "AND o.store_id = ANY(:store_ids)" if store_ids else ""
 
         sql = text(f"""
             SELECT
@@ -332,18 +349,20 @@ class P0Reports:
             rev = r["revenue_fen"]
             total_revenue += rev
             total_orders += r["order_count"]
-            lines.append(StoreRevenueLine(
-                store_id=sid,
-                store_name=r["store_name"],
-                biz_date=target_date,
-                order_count=r["order_count"],
-                table_count=r["table_count"],
-                revenue_fen=rev,
-                discount_fen=r["discount_fen"],
-                avg_ticket_fen=r["avg_ticket_fen"],
-                vs_yesterday_pct=_pct(rev, cmp_index.get((sid, str(yesterday)), 0)),
-                vs_last_week_pct=_pct(rev, cmp_index.get((sid, str(last_week)), 0)),
-            ))
+            lines.append(
+                StoreRevenueLine(
+                    store_id=sid,
+                    store_name=r["store_name"],
+                    biz_date=target_date,
+                    order_count=r["order_count"],
+                    table_count=r["table_count"],
+                    revenue_fen=rev,
+                    discount_fen=r["discount_fen"],
+                    avg_ticket_fen=r["avg_ticket_fen"],
+                    vs_yesterday_pct=_pct(rev, cmp_index.get((sid, str(yesterday)), 0)),
+                    vs_last_week_pct=_pct(rev, cmp_index.get((sid, str(last_week)), 0)),
+                )
+            )
 
         return DailyRevenueSummary(
             tenant_id=tenant_id,
@@ -410,8 +429,7 @@ class P0Reports:
                 use_count=r["use_count"],
                 discount_fen=r["discount_fen"],
                 pct_of_total=(
-                    round(r["discount_fen"] / total_discount_fen * 100, 2)
-                    if total_discount_fen > 0 else 0.0
+                    round(r["discount_fen"] / total_discount_fen * 100, 2) if total_discount_fen > 0 else 0.0
                 ),
             )
             for r in rows
@@ -480,10 +498,7 @@ class P0Reports:
         income_rows = (await session.execute(income_sql, params)).mappings().all()
         refund_rows = (await session.execute(refund_sql, params)).mappings().all()
 
-        refund_index: dict[tuple, int] = {
-            (r["store_id"], r["payment_method"]): r["refund_fen"]
-            for r in refund_rows
-        }
+        refund_index: dict[tuple, int] = {(r["store_id"], r["payment_method"]): r["refund_fen"] for r in refund_rows}
 
         lines = []
         total_income = 0
@@ -493,14 +508,16 @@ class P0Reports:
             net = r["income_fen"] - ref
             total_income += r["income_fen"]
             total_refund += ref
-            lines.append(CashflowLine(
-                store_id=r["store_id"],
-                store_name=r["store_name"],
-                payment_method=r["payment_method"],
-                income_fen=r["income_fen"],
-                refund_fen=ref,
-                net_fen=net,
-            ))
+            lines.append(
+                CashflowLine(
+                    store_id=r["store_id"],
+                    store_name=r["store_name"],
+                    payment_method=r["payment_method"],
+                    income_fen=r["income_fen"],
+                    refund_fen=ref,
+                    net_fen=net,
+                )
+            )
 
         return CashflowByStore(
             tenant_id=tenant_id,
@@ -603,14 +620,16 @@ class P0Reports:
             total_refund += ref
             if r["payment_method"] == "cash":
                 cash_income += r["income_fen"]
-            lines.append(CashflowLine(
-                store_id=store_id,
-                store_name=store_name,
-                payment_method=r["payment_method"],
-                income_fen=r["income_fen"],
-                refund_fen=ref,
-                net_fen=r["income_fen"] - ref,
-            ))
+            lines.append(
+                CashflowLine(
+                    store_id=store_id,
+                    store_name=store_name,
+                    payment_method=r["payment_method"],
+                    income_fen=r["income_fen"],
+                    refund_fen=ref,
+                    net_fen=r["income_fen"] - ref,
+                )
+            )
 
         return DailyCashflow(
             tenant_id=tenant_id,
@@ -651,6 +670,7 @@ class P0Reports:
         )
 
         from datetime import timedelta
+
         yesterday = target_date - timedelta(days=1)
 
         sql = text("""
@@ -711,8 +731,7 @@ class P0Reports:
 
         result = await session.execute(
             sql,
-            {"tenant_id": tenant_id, "store_id": store_id,
-             "target_date": target_date, "yesterday": yesterday},
+            {"tenant_id": tenant_id, "store_id": store_id, "target_date": target_date, "yesterday": yesterday},
         )
         rows = result.mappings().all()
 
@@ -730,9 +749,7 @@ class P0Reports:
                 qty_rank=r["qty_rank"],
                 revenue_rank=r["revenue_rank"],
                 vs_yesterday_qty_pct=(
-                    float(r["vs_yesterday_qty_pct"])
-                    if r["vs_yesterday_qty_pct"] is not None
-                    else None
+                    float(r["vs_yesterday_qty_pct"]) if r["vs_yesterday_qty_pct"] is not None else None
                 ),
             )
             for r in rows
@@ -839,8 +856,7 @@ class P0Reports:
         rows = result.mappings().all()
 
         total_anomaly_discount = sum(
-            r["discount_fen"] for r in rows
-            if r["anomaly_type"] in ("high_discount", "manual")
+            r["discount_fen"] for r in rows if r["anomaly_type"] in ("high_discount", "manual")
         )
 
         lines = [
@@ -1017,9 +1033,7 @@ class P0Reports:
             ORDER BY s.store_name, collection_fen DESC
         """)
 
-        result = await session.execute(
-            sql, {"tenant_id": tenant_id, "target_date": target_date}
-        )
+        result = await session.execute(sql, {"tenant_id": tenant_id, "target_date": target_date})
         rows = result.mappings().all()
 
         return [
@@ -1057,16 +1071,12 @@ class P0Reports:
         )
 
         # 并发查询各维度
-        rev = await self.daily_revenue_summary(
-            tenant_id, [store_id], target_date, db=session
-        )
+        rev = await self.daily_revenue_summary(tenant_id, [store_id], target_date, db=session)
         rt = await self.realtime_store_stats(tenant_id, store_id, db=session)
         audit = await self.billing_audit(tenant_id, store_id, target_date, db=session)
         dish = await self.dish_sales_stats(tenant_id, store_id, target_date, db=session)
 
-        store_line = next(
-            (s for s in rev.store_lines if s.store_id == store_id), None
-        )
+        store_line = next((s for s in rev.store_lines if s.store_id == store_id), None)
 
         return {
             "tenant_id": tenant_id,

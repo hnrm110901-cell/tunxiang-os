@@ -56,7 +56,13 @@ ORDER BY revenue_fen DESC
 
 DIMENSIONS = ["store_name", "order_type", "order_type_label"]
 METRICS = [
-    "order_count", "guest_count", "revenue_fen", "cost_fen",
-    "margin_fen", "margin_rate", "avg_ticket_fen", "revenue_share_pct",
+    "order_count",
+    "guest_count",
+    "revenue_fen",
+    "cost_fen",
+    "margin_fen",
+    "margin_rate",
+    "avg_ticket_fen",
+    "revenue_share_pct",
 ]
 FILTERS = ["start_date", "end_date", "store_id"]

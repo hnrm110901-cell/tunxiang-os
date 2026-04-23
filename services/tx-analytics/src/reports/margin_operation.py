@@ -68,8 +68,12 @@ ORDER BY b.biz_date DESC, s.store_name
 
 DIMENSIONS = ["store_name", "biz_date"]
 METRICS = [
-    "revenue_fen", "theoretical_cost_fen", "actual_cost_fen",
-    "theoretical_margin_rate", "actual_margin_rate",
-    "cost_variance_fen", "cost_variance_rate",
+    "revenue_fen",
+    "theoretical_cost_fen",
+    "actual_cost_fen",
+    "theoretical_margin_rate",
+    "actual_margin_rate",
+    "cost_variance_fen",
+    "cost_variance_rate",
 ]
 FILTERS = ["start_date", "end_date", "store_id"]

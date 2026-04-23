@@ -57,9 +57,14 @@ ORDER BY total_dishes_cooked DESC
 
 DIMENSIONS = ["store_name", "chef_name", "employee_id", "grade_level"]
 METRICS = [
-    "order_count", "total_dishes_cooked", "total_dish_revenue_fen",
-    "avg_serve_duration_min", "timeout_order_count",
-    "return_dish_qty", "return_rate_pct",
-    "commission_fen", "output_rank",
+    "order_count",
+    "total_dishes_cooked",
+    "total_dish_revenue_fen",
+    "avg_serve_duration_min",
+    "timeout_order_count",
+    "return_dish_qty",
+    "return_rate_pct",
+    "commission_fen",
+    "output_rank",
 ]
 FILTERS = ["start_date", "end_date", "store_id"]

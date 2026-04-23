@@ -6,6 +6,7 @@
 
 金额单位：无（品牌档案不含金额字段）
 """
+
 from __future__ import annotations
 
 import uuid
@@ -29,30 +30,30 @@ log = structlog.get_logger(__name__)
 # 24 节气 → 大致日期范围（月/日，不含年，仅用于匹配近似节气上下文）
 # ---------------------------------------------------------------------------
 _SOLAR_TERMS: list[dict[str, Any]] = [
-    {"name": "小寒",  "month": 1,  "day_approx": 6},
-    {"name": "大寒",  "month": 1,  "day_approx": 20},
-    {"name": "立春",  "month": 2,  "day_approx": 4},
-    {"name": "雨水",  "month": 2,  "day_approx": 19},
-    {"name": "惊蛰",  "month": 3,  "day_approx": 6},
-    {"name": "春分",  "month": 3,  "day_approx": 21},
-    {"name": "清明",  "month": 4,  "day_approx": 5},
-    {"name": "谷雨",  "month": 4,  "day_approx": 20},
-    {"name": "立夏",  "month": 5,  "day_approx": 6},
-    {"name": "小满",  "month": 5,  "day_approx": 21},
-    {"name": "芒种",  "month": 6,  "day_approx": 6},
-    {"name": "夏至",  "month": 6,  "day_approx": 21},
-    {"name": "小暑",  "month": 7,  "day_approx": 7},
-    {"name": "大暑",  "month": 7,  "day_approx": 23},
-    {"name": "立秋",  "month": 8,  "day_approx": 7},
-    {"name": "处暑",  "month": 8,  "day_approx": 23},
-    {"name": "白露",  "month": 9,  "day_approx": 8},
-    {"name": "秋分",  "month": 9,  "day_approx": 23},
-    {"name": "寒露",  "month": 10, "day_approx": 8},
-    {"name": "霜降",  "month": 10, "day_approx": 23},
-    {"name": "立冬",  "month": 11, "day_approx": 7},
-    {"name": "小雪",  "month": 11, "day_approx": 22},
-    {"name": "大雪",  "month": 12, "day_approx": 7},
-    {"name": "冬至",  "month": 12, "day_approx": 22},
+    {"name": "小寒", "month": 1, "day_approx": 6},
+    {"name": "大寒", "month": 1, "day_approx": 20},
+    {"name": "立春", "month": 2, "day_approx": 4},
+    {"name": "雨水", "month": 2, "day_approx": 19},
+    {"name": "惊蛰", "month": 3, "day_approx": 6},
+    {"name": "春分", "month": 3, "day_approx": 21},
+    {"name": "清明", "month": 4, "day_approx": 5},
+    {"name": "谷雨", "month": 4, "day_approx": 20},
+    {"name": "立夏", "month": 5, "day_approx": 6},
+    {"name": "小满", "month": 5, "day_approx": 21},
+    {"name": "芒种", "month": 6, "day_approx": 6},
+    {"name": "夏至", "month": 6, "day_approx": 21},
+    {"name": "小暑", "month": 7, "day_approx": 7},
+    {"name": "大暑", "month": 7, "day_approx": 23},
+    {"name": "立秋", "month": 8, "day_approx": 7},
+    {"name": "处暑", "month": 8, "day_approx": 23},
+    {"name": "白露", "month": 9, "day_approx": 8},
+    {"name": "秋分", "month": 9, "day_approx": 23},
+    {"name": "寒露", "month": 10, "day_approx": 8},
+    {"name": "霜降", "month": 10, "day_approx": 23},
+    {"name": "立冬", "month": 11, "day_approx": 7},
+    {"name": "小雪", "month": 11, "day_approx": 22},
+    {"name": "大雪", "month": 12, "day_approx": 7},
+    {"name": "冬至", "month": 12, "day_approx": 22},
 ]
 
 # 节气名 → 适合餐饮营销的食材/主题提示
@@ -95,9 +96,7 @@ class BrandStrategyDbService:
     # brand_profiles CRUD
     # ─────────────────────────────────────────────────────────────────
 
-    async def get_active_profile(
-        self, tenant_id: uuid.UUID, db: AsyncSession
-    ) -> Optional[dict[str, Any]]:
+    async def get_active_profile(self, tenant_id: uuid.UUID, db: AsyncSession) -> Optional[dict[str, Any]]:
         """获取当前激活的品牌档案"""
         result = await db.execute(
             text("""
@@ -117,9 +116,7 @@ class BrandStrategyDbService:
             return None
         return dict(row)
 
-    async def create_profile(
-        self, tenant_id: uuid.UUID, data: BrandProfileCreate, db: AsyncSession
-    ) -> dict[str, Any]:
+    async def create_profile(self, tenant_id: uuid.UUID, data: BrandProfileCreate, db: AsyncSession) -> dict[str, Any]:
         """创建品牌档案
 
         若 is_active=True，先将同租户其他档案设为非激活。
@@ -181,10 +178,7 @@ class BrandStrategyDbService:
         """
         if data.is_active is True:
             await db.execute(
-                text(
-                    "UPDATE brand_profiles SET is_active = FALSE "
-                    "WHERE tenant_id = :tid AND id != :pid"
-                ),
+                text("UPDATE brand_profiles SET is_active = FALSE WHERE tenant_id = :tid AND id != :pid"),
                 {"tid": str(tenant_id), "pid": str(profile_id)},
             )
 
@@ -193,8 +187,13 @@ class BrandStrategyDbService:
         params: dict[str, Any] = {"tid": str(tenant_id), "pid": str(profile_id)}
 
         scalar_fields = {
-            "brand_name", "brand_slogan", "brand_story",
-            "cuisine_type", "price_tier", "core_value_proposition", "is_active",
+            "brand_name",
+            "brand_slogan",
+            "brand_story",
+            "cuisine_type",
+            "price_tier",
+            "core_value_proposition",
+            "is_active",
         }
         jsonb_fields = {"target_segments", "key_scenarios", "brand_voice", "color_palette"}
 
@@ -234,7 +233,9 @@ class BrandStrategyDbService:
     # ─────────────────────────────────────────────────────────────────
 
     async def list_calendar(
-        self, tenant_id: uuid.UUID, db: AsyncSession,
+        self,
+        tenant_id: uuid.UUID,
+        db: AsyncSession,
         brand_profile_id: Optional[uuid.UUID] = None,
     ) -> list[dict[str, Any]]:
         """查询营销日历列表"""
@@ -289,9 +290,7 @@ class BrandStrategyDbService:
         log.info("brand_calendar_entry_created", tenant_id=str(tenant_id), entry_id=str(row["id"]))
         return dict(row)
 
-    async def get_current_season_context(
-        self, tenant_id: uuid.UUID, db: AsyncSession
-    ) -> dict[str, Any]:
+    async def get_current_season_context(self, tenant_id: uuid.UUID, db: AsyncSession) -> dict[str, Any]:
         """获取当前节气/节日上下文
 
         优先从 brand_seasonal_calendar 中查找覆盖今天的活跃营销节点；
@@ -353,7 +352,9 @@ class BrandStrategyDbService:
         return [dict(r) for r in result.mappings()]
 
     async def list_constraints(
-        self, tenant_id: uuid.UUID, db: AsyncSession,
+        self,
+        tenant_id: uuid.UUID,
+        db: AsyncSession,
         brand_profile_id: Optional[uuid.UUID] = None,
     ) -> list[dict[str, Any]]:
         """列出所有内容约束规则"""
@@ -442,9 +443,7 @@ class BrandStrategyDbService:
             return _minimal_brief(tenant_id, channel, target_segment, purpose)
 
         # 2. 获取渠道约束
-        constraints = await self.get_content_constraints(
-            tenant_id, channel, db, brand_profile_id=profile["id"]
-        )
+        constraints = await self.get_content_constraints(tenant_id, channel, db, brand_profile_id=profile["id"])
 
         # 3. 获取当前节气/节日上下文
         season_ctx = await self.get_current_season_context(tenant_id, db)
@@ -530,7 +529,9 @@ class BrandStrategyDbService:
             required_elements=required_elements,
             forbidden_elements=forbidden_elements,
             template_hints=template_hints,
-            current_season_context=season_ctx if season_ctx["has_active_campaign"] or season_ctx["nearest_solar_term"] else None,
+            current_season_context=season_ctx
+            if season_ctx["has_active_campaign"] or season_ctx["nearest_solar_term"]
+            else None,
             segment_description=segment_description,
             system_prompt=system_prompt,
             generated_at=datetime.now(timezone.utc),
@@ -541,15 +542,15 @@ class BrandStrategyDbService:
 # 内部辅助函数
 # ---------------------------------------------------------------------------
 
+
 def _jsonb(value: Any) -> str:
     """将 Python 对象序列化为 JSON 字符串，用于 ::jsonb 绑定"""
     import json
+
     return json.dumps(value, ensure_ascii=False, default=str)
 
 
-def _minimal_brief(
-    tenant_id: uuid.UUID, channel: str, target_segment: str, purpose: str
-) -> ContentBrief:
+def _minimal_brief(tenant_id: uuid.UUID, channel: str, target_segment: str, purpose: str) -> ContentBrief:
     """未配置品牌档案时返回最小化简报（带通用 system prompt）"""
     return ContentBrief(
         tenant_id=tenant_id,
@@ -603,7 +604,7 @@ def _build_system_prompt(
     """组装注入 LLM 的 system message"""
     price_tier_zh = {
         "budget": "经济实惠（人均50元以下）",
-        "mid":    "中等消费（人均50-150元）",
+        "mid": "中等消费（人均50-150元）",
         "upscale": "高档（人均150-500元）",
         "luxury": "奢华（人均500元以上）",
     }.get(price_tier, price_tier)

@@ -2,6 +2,7 @@
 
 典型场景: 9.9元购买价值50元优惠券包(含3张不同面额券)
 """
+
 from typing import Any
 
 import structlog

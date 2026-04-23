@@ -48,8 +48,12 @@ ORDER BY total_dishes_cut DESC
 
 DIMENSIONS = ["store_name", "cutter_name", "employee_id", "grade_level"]
 METRICS = [
-    "order_count", "total_dishes_cut", "total_dish_value_fen",
-    "total_weight_kg", "return_dish_qty",
-    "commission_fen", "output_rank",
+    "order_count",
+    "total_dishes_cut",
+    "total_dish_value_fen",
+    "total_weight_kg",
+    "return_dish_qty",
+    "commission_fen",
+    "output_rank",
 ]
 FILTERS = ["start_date", "end_date", "store_id"]

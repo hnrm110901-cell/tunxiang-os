@@ -11,6 +11,7 @@ v144 表：content_templates
 内置模板：首次请求时通过 UPSERT 写入 DB（幂等）
 RLS 通过 set_config('app.tenant_id') 激活
 """
+
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Optional
@@ -49,7 +50,15 @@ _BUILTIN_TEMPLATES: dict[str, dict] = {
         "name": "朋友圈时令推广",
         "content_type": "moments",
         "body_template": "🌿 {season_theme}\n{dish_name} | {dish_description}\n主厨说：「{chef_quote}」\n📍 {store_name}·{store_address}\n🎁 {benefit_text}",
-        "variables": ["season_theme", "dish_name", "dish_description", "chef_quote", "store_name", "store_address", "benefit_text"],
+        "variables": [
+            "season_theme",
+            "dish_name",
+            "dish_description",
+            "chef_quote",
+            "store_name",
+            "store_address",
+            "benefit_text",
+        ],
     },
     "sms_reactivation": {
         "name": "短信召回",
@@ -79,20 +88,36 @@ _BUILTIN_TEMPLATES: dict[str, dict] = {
         "name": "宴会邀请",
         "content_type": "banquet_invite",
         "body_template": "尊敬的{customer_name}：\n\n{brand_name}诚邀您参加{event_name}。\n\n📅 时间：{event_date}\n📍 地点：{venue}\n🍽️ 菜单亮点：{menu_highlight}\n\n{benefit_text}\n\n期待您的光临！",
-        "variables": ["customer_name", "brand_name", "event_name", "event_date", "venue", "menu_highlight", "benefit_text"],
+        "variables": [
+            "customer_name",
+            "brand_name",
+            "event_name",
+            "event_date",
+            "venue",
+            "menu_highlight",
+            "benefit_text",
+        ],
     },
 }
 
 _VALID_CONTENT_TYPES = {
-    "wecom_chat", "moments", "miniapp_banner", "sms",
-    "dish_story", "new_dish_promo", "seasonal_event",
-    "referral_invite", "store_manager_script", "banquet_invite",
+    "wecom_chat",
+    "moments",
+    "miniapp_banner",
+    "sms",
+    "dish_story",
+    "new_dish_promo",
+    "seasonal_event",
+    "referral_invite",
+    "store_manager_script",
+    "banquet_invite",
 }
 
 
 # ---------------------------------------------------------------------------
 # 统一响应
 # ---------------------------------------------------------------------------
+
 
 def ok_response(data: Any) -> dict:
     return {"ok": True, "data": data}
@@ -105,6 +130,7 @@ def error_response(code: str, message: str) -> dict:
 # ---------------------------------------------------------------------------
 # 内部工具
 # ---------------------------------------------------------------------------
+
 
 async def _set_tenant(db: AsyncSession, tenant_id: str) -> None:
     await db.execute(
@@ -121,6 +147,7 @@ def _is_table_missing(exc: SQLAlchemyError) -> bool:
 async def _ensure_builtin_templates(db: AsyncSession, tid: uuid.UUID) -> None:
     """为当前租户 UPSERT 内置模板（幂等，首次调用时初始化）"""
     import json
+
     now = datetime.now(timezone.utc)
     for key, tpl in _BUILTIN_TEMPLATES.items():
         await db.execute(
@@ -151,6 +178,7 @@ async def _ensure_builtin_templates(db: AsyncSession, tid: uuid.UUID) -> None:
 # 请求模型
 # ---------------------------------------------------------------------------
 
+
 class CreateTemplateRequest(BaseModel):
     name: str
     content_type: str
@@ -174,8 +202,8 @@ class CreateTemplateRequest(BaseModel):
 
 class GenerateContentRequest(BaseModel):
     content_type: str
-    template_id: Optional[str] = None   # 指定模板 ID；不传则自动选内置模板
-    variables: dict = {}                # {"customer_name": "张三", "dish_name": "佛跳墙"}
+    template_id: Optional[str] = None  # 指定模板 ID；不传则自动选内置模板
+    variables: dict = {}  # {"customer_name": "张三", "dish_name": "佛跳墙"}
     brand_id: Optional[str] = None
     target_segment: Optional[str] = None
 
@@ -183,6 +211,7 @@ class GenerateContentRequest(BaseModel):
 # ---------------------------------------------------------------------------
 # 端点
 # ---------------------------------------------------------------------------
+
 
 @router.post("/templates")
 async def create_template(
@@ -199,6 +228,7 @@ async def create_template(
         await _set_tenant(db, x_tenant_id)
         tid = uuid.UUID(x_tenant_id)
         import json
+
         now = datetime.now(timezone.utc)
         new_id = uuid.uuid4()
 
@@ -231,13 +261,15 @@ async def create_template(
             content_type=req.content_type,
             tenant_id=x_tenant_id,
         )
-        return ok_response({
-            "template_id": str(new_id),
-            "name": req.name,
-            "content_type": req.content_type,
-            "variables": req.variables,
-            "is_builtin": False,
-        })
+        return ok_response(
+            {
+                "template_id": str(new_id),
+                "name": req.name,
+                "content_type": req.content_type,
+                "variables": req.variables,
+                "is_builtin": False,
+            }
+        )
 
     except ValueError as exc:
         return error_response("INVALID_PARAM", f"参数格式错误: {exc}")
@@ -420,14 +452,16 @@ async def generate_content(
         except SQLAlchemyError:
             await db.rollback()
 
-        return ok_response({
-            "template_id": str(row.id),
-            "template_name": row.name,
-            "content_type": row.content_type,
-            "generated_text": body,
-            "missing_variables": missing_vars,
-            "_note": "missing_variables 中的变量使用了占位符原文，请补充后重新生成" if missing_vars else "",
-        })
+        return ok_response(
+            {
+                "template_id": str(row.id),
+                "template_name": row.name,
+                "content_type": row.content_type,
+                "generated_text": body,
+                "missing_variables": missing_vars,
+                "_note": "missing_variables 中的变量使用了占位符原文，请补充后重新生成" if missing_vars else "",
+            }
+        )
 
     except ValueError as exc:
         return error_response("INVALID_PARAM", f"参数格式错误: {exc}")
@@ -465,15 +499,17 @@ async def get_template_performance(
         if not row:
             return error_response("NOT_FOUND", f"模板不存在: {template_id}")
 
-        return ok_response({
-            "template_id": str(row.id),
-            "template_name": row.name,
-            "content_type": row.content_type,
-            "is_builtin": row.is_builtin,
-            "usage_count": row.usage_count,
-            "created_at": row.created_at.isoformat() if row.created_at else None,
-            "last_used_at": row.updated_at.isoformat() if row.updated_at else None,
-        })
+        return ok_response(
+            {
+                "template_id": str(row.id),
+                "template_name": row.name,
+                "content_type": row.content_type,
+                "is_builtin": row.is_builtin,
+                "usage_count": row.usage_count,
+                "created_at": row.created_at.isoformat() if row.created_at else None,
+                "last_used_at": row.updated_at.isoformat() if row.updated_at else None,
+            }
+        )
 
     except ValueError as exc:
         return error_response("INVALID_PARAM", f"参数格式错误: {exc}")
@@ -530,9 +566,11 @@ async def validate_content(
         error_count=len(errors),
         tenant_id=x_tenant_id,
     )
-    return ok_response({
-        "valid": valid,
-        "brand_id": req.brand_id,
-        "errors": errors,
-        "warnings": warnings,
-    })
+    return ok_response(
+        {
+            "valid": valid,
+            "brand_id": req.brand_id,
+            "errors": errors,
+            "warnings": warnings,
+        }
+    )

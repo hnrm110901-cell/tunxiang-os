@@ -10,9 +10,10 @@
   - 投入产出建议（成本端/营收端/运营端各2条）
   - 月度品项报告（上新/下架建议、高毛利低动销品项）
 """
+
 from __future__ import annotations
 
-from datetime import date, datetime, timedelta, timezone
+from datetime import datetime, timezone
 from typing import Any
 
 import structlog
@@ -29,6 +30,7 @@ router = APIRouter(prefix="/api/v1/analytics/monthly-brief", tags=["monthly-brie
 
 # ─── 依赖 ─────────────────────────────────────────────────────────────────────
 
+
 async def _get_db(x_tenant_id: str = Header(..., alias="X-Tenant-ID")):
     async for session in get_db_with_tenant(x_tenant_id):
         yield session
@@ -39,6 +41,7 @@ def _get_tenant(x_tenant_id: str = Header(..., alias="X-Tenant-ID")) -> str:
 
 
 # ─── 工具 ─────────────────────────────────────────────────────────────────────
+
 
 def _month_range(year: int, month: int) -> tuple[datetime, datetime]:
     """返回指定月份的 [月初, 下月初) UTC"""
@@ -66,7 +69,8 @@ async def _month_metrics(db: AsyncSession, tenant_id: str, year: int, month: int
     """查询指定月份汇总指标"""
     start, end = _month_range(year, month)
     try:
-        r = await db.execute(text("""
+        r = await db.execute(
+            text("""
             SELECT
                 COALESCE(SUM(total_amount_fen), 0)::bigint     AS revenue_fen,
                 COUNT(*)                                        AS order_count,
@@ -79,7 +83,9 @@ async def _month_metrics(db: AsyncSession, tenant_id: str, year: int, month: int
               AND status    = 'completed'
               AND created_at >= :start
               AND created_at <  :end
-        """), {"tid": tenant_id, "start": start, "end": end})
+        """),
+            {"tid": tenant_id, "start": start, "end": end},
+        )
         row = dict(r.mappings().fetchone() or {})
         revenue = int(row.get("revenue_fen") or 0)
         cost = int(row.get("cost_fen") or 0)
@@ -103,9 +109,13 @@ async def _month_metrics(db: AsyncSession, tenant_id: str, year: int, month: int
     except SQLAlchemyError as exc:
         logger.warning("monthly_brief.metrics_failed", error=str(exc), year=year, month=month)
         return {
-            "revenue_fen": 0, "order_count": 0, "avg_ticket_yuan": 0.0,
-            "margin_rate": 0.0, "discount_rate": 0.0,
-            "business_days": 0, "daily_avg_revenue_yuan": 0.0,
+            "revenue_fen": 0,
+            "order_count": 0,
+            "avg_ticket_yuan": 0.0,
+            "margin_rate": 0.0,
+            "discount_rate": 0.0,
+            "business_days": 0,
+            "daily_avg_revenue_yuan": 0.0,
         }
 
 
@@ -114,7 +124,8 @@ async def _month_member_metrics(db: AsyncSession, tenant_id: str, year: int, mon
     start, end = _month_range(year, month)
     prev_start, _ = _month_range(*_prev_month(year, month))
     try:
-        r = await db.execute(text("""
+        r = await db.execute(
+            text("""
             SELECT
                 COUNT(*) FILTER (WHERE member_id IS NOT NULL) AS member_orders,
                 COUNT(*) FILTER (WHERE member_id IS NULL)     AS guest_orders,
@@ -124,13 +135,16 @@ async def _month_member_metrics(db: AsyncSession, tenant_id: str, year: int, mon
               AND status      = 'completed'
               AND created_at >= :start
               AND created_at <  :end
-        """), {"tid": tenant_id, "start": start, "end": end})
+        """),
+            {"tid": tenant_id, "start": start, "end": end},
+        )
         row = dict(r.mappings().fetchone() or {})
         total = int(row.get("member_orders") or 0) + int(row.get("guest_orders") or 0)
         member_rate = round(int(row.get("member_orders") or 0) / total * 100, 1) if total > 0 else 0.0
 
         # 复购率：当月有2次+消费的会员
-        rep_r = await db.execute(text("""
+        rep_r = await db.execute(
+            text("""
             WITH m AS (
                 SELECT member_id, COUNT(*) AS cnt
                 FROM orders
@@ -145,10 +159,14 @@ async def _month_member_metrics(db: AsyncSession, tenant_id: str, year: int, mon
                 COUNT(*) FILTER (WHERE cnt >= 2)::float AS repurchase_members,
                 COUNT(*)::float                          AS total_members
             FROM m
-        """), {"tid": tenant_id, "start": start, "end": end})
+        """),
+            {"tid": tenant_id, "start": start, "end": end},
+        )
         rep_row = dict(rep_r.mappings().fetchone() or {})
         rep_total = float(rep_row.get("total_members") or 0)
-        repurchase_rate = round(float(rep_row.get("repurchase_members") or 0) / rep_total * 100, 1) if rep_total > 0 else 0.0
+        repurchase_rate = (
+            round(float(rep_row.get("repurchase_members") or 0) / rep_total * 100, 1) if rep_total > 0 else 0.0
+        )
 
         return {
             "member_order_rate": member_rate,
@@ -165,23 +183,27 @@ async def _month_compliance_score(db: AsyncSession, tenant_id: str, year: int, m
     start, end = _month_range(year, month)
     try:
         # 日结合规率（已完成日结的天数 / 营业天数）
-        settle_r = await db.execute(text("""
+        settle_r = await db.execute(
+            text("""
             SELECT COUNT(DISTINCT settlement_date)::int AS settled_days
             FROM daily_settlements
             WHERE tenant_id   = :tid::uuid
               AND status       = 'completed'
               AND settlement_date >= :s_date
               AND settlement_date <  :e_date
-        """), {
-            "tid": tenant_id,
-            "s_date": start.date(),
-            "e_date": end.date(),
-        })
+        """),
+            {
+                "tid": tenant_id,
+                "s_date": start.date(),
+                "e_date": end.date(),
+            },
+        )
         settle_row = dict(settle_r.mappings().fetchone() or {})
         settled_days = int(settle_row.get("settled_days") or 0)
 
         # 折扣纪律：超过 30% 折扣率的订单占比
-        disc_r = await db.execute(text("""
+        disc_r = await db.execute(
+            text("""
             SELECT
                 COUNT(*) FILTER (
                     WHERE total_amount_fen > 0
@@ -193,12 +215,14 @@ async def _month_compliance_score(db: AsyncSession, tenant_id: str, year: int, m
               AND status    = 'completed'
               AND created_at >= :start
               AND created_at <  :end
-        """), {"tid": tenant_id, "start": start, "end": end})
+        """),
+            {"tid": tenant_id, "start": start, "end": end},
+        )
         disc_row = dict(disc_r.mappings().fetchone() or {})
         disc_total = float(disc_row.get("total_count") or 0)
-        discount_exception_rate = round(
-            float(disc_row.get("exc_count") or 0) / disc_total * 100, 2
-        ) if disc_total > 0 else 0.0
+        discount_exception_rate = (
+            round(float(disc_row.get("exc_count") or 0) / disc_total * 100, 2) if disc_total > 0 else 0.0
+        )
 
         return {
             "settled_days": settled_days,
@@ -233,12 +257,14 @@ def _health_check(
         rev_score = 60
     else:
         rev_score = 40
-    checks.append({
-        "item": "营收增长",
-        "score": rev_score,
-        "status": "good" if rev_score >= 80 else ("warning" if rev_score >= 60 else "risk"),
-        "detail": f"月度环比 {rev_mom:+.1f}%" if rev_mom is not None else "无对比数据",
-    })
+    checks.append(
+        {
+            "item": "营收增长",
+            "score": rev_score,
+            "status": "good" if rev_score >= 80 else ("warning" if rev_score >= 60 else "risk"),
+            "detail": f"月度环比 {rev_mom:+.1f}%" if rev_mom is not None else "无对比数据",
+        }
+    )
 
     # 2. 毛利健康度
     margin = this_month["margin_rate"]
@@ -252,12 +278,14 @@ def _health_check(
         m_score = 55
     else:
         m_score = 35
-    checks.append({
-        "item": "毛利健康",
-        "score": m_score,
-        "status": "good" if m_score >= 80 else ("warning" if m_score >= 60 else "risk"),
-        "detail": f"综合毛利率 {margin:.1f}%",
-    })
+    checks.append(
+        {
+            "item": "毛利健康",
+            "score": m_score,
+            "status": "good" if m_score >= 80 else ("warning" if m_score >= 60 else "risk"),
+            "detail": f"综合毛利率 {margin:.1f}%",
+        }
+    )
 
     # 3. 客单趋势
     ticket_mom = _delta(this_month["avg_ticket_yuan"], prev_month["avg_ticket_yuan"])
@@ -269,12 +297,16 @@ def _health_check(
         t_score = 75
     else:
         t_score = 55
-    checks.append({
-        "item": "客单趋势",
-        "score": t_score,
-        "status": "good" if t_score >= 80 else ("warning" if t_score >= 60 else "risk"),
-        "detail": f"客单 ¥{this_month['avg_ticket_yuan']:.1f}，环比 {ticket_mom:+.1f}%" if ticket_mom is not None else f"客单 ¥{this_month['avg_ticket_yuan']:.1f}",
-    })
+    checks.append(
+        {
+            "item": "客单趋势",
+            "score": t_score,
+            "status": "good" if t_score >= 80 else ("warning" if t_score >= 60 else "risk"),
+            "detail": f"客单 ¥{this_month['avg_ticket_yuan']:.1f}，环比 {ticket_mom:+.1f}%"
+            if ticket_mom is not None
+            else f"客单 ¥{this_month['avg_ticket_yuan']:.1f}",
+        }
+    )
 
     # 4. 会员复购率
     repurchase = member.get("repurchase_rate", 0)
@@ -286,12 +318,14 @@ def _health_check(
         r_score = 65
     else:
         r_score = 45
-    checks.append({
-        "item": "会员复购",
-        "score": r_score,
-        "status": "good" if r_score >= 80 else ("warning" if r_score >= 60 else "risk"),
-        "detail": f"月度复购率 {repurchase:.1f}%",
-    })
+    checks.append(
+        {
+            "item": "会员复购",
+            "score": r_score,
+            "status": "good" if r_score >= 80 else ("warning" if r_score >= 60 else "risk"),
+            "detail": f"月度复购率 {repurchase:.1f}%",
+        }
+    )
 
     # 5. 折扣纪律
     disc_exc = compliance.get("discount_exception_rate", 0)
@@ -303,12 +337,14 @@ def _health_check(
         d_score = 65
     else:
         d_score = 40
-    checks.append({
-        "item": "折扣纪律",
-        "score": d_score,
-        "status": "good" if d_score >= 80 else ("warning" if d_score >= 60 else "risk"),
-        "detail": f"超额折扣订单占比 {disc_exc:.1f}%",
-    })
+    checks.append(
+        {
+            "item": "折扣纪律",
+            "score": d_score,
+            "status": "good" if d_score >= 80 else ("warning" if d_score >= 60 else "risk"),
+            "detail": f"超额折扣订单占比 {disc_exc:.1f}%",
+        }
+    )
 
     # 6. 日结合规率
     settled = compliance.get("settled_days", 0)
@@ -322,12 +358,14 @@ def _health_check(
         s_score = 55
     else:
         s_score = 35
-    checks.append({
-        "item": "日结合规",
-        "score": s_score,
-        "status": "good" if s_score >= 80 else ("warning" if s_score >= 60 else "risk"),
-        "detail": f"日结完成率 {settle_rate:.1f}%（{settled}/{bdays} 天）",
-    })
+    checks.append(
+        {
+            "item": "日结合规",
+            "score": s_score,
+            "status": "good" if s_score >= 80 else ("warning" if s_score >= 60 else "risk"),
+            "detail": f"日结完成率 {settle_rate:.1f}%（{settled}/{bdays} 天）",
+        }
+    )
 
     return checks
 
@@ -379,12 +417,10 @@ def _generate_monthly_recommendations(
     if risk_items:
         worst = min(risk_items, key=lambda h: h["score"])
         ops_recs.append(
-            f"本月经营体检【{worst['item']}】评分最低（{worst['score']}分），"
-            f"建议优先改善：{worst['detail']}。"
+            f"本月经营体检【{worst['item']}】评分最低（{worst['score']}分），建议优先改善：{worst['detail']}。"
         )
     ops_recs.append(
-        "建议本月组织一次门店运营复盘会（店长+收银主管），"
-        "重点对账本月收支差异，确保日结数据与财务系统一致。"
+        "建议本月组织一次门店运营复盘会（店长+收银主管），重点对账本月收支差异，确保日结数据与财务系统一致。"
     )
 
     return {
@@ -395,6 +431,7 @@ def _generate_monthly_recommendations(
 
 
 # ─── 端点 ─────────────────────────────────────────────────────────────────────
+
 
 @router.get("/{store_id}", summary="单店月报 — 经营体检 + 投入产出建议")
 async def get_store_monthly_brief(
@@ -461,7 +498,9 @@ async def get_store_monthly_brief(
             "member_metrics": member,
             "health_check": {
                 "overall_score": overall_score,
-                "grade": "A" if overall_score >= 85 else ("B" if overall_score >= 70 else ("C" if overall_score >= 55 else "D")),
+                "grade": "A"
+                if overall_score >= 85
+                else ("B" if overall_score >= 70 else ("C" if overall_score >= 55 else "D")),
                 "items": health,
             },
             "recommendations": recommendations,
@@ -488,7 +527,8 @@ async def get_group_monthly_brief(
     pstart, pend = _month_range(py, pm)
 
     try:
-        r = await db.execute(text("""
+        r = await db.execute(
+            text("""
             SELECT
                 COALESCE(store_id::text, 'unknown') AS store_id,
                 COALESCE(SUM(total_amount_fen), 0)::bigint   AS revenue_fen,
@@ -502,17 +542,22 @@ async def get_group_monthly_brief(
               AND created_at <  :end
             GROUP BY store_id
             ORDER BY revenue_fen DESC
-        """), {"tid": tenant_id, "start": start, "end": end})
+        """),
+            {"tid": tenant_id, "start": start, "end": end},
+        )
         store_rows = r.mappings().all()
 
-        lm_r = await db.execute(text("""
+        lm_r = await db.execute(
+            text("""
             SELECT COALESCE(SUM(total_amount_fen), 0)::bigint AS revenue_fen
             FROM orders
             WHERE tenant_id  = :tid::uuid
               AND status      = 'completed'
               AND created_at >= :start
               AND created_at <  :end
-        """), {"tid": tenant_id, "start": pstart, "end": pend})
+        """),
+            {"tid": tenant_id, "start": pstart, "end": pend},
+        )
         lm_rev = int((lm_r.scalar() or 0))
 
     except SQLAlchemyError as exc:
@@ -528,9 +573,9 @@ async def get_group_monthly_brief(
             "revenue_fen": int(r["revenue_fen"]),
             "order_count": int(r["order_count"]),
             "avg_ticket_yuan": round(float(r["avg_ticket_fen"]) / 100, 2),
-            "margin_rate": round(
-                (int(r["revenue_fen"]) - int(r["cost_fen"])) / int(r["revenue_fen"]) * 100, 1
-            ) if int(r["revenue_fen"]) > 0 else 0.0,
+            "margin_rate": round((int(r["revenue_fen"]) - int(r["cost_fen"])) / int(r["revenue_fen"]) * 100, 1)
+            if int(r["revenue_fen"]) > 0
+            else 0.0,
         }
         for r in store_rows
     ]

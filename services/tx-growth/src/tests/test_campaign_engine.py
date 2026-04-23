@@ -16,6 +16,7 @@
 13. 报名抽奖 (报名+开奖)
 14. 活动效果分析
 """
+
 import os
 import sys
 
@@ -43,6 +44,7 @@ TENANT = "tenant-xuji"
 # Fixtures
 # ===========================================================================
 
+
 @pytest.fixture(autouse=True)
 def clean():
     clear_all_campaigns()
@@ -69,13 +71,12 @@ def reward():
 # 1. 活动创建 — 全22种类型
 # ===========================================================================
 
+
 @pytest.mark.asyncio
 async def test_create_all_campaign_types(engine):
     """22种活动类型均可成功创建"""
     for ctype in CampaignEngine.CAMPAIGN_TYPES:
-        result = await engine.create_campaign(
-            ctype, {"name": f"测试{ctype}"}, TENANT
-        )
+        result = await engine.create_campaign(ctype, {"name": f"测试{ctype}"}, TENANT)
         assert "campaign_id" in result, f"创建 {ctype} 失败"
         assert result["status"] == "draft"
         assert result["tenant_id"] == TENANT
@@ -89,12 +90,11 @@ async def test_create_all_campaign_types(engine):
 # 2. 状态机 — draft -> active -> paused -> ended
 # ===========================================================================
 
+
 @pytest.mark.asyncio
 async def test_campaign_lifecycle(engine):
     """活动完整生命周期: 创建->启动->暂停->恢复->结束"""
-    c = await engine.create_campaign(
-        "spend_reward", {"name": "满减活动"}, TENANT
-    )
+    c = await engine.create_campaign("spend_reward", {"name": "满减活动"}, TENANT)
     cid = c["campaign_id"]
     assert c["status"] == "draft"
 
@@ -118,6 +118,7 @@ async def test_campaign_lifecycle(engine):
 # ===========================================================================
 # 3. 非法状态转换
 # ===========================================================================
+
 
 @pytest.mark.asyncio
 async def test_invalid_state_transitions(engine):
@@ -144,13 +145,18 @@ async def test_invalid_state_transitions(engine):
 # 4. 资格检查
 # ===========================================================================
 
+
 @pytest.mark.asyncio
 async def test_eligibility_check(engine):
     """资格检查: 正常/未启动/预算耗尽/参与上限"""
     c = await engine.create_campaign(
         "scan_coupon",
-        {"name": "扫码领券", "budget_fen": 10000, "max_per_customer": 2,
-         "reward": {"type": "coupon", "amount_fen": 500}},
+        {
+            "name": "扫码领券",
+            "budget_fen": 10000,
+            "max_per_customer": 2,
+            "reward": {"type": "coupon", "amount_fen": 500},
+        },
         TENANT,
     )
     cid = c["campaign_id"]
@@ -184,6 +190,7 @@ async def test_eligibility_check(engine):
 # 5. 触发奖励发放
 # ===========================================================================
 
+
 @pytest.mark.asyncio
 async def test_trigger_reward(engine):
     """触发奖励发放并更新统计"""
@@ -195,9 +202,7 @@ async def test_trigger_reward(engine):
     cid = c["campaign_id"]
     await engine.start_campaign(cid, TENANT)
 
-    r = await engine.trigger_reward(
-        "cust-001", cid, {"type": "register"}, TENANT
-    )
+    r = await engine.trigger_reward("cust-001", cid, {"type": "register"}, TENANT)
     assert r["rewarded"] is True
     assert r["reward"]["reward_type"] == "coupon"
     assert r["reward"]["amount_fen"] == 1000
@@ -211,13 +216,13 @@ async def test_trigger_reward(engine):
 # 6. 消费触发引擎
 # ===========================================================================
 
+
 @pytest.mark.asyncio
 async def test_consume_trigger(engine, trigger):
     """消费满额自动触发奖励"""
     c = await engine.create_campaign(
         "spend_reward",
-        {"name": "满200送券", "threshold_fen": 20000,
-         "reward": {"type": "coupon", "amount_fen": 3000}},
+        {"name": "满200送券", "threshold_fen": 20000, "reward": {"type": "coupon", "amount_fen": 3000}},
         TENANT,
     )
     await engine.start_campaign(c["campaign_id"], TENANT)
@@ -231,6 +236,7 @@ async def test_consume_trigger(engine, trigger):
 # ===========================================================================
 # 7. 注册触发引擎
 # ===========================================================================
+
 
 @pytest.mark.asyncio
 async def test_register_trigger(engine, trigger):
@@ -252,6 +258,7 @@ async def test_register_trigger(engine, trigger):
 # 8. 生日触发引擎
 # ===========================================================================
 
+
 @pytest.mark.asyncio
 async def test_birthday_trigger(engine, trigger):
     """生日触发"""
@@ -272,10 +279,12 @@ async def test_birthday_trigger(engine, trigger):
 # 9. 定时触发 — 精准营销
 # ===========================================================================
 
+
 @pytest.mark.asyncio
 async def test_schedule_trigger(engine, trigger):
     """精准营销定时触发 (每周/每月)"""
     from datetime import datetime, timezone
+
     now = datetime.now(timezone.utc)
     weekday = now.isoweekday()
 
@@ -300,6 +309,7 @@ async def test_schedule_trigger(engine, trigger):
 # 10. 奖励引擎 — 5种奖励类型
 # ===========================================================================
 
+
 @pytest.mark.asyncio
 async def test_reward_engine_all_types(reward):
     """5种奖励类型均可发放"""
@@ -320,6 +330,7 @@ async def test_reward_engine_all_types(reward):
 # ===========================================================================
 # 11. 抽奖概率校验
 # ===========================================================================
+
 
 def test_lottery_probability_validation():
     """抽奖概率总和必须=100%"""
@@ -362,6 +373,7 @@ def test_lottery_draw():
 # 12. 储值套餐多档位匹配
 # ===========================================================================
 
+
 @pytest.mark.asyncio
 async def test_stored_value_tiers():
     """储值套餐: 充500送80, 充1000送200"""
@@ -392,6 +404,7 @@ async def test_stored_value_tiers():
 # 13. 报名抽奖 (报名+开奖)
 # ===========================================================================
 
+
 @pytest.mark.asyncio
 async def test_report_draw():
     """报名抽奖: 报名 -> 开奖"""
@@ -408,22 +421,28 @@ async def test_report_draw():
     # 报名
     for i in range(5):
         r = await report_execute(
-            f"cust-{i}", config,
-            {"campaign_id": "camp-rpt-1", "action": "report"}, TENANT,
+            f"cust-{i}",
+            config,
+            {"campaign_id": "camp-rpt-1", "action": "report"},
+            TENANT,
         )
         assert r["success"] is True
 
     # 重复报名
     r = await report_execute(
-        "cust-0", config,
-        {"campaign_id": "camp-rpt-1", "action": "report"}, TENANT,
+        "cust-0",
+        config,
+        {"campaign_id": "camp-rpt-1", "action": "report"},
+        TENANT,
     )
     assert r["success"] is False
 
     # 开奖
     r = await report_execute(
-        "", config,
-        {"campaign_id": "camp-rpt-1", "action": "draw"}, TENANT,
+        "",
+        config,
+        {"campaign_id": "camp-rpt-1", "action": "draw"},
+        TENANT,
     )
     assert r["success"] is True
     assert r["total_participants"] == 5
@@ -434,13 +453,13 @@ async def test_report_draw():
 # 14. 活动效果分析
 # ===========================================================================
 
+
 @pytest.mark.asyncio
 async def test_campaign_analytics(engine):
     """活动效果分析"""
     c = await engine.create_campaign(
         "scan_coupon",
-        {"name": "扫码领券", "budget_fen": 100000,
-         "reward": {"type": "coupon", "amount_fen": 500}},
+        {"name": "扫码领券", "budget_fen": 100000, "reward": {"type": "coupon", "amount_fen": 500}},
         TENANT,
     )
     cid = c["campaign_id"]
@@ -460,6 +479,7 @@ async def test_campaign_analytics(engine):
 # ===========================================================================
 # 额外: 签到连续奖励
 # ===========================================================================
+
 
 @pytest.mark.asyncio
 async def test_sign_in_streak():
@@ -489,6 +509,7 @@ async def test_sign_in_streak():
 # 额外: 积分兑换
 # ===========================================================================
 
+
 @pytest.mark.asyncio
 async def test_points_exchange():
     """积分兑换: 积分足够/不足/商品不存在"""
@@ -501,22 +522,28 @@ async def test_points_exchange():
 
     # 积分不足
     r = await points_execute(
-        "cust-001", config,
-        {"item_id": "d1", "customer_points": 300}, TENANT,
+        "cust-001",
+        config,
+        {"item_id": "d1", "customer_points": 300},
+        TENANT,
     )
     assert r["success"] is False
 
     # 积分足够
     r = await points_execute(
-        "cust-001", config,
-        {"item_id": "d1", "customer_points": 600}, TENANT,
+        "cust-001",
+        config,
+        {"item_id": "d1", "customer_points": 600},
+        TENANT,
     )
     assert r["success"] is True
     assert r["remaining_points"] == 100
 
     # 商品不存在
     r = await points_execute(
-        "cust-001", config,
-        {"item_id": "d999", "customer_points": 600}, TENANT,
+        "cust-001",
+        config,
+        {"item_id": "d999", "customer_points": 600},
+        TENANT,
     )
     assert r["success"] is False

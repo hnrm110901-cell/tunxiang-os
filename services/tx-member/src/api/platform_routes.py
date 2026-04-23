@@ -9,6 +9,7 @@
 
 所有端点通过 X-Tenant-ID header 传入租户 ID。
 """
+
 import uuid
 from typing import Any, Literal, Optional
 
@@ -30,13 +31,15 @@ _binding_service = PlatformBindingService()
 # Request Models
 # ─────────────────────────────────────────────────────────────────
 
+
 class MeituanOrderReq(BaseModel):
     """美团订单绑定请求体"""
+
     order_no: str
-    amount_fen: int                          # 消费金额（分）
+    amount_fen: int  # 消费金额（分）
     store_id: str
     items: list[dict[str, Any]] = []
-    phone: Optional[str] = None             # 顾客手机号
+    phone: Optional[str] = None  # 顾客手机号
     meituan_user_id: Optional[str] = None
     meituan_openid: Optional[str] = None
 
@@ -50,6 +53,7 @@ class MeituanOrderReq(BaseModel):
 
 class DouyinOrderReq(BaseModel):
     """抖音订单绑定请求体"""
+
     order_no: str
     amount_fen: int
     store_id: str
@@ -67,6 +71,7 @@ class DouyinOrderReq(BaseModel):
 
 class PlatformBindReq(BaseModel):
     """通用平台绑定请求体"""
+
     platform: Literal["meituan", "douyin", "eleme"]
     platform_user_id: str
     phone: Optional[str] = None
@@ -76,6 +81,7 @@ class PlatformBindReq(BaseModel):
 # ─────────────────────────────────────────────────────────────────
 # 端点实现
 # ─────────────────────────────────────────────────────────────────
+
 
 @router.post("/meituan/order")
 async def bind_meituan_order(

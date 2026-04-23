@@ -45,7 +45,10 @@ ORDER BY sales_qty DESC
 
 DIMENSIONS = ["combo_id", "combo_name", "combo_category"]
 METRICS = [
-    "sales_qty", "total_amount_fen", "avg_price_fen",
-    "avg_original_price_fen", "premium_rate_pct",
+    "sales_qty",
+    "total_amount_fen",
+    "avg_price_fen",
+    "avg_original_price_fen",
+    "premium_rate_pct",
 ]
 FILTERS = ["start_date", "end_date", "store_id"]

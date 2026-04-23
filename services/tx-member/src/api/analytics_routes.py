@@ -22,12 +22,14 @@ router = APIRouter(prefix="/api/v1/member/analytics", tags=["member-analytics"])
 
 # ── 请求/响应模型 ─────────────────────────────────────────────
 
+
 class DateRangeParams(BaseModel):
     start_date: str  # YYYY-MM-DD
-    end_date: str    # YYYY-MM-DD
+    end_date: str  # YYYY-MM-DD
 
 
 # ── 1. 会员增长分析 ──────────────────────────────────────────
+
 
 @router.get("/growth")
 async def get_member_growth(
@@ -46,6 +48,7 @@ async def get_member_growth(
 
 # ── 2. 活跃度分析 ─────────────────────────────────────────────
 
+
 @router.get("/activity")
 async def get_activity_analysis(
     start_date: str = Query(..., description="开始日期 YYYY-MM-DD"),
@@ -62,6 +65,7 @@ async def get_activity_analysis(
 
 
 # ── 3. 复购分析 ───────────────────────────────────────────────
+
 
 @router.get("/repurchase")
 async def get_repurchase_analysis(
@@ -80,6 +84,7 @@ async def get_repurchase_analysis(
 
 # ── 4. 流失预警 ───────────────────────────────────────────────
 
+
 @router.get("/churn-prediction")
 async def get_churn_prediction(
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
@@ -97,6 +102,7 @@ async def get_churn_prediction(
 
 
 # ── 5. 偏好洞察 ───────────────────────────────────────────────
+
 
 @router.get("/preference/{customer_id}")
 async def get_preference_insight(

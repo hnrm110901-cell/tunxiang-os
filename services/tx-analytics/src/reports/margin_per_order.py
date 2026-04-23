@@ -56,8 +56,13 @@ ORDER BY pass_rate ASC
 
 DIMENSIONS = ["store_name"]
 METRICS = [
-    "total_orders", "pass_count", "fail_count", "pass_rate",
-    "avg_margin_rate", "avg_fail_margin_rate",
-    "min_margin_rate", "max_margin_rate",
+    "total_orders",
+    "pass_count",
+    "fail_count",
+    "pass_rate",
+    "avg_margin_rate",
+    "avg_fail_margin_rate",
+    "min_margin_rate",
+    "max_margin_rate",
 ]
 FILTERS = ["start_date", "end_date", "store_id"]

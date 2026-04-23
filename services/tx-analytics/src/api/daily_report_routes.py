@@ -9,6 +9,7 @@ POST /api/v1/analytics/daily-reports/generate    — 手动触发生成（预留
 RLS 安全：所有查询通过 set_config('app.tenant_id', ...) 设置租户上下文。
 容错：DB 查询失败时返回空结构，不返回 500。
 """
+
 from datetime import date, datetime, timedelta, timezone
 from typing import Optional
 
@@ -48,8 +49,10 @@ async def _query_daily_report(session, d: date, store_id: Optional[str]) -> dict
         params["store_id"] = store_id
 
     # 核心聚合
-    row = (await session.execute(
-        text(f"""
+    row = (
+        (
+            await session.execute(
+                text(f"""
             SELECT
                 COUNT(*)                              AS order_count,
                 COALESCE(SUM(o.final_amount_fen), 0)  AS revenue_fen,
@@ -62,16 +65,22 @@ async def _query_daily_report(session, d: date, store_id: Optional[str]) -> dict
               AND o.is_deleted = false
               {store_filter}
         """),
-        params,
-    )).mappings().one()
+                params,
+            )
+        )
+        .mappings()
+        .one()
+    )
 
     order_count: int = row["order_count"] or 0
     revenue_fen: int = row["revenue_fen"] or 0
     avg_ticket_fen: int = revenue_fen // order_count if order_count > 0 else 0
 
     # 支付方式分布
-    pay_rows = (await session.execute(
-        text(f"""
+    pay_rows = (
+        (
+            await session.execute(
+                text(f"""
             SELECT
                 COALESCE(o.payment_method, 'other') AS method,
                 SUM(o.final_amount_fen)             AS amount_fen
@@ -84,13 +93,19 @@ async def _query_daily_report(session, d: date, store_id: Optional[str]) -> dict
               {store_filter}
             GROUP BY o.payment_method
         """),
-        params,
-    )).mappings().all()
+                params,
+            )
+        )
+        .mappings()
+        .all()
+    )
     payment_breakdown = {r["method"]: int(r["amount_fen"] or 0) for r in pay_rows}
 
     # 渠道分布
-    channel_rows = (await session.execute(
-        text(f"""
+    channel_rows = (
+        (
+            await session.execute(
+                text(f"""
             SELECT
                 COALESCE(o.order_type, 'other') AS channel,
                 SUM(o.final_amount_fen)         AS amount_fen
@@ -103,21 +118,27 @@ async def _query_daily_report(session, d: date, store_id: Optional[str]) -> dict
               {store_filter}
             GROUP BY o.order_type
         """),
-        params,
-    )).mappings().all()
+                params,
+            )
+        )
+        .mappings()
+        .all()
+    )
     channel_breakdown = {r["channel"]: int(r["amount_fen"] or 0) for r in channel_rows}
 
     # 新增会员数
-    new_members: int = (await session.execute(
-        text("""
+    new_members: int = (
+        await session.execute(
+            text("""
             SELECT COUNT(*) FROM customers
             WHERE tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid
               AND created_at >= :start
               AND created_at <= :end
               AND is_deleted = false
         """),
-        {"start": day_start, "end": day_end},
-    )).scalar() or 0
+            {"start": day_start, "end": day_end},
+        )
+    ).scalar() or 0
 
     return {
         "report_date": d.isoformat(),
@@ -157,7 +178,7 @@ async def list_daily_reports(
         d += timedelta(days=1)
 
     total = len(all_dates)
-    page_dates = all_dates[(page - 1) * size: page * size]
+    page_dates = all_dates[(page - 1) * size : page * size]
 
     try:
         async with async_session_factory() as session:
@@ -168,14 +189,14 @@ async def list_daily_reports(
                 report = await _query_daily_report(session, d, store_id)
                 items.append(report)
 
-        log.info("daily_reports.list", tenant=x_tenant_id, store_id=store_id,
-                 start=str(start), end=str(end), total=total)
+        log.info(
+            "daily_reports.list", tenant=x_tenant_id, store_id=store_id, start=str(start), end=str(end), total=total
+        )
         return {"ok": True, "data": {"items": items, "total": total, "page": page, "size": size}}
 
     except SQLAlchemyError as exc:
         log.warning("daily_reports.list.db_error", tenant=x_tenant_id, error=str(exc))
-        return {"ok": True, "data": {"items": [], "total": 0, "page": page, "size": size,
-                                      "_error": "db_unavailable"}}
+        return {"ok": True, "data": {"items": [], "total": 0, "page": page, "size": size, "_error": "db_unavailable"}}
 
 
 @router.get("/summary")
@@ -206,8 +227,10 @@ async def daily_reports_summary(
         async with async_session_factory() as session:
             await _set_tenant(session, x_tenant_id)
 
-            row = (await session.execute(
-                text(f"""
+            row = (
+                (
+                    await session.execute(
+                        text(f"""
                     SELECT
                         COUNT(*)                              AS total_orders,
                         COALESCE(SUM(o.final_amount_fen), 0) AS total_revenue_fen
@@ -219,25 +242,30 @@ async def daily_reports_summary(
                       AND o.is_deleted = false
                       {store_filter}
                 """),
-                params,
-            )).mappings().one()
+                        params,
+                    )
+                )
+                .mappings()
+                .one()
+            )
 
             total_orders: int = row["total_orders"] or 0
             total_revenue: int = row["total_revenue_fen"] or 0
 
-            new_members_total: int = (await session.execute(
-                text("""
+            new_members_total: int = (
+                await session.execute(
+                    text("""
                     SELECT COUNT(*) FROM customers
                     WHERE tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid
                       AND created_at >= :start
                       AND created_at <= :end
                       AND is_deleted = false
                 """),
-                {"start": day_start, "end": day_end},
-            )).scalar() or 0
+                    {"start": day_start, "end": day_end},
+                )
+            ).scalar() or 0
 
-        log.info("daily_reports.summary", tenant=x_tenant_id, dimension=dimension,
-                 start=str(start), end=str(end))
+        log.info("daily_reports.summary", tenant=x_tenant_id, dimension=dimension, start=str(start), end=str(end))
         return {
             "ok": True,
             "data": {
@@ -255,18 +283,21 @@ async def daily_reports_summary(
 
     except SQLAlchemyError as exc:
         log.warning("daily_reports.summary.db_error", tenant=x_tenant_id, error=str(exc))
-        return {"ok": True, "data": {
-            "dimension": dimension,
-            "start_date": start.isoformat(),
-            "end_date": end.isoformat(),
-            "days": days,
-            "total_order_count": 0,
-            "total_revenue_fen": 0,
-            "avg_daily_revenue_fen": 0,
-            "avg_ticket_fen": 0,
-            "total_new_members": 0,
-            "_error": "db_unavailable",
-        }}
+        return {
+            "ok": True,
+            "data": {
+                "dimension": dimension,
+                "start_date": start.isoformat(),
+                "end_date": end.isoformat(),
+                "days": days,
+                "total_order_count": 0,
+                "total_revenue_fen": 0,
+                "avg_daily_revenue_fen": 0,
+                "avg_ticket_fen": 0,
+                "total_new_members": 0,
+                "_error": "db_unavailable",
+            },
+        }
 
 
 @router.get("/{report_date}")
@@ -284,24 +315,25 @@ async def get_daily_report(
             await _set_tenant(session, x_tenant_id)
             data = await _query_daily_report(session, report_date, store_id)
 
-        log.info("daily_reports.get", tenant=x_tenant_id, date=str(report_date),
-                 store_id=store_id)
+        log.info("daily_reports.get", tenant=x_tenant_id, date=str(report_date), store_id=store_id)
         return {"ok": True, "data": data}
 
     except SQLAlchemyError as exc:
-        log.warning("daily_reports.get.db_error", tenant=x_tenant_id,
-                    date=str(report_date), error=str(exc))
-        return {"ok": True, "data": {
-            "report_date": report_date.isoformat(),
-            "store_id": store_id or "all",
-            "order_count": 0,
-            "revenue_fen": 0,
-            "avg_ticket_fen": 0,
-            "new_members": 0,
-            "payment_breakdown": {},
-            "channel_breakdown": {},
-            "_error": "db_unavailable",
-        }}
+        log.warning("daily_reports.get.db_error", tenant=x_tenant_id, date=str(report_date), error=str(exc))
+        return {
+            "ok": True,
+            "data": {
+                "report_date": report_date.isoformat(),
+                "store_id": store_id or "all",
+                "order_count": 0,
+                "revenue_fen": 0,
+                "avg_ticket_fen": 0,
+                "new_members": 0,
+                "payment_breakdown": {},
+                "channel_breakdown": {},
+                "_error": "db_unavailable",
+            },
+        }
 
 
 @router.post("/generate")
@@ -315,8 +347,7 @@ async def generate_daily_report(
     if target_date > date.today():
         raise HTTPException(status_code=400, detail="不能生成未来日期的日报")
 
-    log.info("daily_reports.generate", tenant=x_tenant_id,
-             date=str(target_date), store_id=store_id)
+    log.info("daily_reports.generate", tenant=x_tenant_id, date=str(target_date), store_id=store_id)
     return {
         "ok": True,
         "data": {

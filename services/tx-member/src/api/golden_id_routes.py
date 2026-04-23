@@ -16,6 +16,7 @@
   - 幂等性：重复绑定同一 openid 返回现有记录（不报错）
   - 隐私保护：存储 phone_hash = sha256(phone+SALT)，不明文存电话号
 """
+
 import hashlib
 import os
 import uuid
@@ -61,9 +62,7 @@ async def _set_tenant(db, tenant_id: str) -> None:
 
 
 class BindChannelReq(BaseModel):
-    customer_id: Optional[str] = Field(
-        None, description="可为空，若提供 phone 则优先按手机号查找已有 customer"
-    )
+    customer_id: Optional[str] = Field(None, description="可为空，若提供 phone 则优先按手机号查找已有 customer")
     channel_type: str = Field(description="meituan/eleme/douyin/wechat")
     channel_openid: str = Field(min_length=1, max_length=128)
     phone: Optional[str] = Field(None, description="手机号（明文，服务端哈希后存储）")
@@ -230,9 +229,7 @@ async def bind_channel(
                     try:
                         resolved_customer_id = uuid.UUID(req.customer_id)
                     except ValueError as e:
-                        raise HTTPException(
-                            status_code=400, detail=f"customer_id 格式错误: {req.customer_id}"
-                        ) from e
+                        raise HTTPException(status_code=400, detail=f"customer_id 格式错误: {req.customer_id}") from e
                 else:
                     resolved_customer_id = uuid.uuid4()
 

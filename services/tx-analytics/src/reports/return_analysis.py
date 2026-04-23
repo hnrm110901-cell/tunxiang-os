@@ -34,7 +34,11 @@ ORDER BY return_count DESC
 
 DIMENSIONS = ["return_reason"]
 METRICS = [
-    "return_count", "return_qty", "return_amount_fen",
-    "reason_pct", "affected_dish_count", "affected_order_count",
+    "return_count",
+    "return_qty",
+    "return_amount_fen",
+    "reason_pct",
+    "affected_dish_count",
+    "affected_order_count",
 ]
 FILTERS = ["start_date", "end_date", "store_id"]

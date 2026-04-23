@@ -12,6 +12,7 @@
 9.  POST /api/v1/offers                         — DB 表不存在时返回 TABLE_NOT_READY
 10. POST /api/v1/offers                         — margin_floor 超出 [0,1] → 422
 """
+
 import os
 import sys
 
@@ -20,9 +21,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 import json
 import uuid
 from datetime import datetime, timezone
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
-import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from sqlalchemy.exc import OperationalError
@@ -33,8 +33,10 @@ _HEADERS = {"X-Tenant-ID": TENANT_ID, "Authorization": "Bearer test"}
 
 # ── 工具 ────────────────────────────────────────────────────────────────────
 
+
 class _FakeRow:
     """模拟 SQLAlchemy named-column row"""
+
     def __init__(self, **kw):
         for k, v in kw.items():
             setattr(self, k, v)
@@ -50,7 +52,7 @@ def _make_db(*execute_results):
 
 # ── 加载路由 ────────────────────────────────────────────────────────────────
 
-from api.offer_routes import router, get_db
+from api.offer_routes import get_db, router
 
 app = FastAPI()
 app.include_router(router)
@@ -59,6 +61,7 @@ app.include_router(router)
 def _override(db):
     def _dep():
         return db
+
     return _dep
 
 
@@ -91,6 +94,7 @@ def _offer_row():
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 场景 1: POST /offers — 正常创建
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 def test_create_offer_ok():
     """正常创建优惠，返回 offer_id 和 goal"""
@@ -125,6 +129,7 @@ def test_create_offer_ok():
 # 场景 2: POST /offers — 缺少 name → 422
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_create_offer_missing_name():
     """name 为必填，缺少时应返回 422"""
     db = AsyncMock()
@@ -142,6 +147,7 @@ def test_create_offer_missing_name():
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 场景 3: POST /offers — 非法 offer_type → 422
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 def test_create_offer_invalid_type():
     """offer_type 不在允许列表时应返回 422"""
@@ -164,6 +170,7 @@ def test_create_offer_invalid_type():
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 场景 4: GET /offers — 正常返回列表
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 def test_list_offers_ok():
     """返回 items/total 分页结构"""
@@ -193,6 +200,7 @@ def test_list_offers_ok():
 # 场景 5: GET /offers — DB 表不存在时 fallback 空列表
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_list_offers_table_not_ready():
     """表不存在时 graceful 返回空列表，ok=True"""
     db = _make_db(
@@ -213,6 +221,7 @@ def test_list_offers_table_not_ready():
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 场景 6: GET /recommend/{segment} — DB 无数据返回模板
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 def test_recommend_offer_fallback_to_template():
     """DB 无匹配优惠时返回内置模板，source=template"""
@@ -238,6 +247,7 @@ def test_recommend_offer_fallback_to_template():
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 场景 7: GET /recommend/{segment} — DB 有数据返回 source=db
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 def test_recommend_offer_from_db():
     """DB 有匹配优惠时返回 source=db"""
@@ -278,6 +288,7 @@ def test_recommend_offer_from_db():
 # 场景 8: GET /recommend/{segment} — 未知 segment 返回通用模板
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_recommend_offer_unknown_segment():
     """未知 segment 不报错，返回通用兜底模板，ok=True"""
     set_cfg = AsyncMock()
@@ -298,6 +309,7 @@ def test_recommend_offer_unknown_segment():
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 场景 9: POST /offers — DB 表不存在返回 TABLE_NOT_READY
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 def test_create_offer_table_not_ready():
     """DB 表不存在时返回 TABLE_NOT_READY 错误码"""
@@ -326,6 +338,7 @@ def test_create_offer_table_not_ready():
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 场景 10: POST /offers — margin_floor 超出范围 → 422
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 def test_create_offer_invalid_margin_floor():
     """margin_floor 超出 [0,1] 时应返回 422"""

@@ -7,10 +7,10 @@ Sprint I: Agent自动试验基础
   - 选择variant时从Beta(alpha, beta)分布采样，选最高值
   - enrollment完成=成功，exited=失败，更新参数
 """
+
 from __future__ import annotations
 
 import random
-from typing import Optional
 from uuid import UUID
 
 import structlog
@@ -23,16 +23,15 @@ logger = structlog.get_logger(__name__)
 class GrowthExperimentService:
     """基于Thompson Sampling的旅程变体自动选择引擎"""
 
-    async def select_variant(
-        self, template_id: UUID, tenant_id: str, db: AsyncSession
-    ) -> dict:
+    async def select_variant(self, template_id: UUID, tenant_id: str, db: AsyncSession) -> dict:
         """Thompson Sampling选择最优variant"""
         await db.execute(
             text("SELECT set_config('app.tenant_id', :tid, true)"),
             {"tid": tenant_id},
         )
 
-        result = await db.execute(text("""
+        result = await db.execute(
+            text("""
             SELECT
                 ab_variant,
                 COUNT(*) FILTER (WHERE journey_state = 'completed') AS successes,
@@ -42,24 +41,28 @@ class GrowthExperimentService:
             WHERE journey_template_id = :tid AND is_deleted = FALSE
               AND ab_variant IS NOT NULL
             GROUP BY ab_variant
-        """), {"tid": str(template_id)})
+        """),
+            {"tid": str(template_id)},
+        )
 
         variants = []
         for row in result.fetchall():
             alpha = (row[1] or 0) + 1  # successes + 1 (prior)
-            beta_val = (row[2] or 0) + 1   # failures + 1 (prior)
+            beta_val = (row[2] or 0) + 1  # failures + 1 (prior)
             # Beta分布采样
             sample = random.betavariate(alpha, beta_val)
-            variants.append({
-                "variant": row[0],
-                "successes": row[1] or 0,
-                "failures": row[2] or 0,
-                "total": row[3] or 0,
-                "alpha": alpha,
-                "beta": beta_val,
-                "sample": sample,
-                "expected_rate": round(alpha / (alpha + beta_val), 3),
-            })
+            variants.append(
+                {
+                    "variant": row[0],
+                    "successes": row[1] or 0,
+                    "failures": row[2] or 0,
+                    "total": row[3] or 0,
+                    "alpha": alpha,
+                    "beta": beta_val,
+                    "sample": sample,
+                    "expected_rate": round(alpha / (alpha + beta_val), 3),
+                }
+            )
 
         if not variants:
             return {"selected": "control", "reason": "no_data", "variants": []}
@@ -96,7 +99,8 @@ class GrowthExperimentService:
             {"tid": tenant_id},
         )
 
-        result = await db.execute(text("""
+        result = await db.execute(
+            text("""
             SELECT
                 ab_variant,
                 COUNT(*) FILTER (WHERE journey_state = 'completed') AS successes,
@@ -106,18 +110,22 @@ class GrowthExperimentService:
               AND ab_variant IS NOT NULL
             GROUP BY ab_variant
             HAVING COUNT(*) >= :min_samples
-        """), {"tid": str(template_id), "min_samples": min_samples})
+        """),
+            {"tid": str(template_id), "min_samples": min_samples},
+        )
 
         variants = []
         for row in result.fetchall():
             total = row[2] or 1
             rate = (row[1] or 0) / total
-            variants.append({
-                "variant": row[0],
-                "successes": row[1] or 0,
-                "total": total,
-                "success_rate": round(rate, 3),
-            })
+            variants.append(
+                {
+                    "variant": row[0],
+                    "successes": row[1] or 0,
+                    "total": total,
+                    "success_rate": round(rate, 3),
+                }
+            )
 
         if len(variants) < 2:
             return {
@@ -127,10 +135,7 @@ class GrowthExperimentService:
             }
 
         best_rate = max(v["success_rate"] for v in variants)
-        pause_candidates = [
-            v for v in variants
-            if v["success_rate"] < best_rate * 0.5 and v["total"] >= min_samples
-        ]
+        pause_candidates = [v for v in variants if v["success_rate"] < best_rate * 0.5 and v["total"] >= min_samples]
 
         if pause_candidates:
             return {
@@ -147,16 +152,15 @@ class GrowthExperimentService:
             "variants": variants,
         }
 
-    async def get_experiment_summary(
-        self, template_id: UUID, tenant_id: str, db: AsyncSession
-    ) -> dict:
+    async def get_experiment_summary(self, template_id: UUID, tenant_id: str, db: AsyncSession) -> dict:
         """获取实验摘要"""
         await db.execute(
             text("SELECT set_config('app.tenant_id', :tid, true)"),
             {"tid": tenant_id},
         )
 
-        result = await db.execute(text("""
+        result = await db.execute(
+            text("""
             SELECT
                 ab_variant,
                 COUNT(*) AS total,
@@ -171,20 +175,24 @@ class GrowthExperimentService:
               AND ab_variant IS NOT NULL
             GROUP BY ab_variant
             ORDER BY ab_variant
-        """), {"tid": str(template_id)})
+        """),
+            {"tid": str(template_id)},
+        )
 
         variants = []
         for row in result.fetchall():
             total = row[1] or 1
-            variants.append({
-                "variant": row[0],
-                "total": row[1],
-                "completed": row[2],
-                "exited": row[3],
-                "active": row[4],
-                "completion_rate": round((row[2] or 0) / total * 100, 1),
-                "avg_duration_hours": round(row[5], 1) if row[5] else None,
-            })
+            variants.append(
+                {
+                    "variant": row[0],
+                    "total": row[1],
+                    "completed": row[2],
+                    "exited": row[3],
+                    "active": row[4],
+                    "completion_rate": round((row[2] or 0) / total * 100, 1),
+                    "avg_duration_hours": round(row[5], 1) if row[5] else None,
+                }
+            )
 
         return {"template_id": str(template_id), "variants": variants}
 
@@ -203,10 +211,12 @@ class GrowthExperimentService:
         )
 
         # 查有A/B实验的活跃模板
-        templates = await db.execute(text("""
+        templates = await db.execute(
+            text("""
             SELECT id, code, name, ab_test_id FROM growth_journey_templates
             WHERE is_deleted = FALSE AND is_active = TRUE AND ab_test_id IS NOT NULL
-        """))
+        """)
+        )
 
         actions_taken = []
 
@@ -221,7 +231,8 @@ class GrowthExperimentService:
             if pause_check["action"] == "pause_underperformers":
                 for variant in pause_check["pause_variants"]:
                     # 暂停该variant的所有active enrollment
-                    paused = await db.execute(text("""
+                    paused = await db.execute(
+                        text("""
                         UPDATE growth_journey_enrollments SET
                             journey_state = 'cancelled',
                             exit_reason = 'auto_experiment_pause',
@@ -232,7 +243,9 @@ class GrowthExperimentService:
                           AND journey_state IN ('eligible', 'active', 'paused')
                           AND is_deleted = FALSE
                         RETURNING id
-                    """), {"tid": str(template_id), "variant": variant})
+                    """),
+                        {"tid": str(template_id), "variant": variant},
+                    )
                     cancelled_count = len(paused.fetchall())
 
                     action = {
@@ -255,11 +268,14 @@ class GrowthExperimentService:
             # 为高效variant增加流量：更新该模板的优先variant
             if pause_check.get("variants"):
                 best_variant = max(pause_check["variants"], key=lambda v: v["success_rate"])
-                await db.execute(text("""
+                await db.execute(
+                    text("""
                     UPDATE growth_journey_templates SET
                         updated_at = NOW()
                     WHERE id = :tid
-                """), {"tid": str(template_id)})
+                """),
+                    {"tid": str(template_id)},
+                )
                 # 记录最优variant到日志
                 logger.info(
                     "auto_iterate_best_variant",
@@ -290,7 +306,8 @@ class GrowthExperimentService:
         adjustments: list[dict] = []
 
         # 检查低效mechanism
-        low_perf = await db.execute(text("""
+        low_perf = await db.execute(
+            text("""
             SELECT
                 mechanism_type,
                 channel,
@@ -303,7 +320,8 @@ class GrowthExperimentService:
               AND execution_state NOT IN ('blocked','skipped')
             GROUP BY mechanism_type, channel
             HAVING COUNT(*) >= 20
-        """))
+        """)
+        )
 
         for row in low_perf.fetchall():
             total = row[2] or 1
@@ -311,20 +329,23 @@ class GrowthExperimentService:
             open_rate = engaged / total
 
             if open_rate < 0.10:
-                adjustments.append({
-                    "type": "low_open_rate",
-                    "mechanism_type": row[0],
-                    "channel": row[1],
-                    "open_rate": round(open_rate * 100, 1),
-                    "total_touches": total,
-                    "recommendation": (
-                        f"mechanism={row[0]} channel={row[1]} "
-                        f"打开率仅{round(open_rate * 100, 1)}%，建议切换渠道或调整文案"
-                    ),
-                })
+                adjustments.append(
+                    {
+                        "type": "low_open_rate",
+                        "mechanism_type": row[0],
+                        "channel": row[1],
+                        "open_rate": round(open_rate * 100, 1),
+                        "total_touches": total,
+                        "recommendation": (
+                            f"mechanism={row[0]} channel={row[1]} "
+                            f"打开率仅{round(open_rate * 100, 1)}%，建议切换渠道或调整文案"
+                        ),
+                    }
+                )
 
         # 检查低效旅程
-        low_journey = await db.execute(text("""
+        low_journey = await db.execute(
+            text("""
             SELECT
                 gjt.code, gjt.name,
                 COUNT(*) AS total,
@@ -335,7 +356,8 @@ class GrowthExperimentService:
               AND gje.created_at >= NOW() - INTERVAL '14 days'
             GROUP BY gjt.code, gjt.name
             HAVING COUNT(*) >= 10
-        """))
+        """)
+        )
 
         for row in low_journey.fetchall():
             total = row[2] or 1
@@ -343,17 +365,18 @@ class GrowthExperimentService:
             comp_rate = completed / total
 
             if comp_rate < 0.05:
-                adjustments.append({
-                    "type": "low_completion_rate",
-                    "journey_code": row[0],
-                    "journey_name": row[1],
-                    "completion_rate": round(comp_rate * 100, 1),
-                    "total_enrollments": total,
-                    "recommendation": (
-                        f"旅程 {row[1]} 完成率仅{round(comp_rate * 100, 1)}%，"
-                        f"建议检查步骤设计或暂停"
-                    ),
-                })
+                adjustments.append(
+                    {
+                        "type": "low_completion_rate",
+                        "journey_code": row[0],
+                        "journey_name": row[1],
+                        "completion_rate": round(comp_rate * 100, 1),
+                        "total_enrollments": total,
+                        "recommendation": (
+                            f"旅程 {row[1]} 完成率仅{round(comp_rate * 100, 1)}%，建议检查步骤设计或暂停"
+                        ),
+                    }
+                )
 
         logger.info("auto_adjust_done", tenant_id=tenant_id, adjustments=len(adjustments))
         return {"adjustments": adjustments}

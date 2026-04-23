@@ -14,18 +14,19 @@
   - DB 操作通过 _FakeSession 模拟
   - 叙事模板部分保留内存实现，直接测试
 """
+
 from __future__ import annotations
 
 import sys
 import types
 from typing import Any, AsyncGenerator
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock
 
-import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 # ─── 最小化 stub 注入 ──────────────────────────────────────────────────────
+
 
 def _inject_stubs() -> None:
     """注入 structlog + shared 存根"""
@@ -41,8 +42,11 @@ def _inject_stubs() -> None:
         sys.modules["structlog"] = stub
 
     for path in [
-        "shared", "shared.ontology", "shared.ontology.src",
-        "shared.events", "shared.events.src",
+        "shared",
+        "shared.ontology",
+        "shared.ontology.src",
+        "shared.events",
+        "shared.events.src",
     ]:
         if path not in sys.modules:
             sys.modules[path] = types.ModuleType(path)
@@ -105,21 +109,25 @@ class _FakeSession:
             rid = params.get("id")
             rpt = self._reports.get(rid)
             if rpt:
-                return _FakeResult([{
-                    "id": rid,
-                    "name": rpt.get("name", "Test"),
-                    "description": rpt.get("description", ""),
-                    "category": rpt.get("category", "operation"),
-                    "sql_template": rpt.get("sql_template", "SELECT 1 AS val"),
-                    "default_params": {},
-                    "dimensions": [],
-                    "metrics": [],
-                    "filters": [],
-                    "is_system": rpt.get("is_system", False),
-                    "is_active": True,
-                    "created_at": "2026-04-09T00:00:00Z",
-                    "updated_at": "2026-04-09T00:00:00Z",
-                }])
+                return _FakeResult(
+                    [
+                        {
+                            "id": rid,
+                            "name": rpt.get("name", "Test"),
+                            "description": rpt.get("description", ""),
+                            "category": rpt.get("category", "operation"),
+                            "sql_template": rpt.get("sql_template", "SELECT 1 AS val"),
+                            "default_params": {},
+                            "dimensions": [],
+                            "metrics": [],
+                            "filters": [],
+                            "is_system": rpt.get("is_system", False),
+                            "is_active": True,
+                            "created_at": "2026-04-09T00:00:00Z",
+                            "updated_at": "2026-04-09T00:00:00Z",
+                        }
+                    ]
+                )
             return _FakeResult([])
 
         if "COUNT(*) FROM report_configs" in sql_str:
@@ -160,9 +168,8 @@ async def _override_get_db() -> AsyncGenerator[Any, None]:
 
 
 from ..api.report_config_routes import (  # noqa: E402
-    router,
     _get_db,
-    _custom_templates,
+    router,
 )
 
 # ─── TestClient 构建 ────────────────────────────────────────────────────────
@@ -176,6 +183,7 @@ HEADERS = {"X-Tenant-ID": "test-tenant"}
 
 
 # ─── 测试辅助 ──────────────────────────────────────────────────────────────────
+
 
 def _create_report(name: str = "测试报表", category: str = "operation") -> dict:
     """创建报表并返回data字典"""
@@ -192,6 +200,7 @@ def _create_report(name: str = "测试报表", category: str = "operation") -> d
 
 
 # ─── 测试用例 ──────────────────────────────────────────────────────────────────
+
 
 class TestGetReportsList:
     """TC-1: 获取报表列表"""

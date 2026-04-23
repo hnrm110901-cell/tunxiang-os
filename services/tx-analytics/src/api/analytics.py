@@ -1,13 +1,15 @@
 """经营分析 API — 接通 Repository 真查询"""
+
 from typing import Optional
 
 import structlog
-from fastapi import APIRouter, Depends, Request, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
-from ..services.repository import AnalyticsRepository
+
 from ..services.narrative_engine import compose_brief
+from ..services.repository import AnalyticsRepository
 from ..services.store_health_service import classify_health
 
 logger = structlog.get_logger()
@@ -24,7 +26,9 @@ def _get_tenant_id(request: Request) -> str:
 
 
 @router.get("/stores/health")
-async def get_store_health(request: Request, store_id: Optional[str] = None, date: Optional[str] = None, db: AsyncSession = Depends(get_db)):
+async def get_store_health(
+    request: Request, store_id: Optional[str] = None, date: Optional[str] = None, db: AsyncSession = Depends(get_db)
+):
     tid = _get_tenant_id(request)
     if not store_id:
         return {"ok": False, "error": {"code": "MISSING_PARAM", "message": "store_id is required"}}
@@ -37,7 +41,9 @@ async def get_store_health(request: Request, store_id: Optional[str] = None, dat
 
 
 @router.get("/stores/{store_id}/health/detail")
-async def get_store_health_detail(store_id: str, request: Request, date: Optional[str] = None, db: AsyncSession = Depends(get_db)):
+async def get_store_health_detail(
+    store_id: str, request: Request, date: Optional[str] = None, db: AsyncSession = Depends(get_db)
+):
     tid = _get_tenant_id(request)
     try:
         repo = AnalyticsRepository(db, tid)
@@ -58,9 +64,33 @@ async def get_store_brief(store_id: str, request: Request, date: str = "today", 
         alerts = await repo.get_kpi_alerts(store_id)
         decisions = await repo.get_top3_decisions(store_id)
         revenue_yuan = daily["revenue_fen"] / 100
-        cost_metrics = {"revenue_yuan": revenue_yuan, "actual_cost_pct": 0.0, "cost_rate_label": "正常", "cost_rate_status": "ok"}
-        brief = compose_brief(store_label=f"门店{store_id[:8]}", cost_metrics=cost_metrics, decision_summary={"approved": 0, "total": len(decisions)}, waste_top5=[], pending_count=len(decisions), top_decisions=decisions)
-        return {"ok": True, "data": {"brief": brief, "metrics": {"revenue_fen": daily["revenue_fen"], "order_count": daily["order_count"], "avg_ticket_fen": daily["avg_ticket_fen"], "health_score": health["overall_score"], "alert_count": len(alerts)}}}
+        cost_metrics = {
+            "revenue_yuan": revenue_yuan,
+            "actual_cost_pct": 0.0,
+            "cost_rate_label": "正常",
+            "cost_rate_status": "ok",
+        }
+        brief = compose_brief(
+            store_label=f"门店{store_id[:8]}",
+            cost_metrics=cost_metrics,
+            decision_summary={"approved": 0, "total": len(decisions)},
+            waste_top5=[],
+            pending_count=len(decisions),
+            top_decisions=decisions,
+        )
+        return {
+            "ok": True,
+            "data": {
+                "brief": brief,
+                "metrics": {
+                    "revenue_fen": daily["revenue_fen"],
+                    "order_count": daily["order_count"],
+                    "avg_ticket_fen": daily["avg_ticket_fen"],
+                    "health_score": health["overall_score"],
+                    "alert_count": len(alerts),
+                },
+            },
+        }
     except ValueError as exc:
         return {"ok": False, "error": {"code": "NOT_FOUND", "message": str(exc)}}
 
@@ -74,7 +104,9 @@ async def get_kpi_alerts(store_id: str, request: Request, db: AsyncSession = Dep
 
 
 @router.get("/kpi/trend")
-async def get_kpi_trend(store_id: str, kpi_name: str, request: Request, days: int = 30, db: AsyncSession = Depends(get_db)):
+async def get_kpi_trend(
+    store_id: str, kpi_name: str, request: Request, days: int = 30, db: AsyncSession = Depends(get_db)
+):
     tid = _get_tenant_id(request)
     repo = AnalyticsRepository(db, tid)
     trend = await repo.get_kpi_trend(store_id, kpi_name, days)
@@ -82,7 +114,9 @@ async def get_kpi_trend(store_id: str, kpi_name: str, request: Request, days: in
 
 
 @router.get("/reports/daily")
-async def get_daily_report(store_id: str, request: Request, date: Optional[str] = None, db: AsyncSession = Depends(get_db)):
+async def get_daily_report(
+    store_id: str, request: Request, date: Optional[str] = None, db: AsyncSession = Depends(get_db)
+):
     tid = _get_tenant_id(request)
     repo = AnalyticsRepository(db, tid)
     report = await repo.get_daily_report(store_id, date or "today")
@@ -90,7 +124,9 @@ async def get_daily_report(store_id: str, request: Request, date: Optional[str] 
 
 
 @router.get("/reports/weekly")
-async def get_weekly_report(store_id: str, request: Request, week: Optional[str] = None, db: AsyncSession = Depends(get_db)):
+async def get_weekly_report(
+    store_id: str, request: Request, week: Optional[str] = None, db: AsyncSession = Depends(get_db)
+):
     tid = _get_tenant_id(request)
     repo = AnalyticsRepository(db, tid)
     report = await repo.get_weekly_report(store_id, week)
@@ -106,7 +142,9 @@ async def get_top3_decisions(store_id: str, request: Request, db: AsyncSession =
 
 
 @router.get("/decisions/behavior-report")
-async def get_behavior_report(store_id: str, start_date: str, end_date: str, request: Request, db: AsyncSession = Depends(get_db)):
+async def get_behavior_report(
+    store_id: str, start_date: str, end_date: str, request: Request, db: AsyncSession = Depends(get_db)
+):
     tid = _get_tenant_id(request)
     repo = AnalyticsRepository(db, tid)
     report = await repo.get_behavior_report(store_id, start_date, end_date)
@@ -164,7 +202,10 @@ async def bff_hq(brand_id: str, request: Request, db: AsyncSession = Depends(get
             d["store_id"] = str(store.id)
             d["store_name"] = store.store_name
         top_decisions.extend(decisions)
-    return {"ok": True, "data": {"health_scores": health_scores, "top_decisions": top_decisions[:5], "alerts": all_alerts}}
+    return {
+        "ok": True,
+        "data": {"health_scores": health_scores, "top_decisions": top_decisions[:5], "alerts": all_alerts},
+    }
 
 
 @router.get("/bff/sm/{store_id}")
@@ -176,7 +217,34 @@ async def bff_store_manager(store_id: str, request: Request, db: AsyncSession = 
         health = await repo.get_store_health(store_id)
         alerts = await repo.get_kpi_alerts(store_id)
         decisions = await repo.get_top3_decisions(store_id)
-        brief = compose_brief(store_label=f"门店{store_id[:8]}", cost_metrics={"revenue_yuan": daily["revenue_fen"] / 100, "actual_cost_pct": 0.0, "cost_rate_label": "正常", "cost_rate_status": "ok"}, decision_summary={"approved": 0, "total": len(decisions)}, waste_top5=[], pending_count=len(decisions), top_decisions=decisions)
-        return {"ok": True, "data": {"brief": brief, "health_score": health["overall_score"], "health_level": classify_health(health["overall_score"]), "alerts": alerts, "decisions": decisions, "metrics": {"revenue_fen": daily["revenue_fen"], "order_count": daily["order_count"], "avg_ticket_fen": daily["avg_ticket_fen"], "guest_count": daily["guest_count"]}}}
+        brief = compose_brief(
+            store_label=f"门店{store_id[:8]}",
+            cost_metrics={
+                "revenue_yuan": daily["revenue_fen"] / 100,
+                "actual_cost_pct": 0.0,
+                "cost_rate_label": "正常",
+                "cost_rate_status": "ok",
+            },
+            decision_summary={"approved": 0, "total": len(decisions)},
+            waste_top5=[],
+            pending_count=len(decisions),
+            top_decisions=decisions,
+        )
+        return {
+            "ok": True,
+            "data": {
+                "brief": brief,
+                "health_score": health["overall_score"],
+                "health_level": classify_health(health["overall_score"]),
+                "alerts": alerts,
+                "decisions": decisions,
+                "metrics": {
+                    "revenue_fen": daily["revenue_fen"],
+                    "order_count": daily["order_count"],
+                    "avg_ticket_fen": daily["avg_ticket_fen"],
+                    "guest_count": daily["guest_count"],
+                },
+            },
+        }
     except ValueError as exc:
         return {"ok": False, "error": {"code": "NOT_FOUND", "message": str(exc)}}

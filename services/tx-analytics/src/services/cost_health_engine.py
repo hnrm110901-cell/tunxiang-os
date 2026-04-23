@@ -11,6 +11,7 @@
 AI 建议触发策略：health_score < 65 时才调用 ModelRouter（控成本）。
 缓存策略：计算结果允许1小时缓存。
 """
+
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
@@ -27,21 +28,21 @@ logger = structlog.get_logger(__name__)
 
 DIMENSION_WEIGHTS: dict[str, float] = {
     "ingredient_cost_rate": 0.45,  # 食材成本率（最重要）
-    "labor_cost_rate": 0.30,       # 人力成本率
-    "waste_rate": 0.25,            # 损耗率
+    "labor_cost_rate": 0.30,  # 人力成本率
+    "waste_rate": 0.25,  # 损耗率
 }
 
 # 行业目标阈值（餐饮行业经验值）
 INDUSTRY_TARGETS: dict[str, float] = {
     "ingredient_cost_rate": 0.30,  # 食材成本率目标≤30%
-    "labor_cost_rate": 0.25,       # 人力成本率目标≤25%
-    "waste_rate": 0.05,            # 损耗率目标≤5%
+    "labor_cost_rate": 0.25,  # 人力成本率目标≤25%
+    "waste_rate": 0.05,  # 损耗率目标≤5%
 }
 
 # 健康等级阈值
 HEALTH_THRESHOLDS = {
-    "healthy": 80.0,   # 绿色：成本结构健康
-    "warning": 65.0,   # 黄色：需关注
+    "healthy": 80.0,  # 绿色：成本结构健康
+    "warning": 65.0,  # 黄色：需关注
     # < 65 → critical：需立即干预
 }
 
@@ -67,9 +68,9 @@ class StoreCostHealthReport(BaseModel):
     period_days: int
 
     # 三维度实际成本率
-    ingredient_cost_rate: float   # 食材成本率（来自 order_items + orders）
-    labor_cost_rate: float        # 人力成本率（来自 crew_shifts + employees）
-    waste_rate: float             # 损耗率（来自 waste_records + purchase_orders）
+    ingredient_cost_rate: float  # 食材成本率（来自 order_items + orders）
+    labor_cost_rate: float  # 人力成本率（来自 crew_shifts + employees）
+    waste_rate: float  # 损耗率（来自 waste_records + purchase_orders）
 
     # 三维度单项分数（0-100）
     ingredient_score: float
@@ -77,8 +78,8 @@ class StoreCostHealthReport(BaseModel):
     waste_score: float
 
     # 综合健康分
-    health_score: float           # 加权综合分 0-100
-    health_level: HealthLevel     # healthy / warning / critical
+    health_score: float  # 加权综合分 0-100
+    health_level: HealthLevel  # healthy / warning / critical
 
     # 品牌基准（同品牌其他门店中位数）
     benchmark_ingredient: float
@@ -301,9 +302,7 @@ class CostHealthEngine:
 
         # ── 2. 食材成本率 ──────────────────────────────────────
         # SQL: SUM(oi.food_cost_fen) / SUM(o.final_amount_fen)，来自已完成订单
-        revenue_cost_row = await self._fetch_revenue_and_food_cost(
-            store_id, tenant_id, period_days, db
-        )
+        revenue_cost_row = await self._fetch_revenue_and_food_cost(store_id, tenant_id, period_days, db)
         net_revenue_fen = revenue_cost_row["net_revenue_fen"] if revenue_cost_row else 0
         food_cost_fen = revenue_cost_row["food_cost_fen"] if revenue_cost_row else 0
         ingredient_rate = calc_ingredient_cost_rate(food_cost_fen, net_revenue_fen)
@@ -337,12 +336,8 @@ class CostHealthEngine:
         ingr_score = calc_dimension_score(
             "ingredient_cost_rate", ingredient_rate, INDUSTRY_TARGETS["ingredient_cost_rate"]
         )
-        labor_score = calc_dimension_score(
-            "labor_cost_rate", labor_rate, INDUSTRY_TARGETS["labor_cost_rate"]
-        )
-        waste_score = calc_dimension_score(
-            "waste_rate", waste_rate, INDUSTRY_TARGETS["waste_rate"]
-        )
+        labor_score = calc_dimension_score("labor_cost_rate", labor_rate, INDUSTRY_TARGETS["labor_cost_rate"])
+        waste_score = calc_dimension_score("waste_rate", waste_rate, INDUSTRY_TARGETS["waste_rate"])
 
         # ── 8. 综合健康分 ──────────────────────────────────────
         health_score = calc_weighted_health_score(ingr_score, labor_score, waste_score)
@@ -501,7 +496,9 @@ class CostHealthEngine:
             tenant_id=tenant_id,
             period_days=period_days,
             store_count=int(row_data["store_count"] or 0),
-            median_ingredient_cost_rate=float(row_data["median_ingredient"] or INDUSTRY_TARGETS["ingredient_cost_rate"]),
+            median_ingredient_cost_rate=float(
+                row_data["median_ingredient"] or INDUSTRY_TARGETS["ingredient_cost_rate"]
+            ),
             median_labor_cost_rate=float(row_data["median_labor"] or INDUSTRY_TARGETS["labor_cost_rate"]),
             median_waste_rate=float(row_data["median_waste"] or INDUSTRY_TARGETS["waste_rate"]),
             mean_ingredient_cost_rate=float(row_data["mean_ingredient"] or INDUSTRY_TARGETS["ingredient_cost_rate"]),
@@ -660,9 +657,7 @@ class CostHealthEngine:
 
     # ── 内部 DB 查询方法 ────────────────────────────────────────────────────
 
-    async def _fetch_store_info(
-        self, store_id: str, tenant_id: str, db: AsyncSession
-    ) -> dict | None:
+    async def _fetch_store_info(self, store_id: str, tenant_id: str, db: AsyncSession) -> dict | None:
         """查询门店名称和品牌ID"""
         result = await db.execute(
             text("""
@@ -708,9 +703,7 @@ class CostHealthEngine:
         )
         return result.mappings().first()
 
-    async def _fetch_labor_cost(
-        self, store_id: str, tenant_id: str, period_days: int, db: AsyncSession
-    ) -> dict | None:
+    async def _fetch_labor_cost(self, store_id: str, tenant_id: str, period_days: int, db: AsyncSession) -> dict | None:
         """查询人力成本
 
         SQL 逻辑：
@@ -737,9 +730,7 @@ class CostHealthEngine:
         )
         return result.mappings().first()
 
-    async def _fetch_waste_rate(
-        self, store_id: str, tenant_id: str, period_days: int, db: AsyncSession
-    ) -> dict | None:
+    async def _fetch_waste_rate(self, store_id: str, tenant_id: str, period_days: int, db: AsyncSession) -> dict | None:
         """查询损耗成本和采购总额
 
         SQL 逻辑：
@@ -772,9 +763,7 @@ class CostHealthEngine:
         )
         return result.mappings().first()
 
-    def _default_benchmark(
-        self, brand_id: str, tenant_id: str, period_days: int
-    ) -> BrandCostBenchmark:
+    def _default_benchmark(self, brand_id: str, tenant_id: str, period_days: int) -> BrandCostBenchmark:
         """无门店数据时返回行业默认基准"""
         return BrandCostBenchmark(
             brand_id=brand_id,

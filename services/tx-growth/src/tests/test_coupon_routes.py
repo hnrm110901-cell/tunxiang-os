@@ -12,16 +12,16 @@
 9.  POST /api/v1/growth/coupons/{id}/apply    — 订单金额不足返回 ORDER_AMOUNT_TOO_LOW
 10. POST /api/v1/growth/coupons/{id}/apply    — 缺少 order_id → 422
 """
+
 import os
 import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 import uuid
-from datetime import date, datetime, timezone, timedelta
+from datetime import date, datetime, timedelta, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from sqlalchemy.exc import OperationalError
@@ -32,8 +32,10 @@ _HEADERS = {"X-Tenant-ID": TENANT_ID, "Authorization": "Bearer test"}
 
 # ── 工具 ────────────────────────────────────────────────────────────────────
 
+
 class _FakeRow:
     """模拟 SQLAlchemy named-column row"""
+
     def __init__(self, **kw):
         for k, v in kw.items():
             setattr(self, k, v)
@@ -57,7 +59,7 @@ def _make_db(*execute_results):
 # ── 加载路由（patch emit_event + get_db） ────────────────────────────────────
 
 with patch("shared.events.src.emitter.emit_event", new=AsyncMock()):
-    from api.coupon_routes import router, get_db
+    from api.coupon_routes import get_db, router
 
 app = FastAPI()
 app.include_router(router)
@@ -66,10 +68,12 @@ app.include_router(router)
 def _override(db):
     def _dep():
         return db
+
     return _dep
 
 
 # ── 复用 mock 行 ─────────────────────────────────────────────────────────────
+
 
 def _coupon_row():
     return _FakeRow(
@@ -121,6 +125,7 @@ def _apply_row():
 # 场景 1: GET /available — 正常路径
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_list_available_coupons_ok():
     """返回可领取优惠券列表"""
     set_cfg = AsyncMock()
@@ -143,6 +148,7 @@ def test_list_available_coupons_ok():
 # 场景 2: GET /available — DB 表不存在 fallback
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_list_available_coupons_table_not_ready():
     """表不存在时 graceful 返回空列表，ok=True"""
     db = _make_db(
@@ -163,6 +169,7 @@ def test_list_available_coupons_table_not_ready():
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 场景 3: POST /claim — 正常领取
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 def test_claim_coupon_ok():
     """正常领取返回 customer_coupon_id"""
@@ -201,6 +208,7 @@ def test_claim_coupon_ok():
 # 场景 4: POST /claim — 缺少 coupon_id → 422
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_claim_missing_coupon_id():
     """coupon_id 为必填，缺少时应返回 422"""
     db = AsyncMock()
@@ -218,6 +226,7 @@ def test_claim_missing_coupon_id():
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 场景 5: POST /claim — DB 表不存在时 TABLE_NOT_READY
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 def test_claim_table_not_ready():
     """表不存在时返回 TABLE_NOT_READY 错误码"""
@@ -245,6 +254,7 @@ def test_claim_table_not_ready():
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 场景 6: POST /verify — 正常核销
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 def test_verify_coupon_ok():
     """核销成功，返回 status=used"""
@@ -278,6 +288,7 @@ def test_verify_coupon_ok():
 # 场景 7: POST /verify — 缺少 customer_coupon_id → 422
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_verify_missing_customer_coupon_id():
     """customer_coupon_id 为必填，缺少时应返回 422"""
     db = AsyncMock()
@@ -296,6 +307,7 @@ def test_verify_missing_customer_coupon_id():
 # 场景 8: GET /my — 重定向提示
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_my_coupons_redirect():
     """返回 redirect 字段，指向 tx-member"""
     db = AsyncMock()
@@ -313,6 +325,7 @@ def test_my_coupons_redirect():
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 场景 9: POST /{id}/apply — 订单金额不足
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 def test_apply_coupon_order_amount_too_low():
     """订单金额未达到门槛时返回 ORDER_AMOUNT_TOO_LOW"""
@@ -347,6 +360,7 @@ def test_apply_coupon_order_amount_too_low():
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 场景 10: POST /{id}/apply — 缺少 order_id → 422
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 def test_apply_coupon_missing_order_id():
     """order_id 为必填，缺少时应返回 422"""

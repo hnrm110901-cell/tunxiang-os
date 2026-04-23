@@ -8,6 +8,7 @@
   - 活鲜损耗专项（三分类）
   - 食安风险图谱
 """
+
 import uuid
 from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock
@@ -53,10 +54,12 @@ async def test_inventory_turnover_normal():
     # inventory snapshots: start=200000, end=300000 => avg=250000
     inv_result = MagicMock()
     inv_mappings = MagicMock()
-    inv_mappings.first.return_value = _make_mapping({
-        "start_cost_fen": 200000,
-        "end_cost_fen": 300000,
-    })
+    inv_mappings.first.return_value = _make_mapping(
+        {
+            "start_cost_fen": 200000,
+            "end_cost_fen": 300000,
+        }
+    )
     inv_result.mappings.return_value = inv_mappings
 
     session.execute.side_effect = [set_config, consumption, inv_result]
@@ -91,10 +94,12 @@ async def test_inventory_turnover_no_consumption():
     consumption.scalar.return_value = 0
     inv_result = MagicMock()
     inv_mappings = MagicMock()
-    inv_mappings.first.return_value = _make_mapping({
-        "start_cost_fen": 100000,
-        "end_cost_fen": 100000,
-    })
+    inv_mappings.first.return_value = _make_mapping(
+        {
+            "start_cost_fen": 100000,
+            "end_cost_fen": 100000,
+        }
+    )
     inv_result.mappings.return_value = inv_mappings
 
     session.execute.side_effect = [set_config, consumption, inv_result]
@@ -124,22 +129,26 @@ async def test_waste_ranking():
     query_result = MagicMock()
     query_mappings = MagicMock()
     query_mappings.all.return_value = [
-        _make_mapping({
-            "ingredient_id": uuid.UUID(INGREDIENT_1),
-            "ingredient_name": "鲍鱼",
-            "total_cost_fen": 50000,
-            "total_qty": 5.0,
-            "frequency": 3,
-            "unit": "只",
-        }),
-        _make_mapping({
-            "ingredient_id": uuid.UUID(INGREDIENT_2),
-            "ingredient_name": "生菜",
-            "total_cost_fen": 2000,
-            "total_qty": 10.0,
-            "frequency": 7,
-            "unit": "kg",
-        }),
+        _make_mapping(
+            {
+                "ingredient_id": uuid.UUID(INGREDIENT_1),
+                "ingredient_name": "鲍鱼",
+                "total_cost_fen": 50000,
+                "total_qty": 5.0,
+                "frequency": 3,
+                "unit": "只",
+            }
+        ),
+        _make_mapping(
+            {
+                "ingredient_id": uuid.UUID(INGREDIENT_2),
+                "ingredient_name": "生菜",
+                "total_cost_fen": 2000,
+                "total_qty": 10.0,
+                "frequency": 7,
+                "unit": "kg",
+            }
+        ),
     ]
     query_result.mappings.return_value = query_mappings
 
@@ -172,26 +181,30 @@ async def test_stocktake_variance_analysis():
     query_result = MagicMock()
     query_mappings = MagicMock()
     query_mappings.all.return_value = [
-        _make_mapping({
-            "ingredient_id": uuid.UUID(INGREDIENT_1),
-            "ingredient_name": "虾仁",
-            "unit": "kg",
-            "total_expected": 20.0,
-            "total_actual": 18.0,
-            "total_variance_qty": -2.0,
-            "total_variance_cost_fen": -6000,
-            "stocktake_count": 2,
-        }),
-        _make_mapping({
-            "ingredient_id": uuid.UUID(INGREDIENT_2),
-            "ingredient_name": "酱油",
-            "unit": "瓶",
-            "total_expected": 10.0,
-            "total_actual": 11.0,
-            "total_variance_qty": 1.0,
-            "total_variance_cost_fen": 500,
-            "stocktake_count": 1,
-        }),
+        _make_mapping(
+            {
+                "ingredient_id": uuid.UUID(INGREDIENT_1),
+                "ingredient_name": "虾仁",
+                "unit": "kg",
+                "total_expected": 20.0,
+                "total_actual": 18.0,
+                "total_variance_qty": -2.0,
+                "total_variance_cost_fen": -6000,
+                "stocktake_count": 2,
+            }
+        ),
+        _make_mapping(
+            {
+                "ingredient_id": uuid.UUID(INGREDIENT_2),
+                "ingredient_name": "酱油",
+                "unit": "瓶",
+                "total_expected": 10.0,
+                "total_actual": 11.0,
+                "total_variance_qty": 1.0,
+                "total_variance_cost_fen": 500,
+                "stocktake_count": 1,
+            }
+        ),
     ]
     query_result.mappings.return_value = query_mappings
 
@@ -224,16 +237,18 @@ async def test_procurement_variance():
     query_result = MagicMock()
     query_mappings = MagicMock()
     query_mappings.all.return_value = [
-        _make_mapping({
-            "ingredient_id": uuid.UUID(INGREDIENT_1),
-            "ingredient_name": "猪肉",
-            "unit": "kg",
-            "total_planned": 100.0,
-            "total_actual": 110.0,
-            "total_planned_cost": 300000,
-            "total_actual_cost": 345000,
-            "order_count": 5,
-        }),
+        _make_mapping(
+            {
+                "ingredient_id": uuid.UUID(INGREDIENT_1),
+                "ingredient_name": "猪肉",
+                "unit": "kg",
+                "total_planned": 100.0,
+                "total_actual": 110.0,
+                "total_planned_cost": 300000,
+                "total_actual_cost": 345000,
+                "order_count": 5,
+            }
+        ),
     ]
     query_result.mappings.return_value = query_mappings
 
@@ -265,24 +280,28 @@ async def test_seafood_waste_analysis():
     query_result = MagicMock()
     query_mappings = MagicMock()
     query_mappings.all.return_value = [
-        _make_mapping({
-            "ingredient_id": uuid.UUID(INGREDIENT_1),
-            "ingredient_name": "帝王蟹",
-            "waste_category": "death",
-            "total_qty": 2.0,
-            "total_cost_fen": 80000,
-            "unit": "只",
-            "occurrence_count": 2,
-        }),
-        _make_mapping({
-            "ingredient_id": uuid.UUID(INGREDIENT_2),
-            "ingredient_name": "石斑鱼",
-            "waste_category": "quality_downgrade",
-            "total_qty": 3.0,
-            "total_cost_fen": 15000,
-            "unit": "条",
-            "occurrence_count": 3,
-        }),
+        _make_mapping(
+            {
+                "ingredient_id": uuid.UUID(INGREDIENT_1),
+                "ingredient_name": "帝王蟹",
+                "waste_category": "death",
+                "total_qty": 2.0,
+                "total_cost_fen": 80000,
+                "unit": "只",
+                "occurrence_count": 2,
+            }
+        ),
+        _make_mapping(
+            {
+                "ingredient_id": uuid.UUID(INGREDIENT_2),
+                "ingredient_name": "石斑鱼",
+                "waste_category": "quality_downgrade",
+                "total_qty": 3.0,
+                "total_cost_fen": 15000,
+                "unit": "条",
+                "occurrence_count": 3,
+            }
+        ),
     ]
     query_result.mappings.return_value = query_mappings
 
@@ -319,15 +338,17 @@ async def test_food_safety_risk_graph():
     expiry_result = MagicMock()
     expiry_mappings = MagicMock()
     expiry_mappings.all.return_value = [
-        _make_mapping({
-            "ingredient_id": uuid.UUID(INGREDIENT_1),
-            "ingredient_name": "三文鱼",
-            "batch_no": "B202603001",
-            "expiry_date": now,
-            "qty_on_hand": 5.0,
-            "unit": "kg",
-            "expiry_status": "expired",
-        }),
+        _make_mapping(
+            {
+                "ingredient_id": uuid.UUID(INGREDIENT_1),
+                "ingredient_name": "三文鱼",
+                "batch_no": "B202603001",
+                "expiry_date": now,
+                "qty_on_hand": 5.0,
+                "unit": "kg",
+                "expiry_status": "expired",
+            }
+        ),
     ]
     expiry_result.mappings.return_value = expiry_mappings
 

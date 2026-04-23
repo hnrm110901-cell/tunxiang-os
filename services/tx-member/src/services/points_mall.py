@@ -3,6 +3,7 @@
 积分兑换流程: 扣积分 + 创建兑换记录 + 库存-1
 所有金额单位：分(fen)。
 """
+
 from __future__ import annotations
 
 import uuid
@@ -18,22 +19,65 @@ logger = structlog.get_logger(__name__)
 # ── 成就里程碑定义 ────────────────────────────────────────────
 
 ACHIEVEMENT_DEFINITIONS = [
-    {"id": "first_order", "name": "初来乍到", "description": "完成首单",
-     "threshold": 1, "metric": "order_count", "reward_points": 10, "icon": "badge_first"},
-    {"id": "orders_10", "name": "常客", "description": "累计下单10次",
-     "threshold": 10, "metric": "order_count", "reward_points": 50, "icon": "badge_regular"},
-    {"id": "orders_50", "name": "铁粉", "description": "累计下单50次",
-     "threshold": 50, "metric": "order_count", "reward_points": 200, "icon": "badge_super"},
-    {"id": "spent_1000", "name": "千元户", "description": "累计消费满1000元",
-     "threshold": 100000, "metric": "total_spent_fen", "reward_points": 100, "icon": "badge_spender"},
-    {"id": "share_5", "name": "美食传播者", "description": "分享5次给好友",
-     "threshold": 5, "metric": "share_count", "reward_points": 30, "icon": "badge_sharer"},
-    {"id": "review_10", "name": "点评达人", "description": "发布10条评价",
-     "threshold": 10, "metric": "review_count", "reward_points": 50, "icon": "badge_reviewer"},
+    {
+        "id": "first_order",
+        "name": "初来乍到",
+        "description": "完成首单",
+        "threshold": 1,
+        "metric": "order_count",
+        "reward_points": 10,
+        "icon": "badge_first",
+    },
+    {
+        "id": "orders_10",
+        "name": "常客",
+        "description": "累计下单10次",
+        "threshold": 10,
+        "metric": "order_count",
+        "reward_points": 50,
+        "icon": "badge_regular",
+    },
+    {
+        "id": "orders_50",
+        "name": "铁粉",
+        "description": "累计下单50次",
+        "threshold": 50,
+        "metric": "order_count",
+        "reward_points": 200,
+        "icon": "badge_super",
+    },
+    {
+        "id": "spent_1000",
+        "name": "千元户",
+        "description": "累计消费满1000元",
+        "threshold": 100000,
+        "metric": "total_spent_fen",
+        "reward_points": 100,
+        "icon": "badge_spender",
+    },
+    {
+        "id": "share_5",
+        "name": "美食传播者",
+        "description": "分享5次给好友",
+        "threshold": 5,
+        "metric": "share_count",
+        "reward_points": 30,
+        "icon": "badge_sharer",
+    },
+    {
+        "id": "review_10",
+        "name": "点评达人",
+        "description": "发布10条评价",
+        "threshold": 10,
+        "metric": "review_count",
+        "reward_points": 50,
+        "icon": "badge_reviewer",
+    },
 ]
 
 
 # ── 工具函数 ──────────────────────────────────────────────────
+
 
 def _now_utc() -> datetime:
     return datetime.now(timezone.utc)
@@ -194,9 +238,13 @@ async def exchange_item(
             VALUES (:eid, :tid, :cid, :iid, :name, :pts, 'confirmed', :now)
         """),
         {
-            "eid": exchange_id, "tid": tenant_id, "cid": customer_id,
-            "iid": item_id, "name": item["name"],
-            "pts": points_cost, "now": now,
+            "eid": exchange_id,
+            "tid": tenant_id,
+            "cid": customer_id,
+            "iid": item_id,
+            "name": item["name"],
+            "pts": points_cost,
+            "now": now,
         },
     )
 
@@ -209,8 +257,11 @@ async def exchange_item(
             VALUES (:id, :tid, :cid, 'spend', 'exchange', :pts, :now)
         """),
         {
-            "id": log_id, "tid": tenant_id, "cid": str(card["card_id"]),
-            "pts": points_cost, "now": now,
+            "id": log_id,
+            "tid": tenant_id,
+            "cid": str(card["card_id"]),
+            "pts": points_cost,
+            "now": now,
         },
     )
     await db.flush()
@@ -279,7 +330,9 @@ async def get_exchange_history(
             "item_name": r["item_name"],
             "points_cost": r["points_cost"],
             "status": r["status"],
-            "created_at": r["created_at"].isoformat() if hasattr(r["created_at"], "isoformat") else str(r["created_at"]),
+            "created_at": r["created_at"].isoformat()
+            if hasattr(r["created_at"], "isoformat")
+            else str(r["created_at"]),
         }
         for r in rows.mappings().all()
     ]
@@ -338,9 +391,14 @@ async def create_mall_item(
                     false, :now, :now)
         """),
         {
-            "iid": item_id, "tid": tenant_id, "name": name,
-            "cat": category, "pts": points_cost,
-            "stock": stock, "img": image_url, "desc": description,
+            "iid": item_id,
+            "tid": tenant_id,
+            "name": name,
+            "cat": category,
+            "pts": points_cost,
+            "stock": stock,
+            "img": image_url,
+            "desc": description,
             "now": now,
         },
     )
@@ -420,12 +478,14 @@ async def get_achievement_list(
             earned_count += 1
         progress = min(100, round(metric_val / defn["threshold"] * 100, 1)) if defn["threshold"] > 0 else 0
 
-        achievements.append({
-            **defn,
-            "earned": earned,
-            "progress": progress,
-            "current_value": int(metric_val),
-        })
+        achievements.append(
+            {
+                **defn,
+                "earned": earned,
+                "progress": progress,
+                "current_value": int(metric_val),
+            }
+        )
 
     logger.info(
         "points_mall.achievements",
@@ -496,8 +556,7 @@ async def check_birthday_privilege(
                 WHERE customer_id = :cid AND tenant_id = :tid
                   AND reward_year = :year AND reward_month = :month
             """),
-            {"cid": customer_id, "tid": tenant_id,
-             "year": _now_utc().year, "month": current_month},
+            {"cid": customer_id, "tid": tenant_id, "year": _now_utc().year, "month": current_month},
         )
         already_claimed = used_row.scalar() is not None
 

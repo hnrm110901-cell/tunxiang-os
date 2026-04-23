@@ -8,6 +8,7 @@
   GET  /api/v1/analytics/evidence-chain/{chain_id} — 获取指定证据链
   GET  /api/v1/analytics/evidence-chain            — 列出最近 20 条（可按商户过滤）
 """
+
 from __future__ import annotations
 
 import json
@@ -29,16 +30,17 @@ router = APIRouter(prefix="/api/v1/analytics", tags=["evidence-chain"])
 
 # ── 数据模型 ──────────────────────────────────────────────────────────────────────
 
+
 class EvidenceLink(BaseModel):
-    source_type: str   # "event" | "materialized_view" | "db_query" | "merchant_target"
-    source_ref: str    # 事件 ID / 物化视图名 / SQL 摘要 / 目标键
-    value_summary: str # 人类可读摘要，例："revenue 日均 28,500元 (↑8%)"
+    source_type: str  # "event" | "materialized_view" | "db_query" | "merchant_target"
+    source_ref: str  # 事件 ID / 物化视图名 / SQL 摘要 / 目标键
+    value_summary: str  # 人类可读摘要，例："revenue 日均 28,500元 (↑8%)"
     confidence: float  # 0.0-1.0
 
 
 class CreateEvidenceChainReq(BaseModel):
     merchant_code: str
-    conclusion_type: str    # "weekly_brief" | "daily_brief" | "anomaly" | "recommendation"
+    conclusion_type: str  # "weekly_brief" | "daily_brief" | "anomaly" | "recommendation"
     conclusion_text: str
     evidence_links: list[EvidenceLink] = Field(default_factory=list)
     merchant_target_refs: list[str] = Field(default_factory=list)
@@ -62,6 +64,7 @@ class AIEvidenceChain(BaseModel):
 
 # ── 租户 UUID 推导 ────────────────────────────────────────────────────────────────
 
+
 def _tenant_uuid(merchant_code: str) -> uuid.UUID:
     """将 merchant_code 映射到确定性 UUID（演示环境）。"""
     tenant_str = f"{merchant_code}-demo-tenant"
@@ -69,6 +72,7 @@ def _tenant_uuid(merchant_code: str) -> uuid.UUID:
 
 
 # ── 端点实现 ──────────────────────────────────────────────────────────────────────
+
 
 @router.post("/evidence-chain", summary="记录 AI 结论证据链", status_code=201)
 async def create_evidence_chain(payload: CreateEvidenceChainReq) -> dict:
@@ -96,9 +100,7 @@ async def create_evidence_chain(payload: CreateEvidenceChainReq) -> dict:
                     "mc": payload.merchant_code,
                     "ctype": payload.conclusion_type,
                     "ctext": payload.conclusion_text,
-                    "elinks": json.dumps(
-                        [lnk.model_dump() for lnk in payload.evidence_links]
-                    ),
+                    "elinks": json.dumps([lnk.model_dump() for lnk in payload.evidence_links]),
                     "trefs": json.dumps(payload.merchant_target_refs),
                     "conf": str(payload.confidence),
                 },

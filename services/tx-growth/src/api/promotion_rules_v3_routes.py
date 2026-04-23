@@ -27,6 +27,7 @@ RLS: NULLIF(current_setting('app.tenant_id', true), '')::uuid
 统一响应: {"ok": bool, "data": {}, "error": {}}
 所有接口需 X-Tenant-ID header
 """
+
 from __future__ import annotations
 
 import uuid
@@ -52,23 +53,23 @@ router = APIRouter(prefix="/api/v1/promotions/v3", tags=["promotion-rules-v3"])
 
 class PromotionTypeV3(str, Enum):
     # V2 类型（复用）
-    TIME_DISCOUNT       = "TIME_DISCOUNT"       # 时段折扣
-    ITEM_DISCOUNT       = "ITEM_DISCOUNT"       # 品项指定折扣
-    BUY_GIFT            = "BUY_GIFT"            # 买赠
-    FULL_REDUCE         = "FULL_REDUCE"         # 满减
-    VOUCHER_VERIFY      = "VOUCHER_VERIFY"      # 团购券核销
+    TIME_DISCOUNT = "TIME_DISCOUNT"  # 时段折扣
+    ITEM_DISCOUNT = "ITEM_DISCOUNT"  # 品项指定折扣
+    BUY_GIFT = "BUY_GIFT"  # 买赠
+    FULL_REDUCE = "FULL_REDUCE"  # 满减
+    VOUCHER_VERIFY = "VOUCHER_VERIFY"  # 团购券核销
 
     # V3 新增类型（B4）
-    HOLIDAY_PRICE       = "HOLIDAY_PRICE"       # 节假日价格（指定日期特价）
-    GROUP_SIZE_DISCOUNT = "GROUP_SIZE_DISCOUNT" # 人数优惠（X人以上享折扣）
-    BIRTHDAY_DISCOUNT   = "BIRTHDAY_DISCOUNT"   # 生日优惠（会员生日当月/当天）
-    FIRST_ORDER_DISCOUNT = "FIRST_ORDER_DISCOUNT" # 首单优惠（新会员首次消费）
+    HOLIDAY_PRICE = "HOLIDAY_PRICE"  # 节假日价格（指定日期特价）
+    GROUP_SIZE_DISCOUNT = "GROUP_SIZE_DISCOUNT"  # 人数优惠（X人以上享折扣）
+    BIRTHDAY_DISCOUNT = "BIRTHDAY_DISCOUNT"  # 生日优惠（会员生日当月/当天）
+    FIRST_ORDER_DISCOUNT = "FIRST_ORDER_DISCOUNT"  # 首单优惠（新会员首次消费）
 
 
 class PromotionStatusV3(str, Enum):
-    ACTIVE   = "active"
+    ACTIVE = "active"
     INACTIVE = "inactive"
-    EXPIRED  = "expired"
+    EXPIRED = "expired"
 
 
 # ─── 工具函数 ────────────────────────────────────────────────────────────────
@@ -101,11 +102,13 @@ async def _set_rls(db: AsyncSession, tenant_id: str) -> None:
 
 # ─── Redis 工具（可选依赖，降级到 DB 计数）────────────────────────────────────
 
+
 def _get_redis_client():
     """尝试获取 Redis 客户端，失败时返回 None（降级模式）。"""
     try:
         import redis.asyncio as aioredis
         from shared.ontology.src.config import settings
+
         return aioredis.from_url(settings.redis_url, decode_responses=True)
     except Exception:
         return None
@@ -127,8 +130,8 @@ async def _incr_usage_redis(
 
     async with redis:
         pipe = redis.pipeline(transaction=True)
-        total_key   = f"tx:promo:usage:total:{rule_id}"
-        budget_key  = f"tx:promo:budget:{rule_id}"
+        total_key = f"tx:promo:usage:total:{rule_id}"
+        budget_key = f"tx:promo:budget:{rule_id}"
         pipe.incr(total_key)
         pipe.incrby(budget_key, discount_fen)
         if member_id:
@@ -136,12 +139,12 @@ async def _incr_usage_redis(
             pipe.incr(member_key)
         results = await pipe.execute()
 
-    total_usage    = results[0]
-    budget_used    = results[1]
-    member_usage   = results[2] if member_id else 0
+    total_usage = results[0]
+    budget_used = results[1]
+    member_usage = results[2] if member_id else 0
     return {
-        "total_usage":     total_usage,
-        "member_usage":    member_usage,
+        "total_usage": total_usage,
+        "member_usage": member_usage,
         "budget_used_fen": budget_used,
     }
 
@@ -153,7 +156,7 @@ async def _get_usage_redis(rule_id: str, member_id: Optional[str] = None) -> dic
         return {"total_usage": -1, "member_usage": -1, "budget_used_fen": -1}
 
     async with redis:
-        total_key  = f"tx:promo:usage:total:{rule_id}"
+        total_key = f"tx:promo:usage:total:{rule_id}"
         budget_key = f"tx:promo:budget:{rule_id}"
         pipe = redis.pipeline()
         pipe.get(total_key)
@@ -163,9 +166,9 @@ async def _get_usage_redis(rule_id: str, member_id: Optional[str] = None) -> dic
         results = await pipe.execute()
 
     return {
-        "total_usage":     int(results[0] or 0),
+        "total_usage": int(results[0] or 0),
         "budget_used_fen": int(results[1] or 0),
-        "member_usage":    int(results[2] or 0) if member_id else 0,
+        "member_usage": int(results[2] or 0) if member_id else 0,
     }
 
 
@@ -416,10 +419,10 @@ class CalculateRequestV3(BaseModel):
     order_items: List[OrderItemV3]
     store_id: Optional[str] = None
     order_time: Optional[datetime] = None
-    member_id: Optional[str] = None          # B3 每人限额检查 + B4 生日/首单判断
+    member_id: Optional[str] = None  # B3 每人限额检查 + B4 生日/首单判断
     guest_count: Optional[int] = Field(None, ge=1)  # B4 人数优惠
-    is_member_birthday: bool = False         # 由前端/tx-member 提供，是否生日
-    is_first_order: bool = False             # 由前端/tx-member 提供，是否首单
+    is_member_birthday: bool = False  # 由前端/tx-member 提供，是否生日
+    is_first_order: bool = False  # 由前端/tx-member 提供，是否首单
 
 
 # ─── V3 计算逻辑 ──────────────────────────────────────────────────────────────
@@ -430,7 +433,7 @@ def _is_time_in_range(order_time: datetime, time_start: str, time_end: str) -> b
         sh, sm = map(int, time_start.split(":"))
         eh, em = map(int, time_end.split(":"))
         t_start = time(sh, sm)
-        t_end   = time(eh, em)
+        t_end = time(eh, em)
         t_order = order_time.time()
         if t_start <= t_end:
             return t_start <= t_order <= t_end
@@ -442,8 +445,8 @@ def _is_time_in_range(order_time: datetime, time_start: str, time_end: str) -> b
 def _is_weekday_match(order_time: datetime, weekdays: Optional[List[int]]) -> bool:
     if not weekdays:
         return True
-    py_weekday = order_time.weekday()   # 0=Mon...6=Sun
-    converted  = (py_weekday + 1) % 7  # 0=Sun,1=Mon...6=Sat
+    py_weekday = order_time.weekday()  # 0=Mon...6=Sun
+    converted = (py_weekday + 1) % 7  # 0=Sun,1=Mon...6=Sat
     return converted in weekdays
 
 
@@ -484,8 +487,8 @@ def _apply_rule_v3(
         }
 
     elif ptype == PromotionTypeV3.ITEM_DISCOUNT:
-        item_skus    = rule.get("item_skus") or []
-        item_price   = rule.get("item_price_fen")
+        item_skus = rule.get("item_skus") or []
+        item_price = rule.get("item_price_fen")
         discount_pct = rule.get("discount_pct")
         if not item_skus:
             return None
@@ -498,7 +501,7 @@ def _apply_rule_v3(
             if item_price is not None and it.unit_price_fen > item_price:
                 diff = (it.unit_price_fen - item_price) * it.qty
                 total_discount += diff
-                parts.append(f"{it.name} 特价 ¥{item_price/100:.2f}")
+                parts.append(f"{it.name} 特价 ¥{item_price / 100:.2f}")
             elif discount_pct is not None:
                 item_total = it.unit_price_fen * it.qty
                 disc = item_total - int(item_total * discount_pct / 100)
@@ -515,7 +518,7 @@ def _apply_rule_v3(
         }
 
     elif ptype == PromotionTypeV3.BUY_GIFT:
-        buy_sku  = rule.get("buy_sku")
+        buy_sku = rule.get("buy_sku")
         gift_sku = rule.get("gift_sku")
         gift_qty = rule.get("gift_qty") or 1
         if not buy_sku or not gift_sku:
@@ -535,7 +538,7 @@ def _apply_rule_v3(
 
     elif ptype == PromotionTypeV3.FULL_REDUCE:
         threshold = rule.get("full_reduce_threshold_fen") or 0
-        amount    = rule.get("full_reduce_amount_fen") or 0
+        amount = rule.get("full_reduce_amount_fen") or 0
         if original_total_fen < threshold:
             return None
         return {
@@ -543,7 +546,7 @@ def _apply_rule_v3(
             "rule_name": rule["name"],
             "promotion_type": ptype,
             "discount_fen": amount,
-            "detail": f"满{threshold//100}减{amount//100}",
+            "detail": f"满{threshold // 100}减{amount // 100}",
         }
 
     # ── V3 新类型 ──────────────────────────────────────────────────────────────
@@ -551,7 +554,7 @@ def _apply_rule_v3(
     elif ptype == PromotionTypeV3.HOLIDAY_PRICE:
         """节假日价格：指定日期范围内，全单打折（discount_pct）。"""
         holiday_dates = rule.get("holiday_dates") or []
-        discount_pct  = rule.get("discount_pct")
+        discount_pct = rule.get("discount_pct")
         if not holiday_dates or not discount_pct:
             return None
         today_str = order_time.strftime("%Y-%m-%d")
@@ -568,7 +571,7 @@ def _apply_rule_v3(
 
     elif ptype == PromotionTypeV3.GROUP_SIZE_DISCOUNT:
         """人数优惠：达到 min_group_size 人时，全单打折（discount_pct）。"""
-        min_size     = rule.get("min_group_size")
+        min_size = rule.get("min_group_size")
         discount_pct = rule.get("discount_pct")
         if not min_size or not discount_pct:
             return None
@@ -607,14 +610,14 @@ def _apply_rule_v3(
         """首单优惠：is_first_order=True 时，全单打折（discount_pct）或满减（full_reduce_amount_fen）。"""
         if not is_first_order:
             return None
-        discount_pct   = rule.get("discount_pct")
-        reduce_amount  = rule.get("full_reduce_amount_fen")
+        discount_pct = rule.get("discount_pct")
+        reduce_amount = rule.get("full_reduce_amount_fen")
         if discount_pct:
             discount_fen = original_total_fen - int(original_total_fen * discount_pct / 100)
             detail = f"首单优惠 {discount_pct}折"
         elif reduce_amount:
             discount_fen = min(reduce_amount, original_total_fen)
-            detail = f"首单立减 ¥{reduce_amount//100}"
+            detail = f"首单立减 ¥{reduce_amount // 100}"
         else:
             return None
         return {
@@ -634,12 +637,12 @@ def _check_gross_margin(
     threshold_pct: int,
 ) -> tuple[bool, float]:
     total_revenue = sum(it.unit_price_fen * it.qty for it in items)
-    total_cost    = sum(it.cost_price_fen * it.qty for it in items)
+    total_cost = sum(it.cost_price_fen * it.qty for it in items)
     if total_revenue <= 0:
         return True, 0.0
-    net_revenue  = total_revenue - total_discount_fen
+    net_revenue = total_revenue - total_discount_fen
     gross_profit = net_revenue - total_cost
-    margin_pct   = gross_profit / net_revenue * 100 if net_revenue > 0 else 0.0
+    margin_pct = gross_profit / net_revenue * 100 if net_revenue > 0 else 0.0
     return margin_pct >= threshold_pct, round(margin_pct, 2)
 
 
@@ -692,19 +695,28 @@ async def create_rule_v3(
                 """
             ),
             {
-                "id": rule_id, "tenant_id": tenant_id,
-                "name": body.name, "promotion_type": body.promotion_type.value,
-                "group_id": body.group_id, "priority": body.priority,
-                "is_exclusive": body.is_exclusive, "stack_allowed": body.stack_allowed,
+                "id": rule_id,
+                "tenant_id": tenant_id,
+                "name": body.name,
+                "promotion_type": body.promotion_type.value,
+                "group_id": body.group_id,
+                "priority": body.priority,
+                "is_exclusive": body.is_exclusive,
+                "stack_allowed": body.stack_allowed,
                 "execution_order": body.execution_order,
                 "total_budget_limit_fen": body.total_budget_limit_fen,
                 "total_usage_limit": body.total_usage_limit,
                 "per_member_limit": body.per_member_limit,
                 "gross_margin_threshold_pct": body.gross_margin_threshold_pct,
-                "time_start": body.time_start, "time_end": body.time_end,
-                "weekdays": body.weekdays, "discount_pct": body.discount_pct,
-                "item_skus": body.item_skus, "item_price_fen": body.item_price_fen,
-                "buy_sku": body.buy_sku, "gift_sku": body.gift_sku, "gift_qty": body.gift_qty,
+                "time_start": body.time_start,
+                "time_end": body.time_end,
+                "weekdays": body.weekdays,
+                "discount_pct": body.discount_pct,
+                "item_skus": body.item_skus,
+                "item_price_fen": body.item_price_fen,
+                "buy_sku": body.buy_sku,
+                "gift_sku": body.gift_sku,
+                "gift_qty": body.gift_qty,
                 "full_reduce_threshold_fen": body.full_reduce_threshold_fen,
                 "full_reduce_amount_fen": body.full_reduce_amount_fen,
                 "voucher_platform": body.voucher_platform,
@@ -713,13 +725,13 @@ async def create_rule_v3(
                 "holiday_dates": body.holiday_dates,
                 "min_group_size": body.min_group_size,
                 "birthday_scope": body.birthday_scope or "month",
-                "valid_from": body.valid_from, "valid_to": body.valid_to,
+                "valid_from": body.valid_from,
+                "valid_to": body.valid_to,
                 "description": body.description,
             },
         )
         await db.commit()
-        logger.info("promo_rule_v3_created", rule_id=str(rule_id), tenant_id=tenant_id,
-                    ptype=body.promotion_type.value)
+        logger.info("promo_rule_v3_created", rule_id=str(rule_id), tenant_id=tenant_id, ptype=body.promotion_type.value)
         return _ok({"id": str(rule_id), "message": "规则创建成功"})
     except SQLAlchemyError as exc:
         await db.rollback()
@@ -744,7 +756,9 @@ async def list_rules_v3(
 
     conditions = ["is_deleted = FALSE", "tenant_id = :tid"]
     params: dict[str, Any] = {
-        "tid": tenant_id, "offset": (page - 1) * size, "limit": size,
+        "tid": tenant_id,
+        "offset": (page - 1) * size,
+        "limit": size,
     }
 
     if status:
@@ -760,9 +774,7 @@ async def list_rules_v3(
     where = " AND ".join(conditions)
 
     try:
-        total = (await db.execute(
-            text(f"SELECT COUNT(*) FROM promotion_rules_v3 WHERE {where}"), params
-        )).scalar() or 0
+        total = (await db.execute(text(f"SELECT COUNT(*) FROM promotion_rules_v3 WHERE {where}"), params)).scalar() or 0
 
         rows = await db.execute(
             text(
@@ -809,34 +821,34 @@ async def update_rule_v3(
     set_parts = ["updated_at = NOW()"]
 
     field_map = {
-        "name":                       body.name,
-        "status":                     body.status.value if body.status else None,
-        "group_id":                   body.group_id,
-        "priority":                   body.priority,
-        "is_exclusive":               body.is_exclusive,
-        "stack_allowed":              body.stack_allowed,
-        "execution_order":            body.execution_order,
-        "total_budget_limit_fen":     body.total_budget_limit_fen,
-        "total_usage_limit":          body.total_usage_limit,
-        "per_member_limit":           body.per_member_limit,
+        "name": body.name,
+        "status": body.status.value if body.status else None,
+        "group_id": body.group_id,
+        "priority": body.priority,
+        "is_exclusive": body.is_exclusive,
+        "stack_allowed": body.stack_allowed,
+        "execution_order": body.execution_order,
+        "total_budget_limit_fen": body.total_budget_limit_fen,
+        "total_usage_limit": body.total_usage_limit,
+        "per_member_limit": body.per_member_limit,
         "gross_margin_threshold_pct": body.gross_margin_threshold_pct,
-        "valid_from":                 body.valid_from,
-        "valid_to":                   body.valid_to,
-        "description":                body.description,
-        "discount_pct":               body.discount_pct,
-        "time_start":                 body.time_start,
-        "time_end":                   body.time_end,
-        "weekdays":                   body.weekdays,
-        "item_skus":                  body.item_skus,
-        "item_price_fen":             body.item_price_fen,
-        "buy_sku":                    body.buy_sku,
-        "gift_sku":                   body.gift_sku,
-        "gift_qty":                   body.gift_qty,
-        "full_reduce_threshold_fen":  body.full_reduce_threshold_fen,
-        "full_reduce_amount_fen":     body.full_reduce_amount_fen,
-        "holiday_dates":              body.holiday_dates,
-        "min_group_size":             body.min_group_size,
-        "birthday_scope":             body.birthday_scope,
+        "valid_from": body.valid_from,
+        "valid_to": body.valid_to,
+        "description": body.description,
+        "discount_pct": body.discount_pct,
+        "time_start": body.time_start,
+        "time_end": body.time_end,
+        "weekdays": body.weekdays,
+        "item_skus": body.item_skus,
+        "item_price_fen": body.item_price_fen,
+        "buy_sku": body.buy_sku,
+        "gift_sku": body.gift_sku,
+        "gift_qty": body.gift_qty,
+        "full_reduce_threshold_fen": body.full_reduce_threshold_fen,
+        "full_reduce_amount_fen": body.full_reduce_amount_fen,
+        "holiday_dates": body.holiday_dates,
+        "min_group_size": body.min_group_size,
+        "birthday_scope": body.birthday_scope,
     }
 
     for field, val in field_map.items():
@@ -852,7 +864,7 @@ async def update_rule_v3(
             text(
                 f"""
                 UPDATE promotion_rules_v3
-                SET {', '.join(set_parts)}
+                SET {", ".join(set_parts)}
                 WHERE id = :rule_id AND tenant_id = :tid AND is_deleted = FALSE
                 """
             ),
@@ -915,13 +927,13 @@ async def calculate_promotions_v3(
     5. 毛利底线硬约束：折扣超标时逐步裁减
     6. 校验通过后异步递增 Redis 计数器（B3 原子操作）
     """
-    tenant_id  = _get_tenant_id(request)
+    tenant_id = _get_tenant_id(request)
     await _ensure_v3_tables(db)
     await _set_rls(db, tenant_id)
 
-    order_time          = body.order_time or datetime.now(timezone.utc)
-    original_total_fen  = sum(it.unit_price_fen * it.qty for it in body.order_items)
-    member_id           = body.member_id
+    order_time = body.order_time or datetime.now(timezone.utc)
+    original_total_fen = sum(it.unit_price_fen * it.qty for it in body.order_items)
+    member_id = body.member_id
 
     # 1. 查询规则（按 execution_order 排序，B2）
     try:
@@ -975,8 +987,8 @@ async def calculate_promotions_v3(
 
     # 4. 按 execution_order 逐条执行（B2），中间金额实时更新（先折后减场景）
     applied_discounts: list[dict] = []
-    running_total_fen  = original_total_fen  # 实时追踪折后金额（按序计算基础）
-    has_non_stackable  = False
+    running_total_fen = original_total_fen  # 实时追踪折后金额（按序计算基础）
+    has_non_stackable = False
 
     for rule in eligible_rules:
         rid = str(rule["id"])
@@ -986,8 +998,9 @@ async def calculate_promotions_v3(
             usage = usage_cache.get(rid, {})
             current_usage = usage.get("total_usage", 0)
             if current_usage >= 0 and current_usage >= rule["total_usage_limit"]:
-                logger.info("promo_v3_total_usage_exceeded", rule_id=rid,
-                            current=current_usage, limit=rule["total_usage_limit"])
+                logger.info(
+                    "promo_v3_total_usage_exceeded", rule_id=rid, current=current_usage, limit=rule["total_usage_limit"]
+                )
                 continue
 
         # B3: 每人限额检查
@@ -995,8 +1008,13 @@ async def calculate_promotions_v3(
             usage = usage_cache.get(rid, {})
             member_usage = usage.get("member_usage", 0)
             if member_usage >= 0 and member_usage >= rule["per_member_limit"]:
-                logger.info("promo_v3_per_member_exceeded", rule_id=rid, member_id=member_id,
-                            current=member_usage, limit=rule["per_member_limit"])
+                logger.info(
+                    "promo_v3_per_member_exceeded",
+                    rule_id=rid,
+                    member_id=member_id,
+                    current=member_usage,
+                    limit=rule["per_member_limit"],
+                )
                 continue
 
         # B2: 以 running_total_fen 作为本条规则的计算基础（体现执行顺序）
@@ -1004,7 +1022,7 @@ async def calculate_promotions_v3(
             rule,
             body.order_items,
             order_time,
-            running_total_fen,   # 上一条规则折后金额
+            running_total_fen,  # 上一条规则折后金额
             body.guest_count,
             body.is_member_birthday,
             body.is_first_order,
@@ -1030,7 +1048,7 @@ async def calculate_promotions_v3(
                     logger.info("promo_v3_budget_exceeded", rule_id=rid)
                     continue
                 result["discount_fen"] = remaining_budget
-                result["detail"] += f"（预算截断至 ¥{remaining_budget/100:.0f}）"
+                result["detail"] += f"（预算截断至 ¥{remaining_budget / 100:.0f}）"
 
         applied_discounts.append(result)
         running_total_fen = max(0, running_total_fen - result["discount_fen"])
@@ -1041,14 +1059,15 @@ async def calculate_promotions_v3(
         (r.get("gross_margin_threshold_pct") or 20 for r in eligible_rules),
         default=20,
     )
-    margin_ok, actual_margin = _check_gross_margin(
-        body.order_items, total_discount_fen, min_threshold
-    )
+    margin_ok, actual_margin = _check_gross_margin(body.order_items, total_discount_fen, min_threshold)
 
     if not margin_ok:
-        logger.warning("promo_v3_margin_constraint_triggered",
-                       actual_margin=actual_margin, threshold=min_threshold,
-                       tenant_id=tenant_id)
+        logger.warning(
+            "promo_v3_margin_constraint_triggered",
+            actual_margin=actual_margin,
+            threshold=min_threshold,
+            tenant_id=tenant_id,
+        )
         # 逐步裁减折扣直到毛利达标（保留最高优先级的折扣）
         applied_filtered: list[dict] = []
         acc_discount = 0
@@ -1058,29 +1077,30 @@ async def calculate_promotions_v3(
             if ok_test:
                 applied_filtered.append(disc)
                 acc_discount = test_disc
-        applied_discounts  = applied_filtered
+        applied_discounts = applied_filtered
         total_discount_fen = acc_discount
-        _, actual_margin   = _check_gross_margin(body.order_items, total_discount_fen, min_threshold)
+        _, actual_margin = _check_gross_margin(body.order_items, total_discount_fen, min_threshold)
 
     final_total_fen = original_total_fen - total_discount_fen
 
     # 6. B3: 异步递增 Redis 计数（校验通过后才记录）
     import asyncio
-    for disc in applied_discounts:
-        asyncio.create_task(
-            _incr_usage_redis(disc["rule_id"], member_id, disc["discount_fen"])
-        )
 
-    return _ok({
-        "original_total_fen":         original_total_fen,
-        "total_discount_fen":         total_discount_fen,
-        "final_total_fen":            final_total_fen,
-        "applied_rules":              applied_discounts,
-        "gross_margin_pct":           actual_margin,
-        "gross_margin_threshold_pct": min_threshold,
-        "margin_constraint_passed":   margin_ok,
-        "execution_mode":             "ordered",   # B2 标识：按 execution_order 顺序执行
-    })
+    for disc in applied_discounts:
+        asyncio.create_task(_incr_usage_redis(disc["rule_id"], member_id, disc["discount_fen"]))
+
+    return _ok(
+        {
+            "original_total_fen": original_total_fen,
+            "total_discount_fen": total_discount_fen,
+            "final_total_fen": final_total_fen,
+            "applied_rules": applied_discounts,
+            "gross_margin_pct": actual_margin,
+            "gross_margin_threshold_pct": min_threshold,
+            "margin_constraint_passed": margin_ok,
+            "execution_mode": "ordered",  # B2 标识：按 execution_order 顺序执行
+        }
+    )
 
 
 @router.get("/usage/{rule_id}")
@@ -1093,19 +1113,23 @@ async def get_rule_usage(
     _get_tenant_id(request)  # 校验 tenant header
     usage = await _get_usage_redis(rule_id, member_id)
     if usage["total_usage"] < 0:
-        return _ok({
+        return _ok(
+            {
+                "rule_id": rule_id,
+                "total_usage": None,
+                "member_usage": None,
+                "budget_used_fen": None,
+                "note": "Redis 不可用，计数降级",
+            }
+        )
+    return _ok(
+        {
             "rule_id": rule_id,
-            "total_usage": None,
-            "member_usage": None,
-            "budget_used_fen": None,
-            "note": "Redis 不可用，计数降级",
-        })
-    return _ok({
-        "rule_id":         rule_id,
-        "total_usage":     usage["total_usage"],
-        "member_usage":    usage["member_usage"],
-        "budget_used_fen": usage["budget_used_fen"],
-    })
+            "total_usage": usage["total_usage"],
+            "member_usage": usage["member_usage"],
+            "budget_used_fen": usage["budget_used_fen"],
+        }
+    )
 
 
 @router.post("/rules/{rule_id}/reset-usage")
@@ -1127,9 +1151,7 @@ async def reset_rule_usage(
         # 注意：per_member keys 用 SCAN 迭代删除（避免 KEYS 阻塞 Redis）
         cursor = 0
         while True:
-            cursor, member_keys = await redis.scan(
-                cursor=cursor, match=f"tx:promo:usage:member:{rule_id}:*", count=100
-            )
+            cursor, member_keys = await redis.scan(cursor=cursor, match=f"tx:promo:usage:member:{rule_id}:*", count=100)
             if member_keys:
                 await redis.delete(*member_keys)
             if cursor == 0:

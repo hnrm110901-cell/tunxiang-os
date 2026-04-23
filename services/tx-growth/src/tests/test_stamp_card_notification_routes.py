@@ -23,6 +23,7 @@
 16. GET  /api/v1/growth/notifications/tasks         — 正常列出任务
 17. GET  /api/v1/growth/notifications/tasks         — DB 表不存在时返回空列表
 """
+
 import os
 import sys
 
@@ -33,7 +34,6 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock, MagicMock
 
-import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from sqlalchemy.exc import OperationalError
@@ -47,9 +47,11 @@ _fake_ontology = sys.modules.get("shared.ontology") or types.ModuleType("shared.
 _fake_src = sys.modules.get("shared.ontology.src") or types.ModuleType("shared.ontology.src")
 _fake_database = sys.modules.get("shared.ontology.src.database") or types.ModuleType("shared.ontology.src.database")
 
+
 # get_db is used as a FastAPI dependency (overridden per-test)
 async def _fake_get_db():
     yield None
+
 
 _fake_database.get_db = _fake_get_db
 
@@ -60,17 +62,17 @@ sys.modules["shared.ontology.src.database"] = _fake_database
 
 # structlog
 _fake_structlog = sys.modules.get("structlog") or types.ModuleType("structlog")
-_fake_structlog.get_logger = MagicMock(return_value=MagicMock(
-    info=MagicMock(), warning=MagicMock(), error=MagicMock()
-))
+_fake_structlog.get_logger = MagicMock(return_value=MagicMock(info=MagicMock(), warning=MagicMock(), error=MagicMock()))
 sys.modules["structlog"] = _fake_structlog
 
 # ---------------------------------------------------------------------------
 # Load routes
 # ---------------------------------------------------------------------------
 
-from api.stamp_card_routes import router as stamp_router, get_db as stamp_get_db
-from api.notification_routes import router as notif_router, get_db as notif_get_db
+from api.notification_routes import get_db as notif_get_db
+from api.notification_routes import router as notif_router
+from api.stamp_card_routes import get_db as stamp_get_db
+from api.stamp_card_routes import router as stamp_router
 
 stamp_app = FastAPI()
 stamp_app.include_router(stamp_router)
@@ -93,6 +95,7 @@ _TEMPLATE_ID = str(uuid.uuid4())
 
 class _FakeRow:
     """Simulate SQLAlchemy named-column row."""
+
     def __init__(self, **kw):
         for k, v in kw.items():
             setattr(self, k, v)
@@ -121,6 +124,7 @@ def _exec_ok(*rows):
 def _override(db):
     def _dep():
         return db
+
     return _dep
 
 
@@ -129,6 +133,7 @@ def _override(db):
 # ===========================================================================
 
 # ── Test 1: 正常返回集章卡信息 ───────────────────────────────────────────────
+
 
 def test_get_my_stamp_card_found():
     card_row = _FakeRow(
@@ -170,7 +175,9 @@ def test_get_my_stamp_card_found():
     assert data["data"]["current_stamps"] == 3
     assert data["data"]["total_slots"] == 8
 
+
 # ── Test 2: 无集章卡时返回 card=None ─────────────────────────────────────────
+
 
 def test_get_my_stamp_card_none():
     cfg_result = _exec_ok()
@@ -190,17 +197,21 @@ def test_get_my_stamp_card_none():
     assert data["ok"] is True
     assert data["data"]["card"] is None
 
+
 # ── Test 3: DB 表不存在时返回 TABLE_NOT_READY ────────────────────────────────
+
 
 def test_get_my_stamp_card_table_missing():
     cfg_result = _exec_ok()
     db = AsyncMock()
     db.commit = AsyncMock()
     db.rollback = AsyncMock()
-    db.execute = AsyncMock(side_effect=[
-        cfg_result,
-        OperationalError("relation stamp_card_instances does not exist", None, None),
-    ])
+    db.execute = AsyncMock(
+        side_effect=[
+            cfg_result,
+            OperationalError("relation stamp_card_instances does not exist", None, None),
+        ]
+    )
     stamp_app.dependency_overrides[stamp_get_db] = _override(db)
 
     client = TestClient(stamp_app)
@@ -213,7 +224,9 @@ def test_get_my_stamp_card_table_missing():
     assert data["ok"] is True
     assert data["data"]["_note"] == "TABLE_NOT_READY"
 
+
 # ── Test 4: 正常盖章返回 stamp_count ─────────────────────────────────────────
+
 
 def test_stamp_success():
     instance_row = _FakeRow(
@@ -229,12 +242,14 @@ def test_stamp_success():
     db = AsyncMock()
     db.commit = AsyncMock()
     db.rollback = AsyncMock()
-    db.execute = AsyncMock(side_effect=[
-        MagicMock(),   # set_config
-        instance_result,
-        MagicMock(),   # INSERT stamp_card_stamps
-        MagicMock(),   # UPDATE stamp_card_instances
-    ])
+    db.execute = AsyncMock(
+        side_effect=[
+            MagicMock(),  # set_config
+            instance_result,
+            MagicMock(),  # INSERT stamp_card_stamps
+            MagicMock(),  # UPDATE stamp_card_instances
+        ]
+    )
     stamp_app.dependency_overrides[stamp_get_db] = _override(db)
 
     client = TestClient(stamp_app)
@@ -253,7 +268,9 @@ def test_stamp_success():
     assert data["data"]["stamp_count"] == 1
     assert data["data"]["current_stamps"] == 3
 
+
 # ── Test 5: 无进行中集章卡返回 NO_ACTIVE_CARD ────────────────────────────────
+
 
 def test_stamp_no_active_card():
     no_instance = MagicMock()
@@ -277,7 +294,9 @@ def test_stamp_no_active_card():
     assert data["ok"] is False
     assert data["error"]["code"] == "NO_ACTIVE_CARD"
 
+
 # ── Test 6: 消费金额不足 ──────────────────────────────────────────────────────
+
 
 def test_stamp_below_minimum():
     instance_row = _FakeRow(
@@ -308,7 +327,9 @@ def test_stamp_below_minimum():
     assert data["ok"] is False
     assert data["error"]["code"] == "BELOW_MINIMUM"
 
+
 # ── Test 7: 奖品列表 ──────────────────────────────────────────────────────────
+
 
 def test_get_prizes():
     prize_row = _FakeRow(
@@ -333,16 +354,20 @@ def test_get_prizes():
     assert data["ok"] is True
     assert data["data"]["total"] == 1
 
+
 # ── Test 8: DB 表不存在时奖品列表返回空 ──────────────────────────────────────
+
 
 def test_get_prizes_table_missing():
     db = AsyncMock()
     db.commit = AsyncMock()
     db.rollback = AsyncMock()
-    db.execute = AsyncMock(side_effect=[
-        MagicMock(),
-        OperationalError("relation stamp_card_templates does not exist", None, None),
-    ])
+    db.execute = AsyncMock(
+        side_effect=[
+            MagicMock(),
+            OperationalError("relation stamp_card_templates does not exist", None, None),
+        ]
+    )
     stamp_app.dependency_overrides[stamp_get_db] = _override(db)
 
     client = TestClient(stamp_app)
@@ -352,7 +377,9 @@ def test_get_prizes_table_missing():
     assert data["ok"] is True
     assert data["data"]["total"] == 0
 
+
 # ── Test 9: 正常兑换返回 redeem_code ─────────────────────────────────────────
+
 
 def test_exchange_prize_success():
     card_row = _FakeRow(
@@ -370,12 +397,14 @@ def test_exchange_prize_success():
     db = AsyncMock()
     db.commit = AsyncMock()
     db.rollback = AsyncMock()
-    db.execute = AsyncMock(side_effect=[
-        MagicMock(),   # set_config
-        card_result,   # SELECT instances
-        MagicMock(),   # UPDATE reward_issued
-        MagicMock(),   # UPDATE completed_count
-    ])
+    db.execute = AsyncMock(
+        side_effect=[
+            MagicMock(),  # set_config
+            card_result,  # SELECT instances
+            MagicMock(),  # UPDATE reward_issued
+            MagicMock(),  # UPDATE completed_count
+        ]
+    )
     stamp_app.dependency_overrides[stamp_get_db] = _override(db)
 
     client = TestClient(stamp_app)
@@ -389,7 +418,9 @@ def test_exchange_prize_success():
     assert data["ok"] is True
     assert "redeem_code" in data["data"]
 
+
 # ── Test 10: 集章卡未集满返回 NOT_COMPLETED ──────────────────────────────────
+
 
 def test_exchange_not_completed():
     card_row = _FakeRow(
@@ -418,7 +449,9 @@ def test_exchange_not_completed():
     assert data["ok"] is False
     assert data["error"]["code"] == "NOT_COMPLETED"
 
+
 # ── Test 11: 奖品已兑换 ──────────────────────────────────────────────────────
+
 
 def test_exchange_already_exchanged():
     card_row = _FakeRow(
@@ -454,6 +487,7 @@ def test_exchange_already_exchanged():
 
 # ── Test 12: 正常创建发送任务 ─────────────────────────────────────────────────
 
+
 def test_send_campaign_notification_success():
     campaign_row = _FakeRow(
         id=uuid.UUID(_CAMPAIGN_ID),
@@ -466,11 +500,13 @@ def test_send_campaign_notification_success():
     db = AsyncMock()
     db.commit = AsyncMock()
     db.rollback = AsyncMock()
-    db.execute = AsyncMock(side_effect=[
-        MagicMock(),      # set_config
-        campaign_result,  # SELECT campaigns
-        MagicMock(),      # INSERT notification_tasks
-    ])
+    db.execute = AsyncMock(
+        side_effect=[
+            MagicMock(),  # set_config
+            campaign_result,  # SELECT campaigns
+            MagicMock(),  # INSERT notification_tasks
+        ]
+    )
     notif_app.dependency_overrides[notif_get_db] = _override(db)
 
     client = TestClient(notif_app)
@@ -490,7 +526,9 @@ def test_send_campaign_notification_success():
     assert "task_id" in data["data"]
     assert data["data"]["channel"] == "sms"
 
+
 # ── Test 13: 非法 channel ────────────────────────────────────────────────────
+
 
 def test_send_campaign_invalid_channel():
     db = _make_db()
@@ -512,7 +550,9 @@ def test_send_campaign_invalid_channel():
     assert data["ok"] is False
     assert data["error"]["code"] == "INVALID_CHANNEL"
 
+
 # ── Test 14: 空目标客户列表 ───────────────────────────────────────────────────
+
 
 def test_send_campaign_empty_targets():
     db = _make_db()
@@ -534,7 +574,9 @@ def test_send_campaign_empty_targets():
     assert data["ok"] is False
     assert data["error"]["code"] == "EMPTY_TARGETS"
 
+
 # ── Test 15: 空消息模板 ───────────────────────────────────────────────────────
+
 
 def test_send_campaign_empty_template():
     db = _make_db()
@@ -556,7 +598,9 @@ def test_send_campaign_empty_template():
     assert data["ok"] is False
     assert data["error"]["code"] == "EMPTY_TEMPLATE"
 
+
 # ── Test 16: 正常列出任务 ─────────────────────────────────────────────────────
+
 
 def test_list_notification_tasks():
     now = datetime.now(timezone.utc)
@@ -582,11 +626,13 @@ def test_list_notification_tasks():
     db = AsyncMock()
     db.commit = AsyncMock()
     db.rollback = AsyncMock()
-    db.execute = AsyncMock(side_effect=[
-        MagicMock(),   # set_config
-        count_result,
-        rows_result,
-    ])
+    db.execute = AsyncMock(
+        side_effect=[
+            MagicMock(),  # set_config
+            count_result,
+            rows_result,
+        ]
+    )
     notif_app.dependency_overrides[notif_get_db] = _override(db)
 
     client = TestClient(notif_app)
@@ -597,16 +643,20 @@ def test_list_notification_tasks():
     assert data["data"]["total"] == 1
     assert data["data"]["items"][0]["channel"] == "sms"
 
+
 # ── Test 17: DB 表不存在时列出任务返回空 ──────────────────────────────────────
+
 
 def test_list_notification_tasks_table_missing():
     db = AsyncMock()
     db.commit = AsyncMock()
     db.rollback = AsyncMock()
-    db.execute = AsyncMock(side_effect=[
-        MagicMock(),
-        OperationalError("relation notification_tasks does not exist", None, None),
-    ])
+    db.execute = AsyncMock(
+        side_effect=[
+            MagicMock(),
+            OperationalError("relation notification_tasks does not exist", None, None),
+        ]
+    )
     notif_app.dependency_overrides[notif_get_db] = _override(db)
 
     client = TestClient(notif_app)

@@ -8,14 +8,14 @@
 
 对标：Olo Guest Intelligence（统一客户智能+交叉推荐） + 海底捞 2 亿会员中台
 """
+
 import hashlib
 import os
 import uuid
-from datetime import datetime
 from typing import Optional
 
 import structlog
-from fastapi import APIRouter, Header, HTTPException, Query
+from fastapi import APIRouter, Header, HTTPException
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
@@ -69,7 +69,9 @@ class PointsTransferReq(BaseModel):
     to_brand_id: str = Field(description="转入品牌ID")
     points: int = Field(gt=0, description="转移积分数（正整数）")
     exchange_rate: float = Field(
-        default=1.0, ge=0.1, le=10.0,
+        default=1.0,
+        ge=0.1,
+        le=10.0,
         description="兑换比例（from_brand 积分 × rate = to_brand 积分）",
     )
     reason: str = Field(default="manual_transfer", description="转移原因")
@@ -197,16 +199,18 @@ async def get_cross_brand_profile(
                 brand_prefs = [r.tag for r in pref_result.fetchall()]
                 all_preferences.extend(brand_prefs)
 
-                brand_profiles.append({
-                    "brand_id": brand_id,
-                    "brand_member_id": brand_member_id,
-                    "points": brand_points,
-                    "stored_value_fen": brand_sv,
-                    "order_count": brand_order_count,
-                    "total_spend_fen": brand_spend,
-                    "preferences": brand_prefs,
-                    "linked_at": link.link_created_at.isoformat() if link.link_created_at else None,
-                })
+                brand_profiles.append(
+                    {
+                        "brand_id": brand_id,
+                        "brand_member_id": brand_member_id,
+                        "points": brand_points,
+                        "stored_value_fen": brand_sv,
+                        "order_count": brand_order_count,
+                        "total_spend_fen": brand_spend,
+                        "preferences": brand_prefs,
+                        "linked_at": link.link_created_at.isoformat() if link.link_created_at else None,
+                    }
+                )
 
             # 去重偏好标签
             unique_preferences = list(dict.fromkeys(all_preferences))

@@ -52,6 +52,5 @@ ORDER BY balance_fen DESC
 """
 
 DIMENSIONS = ["store_name", "ingredient_name", "ingredient_category", "health_status"]
-METRICS = ["current_qty", "avg_cost_fen", "balance_fen", "period_usage_qty",
-           "period_usage_cost_fen", "stock_days"]
+METRICS = ["current_qty", "avg_cost_fen", "balance_fen", "period_usage_qty", "period_usage_cost_fen", "stock_days"]
 FILTERS = ["start_date", "end_date", "store_id"]

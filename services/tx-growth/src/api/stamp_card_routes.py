@@ -30,6 +30,7 @@ router = APIRouter(prefix="/api/v1/growth/stamp-card", tags=["stamp-card"])
 # 统一响应
 # ---------------------------------------------------------------------------
 
+
 def ok_response(data: Any) -> dict:
     return {"ok": True, "data": data}
 
@@ -41,6 +42,7 @@ def error_response(code: str, message: str) -> dict:
 # ---------------------------------------------------------------------------
 # 内部工具
 # ---------------------------------------------------------------------------
+
 
 async def _set_tenant(db: AsyncSession, tenant_id: str) -> None:
     await db.execute(
@@ -58,6 +60,7 @@ def _is_table_missing(exc: SQLAlchemyError) -> bool:
 # 请求模型
 # ---------------------------------------------------------------------------
 
+
 class StampRequest(BaseModel):
     order_id: str
     customer_id: str
@@ -66,13 +69,14 @@ class StampRequest(BaseModel):
 
 
 class ExchangeRequest(BaseModel):
-    card_id: str          # stamp_card_instances.id
+    card_id: str  # stamp_card_instances.id
     customer_id: str
 
 
 # ---------------------------------------------------------------------------
 # 路由
 # ---------------------------------------------------------------------------
+
 
 @router.get("/my")
 async def get_my_stamp_card(
@@ -269,13 +273,15 @@ async def stamp(
             customer_id=str(cid),
             tenant_id=x_tenant_id,
         )
-        return ok_response({
-            "stamp_count": 1,
-            "current_stamps": new_stamp_no,
-            "total_slots": instance.target_stamps,
-            "status": new_status,
-            "card_name": instance.name,
-        })
+        return ok_response(
+            {
+                "stamp_count": 1,
+                "current_stamps": new_stamp_no,
+                "total_slots": instance.target_stamps,
+                "status": new_status,
+                "card_name": instance.name,
+            }
+        )
 
     except ValueError as exc:
         return error_response("INVALID_PARAM", f"参数格式错误: {exc}")
@@ -420,14 +426,16 @@ async def exchange_prize(
             reward_type=row.reward_type,
             tenant_id=x_tenant_id,
         )
-        return ok_response({
-            "redeem_code": redeem_code,
-            "expire_time": expire_time,
-            "card_id": str(card_id),
-            "card_name": row.name,
-            "reward_type": row.reward_type,
-            "reward_config": row.reward_config or {},
-        })
+        return ok_response(
+            {
+                "redeem_code": redeem_code,
+                "expire_time": expire_time,
+                "card_id": str(card_id),
+                "card_name": row.name,
+                "reward_type": row.reward_type,
+                "reward_config": row.reward_config or {},
+            }
+        )
 
     except ValueError as exc:
         return error_response("INVALID_PARAM", f"参数格式错误: {exc}")

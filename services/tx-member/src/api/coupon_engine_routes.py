@@ -1,4 +1,5 @@
 """优惠券引擎 API — 8端点"""
+
 from typing import Optional
 
 from fastapi import APIRouter, Header

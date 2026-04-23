@@ -16,6 +16,7 @@
   - gender → NULL
   不删除：orders（脱敏后保留用于统计）、消费记录（仅保留金额）
 """
+
 from __future__ import annotations
 
 import json
@@ -37,7 +38,7 @@ _ANONYMIZE_FIELDS: Dict[str, Any] = {
     "phone": None,
     "email": None,
     "wechat_openid": None,
-    "name": "__ANON__",          # 特殊处理：拼接 customer_id 前缀
+    "name": "__ANON__",  # 特殊处理：拼接 customer_id 前缀
     "birth_date": None,
     "gender": None,
     "avatar_url": None,
@@ -107,9 +108,13 @@ class GDPRService:
             },
         )
         await self.db.flush()
-        log.info("gdpr_request_created", request_id=str(req_id),
-                 customer_id=customer_id, request_type=request_type,
-                 tenant_id=self.tenant_id)
+        log.info(
+            "gdpr_request_created",
+            request_id=str(req_id),
+            customer_id=customer_id,
+            request_type=request_type,
+            tenant_id=self.tenant_id,
+        )
         return await self.get_request(str(req_id))  # type: ignore[return-value]
 
     async def get_request(self, request_id: str) -> Optional[Dict[str, Any]]:
@@ -189,8 +194,7 @@ class GDPRService:
                         reviewed_at = :now, updated_at = :now
                     WHERE id = :id AND tenant_id = :tid
                 """),
-                {"by": uuid.UUID(reviewed_by), "now": now,
-                 "id": uuid.UUID(request_id), "tid": self._tid},
+                {"by": uuid.UUID(reviewed_by), "now": now, "id": uuid.UUID(request_id), "tid": self._tid},
             )
         else:
             new_status = "rejected"
@@ -202,23 +206,24 @@ class GDPRService:
                         updated_at = :now
                     WHERE id = :id AND tenant_id = :tid
                 """),
-                {"by": uuid.UUID(reviewed_by), "now": now,
-                 "reason": rejection_reason,
-                 "id": uuid.UUID(request_id), "tid": self._tid},
+                {
+                    "by": uuid.UUID(reviewed_by),
+                    "now": now,
+                    "reason": rejection_reason,
+                    "id": uuid.UUID(request_id),
+                    "tid": self._tid,
+                },
             )
 
         await self.db.flush()
-        log.info("gdpr_request_reviewed", request_id=request_id,
-                 new_status=new_status, tenant_id=self.tenant_id)
+        log.info("gdpr_request_reviewed", request_id=request_id, new_status=new_status, tenant_id=self.tenant_id)
         return await self.get_request(request_id)  # type: ignore[return-value]
 
     # ══════════════════════════════════════════════════════
     # 被遗忘权执行
     # ══════════════════════════════════════════════════════
 
-    async def execute_erasure(
-        self, request_id: str, executed_by: str
-    ) -> Dict[str, Any]:
+    async def execute_erasure(self, request_id: str, executed_by: str) -> Dict[str, Any]:
         """执行匿名化：脱敏 customers 表 PII 字段"""
         await self._set_tenant()
         req = await self.get_request(request_id)
@@ -279,9 +284,13 @@ class GDPRService:
             },
         )
         await self.db.flush()
-        log.info("gdpr_erasure_executed", request_id=request_id,
-                 customer_id=customer_id, rows_affected=affected,
-                 tenant_id=self.tenant_id)
+        log.info(
+            "gdpr_erasure_executed",
+            request_id=request_id,
+            customer_id=customer_id,
+            rows_affected=affected,
+            tenant_id=self.tenant_id,
+        )
         return await self.get_request(request_id)  # type: ignore[return-value]
 
     # ══════════════════════════════════════════════════════

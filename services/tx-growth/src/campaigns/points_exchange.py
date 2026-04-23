@@ -3,6 +3,7 @@
 典型场景: 500积分兑换一份甜品, 1000积分兑换50元代金券
 支持兑换商品和兑换优惠券两种模式。
 """
+
 from typing import Any
 
 import structlog

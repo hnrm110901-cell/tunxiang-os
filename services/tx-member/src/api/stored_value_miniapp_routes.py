@@ -14,8 +14,8 @@
   POST /api/v1/member/miniapp/gift-card/purchase         购买礼品卡
   GET  /api/v1/member/miniapp/gift-card/list             我的礼品卡列表
 """
+
 import uuid
-from datetime import datetime, timezone
 
 import structlog
 from fastapi import APIRouter, Depends, Header, Query
@@ -107,10 +107,28 @@ async def get_balance(
                     "status": row["status"],
                 },
             }
-        return {"ok": True, "data": {"balance_fen": 0, "gift_balance_fen": 0, "bonus_balance_fen": 0, "card_id": None, "status": "none"}}
+        return {
+            "ok": True,
+            "data": {
+                "balance_fen": 0,
+                "gift_balance_fen": 0,
+                "bonus_balance_fen": 0,
+                "card_id": None,
+                "status": "none",
+            },
+        }
     except SQLAlchemyError as exc:
         logger.error("miniapp_stored_value_balance_db_error", error=str(exc))
-        return {"ok": True, "data": {"balance_fen": 0, "gift_balance_fen": 0, "bonus_balance_fen": 0, "card_id": None, "status": "none"}}
+        return {
+            "ok": True,
+            "data": {
+                "balance_fen": 0,
+                "gift_balance_fen": 0,
+                "bonus_balance_fen": 0,
+                "card_id": None,
+                "status": "none",
+            },
+        }
 
 
 @router.get("/stored-value/plans")

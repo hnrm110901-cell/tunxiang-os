@@ -10,6 +10,7 @@
 - ROI 归因（5种模型）
 - 端到端：分群 → 旅程 → 发送 → 转化 → ROI
 """
+
 import os
 import sys
 
@@ -60,10 +61,13 @@ def clear_all_offers() -> None:
 def record_redemption(offer_id: str, user_id: str, order_total_fen: int, discount_fen: int) -> None:
     if offer_id not in _test_offer_redemptions:
         _test_offer_redemptions[offer_id] = []
-    _test_offer_redemptions[offer_id].append({
-        "user_id": user_id, "order_total_fen": order_total_fen,
-        "discount_fen": discount_fen,
-    })
+    _test_offer_redemptions[offer_id].append(
+        {
+            "user_id": user_id,
+            "order_total_fen": order_total_fen,
+            "discount_fen": discount_fen,
+        }
+    )
     if offer_id in _test_offers:
         _test_offers[offer_id]["stats"]["redeemed_count"] += 1
         _test_offers[offer_id]["stats"]["total_discount_fen"] += discount_fen
@@ -92,6 +96,14 @@ def clear_all_channel_data() -> None:
     _test_channel_configs.clear()
 
 
+# ---------------------------------------------------------------------------
+# 测试专用内存版 Engine（向后兼容旧的同步 API）
+# v144 DB化后，生产 Engine 变为 async；这些内存版本仅供单元测试使用
+# ---------------------------------------------------------------------------
+import uuid as _uuid
+from datetime import datetime as _dt
+from datetime import timezone as _tz
+
 from services.roi_attribution import (
     ROIAttributionService,
     clear_all_attribution_data,
@@ -99,36 +111,34 @@ from services.roi_attribution import (
 )
 
 
-# ---------------------------------------------------------------------------
-# 测试专用内存版 Engine（向后兼容旧的同步 API）
-# v144 DB化后，生产 Engine 变为 async；这些内存版本仅供单元测试使用
-# ---------------------------------------------------------------------------
-
-import uuid as _uuid
-from datetime import datetime as _dt, timezone as _tz
-
-
 class _MemOfferEngine(OfferEngine):
     """内存版优惠引擎（单元测试用），兼容旧的同步 API"""
 
-    def create_offer(self, name, offer_type, discount_rules, validity_days,
-                     target_segments, stores, time_slots, margin_floor, **kw):
+    def create_offer(
+        self, name, offer_type, discount_rules, validity_days, target_segments, stores, time_slots, margin_floor, **kw
+    ):
         if offer_type not in self.OFFER_TYPES:
             return {"error": f"不支持的优惠类型: {offer_type}"}
         oid = str(_uuid.uuid4())[:8]
         now = _dt.now(_tz.utc).isoformat()
         defaults = self._TYPE_DEFAULTS.get(offer_type, {})
         offer = {
-            "offer_id": oid, "name": name, "offer_type": offer_type,
+            "offer_id": oid,
+            "name": name,
+            "offer_type": offer_type,
             "description": defaults.get("description", ""),
             "goal": defaults.get("goal", "general"),
-            "discount_rules": discount_rules, "validity_days": validity_days,
-            "target_segments": target_segments, "stores": stores,
-            "time_slots": time_slots, "margin_floor": margin_floor,
+            "discount_rules": discount_rules,
+            "validity_days": validity_days,
+            "target_segments": target_segments,
+            "stores": stores,
+            "time_slots": time_slots,
+            "margin_floor": margin_floor,
             "max_per_user": kw.get("max_per_user", 1),
-            "status": "active", "created_at": now, "updated_at": now,
-            "stats": {"issued_count": 0, "redeemed_count": 0,
-                      "total_discount_fen": 0, "total_revenue_fen": 0},
+            "status": "active",
+            "created_at": now,
+            "updated_at": now,
+            "stats": {"issued_count": 0, "redeemed_count": 0, "total_discount_fen": 0, "total_revenue_fen": 0},
         }
         _test_offers[oid] = offer
         return offer
@@ -143,9 +153,13 @@ class _MemOfferEngine(OfferEngine):
         user_count = sum(1 for r in redemptions if r.get("user_id") == user_id)
         if user_count >= offer.get("max_per_user", 1):
             return {"eligible": False, "reason": "已达使用上限"}
-        return {"eligible": True, "offer_id": offer_id, "user_id": user_id,
-                "discount_rules": offer["discount_rules"],
-                "validity_days": offer["validity_days"]}
+        return {
+            "eligible": True,
+            "offer_id": offer_id,
+            "user_id": user_id,
+            "discount_rules": offer["discount_rules"],
+            "validity_days": offer["validity_days"],
+        }
 
     def calculate_offer_cost(self, offer_id):
         offer = _test_offers.get(offer_id)
@@ -170,9 +184,11 @@ class _MemOfferEngine(OfferEngine):
         total_discount_fen = sum(r.get("discount_fen", 0) for r in redemptions)
         total_revenue_fen = sum(r.get("order_total_fen", 0) for r in redemptions)
         return {
-            "offer_id": offer_id, "offer_name": offer.get("name", ""),
+            "offer_id": offer_id,
+            "offer_name": offer.get("name", ""),
             "offer_type": offer.get("offer_type", ""),
-            "issued_count": issued, "redeemed_count": redeemed,
+            "issued_count": issued,
+            "redeemed_count": redeemed,
             "redemption_rate": round(redeemed / max(1, issued), 4),
             "total_discount_fen": total_discount_fen,
             "total_discount_yuan": round(total_discount_fen / 100, 2),
@@ -198,9 +214,13 @@ class _MemContentEngine(ContentEngine):
         tid = str(_uuid.uuid4())[:8]
         now = _dt.now(_tz.utc).isoformat()
         tpl = {
-            "template_id": tid, "name": name, "content_type": content_type,
-            "body_template": body_template, "variables": variables,
-            "is_builtin": False, "created_at": now,
+            "template_id": tid,
+            "name": name,
+            "content_type": content_type,
+            "body_template": body_template,
+            "variables": variables,
+            "is_builtin": False,
+            "created_at": now,
         }
         _test_templates[tid] = tpl
         return tpl
@@ -210,9 +230,14 @@ class _MemContentEngine(ContentEngine):
         if perf:
             return perf
         return {
-            "content_id": content_id, "send_count": 0,
-            "open_count": 0, "click_count": 0, "conversion_count": 0,
-            "open_rate": 0.0, "click_rate": 0.0, "conversion_rate": 0.0,
+            "content_id": content_id,
+            "send_count": 0,
+            "open_count": 0,
+            "click_count": 0,
+            "conversion_count": 0,
+            "open_rate": 0.0,
+            "click_rate": 0.0,
+            "conversion_rate": 0.0,
         }
 
 
@@ -222,36 +247,43 @@ class _MemChannelEngine(ChannelEngine):
     def send_message(self, channel, user_id, content, offer_id=None, **kw):
         if channel not in self.CHANNELS:
             return {"success": False, "error": f"不支持的渠道: {channel}"}
-        max_daily = _test_channel_configs.get(channel, {}).get(
-            "max_daily", self.CHANNELS[channel]["max_daily"]
-        )
+        max_daily = _test_channel_configs.get(channel, {}).get("max_daily", self.CHANNELS[channel]["max_daily"])
         sent = _test_daily_counts.get(user_id, {}).get(channel, 0)
         if sent >= max_daily:
-            return {"success": False, "error": f"频率限制：今日已发送 {sent} 次，上限 {max_daily} 次",
-                    "channel": channel, "user_id": user_id}
+            return {
+                "success": False,
+                "error": f"频率限制：今日已发送 {sent} 次，上限 {max_daily} 次",
+                "channel": channel,
+                "user_id": user_id,
+            }
         mid = str(_uuid.uuid4())[:8]
         now = _dt.now(_tz.utc).isoformat()
-        _test_send_logs.append({
-            "message_id": mid, "channel": channel, "user_id": user_id,
-            "content": content[:200], "offer_id": offer_id,
-            "status": "sent", "sent_at": now,
-        })
+        _test_send_logs.append(
+            {
+                "message_id": mid,
+                "channel": channel,
+                "user_id": user_id,
+                "content": content[:200],
+                "offer_id": offer_id,
+                "status": "sent",
+                "sent_at": now,
+            }
+        )
         _test_daily_counts.setdefault(user_id, {})[channel] = sent + 1
-        return {"success": True, "message_id": mid, "channel": channel,
-                "user_id": user_id, "sent_at": now}
+        return {"success": True, "message_id": mid, "channel": channel, "user_id": user_id, "sent_at": now}
 
     def check_frequency_limit(self, user_id, channel):
         if channel not in self.CHANNELS:
-            return {"allowed": False, "reason": f"不支持的渠道: {channel}",
-                    "current_count": 0, "max_daily": 0}
-        max_daily = _test_channel_configs.get(channel, {}).get(
-            "max_daily", self.CHANNELS[channel]["max_daily"]
-        )
+            return {"allowed": False, "reason": f"不支持的渠道: {channel}", "current_count": 0, "max_daily": 0}
+        max_daily = _test_channel_configs.get(channel, {}).get("max_daily", self.CHANNELS[channel]["max_daily"])
         current = _test_daily_counts.get(user_id, {}).get(channel, 0)
         allowed = current < max_daily
         return {
-            "allowed": allowed, "current_count": current, "max_daily": max_daily,
-            "channel": channel, "channel_name": self.CHANNELS[channel]["name"],
+            "allowed": allowed,
+            "current_count": current,
+            "max_daily": max_daily,
+            "channel": channel,
+            "channel_name": self.CHANNELS[channel]["name"],
             "reason": "" if allowed else f"今日已发送 {current} 次，上限 {max_daily} 次",
         }
 
@@ -263,9 +295,12 @@ class _MemChannelEngine(ChannelEngine):
         unique = len(set(l["user_id"] for l in logs))
         with_offer = sum(1 for l in logs if l.get("offer_id"))
         return {
-            "channel": channel, "channel_name": self.CHANNELS[channel]["name"],
-            "date_range": date_range, "total_sent": total,
-            "unique_users": unique, "with_offer_count": with_offer,
+            "channel": channel,
+            "channel_name": self.CHANNELS[channel]["name"],
+            "date_range": date_range,
+            "total_sent": total,
+            "unique_users": unique,
+            "with_offer_count": with_offer,
             "avg_per_user": round(total / max(1, unique), 2),
         }
 
@@ -292,6 +327,7 @@ class _MemChannelEngine(ChannelEngine):
 # ===========================================================================
 # Fixtures — 真实中餐连锁数据
 # ===========================================================================
+
 
 @pytest.fixture(autouse=True)
 def clean_state():
@@ -356,10 +392,22 @@ def sample_brand(brand_svc):
             {"name": "农家一碗香", "price_fen": 3800, "story": "奶奶辈传下来的味道"},
         ],
         seasonal_plans=[
-            {"season": "spring", "theme": "春笋尝鲜季", "dishes": ["春笋腊肉", "香椿炒蛋"],
-             "start_date": "2026-03-01", "end_date": "2026-05-31", "marketing_focus": "时令新鲜"},
-            {"season": "summer", "theme": "清凉一夏", "dishes": ["凉拌莴笋", "冰镇绿豆汤"],
-             "start_date": "2026-06-01", "end_date": "2026-08-31", "marketing_focus": "消暑开胃"},
+            {
+                "season": "spring",
+                "theme": "春笋尝鲜季",
+                "dishes": ["春笋腊肉", "香椿炒蛋"],
+                "start_date": "2026-03-01",
+                "end_date": "2026-05-31",
+                "marketing_focus": "时令新鲜",
+            },
+            {
+                "season": "summer",
+                "theme": "清凉一夏",
+                "dishes": ["凉拌莴笋", "冰镇绿豆汤"],
+                "start_date": "2026-06-01",
+                "end_date": "2026-08-31",
+                "marketing_focus": "消暑开胃",
+            },
         ],
         promo_boundaries={"max_discount_pct": 30, "margin_floor_pct": 45},
         forbidden_expressions=["最低价", "全网最便宜", "免费送", "跳楼价", "清仓"],
@@ -371,49 +419,89 @@ def sample_users():
     """真实中餐场景用户数据"""
     return [
         {
-            "user_id": "u001", "name": "张大姐",
-            "first_order_days": 5, "recency_days": 2, "order_count": 1,
-            "avg_order_fen": 8800, "total_spent_fen": 8800,
-            "monthly_frequency": 1, "avg_party_size": 4,
-            "weekend_ratio": 1.0, "coupon_usage_rate": 0.0,
-            "health_dish_ratio": 0.2, "festival_order_ratio": 0.0,
-            "has_stored_value": False, "stored_value_balance_fen": 0,
+            "user_id": "u001",
+            "name": "张大姐",
+            "first_order_days": 5,
+            "recency_days": 2,
+            "order_count": 1,
+            "avg_order_fen": 8800,
+            "total_spent_fen": 8800,
+            "monthly_frequency": 1,
+            "avg_party_size": 4,
+            "weekend_ratio": 1.0,
+            "coupon_usage_rate": 0.0,
+            "health_dish_ratio": 0.2,
+            "festival_order_ratio": 0.0,
+            "has_stored_value": False,
+            "stored_value_balance_fen": 0,
         },
         {
-            "user_id": "u002", "name": "李总",
-            "first_order_days": 180, "recency_days": 3, "order_count": 24,
-            "avg_order_fen": 52000, "total_spent_fen": 1248000,
-            "monthly_frequency": 4, "avg_party_size": 8,
-            "weekend_ratio": 0.4, "coupon_usage_rate": 0.1,
-            "health_dish_ratio": 0.1, "festival_order_ratio": 0.3,
-            "has_stored_value": True, "stored_value_balance_fen": 200000,
+            "user_id": "u002",
+            "name": "李总",
+            "first_order_days": 180,
+            "recency_days": 3,
+            "order_count": 24,
+            "avg_order_fen": 52000,
+            "total_spent_fen": 1248000,
+            "monthly_frequency": 4,
+            "avg_party_size": 8,
+            "weekend_ratio": 0.4,
+            "coupon_usage_rate": 0.1,
+            "health_dish_ratio": 0.1,
+            "festival_order_ratio": 0.3,
+            "has_stored_value": True,
+            "stored_value_balance_fen": 200000,
         },
         {
-            "user_id": "u003", "name": "小王",
-            "first_order_days": 90, "recency_days": 75, "order_count": 3,
-            "avg_order_fen": 6500, "total_spent_fen": 19500,
-            "monthly_frequency": 0.5, "avg_party_size": 2,
-            "weekend_ratio": 0.3, "coupon_usage_rate": 0.8,
-            "health_dish_ratio": 0.5, "festival_order_ratio": 0.0,
-            "has_stored_value": False, "stored_value_balance_fen": 0,
+            "user_id": "u003",
+            "name": "小王",
+            "first_order_days": 90,
+            "recency_days": 75,
+            "order_count": 3,
+            "avg_order_fen": 6500,
+            "total_spent_fen": 19500,
+            "monthly_frequency": 0.5,
+            "avg_party_size": 2,
+            "weekend_ratio": 0.3,
+            "coupon_usage_rate": 0.8,
+            "health_dish_ratio": 0.5,
+            "festival_order_ratio": 0.0,
+            "has_stored_value": False,
+            "stored_value_balance_fen": 0,
         },
         {
-            "user_id": "u004", "name": "王阿姨",
-            "first_order_days": 365, "recency_days": 5, "order_count": 48,
-            "avg_order_fen": 7200, "total_spent_fen": 345600,
-            "monthly_frequency": 5, "avg_party_size": 3,
-            "weekend_ratio": 0.7, "coupon_usage_rate": 0.3,
-            "health_dish_ratio": 0.4, "festival_order_ratio": 0.2,
-            "has_stored_value": True, "stored_value_balance_fen": 50000,
+            "user_id": "u004",
+            "name": "王阿姨",
+            "first_order_days": 365,
+            "recency_days": 5,
+            "order_count": 48,
+            "avg_order_fen": 7200,
+            "total_spent_fen": 345600,
+            "monthly_frequency": 5,
+            "avg_party_size": 3,
+            "weekend_ratio": 0.7,
+            "coupon_usage_rate": 0.3,
+            "health_dish_ratio": 0.4,
+            "festival_order_ratio": 0.2,
+            "has_stored_value": True,
+            "stored_value_balance_fen": 50000,
         },
         {
-            "user_id": "u005", "name": "刘先生",
-            "first_order_days": 20, "recency_days": 18, "order_count": 1,
-            "avg_order_fen": 16000, "total_spent_fen": 16000,
-            "monthly_frequency": 0, "avg_party_size": 2,
-            "weekend_ratio": 0.5, "coupon_usage_rate": 0.0,
-            "health_dish_ratio": 0.1, "festival_order_ratio": 0.0,
-            "has_stored_value": False, "stored_value_balance_fen": 0,
+            "user_id": "u005",
+            "name": "刘先生",
+            "first_order_days": 20,
+            "recency_days": 18,
+            "order_count": 1,
+            "avg_order_fen": 16000,
+            "total_spent_fen": 16000,
+            "monthly_frequency": 0,
+            "avg_party_size": 2,
+            "weekend_ratio": 0.5,
+            "coupon_usage_rate": 0.0,
+            "health_dish_ratio": 0.1,
+            "festival_order_ratio": 0.0,
+            "has_stored_value": False,
+            "stored_value_balance_fen": 0,
         },
     ]
 
@@ -422,8 +510,8 @@ def sample_users():
 # 1. 品牌策略引擎测试
 # ===========================================================================
 
-class TestBrandStrategy:
 
+class TestBrandStrategy:
     def test_create_brand_strategy(self, brand_svc):
         result = brand_svc.create_brand_strategy(
             brand_id="zuiqianxian",
@@ -452,10 +540,13 @@ class TestBrandStrategy:
         assert "error" in result
 
     def test_update_brand_strategy(self, brand_svc, sample_brand):
-        result = brand_svc.update_brand_strategy("changzaiyiqi", {
-            "tone": "温暖、亲切、高品质",
-            "forbidden_expressions": ["最低价", "全网最便宜", "免费送", "跳楼价", "清仓", "甩卖"],
-        })
+        result = brand_svc.update_brand_strategy(
+            "changzaiyiqi",
+            {
+                "tone": "温暖、亲切、高品质",
+                "forbidden_expressions": ["最低价", "全网最便宜", "免费送", "跳楼价", "清仓", "甩卖"],
+            },
+        )
         assert result["tone"] == "温暖、亲切、高品质"
         assert "甩卖" in result["forbidden_expressions"]
 
@@ -464,10 +555,18 @@ class TestBrandStrategy:
             brand_id="changzaiyiqi",
             city="长沙",
             district_strategies=[
-                {"district": "岳麓区", "competitor_density": "high",
-                 "price_adjustment_pct": -5, "focus_segments": ["高校学生", "家庭"]},
-                {"district": "芙蓉区", "competitor_density": "medium",
-                 "price_adjustment_pct": 0, "focus_segments": ["商务白领"]},
+                {
+                    "district": "岳麓区",
+                    "competitor_density": "high",
+                    "price_adjustment_pct": -5,
+                    "focus_segments": ["高校学生", "家庭"],
+                },
+                {
+                    "district": "芙蓉区",
+                    "competitor_density": "medium",
+                    "price_adjustment_pct": 0,
+                    "focus_segments": ["商务白领"],
+                },
             ],
         )
         assert result["city"] == "长沙"
@@ -516,8 +615,8 @@ class TestBrandStrategy:
 # 2. 客户分群引擎测试
 # ===========================================================================
 
-class TestAudienceSegmentation:
 
+class TestAudienceSegmentation:
     def test_system_segments_initialized(self, segment_svc):
         segments = segment_svc.list_segments()
         assert len(segments) >= 11
@@ -615,20 +714,29 @@ class TestAudienceSegmentation:
 # 3. 旅程编排引擎测试
 # ===========================================================================
 
-class TestJourneyOrchestrator:
 
+class TestJourneyOrchestrator:
     def _create_sample_journey(self, journey_svc):
         return journey_svc.create_journey(
             name="首单未复购48h召回",
             journey_type="retention",
             trigger={"type": "first_visit_no_repeat_48h", "params": {}},
             nodes=[
-                {"node_id": "n1", "type": "send_content", "content_type": "wecom_chat",
-                 "content_params": {"template": "retention"}, "next": "n2"},
+                {
+                    "node_id": "n1",
+                    "type": "send_content",
+                    "content_type": "wecom_chat",
+                    "content_params": {"template": "retention"},
+                    "next": "n2",
+                },
                 {"node_id": "n2", "type": "wait", "wait_hours": 24, "next": "n3"},
-                {"node_id": "n3", "type": "condition",
-                 "condition": {"type": "opened_content"},
-                 "true_next": "n4", "false_next": "n5"},
+                {
+                    "node_id": "n3",
+                    "type": "condition",
+                    "condition": {"type": "opened_content"},
+                    "true_next": "n4",
+                    "false_next": "n5",
+                },
                 {"node_id": "n4", "type": "send_offer", "offer_type": "second_visit", "next": None},
                 {"node_id": "n5", "type": "notify_staff", "staff_role": "store_manager", "next": None},
             ],
@@ -660,9 +768,11 @@ class TestJourneyOrchestrator:
 
     def test_publish_empty_journey_fails(self, journey_svc):
         journey = journey_svc.create_journey(
-            name="空旅程", journey_type="test",
+            name="空旅程",
+            journey_type="test",
             trigger={"type": "no_visit_7d", "params": {}},
-            nodes=[], target_segment_id="dormant",
+            nodes=[],
+            target_segment_id="dormant",
         )
         result = journey_svc.publish_journey(journey["journey_id"])
         assert "error" in result
@@ -680,28 +790,40 @@ class TestJourneyOrchestrator:
 
     def test_evaluate_triggers(self, journey_svc):
         # 首单未复购 48h
-        assert journey_svc.evaluate_trigger(
-            "first_visit_no_repeat_48h",
-            {"order_count": 1, "recency_days": 3},
-        ) is True
+        assert (
+            journey_svc.evaluate_trigger(
+                "first_visit_no_repeat_48h",
+                {"order_count": 1, "recency_days": 3},
+            )
+            is True
+        )
 
         # 7天未到店
-        assert journey_svc.evaluate_trigger(
-            "no_visit_7d",
-            {"recency_days": 10},
-        ) is True
+        assert (
+            journey_svc.evaluate_trigger(
+                "no_visit_7d",
+                {"recency_days": 10},
+            )
+            is True
+        )
 
         # 生日临近
-        assert journey_svc.evaluate_trigger(
-            "birthday_approaching",
-            {"birthday_in_days": 3},
-        ) is True
+        assert (
+            journey_svc.evaluate_trigger(
+                "birthday_approaching",
+                {"birthday_in_days": 3},
+            )
+            is True
+        )
 
         # 不触发
-        assert journey_svc.evaluate_trigger(
-            "no_visit_30d",
-            {"recency_days": 5},
-        ) is False
+        assert (
+            journey_svc.evaluate_trigger(
+                "no_visit_30d",
+                {"recency_days": 5},
+            )
+            is False
+        )
 
     def test_execute_nodes(self, journey_svc):
         journey = self._create_sample_journey(journey_svc)
@@ -764,8 +886,8 @@ class TestJourneyOrchestrator:
 # 4. 内容引擎测试
 # ===========================================================================
 
-class TestContentEngine:
 
+class TestContentEngine:
     def test_generate_all_content_types(self, content_svc):
         """测试10种内容类型全部能正确生成"""
         for ct in ContentEngine.CONTENT_TYPES:
@@ -863,10 +985,18 @@ class TestContentEngine:
         assert perf["send_count"] == 0
 
         # 记录效果数据
-        record_content_performance(cid, {
-            "send_count": 500, "open_count": 175, "click_count": 60, "conversion_count": 15,
-            "open_rate": 0.35, "click_rate": 0.12, "conversion_rate": 0.03,
-        })
+        record_content_performance(
+            cid,
+            {
+                "send_count": 500,
+                "open_count": 175,
+                "click_count": 60,
+                "conversion_count": 15,
+                "open_rate": 0.35,
+                "click_rate": 0.12,
+                "conversion_rate": 0.03,
+            },
+        )
         perf = content_svc.get_content_performance(cid)
         assert perf["send_count"] == 500
         assert perf["open_rate"] == 0.35
@@ -876,8 +1006,8 @@ class TestContentEngine:
 # 5. 优惠引擎测试
 # ===========================================================================
 
-class TestOfferEngine:
 
+class TestOfferEngine:
     def _create_sample_offer(self, offer_svc):
         return offer_svc.create_offer(
             name="新客首单立减20",
@@ -913,9 +1043,14 @@ class TestOfferEngine:
 
     def test_invalid_offer_type(self, offer_svc):
         result = offer_svc.create_offer(
-            name="无效类型", offer_type="nonexistent",
-            discount_rules={}, validity_days=7,
-            target_segments=[], stores=[], time_slots=[], margin_floor=0.45,
+            name="无效类型",
+            offer_type="nonexistent",
+            discount_rules={},
+            validity_days=7,
+            target_segments=[],
+            stores=[],
+            time_slots=[],
+            margin_floor=0.45,
         )
         assert "error" in result
 
@@ -943,23 +1078,37 @@ class TestOfferEngine:
 
     def test_margin_compliance_pass(self, offer_svc):
         offer = self._create_sample_offer(offer_svc)
-        result = offer_svc.check_margin_compliance(offer["offer_id"], {
-            "total_fen": 15000, "cost_fen": 6000, "discount_fen": 2000,
-        })
+        result = offer_svc.check_margin_compliance(
+            offer["offer_id"],
+            {
+                "total_fen": 15000,
+                "cost_fen": 6000,
+                "discount_fen": 2000,
+            },
+        )
         # revenue_after = 13000, margin = (13000-6000)/13000 = 0.538 > 0.45
         assert result["compliant"] is True
         assert result["margin_rate"] > 0.45
 
     def test_margin_compliance_fail(self, offer_svc):
         offer = offer_svc.create_offer(
-            name="大力度折扣", offer_type="second_visit",
+            name="大力度折扣",
+            offer_type="second_visit",
             discount_rules={"type": "fixed_amount", "amount_fen": 5000},
-            validity_days=7, target_segments=["dormant"],
-            stores=[], time_slots=[], margin_floor=0.45,
+            validity_days=7,
+            target_segments=["dormant"],
+            stores=[],
+            time_slots=[],
+            margin_floor=0.45,
         )
-        result = offer_svc.check_margin_compliance(offer["offer_id"], {
-            "total_fen": 10000, "cost_fen": 5000, "discount_fen": 5000,
-        })
+        result = offer_svc.check_margin_compliance(
+            offer["offer_id"],
+            {
+                "total_fen": 10000,
+                "cost_fen": 5000,
+                "discount_fen": 5000,
+            },
+        )
         # revenue_after = 5000, margin = (5000-5000)/5000 = 0.0 < 0.45
         assert result["compliant"] is False
 
@@ -995,11 +1144,12 @@ class TestOfferEngine:
 # 6. 渠道引擎测试
 # ===========================================================================
 
-class TestChannelEngine:
 
+class TestChannelEngine:
     def test_send_wecom(self, channel_svc):
         result = channel_svc.send_message(
-            channel="wecom", user_id="u001",
+            channel="wecom",
+            user_id="u001",
             content="张大姐您好，上次您点的剁椒鱼头...",
         )
         assert result["success"] is True
@@ -1007,21 +1157,26 @@ class TestChannelEngine:
 
     def test_send_sms(self, channel_svc):
         result = channel_svc.send_message(
-            channel="sms", user_id="u001",
+            channel="sms",
+            user_id="u001",
             content="【尝在一起】您有一张新优惠券待领取。退订回T",
         )
         assert result["success"] is True
 
     def test_send_with_offer(self, channel_svc):
         result = channel_svc.send_message(
-            channel="miniapp", user_id="u001",
-            content="新品上线", offer_id="offer_001",
+            channel="miniapp",
+            user_id="u001",
+            content="新品上线",
+            offer_id="offer_001",
         )
         assert result["success"] is True
 
     def test_invalid_channel(self, channel_svc):
         result = channel_svc.send_message(
-            channel="telegram", user_id="u001", content="test",
+            channel="telegram",
+            user_id="u001",
+            content="test",
         )
         assert result["success"] is False
 
@@ -1083,8 +1238,8 @@ class TestChannelEngine:
 # 7. ROI归因引擎测试
 # ===========================================================================
 
-class TestROIAttribution:
 
+class TestROIAttribution:
     def _setup_attribution_data(self, roi_svc):
         """设置归因测试数据"""
         # 活动A：企微推送
@@ -1192,12 +1347,19 @@ class TestROIAttribution:
 # 8. 端到端测试：分群 → 旅程 → 内容 → 优惠 → 发送 → 转化 → ROI
 # ===========================================================================
 
-class TestEndToEnd:
 
+class TestEndToEnd:
     def test_full_growth_flow(
-        self, brand_svc, segment_svc, journey_svc,
-        content_svc, offer_svc, channel_svc, roi_svc,
-        sample_brand, sample_users,
+        self,
+        brand_svc,
+        segment_svc,
+        journey_svc,
+        content_svc,
+        offer_svc,
+        channel_svc,
+        roi_svc,
+        sample_brand,
+        sample_users,
     ):
         """完整增长链路：
         1. 品牌策略 → 2. 用户分群 → 3. 创建旅程 → 4. 生成内容 →
@@ -1224,11 +1386,15 @@ class TestEndToEnd:
             journey_type="reactivation",
             trigger={"type": "no_visit_30d", "params": {}},
             nodes=[
-                {"node_id": "n1", "type": "send_content", "content_type": "wecom_chat",
-                 "content_params": {}, "next": "n2"},
+                {
+                    "node_id": "n1",
+                    "type": "send_content",
+                    "content_type": "wecom_chat",
+                    "content_params": {},
+                    "next": "n2",
+                },
                 {"node_id": "n2", "type": "wait", "wait_hours": 48, "next": "n3"},
-                {"node_id": "n3", "type": "send_offer", "offer_type": "second_visit",
-                 "next": None},
+                {"node_id": "n3", "type": "send_offer", "offer_type": "second_visit", "next": None},
             ],
             target_segment_id="dormant",
         )
@@ -1261,9 +1427,14 @@ class TestEndToEnd:
         oid = offer["offer_id"]
 
         # 毛利合规检查
-        margin = offer_svc.check_margin_compliance(oid, {
-            "total_fen": 15000, "cost_fen": 5000, "discount_fen": 3000,
-        })
+        margin = offer_svc.check_margin_compliance(
+            oid,
+            {
+                "total_fen": 15000,
+                "cost_fen": 5000,
+                "discount_fen": 3000,
+            },
+        )
         assert margin["compliant"] is True
 
         # ---- Step 6: 渠道发送 ----
@@ -1283,21 +1454,35 @@ class TestEndToEnd:
 
         # ---- Step 7: 记录归因触点 + 转化 ----
         roi_svc.record_touchpoint(
-            dormant_user["user_id"], "wecom", "campaign_dormant_recall", "impression",
+            dormant_user["user_id"],
+            "wecom",
+            "campaign_dormant_recall",
+            "impression",
         )
         roi_svc.record_touchpoint(
-            dormant_user["user_id"], "wecom", "campaign_dormant_recall", "open",
+            dormant_user["user_id"],
+            "wecom",
+            "campaign_dormant_recall",
+            "open",
         )
         roi_svc.record_touchpoint(
-            dormant_user["user_id"], "wecom", "campaign_dormant_recall", "click",
+            dormant_user["user_id"],
+            "wecom",
+            "campaign_dormant_recall",
+            "click",
         )
 
         # 小王到店下单
         roi_svc.record_touchpoint(
-            dormant_user["user_id"], "wecom", "campaign_dormant_recall", "visit",
+            dormant_user["user_id"],
+            "wecom",
+            "campaign_dormant_recall",
+            "visit",
         )
         roi_svc.record_conversion(
-            dormant_user["user_id"], "order_recall_001", 13500,
+            dormant_user["user_id"],
+            "order_recall_001",
+            13500,
         )
 
         # 核销优惠
@@ -1329,7 +1514,12 @@ class TestEndToEnd:
         assert overview["total_converted_users"] == 1
 
     def test_multi_segment_multi_channel(
-        self, segment_svc, content_svc, channel_svc, roi_svc, sample_users,
+        self,
+        segment_svc,
+        content_svc,
+        channel_svc,
+        roi_svc,
+        sample_users,
     ):
         """多分群 × 多渠道的并行营销"""
         # 分群
@@ -1365,12 +1555,18 @@ class TestEndToEnd:
         assert overview["total_converted_users"] >= 1
 
     def test_brand_compliance_blocks_bad_content(
-        self, brand_svc, content_svc, sample_brand,
+        self,
+        brand_svc,
+        content_svc,
+        sample_brand,
     ):
         """品牌合规拦截不当内容"""
         # 生成正常内容
         good = content_svc.generate_content(
-            "moments", "changzaiyiqi", "all", dish_name="剁椒鱼头",
+            "moments",
+            "changzaiyiqi",
+            "all",
+            dish_name="剁椒鱼头",
         )
         val = brand_svc.validate_content_against_brand("changzaiyiqi", good["body"])
         assert val["valid"] is True
@@ -1384,27 +1580,45 @@ class TestEndToEnd:
     def test_margin_floor_hard_constraint(self, offer_svc):
         """毛利底线硬约束（三条硬约束之一）"""
         offer = offer_svc.create_offer(
-            name="极限折扣", offer_type="new_customer_trial",
+            name="极限折扣",
+            offer_type="new_customer_trial",
             discount_rules={"type": "fixed_amount", "amount_fen": 8000},
-            validity_days=3, target_segments=["new_customer"],
-            stores=[], time_slots=[], margin_floor=0.45,
+            validity_days=3,
+            target_segments=["new_customer"],
+            stores=[],
+            time_slots=[],
+            margin_floor=0.45,
         )
 
         # 低毛利订单 + 大额折扣 → 不合规
-        result = offer_svc.check_margin_compliance(offer["offer_id"], {
-            "total_fen": 10000, "cost_fen": 4000, "discount_fen": 8000,
-        })
+        result = offer_svc.check_margin_compliance(
+            offer["offer_id"],
+            {
+                "total_fen": 10000,
+                "cost_fen": 4000,
+                "discount_fen": 8000,
+            },
+        )
         assert result["compliant"] is False
         assert "低于底线" in result["reason"]
 
         # 高毛利订单 + 小额折扣 → 合规
         offer2 = offer_svc.create_offer(
-            name="温和折扣", offer_type="new_customer_trial",
+            name="温和折扣",
+            offer_type="new_customer_trial",
             discount_rules={"type": "fixed_amount", "amount_fen": 1000},
-            validity_days=7, target_segments=["new_customer"],
-            stores=[], time_slots=[], margin_floor=0.45,
+            validity_days=7,
+            target_segments=["new_customer"],
+            stores=[],
+            time_slots=[],
+            margin_floor=0.45,
         )
-        result2 = offer_svc.check_margin_compliance(offer2["offer_id"], {
-            "total_fen": 15000, "cost_fen": 5000, "discount_fen": 1000,
-        })
+        result2 = offer_svc.check_margin_compliance(
+            offer2["offer_id"],
+            {
+                "total_fen": 15000,
+                "cost_fen": 5000,
+                "discount_fen": 1000,
+            },
+        )
         assert result2["compliant"] is True

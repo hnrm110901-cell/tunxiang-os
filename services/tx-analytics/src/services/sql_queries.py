@@ -4,6 +4,7 @@
 金额从 orders 表读 fen（分）。
 每条查询强制 tenant_id 过滤 + RLS 兼容。
 """
+
 from datetime import date, datetime, timedelta, timezone
 
 import structlog
@@ -16,6 +17,7 @@ log = structlog.get_logger()
 # ──────────────────────────────────────────────
 # 1. 每日营收查询
 # ──────────────────────────────────────────────
+
 
 async def query_daily_revenue(
     store_id: str,
@@ -77,6 +79,7 @@ async def query_daily_revenue(
 # 2. 订单数查询
 # ──────────────────────────────────────────────
 
+
 async def query_order_count(
     store_id: str,
     target_date: date,
@@ -128,6 +131,7 @@ async def query_order_count(
 # ──────────────────────────────────────────────
 # 3. 菜品销售明细
 # ──────────────────────────────────────────────
+
 
 async def query_dish_sales(
     store_id: str,
@@ -202,6 +206,7 @@ async def query_dish_sales(
 # 4. 按小时分布
 # ──────────────────────────────────────────────
 
+
 async def query_hourly_distribution(
     store_id: str,
     target_date: date,
@@ -254,6 +259,7 @@ async def query_hourly_distribution(
 # ──────────────────────────────────────────────
 # 5. 支付方式分布
 # ──────────────────────────────────────────────
+
 
 async def query_payment_breakdown(
     store_id: str,
@@ -311,6 +317,7 @@ async def query_payment_breakdown(
 # ──────────────────────────────────────────────
 # 6. 桌台会话（翻台）
 # ──────────────────────────────────────────────
+
 
 async def query_table_sessions(
     store_id: str,
@@ -385,6 +392,7 @@ async def query_table_sessions(
 # ──────────────────────────────────────────────
 # 7. 退菜记录
 # ──────────────────────────────────────────────
+
 
 async def query_returns(
     store_id: str,
@@ -477,10 +485,7 @@ async def query_returns(
         },
     )
     reason_rows = reason_result.mappings().all()
-    by_reason = [
-        {"reason": r["reason"], "count": int(r["count"])}
-        for r in reason_rows
-    ]
+    by_reason = [{"reason": r["reason"], "count": int(r["count"])} for r in reason_rows]
 
     total_return_qty = sum(d["return_qty"] for d in by_dish)
     total_return_amount_fen = sum(d["return_amount_fen"] for d in by_dish)
@@ -496,6 +501,7 @@ async def query_returns(
 # ──────────────────────────────────────────────
 # 8. 今日异常
 # ──────────────────────────────────────────────
+
 
 async def query_alerts_today(
     store_id: str,
@@ -566,6 +572,7 @@ async def query_alerts_today(
 # 9. 多日营收趋势（趋势图）
 # ──────────────────────────────────────────────
 
+
 async def query_revenue_trend(
     store_id: str,
     tenant_id: str,
@@ -615,6 +622,7 @@ async def query_revenue_trend(
 # ──────────────────────────────────────────────
 # 10. Top 菜品（按销量/营收）
 # ──────────────────────────────────────────────
+
 
 async def query_top_dishes(
     store_id: str,

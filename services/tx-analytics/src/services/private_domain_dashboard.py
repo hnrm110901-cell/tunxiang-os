@@ -7,6 +7,7 @@
 - ROI 趋势（近30天）
 - 跨品牌对比
 """
+
 import asyncio
 import os
 from datetime import date, datetime, timedelta
@@ -24,6 +25,7 @@ _TIMEOUT = 8.0
 
 # ─── 内部 HTTP helpers ────────────────────────────────────────────────────────
 
+
 async def _get(client: httpx.AsyncClient, url: str, params: dict | None = None) -> dict:
     """GET with graceful degradation on failure."""
     try:
@@ -36,6 +38,7 @@ async def _get(client: httpx.AsyncClient, url: str, params: dict | None = None) 
 
 
 # ─── 会员健康度评分 ────────────────────────────────────────────────────────────
+
 
 def _compute_member_health_score(rfm_dist: dict) -> dict:
     """
@@ -95,6 +98,7 @@ async def get_member_health(tenant_id: str) -> dict:
 
 # ─── 企微触达效率 ─────────────────────────────────────────────────────────────
 
+
 async def get_wecom_reach_efficiency(tenant_id: str, days: int = 7) -> dict:
     """
     调用 tx-growth attribution dashboard，提取企微渠道指标。
@@ -111,9 +115,7 @@ async def get_wecom_reach_efficiency(tenant_id: str, days: int = 7) -> dict:
             f"{_MEMBER_URL}/api/v1/members/wecom/stats",
             params={"tenant_id": tenant_id, "days": days},
         )
-        attribution_data, wecom_data = await asyncio.gather(
-            attribution_task, wecom_binding_task
-        )
+        attribution_data, wecom_data = await asyncio.gather(attribution_task, wecom_binding_task)
 
     attr = attribution_data.get("data", {})
     wecom = wecom_data.get("data", {})
@@ -137,6 +139,7 @@ async def get_wecom_reach_efficiency(tenant_id: str, days: int = 7) -> dict:
 
 # ─── 旅程转化漏斗 ─────────────────────────────────────────────────────────────
 
+
 async def get_journey_funnel(tenant_id: str) -> dict:
     """
     聚合所有活跃旅程的转化漏斗数据。
@@ -159,12 +162,8 @@ async def get_journey_funnel(tenant_id: str) -> dict:
     total_completed = sum(j.get("completed", 0) for j in journeys)
     total_converted = sum(j.get("converted", 0) for j in journeys)
 
-    overall_completion = (
-        round(total_completed / total_entered * 100, 1) if total_entered else 0.0
-    )
-    overall_conversion = (
-        round(total_converted / total_entered * 100, 1) if total_entered else 0.0
-    )
+    overall_completion = round(total_completed / total_entered * 100, 1) if total_entered else 0.0
+    overall_conversion = round(total_converted / total_entered * 100, 1) if total_entered else 0.0
 
     return {
         "total_active_journeys": len(journeys),
@@ -178,6 +177,7 @@ async def get_journey_funnel(tenant_id: str) -> dict:
 
 
 # ─── ROI 趋势（近30天每日） ──────────────────────────────────────────────────
+
 
 async def get_roi_trend(tenant_id: str, days: int = 30) -> dict:
     """
@@ -218,6 +218,7 @@ async def get_roi_trend(tenant_id: str, days: int = 30) -> dict:
 
 # ─── 跨品牌对比 ──────────────────────────────────────────────────────────────
 
+
 async def get_cross_brand_comparison(group_id: str, tenant_id: str) -> dict:
     """
     跨品牌私域指标对比（总部视角）。
@@ -255,6 +256,7 @@ async def get_cross_brand_comparison(group_id: str, tenant_id: str) -> dict:
 
 
 # ─── 汇总仪表盘（并发聚合） ───────────────────────────────────────────────────
+
 
 async def get_private_domain_dashboard(
     tenant_id: str,

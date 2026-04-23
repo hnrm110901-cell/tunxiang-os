@@ -1,4 +1,5 @@
 """经营叙事引擎纯函数测试"""
+
 import os
 import sys
 
@@ -26,7 +27,9 @@ class TestBuildOverview:
         assert "2/3" in result
 
     def test_no_decisions(self):
-        result = build_overview("A店", {"revenue_yuan": 5000, "actual_cost_pct": 30, "cost_rate_label": "正常"}, {"total": 0})
+        result = build_overview(
+            "A店", {"revenue_yuan": 5000, "actual_cost_pct": 30, "cost_rate_label": "正常"}, {"total": 0}
+        )
         assert "决策" not in result
 
 
@@ -34,7 +37,9 @@ class TestDetectAnomalies:
     def test_critical_cost(self):
         result = detect_anomalies(
             {"cost_rate_status": "critical", "actual_cost_pct": 42.0},
-            [], 0, [],
+            [],
+            0,
+            [],
         )
         assert len(result) >= 1
         assert "严重超标" in result[0]
@@ -42,7 +47,9 @@ class TestDetectAnomalies:
     def test_warning_cost(self):
         result = detect_anomalies(
             {"cost_rate_status": "warning", "actual_cost_pct": 35.0},
-            [], 0, [],
+            [],
+            0,
+            [],
         )
         assert any("偏高" in a for a in result)
 
@@ -50,13 +57,16 @@ class TestDetectAnomalies:
         result = detect_anomalies(
             {"cost_rate_status": "ok"},
             [{"item_name": "鲈鱼", "waste_cost_yuan": 320, "action": "检查供应商"}],
-            0, [],
+            0,
+            [],
         )
         assert any("鲈鱼" in a for a in result)
 
     def test_pending_decisions(self):
         result = detect_anomalies(
-            {"cost_rate_status": "ok"}, [], 3,
+            {"cost_rate_status": "ok"},
+            [],
+            3,
             [{"expected_saving_yuan": 500}],
         )
         assert any("3条决策" in a for a in result)

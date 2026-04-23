@@ -3,6 +3,7 @@
 V2.3: 跨品牌客户去重、统一触达频控、交叉推荐策略
 金额单位：分(fen)
 """
+
 import json
 from typing import Optional
 from uuid import UUID
@@ -35,14 +36,13 @@ class GrowthCrossBrandService:
     # 跨品牌统一画像
     # ------------------------------------------------------------------
 
-    async def get_customer_cross_brand_profile(
-        self, customer_id: UUID, tenant_id: str, db: AsyncSession
-    ) -> dict:
+    async def get_customer_cross_brand_profile(self, customer_id: UUID, tenant_id: str, db: AsyncSession) -> dict:
         """获取客户跨品牌统一画像"""
         await self._set_tenant(db, tenant_id)
 
         # 各品牌下的增长状态
-        brand_profiles = await db.execute(text("""
+        brand_profiles = await db.execute(
+            text("""
             SELECT
                 cgp.brand_id,
                 gbc.brand_name,
@@ -56,12 +56,15 @@ class GrowthCrossBrandService:
             LEFT JOIN growth_brand_configs gbc
                 ON gbc.brand_id = cgp.brand_id AND gbc.tenant_id = cgp.tenant_id
             WHERE cgp.customer_id = :cid AND cgp.is_deleted = FALSE
-        """), {"cid": str(customer_id)})
+        """),
+            {"cid": str(customer_id)},
+        )
 
         brands = [dict(row._mapping) for row in brand_profiles.fetchall()]
 
         # 统一触达历史（跨品牌合并）
-        touch_summary = await db.execute(text("""
+        touch_summary = await db.execute(
+            text("""
             SELECT
                 brand_id,
                 COUNT(*) AS total_touches,
@@ -71,12 +74,15 @@ class GrowthCrossBrandService:
             FROM growth_touch_executions
             WHERE customer_id = :cid AND is_deleted = FALSE
             GROUP BY brand_id
-        """), {"cid": str(customer_id)})
+        """),
+            {"cid": str(customer_id)},
+        )
 
         touches_by_brand = [dict(row._mapping) for row in touch_summary.fetchall()]
 
         # 跨品牌总计
-        total_touch = await db.execute(text("""
+        total_touch = await db.execute(
+            text("""
             SELECT
                 COUNT(*) AS total,
                 COUNT(*) FILTER (WHERE created_at::date = CURRENT_DATE) AS today,
@@ -84,7 +90,9 @@ class GrowthCrossBrandService:
             FROM growth_touch_executions
             WHERE customer_id = :cid AND is_deleted = FALSE
               AND execution_state NOT IN ('blocked','skipped')
-        """), {"cid": str(customer_id)})
+        """),
+            {"cid": str(customer_id)},
+        )
         tt = total_touch.fetchone()
 
         return {
@@ -101,20 +109,21 @@ class GrowthCrossBrandService:
     # 跨品牌频控检查
     # ------------------------------------------------------------------
 
-    async def check_cross_brand_frequency(
-        self, customer_id: UUID, tenant_id: str, db: AsyncSession
-    ) -> dict:
+    async def check_cross_brand_frequency(self, customer_id: UUID, tenant_id: str, db: AsyncSession) -> dict:
         """跨品牌频控检查 — 一个客户在所有品牌下的总触达不超限"""
         await self._set_tenant(db, tenant_id)
 
-        result = await db.execute(text("""
+        result = await db.execute(
+            text("""
             SELECT
                 COUNT(*) FILTER (WHERE created_at::date = CURRENT_DATE) AS today,
                 COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '7 days') AS week
             FROM growth_touch_executions
             WHERE customer_id = :cid AND is_deleted = FALSE
               AND execution_state NOT IN ('blocked','skipped')
-        """), {"cid": str(customer_id)})
+        """),
+            {"cid": str(customer_id)},
+        )
         r = result.fetchone()
         today = r[0] if r else 0
         week = r[1] if r else 0
@@ -142,8 +151,12 @@ class GrowthCrossBrandService:
     # ------------------------------------------------------------------
 
     async def find_cross_brand_opportunities(
-        self, tenant_id: str, db: AsyncSession,
-        min_brands: int = 2, page: int = 1, size: int = 20,
+        self,
+        tenant_id: str,
+        db: AsyncSession,
+        min_brands: int = 2,
+        page: int = 1,
+        size: int = 20,
     ) -> dict:
         """发现跨品牌增长机会 — 在A品牌活跃但B品牌沉默的客户"""
         await self._set_tenant(db, tenant_id)
@@ -151,7 +164,8 @@ class GrowthCrossBrandService:
         offset = (page - 1) * size
 
         # 查在多个品牌下有画像的客户
-        result = await db.execute(text("""
+        result = await db.execute(
+            text("""
             WITH multi_brand_customers AS (
                 SELECT customer_id, COUNT(DISTINCT brand_id) AS brand_count
                 FROM customer_growth_profiles
@@ -187,7 +201,9 @@ class GrowthCrossBrandService:
             GROUP BY customer_id, brand_count
             ORDER BY brand_count DESC
             LIMIT :size OFFSET :offset
-        """), {"min_brands": min_brands, "size": size, "offset": offset})
+        """),
+            {"min_brands": min_brands, "size": size, "offset": offset},
+        )
 
         items = []
         for row in result.fetchall():
@@ -195,13 +211,9 @@ class GrowthCrossBrandService:
 
             # 找机会：某品牌活跃(stable_repeat)但另一品牌沉默(high/critical)
             active_brands = [
-                b for b in brands_data
-                if b.get("repurchase_stage") in ("second_order_done", "stable_repeat")
+                b for b in brands_data if b.get("repurchase_stage") in ("second_order_done", "stable_repeat")
             ]
-            silent_brands = [
-                b for b in brands_data
-                if b.get("reactivation_priority") in ("high", "critical")
-            ]
+            silent_brands = [b for b in brands_data if b.get("reactivation_priority") in ("high", "critical")]
 
             opportunity = None
             if active_brands and silent_brands:
@@ -214,15 +226,18 @@ class GrowthCrossBrandService:
                     "recommended_action": "用活跃品牌的关系唤醒沉默品牌",
                 }
 
-            items.append({
-                "customer_id": str(row[0]),
-                "brand_count": row[1],
-                "brands": brands_data,
-                "opportunity": opportunity,
-            })
+            items.append(
+                {
+                    "customer_id": str(row[0]),
+                    "brand_count": row[1],
+                    "brands": brands_data,
+                    "opportunity": opportunity,
+                }
+            )
 
         # 总数
-        count_result = await db.execute(text("""
+        count_result = await db.execute(
+            text("""
             SELECT COUNT(*) FROM (
                 SELECT customer_id
                 FROM customer_growth_profiles
@@ -230,7 +245,9 @@ class GrowthCrossBrandService:
                 GROUP BY customer_id
                 HAVING COUNT(DISTINCT brand_id) >= :min_brands
             ) sub
-        """), {"min_brands": min_brands})
+        """),
+            {"min_brands": min_brands},
+        )
         total = count_result.scalar() or 0
 
         return {"items": items, "total": total, "page": page, "size": size}
@@ -251,19 +268,25 @@ class GrowthCrossBrandService:
         await self._set_tenant(db, tenant_id)
 
         # 源品牌画像
-        source = await db.execute(text("""
+        source = await db.execute(
+            text("""
             SELECT repurchase_stage, super_user_level, growth_milestone_stage, psych_distance_level
             FROM customer_growth_profiles
             WHERE customer_id = :cid AND brand_id = :bid AND is_deleted = FALSE
-        """), {"cid": str(customer_id), "bid": str(source_brand_id)})
+        """),
+            {"cid": str(customer_id), "bid": str(source_brand_id)},
+        )
         src = source.fetchone()
 
         # 目标品牌画像
-        target = await db.execute(text("""
+        target = await db.execute(
+            text("""
             SELECT repurchase_stage, reactivation_priority, psych_distance_level
             FROM customer_growth_profiles
             WHERE customer_id = :cid AND brand_id = :bid AND is_deleted = FALSE
-        """), {"cid": str(customer_id), "bid": str(target_brand_id)})
+        """),
+            {"cid": str(customer_id), "bid": str(target_brand_id)},
+        )
         tgt = target.fetchone()
 
         if not src or not tgt:

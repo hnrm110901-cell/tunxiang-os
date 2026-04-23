@@ -91,6 +91,7 @@
 
 所有端点必须携带 X-Tenant-ID Header（UUID 格式）。
 """
+
 from __future__ import annotations
 
 from datetime import datetime
@@ -98,19 +99,19 @@ from typing import Any, Optional
 from uuid import UUID
 
 import structlog
-from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
+from fastapi import APIRouter, Header, HTTPException, Query
 from pydantic import BaseModel, Field
+from services.growth_brand_service import GrowthBrandService
+from services.growth_cross_brand_service import GrowthCrossBrandService
+from services.growth_experiment_service import GrowthExperimentService
+from services.growth_journey_service import GrowthJourneyService
+from services.growth_profile_service import GrowthProfileService
+from services.growth_repair_service import GrowthRepairService
+from services.growth_store_capability_service import GrowthStoreCapabilityService
+from services.growth_suggestion_service import GrowthSuggestionService
+from services.growth_touch_service import GrowthTouchService
 from sqlalchemy import text
 
-from services.growth_profile_service import GrowthProfileService
-from services.growth_journey_service import GrowthJourneyService
-from services.growth_touch_service import GrowthTouchService
-from services.growth_repair_service import GrowthRepairService
-from services.growth_suggestion_service import GrowthSuggestionService
-from services.growth_brand_service import GrowthBrandService
-from services.growth_experiment_service import GrowthExperimentService
-from services.growth_cross_brand_service import GrowthCrossBrandService
-from services.growth_store_capability_service import GrowthStoreCapabilityService
 from shared.ontology.src.database import async_session_factory
 
 logger = structlog.get_logger(__name__)
@@ -128,8 +129,9 @@ _cross_brand_svc = GrowthCrossBrandService()
 _store_cap_svc = GrowthStoreCapabilityService()
 
 # 天气/日历信号服务（无状态纯计算，直接在 growth 中实例化）
-from services.weather_signal_proxy import WeatherSignalService as _WeatherSvc
 from services.calendar_signal_proxy import CalendarSignalService as _CalendarSvc
+from services.weather_signal_proxy import WeatherSignalService as _WeatherSvc
+
 _weather_svc = _WeatherSvc()
 _calendar_svc = _CalendarSvc()
 
@@ -137,6 +139,7 @@ _calendar_svc = _CalendarSvc()
 # ---------------------------------------------------------------------------
 # 统一响应
 # ---------------------------------------------------------------------------
+
 
 def ok(data: Any) -> dict:
     return {"ok": True, "data": data}
@@ -159,6 +162,7 @@ def _parse_tenant(x_tenant_id: str) -> UUID:
 
 # --- Customer Growth Profile ---
 
+
 class GrowthProfileUpdate(BaseModel):
     repurchase_stage: Optional[str] = None
     reactivation_priority: Optional[str] = None
@@ -177,6 +181,7 @@ class GrowthProfileUpdate(BaseModel):
 
 
 # --- Journey Template ---
+
 
 class JourneyStepCreate(BaseModel):
     step_no: int
@@ -207,6 +212,7 @@ class JourneyTemplateCreate(BaseModel):
 
 # --- Journey Enrollment ---
 
+
 class EnrollmentCreate(BaseModel):
     customer_id: str
     journey_template_id: str
@@ -214,8 +220,8 @@ class EnrollmentCreate(BaseModel):
     source_event_type: Optional[str] = None
     source_event_id: Optional[str] = None
     assigned_agent_suggestion_id: Optional[str] = None
-    store_id: Optional[str] = None   # V2.3 门店能力过滤
-    brand_id: Optional[str] = None   # V2.3 品牌级归属
+    store_id: Optional[str] = None  # V2.3 门店能力过滤
+    brand_id: Optional[str] = None  # V2.3 品牌级归属
 
 
 class EnrollmentStateUpdate(BaseModel):
@@ -224,6 +230,7 @@ class EnrollmentStateUpdate(BaseModel):
 
 
 # --- Touch Execution ---
+
 
 class TouchExecutionCreate(BaseModel):
     customer_id: str
@@ -246,6 +253,7 @@ class TouchAttributionUpdate(BaseModel):
 
 # --- Service Repair ---
 
+
 class RepairCaseCreate(BaseModel):
     customer_id: str
     source_type: str  # complaint / bad_review / refund / service_timeout
@@ -265,6 +273,7 @@ class RepairCompensationUpdate(BaseModel):
 
 
 # --- Agent Suggestion ---
+
 
 class SuggestionCreate(BaseModel):
     customer_id: Optional[str] = None
@@ -295,6 +304,7 @@ class SuggestionReview(BaseModel):
 # ---------------------------------------------------------------------------
 # Customer Growth Profile 端点 (2)
 # ---------------------------------------------------------------------------
+
 
 @router.get("/customers/{customer_id}/profile")
 async def get_growth_profile(
@@ -341,6 +351,7 @@ async def update_growth_profile(
 # Journey Templates 端点 (6)
 # ---------------------------------------------------------------------------
 
+
 @router.get("/journey-templates")
 async def list_journey_templates(
     journey_type: Optional[str] = Query(None),
@@ -376,7 +387,9 @@ async def create_journey_template(
         await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
         try:
             result = await _journey_svc.create_template(
-                body.model_dump(), str(tenant_id), db,
+                body.model_dump(),
+                str(tenant_id),
+                db,
             )
             await db.commit()
             return ok(result)
@@ -414,7 +427,10 @@ async def update_journey_template(
         await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
         try:
             result = await _journey_svc.update_template(
-                UUID(template_id), body.model_dump(), str(tenant_id), db,
+                UUID(template_id),
+                body.model_dump(),
+                str(tenant_id),
+                db,
             )
             await db.commit()
             return ok(result)
@@ -460,6 +476,7 @@ async def deactivate_journey_template(
 # Journey Enrollments 端点 (4)
 # ---------------------------------------------------------------------------
 
+
 @router.get("/journey-enrollments")
 async def list_journey_enrollments(
     customer_id: Optional[str] = Query(None),
@@ -474,7 +491,8 @@ async def list_journey_enrollments(
         await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
         try:
             result = await _journey_svc.list_enrollments(
-                str(tenant_id), db,
+                str(tenant_id),
+                db,
                 customer_id=customer_id,
                 journey_state=journey_state,
                 page=page,
@@ -546,15 +564,22 @@ async def update_enrollment_state(
             eid = UUID(enrollment_id)
             if target == "paused":
                 result = await _journey_svc.pause_enrollment(
-                    eid, body.pause_reason or "", str(tenant_id), db,
+                    eid,
+                    body.pause_reason or "",
+                    str(tenant_id),
+                    db,
                 )
             elif target == "active":
                 result = await _journey_svc.resume_enrollment(
-                    eid, str(tenant_id), db,
+                    eid,
+                    str(tenant_id),
+                    db,
                 )
             elif target == "cancelled":
                 result = await _journey_svc.cancel_enrollment(
-                    eid, str(tenant_id), db,
+                    eid,
+                    str(tenant_id),
+                    db,
                 )
             else:
                 return err(f"Unsupported target journey_state: {target}")
@@ -567,6 +592,7 @@ async def update_enrollment_state(
 # ---------------------------------------------------------------------------
 # Touch Executions 端点 (4)
 # ---------------------------------------------------------------------------
+
 
 @router.get("/touch-executions")
 async def list_touch_executions(
@@ -634,7 +660,10 @@ async def update_touch_execution_state(
         await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
         try:
             result = await _touch_svc.update_execution_state(
-                UUID(execution_id), body.execution_state, str(tenant_id), db,
+                UUID(execution_id),
+                body.execution_state,
+                str(tenant_id),
+                db,
             )
             await db.commit()
             return ok(result)
@@ -670,6 +699,7 @@ async def update_touch_attribution(
 # ---------------------------------------------------------------------------
 # Service Repair Cases 端点 (5)
 # ---------------------------------------------------------------------------
+
 
 @router.get("/service-repair-cases")
 async def list_repair_cases(
@@ -793,6 +823,7 @@ async def update_repair_compensation(
 # Agent Strategy Suggestions 端点 (5)
 # ---------------------------------------------------------------------------
 
+
 @router.get("/agent-suggestions")
 async def list_agent_suggestions(
     customer_id: Optional[str] = Query(None),
@@ -832,7 +863,9 @@ async def create_agent_suggestion(
         await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
         try:
             result = await _suggestion_svc.create_suggestion(
-                body.model_dump(), str(tenant_id), db,
+                body.model_dump(),
+                str(tenant_id),
+                db,
             )
             await db.commit()
             return ok(result)
@@ -904,7 +937,9 @@ async def publish_agent_suggestion(
         await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
         try:
             result = await _suggestion_svc.publish_suggestion(
-                UUID(suggestion_id), str(tenant_id), db,
+                UUID(suggestion_id),
+                str(tenant_id),
+                db,
             )
             await db.commit()
             return ok(result)
@@ -915,6 +950,7 @@ async def publish_agent_suggestion(
 # ---------------------------------------------------------------------------
 # Dashboard Stats 聚合端点
 # ---------------------------------------------------------------------------
+
 
 @router.get("/dashboard-stats")
 async def get_dashboard_stats(
@@ -929,7 +965,8 @@ async def get_dashboard_stats(
             await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": tenant_id})
 
             # 1. 客户增长画像统计
-            profile_stats = await db.execute(text("""
+            profile_stats = await db.execute(
+                text("""
                 SELECT
                     COUNT(*) AS total_profiles,
                     COUNT(*) FILTER (WHERE repurchase_stage = 'first_order_done') AS first_order_only,
@@ -939,11 +976,13 @@ async def get_dashboard_stats(
                     COUNT(*) FILTER (WHERE service_repair_status NOT IN ('none', 'repair_completed')) AS active_repairs
                 FROM customer_growth_profiles
                 WHERE is_deleted = FALSE
-            """))
+            """)
+            )
             ps = profile_stats.fetchone()
 
             # 2. 旅程enrollment统计
-            enrollment_stats = await db.execute(text("""
+            enrollment_stats = await db.execute(
+                text("""
                 SELECT
                     COUNT(*) AS total_enrollments,
                     COUNT(*) FILTER (WHERE journey_state = 'active') AS active_enrollments,
@@ -952,11 +991,13 @@ async def get_dashboard_stats(
                     COUNT(*) FILTER (WHERE journey_state = 'waiting_observe') AS observing_enrollments
                 FROM growth_journey_enrollments
                 WHERE is_deleted = FALSE
-            """))
+            """)
+            )
             es = enrollment_stats.fetchone()
 
             # 3. 触达执行统计（近7天）
-            touch_stats = await db.execute(text("""
+            touch_stats = await db.execute(
+                text("""
                 SELECT
                     COUNT(*) AS total_touches_7d,
                     COUNT(*) FILTER (WHERE execution_state = 'delivered') AS delivered_7d,
@@ -966,11 +1007,13 @@ async def get_dashboard_stats(
                     COALESCE(SUM(attributed_revenue_fen) FILTER (WHERE attributed_order_id IS NOT NULL), 0) AS attributed_revenue_fen_7d
                 FROM growth_touch_executions
                 WHERE is_deleted = FALSE AND created_at >= NOW() - INTERVAL '7 days'
-            """))
+            """)
+            )
             ts = touch_stats.fetchone()
 
             # 4. Agent建议统计
-            suggestion_stats = await db.execute(text("""
+            suggestion_stats = await db.execute(
+                text("""
                 SELECT
                     COUNT(*) AS total_suggestions,
                     COUNT(*) FILTER (WHERE review_state = 'pending_review') AS pending_review,
@@ -979,7 +1022,8 @@ async def get_dashboard_stats(
                     COUNT(*) FILTER (WHERE review_state = 'rejected') AS rejected
                 FROM growth_agent_strategy_suggestions
                 WHERE is_deleted = FALSE AND created_at >= NOW() - INTERVAL '7 days'
-            """))
+            """)
+            )
             ss = suggestion_stats.fetchone()
 
             # 5. 增长漏斗（首单→入会→触达→到店→复购）
@@ -1002,7 +1046,9 @@ async def get_dashboard_stats(
             # 6. 二访率和召回率
             conversion_rates: dict = {}
             if first_order + second_order + stable > 0:
-                conversion_rates["second_visit_rate"] = round((second_order + stable) / (first_order + second_order + stable) * 100, 1)
+                conversion_rates["second_visit_rate"] = round(
+                    (second_order + stable) / (first_order + second_order + stable) * 100, 1
+                )
             else:
                 conversion_rates["second_visit_rate"] = 0.0
 
@@ -1014,7 +1060,8 @@ async def get_dashboard_stats(
                 conversion_rates["touch_attribution_rate"] = 0.0
 
             # 7. mechanism_type 分组摘要（近7天）
-            mech_stats = await db.execute(text("""
+            mech_stats = await db.execute(
+                text("""
                 SELECT mechanism_type, COUNT(*),
                        COUNT(*) FILTER (WHERE execution_state IN ('opened','clicked','replied')),
                        COUNT(*) FILTER (WHERE attributed_order_id IS NOT NULL)
@@ -1022,68 +1069,81 @@ async def get_dashboard_stats(
                 WHERE is_deleted = FALSE AND created_at >= NOW() - INTERVAL '7 days'
                   AND mechanism_type IS NOT NULL
                 GROUP BY mechanism_type
-            """))
+            """)
+            )
             mech_rows = mech_stats.fetchall()
             mechanism_summary = []
             for mr in mech_rows:
                 total_m = mr[1] or 0
-                mechanism_summary.append({
-                    "mechanism_type": mr[0],
-                    "total": total_m,
-                    "opened": mr[2] or 0,
-                    "attributed": mr[3] or 0,
-                    "open_rate": round((mr[2] or 0) / total_m * 100, 1) if total_m > 0 else 0,
-                    "attribution_rate": round((mr[3] or 0) / total_m * 100, 1) if total_m > 0 else 0,
-                })
+                mechanism_summary.append(
+                    {
+                        "mechanism_type": mr[0],
+                        "total": total_m,
+                        "opened": mr[2] or 0,
+                        "attributed": mr[3] or 0,
+                        "open_rate": round((mr[2] or 0) / total_m * 100, 1) if total_m > 0 else 0,
+                        "attribution_rate": round((mr[3] or 0) / total_m * 100, 1) if total_m > 0 else 0,
+                    }
+                )
 
             # 8. 可识别客户占比
-            identifiable = await db.execute(text("""
+            identifiable = await db.execute(
+                text("""
                 SELECT
                     COUNT(*) AS total,
                     COUNT(*) FILTER (WHERE primary_phone IS NOT NULL OR wechat_openid IS NOT NULL) AS identifiable
                 FROM customers WHERE is_deleted = FALSE
-            """))
+            """)
+            )
             id_row = identifiable.fetchone()
 
             # 9. 首单入会率
-            first_join = await db.execute(text("""
+            first_join = await db.execute(
+                text("""
                 SELECT
                     COUNT(*) FILTER (WHERE first_order_at IS NOT NULL) AS first_orders,
                     COUNT(*) FILTER (WHERE first_order_at IS NOT NULL AND repurchase_stage != 'not_started') AS joined
                 FROM customer_growth_profiles WHERE is_deleted = FALSE
-            """))
+            """)
+            )
             fj_row = first_join.fetchone()
 
             # 10. 30天复购率
-            thirty_day = await db.execute(text("""
+            thirty_day = await db.execute(
+                text("""
                 SELECT
                     COUNT(*) FILTER (WHERE last_order_at >= NOW() - INTERVAL '90 days') AS active_90d,
                     COUNT(*) FILTER (WHERE last_order_at >= NOW() - INTERVAL '30 days'
                         AND repurchase_stage IN ('second_order_done','stable_repeat')) AS repeat_30d
                 FROM customer_growth_profiles WHERE is_deleted = FALSE
-            """))
+            """)
+            )
             td_row = thirty_day.fetchone()
 
             # 11. 召回成功率
-            recall = await db.execute(text("""
+            recall = await db.execute(
+                text("""
                 SELECT
                     COUNT(*) AS total_reactivation,
                     COUNT(*) FILTER (WHERE gje.journey_state = 'completed') AS completed
                 FROM growth_journey_enrollments gje
                 JOIN growth_journey_templates gjt ON gjt.id = gje.journey_template_id
                 WHERE gje.is_deleted = FALSE AND gjt.journey_type = 'reactivation'
-            """))
+            """)
+            )
             rc_row = recall.fetchone()
 
             # 12. 单客触达毛利贡献
-            per_customer = await db.execute(text("""
+            per_customer = await db.execute(
+                text("""
                 SELECT
                     COUNT(DISTINCT customer_id) AS unique_customers,
                     COALESCE(SUM(attributed_revenue_fen), 0) AS total_revenue,
                     COALESCE(SUM(attributed_gross_profit_fen), 0) AS total_profit
                 FROM growth_touch_executions
                 WHERE is_deleted = FALSE AND attributed_order_id IS NOT NULL
-            """))
+            """)
+            )
             pc_row = per_customer.fetchone()
 
             # 组装core_metrics
@@ -1102,48 +1162,53 @@ async def get_dashboard_stats(
                 "channel_reflow_rate": 0,
                 "stored_value_conversion_rate": 0,
                 "banquet_reorder_rate": 0,
-                "repair_revisit_rate": conversion_rates.get("repair_recovery_rate", 0) if "repair_recovery_rate" in conversion_rates else 0,
+                "repair_revisit_rate": conversion_rates.get("repair_recovery_rate", 0)
+                if "repair_recovery_rate" in conversion_rates
+                else 0,
                 "per_customer_profit_fen": round((pc_row[2] if pc_row else 0) / unique_cust),
                 "journey_roi": 0,
                 "private_gmv_ratio": 0,
             }
 
-            return {"ok": True, "data": {
-                "profiles": {
-                    "total": total_profiles,
-                    "first_order_only": first_order,
-                    "second_order_done": second_order,
-                    "stable_repeat": stable,
-                    "high_priority_reactivation": ps[4] if ps else 0,
-                    "active_repairs": ps[5] if ps else 0,
+            return {
+                "ok": True,
+                "data": {
+                    "profiles": {
+                        "total": total_profiles,
+                        "first_order_only": first_order,
+                        "second_order_done": second_order,
+                        "stable_repeat": stable,
+                        "high_priority_reactivation": ps[4] if ps else 0,
+                        "active_repairs": ps[5] if ps else 0,
+                    },
+                    "enrollments": {
+                        "total": es[0] if es else 0,
+                        "active": es[1] if es else 0,
+                        "paused": es[2] if es else 0,
+                        "completed": es[3] if es else 0,
+                        "observing": es[4] if es else 0,
+                    },
+                    "touches_7d": {
+                        "total": ts[0] if ts else 0,
+                        "delivered": delivered,
+                        "opened": ts[2] if ts else 0,
+                        "clicked": ts[3] if ts else 0,
+                        "attributed": attributed,
+                        "attributed_revenue_fen": ts[5] if ts else 0,
+                    },
+                    "suggestions_7d": {
+                        "total": ss[0] if ss else 0,
+                        "pending_review": ss[1] if ss else 0,
+                        "approved": ss[2] if ss else 0,
+                        "published": ss[3] if ss else 0,
+                        "rejected": ss[4] if ss else 0,
+                    },
+                    "funnel": funnel,
+                    "conversion_rates": conversion_rates,
+                    "mechanism_summary": mechanism_summary,
+                    "core_metrics": core_metrics,
                 },
-                "enrollments": {
-                    "total": es[0] if es else 0,
-                    "active": es[1] if es else 0,
-                    "paused": es[2] if es else 0,
-                    "completed": es[3] if es else 0,
-                    "observing": es[4] if es else 0,
-                },
-                "touches_7d": {
-                    "total": ts[0] if ts else 0,
-                    "delivered": delivered,
-                    "opened": ts[2] if ts else 0,
-                    "clicked": ts[3] if ts else 0,
-                    "attributed": attributed,
-                    "attributed_revenue_fen": ts[5] if ts else 0,
-                },
-                "suggestions_7d": {
-                    "total": ss[0] if ss else 0,
-                    "pending_review": ss[1] if ss else 0,
-                    "approved": ss[2] if ss else 0,
-                    "published": ss[3] if ss else 0,
-                    "rejected": ss[4] if ss else 0,
-                },
-                "funnel": funnel,
-                "conversion_rates": conversion_rates,
-                "mechanism_summary": mechanism_summary,
-                "core_metrics": core_metrics,
-            }}
+            }
         except (ValueError, RuntimeError, OSError) as exc:
             return {"ok": False, "error": {"message": str(exc)}}
 
@@ -1151,6 +1216,7 @@ async def get_dashboard_stats(
 # ---------------------------------------------------------------------------
 # Agent Suggestion Metrics 端点（Agent决策仪表盘用）
 # ---------------------------------------------------------------------------
+
 
 @router.get("/agent-suggestions/metrics")
 async def get_agent_suggestion_metrics(
@@ -1166,7 +1232,8 @@ async def get_agent_suggestion_metrics(
             await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": tenant_id})
 
             # 建议总体统计
-            result = await db.execute(text("""
+            result = await db.execute(
+                text("""
                 SELECT
                     COUNT(*) AS total,
                     COUNT(*) FILTER (WHERE review_state = 'approved') AS approved,
@@ -1183,7 +1250,9 @@ async def get_agent_suggestion_metrics(
                     COUNT(*) FILTER (WHERE mechanism_type = 'service_repair') AS repair_mech_count
                 FROM growth_agent_strategy_suggestions
                 WHERE is_deleted = FALSE AND created_at >= NOW() - make_interval(days => :days)
-            """), {"days": days})
+            """),
+                {"days": days},
+            )
             r = result.fetchone()
 
             total = r[0] or 0
@@ -1191,7 +1260,8 @@ async def get_agent_suggestion_metrics(
             published = r[3] or 0
 
             # 每日趋势
-            trend = await db.execute(text("""
+            trend = await db.execute(
+                text("""
                 SELECT
                     created_at::date AS day,
                     COUNT(*) AS total,
@@ -1202,14 +1272,17 @@ async def get_agent_suggestion_metrics(
                 WHERE is_deleted = FALSE AND created_at >= NOW() - make_interval(days => :days)
                 GROUP BY created_at::date
                 ORDER BY day
-            """), {"days": days})
+            """),
+                {"days": days},
+            )
             daily_trend = [
                 {"day": str(row[0]), "total": row[1], "approved": row[2], "published": row[3], "rejected": row[4]}
                 for row in trend.fetchall()
             ]
 
             # 发布后命中率
-            hit_result = await db.execute(text("""
+            hit_result = await db.execute(
+                text("""
                 SELECT
                     COUNT(*) AS total_published,
                     COUNT(*) FILTER (WHERE gje.journey_state = 'completed') AS hit_count
@@ -1219,41 +1292,46 @@ async def get_agent_suggestion_metrics(
                 WHERE gass.is_deleted = FALSE
                   AND gass.review_state = 'published'
                   AND gass.created_at >= NOW() - make_interval(days => :days)
-            """), {"days": days})
+            """),
+                {"days": days},
+            )
             hr = hit_result.fetchone()
             total_pub = hr[0] or 0
             hit_count = hr[1] or 0
 
-            return {"ok": True, "data": {
-                "period_days": days,
-                "overview": {
-                    "total": total,
-                    "approved": approved,
-                    "rejected": r[2] or 0,
-                    "published": published,
-                    "pending": r[4] or 0,
-                    "expired": r[5] or 0,
-                    "approval_rate": round(approved / total * 100, 1) if total > 0 else 0,
-                    "publish_rate": round(published / total * 100, 1) if total > 0 else 0,
-                    "hit_rate": round(hit_count / total_pub * 100, 1) if total_pub > 0 else 0,
+            return {
+                "ok": True,
+                "data": {
+                    "period_days": days,
+                    "overview": {
+                        "total": total,
+                        "approved": approved,
+                        "rejected": r[2] or 0,
+                        "published": published,
+                        "pending": r[4] or 0,
+                        "expired": r[5] or 0,
+                        "approval_rate": round(approved / total * 100, 1) if total > 0 else 0,
+                        "publish_rate": round(published / total * 100, 1) if total > 0 else 0,
+                        "hit_rate": round(hit_count / total_pub * 100, 1) if total_pub > 0 else 0,
+                    },
+                    "by_type": {
+                        "reactivation": r[6] or 0,
+                        "first_to_second": r[7] or 0,
+                        "service_repair": r[8] or 0,
+                    },
+                    "by_mechanism": {
+                        "loss_aversion": r[9] or 0,
+                        "relationship_warmup": r[10] or 0,
+                        "identity_anchor": r[11] or 0,
+                        "service_repair": r[12] or 0,
+                    },
+                    "daily_trend": daily_trend,
+                    "hit_rate_detail": {
+                        "total_published": total_pub,
+                        "hit_count": hit_count,
+                    },
                 },
-                "by_type": {
-                    "reactivation": r[6] or 0,
-                    "first_to_second": r[7] or 0,
-                    "service_repair": r[8] or 0,
-                },
-                "by_mechanism": {
-                    "loss_aversion": r[9] or 0,
-                    "relationship_warmup": r[10] or 0,
-                    "identity_anchor": r[11] or 0,
-                    "service_repair": r[12] or 0,
-                },
-                "daily_trend": daily_trend,
-                "hit_rate_detail": {
-                    "total_published": total_pub,
-                    "hit_count": hit_count,
-                },
-            }}
+            }
         except (ValueError, RuntimeError, OSError) as exc:
             return {"ok": False, "error": {"message": str(exc)}}
 
@@ -1261,6 +1339,7 @@ async def get_agent_suggestion_metrics(
 # ---------------------------------------------------------------------------
 # Customer Funnel Stats 端点（客户总池页面用）
 # ---------------------------------------------------------------------------
+
 
 @router.get("/customers/funnel-stats")
 async def get_funnel_stats(
@@ -1274,7 +1353,8 @@ async def get_funnel_stats(
         try:
             await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": tenant_id})
 
-            profile_stats = await db.execute(text("""
+            profile_stats = await db.execute(
+                text("""
                 SELECT
                     COUNT(*) AS total_profiles,
                     COUNT(*) FILTER (WHERE repurchase_stage = 'first_order_done') AS first_order_only,
@@ -1283,16 +1363,19 @@ async def get_funnel_stats(
                     COUNT(*) FILTER (WHERE reactivation_priority IN ('high', 'critical')) AS high_priority_reactivation
                 FROM customer_growth_profiles
                 WHERE is_deleted = FALSE
-            """))
+            """)
+            )
             ps = profile_stats.fetchone()
 
-            touch_stats = await db.execute(text("""
+            touch_stats = await db.execute(
+                text("""
                 SELECT
                     COUNT(*) FILTER (WHERE execution_state = 'delivered') AS delivered_7d,
                     COUNT(*) FILTER (WHERE attributed_order_id IS NOT NULL) AS attributed_7d
                 FROM growth_touch_executions
                 WHERE is_deleted = FALSE AND created_at >= NOW() - INTERVAL '7 days'
-            """))
+            """)
+            )
             ts = touch_stats.fetchone()
 
             total = ps[0] if ps else 0
@@ -1314,7 +1397,9 @@ async def get_funnel_stats(
 
             conversion_rates: dict = {}
             if first_order + second_order + stable > 0:
-                conversion_rates["second_visit_rate"] = round((second_order + stable) / (first_order + second_order + stable) * 100, 1)
+                conversion_rates["second_visit_rate"] = round(
+                    (second_order + stable) / (first_order + second_order + stable) * 100, 1
+                )
             else:
                 conversion_rates["second_visit_rate"] = 0.0
 
@@ -1327,6 +1412,7 @@ async def get_funnel_stats(
 # Attribution 归因端点 (3)
 # ---------------------------------------------------------------------------
 
+
 @router.get("/attribution/by-mechanism")
 async def get_attribution_by_mechanism(
     days: int = Query(7, ge=1, le=90),
@@ -1338,7 +1424,8 @@ async def get_attribution_by_mechanism(
         try:
             await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": tenant_id})
 
-            result = await db.execute(text("""
+            result = await db.execute(
+                text("""
                 SELECT
                     mechanism_type,
                     COUNT(*) AS total_touches,
@@ -1354,24 +1441,28 @@ async def get_attribution_by_mechanism(
                   AND mechanism_type IS NOT NULL
                 GROUP BY mechanism_type
                 ORDER BY attributed DESC
-            """), {"days": days})
+            """),
+                {"days": days},
+            )
 
             rows = result.fetchall()
             items = []
             for r in rows:
                 delivered = r[2] or 0
-                items.append({
-                    "mechanism_type": r[0],
-                    "total_touches": r[1],
-                    "delivered": delivered,
-                    "opened": r[3] or 0,
-                    "clicked": r[4] or 0,
-                    "attributed": r[5] or 0,
-                    "revenue_fen": r[6] or 0,
-                    "profit_fen": r[7] or 0,
-                    "open_rate": round((r[3] or 0) / delivered * 100, 1) if delivered > 0 else 0,
-                    "attribution_rate": round((r[5] or 0) / delivered * 100, 1) if delivered > 0 else 0,
-                })
+                items.append(
+                    {
+                        "mechanism_type": r[0],
+                        "total_touches": r[1],
+                        "delivered": delivered,
+                        "opened": r[3] or 0,
+                        "clicked": r[4] or 0,
+                        "attributed": r[5] or 0,
+                        "revenue_fen": r[6] or 0,
+                        "profit_fen": r[7] or 0,
+                        "open_rate": round((r[3] or 0) / delivered * 100, 1) if delivered > 0 else 0,
+                        "attribution_rate": round((r[5] or 0) / delivered * 100, 1) if delivered > 0 else 0,
+                    }
+                )
             return ok({"items": items, "days": days})
         except (ValueError, RuntimeError, OSError) as exc:
             return err(str(exc))
@@ -1388,7 +1479,8 @@ async def get_attribution_by_journey_template(
         try:
             await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": tenant_id})
 
-            result = await db.execute(text("""
+            result = await db.execute(
+                text("""
                 SELECT
                     gjt.name AS template_name,
                     gjt.journey_type,
@@ -1409,25 +1501,29 @@ async def get_attribution_by_journey_template(
                 WHERE gjt.is_deleted = FALSE AND gjt.is_active = TRUE
                 GROUP BY gjt.id, gjt.name, gjt.journey_type, gjt.mechanism_family
                 ORDER BY attributed DESC
-            """), {"days": days})
+            """),
+                {"days": days},
+            )
 
             rows = result.fetchall()
             items = []
             for r in rows:
                 total_enroll = r[3] or 0
-                items.append({
-                    "template_name": r[0],
-                    "journey_type": r[1],
-                    "mechanism_family": r[2],
-                    "total_enrollments": total_enroll,
-                    "completed": r[4] or 0,
-                    "exited": r[5] or 0,
-                    "completion_rate": round((r[4] or 0) / total_enroll * 100, 1) if total_enroll > 0 else 0,
-                    "total_touches": r[6] or 0,
-                    "opened": r[7] or 0,
-                    "attributed": r[8] or 0,
-                    "revenue_fen": r[9] or 0,
-                })
+                items.append(
+                    {
+                        "template_name": r[0],
+                        "journey_type": r[1],
+                        "mechanism_family": r[2],
+                        "total_enrollments": total_enroll,
+                        "completed": r[4] or 0,
+                        "exited": r[5] or 0,
+                        "completion_rate": round((r[4] or 0) / total_enroll * 100, 1) if total_enroll > 0 else 0,
+                        "total_touches": r[6] or 0,
+                        "opened": r[7] or 0,
+                        "attributed": r[8] or 0,
+                        "revenue_fen": r[9] or 0,
+                    }
+                )
             return ok({"items": items, "days": days})
         except (ValueError, RuntimeError, OSError) as exc:
             return err(str(exc))
@@ -1444,7 +1540,8 @@ async def get_repair_effectiveness(
         try:
             await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": tenant_id})
 
-            result = await db.execute(text("""
+            result = await db.execute(
+                text("""
                 SELECT
                     COUNT(*) AS total_cases,
                     COUNT(*) FILTER (WHERE repair_state = 'recovered') AS recovered,
@@ -1458,21 +1555,25 @@ async def get_repair_effectiveness(
                 FROM growth_service_repair_cases
                 WHERE is_deleted = FALSE
                   AND created_at >= NOW() - make_interval(days => :days)
-            """), {"days": days})
+            """),
+                {"days": days},
+            )
 
             r = result.fetchone()
             total = r[0] if r else 0
-            return ok({
-                "total_cases": total,
-                "recovered": r[1] or 0 if r else 0,
-                "failed": r[2] or 0 if r else 0,
-                "closed": r[3] or 0 if r else 0,
-                "in_progress": r[4] or 0 if r else 0,
-                "recovery_rate": round((r[1] or 0) / total * 100, 1) if r and total > 0 else 0,
-                "avg_recovery_hours": round(r[5], 1) if r and r[5] else None,
-                "avg_ack_minutes": round(r[6], 1) if r and r[6] else None,
-                "days": days,
-            })
+            return ok(
+                {
+                    "total_cases": total,
+                    "recovered": r[1] or 0 if r else 0,
+                    "failed": r[2] or 0 if r else 0,
+                    "closed": r[3] or 0 if r else 0,
+                    "in_progress": r[4] or 0 if r else 0,
+                    "recovery_rate": round((r[1] or 0) / total * 100, 1) if r and total > 0 else 0,
+                    "avg_recovery_hours": round(r[5], 1) if r and r[5] else None,
+                    "avg_ack_minutes": round(r[6], 1) if r and r[6] else None,
+                    "days": days,
+                }
+            )
         except (ValueError, RuntimeError, OSError) as exc:
             return err(str(exc))
 
@@ -1494,69 +1595,81 @@ async def get_segment_rule_presets(
             presets = []
 
             # 规则1: 首单后7天未二访
-            r1 = await db.execute(text("""
+            r1 = await db.execute(
+                text("""
                 SELECT COUNT(*) FROM customer_growth_profiles
                 WHERE is_deleted = FALSE
                   AND repurchase_stage = 'first_order_done'
                   AND first_order_at < NOW() - INTERVAL '7 days'
                   AND second_order_at IS NULL
-            """))
-            presets.append({
-                "id": "preset_no_second_visit_7d",
-                "name": "首单后7天未二访",
-                "description": "完成首单超过7天但未产生第二笔订单的客户",
-                "tag_type": "first_to_second",
-                "conditions": [
-                    {"field": "repurchase_stage", "op": "eq", "value": "first_order_done"},
-                    {"field": "first_order_at", "op": "lt", "value": "NOW() - 7 days"},
-                    {"field": "second_order_at", "op": "is_null", "value": True},
-                ],
-                "matched_count": r1.scalar() or 0,
-                "recommended_action": "触发首单转二访旅程V2",
-                "priority": "high",
-            })
+            """)
+            )
+            presets.append(
+                {
+                    "id": "preset_no_second_visit_7d",
+                    "name": "首单后7天未二访",
+                    "description": "完成首单超过7天但未产生第二笔订单的客户",
+                    "tag_type": "first_to_second",
+                    "conditions": [
+                        {"field": "repurchase_stage", "op": "eq", "value": "first_order_done"},
+                        {"field": "first_order_at", "op": "lt", "value": "NOW() - 7 days"},
+                        {"field": "second_order_at", "op": "is_null", "value": True},
+                    ],
+                    "matched_count": r1.scalar() or 0,
+                    "recommended_action": "触发首单转二访旅程V2",
+                    "priority": "high",
+                }
+            )
 
             # 规则2: 近30天沉默+有已拥有权益
-            r2 = await db.execute(text("""
+            r2 = await db.execute(
+                text("""
                 SELECT COUNT(*) FROM customer_growth_profiles
                 WHERE is_deleted = FALSE
                   AND reactivation_priority IN ('high', 'critical')
                   AND has_active_owned_benefit = TRUE
                   AND owned_benefit_expire_at > NOW()
-            """))
-            presets.append({
-                "id": "preset_silent_with_benefit",
-                "name": "沉默客·有权益未使用",
-                "description": "30天+未到店且持有未过期权益的客户，适合损失厌恶召回",
-                "tag_type": "reactivation",
-                "conditions": [
-                    {"field": "reactivation_priority", "op": "in", "value": ["high", "critical"]},
-                    {"field": "has_active_owned_benefit", "op": "eq", "value": True},
-                    {"field": "owned_benefit_expire_at", "op": "gt", "value": "NOW()"},
-                ],
-                "matched_count": r2.scalar() or 0,
-                "recommended_action": "触发沉默召回·权益到期型旅程V2",
-                "priority": "critical",
-            })
+            """)
+            )
+            presets.append(
+                {
+                    "id": "preset_silent_with_benefit",
+                    "name": "沉默客·有权益未使用",
+                    "description": "30天+未到店且持有未过期权益的客户，适合损失厌恶召回",
+                    "tag_type": "reactivation",
+                    "conditions": [
+                        {"field": "reactivation_priority", "op": "in", "value": ["high", "critical"]},
+                        {"field": "has_active_owned_benefit", "op": "eq", "value": True},
+                        {"field": "owned_benefit_expire_at", "op": "gt", "value": "NOW()"},
+                    ],
+                    "matched_count": r2.scalar() or 0,
+                    "recommended_action": "触发沉默召回·权益到期型旅程V2",
+                    "priority": "critical",
+                }
+            )
 
             # 规则3: 投诉关闭后待修复
-            r3 = await db.execute(text("""
+            r3 = await db.execute(
+                text("""
                 SELECT COUNT(*) FROM customer_growth_profiles
                 WHERE is_deleted = FALSE
                   AND service_repair_status = 'complaint_closed_pending_repair'
-            """))
-            presets.append({
-                "id": "preset_pending_repair",
-                "name": "投诉关闭·待修复",
-                "description": "投诉已结案但关系未修复的客户，需启动服务修复旅程",
-                "tag_type": "service_repair",
-                "conditions": [
-                    {"field": "service_repair_status", "op": "eq", "value": "complaint_closed_pending_repair"},
-                ],
-                "matched_count": r3.scalar() or 0,
-                "recommended_action": "触发服务修复·四阶协议旅程V2",
-                "priority": "critical",
-            })
+            """)
+            )
+            presets.append(
+                {
+                    "id": "preset_pending_repair",
+                    "name": "投诉关闭·待修复",
+                    "description": "投诉已结案但关系未修复的客户，需启动服务修复旅程",
+                    "tag_type": "service_repair",
+                    "conditions": [
+                        {"field": "service_repair_status", "op": "eq", "value": "complaint_closed_pending_repair"},
+                    ],
+                    "matched_count": r3.scalar() or 0,
+                    "recommended_action": "触发服务修复·四阶协议旅程V2",
+                    "priority": "critical",
+                }
+            )
 
             return ok({"presets": presets})
         except (ValueError, RuntimeError, OSError) as exc:
@@ -1573,32 +1686,40 @@ async def get_tag_distribution(
         await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
         try:
             # 复购阶段分布
-            r1 = await db.execute(text("""
+            r1 = await db.execute(
+                text("""
                 SELECT repurchase_stage, COUNT(*) FROM customer_growth_profiles
                 WHERE is_deleted = FALSE GROUP BY repurchase_stage ORDER BY COUNT(*) DESC
-            """))
+            """)
+            )
             repurchase = [{"stage": row[0], "count": row[1]} for row in r1.fetchall()]
 
             # 召回优先级分布
-            r2 = await db.execute(text("""
+            r2 = await db.execute(
+                text("""
                 SELECT reactivation_priority, COUNT(*) FROM customer_growth_profiles
                 WHERE is_deleted = FALSE GROUP BY reactivation_priority ORDER BY COUNT(*) DESC
-            """))
+            """)
+            )
             reactivation = [{"priority": row[0], "count": row[1]} for row in r2.fetchall()]
 
             # 修复状态分布
-            r3 = await db.execute(text("""
+            r3 = await db.execute(
+                text("""
                 SELECT service_repair_status, COUNT(*) FROM customer_growth_profiles
                 WHERE is_deleted = FALSE AND service_repair_status != 'none'
                 GROUP BY service_repair_status ORDER BY COUNT(*) DESC
-            """))
+            """)
+            )
             repair = [{"status": row[0], "count": row[1]} for row in r3.fetchall()]
 
-            return ok({
-                "repurchase_stage": repurchase,
-                "reactivation_priority": reactivation,
-                "service_repair_status": repair,
-            })
+            return ok(
+                {
+                    "repurchase_stage": repurchase,
+                    "reactivation_priority": reactivation,
+                    "service_repair_status": repair,
+                }
+            )
         except (ValueError, RuntimeError, OSError) as exc:
             return err(str(exc))
 
@@ -1618,6 +1739,7 @@ async def list_offer_packs(
     _parse_tenant(x_tenant_id)  # 验证 tenant 格式
     try:
         from seeds.growth_offer_seeds import GROWTH_OFFER_PACKS
+
         items = list(GROWTH_OFFER_PACKS)
         if pack_type:
             items = [p for p in items if p["pack_type"] == pack_type]
@@ -1643,43 +1765,53 @@ async def get_p1_distribution(
         await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
         try:
             # 心理距离分布
-            r1 = await db.execute(text("""
+            r1 = await db.execute(
+                text("""
                 SELECT psych_distance_level, COUNT(*) FROM customer_growth_profiles
                 WHERE is_deleted = FALSE AND psych_distance_level IS NOT NULL
                 GROUP BY psych_distance_level ORDER BY COUNT(*) DESC
-            """))
+            """)
+            )
             psych_distance = [{"level": row[0], "count": row[1]} for row in r1.fetchall()]
 
             # 超级用户分布
-            r2 = await db.execute(text("""
+            r2 = await db.execute(
+                text("""
                 SELECT super_user_level, COUNT(*) FROM customer_growth_profiles
                 WHERE is_deleted = FALSE AND super_user_level IS NOT NULL
                 GROUP BY super_user_level ORDER BY COUNT(*) DESC
-            """))
+            """)
+            )
             super_user = [{"level": row[0], "count": row[1]} for row in r2.fetchall()]
 
             # 成长里程碑分布
-            r3 = await db.execute(text("""
+            r3 = await db.execute(
+                text("""
                 SELECT growth_milestone_stage, COUNT(*) FROM customer_growth_profiles
                 WHERE is_deleted = FALSE AND growth_milestone_stage IS NOT NULL
                 GROUP BY growth_milestone_stage ORDER BY COUNT(*) DESC
-            """))
+            """)
+            )
             milestones = [{"stage": row[0], "count": row[1]} for row in r3.fetchall()]
 
             # 裂变场景分布
-            r4 = await db.execute(text("""
+            r4 = await db.execute(
+                text("""
                 SELECT referral_scenario, COUNT(*) FROM customer_growth_profiles
                 WHERE is_deleted = FALSE AND referral_scenario IS NOT NULL AND referral_scenario != 'none'
                 GROUP BY referral_scenario ORDER BY COUNT(*) DESC
-            """))
+            """)
+            )
             referral = [{"scenario": row[0], "count": row[1]} for row in r4.fetchall()]
 
-            return ok({
-                "psych_distance": psych_distance,
-                "super_user": super_user,
-                "milestones": milestones,
-                "referral": referral,
-            })
+            return ok(
+                {
+                    "psych_distance": psych_distance,
+                    "super_user": super_user,
+                    "milestones": milestones,
+                    "referral": referral,
+                }
+            )
         except (ValueError, RuntimeError, OSError) as exc:
             return err(str(exc))
 
@@ -1704,6 +1836,7 @@ async def trigger_p1_recompute(
 # V2.2 — Brand Config 端点
 # ---------------------------------------------------------------------------
 
+
 class BrandConfigUpsert(BaseModel):
     brand_name: str
     growth_enabled: bool = True
@@ -1711,13 +1844,15 @@ class BrandConfigUpsert(BaseModel):
     monthly_offer_budget_fen: int = 1000000
     max_touch_per_customer_day: int = 2
     max_touch_per_customer_week: int = 5
-    enabled_channels: list[str] = Field(
-        default_factory=lambda: ["wecom", "miniapp", "sms"]
-    )
+    enabled_channels: list[str] = Field(default_factory=lambda: ["wecom", "miniapp", "sms"])
     enabled_journey_types: list[str] = Field(
         default_factory=lambda: [
-            "first_to_second", "reactivation", "service_repair",
-            "stored_value", "banquet", "channel_reflow",
+            "first_to_second",
+            "reactivation",
+            "service_repair",
+            "stored_value",
+            "banquet",
+            "channel_reflow",
         ]
     )
     auto_approve_low_risk: bool = False
@@ -1808,7 +1943,10 @@ async def check_brand_frequency(
         await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
         try:
             result = await _brand_svc.check_brand_frequency(
-                brand_id, customer_id, str(tenant_id), db,
+                brand_id,
+                customer_id,
+                str(tenant_id),
+                db,
             )
             return ok(result)
         except (ValueError, RuntimeError, OSError) as exc:
@@ -1830,7 +1968,8 @@ async def get_dashboard_stats_by_brand(
         await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
         try:
             # 1) 画像按品牌
-            r_profiles = await db.execute(text("""
+            r_profiles = await db.execute(
+                text("""
                 SELECT
                     brand_id,
                     COUNT(*) AS total_profiles,
@@ -1839,7 +1978,8 @@ async def get_dashboard_stats_by_brand(
                 FROM customer_growth_profiles
                 WHERE is_deleted = FALSE AND brand_id IS NOT NULL
                 GROUP BY brand_id
-            """))
+            """)
+            )
             profiles_by_brand = [
                 {
                     "brand_id": str(row[0]),
@@ -1851,7 +1991,8 @@ async def get_dashboard_stats_by_brand(
             ]
 
             # 2) 旅程参与按品牌
-            r_enrollments = await db.execute(text("""
+            r_enrollments = await db.execute(
+                text("""
                 SELECT
                     brand_id,
                     COUNT(*) AS total_enrollments,
@@ -1860,7 +2001,8 @@ async def get_dashboard_stats_by_brand(
                 FROM growth_journey_enrollments
                 WHERE is_deleted = FALSE AND brand_id IS NOT NULL
                 GROUP BY brand_id
-            """))
+            """)
+            )
             enrollments_by_brand = [
                 {
                     "brand_id": str(row[0]),
@@ -1872,7 +2014,8 @@ async def get_dashboard_stats_by_brand(
             ]
 
             # 3) 触达按品牌
-            r_touches = await db.execute(text("""
+            r_touches = await db.execute(
+                text("""
                 SELECT
                     brand_id,
                     COUNT(*) AS total_touches,
@@ -1882,7 +2025,8 @@ async def get_dashboard_stats_by_brand(
                 FROM growth_touch_executions
                 WHERE is_deleted = FALSE AND brand_id IS NOT NULL
                 GROUP BY brand_id
-            """))
+            """)
+            )
             touches_by_brand = [
                 {
                     "brand_id": str(row[0]),
@@ -1895,7 +2039,8 @@ async def get_dashboard_stats_by_brand(
             ]
 
             # 4) 建议按品牌
-            r_suggestions = await db.execute(text("""
+            r_suggestions = await db.execute(
+                text("""
                 SELECT
                     brand_id,
                     COUNT(*) AS total_suggestions,
@@ -1904,7 +2049,8 @@ async def get_dashboard_stats_by_brand(
                 FROM growth_agent_strategy_suggestions
                 WHERE is_deleted = FALSE AND brand_id IS NOT NULL
                 GROUP BY brand_id
-            """))
+            """)
+            )
             suggestions_by_brand = [
                 {
                     "brand_id": str(row[0]),
@@ -1915,12 +2061,14 @@ async def get_dashboard_stats_by_brand(
                 for row in r_suggestions.fetchall()
             ]
 
-            return ok({
-                "profiles_by_brand": profiles_by_brand,
-                "enrollments_by_brand": enrollments_by_brand,
-                "touches_by_brand": touches_by_brand,
-                "suggestions_by_brand": suggestions_by_brand,
-            })
+            return ok(
+                {
+                    "profiles_by_brand": profiles_by_brand,
+                    "enrollments_by_brand": enrollments_by_brand,
+                    "touches_by_brand": touches_by_brand,
+                    "suggestions_by_brand": suggestions_by_brand,
+                }
+            )
         except (ValueError, RuntimeError, OSError) as exc:
             return err(str(exc))
 
@@ -1977,6 +2125,7 @@ async def get_attribution_by_store(
 # Experiment Engine 端点 (Sprint I)
 # ---------------------------------------------------------------------------
 
+
 @router.get("/experiments/{template_id}/summary")
 async def get_experiment_summary(
     template_id: str,
@@ -1988,7 +2137,9 @@ async def get_experiment_summary(
         await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
         try:
             result = await _experiment_svc.get_experiment_summary(
-                UUID(template_id), str(tenant_id), db,
+                UUID(template_id),
+                str(tenant_id),
+                db,
             )
             return ok(result)
         except (ValueError, RuntimeError, OSError) as exc:
@@ -2006,7 +2157,9 @@ async def select_variant(
         await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
         try:
             result = await _experiment_svc.select_variant(
-                UUID(template_id), str(tenant_id), db,
+                UUID(template_id),
+                str(tenant_id),
+                db,
             )
             return ok(result)
         except (ValueError, RuntimeError, OSError) as exc:
@@ -2025,7 +2178,10 @@ async def auto_pause_check(
         await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
         try:
             result = await _experiment_svc.should_auto_pause(
-                UUID(template_id), min_samples, str(tenant_id), db,
+                UUID(template_id),
+                min_samples,
+                str(tenant_id),
+                db,
             )
             return ok(result)
         except (ValueError, RuntimeError, OSError) as exc:
@@ -2035,6 +2191,7 @@ async def auto_pause_check(
 # ---------------------------------------------------------------------------
 # Cross-Brand 端点 (V2.3)
 # ---------------------------------------------------------------------------
+
 
 @router.get("/cross-brand/customers/{customer_id}/profile")
 async def get_cross_brand_profile(
@@ -2047,7 +2204,9 @@ async def get_cross_brand_profile(
         await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
         try:
             result = await _cross_brand_svc.get_customer_cross_brand_profile(
-                UUID(customer_id), str(tenant_id), db,
+                UUID(customer_id),
+                str(tenant_id),
+                db,
             )
             return ok(result)
         except (ValueError, RuntimeError, OSError) as exc:
@@ -2065,7 +2224,9 @@ async def check_cross_brand_frequency(
         await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
         try:
             result = await _cross_brand_svc.check_cross_brand_frequency(
-                UUID(customer_id), str(tenant_id), db,
+                UUID(customer_id),
+                str(tenant_id),
+                db,
             )
             return ok(result)
         except (ValueError, RuntimeError, OSError) as exc:
@@ -2085,7 +2246,11 @@ async def list_cross_brand_opportunities(
         await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
         try:
             result = await _cross_brand_svc.find_cross_brand_opportunities(
-                str(tenant_id), db, min_brands=min_brands, page=page, size=size,
+                str(tenant_id),
+                db,
+                min_brands=min_brands,
+                page=page,
+                size=size,
             )
             return ok(result)
         except (ValueError, RuntimeError, OSError) as exc:
@@ -2228,7 +2393,9 @@ async def get_store_capabilities(
         await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
         try:
             result = await _store_cap_svc.get_store_capabilities(
-                UUID(store_id), str(tenant_id), db,
+                UUID(store_id),
+                str(tenant_id),
+                db,
             )
             return ok(result)
         except (ValueError, RuntimeError, OSError) as exc:
@@ -2246,7 +2413,9 @@ async def get_store_growth_readiness(
         await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
         try:
             result = await _store_cap_svc.get_store_growth_readiness(
-                UUID(store_id), str(tenant_id), db,
+                UUID(store_id),
+                str(tenant_id),
+                db,
             )
             return ok(result)
         except (ValueError, RuntimeError, OSError) as exc:
@@ -2279,7 +2448,9 @@ async def match_journey_to_stores(
         await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
         try:
             result = await _store_cap_svc.match_journey_to_stores(
-                journey_code, str(tenant_id), db,
+                journey_code,
+                str(tenant_id),
+                db,
             )
             return ok(result)
         except (ValueError, RuntimeError, OSError) as exc:

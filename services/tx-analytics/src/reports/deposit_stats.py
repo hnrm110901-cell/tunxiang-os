@@ -54,8 +54,11 @@ ORDER BY biz_date DESC, deposit_outstanding_fen DESC
 
 DIMENSIONS = ["store_name", "store_code", "biz_date"]
 METRICS = [
-    "deposit_order_count", "deposit_collected_fen",
-    "deposit_refunded_fen", "deposit_outstanding_fen",
-    "total_orders", "deposit_order_pct",
+    "deposit_order_count",
+    "deposit_collected_fen",
+    "deposit_refunded_fen",
+    "deposit_outstanding_fen",
+    "total_orders",
+    "deposit_order_pct",
 ]
 FILTERS = ["start_date", "end_date", "store_id"]

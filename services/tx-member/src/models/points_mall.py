@@ -6,6 +6,7 @@
 
 金额单位：分（fen）。库存 -1 表示不限库存。
 """
+
 import uuid
 from datetime import datetime
 
@@ -28,6 +29,7 @@ class PointsMallProduct(TenantBase):
       dish:         {"dish_id": "xxx", "dish_name": "辣子鸡"}
       stored_value: {"amount_fen": 500}
     """
+
     __tablename__ = "points_mall_products"
 
     name: Mapped[str] = mapped_column(String(100), nullable=False, comment="商品名称")
@@ -35,7 +37,8 @@ class PointsMallProduct(TenantBase):
     image_url: Mapped[str | None] = mapped_column(String(500), comment="商品图片URL")
 
     product_type: Mapped[str] = mapped_column(
-        String(20), nullable=False,
+        String(20),
+        nullable=False,
         comment="physical=实物 | coupon=优惠券 | dish=菜品兑换 | stored_value=储值金",
     )
 
@@ -50,13 +53,22 @@ class PointsMallProduct(TenantBase):
 
     # 兑换限制
     limit_per_customer: Mapped[int] = mapped_column(
-        Integer, nullable=False, default=0, comment="每人最多兑换次数（0=不限）",
+        Integer,
+        nullable=False,
+        default=0,
+        comment="每人最多兑换次数（0=不限）",
     )
     limit_per_period: Mapped[int] = mapped_column(
-        Integer, nullable=False, default=0, comment="每周期最多兑换次数（0=不限）",
+        Integer,
+        nullable=False,
+        default=0,
+        comment="每周期最多兑换次数（0=不限）",
     )
     limit_period_days: Mapped[int] = mapped_column(
-        Integer, nullable=False, default=30, comment="限制周期（天数）",
+        Integer,
+        nullable=False,
+        default=30,
+        comment="限制周期（天数）",
     )
 
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, comment="是否上架")
@@ -80,27 +92,41 @@ class PointsMallOrder(TenantBase):
       pending  → cancelled（退款退积分）
       pending  → expired（超期未核销）
     """
+
     __tablename__ = "points_mall_orders"
 
     order_no: Mapped[str] = mapped_column(
-        String(40), unique=True, nullable=False, index=True,
+        String(40),
+        unique=True,
+        nullable=False,
+        index=True,
         comment="订单号 PM-{YYYYMMDD}-{6位}",
     )
     customer_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), nullable=False, index=True, comment="兑换顾客ID",
+        UUID(as_uuid=True),
+        nullable=False,
+        index=True,
+        comment="兑换顾客ID",
     )
     product_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), nullable=False, index=True, comment="兑换商品ID",
+        UUID(as_uuid=True),
+        nullable=False,
+        index=True,
+        comment="兑换商品ID",
     )
     store_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), comment="兑换门店（实物需要）",
+        UUID(as_uuid=True),
+        comment="兑换门店（实物需要）",
     )
 
     points_deducted: Mapped[int] = mapped_column(Integer, nullable=False, comment="扣除积分")
     quantity: Mapped[int] = mapped_column(Integer, nullable=False, default=1, comment="兑换数量")
 
     status: Mapped[str] = mapped_column(
-        String(20), nullable=False, default="pending", index=True,
+        String(20),
+        nullable=False,
+        default="pending",
+        index=True,
         comment="pending | fulfilled | cancelled | expired",
     )
 

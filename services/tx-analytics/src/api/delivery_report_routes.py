@@ -30,6 +30,7 @@ GET /api/v1/reports/delivery/order-detail     外卖订单明细
   - order-detail:   分页查 delivery_orders，支持 platform/status 过滤
   所有查询均包含 tenant_id + store_id 过滤。
 """
+
 from __future__ import annotations
 
 import csv
@@ -54,6 +55,7 @@ PlatformType = Literal["meituan", "eleme", "douyin", "all"]
 # ──────────────────────────────────────────────
 # 公共辅助
 # ──────────────────────────────────────────────
+
 
 def _require_store(store_id: Optional[str]) -> str:
     if not store_id:
@@ -102,6 +104,7 @@ def _csv_response(rows: list[dict], filename: str) -> StreamingResponse:
 # ──────────────────────────────────────────────
 # 1. 外卖单量统计
 # ──────────────────────────────────────────────
+
 
 @router.get("/summary")
 async def api_delivery_summary(
@@ -180,6 +183,7 @@ async def api_delivery_summary(
 # 2. 外卖品项明细
 # ──────────────────────────────────────────────
 
+
 @router.get("/items")
 async def api_delivery_items(
     store_id: Optional[str] = Query(None, description="门店ID"),
@@ -244,6 +248,7 @@ async def api_delivery_items(
 # ──────────────────────────────────────────────
 # 3. 骑手配送统计
 # ──────────────────────────────────────────────
+
 
 @router.get("/rider-performance")
 async def api_rider_performance(
@@ -333,6 +338,7 @@ async def api_rider_performance(
 # ──────────────────────────────────────────────
 # 4. 外卖订单明细
 # ──────────────────────────────────────────────
+
 
 @router.get("/order-detail")
 async def api_delivery_order_detail(

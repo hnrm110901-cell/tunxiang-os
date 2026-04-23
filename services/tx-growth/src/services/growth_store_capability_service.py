@@ -1,8 +1,10 @@
 """门店供给联动服务 — 门店能力 → 旅程权益动态匹配"""
+
 import json as _json
-import structlog
 from typing import Any
 from uuid import UUID
+
+import structlog
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -41,16 +43,17 @@ class GrowthStoreCapabilityService:
 
     TOTAL_JOURNEY_COUNT = 10  # 特殊旅程(4) + 通用旅程(6)
 
-    async def get_store_capabilities(
-        self, store_id: UUID, tenant_id: str, db: AsyncSession
-    ) -> dict:
+    async def get_store_capabilities(self, store_id: UUID, tenant_id: str, db: AsyncSession) -> dict:
         """获取门店能力标签（从stores.config JSON中提取）"""
         await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": tenant_id})
 
-        result = await db.execute(text("""
+        result = await db.execute(
+            text("""
             SELECT store_name, config, seats, status, city, district
             FROM stores WHERE id = :sid AND is_deleted = FALSE
-        """), {"sid": str(store_id)})
+        """),
+            {"sid": str(store_id)},
+        )
         row = result.fetchone()
 
         if not row:
@@ -86,9 +89,7 @@ class GrowthStoreCapabilityService:
 
         return capabilities
 
-    async def match_journey_to_stores(
-        self, journey_code: str, tenant_id: str, db: AsyncSession
-    ) -> dict:
+    async def match_journey_to_stores(self, journey_code: str, tenant_id: str, db: AsyncSession) -> dict:
         """查找支持特定旅程的所有门店"""
         await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": tenant_id})
 
@@ -96,11 +97,13 @@ class GrowthStoreCapabilityService:
 
         if not required_caps:
             # 通用旅程，所有活跃门店都支持
-            result = await db.execute(text("""
+            result = await db.execute(
+                text("""
                 SELECT id, store_name, city, district, seats
                 FROM stores WHERE is_deleted = FALSE AND status = 'active'
                 ORDER BY store_name
-            """))
+            """)
+            )
             stores = [
                 {"store_id": str(r[0]), "store_name": r[1], "city": r[2], "district": r[3], "seats": r[4]}
                 for r in result.fetchall()
@@ -113,16 +116,16 @@ class GrowthStoreCapabilityService:
             }
 
         # 需要特定能力的旅程，从config JSON中过滤
-        conditions = " AND ".join(
-            [f"(config->>'{cap}')::boolean = true" for cap in required_caps]
-        )
-        result = await db.execute(text(f"""
+        conditions = " AND ".join([f"(config->>'{cap}')::boolean = true" for cap in required_caps])
+        result = await db.execute(
+            text(f"""
             SELECT id, store_name, city, district, seats, config
             FROM stores
             WHERE is_deleted = FALSE AND status = 'active'
               AND {conditions}
             ORDER BY store_name
-        """))
+        """)
+        )
         stores = [
             {"store_id": str(r[0]), "store_name": r[1], "city": r[2], "district": r[3], "seats": r[4]}
             for r in result.fetchall()
@@ -135,9 +138,7 @@ class GrowthStoreCapabilityService:
             "total": len(stores),
         }
 
-    async def get_store_growth_readiness(
-        self, store_id: UUID, tenant_id: str, db: AsyncSession
-    ) -> dict:
+    async def get_store_growth_readiness(self, store_id: UUID, tenant_id: str, db: AsyncSession) -> dict:
         """门店增长就绪度评估 — 该门店能支撑多少种旅程"""
         caps = await self.get_store_capabilities(store_id, tenant_id, db)
         if not caps.get("store_name"):
@@ -153,11 +154,13 @@ class GrowthStoreCapabilityService:
             for cap in required:
                 if not caps.get(cap, False) and cap not in seen_caps:
                     seen_caps.add(cap)
-                    missing_capabilities.append({
-                        "capability": cap,
-                        "blocked_journey": journey,
-                        "recommendation": f"开启{cap}可解锁旅程: {journey}",
-                    })
+                    missing_capabilities.append(
+                        {
+                            "capability": cap,
+                            "blocked_journey": journey,
+                            "recommendation": f"开启{cap}可解锁旅程: {journey}",
+                        }
+                    )
 
         return {
             "store_id": str(store_id),
@@ -169,17 +172,17 @@ class GrowthStoreCapabilityService:
             "missing_capabilities": missing_capabilities,
         }
 
-    async def get_all_stores_readiness(
-        self, tenant_id: str, db: AsyncSession
-    ) -> dict:
+    async def get_all_stores_readiness(self, tenant_id: str, db: AsyncSession) -> dict:
         """所有门店增长就绪度排行"""
         await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": tenant_id})
 
-        result = await db.execute(text("""
+        result = await db.execute(
+            text("""
             SELECT id, store_name, config, seats, city
             FROM stores WHERE is_deleted = FALSE AND status = 'active'
             ORDER BY store_name
-        """))
+        """)
+        )
 
         stores: list[dict] = []
         for row in result.fetchall():
@@ -193,14 +196,16 @@ class GrowthStoreCapabilityService:
                     supported_count += 1
 
             readiness = round(supported_count / self.TOTAL_JOURNEY_COUNT * 100)
-            stores.append({
-                "store_id": str(row[0]),
-                "store_name": row[1],
-                "city": row[4],
-                "seats": row[3],
-                "supported_journeys": supported_count,
-                "readiness_pct": readiness,
-            })
+            stores.append(
+                {
+                    "store_id": str(row[0]),
+                    "store_name": row[1],
+                    "city": row[4],
+                    "seats": row[3],
+                    "supported_journeys": supported_count,
+                    "readiness_pct": readiness,
+                }
+            )
 
         stores.sort(key=lambda s: s["readiness_pct"], reverse=True)
         return {"stores": stores, "total": len(stores)}

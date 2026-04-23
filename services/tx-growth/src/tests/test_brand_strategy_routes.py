@@ -18,13 +18,12 @@
 15. GET  /api/v1/brand/content-brief     — 生成简报成功
 16. GET  /api/v1/brand/content-brief     — 缺少 header → 400
 """
+
 import os
 import sys
 import types
 import uuid
-from unittest.mock import AsyncMock, MagicMock, patch
-
-import pytest
+from unittest.mock import AsyncMock, MagicMock
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
@@ -61,8 +60,9 @@ sys.modules.setdefault("structlog", _structlog)
 _models_pkg = types.ModuleType("models")
 _brand_strategy_models = types.ModuleType("models.brand_strategy")
 
+from typing import Optional
+
 from pydantic import BaseModel
-from typing import Any, Optional
 
 
 class BrandProfileCreate(BaseModel):
@@ -137,10 +137,9 @@ sys.modules.setdefault("services.brand_strategy_db_service", _svc_db)
 # 导入路由
 # ---------------------------------------------------------------------------
 
+from api.brand_strategy_routes import _svc, router
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-
-from api.brand_strategy_routes import router, _svc
 
 app = FastAPI()
 app.include_router(router)

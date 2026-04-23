@@ -11,6 +11,7 @@
   - 品项维度：热销/滞销/新品表现/高毛利低销售
   - 客群维度：新客/回头客/沉默客占比趋势
 """
+
 from __future__ import annotations
 
 from datetime import date, datetime, timedelta, timezone
@@ -30,6 +31,7 @@ router = APIRouter(prefix="/api/v1/analytics/weekly-brief", tags=["weekly-brief"
 
 # ─── 依赖 ─────────────────────────────────────────────────────────────────────
 
+
 async def _get_db(x_tenant_id: str = Header(..., alias="X-Tenant-ID")):
     async for session in get_db_with_tenant(x_tenant_id):
         yield session
@@ -40,6 +42,7 @@ def _get_tenant(x_tenant_id: str = Header(..., alias="X-Tenant-ID")) -> str:
 
 
 # ─── 工具 ─────────────────────────────────────────────────────────────────────
+
 
 def _week_range(week_start: date) -> tuple[datetime, datetime]:
     """返回周一 00:00 UTC 到下周一 00:00 UTC"""
@@ -57,7 +60,8 @@ async def _week_metrics(db: AsyncSession, tenant_id: str, week_start: date) -> d
     """查询指定周的汇总指标"""
     start, end = _week_range(week_start)
     try:
-        r = await db.execute(text("""
+        r = await db.execute(
+            text("""
             SELECT
                 COALESCE(SUM(total_amount_fen), 0)::bigint    AS revenue_fen,
                 COUNT(*)                                       AS order_count,
@@ -70,7 +74,9 @@ async def _week_metrics(db: AsyncSession, tenant_id: str, week_start: date) -> d
               AND status    = 'completed'
               AND created_at >= :start
               AND created_at <  :end
-        """), {"tid": tenant_id, "start": start, "end": end})
+        """),
+            {"tid": tenant_id, "start": start, "end": end},
+        )
         row = dict(r.mappings().fetchone() or {})
         revenue = int(row.get("revenue_fen") or 0)
         cost = int(row.get("cost_fen") or 0)
@@ -94,7 +100,8 @@ async def _week_dish_analysis(db: AsyncSession, tenant_id: str, week_start: date
     """本周品项表现分析"""
     start, end = _week_range(week_start)
     try:
-        r = await db.execute(text("""
+        r = await db.execute(
+            text("""
             SELECT
                 oi.dish_name,
                 SUM(oi.quantity)            AS qty,
@@ -108,10 +115,16 @@ async def _week_dish_analysis(db: AsyncSession, tenant_id: str, week_start: date
             GROUP BY oi.dish_name
             ORDER BY qty DESC
             LIMIT 20
-        """), {"tid": tenant_id, "start": start, "end": end})
+        """),
+            {"tid": tenant_id, "start": start, "end": end},
+        )
         rows = r.mappings().all()
         top5 = [{"name": r["dish_name"], "qty": int(r["qty"]), "revenue_fen": int(r["revenue_fen"])} for r in rows[:5]]
-        bottom5 = [{"name": r["dish_name"], "qty": int(r["qty"]), "revenue_fen": int(r["revenue_fen"])} for r in rows[-5:] if len(rows) >= 5]
+        bottom5 = [
+            {"name": r["dish_name"], "qty": int(r["qty"]), "revenue_fen": int(r["revenue_fen"])}
+            for r in rows[-5:]
+            if len(rows) >= 5
+        ]
         return {"top5_by_qty": top5, "bottom5_by_qty": bottom5, "total_skus_sold": len(rows)}
     except SQLAlchemyError as exc:
         logger.warning("weekly_brief.dish_failed", error=str(exc))
@@ -122,7 +135,8 @@ async def _week_member_analysis(db: AsyncSession, tenant_id: str, week_start: da
     """本周客群结构"""
     start, end = _week_range(week_start)
     try:
-        r = await db.execute(text("""
+        r = await db.execute(
+            text("""
             SELECT
                 COUNT(*) FILTER (WHERE member_id IS NOT NULL)  AS member_orders,
                 COUNT(*) FILTER (WHERE member_id IS NULL)      AS guest_orders,
@@ -132,7 +146,9 @@ async def _week_member_analysis(db: AsyncSession, tenant_id: str, week_start: da
               AND status      = 'completed'
               AND created_at >= :start
               AND created_at <  :end
-        """), {"tid": tenant_id, "start": start, "end": end})
+        """),
+            {"tid": tenant_id, "start": start, "end": end},
+        )
         row = dict(r.mappings().fetchone() or {})
         total = (int(row.get("member_orders") or 0) + int(row.get("guest_orders") or 0)) or 1
         member_rate = round(int(row.get("member_orders") or 0) / total * 100, 1)
@@ -170,21 +186,18 @@ def _generate_weekly_strategies(
         )
     elif rev_delta is not None and rev_delta > 10:
         strategies.append(
-            f"本周营收环比增长 {rev_delta:.1f}%，增长势头良好，"
-            "建议下周维持当前高峰段排队效率，防止因等待过长流失客户。"
+            f"本周营收环比增长 {rev_delta:.1f}%，增长势头良好，建议下周维持当前高峰段排队效率，防止因等待过长流失客户。"
         )
 
     # 毛利策略
     margin_delta = _delta(this_week["margin_rate"], last_week["margin_rate"])
     if margin_delta is not None and margin_delta < -2:
         strategies.append(
-            f"毛利率环比下降 {abs(margin_delta):.1f}ppt，建议排查本周折扣/赠菜异常，"
-            "重点核查门店折扣权限是否被滥用。"
+            f"毛利率环比下降 {abs(margin_delta):.1f}ppt，建议排查本周折扣/赠菜异常，重点核查门店折扣权限是否被滥用。"
         )
     elif this_week["margin_rate"] < 55:
         strategies.append(
-            "毛利率低于 55% 预警线，建议下周对毛利低于 40% 的品项进行定价复审，"
-            "同时检查食材损耗是否超出正常范围。"
+            "毛利率低于 55% 预警线，建议下周对毛利低于 40% 的品项进行定价复审，同时检查食材损耗是否超出正常范围。"
         )
 
     # 品项策略
@@ -225,33 +238,41 @@ def _identify_structural_issues(
 
     rev_wow = _delta(this_week["revenue_fen"], last_week["revenue_fen"])
     if rev_wow is not None and rev_wow < -10:
-        issues.append({
-            "type": "revenue_decline",
-            "severity": "high",
-            "description": f"营收环比连续下滑 {abs(rev_wow):.1f}%，需关注是否有竞对开业或节假日效应",
-        })
+        issues.append(
+            {
+                "type": "revenue_decline",
+                "severity": "high",
+                "description": f"营收环比连续下滑 {abs(rev_wow):.1f}%，需关注是否有竞对开业或节假日效应",
+            }
+        )
 
     margin_val = this_week["margin_rate"]
     if margin_val < 50:
-        issues.append({
-            "type": "low_margin",
-            "severity": "high",
-            "description": f"毛利率 {margin_val:.1f}% 低于健康水位 55%，成本管控存在漏洞",
-        })
+        issues.append(
+            {
+                "type": "low_margin",
+                "severity": "high",
+                "description": f"毛利率 {margin_val:.1f}% 低于健康水位 55%，成本管控存在漏洞",
+            }
+        )
     elif margin_val < 55:
-        issues.append({
-            "type": "margin_warning",
-            "severity": "medium",
-            "description": f"毛利率 {margin_val:.1f}% 接近预警线，建议持续监控",
-        })
+        issues.append(
+            {
+                "type": "margin_warning",
+                "severity": "medium",
+                "description": f"毛利率 {margin_val:.1f}% 接近预警线，建议持续监控",
+            }
+        )
 
     rev_yoy = _delta(this_week["revenue_fen"], yoy_week["revenue_fen"])
     if rev_yoy is not None and rev_yoy < -15:
-        issues.append({
-            "type": "yoy_decline",
-            "severity": "medium",
-            "description": f"较去年同期下降 {abs(rev_yoy):.1f}%，存在市场份额流失风险",
-        })
+        issues.append(
+            {
+                "type": "yoy_decline",
+                "severity": "medium",
+                "description": f"较去年同期下降 {abs(rev_yoy):.1f}%，存在市场份额流失风险",
+            }
+        )
 
     if dish_analysis.get("total_skus_sold", 0) > 0:
         top5_revenue = sum(d.get("revenue_fen", 0) for d in dish_analysis.get("top5_by_qty", []))
@@ -259,16 +280,19 @@ def _identify_structural_issues(
         if this_week["revenue_fen"] > 0:
             top5_concentration = top5_revenue / this_week["revenue_fen"] * 100
             if top5_concentration > 60:
-                issues.append({
-                    "type": "menu_concentration",
-                    "severity": "low",
-                    "description": f"TOP5 品项贡献 {top5_concentration:.1f}% 营收，菜单结构集中风险偏高",
-                })
+                issues.append(
+                    {
+                        "type": "menu_concentration",
+                        "severity": "low",
+                        "description": f"TOP5 品项贡献 {top5_concentration:.1f}% 营收，菜单结构集中风险偏高",
+                    }
+                )
 
     return issues[:5]
 
 
 # ─── 端点 ─────────────────────────────────────────────────────────────────────
+
 
 @router.get("/{store_id}", summary="单店周报 — 结构性问题 + 下周策略建议")
 async def get_store_weekly_brief(
@@ -357,7 +381,8 @@ async def get_group_weekly_brief(
 
     # 集团汇总 + 按门店分组
     try:
-        r = await db.execute(text("""
+        r = await db.execute(
+            text("""
             SELECT
                 COALESCE(store_id::text, 'unknown')            AS store_id,
                 COALESCE(SUM(total_amount_fen), 0)::bigint     AS revenue_fen,
@@ -371,10 +396,13 @@ async def get_group_weekly_brief(
               AND created_at <  :end
             GROUP BY store_id
             ORDER BY revenue_fen DESC
-        """), {"tid": tenant_id, "start": start, "end": end})
+        """),
+            {"tid": tenant_id, "start": start, "end": end},
+        )
         store_rows = r.mappings().all()
 
-        lw_r = await db.execute(text("""
+        lw_r = await db.execute(
+            text("""
             SELECT
                 COALESCE(SUM(total_amount_fen), 0)::bigint AS revenue_fen,
                 COUNT(*)::int                               AS order_count
@@ -383,7 +411,9 @@ async def get_group_weekly_brief(
               AND status      = 'completed'
               AND created_at >= :start
               AND created_at <  :end
-        """), {"tid": tenant_id, "start": lstart, "end": lend})
+        """),
+            {"tid": tenant_id, "start": lstart, "end": lend},
+        )
         lw = dict(lw_r.mappings().fetchone() or {})
 
     except SQLAlchemyError as exc:

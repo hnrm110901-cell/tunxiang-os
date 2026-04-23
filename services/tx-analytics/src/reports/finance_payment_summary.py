@@ -10,15 +10,15 @@ CATEGORY = "finance"
 
 # 各支付渠道手续费率（行业标准）
 FEE_RATES: dict[str, float] = {
-    "wechat": 0.006,       # 微信 0.6%
-    "alipay": 0.006,       # 支付宝 0.6%
-    "cash": 0.0,           # 现金 0%
-    "unionpay": 0.006,     # 银联 0.6%
-    "meituan": 0.05,       # 美团 5% (含佣金)
-    "eleme": 0.05,         # 饿了么 5% (含佣金)
-    "douyin": 0.03,        # 抖音 3%
-    "deposit": 0.0,        # 押金 0%
-    "ar_clearing": 0.0,    # AR清账（应收账款冲抵）0%
+    "wechat": 0.006,  # 微信 0.6%
+    "alipay": 0.006,  # 支付宝 0.6%
+    "cash": 0.0,  # 现金 0%
+    "unionpay": 0.006,  # 银联 0.6%
+    "meituan": 0.05,  # 美团 5% (含佣金)
+    "eleme": 0.05,  # 饿了么 5% (含佣金)
+    "douyin": 0.03,  # 抖音 3%
+    "deposit": 0.0,  # 押金 0%
+    "ar_clearing": 0.0,  # AR清账（应收账款冲抵）0%
 }
 
 SQL_TEMPLATE = """
@@ -76,11 +76,13 @@ def enrich_with_fee(rows: list[dict]) -> list[dict]:
         fee_fen = int(amount_fen * fee_rate)
         net_amount_fen = amount_fen - fee_fen
 
-        enriched.append({
-            **row,
-            "fee_rate": fee_rate,
-            "fee_fen": fee_fen,
-            "net_amount_fen": net_amount_fen,
-        })
+        enriched.append(
+            {
+                **row,
+                "fee_rate": fee_rate,
+                "fee_fen": fee_fen,
+                "net_amount_fen": net_amount_fen,
+            }
+        )
 
     return enriched

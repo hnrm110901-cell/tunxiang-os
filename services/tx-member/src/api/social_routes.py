@@ -3,6 +3,7 @@
 拼单/加入拼单/请客送礼/分享有礼/推荐追踪/社交统计
 所有路由需要 X-Tenant-ID header。
 """
+
 from __future__ import annotations
 
 from typing import Any, Optional
@@ -28,6 +29,7 @@ router = APIRouter(prefix="/api/v1/social", tags=["social"])
 
 
 # ── 请求模型 ──────────────────────────────────────────────────
+
 
 class CreateGroupOrderReq(BaseModel):
     initiator_id: str
@@ -58,6 +60,7 @@ class TrackReferralReq(BaseModel):
 
 # ── 1. 创建拼单 ─────────────────────────────────────────────
 
+
 @router.post("/group-orders")
 async def api_create_group_order(
     body: CreateGroupOrderReq,
@@ -77,6 +80,7 @@ async def api_create_group_order(
 
 # ── 2. 加入拼单 ─────────────────────────────────────────────
 
+
 @router.post("/group-orders/{group_id}/join")
 async def api_join_group_order(
     group_id: str,
@@ -95,6 +99,7 @@ async def api_join_group_order(
 
 
 # ── 3. 请客/送礼 ───────────────────────────────────────────
+
 
 @router.post("/gifts")
 async def api_send_gift(
@@ -116,6 +121,7 @@ async def api_send_gift(
 
 # ── 4. 分享有礼链接 ─────────────────────────────────────────
 
+
 @router.post("/share-links")
 async def api_create_share_link(
     body: CreateShareLinkReq,
@@ -134,6 +140,7 @@ async def api_create_share_link(
 
 # ── 5. 追踪推荐关系 ─────────────────────────────────────────
 
+
 @router.post("/referrals")
 async def api_track_referral(
     body: TrackReferralReq,
@@ -151,6 +158,7 @@ async def api_track_referral(
 
 
 # ── 6. 社交统计 ─────────────────────────────────────────────
+
 
 @router.get("/stats/{customer_id}")
 async def api_social_stats(

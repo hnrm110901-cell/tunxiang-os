@@ -12,6 +12,7 @@
 9.  GET  /api/v1/member/points-rules               — mock SELECT 返回2条规则 → 200
 10. POST /api/v1/member/points-rules               — mock INSERT RETURNING → 200，data 含 id
 """
+
 import os
 import sys
 import types
@@ -22,12 +23,12 @@ import uuid
 from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock
 
-import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 # ─── sys.modules 注入存根，避免 shared.ontology 真实数据库连接 ───────────────
+
 
 def _inject_stubs():
     """注入所需的存根模块，阻止真实 DB 初始化。"""
@@ -61,7 +62,7 @@ _inject_stubs()
 
 # ─── 加载路由 ────────────────────────────────────────────────────────────────
 
-from api.member_level_routes import router, _get_tenant_db  # noqa: E402
+from api.member_level_routes import _get_tenant_db, router  # noqa: E402
 
 app = FastAPI()
 app.include_router(router)
@@ -129,8 +130,10 @@ def _make_db(*results):
 
 def _override_db(db):
     """返回可直接作为 dependency_overrides 值的函数（同步 generator）。"""
+
     def _dep():
         return db
+
     return _dep
 
 
@@ -186,6 +189,7 @@ def _points_rule_row():
 # 场景 1: GET /api/v1/member/level-configs — 返回2条配置
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_list_level_configs_success():
     """mock SELECT 返回2条配置 → 200，data.items 长度=2"""
     rows = [
@@ -211,9 +215,10 @@ def test_list_level_configs_success():
 # 场景 2: POST /api/v1/member/level-configs — 创建成功
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_create_level_config_success():
     """mock 重复检查（无重复）+ INSERT RETURNING → 200，data 含 id"""
-    check_result = _FakeResult(rows=[])            # fetchone() → None（无重复）
+    check_result = _FakeResult(rows=[])  # fetchone() → None（无重复）
     insert_result = _FakeResult(rows=[_level_config_row("gold", "金卡", 5000, 0)])
 
     db = _make_db(check_result, insert_result)
@@ -243,10 +248,11 @@ def test_create_level_config_success():
 # 场景 3: POST /api/v1/member/level-configs — 重复 level_code → 409
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_create_level_config_duplicate():
     """mock SELECT 检查返回已存在记录 → 409"""
     # fetchone() 需要返回非 None，模拟已存在
-    existing_row = (str(uuid.uuid4()),)   # tuple 模拟 DB row
+    existing_row = (str(uuid.uuid4()),)  # tuple 模拟 DB row
     check_result = _FakeResult(fetchone_val=existing_row)
 
     db = _make_db(check_result)
@@ -273,6 +279,7 @@ def test_create_level_config_duplicate():
 # 场景 4: PUT /api/v1/member/level-configs/{id} — 更新成功
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_update_level_config_success():
     """mock UPDATE RETURNING 1行 → 200，data 含更新后的字段"""
     updated_row = _level_config_row("silver", "银卡Plus", 1500, 0)
@@ -297,9 +304,10 @@ def test_update_level_config_success():
 # 场景 5: PUT /api/v1/member/level-configs/{id} — 配置不存在 → 404
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_update_level_config_not_found():
     """mock UPDATE RETURNING 空 → 404"""
-    update_result = _FakeResult(rows=[])   # mappings().fetchone() → None
+    update_result = _FakeResult(rows=[])  # mappings().fetchone() → None
 
     db = _make_db(update_result)
     app.dependency_overrides[_get_tenant_db] = _override_db(db)
@@ -317,6 +325,7 @@ def test_update_level_config_not_found():
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 场景 6: POST /check-upgrade — 积分=500，只有 normal(min=0) → upgraded=False
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 def test_check_upgrade_no_change():
     """积分500，年消费0，等级配置只有 normal(min=0) → upgraded=False"""
@@ -356,6 +365,7 @@ def test_check_upgrade_no_change():
 # 场景 7: POST /check-upgrade — 积分=5000 超过 silver 阈值 → upgraded=True
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_check_upgrade_promoted():
     """积分5000超过 silver 阈值(1000) → upgraded=True，to_level=silver"""
     # execute 调用顺序：
@@ -369,13 +379,15 @@ def test_check_upgrade_promoted():
     pts_result = _FakeResult(fetchone_val=(5000,))
     spend_result = _FakeResult(fetchone_val=(0,))
     # 按 min_points DESC 排列
-    configs_result = _FakeResult(rows=[
-        {"level_code": "silver", "min_points": 1000, "min_annual_spend_fen": 0},
-        {"level_code": "normal", "min_points": 0,    "min_annual_spend_fen": 0},
-    ])
+    configs_result = _FakeResult(
+        rows=[
+            {"level_code": "silver", "min_points": 1000, "min_annual_spend_fen": 0},
+            {"level_code": "normal", "min_points": 0, "min_annual_spend_fen": 0},
+        ]
+    )
     cur_level_result = _FakeResult(fetchone_val=("normal",))
-    update_customers_result = _FakeResult()   # UPDATE customers（容错）
-    insert_history_result = _FakeResult()     # INSERT history
+    update_customers_result = _FakeResult()  # UPDATE customers（容错）
+    insert_history_result = _FakeResult()  # INSERT history
 
     db = _make_db(
         pts_result,
@@ -405,6 +417,7 @@ def test_check_upgrade_promoted():
 # 场景 8: POST /members/{mid}/points/earn — 积分规则存在 → earned_points>0
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_earn_points_success():
     """mock 积分规则返回1条（points_per_100fen=1），mock UPSERT → 200，earned_points>0"""
     # execute 调用顺序：
@@ -417,7 +430,7 @@ def test_earn_points_success():
         "multiplier": 1.0,
     }
     # amount_fen=1000 → base = (1000/100)*1 = 10，multiplier=1 → earned=10
-    rules_result = _FakeResult(rows=[rule_row])   # mappings().fetchone() 取第一条
+    rules_result = _FakeResult(rows=[rule_row])  # mappings().fetchone() 取第一条
     upsert_result = _FakeResult(fetchone_val=(510,))  # 原500 + 10 = 510
 
     db = _make_db(rules_result, upsert_result)
@@ -444,6 +457,7 @@ def test_earn_points_success():
 # 场景 9: GET /api/v1/member/points-rules — 返回2条规则
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_list_points_rules_success():
     """mock SELECT 返回2条规则 → 200，data.items 长度=2"""
     rows = [_points_rule_row(), _points_rule_row()]
@@ -468,6 +482,7 @@ def test_list_points_rules_success():
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 场景 10: POST /api/v1/member/points-rules — 创建积分规则成功
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 def test_create_points_rule_success():
     """mock INSERT RETURNING → 200，data 含 id"""

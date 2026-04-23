@@ -2,6 +2,7 @@
 
 典型场景: 桌台扫码领取当桌优惠券, 或扫描活动海报二维码领券
 """
+
 from typing import Any
 
 import structlog

@@ -67,16 +67,33 @@ LIMIT :page_size OFFSET :page_offset
 """
 
 DIMENSIONS_ORDER = [
-    "store_name", "order_no", "biz_date", "order_time", "order_status",
-    "sales_channel", "table_no", "cashier_name", "server_name",
+    "store_name",
+    "order_no",
+    "biz_date",
+    "order_time",
+    "order_status",
+    "sales_channel",
+    "table_no",
+    "cashier_name",
+    "server_name",
 ]
 METRICS_ORDER = [
-    "total_amount_fen", "discount_fen", "actual_fen", "refund_fen", "guest_count",
+    "total_amount_fen",
+    "discount_fen",
+    "actual_fen",
+    "refund_fen",
+    "guest_count",
 ]
 
 DIMENSIONS_PAYMENT = [
-    "store_name", "order_no", "biz_date", "payment_time",
-    "payment_method", "payment_status", "third_party_trade_no", "cashier_name",
+    "store_name",
+    "order_no",
+    "biz_date",
+    "payment_time",
+    "payment_method",
+    "payment_status",
+    "third_party_trade_no",
+    "cashier_name",
 ]
 METRICS_PAYMENT = ["amount_fen"]
 

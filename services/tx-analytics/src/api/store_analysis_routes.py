@@ -10,6 +10,7 @@
   GET  /{store_id}/shifts        — 班次分析
   POST /comparison               — 多店对比
 """
+
 import uuid
 from datetime import date, timedelta
 from typing import Optional
@@ -34,6 +35,7 @@ router = APIRouter(prefix="/api/v1/analysis/store", tags=["store-analysis"])
 
 class ComparisonRequest(BaseModel):
     """多店对比请求体"""
+
     store_ids: list[str] = Field(..., min_length=2, max_length=10, description="门店ID列表")
     metrics: list[str] = Field(
         default=["revenue", "orders", "avg_ticket"],
