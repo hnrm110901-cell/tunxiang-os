@@ -400,6 +400,11 @@ from .api.reservation_invitation_routes import (
 
 app.include_router(reservation_invitation_router)
 
+# ── Sprint R2 Track C：宴会合同管家（合同 / EO 工单 / 审批日志，v282）──
+from .api.banquet_contract_routes import router as banquet_contract_router
+
+app.include_router(banquet_contract_router)
+
 
 @app.get("/health")
 async def health():

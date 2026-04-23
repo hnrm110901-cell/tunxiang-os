@@ -7,6 +7,9 @@ from .attendance_recovery import AttendanceRecoveryAgent
 
 # Sprint D1 / PR 批次 6 + Overflow：内容洞察 + 遗漏 Skill（冲 100% 覆盖）
 from .audit_trail import AuditTrailAgent
+
+# Sprint R2 Track C：宴会合同管家（P1 · 云端 · margin+safety）
+from .banquet_contract_agent import BanquetContractAgent
 from .banquet_growth import BanquetGrowthAgent
 
 # 专项运营Agent (Phase 6)
@@ -161,6 +164,8 @@ ALL_SKILL_AGENTS = [
     ReservationConciergeAgent,
     # Sprint R2 Track B：销售经理教练（豁免类 P1 Agent）
     SalesCoachAgent,
+    # Sprint R2 Track C：宴会合同管家（P1 Agent，margin + safety）
+    BanquetContractAgent,
 ]
 
 
