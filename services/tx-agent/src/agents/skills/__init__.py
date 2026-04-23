@@ -1,5 +1,9 @@
 from .ai_marketing_orchestrator import AiMarketingOrchestratorAgent
 from .ai_waiter import AIWaiterAgent
+
+# Sprint D1 / PR 批次 5：合规运营（waived + margin + safety）
+from .attendance_compliance_agent import AttendanceComplianceAgent
+from .attendance_recovery import AttendanceRecoveryAgent
 from .banquet_growth import BanquetGrowthAgent
 
 # 专项运营Agent (Phase 6)
@@ -57,8 +61,12 @@ from .store_inspect import StoreInspectAgent
 from .table_dispatch import TableDispatchAgent
 from .trend_discovery import TrendDiscoveryAgent
 
+# Sprint D1 / PR 批次 5：合规运营（HR 类豁免 + 排班 margin）
+from .turnover_risk import TurnoverRiskAgent
+
 # 语音点菜 + AI服务员
 from .voice_order import VoiceOrderAgent
+from .workforce_planner import WorkforcePlannerAgent
 
 ALL_SKILL_AGENTS = [
     # 原有9个核心Agent
@@ -121,6 +129,12 @@ ALL_SKILL_AGENTS = [
     # trend_discovery / pilot_recommender / banquet_growth / private_ops
     # 已在上方注册；本行新增 enterprise_activation）
     EnterpriseActivationAgent,
+    # Sprint D1 / PR 批次 5：合规运营（compliance_alert / store_inspect /
+    # off_peak_traffic 已在上方注册；本行新增 4 个 HR/运营 Agent）
+    AttendanceComplianceAgent,
+    AttendanceRecoveryAgent,
+    TurnoverRiskAgent,
+    WorkforcePlannerAgent,
 ]
 
 

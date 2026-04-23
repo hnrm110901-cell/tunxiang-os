@@ -4,6 +4,59 @@
 
 ---
 
+## 2026-04-23 Sprint D1 批次 5：合规运营 7 Skill（4 豁免 + 3 真实 scope）+ 4 Skill 补注册
+
+### 本次会话目标
+按设计稿 §3.6 推进 W8 批 5：compliance_alert / attendance_compliance / attendance_recovery / turnover_risk / workforce_planner / store_inspect / off_peak_traffic。设计稿明确"多数显式豁免"。
+
+Tier 级别：Tier 2（HR/运营观察类，不触资金路径）。
+
+### 完成状态
+- [x] **4 个豁免**（HR 观察/建议类）：compliance_alert / attendance_compliance / attendance_recovery / turnover_risk。每个 waived_reason 都 ≥30 字符，且避开黑名单说辞（"N/A"/"不适用"/"跳过"）
+- [x] **3 个真实 scope**：
+  - `WorkforcePlannerAgent` → `{"margin"}`（排班直接决定人力成本）
+  - `StoreInspectAgent` → `{"safety"}`（食安巡检 safety 核心）
+  - `OffPeakTrafficAgent` → `{"margin", "experience"}`（低峰引流折扣 + 预约出餐节奏）
+- [x] **4 个 Skill 补注册**（AttendanceComplianceAgent / AttendanceRecoveryAgent / TurnoverRiskAgent / WorkforcePlannerAgent）入 ALL_SKILL_AGENTS
+- [x] **TDD 扩 4 条**（共 33：11 passed + 22 skipped by pre-existing edge_mixin bug）：
+  - `test_batch_5_compliance_skills_declare_scope`：4 豁免 + 3 scope 全对齐，豁免 reason 长度 + 黑名单双重校验
+  - `test_batch_5_registry_contains_4_new_skills`：7 个全部注册（4 新 + 3 旧）
+  - `test_compliance_alert_waived_scope`：豁免路径 run() 返回 scope='waived'
+  - `test_turnover_risk_waived_scope`：同上
+
+### 关键决策
+- **豁免选 4 个而非 5 个** — compliance_alert 虽可解读为"监管红线硬约束"，但实际代码只生成告警，不阻断业务；按实现而非期望来豁免
+- **off_peak_traffic 双 scope** — 低峰折扣冲击毛利，预约引流冲击出餐节奏，两条都要拦截
+- **黑名单校验在测试中显式检查** — 设计稿 §6.2 规定的 "N/A"/"不适用"/"跳过" 禁用词，本批次 4 个豁免全部手工审过不含黑名单词，测试做守门
+
+### 交付清单
+```
+修改：
+  services/tx-agent/src/agents/skills/compliance_alert.py              +8 行（豁免）
+  services/tx-agent/src/agents/skills/attendance_compliance_agent.py   +8 行（豁免）
+  services/tx-agent/src/agents/skills/attendance_recovery.py           +8 行（豁免）
+  services/tx-agent/src/agents/skills/turnover_risk.py                 +8 行（豁免）
+  services/tx-agent/src/agents/skills/workforce_planner.py             +3 行（margin）
+  services/tx-agent/src/agents/skills/store_inspect.py                 +3 行（safety）
+  services/tx-agent/src/agents/skills/off_peak_traffic.py              +3 行（margin + experience）
+  services/tx-agent/src/agents/skills/__init__.py                      +14 行（4 imports + 4 列表追加）
+  services/tx-agent/src/tests/test_constraint_context.py               +74 行（4 tests）
+```
+
+### Sprint D1 覆盖率演进
+- W7 批 4: 33 声明 → 69%
+- **W8 批 5 累计: 40 声明 + 6 context + 6 豁免 → 84%**（设计稿 §2.3 预期 96%，略低是因为剩余 11 个 Skill 在 Overflow 批）
+
+### 下一步
+1. **批次 6 + Overflow（W9 最后 14 个 Skill）** — review_insight / review_summary / intel_reporter / audit_trail / growth_coach / salary_advisor / smart_customer_service + Overflow（ai_marketing_orchestrator / content_generation / competitor_watch / dormant_recall / high_value_member / member_insight / cashier_audit）
+2. **out-of-scope 修 `edge_mixin` 相对导入** — 解锁所有 skipped tests（用户已明确要求批 5 完成后做）
+
+### 已知风险
+- compliance_alert 若未来加"强制停牌"动作，需把豁免改为 `{"margin"}` 类；class-level scope 易错过复审
+- workforce_planner 只声明 scope 未填 context，运行时仍标 n/a
+
+---
+
 ## 2026-04-23 Sprint D1 批次 4：库存原料 7 Skill scope + inventory_alert 填 safety context + 2 豁免
 
 ### 本次会话目标
