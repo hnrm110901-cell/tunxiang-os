@@ -8,6 +8,7 @@
   -  7天：橙色预警（紧急跟进）
   -  1天：红色预警（明日到期，立即处理）
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -51,8 +52,8 @@ class ContractExpiryWatcher:
                 "errors": list[str],
             }
         """
-        from ..services.contract_ledger_service import ContractLedgerService
         from ..agents.a4_budget_alert import A4BudgetAlertAgent
+        from ..services.contract_ledger_service import ContractLedgerService
 
         started_at = datetime.now(timezone.utc)
         check_date = check_date or date.today()
@@ -79,6 +80,7 @@ class ContractExpiryWatcher:
 
         import os
         import uuid as _uuid
+
         from shared.ontology.src.database import TenantSession
 
         tenant_id_str = os.environ.get("DEFAULT_TENANT_ID", "")
@@ -103,11 +105,8 @@ class ContractExpiryWatcher:
 
         try:
             async with TenantSession(tenant_id_str) as db:
-
                 # ── 1. 查询即将到期合同 ─────────────────────────────────────
-                expiring = await contract_svc.check_expiring_contracts(
-                    db=db, tenant_id=tenant_id
-                )
+                expiring = await contract_svc.check_expiring_contracts(db=db, tenant_id=tenant_id)
                 expiring_total = len(expiring)
 
                 for contract in expiring:
@@ -144,9 +143,7 @@ class ContractExpiryWatcher:
                         )
 
                 # ── 2. 触发 A4 Agent 每日检查（费用执行率 + 合同预警生成推送）──
-                a4_result = await a4_agent.run_daily_check(
-                    db=db, tenant_id=tenant_id
-                )
+                a4_result = await a4_agent.run_daily_check(db=db, tenant_id=tenant_id)
                 await db.commit()
 
         except (OSError, RuntimeError, ValueError, SQLAlchemyError) as exc:

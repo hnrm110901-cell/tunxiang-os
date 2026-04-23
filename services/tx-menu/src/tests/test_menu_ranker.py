@@ -1,4 +1,5 @@
 """菜单排名引擎测试"""
+
 import os
 import sys
 
@@ -15,12 +16,45 @@ from services.menu_ranker import (
 )
 
 SAMPLE_DISHES = [
-    {"id": "d1", "name": "剁椒鱼头", "price_fen": 8800, "cost_fen": 3500, "recent_sales": 50, "prev_sales": 30,
-     "current_stock": 20, "min_stock": 5, "refund_rate": 0.02, "lunch_sales_pct": 0.6, "dinner_sales_pct": 0.3},
-    {"id": "d2", "name": "小炒肉", "price_fen": 4200, "cost_fen": 1800, "recent_sales": 80, "prev_sales": 80,
-     "current_stock": 30, "min_stock": 10, "refund_rate": 0.01, "lunch_sales_pct": 0.5, "dinner_sales_pct": 0.4},
-    {"id": "d3", "name": "凉拌黄瓜", "price_fen": 900, "cost_fen": 200, "recent_sales": 20, "prev_sales": 40,
-     "current_stock": 2, "min_stock": 5, "refund_rate": 0.08, "lunch_sales_pct": 0.3, "dinner_sales_pct": 0.2},
+    {
+        "id": "d1",
+        "name": "剁椒鱼头",
+        "price_fen": 8800,
+        "cost_fen": 3500,
+        "recent_sales": 50,
+        "prev_sales": 30,
+        "current_stock": 20,
+        "min_stock": 5,
+        "refund_rate": 0.02,
+        "lunch_sales_pct": 0.6,
+        "dinner_sales_pct": 0.3,
+    },
+    {
+        "id": "d2",
+        "name": "小炒肉",
+        "price_fen": 4200,
+        "cost_fen": 1800,
+        "recent_sales": 80,
+        "prev_sales": 80,
+        "current_stock": 30,
+        "min_stock": 10,
+        "refund_rate": 0.01,
+        "lunch_sales_pct": 0.5,
+        "dinner_sales_pct": 0.4,
+    },
+    {
+        "id": "d3",
+        "name": "凉拌黄瓜",
+        "price_fen": 900,
+        "cost_fen": 200,
+        "recent_sales": 20,
+        "prev_sales": 40,
+        "current_stock": 2,
+        "min_stock": 5,
+        "refund_rate": 0.08,
+        "lunch_sales_pct": 0.3,
+        "dinner_sales_pct": 0.2,
+    },
 ]
 
 

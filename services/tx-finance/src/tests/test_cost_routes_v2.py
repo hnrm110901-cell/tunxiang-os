@@ -14,6 +14,7 @@
 
 测试用例总计：16个
 """
+
 import sys
 import types
 import uuid
@@ -25,8 +26,10 @@ _shared_ont = types.ModuleType("shared.ontology")
 _shared_ont_src = types.ModuleType("shared.ontology.src")
 _shared_ont_src_db = types.ModuleType("shared.ontology.src.database")
 
+
 async def _fake_get_db_with_tenant(tenant_id):
     yield None
+
 
 _shared_ont_src_db.get_db_with_tenant = _fake_get_db_with_tenant
 sys.modules.setdefault("shared", _shared)
@@ -37,10 +40,17 @@ sys.modules.setdefault("shared.ontology.src.database", _shared_ont_src_db)
 # ── Mock structlog ──────────────────────────────────────────────────────────
 _structlog = types.ModuleType("structlog")
 
+
 class _FakeLogger:
-    def info(self, *a, **kw): pass
-    def error(self, *a, **kw): pass
-    def warning(self, *a, **kw): pass
+    def info(self, *a, **kw):
+        pass
+
+    def error(self, *a, **kw):
+        pass
+
+    def warning(self, *a, **kw):
+        pass
+
 
 _structlog.get_logger = lambda *a, **kw: _FakeLogger()
 sys.modules.setdefault("structlog", _structlog)
@@ -50,9 +60,7 @@ import importlib.util
 import pathlib
 
 _api_base = pathlib.Path(__file__).parent.parent / "api"
-_spec = importlib.util.spec_from_file_location(
-    "cost_routes_v2", _api_base / "cost_routes_v2.py"
-)
+_spec = importlib.util.spec_from_file_location("cost_routes_v2", _api_base / "cost_routes_v2.py")
 _mod = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(_mod)
 
@@ -90,8 +98,8 @@ def _make_client(db=None):
 # POST /api/v1/finance/costs
 # ══════════════════════════════════════════════════════════════════════════════
 
-class TestCreateCostItem:
 
+class TestCreateCostItem:
     def test_create_rent_cost_returns_200(self):
         db = _make_db_with_scalar(uuid.uuid4())
         client = _make_client(db)
@@ -187,8 +195,8 @@ class TestCreateCostItem:
 # GET /api/v1/finance/costs
 # ══════════════════════════════════════════════════════════════════════════════
 
-class TestGetCostItems:
 
+class TestGetCostItems:
     def _db_with_rows(self, rows=None):
         if rows is None:
             rows = []
@@ -237,8 +245,8 @@ class TestGetCostItems:
 # GET /api/v1/finance/costs/summary
 # ══════════════════════════════════════════════════════════════════════════════
 
-class TestGetCostSummary:
 
+class TestGetCostSummary:
     def test_valid_request_returns_200(self):
         db = MagicMock()
         mock_result = MagicMock()
@@ -280,8 +288,8 @@ class TestGetCostSummary:
 # POST /api/v1/finance/configs
 # ══════════════════════════════════════════════════════════════════════════════
 
-class TestSetFinanceConfig:
 
+class TestSetFinanceConfig:
     def test_set_pct_config_returns_200(self):
         db = _make_db_with_scalar(uuid.uuid4())
         client = _make_client(db)
@@ -330,8 +338,8 @@ class TestSetFinanceConfig:
 # GET /api/v1/finance/configs/{store_id}
 # ══════════════════════════════════════════════════════════════════════════════
 
-class TestGetFinanceConfigs:
 
+class TestGetFinanceConfigs:
     def test_returns_config_list(self):
         db = MagicMock()
         mock_result = MagicMock()

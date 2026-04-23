@@ -5,6 +5,7 @@
   GET /api/v1/finance/revenue/channel-mix   — 渠道构成趋势（?store_id=&days=）
   GET /api/v1/finance/revenue/hourly        — 小时收入分布（热力图数据）
 """
+
 from __future__ import annotations
 
 import uuid
@@ -26,6 +27,7 @@ _pnl_engine = PnLEngine()
 
 # ─── 依赖注入 ─────────────────────────────────────────────────────────────────
 
+
 async def _get_tenant_db(x_tenant_id: str = Header(..., alias="X-Tenant-ID")):
     async for session in get_db_with_tenant(x_tenant_id):
         yield session
@@ -44,12 +46,11 @@ def _parse_date_param(d: str) -> date:
     try:
         return date.fromisoformat(d)
     except ValueError as exc:
-        raise HTTPException(
-            status_code=400, detail=f"日期格式错误: {d}，请使用 YYYY-MM-DD"
-        ) from exc
+        raise HTTPException(status_code=400, detail=f"日期格式错误: {d}，请使用 YYYY-MM-DD") from exc
 
 
 # ─── GET /revenue/daily ───────────────────────────────────────────────────────
+
 
 @router.get("/revenue/daily", summary="日收入（按渠道/时段分析）")
 async def get_daily_revenue(
@@ -201,6 +202,7 @@ async def get_daily_revenue(
 
 # ─── GET /revenue/channel-mix ─────────────────────────────────────────────────
 
+
 @router.get("/revenue/channel-mix", summary="渠道构成趋势")
 async def get_channel_mix_trend(
     store_id: str = Query(..., description="门店ID"),
@@ -285,6 +287,7 @@ async def get_channel_mix_trend(
 
 # ─── GET /revenue/hourly ──────────────────────────────────────────────────────
 
+
 @router.get("/revenue/hourly", summary="小时收入分布（热力图数据）")
 async def get_hourly_revenue(
     store_id: str = Query(..., description="门店ID"),
@@ -331,7 +334,9 @@ async def get_hourly_revenue(
     rows = result.fetchall()
 
     # 填充 0-23 小时的完整数组（无数据的小时填 0）
-    hourly_map: dict[int, dict] = {h: {"hour": h, "order_count": 0, "net_revenue_fen": 0, "discount_fen": 0} for h in range(24)}
+    hourly_map: dict[int, dict] = {
+        h: {"hour": h, "order_count": 0, "net_revenue_fen": 0, "discount_fen": 0} for h in range(24)
+    }
     for r in rows:
         h = int(r[0])
         hourly_map[h] = {

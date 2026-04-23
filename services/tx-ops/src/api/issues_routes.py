@@ -9,6 +9,7 @@
 
 统一响应格式: {"ok": bool, "data": {}, "error": {}}
 """
+
 from __future__ import annotations
 
 from datetime import date, datetime, timedelta, timezone
@@ -26,9 +27,7 @@ from shared.ontology.src.database import get_db
 router = APIRouter(prefix="/api/v1/ops/issues", tags=["ops-issues"])
 log = structlog.get_logger(__name__)
 
-_VALID_ISSUE_TYPES = {
-    "discount_abuse", "food_safety", "device_fault", "service", "kds_timeout"
-}
+_VALID_ISSUE_TYPES = {"discount_abuse", "food_safety", "device_fault", "service", "kds_timeout"}
 _VALID_SEVERITIES = {"critical", "high", "medium", "low"}
 _VALID_STATUSES = {"open", "in_progress", "resolved", "closed", "escalated"}
 
@@ -202,8 +201,14 @@ async def create_issue(
         row = result.mappings().one()
         await db.commit()
         record = _serialize_row(dict(row))
-        log.info("issue_created", issue_id=str(record["id"]), store_id=body.store_id,
-                 issue_type=body.issue_type, severity=body.severity, tenant_id=x_tenant_id)
+        log.info(
+            "issue_created",
+            issue_id=str(record["id"]),
+            store_id=body.store_id,
+            issue_type=body.issue_type,
+            severity=body.severity,
+            tenant_id=x_tenant_id,
+        )
         return {"ok": True, "data": record}
     except HTTPException:
         raise
@@ -260,7 +265,9 @@ async def list_issues(
         )
         total: int = count_result.scalar_one()
 
-        severity_order = "CASE severity WHEN 'critical' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2 WHEN 'low' THEN 3 ELSE 99 END"
+        severity_order = (
+            "CASE severity WHEN 'critical' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2 WHEN 'low' THEN 3 ELSE 99 END"
+        )
         offset = (page - 1) * size
         params["limit"] = min(size, 50)
         params["offset"] = offset
@@ -344,7 +351,7 @@ async def update_issue(
         result = await db.execute(
             text(f"""
                 UPDATE ops_issues
-                SET {', '.join(set_clauses)}
+                SET {", ".join(set_clauses)}
                 WHERE id = :iid
                 RETURNING {_ISSUE_COLUMNS}
             """),
@@ -355,8 +362,7 @@ async def update_issue(
             raise HTTPException(status_code=404, detail="问题记录不存在")
         await db.commit()
         record = _serialize_row(dict(updated))
-        log.info("issue_updated", issue_id=issue_id, updates=list(params.keys()),
-                 tenant_id=x_tenant_id)
+        log.info("issue_updated", issue_id=issue_id, updates=list(params.keys()), tenant_id=x_tenant_id)
         return {"ok": True, "data": record}
     except HTTPException:
         raise
@@ -408,8 +414,7 @@ async def resolve_issue(
             raise HTTPException(status_code=404, detail="问题记录不存在")
         await db.commit()
         record = _serialize_row(dict(updated))
-        log.info("issue_resolved", issue_id=issue_id, resolved_by=body.resolved_by,
-                 tenant_id=x_tenant_id)
+        log.info("issue_resolved", issue_id=issue_id, resolved_by=body.resolved_by, tenant_id=x_tenant_id)
         return {"ok": True, "data": record}
     except HTTPException:
         raise
@@ -443,53 +448,58 @@ async def auto_detect_issues(
     inserts: List[Dict[str, Any]] = []
 
     for task in kds_timeouts:
-        inserts.append({
-            "tenant_id": x_tenant_id,
-            "store_id": store_id,
-            "issue_date": today.isoformat(),
-            "issue_type": "kds_timeout",
-            "severity": "high",
-            "title": f"KDS超时: {task.get('dish_name', '未知菜品')}",
-            "description": f"任务ID {task.get('id')} 已超出预期出餐时间",
-            "evidence_urls": _json.dumps([]),
-            "due_at": _calc_due_at("high", None),
-            "created_by": "system:auto_detect",
-        })
+        inserts.append(
+            {
+                "tenant_id": x_tenant_id,
+                "store_id": store_id,
+                "issue_date": today.isoformat(),
+                "issue_type": "kds_timeout",
+                "severity": "high",
+                "title": f"KDS超时: {task.get('dish_name', '未知菜品')}",
+                "description": f"任务ID {task.get('id')} 已超出预期出餐时间",
+                "evidence_urls": _json.dumps([]),
+                "due_at": _calc_due_at("high", None),
+                "created_by": "system:auto_detect",
+            }
+        )
 
     for order in discount_abuses:
-        inserts.append({
-            "tenant_id": x_tenant_id,
-            "store_id": store_id,
-            "issue_date": today.isoformat(),
-            "issue_type": "discount_abuse",
-            "severity": "critical",
-            "title": f"折扣异常: 订单 {order.get('order_no', '未知')} 折扣率 {order.get('discount_pct', 0):.1f}%",
-            "description": (
-                f"订单金额 {order.get('original_amount_fen', 0) // 100} 元，"
-                f"实收 {order.get('actual_amount_fen', 0) // 100} 元，"
-                f"折扣率 {order.get('discount_pct', 0):.1f}%，未经审批"
-            ),
-            "evidence_urls": _json.dumps([]),
-            "due_at": _calc_due_at("critical", None),
-            "created_by": "system:auto_detect",
-        })
+        inserts.append(
+            {
+                "tenant_id": x_tenant_id,
+                "store_id": store_id,
+                "issue_date": today.isoformat(),
+                "issue_type": "discount_abuse",
+                "severity": "critical",
+                "title": f"折扣异常: 订单 {order.get('order_no', '未知')} 折扣率 {order.get('discount_pct', 0):.1f}%",
+                "description": (
+                    f"订单金额 {order.get('original_amount_fen', 0) // 100} 元，"
+                    f"实收 {order.get('actual_amount_fen', 0) // 100} 元，"
+                    f"折扣率 {order.get('discount_pct', 0):.1f}%，未经审批"
+                ),
+                "evidence_urls": _json.dumps([]),
+                "due_at": _calc_due_at("critical", None),
+                "created_by": "system:auto_detect",
+            }
+        )
 
     for ingredient in low_inventory:
-        inserts.append({
-            "tenant_id": x_tenant_id,
-            "store_id": store_id,
-            "issue_date": today.isoformat(),
-            "issue_type": "food_safety",
-            "severity": "medium",
-            "title": f"低库存预警: {ingredient.get('name', '未知食材')}",
-            "description": (
-                f"当前库存 {ingredient.get('quantity', 0)}，"
-                f"低于阈值 {ingredient.get('low_stock_threshold', 0)}"
-            ),
-            "evidence_urls": _json.dumps([]),
-            "due_at": _calc_due_at("medium", None),
-            "created_by": "system:auto_detect",
-        })
+        inserts.append(
+            {
+                "tenant_id": x_tenant_id,
+                "store_id": store_id,
+                "issue_date": today.isoformat(),
+                "issue_type": "food_safety",
+                "severity": "medium",
+                "title": f"低库存预警: {ingredient.get('name', '未知食材')}",
+                "description": (
+                    f"当前库存 {ingredient.get('quantity', 0)}，低于阈值 {ingredient.get('low_stock_threshold', 0)}"
+                ),
+                "evidence_urls": _json.dumps([]),
+                "due_at": _calc_due_at("medium", None),
+                "created_by": "system:auto_detect",
+            }
+        )
 
     try:
         await _set_tenant(db, x_tenant_id)
@@ -515,9 +525,14 @@ async def auto_detect_issues(
         log.error("auto_detect_db_error", error=str(exc), store_id=store_id, tenant_id=x_tenant_id)
         raise HTTPException(status_code=500, detail="数据库错误，自动检测写入失败")
 
-    log.info("auto_detect_completed", store_id=store_id,
-             kds_timeouts=len(kds_timeouts), discount_abuses=len(discount_abuses),
-             low_inventory=len(low_inventory), tenant_id=x_tenant_id)
+    log.info(
+        "auto_detect_completed",
+        store_id=store_id,
+        kds_timeouts=len(kds_timeouts),
+        discount_abuses=len(discount_abuses),
+        low_inventory=len(low_inventory),
+        tenant_id=x_tenant_id,
+    )
 
     return {
         "ok": True,

@@ -7,6 +7,7 @@
 
 Mock 路径：shared.ontology.src.database.get_db_with_tenant
 """
+
 import sys
 import types
 import uuid
@@ -17,8 +18,10 @@ _shared_ontology = types.ModuleType("shared.ontology")
 _shared_ontology_src = types.ModuleType("shared.ontology.src")
 _shared_ontology_src_database = types.ModuleType("shared.ontology.src.database")
 
+
 async def _fake_get_db_with_tenant(tenant_id):
     yield None
+
 
 _shared_ontology_src_database.get_db_with_tenant = _fake_get_db_with_tenant
 
@@ -29,11 +32,22 @@ sys.modules.setdefault("shared.ontology.src.database", _shared_ontology_src_data
 
 # ── Mock structlog ──────────────────────────────────────────────────────────
 _structlog = types.ModuleType("structlog")
+
+
 class _FakeLogger:
-    def info(self, *a, **kw): pass
-    def error(self, *a, **kw): pass
-    def warning(self, *a, **kw): pass
-    def debug(self, *a, **kw): pass
+    def info(self, *a, **kw):
+        pass
+
+    def error(self, *a, **kw):
+        pass
+
+    def warning(self, *a, **kw):
+        pass
+
+    def debug(self, *a, **kw):
+        pass
+
+
 _structlog.get_logger = lambda *a, **kw: _FakeLogger()
 sys.modules.setdefault("structlog", _structlog)
 
@@ -44,12 +58,14 @@ _services_txf_src = types.ModuleType("services.tx_finance.src")
 _services_txf_src_services = types.ModuleType("services.tx_finance.src.services")
 _services_txf_src_services_ce = types.ModuleType("services.tx_finance.src.services.cost_engine")
 
+
 class _FakeCostEngine:
     async def get_order_margin(self, order_id, tenant_id, db):
         return {"items": [{"dish_id": str(order_id), "raw_material_cost": 500, "gross_margin_rate": 0.65}]}
 
     async def batch_recompute_date(self, store_id, biz_date, tenant_id, db):
         return {"recomputed_count": 10, "biz_date": str(biz_date)}
+
 
 _services_txf_src_services_ce.CostEngine = _FakeCostEngine
 
@@ -60,15 +76,16 @@ sys.modules.setdefault("services.tx_finance.src.services", _services_txf_src_ser
 sys.modules.setdefault("services.tx_finance.src.services.cost_engine", _services_txf_src_services_ce)
 
 # ── Import 路由 ────────────────────────────────────────────────────────────
+import importlib
+
+# 直接 import 模块
+import importlib.util
+import pathlib
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-import importlib, os, pathlib
-
-# 直接 import 模块
-import importlib.util
 _route_path = str(pathlib.Path(__file__).parent.parent / "api" / "cost_routes.py")
 _spec = importlib.util.spec_from_file_location("cost_routes", _route_path)
 _cost_routes_mod = importlib.util.module_from_spec(_spec)

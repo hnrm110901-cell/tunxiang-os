@@ -6,7 +6,8 @@ POST /api/v1/menu/dishes/batch-soldout   — 批量沽清/恢复
 
 所有操作带 X-Tenant-ID 多租户隔离。
 """
-from typing import Optional, List
+
+from typing import List, Optional
 from uuid import UUID
 
 import structlog
@@ -24,6 +25,7 @@ router = APIRouter(prefix="/api/v1/menu", tags=["menu-display"])
 
 # ─── 鉴权依赖 ────────────────────────────────────────────────
 
+
 async def get_current_user(x_user_id: str = Header(..., alias="X-User-ID")) -> UUID:
     """从请求头提取当前用户，写操作必须鉴权。"""
     try:
@@ -34,9 +36,11 @@ async def get_current_user(x_user_id: str = Header(..., alias="X-User-ID")) -> U
 
 # ─── Pydantic 模型 ─────────────────────────────────────────────
 
+
 class BatchSoldOutItem(BaseModel):
     dish_id: str
     sold_out: bool
+
 
 class BatchSoldOutRequest(BaseModel):
     items: List[BatchSoldOutItem]
@@ -44,6 +48,7 @@ class BatchSoldOutRequest(BaseModel):
 
 
 # ─── 辅助 ──────────────────────────────────────────────────────
+
 
 async def _set_rls(db: AsyncSession, tenant_id: str) -> None:
     await db.execute(
@@ -53,6 +58,7 @@ async def _set_rls(db: AsyncSession, tenant_id: str) -> None:
 
 
 # ─── 菜单展示端点 ──────────────────────────────────────────────
+
 
 @router.get("/display")
 async def get_menu_display(
@@ -127,20 +133,22 @@ async def get_menu_display(
         for d in dishes_raw:
             cat_id = str(d["category_id"]) if d["category_id"] else "uncategorized"
             cat_dish_counts[cat_id] = cat_dish_counts.get(cat_id, 0) + 1
-            dishes.append({
-                "id": str(d["id"]),
-                "name": d["name"],
-                "category": cat_id,
-                "priceFen": d["price_fen"] or 0,
-                "memberPriceFen": d["member_price_fen"],
-                "description": d["description"] or "",
-                "images": d["images"] or [],
-                "tags": d["tags"] or [],
-                "allergens": d["allergens"] or [],
-                "soldOut": bool(d["is_sold_out"]),
-                "pricingMethod": d["pricing_method"] or "normal",
-                "comboType": d["combo_type"],
-            })
+            dishes.append(
+                {
+                    "id": str(d["id"]),
+                    "name": d["name"],
+                    "category": cat_id,
+                    "priceFen": d["price_fen"] or 0,
+                    "memberPriceFen": d["member_price_fen"],
+                    "description": d["description"] or "",
+                    "images": d["images"] or [],
+                    "tags": d["tags"] or [],
+                    "allergens": d["allergens"] or [],
+                    "soldOut": bool(d["is_sold_out"]),
+                    "pricingMethod": d["pricing_method"] or "normal",
+                    "comboType": d["combo_type"],
+                }
+            )
 
         categories = [
             {
@@ -167,6 +175,7 @@ async def get_menu_display(
 
 
 # ─── 菜品规格（SpecSheet 组件专用） ────────────────────────────
+
 
 @router.get("/dishes/{dish_id}/spec-sheet")
 async def get_dish_spec_sheet(
@@ -246,20 +255,22 @@ async def get_dish_spec_sheet(
             )
             opts = opts_result.mappings().all()
 
-            spec_groups.append({
-                "id": str(g["id"]),
-                "name": g["name"],
-                "type": "single" if (g["max_select"] or 1) == 1 else "multi",
-                "required": bool(g["is_required"]),
-                "options": [
-                    {
-                        "id": str(o["id"]),
-                        "label": o["name"],
-                        "extraPriceFen": o["price_delta_fen"] or 0,
-                    }
-                    for o in opts
-                ],
-            })
+            spec_groups.append(
+                {
+                    "id": str(g["id"]),
+                    "name": g["name"],
+                    "type": "single" if (g["max_select"] or 1) == 1 else "multi",
+                    "required": bool(g["is_required"]),
+                    "options": [
+                        {
+                            "id": str(o["id"]),
+                            "label": o["name"],
+                            "extraPriceFen": o["price_delta_fen"] or 0,
+                        }
+                        for o in opts
+                    ],
+                }
+            )
 
         # 获取做法（practices）作为额外规格组
         practice_result = await db.execute(
@@ -281,20 +292,24 @@ async def get_dish_spec_sheet(
             cat = p["category"] or "做法"
             if cat not in practice_groups:
                 practice_groups[cat] = []
-            practice_groups[cat].append({
-                "id": str(p["id"]),
-                "label": p["name"],
-                "extraPriceFen": p["price_delta_fen"] or 0,
-            })
+            practice_groups[cat].append(
+                {
+                    "id": str(p["id"]),
+                    "label": p["name"],
+                    "extraPriceFen": p["price_delta_fen"] or 0,
+                }
+            )
 
         for cat, opts in practice_groups.items():
-            spec_groups.append({
-                "id": f"practice-{cat}",
-                "name": cat,
-                "type": "single",
-                "required": False,
-                "options": opts,
-            })
+            spec_groups.append(
+                {
+                    "id": f"practice-{cat}",
+                    "name": cat,
+                    "type": "single",
+                    "required": False,
+                    "options": opts,
+                }
+            )
 
         images = dish["images"] or []
         return {
@@ -316,6 +331,7 @@ async def get_dish_spec_sheet(
 
 
 # ─── 批量沽清 ──────────────────────────────────────────────────
+
 
 @router.post("/dishes/batch-soldout")
 async def batch_soldout(

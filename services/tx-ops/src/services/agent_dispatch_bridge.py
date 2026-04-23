@@ -5,6 +5,7 @@
 
 事件流: Agent → EventBus.publish() → bridge handler → auto_dispatch.process_agent_alert()
 """
+
 from __future__ import annotations
 
 import time

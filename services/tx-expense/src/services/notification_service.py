@@ -14,6 +14,7 @@
 - 所有外部 HTTP 调用设置超时（5秒）
 - 推送失败记录 failed_reason，不静默吞异常
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -44,6 +45,7 @@ _BATCH_CONCURRENCY = 10
 # 内部工具
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def _now_utc() -> datetime:
     return datetime.now(tz=timezone.utc)
 
@@ -51,6 +53,7 @@ def _now_utc() -> datetime:
 # ─────────────────────────────────────────────────────────────────────────────
 # 渠道配置读取
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 def _get_channel_config(brand_id: str) -> dict[str, Optional[str]]:
     """
@@ -109,6 +112,7 @@ def _get_channel_config(brand_id: str) -> dict[str, Optional[str]]:
 # ─────────────────────────────────────────────────────────────────────────────
 # 消息模板构建
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 def _build_wecom_message(
     event_type: str,
@@ -186,6 +190,7 @@ def _build_message_payload(
 # 审批消息内容生成
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def _generate_approval_message(
     event_type: str,
     application_title: str,
@@ -216,12 +221,7 @@ def _generate_approval_message(
     elif event_type == NotificationEventType.APPROVED.value:
         title = f"[已通过] {application_title}"
         comment_line = f"\n**审批意见**：{comment}" if comment else ""
-        body = (
-            f"您提交的费用申请已审批通过。\n"
-            f"**申请金额**：{amount_yuan}\n"
-            f"**门店**：{store_name}"
-            f"{comment_line}"
-        )
+        body = f"您提交的费用申请已审批通过。\n**申请金额**：{amount_yuan}\n**门店**：{store_name}{comment_line}"
 
     elif event_type == NotificationEventType.REJECTED.value:
         title = f"[已驳回] {application_title}"
@@ -255,11 +255,7 @@ def _generate_approval_message(
 
     else:
         title = f"[通知] {application_title}"
-        body = (
-            f"**申请人**：{applicant_name}\n"
-            f"**门店**：{store_name}\n"
-            f"**申请金额**：{amount_yuan}"
-        )
+        body = f"**申请人**：{applicant_name}\n**门店**：{store_name}\n**申请金额**：{amount_yuan}"
 
     return title, body
 
@@ -267,6 +263,7 @@ def _generate_approval_message(
 # ─────────────────────────────────────────────────────────────────────────────
 # HTTP 推送（内部，含重试）
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 async def _do_http_post(webhook_url: str, payload: dict[str, Any]) -> tuple[bool, str, str]:
     """
@@ -312,6 +309,7 @@ async def _do_http_post(webhook_url: str, payload: dict[str, Any]) -> tuple[bool
 # ─────────────────────────────────────────────────────────────────────────────
 # DB 写入辅助
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 async def _write_notification_record(
     db: AsyncSession,
@@ -362,6 +360,7 @@ async def _write_notification_record(
 # ─────────────────────────────────────────────────────────────────────────────
 # 核心推送方法
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 async def send_notification(
     db: AsyncSession,
@@ -516,6 +515,7 @@ async def send_notification(
 # 语义化快捷方法
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 async def send_approval_requested(
     db: AsyncSession,
     tenant_id: uuid.UUID,
@@ -623,6 +623,7 @@ async def send_reminder(
 # 批量推送（月末核销催办等）
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 async def send_batch_reminders(
     db: AsyncSession,
     tenant_id: uuid.UUID,
@@ -661,11 +662,7 @@ async def send_batch_reminders(
                 total_amount=total_amount,
                 store_name=store_name,
                 brand_id=brand_id,
-                comment=(
-                    f"该申请已等待审批 {pending_hours} 小时，请及时处理。"
-                    if pending_hours
-                    else None
-                ),
+                comment=(f"该申请已等待审批 {pending_hours} 小时，请及时处理。" if pending_hours else None),
             )
             async with lock:
                 if status == PushStatus.SENT.value:

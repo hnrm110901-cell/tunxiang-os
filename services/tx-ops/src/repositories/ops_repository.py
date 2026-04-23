@@ -6,6 +6,7 @@
   - 金额字段统一使用 int（分），严禁 float
   - 不直接 import 路由层任何模块（单向依赖）
 """
+
 from __future__ import annotations
 
 import uuid
@@ -14,7 +15,7 @@ from typing import Any, Optional
 from uuid import UUID
 
 import structlog
-from sqlalchemy import Date, and_, cast, func, select, text, update
+from sqlalchemy import and_, func, select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.entities import (
@@ -86,9 +87,7 @@ class OpsRepository:
         shift = result.scalar_one_or_none()
         return self._shift_to_dict(shift) if shift else None
 
-    async def update_shift(
-        self, shift_id: str, **kwargs: Any
-    ) -> Optional[dict[str, Any]]:
+    async def update_shift(self, shift_id: str, **kwargs: Any) -> Optional[dict[str, Any]]:
         """更新班次字段"""
         await self._set_rls()
         kwargs["updated_at"] = datetime.now(tz=timezone.utc)
@@ -120,11 +119,7 @@ class OpsRepository:
         ]
         if shift_date:
             conditions.append(ShiftHandover.shift_date == shift_date)
-        stmt = (
-            select(ShiftHandover)
-            .where(and_(*conditions))
-            .order_by(ShiftHandover.created_at)
-        )
+        stmt = select(ShiftHandover).where(and_(*conditions)).order_by(ShiftHandover.created_at)
         result = await self.session.execute(stmt)
         return [self._shift_to_dict(s) for s in result.scalars().all()]
 
@@ -195,9 +190,7 @@ class OpsRepository:
         await self.session.flush()
         return self._summary_to_dict(summary)
 
-    async def get_daily_summary(
-        self, store_id: str, summary_date: date
-    ) -> Optional[dict[str, Any]]:
+    async def get_daily_summary(self, store_id: str, summary_date: date) -> Optional[dict[str, Any]]:
         """查询单日汇总"""
         await self._set_rls()
         stmt = select(DailySummary).where(
@@ -211,9 +204,7 @@ class OpsRepository:
         row = result.scalar_one_or_none()
         return self._summary_to_dict(row) if row else None
 
-    async def confirm_daily_summary(
-        self, summary_id: str, confirmed_by: str
-    ) -> Optional[dict[str, Any]]:
+    async def confirm_daily_summary(self, summary_id: str, confirmed_by: str) -> Optional[dict[str, Any]]:
         """确认锁定日汇总"""
         await self._set_rls()
         now = datetime.now(tz=timezone.utc)
@@ -248,11 +239,7 @@ class OpsRepository:
         ]
         if store_ids:
             conditions.append(DailySummary.store_id.in_([UUID(s) for s in store_ids]))
-        stmt = (
-            select(DailySummary)
-            .where(and_(*conditions))
-            .order_by(DailySummary.actual_revenue_fen.desc())
-        )
+        stmt = select(DailySummary).where(and_(*conditions)).order_by(DailySummary.actual_revenue_fen.desc())
         result = await self.session.execute(stmt)
         return [self._summary_to_dict(s) for s in result.scalars().all()]
 
@@ -321,24 +308,18 @@ class OpsRepository:
     async def get_issue(self, issue_id: str) -> Optional[dict[str, Any]]:
         """查询单个问题"""
         await self._set_rls()
-        stmt = select(OpsIssue).where(
-            and_(OpsIssue.id == UUID(issue_id), OpsIssue.is_deleted.is_(False))
-        )
+        stmt = select(OpsIssue).where(and_(OpsIssue.id == UUID(issue_id), OpsIssue.is_deleted.is_(False)))
         result = await self.session.execute(stmt)
         row = result.scalar_one_or_none()
         return self._issue_to_dict(row) if row else None
 
-    async def update_issue(
-        self, issue_id: str, **kwargs: Any
-    ) -> Optional[dict[str, Any]]:
+    async def update_issue(self, issue_id: str, **kwargs: Any) -> Optional[dict[str, Any]]:
         """更新问题字段"""
         await self._set_rls()
         kwargs["updated_at"] = datetime.now(tz=timezone.utc)
         stmt = (
             update(OpsIssue)
-            .where(
-                and_(OpsIssue.id == UUID(issue_id), OpsIssue.is_deleted.is_(False))
-            )
+            .where(and_(OpsIssue.id == UUID(issue_id), OpsIssue.is_deleted.is_(False)))
             .values(**kwargs)
             .returning(OpsIssue)
         )
@@ -384,9 +365,7 @@ class OpsRepository:
         items = [self._issue_to_dict(i) for i in result.scalars().all()]
         return items, total
 
-    async def count_open_critical_issues(
-        self, store_id: str, issue_date: date
-    ) -> dict[str, int]:
+    async def count_open_critical_issues(self, store_id: str, issue_date: date) -> dict[str, int]:
         """统计当日未处理关键问题数"""
         await self._set_rls()
         conditions = [
@@ -477,9 +456,7 @@ class OpsRepository:
         row = result.scalar_one_or_none()
         return self._inspection_to_dict(row) if row else None
 
-    async def update_inspection(
-        self, report_id: str, **kwargs: Any
-    ) -> Optional[dict[str, Any]]:
+    async def update_inspection(self, report_id: str, **kwargs: Any) -> Optional[dict[str, Any]]:
         """更新巡店报告"""
         await self._set_rls()
         kwargs["updated_at"] = datetime.now(tz=timezone.utc)
@@ -522,9 +499,7 @@ class OpsRepository:
         if end_date:
             conditions.append(InspectionReport.inspection_date <= end_date)
 
-        count_stmt = (
-            select(func.count()).select_from(InspectionReport).where(and_(*conditions))
-        )
+        count_stmt = select(func.count()).select_from(InspectionReport).where(and_(*conditions))
         total = (await self.session.execute(count_stmt)).scalar() or 0
 
         stmt = (
@@ -641,11 +616,7 @@ class OpsRepository:
         if role:
             conditions.append(EmployeeDailyPerformance.role == role)
 
-        count_stmt = (
-            select(func.count())
-            .select_from(EmployeeDailyPerformance)
-            .where(and_(*conditions))
-        )
+        count_stmt = select(func.count()).select_from(EmployeeDailyPerformance).where(and_(*conditions))
         total = (await self.session.execute(count_stmt)).scalar() or 0
 
         stmt = (

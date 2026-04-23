@@ -13,9 +13,9 @@
   HMAC-SHA256(message="{event_id}{event_type}{tenant_id}", key=INTERNAL_EVENT_SECRET)
   Header 值格式：sha256=<hex_digest>
 """
+
 from __future__ import annotations
 
-import asyncio
 import hashlib
 import hmac
 import os
@@ -38,6 +38,7 @@ _INTERNAL_EVENT_SECRET: Optional[str] = os.getenv("INTERNAL_EVENT_SECRET")
 # 请求/响应模型
 # ---------------------------------------------------------------------------
 
+
 class IncomingEvent(BaseModel):
     """内部事件推送请求体。"""
 
@@ -56,6 +57,7 @@ class EventAcceptedResponse(BaseModel):
 # ---------------------------------------------------------------------------
 # 验签辅助
 # ---------------------------------------------------------------------------
+
 
 def _verify_signature(
     event_id: str,
@@ -102,6 +104,7 @@ def _verify_signature(
 # ---------------------------------------------------------------------------
 # 路由
 # ---------------------------------------------------------------------------
+
 
 @router.post(
     "/internal/events",
@@ -162,6 +165,7 @@ async def receive_event(
 # ---------------------------------------------------------------------------
 # 后台分发（隔离 import，避免循环依赖）
 # ---------------------------------------------------------------------------
+
 
 async def _dispatch_event(
     event_type: str,

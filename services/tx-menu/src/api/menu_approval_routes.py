@@ -10,6 +10,7 @@ ROUTER REGISTRATION（在 tx-menu/src/main.py 中添加）：
     from .api.menu_approval_routes import router as menu_approval_router
     app.include_router(menu_approval_router)
 """
+
 from __future__ import annotations
 
 import uuid as _uuid

@@ -3,6 +3,7 @@
 异常类型: discount/refund/cashier/food_safety/shortage/complaint/equipment
 集成 workflow_engine 状态机做升级流转。
 """
+
 from __future__ import annotations
 
 import uuid
@@ -18,13 +19,13 @@ log = structlog.get_logger(__name__)
 # ─── 异常类型定义 ───
 
 EXCEPTION_TYPES = {
-    "discount":     "折扣异常",
-    "refund":       "退款/退菜",
-    "cashier":      "收银差异",
-    "food_safety":  "食品安全",
-    "shortage":     "缺料/断货",
-    "complaint":    "客户投诉",
-    "equipment":    "设备故障",
+    "discount": "折扣异常",
+    "refund": "退款/退菜",
+    "cashier": "收银差异",
+    "food_safety": "食品安全",
+    "shortage": "缺料/断货",
+    "complaint": "客户投诉",
+    "equipment": "设备故障",
 }
 
 # 升级层级定义
@@ -161,12 +162,14 @@ async def escalate_exception(
     exception["level"] = to_level
     exception["level_label"] = ESCALATION_LEVELS[to_level]
     exception["status"] = new_status.value
-    exception.get("history", []).append({
-        "action": "escalated",
-        "by": operator_id,
-        "at": datetime.utcnow().isoformat(),
-        "note": f"升级至 {ESCALATION_LEVELS[to_level]} (Level {to_level})",
-    })
+    exception.get("history", []).append(
+        {
+            "action": "escalated",
+            "by": operator_id,
+            "at": datetime.utcnow().isoformat(),
+            "note": f"升级至 {ESCALATION_LEVELS[to_level]} (Level {to_level})",
+        }
+    )
 
     log.info(
         "exception_escalated",
@@ -237,12 +240,14 @@ async def resolve_exception(
     exception["resolution"] = resolution
     exception["resolved_by"] = resolver_id
     exception["resolved_at"] = resolved_at
-    exception.get("history", []).append({
-        "action": "resolved",
-        "by": resolver_id,
-        "at": resolved_at,
-        "note": f"异常已解决: {resolution.get('action_taken', '')}",
-    })
+    exception.get("history", []).append(
+        {
+            "action": "resolved",
+            "by": resolver_id,
+            "at": resolved_at,
+            "note": f"异常已解决: {resolution.get('action_taken', '')}",
+        }
+    )
 
     log.info(
         "exception_resolved",
@@ -286,9 +291,9 @@ async def get_open_exceptions(
     """
     terminal_statuses = {WorkflowStatus.EXECUTED.value, WorkflowStatus.CANCELLED.value}
     open_items = [
-        exc for exc in (exceptions or [])
-        if exc.get("status") not in terminal_statuses
-           and exc.get("store_id") == store_id
+        exc
+        for exc in (exceptions or [])
+        if exc.get("status") not in terminal_statuses and exc.get("store_id") == store_id
     ]
 
     # 按类型统计

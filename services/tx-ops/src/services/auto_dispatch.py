@@ -8,6 +8,7 @@ SLA 定义:
   严重(severe)  15 分钟
   紧急(urgent)   5 分钟
 """
+
 from __future__ import annotations
 
 import uuid
@@ -80,8 +81,8 @@ ESCALATION_CHAIN: Dict[str, str] = {
 
 # ─── 内存存储(生产环境替换为 DB) ───
 
-_dispatch_rules: Dict[str, Dict[str, Any]] = {}   # key: "{tenant_id}:{alert_type}"
-_dispatch_tasks: List[Dict[str, Any]] = []         # 派单任务列表
+_dispatch_rules: Dict[str, Dict[str, Any]] = {}  # key: "{tenant_id}:{alert_type}"
+_dispatch_tasks: List[Dict[str, Any]] = []  # 派单任务列表
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -173,8 +174,7 @@ async def process_agent_alert(
 
     if rule is None:
         raise ValueError(
-            f"Unknown alert_type '{alert_type}'. "
-            f"Register with register_alert_handler() or set_dispatch_rule() first."
+            f"Unknown alert_type '{alert_type}'. Register with register_alert_handler() or set_dispatch_rule() first."
         )
 
     # 严重级别: alert 可覆盖, 否则用规则
@@ -251,7 +251,7 @@ async def get_dispatch_rules(
     prefix = f"{tenant_id}:"
     for key, val in _dispatch_rules.items():
         if key.startswith(prefix):
-            alert_type = key[len(prefix):]
+            alert_type = key[len(prefix) :]
             tenant_rules[alert_type] = val
 
     log.info(
@@ -377,12 +377,14 @@ async def check_sla(
             task["escalated"] = True
             task["assignee_roles"] = escalated_roles
             task["updated_at"] = now_.isoformat()
-            task.setdefault("escalation_history", []).append({
-                "from_roles": current_roles,
-                "to_roles": escalated_roles,
-                "escalated_at": now_.isoformat(),
-                "reason": "SLA timeout",
-            })
+            task.setdefault("escalation_history", []).append(
+                {
+                    "from_roles": current_roles,
+                    "to_roles": escalated_roles,
+                    "escalated_at": now_.isoformat(),
+                    "reason": "SLA timeout",
+                }
+            )
 
             escalated_ids.append(task["task_id"])
 

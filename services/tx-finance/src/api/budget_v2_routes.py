@@ -10,6 +10,7 @@ prefix=/api/v1/finance/budget（注意：复数版 /budgets 由 budget_routes.py
 执行情况端点会自动从 orders/payroll_records/purchase_orders 汇总实际数据，
 与预算目标对比，返回执行率（actual_revenue / target_revenue）。
 """
+
 from __future__ import annotations
 
 import calendar
@@ -31,6 +32,7 @@ router = APIRouter(prefix="/budget", tags=["finance-budget-v2"])
 
 # ─── DB 依赖 ──────────────────────────────────────────────────────────────────
 
+
 async def _get_tenant_db(x_tenant_id: str = Header(..., alias="X-Tenant-ID")):
     async for session in get_db_with_tenant(x_tenant_id):
         yield session
@@ -44,6 +46,7 @@ def _parse_uuid(val: str, field_name: str) -> uuid.UUID:
 
 
 # ─── 请求模型 ─────────────────────────────────────────────────────────────────
+
 
 class CreateMonthlyBudgetRequest(BaseModel):
     store_id: str = Field(..., description="门店 ID（UUID）")
@@ -65,6 +68,7 @@ class CreateMonthlyBudgetRequest(BaseModel):
 
 
 # ─── GET /budget — 年度预算列表 ───────────────────────────────────────────────
+
 
 @router.get("", summary="年度月度预算列表")
 async def list_annual_budgets(
@@ -128,8 +132,7 @@ async def list_annual_budgets(
         }
 
     except (OSError, RuntimeError) as exc:
-        logger.warning("list_annual_budgets_error", error=str(exc),
-                       store_id=store_id, year=year, tenant_id=x_tenant_id)
+        logger.warning("list_annual_budgets_error", error=str(exc), store_id=store_id, year=year, tenant_id=x_tenant_id)
         return {
             "ok": True,
             "data": {
@@ -143,6 +146,7 @@ async def list_annual_budgets(
 
 
 # ─── POST /budget — 创建月度预算 ──────────────────────────────────────────────
+
 
 @router.post("", summary="创建月度预算", status_code=201)
 async def create_monthly_budget(
@@ -193,16 +197,17 @@ async def create_monthly_budget(
             )
             row = result.fetchone()
             if row:
-                upserted.append({
-                    "plan_id": str(row[0]),
-                    "category": row[1],
-                    "budget_fen": int(row[2]),
-                    "status": row[3],
-                })
+                upserted.append(
+                    {
+                        "plan_id": str(row[0]),
+                        "category": row[1],
+                        "budget_fen": int(row[2]),
+                        "status": row[3],
+                    }
+                )
 
         await db.commit()
-        logger.info("monthly_budget_created", store_id=body.store_id,
-                    period=period_str, tenant_id=x_tenant_id)
+        logger.info("monthly_budget_created", store_id=body.store_id, period=period_str, tenant_id=x_tenant_id)
 
         return {
             "ok": True,
@@ -221,6 +226,7 @@ async def create_monthly_budget(
 
 
 # ─── GET /budget/execution — 预算执行情况 ─────────────────────────────────────
+
 
 @router.get("/execution", summary="月度预算执行情况")
 async def get_budget_execution(
@@ -314,11 +320,7 @@ async def get_budget_execution(
         actual_food_fen = int(food_result.scalar() or 0)
 
         # ── 计算执行率与差异 ──────────────────────────────────
-        execution_rate = (
-            round(actual_revenue_fen / revenue_target_fen, 4)
-            if revenue_target_fen > 0
-            else 0.0
-        )
+        execution_rate = round(actual_revenue_fen / revenue_target_fen, 4) if revenue_target_fen > 0 else 0.0
 
         revenue_variance_fen = actual_revenue_fen - revenue_target_fen
         cost_variance_fen = actual_food_fen - cost_budget_fen
@@ -350,16 +352,15 @@ async def get_budget_execution(
                 },
                 "execution_rate": execution_rate,
                 "execution_status": (
-                    "on_track" if execution_rate >= 0.95
-                    else "below_target" if execution_rate >= 0.80
-                    else "critical"
+                    "on_track" if execution_rate >= 0.95 else "below_target" if execution_rate >= 0.80 else "critical"
                 ),
             },
         }
 
     except (OSError, RuntimeError) as exc:
-        logger.warning("budget_execution_error", error=str(exc),
-                       store_id=store_id, year=year, month=month, tenant_id=x_tenant_id)
+        logger.warning(
+            "budget_execution_error", error=str(exc), store_id=store_id, year=year, month=month, tenant_id=x_tenant_id
+        )
         return {
             "ok": True,
             "data": {

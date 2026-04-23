@@ -7,6 +7,7 @@
   - 称重记录（称重→确认→加入订单）
   - 活鲜厨打单打印触发
 """
+
 import uuid as _uuid
 from decimal import Decimal
 from typing import Optional
@@ -25,6 +26,7 @@ router = APIRouter(prefix="/api/v1/menu", tags=["live-seafood"])
 
 # ─── 工具 ─────────────────────────────────────────────────────────────────────
 
+
 def _tenant(request: Request) -> str:
     tid = getattr(request.state, "tenant_id", None) or request.headers.get("X-Tenant-ID", "")
     if not tid:
@@ -42,6 +44,7 @@ async def _set_rls(db: AsyncSession, tenant_id: str) -> None:
 
 # ─── 请求/响应模型 ─────────────────────────────────────────────────────────────
 
+
 class TankZoneReq(BaseModel):
     store_id: str
     zone_code: str = Field(..., max_length=20, description="区域编码，如：A1/海鲜池-1")
@@ -54,10 +57,11 @@ class TankZoneReq(BaseModel):
 
 class UpdateLiveSeafoodReq(BaseModel):
     """更新菜品的活鲜计价方式（补充到已有菜品上）"""
-    pricing_method: str = Field(..., pattern="^(weight|count)$",
-                                description="weight=称重计价 / count=条头计价")
-    weight_unit: Optional[str] = Field(None, pattern="^(jin|liang|kg|g)$",
-                                       description="称重单位（pricing_method=weight时必填）")
+
+    pricing_method: str = Field(..., pattern="^(weight|count)$", description="weight=称重计价 / count=条头计价")
+    weight_unit: Optional[str] = Field(
+        None, pattern="^(jin|liang|kg|g)$", description="称重单位（pricing_method=weight时必填）"
+    )
     price_per_unit_fen: int = Field(..., ge=0, description="单位价格（分/斤 或 分/条）")
     min_order_qty: Optional[float] = Field(None, ge=0.1, description="最小点单量")
     display_unit: str = Field(..., max_length=10, description="展示单位，如：斤/条/头/位")
@@ -73,6 +77,7 @@ class UpdateLiveSeafoodReq(BaseModel):
 
 class WeighRecordReq(BaseModel):
     """创建活鲜称重记录（称重→等待顾客确认）"""
+
     store_id: str
     dish_id: str
     weighed_qty: float = Field(..., gt=0, description="称重数量，如：1.35（斤）")
@@ -95,14 +100,15 @@ class WeighRecordReq(BaseModel):
 
 class ConfirmWeighReq(BaseModel):
     """确认称重记录并绑定到订单"""
+
     order_id: str
     confirmed_by: Optional[str] = None
-    adjusted_qty: Optional[float] = Field(None, gt=0,
-                                           description="顾客要求调整后的重量（如不同则重新计算金额）")
+    adjusted_qty: Optional[float] = Field(None, gt=0, description="顾客要求调整后的重量（如不同则重新计算金额）")
 
 
 class UpdateStockReq(BaseModel):
     """更新活鲜库存（收货/销售/死亡损耗）"""
+
     delta_count: Optional[int] = Field(None, description="库存条数变化（正=增加，负=减少）")
     delta_weight_g: Optional[int] = Field(None, description="库存重量变化（克），正=增加")
     reason: str = Field(..., description="变更原因：purchase=采购入库/sold=售出/death=死亡损耗/adjust=盘点调整")
@@ -110,6 +116,7 @@ class UpdateStockReq(BaseModel):
 
 
 # ─── 鱼缸区域管理 ─────────────────────────────────────────────────────────────
+
 
 @router.get("/tank-zones", summary="查询门店鱼缸区域列表")
 async def list_tank_zones(
@@ -119,7 +126,8 @@ async def list_tank_zones(
 ) -> dict:
     tid = _tenant(request)
     await _set_rls(db, tid)
-    result = await db.execute(text("""
+    result = await db.execute(
+        text("""
         SELECT id, zone_code, zone_name, capacity_kg, water_temp_celsius,
                is_active, sort_order, notes
         FROM fish_tank_zones
@@ -127,17 +135,28 @@ async def list_tank_zones(
           AND tenant_id = :tid
           AND is_deleted = false
         ORDER BY sort_order, zone_code
-    """), {"sid": _uuid.UUID(store_id), "tid": _uuid.UUID(tid)})
+    """),
+        {"sid": _uuid.UUID(store_id), "tid": _uuid.UUID(tid)},
+    )
     rows = result.fetchall()
-    return _ok({"items": [
+    return _ok(
         {
-            "id": str(r[0]), "zone_code": r[1], "zone_name": r[2],
-            "capacity_kg": float(r[3]) if r[3] else None,
-            "water_temp_celsius": float(r[4]) if r[4] else None,
-            "is_active": r[5], "sort_order": r[6], "notes": r[7],
+            "items": [
+                {
+                    "id": str(r[0]),
+                    "zone_code": r[1],
+                    "zone_name": r[2],
+                    "capacity_kg": float(r[3]) if r[3] else None,
+                    "water_temp_celsius": float(r[4]) if r[4] else None,
+                    "is_active": r[5],
+                    "sort_order": r[6],
+                    "notes": r[7],
+                }
+                for r in rows
+            ],
+            "total": len(rows),
         }
-        for r in rows
-    ], "total": len(rows)})
+    )
 
 
 @router.post("/tank-zones", summary="创建鱼缸区域", status_code=201)
@@ -149,24 +168,33 @@ async def create_tank_zone(
     tid = _tenant(request)
     await _set_rls(db, tid)
     zone_id = _uuid.uuid4()
-    await db.execute(text("""
+    await db.execute(
+        text("""
         INSERT INTO fish_tank_zones
             (id, tenant_id, store_id, zone_code, zone_name,
              capacity_kg, water_temp_celsius, notes, sort_order)
         VALUES
             (:id, :tid, :sid, :code, :name, :cap, :temp, :notes, :sort)
-    """), {
-        "id": zone_id, "tid": _uuid.UUID(tid), "sid": _uuid.UUID(req.store_id),
-        "code": req.zone_code, "name": req.zone_name,
-        "cap": req.capacity_kg, "temp": req.water_temp_celsius,
-        "notes": req.notes, "sort": req.sort_order,
-    })
+    """),
+        {
+            "id": zone_id,
+            "tid": _uuid.UUID(tid),
+            "sid": _uuid.UUID(req.store_id),
+            "code": req.zone_code,
+            "name": req.zone_name,
+            "cap": req.capacity_kg,
+            "temp": req.water_temp_celsius,
+            "notes": req.notes,
+            "sort": req.sort_order,
+        },
+    )
     await db.commit()
     log.info("tank_zone.created", zone_id=str(zone_id), store_id=req.store_id)
     return _ok({"id": str(zone_id), "zone_code": req.zone_code, "zone_name": req.zone_name})
 
 
 # ─── 活鲜菜品配置 ──────────────────────────────────────────────────────────────
+
 
 @router.get("/live-seafood", summary="获取门店活鲜菜品列表（含库存）")
 async def list_live_seafood(
@@ -180,8 +208,7 @@ async def list_live_seafood(
     tid = _tenant(request)
     await _set_rls(db, tid)
 
-    conditions = ["d.pricing_method IN ('weight', 'count')",
-                  "d.tenant_id = :tid", "d.is_deleted = false"]
+    conditions = ["d.pricing_method IN ('weight', 'count')", "d.tenant_id = :tid", "d.is_deleted = false"]
     params: dict = {"tid": _uuid.UUID(tid)}
 
     if store_id:
@@ -194,7 +221,8 @@ async def list_live_seafood(
         conditions.append("(d.live_stock_count > 0 OR d.live_stock_weight_g > 0)")
 
     where_clause = " AND ".join(conditions)
-    result = await db.execute(text(f"""  # noqa: S608 — dynamic WHERE built from validated params only
+    result = await db.execute(
+        text(f"""  # noqa: S608 — dynamic WHERE built from validated params only
         SELECT
             d.id, d.dish_name, d.pricing_method,
             d.weight_unit, d.price_per_unit_fen, d.min_order_qty, d.display_unit,
@@ -206,30 +234,37 @@ async def list_live_seafood(
         LEFT JOIN fish_tank_zones tz ON tz.id = d.tank_zone_id
         WHERE {where_clause}
         ORDER BY d.dish_name
-    """), params)
+    """),
+        params,
+    )
 
     rows = result.fetchall()
-    return _ok({"items": [
+    return _ok(
         {
-            "id": str(r[0]),
-            "dish_name": r[1],
-            "pricing_method": r[2],
-            "weight_unit": r[3],
-            "price_per_unit_fen": r[4],
-            "min_order_qty": float(r[5]) if r[5] else 1.0,
-            "display_unit": r[6],
-            "tank_zone_id": str(r[7]) if r[7] else None,
-            "tank_zone_name": r[13],
-            "alive_rate_pct": r[8],
-            "live_stock_count": r[9],
-            "live_stock_weight_g": r[10],
-            "image_url": r[11],
-            "is_available": r[12],
-            # 方便前端展示用：计算展示价格文本
-            "price_display": _format_price_display(r[2], r[4], r[6]),
+            "items": [
+                {
+                    "id": str(r[0]),
+                    "dish_name": r[1],
+                    "pricing_method": r[2],
+                    "weight_unit": r[3],
+                    "price_per_unit_fen": r[4],
+                    "min_order_qty": float(r[5]) if r[5] else 1.0,
+                    "display_unit": r[6],
+                    "tank_zone_id": str(r[7]) if r[7] else None,
+                    "tank_zone_name": r[13],
+                    "alive_rate_pct": r[8],
+                    "live_stock_count": r[9],
+                    "live_stock_weight_g": r[10],
+                    "image_url": r[11],
+                    "is_available": r[12],
+                    # 方便前端展示用：计算展示价格文本
+                    "price_display": _format_price_display(r[2], r[4], r[6]),
+                }
+                for r in rows
+            ],
+            "total": len(rows),
         }
-        for r in rows
-    ], "total": len(rows)})
+    )
 
 
 @router.patch("/live-seafood/{dish_id}", summary="设置菜品为活鲜计价方式")
@@ -242,7 +277,8 @@ async def update_live_seafood_config(
     """将已有菜品升级为活鲜计价模式（称重/条头），更新相关字段。"""
     tid = _tenant(request)
     await _set_rls(db, tid)
-    result = await db.execute(text("""
+    result = await db.execute(
+        text("""
         UPDATE dishes SET
             pricing_method = :method,
             weight_unit = :wunit,
@@ -254,16 +290,19 @@ async def update_live_seafood_config(
             updated_at = now()
         WHERE id = :did AND tenant_id = :tid AND is_deleted = false
         RETURNING id, dish_name, pricing_method, price_per_unit_fen
-    """), {
-        "did": _uuid.UUID(dish_id), "tid": _uuid.UUID(tid),
-        "method": req.pricing_method,
-        "wunit": req.weight_unit,
-        "price": req.price_per_unit_fen,
-        "min_qty": Decimal(str(req.min_order_qty)) if req.min_order_qty else Decimal("1.0"),
-        "dunit": req.display_unit,
-        "zone_id": _uuid.UUID(req.tank_zone_id) if req.tank_zone_id else None,
-        "alive_pct": req.alive_rate_pct,
-    })
+    """),
+        {
+            "did": _uuid.UUID(dish_id),
+            "tid": _uuid.UUID(tid),
+            "method": req.pricing_method,
+            "wunit": req.weight_unit,
+            "price": req.price_per_unit_fen,
+            "min_qty": Decimal(str(req.min_order_qty)) if req.min_order_qty else Decimal("1.0"),
+            "dunit": req.display_unit,
+            "zone_id": _uuid.UUID(req.tank_zone_id) if req.tank_zone_id else None,
+            "alive_pct": req.alive_rate_pct,
+        },
+    )
     row = result.fetchone()
     if not row:
         raise HTTPException(status_code=404, detail="菜品不存在")
@@ -293,28 +332,39 @@ async def update_live_stock(
         set_clauses.append("live_stock_weight_g = GREATEST(0, live_stock_weight_g + :dw)")
         params["dw"] = req.delta_weight_g
 
-    result = await db.execute(text(f"""  # noqa: S608 — dynamic SET built from validated params only
-        UPDATE dishes SET {', '.join(set_clauses)}
+    result = await db.execute(
+        text(f"""  # noqa: S608 — dynamic SET built from validated params only
+        UPDATE dishes SET {", ".join(set_clauses)}
         WHERE id = :did AND tenant_id = :tid AND is_deleted = false
         RETURNING id, dish_name, live_stock_count, live_stock_weight_g
-    """), params)
+    """),
+        params,
+    )
     row = result.fetchone()
     if not row:
         raise HTTPException(status_code=404, detail="菜品不存在")
     await db.commit()
 
-    log.info("live_stock.updated", dish_id=dish_id, reason=req.reason,
-             delta_count=req.delta_count, delta_weight_g=req.delta_weight_g)
-    return _ok({
-        "dish_id": dish_id,
-        "dish_name": row[1],
-        "live_stock_count": row[2],
-        "live_stock_weight_g": row[3],
-        "reason": req.reason,
-    })
+    log.info(
+        "live_stock.updated",
+        dish_id=dish_id,
+        reason=req.reason,
+        delta_count=req.delta_count,
+        delta_weight_g=req.delta_weight_g,
+    )
+    return _ok(
+        {
+            "dish_id": dish_id,
+            "dish_name": row[1],
+            "live_stock_count": row[2],
+            "live_stock_weight_g": row[3],
+            "reason": req.reason,
+        }
+    )
 
 
 # ─── 活鲜称重流程 ──────────────────────────────────────────────────────────────
+
 
 @router.post("/live-seafood/weigh", summary="创建称重记录（称重→等顾客确认）", status_code=201)
 async def create_weigh_record(
@@ -370,7 +420,9 @@ async def create_weigh_record(
     if req.zone_code is not None:
         zone_code_upper = req.zone_code.upper()
         zone_result = await db.execute(
-            text("SELECT zone_code FROM fish_tank_zones WHERE store_id = :sid AND tenant_id = :tid AND zone_code = :zc AND is_deleted = false"),
+            text(
+                "SELECT zone_code FROM fish_tank_zones WHERE store_id = :sid AND tenant_id = :tid AND zone_code = :zc AND is_deleted = false"
+            ),
             {"sid": _uuid.UUID(req.store_id), "tid": _uuid.UUID(tid), "zc": zone_code_upper},
         )
         if not zone_result.fetchone():
@@ -405,55 +457,67 @@ async def create_weigh_record(
     amount_fen = int(qty * req.price_per_unit_fen)
 
     record_id = _uuid.uuid4()
-    await db.execute(text("""
+    await db.execute(
+        text("""
         INSERT INTO live_seafood_weigh_records
             (id, tenant_id, store_id, dish_id, weighed_qty, weight_unit,
              price_per_unit_fen, amount_fen, tank_zone_id, weighed_by, notes, status)
         VALUES
             (:id, :tid, :sid, :did, :qty, :wunit,
              :price, :amount, :zone, :weighed_by, :notes, 'pending')
-    """), {
-        "id": record_id, "tid": _uuid.UUID(tid), "sid": _uuid.UUID(req.store_id),
-        "did": _uuid.UUID(req.dish_id),
-        "qty": qty, "wunit": req.weight_unit,
-        "price": req.price_per_unit_fen, "amount": amount_fen,
-        "zone": _uuid.UUID(req.tank_zone_id) if req.tank_zone_id else None,
-        "weighed_by": _uuid.UUID(req.weighed_by) if req.weighed_by else None,
-        "notes": req.notes,
-    })
+    """),
+        {
+            "id": record_id,
+            "tid": _uuid.UUID(tid),
+            "sid": _uuid.UUID(req.store_id),
+            "did": _uuid.UUID(req.dish_id),
+            "qty": qty,
+            "wunit": req.weight_unit,
+            "price": req.price_per_unit_fen,
+            "amount": amount_fen,
+            "zone": _uuid.UUID(req.tank_zone_id) if req.tank_zone_id else None,
+            "weighed_by": _uuid.UUID(req.weighed_by) if req.weighed_by else None,
+            "notes": req.notes,
+        },
+    )
 
     # 菜品名称已在存在性校验时获取，直接使用
     dish_name = real_dish_name
 
     # 更新 dish_name 快照
-    await db.execute(text("""
+    await db.execute(
+        text("""
         UPDATE live_seafood_weigh_records SET dish_name = :name WHERE id = :id
-    """), {"name": dish_name, "id": record_id})
+    """),
+        {"name": dish_name, "id": record_id},
+    )
 
     await db.commit()
 
-    log.info("weigh_record.created",
-             record_id=str(record_id), dish_id=req.dish_id,
-             qty=float(qty), amount_fen=amount_fen)
+    log.info(
+        "weigh_record.created", record_id=str(record_id), dish_id=req.dish_id, qty=float(qty), amount_fen=amount_fen
+    )
 
-    return _ok({
-        "weigh_record_id": str(record_id),
-        "dish_name": dish_name,
-        "weighed_qty": float(qty),
-        "weight_unit": req.weight_unit,
-        "unit_display": _unit_display(req.weight_unit),
-        "price_per_unit_fen": req.price_per_unit_fen,
-        "amount_fen": amount_fen,
-        "amount_display": f"¥{amount_fen / 100:.2f}",
-        "status": "pending",
-        # 打印称重小票所需信息
-        "print_data": {
+    return _ok(
+        {
+            "weigh_record_id": str(record_id),
             "dish_name": dish_name,
-            "qty_display": f"{float(qty):.3f}{_unit_display(req.weight_unit)}",
-            "unit_price_display": f"¥{req.price_per_unit_fen / 100:.2f}/{_unit_display(req.weight_unit)}",
+            "weighed_qty": float(qty),
+            "weight_unit": req.weight_unit,
+            "unit_display": _unit_display(req.weight_unit),
+            "price_per_unit_fen": req.price_per_unit_fen,
+            "amount_fen": amount_fen,
             "amount_display": f"¥{amount_fen / 100:.2f}",
-        },
-    })
+            "status": "pending",
+            # 打印称重小票所需信息
+            "print_data": {
+                "dish_name": dish_name,
+                "qty_display": f"{float(qty):.3f}{_unit_display(req.weight_unit)}",
+                "unit_price_display": f"¥{req.price_per_unit_fen / 100:.2f}/{_unit_display(req.weight_unit)}",
+                "amount_display": f"¥{amount_fen / 100:.2f}",
+            },
+        }
+    )
 
 
 @router.post("/live-seafood/weigh/{record_id}/confirm", summary="确认称重并绑定到订单")
@@ -471,12 +535,15 @@ async def confirm_weigh_record(
     await _set_rls(db, tid)
 
     # 查称重记录
-    rec_result = await db.execute(text("""
+    rec_result = await db.execute(
+        text("""
         SELECT id, dish_id, dish_name, weighed_qty, weight_unit,
                price_per_unit_fen, amount_fen, status
         FROM live_seafood_weigh_records
         WHERE id = :rid AND tenant_id = :tid
-    """), {"rid": _uuid.UUID(record_id), "tid": _uuid.UUID(tid)})
+    """),
+        {"rid": _uuid.UUID(record_id), "tid": _uuid.UUID(tid)},
+    )
     rec = rec_result.fetchone()
     if not rec:
         raise HTTPException(status_code=404, detail="称重记录不存在")
@@ -488,7 +555,8 @@ async def confirm_weigh_record(
     final_amount_fen = int(final_qty * rec[5])
 
     # 更新称重记录
-    await db.execute(text("""
+    await db.execute(
+        text("""
         UPDATE live_seafood_weigh_records SET
             order_id = :oid,
             confirmed_by = :confirmed_by,
@@ -497,36 +565,44 @@ async def confirm_weigh_record(
             amount_fen = :amount,
             status = 'confirmed'
         WHERE id = :rid AND tenant_id = :tid
-    """), {
-        "oid": _uuid.UUID(req.order_id), "rid": _uuid.UUID(record_id),
-        "tid": _uuid.UUID(tid),
-        "confirmed_by": _uuid.UUID(req.confirmed_by) if req.confirmed_by else None,
-        "qty": final_qty, "amount": final_amount_fen,
-    })
+    """),
+        {
+            "oid": _uuid.UUID(req.order_id),
+            "rid": _uuid.UUID(record_id),
+            "tid": _uuid.UUID(tid),
+            "confirmed_by": _uuid.UUID(req.confirmed_by) if req.confirmed_by else None,
+            "qty": final_qty,
+            "amount": final_amount_fen,
+        },
+    )
 
     # 扣减活鲜库存（按克计）
     weight_g = _to_grams(float(final_qty), rec[4])
-    await db.execute(text("""
+    await db.execute(
+        text("""
         UPDATE dishes SET
             live_stock_weight_g = GREATEST(0, live_stock_weight_g - :wg),
             updated_at = now()
         WHERE id = :did AND tenant_id = :tid
-    """), {"did": rec[1], "tid": _uuid.UUID(tid), "wg": weight_g})
+    """),
+        {"did": rec[1], "tid": _uuid.UUID(tid), "wg": weight_g},
+    )
 
     await db.commit()
 
-    log.info("weigh_record.confirmed",
-             record_id=record_id, order_id=req.order_id, amount_fen=final_amount_fen)
+    log.info("weigh_record.confirmed", record_id=record_id, order_id=req.order_id, amount_fen=final_amount_fen)
 
-    return _ok({
-        "weigh_record_id": record_id,
-        "order_id": req.order_id,
-        "dish_name": rec[2],
-        "final_qty": float(final_qty),
-        "weight_unit": rec[4],
-        "final_amount_fen": final_amount_fen,
-        "status": "confirmed",
-    })
+    return _ok(
+        {
+            "weigh_record_id": record_id,
+            "order_id": req.order_id,
+            "dish_name": rec[2],
+            "final_qty": float(final_qty),
+            "weight_unit": rec[4],
+            "final_amount_fen": final_amount_fen,
+            "status": "confirmed",
+        }
+    )
 
 
 @router.get("/live-seafood/weigh/{store_id}/pending", summary="查询门店待确认称重记录")
@@ -537,7 +613,8 @@ async def list_pending_weigh(
 ) -> dict:
     tid = _tenant(request)
     await _set_rls(db, tid)
-    result = await db.execute(text("""
+    result = await db.execute(
+        text("""
         SELECT r.id, r.dish_id, r.dish_name, r.weighed_qty, r.weight_unit,
                r.price_per_unit_fen, r.amount_fen, r.created_at,
                tz.zone_name
@@ -546,22 +623,34 @@ async def list_pending_weigh(
         WHERE r.store_id = :sid AND r.tenant_id = :tid
           AND r.status = 'pending'
         ORDER BY r.created_at DESC
-    """), {"sid": _uuid.UUID(store_id), "tid": _uuid.UUID(tid)})
+    """),
+        {"sid": _uuid.UUID(store_id), "tid": _uuid.UUID(tid)},
+    )
     rows = result.fetchall()
-    return _ok({"items": [
+    return _ok(
         {
-            "id": str(r[0]), "dish_id": str(r[1]), "dish_name": r[2],
-            "weighed_qty": float(r[3]), "weight_unit": r[4],
-            "price_per_unit_fen": r[5], "amount_fen": r[6],
-            "amount_display": f"¥{r[6] / 100:.2f}",
-            "tank_zone_name": r[8],
-            "created_at": r[7].isoformat() if r[7] else None,
+            "items": [
+                {
+                    "id": str(r[0]),
+                    "dish_id": str(r[1]),
+                    "dish_name": r[2],
+                    "weighed_qty": float(r[3]),
+                    "weight_unit": r[4],
+                    "price_per_unit_fen": r[5],
+                    "amount_fen": r[6],
+                    "amount_display": f"¥{r[6] / 100:.2f}",
+                    "tank_zone_name": r[8],
+                    "created_at": r[7].isoformat() if r[7] else None,
+                }
+                for r in rows
+            ],
+            "total": len(rows),
         }
-        for r in rows
-    ], "total": len(rows)})
+    )
 
 
 # ─── 工具函数 ──────────────────────────────────────────────────────────────────
+
 
 def _format_price_display(pricing_method: str, price_per_unit_fen: int, display_unit: str) -> str:
     """生成价格展示文本，如：68元/斤"""

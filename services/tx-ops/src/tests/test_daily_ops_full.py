@@ -2,6 +2,7 @@
 
 覆盖: store_opening, cruise_monitor, store_closing, daily_review, exception_workflow
 """
+
 from __future__ import annotations
 
 from datetime import date, datetime, timedelta
@@ -45,7 +46,10 @@ async def test_check_item_pass():
     )
 
     checklist = await create_opening_checklist(
-        "store_001", date(2026, 3, 27), "tenant_001", db=None,
+        "store_001",
+        date(2026, 3, 27),
+        "tenant_001",
+        db=None,
     )
     first_item = checklist["items"][0]
 
@@ -75,7 +79,10 @@ async def test_opening_status_can_open():
     )
 
     checklist = await create_opening_checklist(
-        "store_001", date(2026, 3, 27), "tenant_001", db=None,
+        "store_001",
+        date(2026, 3, 27),
+        "tenant_001",
+        db=None,
     )
 
     # 将所有项设为已检查通过
@@ -99,7 +106,10 @@ async def test_opening_status_blocked():
     )
 
     checklist = await create_opening_checklist(
-        "store_001", date(2026, 3, 27), "tenant_001", db=None,
+        "store_001",
+        date(2026, 3, 27),
+        "tenant_001",
+        db=None,
     )
 
     # 第一项(required=True)设为 fail，其余 pass
@@ -133,7 +143,10 @@ async def test_table_cruise_overtime_alert():
     ]
 
     alerts = await check_table_cruise(
-        "store_001", "tenant_001", db=None, tables=tables,
+        "store_001",
+        "tenant_001",
+        db=None,
+        tables=tables,
     )
 
     assert len(alerts) == 1
@@ -149,7 +162,10 @@ async def test_cooking_cruise_backlog_alert():
     orders = [{"order_id": f"ord_{i}", "created_at": datetime.utcnow().isoformat()} for i in range(20)]
 
     alerts = await check_cooking_cruise(
-        "store_001", "tenant_001", db=None, orders=orders,
+        "store_001",
+        "tenant_001",
+        db=None,
+        orders=orders,
     )
 
     backlog_alerts = [a for a in alerts if a["alert_type"] == "cooking_backlog"]
@@ -169,7 +185,10 @@ async def test_stockout_cruise_alerts():
     ]
 
     alerts = await check_stockout_cruise(
-        "store_001", "tenant_001", db=None, dishes=dishes,
+        "store_001",
+        "tenant_001",
+        db=None,
+        dishes=dishes,
     )
 
     assert len(alerts) == 2
@@ -195,8 +214,12 @@ async def test_exception_report_and_escalate():
     )
 
     exc = await report_exception(
-        "store_001", "complaint", {"description": "菜品有异物"},
-        "reporter_001", "tenant_001", db=None,
+        "store_001",
+        "complaint",
+        {"description": "菜品有异物"},
+        "reporter_001",
+        "tenant_001",
+        db=None,
     )
 
     assert exc["type"] == "complaint"
@@ -204,8 +227,11 @@ async def test_exception_report_and_escalate():
     assert exc["level"] == 1
 
     result = await escalate_exception(
-        exc["exception_id"], to_level=2, tenant_id="tenant_001",
-        db=None, exception=exc,
+        exc["exception_id"],
+        to_level=2,
+        tenant_id="tenant_001",
+        db=None,
+        exception=exc,
     )
 
     assert result["escalated"] is True
@@ -222,8 +248,12 @@ async def test_exception_resolve():
     )
 
     exc = await report_exception(
-        "store_001", "equipment", {"description": "打印机卡纸"},
-        "reporter_001", "tenant_001", db=None,
+        "store_001",
+        "equipment",
+        {"description": "打印机卡纸"},
+        "reporter_001",
+        "tenant_001",
+        db=None,
     )
 
     result = await resolve_exception(
@@ -245,8 +275,12 @@ async def test_food_safety_auto_escalation():
     from services.tx_ops.src.services.exception_workflow import report_exception
 
     exc = await report_exception(
-        "store_001", "food_safety", {"description": "食材过期"},
-        "reporter_001", "tenant_001", db=None,
+        "store_001",
+        "food_safety",
+        {"description": "食材过期"},
+        "reporter_001",
+        "tenant_001",
+        db=None,
     )
 
     assert exc["level"] == 3  # 区域经理
@@ -344,7 +378,11 @@ async def test_submit_action_items():
     ]
 
     result = await submit_action_items(
-        "store_001", items, "mgr_001", "tenant_001", db=None,
+        "store_001",
+        items,
+        "mgr_001",
+        "tenant_001",
+        db=None,
     )
 
     assert result["submitted_count"] == 2
@@ -361,13 +399,20 @@ async def test_sign_off_review():
     )
 
     review = await generate_daily_review(
-        "store_001", date(2026, 3, 27), "tenant_001", db=None,
+        "store_001",
+        date(2026, 3, 27),
+        "tenant_001",
+        db=None,
     )
     assert review["status"] == "draft"
 
     result = await sign_off_review(
-        "store_001", date(2026, 3, 27), "mgr_001", "tenant_001",
-        db=None, review=review,
+        "store_001",
+        date(2026, 3, 27),
+        "mgr_001",
+        "tenant_001",
+        db=None,
+        review=review,
     )
 
     assert result["signed_off"] is True
@@ -383,12 +428,19 @@ async def test_sign_off_review_already_signed():
     )
 
     review = await generate_daily_review(
-        "store_001", date(2026, 3, 27), "tenant_001", db=None,
+        "store_001",
+        date(2026, 3, 27),
+        "tenant_001",
+        db=None,
     )
     review["status"] = "signed_off"
 
     with pytest.raises(ValueError, match="already signed off"):
         await sign_off_review(
-            "store_001", date(2026, 3, 27), "mgr_001", "tenant_001",
-            db=None, review=review,
+            "store_001",
+            date(2026, 3, 27),
+            "mgr_001",
+            "tenant_001",
+            db=None,
+            review=review,
         )

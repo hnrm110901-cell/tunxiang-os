@@ -12,6 +12,7 @@
   1. _clear_all() 供旧版单元测试调用（待测试迁移后删除）
   2. 作为迁移前的历史参考
 """
+
 import uuid
 from typing import Optional
 
@@ -20,11 +21,11 @@ from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..models.menu_template import (
-    MenuTemplate,
-    StoreMenuPublish,
     ChannelPrice,
-    SeasonalMenu,
+    MenuTemplate,
     RoomMenu,
+    SeasonalMenu,
+    StoreMenuPublish,
 )
 
 log = structlog.get_logger()
@@ -312,13 +313,11 @@ async def get_store_menu(
         .where(ChannelPrice.channel == channel)
         .where(ChannelPrice.is_deleted == False)  # noqa: E712
     )
-    price_map: dict[str, int] = {
-        str(cp.dish_id): cp.price_fen for cp in price_result.scalars().all()
-    }
+    price_map: dict[str, int] = {str(cp.dish_id): cp.price_fen for cp in price_result.scalars().all()}
 
     # 应用渠道差异价
     dishes_with_price = []
-    for dish in (menu.dishes or []):
+    for dish in menu.dishes or []:
         dish_copy = dict(dish)
         dish_id = dish.get("dish_id", "")
         if dish_id in price_map:

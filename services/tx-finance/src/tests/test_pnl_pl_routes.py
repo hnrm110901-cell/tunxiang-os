@@ -16,12 +16,14 @@
 
 Mock 路径：shared.ontology.src.database.get_db_with_tenant
 """
+
+import importlib.util
+import pathlib
 import sys
 import types
 import uuid
-import pathlib
-import importlib.util
 from unittest.mock import AsyncMock, MagicMock, patch
+
 
 # ── Mock shared.ontology.src.database ──────────────────────────────────────
 def _ensure_mod(name):
@@ -29,8 +31,10 @@ def _ensure_mod(name):
         sys.modules[name] = types.ModuleType(name)
     return sys.modules[name]
 
+
 async def _fake_get_db_with_tenant(tenant_id):
     yield None
+
 
 _db_mod = _ensure_mod("shared.ontology.src.database")
 _db_mod.get_db_with_tenant = _fake_get_db_with_tenant
@@ -40,16 +44,28 @@ for _n in ["shared", "shared.ontology", "shared.ontology.src"]:
 
 # ── Mock structlog ──────────────────────────────────────────────────────────
 _sl = _ensure_mod("structlog")
+
+
 class _FL:
-    def info(self, *a, **k): pass
-    def error(self, *a, **k): pass
-    def warning(self, *a, **k): pass
-    def debug(self, *a, **k): pass
+    def info(self, *a, **k):
+        pass
+
+    def error(self, *a, **k):
+        pass
+
+    def warning(self, *a, **k):
+        pass
+
+    def debug(self, *a, **k):
+        pass
+
+
 _sl.get_logger = lambda *a, **k: _FL()
 
 # ── Mock services.pnl_engine (used by pnl_routes.py) ───────────────────────
 for _n in ["services", "services.pnl_engine"]:
     _ensure_mod(_n)
+
 
 class _FakePnLResult:
     net_revenue_fen = 100000
@@ -63,9 +79,11 @@ class _FakePnLResult:
             "operating_profit_fen": self.operating_profit_fen,
         }
 
+
 class _FakePnLEngine:
     async def calculate_daily_pnl(self, tenant_id, store_id, pnl_date, db):
         return _FakePnLResult()
+
 
 sys.modules["services.pnl_engine"].PnLEngine = _FakePnLEngine
 
@@ -78,11 +96,13 @@ for _n in [
 ]:
     _ensure_mod(_n)
 
+
 class _FakePLReport:
     revenue_fen = 200000
 
     def to_dict(self):
         return {"revenue_fen": self.revenue_fen, "gross_profit_fen": 120000}
+
 
 class _FakePLReportService:
     async def get_daily_pl(self, store_id, biz_date, tenant_id, db):
@@ -100,18 +120,24 @@ class _FakePLReportService:
     async def get_vouchers(self, store_id, biz_date, tenant_id, db, status):
         return [{"voucher_no": "V20260101ABCD", "status": "draft"}]
 
+
 sys.modules["services.tx_finance.src.services.pl_report"].PLReportService = _FakePLReportService
 
 # ── Mock shared.ontology.src.entities (used by pl_routes.py /stores) ───────
 _entities_mod = _ensure_mod("shared.ontology.src.entities")
+
+
 class _FakeStore:
     id = None
     tenant_id = None
     is_deleted = False
+
+
 _entities_mod.Store = _FakeStore
 
 # ── Import 两个路由模块 ────────────────────────────────────────────────────
 _api_dir = pathlib.Path(__file__).parent.parent / "api"
+
 
 def _load_route(filename):
     path = str(_api_dir / filename)
@@ -119,6 +145,7 @@ def _load_route(filename):
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     return mod
+
 
 _pnl_mod = _load_route("pnl_routes.py")
 _pl_mod = _load_route("pl_routes.py")
@@ -144,6 +171,7 @@ pl_client = TestClient(pl_app, raise_server_exceptions=False)
 # ═══════════════════════════════════════════════════════════════════════════
 # pnl_routes.py tests
 # ═══════════════════════════════════════════════════════════════════════════
+
 
 class TestCalculatePnL:
     """POST /pnl/calculate"""
@@ -295,6 +323,7 @@ class TestBatchCalculatePnL:
 # pl_routes.py tests
 # ═══════════════════════════════════════════════════════════════════════════
 
+
 class TestGetDailyPL:
     """GET /daily"""
 
@@ -362,7 +391,7 @@ class TestGetStoresPLComparison:
 
     def test_no_store_ids_returns_empty_or_200(self):
         # Without store_ids, tries to query DB (which is None) → 500 or 200
-        r = pl_client.get(f"/stores?date=2026-01-01", headers=HEADERS)
+        r = pl_client.get("/stores?date=2026-01-01", headers=HEADERS)
         assert r.status_code in (200, 500)
 
     def test_with_store_ids_returns_200(self):
@@ -380,7 +409,7 @@ class TestGetStoresPLComparison:
         assert r.status_code == 400
 
     def test_missing_tenant_returns_422(self):
-        r = pl_client.get(f"/stores?date=2026-01-01")
+        r = pl_client.get("/stores?date=2026-01-01")
         assert r.status_code == 422
 
 

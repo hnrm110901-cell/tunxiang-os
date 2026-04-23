@@ -13,17 +13,18 @@
   - 每个测试类使用 setup_method 清理内存存储，避免测试间污染
   - emit_event 通过 patch("asyncio.create_task") 拦截
 """
+
 from __future__ import annotations
 
 import uuid
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import patch
 
 import pytest
+import services.tx_ops.src.api.energy_routes as energy_module
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from ..api.energy_routes import router as energy_router
-import services.tx_ops.src.api.energy_routes as energy_module
 
 # ── 应用组装 ──────────────────────────────────────────────────────────────────
 
@@ -39,6 +40,7 @@ HEADERS = {"X-Tenant-ID": TENANT_ID}
 
 # ── 内存存储清理工具 ───────────────────────────────────────────────────────────
 
+
 def _clear_stores():
     """清空 energy_routes 模块级内存存储，隔离测试副作用。"""
     energy_module._budget_store.clear()
@@ -47,8 +49,10 @@ def _clear_stores():
 
 # ── analyze_from_mv Mock 工具 ─────────────────────────────────────────────────
 
+
 def _mock_mv_fast_path(electricity_kwh=None, gas_m3=None, water_ton=None, energy_cost_fen=None):
     """返回 mv_fast_path 推理层数据的 mock 结果。"""
+
     async def _analyze(tenant_id, store_id):
         return {
             "inference_layer": "mv_fast_path",
@@ -62,16 +66,19 @@ def _mock_mv_fast_path(electricity_kwh=None, gas_m3=None, water_ton=None, energy
                 "stat_date": None,
             },
         }
+
     return _analyze
 
 
 def _mock_mv_no_data():
     """返回 agent_analysis 路径（无 mv 数据）的 mock 结果。"""
+
     async def _analyze(tenant_id, store_id):
         return {
             "inference_layer": "agent_analysis",
             "data": {},
         }
+
     return _analyze
 
 
@@ -219,18 +226,20 @@ class TestListEnergyAlertRules:
 
     def _seed_rule(self, is_active: bool = True):
         """直接向内存存储写入一条告警规则。"""
-        energy_module._alert_rule_store.append({
-            "rule_id": str(uuid.uuid4()),
-            "tenant_id": TENANT_ID,
-            "store_id": STORE_ID,
-            "rule_name": "电耗超预算90%告警",
-            "metric": "electricity_kwh",
-            "threshold_type": "budget_pct",
-            "threshold_value": 90.0,
-            "severity": "warning",
-            "is_active": is_active,
-            "created_at": "2026-04-01T00:00:00+00:00",
-        })
+        energy_module._alert_rule_store.append(
+            {
+                "rule_id": str(uuid.uuid4()),
+                "tenant_id": TENANT_ID,
+                "store_id": STORE_ID,
+                "rule_name": "电耗超预算90%告警",
+                "metric": "electricity_kwh",
+                "threshold_type": "budget_pct",
+                "threshold_value": 90.0,
+                "severity": "warning",
+                "is_active": is_active,
+                "created_at": "2026-04-01T00:00:00+00:00",
+            }
+        )
 
     def test_returns_all_active_rules_by_default(self):
         """默认 active_only=True，只返回启用中的规则。"""
@@ -416,18 +425,20 @@ class TestBudgetVsActual:
         self._seed_budget()
 
         # 写入一条 budget_pct 规则：电耗超过 80% 即告警
-        energy_module._alert_rule_store.append({
-            "rule_id": str(uuid.uuid4()),
-            "tenant_id": TENANT_ID,
-            "store_id": STORE_ID,
-            "rule_name": "电耗超80%告警",
-            "metric": "electricity_kwh",
-            "threshold_type": "budget_pct",
-            "threshold_value": 80.0,
-            "severity": "warning",
-            "is_active": True,
-            "created_at": "2026-04-01T00:00:00+00:00",
-        })
+        energy_module._alert_rule_store.append(
+            {
+                "rule_id": str(uuid.uuid4()),
+                "tenant_id": TENANT_ID,
+                "store_id": STORE_ID,
+                "rule_name": "电耗超80%告警",
+                "metric": "electricity_kwh",
+                "threshold_type": "budget_pct",
+                "threshold_value": 80.0,
+                "severity": "warning",
+                "is_active": True,
+                "created_at": "2026-04-01T00:00:00+00:00",
+            }
+        )
 
         # 实际用电 4500 kWh，预算 5000 kWh → 90% > 80% → 触发告警
         with patch(

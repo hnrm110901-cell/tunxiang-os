@@ -15,11 +15,11 @@
   - expense_categories（科目树）
   - invoices（发票表）
 """
+
 from __future__ import annotations
 
 import calendar
 from datetime import date, datetime, timezone
-from typing import Optional
 from uuid import UUID
 
 import structlog
@@ -73,6 +73,7 @@ _ABNORMAL_MULTIPLIER = 3
 # 辅助
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def _month_range(year: int, month: int) -> tuple[date, date]:
     """返回 (month_start, month_end) 作为查询边界。"""
     first_day = date(year, month, 1)
@@ -102,6 +103,7 @@ def _quarter_range(year: int, month: int) -> tuple[date, date]:
 # ─────────────────────────────────────────────────────────────────────────────
 # 报表服务
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class ExpenseReportService:
     """
@@ -210,11 +212,14 @@ class ExpenseReportService:
               AND ea.is_deleted = FALSE
               AND DATE(ea.created_at) BETWEEN :start AND :end
         """)
-        result = await db.execute(sql, {
-            "tenant_id": str(tenant_id),
-            "start": start,
-            "end": end,
-        })
+        result = await db.execute(
+            sql,
+            {
+                "tenant_id": str(tenant_id),
+                "start": start,
+                "end": end,
+            },
+        )
         row = result.mappings().one_or_none()
         if not row:
             return {}
@@ -253,25 +258,30 @@ class ExpenseReportService:
             GROUP BY ea.store_id
             ORDER BY SUM(ea.total_amount) DESC NULLS LAST
         """)
-        result = await db.execute(sql, {
-            "tenant_id": str(tenant_id),
-            "start": start,
-            "end": end,
-        })
+        result = await db.execute(
+            sql,
+            {
+                "tenant_id": str(tenant_id),
+                "start": start,
+                "end": end,
+            },
+        )
         rows = result.mappings().all()
 
         stores = []
         for row in rows:
             total = int(row["application_count"] or 0)
             approved = int(row["approved_count"] or 0)
-            stores.append({
-                "store_id": str(row["store_id"]),
-                "application_count": total,
-                "total_amount_fen": int(row["total_amount_fen"] or 0),
-                "approved_count": approved,
-                "approved_amount_fen": int(row["approved_amount_fen"] or 0),
-                "approval_rate": round(approved / total, 4) if total > 0 else 0.0,
-            })
+            stores.append(
+                {
+                    "store_id": str(row["store_id"]),
+                    "application_count": total,
+                    "total_amount_fen": int(row["total_amount_fen"] or 0),
+                    "approved_count": approved,
+                    "approved_amount_fen": int(row["approved_amount_fen"] or 0),
+                    "approval_rate": round(approved / total, 4) if total > 0 else 0.0,
+                }
+            )
         return stores
 
     async def _query_by_category(
@@ -312,11 +322,14 @@ class ExpenseReportService:
             GROUP BY ec.id, ec.name, ec.code, pt.grand_total
             ORDER BY SUM(ei.amount) DESC NULLS LAST
         """)
-        result = await db.execute(sql, {
-            "tenant_id": str(tenant_id),
-            "start": start,
-            "end": end,
-        })
+        result = await db.execute(
+            sql,
+            {
+                "tenant_id": str(tenant_id),
+                "start": start,
+                "end": end,
+            },
+        )
         rows = result.mappings().all()
         return [
             {
@@ -353,11 +366,14 @@ class ExpenseReportService:
             ORDER BY SUM(ea.total_amount) DESC NULLS LAST
             LIMIT 20
         """)
-        result = await db.execute(sql, {
-            "tenant_id": str(tenant_id),
-            "start": start,
-            "end": end,
-        })
+        result = await db.execute(
+            sql,
+            {
+                "tenant_id": str(tenant_id),
+                "start": start,
+                "end": end,
+            },
+        )
         rows = result.mappings().all()
         return [
             {
@@ -421,10 +437,13 @@ class ExpenseReportService:
         """)
 
         try:
-            result = await db.execute(sql, {
-                "tenant_id": str(tenant_id),
-                "months": months,
-            })
+            result = await db.execute(
+                sql,
+                {
+                    "tenant_id": str(tenant_id),
+                    "months": months,
+                },
+            )
             rows = list(result.mappings().all())
         except SQLAlchemyError as exc:
             logger.error(
@@ -514,12 +533,15 @@ class ExpenseReportService:
         """)
 
         try:
-            result = await db.execute(sql, {
-                "tenant_id": str(tenant_id),
-                "start": start,
-                "end": end,
-                "limit": limit,
-            })
+            result = await db.execute(
+                sql,
+                {
+                    "tenant_id": str(tenant_id),
+                    "start": start,
+                    "end": end,
+                    "limit": limit,
+                },
+            )
             rows = result.mappings().all()
         except SQLAlchemyError as exc:
             logger.error(
@@ -578,9 +600,7 @@ class ExpenseReportService:
 
         # ── Rule-1：单笔超过本人上季度平均 3 倍 ─────────────────────────────
         try:
-            rule1_rows = await self._detect_over_personal_avg(
-                db, tenant_id, start, end, q_start, q_end
-            )
+            rule1_rows = await self._detect_over_personal_avg(db, tenant_id, start, end, q_start, q_end)
             results.extend(rule1_rows)
         except SQLAlchemyError as exc:
             logger.error(
@@ -592,9 +612,7 @@ class ExpenseReportService:
 
         # ── Rule-2：同一天同一科目多次报销 ──────────────────────────────────
         try:
-            rule2_rows = await self._detect_same_day_same_category(
-                db, tenant_id, start, end
-            )
+            rule2_rows = await self._detect_same_day_same_category(db, tenant_id, start, end)
             results.extend(rule2_rows)
         except SQLAlchemyError as exc:
             logger.error(
@@ -606,9 +624,7 @@ class ExpenseReportService:
 
         # ── Rule-3：节假日大额报销 ───────────────────────────────────────────
         try:
-            rule3_rows = await self._detect_holiday_large(
-                db, tenant_id, start, end
-            )
+            rule3_rows = await self._detect_holiday_large(db, tenant_id, start, end)
             results.extend(rule3_rows)
         except SQLAlchemyError as exc:
             logger.error(
@@ -672,14 +688,17 @@ class ExpenseReportService:
             ORDER BY ei.amount DESC
             LIMIT 100
         """)
-        result = await db.execute(sql, {
-            "tenant_id": str(tenant_id),
-            "q_start": q_start,
-            "q_end": q_end,
-            "start": start,
-            "end": end,
-            "multiplier": _ABNORMAL_MULTIPLIER,
-        })
+        result = await db.execute(
+            sql,
+            {
+                "tenant_id": str(tenant_id),
+                "q_start": q_start,
+                "q_end": q_end,
+                "start": start,
+                "end": end,
+                "multiplier": _ABNORMAL_MULTIPLIER,
+            },
+        )
         rows = result.mappings().all()
         return [
             {
@@ -725,29 +744,34 @@ class ExpenseReportService:
             ORDER BY COUNT(DISTINCT ea.id) DESC, SUM(ei.amount) DESC
             LIMIT 50
         """)
-        result = await db.execute(sql, {
-            "tenant_id": str(tenant_id),
-            "start": start,
-            "end": end,
-        })
+        result = await db.execute(
+            sql,
+            {
+                "tenant_id": str(tenant_id),
+                "start": start,
+                "end": end,
+            },
+        )
         rows = result.mappings().all()
 
         anomalies = []
         for row in rows:
             app_ids = (row["application_ids"] or "").split(",")
             # 每个 group 取第一个 application_id 作为代表
-            anomalies.append({
-                "rule": "same_day_same_category",
-                "application_id": app_ids[0].strip() if app_ids else "",
-                "applicant_id": str(row["applicant_id"]),
-                "amount_fen": int(row["total_amount_fen"]),
-                "expense_date": str(row["expense_date"]),
-                "category_name": row["category_name"],
-                "detail": (
-                    f"同一天（{row['expense_date']}）同一科目「{row['category_name']}」"
-                    f"提交 {row['application_count']} 次报销，合计 {row['total_amount_fen'] / 100:.2f} 元"
-                ),
-            })
+            anomalies.append(
+                {
+                    "rule": "same_day_same_category",
+                    "application_id": app_ids[0].strip() if app_ids else "",
+                    "applicant_id": str(row["applicant_id"]),
+                    "amount_fen": int(row["total_amount_fen"]),
+                    "expense_date": str(row["expense_date"]),
+                    "category_name": row["category_name"],
+                    "detail": (
+                        f"同一天（{row['expense_date']}）同一科目「{row['category_name']}」"
+                        f"提交 {row['application_count']} 次报销，合计 {row['total_amount_fen'] / 100:.2f} 元"
+                    ),
+                }
+            )
         return anomalies
 
     async def _detect_holiday_large(
@@ -772,12 +796,15 @@ class ExpenseReportService:
             ORDER BY ea.total_amount DESC
             LIMIT 100
         """)
-        result = await db.execute(sql, {
-            "tenant_id": str(tenant_id),
-            "threshold": _HOLIDAY_LARGE_AMOUNT_FEN,
-            "start": start,
-            "end": end,
-        })
+        result = await db.execute(
+            sql,
+            {
+                "tenant_id": str(tenant_id),
+                "threshold": _HOLIDAY_LARGE_AMOUNT_FEN,
+                "start": start,
+                "end": end,
+            },
+        )
         rows = result.mappings().all()
 
         anomalies = []
@@ -792,19 +819,21 @@ class ExpenseReportService:
             is_holiday = mmdd in _CN_HOLIDAYS_MMDD or is_weekend
 
             if is_holiday:
-                anomalies.append({
-                    "rule": "holiday_large",
-                    "application_id": str(row["application_id"]),
-                    "applicant_id": str(row["applicant_id"]),
-                    "amount_fen": int(row["total_amount_fen"]),
-                    "expense_date": str(exp_date),
-                    "category_name": None,
-                    "detail": (
-                        f"节假日/周末（{exp_date}）大额报销 "
-                        f"{row['total_amount_fen'] / 100:.2f} 元，"
-                        f"超过阈值 {_HOLIDAY_LARGE_AMOUNT_FEN / 100:.2f} 元"
-                    ),
-                })
+                anomalies.append(
+                    {
+                        "rule": "holiday_large",
+                        "application_id": str(row["application_id"]),
+                        "applicant_id": str(row["applicant_id"]),
+                        "amount_fen": int(row["total_amount_fen"]),
+                        "expense_date": str(exp_date),
+                        "category_name": None,
+                        "detail": (
+                            f"节假日/周末（{exp_date}）大额报销 "
+                            f"{row['total_amount_fen'] / 100:.2f} 元，"
+                            f"超过阈值 {_HOLIDAY_LARGE_AMOUNT_FEN / 100:.2f} 元"
+                        ),
+                    }
+                )
         return anomalies
 
     # ─────────────────────────────────────────────────────────────────────────

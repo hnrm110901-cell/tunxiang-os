@@ -2,10 +2,11 @@
 
 聚合一周内的日复盘数据，生成周度趋势分析、问题汇总、改进措施。
 """
+
 from __future__ import annotations
 
 import uuid
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, timedelta
 from typing import Any, Dict, List, Optional
 
 import structlog
@@ -125,12 +126,14 @@ def aggregate_weekly_from_daily(
         total_cost += day_cost
         total_waste += day_waste
 
-        daily_trend.append({
-            "date": review.get("date", ""),
-            "revenue_fen": day_rev,
-            "orders": day_orders,
-            "margin_pct": review.get("margin_summary", {}).get("gross_margin_pct", 0.0),
-        })
+        daily_trend.append(
+            {
+                "date": review.get("date", ""),
+                "revenue_fen": day_rev,
+                "orders": day_orders,
+                "margin_pct": review.get("margin_summary", {}).get("gross_margin_pct", 0.0),
+            }
+        )
 
     day_count = len(daily_reviews)
     gross_profit = total_revenue - total_cost
@@ -165,7 +168,6 @@ async def _fetch_last_week_summary(
 
     if db is not None:
         try:
-            from sqlalchemy.ext.asyncio import AsyncSession
             await db.execute(
                 text("SELECT set_config('app.tenant_id', :tid, true)"),
                 {"tid": tenant_id},
@@ -194,8 +196,13 @@ async def _fetch_last_week_summary(
                     "total_waste_fen": row.total_waste_fen or 0,
                 }
         except SQLAlchemyError as exc:
-            log.error("fetch_last_week_summary_db_error", exc_info=True,
-                      error=str(exc), store_id=store_id, tenant_id=tenant_id)
+            log.error(
+                "fetch_last_week_summary_db_error",
+                exc_info=True,
+                error=str(exc),
+                store_id=store_id,
+                tenant_id=tenant_id,
+            )
 
     return {
         "total_revenue_fen": 0,
@@ -210,6 +217,7 @@ def _calc_week_comparison(
     last: Dict[str, Any],
 ) -> Dict[str, Any]:
     """计算本周 vs 上周对比。"""
+
     def _delta_pct(cur: int | float, prev: int | float) -> float:
         if prev == 0:
             return 0.0
@@ -225,7 +233,8 @@ def _calc_week_comparison(
             last.get("total_orders", 0),
         ),
         "margin_delta_pp": round(
-            current.get("avg_margin_pct", 0.0) - last.get("avg_margin_pct", 0.0), 2,
+            current.get("avg_margin_pct", 0.0) - last.get("avg_margin_pct", 0.0),
+            2,
         ),
         "waste_delta_pct": _delta_pct(
             current.get("total_waste_fen", 0),
@@ -277,31 +286,37 @@ def _generate_improvement_actions(
     actions: List[Dict[str, Any]] = []
 
     if week_summary.get("avg_margin_pct", 100) < 50:
-        actions.append({
-            "type": "margin",
-            "priority": "high",
-            "title": f"本周平均毛利率 {week_summary['avg_margin_pct']}%，低于50%",
-            "suggestion": "核查高成本菜品、损耗原因，优化采购和出品标准",
-        })
+        actions.append(
+            {
+                "type": "margin",
+                "priority": "high",
+                "title": f"本周平均毛利率 {week_summary['avg_margin_pct']}%，低于50%",
+                "suggestion": "核查高成本菜品、损耗原因，优化采购和出品标准",
+            }
+        )
 
     if week_summary.get("total_waste_fen", 0) > 0:
         waste_ratio = week_summary["total_waste_fen"] / max(week_summary.get("total_revenue_fen", 1), 1)
         if waste_ratio > 0.03:
-            actions.append({
-                "type": "waste",
-                "priority": "high",
-                "title": f"本周损耗占比 {round(waste_ratio * 100, 2)}%，超过3%警戒线",
-                "suggestion": "分析损耗原因（过期/操作/退菜），针对性改进",
-            })
+            actions.append(
+                {
+                    "type": "waste",
+                    "priority": "high",
+                    "title": f"本周损耗占比 {round(waste_ratio * 100, 2)}%，超过3%警戒线",
+                    "suggestion": "分析损耗原因（过期/操作/退菜），针对性改进",
+                }
+            )
 
     for issue in top_issues[:3]:
         if issue["count"] >= 3:
-            actions.append({
-                "type": issue["type"],
-                "priority": "medium",
-                "title": f"问题类型「{issue['type']}」本周出现 {issue['count']} 次",
-                "suggestion": "需要制定专项整改方案，避免问题反复出现",
-            })
+            actions.append(
+                {
+                    "type": issue["type"],
+                    "priority": "medium",
+                    "title": f"问题类型「{issue['type']}」本周出现 {issue['count']} 次",
+                    "suggestion": "需要制定专项整改方案，避免问题反复出现",
+                }
+            )
 
     return actions
 
@@ -314,20 +329,23 @@ def _extract_highlights(
     highlights: List[Dict[str, Any]] = []
 
     if week_summary.get("avg_margin_pct", 0) >= 60:
-        highlights.append({
-            "type": "margin",
-            "title": f"本周平均毛利率达 {week_summary['avg_margin_pct']}%，表现优秀",
-        })
+        highlights.append(
+            {
+                "type": "margin",
+                "title": f"本周平均毛利率达 {week_summary['avg_margin_pct']}%，表现优秀",
+            }
+        )
 
     # 查找营收最好的一天
     trend = week_summary.get("daily_trend", [])
     if trend:
         best_day = max(trend, key=lambda d: d.get("revenue_fen", 0))
         if best_day.get("revenue_fen", 0) > 0:
-            highlights.append({
-                "type": "revenue",
-                "title": f"本周营收最高日 {best_day.get('date', '')}，"
-                         f"营收 {best_day['revenue_fen']} 分",
-            })
+            highlights.append(
+                {
+                    "type": "revenue",
+                    "title": f"本周营收最高日 {best_day.get('date', '')}，营收 {best_day['revenue_fen']} 分",
+                }
+            )
 
     return highlights

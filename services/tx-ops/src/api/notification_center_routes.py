@@ -9,6 +9,7 @@
 
 表：notifications / notification_templates (v133)
 """
+
 from __future__ import annotations
 
 import uuid
@@ -16,7 +17,7 @@ from datetime import datetime, timezone
 from typing import Optional
 
 import structlog
-from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
@@ -33,9 +34,7 @@ logger = structlog.get_logger(__name__)
 
 
 def _get_tenant_id(request: Request) -> str:
-    tid = getattr(request.state, "tenant_id", None) or request.headers.get(
-        "X-Tenant-ID", ""
-    )
+    tid = getattr(request.state, "tenant_id", None) or request.headers.get("X-Tenant-ID", "")
     if not tid:
         raise HTTPException(status_code=400, detail="X-Tenant-ID header required")
     return tid
@@ -62,6 +61,7 @@ async def _set_rls(db: AsyncSession, tenant_id: str) -> None:
 
 class SendNotificationReq(BaseModel):
     """发送通知请求"""
+
     template_code: str = Field(..., description="模板代码")
     target_type: str = Field(..., pattern="^(customer|employee|store|all)$")
     target_id: Optional[str] = Field(None, description="目标ID，all时可为空")
@@ -71,13 +71,17 @@ class SendNotificationReq(BaseModel):
 
 class SendSmsDirectReq(BaseModel):
     """直发短信请求"""
+
     phone: str = Field(..., description="手机号")
-    template_code: str = Field(..., description="模板代码: verification_code/order_notification/queue_notification/marketing")
+    template_code: str = Field(
+        ..., description="模板代码: verification_code/order_notification/queue_notification/marketing"
+    )
     variables: dict[str, str] = Field(default_factory=dict, description="模板变量")
 
 
 class SendWechatDirectReq(BaseModel):
     """直发微信订阅消息请求"""
+
     openid: str = Field(..., description="用户 openid")
     template_code: str = Field(..., description="模板代码: order_status/queue_called/promotion/booking_reminder")
     variables: dict[str, str] = Field(default_factory=dict, description="模板变量")
@@ -85,6 +89,7 @@ class SendWechatDirectReq(BaseModel):
 
 class SendMultiChannelReq(BaseModel):
     """多渠道同时发送请求"""
+
     channels: list[str] = Field(..., description="渠道列表: sms/wechat_subscribe/in_app/email")
     target: dict[str, str] = Field(..., description="目标地址: {phone, openid, user_id, email}")
     template_code: str = Field(..., description="模板代码")
@@ -93,6 +98,7 @@ class SendMultiChannelReq(BaseModel):
 
 class UpdateTemplateReq(BaseModel):
     """更新模板请求"""
+
     name: Optional[str] = None
     channel: Optional[str] = None
     category: Optional[str] = None
@@ -232,11 +238,13 @@ async def mark_read(
         if not row:
             raise HTTPException(status_code=404, detail="通知不存在")
 
-        return _ok({
-            "id": notification_id,
-            "status": "read",
-            "read_at": now.isoformat(),
-        })
+        return _ok(
+            {
+                "id": notification_id,
+                "status": "read",
+                "read_at": now.isoformat(),
+            }
+        )
 
     except SQLAlchemyError as exc:
         logger.error("notifications_mark_read_db_error", exc_info=True, error=str(exc), tenant_id=tenant_id)
@@ -338,22 +346,25 @@ async def send_notification(
                 "now": now,
             },
         )
-        logger.info("notification_sent", notification_id=notification_id,
-                    template_code=req.template_code, tenant_id=tenant_id)
+        logger.info(
+            "notification_sent", notification_id=notification_id, template_code=req.template_code, tenant_id=tenant_id
+        )
 
-        return _ok({
-            "id": notification_id,
-            "template_code": req.template_code,
-            "target_type": req.target_type,
-            "target_id": req.target_id,
-            "channel": req.channel,
-            "title": title,
-            "content": content,
-            "category": tpl.category,
-            "priority": "normal",
-            "status": "sent",
-            "sent_at": now.isoformat(),
-        })
+        return _ok(
+            {
+                "id": notification_id,
+                "template_code": req.template_code,
+                "target_type": req.target_type,
+                "target_id": req.target_id,
+                "channel": req.channel,
+                "title": title,
+                "content": content,
+                "category": tpl.category,
+                "priority": "normal",
+                "status": "sent",
+                "sent_at": now.isoformat(),
+            }
+        )
 
     except HTTPException:
         raise
@@ -401,7 +412,7 @@ async def send_sms_direct(req: SendSmsDirectReq, request: Request) -> dict:
         raise HTTPException(
             status_code=400,
             detail=f"Unknown SMS template_code: {req.template_code}. "
-                   f"Valid: verification_code, order_notification, queue_notification, marketing",
+            f"Valid: verification_code, order_notification, queue_notification, marketing",
         )
 
     return _ok(result)
@@ -450,7 +461,7 @@ async def send_wechat_direct(req: SendWechatDirectReq, request: Request) -> dict
         raise HTTPException(
             status_code=400,
             detail=f"Unknown WeChat template_code: {req.template_code}. "
-                   f"Valid: order_status, queue_called, promotion, booking_reminder",
+            f"Valid: order_status, queue_called, promotion, booking_reminder",
         )
 
     return _ok(result)
@@ -482,17 +493,17 @@ async def send_multi_channel(req: SendMultiChannelReq, request: Request) -> dict
         variables=req.variables,
     )
 
-    return _ok({
-        "total": len(results),
-        "results": results,
-    })
+    return _ok(
+        {
+            "total": len(results),
+            "results": results,
+        }
+    )
 
 
 # ─── 模板管理接口 ───
 
-_template_router = APIRouter(
-    prefix="/api/v1/ops/notification-templates", tags=["notification-templates"]
-)
+_template_router = APIRouter(prefix="/api/v1/ops/notification-templates", tags=["notification-templates"])
 
 
 @_template_router.get("")

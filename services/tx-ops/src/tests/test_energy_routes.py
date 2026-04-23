@@ -14,6 +14,7 @@
   - db.execute side_effect 列表按顺序消费（index-0 = _set_tenant 的 set_config）
   - list 端点使用 r._mapping 模式；upsert/create/delete 使用 fetchone()._mapping
 """
+
 from __future__ import annotations
 
 import sys
@@ -22,7 +23,6 @@ import uuid
 from typing import AsyncGenerator
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from sqlalchemy.exc import SQLAlchemyError
@@ -47,8 +47,10 @@ _ensure_stub("shared.ontology")
 _ensure_stub("shared.ontology.src")
 _db_mod = _ensure_stub("shared.ontology.src.database")
 if not hasattr(_db_mod, "get_db"):
+
     async def _placeholder_get_db():  # pragma: no cover
         yield None
+
     _db_mod.get_db = _placeholder_get_db
 
 # shared.events.*
@@ -58,12 +60,14 @@ _ensure_stub("shared.events.src.emitter", {"emit_event": AsyncMock()})
 _ev_types = _ensure_stub("shared.events.src.event_types")
 # EnergyEventType 枚举存根
 if not hasattr(_ev_types, "EnergyEventType"):
+
     class _FakeEnergyEventType:
         READING_CAPTURED = "energy.reading_captured"
         ANOMALY_DETECTED = "energy.anomaly_detected"
         BENCHMARK_SET = "energy.benchmark_set"
         BUDGET_SET = "energy.budget_set"
         ALERT_RULE_CREATED = "energy.alert_rule_created"
+
     _ev_types.EnergyEventType = _FakeEnergyEventType
 
 # structlog 存根
@@ -82,8 +86,9 @@ _ensure_stub("services.tx_brain.src.agents.energy_monitor", {"energy_monitor": _
 
 # ── 导入路由（存根注入之后） ──────────────────────────────────────────────────
 
-from ..api.energy_routes import router as energy_router  # noqa: E402
 from shared.ontology.src.database import get_db  # noqa: E402
+
+from ..api.energy_routes import router as energy_router  # noqa: E402
 
 # ── FastAPI 应用 ───────────────────────────────────────────────────────────────
 
@@ -143,12 +148,15 @@ def _make_db(side_effects: list) -> AsyncMock:
 
 def _override(db_mock: AsyncMock):
     """返回 get_db dependency_overrides 覆盖函数。"""
+
     async def _dep() -> AsyncGenerator:
         yield db_mock
+
     return _dep
 
 
 # ── 预算行数据工厂 ─────────────────────────────────────────────────────────────
+
 
 def _budget_row(idx: int = 1) -> dict:
     return {
@@ -200,10 +208,12 @@ class TestListEnergyBudgets:
     def test_list_budgets_success(self):
         """mock SELECT 返回2条预算 → 200，data.items 长度=2。"""
         rows = [_budget_row(1), _budget_row(2)]
-        db = _make_db([
-            _set_tenant_result(),           # _set_tenant
-            _make_fetchall_result(rows),    # SELECT energy_budgets
-        ])
+        db = _make_db(
+            [
+                _set_tenant_result(),  # _set_tenant
+                _make_fetchall_result(rows),  # SELECT energy_budgets
+            ]
+        )
         app.dependency_overrides[get_db] = _override(db)
 
         with TestClient(app) as client:
@@ -225,10 +235,12 @@ class TestListEnergyBudgets:
 
     def test_list_budgets_empty(self):
         """mock SELECT 返回空 → 200，data.items=[]。"""
-        db = _make_db([
-            _set_tenant_result(),
-            _make_fetchall_result([]),
-        ])
+        db = _make_db(
+            [
+                _set_tenant_result(),
+                _make_fetchall_result([]),
+            ]
+        )
         app.dependency_overrides[get_db] = _override(db)
 
         with TestClient(app) as client:
@@ -279,10 +291,12 @@ class TestUpsertEnergyBudget:
             "water_budget_ton": 75.0,
             "cost_budget_fen": 55000,
         }
-        db = _make_db([
-            _set_tenant_result(),                      # _set_tenant
-            _make_fetchone_result(returned_row),       # INSERT ... RETURNING
-        ])
+        db = _make_db(
+            [
+                _set_tenant_result(),  # _set_tenant
+                _make_fetchone_result(returned_row),  # INSERT ... RETURNING
+            ]
+        )
         app.dependency_overrides[get_db] = _override(db)
 
         with patch("asyncio.create_task"):
@@ -302,10 +316,12 @@ class TestUpsertEnergyBudget:
 
     def test_upsert_budget_db_error(self):
         """mock SQLAlchemyError → 500 错误响应。"""
-        db = _make_db([
-            _set_tenant_result(),                               # _set_tenant
-            SQLAlchemyError("connection reset"),                # INSERT 失败
-        ])
+        db = _make_db(
+            [
+                _set_tenant_result(),  # _set_tenant
+                SQLAlchemyError("connection reset"),  # INSERT 失败
+            ]
+        )
         app.dependency_overrides[get_db] = _override(db)
 
         with TestClient(app) as client:
@@ -338,10 +354,12 @@ class TestListAlertRules:
     def test_list_alert_rules_success(self):
         """mock SELECT 返回2条规则 → 200，data.items 长度=2。"""
         rows = [_alert_rule_row(1), _alert_rule_row(2)]
-        db = _make_db([
-            _set_tenant_result(),
-            _make_fetchall_result(rows),
-        ])
+        db = _make_db(
+            [
+                _set_tenant_result(),
+                _make_fetchall_result(rows),
+            ]
+        )
         app.dependency_overrides[get_db] = _override(db)
 
         with TestClient(app) as client:
@@ -396,10 +414,12 @@ class TestCreateAlertRule:
             "alert_level": "warning",
             "is_active": True,
         }
-        db = _make_db([
-            _set_tenant_result(),
-            _make_fetchone_result(returned_row),
-        ])
+        db = _make_db(
+            [
+                _set_tenant_result(),
+                _make_fetchone_result(returned_row),
+            ]
+        )
         app.dependency_overrides[get_db] = _override(db)
 
         with patch("asyncio.create_task"):
@@ -437,10 +457,12 @@ class TestDeleteAlertRule:
         """mock UPDATE SET is_deleted=TRUE RETURNING → 200，data.deleted=True。"""
         # RETURNING id 返回一行
         deleted_row = {"id": RULE_ID}
-        db = _make_db([
-            _set_tenant_result(),
-            _make_fetchone_result(deleted_row),
-        ])
+        db = _make_db(
+            [
+                _set_tenant_result(),
+                _make_fetchone_result(deleted_row),
+            ]
+        )
         app.dependency_overrides[get_db] = _override(db)
 
         with TestClient(app) as client:
@@ -457,10 +479,12 @@ class TestDeleteAlertRule:
 
     def test_delete_alert_rule_not_found(self):
         """mock UPDATE RETURNING 空（规则不存在或已删除）→ 404。"""
-        db = _make_db([
-            _set_tenant_result(),
-            _make_fetchone_result(None),   # RETURNING 返回空
-        ])
+        db = _make_db(
+            [
+                _set_tenant_result(),
+                _make_fetchone_result(None),  # RETURNING 返回空
+            ]
+        )
         app.dependency_overrides[get_db] = _override(db)
 
         with TestClient(app) as client:

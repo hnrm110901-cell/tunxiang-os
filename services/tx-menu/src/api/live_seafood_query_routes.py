@@ -8,6 +8,7 @@ Endpoints:
   GET /api/v1/live-seafood/tanks?store_id=          — 门店鱼缸列表（含库存摘要）
   GET /api/v1/live-seafood/tanks/{zone_code}/dishes?store_id=  — 指定鱼缸当前可点菜品
 """
+
 from typing import Optional
 
 import structlog
@@ -23,6 +24,7 @@ router = APIRouter(prefix="/api/v1/live-seafood", tags=["live-seafood-query"])
 
 
 # ─── 工具 ─────────────────────────────────────────────────────────────────────
+
 
 def _tenant(request: Request) -> str:
     tid = getattr(request.state, "tenant_id", None) or request.headers.get("X-Tenant-ID", "")
@@ -52,6 +54,7 @@ def _price_display(price_per_unit_fen: Optional[int], display_unit: Optional[str
 
 
 # ─── Endpoints ───────────────────────────────────────────────────────────────
+
 
 @router.get("/tanks", summary="门店鱼缸区域列表（含库存摘要）")
 async def list_tanks(
@@ -160,8 +163,7 @@ async def list_tank_dishes(
         )
         zone_row = zone_result.fetchone()
     except SQLAlchemyError as exc:
-        log.error("live_seafood.list_tank_dishes.db_error",
-                  zone_code=zone_code, store_id=store_id, error=str(exc))
+        log.error("live_seafood.list_tank_dishes.db_error", zone_code=zone_code, store_id=store_id, error=str(exc))
         raise HTTPException(status_code=500, detail="数据库查询失败") from exc
 
     if not zone_row:
@@ -195,8 +197,7 @@ async def list_tank_dishes(
         )
         dish_rows = dishes_result.fetchall()
     except SQLAlchemyError as exc:
-        log.error("live_seafood.list_tank_dishes.dishes_db_error",
-                  zone_id=zone_id, error=str(exc))
+        log.error("live_seafood.list_tank_dishes.dishes_db_error", zone_id=zone_id, error=str(exc))
         dish_rows = []
 
     dishes = [
@@ -216,10 +217,11 @@ async def list_tank_dishes(
         for r in dish_rows
     ]
 
-    log.info("live_seafood.list_tank_dishes",
-             zone_code=zone_code_upper, store_id=store_id, dish_count=len(dishes))
-    return _ok({
-        "zone_code": zone_code_upper,
-        "zone_name": zone_name,
-        "dishes": dishes,
-    })
+    log.info("live_seafood.list_tank_dishes", zone_code=zone_code_upper, store_id=store_id, dish_count=len(dishes))
+    return _ok(
+        {
+            "zone_code": zone_code_upper,
+            "zone_name": zone_name,
+            "dishes": dishes,
+        }
+    )

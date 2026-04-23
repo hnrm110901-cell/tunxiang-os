@@ -17,6 +17,7 @@
 
 所有金额单位：分（fen）。
 """
+
 from __future__ import annotations
 
 import calendar
@@ -55,13 +56,15 @@ def _prorate(monthly_fen: int, period_days: int, month_days: int) -> int:
 
 # ─── 数据类 ──────────────────────────────────────────────────────────────────
 
+
 @dataclass
 class RevenueBreakdown:
     """营收明细"""
-    dine_in_fen: int = 0          # 堂食收入
-    delivery_fen: int = 0         # 外卖收入
-    stored_value_fen: int = 0     # 储值卡收现（充值）
-    other_fen: int = 0            # 其他收入
+
+    dine_in_fen: int = 0  # 堂食收入
+    delivery_fen: int = 0  # 外卖收入
+    stored_value_fen: int = 0  # 储值卡收现（充值）
+    other_fen: int = 0  # 其他收入
 
     @property
     def total_fen(self) -> int:
@@ -71,9 +74,10 @@ class RevenueBreakdown:
 @dataclass
 class CostBreakdown:
     """成本明细"""
-    food_cost_fen: int = 0        # 食材成本（BOM计算）
-    waste_cost_fen: int = 0       # 食材损耗
-    is_estimated: bool = False    # 是否使用估算值
+
+    food_cost_fen: int = 0  # 食材成本（BOM计算）
+    waste_cost_fen: int = 0  # 食材损耗
+    is_estimated: bool = False  # 是否使用估算值
     estimated_reason: str = ""
 
     @property
@@ -84,10 +88,11 @@ class CostBreakdown:
 @dataclass
 class OperatingExpenses:
     """经营费用"""
-    labor_cost_fen: int = 0       # 人工成本
-    rent_fen: int = 0             # 房租
-    utility_fen: int = 0          # 水电
-    other_fixed_fen: int = 0      # 其他固定费用
+
+    labor_cost_fen: int = 0  # 人工成本
+    rent_fen: int = 0  # 房租
+    utility_fen: int = 0  # 水电
+    other_fixed_fen: int = 0  # 其他固定费用
 
     @property
     def total_fen(self) -> int:
@@ -97,6 +102,7 @@ class OperatingExpenses:
 @dataclass
 class PLStatement:
     """门店 P&L 损益表"""
+
     store_id: uuid.UUID
     start_date: date
     end_date: date
@@ -178,8 +184,9 @@ class PLStatement:
 @dataclass
 class BrandPLStatement:
     """品牌级 P&L（多门店汇总）"""
+
     brand_id: str
-    month: str              # YYYY-MM
+    month: str  # YYYY-MM
     store_count: int
     total_revenue_fen: int
     total_food_cost_fen: int
@@ -216,6 +223,7 @@ class BrandPLStatement:
 
 
 # ─── PLService ────────────────────────────────────────────────────────────────
+
 
 class PLService:
     """P&L 损益表服务
@@ -256,9 +264,7 @@ class PLService:
         period_days = _days_in_period(start_date, end_date)
 
         # ── 1. 营收明细 ──
-        revenue = await self._fetch_revenue_breakdown(
-            store_id, start_date, end_date, tenant_id, db
-        )
+        revenue = await self._fetch_revenue_breakdown(store_id, start_date, end_date, tenant_id, db)
 
         # ── 2. 食材成本（从 cost_snapshots）──
         food_cost_fen, is_estimated, estimated_reason = await self._fetch_food_cost(
@@ -266,9 +272,7 @@ class PLService:
         )
 
         # ── 3. 损耗成本 ──
-        waste_cost_fen = await self._repo.fetch_waste_cost(
-            store_id, start_date, end_date, tenant_id, db
-        )
+        waste_cost_fen = await self._repo.fetch_waste_cost(store_id, start_date, end_date, tenant_id, db)
 
         cost = CostBreakdown(
             food_cost_fen=food_cost_fen,
@@ -278,9 +282,7 @@ class PLService:
         )
 
         # ── 4. 经营费用（固定成本按天摊销）──
-        opex = await self._fetch_operating_expenses(
-            store_id, start_date, end_date, period_days, tenant_id, db
-        )
+        opex = await self._fetch_operating_expenses(store_id, start_date, end_date, period_days, tenant_id, db)
 
         log.info(
             "store_pl.computed",
@@ -305,7 +307,7 @@ class PLService:
     async def get_brand_pl(
         self,
         brand_id: str,
-        month: str,       # YYYY-MM
+        month: str,  # YYYY-MM
         tenant_id: uuid.UUID,
         db: AsyncSession,
     ) -> BrandPLStatement:
@@ -343,10 +345,12 @@ class PLService:
 
         for sid in store_ids:
             pl = await self.get_store_pl(sid, start_date, end_date, tenant_id, db)
-            store_details.append({
-                "store_id": str(sid),
-                **{k: v for k, v in pl.to_dict().items() if k != "store_id"},
-            })
+            store_details.append(
+                {
+                    "store_id": str(sid),
+                    **{k: v for k, v in pl.to_dict().items() if k != "store_id"},
+                }
+            )
             total_revenue += pl.total_revenue_fen
             total_food_cost += pl.cost.total_food_cost_fen
             total_gross_profit += pl.gross_profit_fen
@@ -355,9 +359,7 @@ class PLService:
                 any_estimated = True
 
         # 按毛利率降序排列门店
-        store_details.sort(
-            key=lambda x: x.get("gross_margin_rate", 0), reverse=True
-        )
+        store_details.sort(key=lambda x: x.get("gross_margin_rate", 0), reverse=True)
 
         logger.info(
             "brand_pl.computed",
@@ -415,6 +417,7 @@ class PLService:
             GROUP BY o.order_type
         """)
         from datetime import datetime, timezone
+
         start_dt = datetime.combine(start_date, datetime.min.time()).replace(tzinfo=timezone.utc)
         end_dt = datetime.combine(end_date, datetime.max.time()).replace(tzinfo=timezone.utc)
 
@@ -436,9 +439,7 @@ class PLService:
                 error=str(exc),
             )
             # 降级：查总收入不分类
-            total = await self._repo.fetch_daily_revenue_for_cost(
-                store_id, start_date, tenant_id, db
-            )
+            total = await self._repo.fetch_daily_revenue_for_cost(store_id, start_date, tenant_id, db)
             return RevenueBreakdown(dine_in_fen=total)
 
         rb = RevenueBreakdown()
@@ -489,6 +490,7 @@ class PLService:
               AND o.is_deleted = false
         """)
         from datetime import datetime, timezone
+
         start_dt = datetime.combine(start_date, datetime.min.time()).replace(tzinfo=timezone.utc)
         end_dt = datetime.combine(end_date, datetime.max.time()).replace(tzinfo=timezone.utc)
 
@@ -525,9 +527,7 @@ class PLService:
         人工成本：从 payroll_records 按月查询
         """
         # 读取门店固定成本配置
-        config = await self._repo.fetch_store_fixed_cost_config(
-            store_id, tenant_id, db
-        )
+        config = await self._repo.fetch_store_fixed_cost_config(store_id, tenant_id, db)
 
         # 按区间跨越的月份摊销固定费用
         rent_fen = 0
@@ -565,9 +565,7 @@ class PLService:
             current += timedelta(days=1)
 
         for y, m in months_covered:
-            month_labor = await self._repo.fetch_monthly_labor_cost(
-                store_id, y, m, tenant_id, db
-            )
+            month_labor = await self._repo.fetch_monthly_labor_cost(store_id, y, m, tenant_id, db)
             if month_labor > 0:
                 month_days = calendar.monthrange(y, m)[1]
                 month_start = date(y, m, 1)

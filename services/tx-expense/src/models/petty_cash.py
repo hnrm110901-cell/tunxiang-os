@@ -6,6 +6,7 @@ PettyCashSettlement：月末核销单（A1Agent自动生成，财务确认）
 
 所有金额字段单位：分(fen)。
 """
+
 from __future__ import annotations
 
 import uuid
@@ -27,16 +28,16 @@ from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from shared.ontology.src.base import TenantBase
+
 from .expense_enums import (
     PettyCashAccountStatus,
     PettyCashSettlementStatus,
-    PettyCashTransactionType,
 )
-
 
 # ─────────────────────────────────────────────────────────────────────────────
 # PettyCashAccount — 备用金账户（每个门店唯一）
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class PettyCashAccount(TenantBase):
     """
@@ -44,6 +45,7 @@ class PettyCashAccount(TenantBase):
     每个门店只有一个账户（tenant_id + store_id 联合唯一）。
     余额由应用层在每次写入 transaction 时同步更新，与最新流水的 balance_after 保持一致。
     """
+
     __tablename__ = "petty_cash_accounts"
 
     store_id: Mapped[uuid.UUID] = mapped_column(
@@ -138,12 +140,14 @@ class PettyCashAccount(TenantBase):
 # PettyCashTransaction — 备用金流水
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 class PettyCashTransaction(TenantBase):
     """
     备用金流水记录。
     正数=收入（补充/归还/期初），负数=支出（日常/日结调整）。
     每次写入时，amount 和 balance_after 必须在同一数据库事务内与账户余额保持一致。
     """
+
     __tablename__ = "petty_cash_transactions"
 
     account_id: Mapped[uuid.UUID] = mapped_column(
@@ -228,12 +232,14 @@ class PettyCashTransaction(TenantBase):
 # PettyCashSettlement — 月末核销单
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 class PettyCashSettlement(TenantBase):
     """
     月末核销单。
     每个账户每自然月一张（tenant_id + account_id + settlement_month 唯一）。
     由 A1Agent 自动生成 draft，财务人工确认后关闭。
     """
+
     __tablename__ = "petty_cash_settlements"
 
     account_id: Mapped[uuid.UUID] = mapped_column(

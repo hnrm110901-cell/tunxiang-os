@@ -2,6 +2,7 @@
 涵盖端点数 Top-3：dishes.py (12) / live_seafood_routes.py (8) / dish_spec_routes.py (5)
 测试数量：≥ 15
 """
+
 import sys
 import types
 
@@ -77,10 +78,11 @@ _models_pkg.DishPractice = _FakeDishPractice
 sys.modules.setdefault("src.api.models", _models_pkg)
 sys.modules.setdefault("src.api.models.dish_practice", _models_pkg)
 
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from unittest.mock import AsyncMock, MagicMock, patch
 
 TENANT_ID = "11111111-1111-1111-1111-111111111111"
 DISH_ID = "22222222-2222-2222-2222-222222222222"
@@ -91,8 +93,10 @@ STORE_ID = "33333333-3333-3333-3333-333333333333"
 # PART 1 — dishes.py  (12 endpoints)
 # ════════════════════════════════════════════════════════════════════
 
+
 def _make_dishes_app():
     from services.tx_menu.src.api import dishes as _dishes_mod  # type: ignore[import]
+
     app = FastAPI()
     app.include_router(_dishes_mod.router)
     return app
@@ -100,7 +104,9 @@ def _make_dishes_app():
 
 def _make_dishes_app_direct():
     """Import dishes directly from the known path."""
-    import importlib.util, pathlib
+    import importlib.util
+    import pathlib
+
     spec_path = str(pathlib.Path(__file__).parent.parent / "api" / "dishes.py")
     spec = importlib.util.spec_from_file_location("dishes_module", spec_path)
     mod = importlib.util.module_from_spec(spec)
@@ -217,8 +223,11 @@ class TestDishesEndpoints:
 # PART 2 — live_seafood_routes.py  (8 endpoints)
 # ════════════════════════════════════════════════════════════════════
 
+
 def _make_live_seafood_app():
-    import importlib.util, pathlib
+    import importlib.util
+    import pathlib
+
     spec_path = str(pathlib.Path(__file__).parent.parent / "api" / "live_seafood_routes.py")
     spec = importlib.util.spec_from_file_location("live_seafood_routes", spec_path)
     mod = importlib.util.module_from_spec(spec)
@@ -263,6 +272,7 @@ def live_seafood_client():
 
     # Override the dependency at app level
     import shared.ontology.src.database as _db_mod  # type: ignore[import]
+
     with patch.object(_db_mod, "get_db", _override_get_db):
         return TestClient(app, raise_server_exceptions=False), mock_session
 
@@ -330,9 +340,7 @@ class TestLiveSeafoodEndpoints:
         client, mock_session = live_seafood_client
         # Make mock return a row for the UPDATE RETURNING
         row = MagicMock()
-        row.__getitem__ = lambda self, key: {
-            0: DISH_ID, 1: "石斑鱼", 2: 5, 3: 2500
-        }[key]
+        row.__getitem__ = lambda self, key: {0: DISH_ID, 1: "石斑鱼", 2: 5, 3: 2500}[key]
         mock_result2 = MagicMock()
         mock_result2.fetchone.return_value = row
         mock_session.execute = AsyncMock(return_value=mock_result2)
@@ -350,8 +358,11 @@ class TestLiveSeafoodEndpoints:
 # PART 3 — dish_spec_routes.py  (5 endpoints)
 # ════════════════════════════════════════════════════════════════════
 
+
 def _make_spec_app():
-    import importlib.util, pathlib
+    import importlib.util
+    import pathlib
+
     spec_path = str(pathlib.Path(__file__).parent.parent / "api" / "dish_spec_routes.py")
     spec = importlib.util.spec_from_file_location("dish_spec_routes", spec_path)
     mod = importlib.util.module_from_spec(spec)
@@ -378,6 +389,7 @@ def spec_client():
         yield mock_session
 
     import shared.ontology.src.database as _db_mod  # type: ignore[import]
+
     with patch.object(_db_mod, "get_db", _override_get_db):
         return TestClient(app, raise_server_exceptions=False), mock_session
 
@@ -407,6 +419,7 @@ class TestDishSpecEndpoints:
     def test_create_spec_db_error_503(self, spec_client):
         client, mock_session = spec_client
         from sqlalchemy.exc import SQLAlchemyError
+
         mock_session.execute = AsyncMock(side_effect=SQLAlchemyError("DB error"))
         payload = {
             "dish_id": DISH_ID,

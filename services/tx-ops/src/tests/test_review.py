@@ -2,6 +2,7 @@
 
 覆盖周复盘、月复盘、问题追踪（含状态机和红黄绿）、知识库。
 """
+
 from __future__ import annotations
 
 from datetime import date
@@ -94,8 +95,7 @@ async def test_generate_weekly_review():
             orders=50 + i * 5,
             cost=40000 + i * 3000,
             waste=1000 + i * 200,
-            exceptions=[{"type": "food_safety", "summary": "温度异常", "impact_fen": 500}]
-            if i % 2 == 0 else [],
+            exceptions=[{"type": "food_safety", "summary": "温度异常", "impact_fen": 500}] if i % 2 == 0 else [],
         )
         for i in range(7)
     ]

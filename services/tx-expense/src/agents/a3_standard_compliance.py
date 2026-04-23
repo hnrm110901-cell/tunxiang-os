@@ -28,6 +28,7 @@ Agent铁律：
 量化目标：
   差标违规报销率 12%→<2%，财务复核退单工作量 -60%
 """
+
 from __future__ import annotations
 
 import uuid
@@ -36,7 +37,8 @@ from typing import Optional
 from uuid import UUID
 
 import structlog
-from sqlalchemy import select, text as sa_text
+from sqlalchemy import select
+from sqlalchemy import text as sa_text
 from sqlalchemy.exc import OperationalError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -52,8 +54,8 @@ from ..services import notification_service
 log = structlog.get_logger(__name__)
 
 # 超标分级阈值（与 expense_standard_service.check_compliance 保持一致）
-_WARN_THRESHOLD = 0.20    # <20% → compliant_with_warning（允许提交，高亮）
-_MINOR_THRESHOLD = 0.50   # 20%-50% → over_limit_minor（需说明）
+_WARN_THRESHOLD = 0.20  # <20% → compliant_with_warning（允许提交，高亮）
+_MINOR_THRESHOLD = 0.50  # 20%-50% → over_limit_minor（需说明）
 # >50% → over_limit_major（截断）
 
 # 连续超标触发主管通知的次数
@@ -64,13 +66,38 @@ _LOOKBACK_DAYS = 90
 
 # 城市关键词：用于从 description 中提取目的地
 _KNOWN_CITIES = [
-    "北京", "上海", "广州", "深圳",           # 一线
-    "成都", "杭州", "武汉", "西安", "南京",    # 新一线
-    "重庆", "天津", "苏州", "长沙", "郑州",
-    "青岛", "宁波", "无锡", "东莞", "福州",
-    "合肥", "昆明", "沈阳", "哈尔滨", "济南",
-    "长春", "贵阳", "太原", "南宁", "石家庄",
-    "厦门", "乌鲁木齐", "南昌",
+    "北京",
+    "上海",
+    "广州",
+    "深圳",  # 一线
+    "成都",
+    "杭州",
+    "武汉",
+    "西安",
+    "南京",  # 新一线
+    "重庆",
+    "天津",
+    "苏州",
+    "长沙",
+    "郑州",
+    "青岛",
+    "宁波",
+    "无锡",
+    "东莞",
+    "福州",
+    "合肥",
+    "昆明",
+    "沈阳",
+    "哈尔滨",
+    "济南",
+    "长春",
+    "贵阳",
+    "太原",
+    "南宁",
+    "石家庄",
+    "厦门",
+    "乌鲁木齐",
+    "南昌",
 ]
 
 # 差标费用类型关键词映射（description → expense_type）
@@ -99,6 +126,7 @@ _EXPENSE_TYPE_KEYWORDS: dict[str, str] = {
 # 内部工具：Agent 任务日志
 # =============================================================================
 
+
 async def _log_agent_job(
     db: AsyncSession,
     tenant_id: UUID,
@@ -125,6 +153,7 @@ async def _log_agent_job(
 # 1. 申请人职级获取
 # =============================================================================
 
+
 async def _get_applicant_level(
     db: AsyncSession,
     tenant_id: UUID,
@@ -143,6 +172,7 @@ async def _get_applicant_level(
       若服务不可用（网络超时/服务宕机），自动降级到 fallback 逻辑。
     """
     import os
+
     import httpx
 
     # 尝试通过 tx-org 服务获取
@@ -168,17 +198,15 @@ async def _get_applicant_level(
 
     # Fallback：从历史申请推断职级（查 metadata.staff_level 字段）
     try:
-        stmt = (
-            sa_text(
-                "SELECT metadata->>'staff_level' AS staff_level "
-                "FROM expense_applications "
-                "WHERE tenant_id = :tenant_id "
-                "  AND applicant_id = :applicant_id "
-                "  AND metadata->>'staff_level' IS NOT NULL "
-                "  AND is_deleted = FALSE "
-                "ORDER BY created_at DESC "
-                "LIMIT 1"
-            )
+        stmt = sa_text(
+            "SELECT metadata->>'staff_level' AS staff_level "
+            "FROM expense_applications "
+            "WHERE tenant_id = :tenant_id "
+            "  AND applicant_id = :applicant_id "
+            "  AND metadata->>'staff_level' IS NOT NULL "
+            "  AND is_deleted = FALSE "
+            "ORDER BY created_at DESC "
+            "LIMIT 1"
         )
         result = await db.execute(
             stmt,
@@ -204,6 +232,7 @@ async def _get_applicant_level(
 # =============================================================================
 # 2. 目的地城市提取
 # =============================================================================
+
 
 def _extract_destination_city(
     application_metadata: dict,
@@ -242,6 +271,7 @@ def _extract_destination_city(
 # =============================================================================
 # 3. 单项合规检查（核心）
 # =============================================================================
+
 
 async def check_item_compliance(
     db: AsyncSession,
@@ -360,8 +390,7 @@ async def check_item_compliance(
             "compliance_action": "none",
             "suggestion": _build_suggestion(expense_type, limit_fen),
             "message": (
-                f"金额超出差标 {over_pct_str}（限额 {limit_yuan:.0f} 元），"
-                "轻微超标，审批单将高亮显示，由审批人决定"
+                f"金额超出差标 {over_pct_str}（限额 {limit_yuan:.0f} 元），轻微超标，审批单将高亮显示，由审批人决定"
             ),
         }
 
@@ -427,6 +456,7 @@ def _build_suggestion(expense_type: str, limit_fen: Optional[int]) -> Optional[s
 # =============================================================================
 # 4. 申请级完整检查
 # =============================================================================
+
 
 async def check_application_compliance(
     db: AsyncSession,
@@ -504,9 +534,7 @@ async def check_application_compliance(
             return summary
 
         # 步骤2：获取申请人职级
-        staff_level = await _get_applicant_level(
-            db, tenant_id, application.applicant_id
-        )
+        staff_level = await _get_applicant_level(db, tenant_id, application.applicant_id)
 
         # 步骤3：提取目的地城市
         destination_city = _extract_destination_city(
@@ -580,7 +608,7 @@ async def check_application_compliance(
             std_status = "over_limit_minor"
             can_submit = False
         elif has_warning:
-            overall_status = "compliant"    # 允许提交，审批单高亮
+            overall_status = "compliant"  # 允许提交，审批单高亮
             # 标准状态：<20% 超标 → compliant_with_warning
             std_status = "compliant_with_warning"
             can_submit = True
@@ -608,9 +636,7 @@ async def check_application_compliance(
         # 步骤7：连续超标≥3次，通知主管
         if history["consecutive_over_limit"] >= _ESCALATE_CONSECUTIVE:
             summary["escalate_to_supervisor"] = True
-            supervisor_id = await _get_supervisor_id(
-                db, tenant_id, application.applicant_id
-            )
+            supervisor_id = await _get_supervisor_id(db, tenant_id, application.applicant_id)
             summary["supervisor_id"] = supervisor_id
 
         # 生成汇总说明
@@ -642,7 +668,7 @@ async def check_application_compliance(
     except (OSError, RuntimeError, ValueError, SQLAlchemyError) as exc:
         error_msg = f"{type(exc).__name__}: {exc}"
         summary["error"] = error_msg
-        summary["status"] = "compliant"           # 异常时放行，不阻断主流程
+        summary["status"] = "compliant"  # 异常时放行，不阻断主流程
         summary["overall_status"] = "compliant"
         summary["can_submit"] = True
         summary["max_over_rate"] = 0.0
@@ -689,24 +715,15 @@ def _build_summary_message(
     parts = []
 
     if has_major:
-        parts.append(
-            f"有费用项超标超过50%，超出部分已截断至差标限额，"
-            f"请确认后通过特殊申请通道补充提交"
-        )
+        parts.append("有费用项超标超过50%，超出部分已截断至差标限额，请确认后通过特殊申请通道补充提交")
     elif required_count > 0:
-        parts.append(
-            f"有 {required_count} 项费用超标20%-50%，"
-            "请在对应明细的备注中填写超标说明后重新提交"
-        )
+        parts.append(f"有 {required_count} 项费用超标20%-50%，请在对应明细的备注中填写超标说明后重新提交")
 
     if total_over_amount_fen > 0:
         parts.append(f"超标金额合计：{total_over_amount_fen / 100:.2f} 元")
 
     if escalate:
-        parts.append(
-            f"您近期已连续超标 {consecutive_count} 次，"
-            "系统将自动通知您的直属上级"
-        )
+        parts.append(f"您近期已连续超标 {consecutive_count} 次，系统将自动通知您的直属上级")
 
     return "；".join(parts) if parts else "请检查费用明细后重新提交"
 
@@ -714,6 +731,7 @@ def _build_summary_message(
 # =============================================================================
 # 5. 历史合规率检查
 # =============================================================================
+
 
 async def _check_historical_compliance_rate(
     db: AsyncSession,
@@ -769,10 +787,7 @@ async def _check_historical_compliance_rate(
         total = len(rows)
         # 有超标状态（needs_explanation / needs_special_channel）算超标
         over_statuses = {"needs_explanation", "needs_special_channel"}
-        over_count = sum(
-            1 for row in rows
-            if row[0] in over_statuses
-        )
+        over_count = sum(1 for row in rows if row[0] in over_statuses)
 
         # 计算连续超标次数（从最近一次开始向前数）
         consecutive = 0
@@ -810,6 +825,7 @@ async def _get_supervisor_id(
     不可用时返回 None。
     """
     import os
+
     import httpx
 
     tx_org_base = os.environ.get("TX_ORG_INTERNAL_URL", "http://localhost:8012")
@@ -837,6 +853,7 @@ async def _get_supervisor_id(
 # =============================================================================
 # 6. 超标通知主管
 # =============================================================================
+
 
 async def notify_supervisor_of_repeated_violations(
     db: AsyncSession,
@@ -872,7 +889,7 @@ async def notify_supervisor_of_repeated_violations(
             recipient_role="supervisor",
             event_type=NotificationEventType.REMINDER.value,
             application_title="差标合规预警——下属员工连续超标",
-            applicant_name=str(applicant_id),     # P1阶段占位，实际应从 tx-org 拉取姓名
+            applicant_name=str(applicant_id),  # P1阶段占位，实际应从 tx-org 拉取姓名
             total_amount=0,
             store_name="",
             brand_id=brand_id,
@@ -907,6 +924,7 @@ async def notify_supervisor_of_repeated_violations(
 # =============================================================================
 # 7. 申请提交前预检（快速版）
 # =============================================================================
+
 
 async def pre_check_before_submit(
     db: AsyncSession,
@@ -978,18 +996,20 @@ async def pre_check_before_submit(
                 warning_count += 1
 
             # 精简输出（去掉冗余字段，减少前端解析负担）
-            item_results.append({
-                "index": idx,
-                "description": description,
-                "status": status,
-                "compliant": result["compliant"],
-                "limit_fen": result["limit_fen"],
-                "over_rate": result["over_rate"],
-                "allowed_amount_fen": result["allowed_amount_fen"],
-                "compliance_action": result["compliance_action"],
-                "suggestion": result["suggestion"],
-                "message": result["message"],
-            })
+            item_results.append(
+                {
+                    "index": idx,
+                    "description": description,
+                    "status": status,
+                    "compliant": result["compliant"],
+                    "limit_fen": result["limit_fen"],
+                    "over_rate": result["over_rate"],
+                    "allowed_amount_fen": result["allowed_amount_fen"],
+                    "compliance_action": result["compliance_action"],
+                    "suggestion": result["suggestion"],
+                    "message": result["message"],
+                }
+            )
 
         except (OperationalError, SQLAlchemyError, ValueError) as exc:
             log.warning(
@@ -999,18 +1019,20 @@ async def pre_check_before_submit(
                 error=f"{type(exc).__name__}: {exc}",
             )
             # 单项异常：放行，不阻断整体预检
-            item_results.append({
-                "index": idx,
-                "description": description,
-                "status": "no_rule",
-                "compliant": True,
-                "limit_fen": None,
-                "over_rate": None,
-                "allowed_amount_fen": amount_fen,
-                "compliance_action": "none",
-                "suggestion": None,
-                "message": "检查异常，已放行",
-            })
+            item_results.append(
+                {
+                    "index": idx,
+                    "description": description,
+                    "status": "no_rule",
+                    "compliant": True,
+                    "limit_fen": None,
+                    "over_rate": None,
+                    "allowed_amount_fen": amount_fen,
+                    "compliance_action": "none",
+                    "suggestion": None,
+                    "message": "检查异常，已放行",
+                }
+            )
 
     # 生成摘要
     if not can_submit:
@@ -1037,6 +1059,7 @@ async def pre_check_before_submit(
 # =============================================================================
 # 8. Agent 统一入口
 # =============================================================================
+
 
 async def run(
     db: AsyncSession,
@@ -1077,17 +1100,18 @@ async def run(
                 history = await _check_historical_compliance_rate(
                     db=db,
                     tenant_id=tenant_id,
-                    applicant_id=uuid.UUID(payload["applicant_id"])
-                    if payload.get("applicant_id") else application_id,
+                    applicant_id=uuid.UUID(payload["applicant_id"]) if payload.get("applicant_id") else application_id,
                 )
                 import asyncio
+
                 asyncio.create_task(
                     notify_supervisor_of_repeated_violations(
                         db=db,
                         tenant_id=tenant_id,
                         brand_id=brand_id,
                         applicant_id=uuid.UUID(payload["applicant_id"])
-                        if payload.get("applicant_id") else application_id,
+                        if payload.get("applicant_id")
+                        else application_id,
                         application_id=application_id,
                         consecutive_count=history["consecutive_over_limit"],
                     )

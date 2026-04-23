@@ -6,6 +6,7 @@
 
 金额约定：所有金额字段单位为分(fen)，1元=100分。
 """
+
 from __future__ import annotations
 
 from datetime import date
@@ -17,8 +18,8 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from shared.ontology.src.database import get_db
 import src.services.travel_expense_service as _travel_svc
+from shared.ontology.src.database import get_db
 
 router = APIRouter()
 log = structlog.get_logger(__name__)
@@ -27,6 +28,7 @@ log = structlog.get_logger(__name__)
 # ---------------------------------------------------------------------------
 # 依赖注入
 # ---------------------------------------------------------------------------
+
 
 async def get_tenant_id(x_tenant_id: str = Header(..., alias="X-Tenant-ID")) -> UUID:
     try:
@@ -45,6 +47,7 @@ async def get_current_user(x_user_id: str = Header(..., alias="X-User-ID")) -> U
 # ---------------------------------------------------------------------------
 # Pydantic Schema
 # ---------------------------------------------------------------------------
+
 
 class TravelRequestCreate(BaseModel):
     brand_id: UUID
@@ -83,13 +86,13 @@ class TravelItineraryCreate(BaseModel):
 
 class TravelItineraryUpdate(BaseModel):
     store_name: Optional[str] = None
-    checkin_time: Optional[str] = None          # ISO 8601 字符串，由服务层解析
+    checkin_time: Optional[str] = None  # ISO 8601 字符串，由服务层解析
     checkout_time: Optional[str] = None
     duration_minutes: Optional[int] = None
     checkin_location: Optional[Dict[str, Any]] = None
     checkout_location: Optional[Dict[str, Any]] = None
     gps_track: Optional[List[Dict[str, Any]]] = None
-    leg_mileage_km: Optional[str] = None        # Decimal 字符串
+    leg_mileage_km: Optional[str] = None  # Decimal 字符串
     itinerary_status: Optional[str] = None
     skip_reason: Optional[str] = None
     sequence_order: Optional[int] = None
@@ -103,7 +106,7 @@ class CompleteTravel(BaseModel):
     actual_end_date: Optional[date] = None
     total_cost_fen: int = Field(..., ge=0, description="实际总费用，单位：分(fen)")
     mileage_allowance_fen: Optional[int] = Field(None, ge=0, description="里程补贴，单位：分(fen)")
-    total_mileage_km: Optional[str] = None      # Decimal 字符串
+    total_mileage_km: Optional[str] = None  # Decimal 字符串
 
 
 class PaginatedResponse(BaseModel):
@@ -116,6 +119,7 @@ class PaginatedResponse(BaseModel):
 # ---------------------------------------------------------------------------
 # 端点实现
 # ---------------------------------------------------------------------------
+
 
 @router.post("/requests", status_code=status.HTTP_201_CREATED)
 async def create_travel_request(
@@ -174,7 +178,8 @@ async def list_travel_requests(
     """
     try:
         filters = {
-            k: v for k, v in {
+            k: v
+            for k, v in {
                 "status": travel_status,
                 "applicant_id": applicant_id,
                 "traveler_id": traveler_id,
@@ -184,7 +189,8 @@ async def list_travel_requests(
                 "date_to": date_to,
                 "page": page,
                 "page_size": page_size,
-            }.items() if v is not None
+            }.items()
+            if v is not None
         }
         items, total = await _travel_svc.list_travel_requests(
             db=db,
@@ -210,9 +216,7 @@ async def get_travel_request(
 ) -> Dict[str, Any]:
     """获取差旅申请详情（含行程明细和费用分摊）"""
     try:
-        result = await _travel_svc.get_travel_request(
-            db=db, tenant_id=tenant_id, request_id=request_id
-        )
+        result = await _travel_svc.get_travel_request(db=db, tenant_id=tenant_id, request_id=request_id)
         return {"ok": True, "data": _serialize_request(result, with_relations=True)}
     except LookupError:
         raise HTTPException(status_code=404, detail="差旅申请不存在或无权访问")
@@ -409,9 +413,7 @@ async def get_allowances(
     - 金额单位为分(fen)
     """
     try:
-        result = await _travel_svc.calculate_allowances(
-            db=db, tenant_id=tenant_id, request_id=request_id
-        )
+        result = await _travel_svc.calculate_allowances(db=db, tenant_id=tenant_id, request_id=request_id)
         return {"ok": True, "data": result}
     except LookupError:
         raise HTTPException(status_code=404, detail="差旅申请不存在或无权访问")
@@ -476,16 +478,16 @@ async def get_travel_stats(
     """
     try:
         filters = {
-            k: v for k, v in {
+            k: v
+            for k, v in {
                 "brand_id": brand_id,
                 "store_id": store_id,
                 "date_from": date_from,
                 "date_to": date_to,
-            }.items() if v is not None
+            }.items()
+            if v is not None
         }
-        result = await _travel_svc.get_stats(
-            db=db, tenant_id=tenant_id, filters=filters
-        )
+        result = await _travel_svc.get_stats(db=db, tenant_id=tenant_id, filters=filters)
         return {"ok": True, "data": result}
     except Exception as exc:
         log.error("travel_stats_failed", error=str(exc), tenant_id=str(tenant_id), exc_info=True)
@@ -506,9 +508,7 @@ async def get_travel_allocations(
     - 金额单位为分(fen)
     """
     try:
-        request = await _travel_svc.get_travel_request(
-            db=db, tenant_id=tenant_id, request_id=request_id
-        )
+        request = await _travel_svc.get_travel_request(db=db, tenant_id=tenant_id, request_id=request_id)
         allocations = request.allocations or []
         data = [
             {
@@ -536,6 +536,7 @@ async def get_travel_allocations(
 # ---------------------------------------------------------------------------
 # 序列化辅助
 # ---------------------------------------------------------------------------
+
 
 def _serialize_request(request: Any, with_relations: bool = False) -> Dict[str, Any]:
     """将 TravelRequest ORM 对象序列化为 dict（兼容 JSON 序列化）。"""

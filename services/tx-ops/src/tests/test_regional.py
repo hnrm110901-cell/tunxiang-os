@@ -1,4 +1,5 @@
 """E8 区域追踪与整改测试"""
+
 import os
 import sys
 
@@ -35,12 +36,17 @@ class TestDispatchRectification:
 
     @pytest.mark.asyncio
     async def test_dispatch_fields_complete(self):
-        result = await dispatch_rectification(
-            "r1", "s1", "i1", "a1", "2026-05-01", "t1", db=None
-        )
+        result = await dispatch_rectification("r1", "s1", "i1", "a1", "2026-05-01", "t1", db=None)
         required_keys = {
-            "rectification_id", "region_id", "store_id", "issue_id",
-            "assignee_id", "deadline", "status", "tenant_id", "created_at",
+            "rectification_id",
+            "region_id",
+            "store_id",
+            "issue_id",
+            "assignee_id",
+            "deadline",
+            "status",
+            "tenant_id",
+            "created_at",
         }
         assert required_keys.issubset(result.keys())
 
@@ -55,8 +61,12 @@ class TestTrackRectification:
     async def test_valid_transition(self):
         record = {"status": "dispatched", "progress_notes": []}
         result = await track_rectification(
-            "rect_001", "t1", db=None,
-            record=record, new_status="in_progress", note="started work",
+            "rect_001",
+            "t1",
+            db=None,
+            record=record,
+            new_status="in_progress",
+            note="started work",
         )
         assert result["status"] == "in_progress"
         assert record["status"] == "in_progress"
@@ -67,8 +77,11 @@ class TestTrackRectification:
         record = {"status": "dispatched", "progress_notes": []}
         with pytest.raises(ValueError, match="Cannot transition"):
             await track_rectification(
-                "rect_001", "t1", db=None,
-                record=record, new_status="submitted",
+                "rect_001",
+                "t1",
+                db=None,
+                record=record,
+                new_status="submitted",
             )
 
     @pytest.mark.asyncio
@@ -91,7 +104,12 @@ class TestSubmitReview:
     async def test_pass_review_closes(self):
         record = {"status": "submitted", "review_result": None}
         result = await submit_review(
-            "rect_001", "reviewer_1", "pass", "t1", db=None, record=record,
+            "rect_001",
+            "reviewer_1",
+            "pass",
+            "t1",
+            db=None,
+            record=record,
         )
         assert result["result"] == "pass"
         assert result["status"] == "closed"
@@ -101,7 +119,12 @@ class TestSubmitReview:
     async def test_fail_review_stays_reviewed(self):
         record = {"status": "submitted", "review_result": None}
         result = await submit_review(
-            "rect_001", "reviewer_1", "fail", "t1", db=None, record=record,
+            "rect_001",
+            "reviewer_1",
+            "fail",
+            "t1",
+            db=None,
+            record=record,
         )
         assert result["result"] == "fail"
         assert result["status"] == "reviewed"
@@ -159,7 +182,11 @@ class TestCrossStoreBenchmark:
     async def test_benchmark_ranking(self):
         metrics = {"s1": 95.0, "s2": 80.0, "s3": 60.0}
         result = await cross_store_benchmark(
-            "food_safety_score", "r1", "t1", db=None, store_metrics=metrics,
+            "food_safety_score",
+            "r1",
+            "t1",
+            db=None,
+            store_metrics=metrics,
         )
         assert result["metric"] == "food_safety_score"
         assert result["ranking"][0]["store_id"] == "s1"
@@ -190,8 +217,12 @@ class TestRegionalReport:
         ]
         scores = [{"store_id": "s1", "score": 85}, {"store_id": "s2", "score": 75}]
         result = await generate_regional_report(
-            "r1", "2026-03", "t1", db=None,
-            rectifications=rects, store_scores=scores,
+            "r1",
+            "2026-03",
+            "t1",
+            db=None,
+            rectifications=rects,
+            store_scores=scores,
         )
         summary = result["rectification_summary"]
         assert summary["total"] == 4

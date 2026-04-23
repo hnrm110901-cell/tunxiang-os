@@ -4,6 +4,7 @@
 - POST /api/v1/menu/dishes/{dish_id}/practices   批量保存做法
 - DELETE /api/v1/menu/practices/{practice_id}     删除单条做法
 """
+
 import uuid
 
 import structlog
@@ -33,6 +34,7 @@ def _ok(data: dict | list) -> dict:
 
 # ─── 请求模型 ───
 
+
 class PracticeItem(BaseModel):
     practice_name: str
     practice_group: str = "default"
@@ -46,6 +48,7 @@ class BatchSavePracticesReq(BaseModel):
 
 
 # ─── 端点 ───
+
 
 @router.get("/dishes/{dish_id}/practices")
 async def list_practices(
@@ -122,12 +125,14 @@ async def batch_save_practices(
             sort_order=p.sort_order,
         )
         db.add(practice)
-        created.append({
-            "id": str(practice.id),
-            "practice_name": p.practice_name,
-            "practice_group": p.practice_group,
-            "additional_price_fen": p.additional_price_fen,
-        })
+        created.append(
+            {
+                "id": str(practice.id),
+                "practice_name": p.practice_name,
+                "practice_group": p.practice_group,
+                "additional_price_fen": p.additional_price_fen,
+            }
+        )
 
     await db.commit()
     logger.info("practices_saved", dish_id=dish_id, count=len(created))

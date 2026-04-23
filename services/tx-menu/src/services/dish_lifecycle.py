@@ -9,6 +9,7 @@
 所有方法显式传入 tenant_id，强制租户隔离。
 不创建 Alembic 文件，不修改 main.py。
 """
+
 from __future__ import annotations
 
 import uuid
@@ -25,22 +26,22 @@ log = structlog.get_logger(__name__)
 
 # ─── 阈值常量 ─────────────────────────────────────────────────────────────────
 
-NEW_DISH_EVAL_DAYS: int = 7            # 新品评测期天数
-SELLOUT_WARNING_DAYS: int = 2          # 低于N天销量时预警
-LOW_HEALTH_THRESHOLD: float = 40.0    # 健康分低于此值进入待优化
-LOW_SALES_THRESHOLD: int = 5          # 评测期内销量低于此值建议下架
-LOW_MARGIN_THRESHOLD: float = 0.15    # 毛利率低于此值建议调价
+NEW_DISH_EVAL_DAYS: int = 7  # 新品评测期天数
+SELLOUT_WARNING_DAYS: int = 2  # 低于N天销量时预警
+LOW_HEALTH_THRESHOLD: float = 40.0  # 健康分低于此值进入待优化
+LOW_SALES_THRESHOLD: int = 5  # 评测期内销量低于此值建议下架
+LOW_MARGIN_THRESHOLD: float = 0.15  # 毛利率低于此值建议调价
 REMOVAL_MARGIN_CRITICAL: float = 0.10  # 毛利率持续低于此值纳入下架建议
-REMOVAL_LOW_HEALTH_DAYS: int = 30     # 健康分低于40持续此天数→下架建议
+REMOVAL_LOW_HEALTH_DAYS: int = 30  # 健康分低于40持续此天数→下架建议
 
 
 # ─── 内存数据存储（测试用，与 dish_intelligence 同样模式） ──────────────────
 
 
-_dishes: dict[str, dict] = {}               # key: "{tenant_id}:{dish_id}"
+_dishes: dict[str, dict] = {}  # key: "{tenant_id}:{dish_id}"
 _store_dish_index: dict[str, list[str]] = {}  # key: "{tenant_id}:{store_id}" → [dish_id, ...]
 _dish_health_history: dict[str, list[dict]] = {}  # key: "{tenant_id}:{dish_id}" → [score_record, ...]
-_notifications: list[dict] = []             # 生成的通知列表
+_notifications: list[dict] = []  # 生成的通知列表
 
 
 def inject_dish_lifecycle_data(dish_id: str, store_id: str, tenant_id: str, data: dict) -> None:
@@ -91,13 +92,14 @@ def _get_notifications() -> list[dict]:
 @dataclass
 class EvalReport:
     """新品评测报告"""
+
     dish_id: str
     tenant_id: str
     store_id: str
     eval_period_days: int
-    eval_sales: int                     # 评测期销量
-    margin_rate: float                  # 评测期毛利率
-    verdict: str                        # pass / low_sales / low_margin / failed
+    eval_sales: int  # 评测期销量
+    margin_rate: float  # 评测期毛利率
+    verdict: str  # pass / low_sales / low_margin / failed
     suggestions: list[str] = field(default_factory=list)
     evaluated_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
@@ -118,13 +120,14 @@ class EvalReport:
 @dataclass
 class SelloutWarning:
     """沽清预警"""
+
     dish_id: str
     tenant_id: str
     store_id: str
-    stock_qty: float                    # 当前库存
-    daily_avg_sales: float              # 日均销量
-    days_remaining: float               # 预计剩余天数
-    warning_level: str                  # urgent (<1天) / warning (<2天)
+    stock_qty: float  # 当前库存
+    daily_avg_sales: float  # 日均销量
+    days_remaining: float  # 预计剩余天数
+    warning_level: str  # urgent (<1天) / warning (<2天)
 
     def to_dict(self) -> dict:
         return {
@@ -141,12 +144,13 @@ class SelloutWarning:
 @dataclass
 class RemovalSuggestion:
     """下架建议"""
+
     dish_id: str
     tenant_id: str
     store_id: str
-    reason: str                         # 下架主因
-    evidence: dict                      # 数据支撑
-    priority: str                       # high / medium
+    reason: str  # 下架主因
+    evidence: dict  # 数据支撑
+    priority: str  # high / medium
 
     def to_dict(self) -> dict:
         return {
@@ -254,8 +258,7 @@ class DishLifecycleService:
         if margin_rate < LOW_MARGIN_THRESHOLD:
             verdict = "low_margin" if verdict == "pass" else "failed"
             suggestions.append(
-                f"评测期毛利率{margin_rate:.1%}，"
-                f"低于警戒线{LOW_MARGIN_THRESHOLD:.0%}，建议调价或降低食材成本"
+                f"评测期毛利率{margin_rate:.1%}，低于警戒线{LOW_MARGIN_THRESHOLD:.0%}，建议调价或降低食材成本"
             )
 
         return EvalReport(
@@ -273,15 +276,17 @@ class DishLifecycleService:
         """将评测结论写入通知列表"""
         if report.verdict == "pass":
             return
-        _notifications.append({
-            "type": "new_dish_eval",
-            "dish_id": report.dish_id,
-            "tenant_id": report.tenant_id,
-            "store_id": report.store_id,
-            "verdict": report.verdict,
-            "suggestions": report.suggestions,
-            "created_at": datetime.now(timezone.utc).isoformat(),
-        })
+        _notifications.append(
+            {
+                "type": "new_dish_eval",
+                "dish_id": report.dish_id,
+                "tenant_id": report.tenant_id,
+                "store_id": report.store_id,
+                "verdict": report.verdict,
+                "suggestions": report.suggestions,
+                "created_at": datetime.now(timezone.utc).isoformat(),
+            }
+        )
 
     async def _check_evals_from_db(self, tenant_id: str, db: object) -> list[EvalReport]:
         """从数据库执行新品评测（生产路径）"""
@@ -334,14 +339,10 @@ class DishLifecycleService:
             verdict = "pass"
             if eval_sales < LOW_SALES_THRESHOLD:
                 verdict = "low_sales"
-                suggestions.append(
-                    f"评测期销量{eval_sales}份，低于阈值{LOW_SALES_THRESHOLD}份，建议下架"
-                )
+                suggestions.append(f"评测期销量{eval_sales}份，低于阈值{LOW_SALES_THRESHOLD}份，建议下架")
             if margin_rate < LOW_MARGIN_THRESHOLD:
                 verdict = "low_margin" if verdict == "pass" else "failed"
-                suggestions.append(
-                    f"毛利率{margin_rate:.1%}，低于警戒线{LOW_MARGIN_THRESHOLD:.0%}，建议调价"
-                )
+                suggestions.append(f"毛利率{margin_rate:.1%}，低于警戒线{LOW_MARGIN_THRESHOLD:.0%}，建议调价")
 
             report = EvalReport(
                 dish_id=str(row["id"]),
@@ -382,9 +383,7 @@ class DishLifecycleService:
             return await self._sellout_from_memory(store_id, tenant_id)
         return await self._sellout_from_db(store_id, tenant_id, db)
 
-    async def _sellout_from_memory(
-        self, store_id: str, tenant_id: str
-    ) -> list[SelloutWarning]:
+    async def _sellout_from_memory(self, store_id: str, tenant_id: str) -> list[SelloutWarning]:
         """从内存数据执行沽清预警（测试路径）"""
         store_key = f"{tenant_id}:{store_id}"
         dish_ids = _store_dish_index.get(store_key, [])
@@ -403,15 +402,17 @@ class DishLifecycleService:
             days_remaining = stock_qty / daily_avg
             if days_remaining < self.SELLOUT_WARNING_DAYS:
                 warning_level = "urgent" if days_remaining < 1 else "warning"
-                warnings.append(SelloutWarning(
-                    dish_id=did,
-                    tenant_id=tenant_id,
-                    store_id=store_id,
-                    stock_qty=stock_qty,
-                    daily_avg_sales=daily_avg,
-                    days_remaining=days_remaining,
-                    warning_level=warning_level,
-                ))
+                warnings.append(
+                    SelloutWarning(
+                        dish_id=did,
+                        tenant_id=tenant_id,
+                        store_id=store_id,
+                        stock_qty=stock_qty,
+                        daily_avg_sales=daily_avg,
+                        days_remaining=days_remaining,
+                        warning_level=warning_level,
+                    )
+                )
 
         log.info(
             "sellout_warnings_checked",
@@ -421,9 +422,7 @@ class DishLifecycleService:
         )
         return warnings
 
-    async def _sellout_from_db(
-        self, store_id: str, tenant_id: str, db: object
-    ) -> list[SelloutWarning]:
+    async def _sellout_from_db(self, store_id: str, tenant_id: str, db: object) -> list[SelloutWarning]:
         """从数据库执行沽清预警（生产路径）"""
         from sqlalchemy import text
 
@@ -476,15 +475,17 @@ class DishLifecycleService:
             days_remaining = stock_qty / daily_avg
             if days_remaining < self.SELLOUT_WARNING_DAYS:
                 warning_level = "urgent" if days_remaining < 1 else "warning"
-                warnings.append(SelloutWarning(
-                    dish_id=str(row["dish_id"]),
-                    tenant_id=tenant_id,
-                    store_id=store_id,
-                    stock_qty=stock_qty,
-                    daily_avg_sales=daily_avg,
-                    days_remaining=days_remaining,
-                    warning_level=warning_level,
-                ))
+                warnings.append(
+                    SelloutWarning(
+                        dish_id=str(row["dish_id"]),
+                        tenant_id=tenant_id,
+                        store_id=store_id,
+                        stock_qty=stock_qty,
+                        daily_avg_sales=daily_avg,
+                        days_remaining=days_remaining,
+                        warning_level=warning_level,
+                    )
+                )
 
         log.info(
             "sellout_warnings_db_checked",
@@ -516,9 +517,7 @@ class DishLifecycleService:
             return await self._removal_from_memory(store_id, tenant_id)
         return await self._removal_from_db(store_id, tenant_id, db)
 
-    async def _removal_from_memory(
-        self, store_id: str, tenant_id: str
-    ) -> list[RemovalSuggestion]:
+    async def _removal_from_memory(self, store_id: str, tenant_id: str) -> list[RemovalSuggestion]:
         """从内存数据生成下架建议（测试路径）"""
         store_key = f"{tenant_id}:{store_id}"
         dish_ids = _store_dish_index.get(store_key, [])
@@ -542,49 +541,55 @@ class DishLifecycleService:
                     low_health_since = low_health_since.replace(tzinfo=timezone.utc)
                 low_health_days = (now - low_health_since).days
                 if low_health_days >= REMOVAL_LOW_HEALTH_DAYS:
-                    suggestions.append(RemovalSuggestion(
-                        dish_id=did,
-                        tenant_id=tenant_id,
-                        store_id=store_id,
-                        reason="健康分持续低于40分超过30天",
-                        evidence={
-                            "low_health_since": low_health_since_str,
-                            "low_health_days": low_health_days,
-                        },
-                        priority="high",
-                    ))
+                    suggestions.append(
+                        RemovalSuggestion(
+                            dish_id=did,
+                            tenant_id=tenant_id,
+                            store_id=store_id,
+                            reason="健康分持续低于40分超过30天",
+                            evidence={
+                                "low_health_since": low_health_since_str,
+                                "low_health_days": low_health_days,
+                            },
+                            priority="high",
+                        )
+                    )
                     continue
 
             # 条件2：评测期销量为0
             if eval_sales is not None and eval_sales == 0:
-                suggestions.append(RemovalSuggestion(
-                    dish_id=did,
-                    tenant_id=tenant_id,
-                    store_id=store_id,
-                    reason="新品评测期内零销量",
-                    evidence={
-                        "eval_period_days": self.NEW_DISH_EVAL_DAYS,
-                        "eval_sales": 0,
-                    },
-                    priority="high",
-                ))
+                suggestions.append(
+                    RemovalSuggestion(
+                        dish_id=did,
+                        tenant_id=tenant_id,
+                        store_id=store_id,
+                        reason="新品评测期内零销量",
+                        evidence={
+                            "eval_period_days": self.NEW_DISH_EVAL_DAYS,
+                            "eval_sales": 0,
+                        },
+                        priority="high",
+                    )
+                )
                 continue
 
             # 条件3：毛利率持续低于10%
             if margin_rate < REMOVAL_MARGIN_CRITICAL:
-                suggestions.append(RemovalSuggestion(
-                    dish_id=did,
-                    tenant_id=tenant_id,
-                    store_id=store_id,
-                    reason=f"毛利率{margin_rate:.1%}持续低于警戒线{REMOVAL_MARGIN_CRITICAL:.0%}",
-                    evidence={
-                        "margin_rate": round(margin_rate, 4),
-                        "threshold": REMOVAL_MARGIN_CRITICAL,
-                        "price_fen": price_fen,
-                        "cost_fen": cost_fen,
-                    },
-                    priority="medium",
-                ))
+                suggestions.append(
+                    RemovalSuggestion(
+                        dish_id=did,
+                        tenant_id=tenant_id,
+                        store_id=store_id,
+                        reason=f"毛利率{margin_rate:.1%}持续低于警戒线{REMOVAL_MARGIN_CRITICAL:.0%}",
+                        evidence={
+                            "margin_rate": round(margin_rate, 4),
+                            "threshold": REMOVAL_MARGIN_CRITICAL,
+                            "price_fen": price_fen,
+                            "cost_fen": cost_fen,
+                        },
+                        priority="medium",
+                    )
+                )
 
         log.info(
             "removal_suggestions_generated",
@@ -594,9 +599,7 @@ class DishLifecycleService:
         )
         return suggestions
 
-    async def _removal_from_db(
-        self, store_id: str, tenant_id: str, db: object
-    ) -> list[RemovalSuggestion]:
+    async def _removal_from_db(self, store_id: str, tenant_id: str, db: object) -> list[RemovalSuggestion]:
         """从数据库生成下架建议（生产路径）"""
         from sqlalchemy import text
 
@@ -652,17 +655,19 @@ class DishLifecycleService:
 
             # 条件1
             if low_health_since and low_health_since <= health_cutoff:
-                suggestions.append(RemovalSuggestion(
-                    dish_id=dish_id,
-                    tenant_id=tenant_id,
-                    store_id=store_id,
-                    reason="健康分持续低于40分超过30天",
-                    evidence={
-                        "low_health_since": low_health_since.isoformat(),
-                        "low_health_days": (now - low_health_since).days,
-                    },
-                    priority="high",
-                ))
+                suggestions.append(
+                    RemovalSuggestion(
+                        dish_id=dish_id,
+                        tenant_id=tenant_id,
+                        store_id=store_id,
+                        reason="健康分持续低于40分超过30天",
+                        evidence={
+                            "low_health_since": low_health_since.isoformat(),
+                            "low_health_days": (now - low_health_since).days,
+                        },
+                        priority="high",
+                    )
+                )
                 continue
 
             # 条件2
@@ -670,34 +675,38 @@ class DishLifecycleService:
             if launched_at:
                 days_since_launch = (now - launched_at.replace(tzinfo=timezone.utc)).days
                 if days_since_launch >= self.NEW_DISH_EVAL_DAYS and eval_sales == 0:
-                    suggestions.append(RemovalSuggestion(
-                        dish_id=dish_id,
-                        tenant_id=tenant_id,
-                        store_id=store_id,
-                        reason="新品评测期内零销量",
-                        evidence={
-                            "eval_period_days": self.NEW_DISH_EVAL_DAYS,
-                            "eval_sales": 0,
-                        },
-                        priority="high",
-                    ))
+                    suggestions.append(
+                        RemovalSuggestion(
+                            dish_id=dish_id,
+                            tenant_id=tenant_id,
+                            store_id=store_id,
+                            reason="新品评测期内零销量",
+                            evidence={
+                                "eval_period_days": self.NEW_DISH_EVAL_DAYS,
+                                "eval_sales": 0,
+                            },
+                            priority="high",
+                        )
+                    )
                     continue
 
             # 条件3
             if margin_rate < REMOVAL_MARGIN_CRITICAL:
-                suggestions.append(RemovalSuggestion(
-                    dish_id=dish_id,
-                    tenant_id=tenant_id,
-                    store_id=store_id,
-                    reason=f"毛利率{margin_rate:.1%}持续低于警戒线{REMOVAL_MARGIN_CRITICAL:.0%}",
-                    evidence={
-                        "margin_rate": round(margin_rate, 4),
-                        "threshold": REMOVAL_MARGIN_CRITICAL,
-                        "price_fen": price_fen,
-                        "cost_fen": cost_fen,
-                    },
-                    priority="medium",
-                ))
+                suggestions.append(
+                    RemovalSuggestion(
+                        dish_id=dish_id,
+                        tenant_id=tenant_id,
+                        store_id=store_id,
+                        reason=f"毛利率{margin_rate:.1%}持续低于警戒线{REMOVAL_MARGIN_CRITICAL:.0%}",
+                        evidence={
+                            "margin_rate": round(margin_rate, 4),
+                            "threshold": REMOVAL_MARGIN_CRITICAL,
+                            "price_fen": price_fen,
+                            "cost_fen": cost_fen,
+                        },
+                        priority="medium",
+                    )
+                )
 
         log.info(
             "removal_suggestions_db_generated",
@@ -759,7 +768,7 @@ class DishLifecycleService:
     ) -> list[str]:
         """找出健康分低于阈值的菜品，标记为待优化状态"""
         if db is not None:
-            return []   # 生产路径：由调用方对每门店分别触发
+            return []  # 生产路径：由调用方对每门店分别触发
 
         now_str = datetime.now(timezone.utc).isoformat()
         flagged = []

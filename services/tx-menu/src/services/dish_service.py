@@ -4,6 +4,7 @@
 价格单位: 分(fen)
 所有操作强制 tenant_id 租户隔离。
 """
+
 import uuid
 from datetime import datetime, timezone
 from typing import Optional
@@ -161,9 +162,21 @@ def update_dish(dish_id: str, tenant_id: str, **updates) -> dict:
         raise ValueError(f"菜品不存在: {dish_id}")
 
     updatable = {
-        "dish_name", "price_fen", "cost_fen", "description", "image_url",
-        "kitchen_station", "preparation_time", "unit", "spicy_level",
-        "tags", "season", "is_seasonal", "is_available", "sort_order", "category_id",
+        "dish_name",
+        "price_fen",
+        "cost_fen",
+        "description",
+        "image_url",
+        "kitchen_station",
+        "preparation_time",
+        "unit",
+        "spicy_level",
+        "tags",
+        "season",
+        "is_seasonal",
+        "is_available",
+        "sort_order",
+        "category_id",
     }
 
     for key, value in updates.items():
@@ -225,10 +238,7 @@ def list_dishes(
     if status and status not in VALID_DISH_STATUSES:
         raise ValueError(f"status 必须为 {VALID_DISH_STATUSES} 之一")
 
-    candidates = [
-        d for d in _dishes.values()
-        if d["tenant_id"] == tenant_id and not d["is_deleted"]
-    ]
+    candidates = [d for d in _dishes.values() if d["tenant_id"] == tenant_id and not d["is_deleted"]]
 
     # 筛选
     if store_id:
@@ -248,7 +258,7 @@ def list_dishes(
 
     total = len(candidates)
     start = (page - 1) * size
-    items = candidates[start:start + size]
+    items = candidates[start : start + size]
 
     return {"items": items, "total": total, "page": page, "size": size}
 
@@ -258,7 +268,8 @@ def list_dishes_by_category(tenant_id: str, category_id: str) -> list[dict]:
     if not tenant_id:
         raise ValueError("tenant_id 不能为空")
     return [
-        d for d in _dishes.values()
+        d
+        for d in _dishes.values()
         if d["tenant_id"] == tenant_id
         and not d["is_deleted"]
         and d.get("category_id") == category_id
@@ -273,8 +284,7 @@ def list_dishes_by_status(tenant_id: str, status: str) -> list[dict]:
     if status not in VALID_DISH_STATUSES:
         raise ValueError(f"status 必须为 {VALID_DISH_STATUSES} 之一")
     return [
-        d for d in _dishes.values()
-        if d["tenant_id"] == tenant_id and not d["is_deleted"] and d["status"] == status
+        d for d in _dishes.values() if d["tenant_id"] == tenant_id and not d["is_deleted"] and d["status"] == status
     ]
 
 
@@ -285,10 +295,7 @@ def list_dishes_by_season(tenant_id: str, season: str) -> list[dict]:
     if season not in VALID_SEASONS:
         raise ValueError(f"season 必须为 {VALID_SEASONS} 之一")
     return [
-        d for d in _dishes.values()
-        if d["tenant_id"] == tenant_id
-        and not d["is_deleted"]
-        and d.get("season") == season
+        d for d in _dishes.values() if d["tenant_id"] == tenant_id and not d["is_deleted"] and d.get("season") == season
     ]
 
 

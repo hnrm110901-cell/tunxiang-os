@@ -10,6 +10,7 @@
 
 金额单位：分（fen, int）。
 """
+
 from __future__ import annotations
 
 import math
@@ -27,6 +28,7 @@ _DEFAULT_CM_RATE: float = 0.60
 
 # ─── 枚举 ──────────────────────────────────────────────────────────────────────
 
+
 class ScenarioType(str, Enum):
     INGREDIENT_PRICE_CHANGE = "ingredient_price_change"
     DISH_PRICE_CHANGE = "dish_price_change"
@@ -36,19 +38,22 @@ class ScenarioType(str, Enum):
 
 # ─── 数据类 ────────────────────────────────────────────────────────────────────
 
+
 @dataclass
 class ImpactItem:
     """单项影响明细"""
-    name: str           # 菜品名 / 原料名 / 时段名
-    baseline_fen: int   # 基准值（成本/利润/营业额）
+
+    name: str  # 菜品名 / 原料名 / 时段名
+    baseline_fen: int  # 基准值（成本/利润/营业额）
     simulated_fen: int  # 模拟值
-    delta_fen: int      # 差值（正=增加, 负=减少）
-    delta_pct: float    # 差值百分比
+    delta_fen: int  # 差值（正=增加, 负=减少）
+    delta_pct: float  # 差值百分比
 
 
 @dataclass
 class ScenarioResult:
     """场景模拟结果"""
+
     scenario_type: str
     description: str
     affected_items: list[ImpactItem] = field(default_factory=list)
@@ -77,6 +82,7 @@ class ScenarioResult:
 
 # ─── 工具函数 ──────────────────────────────────────────────────────────────────
 
+
 def _safe_pct(delta: int, base: int) -> float:
     return round(delta / base, 4) if base != 0 else 0.0
 
@@ -96,6 +102,7 @@ def _top_n_impacts(items: list[ImpactItem], n: int = 5) -> list[dict]:
 
 
 # ─── 核心引擎 ──────────────────────────────────────────────────────────────────
+
 
 class ScenarioSimulator:
     """What-If 场景模拟器（无状态，纯函数风格）
@@ -165,9 +172,7 @@ class ScenarioSimulator:
 
     # ─── 场景1：原料涨跌价 ────────────────────────────────────────────────────
 
-    def _sim_ingredient_price(
-        self, params: dict, context: dict
-    ) -> ScenarioResult:
+    def _sim_ingredient_price(self, params: dict, context: dict) -> ScenarioResult:
         """原料涨跌价模拟
 
         params:
@@ -190,16 +195,12 @@ class ScenarioSimulator:
             price_fen = int(dish.get("selling_price_fen", 0))
 
             bom_items = dish.get("bom_items", [])
-            baseline_bom_cost = sum(
-                int(b.get("quantity", 0) * b.get("unit_cost_fen", 0))
-                for b in bom_items
-            )
+            baseline_bom_cost = sum(int(b.get("quantity", 0) * b.get("unit_cost_fen", 0)) for b in bom_items)
             # 找到受影响的原料
             affected_cost_delta = 0
             for b in bom_items:
-                match = (
-                    (ingredient_id and b.get("ingredient_id") == ingredient_id)
-                    or (ingredient_name and ingredient_name in b.get("ingredient_name", ""))
+                match = (ingredient_id and b.get("ingredient_id") == ingredient_id) or (
+                    ingredient_name and ingredient_name in b.get("ingredient_name", "")
                 )
                 if match:
                     item_cost = int(b.get("quantity", 0) * b.get("unit_cost_fen", 0))
@@ -215,20 +216,25 @@ class ScenarioSimulator:
             total_baseline_cost += baseline_bom_cost * qty
             total_sim_cost += sim_bom_cost * qty
 
-            impacts.append(ImpactItem(
-                name=dish_name,
-                baseline_fen=baseline_profit,
-                simulated_fen=sim_profit,
-                delta_fen=sim_profit - baseline_profit,
-                delta_pct=_safe_pct(sim_profit - baseline_profit, baseline_profit),
-            ))
+            impacts.append(
+                ImpactItem(
+                    name=dish_name,
+                    baseline_fen=baseline_profit,
+                    simulated_fen=sim_profit,
+                    delta_fen=sim_profit - baseline_profit,
+                    delta_pct=_safe_pct(sim_profit - baseline_profit, baseline_profit),
+                )
+            )
 
         total_delta = sum(it.delta_fen for it in impacts)
         # 估算月度基准利润（若context有store信息则用真实值）
         store = context.get("store", {})
-        baseline_profit_total = int(store.get("monthly_revenue_fen", 0)) - int(
-            store.get("monthly_fixed_cost_fen", 0)
-        ) - int(store.get("monthly_labor_fen", 0)) - total_baseline_cost
+        baseline_profit_total = (
+            int(store.get("monthly_revenue_fen", 0))
+            - int(store.get("monthly_fixed_cost_fen", 0))
+            - int(store.get("monthly_labor_fen", 0))
+            - total_baseline_cost
+        )
 
         direction = "涨价" if change_pct > 0 else "降价"
         ing_display = ingredient_name or ingredient_id or "指定原料"
@@ -277,19 +283,15 @@ class ScenarioSimulator:
         total_delta = 0
 
         for dish in dishes:
-            match = (
-                (dish_id and dish.get("dish_id") == dish_id)
-                or (dish_name_kw and dish_name_kw in dish.get("dish_name", ""))
+            match = (dish_id and dish.get("dish_id") == dish_id) or (
+                dish_name_kw and dish_name_kw in dish.get("dish_name", "")
             )
             if not match:
                 continue
 
             price = int(dish.get("selling_price_fen", 0))
             qty = int(dish.get("monthly_quantity", 0))
-            bom_cost = sum(
-                int(b.get("quantity", 0) * b.get("unit_cost_fen", 0))
-                for b in dish.get("bom_items", [])
-            )
+            bom_cost = sum(int(b.get("quantity", 0) * b.get("unit_cost_fen", 0)) for b in dish.get("bom_items", []))
 
             new_price = int(price * (1 + price_chg))
             new_qty = max(0, int(qty * (1 + volume_chg)))
@@ -298,13 +300,15 @@ class ScenarioSimulator:
             sim_profit = (new_price - bom_cost) * new_qty
             delta = sim_profit - baseline_profit
 
-            impacts.append(ImpactItem(
-                name=dish.get("dish_name", ""),
-                baseline_fen=baseline_profit,
-                simulated_fen=sim_profit,
-                delta_fen=delta,
-                delta_pct=_safe_pct(delta, baseline_profit),
-            ))
+            impacts.append(
+                ImpactItem(
+                    name=dish.get("dish_name", ""),
+                    baseline_fen=baseline_profit,
+                    simulated_fen=sim_profit,
+                    delta_fen=delta,
+                    delta_pct=_safe_pct(delta, baseline_profit),
+                )
+            )
             total_delta += delta
 
         store = context.get("store", {})

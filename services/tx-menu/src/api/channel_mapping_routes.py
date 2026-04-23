@@ -10,6 +10,7 @@ ROUTER REGISTRATION (在tx-menu/src/main.py中添加):
     from .api.channel_mapping_routes import router as channel_mapping_router
     app.include_router(channel_mapping_router)
 """
+
 from __future__ import annotations
 
 import uuid as _uuid

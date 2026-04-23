@@ -10,10 +10,11 @@
 - cost_type: food/labor/rent/utility/other
 - data_status: pending/complete/manual_adjusted
 """
+
 from __future__ import annotations
 
 import uuid
-from datetime import date, datetime
+from datetime import date
 from decimal import Decimal
 from typing import List, Optional
 
@@ -31,10 +32,10 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from shared.ontology.src.base import TenantBase
 
-
 # ─────────────────────────────────────────────────────────────────────────────
 # DailyCostReport — 每日成本归集日报
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class DailyCostReport(TenantBase):
     """
@@ -47,73 +48,96 @@ class DailyCostReport(TenantBase):
         complete        — Worker 已完成归集计算
         manual_adjusted — 人工调整过数据
     """
+
     __tablename__ = "daily_cost_reports"
 
-    store_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), nullable=False, index=True, comment="门店ID"
-    )
-    report_date: Mapped[date] = mapped_column(
-        Date, nullable=False, comment="日报日期"
-    )
+    store_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False, index=True, comment="门店ID")
+    report_date: Mapped[date] = mapped_column(Date, nullable=False, comment="日报日期")
 
     # ── 营收数据（来自POS）────────────────────────────────────────────────
     total_revenue_fen: Mapped[int] = mapped_column(
-        BigInteger, nullable=False, default=0, server_default="0",
+        BigInteger,
+        nullable=False,
+        default=0,
+        server_default="0",
         comment="当日营收（分）",
     )
     table_count: Mapped[int] = mapped_column(
-        Integer, nullable=False, default=0, server_default="0",
+        Integer,
+        nullable=False,
+        default=0,
+        server_default="0",
         comment="桌次",
     )
     customer_count: Mapped[int] = mapped_column(
-        Integer, nullable=False, default=0, server_default="0",
+        Integer,
+        nullable=False,
+        default=0,
+        server_default="0",
         comment="客数",
     )
 
     # ── 成本数据（来自费控）──────────────────────────────────────────────
     food_cost_fen: Mapped[int] = mapped_column(
-        BigInteger, nullable=False, default=0, server_default="0",
+        BigInteger,
+        nullable=False,
+        default=0,
+        server_default="0",
         comment="食材成本（分）",
     )
     labor_cost_fen: Mapped[int] = mapped_column(
-        BigInteger, nullable=False, default=0, server_default="0",
+        BigInteger,
+        nullable=False,
+        default=0,
+        server_default="0",
         comment="人力成本（分）",
     )
     other_cost_fen: Mapped[int] = mapped_column(
-        BigInteger, nullable=False, default=0, server_default="0",
+        BigInteger,
+        nullable=False,
+        default=0,
+        server_default="0",
         comment="其他费用（分）",
     )
     total_cost_fen: Mapped[int] = mapped_column(
-        BigInteger, nullable=False, default=0, server_default="0",
+        BigInteger,
+        nullable=False,
+        default=0,
+        server_default="0",
         comment="总成本（分）",
     )
 
     # ── 计算指标────────────────────────────────────────────────────────
     food_cost_rate: Mapped[Optional[Decimal]] = mapped_column(
-        Numeric(7, 4), nullable=True,
+        Numeric(7, 4),
+        nullable=True,
         comment="食材成本率 = food_cost_fen / total_revenue_fen",
     )
     labor_cost_rate: Mapped[Optional[Decimal]] = mapped_column(
-        Numeric(7, 4), nullable=True,
+        Numeric(7, 4),
+        nullable=True,
         comment="人力成本率 = labor_cost_fen / total_revenue_fen",
     )
     gross_margin_rate: Mapped[Optional[Decimal]] = mapped_column(
-        Numeric(7, 4), nullable=True,
+        Numeric(7, 4),
+        nullable=True,
         comment="毛利率 = (total_revenue_fen - total_cost_fen) / total_revenue_fen",
     )
 
     # ── 元数据──────────────────────────────────────────────────────────
     pos_data_source: Mapped[Optional[str]] = mapped_column(
-        String(50), nullable=True,
+        String(50),
+        nullable=True,
         comment="POS数据来源：pinzhi/aoqiwei/meituan",
     )
     data_status: Mapped[str] = mapped_column(
-        String(32), nullable=False, default="pending", server_default="pending",
+        String(32),
+        nullable=False,
+        default="pending",
+        server_default="pending",
         comment="数据状态：pending/complete/manual_adjusted",
     )
-    notes: Mapped[Optional[str]] = mapped_column(
-        Text, nullable=True, comment="备注"
-    )
+    notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True, comment="备注")
 
     # ── 关联──────────────────────────────────────────────────────────
     attribution_items: Mapped[List["CostAttributionItem"]] = relationship(
@@ -140,6 +164,7 @@ class DailyCostReport(TenantBase):
 # CostAttributionItem — 成本归集明细
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 class CostAttributionItem(TenantBase):
     """
     成本归集明细。记录每一笔费控申请如何归集到门店成本日报。
@@ -151,6 +176,7 @@ class CostAttributionItem(TenantBase):
         utility — 水电气
         other   — 其他费用
     """
+
     __tablename__ = "cost_attribution_items"
 
     report_id: Mapped[Optional[uuid.UUID]] = mapped_column(
@@ -161,25 +187,20 @@ class CostAttributionItem(TenantBase):
         comment="关联日报ID",
     )
     expense_application_id: Mapped[Optional[uuid.UUID]] = mapped_column(
-        UUID(as_uuid=True), nullable=True, index=True,
+        UUID(as_uuid=True),
+        nullable=True,
+        index=True,
         comment="费控申请ID",
     )
-    store_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), nullable=False, index=True, comment="门店ID"
-    )
-    attribution_date: Mapped[date] = mapped_column(
-        Date, nullable=False, comment="归集日期"
-    )
+    store_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False, index=True, comment="门店ID")
+    attribution_date: Mapped[date] = mapped_column(Date, nullable=False, comment="归集日期")
     cost_type: Mapped[Optional[str]] = mapped_column(
-        String(32), nullable=True,
+        String(32),
+        nullable=True,
         comment="成本类型：food/labor/rent/utility/other",
     )
-    amount_fen: Mapped[int] = mapped_column(
-        BigInteger, nullable=False, comment="金额（分）"
-    )
-    description: Mapped[Optional[str]] = mapped_column(
-        Text, nullable=True, comment="描述"
-    )
+    amount_fen: Mapped[int] = mapped_column(BigInteger, nullable=False, comment="金额（分）")
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True, comment="描述")
 
     # ── 关联──────────────────────────────────────────────────────────
     report: Mapped[Optional["DailyCostReport"]] = relationship(

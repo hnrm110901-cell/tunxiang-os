@@ -3,6 +3,7 @@
 基于菜品销售数据、评价数据、毛利数据，为每道菜品提供经营智能分析。
 所有操作强制 tenant_id 租户隔离。
 """
+
 import uuid
 from datetime import datetime, timezone
 from enum import Enum
@@ -17,52 +18,52 @@ log = structlog.get_logger()
 
 
 class DishStatus(str, Enum):
-    star = "star"                    # 高销高利（明星菜）
-    rising = "rising"                # 销量上升趋势
-    declining = "declining"          # 销量下降趋势
-    underperform = "underperform"    # 低销低利（瘦狗菜）
+    star = "star"  # 高销高利（明星菜）
+    rising = "rising"  # 销量上升趋势
+    declining = "declining"  # 销量下降趋势
+    underperform = "underperform"  # 低销低利（瘦狗菜）
     seasonal_peak = "seasonal_peak"  # 季节旺季
-    new = "new"                      # 新品
+    new = "new"  # 新品
 
 
 class DishLifecycle(str, Enum):
-    launch = "launch"        # 上新
-    growth = "growth"        # 成长
-    mature = "mature"        # 成熟
-    decline = "decline"      # 衰退
+    launch = "launch"  # 上新
+    growth = "growth"  # 成长
+    mature = "mature"  # 成熟
+    decline = "decline"  # 衰退
 
 
 class DishAction(str, Enum):
-    promote = "promote"      # 推广
-    raise_price = "raise_price"    # 提价
-    lower_price = "lower_price"    # 降价
-    replace = "replace"      # 替换
-    delist = "delist"        # 下架
-    maintain = "maintain"    # 维持现状
-    observe = "observe"      # 观察
+    promote = "promote"  # 推广
+    raise_price = "raise_price"  # 提价
+    lower_price = "lower_price"  # 降价
+    replace = "replace"  # 替换
+    delist = "delist"  # 下架
+    maintain = "maintain"  # 维持现状
+    observe = "observe"  # 观察
 
 
 # ─── 阈值常量 ───
 
 
-STAR_SALES_PERCENTILE = 0.7       # 销量 top 30% 算高销
-STAR_MARGIN_THRESHOLD = 0.55      # 毛利率 > 55% 算高利
-LOW_SALES_PERCENTILE = 0.3        # 销量 bottom 30% 算低销
-LOW_MARGIN_THRESHOLD = 0.35       # 毛利率 < 35% 算低利
-RISING_GROWTH_RATE = 0.10         # 周环比增长 > 10% 算上升
-DECLINING_GROWTH_RATE = -0.10     # 周环比下降 > 10% 算下降
-NEW_DISH_DAYS = 30                # 上新 30 天内算新品
-BAD_REVIEW_THRESHOLD = 0.10       # 差评率 > 10% 需关注
-REORDER_THRESHOLD = 0.25          # 复点率 > 25% 算良好
-LIFECYCLE_GROWTH_WEEKS = 8        # 上新后 8 周内算成长期
-LIFECYCLE_MATURE_WEEKS = 24       # 8-24 周算成熟期
+STAR_SALES_PERCENTILE = 0.7  # 销量 top 30% 算高销
+STAR_MARGIN_THRESHOLD = 0.55  # 毛利率 > 55% 算高利
+LOW_SALES_PERCENTILE = 0.3  # 销量 bottom 30% 算低销
+LOW_MARGIN_THRESHOLD = 0.35  # 毛利率 < 35% 算低利
+RISING_GROWTH_RATE = 0.10  # 周环比增长 > 10% 算上升
+DECLINING_GROWTH_RATE = -0.10  # 周环比下降 > 10% 算下降
+NEW_DISH_DAYS = 30  # 上新 30 天内算新品
+BAD_REVIEW_THRESHOLD = 0.10  # 差评率 > 10% 需关注
+REORDER_THRESHOLD = 0.25  # 复点率 > 25% 算良好
+LIFECYCLE_GROWTH_WEEKS = 8  # 上新后 8 周内算成长期
+LIFECYCLE_MATURE_WEEKS = 24  # 8-24 周算成熟期
 
 
 # ─── 内部存储（可替换为 DB 查询） ───
 
 
-_dish_sales: dict[str, dict] = {}      # dish_id -> 销售统计
-_dish_reviews: dict[str, dict] = {}    # dish_id -> 评价统计
+_dish_sales: dict[str, dict] = {}  # dish_id -> 销售统计
+_dish_reviews: dict[str, dict] = {}  # dish_id -> 评价统计
 
 
 def _now_iso() -> str:

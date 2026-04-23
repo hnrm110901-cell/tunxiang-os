@@ -12,6 +12,7 @@ tx-finance/src/api/e_invoice_routes.py
     cd /Users/lichun/tunxiang-os/services/tx-finance
     pytest src/tests/test_e_invoice.py -v
 """
+
 from __future__ import annotations
 
 import sys
@@ -37,10 +38,16 @@ def _make_stub(name: str, **attrs) -> types.ModuleType:
 if "structlog" not in sys.modules:
     _log_stub = MagicMock()
     _log_stub.get_logger.return_value = MagicMock(
-        info=MagicMock(), warning=MagicMock(), error=MagicMock(),
-        bind=MagicMock(return_value=MagicMock(
-            info=MagicMock(), warning=MagicMock(), error=MagicMock(),
-        )),
+        info=MagicMock(),
+        warning=MagicMock(),
+        error=MagicMock(),
+        bind=MagicMock(
+            return_value=MagicMock(
+                info=MagicMock(),
+                warning=MagicMock(),
+                error=MagicMock(),
+            )
+        ),
     )
     sys.modules["structlog"] = _log_stub
 
@@ -53,9 +60,7 @@ if "sqlalchemy" not in sys.modules:
         SQLAlchemyError=type("SQLAlchemyError", (Exception,), {}),
     )
     sys.modules["sqlalchemy.ext"] = _make_stub("sqlalchemy.ext")
-    sys.modules["sqlalchemy.ext.asyncio"] = _make_stub(
-        "sqlalchemy.ext.asyncio", AsyncSession=MagicMock()
-    )
+    sys.modules["sqlalchemy.ext.asyncio"] = _make_stub("sqlalchemy.ext.asyncio", AsyncSession=MagicMock())
 else:
     if not hasattr(sys.modules["sqlalchemy"], "select"):
         sys.modules["sqlalchemy"].select = MagicMock()
@@ -74,9 +79,7 @@ sys.modules["shared.ontology.src.database"] = _db_stub
 # ── shared.adapters.nuonuo ────────────────────────────────────────────────────
 sys.modules.setdefault("shared.adapters", _make_stub("shared.adapters"))
 sys.modules.setdefault("shared.adapters.nuonuo", _make_stub("shared.adapters.nuonuo"))
-sys.modules.setdefault(
-    "shared.adapters.nuonuo.src", _make_stub("shared.adapters.nuonuo.src")
-)
+sys.modules.setdefault("shared.adapters.nuonuo.src", _make_stub("shared.adapters.nuonuo.src"))
 sys.modules["shared.adapters.nuonuo.src.invoice_client"] = _make_stub(
     "shared.adapters.nuonuo.src.invoice_client",
     NuonuoInvoiceClient=MagicMock(),
@@ -122,9 +125,7 @@ import importlib.util
 import pathlib
 
 _api_dir = pathlib.Path(__file__).parent.parent / "api"
-_spec = importlib.util.spec_from_file_location(
-    "e_invoice_routes_mod", _api_dir / "e_invoice_routes.py"
-)
+_spec = importlib.util.spec_from_file_location("e_invoice_routes_mod", _api_dir / "e_invoice_routes.py")
 _routes_mod = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(_routes_mod)
 
@@ -223,9 +224,7 @@ def test_invoice_request_pending():
         invoice_id_2 = body2["data"]["id"]
 
         # service mock 始终返回同一对象 → id 应相同
-        assert invoice_id_1 == invoice_id_2, (
-            f"幂等校验失败：首次 {invoice_id_1}，二次 {invoice_id_2}"
-        )
+        assert invoice_id_1 == invoice_id_2, f"幂等校验失败：首次 {invoice_id_1}，二次 {invoice_id_2}"
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -240,9 +239,7 @@ def test_red_note_requires_issued():
 
     with patch.object(_routes_mod, "_invoice_service") as svc:
         svc.cancel_invoice = AsyncMock(
-            side_effect=_InvoiceStatusError(
-                f"发票 {INVOICE_ID} 状态为 pending，只有 issued 状态可作废"
-            )
+            side_effect=_InvoiceStatusError(f"发票 {INVOICE_ID} 状态为 pending，只有 issued 状态可作废")
         )
         client = TestClient(app)
         resp = client.post(
@@ -301,7 +298,7 @@ def test_tax_ledger_summary():
     mock_row = MagicMock()
     mock_row._mapping = {
         "total_invoice_amount_fen": 1500000,  # 15000.00 元
-        "sales_tax_amount_fen": 84905,        # 849.05 元
+        "sales_tax_amount_fen": 84905,  # 849.05 元
         "uninvoiced_order_count": 3,
     }
     mock_result.fetchone = MagicMock(return_value=mock_row)
@@ -334,6 +331,4 @@ def test_tax_ledger_summary():
         pytest.skip("tax-ledger 端点尚未注册，待 Y-B3 完整实现后启用")
     else:
         # 其他错误视为通过（路由初始化阶段）
-        assert resp.status_code in (200, 404, 422), (
-            f"意外状态码：{resp.status_code}，body: {resp.text}"
-        )
+        assert resp.status_code in (200, 404, 422), f"意外状态码：{resp.status_code}，body: {resp.text}"

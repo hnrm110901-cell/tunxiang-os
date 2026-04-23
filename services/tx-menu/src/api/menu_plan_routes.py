@@ -27,11 +27,11 @@
   - 下发操作发射 MenuEventType.PLAN_DISTRIBUTED（扩展现有 scheme_routes distribute 端点）
   - 重置覆盖发射 MenuEventType.STORE_OVERRIDE_RESET
 """
+
 from __future__ import annotations
 
 import asyncio
 import uuid
-from datetime import datetime, timezone
 from typing import Optional
 
 import structlog
@@ -40,9 +40,9 @@ from pydantic import BaseModel, Field
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from shared.ontology.src.database import get_db
 from shared.events.src.emitter import emit_event
 from shared.events.src.event_types import MenuEventType
+from shared.ontology.src.database import get_db
 
 log = structlog.get_logger(__name__)
 
@@ -323,14 +323,16 @@ async def rollback_plan_version(
     await db.commit()
     log.info("menu_plan.rolled_back", plan_id=plan_id, version=version_number, tenant_id=x_tenant_id)
 
-    asyncio.create_task(emit_event(
-        event_type=MenuEventType.PLAN_ROLLED_BACK,
-        tenant_id=tid,
-        stream_id=plan_id,
-        payload={"version_number": version_number, "operator": x_operator},
-        source_service="tx-menu",
-        metadata={"operator_id": x_operator or ""},
-    ))
+    asyncio.create_task(
+        emit_event(
+            event_type=MenuEventType.PLAN_ROLLED_BACK,
+            tenant_id=tid,
+            stream_id=plan_id,
+            payload={"version_number": version_number, "operator": x_operator},
+            source_service="tx-menu",
+            metadata={"operator_id": x_operator or ""},
+        )
+    )
 
     return {
         "ok": True,
@@ -377,9 +379,7 @@ async def get_distribute_log(
         where += " AND status = :status"
         params["status"] = status
 
-    count_res = await db.execute(
-        text(f"SELECT COUNT(*) FROM menu_distribute_log {where}"), params
-    )
+    count_res = await db.execute(text(f"SELECT COUNT(*) FROM menu_distribute_log {where}"), params)
     total = count_res.scalar() or 0
 
     params["limit"] = size
@@ -441,9 +441,7 @@ async def list_store_overrides(
             _err(400, "无效的 scheme_id")
         where += " AND smo.scheme_id = :scheme_id"
 
-    count_res = await db.execute(
-        text(f"SELECT COUNT(*) FROM store_menu_overrides smo {where}"), params
-    )
+    count_res = await db.execute(text(f"SELECT COUNT(*) FROM store_menu_overrides smo {where}"), params)
     total = count_res.scalar() or 0
 
     params["limit"] = size
@@ -531,15 +529,17 @@ async def batch_upsert_store_overrides(
     await db.commit()
     log.info("store_menu.batch_override", store_id=store_id, count=upserted, tenant_id=x_tenant_id)
 
-    asyncio.create_task(emit_event(
-        event_type=MenuEventType.STORE_OVERRIDE_SET,
-        tenant_id=tid,
-        stream_id=store_id,
-        payload={"store_id": store_id, "upserted_count": upserted, "operator": x_operator},
-        store_id=store_id,
-        source_service="tx-menu",
-        metadata={"operator_id": x_operator or ""},
-    ))
+    asyncio.create_task(
+        emit_event(
+            event_type=MenuEventType.STORE_OVERRIDE_SET,
+            tenant_id=tid,
+            stream_id=store_id,
+            payload={"store_id": store_id, "upserted_count": upserted, "operator": x_operator},
+            store_id=store_id,
+            source_service="tx-menu",
+            metadata={"operator_id": x_operator or ""},
+        )
+    )
 
     return {"ok": True, "data": {"store_id": store_id, "upserted_count": upserted}}
 
@@ -579,15 +579,17 @@ async def reset_store_overrides(
     deleted_count = result.rowcount
     log.info("store_menu.reset", store_id=store_id, deleted=deleted_count, tenant_id=x_tenant_id)
 
-    asyncio.create_task(emit_event(
-        event_type=MenuEventType.STORE_OVERRIDE_RESET,
-        tenant_id=tid,
-        stream_id=store_id,
-        payload={"store_id": store_id, "deleted_count": deleted_count, "scheme_id": scheme_id},
-        store_id=store_id,
-        source_service="tx-menu",
-        metadata={"operator_id": x_operator or ""},
-    ))
+    asyncio.create_task(
+        emit_event(
+            event_type=MenuEventType.STORE_OVERRIDE_RESET,
+            tenant_id=tid,
+            stream_id=store_id,
+            payload={"store_id": store_id, "deleted_count": deleted_count, "scheme_id": scheme_id},
+            store_id=store_id,
+            source_service="tx-menu",
+            metadata={"operator_id": x_operator or ""},
+        )
+    )
 
     return {"ok": True, "data": {"store_id": store_id, "deleted_override_count": deleted_count}}
 

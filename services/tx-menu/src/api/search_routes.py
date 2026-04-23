@@ -7,10 +7,11 @@ POST /api/v1/menu/search/record        — 记录搜索行为（upsert search_ho
 RLS 租户隔离：set_config('app.tenant_id', ...)
 DB 不可用时 graceful 降级。
 """
+
 from typing import Optional
 
 import structlog
-from fastapi import APIRouter, Depends, Header, HTTPException, Query
+from fastapi import APIRouter, Depends, Header, Query
 from pydantic import BaseModel, Field
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
@@ -24,12 +25,14 @@ router = APIRouter(prefix="/api/v1/menu/search", tags=["menu-search"])
 
 # ─── 请求模型 ───
 
+
 class SearchRecordRequest(BaseModel):
     keyword: str = Field(..., max_length=50, description="搜索关键词")
     source: str = Field("miniapp", description="来源: miniapp / h5 / pos")
 
 
 # ─── 辅助 ───
+
 
 async def _set_rls(db: AsyncSession, tenant_id: str) -> None:
     await db.execute(

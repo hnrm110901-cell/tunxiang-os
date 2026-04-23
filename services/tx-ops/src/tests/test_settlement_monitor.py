@@ -13,6 +13,7 @@
   - app.dependency_overrides[get_db] + AsyncMock
   - DB mock 返回模拟行数据
 """
+
 from __future__ import annotations
 
 import sys
@@ -22,10 +23,8 @@ from datetime import date, datetime, timedelta, timezone
 from typing import AsyncGenerator
 from unittest.mock import AsyncMock, MagicMock
 
-import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-
 
 # ══════════════════════════════════════════════════════════════════════════════
 #  sys.modules 存根注入（必须在导入路由前完成）
@@ -47,8 +46,10 @@ _ensure_stub("shared.ontology")
 _ensure_stub("shared.ontology.src")
 _db_mod = _ensure_stub("shared.ontology.src.database")
 if not hasattr(_db_mod, "get_db"):
+
     async def _placeholder_get_db():
         yield None
+
     _db_mod.get_db = _placeholder_get_db
 
 _ensure_stub("shared.events")
@@ -56,8 +57,10 @@ _ensure_stub("shared.events.src")
 _ensure_stub("shared.events.src.emitter", {"emit_event": AsyncMock()})
 _ev_types = _ensure_stub("shared.events.src.event_types")
 if not hasattr(_ev_types, "SettlementEventType"):
+
     class _FakeSettlementEventType:
         DAILY_CLOSED = "settlement.daily_closed"
+
     _ev_types.SettlementEventType = _FakeSettlementEventType
 
 if "structlog" not in sys.modules:
@@ -75,12 +78,13 @@ if "asyncpg" not in sys.modules:
 #  导入路由（存根注入后）
 # ══════════════════════════════════════════════════════════════════════════════
 
-from ..api.settlement_monitor_routes import router as monitor_router  # noqa: E402
-from ..api.settlement_monitor_routes import (  # noqa: E402
-    _is_overdue,
-    _compute_summary,
-)
 from shared.ontology.src.database import get_db  # noqa: E402
+
+from ..api.settlement_monitor_routes import (  # noqa: E402
+    _compute_summary,
+    _is_overdue,
+)
+from ..api.settlement_monitor_routes import router as monitor_router  # noqa: E402
 
 # ══════════════════════════════════════════════════════════════════════════════
 #  FastAPI 应用
@@ -98,16 +102,21 @@ HEADERS = {"X-Tenant-ID": TENANT_ID}
 
 def _make_row_mapping(data: dict):
     """创建模拟 SQLAlchemy row._mapping 对象。"""
+
     class FakeMapping:
         def __init__(self, d):
             self._data = d
+
         def __getitem__(self, key):
             return self._data[key]
+
         def get(self, key, default=None):
             return self._data.get(key, default)
+
     class FakeRow:
         def __init__(self, d):
             self._mapping = FakeMapping(d)
+
     return FakeRow(data)
 
 
@@ -126,22 +135,43 @@ def _make_db_with_stores(stores_data: list[dict]) -> AsyncMock:
 
 SAMPLE_STORES = [
     {
-        "store_id": "store_001", "store_name": "芙蓉路店", "brand_name": "尝在一起",
-        "brand_id": "brand_001", "region_id": "region_001", "status": "completed",
-        "expected_close_time": "22:00", "actual_close_time": "21:45",
-        "operator_name": "张店长", "duration_minutes": 45, "remarks": "",
+        "store_id": "store_001",
+        "store_name": "芙蓉路店",
+        "brand_name": "尝在一起",
+        "brand_id": "brand_001",
+        "region_id": "region_001",
+        "status": "completed",
+        "expected_close_time": "22:00",
+        "actual_close_time": "21:45",
+        "operator_name": "张店长",
+        "duration_minutes": 45,
+        "remarks": "",
     },
     {
-        "store_id": "store_002", "store_name": "五一广场店", "brand_name": "尝在一起",
-        "brand_id": "brand_001", "region_id": "region_001", "status": "running",
-        "expected_close_time": "22:00", "actual_close_time": None,
-        "operator_name": "李店长", "duration_minutes": None, "remarks": "",
+        "store_id": "store_002",
+        "store_name": "五一广场店",
+        "brand_name": "尝在一起",
+        "brand_id": "brand_001",
+        "region_id": "region_001",
+        "status": "running",
+        "expected_close_time": "22:00",
+        "actual_close_time": None,
+        "operator_name": "李店长",
+        "duration_minutes": None,
+        "remarks": "",
     },
     {
-        "store_id": "store_003", "store_name": "解放西店", "brand_name": "最黔线",
-        "brand_id": "brand_002", "region_id": "region_001", "status": "pending",
-        "expected_close_time": "21:30", "actual_close_time": None,
-        "operator_name": "王店长", "duration_minutes": None, "remarks": "",
+        "store_id": "store_003",
+        "store_name": "解放西店",
+        "brand_name": "最黔线",
+        "brand_id": "brand_002",
+        "region_id": "region_001",
+        "status": "pending",
+        "expected_close_time": "21:30",
+        "actual_close_time": None,
+        "operator_name": "王店长",
+        "duration_minutes": None,
+        "remarks": "",
     },
 ]
 
@@ -149,6 +179,7 @@ SAMPLE_STORES = [
 def _override(db_mock: AsyncMock):
     async def _dep() -> AsyncGenerator:
         yield db_mock
+
     return _dep
 
 
@@ -268,11 +299,15 @@ class TestHistoryEndpoint:
         trend_rows = []
         for i in range(3):
             d = today - timedelta(days=2 - i)
-            trend_rows.append(_make_row_mapping({
-                "settlement_date": d,
-                "total": 5,
-                "completed": 4 + (i % 2),
-            }))
+            trend_rows.append(
+                _make_row_mapping(
+                    {
+                        "settlement_date": d,
+                        "total": 5,
+                        "completed": 4 + (i % 2),
+                    }
+                )
+            )
         result_mock = MagicMock()
         result_mock.fetchall.return_value = trend_rows
         db.execute = AsyncMock(return_value=result_mock)
