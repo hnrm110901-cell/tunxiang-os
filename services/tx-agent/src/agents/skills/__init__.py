@@ -53,6 +53,9 @@ from .points_advisor import PointsAdvisorAgent
 from .private_ops import PrivateOpsAgent
 from .queue_seating import QueueSeatingAgent
 from .referral_growth import ReferralGrowthAgent
+
+# Sprint R2 Track A：AI 预订礼宾员（P0 云端+边缘）
+from .reservation_concierge import ReservationConciergeAgent
 from .review_insight import ReviewInsightAgent
 from .review_summary import ReviewSummaryAgent
 from .salary_advisor import SalaryAdvisorAgent
@@ -151,6 +154,8 @@ ALL_SKILL_AGENTS = [
     GrowthCoachAgent,
     SmartCustomerServiceAgent,
     CashierAuditAgent,
+    # Sprint R2 Track A：AI 预订礼宾员（P0 Agent，margin + experience）
+    ReservationConciergeAgent,
 ]
 
 
