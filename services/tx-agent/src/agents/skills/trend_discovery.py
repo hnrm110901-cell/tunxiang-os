@@ -34,6 +34,12 @@ class TrendDiscoveryAgent(SkillAgent):
     priority = "P1"
     run_location = "cloud"
 
+    # Sprint D1 / PR 批次 4：纯洞察报告类，不直接决策，豁免三约束
+    constraint_scope = set()
+    constraint_waived_reason = (
+        "纯搜索趋势洞察报告，不触发业务决策；毛利/食安/体验均不适用，仅输出分析供人工决策"
+    )
+
     def get_supported_actions(self) -> list[str]:
         return [
             "analyze_search_hot_words",
