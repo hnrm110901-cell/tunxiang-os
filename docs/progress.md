@@ -1,3 +1,76 @@
+## 2026-04-23 Sprint E1：外卖 canonical schema（5 平台 payload 统一）
+
+### 本次会话目标
+按 `docs/sprint-plan-2026Q2-unified.md` Sprint E 推进 E1：把 5 个平台（美团/饿了么/抖音/小红书/微信）千差万别的订单 payload 规范化到统一 `CanonicalDeliveryOrder`，下游分析 / Agent / BI 只认 canonical，不碰平台。raw_payload 保真归档 + payload_sha256 幂等去重 + 状态机统一 + 金额全 fen(BIGINT)。
+
+Tier 级别：Tier 2（外卖订单链路依赖，未触资金结算路径）。
+
+### 完成状态
+- [x] **v285 迁移**：`canonical_delivery_orders` + `canonical_delivery_items` 双表
+  - 6 平台 CHECK：meituan/eleme/douyin/xiaohongshu/wechat/other
+  - 10 状态机：pending/accepted/preparing/dispatched/delivering/delivered/completed/cancelled/refunded/error
+  - 4 订单类型：delivery/pickup/dine_in/group_buy
+  - 金额 11 字段全 BIGINT fen（gross/discount/commission/subsidy/delivery_fee/cost/packaging/tax/tip/paid/net）
+  - 时间轴 7 字段（placed/accepted/dispatched/delivered/completed/cancelled/expected_delivery）
+  - raw_payload + payload_sha256 UNIQUE + canonical_version + transformation_errors
+  - 5 索引（platform_order_id UNIQUE / payload_sha256 UNIQUE / canonical_no UNIQUE / store+time / status+time 活跃订单）
+  - RLS app.tenant_id 双表
+- [x] **`shared/adapters/delivery_canonical/` 模块**：
+  - `base.py`：`CanonicalDeliveryOrder` / `CanonicalDeliveryItem` dataclass + 工具函数 `compute_payload_sha256` / `mask_phone` / `hash_address` / `to_fen` + `CanonicalTransformer` ABC
+  - `registry.py`：`register_transformer` / `get_transformer` / `transform` / `list_supported_platforms`
+  - `transformers.py`：5 平台 transformer 实现（每个含 STATUS_MAP + `supports()` 嗅探 + transform 逻辑）
+- [x] **3 路 API**（`services/tx-trade/src/api/canonical_delivery_routes.py`）：
+  - `POST /api/v1/trade/delivery/canonical/ingest` — 幂等 UPSERT（ON CONFLICT 状态变更时更新时间戳）
+  - `GET /api/v1/trade/delivery/canonical/{id}` — 订单 + items 嵌套
+  - `GET /api/v1/trade/delivery/canonical` — 分页查询（platform/store/status/date_from/date_to 过滤）
+  - `GET /api/v1/trade/delivery/canonical/meta/platforms` — 供前端枚举
+- [x] **64 TDD 测试全绿**（0.05s）：
+  - 工具函数 17（sha256 稳定 / mask_phone 4 种 / hash_address / to_fen 5 种 / _parse_ts 5 种）
+  - CanonicalModels 9（自动 subtotal/total/net_amount/sha256 + 非法值拒绝 + transformation_errors + to_insert_params 契约）
+  - Registry 3
+  - Meituan 7（基本 + dine_in + 未知 status 降级 + 缺 orderId + phone 脱敏 + 地址 hash + supports 嗅探）
+  - Eleme 5（基本 + 4 种 status 映射 + 未知降级 + 缺 id + supports）
+  - Douyin 5（基本 + group_buy + 毫秒时间戳 + items + 缺 create_time）
+  - Xiaohongshu 4
+  - Wechat 3
+  - v285 迁移静态断言 8
+- [x] Ruff 全绿
+
+### 关键决策
+- **raw_payload 强制归档** — 每条 canonical 都带原始推送 JSONB，即便 transformer 升级后也能回刷。`canonical_version` 字段预留批量迁移标识
+- **幂等通过 UNIQUE (tenant, platform, platform_order_id)**，而非仅 payload_sha256 — 平台会多次推送同一订单不同状态（如 meituan 从 status=2 到 4 到 9），需要 UPSERT 更新时间戳，不是单纯拒绝重复
+- **`supports()` 嗅探器** — 允许未来做 auto-detect（webhook 不带 platform header 时用 supports 找匹配的 transformer），本 PR 暂不在 API 层启用，但框架留好
+- **transformation_errors 不中断转换** — 非致命问题（单个 item 解析失败 / 未知 status）记到数组里，transform 继续；致命问题（缺 orderId / placed_at）直接抛 `TransformationError`
+- **`to_fen()` 保守规则** — int 视为已是 fen，float/str 视为元乘 100。transformer 应明确传入单位（美团传浮点、饿了么/抖音传 int），避免启发式错误
+- **小红书 status=completed 默认** — 小红书核销场景没有中间态，一来就是完成。后续若支持团购预订，需扩展 status map
+- **`wechat` 自营也归 canonical** — 虽然是内部订单，但走同一 schema 能让分析层统一看"全渠道订单"，`internal_dish_id` 直接回填为平台 SKU id
+
+### 交付清单
+```
+新建：
+  shared/db-migrations/versions/v285_canonical_delivery_orders.py      (~180 行，2 表 + 5 索引 + RLS + 注释)
+  shared/adapters/delivery_canonical/__init__.py                        统一导出
+  shared/adapters/delivery_canonical/base.py                            (~230 行，dataclass + ABC + 工具)
+  shared/adapters/delivery_canonical/registry.py                        (~55 行)
+  shared/adapters/delivery_canonical/transformers.py                    (~490 行，5 平台 transformer)
+  services/tx-trade/src/api/canonical_delivery_routes.py                (~340 行，3 端点 + UPSERT)
+  shared/adapters/delivery_canonical/tests/test_canonical.py            (64 测试 ~650 行)
+```
+
+### 下一步
+- **E2 一键发布**（v286 迁移 + dish_publish_registry）— 同一个菜品配置一次同步到 5 平台，本 E1 的 canonical schema 是 E2 的下游依赖
+- **E3 小红书核销** — 实装 xiaohongshu_adapter（当前 transformer 对 payload 格式已就绪，差 OAuth + 签名校验 + webhook ingress）
+- **E4 异议工作流**（v287 迁移）— `delivery_disputes` 表 + 状态机 + 自动响应模板
+- **canonical_delivery_routes 挂载到 tx-trade main.py** — 当前只写了 router，需要在 `services/tx-trade/src/main.py` 注册
+
+### 已知风险
+- **Meituan STATUS_MAP 不完整** — 实际美团还有 13/14 等预订/退款状态，当前 9 个主要状态覆盖 80%，剩余会走 "未知 status 降级 pending"
+- **Eleme status 字符串枚举版本差异** — v2 API 的 VALID/UNPROCESSED/COMPLETED 和 v1 API 字符串不同；本 PR 对齐 v2，v1 payload 会走降级
+- **`to_fen(int)` 启发式** — transformer 传 `price=8850` 和 `price=88.50` 结果不同。若上游传错单位会 100x 误差。**mitigation**: transformer 明确注释每个字段单位，DB CHECK 约束 amount >= 0 catch 不了单位错误
+- **UPSERT 不更新 items** — 重复推送只更新 order 主体（status/时间戳/payload），items 以首次写入为准。若平台推送时 items 变了（例如顾客补加菜），当前会漏。预期平台更改订单会改 platform_order_id，需要真实场景验证
+
+---
+
 ## 2026-04-23 Sprint D4b：薪资异常检测 Sonnet 4.7 + Prompt Cache（城市基准共享）
 
 ### 本次会话目标

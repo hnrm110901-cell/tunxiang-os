@@ -1,3 +1,31 @@
+## 2026-04-23 Sprint E1 外卖 canonical schema — 5 平台 payload 统一
+
+### 今日完成
+- [v285 迁移] `canonical_delivery_orders` + `canonical_delivery_items` 双表：6 平台 CHECK + 10 状态机 + 4 订单类型 + 11 金额 fen 字段 + 7 时间字段 + raw_payload 保真 + payload_sha256 幂等 + RLS + 5 索引
+- [shared/adapters/delivery_canonical/] 新模块：`base.py`（dataclass + ABC + 工具 compute_payload_sha256/mask_phone/hash_address/to_fen）+ `registry.py`（register/get/transform）+ `transformers.py`（美团/饿了么/抖音/小红书/微信 5 transformer，每个含 STATUS_MAP + supports 嗅探）
+- [3 路 API] POST /ingest（幂等 UPSERT，ON CONFLICT 更新时间戳）+ GET /{id}（订单 + items）+ GET 列表（platform/store/status/date 过滤）+ GET meta/platforms
+- [64 测试全绿] 0.05s — 工具 17 / CanonicalModels 9 / Registry 3 / Meituan 7 / Eleme 5 / Douyin 5 / Xiaohongshu 4 / Wechat 3 / migration 8 + 3 杂项
+
+### 数据变化
+- 迁移版本：v284 → v285
+- 新增 API 模块：1 个（tx-trade/canonical_delivery_routes）
+- 新增共享模块：1 个（shared/adapters/delivery_canonical/）
+- 新增测试：64 个
+
+### 遗留问题
+- Meituan STATUS_MAP 9 个覆盖 80%，未覆盖预订/退款子状态 — 走 "未知降级 pending" + 记 transformation_errors
+- Eleme status 对齐 v2 API，v1 会走降级
+- `to_fen(int)` 启发式若上游传错单位会 100x 误差；依赖 transformer 注释纪律
+- UPSERT 不更新 items（以首次为准）— 真实场景验证后决定是否开放
+- canonical_delivery_routes 尚未挂载到 tx-trade main.py — 下次 PR 合入前补
+
+### 明日计划
+- **E2 一键发布**（v286 + dish_publish_registry）— 基于本 E1 canonical schema 的下游
+- **E3 小红书核销** — XiaohongshuTransformer payload 已就绪，差 OAuth + 签名 + webhook ingress
+- **E4 异议工作流**（v287 + delivery_disputes + 状态机 + 自动响应）
+
+---
+
 ## 2026-04-23 Sprint D1 批次 6 + Overflow — 14 Skill 冲 100% 覆盖 + CI 门禁
 
 ### 今日完成
