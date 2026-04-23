@@ -1,3 +1,34 @@
+## 2026-04-23 Sprint D2 — Agent 决策 ROI 三字段 + mv_agent_roi_monthly 物化视图
+
+### 今日完成
+- [shared/db-migrations/versions/v264_agent_decision_logs_roi_fields.py] +4 列（saved_labor_hours/prevented_loss_fen/improved_kpi/roi_evidence）+ 2 非负 CHECK + 覆盖索引 + 列注释；upgrade/downgrade 完整
+- [shared/db-migrations/versions/v265_mv_agent_roi_monthly.py] mv_agent_roi_monthly 按月聚合 + UNIQUE 索引 + refresh_mv_agent_roi_monthly() PL/pgSQL 函数（自动降级）+ 13 个月滑动窗口
+- [services/tx-agent/src/models/decision_log.py] AgentDecisionLog ORM +4 Mapped 字段（Decimal/BIGINT/JSONB）
+- [services/tx-agent/src/agents/base.py] AgentResult dataclass +4 ROI 字段（field(default_factory=dict) 避免实例共享）
+- [services/tx-agent/src/services/decision_log_service.py] log_skill_result 提取 ROI + 类型降级
+- [services/tx-agent/src/api/agent_roi_routes.py] 3 新端点：/decision-roi/monthly / /refresh / /summary
+- [services/tx-agent/src/tests/test_d2_roi_fields.py] 10 TDD 测试（7 passed + 3 skipped）
+
+### 数据变化
+- 迁移版本：v263 → **v264_roi → v265_mv_roi**
+- 新增文件：3（v264/v265 迁移 + test_d2_roi_fields）
+- 修改文件：4（decision_log ORM / base.py / decision_log_service / agent_roi_routes）
+- 新增测试：10（7 passed + 3 skipped）
+- ruff 状态：All checks passed!
+
+### 遗留问题
+- decision_log_service 有 pre-existing 相对导入 bug（同 edge_mixin），3 测试 skipped；生产 Docker 正常
+- Skill 端未填 ROI 数据时 mv 全为 0（渐进填充）
+- K8s CronJob 自动刷新 mv 未配（放运维层）
+- 设计稿决策点 #1 "D2 agent_decision_logs 新增列" 待创始人签字
+
+### 明日计划
+- 等 PR 合入后启动 D3 三赛道（D3a RFM / D3b 活动 ROI / D3c 菜品动态定价）
+- K8s CronJob 每日 02:00 调 refresh_mv_agent_roi_monthly()
+- Grafana 看板消费 mv
+
+---
+
 ## 2026-04-18 Sprint D1 批次 2 — 出餐体验 7 Skill + 2 Skill 填 context（PR H）
 
 ### 今日完成

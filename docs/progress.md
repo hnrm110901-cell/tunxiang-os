@@ -4,6 +4,65 @@
 
 ---
 
+## 2026-04-23 Sprint D2：Agent 决策 ROI 三字段 + mv_agent_roi_monthly 物化视图
+
+### 本次会话目标
+按 [sprint-plan-2026Q2-unified.md Sprint D D2](docs/sprint-plan-2026Q2-unified.md) 启动：
+> D2 ROI 三字段（`saved_labor_hours / prevented_loss_fen / improved_kpi / roi_evidence` + `mv_agent_roi_monthly`）
+
+核心问题：**"Agent 做了 100 件事，但没人知道省了多少钱"**。每条 AgentDecisionLog 自带量化 ROI。
+
+Tier 级别：Tier 1（改 agent_decision_logs 核心留痕表，V1 规划决策点 #1 要求创始人签字）。
+
+### 完成状态
+- [x] **v264 迁移** — 加 4 列（saved_labor_hours NUMERIC / prevented_loss_fen BIGINT / improved_kpi JSONB / roi_evidence JSONB）+ 2 非负 CHECK + 覆盖索引（仅索引有 ROI 的行）+ 列注释。`IF NOT EXISTS` 幂等，upgrade/downgrade 完整。
+- [x] **v265 迁移** — mv_agent_roi_monthly 按 (tenant, store, agent, month) 聚合 decision_count/avg_confidence/saved_labor_hours_sum/prevented_loss_fen_sum/revenue_uplift_fen_sum（从 improved_kpi->>'revenue_uplift_fen'）/nps_delta_avg。UNIQUE 索引支持 REFRESH CONCURRENTLY。`refresh_mv_agent_roi_monthly()` PL/pgSQL 函数自动降级。13 个月滑动窗口。
+- [x] **AgentDecisionLog ORM** — 新增 4 Mapped 字段（Decimal/BIGINT/JSONB），默认值 0/dict
+- [x] **AgentResult dataclass** — `saved_labor_hours / prevented_loss_fen / improved_kpi / roi_evidence`，`default_factory=dict` 避免实例共享
+- [x] **decision_log_service** — `log_skill_result` 从 AgentResult 提取 ROI 写入；非 dict 降级；旧 result 默认 0/{}
+- [x] **3 个 ROI API 端点**：
+  - `GET /api/v1/agent/roi/decision-roi/monthly` — 查 mv（agent_id/store_id/months_back 过滤）
+  - `POST /api/v1/agent/roi/decision-roi/refresh` — 手工触发 refresh 函数
+  - `GET /api/v1/agent/roi/decision-roi/summary` — 租户当月各 Agent ROI 快照
+- [x] **TDD 10 测试**（7 passed + 3 skipped by pre-existing relative import bug）：AgentResult 默认/可填/独立 3 + decision_log_service 3 skipped + 迁移 SQL 静态验证 4
+
+### 关键决策
+- **revision slug 用 "v264_roi"** — 避免与其他并行 Squad 的 v264_* 冲突
+- **ROI 挂 agent_decision_logs 而非独立表** — 每条决策 1:1 ROI，查询简单；旧 agent_roi_metrics（按日汇总）共存
+- **improved_kpi 用 JSONB** — KPI 种类会增加（复购/NPS/翻台/…），灵活可扩展；mv 按 `->>'revenue_uplift_fen'::bigint` 提取关键指标
+- **refresh 函数 try/except 降级** — 首次 CONCURRENTLY 失败自动走非并发刷新
+- **mv 保留 13 个月** — 月度对比 12 + 1 过渡。50 Skill × 5 Store × 13 月 = 3250 行/租户
+- **未写 cron** — 本 PR 提供函数 + 端点，cron 配置放运维层（K8s CronJob）
+- **AgentResult.improved_kpi 用 `field(default_factory=dict)`** — 守门测试 test_agent_result_roi_fields_independent_per_instance
+
+### 交付清单
+```
+新增：
+  shared/db-migrations/versions/v264_agent_decision_logs_roi_fields.py  90 行
+  shared/db-migrations/versions/v265_mv_agent_roi_monthly.py             100 行
+  services/tx-agent/src/tests/test_d2_roi_fields.py                      205 行
+
+修改：
+  services/tx-agent/src/models/decision_log.py                +20 行
+  services/tx-agent/src/agents/base.py                        +7 行
+  services/tx-agent/src/services/decision_log_service.py      +18 行
+  services/tx-agent/src/api/agent_roi_routes.py               +120 行（3 新端点）
+```
+
+### 下一步
+1. **创始人签字** — 设计稿决策点 #1 "D2 agent_decision_logs 新增列 — 核心留痕变更"
+2. **D3 三赛道**：D3a RFM+Haiku / D3b 活动 ROI Prophet / D3c 菜品动态定价
+3. **K8s CronJob** — 每日 02:00 调 refresh_mv_agent_roi_monthly()
+4. **Grafana 看板** — 消费 mv 绘 Agent/月 ROI 曲线
+5. **Skill 端填 ROI 数据** — 51 Skill 在关键 action 填 AgentResult ROI 字段（类似 D1 context 渐进填充）
+
+### 已知风险
+- mv 刷新失败不 rollback 业务（需监控 alert）
+- Skill 端暂不填 ROI 数据时 mv 全为 0（基础设施就绪，数据靠 Squad 渐进填）
+- 跨租户共享 mv（refresh 端点生产应禁用，只允许运维触发）
+
+---
+
 ## 2026-04-18 20:05 Sprint D1 批次 2 / PR H：出餐体验 7 Skill scope 声明 + 2 Skill 填 context
 
 ### 本次会话目标

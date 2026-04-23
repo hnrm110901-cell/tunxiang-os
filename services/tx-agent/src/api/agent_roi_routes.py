@@ -441,3 +441,151 @@ async def collect_roi_metrics(
         logger.error("roi_collect_insert_failed", error=str(exc), exc_info=True)
         from fastapi import HTTPException
         raise HTTPException(status_code=500, detail="ROI 指标写入失败，请重试")
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Sprint D2：基于 agent_decision_logs ROI 字段 + mv_agent_roi_monthly 物化视图
+#
+# 与上方基于 agent_roi_metrics 表的旧接口共存。新接口路径 /decision-roi/* 明确
+# 语义（"决策级 ROI" 而非"每日采集指标"）。
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+@router.get("/decision-roi/monthly", summary="D2: 按月聚合的决策 ROI（来自 mv_agent_roi_monthly）")
+async def get_decision_roi_monthly(
+    agent_id: str | None = Query(None, description="筛选单个 agent_id；不传则返回全部"),
+    store_id: str | None = Query(None, description="筛选门店 UUID；不传则返回租户汇总"),
+    months_back: int = Query(6, ge=1, le=13, description="回溯月数（mv 保留 13 个月）"),
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db_with_tenant),
+) -> dict:
+    """查询 mv_agent_roi_monthly：按 tenant/store/agent/month 的 ROI 聚合。
+
+    返回每月一行：decision_count / saved_labor_hours_sum / prevented_loss_fen_sum /
+                  revenue_uplift_fen_sum / nps_delta_avg / avg_confidence
+    """
+    filters = ["tenant_id = CAST(:tenant_id AS uuid)"]
+    params: dict = {"tenant_id": x_tenant_id, "months_back": months_back}
+
+    if agent_id:
+        filters.append("agent_id = :agent_id")
+        params["agent_id"] = agent_id
+    if store_id:
+        filters.append("store_id = CAST(:store_id AS uuid)")
+        params["store_id"] = store_id
+
+    # 只取回溯窗口内
+    filters.append(
+        "period_month >= DATE_TRUNC('month', CURRENT_DATE - :months_back * INTERVAL '1 month')::date"
+    )
+    where = " AND ".join(filters)
+
+    try:
+        result = await db.execute(text(f"""
+            SELECT
+                period_month,
+                store_id::text AS store_id,
+                agent_id,
+                decision_count,
+                avg_confidence,
+                saved_labor_hours_sum,
+                prevented_loss_fen_sum,
+                revenue_uplift_fen_sum,
+                nps_delta_avg
+            FROM mv_agent_roi_monthly
+            WHERE {where}
+            ORDER BY period_month DESC, agent_id
+        """), params)
+        rows = [dict(r) for r in result.mappings()]
+    except SQLAlchemyError as exc:
+        logger.error("d2_roi_monthly_query_failed", error=str(exc), exc_info=True)
+        return {"ok": False, "error": {"message": "查询 mv_agent_roi_monthly 失败"}}
+
+    # 序列化 Decimal / date 为 JSON 友好类型
+    for r in rows:
+        pm = r.get("period_month")
+        if pm is not None:
+            r["period_month"] = pm.isoformat()
+        for k in ("avg_confidence", "saved_labor_hours_sum", "nps_delta_avg"):
+            if r.get(k) is not None:
+                r[k] = float(r[k])
+
+    return {"ok": True, "data": {
+        "rows": rows,
+        "filters": {"agent_id": agent_id, "store_id": store_id, "months_back": months_back},
+    }}
+
+
+@router.post("/decision-roi/refresh", summary="D2: 手工刷新 mv_agent_roi_monthly（运维用）")
+async def refresh_decision_roi_mv(
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db_with_tenant),
+) -> dict:
+    """手工触发 `SELECT refresh_mv_agent_roi_monthly()`，通常由 cron 每日 02:00 调用。
+
+    注：物化视图是跨租户共享的，任一租户调用此端点会刷新全部数据。生产环境
+    建议通过独立 cron 调用，此端点仅用于排查或紧急重建。
+    """
+    try:
+        await db.execute(text("SELECT refresh_mv_agent_roi_monthly()"))
+        await db.commit()
+        logger.info("d2_roi_mv_refreshed", triggered_by=x_tenant_id)
+        return {"ok": True, "data": {"refreshed": True}}
+    except SQLAlchemyError as exc:
+        await db.rollback()
+        logger.error("d2_roi_mv_refresh_failed", error=str(exc), exc_info=True)
+        return {"ok": False, "error": {"message": f"刷新失败: {exc}"}}
+
+
+@router.get("/decision-roi/summary", summary="D2: 租户当月 ROI 快照")
+async def get_decision_roi_summary(
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db_with_tenant),
+) -> dict:
+    """租户当月各 Agent 累计 ROI 一屏汇总，首页"三条硬约束 ROI"展示卡用。"""
+    try:
+        result = await db.execute(text("""
+            SELECT
+                agent_id,
+                SUM(decision_count)            AS decisions,
+                SUM(saved_labor_hours_sum)     AS saved_hours,
+                SUM(prevented_loss_fen_sum)    AS prevented_loss_fen,
+                SUM(revenue_uplift_fen_sum)    AS revenue_uplift_fen,
+                AVG(avg_confidence)            AS avg_confidence
+            FROM mv_agent_roi_monthly
+            WHERE tenant_id = CAST(:tenant_id AS uuid)
+              AND period_month = DATE_TRUNC('month', CURRENT_DATE)::date
+            GROUP BY agent_id
+            ORDER BY (
+                SUM(prevented_loss_fen_sum)
+                + SUM(revenue_uplift_fen_sum)
+                + SUM(saved_labor_hours_sum) * 10000
+            ) DESC
+            LIMIT 20
+        """), {"tenant_id": x_tenant_id})
+        rows = [dict(r) for r in result.mappings()]
+    except SQLAlchemyError as exc:
+        logger.error("d2_roi_summary_failed", error=str(exc), exc_info=True)
+        return {"ok": False, "error": {"message": "ROI 汇总查询失败"}}
+
+    # 汇总维度
+    total_saved_hours = sum(float(r.get("saved_hours") or 0) for r in rows)
+    total_prevented_fen = sum(int(r.get("prevented_loss_fen") or 0) for r in rows)
+    total_revenue_up_fen = sum(int(r.get("revenue_uplift_fen") or 0) for r in rows)
+
+    for r in rows:
+        for k in ("saved_hours", "avg_confidence"):
+            if r.get(k) is not None:
+                r[k] = float(r[k])
+
+    return {"ok": True, "data": {
+        "by_agent": rows,
+        "aggregate": {
+            "saved_labor_hours": round(total_saved_hours, 2),
+            "prevented_loss_fen": total_prevented_fen,
+            "prevented_loss_yuan": round(total_prevented_fen / 100, 2),
+            "revenue_uplift_fen": total_revenue_up_fen,
+            "revenue_uplift_yuan": round(total_revenue_up_fen / 100, 2),
+        },
+        "period": "current_month",
+    }}

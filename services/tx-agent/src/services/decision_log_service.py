@@ -108,6 +108,17 @@ class DecisionLogService:
         """
         try:
             result_data: dict = getattr(result, "data", None) or {}
+
+            # Sprint D2：从 AgentResult 提取 ROI 三字段（未填则默认 0/{}）
+            saved_labor_hours = float(getattr(result, "saved_labor_hours", 0.0) or 0.0)
+            prevented_loss_fen = int(getattr(result, "prevented_loss_fen", 0) or 0)
+            improved_kpi = getattr(result, "improved_kpi", None) or {}
+            roi_evidence = getattr(result, "roi_evidence", None) or {}
+            if not isinstance(improved_kpi, dict):
+                improved_kpi = {}
+            if not isinstance(roi_evidence, dict):
+                roi_evidence = {}
+
             record = AgentDecisionLog(
                 tenant_id=UUID(tenant_id),
                 store_id=UUID(store_id) if store_id else None,
@@ -126,6 +137,11 @@ class DecisionLogService:
                 if isinstance(result_data, dict)
                 else 1.0,
                 plan_id=plan_id,
+                # Sprint D2：ROI 写入（v264 迁移新增列）
+                saved_labor_hours=saved_labor_hours,
+                prevented_loss_fen=prevented_loss_fen,
+                improved_kpi=improved_kpi,
+                roi_evidence=roi_evidence,
             )
             db.add(record)
             await db.flush()
