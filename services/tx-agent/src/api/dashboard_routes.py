@@ -4,6 +4,7 @@ Dashboard BFF — 总部首页数据聚合接口
 GET /api/v1/dashboard/summary
 返回今日经营关键指标、门店健康排名、近期 Agent 决策
 """
+
 from __future__ import annotations
 
 import asyncio

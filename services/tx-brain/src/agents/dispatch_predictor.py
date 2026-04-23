@@ -4,6 +4,7 @@
 - 快路径：基于菜品分类历史均值估算，不调用Claude（低负载/普通订单）
 - 慢路径：Claude sonnet分析（厨房高负载 / 活鲜菜品 / 大桌 / 超长等待）
 """
+
 from __future__ import annotations
 
 import json
@@ -125,9 +126,7 @@ class DispatchPredictorAgent:
             avg_wait_minutes=kitchen_load.get("avg_wait_minutes", 0),
             estimated_minutes=result.get("estimated_minutes"),
             confidence=result.get("confidence"),
-            has_live_seafood=any(
-                item.get("is_live_seafood") for item in order.get("items", [])
-            ),
+            has_live_seafood=any(item.get("is_live_seafood") for item in order.get("items", [])),
         )
 
         return {**result, "trigger_slow_path": True, "source": "claude"}
@@ -158,9 +157,7 @@ class DispatchPredictorAgent:
             "recommendations": recommendations,
         }
 
-    def _build_context(
-        self, order: dict, kitchen_load: dict, quick_estimate: dict
-    ) -> str:
+    def _build_context(self, order: dict, kitchen_load: dict, quick_estimate: dict) -> str:
         items = order.get("items", [])
         items_str = "\n".join(
             f"  - {item.get('dish_name', '未知菜品')} "
@@ -171,18 +168,18 @@ class DispatchPredictorAgent:
         )
 
         return f"""订单信息：
-- 订单ID：{order.get('id', '未知')}
-- 桌位人数：{order.get('table_size', 0)}人
-- 下单时间：{order.get('created_at', '未知')}
+- 订单ID：{order.get("id", "未知")}
+- 桌位人数：{order.get("table_size", 0)}人
+- 下单时间：{order.get("created_at", "未知")}
 - 菜品列表：
-{items_str if items_str else '  （无菜品）'}
+{items_str if items_str else "  （无菜品）"}
 
 厨房当前负载：
-- 待处理工单数：{kitchen_load.get('pending_tasks', 0)}单
-- 平均等待时间：{kitchen_load.get('avg_wait_minutes', 0):.1f}分钟
-- 在岗厨师数：{kitchen_load.get('active_chefs', 0)}人
+- 待处理工单数：{kitchen_load.get("pending_tasks", 0)}单
+- 平均等待时间：{kitchen_load.get("avg_wait_minutes", 0):.1f}分钟
+- 在岗厨师数：{kitchen_load.get("active_chefs", 0)}人
 
-快路径估算参考：{quick_estimate.get('estimated_minutes', 0)}分钟（置信度0.7）
+快路径估算参考：{quick_estimate.get("estimated_minutes", 0)}分钟（置信度0.7）
 
 请结合厨房实际负载给出更精准的出餐时间预测。"""
 
@@ -206,7 +203,6 @@ class DispatchPredictorAgent:
             "key_bottleneck": fallback.get("key_bottleneck", "AI解析失败，使用快路径兜底"),
         }
 
-
     async def analyze_from_mv(self, tenant_id: str, store_id: str | None = None) -> dict:
         """从 mv_store_pnl 快速读取出餐压力背景数据，<5ms，无 Claude 调用。
 
@@ -215,6 +211,7 @@ class DispatchPredictorAgent:
         """
         from sqlalchemy import text
         from sqlalchemy.exc import SQLAlchemyError
+
         from shared.ontology.src.database import get_db
 
         try:

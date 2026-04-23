@@ -6,6 +6,7 @@
 - 常用菜品名 → 菜品ID 映射持久化（JSON文件）
 - 网络不可用时：用本地缓存 + 模糊匹配兜底
 """
+
 from __future__ import annotations
 
 import json

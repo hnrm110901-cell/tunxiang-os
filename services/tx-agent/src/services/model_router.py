@@ -22,6 +22,7 @@
       db=db_session,          # 可选，传入则记录成本
   )
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -42,6 +43,7 @@ logger = structlog.get_logger()
 # 1. 模型选择策略
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 class ModelSelectionStrategy:
     """根据任务类型和成本/速度权衡选择最优模型。
 
@@ -54,20 +56,20 @@ class ModelSelectionStrategy:
     # 任务类型 → 默认模型映射
     TASK_MODEL_MAP: dict[str, str] = {
         "quick_classification": "claude-haiku-4-5-20251001",
-        "standard_analysis":    "claude-sonnet-4-6",
-        "complex_reasoning":    "claude-opus-4-6",
-        "agent_decision":       "claude-sonnet-4-6",
-        "supplier_scoring":     "claude-sonnet-4-6",
-        "demand_forecast":      "claude-sonnet-4-6",
-        "cost_analysis":        "claude-sonnet-4-6",
-        "patrol_report":        "claude-haiku-4-5-20251001",
-        "dashboard_brief":      "claude-sonnet-4-6",
-        "default":              "claude-sonnet-4-6",
+        "standard_analysis": "claude-sonnet-4-6",
+        "complex_reasoning": "claude-opus-4-6",
+        "agent_decision": "claude-sonnet-4-6",
+        "supplier_scoring": "claude-sonnet-4-6",
+        "demand_forecast": "claude-sonnet-4-6",
+        "cost_analysis": "claude-sonnet-4-6",
+        "patrol_report": "claude-haiku-4-5-20251001",
+        "dashboard_brief": "claude-sonnet-4-6",
+        "default": "claude-sonnet-4-6",
     }
 
     # 紧急程度升/降级规则
     _DOWNGRADE_MODEL = "claude-haiku-4-5-20251001"
-    _UPGRADE_MODEL   = "claude-opus-4-6"
+    _UPGRADE_MODEL = "claude-opus-4-6"
 
     def select_model(self, task_type: str, urgency: str = "normal") -> str:
         """选择模型。
@@ -92,20 +94,22 @@ class ModelSelectionStrategy:
 # 2. 成本追踪
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 @dataclass
 class ModelCallRecord:
     """单次模型调用记录"""
-    tenant_id:   str
-    task_type:   str
-    model:       str
-    input_tokens:  int
+
+    tenant_id: str
+    task_type: str
+    model: str
+    input_tokens: int
     output_tokens: int
-    cost_usd:    float
+    cost_usd: float
     duration_ms: int
-    success:     bool
-    error_type:  Optional[str]
-    created_at:  datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    request_id:  Optional[str] = None
+    success: bool
+    error_type: Optional[str]
+    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    request_id: Optional[str] = None
 
 
 class CostTracker:
@@ -116,9 +120,9 @@ class CostTracker:
 
     # 2025 年 Claude API 定价（USD / 1M tokens）
     PRICING: dict[str, dict[str, float]] = {
-        "claude-haiku-4-5-20251001": {"input": 0.80,  "output": 4.00},
-        "claude-sonnet-4-6":         {"input": 3.00,  "output": 15.00},
-        "claude-opus-4-6":           {"input": 15.00, "output": 75.00},
+        "claude-haiku-4-5-20251001": {"input": 0.80, "output": 4.00},
+        "claude-sonnet-4-6": {"input": 3.00, "output": 15.00},
+        "claude-opus-4-6": {"input": 15.00, "output": 75.00},
     }
 
     def calculate_cost(self, model: str, input_tokens: int, output_tokens: int) -> float:
@@ -131,10 +135,7 @@ class CostTracker:
             logger.warning("unknown_model_pricing", model=model)
             pricing = self.PRICING["claude-sonnet-4-6"]
 
-        cost = (
-            input_tokens  / 1_000_000 * pricing["input"] +
-            output_tokens / 1_000_000 * pricing["output"]
-        )
+        cost = input_tokens / 1_000_000 * pricing["input"] + output_tokens / 1_000_000 * pricing["output"]
         return round(cost, 6)
 
     async def record_call(self, record: ModelCallRecord, db: Any) -> None:
@@ -158,20 +159,23 @@ class CostTracker:
             ON CONFLICT (request_id) DO NOTHING
         """)
         try:
-            await db.execute(sql, {
-                "id":            str(uuid.uuid4()),
-                "tenant_id":     record.tenant_id,
-                "task_type":     record.task_type,
-                "model":         record.model,
-                "input_tokens":  record.input_tokens,
-                "output_tokens": record.output_tokens,
-                "cost_usd":      record.cost_usd,
-                "duration_ms":   record.duration_ms,
-                "success":       record.success,
-                "error_type":    record.error_type,
-                "request_id":    record.request_id,
-                "created_at":    record.created_at,
-            })
+            await db.execute(
+                sql,
+                {
+                    "id": str(uuid.uuid4()),
+                    "tenant_id": record.tenant_id,
+                    "task_type": record.task_type,
+                    "model": record.model,
+                    "input_tokens": record.input_tokens,
+                    "output_tokens": record.output_tokens,
+                    "cost_usd": record.cost_usd,
+                    "duration_ms": record.duration_ms,
+                    "success": record.success,
+                    "error_type": record.error_type,
+                    "request_id": record.request_id,
+                    "created_at": record.created_at,
+                },
+            )
             await db.commit()
         except Exception as exc:  # noqa: BLE001 — 成本记录失败不阻塞主业务
             logger.warning("cost_record_failed", error=str(exc), tenant_id=record.tenant_id, exc_info=True)
@@ -228,41 +232,41 @@ class CostTracker:
 
         params = {
             "tenant_id": tenant_id,
-            "start_dt":  datetime.combine(start_date, datetime.min.time()).replace(tzinfo=timezone.utc),
-            "end_dt":    datetime.combine(end_date,   datetime.min.time()).replace(tzinfo=timezone.utc),
+            "start_dt": datetime.combine(start_date, datetime.min.time()).replace(tzinfo=timezone.utc),
+            "end_dt": datetime.combine(end_date, datetime.min.time()).replace(tzinfo=timezone.utc),
         }
 
         try:
-            agg_row   = (await db.execute(aggregate_sql, params)).mappings().one()
+            agg_row = (await db.execute(aggregate_sql, params)).mappings().one()
             model_rows = (await db.execute(by_model_sql, params)).mappings().all()
         except Exception as exc:  # noqa: BLE001 — DB查询失败降级返回空统计
             logger.error("get_tenant_usage_failed", error=str(exc), tenant_id=tenant_id, exc_info=True)
             return {
                 "tenant_id": tenant_id,
                 "start_date": str(start_date),
-                "end_date":   str(end_date),
-                "total_input_tokens":  0,
+                "end_date": str(end_date),
+                "total_input_tokens": 0,
                 "total_output_tokens": 0,
-                "total_cost_usd":      0.0,
-                "call_count":          0,
-                "success_count":       0,
-                "by_model":            [],
+                "total_cost_usd": 0.0,
+                "call_count": 0,
+                "success_count": 0,
+                "by_model": [],
             }
 
         return {
-            "tenant_id":             tenant_id,
-            "start_date":            str(start_date),
-            "end_date":              str(end_date),
-            "total_input_tokens":    int(agg_row["total_input_tokens"]),
-            "total_output_tokens":   int(agg_row["total_output_tokens"]),
-            "total_cost_usd":        float(agg_row["total_cost_usd"]),
-            "call_count":            int(agg_row["call_count"]),
-            "success_count":         int(agg_row["success_count"]),
+            "tenant_id": tenant_id,
+            "start_date": str(start_date),
+            "end_date": str(end_date),
+            "total_input_tokens": int(agg_row["total_input_tokens"]),
+            "total_output_tokens": int(agg_row["total_output_tokens"]),
+            "total_cost_usd": float(agg_row["total_cost_usd"]),
+            "call_count": int(agg_row["call_count"]),
+            "success_count": int(agg_row["success_count"]),
             "by_model": [
                 {
-                    "model":      row["model"],
+                    "model": row["model"],
                     "call_count": int(row["call_count"]),
-                    "cost_usd":   float(row["cost_usd"]),
+                    "cost_usd": float(row["cost_usd"]),
                 }
                 for row in model_rows
             ],
@@ -285,9 +289,9 @@ class CostTracker:
         model = strategy.select_model(task_type)
         # 粗略价格（分/千token，仅用于预算估算）
         price_per_1k = {
-            "claude-haiku-4-5-20251001": 1,    # ~0.01元/千token
-            "claude-sonnet-4-6":         5,    # ~0.05元/千token
-            "claude-opus-4-6":          20,    # ~0.20元/千token
+            "claude-haiku-4-5-20251001": 1,  # ~0.01元/千token
+            "claude-sonnet-4-6": 5,  # ~0.05元/千token
+            "claude-opus-4-6": 20,  # ~0.20元/千token
         }.get(model, 5)
 
         return (estimated_tokens * price_per_1k) // 1000
@@ -297,9 +301,10 @@ class CostTracker:
 # 3. 熔断器
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 class CircuitState(str, Enum):
-    CLOSED    = "closed"     # 正常
-    OPEN      = "open"       # 熔断中
+    CLOSED = "closed"  # 正常
+    OPEN = "open"  # 熔断中
     HALF_OPEN = "half_open"  # 探测中
 
 
@@ -328,15 +333,15 @@ class CircuitBreaker:
         recovery_timeout_s: int = 30,
         redis_url: Optional[str] = None,
     ) -> None:
-        self.name               = name
-        self.failure_threshold  = failure_threshold
+        self.name = name
+        self.failure_threshold = failure_threshold
         self.recovery_timeout_s = recovery_timeout_s
-        self._redis_url         = redis_url or os.environ.get("REDIS_URL", "redis://localhost:6379")
+        self._redis_url = redis_url or os.environ.get("REDIS_URL", "redis://localhost:6379")
 
         # 内存状态（Redis 不可用时使用）
-        self._state:          CircuitState = CircuitState.CLOSED
-        self._failure_count:  int          = 0
-        self._opened_at:      Optional[float] = None
+        self._state: CircuitState = CircuitState.CLOSED
+        self._failure_count: int = 0
+        self._opened_at: Optional[float] = None
 
         # Redis 客户端（懒加载）
         self._redis: Any = None
@@ -351,6 +356,7 @@ class CircuitBreaker:
         if self._redis is None:
             try:
                 import redis.asyncio as aioredis
+
                 self._redis = aioredis.from_url(self._redis_url, decode_responses=True)
                 await self._redis.ping()
             except Exception as exc:  # noqa: BLE001 — Redis连接失败降级为内存状态
@@ -405,7 +411,7 @@ class CircuitBreaker:
 
         try:
             pipe = redis.pipeline()
-            pipe.set(self._redis_key("state"),         state.value)
+            pipe.set(self._redis_key("state"), state.value)
             pipe.set(self._redis_key("failure_count"), str(failure_count))
             if opened_at is not None:
                 pipe.set(self._redis_key("opened_at"), str(opened_at))
@@ -500,6 +506,7 @@ class CircuitBreaker:
 # 4. ModelRouter — 统一路由入口
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 class ModelRouter:
     """所有 Claude API 调用的统一路由层。
 
@@ -519,8 +526,8 @@ class ModelRouter:
         )
     """
 
-    MAX_RETRIES    = 3
-    RETRY_DELAYS   = [1, 2, 4]   # 秒，指数退避
+    MAX_RETRIES = 3
+    RETRY_DELAYS = [1, 2, 4]  # 秒，指数退避
     DEFAULT_TIMEOUT_S = 30
 
     # 默认预算：每租户每月 500 元（50000 分）
@@ -537,10 +544,10 @@ class ModelRouter:
         if not resolved_key:
             raise ValueError("ANTHROPIC_API_KEY 环境变量未设置")
 
-        self._client         = AsyncAnthropic(api_key=resolved_key)
-        self._circuit        = circuit_breaker or CircuitBreaker()
-        self._cost_tracker   = cost_tracker or CostTracker()
-        self._strategy       = model_strategy or ModelSelectionStrategy()
+        self._client = AsyncAnthropic(api_key=resolved_key)
+        self._circuit = circuit_breaker or CircuitBreaker()
+        self._cost_tracker = cost_tracker or CostTracker()
+        self._strategy = model_strategy or ModelSelectionStrategy()
 
         # Redis 客户端（懒加载，用于租户预算检查）
         self._redis: Any = None
@@ -554,6 +561,7 @@ class ModelRouter:
         if self._redis is None:
             try:
                 import redis.asyncio as aioredis
+
                 self._redis = aioredis.from_url(self._redis_url, decode_responses=True)
                 await self._redis.ping()
             except (OSError, RuntimeError) as exc:
@@ -628,16 +636,11 @@ class ModelRouter:
         length = len(content)
 
         # 简单分类任务 → haiku
-        if length < 300 and any(
-            kw in content for kw in ["分类", "判断是否", "是还是否", "true/false", "属于哪"]
-        ):
+        if length < 300 and any(kw in content for kw in ["分类", "判断是否", "是还是否", "true/false", "属于哪"]):
             return "quick_classification"
 
         # 复杂推理任务 → opus
-        if any(
-            kw in content
-            for kw in ["预测未来", "根本原因", "深度分析", "财务预测", "战略建议", "为什么会"]
-        ):
+        if any(kw in content for kw in ["预测未来", "根本原因", "深度分析", "财务预测", "战略建议", "为什么会"]):
             return "complex_reasoning"
 
         # 长文本 → sonnet
@@ -649,15 +652,15 @@ class ModelRouter:
 
     async def complete(
         self,
-        tenant_id:     str,
-        task_type:     str,
-        messages:      list[dict[str, str]],
-        system:        Optional[str] = None,
-        urgency:       str = "normal",
-        max_tokens:    int = 1024,
-        timeout_s:     int = DEFAULT_TIMEOUT_S,
-        request_id:    Optional[str] = None,
-        db:            Any = None,
+        tenant_id: str,
+        task_type: str,
+        messages: list[dict[str, str]],
+        system: Optional[str] = None,
+        urgency: str = "normal",
+        max_tokens: int = 1024,
+        timeout_s: int = DEFAULT_TIMEOUT_S,
+        request_id: Optional[str] = None,
+        db: Any = None,
     ) -> str:
         """发起 Claude API 调用，返回模型生成的文本。
 
@@ -726,7 +729,7 @@ class ModelRouter:
                 )
 
                 duration_ms = int((time.monotonic() - start_ms) * 1000)
-                input_tokens  = response.usage.input_tokens
+                input_tokens = response.usage.input_tokens
                 output_tokens = response.usage.output_tokens
                 cost_usd = self._cost_tracker.calculate_cost(model, input_tokens, output_tokens)
 
@@ -843,17 +846,17 @@ class ModelRouter:
 
     async def _call_api(
         self,
-        model:      str,
-        messages:   list[dict[str, str]],
-        system:     Optional[str],
+        model: str,
+        messages: list[dict[str, str]],
+        system: Optional[str],
         max_tokens: int,
-        timeout_s:  int,
+        timeout_s: int,
     ) -> Any:
         """实际发起 Anthropic SDK 调用，带超时控制。"""
         kwargs: dict[str, Any] = {
-            "model":      model,
+            "model": model,
             "max_tokens": max_tokens,
-            "messages":   messages,
+            "messages": messages,
         }
         if system:
             kwargs["system"] = system
@@ -906,9 +909,9 @@ class ModelRouter:
         await self._check_tenant_budget(tenant_id, estimated_cost_fen)
 
         kwargs: dict[str, Any] = {
-            "model":      model,
+            "model": model,
             "max_tokens": max_tokens,
-            "messages":   messages,
+            "messages": messages,
         }
         if system:
             kwargs["system"] = system

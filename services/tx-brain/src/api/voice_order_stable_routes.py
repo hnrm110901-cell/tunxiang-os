@@ -10,6 +10,7 @@ Endpoints:
   POST   /api/v1/brain/voice/cache/warm           预热菜品名缓存
   GET    /api/v1/brain/voice/cache/stats          缓存命中率统计
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -52,9 +53,7 @@ class DishItem(BaseModel):
 
 
 class WarmCacheRequest(BaseModel):
-    dish_catalog: list[dict[str, Any]] = Field(
-        ..., description="菜品列表，每项包含 dish_id + name"
-    )
+    dish_catalog: list[dict[str, Any]] = Field(..., description="菜品列表，每项包含 dish_id + name")
 
 
 # ─── 内部工具函数 ─────────────────────────────────────────────────────────────
@@ -72,13 +71,15 @@ def _record_metric(
     endpoint: str = "transcribe",
 ) -> None:
     """埋点：记录一次语音调用指标"""
-    _call_metrics.append({
-        "ts": time.time(),
-        "endpoint": endpoint,
-        "duration_ms": round(duration_ms, 2),
-        "method": method,   # "cache" | "ai" | "timeout"
-        "success": success,
-    })
+    _call_metrics.append(
+        {
+            "ts": time.time(),
+            "endpoint": endpoint,
+            "duration_ms": round(duration_ms, 2),
+            "method": method,  # "cache" | "ai" | "timeout"
+            "success": success,
+        }
+    )
 
 
 async def _mock_transcribe_ai(audio_bytes: bytes, language: str = "zh") -> dict[str, Any]:
@@ -109,8 +110,7 @@ def _parse_text_to_cart(text: str) -> list[dict[str, Any]]:
     import re
 
     # 数量词映射
-    cn_nums = {"一": 1, "两": 2, "三": 3, "四": 4, "五": 5,
-               "六": 6, "七": 7, "八": 8, "九": 9, "十": 10}
+    cn_nums = {"一": 1, "两": 2, "三": 3, "四": 4, "五": 5, "六": 6, "七": 7, "八": 8, "九": 9, "十": 10}
     items: list[dict[str, Any]] = []
 
     # 匹配：(来/加)(数量词/数字)(份/个/碗/杯)(菜名)
@@ -124,7 +124,7 @@ def _parse_text_to_cart(text: str) -> list[dict[str, Any]]:
         for m in matches:
             if isinstance(m, tuple) and len(m) == 2:
                 qty_str, name = m
-                qty = cn_nums.get(qty_str, None)
+                qty = cn_nums.get(qty_str)
                 if qty is None:
                     try:
                         qty = int(qty_str)
@@ -310,9 +310,7 @@ async def voice_metrics() -> dict[str, Any]:
             "timeout_rate": round(timeout_count / total, 4),
             "avg_duration_ms": round(avg_duration, 2),
             "method_breakdown": method_counts,
-            "recent_errors": [
-                m for m in metrics_list[-20:] if not m["success"]
-            ],
+            "recent_errors": [m for m in metrics_list[-20:] if not m["success"]],
         },
     }
 

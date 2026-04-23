@@ -7,6 +7,7 @@ CoreML Bridge 运行在 Mac mini M4 上（Swift Vapor，port 8100）。
 环境变量：
     COREML_BRIDGE_URL: CoreML Bridge 地址，默认 http://localhost:8100
 """
+
 from __future__ import annotations
 
 import os
@@ -35,10 +36,7 @@ class EdgeInferenceClient:
     """
 
     def __init__(self, bridge_url: Optional[str] = None) -> None:
-        self._base_url = (
-            bridge_url
-            or os.environ.get("COREML_BRIDGE_URL", _DEFAULT_BRIDGE_URL)
-        ).rstrip("/")
+        self._base_url = (bridge_url or os.environ.get("COREML_BRIDGE_URL", _DEFAULT_BRIDGE_URL)).rstrip("/")
 
     # ─── 出餐时间预测 ─────────────────────────────────────────────
 
@@ -220,8 +218,8 @@ class EdgeInferenceClient:
     ) -> dict:
         """出餐时间 fallback：基于队列和时段的统计公式"""
         peak_hours = {11, 12, 13, 17, 18, 19, 20}
-        base = 300                              # 5分钟基准
-        queue_wait = queue_length * 90          # 每单90秒等待
+        base = 300  # 5分钟基准
+        queue_wait = queue_length * 90  # 每单90秒等待
         peak_bonus = 120 if hour in peak_hours else 0
         weekend_bonus = 60 if day_type == "weekend" else 0
         total = base + queue_wait + peak_bonus + weekend_bonus
@@ -271,10 +269,23 @@ class EdgeInferenceClient:
     def _fallback_traffic(self, hour: int) -> dict:
         """客流量 fallback：时段历史均值"""
         hour_weights = {
-            6: 0.05, 7: 0.10, 8: 0.15, 9: 0.20, 10: 0.30,
-            11: 0.80, 12: 1.00, 13: 0.90, 14: 0.50, 15: 0.30,
-            16: 0.25, 17: 0.70, 18: 1.00, 19: 0.95, 20: 0.80,
-            21: 0.50, 22: 0.20,
+            6: 0.05,
+            7: 0.10,
+            8: 0.15,
+            9: 0.20,
+            10: 0.30,
+            11: 0.80,
+            12: 1.00,
+            13: 0.90,
+            14: 0.50,
+            15: 0.30,
+            16: 0.25,
+            17: 0.70,
+            18: 1.00,
+            19: 0.95,
+            20: 0.80,
+            21: 0.50,
+            22: 0.20,
         }
         weight = hour_weights.get(hour, 0.10)
         base = 40.0

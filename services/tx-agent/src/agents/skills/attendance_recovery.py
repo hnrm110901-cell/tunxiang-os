@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import date, datetime, timedelta
+from datetime import date, datetime
 from typing import Any, Optional
 from uuid import uuid4
 
@@ -101,11 +101,14 @@ async def _load_absent_schedule(
         LIMIT 1
     """)
     try:
-        result = await db.execute(q, {
-            "tenant_id": tenant_id,
-            "employee_id": employee_id,
-            "absent_date": absent_date,
-        })
+        result = await db.execute(
+            q,
+            {
+                "tenant_id": tenant_id,
+                "employee_id": employee_id,
+                "absent_date": absent_date,
+            },
+        )
         row = result.mappings().first()
         return dict(row) if row else None
     except (OperationalError, ProgrammingError) as exc:
@@ -131,16 +134,19 @@ async def _create_shift_gap(
         )
     """)
     try:
-        await db.execute(q, {
-            "gap_id": gap_id,
-            "tenant_id": tenant_id,
-            "store_id": schedule.get("store_id"),
-            "gap_date": schedule.get("shift_date"),
-            "start_time": schedule.get("start_time"),
-            "end_time": schedule.get("end_time"),
-            "role": schedule.get("role"),
-            "emp_id": schedule.get("employee_id"),
-        })
+        await db.execute(
+            q,
+            {
+                "gap_id": gap_id,
+                "tenant_id": tenant_id,
+                "store_id": schedule.get("store_id"),
+                "gap_date": schedule.get("shift_date"),
+                "start_time": schedule.get("start_time"),
+                "end_time": schedule.get("end_time"),
+                "role": schedule.get("role"),
+                "emp_id": schedule.get("employee_id"),
+            },
+        )
         await db.commit()
         return gap_id
     except (OperationalError, ProgrammingError) as exc:
@@ -178,13 +184,16 @@ async def _find_available_candidates(
         LIMIT 10
     """)
     try:
-        result = await db.execute(q, {
-            "tenant_id": tenant_id,
-            "store_id": store_id,
-            "gap_date": gap_date,
-            "role": role,
-            "exclude_id": exclude_employee_id,
-        })
+        result = await db.execute(
+            q,
+            {
+                "tenant_id": tenant_id,
+                "store_id": store_id,
+                "gap_date": gap_date,
+                "role": role,
+                "exclude_id": exclude_employee_id,
+            },
+        )
         return [dict(r) for r in result.mappings()]
     except (OperationalError, ProgrammingError) as exc:
         logger.warning("recovery_find_candidates_failed", error=str(exc))
@@ -220,7 +229,11 @@ class AttendanceRecoveryAgent(SkillAgent):
         return None
 
     async def _fetch_reservation_context(
-        self, db: Any, tenant_id: str, store_id: str, target_date: date,
+        self,
+        db: Any,
+        tenant_id: str,
+        store_id: str,
+        target_date: date,
     ) -> dict[str, Any]:
         """从tx-trade查询当天预订数据，用于评估缺勤紧急程度。
 
@@ -242,11 +255,14 @@ class AttendanceRecoveryAgent(SkillAgent):
                   AND reservation_date = :date
                   AND status IN ('confirmed', 'seated')
             """)
-            result = await db.execute(sql, {
-                "tid": str(tenant_id),
-                "store_id": str(store_id),
-                "date": str(target_date),
-            })
+            result = await db.execute(
+                sql,
+                {
+                    "tid": str(tenant_id),
+                    "store_id": str(store_id),
+                    "date": str(target_date),
+                },
+            )
             row = result.mappings().first()
             return dict(row) if row else {}
         except (OperationalError, ProgrammingError) as exc:
@@ -269,7 +285,10 @@ class AttendanceRecoveryAgent(SkillAgent):
         如果客流预测>均值1.3倍 + 任何岗位缺勤 -> 至少urgent(high)
         """
         reservation_ctx = await self._fetch_reservation_context(
-            db, tenant_id, store_id, target_date,
+            db,
+            tenant_id,
+            store_id,
+            target_date,
         )
         if not reservation_ctx:
             return base_urgency
@@ -283,7 +302,9 @@ class AttendanceRecoveryAgent(SkillAgent):
         if large_parties > 0 and pos_lower in ("chef", "cook", "厨师", "后厨"):
             logger.info(
                 "recovery_urgency_upgrade_banquet",
-                store_id=store_id, large_parties=large_parties, position=position,
+                store_id=store_id,
+                large_parties=large_parties,
+                position=position,
             )
             return "critical"
 
@@ -291,7 +312,9 @@ class AttendanceRecoveryAgent(SkillAgent):
         if vip_count > 0 and pos_lower in ("waiter", "服务员", "前厅"):
             logger.info(
                 "recovery_urgency_upgrade_vip",
-                store_id=store_id, vip_count=vip_count, position=position,
+                store_id=store_id,
+                vip_count=vip_count,
+                position=position,
             )
             return "critical"
 
@@ -299,7 +322,8 @@ class AttendanceRecoveryAgent(SkillAgent):
         if total_reservations > 5 and base_urgency == "normal":
             logger.info(
                 "recovery_urgency_upgrade_volume",
-                store_id=store_id, total_reservations=total_reservations,
+                store_id=store_id,
+                total_reservations=total_reservations,
             )
             return "high"
 
@@ -325,13 +349,9 @@ class AttendanceRecoveryAgent(SkillAgent):
         """检测缺勤：查排班 → 创建缺口 → 查候选 → 返回推荐列表。"""
         employee_id = params.get("employee_id")
         if not employee_id:
-            return AgentResult(success=False, action="detect_absence",
-                               error="缺少 employee_id")
+            return AgentResult(success=False, action="detect_absence", error="缺少 employee_id")
         absent_date_str = params.get("absent_date")
-        absent_date = (
-            date.fromisoformat(absent_date_str) if absent_date_str
-            else date.today()
-        )
+        absent_date = date.fromisoformat(absent_date_str) if absent_date_str else date.today()
 
         if not self._db:
             logger.warning("recovery_detect_no_db", tenant_id=self.tenant_id)
@@ -342,9 +362,7 @@ class AttendanceRecoveryAgent(SkillAgent):
             )
 
         # 真实逻辑
-        schedule = await _load_absent_schedule(
-            self._db, self.tenant_id, employee_id, absent_date
-        )
+        schedule = await _load_absent_schedule(self._db, self.tenant_id, employee_id, absent_date)
         if not schedule:
             return AgentResult(
                 success=True,
@@ -360,12 +378,19 @@ class AttendanceRecoveryAgent(SkillAgent):
 
         # 获取预订上下文用于动态紧急度和候选人评分
         reservation_ctx = await self._fetch_reservation_context(
-            self._db, self.tenant_id, store_id, absent_date,
+            self._db,
+            self.tenant_id,
+            store_id,
+            absent_date,
         )
 
         candidates_raw = await _find_available_candidates(
-            self._db, self.tenant_id, store_id,
-            absent_date, role, employee_id,
+            self._db,
+            self.tenant_id,
+            store_id,
+            absent_date,
+            role,
+            employee_id,
         )
         candidates = []
         for c in candidates_raw:
@@ -383,7 +408,12 @@ class AttendanceRecoveryAgent(SkillAgent):
 
         base_urgency = _urgency_level(str(schedule.get("start_time") or ""))
         urgency = await self._calculate_dynamic_urgency(
-            self._db, self.tenant_id, store_id, absent_date, role, base_urgency,
+            self._db,
+            self.tenant_id,
+            store_id,
+            absent_date,
+            role,
+            base_urgency,
         )
         emp_name = schedule.get("emp_name") or employee_id
 
@@ -413,8 +443,7 @@ class AttendanceRecoveryAgent(SkillAgent):
         exclude_id = params.get("exclude_employee_id", "00000000-0000-0000-0000-000000000000")
 
         if not store_id:
-            return AgentResult(success=False, action="find_replacements",
-                               error="缺少 store_id")
+            return AgentResult(success=False, action="find_replacements", error="缺少 store_id")
 
         if not self._db:
             logger.warning("recovery_replacements_no_db", tenant_id=self.tenant_id)
@@ -426,7 +455,10 @@ class AttendanceRecoveryAgent(SkillAgent):
 
         # 获取预订上下文用于候选人评分
         reservation_ctx = await self._fetch_reservation_context(
-            self._db, self.tenant_id, store_id, gap_date,
+            self._db,
+            self.tenant_id,
+            store_id,
+            gap_date,
         )
 
         candidates_raw = await _find_available_candidates(
@@ -452,8 +484,7 @@ class AttendanceRecoveryAgent(SkillAgent):
         """手动创建缺口预警。"""
         store_id = self._store_scope(params)
         if not store_id:
-            return AgentResult(success=False, action="create_gap_alert",
-                               error="缺少 store_id")
+            return AgentResult(success=False, action="create_gap_alert", error="缺少 store_id")
 
         gap_date_str = params.get("gap_date")
         gap_date = date.fromisoformat(gap_date_str) if gap_date_str else date.today()
@@ -490,8 +521,7 @@ class AttendanceRecoveryAgent(SkillAgent):
         message = params.get("message", "您有一条补班邀请，请确认是否接受。")
 
         if not candidate_ids:
-            return AgentResult(success=False, action="notify_candidates",
-                               error="缺少 candidate_ids")
+            return AgentResult(success=False, action="notify_candidates", error="缺少 candidate_ids")
 
         # TODO: 接入IM通知（企微/钉钉）
         logger.info(

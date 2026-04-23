@@ -3,6 +3,7 @@
 Agent 发布洞察（finding），其他 Agent 可订阅感知。
 用于跨 Agent 协同：如库存 Agent 发现低库存 → 排菜 Agent 自动调整推荐。
 """
+
 import time
 from collections import defaultdict
 from dataclasses import dataclass, field
@@ -16,6 +17,7 @@ logger = structlog.get_logger()
 @dataclass
 class Finding:
     """Agent 洞察"""
+
     agent_id: str
     finding_type: str
     data: dict
@@ -46,7 +48,7 @@ class MemoryBus:
         findings.append(finding)
         # 保持每类型最多 100 条
         if len(findings) > self._max_per_type:
-            self._findings[finding.finding_type] = findings[-self._max_per_type:]
+            self._findings[finding.finding_type] = findings[-self._max_per_type :]
 
         logger.info(
             "finding_published",
@@ -67,7 +69,8 @@ class MemoryBus:
         findings = self._findings.get(finding_type, [])
 
         result = [
-            f for f in findings
+            f
+            for f in findings
             if (now - f.timestamp) < f.ttl_seconds
             and f.confidence >= min_confidence
             and (store_id is None or f.store_id == store_id)

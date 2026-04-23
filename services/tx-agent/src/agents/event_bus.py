@@ -9,6 +9,7 @@
 升级记录：
 - v2（2026-04-01）：新增 Redis Streams 持久化（双轨并行），AgentEvent 增加 tenant_id 字段
 """
+
 import asyncio
 import json
 import time
@@ -25,6 +26,7 @@ logger = structlog.get_logger()
 @dataclass
 class AgentEvent:
     """Agent 事件"""
+
     event_type: str
     source_agent: str
     store_id: str
@@ -110,7 +112,7 @@ class EventBus:
         stream = self._streams[event.event_type]
         stream.append(event)
         if len(stream) > self._max_per_stream:
-            self._streams[event.event_type] = stream[-self._max_per_stream:]
+            self._streams[event.event_type] = stream[-self._max_per_stream :]
 
         logger.info(
             "event_published",
@@ -297,112 +299,105 @@ DEFAULT_EVENT_HANDLERS: dict[str, list[tuple[str, str]]] = {
         ("finance_audit", "generate_shift_summary"),
         ("store_inspect", "trigger_shift_checklist"),
     ],
-
     # ── 交易域事件驱动 ────────────────────────────────────────────────
     "trade.order.paid": [
-        ("member_insight", "update_customer_rfm"),      # 更新会员RFM分层
-        ("private_ops", "check_journey_trigger"),        # 检查私域旅程触发条件
-        ("finance_audit", "update_daily_revenue"),       # 更新日营收
+        ("member_insight", "update_customer_rfm"),  # 更新会员RFM分层
+        ("private_ops", "check_journey_trigger"),  # 检查私域旅程触发条件
+        ("finance_audit", "update_daily_revenue"),  # 更新日营收
         ("personalization", "generate_reorder_prompt"),  # 消费后→生成复购提醒文案
     ],
     "trade.discount.blocked": [
-        ("discount_guard", "log_violation"),             # 记录折扣违规
-        ("finance_audit", "flag_discount_anomaly"),      # 财务稽核标记
+        ("discount_guard", "log_violation"),  # 记录折扣违规
+        ("finance_audit", "flag_discount_anomaly"),  # 财务稽核标记
     ],
     "trade.daily_settlement.completed": [
-        ("finance_audit", "generate_shift_summary"),     # 生成班次财务摘要
-        ("store_inspect", "trigger_shift_checklist"),    # 触发班次质检清单
+        ("finance_audit", "generate_shift_summary"),  # 生成班次财务摘要
+        ("store_inspect", "trigger_shift_checklist"),  # 触发班次质检清单
     ],
-
     # ── 供应链域事件驱动 ──────────────────────────────────────────────
     "supply.stock.low": [
-        ("inventory_alert", "assess_shortage_severity"), # 评估库存短缺严重程度
-        ("smart_menu", "suggest_alternatives"),          # 推荐替代菜品
+        ("inventory_alert", "assess_shortage_severity"),  # 评估库存短缺严重程度
+        ("smart_menu", "suggest_alternatives"),  # 推荐替代菜品
     ],
     "supply.stock.zero": [
-        ("smart_menu", "mark_sold_out"),                 # 标记售罄
-        ("inventory_alert", "urgent_reorder_notify"),    # 紧急补货通知
+        ("smart_menu", "mark_sold_out"),  # 标记售罄
+        ("inventory_alert", "urgent_reorder_notify"),  # 紧急补货通知
     ],
     "supply.ingredient.expiring": [
-        ("inventory_alert", "plan_usage"),               # 制定快速用料计划
-        ("smart_menu", "push_expiry_specials"),          # 推荐到期食材特价菜
+        ("inventory_alert", "plan_usage"),  # 制定快速用料计划
+        ("smart_menu", "push_expiry_specials"),  # 推荐到期食材特价菜
     ],
     "supply.receiving.variance": [
-        ("finance_audit", "flag_receiving_variance"),    # 财务稽核标记收货差异
+        ("finance_audit", "flag_receiving_variance"),  # 财务稽核标记收货差异
     ],
-
     # ── 组织人事域事件驱动 ────────────────────────────────────────────
     "org.attendance.late": [
-        ("store_inspect", "log_attendance_issue"),       # 记录考勤问题
+        ("store_inspect", "log_attendance_issue"),  # 记录考勤问题
     ],
     "org.attendance.exception": [
-        ("store_inspect", "create_followup_task"),       # 创建跟进任务
+        ("store_inspect", "create_followup_task"),  # 创建跟进任务
     ],
     "org.approval.completed": [
-        ("finance_audit", "process_approval_result"),    # 审批完成后财务联动
+        ("finance_audit", "process_approval_result"),  # 审批完成后财务联动
     ],
-
     # ── 财务域事件驱动 ────────────────────────────────────────────────
     "finance.cost_rate.exceeded": [
-        ("finance_audit", "root_cause_analysis"),        # 成本率超标原因分析
-        ("smart_menu", "flag_high_cost_dishes"),         # 标记高成本菜品
+        ("finance_audit", "root_cause_analysis"),  # 成本率超标原因分析
+        ("smart_menu", "flag_high_cost_dishes"),  # 标记高成本菜品
     ],
     "finance.daily_pl.generated": [
-        ("finance_audit", "check_pl_anomaly"),           # P&L异常检测
+        ("finance_audit", "check_pl_anomaly"),  # P&L异常检测
     ],
-
     # ── 千人千面Agent事件驱动 ────────────────────────────────────────
     "member.profile_updated": [
-        ("personalization", "generate_batch_reasons"),    # 用户画像更新→重新生成推荐理由
+        ("personalization", "generate_batch_reasons"),  # 用户画像更新→重新生成推荐理由
     ],
     # ── 排位Agent事件驱动 ────────────────────────────────────────────
     "trade.table.freed": [
-        ("queue_seating", "auto_call_next"),              # 桌台空出自动叫号
+        ("queue_seating", "auto_call_next"),  # 桌台空出自动叫号
     ],
     "trade.queue.ticket_created": [
-        ("queue_seating", "predict_wait_time"),           # 新排队预测等位时间
+        ("queue_seating", "predict_wait_time"),  # 新排队预测等位时间
     ],
     "trade.reservation.no_show": [
-        ("queue_seating", "handle_no_show_release"),      # 爽约释放桌位
+        ("queue_seating", "handle_no_show_release"),  # 爽约释放桌位
     ],
-
     # ── 后厨超时Agent事件驱动 ────────────────────────────────────────
     "kds.item.overtime_warning": [
-        ("kitchen_overtime", "analyze_overtime_cause"),    # 出餐超时原因分析
-        ("kitchen_overtime", "auto_rush_notify"),          # 自动催菜
+        ("kitchen_overtime", "analyze_overtime_cause"),  # 出餐超时原因分析
+        ("kitchen_overtime", "auto_rush_notify"),  # 自动催菜
     ],
     "kds.scan.scheduled": [
-        ("kitchen_overtime", "scan_overtime_items"),       # 定时扫描超时项
+        ("kitchen_overtime", "scan_overtime_items"),  # 定时扫描超时项
     ],
-
     # ── 收银异常Agent事件驱动 ────────────────────────────────────────
     "trade.order.reverse_settled": [
         ("billing_anomaly", "detect_reverse_settle_anomaly"),  # 反结账异常检测
     ],
     "trade.payment.confirmed": [
-        ("billing_anomaly", "detect_payment_anomaly"),    # 支付异常检测
+        ("billing_anomaly", "detect_payment_anomaly"),  # 支付异常检测
     ],
     "trade.shift.closed": [
-        ("billing_anomaly", "analyze_shift_variance"),    # 班结现金差异
+        ("billing_anomaly", "analyze_shift_variance"),  # 班结现金差异
     ],
-
     # ── 闭店Agent事件驱动 ────────────────────────────────────────────
     "ops.closing_time.approaching": [
-        ("closing_ops", "pre_closing_check"),             # 闭店前30分钟预检
-        ("closing_ops", "remind_unsettled_orders"),       # 未结单提醒
+        ("closing_ops", "pre_closing_check"),  # 闭店前30分钟预检
+        ("closing_ops", "remind_unsettled_orders"),  # 未结单提醒
     ],
     "ops.checklist.closing_submitted": [
-        ("closing_ops", "check_checklist_status"),        # 检查单提交追踪
+        ("closing_ops", "check_checklist_status"),  # 检查单提交追踪
     ],
     "ops.daily_settlement.completed": [
-        ("closing_ops", "validate_daily_settlement"),     # 日结数据校验
-        ("closing_ops", "generate_closing_report"),       # 生成闭店报告
+        ("closing_ops", "validate_daily_settlement"),  # 日结数据校验
+        ("closing_ops", "generate_closing_report"),  # 生成闭店报告
     ],
 }
 
 
 def _make_placeholder_handler(aid: str, act: str) -> Callable:
     """创建占位处理器：记录事件并返回动作名"""
+
     def handler(event: AgentEvent) -> dict:
         return {
             "agent_id": aid,
@@ -411,6 +406,7 @@ def _make_placeholder_handler(aid: str, act: str) -> Callable:
             "store_id": event.store_id,
             "processed": True,
         }
+
     return handler
 
 
@@ -424,7 +420,9 @@ def create_default_event_bus() -> EventBus:
     for event_type, handlers in DEFAULT_EVENT_HANDLERS.items():
         for agent_id, action_name in handlers:
             bus.register_handler(
-                event_type, agent_id, _make_placeholder_handler(agent_id, action_name),
+                event_type,
+                agent_id,
+                _make_placeholder_handler(agent_id, action_name),
             )
     return bus
 

@@ -2,6 +2,7 @@
 
 宴会线索挖掘、宴会套餐推荐、宴会转化跟踪、宴会档期管理、宴会收益分析、宴会口碑管理。
 """
+
 from typing import Any
 
 from ..base import AgentResult, SkillAgent
@@ -11,7 +12,12 @@ BANQUET_TYPES = {
     "wedding": {"name": "婚宴", "avg_per_table_fen": 200000, "min_tables": 10, "peak_months": [5, 6, 9, 10]},
     "birthday": {"name": "生日宴", "avg_per_table_fen": 120000, "min_tables": 3, "peak_months": list(range(1, 13))},
     "corporate": {"name": "商务宴请", "avg_per_table_fen": 180000, "min_tables": 2, "peak_months": [1, 3, 6, 12]},
-    "baby_banquet": {"name": "满月/百日宴", "avg_per_table_fen": 150000, "min_tables": 5, "peak_months": list(range(1, 13))},
+    "baby_banquet": {
+        "name": "满月/百日宴",
+        "avg_per_table_fen": 150000,
+        "min_tables": 5,
+        "peak_months": list(range(1, 13)),
+    },
     "reunion": {"name": "家庭聚餐", "avg_per_table_fen": 100000, "min_tables": 2, "peak_months": [1, 2, 10]},
     "graduation": {"name": "升学/谢师宴", "avg_per_table_fen": 130000, "min_tables": 5, "peak_months": [6, 7, 8]},
 }
@@ -68,36 +74,55 @@ class BanquetGrowthAgent(SkillAgent):
             # 生日宴线索：生日在未来30天内
             birth_month = m.get("birth_month")
             if birth_month and abs(birth_month - current_month) <= 1:
-                leads.append({
-                    "customer_id": customer_id, "name": name,
-                    "lead_type": "birthday", "lead_type_name": "生日宴",
-                    "confidence": 0.6, "estimated_tables": 3,
-                    "signal": f"生日在{birth_month}月",
-                })
+                leads.append(
+                    {
+                        "customer_id": customer_id,
+                        "name": name,
+                        "lead_type": "birthday",
+                        "lead_type_name": "生日宴",
+                        "confidence": 0.6,
+                        "estimated_tables": 3,
+                        "signal": f"生日在{birth_month}月",
+                    }
+                )
 
             # 婚宴线索：近期搜索/咨询过
             if m.get("searched_wedding"):
-                leads.append({
-                    "customer_id": customer_id, "name": name,
-                    "lead_type": "wedding", "lead_type_name": "婚宴",
-                    "confidence": 0.8, "estimated_tables": 15,
-                    "signal": "近期搜索婚宴信息",
-                })
+                leads.append(
+                    {
+                        "customer_id": customer_id,
+                        "name": name,
+                        "lead_type": "wedding",
+                        "lead_type_name": "婚宴",
+                        "confidence": 0.8,
+                        "estimated_tables": 15,
+                        "signal": "近期搜索婚宴信息",
+                    }
+                )
 
             # 商务宴请：高频商务客户
             if m.get("is_corporate") and m.get("monthly_frequency", 0) >= 3:
-                leads.append({
-                    "customer_id": customer_id, "name": name,
-                    "lead_type": "corporate", "lead_type_name": "商务宴请",
-                    "confidence": 0.5, "estimated_tables": 3,
-                    "signal": "高频商务客户",
-                })
+                leads.append(
+                    {
+                        "customer_id": customer_id,
+                        "name": name,
+                        "lead_type": "corporate",
+                        "lead_type_name": "商务宴请",
+                        "confidence": 0.5,
+                        "estimated_tables": 3,
+                        "signal": "高频商务客户",
+                    }
+                )
 
         leads.sort(key=lambda x: x["confidence"], reverse=True)
         return AgentResult(
-            success=True, action="discover_banquet_leads",
-            data={"leads": leads[:50], "total": len(leads),
-                  "by_type": {t: sum(1 for l in leads if l["lead_type"] == t) for t in BANQUET_TYPES}},
+            success=True,
+            action="discover_banquet_leads",
+            data={
+                "leads": leads[:50],
+                "total": len(leads),
+                "by_type": {t: sum(1 for l in leads if l["lead_type"] == t) for t in BANQUET_TYPES},
+            },
             reasoning=f"发现 {len(leads)} 条宴会线索",
             confidence=0.7,
         )
@@ -115,14 +140,16 @@ class BanquetGrowthAgent(SkillAgent):
         for tier_key, tier in PACKAGE_TIERS.items():
             per_table = int(base_price * tier["multiplier"])
             total = per_table * table_count
-            packages.append({
-                "tier": tier_key,
-                "tier_name": tier["name"],
-                "per_table_yuan": round(per_table / 100, 2),
-                "total_yuan": round(total / 100, 2),
-                "table_count": table_count,
-                "includes": self._get_package_items(banquet_type, tier_key),
-            })
+            packages.append(
+                {
+                    "tier": tier_key,
+                    "tier_name": tier["name"],
+                    "per_table_yuan": round(per_table / 100, 2),
+                    "total_yuan": round(total / 100, 2),
+                    "table_count": table_count,
+                    "includes": self._get_package_items(banquet_type, tier_key),
+                }
+            )
 
         # 推荐最合适的
         recommended = "standard"
@@ -132,7 +159,8 @@ class BanquetGrowthAgent(SkillAgent):
                     recommended = pkg["tier"]
 
         return AgentResult(
-            success=True, action="recommend_banquet_package",
+            success=True,
+            action="recommend_banquet_package",
             data={
                 "banquet_type": banquet_type,
                 "banquet_type_name": type_info["name"],
@@ -166,15 +194,17 @@ class BanquetGrowthAgent(SkillAgent):
         pipeline_value_fen = sum(l.get("estimated_value_fen", 0) for l in leads if l.get("status") == "pending")
 
         return AgentResult(
-            success=True, action="track_banquet_conversion",
+            success=True,
+            action="track_banquet_conversion",
             data={
-                "total_leads": total_leads, "converted": converted,
-                "pending": pending, "lost": lost,
+                "total_leads": total_leads,
+                "converted": converted,
+                "pending": pending,
+                "lost": lost,
                 "conversion_rate_pct": conversion_rate,
                 "pipeline_value_yuan": round(pipeline_value_fen / 100, 2),
             },
-            reasoning=f"宴会线索 {total_leads} 条，转化 {converted} 单（{conversion_rate}%），"
-                      f"在谈 {pending} 单",
+            reasoning=f"宴会线索 {total_leads} 条，转化 {converted} 单（{conversion_rate}%），在谈 {pending} 单",
             confidence=0.85,
         )
 
@@ -193,7 +223,8 @@ class BanquetGrowthAgent(SkillAgent):
         available_slots = capacity_per_day * 30 - sum(booked_dates.values())
 
         return AgentResult(
-            success=True, action="manage_banquet_schedule",
+            success=True,
+            action="manage_banquet_schedule",
             data={
                 "month": month,
                 "total_bookings": len(bookings),
@@ -221,15 +252,18 @@ class BanquetGrowthAgent(SkillAgent):
             by_type[bt]["revenue_fen"] += b.get("revenue_fen", 0)
 
         return AgentResult(
-            success=True, action="analyze_banquet_revenue",
+            success=True,
+            action="analyze_banquet_revenue",
             data={
                 "total_banquets": len(banquets),
                 "total_revenue_yuan": round(total_revenue_fen / 100, 2),
                 "total_cost_yuan": round(total_cost_fen / 100, 2),
                 "gross_margin_pct": gross_margin,
                 "avg_revenue_yuan": round(total_revenue_fen / max(1, len(banquets)) / 100, 2),
-                "by_type": {k: {"count": v["count"], "revenue_yuan": round(v["revenue_fen"] / 100, 2)}
-                           for k, v in by_type.items()},
+                "by_type": {
+                    k: {"count": v["count"], "revenue_yuan": round(v["revenue_fen"] / 100, 2)}
+                    for k, v in by_type.items()
+                },
             },
             reasoning=f"宴会收入 ¥{total_revenue_fen / 100:.0f}，毛利率 {gross_margin}%",
             confidence=0.85,
@@ -252,7 +286,8 @@ class BanquetGrowthAgent(SkillAgent):
                 suggestions.append({"issue": "场地布置", "action": "升级宴会布置方案"})
 
         return AgentResult(
-            success=True, action="manage_banquet_review",
+            success=True,
+            action="manage_banquet_review",
             data={
                 "total_reviews": len(reviews),
                 "avg_rating": round(avg_rating, 1),

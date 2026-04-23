@@ -14,6 +14,7 @@ Sprint D1 / PR G 扩展：
   - 结果附带 `scope` 字段（"margin" / "safety" / "experience" / "n/a" / "waived"），
     下游可按 scope 维度做 Grafana 覆盖率统计
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -26,14 +27,15 @@ from .context import ConstraintContext
 logger = structlog.get_logger()
 
 # 默认阈值（可通过门店配置覆盖）
-DEFAULT_MIN_MARGIN_RATE = 0.15       # 毛利率不低于 15%
-DEFAULT_EXPIRY_BUFFER_HOURS = 24     # 食材距过期不少于 24 小时
-DEFAULT_MAX_SERVE_MINUTES = 30       # 出餐不超过 30 分钟
+DEFAULT_MIN_MARGIN_RATE = 0.15  # 毛利率不低于 15%
+DEFAULT_EXPIRY_BUFFER_HOURS = 24  # 食材距过期不少于 24 小时
+DEFAULT_MAX_SERVE_MINUTES = 30  # 出餐不超过 30 分钟
 
 
 @dataclass
 class ConstraintResult:
     """约束校验结果"""
+
     passed: bool = True
     violations: list[str] = field(default_factory=list)
     margin_check: Optional[dict] = None
@@ -90,9 +92,7 @@ class ConstraintChecker:
         elif isinstance(ctx_or_data, ConstraintContext):
             ctx = ctx_or_data
         else:
-            raise TypeError(
-                f"check_all 只接受 ConstraintContext 或 dict，收到 {type(ctx_or_data).__name__}"
-            )
+            raise TypeError(f"check_all 只接受 ConstraintContext 或 dict，收到 {type(ctx_or_data).__name__}")
 
         # scope 默认取 ctx.constraint_scope；显式 scope 参数优先（便于 base.py 强制覆盖）
         effective_scope: set[str] = scope if scope is not None else set(ctx.constraint_scope)
@@ -126,9 +126,7 @@ class ConstraintChecker:
                 result.scopes_checked.append("safety")
                 if not safety_result.get("passed", True):
                     result.passed = False
-                    result.violations.append(
-                        f"食安合规违规: {safety_result.get('reason', '临期/过期食材')}"
-                    )
+                    result.violations.append(f"食安合规违规: {safety_result.get('reason', '临期/过期食材')}")
 
         # 3. 客户体验
         if "experience" in effective_scope:
@@ -176,11 +174,13 @@ class ConstraintChecker:
             if ing.remaining_hours is None:
                 continue
             if ing.remaining_hours < self.expiry_buffer_hours:
-                violations.append({
-                    "ingredient": ing.name,
-                    "remaining_hours": ing.remaining_hours,
-                    "threshold_hours": self.expiry_buffer_hours,
-                })
+                violations.append(
+                    {
+                        "ingredient": ing.name,
+                        "remaining_hours": ing.remaining_hours,
+                        "threshold_hours": self.expiry_buffer_hours,
+                    }
+                )
 
         if violations:
             return {"passed": False, "reason": "临期食材", "items": violations}

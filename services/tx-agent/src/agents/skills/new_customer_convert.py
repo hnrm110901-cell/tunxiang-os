@@ -2,6 +2,7 @@
 
 识别新到店客户，生成欢迎权益，创建首访触达旅程，预测转化概率，分析来源渠道。
 """
+
 import uuid
 from typing import Any
 
@@ -72,25 +73,34 @@ class NewCustomerConvertAgent(SkillAgent):
             first_visit_days_ago = c.get("first_visit_days_ago", 0)
             if visit_count <= 1 and first_visit_days_ago <= lookback_days:
                 avg_spend_fen = c.get("avg_spend_fen", 0)
-                spend_tier = "high_spend" if avg_spend_fen >= 15000 else "mid_spend" if avg_spend_fen >= 8000 else "low_spend"
-                new_customers.append({
-                    "customer_id": c.get("customer_id"),
-                    "name": c.get("name", ""),
-                    "first_visit_date": c.get("first_visit_date", ""),
-                    "source_channel": c.get("source_channel", "未知"),
-                    "spend_fen": avg_spend_fen,
-                    "spend_tier": spend_tier,
-                    "has_registered": c.get("has_registered", False),
-                })
+                spend_tier = (
+                    "high_spend" if avg_spend_fen >= 15000 else "mid_spend" if avg_spend_fen >= 8000 else "low_spend"
+                )
+                new_customers.append(
+                    {
+                        "customer_id": c.get("customer_id"),
+                        "name": c.get("name", ""),
+                        "first_visit_date": c.get("first_visit_date", ""),
+                        "source_channel": c.get("source_channel", "未知"),
+                        "spend_fen": avg_spend_fen,
+                        "spend_tier": spend_tier,
+                        "has_registered": c.get("has_registered", False),
+                    }
+                )
 
         return AgentResult(
-            success=True, action="identify_new_customers",
-            data={"new_customers": new_customers[:100], "total": len(new_customers),
-                  "lookback_days": lookback_days,
-                  "registration_rate": round(
-                      sum(1 for nc in new_customers if nc["has_registered"]) / max(1, len(new_customers)) * 100, 1)},
+            success=True,
+            action="identify_new_customers",
+            data={
+                "new_customers": new_customers[:100],
+                "total": len(new_customers),
+                "lookback_days": lookback_days,
+                "registration_rate": round(
+                    sum(1 for nc in new_customers if nc["has_registered"]) / max(1, len(new_customers)) * 100, 1
+                ),
+            },
             reasoning=f"过去{lookback_days}天识别到 {len(new_customers)} 位新客，"
-                      f"注册率 {sum(1 for nc in new_customers if nc['has_registered']) / max(1, len(new_customers)) * 100:.1f}%",
+            f"注册率 {sum(1 for nc in new_customers if nc['has_registered']) / max(1, len(new_customers)) * 100:.1f}%",
             confidence=0.9,
         )
 
@@ -122,7 +132,8 @@ class NewCustomerConvertAgent(SkillAgent):
             bonus_items.append({"item": "指定饮品半价", "type": "half_price"})
 
         return AgentResult(
-            success=True, action="generate_welcome_offer",
+            success=True,
+            action="generate_welcome_offer",
             data={
                 "offer_id": offer_id,
                 "customer_id": customer_id,
@@ -145,16 +156,19 @@ class NewCustomerConvertAgent(SkillAgent):
         journey_id = str(uuid.uuid4())[:8]
         steps = []
         for node in FIRST_VISIT_JOURNEY:
-            steps.append({
-                "step": node["step"],
-                "delay_hours": node["delay_hours"],
-                "channel": node["channel"],
-                "content": node["content"],
-                "status": "pending",
-            })
+            steps.append(
+                {
+                    "step": node["step"],
+                    "delay_hours": node["delay_hours"],
+                    "channel": node["channel"],
+                    "content": node["content"],
+                    "status": "pending",
+                }
+            )
 
         return AgentResult(
-            success=True, action="create_first_visit_journey",
+            success=True,
+            action="create_first_visit_journey",
             data={
                 "journey_id": journey_id,
                 "customer_id": customer_id,
@@ -201,12 +215,14 @@ class NewCustomerConvertAgent(SkillAgent):
 
             score = min(0.95, score)
 
-            predictions.append({
-                "customer_id": c.get("customer_id"),
-                "conversion_prob": round(score, 2),
-                "level": "高" if score >= 0.7 else "中" if score >= 0.5 else "低",
-                "key_factors": [],
-            })
+            predictions.append(
+                {
+                    "customer_id": c.get("customer_id"),
+                    "conversion_prob": round(score, 2),
+                    "level": "高" if score >= 0.7 else "中" if score >= 0.5 else "低",
+                    "key_factors": [],
+                }
+            )
             if registered:
                 predictions[-1]["key_factors"].append("已注册会员")
             if spend_fen >= 10000:
@@ -216,10 +232,14 @@ class NewCustomerConvertAgent(SkillAgent):
 
         high_count = sum(1 for p in predictions if p["level"] == "高")
         return AgentResult(
-            success=True, action="predict_conversion_probability",
-            data={"predictions": predictions[:50], "total": len(predictions),
-                  "high_conversion_count": high_count,
-                  "avg_prob": round(sum(p["conversion_prob"] for p in predictions) / max(1, len(predictions)), 2)},
+            success=True,
+            action="predict_conversion_probability",
+            data={
+                "predictions": predictions[:50],
+                "total": len(predictions),
+                "high_conversion_count": high_count,
+                "avg_prob": round(sum(p["conversion_prob"] for p in predictions) / max(1, len(predictions)), 2),
+            },
             reasoning=f"预测 {len(predictions)} 位新客转化概率，高转化 {high_count} 人",
             confidence=0.75,
         )
@@ -241,20 +261,26 @@ class NewCustomerConvertAgent(SkillAgent):
         total = len(customers)
         channels = []
         for name, stats in sorted(channel_stats.items(), key=lambda x: x[1]["count"], reverse=True):
-            channels.append({
-                "channel": name,
-                "count": stats["count"],
-                "pct": round(stats["count"] / max(1, total) * 100, 1),
-                "avg_spend_yuan": round(stats["total_spend_fen"] / max(1, stats["count"]) / 100, 2),
-                "registration_rate": round(stats["registered"] / max(1, stats["count"]) * 100, 1),
-            })
+            channels.append(
+                {
+                    "channel": name,
+                    "count": stats["count"],
+                    "pct": round(stats["count"] / max(1, total) * 100, 1),
+                    "avg_spend_yuan": round(stats["total_spend_fen"] / max(1, stats["count"]) / 100, 2),
+                    "registration_rate": round(stats["registered"] / max(1, stats["count"]) * 100, 1),
+                }
+            )
 
         return AgentResult(
-            success=True, action="analyze_new_customer_source",
-            data={"channels": channels, "total_new_customers": total,
-                  "top_channel": channels[0]["channel"] if channels else "无"},
+            success=True,
+            action="analyze_new_customer_source",
+            data={
+                "channels": channels,
+                "total_new_customers": total,
+                "top_channel": channels[0]["channel"] if channels else "无",
+            },
             reasoning=f"分析 {total} 位新客来源，TOP渠道: {channels[0]['channel'] if channels else '无'}"
-                      f"（{channels[0]['pct'] if channels else 0}%）",
+            f"（{channels[0]['pct'] if channels else 0}%）",
             confidence=0.85,
         )
 
@@ -272,7 +298,8 @@ class NewCustomerConvertAgent(SkillAgent):
         growth_rate = round((new_count - prev_new_count) / max(1, prev_new_count) * 100, 1)
 
         return AgentResult(
-            success=True, action="get_new_customer_stats",
+            success=True,
+            action="get_new_customer_stats",
             data={
                 "period": period,
                 "new_count": new_count,
@@ -284,6 +311,6 @@ class NewCustomerConvertAgent(SkillAgent):
                 "status": "增长" if growth_rate > 0 else "下降" if growth_rate < 0 else "持平",
             },
             reasoning=f"{period}新客 {new_count} 人，环比{'增长' if growth_rate > 0 else '下降'} {abs(growth_rate)}%，"
-                      f"转化率 {conversion_rate}%",
+            f"转化率 {conversion_rate}%",
             confidence=0.9,
         )

@@ -3,13 +3,14 @@
 从 DB 读写 agent_memories 表，支持按类型/键/门店过滤、过期淘汰、
 访问计数、ILIKE 模糊搜索（后续接入向量搜索）。
 """
+
 from __future__ import annotations
 
 from datetime import datetime, timezone
 from uuid import UUID
 
 import structlog
-from sqlalchemy import delete, func, select, update
+from sqlalchemy import func, select, update
 from sqlalchemy.exc import NoResultFound
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -79,9 +80,7 @@ class AgentMemoryService:
             AgentMemory.is_deleted == False,  # noqa: E712
         )
         # 排除已过期
-        stmt = stmt.where(
-            (AgentMemory.expires_at.is_(None)) | (AgentMemory.expires_at > now)
-        )
+        stmt = stmt.where((AgentMemory.expires_at.is_(None)) | (AgentMemory.expires_at > now))
         if memory_type is not None:
             stmt = stmt.where(AgentMemory.memory_type == memory_type)
         if memory_key is not None:
@@ -122,9 +121,7 @@ class AgentMemoryService:
             AgentMemory.tenant_id == UUID(tenant_id),
             AgentMemory.is_deleted == False,  # noqa: E712
             (AgentMemory.expires_at.is_(None)) | (AgentMemory.expires_at > now),
-            AgentMemory.memory_key.ilike(
-                f"%{query_text.replace('%', '\\%').replace('_', '\\_')}%"
-            ),
+            AgentMemory.memory_key.ilike(f"%{query_text.replace('%', '\\%').replace('_', '\\_')}%"),
         )
         if agent_id is not None:
             stmt = stmt.where(AgentMemory.agent_id == agent_id)
@@ -205,9 +202,7 @@ class AgentMemoryService:
             to_delete_ids = [m.id for m in group_memories[1:]]
             if to_delete_ids:
                 await self.db.execute(
-                    update(AgentMemory)
-                    .where(AgentMemory.id.in_(to_delete_ids))
-                    .values(is_deleted=True)
+                    update(AgentMemory).where(AgentMemory.id.in_(to_delete_ids)).values(is_deleted=True)
                 )
                 # 将被合并条目的 access_count 累加到保留条目
                 total_access = sum(m.access_count for m in group_memories[1:])

@@ -7,7 +7,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import date, datetime, timedelta
+from datetime import date, timedelta
 from typing import Any
 
 import structlog
@@ -21,6 +21,7 @@ logger = structlog.get_logger(__name__)
 # ---------------------------------------------------------------------------
 # 纯函数
 # ---------------------------------------------------------------------------
+
 
 def calculate_completeness_score(
     records: list[dict],
@@ -91,6 +92,7 @@ def check_expiry_risk(expiry_date: date | str | None, alert_days: int = 30) -> d
 # 业务服务
 # ---------------------------------------------------------------------------
 
+
 async def record_inbound(
     tenant_id: str,
     store_id: str,
@@ -107,10 +109,7 @@ async def record_inbound(
     async with TenantSession(tenant_id) as db:
         # 检查供应商是否已登记
         supplier_row = await db.execute(
-            text(
-                "SELECT id, name, status FROM civic_suppliers "
-                "WHERE tenant_id = :tenant_id AND id = :supplier_id"
-            ),
+            text("SELECT id, name, status FROM civic_suppliers WHERE tenant_id = :tenant_id AND id = :supplier_id"),
             {"tenant_id": tenant_id, "supplier_id": data["supplier_id"]},
         )
         supplier = supplier_row.mappings().first()
@@ -173,8 +172,7 @@ async def get_inbound_records(
                 "WHERE tenant_id = :tenant_id AND store_id = :store_id "
                 "  AND recorded_at >= :date_from AND recorded_at < :date_to"
             ),
-            {"tenant_id": tenant_id, "store_id": store_id,
-             "date_from": date_from, "date_to": date_to},
+            {"tenant_id": tenant_id, "store_id": store_id, "date_from": date_from, "date_to": date_to},
         )
         total = count_result.scalar() or 0
 
@@ -188,9 +186,14 @@ async def get_inbound_records(
                 "ORDER BY recorded_at DESC "
                 "LIMIT :limit OFFSET :offset"
             ),
-            {"tenant_id": tenant_id, "store_id": store_id,
-             "date_from": date_from, "date_to": date_to,
-             "limit": size, "offset": offset},
+            {
+                "tenant_id": tenant_id,
+                "store_id": store_id,
+                "date_from": date_from,
+                "date_to": date_to,
+                "limit": size,
+                "offset": offset,
+            },
         )
         items = [dict(r) for r in rows.mappings().all()]
 
@@ -383,8 +386,10 @@ async def record_coldchain(
 
     logger.info(
         "coldchain_recorded",
-        tenant_id=tenant_id, store_id=store_id,
-        temp=data["temperature"], record_id=record_id,
+        tenant_id=tenant_id,
+        store_id=store_id,
+        temp=data["temperature"],
+        record_id=record_id,
     )
     return {"id": record_id, "status": "recorded", **data}
 
@@ -412,17 +417,14 @@ async def check_completeness(
                 "WHERE tenant_id = :tenant_id AND store_id = :store_id "
                 "  AND recorded_at >= :date_from AND recorded_at < :date_to"
             ),
-            {"tenant_id": tenant_id, "store_id": store_id,
-             "date_from": check_date, "date_to": next_day},
+            {"tenant_id": tenant_id, "store_id": store_id, "date_from": check_date, "date_to": next_day},
         )
         records = [dict(r) for r in rec_rows.mappings().all()]
 
         # 所有活跃供应商
         sup_rows = await db.execute(
             text(
-                "SELECT id, name, license_no, license_expiry, status "
-                "FROM civic_suppliers "
-                "WHERE tenant_id = :tenant_id"
+                "SELECT id, name, license_no, license_expiry, status FROM civic_suppliers WHERE tenant_id = :tenant_id"
             ),
             {"tenant_id": tenant_id},
         )
@@ -434,21 +436,25 @@ async def check_completeness(
     missing_items = []
     missing_batch = [r for r in records if not r.get("batch_no")]
     if missing_batch:
-        missing_items.append({
-            "type": "missing_batch_no",
-            "count": len(missing_batch),
-            "items": [r["item_name"] for r in missing_batch],
-        })
+        missing_items.append(
+            {
+                "type": "missing_batch_no",
+                "count": len(missing_batch),
+                "items": [r["item_name"] for r in missing_batch],
+            }
+        )
 
     supplier_ids_in_records = {r["supplier_id"] for r in records if r.get("supplier_id")}
     registered_ids = {s["id"] for s in suppliers if s.get("status") == "active"}
     unregistered = supplier_ids_in_records - registered_ids
     if unregistered:
-        missing_items.append({
-            "type": "unregistered_supplier",
-            "count": len(unregistered),
-            "supplier_ids": list(unregistered),
-        })
+        missing_items.append(
+            {
+                "type": "unregistered_supplier",
+                "count": len(unregistered),
+                "supplier_ids": list(unregistered),
+            }
+        )
 
     return {
         "date": check_date,
@@ -488,10 +494,7 @@ async def get_trace_stats(tenant_id: str, store_id: str) -> dict:
 
         # 供应商统计
         sup_count = await db.execute(
-            text(
-                "SELECT COUNT(*) AS cnt FROM civic_suppliers "
-                "WHERE tenant_id = :tenant_id AND status = 'active'"
-            ),
+            text("SELECT COUNT(*) AS cnt FROM civic_suppliers WHERE tenant_id = :tenant_id AND status = 'active'"),
             {"tenant_id": tenant_id},
         )
         active_suppliers = sup_count.scalar() or 0

@@ -18,6 +18,7 @@
   - get_db() 通过 async generator 模拟
   - SQLAlchemyError 注入模拟 DB 故障
 """
+
 from __future__ import annotations
 
 import uuid
@@ -26,8 +27,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from sqlalchemy.exc import SQLAlchemyError
 
-from ..agents.menu_optimizer import MenuOptimizer
 from ..agents.dispatch_predictor import DispatchPredictorAgent
+from ..agents.menu_optimizer import MenuOptimizer
 
 # ── 固定测试值 ─────────────────────────────────────────────────────────────────
 
@@ -104,10 +105,7 @@ class TestMenuOptimizerAnalyzeFromMV:
     async def test_normal_3_high_loss_returns_medium_risk(self) -> None:
         """正常路径：3个高损耗食材(loss_rate=0.15) → high_loss_count=3, risk_signal="medium"。"""
         agent = MenuOptimizer()
-        rows = [
-            _make_bom_row(f"ING-{i:03d}", f"食材{i}", 0.15)
-            for i in range(3)
-        ]
+        rows = [_make_bom_row(f"ING-{i:03d}", f"食材{i}", 0.15) for i in range(3)]
         db_session = _make_db_session(rows=rows)
 
         with patch(
@@ -133,10 +131,7 @@ class TestMenuOptimizerAnalyzeFromMV:
     async def test_5_high_loss_returns_high_risk_with_hints(self) -> None:
         """高风险：5个高损耗食材 → risk_signal="high", menu_hints 不为空。"""
         agent = MenuOptimizer()
-        rows = [
-            _make_bom_row(f"ING-{i:03d}", f"高损食材{i}", 0.20)
-            for i in range(5)
-        ]
+        rows = [_make_bom_row(f"ING-{i:03d}", f"高损食材{i}", 0.20) for i in range(5)]
         db_session = _make_db_session(rows=rows)
 
         with patch(
@@ -206,10 +201,7 @@ class TestDispatchPredictorAnalyzeFromMV:
         """正常：近7天 order_count=[200,180,190,170,180,175,200] → avg≈185, load_level="medium"。"""
         agent = DispatchPredictorAgent()
         order_counts = [200, 180, 190, 170, 180, 175, 200]
-        rows = [
-            _make_pnl_row(f"2026-03-{28 - i:02d}", cnt)
-            for i, cnt in enumerate(order_counts)
-        ]
+        rows = [_make_pnl_row(f"2026-03-{28 - i:02d}", cnt) for i, cnt in enumerate(order_counts)]
         db_session = _make_db_session(rows=rows)
 
         with patch(
@@ -233,10 +225,7 @@ class TestDispatchPredictorAnalyzeFromMV:
         agent = DispatchPredictorAgent()
         # rows 按 stat_date DESC，最新的在前
         order_counts = [370, 360, 350, 190, 180, 200, 195]
-        rows = [
-            _make_pnl_row(f"2026-03-{28 - i:02d}", cnt)
-            for i, cnt in enumerate(order_counts)
-        ]
+        rows = [_make_pnl_row(f"2026-03-{28 - i:02d}", cnt) for i, cnt in enumerate(order_counts)]
         db_session = _make_db_session(rows=rows)
 
         with patch(

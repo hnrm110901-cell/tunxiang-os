@@ -6,6 +6,7 @@ P3-01: 差异化护城河，AI领先能力
   member_frequency_check   — 同一会员N天内折扣频率超阈值预警
   table_pattern_analyze    — 同一桌台连续折扣异常模式检测
 """
+
 from __future__ import annotations
 
 import uuid
@@ -13,7 +14,7 @@ from datetime import date, datetime, timedelta, timezone
 from typing import Optional
 
 import structlog
-from fastapi import APIRouter, Depends, Header, Query
+from fastapi import APIRouter, Query
 from pydantic import BaseModel
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
@@ -35,14 +36,17 @@ _DECISION_LOGS: list[dict] = []
 
 # ─── DB 依赖 ─────────────────────────────────────────────────────────────────
 
+
 def _make_get_db(tenant_id: str):
     async def _get_db():
         async for session in get_db_with_tenant(tenant_id):
             yield session
+
     return _get_db
 
 
 # ─── 请求体模型 ──────────────────────────────────────────────────────────────
+
 
 class MemberFrequencyCheckRequest(BaseModel):
     member_id: str
@@ -60,9 +64,10 @@ class TablePatternAnalyzeRequest(BaseModel):
 
 # ─── 决策日志模型 ────────────────────────────────────────────────────────────
 
+
 class DiscountGuardDecision(BaseModel):
     agent_id: str = "discount_guard_v2"
-    decision_type: str   # "member_frequency_check" / "table_pattern_analyze"
+    decision_type: str  # "member_frequency_check" / "table_pattern_analyze"
     input_context: dict
     reasoning: str
     output_action: dict
@@ -72,6 +77,7 @@ class DiscountGuardDecision(BaseModel):
 
 
 # ─── 工具函数 ────────────────────────────────────────────────────────────────
+
 
 def _calc_risk_level(count: int, threshold: int) -> str:
     """根据折扣次数与阈值计算风险等级。
@@ -133,6 +139,7 @@ def _build_constraints_check(
 
 # ─── DB 查询函数 ──────────────────────────────────────────────────────────────
 
+
 async def _query_high_freq_members(
     db: AsyncSession,
     store_id: Optional[str],
@@ -182,15 +189,17 @@ async def _query_high_freq_members(
         count = int(row["discount_count"])
         total_fen = int(row["total_saved_fen"])
         level = _calc_risk_level(count, threshold)
-        members.append({
-            "member_id": row["member_id"],
-            "name": row["name"] or "未知",
-            "discount_count": count,
-            "total_saved_fen": total_fen,
-            "risk_level": level,
-            "latest_discount": row["latest_discount"],
-            "note": f"{days}天内{count}次折扣，累计减免¥{total_fen / 100:.0f}",
-        })
+        members.append(
+            {
+                "member_id": row["member_id"],
+                "name": row["name"] or "未知",
+                "discount_count": count,
+                "total_saved_fen": total_fen,
+                "risk_level": level,
+                "latest_discount": row["latest_discount"],
+                "note": f"{days}天内{count}次折扣，累计减免¥{total_fen / 100:.0f}",
+            }
+        )
     return members
 
 
@@ -286,21 +295,19 @@ async def _query_suspicious_tables(
         anomaly_score = min(0.99, (consecutive_days / max(days, 1)) * 0.6 + avg_rate * 0.4)
 
         waiter_ids = row["waiter_ids"] or []
-        related_employees = [
-            {"id": str(wid), "name": "", "count": discount_count}
-            for wid in waiter_ids
-            if wid
-        ]
+        related_employees = [{"id": str(wid), "name": "", "count": discount_count} for wid in waiter_ids if wid]
 
-        tables.append({
-            "table_id": row["table_id"],
-            "table_name": f"桌台-{row['table_id'][:8]}",
-            "consecutive_discount_days": consecutive_days,
-            "discount_count": discount_count,
-            "related_employees": related_employees,
-            "anomaly_score": round(anomaly_score, 2),
-            "note": f"该桌台{consecutive_days}天内出现{discount_count}次折扣，异常评分{anomaly_score:.2f}",
-        })
+        tables.append(
+            {
+                "table_id": row["table_id"],
+                "table_name": f"桌台-{row['table_id'][:8]}",
+                "consecutive_discount_days": consecutive_days,
+                "discount_count": discount_count,
+                "related_employees": related_employees,
+                "anomaly_score": round(anomaly_score, 2),
+                "note": f"该桌台{consecutive_days}天内出现{discount_count}次折扣，异常评分{anomaly_score:.2f}",
+            }
+        )
     return tables
 
 
@@ -344,8 +351,7 @@ async def _query_table_history(
                 "consecutive_discount_days": consecutive_days,
                 "discount_count": int(row["discount_count"]),
                 "related_employees": [
-                    {"id": str(wid), "name": "", "count": int(row["discount_count"])}
-                    for wid in waiter_ids if wid
+                    {"id": str(wid), "name": "", "count": int(row["discount_count"])} for wid in waiter_ids if wid
                 ],
                 "anomaly_score": round(anomaly_score, 2),
             }
@@ -355,6 +361,7 @@ async def _query_table_history(
 
 
 # ─── Action 1: 会员折扣频率检测 ──────────────────────────────────────────────
+
 
 @router.get("/member-frequency")
 async def get_high_frequency_members(
@@ -494,6 +501,7 @@ async def check_member_frequency_realtime(
 
 # ─── Action 2: 客位连续折扣预警 ──────────────────────────────────────────────
 
+
 @router.get("/table-pattern")
 async def get_suspicious_table_patterns(
     tenant_id: str = Query(..., description="租户ID"),
@@ -512,10 +520,7 @@ async def get_suspicious_table_patterns(
     suspicious.sort(key=lambda x: x["anomaly_score"], reverse=True)
 
     total_tables = len(suspicious)
-    avg_discount = (
-        sum(t["discount_count"] for t in suspicious) / total_tables
-        if total_tables > 0 else 0
-    )
+    avg_discount = sum(t["discount_count"] for t in suspicious) / total_tables if total_tables > 0 else 0
     suspicious_rate = round(total_tables / max(total_tables, 1) * 100, 1) if total_tables > 0 else 0.0
 
     logger.info(
@@ -583,9 +588,7 @@ async def analyze_table_pattern_realtime(
         ]
 
         # 判断当前员工是否是惯常操作者
-        is_same_employee = any(
-            e["id"] == body.employee_id for e in raw_employees
-        )
+        is_same_employee = any(e["id"] == body.employee_id for e in raw_employees)
         anomaly_score = existing_table["anomaly_score"]
 
         # 模式匹配：连续天数 ≥ 3 且是同一员工 → critical；连续天数 ≥ 2 → warning
@@ -601,8 +604,7 @@ async def analyze_table_pattern_realtime(
             is_pattern_match = True
             alert_level = "warning"
             alert_message = (
-                f"注意：{table_name}近期已连续{consecutive_days}天出现折扣，"
-                f"本次折扣已延续该模式，请主管确认是否合规。"
+                f"注意：{table_name}近期已连续{consecutive_days}天出现折扣，本次折扣已延续该模式，请主管确认是否合规。"
             )
         else:
             is_pattern_match = False
@@ -632,9 +634,7 @@ async def analyze_table_pattern_realtime(
             "alert_level": alert_level,
             "alert_message": alert_message,
         },
-        constraints_check=_build_constraints_check(
-            body.discount_amount_fen, is_pattern_match
-        ),
+        constraints_check=_build_constraints_check(body.discount_amount_fen, is_pattern_match),
         confidence=confidence,
         created_at=datetime.now(timezone.utc),
     )
@@ -668,6 +668,7 @@ async def analyze_table_pattern_realtime(
 
 
 # ─── 汇总统计 ────────────────────────────────────────────────────────────────
+
 
 @router.get("/summary")
 async def get_discount_guard_summary(
@@ -803,12 +804,11 @@ async def get_discount_guard_summary(
 
 # ─── 决策日志查询（运营审计用）──────────────────────────────────────────────
 
+
 @router.get("/decisions")
 async def list_decision_logs(
     tenant_id: str = Query(..., description="租户ID"),
-    decision_type: Optional[str] = Query(
-        None, description="过滤类型：member_frequency_check / table_pattern_analyze"
-    ),
+    decision_type: Optional[str] = Query(None, description="过滤类型：member_frequency_check / table_pattern_analyze"),
     limit: int = Query(20, ge=1, le=100, description="返回条数"),
 ) -> dict:
     """查询 Agent 决策日志（调试与合规审计）。"""

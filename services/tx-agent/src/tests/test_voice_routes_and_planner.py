@@ -14,6 +14,7 @@ Covered routes:
 
 Total: 17 test cases
 """
+
 import sys
 import types
 
@@ -21,8 +22,10 @@ import types
 _src_mod = types.ModuleType("src")
 _db_mod = types.ModuleType("src.db")
 
+
 async def _fake_get_db():
     yield None
+
 
 _db_mod.get_db = _fake_get_db
 sys.modules.setdefault("src", _src_mod)
@@ -30,6 +33,7 @@ sys.modules.setdefault("src.db", _db_mod)
 
 # stub structlog
 import logging
+
 _structlog = types.ModuleType("structlog")
 _structlog.get_logger = lambda *a, **kw: logging.getLogger("test")
 sys.modules.setdefault("structlog", _structlog)
@@ -39,11 +43,13 @@ _agents_pkg = types.ModuleType("src.agents")
 _agents_skills_pkg = types.ModuleType("src.agents.skills")
 _voice_order_mod = types.ModuleType("src.agents.skills.voice_order")
 
+
 class _FakeVoiceResult:
     def __init__(self, success=True, data=None, error=None):
         self.success = success
         self.data = data or {}
         self.error = error
+
 
 class _FakeVoiceOrderAgent:
     def __init__(self, tenant_id="default", store_id=""):
@@ -53,6 +59,7 @@ class _FakeVoiceOrderAgent:
     async def run(self, action, payload):
         return _FakeVoiceResult(success=True, data={"action": action})
 
+
 _voice_order_mod.VoiceOrderAgent = _FakeVoiceOrderAgent
 sys.modules.setdefault("src.agents", _agents_pkg)
 sys.modules.setdefault("src.agents.skills", _agents_skills_pkg)
@@ -61,6 +68,7 @@ sys.modules.setdefault("src.agents.skills.voice_order", _voice_order_mod)
 # stub DailyPlannerAgent
 _planner_mod = types.ModuleType("src.agents.planner")
 
+
 class _FakeDailyPlannerAgent:
     def __init__(self, tenant_id="default", store_id=""):
         pass
@@ -68,25 +76,29 @@ class _FakeDailyPlannerAgent:
     async def generate_daily_plan(self):
         return {"tasks": [], "store_id": "s1", "date": "today"}
 
+
 _planner_mod.DailyPlannerAgent = _FakeDailyPlannerAgent
 sys.modules.setdefault("src.agents.planner", _planner_mod)
 
 import os
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+
+import base64
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
-from unittest.mock import AsyncMock, MagicMock, patch
-import base64
-
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Fixtures
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def _build_voice_app():
     from api.voice_routes import router
+
     app = FastAPI()
     app.include_router(router)
     return app
@@ -94,6 +106,7 @@ def _build_voice_app():
 
 def _build_planner_app():
     from api.planner import router
+
     app = FastAPI()
     app.include_router(router)
     return app
@@ -116,6 +129,7 @@ def planner_client():
 # ─────────────────────────────────────────────────────────────────────────────
 # POST /api/v1/voice/transcribe
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_transcribe_happy_path(voice_client):
@@ -181,6 +195,7 @@ async def test_transcribe_agent_error(voice_client):
 # POST /api/v1/voice/parse-intent
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_parse_intent_happy_path(voice_client):
     """Text with store_id returns ok=True with intent data."""
@@ -213,6 +228,7 @@ async def test_parse_intent_no_store_id(voice_client):
 # ─────────────────────────────────────────────────────────────────────────────
 # POST /api/v1/voice/match-dishes
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_match_dishes_with_menu(voice_client):
@@ -251,6 +267,7 @@ async def test_match_dishes_empty_menu(voice_client):
 # POST /api/v1/voice/confirm-order
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_confirm_order_happy_path(voice_client):
     """Valid matched_items + table_id returns ok=True."""
@@ -285,6 +302,7 @@ async def test_confirm_order_empty_items(voice_client):
 # GET /api/v1/voice/stats/{store_id}
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_voice_stats_today(voice_client):
     """Default period=today returns stats for the store."""
@@ -312,6 +330,7 @@ async def test_voice_stats_custom_period(voice_client):
 # ─────────────────────────────────────────────────────────────────────────────
 # POST /api/v1/agent/plans/generate
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_generate_plan_happy_path(planner_client):
@@ -346,6 +365,7 @@ async def test_generate_plan_agent_error(planner_client):
 # GET /api/v1/agent/plans/{store_id}
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_get_plan_returns_pending(planner_client):
     """GET plan for a store returns status pending_approval by default."""
@@ -361,6 +381,7 @@ async def test_get_plan_returns_pending(planner_client):
 # ─────────────────────────────────────────────────────────────────────────────
 # POST /api/v1/agent/plans/{plan_id}/approve
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_approve_plan_returns_approved(planner_client):
@@ -378,6 +399,7 @@ async def test_approve_plan_returns_approved(planner_client):
 # GET /api/v1/agent/plans/{plan_id}/status
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_plan_status_executing(planner_client):
     """Status endpoint returns current execution status."""
@@ -393,6 +415,7 @@ async def test_plan_status_executing(planner_client):
 # ─────────────────────────────────────────────────────────────────────────────
 # GET /api/v1/agent/plans/history/
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_plan_history_default_limit(planner_client):

@@ -15,6 +15,7 @@
   9.  POST /session             — 创建会话 happy path
   10. GET  /session/{id}        — 获取会话 happy path / not found → 404
 """
+
 from __future__ import annotations
 
 import io
@@ -25,8 +26,8 @@ import uuid
 
 # ─── sys.path 准备 ───────────────────────────────────────────────────────────
 _TESTS_DIR = os.path.dirname(__file__)
-_SRC_DIR   = os.path.join(_TESTS_DIR, "..")
-_ROOT_DIR  = os.path.abspath(os.path.join(_TESTS_DIR, "..", "..", "..", ".."))
+_SRC_DIR = os.path.join(_TESTS_DIR, "..")
+_ROOT_DIR = os.path.abspath(os.path.join(_TESTS_DIR, "..", "..", "..", ".."))
 
 for _p in [_SRC_DIR, _ROOT_DIR]:
     if _p not in sys.path:
@@ -41,8 +42,8 @@ def _ensure_pkg(name: str, path: str) -> None:
         sys.modules[name] = mod
 
 
-_ensure_pkg("src",          _SRC_DIR)
-_ensure_pkg("src.api",      os.path.join(_SRC_DIR, "api"))
+_ensure_pkg("src", _SRC_DIR)
+_ensure_pkg("src.api", os.path.join(_SRC_DIR, "api"))
 _ensure_pkg("src.services", os.path.join(_SRC_DIR, "services"))
 
 # ─── structlog mock ──────────────────────────────────────────────────────────
@@ -56,7 +57,6 @@ _structlog.get_logger = lambda: types.SimpleNamespace(  # type: ignore[attr-defi
 sys.modules.setdefault("structlog", _structlog)
 
 # ─── voice_orchestrator mock ─────────────────────────────────────────────────
-from unittest.mock import AsyncMock, MagicMock, patch  # noqa: E402
 
 _orch_mod = types.ModuleType("src.services.voice_orchestrator")
 
@@ -122,7 +122,6 @@ _sess_mod.VoiceSessionManager = _FakeSessionManager  # type: ignore[attr-defined
 sys.modules["src.services.voice_session"] = _sess_mod
 
 # ─── 正式 import ─────────────────────────────────────────────────────────────
-import pytest  # noqa: E402
 from fastapi import FastAPI  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 
@@ -138,6 +137,7 @@ client = TestClient(app)
 def _wav_bytes() -> bytes:
     """最小合法 WAV 文件头（44 bytes）"""
     import struct
+
     data_size = 44
     header = struct.pack(
         "<4sI4s4sIHHIIHH4sI",
@@ -146,12 +146,12 @@ def _wav_bytes() -> bytes:
         b"WAVE",
         b"fmt ",
         16,
-        1,       # PCM
-        1,       # channels
-        16000,   # sample rate
-        32000,   # byte rate
-        2,       # block align
-        16,      # bits per sample
+        1,  # PCM
+        1,  # channels
+        16000,  # sample rate
+        32000,  # byte rate
+        2,  # block align
+        16,  # bits per sample
         b"data",
         data_size,
     )
@@ -161,6 +161,7 @@ def _wav_bytes() -> bytes:
 # ═══════════════════════════════════════════════════════════════════════════════
 # 1. POST /command — happy path
 # ═══════════════════════════════════════════════════════════════════════════════
+
 
 def test_voice_command_happy_path():
     audio = _wav_bytes()
@@ -180,6 +181,7 @@ def test_voice_command_happy_path():
 # 2. POST /command — 空音频 → 400
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 def test_voice_command_empty_audio():
     resp = client.post(
         "/api/v1/voice/command",
@@ -194,6 +196,7 @@ def test_voice_command_empty_audio():
 # ═══════════════════════════════════════════════════════════════════════════════
 # 3. POST /command — 缺少 store_id → 400
 # ═══════════════════════════════════════════════════════════════════════════════
+
 
 def test_voice_command_missing_store_id():
     audio = _wav_bytes()
@@ -210,6 +213,7 @@ def test_voice_command_missing_store_id():
 # ═══════════════════════════════════════════════════════════════════════════════
 # 4. POST /transcribe — happy path
 # ═══════════════════════════════════════════════════════════════════════════════
+
 
 def test_transcribe_happy_path():
     audio = _wav_bytes()
@@ -228,6 +232,7 @@ def test_transcribe_happy_path():
 # 5. POST /transcribe — 空音频 → 400
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 def test_transcribe_empty_audio():
     resp = client.post(
         "/api/v1/voice/transcribe",
@@ -242,6 +247,7 @@ def test_transcribe_empty_audio():
 # ═══════════════════════════════════════════════════════════════════════════════
 # 6. POST /transcribe — 不支持的 content_type → 400
 # ═══════════════════════════════════════════════════════════════════════════════
+
 
 def test_transcribe_invalid_format():
     resp = client.post(
@@ -258,6 +264,7 @@ def test_transcribe_invalid_format():
 # 7. POST /understand — happy path
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 def test_understand_happy_path():
     resp = client.post(
         "/api/v1/voice/understand",
@@ -273,6 +280,7 @@ def test_understand_happy_path():
 # 8. POST /understand — 空文本 → 400
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 def test_understand_empty_text():
     resp = client.post(
         "/api/v1/voice/understand",
@@ -286,6 +294,7 @@ def test_understand_empty_text():
 # ═══════════════════════════════════════════════════════════════════════════════
 # 9. POST /session — 创建会话 happy path
 # ═══════════════════════════════════════════════════════════════════════════════
+
 
 def test_create_session_happy_path():
     resp = client.post(
@@ -304,6 +313,7 @@ def test_create_session_happy_path():
 # 10a. GET /session/{id} — happy path
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 def test_get_session_happy_path():
     resp = client.get(f"/api/v1/voice/session/{SESSION_ID}")
     assert resp.status_code == 200
@@ -315,6 +325,7 @@ def test_get_session_happy_path():
 # ═══════════════════════════════════════════════════════════════════════════════
 # 10b. GET /session/{id} — not found → 404
 # ═══════════════════════════════════════════════════════════════════════════════
+
 
 def test_get_session_not_found():
     resp = client.get("/api/v1/voice/session/VS-NONEXISTENT")

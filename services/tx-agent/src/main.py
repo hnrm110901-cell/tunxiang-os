@@ -2,11 +2,11 @@
 
 Master Agent 编排 + 9 个 Skill Agent + 三条硬约束
 """
+
 import asyncio
 from contextlib import asynccontextmanager
 
 import structlog
-
 from fastapi import Depends, FastAPI, Header
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -14,35 +14,35 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from shared.ontology.src.database import get_db_with_tenant
 
 from .agents.domain_event_consumer import DomainEventConsumer
+from .api.agent_hub_routes import router as agent_hub_router
+from .api.agent_kpi_routes import router as agent_kpi_router
 from .api.agent_monitor_routes import router as agent_monitor_router
+from .api.agent_roi_routes import router as agent_roi_router
+from .api.ai_marketing_orchestrator_routes import router as ai_marketing_orchestrator_router  # AI营销编排 P1（v207）
+from .api.autonomy_controller_routes import router as autonomy_controller_router
 from .api.daily_review_routes import router as daily_review_router
-from .api.master_agent_routes import router as master_agent_router
-from .api.projector_routes import router as projector_router
 from .api.dashboard_routes import router as dashboard_router
+from .api.discount_guard_enhanced_routes import router as discount_guard_enhanced_router
+from .api.edge_routes import router as edge_router  # P1-5 边缘推理状态/代理接口
 from .api.health_routes import router as health_router
 from .api.inventory_routes import router as inventory_router
+from .api.knowledge_routes import router as knowledge_router  # 知识库管理 API
+from .api.master_agent_routes import router as master_agent_router
 from .api.notification_routes import router as notification_router
 from .api.observability import router as observability_router
 from .api.operation_plan_routes import router as operation_plan_router
+from .api.ops_agent_routes import router as ops_agent_router
 from .api.orchestrator_routes import router as orchestrator_router
 from .api.planner import router as planner_router
+from .api.projector_routes import router as projector_router
+from .api.skill_context_routes import router as skill_context_router
+from .api.skill_registry_routes import router as skill_registry_router
 from .api.specials_routes import router as specials_router
 from .api.store_clone_routes import router as store_clone_router
 from .api.store_health_routes import router as store_health_router
 from .api.stream_routes import router as stream_router
-from .api.voice_routes import router as voice_router
-from .api.skill_registry_routes import router as skill_registry_router
-from .api.skill_context_routes import router as skill_context_router
-from .api.discount_guard_enhanced_routes import router as discount_guard_enhanced_router
-from .api.agent_hub_routes import router as agent_hub_router
-from .api.ops_agent_routes import router as ops_agent_router
-from .api.autonomy_controller_routes import router as autonomy_controller_router
-from .api.agent_roi_routes import router as agent_roi_router
-from .api.agent_kpi_routes import router as agent_kpi_router
-from .api.ai_marketing_orchestrator_routes import router as ai_marketing_orchestrator_router  # AI营销编排 P1（v207）
-from .api.knowledge_routes import router as knowledge_router  # 知识库管理 API
 from .api.tool_routes import router as tool_router
-from .api.edge_routes import router as edge_router  # P1-5 边缘推理状态/代理接口
+from .api.voice_routes import router as voice_router
 from .routers.diagnosis_router import router as diagnosis_router
 from .routers.pilot_router import router as pilot_router
 
@@ -124,15 +124,17 @@ async def lifespan(app: FastAPI):
 
     # ── Skill-aware EventBus（并行运行，与 DomainEventConsumer 互不干扰）──
     import os as _os2
+
     from shared.skill_registry import SkillRegistry
     from shared.skill_registry.src.skill_event_consumer import SkillEventConsumer
+
     from .agents.skill_handlers import (
-        handle_order_skill_events,
-        handle_member_skill_events,
-        handle_inventory_skill_events,
-        handle_safety_skill_events,
-        handle_finance_skill_events,
         handle_approval_skill_events,
+        handle_finance_skill_events,
+        handle_inventory_skill_events,
+        handle_member_skill_events,
+        handle_order_skill_events,
+        handle_safety_skill_events,
     )
 
     # 扫描所有 Skill（services/ 目录）
@@ -162,12 +164,10 @@ async def lifespan(app: FastAPI):
     # 从 PROJECTOR_TENANT_IDS 环境变量读取需要运行投影器的租户列表
     # 格式：逗号分隔的 UUID 字符串，如 "uuid1,uuid2"
     import os as _os
+
     from .services.projector_runner import get_runner
 
-    projector_tenant_ids = [
-        t.strip() for t in _os.getenv("PROJECTOR_TENANT_IDS", "").split(",")
-        if t.strip()
-    ]
+    projector_tenant_ids = [t.strip() for t in _os.getenv("PROJECTOR_TENANT_IDS", "").split(",") if t.strip()]
     runner = get_runner()
     if projector_tenant_ids:
         await runner.start(tenant_ids=projector_tenant_ids)
@@ -199,6 +199,7 @@ app = FastAPI(
 )
 
 from prometheus_fastapi_instrumentator import Instrumentator
+
 Instrumentator().instrument(app).expose(app)
 
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
@@ -260,10 +261,14 @@ async def list_agents(
 ):
     """列出所有注册的 Agent"""
     from .agents.skills import ALL_SKILL_AGENTS
-    return {"ok": True, "data": [
-        {"agent_id": a.agent_id, "agent_name": a.agent_name, "priority": a.priority, "run_location": a.run_location}
-        for a in ALL_SKILL_AGENTS
-    ]}
+
+    return {
+        "ok": True,
+        "data": [
+            {"agent_id": a.agent_id, "agent_name": a.agent_name, "priority": a.priority, "run_location": a.run_location}
+            for a in ALL_SKILL_AGENTS
+        ],
+    }
 
 
 @app.post("/api/v1/agent/dispatch")
@@ -292,11 +297,15 @@ async def dispatch_agent(
         master.register(cls(tenant_id=x_tenant_id, db=db, model_router=model_router))
 
     result = await master.dispatch(agent_id, action, params)
-    return {"ok": result.success, "data": {
-        "action": result.action,
-        "data": result.data,
-        "reasoning": result.reasoning,
-        "confidence": result.confidence,
-        "constraints_passed": result.constraints_passed,
-        "execution_ms": result.execution_ms,
-    }, "error": result.error}
+    return {
+        "ok": result.success,
+        "data": {
+            "action": result.action,
+            "data": result.data,
+            "reasoning": result.reasoning,
+            "confidence": result.confidence,
+            "constraints_passed": result.constraints_passed,
+            "execution_ms": result.execution_ms,
+        },
+        "error": result.error,
+    }

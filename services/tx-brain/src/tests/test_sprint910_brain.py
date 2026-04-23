@@ -12,7 +12,6 @@ Covers:
 - Auto-insight generation
 """
 
-
 import pytest
 
 from ..ontology.bootstrap import OntologyBootstrap
@@ -61,8 +60,11 @@ def sync(seeded_repo: OntologyRepository) -> PGToNeo4jSync:
         table_name="ingredients",
         node_label="Ingredient",
         field_mapping={
-            "id": "id", "name": "name", "unit": "unit",
-            "price_per_kg_fen": "price_per_kg_fen", "tenant_id": "tenant_id",
+            "id": "id",
+            "name": "name",
+            "unit": "unit",
+            "price_per_kg_fen": "price_per_kg_fen",
+            "tenant_id": "tenant_id",
         },
         id_field="id",
     )
@@ -138,9 +140,14 @@ class TestSchema:
 
 class TestRepository:
     def test_create_node(self, repo: OntologyRepository) -> None:
-        result = repo.create_node("Store", {
-            "id": "s1", "name": "Test Store", "tenant_id": "t1",
-        })
+        result = repo.create_node(
+            "Store",
+            {
+                "id": "s1",
+                "name": "Test Store",
+                "tenant_id": "t1",
+            },
+        )
         assert result["ok"] is True
         assert result["node_id"] == "s1"
 
@@ -558,27 +565,40 @@ class TestCostTruth:
         result = cost_engine.calculate_dish_cost("nonexistent")
         assert result["ok"] is False
 
-    def test_calculate_order_cost(
-        self, cost_engine: CostTruthEngine, seeded_repo: OntologyRepository
-    ) -> None:
+    def test_calculate_order_cost(self, cost_engine: CostTruthEngine, seeded_repo: OntologyRepository) -> None:
         """Order cost = sum of dish costs × quantities."""
         # Create an order
-        seeded_repo.create_node("Order", {
-            "id": "order-001",
-            "tenant_id": "tenant-001",
-            "store_id": "store-001",
-            "total_fen": 27400,  # 剁椒鱼头128 + 小炒黄牛肉68 + 酸菜鱼78 = 274元
-        })
+        seeded_repo.create_node(
+            "Order",
+            {
+                "id": "order-001",
+                "tenant_id": "tenant-001",
+                "store_id": "store-001",
+                "total_fen": 27400,  # 剁椒鱼头128 + 小炒黄牛肉68 + 酸菜鱼78 = 274元
+            },
+        )
         seeded_repo.create_relationship(
-            "Order", "order-001", "CONTAINS", "Dish", "dish-djyt",
+            "Order",
+            "order-001",
+            "CONTAINS",
+            "Dish",
+            "dish-djyt",
             {"quantity": 1, "price_fen": 12800},
         )
         seeded_repo.create_relationship(
-            "Order", "order-001", "CONTAINS", "Dish", "dish-xchnr",
+            "Order",
+            "order-001",
+            "CONTAINS",
+            "Dish",
+            "dish-xchnr",
             {"quantity": 1, "price_fen": 6800},
         )
         seeded_repo.create_relationship(
-            "Order", "order-001", "CONTAINS", "Dish", "dish-scy",
+            "Order",
+            "order-001",
+            "CONTAINS",
+            "Dish",
+            "dish-scy",
             {"quantity": 1, "price_fen": 7800},
         )
 
@@ -753,9 +773,7 @@ class TestCausalReasoning:
 class TestMultiFactorAttribution:
     def test_analyze_metric_change(self, reasoning_engine: ReasoningEngine) -> None:
         """Decompose store margin change into contributing factors."""
-        result = reasoning_engine.analyze_metric_change(
-            "store-001", "margin", "上周", "本周"
-        )
+        result = reasoning_engine.analyze_metric_change("store-001", "margin", "上周", "本周")
         assert result["ok"] is True
         assert result["metric"] == "margin"
         assert len(result["factors"]) > 0
@@ -888,9 +906,7 @@ class TestAutoInsight:
 
 class TestWhyQA:
     def test_answer_why_revenue(self, reasoning_engine: ReasoningEngine) -> None:
-        result = reasoning_engine.answer_why(
-            "为什么上周营收下降了？", store_id="store-001"
-        )
+        result = reasoning_engine.answer_why("为什么上周营收下降了？", store_id="store-001")
         assert result["ok"] is True
         assert result["metric"] == "revenue"
         assert result["direction"] == "decline"
@@ -898,16 +914,12 @@ class TestWhyQA:
         assert result["analysis"]["ok"] is True
 
     def test_answer_why_margin(self, reasoning_engine: ReasoningEngine) -> None:
-        result = reasoning_engine.answer_why(
-            "为什么毛利率降低了？", store_id="store-001"
-        )
+        result = reasoning_engine.answer_why("为什么毛利率降低了？", store_id="store-001")
         assert result["ok"] is True
         assert result["metric"] == "margin"
 
     def test_answer_why_traffic(self, reasoning_engine: ReasoningEngine) -> None:
-        result = reasoning_engine.answer_why(
-            "客流量为什么减少了？", store_id="store-001"
-        )
+        result = reasoning_engine.answer_why("客流量为什么减少了？", store_id="store-001")
         assert result["ok"] is True
         assert result["metric"] == "traffic"
 
@@ -958,17 +970,13 @@ class TestIntegration:
     def test_full_chain_dish_to_supplier(self, seeded_repo: OntologyRepository) -> None:
         """Trace: 剁椒鱼头 → 鲈鱼 → 湘江水产."""
         # Dish → Ingredient
-        bom_rels = seeded_repo.get_relationships(
-            "Dish", "dish-djyt", rel_type="USES_INGREDIENT", direction="out"
-        )
+        bom_rels = seeded_repo.get_relationships("Dish", "dish-djyt", rel_type="USES_INGREDIENT", direction="out")
         luyu_rel = [r for r in bom_rels if r["to_node_id"] == "ing-luyu"]
         assert len(luyu_rel) == 1
         assert luyu_rel[0]["properties"]["quantity_g"] == 1200.0
 
         # Ingredient → Supplier
-        sup_rels = seeded_repo.get_relationships(
-            "Ingredient", "ing-luyu", rel_type="SUPPLIED_BY", direction="out"
-        )
+        sup_rels = seeded_repo.get_relationships("Ingredient", "ing-luyu", rel_type="SUPPLIED_BY", direction="out")
         assert len(sup_rels) == 1
         assert sup_rels[0]["to_node_id"] == "sup-fish"
 
@@ -1001,9 +1009,7 @@ class TestIntegration:
         actions = causal_engine.suggest_actions(top_cause)
         assert len(actions) > 0
 
-    def test_sync_then_cost_calculation(
-        self, sync: PGToNeo4jSync, cost_engine: CostTruthEngine
-    ) -> None:
+    def test_sync_then_cost_calculation(self, sync: PGToNeo4jSync, cost_engine: CostTruthEngine) -> None:
         """Sync a new dish, then calculate its cost."""
         # Create dish
         sync.process_change(
@@ -1020,11 +1026,19 @@ class TestIntegration:
 
         # Add BOM via repo (simulating BOM sync)
         sync.repo.create_relationship(
-            "Dish", "dish-int-test", "USES_INGREDIENT", "Ingredient", "ing-huangniurou",
+            "Dish",
+            "dish-int-test",
+            "USES_INGREDIENT",
+            "Ingredient",
+            "ing-huangniurou",
             {"quantity_g": 250.0, "unit": "g", "yield_rate": 0.85},
         )
         sync.repo.create_relationship(
-            "Dish", "dish-int-test", "USES_INGREDIENT", "Ingredient", "ing-lajiao",
+            "Dish",
+            "dish-int-test",
+            "USES_INGREDIENT",
+            "Ingredient",
+            "ing-lajiao",
             {"quantity_g": 80.0, "unit": "g", "yield_rate": 0.90},
         )
 

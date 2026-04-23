@@ -8,6 +8,7 @@
   GET    /api/v1/event-bindings/event-types          — 列出所有已配置的事件类型
   GET    /api/v1/event-bindings/handlers/{event_type} — 获取事件的 handler 列表
 """
+
 from __future__ import annotations
 
 from uuid import UUID

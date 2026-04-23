@@ -7,6 +7,7 @@
   POST /api/v1/operation-plans/{plan_id}/confirm  确认执行
   POST /api/v1/operation-plans/{plan_id}/cancel   取消
 """
+
 from __future__ import annotations
 
 from datetime import datetime
@@ -26,6 +27,7 @@ router = APIRouter(prefix="/api/v1/operation-plans", tags=["operation-plans"])
 
 # ── Request Models ──────────────────────────────────────────────────────────────
 
+
 class SubmitOperationRequest(BaseModel):
     operation_type: str = Field(..., description="操作类型，如 menu.price.bulk_update")
     params: dict[str, Any] = Field(default_factory=dict, description="操作参数")
@@ -41,6 +43,7 @@ class CancelRequest(BaseModel):
 
 
 # ── Response Models ─────────────────────────────────────────────────────────────
+
 
 class ImpactAnalysisOut(BaseModel):
     affected_stores: int
@@ -74,6 +77,7 @@ class SubmitResponse(BaseModel):
 
 
 # ── Helper ──────────────────────────────────────────────────────────────────────
+
 
 def _plan_to_out(plan: Any) -> OperationPlanOut:
     """将 OperationPlan dataclass 转换为 Pydantic 输出模型"""
@@ -124,6 +128,7 @@ def _get_planner(db: AsyncSession) -> Any:
 
 
 # ── Endpoints ───────────────────────────────────────────────────────────────────
+
 
 @router.post("", response_model=dict)
 async def submit_operation(

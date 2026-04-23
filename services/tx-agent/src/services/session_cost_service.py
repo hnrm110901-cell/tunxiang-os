@@ -3,6 +3,7 @@
 按维度（Agent模板/门店/日期）聚合 Session 的 Token 消耗和成本数据。
 金额单位：分（整数），遵循 CLAUDE.md 规范。
 """
+
 from __future__ import annotations
 
 import uuid

@@ -2,6 +2,7 @@
 
 低峰时段识别、低峰专属优惠设计、预约引流、团购引流、低峰效果分析、客流预测调整。
 """
+
 import uuid
 from typing import Any
 
@@ -65,7 +66,8 @@ class OffPeakTrafficAgent(SkillAgent):
         if not hourly_traffic:
             # 使用默认模型
             return AgentResult(
-                success=True, action="identify_off_peak_slots",
+                success=True,
+                action="identify_off_peak_slots",
                 data={
                     "off_peak_slots": [
                         {"slot": "morning", "label": "早茶(09:00-11:00)", "utilization_pct": 25},
@@ -94,14 +96,16 @@ class OffPeakTrafficAgent(SkillAgent):
                 peak.append(entry)
 
         return AgentResult(
-            success=True, action="identify_off_peak_slots",
+            success=True,
+            action="identify_off_peak_slots",
             data={
                 "off_peak_hours": off_peak,
                 "peak_hours": peak,
                 "off_peak_count": len(off_peak),
                 "threshold_pct": threshold_pct,
                 "avg_off_peak_utilization": round(
-                    sum(h["utilization_pct"] for h in off_peak) / max(1, len(off_peak)), 1),
+                    sum(h["utilization_pct"] for h in off_peak) / max(1, len(off_peak)), 1
+                ),
             },
             reasoning=f"识别到 {len(off_peak)} 个低峰时段（利用率<{threshold_pct}%）",
             confidence=0.85,
@@ -130,7 +134,8 @@ class OffPeakTrafficAgent(SkillAgent):
         margin_impact_fen = avg_ticket_fen - discounted_ticket
 
         return AgentResult(
-            success=True, action="design_off_peak_offer",
+            success=True,
+            action="design_off_peak_offer",
             data={
                 "offer_id": offer_id,
                 "slot": slot,
@@ -144,7 +149,7 @@ class OffPeakTrafficAgent(SkillAgent):
                 "channels": ["门店立牌", "美团", "大众点评", "小程序"],
             },
             reasoning=f"为{TIME_SLOTS.get(slot, {}).get('label', slot)}设计「{strategy['name']}」，"
-                      f"折扣 {strategy['discount']:.0%}",
+            f"折扣 {strategy['discount']:.0%}",
             confidence=0.8,
         )
 
@@ -157,7 +162,8 @@ class OffPeakTrafficAgent(SkillAgent):
         slot_info = TIME_SLOTS.get(slot, {"label": slot, "start": "", "end": ""})
 
         return AgentResult(
-            success=True, action="create_reservation_incentive",
+            success=True,
+            action="create_reservation_incentive",
             data={
                 "slot": slot,
                 "slot_label": slot_info["label"],
@@ -184,7 +190,8 @@ class OffPeakTrafficAgent(SkillAgent):
         deal_id = str(uuid.uuid4())[:8]
 
         return AgentResult(
-            success=True, action="create_group_deal",
+            success=True,
+            action="create_group_deal",
             data={
                 "deal_id": deal_id,
                 "slot": slot,
@@ -213,7 +220,8 @@ class OffPeakTrafficAgent(SkillAgent):
         daily_incremental = round(incremental_revenue_fen / max(1, period_days) / 100, 2)
 
         return AgentResult(
-            success=True, action="analyze_off_peak_effect",
+            success=True,
+            action="analyze_off_peak_effect",
             data={
                 "before_avg_traffic": before_traffic,
                 "after_avg_traffic": after_traffic,
@@ -258,17 +266,17 @@ class OffPeakTrafficAgent(SkillAgent):
         total_adjusted = sum(adjusted.values())
 
         return AgentResult(
-            success=True, action="adjust_traffic_forecast",
+            success=True,
+            action="adjust_traffic_forecast",
             data={
                 "base_forecast": base_forecast,
                 "adjusted_forecast": adjusted,
                 "total_base": total_base,
                 "total_adjusted": total_adjusted,
                 "adjustment_pct": round((total_adjusted - total_base) / max(1, total_base) * 100, 1),
-                "factors": {"weather": weather, "is_holiday": is_holiday,
-                           "active_campaigns": len(active_campaigns)},
+                "factors": {"weather": weather, "is_holiday": is_holiday, "active_campaigns": len(active_campaigns)},
             },
             reasoning=f"客流预测调整: {total_base}→{total_adjusted}人次"
-                      f"（天气:{weather}，节假日:{'是' if is_holiday else '否'}，活动:{len(active_campaigns)}个）",
+            f"（天气:{weather}，节假日:{'是' if is_holiday else '否'}，活动:{len(active_campaigns)}个）",
             confidence=0.7,
         )

@@ -395,23 +395,15 @@ class ComplianceAlertAgent(SkillAgent):
     async def _scan_all(self, params: dict[str, Any]) -> AgentResult:
         store_id = self._store_scope(params)
         if self._db:
-            documents = await compliance_alert_service.scan_documents(
-                self._db, self.tenant_id, store_id
-            )
-            performance = await compliance_alert_service.scan_performance(
-                self._db, self.tenant_id, store_id
-            )
-            attendance = await compliance_alert_service.scan_attendance(
-                self._db, self.tenant_id, store_id
-            )
+            documents = await compliance_alert_service.scan_documents(self._db, self.tenant_id, store_id)
+            performance = await compliance_alert_service.scan_performance(self._db, self.tenant_id, store_id)
+            attendance = await compliance_alert_service.scan_attendance(self._db, self.tenant_id, store_id)
         else:
             logger.warning("compliance_scan_all_no_db", tenant_id=self.tenant_id)
             documents = []
             performance = []
             attendance = []
-        summary = compliance_alert_service.merge_summaries(
-            documents, performance, attendance
-        )
+        summary = compliance_alert_service.merge_summaries(documents, performance, attendance)
         n = summary["total"]
         m = summary["critical"]
         return AgentResult(
@@ -430,9 +422,7 @@ class ComplianceAlertAgent(SkillAgent):
     async def _scan_documents(self, params: dict[str, Any]) -> AgentResult:
         store_id = self._store_scope(params)
         if self._db:
-            documents = await compliance_alert_service.scan_documents(
-                self._db, self.tenant_id, store_id
-            )
+            documents = await compliance_alert_service.scan_documents(self._db, self.tenant_id, store_id)
         else:
             logger.warning("compliance_scan_documents_no_db", tenant_id=self.tenant_id)
             documents = []
@@ -448,9 +438,7 @@ class ComplianceAlertAgent(SkillAgent):
     async def _scan_performance(self, params: dict[str, Any]) -> AgentResult:
         store_id = self._store_scope(params)
         if self._db:
-            performance = await compliance_alert_service.scan_performance(
-                self._db, self.tenant_id, store_id
-            )
+            performance = await compliance_alert_service.scan_performance(self._db, self.tenant_id, store_id)
         else:
             logger.warning("compliance_scan_performance_no_db", tenant_id=self.tenant_id)
             performance = []
@@ -466,9 +454,7 @@ class ComplianceAlertAgent(SkillAgent):
     async def _scan_attendance(self, params: dict[str, Any]) -> AgentResult:
         store_id = self._store_scope(params)
         if self._db:
-            attendance = await compliance_alert_service.scan_attendance(
-                self._db, self.tenant_id, store_id
-            )
+            attendance = await compliance_alert_service.scan_attendance(self._db, self.tenant_id, store_id)
         else:
             logger.warning("compliance_scan_attendance_no_db", tenant_id=self.tenant_id)
             attendance = []
@@ -484,9 +470,7 @@ class ComplianceAlertAgent(SkillAgent):
     async def _get_alert_summary(self, params: dict[str, Any]) -> AgentResult:
         store_id = self._store_scope(params)
         if self._db:
-            payload = await compliance_alert_service.get_alert_summary(
-                self._db, self.tenant_id, store_id
-            )
+            payload = await compliance_alert_service.get_alert_summary(self._db, self.tenant_id, store_id)
         else:
             logger.warning("compliance_alert_summary_no_db", tenant_id=self.tenant_id)
             payload = {
@@ -504,9 +488,6 @@ class ComplianceAlertAgent(SkillAgent):
             success=True,
             action="get_alert_summary",
             data=payload,
-            reasoning=(
-                f"预警摘要：合计 {payload['summary']['total']} 项，"
-                f"紧急 {payload['summary']['critical']} 项"
-            ),
+            reasoning=(f"预警摘要：合计 {payload['summary']['total']} 项，紧急 {payload['summary']['critical']} 项"),
             confidence=0.93,
         )

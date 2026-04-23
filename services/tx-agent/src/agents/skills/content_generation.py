@@ -11,6 +11,7 @@
     3. 遵守渠道字数限制（max_length）
     4. 融入当前节气/节日营销上下文
 """
+
 import os
 from typing import Any, Optional
 
@@ -89,14 +90,14 @@ def _apply_brand_constraints(
     """
     if brief is None:
         if len(content) > max_chars:
-            content = content[:max_chars - 3] + "..."
+            content = content[: max_chars - 3] + "..."
         return content
 
     # 渠道字数约束：取品牌约束与平台约束的较小值
     brand_max = brief.get("max_length")
     effective_max = min(brand_max, max_chars) if brand_max else max_chars
     if len(content) > effective_max:
-        content = content[:effective_max - 3] + "..."
+        content = content[: effective_max - 3] + "..."
 
     # 禁止词检查（替换处理，生产环境建议重新生成）
     for word in brief.get("forbidden_words", []):
@@ -232,19 +233,17 @@ class ContentGenerationAgent(SkillAgent):
             ]
 
         # 应用品牌约束（forbidden_words / max_length）
-        constrained_copies = [
-            _apply_brand_constraints(c, brand_brief, 500) for c in copies
-        ]
+        constrained_copies = [_apply_brand_constraints(c, brand_brief, 500) for c in copies]
 
         return AgentResult(
-            success=True, action="generate_marketing_copy",
+            success=True,
+            action="generate_marketing_copy",
             data={
                 "campaign_type": campaign_type,
                 "tone": tone,
                 "tone_name": tone_info["name"],
                 "copies": [
-                    {"version": i + 1, "text": c, "char_count": len(c)}
-                    for i, c in enumerate(constrained_copies)
+                    {"version": i + 1, "text": c, "char_count": len(c)} for i, c in enumerate(constrained_copies)
                 ],
                 "recommended_version": 1,
                 "target_audience": target_audience,
@@ -301,10 +300,12 @@ class ContentGenerationAgent(SkillAgent):
             content = f"来{brand_name}必点{dish_text}！#美食探店 #{brand_name}"
             image_guide = "建议拍摄15-30秒菜品特写视频"
         elif platform == "xiaohongshu":
-            content = (f"在{brand_name}发现了宝藏餐厅！\n\n"
-                      f"必点推荐：{dish_text}\n"
-                      f"每一道都超级惊艳，{topic}不踩雷\n\n"
-                      f"#{brand_name} #美食推荐 #{topic}")
+            content = (
+                f"在{brand_name}发现了宝藏餐厅！\n\n"
+                f"必点推荐：{dish_text}\n"
+                f"每一道都超级惊艳，{topic}不踩雷\n\n"
+                f"#{brand_name} #美食推荐 #{topic}"
+            )
             image_guide = "建议9宫格精修图，第一张为环境/摆盘"
         elif platform == "sms":
             content = f"【{brand_name}】{topic}，{dish_text}等你来尝！回T退订"
@@ -317,7 +318,8 @@ class ContentGenerationAgent(SkillAgent):
         content = _apply_brand_constraints(content, brand_brief, max_chars)
 
         return AgentResult(
-            success=True, action="generate_social_content",
+            success=True,
+            action="generate_social_content",
             data={
                 "platform": platform,
                 "platform_name": platform_info["name"],
@@ -331,8 +333,7 @@ class ContentGenerationAgent(SkillAgent):
                 "brand_system_prompt": brand_brief.get("system_prompt") if brand_brief else None,
             },
             reasoning=(
-                f"为{platform_info['name']}生成内容，{len(content)}字"
-                + ("（已应用品牌约束）" if brand_brief else "")
+                f"为{platform_info['name']}生成内容，{len(content)}字" + ("（已应用品牌约束）" if brand_brief else "")
             ),
             confidence=0.8,
         )
@@ -354,7 +355,8 @@ class ContentGenerationAgent(SkillAgent):
         }
 
         return AgentResult(
-            success=True, action="generate_dish_description",
+            success=True,
+            action="generate_dish_description",
             data={
                 "dish_name": dish_name,
                 "descriptions": descriptions,
@@ -383,7 +385,8 @@ class ContentGenerationAgent(SkillAgent):
         }
 
         return AgentResult(
-            success=True, action="generate_poster_copy",
+            success=True,
+            action="generate_poster_copy",
             data={
                 "event_name": event_name,
                 "poster_copy": poster,
@@ -406,24 +409,50 @@ class ContentGenerationAgent(SkillAgent):
             script = {
                 "scenes": [
                     {"time": "0-3s", "visual": "门店外景/招牌", "narration": f"来{brand_name}打卡！", "bgm": "轻快"},
-                    {"time": "3-8s", "visual": f"{featured_dish}特写", "narration": f"这道{featured_dish}绝了！", "bgm": "轻快"},
-                    {"time": "8-12s", "visual": "夹起/品尝动作", "narration": f"入口{topic}，好吃到停不下来", "bgm": "高潮"},
+                    {
+                        "time": "3-8s",
+                        "visual": f"{featured_dish}特写",
+                        "narration": f"这道{featured_dish}绝了！",
+                        "bgm": "轻快",
+                    },
+                    {
+                        "time": "8-12s",
+                        "visual": "夹起/品尝动作",
+                        "narration": f"入口{topic}，好吃到停不下来",
+                        "bgm": "高潮",
+                    },
                     {"time": "12-15s", "visual": "门店地址字幕", "narration": "快来尝尝吧！", "bgm": "轻快"},
                 ],
             }
         else:
             script = {
                 "scenes": [
-                    {"time": "0-3s", "visual": "开场悬念/美食近景", "narration": "你绝对没吃过这么好吃的！", "bgm": "悬疑"},
-                    {"time": "3-10s", "visual": "环境+点菜过程", "narration": f"来{brand_name}，必点{featured_dish}", "bgm": "轻快"},
+                    {
+                        "time": "0-3s",
+                        "visual": "开场悬念/美食近景",
+                        "narration": "你绝对没吃过这么好吃的！",
+                        "bgm": "悬疑",
+                    },
+                    {
+                        "time": "3-10s",
+                        "visual": "环境+点菜过程",
+                        "narration": f"来{brand_name}，必点{featured_dish}",
+                        "bgm": "轻快",
+                    },
                     {"time": "10-20s", "visual": "菜品上桌+特写", "narration": f"{topic}，色香味俱全", "bgm": "轻快"},
-                    {"time": "20-25s", "visual": "品尝+表情反应", "narration": "入口的瞬间，幸福感爆棚！", "bgm": "高潮"},
+                    {
+                        "time": "20-25s",
+                        "visual": "品尝+表情反应",
+                        "narration": "入口的瞬间，幸福感爆棚！",
+                        "bgm": "高潮",
+                    },
                     {"time": "25-30s", "visual": "结尾字幕+定位", "narration": "关注收藏，下次不迷路！", "bgm": "轻快"},
                 ],
             }
 
         return AgentResult(
-            success=True, action="generate_video_script",
+            success=True,
+            action="generate_video_script",
             data={
                 "topic": topic,
                 "duration_seconds": duration_seconds,
@@ -462,12 +491,15 @@ class ContentGenerationAgent(SkillAgent):
                 issues.append("菜品口味")
 
             issue_text = "、".join(issues) if issues else "您反映的问题"
-            reply = (f"非常抱歉给您带来了不好的体验！关于{issue_text}，"
-                    f"我们已经高度重视并着手改进。欢迎您联系我们（电话/微信），"
-                    f"我们将为您准备一份专属补偿。")
+            reply = (
+                f"非常抱歉给您带来了不好的体验！关于{issue_text}，"
+                f"我们已经高度重视并着手改进。欢迎您联系我们（电话/微信），"
+                f"我们将为您准备一份专属补偿。"
+            )
 
         return AgentResult(
-            success=True, action="generate_review_reply",
+            success=True,
+            action="generate_review_reply",
             data={
                 "platform": platform,
                 "rating": rating,

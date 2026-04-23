@@ -16,10 +16,10 @@
     POST /api/v1/projectors/rebuild/{projector_name}?tenant_id=xxx
     GET  /api/v1/projectors/status
 """
+
 from __future__ import annotations
 
 import asyncio
-import os
 from typing import Optional
 from uuid import UUID
 
@@ -112,9 +112,7 @@ class ProjectorRunner:
         """
         import time
 
-        projector_cls = next(
-            (p for p in ALL_PROJECTORS if p.name == projector_name), None
-        )
+        projector_cls = next((p for p in ALL_PROJECTORS if p.name == projector_name), None)
         if not projector_cls:
             raise ValueError(f"未知投影器: {projector_name}")
 
@@ -139,12 +137,14 @@ class ProjectorRunner:
         statuses = []
         for key, task in self._tasks.items():
             name, tenant_id = key.split(":", 1)
-            statuses.append({
-                "projector_name": name,
-                "tenant_id": tenant_id,
-                "running": not task.done(),
-                "failed": task.done() and not task.cancelled() and task.exception() is not None,
-            })
+            statuses.append(
+                {
+                    "projector_name": name,
+                    "tenant_id": tenant_id,
+                    "running": not task.done(),
+                    "failed": task.done() and not task.cancelled() and task.exception() is not None,
+                }
+            )
         return statuses
 
 

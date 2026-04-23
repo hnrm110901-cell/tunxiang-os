@@ -3,6 +3,7 @@
 试点门店筛选、门店画像对比、试点方案设计、试点效果监测、推广可行性评估、门店聚类分析。
 扩展：一键从情报建议创建试点计划、活跃试点状态汇总。
 """
+
 import uuid
 from typing import Any
 
@@ -10,7 +11,13 @@ from ..base import AgentResult, SkillAgent
 
 # 门店评估维度
 STORE_EVAL_DIMENSIONS = [
-    "客流量", "客单价", "会员占比", "服务评分", "管理能力", "位置优势", "设备完备度",
+    "客流量",
+    "客单价",
+    "会员占比",
+    "服务评分",
+    "管理能力",
+    "位置优势",
+    "设备完备度",
 ]
 
 
@@ -73,22 +80,25 @@ class PilotRecommenderAgent(SkillAgent):
                 if req in s.get("features", []):
                     score += 5
 
-            scored.append({
-                "store_id": s.get("store_id"),
-                "store_name": s.get("store_name", ""),
-                "city": s.get("city", ""),
-                "district": s.get("district", ""),
-                "pilot_score": round(score, 1),
-                "daily_traffic": s.get("daily_traffic", 0),
-                "avg_rating": s.get("avg_rating", 0),
-                "member_pct": s.get("member_pct", 0),
-            })
+            scored.append(
+                {
+                    "store_id": s.get("store_id"),
+                    "store_name": s.get("store_name", ""),
+                    "city": s.get("city", ""),
+                    "district": s.get("district", ""),
+                    "pilot_score": round(score, 1),
+                    "daily_traffic": s.get("daily_traffic", 0),
+                    "avg_rating": s.get("avg_rating", 0),
+                    "member_pct": s.get("member_pct", 0),
+                }
+            )
 
         scored.sort(key=lambda x: x["pilot_score"], reverse=True)
         recommended = scored[:pilot_count]
 
         return AgentResult(
-            success=True, action="recommend_pilot_stores",
+            success=True,
+            action="recommend_pilot_stores",
             data={
                 "recommended": recommended,
                 "project_type": project_type,
@@ -97,7 +107,7 @@ class PilotRecommenderAgent(SkillAgent):
                 "avg_score": round(sum(r["pilot_score"] for r in recommended) / max(1, len(recommended)), 1),
             },
             reasoning=f"为「{project_type}」推荐 {len(recommended)} 家试点门店，"
-                      f"平均评分 {sum(r['pilot_score'] for r in recommended) / max(1, len(recommended)):.1f}",
+            f"平均评分 {sum(r['pilot_score'] for r in recommended) / max(1, len(recommended)):.1f}",
             confidence=0.8,
         )
 
@@ -108,8 +118,15 @@ class PilotRecommenderAgent(SkillAgent):
         if len(stores) < 2:
             return AgentResult(success=False, action="compare_store_profiles", error="至少需要2家门店进行对比")
 
-        dimensions = ["daily_revenue_yuan", "daily_traffic", "avg_ticket_yuan", "member_pct",
-                     "avg_rating", "staff_count", "table_count"]
+        dimensions = [
+            "daily_revenue_yuan",
+            "daily_traffic",
+            "avg_ticket_yuan",
+            "member_pct",
+            "avg_rating",
+            "staff_count",
+            "table_count",
+        ]
 
         comparison = []
         for s in stores:
@@ -128,7 +145,8 @@ class PilotRecommenderAgent(SkillAgent):
             best_in[dim] = best_store["store_name"]
 
         return AgentResult(
-            success=True, action="compare_store_profiles",
+            success=True,
+            action="compare_store_profiles",
             data={
                 "comparison": comparison,
                 "dimensions": dimensions,
@@ -152,8 +170,16 @@ class PilotRecommenderAgent(SkillAgent):
             "duration_days": duration_days,
             "phases": [
                 {"phase": "准备期", "days": "D-7 到 D-1", "tasks": ["培训门店人员", "准备物料", "配置系统", "确认KPI"]},
-                {"phase": "试点期", "days": f"D1 到 D{duration_days}", "tasks": ["每日数据收集", "问题记录", "周中复盘"]},
-                {"phase": "总结期", "days": f"D{duration_days + 1} 到 D{duration_days + 3}", "tasks": ["数据汇总", "效果评估", "推广决策"]},
+                {
+                    "phase": "试点期",
+                    "days": f"D1 到 D{duration_days}",
+                    "tasks": ["每日数据收集", "问题记录", "周中复盘"],
+                },
+                {
+                    "phase": "总结期",
+                    "days": f"D{duration_days + 1} 到 D{duration_days + 3}",
+                    "tasks": ["数据汇总", "效果评估", "推广决策"],
+                },
             ],
             "kpis": kpis if kpis else ["日均销量", "顾客满意度", "操作效率", "毛利率"],
             "control_group": "未参与试点的同类型门店",
@@ -165,7 +191,8 @@ class PilotRecommenderAgent(SkillAgent):
         }
 
         return AgentResult(
-            success=True, action="design_pilot_plan",
+            success=True,
+            action="design_pilot_plan",
             data=plan,
             reasoning=f"设计「{project_name}」试点方案: {len(pilot_stores)}家门店，{duration_days}天",
             confidence=0.85,
@@ -183,18 +210,21 @@ class PilotRecommenderAgent(SkillAgent):
             control_value = sum(d.get(kpi, 0) for d in control_data) / max(1, len(control_data))
             lift = round((pilot_value - control_value) / max(0.01, control_value) * 100, 1)
 
-            metrics.append({
-                "kpi": kpi,
-                "pilot_avg": round(pilot_value, 2),
-                "control_avg": round(control_value, 2),
-                "lift_pct": lift,
-                "status": "达标" if lift > 0 else "未达标",
-            })
+            metrics.append(
+                {
+                    "kpi": kpi,
+                    "pilot_avg": round(pilot_value, 2),
+                    "control_avg": round(control_value, 2),
+                    "lift_pct": lift,
+                    "status": "达标" if lift > 0 else "未达标",
+                }
+            )
 
         overall_positive = sum(1 for m in metrics if m["lift_pct"] > 0)
 
         return AgentResult(
-            success=True, action="monitor_pilot_effect",
+            success=True,
+            action="monitor_pilot_effect",
             data={
                 "metrics": metrics,
                 "overall_assessment": "正面" if overall_positive > len(metrics) / 2 else "待观察",
@@ -202,7 +232,7 @@ class PilotRecommenderAgent(SkillAgent):
                 "control_stores_count": len(control_data),
             },
             reasoning=f"试点监测: {overall_positive}/{len(metrics)} 个KPI正向，"
-                      f"整体{'正面' if overall_positive > len(metrics) / 2 else '待观察'}",
+            f"整体{'正面' if overall_positive > len(metrics) / 2 else '待观察'}",
             confidence=0.8,
         )
 
@@ -219,10 +249,22 @@ class PilotRecommenderAgent(SkillAgent):
 
         # 综合评估
         readiness_score = round(
-            kpi_pass_rate * 0.3 + customer_satisfaction * 0.25 +
-            operational_feasibility * 0.25 + min(100, roi * 20) * 0.2, 1)
+            kpi_pass_rate * 0.3
+            + customer_satisfaction * 0.25
+            + operational_feasibility * 0.25
+            + min(100, roi * 20) * 0.2,
+            1,
+        )
 
-        decision = "全面推广" if readiness_score >= 75 else "分批推广" if readiness_score >= 55 else "继续试点" if readiness_score >= 40 else "暂停推广"
+        decision = (
+            "全面推广"
+            if readiness_score >= 75
+            else "分批推广"
+            if readiness_score >= 55
+            else "继续试点"
+            if readiness_score >= 40
+            else "暂停推广"
+        )
 
         rollout_plan = None
         if decision in ("全面推广", "分批推广"):
@@ -236,7 +278,8 @@ class PilotRecommenderAgent(SkillAgent):
             }
 
         return AgentResult(
-            success=True, action="assess_rollout_feasibility",
+            success=True,
+            action="assess_rollout_feasibility",
             data={
                 "readiness_score": readiness_score,
                 "decision": decision,
@@ -285,16 +328,19 @@ class PilotRecommenderAgent(SkillAgent):
             else:
                 cluster = "低流量低客单"
 
-            clusters[cluster].append({
-                "store_id": s.get("store_id"),
-                "store_name": s.get("store_name", ""),
-                "daily_traffic": traffic,
-                "avg_ticket_yuan": round(ticket / 100, 2),
-                "cluster": cluster,
-            })
+            clusters[cluster].append(
+                {
+                    "store_id": s.get("store_id"),
+                    "store_name": s.get("store_name", ""),
+                    "daily_traffic": traffic,
+                    "avg_ticket_yuan": round(ticket / 100, 2),
+                    "cluster": cluster,
+                }
+            )
 
         return AgentResult(
-            success=True, action="cluster_stores",
+            success=True,
+            action="cluster_stores",
             data={
                 "clusters": {k: {"count": len(v), "stores": v[:5]} for k, v in clusters.items()},
                 "total_stores": len(stores),
@@ -355,14 +401,15 @@ class PilotRecommenderAgent(SkillAgent):
         }
 
         return AgentResult(
-            success=True, action="create_pilot_from_recommendation",
+            success=True,
+            action="create_pilot_from_recommendation",
             data={
                 "pilot_draft": pilot_draft,
                 "next_step": "调用 POST /api/v1/pilots 提交此草稿，再调用 POST /api/v1/pilots/{id}/activate 激活",
                 "stores_selected": len(target_stores),
             },
             reasoning=f"从情报建议生成试点草稿「{pilot_draft['name']}」，"
-                      f"目标 {len(target_stores)} 家门店，等待人工确认",
+            f"目标 {len(target_stores)} 家门店，等待人工确认",
             confidence=0.85,
         )
 
@@ -385,22 +432,25 @@ class PilotRecommenderAgent(SkillAgent):
             elif progress_pct >= 80 and p.get("kpi_pass_rate", 0) >= 0.8:
                 status_flag = "优秀：可提前收尾"
 
-            summary.append({
-                "pilot_id": p.get("pilot_id", ""),
-                "name": p.get("name", ""),
-                "pilot_type": p.get("pilot_type", ""),
-                "progress_pct": progress_pct,
-                "days_remaining": max(0, total_days - days_elapsed),
-                "kpi_pass_rate": p.get("kpi_pass_rate", 0),
-                "status_flag": status_flag,
-                "store_count": len(p.get("target_stores", [])),
-            })
+            summary.append(
+                {
+                    "pilot_id": p.get("pilot_id", ""),
+                    "name": p.get("name", ""),
+                    "pilot_type": p.get("pilot_type", ""),
+                    "progress_pct": progress_pct,
+                    "days_remaining": max(0, total_days - days_elapsed),
+                    "kpi_pass_rate": p.get("kpi_pass_rate", 0),
+                    "status_flag": status_flag,
+                    "store_count": len(p.get("target_stores", [])),
+                }
+            )
 
         summary.sort(key=lambda x: x["progress_pct"], reverse=True)
         warning_count = sum(1 for s in summary if "预警" in s["status_flag"])
 
         return AgentResult(
-            success=True, action="get_pilot_status_summary",
+            success=True,
+            action="get_pilot_status_summary",
             data={
                 "active_count": len(summary),
                 "warning_count": warning_count,

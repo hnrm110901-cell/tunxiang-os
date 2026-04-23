@@ -8,6 +8,7 @@
 3. 厨师语音报损："鲈鱼损耗两斤记一下"
 4. 收银语音操作："A05桌结账"
 """
+
 from __future__ import annotations
 
 import re
@@ -23,8 +24,18 @@ logger = structlog.get_logger()
 # ─── 中文数字映射 ───────────────────────────────────────────────
 
 _CN_NUM_MAP: dict[str, int] = {
-    "零": 0, "一": 1, "二": 2, "两": 2, "三": 3, "四": 4,
-    "五": 5, "六": 6, "七": 7, "八": 8, "九": 9, "十": 10,
+    "零": 0,
+    "一": 1,
+    "二": 2,
+    "两": 2,
+    "三": 3,
+    "四": 4,
+    "五": 5,
+    "六": 6,
+    "七": 7,
+    "八": 8,
+    "九": 9,
+    "十": 10,
 }
 
 _SPICE_LEVELS: dict[str, str] = {
@@ -123,9 +134,7 @@ class VoiceOrchestrator:
     def __init__(self) -> None:
         self._whisper_model: Any = None
         self._whisper_available: bool = False
-        self._intent_patterns: list[tuple[str, list[re.Pattern[str]]]] = (
-            self._build_intent_patterns()
-        )
+        self._intent_patterns: list[tuple[str, list[re.Pattern[str]]]] = self._build_intent_patterns()
         # 模拟服务注册表（实际部署时注入真实服务）
         self._service_registry: dict[str, Any] = {}
 
@@ -143,6 +152,7 @@ class VoiceOrchestrator:
             return self._whisper_available
         try:
             import whisper  # type: ignore[import-untyped]
+
             logger.info("whisper_v3_loading", model=model_name)
             self._whisper_model = whisper.load_model(model_name)
             self._whisper_available = True
@@ -183,9 +193,7 @@ class VoiceOrchestrator:
         )
         return result
 
-    async def _transcribe_whisper(
-        self, audio_bytes: bytes, language: str, start: float
-    ) -> dict[str, Any]:
+    async def _transcribe_whisper(self, audio_bytes: bytes, language: str, start: float) -> dict[str, Any]:
         """Whisper v3 实际转写。"""
         import os
         import tempfile
@@ -206,9 +214,7 @@ class VoiceOrchestrator:
             text: str = result.get("text", "").strip()
             segments = result.get("segments", [])
             if segments:
-                avg_no_speech = sum(
-                    s.get("no_speech_prob", 0.0) for s in segments
-                ) / len(segments)
+                avg_no_speech = sum(s.get("no_speech_prob", 0.0) for s in segments) / len(segments)
                 confidence = round(1.0 - avg_no_speech, 4)
             else:
                 confidence = 0.0
@@ -230,9 +236,7 @@ class VoiceOrchestrator:
                 except OSError:
                     pass
 
-    def _transcribe_mock(
-        self, audio_bytes: bytes, language: str, start: float
-    ) -> dict[str, Any]:
+    def _transcribe_mock(self, audio_bytes: bytes, language: str, start: float) -> dict[str, Any]:
         """Mock 转写（Whisper 不可用时）。根据音频长度模拟。"""
         elapsed_ms = int((time.monotonic() - start) * 1000)
 
@@ -251,9 +255,7 @@ class VoiceOrchestrator:
     # 2. NLU — Natural Language Understanding
     # ══════════════════════════════════════════════════════════════
 
-    async def understand(
-        self, text: str, context: Optional[dict[str, Any]] = None
-    ) -> dict[str, Any]:
+    async def understand(self, text: str, context: Optional[dict[str, Any]] = None) -> dict[str, Any]:
         """NLU: 文本 → 意图 + 实体
 
         Enhanced intent parsing with 16 restaurant intents.
@@ -299,9 +301,7 @@ class VoiceOrchestrator:
                 intent_name = "order_add"
                 confidence = 0.75
                 context_used = True
-            elif last_intent == "order_add" and any(
-                k in text for k in _SPICE_LEVELS
-            ):
+            elif last_intent == "order_add" and any(k in text for k in _SPICE_LEVELS):
                 intent_name = "order_modify"
                 confidence = 0.70
                 context_used = True
@@ -327,9 +327,7 @@ class VoiceOrchestrator:
             "context_used": context_used,
         }
 
-    def _extract_global_entities(
-        self, text: str, entities: dict[str, Any]
-    ) -> None:
+    def _extract_global_entities(self, text: str, entities: dict[str, Any]) -> None:
         """从文本中提取全局实体（辣度、口味等）。"""
         # 辣度
         for keyword, level in _SPICE_LEVELS.items():
@@ -343,9 +341,7 @@ class VoiceOrchestrator:
                 entities["flavor"] = flavor
                 break
 
-    def _extract_pattern_entities(
-        self, match: re.Match[str], entities: dict[str, Any]
-    ) -> None:
+    def _extract_pattern_entities(self, match: re.Match[str], entities: dict[str, Any]) -> None:
         """从正则匹配中提取实体。"""
         groupdict = match.groupdict()
 
@@ -396,160 +392,190 @@ class VoiceOrchestrator:
         """构建16种中文餐饮场景意图的正则模式。"""
         return [
             # ── order_add: 加菜/下单 ──
-            ("order_add", [
-                re.compile(
-                    r"(?P<table_no>[A-Za-z]?\d+)\s*号?\s*桌?\s*(加|来|上|要)\s*"
-                    r"(?P<quantity>[一二两三四五六七八九十\d]+)?\s*[份个道]?\s*"
-                    r"(?P<dish_name>[\u4e00-\u9fff]{2,})"
-                ),
-                re.compile(
-                    r"(加|来|上|再来|要)\s*(?P<quantity>[一二两三四五六七八九十\d]+)\s*[份个道]\s*"
-                    r"(?P<dish_name>[\u4e00-\u9fff]{2,})"
-                ),
-                re.compile(
-                    r"(?P<dish_name>[\u4e00-\u9fff]{2,})\s*(来|要|加)\s*"
-                    r"(?P<quantity>[一二两三四五六七八九十\d]+)\s*[份个道]"
-                ),
-                re.compile(
-                    r"(加菜|加个|来个|来一个|来份|来一份|上一份)\s*(?P<dish_name>[\u4e00-\u9fff]{2,})?"
-                ),
-            ]),
+            (
+                "order_add",
+                [
+                    re.compile(
+                        r"(?P<table_no>[A-Za-z]?\d+)\s*号?\s*桌?\s*(加|来|上|要)\s*"
+                        r"(?P<quantity>[一二两三四五六七八九十\d]+)?\s*[份个道]?\s*"
+                        r"(?P<dish_name>[\u4e00-\u9fff]{2,})"
+                    ),
+                    re.compile(
+                        r"(加|来|上|再来|要)\s*(?P<quantity>[一二两三四五六七八九十\d]+)\s*[份个道]\s*"
+                        r"(?P<dish_name>[\u4e00-\u9fff]{2,})"
+                    ),
+                    re.compile(
+                        r"(?P<dish_name>[\u4e00-\u9fff]{2,})\s*(来|要|加)\s*"
+                        r"(?P<quantity>[一二两三四五六七八九十\d]+)\s*[份个道]"
+                    ),
+                    re.compile(r"(加菜|加个|来个|来一个|来份|来一份|上一份)\s*(?P<dish_name>[\u4e00-\u9fff]{2,})?"),
+                ],
+            ),
             # ── order_remove: 退菜 ──
-            ("order_remove", [
-                re.compile(
-                    r"(退|取消|撤)\s*(?P<quantity>[一二两三四五六七八九十\d]+)?\s*[份个道]?\s*"
-                    r"(?P<dish_name>[\u4e00-\u9fff]{2,})"
-                ),
-                re.compile(r"(?P<dish_name>[\u4e00-\u9fff]{2,})\s*(退了|不要了|取消)"),
-                re.compile(r"(退菜|退掉)"),
-            ]),
+            (
+                "order_remove",
+                [
+                    re.compile(
+                        r"(退|取消|撤)\s*(?P<quantity>[一二两三四五六七八九十\d]+)?\s*[份个道]?\s*"
+                        r"(?P<dish_name>[\u4e00-\u9fff]{2,})"
+                    ),
+                    re.compile(r"(?P<dish_name>[\u4e00-\u9fff]{2,})\s*(退了|不要了|取消)"),
+                    re.compile(r"(退菜|退掉)"),
+                ],
+            ),
             # ── order_modify: 改单/改口味 ──
-            ("order_modify", [
-                re.compile(
-                    r"(?P<dish_name>[\u4e00-\u9fff]{2,})\s*(改|换)(成|为)?\s*"
-                    r"(?P<flavor>[\u4e00-\u9fff]{2,})"
-                ),
-                re.compile(r"(改单|改菜|修改订单)"),
-            ]),
+            (
+                "order_modify",
+                [
+                    re.compile(
+                        r"(?P<dish_name>[\u4e00-\u9fff]{2,})\s*(改|换)(成|为)?\s*"
+                        r"(?P<flavor>[\u4e00-\u9fff]{2,})"
+                    ),
+                    re.compile(r"(改单|改菜|修改订单)"),
+                ],
+            ),
             # ── checkout: 结账 ──
-            ("checkout", [
-                re.compile(
-                    r"(?P<table_no>[A-Za-z]?\d+)\s*号?\s*桌?\s*(买单|结账|结帐|埋单)"
-                ),
-                re.compile(
-                    r"(买单|结账|结帐|埋单)\s*(?P<table_no>[A-Za-z]?\d+)?\s*号?\s*桌?"
-                ),
-            ]),
+            (
+                "checkout",
+                [
+                    re.compile(r"(?P<table_no>[A-Za-z]?\d+)\s*号?\s*桌?\s*(买单|结账|结帐|埋单)"),
+                    re.compile(r"(买单|结账|结帐|埋单)\s*(?P<table_no>[A-Za-z]?\d+)?\s*号?\s*桌?"),
+                ],
+            ),
             # ── open_table: 开台 ──
-            ("open_table", [
-                re.compile(
-                    r"(?P<table_no>[A-Za-z]?\d+)\s*号?\s*桌?\s*(开台|开桌)"
-                ),
-                re.compile(
-                    r"(开台|开桌)\s*(?P<table_no>[A-Za-z]?\d+)?\s*号?\s*桌?"
-                ),
-            ]),
+            (
+                "open_table",
+                [
+                    re.compile(r"(?P<table_no>[A-Za-z]?\d+)\s*号?\s*桌?\s*(开台|开桌)"),
+                    re.compile(r"(开台|开桌)\s*(?P<table_no>[A-Za-z]?\d+)?\s*号?\s*桌?"),
+                ],
+            ),
             # ── query_revenue: 营收查询 ──
-            ("query_revenue", [
-                re.compile(
-                    r"(?P<date_ref>今天|今日|昨天|昨日|本周|这周|本月|这个月)\s*"
-                    r"(营业额|收入|流水|卖了多少|营收|销售额)(多少|是多少|怎么样)?"
-                ),
-                re.compile(
-                    r"(营业额|收入|流水|营收|销售额)\s*(多少|是多少|怎么样|如何)"
-                ),
-            ]),
+            (
+                "query_revenue",
+                [
+                    re.compile(
+                        r"(?P<date_ref>今天|今日|昨天|昨日|本周|这周|本月|这个月)\s*"
+                        r"(营业额|收入|流水|卖了多少|营收|销售额)(多少|是多少|怎么样)?"
+                    ),
+                    re.compile(r"(营业额|收入|流水|营收|销售额)\s*(多少|是多少|怎么样|如何)"),
+                ],
+            ),
             # ── query_inventory: 库存查询 ──
-            ("query_inventory", [
-                re.compile(
-                    r"(?P<ingredient>[\u4e00-\u9fff]{2,})\s*"
-                    r"(还有多少|还有吗|还有没有|库存|剩多少|还剩)"
-                ),
-                re.compile(r"(库存|存货)\s*(查一下|查看|查询|怎么样|多少)"),
-                re.compile(r"(查一下|查看|查询)\s*(库存|存货)"),
-            ]),
+            (
+                "query_inventory",
+                [
+                    re.compile(
+                        r"(?P<ingredient>[\u4e00-\u9fff]{2,})\s*"
+                        r"(还有多少|还有吗|还有没有|库存|剩多少|还剩)"
+                    ),
+                    re.compile(r"(库存|存货)\s*(查一下|查看|查询|怎么样|多少)"),
+                    re.compile(r"(查一下|查看|查询)\s*(库存|存货)"),
+                ],
+            ),
             # ── query_order_status: 订单状态 ──
-            ("query_order_status", [
-                re.compile(
-                    r"(?P<table_no>[A-Za-z]?\d+)\s*号?\s*桌?\s*"
-                    r"(什么情况|什么状态|怎么样了|状态|出了没|好了没|菜齐了没)"
-                ),
-                re.compile(r"(查一下|查看|查询)\s*(订单|桌台)\s*(状态|情况)?"),
-                re.compile(r"(订单|桌台).*(查|看|状态)"),
-            ]),
+            (
+                "query_order_status",
+                [
+                    re.compile(
+                        r"(?P<table_no>[A-Za-z]?\d+)\s*号?\s*桌?\s*"
+                        r"(什么情况|什么状态|怎么样了|状态|出了没|好了没|菜齐了没)"
+                    ),
+                    re.compile(r"(查一下|查看|查询)\s*(订单|桌台)\s*(状态|情况)?"),
+                    re.compile(r"(订单|桌台).*(查|看|状态)"),
+                ],
+            ),
             # ── report_waste: 报损 ──
-            ("report_waste", [
-                re.compile(
-                    r"(?P<ingredient>[\u4e00-\u9fff]{2,})\s*(损耗|报损|坏了|扔了)\s*"
-                    r"(?P<weight>[一二两三四五六七八九十\d]+)\s*(?P<unit>斤|公斤|kg|克|g)"
-                ),
-                re.compile(
-                    r"(损耗|报损)\s*(?P<ingredient>[\u4e00-\u9fff]{2,})\s*"
-                    r"(?P<weight>[一二两三四五六七八九十\d]+)\s*(?P<unit>斤|公斤|kg|克|g)"
-                ),
-                re.compile(
-                    r"(?P<ingredient>[\u4e00-\u9fff]{2,})\s*"
-                    r"(?P<weight>[一二两三四五六七八九十\d]+)\s*(?P<unit>斤|公斤|kg|克|g)\s*"
-                    r"(损耗|报损|坏了|扔了)"
-                ),
-                re.compile(r"(报损|记损耗)"),
-            ]),
+            (
+                "report_waste",
+                [
+                    re.compile(
+                        r"(?P<ingredient>[\u4e00-\u9fff]{2,})\s*(损耗|报损|坏了|扔了)\s*"
+                        r"(?P<weight>[一二两三四五六七八九十\d]+)\s*(?P<unit>斤|公斤|kg|克|g)"
+                    ),
+                    re.compile(
+                        r"(损耗|报损)\s*(?P<ingredient>[\u4e00-\u9fff]{2,})\s*"
+                        r"(?P<weight>[一二两三四五六七八九十\d]+)\s*(?P<unit>斤|公斤|kg|克|g)"
+                    ),
+                    re.compile(
+                        r"(?P<ingredient>[\u4e00-\u9fff]{2,})\s*"
+                        r"(?P<weight>[一二两三四五六七八九十\d]+)\s*(?P<unit>斤|公斤|kg|克|g)\s*"
+                        r"(损耗|报损|坏了|扔了)"
+                    ),
+                    re.compile(r"(报损|记损耗)"),
+                ],
+            ),
             # ── call_service: 呼叫服务员 ──
-            ("call_service", [
-                re.compile(r"(服务员|叫一下服务员|呼叫服务员|叫服务员)"),
-            ]),
+            (
+                "call_service",
+                [
+                    re.compile(r"(服务员|叫一下服务员|呼叫服务员|叫服务员)"),
+                ],
+            ),
             # ── rush_order: 催菜 ──
-            ("rush_order", [
-                re.compile(
-                    r"(?P<table_no>[A-Za-z]?\d+)\s*号?\s*桌?\s*(催菜|催一下|催单)"
-                ),
-                re.compile(
-                    r"(催菜|催一下|催单)\s*(?P<table_no>[A-Za-z]?\d+)?\s*号?\s*桌?"
-                ),
-            ]),
+            (
+                "rush_order",
+                [
+                    re.compile(r"(?P<table_no>[A-Za-z]?\d+)\s*号?\s*桌?\s*(催菜|催一下|催单)"),
+                    re.compile(r"(催菜|催一下|催单)\s*(?P<table_no>[A-Za-z]?\d+)?\s*号?\s*桌?"),
+                ],
+            ),
             # ── reserve_table: 预订 ──
-            ("reserve_table", [
-                re.compile(
-                    r"(预[定订]|订[位桌台])\s*(?P<guest_count>[一二两三四五六七八九十\d]+)?\s*"
-                    r"[人位个]?\s*(?P<time_ref>[\u4e00-\u9fff\d:：]+)?"
-                ),
-                re.compile(r"(订位|预约|预订|留位)"),
-            ]),
+            (
+                "reserve_table",
+                [
+                    re.compile(
+                        r"(预[定订]|订[位桌台])\s*(?P<guest_count>[一二两三四五六七八九十\d]+)?\s*"
+                        r"[人位个]?\s*(?P<time_ref>[\u4e00-\u9fff\d:：]+)?"
+                    ),
+                    re.compile(r"(订位|预约|预订|留位)"),
+                ],
+            ),
             # ── query_staff: 查员工 ──
-            ("query_staff", [
-                re.compile(r"(谁在上班|今天谁当班|值班|排班|在岗)"),
-                re.compile(r"(查一下|查看)\s*(员工|服务员|店员)"),
-            ]),
+            (
+                "query_staff",
+                [
+                    re.compile(r"(谁在上班|今天谁当班|值班|排班|在岗)"),
+                    re.compile(r"(查一下|查看)\s*(员工|服务员|店员)"),
+                ],
+            ),
             # ── daily_report: 日报 ──
-            ("daily_report", [
-                re.compile(r"(日报|日结|营业报表|经营报表|营业报告|今日总结)"),
-                re.compile(r"(出|看|给我)\s*(报表|报告|日报)"),
-            ]),
+            (
+                "daily_report",
+                [
+                    re.compile(r"(日报|日结|营业报表|经营报表|营业报告|今日总结)"),
+                    re.compile(r"(出|看|给我)\s*(报表|报告|日报)"),
+                ],
+            ),
             # ── switch_table: 换桌 ──
-            ("switch_table", [
-                re.compile(
-                    r"(?P<table_no>[A-Za-z]?\d+)\s*号?\s*桌?\s*换到?\s*"
-                    r"(?P<target_table>[A-Za-z]?\d+)\s*号?\s*桌?"
-                ),
-                re.compile(r"(换桌|转桌|换台)"),
-            ]),
+            (
+                "switch_table",
+                [
+                    re.compile(
+                        r"(?P<table_no>[A-Za-z]?\d+)\s*号?\s*桌?\s*换到?\s*"
+                        r"(?P<target_table>[A-Za-z]?\d+)\s*号?\s*桌?"
+                    ),
+                    re.compile(r"(换桌|转桌|换台)"),
+                ],
+            ),
             # ── merge_table: 并桌 ──
-            ("merge_table", [
-                re.compile(
-                    r"(?P<table_a>[A-Za-z]?\d+)\s*号?\s*桌?\s*和\s*"
-                    r"(?P<table_b>[A-Za-z]?\d+)\s*号?\s*桌?\s*(并|合|合并)"
-                ),
-                re.compile(r"(并桌|合桌|合台|拼桌)"),
-            ]),
+            (
+                "merge_table",
+                [
+                    re.compile(
+                        r"(?P<table_a>[A-Za-z]?\d+)\s*号?\s*桌?\s*和\s*"
+                        r"(?P<table_b>[A-Za-z]?\d+)\s*号?\s*桌?\s*(并|合|合并)"
+                    ),
+                    re.compile(r"(并桌|合桌|合台|拼桌)"),
+                ],
+            ),
         ]
 
     # ══════════════════════════════════════════════════════════════
     # 3. Dialog Management — 多轮对话管理
     # ══════════════════════════════════════════════════════════════
 
-    async def manage_dialog(
-        self, session_id: str, nlu_result: dict[str, Any]
-    ) -> dict[str, Any]:
+    async def manage_dialog(self, session_id: str, nlu_result: dict[str, Any]) -> dict[str, Any]:
         """多轮对话管理
 
         处理：
@@ -581,9 +607,7 @@ class VoiceOrchestrator:
             "complete": True,
         }
 
-    def _check_required_slots(
-        self, intent: str, entities: dict[str, Any]
-    ) -> list[str]:
+    def _check_required_slots(self, intent: str, entities: dict[str, Any]) -> list[str]:
         """检查意图所需的必填槽位。"""
         required_slots: dict[str, list[str]] = {
             "order_add": ["dish_name"],
@@ -600,9 +624,7 @@ class VoiceOrchestrator:
         needed = required_slots.get(intent, [])
         return [slot for slot in needed if slot not in entities]
 
-    def _generate_slot_prompt(
-        self, slot: str, entities: dict[str, Any]
-    ) -> str:
+    def _generate_slot_prompt(self, slot: str, entities: dict[str, Any]) -> str:
         """生成补全信息的提问语句。"""
         prompts: dict[str, str] = {
             "dish_name": "请问要什么菜？",
@@ -812,10 +834,13 @@ class VoiceOrchestrator:
             },
         }
 
-        result = simulations.get(intent, {
-            "ok": True,
-            "data": {"intent": intent, "status": "simulated"},
-        })
+        result = simulations.get(
+            intent,
+            {
+                "ok": True,
+                "data": {"intent": intent, "status": "simulated"},
+            },
+        )
         result["simulated"] = True
         return result
 
@@ -823,9 +848,7 @@ class VoiceOrchestrator:
     # 5. Response Generation — 中文自然语言回复
     # ══════════════════════════════════════════════════════════════
 
-    async def generate_response(
-        self, action_result: dict[str, Any], format: str = "text"
-    ) -> dict[str, Any]:
+    async def generate_response(self, action_result: dict[str, Any], format: str = "text") -> dict[str, Any]:
         """生成中文自然语言回复。
 
         Args:
@@ -846,9 +869,7 @@ class VoiceOrchestrator:
         text = self._build_response_text(intent, data)
         return self._format_response(text, format)
 
-    def _build_response_text(
-        self, intent: str, data: dict[str, Any]
-    ) -> str:
+    def _build_response_text(self, intent: str, data: dict[str, Any]) -> str:
         """根据意图和数据构建回复文本。"""
         if intent == "order_add":
             dish = data.get("dish_name", "菜品")
@@ -887,9 +908,7 @@ class VoiceOrchestrator:
                 growth_str = f"，较昨日增长{int(growth * 100)}%"
             elif growth < 0:
                 growth_str = f"，较昨日下降{int(abs(growth) * 100)}%"
-            return (
-                f"{date_ref}营收{rev // 100:,}元，共{count}单{growth_str}"
-            )
+            return f"{date_ref}营收{rev // 100:,}元，共{count}单{growth_str}"
 
         if intent == "query_inventory":
             ingredient = data.get("ingredient", "")
@@ -947,18 +966,14 @@ class VoiceOrchestrator:
 
         return "操作已完成"
 
-    def _format_response(
-        self, text: str, format: str
-    ) -> dict[str, Any]:
+    def _format_response(self, text: str, format: str) -> dict[str, Any]:
         """格式化回复。"""
         result: dict[str, Any] = {
             "response_text": text,
             "format": format,
         }
         if format == "ssml":
-            result["ssml"] = (
-                f'<speak><prosody rate="medium">{text}</prosody></speak>'
-            )
+            result["ssml"] = f'<speak><prosody rate="medium">{text}</prosody></speak>'
         return result
 
     # ══════════════════════════════════════════════════════════════

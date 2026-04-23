@@ -8,6 +8,7 @@
   - override get_db_no_rls 依赖，注入 AsyncMock db session
   - 覆盖：正常路径 / 舆情数据注入验证 / APIConnectionError 降级 / 必填字段缺失 → 422
 """
+
 from __future__ import annotations
 
 import uuid
@@ -17,8 +18,9 @@ import anthropic
 import pytest
 from httpx import ASGITransport, AsyncClient
 
-from ..main import app
 from shared.ontology.src.database import get_db_no_rls
+
+from ..main import app
 
 # ─── 常量 ──────────────────────────────────────────────────────────
 
@@ -66,13 +68,12 @@ def mock_db():
 @pytest.fixture
 async def client(mock_db):
     """ASGITransport 客户端，override get_db_no_rls 依赖注入 mock db。"""
+
     async def _override_get_db_no_rls():
         yield mock_db
 
     app.dependency_overrides[get_db_no_rls] = _override_get_db_no_rls
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as ac:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
         yield ac
     app.dependency_overrides.clear()
 
@@ -95,9 +96,7 @@ async def test_patrol_mv_insight_success(client, headers):
         "auto_alert_required": False,
         "source": "claude",
     }
-    with patch(
-        "services.tx_brain.src.api.brain_routes.patrol_inspector"
-    ) as mock_agent:
+    with patch("services.tx_brain.src.api.brain_routes.patrol_inspector") as mock_agent:
         mock_agent.analyze_from_mv = AsyncMock(return_value=mock_result)
         resp = await client.post(
             "/api/v1/brain/patrol/mv-insight",
@@ -140,9 +139,7 @@ async def test_patrol_mv_insight_with_opinion_context(client, headers):
         },
         "source": "claude",
     }
-    with patch(
-        "services.tx_brain.src.api.brain_routes.patrol_inspector"
-    ) as mock_agent:
+    with patch("services.tx_brain.src.api.brain_routes.patrol_inspector") as mock_agent:
         mock_agent.analyze_from_mv = AsyncMock(return_value=mock_result)
         resp = await client.post(
             "/api/v1/brain/patrol/mv-insight",
@@ -169,9 +166,7 @@ async def test_patrol_mv_insight_with_opinion_context(client, headers):
 @pytest.mark.asyncio
 async def test_patrol_mv_insight_connection_error(client, headers):
     """巡店质检增强分析：analyze_from_mv 抛出 APIConnectionError → ok=False + AI_CONNECTION_ERROR。"""
-    with patch(
-        "services.tx_brain.src.api.brain_routes.patrol_inspector"
-    ) as mock_agent:
+    with patch("services.tx_brain.src.api.brain_routes.patrol_inspector") as mock_agent:
         mock_agent.analyze_from_mv = AsyncMock(
             side_effect=anthropic.APIConnectionError(request=None)  # type: ignore[arg-type]
         )

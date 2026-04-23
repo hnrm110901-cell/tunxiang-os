@@ -1,4 +1,5 @@
 """MemberInsight + PrivateOps Agent 测试"""
+
 import asyncio
 import os
 import sys
@@ -14,7 +15,14 @@ SAMPLE_MEMBERS = [
     {"customer_id": "c1", "name": "张三", "recency_days": 5, "frequency": 15, "monetary_fen": 800000},
     {"customer_id": "c2", "name": "李四", "recency_days": 45, "frequency": 3, "monetary_fen": 50000},
     {"customer_id": "c3", "name": "王五", "recency_days": 120, "frequency": 1, "monetary_fen": 10000},
-    {"customer_id": "c4", "name": "赵六", "recency_days": 200, "frequency": 0, "monetary_fen": 5000, "birth_date": "03-25"},
+    {
+        "customer_id": "c4",
+        "name": "赵六",
+        "recency_days": 200,
+        "frequency": 0,
+        "monetary_fen": 5000,
+        "birth_date": "03-25",
+    },
 ]
 
 
@@ -61,17 +69,29 @@ class TestJourney:
 class TestBadReview:
     def test_high_severity(self):
         agent = MemberInsightAgent(tenant_id=TID)
-        result = asyncio.run(agent.execute("process_bad_review", {
-            "review_text": "太难吃了，等太久，服务差", "rating": 1,
-        }))
+        result = asyncio.run(
+            agent.execute(
+                "process_bad_review",
+                {
+                    "review_text": "太难吃了，等太久，服务差",
+                    "rating": 1,
+                },
+            )
+        )
         assert result.data["severity"] == "high"
         assert len(result.data["detected_issues"]) >= 2
 
     def test_low_severity(self):
         agent = MemberInsightAgent(tenant_id=TID)
-        result = asyncio.run(agent.execute("process_bad_review", {
-            "review_text": "还可以", "rating": 4,
-        }))
+        result = asyncio.run(
+            agent.execute(
+                "process_bad_review",
+                {
+                    "review_text": "还可以",
+                    "rating": 4,
+                },
+            )
+        )
         assert result.data["severity"] == "low"
 
 
@@ -87,39 +107,66 @@ class TestSignals:
 class TestServiceQuality:
     def test_good_quality(self):
         agent = MemberInsightAgent(tenant_id=TID)
-        result = asyncio.run(agent.execute("monitor_service_quality", {
-            "feedbacks": [{"rating": 5}, {"rating": 4}, {"rating": 5}, {"rating": 4}],
-        }))
+        result = asyncio.run(
+            agent.execute(
+                "monitor_service_quality",
+                {
+                    "feedbacks": [{"rating": 5}, {"rating": 4}, {"rating": 5}, {"rating": 4}],
+                },
+            )
+        )
         assert result.data["status"] == "good"
         assert result.data["avg_rating"] > 4
 
     def test_critical_quality(self):
         agent = MemberInsightAgent(tenant_id=TID)
-        result = asyncio.run(agent.execute("monitor_service_quality", {
-            "feedbacks": [{"rating": 1}, {"rating": 2}, {"rating": 1}, {"rating": 3}],
-        }))
+        result = asyncio.run(
+            agent.execute(
+                "monitor_service_quality",
+                {
+                    "feedbacks": [{"rating": 1}, {"rating": 2}, {"rating": 1}, {"rating": 3}],
+                },
+            )
+        )
         assert result.data["status"] == "critical"
 
 
 # ─── PrivateOps 测试 ───
 
+
 class TestPerformance:
     def test_good_score(self):
         agent = PrivateOpsAgent(tenant_id=TID)
-        result = asyncio.run(agent.execute("score_performance", {
-            "role": "waiter",
-            "metrics": {"service_count": 90, "tips": 85, "complaints": 95, "upsell": 80, "attendance": 100},
-        }))
+        result = asyncio.run(
+            agent.execute(
+                "score_performance",
+                {
+                    "role": "waiter",
+                    "metrics": {"service_count": 90, "tips": 85, "complaints": 95, "upsell": 80, "attendance": 100},
+                },
+            )
+        )
         assert result.data["grade"] in ("A", "B")
         assert result.data["commission_fen"] > 0
 
     def test_food_safety_penalty(self):
         agent = PrivateOpsAgent(tenant_id=TID)
-        result = asyncio.run(agent.execute("score_performance", {
-            "role": "chef",
-            "metrics": {"dish_quality": 90, "speed": 85, "waste": 80, "consistency": 85, "hygiene": 90,
-                        "food_safety_violation": True},
-        }))
+        result = asyncio.run(
+            agent.execute(
+                "score_performance",
+                {
+                    "role": "chef",
+                    "metrics": {
+                        "dish_quality": 90,
+                        "speed": 85,
+                        "waste": 80,
+                        "consistency": 85,
+                        "hygiene": 90,
+                        "food_safety_violation": True,
+                    },
+                },
+            )
+        )
         assert result.data["total_score"] <= 30
         assert "食安" in result.data["penalties"][0]
 
@@ -127,29 +174,50 @@ class TestPerformance:
 class TestLaborCost:
     def test_within_budget(self):
         agent = PrivateOpsAgent(tenant_id=TID)
-        result = asyncio.run(agent.execute("analyze_labor_cost", {
-            "total_wage_fen": 20000000, "revenue_fen": 100000000, "staff_count": 25, "target_rate": 0.25,
-        }))
+        result = asyncio.run(
+            agent.execute(
+                "analyze_labor_cost",
+                {
+                    "total_wage_fen": 20000000,
+                    "revenue_fen": 100000000,
+                    "staff_count": 25,
+                    "target_rate": 0.25,
+                },
+            )
+        )
         assert result.data["status"] == "ok"
         assert result.data["labor_cost_rate_pct"] == 20.0
 
     def test_over_budget(self):
         agent = PrivateOpsAgent(tenant_id=TID)
-        result = asyncio.run(agent.execute("analyze_labor_cost", {
-            "total_wage_fen": 40000000, "revenue_fen": 100000000, "staff_count": 30, "target_rate": 0.25,
-        }))
+        result = asyncio.run(
+            agent.execute(
+                "analyze_labor_cost",
+                {
+                    "total_wage_fen": 40000000,
+                    "revenue_fen": 100000000,
+                    "staff_count": 30,
+                    "target_rate": 0.25,
+                },
+            )
+        )
         assert result.data["status"] == "critical"
 
 
 class TestAttendance:
     def test_detects_issues(self):
         agent = PrivateOpsAgent(tenant_id=TID)
-        result = asyncio.run(agent.execute("warn_attendance", {
-            "records": [
-                {"name": "张三", "late_count": 5, "absent_count": 1, "early_leave_count": 2},
-                {"name": "李四", "late_count": 0, "absent_count": 0, "early_leave_count": 0},
-            ],
-        }))
+        result = asyncio.run(
+            agent.execute(
+                "warn_attendance",
+                {
+                    "records": [
+                        {"name": "张三", "late_count": 5, "absent_count": 1, "early_leave_count": 2},
+                        {"name": "李四", "late_count": 0, "absent_count": 0, "early_leave_count": 0},
+                    ],
+                },
+            )
+        )
         assert result.data["total"] == 1
         assert result.data["warnings"][0]["employee"] == "张三"
 
@@ -157,15 +225,20 @@ class TestAttendance:
 class TestSeating:
     def test_allocates_best_match(self):
         agent = PrivateOpsAgent(tenant_id=TID)
-        result = asyncio.run(agent.execute("allocate_seating", {
-            "guest_count": 4,
-            "preferences": ["包间"],
-            "available_tables": [
-                {"table_no": "A01", "seats": 4, "area": "大厅"},
-                {"table_no": "B01", "seats": 6, "area": "包间"},
-                {"table_no": "B02", "seats": 8, "area": "包间"},
-            ],
-        }))
+        result = asyncio.run(
+            agent.execute(
+                "allocate_seating",
+                {
+                    "guest_count": 4,
+                    "preferences": ["包间"],
+                    "available_tables": [
+                        {"table_no": "A01", "seats": 4, "area": "大厅"},
+                        {"table_no": "B01", "seats": 6, "area": "包间"},
+                        {"table_no": "B02", "seats": 8, "area": "包间"},
+                    ],
+                },
+            )
+        )
         assert result.success
         assert result.data["area"] == "包间"
 
@@ -178,16 +251,21 @@ class TestSeating:
 class TestBEO:
     def test_generates_beo(self):
         agent = PrivateOpsAgent(tenant_id=TID)
-        result = asyncio.run(agent.execute("generate_beo", {
-            "event_name": "张总寿宴",
-            "guest_count": 30,
-            "event_date": "2026-04-15",
-            "menu_items": [
-                {"name": "龙虾", "price_fen": 28800, "quantity": 3},
-                {"name": "鲍鱼", "price_fen": 18800, "quantity": 3},
-            ],
-            "special_requests": ["无花生", "红色主题布置"],
-        }))
+        result = asyncio.run(
+            agent.execute(
+                "generate_beo",
+                {
+                    "event_name": "张总寿宴",
+                    "guest_count": 30,
+                    "event_date": "2026-04-15",
+                    "menu_items": [
+                        {"name": "龙虾", "price_fen": 28800, "quantity": 3},
+                        {"name": "鲍鱼", "price_fen": 18800, "quantity": 3},
+                    ],
+                    "special_requests": ["无花生", "红色主题布置"],
+                },
+            )
+        )
         assert result.success
         assert result.data["guest_count"] == 30
         assert len(result.data["timeline"]) == 5

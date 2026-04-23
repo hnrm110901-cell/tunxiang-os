@@ -16,11 +16,13 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from shared.ontology.src.database import TenantSession
 
-from . import traceability_service
-from . import kitchen_monitor_service
-from . import env_compliance_service
-from . import fire_safety_service
-from . import license_manager_service
+from . import (
+    env_compliance_service,
+    fire_safety_service,
+    kitchen_monitor_service,
+    license_manager_service,
+    traceability_service,
+)
 
 logger = structlog.get_logger(__name__)
 
@@ -40,6 +42,7 @@ DIMENSION_WEIGHTS: dict[str, int] = {
 # ---------------------------------------------------------------------------
 # 纯函数
 # ---------------------------------------------------------------------------
+
 
 def calculate_dimension_score(domain: str, metrics: dict[str, Any]) -> float:
     """单维度评分算法 (0-100)。
@@ -113,13 +116,15 @@ def identify_top_issues(dimension_scores: dict[str, float]) -> list[dict]:
             severity = "warning"
         else:
             continue
-        issues.append({
-            "domain": domain,
-            "label": issue_labels.get(domain, domain),
-            "score": score,
-            "severity": severity,
-            "weight": DIMENSION_WEIGHTS.get(domain, 0),
-        })
+        issues.append(
+            {
+                "domain": domain,
+                "label": issue_labels.get(domain, domain),
+                "score": score,
+                "severity": severity,
+                "weight": DIMENSION_WEIGHTS.get(domain, 0),
+            }
+        )
 
     return issues
 
@@ -127,6 +132,7 @@ def identify_top_issues(dimension_scores: dict[str, float]) -> list[dict]:
 # ---------------------------------------------------------------------------
 # 业务服务
 # ---------------------------------------------------------------------------
+
 
 async def calculate_store_score(tenant_id: str, store_id: str) -> dict:
     """计算单店合规评分。
@@ -230,10 +236,7 @@ async def calculate_store_score(tenant_id: str, store_id: str) -> dict:
     }
 
     # 加权总分
-    total_score = sum(
-        dimension_scores[d] * DIMENSION_WEIGHTS[d] / 100
-        for d in dimension_scores
-    )
+    total_score = sum(dimension_scores[d] * DIMENSION_WEIGHTS[d] / 100 for d in dimension_scores)
     total_score = round(total_score, 1)
     risk_level = determine_risk_level(total_score)
     top_issues = identify_top_issues(dimension_scores)
@@ -368,10 +371,7 @@ async def daily_score_batch(tenant_id: str) -> dict:
 
     async with TenantSession(tenant_id) as db:
         store_rows = await db.execute(
-            text(
-                "SELECT id FROM stores "
-                "WHERE tenant_id = :tenant_id AND status = 'active'"
-            ),
+            text("SELECT id FROM stores WHERE tenant_id = :tenant_id AND status = 'active'"),
             {"tenant_id": tenant_id},
         )
         store_ids = [r["id"] for r in store_rows.mappings().all()]

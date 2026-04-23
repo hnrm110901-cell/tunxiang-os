@@ -3,6 +3,7 @@
 新品趋势扫描、新品可行性评估、新品定价建议、新品试销方案、竞品新品跟踪、新品上线评估。
 扩展：发现建议时自动登记 draft 试点、待决策试点列表。
 """
+
 import uuid
 from datetime import date, timedelta
 from typing import Any
@@ -65,21 +66,24 @@ class NewProductScoutAgent(SkillAgent):
             already_have = name in our_menu
 
             if growth >= 10 or popularity >= 70:
-                opportunities.append({
-                    "dish_name": name,
-                    "category": category,
-                    "popularity_score": popularity,
-                    "growth_pct": growth,
-                    "already_in_menu": already_have,
-                    "opportunity_score": round(popularity * 0.6 + growth * 0.4, 1),
-                    "source": item.get("source", "市场数据"),
-                    "recommendation": "已有菜品，建议主推" if already_have else "建议研发上新",
-                })
+                opportunities.append(
+                    {
+                        "dish_name": name,
+                        "category": category,
+                        "popularity_score": popularity,
+                        "growth_pct": growth,
+                        "already_in_menu": already_have,
+                        "opportunity_score": round(popularity * 0.6 + growth * 0.4, 1),
+                        "source": item.get("source", "市场数据"),
+                        "recommendation": "已有菜品，建议主推" if already_have else "建议研发上新",
+                    }
+                )
 
         opportunities.sort(key=lambda x: x["opportunity_score"], reverse=True)
 
         return AgentResult(
-            success=True, action="scan_new_product_trends",
+            success=True,
+            action="scan_new_product_trends",
             data={
                 "opportunities": opportunities[:15],
                 "total_scanned": len(trend_data),
@@ -87,7 +91,7 @@ class NewProductScoutAgent(SkillAgent):
                 "new_to_develop": sum(1 for o in opportunities if not o["already_in_menu"]),
             },
             reasoning=f"扫描 {len(trend_data)} 个趋势，发现 {len(opportunities)} 个新品机会，"
-                      f"需研发 {sum(1 for o in opportunities if not o['already_in_menu'])} 个",
+            f"需研发 {sum(1 for o in opportunities if not o['already_in_menu'])} 个",
             confidence=0.75,
         )
 
@@ -119,7 +123,11 @@ class NewProductScoutAgent(SkillAgent):
         scores["设备兼容性"] = round(equip_match * 100, 0)
 
         # 毛利率预估
-        margin_pct = round((expected_price_fen - estimated_cost_fen) / max(1, expected_price_fen) * 100, 1) if expected_price_fen > 0 else 0
+        margin_pct = (
+            round((expected_price_fen - estimated_cost_fen) / max(1, expected_price_fen) * 100, 1)
+            if expected_price_fen > 0
+            else 0
+        )
         scores["毛利率预估"] = min(100, max(0, margin_pct * 1.5))
 
         # 综合评分
@@ -127,7 +135,8 @@ class NewProductScoutAgent(SkillAgent):
         feasibility = "高" if total_score >= 75 else "中" if total_score >= 50 else "低"
 
         return AgentResult(
-            success=True, action="assess_feasibility",
+            success=True,
+            action="assess_feasibility",
             data={
                 "dish_name": dish_name,
                 "dimension_scores": scores,
@@ -137,7 +146,11 @@ class NewProductScoutAgent(SkillAgent):
                 "missing_ingredients": list(set(ingredients) - set(available_ingredients)),
                 "missing_skills": list(set(required_skills) - set(chef_skills)),
                 "missing_equipment": list(set(required_equipment) - set(existing_equipment)),
-                "recommendation": "建议上线" if feasibility == "高" else "需补齐短板后上线" if feasibility == "中" else "暂不建议",
+                "recommendation": "建议上线"
+                if feasibility == "高"
+                else "需补齐短板后上线"
+                if feasibility == "中"
+                else "暂不建议",
             },
             reasoning=f"「{dish_name}」可行性评分 {total_score}分（{feasibility}），毛利率 {margin_pct}%",
             confidence=0.8,
@@ -155,7 +168,11 @@ class NewProductScoutAgent(SkillAgent):
         cost_plus_price = int(cost_fen / (1 - target_margin_pct / 100))
 
         # 竞品参考定价
-        avg_comp_price = int(sum(p.get("price_fen", 0) for p in competitor_prices) / max(1, len(competitor_prices))) if competitor_prices else 0
+        avg_comp_price = (
+            int(sum(p.get("price_fen", 0) for p in competitor_prices) / max(1, len(competitor_prices)))
+            if competitor_prices
+            else 0
+        )
 
         # 综合定价建议
         if avg_comp_price > 0:
@@ -166,7 +183,8 @@ class NewProductScoutAgent(SkillAgent):
         actual_margin = round((suggested - cost_fen) / max(1, suggested) * 100, 1)
 
         return AgentResult(
-            success=True, action="suggest_pricing",
+            success=True,
+            action="suggest_pricing",
             data={
                 "dish_name": dish_name,
                 "cost_yuan": round(cost_fen / 100, 2),
@@ -215,7 +233,8 @@ class NewProductScoutAgent(SkillAgent):
         }
 
         return AgentResult(
-            success=True, action="plan_trial_sale",
+            success=True,
+            action="plan_trial_sale",
             data=plan,
             reasoning=f"「{dish_name}」试销方案: {len(trial_stores)} 家门店，{trial_days}天，日限 {daily_limit} 份",
             confidence=0.85,
@@ -227,21 +246,24 @@ class NewProductScoutAgent(SkillAgent):
 
         tracked = []
         for p in competitor_new_products:
-            tracked.append({
-                "competitor": p.get("competitor", ""),
-                "dish_name": p.get("dish_name", ""),
-                "category": p.get("category", ""),
-                "price_yuan": round(p.get("price_fen", 0) / 100, 2),
-                "launch_date": p.get("launch_date", ""),
-                "estimated_sales": p.get("estimated_daily_sales", 0),
-                "customer_rating": p.get("rating", 0),
-                "is_hit": p.get("rating", 0) >= 4.5 and p.get("estimated_daily_sales", 0) >= 20,
-                "our_response": "需要跟进" if p.get("rating", 0) >= 4.5 else "持续观察",
-            })
+            tracked.append(
+                {
+                    "competitor": p.get("competitor", ""),
+                    "dish_name": p.get("dish_name", ""),
+                    "category": p.get("category", ""),
+                    "price_yuan": round(p.get("price_fen", 0) / 100, 2),
+                    "launch_date": p.get("launch_date", ""),
+                    "estimated_sales": p.get("estimated_daily_sales", 0),
+                    "customer_rating": p.get("rating", 0),
+                    "is_hit": p.get("rating", 0) >= 4.5 and p.get("estimated_daily_sales", 0) >= 20,
+                    "our_response": "需要跟进" if p.get("rating", 0) >= 4.5 else "持续观察",
+                }
+            )
 
         hits = [t for t in tracked if t["is_hit"]]
         return AgentResult(
-            success=True, action="track_competitor_new_products",
+            success=True,
+            action="track_competitor_new_products",
             data={
                 "tracked_products": tracked,
                 "total": len(tracked),
@@ -276,7 +298,8 @@ class NewProductScoutAgent(SkillAgent):
         decision = "通过" if total >= 70 else "有条件通过" if total >= 50 else "不通过"
 
         return AgentResult(
-            success=True, action="evaluate_launch_readiness",
+            success=True,
+            action="evaluate_launch_readiness",
             data={
                 "dish_name": dish_name,
                 "dimension_scores": scores,
@@ -343,8 +366,12 @@ class NewProductScoutAgent(SkillAgent):
             "end_date": end_date,
             "status": "draft",
             "success_criteria": [
-                {"metric": "total_sales", "operator": "gte", "threshold": 15 * trial_days,
-                 "description": f"试销期总销量 ≥ {15 * trial_days} 份"},
+                {
+                    "metric": "total_sales",
+                    "operator": "gte",
+                    "threshold": 15 * trial_days,
+                    "description": f"试销期总销量 ≥ {15 * trial_days} 份",
+                },
             ],
             "opportunity_score": opportunity_score,
             "scout_source": source,
@@ -352,14 +379,15 @@ class NewProductScoutAgent(SkillAgent):
         }
 
         return AgentResult(
-            success=True, action="register_scouted_pilot",
+            success=True,
+            action="register_scouted_pilot",
             data={
                 "pilot_draft": pilot_draft,
                 "auto_registered": True,
                 "next_step": "调用 POST /api/v1/pilots 提交草稿，等待运营团队决策",
             },
             reasoning=f"新品「{dish_name}」（机会评分 {opportunity_score}）已登记试点草稿，"
-                      f"建议 {start_date} 至 {end_date} 试销",
+            f"建议 {start_date} 至 {end_date} 试销",
             confidence=0.75,
         )
 
@@ -372,17 +400,15 @@ class NewProductScoutAgent(SkillAgent):
         draft_pilots = params.get("draft_pilots", [])
 
         # 筛选新品侦察来源
-        scouted = [
-            p for p in draft_pilots
-            if p.get("recommendation_source") in ("trend_signal", "competitor_watch")
-        ]
+        scouted = [p for p in draft_pilots if p.get("recommendation_source") in ("trend_signal", "competitor_watch")]
         scouted.sort(key=lambda p: p.get("opportunity_score", 0), reverse=True)
 
         urgent = [p for p in scouted if p.get("opportunity_score", 0) >= 75]
         watch = [p for p in scouted if p.get("opportunity_score", 0) < 75]
 
         return AgentResult(
-            success=True, action="get_scouted_pending_pilots",
+            success=True,
+            action="get_scouted_pending_pilots",
             data={
                 "total_pending": len(scouted),
                 "urgent_decision": len(urgent),
@@ -390,7 +416,6 @@ class NewProductScoutAgent(SkillAgent):
                 "pilots": scouted[:20],
                 "action_required": "请在7天内对高分建议（评分≥75）做出试点决策",
             },
-            reasoning=f"待决策新品试点建议 {len(scouted)} 个，"
-                      f"其中紧急决策 {len(urgent)} 个（评分≥75）",
+            reasoning=f"待决策新品试点建议 {len(scouted)} 个，其中紧急决策 {len(urgent)} 个（评分≥75）",
             confidence=0.8,
         )

@@ -40,6 +40,7 @@ FIRE_CHECKLIST: list[dict[str, str]] = [
 # 纯函数
 # ---------------------------------------------------------------------------
 
+
 def is_inspection_overdue(next_date: date | str | None, today: date | None = None) -> bool:
     """判断是否逾期未检。"""
     if next_date is None:
@@ -54,6 +55,7 @@ def is_inspection_overdue(next_date: date | str | None, today: date | None = Non
 # ---------------------------------------------------------------------------
 # 业务服务
 # ---------------------------------------------------------------------------
+
 
 async def register_equipment(
     tenant_id: str,
@@ -214,8 +216,10 @@ async def record_inspection(
 
     logger.info(
         "fire_inspection_recorded",
-        tenant_id=tenant_id, inspection_id=inspection_id,
-        passed=passed_items, total=total_items,
+        tenant_id=tenant_id,
+        inspection_id=inspection_id,
+        passed=passed_items,
+        total=total_items,
     )
     return {
         "id": inspection_id,

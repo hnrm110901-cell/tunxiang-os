@@ -6,16 +6,15 @@ P3-01 折扣守护Agent增强 — 测试用例
   3. test_realtime_member_check_normal     — 首次折扣 → is_suspicious=False, risk_level=low
   4. test_table_pattern_anomaly            — A8桌连续5天 → anomaly_score>0.7，员工列表非空
 """
+
 import os
 import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-import pytest
-from fastapi.testclient import TestClient
-from fastapi import FastAPI
-
 from api.discount_guard_enhanced_routes import router
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
 
 # ─── 测试 App 独立实例（不依赖完整 tx-agent main.py）────────────────────────
 
@@ -31,6 +30,7 @@ BASE_HEADERS = {"X-Tenant-ID": TENANT_ID}
 # ══════════════════════════════════════════════════════════════════
 # 1. 高频会员查询
 # ══════════════════════════════════════════════════════════════════
+
 
 def test_member_frequency_detection():
     """
@@ -80,6 +80,7 @@ def test_member_frequency_detection():
 # ══════════════════════════════════════════════════════════════════
 # 2. 实时检查：可疑（第5次折扣）
 # ══════════════════════════════════════════════════════════════════
+
 
 def test_realtime_member_check_suspicious():
     """
@@ -131,6 +132,7 @@ def test_realtime_member_check_suspicious():
 # 3. 实时检查：首次折扣（正常）
 # ══════════════════════════════════════════════════════════════════
 
+
 def test_realtime_member_check_normal():
     """
     POST /member-frequency/check — 全新会员（历史无记录）
@@ -141,7 +143,7 @@ def test_realtime_member_check_normal():
       - recommendation="正常放行"
     """
     payload = {
-        "member_id": "mem-brand-new-xyz",   # 在 Mock 数据中不存在
+        "member_id": "mem-brand-new-xyz",  # 在 Mock 数据中不存在
         "order_id": "ORD-FIRST-001",
         "discount_type": "birthday_discount",
         "discount_amount_fen": 3000,
@@ -161,14 +163,13 @@ def test_realtime_member_check_normal():
     assert data["is_suspicious"] is False, "首次折扣不应被标记为可疑"
     assert data["risk_level"] == "low", f"首次折扣应为 low，实际 {data['risk_level']}"
     assert data["frequency_in_window"] == 1, "首次折扣频率应为1"
-    assert data["recommendation"] == "正常放行", (
-        f"首次折扣应建议正常放行，实际：{data['recommendation']}"
-    )
+    assert data["recommendation"] == "正常放行", f"首次折扣应建议正常放行，实际：{data['recommendation']}"
 
 
 # ══════════════════════════════════════════════════════════════════
 # 4. 桌台异常模式分析：A8桌
 # ══════════════════════════════════════════════════════════════════
+
 
 def test_table_pattern_anomaly():
     """
@@ -184,7 +185,7 @@ def test_table_pattern_anomaly():
     payload = {
         "table_id": "table-A8",
         "order_id": "ORD-A8-TODAY",
-        "employee_id": "emp-011",        # 赵服务员
+        "employee_id": "emp-011",  # 赵服务员
         "discount_amount_fen": 15000,
     }
     resp = client.post(
@@ -200,12 +201,8 @@ def test_table_pattern_anomaly():
     data = body["data"]
 
     assert data["is_pattern_match"] is True, "A8桌连续5天折扣应匹配异常模式"
-    assert data["consecutive_discount_days"] >= 3, (
-        f"连续折扣天数应 >= 3，实际 {data['consecutive_discount_days']}"
-    )
-    assert data["anomaly_score"] > 0.7, (
-        f"A8桌异常评分应 > 0.7，实际 {data['anomaly_score']}"
-    )
+    assert data["consecutive_discount_days"] >= 3, f"连续折扣天数应 >= 3，实际 {data['consecutive_discount_days']}"
+    assert data["anomaly_score"] > 0.7, f"A8桌异常评分应 > 0.7，实际 {data['anomaly_score']}"
 
     employees = data["related_employees"]
     assert isinstance(employees, list), "related_employees 应为列表"
@@ -229,6 +226,7 @@ def test_table_pattern_anomaly():
 # ══════════════════════════════════════════════════════════════════
 # 5. 补充：GET /table-pattern 基础验证
 # ══════════════════════════════════════════════════════════════════
+
 
 def test_table_pattern_list():
     """
@@ -259,6 +257,7 @@ def test_table_pattern_list():
 # ══════════════════════════════════════════════════════════════════
 # 6. 补充：GET /summary 基础验证
 # ══════════════════════════════════════════════════════════════════
+
 
 def test_summary_endpoint():
     """

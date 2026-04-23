@@ -3,6 +3,7 @@
 GET /api/v1/notifications/pending — 轮询待处理通知（Redis list）
 SSE /api/v1/notifications/stream  — 实时推送（Redis Pub/Sub → SSE）
 """
+
 from __future__ import annotations
 
 import asyncio

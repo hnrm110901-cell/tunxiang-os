@@ -3,6 +3,7 @@
 提供 KPI 汇总、Session 运行列表、Session 事件时间线、Agent 效果分析、健康度监控。
 从 SessionRun / SessionEvent / AgentDecisionLog 真实 DB 查询。
 """
+
 from __future__ import annotations
 
 from datetime import date, datetime, timedelta, timezone
@@ -14,16 +15,18 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from shared.ontology.src.database import get_db_with_tenant
+
 from ..models.decision_log import AgentDecisionLog
 from ..models.session_event import SessionEvent
 from ..models.session_run import SessionRun
-from shared.ontology.src.database import get_db_with_tenant
 
 logger = structlog.get_logger(__name__)
 router = APIRouter(prefix="/api/v1/agent/observability", tags=["observability"])
 
 
 # ── DB 依赖 ──────────────────────────────────────────────────────────────────
+
 
 async def _get_db(
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
@@ -33,6 +36,7 @@ async def _get_db(
 
 
 # ── 工具函数 ─────────────────────────────────────────────────────────────────
+
 
 def _parse_date(d: date | None) -> datetime | None:
     """将 date 转为 timezone-aware datetime（当日 00:00 UTC）"""
@@ -50,6 +54,7 @@ def _parse_end_date(d: date | None) -> datetime | None:
 
 
 # ── 1. KPI Summary ──────────────────────────────────────────────────────────
+
 
 @router.get("/kpis")
 async def get_kpis(
@@ -116,7 +121,8 @@ async def get_kpis(
     except (SQLAlchemyError, ConnectionError) as exc:
         logger.error("observability.kpis.db_error", error=str(exc), exc_info=True)
         return {
-            "ok": False, "error": {"message": "DB query failed", "detail": str(exc)},
+            "ok": False,
+            "error": {"message": "DB query failed", "detail": str(exc)},
             "data": {
                 "total_sessions": 0,
                 "completed": 0,
@@ -133,6 +139,7 @@ async def get_kpis(
 
 
 # ── 2. Session List ─────────────────────────────────────────────────────────
+
 
 @router.get("/sessions")
 async def get_sessions(
@@ -193,12 +200,14 @@ async def get_sessions(
     except (SQLAlchemyError, ConnectionError) as exc:
         logger.error("observability.sessions.db_error", error=str(exc), exc_info=True)
         return {
-            "ok": False, "error": {"message": "DB query failed", "detail": str(exc)},
+            "ok": False,
+            "error": {"message": "DB query failed", "detail": str(exc)},
             "data": {"items": [], "total": 0, "page": page, "size": size},
         }
 
 
 # ── 3. Session Timeline ─────────────────────────────────────────────────────
+
 
 @router.get("/sessions/{session_id}/timeline")
 async def get_session_timeline(
@@ -247,12 +256,14 @@ async def get_session_timeline(
     except (SQLAlchemyError, ConnectionError) as exc:
         logger.error("observability.timeline.db_error", error=str(exc), session_id=session_id, exc_info=True)
         return {
-            "ok": False, "error": {"message": "DB query failed", "detail": str(exc)},
+            "ok": False,
+            "error": {"message": "DB query failed", "detail": str(exc)},
             "data": {"session_id": session_id, "events": [], "count": 0},
         }
 
 
 # ── 4. Agent Effectiveness ──────────────────────────────────────────────────
+
 
 @router.get("/effectiveness")
 async def get_effectiveness(
@@ -263,12 +274,16 @@ async def get_effectiveness(
 ) -> dict:
     """效果分析 — 按 agent_id 分组统计调用次数、成功率、平均置信度、平均耗时"""
     try:
-        query = select(
-            AgentDecisionLog.agent_id,
-            func.count().label("total_calls"),
-            func.avg(AgentDecisionLog.confidence).label("avg_confidence"),
-            func.avg(AgentDecisionLog.execution_ms).label("avg_execution_ms"),
-        ).where(AgentDecisionLog.is_deleted.is_(False)).group_by(AgentDecisionLog.agent_id)
+        query = (
+            select(
+                AgentDecisionLog.agent_id,
+                func.count().label("total_calls"),
+                func.avg(AgentDecisionLog.confidence).label("avg_confidence"),
+                func.avg(AgentDecisionLog.execution_ms).label("avg_execution_ms"),
+            )
+            .where(AgentDecisionLog.is_deleted.is_(False))
+            .group_by(AgentDecisionLog.agent_id)
+        )
 
         if store_id:
             query = query.where(AgentDecisionLog.store_id == store_id)
@@ -281,11 +296,15 @@ async def get_effectiveness(
         rows = result.all()
 
         # 从 SessionRun 中获取每个 agent 的成功率
-        sr_query = select(
-            SessionRun.agent_template_name,
-            func.count().label("total"),
-            func.count().filter(SessionRun.status == "completed").label("completed"),
-        ).where(SessionRun.is_deleted.is_(False)).group_by(SessionRun.agent_template_name)
+        sr_query = (
+            select(
+                SessionRun.agent_template_name,
+                func.count().label("total"),
+                func.count().filter(SessionRun.status == "completed").label("completed"),
+            )
+            .where(SessionRun.is_deleted.is_(False))
+            .group_by(SessionRun.agent_template_name)
+        )
 
         if store_id:
             sr_query = sr_query.where(SessionRun.store_id == store_id)
@@ -297,8 +316,7 @@ async def get_effectiveness(
         sr_result = await db.execute(sr_query)
         sr_rows = sr_result.all()
         success_map = {
-            r.agent_template_name: round(r.completed / r.total * 100, 1) if r.total > 0 else 0.0
-            for r in sr_rows
+            r.agent_template_name: round(r.completed / r.total * 100, 1) if r.total > 0 else 0.0 for r in sr_rows
         }
 
         agents = [
@@ -313,10 +331,14 @@ async def get_effectiveness(
         ]
 
         # 决策类型分布
-        dt_query = select(
-            AgentDecisionLog.decision_type,
-            func.count().label("count"),
-        ).where(AgentDecisionLog.is_deleted.is_(False)).group_by(AgentDecisionLog.decision_type)
+        dt_query = (
+            select(
+                AgentDecisionLog.decision_type,
+                func.count().label("count"),
+            )
+            .where(AgentDecisionLog.is_deleted.is_(False))
+            .group_by(AgentDecisionLog.decision_type)
+        )
 
         if store_id:
             dt_query = dt_query.where(AgentDecisionLog.store_id == store_id)
@@ -328,10 +350,7 @@ async def get_effectiveness(
         dt_result = await db.execute(dt_query)
         dt_rows = dt_result.all()
 
-        decision_type_distribution = [
-            {"type": r.decision_type, "count": r.count}
-            for r in dt_rows
-        ]
+        decision_type_distribution = [{"type": r.decision_type, "count": r.count} for r in dt_rows]
 
         return {
             "ok": True,
@@ -343,12 +362,14 @@ async def get_effectiveness(
     except (SQLAlchemyError, ConnectionError) as exc:
         logger.error("observability.effectiveness.db_error", error=str(exc), exc_info=True)
         return {
-            "ok": False, "error": {"message": "DB query failed", "detail": str(exc)},
+            "ok": False,
+            "error": {"message": "DB query failed", "detail": str(exc)},
             "data": {"agents": [], "decision_type_distribution": []},
         }
 
 
 # ── 5. Health Check ──────────────────────────────────────────────────────────
+
 
 @router.get("/health")
 async def get_health(
@@ -371,17 +392,21 @@ async def get_health(
 
         # 各 Agent 今日统计
         today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
-        agent_query = select(
-            SessionRun.agent_template_name,
-            func.count().label("today_calls"),
-            func.count().filter(SessionRun.status == "failed").label("today_failed"),
-            func.avg(
-                func.extract("epoch", SessionRun.finished_at) - func.extract("epoch", SessionRun.started_at)
-            ).label("avg_duration_sec"),
-        ).where(
-            SessionRun.is_deleted.is_(False),
-            SessionRun.started_at >= today_start,
-        ).group_by(SessionRun.agent_template_name)
+        agent_query = (
+            select(
+                SessionRun.agent_template_name,
+                func.count().label("today_calls"),
+                func.count().filter(SessionRun.status == "failed").label("today_failed"),
+                func.avg(
+                    func.extract("epoch", SessionRun.finished_at) - func.extract("epoch", SessionRun.started_at)
+                ).label("avg_duration_sec"),
+            )
+            .where(
+                SessionRun.is_deleted.is_(False),
+                SessionRun.started_at >= today_start,
+            )
+            .group_by(SessionRun.agent_template_name)
+        )
 
         agent_result = await db.execute(agent_query)
         agent_rows = agent_result.all()
@@ -396,21 +421,21 @@ async def get_health(
             elif error_rate > 0.02:
                 agent_status = "warning"
 
-            agents.append({
-                "agent_id": r.agent_template_name,
-                "status": agent_status,
-                "today_calls": r.today_calls,
-                "today_failed": r.today_failed,
-                "avg_latency_ms": avg_latency_ms,
-                "error_rate": error_rate,
-            })
+            agents.append(
+                {
+                    "agent_id": r.agent_template_name,
+                    "status": agent_status,
+                    "today_calls": r.today_calls,
+                    "today_failed": r.today_failed,
+                    "avg_latency_ms": avg_latency_ms,
+                    "error_rate": error_rate,
+                }
+            )
 
         # 整体状态判定
         has_error = any(a["status"] == "error" for a in agents)
         has_warning = any(a["status"] == "warning" for a in agents)
-        recent_failure_rate = (
-            recent.failed_recent / recent.total_recent if recent.total_recent > 0 else 0.0
-        )
+        recent_failure_rate = recent.failed_recent / recent.total_recent if recent.total_recent > 0 else 0.0
 
         if has_error or recent_failure_rate > 0.2:
             overall_status = "unhealthy"
@@ -439,7 +464,8 @@ async def get_health(
     except (SQLAlchemyError, ConnectionError) as exc:
         logger.error("observability.health.db_error", error=str(exc), exc_info=True)
         return {
-            "ok": False, "error": {"message": "DB query failed", "detail": str(exc)},
+            "ok": False,
+            "error": {"message": "DB query failed", "detail": str(exc)},
             "data": {
                 "overall_status": "unhealthy",
                 "recent_5min": {"total": 0, "failed": 0},

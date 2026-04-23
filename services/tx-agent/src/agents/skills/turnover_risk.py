@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from datetime import date, datetime, timedelta
 from typing import Any, Optional
 
 import structlog
@@ -104,10 +103,7 @@ def _generate_interventions(dimensions: dict[str, dict[str, Any]]) -> list[str]:
         suggestions.append("安排一对一辅导和心理关怀，关注服务质量下降原因")
 
     # 多维度同时下滑 -> 紧急面谈
-    high_dims = sum(
-        1 for d in dimensions.values()
-        if isinstance(d, dict) and d.get("score", 0) >= 60
-    )
+    high_dims = sum(1 for d in dimensions.values() if isinstance(d, dict) and d.get("score", 0) >= 60)
     if high_dims >= 3:
         suggestions.insert(0, "【紧急】多维度同时下滑，建议立即安排面谈，评估是否需要调岗或协商解除")
 
@@ -609,7 +605,9 @@ async def _fetch_risk_employees(
         complaint_dim = {"score": 0, "detail": "无投诉记录"}
         biz_dim = {
             "score": salary_score,
-            "detail": f"薪资低于同岗均值{round((1 - float(base_salary) / float(role_avg)) * 100)}%" if (base_salary and role_avg and float(role_avg) > 0) else "薪资数据正常",
+            "detail": f"薪资低于同岗均值{round((1 - float(base_salary) / float(role_avg)) * 100)}%"
+            if (base_salary and role_avg and float(role_avg) > 0)
+            else "薪资数据正常",
             "signals": [],
         }
         svc_dim = {"score": 0, "detail": "服务质量正常", "signals": []}
@@ -633,17 +631,19 @@ async def _fetch_risk_employees(
         else:
             alert_level = 0
 
-        employees.append({
-            "employee_id": emp_id,
-            "emp_name": row.get("emp_name") or emp_id,
-            "store_id": str(row.get("store_id") or ""),
-            "risk_score": risk_score,
-            "risk_level": _risk_level(risk_score),
-            "risk_color": _risk_color(risk_score),
-            "alert_level": alert_level,
-            "dimensions": dimensions,
-            "interventions": _generate_interventions(dimensions),
-        })
+        employees.append(
+            {
+                "employee_id": emp_id,
+                "emp_name": row.get("emp_name") or emp_id,
+                "store_id": str(row.get("store_id") or ""),
+                "risk_score": risk_score,
+                "risk_level": _risk_level(risk_score),
+                "risk_color": _risk_color(risk_score),
+                "alert_level": alert_level,
+                "dimensions": dimensions,
+                "interventions": _generate_interventions(dimensions),
+            }
+        )
 
     employees.sort(key=lambda e: e["risk_score"], reverse=True)
     return employees
@@ -750,10 +750,7 @@ class TurnoverRiskAgent(SkillAgent):
         svc_trends = await _scan_service_quality(self._db, self.tenant_id, store_id=store_id)
 
         # 合并所有员工
-        all_emp_ids = (
-            set(att_trends.keys()) | set(perf_trends.keys())
-            | set(biz_trends.keys()) | set(svc_trends.keys())
-        )
+        all_emp_ids = set(att_trends.keys()) | set(perf_trends.keys()) | set(biz_trends.keys()) | set(svc_trends.keys())
         employees: list[dict[str, Any]] = []
 
         for emp_id in all_emp_ids:
@@ -789,17 +786,19 @@ class TurnoverRiskAgent(SkillAgent):
             else:
                 alert_level = 0
 
-            employees.append({
-                "employee_id": emp_id,
-                "emp_name": emp_name,
-                "store_id": emp_store,
-                "risk_score": risk_score,
-                "risk_level": _risk_level(risk_score),
-                "risk_color": _risk_color(risk_score),
-                "alert_level": alert_level,
-                "dimensions": dimensions,
-                "interventions": _generate_interventions(dimensions),
-            })
+            employees.append(
+                {
+                    "employee_id": emp_id,
+                    "emp_name": emp_name,
+                    "store_id": emp_store,
+                    "risk_score": risk_score,
+                    "risk_level": _risk_level(risk_score),
+                    "risk_color": _risk_color(risk_score),
+                    "alert_level": alert_level,
+                    "dimensions": dimensions,
+                    "interventions": _generate_interventions(dimensions),
+                }
+            )
 
         employees.sort(key=lambda e: e["risk_score"], reverse=True)
         high_count = sum(1 for e in employees if e["risk_score"] >= 60)
@@ -833,8 +832,7 @@ class TurnoverRiskAgent(SkillAgent):
         """为指定员工生成干预建议。"""
         employee_id = params.get("employee_id")
         if not employee_id:
-            return AgentResult(success=False, action="generate_intervention",
-                               error="缺少 employee_id")
+            return AgentResult(success=False, action="generate_intervention", error="缺少 employee_id")
 
         # 先计算该员工风险
         store_id = self._store_scope(params)
@@ -849,10 +847,16 @@ class TurnoverRiskAgent(SkillAgent):
         att_trends = await _scan_attendance_trends(self._db, self.tenant_id, store_id)
         perf_trends = await _scan_performance_trends(self._db, self.tenant_id, store_id)
         biz_trends = await _scan_business_performance(
-            self._db, self.tenant_id, employee_id=employee_id, store_id=store_id,
+            self._db,
+            self.tenant_id,
+            employee_id=employee_id,
+            store_id=store_id,
         )
         svc_trends = await _scan_service_quality(
-            self._db, self.tenant_id, employee_id=employee_id, store_id=store_id,
+            self._db,
+            self.tenant_id,
+            employee_id=employee_id,
+            store_id=store_id,
         )
 
         att = att_trends.get(employee_id, {"score": 30, "detail": "无考勤异常"})

@@ -14,13 +14,14 @@ from sqlalchemy import text
 
 from shared.ontology.src.database import TenantSession
 
-from . import traceability_service
-from . import kitchen_monitor_service
-from . import env_compliance_service
-from . import fire_safety_service
-from . import license_manager_service
-from . import submission_engine
-from . import compliance_score_service
+from . import (
+    compliance_score_service,
+    env_compliance_service,
+    kitchen_monitor_service,
+    license_manager_service,
+    submission_engine,
+    traceability_service,
+)
 
 logger = structlog.get_logger(__name__)
 
@@ -28,6 +29,7 @@ logger = structlog.get_logger(__name__)
 # ===========================================================================
 # 事件驱动处理
 # ===========================================================================
+
 
 async def on_purchase_received(event: dict[str, Any]) -> dict:
     """进货入库 -> 自动录入追溯台账。
@@ -47,7 +49,9 @@ async def on_purchase_received(event: dict[str, Any]) -> dict:
         # 判断是否需要自动上报
         if submission_engine.should_auto_submit("trace"):
             await submission_engine.submit_to_platform(
-                tenant_id, store_id, "trace",
+                tenant_id,
+                store_id,
+                "trace",
                 {"type": "inbound", "record": record},
             )
 
@@ -131,7 +135,9 @@ async def on_waste_recorded(event: dict[str, Any]) -> dict:
     # 自动上报
     if submission_engine.should_auto_submit("env"):
         await submission_engine.submit_to_platform(
-            tenant_id, store_id, "env",
+            tenant_id,
+            store_id,
+            "env",
             {"type": "waste_disposal", "record": record},
         )
 
@@ -160,7 +166,9 @@ async def on_kitchen_alert(event: dict[str, Any]) -> dict:
     # 评估是否自动上报
     if submission_engine.should_auto_submit("kitchen", alert_type=event["alert_type"]):
         submission = await submission_engine.submit_to_platform(
-            tenant_id, store_id, "kitchen",
+            tenant_id,
+            store_id,
+            "kitchen",
             {"type": "ai_alert", "alert": alert},
         )
         log.info("kitchen_alert_auto_submitted", alert_id=alert["id"], submission=submission["status"])
@@ -176,6 +184,7 @@ async def on_kitchen_alert(event: dict[str, Any]) -> dict:
 # ===========================================================================
 # Agent Skill（自然语言交互）
 # ===========================================================================
+
 
 async def skill_check_compliance(tenant_id: str, store_id: str) -> str:
     """返回门店合规状态的自然语言摘要。"""
@@ -238,9 +247,9 @@ async def skill_trace_ingredient(
         records = [dict(r) for r in rows.mappings().all()]
 
     if not records:
-        return f"未找到与 \"{keyword}\" 相关的进货记录"
+        return f'未找到与 "{keyword}" 相关的进货记录'
 
-    lines = [f"找到 {len(records)} 条与 \"{keyword}\" 相关的记录:"]
+    lines = [f'找到 {len(records)} 条与 "{keyword}" 相关的记录:']
     for r in records:
         supplier_info = r.get("supplier_name", "未知供应商")
         if r.get("supplier_license"):
@@ -304,6 +313,7 @@ async def skill_license_overview(tenant_id: str) -> str:
 # 每日任务
 # ===========================================================================
 
+
 async def daily_compliance_scan(tenant_id: str) -> dict:
     """全品牌合规巡检 — 每日执行。
 
@@ -345,10 +355,7 @@ async def daily_compliance_scan(tenant_id: str) -> dict:
     # 4. 追溯完整性（所有门店）
     async with TenantSession(tenant_id) as db:
         store_rows = await db.execute(
-            text(
-                "SELECT id, name FROM stores "
-                "WHERE tenant_id = :tenant_id AND status = 'active'"
-            ),
+            text("SELECT id, name FROM stores WHERE tenant_id = :tenant_id AND status = 'active'"),
             {"tenant_id": tenant_id},
         )
         stores = [dict(r) for r in store_rows.mappings().all()]
@@ -356,14 +363,18 @@ async def daily_compliance_scan(tenant_id: str) -> dict:
     trace_issues = []
     for store in stores:
         completeness = await traceability_service.check_completeness(
-            tenant_id, store["id"], today_str,
+            tenant_id,
+            store["id"],
+            today_str,
         )
         if completeness["score"] < 80:
-            trace_issues.append({
-                "store_id": store["id"],
-                "store_name": store.get("name"),
-                "score": completeness["score"],
-            })
+            trace_issues.append(
+                {
+                    "store_id": store["id"],
+                    "store_name": store.get("name"),
+                    "score": completeness["score"],
+                }
+            )
 
     if trace_issues:
         summary_parts.append(f"追溯完整性: {len(trace_issues)}家门店低于80分")
@@ -375,8 +386,7 @@ async def daily_compliance_scan(tenant_id: str) -> dict:
     red_stores = [r for r in score_result.get("results", []) if r.get("risk") == "red"]
     yellow_stores = [r for r in score_result.get("results", []) if r.get("risk") == "yellow"]
     summary_parts.append(
-        f"合规评分: {score_result['scored']}家已评分, "
-        f"{len(red_stores)}家高风险, {len(yellow_stores)}家中风险"
+        f"合规评分: {score_result['scored']}家已评分, {len(red_stores)}家高风险, {len(yellow_stores)}家中风险"
     )
 
     # 组装摘要

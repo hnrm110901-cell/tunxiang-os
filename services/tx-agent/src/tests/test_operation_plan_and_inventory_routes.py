@@ -12,6 +12,7 @@ Covered routes:
 
 Total: 20 test cases
 """
+
 import os
 import sys
 import types
@@ -21,8 +22,10 @@ from datetime import datetime, timezone
 _src_mod = types.ModuleType("src")
 _db_mod = types.ModuleType("src.db")
 
+
 async def _fake_get_db():
     yield None
+
 
 _db_mod.get_db = _fake_get_db
 sys.modules.setdefault("src", _src_mod)
@@ -33,8 +36,10 @@ _shared_ont = types.ModuleType("shared.ontology")
 _shared_ont_src = types.ModuleType("shared.ontology.src")
 _shared_db = types.ModuleType("shared.ontology.src.database")
 
+
 async def _fake_get_db_with_tenant(tenant_id: str):
     yield None
+
 
 _shared_db.get_db_with_tenant = _fake_get_db_with_tenant
 sys.modules.setdefault("shared", _shared)
@@ -43,24 +48,27 @@ sys.modules.setdefault("shared.ontology.src", _shared_ont_src)
 sys.modules.setdefault("shared.ontology.src.database", _shared_db)
 
 import logging
+
 _structlog = types.ModuleType("structlog")
 _structlog.get_logger = lambda *a, **kw: logging.getLogger("test")
 sys.modules.setdefault("structlog", _structlog)
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
-from unittest.mock import AsyncMock, MagicMock, patch
-
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Shared helpers: fake OperationPlan dataclass-like object
 # ─────────────────────────────────────────────────────────────────────────────
 
-def _make_fake_plan(plan_id="plan-001", tenant_id="t1", status="pending_confirm",
-                    confirmed_by=None, confirmed_at=None, executed_at=None):
+
+def _make_fake_plan(
+    plan_id="plan-001", tenant_id="t1", status="pending_confirm", confirmed_by=None, confirmed_at=None, executed_at=None
+):
     """Build a minimal fake plan object that _plan_to_out() can consume."""
     impact = MagicMock()
     impact.affected_stores = 3
@@ -92,8 +100,10 @@ def _make_fake_plan(plan_id="plan-001", tenant_id="t1", status="pending_confirm"
 # App fixture: operation_plan_routes
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def _build_op_plan_app():
     from api.operation_plan_routes import router
+
     app = FastAPI()
     app.include_router(router)
     return app
@@ -110,6 +120,7 @@ def op_plan_client():
 # POST /api/v1/operation-plans
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_submit_operation_no_plan_needed(op_plan_client):
     """When planner.submit returns None, needs_plan=False."""
@@ -120,8 +131,7 @@ async def test_submit_operation_no_plan_needed(op_plan_client):
         async with op_plan_client as c:
             resp = await c.post(
                 "/api/v1/operation-plans",
-                json={"operation_type": "menu.price.single_update",
-                      "params": {}, "operator_id": "op-001"},
+                json={"operation_type": "menu.price.single_update", "params": {}, "operator_id": "op-001"},
                 headers={"X-Tenant-ID": "t1"},
             )
     assert resp.status_code == 200
@@ -141,8 +151,11 @@ async def test_submit_operation_plan_triggered(op_plan_client):
         async with op_plan_client as c:
             resp = await c.post(
                 "/api/v1/operation-plans",
-                json={"operation_type": "menu.price.bulk_update",
-                      "params": {"delta_fen": 100}, "operator_id": "op-001"},
+                json={
+                    "operation_type": "menu.price.bulk_update",
+                    "params": {"delta_fen": 100},
+                    "operator_id": "op-001",
+                },
                 headers={"X-Tenant-ID": "t1"},
             )
     assert resp.status_code == 200
@@ -168,6 +181,7 @@ async def test_submit_operation_validates_required_fields(op_plan_client):
 # ─────────────────────────────────────────────────────────────────────────────
 # GET /api/v1/operation-plans/pending
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_list_pending_plans_empty(op_plan_client):
@@ -204,6 +218,7 @@ async def test_list_pending_plans_with_results(op_plan_client):
 # ─────────────────────────────────────────────────────────────────────────────
 # GET /api/v1/operation-plans/{plan_id}
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_get_plan_not_found(op_plan_client):
@@ -249,6 +264,7 @@ async def test_get_plan_happy_path(op_plan_client):
 # ─────────────────────────────────────────────────────────────────────────────
 # POST /api/v1/operation-plans/{plan_id}/confirm
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_confirm_plan_success(op_plan_client):
@@ -313,6 +329,7 @@ async def test_confirm_plan_not_found(op_plan_client):
 # POST /api/v1/operation-plans/{plan_id}/cancel
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_cancel_plan_success(op_plan_client):
     """Happy path: plan cancelled successfully."""
@@ -360,8 +377,10 @@ async def test_cancel_plan_already_executed(op_plan_client):
 # App fixture: inventory_routes
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def _build_inventory_app():
     from api.inventory_routes import router
+
     app = FastAPI()
     app.include_router(router)
     return app
@@ -377,6 +396,7 @@ def inventory_client():
 # ─────────────────────────────────────────────────────────────────────────────
 # GET /api/v1/inventory/dashboard
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_inventory_dashboard_happy_path(inventory_client):
@@ -416,6 +436,7 @@ async def test_inventory_dashboard_happy_path(inventory_client):
 async def test_inventory_dashboard_with_low_items(inventory_client):
     """Low stock items are serialized correctly."""
     from datetime import date
+
     summary_row = MagicMock()
     summary_row.out_of_stock = 1
     summary_row.critical = 0
@@ -481,6 +502,7 @@ async def test_inventory_dashboard_db_error_graceful(inventory_client):
 # POST /api/v1/inventory/restock-plan
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_generate_restock_plan_happy_path(inventory_client):
     """Happy path: restock plan generated via MasterAgent dispatch."""
@@ -500,9 +522,11 @@ async def test_generate_restock_plan_happy_path(inventory_client):
     mock_master.dispatch = AsyncMock(side_effect=[alert_result, severity_result])
     mock_master.register = MagicMock()
 
-    with patch("api.inventory_routes.MasterAgent", return_value=mock_master), \
-         patch("api.inventory_routes.ALL_SKILL_AGENTS", []), \
-         patch("api.inventory_routes.ModelRouter", side_effect=ValueError("no key")):
+    with (
+        patch("api.inventory_routes.MasterAgent", return_value=mock_master),
+        patch("api.inventory_routes.ALL_SKILL_AGENTS", []),
+        patch("api.inventory_routes.ModelRouter", side_effect=ValueError("no key")),
+    ):
         async with inventory_client as c:
             resp = await c.post(
                 "/api/v1/inventory/restock-plan?store_id=s1",
@@ -522,9 +546,11 @@ async def test_generate_restock_plan_agent_error(inventory_client):
     mock_master.dispatch = AsyncMock(side_effect=RuntimeError("agent crashed"))
     mock_master.register = MagicMock()
 
-    with patch("api.inventory_routes.MasterAgent", return_value=mock_master), \
-         patch("api.inventory_routes.ALL_SKILL_AGENTS", []), \
-         patch("api.inventory_routes.ModelRouter", side_effect=ValueError("no key")):
+    with (
+        patch("api.inventory_routes.MasterAgent", return_value=mock_master),
+        patch("api.inventory_routes.ALL_SKILL_AGENTS", []),
+        patch("api.inventory_routes.ModelRouter", side_effect=ValueError("no key")),
+    ):
         async with inventory_client as c:
             resp = await c.post(
                 "/api/v1/inventory/restock-plan?store_id=s1",
@@ -539,6 +565,7 @@ async def test_generate_restock_plan_agent_error(inventory_client):
 # ─────────────────────────────────────────────────────────────────────────────
 # GET /api/v1/inventory/restock-plan
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_get_latest_restock_plan_found(inventory_client):

@@ -6,6 +6,7 @@
 3. 食安合规硬约束：效期≤3天的食材强制标红
 4. 调用Claude Haiku生成采购建议和预算估算
 """
+
 from __future__ import annotations
 
 import json
@@ -147,14 +148,9 @@ class InventorySentinelAgent:
             totals[name] += record.get("consumed_qty", 0)
             dates[name].add(record.get("date", ""))
 
-        return {
-            name: totals[name] / max(len(dates[name]), 1)
-            for name in totals
-        }
+        return {name: totals[name] / max(len(dates[name]), 1) for name in totals}
 
-    def _identify_risks(
-        self, inventory: list[dict], consumption_rates: dict[str, float]
-    ) -> list[dict]:
+    def _identify_risks(self, inventory: list[dict], consumption_rates: dict[str, float]) -> list[dict]:
         """识别风险食材列表（high/medium级别）。"""
         risk_items: list[dict] = []
         today = date.today()
@@ -197,17 +193,19 @@ class InventorySentinelAgent:
                 suggested_qty = round(rate * REORDER_DAYS, 1) if rate > 0 else 0
                 unit_cost_fen = item.get("unit_cost_fen", 0)
 
-                risk_items.append({
-                    "ingredient_name": name,
-                    "current_stock": current_qty,
-                    "unit": item.get("unit", ""),
-                    "daily_consumption": round(rate, 2),
-                    "days_remaining": round(days_remaining, 1),
-                    "risk_level": risk_level,
-                    "expiry_warning": expiry_warning,
-                    "suggested_order_qty": suggested_qty,
-                    "unit_cost_fen": unit_cost_fen,
-                })
+                risk_items.append(
+                    {
+                        "ingredient_name": name,
+                        "current_stock": current_qty,
+                        "unit": item.get("unit", ""),
+                        "daily_consumption": round(rate, 2),
+                        "days_remaining": round(days_remaining, 1),
+                        "risk_level": risk_level,
+                        "expiry_warning": expiry_warning,
+                        "suggested_order_qty": suggested_qty,
+                        "unit_cost_fen": unit_cost_fen,
+                    }
+                )
 
         # 按风险等级排序：high优先
         risk_items.sort(key=lambda x: (0 if x["risk_level"] == "high" else 1, x["days_remaining"]))
@@ -219,10 +217,7 @@ class InventorySentinelAgent:
         expiry_items = [r for r in risk_items if r.get("expiry_warning")]
 
         # 计算预估采购金额
-        rough_budget_fen = sum(
-            r.get("suggested_order_qty", 0) * r.get("unit_cost_fen", 0)
-            for r in risk_items
-        )
+        rough_budget_fen = sum(r.get("suggested_order_qty", 0) * r.get("unit_cost_fen", 0) for r in risk_items)
 
         items_lines = []
         for r in risk_items:
@@ -245,7 +240,7 @@ class InventorySentinelAgent:
 风险食材明细：
 {chr(10).join(items_lines)}
 
-预估总采购金额：约{rough_budget_fen/100:.0f}元
+预估总采购金额：约{rough_budget_fen / 100:.0f}元
 
 请根据以上数据生成采购建议，重点关注高风险和临期食材。"""
 
@@ -266,10 +261,7 @@ class InventorySentinelAgent:
         # 兜底：返回自动计算的结果，不含Claude建议
         high_count = sum(1 for r in risk_items if r["risk_level"] == "high")
         expiry_count = sum(1 for r in risk_items if r.get("expiry_warning"))
-        rough_budget = sum(
-            r.get("suggested_order_qty", 0) * r.get("unit_cost_fen", 0)
-            for r in risk_items
-        )
+        rough_budget = sum(r.get("suggested_order_qty", 0) * r.get("unit_cost_fen", 0) for r in risk_items)
 
         summary_parts = []
         if high_count:
@@ -286,7 +278,6 @@ class InventorySentinelAgent:
             "total_purchase_budget_estimate_fen": int(rough_budget),
         }
 
-
     async def analyze_from_mv(self, tenant_id: str, store_id: str | None = None) -> dict:
         """从 mv_inventory_bom 快速读取 BOM 损耗数据，<5ms，无 Claude 调用。
 
@@ -295,6 +286,7 @@ class InventorySentinelAgent:
         """
         from sqlalchemy import text
         from sqlalchemy.exc import SQLAlchemyError
+
         from shared.ontology.src.database import get_db
 
         try:
