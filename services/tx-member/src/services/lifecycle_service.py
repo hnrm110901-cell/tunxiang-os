@@ -1,5 +1,28 @@
 """会员生命周期自动化服务
 
+================================================================
+DEPRECATED: 此模块已被 customer_lifecycle_fsm.py（v264 迁移）取代
+================================================================
+
+背景：
+- 老版（本文件）阈值：new=7 / active=30 / dormant=90 天
+- 新版 FSM：no_order / active(≤60) / dormant(≤180) / churned；事件溯源
+- 并行存在会导致同一客户在两套系统被打不同标签 → Agent 取哪一个？
+
+计划（独立审查报告 P0-3）：
+- 当前阶段：**不删除**，保留现存调用（lifecycle_router.py / lifecycle_routes.py
+  / test_lifecycle.py），避免在线业务中断。
+- Sprint R3 前：完成所有调用方迁移到 customer_lifecycle_fsm.CustomerLifecycleFSM
+- 2026-Q3：此文件计划删除。DEVLOG.md 需同步记录淘汰节点。
+- 本文件**禁止新增调用点**。如果你在 review 中看到新代码 import 本模块，
+  请 reject 并引导至 `services.customer_lifecycle_fsm`。
+
+参考：
+- docs/sprint-r1-independent-review.md P0-3
+- services/tx-member/src/services/customer_lifecycle_fsm.py
+
+----
+
 四阶段生命周期：new → active → dormant → churned（可回流 reactivated）
 
 设计原则：

@@ -643,3 +643,174 @@ def test_repo_row_to_record_mapping():
     assert rec.previous_state == CustomerLifecycleState.NO_ORDER
     assert rec.transition_count == 1
     assert rec.last_transition_event_id == trig
+
+
+# ═════════════════════════════════════════════════════════════════════
+# P0-1 新增测试（补缺口）：
+# - test_order_cancelled_triggers_state_rollback_if_no_other_paid_orders
+# - test_order_cancelled_keeps_active_if_other_paid_orders_exist
+# - test_order_refunded_same_as_cancelled
+# - test_projector_skips_events_older_than_current_state（occurred_at 单调性）
+# ═════════════════════════════════════════════════════════════════════
+
+
+@pytest.mark.asyncio
+async def test_order_cancelled_triggers_state_rollback_if_no_other_paid_orders():
+    """客户单笔消费后状态迁到 active，随即整单取消且 60 天窗口内无其他已付订单
+    → 生命周期回退到 no_order 并发 STATE_CHANGED 事件。"""
+    _EMIT_EVENT_MOCK.reset_mock()
+    tid = _uid()
+    cid = _uid()
+    repo = _FakeRepo(tid)
+    # 现状：当前是 active，该记录由 order.paid 事件写入
+    paid_event_id = _uid()
+    repo._rows[cid] = _record(
+        tid,
+        cid,
+        CustomerLifecycleState.ACTIVE,
+        previous=None,
+        count=1,
+        trigger=paid_event_id,
+    )
+
+    fsm = _TestFSM(tid, repo)
+    now = datetime.now(timezone.utc)
+    cancel_event_id = _uid()
+
+    result = await fsm.handle_order_reversal(
+        customer_id=cid,
+        trigger_event_id=cancel_event_id,
+        now=now,
+        previous_paid_order_at=None,  # 无其他已付订单
+        remaining_order_count=0,
+        reversal_type="order_cancelled",
+    )
+
+    assert result is not None
+    # order_count=0 + last_order_at=None → evaluate 回到 NO_ORDER
+    assert result.state == CustomerLifecycleState.NO_ORDER
+    assert result.previous_state == CustomerLifecycleState.ACTIVE
+    # 发 1 条 STATE_CHANGED
+    assert _EMIT_EVENT_MOCK.call_count == 1
+    call = _EMIT_EVENT_MOCK.call_args.kwargs
+    assert call["payload"]["previous_state"] == "active"
+    assert call["payload"]["next_state"] == "no_order"
+    assert call["payload"]["reason"] == "order_cancelled"
+    assert call["payload"]["trigger_event_id"] == str(cancel_event_id)
+
+
+@pytest.mark.asyncio
+async def test_order_cancelled_keeps_active_if_other_paid_orders_exist():
+    """客户近 30 天有另一单合法消费，此刻取消最新一单 → 状态保持 active 不变。"""
+    _EMIT_EVENT_MOCK.reset_mock()
+    tid = _uid()
+    cid = _uid()
+    repo = _FakeRepo(tid)
+    paid_event_id = _uid()
+    repo._rows[cid] = _record(
+        tid,
+        cid,
+        CustomerLifecycleState.ACTIVE,
+        previous=CustomerLifecycleState.NO_ORDER,
+        count=2,
+        trigger=paid_event_id,
+    )
+
+    fsm = _TestFSM(tid, repo)
+    now = datetime.now(timezone.utc)
+    cancel_event_id = _uid()
+
+    # 该客户 30 天前还有一单已付订单
+    other_paid_at = now - timedelta(days=30)
+
+    result = await fsm.handle_order_reversal(
+        customer_id=cid,
+        trigger_event_id=cancel_event_id,
+        now=now,
+        previous_paid_order_at=other_paid_at,
+        remaining_order_count=1,
+        reversal_type="order_cancelled",
+    )
+
+    # 状态仍是 active（因 30 天 < 60 天阈值）
+    assert result is not None
+    assert result.state == CustomerLifecycleState.ACTIVE
+    # 不发 STATE_CHANGED
+    assert _EMIT_EVENT_MOCK.call_count == 0
+    # last_transition_event_id 应已被 touch 以保留审计链
+    assert result.last_transition_event_id == cancel_event_id
+
+
+@pytest.mark.asyncio
+async def test_order_refunded_same_as_cancelled():
+    """退款事件走与取消相同的回退逻辑（reversal_type 差异仅在 reason 字段）。"""
+    _EMIT_EVENT_MOCK.reset_mock()
+    tid = _uid()
+    cid = _uid()
+    repo = _FakeRepo(tid)
+    paid_event_id = _uid()
+    repo._rows[cid] = _record(
+        tid,
+        cid,
+        CustomerLifecycleState.ACTIVE,
+        previous=None,
+        count=1,
+        trigger=paid_event_id,
+    )
+
+    fsm = _TestFSM(tid, repo)
+    now = datetime.now(timezone.utc)
+    refund_event_id = _uid()
+
+    result = await fsm.handle_order_reversal(
+        customer_id=cid,
+        trigger_event_id=refund_event_id,
+        now=now,
+        previous_paid_order_at=None,
+        remaining_order_count=0,
+        reversal_type="order_refunded",
+    )
+
+    assert result is not None
+    assert result.state == CustomerLifecycleState.NO_ORDER
+    assert result.previous_state == CustomerLifecycleState.ACTIVE
+    assert _EMIT_EVENT_MOCK.call_count == 1
+    call = _EMIT_EVENT_MOCK.call_args.kwargs
+    assert call["payload"]["reason"] == "order_refunded"
+
+
+@pytest.mark.asyncio
+async def test_projector_skips_events_older_than_current_state():
+    """P1-4 单调性：projector.handle 收到 occurred_at 早于已有状态 since_ts 的
+    事件，应直接早退，不触发任何 FSM 写入或事件发射。
+
+    策略：monkey-patch projector._is_event_older_than_current_state 返回 True，
+    模拟"DB 检查发现事件过老"，确认 handle 早退。
+    """
+    from services.customer_lifecycle_projector import CustomerLifecycleProjector
+
+    _EMIT_EVENT_MOCK.reset_mock()
+    tid = _uid()
+    cid = _uid()
+
+    projector = CustomerLifecycleProjector(tenant_id=tid)
+
+    # monkey-patch 单调性预检直接返回 True（事件过老）
+    async def _always_older(*, customer_id, occurred_at):
+        return True
+
+    projector._is_event_older_than_current_state = _always_older  # type: ignore[assignment]
+
+    old_occurred_at = datetime.now(timezone.utc) - timedelta(days=365)
+    event = {
+        "event_id": str(_uid()),
+        "event_type": "order.paid",
+        "occurred_at": old_occurred_at.isoformat(),
+        "payload": {"customer_id": str(cid), "order_count": 5},
+    }
+
+    # conn 参数无用（FSM 不复用 asyncpg conn），传 None
+    await projector.handle(event, conn=None)
+
+    # 单调性过滤生效：没触发任何事件发射
+    assert _EMIT_EVENT_MOCK.call_count == 0
