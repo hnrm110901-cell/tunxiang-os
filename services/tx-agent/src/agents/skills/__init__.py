@@ -59,6 +59,9 @@ from .reservation_concierge import ReservationConciergeAgent
 from .review_insight import ReviewInsightAgent
 from .review_summary import ReviewSummaryAgent
 from .salary_advisor import SalaryAdvisorAgent
+
+# Sprint R2 Track B：销售经理教练（P1 / 云端 / 豁免）
+from .sales_coach import SalesCoachAgent
 from .seasonal_campaign import SeasonalCampaignAgent
 from .serve_dispatch import ServeDispatchAgent
 from .smart_customer_service import SmartCustomerServiceAgent
@@ -156,6 +159,8 @@ ALL_SKILL_AGENTS = [
     CashierAuditAgent,
     # Sprint R2 Track A：AI 预订礼宾员（P0 Agent，margin + experience）
     ReservationConciergeAgent,
+    # Sprint R2 Track B：销售经理教练（豁免类 P1 Agent）
+    SalesCoachAgent,
 ]
 
 
