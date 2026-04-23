@@ -61,6 +61,8 @@ class ModelRouter:
         "supplier_insight": TaskComplexity.MODERATE,
         "hr_report_generation": TaskComplexity.MODERATE,
         "cypher_generation": TaskComplexity.MODERATE,
+        # Sprint D3c：菜品动态定价分析 + 毛利底线校验（Core ML 给弹性，Sonnet 给判断）
+        "dish_dynamic_pricing": TaskComplexity.MODERATE,
         # 复杂任务
         "root_cause_analysis": TaskComplexity.COMPLEX,
         "decision_recommendation": TaskComplexity.COMPLEX,

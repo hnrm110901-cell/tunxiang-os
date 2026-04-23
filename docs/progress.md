@@ -4,6 +4,64 @@
 
 ---
 
+## 2026-04-23 Sprint D3c：菜品动态定价 Core ML + Sonnet（目标毛利 +2pp）
+
+### 本次会话目标
+按 sprint-plan-2026Q2-unified.md D3c：log-log 弹性回归 + 约束优化求最优价格，Sonnet 校验品牌风险，店长审批，7-14 天回测。硬约束：毛利底线 15% + 调价幅度 ±15%。
+
+Tier 级别：Tier 2（改 dishes.price_fen 会影响收银，但通过 status='applied' 状态位由独立 worker 执行，本 PR 只做规划 + 审批状态机）。
+
+### 完成状态
+- [x] ModelRouter 注册 dish_dynamic_pricing → MODERATE → sonnet-4-6
+- [x] v278 迁移：dish_pricing_suggestions 表 + 6 态 status（plan→human_confirmed→applied/reverted/rejected/expired）+ RLS + 3 索引 + CHECK 约束
+- [x] DishDynamicPricingService 完整：
+  - estimate_elasticity_log_log：log(Q)=α+ε log(P) 最小二乘，R² 作 confidence，clamp ε ∈ [-5, 2]
+  - solve_optimal_price：P* = C·ε/(ε+1)，约束到 margin_floor + ±max_change_pct 可行域
+  - expected_qty_delta：Q_new/Q_old = (P_new/P_old)^ε
+  - 三级降级：log_log (≥14 点) → prior (ε=-1.0) → insufficient
+  - ε ≥ 0 不动价（防噪声带偏）
+  - ε ∈ [-1, 0) 涨到上限（低弹性菜）
+  - 当前价低于 margin_floor → 强制涨到 min_price
+- [x] Sonnet 校验分三档（low/medium/high），fallback 规则按 change_pct + elasticity 置信 + suggested_margin_rate 决定
+- [x] 5 端点：/suggest + /confirm/{id} + /apply/{id} + /reject/{id} + /revert/{id} + /summary
+- [x] 23 TDD 测试全绿：弹性 3 + 最优价格 5 + qty_delta 4 + suggest_pricing 3 + Sonnet 3 + parse 1 + 迁移 4 + router 1
+
+### 关键决策
+- **Core ML 不直接做弹性**：数据量小 + 可解释性重要，log-log 本地算；Core ML 保留给客流修正 demand（后续 PR）
+- **ε 理论最优 vs 约束**：P* = C·ε/(ε+1) 只在 ε<-1 时有解；ε∈[-1, 0) 涨到 max_change 上限
+- **clamp ε ∈ [-5, 2]**：防止噪声异常值把价格推离谱
+- **店长强审批**：plan → human_confirmed → applied 状态机，无自动落价（保护现金链路）
+- **worker 异步落价**：applied 状态切换后由独立 worker 更新 dishes.price_fen，保持端点事务边界清晰
+- **risk_level 3 档**：low 可快速批 / medium 默认值 / high 必须二审
+- **Sonnet 响应 risk_level 解析鲁棒**：大小写/空格/位置都不敏感，未匹配默认 low
+
+### 交付清单
+```
+新增：
+  shared/db-migrations/versions/v278_dish_pricing_suggestions.py        130 行
+  services/tx-menu/src/services/dish_dynamic_pricing_service.py         465 行
+  services/tx-menu/src/api/dish_pricing_routes.py                       330 行（5 端点）
+  services/tx-menu/src/tests/test_d3c_dish_pricing.py                   410 行（23 tests）
+
+修改：
+  services/tunxiang-api/src/shared/core/model_router.py  +2 行
+```
+
+### 下一步
+1. **D4a 成本根因**（Sonnet 4.7 + Prompt Cache）
+2. **D4b 薪资异常** / **D4c 预算预测**
+3. **dish_pricing_apply_worker**（独立 PR）消费 status='applied' 更新 dishes.price_fen
+4. **dish_pricing_backtest_worker**（独立 PR）7-14 天回填 actual_qty_delta + actual_margin_delta
+5. Core ML /predict/price-elasticity 端点（Swift 工作）
+
+### 已知风险
+- 弹性估算基于相对稀疏数据（小店 14 天难凑），初期 insufficient 多 → high risk
+- 最优价格公式假设弹性为常数，实际价格跳变大时弹性非线性
+- 调价幅度 ±15% 对高弹性菜可能太保守，错失利润空间
+- Sonnet 未接时 fallback 规则可能偏严（都是 medium/high）
+
+---
+
 ## 2026-04-18 20:05 Sprint D1 批次 2 / PR H：出餐体验 7 Skill scope 声明 + 2 Skill 填 context
 
 ### 本次会话目标

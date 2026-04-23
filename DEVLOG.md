@@ -1,3 +1,31 @@
+## 2026-04-23 Sprint D3c — 菜品动态定价 Core ML + Sonnet（目标毛利 +2pp）
+
+### 今日完成
+- [model_router.py] dish_dynamic_pricing → MODERATE → sonnet-4-6
+- [v278_dish_pricing_suggestions.py] 6 态 status 机 + RLS + 3 索引 + CHECK 约束
+- [dish_dynamic_pricing_service.py] log-log 弹性回归 + 最优价格求解 + 硬约束校验 + Sonnet 语义分级
+- [dish_pricing_routes.py] 5 端点：/suggest /confirm/{id} /apply/{id} /reject/{id} /revert/{id} /summary
+- [test_d3c_dish_pricing.py] 23 TDD 测试全绿
+
+### 数据变化
+- 迁移：v277 → v278_dish_pricing
+- 新增文件：4，修改：1
+- 新增测试：23（全绿）
+- ruff：全绿
+
+### 遗留问题
+- 弹性估算数据稀疏时 insufficient → fallback prior
+- 最优价格公式假设弹性为常数
+- 调价幅度 ±15% 可能过保守
+- Core ML /predict/price-elasticity 端点（Swift 工作）未建
+- apply/backtest worker 未建
+
+### 明日计划
+- D4a 成本根因（Sonnet 4.7 + Prompt Cache）
+- D4b 薪资异常 / D4c 预算预测
+
+---
+
 ## 2026-04-18 Sprint D1 批次 2 — 出餐体验 7 Skill + 2 Skill 填 context（PR H）
 
 ### 今日完成
