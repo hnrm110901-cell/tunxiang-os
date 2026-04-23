@@ -85,6 +85,7 @@ from api.staffing_template_routes import router as staffing_template_router
 from api.store_clone_routes import router as store_clone_router
 from api.store_ops_routes import router as store_ops_router
 from api.store_readiness_routes import router as store_readiness_router
+from api.task_routes import router as task_router  # Sprint R1 Track B: 统一任务引擎（v265）
 from api.tax_filing_routes import router as tax_filing_router
 from api.tenant_systems_routes import router as tenant_systems_router
 from api.transfer_routes import router as transfer_db_router
@@ -240,6 +241,7 @@ app.include_router(attendance_compliance_router)  # 考勤深度合规审计（v
 from api.franchise_fee_routes import router as franchise_fee_router
 
 app.include_router(franchise_fee_router)  # 加盟收费闭环（天财对标）账单/收款/出账规则/报表
+app.include_router(task_router)  # 统一任务引擎（Sprint R1 Track B，v265表）10 类任务派单/完成/升级
 
 
 @app.get("/health")
