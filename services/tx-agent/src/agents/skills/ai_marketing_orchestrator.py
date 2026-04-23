@@ -98,6 +98,9 @@ class AiMarketingOrchestratorAgent(SkillAgent):
     run_location = "cloud"
     agent_level = 2  # auto + rollback
 
+    # Sprint D1 / PR Overflow：营销触达发券/折扣直接冲击毛利底线
+    constraint_scope = {"margin"}
+
     def get_supported_actions(self) -> list[str]:
         return [
             "execute_post_order_touch",

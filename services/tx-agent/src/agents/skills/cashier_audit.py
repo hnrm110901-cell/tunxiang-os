@@ -33,6 +33,10 @@ class CashierAuditAgent(SkillAgent):
     priority = "P0"
     run_location = "edge+cloud"
 
+    # Sprint D1 / PR Overflow：折扣异常/挂账超额检测直接关联毛利底线
+    # （设计稿 §附录B "cashier_audit 状态复核" 决策点已被覆盖：P0 实装级别接入 margin）
+    constraint_scope = {"margin"}
+
     def get_supported_actions(self) -> list[str]:
         return [
             "audit_transaction",

@@ -28,6 +28,13 @@ class CompetitorWatchAgent(SkillAgent):
     priority = "P1"
     run_location = "cloud"
 
+    # Sprint D1 / PR Overflow：纯竞对扫描与威胁预警，不触发业务决策，豁免
+    constraint_scope = set()
+    constraint_waived_reason = (
+        "竞对动态监测纯数据扫描与威胁预警报告，输出供市场团队决策参考，"
+        "不直接操作毛利/食安/客户体验三条业务约束维度"
+    )
+
     def get_supported_actions(self) -> list[str]:
         return [
             "scan_competitor_updates",

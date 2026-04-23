@@ -44,6 +44,9 @@ class MemberInsightAgent(SkillAgent):
     priority = "P1"
     run_location = "cloud"
 
+    # Sprint D1 / PR Overflow：RFM 触达决策（发券/召回）直接冲击毛利
+    constraint_scope = {"margin"}
+
     def get_supported_actions(self) -> list[str]:
         return [
             "analyze_rfm",

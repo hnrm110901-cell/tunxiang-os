@@ -51,6 +51,9 @@ class DormantRecallAgent(SkillAgent):
     priority = "P0"
     run_location = "cloud"
 
+    # Sprint D1 / PR Overflow：召回策略发券/折扣直接冲击毛利
+    constraint_scope = {"margin"}
+
     def get_supported_actions(self) -> list[str]:
         return [
             "detect_dormant_users",
