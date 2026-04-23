@@ -264,6 +264,11 @@ DOMAIN_STREAM_MAP: dict[str, str] = {
     "knowledge": "tx_knowledge_events",
     # 旧系统适配器域（Sprint F1 / PR F，14 个 POS / 外卖 / 物流 / 财税适配器统一入口）
     "adapter": "tx_adapter_events",
+    # 预订业务 Sprint R1 新增域
+    "customer": "tx_customer_lifecycle_events",
+    "task": "tx_task_events",
+    "sales_target": "tx_sales_target_events",
+    "banquet": "tx_banquet_lead_events",
     # 兼容旧域
     "trade": "trade_events",
     "supply": "supply_events",
@@ -302,6 +307,11 @@ DOMAIN_STREAM_TYPE_MAP: dict[str, str] = {
     "knowledge": "knowledge",
     # 旧系统适配器域（Sprint F1 / PR F）
     "adapter": "adapter",
+    # 预订业务 Sprint R1 新增域
+    "customer": "customer_lifecycle",
+    "task": "task",
+    "sales_target": "sales_target",
+    "banquet": "banquet_lead",
 }
 
 # ──────────────────────────────────────────────────────────────────────
@@ -438,6 +448,64 @@ class GrowthEventType(str, Enum):
     STORE_READINESS_EVALUATED = "growth.store_readiness_evaluated"
 
 
+# ──────────────────────────────────────────────────────────────────────
+# 预订业务 Sprint R1 新增域（reservation-roadmap-2026-q2.md §6）
+# ──────────────────────────────────────────────────────────────────────
+
+
+class CustomerLifecycleEventType(str, Enum):
+    """客户生命周期状态机事件 — 四象限跃迁（R1 新增）
+
+    对应 customer_lifecycle_state 表状态流转：
+        无订单(no_order) → 活跃(active) → 沉睡(dormant) → 流失(churned)
+        逆向：沉睡/流失 → 活跃（唤醒/召回）
+
+    每次状态迁移写入本事件，由 CustomerLifecycleProjector 消费生成
+    mv_customer_lifecycle 物化视图，支撑销售教练 Agent 的 4 象限分析。
+    """
+
+    STATE_CHANGED = "customer.state_changed"  # 四象限跃迁：无订单/活跃/沉睡/流失
+
+
+class TaskEventType(str, Enum):
+    """任务引擎事件 — 10 类销售/服务任务统一事件流（R1 新增）
+
+    对应 tasks 表，10 类任务：
+      lead_follow_up / banquet_stage / dining_followup / birthday /
+      anniversary / dormant_recall / new_customer / confirm_arrival /
+      adhoc / banquet_followup
+
+    销售教练 Agent 按本事件流追踪每日派单/完成率/逾期升级。
+    """
+
+    DISPATCHED = "task.dispatched"  # 任务派发（assignee_employee_id 已分配）
+    COMPLETED = "task.completed"  # 任务完成（completed_at 已写入）
+    ESCALATED = "task.escalated"  # 任务升级（to store_manager / area_manager）
+
+
+class SalesTargetEventType(str, Enum):
+    """销售目标事件 — 年/月/周/日目标与进度追踪（R1 新增）
+
+    对应 sales_targets 表（目标设定）和 sales_progress 表（进度快照）。
+    销售教练 Agent 按本事件流触发 decompose_target / diagnose_gap。
+    """
+
+    SET = "sales_target.set"  # 目标设定（新增/修改）
+    PROGRESS_UPDATED = "sales_target.progress_updated"  # 进度快照更新
+
+
+class BanquetLeadEventType(str, Enum):
+    """宴会商机漏斗事件 — 全部商机 → 商机 → 订单 → 失效（R1 新增）
+
+    对应 banquet_leads 表，四阶段漏斗：all/opportunity/order/invalid
+    banquet_growth Agent 的 lead_funnel_analytics action 消费本事件流。
+    """
+
+    CREATED = "banquet.lead_created"  # 商机创建
+    STAGE_CHANGED = "banquet.lead_stage_changed"  # 阶段变更
+    CONVERTED = "banquet.lead_converted"  # 商机转正式订单
+
+
 def resolve_stream_key(event_type: str) -> str:
     """根据事件类型字符串解析目标 Redis Stream key。
 
@@ -488,4 +556,59 @@ ALL_EVENT_ENUMS = (
     MenuEventType,
     # 旧系统适配器域（Sprint F1 / PR F）
     AdapterEventType,
+    # 预订业务 Sprint R1 新增域（reservation-roadmap-2026-q2.md §6）
+    CustomerLifecycleEventType,
+    TaskEventType,
+    SalesTargetEventType,
+    BanquetLeadEventType,
 )
+
+
+# ──────────────────────────────────────────────────────────────────────
+# 公共导出
+# ──────────────────────────────────────────────────────────────────────
+
+__all__ = [
+    # 核心业务域
+    "OrderEventType",
+    "DiscountEventType",
+    "PaymentEventType",
+    "MemberEventType",
+    "InventoryEventType",
+    "ChannelEventType",
+    "ReservationEventType",
+    "SettlementEventType",
+    # 新增模块
+    "SafetyEventType",
+    "EnergyEventType",
+    "ReviewEventType",
+    "OpinionEventType",
+    "RecipeEventType",
+    # 系统域
+    "TableEventType",
+    "KdsEventType",
+    "AgentEventType",
+    # 财务应收管理域
+    "DepositEventType",
+    "WineStorageEventType",
+    "CreditEventType",
+    # 食安巡检 / 营销活动 / 知识库
+    "SafetyInspectionEventType",
+    "CampaignEventType",
+    "KnowledgeEventType",
+    # 增长中枢 / 菜谱方案 / 适配器
+    "GrowthEventType",
+    "MenuEventType",
+    "AdapterEventType",
+    # 预订业务 Sprint R1 新增
+    "CustomerLifecycleEventType",
+    "TaskEventType",
+    "SalesTargetEventType",
+    "BanquetLeadEventType",
+    # 全局查找表与工具
+    "DOMAIN_STREAM_MAP",
+    "DOMAIN_STREAM_TYPE_MAP",
+    "ALL_EVENT_ENUMS",
+    "resolve_stream_key",
+    "resolve_stream_type",
+]
