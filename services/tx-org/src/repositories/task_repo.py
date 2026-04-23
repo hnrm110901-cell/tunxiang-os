@@ -58,7 +58,18 @@ class TaskQuery:
 
 
 class TaskRepository(Protocol):
-    async def create(self, task: Task) -> Task: ...
+    async def create(self, task: Task) -> Task:
+        """写入任务。命中幂等键时返回既有 Task（task_id 与入参不同）。
+
+        独立验证 P1-1 修复（2026-04-23）：create 必须内建幂等，
+        不再依赖上层 asyncio.Lock。两种实现：
+          - PG：``INSERT ... ON CONFLICT (tenant_id, task_type, assignee,
+            COALESCE(customer_id, ZERO), DATE(due_at)) WHERE status IN
+            ('pending','completed','escalated') DO NOTHING RETURNING``；
+            未命中 RETURNING 时再 SELECT 既有行。
+          - InMemory：写入前 find_by_idempotency_key，命中则返回。
+        """
+        ...
 
     async def get(self, task_id: UUID, tenant_id: UUID) -> Optional[Task]: ...
 
@@ -105,6 +116,16 @@ class InMemoryTaskRepository:
         return self._by_tenant.setdefault(tenant_id, {})
 
     async def create(self, task: Task) -> Task:
+        # 幂等：复用 find_by_idempotency_key 语义，与 PG ON CONFLICT 对齐
+        existing = await self.find_by_idempotency_key(
+            tenant_id=task.tenant_id,
+            task_type=task.task_type,
+            assignee_employee_id=task.assignee_employee_id,
+            customer_id=task.customer_id,
+            due_at=task.due_at,
+        )
+        if existing is not None:
+            return existing
         bucket = self._bucket(task.tenant_id)
         bucket[task.task_id] = task
         return task
@@ -158,8 +179,12 @@ class InMemoryTaskRepository:
         customer_id: Optional[UUID],
         due_at: datetime,
     ) -> Optional[Task]:
+        # 与 v270 部分索引一致：只在 pending/completed/escalated 上匹配，
+        # cancelled 的任务不参与幂等（允许重新派单）。
         day = due_at.astimezone(timezone.utc).date()
         for task in self._bucket(tenant_id).values():
+            if task.status == TaskStatus.CANCELLED:
+                continue
             if (
                 task.task_type == task_type
                 and task.assignee_employee_id == assignee_employee_id
@@ -175,6 +200,11 @@ class InMemoryTaskRepository:
 # ──────────────────────────────────────────────────────────────────────
 
 
+# 幂等 UUID 哨兵：与 v270 部分索引 ``COALESCE(customer_id, ZERO_UUID)`` 对齐。
+_IDEMPOTENCY_NULL_CUSTOMER_SENTINEL = "00000000-0000-0000-0000-000000000000"
+
+# INSERT 兼具主键冲突兜底（极低概率 UUID 重复）+ 幂等键兜底：
+# 命中 v270 唯一部分索引时返回零行，调用方再 SELECT 出既有任务。
 _INSERT_SQL = text(
     """
     INSERT INTO tasks (
@@ -186,7 +216,11 @@ _INSERT_SQL = text(
         :customer_id, :due_at, :status, :source_event_id, CAST(:payload AS JSONB),
         :dispatched_at, :created_at, :updated_at
     )
-    ON CONFLICT (task_id) DO NOTHING
+    ON CONFLICT DO NOTHING
+    RETURNING task_id, tenant_id, store_id, task_type, assignee_employee_id,
+              customer_id, due_at, status, escalated_to_employee_id, escalated_at,
+              cancel_reason, source_event_id, payload, dispatched_at, completed_at,
+              created_at, updated_at
     """
 )
 
@@ -212,9 +246,15 @@ class PgTaskRepository:
     session: AsyncSession
 
     async def create(self, task: Task) -> Task:
+        """原子派单（幂等）。
+
+        并发 2 个进程同时派同一任务时：DB 唯一索引（v270 部分索引）
+        只会让其中一个成功；另一进程 RETURNING 零行，落回 SELECT 找到
+        已存在行并返回。无需上层 asyncio.Lock。
+        """
         import json
 
-        await self.session.execute(
+        result = await self.session.execute(
             _INSERT_SQL,
             {
                 "task_id": str(task.task_id),
@@ -232,6 +272,21 @@ class PgTaskRepository:
                 "updated_at": task.updated_at,
             },
         )
+        row = result.mappings().first()
+        if row is not None:
+            return _row_to_task(row)
+
+        # RETURNING 零行 = 命中 v270 幂等唯一索引，落回既有 Task
+        existing = await self.find_by_idempotency_key(
+            tenant_id=task.tenant_id,
+            task_type=task.task_type,
+            assignee_employee_id=task.assignee_employee_id,
+            customer_id=task.customer_id,
+            due_at=task.due_at,
+        )
+        if existing is not None:
+            return existing
+        # 理论上不应走到这里（除非索引未建）；保留兜底，避免阻塞主业务。
         return task
 
     async def get(self, task_id: UUID, tenant_id: UUID) -> Optional[Task]:
@@ -329,6 +384,8 @@ class PgTaskRepository:
         customer_id: Optional[UUID],
         due_at: datetime,
     ) -> Optional[Task]:
+        # 与 v270 部分索引 ``WHERE status IN ('pending','completed','escalated')``
+        # 严格对齐；cancelled 任务不参与幂等，允许重新派单。
         sql = text(
             "SELECT task_id, tenant_id, store_id, task_type, assignee_employee_id, "
             "customer_id, due_at, status, escalated_to_employee_id, escalated_at, "
@@ -340,7 +397,8 @@ class PgTaskRepository:
             "  AND assignee_employee_id = :assignee "
             "  AND (customer_id IS NOT DISTINCT FROM :customer_id) "
             "  AND DATE(due_at AT TIME ZONE 'UTC') = DATE(:due_at AT TIME ZONE 'UTC') "
-            "ORDER BY dispatched_at ASC LIMIT 1"
+            "  AND status IN ('pending', 'completed', 'escalated') "
+            "ORDER BY created_at DESC LIMIT 1"
         )
         row = (
             await self.session.execute(

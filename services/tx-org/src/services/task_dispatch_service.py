@@ -20,10 +20,20 @@
 Tier 1 标准（CLAUDE.md §17）：
   - P99 延迟要求由 PG 迁移 + 合适索引保障；本服务不做额外网络 I/O
   - 租户隔离由仓库层 tenant_id 过滤 + v265 RLS 策略双保险
-  - 幂等派单由应用层去重 + DB 唯一索引（后续 v266 视情况补）共同兜底
+  - 幂等派单由 DB 唯一索引（v270）+ 内存仓库去重共同兜底
 
-工作线程安全：``_dispatch_locks`` 使用 ``asyncio.Lock`` 按 tenant 细粒度锁，
-避免同一租户高并发派单时幂等检查与写入之间的竞态。
+并发模型（独立验证 P1-1 修复，2026-04-23）：
+  早期版本使用 ``_locks: dict[tenant_id, asyncio.Lock]`` 按租户串行化
+  「幂等查询 + INSERT」两步。200 桌并发结账派 dining_followup 时，
+  该大锁把派单退化为单线程，P99 必然破门槛。
+
+  现方案：
+    - PG 生产路径：依赖 v270 唯一部分索引（tenant_id, task_type, assignee,
+      COALESCE(customer_id, ZERO_UUID), DATE(due_at)) WHERE status IN
+      ('pending','completed','escalated')，``INSERT ... ON CONFLICT DO NOTHING
+      RETURNING *``；冲突落空后 SELECT 出既有任务。
+    - 内存仓库路径：单事件循环内，``find_by_idempotency_key`` 与 ``create``
+      之间没有真正的并发写入，原子性已由 asyncio 合作调度保证。
 """
 
 from __future__ import annotations
@@ -94,16 +104,8 @@ class TaskDispatchService:
     """
 
     repo: TaskRepository = field(default_factory=InMemoryTaskRepository)
-    _locks: dict[UUID, asyncio.Lock] = field(default_factory=dict)
 
     # ── 内部工具 ────────────────────────────────────────────────────
-
-    def _lock_for(self, tenant_id: UUID) -> asyncio.Lock:
-        lock = self._locks.get(tenant_id)
-        if lock is None:
-            lock = asyncio.Lock()
-            self._locks[tenant_id] = lock
-        return lock
 
     def _utcnow(self) -> datetime:
         return datetime.now(timezone.utc)
@@ -140,47 +142,42 @@ class TaskDispatchService:
         Returns:
             新建或已存在的 Task 对象。
         """
-        async with self._lock_for(tenant_id):
-            existing = await self.repo.find_by_idempotency_key(
-                tenant_id=tenant_id,
-                task_type=task_type,
-                assignee_employee_id=assignee_employee_id,
-                customer_id=customer_id,
-                due_at=due_at,
+        # 幂等判定由仓库层兜底：
+        #   PG：v270 唯一部分索引 + INSERT ... ON CONFLICT DO NOTHING
+        #   内存：create 前 find_by_idempotency_key 仍然有效（单事件循环原子）
+        now = self._utcnow()
+        candidate = Task(
+            task_id=uuid4(),
+            tenant_id=tenant_id,
+            store_id=store_id,
+            task_type=task_type,
+            assignee_employee_id=assignee_employee_id,
+            customer_id=customer_id,
+            due_at=due_at,
+            status=TaskStatus.PENDING,
+            source_event_id=source_event_id,
+            payload=payload or {},
+            dispatched_at=now,
+            created_at=now,
+            updated_at=now,
+        )
+        persisted = await self.repo.create(candidate)
+        idempotent_hit = persisted.task_id != candidate.task_id
+        if idempotent_hit:
+            logger.info(
+                "task_dispatch_idempotent_hit",
+                task_id=str(persisted.task_id),
+                task_type=task_type.value,
+                tenant_id=str(tenant_id),
             )
-            if existing is not None:
-                logger.info(
-                    "task_dispatch_idempotent_hit",
-                    task_id=str(existing.task_id),
-                    task_type=task_type.value,
-                    tenant_id=str(tenant_id),
-                )
-                return existing
+            return persisted
 
-            now = self._utcnow()
-            task = Task(
-                task_id=uuid4(),
-                tenant_id=tenant_id,
-                store_id=store_id,
-                task_type=task_type,
-                assignee_employee_id=assignee_employee_id,
-                customer_id=customer_id,
-                due_at=due_at,
-                status=TaskStatus.PENDING,
-                source_event_id=source_event_id,
-                payload=payload or {},
-                dispatched_at=now,
-                created_at=now,
-                updated_at=now,
-            )
-            await self.repo.create(task)
-
-        # 事件旁路（锁外 create_task 不阻塞）
+        # 事件旁路（非阻塞 create_task）
         asyncio.create_task(
             emit_event(
                 event_type=TaskEventType.DISPATCHED,
                 tenant_id=tenant_id,
-                stream_id=str(task.task_id),
+                stream_id=str(persisted.task_id),
                 payload={
                     "task_type": task_type.value,
                     "assignee_employee_id": str(assignee_employee_id),
@@ -196,13 +193,13 @@ class TaskDispatchService:
         )
         logger.info(
             "task_dispatched",
-            task_id=str(task.task_id),
+            task_id=str(persisted.task_id),
             task_type=task_type.value,
             tenant_id=str(tenant_id),
             assignee=str(assignee_employee_id),
             due_at=due_at.isoformat(),
         )
-        return task
+        return persisted
 
     # ── 完成 ────────────────────────────────────────────────────────
 

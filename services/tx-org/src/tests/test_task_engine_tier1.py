@@ -476,6 +476,95 @@ async def test_list_tasks_filters(monkeypatch):
 
 
 # ──────────────────────────────────────────────────────────────────────
+# 11. 独立验证 P1-1：移除 asyncio.Lock 后 200 并发仍正确
+# ──────────────────────────────────────────────────────────────────────
+
+
+@pytest.mark.anyio
+async def test_200_concurrent_dispatch_no_asyncio_lock(monkeypatch):
+    """独立验证 P1-1：asyncio.Lock 移除后，200 并发派单依然：
+       - 不死锁
+       - 产出 200 个不同 task_id（每个都是新派的）
+       - 派单服务无 _locks / _lock_for 属性残留
+    """
+    service, emit_mock, repo = _make_service(monkeypatch)
+
+    # 行为级断言：lock 相关属性已被彻底移除
+    assert not hasattr(service, "_locks"), (
+        "independent review P1-1: asyncio.Lock 大锁必须删除"
+    )
+    assert not hasattr(service, "_lock_for"), (
+        "independent review P1-1: _lock_for 工具方法必须删除"
+    )
+
+    tenant_id = uuid4()
+    base_due = _utcnow() + timedelta(hours=1)
+
+    async def _one(i: int):
+        return await service.dispatch_task(
+            task_type=TaskType.DINING_FOLLOWUP,  # 模拟 200 桌结账后派回访
+            assignee_employee_id=uuid4(),  # 不同员工避免幂等去重
+            customer_id=uuid4(),
+            due_at=base_due + timedelta(seconds=i),
+            payload={"table_no": i},
+            tenant_id=tenant_id,
+        )
+
+    results = await asyncio.wait_for(
+        asyncio.gather(*[_one(i) for i in range(200)]),
+        timeout=10.0,
+    )
+    assert len(results) == 200
+    assert len({t.task_id for t in results}) == 200, (
+        "200 笔派单应产出 200 个不同 task_id，无重复"
+    )
+
+
+@pytest.mark.anyio
+async def test_idempotent_dispatch_uses_db_unique_not_lock(monkeypatch):
+    """独立验证 P1-1：模拟 2 个进程同时派同一任务，由仓库层兜底幂等，
+    不依赖 asyncio.Lock 也不发两次事件。
+
+    对应生产路径：PgTaskRepository 使用 v270 唯一部分索引 + ON CONFLICT
+    DO NOTHING RETURNING；内存路径由 find_by_idempotency_key 保证同语义。
+    """
+    service, emit_mock, repo = _make_service(monkeypatch)
+
+    tenant_id = uuid4()
+    assignee = uuid4()
+    customer = uuid4()
+    due_at = _utcnow() + timedelta(hours=3)
+
+    kwargs = {
+        "task_type": TaskType.DORMANT_RECALL,
+        "assignee_employee_id": assignee,
+        "customer_id": customer,
+        "due_at": due_at,
+        "payload": {"probe": "concurrent"},
+        "tenant_id": tenant_id,
+    }
+
+    # 并发两笔同幂等键派单 —— DB 索引兜底应让二者产出同一 task_id
+    t1, t2 = await asyncio.gather(
+        service.dispatch_task(**kwargs),
+        service.dispatch_task(**kwargs),
+    )
+    assert t1.task_id == t2.task_id, (
+        "独立验证 P1-1：同幂等键两次派单必须返回同一 task_id"
+    )
+
+    # 仓库里只有 1 条
+    rows = await service.list_tasks(tenant_id=tenant_id)
+    assert len(rows) == 1
+
+    # 事件只发 1 次（第二次是幂等命中，不重发）
+    await _drain_tasks()
+    assert emit_mock.await_count == 1, (
+        "独立验证 P1-1：幂等命中不应重复发射 DISPATCHED 事件"
+    )
+
+
+# ──────────────────────────────────────────────────────────────────────
 # 兜底：导出任务类型数量保持 10
 # ──────────────────────────────────────────────────────────────────────
 
