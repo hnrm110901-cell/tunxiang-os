@@ -471,3 +471,155 @@ class TestTenantIsolation:
         assert meituan_rows[0]["estimated_amount_fen_total"] == 1_000_000, (
             "RLS 隔离失败：租户 A 看到了租户 B 的金额"
         )
+
+
+# ─────────────────────────────────────────────────────────────────────────
+# T6. 独立验证 P1-3：订金退款触发 lead.stage=invalid（因果链关联）
+# ─────────────────────────────────────────────────────────────────────────
+
+
+class TestDepositRefundInvalidates:
+    """徐记海鲜婚宴退宴场景：客户付订金后新郎新娘闹掰要求退宴 →
+    财务退款 → banquet_lead.stage 自动切 invalid，
+    且新发射的 lead_stage_changed 事件携带 causation_id = deposit_event_id，
+    保证下游 Agent 能回溯退款原因。
+    """
+
+    @pytest.mark.asyncio
+    async def test_deposit_refunded_triggers_lead_invalid(
+        self,
+        service: BanquetLeadService,
+        emitted: list[dict[str, Any]],
+    ):
+        """deposit 退款事件 → handle_deposit_refunded →
+          - lead.stage = invalid
+          - invalidation_reason 包含"订金退款"前缀 + 原因
+          - causation_id 关联到 deposit_event_id
+        """
+        # 场景：客户已付订金 5 万（订单已转到 order 阶段）
+        lead = await service.create_lead(
+            customer_id=uuid.uuid4(),
+            banquet_type=BanquetType.WEDDING,
+            source_channel=SourceChannel.REFERRAL,
+            sales_employee_id=uuid.uuid4(),
+            estimated_amount_fen=5_000_000,  # 5 万元
+            estimated_tables=30,
+            scheduled_date=None,
+            tenant_id=TENANT_A,
+        )
+        operator_id = uuid.uuid4()
+        # 推进到 order（已收订金的状态）
+        await service.transition_stage(
+            lead_id=lead.lead_id,
+            next_stage=LeadStage.OPPORTUNITY,
+            operator_id=operator_id,
+            tenant_id=TENANT_A,
+        )
+        await service.transition_stage(
+            lead_id=lead.lead_id,
+            next_stage=LeadStage.ORDER,
+            operator_id=operator_id,
+            tenant_id=TENANT_A,
+        )
+
+        # 客户取消宴席：财务发起退款，deposit.refunded 事件 ID 如下
+        deposit_event_id = uuid.uuid4()
+
+        result = await service.handle_deposit_refunded(
+            lead_id=lead.lead_id,
+            tenant_id=TENANT_A,
+            deposit_event_id=deposit_event_id,
+            refund_reason="新郎新娘取消婚礼",
+            operator_id=operator_id,
+        )
+
+        # 断言 1：stage 被切到 invalid
+        assert result.stage == LeadStage.INVALID
+        # 断言 2：invalidation_reason 包含"订金退款"前缀 + 业务原因
+        assert result.invalidation_reason is not None
+        assert "订金退款" in result.invalidation_reason
+        assert "新郎新娘取消婚礼" in result.invalidation_reason
+
+        # 断言 3：最后一条 lead_stage_changed 事件的 causation_id == deposit_event_id
+        stage_changed_events = [
+            e
+            for e in emitted
+            if e["event_type"].value == "banquet.lead_stage_changed"
+        ]
+        assert len(stage_changed_events) >= 1, (
+            "应至少发射一条 lead_stage_changed（order→invalid）"
+        )
+        last_change = stage_changed_events[-1]
+        assert last_change["causation_id"] == deposit_event_id, (
+            "独立验证 P1-3：lead_stage_changed.causation_id 必须等于 deposit_event_id"
+        )
+        assert last_change["payload"]["next_stage"] == "invalid"
+
+    @pytest.mark.asyncio
+    async def test_deposit_refund_preserves_causation_chain(
+        self,
+        service: BanquetLeadService,
+        emitted: list[dict[str, Any]],
+    ):
+        """lead_stage_changed 事件的 causation_id 必须严格等于 deposit_refunded
+        的 event_id，实现完整因果链：
+
+            deposit.refunded (event_id=E1)
+                └─> banquet.lead_stage_changed (causation_id=E1)
+                        └─> (R2) 销售佣金回收 Saga
+                        └─> (R2) 场地档期释放
+        """
+        lead = await service.create_lead(
+            customer_id=uuid.uuid4(),
+            banquet_type=BanquetType.CORPORATE,
+            source_channel=SourceChannel.INTERNAL,
+            sales_employee_id=uuid.uuid4(),
+            estimated_amount_fen=2_000_000,
+            estimated_tables=10,
+            scheduled_date=None,
+            tenant_id=TENANT_A,
+        )
+        # 直接从 all → invalid 也是合法流转（企业客户订金后取消）
+        # 不需要经过 opportunity / order
+
+        # 独特的 UUID 便于后续强等值断言
+        deposit_event_id = uuid.uuid4()
+
+        emitted.clear()
+        await service.handle_deposit_refunded(
+            lead_id=lead.lead_id,
+            tenant_id=TENANT_A,
+            deposit_event_id=deposit_event_id,
+            refund_reason="企业活动推迟",
+        )
+
+        # 因果链：必须有且仅有一条 lead_stage_changed 事件，且 causation_id 精确匹配
+        stage_events = [
+            e
+            for e in emitted
+            if e["event_type"].value == "banquet.lead_stage_changed"
+        ]
+        assert len(stage_events) == 1, (
+            "单次 deposit 退款只应触发一次 stage_changed（幂等）"
+        )
+        stage_evt = stage_events[0]
+        assert stage_evt["causation_id"] == deposit_event_id, (
+            f"causation_id 不匹配：expected {deposit_event_id}, "
+            f"got {stage_evt['causation_id']}"
+        )
+        # stream_id 是 lead_id，payload.next_stage=invalid
+        assert stage_evt["stream_id"] == str(lead.lead_id)
+        assert stage_evt["payload"]["next_stage"] == "invalid"
+        assert "订金退款" in stage_evt["payload"]["invalidation_reason"]
+
+        # 幂等再调一次不应再发事件
+        emitted.clear()
+        await service.handle_deposit_refunded(
+            lead_id=lead.lead_id,
+            tenant_id=TENANT_A,
+            deposit_event_id=uuid.uuid4(),  # 即便换新 event_id 也不应再改动
+            refund_reason="重复退款请求",
+        )
+        assert emitted == [], (
+            "lead 已 invalid 后再收 deposit.refunded 应幂等短路，不重发事件"
+        )

@@ -200,10 +200,17 @@ class BanquetLeadService:
         operator_id: Optional[uuid.UUID],
         tenant_id: uuid.UUID,
         invalidation_reason: Optional[str] = None,
+        causation_id: Optional[uuid.UUID | str] = None,
     ) -> BanquetLead:
         """阶段流转：all → opportunity → order → (invalid)。
 
         幂等规则：若 next_stage == 当前 stage，直接返回当前 lead，不发事件。
+
+        Args:
+            causation_id: 触发本次流转的父事件 ID（因果链追踪）。
+                典型场景：订金退款 → lead 置 invalid 时，将 deposit.refunded
+                的 event_id 作为 causation_id 透传，让下游 Agent 能从 lead
+                回溯到原退款动作。
         """
         lead = await self._repo.get_by_id(lead_id, tenant_id)
         if lead is None:
@@ -257,6 +264,7 @@ class BanquetLeadService:
             payload=payload,
             store_id=updated.store_id,
             metadata={"operator_id": str(operator_id)} if operator_id else None,
+            causation_id=causation_id,
         )
         logger.info(
             "banquet_lead_stage_changed",
@@ -264,6 +272,7 @@ class BanquetLeadService:
             lead_id=str(lead_id),
             previous_stage=previous_stage.value,
             next_stage=next_stage.value,
+            causation_id=str(causation_id) if causation_id else None,
         )
         return updated
 
@@ -339,6 +348,80 @@ class BanquetLeadService:
             tenant_id=str(tenant_id),
             lead_id=str(lead_id),
             reservation_id=str(reservation_id),
+        )
+        return updated
+
+    # ─────────────────────────────────────────────────────────────────
+    # 订金退款 → 商机置失效（独立验证 P1-3 接入点，2026-04-23）
+    # ─────────────────────────────────────────────────────────────────
+
+    async def handle_deposit_refunded(
+        self,
+        *,
+        lead_id: uuid.UUID,
+        tenant_id: uuid.UUID,
+        deposit_event_id: uuid.UUID | str,
+        refund_reason: str,
+        operator_id: Optional[uuid.UUID] = None,
+    ) -> BanquetLead:
+        """订金退款 → 商机流转到 invalid（徐记海鲜婚宴退宴场景）。
+
+        业务流程：
+          1. 客户婚宴已下订金（DepositEventType.COLLECTED/RECEIVED）
+          2. 客户取消宴席 → tx-finance 发 deposit.refunded 事件
+          3. BanquetFunnelProjector 订阅该事件 → 调本方法
+          4. 本方法将 lead.stage 切到 invalid，invalidation_reason 自动填入
+          5. 发射 banquet.lead_stage_changed 事件，causation_id = deposit_event_id
+
+        因果链保障：R2 banquet_contract_agent 可以通过
+          ``SELECT * FROM events WHERE causation_id = <deposit_refunded.event_id>``
+        查到所有由退款触发的下游动作（lead 失效、销售佣金回收等）。
+
+        Args:
+            lead_id:          宴会商机 ID
+            tenant_id:        租户 ID（RLS 隔离）
+            deposit_event_id: 触发本次失效的退款事件 ID（因果链父）
+            refund_reason:    退款原因（如 "客户取消宴席"）
+            operator_id:      操作员（通常是财务员工；缺省表示系统自动）
+
+        Returns:
+            更新后的 BanquetLead（stage=invalid）
+
+        Raises:
+            BanquetLeadNotFoundError: lead 不存在或越租户访问
+            InvalidStageTransitionError: 当前 stage 已无法流转到 invalid
+                （实际上 INVALID 是唯一终态，从 all/opportunity/order 均可进入）
+        """
+        # 幂等：若 lead 已 invalid 就直接返回（transition_stage 内部已保证）
+        lead = await self._repo.get_by_id(lead_id, tenant_id)
+        if lead is None:
+            raise BanquetLeadNotFoundError(
+                f"lead_id={lead_id} not found for tenant={tenant_id}"
+            )
+        if lead.stage == LeadStage.INVALID:
+            logger.info(
+                "banquet_lead_already_invalid_on_deposit_refund",
+                tenant_id=str(tenant_id),
+                lead_id=str(lead_id),
+                deposit_event_id=str(deposit_event_id),
+            )
+            return lead
+
+        invalidation_reason = f"订金退款: {refund_reason}"
+        updated = await self.transition_stage(
+            lead_id=lead_id,
+            next_stage=LeadStage.INVALID,
+            operator_id=operator_id,
+            tenant_id=tenant_id,
+            invalidation_reason=invalidation_reason,
+            causation_id=deposit_event_id,
+        )
+        logger.info(
+            "banquet_lead_invalidated_by_deposit_refund",
+            tenant_id=str(tenant_id),
+            lead_id=str(lead_id),
+            deposit_event_id=str(deposit_event_id),
+            refund_reason=refund_reason,
         )
         return updated
 
@@ -431,8 +514,13 @@ class BanquetLeadService:
         payload: dict[str, Any],
         store_id: Optional[uuid.UUID] = None,
         metadata: Optional[dict[str, Any]] = None,
+        causation_id: Optional[uuid.UUID | str] = None,
     ) -> None:
-        """调用注入的 emit_event。异步实现在注入函数内决定（真实用 create_task）。"""
+        """调用注入的 emit_event。异步实现在注入函数内决定（真实用 create_task）。
+
+        causation_id 如存在，会透传给 emitter 写入 events 表，支撑
+        Agent 的因果链溯源（如：lead_stage_changed → deposit.refunded）。
+        """
         try:
             await self._emit_event(
                 event_type=event_type,
@@ -442,6 +530,7 @@ class BanquetLeadService:
                 store_id=store_id,
                 source_service="tx-trade",
                 metadata=metadata,
+                causation_id=causation_id,
             )
         except (asyncio.CancelledError, RuntimeError, ValueError) as exc:
             # 事件写入失败不得影响主业务，但要显式留痕
