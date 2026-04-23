@@ -16,6 +16,7 @@ DeliveryAgent 通过 20 个关键业务问题引导商户完成系统配置，
   - 新客户全新上线（3天目标）
   - 天财商龙切换客户（30天迁移，answers 中携带 migration_source=tiancai）
 """
+
 from __future__ import annotations
 
 import json
@@ -24,7 +25,7 @@ from datetime import datetime, timezone
 from typing import Any, Optional
 
 import structlog
-from fastapi import APIRouter, Header, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from ..response import ok
@@ -252,6 +253,7 @@ class AnswerRequest(BaseModel):
     1. 逐问回答：key + value
     2. 批量回答：answers dict
     """
+
     key: Optional[str] = None
     value: Optional[Any] = None
     answers: Optional[dict[str, Any]] = None  # 批量
@@ -264,7 +266,7 @@ def _build_config_package(session: OnboardingSession) -> dict:
     """
     将会话中的 answers 通过业态模板生成 TenantConfigPackage。
     """
-    from shared.config_templates import get_template, RestaurantType
+    from shared.config_templates import RestaurantType, get_template
 
     rt_raw = session.answers.get("restaurant_type", "casual_dining")
     try:
@@ -273,10 +275,12 @@ def _build_config_package(session: OnboardingSession) -> dict:
         rt = RestaurantType.CASUAL_DINING
 
     template = get_template(rt)
-    pkg = template.apply({
-        **session.answers,
-        "delivery_session_id": session.session_id,
-    })
+    pkg = template.apply(
+        {
+            **session.answers,
+            "delivery_session_id": session.session_id,
+        }
+    )
 
     # 写入 tenant_id（来自会话）
     pkg_dict = pkg.model_dump(mode="json")  # datetime → ISO string
@@ -305,6 +309,7 @@ def _next_question(session: OnboardingSession) -> Optional[dict]:
 async def list_templates() -> dict:
     """列出所有可用业态模板（供前端业态选择器使用）。"""
     from shared.config_templates import list_templates as _list
+
     return ok(_list())
 
 
@@ -339,14 +344,16 @@ async def start_session(req: StartRequest) -> dict:
         prefilled_count=len(session.answers),
     )
 
-    return ok({
-        "session_id": sid,
-        "total_questions": len(DELIVERY_QUESTIONS),
-        "answered_count": len(session.answers),
-        "unanswered_required": unanswered,
-        "next_question": next_q,
-        "progress_pct": round(len(session.answers) / len(DELIVERY_QUESTIONS) * 100),
-    })
+    return ok(
+        {
+            "session_id": sid,
+            "total_questions": len(DELIVERY_QUESTIONS),
+            "answered_count": len(session.answers),
+            "unanswered_required": unanswered,
+            "next_question": next_q,
+            "progress_pct": round(len(session.answers) / len(DELIVERY_QUESTIONS) * 100),
+        }
+    )
 
 
 @router.post("/{session_id}/answer")
@@ -375,15 +382,17 @@ async def answer_question(session_id: str, req: AnswerRequest) -> dict:
     unanswered = _unanswered_required(session)
     is_complete = next_q is None
 
-    return ok({
-        "session_id": session_id,
-        "answered_count": len(session.answers),
-        "total_questions": len(DELIVERY_QUESTIONS),
-        "progress_pct": round(len(session.answers) / len(DELIVERY_QUESTIONS) * 100),
-        "unanswered_required": unanswered,
-        "next_question": next_q,
-        "is_complete": is_complete,
-    })
+    return ok(
+        {
+            "session_id": session_id,
+            "answered_count": len(session.answers),
+            "total_questions": len(DELIVERY_QUESTIONS),
+            "progress_pct": round(len(session.answers) / len(DELIVERY_QUESTIONS) * 100),
+            "unanswered_required": unanswered,
+            "next_question": next_q,
+            "is_complete": is_complete,
+        }
+    )
 
 
 @router.get("/{session_id}/preview")
@@ -399,13 +408,15 @@ async def preview_config(session_id: str) -> dict:
     pkg_dict = _build_config_package(session)
     unanswered = _unanswered_required(session)
 
-    return ok({
-        "session_id": session_id,
-        "is_ready": len(unanswered) == 0,
-        "unanswered_required": unanswered,
-        "config_preview": pkg_dict,
-        "note": "此为预览，调用 POST /{session_id}/confirm 生成正式配置包",
-    })
+    return ok(
+        {
+            "session_id": session_id,
+            "is_ready": len(unanswered) == 0,
+            "unanswered_required": unanswered,
+            "config_preview": pkg_dict,
+            "note": "此为预览，调用 POST /{session_id}/confirm 生成正式配置包",
+        }
+    )
 
 
 @router.post("/{session_id}/confirm")
@@ -439,12 +450,14 @@ async def confirm_session(session_id: str) -> dict:
         restaurant_type=pkg_dict.get("restaurant_type"),
     )
 
-    return ok({
-        "session_id": session_id,
-        "tenant_id": session.tenant_id,
-        "config_package": pkg_dict,
-        "next_step": f"POST /api/v1/onboarding/import  body: {{\"session_id\": \"{session_id}\"}}",
-    })
+    return ok(
+        {
+            "session_id": session_id,
+            "tenant_id": session.tenant_id,
+            "config_package": pkg_dict,
+            "next_step": f'POST /api/v1/onboarding/import  body: {{"session_id": "{session_id}"}}',
+        }
+    )
 
 
 class ImportRequest(BaseModel):
@@ -481,12 +494,14 @@ async def import_config(req: ImportRequest, request: Request) -> dict:
 
     if req.dry_run:
         logger.info("onboarding_import_dry_run", tenant_id=tenant_id)
-        return ok({
-            "dry_run": True,
-            "tenant_id": tenant_id,
-            "items_to_import": _count_import_items(pkg_dict),
-            "message": "dry_run=True，未写入数据库",
-        })
+        return ok(
+            {
+                "dry_run": True,
+                "tenant_id": tenant_id,
+                "items_to_import": _count_import_items(pkg_dict),
+                "message": "dry_run=True，未写入数据库",
+            }
+        )
 
     import_result = await _do_import(tenant_id, pkg_dict)
 
@@ -497,12 +512,14 @@ async def import_config(req: ImportRequest, request: Request) -> dict:
         result=import_result,
     )
 
-    return ok({
-        "tenant_id": tenant_id,
-        "import_result": import_result,
-        "health_check_url": f"/api/v1/config/health/{tenant_id}",
-        "message": "配置已导入。请访问 health_check_url 确认配置健康度 ≥ 90 后再正式上线。",
-    })
+    return ok(
+        {
+            "tenant_id": tenant_id,
+            "import_result": import_result,
+            "health_check_url": f"/api/v1/config/health/{tenant_id}",
+            "message": "配置已导入。请访问 health_check_url 确认配置健康度 ≥ 90 后再正式上线。",
+        }
+    )
 
 
 # ── 内部导入实现 ──────────────────────────────────────────────────────
@@ -526,8 +543,9 @@ async def _do_import(tenant_id: str, pkg: dict) -> dict:
     当数据库不可用时（如开发环境），返回 mock 结果。
     """
     try:
-        from shared.ontology.src.database import async_session_factory
         from sqlalchemy import text
+
+        from shared.ontology.src.database import async_session_factory
 
         async with async_session_factory() as db:
             await db.execute(text("SET app.tenant_id = :tid"), {"tid": tenant_id})
@@ -538,7 +556,8 @@ async def _do_import(tenant_id: str, pkg: dict) -> dict:
             printers = pkg.get("printers", [])
             if printers:
                 for idx, p in enumerate(printers):
-                    await db.execute(text("""
+                    await db.execute(
+                        text("""
                         INSERT INTO printer_configs
                           (tenant_id, name, printer_type, protocol, connection,
                            ip, is_default, auto_cut, copies, created_at, updated_at)
@@ -550,24 +569,27 @@ async def _do_import(tenant_id: str, pkg: dict) -> dict:
                           printer_type = EXCLUDED.printer_type,
                           is_default   = EXCLUDED.is_default,
                           updated_at   = NOW()
-                    """), {
-                        "tid": tenant_id,
-                        "name": p.get("name", f"打印机{idx+1}"),
-                        "ptype": p.get("printer_type", "receipt"),
-                        "protocol": p.get("protocol", "escpos"),
-                        "conn": p.get("connection", "network"),
-                        "ip": p.get("ip", ""),
-                        "is_default": p.get("is_default", False),
-                        "auto_cut": p.get("auto_cut", True),
-                        "copies": p.get("copies", 1),
-                    })
+                    """),
+                        {
+                            "tid": tenant_id,
+                            "name": p.get("name", f"打印机{idx + 1}"),
+                            "ptype": p.get("printer_type", "receipt"),
+                            "protocol": p.get("protocol", "escpos"),
+                            "conn": p.get("connection", "network"),
+                            "ip": p.get("ip", ""),
+                            "is_default": p.get("is_default", False),
+                            "auto_cut": p.get("auto_cut", True),
+                            "copies": p.get("copies", 1),
+                        },
+                    )
                 results["printers"] = len(printers)
 
             # 2. 班次配置
             shifts = pkg.get("shifts", [])
             if shifts:
                 for s in shifts:
-                    await db.execute(text("""
+                    await db.execute(
+                        text("""
                         INSERT INTO shift_configs
                           (tenant_id, shift_name, start_time, end_time,
                            is_overnight, settlement_cutoff, created_at, updated_at)
@@ -580,20 +602,23 @@ async def _do_import(tenant_id: str, pkg: dict) -> dict:
                           end_time            = EXCLUDED.end_time,
                           settlement_cutoff   = EXCLUDED.settlement_cutoff,
                           updated_at          = NOW()
-                    """), {
-                        "tid": tenant_id,
-                        "name": s.get("shift_name"),
-                        "start": s.get("start_time"),
-                        "end": s.get("end_time"),
-                        "overnight": s.get("is_overnight", False),
-                        "cutoff": s.get("settlement_cutoff", "02:00"),
-                    })
+                    """),
+                        {
+                            "tid": tenant_id,
+                            "name": s.get("shift_name"),
+                            "start": s.get("start_time"),
+                            "end": s.get("end_time"),
+                            "overnight": s.get("is_overnight", False),
+                            "cutoff": s.get("settlement_cutoff", "02:00"),
+                        },
+                    )
                 results["shifts"] = len(shifts)
 
             # 3. Agent 策略快照（写入 JSONB）
             agent_policies = pkg.get("agent_policies", {})
             billing_rules = pkg.get("billing_rules", {})
-            await db.execute(text("""
+            await db.execute(
+                text("""
                 INSERT INTO tenant_agent_configs
                   (tenant_id, agent_policies, billing_rules,
                    restaurant_type, onboarding_session_id,
@@ -608,13 +633,15 @@ async def _do_import(tenant_id: str, pkg: dict) -> dict:
                   restaurant_type      = EXCLUDED.restaurant_type,
                   onboarding_session_id = EXCLUDED.onboarding_session_id,
                   updated_at           = NOW()
-            """), {
-                "tid": tenant_id,
-                "policies": json.dumps(agent_policies, ensure_ascii=False),
-                "billing": json.dumps(billing_rules, ensure_ascii=False),
-                "rt": pkg.get("restaurant_type", "casual_dining"),
-                "sid": pkg.get("delivery_session_id", ""),
-            })
+            """),
+                {
+                    "tid": tenant_id,
+                    "policies": json.dumps(agent_policies, ensure_ascii=False),
+                    "billing": json.dumps(billing_rules, ensure_ascii=False),
+                    "rt": pkg.get("restaurant_type", "casual_dining"),
+                    "sid": pkg.get("delivery_session_id", ""),
+                },
+            )
             results["agent_config"] = 1
 
             await db.commit()

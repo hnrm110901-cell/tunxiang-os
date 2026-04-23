@@ -8,6 +8,7 @@
 
 降级策略：Redis不可用时跳过注入，下游服务自行查询
 """
+
 import json
 import os
 from typing import Optional
@@ -32,9 +33,12 @@ async def _get_redis():
     if _redis is None:
         try:
             import redis.asyncio as aioredis
+
             _redis = await aioredis.from_url(
-                REDIS_URL, decode_responses=True,
-                socket_connect_timeout=2, socket_timeout=2,
+                REDIS_URL,
+                decode_responses=True,
+                socket_connect_timeout=2,
+                socket_timeout=2,
             )
         except (ImportError, OSError) as exc:
             logger.warning("personalization_redis_unavailable", error=str(exc))
@@ -50,6 +54,7 @@ def _extract_user_id(request: Request) -> Optional[str]:
     token = auth[7:]
     try:
         import base64
+
         payload = token.split(".")[1]
         # 补齐base64 padding
         payload += "=" * (4 - len(payload) % 4)
@@ -86,8 +91,7 @@ class PersonalizationMiddleware(BaseHTTPMiddleware):
                     headers[b"x-user-subscription"] = ctx.get("subscription", "none").encode()
                     scope["headers"] = list(headers.items())
 
-                    logger.debug("personalization_context_injected",
-                                user_id=user_id, segment=ctx.get("segment"))
+                    logger.debug("personalization_context_injected", user_id=user_id, segment=ctx.get("segment"))
         except (ConnectionError, TimeoutError, OSError) as exc:
             # Redis不可用→降级跳过，不影响请求
             logger.warning("personalization_redis_error", error=str(exc))

@@ -8,6 +8,7 @@
 
 数据库表: audit_logs（见 v070_audit_logs 迁移）
 """
+
 from __future__ import annotations
 
 import uuid
@@ -26,6 +27,7 @@ logger = structlog.get_logger(__name__)
 
 class AuditAction(str, Enum):
     """所有受审计的业务操作类型。"""
+
     # 认证
     LOGIN = "auth.login"
     LOGOUT = "auth.logout"
@@ -51,17 +53,18 @@ class AuditAction(str, Enum):
 @dataclass
 class AuditEntry:
     """一条审计日志的完整信息。"""
+
     tenant_id: UUID
     action: AuditAction
-    actor_id: str           # 操作人ID（user_id / app_key / agent_id）
-    actor_type: str         # user / api_app / agent / system
-    resource_type: str      # customer / order / employee / config …
+    actor_id: str  # 操作人ID（user_id / app_key / agent_id）
+    actor_type: str  # user / api_app / agent / system
+    resource_type: str  # customer / order / employee / config …
     resource_id: str | None = None
-    before_state: dict | None = None    # 变更前状态（敏感字段自动脱敏）
-    after_state: dict | None = None     # 变更后状态（敏感字段自动脱敏）
+    before_state: dict | None = None  # 变更前状态（敏感字段自动脱敏）
+    after_state: dict | None = None  # 变更后状态（敏感字段自动脱敏）
     ip_address: str | None = None
     user_agent: str | None = None
-    severity: str = "info"              # info / warning / critical
+    severity: str = "info"  # info / warning / critical
     extra: dict = field(default_factory=dict)
 
 
@@ -135,10 +138,7 @@ def _mask_sensitive(data: dict | None) -> dict | None:
         elif isinstance(value, dict):
             result[key] = _mask_sensitive(value)
         elif isinstance(value, list):
-            result[key] = [
-                _mask_sensitive(item) if isinstance(item, dict) else item
-                for item in value
-            ]
+            result[key] = [_mask_sensitive(item) if isinstance(item, dict) else item for item in value]
         else:
             result[key] = value
     return result
@@ -369,14 +369,16 @@ class AuditLogService:
             },
         )
         for row in fail_rows.mappings().all():
-            alerts.append({
-                "type": "excessive_login_failures",
-                "severity": "critical",
-                "actor_id": row["actor_id"],
-                "hour_bucket": str(row["hour_bucket"]),
-                "count": row["cnt"],
-                "message": f"actor {row['actor_id']} 在1小时内登录失败 {row['cnt']} 次",
-            })
+            alerts.append(
+                {
+                    "type": "excessive_login_failures",
+                    "severity": "critical",
+                    "actor_id": row["actor_id"],
+                    "hour_bucket": str(row["hour_bucket"]),
+                    "count": row["cnt"],
+                    "message": f"actor {row['actor_id']} 在1小时内登录失败 {row['cnt']} 次",
+                }
+            )
 
         # 2. CONSTRAINT_OVERRIDE（任意一次即告警）
         override_rows = await db.execute(
@@ -396,16 +398,18 @@ class AuditLogService:
             },
         )
         for row in override_rows.mappings().all():
-            alerts.append({
-                "type": "constraint_override",
-                "severity": "critical",
-                "actor_id": row["actor_id"],
-                "actor_type": row["actor_type"],
-                "resource_type": row["resource_type"],
-                "resource_id": row["resource_id"],
-                "created_at": row["created_at"].isoformat() if row["created_at"] else None,
-                "message": f"Agent 突破硬约束: {row['actor_id']} on {row['resource_type']}/{row['resource_id']}",
-            })
+            alerts.append(
+                {
+                    "type": "constraint_override",
+                    "severity": "critical",
+                    "actor_id": row["actor_id"],
+                    "actor_type": row["actor_type"],
+                    "resource_type": row["resource_type"],
+                    "resource_id": row["resource_id"],
+                    "created_at": row["created_at"].isoformat() if row["created_at"] else None,
+                    "message": f"Agent 突破硬约束: {row['actor_id']} on {row['resource_type']}/{row['resource_id']}",
+                }
+            )
 
         # 3. DATA_EXPORT > 3次/小时
         export_rows = await db.execute(
@@ -428,14 +432,16 @@ class AuditLogService:
             },
         )
         for row in export_rows.mappings().all():
-            alerts.append({
-                "type": "excessive_data_export",
-                "severity": "warning",
-                "actor_id": row["actor_id"],
-                "hour_bucket": str(row["hour_bucket"]),
-                "count": row["cnt"],
-                "message": f"actor {row['actor_id']} 在1小时内导出数据 {row['cnt']} 次",
-            })
+            alerts.append(
+                {
+                    "type": "excessive_data_export",
+                    "severity": "warning",
+                    "actor_id": row["actor_id"],
+                    "hour_bucket": str(row["hour_bucket"]),
+                    "count": row["cnt"],
+                    "message": f"actor {row['actor_id']} 在1小时内导出数据 {row['cnt']} 次",
+                }
+            )
 
         # 4. 凌晨 2-5 点的 LOGIN 事件（按本地时区 Asia/Shanghai）
         night_rows = await db.execute(
@@ -455,15 +461,17 @@ class AuditLogService:
             },
         )
         for row in night_rows.mappings().all():
-            alerts.append({
-                "type": "nighttime_login",
-                "severity": "warning",
-                "actor_id": row["actor_id"],
-                "actor_type": row["actor_type"],
-                "ip_address": row["ip_address"],
-                "created_at": row["created_at"].isoformat() if row["created_at"] else None,
-                "message": f"凌晨异常登录: actor {row['actor_id']} at {row['created_at']}",
-            })
+            alerts.append(
+                {
+                    "type": "nighttime_login",
+                    "severity": "warning",
+                    "actor_id": row["actor_id"],
+                    "actor_type": row["actor_type"],
+                    "ip_address": row["ip_address"],
+                    "created_at": row["created_at"].isoformat() if row["created_at"] else None,
+                    "message": f"凌晨异常登录: actor {row['actor_id']} at {row['created_at']}",
+                }
+            )
 
         return alerts
 
@@ -476,9 +484,11 @@ class AuditLogService:
 # 内部工具函数
 # ────────────────────────────────────────────────────────────────────
 
+
 def _json_dumps(obj: Any) -> str | None:
     """将 dict 序列化为 JSON 字符串，None 返回 None。"""
     if obj is None:
         return None
     import json
+
     return json.dumps(obj, ensure_ascii=False, default=str)

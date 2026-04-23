@@ -36,9 +36,7 @@ class RateLimiter:
         """注入Redis客户端（支持延迟初始化）"""
         self._redis = redis_client
 
-    async def check_rate_limit(
-        self, app_id: str, limit_per_min: int
-    ) -> tuple[bool, int, int]:
+    async def check_rate_limit(self, app_id: str, limit_per_min: int) -> tuple[bool, int, int]:
         """检查速率限制。
 
         Args:
@@ -242,20 +240,14 @@ class LoginBruteForceProtection:
         ip_key = f"login_fail:ip:{ip}"
         user_key = f"login_fail:user:{username}"
         if not self._redis:
-            return (
-                self._mem_get(ip_key) >= self.MAX_ATTEMPTS
-                or self._mem_get(user_key) >= self.MAX_ATTEMPTS
-            )
+            return self._mem_get(ip_key) >= self.MAX_ATTEMPTS or self._mem_get(user_key) >= self.MAX_ATTEMPTS
         try:
             ip_count = await self._redis.get(ip_key) or 0
             user_count = await self._redis.get(user_key) or 0
             return int(ip_count) >= self.MAX_ATTEMPTS or int(user_count) >= self.MAX_ATTEMPTS
         except Exception as exc:  # noqa: BLE001 — Redis故障降级到内存计数器
             logger.warning("brute_force_check_error_fallback_mem", error=str(exc))
-            return (
-                self._mem_get(ip_key) >= self.MAX_ATTEMPTS
-                or self._mem_get(user_key) >= self.MAX_ATTEMPTS
-            )
+            return self._mem_get(ip_key) >= self.MAX_ATTEMPTS or self._mem_get(user_key) >= self.MAX_ATTEMPTS
 
     async def clear_on_success(self, ip: str, username: str) -> None:
         """登录成功后清除失败计数。"""

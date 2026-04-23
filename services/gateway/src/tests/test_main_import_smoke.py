@@ -6,6 +6,7 @@
 `gateway/src/services/`（本服务子包），与仓库根的 `services/` 命名冲突。故用子进程、仅将
 仓库根加入 PYTHONPATH，做干净导入。
 """
+
 from __future__ import annotations
 
 import os

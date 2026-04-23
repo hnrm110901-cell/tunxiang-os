@@ -8,6 +8,7 @@
 
 三权分立检查在每次角色授权时也执行（防止数据库出现违规状态）。
 """
+
 from __future__ import annotations
 
 from typing import Callable
@@ -107,6 +108,7 @@ def require_mfa() -> Callable:
             user: UserContext = Depends(require_mfa())
         ): ...
     """
+
     async def check(
         user: UserContext = Depends(get_current_user),
     ) -> UserContext:
@@ -131,6 +133,7 @@ def require_permission(resource: Resource, action: Action) -> Callable:
             )
         ): ...
     """
+
     async def check(
         request: Request,
         user: UserContext = Depends(get_current_user),

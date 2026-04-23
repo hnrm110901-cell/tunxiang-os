@@ -23,6 +23,7 @@ sync_scheduler 单元测试（纯逻辑，不经过 HTTP）：
  13. _with_retry — 首次成功，retry_count=0
  14. _with_retry — 三次全失败，指数退避（sleep 次数 + 时长）
 """
+
 from __future__ import annotations
 
 import os
@@ -43,7 +44,7 @@ for _mod in (
         sys.modules[_mod] = _um.MagicMock()
 
 # ── 业务导入 ──────────────────────────────────────────────────────────────────
-from typing import Any, AsyncGenerator
+from typing import AsyncGenerator
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
@@ -57,7 +58,6 @@ from services.gateway.src.sync_scheduler import sync_router as sync_health_route
 
 # 导入真实的 get_db_no_rls 引用，供 dependency_overrides 使用
 from shared.ontology.src.database import get_db_no_rls
-
 
 # ════════════════════════════════════════════════════════════════════════════
 #  辅助：构建不含中间件的最小测试 app
@@ -93,6 +93,7 @@ def _make_db_mock() -> AsyncMock:
 
 def _override_db(app: FastAPI, db_mock: AsyncMock) -> None:
     """通过 dependency_overrides 将 get_db_no_rls 替换为返回 mock session 的生成器。"""
+
     async def _fake_db() -> AsyncGenerator[AsyncMock, None]:
         yield db_mock
 
@@ -444,11 +445,11 @@ async def test_with_retry_all_attempts_fail_exponential_backoff():
 
     assert result["status"] == "failed"
     assert result["retry_count"] == RETRY_TIMES - 1
-    assert result["next_retry_at"] is None          # 已用尽，不再调度
+    assert result["next_retry_at"] is None  # 已用尽，不再调度
 
     # 睡眠次数 = RETRY_TIMES - 1（最后一次失败后不再等待）
     assert len(sleep_calls) == RETRY_TIMES - 1
 
     # 指数退避：第1次 300s，第2次 600s
-    assert sleep_calls[0] == RETRY_DELAY_SECONDS * (2 ** 0)   # 300
-    assert sleep_calls[1] == RETRY_DELAY_SECONDS * (2 ** 1)   # 600
+    assert sleep_calls[0] == RETRY_DELAY_SECONDS * (2**0)  # 300
+    assert sleep_calls[1] == RETRY_DELAY_SECONDS * (2**1)  # 600

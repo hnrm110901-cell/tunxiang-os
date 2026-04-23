@@ -133,9 +133,7 @@ async def assign_template(
 ):
     """为商户分配模板 — UPDATE platform_tenants.plan_template"""
     try:
-        updated = await hub_service.hub_update_merchant(
-            db, merchant_id, {"plan_template": template_id}
-        )
+        updated = await hub_service.hub_update_merchant(db, merchant_id, {"plan_template": template_id})
         if not updated:
             raise HTTPException(status_code=404, detail=f"商户 {merchant_id} 不存在")
         return {"ok": True, "data": {"merchant_id": merchant_id, "template": template_id}}

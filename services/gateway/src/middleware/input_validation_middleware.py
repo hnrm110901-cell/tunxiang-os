@@ -11,7 +11,6 @@
 """
 
 import json
-import time
 from typing import Callable
 
 import structlog
@@ -20,8 +19,7 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
 from shared.security.src.sql_guard import check_sql_injection
-from shared.security.src.xss_guard import validate_no_script, get_csp_header
-from shared.security.src.validators import sanitize_string
+from shared.security.src.xss_guard import get_csp_header, validate_no_script
 
 logger = structlog.get_logger(__name__)
 

@@ -9,6 +9,7 @@ POST /api/v1/wecom/bot/callback — 企微机器人消息回调
   2. 调用 tx-analytics NLQ /ask 端点
   3. 将 NLQ 结果格式化为企微消息返回
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -35,6 +36,7 @@ _BOT_WEBHOOK_URL: str = os.getenv("WECOM_BOT_WEBHOOK_URL", "")
 
 # ─── 签名验证 ────────────────────────────────────────────────────────
 
+
 def _verify_signature(token: str, timestamp: str, nonce: str, signature: str) -> bool:
     """验证企微回调签名：sha1(排序拼接 token + timestamp + nonce)"""
     parts = sorted([token, timestamp, nonce])
@@ -44,6 +46,7 @@ def _verify_signature(token: str, timestamp: str, nonce: str, signature: str) ->
 
 
 # ─── NLQ 调用 ────────────────────────────────────────────────────────
+
 
 async def _call_nlq(
     question: str,
@@ -127,6 +130,7 @@ async def _send_wecom_reply(webhook_url: str, content: str) -> None:
 
 # ─── XML 解析 ────────────────────────────────────────────────────────
 
+
 def _parse_xml_message(raw_xml: str) -> dict[str, str]:
     """解析企微回调 XML 消息"""
     try:
@@ -143,8 +147,10 @@ def _parse_xml_message(raw_xml: str) -> dict[str, str]:
 
 # ─── 请求模型（JSON 模式） ────────────────────────────────────────────
 
+
 class BotMessageRequest(BaseModel):
     """企微机器人消息（JSON 格式回调）"""
+
     msg_type: str = Field(default="text", alias="MsgType", description="消息类型")
     content: str = Field(default="", alias="Content", description="消息内容")
     from_user: str = Field(default="", alias="FromUserName", description="发送者企微ID")
@@ -152,6 +158,7 @@ class BotMessageRequest(BaseModel):
 
 
 # ─── 路由 ─────────────────────────────────────────────────────────────
+
 
 @router.get("/callback")
 async def bot_callback_verify(
@@ -199,6 +206,7 @@ async def bot_callback_message(
     else:
         try:
             import json
+
             msg = json.loads(body_str)
             msg_type = msg.get("MsgType", msg.get("msg_type", "text"))
             content = msg.get("Content", msg.get("content", ""))
@@ -229,6 +237,7 @@ async def bot_callback_message(
 
     # 异步发送企微回复（不阻塞响应）
     import asyncio
+
     if _BOT_WEBHOOK_URL:
         asyncio.create_task(_send_wecom_reply(_BOT_WEBHOOK_URL, reply_text))
 

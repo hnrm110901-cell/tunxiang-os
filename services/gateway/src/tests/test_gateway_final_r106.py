@@ -4,6 +4,7 @@
   - upload_routes.py     (4 endpoints: POST /image, POST /file, POST /base64, DELETE /{key})
 测试数量：≥ 8
 """
+
 import sys
 import types
 import unittest.mock as _mock
@@ -33,7 +34,11 @@ class COSUploadError(Exception):
 
 class FakeCOSService:
     async def upload_file(self, file_bytes, filename, content_type, folder):
-        return {"url": f"https://cdn.example.com/{folder}/{filename}", "key": f"{folder}/{filename}", "size": len(file_bytes)}
+        return {
+            "url": f"https://cdn.example.com/{folder}/{filename}",
+            "key": f"{folder}/{filename}",
+            "size": len(file_bytes),
+        }
 
     async def upload_base64(self, base64_data, filename, folder, content_type):
         return {"url": f"https://cdn.example.com/{folder}/{filename}", "key": f"{folder}/{filename}", "size": 100}
@@ -64,13 +69,13 @@ _src_response.ok = _ok_response
 sys.modules.setdefault("src", _src)
 sys.modules.setdefault("src.response", _src_response)
 
-import pytest
 import importlib.util
+import io
 import pathlib
+
+import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from unittest.mock import AsyncMock, MagicMock, patch
-import io
 
 GATEWAY_SRC = pathlib.Path(__file__).parent.parent
 TENANT_ID = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
@@ -86,6 +91,7 @@ def _load_module(rel_path: str, name: str):
 # ════════════════════════════════════════════════════════════════════
 # PART A — pos_sync_routes.py  (1 endpoint)
 # ════════════════════════════════════════════════════════════════════
+
 
 @pytest.fixture(scope="module")
 def pos_sync_client():
@@ -165,6 +171,7 @@ class TestPosSyncRoutes:
 # PART B — upload_routes.py  (4 endpoints)
 # ════════════════════════════════════════════════════════════════════
 
+
 @pytest.fixture(scope="module")
 def upload_client():
     mod = _load_module("api/upload_routes.py", "upload_routes")
@@ -223,6 +230,7 @@ class TestUploadRoutes:
     def test_upload_base64_success(self, upload_client):
         """Base64 上传 → ok=True"""
         import base64
+
         data = base64.b64encode(b"fake image data").decode()
         r = upload_client.post(
             "/api/v1/upload/base64",

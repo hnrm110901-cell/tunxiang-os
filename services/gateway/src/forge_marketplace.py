@@ -109,6 +109,7 @@ PAYOUT_STATUSES = {"pending", "processing", "completed", "failed"}
 #  辅助函数
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
@@ -124,6 +125,7 @@ def _gen_api_key() -> str:
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 #  预置示例应用数据
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 def _build_seed_developers() -> Dict[str, dict]:
     """构建预置开发者数据"""
@@ -689,9 +691,16 @@ class ForgeMarketplaceService:
             raise ValueError(f"应用不存在: {app_id}")
 
         allowed_fields = {
-            "app_name", "description", "version", "icon_url",
-            "screenshots", "pricing_model", "price_fen",
-            "permissions", "api_endpoints", "webhook_urls",
+            "app_name",
+            "description",
+            "version",
+            "icon_url",
+            "screenshots",
+            "pricing_model",
+            "price_fen",
+            "permissions",
+            "api_endpoints",
+            "webhook_urls",
         }
 
         for key, value in updates.items():
@@ -860,14 +869,16 @@ class ForgeMarketplaceService:
         for app in self._apps.values():
             if app["status"] == "pending_review":
                 developer = self._developers.get(app["developer_id"], {})
-                pending.append({
-                    "app_id": app["app_id"],
-                    "app_name": app["app_name"],
-                    "developer_name": developer.get("name", ""),
-                    "category": app["category"],
-                    "version": app["version"],
-                    "submitted_at": app["created_at"],
-                })
+                pending.append(
+                    {
+                        "app_id": app["app_id"],
+                        "app_name": app["app_name"],
+                        "developer_name": developer.get("name", ""),
+                        "category": app["category"],
+                        "version": app["version"],
+                        "submitted_at": app["created_at"],
+                    }
+                )
         return pending
 
     def get_review_history(self, app_id: str) -> list[dict]:
@@ -981,14 +992,16 @@ class ForgeMarketplaceService:
         for key, inst in self._installations.items():
             if inst["tenant_id"] == tenant_id and inst["status"] == "active":
                 app = self._apps.get(inst["app_id"], {})
-                installed.append({
-                    **inst,
-                    "app_name": app.get("app_name", ""),
-                    "category": app.get("category", ""),
-                    "version": app.get("version", ""),
-                    "pricing_model": app.get("pricing_model", ""),
-                    "price_display": app.get("price_display", ""),
-                })
+                installed.append(
+                    {
+                        **inst,
+                        "app_name": app.get("app_name", ""),
+                        "category": app.get("category", ""),
+                        "version": app.get("version", ""),
+                        "pricing_model": app.get("pricing_model", ""),
+                        "price_display": app.get("price_display", ""),
+                    }
+                )
         return installed
 
     def get_installation_status(self, tenant_id: str, app_id: str) -> dict:
@@ -1108,16 +1121,18 @@ class ForgeMarketplaceService:
             if key["developer_id"] == developer_id:
                 # 安全：仅显示密钥前缀
                 masked_key = key["api_key"][:16] + "..." if key.get("api_key") else ""
-                keys.append({
-                    "key_id": key["key_id"],
-                    "key_name": key["key_name"],
-                    "api_key_prefix": masked_key,
-                    "permissions": key["permissions"],
-                    "status": key["status"],
-                    "created_at": key["created_at"],
-                    "last_used_at": key.get("last_used_at"),
-                    "usage_count": key.get("usage_count", 0),
-                })
+                keys.append(
+                    {
+                        "key_id": key["key_id"],
+                        "key_name": key["key_name"],
+                        "api_key_prefix": masked_key,
+                        "permissions": key["permissions"],
+                        "status": key["status"],
+                        "created_at": key["created_at"],
+                        "last_used_at": key.get("last_used_at"),
+                        "usage_count": key.get("usage_count", 0),
+                    }
+                )
         return keys
 
     def get_api_usage(self, developer_id: str, period: str = "month") -> dict:
@@ -1140,11 +1155,13 @@ class ForgeMarketplaceService:
             if key["developer_id"] == developer_id and key["status"] == "active":
                 usage = key.get("usage_count", 0)
                 total_calls += usage
-                key_breakdown.append({
-                    "key_id": key["key_id"],
-                    "key_name": key["key_name"],
-                    "usage_count": usage,
-                })
+                key_breakdown.append(
+                    {
+                        "key_id": key["key_id"],
+                        "key_name": key["key_name"],
+                        "usage_count": usage,
+                    }
+                )
 
         # 模拟用量限制
         quota = 100000 if self._developers[developer_id].get("dev_type") == "company" else 10000
@@ -1323,14 +1340,16 @@ class ForgeMarketplaceService:
             total_payout += app_payout
 
             if app_revenue > 0:
-                app_breakdown.append({
-                    "app_id": app["app_id"],
-                    "app_name": app["app_name"],
-                    "revenue_fen": app_revenue,
-                    "platform_fee_fen": app_fee,
-                    "developer_payout_fen": app_payout,
-                    "install_count": app.get("install_count", 0),
-                })
+                app_breakdown.append(
+                    {
+                        "app_id": app["app_id"],
+                        "app_name": app["app_name"],
+                        "revenue_fen": app_revenue,
+                        "platform_fee_fen": app_fee,
+                        "developer_payout_fen": app_payout,
+                        "install_count": app.get("install_count", 0),
+                    }
+                )
 
         return {
             "developer_id": developer_id,
@@ -1404,16 +1423,12 @@ class ForgeMarketplaceService:
         # 扣除已提现金额
         existing_payouts = self._payouts.get(developer_id, [])
         already_paid = sum(
-            p["amount_fen"]
-            for p in existing_payouts
-            if p["status"] in ("pending", "processing", "completed")
+            p["amount_fen"] for p in existing_payouts if p["status"] in ("pending", "processing", "completed")
         )
         available -= already_paid
 
         if amount_fen > available:
-            raise ValueError(
-                f"余额不足: 可提现 {available} 分，请求 {amount_fen} 分"
-            )
+            raise ValueError(f"余额不足: 可提现 {available} 分，请求 {amount_fen} 分")
 
         payout_id = _gen_id("payout")
         now = _now_iso()
@@ -1476,9 +1491,9 @@ class ForgeMarketplaceService:
             "total_installs": total_installs,
             "total_revenue_fen": total_revenue,
             "category_distribution": category_counts,
-            "avg_rating": round(
-                sum(a.get("rating", 0) for a in published_apps) / len(published_apps), 2
-            ) if published_apps else 0,
+            "avg_rating": round(sum(a.get("rating", 0) for a in published_apps) / len(published_apps), 2)
+            if published_apps
+            else 0,
             "generated_at": _now_iso(),
         }
 
@@ -1509,18 +1524,20 @@ class ForgeMarketplaceService:
         for i, app in enumerate(published[:limit]):
             developer = self._developers.get(app["developer_id"], {})
             cat_info = APP_CATEGORIES.get(app["category"], {})
-            results.append({
-                "rank": i + 1,
-                "app_id": app["app_id"],
-                "app_name": app["app_name"],
-                "developer_name": developer.get("name", ""),
-                "category": app["category"],
-                "category_name": cat_info.get("name", ""),
-                "rating": app.get("rating", 0),
-                "install_count": app.get("install_count", 0),
-                "price_display": app.get("price_display", ""),
-                "trend_score": round(app.get("_trend_score", 0), 4),
-            })
+            results.append(
+                {
+                    "rank": i + 1,
+                    "app_id": app["app_id"],
+                    "app_name": app["app_name"],
+                    "developer_name": developer.get("name", ""),
+                    "category": app["category"],
+                    "category_name": cat_info.get("name", ""),
+                    "rating": app.get("rating", 0),
+                    "install_count": app.get("install_count", 0),
+                    "price_display": app.get("price_display", ""),
+                    "trend_score": round(app.get("_trend_score", 0), 4),
+                }
+            )
 
         # 清理临时字段
         for app in published:

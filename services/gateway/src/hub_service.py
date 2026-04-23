@@ -67,10 +67,7 @@ async def hub_list_stores(
 ) -> dict[str, Any]:
     offset = max(0, (page - 1) * size)
     base_params: dict[str, Any] = {}
-    where = (
-        "NOT COALESCE(s.is_deleted, false) "
-        "AND NOT COALESCE(pt.is_deleted, false)"
-    )
+    where = "NOT COALESCE(s.is_deleted, false) AND NOT COALESCE(pt.is_deleted, false)"
     if merchant_id:
         where += " AND pt.tenant_id::text = :mid"
         base_params["mid"] = merchant_id
@@ -311,9 +308,7 @@ async def hub_create_merchant(db: AsyncSession, data: dict[str, Any]) -> str:
     return new_id
 
 
-async def hub_update_merchant(
-    db: AsyncSession, merchant_id: str, updates: dict[str, Any]
-) -> bool:
+async def hub_update_merchant(db: AsyncSession, merchant_id: str, updates: dict[str, Any]) -> bool:
     """UPDATE platform_tenants，返回 True 表示找到了该行并更新。"""
     if not updates:
         return True
@@ -346,9 +341,7 @@ async def hub_update_merchant(
     return result.rowcount > 0
 
 
-async def hub_push_update(
-    db: AsyncSession, store_ids: list[str], target_version: str
-) -> int:
+async def hub_push_update(db: AsyncSession, store_ids: list[str], target_version: str) -> int:
     """将 hub_edge_devices 中指定 store_label 或 store 所属门店的目标版本写入备注，
     并在 hub_store_overlay 打上待升级标记。
     由于 hub_edge_devices 无 pending_version 列，此处更新 client_version 为目标版本以记录意图，
@@ -432,18 +425,12 @@ async def hub_create_ticket(db: AsyncSession, data: dict[str, Any]) -> str:
 
 
 async def hub_platform_stats(db: AsyncSession) -> dict[str, Any]:
-    m = await db.execute(
-        text("SELECT COUNT(*) FROM platform_tenants WHERE NOT COALESCE(is_deleted, false)")
-    )
+    m = await db.execute(text("SELECT COUNT(*) FROM platform_tenants WHERE NOT COALESCE(is_deleted, false)"))
     total_merchants = int(m.scalar_one())
-    s = await db.execute(
-        text("SELECT COUNT(*) FROM stores WHERE NOT COALESCE(is_deleted, false)")
-    )
+    s = await db.execute(text("SELECT COUNT(*) FROM stores WHERE NOT COALESCE(is_deleted, false)"))
     total_stores = int(s.scalar_one())
     active = await db.execute(
-        text(
-            "SELECT COUNT(*) FROM stores WHERE NOT COALESCE(is_deleted, false) AND status = 'active'"
-        )
+        text("SELECT COUNT(*) FROM stores WHERE NOT COALESCE(is_deleted, false) AND status = 'active'")
     )
     active_stores = int(active.scalar_one())
 

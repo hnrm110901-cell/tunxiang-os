@@ -10,6 +10,7 @@ POST /internal/wecom/send
     text_card  — 文本卡片（带按钮和跳转链接）
     news       — 图文消息
 """
+
 from __future__ import annotations
 
 from typing import Literal, Optional
@@ -32,9 +33,7 @@ router = APIRouter(prefix="/internal/wecom", tags=["wecom-internal"])
 
 class WecomSendRequest(BaseModel):
     user_id: str = Field(..., description="企微 external_userid 或员工 userid")
-    message_type: Literal["text", "text_card", "news"] = Field(
-        "text", description="消息类型"
-    )
+    message_type: Literal["text", "text_card", "news"] = Field("text", description="消息类型")
     # text
     content: Optional[str] = Field(None, description="文本消息内容（message_type=text 时使用）")
     # text_card

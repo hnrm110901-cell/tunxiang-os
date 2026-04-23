@@ -309,6 +309,7 @@ _brute_force_guard = LoginBruteForceProtection()
 # 工具函数
 # ─────────────────────────────────────────────────────────────────
 
+
 def _extract_token(request: Request) -> Optional[str]:
     auth = request.headers.get("Authorization", "")
     if auth.startswith("Bearer "):
@@ -489,6 +490,7 @@ async def _issue_tokens(
 # Request / Response 模型
 # ─────────────────────────────────────────────────────────────────
 
+
 class LoginBody(BaseModel):
     username: str = Field(..., min_length=1, max_length=64)
     password: str = Field(..., min_length=1)
@@ -510,6 +512,7 @@ class MFASetupEnableBody(BaseModel):
 # ─────────────────────────────────────────────────────────────────
 # 步骤1：登录（密码验证）
 # ─────────────────────────────────────────────────────────────────
+
 
 @router.post("/login")
 async def login(body: LoginBody, request: Request):
@@ -556,9 +559,7 @@ async def login(body: LoginBody, request: Request):
         ph: Optional[str] = db_user_row.get("password_hash")
         if ph:
             try:
-                password_ok = bcrypt.checkpw(
-                    body.password.encode(), ph.encode()
-                )
+                password_ok = bcrypt.checkpw(body.password.encode(), ph.encode())
             except (ValueError, TypeError):
                 password_ok = False
         if password_ok:
@@ -630,11 +631,13 @@ async def login(body: LoginBody, request: Request):
             "failed_count": 0,
         }
         logger.info("login_mfa_required", username=username, ip=ip)
-        return ok({
-            "step": "mfa_required",
-            "session_token": session_token,
-            "expires_in": _MFA_SESSION_TTL_SECONDS,
-        })
+        return ok(
+            {
+                "step": "mfa_required",
+                "session_token": session_token,
+                "expires_in": _MFA_SESSION_TTL_SECONDS,
+            }
+        )
 
     # 5. 未启用MFA，直接签发token
     tokens = await _issue_tokens(
@@ -676,17 +679,20 @@ async def login(body: LoginBody, request: Request):
     except (OperationalError, SQLAlchemyError) as audit_exc:
         logger.warning("audit_log_write_failed", error=str(audit_exc))
 
-    return ok({
-        **tokens,
-        "user": user_info,
-        # 向后兼容字段
-        "token": legacy_token,
-    })
+    return ok(
+        {
+            **tokens,
+            "user": user_info,
+            # 向后兼容字段
+            "token": legacy_token,
+        }
+    )
 
 
 # ─────────────────────────────────────────────────────────────────
 # 步骤2：MFA验证
 # ─────────────────────────────────────────────────────────────────
+
 
 @router.post("/mfa/verify")
 async def mfa_verify(body: MFAVerifyBody, request: Request):
@@ -819,16 +825,19 @@ async def mfa_verify(body: MFAVerifyBody, request: Request):
     except (OperationalError, SQLAlchemyError) as audit_exc:
         logger.warning("audit_log_write_failed", error=str(audit_exc))
 
-    return ok({
-        **tokens,
-        "user": user_info,
-        "token": legacy_token,
-    })
+    return ok(
+        {
+            **tokens,
+            "user": user_info,
+            "token": legacy_token,
+        }
+    )
 
 
 # ─────────────────────────────────────────────────────────────────
 # Refresh Token
 # ─────────────────────────────────────────────────────────────────
+
 
 @router.post("/refresh")
 async def refresh_token(body: RefreshBody, request: Request):
@@ -955,6 +964,7 @@ async def refresh_token(body: RefreshBody, request: Request):
 # 登出
 # ─────────────────────────────────────────────────────────────────
 
+
 @router.post("/logout")
 async def logout(request: Request, body: Optional[RefreshBody] = None):
     """撤销 refresh_token，使会话失效。
@@ -1012,6 +1022,7 @@ async def logout(request: Request, body: Optional[RefreshBody] = None):
 # ─────────────────────────────────────────────────────────────────
 # 当前用户信息
 # ─────────────────────────────────────────────────────────────────
+
 
 @router.get("/me")
 async def me(request: Request):
@@ -1082,6 +1093,7 @@ async def me(request: Request):
 # MFA 设置端点
 # ─────────────────────────────────────────────────────────────────
 
+
 @router.post("/mfa/setup")
 async def mfa_setup(request: Request):
     """返回 TOTP setup URI（用于前端生成二维码）。
@@ -1124,10 +1136,12 @@ async def mfa_setup(request: Request):
     totp_uri = _mfa_service.get_totp_uri(encrypted_secret, username or "")
 
     logger.info("mfa_setup_initiated", user_id=user_id)
-    return ok({
-        "totp_uri": totp_uri,
-        "message": "请使用验证器App（Google Authenticator/Authy）扫描二维码，然后调用 /mfa/enable 提交验证码",
-    })
+    return ok(
+        {
+            "totp_uri": totp_uri,
+            "message": "请使用验证器App（Google Authenticator/Authy）扫描二维码，然后调用 /mfa/enable 提交验证码",
+        }
+    )
 
 
 @router.post("/mfa/enable")
@@ -1229,16 +1243,19 @@ async def mfa_enable(body: MFASetupEnableBody, request: Request):
     except (OperationalError, SQLAlchemyError) as audit_exc:
         logger.warning("audit_log_write_failed", error=str(audit_exc))
 
-    return ok({
-        "message": "MFA已成功启用",
-        "backup_codes": backup_codes_plain,
-        "backup_codes_warning": "请将备用码保存在安全位置，每个备用码只能使用一次，丢失后无法找回",
-    })
+    return ok(
+        {
+            "message": "MFA已成功启用",
+            "backup_codes": backup_codes_plain,
+            "backup_codes_warning": "请将备用码保存在安全位置，每个备用码只能使用一次，丢失后无法找回",
+        }
+    )
 
 
 # ─────────────────────────────────────────────────────────────────
 # 向后兼容端点（旧版 verify）
 # ─────────────────────────────────────────────────────────────────
+
 
 @router.get("/verify")
 async def verify_token(request: Request):
@@ -1258,19 +1275,23 @@ async def verify_token(request: Request):
         db_user = await _load_user_dict_by_id(user_id)
         if db_user:
             uname = db_user["username"]
-            return ok({
-                "valid": True,
-                "user": _user_info_from_demo(uname, db_user),
-                "mfa_verified": payload.get("mfa_verified", False),
-            })
+            return ok(
+                {
+                    "valid": True,
+                    "user": _user_info_from_demo(uname, db_user),
+                    "mfa_verified": payload.get("mfa_verified", False),
+                }
+            )
         if _demo_auth_enabled():
             for username, user in DEMO_USERS.items():
                 if user["user_id"] == user_id:
-                    return ok({
-                        "valid": True,
-                        "user": _user_info_from_demo(username, user),
-                        "mfa_verified": payload.get("mfa_verified", False),
-                    })
+                    return ok(
+                        {
+                            "valid": True,
+                            "user": _user_info_from_demo(username, user),
+                            "mfa_verified": payload.get("mfa_verified", False),
+                        }
+                    )
         return ok({"valid": False, "user": None})
 
     # 回退：旧版内存 token

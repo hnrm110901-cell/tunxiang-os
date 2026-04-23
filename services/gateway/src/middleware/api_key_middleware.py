@@ -11,7 +11,6 @@
 """
 
 import os
-import time
 
 import structlog
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -68,9 +67,7 @@ class ApiKeyMiddleware(BaseHTTPMiddleware):
         # 格式校验：API Key 应以 txapp_ 或 txat_ 开头
         if not api_key.startswith(("txapp_", "txat_")):
             logger.warning("api_key_invalid_format", key_prefix=api_key[:10])
-            return _error_response(
-                401, "INVALID_API_KEY", "API Key format is invalid"
-            )
+            return _error_response(401, "INVALID_API_KEY", "API Key format is invalid")
 
         # 尝试查询数据库验证
         app_info = await self._verify_api_key(api_key)
@@ -81,9 +78,7 @@ class ApiKeyMiddleware(BaseHTTPMiddleware):
                 key_prefix=api_key[:10],
                 path=request.url.path,
             )
-            return _error_response(
-                401, "INVALID_API_KEY", "API Key is invalid or revoked"
-            )
+            return _error_response(401, "INVALID_API_KEY", "API Key is invalid or revoked")
 
         # 注入认证信息
         request.state.auth_method = "api_key"
