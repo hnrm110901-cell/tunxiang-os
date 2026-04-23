@@ -1,3 +1,29 @@
+## 2026-04-23 Sprint D4a — 成本根因分析 Sonnet 4.7 + Prompt Cache（≥75% 命中）
+
+### 今日完成
+- [model_router.py] 3 D4 task_types 注册（cost_root_cause / salary_anomaly / budget_forecast → COMPLEX）
+- [v279_cost_root_cause_analyses.py] 5 态 status + 3 analysis_type + UNIQUE (tenant,store,month) for monthly + RLS + 3 索引 + Prompt Cache 4 字段
+- [cost_root_cause_service.py] CachedPromptBuilder（2 段 cacheable system）+ CostRootCauseService（触发阈值 / parse 鲁棒 / fallback 规则引擎 / cache_hit_rate 自动计算）
+- [cost_root_cause_routes.py] 3 端点：/analyze /review/{id} /summary（含 cache 命中率统计）
+- [test_d4a_cost_root_cause.py] 27 TDD 全绿
+
+### 数据变化
+- 迁移：v278 → v279
+- 新增文件：4，修改：1
+- 新增测试：27（全绿）
+- ruff：All checks passed!
+
+### 遗留问题
+- 生产 Anthropic SDK invoker 未默认注入
+- 首月 Prompt Cache 命中率可能 <75%（需建稳态 cache）
+- Sonnet JSON 格式解析依赖 schema 严格度
+
+### 明日计划
+- D4b 薪资异常（salary_anomaly_detection）
+- D4c 预算预测（budget_forecast_analysis）
+
+---
+
 ## 2026-04-18 Sprint D1 批次 2 — 出餐体验 7 Skill + 2 Skill 填 context（PR H）
 
 ### 今日完成

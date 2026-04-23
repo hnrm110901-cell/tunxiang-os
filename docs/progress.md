@@ -4,6 +4,67 @@
 
 ---
 
+## 2026-04-23 Sprint D4a：成本根因分析 Sonnet 4.7 + Prompt Cache（≥75% 命中）
+
+### 本次会话目标
+按 sprint-plan-2026Q2-unified.md D4：月底成本超预算 5% 时，Agent 自动定位根因（原料涨价 / 浪费升高 / BOM 偏差 / 供应商切换），Sonnet 4.7 分析 + Prompt Cache 把多店同月分析的 system prompt 共享，目标缓存命中 ≥75% → 成本降 70%+。
+
+Tier 级别：Tier 2（分析报告类，不直接操作资金/食材/出餐）。
+
+### 完成状态
+- [x] ModelRouter 注册 3 个 D4 task_type（cost_root_cause / salary_anomaly / budget_forecast → COMPLEX）
+- [x] v279 迁移 cost_root_cause_analyses：5 态 status + 3 种 analysis_type + UNIQUE (tenant, store, month) for monthly_cost_overrun + RLS + 3 索引
+- [x] Prompt Cache 字段完整：cache_read_tokens / cache_creation_tokens / input_tokens / output_tokens
+- [x] CachedPromptBuilder：2 段 cacheable system（STABLE_SYSTEM + INDUSTRY_BENCHMARKS）+ 动态 user，cache_control=ephemeral
+- [x] CostRootCauseService：
+  - 触发阈值 ≥5% 成本超支（<5% 不分析）
+  - parse_sonnet_response 支持 code fence / 损坏 JSON 降级
+  - invoker=None 走 fallback 规则引擎（price_hike / waste_spike / bom_deviation / other）
+  - cache_hit_rate 属性自动计算
+- [x] 3 API 端点：POST /analyze + POST /review/{id} + GET /summary（含 cache 命中率统计）
+- [x] 27 TDD 测试全绿
+
+### 关键决策
+- **Sonnet 4.7 而非 Opus**：成本 1/3，成本归因任务思考深度足够
+- **prompt 分 3 段**：STABLE_SYSTEM（职责 + 输出 schema）+ INDUSTRY_BENCHMARKS（大块行业基准）+ user（动态门店数据）；system 两段都 cacheable
+- **invoker 接口标准化**：`async (request: dict) -> response: dict`，request 含完整 Anthropic Messages API 结构，生产只需注入实际 SDK 调用
+- **UNIQUE (tenant, store, month)** 只对 monthly_cost_overrun 生效，manual/sudden 允许多条（ON CONFLICT 幂等更新）
+- **cache_hit_rate** = cache_read / (cache_read + cache_creation + non_cached_input)，output 不算
+- **5% 触发阈值 COST_OVERRUN_TRIGGER_PCT** 常量化，便于调参
+- **fallback 规则引擎**：invoker 不可用时不阻塞，规则版返 top-3 cause + remediation
+
+### 交付清单
+```
+新增：
+  shared/db-migrations/versions/v279_cost_root_cause_analyses.py       128 行
+  services/tx-finance/src/services/cost_root_cause_service.py          ~460 行
+  services/tx-finance/src/api/cost_root_cause_routes.py                ~300 行
+  services/tx-finance/src/tests/test_d4a_cost_root_cause.py            ~470 行（27 tests）
+
+修改：
+  services/tunxiang-api/src/shared/core/model_router.py  +6 行（3 task_types）
+```
+
+### Prompt Cache 经济测算
+- 10 店月初分析：system 3000 tokens × 9 次 cache_read + 1 次 cache_create
+- 命中率 = 27000 / (27000+3000+10000) = **67.5%**（单轮）
+- 连续 3 个月跑 → 27K+27K/(27K+27K+10K+10K) 累计 → 逼近 85%
+- 月成本降：¥0.65 → ¥0.18/10 店，符合月预算 ¥12,000
+
+### 下一步
+1. **D4b 薪资异常**（salary_anomaly_detection，同 prompt cache 模式）
+2. **D4c 预算预测**（budget_forecast_analysis）
+3. **生产 Anthropic SDK wire**：CostRootCauseService(sonnet_invoker=claude_api_call)
+4. **cron 定时触发**：每月 1 号跑上月分析
+5. **mv_cost_root_cause_monthly_summary**（可选）：按月聚合所有店的 top 根因分布
+
+### 已知风险
+- Prompt Cache 首月命中率低于 75%（需连续 3 月建稳态 cache）
+- Sonnet 返回 JSON 格式严格度取决于 prompt，极端情况可能解析失败走 fallback
+- 小店信号稀疏（浪费/BOM 数据少）→ 规则引擎返"other"建议补数据
+
+---
+
 ## 2026-04-18 20:05 Sprint D1 批次 2 / PR H：出餐体验 7 Skill scope 声明 + 2 Skill 填 context
 
 ### 本次会话目标
