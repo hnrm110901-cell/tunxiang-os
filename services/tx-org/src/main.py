@@ -78,6 +78,7 @@ from api.region_management_routes import router as region_management_router
 from api.revenue_schedule_routes import router as revenue_schedule_router
 from api.role_api import router as role_router
 from api.salary_items import router as salary_items_router
+from api.sales_target_routes import router as sales_target_router
 from api.schedule import router as schedule_router
 from api.schedule_routes import router as schedule_v2_router
 from api.staffing_analysis_routes import router as staffing_analysis_router
@@ -241,6 +242,7 @@ app.include_router(attendance_compliance_router)  # 考勤深度合规审计（v
 from api.franchise_fee_routes import router as franchise_fee_router
 
 app.include_router(franchise_fee_router)  # 加盟收费闭环（天财对标）账单/收款/出账规则/报表
+app.include_router(sales_target_router)  # 销售目标管理（Sprint R1 Track C，v266表）年/月/员工目标+进度追踪
 app.include_router(task_router)  # 统一任务引擎（Sprint R1 Track B，v265表）10 类任务派单/完成/升级
 
 
