@@ -12,8 +12,7 @@
 
 from __future__ import annotations
 
-from datetime import date, datetime, timezone
-from typing import Any, Optional
+from typing import Any
 
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
@@ -32,9 +31,7 @@ router = APIRouter(prefix="/api/v1/hr/governance", tags=["governance"])
 
 
 def _get_tenant_id(request: Request) -> str:
-    tid = getattr(request.state, "tenant_id", None) or request.headers.get(
-        "X-Tenant-ID", ""
-    )
+    tid = getattr(request.state, "tenant_id", None) or request.headers.get("X-Tenant-ID", "")
     if not tid:
         raise HTTPException(status_code=400, detail="X-Tenant-ID header required")
     return tid
@@ -161,14 +158,16 @@ async def governance_dashboard(
 
     avg_labor_cost_rate = round(total_salary_fen / max(1, total_rev), 4) if total_rev > 0 else 0
 
-    return _ok({
-        "total_headcount": total_headcount,
-        "by_brand": by_brand,
-        "by_region": by_region,
-        "avg_attendance_rate": avg_attendance_rate,
-        "avg_labor_cost_rate": avg_labor_cost_rate,
-        "productivity_per_person_fen": productivity_per_person_fen,
-    })
+    return _ok(
+        {
+            "total_headcount": total_headcount,
+            "by_brand": by_brand,
+            "by_region": by_region,
+            "avg_attendance_rate": avg_attendance_rate,
+            "avg_labor_cost_rate": avg_labor_cost_rate,
+            "productivity_per_person_fen": productivity_per_person_fen,
+        }
+    )
 
 
 @router.get("/benchmark")
@@ -233,12 +232,14 @@ async def governance_benchmark(
         """)
     else:
         # labor_cost_rate — 需要薪资数据，暂 mock
-        return _ok({
-            "metric": metric,
-            "stores": [],
-            "average": 0,
-            "note": "劳动力成本率需接入薪资模块，暂无数据",
-        })
+        return _ok(
+            {
+                "metric": metric,
+                "stores": [],
+                "average": 0,
+                "note": "劳动力成本率需接入薪资模块，暂无数据",
+            }
+        )
 
     try:
         result = await db.execute(q, {"tenant_id": tenant_id})
@@ -256,19 +257,23 @@ async def governance_benchmark(
     stores = []
     for rank, r in enumerate(rows, 1):
         val = float(r.get("metric_value") or 0)
-        stores.append({
-            "store_id": str(r.get("store_id") or ""),
-            "store_name": str(r.get("store_name") or ""),
-            "metric_value": round(val, 4),
-            "rank": rank,
-            "diff_from_avg": round(val - avg_val, 4),
-        })
+        stores.append(
+            {
+                "store_id": str(r.get("store_id") or ""),
+                "store_name": str(r.get("store_name") or ""),
+                "metric_value": round(val, 4),
+                "rank": rank,
+                "diff_from_avg": round(val - avg_val, 4),
+            }
+        )
 
-    return _ok({
-        "metric": metric,
-        "stores": stores,
-        "average": round(avg_val, 4),
-    })
+    return _ok(
+        {
+            "metric": metric,
+            "stores": stores,
+            "average": round(avg_val, 4),
+        }
+    )
 
 
 @router.get("/staffing")
@@ -312,21 +317,25 @@ async def governance_staffing(
         diff = actual - target
         total_target += target
         total_actual += actual
-        stores.append({
-            "store_id": str(r.get("store_id") or ""),
-            "store_name": str(r.get("store_name") or ""),
-            "staffing_target": target,
-            "actual_count": actual,
-            "diff": diff,
-            "status": "over" if diff > 0 else ("under" if diff < 0 else "balanced"),
-        })
+        stores.append(
+            {
+                "store_id": str(r.get("store_id") or ""),
+                "store_name": str(r.get("store_name") or ""),
+                "staffing_target": target,
+                "actual_count": actual,
+                "diff": diff,
+                "status": "over" if diff > 0 else ("under" if diff < 0 else "balanced"),
+            }
+        )
 
-    return _ok({
-        "stores": stores,
-        "total_target": total_target,
-        "total_actual": total_actual,
-        "total_diff": total_actual - total_target,
-    })
+    return _ok(
+        {
+            "stores": stores,
+            "total_target": total_target,
+            "total_actual": total_actual,
+            "total_diff": total_actual - total_target,
+        }
+    )
 
 
 @router.get("/risk-stores")
@@ -417,34 +426,32 @@ async def governance_risk_stores(
         late_rate = float(att.get("late_rate") or 0)
         alert_rate = alert_map.get(store_id, 0)
         store_salary = salary_map.get(store_id, 0)
-        cost_deviation = (
-            abs(store_salary - _avg_salary) / max(1, _avg_salary)
-            if _avg_salary > 0 else 0
-        )
+        cost_deviation = abs(store_salary - _avg_salary) / max(1, _avg_salary) if _avg_salary > 0 else 0
 
         # 综合评分（越高越好）
         score = (
-            attendance_rate * 0.3
-            + (1.0 - late_rate) * 0.2
-            + (1.0 - alert_rate) * 0.3
-            + (1.0 - cost_deviation) * 0.2
+            attendance_rate * 0.3 + (1.0 - late_rate) * 0.2 + (1.0 - alert_rate) * 0.3 + (1.0 - cost_deviation) * 0.2
         )
 
-        stores.append({
-            "store_id": store_id,
-            "store_name": str(att.get("store_name") or ""),
-            "attendance_rate": round(attendance_rate, 4),
-            "late_rate": round(late_rate, 4),
-            "alert_rate": round(alert_rate, 4),
-            "cost_deviation": round(cost_deviation, 4),
-            "composite_score": round(score, 4),
-            "total_records": int(att.get("total_records") or 0),
-        })
+        stores.append(
+            {
+                "store_id": store_id,
+                "store_name": str(att.get("store_name") or ""),
+                "attendance_rate": round(attendance_rate, 4),
+                "late_rate": round(late_rate, 4),
+                "alert_rate": round(alert_rate, 4),
+                "cost_deviation": round(cost_deviation, 4),
+                "composite_score": round(score, 4),
+                "total_records": int(att.get("total_records") or 0),
+            }
+        )
 
     # 按评分升序（低分=高风险）
     stores.sort(key=lambda s: s["composite_score"])
 
-    return _ok({
-        "stores": stores,
-        "total_stores": len(stores),
-    })
+    return _ok(
+        {
+            "stores": stores,
+            "total_stores": len(stores),
+        }
+    )

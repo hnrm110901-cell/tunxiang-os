@@ -58,6 +58,7 @@ WORK_DAYS_MARCH_2026 = count_work_days(2026, 3)
 #  1. 全职员工基本工资按出勤天数正确计算
 # ═══════════════════════════════════════════════════════
 
+
 class TestBaseSalaryProration:
     """基本工资按出勤比例计算"""
 
@@ -93,6 +94,7 @@ class TestBaseSalaryProration:
 #  2. 迟到扣款累积
 # ═══════════════════════════════════════════════════════
 
+
 class TestLateDeductionAccumulation:
     """迟到扣款按次累积"""
 
@@ -110,7 +112,9 @@ class TestLateDeductionAccumulation:
         """通过 V2 引擎验证迟到后应发减少"""
         engine = PayrollEngineV2()
         record_no_late = engine.compute_monthly(
-            tenant_id=TENANT_ID, employee_id=EMP_ID, store_id=STORE_ID,
+            tenant_id=TENANT_ID,
+            employee_id=EMP_ID,
+            store_id=STORE_ID,
             payroll_month="2026-03",
             base_salary_fen=600_000,
             work_days_in_month=WORK_DAYS_MARCH_2026,
@@ -120,7 +124,9 @@ class TestLateDeductionAccumulation:
             early_leave_count=0,
         )
         record_3_late = engine.compute_monthly(
-            tenant_id=TENANT_ID, employee_id=EMP_ID, store_id=STORE_ID,
+            tenant_id=TENANT_ID,
+            employee_id=EMP_ID,
+            store_id=STORE_ID,
             payroll_month="2026-03",
             base_salary_fen=600_000,
             work_days_in_month=WORK_DAYS_MARCH_2026,
@@ -140,15 +146,14 @@ class TestLateDeductionAccumulation:
 
     def test_full_attendance_bonus_lost_on_late(self):
         """有迟到时全勤奖不发放"""
-        bonus = compute_full_attendance_bonus(
-            absence_days=0, late_count=1, early_leave_count=0, bonus_fen=30_000
-        )
+        bonus = compute_full_attendance_bonus(absence_days=0, late_count=1, early_leave_count=0, bonus_fen=30_000)
         assert bonus == 0
 
 
 # ═══════════════════════════════════════════════════════
 #  3. 旷工按日薪扣减
 # ═══════════════════════════════════════════════════════
+
 
 class TestAbsenceDeductionByDailyRate:
     """旷工按日薪（月薪/工作日）扣减"""
@@ -160,7 +165,7 @@ class TestAbsenceDeductionByDailyRate:
             absence_days=1,
             work_days_in_month=22,
         )
-        daily = 440_000 // 22   # = 20000 分 = 200 元
+        daily = 440_000 // 22  # = 20000 分 = 200 元
         assert deduction == daily
 
     def test_two_day_absence(self):
@@ -178,7 +183,9 @@ class TestAbsenceDeductionByDailyRate:
         """通过 V2 引擎验证旷工扣款"""
         engine = PayrollEngineV2()
         record = engine.compute_monthly(
-            tenant_id=TENANT_ID, employee_id=EMP_ID, store_id=STORE_ID,
+            tenant_id=TENANT_ID,
+            employee_id=EMP_ID,
+            store_id=STORE_ID,
             payroll_month="2026-03",
             base_salary_fen=440_000,
             work_days_in_month=22,
@@ -187,13 +194,14 @@ class TestAbsenceDeductionByDailyRate:
             late_count=0,
             early_leave_count=0,
         )
-        expected_deduction = (440_000 // 22) * 2 / 100   # 元
+        expected_deduction = (440_000 // 22) * 2 / 100  # 元
         assert record.attendance_deduction == pytest.approx(expected_deduction, abs=0.5)
 
 
 # ═══════════════════════════════════════════════════════
 #  4. 加班 1.5 倍工资
 # ═══════════════════════════════════════════════════════
+
 
 class TestOvertimePay:
     """加班工资按倍率计算"""
@@ -223,21 +231,29 @@ class TestOvertimePay:
         """通过 V2 引擎验证加班后应发增加"""
         engine = PayrollEngineV2()
         base = engine.compute_monthly(
-            tenant_id=TENANT_ID, employee_id=EMP_ID, store_id=STORE_ID,
+            tenant_id=TENANT_ID,
+            employee_id=EMP_ID,
+            store_id=STORE_ID,
             payroll_month="2026-03",
             base_salary_fen=440_000,
             work_days_in_month=22,
             attendance_days=22,
-            absence_days=0, late_count=0, early_leave_count=0,
+            absence_days=0,
+            late_count=0,
+            early_leave_count=0,
             overtime_weekday_hours=0,
         )
         with_ot = engine.compute_monthly(
-            tenant_id=TENANT_ID, employee_id=EMP_ID, store_id=STORE_ID,
+            tenant_id=TENANT_ID,
+            employee_id=EMP_ID,
+            store_id=STORE_ID,
             payroll_month="2026-03",
             base_salary_fen=440_000,
             work_days_in_month=22,
             attendance_days=22,
-            absence_days=0, late_count=0, early_leave_count=0,
+            absence_days=0,
+            late_count=0,
+            early_leave_count=0,
             overtime_weekday_hours=4,
         )
         # 加班费 = 时薪 * 1.5 * 4 小时（单位元）
@@ -250,6 +266,7 @@ class TestOvertimePay:
 # ═══════════════════════════════════════════════════════
 #  5. 个税免征额以上累进计算
 # ═══════════════════════════════════════════════════════
+
 
 class TestIncomeTaxProgressive:
     """个税在免征额（5000元/月）以上累进计算"""
@@ -283,7 +300,7 @@ class TestIncomeTaxProgressive:
         """累计收入超过 36000 元应纳税所得后进入 10% 档"""
         calc = IncomeTaxCalculator()
         # 月收入 15000，社保 2000，从第 4 月开始（前 3 月累计 45000）
-        ytd_si = 2_000.0 * 3 + 2_000.0   # 前3月 + 当月
+        ytd_si = 2_000.0 * 3 + 2_000.0  # 前3月 + 当月
         result = calc.calculate_monthly(
             current_month_income=15_000.0,
             ytd_income=15_000.0 * 3,
@@ -301,7 +318,7 @@ class TestIncomeTaxProgressive:
         result = calc.calculate_monthly(
             current_month_income=5_500.0,
             ytd_income=0.0,
-            ytd_tax_paid=99999.0,   # 异常大的已缴税额
+            ytd_tax_paid=99999.0,  # 异常大的已缴税额
             ytd_social_insurance=500.0,
             month_index=1,
         )
@@ -311,6 +328,7 @@ class TestIncomeTaxProgressive:
 # ═══════════════════════════════════════════════════════
 #  6. 提成按销售比例
 # ═══════════════════════════════════════════════════════
+
 
 class TestCommissionCalculation:
     """提成按销售额 × 提成率计算"""
@@ -329,21 +347,32 @@ class TestCommissionCalculation:
         """提成计入应发工资"""
         engine = PayrollEngineV2()
         no_commission = engine.compute_monthly(
-            tenant_id=TENANT_ID, employee_id=EMP_ID, store_id=STORE_ID,
+            tenant_id=TENANT_ID,
+            employee_id=EMP_ID,
+            store_id=STORE_ID,
             payroll_month="2026-03",
             base_salary_fen=600_000,
-            work_days_in_month=22, attendance_days=22,
-            absence_days=0, late_count=0, early_leave_count=0,
-            sales_amount_fen=0, commission_rate=0.0,
+            work_days_in_month=22,
+            attendance_days=22,
+            absence_days=0,
+            late_count=0,
+            early_leave_count=0,
+            sales_amount_fen=0,
+            commission_rate=0.0,
         )
         with_commission = engine.compute_monthly(
-            tenant_id=TENANT_ID, employee_id=EMP_ID, store_id=STORE_ID,
+            tenant_id=TENANT_ID,
+            employee_id=EMP_ID,
+            store_id=STORE_ID,
             payroll_month="2026-03",
             base_salary_fen=600_000,
-            work_days_in_month=22, attendance_days=22,
-            absence_days=0, late_count=0, early_leave_count=0,
-            sales_amount_fen=1_000_000,   # 1 万元
-            commission_rate=0.02,           # 2%
+            work_days_in_month=22,
+            attendance_days=22,
+            absence_days=0,
+            late_count=0,
+            early_leave_count=0,
+            sales_amount_fen=1_000_000,  # 1 万元
+            commission_rate=0.02,  # 2%
         )
         # 提成 200 元计入应发
         diff = with_commission.gross_salary - no_commission.gross_salary
@@ -353,6 +382,7 @@ class TestCommissionCalculation:
 # ═══════════════════════════════════════════════════════
 #  7. 社保三项扣款（养老 8% / 医疗 2% / 失业 0.3%）
 # ═══════════════════════════════════════════════════════
+
 
 class TestSocialInsuranceThreeItems:
     """五险一金分项计算（长沙标准）"""
@@ -419,6 +449,7 @@ class TestSocialInsuranceThreeItems:
 #  8. 实发 = 应发 - 各项扣款
 # ═══════════════════════════════════════════════════════
 
+
 class TestNetSalaryFormula:
     """实发工资公式验证"""
 
@@ -447,11 +478,16 @@ class TestNetSalaryFormula:
         """实发工资不为负"""
         engine = PayrollEngineV2()
         record = engine.compute_monthly(
-            tenant_id=TENANT_ID, employee_id=EMP_ID, store_id=STORE_ID,
+            tenant_id=TENANT_ID,
+            employee_id=EMP_ID,
+            store_id=STORE_ID,
             payroll_month="2026-03",
             base_salary_fen=450_000,
-            work_days_in_month=22, attendance_days=22,
-            absence_days=0, late_count=0, early_leave_count=0,
+            work_days_in_month=22,
+            attendance_days=22,
+            absence_days=0,
+            late_count=0,
+            early_leave_count=0,
         )
         assert record.net_salary >= 0.0
 
@@ -459,18 +495,20 @@ class TestNetSalaryFormula:
         """全流程：基本工资 + 迟到扣款 + 社保 + 个税 → 实发"""
         engine = PayrollEngineV2()
         record = engine.compute_monthly(
-            tenant_id=TENANT_ID, employee_id=EMP_ID, store_id=STORE_ID,
+            tenant_id=TENANT_ID,
+            employee_id=EMP_ID,
+            store_id=STORE_ID,
             payroll_month="2026-03",
             base_salary_fen=600_000,
             work_days_in_month=22,
-            attendance_days=21,     # 缺勤 1 天
+            attendance_days=21,  # 缺勤 1 天
             absence_days=1,
-            late_count=2,           # 迟到 2 次 × 50 元
+            late_count=2,  # 迟到 2 次 × 50 元
             early_leave_count=0,
             late_deduction_per_time_fen=5_000,
-            sales_amount_fen=500_000,   # 5000 元销售额
-            commission_rate=0.02,        # 2% 提成 = 100 元
-            overtime_weekday_hours=3,   # 3小时工作日加班
+            sales_amount_fen=500_000,  # 5000 元销售额
+            commission_rate=0.02,  # 2% 提成 = 100 元
+            overtime_weekday_hours=3,  # 3小时工作日加班
             month_index=3,
         )
         # 实发 = 应发（含提成/加班） - 考勤扣款 - 社保个人 - 个税，均 >= 0
@@ -483,6 +521,7 @@ class TestNetSalaryFormula:
 # ═══════════════════════════════════════════════════════
 #  附加：attendance_summary 降级逻辑测试（单元测试）
 # ═══════════════════════════════════════════════════════
+
 
 class TestAttendanceSummaryDefaultFields:
     """验证考勤汇总的默认字段填充逻辑（非 DB 版，针对字典操作）"""

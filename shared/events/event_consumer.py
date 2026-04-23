@@ -6,6 +6,7 @@
 - 支持从指定 ID 重放事件（运维用）
 - 禁止 broad except，所有异常类型明确列举
 """
+
 from __future__ import annotations
 
 import json
@@ -14,7 +15,7 @@ from uuid import UUID
 
 import structlog
 
-from .event_publisher import REDIS_URL, STREAM_KEY, MemberEventPublisher
+from .event_publisher import STREAM_KEY, MemberEventPublisher
 from .member_events import MemberEvent, MemberEventType
 
 logger = structlog.get_logger(__name__)
@@ -115,6 +116,7 @@ class MemberEventConsumer:
                 )
                 # 短暂等待后重试（避免错误风暴）
                 import asyncio
+
                 await asyncio.sleep(2)
                 continue
             except OSError as exc:
@@ -124,6 +126,7 @@ class MemberEventConsumer:
                     error=str(exc),
                 )
                 import asyncio
+
                 await asyncio.sleep(5)
                 # 重置连接
                 MemberEventPublisher._redis = None
@@ -136,9 +139,7 @@ class MemberEventConsumer:
 
             for _stream, entries in messages:
                 for entry_id, fields in entries:
-                    await self._process_entry(
-                        redis, entry_id, fields, handler
-                    )
+                    await self._process_entry(redis, entry_id, fields, handler)
 
     async def _process_entry(
         self,
@@ -314,9 +315,7 @@ def _deserialize_event(fields: dict[str, str]) -> MemberEvent:
 
     from datetime import datetime, timezone
 
-    occurred_at_str: str = fields.get(
-        "occurred_at", datetime.now(timezone.utc).isoformat()
-    )
+    occurred_at_str: str = fields.get("occurred_at", datetime.now(timezone.utc).isoformat())
     try:
         occurred_at = datetime.fromisoformat(occurred_at_str)
     except ValueError:

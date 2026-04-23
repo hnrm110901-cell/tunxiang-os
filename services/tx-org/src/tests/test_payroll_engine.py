@@ -107,8 +107,8 @@ class TestComputeCommission:
     def test_tiered_commission(self):
         """阶梯提成"""
         tiers = [
-            (500_000, 0.03),       # 0-5000 元: 3%
-            (1_000_000, 0.05),     # 5000-10000 元: 5%
+            (500_000, 0.03),  # 0-5000 元: 3%
+            (1_000_000, 0.05),  # 5000-10000 元: 5%
             (float("inf"), 0.08),  # 10000+ 元: 8%
         ]
         # 销售额 8000 元 = 800000 分
@@ -200,14 +200,20 @@ class TestFullAttendanceBonus:
     def test_qualify(self):
         """全勤时发放"""
         result = compute_full_attendance_bonus(
-            absence_days=0, late_count=0, early_leave_count=0, bonus_fen=30_000,
+            absence_days=0,
+            late_count=0,
+            early_leave_count=0,
+            bonus_fen=30_000,
         )
         assert result == 30_000
 
     def test_disqualify_late(self):
         """有迟到不发放"""
         result = compute_full_attendance_bonus(
-            absence_days=0, late_count=1, early_leave_count=0, bonus_fen=30_000,
+            absence_days=0,
+            late_count=1,
+            early_leave_count=0,
+            bonus_fen=30_000,
         )
         assert result == 0
 

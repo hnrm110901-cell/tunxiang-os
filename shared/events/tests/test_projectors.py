@@ -12,30 +12,30 @@
   - 直接调用 handle() 方法验证 SQL 参数
   - 不依赖 PostgreSQL、Redis 或任何网络资源
 """
+
 from __future__ import annotations
 
-import asyncio
 import json
 import uuid
 from contextlib import asynccontextmanager
-from datetime import date, datetime, timezone, timedelta
-from unittest.mock import AsyncMock, MagicMock, patch, call
+from datetime import date, datetime, timedelta, timezone
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-# ── 被测模块 ──────────────────────────────────────────────────────────────────
+from shared.events.src.projector import ProjectorBase
+from shared.events.src.projectors.channel_margin import ChannelMarginProjector
 
+# ── 被测模块 ──────────────────────────────────────────────────────────────────
 from shared.events.src.projectors.discount_health import (
     DiscountHealthProjector,
     _classify_leak_type,
 )
+from shared.events.src.projectors.energy_efficiency import EnergyEfficiencyProjector
 from shared.events.src.projectors.safety_compliance import (
     SafetyComplianceProjector,
     _iso_week_monday,
 )
-from shared.events.src.projectors.energy_efficiency import EnergyEfficiencyProjector
-from shared.events.src.projectors.channel_margin import ChannelMarginProjector
-from shared.events.src.projector import ProjectorBase
 
 # ── 测试固定值 ─────────────────────────────────────────────────────────────────
 
@@ -83,7 +83,6 @@ def _mock_conn() -> AsyncMock:
 
 
 class TestDiscountHealthProjector:
-
     def setup_method(self):
         self.proj = DiscountHealthProjector(tenant_id=TENANT_ID)
 
@@ -107,12 +106,15 @@ class TestDiscountHealthProjector:
     async def test_discount_applied_updates_stats(self):
         """discount.applied 应触发：UPSERT + UPDATE discounted_orders + _recalc_discount_rate。"""
         conn = _mock_conn()
-        event = _make_event("discount.applied", {
-            "discount_fen": 500,
-            "margin_passed": True,
-            "approval_id": None,
-            "discount_type": "percent_off",
-        })
+        event = _make_event(
+            "discount.applied",
+            {
+                "discount_fen": 500,
+                "margin_passed": True,
+                "approval_id": None,
+                "discount_type": "percent_off",
+            },
+        )
 
         await self.proj.handle(event, conn)
 
@@ -126,11 +128,14 @@ class TestDiscountHealthProjector:
     async def test_discount_applied_unauthorized_increments_count(self):
         """无授权折扣（approval_id=None）应使 unauthorized_count + 1。"""
         conn = _mock_conn()
-        event = _make_event("discount.applied", {
-            "discount_fen": 200,
-            "margin_passed": True,
-            "approval_id": None,
-        })
+        event = _make_event(
+            "discount.applied",
+            {
+                "discount_fen": 200,
+                "margin_passed": True,
+                "approval_id": None,
+            },
+        )
 
         await self.proj.handle(event, conn)
 
@@ -196,7 +201,6 @@ class TestDiscountHealthProjector:
 
 
 class TestClassifyLeakType:
-
     def test_no_approval_no_margin(self):
         payload = {"approval_id": None, "margin_passed": False}
         assert _classify_leak_type(payload) == "unauthorized_margin_breach"
@@ -228,7 +232,6 @@ class TestClassifyLeakType:
 
 
 class TestSafetyComplianceProjector:
-
     def setup_method(self):
         self.proj = SafetyComplianceProjector(tenant_id=TENANT_ID)
 
@@ -236,12 +239,15 @@ class TestSafetyComplianceProjector:
     async def test_sample_logged_increments_count(self):
         """safety.sample_logged 应触发 sample_logged_count + 1。"""
         conn = _mock_conn()
-        event = _make_event("safety.sample_logged", {
-            "sample_id": str(uuid.uuid4()),
-            "dish_name": "红烧肉",
-            "sample_weight_g": 130.0,
-            "meal_period": "lunch",
-        })
+        event = _make_event(
+            "safety.sample_logged",
+            {
+                "sample_id": str(uuid.uuid4()),
+                "dish_name": "红烧肉",
+                "sample_weight_g": 130.0,
+                "meal_period": "lunch",
+            },
+        )
 
         await self.proj.handle(event, conn)
 
@@ -252,13 +258,16 @@ class TestSafetyComplianceProjector:
     async def test_inspection_done_updates_score(self):
         """safety.inspection_done 应触发 inspection_done + 1 和 compliance_score 更新。"""
         conn = _mock_conn()
-        event = _make_event("safety.inspection_done", {
-            "inspection_id": str(uuid.uuid4()),
-            "total_items": 20,
-            "passed_items": 18,
-            "overall_score": 90.0,
-            "violations": [],
-        })
+        event = _make_event(
+            "safety.inspection_done",
+            {
+                "inspection_id": str(uuid.uuid4()),
+                "total_items": 20,
+                "passed_items": 18,
+                "overall_score": 90.0,
+                "violations": [],
+            },
+        )
 
         await self.proj.handle(event, conn)
 
@@ -270,11 +279,14 @@ class TestSafetyComplianceProjector:
     async def test_violation_found_increments_count(self):
         """safety.violation_found 应触发 violation_count + 1。"""
         conn = _mock_conn()
-        event = _make_event("safety.violation_found", {
-            "violation_id": str(uuid.uuid4()),
-            "severity": "major",
-            "violation_type": "expired_ingredient",
-        })
+        event = _make_event(
+            "safety.violation_found",
+            {
+                "violation_id": str(uuid.uuid4()),
+                "severity": "major",
+                "violation_type": "expired_ingredient",
+            },
+        )
 
         await self.proj.handle(event, conn)
 
@@ -285,12 +297,15 @@ class TestSafetyComplianceProjector:
     async def test_temperature_recorded_non_compliant(self):
         """safety.temperature_recorded with anomaly 应记录异常。"""
         conn = _mock_conn()
-        event = _make_event("safety.temperature_recorded", {
-            "record_id": str(uuid.uuid4()),
-            "location": "refrigerator",
-            "temp_celsius": 12.0,
-            "compliant": False,
-        })
+        event = _make_event(
+            "safety.temperature_recorded",
+            {
+                "record_id": str(uuid.uuid4()),
+                "location": "refrigerator",
+                "temp_celsius": 12.0,
+                "compliant": False,
+            },
+        )
 
         await self.proj.handle(event, conn)
 
@@ -322,13 +337,16 @@ class TestSafetyComplianceProjector:
         overall_passed=True 时 pass_delta=1，critical_failures=0。
         """
         conn = _mock_conn()
-        event = _make_event("safety.haccp_check_completed", {
-            "check_id": str(uuid.uuid4()),
-            "overall_passed": True,
-            "critical_failures": 0,
-            "control_points_checked": 12,
-            "control_points_passed": 12,
-        })
+        event = _make_event(
+            "safety.haccp_check_completed",
+            {
+                "check_id": str(uuid.uuid4()),
+                "overall_passed": True,
+                "critical_failures": 0,
+                "control_points_checked": 12,
+                "control_points_passed": 12,
+            },
+        )
 
         await self.proj.handle(event, conn)
 
@@ -347,8 +365,8 @@ class TestSafetyComplianceProjector:
         update_call = conn.execute.call_args_list[1]
         args = update_call[0]
         # args: (sql, tenant_id, store_id, stat_week, pass_delta, critical_failures, event_id)
-        assert args[4] == 1   # pass_delta（overall_passed=True）
-        assert args[5] == 0   # critical_failures
+        assert args[4] == 1  # pass_delta（overall_passed=True）
+        assert args[5] == 0  # critical_failures
 
     @pytest.mark.asyncio
     async def test_safety_projector_handles_haccp_critical(self):
@@ -357,12 +375,15 @@ class TestSafetyComplianceProjector:
         passed_checks 不递增（本次未通过）。
         """
         conn = _mock_conn()
-        event = _make_event("safety.haccp_critical_failure", {
-            "check_id": str(uuid.uuid4()),
-            "control_point": "冷链温度",
-            "critical_failures": 2,
-            "corrective_action_required": True,
-        })
+        event = _make_event(
+            "safety.haccp_critical_failure",
+            {
+                "check_id": str(uuid.uuid4()),
+                "control_point": "冷链温度",
+                "critical_failures": 2,
+                "corrective_action_required": True,
+            },
+        )
 
         await self.proj.handle(event, conn)
 
@@ -383,7 +404,7 @@ class TestSafetyComplianceProjector:
         update_call = conn.execute.call_args_list[1]
         args = update_call[0]
         # args: (sql, tenant_id, store_id, stat_week, critical_failures, event_id)
-        assert args[4] == 2   # critical_failures 来自 payload
+        assert args[4] == 2  # critical_failures 来自 payload
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -392,7 +413,6 @@ class TestSafetyComplianceProjector:
 
 
 class TestEnergyEfficiencyProjector:
-
     def setup_method(self):
         self.proj = EnergyEfficiencyProjector(tenant_id=TENANT_ID)
 
@@ -400,11 +420,14 @@ class TestEnergyEfficiencyProjector:
     async def test_reading_captured_accumulates_electricity(self):
         """energy.reading_captured 应累加 electricity_kwh。"""
         conn = _mock_conn()
-        event = _make_event("energy.reading_captured", {
-            "meter_type": "electricity",
-            "electricity_kwh": 15.5,
-            "cost_fen": 1200,
-        })
+        event = _make_event(
+            "energy.reading_captured",
+            {
+                "meter_type": "electricity",
+                "electricity_kwh": 15.5,
+                "cost_fen": 1200,
+            },
+        )
 
         await self.proj.handle(event, conn)
 
@@ -417,11 +440,14 @@ class TestEnergyEfficiencyProjector:
     async def test_anomaly_detected_increments_count(self):
         """energy.anomaly_detected 应触发 anomaly_count + 1。"""
         conn = _mock_conn()
-        event = _make_event("energy.anomaly_detected", {
-            "anomaly_type": "off_hours_usage",
-            "value": 5.0,
-            "is_off_hours": True,
-        })
+        event = _make_event(
+            "energy.anomaly_detected",
+            {
+                "anomaly_type": "off_hours_usage",
+                "value": 5.0,
+                "is_off_hours": True,
+            },
+        )
 
         await self.proj.handle(event, conn)
 
@@ -446,11 +472,14 @@ class TestEnergyEfficiencyProjector:
     async def test_gas_reading_uses_gas_field(self):
         """燃气表读数应累加 gas_m3，不影响 electricity_kwh。"""
         conn = _mock_conn()
-        event = _make_event("energy.reading_captured", {
-            "meter_type": "gas",
-            "gas_m3": 3.2,
-            "electricity_kwh": 0,
-        })
+        event = _make_event(
+            "energy.reading_captured",
+            {
+                "meter_type": "gas",
+                "gas_m3": 3.2,
+                "electricity_kwh": 0,
+            },
+        )
 
         await self.proj.handle(event, conn)
 
@@ -463,7 +492,7 @@ class TestEnergyEfficiencyProjector:
         assert update_call is not None
         args = update_call[0]
         # args: (sql, tenant_id, store_id, stat_date, electricity, gas, water, cost_fen, event_id)
-        assert args[5] == 3.2   # gas_m3 位置
+        assert args[5] == 3.2  # gas_m3 位置
 
     @pytest.mark.asyncio
     async def test_no_store_id_skips(self):
@@ -483,6 +512,7 @@ class TestEnergyEfficiencyProjector:
 
 class _ConcreteProjector(ProjectorBase):
     """最简投影器子类，用于测试基类行为。"""
+
     name = "test_projector"
     event_types = {"order.paid"}
     handle_calls: list = []
@@ -492,7 +522,6 @@ class _ConcreteProjector(ProjectorBase):
 
 
 class TestProjectorBase:
-
     @pytest.mark.asyncio
     async def test_process_backlog_calls_handle_for_each_event(self):
         """_process_backlog 应对每条事件调用 handle()，并更新 checkpoint。"""
@@ -536,10 +565,7 @@ class TestProjectorBase:
 
         assert proj.handle_calls == ["order.paid"]
         # 应有一次 INSERT INTO projector_checkpoints
-        checkpoint_sqls = [
-            c[0][0] for c in mock_conn.execute.call_args_list
-            if "projector_checkpoints" in c[0][0]
-        ]
+        checkpoint_sqls = [c[0][0] for c in mock_conn.execute.call_args_list if "projector_checkpoints" in c[0][0]]
         assert len(checkpoint_sqls) >= 1
 
     @pytest.mark.asyncio
@@ -563,6 +589,7 @@ class TestProjectorBase:
         # asyncpg 在函数体内 import，需通过 sys.modules 注入 fake 模块
         import sys
         import types
+
         fake_asyncpg = types.ModuleType("asyncpg")
         fake_asyncpg.create_pool = AsyncMock(return_value=mock_pool)  # type: ignore[attr-defined]
 
@@ -577,29 +604,27 @@ class TestProjectorBase:
                 sys.modules["asyncpg"] = original
 
         # 检查点 RESET 调用：INSERT ... last_rebuilt_at = NOW()
-        reset_sqls = [
-            c[0][0] for c in mock_conn.execute.call_args_list
-            if "last_rebuilt_at" in c[0][0]
-        ]
+        reset_sqls = [c[0][0] for c in mock_conn.execute.call_args_list if "last_rebuilt_at" in c[0][0]]
         assert len(reset_sqls) >= 1
 
     def test_projector_name_uniqueness(self):
         """所有已注册投影器的 name 必须不重复。"""
         from shared.events.src.projectors import ALL_PROJECTORS
+
         names = [p.name for p in ALL_PROJECTORS]
         assert len(names) == len(set(names)), f"投影器名称重复: {names}"
 
     def test_all_projectors_have_event_types(self):
         """每个投影器必须声明至少一个关注事件类型。"""
         from shared.events.src.projectors import ALL_PROJECTORS
+
         for projector_cls in ALL_PROJECTORS:
-            assert projector_cls.event_types, (
-                f"{projector_cls.name} 未声明 event_types"
-            )
+            assert projector_cls.event_types, f"{projector_cls.name} 未声明 event_types"
 
     def test_all_projectors_instantiable(self):
         """所有投影器类应能以 tenant_id 正常实例化。"""
         from shared.events.src.projectors import ALL_PROJECTORS
+
         for projector_cls in ALL_PROJECTORS:
             instance = projector_cls(tenant_id=TENANT_ID)
             assert instance.name
@@ -629,12 +654,15 @@ class TestPublicOpinionProjector:
     async def test_handle_positive_mention_increments_positive_count(self):
         """opinion.mention_captured (positive) 应 UPSERT 统计行并增加 positive_count。"""
         conn = _mock_conn()
-        event = _make_event("opinion.mention_captured", {
-            "platform": "dianping",
-            "sentiment": "positive",
-            "rating": 5.0,
-            "content": "服务很好！",
-        })
+        event = _make_event(
+            "opinion.mention_captured",
+            {
+                "platform": "dianping",
+                "sentiment": "positive",
+                "rating": 5.0,
+                "content": "服务很好！",
+            },
+        )
 
         await self.proj.handle(event, conn)
 
@@ -648,12 +676,15 @@ class TestPublicOpinionProjector:
     async def test_handle_negative_mention_increments_negative_count(self):
         """opinion.mention_captured (negative) 应增加 negative_count。"""
         conn = _mock_conn()
-        event = _make_event("opinion.mention_captured", {
-            "platform": "meituan",
-            "sentiment": "negative",
-            "rating": 1.0,
-            "content": "等太久了",
-        })
+        event = _make_event(
+            "opinion.mention_captured",
+            {
+                "platform": "meituan",
+                "sentiment": "negative",
+                "rating": 1.0,
+                "content": "等太久了",
+            },
+        )
 
         await self.proj.handle(event, conn)
 
@@ -664,11 +695,14 @@ class TestPublicOpinionProjector:
     async def test_handle_neutral_mention_increments_neutral_count(self):
         """opinion.mention_captured (neutral) 应增加 neutral_count。"""
         conn = _mock_conn()
-        event = _make_event("opinion.mention_captured", {
-            "platform": "weibo",
-            "sentiment": "neutral",
-            "content": "还行",
-        })
+        event = _make_event(
+            "opinion.mention_captured",
+            {
+                "platform": "weibo",
+                "sentiment": "neutral",
+                "content": "还行",
+            },
+        )
 
         await self.proj.handle(event, conn)
 
@@ -680,10 +714,13 @@ class TestPublicOpinionProjector:
         """opinion.resolved 应更新 public_opinion_mentions.is_resolved=true。"""
         conn = _mock_conn()
         mention_id = str(uuid.uuid4())
-        event = _make_event("opinion.resolved", {
-            "mention_id": mention_id,
-            "resolution_note": "已联系顾客致歉",
-        })
+        event = _make_event(
+            "opinion.resolved",
+            {
+                "mention_id": mention_id,
+                "resolution_note": "已联系顾客致歉",
+            },
+        )
 
         await self.proj.handle(event, conn)
 
@@ -695,10 +732,13 @@ class TestPublicOpinionProjector:
     async def test_handle_resolved_no_mention_id_skips(self):
         """opinion.resolved 缺少 mention_id 时应静默跳过（不执行 UPDATE）。"""
         conn = _mock_conn()
-        event = _make_event("opinion.resolved", {
-            "resolution_note": "已处理",
-            # 缺少 mention_id
-        })
+        event = _make_event(
+            "opinion.resolved",
+            {
+                "resolution_note": "已处理",
+                # 缺少 mention_id
+            },
+        )
 
         await self.proj.handle(event, conn)
 
@@ -721,12 +761,15 @@ class TestPublicOpinionProjector:
     async def test_mention_with_rating_triggers_avg_recalc(self):
         """带 rating 的 mention 应触发 avg_rating 重新计算（额外的 UPDATE）。"""
         conn = _mock_conn()
-        event = _make_event("opinion.mention_captured", {
-            "platform": "dianping",
-            "sentiment": "positive",
-            "rating": 4.5,
-            "sentiment_score": 0.85,
-        })
+        event = _make_event(
+            "opinion.mention_captured",
+            {
+                "platform": "dianping",
+                "sentiment": "positive",
+                "rating": 4.5,
+                "sentiment_score": 0.85,
+            },
+        )
 
         await self.proj.handle(event, conn)
 
@@ -758,11 +801,13 @@ class TestEventTypeCoverage:
 
     def test_channel_projector_registered(self):
         from shared.events.src.projectors import ALL_PROJECTORS
+
         names = {p.name for p in ALL_PROJECTORS}
         assert "channel_margin" in names
 
     def test_settlement_projector_registered(self):
         from shared.events.src.projectors import ALL_PROJECTORS
+
         names = {p.name for p in ALL_PROJECTORS}
         assert "daily_settlement" in names
 
@@ -773,6 +818,7 @@ class TestEventTypeCoverage:
     def test_opinion_event_type_enum_values(self):
         """OpinionEventType 枚举值与投影器 event_types 字符串完全吻合。"""
         from shared.events.src.event_types import OpinionEventType
+
         assert OpinionEventType.MENTION_CAPTURED.value == "opinion.mention_captured"
         assert OpinionEventType.RESOLVED.value == "opinion.resolved"
         # 枚举值应在投影器中能找到
@@ -782,12 +828,14 @@ class TestEventTypeCoverage:
     def test_channel_commission_calc_event_type_exists(self):
         """CHANNEL.COMMISSION_CALC 事件类型在 ChannelEventType 中已注册。"""
         from shared.events.src.event_types import ChannelEventType
+
         assert ChannelEventType.COMMISSION_CALC.value == "channel.commission_calc"
         assert "channel.commission_calc" in ChannelMarginProjector.event_types
 
     def test_safety_projector_covers_haccp_events(self):
         """SafetyComplianceProjector 应包含 HACCP 两个事件类型。"""
         from shared.events.src.event_types import SafetyEventType
+
         assert SafetyEventType.HACCP_CHECK_COMPLETED.value == "safety.haccp_check_completed"
         assert SafetyEventType.HACCP_CRITICAL_FAILURE.value == "safety.haccp_critical_failure"
         assert "safety.haccp_check_completed" in SafetyComplianceProjector.event_types
@@ -800,10 +848,10 @@ class TestEventTypeCoverage:
 
 
 class TestChannelMarginProjector:
-
     @pytest.fixture
     def projector(self):
         from shared.events.src.projectors.channel_margin import ChannelMarginProjector
+
         return ChannelMarginProjector(tenant_id="11111111-1111-1111-1111-111111111111")
 
     def _make_conn(self):
@@ -899,7 +947,6 @@ from shared.events.src.projectors.store_pnl import StorePnlProjector
 
 
 class TestStorePnlProjector:
-
     def setup_method(self):
         self.proj = StorePnlProjector(tenant_id=TENANT_ID)
 
@@ -919,10 +966,13 @@ class TestStorePnlProjector:
     async def test_order_paid_with_customer_id_increments_customer_count(self):
         """order.paid 含 customer_id 时，customer_count 增量参数应为 1。"""
         conn = _mock_conn()
-        event = _make_event("order.paid", {
-            "final_amount_fen": 5000,
-            "customer_id": str(uuid.uuid4()),
-        })
+        event = _make_event(
+            "order.paid",
+            {
+                "final_amount_fen": 5000,
+                "customer_id": str(uuid.uuid4()),
+            },
+        )
         await self.proj.handle(event, conn)
         # 找 UPDATE mv_store_pnl ... order_count 的调用，验证 customer_count delta=1
         update_call = None
@@ -949,10 +999,13 @@ class TestStorePnlProjector:
     async def test_member_recharged_increments_stored_value(self):
         """member.recharged 应累计 stored_value_new_fen（amount + gift）。"""
         conn = _mock_conn()
-        event = _make_event("member.recharged", {
-            "amount_fen": 10000,
-            "gift_amount_fen": 500,
-        })
+        event = _make_event(
+            "member.recharged",
+            {
+                "amount_fen": 10000,
+                "gift_amount_fen": 500,
+            },
+        )
         await self.proj.handle(event, conn)
         sqls = [c[0][0] for c in conn.execute.call_args_list]
         assert any("stored_value_new_fen" in s for s in sqls)
@@ -1007,16 +1060,17 @@ class TestStorePnlProjector:
         args = update_call[0]
         assert args[4] == 2000
 
+
 # ══════════════════════════════════════════════════════════════════════════════
 #  I. DailySettlementProjector（Team C）
 # ══════════════════════════════════════════════════════════════════════════════
 
 
 class TestDailySettlementProjector:
-
     @pytest.fixture
     def projector(self):
         from shared.events.src.projectors.daily_settlement import DailySettlementProjector
+
         return DailySettlementProjector(tenant_id="11111111-1111-1111-1111-111111111111")
 
     def _make_conn(self):
@@ -1068,11 +1122,14 @@ class TestDailySettlementProjector:
     async def test_discrepancy_found_appends_pending_items(self, projector):
         """settlement.discrepancy_found → pending_items jsonb concat"""
         conn = self._make_conn()
-        event = self._make_event("settlement.discrepancy_found", {
-            "discrepancy_type": "cash_short",
-            "amount_fen": 500,
-            "description": "现金少500",
-        })
+        event = self._make_event(
+            "settlement.discrepancy_found",
+            {
+                "discrepancy_type": "cash_short",
+                "amount_fen": 500,
+                "description": "现金少500",
+            },
+        )
         await projector.handle(event, conn)
         calls_sql = [str(c.args[0]) for c in conn.execute.call_args_list]
         assert any("pending_items" in sql for sql in calls_sql)
@@ -1102,10 +1159,10 @@ class TestDailySettlementProjector:
 
 
 class TestMemberClvProjector:
-
     @pytest.fixture
     def projector(self):
         from shared.events.src.projectors.member_clv import MemberClvProjector
+
         return MemberClvProjector(tenant_id="11111111-1111-1111-1111-111111111111")
 
     def _make_conn(self):
@@ -1127,10 +1184,13 @@ class TestMemberClvProjector:
     async def test_order_paid_increments_visit_and_spend(self, projector):
         """order.paid → visit_count+1 且 total_spend_fen += amount"""
         conn = self._make_conn()
-        event = self._make_event("order.paid", {
-            "customer_id": "cccccccc-cccc-cccc-cccc-cccccccccccc",
-            "final_amount_fen": 9900,
-        })
+        event = self._make_event(
+            "order.paid",
+            {
+                "customer_id": "cccccccc-cccc-cccc-cccc-cccccccccccc",
+                "final_amount_fen": 9900,
+            },
+        )
         await projector.handle(event, conn)
         calls_sql = [str(c.args[0]) for c in conn.execute.call_args_list]
         assert any("visit_count" in sql for sql in calls_sql)
@@ -1148,11 +1208,14 @@ class TestMemberClvProjector:
     async def test_recharged_increments_stored_value(self, projector):
         """member.recharged → stored_value_balance_fen += amount + gift"""
         conn = self._make_conn()
-        event = self._make_event("member.recharged", {
-            "customer_id": "cccccccc-cccc-cccc-cccc-cccccccccccc",
-            "amount_fen": 10000,
-            "gift_amount_fen": 500,
-        })
+        event = self._make_event(
+            "member.recharged",
+            {
+                "customer_id": "cccccccc-cccc-cccc-cccc-cccccccccccc",
+                "amount_fen": 10000,
+                "gift_amount_fen": 500,
+            },
+        )
         await projector.handle(event, conn)
         calls_sql = [str(c.args[0]) for c in conn.execute.call_args_list]
         assert any("stored_value_balance_fen" in sql for sql in calls_sql)
@@ -1164,10 +1227,13 @@ class TestMemberClvProjector:
     async def test_consumed_decreases_stored_value(self, projector):
         """member.consumed → stored_value_balance_fen -= amount（GREATEST 防负数）"""
         conn = self._make_conn()
-        event = self._make_event("member.consumed", {
-            "customer_id": "cccccccc-cccc-cccc-cccc-cccccccccccc",
-            "amount_fen": 3000,
-        })
+        event = self._make_event(
+            "member.consumed",
+            {
+                "customer_id": "cccccccc-cccc-cccc-cccc-cccccccccccc",
+                "amount_fen": 3000,
+            },
+        )
         await projector.handle(event, conn)
         calls_sql = [str(c.args[0]) for c in conn.execute.call_args_list]
         assert any("stored_value_balance_fen" in sql for sql in calls_sql)
@@ -1178,10 +1244,13 @@ class TestMemberClvProjector:
     async def test_voucher_used_increments_count(self, projector):
         """member.voucher_used → voucher_used_count+1"""
         conn = self._make_conn()
-        event = self._make_event("member.voucher_used", {
-            "customer_id": "cccccccc-cccc-cccc-cccc-cccccccccccc",
-            "face_value_fen": 2000,
-        })
+        event = self._make_event(
+            "member.voucher_used",
+            {
+                "customer_id": "cccccccc-cccc-cccc-cccc-cccccccccccc",
+                "face_value_fen": 2000,
+            },
+        )
         await projector.handle(event, conn)
         calls_sql = [str(c.args[0]) for c in conn.execute.call_args_list]
         assert any("voucher_used_count" in sql for sql in calls_sql)
@@ -1190,11 +1259,14 @@ class TestMemberClvProjector:
     async def test_churn_predicted_sets_probability(self, projector):
         """member.churn_predicted → churn_probability=0.85"""
         conn = self._make_conn()
-        event = self._make_event("member.churn_predicted", {
-            "customer_id": "cccccccc-cccc-cccc-cccc-cccccccccccc",
-            "churn_probability": 0.85,
-            "next_visit_days": 30,
-        })
+        event = self._make_event(
+            "member.churn_predicted",
+            {
+                "customer_id": "cccccccc-cccc-cccc-cccc-cccccccccccc",
+                "churn_probability": 0.85,
+                "next_visit_days": 30,
+            },
+        )
         await projector.handle(event, conn)
         calls_sql = [str(c.args[0]) for c in conn.execute.call_args_list]
         assert any("churn_probability" in sql for sql in calls_sql)
@@ -1209,10 +1281,10 @@ class TestMemberClvProjector:
 
 
 class TestInventoryBomProjector:
-
     @pytest.fixture
     def projector(self):
         from shared.events.src.projectors.inventory_bom import InventoryBomProjector
+
         return InventoryBomProjector(tenant_id="11111111-1111-1111-1111-111111111111")
 
     def _make_conn(self):
@@ -1234,12 +1306,15 @@ class TestInventoryBomProjector:
     async def test_consumed_increments_theoretical_and_actual(self, projector):
         """inventory.consumed → theoretical_usage_g++ 且 actual_usage_g++"""
         conn = self._make_conn()
-        event = self._make_event("inventory.consumed", {
-            "ingredient_id": "dddddddd-dddd-dddd-dddd-dddddddddddd",
-            "ingredient_name": "猪肉",
-            "quantity_g": 200.0,
-            "theoretical_g": 190.0,
-        })
+        event = self._make_event(
+            "inventory.consumed",
+            {
+                "ingredient_id": "dddddddd-dddd-dddd-dddd-dddddddddddd",
+                "ingredient_name": "猪肉",
+                "quantity_g": 200.0,
+                "theoretical_g": 190.0,
+            },
+        )
         await projector.handle(event, conn)
         calls_sql = [str(c.args[0]) for c in conn.execute.call_args_list]
         assert any("theoretical_usage_g" in sql for sql in calls_sql)
@@ -1249,10 +1324,13 @@ class TestInventoryBomProjector:
     async def test_consumed_no_ingredient_id_skips(self, projector):
         """payload 无 ingredient_id → 0 execute"""
         conn = self._make_conn()
-        event = self._make_event("inventory.consumed", {
-            "ingredient_name": "猪肉",
-            "quantity_g": 200.0,
-        })
+        event = self._make_event(
+            "inventory.consumed",
+            {
+                "ingredient_name": "猪肉",
+                "quantity_g": 200.0,
+            },
+        )
         await projector.handle(event, conn)
         conn.execute.assert_not_called()
 
@@ -1260,11 +1338,14 @@ class TestInventoryBomProjector:
     async def test_wasted_increments_waste_g(self, projector):
         """inventory.wasted → waste_g++"""
         conn = self._make_conn()
-        event = self._make_event("inventory.wasted", {
-            "ingredient_id": "dddddddd-dddd-dddd-dddd-dddddddddddd",
-            "ingredient_name": "鸡蛋",
-            "quantity_g": 50.0,
-        })
+        event = self._make_event(
+            "inventory.wasted",
+            {
+                "ingredient_id": "dddddddd-dddd-dddd-dddd-dddddddddddd",
+                "ingredient_name": "鸡蛋",
+                "quantity_g": 50.0,
+            },
+        )
         await projector.handle(event, conn)
         calls_sql = [str(c.args[0]) for c in conn.execute.call_args_list]
         assert any("waste_g" in sql for sql in calls_sql)
@@ -1273,11 +1354,14 @@ class TestInventoryBomProjector:
     async def test_recalc_called_after_consumed(self, projector):
         """inventory.consumed 后调用 _recalc_loss（SQL 包含 unexplained_loss_g 或 loss_rate）"""
         conn = self._make_conn()
-        event = self._make_event("inventory.consumed", {
-            "ingredient_id": "dddddddd-dddd-dddd-dddd-dddddddddddd",
-            "ingredient_name": "面粉",
-            "quantity_g": 300.0,
-        })
+        event = self._make_event(
+            "inventory.consumed",
+            {
+                "ingredient_id": "dddddddd-dddd-dddd-dddd-dddddddddddd",
+                "ingredient_name": "面粉",
+                "quantity_g": 300.0,
+            },
+        )
         await projector.handle(event, conn)
         calls_sql = [str(c.args[0]) for c in conn.execute.call_args_list]
         assert any("unexplained_loss_g" in sql or "loss_rate" in sql for sql in calls_sql)
@@ -1286,11 +1370,14 @@ class TestInventoryBomProjector:
     async def test_recalc_called_after_wasted(self, projector):
         """inventory.wasted 后也调用 _recalc_loss"""
         conn = self._make_conn()
-        event = self._make_event("inventory.wasted", {
-            "ingredient_id": "dddddddd-dddd-dddd-dddd-dddddddddddd",
-            "ingredient_name": "油",
-            "quantity_g": 100.0,
-        })
+        event = self._make_event(
+            "inventory.wasted",
+            {
+                "ingredient_id": "dddddddd-dddd-dddd-dddd-dddddddddddd",
+                "ingredient_name": "油",
+                "quantity_g": 100.0,
+            },
+        )
         await projector.handle(event, conn)
         calls_sql = [str(c.args[0]) for c in conn.execute.call_args_list]
         assert any("unexplained_loss_g" in sql or "loss_rate" in sql for sql in calls_sql)
@@ -1299,10 +1386,13 @@ class TestInventoryBomProjector:
     async def test_no_store_id_skips_event(self, projector):
         """无 store_id → 跳过，不触发任何 execute"""
         conn = self._make_conn()
-        event = self._make_event("inventory.consumed", {
-            "ingredient_id": "dddddddd-dddd-dddd-dddd-dddddddddddd",
-            "quantity_g": 100.0,
-        })
+        event = self._make_event(
+            "inventory.consumed",
+            {
+                "ingredient_id": "dddddddd-dddd-dddd-dddd-dddddddddddd",
+                "quantity_g": 100.0,
+            },
+        )
         event.pop("store_id")
         await projector.handle(event, conn)
         conn.execute.assert_not_called()

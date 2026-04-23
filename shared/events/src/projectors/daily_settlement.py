@@ -9,6 +9,7 @@
 
 维护视图：mv_daily_settlement
 """
+
 from __future__ import annotations
 
 import json
@@ -20,7 +21,6 @@ from ..projector import ProjectorBase
 
 
 class DailySettlementProjector(ProjectorBase):
-
     name = "daily_settlement"
     event_types = {
         "payment.confirmed",
@@ -52,7 +52,9 @@ class DailySettlementProjector(ProjectorBase):
             VALUES ($1, $2, $3, 'open', NOW())
             ON CONFLICT (tenant_id, store_id, stat_date) DO NOTHING
             """,
-            self.tenant_id, UUID(str(store_id)), stat_date,
+            self.tenant_id,
+            UUID(str(store_id)),
+            stat_date,
         )
 
         if event_type == "payment.confirmed":
@@ -76,8 +78,11 @@ class DailySettlementProjector(ProjectorBase):
                     updated_at       = NOW()
                 WHERE tenant_id = $1 AND store_id = $2 AND stat_date = $3
                 """,
-                self.tenant_id, UUID(str(store_id)), stat_date,
-                amount_fen, UUID(str(event["event_id"])),
+                self.tenant_id,
+                UUID(str(store_id)),
+                stat_date,
+                amount_fen,
+                UUID(str(event["event_id"])),
             )
 
         elif event_type == "payment.cash_declared":
@@ -94,8 +99,12 @@ class DailySettlementProjector(ProjectorBase):
                     updated_at           = NOW()
                 WHERE tenant_id = $1 AND store_id = $2 AND stat_date = $3
                 """,
-                self.tenant_id, UUID(str(store_id)), stat_date,
-                declared_fen, system_fen, discrepancy,
+                self.tenant_id,
+                UUID(str(store_id)),
+                stat_date,
+                declared_fen,
+                system_fen,
+                discrepancy,
                 UUID(str(event["event_id"])),
             )
 
@@ -110,8 +119,11 @@ class DailySettlementProjector(ProjectorBase):
                     updated_at                 = NOW()
                 WHERE tenant_id = $1 AND store_id = $2 AND stat_date = $3
                 """,
-                self.tenant_id, UUID(str(store_id)), stat_date,
-                amount_fen, UUID(str(event["event_id"])),
+                self.tenant_id,
+                UUID(str(store_id)),
+                stat_date,
+                amount_fen,
+                UUID(str(event["event_id"])),
             )
 
         elif event_type == "settlement.daily_closed":
@@ -126,7 +138,9 @@ class DailySettlementProjector(ProjectorBase):
                     updated_at    = NOW()
                 WHERE tenant_id = $1 AND store_id = $2 AND stat_date = $3
                 """,
-                self.tenant_id, UUID(str(store_id)), stat_date,
+                self.tenant_id,
+                UUID(str(store_id)),
+                stat_date,
                 occurred_at,
                 UUID(str(operator_id)) if operator_id else None,
                 UUID(str(event["event_id"])),
@@ -147,8 +161,11 @@ class DailySettlementProjector(ProjectorBase):
                     updated_at    = NOW()
                 WHERE tenant_id = $1 AND store_id = $2 AND stat_date = $3
                 """,
-                self.tenant_id, UUID(str(store_id)), stat_date,
-                json.dumps([item]), UUID(str(event["event_id"])),
+                self.tenant_id,
+                UUID(str(store_id)),
+                stat_date,
+                json.dumps([item]),
+                UUID(str(event["event_id"])),
             )
 
         elif event_type == "settlement.reconciled":
@@ -160,6 +177,8 @@ class DailySettlementProjector(ProjectorBase):
                     updated_at    = NOW()
                 WHERE tenant_id = $1 AND store_id = $2 AND stat_date = $3
                 """,
-                self.tenant_id, UUID(str(store_id)), stat_date,
+                self.tenant_id,
+                UUID(str(store_id)),
+                stat_date,
                 UUID(str(event["event_id"])),
             )

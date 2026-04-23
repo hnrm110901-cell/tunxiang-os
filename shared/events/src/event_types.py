@@ -11,6 +11,7 @@
 扩展域（屯象OS特有）：
   KDS厨房(kds) / Agent决策(agent) / 舆情评价(review) / 成本卡(recipe)
 """
+
 from __future__ import annotations
 
 from enum import Enum
@@ -19,38 +20,39 @@ from enum import Enum
 # 核心业务域（七条因果链直接关联）
 # ──────────────────────────────────────────────────────────────────────
 
+
 class OrderEventType(str, Enum):
     """订单事件 — 因果链①②③④⑤⑥⑦"""
 
-    CREATED = "order.created"              # 订单创建
-    ITEM_ADDED = "order.item_added"        # 加菜
-    ITEM_removed = "order.item_removed"    # 退菜
-    SUBMITTED = "order.submitted"          # 提交出餐
-    PAID = "order.paid"                    # 支付完成
-    CANCELLED = "order.cancelled"          # 取消
-    REFUNDED = "order.refunded"            # 整单退款
+    CREATED = "order.created"  # 订单创建
+    ITEM_ADDED = "order.item_added"  # 加菜
+    ITEM_removed = "order.item_removed"  # 退菜
+    SUBMITTED = "order.submitted"  # 提交出餐
+    PAID = "order.paid"  # 支付完成
+    CANCELLED = "order.cancelled"  # 取消
+    REFUNDED = "order.refunded"  # 整单退款
     PARTIAL_REFUNDED = "order.partial_refunded"  # 部分退款
-    CLOSED = "order.closed"               # 结账关闭
+    CLOSED = "order.closed"  # 结账关闭
     BILLING_RULE_APPLIED = "order.billing_rule_applied"  # 账单规则（最低消费/服务费）应用
 
 
 class DiscountEventType(str, Enum):
     """折扣授权事件 — 因果链①折扣健康"""
 
-    APPLIED = "discount.applied"           # 折扣被应用
-    AUTHORIZED = "discount.authorized"     # 主管授权
-    REVOKED = "discount.revoked"           # 折扣撤销
+    APPLIED = "discount.applied"  # 折扣被应用
+    AUTHORIZED = "discount.authorized"  # 主管授权
+    REVOKED = "discount.revoked"  # 折扣撤销
     THRESHOLD_EXCEEDED = "discount.threshold_exceeded"  # 超授权阈值
-    LEAK_DETECTED = "discount.leak_detected"            # Agent检测到泄漏
+    LEAK_DETECTED = "discount.leak_detected"  # Agent检测到泄漏
 
 
 class PaymentEventType(str, Enum):
     """支付事件 — 因果链⑦日清日结"""
 
-    INITIATED = "payment.initiated"        # 发起支付
-    CONFIRMED = "payment.confirmed"        # 支付确认
-    FAILED = "payment.failed"             # 支付失败
-    REFUNDED = "payment.refunded"         # 退款
+    INITIATED = "payment.initiated"  # 发起支付
+    CONFIRMED = "payment.confirmed"  # 支付确认
+    FAILED = "payment.failed"  # 支付失败
+    REFUNDED = "payment.refunded"  # 退款
     CASH_DECLARED = "payment.cash_declared"  # 现金申报
     CHANNEL_SETTLED = "payment.channel_settled"  # 渠道结算到账
 
@@ -58,13 +60,13 @@ class PaymentEventType(str, Enum):
 class MemberEventType(str, Enum):
     """会员事件 — 因果链⑤会员真ROI"""
 
-    REGISTERED = "member.registered"          # 注册
-    RECHARGED = "member.recharged"            # 储值充值（负债事件）
-    CONSUMED = "member.consumed"              # 储值消费（收入确认事件）
-    VOUCHER_ISSUED = "member.voucher_issued"   # 发券
-    VOUCHER_USED = "member.voucher_used"      # 核销券
+    REGISTERED = "member.registered"  # 注册
+    RECHARGED = "member.recharged"  # 储值充值（负债事件）
+    CONSUMED = "member.consumed"  # 储值消费（收入确认事件）
+    VOUCHER_ISSUED = "member.voucher_issued"  # 发券
+    VOUCHER_USED = "member.voucher_used"  # 核销券
     VOUCHER_EXPIRED = "member.voucher_expired"  # 券过期
-    UPGRADED = "member.upgraded"              # 等级升级
+    UPGRADED = "member.upgraded"  # 等级升级
     POINTS_CHANGED = "member.points_changed"  # 积分变动
     CHURN_PREDICTED = "member.churn_predicted"  # Agent预测流失
 
@@ -72,33 +74,33 @@ class MemberEventType(str, Enum):
 class InventoryEventType(str, Enum):
     """库存/损耗事件 — 因果链③BOM推算"""
 
-    RECEIVED = "inventory.received"           # 入库
-    CONSUMED = "inventory.consumed"           # 出库（BOM推算）
-    WASTED = "inventory.wasted"               # 损耗登记
-    ADJUSTED = "inventory.adjusted"           # 盘点调整
-    EXPIRED = "inventory.expired"             # 过期报废
-    LOW_STOCK = "inventory.low_stock"         # 库存预警
-    TRANSFER_IN = "inventory.transfer_in"     # 调拨入库
-    TRANSFER_OUT = "inventory.transfer_out"   # 调拨出库
+    RECEIVED = "inventory.received"  # 入库
+    CONSUMED = "inventory.consumed"  # 出库（BOM推算）
+    WASTED = "inventory.wasted"  # 损耗登记
+    ADJUSTED = "inventory.adjusted"  # 盘点调整
+    EXPIRED = "inventory.expired"  # 过期报废
+    LOW_STOCK = "inventory.low_stock"  # 库存预警
+    TRANSFER_IN = "inventory.transfer_in"  # 调拨入库
+    TRANSFER_OUT = "inventory.transfer_out"  # 调拨出库
 
 
 class ChannelEventType(str, Enum):
     """渠道事件 — 因果链②外卖真毛利"""
 
-    ORDER_SYNCED = "channel.order_synced"         # 渠道订单同步
-    COMMISSION_CALC = "channel.commission_calc"   # 佣金计算
-    SETTLEMENT = "channel.settlement"             # 渠道结算
+    ORDER_SYNCED = "channel.order_synced"  # 渠道订单同步
+    COMMISSION_CALC = "channel.commission_calc"  # 佣金计算
+    SETTLEMENT = "channel.settlement"  # 渠道结算
     PROMOTION_APPLIED = "channel.promotion_applied"  # 平台活动补贴
-    CHARGEBACK = "channel.chargeback"             # 渠道拒付
+    CHARGEBACK = "channel.chargeback"  # 渠道拒付
 
 
 class ReservationEventType(str, Enum):
     """预订/宴会事件 — 因果链⑥宴会收入链"""
 
-    CREATED = "reservation.created"               # 预订创建
-    CONFIRMED = "reservation.confirmed"           # 确认预订
-    CANCELLED = "reservation.cancelled"           # 取消预订
-    BANQUET_DEPOSIT_PAID = "reservation.banquet_deposit_paid"   # 宴会定金
+    CREATED = "reservation.created"  # 预订创建
+    CONFIRMED = "reservation.confirmed"  # 确认预订
+    CANCELLED = "reservation.cancelled"  # 取消预订
+    BANQUET_DEPOSIT_PAID = "reservation.banquet_deposit_paid"  # 宴会定金
     BANQUET_MENU_CONFIRMED = "reservation.banquet_menu_confirmed"  # 菜单确认
     BANQUET_SETTLED = "reservation.banquet_settled"  # 宴会结账
 
@@ -106,74 +108,76 @@ class ReservationEventType(str, Enum):
 class SettlementEventType(str, Enum):
     """财务结算事件 — 因果链⑦日清日结"""
 
-    DAILY_CLOSED = "settlement.daily_closed"         # 日结完成
-    RECONCILED = "settlement.reconciled"             # 对账完成
+    DAILY_CLOSED = "settlement.daily_closed"  # 日结完成
+    RECONCILED = "settlement.reconciled"  # 对账完成
     DISCREPANCY_FOUND = "settlement.discrepancy_found"  # 差异发现
     REVENUE_RECOGNIZED = "settlement.revenue_recognized"  # 收入确认
     STORED_VALUE_DEFERRED = "settlement.stored_value_deferred"  # 储值负债入账
-    ADVANCE_CONSUMED = "settlement.advance_consumed"    # 预收款转收入
+    ADVANCE_CONSUMED = "settlement.advance_consumed"  # 预收款转收入
 
 
 # ──────────────────────────────────────────────────────────────────────
 # 新增模块（事件总线上的自然延伸，方案第5节）
 # ──────────────────────────────────────────────────────────────────────
 
+
 class SafetyEventType(str, Enum):
     """食品安全合规事件 — 法律义务（市场监管总局要求）"""
 
-    SAMPLE_LOGGED = "safety.sample_logged"              # 留样登记
+    SAMPLE_LOGGED = "safety.sample_logged"  # 留样登记
     TEMPERATURE_RECORDED = "safety.temperature_recorded"  # 温度记录
-    INSPECTION_DONE = "safety.inspection_done"          # 检查完成
-    VIOLATION_FOUND = "safety.violation_found"          # 违规发现
-    EXPIRY_ALERT = "safety.expiry_alert"                # 临期预警
+    INSPECTION_DONE = "safety.inspection_done"  # 检查完成
+    VIOLATION_FOUND = "safety.violation_found"  # 违规发现
+    EXPIRY_ALERT = "safety.expiry_alert"  # 临期预警
     CERTIFICATE_UPDATED = "safety.certificate_updated"  # 证件更新
-    TRAINING_COMPLETED = "safety.training_completed"    # 食安培训完成
+    TRAINING_COMPLETED = "safety.training_completed"  # 食安培训完成
     # HACCP 检查计划专属事件（v163 新增）
-    HACCP_CHECK_COMPLETED = "safety.haccp_check_completed"    # HACCP检查执行完成
+    HACCP_CHECK_COMPLETED = "safety.haccp_check_completed"  # HACCP检查执行完成
     HACCP_CRITICAL_FAILURE = "safety.haccp_critical_failure"  # HACCP关键控制点失控
 
 
 class EnergyEventType(str, Enum):
     """能耗管理事件 — IoT智能电表/燃气表"""
 
-    READING_CAPTURED = "energy.reading_captured"        # 抄表数据
-    ANOMALY_DETECTED = "energy.anomaly_detected"        # 异常能耗
-    ALERT_SENT = "energy.alert_sent"                    # 告警推送
-    BENCHMARK_SET = "energy.benchmark_set"              # 基准线设置
-    BUDGET_SET = "energy.budget_set"                    # 月度预算配置（v164 新增）
-    ALERT_RULE_CREATED = "energy.alert_rule_created"    # 告警规则创建（v164 新增）
+    READING_CAPTURED = "energy.reading_captured"  # 抄表数据
+    ANOMALY_DETECTED = "energy.anomaly_detected"  # 异常能耗
+    ALERT_SENT = "energy.alert_sent"  # 告警推送
+    BENCHMARK_SET = "energy.benchmark_set"  # 基准线设置
+    BUDGET_SET = "energy.budget_set"  # 月度预算配置（v164 新增）
+    ALERT_RULE_CREATED = "energy.alert_rule_created"  # 告警规则创建（v164 新增）
 
 
 class ReviewEventType(str, Enum):
     """舆情/评价事件"""
 
-    CAPTURED = "review.captured"                        # 评价采集
-    SENTIMENT_ANALYZED = "review.sentiment_analyzed"    # 情感分析完成
-    ATTRIBUTED = "review.attributed"                    # 归因到菜品/员工
-    RESPONDED = "review.responded"                      # 商家回复
+    CAPTURED = "review.captured"  # 评价采集
+    SENTIMENT_ANALYZED = "review.sentiment_analyzed"  # 情感分析完成
+    ATTRIBUTED = "review.attributed"  # 归因到菜品/员工
+    RESPONDED = "review.responded"  # 商家回复
 
 
 class OpinionEventType(str, Enum):
     """公众舆情监控事件（PublicOpinionProjector 消费）"""
 
-    MENTION_CAPTURED = "opinion.mention_captured"       # 新舆情采集
-    RESOLVED = "opinion.resolved"                       # 舆情已处理
-    SENTIMENT_ANALYZED = "opinion.sentiment_analyzed"   # 情感分析完成
-    ESCALATED = "opinion.escalated"                     # 舆情升级（需人工介入）
+    MENTION_CAPTURED = "opinion.mention_captured"  # 新舆情采集
+    RESOLVED = "opinion.resolved"  # 舆情已处理
+    SENTIMENT_ANALYZED = "opinion.sentiment_analyzed"  # 情感分析完成
+    ESCALATED = "opinion.escalated"  # 舆情升级（需人工介入）
 
 
 class RecipeEventType(str, Enum):
     """成本卡事件 — 动态毛利"""
 
-    COST_UPDATED = "recipe.cost_updated"                # 成本卡更新
+    COST_UPDATED = "recipe.cost_updated"  # 成本卡更新
     PROCUREMENT_PRICE_CHANGED = "recipe.procurement_price_changed"  # 采购价变动
     MENU_PRICE_ADJUSTED = "recipe.menu_price_adjusted"  # 菜单价格调整
-    MARGIN_ALERT = "recipe.margin_alert"                # 毛利预警
+    MARGIN_ALERT = "recipe.margin_alert"  # 毛利预警
 
 
 # ──────────────────────────────────────────────────────────────────────
 # 屯象OS系统级域
 # ──────────────────────────────────────────────────────────────────────
+
 
 class TableEventType(str, Enum):
     """桌台会话事件 — 桌台中心化架构核心事件流（v149新增）
@@ -188,20 +192,20 @@ class TableEventType(str, Enum):
       - 翻台率 Agent：OVERSTAY_ALERT 触发后主动干预
     """
 
-    OPENED = "table.opened"                    # 开台（创建 TableSession）
-    ORDER_PLACED = "table.order_placed"        # 首次点菜完成（主单提交）
-    ADD_ORDERED = "table.add_ordered"          # 加菜（追加点单，order_sequence >= 2）
-    DISH_SERVED = "table.dish_served"          # 菜品上桌确认（KDS 出餐扫描/手动确认）
-    SERVICE_CALLED = "table.service_called"    # 服务呼叫（催菜/呼叫服务员/需要物品）
-    BILL_REQUESTED = "table.bill_requested"    # 请求买单（买单按钮/扫码自助买单）
-    PAID = "table.paid"                        # 结账完成（支付成功）
-    CLEARED = "table.cleared"                  # 清台完成（桌台归还为空闲状态）
-    TRANSFERRED = "table.transferred"          # 转台（会话迁移到新桌台）
-    MERGED = "table.merged"                    # 并台（多会话合并为主会话）
-    SPLIT = "table.split"                      # 拆台（主会话拆分为独立会话）
-    VIP_IDENTIFIED = "table.vip_identified"    # VIP 识别（开台/中途扫码/人脸识别）
-    OVERSTAY_ALERT = "table.overstay_alert"    # 超时预警（Agent 触发，超过门店设定翻台上限）
-    WAITER_CHANGED = "table.waiter_changed"    # 换服务员（责任服务员变更）
+    OPENED = "table.opened"  # 开台（创建 TableSession）
+    ORDER_PLACED = "table.order_placed"  # 首次点菜完成（主单提交）
+    ADD_ORDERED = "table.add_ordered"  # 加菜（追加点单，order_sequence >= 2）
+    DISH_SERVED = "table.dish_served"  # 菜品上桌确认（KDS 出餐扫描/手动确认）
+    SERVICE_CALLED = "table.service_called"  # 服务呼叫（催菜/呼叫服务员/需要物品）
+    BILL_REQUESTED = "table.bill_requested"  # 请求买单（买单按钮/扫码自助买单）
+    PAID = "table.paid"  # 结账完成（支付成功）
+    CLEARED = "table.cleared"  # 清台完成（桌台归还为空闲状态）
+    TRANSFERRED = "table.transferred"  # 转台（会话迁移到新桌台）
+    MERGED = "table.merged"  # 并台（多会话合并为主会话）
+    SPLIT = "table.split"  # 拆台（主会话拆分为独立会话）
+    VIP_IDENTIFIED = "table.vip_identified"  # VIP 识别（开台/中途扫码/人脸识别）
+    OVERSTAY_ALERT = "table.overstay_alert"  # 超时预警（Agent 触发，超过门店设定翻台上限）
+    WAITER_CHANGED = "table.waiter_changed"  # 换服务员（责任服务员变更）
     GUEST_COUNT_UPDATED = "table.guest_count_updated"  # 就餐人数修改
 
 
@@ -219,7 +223,7 @@ class AgentEventType(str, Enum):
     DECISION = "agent.decision"
     CONSTRAINT_VIOLATION = "agent.constraint_violation"
     ALERT = "agent.alert"
-    ALERT_ACKNOWLEDGED = "agent.alert_acknowledged"     # 老板在WeCom确认告警
+    ALERT_ACKNOWLEDGED = "agent.alert_acknowledged"  # 老板在WeCom确认告警
 
 
 # ──────────────────────────────────────────────────────────────────────
@@ -229,111 +233,112 @@ class AgentEventType(str, Enum):
 # 域名 -> Redis Stream key 映射（投影器消费用）
 DOMAIN_STREAM_MAP: dict[str, str] = {
     # 桌台会话域（v149新增，桌台中心化核心）
-    "table":        "tx_dining_session_events",  # 桌台堂食会话域（v149，dining_sessions表）
+    "table": "tx_dining_session_events",  # 桌台堂食会话域（v149，dining_sessions表）
     # 核心业务域
-    "order":        "tx_order_events",
-    "discount":     "tx_discount_events",
-    "payment":      "tx_payment_events",
-    "member":       "tx_member_events",
-    "inventory":    "tx_inventory_events",
-    "channel":      "tx_channel_events",
-    "reservation":  "tx_reservation_events",
-    "settlement":   "tx_settlement_events",
+    "order": "tx_order_events",
+    "discount": "tx_discount_events",
+    "payment": "tx_payment_events",
+    "member": "tx_member_events",
+    "inventory": "tx_inventory_events",
+    "channel": "tx_channel_events",
+    "reservation": "tx_reservation_events",
+    "settlement": "tx_settlement_events",
     # 新增模块
-    "safety":       "tx_safety_events",
-    "energy":       "tx_energy_events",
-    "opinion":      "tx_opinion_events",
-    "review":       "tx_review_events",
-    "recipe":       "tx_recipe_events",
+    "safety": "tx_safety_events",
+    "energy": "tx_energy_events",
+    "opinion": "tx_opinion_events",
+    "review": "tx_review_events",
+    "recipe": "tx_recipe_events",
     # 系统域
-    "kds":          "tx_kds_events",
-    "agent":        "tx_agent_events",
+    "kds": "tx_kds_events",
+    "agent": "tx_agent_events",
     # 财务应收管理域（v156 新增）
-    "deposit":      "tx_deposit_events",
+    "deposit": "tx_deposit_events",
     "wine_storage": "tx_wine_storage_events",
-    "credit":       "tx_credit_events",
+    "credit": "tx_credit_events",
     # 营销活动域（v157 新增）
-    "campaign":     "tx_campaign_events",
+    "campaign": "tx_campaign_events",
     # 增长中枢域（v184 新增）
-    "growth":       "tx_growth_events",
+    "growth": "tx_growth_events",
     # 知识库域
-    "knowledge":    "tx_knowledge_events",
+    "knowledge": "tx_knowledge_events",
     # 旧系统适配器域（Sprint F1 / PR F，14 个 POS / 外卖 / 物流 / 财税适配器统一入口）
-    "adapter":      "tx_adapter_events",
+    "adapter": "tx_adapter_events",
     # 兼容旧域
-    "trade":        "trade_events",
-    "supply":       "supply_events",
-    "finance":      "finance_events",
-    "org":          "org_events",
-    "menu":         "menu_events",
-    "ops":          "ops_events",
+    "trade": "trade_events",
+    "supply": "supply_events",
+    "finance": "finance_events",
+    "org": "org_events",
+    "menu": "menu_events",
+    "ops": "ops_events",
 }
 
 # 域名 -> stream_type 映射（PG events 表 stream_type 字段）
 DOMAIN_STREAM_TYPE_MAP: dict[str, str] = {
-    "table":        "dining_session",   # 桌台堂食会话域（v149，dining_sessions表）
-    "order":        "order",
-    "discount":     "order",        # 折扣是订单聚合根的一部分
-    "payment":      "payment",
-    "member":       "member",
-    "inventory":    "inventory",
-    "channel":      "channel",
-    "reservation":  "reservation",
-    "settlement":   "settlement",
-    "safety":       "safety",
-    "energy":       "energy",
-    "campaign":     "campaign",
-    "opinion":      "opinion",
-    "review":       "review",
-    "recipe":       "dish",
-    "kds":          "order",
-    "agent":        "agent",
+    "table": "dining_session",  # 桌台堂食会话域（v149，dining_sessions表）
+    "order": "order",
+    "discount": "order",  # 折扣是订单聚合根的一部分
+    "payment": "payment",
+    "member": "member",
+    "inventory": "inventory",
+    "channel": "channel",
+    "reservation": "reservation",
+    "settlement": "settlement",
+    "safety": "safety",
+    "energy": "energy",
+    "campaign": "campaign",
+    "opinion": "opinion",
+    "review": "review",
+    "recipe": "dish",
+    "kds": "order",
+    "agent": "agent",
     # 财务应收管理域（v156 新增）
-    "deposit":      "deposit",
+    "deposit": "deposit",
     "wine_storage": "wine_storage",
-    "credit":       "credit",
+    "credit": "credit",
     # 增长中枢域（v184 新增）
-    "growth":       "growth",
+    "growth": "growth",
     # 知识库域
-    "knowledge":    "knowledge",
+    "knowledge": "knowledge",
     # 旧系统适配器域（Sprint F1 / PR F）
-    "adapter":      "adapter",
+    "adapter": "adapter",
 }
 
 # ──────────────────────────────────────────────────────────────────────
 # 财务应收管理域（押金 / 存酒 / 企业挂账，v156 新增）
 # ──────────────────────────────────────────────────────────────────────
 
+
 class DepositEventType(str, Enum):
     """押金事件"""
 
-    COLLECTED = "deposit.collected"                        # 押金收取
-    REGISTERED = "deposit.registered"                      # 宴会定金登记（收取的别名，模块4.1）
-    APPLIED = "deposit.applied"                            # 押金抵扣
-    CONVERTED = "deposit.converted"                        # 定金转预收（宴会结账抵扣，模块4.1）
-    REFUNDED = "deposit.refunded"                          # 押金退还
+    COLLECTED = "deposit.collected"  # 押金收取
+    REGISTERED = "deposit.registered"  # 宴会定金登记（收取的别名，模块4.1）
+    APPLIED = "deposit.applied"  # 押金抵扣
+    CONVERTED = "deposit.converted"  # 定金转预收（宴会结账抵扣，模块4.1）
+    REFUNDED = "deposit.refunded"  # 押金退还
     CONVERTED_TO_REVENUE = "deposit.converted_to_revenue"  # 转收入
-    EXPIRED = "deposit.expired"                            # 押金过期
+    EXPIRED = "deposit.expired"  # 押金过期
 
 
 class WineStorageEventType(str, Enum):
     """存酒事件"""
 
-    STORED = "wine_storage.stored"                         # 存酒
-    RETRIEVED = "wine_storage.retrieved"                   # 取酒
-    EXPIRING_SOON = "wine_storage.expiring_soon"           # 即将到期
-    EXPIRED = "wine_storage.expired"                       # 已过期
-    TRANSFERRED = "wine_storage.transferred"               # 转赠
+    STORED = "wine_storage.stored"  # 存酒
+    RETRIEVED = "wine_storage.retrieved"  # 取酒
+    EXPIRING_SOON = "wine_storage.expiring_soon"  # 即将到期
+    EXPIRED = "wine_storage.expired"  # 已过期
+    TRANSFERRED = "wine_storage.transferred"  # 转赠
 
 
 class CreditEventType(str, Enum):
     """企业挂账事件"""
 
-    CHARGED = "credit.charged"                             # 挂账消费
-    BILL_GENERATED = "credit.bill_generated"               # 账单生成
-    PAYMENT_RECEIVED = "credit.payment_received"           # 还款到账
-    LIMIT_WARNING = "credit.limit_warning"                 # 额度预警（使用率 >80%）
-    OVERDUE = "credit.overdue"                             # 账单逾期
+    CHARGED = "credit.charged"  # 挂账消费
+    BILL_GENERATED = "credit.bill_generated"  # 账单生成
+    PAYMENT_RECEIVED = "credit.payment_received"  # 还款到账
+    LIMIT_WARNING = "credit.limit_warning"  # 额度预警（使用率 >80%）
+    OVERDUE = "credit.overdue"  # 账单逾期
 
 
 class SafetyInspectionEventType(str, Enum):
@@ -341,10 +346,10 @@ class SafetyInspectionEventType(str, Enum):
 
     INSPECTION_STARTED = "safety.inspection.started"
     INSPECTION_COMPLETED = "safety.inspection.completed"
-    INSPECTION_FAILED = "safety.inspection.failed"           # 不合格
-    CRITICAL_ITEM_FAILED = "safety.critical_item.failed"    # 关键项不合格（高优先级告警）
+    INSPECTION_FAILED = "safety.inspection.failed"  # 不合格
+    CRITICAL_ITEM_FAILED = "safety.critical_item.failed"  # 关键项不合格（高优先级告警）
     INGREDIENT_EXPIRED = "safety.ingredient.expired"
-    CORRECTION_OVERDUE = "safety.correction.overdue"        # 整改超期未完成
+    CORRECTION_OVERDUE = "safety.correction.overdue"  # 整改超期未完成
 
 
 class CampaignEventType(str, Enum):
@@ -355,12 +360,13 @@ class CampaignEventType(str, Enum):
     DEACTIVATED = "campaign.deactivated"
     COUPON_APPLIED = "campaign.coupon_applied"
     COUPON_EXPIRED = "campaign.coupon_expired"
-    BUDGET_EXHAUSTED = "campaign.budget_exhausted"          # 活动预算耗尽
+    BUDGET_EXHAUSTED = "campaign.budget_exhausted"  # 活动预算耗尽
 
 
 # ──────────────────────────────────────────────────────────────────────
 # 增长中枢域（私域复购链路，v184 新增）
 # ──────────────────────────────────────────────────────────────────────
+
 
 class KnowledgeEventType(str, Enum):
     """知识库域事件"""
@@ -378,11 +384,11 @@ class KnowledgeEventType(str, Enum):
 class MenuEventType(str, Enum):
     """菜谱方案事件 — 模块3.4 批量下发与门店差异化"""
 
-    PLAN_CREATED = "menu.plan_created"          # 方案创建
-    PLAN_PUBLISHED = "menu.plan_published"      # 方案发布（draft→published）
+    PLAN_CREATED = "menu.plan_created"  # 方案创建
+    PLAN_PUBLISHED = "menu.plan_published"  # 方案发布（draft→published）
     PLAN_DISTRIBUTED = "menu.plan_distributed"  # 方案批量下发到门店
     PLAN_ROLLED_BACK = "menu.plan_rolled_back"  # 回滚到历史版本
-    STORE_OVERRIDE_SET = "menu.store_override_set"    # 门店微调（价格/状态覆盖）
+    STORE_OVERRIDE_SET = "menu.store_override_set"  # 门店微调（价格/状态覆盖）
     STORE_OVERRIDE_RESET = "menu.store_override_reset"  # 门店覆盖全部重置为集团方案
 
 
@@ -402,16 +408,16 @@ class AdapterEventType(str, Enum):
       - WEBHOOK_RECEIVED 作为三方回调链路的入口事件（外卖退单、异议、票据回执）
     """
 
-    SYNC_STARTED = "adapter.sync_started"           # 同步开始（按 scope=orders/menu/members/inventory 区分）
-    SYNC_FINISHED = "adapter.sync_finished"         # 同步成功结束
-    SYNC_FAILED = "adapter.sync_failed"             # 同步失败（需 payload.error_code）
-    ORDER_INGESTED = "adapter.order_ingested"       # 单条外卖/POS 订单入库
-    MENU_SYNCED = "adapter.menu_synced"             # 菜品同步批次
-    MEMBER_SYNCED = "adapter.member_synced"         # 会员同步批次
-    INVENTORY_SYNCED = "adapter.inventory_synced"   # 库存同步批次
-    STATUS_PUSHED = "adapter.status_pushed"         # 状态回写三方（并行运行期关键事件）
-    WEBHOOK_RECEIVED = "adapter.webhook_received"   # 三方 webhook 回调入口
-    RECONNECTED = "adapter.reconnected"             # 长时故障后首次恢复（触发 Agent 重算）
+    SYNC_STARTED = "adapter.sync_started"  # 同步开始（按 scope=orders/menu/members/inventory 区分）
+    SYNC_FINISHED = "adapter.sync_finished"  # 同步成功结束
+    SYNC_FAILED = "adapter.sync_failed"  # 同步失败（需 payload.error_code）
+    ORDER_INGESTED = "adapter.order_ingested"  # 单条外卖/POS 订单入库
+    MENU_SYNCED = "adapter.menu_synced"  # 菜品同步批次
+    MEMBER_SYNCED = "adapter.member_synced"  # 会员同步批次
+    INVENTORY_SYNCED = "adapter.inventory_synced"  # 库存同步批次
+    STATUS_PUSHED = "adapter.status_pushed"  # 状态回写三方（并行运行期关键事件）
+    WEBHOOK_RECEIVED = "adapter.webhook_received"  # 三方 webhook 回调入口
+    RECONNECTED = "adapter.reconnected"  # 长时故障后首次恢复（触发 Agent 重算）
     CREDENTIAL_EXPIRED = "adapter.credential_expired"  # Token/AccessKey 到期
 
 
@@ -450,7 +456,7 @@ def resolve_stream_type(event_type: str) -> str:
 
 # 所有事件类型枚举（用于校验）— 放在所有类定义之后，避免 forward reference
 ALL_EVENT_ENUMS = (
-    TableEventType,       # 桌台会话域（v149）
+    TableEventType,  # 桌台会话域（v149）
     OrderEventType,
     DiscountEventType,
     PaymentEventType,

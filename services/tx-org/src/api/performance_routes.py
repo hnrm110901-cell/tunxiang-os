@@ -271,9 +271,7 @@ async def points_award(
     tid_s = str(_parse_uuid("X-Tenant-ID", x_tenant_id))
     try:
         if body.rule_code == "manual_adjust":
-            result = await apply_manual_points_delta(
-                db, tid_s, body.employee_id, body.extra_points, body.note
-            )
+            result = await apply_manual_points_delta(db, tid_s, body.employee_id, body.extra_points, body.note)
         elif body.rule_code not in POINT_RULES:
             raise HTTPException(
                 status_code=400,
@@ -282,9 +280,7 @@ async def points_award(
         else:
             base_pts = int(POINT_RULES[body.rule_code]["points"])
             if base_pts < 0:
-                dres = await deduct_points(
-                    db, tid_s, body.employee_id, body.rule_code, body.note
-                )
+                dres = await deduct_points(db, tid_s, body.employee_id, body.rule_code, body.note)
                 result = {
                     "employee_id": body.employee_id,
                     "points_awarded": -int(dres["points_deducted"]),

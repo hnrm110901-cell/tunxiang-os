@@ -8,6 +8,7 @@ Action: read / create / update / delete / export / approve
   - SYSTEM_ADMIN 不能 read:audit_logs（三权分立核心约束）
   - CASHIER 只能操作 orders（下单/支付），不能访问 finance/analytics
 """
+
 from enum import Enum
 
 from .roles import PlatformRole, TenantRole
@@ -120,7 +121,7 @@ ROLE_PERMISSIONS: dict[PlatformRole | TenantRole, set[Permission]] = {
         (Resource.ORDERS, Action.READ),
         (Resource.ORDERS, Action.CREATE),
         (Resource.ORDERS, Action.UPDATE),
-        (Resource.MEMBERS, Action.READ),   # 查询会员积分
+        (Resource.MEMBERS, Action.READ),  # 查询会员积分
         (Resource.MENU, Action.READ),
     },
     TenantRole.WAITER: {

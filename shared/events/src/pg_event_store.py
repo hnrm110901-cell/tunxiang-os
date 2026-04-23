@@ -25,6 +25,7 @@
 - PG 不可用时降级（记录日志，不抛异常，不影响主业务）
 - 事件 payload 中金额字段约定为分（整数）
 """
+
 from __future__ import annotations
 
 import json
@@ -90,9 +91,9 @@ class PgEventStore:
     async def append(
         cls,
         *,
-        event_type: object,                  # 任意 EventType 枚举或字符串
+        event_type: object,  # 任意 EventType 枚举或字符串
         tenant_id: UUID | str,
-        stream_id: str,                      # 聚合根ID，如订单号、会员ID
+        stream_id: str,  # 聚合根ID，如订单号、会员ID
         payload: dict[str, Any],
         store_id: Optional[UUID | str] = None,
         source_service: str = "unknown",

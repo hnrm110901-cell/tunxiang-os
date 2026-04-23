@@ -7,6 +7,7 @@
 
 维护视图：mv_energy_efficiency
 """
+
 from __future__ import annotations
 
 import json
@@ -18,7 +19,6 @@ from ..projector import ProjectorBase
 
 
 class EnergyEfficiencyProjector(ProjectorBase):
-
     name = "energy_efficiency"
     event_types = {
         "energy.reading_captured",
@@ -47,7 +47,9 @@ class EnergyEfficiencyProjector(ProjectorBase):
             VALUES ($1, $2, $3, NOW())
             ON CONFLICT (tenant_id, store_id, stat_date) DO NOTHING
             """,
-            self.tenant_id, UUID(str(store_id)), stat_date,
+            self.tenant_id,
+            UUID(str(store_id)),
+            stat_date,
         )
 
         if event_type == "energy.reading_captured":
@@ -66,8 +68,13 @@ class EnergyEfficiencyProjector(ProjectorBase):
                     updated_at       = NOW()
                 WHERE tenant_id = $1 AND store_id = $2 AND stat_date = $3
                 """,
-                self.tenant_id, UUID(str(store_id)), stat_date,
-                electricity, gas, water, cost_fen,
+                self.tenant_id,
+                UUID(str(store_id)),
+                stat_date,
+                electricity,
+                gas,
+                water,
+                cost_fen,
                 UUID(str(event["event_id"])),
             )
             await _recalc_ratio(conn, self.tenant_id, UUID(str(store_id)), stat_date)
@@ -90,8 +97,11 @@ class EnergyEfficiencyProjector(ProjectorBase):
                     updated_at          = NOW()
                 WHERE tenant_id = $1 AND store_id = $2 AND stat_date = $3
                 """,
-                self.tenant_id, UUID(str(store_id)), stat_date,
-                json.dumps(off_hours), UUID(str(event["event_id"])),
+                self.tenant_id,
+                UUID(str(store_id)),
+                stat_date,
+                json.dumps(off_hours),
+                UUID(str(event["event_id"])),
             )
 
         elif event_type == "order.paid":
@@ -104,8 +114,11 @@ class EnergyEfficiencyProjector(ProjectorBase):
                     updated_at    = NOW()
                 WHERE tenant_id = $1 AND store_id = $2 AND stat_date = $3
                 """,
-                self.tenant_id, UUID(str(store_id)), stat_date,
-                final_fen, UUID(str(event["event_id"])),
+                self.tenant_id,
+                UUID(str(store_id)),
+                stat_date,
+                final_fen,
+                UUID(str(event["event_id"])),
             )
             await _recalc_ratio(conn, self.tenant_id, UUID(str(store_id)), stat_date)
 
@@ -122,5 +135,7 @@ async def _recalc_ratio(conn: object, tenant_id: UUID, store_id: UUID, stat_date
         END
         WHERE tenant_id = $1 AND store_id = $2 AND stat_date = $3
         """,
-        tenant_id, store_id, stat_date,
+        tenant_id,
+        store_id,
+        stat_date,
     )

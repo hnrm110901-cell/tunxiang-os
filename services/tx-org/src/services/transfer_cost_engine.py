@@ -7,13 +7,10 @@
 from __future__ import annotations
 
 from datetime import date, datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 from uuid import uuid4
 
 import structlog
-from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from services.store_transfer_service import (
     compute_cost_split,
     compute_time_split,
@@ -21,6 +18,8 @@ from services.store_transfer_service import (
     generate_detail_report,
     generate_summary_report,
 )
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
 
 log = structlog.get_logger(__name__)
 
@@ -452,10 +451,7 @@ class TransferCostEngine:
             detail_reports.append(detail)
 
         # 汇总表
-        all_emp_cost = [
-            {"employee_id": eid, "cost_split": emp["cost_split"]}
-            for eid, emp in employee_map.items()
-        ]
+        all_emp_cost = [{"employee_id": eid, "cost_split": emp["cost_split"]} for eid, emp in employee_map.items()]
         summary = generate_summary_report(all_emp_cost)
 
         # 分析表

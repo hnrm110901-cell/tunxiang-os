@@ -12,14 +12,15 @@
   DELETE /api/v1/mentorships/{mentorship_id}            软删除
 """
 
+from datetime import date, datetime, timezone
+from typing import Any, Optional
+from uuid import uuid4
+
+import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
-from typing import Any, Optional, List
-from uuid import uuid4
-from datetime import datetime, date, timezone
-import structlog
 
 from shared.ontology.src.database import get_db
 
@@ -144,25 +145,27 @@ async def mentorship_statistics(
     """)
     store_rows = (await db.execute(store_sql, params)).mappings().all()
 
-    return _ok({
-        "total": overall["total"],
-        "active_count": overall["active_count"],
-        "completed_count": overall["completed_count"],
-        "terminated_count": overall["terminated_count"],
-        "avg_mentor_score": round(float(overall["avg_mentor_score"]), 1),
-        "avg_pass_rate": round(float(overall["avg_pass_rate"]), 2),
-        "by_store": [
-            {
-                "store_id": r["store_id"],
-                "total": r["total"],
-                "active_count": r["active_count"],
-                "completed_count": r["completed_count"],
-                "avg_mentor_score": round(float(r["avg_mentor_score"]), 1),
-                "avg_pass_rate": round(float(r["avg_pass_rate"]), 2),
-            }
-            for r in store_rows
-        ],
-    })
+    return _ok(
+        {
+            "total": overall["total"],
+            "active_count": overall["active_count"],
+            "completed_count": overall["completed_count"],
+            "terminated_count": overall["terminated_count"],
+            "avg_mentor_score": round(float(overall["avg_mentor_score"]), 1),
+            "avg_pass_rate": round(float(overall["avg_pass_rate"]), 2),
+            "by_store": [
+                {
+                    "store_id": r["store_id"],
+                    "total": r["total"],
+                    "active_count": r["active_count"],
+                    "completed_count": r["completed_count"],
+                    "avg_mentor_score": round(float(r["avg_mentor_score"]), 1),
+                    "avg_pass_rate": round(float(r["avg_pass_rate"]), 2),
+                }
+                for r in store_rows
+            ],
+        }
+    )
 
 
 # ── GET /leaderboard (before /{mentorship_id} to avoid route clash) ──
@@ -289,9 +292,15 @@ async def create_mentorship(
           AND status = 'active'
           AND is_deleted = FALSE
     """)
-    active = (await db.execute(active_sql, {
-        "tid": tenant_id, "mentee_id": body.mentee_id,
-    })).first()
+    active = (
+        await db.execute(
+            active_sql,
+            {
+                "tid": tenant_id,
+                "mentee_id": body.mentee_id,
+            },
+        )
+    ).first()
     if active:
         raise HTTPException(
             status_code=409,
@@ -312,17 +321,35 @@ async def create_mentorship(
              :notes, FALSE, :now, :now)
         RETURNING id::text AS mentorship_id
     """)
-    result = (await db.execute(sql, {
-        "id": new_id, "tid": tenant_id,
-        "mentor_id": body.mentor_id, "mentee_id": body.mentee_id,
-        "store_id": body.store_id, "start_date": body.start_date,
-        "notes": body.notes, "now": now,
-    })).mappings().first()
+    result = (
+        (
+            await db.execute(
+                sql,
+                {
+                    "id": new_id,
+                    "tid": tenant_id,
+                    "mentor_id": body.mentor_id,
+                    "mentee_id": body.mentee_id,
+                    "store_id": body.store_id,
+                    "start_date": body.start_date,
+                    "notes": body.notes,
+                    "now": now,
+                },
+            )
+        )
+        .mappings()
+        .first()
+    )
 
     await db.commit()
 
-    log.info("mentorship.created", mentorship_id=new_id, tenant_id=tenant_id,
-             mentor_id=body.mentor_id, mentee_id=body.mentee_id)
+    log.info(
+        "mentorship.created",
+        mentorship_id=new_id,
+        tenant_id=tenant_id,
+        mentor_id=body.mentor_id,
+        mentee_id=body.mentee_id,
+    )
 
     return _ok({"mentorship_id": str(result["mentorship_id"])})
 
@@ -386,8 +413,7 @@ async def update_mentorship(
 
     await db.commit()
 
-    log.info("mentorship.updated", mentorship_id=mentorship_id, tenant_id=tenant_id,
-             updated_fields=list(fields.keys()))
+    log.info("mentorship.updated", mentorship_id=mentorship_id, tenant_id=tenant_id, updated_fields=list(fields.keys()))
 
     return _ok({"mentorship_id": mentorship_id})
 
@@ -418,20 +444,37 @@ async def complete_mentorship(
         WHERE id = :id AND tenant_id = :tid AND status = 'active' AND is_deleted = FALSE
         RETURNING id::text AS mentorship_id
     """)
-    result = (await db.execute(sql, {
-        "id": mentorship_id, "tid": tenant_id,
-        "end_date": today, "mentor_score": body.mentor_score,
-        "mentee_pass_rate": body.mentee_pass_rate,
-        "notes": body.notes, "now": now,
-    })).mappings().first()
+    result = (
+        (
+            await db.execute(
+                sql,
+                {
+                    "id": mentorship_id,
+                    "tid": tenant_id,
+                    "end_date": today,
+                    "mentor_score": body.mentor_score,
+                    "mentee_pass_rate": body.mentee_pass_rate,
+                    "notes": body.notes,
+                    "now": now,
+                },
+            )
+        )
+        .mappings()
+        .first()
+    )
 
     if not result:
         raise HTTPException(status_code=404, detail="Active mentorship not found")
 
     await db.commit()
 
-    log.info("mentorship.completed", mentorship_id=mentorship_id, tenant_id=tenant_id,
-             mentor_score=body.mentor_score, mentee_pass_rate=body.mentee_pass_rate)
+    log.info(
+        "mentorship.completed",
+        mentorship_id=mentorship_id,
+        tenant_id=tenant_id,
+        mentor_score=body.mentor_score,
+        mentee_pass_rate=body.mentee_pass_rate,
+    )
 
     return _ok({"mentorship_id": mentorship_id})
 
@@ -460,10 +503,22 @@ async def terminate_mentorship(
         WHERE id = :id AND tenant_id = :tid AND status = 'active' AND is_deleted = FALSE
         RETURNING id::text AS mentorship_id
     """)
-    result = (await db.execute(sql, {
-        "id": mentorship_id, "tid": tenant_id,
-        "end_date": today, "notes": body.notes, "now": now,
-    })).mappings().first()
+    result = (
+        (
+            await db.execute(
+                sql,
+                {
+                    "id": mentorship_id,
+                    "tid": tenant_id,
+                    "end_date": today,
+                    "notes": body.notes,
+                    "now": now,
+                },
+            )
+        )
+        .mappings()
+        .first()
+    )
 
     if not result:
         raise HTTPException(status_code=404, detail="Active mentorship not found")

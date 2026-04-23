@@ -17,7 +17,6 @@ from __future__ import annotations
 
 from datetime import date, timedelta
 from typing import Any, Optional
-from uuid import UUID
 
 import structlog
 from sqlalchemy import text
@@ -36,14 +35,18 @@ class ContributionScoreService:
     # 岗位权重差异化
     ROLE_WEIGHTS: dict[str, dict[str, float]] = {
         "服务员": {"revenue": 0.30, "efficiency": 0.20, "satisfaction": 0.30, "attendance": 0.15, "teamwork": 0.05},
-        "厨师":   {"revenue": 0.15, "efficiency": 0.35, "satisfaction": 0.25, "attendance": 0.15, "teamwork": 0.10},
+        "厨师": {"revenue": 0.15, "efficiency": 0.35, "satisfaction": 0.25, "attendance": 0.15, "teamwork": 0.10},
         "收银员": {"revenue": 0.25, "efficiency": 0.25, "satisfaction": 0.20, "attendance": 0.20, "teamwork": 0.10},
-        "店长":   {"revenue": 0.35, "efficiency": 0.15, "satisfaction": 0.20, "attendance": 0.15, "teamwork": 0.15},
+        "店长": {"revenue": 0.35, "efficiency": 0.15, "satisfaction": 0.20, "attendance": 0.15, "teamwork": 0.15},
     }
 
     # 默认权重（未匹配的岗位使用）
     DEFAULT_WEIGHTS: dict[str, float] = {
-        "revenue": 0.25, "efficiency": 0.25, "satisfaction": 0.20, "attendance": 0.20, "teamwork": 0.10,
+        "revenue": 0.25,
+        "efficiency": 0.25,
+        "satisfaction": 0.20,
+        "attendance": 0.20,
+        "teamwork": 0.10,
     }
 
     # ── 公开方法 ─────────────────────────────────────────────────────
@@ -77,19 +80,43 @@ class ContributionScoreService:
 
         # 并行计算5个维度分
         revenue = await self.calculate_revenue_contribution(
-            db, tenant_id, employee_id, store_id, period_start, period_end,
+            db,
+            tenant_id,
+            employee_id,
+            store_id,
+            period_start,
+            period_end,
         )
         efficiency = await self.calculate_efficiency_score(
-            db, tenant_id, employee_id, store_id, period_start, period_end,
+            db,
+            tenant_id,
+            employee_id,
+            store_id,
+            period_start,
+            period_end,
         )
         satisfaction = await self.calculate_satisfaction_score(
-            db, tenant_id, employee_id, store_id, period_start, period_end,
+            db,
+            tenant_id,
+            employee_id,
+            store_id,
+            period_start,
+            period_end,
         )
         attendance = await self.calculate_attendance_score(
-            db, tenant_id, employee_id, period_start, period_end,
+            db,
+            tenant_id,
+            employee_id,
+            period_start,
+            period_end,
         )
         teamwork = await self.calculate_teamwork_score(
-            db, tenant_id, employee_id, store_id, period_start, period_end,
+            db,
+            tenant_id,
+            employee_id,
+            store_id,
+            period_start,
+            period_end,
         )
 
         dimensions = {
@@ -102,9 +129,7 @@ class ContributionScoreService:
 
         # 按岗位权重加权
         weights = self.ROLE_WEIGHTS.get(role, self.DEFAULT_WEIGHTS)
-        total_score = sum(
-            dimensions[dim] * weights[dim] for dim in dimensions
-        )
+        total_score = sum(dimensions[dim] * weights[dim] for dim in dimensions)
         total_score = round(min(100.0, max(0.0, total_score)), 1)
 
         log.info(
@@ -151,27 +176,35 @@ class ContributionScoreService:
         for emp in employees:
             try:
                 score_data = await self.calculate_score(
-                    db, tenant_id, str(emp["employee_id"]),
-                    period_start, period_end,
+                    db,
+                    tenant_id,
+                    str(emp["employee_id"]),
+                    period_start,
+                    period_end,
                 )
                 # 获取上一周期趋势
                 prev_start, prev_end = self._prev_period(period_start, period_end)
                 prev_score = await self._get_period_total(
-                    db, tenant_id, str(emp["employee_id"]),
-                    prev_start, prev_end,
+                    db,
+                    tenant_id,
+                    str(emp["employee_id"]),
+                    prev_start,
+                    prev_end,
                 )
                 delta = round(score_data["total_score"] - prev_score, 1) if prev_score > 0 else 0.0
                 trend = "up" if delta > 0 else ("down" if delta < 0 else "same")
 
-                rankings.append({
-                    "employee_id": str(emp["employee_id"]),
-                    "name": emp.get("emp_name", ""),
-                    "role": emp.get("role", ""),
-                    "total_score": score_data["total_score"],
-                    "dimensions": score_data["dimensions"],
-                    "trend": trend,
-                    "delta": delta,
-                })
+                rankings.append(
+                    {
+                        "employee_id": str(emp["employee_id"]),
+                        "name": emp.get("emp_name", ""),
+                        "role": emp.get("role", ""),
+                        "total_score": score_data["total_score"],
+                        "dimensions": score_data["dimensions"],
+                        "trend": trend,
+                        "delta": delta,
+                    }
+                )
             except (ProgrammingError, DBAPIError, ValueError) as exc:
                 log.warning(
                     "contribution_score_skip",
@@ -228,10 +261,16 @@ class ContributionScoreService:
                   AND created_at BETWEEN :start AND :end
                   AND status = 'paid'
             """)
-            row = await db.execute(sql_employee, {
-                "tid": tenant_id, "store_id": store_id,
-                "eid": employee_id, "start": period_start, "end": period_end,
-            })
+            row = await db.execute(
+                sql_employee,
+                {
+                    "tid": tenant_id,
+                    "store_id": store_id,
+                    "eid": employee_id,
+                    "start": period_start,
+                    "end": period_end,
+                },
+            )
             emp_result = row.mappings().first()
             emp_revenue = int(emp_result["revenue_fen"] or 0) if emp_result else 0
 
@@ -252,10 +291,15 @@ class ContributionScoreService:
                     GROUP BY waiter_id
                 ) sub
             """)
-            avg_row = await db.execute(sql_avg, {
-                "tid": tenant_id, "store_id": store_id,
-                "start": period_start, "end": period_end,
-            })
+            avg_row = await db.execute(
+                sql_avg,
+                {
+                    "tid": tenant_id,
+                    "store_id": store_id,
+                    "start": period_start,
+                    "end": period_end,
+                },
+            )
             avg_result = avg_row.mappings().first()
             avg_revenue = float(avg_result["avg_revenue_fen"] or 1) if avg_result else 1.0
 
@@ -265,7 +309,9 @@ class ContributionScoreService:
         except (ProgrammingError, DBAPIError) as exc:
             log.warning(
                 "contribution.revenue_unavailable",
-                tenant_id=tenant_id, employee_id=employee_id, error=str(exc),
+                tenant_id=tenant_id,
+                employee_id=employee_id,
+                error=str(exc),
             )
             return _BASELINE
 
@@ -294,10 +340,16 @@ class ContributionScoreService:
                   AND created_at BETWEEN :start AND :end
                   AND status = 'paid'
             """)
-            o_row = await db.execute(sql_orders, {
-                "tid": tenant_id, "store_id": store_id,
-                "eid": employee_id, "start": period_start, "end": period_end,
-            })
+            o_row = await db.execute(
+                sql_orders,
+                {
+                    "tid": tenant_id,
+                    "store_id": store_id,
+                    "eid": employee_id,
+                    "start": period_start,
+                    "end": period_end,
+                },
+            )
             order_count = int((o_row.mappings().first() or {}).get("order_count", 0))
 
             sql_attendance = text("""
@@ -308,10 +360,15 @@ class ContributionScoreService:
                   AND attendance_date BETWEEN :start AND :end
                   AND status IN ('normal', 'late')
             """)
-            a_row = await db.execute(sql_attendance, {
-                "tid": tenant_id, "eid": employee_id,
-                "start": period_start, "end": period_end,
-            })
+            a_row = await db.execute(
+                sql_attendance,
+                {
+                    "tid": tenant_id,
+                    "eid": employee_id,
+                    "start": period_start,
+                    "end": period_end,
+                },
+            )
             work_days = int((a_row.mappings().first() or {}).get("work_days", 0))
 
             if work_days == 0 or order_count == 0:
@@ -327,7 +384,9 @@ class ContributionScoreService:
         except (ProgrammingError, DBAPIError) as exc:
             log.warning(
                 "contribution.efficiency_unavailable",
-                tenant_id=tenant_id, employee_id=employee_id, error=str(exc),
+                tenant_id=tenant_id,
+                employee_id=employee_id,
+                error=str(exc),
             )
             return _BASELINE
 
@@ -358,10 +417,16 @@ class ContributionScoreService:
                   AND (o.waiter_id = CAST(:eid AS TEXT) OR o.cashier_id = CAST(:eid AS TEXT))
                   AND o.created_at BETWEEN :start AND :end
             """)
-            row = await db.execute(sql_refund, {
-                "tid": tenant_id, "store_id": store_id,
-                "eid": employee_id, "start": period_start, "end": period_end,
-            })
+            row = await db.execute(
+                sql_refund,
+                {
+                    "tid": tenant_id,
+                    "store_id": store_id,
+                    "eid": employee_id,
+                    "start": period_start,
+                    "end": period_end,
+                },
+            )
             result = row.mappings().first()
             total_items = int(result["total_items"] or 0) if result else 0
             refunded = int(result["refunded_items"] or 0) if result else 0
@@ -377,7 +442,9 @@ class ContributionScoreService:
         except (ProgrammingError, DBAPIError) as exc:
             log.warning(
                 "contribution.satisfaction_unavailable",
-                tenant_id=tenant_id, employee_id=employee_id, error=str(exc),
+                tenant_id=tenant_id,
+                employee_id=employee_id,
+                error=str(exc),
             )
             return _BASELINE
 
@@ -402,10 +469,15 @@ class ContributionScoreService:
                   AND employee_id = CAST(:eid AS TEXT)
                   AND attendance_date BETWEEN :start AND :end
             """)
-            row = await db.execute(sql, {
-                "tid": tenant_id, "eid": employee_id,
-                "start": period_start, "end": period_end,
-            })
+            row = await db.execute(
+                sql,
+                {
+                    "tid": tenant_id,
+                    "eid": employee_id,
+                    "start": period_start,
+                    "end": period_end,
+                },
+            )
             result = row.mappings().first()
             total = int(result["total_days"] or 0) if result else 0
 
@@ -425,7 +497,9 @@ class ContributionScoreService:
         except (ProgrammingError, DBAPIError) as exc:
             log.warning(
                 "contribution.attendance_unavailable",
-                tenant_id=tenant_id, employee_id=employee_id, error=str(exc),
+                tenant_id=tenant_id,
+                employee_id=employee_id,
+                error=str(exc),
             )
             return _BASELINE
 
@@ -451,11 +525,16 @@ class ContributionScoreService:
                   AND us.is_cross_position = TRUE
                   AND us.is_deleted = FALSE
             """)
-            row = await db.execute(sql, {
-                "tid": tenant_id, "eid": employee_id,
-                "store_id": store_id,
-                "start": period_start, "end": period_end,
-            })
+            row = await db.execute(
+                sql,
+                {
+                    "tid": tenant_id,
+                    "eid": employee_id,
+                    "store_id": store_id,
+                    "start": period_start,
+                    "end": period_end,
+                },
+            )
             result = row.mappings().first()
             cross_count = int(result["cross_support_count"] or 0) if result else 0
 
@@ -466,7 +545,9 @@ class ContributionScoreService:
         except (ProgrammingError, DBAPIError) as exc:
             log.warning(
                 "contribution.teamwork_unavailable",
-                tenant_id=tenant_id, employee_id=employee_id, error=str(exc),
+                tenant_id=tenant_id,
+                employee_id=employee_id,
+                error=str(exc),
             )
             return _BASELINE
 
@@ -487,21 +568,29 @@ class ContributionScoreService:
             p_start = p_end - timedelta(days=6)
             try:
                 score_data = await self.calculate_score(
-                    db, tenant_id, employee_id, p_start, p_end,
+                    db,
+                    tenant_id,
+                    employee_id,
+                    p_start,
+                    p_end,
                 )
-                trend.append({
-                    "period_start": p_start.isoformat(),
-                    "period_end": p_end.isoformat(),
-                    "total_score": score_data["total_score"],
-                    "dimensions": score_data["dimensions"],
-                })
+                trend.append(
+                    {
+                        "period_start": p_start.isoformat(),
+                        "period_end": p_end.isoformat(),
+                        "total_score": score_data["total_score"],
+                        "dimensions": score_data["dimensions"],
+                    }
+                )
             except (ProgrammingError, DBAPIError, ValueError):
-                trend.append({
-                    "period_start": p_start.isoformat(),
-                    "period_end": p_end.isoformat(),
-                    "total_score": 0,
-                    "dimensions": {},
-                })
+                trend.append(
+                    {
+                        "period_start": p_start.isoformat(),
+                        "period_end": p_end.isoformat(),
+                        "total_score": 0,
+                        "dimensions": {},
+                    }
+                )
 
         return trend
 
@@ -515,7 +604,10 @@ class ContributionScoreService:
         )
 
     async def _fetch_employee(
-        self, db: AsyncSession, tenant_id: str, employee_id: str,
+        self,
+        db: AsyncSession,
+        tenant_id: str,
+        employee_id: str,
     ) -> Optional[dict[str, Any]]:
         row = await db.execute(
             text("""
@@ -531,7 +623,10 @@ class ContributionScoreService:
         return dict(m) if m else None
 
     async def _fetch_store_employees(
-        self, db: AsyncSession, tenant_id: str, store_id: str,
+        self,
+        db: AsyncSession,
+        tenant_id: str,
+        store_id: str,
     ) -> list[dict[str, Any]]:
         rows = await db.execute(
             text("""
@@ -558,7 +653,11 @@ class ContributionScoreService:
         """获取某个周期的总分（用于趋势对比），简化版只算营收+出勤"""
         try:
             score_data = await self.calculate_score(
-                db, tenant_id, employee_id, period_start, period_end,
+                db,
+                tenant_id,
+                employee_id,
+                period_start,
+                period_end,
             )
             return score_data["total_score"]
         except (ProgrammingError, DBAPIError, ValueError):

@@ -11,6 +11,7 @@
 
 维护视图：mv_safety_compliance（按周聚合）
 """
+
 from __future__ import annotations
 
 import json
@@ -28,7 +29,6 @@ def _iso_week_monday(dt: datetime) -> "datetime.date":
 
 
 class SafetyComplianceProjector(ProjectorBase):
-
     name = "safety_compliance"
     event_types = {
         "safety.sample_logged",
@@ -62,7 +62,9 @@ class SafetyComplianceProjector(ProjectorBase):
             VALUES ($1, $2, $3, 0, NOW())
             ON CONFLICT (tenant_id, store_id, stat_week) DO NOTHING
             """,
-            self.tenant_id, UUID(str(store_id)), stat_week,
+            self.tenant_id,
+            UUID(str(store_id)),
+            stat_week,
         )
 
         if event_type == "safety.sample_logged":
@@ -74,7 +76,9 @@ class SafetyComplianceProjector(ProjectorBase):
                     updated_at          = NOW()
                 WHERE tenant_id = $1 AND store_id = $2 AND stat_week = $3
                 """,
-                self.tenant_id, UUID(str(store_id)), stat_week,
+                self.tenant_id,
+                UUID(str(store_id)),
+                stat_week,
                 UUID(str(event["event_id"])),
             )
 
@@ -88,7 +92,9 @@ class SafetyComplianceProjector(ProjectorBase):
                     updated_at          = NOW()
                 WHERE tenant_id = $1 AND store_id = $2 AND stat_week = $3
                 """,
-                self.tenant_id, UUID(str(store_id)), stat_week,
+                self.tenant_id,
+                UUID(str(store_id)),
+                stat_week,
                 UUID(str(event["event_id"])),
             )
             await _recalc_compliance_score(conn, self.tenant_id, UUID(str(store_id)), stat_week)
@@ -100,9 +106,7 @@ class SafetyComplianceProjector(ProjectorBase):
                 "severity": payload.get("severity", "medium"),
                 "found_at": occurred_at.isoformat(),
             }
-            deduction = {"critical": 20, "high": 10, "medium": 5, "low": 2}.get(
-                payload.get("severity", "medium"), 5
-            )
+            deduction = {"critical": 20, "high": 10, "medium": 5, "low": 2}.get(payload.get("severity", "medium"), 5)
             await conn.execute(  # type: ignore[union-attr]
                 """
                 UPDATE mv_safety_compliance
@@ -112,8 +116,11 @@ class SafetyComplianceProjector(ProjectorBase):
                     updated_at         = NOW()
                 WHERE tenant_id = $1 AND store_id = $2 AND stat_week = $3
                 """,
-                self.tenant_id, UUID(str(store_id)), stat_week,
-                deduction, UUID(str(event["event_id"])),
+                self.tenant_id,
+                UUID(str(store_id)),
+                stat_week,
+                deduction,
+                UUID(str(event["event_id"])),
             )
 
         elif event_type == "safety.expiry_alert":
@@ -132,20 +139,18 @@ class SafetyComplianceProjector(ProjectorBase):
                     updated_at    = NOW()
                 WHERE tenant_id = $1 AND store_id = $2 AND stat_week = $3
                 """,
-                self.tenant_id, UUID(str(store_id)), stat_week,
-                json.dumps([alert]), UUID(str(event["event_id"])),
+                self.tenant_id,
+                UUID(str(store_id)),
+                stat_week,
+                json.dumps([alert]),
+                UUID(str(event["event_id"])),
             )
 
         elif event_type == "safety.haccp_check_completed":
-            await self._handle_haccp_check_completed(
-                event, conn, stat_week, UUID(str(store_id))
-            )
+            await self._handle_haccp_check_completed(event, conn, stat_week, UUID(str(store_id)))
 
         elif event_type == "safety.haccp_critical_failure":
-            await self._handle_haccp_critical_failure(
-                event, conn, stat_week, UUID(str(store_id))
-            )
-
+            await self._handle_haccp_critical_failure(event, conn, stat_week, UUID(str(store_id)))
 
     async def _handle_haccp_check_completed(
         self,
@@ -184,8 +189,11 @@ class SafetyComplianceProjector(ProjectorBase):
                 updated_at               = NOW()
             WHERE tenant_id = $1 AND store_id = $2 AND stat_week = $3
             """,
-            self.tenant_id, store_id, stat_week,
-            pass_delta, critical_failures,
+            self.tenant_id,
+            store_id,
+            stat_week,
+            pass_delta,
+            critical_failures,
             UUID(str(event["event_id"])),
         )
 
@@ -223,7 +231,9 @@ class SafetyComplianceProjector(ProjectorBase):
                 updated_at                  = NOW()
             WHERE tenant_id = $1 AND store_id = $2 AND stat_week = $3
             """,
-            self.tenant_id, store_id, stat_week,
+            self.tenant_id,
+            store_id,
+            stat_week,
             critical_failures,
             UUID(str(event["event_id"])),
         )
@@ -241,5 +251,7 @@ async def _recalc_compliance_score(conn: object, tenant_id: UUID, store_id: UUID
         END
         WHERE tenant_id = $1 AND store_id = $2 AND stat_week = $3
         """,
-        tenant_id, store_id, stat_week,
+        tenant_id,
+        store_id,
+        stat_week,
     )

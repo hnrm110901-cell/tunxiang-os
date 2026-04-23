@@ -2,16 +2,18 @@
 员工培训管理 + 绩效考核扩展 — 单元测试
 OR-02 / Y-G8
 """
+
 from __future__ import annotations
 
-from datetime import date, timedelta
+from datetime import date
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from fastapi import FastAPI
-from httpx import AsyncClient, ASGITransport
+from httpx import ASGITransport, AsyncClient
 
 # ── 测试 App 构建 ─────────────────────────────────────────────────────────────
+
 
 def _make_app() -> FastAPI:
     from api.employee_training_routes import router as training_router
@@ -28,6 +30,7 @@ HEADERS = {"X-Tenant-ID": TENANT_ID}
 
 # ── 辅助 ─────────────────────────────────────────────────────────────────────
 
+
 def _make_mock_db():
     """返回最小可用的异步 DB mock，令 RLS set_config 不报错。"""
     db = AsyncMock()
@@ -42,6 +45,7 @@ def _make_mock_db():
 
 
 # ── Test 1: 培训记录列表 ──────────────────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_training_records_list():
@@ -87,12 +91,13 @@ async def test_training_records_list():
     for record in MOCK_TRAINING_RECORDS:
         assert "training_type" in record, f"记录 {record.get('id')} 缺少 training_type"
         assert "passed" in record, f"记录 {record.get('id')} 缺少 passed"
-        assert record["training_type"] in (
-            "onboarding", "food_safety", "service", "skills", "compliance", "other"
-        ), f"training_type 值不合法: {record['training_type']}"
+        assert record["training_type"] in ("onboarding", "food_safety", "service", "skills", "compliance", "other"), (
+            f"training_type 值不合法: {record['training_type']}"
+        )
 
 
 # ── Test 2: 即将到期证书 ─────────────────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_expiring_certificates():
@@ -101,7 +106,7 @@ async def test_expiring_certificates():
     MOCK 数据中 certificate_expires_at = "2026-04-25"（测试日 2026-04-06），
     距今 19 天，应在 30 天窗口内。
     """
-    from api.employee_training_routes import MOCK_TRAINING_RECORDS, _days_until, _cert_status
+    from api.employee_training_routes import MOCK_TRAINING_RECORDS, _cert_status, _days_until
 
     today = date.today()
 
@@ -118,14 +123,11 @@ async def test_expiring_certificates():
     # 验证到期日期有效且在 30 天窗口内
     assert days_remaining >= 0, f"证书已过期（剩余 {days_remaining} 天），测试数据需更新"
     assert days_remaining <= 30, (
-        f"王收银消防证书剩余 {days_remaining} 天，超过 30 天预警窗口。"
-        f"今日 {today}，到期日 {exp_date_str}"
+        f"王收银消防证书剩余 {days_remaining} 天，超过 30 天预警窗口。今日 {today}，到期日 {exp_date_str}"
     )
 
     cert_status = _cert_status(days_remaining)
-    assert cert_status in ("warning", "critical"), (
-        f"证书状态应为 warning/critical，实际为 {cert_status}"
-    )
+    assert cert_status in ("warning", "critical"), f"证书状态应为 warning/critical，实际为 {cert_status}"
 
     # 验证该记录能被 expiring-certs 端点降级逻辑捕获
     expiring_mock = []
@@ -137,21 +139,19 @@ async def test_expiring_certificates():
             expiring_mock.append(r)
 
     emp_names_in_expiring = [r.get("employee_name") for r in expiring_mock]
-    assert "王收银" in emp_names_in_expiring, (
-        f"王收银应出现在到期预警列表中，当前列表: {emp_names_in_expiring}"
-    )
+    assert "王收银" in emp_names_in_expiring, f"王收银应出现在到期预警列表中，当前列表: {emp_names_in_expiring}"
 
 
 # ── Test 3: 绩效评分加权计算 ─────────────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_performance_evaluation():
     """绩效评分：提交3名员工评分，验证综合分=加权平均，评级正确（≥90→A）。"""
     from api.performance_scoring_routes import (
-        _compute_weighted_score,
-        _compute_grade,
         KPI_WEIGHTS,
-        EvaluationItem,
+        _compute_grade,
+        _compute_weighted_score,
     )
 
     test_cases = [
@@ -192,9 +192,7 @@ async def test_performance_evaluation():
         )
 
     # 3. 特殊验证：90分精确边界 → A
-    score_90 = _compute_weighted_score(
-        {"service": 90, "efficiency": 90, "attendance": 90}, "default"
-    )
+    score_90 = _compute_weighted_score({"service": 90, "efficiency": 90, "attendance": 90}, "default")
     assert score_90 == 90.0, f"全90分综合分应为90.0，实际 {score_90}"
     grade_90, _ = _compute_grade(90.0)
     assert grade_90 == "A", f"90分应评为A级，实际 {grade_90}"
@@ -202,20 +200,17 @@ async def test_performance_evaluation():
     # 4. 权重配置合理性：每个岗位权重之和 == 1.0（允许 ±0.01 精度）
     for role, weights in KPI_WEIGHTS.items():
         total = sum(weights.values())
-        assert abs(total - 1.0) <= 0.01, (
-            f"岗位 {role} 权重之和 {total:.3f} 不等于 1.0"
-        )
+        assert abs(total - 1.0) <= 0.01, f"岗位 {role} 权重之和 {total:.3f} 不等于 1.0"
 
 
 # ── Test 4: 绩效概览统计 ─────────────────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_performance_stats():
     """绩效概览：降级 mock 返回的 avg_score / excellent_rate 字段为数值类型。"""
     from api.performance_scoring_routes import (
         MOCK_SCORES,
-        _compute_weighted_score,
-        _compute_grade,
         _grade_distribution,
     )
 
@@ -244,9 +239,7 @@ async def test_performance_stats():
     assert set(grade_dist.keys()) == {"A", "B", "C", "D", "E"}, (
         f"grade_distribution 键应为 A/B/C/D/E，实际 {set(grade_dist.keys())}"
     )
-    assert sum(grade_dist.values()) == len(all_scores), (
-        "各评级人数之和应等于总人数"
-    )
+    assert sum(grade_dist.values()) == len(all_scores), "各评级人数之和应等于总人数"
 
     # 4. 百分率合计不超过 100%（优秀率 + 待改进率 <= 总参与率100%）
     assert excellent_rate + needs_improvement_rate <= 100.0 + 0.1, (

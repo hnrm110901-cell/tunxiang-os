@@ -127,7 +127,7 @@ class TestSalaryCompute:
     def _standard_employee(self) -> dict:
         """标准员工数据"""
         return {
-            "base_salary_fen": 500000,       # 5000元
+            "base_salary_fen": 500000,  # 5000元
             "attendance_days": 22,
             "work_days_in_month": 22,
             "weekday_ot_hours": 10,
@@ -140,11 +140,11 @@ class TestSalaryCompute:
             "early_leave_count": 0,
             "early_leave_deduction_per_time_fen": 5000,
             "absent_days": 0,
-            "perf_coefficient": 120,         # 绩效1.2
-            "sales_amount_fen": 10000000,    # 销售额10万
-            "commission_rate": 0.02,         # 2%提成
+            "perf_coefficient": 120,  # 绩效1.2
+            "sales_amount_fen": 10000000,  # 销售额10万
+            "commission_rate": 0.02,  # 2%提成
             "full_attendance_bonus_fen": 30000,  # 全勤奖300元
-            "seniority_months": 30,          # 工龄30个月
+            "seniority_months": 30,  # 工龄30个月
             "social_base_fen": 500000,
             "housing_fund_base_fen": 500000,
             "housing_fund_rate": 0.07,
@@ -159,12 +159,24 @@ class TestSalaryCompute:
     def _standard_enabled(self) -> list:
         """标准启用项"""
         return [
-            "ATT_001", "ATT_005", "ATT_007",
-            "OT_002", "OT_004", "OT_007",
-            "PERF_002", "PERF_003", "PERF_006",
-            "SUB_001", "SUB_002", "SUB_005",
-            "DED_001", "DED_002",
-            "SOC_001", "SOC_002", "SOC_003", "SOC_004",
+            "ATT_001",
+            "ATT_005",
+            "ATT_007",
+            "OT_002",
+            "OT_004",
+            "OT_007",
+            "PERF_002",
+            "PERF_003",
+            "PERF_006",
+            "SUB_001",
+            "SUB_002",
+            "SUB_005",
+            "DED_001",
+            "DED_002",
+            "SOC_001",
+            "SOC_002",
+            "SOC_003",
+            "SOC_004",
         ]
 
     def test_basic_salary_compute(self):
@@ -181,10 +193,7 @@ class TestSalaryCompute:
         assert result["net_fen"] > 0
         # 实发 = 应发 - 扣款 - 社保 - 个税
         assert result["net_fen"] == (
-            result["gross_fen"]
-            - result["total_deduction_fen"]
-            - result["social_personal_fen"]
-            - result["tax_fen"]
+            result["gross_fen"] - result["total_deduction_fen"] - result["social_personal_fen"] - result["tax_fen"]
         )
 
     def test_full_attendance_bonus_awarded(self):

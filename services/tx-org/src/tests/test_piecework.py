@@ -9,6 +9,7 @@
   6. TestDBErrorReturns500           — DB异常时返回500而非mock数据
   7. TestSerializeRow                — _serialize_row 正确处理 UUID/datetime/date
 """
+
 from __future__ import annotations
 
 import uuid
@@ -17,11 +18,11 @@ from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from fastapi import FastAPI
-from fastapi.testclient import TestClient
 
 # 被测模块
-from api.piecework_routes import router, _serialize_row
+from api.piecework_routes import _serialize_row, router
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
 
 TENANT_ID = "11111111-1111-1111-1111-111111111111"
 STORE_ID = "22222222-2222-2222-2222-222222222222"
@@ -33,6 +34,7 @@ HEADERS = {"X-Tenant-ID": TENANT_ID}
 # ──────────────────────────────────────────────────────────────────────────────
 # Fixture: 构造测试 App（使用 mock DB）
 # ──────────────────────────────────────────────────────────────────────────────
+
 
 def _make_app() -> FastAPI:
     app = FastAPI()
@@ -67,9 +69,7 @@ def _make_db_with_rows(rows: list[dict[str, Any]]) -> AsyncMock:
     """返回 mock DB，execute 返回指定行集。"""
     mock_db = AsyncMock()
     mock_result = MagicMock()
-    mock_result.__iter__ = MagicMock(
-        return_value=iter([_MockRow(r) for r in rows])
-    )
+    mock_result.__iter__ = MagicMock(return_value=iter([_MockRow(r) for r in rows]))
     mock_db.execute.return_value = mock_result
     return mock_db
 
@@ -77,6 +77,7 @@ def _make_db_with_rows(rows: list[dict[str, Any]]) -> AsyncMock:
 # ──────────────────────────────────────────────────────────────────────────────
 # 测试1: 区域 CRUD 全流程
 # ──────────────────────────────────────────────────────────────────────────────
+
 
 class TestZoneCRUD:
     """区域创建/查询/更新/删除全流程测试。"""
@@ -102,11 +103,16 @@ class TestZoneCRUD:
     def test_zone_list_returns_db_rows(self) -> None:
         """GET /zones 成功时返回DB数据。"""
         db_rows = [
-            {"id": uuid.UUID("00000000-0000-0000-0000-000000000001"),
-             "tenant_id": uuid.UUID(TENANT_ID), "store_id": None,
-             "name": "热菜区", "description": "热菜", "is_active": True,
-             "created_at": datetime(2026, 1, 1, tzinfo=timezone.utc),
-             "updated_at": datetime(2026, 1, 1, tzinfo=timezone.utc)},
+            {
+                "id": uuid.UUID("00000000-0000-0000-0000-000000000001"),
+                "tenant_id": uuid.UUID(TENANT_ID),
+                "store_id": None,
+                "name": "热菜区",
+                "description": "热菜",
+                "is_active": True,
+                "created_at": datetime(2026, 1, 1, tzinfo=timezone.utc),
+                "updated_at": datetime(2026, 1, 1, tzinfo=timezone.utc),
+            },
         ]
         app = _make_app()
         mock_db = _make_db_with_rows(db_rows)
@@ -183,13 +189,14 @@ class TestZoneCRUD:
 # 测试2: 方案含5个品项明细
 # ──────────────────────────────────────────────────────────────────────────────
 
+
 class TestSchemeWithItems:
     """创建方案（含5个品项明细），查询明细完整。"""
 
     ITEMS_5 = [
-        {"dish_name": "红烧肉",   "unit_fee_fen": 200, "min_qty": 1},
+        {"dish_name": "红烧肉", "unit_fee_fen": 200, "min_qty": 1},
         {"dish_name": "清蒸鲈鱼", "unit_fee_fen": 300, "min_qty": 1},
-        {"dish_name": "水煮鱼",   "unit_fee_fen": 250, "min_qty": 1},
+        {"dish_name": "水煮鱼", "unit_fee_fen": 250, "min_qty": 1},
         {"dish_name": "夫妻肺片", "unit_fee_fen": 150, "min_qty": 1},
         {"dish_name": "宫保鸡丁", "unit_fee_fen": 180, "min_qty": 2},
     ]
@@ -224,17 +231,25 @@ class TestSchemeWithItems:
 
         # 第一次 execute: _set_rls; 第二次: scheme查询; 第三次: items查询
         scheme_data = {
-            "id": uuid.UUID(scheme_id), "tenant_id": uuid.UUID(TENANT_ID),
-            "zone_id": None, "zone_name": None,
-            "name": "测试方案", "calc_type": "by_dish",
-            "applicable_role": "chef", "effective_date": date(2026, 1, 1),
+            "id": uuid.UUID(scheme_id),
+            "tenant_id": uuid.UUID(TENANT_ID),
+            "zone_id": None,
+            "zone_name": None,
+            "name": "测试方案",
+            "calc_type": "by_dish",
+            "applicable_role": "chef",
+            "effective_date": date(2026, 1, 1),
             "is_active": True,
             "created_at": datetime(2026, 1, 1, tzinfo=timezone.utc),
             "updated_at": datetime(2026, 1, 1, tzinfo=timezone.utc),
         }
         item_data = {
-            "id": uuid.uuid4(), "dish_id": None, "method_id": None,
-            "dish_name": "红烧肉", "unit_fee_fen": 200, "min_qty": 1,
+            "id": uuid.uuid4(),
+            "dish_id": None,
+            "method_id": None,
+            "dish_name": "红烧肉",
+            "unit_fee_fen": 200,
+            "min_qty": 1,
             "created_at": datetime(2026, 1, 1, tzinfo=timezone.utc),
         }
 
@@ -285,7 +300,7 @@ class TestSchemeWithItems:
                 "/api/v1/org/piecework/schemes",
                 json={
                     "name": "测试方案",
-                    "calc_type": "by_banana",   # 非法值
+                    "calc_type": "by_banana",  # 非法值
                     "applicable_role": "chef",
                     "items": [],
                 },
@@ -297,13 +312,19 @@ class TestSchemeWithItems:
     def test_scheme_list_returns_db_rows(self) -> None:
         """GET /schemes 成功时返回DB数据。"""
         db_rows = [
-            {"id": uuid.uuid4(), "tenant_id": uuid.UUID(TENANT_ID),
-             "zone_id": None, "zone_name": None,
-             "name": "测试方案", "calc_type": "by_dish",
-             "applicable_role": "chef", "effective_date": date(2026, 1, 1),
-             "is_active": True,
-             "created_at": datetime(2026, 1, 1, tzinfo=timezone.utc),
-             "updated_at": datetime(2026, 1, 1, tzinfo=timezone.utc)},
+            {
+                "id": uuid.uuid4(),
+                "tenant_id": uuid.UUID(TENANT_ID),
+                "zone_id": None,
+                "zone_name": None,
+                "name": "测试方案",
+                "calc_type": "by_dish",
+                "applicable_role": "chef",
+                "effective_date": date(2026, 1, 1),
+                "is_active": True,
+                "created_at": datetime(2026, 1, 1, tzinfo=timezone.utc),
+                "updated_at": datetime(2026, 1, 1, tzinfo=timezone.utc),
+            },
         ]
         app = _make_app()
         mock_db = _make_db_with_rows(db_rows)
@@ -322,15 +343,19 @@ class TestSchemeWithItems:
 # 测试3: total_fee_fen = quantity x unit_fee_fen
 # ──────────────────────────────────────────────────────────────────────────────
 
+
 class TestRecordTotalFeeCalculation:
     """total_fee_fen 由 API 层计算正确（DB 层由 GENERATED STORED 列保证）。"""
 
-    @pytest.mark.parametrize("quantity,unit_fee_fen,expected", [
-        (1,  200,    200),
-        (10, 150,   1500),
-        (99, 99,    9801),
-        (5,  1000,  5000),
-    ])
+    @pytest.mark.parametrize(
+        "quantity,unit_fee_fen,expected",
+        [
+            (1, 200, 200),
+            (10, 150, 1500),
+            (99, 99, 9801),
+            (5, 1000, 5000),
+        ],
+    )
     def test_total_fee_calculation(
         self,
         quantity: int,
@@ -381,7 +406,7 @@ class TestRecordTotalFeeCalculation:
                     "store_id": STORE_ID,
                     "employee_id": EMPLOYEE_A,
                     "dish_name": "红烧肉",
-                    "quantity": 0,         # 非法
+                    "quantity": 0,  # 非法
                     "unit_fee_fen": 200,
                 },
                 headers=HEADERS,
@@ -394,15 +419,16 @@ class TestRecordTotalFeeCalculation:
 # 测试4: 同员工多条记录汇总金额
 # ──────────────────────────────────────────────────────────────────────────────
 
+
 class TestEmployeeStatsAggregation:
     """同员工多条记录汇总金额正确。"""
 
     def test_aggregation_sum_correct(self) -> None:
         """stats/employee 返回各品项汇总，grand_total = sum(total_fee_fen)。"""
         agg_rows = [
-            {"dish_name": "红烧肉",   "total_quantity": 10, "unit_fee_fen": 200, "total_fee_fen": 2000},
-            {"dish_name": "清蒸鲈鱼", "total_quantity": 5,  "unit_fee_fen": 300, "total_fee_fen": 1500},
-            {"dish_name": "水煮鱼",   "total_quantity": 8,  "unit_fee_fen": 250, "total_fee_fen": 2000},
+            {"dish_name": "红烧肉", "total_quantity": 10, "unit_fee_fen": 200, "total_fee_fen": 2000},
+            {"dish_name": "清蒸鲈鱼", "total_quantity": 5, "unit_fee_fen": 300, "total_fee_fen": 1500},
+            {"dish_name": "水煮鱼", "total_quantity": 8, "unit_fee_fen": 250, "total_fee_fen": 2000},
         ]
         expected_total = sum(r["total_fee_fen"] for r in agg_rows)  # 5500
 
@@ -444,6 +470,7 @@ class TestEmployeeStatsAggregation:
 # 测试5: 日报最多5名员工，按金额降序
 # ──────────────────────────────────────────────────────────────────────────────
 
+
 class TestDailyReportTop5:
     """日报返回最多5名员工，按金额降序。"""
 
@@ -483,8 +510,7 @@ class TestDailyReportTop5:
         with patch("api.piecework_routes.get_db", return_value=mock_db):
             client = TestClient(_make_app())
             resp = client.get(
-                f"/api/v1/org/piecework/daily-report"
-                f"?store_id={STORE_ID}&date=2026-04-06",
+                f"/api/v1/org/piecework/daily-report?store_id={STORE_ID}&date=2026-04-06",
                 headers=HEADERS,
             )
 
@@ -507,9 +533,9 @@ class TestDailyReportTop5:
         top5_data = [
             {"employee_id": str(uuid.uuid4()), "total_fee_fen": 20000, "quantity": 40, "rank": 1},
             {"employee_id": str(uuid.uuid4()), "total_fee_fen": 15000, "quantity": 30, "rank": 2},
-            {"employee_id": str(uuid.uuid4()), "total_fee_fen": 8000,  "quantity": 16, "rank": 3},
-            {"employee_id": str(uuid.uuid4()), "total_fee_fen": 5000,  "quantity": 10, "rank": 4},
-            {"employee_id": str(uuid.uuid4()), "total_fee_fen": 2000,  "quantity": 4,  "rank": 5},
+            {"employee_id": str(uuid.uuid4()), "total_fee_fen": 8000, "quantity": 16, "rank": 3},
+            {"employee_id": str(uuid.uuid4()), "total_fee_fen": 5000, "quantity": 10, "rank": 4},
+            {"employee_id": str(uuid.uuid4()), "total_fee_fen": 2000, "quantity": 4, "rank": 5},
         ]
 
         call_count = 0
@@ -534,8 +560,7 @@ class TestDailyReportTop5:
         with patch("api.piecework_routes.get_db", return_value=mock_db):
             client = TestClient(app)
             resp = client.get(
-                f"/api/v1/org/piecework/daily-report"
-                f"?store_id={STORE_ID}&date=2026-04-06",
+                f"/api/v1/org/piecework/daily-report?store_id={STORE_ID}&date=2026-04-06",
                 headers=HEADERS,
             )
 
@@ -551,20 +576,25 @@ class TestDailyReportTop5:
 # 测试6: DB异常时返回500
 # ──────────────────────────────────────────────────────────────────────────────
 
+
 class TestDBErrorReturns500:
     """DB 不可用时，查询端点返回 500 而非 mock 数据。"""
 
-    @pytest.mark.parametrize("path", [
-        "/api/v1/org/piecework/zones",
-        "/api/v1/org/piecework/schemes",
-        f"/api/v1/org/piecework/stats/store?store_id={STORE_ID}&start_date=2026-04-01&end_date=2026-04-06",
-        f"/api/v1/org/piecework/stats/employee?employee_id={EMPLOYEE_A}&start_date=2026-04-01&end_date=2026-04-06",
-        f"/api/v1/org/piecework/stats/by-dish?store_id={STORE_ID}&date=2026-04-06",
-        f"/api/v1/org/piecework/daily-report?store_id={STORE_ID}&date=2026-04-06",
-    ])
+    @pytest.mark.parametrize(
+        "path",
+        [
+            "/api/v1/org/piecework/zones",
+            "/api/v1/org/piecework/schemes",
+            f"/api/v1/org/piecework/stats/store?store_id={STORE_ID}&start_date=2026-04-01&end_date=2026-04-06",
+            f"/api/v1/org/piecework/stats/employee?employee_id={EMPLOYEE_A}&start_date=2026-04-01&end_date=2026-04-06",
+            f"/api/v1/org/piecework/stats/by-dish?store_id={STORE_ID}&date=2026-04-06",
+            f"/api/v1/org/piecework/daily-report?store_id={STORE_ID}&date=2026-04-06",
+        ],
+    )
     def test_db_error_returns_500(self, path: str) -> None:
         """所有查询端点在DB异常时返回500。"""
         from sqlalchemy.exc import SQLAlchemyError
+
         app = _make_app()
         mock_db = AsyncMock()
         mock_db.execute.side_effect = SQLAlchemyError("db down")
@@ -578,6 +608,7 @@ class TestDBErrorReturns500:
     def test_scheme_detail_db_error_returns_500(self) -> None:
         """GET /schemes/{id} DB异常时返回500。"""
         from sqlalchemy.exc import SQLAlchemyError
+
         scheme_id = str(uuid.uuid4())
         app = _make_app()
         mock_db = AsyncMock()
@@ -596,6 +627,7 @@ class TestDBErrorReturns500:
 # ──────────────────────────────────────────────────────────────────────────────
 # 测试7: _serialize_row 序列化
 # ──────────────────────────────────────────────────────────────────────────────
+
 
 class TestSerializeRow:
     """_serialize_row 正确处理 UUID/datetime/date。"""

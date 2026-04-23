@@ -17,6 +17,7 @@
 - Redis 不可用时降级（记录日志，不抛异常，不影响主业务）
 - Stream MAXLEN ~ 100_000，自动修剪旧事件
 """
+
 from __future__ import annotations
 
 import json

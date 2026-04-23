@@ -8,6 +8,7 @@
 - 优雅关闭（stop 信号）
 - Mock 模式（从 EventPublisher 的内存队列消费）
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -162,7 +163,7 @@ class EventConsumer:
             batch_size=batch_size,
         )
 
-        streams_arg = {sk: ">" for sk in self._stream_keys}
+        streams_arg = dict.fromkeys(self._stream_keys, ">")
 
         while self._running:
             try:
@@ -192,7 +193,7 @@ class EventConsumer:
                 await asyncio.sleep(5)
                 redis = await self._get_redis()
                 await self._ensure_groups(redis)
-                streams_arg = {sk: ">" for sk in self._stream_keys}
+                streams_arg = dict.fromkeys(self._stream_keys, ">")
                 continue
 
             if not messages:
@@ -247,9 +248,7 @@ class EventConsumer:
             return
 
         for handler in handlers:
-            success = await self._invoke_handler_with_retry(
-                handler, event, stream_key, entry_id, fields, redis
-            )
+            success = await self._invoke_handler_with_retry(handler, event, stream_key, entry_id, fields, redis)
             if not success:
                 # handler 重试耗尽，已送 DLQ
                 break
@@ -302,9 +301,7 @@ class EventConsumer:
             entry_id=entry_id,
             group=self.group_name,
         )
-        await self._send_to_dlq(
-            redis, stream_key, entry_id, fields, "handler retries exhausted"
-        )
+        await self._send_to_dlq(redis, stream_key, entry_id, fields, "handler retries exhausted")
         return False
 
     # ------------------------------------------------------------------

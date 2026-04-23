@@ -60,9 +60,7 @@ _OVERTIME_MIN = 30
 
 
 def _get_tenant_id(request: Request) -> str:
-    tid = getattr(request.state, "tenant_id", None) or request.headers.get(
-        "X-Tenant-ID", ""
-    )
+    tid = getattr(request.state, "tenant_id", None) or request.headers.get("X-Tenant-ID", "")
     if not tid:
         raise HTTPException(status_code=400, detail="X-Tenant-ID header required")
     return tid
@@ -129,6 +127,7 @@ def _calculate_clock_in_status(
     # shift_start 可能是 time 对象或 datetime
     if hasattr(shift_start, "hour"):
         from datetime import time as t_type
+
         if isinstance(shift_start, t_type):
             scheduled_dt = datetime.combine(clock_time.date(), shift_start)
             if clock_time.tzinfo:
@@ -166,6 +165,7 @@ def _calculate_clock_out_status(
 
     if hasattr(shift_end, "hour"):
         from datetime import time as t_type
+
         if isinstance(shift_end, t_type):
             scheduled_dt = datetime.combine(clock_time.date(), shift_end)
             if clock_time.tzinfo:
@@ -273,6 +273,7 @@ async def clock_in(
     scheduled_time: Optional[datetime] = None
     if shift_start_time is not None:
         from datetime import time as t_type
+
         if isinstance(shift_start_time, t_type):
             scheduled_time = datetime.combine(work_date, shift_start_time)
 
@@ -322,16 +323,18 @@ async def clock_in(
         },
     )
 
-    return _ok({
-        "clock_record_id": str(clock_record["id"]),
-        "employee_id": req.employee_id,
-        "clock_time": clock_time.isoformat(),
-        "status": status,
-        "diff_minutes": diff_minutes,
-        "scheduled_shift": shift_name,
-        "scheduled_time": scheduled_time.isoformat() if scheduled_time else None,
-        "late_minutes": late_minutes,
-    })
+    return _ok(
+        {
+            "clock_record_id": str(clock_record["id"]),
+            "employee_id": req.employee_id,
+            "clock_time": clock_time.isoformat(),
+            "status": status,
+            "diff_minutes": diff_minutes,
+            "scheduled_shift": shift_name,
+            "scheduled_time": scheduled_time.isoformat() if scheduled_time else None,
+            "late_minutes": late_minutes,
+        }
+    )
 
 
 @router.post("/api/v1/attendance/clock-out")
@@ -424,6 +427,7 @@ async def clock_out(
     scheduled_time_out: Optional[datetime] = None
     if shift_end_time is not None:
         from datetime import time as t_type
+
         if isinstance(shift_end_time, t_type):
             scheduled_time_out = datetime.combine(work_date, shift_end_time)
 
@@ -454,18 +458,20 @@ async def clock_out(
         },
     )
 
-    return _ok({
-        "clock_record_id": str(clock_out_record["id"]),
-        "clock_in_id": str(open_in["id"]),
-        "employee_id": req.employee_id,
-        "clock_time": clock_time.isoformat(),
-        "status": out_status,
-        "final_daily_status": final_status,
-        "diff_minutes": diff_minutes,
-        "work_hours": work_hours,
-        "overtime_hours": overtime_hours,
-        "early_leave_minutes": early_leave_minutes,
-    })
+    return _ok(
+        {
+            "clock_record_id": str(clock_out_record["id"]),
+            "clock_in_id": str(open_in["id"]),
+            "employee_id": req.employee_id,
+            "clock_time": clock_time.isoformat(),
+            "status": out_status,
+            "final_daily_status": final_status,
+            "diff_minutes": diff_minutes,
+            "work_hours": work_hours,
+            "overtime_hours": overtime_hours,
+            "early_leave_minutes": early_leave_minutes,
+        }
+    )
 
 
 @router.get("/api/v1/attendance/daily")
@@ -481,12 +487,14 @@ async def get_daily_attendance(
 
     records = await get_daily_attendance_for_store(store_id, target_date, tenant_id, db)
 
-    return _ok({
-        "store_id": store_id,
-        "date": target_date.isoformat(),
-        "items": records,
-        "total": len(records),
-    })
+    return _ok(
+        {
+            "store_id": store_id,
+            "date": target_date.isoformat(),
+            "items": records,
+            "total": len(records),
+        }
+    )
 
 
 @router.get("/api/v1/attendance/summary")
@@ -536,13 +544,15 @@ async def list_attendance_anomalies(
 
     anomalies = await get_attendance_anomalies(store_id, start_date, end_date, tenant_id, db)
 
-    return _ok({
-        "store_id": store_id,
-        "start_date": start_date.isoformat(),
-        "end_date": end_date.isoformat(),
-        "items": anomalies,
-        "total": len(anomalies),
-    })
+    return _ok(
+        {
+            "store_id": store_id,
+            "start_date": start_date.isoformat(),
+            "end_date": end_date.isoformat(),
+            "items": anomalies,
+            "total": len(anomalies),
+        }
+    )
 
 
 @router.get("/api/v1/attendance/payroll-data")
@@ -562,10 +572,7 @@ async def get_payroll_data(
     # 查询门店的考勤规则（迟到扣款）
     # 因为 employee_id 可能跨门店，先查员工所在门店
     emp_row = await db.execute(
-        text(
-            "SELECT store_id FROM employees "
-            "WHERE id = :eid AND tenant_id = :tid AND is_deleted = FALSE LIMIT 1"
-        ),
+        text("SELECT store_id FROM employees WHERE id = :eid AND tenant_id = :tid AND is_deleted = FALSE LIMIT 1"),
         {"eid": employee_id, "tid": tenant_id},
     )
     emp = emp_row.mappings().first()
@@ -603,11 +610,13 @@ async def mark_absent(
 
     count = await mark_absent_employees(req.store_id, req.work_date, tenant_id, db)
 
-    return _ok({
-        "store_id": req.store_id,
-        "work_date": req.work_date.isoformat(),
-        "marked_absent_count": count,
-    })
+    return _ok(
+        {
+            "store_id": req.store_id,
+            "work_date": req.work_date.isoformat(),
+            "marked_absent_count": count,
+        }
+    )
 
 
 # ── 请求模型（补充端点） ──────────────────────────────────────────────────────
@@ -697,14 +706,16 @@ async def list_attendance_records(
             if hasattr(v, "isoformat"):
                 row[k] = v.isoformat()
 
-    return _ok({
-        "year": year,
-        "month": month,
-        "employee_id": employee_id,
-        "store_id": store_id,
-        "items": rows,
-        "total": len(rows),
-    })
+    return _ok(
+        {
+            "year": year,
+            "month": month,
+            "employee_id": employee_id,
+            "store_id": store_id,
+            "items": rows,
+            "total": len(rows),
+        }
+    )
 
 
 # ── 补充端点：月度个人汇总 ────────────────────────────────────────────────────
@@ -789,12 +800,14 @@ async def get_employee_attendance_summary(
             "total_overtime_hours": float(row["total_overtime_hours"] or 0),
         }
 
-    return _ok({
-        "employee_id": employee_id,
-        "year": year,
-        "month": month,
-        **summary,
-    })
+    return _ok(
+        {
+            "employee_id": employee_id,
+            "year": year,
+            "month": month,
+            **summary,
+        }
+    )
 
 
 # ── 补充端点：人工调整（HR权限） ──────────────────────────────────────────────
@@ -909,15 +922,17 @@ async def adjust_attendance_record(
         },
     )
 
-    return _ok({
-        "record_id": record_id,
-        "employee_id": str(existing["employee_id"]),
-        "clock_in_at": new_clock_in.isoformat() if new_clock_in else None,
-        "clock_out_at": new_clock_out.isoformat() if new_clock_out else None,
-        "worked_minutes": int(new_work_hours * 60) if new_work_hours is not None else None,
-        "work_hours": new_work_hours,
-        "adjust_note": adjust_note,
-    })
+    return _ok(
+        {
+            "record_id": record_id,
+            "employee_id": str(existing["employee_id"]),
+            "clock_in_at": new_clock_in.isoformat() if new_clock_in else None,
+            "clock_out_at": new_clock_out.isoformat() if new_clock_out else None,
+            "worked_minutes": int(new_work_hours * 60) if new_work_hours is not None else None,
+            "work_hours": new_work_hours,
+            "adjust_note": adjust_note,
+        }
+    )
 
 
 # ── 补充端点：今日全店考勤状态 ────────────────────────────────────────────────
@@ -1023,20 +1038,18 @@ async def get_today_store_attendance(
         for row in sched_rows:
             emp_id = str(row["employee_id"])
             if emp_id not in clocked_employee_ids:
-                not_clocked.append({
-                    "employee_id": emp_id,
-                    "employee_name": row.get("employee_name"),
-                    "employee_role": row.get("employee_role"),
-                    "scheduled_shift": row.get("shift_name"),
-                    "shift_start_time": (
-                        row["shift_start_time"].isoformat()
-                        if row.get("shift_start_time") else None
-                    ),
-                    "shift_end_time": (
-                        row["shift_end_time"].isoformat()
-                        if row.get("shift_end_time") else None
-                    ),
-                })
+                not_clocked.append(
+                    {
+                        "employee_id": emp_id,
+                        "employee_name": row.get("employee_name"),
+                        "employee_role": row.get("employee_role"),
+                        "scheduled_shift": row.get("shift_name"),
+                        "shift_start_time": (
+                            row["shift_start_time"].isoformat() if row.get("shift_start_time") else None
+                        ),
+                        "shift_end_time": (row["shift_end_time"].isoformat() if row.get("shift_end_time") else None),
+                    }
+                )
     except SQLAlchemyError as exc:
         # employee_schedules 表不存在时降级：only report clocked/not-clocked from DA
         if "UndefinedTable" in type(exc).__name__ or "does not exist" in str(exc):
@@ -1058,16 +1071,18 @@ async def get_today_store_attendance(
         },
     )
 
-    return _ok({
-        "store_id": store_id,
-        "date": today.isoformat(),
-        "clocked_in": clocked_in,
-        "clocked_out": clocked_out,
-        "not_clocked": not_clocked,
-        "summary": {
-            "on_duty": len(clocked_in),
-            "completed": len(clocked_out),
-            "absent_or_pending": len(not_clocked),
-            "total_scheduled": len(clocked_in) + len(clocked_out) + len(not_clocked),
-        },
-    })
+    return _ok(
+        {
+            "store_id": store_id,
+            "date": today.isoformat(),
+            "clocked_in": clocked_in,
+            "clocked_out": clocked_out,
+            "not_clocked": not_clocked,
+            "summary": {
+                "on_duty": len(clocked_in),
+                "completed": len(clocked_out),
+                "absent_or_pending": len(not_clocked),
+                "total_scheduled": len(clocked_in) + len(clocked_out) + len(not_clocked),
+            },
+        }
+    )

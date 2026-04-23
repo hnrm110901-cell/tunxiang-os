@@ -37,9 +37,7 @@ _service = RevenueScheduleService()
 
 
 def _get_tenant_id(request: Request) -> str:
-    tid = getattr(request.state, "tenant_id", None) or request.headers.get(
-        "X-Tenant-ID", ""
-    )
+    tid = getattr(request.state, "tenant_id", None) or request.headers.get("X-Tenant-ID", "")
     if not tid:
         raise HTTPException(status_code=400, detail="X-Tenant-ID header required")
     return tid
@@ -85,9 +83,7 @@ async def revenue_analysis(
         weeks=weeks,
     )
     try:
-        data = await _service.analyze_revenue_pattern(
-            db, tenant_id, store_id, weeks
-        )
+        data = await _service.analyze_revenue_pattern(db, tenant_id, store_id, weeks)
         return _ok(data)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
@@ -97,9 +93,7 @@ async def revenue_analysis(
 async def optimal_plan(
     request: Request,
     store_id: str = Query(..., description="门店ID"),
-    week_start: Optional[date] = Query(
-        None, description="周起始日（周一），默认下周一"
-    ),
+    week_start: Optional[date] = Query(None, description="周起始日（周一），默认下周一"),
     db: AsyncSession = Depends(get_db),
 ):
     """最优排班方案——返回一整周7天×6时段的最优人力配置。"""
@@ -116,9 +110,7 @@ async def optimal_plan(
         week_start=week_start.isoformat(),
     )
     try:
-        data = await _service.generate_weekly_plan(
-            db, tenant_id, store_id, week_start
-        )
+        data = await _service.generate_weekly_plan(db, tenant_id, store_id, week_start)
         return _ok(data)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
@@ -155,9 +147,7 @@ async def apply_plan(
 async def comparison(
     request: Request,
     store_id: str = Query(..., description="门店ID"),
-    week_start: Optional[date] = Query(
-        None, description="周起始日（周一），默认下周一"
-    ),
+    week_start: Optional[date] = Query(None, description="周起始日（周一），默认下周一"),
     db: AsyncSession = Depends(get_db),
 ):
     """当前排班 vs 最优排班对比——按时段展示差异。"""
@@ -174,26 +164,26 @@ async def comparison(
         week_start=week_start.isoformat(),
     )
     try:
-        plan = await _service.generate_weekly_plan(
-            db, tenant_id, store_id, week_start
-        )
+        plan = await _service.generate_weekly_plan(db, tenant_id, store_id, week_start)
 
         # 汇总各时段差异
         slot_comparison: list[dict] = []
         for day_plan in plan["daily_plans"]:
             for slot in day_plan["slots"]:
                 if slot.get("delta"):
-                    slot_comparison.append({
-                        "date": day_plan["date"],
-                        "weekday_name": day_plan["weekday_name"],
-                        "slot_name": slot["slot_name"],
-                        "start_time": slot["start_time"],
-                        "end_time": slot["end_time"],
-                        "predicted_revenue_fen": slot["predicted_revenue_fen"],
-                        "optimal_staff": slot["optimal_staff"],
-                        "current_staff": slot["current_staff"],
-                        "delta": slot["delta"],
-                    })
+                    slot_comparison.append(
+                        {
+                            "date": day_plan["date"],
+                            "weekday_name": day_plan["weekday_name"],
+                            "slot_name": slot["slot_name"],
+                            "start_time": slot["start_time"],
+                            "end_time": slot["end_time"],
+                            "predicted_revenue_fen": slot["predicted_revenue_fen"],
+                            "optimal_staff": slot["optimal_staff"],
+                            "current_staff": slot["current_staff"],
+                            "delta": slot["delta"],
+                        }
+                    )
 
         data = {
             "store_id": store_id,
@@ -226,9 +216,7 @@ async def savings_estimate(
         month=month,
     )
     try:
-        data = await _service.estimate_monthly_savings(
-            db, tenant_id, store_id, month
-        )
+        data = await _service.estimate_monthly_savings(db, tenant_id, store_id, month)
         return _ok(data)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))

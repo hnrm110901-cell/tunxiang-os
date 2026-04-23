@@ -1,16 +1,14 @@
 """薪资项目库 API — 7大类71项标准模板 + 自定义扩展"""
+
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
-
 from services.salary_item_library import (
-    CATEGORIES,
     compute_salary_by_items,
     create_custom_salary_item,
     get_all_items,
     get_categories,
-    get_item_by_code,
     get_items_by_category,
     get_tenant_salary_items,
     init_salary_items_for_tenant,
@@ -98,10 +96,7 @@ async def list_categories():
     return {
         "ok": True,
         "data": {
-            "categories": [
-                {"key": k, "name": v, "count": len(get_items_by_category(k))}
-                for k, v in categories.items()
-            ]
+            "categories": [{"key": k, "name": v, "count": len(get_items_by_category(k))} for k, v in categories.items()]
         },
     }
 

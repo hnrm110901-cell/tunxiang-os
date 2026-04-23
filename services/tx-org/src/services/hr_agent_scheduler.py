@@ -11,9 +11,7 @@
 
 from __future__ import annotations
 
-import asyncio
 from datetime import date, timedelta
-from typing import Any, Optional
 
 import structlog
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -199,7 +197,9 @@ class HRAgentScheduler:
         降级链：DB查询 → DEFAULT_TENANT_ID 环境变量 → 返回空列表。
         """
         import os as _os
+
         from sqlalchemy import text as _text
+
         from shared.ontology.src.database import get_db_no_rls
 
         try:

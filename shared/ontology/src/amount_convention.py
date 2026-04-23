@@ -35,9 +35,7 @@ def format_amount(fen: int) -> str:
 def validate_fen(value: int, field_name: str = "amount") -> int:
     """校验分值合法性"""
     if not isinstance(value, int):
-        raise ValueError(
-            f"{field_name} must be integer (fen), got {type(value).__name__}"
-        )
+        raise ValueError(f"{field_name} must be integer (fen), got {type(value).__name__}")
     if value < 0:
         raise ValueError(f"{field_name} cannot be negative: {value}")
     return value

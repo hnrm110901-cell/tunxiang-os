@@ -309,37 +309,44 @@ async def _dispatch_on_approved(
     if business_type == "leave":
         await _post_callback(
             f"{_ORG_URL}/api/v1/leave-requests/{business_id}/confirm",
-            tenant_id, business_id,
+            tenant_id,
+            business_id,
         )
     elif business_type == "purchase":
         await _post_callback(
             f"{_SUPPLY_URL}/api/v1/purchase-orders/{business_id}/confirm",
-            tenant_id, business_id,
+            tenant_id,
+            business_id,
         )
     elif business_type == "discount":
         await _post_callback(
             f"{_TRADE_URL}/api/v1/discounts/{business_id}/approve",
-            tenant_id, business_id,
+            tenant_id,
+            business_id,
         )
     elif business_type == "price_change":
         await _post_callback(
             f"{_MENU_URL}/api/v1/menu-changes/{business_id}/apply",
-            tenant_id, business_id,
+            tenant_id,
+            business_id,
         )
     elif business_type == "refund":
         await _post_callback(
             f"{_TRADE_URL}/api/v1/refunds/{business_id}/approve",
-            tenant_id, business_id,
+            tenant_id,
+            business_id,
         )
     elif business_type == "expense":
         await _post_callback(
             f"{_FINANCE_URL}/api/v1/expenses/{business_id}/approve",
-            tenant_id, business_id,
+            tenant_id,
+            business_id,
         )
     elif business_type == "credit_agreement":
         await _post_callback(
             f"{_FINANCE_URL}/api/v1/credit/agreements/{business_id}/approval-callback",
-            tenant_id, business_id,
+            tenant_id,
+            business_id,
             body={"decision": "approved", "approver_id": summary.get("approver_id", "")},
         )
     # custom 类型无标准回调
@@ -360,7 +367,8 @@ async def _dispatch_on_rejected(
     if business_type == "credit_agreement":
         await _post_callback(
             f"{_FINANCE_URL}/api/v1/credit/agreements/{business_id}/approval-callback",
-            tenant_id, business_id,
+            tenant_id,
+            business_id,
             body={"decision": "rejected", "approver_id": ""},
         )
 
@@ -570,10 +578,7 @@ class ApprovalEngine:
             await _send_notification(
                 recipient_id=approver_id,
                 title=f"【待审批】{title}",
-                body=(
-                    f"您有一条新的审批待处理"
-                    f"（节点 {node_order}：{node['node_name']}）"
-                ),
+                body=(f"您有一条新的审批待处理（节点 {node_order}：{node['node_name']}）"),
                 meta={
                     "instance_id": instance_id,
                     "node_order": node_order,
@@ -706,14 +711,20 @@ class ApprovalEngine:
                 status=_STATUS_APPROVED,
                 tenant_id=tenant_id,
             )
-            asyncio.create_task(UniversalPublisher.publish(
-                event_type=OrgEventType.APPROVAL_COMPLETED,
-                tenant_id=tenant_id,
-                store_id=instance.get("store_id"),
-                entity_id=instance_id,
-                event_data={"instance_id": instance_id, "business_type": str(instance.get("business_type") or ""), "result": _STATUS_APPROVED},
-                source_service="tx-org",
-            ))
+            asyncio.create_task(
+                UniversalPublisher.publish(
+                    event_type=OrgEventType.APPROVAL_COMPLETED,
+                    tenant_id=tenant_id,
+                    store_id=instance.get("store_id"),
+                    entity_id=instance_id,
+                    event_data={
+                        "instance_id": instance_id,
+                        "business_type": str(instance.get("business_type") or ""),
+                        "result": _STATUS_APPROVED,
+                    },
+                    source_service="tx-org",
+                )
+            )
 
     # ── 创建自动通过实例（触发条件不满足时）────────────────────────────────────
 
@@ -799,9 +810,7 @@ class ApprovalEngine:
 
         current_node_order: int = int(instance.get("current_node_order") or 1)
         if current_node_order != node_order:
-            raise ValueError(
-                f"当前节点为 {current_node_order}，不能处理节点 {node_order}"
-            )
+            raise ValueError(f"当前节点为 {current_node_order}，不能处理节点 {node_order}")
 
         node_instances = await _fetch_node_instances(instance_id, node_order, tenant_id, db)
         my_record = next(
@@ -809,13 +818,9 @@ class ApprovalEngine:
             None,
         )
         if not my_record:
-            raise ValueError(
-                f"审批人 {approver_id} 不在节点 {node_order} 的审批人列表中"
-            )
+            raise ValueError(f"审批人 {approver_id} 不在节点 {node_order} 的审批人列表中")
         if my_record["status"] != _STATUS_PENDING:
-            raise ValueError(
-                f"该审批人已处理此节点，当前状态: {my_record['status']}"
-            )
+            raise ValueError(f"该审批人已处理此节点，当前状态: {my_record['status']}")
 
         # 更新 node_instance
         await db.execute(
@@ -937,9 +942,7 @@ class ApprovalEngine:
 
         current_node_order: int = int(instance.get("current_node_order") or 1)
         if current_node_order != node_order:
-            raise ValueError(
-                f"当前节点为 {current_node_order}，不能处理节点 {node_order}"
-            )
+            raise ValueError(f"当前节点为 {current_node_order}，不能处理节点 {node_order}")
 
         node_instances = await _fetch_node_instances(instance_id, node_order, tenant_id, db)
         my_record = next(
@@ -947,13 +950,9 @@ class ApprovalEngine:
             None,
         )
         if not my_record:
-            raise ValueError(
-                f"审批人 {approver_id} 不在节点 {node_order} 的审批人列表中"
-            )
+            raise ValueError(f"审批人 {approver_id} 不在节点 {node_order} 的审批人列表中")
         if my_record["status"] != _STATUS_PENDING:
-            raise ValueError(
-                f"该审批人已处理此节点，当前状态: {my_record['status']}"
-            )
+            raise ValueError(f"该审批人已处理此节点，当前状态: {my_record['status']}")
 
         # 更新拒绝记录
         await db.execute(
@@ -1017,14 +1016,20 @@ class ApprovalEngine:
             node_order=node_order,
             tenant_id=tenant_id,
         )
-        asyncio.create_task(UniversalPublisher.publish(
-            event_type=OrgEventType.APPROVAL_COMPLETED,
-            tenant_id=tenant_id,
-            store_id=instance.get("store_id"),
-            entity_id=instance_id,
-            event_data={"instance_id": instance_id, "business_type": str(instance.get("business_type") or ""), "result": _STATUS_REJECTED},
-            source_service="tx-org",
-        ))
+        asyncio.create_task(
+            UniversalPublisher.publish(
+                event_type=OrgEventType.APPROVAL_COMPLETED,
+                tenant_id=tenant_id,
+                store_id=instance.get("store_id"),
+                entity_id=instance_id,
+                event_data={
+                    "instance_id": instance_id,
+                    "business_type": str(instance.get("business_type") or ""),
+                    "result": _STATUS_REJECTED,
+                },
+                source_service="tx-org",
+            )
+        )
         return await _fetch_instance(instance_id, tenant_id, db) or instance
 
     # ── 撤回审批 ──────────────────────────────────────────────────────────────
@@ -1233,9 +1238,7 @@ class ApprovalEngine:
 
                 else:  # escalate — 仅催办，不改状态
                     store_id = str(row.get("store_id") or "")
-                    approvers = await _find_approvers_for_node(
-                        current_node, store_id, tenant_id, db
-                    )
+                    approvers = await _find_approvers_for_node(current_node, store_id, tenant_id, db)
                     for approver_id in approvers:
                         await _send_notification(
                             recipient_id=approver_id,

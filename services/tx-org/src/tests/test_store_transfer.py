@@ -212,10 +212,10 @@ class TestComputeCostSplit:
             "emp_001": {"store_a": 120.0, "store_b": 40.0},
         }
         salary_data = {
-            "base_fen": 800_000,     # 8000 元
+            "base_fen": 800_000,  # 8000 元
             "overtime_fen": 200_000,  # 2000 元
-            "social_fen": 300_000,    # 3000 元
-            "bonus_fen": 100_000,     # 1000 元
+            "social_fen": 300_000,  # 3000 元
+            "bonus_fen": 100_000,  # 1000 元
         }
         result = compute_cost_split(time_split, salary_data)
         emp = result["emp_001"]
@@ -290,8 +290,20 @@ class TestDetailReport:
         """明细报告包含正确结构"""
         time_split = {"store_a": 120.0, "store_b": 40.0}
         cost_split = {
-            "store_a": {"wage_fen": 750_000, "social_fen": 225_000, "bonus_fen": 75_000, "total_fen": 1_050_000, "ratio": 0.75},
-            "store_b": {"wage_fen": 250_000, "social_fen": 75_000, "bonus_fen": 25_000, "total_fen": 350_000, "ratio": 0.25},
+            "store_a": {
+                "wage_fen": 750_000,
+                "social_fen": 225_000,
+                "bonus_fen": 75_000,
+                "total_fen": 1_050_000,
+                "ratio": 0.75,
+            },
+            "store_b": {
+                "wage_fen": 250_000,
+                "social_fen": 75_000,
+                "bonus_fen": 25_000,
+                "total_fen": 350_000,
+                "ratio": 0.25,
+            },
         }
         report = generate_detail_report("emp_001", time_split, cost_split)
 
@@ -312,7 +324,12 @@ class TestSummaryReport:
             {
                 "employee_id": "emp_001",
                 "cost_split": {
-                    "store_a": {"wage_fen": 750_000, "social_fen": 225_000, "bonus_fen": 75_000, "total_fen": 1_050_000},
+                    "store_a": {
+                        "wage_fen": 750_000,
+                        "social_fen": 225_000,
+                        "bonus_fen": 75_000,
+                        "total_fen": 1_050_000,
+                    },
                     "store_b": {"wage_fen": 250_000, "social_fen": 75_000, "bonus_fen": 25_000, "total_fen": 350_000},
                 },
             },

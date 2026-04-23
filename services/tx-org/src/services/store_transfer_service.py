@@ -125,12 +125,14 @@ def compute_time_split(
         emp_id = t["employee_id"]
         if emp_id not in transfer_map:
             transfer_map[emp_id] = []
-        transfer_map[emp_id].append({
-            "from_store_id": t["from_store_id"],
-            "to_store_id": t["to_store_id"],
-            "start_date": date.fromisoformat(t["start_date"]),
-            "end_date": date.fromisoformat(t["end_date"]),
-        })
+        transfer_map[emp_id].append(
+            {
+                "from_store_id": t["from_store_id"],
+                "to_store_id": t["to_store_id"],
+                "start_date": date.fromisoformat(t["start_date"]),
+                "end_date": date.fromisoformat(t["end_date"]),
+            }
+        )
 
     result: Dict[str, Dict[str, float]] = {}
 
@@ -307,15 +309,17 @@ def generate_detail_report(
     stores_detail = []
     for store_id in sorted(cost_split.keys()):
         cs = cost_split[store_id]
-        stores_detail.append({
-            "store_id": store_id,
-            "hours": time_split.get(store_id, 0.0),
-            "ratio": cs.get("ratio", 0.0),
-            "wage_fen": cs.get("wage_fen", 0),
-            "social_fen": cs.get("social_fen", 0),
-            "bonus_fen": cs.get("bonus_fen", 0),
-            "total_fen": cs.get("total_fen", 0),
-        })
+        stores_detail.append(
+            {
+                "store_id": store_id,
+                "hours": time_split.get(store_id, 0.0),
+                "ratio": cs.get("ratio", 0.0),
+                "wage_fen": cs.get("wage_fen", 0),
+                "social_fen": cs.get("social_fen", 0),
+                "bonus_fen": cs.get("bonus_fen", 0),
+                "total_fen": cs.get("total_fen", 0),
+            }
+        )
 
     return {
         "employee_id": employee_id,

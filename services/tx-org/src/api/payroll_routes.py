@@ -442,8 +442,15 @@ async def create_payroll_record(
         employee_id=req.employee_id,
         gross_pay_fen=gross_pay,
     )
-    return _ok({"record_id": record_id, "status": "draft", "gross_pay_fen": gross_pay,
-                "tax_fen": tax_fen, "net_pay_fen": net_pay})
+    return _ok(
+        {
+            "record_id": record_id,
+            "status": "draft",
+            "gross_pay_fen": gross_pay,
+            "tax_fen": tax_fen,
+            "net_pay_fen": net_pay,
+        }
+    )
 
 
 @router.get("/records/{record_id}")
@@ -456,33 +463,43 @@ async def get_payroll_record(
     await _set_rls(db, x_tenant_id)
 
     record_row = (
-        await db.execute(
-            text("""
+        (
+            await db.execute(
+                text("""
                 SELECT * FROM payroll_records
                 WHERE id = :id AND tenant_id = :tenant_id AND is_deleted = false
             """),
-            {"id": record_id, "tenant_id": x_tenant_id},
+                {"id": record_id, "tenant_id": x_tenant_id},
+            )
         )
-    ).mappings().first()
+        .mappings()
+        .first()
+    )
 
     if not record_row:
         raise _err(f"薪资单不存在: {record_id}", 404)
 
     lines = (
-        await db.execute(
-            text("""
+        (
+            await db.execute(
+                text("""
                 SELECT * FROM payroll_line_items
                 WHERE record_id = :record_id AND tenant_id = :tenant_id
                 ORDER BY created_at
             """),
-            {"record_id": record_id, "tenant_id": x_tenant_id},
+                {"record_id": record_id, "tenant_id": x_tenant_id},
+            )
         )
-    ).mappings().all()
+        .mappings()
+        .all()
+    )
 
-    return _ok({
-        **dict(record_row),
-        "line_items": [dict(li) for li in lines],
-    })
+    return _ok(
+        {
+            **dict(record_row),
+            "line_items": [dict(li) for li in lines],
+        }
+    )
 
 
 @router.post("/records/{record_id}/approve")
@@ -497,14 +514,18 @@ async def approve_payroll_record(
 
     # 验证当前状态
     row = (
-        await db.execute(
-            text("""
+        (
+            await db.execute(
+                text("""
                 SELECT id, status FROM payroll_records
                 WHERE id = :id AND tenant_id = :tenant_id AND is_deleted = false
             """),
-            {"id": record_id, "tenant_id": x_tenant_id},
+                {"id": record_id, "tenant_id": x_tenant_id},
+            )
         )
-    ).mappings().first()
+        .mappings()
+        .first()
+    )
 
     if not row:
         raise _err(f"薪资单不存在: {record_id}", 404)
@@ -550,14 +571,18 @@ async def void_payroll_record(
     await _set_rls(db, x_tenant_id)
 
     row = (
-        await db.execute(
-            text("""
+        (
+            await db.execute(
+                text("""
                 SELECT id, status FROM payroll_records
                 WHERE id = :id AND tenant_id = :tenant_id AND is_deleted = false
             """),
-            {"id": record_id, "tenant_id": x_tenant_id},
+                {"id": record_id, "tenant_id": x_tenant_id},
+            )
         )
-    ).mappings().first()
+        .mappings()
+        .first()
+    )
 
     if not row:
         raise _err(f"薪资单不存在: {record_id}", 404)
@@ -611,8 +636,9 @@ async def calculate_payroll(
 
     # 先查门店级别配置，再查品牌级（store_id IS NULL），取最近生效的
     config_row = (
-        await db.execute(
-            text("""
+        (
+            await db.execute(
+                text("""
                 SELECT * FROM payroll_configs
                 WHERE tenant_id = :tenant_id
                   AND is_active = true
@@ -624,13 +650,16 @@ async def calculate_payroll(
                   effective_from DESC
                 LIMIT 1
             """),
-            {
-                "tenant_id": effective_tenant,
-                "store_id": req.store_id,
-                "period_start": period_start,
-            },
+                {
+                    "tenant_id": effective_tenant,
+                    "store_id": req.store_id,
+                    "period_start": period_start,
+                },
+            )
         )
-    ).mappings().first()
+        .mappings()
+        .first()
+    )
 
     if not config_row:
         raise _err(
@@ -694,6 +723,7 @@ async def calculate_payroll(
 
     # ── 7. 确定薪资周期结束日（取当月最后一天） ──────────────────────────
     import calendar
+
     last_day = calendar.monthrange(req.year, req.month)[1]
     pay_period_end = date(req.year, req.month, last_day)
 
@@ -744,78 +774,92 @@ async def calculate_payroll(
     line_items: list[dict[str, Any]] = []
 
     if base_pay_fen != 0:
-        line_items.append({
-            "item_type": "base",
-            "item_name": "基本工资",
-            "amount_fen": base_pay_fen,
-            "quantity": None,
-            "unit_price_fen": None,
-            "notes": f"salary_type={salary_type}",
-        })
+        line_items.append(
+            {
+                "item_type": "base",
+                "item_name": "基本工资",
+                "amount_fen": base_pay_fen,
+                "quantity": None,
+                "unit_price_fen": None,
+                "notes": f"salary_type={salary_type}",
+            }
+        )
 
     if salary_type == "hourly" and req.worked_hours:
         line_items[-1]["quantity"] = str(req.worked_hours)
         line_items[-1]["unit_price_fen"] = cfg.get("hourly_rate_fen")
 
     if req.overtime_pay_fen > 0:
-        line_items.append({
-            "item_type": "overtime",
-            "item_name": "加班工资",
-            "amount_fen": req.overtime_pay_fen,
-            "quantity": None,
-            "unit_price_fen": None,
-            "notes": None,
-        })
+        line_items.append(
+            {
+                "item_type": "overtime",
+                "item_name": "加班工资",
+                "amount_fen": req.overtime_pay_fen,
+                "quantity": None,
+                "unit_price_fen": None,
+                "notes": None,
+            }
+        )
 
     if req.commission_fen > 0:
-        line_items.append({
-            "item_type": "commission",
-            "item_name": "提成",
-            "amount_fen": req.commission_fen,
-            "quantity": None,
-            "unit_price_fen": None,
-            "notes": None,
-        })
+        line_items.append(
+            {
+                "item_type": "commission",
+                "item_name": "提成",
+                "amount_fen": req.commission_fen,
+                "quantity": None,
+                "unit_price_fen": None,
+                "notes": None,
+            }
+        )
 
     if piecework_pay_fen > 0:
-        line_items.append({
-            "item_type": "piecework",
-            "item_name": "计件工资",
-            "amount_fen": piecework_pay_fen,
-            "quantity": str(req.quantity) if req.quantity else None,
-            "unit_price_fen": cfg.get("piecework_rate_fen"),
-            "notes": cfg.get("piecework_unit"),
-        })
+        line_items.append(
+            {
+                "item_type": "piecework",
+                "item_name": "计件工资",
+                "amount_fen": piecework_pay_fen,
+                "quantity": str(req.quantity) if req.quantity else None,
+                "unit_price_fen": cfg.get("piecework_rate_fen"),
+                "notes": cfg.get("piecework_unit"),
+            }
+        )
 
     if req.kpi_bonus_fen > 0:
-        line_items.append({
-            "item_type": "kpi",
-            "item_name": "绩效奖金",
-            "amount_fen": req.kpi_bonus_fen,
-            "quantity": None,
-            "unit_price_fen": None,
-            "notes": None,
-        })
+        line_items.append(
+            {
+                "item_type": "kpi",
+                "item_name": "绩效奖金",
+                "amount_fen": req.kpi_bonus_fen,
+                "quantity": None,
+                "unit_price_fen": None,
+                "notes": None,
+            }
+        )
 
     if req.deduction_fen > 0:
-        line_items.append({
-            "item_type": "deduction",
-            "item_name": "考勤扣款",
-            "amount_fen": -req.deduction_fen,  # 负数表示扣除
-            "quantity": None,
-            "unit_price_fen": None,
-            "notes": None,
-        })
+        line_items.append(
+            {
+                "item_type": "deduction",
+                "item_name": "考勤扣款",
+                "amount_fen": -req.deduction_fen,  # 负数表示扣除
+                "quantity": None,
+                "unit_price_fen": None,
+                "notes": None,
+            }
+        )
 
     if tax_fen > 0:
-        line_items.append({
-            "item_type": "tax",
-            "item_name": "个人所得税",
-            "amount_fen": -tax_fen,  # 负数表示扣除
-            "quantity": None,
-            "unit_price_fen": None,
-            "notes": "简化税率 3%，起征额 5000 元",
-        })
+        line_items.append(
+            {
+                "item_type": "tax",
+                "item_name": "个人所得税",
+                "amount_fen": -tax_fen,  # 负数表示扣除
+                "quantity": None,
+                "unit_price_fen": None,
+                "notes": "简化税率 3%，起征额 5000 元",
+            }
+        )
 
     # 批量插入明细行
     if line_items:
@@ -853,27 +897,29 @@ async def calculate_payroll(
         line_item_count=len(line_items),
     )
 
-    return _ok({
-        "record_id": record_id,
-        "employee_id": req.employee_id,
-        "store_id": req.store_id,
-        "pay_period_start": period_start.isoformat(),
-        "pay_period_end": pay_period_end.isoformat(),
-        "salary_type": salary_type,
-        "base_pay_fen": base_pay_fen,
-        "overtime_pay_fen": req.overtime_pay_fen,
-        "commission_fen": req.commission_fen,
-        "piecework_pay_fen": piecework_pay_fen,
-        "kpi_bonus_fen": req.kpi_bonus_fen,
-        "deduction_fen": req.deduction_fen,
-        "gross_pay_fen": gross_pay_fen,
-        "tax_fen": tax_fen,
-        "net_pay_fen": net_pay_fen,
-        "status": "draft",
-        "config_id": str(cfg["id"]),
-        "line_items": line_items,
-        "calc_snapshot": calc_snapshot,
-    })
+    return _ok(
+        {
+            "record_id": record_id,
+            "employee_id": req.employee_id,
+            "store_id": req.store_id,
+            "pay_period_start": period_start.isoformat(),
+            "pay_period_end": pay_period_end.isoformat(),
+            "salary_type": salary_type,
+            "base_pay_fen": base_pay_fen,
+            "overtime_pay_fen": req.overtime_pay_fen,
+            "commission_fen": req.commission_fen,
+            "piecework_pay_fen": piecework_pay_fen,
+            "kpi_bonus_fen": req.kpi_bonus_fen,
+            "deduction_fen": req.deduction_fen,
+            "gross_pay_fen": gross_pay_fen,
+            "tax_fen": tax_fen,
+            "net_pay_fen": net_pay_fen,
+            "status": "draft",
+            "config_id": str(cfg["id"]),
+            "line_items": line_items,
+            "calc_snapshot": calc_snapshot,
+        }
+    )
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -905,14 +951,18 @@ async def list_payroll_line_items(
         raise _err(f"薪资单不存在: {record_id}", 404)
 
     rows = (
-        await db.execute(
-            text("""
+        (
+            await db.execute(
+                text("""
                 SELECT * FROM payroll_line_items
                 WHERE record_id = :record_id AND tenant_id = :tenant_id
                 ORDER BY created_at
             """),
-            {"record_id": record_id, "tenant_id": x_tenant_id},
+                {"record_id": record_id, "tenant_id": x_tenant_id},
+            )
         )
-    ).mappings().all()
+        .mappings()
+        .all()
+    )
 
     return _ok({"record_id": record_id, "items": [dict(r) for r in rows], "total": len(rows)})

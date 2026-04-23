@@ -130,8 +130,7 @@ async def list_payroll_configs(
         params["role"] = role
 
     sql = text(
-        f"SELECT * FROM payroll_configs WHERE {' AND '.join(conditions)}"
-        " ORDER BY employee_role, effective_from DESC"
+        f"SELECT * FROM payroll_configs WHERE {' AND '.join(conditions)} ORDER BY employee_role, effective_from DESC"
     )
     rows = (await db.execute(sql, params)).mappings().all()
     return _ok([dict(r) for r in rows])
@@ -240,9 +239,7 @@ async def batch_calculate_store_payroll(
 ) -> dict[str, Any]:
     """批量计算门店当月所有有绩效记录的员工薪资"""
     engine = PayrollEngine()
-    results = await engine.batch_calculate_store(
-        db, x_tenant_id, req.store_id, req.year, req.month
-    )
+    results = await engine.batch_calculate_store(db, x_tenant_id, req.store_id, req.year, req.month)
     success = [r for r in results if r.get("status") != "error"]
     errors = [r for r in results if r.get("status") == "error"]
     return _ok(
@@ -288,6 +285,7 @@ async def list_payroll_records(
         params["store_id"] = store_id
     if year and month:
         from datetime import date as _date
+
         params["period_start"] = _date(year, month, 1)
         conditions.append("r.pay_period_start = :period_start")
     if status:
@@ -325,28 +323,36 @@ async def get_payroll_record(
         {"tid": x_tenant_id},
     )
     record_row = (
-        await db.execute(
-            text("""
+        (
+            await db.execute(
+                text("""
                 SELECT * FROM payroll_records
                 WHERE id = :id AND tenant_id = :tenant_id AND is_deleted = false
             """),
-            {"id": record_id, "tenant_id": x_tenant_id},
+                {"id": record_id, "tenant_id": x_tenant_id},
+            )
         )
-    ).mappings().first()
+        .mappings()
+        .first()
+    )
 
     if not record_row:
         raise _err(f"薪资单不存在: {record_id}", 404)
 
     lines = (
-        await db.execute(
-            text("""
+        (
+            await db.execute(
+                text("""
                 SELECT * FROM payroll_line_items
                 WHERE record_id = :record_id AND tenant_id = :tenant_id
                 ORDER BY created_at
             """),
-            {"record_id": record_id, "tenant_id": x_tenant_id},
+                {"record_id": record_id, "tenant_id": x_tenant_id},
+            )
         )
-    ).mappings().all()
+        .mappings()
+        .all()
+    )
 
     return _ok(
         {
@@ -366,9 +372,7 @@ async def approve_payroll_record(
     """审批薪资单（draft → approved）"""
     engine = PayrollEngine()
     try:
-        result = await engine.approve_payroll(
-            db, x_tenant_id, record_id, req.approved_by
-        )
+        result = await engine.approve_payroll(db, x_tenant_id, record_id, req.approved_by)
     except ValueError as exc:
         raise _err(str(exc)) from exc
     return _ok(result)
@@ -389,7 +393,5 @@ async def get_payroll_summary(
 ) -> dict[str, Any]:
     """门店月度薪资汇总（含环比、岗位分布、中位数）"""
     engine = PayrollEngine()
-    summary = await engine.get_payroll_summary(
-        db, x_tenant_id, store_id, year, month
-    )
+    summary = await engine.get_payroll_summary(db, x_tenant_id, store_id, year, month)
     return _ok(summary)

@@ -30,6 +30,7 @@ from services.labor_efficiency_service import (
 
 # ── 辅助：构造门店数据 ────────────────────────────────────────
 
+
 def _make_store(
     store_id: str = "s1",
     store_name: str = "测试门店",
@@ -59,6 +60,7 @@ def _make_store(
 
 # ── 1. 人力成本占比 ───────────────────────────────────────────
 
+
 def test_labor_cost_ratio_excellent():
     """成本占比 20% -> excellent"""
     result = compute_labor_cost_ratio(200_000, 1_000_000)
@@ -83,6 +85,7 @@ def test_labor_cost_ratio_zero_revenue():
 
 # ── 2. 人均贡献产值 ───────────────────────────────────────────
 
+
 def test_revenue_per_capita_excellent():
     """人均 400万分 > 目标 350万分 -> excellent"""
     result = compute_revenue_per_capita(40_000_000, 10)
@@ -99,6 +102,7 @@ def test_revenue_per_capita_zero_headcount():
 
 # ── 3. 人时营业额 ─────────────────────────────────────────────
 
+
 def test_revenue_per_hour_good():
     """人时 12500分 在 min-target 之间 -> good"""
     result = compute_revenue_per_hour(12_500_000, 1000.0)
@@ -113,6 +117,7 @@ def test_revenue_per_hour_zero_hours():
 
 
 # ── 4. 人时待客数 ─────────────────────────────────────────────
+
 
 def test_guests_per_hour_excellent():
     """2.0 人/小时 > 目标 1.5 -> excellent"""
@@ -130,6 +135,7 @@ def test_guests_per_hour_warning():
 
 # ── 5. 工作有效性 ─────────────────────────────────────────────
 
+
 def test_work_effectiveness_excellent():
     """85% > 目标 80% -> excellent"""
     result = compute_work_effectiveness(85.0, 100.0)
@@ -145,6 +151,7 @@ def test_work_effectiveness_critical():
 
 
 # ── 6. 综合评分 ───────────────────────────────────────────────
+
 
 def test_store_efficiency_overall_score():
     """综合评分应在 0-100 范围"""
@@ -173,6 +180,7 @@ def test_store_efficiency_excellent_store():
 
 # ── 7. 多门店排名 ─────────────────────────────────────────────
 
+
 def test_compare_stores_ranking():
     """多门店排名按评分降序"""
     stores = [
@@ -191,6 +199,7 @@ def test_compare_stores_ranking():
 
 
 # ── 8. 预警生成 ───────────────────────────────────────────────
+
 
 def test_generate_alerts_for_critical_store():
     """差门店应生成预警"""
@@ -229,6 +238,7 @@ def test_generate_alerts_empty_for_excellent():
 
 
 # ── 9-12. 四种角色看板 ────────────────────────────────────────
+
 
 def test_boss_view():
     """老板看板包含品牌汇总、门店排名、成本趋势"""
@@ -299,7 +309,13 @@ def test_staff_view():
         "revenue_fen": 2_800_000,
         "guests_served": 280,
         "attendance": {"present_days": 22, "absent_days": 0, "late_count": 1, "early_leave_count": 0},
-        "salary": {"base_fen": 400_000, "commission_fen": 80_000, "bonus_fen": 30_000, "deduction_fen": 5_000, "net_fen": 505_000},
+        "salary": {
+            "base_fen": 400_000,
+            "commission_fen": 80_000,
+            "bonus_fen": 30_000,
+            "deduction_fen": 5_000,
+            "net_fen": 505_000,
+        },
     }
     view = get_staff_view(emp)
     assert view["role"] == "staff"

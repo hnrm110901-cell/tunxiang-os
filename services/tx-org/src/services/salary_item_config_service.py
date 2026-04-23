@@ -200,9 +200,7 @@ async def update_item_value(
         {"cv": custom_value_fen, "tid": tenant_id, "sid": store_id, "code": item_code},
     )
     if res.mappings().first() is None:
-        raise ValueError(
-            f"门店薪资配置中不存在该项目: store_id={store_id} item_code={item_code}"
-        )
+        raise ValueError(f"门店薪资配置中不存在该项目: store_id={store_id} item_code={item_code}")
     log.info(
         "salary_item_value_updated",
         tenant_id=str(tenant_id),

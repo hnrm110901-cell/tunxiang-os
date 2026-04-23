@@ -19,11 +19,11 @@
 
 from __future__ import annotations
 
+import json
 from datetime import date, datetime, timezone
 from typing import Any, List, Optional
 from uuid import uuid4
 
-import json
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
@@ -56,9 +56,7 @@ SEVERITY_WEIGHT = {"critical": 3, "warning": 2, "info": 1}
 
 
 def _get_tenant_id(request: Request) -> str:
-    tid = getattr(request.state, "tenant_id", None) or request.headers.get(
-        "X-Tenant-ID", ""
-    )
+    tid = getattr(request.state, "tenant_id", None) or request.headers.get("X-Tenant-ID", "")
     if not tid:
         raise HTTPException(status_code=400, detail="X-Tenant-ID header required")
     return tid
@@ -175,7 +173,9 @@ async def _generate_order_no(db: AsyncSession) -> str:
 
 
 class CreateAlertReq(BaseModel):
-    alert_type: str = Field(..., description="预警类型: turnover/peak_gap/training_lag/schedule_imbalance/new_store_gap")
+    alert_type: str = Field(
+        ..., description="预警类型: turnover/peak_gap/training_lag/schedule_imbalance/new_store_gap"
+    )
     store_id: Optional[str] = Field(None, description="门店ID")
     employee_id: Optional[str] = Field(None, description="员工ID")
     severity: str = Field(default="warning", description="严重度: info/warning/critical")
@@ -322,9 +322,7 @@ async def create_ai_alert(
         )
 
     # 去重检查：同类型+同门店+同员工+未解决+24小时内
-    existing = await _check_duplicate(
-        db, tenant_id, req.alert_type, req.store_id, req.employee_id
-    )
+    existing = await _check_duplicate(db, tenant_id, req.alert_type, req.store_id, req.employee_id)
     if existing:
         log.info(
             "create_ai_alert_skipped_duplicate",
@@ -332,11 +330,13 @@ async def create_ai_alert(
             existing_id=existing["alert_id"],
             alert_type=req.alert_type,
         )
-        return _ok({
-            "alert_id": existing["alert_id"],
-            "duplicate": True,
-            "message": "24小时内已存在同类未解决预警，跳过创建",
-        })
+        return _ok(
+            {
+                "alert_id": existing["alert_id"],
+                "duplicate": True,
+                "message": "24小时内已存在同类未解决预警，跳过创建",
+            }
+        )
 
     now = datetime.now(timezone.utc)
     alert_id = str(uuid4())
@@ -379,11 +379,13 @@ async def create_ai_alert(
         severity=req.severity,
         store_id=req.store_id,
     )
-    return _ok({
-        "alert_id": row._mapping["alert_id"],
-        "duplicate": False,
-        "created_at": now.isoformat(),
-    })
+    return _ok(
+        {
+            "alert_id": row._mapping["alert_id"],
+            "duplicate": False,
+            "created_at": now.isoformat(),
+        }
+    )
 
 
 @router.get("/dashboard")
@@ -485,24 +487,26 @@ async def get_ai_alert_dashboard(
     resolution_rate = round(resolved_30d / total_30d, 4) if total_30d > 0 else 0.0
 
     log.info("ai_alert_dashboard", tenant_id=tenant_id, total_unresolved=ov["total_unresolved"])
-    return _ok({
-        "total_unresolved": ov["total_unresolved"],
-        "by_type": {
-            "turnover": ov["t_turnover"],
-            "peak_gap": ov["t_peak_gap"],
-            "training_lag": ov["t_training_lag"],
-            "schedule_imbalance": ov["t_schedule_imbalance"],
-            "new_store_gap": ov["t_new_store_gap"],
-        },
-        "by_severity": {
-            "info": ov["s_info"],
-            "warning": ov["s_warning"],
-            "critical": ov["s_critical"],
-        },
-        "recent_critical": recent_critical,
-        "trend_7d": trend_7d,
-        "resolution_rate": resolution_rate,
-    })
+    return _ok(
+        {
+            "total_unresolved": ov["total_unresolved"],
+            "by_type": {
+                "turnover": ov["t_turnover"],
+                "peak_gap": ov["t_peak_gap"],
+                "training_lag": ov["t_training_lag"],
+                "schedule_imbalance": ov["t_schedule_imbalance"],
+                "new_store_gap": ov["t_new_store_gap"],
+            },
+            "by_severity": {
+                "info": ov["s_info"],
+                "warning": ov["s_warning"],
+                "critical": ov["s_critical"],
+            },
+            "recent_critical": recent_critical,
+            "trend_7d": trend_7d,
+            "resolution_rate": resolution_rate,
+        }
+    )
 
 
 @router.post("/batch")
@@ -532,9 +536,7 @@ async def batch_create_ai_alerts(
             )
 
         # 去重检查
-        existing = await _check_duplicate(
-            db, tenant_id, alert.alert_type, alert.store_id, alert.employee_id
-        )
+        existing = await _check_duplicate(db, tenant_id, alert.alert_type, alert.store_id, alert.employee_id)
         if existing:
             skipped_duplicates += 1
             continue
@@ -576,10 +578,12 @@ async def batch_create_ai_alerts(
         created=created,
         skipped_duplicates=skipped_duplicates,
     )
-    return _ok({
-        "created": created,
-        "skipped_duplicates": skipped_duplicates,
-    })
+    return _ok(
+        {
+            "created": created,
+            "skipped_duplicates": skipped_duplicates,
+        }
+    )
 
 
 @router.get("/store/{store_id}/summary")
@@ -654,24 +658,28 @@ async def get_store_alert_summary(
         total_unresolved += cnt
         if d.get("latest_created_at"):
             d["latest_created_at"] = str(d["latest_created_at"])
-        groups.append({
-            "alert_type": d["alert_type"],
-            "count": cnt,
-            "latest": {
-                "alert_id": d["latest_alert_id"],
-                "severity": d["latest_severity"],
-                "title": d["latest_title"],
-                "detail": d["latest_detail"],
-                "created_at": d["latest_created_at"],
-            },
-        })
+        groups.append(
+            {
+                "alert_type": d["alert_type"],
+                "count": cnt,
+                "latest": {
+                    "alert_id": d["latest_alert_id"],
+                    "severity": d["latest_severity"],
+                    "title": d["latest_title"],
+                    "detail": d["latest_detail"],
+                    "created_at": d["latest_created_at"],
+                },
+            }
+        )
 
     log.info("store_alert_summary", tenant_id=tenant_id, store_id=store_id, total=total_unresolved)
-    return _ok({
-        "store_id": store_id,
-        "total_unresolved": total_unresolved,
-        "by_type": groups,
-    })
+    return _ok(
+        {
+            "store_id": store_id,
+            "total_unresolved": total_unresolved,
+            "by_type": groups,
+        }
+    )
 
 
 @router.get("/{alert_id}")
@@ -801,11 +809,13 @@ async def resolve_ai_alert(
         raise HTTPException(status_code=400, detail="预警已处理，无法重复操作")
 
     log.info("resolve_ai_alert", tenant_id=tenant_id, alert_id=alert_id, by=req.resolved_by)
-    return _ok({
-        "alert_id": alert_id,
-        "resolved": True,
-        "resolved_at": now.isoformat(),
-    })
+    return _ok(
+        {
+            "alert_id": alert_id,
+            "resolved": True,
+            "resolved_at": now.isoformat(),
+        }
+    )
 
 
 @router.put("/{alert_id}/dismiss")
@@ -846,12 +856,14 @@ async def dismiss_ai_alert(
         raise HTTPException(status_code=400, detail="预警已处理，无法重复操作")
 
     log.info("dismiss_ai_alert", tenant_id=tenant_id, alert_id=alert_id)
-    return _ok({
-        "alert_id": alert_id,
-        "resolved": True,
-        "dismissed": True,
-        "resolved_at": now.isoformat(),
-    })
+    return _ok(
+        {
+            "alert_id": alert_id,
+            "resolved": True,
+            "dismissed": True,
+            "resolved_at": now.isoformat(),
+        }
+    )
 
 
 @router.post("/{alert_id}/create-order")
@@ -940,10 +952,12 @@ async def create_order_from_alert(
         order_id=order_id,
         order_no=order_no,
     )
-    return _ok({
-        "alert_id": alert_id,
-        "order_id": order_id,
-        "order_no": order_no,
-        "status": "draft",
-        "created_at": now.isoformat(),
-    })
+    return _ok(
+        {
+            "alert_id": alert_id,
+            "order_id": order_id,
+            "order_no": order_no,
+            "status": "draft",
+            "created_at": now.isoformat(),
+        }
+    )
