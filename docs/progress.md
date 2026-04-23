@@ -4,6 +4,45 @@
 
 ---
 
+## 2026-04-23 edge_mixin 相对导入修复 + ConstraintContext.from_data 零价格回归修复
+
+### 本次会话目标
+用户批 5 完成后明确要求的后续动作：修 `edge_mixin` 相对导入 bug，解锁 22 个 skipped tests。
+
+根因分析：
+- 生产 Docker：`PYTHONPATH=/app`，代码路径 `/app/services/tx_agent/src/agents/edge_mixin.py`，`from ..services.edge_inference_client` 解析为 `services.tx_agent.src.services.edge_inference_client` ✓
+- 本地 pytest：`sys.path.insert(0, "services/tx-agent/src")`，`agents` 包在顶层，`..services` 超出顶层 → `ImportError: attempted relative import beyond top-level package`
+- 影响：整个 `agents.skills/__init__.py` 导入失败（因为 `discount_guard` 和 `inventory_alert` 继承 `EdgeAwareMixin`），22 条 skill-dependent tests 只能 skip
+
+### 完成状态
+- [x] **双轨兼容修复** — `services/tx-agent/src/agents/edge_mixin.py` 的 `from ..services.edge_inference_client` 加 try/except fallback 到绝对导入 `from services.edge_inference_client`，生产相对路径优先，pytest 回落绝对路径
+- [x] **发现并修 ConstraintContext.from_data 零价格回归** — 批 1 引入的 `data.get("price_fen") or data.get("final_amount_fen")` 写法让 `price_fen=0` 被 truthy 测试误判为 None，导致旧 `checker.check_margin({"price_fen": 0, ...})` 返回 None 而非 `{passed: False}`。改为显式 `is None` 判断。
+- [x] **验证全部通过** — `test_constraint_context.py` 33/33（之前 11 passed + 22 skipped）+ `test_constraints_migrated.py` 38/38（之前 1 failed）= **71/71 绿**
+- [x] **生产兼容性** — try 块优先走 relative import，生产 Docker 行为不变；只在 ImportError 触发时才走绝对路径
+
+### 关键决策
+- **try/except 而非改模块路径** — 把 `from ..services.xxx` 改为 `from services.xxx` 会让生产 Docker 找不到（生产下 `services` 顶层是 tx-trade/tx-agent 等微服务目录，不是 tx_agent 内部 services）。try/except 是唯一双向兼容的方法。
+- **其他 `from ..services.xxx` 文件暂不修** — `routers/pilot_router.py` / `agents/domain_event_consumer.py` / `agents/master.py` / `api/orchestrator_routes.py` 也有同样 pattern，但都不在 pytest 路径中（未被 test 直接/间接 import），暂按"一处一改"原则留单独 PR
+- **零价格回归修复随本 PR** — 虽然语义是批 1 遗留，但被 edge_mixin 解锁后的 `test_constraints_migrated.py` 才能真正测到。放到本 PR 避免"修一个 bug 引入另一个可见 bug"
+
+### 交付清单
+```
+修改：
+  services/tx-agent/src/agents/edge_mixin.py           +16 行（try/except 绝对导入 fallback）
+  services/tx-agent/src/agents/context.py              +7 行，-2 行（from_data 零价格兼容）
+  services/tx-agent/src/tests/test_constraint_context.py +2 行，-2 行（banker rounding 13→12 断言修正）
+```
+
+### 下一步
+1. **批次 6 + Overflow（W9 最后 14 个 Skill）** — review_insight / review_summary / intel_reporter / audit_trail / growth_coach / salary_advisor / smart_customer_service + Overflow（ai_marketing_orchestrator / content_generation / competitor_watch / dormant_recall / high_value_member / member_insight / cashier_audit）
+2. **tx-agent 其他 `from ..services.xxx` 按需修** — 若未来 test 依赖它们，再按同 pattern 加 try/except
+
+### 已知风险
+- try/except 掩盖真实 ImportError — 若 production 下 `..services.edge_inference_client` 真的不存在（模块被删/改名），fallback 会偷偷走绝对路径而无告警。mitigation：日志观察 INFO 级别 `relative_import_fallback` 事件（当前未加，后续可打点）
+- 其他 tx-agent 跨包相对导入文件未修，若 CI 扩大测试面会遇到相同问题
+
+---
+
 ## 2026-04-23 Sprint D1 批次 5：合规运营 7 Skill（4 豁免 + 3 真实 scope）+ 4 Skill 补注册
 
 ### 本次会话目标

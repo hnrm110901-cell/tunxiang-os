@@ -122,9 +122,17 @@ class ConstraintContext:
                 )
             ingredients = converted or None
 
+        # 用 `if key in` 而非 `or`，避免 price_fen=0 被 truthy 测试误判为 None
+        # （price=0 是 "零售价错误设为 0" 的真实违规场景，checker 要返 {passed:False}）
+        price_fen = data.get("price_fen")
+        if price_fen is None:
+            price_fen = data.get("final_amount_fen")
+        cost_fen = data.get("cost_fen")
+        if cost_fen is None:
+            cost_fen = data.get("food_cost_fen")
         return cls(
-            price_fen=data.get("price_fen") or data.get("final_amount_fen"),
-            cost_fen=data.get("cost_fen") or data.get("food_cost_fen"),
+            price_fen=price_fen,
+            cost_fen=cost_fen,
             ingredients=ingredients,
             estimated_serve_minutes=data.get("estimated_serve_minutes"),
         )
