@@ -1,3 +1,55 @@
+## 2026-04-23 Sprint R2 — 3 Agent 并行实装（P0 礼宾员 + P1 销售教练 + P1 合同管家）
+
+### 今日完成（基于 R1 底座 + 契约文档 docs/reservation-r2-contracts.md）
+
+**R2-A reservation_concierge（P0 云端+边缘）**
+- 5 action：identify_caller / suggest_slot / detect_collision / send_invitation / confirm_arrival
+- constraint_scope = {margin, experience}，食安豁免
+- Whisper 降级（coreml-bridge:8100 无法访问 → cloud LLM）
+- 邀请函原子回滚 + v281 InvitationRepository（InMemory + Pg）
+- 6 HTTP 端点 + 依赖注入解耦 R1
+- 测试：23 条（13 Agent + 10 Invitation tier 2）✅
+
+**R2-B sales_coach（P1 云端 · 豁免策略层）**
+- 6 action：decompose_target / dispatch_daily_tasks / diagnose_gap / coach_action / audit_coverage / score_profile_completeness
+- constraint_scope = set()，waived_reason 80 字符（对齐 D1/PR-G 豁免机制）
+- _SalesCoachHttpClient 调 R1（sales-targets / tasks / customer-lifecycle）
+- sales_coach_job_service：daily coaching / weekly profile audit 幂等 job
+- 测试：26 条（18 Agent + 8 Job）✅
+
+**R2-C banquet_contract_agent（P1 云端 · margin+safety）**
+- 5 action：generate_contract / split_eo / route_approval / lock_schedule / progress_reminder
+- 审批链阈值：<10W auto_pass / ≥10W 或婚宴→店长 / ≥50W→区经
+- safety 硬约束：dish_bom 批次 <24h 触发违规；margin：毛利率 <15% 触发违规
+- 电子签 placeholder（R3 接 e签宝/法大大/腾讯）
+- 8 HTTP 端点（合同 CRUD + EO 工单 + 审批）
+- 测试：24 条（12 Agent + 12 Contract tier 2）✅
+
+### 数据变化
+- 新增 Agent：3（ReservationConciergeAgent / SalesCoachAgent / BanquetContractAgent）
+- 新增文件：18（3 Agent + 3 服务 + 3 测试文件 + 4 tx-trade service + 2 repo + 2 routes + 1 PDF gen）
+- SKILL_REGISTRY：49 → 52 = **100% 覆盖**
+- R2 新增测试：73 条（全部 Tier 2 TDD）
+- Tier 1 回归：50/50 ✅ 全绿（不破坏 R1）
+- 事件总线接入：8 新事件类型全部走 asyncio.create_task(emit_event(...))
+- 硬约束校验矩阵：
+  * reservation_concierge = {margin, experience}
+  * sales_coach = set() + waived_reason
+  * banquet_contract_agent = {margin, safety}
+
+### 遗留
+- Pg Repository 生产联调（需 CI 跑 v264/v265/v266/v267/v270/v281/v282 完整链）
+- 电子签真实接入（法务选型 + R3）
+- cashier_engine order.paid payload 补 sales_employee_id/cashier_id（P0-2 follow-up）
+- 老版 lifecycle_service.py 在 lifecycle_routes.py + 7 处仍调用（P0-3 → R3 合一）
+- 跨服务 pytest 全量 session 存在 src 包名冲突（各服务独立跑绕过，CI 已对齐）
+
+### 明日计划
+- PR #90 合并决策（合入 main 需徐记海鲜 PM 审阅）
+- Sprint R3 启动：分析报表（12 图）+ 集团监控台 + 高德/百度预订聚合
+
+---
+
 ## 2026-04-23 Sprint R1 — 预订底座 4 Track 并行实装（Tier 1 零容忍）
 
 ### 今日完成（5 个 Agent 串并行编排）

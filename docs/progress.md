@@ -59,6 +59,55 @@ Tier 级别：Tier 2（薪资合规影响组织运营成本，未触资金链路
 
 ---
 
+## 2026-04-24 02:00 Sprint R2 — 3 Agent 业务实装完成
+
+### 本次会话目标（续前一会话）
+R1 底座 + 独立审查 P0/P1 修复 + R2 契约锁定完成后，启动 R2 3 Agent 并行实装（reservation_concierge / sales_coach / banquet_contract_agent）。
+
+Tier 级别：Tier 2 高标准（3 Agent 均走 TDD + 硬约束校验 + 决策留痕）。
+
+### 不得触碰的边界
+- [x] shared/ontology（Ontology 冻结；用 extensions 子目录）
+- [x] 已应用迁移 v001-v282（未修改）
+- [x] R1 service 内部（3 Agent 只调 R1 HTTP API，不 import）
+- [x] cashier_engine / banquet_routes / reservation_service（只读）
+- [x] 其他 Track 文件（严格按 r2-contracts §1 文件所有权边界）
+
+### 完成状态
+- [x] **R2-A reservation_concierge（Track A，P0）**：5 action + Whisper 降级 + 邀请函原子回滚 + 6 HTTP 端点 + 23/23 Tier 2 测试
+- [x] **R2-B sales_coach（Track B，P1 豁免）**：6 action + _SalesCoachHttpClient + 定时 job service + 26/26 Tier 2 测试
+- [x] **R2-C banquet_contract_agent（Track C，P1）**：5 action + 审批链阈值 + 电子签 placeholder + 8 HTTP 端点 + 24/24 Tier 2 测试
+- [x] SKILL_REGISTRY 扩到 52/52 = **100% 覆盖**
+- [x] R1 回归测试 50/50 不破坏
+- [x] 3 Commits 提交（每 Track 一个 atomic commit）
+
+### 关键决策
+- **依赖注入解耦**：3 Agent 全部通过 HTTP 调 R1，不 import service（避免循环依赖）
+- **InMemory + Pg 双 repo**：测试零 DB 依赖，生产走 RLS
+- **电子签 placeholder**：R2 不接真实第三方，R3 法务选型后切换
+- **Whisper 降级**：无 coreml-bridge 时 fallback 云端
+- **豁免类 Agent 规范**：sales_coach waived_reason 80 字符（对齐 D1/PR-G）
+- **审批链阈值导出**：STORE_MANAGER_THRESHOLD_FEN=1M / DISTRICT_MANAGER_THRESHOLD_FEN=5M
+
+### 下一步
+- PR #90 最终 review（徐记海鲜 PM + 创始人）
+- PR #90 合并进 main（迁移链 v264→v265→v266→v267→v270→v281→v282 顺序部署）
+- Sprint R3：12 图运营报表 + 集团监控台 + 高德/百度预订聚合
+
+### 已知风险
+- cashier_engine 未发 sales_employee_id/cashier_id → 生产上 sales_target 员工维度仍为 0（P0-2 保守降级）
+- 老版 lifecycle_service 仍 7 处调用（P0-3 R3 前必须合一）
+- Pg Repo 生产联调仅通过 DDL PREPARE，真实数据端到端未跑
+- 电子签 / Whisper / AI 外呼 3 外部依赖待法务与合规
+
+### 本次编排规模（R1+R2 总览）
+- 5 阶段 / 10 个 Agent：R1 Architect → R1 4 并行 → 独立审查 → 3 并行修复 → R2 Architect → R2 3 并行
+- 总提交：15 commits 在 feat/sprint-r1 分支（[PR #90](https://github.com/hnrm110901-cell/tunxiang-os/pull/90)）
+- 总测试：50 Tier 1 + 73 Tier 2 = **123 新测试 全绿**
+- 总 ruff 全绿代码：~10k 行
+
+---
+
 ## 2026-04-23 22:00 Sprint R1 预订底座 — 4 Track 并行实装完成
 
 ### 本次会话目标（续前一会话）
