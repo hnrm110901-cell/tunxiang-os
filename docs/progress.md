@@ -1,3 +1,50 @@
+## 2026-04-23 Sprint D4c：预算预测 Sonnet 4.7 + Prompt Cache（P&L 行业 benchmark 共享）
+
+### 本次会话目标
+按 `docs/sprint-plan-2026Q2-unified.md` D 批次收官 D4c（复用 D4a/D4b CachedPromptBuilder 模式）：月度/季度 CFO 做下期预算时，Sonnet 4.7 基于历史 12 月 P&L + 5 业态行业 benchmark 预测下期成本结构异常（食材占比 / 人工占比 / 租金 / 能耗 / 净利），给出 variance_risks + preventive_actions。行业 P&L benchmark（~2KB）cacheable，多店多品牌多季度分析共享 cache 命中率目标 ≥ 75%。
+
+Tier 级别：Tier 2（影响预算决策，未触资金路径）。
+
+### 完成状态
+- [x] **ModelRouter 注册** `budget_forecast_analysis → COMPLEX`（Service 层显式覆盖 `claude-sonnet-4-7` 走 Prompt Cache beta）
+- [x] **v281 迁移**：`budget_forecast_analyses` 表（6 状态机 pending/analyzed/approved/revised/escalated/error + 4 scope monthly_brand/monthly_store/quarterly_brand/adhoc + 5 业态 full_service/quick_service/tea_beverage/buffet/hot_pot + Prompt Cache 4 字段 + 聚合字段 predicted_revenue/net/margin + RLS app.tenant_id + 3 索引 + UNIQUE(tenant, brand, store, month, scope) 幂等）
+- [x] **`BudgetForecastService`**：`CachedPromptBuilder`（2 段 cacheable system：STABLE_SYSTEM 输出 schema + PNL_BENCHMARKS 5 业态目标食材/人工/租金/能耗/净利率 + 季节性调整 + 合规红线）+ invoker 协议 `async (request: dict) → response: dict` + 规则引擎 fallback（中位数 × 近 3 月趋势系数，覆盖 4 类风险：margin_compression / labor 红线 / food 红线 / cost_overrun）+ 排序 legal_flag desc → severity desc → |delta_fen| desc + `save_forecast_to_db` ON CONFLICT 幂等升级 + 自动升级 has_critical/has_legal_flag → status='escalated' + 行数不全时用规则引擎补齐 line_items
+- [x] **3 路 API**：`POST /api/v1/finance/budget/forecast`（12 月 P&L 历史入参 → predicted_line_items + variance_risks + preventive_actions + cache stats）+ `POST /review/{id}`（CFO approve/revise/escalate，revise 必须附 revision_note）+ `GET /summary`（按 status+business_type 聚合 + 平均 margin + Prompt Cache 命中率门槛 0.75）
+- [x] **37 TDD 测试全绿**（0.13s）：Bundle 合法性 5 / CachedPromptBuilder 结构+schema+基准+用户消息 4 / parse_sonnet_response 3 / Fallback 规则 6 / 风险排序 1 / Result 属性 2 / cache_hit_rate 4 / invoker 成功+失败+不全+空 4 / v281 迁移静态 7 / ModelRouter 1
+- [x] Ruff 全绿
+
+### 关键决策
+- **P&L benchmark cacheable 而非运行时查 `industry_benchmark` 表** — 5 业态的 P25~P75 区间通过 `PNL_BENCHMARKS` 字符串硬编码进 CachedPromptBuilder 第 2 段。季度刷新只需 deploy，换来跨分析共享 cache → 稳态命中率 ~85%。
+- **行数不全自动用规则引擎补齐** — 若 Sonnet 只返了部分 line_item（如漏了 rent），service 层用规则引擎补齐剩余项并标注 "[行数不全...]"。避免 API 层消费方拿到半残 line_items 崩溃。
+- **revise 必须附 revision_note** — CFO 修订预算必须写理由，API 层强制校验。与 D4b 的 review 端点对比更严格（D4b 允许 act_on 无备注）。
+- **UNIQUE (tenant, brand, store, month, scope) 全维度幂等** — 允许同月同店有 monthly_store 和 quarterly_brand 两条记录（不同 scope），但同 scope 只允许一条。D4b 的 UNIQUE 只针对 monthly_batch 一个 scope。
+- **MonthlyPnL 不存 `net_fen` 字段而是计算属性** — revenue - 5 项成本 = net，写入 DB 的只有 6 个原子字段，避免数据矛盾。
+- **趋势系数限幅 [0.8, 1.2]** — 防止极端月（春节 / 台风）污染预测。真实 Sonnet 分析能考虑季节性修正。
+
+### 交付清单
+```
+新建：
+  shared/db-migrations/versions/v281_budget_forecast_analyses.py        (~150 行 DDL + RLS + 3 索引 + 表/列注释)
+  services/tx-finance/src/services/budget_forecast_service.py           (~600 行 Service + CachedPromptBuilder + invoker + fallback)
+  services/tx-finance/src/api/budget_forecast_routes.py                 (~300 行 3 端点 + Pydantic 模型)
+  services/tx-finance/src/tests/test_d4c_budget_forecast.py             (37 测试覆盖协议/规则/解析/cache/迁移)
+修改：
+  services/tunxiang-api/src/shared/core/model_router.py                 +3 行（budget_forecast_analysis → COMPLEX）
+```
+
+### 下一步
+- **D4 收官合并路径** — D4a (PR #85) / D4b (PR #87) / D4c (本 PR) 合入 main 后，抽取共享 `shared/prompt_cache/builder.py`：三份 CachedPromptBuilder 的 cache_control 逻辑一致，只有 `STABLE_SYSTEM` / `DOMAIN_BENCHMARKS` 段内容不同 → 抽 `BaseCachedPromptBuilder` + 三子类
+- **真实 Anthropic SDK 注入** — tx-brain 提供 `async def invoke_with_cache(request: dict) → dict`，依赖注入到 D4a/D4b/D4c service
+- **Prompt Cache 命中率看板** — 抽 `mv_prompt_cache_daily` 物化视图从三张 analysis 表聚合 `cache_hit_rate`，Grafana 看板周度刷新，目标 ≥ 0.75
+- **D4a 迁移链修复** — v279 尚未合并但 main 已有 v280（由 D4b 的 SOP 合并路径带入），v278 / v279 合入后链路恢复
+
+### 已知风险
+- **真实 Anthropic SDK 未接入** — invoker=None 走规则引擎；上线前需 tx-brain 注入
+- **P&L benchmark 硬编码** — 5 业态区间基于 2025 年行业报告，2026H2 需校正
+- **季节性调整仅文字提示** — 规则引擎 fallback 没考虑春节/夏季/雨季的动态系数，真实 Sonnet 分析能处理。上线前需真数据 backtest 验证 MAPE ≤ 15%
+
+---
+
 ## 2026-04-23 Sprint D4b：薪资异常检测 Sonnet 4.7 + Prompt Cache（城市基准共享）
 
 ### 本次会话目标

@@ -72,6 +72,9 @@ class ModelRouter:
         # Sprint D4b：薪资异常检测（Sonnet 4.7 + Prompt Cache 共享城市基准）
         # Service 层显式覆盖 model_id=claude-sonnet-4-7 走 Prompt Cache beta
         "salary_anomaly_detection": TaskComplexity.COMPLEX,
+        # Sprint D4c：预算预测（Sonnet 4.7 + Prompt Cache 共享 P&L 行业 benchmark）
+        # Service 层显式覆盖 model_id=claude-sonnet-4-7 走 Prompt Cache beta
+        "budget_forecast_analysis": TaskComplexity.COMPLEX,
     }
 
     # 复杂度 -> 模型映射
