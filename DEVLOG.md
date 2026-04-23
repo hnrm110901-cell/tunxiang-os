@@ -1,3 +1,29 @@
+## 2026-04-23 D4 基建 — shared/prompt_cache/ 共享模块
+
+### 今日完成
+- [shared/prompt_cache/__init__.py] 统一导出 6 个符号
+- [base_builder.py] `BaseCachedPromptBuilder` ABC（3 抽象方法 stable_system/domain_benchmarks/serialize_user_context + build_messages + validate_cache_size + extract_usage）
+- [response_parser.py] `parse_json_response`（剥离 code fence + 顶层非 dict 拒绝）+ `extract_text_from_content`（content blocks 拼文本）+ `parse_response` 端到端
+- [invoker.py] `AnthropicCacheInvoker` 真实 SDK 封装（60s timeout + 2 次 retry + 懒加载 SDK）+ `UsageStats` + `CacheInvoker` Callable 协议
+- [metrics.py] `CacheHitTargets`（LAUNCH 0.40 / STEADY 0.75 / EXCELLENT 0.85）+ `AggregatedUsage` + `compute_cache_hit_rate` + `aggregate_usage`
+- [37 测试全绿] 0.06s — Base 9 / Parser 10 / UsageStats 4 / Metrics 7 / Invoker 6 / 1 ABC 限制
+
+### 数据变化
+- 新增基建模块：1 个（shared/prompt_cache/）
+- 新增测试：37 个
+- 未改动 D4a/D4b/D4c（保持 OPEN PR 状态不受影响）
+
+### 遗留问题
+- AnthropicCacheInvoker 真实 SDK 路径未覆盖 — 需 integration test 用 VCR/录播
+- D4 三个 OPEN PR 仍带重复 builder 代码 — follow-up refactor PR 合入前短暂存在，可接受
+
+### 明日计划
+- D4a/b/c 全合入后，follow-up PR 把三个 service 的 builder 改成继承 `BaseCachedPromptBuilder`
+- v282 迁移：`mv_prompt_cache_daily` 物化视图从三张 D4 表 UNION 聚合
+- 按 sprint plan 下一步进入 Sprint E 外卖中心
+
+---
+
 ## 2026-04-23 Sprint D1 批次 6 + Overflow — 14 Skill 冲 100% 覆盖 + CI 门禁
 
 ### 今日完成

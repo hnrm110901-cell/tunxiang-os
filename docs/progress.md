@@ -1,3 +1,67 @@
+## 2026-04-23 Sprint D4 基建：shared/prompt_cache/ 共享模块（抽取三份重复 Builder）
+
+### 本次会话目标
+D4a/D4b/D4c 三个 service 各自实现了近似同构的 CachedPromptBuilder（两段 cacheable system + cache_control + 动态 user），DRY 违规。抽 `shared/prompt_cache/` 模块作为三个 service 未来 refactor 的地基，同时抽出配套的 JSON 解析、Anthropic SDK 封装、命中率统计工具。
+
+本 PR 只引入 shared 模块 + 单元测试，**不改动 D4a/D4b/D4c**（它们是 OPEN PR）。三个 D4 PR 合入后由 follow-up PR 改造各 service 使用 `BaseCachedPromptBuilder`。
+
+Tier 级别：Tier 3（基建/工具模块，不触业务路径）。
+
+### 完成状态
+- [x] **`shared/prompt_cache/__init__.py`** — 统一导出 `BaseCachedPromptBuilder` / `AnthropicCacheInvoker` / `UsageStats` / `parse_json_response` / `aggregate_usage` / `compute_cache_hit_rate`
+- [x] **`base_builder.py`** — `BaseCachedPromptBuilder` ABC：
+  - 三个抽象方法 `stable_system()` / `domain_benchmarks()` / `serialize_user_context(bundle)`
+  - 统一 `build_messages(bundle)` 构造 Anthropic messages API 入参（两段 ephemeral cache_control）
+  - `validate_cache_size()` 静态门槛校验（<1024 tokens 警告）
+  - `extract_usage(response)` 把 4 个 token 字段从 SDK 字段名规范化
+- [x] **`response_parser.py`** — `extract_text_from_content` 从 content blocks 拼文本 + `parse_json_response` 容错解析（剥离 ```json``` fence + 失败返 `{}`）+ `parse_response` 端到端便捷函数
+- [x] **`invoker.py`** — `CacheInvoker` Callable 协议 + `UsageStats` 规范化 usage 数据 + `AnthropicCacheInvoker`（真实 SDK 封装，60s 超时，2 次 retry 指数退避，懒加载 SDK 以支持未装 anthropic 的环境）+ `_sdk_response_to_dict` 兼容 pydantic/dict 两种响应形态
+- [x] **`metrics.py`** — `CacheHitTargets` 门槛常量（LAUNCH=0.40 / STEADY=0.75 / EXCELLENT=0.85）+ `AggregatedUsage` 多次 usage 累加 + `compute_cache_hit_rate` 单次计算 + `aggregate_usage` 从 DB rows 聚合
+- [x] **37 TDD 测试全绿**（0.06s）：
+  - BaseCachedPromptBuilder 9 测试（cache_control / 消息结构 / usage 提取 / size 校验 / ABC 不可实例化）
+  - parse_json_response 10 测试（valid / code-fence / broken / empty / list-reject / end-to-end）
+  - UsageStats 4 测试
+  - Metrics 7 测试（零值 / typical / 多次聚合 / 稳态 / 未达标 / to_dict 契约 / 常量值）
+  - AnthropicCacheInvoker 6 测试（env key / explicit key / 缺 key 异常 / dict/pydantic 响应归一化 / 默认参数）
+- [x] Ruff 全绿
+
+### 关键决策
+- **ABC + classmethod 强制子类实现三件套** — `@abstractmethod` 保证忘了实现就 `TypeError`；classmethod 让 subclass 不需要实例化（D4 builder 都是静态工厂模式）。D4a/b/c 重构时只需继承 + 覆盖三个 method + 可选调整 `MODEL_ID` / `MAX_TOKENS` / `USER_PROMPT_PREFIX`
+- **invoker 懒加载 anthropic SDK** — `_get_client()` 在首次调用时才 `from anthropic import AsyncAnthropic`，单元测试环境无需安装 SDK 即可 import 本模块；若构造 `AnthropicCacheInvoker(api_key="x")` 不调用也不会失败
+- **parse_json_response 拒绝顶层非 dict** — D4 三个 service 都期望 `{"predicted_line_items": [], ...}`，若 Sonnet 返回 `[...]` 也视为失败降级。记日志便于排查
+- **CacheHitTargets 三档门槛** — 不只给 API 返一个布尔（is ≥75%），而是让调用方按业务阶段选择（新上线只要 ≥40% 就算达标），未来可能要按品牌/租户 SLA 调整
+- **验证 `< 1024` tokens 警告** — Anthropic Prompt Cache 硬门槛 1024 tokens，低于此值根本不会缓存。`validate_cache_size()` 在测试 / deploy 前 catch 这个坑，避免生产环境 cache 命中率 0% 原因不明
+- **不在本 PR 改动 D4a/D4b/D4c** — 三个 PR 处于 OPEN 审核阶段，动它们会引发 rebase + 冲突。本 PR 仅加模块，follow-up PR 做 refactor
+
+### 交付清单
+```
+新建（shared 基建）：
+  shared/prompt_cache/__init__.py                      统一导出
+  shared/prompt_cache/base_builder.py                  BaseCachedPromptBuilder ABC（~120 行）
+  shared/prompt_cache/response_parser.py               parse_json_response + extract_text_from_content（~100 行）
+  shared/prompt_cache/invoker.py                       AnthropicCacheInvoker + UsageStats（~170 行）
+  shared/prompt_cache/metrics.py                       AggregatedUsage + CacheHitTargets（~130 行）
+  shared/prompt_cache/tests/__init__.py
+  shared/prompt_cache/tests/test_prompt_cache.py       37 测试（~260 行）
+```
+
+### 下一步
+- **D4 refactor follow-up PR**（PR #85/87/88 合入后触发）：
+  1. `tx-finance/services/cost_root_cause_service.py`：`CachedPromptBuilder` → `class CostRootCauseBuilder(BaseCachedPromptBuilder)`
+  2. `tx-org/services/salary_anomaly_service.py`：同
+  3. `tx-finance/services/budget_forecast_service.py`：同
+  4. 删除三份 `parse_sonnet_response` 重复实现，改用 `from shared.prompt_cache import parse_json_response`
+  5. 三份 service 都注入 `AnthropicCacheInvoker` 替代 `invoker=None` fallback
+- **`mv_prompt_cache_daily` 物化视图**（v282 迁移，D4 全合入后）：从三张 analysis 表 UNION 聚合 `cache_hit_rate`，Grafana 看板周度刷新
+- **D5 批次开启**（按 sprint plan 下一步 Sprint E 外卖中心）
+
+### 已知风险
+- **SDK 真实调用路径未单元测试** — `AnthropicCacheInvoker.__call__` 依赖真 SDK，测试只覆盖构造 + 错误路径；需 integration test 用 VCR / 录播真实调用
+- **`validate_cache_size()` 估算精度有限** — 2 字符/token 是中英文混合粗估，真实 tokenizer 结果可能 ±20%。边界值（~1000 tokens 估算）可能误报
+- **D4 OPEN PR 仍带重复 Builder 代码** — follow-up refactor PR 合入前，这份重复代码会短暂存在于 main。是可接受的 migration 成本
+
+---
+
 ## 2026-04-23 Sprint D4b：薪资异常检测 Sonnet 4.7 + Prompt Cache（城市基准共享）
 
 ### 本次会话目标
