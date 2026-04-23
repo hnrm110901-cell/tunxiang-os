@@ -59,6 +59,97 @@ Tier 级别：Tier 2（薪资合规影响组织运营成本，未触资金链路
 
 ---
 
+## 2026-04-23 22:00 Sprint R1 预订底座 — 4 Track 并行实装完成
+
+### 本次会话目标（续前一会话）
+执行 reservation-roadmap-2026-q2.md §6 Sprint R1：客户状态机 FSM / 任务引擎 / 销售目标 / 宴会商机漏斗 4 条并行底座。
+
+Tier 级别：**Tier 1 零容忍**（4 Track 均属）。采用 5 个 Agent 两阶段编排（1 架构 + 4 实装），TDD 先行。
+
+### 不得触碰的边界
+- [x] shared/ontology/（Ontology 冻结） — 用 extensions/ 子目录绕行
+- [x] 已应用迁移 v001-v263（未修改）
+- [x] 现有 RLS 策略文件（未触碰）
+- [x] 其他 Track 文件（4 Agent 严格按契约文档 §4 文件所有权边界执行）
+
+### 完成状态
+- [x] **阶段 1 Lead Architect**：契约冻结（v264-v267 迁移 / 4 事件枚举 / 4 Pydantic 模型 / 契约文档）
+- [x] **Track A — 客户生命周期 FSM**：5 新文件 + 10/10 Tier 1 测试 + 200 并发无竞态
+- [x] **Track B — 统一任务引擎**：5 新文件 + 12/12 Tier 1 测试 + 24h/72h 自动升级
+- [x] **Track C — 销售目标系统**：5 新文件 + 9/9 Tier 1 测试 + 工作日加权分解精确
+- [x] **Track D — 宴会商机漏斗**：5 新文件 + 8/8 Tier 1 测试 + 8 渠道归因
+- [x] 根目录 pytest 全 39 条 Tier 1 测试全绿
+- [x] ruff 新代码全绿
+- [x] 所有状态变更接入事件总线（asyncio.create_task + emit_event）
+- [x] 所有新表启用 RLS + app.tenant_id
+- [x] DEVLOG.md 顶部条目更新
+
+### 关键决策
+- **5 Agent 两阶段编排**：先串行 1 个 Lead Architect 锁契约，再后台并行 4 个实装 Agent，避免 event_types.py / 迁移版本号冲突
+- **版本号顺延**：v230-v233 规划值 → 实际 v264-v267（v263 已占用）
+- **Ontology 冻结绕行**：新建 shared/ontology/src/extensions/ 子目录放新契约，不动 entities.py
+- **Repository 双实现**：每 Track 都有 InMemory（测试零 DB 依赖）+ Pg（生产 RLS SQL）
+- **金额单位**：全部 int + _fen 后缀（对齐 §15）；achievement_rate 用 Decimal 字符串化
+- **幂等机制**：3 种（trigger_event_id 短路 / 日级派单键 / source_event_id 进度去重）
+
+### 下一步
+- 4 Track 拆分独立 PR 串行合并（v264→v265→v266→v267 顺序依赖）
+- DEV 环境跑迁移做 PgRepository 端到端联调
+- 更新 reservation-roadmap-2026-q2.md §6 的 v230-v233 引用 → v264-v267
+- Sprint R2 启动：reservation_concierge + sales_coach + banquet_contract_agent 3 个 Agent 实装
+
+### 已知风险
+- 3 个 Pg 生产 Repo 未端到端联调（Tier 1 DEMO 验收前必过）
+- TaskAutoGenerator CandidateProvider 待 R2 各 Track 注入
+- 若 4 PR 串行合并期间有新迁移需更高版本号，版本号链需手动调整
+- main.py 3 处 pre-existing F401（FlagContext）未清理（历史遗留）
+- 规划文档 v230-v233 引用未同步，需修订
+
+---
+
+## 2026-04-23 18:00 预订模块规划：对标天财食尚订 + AI 智能体路线图
+
+### 本次会话目标
+学习天财商龙 SaaS"食尚订"产品，结合屯象OS 现有预订功能及 Agent，比对差距，规划满足连锁餐饮真实业务的预订流程 + AI 智能体。
+
+Tier 级别：规划文档（输出路线图，未修改生产代码）。
+
+### 不得触碰的边界
+- [x] shared/ontology/（Ontology 冻结，未变更）
+- [x] 已应用迁移（v001-v229，未修改）
+- [x] RLS 策略文件（未触碰）
+- [x] 任何生产路由 / service（规划阶段，不写实现）
+
+### 完成状态
+- [x] 解析 PPTX 52 页，提炼 7 大能力矩阵
+- [x] 扫描屯象OS 预订/宴会/Agent 现状（tx-trade 10 路由 + 2 Agent + 前端 5 页面）
+- [x] 深扫 3 核心缺口：AI 预订电话 / 销售目标 / 客户状态机
+- [x] 输出 11 项差距矩阵（Tier 分级）
+- [x] 输出 6 层业务流程总体蓝图
+- [x] 规划 3 新 Agent + 3 增强 Agent
+- [x] 输出 3 Sprint / 6 周路线图
+- [x] 落盘 docs/reservation-roadmap-2026-q2.md
+
+### 关键决策
+- **不新建服务**：能力收口在 tx-trade / tx-agent / tx-org / tx-member，避免服务增生
+- **事件总线强制接入**：7 类新事件走 shared/events v147，承接 CLAUDE.md §15 规范
+- **Ontology 不改**：新实体（task / sales_target / banquet_lead / contract）挂 Order/Customer/Employee 的扩展关系表
+- **Agent 分层**：reservation_concierge 双层（边缘 Whisper + 云端 Claude），sales_coach / banquet_contract_agent 纯云端
+- **Tier 分级**：AI 预订电话 / 宴会商机漏斗 / 宴会合同 EO 归入 T1 零容忍（TDD + DEMO 验收）
+
+### 下一步
+- 本文档评审（创始人 + 徐记海鲜 PM）
+- Sprint R1 启动（客户状态机 FSM + 任务引擎 + 销售目标 + 宴会漏斗，v230 迁移）
+- DEMO 环境补 200 客户画像 + 50 宴会商机
+
+### 已知风险
+- 电子签第三方未选型（e 签宝 / 法大大 / 腾讯电子签）
+- AI 外呼牌照 + 合规授权待确认
+- 集团监控台 WS 扩容（20K 并发订阅）方案未定
+- 本次为规划文档，尚未涉及 Tier 1 代码路径实操，R1 启动时需独立验证会话（CLAUDE.md §19）
+
+---
+
 ## 2026-04-23 Sprint D1 批次 6 + Overflow：14 Skill 冲 100% 覆盖 + CI 门禁
 
 ### 本次会话目标

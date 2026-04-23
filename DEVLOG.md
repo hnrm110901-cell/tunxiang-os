@@ -1,3 +1,82 @@
+## 2026-04-23 Sprint R1 — 预订底座 4 Track 并行实装（Tier 1 零容忍）
+
+### 今日完成（5 个 Agent 串并行编排）
+- **阶段 1（串行 Lead Architect）** — 契约冻结
+  - shared/events/src/event_types.py：新增 4 个事件枚举（Customer / Task / SalesTarget / BanquetLead）
+  - shared/db-migrations/versions/：v264-v267 四份迁移骨架（RLS + app.tenant_id + ENUM + COMMENT + 完整 downgrade）
+  - shared/ontology/src/extensions/：新建子目录 + 4 份 Pydantic 模型（customer_lifecycle/tasks/sales_targets/banquet_leads，不碰冻结的 entities.py）
+  - docs/reservation-r1-contracts.md：契约文档，锁定文件所有权边界 + 测试场景矩阵
+  - 版本号变更：规划原定 v230-v233，发现 v263 已占用 → 顺延至 v264-v267
+
+- **阶段 2（4 Agent 并行领域实装）**
+  - Track A — tx-member 客户生命周期 FSM（无订单/活跃/沉睡/流失 4 象限 + SELECT FOR UPDATE 行锁 + 投影器订阅 ORDER.PAID）：5 新文件 + 10/10 Tier 1 测试
+  - Track B — tx-org 统一任务引擎（10 类任务 + 24h→店长/72h→区经自动升级 + 幂等派单）：5 新文件 + 12/12 Tier 1 测试
+  - Track C — tx-org 销售目标系统（6 metric + 年→月→日工作日加权分解 + 幂等进度 + leaderboard）：5 新文件 + 9/9 Tier 1 测试
+  - Track D — tx-trade 宴会商机漏斗（all→opportunity→order→invalid 状态机 + 8 渠道归因 + 投影器）：5 新文件 + 8/8 Tier 1 测试
+
+### 数据变化
+- 新增文档：2（reservation-roadmap-2026-q2.md 规划 + reservation-r1-contracts.md 契约，~1200 行）
+- 新增迁移：4（v264-v267）
+- 新增 Pydantic 模型：4（extensions/）
+- 新增事件枚举：4 类型（CUSTOMER.STATE_CHANGED / TASK.DISPATCHED|COMPLETED|ESCALATED / SALES_TARGET.SET|PROGRESS_UPDATED / BANQUET.LEAD_CREATED|STAGE_CHANGED|CONVERTED）
+- 新增代码：20 个文件（服务 + 仓储 + 路由 + 投影器 + 测试）
+- 新增 Tier 1 测试：**39 / 39 全绿**（A:10 + B:12 + C:9 + D:8）
+- ruff 检查：全绿，无 broad except，无 F401 新增
+- 主服务路由注册：tx-member/main.py + tx-org/main.py（2 条 router）+ tx-trade/main.py
+- 所有状态变更均走 asyncio.create_task(emit_event(...))（对齐 CLAUDE.md §15）
+- 所有新表均启用 RLS + app.tenant_id（对齐 CLAUDE.md §14）
+
+### Tier 1 验收
+- 200 并发无竞态（customer_lifecycle / task_dispatch / sales_progress 3 track 均验证）
+- 幂等性（trigger_event_id / 日级 dispatch 键 / source_event_id 三种机制）
+- 跨租户 RLS 隔离
+- 状态机合法流转（banquet_lead 拒绝倒退 + invalid 必带 reason）
+- ruff 新代码全绿
+
+### 遗留问题
+- PgTaskRepository / PgBanquetLeadRepo / PgSalesTargetRepo 三个生产 SQL 实现需 DEV 库跑 v264-v267 迁移后做端到端联调
+- 规划文档 reservation-roadmap-2026-q2.md §6 的 v230-v233 版本号引用需同步改为 v264-v267
+- TaskAutoGenerator.CandidateProvider 回调待 R2 由 tx-member 沉睡扫描 / tx-trade 核餐 T-2h / tx-member 生日扫描注入
+- 规划文档 main.py 三处的 pre-existing F401（FlagContext）未清理（非本次范围）
+
+### 明日计划
+- 4 Track 拆分为独立 PR 串行合并（依赖顺序 v264→v265→v266→v267）
+- DEV 环境跑迁移做端到端联调
+- Sprint R2 启动：reservation_concierge + sales_coach + banquet_contract_agent 3 个新 Agent 实装
+
+---
+
+## 2026-04-23 预订模块规划 — 对标天财食尚订 + AI 智能体路线图
+
+### 今日完成
+- [分析] 解析《食尚订产品介绍 2025.11.19.pptx》，提炼 7 大能力类（多渠道聚合 / 预订电话 Pro / 预订台 / 宴会全流程 / CRM 联动 / 目标管理 / 任务管理 / 运营分析 / 集团监控）
+- [盘点] 扫描屯象OS 预订侧现状：tx-trade 预订+宴会 10 路由、web-reception+web-pos+web-admin 前端、banquet_growth + dormant_recall 2 Agent、美团/点评/微信 Webhook 已对接
+- [差距矩阵] 输出 11 项差距，Tier 分级：T1 零容忍 3 项（AI 预订电话 / 宴会商机漏斗 / 宴会合同 EO）/ T2 高标准 5 项 / T3 常规 3 项
+- [业务流程蓝图] 6 层架构：公域流量入口 → L1 预订聚合 → L2 类型路由 → L3 宴会特殊流 → L4 任务引擎 → L5 客户状态机 → L6 Agent 智能层
+- [Agent 规划] 3 个新 Agent（reservation_concierge / sales_coach / banquet_contract_agent）+ 3 个增强（banquet_growth / dormant_recall / member_insight）
+- [路线图] 3 Sprint / 6 周：R1 数据底座（客户状态机 + 任务引擎 + 销售目标 + 宴会漏斗）→ R2 Agent 实装 → R3 分析与灰度
+- [文档落盘] docs/reservation-roadmap-2026-q2.md
+
+### 数据变化
+- 新增文档：1（reservation-roadmap-2026-q2.md，~500 行）
+- 规划新增事件类型：7 个（RESERVATION / BANQUET / TASK / SALES_TARGET / CUSTOMER 域）
+- 规划新增 Agent：3 个（reservation_concierge / sales_coach / banquet_contract_agent）
+- 规划增强 Agent：3 个（banquet_growth / dormant_recall / member_insight）
+- 规划迁移版本：v230（customer_lifecycle_fsm + tasks + sales_targets + banquet_leads）
+
+### 遗留问题
+- 电子签第三方选型（e 签宝 / 法大大 / 腾讯电子签）需法务确认
+- AI 外呼牌照 + 合规授权文案未定
+- 高德 / 百度地图商家入驻运营账号准入
+- 集团监控台 WS 扩容方案（100 店 × 200 桌 = 20K 并发订阅）
+
+### 明日计划
+- 本文档评审（创始人 + 徐记海鲜 PM）
+- Sprint R1 任务分派（T1 任务 TDD 先行）
+- DEMO 环境样本补充（200 客户画像 + 50 宴会商机）
+
+---
+
 ## 2026-04-23 Sprint D1 批次 6 + Overflow — 14 Skill 冲 100% 覆盖 + CI 门禁
 
 ### 今日完成
