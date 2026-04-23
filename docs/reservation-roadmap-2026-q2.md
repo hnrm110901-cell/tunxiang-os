@@ -211,7 +211,7 @@ attribution_weight = {
 
 ## 6. 落地路线图（3 Sprint / 6 周）
 
-### Sprint R1（2 周）— 数据与状态机底座（T1 零容忍）
+### Sprint R1（2 周）— 数据与状态机底座（T1 零容忍）🟢 已交付
 
 | 任务 | 交付 | 位置 |
 |------|------|------|
@@ -220,7 +220,9 @@ attribution_weight = {
 | 销售目标表 + API | `sales_targets` + `sales_progress` + 员工-目标-完成率 | `services/tx-org/` v266 ✅ |
 | 宴会商机漏斗模型 | `banquet_leads` + 转化事件 + `mv_banquet_funnel` | `services/tx-trade/` v267 ✅ |
 
-> 2026-04-23 实装进度：v230-v233 规划值因 v263 已占用顺延为 v264-v267，4 Track 已全部完成 39/39 Tier 1 测试。详见 `docs/reservation-r1-contracts.md`。
+> 2026-04-23 实装进度：v230-v233 规划值因 v263 已占用顺延为 v264-v267，4 Track 已全部完成 39/39 Tier 1 测试。
+> **R1 DEV 联调 ✅** — docker-postgres-1 全量迁移 apply + RLS 隔离 + PgRepository SQL PREPARE 均通过，详见 `docs/sprint-r1-dev-integration-report.md`。
+> 契约详见 `docs/reservation-r1-contracts.md`。
 
 **Tier 1 测试门槛**：
 - 200 桌并发下客户状态机无冲突
@@ -228,15 +230,18 @@ attribution_weight = {
 - 订金 Saga 无半状态
 - 合同 PDF 生成 P99 < 3s
 
-### Sprint R2（2 周）— Agent 实装（T2 高标准）
+### Sprint R2（2 周）— Agent 实装（T2 高标准）🟡 进行中
 
-| 任务 | 交付 |
-|------|------|
-| `reservation_concierge` Agent | 5 actions + Whisper 桥接 + 来电弹屏 WS 推送 |
-| `sales_coach` Agent | 6 actions + 每日定时任务派发 |
-| `banquet_contract_agent` Agent | 5 actions + PDF 合同模板 + 电子签对接 |
-| 前端 — 来电弹屏面板 | `web-pos/src/pages/CallerPopupPanel.tsx` + WS 订阅 |
-| 前端 — 销售经理 PWA | `web-crew` 增加 `SalesTargetTab` + `TaskListTab` |
+| 任务 | 交付 | 迁移 |
+|------|------|------|
+| `reservation_concierge` Agent | 5 actions + Whisper 桥接 + 来电弹屏 WS 推送 | v281 ✅ 骨架 |
+| `sales_coach` Agent | 6 actions + 每日定时任务派发 | 复用 R1 v265/v266 |
+| `banquet_contract_agent` Agent | 5 actions + PDF 合同模板 + 电子签对接 | v282 ✅ 骨架 |
+| 前端 — 来电弹屏面板 | `web-pos/src/pages/CallerPopupPanel.tsx` + WS 订阅 | — |
+| 前端 — 销售经理 PWA | `web-crew` 增加 `SalesTargetTab` + `TaskListTab` | — |
+
+> **R2 契约锁定 🟡 2026-04-23** — 迁移版本号规划原 v230-v233，R1 已占用 v264-v267，R2 顺延为 **v281 / v282**（v268-v280 已被 SOP / 记忆进化 / 薪资异常平行分支占用）。
+> 契约详见 `docs/reservation-r2-contracts.md`：3 Agent 的 5+6+5 actions 全部 ActionParams / ActionResult 冻结，文件所有权边界明确，硬约束校验矩阵锁定。
 
 ### Sprint R3（2 周）— 分析与灰度（T3 常规）
 
