@@ -33,6 +33,7 @@ from .api.card_routes import router as card_router
 from .api.coupon_engine_routes import router as coupon_engine_router
 from .api.cross_brand_member_routes import router as cross_brand_router  # 跨品牌会员智能
 from .api.customer_depth_routes import router as customer_depth_router
+from .api.customer_lifecycle_routes import router as customer_lifecycle_router  # R1 客户生命周期 FSM
 from .api.gdpr_routes import router as gdpr_router
 from .api.gift_card_routes import router as gift_card_router
 from .api.golden_id_routes import router as golden_id_router  # Y-D9 全渠道 Golden ID 映射
@@ -217,6 +218,7 @@ app.include_router(golden_id_router)  # Y-D9 全渠道 Golden ID 映射
 app.include_router(cross_brand_router)  # 跨品牌会员智能
 app.include_router(recommendation_router)  # 实时推荐引擎
 app.include_router(subscription_router)  # 付费会员订阅
+app.include_router(customer_lifecycle_router)  # R1 客户生命周期 FSM
 
 
 @app.get("/health")
