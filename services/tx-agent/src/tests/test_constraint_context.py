@@ -308,9 +308,10 @@ async def test_serve_dispatch_fills_experience_context():
     # 已填 estimated_serve_minutes → scope 不再是 n/a
     assert result.constraints_detail["scope"] == "experience"
     assert "experience" in result.constraints_detail["scopes_checked"]
-    # 3 道普通菜 + 无队列：base = 5 + 3*2.5 = 12.5 → 13 分钟，< 30 阈值应通过
+    # 3 道普通菜 + 无队列：base = 5 + 3*2.5 = 12.5，round() 用 Python 银行家舍入
+    # 取整结果为 12（round-half-to-even），< 30 阈值应通过
     assert result.constraints_passed is True
-    assert result.constraints_detail["experience_check"]["actual_minutes"] == 13
+    assert result.constraints_detail["experience_check"]["actual_minutes"] == 12
 
 
 @pytest.mark.asyncio

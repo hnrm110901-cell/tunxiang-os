@@ -1,3 +1,25 @@
+## 2026-04-23 fix — edge_mixin 相对导入 + ConstraintContext.from_data 零价格回归
+
+### 今日完成
+- [agents/edge_mixin.py] try `from ..services.edge_inference_client` / except ImportError fallback 到 `from services.edge_inference_client` — 解锁 pytest 本地运行 skill 包导入
+- [agents/context.py] `from_data` 用 `is None` 显式判断替换 `or`，修复 `price_fen=0` 误判为 None 导致的 check_margin regression
+- [tests/test_constraint_context.py] serve_dispatch assertion 13→12（Python 银行家舍入）
+
+### 数据变化
+- 迁移版本：无
+- 修改文件：3（edge_mixin / context / test）
+- 新增测试：0（但 22 个之前 skipped 现全部运行）
+- 测试状态：**test_constraint_context 33/33 + test_constraints_migrated 38/38 = 71/71 绿**
+
+### 遗留问题
+- tx-agent 其他 4 个 `from ..services.xxx` 文件同样 pattern，当前未被 pytest 触发，留 follow-up PR
+- try/except 掩盖真实 ImportError 风险（mitigation 留后续 INFO 日志打点）
+
+### 明日计划
+- 批次 6 + Overflow（W9 最后 14 Skill）
+
+---
+
 ## 2026-04-23 Sprint D1 批次 5 — 合规运营 7 Skill（4 豁免 + 3 scope）+ 4 Skill 补注册
 
 ### 今日完成
