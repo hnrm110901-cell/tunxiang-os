@@ -77,6 +77,31 @@ try:
 except ImportError:
     agent_message_router = None
 
+try:
+    from .api.memory_evolution_routes import router as memory_evolution_router
+except ImportError:
+    memory_evolution_router = None
+
+try:
+    from .api.sop_routes import router as sop_router
+except ImportError:
+    sop_router = None
+
+try:
+    from .api.im_sop_routes import router as im_sop_router
+except ImportError:
+    im_sop_router = None
+
+try:
+    from .api.coaching_routes import router as coaching_router
+except ImportError:
+    coaching_router = None
+
+try:
+    from .api.feedback_routes import router as feedback_router
+except ImportError:
+    feedback_router = None
+
 
 async def get_db_with_tenant_factory(
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
@@ -248,6 +273,16 @@ if agent_memory_router is not None:
     app.include_router(agent_memory_router)
 if agent_message_router is not None:
     app.include_router(agent_message_router)
+if memory_evolution_router is not None:
+    app.include_router(memory_evolution_router)
+if sop_router is not None:
+    app.include_router(sop_router)
+if im_sop_router is not None:
+    app.include_router(im_sop_router)
+if coaching_router is not None:
+    app.include_router(coaching_router)
+if feedback_router is not None:
+    app.include_router(feedback_router)
 
 
 @app.get("/health")

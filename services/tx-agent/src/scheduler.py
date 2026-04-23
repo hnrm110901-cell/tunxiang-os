@@ -119,6 +119,26 @@ AGENT_SCHEDULES: dict[str, dict[str, Any]] = {
         "task": "billing_daily_risk_scan",
         "description": "收银异常日终审计：反结账/漏单/挂账超期汇总",
     },
+    # ─── Phase S4: 记忆进化闭环定时任务 ───
+    "memory_evolution": {
+        "hour": 2,
+        "minute": 0,
+        "task": "run_memory_evolution",
+        "description": "每日记忆进化：信号分析+偏好推断+记忆写入",
+    },
+    "memory_consolidation": {
+        "hour": 3,
+        "minute": 30,
+        "task": "run_memory_consolidation",
+        "description": "每日记忆整合：衰减+整合+清理过期记忆",
+    },
+    # ─── Phase S3: AI运营教练定时任务 ───
+    "baseline_update": {
+        "hour": 3,
+        "minute": 0,
+        "task": "run_baseline_update",
+        "description": "每周基线更新：基于过去4周数据更新门店基线（周一执行）",
+    },
 }
 
 # ─── 高频定时任务（秒级间隔，需要独立调度器运行） ───
@@ -137,6 +157,12 @@ INTERVAL_SCHEDULES: dict[str, dict[str, Any]] = {
         "description": "排队等位时间更新：每2分钟刷新所有门店的等位预测",
         "agent_id": "queue_seating",
         "action": "predict_wait_time",
+    },
+    # ─── Phase S1: SOP节拍定时任务 ───
+    "sop_tick": {
+        "interval_seconds": 900,
+        "task": "run_sop_tick",
+        "description": "SOP 15分钟节拍：检查所有门店的待执行/超时任务",
     },
 }
 
@@ -388,3 +414,88 @@ TASK_REGISTRY: dict[str, callable] = {
 def get_task_function(task_name: str) -> Optional[callable]:
     """根据任务名获取对应的函数"""
     return TASK_REGISTRY.get(task_name)
+
+
+# ─── APScheduler 定时任务注册（Phase S1-S4 新增） ───
+# 以下函数在 lifespan 中由 APScheduler 调用
+# 使用 lazy import 避免循环依赖
+
+
+async def _run_sop_tick() -> None:
+    """SOP 15分钟节拍 — 检查所有门店的待执行/超时任务"""
+    from .workers.sop_tick_worker import SOPTickWorker
+
+    worker = SOPTickWorker()
+    await worker.run()
+
+
+async def _run_memory_consolidation() -> None:
+    """每日记忆整合（凌晨3:30）— 衰减 + 整合 + 清理过期记忆"""
+    from .workers.memory_consolidation_worker import MemoryConsolidationWorker
+
+    worker = MemoryConsolidationWorker()
+    await worker.run()
+
+
+async def _run_memory_evolution() -> None:
+    """每日记忆进化（凌晨2:00）— 信号分析 + 偏好推断 + 记忆写入"""
+    from .workers.memory_evolution_worker import MemoryEvolutionWorker
+
+    worker = MemoryEvolutionWorker()
+    await worker.run()
+
+
+async def _run_baseline_update() -> None:
+    """每周基线更新（周一凌晨3:00）— 基于过去4周数据更新门店基线"""
+    from .workers.baseline_updater_worker import BaselineUpdaterWorker
+
+    worker = BaselineUpdaterWorker()
+    await worker.run()
+
+
+def register_apscheduler_jobs(_scheduler: Any) -> None:
+    """向 APScheduler 实例注册所有定时任务
+
+    调用方式（在 lifespan 中）：
+        from apscheduler.schedulers.asyncio import AsyncIOScheduler
+        scheduler = AsyncIOScheduler()
+        register_apscheduler_jobs(scheduler)
+        scheduler.start()
+
+    Args:
+        _scheduler: APScheduler 的 AsyncIOScheduler 实例
+    """
+    import asyncio
+
+    # SOP 15分钟节拍
+    _scheduler.add_job(
+        lambda: asyncio.create_task(_run_sop_tick()),
+        "interval", minutes=15,
+        id="sop_tick", replace_existing=True,
+    )
+
+    # 每日记忆进化（凌晨2:00）
+    _scheduler.add_job(
+        lambda: asyncio.create_task(_run_memory_evolution()),
+        "cron", hour=2, minute=0,
+        id="memory_evolution", replace_existing=True,
+    )
+
+    # 每日记忆整合（凌晨3:30）
+    _scheduler.add_job(
+        lambda: asyncio.create_task(_run_memory_consolidation()),
+        "cron", hour=3, minute=30,
+        id="memory_consolidation", replace_existing=True,
+    )
+
+    # 每周基线更新（周一凌晨3:00）
+    _scheduler.add_job(
+        lambda: asyncio.create_task(_run_baseline_update()),
+        "cron", day_of_week="mon", hour=3, minute=0,
+        id="baseline_update", replace_existing=True,
+    )
+
+    logger.info(
+        "apscheduler_jobs_registered",
+        jobs=["sop_tick", "memory_evolution", "memory_consolidation", "baseline_update"],
+    )
