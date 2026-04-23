@@ -657,28 +657,19 @@ class SOPTaskService:
         iid = UUID(instance_id)
         now = datetime.now(timezone.utc)
 
-        # 检查当前状态
+        # 原子状态转换：WHERE 同时校验旧状态，防止并发竞态
         result = await self.db.execute(
-            text("""
-                SELECT status FROM sop_task_instances
-                WHERE id = :instance_id AND tenant_id = :tenant_id AND is_deleted = FALSE
-            """),
-            {"instance_id": iid, "tenant_id": tid},
-        )
-        row = result.fetchone()
-        if row is None:
-            raise ValueError(f"任务实例不存在: {instance_id}")
-        if row.status != "pending":
-            raise ValueError(f"任务状态不允许开始: {row.status}")
-
-        await self.db.execute(
             text("""
                 UPDATE sop_task_instances
                 SET status = 'in_progress',
                     assignee_id = :assignee_id,
                     started_at = :now,
                     updated_at = :now
-                WHERE id = :instance_id AND tenant_id = :tenant_id
+                WHERE id = :instance_id
+                  AND tenant_id = :tenant_id
+                  AND status = 'pending'
+                  AND is_deleted = FALSE
+                RETURNING id
             """),
             {
                 "instance_id": iid,
@@ -687,6 +678,15 @@ class SOPTaskService:
                 "now": now,
             },
         )
+        if result.fetchone() is None:
+            check = await self.db.execute(
+                text("SELECT status FROM sop_task_instances WHERE id = :id AND tenant_id = :tid AND is_deleted = FALSE"),
+                {"id": iid, "tid": tid},
+            )
+            row = check.fetchone()
+            if row is None:
+                raise ValueError(f"任务实例不存在: {instance_id}")
+            raise ValueError(f"任务状态不允许开始: {row.status}")
         await self.db.flush()
 
         logger.info(
@@ -714,21 +714,8 @@ class SOPTaskService:
         iid = UUID(instance_id)
         now = datetime.now(timezone.utc)
 
-        # 检查当前状态
+        # 原子状态转换：WHERE 同时校验旧状态
         result = await self.db.execute(
-            text("""
-                SELECT status FROM sop_task_instances
-                WHERE id = :instance_id AND tenant_id = :tenant_id AND is_deleted = FALSE
-            """),
-            {"instance_id": iid, "tenant_id": tid},
-        )
-        row = result.fetchone()
-        if row is None:
-            raise ValueError(f"任务实例不存在: {instance_id}")
-        if row.status not in ("in_progress", "pending"):
-            raise ValueError(f"任务状态不允许完成: {row.status}")
-
-        await self.db.execute(
             text("""
                 UPDATE sop_task_instances
                 SET status = 'completed',
@@ -736,7 +723,11 @@ class SOPTaskService:
                     result = :result,
                     compliance = :compliance,
                     updated_at = :now
-                WHERE id = :instance_id AND tenant_id = :tenant_id
+                WHERE id = :instance_id
+                  AND tenant_id = :tenant_id
+                  AND status IN ('in_progress', 'pending')
+                  AND is_deleted = FALSE
+                RETURNING id
             """),
             {
                 "instance_id": iid,
@@ -746,6 +737,15 @@ class SOPTaskService:
                 "compliance": compliance,
             },
         )
+        if result.fetchone() is None:
+            check = await self.db.execute(
+                text("SELECT status FROM sop_task_instances WHERE id = :id AND tenant_id = :tid AND is_deleted = FALSE"),
+                {"id": iid, "tid": tid},
+            )
+            row = check.fetchone()
+            if row is None:
+                raise ValueError(f"任务实例不存在: {instance_id}")
+            raise ValueError(f"任务状态不允许完成: {row.status}")
         await self.db.flush()
 
         logger.info(

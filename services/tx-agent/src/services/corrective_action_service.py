@@ -164,20 +164,18 @@ class CorrectiveActionService:
         aid = UUID(action_id)
         now = datetime.now(timezone.utc)
 
-        row = await self._get_action_row(tid, aid)
-        if row is None:
-            raise ValueError(f"纠正动作不存在: {action_id}")
-        if row.status not in ("open", "escalated"):
-            raise ValueError(f"状态不允许解决: {row.status}")
-
-        await self.db.execute(
+        # 原子状态转换：WHERE 同时校验旧状态
+        result = await self.db.execute(
             text("""
                 UPDATE sop_corrective_actions
                 SET status = 'resolved',
                     resolution = :resolution,
-                    resolved_at = :now,
                     updated_at = :now
-                WHERE id = :action_id AND tenant_id = :tenant_id
+                WHERE id = :action_id
+                  AND tenant_id = :tenant_id
+                  AND status IN ('open', 'escalated')
+                  AND is_deleted = FALSE
+                RETURNING id
             """),
             {
                 "action_id": aid,
@@ -186,6 +184,11 @@ class CorrectiveActionService:
                 "now": now,
             },
         )
+        if result.fetchone() is None:
+            row = await self._get_action_row(tid, aid)
+            if row is None:
+                raise ValueError(f"纠正动作不存在: {action_id}")
+            raise ValueError(f"状态不允许解决: {row.status}")
         await self.db.flush()
 
         logger.info(
@@ -207,20 +210,19 @@ class CorrectiveActionService:
         aid = UUID(action_id)
         now = datetime.now(timezone.utc)
 
-        row = await self._get_action_row(tid, aid)
-        if row is None:
-            raise ValueError(f"纠正动作不存在: {action_id}")
-        if row.status != "resolved":
-            raise ValueError(f"状态不允许验证: {row.status}")
-
-        await self.db.execute(
+        # 原子状态转换
+        result = await self.db.execute(
             text("""
                 UPDATE sop_corrective_actions
                 SET status = 'verified',
                     verified_by = :verified_by,
                     verified_at = :now,
                     updated_at = :now
-                WHERE id = :action_id AND tenant_id = :tenant_id
+                WHERE id = :action_id
+                  AND tenant_id = :tenant_id
+                  AND status = 'resolved'
+                  AND is_deleted = FALSE
+                RETURNING id
             """),
             {
                 "action_id": aid,
@@ -229,6 +231,11 @@ class CorrectiveActionService:
                 "now": now,
             },
         )
+        if result.fetchone() is None:
+            row = await self._get_action_row(tid, aid)
+            if row is None:
+                raise ValueError(f"纠正动作不存在: {action_id}")
+            raise ValueError(f"状态不允许验证: {row.status}")
         await self.db.flush()
 
         logger.info(
