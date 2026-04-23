@@ -3,6 +3,7 @@
 8 个端点：禁用过期原料、检查禁用食材、批次追溯、留样记录、
 温控记录、合规检查表、食安事件上报、责任追踪链。
 """
+
 from datetime import date, datetime
 from typing import Optional
 
@@ -52,8 +53,7 @@ class RecordTemperatureRequest(BaseModel):
 class ReportEventRequest(BaseModel):
     store_id: str
     event_type: str = Field(
-        description="expired_ingredient / temperature_violation / "
-                    "foreign_object / food_poisoning / pest / other",
+        description="expired_ingredient / temperature_violation / foreign_object / food_poisoning / pest / other",
     )
     detail: str
     severity: str = Field(description="low / medium / high / critical")

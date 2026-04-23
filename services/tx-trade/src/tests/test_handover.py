@@ -10,6 +10,7 @@
 7. 渠道核对 → 单渠道+全渠道报告
 8. 现金长短款明细（长款/短款/平衡）
 """
+
 import os
 import sys
 
@@ -34,6 +35,7 @@ CASHIER_ID = "C001"
 
 class FakeRow:
     """模拟 SQLAlchemy ORM 行"""
+
     def __init__(self, **kwargs):
         for k, v in kwargs.items():
             setattr(self, k, v)
@@ -59,6 +61,7 @@ class FakeResult:
 
 class FakeSession:
     """模拟 AsyncSession 用于纯逻辑测试"""
+
     def __init__(self):
         self.added = []
         self.deleted = []
@@ -102,11 +105,14 @@ class TestShiftHandoverService:
         """场景1: 开始交班 — 创建记录+快照"""
         db = FakeSession()
         # _snapshot_shift_data 查两次: orders, payments（无订单时不查退款）
-        db.set_results([
-            FakeResult(rows=[]),  # orders query
-        ])
+        db.set_results(
+            [
+                FakeResult(rows=[]),  # orders query
+            ]
+        )
 
         from services.shift_handover_service import ShiftHandoverService
+
         svc = ShiftHandoverService(db, TENANT_ID)
         result = await svc.start_handover(CASHIER_ID, STORE_ID)
 
@@ -138,11 +144,14 @@ class TestShiftHandoverService:
             },
             notes=None,
         )
-        db.set_results([
-            FakeResult(scalar=fake_handover),  # _get_handover
-        ])
+        db.set_results(
+            [
+                FakeResult(scalar=fake_handover),  # _get_handover
+            ]
+        )
 
         from services.shift_handover_service import ShiftHandoverService
+
         svc = ShiftHandoverService(db, TENANT_ID)
         result = await svc.record_cash_count(
             handover_id,
@@ -181,6 +190,7 @@ class TestShiftHandoverService:
         db.set_results([FakeResult(scalar=fake_handover)])
 
         from services.shift_handover_service import ShiftHandoverService
+
         svc = ShiftHandoverService(db, TENANT_ID)
         result = await svc.finalize_handover(handover_id)
 
@@ -214,6 +224,7 @@ class TestShiftHandoverService:
         db.set_results([FakeResult(scalar=fake_handover)])
 
         from services.shift_handover_service import ShiftHandoverService
+
         svc = ShiftHandoverService(db, TENANT_ID)
         result = await svc.finalize_handover(handover_id)
 
@@ -268,13 +279,16 @@ class TestShiftReconciliation:
             status="paid",
         )
 
-        db.set_results([
-            FakeResult(scalar=fake_handover),  # _get_handover
-            FakeResult(rows=[(order_id_1,), (order_id_2,)]),  # _get_shift_order_ids
-            FakeResult(rows=[fake_payment_matched, fake_payment_unmatched]),  # payments
-        ])
+        db.set_results(
+            [
+                FakeResult(scalar=fake_handover),  # _get_handover
+                FakeResult(rows=[(order_id_1,), (order_id_2,)]),  # _get_shift_order_ids
+                FakeResult(rows=[fake_payment_matched, fake_payment_unmatched]),  # payments
+            ]
+        )
 
         from services.shift_reconciliation import ShiftReconciliationService
+
         svc = ShiftReconciliationService(db, TENANT_ID)
         result = await svc.reconcile_shift(handover_id)
 
@@ -324,16 +338,19 @@ class TestShiftReconciliation:
             waiter_id=CASHIER_ID,
         )
 
-        db.set_results([
-            FakeResult(scalar=fake_handover),  # _get_handover
-            FakeResult(rows=[(order_id,)]),  # _get_shift_order_ids
-            FakeResult(rows=[fake_refund]),  # refunds
-            FakeResult(scalar=fake_order),  # order for refund check
-            FakeResult(rows=[fake_order]),  # orders for discount check
-            FakeResult(rows=[]),  # large cash payments
-        ])
+        db.set_results(
+            [
+                FakeResult(scalar=fake_handover),  # _get_handover
+                FakeResult(rows=[(order_id,)]),  # _get_shift_order_ids
+                FakeResult(rows=[fake_refund]),  # refunds
+                FakeResult(scalar=fake_order),  # order for refund check
+                FakeResult(rows=[fake_order]),  # orders for discount check
+                FakeResult(rows=[]),  # large cash payments
+            ]
+        )
 
         from services.shift_reconciliation import ShiftReconciliationService
+
         svc = ShiftReconciliationService(db, TENANT_ID)
         result = await svc.flag_suspicious_transactions(handover_id)
 
@@ -363,12 +380,15 @@ class TestChannelVerify:
             status="paid",
         )
 
-        db.set_results([
-            FakeResult(rows=[(order_id,)]),  # order_ids
-            FakeResult(rows=[fake_payment]),  # wechat payments
-        ])
+        db.set_results(
+            [
+                FakeResult(rows=[(order_id,)]),  # order_ids
+                FakeResult(rows=[fake_payment]),  # wechat payments
+            ]
+        )
 
         from services.channel_verify import ChannelVerifyService
+
         svc = ChannelVerifyService(db, TENANT_ID)
         result = await svc.verify_wechat_payments(STORE_ID, "2026-03-27")
 
@@ -390,6 +410,7 @@ class TestChannelVerify:
             db._execute_results.append(FakeResult(rows=[]))  # no payments
 
         from services.channel_verify import ChannelVerifyService
+
         svc = ChannelVerifyService(db, TENANT_ID)
         result = await svc.generate_channel_report(STORE_ID, "2026-03-27")
 
@@ -439,6 +460,7 @@ class TestCashVarianceDetail:
         db.set_results([FakeResult(scalar=fake_handover)])
 
         from services.shift_reconciliation import ShiftReconciliationService
+
         svc = ShiftReconciliationService(db, TENANT_ID)
         result = await svc.get_cash_variance_detail(handover_id)
 

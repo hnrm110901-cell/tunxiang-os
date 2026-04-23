@@ -11,6 +11,7 @@
 
 统一响应格式: {"ok": bool, "data": {}, "error": {}}
 """
+
 from __future__ import annotations
 
 import math
@@ -39,8 +40,7 @@ class BomItemIn(BaseModel):
     quantity: Decimal = Field(..., gt=Decimal("0"), description="标准用量（不含损耗）")
     unit: str = Field(..., max_length=20, description="kg/g/L/mL/个/份")
     unit_cost_fen: int = Field(0, ge=0, description="单位成本（分）")
-    loss_rate: Decimal = Field(Decimal("0.05"), ge=Decimal("0"), le=Decimal("1"),
-                               description="损耗率，默认0.05（5%）")
+    loss_rate: Decimal = Field(Decimal("0.05"), ge=Decimal("0"), le=Decimal("1"), description="损耗率，默认0.05（5%）")
     is_semi_product: bool = False
     semi_product_bom_id: Optional[str] = None
     sort_order: int = 0
@@ -428,7 +428,7 @@ async def update_bom(
             await db.execute(
                 text(f"""
                     UPDATE dish_boms
-                    SET {', '.join(set_clauses)}
+                    SET {", ".join(set_clauses)}
                     WHERE id = :bom_id AND tenant_id = :tid
                 """),
                 update_params,
@@ -561,11 +561,14 @@ async def calculate_bom_cost(
         await db.commit()
         log.info("bom.cost_calculated", bom_id=bom_id, total_cost_fen=total_cost)
 
-        return {"ok": True, "data": {
-            "bom_id": bom_id,
-            "total_cost_fen": total_cost,
-            "items": updated_items,
-        }}
+        return {
+            "ok": True,
+            "data": {
+                "bom_id": bom_id,
+                "total_cost_fen": total_cost,
+                "items": updated_items,
+            },
+        }
 
     except HTTPException:
         raise
@@ -619,26 +622,31 @@ async def bom_cost_breakdown(
         for item in items:
             item_cost = item["total_cost_fen"] or 0
             pct = round(item_cost / total * 100, 2) if total > 0 else 0.0
-            breakdown.append({
-                "ingredient_name": item["ingredient_name"],
-                "ingredient_code": item["ingredient_code"],
-                "quantity": str(item["quantity"]),
-                "unit": item["unit"],
-                "unit_cost_fen": item["unit_cost_fen"],
-                "total_cost_fen": item_cost,
-                "loss_rate": str(item["loss_rate"]),
-                "is_semi_product": item["is_semi_product"],
-                "cost_pct": pct,
-            })
+            breakdown.append(
+                {
+                    "ingredient_name": item["ingredient_name"],
+                    "ingredient_code": item["ingredient_code"],
+                    "quantity": str(item["quantity"]),
+                    "unit": item["unit"],
+                    "unit_cost_fen": item["unit_cost_fen"],
+                    "total_cost_fen": item_cost,
+                    "loss_rate": str(item["loss_rate"]),
+                    "is_semi_product": item["is_semi_product"],
+                    "cost_pct": pct,
+                }
+            )
 
-        return {"ok": True, "data": {
-            "bom_id": bom_id,
-            "dish_id": str(bom["dish_id"]),
-            "total_cost_fen": bom["total_cost_fen"],
-            "yield_qty": str(bom["yield_qty"]),
-            "yield_unit": bom["yield_unit"],
-            "breakdown": breakdown,
-        }}
+        return {
+            "ok": True,
+            "data": {
+                "bom_id": bom_id,
+                "dish_id": str(bom["dish_id"]),
+                "total_cost_fen": bom["total_cost_fen"],
+                "yield_qty": str(bom["yield_qty"]),
+                "yield_unit": bom["yield_unit"],
+                "breakdown": breakdown,
+            },
+        }
 
     except HTTPException:
         raise
@@ -712,17 +720,15 @@ async def consume_stock_by_bom(
 
         consumed = []
         for item in bom_items:
-            actual_qty = (
-                float(item["quantity"])
-                * (1 + float(item["loss_rate"]))
-                * float(body.quantity)
+            actual_qty = float(item["quantity"]) * (1 + float(item["loss_rate"])) * float(body.quantity)
+            consumed.append(
+                {
+                    "ingredient_code": item["ingredient_code"],
+                    "ingredient_name": item["ingredient_name"],
+                    "consumed_qty": round(actual_qty, 4),
+                    "unit": item["unit"],
+                }
             )
-            consumed.append({
-                "ingredient_code": item["ingredient_code"],
-                "ingredient_name": item["ingredient_name"],
-                "consumed_qty": round(actual_qty, 4),
-                "unit": item["unit"],
-            })
 
             # 扣减库存（若 ingredients 表存在对应 ingredient_code+store_id 记录）
             if item["ingredient_code"]:
@@ -753,13 +759,16 @@ async def consume_stock_by_bom(
             store_id=body.store_id,
         )
 
-        return {"ok": True, "data": {
-            "dish_id": dish_id,
-            "bom_id": bom_id,
-            "quantity": str(body.quantity),
-            "store_id": body.store_id,
-            "consumed": consumed,
-        }}
+        return {
+            "ok": True,
+            "data": {
+                "dish_id": dish_id,
+                "bom_id": bom_id,
+                "quantity": str(body.quantity),
+                "store_id": body.store_id,
+                "consumed": consumed,
+            },
+        }
 
     except ValueError as exc:
         await db.rollback()

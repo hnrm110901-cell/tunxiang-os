@@ -10,6 +10,7 @@
 
 支持2-12块屏拼接,实时库存同步,AI时段推荐,数据驱动排版。
 """
+
 from __future__ import annotations
 
 import uuid
@@ -97,7 +98,10 @@ FESTIVAL_THEMES = {
 
 
 async def get_menu_wall_layout(
-    store_id: str, screen_count: int, tenant_id: str, db: Any,
+    store_id: str,
+    screen_count: int,
+    tenant_id: str,
+    db: Any,
 ) -> dict:
     """获取菜单墙布局"""
     supported = sorted(ZONE_LAYOUTS.keys())
@@ -117,7 +121,11 @@ async def get_menu_wall_layout(
 
 
 async def get_screen_content(
-    store_id: str, screen_id: int, zone_type: str, tenant_id: str, db: Any,
+    store_id: str,
+    screen_id: int,
+    zone_type: str,
+    tenant_id: str,
+    db: Any,
 ) -> dict:
     """获取单块屏幕内容(mock, 接入菜品库后替换)"""
     logger.info("tv_menu.screen_content", store_id=store_id, screen_id=screen_id, zone=zone_type)
@@ -155,7 +163,9 @@ def _get_current_time_slot() -> dict:
 
 
 async def get_time_based_recommendation(
-    store_id: str, tenant_id: str, db: Any,
+    store_id: str,
+    tenant_id: str,
+    db: Any,
 ) -> dict:
     """时段推荐"""
     slot = _get_current_time_slot()
@@ -170,7 +180,10 @@ async def get_time_based_recommendation(
 
 
 async def get_weather_recommendation(
-    store_id: str, weather: str, tenant_id: str, db: Any,
+    store_id: str,
+    weather: str,
+    tenant_id: str,
+    db: Any,
 ) -> dict:
     """天气联动推荐"""
     config = WEATHER_RECOMMENDATIONS.get(weather, WEATHER_RECOMMENDATIONS["normal"])
@@ -184,19 +197,17 @@ async def get_weather_recommendation(
 
 
 def compute_dish_display_score(
-    margin_rate: float, sales_count: int, rating: float, is_new: bool,
+    margin_rate: float,
+    sales_count: int,
+    rating: float,
+    is_new: bool,
 ) -> float:
     """数据驱动排版评分
 
     权重: 毛利0.4 + 销量0.3 + 好评0.2 + 新品0.1
     得分前20%=大图Hero, 20-50%=中图, 50-80%=小图, 80%+=文字
     """
-    score = (
-        margin_rate * 0.4
-        + min(sales_count / 100, 1.0) * 0.3
-        + (rating / 5.0) * 0.2
-        + (0.1 if is_new else 0.0)
-    )
+    score = margin_rate * 0.4 + min(sales_count / 100, 1.0) * 0.3 + (rating / 5.0) * 0.2 + (0.1 if is_new else 0.0)
     return round(score, 4)
 
 
@@ -221,8 +232,12 @@ async def get_smart_layout(store_id: str, tenant_id: str, db: Any) -> dict:
 
 
 async def trigger_order_from_tv(
-    store_id: str, table_id: str, items: list, customer_id: str | None,
-    tenant_id: str, db: Any,
+    store_id: str,
+    table_id: str,
+    items: list,
+    customer_id: str | None,
+    tenant_id: str,
+    db: Any,
 ) -> dict:
     """从电视墙触控下单 → 直连POS"""
     order_id = f"TV-{uuid.uuid4().hex[:12].upper()}"
@@ -243,13 +258,22 @@ _screen_registry: dict[str, list] = {}
 
 
 async def register_screen(
-    store_id: str, screen_id: str, ip: str, position: str,
-    size_inches: int, tenant_id: str, db: Any,
+    store_id: str,
+    screen_id: str,
+    ip: str,
+    position: str,
+    size_inches: int,
+    tenant_id: str,
+    db: Any,
 ) -> dict:
     """注册屏幕"""
     info = {
-        "screen_id": screen_id, "ip": ip, "position": position,
-        "size_inches": size_inches, "store_id": store_id, "status": "online",
+        "screen_id": screen_id,
+        "ip": ip,
+        "position": position,
+        "size_inches": size_inches,
+        "store_id": store_id,
+        "status": "online",
     }
     _screen_registry.setdefault(store_id, []).append(info)
     logger.info("tv_menu.screen_registered", store_id=store_id, screen_id=screen_id, ip=ip)

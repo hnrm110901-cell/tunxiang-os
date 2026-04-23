@@ -9,6 +9,7 @@
 6. 拆单支付(微信200+支付宝100+现金50=350)
 7. 称重菜品定价(龙虾 280/斤 × 1.5斤 = 420)
 """
+
 import os
 import sys
 
@@ -32,6 +33,7 @@ WAITER_ID = "W001"
 
 class FakeRow:
     """模拟 SQLAlchemy ORM 行"""
+
     def __init__(self, **kwargs):
         for k, v in kwargs.items():
             setattr(self, k, v)
@@ -57,6 +59,7 @@ class FakeResult:
 
 class FakeSession:
     """模拟 AsyncSession 用于纯逻辑测试"""
+
     def __init__(self):
         self.added = []
         self.deleted = []
@@ -94,6 +97,7 @@ class TestCashierEngineUnit:
     def test_gen_order_no_format(self):
         """订单号格式: TX + 14位时间 + 4位随机"""
         from services.cashier_engine import _gen_order_no
+
         order_no = _gen_order_no()
         assert order_no.startswith("TX")
         assert len(order_no) == 20  # TX(2) + datetime(14) + random(4)
@@ -101,6 +105,7 @@ class TestCashierEngineUnit:
     def test_method_to_category_mapping(self):
         """支付方式→类别映射"""
         from services.cashier_engine import CashierEngine
+
         assert CashierEngine._method_to_category("cash") == "现金"
         assert CashierEngine._method_to_category("wechat") == "移动支付"
         assert CashierEngine._method_to_category("alipay") == "移动支付"
@@ -116,6 +121,7 @@ class TestPaymentGatewayUnit:
     def test_payment_methods_config(self):
         """支付方式配置完整性"""
         from services.payment_gateway import PaymentGateway
+
         methods = PaymentGateway.PAYMENT_METHODS
 
         assert "cash" in methods
@@ -159,6 +165,7 @@ class TestDailySettlementUnit:
     def test_cash_variance_threshold(self):
         """现金差异告警阈值 = ¥10 = 1000分"""
         from services.daily_settlement import DailySettlementService
+
         assert DailySettlementService.CASH_VARIANCE_THRESHOLD_FEN == 1000
 
 
@@ -439,12 +446,12 @@ class TestCashCountVariance:
     def test_denomination_breakdown_total(self):
         """面额明细加总"""
         breakdown = {
-            "100": 5,   # 5张百元 = 500
-            "50": 3,    # 3张五十 = 150
-            "20": 2,    # 2张二十 = 40
-            "10": 5,    # 5张十元 = 50
-            "5": 3,     # 3张五元 = 15
-            "1": 8,     # 8张一元 = 8
+            "100": 5,  # 5张百元 = 500
+            "50": 3,  # 3张五十 = 150
+            "20": 2,  # 2张二十 = 40
+            "10": 5,  # 5张十元 = 50
+            "5": 3,  # 3张五元 = 15
+            "1": 8,  # 8张一元 = 8
         }
         total_yuan = sum(int(denom) * count for denom, count in breakdown.items())
         assert total_yuan == 763
@@ -458,24 +465,35 @@ class TestSettlementLifecycle:
     def test_full_lifecycle_states(self):
         """完整日结状态流转"""
         from services.daily_settlement import DailySettlementService
+
         states = DailySettlementService.SETTLEMENT_STATUS
         assert states == [
-            "draft", "counting", "reviewing", "manager_confirmed",
-            "chef_confirmed", "submitted", "approved", "closed", "reopened",
+            "draft",
+            "counting",
+            "reviewing",
+            "manager_confirmed",
+            "chef_confirmed",
+            "submitted",
+            "approved",
+            "closed",
+            "reopened",
         ]
 
     def test_transition_draft_to_counting(self):
         from services.daily_settlement import DailySettlementService
+
         transitions = DailySettlementService.STATUS_TRANSITIONS
         assert "counting" in transitions["draft"]
 
     def test_transition_submitted_to_approved(self):
         from services.daily_settlement import DailySettlementService
+
         transitions = DailySettlementService.STATUS_TRANSITIONS
         assert "approved" in transitions["submitted"]
 
     def test_transition_closed_to_reopened(self):
         from services.daily_settlement import DailySettlementService
+
         transitions = DailySettlementService.STATUS_TRANSITIONS
         assert "reopened" in transitions["closed"]
 
@@ -507,6 +525,7 @@ class TestOrderCancelAndRefund:
         """取消订单应释放桌台"""
         # 验证状态流转逻辑
         from services.state_machine import sync_table_on_order_change
+
         table_target = sync_table_on_order_change("cancelled")
         assert table_target == "empty"
 
@@ -537,6 +556,7 @@ class TestStateMachineIntegration:
     def test_table_lifecycle(self):
         """桌台完整生命周期：空→用餐→待结→待清→空"""
         from services.state_machine import can_table_transition
+
         assert can_table_transition("empty", "dining")
         assert can_table_transition("dining", "pending_checkout")
         assert can_table_transition("pending_checkout", "pending_cleanup")
@@ -545,20 +565,21 @@ class TestStateMachineIntegration:
     def test_table_invalid_transition(self):
         """非法桌台状态转换"""
         from services.state_machine import can_table_transition
+
         assert not can_table_transition("empty", "pending_checkout")
         assert not can_table_transition("dining", "empty")  # must go through checkout
 
     def test_order_lifecycle(self):
         """订单完整生命周期"""
         from services.state_machine import validate_order_lifecycle
-        result = validate_order_lifecycle([
-            "draft", "placed", "preparing", "all_served", "pending_payment", "paid"
-        ])
+
+        result = validate_order_lifecycle(["draft", "placed", "preparing", "all_served", "pending_payment", "paid"])
         assert result["valid"] is True
 
     def test_order_invalid_lifecycle(self):
         """非法订单生命周期"""
         from services.state_machine import validate_order_lifecycle
+
         result = validate_order_lifecycle(["draft", "paid"])  # skip everything
         assert result["valid"] is False
 
@@ -651,6 +672,7 @@ class TestPaymentGatewayFeatures:
     def test_shouqianba_trade_no_format(self):
         """收钱吧交易号格式"""
         from services.payment_gateway import PaymentGateway
+
         db = FakeSession()
         gw = PaymentGateway(db, TENANT_ID)
         trade_no = gw._call_shouqianba_pay("PAY001", 10000, "auth123", "wechat")
@@ -659,6 +681,7 @@ class TestPaymentGatewayFeatures:
     def test_shouqianba_refund_trade_no_format(self):
         """收钱吧退款交易号格式"""
         from services.payment_gateway import PaymentGateway
+
         db = FakeSession()
         gw = PaymentGateway(db, TENANT_ID)
         refund_no = gw._call_shouqianba_refund("SQB001", "REF001", 5000)

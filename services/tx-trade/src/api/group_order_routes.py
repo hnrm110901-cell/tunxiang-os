@@ -9,6 +9,7 @@
   POST /{code}/lock        — 锁定拼单（停止加人，准备结算）
   POST /{code}/cancel      — 取消拼单
 """
+
 from __future__ import annotations
 
 import random
@@ -53,7 +54,7 @@ _groups: dict[str, GroupOrderResponse] = {}
 
 
 def _gen_code() -> str:
-    return ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
+    return "".join(random.choices(string.ascii_uppercase + string.digits, k=6))
 
 
 def _require_tenant(tid: Optional[str]) -> str:
@@ -74,14 +75,25 @@ async def create_group_order(
     now = datetime.now(timezone.utc)
 
     group = GroupOrderResponse(
-        id=gid, code=code, store_id=req.store_id, store_name="徐记海鲜",
-        creator_name="发起人", status="open",
-        min_people=req.min_people, max_people=req.max_people,
+        id=gid,
+        code=code,
+        store_id=req.store_id,
+        store_name="徐记海鲜",
+        creator_name="发起人",
+        status="open",
+        min_people=req.min_people,
+        max_people=req.max_people,
         discount_rate=req.discount_rate,
-        participants=[{
-            "user_id": tid, "nickname": "发起人", "avatar_url": "",
-            "item_count": 0, "subtotal_fen": 0, "is_ready": False,
-        }],
+        participants=[
+            {
+                "user_id": tid,
+                "nickname": "发起人",
+                "avatar_url": "",
+                "item_count": 0,
+                "subtotal_fen": 0,
+                "is_ready": False,
+            }
+        ],
         total_fen=0,
         expires_at=(now + timedelta(minutes=30)).isoformat(),
     )
@@ -118,10 +130,16 @@ async def join_group_order(
     if len(group.participants) >= group.max_people:
         raise HTTPException(status_code=400, detail="拼单人数已满")
 
-    group.participants.append({
-        "user_id": tid, "nickname": f"参与者{len(group.participants) + 1}",
-        "avatar_url": "", "item_count": 0, "subtotal_fen": 0, "is_ready": False,
-    })
+    group.participants.append(
+        {
+            "user_id": tid,
+            "nickname": f"参与者{len(group.participants) + 1}",
+            "avatar_url": "",
+            "item_count": 0,
+            "subtotal_fen": 0,
+            "is_ready": False,
+        }
+    )
     logger.info("group_order_joined", code=code, user=tid, count=len(group.participants))
     return {"ok": True, "data": group.model_dump()}
 

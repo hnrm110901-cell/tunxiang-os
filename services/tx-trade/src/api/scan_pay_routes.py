@@ -3,9 +3,9 @@
 统一响应格式: {"ok": bool, "data": {}, "error": {}}
 所有接口需 X-Tenant-ID header。
 """
+
 import asyncio
 import uuid
-from datetime import datetime, timezone
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -91,14 +91,16 @@ async def scan_pay(
         await db.commit()
 
         # 事件：支付发起
-        asyncio.create_task(emit_event(
-            event_type=PaymentEventType.INITIATED,
-            tenant_id=tenant_id,
-            stream_id=payment_id,
-            payload={"amount_fen": body.amount_fen, "channel": channel, "store_id": body.store_id},
-            store_id=body.store_id,
-            source_service="tx-trade",
-        ))
+        asyncio.create_task(
+            emit_event(
+                event_type=PaymentEventType.INITIATED,
+                tenant_id=tenant_id,
+                stream_id=payment_id,
+                payload={"amount_fen": body.amount_fen, "channel": channel, "store_id": body.store_id},
+                store_id=body.store_id,
+                source_service="tx-trade",
+            )
+        )
 
         # 异步模拟支付结果（实际应调用微信/支付宝 API）
         asyncio.create_task(_simulate_payment(payment_id, tenant_id, body.store_id, body.amount_fen, channel))
@@ -117,21 +119,21 @@ async def scan_pay(
             client_ip=user.client_ip,
         )
 
-        return _ok({
-            "payment_id": payment_id,
-            "channel": channel,
-            "amount_fen": body.amount_fen,
-            "status": "pending",
-            "message": f"正在通过{channel}收款，请稍候",
-        })
+        return _ok(
+            {
+                "payment_id": payment_id,
+                "channel": channel,
+                "amount_fen": body.amount_fen,
+                "status": "pending",
+                "message": f"正在通过{channel}收款，请稍候",
+            }
+        )
     except SQLAlchemyError as exc:
         await db.rollback()
         raise HTTPException(status_code=500, detail=f"支付发起失败: {exc}")
 
 
-async def _simulate_payment(
-    payment_id: str, tenant_id: str, store_id: str, amount_fen: int, channel: str
-) -> None:
+async def _simulate_payment(payment_id: str, tenant_id: str, store_id: str, amount_fen: int, channel: str) -> None:
     """模拟异步支付回调（生产环境替换为第三方回调处理）。"""
     from shared.ontology.src.database import async_session_factory  # 避免循环导入
 

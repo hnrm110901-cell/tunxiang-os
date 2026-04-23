@@ -6,6 +6,7 @@
 入库核心：验收完成后向 ingredient_transactions 写 'receiving' 类型流水，
 并更新 ingredients.current_quantity 和 unit_price_fen（加权均价）。
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -48,6 +49,7 @@ def _now() -> datetime:
 
 async def _set_tenant(db: AsyncSession, tenant_id: str) -> None:
     from sqlalchemy import text
+
     await db.execute(
         text("SELECT set_config('app.tenant_id', :tid, true)"),
         {"tid": str(tenant_id)},
@@ -195,9 +197,13 @@ async def list_receiving_orders(
     if status:
         filters.append(ReceivingOrder.status == status)
     if date_from:
-        filters.append(ReceivingOrder.created_at >= datetime(date_from.year, date_from.month, date_from.day, tzinfo=timezone.utc))
+        filters.append(
+            ReceivingOrder.created_at >= datetime(date_from.year, date_from.month, date_from.day, tzinfo=timezone.utc)
+        )
     if date_to:
-        filters.append(ReceivingOrder.created_at < datetime(date_to.year, date_to.month, date_to.day + 1, tzinfo=timezone.utc))
+        filters.append(
+            ReceivingOrder.created_at < datetime(date_to.year, date_to.month, date_to.day + 1, tzinfo=timezone.utc)
+        )
 
     count_q = select(func.count(ReceivingOrder.id)).where(*filters)
     total = (await db.execute(count_q)).scalar() or 0
@@ -376,8 +382,7 @@ async def complete_receiving(
     pending_items = [i for i in order.items if i.status == ReceivingItemStatus.pending.value]
     if pending_items:
         raise ValueError(
-            f"还有 {len(pending_items)} 项未完成验收（item_ids: "
-            f"{[str(i.id) for i in pending_items[:5]]}）"
+            f"还有 {len(pending_items)} 项未完成验收（item_ids: {[str(i.id) for i in pending_items[:5]]}）"
         )
 
     # 执行入库
@@ -426,18 +431,20 @@ async def complete_receiving(
 
     # ── 事件总线：收货完成 ──────────────────────────────────
     if received_count > 0:
-        asyncio.create_task(UniversalPublisher.publish(
-            event_type=SupplyEventType.RECEIVING_COMPLETED,
-            tenant_id=_uuid(tenant_id),
-            store_id=order.store_id,
-            entity_id=order.id,
-            event_data={
-                "po_id": str(order.procurement_order_id) if order.procurement_order_id else None,
-                "supplier_id": str(order.supplier_id) if order.supplier_id else None,
-                "items_count": received_count,
-            },
-            source_service="tx-supply",
-        ))
+        asyncio.create_task(
+            UniversalPublisher.publish(
+                event_type=SupplyEventType.RECEIVING_COMPLETED,
+                tenant_id=_uuid(tenant_id),
+                store_id=order.store_id,
+                entity_id=order.id,
+                event_data={
+                    "po_id": str(order.procurement_order_id) if order.procurement_order_id else None,
+                    "supplier_id": str(order.supplier_id) if order.supplier_id else None,
+                    "items_count": received_count,
+                },
+                source_service="tx-supply",
+            )
+        )
 
     # ── 事件总线：收货差异超5% ──────────────────────────────
     for item in order.items:
@@ -447,19 +454,21 @@ async def complete_receiving(
             variance_pct = (expected - accepted) / expected
             if variance_pct > 0.05:
                 variance_fen = round((expected - accepted) * (item.unit_price_fen or 0))
-                asyncio.create_task(UniversalPublisher.publish(
-                    event_type=SupplyEventType.RECEIVING_VARIANCE,
-                    tenant_id=_uuid(tenant_id),
-                    store_id=order.store_id,
-                    entity_id=order.id,
-                    event_data={
-                        "po_id": str(order.procurement_order_id) if order.procurement_order_id else None,
-                        "ingredient_id": str(item.ingredient_id),
-                        "variance_pct": round(variance_pct, 4),
-                        "variance_fen": variance_fen,
-                    },
-                    source_service="tx-supply",
-                ))
+                asyncio.create_task(
+                    UniversalPublisher.publish(
+                        event_type=SupplyEventType.RECEIVING_VARIANCE,
+                        tenant_id=_uuid(tenant_id),
+                        store_id=order.store_id,
+                        entity_id=order.id,
+                        event_data={
+                            "po_id": str(order.procurement_order_id) if order.procurement_order_id else None,
+                            "ingredient_id": str(item.ingredient_id),
+                            "variance_pct": round(variance_pct, 4),
+                            "variance_fen": variance_fen,
+                        },
+                        source_service="tx-supply",
+                    )
+                )
 
     return {
         "order_id": order_id,
@@ -492,9 +501,7 @@ async def _process_item_to_inventory(
     )
     ingredient = ing_result.scalar_one_or_none()
     if ingredient is None:
-        raise ValueError(
-            f"原料 {item.ingredient_id}（{item.ingredient_name}）在门店 {store_id} 不存在，无法入库"
-        )
+        raise ValueError(f"原料 {item.ingredient_id}（{item.ingredient_name}）在门店 {store_id} 不存在，无法入库")
 
     qty_before = ingredient.current_quantity
     qty_after = qty_before + accepted_qty
@@ -513,6 +520,7 @@ async def _process_item_to_inventory(
 
     # 创建库存流水
     import json
+
     notes_data: dict = {}
     if item.expiry_date:
         notes_data["expiry_date"] = item.expiry_date.isoformat()

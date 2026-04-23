@@ -177,9 +177,7 @@ async def api_pending_approvals(
     db: AsyncSession = Depends(get_db),
 ):
     try:
-        result = await get_pending_approvals(
-            approver_id=x_staff_id, store_id=store_id, tenant_id=x_tenant_id, db=db
-        )
+        result = await get_pending_approvals(approver_id=x_staff_id, store_id=store_id, tenant_id=x_tenant_id, db=db)
     except Exception as e:  # noqa: BLE001 — MLPS3-P0: 审批列表获取失败降级为空，最外层兜底
         log.warning("pending_approvals_fallback", error=str(e))
         result = []

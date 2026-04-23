@@ -2,6 +2,7 @@
 
 所有接口需要 X-Tenant-ID header。
 """
+
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
@@ -42,6 +43,7 @@ def _get_tenant_id(request: Request) -> str:
 
 # ─── 请求模型 ───
 
+
 class DispatchItem(BaseModel):
     dish_id: str
     item_name: str
@@ -73,6 +75,7 @@ class RushConfirmReq(BaseModel):
 
 
 # ─── 分单与队列 ───
+
 
 @router.post("/dispatch/{order_id}")
 async def api_dispatch_order(
@@ -195,6 +198,7 @@ async def api_resolve_dept(
 
 # ─── KDS 操作 ───
 
+
 @router.post("/task/{task_id}/start")
 async def api_start_cooking(
     task_id: str,
@@ -314,9 +318,11 @@ async def api_rush_status(
         task_uuid = _uuid.UUID(task_id)
     except ValueError:
         from fastapi import HTTPException
+
         raise HTTPException(status_code=400, detail="无效的 task_id 或 tenant_id")
 
     from datetime import datetime, timezone
+
     stmt = select(KDSTask).where(
         and_(
             KDSTask.id == task_uuid,
@@ -330,11 +336,7 @@ async def api_rush_status(
 
     now = datetime.now(timezone.utc)
     promised_at = db_task.promised_at
-    is_overdue = (
-        promised_at is not None
-        and db_task.status not in ("done", "cancelled")
-        and promised_at < now
-    )
+    is_overdue = promised_at is not None and db_task.status not in ("done", "cancelled") and promised_at < now
 
     return {
         "ok": True,
@@ -366,6 +368,7 @@ async def api_rush_overdue_check(
 
 
 # ─── 超时预警 ───
+
 
 @router.get("/timeouts/{store_id}")
 async def api_check_timeouts(

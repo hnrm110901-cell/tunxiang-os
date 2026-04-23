@@ -4,6 +4,7 @@
 - POST /api/v1/crew/generate-shift-summary — SSE 流式生成本班摘要（调用 Claude API）
 - GET  /api/v1/crew/shift-summary-history  — 历史摘要列表
 """
+
 import json
 from typing import Any, Optional
 
@@ -22,6 +23,7 @@ logger = structlog.get_logger(__name__)
 router = APIRouter(tags=["crew-shift-summary"])
 
 # ---------- Pydantic 模型 ----------
+
 
 class ShiftData(BaseModel):
     table_count: int = Field(..., description="接待桌次")
@@ -110,6 +112,7 @@ async def _empty_stream():
 
 # ---------- DB 历史摘要查询 ----------
 
+
 async def _fetch_history_from_db(
     db: AsyncSession,
     crew_id: str,
@@ -138,24 +141,27 @@ async def _fetch_history_from_db(
     rows = result.mappings().all()
     items = []
     for row in rows:
-        items.append({
-            "id":         row["id"],
-            "crew_id":    row["crew_id"],
-            "summary":    row["summary"],
-            "shift_date": row["shift_date"].isoformat() if row["shift_date"] else "",
-            "shift_label": row["shift_label"] or "",
-            "created_at": row["created_at_label"] or "",
-        })
+        items.append(
+            {
+                "id": row["id"],
+                "crew_id": row["crew_id"],
+                "summary": row["summary"],
+                "shift_date": row["shift_date"].isoformat() if row["shift_date"] else "",
+                "shift_label": row["shift_label"] or "",
+                "created_at": row["created_at_label"] or "",
+            }
+        )
     return items
 
 
 # ---------- 路由 ----------
 
+
 @router.post("/api/v1/crew/generate-shift-summary")
 async def generate_shift_summary(
     body: GenerateSummaryRequest,
     x_operator_id: str = Header(default="op-001", alias="X-Operator-ID"),
-    x_tenant_id: str   = Header(default="",       alias="X-Tenant-ID"),
+    x_tenant_id: str = Header(default="", alias="X-Tenant-ID"),
 ):
     """
     生成本班次AI智能摘要（SSE 流式响应）。
@@ -192,7 +198,7 @@ async def generate_shift_summary(
 @router.get("/api/v1/crew/shift-summary-history")
 async def get_shift_summary_history(
     x_operator_id: str = Header(default="op-001", alias="X-Operator-ID"),
-    x_tenant_id: str   = Header(default="",       alias="X-Tenant-ID"),
+    x_tenant_id: str = Header(default="", alias="X-Tenant-ID"),
     db: AsyncSession = Depends(get_db),
 ):
     """

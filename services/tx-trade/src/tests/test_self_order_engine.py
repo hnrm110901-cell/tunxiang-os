@@ -8,6 +8,7 @@
 6. GPS最近门店
 7. 预计等待时间
 """
+
 import os
 import sys
 
@@ -39,6 +40,7 @@ ORDER_ID = str(uuid.uuid4())
 
 
 # ── Mock DB helpers ──────────────────────────────────────────
+
 
 class FakeMappingResult:
     def __init__(self, rows):
@@ -75,6 +77,7 @@ def make_async_db(side_effects=None):
 
 # ── 1. 时段检测 ─────────────────────────────────────────────
 
+
 class TestMealPeriod:
     def test_breakfast(self):
         assert _detect_meal_period(7) == "breakfast"
@@ -96,6 +99,7 @@ class TestMealPeriod:
 
 
 # ── 2. AI推荐权重 ───────────────────────────────────────────
+
 
 class TestAIRecommendWeights:
     def test_weights_sum_to_one(self):
@@ -120,23 +124,45 @@ class TestAIRecommendWeights:
 
 # ── 3. AI推荐函数 ───────────────────────────────────────────
 
+
 class TestAIRecommend:
     @pytest.mark.asyncio
     async def test_recommend_returns_dishes(self):
         dishes = [
-            {"id": "d1", "name": "鱼头", "category": "meat", "price_fen": 8800,
-             "tags": ["main", "soup"], "margin_rate": 0.4, "monthly_sales": 200},
-            {"id": "d2", "name": "红烧肉", "category": "meat", "price_fen": 5600,
-             "tags": ["staple"], "margin_rate": 0.35, "monthly_sales": 150},
+            {
+                "id": "d1",
+                "name": "鱼头",
+                "category": "meat",
+                "price_fen": 8800,
+                "tags": ["main", "soup"],
+                "margin_rate": 0.4,
+                "monthly_sales": 200,
+            },
+            {
+                "id": "d2",
+                "name": "红烧肉",
+                "category": "meat",
+                "price_fen": 5600,
+                "tags": ["staple"],
+                "margin_rate": 0.35,
+                "monthly_sales": 150,
+            },
         ]
-        db = make_async_db([
-            FakeResult(),  # _set_tenant
-            FakeResult(rows=[dishes[0], dishes[1]]),  # dish query
-            FakeResult(rows=[]),  # history query
-        ])
+        db = make_async_db(
+            [
+                FakeResult(),  # _set_tenant
+                FakeResult(rows=[dishes[0], dishes[1]]),  # dish query
+                FakeResult(rows=[]),  # history query
+            ]
+        )
         result = await ai_recommend_dishes(
-            customer_id=CUSTOMER_ID, guest_count=2, time_slot="lunch",
-            weather="cold", store_id=STORE_ID, tenant_id=TENANT_ID, db=db,
+            customer_id=CUSTOMER_ID,
+            guest_count=2,
+            time_slot="lunch",
+            weather="cold",
+            store_id=STORE_ID,
+            tenant_id=TENANT_ID,
+            db=db,
         )
         assert "recommendations" in result
         assert result["guest_count"] == 2
@@ -144,19 +170,27 @@ class TestAIRecommend:
 
     @pytest.mark.asyncio
     async def test_recommend_limit_by_guest_count(self):
-        db = make_async_db([
-            FakeResult(),  # _set_tenant
-            FakeResult(rows=[]),  # no dishes
-            FakeResult(rows=[]),  # no history
-        ])
+        db = make_async_db(
+            [
+                FakeResult(),  # _set_tenant
+                FakeResult(rows=[]),  # no dishes
+                FakeResult(rows=[]),  # no history
+            ]
+        )
         result = await ai_recommend_dishes(
-            customer_id=None, guest_count=6, time_slot=None,
-            weather=None, store_id=STORE_ID, tenant_id=TENANT_ID, db=db,
+            customer_id=None,
+            guest_count=6,
+            time_slot=None,
+            weather=None,
+            store_id=STORE_ID,
+            tenant_id=TENANT_ID,
+            db=db,
         )
         assert result["recommendations"] == []
 
 
 # ── 4. 最优优惠方案 ─────────────────────────────────────────
+
 
 class TestBestDeal:
     @pytest.mark.asyncio
@@ -185,8 +219,7 @@ class TestBestDeal:
     async def test_percentage_coupon(self):
         cart = [{"dish_id": "d1", "price_fen": 10000, "quantity": 1}]
         coupons = [
-            {"coupon_id": "c1", "type": "percentage", "threshold_fen": 5000,
-             "discount_rate": 0.8, "discount_fen": 0},
+            {"coupon_id": "c1", "type": "percentage", "threshold_fen": 5000, "discount_rate": 0.8, "discount_fen": 0},
         ]
         db = make_async_db([FakeResult()])
         result = await find_best_deal(cart, coupons, TENANT_ID, db)
@@ -196,14 +229,17 @@ class TestBestDeal:
 
 # ── 5. AA 分摊 ──────────────────────────────────────────────
 
+
 class TestAASplit:
     @pytest.mark.asyncio
     async def test_even_split_exact(self):
-        db = make_async_db([
-            FakeResult(),  # _set_tenant
-            FakeResult(rows=[{"final_amount_fen": 300}]),  # order
-            FakeResult(rows=[]),  # items
-        ])
+        db = make_async_db(
+            [
+                FakeResult(),  # _set_tenant
+                FakeResult(rows=[{"final_amount_fen": 300}]),  # order
+                FakeResult(rows=[]),  # items
+            ]
+        )
         result = await calculate_aa_split(ORDER_ID, 3, TENANT_ID, db)
         assert result["split_count"] == 3
         assert sum(s["amount_fen"] for s in result["even_split"]) == 300
@@ -212,11 +248,13 @@ class TestAASplit:
 
     @pytest.mark.asyncio
     async def test_even_split_remainder(self):
-        db = make_async_db([
-            FakeResult(),
-            FakeResult(rows=[{"final_amount_fen": 100}]),
-            FakeResult(rows=[]),
-        ])
+        db = make_async_db(
+            [
+                FakeResult(),
+                FakeResult(rows=[{"final_amount_fen": 100}]),
+                FakeResult(rows=[]),
+            ]
+        )
         result = await calculate_aa_split(ORDER_ID, 3, TENANT_ID, db)
         amounts = [s["amount_fen"] for s in result["even_split"]]
         assert sum(amounts) == 100
@@ -234,6 +272,7 @@ class TestAASplit:
 
 # ── 6. 制作进度 ─────────────────────────────────────────────
 
+
 class TestPreparation:
     def test_five_steps(self):
         assert len(PREPARATION_STEPS) == 5
@@ -246,6 +285,7 @@ class TestPreparation:
 
 
 # ── 7. GPS距离计算 ──────────────────────────────────────────
+
 
 class TestHaversine:
     def test_same_point(self):

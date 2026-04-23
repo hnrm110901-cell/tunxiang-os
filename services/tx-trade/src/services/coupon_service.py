@@ -4,6 +4,7 @@
 券叠加规则：同类型不叠加，不同类型可叠加。
 权益优先级：会员价 > 活动券 > 通用券。
 """
+
 import uuid
 from datetime import date, datetime, timezone
 from typing import Optional
@@ -218,13 +219,15 @@ async def recharge(
 
     card["balance_fen"] += amount_fen
     card["total_recharged_fen"] += amount_fen
-    card["transactions"].append({
-        "type": "recharge",
-        "amount_fen": amount_fen,
-        "payment_method": payment_method,
-        "balance_after_fen": card["balance_fen"],
-        "at": datetime.now(timezone.utc).isoformat(),
-    })
+    card["transactions"].append(
+        {
+            "type": "recharge",
+            "amount_fen": amount_fen,
+            "payment_method": payment_method,
+            "balance_after_fen": card["balance_fen"],
+            "at": datetime.now(timezone.utc).isoformat(),
+        }
+    )
     _StoredValueStore.save(card_id, card)
 
     logger.info(
@@ -274,7 +277,7 @@ async def deduct_stored_value(
             "amount": amount_fen,
             "card_id": card_id,
             "tenant_id": tenant_id,
-        }
+        },
     )
     row = result.fetchone()
     if row is None:
@@ -286,7 +289,7 @@ async def deduct_stored_value(
             FROM stored_value_accounts
             WHERE id = :card_id AND tenant_id = :tenant_id::uuid
             """),
-            {"card_id": card_id, "tenant_id": tenant_id}
+            {"card_id": card_id, "tenant_id": tenant_id},
         )
         account = check.fetchone()
         if account is None:
@@ -294,9 +297,7 @@ async def deduct_stored_value(
         if account.is_deleted:
             raise ValueError("储值账户已注销")
         available = account.balance_fen - account.frozen_fen
-        raise ValueError(
-            f"余额不足：可用 {available} 分，需扣 {amount_fen} 分"
-        )
+        raise ValueError(f"余额不足：可用 {available} 分，需扣 {amount_fen} 分")
 
     # 写流水记录（写入 stored_value_transactions 表）
     try:
@@ -317,7 +318,7 @@ async def deduct_stored_value(
                 "amount": amount_fen,
                 "balance_after": row.balance_fen,
                 "order_id": order_id,
-            }
+            },
         )
     except SQLAlchemyError:
         # 流水写入失败不影响主流程（幂等）
@@ -384,9 +385,7 @@ async def verify_coupon(
     # 检查最低消费
     min_amount_fen = coupon.get("min_order_amount_fen", 0)
     if min_amount_fen > 0 and order_id:
-        result = await db.execute(
-            select(Order).where(Order.id == uuid.UUID(order_id))
-        )
+        result = await db.execute(select(Order).where(Order.id == uuid.UUID(order_id)))
         order = result.scalar_one_or_none()
         if order and order.total_amount_fen < min_amount_fen:
             return {
@@ -478,12 +477,14 @@ async def check_benefit_conflict(
     # 检测同类型冲突
     for btype, count in type_counts.items():
         if count > 1:
-            conflicts.append({
-                "conflict_type": "same_type_stack",
-                "benefit_type": btype,
-                "count": count,
-                "message": f"同类型权益({COUPON_TYPES.get(btype, btype)})不可叠加，已选{count}个",
-            })
+            conflicts.append(
+                {
+                    "conflict_type": "same_type_stack",
+                    "benefit_type": btype,
+                    "count": count,
+                    "message": f"同类型权益({COUPON_TYPES.get(btype, btype)})不可叠加，已选{count}个",
+                }
+            )
 
     # 按优先级排序可用权益（每种类型取第一个）
     seen_types: set[str] = set()

@@ -1,4 +1,5 @@
 """宴会全流程 API — 线索→报价→签约→定金→菜单→执行→结账→回访→套餐模板"""
+
 import structlog
 from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel, Field
@@ -6,8 +7,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db_with_tenant
 
-from ..services.banquet_integration import BanquetIntegrationService
 from ..services import banquet_template_service as tpl_svc
+from ..services.banquet_integration import BanquetIntegrationService
 
 logger = structlog.get_logger()
 router = APIRouter(prefix="/api/v1/banquets", tags=["banquet"])
@@ -15,10 +16,12 @@ router = APIRouter(prefix="/api/v1/banquets", tags=["banquet"])
 
 # ─── 依赖注入 ───
 
+
 async def _get_db(request: Request):
     tenant_id = getattr(request.state, "tenant_id", None) or request.headers.get("X-Tenant-ID", "")
     if not tenant_id:
         from fastapi import HTTPException
+
         raise HTTPException(400, "Missing X-Tenant-ID")
     async for session in get_db_with_tenant(tenant_id):
         yield session
@@ -39,6 +42,7 @@ def _err(msg: str, code: str = "BAD_REQUEST") -> dict:
 
 
 # ─── Request Models ───
+
 
 class CreateLeadReq(BaseModel):
     customer_name: str = Field(..., min_length=1)
@@ -79,6 +83,7 @@ class FeedbackReq(BaseModel):
 
 
 # ─── Endpoints ───
+
 
 @router.post("/leads")
 async def create_lead(body: CreateLeadReq, svc: BanquetIntegrationService = Depends(_svc)):
@@ -143,8 +148,7 @@ async def get_contract(contract_id: str, svc: BanquetIntegrationService = Depend
 
 
 @router.post("/contracts/{contract_id}/deposit")
-async def collect_deposit(contract_id: str, body: CollectDepositReq,
-                          svc: BanquetIntegrationService = Depends(_svc)):
+async def collect_deposit(contract_id: str, body: CollectDepositReq, svc: BanquetIntegrationService = Depends(_svc)):
     """收定金（自动创建支付记录）"""
     try:
         result = await svc.collect_deposit(
@@ -158,8 +162,7 @@ async def collect_deposit(contract_id: str, body: CollectDepositReq,
 
 
 @router.put("/contracts/{contract_id}/confirm-menu")
-async def confirm_menu(contract_id: str, body: ConfirmMenuReq,
-                       svc: BanquetIntegrationService = Depends(_svc)):
+async def confirm_menu(contract_id: str, body: ConfirmMenuReq, svc: BanquetIntegrationService = Depends(_svc)):
     """确认菜单（自动BOM展开+采购单）"""
     try:
         result = await svc.confirm_menu(
@@ -182,8 +185,7 @@ async def start_execution(contract_id: str, svc: BanquetIntegrationService = Dep
 
 
 @router.post("/contracts/{contract_id}/settle")
-async def settle_banquet(contract_id: str, body: SettleReq,
-                         svc: BanquetIntegrationService = Depends(_svc)):
+async def settle_banquet(contract_id: str, body: SettleReq, svc: BanquetIntegrationService = Depends(_svc)):
     """结账（扣除定金，尾款支付）"""
     try:
         result = await svc.settle_banquet(
@@ -196,8 +198,7 @@ async def settle_banquet(contract_id: str, body: SettleReq,
 
 
 @router.post("/contracts/{contract_id}/feedback")
-async def complete_feedback(contract_id: str, body: FeedbackReq,
-                            svc: BanquetIntegrationService = Depends(_svc)):
+async def complete_feedback(contract_id: str, body: FeedbackReq, svc: BanquetIntegrationService = Depends(_svc)):
     """回访（自动更新会员积分）"""
     try:
         result = await svc.complete_feedback(

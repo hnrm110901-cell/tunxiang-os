@@ -18,14 +18,15 @@ kds_swimlane_routes（依赖 src.services.kds_swimlane 服务层）：
 11. POST /api/v1/kds/swimlane/tasks/{task_id}/advance — 推进工序成功，all_done=False
 12. POST /api/v1/kds/swimlane/tasks/{task_id}/advance — 最后一道工序，all_done=True
 """
+
 import os
 import sys
 import types
 
 # ─── 路径准备 ─────────────────────────────────────────────────────────────────
 _TESTS_DIR = os.path.dirname(__file__)
-_SRC_DIR   = os.path.abspath(os.path.join(_TESTS_DIR, ".."))
-_ROOT_DIR  = os.path.abspath(os.path.join(_TESTS_DIR, "..", "..", "..", ".."))
+_SRC_DIR = os.path.abspath(os.path.join(_TESTS_DIR, ".."))
+_ROOT_DIR = os.path.abspath(os.path.join(_TESTS_DIR, "..", "..", "..", ".."))
 
 for _p in [_SRC_DIR, _ROOT_DIR]:
     if _p not in sys.path:
@@ -33,6 +34,7 @@ for _p in [_SRC_DIR, _ROOT_DIR]:
 
 
 # ─── 建立 src 包层级 ──────────────────────────────────────────────────────────
+
 
 def _ensure_pkg(name: str, path: str) -> None:
     if name not in sys.modules:
@@ -42,13 +44,14 @@ def _ensure_pkg(name: str, path: str) -> None:
         sys.modules[name] = mod
 
 
-_ensure_pkg("src",          _SRC_DIR)
-_ensure_pkg("src.api",      os.path.join(_SRC_DIR, "api"))
+_ensure_pkg("src", _SRC_DIR)
+_ensure_pkg("src.api", os.path.join(_SRC_DIR, "api"))
 _ensure_pkg("src.services", os.path.join(_SRC_DIR, "services"))
-_ensure_pkg("src.models",   os.path.join(_SRC_DIR, "models"))
+_ensure_pkg("src.models", os.path.join(_SRC_DIR, "models"))
 
 
 # ─── stub helper ──────────────────────────────────────────────────────────────
+
 
 def _stub_module(full_name: str, **attrs):
     if full_name in sys.modules:
@@ -79,43 +82,42 @@ _stub_module(
 )
 
 # ─── stub models（服务层依赖，路由层不直接使用）────────────────────────────────
-_stub_module("src.models.kds_task",        KDSTask=None)
-_stub_module("src.models.kds_task_step",   KDSTaskStep=None)
+_stub_module("src.models.kds_task", KDSTask=None)
+_stub_module("src.models.kds_task_step", KDSTaskStep=None)
 _stub_module("src.models.production_step", ProductionStep=None)
 
 # ─── 正式导入 ──────────────────────────────────────────────────────────────────
 import uuid
-from datetime import date, timedelta
+from datetime import date
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from src.api.kds_station_profit_routes import router as profit_router  # type: ignore[import]
-from src.api.kds_swimlane_routes        import router as swimlane_router  # type: ignore[import]
+from src.api.kds_swimlane_routes import router as swimlane_router  # type: ignore[import]
 from src.db import get_db as src_get_db  # type: ignore[import]
-
 
 # ─── 常量 ─────────────────────────────────────────────────────────────────────
 
-TENANT_ID   = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
-STORE_ID    = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
-DEPT_ID     = "cccccccc-cccc-cccc-cccc-cccccccccccc"
-TASK_ID     = "dddddddd-dddd-dddd-dddd-dddddddddddd"
-STEP_ID     = "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee"
-NEXT_STEP   = "ffffffff-ffff-ffff-ffff-ffffffffffff"
+TENANT_ID = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+STORE_ID = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+DEPT_ID = "cccccccc-cccc-cccc-cccc-cccccccccccc"
+TASK_ID = "dddddddd-dddd-dddd-dddd-dddddddddddd"
+STEP_ID = "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee"
+NEXT_STEP = "ffffffff-ffff-ffff-ffff-ffffffffffff"
 
 HEADERS = {"X-Tenant-ID": TENANT_ID}
 
 
 # ─── 工具函数 ──────────────────────────────────────────────────────────────────
 
+
 def _make_mock_db() -> AsyncMock:
     db = AsyncMock()
-    db.commit   = AsyncMock()
+    db.commit = AsyncMock()
     db.rollback = AsyncMock()
-    db.execute  = AsyncMock(return_value=MagicMock())
+    db.execute = AsyncMock(return_value=MagicMock())
     return db
 
 
@@ -144,6 +146,7 @@ def _make_swimlane_app(db: AsyncMock) -> FastAPI:
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 场景 1: GET /station-profit?period=today — 正常返回 depts 汇总
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 def test_station_profit_today_success():
     """档口毛利报表：today 周期，2个档口，校验 total_revenue 及毛利颜色语义。"""
@@ -204,6 +207,7 @@ def test_station_profit_today_success():
 # 场景 2: GET /station-profit?period=week — week 周期计算正确
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_station_profit_week_period():
     """week 周期：start_date 应是本周一，end_date 是今天；验证服务层被调用的日期参数。"""
     db = _make_mock_db()
@@ -235,6 +239,7 @@ def test_station_profit_week_period():
 # 场景 3: GET /station-profit?period=month — month 周期计算正确
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_station_profit_month_period():
     """month 周期：start_date 应是本月1日，end_date 是今天。"""
     db = _make_mock_db()
@@ -264,6 +269,7 @@ def test_station_profit_month_period():
 # 场景 4: GET /station-profit?start_date=&end_date= — 自定义日期区间优先
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_station_profit_custom_date_range():
     """自定义 start_date/end_date 优先级高于 period 预设。"""
     db = _make_mock_db()
@@ -274,7 +280,7 @@ def test_station_profit_custom_date_range():
         return {"total_revenue": 0, "total_profit": 0, "avg_margin_pct": 0, "depts": []}
 
     start = "2026-03-01"
-    end   = "2026-03-31"
+    end = "2026-03-31"
 
     with patch(
         "src.api.kds_station_profit_routes.get_station_profit_summary",
@@ -285,7 +291,7 @@ def test_station_profit_custom_date_range():
             "/api/v1/kds/station-profit",
             params={
                 "store_id": STORE_ID,
-                "period": "today",          # 被覆盖
+                "period": "today",  # 被覆盖
                 "start_date": start,
                 "end_date": end,
             },
@@ -295,16 +301,17 @@ def test_station_profit_custom_date_range():
     assert resp.status_code == 200
     # start_date 应等于自定义值，而非今天
     assert captured["start_date"] == date(2026, 3, 1)
-    assert captured["end_date"]   == date(2026, 3, 31)
+    assert captured["end_date"] == date(2026, 3, 31)
     # response 中也应含自定义日期
     data = resp.json()["data"]
     assert data["start_date"] == "2026-03-01"
-    assert data["end_date"]   == "2026-03-31"
+    assert data["end_date"] == "2026-03-31"
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 场景 5: GET /station-profit — 无档口数据时返回空 depts + 0 合计
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 def test_station_profit_empty_result():
     """没有完成任务时，服务层返回空汇总，响应也应是 0 / 空列表。"""
@@ -337,6 +344,7 @@ def test_station_profit_empty_result():
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 场景 6: GET /swimlane/board?dept_id=xxx — 正常返回 steps + lanes
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 def test_swimlane_board_success():
     """泳道看板：2道工序，热菜间有1个任务在工序1，返回结构正确。"""
@@ -387,6 +395,7 @@ def test_swimlane_board_success():
 # 场景 7: GET /swimlane/board — 无工序时返回空看板
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_swimlane_board_empty():
     """档口未配置工序时，看板返回空 steps 和 lanes。"""
     db = _make_mock_db()
@@ -412,13 +421,14 @@ def test_swimlane_board_empty():
 # 场景 8: GET /swimlane/steps?dept_id=xxx — 正常返回工序列表
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_get_swimlane_steps_success():
     """工序定义列表：3道工序，按 step_order 返回。"""
     db = _make_mock_db()
 
     fake_steps = [
-        {"step_id": STEP_ID,   "step_name": "切配",   "step_order": 1, "color": "#FF6B6B"},
-        {"step_id": NEXT_STEP, "step_name": "烹饪",   "step_order": 2, "color": "#4ECDC4"},
+        {"step_id": STEP_ID, "step_name": "切配", "step_order": 1, "color": "#FF6B6B"},
+        {"step_id": NEXT_STEP, "step_name": "烹饪", "step_order": 2, "color": "#4ECDC4"},
         {"step_id": str(uuid.uuid4()), "step_name": "装盘", "step_order": 3, "color": "#45B7D1"},
     ]
 
@@ -446,6 +456,7 @@ def test_get_swimlane_steps_success():
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 场景 9: POST /swimlane/steps — 新建工序，返回 created=True
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 def test_upsert_step_create():
     """新增工序（不传 step_id）：服务层返回 created=True。"""
@@ -482,6 +493,7 @@ def test_upsert_step_create():
 # 场景 10: POST /swimlane/steps — 更新现有工序，返回 updated=True
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_upsert_step_update():
     """更新工序（传入 step_id）：服务层返回 updated=True。"""
     db = _make_mock_db()
@@ -517,6 +529,7 @@ def test_upsert_step_update():
 # 场景 11: POST /swimlane/tasks/{task_id}/advance — 推进工序，all_done=False
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_advance_step_not_last():
     """推进非最后一道工序：服务层返回 all_done=False，next_step 有值。"""
     db = _make_mock_db()
@@ -551,6 +564,7 @@ def test_advance_step_not_last():
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 场景 12: POST /swimlane/tasks/{task_id}/advance — 最后一道工序，all_done=True
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 def test_advance_step_last_step():
     """推进最后一道工序：服务层返回 all_done=True，next_step=None。"""

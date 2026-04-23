@@ -1,4 +1,5 @@
 """申购全流程测试"""
+
 import os
 import sys
 
@@ -68,8 +69,15 @@ class TestCreateReplenishment:
     @pytest.mark.asyncio
     async def test_replenishment_needed(self):
         inventory = [
-            {"ingredient_id": "i1", "name": "鲈鱼", "current_qty": 2, "safety_qty": 10,
-             "daily_usage": 5, "unit": "kg", "estimated_price_fen": 3500},
+            {
+                "ingredient_id": "i1",
+                "name": "鲈鱼",
+                "current_qty": 2,
+                "safety_qty": 10,
+                "daily_usage": 5,
+                "unit": "kg",
+                "estimated_price_fen": 3500,
+            },
         ]
         result = await create_replenishment("store_1", "t1", db=None, inventory_data=inventory)
         assert result["requisition_id"] is not None
@@ -117,8 +125,13 @@ class TestApproveRequisition:
     async def test_store_level_approve(self):
         req = {"status": "pending_approval", "approval_level": "store", "approval_log": []}
         result = await approve_requisition(
-            "req_001", "mgr_1", "approve", "t1", db=None,
-            requisition=req, approver_role="store_manager",
+            "req_001",
+            "mgr_1",
+            "approve",
+            "t1",
+            db=None,
+            requisition=req,
+            approver_role="store_manager",
         )
         assert req["status"] == "approved"
         assert result["decision"] == "approve"
@@ -128,8 +141,13 @@ class TestApproveRequisition:
     async def test_region_level_needs_escalation(self):
         req = {"status": "pending_approval", "approval_level": "region", "approval_log": []}
         result = await approve_requisition(
-            "req_001", "mgr_1", "approve", "t1", db=None,
-            requisition=req, approver_role="store_manager",
+            "req_001",
+            "mgr_1",
+            "approve",
+            "t1",
+            db=None,
+            requisition=req,
+            approver_role="store_manager",
         )
         assert req["status"] == "store_approved"  # 未最终审批, 需区域
 
@@ -137,8 +155,13 @@ class TestApproveRequisition:
     async def test_region_manager_final_approve(self):
         req = {"status": "store_approved", "approval_level": "region", "approval_log": []}
         result = await approve_requisition(
-            "req_001", "reg_1", "approve", "t1", db=None,
-            requisition=req, approver_role="region_manager",
+            "req_001",
+            "reg_1",
+            "approve",
+            "t1",
+            db=None,
+            requisition=req,
+            approver_role="region_manager",
         )
         assert req["status"] == "approved"
 
@@ -146,8 +169,14 @@ class TestApproveRequisition:
     async def test_reject(self):
         req = {"status": "pending_approval", "approval_level": "store", "approval_log": []}
         result = await approve_requisition(
-            "req_001", "mgr_1", "reject", "t1", db=None,
-            requisition=req, approver_role="store_manager", comment="预算不足",
+            "req_001",
+            "mgr_1",
+            "reject",
+            "t1",
+            db=None,
+            requisition=req,
+            approver_role="store_manager",
+            comment="预算不足",
         )
         assert req["status"] == "rejected"
         assert req["rejection_reason"] == "预算不足"
@@ -173,8 +202,12 @@ class TestConvertToPurchase:
             "total_estimated_fen": 35000,
         }
         result = await convert_to_purchase(
-            "req_001", "t1", db=None,
-            requisition=req, supplier_id="sup_1", supplier_name="海鲜供应商",
+            "req_001",
+            "t1",
+            db=None,
+            requisition=req,
+            supplier_id="sup_1",
+            supplier_name="海鲜供应商",
         )
         assert result["po_id"].startswith("po_")
         assert result["requisition_id"] == "req_001"

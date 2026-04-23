@@ -1,4 +1,5 @@
 """服务铃 API 路由"""
+
 from datetime import date
 from typing import Optional
 

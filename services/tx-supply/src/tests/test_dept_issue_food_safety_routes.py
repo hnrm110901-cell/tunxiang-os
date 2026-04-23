@@ -22,6 +22,7 @@
 
 测试数: 30
 """
+
 from __future__ import annotations
 
 import sys
@@ -49,11 +50,10 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from fastapi import FastAPI
-from fastapi.testclient import TestClient
-
 # ── dept_issue_routes 不依赖 shared.ontology，直接导入 ────────────────────────
 from api.dept_issue_routes import router as dept_issue_router
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
 
 # ── food_safety_routes 依赖 shared.ontology.src.database.get_db ───────────────
 # 需要预先 stub 相关模块

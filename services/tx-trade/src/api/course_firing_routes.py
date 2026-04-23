@@ -1,4 +1,5 @@
 """Course Firing API 路由 — 打菜时机控制"""
+
 from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession

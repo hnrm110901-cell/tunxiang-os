@@ -10,6 +10,7 @@
 7. KDS同步 — 未发送菜品推送到后厨
 8. 扫码统计 — 订单数/金额/热门菜品
 """
+
 import os
 import sys
 
@@ -21,6 +22,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 # ─── 工具 ───
+
 
 def _uid() -> str:
     return str(uuid.uuid4())
@@ -89,6 +91,7 @@ class FakeDB:
 
 # ─── 1. 桌码生成测试 ───
 
+
 class TestGenerateTableQrcode:
     def test_qrcode_format(self):
         """桌码格式正确: TX-{简码}-{桌号}"""
@@ -138,6 +141,7 @@ class TestGenerateTableQrcode:
 
 # ─── 2. 桌码解析测试 ───
 
+
 class TestParseQrcode:
     def test_parse_valid_code(self):
         """正常解析桌码"""
@@ -173,6 +177,7 @@ class TestParseQrcode:
 
 # ─── 3. 扫码下单测试 ───
 
+
 class TestCreateScanOrder:
     @pytest.mark.asyncio
     async def test_create_new_order(self):
@@ -201,12 +206,14 @@ class TestCreateScanOrder:
             is_deleted=False,
         )
 
-        db.set_results([
-            FakeResult(scalar=fake_table),  # 桌台查询
-            FakeResult(),                    # update Table (lock)
-            FakeResult(scalar=fake_dish),    # 菜品查询
-            FakeResult(),                    # update Order (total)
-        ])
+        db.set_results(
+            [
+                FakeResult(scalar=fake_table),  # 桌台查询
+                FakeResult(),  # update Table (lock)
+                FakeResult(scalar=fake_dish),  # 菜品查询
+                FakeResult(),  # update Order (total)
+            ]
+        )
 
         items = [{"dish_id": DISH_ID_1, "quantity": 2}]
 
@@ -230,6 +237,7 @@ class TestCreateScanOrder:
 
 
 # ─── 4. 加菜追加测试 ───
+
 
 class TestAddItemsToOrder:
     @pytest.mark.asyncio
@@ -257,11 +265,13 @@ class TestAddItemsToOrder:
             is_deleted=False,
         )
 
-        db.set_results([
-            FakeResult(scalar=fake_order),  # 订单查询
-            FakeResult(scalar=fake_dish),    # 菜品查询
-            FakeResult(),                    # update Order total
-        ])
+        db.set_results(
+            [
+                FakeResult(scalar=fake_order),  # 订单查询
+                FakeResult(scalar=fake_dish),  # 菜品查询
+                FakeResult(),  # update Order total
+            ]
+        )
 
         items = [{"dish_id": DISH_ID_2, "quantity": 1}]
 
@@ -306,6 +316,7 @@ class TestAddItemsToOrder:
 
 
 # ─── 5. 请求结账测试 ───
+
 
 class TestRequestCheckout:
     @pytest.mark.asyncio
@@ -365,6 +376,7 @@ class TestRequestCheckout:
 
 
 # ─── 6. 桌码生成/解析往返测试 ───
+
 
 class TestQrcodeRoundtrip:
     def test_generate_then_parse(self):

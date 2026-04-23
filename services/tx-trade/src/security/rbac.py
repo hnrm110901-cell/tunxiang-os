@@ -28,6 +28,7 @@
 
 所有决策通过 structlog 记录 rbac_denied / rbac_mfa_required，后续接入 SIEM。
 """
+
 from __future__ import annotations
 
 import os

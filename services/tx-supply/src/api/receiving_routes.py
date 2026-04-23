@@ -2,6 +2,7 @@
 
 统一响应格式: {"ok": bool, "data": {}, "error": {}}
 """
+
 from __future__ import annotations
 
 from typing import List
@@ -113,8 +114,12 @@ async def reject_item(
     """C5: 退货"""
     try:
         result = await reject_item(
-            receiving_id, body.item_id, body.reason,
-            body.quantity, x_tenant_id, db=None,
+            receiving_id,
+            body.item_id,
+            body.reason,
+            body.quantity,
+            x_tenant_id,
+            db=None,
         )
         return {"ok": True, "data": result}
     except ValueError as e:
@@ -134,9 +139,11 @@ async def create_transfer(
     """C5: 发起门店调拨"""
     try:
         result = await create_transfer(
-            body.from_store_id, body.to_store_id,
+            body.from_store_id,
+            body.to_store_id,
             [i.model_dump() for i in body.items],
-            x_tenant_id, db=None,
+            x_tenant_id,
+            db=None,
         )
         return {"ok": True, "data": result}
     except ValueError as e:
@@ -157,8 +164,11 @@ async def confirm_transfer(
     """C5: 确认调拨（发方/收方）"""
     try:
         result = await confirm_transfer(
-            transfer_id, body.confirmed_by, x_tenant_id,
-            db=None, role=body.role,
+            transfer_id,
+            body.confirmed_by,
+            x_tenant_id,
+            db=None,
+            role=body.role,
         )
         return {"ok": True, "data": result}
     except ValueError as e:

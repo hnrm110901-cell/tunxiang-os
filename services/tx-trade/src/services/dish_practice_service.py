@@ -6,6 +6,7 @@
 数据模型：内存存储（后续可迁移 DB）。
 所有金额单位：分（fen）。
 """
+
 import uuid
 
 import structlog

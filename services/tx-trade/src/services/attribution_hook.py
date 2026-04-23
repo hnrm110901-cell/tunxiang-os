@@ -12,6 +12,7 @@
 
 不阻断主业务流程：所有调用均 fire-and-forget（create_task），异常只记日志。
 """
+
 import asyncio
 import os
 import uuid
@@ -23,9 +24,7 @@ import structlog
 log = structlog.get_logger(__name__)
 
 # tx-growth 服务地址（通过环境变量注入，Mac mini 本地时使用 localhost:8003）
-_GROWTH_SERVICE_URL = os.getenv(
-    "TX_GROWTH_SERVICE_URL", "http://localhost:8003"
-)
+_GROWTH_SERVICE_URL = os.getenv("TX_GROWTH_SERVICE_URL", "http://localhost:8003")
 _ATTRIBUTION_ENDPOINT = f"{_GROWTH_SERVICE_URL}/api/v1/growth/attribution/attribute-conversion"
 
 # Redis Stream（降级用）
@@ -58,6 +57,7 @@ async def _post_attribution(
 
     try:
         import httpx  # type: ignore
+
         async with httpx.AsyncClient(timeout=5.0) as client:
             resp = await client.post(_ATTRIBUTION_ENDPOINT, json=payload, headers=headers)
             if resp.status_code == 200:
@@ -103,6 +103,7 @@ async def _fallback_redis_stream(
         import json
 
         import redis.asyncio as aioredis  # type: ignore
+
         redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
         r = aioredis.from_url(redis_url, decode_responses=True, socket_connect_timeout=1)
         await r.xadd(

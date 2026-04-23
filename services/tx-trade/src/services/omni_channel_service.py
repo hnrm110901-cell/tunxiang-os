@@ -3,6 +3,7 @@
 支持美团/饿了么/抖音三平台订单统一接收、标准化、接单/拒单、KDS分发。
 每个方法显式传入 tenant_id，不依赖会话变量，确保多租户隔离。
 """
+
 from __future__ import annotations
 
 import uuid
@@ -38,6 +39,7 @@ class UnsupportedPlatformError(OmniChannelError):
 @dataclass
 class UnifiedOrderItem:
     """统一订单项"""
+
     name: str
     quantity: int
     price_fen: int
@@ -49,19 +51,20 @@ class UnifiedOrderItem:
 @dataclass
 class UnifiedOrder:
     """统一订单格式——所有平台标准化后的内部表示"""
-    platform: str                     # meituan / eleme / douyin
-    platform_order_id: str            # 平台原始订单ID
-    source_channel: str               # 同 platform，写入 orders.sales_channel_id
+
+    platform: str  # meituan / eleme / douyin
+    platform_order_id: str  # 平台原始订单ID
+    source_channel: str  # 同 platform，写入 orders.sales_channel_id
     tenant_id: str
     store_id: str
-    status: str                       # pending / confirmed / rejected / cancelled
+    status: str  # pending / confirmed / rejected / cancelled
     total_fen: int
     items: List[UnifiedOrderItem]
     notes: str = ""
     customer_phone: str = ""
     delivery_address: str = ""
     created_at: Optional[datetime] = None
-    internal_order_id: Optional[str] = None   # 写库后赋值
+    internal_order_id: Optional[str] = None  # 写库后赋值
 
 
 # ─── 平台标准化函数 ────────────────────────────────────────────────────────────
@@ -79,13 +82,15 @@ def _normalize_meituan(raw: dict[str, Any], store_id: str, tenant_id: str) -> Un
 
     items = []
     for food in food_list:
-        items.append(UnifiedOrderItem(
-            name=str(food.get("food_name", "")),
-            quantity=int(food.get("quantity", 1)),
-            price_fen=int(food.get("price", 0)),
-            sku_id=str(food.get("app_food_code", "")),
-            notes=str(food.get("food_property", "")),
-        ))
+        items.append(
+            UnifiedOrderItem(
+                name=str(food.get("food_name", "")),
+                quantity=int(food.get("quantity", 1)),
+                price_fen=int(food.get("price", 0)),
+                sku_id=str(food.get("app_food_code", "")),
+                notes=str(food.get("food_property", "")),
+            )
+        )
 
     return UnifiedOrder(
         platform="meituan",
@@ -108,13 +113,15 @@ def _normalize_eleme(raw: dict[str, Any], store_id: str, tenant_id: str) -> Unif
     food_list = raw.get("food_list", raw.get("items", []))
     items = []
     for food in food_list:
-        items.append(UnifiedOrderItem(
-            name=str(food.get("food_name", food.get("name", ""))),
-            quantity=int(food.get("quantity", food.get("count", 1))),
-            price_fen=int(food.get("price", 0)),
-            sku_id=str(food.get("food_id", food.get("sku_id", ""))),
-            notes=str(food.get("remark", "")),
-        ))
+        items.append(
+            UnifiedOrderItem(
+                name=str(food.get("food_name", food.get("name", ""))),
+                quantity=int(food.get("quantity", food.get("count", 1))),
+                price_fen=int(food.get("price", 0)),
+                sku_id=str(food.get("food_id", food.get("sku_id", ""))),
+                notes=str(food.get("remark", "")),
+            )
+        )
 
     create_time_raw = raw.get("create_time", "")
     try:
@@ -146,13 +153,15 @@ def _normalize_douyin(raw: dict[str, Any], store_id: str, tenant_id: str) -> Uni
     item_list = raw.get("items", raw.get("food_list", []))
     items = []
     for item in item_list:
-        items.append(UnifiedOrderItem(
-            name=str(item.get("item_name", item.get("food_name", ""))),
-            quantity=int(item.get("quantity", 1)),
-            price_fen=int(item.get("price", 0)),
-            sku_id=str(item.get("item_id", item.get("sku_id", ""))),
-            notes=str(item.get("remark", "")),
-        ))
+        items.append(
+            UnifiedOrderItem(
+                name=str(item.get("item_name", item.get("food_name", ""))),
+                quantity=int(item.get("quantity", 1)),
+                price_fen=int(item.get("price", 0)),
+                sku_id=str(item.get("item_id", item.get("sku_id", ""))),
+                notes=str(item.get("remark", "")),
+            )
+        )
 
     return UnifiedOrder(
         platform="douyin",
@@ -517,9 +526,7 @@ class OmniChannelService:
 
         orders = []
         for row in rows:
-            plat = row_omni_platform_key(row, self.PLATFORMS) or str(
-                getattr(row, "sales_channel_id", "") or ""
-            )
+            plat = row_omni_platform_key(row, self.PLATFORMS) or str(getattr(row, "sales_channel_id", "") or "")
             ext_id = row_omni_platform_order_id(row) or str(row.order_no or "")
             unified_items = _items_from_omni_meta(row)
             om = _omni_meta(row)
@@ -572,18 +579,15 @@ class OmniChannelService:
         sid = uuid.UUID(store_id)
         cutoff_time = datetime.now(timezone.utc) - timedelta(minutes=self.auto_reject_minutes)
 
-        stmt = (
-            select(OrderModel)
-            .where(
-                and_(
-                    OrderModel.tenant_id == tid,
-                    OrderModel.store_id == sid,
-                    OrderModel.status == "pending",
-                    OrderModel.order_type.in_(["delivery", "takeaway"]),
-                    omni_order_match_clause(OrderModel, self.PLATFORMS),
-                    OrderModel.created_at <= cutoff_time,
-                    OrderModel.is_deleted == False,  # noqa: E712
-                )
+        stmt = select(OrderModel).where(
+            and_(
+                OrderModel.tenant_id == tid,
+                OrderModel.store_id == sid,
+                OrderModel.status == "pending",
+                OrderModel.order_type.in_(["delivery", "takeaway"]),
+                omni_order_match_clause(OrderModel, self.PLATFORMS),
+                OrderModel.created_at <= cutoff_time,
+                OrderModel.is_deleted == False,  # noqa: E712
             )
         )
         result = await db.execute(stmt)
@@ -733,24 +737,30 @@ class OmniChannelService:
         if platform == "meituan":
             from shared.adapters.meituan_saas.src.adapter import MeituanSaasAdapter
 
-            return MeituanSaasAdapter(config={
-                "app_key": os.environ.get("MEITUAN_APP_KEY", ""),
-                "app_secret": os.environ.get("MEITUAN_APP_SECRET", ""),
-                "poi_id": os.environ.get("MEITUAN_POI_ID", ""),
-            })
+            return MeituanSaasAdapter(
+                config={
+                    "app_key": os.environ.get("MEITUAN_APP_KEY", ""),
+                    "app_secret": os.environ.get("MEITUAN_APP_SECRET", ""),
+                    "poi_id": os.environ.get("MEITUAN_POI_ID", ""),
+                }
+            )
         elif platform == "eleme":
             from shared.adapters.eleme.src.adapter import ElemeAdapter
 
-            return ElemeAdapter(config={
-                "app_key": os.environ.get("ELEME_APP_KEY", ""),
-                "app_secret": os.environ.get("ELEME_APP_SECRET", ""),
-            })
+            return ElemeAdapter(
+                config={
+                    "app_key": os.environ.get("ELEME_APP_KEY", ""),
+                    "app_secret": os.environ.get("ELEME_APP_SECRET", ""),
+                }
+            )
         elif platform == "douyin":
             from shared.adapters.douyin.src.adapter import DouyinAdapter
 
-            return DouyinAdapter(config={
-                "app_id": os.environ.get("DOUYIN_APP_ID", ""),
-                "app_secret": os.environ.get("DOUYIN_APP_SECRET", ""),
-            })
+            return DouyinAdapter(
+                config={
+                    "app_id": os.environ.get("DOUYIN_APP_ID", ""),
+                    "app_secret": os.environ.get("DOUYIN_APP_SECRET", ""),
+                }
+            )
         else:
             raise UnsupportedPlatformError(f"不支持的平台: {platform}")

@@ -3,6 +3,7 @@
 统一响应格式: {"ok": bool, "data": {}, "error": {}}
 所有接口需要 X-Tenant-ID header。
 """
+
 from __future__ import annotations
 
 import os
@@ -30,6 +31,7 @@ router = APIRouter(prefix="/api/v1/kingdee", tags=["kingdee"])
 #  请求模型
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 class MonthExportRequest(BaseModel):
     store_id: str
     month: str = Field(pattern=r"^\d{4}-\d{2}$", description="YYYY-MM")
@@ -49,10 +51,10 @@ class RetryRequest(BaseModel):
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 
-
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 #  1. 采购入库汇总导出
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 @router.post("/export/purchase-receipt")
 async def api_export_purchase_receipt(
@@ -64,7 +66,10 @@ async def api_export_purchase_receipt(
 
     try:
         result = await export_purchase_receipt(
-            req.store_id, req.month, x_tenant_id, _get_db,
+            req.store_id,
+            req.month,
+            x_tenant_id,
+            _get_db,
         )
         return {"ok": True, "data": result}
     except ValueError as e:
@@ -74,6 +79,7 @@ async def api_export_purchase_receipt(
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 #  2. 成本结转导出
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 @router.post("/export/cost-transfer")
 async def api_export_cost_transfer(
@@ -85,7 +91,10 @@ async def api_export_cost_transfer(
 
     try:
         result = await export_cost_transfer(
-            req.store_id, req.month, x_tenant_id, _get_db,
+            req.store_id,
+            req.month,
+            x_tenant_id,
+            _get_db,
         )
         return {"ok": True, "data": result}
     except ValueError as e:
@@ -95,6 +104,7 @@ async def api_export_cost_transfer(
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 #  3. 调拨出入库导出
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 @router.post("/export/transfer")
 async def api_export_transfer(
@@ -106,7 +116,10 @@ async def api_export_transfer(
 
     try:
         result = await export_transfer_in_out(
-            req.store_id, req.month, x_tenant_id, _get_db,
+            req.store_id,
+            req.month,
+            x_tenant_id,
+            _get_db,
         )
         return {"ok": True, "data": result}
     except ValueError as e:
@@ -116,6 +129,7 @@ async def api_export_transfer(
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 #  4. 工资计提导出
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 @router.post("/export/salary-accrual")
 async def api_export_salary_accrual(
@@ -127,7 +141,10 @@ async def api_export_salary_accrual(
 
     try:
         result = await export_salary_accrual(
-            req.store_id, req.month, x_tenant_id, _get_db,
+            req.store_id,
+            req.month,
+            x_tenant_id,
+            _get_db,
         )
         return {"ok": True, "data": result}
     except ValueError as e:
@@ -137,6 +154,7 @@ async def api_export_salary_accrual(
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 #  5. 收营日报导出
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 @router.post("/export/daily-revenue")
 async def api_export_daily_revenue(
@@ -148,7 +166,10 @@ async def api_export_daily_revenue(
 
     try:
         result = await export_daily_revenue(
-            req.store_id, req.date, x_tenant_id, _get_db,
+            req.store_id,
+            req.date,
+            x_tenant_id,
+            _get_db,
         )
         return {"ok": True, "data": result}
     except ValueError as e:
@@ -158,6 +179,7 @@ async def api_export_daily_revenue(
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 #  6. 销售出库导出
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 @router.post("/export/sales-delivery")
 async def api_export_sales_delivery(
@@ -169,7 +191,10 @@ async def api_export_sales_delivery(
 
     try:
         result = await export_sales_delivery(
-            req.store_id, req.month, x_tenant_id, _get_db,
+            req.store_id,
+            req.month,
+            x_tenant_id,
+            _get_db,
         )
         return {"ok": True, "data": result}
     except ValueError as e:
@@ -179,6 +204,7 @@ async def api_export_sales_delivery(
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 #  7. 导出历史
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 @router.get("/export/history")
 async def api_export_history(
@@ -192,7 +218,8 @@ async def api_export_history(
     from services.kingdee_bridge import get_export_history
 
     result = await get_export_history(
-        x_tenant_id, _get_db,
+        x_tenant_id,
+        _get_db,
         store_id=store_id,
         export_type=export_type,
         page=page,
@@ -205,6 +232,7 @@ async def api_export_history(
 #  8. 重试失败导出
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 @router.post("/export/retry")
 async def api_retry_export(
     req: RetryRequest,
@@ -215,7 +243,9 @@ async def api_retry_export(
 
     try:
         result = await retry_failed_export(
-            req.export_id, x_tenant_id, _get_db,
+            req.export_id,
+            x_tenant_id,
+            _get_db,
         )
         return {"ok": True, "data": result}
     except ValueError as e:
@@ -225,6 +255,7 @@ async def api_retry_export(
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 #  供应链对接辅助
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 def _kingdee_configured() -> bool:
     return bool(_KINGDEE_API_URL and _KINGDEE_APP_ID)
@@ -250,6 +281,7 @@ async def _post_kingdee(path: str, payload: Any) -> dict:
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 #  9. 同步库存到金蝶
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 class SyncInventoryRequest(BaseModel):
     store_id: str
@@ -318,11 +350,12 @@ async def api_sync_inventory(
 #  10. 同步采购单到金蝶
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 class SyncPurchaseRequest(BaseModel):
     store_id: str
     purchase_order_id: Optional[str] = None  # None = 同步所有未同步采购单
-    date_from: Optional[str] = None          # YYYY-MM-DD
-    date_to: Optional[str] = None            # YYYY-MM-DD
+    date_from: Optional[str] = None  # YYYY-MM-DD
+    date_to: Optional[str] = None  # YYYY-MM-DD
 
 
 @router.post("/supply/sync-purchase")
@@ -399,13 +432,17 @@ async def api_sync_purchase(
 #  11. 查询金蝶连接状态
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 @router.get("/supply/status")
 async def api_kingdee_status(
     x_tenant_id: str = Header(...),
 ) -> dict:
     """查询金蝶ERP连接状态"""
     if not _kingdee_configured():
-        return {"ok": True, "data": {"connected": False, "reason": "金蝶未配置 (KINGDEE_API_URL / KINGDEE_APP_ID 未设置)"}}
+        return {
+            "ok": True,
+            "data": {"connected": False, "reason": "金蝶未配置 (KINGDEE_API_URL / KINGDEE_APP_ID 未设置)"},
+        }
 
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
@@ -415,7 +452,10 @@ async def api_kingdee_status(
             )
             connected = resp.status_code < 400
             log.info("kingdee_status_check", connected=connected, status=resp.status_code)
-            return {"ok": True, "data": {"connected": connected, "http_status": resp.status_code, "url": _KINGDEE_API_URL}}
+            return {
+                "ok": True,
+                "data": {"connected": connected, "http_status": resp.status_code, "url": _KINGDEE_API_URL},
+            }
     except httpx.RequestError as e:
         log.warning("kingdee_status_unreachable", error=str(e))
         return {"ok": True, "data": {"connected": False, "reason": f"无法连接: {e}", "url": _KINGDEE_API_URL}}
@@ -424,6 +464,7 @@ async def api_kingdee_status(
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 #  12. 从金蝶拉取科目数据
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 class PullAccountsRequest(BaseModel):
     store_id: str

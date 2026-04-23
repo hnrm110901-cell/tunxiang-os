@@ -4,6 +4,7 @@
 所有重量单位：克（g）。金额单位：分（fen）。
 活鲜状态流转：alive → weak → dead（不可逆）。
 """
+
 import uuid
 from datetime import date, datetime, timezone
 from typing import Optional
@@ -128,9 +129,7 @@ async def track_live_status(
     previous_status = records[-1]["status"] if records else None
     if previous_status is not None:
         if _STATUS_ORDER[status] < _STATUS_ORDER[previous_status]:
-            raise ValueError(
-                f"活鲜状态不可逆转: 当前 {previous_status} → 目标 {status}"
-            )
+            raise ValueError(f"活鲜状态不可逆转: 当前 {previous_status} → 目标 {status}")
 
     record_id = uuid.uuid4().hex[:12].upper()
     record = {
@@ -190,7 +189,10 @@ async def track_live_status(
 
 
 async def _get_ingredient_safe(
-    db: AsyncSession, ingredient_id: str, store_id: str, tenant_id: str,
+    db: AsyncSession,
+    ingredient_id: str,
+    store_id: str,
+    tenant_id: str,
 ) -> Optional[Ingredient]:
     """获取原料记录，不存在返回 None"""
     result = await db.execute(
@@ -262,13 +264,15 @@ async def calculate_live_loss(
                 unit_fen = (ingredient.unit_price_fen or 0) if ingredient else 0
                 loss_fen = round(unit_fen * weight / 1000.0)
                 total_loss_value_fen += loss_fen
-                details.append({
-                    "ingredient_id": rec_ingredient,
-                    "type": "dead",
-                    "weight_g": weight,
-                    "loss_value_fen": loss_fen,
-                    "recorded_at": rec["recorded_at"],
-                })
+                details.append(
+                    {
+                        "ingredient_id": rec_ingredient,
+                        "type": "dead",
+                        "weight_g": weight,
+                        "loss_value_fen": loss_fen,
+                        "recorded_at": rec["recorded_at"],
+                    }
+                )
             elif rec["status"] == LIVE_STATUS_WEAK:
                 # 品质降级损耗 = 原价的30%
                 weak_loss_g += weight
@@ -276,27 +280,26 @@ async def calculate_live_loss(
                 unit_fen = (ingredient.unit_price_fen or 0) if ingredient else 0
                 discount_loss = round(unit_fen * weight / 1000.0 * 0.3)
                 total_loss_value_fen += discount_loss
-                details.append({
-                    "ingredient_id": rec_ingredient,
-                    "type": "weak_downgrade",
-                    "weight_g": weight,
-                    "loss_value_fen": discount_loss,
-                    "recorded_at": rec["recorded_at"],
-                })
+                details.append(
+                    {
+                        "ingredient_id": rec_ingredient,
+                        "type": "weak_downgrade",
+                        "weight_g": weight,
+                        "loss_value_fen": discount_loss,
+                        "recorded_at": rec["recorded_at"],
+                    }
+                )
 
     # 称重差：查 DB 中 waste 事务的称重差记录
     tid = _uuid(tenant_id)
     sid = _uuid(store_id)
-    waste_q = (
-        select(func.coalesce(func.sum(IngredientTransaction.quantity), 0))
-        .where(
-            IngredientTransaction.tenant_id == tid,
-            IngredientTransaction.store_id == sid,
-            IngredientTransaction.transaction_type == TransactionType.waste.value,
-            IngredientTransaction.is_deleted == False,  # noqa: E712
-            IngredientTransaction.created_at >= start_dt,
-            IngredientTransaction.created_at <= end_dt,
-        )
+    waste_q = select(func.coalesce(func.sum(IngredientTransaction.quantity), 0)).where(
+        IngredientTransaction.tenant_id == tid,
+        IngredientTransaction.store_id == sid,
+        IngredientTransaction.transaction_type == TransactionType.waste.value,
+        IngredientTransaction.is_deleted == False,  # noqa: E712
+        IngredientTransaction.created_at >= start_dt,
+        IngredientTransaction.created_at <= end_dt,
     )
     waste_result = await db.execute(waste_q)
     waste_kg = float(waste_result.scalar() or 0)
@@ -364,17 +367,19 @@ async def get_tank_inventory(
         total_weak_g += weak_g
         total_value_fen += tank_value
 
-        tanks.append({
-            "tank_id": tank_id,
-            "species": tank_info.get("species", ""),
-            "alive_count": tank_info.get("alive_count", 0),
-            "alive_weight_g": alive_g,
-            "weak_count": tank_info.get("weak_count", 0),
-            "weak_weight_g": weak_g,
-            "total_value_fen": tank_value,
-            "temperature": tank_info.get("temperature"),
-            "updated_at": tank_info.get("updated_at"),
-        })
+        tanks.append(
+            {
+                "tank_id": tank_id,
+                "species": tank_info.get("species", ""),
+                "alive_count": tank_info.get("alive_count", 0),
+                "alive_weight_g": alive_g,
+                "weak_count": tank_info.get("weak_count", 0),
+                "weak_weight_g": weak_g,
+                "total_value_fen": tank_value,
+                "temperature": tank_info.get("temperature"),
+                "updated_at": tank_info.get("updated_at"),
+            }
+        )
 
     log.info("tank_inventory.fetched", tank_count=len(tanks))
 
@@ -494,9 +499,7 @@ async def price_by_weight(
     }
 
 
-def set_market_price(
-    ingredient_id: str, store_id: str, tenant_id: str, price_fen_per_g: int
-) -> None:
+def set_market_price(ingredient_id: str, store_id: str, tenant_id: str, price_fen_per_g: int) -> None:
     """设置活鲜时价（分/克）。"""
     if price_fen_per_g <= 0:
         raise ValueError("时价必须大于0")
@@ -531,14 +534,11 @@ async def get_seafood_dashboard(
     # 活鲜原料库存（DB查询）
     tid = _uuid(tenant_id)
     sid = _uuid(store_id)
-    inv_q = (
-        select(Ingredient)
-        .where(
-            Ingredient.tenant_id == tid,
-            Ingredient.store_id == sid,
-            Ingredient.category == "seafood",
-            Ingredient.is_deleted == False,  # noqa: E712
-        )
+    inv_q = select(Ingredient).where(
+        Ingredient.tenant_id == tid,
+        Ingredient.store_id == sid,
+        Ingredient.category == "seafood",
+        Ingredient.is_deleted == False,  # noqa: E712
     )
     result = await db.execute(inv_q)
     seafood_items = result.scalars().all()
@@ -555,34 +555,40 @@ async def get_seafood_dashboard(
         records = _live_status_records.get(status_key, [])
         current_live_status = records[-1]["status"] if records else LIVE_STATUS_ALIVE
 
-        inventory_items.append({
-            "id": str(item.id),
-            "name": item.ingredient_name,
-            "quantity_kg": item.current_quantity,
-            "unit_price_fen": item.unit_price_fen,
-            "value_fen": value,
-            "status": item.status,
-            "live_status": current_live_status,
-        })
+        inventory_items.append(
+            {
+                "id": str(item.id),
+                "name": item.ingredient_name,
+                "quantity_kg": item.current_quantity,
+                "unit_price_fen": item.unit_price_fen,
+                "value_fen": value,
+                "status": item.status,
+                "live_status": current_live_status,
+            }
+        )
 
         # 库存预警
         if item.status in (InventoryStatus.low.value, InventoryStatus.critical.value):
-            alerts.append({
-                "type": "low_stock",
-                "ingredient": item.ingredient_name,
-                "current_qty": item.current_quantity,
-                "min_qty": item.min_quantity,
-                "severity": "critical" if item.status == InventoryStatus.critical.value else "warning",
-            })
+            alerts.append(
+                {
+                    "type": "low_stock",
+                    "ingredient": item.ingredient_name,
+                    "current_qty": item.current_quantity,
+                    "min_qty": item.min_quantity,
+                    "severity": "critical" if item.status == InventoryStatus.critical.value else "warning",
+                }
+            )
 
         # 活鲜状态预警
         if current_live_status == LIVE_STATUS_WEAK:
-            alerts.append({
-                "type": "weak_seafood",
-                "ingredient": item.ingredient_name,
-                "severity": "warning",
-                "suggestion": "建议尽快售出或降价促销",
-            })
+            alerts.append(
+                {
+                    "type": "weak_seafood",
+                    "ingredient": item.ingredient_name,
+                    "severity": "warning",
+                    "suggestion": "建议尽快售出或降价促销",
+                }
+            )
 
     log.info("seafood_dashboard.built", item_count=len(inventory_items), alert_count=len(alerts))
 
@@ -731,26 +737,24 @@ async def transfer_between_locations(
         for src_item in from_items:
             if src_item["ingredient_id"] == ing_id:
                 if src_item["quantity_g"] < qty_g:
-                    raise ValueError(
-                        f"库存不足: {ing_id} 需要 {qty_g}g, 当前 {src_item['quantity_g']}g"
-                    )
+                    raise ValueError(f"库存不足: {ing_id} 需要 {qty_g}g, 当前 {src_item['quantity_g']}g")
                 src_item["quantity_g"] -= qty_g
-                src_item["value_fen"] = round(
-                    src_item["unit_price_fen"] * src_item["quantity_g"] / 1000.0
-                )
+                src_item["value_fen"] = round(src_item["unit_price_fen"] * src_item["quantity_g"] / 1000.0)
                 source_found = True
 
                 # 添加到目标
-                to_items.append({
-                    "ingredient_id": ing_id,
-                    "ingredient_name": src_item.get("ingredient_name", ""),
-                    "quantity_g": qty_g,
-                    "unit_price_fen": src_item.get("unit_price_fen", 0),
-                    "value_fen": round(src_item.get("unit_price_fen", 0) * qty_g / 1000.0),
-                    "warehouse_type": to_type,
-                    "transfer_id": transfer_id,
-                    "updated_at": _now().isoformat(),
-                })
+                to_items.append(
+                    {
+                        "ingredient_id": ing_id,
+                        "ingredient_name": src_item.get("ingredient_name", ""),
+                        "quantity_g": qty_g,
+                        "unit_price_fen": src_item.get("unit_price_fen", 0),
+                        "value_fen": round(src_item.get("unit_price_fen", 0) * qty_g / 1000.0),
+                        "warehouse_type": to_type,
+                        "transfer_id": transfer_id,
+                        "updated_at": _now().isoformat(),
+                    }
+                )
                 break
 
         if not source_found:

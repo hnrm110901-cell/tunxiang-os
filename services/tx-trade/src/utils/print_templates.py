@@ -15,11 +15,13 @@
   [CUT]                   切纸
   [FEED:N]                走纸N行
 """
+
 from __future__ import annotations
 
 from typing import Optional
 
 # ─── 基础标记构建函数 ──────────────────────────────────────────────────────────
+
 
 def center(text: str) -> str:
     """居中对齐标记。"""
@@ -73,6 +75,7 @@ def feed(lines: int = 1) -> str:
 
 # ─── 辅助工具 ─────────────────────────────────────────────────────────────────
 
+
 def _gbk_len(text: str) -> int:
     """计算文本的 GBK 字节宽度（中文算2字符，ASCII算1字符）。"""
     return len(text.encode("gbk", errors="replace"))
@@ -106,6 +109,7 @@ def _fmt_fen_per_jin(fen_per_jin: int) -> str:
 
 
 # ─── 活鲜称重单模板 ───────────────────────────────────────────────────────────
+
 
 def render_live_seafood_receipt(data: dict) -> str:
     """生成活鲜称重单语义标记文本。
@@ -192,6 +196,7 @@ def render_live_seafood_receipt(data: dict) -> str:
 
 
 # ─── 宴席通知单模板 ───────────────────────────────────────────────────────────
+
 
 def render_banquet_notice(data: dict) -> str:
     """生成宴席通知单语义标记文本（发给后厨各档口的出品计划）。
@@ -311,6 +316,7 @@ def render_banquet_notice(data: dict) -> str:
 
 
 # ─── Mock 数据（调试用）────────────────────────────────────────────────────────
+
 
 def _mock_live_seafood_receipt() -> dict:
     """活鲜称重单 Mock 数据。"""

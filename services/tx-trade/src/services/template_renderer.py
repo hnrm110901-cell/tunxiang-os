@@ -22,6 +22,7 @@
   logo_image      — Logo位图（base64图片，需Pillow）
   underlined_text — 下划线文字
 """
+
 import re
 from typing import Any
 
@@ -112,11 +113,11 @@ def _build_qrcode(data: str, size: int = 6) -> bytes:
     size = max(1, min(16, size))
 
     buf = bytearray()
-    buf += b'\x1d\x28\x6b\x04\x00\x31\x41\x32\x00'           # Model 2
-    buf += b'\x1d\x28\x6b\x03\x00\x31\x43' + bytes([size])    # 大小
-    buf += b'\x1d\x28\x6b\x03\x00\x31\x45\x31'               # 纠错等级 M
-    buf += b'\x1d\x28\x6b' + bytes([pL, pH]) + b'\x31\x50\x30' + encoded  # 存数据
-    buf += b'\x1d\x28\x6b\x03\x00\x31\x51\x30'               # 打印
+    buf += b"\x1d\x28\x6b\x04\x00\x31\x41\x32\x00"  # Model 2
+    buf += b"\x1d\x28\x6b\x03\x00\x31\x43" + bytes([size])  # 大小
+    buf += b"\x1d\x28\x6b\x03\x00\x31\x45\x31"  # 纠错等级 M
+    buf += b"\x1d\x28\x6b" + bytes([pL, pH]) + b"\x31\x50\x30" + encoded  # 存数据
+    buf += b"\x1d\x28\x6b\x03\x00\x31\x51\x30"  # 打印
     buf += LF
     return bytes(buf)
 
@@ -130,15 +131,15 @@ def _build_barcode(data: str, barcode_type: str = "CODE128") -> bytes:
 
     buf = bytearray()
     buf += ESC_ALIGN_CENTER
-    buf += b'\x1d\x68\x50'   # 高度 80点
-    buf += b'\x1d\x77\x02'   # 宽度 2
-    buf += b'\x1d\x48\x02'   # HRI 在条码下方
+    buf += b"\x1d\x68\x50"  # 高度 80点
+    buf += b"\x1d\x77\x02"  # 宽度 2
+    buf += b"\x1d\x48\x02"  # HRI 在条码下方
 
     encoded = data.encode("ascii", errors="replace")
     if code == 73:
-        buf += b'\x1d\x6b' + bytes([code, len(encoded)]) + encoded
+        buf += b"\x1d\x6b" + bytes([code, len(encoded)]) + encoded
     else:
-        buf += b'\x1d\x6b' + bytes([code]) + encoded + b'\x00'
+        buf += b"\x1d\x6b" + bytes([code]) + encoded + b"\x00"
 
     buf += ESC_ALIGN_LEFT + LF
     return bytes(buf)
@@ -146,6 +147,7 @@ def _build_barcode(data: str, barcode_type: str = "CODE128") -> bytes:
 
 def _apply_template_vars(text: str, context: dict[str, Any]) -> str:
     """将 {{key}} 占位符替换为 context 中的值。"""
+
     def replacer(m: re.Match) -> str:
         key = m.group(1).strip()
         return str(context.get(key, m.group(0)))
@@ -213,7 +215,7 @@ class TemplateRenderer:
                 )
 
         # 走纸 + 半切
-        buf += ESC_FEED + b'\x03' + GS_CUT_PARTIAL
+        buf += ESC_FEED + b"\x03" + GS_CUT_PARTIAL
         return bytes(buf)
 
     def _render_element(
@@ -251,9 +253,7 @@ class TemplateRenderer:
 
     # ─── element 渲染方法 ───
 
-    def _render_store_name(
-        self, elem: dict, ctx: dict, line_width: int
-    ) -> bytes:
+    def _render_store_name(self, elem: dict, ctx: dict, line_width: int) -> bytes:
         """店名。"""
         name = ctx.get("store_name", "")
         align = _ALIGN_BYTES.get(elem.get("align", "center"), ESC_ALIGN_CENTER)
@@ -268,9 +268,7 @@ class TemplateRenderer:
         buf += GS_SIZE_NORMAL + ESC_BOLD_OFF + ESC_ALIGN_LEFT
         return bytes(buf)
 
-    def _render_store_address(
-        self, elem: dict, ctx: dict, line_width: int
-    ) -> bytes:
+    def _render_store_address(self, elem: dict, ctx: dict, line_width: int) -> bytes:
         """门店地址。"""
         address = ctx.get("store_address", "")
         if not address:
@@ -288,9 +286,7 @@ class TemplateRenderer:
         buf += ESC_ALIGN_LEFT
         return bytes(buf)
 
-    def _render_separator(
-        self, elem: dict, ctx: dict, line_width: int
-    ) -> bytes:
+    def _render_separator(self, elem: dict, ctx: dict, line_width: int) -> bytes:
         """分隔线。"""
         char = elem.get("char", "-")
         # 确保只用 ASCII 字符
@@ -298,9 +294,7 @@ class TemplateRenderer:
             char = "-"
         return _sep(char, line_width)
 
-    def _render_order_info(
-        self, elem: dict, ctx: dict, line_width: int
-    ) -> bytes:
+    def _render_order_info(self, elem: dict, ctx: dict, line_width: int) -> bytes:
         """订单信息行组。"""
         fields: list[str] = elem.get("fields", ["table_no", "order_no", "cashier", "datetime"])
         ctx_keys = {
@@ -320,9 +314,7 @@ class TemplateRenderer:
                 buf += line.encode("gbk", errors="replace") + LF
         return bytes(buf)
 
-    def _render_order_items(
-        self, elem: dict, ctx: dict, line_width: int
-    ) -> bytes:
+    def _render_order_items(self, elem: dict, ctx: dict, line_width: int) -> bytes:
         """菜品明细表。"""
         show_price = elem.get("show_price", True)
         show_qty = elem.get("show_qty", True)
@@ -334,13 +326,9 @@ class TemplateRenderer:
 
         # 表头
         if show_qty and show_subtotal:
-            buf += _pad_three_columns("品名", "数量", "金额", line_width).encode(
-                "gbk", errors="replace"
-            ) + LF
+            buf += _pad_three_columns("品名", "数量", "金额", line_width).encode("gbk", errors="replace") + LF
         elif show_qty:
-            buf += _pad_two_columns("品名", "数量", line_width).encode(
-                "gbk", errors="replace"
-            ) + LF
+            buf += _pad_two_columns("品名", "数量", line_width).encode("gbk", errors="replace") + LF
         else:
             buf += "品名".encode("gbk", errors="replace") + LF
 
@@ -360,13 +348,9 @@ class TemplateRenderer:
 
             if show_qty and show_subtotal:
                 amount_str = _yuan_str(subtotal)
-                buf += _pad_three_columns(name, str(qty), amount_str, line_width).encode(
-                    "gbk", errors="replace"
-                ) + LF
+                buf += _pad_three_columns(name, str(qty), amount_str, line_width).encode("gbk", errors="replace") + LF
             elif show_qty:
-                buf += _pad_two_columns(name, str(qty), line_width).encode(
-                    "gbk", errors="replace"
-                ) + LF
+                buf += _pad_two_columns(name, str(qty), line_width).encode("gbk", errors="replace") + LF
             else:
                 buf += name.encode("gbk", errors="replace") + LF
 
@@ -383,9 +367,7 @@ class TemplateRenderer:
 
         return bytes(buf)
 
-    def _render_total_summary(
-        self, elem: dict, ctx: dict, line_width: int
-    ) -> bytes:
+    def _render_total_summary(self, elem: dict, ctx: dict, line_width: int) -> bytes:
         """合计区。"""
         show_discount = elem.get("show_discount", True)
         show_service_fee = elem.get("show_service_fee", True)
@@ -398,31 +380,21 @@ class TemplateRenderer:
         buf = bytearray()
         buf += ESC_ALIGN_LEFT
 
-        buf += _pad_two_columns("小计:", _yuan_str(subtotal), line_width).encode(
-            "gbk", errors="replace"
-        ) + LF
+        buf += _pad_two_columns("小计:", _yuan_str(subtotal), line_width).encode("gbk", errors="replace") + LF
 
         if show_discount and discount > 0:
-            buf += _pad_two_columns(
-                "优惠:", f"-{_yuan_str(discount)}", line_width
-            ).encode("gbk", errors="replace") + LF
+            buf += _pad_two_columns("优惠:", f"-{_yuan_str(discount)}", line_width).encode("gbk", errors="replace") + LF
 
         if show_service_fee and service_fee > 0:
-            buf += _pad_two_columns("服务费:", _yuan_str(service_fee), line_width).encode(
-                "gbk", errors="replace"
-            ) + LF
+            buf += _pad_two_columns("服务费:", _yuan_str(service_fee), line_width).encode("gbk", errors="replace") + LF
 
         # 实付（大字加粗）
         buf += GS_SIZE_DOUBLE_BOTH + ESC_BOLD_ON
-        buf += _pad_two_columns("实付:", _yuan_str(total), line_width).encode(
-            "gbk", errors="replace"
-        ) + LF
+        buf += _pad_two_columns("实付:", _yuan_str(total), line_width).encode("gbk", errors="replace") + LF
         buf += GS_SIZE_NORMAL + ESC_BOLD_OFF
         return bytes(buf)
 
-    def _render_payment_method(
-        self, elem: dict, ctx: dict, line_width: int
-    ) -> bytes:
+    def _render_payment_method(self, elem: dict, ctx: dict, line_width: int) -> bytes:
         """支付方式 + 找零。"""
         show_change = elem.get("show_change", True)
 
@@ -436,20 +408,14 @@ class TemplateRenderer:
         buf += f"支付方式: {label}".encode("gbk", errors="replace") + LF
 
         if payment_amount > 0:
-            buf += _pad_two_columns(
-                "收款:", _yuan_str(payment_amount), line_width
-            ).encode("gbk", errors="replace") + LF
+            buf += _pad_two_columns("收款:", _yuan_str(payment_amount), line_width).encode("gbk", errors="replace") + LF
 
         if show_change and change > 0:
-            buf += _pad_two_columns(
-                "找零:", _yuan_str(change), line_width
-            ).encode("gbk", errors="replace") + LF
+            buf += _pad_two_columns("找零:", _yuan_str(change), line_width).encode("gbk", errors="replace") + LF
 
         return bytes(buf)
 
-    def _render_qrcode(
-        self, elem: dict, ctx: dict, line_width: int
-    ) -> bytes:
+    def _render_qrcode(self, elem: dict, ctx: dict, line_width: int) -> bytes:
         """二维码。"""
         content_field = elem.get("content_field", "order_id")
         static_content = elem.get("content", "")
@@ -466,9 +432,7 @@ class TemplateRenderer:
         buf += ESC_ALIGN_LEFT
         return bytes(buf)
 
-    def _render_barcode(
-        self, elem: dict, ctx: dict, line_width: int
-    ) -> bytes:
+    def _render_barcode(self, elem: dict, ctx: dict, line_width: int) -> bytes:
         """条形码。"""
         content_field = elem.get("content_field", "order_no")
         static_content = elem.get("content", "")
@@ -480,9 +444,7 @@ class TemplateRenderer:
 
         return _build_barcode(str(content), barcode_type)
 
-    def _render_custom_text(
-        self, elem: dict, ctx: dict, line_width: int
-    ) -> bytes:
+    def _render_custom_text(self, elem: dict, ctx: dict, line_width: int) -> bytes:
         """自定义文字（支持 {{变量}} 模板替换）。"""
         raw_content = elem.get("content", "")
         content = _apply_template_vars(raw_content, ctx)
@@ -500,16 +462,12 @@ class TemplateRenderer:
         buf += GS_SIZE_NORMAL + ESC_ALIGN_LEFT
         return bytes(buf)
 
-    def _render_blank_lines(
-        self, elem: dict, ctx: dict, line_width: int
-    ) -> bytes:
+    def _render_blank_lines(self, elem: dict, ctx: dict, line_width: int) -> bytes:
         """空行。"""
         count = max(1, min(10, elem.get("count", 1)))
         return LF * count
 
-    def _render_logo_text(
-        self, elem: dict, ctx: dict, line_width: int
-    ) -> bytes:
+    def _render_logo_text(self, elem: dict, ctx: dict, line_width: int) -> bytes:
         """品牌口号/备注文字，同 custom_text 但默认居中。"""
         raw_content = elem.get("content", "")
         content = _apply_template_vars(raw_content, ctx)
@@ -545,7 +503,7 @@ class TemplateRenderer:
         █            好味道火锅总店                     █
         ████████████████████████████████████████████████
         """
-        buf = b''
+        buf = b""
         content = self._resolve_vars(elem.get("content", ctx.get("store_name", "")), ctx)
         align = elem.get("align", "center")
         size = elem.get("size", "double_height")
@@ -564,14 +522,14 @@ class TemplateRenderer:
         buf += ESC_BOLD_ON
 
         # 上方满行空格（形成黑色横带效果）
-        buf += (b' ' * effective_width) + LF
+        buf += (b" " * effective_width) + LF
 
         # 内容行（带padding）
         padded = " " * padding + content + " " * padding
         buf += padded.encode("gbk", errors="replace") + LF
 
         # 下方黑色横带
-        buf += (b' ' * effective_width) + LF
+        buf += (b" " * effective_width) + LF
 
         # 重置
         buf += GS_INVERT_OFF + GS_SIZE_NORMAL + ESC_BOLD_OFF + ESC_ALIGN_LEFT
@@ -594,18 +552,18 @@ class TemplateRenderer:
           "bracket"   — 【────────────────────────────────────────────】
           default     — ————————————————————————————————————————————————
         """
-        buf = b''
+        buf = b""
         style = elem.get("style", "dash")
 
         style_chars = {
-            "double":    ("═", line_width),
-            "dots":      ("·", line_width),
-            "diamond":   ("◆", line_width // 2),  # 双字节字符占2格
-            "star":      ("★", line_width // 2),
-            "wave":      ("～", line_width // 2),
-            "dash":      ("-", line_width),
+            "double": ("═", line_width),
+            "dots": ("·", line_width),
+            "diamond": ("◆", line_width // 2),  # 双字节字符占2格
+            "star": ("★", line_width // 2),
+            "wave": ("～", line_width // 2),
+            "dash": ("-", line_width),
             "bold_dash": ("=", line_width),
-            "dot_line":  ("· ", line_width // 2),
+            "dot_line": ("· ", line_width // 2),
         }
 
         buf += ESC_ALIGN_CENTER
@@ -651,7 +609,7 @@ class TemplateRenderer:
         ║           本单享受8.8折优惠                   ║
         ╚══════════════════════════════════════════════╝
         """
-        buf = b''
+        buf = b""
         style = elem.get("style", "single")
         lines_raw = elem.get("lines", ["感谢光临"])
         align = elem.get("align", "center")
@@ -694,7 +652,7 @@ class TemplateRenderer:
             try:
                 buf += row.encode("gbk", errors="replace") + LF
             except (UnicodeEncodeError, ValueError):
-                buf += (v + content[:inner_width - 1] + v).encode("ascii", errors="replace") + LF
+                buf += (v + content[: inner_width - 1] + v).encode("ascii", errors="replace") + LF
 
         # 底部边框
         bot_line = bl + h * (inner_width - 1) + br
@@ -717,7 +675,8 @@ class TemplateRenderer:
         如果Pillow未安装或图片无效，降级为文字占位（不报错）。
         """
         import base64
-        buf = b''
+
+        buf = b""
         img_b64 = elem.get("image_base64", "")
         if not img_b64:
             return buf  # 无图片，跳过
@@ -744,7 +703,7 @@ class TemplateRenderer:
 
     def _render_underlined_text(self, elem: dict, ctx: dict, line_width: int) -> bytes:
         """下划线文字。"""
-        buf = b''
+        buf = b""
         content = self._resolve_vars(elem.get("content", ""), ctx)
         align = _ALIGN_BYTES.get(elem.get("align", "left"), ESC_ALIGN_LEFT)
         bold = elem.get("bold", False)

@@ -2,6 +2,7 @@
 
 POST /api/v1/orders/{order_id}/transfer-table  转台
 """
+
 from typing import Optional
 
 import structlog
@@ -30,12 +31,14 @@ def _ok(data: dict | list) -> dict:
 
 # ─── 请求模型 ───
 
+
 class TransferTableReq(BaseModel):
     target_table_no: str
     operator_id: Optional[str] = None
 
 
 # ─── 端点 ───
+
 
 @router.post("/orders/{order_id}/transfer-table")
 async def transfer_table(

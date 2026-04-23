@@ -3,6 +3,7 @@
 依赖表：banquet_deposits、banquet_confirmations（v043 迁移创建）
 微信支付为 mock 实现，真实配置见各 TODO 注释。
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -354,9 +355,7 @@ class BanquetPaymentService:
             return _row_to_deposit(dict(existing))
 
         if existing["status"] != "pending":
-            raise ValueError(
-                f"支付回调状态非法: payment_no={payment_no}, status={existing['status']}"
-            )
+            raise ValueError(f"支付回调状态非法: payment_no={payment_no}, status={existing['status']}")
 
         result = await self._db.execute(
             text("""

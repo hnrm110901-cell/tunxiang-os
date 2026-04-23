@@ -26,6 +26,7 @@
   get_busy_period_forecast(store_id, date, tenant_id, db) -> list[BusyPeriod]
     今日高峰时段预测（基于历史数据）
 """
+
 from __future__ import annotations
 
 import os
@@ -42,13 +43,13 @@ COREML_URL = os.getenv("COREML_BRIDGE_URL", "http://localhost:8100")
 # ─── 时段系数 ───
 # 午高峰 11:30-13:00 × 1.3，晚高峰 17:30-20:00 × 1.4，其他 × 1.0
 _PEAK_PERIODS = [
-    (11, 30, 13, 0,  1.3),   # (start_h, start_m, end_h, end_m, factor)
-    (17, 30, 20, 0,  1.4),
+    (11, 30, 13, 0, 1.3),  # (start_h, start_m, end_h, end_m, factor)
+    (17, 30, 20, 0, 1.4),
 ]
 
 # ─── 默认兜底数据（无历史数据/ML 不可用时使用） ───
 _DEFAULT_DISH_PREP_SECONDS: dict[str, float] = {
-    "default": 600.0,   # 10分钟兜底
+    "default": 600.0,  # 10分钟兜底
 }
 
 _DEFAULT_TABLE_DINING_MINUTES: dict[int, float] = {
@@ -63,6 +64,7 @@ _DEFAULT_TABLE_DINING_MINUTES: dict[int, float] = {
 # ────────────────────────────────────────────
 # 数据类（轻量，无ORM依赖）
 # ────────────────────────────────────────────
+
 
 class DishTimePrediction:
     __slots__ = ("dish_id", "estimated_minutes", "confidence", "method", "queue_depth", "raw_seconds")
@@ -123,8 +125,12 @@ class OrderCompletionPrediction:
 
 class TableTurnPrediction:
     __slots__ = (
-        "table_no", "estimated_finish_minutes", "confidence",
-        "suggestion", "elapsed_minutes", "avg_dining_minutes",
+        "table_no",
+        "estimated_finish_minutes",
+        "confidence",
+        "suggestion",
+        "elapsed_minutes",
+        "avg_dining_minutes",
     )
 
     def __init__(
@@ -182,6 +188,7 @@ class BusyPeriod:
 # Core ML 调用（1秒超时，快速降级）
 # ────────────────────────────────────────────
 
+
 async def _call_coreml_dish_time(dish_id: str, queue_depth: int) -> Optional[float]:
     """调用 coreml-bridge 预测菜品制作时间。1秒超时，失败返回None触发规则降级。"""
     try:
@@ -230,6 +237,7 @@ async def _call_coreml_table_turn(
 # 时段系数
 # ────────────────────────────────────────────
 
+
 def _get_peak_factor(now: Optional[datetime] = None) -> float:
     """根据当前时间返回高峰时段系数。"""
     dt = now or datetime.now(tz=timezone.utc).astimezone()
@@ -246,6 +254,7 @@ def _get_peak_factor(now: Optional[datetime] = None) -> float:
 # ────────────────────────────────────────────
 # 规则引擎：菜品平均制作时长（DB + 默认值降级）
 # ────────────────────────────────────────────
+
 
 async def _get_dish_avg_seconds(
     dish_id: str,
@@ -264,6 +273,7 @@ async def _get_dish_avg_seconds(
 
     try:
         from sqlalchemy import text as sa_text
+
         sql = sa_text("""
             SELECT AVG(EXTRACT(EPOCH FROM (kt.served_at - kt.called_at))) AS avg_seconds,
                    COUNT(*) AS sample_count
@@ -305,6 +315,7 @@ async def _get_queue_depth(
         return 0
     try:
         from sqlalchemy import text as sa_text
+
         sql = sa_text("""
             SELECT COUNT(*) AS cnt
             FROM kds_tasks
@@ -328,6 +339,7 @@ async def _get_queue_depth(
 # 规则引擎：桌台平均就餐时长（DB + 默认值降级）
 # ────────────────────────────────────────────
 
+
 async def _get_avg_dining_minutes(
     seats: int,
     store_id: str,
@@ -348,6 +360,7 @@ async def _get_avg_dining_minutes(
 
     try:
         from sqlalchemy import text as sa_text
+
         sql = sa_text("""
             SELECT AVG(EXTRACT(EPOCH FROM (ds.cleared_at - ds.opened_at)) / 60) AS avg_min,
                    COUNT(*) AS sample_count
@@ -383,6 +396,7 @@ async def _get_avg_dining_minutes(
 # 公开接口
 # ────────────────────────────────────────────
 
+
 async def predict_dish_time(
     dish_id: str,
     dept_id: str,
@@ -412,9 +426,7 @@ async def predict_dish_time(
         )
 
     # 2. 规则引擎降级
-    avg_seconds, has_real_data = await _get_dish_avg_seconds(
-        dish_id, dept_id, store_id, tenant_id, db
-    )
+    avg_seconds, has_real_data = await _get_dish_avg_seconds(dish_id, dept_id, store_id, tenant_id, db)
     peak_factor = _get_peak_factor()
     # 队列系数：每个pending任务额外30秒等待
     queue_extra_seconds = queue_depth * 30.0
@@ -451,6 +463,7 @@ async def predict_order_completion(
     if db is not None:
         try:
             from sqlalchemy import text as sa_text
+
             sql = sa_text("""
                 SELECT oi.dish_id, oi.dish_name, oi.dept_id, o.store_id
                 FROM order_items oi
@@ -531,6 +544,7 @@ async def predict_table_turn(
     if db is not None and order_id:
         try:
             from sqlalchemy import text as sa_text
+
             sql = sa_text("""
                 SELECT
                     EXTRACT(EPOCH FROM (NOW() - o.opened_at)) / 60 AS elapsed_min,
@@ -549,9 +563,7 @@ async def predict_table_turn(
         except Exception as exc:  # noqa: BLE001
             logger.warning("table_elapsed_query_failed", order_id=order_id, error=str(exc), exc_info=True)
 
-    avg_dining, has_real_data = await _get_avg_dining_minutes(
-        real_seats, store_id, tenant_id, db
-    )
+    avg_dining, has_real_data = await _get_avg_dining_minutes(real_seats, store_id, tenant_id, db)
 
     # 1. 尝试 Core ML
     ml_finish = await _call_coreml_table_turn(table_no, real_seats, real_elapsed)
@@ -628,6 +640,7 @@ async def get_busy_period_forecast(
     if db is not None:
         try:
             from sqlalchemy import text as sa_text
+
             sql = sa_text("""
                 SELECT
                     EXTRACT(HOUR FROM opened_at) AS hour,
@@ -656,20 +669,24 @@ async def get_busy_period_forecast(
                     if h <= end + 1:
                         end = h + 1
                     else:
-                        periods.append(BusyPeriod(
-                            start_time=f"{start:02d}:00",
-                            end_time=f"{end:02d}:00",
-                            expected_covers=int(rows[0].order_count),
-                            confidence="medium",
-                        ))
+                        periods.append(
+                            BusyPeriod(
+                                start_time=f"{start:02d}:00",
+                                end_time=f"{end:02d}:00",
+                                expected_covers=int(rows[0].order_count),
+                                confidence="medium",
+                            )
+                        )
                         start = h
                         end = h + 1
-                periods.append(BusyPeriod(
-                    start_time=f"{start:02d}:00",
-                    end_time=f"{end:02d}:00",
-                    expected_covers=int(rows[0].order_count),
-                    confidence="medium",
-                ))
+                periods.append(
+                    BusyPeriod(
+                        start_time=f"{start:02d}:00",
+                        end_time=f"{end:02d}:00",
+                        expected_covers=int(rows[0].order_count),
+                        confidence="medium",
+                    )
+                )
                 return periods
         except Exception as exc:  # noqa: BLE001
             logger.warning("busy_period_query_failed", store_id=store_id, error=str(exc), exc_info=True)

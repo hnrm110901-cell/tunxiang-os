@@ -10,6 +10,7 @@
 7. GET  /export/history
 8. POST /export/retry
 """
+
 import os
 import sys
 
@@ -70,16 +71,10 @@ class TestRouterRegistration:
 
     def test_post_endpoints_count(self):
         """POST 端点应有 7 个"""
-        post_routes = [
-            r for r in router.routes
-            if hasattr(r, "methods") and "POST" in r.methods
-        ]
+        post_routes = [r for r in router.routes if hasattr(r, "methods") and "POST" in r.methods]
         assert len(post_routes) == 7
 
     def test_get_endpoints_count(self):
         """GET 端点应有 1 个"""
-        get_routes = [
-            r for r in router.routes
-            if hasattr(r, "methods") and "GET" in r.methods
-        ]
+        get_routes = [r for r in router.routes if hasattr(r, "methods") and "GET" in r.methods]
         assert len(get_routes) == 1

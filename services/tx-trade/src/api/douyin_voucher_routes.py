@@ -14,6 +14,7 @@ Y-I2
   GET  /api/v1/trade/douyin-voucher/stores              已授权门店列表
   POST /api/v1/trade/douyin-voucher/stores/{id}/authorize  门店授权
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -342,19 +343,23 @@ async def batch_verify_vouchers(
         if dy_resp["code"] == 0:
             order_id = f"dy-order-{uuid.uuid4().hex[:12]}"
             success_count += 1
-            results.append({
-                "voucher_code": req.voucher_code,
-                "success": True,
-                "order_id": order_id,
-                "voucher_info": dy_resp["data"],
-            })
+            results.append(
+                {
+                    "voucher_code": req.voucher_code,
+                    "success": True,
+                    "order_id": order_id,
+                    "voucher_info": dy_resp["data"],
+                }
+            )
         elif dy_resp["code"] in (40002, 40003):
             fail_count += 1
-            results.append({
-                "voucher_code": req.voucher_code,
-                "success": False,
-                "error": {"code": f"VOUCHER_{dy_resp['code']}", "message": dy_resp["msg"]},
-            })
+            results.append(
+                {
+                    "voucher_code": req.voucher_code,
+                    "success": False,
+                    "error": {"code": f"VOUCHER_{dy_resp['code']}", "message": dy_resp["msg"]},
+                }
+            )
         else:
             # 平台错误 → 写重试队列
             task_id = _enqueue_retry(
@@ -364,12 +369,14 @@ async def batch_verify_vouchers(
                 error_msg=dy_resp["msg"],
             )
             fail_count += 1
-            results.append({
-                "voucher_code": req.voucher_code,
-                "success": False,
-                "error": {"code": "PLATFORM_ERROR", "message": dy_resp["msg"]},
-                "retry_task_id": task_id,
-            })
+            results.append(
+                {
+                    "voucher_code": req.voucher_code,
+                    "success": False,
+                    "error": {"code": "PLATFORM_ERROR", "message": dy_resp["msg"]},
+                    "retry_task_id": task_id,
+                }
+            )
 
     logger.info(
         "douyin_batch_verify_completed",
@@ -507,22 +514,26 @@ async def get_reconciliation_report(
     unmatched = local_count - matched
     discrepancy_amount_fen = 31600  # 2张未匹配的券（15800×2）
 
-    unmatched_records = [
-        {
-            "voucher_code": "DY_UNDEF_A001",
-            "local_order_id": "dy-order-aaa001",
-            "platform_status": "not_found",
-            "amount_fen": 15800,
-            "issue": "本地已核销，平台无记录",
-        },
-        {
-            "voucher_code": "DY_UNDEF_A002",
-            "local_order_id": None,
-            "platform_status": "used",
-            "amount_fen": 15800,
-            "issue": "平台已核销，本地无记录",
-        },
-    ] if unmatched > 0 else []
+    unmatched_records = (
+        [
+            {
+                "voucher_code": "DY_UNDEF_A001",
+                "local_order_id": "dy-order-aaa001",
+                "platform_status": "not_found",
+                "amount_fen": 15800,
+                "issue": "本地已核销，平台无记录",
+            },
+            {
+                "voucher_code": "DY_UNDEF_A002",
+                "local_order_id": None,
+                "platform_status": "used",
+                "amount_fen": 15800,
+                "issue": "平台已核销，本地无记录",
+            },
+        ]
+        if unmatched > 0
+        else []
+    )
 
     logger.info(
         "douyin_reconciliation_report",
@@ -680,8 +691,7 @@ async def auto_retry_queue(
 ) -> dict:
     """触发批量自动重试（最大3次；仅店长/管理员）"""
     pending_tasks = [
-        t for t in _RETRY_QUEUE.values()
-        if t["status"] == "pending" and t["retry_count"] < MAX_RETRY_TIMES
+        t for t in _RETRY_QUEUE.values() if t["status"] == "pending" and t["retry_count"] < MAX_RETRY_TIMES
     ]
 
     if not pending_tasks:

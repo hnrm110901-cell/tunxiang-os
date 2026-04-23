@@ -8,6 +8,7 @@ v186新增：开台时自动关联当前营业市别（market_session_id）
 统一响应格式: {"ok": bool, "data": {}, "error": {}}
 所有接口需 X-Tenant-ID header。
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -22,6 +23,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
+
 from ..services.dining_session_service import DiningSessionService
 
 logger = structlog.get_logger(__name__)
@@ -30,6 +32,7 @@ router = APIRouter(prefix="/api/v1/dining-sessions", tags=["dining-sessions"])
 
 
 # ─── 通用工具 ─────────────────────────────────────────────────────────────────
+
 
 def _get_tenant_id(request: Request) -> str:
     tid = getattr(request.state, "tenant_id", None) or request.headers.get("X-Tenant-ID", "")
@@ -55,16 +58,18 @@ def _svc(db: AsyncSession, tenant_id: str) -> DiningSessionService:
 
 # ─── 请求 / 响应 Pydantic 模型 ────────────────────────────────────────────────
 
+
 class OpenTableReq(BaseModel):
     """开台请求"""
-    store_id:         uuid.UUID
-    table_id:         uuid.UUID
-    guest_count:      int        = Field(ge=1, le=100, description="就餐人数")
-    lead_waiter_id:   uuid.UUID  = Field(description="责任服务员ID")
-    zone_id:          Optional[uuid.UUID] = None
-    booking_id:       Optional[uuid.UUID] = None
-    vip_customer_id:  Optional[uuid.UUID] = None
-    session_type:     str        = Field(
+
+    store_id: uuid.UUID
+    table_id: uuid.UUID
+    guest_count: int = Field(ge=1, le=100, description="就餐人数")
+    lead_waiter_id: uuid.UUID = Field(description="责任服务员ID")
+    zone_id: Optional[uuid.UUID] = None
+    booking_id: Optional[uuid.UUID] = None
+    vip_customer_id: Optional[uuid.UUID] = None
+    session_type: str = Field(
         default="dine_in",
         description="类型：dine_in/banquet/vip_room/self_order/hotpot",
     )
@@ -80,39 +85,43 @@ class OpenTableReq(BaseModel):
 
 class TransferTableReq(BaseModel):
     """转台请求"""
+
     target_table_id: uuid.UUID
-    reason:          str = Field(max_length=200, description="转台原因")
-    operator_id:     uuid.UUID
+    reason: str = Field(max_length=200, description="转台原因")
+    operator_id: uuid.UUID
 
 
 class MergeSessionsReq(BaseModel):
     """并台请求"""
-    secondary_session_ids: list[uuid.UUID] = Field(
-        min_length=1, description="要合并进来的副会话ID列表（至少1个）"
-    )
+
+    secondary_session_ids: list[uuid.UUID] = Field(min_length=1, description="要合并进来的副会话ID列表（至少1个）")
     operator_id: uuid.UUID
 
 
 class RequestBillReq(BaseModel):
     """买单请求"""
+
     operator_id: Optional[uuid.UUID] = None
 
 
 class CompletePaymentReq(BaseModel):
     """结账完成（由支付服务回调）"""
-    final_amount_fen:    int = Field(ge=0, description="实付金额（分）")
+
+    final_amount_fen: int = Field(ge=0, description="实付金额（分）")
     discount_amount_fen: int = Field(default=0, ge=0, description="折扣金额（分）")
 
 
 class ClearTableReq(BaseModel):
     """清台请求"""
+
     cleaner_id: uuid.UUID = Field(description="清台操作员工ID")
 
 
 class IdentifyVipReq(BaseModel):
     """VIP识别请求"""
-    customer_id:    uuid.UUID
-    identified_by:  str = Field(
+
+    customer_id: uuid.UUID
+    identified_by: str = Field(
         default="scan",
         description="识别方式：scan/phone/face/manual",
     )
@@ -120,11 +129,13 @@ class IdentifyVipReq(BaseModel):
 
 class UpdateGuestCountReq(BaseModel):
     """修改就餐人数"""
+
     guest_count: int = Field(ge=1, le=100)
     operator_id: Optional[uuid.UUID] = None
 
 
 # ─── 路由 ─────────────────────────────────────────────────────────────────────
+
 
 @router.post("", summary="开台")
 async def open_table(
@@ -158,9 +169,7 @@ async def open_table(
     # v186：开台后自动关联当前营业市别（后台异步，不阻塞开台响应）
     session_id_for_market = session.get("id") if isinstance(session, dict) else getattr(session, "id", None)
     if session_id_for_market:
-        asyncio.create_task(
-            _bind_market_session(db, tid, str(body.store_id), str(session_id_for_market))
-        )
+        asyncio.create_task(_bind_market_session(db, tid, str(body.store_id), str(session_id_for_market)))
 
     return _ok(session)
 
@@ -171,9 +180,7 @@ async def _get_current_market_session_id(
     store_id: str,
 ) -> Optional[str]:
     """查询当前时间所在的营业市别ID（优先门店配置，无则查集团模板）"""
-    await db.execute(
-        text("SELECT set_config('app.tenant_id', :tid, TRUE)"), {"tid": tenant_id}
-    )
+    await db.execute(text("SELECT set_config('app.tenant_id', :tid, TRUE)"), {"tid": tenant_id})
     now_time = datetime.now().time()
 
     def _in_session(start: time, end: time) -> bool:
@@ -182,34 +189,46 @@ async def _get_current_market_session_id(
         return now_time >= start or now_time < end
 
     # 1. 门店自定义配置
-    store_rows = (await db.execute(
-        text("""
+    store_rows = (
+        await db.execute(
+            text("""
             SELECT id, start_time, end_time
             FROM store_market_sessions
             WHERE tenant_id = :tid AND store_id = :sid AND is_active = TRUE
         """),
-        {"tid": tenant_id, "sid": store_id},
-    )).fetchall()
+            {"tid": tenant_id, "sid": store_id},
+        )
+    ).fetchall()
 
     for row in store_rows:
-        st = row.start_time if isinstance(row.start_time, time) else datetime.strptime(str(row.start_time), "%H:%M:%S").time()
+        st = (
+            row.start_time
+            if isinstance(row.start_time, time)
+            else datetime.strptime(str(row.start_time), "%H:%M:%S").time()
+        )
         et = row.end_time if isinstance(row.end_time, time) else datetime.strptime(str(row.end_time), "%H:%M:%S").time()
         if _in_session(st, et):
             return str(row.id)
 
     # 2. 集团模板
-    tmpl_rows = (await db.execute(
-        text("""
+    tmpl_rows = (
+        await db.execute(
+            text("""
             SELECT id, start_time, end_time
             FROM market_session_templates
             WHERE tenant_id = :tid AND is_active = TRUE
             ORDER BY display_order, start_time
         """),
-        {"tid": tenant_id},
-    )).fetchall()
+            {"tid": tenant_id},
+        )
+    ).fetchall()
 
     for row in tmpl_rows:
-        st = row.start_time if isinstance(row.start_time, time) else datetime.strptime(str(row.start_time), "%H:%M:%S").time()
+        st = (
+            row.start_time
+            if isinstance(row.start_time, time)
+            else datetime.strptime(str(row.start_time), "%H:%M:%S").time()
+        )
         et = row.end_time if isinstance(row.end_time, time) else datetime.strptime(str(row.end_time), "%H:%M:%S").time()
         if _in_session(st, et):
             return str(row.id)
@@ -454,6 +473,7 @@ async def update_guest_count(
         _err("会话不存在", code=404)
 
     from sqlalchemy import text
+
     await db.execute(
         text("""
             UPDATE dining_sessions
@@ -524,6 +544,7 @@ async def link_banquet_session(
     """将堂食会话关联到宴席场次，用于宴席多桌统一调度和结账。"""
     tid = _get_tenant_id(request)
     from sqlalchemy import text
+
     session_result = await db.execute(
         text("SELECT id FROM dining_sessions WHERE id = :sid AND tenant_id = :tid AND is_deleted = false"),
         {"sid": session_id, "tid": str(tid)},

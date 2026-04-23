@@ -9,6 +9,7 @@
 # from .api.smart_procurement_routes import router as smart_procurement_router
 # app.include_router(smart_procurement_router)
 """
+
 from __future__ import annotations
 
 import uuid
@@ -36,6 +37,7 @@ router = APIRouter(
 # 工具函数
 # ──────────────────────────────────────────────────────────────────────────────
 
+
 def _ok(data: Any) -> dict[str, Any]:
     return {"ok": True, "data": data}
 
@@ -45,8 +47,7 @@ def _err(msg: str, status: int = 400) -> HTTPException:
 
 
 async def _set_rls(db: AsyncSession, tenant_id: str) -> None:
-    await db.execute(text("SELECT set_config('app.tenant_id', :tid, TRUE)"),
-                     {"tid": tenant_id})
+    await db.execute(text("SELECT set_config('app.tenant_id', :tid, TRUE)"), {"tid": tenant_id})
 
 
 def _serialize_row(row: Any) -> dict[str, Any]:
@@ -69,6 +70,7 @@ SAFETY_STOCK_FACTOR = 1.3
 # 内部预测 & BOM分解
 # ──────────────────────────────────────────────────────────────────────────────
 
+
 async def _forecast_dish_demand(
     db: AsyncSession,
     store_id: str,
@@ -77,7 +79,8 @@ async def _forecast_dish_demand(
 ) -> list[dict[str, Any]]:
     """预测菜品需求量：基于近7天平均日销量 * days_ahead。"""
     try:
-        rows = await db.execute(text("""
+        rows = await db.execute(
+            text("""
             SELECT oi.dish_id,
                    d.name AS dish_name,
                    COALESCE(SUM(oi.quantity), 0) AS total_sold,
@@ -92,11 +95,13 @@ async def _forecast_dish_demand(
             GROUP BY oi.dish_id, d.name
             HAVING SUM(oi.quantity) > 0
             ORDER BY predicted_demand DESC
-        """), {
-            "tid": tenant_id,
-            "store_id": store_id,
-            "days": days_ahead,
-        })
+        """),
+            {
+                "tid": tenant_id,
+                "store_id": store_id,
+                "days": days_ahead,
+            },
+        )
         return [_serialize_row(r) for r in rows]
     except SQLAlchemyError:
         return []
@@ -121,7 +126,8 @@ async def _bom_decompose(
             continue
 
         try:
-            bom_rows = await db.execute(text("""
+            bom_rows = await db.execute(
+                text("""
                 SELECT bi.ingredient_id, i.name AS ingredient_name,
                        bi.standard_qty, i.unit
                 FROM bom_items bi
@@ -133,11 +139,13 @@ async def _bom_decompose(
                   AND bt.is_active = TRUE
                   AND bt.is_deleted = FALSE
                   AND bi.is_deleted = FALSE
-            """), {
-                "tid": tenant_id,
-                "store_id": store_id,
-                "dish_id": str(dish_id),
-            })
+            """),
+                {
+                    "tid": tenant_id,
+                    "store_id": store_id,
+                    "dish_id": str(dish_id),
+                },
+            )
 
             for bom in bom_rows:
                 iid = str(bom.ingredient_id)
@@ -168,18 +176,21 @@ async def _get_current_stock(
         return {}
 
     try:
-        rows = await db.execute(text("""
+        rows = await db.execute(
+            text("""
             SELECT id, COALESCE(quantity, 0) AS qty
             FROM ingredients
             WHERE tenant_id = :tid
               AND store_id  = :store_id
               AND is_deleted = FALSE
               AND id = ANY(:ids::uuid[])
-        """), {
-            "tid": tenant_id,
-            "store_id": store_id,
-            "ids": ingredient_ids,
-        })
+        """),
+            {
+                "tid": tenant_id,
+                "store_id": store_id,
+                "ids": ingredient_ids,
+            },
+        )
         return {str(r.id): float(r.qty) for r in rows}
     except SQLAlchemyError:
         return {}
@@ -192,7 +203,8 @@ async def _get_best_supplier(
 ) -> dict[str, Any] | None:
     """获取原料的最佳供应商（最近供货 + 评分最高）。"""
     try:
-        row = await db.execute(text("""
+        row = await db.execute(
+            text("""
             SELECT supplier_id, supplier_name,
                    COALESCE(unit_price_fen, 0) AS unit_price_fen
             FROM receiving_records
@@ -201,7 +213,9 @@ async def _get_best_supplier(
               AND is_deleted = FALSE
             ORDER BY created_at DESC
             LIMIT 1
-        """), {"tid": tenant_id, "iid": ingredient_id})
+        """),
+            {"tid": tenant_id, "iid": ingredient_id},
+        )
         r = row.fetchone()
         if r:
             return {
@@ -218,6 +232,7 @@ async def _get_best_supplier(
 # Pydantic 模型
 # ──────────────────────────────────────────────────────────────────────────────
 
+
 class CreateOrderRequest(BaseModel):
     suggestion_ids: list[str] = Field(..., min_length=1, description="要下单的建议ID列表")
 
@@ -225,6 +240,7 @@ class CreateOrderRequest(BaseModel):
 # ──────────────────────────────────────────────────────────────────────────────
 # GET /{store_id}/suggestion — 基于需求预测生成采购建议
 # ──────────────────────────────────────────────────────────────────────────────
+
 
 @router.get("/{store_id}/suggestion")
 async def get_procurement_suggestion(
@@ -249,18 +265,19 @@ async def get_procurement_suggestion(
         ingredient_needs = await _bom_decompose(db, x_tenant_id, sid, dish_demands)
 
         if not ingredient_needs:
-            return _ok({
-                "store_id": str(store_id),
-                "days_ahead": days_ahead,
-                "suggestions": [],
-                "total": 0,
-                "total_estimated_cost_fen": 0,
-                "message": "无BOM数据或近期无销售记录，无法生成采购建议",
-            })
+            return _ok(
+                {
+                    "store_id": str(store_id),
+                    "days_ahead": days_ahead,
+                    "suggestions": [],
+                    "total": 0,
+                    "total_estimated_cost_fen": 0,
+                    "message": "无BOM数据或近期无销售记录，无法生成采购建议",
+                }
+            )
 
         # 3. 查当前库存
-        stock = await _get_current_stock(
-            db, x_tenant_id, sid, list(ingredient_needs.keys()))
+        stock = await _get_current_stock(db, x_tenant_id, sid, list(ingredient_needs.keys()))
 
         # 4. 计算建议采购量并存储
         suggestions: list[dict[str, Any]] = []
@@ -283,7 +300,8 @@ async def get_procurement_suggestion(
 
             # 写入建议表
             suggestion_id = uuid.uuid4()
-            await db.execute(text("""
+            await db.execute(
+                text("""
                 INSERT INTO smart_procurement_suggestions
                     (id, tenant_id, store_id, ingredient_id, ingredient_name,
                      predicted_demand, current_stock, safety_stock,
@@ -293,35 +311,44 @@ async def get_procurement_suggestion(
                         :demand, :stock, :safety,
                         :qty, :unit, :sup_id, :sup_name,
                         :cost, :days, 'draft')
-            """), {
-                "id": str(suggestion_id), "tid": x_tenant_id,
-                "store_id": sid, "iid": iid,
-                "iname": info["ingredient_name"],
-                "demand": predicted, "stock": current, "safety": safety,
-                "qty": suggested_qty, "unit": info["unit"],
-                "sup_id": supplier["supplier_id"] if supplier else None,
-                "sup_name": supplier["supplier_name"] if supplier else "",
-                "cost": estimated_cost, "days": days_ahead,
-            })
+            """),
+                {
+                    "id": str(suggestion_id),
+                    "tid": x_tenant_id,
+                    "store_id": sid,
+                    "iid": iid,
+                    "iname": info["ingredient_name"],
+                    "demand": predicted,
+                    "stock": current,
+                    "safety": safety,
+                    "qty": suggested_qty,
+                    "unit": info["unit"],
+                    "sup_id": supplier["supplier_id"] if supplier else None,
+                    "sup_name": supplier["supplier_name"] if supplier else "",
+                    "cost": estimated_cost,
+                    "days": days_ahead,
+                },
+            )
 
-            suggestions.append({
-                "suggestion_id": str(suggestion_id),
-                "ingredient_id": iid,
-                "ingredient_name": info["ingredient_name"],
-                "predicted_demand": round(predicted, 2),
-                "current_stock": round(current, 2),
-                "safety_stock": round(safety, 2),
-                "suggested_qty": round(suggested_qty, 2),
-                "unit": info["unit"],
-                "supplier_id": supplier["supplier_id"] if supplier else None,
-                "supplier_name": supplier["supplier_name"] if supplier else None,
-                "unit_price_fen": unit_price,
-                "estimated_cost_fen": estimated_cost,
-            })
+            suggestions.append(
+                {
+                    "suggestion_id": str(suggestion_id),
+                    "ingredient_id": iid,
+                    "ingredient_name": info["ingredient_name"],
+                    "predicted_demand": round(predicted, 2),
+                    "current_stock": round(current, 2),
+                    "safety_stock": round(safety, 2),
+                    "suggested_qty": round(suggested_qty, 2),
+                    "unit": info["unit"],
+                    "supplier_id": supplier["supplier_id"] if supplier else None,
+                    "supplier_name": supplier["supplier_name"] if supplier else None,
+                    "unit_price_fen": unit_price,
+                    "estimated_cost_fen": estimated_cost,
+                }
+            )
 
         await db.commit()
-        logger.info("smart_procurement.suggestion.generated",
-                    store_id=sid, items=len(suggestions))
+        logger.info("smart_procurement.suggestion.generated", store_id=sid, items=len(suggestions))
 
     except HTTPException:
         raise
@@ -330,18 +357,21 @@ async def get_procurement_suggestion(
         logger.error("smart_procurement.suggestion.failed", error=str(exc))
         raise _err(f"生成采购建议失败：{exc}", 500) from exc
 
-    return _ok({
-        "store_id": str(store_id),
-        "days_ahead": days_ahead,
-        "suggestions": suggestions,
-        "total": len(suggestions),
-        "total_estimated_cost_fen": total_cost_fen,
-    })
+    return _ok(
+        {
+            "store_id": str(store_id),
+            "days_ahead": days_ahead,
+            "suggestions": suggestions,
+            "total": len(suggestions),
+            "total_estimated_cost_fen": total_cost_fen,
+        }
+    )
 
 
 # ──────────────────────────────────────────────────────────────────────────────
 # POST /{store_id}/create-order — 一键生成采购订单
 # ──────────────────────────────────────────────────────────────────────────────
+
 
 @router.post("/{store_id}/create-order", status_code=201)
 async def create_procurement_order(
@@ -362,7 +392,8 @@ async def create_procurement_order(
         for i, s in enumerate(suggestion_ids):
             params[f"s{i}"] = s
 
-        rows = await db.execute(text(f"""
+        rows = await db.execute(
+            text(f"""
             SELECT id, ingredient_id, ingredient_name, suggested_qty, unit,
                    supplier_id, supplier_name, estimated_cost_fen
             FROM smart_procurement_suggestions
@@ -370,7 +401,9 @@ async def create_procurement_order(
               AND status = 'draft'
               AND id IN ({placeholders})
               AND is_deleted = FALSE
-        """), params)
+        """),
+            params,
+        )
         suggestions = rows.fetchall()
 
         if not suggestions:
@@ -382,43 +415,51 @@ async def create_procurement_order(
         order_no = f"SP-{now.strftime('%Y%m%d')}-{str(order_id)[:4].upper()}"
         total_amount = sum(int(s.estimated_cost_fen or 0) for s in suggestions)
 
-        await db.execute(text("""
+        await db.execute(
+            text("""
             INSERT INTO smart_procurement_orders
                 (id, tenant_id, store_id, suggestion_ids, order_no,
                  total_amount_fen, item_count, status, source)
             VALUES (:id, :tid, :store_id, :sids::jsonb, :order_no,
                     :amount, :count, 'pending', 'ai_suggested')
-        """), {
-            "id": str(order_id), "tid": x_tenant_id,
-            "store_id": sid,
-            "sids": str([str(s.id) for s in suggestions]).replace("'", '"'),
-            "order_no": order_no,
-            "amount": total_amount,
-            "count": len(suggestions),
-        })
+        """),
+            {
+                "id": str(order_id),
+                "tid": x_tenant_id,
+                "store_id": sid,
+                "sids": str([str(s.id) for s in suggestions]).replace("'", '"'),
+                "order_no": order_no,
+                "amount": total_amount,
+                "count": len(suggestions),
+            },
+        )
 
         # 3. 更新建议状态为 ordered
         for s in suggestions:
-            await db.execute(text("""
+            await db.execute(
+                text("""
                 UPDATE smart_procurement_suggestions
                 SET status = 'ordered'
                 WHERE id = :sid AND tenant_id = :tid
-            """), {"sid": str(s.id), "tid": x_tenant_id})
+            """),
+                {"sid": str(s.id), "tid": x_tenant_id},
+            )
 
         await db.commit()
 
-        items = [{
-            "ingredient_id": str(s.ingredient_id),
-            "ingredient_name": getattr(s, "ingredient_name", ""),
-            "suggested_qty": float(s.suggested_qty),
-            "unit": getattr(s, "unit", "kg"),
-            "supplier_name": getattr(s, "supplier_name", ""),
-            "estimated_cost_fen": int(s.estimated_cost_fen or 0),
-        } for s in suggestions]
+        items = [
+            {
+                "ingredient_id": str(s.ingredient_id),
+                "ingredient_name": getattr(s, "ingredient_name", ""),
+                "suggested_qty": float(s.suggested_qty),
+                "unit": getattr(s, "unit", "kg"),
+                "supplier_name": getattr(s, "supplier_name", ""),
+                "estimated_cost_fen": int(s.estimated_cost_fen or 0),
+            }
+            for s in suggestions
+        ]
 
-        logger.info("smart_procurement.order.created",
-                    order_id=str(order_id), order_no=order_no,
-                    items=len(items))
+        logger.info("smart_procurement.order.created", order_id=str(order_id), order_no=order_no, items=len(items))
 
     except HTTPException:
         raise
@@ -427,20 +468,23 @@ async def create_procurement_order(
         logger.error("smart_procurement.order.create.failed", error=str(exc))
         raise _err(f"创建采购订单失败：{exc}", 500) from exc
 
-    return _ok({
-        "order_id": str(order_id),
-        "order_no": order_no,
-        "store_id": str(store_id),
-        "total_amount_fen": total_amount,
-        "item_count": len(items),
-        "items": items,
-        "status": "pending",
-    })
+    return _ok(
+        {
+            "order_id": str(order_id),
+            "order_no": order_no,
+            "store_id": str(store_id),
+            "total_amount_fen": total_amount,
+            "item_count": len(items),
+            "items": items,
+            "status": "pending",
+        }
+    )
 
 
 # ──────────────────────────────────────────────────────────────────────────────
 # GET /waste-reduction — 预测采购vs实际使用对比
 # ──────────────────────────────────────────────────────────────────────────────
+
 
 @router.get("/waste-reduction")
 async def waste_reduction_report(
@@ -468,7 +512,8 @@ async def waste_reduction_report(
             params["store_id"] = str(store_id)
 
         # 1. AI建议汇总
-        suggestion_rows = await db.execute(text(f"""
+        suggestion_rows = await db.execute(
+            text(f"""
             SELECT
                 COUNT(*)                                    AS total_suggestions,
                 SUM(CASE WHEN s.status = 'ordered' THEN 1 ELSE 0 END) AS adopted_count,
@@ -480,11 +525,14 @@ async def waste_reduction_report(
               AND s.created_at >= :since
               AND s.is_deleted = FALSE
               {store_filter}
-        """), params)
+        """),
+            params,
+        )
         suggestion_stats = suggestion_rows.fetchone()
 
         # 2. 实际采购 vs 实际消耗（基于库存流水）
-        waste_rows = await db.execute(text(f"""
+        waste_rows = await db.execute(
+            text(f"""
             SELECT
                 COALESCE(SUM(CASE WHEN transaction_type = 'inbound'
                              THEN quantity ELSE 0 END), 0)  AS total_inbound,
@@ -497,7 +545,9 @@ async def waste_reduction_report(
               AND created_at >= :since
               AND is_deleted = FALSE
               {"AND store_id = :store_id" if store_id else ""}
-        """), params)
+        """),
+            params,
+        )
         waste_stats = waste_rows.fetchone()
 
         total_inbound = float(waste_stats.total_inbound or 0) if waste_stats else 0
@@ -512,33 +562,39 @@ async def waste_reduction_report(
         adopted = int(suggestion_stats.adopted_count or 0) if suggestion_stats else 0
         adoption_rate = (adopted / total_suggestions * 100) if total_suggestions > 0 else 0
 
-        logger.info("smart_procurement.waste_reduction",
-                    store_id=str(store_id) if store_id else "all",
-                    waste_rate=round(waste_rate, 1))
+        logger.info(
+            "smart_procurement.waste_reduction",
+            store_id=str(store_id) if store_id else "all",
+            waste_rate=round(waste_rate, 1),
+        )
 
     except SQLAlchemyError as exc:
         logger.error("smart_procurement.waste_reduction.failed", error=str(exc))
         raise _err(f"浪费分析失败：{exc}", 500) from exc
 
-    return _ok({
-        "analysis_period_days": days,
-        "store_id": str(store_id) if store_id else None,
-        "ai_suggestions": {
-            "total_suggestions": total_suggestions,
-            "adopted_count": adopted,
-            "adoption_rate_pct": round(adoption_rate, 1),
-            "total_suggested_cost_fen": int(suggestion_stats.total_suggested_cost_fen or 0) if suggestion_stats else 0,
-            "adopted_cost_fen": int(suggestion_stats.adopted_cost_fen or 0) if suggestion_stats else 0,
-        },
-        "inventory_flow": {
-            "total_inbound": round(total_inbound, 2),
-            "total_usage": round(total_usage, 2),
-            "total_waste": round(total_waste, 2),
-            "waste_rate_pct": round(waste_rate, 1),
-            "utilization_rate_pct": round(utilization_rate, 1),
-        },
-        "insight": _generate_waste_insight(waste_rate, adoption_rate),
-    })
+    return _ok(
+        {
+            "analysis_period_days": days,
+            "store_id": str(store_id) if store_id else None,
+            "ai_suggestions": {
+                "total_suggestions": total_suggestions,
+                "adopted_count": adopted,
+                "adoption_rate_pct": round(adoption_rate, 1),
+                "total_suggested_cost_fen": int(suggestion_stats.total_suggested_cost_fen or 0)
+                if suggestion_stats
+                else 0,
+                "adopted_cost_fen": int(suggestion_stats.adopted_cost_fen or 0) if suggestion_stats else 0,
+            },
+            "inventory_flow": {
+                "total_inbound": round(total_inbound, 2),
+                "total_usage": round(total_usage, 2),
+                "total_waste": round(total_waste, 2),
+                "waste_rate_pct": round(waste_rate, 1),
+                "utilization_rate_pct": round(utilization_rate, 1),
+            },
+            "insight": _generate_waste_insight(waste_rate, adoption_rate),
+        }
+    )
 
 
 def _generate_waste_insight(waste_rate: float, adoption_rate: float) -> str:

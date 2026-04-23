@@ -11,6 +11,7 @@
 # from .api.supplier_scoring_routes import router as supplier_scoring_router
 # app.include_router(supplier_scoring_router)
 """
+
 from __future__ import annotations
 
 from datetime import date
@@ -34,8 +35,10 @@ router = APIRouter(prefix="/api/v1/suppliers", tags=["supplier-scoring"])
 # 请求 / 响应模型
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 class TriggerScoreRequest(BaseModel):
     """POST /suppliers/{id}/score 请求体"""
+
     supplier_name: str = Field(description="供应商名称（用于 AI Prompt）")
     period_start: date = Field(description="评分周期开始日期")
     period_end: date = Field(description="评分周期结束日期")
@@ -73,10 +76,12 @@ class RankingItem(BaseModel):
 # ModelRouter 惰性加载（避免循环导入）
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def _get_model_router():
     """惰性获取 ModelRouter 实例。若模块不存在则返回 None（优雅降级）。"""
     try:
         from shared.core.model_router import ModelRouter  # type: ignore[import]
+
         return ModelRouter()
     except ImportError:
         logger.warning(
@@ -90,6 +95,7 @@ def _get_model_router():
 # POST /api/v1/suppliers/{supplier_id}/score
 # 手动触发评分
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @router.post("/{supplier_id}/score")
 async def trigger_supplier_score(
@@ -168,6 +174,7 @@ async def trigger_supplier_score(
 # GET /api/v1/suppliers/{supplier_id}/scores
 # 查询评分历史
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @router.get("/{supplier_id}/scores")
 async def get_supplier_score_history(
@@ -251,6 +258,7 @@ async def get_supplier_score_history(
 # 按综合分排名（取各供应商最新一期评分）
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 @router.get("/ranking")
 async def get_supplier_ranking(
     limit: int = Query(20, ge=1, le=100, description="返回前 N 名"),
@@ -303,11 +311,16 @@ async def get_supplier_ranking(
     """)
 
     try:
-        rows = (await db.execute(ranking_sql, {
-            "tenant_id": x_tenant_id,
-            "tier": tier,
-            "limit": limit,
-        })).fetchall()
+        rows = (
+            await db.execute(
+                ranking_sql,
+                {
+                    "tenant_id": x_tenant_id,
+                    "tier": tier,
+                    "limit": limit,
+                },
+            )
+        ).fetchall()
 
         ranking = []
         for i, r in enumerate(rows, start=1):
@@ -337,6 +350,7 @@ async def get_supplier_ranking(
 # ─────────────────────────────────────────────────────────────────────────────
 # 内部辅助
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 def _tier_label(tier: str) -> str:
     """将英文分级转换为中文标签。"""

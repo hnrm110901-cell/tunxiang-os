@@ -12,6 +12,7 @@
 
 测试数: 24
 """
+
 from __future__ import annotations
 
 import sys
@@ -33,16 +34,13 @@ sys.modules.setdefault("src.db", fake_db)
 # ── 标准导入 ──────────────────────────────────────────────────────────────────
 import os
 
-import pytest
-
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from unittest.mock import AsyncMock, patch
 
+from api.requisition_routes import router as req_router
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-
-from api.requisition_routes import router as req_router
 
 # ── App 组装 ──────────────────────────────────────────────────────────────────
 app = FastAPI()
@@ -77,8 +75,20 @@ class TestCreateRequisition:
                 "store_id": STORE_ID,
                 "requester_id": "emp_001",
                 "items": [
-                    {"ingredient_id": "i1", "name": "猪肉", "quantity": 10.0, "unit": "kg", "estimated_price_fen": 3500},
-                    {"ingredient_id": "i2", "name": "白菜", "quantity": 20.0, "unit": "kg", "estimated_price_fen": 1750},
+                    {
+                        "ingredient_id": "i1",
+                        "name": "猪肉",
+                        "quantity": 10.0,
+                        "unit": "kg",
+                        "estimated_price_fen": 3500,
+                    },
+                    {
+                        "ingredient_id": "i2",
+                        "name": "白菜",
+                        "quantity": 20.0,
+                        "unit": "kg",
+                        "estimated_price_fen": 1750,
+                    },
                 ],
             }
             with patch(f"{_MOD}.create_requisition", new_callable=AsyncMock, return_value=mock_ret):

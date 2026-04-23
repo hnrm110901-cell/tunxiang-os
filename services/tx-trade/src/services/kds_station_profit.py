@@ -16,6 +16,7 @@
 
 输出按档口分组，每档口一行汇总数据。
 """
+
 from datetime import date
 
 import structlog
@@ -86,11 +87,14 @@ async def get_station_profit_report(
         ORDER BY revenue DESC
     """)
 
-    result = await db.execute(sql, {
-        "tenant_id": tenant_id,
-        "start_date": start_date,
-        "end_date": end_date,
-    })
+    result = await db.execute(
+        sql,
+        {
+            "tenant_id": tenant_id,
+            "start_date": start_date,
+            "end_date": end_date,
+        },
+    )
     rows = result.mappings().all()
 
     report = []
@@ -104,16 +108,18 @@ async def get_station_profit_report(
         else:
             status = "danger"
 
-        report.append({
-            "dept_id": r["dept_id"],
-            "dept_name": r["dept_name"] or "未知档口",
-            "dish_count": int(r["dish_count"] or 0),
-            "revenue": float(r["revenue"] or 0),
-            "cost": float(r["cost"] or 0),
-            "profit": float(r["profit"] or 0),
-            "profit_margin_pct": profit_margin,
-            "status": status,
-        })
+        report.append(
+            {
+                "dept_id": r["dept_id"],
+                "dept_name": r["dept_name"] or "未知档口",
+                "dish_count": int(r["dish_count"] or 0),
+                "revenue": float(r["revenue"] or 0),
+                "cost": float(r["cost"] or 0),
+                "profit": float(r["profit"] or 0),
+                "profit_margin_pct": profit_margin,
+                "status": status,
+            }
+        )
 
     logger.info(
         "kds.station_profit.computed",

@@ -7,6 +7,7 @@ GET  /api/v1/discount/audit-log/high-risk — 高风险折扣记录
 统一响应格式: {"ok": bool, "data": {}, "error": {}}
 所有接口需 X-Tenant-ID header。
 """
+
 from __future__ import annotations
 
 from datetime import datetime
@@ -109,17 +110,17 @@ async def get_audit_summary(
         items = log_result.get("items", [])
         total_count = log_result.get("total", 0)
         total_discount = sum(float(i["discount_amount"]) for i in items)
-        high_risk_count = sum(
-            op["high_risk_count"] for op in high_risk_result.get("summary", [])
-        )
+        high_risk_count = sum(op["high_risk_count"] for op in high_risk_result.get("summary", []))
 
-        return _ok({
-            "period": period,
-            "total_count": total_count,
-            "total_discount_amount": round(total_discount, 2),
-            "high_risk_count": high_risk_count,
-            "by_operator": high_risk_result.get("summary", []),
-        })
+        return _ok(
+            {
+                "period": period,
+                "total_count": total_count,
+                "total_discount_amount": round(total_discount, 2),
+                "high_risk_count": high_risk_count,
+                "by_operator": high_risk_result.get("summary", []),
+            }
+        )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except SQLAlchemyError as exc:
@@ -150,7 +151,8 @@ async def get_high_risk(
         )
         threshold = Decimal(threshold_pct) / 100
         high_risk_items = [
-            item for item in result["items"]
+            item
+            for item in result["items"]
             if Decimal(item["original_amount"]) > 0
             and Decimal(item["discount_amount"]) / Decimal(item["original_amount"]) >= threshold
         ]
@@ -160,11 +162,13 @@ async def get_high_risk(
             threshold_pct=threshold_pct,
         )
 
-        return _ok({
-            "items": high_risk_items,
-            "threshold_pct": threshold_pct,
-            "operator_summary": summary_result.get("summary", []),
-        })
+        return _ok(
+            {
+                "items": high_risk_items,
+                "threshold_pct": threshold_pct,
+                "operator_summary": summary_result.get("summary", []),
+            }
+        )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except SQLAlchemyError as exc:

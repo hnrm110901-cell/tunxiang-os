@@ -5,6 +5,7 @@
 - warning: 接近超时阈值 -> WebSocket 推送标红到 KDS 前端
 - critical: 已超时(2x阈值) -> 推送告警到管理员手机 + 触发 serve_dispatch Agent
 """
+
 import os
 import uuid
 from datetime import datetime, timezone
@@ -291,9 +292,7 @@ async def _trigger_serve_dispatch_agent(
                 json={
                     "store_id": store_id,
                     "critical_count": critical_count,
-                    "timeout_items": [
-                        t for t in timeout_items if t["status"] == "critical"
-                    ],
+                    "timeout_items": [t for t in timeout_items if t["status"] == "critical"],
                 },
             )
     except (httpx.HTTPError, OSError) as exc:

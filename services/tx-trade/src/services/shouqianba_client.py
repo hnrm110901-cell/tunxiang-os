@@ -56,9 +56,7 @@ class ShouqianbaClient:
         self.terminal_key = terminal_key or os.environ["SHOUQIANBA_TERMINAL_KEY"]
         self.vendor_sn = vendor_sn or os.environ.get("SHOUQIANBA_VENDOR_SN", "")
         self.vendor_key = vendor_key or os.environ.get("SHOUQIANBA_VENDOR_KEY", "")
-        self._base_url = os.environ.get(
-            "SHOUQIANBA_BASE_URL", "https://vsi-api.shouqianba.com"
-        )
+        self._base_url = os.environ.get("SHOUQIANBA_BASE_URL", "https://vsi-api.shouqianba.com")
         self._external_client = http_client is not None
         self._client = http_client or httpx.AsyncClient(
             base_url=self._base_url,
@@ -111,9 +109,7 @@ class ShouqianbaClient:
             total_amount=total_amount,
             subject=subject,
         )
-        resp = await self._signed_request(
-            "/upay/v2/pay", body, timeout=self.PAY_TIMEOUT
-        )
+        resp = await self._signed_request("/upay/v2/pay", body, timeout=self.PAY_TIMEOUT)
         biz = self._extract_biz_response(resp, "pay")
 
         # 支付可能处于处理中，需要轮询
@@ -160,9 +156,7 @@ class ShouqianbaClient:
             total_amount=total_amount,
             subject=subject,
         )
-        resp = await self._signed_request(
-            "/upay/v2/precreate", body, timeout=self.PAY_TIMEOUT
-        )
+        resp = await self._signed_request("/upay/v2/precreate", body, timeout=self.PAY_TIMEOUT)
         return self._extract_biz_response(resp, "precreate")
 
     async def query(self, sn: str) -> dict:
@@ -219,9 +213,7 @@ class ShouqianbaClient:
             refund_request_no=refund_request_no,
             refund_amount=refund_amount,
         )
-        resp = await self._signed_request(
-            "/upay/v2/refund", body, timeout=self.PAY_TIMEOUT
-        )
+        resp = await self._signed_request("/upay/v2/refund", body, timeout=self.PAY_TIMEOUT)
         return self._extract_biz_response(resp, "refund")
 
     async def cancel(self, sn: str) -> dict:
@@ -240,9 +232,7 @@ class ShouqianbaClient:
             "sn": sn,
         }
         logger.info("sqb_cancel_request", sn=sn)
-        resp = await self._signed_request(
-            "/upay/v2/cancel", body, timeout=self.PAY_TIMEOUT
-        )
+        resp = await self._signed_request("/upay/v2/cancel", body, timeout=self.PAY_TIMEOUT)
         return self._extract_biz_response(resp, "cancel")
 
     # ─── 内部方法 ───────────────────────────

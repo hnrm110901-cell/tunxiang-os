@@ -11,6 +11,7 @@
   GET  /expo/{plan_id}/status         - 单桌协调状态
   POST /expo/dispatch/{order_id}/fire - 分单并创建TableFire计划（集成入口）
 """
+
 import uuid
 from typing import Optional
 
@@ -40,6 +41,7 @@ def _get_tenant_id(request: Request) -> str:
 
 # ─── 请求模型 ───
 
+
 class DispatchAndFireItem(BaseModel):
     dish_id: str
     item_name: str
@@ -50,6 +52,7 @@ class DispatchAndFireItem(BaseModel):
 
 class DispatchAndFireReq(BaseModel):
     """分单并创建TableFire协调计划的请求体"""
+
     items: list[DispatchAndFireItem]
     table_number: Optional[str] = None
     order_no: Optional[str] = None
@@ -59,6 +62,7 @@ class DispatchAndFireReq(BaseModel):
 # ═════════════════════════════════════════════
 # GET /expo/{store_id}/overview
 # ═════════════════════════════════════════════
+
 
 @router.get("/{store_id}/overview")
 async def expo_overview(
@@ -111,6 +115,7 @@ async def expo_overview(
 # POST /expo/{plan_id}/served
 # ═════════════════════════════════════════════
 
+
 @router.post("/{plan_id}/served")
 async def expo_mark_served(
     plan_id: str,
@@ -150,6 +155,7 @@ async def expo_mark_served(
 # ═════════════════════════════════════════════
 # GET /expo/{plan_id}/status
 # ═════════════════════════════════════════════
+
 
 @router.get("/{plan_id}/status")
 async def expo_plan_status(
@@ -210,9 +216,7 @@ async def expo_plan_status(
             "status": plan.status,
             "dept_readiness": readiness,
             "dept_delays": plan.dept_delays or {},
-            "target_completion": (
-                plan.target_completion.isoformat() if plan.target_completion else None
-            ),
+            "target_completion": (plan.target_completion.isoformat() if plan.target_completion else None),
             "ready_depts": ready,
             "total_depts": total,
         },
@@ -222,6 +226,7 @@ async def expo_plan_status(
 # ═════════════════════════════════════════════
 # POST /expo/dispatch/{order_id}/fire
 # ═════════════════════════════════════════════
+
 
 @router.post("/dispatch/{order_id}/fire")
 async def expo_dispatch_and_fire(

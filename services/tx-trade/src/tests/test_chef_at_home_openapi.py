@@ -1,4 +1,5 @@
 """大厨到家：main.py 挂载与路由前缀校验（不导入完整 FastAPI app，避免 CI/Python 版本差异）。"""
+
 from pathlib import Path
 
 

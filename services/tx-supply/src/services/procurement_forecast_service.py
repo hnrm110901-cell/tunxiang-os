@@ -22,6 +22,7 @@ AI 调用约束：
   - bom_templates / bom_items — BOM分解（可降级）
   - suppliers             — 供应商信息（可降级）
 """
+
 from __future__ import annotations
 
 import math
@@ -36,11 +37,11 @@ from .demand_forecast import DemandForecastService
 log = structlog.get_logger(__name__)
 
 # ─── 常量 ───
-AI_SUMMARY_THRESHOLD_FEN = 1_000_000   # 1万元（分）
-SAFETY_FACTOR = 1.1                    # EOQ 安全系数
+AI_SUMMARY_THRESHOLD_FEN = 1_000_000  # 1万元（分）
+SAFETY_FACTOR = 1.1  # EOQ 安全系数
 DEFAULT_FORECAST_DAYS = 7
-DEFAULT_LEAD_DAYS = 2                  # 供应商交期默认值（供应商信息缺失时）
-DEFAULT_PACKAGE_SIZE = 1.0             # 包装规格默认值
+DEFAULT_LEAD_DAYS = 2  # 供应商交期默认值（供应商信息缺失时）
+DEFAULT_PACKAGE_SIZE = 1.0  # 包装规格默认值
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -513,6 +514,7 @@ class ProcurementForecastService:
     ):
         """从 inventory_thresholds 获取门店阈值配置（复用 SmartReplenishmentService）"""
         from .smart_replenishment import SmartReplenishmentService
+
         svc = SmartReplenishmentService()
         return await svc.get_thresholds(store_id, tenant_id, db)
 
@@ -525,6 +527,7 @@ class ProcurementForecastService:
     ) -> dict[str, float]:
         """批量查询当前库存（复用 SmartReplenishmentService）"""
         from .smart_replenishment import SmartReplenishmentService
+
         svc = SmartReplenishmentService()
         return await svc._fetch_current_stocks(store_id, tenant_id, ingredient_ids, db)
 
@@ -613,17 +616,14 @@ class ProcurementForecastService:
         # 构建摘要上下文
         supplier_lines = []
         for order in orders:
-            items_str = "、".join(
-                f"{i.ingredient_name}×{i.purchase_qty}{i.unit}" for i in order.items
-            )
+            items_str = "、".join(f"{i.ingredient_name}×{i.purchase_qty}{i.unit}" for i in order.items)
             supplier_lines.append(
                 f"供应商 {order.supplier_id}（交期{order.lead_days}天）：{items_str}，小计{order.total_fen // 100}元"
             )
 
         prompt = (
             f"请为以下采购计划生成简洁的中文摘要（100字内），重点说明总金额、主要食材和风险提示：\n"
-            f"总金额：{total_yuan:.0f}元\n"
-            + "\n".join(supplier_lines)
+            f"总金额：{total_yuan:.0f}元\n" + "\n".join(supplier_lines)
         )
 
         router = ModelRouter()

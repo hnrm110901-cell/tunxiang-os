@@ -1,4 +1,5 @@
 """交易域 API — 订单 CRUD + 支付 + 小票打印（已接通数据库）"""
+
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -22,6 +23,7 @@ def _get_tenant_id(request: Request) -> str:
 
 
 # ─── 请求模型 ───
+
 
 class CreateOrderReq(BaseModel):
     store_id: str
@@ -65,12 +67,16 @@ class RefundReq(BaseModel):
 
 # ─── 订单端点 ───
 
+
 @router.post("/orders")
 async def create_order(req: CreateOrderReq, request: Request, db: AsyncSession = Depends(get_db)):
     svc = OrderService(db, _get_tenant_id(request))
     result = await svc.create_order(
-        store_id=req.store_id, order_type=req.order_type,
-        table_no=req.table_no, customer_id=req.customer_id, waiter_id=req.waiter_id,
+        store_id=req.store_id,
+        order_type=req.order_type,
+        table_no=req.table_no,
+        customer_id=req.customer_id,
+        waiter_id=req.waiter_id,
     )
     return {"ok": True, "data": result, "error": None}
 
@@ -79,15 +85,21 @@ async def create_order(req: CreateOrderReq, request: Request, db: AsyncSession =
 async def add_item(order_id: str, req: AddItemReq, request: Request, db: AsyncSession = Depends(get_db)):
     svc = OrderService(db, _get_tenant_id(request))
     result = await svc.add_item(
-        order_id=order_id, dish_id=req.dish_id, dish_name=req.dish_name,
-        quantity=req.quantity, unit_price_fen=req.unit_price_fen,
-        notes=req.notes, customizations=req.customizations,
+        order_id=order_id,
+        dish_id=req.dish_id,
+        dish_name=req.dish_name,
+        quantity=req.quantity,
+        unit_price_fen=req.unit_price_fen,
+        notes=req.notes,
+        customizations=req.customizations,
     )
     return {"ok": True, "data": result, "error": None}
 
 
 @router.patch("/orders/{order_id}/items/{item_id}")
-async def update_item(order_id: str, item_id: str, req: UpdateItemQtyReq, request: Request, db: AsyncSession = Depends(get_db)):
+async def update_item(
+    order_id: str, item_id: str, req: UpdateItemQtyReq, request: Request, db: AsyncSession = Depends(get_db)
+):
     svc = OrderService(db, _get_tenant_id(request))
     result = await svc.update_item_quantity(item_id=item_id, new_quantity=req.new_quantity)
     return {"ok": True, "data": result, "error": None}
@@ -132,12 +144,16 @@ async def get_order(order_id: str, request: Request, db: AsyncSession = Depends(
 
 # ─── 支付端点 ───
 
+
 @router.post("/orders/{order_id}/payments")
 async def create_payment(order_id: str, req: CreatePaymentReq, request: Request, db: AsyncSession = Depends(get_db)):
     svc = PaymentService(db, _get_tenant_id(request))
     result = await svc.create_payment(
-        order_id=order_id, method=req.method, amount_fen=req.amount_fen,
-        trade_no=req.trade_no, credit_account_name=req.credit_account_name,
+        order_id=order_id,
+        method=req.method,
+        amount_fen=req.amount_fen,
+        trade_no=req.trade_no,
+        credit_account_name=req.credit_account_name,
     )
     return {"ok": True, "data": result, "error": None}
 
@@ -146,8 +162,11 @@ async def create_payment(order_id: str, req: CreatePaymentReq, request: Request,
 async def refund(order_id: str, req: RefundReq, request: Request, db: AsyncSession = Depends(get_db)):
     svc = PaymentService(db, _get_tenant_id(request))
     result = await svc.process_refund(
-        order_id=order_id, payment_id=req.payment_id,
-        amount_fen=req.amount_fen, refund_type=req.refund_type, reason=req.reason,
+        order_id=order_id,
+        payment_id=req.payment_id,
+        amount_fen=req.amount_fen,
+        refund_type=req.refund_type,
+        reason=req.reason,
     )
     return {"ok": True, "data": result, "error": None}
 
@@ -160,6 +179,7 @@ async def get_payments(order_id: str, request: Request, db: AsyncSession = Depen
 
 
 # ─── 打印端点 ───
+
 
 @router.post("/orders/{order_id}/print/receipt")
 async def print_receipt(order_id: str, request: Request, db: AsyncSession = Depends(get_db)):

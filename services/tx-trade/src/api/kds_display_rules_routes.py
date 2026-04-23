@@ -11,6 +11,7 @@
 所有端点需要 X-Tenant-ID header。
 持久化方式：kds_display_rules 表（v210 迁移创建）。
 """
+
 from __future__ import annotations
 
 import json
@@ -29,6 +30,7 @@ router = APIRouter(tags=["kds-display-rules"])
 
 # ─── 公共依赖 ───────────────────────────────────────────────────────────────
 
+
 def _get_tenant_id(request: Request) -> str:
     tid = getattr(request.state, "tenant_id", None) or request.headers.get("X-Tenant-ID", "")
     if not tid:
@@ -37,6 +39,7 @@ def _get_tenant_id(request: Request) -> str:
 
 
 # ─── 请求 / 响应 Schemas ────────────────────────────────────────────────────
+
 
 class ChannelColors(BaseModel):
     dine_in: str = "#2ECC71"
@@ -70,6 +73,7 @@ _DEFAULTS = DisplayRulesPayload()
 
 # ─── GET /display-rules/{store_id} ──────────────────────────────────────────
 
+
 @router.get("/display-rules/{store_id}")
 async def get_display_rules(
     store_id: str,
@@ -99,6 +103,7 @@ async def get_display_rules(
 
 
 # ─── PUT /display-rules/{store_id} ──────────────────────────────────────────
+
 
 @router.put("/display-rules/{store_id}")
 async def put_display_rules(

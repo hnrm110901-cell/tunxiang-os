@@ -18,6 +18,7 @@
 
 统一响应格式: {"ok": bool, "data": {}, "error": {}}
 """
+
 from __future__ import annotations
 
 import structlog
@@ -31,10 +32,9 @@ log = structlog.get_logger(__name__)
 
 _PERIOD_MAP: dict[str, int] = {
     "today": 1,
-    "week":  7,
+    "week": 7,
     "month": 30,
 }
-
 
 
 def _compute_quadrant(sales: int, margin: float, avg_sales: float, avg_margin: float) -> str:
@@ -55,23 +55,25 @@ def _build_analysis(raw: list[dict]) -> dict:
     dishes: list[dict] = []
     for d in raw:
         price = d.get("price") or 0
-        cost  = d.get("cost")  or 0
+        cost = d.get("cost") or 0
         margin = round((price - cost) / price, 4) if price > 0 else 0.0
-        dishes.append({
-            "id":           d["id"],
-            "name":         d["name"],
-            "category":     d.get("category", ""),
-            "price":        price,
-            "cost":         cost,
-            "gross_margin": margin,
-            "sales_count":  d.get("sales_count", 0),
-            "quadrant":     "",          # 待填充
-        })
+        dishes.append(
+            {
+                "id": d["id"],
+                "name": d["name"],
+                "category": d.get("category", ""),
+                "price": price,
+                "cost": cost,
+                "gross_margin": margin,
+                "sales_count": d.get("sales_count", 0),
+                "quadrant": "",  # 待填充
+            }
+        )
 
     if not dishes:
         return {"dishes": [], "summary": {"star": 0, "cash_cow": 0, "plowshare": 0, "dog": 0}}
 
-    avg_sales  = sum(d["sales_count"] for d in dishes) / len(dishes)
+    avg_sales = sum(d["sales_count"] for d in dishes) / len(dishes)
     avg_margin = sum(d["gross_margin"] for d in dishes) / len(dishes)
 
     summary = {"star": 0, "cash_cow": 0, "plowshare": 0, "dog": 0}
@@ -85,22 +87,20 @@ def _build_analysis(raw: list[dict]) -> dict:
 
 # ─── 工具：提取租户ID ───
 
+
 def _tenant_id(request: Request) -> str:
-    return (
-        getattr(request.state, "tenant_id", None)
-        or request.headers.get("X-Tenant-ID", "")
-        or "default"
-    )
+    return getattr(request.state, "tenant_id", None) or request.headers.get("X-Tenant-ID", "") or "default"
 
 
 # ─── 路由 ───
 
+
 @router.get("/api/v1/menu/engineering-analysis")
 async def get_engineering_analysis(
     request: Request,
-    period:   str = Query(default="week",  description="统计周期: today/week/month"),
-    store_id: str = Query(default="",      description="门店ID"),
-    category: str = Query(default="",      description="分类筛选（空=全部）"),
+    period: str = Query(default="week", description="统计周期: today/week/month"),
+    store_id: str = Query(default="", description="门店ID"),
+    category: str = Query(default="", description="分类筛选（空=全部）"),
 ) -> dict:
     """
     菜单工程分析 — BCG 矩阵变体。
@@ -157,11 +157,11 @@ async def get_engineering_analysis(
 
             for row in rows:
                 entry = {
-                    "id":          str(row.id),
-                    "name":        row.name,
-                    "category":    "",
-                    "price":       row.price or 0,
-                    "cost":        row.cost  or 0,
+                    "id": str(row.id),
+                    "name": row.name,
+                    "category": "",
+                    "price": row.price or 0,
+                    "cost": row.cost or 0,
                     "sales_count": int(row.sales_count),
                 }
                 raw.append(entry)

@@ -4,6 +4,7 @@
 同桌多人可同时点餐，合并到同一订单。
 下单后自动同步KDS。
 """
+
 import hashlib
 import uuid
 from datetime import date, datetime, timedelta, timezone
@@ -48,10 +49,7 @@ def generate_table_qrcode(
     short_code = _store_short_code(store_id)
     qrcode = f"TX-{short_code}-{table_id}"
     # 小程序扫码后跳转的页面路径
-    miniapp_path = (
-        f"/pages/scan-order/index?code={qrcode}"
-        f"&store_id={store_id}&table_id={table_id}"
-    )
+    miniapp_path = f"/pages/scan-order/index?code={qrcode}&store_id={store_id}&table_id={table_id}"
 
     logger.info(
         "table_qrcode_generated",
@@ -204,12 +202,14 @@ async def create_scan_order(
         )
         db.add(order_item)
         total_added_fen += subtotal
-        added_items.append({
-            "item_id": str(order_item.id),
-            "dish_name": dish.dish_name,
-            "quantity": qty,
-            "subtotal_fen": subtotal,
-        })
+        added_items.append(
+            {
+                "item_id": str(order_item.id),
+                "dish_name": dish.dish_name,
+                "quantity": qty,
+                "subtotal_fen": subtotal,
+            }
+        )
 
     # 更新订单总额
     if total_added_fen > 0:
@@ -321,12 +321,14 @@ async def add_items_to_order(
         )
         db.add(order_item)
         total_added_fen += subtotal
-        added_items.append({
-            "item_id": str(order_item.id),
-            "dish_name": dish.dish_name,
-            "quantity": qty,
-            "subtotal_fen": subtotal,
-        })
+        added_items.append(
+            {
+                "item_id": str(order_item.id),
+                "dish_name": dish.dish_name,
+                "quantity": qty,
+                "subtotal_fen": subtotal,
+            }
+        )
 
     # 更新订单总额
     if total_added_fen > 0:
@@ -536,13 +538,15 @@ async def sync_to_kds(
     # 构造 KDS 分单数据
     kds_items = []
     for item in unsent_items:
-        kds_items.append({
-            "dish_id": str(item.dish_id) if item.dish_id else "",
-            "item_name": item.item_name,
-            "quantity": item.quantity,
-            "order_item_id": str(item.id),
-            "notes": item.notes or "",
-        })
+        kds_items.append(
+            {
+                "dish_id": str(item.dish_id) if item.dish_id else "",
+                "item_name": item.item_name,
+                "quantity": item.quantity,
+                "order_item_id": str(item.id),
+                "notes": item.notes or "",
+            }
+        )
 
     # 触发 KDS 分单 + 厨打
     dispatch_result = await dispatch_order_to_kds(

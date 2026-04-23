@@ -12,6 +12,7 @@
 9.  test_queue_my_ticket_not_found     — mock SELECT 空，ticket_id 传空 → 200，data=None
 10. test_queue_cancel_success          — mock UPDATE RETURNING 1 行 → 200，ok=True
 """
+
 from __future__ import annotations
 
 import os
@@ -23,13 +24,12 @@ import uuid
 from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock
 
-import pytest
+from api.customer_booking_routes import router
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from api.customer_booking_routes import router
 from shared.ontology.src.database import get_db
 
 # ─── 常量 ────────────────────────────────────────────────────────────────────
@@ -45,6 +45,7 @@ _NOW = datetime(2026, 7, 1, 12, 0, 0, tzinfo=timezone.utc)
 
 
 # ─── 辅助工厂 ────────────────────────────────────────────────────────────────
+
 
 def mock_db() -> AsyncMock:
     """返回一个最小可用的 AsyncSession mock。"""
@@ -102,6 +103,7 @@ def _make_app(db: AsyncMock) -> FastAPI:
 # 1. test_create_booking_success
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_create_booking_success():
     """INSERT RETURNING 成功 → HTTP 200，ok=True，data 含 id 字段。"""
     booking_id = str(uuid.uuid4())
@@ -146,6 +148,7 @@ def test_create_booking_success():
 # 2. test_create_booking_db_error
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_create_booking_db_error():
     """SQLAlchemyError → HTTP 200，ok=False，error 非空。
 
@@ -178,6 +181,7 @@ def test_create_booking_db_error():
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 3. test_list_bookings_success
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 def test_list_bookings_success():
     """SELECT 返回 2 条记录 → HTTP 200，ok=True，data.items 长度=2。"""
@@ -232,6 +236,7 @@ def test_list_bookings_success():
 # 4. test_list_bookings_empty
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_list_bookings_empty():
     """SELECT 返回空 → HTTP 200，ok=True，data.items=[]。"""
     set_cfg_result = MagicMock()
@@ -258,6 +263,7 @@ def test_list_bookings_empty():
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 5. test_cancel_booking_success
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 def test_cancel_booking_success():
     """UPDATE RETURNING 1 行 → HTTP 200，ok=True，data.status='cancelled'。"""
@@ -288,6 +294,7 @@ def test_cancel_booking_success():
 # 6. test_cancel_booking_not_found
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_cancel_booking_not_found():
     """UPDATE RETURNING 空（rec=None） → HTTP 200，ok=False（路由返回 _err_resp）。
 
@@ -317,6 +324,7 @@ def test_cancel_booking_not_found():
 # 7. test_queue_take_success
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_queue_take_success():
     """当日已有 2 条记录 → ticket_no='A003'，HTTP 200，ok=True。
 
@@ -329,21 +337,25 @@ def test_queue_take_success():
     ticket_uuid = uuid.uuid4()
 
     set_cfg_result = MagicMock()
-    count_today_result = _make_result(scalar_val=2)          # 已有 2 条，下一个 = A003
-    insert_result = _make_result(one={
-        "id": ticket_uuid,
-        "status": "waiting",
-        "created_at": _NOW,
-    })
-    count_waiting_result = _make_result(scalar_val=1)        # waiting=1，ahead=0
+    count_today_result = _make_result(scalar_val=2)  # 已有 2 条，下一个 = A003
+    insert_result = _make_result(
+        one={
+            "id": ticket_uuid,
+            "status": "waiting",
+            "created_at": _NOW,
+        }
+    )
+    count_waiting_result = _make_result(scalar_val=1)  # waiting=1，ahead=0
 
     db = mock_db()
-    db.execute = AsyncMock(side_effect=[
-        set_cfg_result,
-        count_today_result,
-        insert_result,
-        count_waiting_result,
-    ])
+    db.execute = AsyncMock(
+        side_effect=[
+            set_cfg_result,
+            count_today_result,
+            insert_result,
+            count_waiting_result,
+        ]
+    )
 
     app = _make_app(db)
     client = TestClient(app)
@@ -369,6 +381,7 @@ def test_queue_take_success():
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 8. test_queue_my_ticket_success
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 def test_queue_my_ticket_success():
     """SELECT 1 条 ticket → HTTP 200，ok=True，data 含 ticketNo 字段。
@@ -402,11 +415,13 @@ def test_queue_my_ticket_success():
     count_ahead_result = _make_result(scalar_val=0)
 
     db = mock_db()
-    db.execute = AsyncMock(side_effect=[
-        set_cfg_result,
-        select_result,
-        count_ahead_result,
-    ])
+    db.execute = AsyncMock(
+        side_effect=[
+            set_cfg_result,
+            select_result,
+            count_ahead_result,
+        ]
+    )
 
     app = _make_app(db)
     client = TestClient(app)
@@ -427,6 +442,7 @@ def test_queue_my_ticket_success():
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 9. test_queue_my_ticket_not_found
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 def test_queue_my_ticket_not_found():
     """ticket_id 未传（空字符串）→ 路由提前返回 ok=True，data=None（不查 DB）。
@@ -457,15 +473,18 @@ def test_queue_my_ticket_not_found():
 # 10. test_queue_cancel_success
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_queue_cancel_success():
     """UPDATE RETURNING 1 行 → HTTP 200，ok=True，data.status='cancelled'。"""
     ticket_id = str(uuid.uuid4())
 
     set_cfg_result = MagicMock()
-    update_result = _make_result(first={
-        "id": uuid.UUID(ticket_id),
-        "ticket_no": "A001",
-    })
+    update_result = _make_result(
+        first={
+            "id": uuid.UUID(ticket_id),
+            "ticket_no": "A001",
+        }
+    )
 
     db = mock_db()
     db.execute = AsyncMock(side_effect=[set_cfg_result, update_result])

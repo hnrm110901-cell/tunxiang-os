@@ -22,6 +22,7 @@
   GET    /api/v1/supply/voice-count/sessions/{session_id}/variance  — 差异分析
   POST   /api/v1/supply/voice-count/sessions/{session_id}/submit    — 提交盘点单
 """
+
 import asyncio
 import difflib
 import json
@@ -63,21 +64,60 @@ def _err(msg: str, code: int = 400) -> None:
 
 # 中文数字映射
 _CN_DIGIT_MAP = {
-    "零": 0, "一": 1, "二": 2, "三": 3, "四": 4,
-    "五": 5, "六": 6, "七": 7, "八": 8, "九": 9,
-    "十": 10, "百": 100, "千": 1000,
+    "零": 0,
+    "一": 1,
+    "二": 2,
+    "三": 3,
+    "四": 4,
+    "五": 5,
+    "六": 6,
+    "七": 7,
+    "八": 8,
+    "九": 9,
+    "十": 10,
+    "百": 100,
+    "千": 1000,
     # 兼容大写数字
-    "壹": 1, "贰": 2, "叁": 3, "肆": 4, "伍": 5,
-    "陆": 6, "柒": 7, "捌": 8, "玖": 9, "拾": 10, "佰": 100,
+    "壹": 1,
+    "贰": 2,
+    "叁": 3,
+    "肆": 4,
+    "伍": 5,
+    "陆": 6,
+    "柒": 7,
+    "捌": 8,
+    "玖": 9,
+    "拾": 10,
+    "佰": 100,
 }
 
 # 支持的计量单位（按优先级排列）
 _UNITS = [
-    "公斤", "千克", "克", "斤", "两",  # 重量
-    "升", "毫升", "斤",                  # 体积
-    "箱", "件", "包", "袋", "瓶", "桶", "罐", "盒",  # 包装
-    "个", "只", "条", "块", "片", "颗", "粒", "根",  # 计件
-    "份",                                 # 份量
+    "公斤",
+    "千克",
+    "克",
+    "斤",
+    "两",  # 重量
+    "升",
+    "毫升",
+    "斤",  # 体积
+    "箱",
+    "件",
+    "包",
+    "袋",
+    "瓶",
+    "桶",
+    "罐",
+    "盒",  # 包装
+    "个",
+    "只",
+    "条",
+    "块",
+    "片",
+    "颗",
+    "粒",
+    "根",  # 计件
+    "份",  # 份量
 ]
 
 # 单位标准化映射
@@ -222,11 +262,11 @@ def parse_voice_inventory_text(raw_text: str, item_list: list) -> dict:
             unit = unit_match.group(1)
             unit = _UNIT_NORMALIZE.get(unit, unit)
             # 商品名 = 去掉数字和单位后的文本
-            name_candidate = text[:arabic_match.start()].strip()
+            name_candidate = text[: arabic_match.start()].strip()
             if not name_candidate:
-                name_candidate = text[num_end + unit_match.end():].strip()
+                name_candidate = text[num_end + unit_match.end() :].strip()
         else:
-            name_candidate = text[:arabic_match.start()].strip()
+            name_candidate = text[: arabic_match.start()].strip()
             if not name_candidate:
                 name_candidate = text[num_end:].strip()
 
@@ -239,11 +279,11 @@ def parse_voice_inventory_text(raw_text: str, item_list: list) -> dict:
             if unit_match:
                 unit = unit_match.group(1)
                 unit = _UNIT_NORMALIZE.get(unit, unit)
-                name_candidate = text[:cn_match.start()].strip()
+                name_candidate = text[: cn_match.start()].strip()
                 if not name_candidate:
-                    name_candidate = text[num_end + unit_match.end():].strip()
+                    name_candidate = text[num_end + unit_match.end() :].strip()
             else:
-                name_candidate = text[:cn_match.start()].strip()
+                name_candidate = text[: cn_match.start()].strip()
                 if not name_candidate:
                     name_candidate = text[num_end:].strip()
 
@@ -291,16 +331,11 @@ def parse_voice_inventory_text(raw_text: str, item_list: list) -> dict:
         }
 
     # 模糊匹配（cutoff=0.6 中等置信度；cutoff=0.4 低置信度备选）
-    close_matches = difflib.get_close_matches(
-        name_candidate, item_names, n=5, cutoff=0.4
-    )
+    close_matches = difflib.get_close_matches(name_candidate, item_names, n=5, cutoff=0.4)
 
     if not close_matches:
         # 尝试包含匹配（商品名包含关键词）
-        close_matches = [
-            n for n in item_names
-            if name_candidate and (name_candidate in n or n in name_candidate)
-        ][:5]
+        close_matches = [n for n in item_names if name_candidate and (name_candidate in n or n in name_candidate)][:5]
 
     if not close_matches:
         return {
@@ -362,6 +397,7 @@ def parse_voice_inventory_text(raw_text: str, item_list: list) -> dict:
 
 class CreateVoiceCountSessionReq(BaseModel):
     """创建语音盘点会话"""
+
     store_id: str = Field(description="门店ID")
     warehouse_id: Optional[str] = Field(default=None, description="仓库ID（不传则盘整个门店）")
     count_type: str = Field(
@@ -377,6 +413,7 @@ class CreateVoiceCountSessionReq(BaseModel):
 
 class VoiceEntryReq(BaseModel):
     """语音识别提交"""
+
     raw_text: str = Field(description="ASR原始文字，如：五花肉三十五点五公斤")
     confidence: float = Field(ge=0.0, le=1.0, description="ASR置信度（0-1）")
     audio_duration_ms: int = Field(ge=0, description="语音时长（毫秒）")
@@ -384,6 +421,7 @@ class VoiceEntryReq(BaseModel):
 
 class ConfirmEntryReq(BaseModel):
     """确认/修正语音录入"""
+
     item_id: str = Field(description="物料ID")
     quantity: float = Field(gt=0, description="盘点数量")
     unit: str = Field(description="计量单位")
@@ -499,15 +537,17 @@ async def create_voice_count_session(
         store_id=req.store_id,
         item_count=len(item_list),
     )
-    return _ok({
-        "session_id": session_id,
-        "store_id": req.store_id,
-        "count_type": req.count_type,
-        "status": "open",
-        "item_list": item_list,
-        "total_items": len(item_list),
-        "created_at": now.isoformat(),
-    })
+    return _ok(
+        {
+            "session_id": session_id,
+            "store_id": req.store_id,
+            "count_type": req.count_type,
+            "status": "open",
+            "item_list": item_list,
+            "total_items": len(item_list),
+            "created_at": now.isoformat(),
+        }
+    )
 
 
 @router.get("/sessions/{session_id}")
@@ -612,17 +652,19 @@ async def submit_voice_entry(
         confidence_level=parse_result["confidence_level"],
     )
 
-    return _ok({
-        "recognized": parse_result["recognized"],
-        "item_id": parse_result["item_id"],
-        "item_name": parse_result["item_name"],
-        "quantity": parse_result["quantity"],
-        "unit": parse_result["unit"],
-        "confidence_level": parse_result["confidence_level"],
-        "alternatives": parse_result["alternatives"],
-        "asr_confidence": req.confidence,
-        "parse_detail": parse_result["parse_detail"],
-    })
+    return _ok(
+        {
+            "recognized": parse_result["recognized"],
+            "item_id": parse_result["item_id"],
+            "item_name": parse_result["item_name"],
+            "quantity": parse_result["quantity"],
+            "unit": parse_result["unit"],
+            "confidence_level": parse_result["confidence_level"],
+            "alternatives": parse_result["alternatives"],
+            "asr_confidence": req.confidence,
+            "parse_detail": parse_result["parse_detail"],
+        }
+    )
 
 
 @router.post("/sessions/{session_id}/entries")
@@ -720,15 +762,17 @@ async def confirm_entry(
         unit=req.unit,
         source=req.source,
     )
-    return _ok({
-        "entry_id": entry_id,
-        "session_id": session_id,
-        "item_id": req.item_id,
-        "item_name": item["item_name"],
-        "quantity": req.quantity,
-        "unit": req.unit,
-        "source": req.source,
-    })
+    return _ok(
+        {
+            "entry_id": entry_id,
+            "session_id": session_id,
+            "item_id": req.item_id,
+            "item_name": item["item_name"],
+            "quantity": req.quantity,
+            "unit": req.unit,
+            "source": req.source,
+        }
+    )
 
 
 @router.get("/sessions/{session_id}/entries")
@@ -847,16 +891,18 @@ async def get_variance(
         cost_fen = cost_map.get(item_id, 0)
         variance_amount_fen = int(variance * cost_fen)
 
-        variance_list.append({
-            "item_id": item_id,
-            "item_name": item["item_name"],
-            "unit": item.get("unit", ""),
-            "expected": expected,
-            "counted": counted,
-            "is_counted": entry is not None,
-            "variance": round(variance, 3),
-            "variance_amount_fen": variance_amount_fen,
-        })
+        variance_list.append(
+            {
+                "item_id": item_id,
+                "item_name": item["item_name"],
+                "unit": item.get("unit", ""),
+                "expected": expected,
+                "counted": counted,
+                "is_counted": entry is not None,
+                "variance": round(variance, 3),
+                "variance_amount_fen": variance_amount_fen,
+            }
+        )
 
     # 按差异绝对值排序，差异大的排前面
     variance_list.sort(key=lambda x: abs(x["variance_amount_fen"]), reverse=True)
@@ -865,17 +911,19 @@ async def get_variance(
     variance_items_count = sum(1 for v in variance_list if v["variance"] != 0)
     uncounted_items = sum(1 for v in variance_list if not v["is_counted"])
 
-    return _ok({
-        "session_id": session_id,
-        "variance_list": variance_list,
-        "summary": {
-            "total_items": len(variance_list),
-            "counted_items": len(variance_list) - uncounted_items,
-            "uncounted_items": uncounted_items,
-            "variance_items": variance_items_count,
-            "total_variance_amount_fen": total_variance_amount_fen,
-        },
-    })
+    return _ok(
+        {
+            "session_id": session_id,
+            "variance_list": variance_list,
+            "summary": {
+                "total_items": len(variance_list),
+                "counted_items": len(variance_list) - uncounted_items,
+                "uncounted_items": uncounted_items,
+                "variance_items": variance_items_count,
+                "total_variance_amount_fen": total_variance_amount_fen,
+            },
+        }
+    )
 
 
 @router.post("/sessions/{session_id}/submit")
@@ -961,16 +1009,18 @@ async def submit_voice_count(
             variance_items += 1
             total_variance_amount_fen += variance_amount_fen
 
-        count_items.append({
-            "item_id": item_id,
-            "item_name": item["item_name"],
-            "unit": item.get("unit", ""),
-            "expected": expected,
-            "counted": counted,
-            "variance": round(variance, 3),
-            "variance_amount_fen": variance_amount_fen,
-            "source": entry["source"] if entry else "expected",
-        })
+        count_items.append(
+            {
+                "item_id": item_id,
+                "item_name": item["item_name"],
+                "unit": item.get("unit", ""),
+                "expected": expected,
+                "counted": counted,
+                "variance": round(variance, 3),
+                "variance_amount_fen": variance_amount_fen,
+                "source": entry["source"] if entry else "expected",
+            }
+        )
 
     try:
         # 写入盘点单主表
@@ -1044,20 +1094,22 @@ async def submit_voice_count(
         _err(f"提交盘点失败：{exc}", code=500)
 
     # 旁路写入事件总线
-    asyncio.create_task(emit_event(
-        event_type=InventoryEventType.ADJUSTED,
-        tenant_id=x_tenant_id,
-        stream_id=count_sheet_id,
-        payload={
-            "count_sheet_no": count_sheet_no,
-            "total_items": len(count_items),
-            "variance_items": variance_items,
-            "total_variance_amount_fen": total_variance_amount_fen,
-            "source": "voice_count",
-        },
-        store_id=session["store_id"],
-        source_service="tx-supply",
-    ))
+    asyncio.create_task(
+        emit_event(
+            event_type=InventoryEventType.ADJUSTED,
+            tenant_id=x_tenant_id,
+            stream_id=count_sheet_id,
+            payload={
+                "count_sheet_no": count_sheet_no,
+                "total_items": len(count_items),
+                "variance_items": variance_items,
+                "total_variance_amount_fen": total_variance_amount_fen,
+                "source": "voice_count",
+            },
+            store_id=session["store_id"],
+            source_service="tx-supply",
+        )
+    )
 
     logger.info(
         "voice_count_submitted",
@@ -1066,12 +1118,14 @@ async def submit_voice_count(
         total_items=len(count_items),
         variance_items=variance_items,
     )
-    return _ok({
-        "count_sheet_id": count_sheet_id,
-        "count_sheet_no": count_sheet_no,
-        "session_id": session_id,
-        "total_items": len(count_items),
-        "variance_items": variance_items,
-        "total_variance_amount_fen": total_variance_amount_fen,
-        "status": "submitted",
-    })
+    return _ok(
+        {
+            "count_sheet_id": count_sheet_id,
+            "count_sheet_no": count_sheet_no,
+            "session_id": session_id,
+            "total_items": len(count_items),
+            "variance_items": variance_items,
+            "total_variance_amount_fen": total_variance_amount_fen,
+            "status": "submitted",
+        }
+    )

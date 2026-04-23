@@ -6,6 +6,7 @@
 服务费阶梯：4人以下60000分, 4-8人80000分, 8人以上120000分。
 厨师状态：available / booked / on_service / off_duty。
 """
+
 import uuid
 from datetime import datetime, timezone
 from typing import Optional
@@ -34,9 +35,9 @@ def _now_iso() -> str:
 # ─── 服务费阶梯（分） ───
 
 SERVICE_FEE_TIERS = [
-    (4, 60000),    # 4人以下: 600元
-    (8, 80000),    # 4-8人: 800元
-    (999, 120000), # 8人以上: 1200元
+    (4, 60000),  # 4人以下: 600元
+    (8, 80000),  # 4-8人: 800元
+    (999, 120000),  # 8人以上: 1200元
 ]
 
 # 食材费基数（分/人），实际应从菜品BOM计算
@@ -48,8 +49,14 @@ _TRANSPORT_FEE_PER_KM_FEN = 500  # 5元/公里
 CHEF_STATUSES = ("available", "booked", "on_service", "off_duty")
 
 BOOKING_STATUSES = (
-    "pending", "confirmed", "chef_departed", "chef_arrived",
-    "cooking", "completed", "cancelled", "rated",
+    "pending",
+    "confirmed",
+    "chef_departed",
+    "chef_arrived",
+    "cooking",
+    "completed",
+    "cancelled",
+    "rated",
 )
 
 
@@ -63,33 +70,46 @@ def _calc_service_fee_fen(guest_count: int) -> int:
 
 # ─── 初始化示例厨师数据 ───
 
+
 def _ensure_sample_chefs(tenant_id: str) -> None:
     """确保有示例厨师数据（仅开发用）"""
     if any(c["tenant_id"] == tenant_id for c in _chefs.values()):
         return
     samples = [
         {
-            "name": "王大厨", "title": "行政总厨",
+            "name": "王大厨",
+            "title": "行政总厨",
             "cuisine_types": ["湘菜", "海鲜"],
             "specialties": ["剁椒鱼头", "清蒸龙虾", "蒜蓉粉丝蒸扇贝"],
-            "years_experience": 18, "rating": 4.9, "total_services": 326,
-            "avatar": "/static/chef-wang.jpg", "area": "长沙",
+            "years_experience": 18,
+            "rating": 4.9,
+            "total_services": 326,
+            "avatar": "/static/chef-wang.jpg",
+            "area": "长沙",
             "status": "available",
         },
         {
-            "name": "李师傅", "title": "金牌厨师",
+            "name": "李师傅",
+            "title": "金牌厨师",
             "cuisine_types": ["粤菜", "海鲜"],
             "specialties": ["白灼海虾", "蒸石斑", "避风塘炒蟹"],
-            "years_experience": 12, "rating": 4.8, "total_services": 218,
-            "avatar": "/static/chef-li.jpg", "area": "长沙",
+            "years_experience": 12,
+            "rating": 4.8,
+            "total_services": 218,
+            "avatar": "/static/chef-li.jpg",
+            "area": "长沙",
             "status": "available",
         },
         {
-            "name": "陈大厨", "title": "资深厨师",
+            "name": "陈大厨",
+            "title": "资深厨师",
             "cuisine_types": ["湘菜", "川菜"],
             "specialties": ["口味虾", "辣椒炒肉", "水煮鱼"],
-            "years_experience": 15, "rating": 4.7, "total_services": 189,
-            "avatar": "/static/chef-chen.jpg", "area": "长沙",
+            "years_experience": 15,
+            "rating": 4.7,
+            "total_services": 189,
+            "avatar": "/static/chef-chen.jpg",
+            "area": "长沙",
             "status": "available",
         },
     ]
@@ -215,17 +235,19 @@ async def list_available_chefs(
         if has_conflict:
             continue
 
-        results.append({
-            "id": chef["id"],
-            "name": chef["name"],
-            "title": chef["title"],
-            "cuisine_types": chef["cuisine_types"],
-            "specialties": chef["specialties"],
-            "years_experience": chef["years_experience"],
-            "rating": chef["rating"],
-            "total_services": chef["total_services"],
-            "avatar": chef["avatar"],
-        })
+        results.append(
+            {
+                "id": chef["id"],
+                "name": chef["name"],
+                "title": chef["title"],
+                "cuisine_types": chef["cuisine_types"],
+                "specialties": chef["specialties"],
+                "years_experience": chef["years_experience"],
+                "rating": chef["rating"],
+                "total_services": chef["total_services"],
+                "avatar": chef["avatar"],
+            }
+        )
 
     logger.info(
         "chef_at_home.chefs_listed",
@@ -491,16 +513,15 @@ async def get_booking_history(
 ) -> dict:
     """获取顾客预约历史"""
     all_bookings = [
-        b for b in _bookings.values()
-        if b["tenant_id"] == tenant_id
-        and b["customer_id"] == customer_id
-        and not b["is_deleted"]
+        b
+        for b in _bookings.values()
+        if b["tenant_id"] == tenant_id and b["customer_id"] == customer_id and not b["is_deleted"]
     ]
     all_bookings.sort(key=lambda b: b["created_at"], reverse=True)
 
     total = len(all_bookings)
     start = (page - 1) * size
-    items = all_bookings[start:start + size]
+    items = all_bookings[start : start + size]
 
     logger.info(
         "chef_at_home.history_listed",
@@ -549,10 +570,12 @@ async def get_chef_schedule(
     calendar = []
     for day in range(1, days_in_month + 1):
         date_str = f"{month}-{day:02d}"
-        calendar.append({
-            "date": date_str,
-            "available": date_str not in booked_dates,
-        })
+        calendar.append(
+            {
+                "date": date_str,
+                "available": date_str not in booked_dates,
+            }
+        )
 
     logger.info(
         "chef_at_home.schedule_viewed",

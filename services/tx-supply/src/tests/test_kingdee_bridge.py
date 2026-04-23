@@ -12,6 +12,7 @@
 9. 凭证金额单位为分
 10. 导出记录结构完整性
 """
+
 import os
 import sys
 from unittest.mock import AsyncMock, MagicMock
@@ -42,6 +43,7 @@ from services.kingdee_bridge import (
 
 # ─── Mock 工具 ───
 
+
 def _make_mock_db(rows=None, scalar_value=None, mappings_first=None):
     """构建 mock AsyncSession"""
     mock_db = AsyncMock()
@@ -62,6 +64,7 @@ def _make_mock_db(rows=None, scalar_value=None, mappings_first=None):
 
 
 # ─── 测试 ───
+
 
 class TestVoucherEntry:
     def test_make_entry_debit(self):
@@ -199,6 +202,7 @@ class TestExportHistory:
         mock_db = AsyncMock()
 
         call_count = 0
+
         async def side_effect(*args, **kwargs):
             nonlocal call_count
             call_count += 1
@@ -247,8 +251,14 @@ class TestExportRecordStructure:
         result = await export_purchase_receipt("store1", "2026-03", "t1", db)
 
         required_fields = [
-            "export_id", "export_type", "store_id", "period",
-            "tenant_id", "status", "voucher", "created_at",
+            "export_id",
+            "export_type",
+            "store_id",
+            "period",
+            "tenant_id",
+            "status",
+            "voucher",
+            "created_at",
         ]
         for field in required_fields:
             assert field in result, f"Missing field: {field}"

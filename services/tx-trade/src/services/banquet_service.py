@@ -5,6 +5,7 @@
 
 所有金额单位：分（fen）。
 """
+
 import uuid
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
@@ -17,9 +18,11 @@ logger = structlog.get_logger()
 
 # ─── 数据模型 ───
 
+
 @dataclass
 class BanquetProposal:
     """宴会方案"""
+
     proposal_id: str
     event_type: str  # wedding/birthday/business/team_building/anniversary
     guest_count: int
@@ -37,6 +40,7 @@ class BanquetProposal:
 @dataclass
 class BanquetCostEstimate:
     """宴会成本估算"""
+
     proposal_id: str
     food_cost_fen: int
     labor_cost_fen: int
@@ -108,23 +112,23 @@ EVENT_TYPE_CONFIG = {
 # 菜品单价参考（分/位）— 用于方案测算
 TIER_PRICING = {
     "economy": {
-        "wedding": 68800,      # 688元/位
-        "birthday": 58800,     # 588元/位
-        "business": 78800,     # 788元/位
+        "wedding": 68800,  # 688元/位
+        "birthday": 58800,  # 588元/位
+        "business": 78800,  # 788元/位
         "team_building": 18800,  # 188元/位
         "anniversary": 58800,  # 588元/位
     },
     "standard": {
-        "wedding": 98800,      # 988元/位
-        "birthday": 78800,     # 788元/位
-        "business": 118800,    # 1188元/位
+        "wedding": 98800,  # 988元/位
+        "birthday": 78800,  # 788元/位
+        "business": 118800,  # 1188元/位
         "team_building": 28800,  # 288元/位
         "anniversary": 88800,  # 888元/位
     },
     "premium": {
-        "wedding": 158800,     # 1588元/位
-        "birthday": 128800,    # 1288元/位
-        "business": 188800,    # 1888元/位
+        "wedding": 158800,  # 1588元/位
+        "birthday": 128800,  # 1288元/位
+        "business": 188800,  # 1888元/位
         "team_building": 48800,  # 488元/位
         "anniversary": 138800,  # 1388元/位
     },
@@ -332,9 +336,24 @@ MENU_TEMPLATES = {
 # 场地参考配置
 VENUE_TEMPLATES = {
     "small_hall": {"name": "小宴会厅", "capacity": 60, "features": ["独立空调", "投影"], "cost_fen": 200000},
-    "medium_hall": {"name": "中型宴会厅", "capacity": 150, "features": ["独立空调", "投影", "LED屏", "音响"], "cost_fen": 500000},
-    "large_hall": {"name": "大宴会厅", "capacity": 300, "features": ["独立空调", "投影", "LED屏", "音响", "舞台", "灯光"], "cost_fen": 1000000},
-    "vip_room": {"name": "VIP包间", "capacity": 20, "features": ["独立空调", "投影", "KTV", "独立卫生间"], "cost_fen": 100000},
+    "medium_hall": {
+        "name": "中型宴会厅",
+        "capacity": 150,
+        "features": ["独立空调", "投影", "LED屏", "音响"],
+        "cost_fen": 500000,
+    },
+    "large_hall": {
+        "name": "大宴会厅",
+        "capacity": 300,
+        "features": ["独立空调", "投影", "LED屏", "音响", "舞台", "灯光"],
+        "cost_fen": 1000000,
+    },
+    "vip_room": {
+        "name": "VIP包间",
+        "capacity": 20,
+        "features": ["独立空调", "投影", "KTV", "独立卫生间"],
+        "cost_fen": 100000,
+    },
     "outdoor": {"name": "户外花园", "capacity": 200, "features": ["自然景观", "帐篷", "灯光"], "cost_fen": 800000},
 }
 
@@ -385,8 +404,7 @@ class BanquetService:
             special_requests: 特殊要求
         """
         if event_type not in EVENT_TYPE_CONFIG:
-            raise ValueError(f"Unsupported event_type: {event_type}. "
-                             f"Must be one of {list(EVENT_TYPE_CONFIG.keys())}")
+            raise ValueError(f"Unsupported event_type: {event_type}. Must be one of {list(EVENT_TYPE_CONFIG.keys())}")
         if guest_count <= 0:
             raise ValueError("guest_count must be positive")
         if budget_range[0] > budget_range[1]:
@@ -418,8 +436,7 @@ class BanquetService:
         }
 
         _inquiries[inquiry_id] = inquiry
-        logger.info("banquet_inquiry_created", inquiry_id=inquiry_id,
-                     event_type=event_type, guest_count=guest_count)
+        logger.info("banquet_inquiry_created", inquiry_id=inquiry_id, event_type=event_type, guest_count=guest_count)
         return inquiry
 
     def list_inquiries(
@@ -480,22 +497,26 @@ class BanquetService:
                     if restriction.lower() in item["name"].lower():
                         flagged = True
                         break
-                filtered_menu.append({
-                    **item,
-                    "flagged_dietary": flagged,
-                    "substitute_available": flagged,
-                })
+                filtered_menu.append(
+                    {
+                        **item,
+                        "flagged_dietary": flagged,
+                        "substitute_available": flagged,
+                    }
+                )
 
             tier_total_fen = tier_price * guest_count
-            tiers.append({
-                "tier": tier_name,
-                "tier_name": {"economy": "经济档", "standard": "标准档", "premium": "豪华档"}[tier_name],
-                "price_per_head_fen": tier_price,
-                "total_fen": tier_total_fen,
-                "menu": filtered_menu,
-                "course_count": len(filtered_menu),
-                "recommended": tier_name == "standard",
-            })
+            tiers.append(
+                {
+                    "tier": tier_name,
+                    "tier_name": {"economy": "经济档", "standard": "标准档", "premium": "豪华档"}[tier_name],
+                    "price_per_head_fen": tier_price,
+                    "total_fen": tier_total_fen,
+                    "menu": filtered_menu,
+                    "course_count": len(filtered_menu),
+                    "recommended": tier_name == "standard",
+                }
+            )
 
         # 推荐场地
         if guest_count <= 20:
@@ -521,7 +542,7 @@ class BanquetService:
 
         # 服务人力方案
         waiter_count = max(2, guest_count // 15)  # 1个服务员服务15位客人
-        chef_count = max(2, guest_count // 25)    # 1个厨师服务25位客人
+        chef_count = max(2, guest_count // 25)  # 1个厨师服务25位客人
         service_plan = {
             "waiters": waiter_count,
             "chefs": chef_count,
@@ -576,9 +597,13 @@ class BanquetService:
             _inquiries[inquiry_id]["proposal_id"] = proposal_id
             _inquiries[inquiry_id]["updated_at"] = _now_iso()
 
-        logger.info("banquet_proposal_generated", proposal_id=proposal_id,
-                     event_type=event_type, guest_count=guest_count,
-                     margin_rate=round(margin_rate, 4))
+        logger.info(
+            "banquet_proposal_generated",
+            proposal_id=proposal_id,
+            event_type=event_type,
+            guest_count=guest_count,
+            margin_rate=round(margin_rate, 4),
+        )
         return proposal
 
     def _find_similar_cases(self, event_type: str, guest_count: int, budget_fen: int) -> list[dict]:
@@ -589,13 +614,15 @@ class BanquetService:
                 continue
             gc = case.get("guest_count", 0)
             if abs(gc - guest_count) <= guest_count * 0.3:
-                similar.append({
-                    "case_id": case["case_id"],
-                    "event_type": case["event_type"],
-                    "guest_count": gc,
-                    "satisfaction_score": case.get("satisfaction_score", 0),
-                    "highlights": case.get("highlights", []),
-                })
+                similar.append(
+                    {
+                        "case_id": case["case_id"],
+                        "event_type": case["event_type"],
+                        "guest_count": gc,
+                        "satisfaction_score": case.get("satisfaction_score", 0),
+                        "highlights": case.get("highlights", []),
+                    }
+                )
         # 返回最相似的3个
         return sorted(similar, key=lambda x: x.get("satisfaction_score", 0), reverse=True)[:3]
 
@@ -636,8 +663,12 @@ class BanquetService:
             margin_rate=round(margin_rate, 4),
         )
 
-        logger.info("banquet_cost_estimated", proposal_id=proposal_id,
-                     total_cost_fen=total_cost, margin_rate=round(margin_rate, 4))
+        logger.info(
+            "banquet_cost_estimated",
+            proposal_id=proposal_id,
+            total_cost_fen=total_cost,
+            margin_rate=round(margin_rate, 4),
+        )
         return estimate
 
     # ─── 4. Contract & Confirmation ───
@@ -662,9 +693,7 @@ class BanquetService:
         # 校验定金 — 最低为预估总价的 20%
         min_deposit = int(proposal.estimated_total * 0.2)
         if deposit_amount_fen < min_deposit:
-            raise ValueError(
-                f"Deposit {deposit_amount_fen} fen below minimum {min_deposit} fen (20% of total)"
-            )
+            raise ValueError(f"Deposit {deposit_amount_fen} fen below minimum {min_deposit} fen (20% of total)")
 
         booking_id = f"BKG-{_gen_id()}"
 
@@ -705,9 +734,13 @@ class BanquetService:
         inquiry["booking_id"] = booking_id
         inquiry["updated_at"] = _now_iso()
 
-        logger.info("banquet_booking_confirmed", booking_id=booking_id,
-                     event_type=proposal.event_type, guest_count=proposal.guest_count,
-                     deposit_fen=deposit_amount_fen)
+        logger.info(
+            "banquet_booking_confirmed",
+            booking_id=booking_id,
+            event_type=proposal.event_type,
+            guest_count=proposal.guest_count,
+            deposit_fen=deposit_amount_fen,
+        )
         return booking
 
     def update_booking_status(self, booking_id: str, status: str) -> dict:
@@ -724,8 +757,7 @@ class BanquetService:
         booking["status"] = status
         booking["updated_at"] = _now_iso()
 
-        logger.info("banquet_status_updated", booking_id=booking_id,
-                     old_status=old_status, new_status=status)
+        logger.info("banquet_status_updated", booking_id=booking_id, old_status=old_status, new_status=status)
         return {"booking_id": booking_id, "old_status": old_status, "new_status": status}
 
     # ─── 5. Execution Checklist (宴会执行检查清单) ───
@@ -746,12 +778,42 @@ class BanquetService:
                 "phase": "T-7",
                 "phase_name": "筹备启动",
                 "items": [
-                    {"task": "食材预订确认 — 高端食材(龙虾/鲍鱼/帝王蟹)提前锁定供应商", "responsible": "采购主管", "status": "pending", "required": True},
-                    {"task": "人力排班确认 — 确认服务员/厨师/协调员排班到位", "responsible": "前厅经理", "status": "pending", "required": True},
-                    {"task": "场地布置方案确认 — 与客户确认最终装饰方案和布局图", "responsible": "宴会经理", "status": "pending", "required": True},
-                    {"task": "设备检查 — LED屏/音响/灯光/投影设备预约和检测", "responsible": "工程部", "status": "pending", "required": True},
-                    {"task": "客户确认 — 电话确认最终人数、菜单、特殊需求", "responsible": "宴会经理", "status": "pending", "required": True},
-                    {"task": "酒水备货 — 根据预算和人数准备酒水饮料", "responsible": "吧台主管", "status": "pending", "required": False},
+                    {
+                        "task": "食材预订确认 — 高端食材(龙虾/鲍鱼/帝王蟹)提前锁定供应商",
+                        "responsible": "采购主管",
+                        "status": "pending",
+                        "required": True,
+                    },
+                    {
+                        "task": "人力排班确认 — 确认服务员/厨师/协调员排班到位",
+                        "responsible": "前厅经理",
+                        "status": "pending",
+                        "required": True,
+                    },
+                    {
+                        "task": "场地布置方案确认 — 与客户确认最终装饰方案和布局图",
+                        "responsible": "宴会经理",
+                        "status": "pending",
+                        "required": True,
+                    },
+                    {
+                        "task": "设备检查 — LED屏/音响/灯光/投影设备预约和检测",
+                        "responsible": "工程部",
+                        "status": "pending",
+                        "required": True,
+                    },
+                    {
+                        "task": "客户确认 — 电话确认最终人数、菜单、特殊需求",
+                        "responsible": "宴会经理",
+                        "status": "pending",
+                        "required": True,
+                    },
+                    {
+                        "task": "酒水备货 — 根据预算和人数准备酒水饮料",
+                        "responsible": "吧台主管",
+                        "status": "pending",
+                        "required": False,
+                    },
                 ],
             },
             # T-3: 物料到位
@@ -759,11 +821,36 @@ class BanquetService:
                 "phase": "T-3",
                 "phase_name": "物料到位",
                 "items": [
-                    {"task": f"食材到货验收 — 检查{guest_count}位宾客所需食材新鲜度和数量", "responsible": "采购主管", "status": "pending", "required": True},
-                    {"task": "特殊器材准备 — 装饰物料/鲜花/气球/横幅到位", "responsible": "宴会经理", "status": "pending", "required": True},
-                    {"task": "餐具清点 — 确认足够的碗碟杯筷（含备用10%）", "responsible": "前厅领班", "status": "pending", "required": True},
-                    {"task": "菜品试做 — 主要菜品预制准备和试味", "responsible": "行政总厨", "status": "pending", "required": True},
-                    {"task": "活鲜入池 — 活海鲜入养殖池暂养", "responsible": "海鲜池管理员", "status": "pending", "required": event_type in ("wedding", "business", "anniversary")},
+                    {
+                        "task": f"食材到货验收 — 检查{guest_count}位宾客所需食材新鲜度和数量",
+                        "responsible": "采购主管",
+                        "status": "pending",
+                        "required": True,
+                    },
+                    {
+                        "task": "特殊器材准备 — 装饰物料/鲜花/气球/横幅到位",
+                        "responsible": "宴会经理",
+                        "status": "pending",
+                        "required": True,
+                    },
+                    {
+                        "task": "餐具清点 — 确认足够的碗碟杯筷（含备用10%）",
+                        "responsible": "前厅领班",
+                        "status": "pending",
+                        "required": True,
+                    },
+                    {
+                        "task": "菜品试做 — 主要菜品预制准备和试味",
+                        "responsible": "行政总厨",
+                        "status": "pending",
+                        "required": True,
+                    },
+                    {
+                        "task": "活鲜入池 — 活海鲜入养殖池暂养",
+                        "responsible": "海鲜池管理员",
+                        "status": "pending",
+                        "required": event_type in ("wedding", "business", "anniversary"),
+                    },
                 ],
             },
             # T-1: 彩排准备
@@ -771,11 +858,36 @@ class BanquetService:
                 "phase": "T-1",
                 "phase_name": "彩排准备",
                 "items": [
-                    {"task": "场地布置 — 按方案完成桌椅/装饰/灯光/音响布置", "responsible": "宴会经理", "status": "pending", "required": True},
-                    {"task": "灯光音响测试 — 全流程灯光音响走一遍", "responsible": "工程部", "status": "pending", "required": True},
-                    {"task": "服务流程彩排 — 全体服务人员走位演练", "responsible": "前厅经理", "status": "pending", "required": True},
-                    {"task": "菜品预制 — 可提前预制的菜品开始准备", "responsible": "行政总厨", "status": "pending", "required": True},
-                    {"task": "客户最终确认 — 确认最终到场人数和座位安排", "responsible": "宴会经理", "status": "pending", "required": True},
+                    {
+                        "task": "场地布置 — 按方案完成桌椅/装饰/灯光/音响布置",
+                        "responsible": "宴会经理",
+                        "status": "pending",
+                        "required": True,
+                    },
+                    {
+                        "task": "灯光音响测试 — 全流程灯光音响走一遍",
+                        "responsible": "工程部",
+                        "status": "pending",
+                        "required": True,
+                    },
+                    {
+                        "task": "服务流程彩排 — 全体服务人员走位演练",
+                        "responsible": "前厅经理",
+                        "status": "pending",
+                        "required": True,
+                    },
+                    {
+                        "task": "菜品预制 — 可提前预制的菜品开始准备",
+                        "responsible": "行政总厨",
+                        "status": "pending",
+                        "required": True,
+                    },
+                    {
+                        "task": "客户最终确认 — 确认最终到场人数和座位安排",
+                        "responsible": "宴会经理",
+                        "status": "pending",
+                        "required": True,
+                    },
                 ],
             },
             # T-0: 宴会当天
@@ -783,15 +895,60 @@ class BanquetService:
                 "phase": "T-0",
                 "phase_name": "宴会当天",
                 "items": [
-                    {"task": "场地最终检查 — 开场前2小时全面检查", "responsible": "宴会经理", "status": "pending", "required": True},
-                    {"task": "迎宾准备 — 签到台/引导牌/迎宾花篮就位", "responsible": "前厅领班", "status": "pending", "required": True},
-                    {"task": "迎宾 — 引导宾客入座、发放伴手礼", "responsible": "服务团队", "status": "pending", "required": True},
-                    {"task": "开场仪式 — 按流程执行(婚礼仪式/祝寿/致辞等)", "responsible": "宴会协调员", "status": "pending", "required": True},
-                    {"task": "上菜 — 按顺序上菜：冷盘→热菜→主菜→汤→甜品→水果", "responsible": "传菜组", "status": "pending", "required": True},
-                    {"task": "祝酒/互动环节 — 协助敬酒、游戏互动", "responsible": "宴会协调员", "status": "pending", "required": event_type in ("wedding", "birthday", "team_building")},
-                    {"task": "甜品/蛋糕环节 — 切蛋糕、甜品台开放", "responsible": "甜品师", "status": "pending", "required": event_type in ("wedding", "birthday", "anniversary")},
-                    {"task": "送客 — 客户致谢、伴手礼分发、合影留念", "responsible": "宴会经理", "status": "pending", "required": True},
-                    {"task": "现场拆除与清洁 — 宴会结束后30分钟内开始", "responsible": "保洁组", "status": "pending", "required": True},
+                    {
+                        "task": "场地最终检查 — 开场前2小时全面检查",
+                        "responsible": "宴会经理",
+                        "status": "pending",
+                        "required": True,
+                    },
+                    {
+                        "task": "迎宾准备 — 签到台/引导牌/迎宾花篮就位",
+                        "responsible": "前厅领班",
+                        "status": "pending",
+                        "required": True,
+                    },
+                    {
+                        "task": "迎宾 — 引导宾客入座、发放伴手礼",
+                        "responsible": "服务团队",
+                        "status": "pending",
+                        "required": True,
+                    },
+                    {
+                        "task": "开场仪式 — 按流程执行(婚礼仪式/祝寿/致辞等)",
+                        "responsible": "宴会协调员",
+                        "status": "pending",
+                        "required": True,
+                    },
+                    {
+                        "task": "上菜 — 按顺序上菜：冷盘→热菜→主菜→汤→甜品→水果",
+                        "responsible": "传菜组",
+                        "status": "pending",
+                        "required": True,
+                    },
+                    {
+                        "task": "祝酒/互动环节 — 协助敬酒、游戏互动",
+                        "responsible": "宴会协调员",
+                        "status": "pending",
+                        "required": event_type in ("wedding", "birthday", "team_building"),
+                    },
+                    {
+                        "task": "甜品/蛋糕环节 — 切蛋糕、甜品台开放",
+                        "responsible": "甜品师",
+                        "status": "pending",
+                        "required": event_type in ("wedding", "birthday", "anniversary"),
+                    },
+                    {
+                        "task": "送客 — 客户致谢、伴手礼分发、合影留念",
+                        "responsible": "宴会经理",
+                        "status": "pending",
+                        "required": True,
+                    },
+                    {
+                        "task": "现场拆除与清洁 — 宴会结束后30分钟内开始",
+                        "responsible": "保洁组",
+                        "status": "pending",
+                        "required": True,
+                    },
                 ],
             },
             # T+1: 结算复盘
@@ -799,11 +956,36 @@ class BanquetService:
                 "phase": "T+1",
                 "phase_name": "结算复盘",
                 "items": [
-                    {"task": "费用结算 — 核对最终费用、收取尾款", "responsible": "财务", "status": "pending", "required": True},
-                    {"task": "客户回访 — 24小时内电话/微信回访，收集满意度", "responsible": "宴会经理", "status": "pending", "required": True},
-                    {"task": "案例沉淀 — 整理照片/视频/数据，归档为案例", "responsible": "宴会经理", "status": "pending", "required": False},
-                    {"task": "团队复盘 — 总结亮点和改进点", "responsible": "店长", "status": "pending", "required": False},
-                    {"task": "物料盘点 — 清点剩余物料、计算损耗", "responsible": "采购主管", "status": "pending", "required": True},
+                    {
+                        "task": "费用结算 — 核对最终费用、收取尾款",
+                        "responsible": "财务",
+                        "status": "pending",
+                        "required": True,
+                    },
+                    {
+                        "task": "客户回访 — 24小时内电话/微信回访，收集满意度",
+                        "responsible": "宴会经理",
+                        "status": "pending",
+                        "required": True,
+                    },
+                    {
+                        "task": "案例沉淀 — 整理照片/视频/数据，归档为案例",
+                        "responsible": "宴会经理",
+                        "status": "pending",
+                        "required": False,
+                    },
+                    {
+                        "task": "团队复盘 — 总结亮点和改进点",
+                        "responsible": "店长",
+                        "status": "pending",
+                        "required": False,
+                    },
+                    {
+                        "task": "物料盘点 — 清点剩余物料、计算损耗",
+                        "responsible": "采购主管",
+                        "status": "pending",
+                        "required": True,
+                    },
                 ],
             },
         ]
@@ -813,9 +995,12 @@ class BanquetService:
         booking["checklist"] = checklist
         booking["updated_at"] = _now_iso()
 
-        logger.info("banquet_checklist_generated", booking_id=booking_id,
-                     total_phases=len(checklist),
-                     total_items=sum(len(phase["items"]) for phase in checklist))
+        logger.info(
+            "banquet_checklist_generated",
+            booking_id=booking_id,
+            total_phases=len(checklist),
+            total_items=sum(len(phase["items"]) for phase in checklist),
+        )
         return checklist
 
     # ─── 6. Post-Event ───
@@ -873,8 +1058,7 @@ class BanquetService:
         booking["settlement"] = settlement
         booking["updated_at"] = _now_iso()
 
-        logger.info("banquet_settled", booking_id=booking_id,
-                     final_total_fen=final_total, balance_due_fen=balance_due)
+        logger.info("banquet_settled", booking_id=booking_id, final_total_fen=final_total, balance_due_fen=balance_due)
         return settlement
 
     def collect_feedback(
@@ -904,10 +1088,13 @@ class BanquetService:
             "event_type": booking["event_type"],
             "satisfaction_score": satisfaction_score,
             "satisfaction_level": (
-                "excellent" if satisfaction_score >= 9 else
-                "good" if satisfaction_score >= 7 else
-                "average" if satisfaction_score >= 5 else
-                "poor"
+                "excellent"
+                if satisfaction_score >= 9
+                else "good"
+                if satisfaction_score >= 7
+                else "average"
+                if satisfaction_score >= 5
+                else "poor"
             ),
             "feedback_text": feedback_text,
             "collected_at": _now_iso(),
@@ -917,8 +1104,7 @@ class BanquetService:
         booking["feedback_id"] = feedback_id
         booking["updated_at"] = _now_iso()
 
-        logger.info("banquet_feedback_collected", booking_id=booking_id,
-                     score=satisfaction_score)
+        logger.info("banquet_feedback_collected", booking_id=booking_id, score=satisfaction_score)
         return feedback
 
     def archive_as_case(
@@ -961,6 +1147,5 @@ class BanquetService:
         booking["case_id"] = case_id
         booking["updated_at"] = _now_iso()
 
-        logger.info("banquet_case_archived", case_id=case_id, booking_id=booking_id,
-                     event_type=booking["event_type"])
+        logger.info("banquet_case_archived", case_id=case_id, booking_id=booking_id, event_type=booking["event_type"])
         return case

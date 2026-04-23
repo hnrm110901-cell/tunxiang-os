@@ -10,19 +10,23 @@ TC-P2-12 智慧商街/档口管理 — 测试套件
 
 运行：pytest services/tx-trade/src/tests/test_food_court.py -v
 """
+
 import pytest
 import pytest_asyncio
-from httpx import AsyncClient, ASGITransport
+from httpx import ASGITransport, AsyncClient
+
 
 # 延迟导入，避免循环依赖问题
 def get_app():
     from services.tx_trade.src.main import app
+
     return app
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Fixtures
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @pytest_asyncio.fixture
 async def client():
@@ -31,8 +35,9 @@ async def client():
         from services.tx_trade.src.main import app as _app
     except ImportError:
         # 路径别名兼容
-        import sys
         import os
+        import sys
+
         sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../../../.."))
         from services.tx_trade.src.main import app as _app
 
@@ -59,6 +64,7 @@ def mock_outlet_payload():
 # ─────────────────────────────────────────────────────────────────────────────
 # Test 1: 获取档口列表
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_get_outlets_list(client: AsyncClient):
@@ -116,6 +122,7 @@ async def test_get_outlets_list_with_store_filter(client: AsyncClient):
 # Test 2: 创建档口（outlet_code唯一性）
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_create_outlet(client: AsyncClient, mock_outlet_payload: dict):
     """创建新档口，验证outlet_code唯一性逻辑"""
@@ -146,10 +153,7 @@ async def test_create_outlet(client: AsyncClient, mock_outlet_payload: dict):
     )
 
     # 应该返回422（唯一性冲突）
-    assert dup_response.status_code == 422, (
-        f"预期422，实际 {dup_response.status_code}，"
-        f"响应：{dup_response.text}"
-    )
+    assert dup_response.status_code == 422, f"预期422，实际 {dup_response.status_code}，响应：{dup_response.text}"
 
     # Step 3: 不同门店相同编号应该允许
     different_store_payload = {
@@ -167,6 +171,7 @@ async def test_create_outlet(client: AsyncClient, mock_outlet_payload: dict):
 # ─────────────────────────────────────────────────────────────────────────────
 # Test 3: 完整下单流程
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_food_court_order_flow(client: AsyncClient):
@@ -271,6 +276,7 @@ async def test_checkout_cash_with_change(client: AsyncClient):
 # Test 4: 档口数据隔离
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_outlet_data_isolation(client: AsyncClient):
     """档口数据隔离：A档口报表不含B档口数据"""
@@ -284,9 +290,7 @@ async def test_outlet_data_isolation(client: AsyncClient):
 
     # 所有返回的订单都应属于 out-001
     for order in orders_a:
-        assert order["outlet_id"] == "out-001", (
-            f"过滤 out-001 返回了其他档口的订单：{order['outlet_id']}"
-        )
+        assert order["outlet_id"] == "out-001", f"过滤 out-001 返回了其他档口的订单：{order['outlet_id']}"
 
     # 查询out-002档口的订单
     resp_b = await client.get(
@@ -297,9 +301,7 @@ async def test_outlet_data_isolation(client: AsyncClient):
     orders_b = resp_b.json()["data"]["items"]
 
     for order in orders_b:
-        assert order["outlet_id"] == "out-002", (
-            f"过滤 out-002 返回了其他档口的订单：{order['outlet_id']}"
-        )
+        assert order["outlet_id"] == "out-002", f"过滤 out-002 返回了其他档口的订单：{order['outlet_id']}"
 
     # A、B两个档口的订单集合无重叠
     ids_a = {o["id"] for o in orders_a}
@@ -332,6 +334,7 @@ async def test_get_nonexistent_outlet(client: AsyncClient):
 # ─────────────────────────────────────────────────────────────────────────────
 # Test 5: 日报统计
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_daily_stats(client: AsyncClient):
@@ -380,6 +383,7 @@ async def test_daily_stats(client: AsyncClient):
 async def test_outlet_compare_stats(client: AsyncClient):
     """档口对比报表：多档口营业额对比"""
     from datetime import date, timedelta
+
     start = date.today()
     end = start + timedelta(days=6)
 

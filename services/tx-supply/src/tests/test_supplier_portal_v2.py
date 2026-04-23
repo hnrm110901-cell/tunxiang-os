@@ -5,22 +5,24 @@
   2. 提交报价：status 从 pending→quoted，quoted_price_fen 正确记录
   3. 更新评级：rating=4.2 通过范围校验，超出 1.0-5.0 返回 422
 """
+
 from __future__ import annotations
 
-import pytest
-from fastapi import FastAPI
-from fastapi.testclient import TestClient
-from unittest.mock import AsyncMock, MagicMock, patch
-from sqlalchemy.exc import OperationalError
+import os
 
 # 导入路由模块
 import sys
-import os
+from unittest.mock import AsyncMock, MagicMock, patch
+
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
+from sqlalchemy.exc import OperationalError
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../../../../.."))
 
 from services.tx_supply.src.api.supplier_portal_v2_routes import (
-    router,
     MOCK_SUPPLIERS,
+    router,
 )
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -38,6 +40,7 @@ TENANT_HEADER = {"X-Tenant-ID": "test-tenant-001"}
 # 通用 DB Mock 工具
 # ──────────────────────────────────────────────────────────────────────────────
 
+
 def _make_mock_db_session(rows=None, scalar_value=None):
     """返回一个模拟 AsyncSession"""
     db = AsyncMock()
@@ -45,7 +48,7 @@ def _make_mock_db_session(rows=None, scalar_value=None):
     # execute 返回 mock result
     mock_result = MagicMock()
     mock_result.mappings.return_value.all.return_value = rows or []
-    mock_result.mappings.return_value.first.return_value = (rows[0] if rows else None)
+    mock_result.mappings.return_value.first.return_value = rows[0] if rows else None
     mock_result.scalar_one.return_value = scalar_value if scalar_value is not None else len(rows or [])
     db.execute = AsyncMock(return_value=mock_result)
     db.commit = AsyncMock()
@@ -57,6 +60,7 @@ def _make_mock_db_session(rows=None, scalar_value=None):
 # ──────────────────────────────────────────────────────────────────────────────
 # 测试 1：供应商列表 — mock 数据显式标注 _data_source="mock"，非静默
 # ──────────────────────────────────────────────────────────────────────────────
+
 
 class TestSupplierListNotSilentMock:
     def test_supplier_list_not_silent_mock(self):
@@ -79,9 +83,7 @@ class TestSupplierListNotSilentMock:
 
         # 直接测试 mock 数据本身的标注
         for supplier in MOCK_SUPPLIERS:
-            assert "_data_source" in supplier, (
-                f"Mock 供应商 {supplier.get('id')} 缺少 _data_source 标注"
-            )
+            assert "_data_source" in supplier, f"Mock 供应商 {supplier.get('id')} 缺少 _data_source 标注"
             assert supplier["_data_source"] == "mock", (
                 f"Mock 供应商 _data_source 应为 'mock'，实际为 '{supplier['_data_source']}'"
             )
@@ -91,17 +93,13 @@ class TestSupplierListNotSilentMock:
         required_fields = {"id", "name", "rating", "total_orders", "portal_status"}
         for supplier in MOCK_SUPPLIERS:
             missing = required_fields - set(supplier.keys())
-            assert not missing, (
-                f"Mock 供应商 {supplier.get('id')} 缺少必填字段: {missing}"
-            )
+            assert not missing, f"Mock 供应商 {supplier.get('id')} 缺少必填字段: {missing}"
 
     def test_supplier_list_rating_range_valid(self):
         """Mock 供应商评级必须在 1.0-5.0 范围内"""
         for supplier in MOCK_SUPPLIERS:
             rating = supplier.get("rating", 0)
-            assert 1.0 <= rating <= 5.0, (
-                f"Mock 供应商 {supplier.get('id')} 评级 {rating} 不在 1.0-5.0 范围内"
-            )
+            assert 1.0 <= rating <= 5.0, f"Mock 供应商 {supplier.get('id')} 评级 {rating} 不在 1.0-5.0 范围内"
 
     def test_supplier_list_no_silent_downgrade(self):
         """
@@ -138,13 +136,13 @@ class TestSupplierListNotSilentMock:
         # 逻辑验证：OperationalError 触发 mock；正常流程走 DB
         # 供应商路由中的降级逻辑只在 except (OperationalError, ...) 中触发
         import inspect
+
         from services.tx_supply.src.api import supplier_portal_v2_routes
+
         source = inspect.getsource(supplier_portal_v2_routes.list_suppliers_portal)
 
         # 确认只有在异常处理块内才返回 mock 数据
-        assert "_data_source\": \"mock\"" in source or '_data_source": "mock"' in source, (
-            "mock 数据标注代码应存在于路由中"
-        )
+        assert '_data_source": "mock"' in source or '_data_source": "mock"' in source, "mock 数据标注代码应存在于路由中"
         assert "OperationalError" in source or "InterfaceError" in source, (
             "路由必须捕获 OperationalError/InterfaceError 才能触发 mock 降级"
         )
@@ -153,6 +151,7 @@ class TestSupplierListNotSilentMock:
 # ──────────────────────────────────────────────────────────────────────────────
 # 测试 2：提交报价 — status 从 pending→quoted，quoted_price_fen 正确记录
 # ──────────────────────────────────────────────────────────────────────────────
+
 
 class TestRFQQuoteSubmit:
     def test_rfq_quote_submit_success(self):
@@ -188,9 +187,7 @@ class TestRFQQuoteSubmit:
         assert resp.status_code == 200, f"期望 200，实际 {resp.status_code}: {resp.text}"
         data = resp.json()
         assert data["ok"] is True, f"ok 应为 True: {data}"
-        assert data["data"]["status"] == "quoted", (
-            f"status 应为 'quoted'，实际为 '{data['data']['status']}'"
-        )
+        assert data["data"]["status"] == "quoted", f"status 应为 'quoted'，实际为 '{data['data']['status']}'"
         assert data["data"]["quoted_price_fen"] == 50000, (
             f"quoted_price_fen 应为 50000，实际为 {data['data']['quoted_price_fen']}"
         )
@@ -250,9 +247,7 @@ class TestRFQQuoteSubmit:
                 headers=TENANT_HEADER,
             )
 
-        assert resp.status_code == 400, (
-            f"已报价的询价单再次提交应返回 400，实际 {resp.status_code}"
-        )
+        assert resp.status_code == 400, f"已报价的询价单再次提交应返回 400，实际 {resp.status_code}"
         data = resp.json()
         assert data["ok"] is False
         assert data["error"]["code"] == "INVALID_STATUS"
@@ -278,9 +273,7 @@ class TestRFQQuoteSubmit:
                 headers=TENANT_HEADER,
             )
 
-        assert resp.status_code == 503, (
-            f"DB 不可用时应返回 503，实际 {resp.status_code}"
-        )
+        assert resp.status_code == 503, f"DB 不可用时应返回 503，实际 {resp.status_code}"
         data = resp.json()
         assert data["detail"]["readonly_mode"] is True
         assert data["detail"]["error"]["code"] == "DB_UNAVAILABLE"
@@ -289,6 +282,7 @@ class TestRFQQuoteSubmit:
 # ──────────────────────────────────────────────────────────────────────────────
 # 测试 3：更新评级 — rating=4.2 通过，超出 1.0-5.0 返回 422
 # ──────────────────────────────────────────────────────────────────────────────
+
 
 class TestSupplierRatingUpdate:
     def test_rating_update_valid_42(self):
@@ -356,9 +350,7 @@ class TestSupplierRatingUpdate:
             json={"rating": 5.1},
             headers=TENANT_HEADER,
         )
-        assert resp.status_code == 422, (
-            f"评级超出 5.0 应返回 422，实际 {resp.status_code}"
-        )
+        assert resp.status_code == 422, f"评级超出 5.0 应返回 422，实际 {resp.status_code}"
 
     def test_rating_update_below_min_returns_422(self):
         """rating=0.9（低于最小值 1.0）应返回 422"""
@@ -367,9 +359,7 @@ class TestSupplierRatingUpdate:
             json={"rating": 0.9},
             headers=TENANT_HEADER,
         )
-        assert resp.status_code == 422, (
-            f"评级低于 1.0 应返回 422，实际 {resp.status_code}"
-        )
+        assert resp.status_code == 422, f"评级低于 1.0 应返回 422，实际 {resp.status_code}"
 
     def test_rating_update_negative_returns_422(self):
         """rating=-1（负数）应返回 422"""
@@ -396,9 +386,7 @@ class TestSupplierRatingUpdate:
                 headers=TENANT_HEADER,
             )
 
-        assert resp.status_code == 503, (
-            f"DB 不可用时应返回 503，实际 {resp.status_code}"
-        )
+        assert resp.status_code == 503, f"DB 不可用时应返回 503，实际 {resp.status_code}"
         data = resp.json()
         assert data["detail"]["error"]["code"] == "DB_UNAVAILABLE"
         assert data["detail"]["readonly_mode"] is True

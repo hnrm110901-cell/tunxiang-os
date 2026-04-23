@@ -10,6 +10,7 @@
 - GET  /waste/analysis                 — 损耗分析
 - GET  /waste/top-items                — 损耗排行
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -94,22 +95,24 @@ async def deduct_for_order_route(
         data = await deduct_for_order(order_id, order_items, body.store_id, x_tenant_id, db)
         # ─── Phase 1 平行事件写入：BOM扣料（每个食材一条事件）───
         for deducted in data.get("deducted_items", []):
-            asyncio.create_task(emit_event(
-                event_type=InventoryEventType.CONSUMED,
-                tenant_id=x_tenant_id,
-                stream_id=deducted.get("ingredient_id", order_id),
-                payload={
-                    "ingredient_id": deducted.get("ingredient_id"),
-                    "ingredient_name": deducted.get("ingredient_name", ""),
-                    "quantity_g": deducted.get("quantity", 0),
-                    "theoretical_g": deducted.get("theoretical_quantity", deducted.get("quantity", 0)),
-                    "order_id": order_id,
-                    "bom_deduction": True,
-                },
-                store_id=body.store_id,
-                source_service="tx-supply",
-                causation_id=order_id,
-            ))
+            asyncio.create_task(
+                emit_event(
+                    event_type=InventoryEventType.CONSUMED,
+                    tenant_id=x_tenant_id,
+                    stream_id=deducted.get("ingredient_id", order_id),
+                    payload={
+                        "ingredient_id": deducted.get("ingredient_id"),
+                        "ingredient_name": deducted.get("ingredient_name", ""),
+                        "quantity_g": deducted.get("quantity", 0),
+                        "theoretical_g": deducted.get("theoretical_quantity", deducted.get("quantity", 0)),
+                        "order_id": order_id,
+                        "bom_deduction": True,
+                    },
+                    store_id=body.store_id,
+                    source_service="tx-supply",
+                    causation_id=order_id,
+                )
+            )
         return {"ok": True, "data": data}
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
@@ -130,20 +133,22 @@ async def rollback_deduction_route(
         data = await rollback_deduction(order_id, x_tenant_id, db)
         # ─── Phase 1 平行事件写入：扣料回滚（每条回补记录一个事件）───
         for item in data.get("restored_items", []):
-            asyncio.create_task(emit_event(
-                event_type=InventoryEventType.ADJUSTED,
-                tenant_id=x_tenant_id,
-                stream_id=item.get("ingredient_id", order_id),
-                payload={
-                    "ingredient_id": item.get("ingredient_id"),
-                    "ingredient_name": item.get("ingredient_name", ""),
-                    "delta_g": item.get("quantity", 0),
-                    "reason": "deduction_rollback",
-                    "order_id": order_id,
-                },
-                source_service="tx-supply",
-                causation_id=order_id,
-            ))
+            asyncio.create_task(
+                emit_event(
+                    event_type=InventoryEventType.ADJUSTED,
+                    tenant_id=x_tenant_id,
+                    stream_id=item.get("ingredient_id", order_id),
+                    payload={
+                        "ingredient_id": item.get("ingredient_id"),
+                        "ingredient_name": item.get("ingredient_name", ""),
+                        "delta_g": item.get("quantity", 0),
+                        "reason": "deduction_rollback",
+                        "order_id": order_id,
+                    },
+                    source_service="tx-supply",
+                    causation_id=order_id,
+                )
+            )
         return {"ok": True, "data": data}
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
@@ -200,22 +205,24 @@ async def finalize_stocktake_route(
             delta = diff.get("delta_g", 0)
             if delta == 0:
                 continue
-            asyncio.create_task(emit_event(
-                event_type=InventoryEventType.ADJUSTED,
-                tenant_id=x_tenant_id,
-                stream_id=diff.get("ingredient_id", stocktake_id),
-                payload={
-                    "stocktake_id": stocktake_id,
-                    "ingredient_id": diff.get("ingredient_id"),
-                    "ingredient_name": diff.get("ingredient_name", ""),
-                    "delta_g": delta,
-                    "system_qty_g": diff.get("system_qty_g"),
-                    "actual_qty_g": diff.get("actual_qty_g"),
-                    "reason": "stocktake_finalize",
-                },
-                source_service="tx-supply",
-                causation_id=stocktake_id,
-            ))
+            asyncio.create_task(
+                emit_event(
+                    event_type=InventoryEventType.ADJUSTED,
+                    tenant_id=x_tenant_id,
+                    stream_id=diff.get("ingredient_id", stocktake_id),
+                    payload={
+                        "stocktake_id": stocktake_id,
+                        "ingredient_id": diff.get("ingredient_id"),
+                        "ingredient_name": diff.get("ingredient_name", ""),
+                        "delta_g": delta,
+                        "system_qty_g": diff.get("system_qty_g"),
+                        "actual_qty_g": diff.get("actual_qty_g"),
+                        "reason": "stocktake_finalize",
+                    },
+                    source_service="tx-supply",
+                    causation_id=stocktake_id,
+                )
+            )
         return {"ok": True, "data": data}
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))

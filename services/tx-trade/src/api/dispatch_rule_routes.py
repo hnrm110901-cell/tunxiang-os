@@ -4,6 +4,7 @@
 
 所有接口需要 X-Tenant-ID header。
 """
+
 import uuid
 from datetime import datetime, timezone
 from typing import Optional
@@ -41,16 +42,10 @@ class DispatchRuleCreate(BaseModel):
     match_dish_id: Optional[str] = Field(None, description="按菜品ID匹配（UUID字符串）")
     match_dish_category: Optional[str] = Field(None, max_length=50, description="按菜品分类匹配")
     match_brand_id: Optional[str] = Field(None, description="按品牌ID匹配（UUID字符串）")
-    match_channel: Optional[str] = Field(
-        None,
-        description="按渠道匹配：dine_in/takeaway/delivery/reservation"
-    )
+    match_channel: Optional[str] = Field(None, description="按渠道匹配：dine_in/takeaway/delivery/reservation")
     match_time_start: Optional[str] = Field(None, description="时段开始，格式 HH:MM，如 11:00")
     match_time_end: Optional[str] = Field(None, description="时段结束，格式 HH:MM，如 14:00")
-    match_day_type: Optional[str] = Field(
-        None,
-        description="工作日类型：weekday/weekend/holiday"
-    )
+    match_day_type: Optional[str] = Field(None, description="工作日类型：weekday/weekend/holiday")
 
     target_dept_id: str = Field(..., description="目标档口ID（UUID字符串）")
     target_printer_id: Optional[str] = Field(None, description="覆盖打印机ID（可选）")
@@ -95,6 +90,7 @@ def _parse_time(val: Optional[str]):
     if val is None:
         return None
     from datetime import time as _time
+
     try:
         h, m = val.split(":")
         return _time(int(h), int(m))
@@ -385,7 +381,8 @@ async def simulate_routing(
 
     log.info(
         "dispatch_rule.simulate",
-        dish_id=dish_id, dept_id=str(dept_id) if dept_id else None,
+        dish_id=dish_id,
+        dept_id=str(dept_id) if dept_id else None,
     )
     return {
         "ok": True,
@@ -393,5 +390,5 @@ async def simulate_routing(
             "dept": dept_info if dept_info else None,
             "printer_id_override": str(printer_id) if printer_id else None,
             "matched": dept_id is not None,
-        }
+        },
     }

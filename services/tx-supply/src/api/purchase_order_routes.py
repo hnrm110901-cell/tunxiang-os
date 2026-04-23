@@ -72,6 +72,7 @@ DDL（如 purchase_orders 表尚未创建，请执行以下迁移）:
 
 统一响应格式: {"ok": bool, "data": {}, "error": {}}
 """
+
 from __future__ import annotations
 
 import uuid
@@ -258,9 +259,7 @@ async def create_purchase_order(
         now = _now()
 
         # 计算总金额（分）
-        total_amount_fen = sum(
-            int(item.quantity * item.unit_price_fen) for item in body.items
-        )
+        total_amount_fen = sum(int(item.quantity * item.unit_price_fen) for item in body.items)
 
         # 插入采购单主记录
         await db.execute(

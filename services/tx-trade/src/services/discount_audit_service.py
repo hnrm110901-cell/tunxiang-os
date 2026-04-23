@@ -5,6 +5,7 @@
   2. get_audit_log()          — 查询审计记录（支持多维度过滤）
   3. get_high_risk_summary()  — 高风险折扣汇总（折扣率超过阈值的记录聚合）
 """
+
 from __future__ import annotations
 
 import uuid
@@ -21,10 +22,17 @@ from ..models.discount_audit_log import DiscountAuditLog
 
 logger = structlog.get_logger(__name__)
 
-VALID_ACTION_TYPES = frozenset({
-    "discount_pct", "discount_amt", "gift_item",
-    "return_item", "free_order", "price_override", "coupon",
-})
+VALID_ACTION_TYPES = frozenset(
+    {
+        "discount_pct",
+        "discount_amt",
+        "gift_item",
+        "return_item",
+        "free_order",
+        "price_override",
+        "coupon",
+    }
+)
 
 
 class DiscountAuditService:
@@ -54,10 +62,7 @@ class DiscountAuditService:
         device_id: Optional[str] = None,
     ) -> dict[str, Any]:
         if action_type not in VALID_ACTION_TYPES:
-            raise ValueError(
-                f"Invalid action_type '{action_type}'. "
-                f"Must be one of: {sorted(VALID_ACTION_TYPES)}"
-            )
+            raise ValueError(f"Invalid action_type '{action_type}'. Must be one of: {sorted(VALID_ACTION_TYPES)}")
 
         discount_amount = original_amount - final_amount
 
@@ -235,6 +240,7 @@ class DiscountAuditService:
 #  helpers
 # ──────────────────────────────────────────────────────────
 
+
 def _row_to_dict(row: DiscountAuditLog) -> dict[str, Any]:
     return {
         "id": str(row.id),
@@ -251,8 +257,7 @@ def _row_to_dict(row: DiscountAuditLog) -> dict[str, Any]:
         "final_amount": str(row.final_amount),
         "discount_amount": str(row.discount_amount),
         "discount_pct": (
-            round(float(row.discount_amount) / float(row.original_amount) * 100, 1)
-            if row.original_amount else 0.0
+            round(float(row.discount_amount) / float(row.original_amount) * 100, 1) if row.original_amount else 0.0
         ),
         "reason": row.reason,
         "extra": row.extra,

@@ -11,6 +11,7 @@
 折扣引擎集成（v106）：
   - checkout_with_discounts → 调用折扣引擎计算叠加优惠，写 checkout_discount_log
 """
+
 from typing import List, Optional
 from uuid import UUID
 
@@ -636,6 +637,7 @@ async def list_orders(
 
 class CheckoutWithDiscountsReq(BaseModel):
     """结账时携带优惠信息，引擎自动计算叠加"""
+
     method: str = Field(..., description="支付方式：cash/wechat/alipay/unionpay/member_balance/credit_account")
     base_amount_fen: int = Field(..., ge=1, description="原始金额（分）")
     discounts: List[DiscountInput] = Field(default_factory=list, description="待叠加的优惠列表")
@@ -758,7 +760,9 @@ async def checkout_with_discounts(
             },
         )
 
-    return _ok({
-        "discount": discount_result,
-        "payment": payment_result,
-    })
+    return _ok(
+        {
+            "discount": discount_result,
+            "payment": payment_result,
+        }
+    )

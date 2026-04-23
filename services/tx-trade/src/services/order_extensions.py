@@ -2,6 +2,7 @@
 
 赠菜必须有审批人，所有金额单位：分（fen）。
 """
+
 import uuid
 from datetime import datetime, timezone
 from typing import Optional
@@ -136,9 +137,7 @@ async def split_order(
         raise ValueError(f"订单状态({order.status})不允许拆单")
 
     # 加载所有明细
-    items_result = await db.execute(
-        select(OrderItem).where(OrderItem.order_id == uuid.UUID(order_id))
-    )
+    items_result = await db.execute(select(OrderItem).where(OrderItem.order_id == uuid.UUID(order_id)))
     all_items = {str(i.id): i for i in items_result.scalars().all()}
 
     # 校验所有 item_id 存在
@@ -151,15 +150,11 @@ async def split_order(
 
     # 第一组保留在原订单
     first_group_ids = set(items_groups[0])
-    first_group_total = sum(
-        all_items[iid].subtotal_fen for iid in first_group_ids if iid in all_items
-    )
+    first_group_total = sum(all_items[iid].subtotal_fen for iid in first_group_ids if iid in all_items)
 
     # 从第二组开始，为每组创建新订单
     for group_idx, group in enumerate(items_groups[1:], start=2):
-        group_total = sum(
-            all_items[iid].subtotal_fen for iid in group if iid in all_items
-        )
+        group_total = sum(all_items[iid].subtotal_fen for iid in group if iid in all_items)
         now = datetime.now(timezone.utc)
         new_order_id = uuid.uuid4()
         new_order = Order(
@@ -252,9 +247,7 @@ async def merge_orders(
 
         # 移动副单明细到主单
         await db.execute(
-            update(OrderItem)
-            .where(OrderItem.order_id == uuid.UUID(sid))
-            .values(order_id=uuid.UUID(primary_id))
+            update(OrderItem).where(OrderItem.order_id == uuid.UUID(sid)).values(order_id=uuid.UUID(primary_id))
         )
 
         merged_amount += sec_order.total_amount_fen

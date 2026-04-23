@@ -15,24 +15,25 @@ WebSocket 消息格式（客户端 → 服务端）：
   {"action": "ping"}
   {"action": "subscribe"}   — 订阅门店叫号推送
 """
+
 import asyncio
 import json
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Optional
 
 import structlog
-from fastapi import APIRouter, Query, Request, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Depends, Query, Request, WebSocket, WebSocketDisconnect
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
-from fastapi import Depends
 
 logger = structlog.get_logger(__name__)
 
 router = APIRouter(tags=["calling-screen"])
 
 # ─── 连接管理器（内存级，单实例部署） ───────────────────────────────────────
+
 
 class CallingScreenManager:
     """管理门店叫号屏的 WebSocket 连接。
@@ -186,13 +187,18 @@ async def calling_screen_ws(
     await _manager.connect(store_id, ws)
 
     # 发送欢迎消息：当前叫号数量
-    await ws.send_text(json.dumps({
-        "event": "connected",
-        "data": {
-            "store_id": store_id,
-            "connections": _manager.connection_count(store_id),
-        },
-    }, ensure_ascii=False))
+    await ws.send_text(
+        json.dumps(
+            {
+                "event": "connected",
+                "data": {
+                    "store_id": store_id,
+                    "connections": _manager.connection_count(store_id),
+                },
+            },
+            ensure_ascii=False,
+        )
+    )
 
     # 保活 ping 任务
     async def _ping_loop() -> None:
@@ -214,10 +220,14 @@ async def calling_screen_ws(
                     await ws.send_text(json.dumps({"event": "pong", "data": {}}))
                 elif msg.get("action") == "subscribe":
                     # 客户端重新订阅（重连后发送）
-                    await ws.send_text(json.dumps({
-                        "event": "subscribed",
-                        "data": {"store_id": store_id},
-                    }))
+                    await ws.send_text(
+                        json.dumps(
+                            {
+                                "event": "subscribed",
+                                "data": {"store_id": store_id},
+                            }
+                        )
+                    )
             except (json.JSONDecodeError, KeyError):
                 pass  # 忽略非法消息，不断开连接
 

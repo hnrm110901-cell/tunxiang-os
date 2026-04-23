@@ -6,10 +6,10 @@ FastAPI router for smart table card endpoints.
 Provides real DB queries against the `tables` and `orders` tables (v002).
 """
 
-import structlog
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
+import structlog
 from fastapi import APIRouter, Header, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy import text
@@ -34,6 +34,7 @@ VALID_STATUSES = {"free", "occupied", "reserved", "dirty", "pending_checkout"}
 
 class TableCardFieldResponse(BaseModel):
     """Resolved field for table card."""
+
     key: str
     label: str
     value: Any
@@ -44,6 +45,7 @@ class TableCardFieldResponse(BaseModel):
 
 class TableCardResponse(BaseModel):
     """Resolved table card response."""
+
     table_id: str
     table_no: str
     area: Optional[str] = None
@@ -56,18 +58,21 @@ class TableCardResponse(BaseModel):
 
 class TablesListResponse(BaseModel):
     """Response for list tables endpoint."""
+
     ok: bool = True
     data: Dict[str, Any]
 
 
 class StatisticsResponse(BaseModel):
     """Table statistics response."""
+
     ok: bool = True
     data: Dict[str, Any]
 
 
 class FieldRankingResponse(BaseModel):
     """Field ranking information."""
+
     field_key: str
     score: float = Field(ge=0, le=100)
     click_count: int
@@ -76,6 +81,7 @@ class FieldRankingResponse(BaseModel):
 
 class UpdateStatusRequest(BaseModel):
     """Request body for status update."""
+
     status: str = Field(description="New status: free/occupied/reserved/dirty/pending_checkout")
 
 
@@ -83,8 +89,9 @@ class UpdateStatusRequest(BaseModel):
 # Helper: build summary from status counts
 # ============================================================================
 
+
 def _build_summary(rows) -> Dict[str, int]:
-    summary: Dict[str, int] = {s: 0 for s in VALID_STATUSES}
+    summary: Dict[str, int] = dict.fromkeys(VALID_STATUSES, 0)
     for row in rows:
         status = row["status"]
         if status in summary:
@@ -101,7 +108,7 @@ def _detect_meal_period() -> str:
         return "lunch"
     elif 17 <= hour < 21:
         return "dinner"
-    elif 21 <= hour or hour < 2:
+    elif hour >= 21 or hour < 2:
         return "late_night"
     else:
         return "off_peak"
@@ -110,6 +117,7 @@ def _detect_meal_period() -> str:
 # ============================================================================
 # GET /statistics  — must be registered BEFORE /{table_id}
 # ============================================================================
+
 
 @router.get(
     "/statistics",
@@ -164,6 +172,7 @@ async def get_statistics(
 # GET /field-rankings
 # ============================================================================
 
+
 @router.get(
     "/field-rankings",
     summary="Get learned field rankings",
@@ -185,6 +194,7 @@ async def get_field_rankings(
 # ============================================================================
 # GET /  — list tables
 # ============================================================================
+
 
 @router.get(
     "/",
@@ -302,6 +312,7 @@ async def list_tables(
 # GET /{table_id}  — single table detail
 # ============================================================================
 
+
 @router.get(
     "/{table_id}",
     summary="Get single table detail",
@@ -336,9 +347,7 @@ async def get_table_detail(
     """)
     try:
         async for db in get_db_with_tenant(x_tenant_id):
-            result = await db.execute(
-                sql, {"table_id": table_id, "sid": store_id, "tid": x_tenant_id}
-            )
+            result = await db.execute(sql, {"table_id": table_id, "sid": store_id, "tid": x_tenant_id})
             row = result.fetchone()
 
         if row is None:
@@ -369,6 +378,7 @@ async def get_table_detail(
 # POST /{table_id}/click  — record field click
 # ============================================================================
 
+
 @router.post(
     "/{table_id}/click",
     status_code=201,
@@ -393,6 +403,7 @@ async def record_click(
 # ============================================================================
 # PUT /{table_id}/status  — update table status
 # ============================================================================
+
 
 @router.put(
     "/{table_id}/status",

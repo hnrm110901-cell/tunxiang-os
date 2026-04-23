@@ -8,6 +8,7 @@ POST /api/v1/voice/parse-order
     调用 Claude API (claude-haiku-4-5-20251001) 从语音文字中提取
     结构化点单数据；失败时返回空 items 列表（不抛错）。
 """
+
 from __future__ import annotations
 
 import json
@@ -33,6 +34,7 @@ _HTTP_TIMEOUT = 15.0
 
 
 # ─── 请求/响应 Schema ─────────────────────────────────────────────────────────
+
 
 class TranscribeRequest(BaseModel):
     audio_base64: str = Field(..., description="Base64 编码的音频数据")
@@ -63,10 +65,10 @@ class ParseOrderResponse(BaseModel):
 
 # ─── 内部工具 ─────────────────────────────────────────────────────────────────
 
+
 def _fallback_parse(text: str) -> list[ParsedOrderItem]:
     """简单正则 fallback，NLU 不可用时使用。"""
-    cn_num = {"一": 1, "二": 2, "两": 2, "三": 3, "四": 4, "五": 5,
-              "六": 6, "七": 7, "八": 8, "九": 9, "十": 10}
+    cn_num = {"一": 1, "二": 2, "两": 2, "三": 3, "四": 4, "五": 5, "六": 6, "七": 7, "八": 8, "九": 9, "十": 10}
 
     def to_int(s: str) -> int:
         try:
@@ -106,15 +108,14 @@ async def _call_claude_parse(text: str, menu_context: list[str] | None) -> list[
 
     system_prompt = (
         "你是餐厅点单助手，从语音识别文字中提取点单信息，返回JSON格式。\n"
-        "JSON结构：{\"items\": [{\"dishName\": \"菜品名\", \"quantity\": 数量, "
-        "\"note\": \"备注或null\", \"confidence\": 0到1的置信度}]}\n"
+        'JSON结构：{"items": [{"dishName": "菜品名", "quantity": 数量, '
+        '"note": "备注或null", "confidence": 0到1的置信度}]}\n'
         "规则：\n"
         "1. dishName 只保留菜品名称，去掉数量词\n"
         "2. quantity 默认为1\n"
-        "3. note 提取如\"少辣\"\"不要香菜\"等特殊要求\n"
+        '3. note 提取如"少辣""不要香菜"等特殊要求\n'
         "4. confidence 根据识别清晰度判断\n"
-        "5. 仅输出 JSON，不要其他内容"
-        + menu_hint
+        "5. 仅输出 JSON，不要其他内容" + menu_hint
     )
 
     payload = {
@@ -164,16 +165,14 @@ async def _call_claude_parse(text: str, menu_context: list[str] | None) -> list[
 
 # ─── 路由 ─────────────────────────────────────────────────────────────────────
 
+
 @router.post("/transcribe", response_model=dict)
 async def transcribe_audio(body: TranscribeRequest, request: Request) -> dict:
     """
     将 base64 音频转发到 mac-station 或 Core ML Bridge 进行语音识别。
     优先尝试 mac-station；失败时自动降级到 coreml-bridge。
     """
-    tenant_id = (
-        getattr(request.state, "tenant_id", None)
-        or request.headers.get("X-Tenant-ID", "")
-    )
+    tenant_id = getattr(request.state, "tenant_id", None) or request.headers.get("X-Tenant-ID", "")
 
     payload = {"audio_base64": body.audio_base64, "format": body.format}
     if tenant_id:

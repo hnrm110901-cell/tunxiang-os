@@ -15,6 +15,7 @@ Saga步骤：
   paying 状态：查询payment网关确认是否已扣款，已扣款则继续S3或补偿
   completing 状态：重试S3，失败则补偿
 """
+
 import asyncio
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -32,13 +33,14 @@ logger = structlog.get_logger(__name__)
 
 class SagaStep:
     """Saga步骤常量"""
-    VALIDATING   = "validating"
-    PAYING       = "paying"
-    COMPLETING   = "completing"
-    DONE         = "done"
+
+    VALIDATING = "validating"
+    PAYING = "paying"
+    COMPLETING = "completing"
+    DONE = "done"
     COMPENSATING = "compensating"
-    COMPENSATED  = "compensated"
-    FAILED       = "failed"
+    COMPENSATED = "compensated"
+    FAILED = "failed"
 
 
 # 挂起Saga的超时阈值（分钟）
@@ -234,14 +236,16 @@ class PaymentSagaService:
         await self._update_step(saga_id, SagaStep.DONE)
         log.info("saga_done", payment_id=payment_id, payment_no=payment_no)
 
-        asyncio.create_task(UniversalPublisher.publish(
-            event_type=TradeEventType.ORDER_PAID,
-            tenant_id=self._tenant_id,
-            store_id=None,
-            entity_id=order_id,
-            event_data={"total_fen": amount_fen, "channel": method},
-            source_service="tx-trade",
-        ))
+        asyncio.create_task(
+            UniversalPublisher.publish(
+                event_type=TradeEventType.ORDER_PAID,
+                tenant_id=self._tenant_id,
+                store_id=None,
+                entity_id=order_id,
+                event_data={"total_fen": amount_fen, "channel": method},
+                source_service="tx-trade",
+            )
+        )
 
         return {
             "saga_id": str(saga_id),
@@ -319,14 +323,16 @@ class PaymentSagaService:
         await self._db.flush()
         log.info("saga_compensated", payment_id=payment_id)
 
-        asyncio.create_task(UniversalPublisher.publish(
-            event_type=TradeEventType.ORDER_REFUNDED,
-            tenant_id=self._tenant_id,
-            store_id=None,
-            entity_id=row["payment_id"],
-            event_data={"amount_fen": amount_fen, "reason": reason},
-            source_service="tx-trade",
-        ))
+        asyncio.create_task(
+            UniversalPublisher.publish(
+                event_type=TradeEventType.ORDER_REFUNDED,
+                tenant_id=self._tenant_id,
+                store_id=None,
+                entity_id=row["payment_id"],
+                event_data={"amount_fen": amount_fen, "reason": reason},
+                source_service="tx-trade",
+            )
+        )
 
         return True
 
@@ -428,10 +434,7 @@ class PaymentSagaService:
         from shared.ontology.src.enums import OrderStatus
 
         result = await self._db.execute(
-            text(
-                "SELECT id, status FROM orders "
-                "WHERE id = :order_id AND tenant_id = :tenant_id"
-            ),
+            text("SELECT id, status FROM orders WHERE id = :order_id AND tenant_id = :tenant_id"),
             {"order_id": order_id, "tenant_id": self._tenant_id},
         )
         row = result.mappings().first()
@@ -470,10 +473,7 @@ class PaymentSagaService:
         if result.rowcount == 0:
             # 可能已完成（幂等），也可能不存在
             check = await self._db.execute(
-                text(
-                    "SELECT status FROM orders "
-                    "WHERE id = :order_id AND tenant_id = :tenant_id"
-                ),
+                text("SELECT status FROM orders WHERE id = :order_id AND tenant_id = :tenant_id"),
                 {"order_id": order_id, "tenant_id": self._tenant_id},
             )
             row = check.mappings().first()

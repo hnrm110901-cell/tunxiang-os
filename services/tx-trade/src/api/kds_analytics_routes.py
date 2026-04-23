@@ -5,6 +5,7 @@ ROUTER REGISTRATION（在 main.py 中添加）：
   from .api.kds_analytics_routes import router as kds_analytics_router
   app.include_router(kds_analytics_router, prefix="/api/v1/kds-analytics")
 """
+
 from datetime import date, datetime, timezone
 from typing import List, Optional
 
@@ -26,17 +27,16 @@ router = APIRouter(tags=["kds-analytics"])
 
 # ── 公共依赖 ─────────────────────────────────────────────────
 
+
 def _tenant_id(request: Request) -> str:
-    tid = (
-        getattr(request.state, "tenant_id", None)
-        or request.headers.get("X-Tenant-ID", "")
-    )
+    tid = getattr(request.state, "tenant_id", None) or request.headers.get("X-Tenant-ID", "")
     if not tid:
         raise HTTPException(status_code=400, detail="X-Tenant-ID header required")
     return tid
 
 
 # ── 响应模型 ─────────────────────────────────────────────────
+
 
 class DishRankItemOut(BaseModel):
     dish_id: str
@@ -85,6 +85,7 @@ class NewCustomerRateOut(BaseModel):
 
 
 # ── 端点实现 ─────────────────────────────────────────────────
+
 
 @router.get(
     "/rankings/{store_id}",

@@ -7,6 +7,7 @@
   GET  /api/v1/orders/{order_id}/split-pay                  — 获取分摊状态列表
   POST /api/v1/orders/{order_id}/split-pay/{split_no}/settle — 某份结账
 """
+
 from __future__ import annotations
 
 from datetime import datetime, timezone
@@ -27,6 +28,7 @@ router = APIRouter(prefix="/api/v1/orders", tags=["split-payment"])
 
 # ─── 工具函数 ─────────────────────────────────────────────────────────────────
 
+
 def _ok(data: object) -> dict:
     return {"ok": True, "data": data, "error": None}
 
@@ -36,10 +38,7 @@ def _err(msg: str, code: str = "BAD_REQUEST") -> dict:
 
 
 def _get_tenant_id(request: Request) -> str:
-    tenant_id = (
-        getattr(request.state, "tenant_id", None)
-        or request.headers.get("X-Tenant-ID", "")
-    )
+    tenant_id = getattr(request.state, "tenant_id", None) or request.headers.get("X-Tenant-ID", "")
     if not tenant_id:
         raise HTTPException(status_code=400, detail="Missing X-Tenant-ID")
     return tenant_id
@@ -50,6 +49,7 @@ async def _set_tenant(db: AsyncSession, tenant_id: str) -> None:
 
 
 # ─── Pydantic 模型 ────────────────────────────────────────────────────────────
+
 
 class InitSplitPayRequest(BaseModel):
     total_splits: int = Field(..., ge=2, le=10, description="总份数，2-10")
@@ -63,9 +63,7 @@ class InitSplitPayRequest(BaseModel):
 
 
 class SplitSettleRequest(BaseModel):
-    payment_method: str = Field(
-        ..., description="支付方式：wechat|alipay|cash|credit|tab"
-    )
+    payment_method: str = Field(..., description="支付方式：wechat|alipay|cash|credit|tab")
     member_id: Optional[str] = Field(None, description="关联会员 ID（可选）")
 
     @field_validator("payment_method")
@@ -78,6 +76,7 @@ class SplitSettleRequest(BaseModel):
 
 
 # ─── 均等分摊金额计算 ─────────────────────────────────────────────────────────
+
 
 def _calc_split_amounts(total_fen: int, splits: int) -> list[int]:
     """
@@ -92,6 +91,7 @@ def _calc_split_amounts(total_fen: int, splits: int) -> list[int]:
 
 
 # ─── 端点 ─────────────────────────────────────────────────────────────────────
+
 
 @router.post("/{order_id}/split-pay/init", summary="初始化分摊结账")
 async def init_split_pay(
@@ -116,10 +116,7 @@ async def init_split_pay(
 
         # 查询订单，获取 final_amount_fen
         order_row = await db.execute(
-            text(
-                "SELECT final_amount_fen FROM orders "
-                "WHERE id = :oid AND is_deleted = FALSE"
-            ),
+            text("SELECT final_amount_fen FROM orders WHERE id = :oid AND is_deleted = FALSE"),
             {"oid": order_id},
         )
         order = order_row.fetchone()
@@ -130,10 +127,7 @@ async def init_split_pay(
 
         # 检查是否已存在进行中的分摊记录（防重复初始化）
         existing_row = await db.execute(
-            text(
-                "SELECT status FROM order_split_payments "
-                "WHERE order_id = :oid AND is_deleted = FALSE"
-            ),
+            text("SELECT status FROM order_split_payments WHERE order_id = :oid AND is_deleted = FALSE"),
             {"oid": order_id},
         )
         existing = existing_row.fetchall()

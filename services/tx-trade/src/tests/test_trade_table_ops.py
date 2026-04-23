@@ -4,13 +4,13 @@
 避免真实数据库依赖。
 测试以 `src` 为包根（services/tx-trade 作为工作目录）运行。
 """
+
 import sys
 import uuid
 from datetime import datetime
 from typing import Optional
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from pydantic import BaseModel
@@ -29,6 +29,7 @@ _db_module.get_db = MagicMock()
 sys.modules.setdefault("structlog", MagicMock())
 
 # ─── seat_order_service Pydantic 模型 stub（路由文件中有 response_model 用到） ───
+
 
 class _OrderSeat(BaseModel):
     seat_no: int
@@ -77,6 +78,7 @@ TABLE_ID = str(uuid.uuid4())
 def _async_db_override(db: AsyncMock):
     async def _override():
         yield db
+
     return _override
 
 
@@ -140,6 +142,7 @@ class TestSeatOrderRoutes:
     def test_assign_item_seat_not_found(self):
         """item 不存在时返回 404"""
         from sqlalchemy.exc import NoResultFound
+
         with patch(
             "src.api.seat_order_routes.assign_item_to_seat",
             new=AsyncMock(side_effect=NoResultFound("not found")),
@@ -196,6 +199,7 @@ class TestSeatOrderRoutes:
     def test_self_pay_link_not_found(self):
         """seat_no 不存在时返回 404"""
         from sqlalchemy.exc import NoResultFound
+
         with patch(
             "src.api.seat_order_routes.generate_self_pay_link",
             new=AsyncMock(side_effect=NoResultFound("seat not found")),
@@ -364,7 +368,8 @@ class TestTableOpsRoutes:
             engine_mock.transfer_table = AsyncMock(side_effect=engine_raise)
         else:
             engine_mock.transfer_table = AsyncMock(
-                return_value=engine_return or {
+                return_value=engine_return
+                or {
                     "order_id": ORDER_ID,
                     "from_table": "A01",
                     "to_table": "A02",

@@ -17,20 +17,21 @@ shift_report_routes.py — 5 个
 9. GET  /api/v1/shifts/{store_id}/report          — date 参数格式非法 → 422
 10. GET /api/v1/shifts/{store_id}/operators       — 正常返回厨师绩效列表
 """
+
 from __future__ import annotations
 
 import os
 import sys
 import types
 import uuid
-from datetime import date, time
+from datetime import time
 from unittest.mock import AsyncMock, MagicMock, patch
 
 # ─── sys.path 设置 ─────────────────────────────────────────────────────────────
 
 _TESTS_DIR = os.path.dirname(__file__)
-_SRC_DIR   = os.path.abspath(os.path.join(_TESTS_DIR, ".."))
-_ROOT_DIR  = os.path.abspath(os.path.join(_TESTS_DIR, "..", "..", "..", ".."))
+_SRC_DIR = os.path.abspath(os.path.join(_TESTS_DIR, ".."))
+_ROOT_DIR = os.path.abspath(os.path.join(_TESTS_DIR, "..", "..", "..", ".."))
 
 for _p in [_SRC_DIR, _ROOT_DIR]:
     if _p not in sys.path:
@@ -38,6 +39,7 @@ for _p in [_SRC_DIR, _ROOT_DIR]:
 
 
 # ─── 包层级注册（解决相对导入 from ..services.X 问题） ──────────────────────────
+
 
 def _stub(name: str, **attrs) -> types.ModuleType:
     """注入一个空模块存根（仅当尚未存在时）。"""
@@ -60,10 +62,10 @@ def _ensure_pkg(name: str, path: str) -> types.ModuleType:
 
 
 # 注册 src 包层级（让相对导入能够解析 ..services）
-_ensure_pkg("src",          _SRC_DIR)
-_ensure_pkg("src.api",      os.path.join(_SRC_DIR, "api"))
+_ensure_pkg("src", _SRC_DIR)
+_ensure_pkg("src.api", os.path.join(_SRC_DIR, "api"))
 _ensure_pkg("src.services", os.path.join(_SRC_DIR, "services"))
-_ensure_pkg("src.models",   os.path.join(_SRC_DIR, "models"))
+_ensure_pkg("src.models", os.path.join(_SRC_DIR, "models"))
 
 # ─── shared.* 存根 ─────────────────────────────────────────────────────────────
 
@@ -71,15 +73,19 @@ _stub("shared")
 _stub("shared.events")
 _stub("shared.events.src")
 
+
 async def _fake_emit_event(*_args, **_kwargs):  # pragma: no cover
     pass
+
 
 _stub("shared.events.src.emitter", emit_event=_fake_emit_event)
 
 import enum as _enum  # noqa: E402
 
+
 class _TradeEventType(_enum.Enum):
     PAID = "ORDER.PAID"
+
 
 _stub("shared.events.src.event_types", TradeEventType=_TradeEventType, OrderEventType=_TradeEventType)
 
@@ -92,12 +98,14 @@ _stub("shared.ontology.src.enums", OrderStatus=None)
 # shared.ontology.src.database — 注入 get_db / get_db_with_tenant 占位符
 _db_mod = types.ModuleType("shared.ontology.src.database")
 
+
 async def _get_db_placeholder():  # pragma: no cover
     yield None
 
-_db_mod.get_db             = _get_db_placeholder
+
+_db_mod.get_db = _get_db_placeholder
 _db_mod.get_db_with_tenant = _get_db_placeholder
-_db_mod.get_db_no_rls      = _get_db_placeholder
+_db_mod.get_db_no_rls = _get_db_placeholder
 sys.modules["shared.ontology.src.database"] = _db_mod
 
 # ─── src.models 存根（避免 SQLAlchemy 模型导入链爆炸） ───────────────────────────
@@ -108,6 +116,7 @@ _stub("src.models.settlement", ShiftHandover=object)
 _stub("src.models.shift_config", ShiftConfig=object)
 
 # ─── src.services 存根（让路由相对导入时找到服务类）────────────────────────────────
+
 
 class _StubShiftHandoverService:
     def __init__(self, db, tenant_id): ...
@@ -126,50 +135,47 @@ class _StubShiftReportService:
     async def get_operator_performance(self, *a, **kw): ...
 
 
-_stub("src.services.shift_handover_service",
-      ShiftHandoverService=_StubShiftHandoverService)
-_stub("src.services.shift_report",
-      ShiftReportService=_StubShiftReportService)
+_stub("src.services.shift_handover_service", ShiftHandoverService=_StubShiftHandoverService)
+_stub("src.services.shift_report", ShiftReportService=_StubShiftReportService)
 
 # ─── 导入被测路由 ──────────────────────────────────────────────────────────────
 
-import pytest                                                      # noqa: E402
-from fastapi import FastAPI                                        # noqa: E402
-from fastapi.testclient import TestClient                          # noqa: E402
+from fastapi import FastAPI  # noqa: E402
+from fastapi.testclient import TestClient  # noqa: E402
 
-from src.api.shift_routes import router as shift_router            # type: ignore[import]  # noqa: E402
+from src.api.shift_report_routes import _get_db_session as _report_db_dep  # type: ignore[import]  # noqa: E402
+from src.api.shift_report_routes import router as report_router  # type: ignore[import]  # noqa: E402
 from src.api.shift_routes import _get_db_session as _shift_db_dep  # type: ignore[import]  # noqa: E402
-
-from src.api.shift_report_routes import router as report_router               # type: ignore[import]  # noqa: E402
-from src.api.shift_report_routes import _get_db_session as _report_db_dep     # type: ignore[import]  # noqa: E402
-
-from shared.ontology.src.database import get_db                    # noqa: E402  # noqa: F401
+from src.api.shift_routes import router as shift_router  # type: ignore[import]  # noqa: E402
 
 # ─── 常量 ──────────────────────────────────────────────────────────────────────
 
-TENANT_ID   = str(uuid.uuid4())
-STORE_ID    = str(uuid.uuid4())
-CASHIER_ID  = str(uuid.uuid4())
+TENANT_ID = str(uuid.uuid4())
+STORE_ID = str(uuid.uuid4())
+CASHIER_ID = str(uuid.uuid4())
 HANDOVER_ID = str(uuid.uuid4())
-SHIFT_ID    = str(uuid.uuid4())
+SHIFT_ID = str(uuid.uuid4())
 
 SHIFT_HEADERS = {"X-Tenant-ID": TENANT_ID}
 
 
 # ─── 辅助工厂 ──────────────────────────────────────────────────────────────────
 
+
 def _make_db() -> AsyncMock:
     db = AsyncMock()
-    db.commit   = AsyncMock()
+    db.commit = AsyncMock()
     db.rollback = AsyncMock()
-    db.execute  = AsyncMock()
+    db.execute = AsyncMock()
     return db
 
 
 def _db_override(db: AsyncMock):
     """生成 async generator 覆盖函数，注入 mock DB session"""
+
     async def _dep():
         yield db
+
     return _dep
 
 
@@ -178,6 +184,7 @@ def _db_override(db: AsyncMock):
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 # 场景 1: POST /handover — 正常开始交班 ─────────────────────────────────────────
+
 
 def test_start_handover_ok():
     """ShiftHandoverService.start_handover 成功时返回 ok=True 和 handover_id"""
@@ -215,6 +222,7 @@ def test_start_handover_ok():
 
 # 场景 2: POST /handover — 缺少 X-Tenant-ID → 400 ──────────────────────────────
 
+
 def test_start_handover_missing_tenant():
     """不提供 X-Tenant-ID header 时路由返回 400"""
     db = _make_db()
@@ -236,6 +244,7 @@ def test_start_handover_missing_tenant():
 
 
 # 场景 3: POST /handover/{id}/cash-count — 现金清点正常 ─────────────────────────
+
 
 def test_record_cash_count_ok():
     """record_cash_count 返回 cash_actual_fen，ok=True"""
@@ -273,6 +282,7 @@ def test_record_cash_count_ok():
 
 # 场景 4: POST /handover/{id}/finalize — 完成交班 ──────────────────────────────
 
+
 def test_finalize_handover_ok():
     """finalize_handover 成功返回 variance_fen 和 variance_alert 字段"""
     db = _make_db()
@@ -309,6 +319,7 @@ def test_finalize_handover_ok():
 
 # 场景 5: POST /handover — 业务校验失败（ValueError → 400） ─────────────────────
 
+
 def test_start_handover_service_value_error():
     """ShiftHandoverService.start_handover 抛 ValueError 时返回 400"""
     db = _make_db()
@@ -319,9 +330,7 @@ def test_start_handover_service_value_error():
 
     with patch("src.api.shift_routes.ShiftHandoverService") as MockSvc:
         instance = MagicMock()
-        instance.start_handover = AsyncMock(
-            side_effect=ValueError("当前已有未完成交班，请先完成")
-        )
+        instance.start_handover = AsyncMock(side_effect=ValueError("当前已有未完成交班，请先完成"))
         MockSvc.return_value = instance
 
         client = TestClient(app)
@@ -341,6 +350,7 @@ def test_start_handover_service_value_error():
 
 # 场景 6: GET /{store_id}/config — 正常返回班次配置列表 ──────────────────────────
 
+
 def test_list_shift_configs_ok():
     """list_shift_configs 有数据时返回 ok=True，data 为配置列表"""
     db = _make_db()
@@ -350,13 +360,13 @@ def test_list_shift_configs_ok():
     app.dependency_overrides[_report_db_dep] = _db_override(db)
 
     fake_config = MagicMock()
-    fake_config.id         = uuid.uuid4()
-    fake_config.store_id   = uuid.UUID(STORE_ID)
+    fake_config.id = uuid.uuid4()
+    fake_config.store_id = uuid.UUID(STORE_ID)
     fake_config.shift_name = "午班"
     fake_config.start_time = time(11, 0)
-    fake_config.end_time   = time(14, 0)
-    fake_config.color      = "#FF6B35"
-    fake_config.is_active  = True
+    fake_config.end_time = time(14, 0)
+    fake_config.color = "#FF6B35"
+    fake_config.is_active = True
     fake_config.created_at = None
 
     with patch("src.api.shift_report_routes.ShiftReportService") as MockSvc:
@@ -381,6 +391,7 @@ def test_list_shift_configs_ok():
 
 # 场景 7: POST /{store_id}/config — 创建班次配置成功 ────────────────────────────
 
+
 def test_create_shift_config_ok():
     """create_shift_config 成功时返回新建配置，ok=True"""
     db = _make_db()
@@ -390,13 +401,13 @@ def test_create_shift_config_ok():
     app.dependency_overrides[_report_db_dep] = _db_override(db)
 
     new_config = MagicMock()
-    new_config.id         = uuid.uuid4()
-    new_config.store_id   = uuid.UUID(STORE_ID)
+    new_config.id = uuid.uuid4()
+    new_config.store_id = uuid.UUID(STORE_ID)
     new_config.shift_name = "晚班"
     new_config.start_time = time(17, 0)
-    new_config.end_time   = time(21, 0)
-    new_config.color      = "#2196F3"
-    new_config.is_active  = True
+    new_config.end_time = time(21, 0)
+    new_config.color = "#2196F3"
+    new_config.is_active = True
     new_config.created_at = None
 
     with patch("src.api.shift_report_routes.ShiftReportService") as MockSvc:
@@ -410,8 +421,8 @@ def test_create_shift_config_ok():
             json={
                 "shift_name": "晚班",
                 "start_time": "17:00",
-                "end_time":   "21:00",
-                "color":      "#2196F3",
+                "end_time": "21:00",
+                "color": "#2196F3",
             },
             headers=SHIFT_HEADERS,
         )
@@ -421,10 +432,11 @@ def test_create_shift_config_ok():
     assert body["ok"] is True
     assert body["data"]["shift_name"] == "晚班"
     assert body["data"]["start_time"] == "17:00"
-    assert body["data"]["end_time"]   == "21:00"
+    assert body["data"]["end_time"] == "21:00"
 
 
 # 场景 8: GET /{store_id}/report — 正常返回报表摘要 ─────────────────────────────
+
 
 def test_get_shift_report_ok():
     """get_shift_summary 成功时返回含 total_tasks/timeout_rate 的报表摘要"""
@@ -435,38 +447,38 @@ def test_get_shift_report_ok():
     app.dependency_overrides[_report_db_dep] = _db_override(db)
 
     fake_dept = MagicMock()
-    fake_dept.dept_id              = "dept-01"
-    fake_dept.dept_name            = "炒菜档"
-    fake_dept.total_tasks          = 50
-    fake_dept.finished_tasks       = 48
+    fake_dept.dept_id = "dept-01"
+    fake_dept.dept_name = "炒菜档"
+    fake_dept.total_tasks = 50
+    fake_dept.finished_tasks = 48
     fake_dept.avg_duration_seconds = 95.3
-    fake_dept.timeout_count        = 3
-    fake_dept.remake_count         = 1
-    fake_dept.timeout_rate         = 0.0625
-    fake_dept.remake_rate          = 0.0208
+    fake_dept.timeout_count = 3
+    fake_dept.remake_count = 1
+    fake_dept.timeout_rate = 0.0625
+    fake_dept.remake_rate = 0.0208
 
     fake_op = MagicMock()
-    fake_op.operator_id            = "op-001"
-    fake_op.operator_name          = "张三"
-    fake_op.total_tasks            = 30
-    fake_op.finished_tasks         = 29
-    fake_op.avg_duration_seconds   = 88.0
-    fake_op.remake_count           = 0
-    fake_op.remake_rate            = 0.0
+    fake_op.operator_id = "op-001"
+    fake_op.operator_name = "张三"
+    fake_op.total_tasks = 30
+    fake_op.finished_tasks = 29
+    fake_op.avg_duration_seconds = 88.0
+    fake_op.remake_count = 0
+    fake_op.remake_rate = 0.0
 
     fake_summary = MagicMock()
-    fake_summary.shift_id              = SHIFT_ID
-    fake_summary.shift_name            = "午班"
-    fake_summary.date                  = "2026-04-04"
-    fake_summary.total_tasks           = 80
-    fake_summary.finished_tasks        = 77
-    fake_summary.avg_duration_seconds  = 92.5
-    fake_summary.timeout_count         = 5
-    fake_summary.remake_count          = 2
-    fake_summary.timeout_rate          = 0.065
-    fake_summary.remake_rate           = 0.026
-    fake_summary.dept_stats            = [fake_dept]
-    fake_summary.operator_stats        = [fake_op]
+    fake_summary.shift_id = SHIFT_ID
+    fake_summary.shift_name = "午班"
+    fake_summary.date = "2026-04-04"
+    fake_summary.total_tasks = 80
+    fake_summary.finished_tasks = 77
+    fake_summary.avg_duration_seconds = 92.5
+    fake_summary.timeout_count = 5
+    fake_summary.remake_count = 2
+    fake_summary.timeout_rate = 0.065
+    fake_summary.remake_rate = 0.026
+    fake_summary.dept_stats = [fake_dept]
+    fake_summary.operator_stats = [fake_op]
 
     with patch("src.api.shift_report_routes.ShiftReportService") as MockSvc:
         instance = MagicMock()
@@ -497,6 +509,7 @@ def test_get_shift_report_ok():
 # shift_report_routes.get_shift_report 仅捕获 date.fromisoformat() 的 ValueError
 # 并转为 422，这是该路由的唯一业务校验失败路径。
 
+
 def test_get_shift_report_invalid_date():
     """date 参数格式非法（非 YYYY-MM-DD）时路由返回 422"""
     db = _make_db()
@@ -523,6 +536,7 @@ def test_get_shift_report_invalid_date():
 
 # 场景 10: GET /{store_id}/operators — 正常返回厨师绩效列表 ────────────────────────
 
+
 def test_get_operator_performance_ok():
     """get_operator_performance 成功时返回厨师绩效列表，ok=True"""
     db = _make_db()
@@ -532,22 +546,22 @@ def test_get_operator_performance_ok():
     app.dependency_overrides[_report_db_dep] = _db_override(db)
 
     op1 = MagicMock()
-    op1.operator_id            = "op-001"
-    op1.operator_name          = "李四"
-    op1.total_tasks            = 40
-    op1.finished_tasks         = 39
-    op1.avg_duration_seconds   = 85.2
-    op1.remake_count           = 1
-    op1.remake_rate            = 0.0256
+    op1.operator_id = "op-001"
+    op1.operator_name = "李四"
+    op1.total_tasks = 40
+    op1.finished_tasks = 39
+    op1.avg_duration_seconds = 85.2
+    op1.remake_count = 1
+    op1.remake_rate = 0.0256
 
     op2 = MagicMock()
-    op2.operator_id            = "op-002"
-    op2.operator_name          = "王五"
-    op2.total_tasks            = 35
-    op2.finished_tasks         = 35
-    op2.avg_duration_seconds   = 78.0
-    op2.remake_count           = 0
-    op2.remake_rate            = 0.0
+    op2.operator_id = "op-002"
+    op2.operator_name = "王五"
+    op2.total_tasks = 35
+    op2.finished_tasks = 35
+    op2.avg_duration_seconds = 78.0
+    op2.remake_count = 0
+    op2.remake_rate = 0.0
 
     with patch("src.api.shift_report_routes.ShiftReportService") as MockSvc:
         instance = MagicMock()

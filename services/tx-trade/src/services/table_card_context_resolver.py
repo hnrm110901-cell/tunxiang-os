@@ -6,16 +6,13 @@ Core context resolver with 9 business rules (R1-R9).
 Resolves which fields to display on table cards based on current context.
 """
 
-import asyncio
 import logging
-from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional, Tuple
+from datetime import datetime
 from enum import Enum
+from typing import Any, Dict, List, Optional, Tuple
 
 from pydantic import BaseModel, Field
-from sqlalchemy import select, and_, func
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
 
 logger = logging.getLogger(__name__)
 
@@ -24,8 +21,10 @@ logger = logging.getLogger(__name__)
 # Enums and Models
 # ============================================================================
 
+
 class AlertLevel(str, Enum):
     """Alert level for card fields."""
+
     NORMAL = "normal"
     WARNING = "warning"
     CRITICAL = "critical"
@@ -33,6 +32,7 @@ class AlertLevel(str, Enum):
 
 class MealPeriod(str, Enum):
     """Meal period classification."""
+
     BREAKFAST = "breakfast"
     LUNCH = "lunch"
     DINNER = "dinner"
@@ -41,6 +41,7 @@ class MealPeriod(str, Enum):
 
 class TableStatus(str, Enum):
     """Table status values."""
+
     EMPTY = "empty"
     DINING = "dining"
     RESERVED = "reserved"
@@ -50,13 +51,15 @@ class TableStatus(str, Enum):
 
 class BusinessType(str, Enum):
     """Business type classification."""
-    PRO = "pro"               # Full-featured (å°å®«å)
-    STANDARD = "standard"     # Standard features (å°å¨ä¸èµ·)
-    LITE = "lite"             # Minimal features (æé»çº¿)
+
+    PRO = "pro"  # Full-featured (å°å®«å)
+    STANDARD = "standard"  # Standard features (å°å¨ä¸èµ·)
+    LITE = "lite"  # Minimal features (æé»çº¿)
 
 
 class CardFieldDef(BaseModel):
     """Field definition for table card display."""
+
     key: str
     label: str
     category: str  # identity, status, financial, service, timing, custom
@@ -67,6 +70,7 @@ class CardFieldDef(BaseModel):
 
 class CardField(BaseModel):
     """Resolved card field with value and priority."""
+
     key: str
     label: str
     value: Any
@@ -77,6 +81,7 @@ class CardField(BaseModel):
 
 class ContextRule(BaseModel):
     """Context-aware rule for field adjustment."""
+
     rule_id: str  # R1, R2, ..., R9
     condition: str
     priority_delta: int = 0
@@ -87,6 +92,7 @@ class ContextRule(BaseModel):
 
 class ResolveContext(BaseModel):
     """Context for field resolution."""
+
     tenant_id: str
     store_id: str
     table_id: str
@@ -144,6 +150,7 @@ STATUS_FIELD_POOLS = {
 # ============================================================================
 # Business Rules (R1-R9)
 # ============================================================================
+
 
 class BusinessRuleEngine:
     """Engine for applying business context rules."""
@@ -350,6 +357,7 @@ class BusinessRuleEngine:
 # Main Context Resolver
 # ============================================================================
 
+
 class TableCardContextResolver:
     """
     Core context resolver service for smart table card display.
@@ -393,15 +401,11 @@ class TableCardContextResolver:
         field_pool = STATUS_FIELD_POOLS.get(status, [])
 
         # Compute base scores for all candidate fields
-        scored_fields: Dict[str, int] = {
-            field.key: field.base_priority for field in field_pool
-        }
+        scored_fields: Dict[str, int] = {field.key: field.base_priority for field in field_pool}
 
         # Get field rankings from learning engine if available
         if self.learning_engine:
-            learned_rankings = await self.learning_engine.get_field_rankings(
-                context.store_id, context.meal_period
-            )
+            learned_rankings = await self.learning_engine.get_field_rankings(context.store_id, context.meal_period)
             for field_key, learned_score in learned_rankings.items():
                 if field_key in scored_fields:
                     scored_fields[field_key] = int(learned_score * 0.3 + scored_fields[field_key] * 0.7)
@@ -464,9 +468,7 @@ class TableCardContextResolver:
         else:
             return MealPeriod.LATE_NIGHT
 
-    async def get_display_config(
-        self, store_id: str, business_type: BusinessType
-    ) -> Dict[str, Any]:
+    async def get_display_config(self, store_id: str, business_type: BusinessType) -> Dict[str, Any]:
         """Get display configuration for given business type."""
         configs = {
             BusinessType.PRO: {

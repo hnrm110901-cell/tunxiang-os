@@ -4,7 +4,7 @@ W6 服务员绩效实时看板后端接口
 
 数据来源：crew_shift_summaries 表（v151 迁移，含 crew_id/table_count/revenue_fen/turnover_rate 等字段）
 """
-import uuid as _uuid
+
 from datetime import date, timedelta
 from typing import Literal, Optional
 
@@ -22,6 +22,7 @@ router = APIRouter(prefix="/api/v1/crew/stats", tags=["crew-stats"])
 
 
 # ---------- 工具函数 ----------
+
 
 def _badge(rank: int) -> Optional[str]:
     return {1: "gold", 2: "silver", 3: "bronze"}.get(rank)
@@ -46,6 +47,7 @@ async def _set_rls(db: AsyncSession, tenant_id: str) -> None:
 
 
 # ---------- 路由 ----------
+
 
 @router.get("/me")
 async def get_my_stats(
@@ -82,12 +84,15 @@ async def get_my_stats(
               AND css.is_deleted = false
             GROUP BY css.crew_id
         """)
-        result = await db.execute(sql, {
-            "store_id": store_id,
-            "crew_id": x_operator_id,
-            "start_date": start_date,
-            "end_date": end_date,
-        })
+        result = await db.execute(
+            sql,
+            {
+                "store_id": store_id,
+                "crew_id": x_operator_id,
+                "start_date": start_date,
+                "end_date": end_date,
+            },
+        )
         row = result.fetchone()
 
         if not row:
@@ -113,15 +118,15 @@ async def get_my_stats(
         table_count = int(row.table_count)
         stats = {
             "operator_id": x_operator_id,
-            "operator_name": None,              # crew_shift_summaries 无 name 字段，需联查 employees
+            "operator_name": None,  # crew_shift_summaries 无 name 字段，需联查 employees
             "table_count": table_count,
             "table_turns": table_count,
             "revenue_contributed": revenue,
             "avg_check": revenue // max(table_count, 1),
-            "upsell_count": 0,                  # crew_shift_summaries 暂无 upsell 字段
+            "upsell_count": 0,  # crew_shift_summaries 暂无 upsell 字段
             "upsell_rate": 0.0,
             "complaint_count": int(row.complaint_count),
-            "rank": None,                       # 排名需在 leaderboard 端点计算
+            "rank": None,  # 排名需在 leaderboard 端点计算
             "total_staff": 0,
             "period": period,
         }
@@ -131,12 +136,23 @@ async def get_my_stats(
 
     except SQLAlchemyError as e:
         log.warning("crew_stats_me_db_error", error=str(e))
-        return {"ok": True, "data": {
-            "operator_id": x_operator_id, "operator_name": None,
-            "table_count": 0, "table_turns": 0, "revenue_contributed": 0,
-            "avg_check": 0, "upsell_count": 0, "upsell_rate": 0.0,
-            "complaint_count": 0, "rank": None, "total_staff": 0, "period": period,
-        }}
+        return {
+            "ok": True,
+            "data": {
+                "operator_id": x_operator_id,
+                "operator_name": None,
+                "table_count": 0,
+                "table_turns": 0,
+                "revenue_contributed": 0,
+                "avg_check": 0,
+                "upsell_count": 0,
+                "upsell_rate": 0.0,
+                "complaint_count": 0,
+                "rank": None,
+                "total_staff": 0,
+                "period": period,
+            },
+        }
     except Exception as e:  # noqa: BLE001 — MLPS3-P0: 最外层HTTP兜底
         log.error("crew_stats_me_error", error=str(e), exc_info=True)
         raise HTTPException(status_code=500, detail="服务器内部错误")
@@ -185,23 +201,28 @@ async def get_leaderboard(
             ORDER BY metric_value DESC
             LIMIT 50
         """)
-        result = await db.execute(sql, {
-            "store_id": store_id,
-            "start_date": start_date,
-            "end_date": end_date,
-        })
+        result = await db.execute(
+            sql,
+            {
+                "store_id": store_id,
+                "start_date": start_date,
+                "end_date": end_date,
+            },
+        )
         rows = result.fetchall()
 
         items = []
         for i, row in enumerate(rows):
             rank = i + 1
-            items.append({
-                "rank": rank,
-                "operator_id": row.crew_id,
-                "operator_name": None,          # 需联查 employees 表
-                "value": int(row.metric_value),
-                "badge": _badge(rank),
-            })
+            items.append(
+                {
+                    "rank": rank,
+                    "operator_id": row.crew_id,
+                    "operator_name": None,  # 需联查 employees 表
+                    "value": int(row.metric_value),
+                    "badge": _badge(rank),
+                }
+            )
 
         log.info("crew_stats_leaderboard_ok", count=len(items))
         return {"ok": True, "data": {"items": items, "total": len(items)}}
@@ -248,12 +269,15 @@ async def get_trend(
             GROUP BY css.shift_date
             ORDER BY css.shift_date
         """)
-        result = await db.execute(sql, {
-            "store_id": store_id,
-            "crew_id": operator_id,
-            "start_date": start_date,
-            "end_date": today,
-        })
+        result = await db.execute(
+            sql,
+            {
+                "store_id": store_id,
+                "crew_id": operator_id,
+                "start_date": start_date,
+                "end_date": today,
+            },
+        )
         db_rows = {row.shift_date: row for row in result.fetchall()}
 
         # 补零确保连续日期
@@ -261,12 +285,14 @@ async def get_trend(
         for d in range(days - 1, -1, -1):
             day = today - timedelta(days=d)
             row = db_rows.get(day)
-            trend.append({
-                "date": day.isoformat(),
-                "table_turns": int(row.table_count) if row else 0,
-                "revenue_contributed": int(row.revenue_fen) if row else 0,
-                "upsell_count": 0,      # crew_shift_summaries 暂无 upsell 字段
-            })
+            trend.append(
+                {
+                    "date": day.isoformat(),
+                    "table_turns": int(row.table_count) if row else 0,
+                    "revenue_contributed": int(row.revenue_fen) if row else 0,
+                    "upsell_count": 0,  # crew_shift_summaries 暂无 upsell 字段
+                }
+            )
 
         log.info("crew_stats_trend_ok", data_points=len(trend))
         return {"ok": True, "data": {"items": trend, "operator_id": operator_id}}
@@ -275,8 +301,12 @@ async def get_trend(
         log.warning("crew_stats_trend_db_error", error=str(e))
         # 返回全零趋势，不抛错
         trend = [
-            {"date": (today - timedelta(days=d)).isoformat(),
-             "table_turns": 0, "revenue_contributed": 0, "upsell_count": 0}
+            {
+                "date": (today - timedelta(days=d)).isoformat(),
+                "table_turns": 0,
+                "revenue_contributed": 0,
+                "upsell_count": 0,
+            }
             for d in range(days - 1, -1, -1)
         ]
         return {"ok": True, "data": {"items": trend, "operator_id": operator_id}}
