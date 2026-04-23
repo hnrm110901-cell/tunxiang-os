@@ -141,6 +141,13 @@ class ContentGenerationAgent(SkillAgent):
     priority = "P1"
     run_location = "cloud"
 
+    # Sprint D1 / PR Overflow：纯文案生成，不触发业务决策，豁免
+    constraint_scope = set()
+    constraint_waived_reason = (
+        "内容生成纯文案/脚本/海报文案/评论回复生成工具，"
+        "不直接操作毛利/食安/客户体验三条业务约束维度"
+    )
+
     def get_supported_actions(self) -> list[str]:
         return [
             "generate_marketing_copy",

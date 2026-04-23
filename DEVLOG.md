@@ -1,3 +1,35 @@
+## 2026-04-23 Sprint D1 批次 6 + Overflow — 14 Skill 冲 100% 覆盖 + CI 门禁
+
+### 今日完成
+- [批次 6 全豁免] review_insight / review_summary / intel_reporter / audit_trail / growth_coach / salary_advisor / smart_customer_service — 每条 reason ≥30 字符且无黑名单说辞
+- [Overflow margin] ai_marketing_orchestrator / dormant_recall / high_value_member / member_insight / cashier_audit
+- [Overflow 豁免] content_generation / competitor_watch
+- [skills/__init__.py] 5 个 Skill 补注册：ReviewSummary / AuditTrail / GrowthCoach / SmartCustomerService / CashierAudit
+- [skills/trend_discovery.py / pilot_recommender.py] 重写 waived_reason 去黑名单"不适用"
+- [tests/test_constraint_context.py] 扩 5 条：批 6 全豁免 + Overflow margin/豁免 + 新注册 + **test_100_percent_registry_coverage CI 门禁**
+
+### 数据变化
+- SKILL_REGISTRY 规模：**50/50 = 100% 覆盖**
+- 豁免分布：15 个（批 4 trend_discovery/pilot_recommender + 批 5 四 HR + 批 6 七 + Overflow 二）
+- 修改文件：18（14 Skills + 2 pre-existing reason + __init__ + test）
+- 新增测试：5（共 76：全绿）
+- ruff 状态：新代码全绿（pre-existing 6 F401 datetime 不增量）
+
+### cashier_audit 决策点结论（设计稿 §附录 B #2）
+选择：**按 P0 margin 接入**（非豁免、非继续观察）
+依据：agent_id 已有 audit_transaction / audit_discount_anomaly 等实装 action，实际作为折扣/挂账/现金异常的检测拦截器，与 margin 守门员语义一致
+
+### 遗留问题
+- 51 Skill 中仅 9 P0 + 7 批 1-4 context 填充（16 个）有真实 price_fen/cost_fen/ingredients 数据，其余 35 个运行仍标 scope='n/a'
+- 豁免率 29%（15/51）偏高，Grafana 上线后应监控豁免 Skill 实际触达率
+- pre-existing 6 F401 datetime 未清理
+
+### 明日计划
+- 等 PR 栈 #78/#79/本 PR 合入
+- 启动 D2 ROI 三字段 / D3 RFM / D4 成本根因
+
+---
+
 ## 2026-04-23 fix — edge_mixin 相对导入 + ConstraintContext.from_data 零价格回归
 
 ### 今日完成

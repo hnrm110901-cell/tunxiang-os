@@ -27,6 +27,13 @@ class ReviewInsightAgent(SkillAgent):
     priority = "P1"
     run_location = "cloud"
 
+    # Sprint D1 / PR 批次 6：纯评论 NLP 分析，不触发业务决策，豁免
+    constraint_scope = set()
+    constraint_waived_reason = (
+        "评论主题洞察纯 NLP 情感/主题分析，输出差评根因和回复建议供运营参考，"
+        "不直接操作毛利/食安/客户体验三条业务约束维度"
+    )
+
     def get_supported_actions(self) -> list[str]:
         return [
             "extract_review_topics",

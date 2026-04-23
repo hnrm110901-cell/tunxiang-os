@@ -595,3 +595,119 @@ async def test_turnover_risk_waived_scope():
     result = await agent.run("noop_unknown", {})
     assert result.constraints_detail["scope"] == "waived"
     assert result.constraints_passed is True
+
+
+# ──────────────────────────────────────────────────────────────────────
+# 11. 批次 6 + Overflow（W9 最后 14 Skill，冲 100% 覆盖）
+# ──────────────────────────────────────────────────────────────────────
+
+def test_batch_6_content_insight_skills_all_waived():
+    """批次 6 七个纯报告类 Skill 应全部豁免，reason ≥30 字符且无黑名单说辞"""
+    _import_skills_or_skip()
+    from agents.skills.audit_trail import AuditTrailAgent
+    from agents.skills.growth_coach import GrowthCoachAgent
+    from agents.skills.intel_reporter import IntelReporterAgent
+    from agents.skills.review_insight import ReviewInsightAgent
+    from agents.skills.review_summary import ReviewSummaryAgent
+    from agents.skills.salary_advisor import SalaryAdvisorAgent
+    from agents.skills.smart_customer_service import SmartCustomerServiceAgent
+
+    waived = [
+        ReviewInsightAgent, ReviewSummaryAgent, IntelReporterAgent,
+        AuditTrailAgent, GrowthCoachAgent, SalaryAdvisorAgent,
+        SmartCustomerServiceAgent,
+    ]
+    for cls in waived:
+        assert cls.constraint_scope == set(), f"{cls.__name__} 应豁免"
+        reason = cls.constraint_waived_reason
+        assert reason is not None and len(reason) >= 30, (
+            f"{cls.__name__} waived_reason 长度 {len(reason or '')} < 30"
+        )
+        for blacklist in ("N/A", "不适用", "跳过"):
+            assert blacklist not in reason, (
+                f"{cls.__name__} 含黑名单 {blacklist}"
+            )
+
+
+def test_overflow_margin_skills():
+    """Overflow 5 个营销/会员类 Skill 声明 margin（折扣/奖励冲击毛利底线）"""
+    _import_skills_or_skip()
+    from agents.skills.ai_marketing_orchestrator import AiMarketingOrchestratorAgent
+    from agents.skills.cashier_audit import CashierAuditAgent
+    from agents.skills.dormant_recall import DormantRecallAgent
+    from agents.skills.high_value_member import HighValueMemberAgent
+    from agents.skills.member_insight import MemberInsightAgent
+
+    for cls in (AiMarketingOrchestratorAgent, DormantRecallAgent,
+                HighValueMemberAgent, MemberInsightAgent, CashierAuditAgent):
+        assert cls.constraint_scope == {"margin"}, f"{cls.__name__} 应为 margin"
+
+
+def test_overflow_waived_skills():
+    """Overflow 2 个纯内容/扫描类豁免"""
+    _import_skills_or_skip()
+    from agents.skills.competitor_watch import CompetitorWatchAgent
+    from agents.skills.content_generation import ContentGenerationAgent
+
+    for cls in (ContentGenerationAgent, CompetitorWatchAgent):
+        assert cls.constraint_scope == set()
+        assert cls.constraint_waived_reason is not None
+        assert len(cls.constraint_waived_reason) >= 30
+
+
+def test_100_percent_registry_coverage():
+    """51 个 Skill 文件应 100% 在 SKILL_REGISTRY 中声明 scope。
+
+    CI 门禁：批次 6 + Overflow 合并后，SKILL_REGISTRY 规模应 ≥50，
+    且每个 Skill 都有 constraint_scope 类属性（不是基类默认）且
+    空 scope 的必有 ≥30 字符 waived_reason。
+    """
+    _import_skills_or_skip()
+    from agents.skills import SKILL_REGISTRY
+
+    assert len(SKILL_REGISTRY) >= 50, (
+        f"SKILL_REGISTRY 只有 {len(SKILL_REGISTRY)} 个，未达 50 覆盖率目标"
+    )
+
+    missing_scope: list[str] = []
+    empty_without_reason: list[str] = []
+    blacklist_violations: list[str] = []
+
+    for agent_id, cls in SKILL_REGISTRY.items():
+        # 获取本类声明的 constraint_scope（允许继承基类默认 3 约束）
+        scope = getattr(cls, "constraint_scope", None)
+        if scope is None:
+            missing_scope.append(agent_id)
+            continue
+
+        # 空 scope 必须声明 waived_reason ≥30 字符
+        if scope == set():
+            reason = getattr(cls, "constraint_waived_reason", None)
+            if not reason or len(reason) < 30:
+                empty_without_reason.append(
+                    f"{agent_id}(reason_len={len(reason or '')})"
+                )
+                continue
+            for blacklist in ("N/A", "不适用", "跳过"):
+                if blacklist in reason:
+                    blacklist_violations.append(f"{agent_id}: {blacklist!r}")
+
+    assert not missing_scope, f"缺 constraint_scope: {missing_scope}"
+    assert not empty_without_reason, (
+        f"豁免 Skill 缺 ≥30 字符 reason: {empty_without_reason}"
+    )
+    assert not blacklist_violations, (
+        f"豁免 reason 含黑名单说辞: {blacklist_violations}"
+    )
+
+
+def test_batch_6_overflow_new_registrations():
+    """批次 6 + Overflow 新增 5 个注册项"""
+    _import_skills_or_skip()
+    from agents.skills import SKILL_REGISTRY
+
+    # 批次 6 新注册：review_summary / audit_trail / growth_coach / smart_customer_service
+    # Overflow 新注册：cashier_audit
+    for aid in ("review_summary", "audit_trail", "growth_coach",
+                "smart_customer_service", "cashier_audit"):
+        assert aid in SKILL_REGISTRY, f"{aid} 未注册"

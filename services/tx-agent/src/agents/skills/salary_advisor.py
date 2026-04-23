@@ -427,6 +427,13 @@ class SalaryAdvisorAgent(SkillAgent):
     priority = "P2"
     run_location = "cloud"
 
+    # Sprint D1 / PR 批次 6：纯薪酬建议，HRD 最终决策，不直接操作三约束，豁免
+    constraint_scope = set()
+    constraint_waived_reason = (
+        "AI 薪酬顾问输出建议和风险预测供 HRD 参考，由人工最终决策调薪，"
+        "不直接操作毛利/食安/客户体验三条业务约束维度"
+    )
+
     def get_supported_actions(self) -> list[str]:
         return [
             "recommend_salary",

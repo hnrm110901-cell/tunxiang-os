@@ -4,10 +4,14 @@ from .ai_waiter import AIWaiterAgent
 # Sprint D1 / PR 批次 5：合规运营（waived + margin + safety）
 from .attendance_compliance_agent import AttendanceComplianceAgent
 from .attendance_recovery import AttendanceRecoveryAgent
+
+# Sprint D1 / PR 批次 6 + Overflow：内容洞察 + 遗漏 Skill（冲 100% 覆盖）
+from .audit_trail import AuditTrailAgent
 from .banquet_growth import BanquetGrowthAgent
 
 # 专项运营Agent (Phase 6)
 from .billing_anomaly import BillingAnomalyAgent
+from .cashier_audit import CashierAuditAgent
 from .closing_agent import ClosingAgent
 
 # Intel Agents (情报Agent)
@@ -26,6 +30,7 @@ from .finance_audit import FinanceAuditAgent
 
 # Sprint D1 / PR G 批次 1：接入 ConstraintContext
 from .growth_attribution import GrowthAttributionAgent
+from .growth_coach import GrowthCoachAgent
 from .high_value_member import HighValueMemberAgent
 from .ingredient_radar import IngredientRadarAgent
 from .intel_reporter import IntelReporterAgent
@@ -49,9 +54,11 @@ from .private_ops import PrivateOpsAgent
 from .queue_seating import QueueSeatingAgent
 from .referral_growth import ReferralGrowthAgent
 from .review_insight import ReviewInsightAgent
+from .review_summary import ReviewSummaryAgent
 from .salary_advisor import SalaryAdvisorAgent
 from .seasonal_campaign import SeasonalCampaignAgent
 from .serve_dispatch import ServeDispatchAgent
+from .smart_customer_service import SmartCustomerServiceAgent
 from .smart_menu import SmartMenuAgent
 from .smart_service import SmartServiceAgent
 from .stockout_alert import StockoutAlertAgent
@@ -135,6 +142,15 @@ ALL_SKILL_AGENTS = [
     AttendanceRecoveryAgent,
     TurnoverRiskAgent,
     WorkforcePlannerAgent,
+    # Sprint D1 / PR 批次 6 + Overflow：冲 100% 覆盖
+    # （review_insight / intel_reporter / salary_advisor 已在上方注册；
+    #  本行新增 5 个：review_summary / audit_trail / growth_coach /
+    #  smart_customer_service / cashier_audit）
+    ReviewSummaryAgent,
+    AuditTrailAgent,
+    GrowthCoachAgent,
+    SmartCustomerServiceAgent,
+    CashierAuditAgent,
 ]
 
 
