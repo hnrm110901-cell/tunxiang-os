@@ -45,6 +45,25 @@ log = structlog.get_logger(__name__)
 # 金额类指标（金额分解时按日权重；非金额类 count 指标同样按权重分解，但都用整数）
 _METRIC_VALUES = {m.value for m in MetricType}
 
+# 门店级哨兵 employee_id：表示"这是门店级目标，不归属任何个人员工"
+# 约定：UUID(int=0) = '00000000-0000-0000-0000-000000000000'
+# 对齐 SalesTargetRepository.STORE_LEVEL_SENTINEL_EMPLOYEE_ID
+STORE_LEVEL_SENTINEL_EMPLOYEE_ID = UUID(int=0)
+
+# 仅能按"门店"维度聚合的指标（桌数/单均/人均都是门店级语义，
+# 给单个销售建此类目标必定算不准；P0-2 修复强制要求 is_store_level=True）
+_STORE_LEVEL_ONLY_METRICS = frozenset(
+    {
+        MetricType.TABLE_COUNT.value,
+        MetricType.UNIT_AVG_FEN.value,
+        MetricType.PER_GUEST_AVG_FEN.value,
+    }
+)
+
+
+class SalesTargetValidationError(ValueError):
+    """销售目标业务规则校验失败（如给个人建门店级指标）。"""
+
 # 工作日（周一=0 ~ 周五=4）权重
 _WORKDAY_WEIGHT = Decimal("1.2")
 # 周末（周六=5 / 周日=6）权重
@@ -181,6 +200,19 @@ class SalesTargetService:
         )
         if mt_value not in _METRIC_VALUES:
             raise ValueError(f"未知 metric_type: {mt_value}")
+
+        # P0-2 防御性校验：门店级指标（桌数/单均/人均）不能给单个员工建目标
+        # 必须用 STORE_LEVEL_SENTINEL_EMPLOYEE_ID 标识为门店级目标。
+        if (
+            mt_value in _STORE_LEVEL_ONLY_METRICS
+            and employee_id != STORE_LEVEL_SENTINEL_EMPLOYEE_ID
+        ):
+            raise SalesTargetValidationError(
+                f"metric_type={mt_value!r} 是门店级指标，"
+                f"不能给单个员工建目标；请使用 "
+                f"STORE_LEVEL_SENTINEL_EMPLOYEE_ID "
+                f"({STORE_LEVEL_SENTINEL_EMPLOYEE_ID}) 建门店级目标。"
+            )
 
         target = await self._repo.insert_target(
             db,
@@ -509,13 +541,24 @@ class SalesTargetService:
             mt = t["metric_type"]
             if hasattr(mt, "value"):
                 mt = mt.value
+            # P0-2 修复：透传 employee_id 给聚合层，确保按员工归属分离聚合
+            t_emp_id = t.get("employee_id")
+            if isinstance(t_emp_id, str):
+                t_emp_id = UUID(t_emp_id)
+            t_store_id = t.get("store_id")
+            if isinstance(t_store_id, str):
+                try:
+                    t_store_id = UUID(t_store_id)
+                except ValueError:
+                    t_store_id = None
             actual = await self._repo.aggregate_metric_from_views(
                 db,
                 tenant_id=tenant_id,
-                store_id=t.get("store_id"),
+                store_id=t_store_id,
                 metric_type=mt,
                 period_start=period_start,
                 period_end=period_end,
+                employee_id=t_emp_id,
             )
             progress = await self.record_progress(
                 db,

@@ -14,7 +14,7 @@
 
 from __future__ import annotations
 
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Any
 from uuid import UUID, uuid4
@@ -505,7 +505,34 @@ class SalesTargetRepository:
             for r in rows
         ]
 
-    # ── 事件聚合（从 mv_store_pnl 读取实际值） ──────────────────────────
+    # ── 事件聚合（从 mv_store_pnl 读取门店级实际值） ────────────────────
+    #
+    # 指标分级（P0-2 修复）：
+    #   - 门店级指标（store-level）：table_count / unit_avg_fen / per_guest_avg_fen
+    #     这些本质是门店粒度（桌数=门店计数；单均/人均=门店维度平均），
+    #     给单个员工建这类目标在业务上无法"按员工归属"聚合
+    #     → Service 层负责拒绝（要求 employee_id 为门店级哨兵）
+    #     → Repository 层仅在 employee_id 为门店级哨兵时通过 mv_store_pnl 聚合
+    #   - 员工可归属指标（per-employee）：revenue_fen / order_count / new_customer_count
+    #     这些可以按订单归属员工（sales_employee_id/cashier_id）聚合
+    #     → 优先从 events 表按 payload 中的归属员工字段过滤
+    #     → 若无可用归属字段 → 降级 0 + warning（不再假装给出值）
+    #
+    # 注：历史实现只用 mv_store_pnl 按 store_id 聚合（不管 employee_id），
+    # 导致同店多名销售经理拿到**相同**的 actual_value，直接影响薪资提成。
+
+    # 存储级哨兵：表示"这是门店级目标，不归属任何个人员工"
+    # (UUID(int=0) = '00000000-0000-0000-0000-000000000000')
+    STORE_LEVEL_SENTINEL_EMPLOYEE_ID = UUID(int=0)
+
+    # 门店级指标（个人无法独立聚合）
+    _STORE_LEVEL_METRICS = frozenset(
+        {"table_count", "unit_avg_fen", "per_guest_avg_fen"}
+    )
+    # 可按员工归属聚合的指标
+    _PER_EMPLOYEE_METRICS = frozenset(
+        {"revenue_fen", "order_count", "new_customer_count"}
+    )
 
     async def aggregate_metric_from_views(
         self,
@@ -516,19 +543,84 @@ class SalesTargetRepository:
         metric_type: str,
         period_start: date,
         period_end: date,
+        employee_id: UUID | None = None,
     ) -> int:
-        """从物化视图聚合指定指标的实际值（Phase 3 读视图，不跨服务查）。
+        """按员工归属聚合指标的实际值（P0-2 修复，严格按 employee_id 过滤）。
 
-        映射关系：
-          revenue_fen        → SUM(gross_revenue_fen)
-          order_count        → SUM(order_count)
-          table_count        → SUM(order_count)    (门店无桌数视图，用订单数兜底)
-          unit_avg_fen       → SUM(gross_revenue_fen) / NULLIF(SUM(order_count),0)
-          per_guest_avg_fen  → SUM(avg_check_fen)   (视图已存客单价，直接聚合取均)
-          new_customer_count → SUM(customer_count)
+        聚合策略：
+          1. metric_type ∈ 门店级指标（table_count/unit_avg_fen/per_guest_avg_fen）
+             - employee_id 必须为 STORE_LEVEL_SENTINEL 或 None，否则拒绝（返回 0 + warn）
+             - 从 mv_store_pnl 按 store_id 聚合（门店粒度，无员工维度）
+          2. metric_type ∈ 员工可归属指标（revenue_fen/order_count/new_customer_count）
+             - 必须传入具体 employee_id（非哨兵）
+             - 从 events 表按 payload->>'sales_employee_id' 过滤 order.paid 事件
+             - 兼容 payload->>'cashier_id'（收银员归属）作为次选
+             - payload 中无任何归属字段时返回 0 + warning（不沉默错配）
 
-        视图不存在或无数据时返回 0（测试环境不强制依赖 v148）。
+        视图/表不存在或权限不足时返回 0 并记录 warning。
         """
+        if metric_type in self._STORE_LEVEL_METRICS:
+            # 门店级指标：要求 employee_id 为哨兵或 None
+            if (
+                employee_id is not None
+                and employee_id != self.STORE_LEVEL_SENTINEL_EMPLOYEE_ID
+            ):
+                log.warning(
+                    "sales_target_store_level_metric_rejected_individual",
+                    metric_type=metric_type,
+                    employee_id=str(employee_id),
+                    reason=(
+                        "门店级指标不支持按个人员工聚合，"
+                        "请使用 STORE_LEVEL_SENTINEL_EMPLOYEE_ID 建门店级目标"
+                    ),
+                )
+                return 0
+            return await self._aggregate_store_level_from_view(
+                db,
+                tenant_id=tenant_id,
+                store_id=store_id,
+                metric_type=metric_type,
+                period_start=period_start,
+                period_end=period_end,
+            )
+
+        if metric_type in self._PER_EMPLOYEE_METRICS:
+            if (
+                employee_id is None
+                or employee_id == self.STORE_LEVEL_SENTINEL_EMPLOYEE_ID
+            ):
+                # 门店级 revenue/order_count 目标：允许走 mv_store_pnl 总额
+                return await self._aggregate_store_level_from_view(
+                    db,
+                    tenant_id=tenant_id,
+                    store_id=store_id,
+                    metric_type=metric_type,
+                    period_start=period_start,
+                    period_end=period_end,
+                )
+            return await self._aggregate_per_employee_from_events(
+                db,
+                tenant_id=tenant_id,
+                store_id=store_id,
+                metric_type=metric_type,
+                period_start=period_start,
+                period_end=period_end,
+                employee_id=employee_id,
+            )
+
+        raise ValueError(f"未知 metric_type: {metric_type}")
+
+    async def _aggregate_store_level_from_view(
+        self,
+        db: AsyncSession,
+        *,
+        tenant_id: UUID,
+        store_id: UUID | None,
+        metric_type: str,
+        period_start: date,
+        period_end: date,
+    ) -> int:
+        """从 mv_store_pnl 按门店维度聚合（门店级目标）。"""
         metric_to_sql = {
             "revenue_fen": "COALESCE(SUM(gross_revenue_fen), 0)",
             "order_count": "COALESCE(SUM(order_count), 0)",
@@ -565,12 +657,117 @@ class SalesTargetRepository:
         try:
             result = await db.execute(sql, params)
             row = result.fetchone()
-        except Exception as exc:  # noqa: BLE001
-            # 视图不存在/权限不足等场景：降级 0，记录告警
+        except (ValueError, RuntimeError, LookupError) as exc:
             log.warning(
                 "sales_target_aggregate_view_unavailable",
                 error=str(exc),
                 metric_type=metric_type,
+            )
+            return 0
+        except Exception as exc:  # noqa: BLE001 — 兼容 asyncpg/SQLAlchemy 驱动异常
+            log.warning(
+                "sales_target_aggregate_view_unavailable",
+                error=str(exc),
+                metric_type=metric_type,
+                exc_info=True,
+            )
+            return 0
+        if row is None:
+            return 0
+        value = getattr(row, "actual", None)
+        if value is None and hasattr(row, "_mapping"):
+            value = row._mapping.get("actual", 0)
+        return int(value or 0)
+
+    async def _aggregate_per_employee_from_events(
+        self,
+        db: AsyncSession,
+        *,
+        tenant_id: UUID,
+        store_id: UUID | None,
+        metric_type: str,
+        period_start: date,
+        period_end: date,
+        employee_id: UUID,
+    ) -> int:
+        """从 events 表按员工归属聚合（order.paid 事件）。
+
+        归因字段优先级（payload JSONB 读取）：
+          1. sales_employee_id — 明确的销售归属（R2 将补齐）
+          2. cashier_id        — 收银员归属（v011 orders 字段，当前主用）
+
+        metric 映射：
+          revenue_fen        → SUM((payload->>'final_amount_fen')::bigint)
+          order_count        → COUNT(*)
+          new_customer_count → COUNT(DISTINCT customer_id) where is_new=true
+                               （R2 事件扩展字段；当前降级为 COUNT DISTINCT customer_id）
+
+        period_end 按「含」语义：occurred_at < (period_end + 1 day)
+        """
+        # period_end 是"含"当天，转为排他上界
+        period_end_exclusive = period_end + timedelta(days=1)
+
+        metric_sql: dict[str, str] = {
+            "revenue_fen": (
+                "COALESCE(SUM((payload->>'final_amount_fen')::bigint), 0)"
+            ),
+            "order_count": "COUNT(*)",
+            "new_customer_count": (
+                "COUNT(DISTINCT NULLIF(payload->>'customer_id', ''))"
+            ),
+        }
+        if metric_type not in metric_sql:
+            raise ValueError(
+                f"metric_type {metric_type!r} 不是员工可归属指标"
+            )
+
+        clauses = [
+            "tenant_id = :tenant_id",
+            "event_type = 'order.paid'",
+            "occurred_at >= :period_start",
+            "occurred_at < :period_end_exclusive",
+            # 按员工归属过滤：优先 sales_employee_id，回退 cashier_id
+            "("
+            "payload->>'sales_employee_id' = :employee_id "
+            "OR (payload->>'sales_employee_id' IS NULL "
+            "    AND payload->>'cashier_id' = :employee_id)"
+            ")",
+        ]
+        params: dict[str, Any] = {
+            "tenant_id": str(tenant_id),
+            "period_start": period_start,
+            "period_end_exclusive": period_end_exclusive,
+            "employee_id": str(employee_id),
+        }
+        if store_id is not None:
+            clauses.append("store_id = :store_id")
+            params["store_id"] = str(store_id)
+
+        sql = text(
+            f"""
+            SELECT {metric_sql[metric_type]} AS actual
+            FROM events
+            WHERE {' AND '.join(clauses)}
+            """
+        )
+        try:
+            result = await db.execute(sql, params)
+            row = result.fetchone()
+        except (ValueError, RuntimeError, LookupError) as exc:
+            log.warning(
+                "sales_target_aggregate_events_unavailable",
+                error=str(exc),
+                metric_type=metric_type,
+                employee_id=str(employee_id),
+            )
+            return 0
+        except Exception as exc:  # noqa: BLE001 — 兼容 asyncpg/SQLAlchemy 驱动异常
+            log.warning(
+                "sales_target_aggregate_events_unavailable",
+                error=str(exc),
+                metric_type=metric_type,
+                employee_id=str(employee_id),
+                exc_info=True,
             )
             return 0
         if row is None:

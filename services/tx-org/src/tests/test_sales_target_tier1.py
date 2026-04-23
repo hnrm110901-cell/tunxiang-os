@@ -174,6 +174,15 @@ MetricType = _targets_mod.MetricType
 # ──────────────────────────────────────────────────────────────────────────────
 
 
+def _ensure_datetime(v):
+    """把 date 转 datetime（用于 events.occurred_at 比较）。"""
+    if isinstance(v, datetime):
+        return v
+    if isinstance(v, date):
+        return datetime(v.year, v.month, v.day, tzinfo=timezone.utc)
+    return v
+
+
 class _FakeRow:
     def __init__(self, mapping: dict) -> None:
         self._mapping = mapping
@@ -214,6 +223,8 @@ class FakeDB:
         self.targets: list[dict] = []
         self.progress: list[dict] = []
         self.pnl_rows: list[dict] = []  # mv_store_pnl 模拟
+        # events 表模拟：每行包含 tenant_id / store_id / event_type / occurred_at / payload(dict)
+        self.events: list[dict] = []
         self._lock = asyncio.Lock()
         self.commit = AsyncMock()
         self.rollback = AsyncMock()
@@ -415,6 +426,54 @@ class FakeDB:
                 reverse=True,
             )
             return _FakeResult([_FakeRow(r) for r in rows_out[: params["limit"]]])
+
+        # ── events 表聚合（P0-2：按员工归属过滤 order.paid）
+        if "FROM EVENTS" in s and "ORDER.PAID" in s:
+            employee_id = params["employee_id"]
+            period_start = params["period_start"]
+            period_end_exclusive = params["period_end_exclusive"]
+            rows = [
+                e
+                for e in self.events
+                if str(e.get("tenant_id")) == params["tenant_id"]
+                and e.get("event_type") == "order.paid"
+                and e["occurred_at"] >= _ensure_datetime(period_start)
+                and e["occurred_at"] < _ensure_datetime(period_end_exclusive)
+            ]
+            if "store_id" in params:
+                rows = [
+                    r for r in rows
+                    if str(r.get("store_id", "")) == params["store_id"]
+                ]
+            # 归属过滤：sales_employee_id 优先，cashier_id 回退
+            def _matches_emp(ev):
+                payload = ev.get("payload", {})
+                sei = payload.get("sales_employee_id")
+                if sei is not None:
+                    return str(sei) == employee_id
+                # sales_employee_id 为 None/缺失 → 看 cashier_id
+                cashier = payload.get("cashier_id")
+                return cashier is not None and str(cashier) == employee_id
+
+            rows = [r for r in rows if _matches_emp(r)]
+
+            # 执行对应 metric 的聚合
+            if "FINAL_AMOUNT_FEN" in s:
+                # revenue_fen
+                total = sum(
+                    int(r["payload"].get("final_amount_fen", 0)) for r in rows
+                )
+                return _FakeResult([_FakeRow({"actual": total})])
+            if "COUNT(DISTINCT" in s:
+                # new_customer_count
+                distinct = {
+                    r["payload"].get("customer_id")
+                    for r in rows
+                    if r["payload"].get("customer_id")
+                }
+                return _FakeResult([_FakeRow({"actual": len(distinct)})])
+            # 默认 COUNT(*)（order_count）
+            return _FakeResult([_FakeRow({"actual": len(rows)})])
 
         # ── mv_store_pnl 聚合（未填数据时返回 0）
         if "FROM MV_STORE_PNL" in s:
@@ -680,21 +739,37 @@ async def test_idempotent_same_source_event_id(fake_db, service):
 
 @pytest.mark.asyncio
 async def test_6_metric_types_all_trackable(fake_db, service):
-    """06 六种 metric_type 全部可写入并可读取达成率。"""
+    """06 六种 metric_type 全部可写入并可读取达成率。
+
+    P0-2 后：门店级指标（table_count/unit_avg_fen/per_guest_avg_fen）需用
+    STORE_LEVEL_SENTINEL_EMPLOYEE_ID 建目标；员工级指标照常使用个人 employee_id。
+    """
+    from txorg.services.sales_target_service import (
+        STORE_LEVEL_SENTINEL_EMPLOYEE_ID,
+    )
+
+    # (metric, 是否门店级)
     metrics = [
-        MetricType.REVENUE_FEN,
-        MetricType.ORDER_COUNT,
-        MetricType.TABLE_COUNT,
-        MetricType.UNIT_AVG_FEN,
-        MetricType.PER_GUEST_AVG_FEN,
-        MetricType.NEW_CUSTOMER_COUNT,
+        (MetricType.REVENUE_FEN, False),
+        (MetricType.ORDER_COUNT, False),
+        (MetricType.TABLE_COUNT, True),
+        (MetricType.UNIT_AVG_FEN, True),
+        (MetricType.PER_GUEST_AVG_FEN, True),
+        (MetricType.NEW_CUSTOMER_COUNT, False),
     ]
     created = []
-    for i, mt in enumerate(metrics):
+    for i, (mt, is_store_level) in enumerate(metrics):
+        emp_id = (
+            STORE_LEVEL_SENTINEL_EMPLOYEE_ID
+            if is_store_level
+            else UUID(f"0000000{i}-0000-0000-0000-000000000000")
+        )
+        # 门店级指标会因 UNIQUE 约束碰撞（同 employee/period_start/metric）
+        # 但这里每个 metric_type 不同，不会冲突
         t = await service.set_target(
             fake_db,
             tenant_id=TENANT_A,
-            employee_id=UUID(f"0000000{i}-0000-0000-0000-000000000000"),
+            employee_id=emp_id,
             period_type=PeriodType.MONTH,
             period_start=date(2026, 4, 1),
             period_end=date(2026, 4, 30),
@@ -829,3 +904,244 @@ async def test_200_concurrent_progress_updates_no_race(fake_db, service):
     # 每条 actual_value 均有对应 progress
     vals = sorted(int(p["actual_value"]) for p in fake_db.progress)
     assert vals == list(range(1, 201))
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# P0-2 新增 Tier 1 测试（aggregate 按 employee_id 过滤 + 门店级指标校验）
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_aggregate_filters_by_employee_id(fake_db, service):
+    """10 P0-2：同店 2 个销售经理，aggregate 按 employee_id 严格分离。
+
+    场景：徐记解放西店 4 月，销售经理 A 归属订单 revenue=30,000 分；
+    销售经理 B 归属订单 revenue=70,000 分。历史 bug 会让两人都拿到 100,000；
+    修复后 A.actual=30,000，B.actual=70,000。
+    """
+    sales_A = UUID("a1a1a1a1-a1a1-a1a1-a1a1-a1a1a1a1a1a1")
+    sales_B = UUID("b1b1b1b1-b1b1-b1b1-b1b1-b1b1b1b1b1b1")
+
+    # 两个销售经理在同门店、同周期、同指标各建一个目标
+    t_a = await service.set_target(
+        fake_db,
+        tenant_id=TENANT_A,
+        employee_id=sales_A,
+        period_type=PeriodType.MONTH,
+        period_start=date(2026, 4, 1),
+        period_end=date(2026, 4, 30),
+        metric_type=MetricType.REVENUE_FEN,
+        target_value=100_000,
+        store_id=STORE_1,
+    )
+    t_b = await service.set_target(
+        fake_db,
+        tenant_id=TENANT_A,
+        employee_id=sales_B,
+        period_type=PeriodType.MONTH,
+        period_start=date(2026, 4, 1),
+        period_end=date(2026, 4, 30),
+        metric_type=MetricType.REVENUE_FEN,
+        target_value=100_000,
+        store_id=STORE_1,
+    )
+
+    # 塞入 events：A 归属订单 30,000 分；B 归属订单 70,000 分
+    fake_db.events.extend(
+        [
+            {
+                "tenant_id": TENANT_A,
+                "store_id": STORE_1,
+                "event_type": "order.paid",
+                "occurred_at": datetime(2026, 4, 10, 12, 0, tzinfo=timezone.utc),
+                "payload": {
+                    "sales_employee_id": str(sales_A),
+                    "final_amount_fen": 10_000,
+                },
+            },
+            {
+                "tenant_id": TENANT_A,
+                "store_id": STORE_1,
+                "event_type": "order.paid",
+                "occurred_at": datetime(2026, 4, 15, 13, 0, tzinfo=timezone.utc),
+                "payload": {
+                    "sales_employee_id": str(sales_A),
+                    "final_amount_fen": 20_000,
+                },
+            },
+            {
+                "tenant_id": TENANT_A,
+                "store_id": STORE_1,
+                "event_type": "order.paid",
+                "occurred_at": datetime(2026, 4, 20, 18, 0, tzinfo=timezone.utc),
+                "payload": {
+                    "sales_employee_id": str(sales_B),
+                    "final_amount_fen": 70_000,
+                },
+            },
+        ]
+    )
+
+    await service.aggregate_from_orders(
+        fake_db,
+        tenant_id=TENANT_A,
+        period_type=PeriodType.MONTH,
+        period_start=date(2026, 4, 1),
+        period_end=date(2026, 4, 30),
+    )
+    await _drain_tasks()
+
+    ach_a = await service.get_achievement(
+        fake_db, tenant_id=TENANT_A, target_id=t_a["target_id"]
+    )
+    ach_b = await service.get_achievement(
+        fake_db, tenant_id=TENANT_A, target_id=t_b["target_id"]
+    )
+
+    assert int(ach_a["actual_value"]) == 30_000, (
+        "销售经理 A 的 actual 必须只含归属 A 的订单（30,000），"
+        f"实际 {ach_a['actual_value']}"
+    )
+    assert int(ach_b["actual_value"]) == 70_000, (
+        "销售经理 B 的 actual 必须只含归属 B 的订单（70,000），"
+        f"实际 {ach_b['actual_value']}"
+    )
+    # 关键：两人 actual_value 不能相同（历史 bug 会让两人都=100,000）
+    assert ach_a["actual_value"] != ach_b["actual_value"], (
+        "同店多销售经理不能共享门店全额 actual（P0-2 回归）"
+    )
+
+
+@pytest.mark.asyncio
+async def test_cashier_cannot_have_revenue_target_without_store_level_flag(
+    fake_db, service
+):
+    """11 P0-2：收银员被误建 revenue 目标时，aggregate 不能分走全门店营收。
+
+    场景：收银员老王（EMP_1）被管理员误建了 revenue_fen 目标；
+    门店有两笔订单，sales_employee_id=张三，cashier_id=老王。
+    期望：老王虽然是 cashier，但 sales_employee_id 不是他 → actual 算给张三，不算给老王。
+    （若 sales_employee_id 缺失，才回退 cashier_id 作为归属）
+    """
+    sales_zhangsan = UUID("33333333-3333-3333-3333-333333333333")
+    cashier_laowang = EMP_1
+
+    # 管理员为收银员老王误建 revenue 目标
+    t_laowang = await service.set_target(
+        fake_db,
+        tenant_id=TENANT_A,
+        employee_id=cashier_laowang,
+        period_type=PeriodType.MONTH,
+        period_start=date(2026, 4, 1),
+        period_end=date(2026, 4, 30),
+        metric_type=MetricType.REVENUE_FEN,
+        target_value=1_000_000,
+        store_id=STORE_1,
+    )
+    # 销售经理张三同期同店的真实目标
+    t_zhangsan = await service.set_target(
+        fake_db,
+        tenant_id=TENANT_A,
+        employee_id=sales_zhangsan,
+        period_type=PeriodType.MONTH,
+        period_start=date(2026, 4, 1),
+        period_end=date(2026, 4, 30),
+        metric_type=MetricType.REVENUE_FEN,
+        target_value=1_000_000,
+        store_id=STORE_1,
+    )
+
+    # 订单归属：sales_employee_id=张三（权威归属），老王只是收银员
+    fake_db.events.append(
+        {
+            "tenant_id": TENANT_A,
+            "store_id": STORE_1,
+            "event_type": "order.paid",
+            "occurred_at": datetime(2026, 4, 12, 19, 0, tzinfo=timezone.utc),
+            "payload": {
+                "sales_employee_id": str(sales_zhangsan),
+                "cashier_id": str(cashier_laowang),
+                "final_amount_fen": 500_000,
+            },
+        }
+    )
+
+    await service.aggregate_from_orders(
+        fake_db,
+        tenant_id=TENANT_A,
+        period_type=PeriodType.MONTH,
+        period_start=date(2026, 4, 1),
+        period_end=date(2026, 4, 30),
+    )
+    await _drain_tasks()
+
+    ach_laowang = await service.get_achievement(
+        fake_db, tenant_id=TENANT_A, target_id=t_laowang["target_id"]
+    )
+    ach_zhangsan = await service.get_achievement(
+        fake_db, tenant_id=TENANT_A, target_id=t_zhangsan["target_id"]
+    )
+
+    # 老王（cashier）不能分走张三的销售业绩
+    assert int(ach_laowang["actual_value"]) == 0, (
+        f"sales_employee_id=张三时，收银员老王的 actual 应为 0，"
+        f"实际 {ach_laowang['actual_value']}（若 != 0，P0-2 回归！）"
+    )
+    # 张三（正确归属）拿到 500,000
+    assert int(ach_zhangsan["actual_value"]) == 500_000
+
+
+@pytest.mark.asyncio
+async def test_per_guest_avg_metric_rejects_individual_target(fake_db, service):
+    """12 P0-2：人均/桌数/单均（门店级指标）禁止给单个员工建目标。
+
+    场景：管理员给销售经理建 per_guest_avg_fen 目标 → 必须抛
+    SalesTargetValidationError；改用 STORE_LEVEL_SENTINEL_EMPLOYEE_ID 成功。
+    """
+    from txorg.services.sales_target_service import (
+        STORE_LEVEL_SENTINEL_EMPLOYEE_ID,
+        SalesTargetValidationError,
+    )
+
+    # 1) 给单个员工建门店级指标 → 应拒绝
+    with pytest.raises(SalesTargetValidationError):
+        await service.set_target(
+            fake_db,
+            tenant_id=TENANT_A,
+            employee_id=EMP_1,
+            period_type=PeriodType.MONTH,
+            period_start=date(2026, 4, 1),
+            period_end=date(2026, 4, 30),
+            metric_type=MetricType.PER_GUEST_AVG_FEN,
+            target_value=15_000,
+            store_id=STORE_1,
+        )
+
+    # 2) table_count 同样拒绝
+    with pytest.raises(SalesTargetValidationError):
+        await service.set_target(
+            fake_db,
+            tenant_id=TENANT_A,
+            employee_id=EMP_1,
+            period_type=PeriodType.MONTH,
+            period_start=date(2026, 4, 1),
+            period_end=date(2026, 4, 30),
+            metric_type=MetricType.TABLE_COUNT,
+            target_value=800,
+            store_id=STORE_1,
+        )
+
+    # 3) 使用 STORE_LEVEL_SENTINEL_EMPLOYEE_ID 建门店级目标 → 通过
+    store_target = await service.set_target(
+        fake_db,
+        tenant_id=TENANT_A,
+        employee_id=STORE_LEVEL_SENTINEL_EMPLOYEE_ID,
+        period_type=PeriodType.MONTH,
+        period_start=date(2026, 4, 1),
+        period_end=date(2026, 4, 30),
+        metric_type=MetricType.PER_GUEST_AVG_FEN,
+        target_value=15_000,
+        store_id=STORE_1,
+    )
+    assert store_target["target_value"] == 15_000
+    assert store_target["metric_type"] == "per_guest_avg_fen"
