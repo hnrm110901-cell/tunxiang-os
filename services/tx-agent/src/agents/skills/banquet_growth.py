@@ -37,6 +37,9 @@ class BanquetGrowthAgent(SkillAgent):
     priority = "P1"
     run_location = "cloud"
 
+    # Sprint D1 / PR 批次 4：宴会套餐推荐直接定大额订单毛利
+    constraint_scope = {"margin"}
+
     def get_supported_actions(self) -> list[str]:
         return [
             "discover_banquet_leads",

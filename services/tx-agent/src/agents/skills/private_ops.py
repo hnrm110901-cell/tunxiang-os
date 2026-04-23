@@ -34,6 +34,9 @@ class PrivateOpsAgent(SkillAgent):
     priority = "P2"
     run_location = "cloud"
 
+    # Sprint D1 / PR 批次 4：私域人力成本 + 宴会预订涉及 margin
+    constraint_scope = {"margin"}
+
     def get_supported_actions(self) -> list[str]:
         return [
             "get_private_domain_dashboard",

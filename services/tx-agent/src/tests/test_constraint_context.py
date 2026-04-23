@@ -425,3 +425,99 @@ async def test_menu_advisor_optimize_pricing_picks_worst_margin_as_basis():
     assert result.constraints_detail["scope"] == "margin"
     # 最差毛利 5% < 15% 阈值，应拦截
     assert result.constraints_passed is False
+
+
+# ──────────────────────────────────────────────────────────────────────
+# 9. 批次 4（W7 库存原料）
+# ──────────────────────────────────────────────────────────────────────
+
+def test_batch_4_inventory_skills_declare_scope():
+    _import_skills_or_skip()
+    from agents.skills.banquet_growth import BanquetGrowthAgent
+    from agents.skills.enterprise_activation import EnterpriseActivationAgent
+    from agents.skills.inventory_alert import InventoryAlertAgent
+    from agents.skills.new_product_scout import NewProductScoutAgent
+    from agents.skills.pilot_recommender import PilotRecommenderAgent
+    from agents.skills.private_ops import PrivateOpsAgent
+    from agents.skills.trend_discovery import TrendDiscoveryAgent
+
+    # 主 safety + margin 组合
+    assert InventoryAlertAgent.constraint_scope == {"margin", "safety"}
+    assert NewProductScoutAgent.constraint_scope == {"margin", "safety"}
+    # 纯 margin（合同/套餐金额）
+    assert BanquetGrowthAgent.constraint_scope == {"margin"}
+    assert EnterpriseActivationAgent.constraint_scope == {"margin"}
+    assert PrivateOpsAgent.constraint_scope == {"margin"}
+    # 纯洞察/建议类 → 豁免
+    assert TrendDiscoveryAgent.constraint_scope == set()
+    assert TrendDiscoveryAgent.constraint_waived_reason is not None
+    assert len(TrendDiscoveryAgent.constraint_waived_reason) >= 30
+    assert PilotRecommenderAgent.constraint_scope == set()
+    assert PilotRecommenderAgent.constraint_waived_reason is not None
+    assert len(PilotRecommenderAgent.constraint_waived_reason) >= 30
+
+
+def test_batch_4_registry_contains_enterprise_activation():
+    _import_skills_or_skip()
+    from agents.skills import SKILL_REGISTRY
+
+    # enterprise_activation 是本 PR 新加的注册
+    assert "enterprise_activation" in SKILL_REGISTRY
+    # 其他 6 个在上批次/本批次之前已注册
+    for aid in ("inventory_alert", "new_product_scout", "trend_discovery",
+                "pilot_recommender", "banquet_growth", "private_ops"):
+        assert aid in SKILL_REGISTRY, f"{aid} 未注册"
+
+
+@pytest.mark.asyncio
+async def test_inventory_alert_check_expiration_fills_safety_context():
+    """check_expiration 填入 IngredientSnapshot，safety 约束真实生效"""
+    skills_pkg = _import_skills_or_skip()
+    _ = skills_pkg
+    from agents.skills.inventory_alert import InventoryAlertAgent
+
+    agent = InventoryAlertAgent(tenant_id="t1")
+    # 所有食材 remaining_hours >= 24h 阈值
+    result = await agent.run("check_expiration", {
+        "items": [
+            {"name": "鱼头", "remaining_hours": 48.0, "batch_id": "B-001"},
+            {"name": "辣椒", "remaining_hours": 72.0, "batch_id": "B-002"},
+        ],
+    })
+    assert result.constraints_detail["scope"] == "safety"
+    assert "safety" in result.constraints_detail["scopes_checked"]
+    assert result.constraints_passed is True
+
+
+@pytest.mark.asyncio
+async def test_inventory_alert_expired_ingredient_blocks_decision():
+    """临期食材（<24h）应触发 safety 违规拦截"""
+    skills_pkg = _import_skills_or_skip()
+    _ = skills_pkg
+    from agents.skills.inventory_alert import InventoryAlertAgent
+
+    agent = InventoryAlertAgent(tenant_id="t1")
+    # 鱼头仅剩 6 小时 < 24h 阈值 → safety 违规
+    result = await agent.run("check_expiration", {
+        "items": [
+            {"name": "鱼头", "remaining_hours": 6.0, "batch_id": "B-001"},
+            {"name": "辣椒", "remaining_hours": 48.0, "batch_id": "B-002"},
+        ],
+    })
+    assert result.constraints_detail["scope"] == "safety"
+    assert result.constraints_passed is False
+    assert any("食安" in v or "临期" in v for v in result.constraints_detail["violations"])
+
+
+@pytest.mark.asyncio
+async def test_trend_discovery_waived_scope():
+    """TrendDiscoveryAgent 豁免，任何 run() 都应走 waived 路径"""
+    skills_pkg = _import_skills_or_skip()
+    _ = skills_pkg
+    from agents.skills.trend_discovery import TrendDiscoveryAgent
+
+    agent = TrendDiscoveryAgent(tenant_id="t1")
+    result = await agent.run("noop_unknown", {})
+    assert result.constraints_detail["scope"] == "waived"
+    assert result.constraints_passed is True
+    assert result.constraints_detail["waived_reason"].startswith("纯搜索趋势洞察")

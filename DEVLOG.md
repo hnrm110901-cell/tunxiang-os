@@ -1,3 +1,32 @@
+## 2026-04-23 Sprint D1 批次 4 — 库存原料 7 Skill + 2 豁免 + inventory_alert 填 safety context
+
+### 今日完成
+- [skills/inventory_alert.py] constraint_scope={"margin","safety"} + _check_expiration 填 list[IngredientSnapshot]
+- [skills/new_product_scout.py] constraint_scope={"margin","safety"}
+- [skills/banquet_growth.py] constraint_scope={"margin"}
+- [skills/enterprise_activation.py] constraint_scope={"margin"}（已设 MIN_ENTERPRISE_MARGIN_RATE=0.15）
+- [skills/private_ops.py] constraint_scope={"margin"}
+- [skills/trend_discovery.py] constraint_scope=set() + waived_reason（纯搜索趋势洞察 ≥30 字符）
+- [skills/pilot_recommender.py] constraint_scope=set() + waived_reason（纯门店聚类建议 ≥30 字符）
+- [skills/__init__.py] EnterpriseActivationAgent 补注册
+- [tests/test_constraint_context.py] 扩 5 条 test：batch 4 scope / 注册补全 / 食材 48h 通过 / 食材 6h 拦截 / trend_discovery 豁免
+
+### 数据变化
+- 迁移版本：无
+- 修改文件：9（7 Skills + __init__ + test）
+- 新增测试：5（共 29：11 passed + 18 skipped by pre-existing edge_mixin bug）
+- ruff 状态：新改文件全绿
+
+### 遗留问题
+- inventory_alert 剩余 12 action 未填 context（监控/补货/优化等可填 margin context）
+- D1 累计覆盖率 69%（设计稿 §2.3 预期 65%，略超）
+
+### 明日计划
+- 批次 5（W8 合规运营 7 Skill，多数豁免）
+- 批次 6 + Overflow（W9 内容洞察 7 + 遗漏 7）
+
+---
+
 ## 2026-04-19 Sprint D1 批次 3 — 定价营销 margin context + points_advisor 注册补全（PR I）
 
 ### 今日完成

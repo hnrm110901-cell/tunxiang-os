@@ -18,6 +18,7 @@ from typing import Any
 import structlog
 
 from ..base import ActionConfig, AgentResult, SkillAgent
+from ..context import ConstraintContext, IngredientSnapshot
 from ..edge_mixin import EdgeAwareMixin
 
 logger = structlog.get_logger(__name__)
@@ -29,6 +30,9 @@ class InventoryAlertAgent(EdgeAwareMixin, SkillAgent):
     description = "库存监控、需求预测、补货告警、供应商管理、损耗分析"
     priority = "P1"
     run_location = "edge+cloud"
+
+    # Sprint D1 / PR 批次 4：库存预警核心是食材保质期/临期（safety）+ 预订采购成本（margin）
+    constraint_scope = {"margin", "safety"}
 
     def get_supported_actions(self) -> list[str]:
         return [
@@ -404,6 +408,16 @@ class InventoryAlertAgent(EdgeAwareMixin, SkillAgent):
             elif remaining_hours <= 72:
                 warnings.append({"item": name, "status": "warning", "remaining_hours": remaining_hours})
 
+        # Sprint D1 / PR 批次 4：填 context 让 safety 约束真实生效
+        # （checker 会验证 remaining_hours >= 24 否则决策被拦截）
+        snapshots = [
+            IngredientSnapshot(
+                name=item.get("name", "unknown"),
+                remaining_hours=item.get("remaining_hours"),
+                batch_id=item.get("batch_id"),
+            )
+            for item in items
+        ]
         return AgentResult(
             success=True,
             action="check_expiration",
@@ -414,6 +428,10 @@ class InventoryAlertAgent(EdgeAwareMixin, SkillAgent):
             },
             reasoning=f"发现 {len(warnings)} 个保质期预警",
             confidence=0.95,
+            context=ConstraintContext(
+                ingredients=snapshots or None,
+                constraint_scope={"safety"},
+            ),
         )
 
     # ─── 库存水位优化 ───

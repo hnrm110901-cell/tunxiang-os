@@ -15,6 +15,9 @@ from .content_generation import ContentGenerationAgent
 from .cost_diagnosis import CostDiagnosisAgent
 from .discount_guard import DiscountGuardAgent
 from .dormant_recall import DormantRecallAgent
+
+# Sprint D1 / PR 批次 4：库存原料（margin + safety，或豁免）
+from .enterprise_activation import EnterpriseActivationAgent
 from .finance_audit import FinanceAuditAgent
 
 # Sprint D1 / PR G 批次 1：接入 ConstraintContext
@@ -114,6 +117,10 @@ ALL_SKILL_AGENTS = [
     # seasonal_campaign / personalization / new_customer_convert /
     # referral_growth 已在上方注册；本行新增 points_advisor）
     PointsAdvisorAgent,
+    # Sprint D1 / PR 批次 4：库存原料（inventory_alert / new_product_scout /
+    # trend_discovery / pilot_recommender / banquet_growth / private_ops
+    # 已在上方注册；本行新增 enterprise_activation）
+    EnterpriseActivationAgent,
 ]
 
 
