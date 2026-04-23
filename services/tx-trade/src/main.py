@@ -388,6 +388,11 @@ from .api.kiosk_routes import router as kiosk_router
 
 app.include_router(kiosk_router)
 
+# ── Sprint R1 Track D：宴会商机漏斗（全部/商机/订单/失效 + 渠道归因）──
+from .api.banquet_lead_routes import router as banquet_lead_router
+
+app.include_router(banquet_lead_router)
+
 
 @app.get("/health")
 async def health():
