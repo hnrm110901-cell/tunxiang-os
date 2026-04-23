@@ -1,3 +1,28 @@
+## 2026-04-23 Sprint D4b 薪资异常检测 — Sonnet 4.7 + Prompt Cache
+
+### 今日完成
+- [v280 迁移] `salary_anomaly_analyses` 表：6 状态机 + 4 分析 scope + Prompt Cache 4 字段 + RLS + 3 索引 + 月度唯一索引
+- [SalaryAnomalyService] `CachedPromptBuilder`（2 段 cacheable system：JSON schema + 城市基准长沙/北京/上海/武汉/成都 P25/P50/P75） + invoker 协议 + 5 类规则 fallback（below_market / overtime_excess / sudden_raise / commission_abuse / social_insurance_missing） + legal_risk × severity × impact_fen 三级排序 + critical/legal_risk 自动升级 status='escalated'
+- [API 3 端点] POST /analyze（月度/批量入参 → ranked_anomalies + remediation + cache stats） + POST /review/{id}（HRD act_on/dismiss/escalate 状态机迁移） + GET /summary（status+city 聚合 + 命中率门槛 0.75）
+- [ModelRouter] 注册 `salary_anomaly_detection → COMPLEX`（Service 层硬编码 claude-sonnet-4-7 覆盖默认值走 Prompt Cache beta）
+- [27 测试全绿] 0.04s — Bundle 2 / CachedPromptBuilder 2 / parse 3 / fallback 6 / sort 1 / has_critical 1 / invoker 2 / cache_hit_rate 4 / migration 5 / router 1
+
+### 数据变化
+- 迁移版本：v279 → v280
+- 新增 API 模块：1 个（tx-org/salary_anomaly_routes）
+- 新增测试：27 个（test_d4b_salary_anomaly.py）
+
+### 遗留问题
+- 真实 Anthropic SDK 未接入 — 当前 invoker=None 走规则引擎 fallback；上线前需 tx-brain 注入真实 async client
+- 城市基准硬编码 5 城市 — 其他城市分析会走默认兜底，需每季度刷新 CITY_BENCHMARKS
+- 高端餐厅主厨提成 >200% 底薪会误报 commission_abuse — 需"高端店白名单"豁免
+
+### 明日计划
+- **D4c 预算预测**（budget_forecast_analysis）— 最后一个 D4 子批次，复用 CachedPromptBuilder 模式，历史 P&L 行业 benchmark 作为 cacheable system，预测下月品牌/门店成本结构异常
+- D4a+D4b 合入后，抽共享 `shared/prompt_cache/builder.py` 减少三份重复代码
+
+---
+
 ## 2026-04-23 Sprint D1 批次 6 + Overflow — 14 Skill 冲 100% 覆盖 + CI 门禁
 
 ### 今日完成
