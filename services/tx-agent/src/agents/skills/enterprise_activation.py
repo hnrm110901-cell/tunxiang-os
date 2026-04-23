@@ -49,6 +49,9 @@ class EnterpriseActivationAgent(SkillAgent):
     priority = "P1"
     run_location = "cloud"
 
+    # Sprint D1 / PR 批次 4：企业套餐设计直接影响大额合同毛利（已设 MIN_ENTERPRISE_MARGIN_RATE=0.15）
+    constraint_scope = {"margin"}
+
     def get_supported_actions(self) -> list[str]:
         return ["identify", "design_package", "track_lifecycle"]
 

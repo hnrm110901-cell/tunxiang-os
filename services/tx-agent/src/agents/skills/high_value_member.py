@@ -37,6 +37,9 @@ class HighValueMemberAgent(SkillAgent):
     priority = "P0"
     run_location = "cloud"
 
+    # Sprint D1 / PR Overflow：专属权益/折扣 + 流失预警触发召回券 → margin
+    constraint_scope = {"margin"}
+
     def get_supported_actions(self) -> list[str]:
         return [
             "identify_high_value_members",

@@ -65,6 +65,9 @@ class StoreInspectAgent(SkillAgent):
     priority = "P2"
     run_location = "cloud"
 
+    # Sprint D1 / PR 批次 5：食安巡检是 safety 核心动作
+    constraint_scope = {"safety"}
+
     def get_supported_actions(self) -> list[str]:
         return [
             "health_check",

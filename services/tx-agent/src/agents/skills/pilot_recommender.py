@@ -28,6 +28,13 @@ class PilotRecommenderAgent(SkillAgent):
     priority = "P1"
     run_location = "cloud"
 
+    # Sprint D1 / PR 批次 4：门店筛选本身不决策资源/食材，建议类，豁免
+    constraint_scope = set()
+    constraint_waived_reason = (
+        "纯门店聚类与试点建议生成器，不直接决策采购/定价/出餐；"
+        "毛利/食安/客户体验三维度不涉及，输出门店画像供拓展决策参考"
+    )
+
     def get_supported_actions(self) -> list[str]:
         return [
             "recommend_pilot_stores",

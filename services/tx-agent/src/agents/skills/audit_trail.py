@@ -24,6 +24,13 @@ class AuditTrailAgent(SkillAgent):
     priority = "P1"
     run_location = "cloud"
 
+    # Sprint D1 / PR 批次 6：仅记录其他 Agent 的决策审计日志，自身不做业务决策，豁免
+    constraint_scope = set()
+    constraint_waived_reason = (
+        "审计留痕纯日志记录与查询工具，不触发任何业务决策；"
+        "记录的是其他 Agent 的决策过程，自身不涉及毛利/食安/体验维度"
+    )
+
     def get_supported_actions(self) -> list[str]:
         return [
             "log_decision",

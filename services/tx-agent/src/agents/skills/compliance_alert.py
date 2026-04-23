@@ -341,6 +341,13 @@ class ComplianceAlertAgent(SkillAgent):
     priority = "P1"
     run_location = "cloud"
 
+    # Sprint D1 / PR 批次 5：合规预警只扫描+推送告警，不决策资金/食材/出餐，豁免三约束
+    constraint_scope = set()
+    constraint_waived_reason = (
+        "合规预警纯扫描与告警推送（HR 证件/绩效/考勤异常），"
+        "不触发毛利/食安/出餐体验维度的业务决策，属于观察类 Skill"
+    )
+
     def get_supported_actions(self) -> list[str]:
         return [
             "scan_all",

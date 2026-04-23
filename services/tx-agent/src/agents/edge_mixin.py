@@ -16,7 +16,20 @@ from typing import Any
 
 import structlog
 
-from ..services.edge_inference_client import EdgeInferenceClient
+# ── 相对 vs 绝对导入双轨兼容（Sprint D1 后置 PR 修复）
+#
+# 生产 Docker：PYTHONPATH=/app，代码位于 /app/services/tx_agent/src/agents/
+#   → `..services` 解析为 services.tx_agent.src.services，relative 路径成立
+# 本地 pytest：sys.path.insert(0, "services/tx-agent/src")
+#   → `agents` 是顶层包，`..services` 超出包边界，ImportError
+#   → 此时 `services.edge_inference_client` 作为顶层包可 import
+#
+# 两路径独立，`try/except ImportError` 兼容两套部署形态，避免 skills/__init__.py
+# 整个被拒绝导入（这会让 test_constraint_context.py 的 22 个 skill 测试全部 skip）。
+try:
+    from ..services.edge_inference_client import EdgeInferenceClient
+except ImportError:
+    from services.edge_inference_client import EdgeInferenceClient  # type: ignore[no-redef]
 
 logger = structlog.get_logger(__name__)
 

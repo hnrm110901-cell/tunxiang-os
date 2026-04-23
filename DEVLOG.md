@@ -1,25 +1,140 @@
-## 2026-04-23 Sprint D4b 薪资异常检测 — Sonnet 4.7 + Prompt Cache
+## 2026-04-23 Sprint D1 批次 6 + Overflow — 14 Skill 冲 100% 覆盖 + CI 门禁
 
 ### 今日完成
-- [v280 迁移] `salary_anomaly_analyses` 表：6 状态机 + 4 分析 scope + Prompt Cache 4 字段 + RLS + 3 索引 + 月度唯一索引
-- [SalaryAnomalyService] `CachedPromptBuilder`（2 段 cacheable system：JSON schema + 城市基准长沙/北京/上海/武汉/成都 P25/P50/P75） + invoker 协议 + 5 类规则 fallback（below_market / overtime_excess / sudden_raise / commission_abuse / social_insurance_missing） + legal_risk × severity × impact_fen 三级排序 + critical/legal_risk 自动升级 status='escalated'
-- [API 3 端点] POST /analyze（月度/批量入参 → ranked_anomalies + remediation + cache stats） + POST /review/{id}（HRD act_on/dismiss/escalate 状态机迁移） + GET /summary（status+city 聚合 + 命中率门槛 0.75）
-- [ModelRouter] 注册 `salary_anomaly_detection → COMPLEX`（Service 层硬编码 claude-sonnet-4-7 覆盖默认值走 Prompt Cache beta）
-- [27 测试全绿] 0.02s — Bundle 2 / CachedPromptBuilder 2 / parse 3 / fallback 6 / sort 1 / has_critical 1 / invoker 2 / cache_hit_rate 4 / migration 5 / router 1
+- [批次 6 全豁免] review_insight / review_summary / intel_reporter / audit_trail / growth_coach / salary_advisor / smart_customer_service — 每条 reason ≥30 字符且无黑名单说辞
+- [Overflow margin] ai_marketing_orchestrator / dormant_recall / high_value_member / member_insight / cashier_audit
+- [Overflow 豁免] content_generation / competitor_watch
+- [skills/__init__.py] 5 个 Skill 补注册：ReviewSummary / AuditTrail / GrowthCoach / SmartCustomerService / CashierAudit
+- [skills/trend_discovery.py / pilot_recommender.py] 重写 waived_reason 去黑名单"不适用"
+- [tests/test_constraint_context.py] 扩 5 条：批 6 全豁免 + Overflow margin/豁免 + 新注册 + **test_100_percent_registry_coverage CI 门禁**
 
 ### 数据变化
-- 迁移版本：v279 → v280
-- 新增 API 模块：1 个（tx-org/salary_anomaly_routes）
-- 新增测试：27 个（test_d4b_salary_anomaly.py）
+- SKILL_REGISTRY 规模：**50/50 = 100% 覆盖**
+- 豁免分布：15 个（批 4 trend_discovery/pilot_recommender + 批 5 四 HR + 批 6 七 + Overflow 二）
+- 修改文件：18（14 Skills + 2 pre-existing reason + __init__ + test）
+- 新增测试：5（共 76：全绿）
+- ruff 状态：新代码全绿（pre-existing 6 F401 datetime 不增量）
+
+### cashier_audit 决策点结论（设计稿 §附录 B #2）
+选择：**按 P0 margin 接入**（非豁免、非继续观察）
+依据：agent_id 已有 audit_transaction / audit_discount_anomaly 等实装 action，实际作为折扣/挂账/现金异常的检测拦截器，与 margin 守门员语义一致
 
 ### 遗留问题
-- 真实 Anthropic SDK 未接入 — 当前 invoker=None 走规则引擎 fallback；上线前需 tx-brain 注入真实 async client
-- 城市基准硬编码 5 城市 — 其他城市分析会走默认兜底（近似长沙 P50），需每季度刷新 CITY_BENCHMARKS
-- 高端餐厅主厨提成 >200% 底薪会误报 commission_abuse — 需"高端店白名单"豁免
+- 51 Skill 中仅 9 P0 + 7 批 1-4 context 填充（16 个）有真实 price_fen/cost_fen/ingredients 数据，其余 35 个运行仍标 scope='n/a'
+- 豁免率 29%（15/51）偏高，Grafana 上线后应监控豁免 Skill 实际触达率
+- pre-existing 6 F401 datetime 未清理
 
 ### 明日计划
-- **D4c 预算预测**（budget_forecast_analysis）— 最后一个 D4 子批次，复用 CachedPromptBuilder 模式，历史 P&L 行业 benchmark 作为 cacheable system，预测下月品牌/门店成本结构异常
-- D4a+D4b 合入后，抽共享 `shared/prompt_cache/builder.py` 减少三份重复代码
+- 等 PR 栈 #78/#79/本 PR 合入
+- 启动 D2 ROI 三字段 / D3 RFM / D4 成本根因
+
+---
+
+## 2026-04-23 fix — edge_mixin 相对导入 + ConstraintContext.from_data 零价格回归
+
+### 今日完成
+- [agents/edge_mixin.py] try `from ..services.edge_inference_client` / except ImportError fallback 到 `from services.edge_inference_client` — 解锁 pytest 本地运行 skill 包导入
+- [agents/context.py] `from_data` 用 `is None` 显式判断替换 `or`，修复 `price_fen=0` 误判为 None 导致的 check_margin regression
+- [tests/test_constraint_context.py] serve_dispatch assertion 13→12（Python 银行家舍入）
+
+### 数据变化
+- 迁移版本：无
+- 修改文件：3（edge_mixin / context / test）
+- 新增测试：0（但 22 个之前 skipped 现全部运行）
+- 测试状态：**test_constraint_context 33/33 + test_constraints_migrated 38/38 = 71/71 绿**
+
+### 遗留问题
+- tx-agent 其他 4 个 `from ..services.xxx` 文件同样 pattern，当前未被 pytest 触发，留 follow-up PR
+- try/except 掩盖真实 ImportError 风险（mitigation 留后续 INFO 日志打点）
+
+### 明日计划
+- 批次 6 + Overflow（W9 最后 14 Skill）
+
+---
+
+## 2026-04-23 Sprint D1 批次 5 — 合规运营 7 Skill（4 豁免 + 3 scope）+ 4 Skill 补注册
+
+### 今日完成
+- [skills/compliance_alert.py] 豁免（HR 证件/绩效/考勤异常扫描与告警推送 reason ≥30 字符）
+- [skills/attendance_compliance_agent.py] 豁免（GPS/代打卡/加班超时异常识别，输出建议）
+- [skills/attendance_recovery.py] 豁免（事件驱动排班缺口补救，输出候选人推荐）
+- [skills/turnover_risk.py] 豁免（多维信号扫描与离职风险评分 + 干预建议）
+- [skills/workforce_planner.py] constraint_scope={"margin"}（排班决定人力成本）
+- [skills/store_inspect.py] constraint_scope={"safety"}（食安巡检）
+- [skills/off_peak_traffic.py] constraint_scope={"margin","experience"}（引流折扣 + 预约出餐节奏）
+- [skills/__init__.py] 4 个 Skill 补注册（AttendanceCompliance / AttendanceRecovery / TurnoverRisk / WorkforcePlanner）
+- [tests/test_constraint_context.py] 扩 4 条 test：batch 5 scope + reason 长度/黑名单校验 / 注册补全 / compliance_alert 豁免 / turnover_risk 豁免
+
+### 数据变化
+- 迁移版本：无
+- 修改文件：9（7 Skills + __init__ + test）
+- 新增测试：4（共 33：11 passed + 22 skipped）
+- ruff 状态：新增代码全绿（pre-existing 6 F401 datetime unused 不变）
+
+### 遗留问题
+- workforce_planner 只声明 scope 未填 context（运行仍标 n/a）
+- compliance_alert 若未来加强制动作，scope 需复审
+- D1 累计覆盖率 84%（设计稿预期 96%，剩余 11 Skill 在批 6 + Overflow）
+
+### 明日计划
+- 批次 6 + Overflow（W9 最后 14 Skill）
+- out-of-scope 修 edge_mixin 相对导入（用户已明确要求批 5 完成后做）
+
+---
+
+## 2026-04-23 Sprint D1 批次 4 — 库存原料 7 Skill + 2 豁免 + inventory_alert 填 safety context
+
+### 今日完成
+- [skills/inventory_alert.py] constraint_scope={"margin","safety"} + _check_expiration 填 list[IngredientSnapshot]
+- [skills/new_product_scout.py] constraint_scope={"margin","safety"}
+- [skills/banquet_growth.py] constraint_scope={"margin"}
+- [skills/enterprise_activation.py] constraint_scope={"margin"}（已设 MIN_ENTERPRISE_MARGIN_RATE=0.15）
+- [skills/private_ops.py] constraint_scope={"margin"}
+- [skills/trend_discovery.py] constraint_scope=set() + waived_reason（纯搜索趋势洞察 ≥30 字符）
+- [skills/pilot_recommender.py] constraint_scope=set() + waived_reason（纯门店聚类建议 ≥30 字符）
+- [skills/__init__.py] EnterpriseActivationAgent 补注册
+- [tests/test_constraint_context.py] 扩 5 条 test：batch 4 scope / 注册补全 / 食材 48h 通过 / 食材 6h 拦截 / trend_discovery 豁免
+
+### 数据变化
+- 迁移版本：无
+- 修改文件：9（7 Skills + __init__ + test）
+- 新增测试：5（共 29：11 passed + 18 skipped by pre-existing edge_mixin bug）
+- ruff 状态：新改文件全绿
+
+### 遗留问题
+- inventory_alert 剩余 12 action 未填 context（监控/补货/优化等可填 margin context）
+- D1 累计覆盖率 69%（设计稿 §2.3 预期 65%，略超）
+
+### 明日计划
+- 批次 5（W8 合规运营 7 Skill，多数豁免）
+- 批次 6 + Overflow（W9 内容洞察 7 + 遗漏 7）
+
+---
+
+## 2026-04-19 Sprint D1 批次 3 — 定价营销 margin context + points_advisor 注册补全（PR I）
+
+### 今日完成
+- [services/tx-agent/src/agents/skills/__init__.py] PointsAdvisorAgent import + ALL_SKILL_AGENTS 追加（批次 3 其他 6 个已在注册表）
+- [services/tx-agent/src/agents/skills/smart_menu.py] _simulate_cost 填 ConstraintContext(price_fen, cost_fen, scope={margin})
+- [services/tx-agent/src/agents/skills/menu_advisor.py] _optimize_pricing 扫描 dishes 找最差毛利作 margin 校验基准
+- [services/tx-agent/src/tests/test_constraint_context.py] 5 TDD：batch 3 scope 声明 / points_advisor 注册 / smart_menu 通过场景 / smart_menu 违规场景 / menu_advisor 按最差毛利拦截
+
+### 数据变化
+- 迁移版本：无
+- 修改文件：4（skills/__init__.py + 2 Skills + test）
+- 新增测试：5（共 24：11 passed + 13 skipped）
+- ruff 状态：All checks passed
+
+### 协同备注
+- commit 9e6f99d7（pzlichun-a11y 本地 main，另一 Claude Opus 4.6 agent 推进）已为批次 3 全部 7 个 Skill 追加 constraint_scope={margin} 声明
+- 本 PR 只补"注册表 + context 填充"两块缺失，不重复声明
+
+### 遗留问题
+- 批次 3 剩余 5 个 Skill 只声明 scope 未填 context（需 Squad Owner 按业务数据补）
+- personalization_agent.py 4 个 pre-existing F541（空 f-string）未修，out-of-scope
+
+### 明日计划
+- 启动批次 4（W7 库存原料 7 Skill，safety scope）
 
 ---
 

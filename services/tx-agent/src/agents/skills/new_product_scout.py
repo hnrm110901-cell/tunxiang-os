@@ -24,6 +24,9 @@ class NewProductScoutAgent(SkillAgent):
     priority = "P1"
     run_location = "cloud"
 
+    # Sprint D1 / PR 批次 4：新品评估包含原料可得性 (safety) + 毛利估算 (margin)
+    constraint_scope = {"margin", "safety"}
+
     def get_supported_actions(self) -> list[str]:
         return [
             "scan_new_product_trends",
