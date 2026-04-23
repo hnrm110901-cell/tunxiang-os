@@ -4,6 +4,61 @@
 
 ---
 
+## 2026-04-23 Sprint D3b：活动 ROI Prophet+Sonnet 预测（目标 MAPE<20%）
+
+### 本次会话目标
+按 sprint-plan-2026Q2-unified.md Sprint D D3b：营销活动规划期用 Prophet 预测 counterfactual baseline（无活动营收），活动期回填 actual 算 MAPE + 真实 uplift，Sonnet 解读"为什么偏"和"下一步怎么办"。
+
+Tier 级别：Tier 2（预测 + 文案分析，不改资金链路）。
+
+### 完成状态
+- [x] ModelRouter 注册 campaign_roi_forecast → MODERATE → claude-sonnet-4-6
+- [x] v277 迁移 campaign_roi_forecasts 表：baseline/uplift/confidence/actual/MAPE/needs_calibration + 5 态 status（plan→running→completed/cancelled/error）+ RLS + 3 索引 + CHECK 约束
+- [x] CampaignROIForecastService 完整：
+  - Prophet 作 optional dependency，try/except ImportError 降级
+  - 三级降级：prophet (≥30 点) → linear (≥2 点) → moving_average
+  - mean_absolute_percentage_error（零 actual 跳过）
+  - backtest 自动标记 needs_calibration（MAPE > 20%）
+  - Sonnet 分析 prompt 约定 "action|lift|priority" 格式，解析三元组
+  - fallback 模板按 MAPE+uplift 符号生成中文分析
+- [x] 3 API 端点：POST /forecast / POST /complete/{id} / GET /summary
+- [x] 28 TDD 测试全绿：MAPE 5 + MA 3 + linear 3 + Prophet 1 + service 3 + backtest 3 + Sonnet 5 + 迁移 4 + router 1
+
+### 关键决策
+- **Prophet 作 optional**：requirements 不新增强依赖，ImportError 降级到 linear/MA，避免阻塞部署
+- **三级 forecast 降级**：充分训练（Prophet）→ 弱季节（linear）→ 最后兜底（moving_average）
+- **confidence 上限 cap 0.85（linear/MA）/ 0.95（Prophet）**：避免线性/MA 过度自信，R²=1 也最多 0.85
+- **needs_calibration = MAPE > 20%**：设计稿的 20% 阈值落到代码 MAPE_THRESHOLD 常量
+- **Sonnet 输出格式约定**：行首文本 + 尾部 "action|lift|priority" 元组，parser 降级（解析失败全入 analysis）
+- **baseline 按日均分摊（complete 阶段）**：生产版应存每日 baseline，本 PR 简化版分摊避免加表
+
+### 交付清单
+```
+新增：
+  shared/db-migrations/versions/v277_campaign_roi_forecasts.py      118 行
+  services/tx-member/src/services/campaign_roi_forecast_service.py  440 行
+  services/tx-member/src/api/campaign_roi_forecast_routes.py        303 行
+  services/tx-member/src/tests/test_d3b_campaign_roi.py             349 行（28 tests）
+
+修改：
+  services/tunxiang-api/src/shared/core/model_router.py  +2 行
+```
+
+### 下一步
+1. D3c 菜品动态定价 Core ML+Sonnet（毛利 +2pp）
+2. D4a 成本根因（Sonnet 4.7 + Prompt Cache）
+3. Prophet 实际安装 + 生产 Sonnet invoker wire
+4. 按每日 baseline 存表（替换当前按均分摊）
+5. mv_campaign_roi_lift_monthly（可选，D3b 验证层）
+
+### 已知风险
+- Prophet 未装时降级到 linear/MA，MAPE 高的 campaign 较多，初期 needs_calibration 触发频繁（预期）
+- Sonnet 响应格式约定脆弱（line.split("|")），模型不遵守格式时 action 全进 analysis 文本
+- baseline 按日均分摊简化，天内波动大时 MAPE 会被低估或高估
+- 跨租户共享 mv 查询（summary 端点）但 RLS 会过滤
+
+---
+
 ## 2026-04-18 20:05 Sprint D1 批次 2 / PR H：出餐体验 7 Skill scope 声明 + 2 Skill 填 context
 
 ### 本次会话目标

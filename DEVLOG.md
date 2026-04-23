@@ -1,3 +1,29 @@
+## 2026-04-23 Sprint D3b — 活动 ROI Prophet+Sonnet 预测（MAPE<20%）
+
+### 今日完成
+- [tunxiang-api/shared/core/model_router.py] campaign_roi_forecast → MODERATE → sonnet-4-6
+- [shared/db-migrations/versions/v277_campaign_roi_forecasts.py] baseline/uplift/MAPE/needs_calibration + 5 态 status + RLS + 3 索引 + CHECK
+- [services/tx-member/src/services/campaign_roi_forecast_service.py] 三级降级 forecast (prophet→linear→MA) + MAPE + Sonnet 分析 + fallback 模板
+- [services/tx-member/src/api/campaign_roi_forecast_routes.py] 3 端点：/forecast /complete/{id} /summary
+- [services/tx-member/src/tests/test_d3b_campaign_roi.py] 28 TDD 全绿
+
+### 数据变化
+- 迁移：v276 → v277_campaign_roi
+- 新增文件：4，修改：1
+- 新增测试：28（全绿）
+- ruff：All checks passed!
+
+### 遗留问题
+- Prophet 未实际安装（ImportError 降级到 linear/MA）
+- Sonnet response 格式脆弱
+- baseline 按日均分摊简化（生产版应存每日预测）
+
+### 明日计划
+- D3c 菜品动态定价 Core ML+Sonnet（毛利 +2pp）
+- D4a/b/c 成本根因/薪资/预算
+
+---
+
 ## 2026-04-18 Sprint D1 批次 2 — 出餐体验 7 Skill + 2 Skill 填 context（PR H）
 
 ### 今日完成
