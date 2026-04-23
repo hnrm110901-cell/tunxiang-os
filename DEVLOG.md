@@ -1,3 +1,31 @@
+## 2026-04-23 Sprint D3a — RFM 触达 Haiku 4.5 + CF（复购率 +5pp）
+
+### 今日完成
+- [tunxiang-api/shared/core/model_router.py] rfm_outreach_message → SIMPLE → haiku-4-5
+- [shared/db-migrations/versions/v266_rfm_outreach_campaigns.py] rfm_outreach_campaigns 表（5 态 status + RLS + 2 索引）
+- [services/tx-member/src/services/rfm_outreach_service.py] score_rfm / segment_for / cosine / CF / build_plan / save_plan_to_db
+- [services/tx-member/src/api/rfm_outreach_routes.py] 2 端点 + _fetch_customer_snapshots
+- [services/tx-member/src/tests/test_d3a_rfm_outreach.py] 22 TDD 测试全绿
+
+### 数据变化
+- 迁移：v265_mv_roi → v266_rfm_outreach
+- 新增文件：4，修改文件：1
+- 新增测试：22（全绿）
+- ruff 状态：All checks passed!
+
+### 遗留问题
+- Haiku API invoker 未默认注入
+- CF 低数据退化（新店活跃客户少）
+- rfm_outreach_worker 未建
+- mv_rfm_outreach_lift 未建
+- app.py router 注册未加
+
+### 明日计划
+- D3b 活动 ROI Prophet+Sonnet（MAPE<20%）
+- D3c 菜品动态定价 Core ML+Sonnet（毛利 +2pp）
+
+---
+
 ## 2026-04-18 Sprint D1 批次 2 — 出餐体验 7 Skill + 2 Skill 填 context（PR H）
 
 ### 今日完成

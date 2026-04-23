@@ -4,6 +4,57 @@
 
 ---
 
+## 2026-04-23 Sprint D3a：RFM 触达 Haiku 4.5 + CF（目标复购率 +5pp）
+
+### 本次会话目标
+按 sprint-plan-2026Q2-unified.md Sprint D D3a：把沉睡客户（S4/S5）从"无感知大名单"升级为 CF 选人 + Haiku 写词 + 店长审批 + 自动归因可量化增长工作流。
+
+Tier 级别：Tier 2（触达 + Haiku 文案，不改资金链路）。
+
+### 完成状态
+- [x] ModelRouter 注册 rfm_outreach_message → SIMPLE → claude-haiku-4-5
+- [x] v266 迁移：rfm_outreach_campaigns 表 + 5 态 status 枚举 + RLS(app.tenant_id) + 2 索引 + 列注释
+- [x] RFMOutreachService 完整：score_rfm / segment_for（S1-S5，三维取最弱）/ cosine_similarity / score_cf_candidate（item-item CF，top_items 剔除已点）/ build_plan / save_plan_to_db
+- [x] 2 API 端点：POST /api/v1/member/rfm/outreach/plan + POST /execute/{id}
+- [x] TDD 22 测试全绿
+
+### 关键决策
+- CF 选 item-item 集合余弦（数据量 O(N²) 可接受 + 可解释）
+- Haiku 4.5 而非 Sonnet（文案格式固定，成本 1/3，符合月预算 ¥12,000）
+- segment 取三维 min（避免 R 掩盖 F/M）
+- 5 态状态机 + CHECK 约束
+- auto_confirm=True 仍强制 X-Operator-ID
+- Haiku 失败降级 fallback 模板不阻断规划
+- 暂不改 entities.py，用 raw SQL + CAST 绕过
+
+### 交付清单
+```
+新增：
+  shared/db-migrations/versions/v266_rfm_outreach_campaigns.py
+  services/tx-member/src/services/rfm_outreach_service.py
+  services/tx-member/src/api/rfm_outreach_routes.py
+  services/tx-member/src/tests/test_d3a_rfm_outreach.py (22 tests)
+
+修改：
+  services/tunxiang-api/src/shared/core/model_router.py  +2 行
+```
+
+### 下一步
+1. D3b 活动 ROI Prophet+Sonnet（MAPE<20%）
+2. D3c 菜品动态定价 Core ML+Sonnet（毛利 +2pp）
+3. rfm_outreach_worker 消费 status='sending'
+4. 归因 worker 14 天窗口回写 attributed_order_ids
+5. mv_rfm_outreach_lift_monthly 验证复购率 +5pp
+6. app.py 注册 rfm_outreach_routes.router
+
+### 已知风险
+- Haiku API 未默认注入
+- CF 低数据退化
+- sending worker 未建
+- mv_rfm_outreach_lift 未建
+
+---
+
 ## 2026-04-18 20:05 Sprint D1 批次 2 / PR H：出餐体验 7 Skill scope 声明 + 2 Skill 填 context
 
 ### 本次会话目标
