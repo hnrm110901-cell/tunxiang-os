@@ -147,6 +147,13 @@ class AttendanceComplianceAgent(SkillAgent):
     run_location = "cloud"
     agent_level = 1  # 建议级（需人工确认）
 
+    # Sprint D1 / PR 批次 5：考勤合规检测输出建议供 HR 决策，不触发资金/食材/出餐，豁免
+    constraint_scope = set()
+    constraint_waived_reason = (
+        "考勤合规检测纯异常识别（GPS/代打卡/加班超时），输出 HR 建议供人工决策，"
+        "不直接操作毛利/食安/体验三条业务约束维度"
+    )
+
     def get_supported_actions(self) -> list[str]:
         return [
             "daily_compliance_scan",

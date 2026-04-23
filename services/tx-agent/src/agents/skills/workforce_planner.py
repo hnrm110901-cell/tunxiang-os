@@ -191,6 +191,9 @@ class WorkforcePlannerAgent(SkillAgent):
     description = "基于历史客流与POS营收数据，分析人力配置合理性并生成最优排班方案"
     priority = "P1"
     run_location = "cloud"
+
+    # Sprint D1 / PR 批次 5：排班直接决定人力成本（margin 维度）
+    constraint_scope = {"margin"}
     agent_level = 2  # 自动生成draft排班 + 30分钟回滚窗口
 
     def get_supported_actions(self) -> list[str]:

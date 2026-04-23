@@ -34,6 +34,9 @@ class OffPeakTrafficAgent(SkillAgent):
     priority = "P1"
     run_location = "cloud"
 
+    # Sprint D1 / PR 批次 5：低峰引流折扣 → margin；预约/团购影响出餐节奏 → experience
+    constraint_scope = {"margin", "experience"}
+
     def get_supported_actions(self) -> list[str]:
         return [
             "identify_off_peak_slots",

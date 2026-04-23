@@ -521,3 +521,76 @@ async def test_trend_discovery_waived_scope():
     assert result.constraints_detail["scope"] == "waived"
     assert result.constraints_passed is True
     assert result.constraints_detail["waived_reason"].startswith("纯搜索趋势洞察")
+
+
+# ──────────────────────────────────────────────────────────────────────
+# 10. 批次 5（W8 合规运营：4 豁免 + 3 真实 scope）
+# ──────────────────────────────────────────────────────────────────────
+
+def test_batch_5_compliance_skills_declare_scope():
+    _import_skills_or_skip()
+    from agents.skills.attendance_compliance_agent import AttendanceComplianceAgent
+    from agents.skills.attendance_recovery import AttendanceRecoveryAgent
+    from agents.skills.compliance_alert import ComplianceAlertAgent
+    from agents.skills.off_peak_traffic import OffPeakTrafficAgent
+    from agents.skills.store_inspect import StoreInspectAgent
+    from agents.skills.turnover_risk import TurnoverRiskAgent
+    from agents.skills.workforce_planner import WorkforcePlannerAgent
+
+    # 4 个豁免（HR 观察/建议类）
+    for cls in (ComplianceAlertAgent, AttendanceComplianceAgent,
+                AttendanceRecoveryAgent, TurnoverRiskAgent):
+        assert cls.constraint_scope == set(), f"{cls.__name__} 应为空 scope (豁免)"
+        assert cls.constraint_waived_reason is not None, f"{cls.__name__} 缺 waived_reason"
+        assert len(cls.constraint_waived_reason) >= 30, (
+            f"{cls.__name__} waived_reason 长度 {len(cls.constraint_waived_reason)} < 30"
+        )
+        # 禁用黑名单空洞说辞
+        for blacklist in ("N/A", "不适用", "跳过"):
+            assert blacklist not in cls.constraint_waived_reason, (
+                f"{cls.__name__} waived_reason 包含黑名单说辞 {blacklist}"
+            )
+
+    # 3 个真实 scope
+    assert WorkforcePlannerAgent.constraint_scope == {"margin"}
+    assert StoreInspectAgent.constraint_scope == {"safety"}
+    assert OffPeakTrafficAgent.constraint_scope == {"margin", "experience"}
+
+
+def test_batch_5_registry_contains_4_new_skills():
+    _import_skills_or_skip()
+    from agents.skills import SKILL_REGISTRY
+
+    # 4 个本 PR 新注册的
+    for aid in ("attendance_compliance", "attendance_recovery",
+                "turnover_risk", "workforce_planner"):
+        assert aid in SKILL_REGISTRY, f"{aid} 未注册"
+    # 3 个本 PR 之前已注册的
+    for aid in ("compliance_alert", "store_inspect", "off_peak_traffic"):
+        assert aid in SKILL_REGISTRY, f"{aid} 未注册"
+
+
+@pytest.mark.asyncio
+async def test_compliance_alert_waived_scope():
+    """ComplianceAlertAgent 豁免：任何 run() 都应走 waived 路径"""
+    skills_pkg = _import_skills_or_skip()
+    _ = skills_pkg
+    from agents.skills.compliance_alert import ComplianceAlertAgent
+
+    agent = ComplianceAlertAgent(tenant_id="t1")
+    result = await agent.run("noop_unknown", {})
+    assert result.constraints_detail["scope"] == "waived"
+    assert result.constraints_passed is True
+    assert "合规预警" in result.constraints_detail["waived_reason"]
+
+
+@pytest.mark.asyncio
+async def test_turnover_risk_waived_scope():
+    skills_pkg = _import_skills_or_skip()
+    _ = skills_pkg
+    from agents.skills.turnover_risk import TurnoverRiskAgent
+
+    agent = TurnoverRiskAgent(tenant_id="t1")
+    result = await agent.run("noop_unknown", {})
+    assert result.constraints_detail["scope"] == "waived"
+    assert result.constraints_passed is True

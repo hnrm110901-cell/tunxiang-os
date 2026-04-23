@@ -1,3 +1,33 @@
+## 2026-04-23 Sprint D1 批次 5 — 合规运营 7 Skill（4 豁免 + 3 scope）+ 4 Skill 补注册
+
+### 今日完成
+- [skills/compliance_alert.py] 豁免（HR 证件/绩效/考勤异常扫描与告警推送 reason ≥30 字符）
+- [skills/attendance_compliance_agent.py] 豁免（GPS/代打卡/加班超时异常识别，输出建议）
+- [skills/attendance_recovery.py] 豁免（事件驱动排班缺口补救，输出候选人推荐）
+- [skills/turnover_risk.py] 豁免（多维信号扫描与离职风险评分 + 干预建议）
+- [skills/workforce_planner.py] constraint_scope={"margin"}（排班决定人力成本）
+- [skills/store_inspect.py] constraint_scope={"safety"}（食安巡检）
+- [skills/off_peak_traffic.py] constraint_scope={"margin","experience"}（引流折扣 + 预约出餐节奏）
+- [skills/__init__.py] 4 个 Skill 补注册（AttendanceCompliance / AttendanceRecovery / TurnoverRisk / WorkforcePlanner）
+- [tests/test_constraint_context.py] 扩 4 条 test：batch 5 scope + reason 长度/黑名单校验 / 注册补全 / compliance_alert 豁免 / turnover_risk 豁免
+
+### 数据变化
+- 迁移版本：无
+- 修改文件：9（7 Skills + __init__ + test）
+- 新增测试：4（共 33：11 passed + 22 skipped）
+- ruff 状态：新增代码全绿（pre-existing 6 F401 datetime unused 不变）
+
+### 遗留问题
+- workforce_planner 只声明 scope 未填 context（运行仍标 n/a）
+- compliance_alert 若未来加强制动作，scope 需复审
+- D1 累计覆盖率 84%（设计稿预期 96%，剩余 11 Skill 在批 6 + Overflow）
+
+### 明日计划
+- 批次 6 + Overflow（W9 最后 14 Skill）
+- out-of-scope 修 edge_mixin 相对导入（用户已明确要求批 5 完成后做）
+
+---
+
 ## 2026-04-23 Sprint D1 批次 4 — 库存原料 7 Skill + 2 豁免 + inventory_alert 填 safety context
 
 ### 今日完成
