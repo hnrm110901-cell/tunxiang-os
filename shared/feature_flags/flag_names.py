@@ -83,6 +83,9 @@ class AgentFlags:
     # Sprint D3a: RFM 触达 Skill Agent 启用开关（目标复购率 +5pp）
     RFM_OUTREACH_ENABLE = "agent.rfm_outreach.enable"
 
+    # Sprint D4b: 薪资异常 Skill Agent 启用开关（加班/薪资环比稽核）
+    SALARY_ANOMALY_ENABLE = "agent.salary_anomaly.enable"
+
 
 class TradeFlags:
     """交易履约域 Flag 名称。"""

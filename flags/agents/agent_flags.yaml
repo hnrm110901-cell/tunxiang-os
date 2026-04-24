@@ -213,6 +213,21 @@ flags:
       prod: false
     tags: [agent, d4a, sprint-q2-2026]
 
+  - identifier: agent_salary_anomaly_enable
+    name: agent.salary_anomaly.enable
+    description: >
+      D4b 薪资异常 Skill Agent 启用开关。
+      基于 Claude Sonnet 4.7 + Prompt Cache，识别加班时长异常与薪资环比异常，
+      拦截错发工资并给出复核建议（Level 1，建议级）。
+      默认关闭；合并后由运维按环境逐步开启（dev → test → pilot → prod）。
+    defaultValue: false
+    environments:
+      dev: false
+      test: false
+      pilot: false
+      prod: false
+    tags: [agent, d4b, sprint-q2-2026]
+
   - identifier: agent_rfm_outreach_enable
     name: agent.rfm_outreach.enable
     description: >
