@@ -64,6 +64,7 @@ def get_valid_transitions(service_mode: str) -> dict[str, list[str]]:
     # dine_first 和其他模式使用默认状态机
     return VALID_TRANSITIONS
 
+
 # 终态集合：这些状态下桌台可以释放给下一批客人
 TERMINAL_STATUSES = {"paid", "clearing", "disabled"}
 
@@ -224,9 +225,7 @@ class DiningSessionService:
         # dine_first:   从 seated 开始（传统堂食流程）
         # retail:       不应走到这里（retail模式不创建dining_session）
         if zone_service_mode == "retail":
-            raise ValueError(
-                "retail 模式不创建堂食会话，请使用 /cashier/retail-sale 端点"
-            )
+            raise ValueError("retail 模式不创建堂食会话，请使用 /cashier/retail-sale 端点")
         initial_status = "ordering" if zone_service_mode == "scan_and_pay" else "seated"
 
         # 插入 dining_sessions

@@ -6,6 +6,7 @@
   - 主题提取归类（topics）
   - 写入 review_intel 表
 """
+
 import uuid
 from datetime import datetime, timezone
 from typing import Any
@@ -24,9 +25,18 @@ _SENTIMENT_BATCH_SIZE = 10
 
 # 主题分类候选标签
 _TOPIC_CATEGORIES = [
-    "菜品口味", "菜品分量", "菜品新鲜度", "菜品外观",
-    "服务态度", "上菜速度", "环境氛围", "价格性价比",
-    "包装品质", "外卖配送", "停车便利", "卫生整洁",
+    "菜品口味",
+    "菜品分量",
+    "菜品新鲜度",
+    "菜品外观",
+    "服务态度",
+    "上菜速度",
+    "环境氛围",
+    "价格性价比",
+    "包装品质",
+    "外卖配送",
+    "停车便利",
+    "卫生整洁",
 ]
 
 
@@ -71,6 +81,7 @@ class ReviewCollectorService:
             days=days,
         )
         import time
+
         t0 = time.monotonic()
 
         # 1. 从平台采集原始点评
@@ -195,6 +206,7 @@ class ReviewCollectorService:
         topic_list_str = "、".join(_TOPIC_CATEGORIES)
         try:
             import json
+
             message = await self._ai.messages.create(
                 model="claude-haiku-4-5-20251001",
                 max_tokens=256,
@@ -256,6 +268,7 @@ class ReviewCollectorService:
 
 # ─── 内部辅助函数 ───
 
+
 async def _fetch_reviews_from_platform(
     source: str,
     platform_store_id: str,
@@ -266,6 +279,7 @@ async def _fetch_reviews_from_platform(
 
     if source == "meituan":
         from adapters.meituan_adapter import MeituanAdapter
+
         adapter = MeituanAdapter(
             app_key=os.environ.get("MEITUAN_APP_KEY", ""),
             app_secret=os.environ.get("MEITUAN_APP_SECRET", ""),
@@ -287,6 +301,7 @@ async def _fetch_reviews_from_platform(
 
     if source == "douyin":
         from adapters.douyin_adapter import DouyinAdapter
+
         adapter = DouyinAdapter(
             client_key=os.environ.get("DOUYIN_CLIENT_KEY", ""),
             client_secret=os.environ.get("DOUYIN_CLIENT_SECRET", ""),
@@ -312,4 +327,5 @@ async def _fetch_reviews_from_platform(
 def _serialize_topics(topics: list[dict[str, Any]]) -> str:
     """将 topics 列表序列化为 JSON 字符串（供 SQLAlchemy text() 参数绑定）"""
     import json
+
     return json.dumps(topics, ensure_ascii=False)

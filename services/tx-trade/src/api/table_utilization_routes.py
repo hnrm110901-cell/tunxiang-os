@@ -58,9 +58,9 @@ async def _set_rls(db: AsyncSession, tenant_id: str) -> None:
 
 # ─── 建议生成阈值 ────────────────────────────────────────────────────────────
 
-_LOW_UTIL_THRESHOLD = 0.3       # 座位利用率 < 30% → 建议拼桌
-_LOW_SESSION_THRESHOLD = 2      # 日均翻台次数 < 2 → 建议关闭
-_HIGH_DURATION_THRESHOLD = 90   # 平均用餐时长 > 90分钟 → 建议调整时限
+_LOW_UTIL_THRESHOLD = 0.3  # 座位利用率 < 30% → 建议拼桌
+_LOW_SESSION_THRESHOLD = 2  # 日均翻台次数 < 2 → 建议关闭
+_HIGH_DURATION_THRESHOLD = 90  # 平均用餐时长 > 90分钟 → 建议调整时限
 
 
 # ─── 路由 ─────────────────────────────────────────────────────────────────────
@@ -117,26 +117,30 @@ async def get_dashboard(
     for r in rows:
         total_sessions = int(r.total_sessions or 0)
         table_count = int(r.table_count or 1)
-        zones.append({
-            "zone_id": str(r.zone_id) if r.zone_id else None,
-            "zone_type": r.zone_type,
-            "zone_name": r.zone_name or "未分区",
-            "table_count": table_count,
-            "total_sessions": total_sessions,
-            "avg_turnover_rate": round(total_sessions / (table_count * days_count), 2),
-            "avg_seat_utilization": round(float(r.avg_seat_util or 0), 3),
-            "avg_duration_min": round(float(r.avg_duration or 0), 1),
-            "avg_per_capita_fen": int(r.avg_per_capita_fen or 0),
-            "total_revenue_fen": int(r.total_revenue_fen or 0),
-            "avg_service_calls": round(float(r.avg_service_calls or 0), 1),
-        })
+        zones.append(
+            {
+                "zone_id": str(r.zone_id) if r.zone_id else None,
+                "zone_type": r.zone_type,
+                "zone_name": r.zone_name or "未分区",
+                "table_count": table_count,
+                "total_sessions": total_sessions,
+                "avg_turnover_rate": round(total_sessions / (table_count * days_count), 2),
+                "avg_seat_utilization": round(float(r.avg_seat_util or 0), 3),
+                "avg_duration_min": round(float(r.avg_duration or 0), 1),
+                "avg_per_capita_fen": int(r.avg_per_capita_fen or 0),
+                "total_revenue_fen": int(r.total_revenue_fen or 0),
+                "avg_service_calls": round(float(r.avg_service_calls or 0), 1),
+            }
+        )
 
-    return _ok({
-        "store_id": str(store_id),
-        "date_from": date_from.isoformat(),
-        "date_to": date_to.isoformat(),
-        "zones": zones,
-    })
+    return _ok(
+        {
+            "store_id": str(store_id),
+            "date_from": date_from.isoformat(),
+            "date_to": date_to.isoformat(),
+            "zones": zones,
+        }
+    )
 
 
 @router.get("/{store_id}/heatmap", summary="桌台×时段热力图")
@@ -216,30 +220,36 @@ async def get_heatmap(
                 "sessions": [],
             }
 
-        table_sessions[zkey][tkey]["sessions"].append({
-            "market_session_id": str(r.market_session_id) if r.market_session_id else None,
-            "market_session_name": r.market_session_name,
-            "session_count": int(r.session_count or 0),
-            "avg_seat_utilization": round(float(r.avg_seat_util or 0), 3),
-            "avg_duration_min": round(float(r.avg_duration or 0), 1),
-            "avg_per_capita_fen": int(r.avg_per_capita or 0),
-            "sum_revenue_fen": int(r.sum_revenue_fen or 0),
-        })
+        table_sessions[zkey][tkey]["sessions"].append(
+            {
+                "market_session_id": str(r.market_session_id) if r.market_session_id else None,
+                "market_session_name": r.market_session_name,
+                "session_count": int(r.session_count or 0),
+                "avg_seat_utilization": round(float(r.avg_seat_util or 0), 3),
+                "avg_duration_min": round(float(r.avg_duration or 0), 1),
+                "avg_per_capita_fen": int(r.avg_per_capita or 0),
+                "sum_revenue_fen": int(r.sum_revenue_fen or 0),
+            }
+        )
 
     zones = []
     for zkey, zinfo in zone_map.items():
-        zones.append({
-            "zone_name": zinfo["zone_name"],
-            "zone_id": str(zinfo["zone_id"]) if zinfo["zone_id"] else None,
-            "tables": list(table_sessions[zkey].values()),
-        })
+        zones.append(
+            {
+                "zone_name": zinfo["zone_name"],
+                "zone_id": str(zinfo["zone_id"]) if zinfo["zone_id"] else None,
+                "tables": list(table_sessions[zkey].values()),
+            }
+        )
 
-    return _ok({
-        "store_id": str(store_id),
-        "date_from": date_from.isoformat(),
-        "date_to": date_to.isoformat(),
-        "zones": zones,
-    })
+    return _ok(
+        {
+            "store_id": str(store_id),
+            "date_from": date_from.isoformat(),
+            "date_to": date_to.isoformat(),
+            "zones": zones,
+        }
+    )
 
 
 @router.get("/{store_id}/recommendations", summary="Agent调度建议")
@@ -325,20 +335,22 @@ async def get_recommendations(
         # 建议1：低座位利用率 → 拼桌
         if avg_util < _LOW_UTIL_THRESHOLD and total_sessions > 0:
             confidence = round(min(1.0, (_LOW_UTIL_THRESHOLD - avg_util) / _LOW_UTIL_THRESHOLD), 2)
-            recommendations.append({
-                "type": "merge_suggestion",
-                "table_no": table_no,
-                "market_session": ms_name,
-                "detail": (
-                    f"{r.zone_name or '未分区'} {table_no} 在{ms_name}时段"
-                    f"座位利用率仅 {avg_util:.0%}，建议与相邻桌合并或调整桌型"
-                ),
-                "confidence": confidence,
-                "metrics": {
-                    "avg_seat_utilization": round(avg_util, 3),
-                    "daily_sessions": round(daily_sessions, 1),
-                },
-            })
+            recommendations.append(
+                {
+                    "type": "merge_suggestion",
+                    "table_no": table_no,
+                    "market_session": ms_name,
+                    "detail": (
+                        f"{r.zone_name or '未分区'} {table_no} 在{ms_name}时段"
+                        f"座位利用率仅 {avg_util:.0%}，建议与相邻桌合并或调整桌型"
+                    ),
+                    "confidence": confidence,
+                    "metrics": {
+                        "avg_seat_utilization": round(avg_util, 3),
+                        "daily_sessions": round(daily_sessions, 1),
+                    },
+                }
+            )
 
         # 建议2：低翻台率 → 关闭
         if daily_sessions < _LOW_SESSION_THRESHOLD and total_sessions > 0:
@@ -346,20 +358,22 @@ async def get_recommendations(
                 min(1.0, (_LOW_SESSION_THRESHOLD - daily_sessions) / _LOW_SESSION_THRESHOLD),
                 2,
             )
-            recommendations.append({
-                "type": "close_suggestion",
-                "table_no": table_no,
-                "market_session": ms_name,
-                "detail": (
-                    f"{r.zone_name or '未分区'} {table_no} 在{ms_name}时段"
-                    f"日均翻台仅 {daily_sessions:.1f} 次，建议该时段关闭此桌"
-                ),
-                "confidence": confidence,
-                "metrics": {
-                    "daily_sessions": round(daily_sessions, 1),
-                    "total_sessions": total_sessions,
-                },
-            })
+            recommendations.append(
+                {
+                    "type": "close_suggestion",
+                    "table_no": table_no,
+                    "market_session": ms_name,
+                    "detail": (
+                        f"{r.zone_name or '未分区'} {table_no} 在{ms_name}时段"
+                        f"日均翻台仅 {daily_sessions:.1f} 次，建议该时段关闭此桌"
+                    ),
+                    "confidence": confidence,
+                    "metrics": {
+                        "daily_sessions": round(daily_sessions, 1),
+                        "total_sessions": total_sessions,
+                    },
+                }
+            )
 
         # 建议3：用餐时间过长 → 调整时限
         if avg_dur > _HIGH_DURATION_THRESHOLD and total_sessions > 0:
@@ -367,31 +381,35 @@ async def get_recommendations(
                 min(1.0, (avg_dur - _HIGH_DURATION_THRESHOLD) / _HIGH_DURATION_THRESHOLD),
                 2,
             )
-            recommendations.append({
-                "type": "time_limit_adjust",
-                "table_no": table_no,
-                "market_session": ms_name,
-                "detail": (
-                    f"{r.zone_name or '未分区'} {table_no} 在{ms_name}时段"
-                    f"平均用餐时长 {avg_dur:.0f} 分钟，建议设置 {int(avg_dur * 0.8)} 分钟时限"
-                ),
-                "confidence": confidence,
-                "metrics": {
-                    "avg_duration_min": round(avg_dur, 1),
-                    "suggested_limit_min": int(avg_dur * 0.8),
-                },
-            })
+            recommendations.append(
+                {
+                    "type": "time_limit_adjust",
+                    "table_no": table_no,
+                    "market_session": ms_name,
+                    "detail": (
+                        f"{r.zone_name or '未分区'} {table_no} 在{ms_name}时段"
+                        f"平均用餐时长 {avg_dur:.0f} 分钟，建议设置 {int(avg_dur * 0.8)} 分钟时限"
+                    ),
+                    "confidence": confidence,
+                    "metrics": {
+                        "avg_duration_min": round(avg_dur, 1),
+                        "suggested_limit_min": int(avg_dur * 0.8),
+                    },
+                }
+            )
 
     # 按置信度降序排列
     recommendations.sort(key=lambda x: x["confidence"], reverse=True)
 
-    return _ok({
-        "store_id": str(store_id),
-        "date_from": date_from.isoformat(),
-        "date_to": date_to.isoformat(),
-        "recommendations": recommendations,
-        "total": len(recommendations),
-    })
+    return _ok(
+        {
+            "store_id": str(store_id),
+            "date_from": date_from.isoformat(),
+            "date_to": date_to.isoformat(),
+            "recommendations": recommendations,
+            "total": len(recommendations),
+        }
+    )
 
 
 @router.post("/refresh", summary="手动刷新物化视图")

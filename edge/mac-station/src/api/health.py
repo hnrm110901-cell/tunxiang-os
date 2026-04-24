@@ -5,6 +5,7 @@
   GET /discovery   门店设备发现（返回 mac-station 可用服务列表）
   GET /status      详细运行状态（同步延迟 / 离线时长 / 缓存命中率）
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -14,9 +15,8 @@ from typing import Any
 
 import psutil
 import structlog
-from fastapi import APIRouter
-
 from config import get_config
+from fastapi import APIRouter
 from services.offline_cache import get_offline_cache
 
 logger = structlog.get_logger(__name__)
@@ -124,7 +124,11 @@ async def service_discovery() -> dict[str, Any]:
             "version": _VERSION,
             "services": [
                 {"name": "local_data", "path": "/api/v1/local", "description": "本地数据查询（订单/菜单/桌台/库存）"},
-                {"name": "agent_proxy", "path": "/api/v1/agent", "description": "Agent 本地代理（CoreML推理/折扣检测）"},
+                {
+                    "name": "agent_proxy",
+                    "path": "/api/v1/agent",
+                    "description": "Agent 本地代理（CoreML推理/折扣检测）",
+                },
                 {"name": "offline_query", "path": "/api/v1/offline", "description": "离线查询（营业额/库存/订单）"},
                 {"name": "vision", "path": "/api/v1/vision", "description": "视觉AI（菜品质检/卫生巡检/客流统计）"},
                 {"name": "voice", "path": "/api/v1/voice", "description": "语音服务（转写/意图解析）"},
@@ -132,7 +136,11 @@ async def service_discovery() -> dict[str, Any]:
                 {"name": "ota", "path": "/api/v1/ota", "description": "OTA版本检查"},
                 {"name": "kds_push", "path": "/ws/kds", "description": "KDS WebSocket推送"},
                 {"name": "pos_push", "path": "/ws/pos", "description": "POS WebSocket推送"},
-                {"name": "coreml_bridge", "path": "http://localhost:8100", "description": "Core ML推理桥接（独立进程）"},
+                {
+                    "name": "coreml_bridge",
+                    "path": "http://localhost:8100",
+                    "description": "Core ML推理桥接（独立进程）",
+                },
             ],
             "network": {
                 "tailscale_ip": cfg.tailscale_ip or "not_configured",

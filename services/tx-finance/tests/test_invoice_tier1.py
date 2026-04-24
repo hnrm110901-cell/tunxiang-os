@@ -22,7 +22,7 @@ import os
 import sys
 import uuid
 from decimal import Decimal
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -74,8 +74,8 @@ class TestInvoiceGoldenTaxPhase4:
           - invoiceDetailList: 商品明细列表（至少1行）
         """
         sys.path.insert(0, FINANCE_SRC)
-        from services.invoice_service import InvoiceService
         from models.invoice import Invoice
+        from services.invoice_service import InvoiceService
 
         mock_invoice = MagicMock(spec=Invoice)
         mock_invoice.id = uuid.uuid4()
@@ -176,7 +176,6 @@ class TestInvoiceIdempotencyTier1:
         TODO: 接入真实 InvoiceService 后验证此行为。
         参考 tx-finance/tests/test_invoice.py 中的 test_request_invoice_* 测试。
         """
-        from services.invoice_service import InvoiceService, InvoiceStatusError
         from models.invoice import Invoice
 
         # 模拟数据库中已存在该订单的发票
@@ -249,7 +248,6 @@ class TestInvoiceValidationTier1:
         场景：因编程错误导致 amount=0 的开票请求。
         0元发票在税务系统中是无效发票，会被退票并触发稽查。
         """
-        from decimal import InvalidOperation
 
         zero_amount = Decimal("0")
         assert zero_amount == 0, "0元金额"
@@ -274,8 +272,9 @@ class TestInvoiceValidationTier1:
         场景：防止开具金额与消费不符的发票（刷单风险）。
         允许0.01元以内的舍入误差（分钱精度）。
         """
-        from services.invoice_service import InvoiceService, InvoiceAmountMismatchError
         from decimal import Decimal
+
+        from services.invoice_service import InvoiceAmountMismatchError, InvoiceService
 
         svc = InvoiceService(nuonuo_client=_make_mock_nuonuo_client())
 
@@ -322,8 +321,8 @@ class TestInvoiceValidationTier1:
 
         场景：发票作废后，客人误操作点击重打，系统应拒绝。
         """
-        from services.invoice_service import InvoiceService, InvoiceStatusError
         from models.invoice import Invoice
+        from services.invoice_service import InvoiceService
 
         svc = InvoiceService(nuonuo_client=_make_mock_nuonuo_client())
 

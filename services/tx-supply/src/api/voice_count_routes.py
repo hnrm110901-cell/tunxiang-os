@@ -746,7 +746,7 @@ async def confirm_entry(
         )
         await db.execute(
             text("UPDATE voice_count_sessions SET updated_at = :now WHERE id = :session_id AND tenant_id = :tenant_id"),
-            {"session_id": session_id, "tenant_id": tenant_id, "now": now},
+            {"session_id": session_id, "tenant_id": x_tenant_id, "now": now},
         )
         await db.commit()
     except Exception as exc:
@@ -1085,7 +1085,7 @@ async def submit_voice_count(
                 SET status = 'submitted', updated_at = :now
                 WHERE id = :session_id AND tenant_id = :tenant_id
             """),
-            {"session_id": session_id, "tenant_id": tenant_id, "now": now},
+            {"session_id": session_id, "tenant_id": x_tenant_id, "now": now},
         )
         await db.commit()
     except Exception as exc:

@@ -7,7 +7,7 @@ ROUTER REGISTRATION（在 main.py 中添加）：
 """
 
 from datetime import date
-from typing import List, Optional
+from typing import Optional
 
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
@@ -25,6 +25,7 @@ router = APIRouter(tags=["kds-piecework"])
 
 # ── 公共依赖 ─────────────────────────────────────────────────
 
+
 def _tenant_id(request: Request) -> str:
     tid = getattr(request.state, "tenant_id", None) or request.headers.get("X-Tenant-ID", "")
     if not tid:
@@ -33,6 +34,7 @@ def _tenant_id(request: Request) -> str:
 
 
 # ── 请求/响应模型 ────────────────────────────────────────────
+
 
 class RecordPieceworkRequest(BaseModel):
     store_id: str
@@ -64,6 +66,7 @@ class UpdateSchemeRequest(BaseModel):
 
 
 # ── 端点 ─────────────────────────────────────────────────────
+
 
 @router.post("/record")
 async def record_piecework(

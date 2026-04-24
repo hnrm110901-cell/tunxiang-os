@@ -3,13 +3,14 @@
 所有路由通过本模块获取服务实例，避免循环导入。
 生命周期由 main.py 的 lifespan 管理。
 """
+
 from __future__ import annotations
 
 from typing import Optional
 
 from .channels.registry import ChannelRegistry
-from .routing.engine import PaymentRoutingEngine
 from .payment_service import PaymentNexusService
+from .routing.engine import PaymentRoutingEngine
 
 # 全局单例（由 lifespan 初始化）
 _registry: Optional[ChannelRegistry] = None
@@ -41,6 +42,7 @@ async def get_routing_engine() -> PaymentRoutingEngine:
 async def get_db():
     """获取数据库会话（延迟导入避免循环依赖）"""
     from shared.ontology.src.database import get_async_session
+
     async for session in get_async_session():
         return session
 

@@ -773,6 +773,7 @@ async def checkout_with_discounts(
 
 class RetailSaleReq(BaseModel):
     """零售模式请求 — 无桌台无会话"""
+
     store_id: str
     items: list[dict] = Field(..., description="商品列表: [{barcode, name, qty, unit_price_fen}]")
     payment_method: str = "wechat"
@@ -782,6 +783,7 @@ class RetailSaleReq(BaseModel):
 
 class PreOrderReq(BaseModel):
     """预点单请求 — 包厢客人到店前预选菜品"""
+
     store_id: str
     table_no: str
     booking_id: Optional[str] = None
@@ -792,6 +794,7 @@ class PreOrderReq(BaseModel):
 
 class RedeemVoucherReq(BaseModel):
     """券核销请求"""
+
     voucher_type: str = Field(..., description="券类型: platform_voucher / cash_voucher / member_points")
     voucher_code: str
     zone_id: Optional[str] = None

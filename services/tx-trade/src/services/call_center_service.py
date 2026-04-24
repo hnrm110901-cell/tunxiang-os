@@ -549,11 +549,15 @@ class CallCenterService:
             {"tid": str(tenant_id), "sid": str(store_id)},
         )
         stats = row.mappings().first()
-        return dict(stats) if stats else {
-            "total_calls": 0,
-            "answered": 0,
-            "missed": 0,
-            "avg_duration_sec": 0,
-            "answer_rate": 0,
-            "miss_rate": 0,
-        }
+        return (
+            dict(stats)
+            if stats
+            else {
+                "total_calls": 0,
+                "answered": 0,
+                "missed": 0,
+                "avg_duration_sec": 0,
+                "answer_rate": 0,
+                "miss_rate": 0,
+            }
+        )

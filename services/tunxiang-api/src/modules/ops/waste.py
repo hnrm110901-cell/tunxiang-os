@@ -2,12 +2,11 @@
 
 Sprint 5-8 实现：WasteGuardV2
 """
+
 import os
 import sys
 
-_TX_SUPPLY_SRC = os.path.abspath(
-    os.path.join(os.path.dirname(__file__), "../../../../tx-supply/src")
-)
+_TX_SUPPLY_SRC = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../../tx-supply/src"))
 if _TX_SUPPLY_SRC not in sys.path:
     sys.path.insert(0, _TX_SUPPLY_SRC)
 

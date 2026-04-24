@@ -7,6 +7,7 @@
 - 门店在断网期间完成的订单状态不会被云端旧状态回滚
 - 其余字段（金额、菜品、时间戳等）以云端为准，避免本地脏数据污染全局
 """
+
 from __future__ import annotations
 
 from datetime import datetime, timezone
@@ -17,9 +18,7 @@ import structlog
 logger = structlog.get_logger()
 
 # 终态集合：处于这些状态的本地记录不被远端非终态覆盖
-TERMINAL_STATUSES: frozenset[str] = frozenset(
-    {"done", "served", "completed", "cancelled", "refunded", "closed"}
-)
+TERMINAL_STATUSES: frozenset[str] = frozenset({"done", "served", "completed", "cancelled", "refunded", "closed"})
 
 
 def _parse_ts(value: Any) -> datetime:

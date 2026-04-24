@@ -433,9 +433,8 @@ class Evolution2030Service:
         for store_features in self._store_features.values():
             total_features_enabled += sum(1 for v in store_features.values() if v)
             total_features_possible += len(store_features)
-        feature_coverage = (
-            _safe_ratio(total_features_enabled, total_features_possible) if total_features_possible > 0 else 0.5
-        )
+        # 已由外层 `total_features_possible > 0` 守护，直接除即可（无需 _safe_ratio helper）
+        feature_coverage = total_features_enabled / total_features_possible if total_features_possible > 0 else 0.5
         feature_score = round(feature_coverage * 20, 1)
 
         # 区域覆盖维度 (满分20)

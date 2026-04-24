@@ -9,6 +9,7 @@
   3. 将推断结果写入记忆系统
   4. 强化/弱化已有记忆
 """
+
 from __future__ import annotations
 
 import os
@@ -87,10 +88,12 @@ class MemoryEvolutionWorker:
             if db is None:
                 log.error("memory_evolution.db_session_failed")
                 stats.tenants_failed += 1
-                stats.errors.append({
-                    "tenant_id": tenant_id,
-                    "error": "无法获取数据库会话",
-                })
+                stats.errors.append(
+                    {
+                        "tenant_id": tenant_id,
+                        "error": "无法获取数据库会话",
+                    }
+                )
                 return
 
             svc = FeedbackEvolutionService(db)
@@ -114,10 +117,12 @@ class MemoryEvolutionWorker:
 
         except Exception as exc:  # 最外层兜底，单租户失败不影响其他
             stats.tenants_failed += 1
-            stats.errors.append({
-                "tenant_id": tenant_id,
-                "error": str(exc),
-            })
+            stats.errors.append(
+                {
+                    "tenant_id": tenant_id,
+                    "error": str(exc),
+                }
+            )
             log.error(
                 "memory_evolution.tenant_failed",
                 error=str(exc),

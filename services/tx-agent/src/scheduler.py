@@ -470,29 +470,41 @@ def register_apscheduler_jobs(_scheduler: Any) -> None:
     # SOP 15分钟节拍
     _scheduler.add_job(
         lambda: asyncio.create_task(_run_sop_tick()),
-        "interval", minutes=15,
-        id="sop_tick", replace_existing=True,
+        "interval",
+        minutes=15,
+        id="sop_tick",
+        replace_existing=True,
     )
 
     # 每日记忆进化（凌晨2:00）
     _scheduler.add_job(
         lambda: asyncio.create_task(_run_memory_evolution()),
-        "cron", hour=2, minute=0,
-        id="memory_evolution", replace_existing=True,
+        "cron",
+        hour=2,
+        minute=0,
+        id="memory_evolution",
+        replace_existing=True,
     )
 
     # 每日记忆整合（凌晨3:30）
     _scheduler.add_job(
         lambda: asyncio.create_task(_run_memory_consolidation()),
-        "cron", hour=3, minute=30,
-        id="memory_consolidation", replace_existing=True,
+        "cron",
+        hour=3,
+        minute=30,
+        id="memory_consolidation",
+        replace_existing=True,
     )
 
     # 每周基线更新（周一凌晨3:00）
     _scheduler.add_job(
         lambda: asyncio.create_task(_run_baseline_update()),
-        "cron", day_of_week="mon", hour=3, minute=0,
-        id="baseline_update", replace_existing=True,
+        "cron",
+        day_of_week="mon",
+        hour=3,
+        minute=0,
+        id="baseline_update",
+        replace_existing=True,
     )
 
     logger.info(

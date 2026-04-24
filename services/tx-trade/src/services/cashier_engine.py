@@ -1462,11 +1462,13 @@ class CashierEngine:
         # 自动结算
         payment_result = await self.settle_order(
             order_id=str(order_id),
-            payments=[{
-                "method": payment_method,
-                "amount_fen": payment_amount_fen or total_fen,
-                "trade_no": auth_code,
-            }],
+            payments=[
+                {
+                    "method": payment_method,
+                    "amount_fen": payment_amount_fen or total_fen,
+                    "trade_no": auth_code,
+                }
+            ],
         )
 
         # 旁路事件
@@ -1547,10 +1549,7 @@ class CashierEngine:
 
         # 预点单允许 free 和 reserved 两种桌态
         if table.status not in (TableStatus.free.value, TableStatus.reserved.value):
-            raise ValueError(
-                f"桌台 {table_no} 当前状态 {table.status}，"
-                f"预点单仅允许空闲或已预订状态的桌台"
-            )
+            raise ValueError(f"桌台 {table_no} 当前状态 {table.status}，预点单仅允许空闲或已预订状态的桌台")
 
         # 创建预点订单（status=pre_ordered，不锁桌）
         order_no = _gen_order_no()

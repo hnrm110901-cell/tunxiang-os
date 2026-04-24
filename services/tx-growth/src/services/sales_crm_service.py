@@ -141,8 +141,10 @@ class SalesCRMService:
     ) -> dict:
         """更新销售目标设定值"""
         allowed = {
-            "target_revenue_fen", "target_orders",
-            "target_new_customers", "target_reservations",
+            "target_revenue_fen",
+            "target_orders",
+            "target_new_customers",
+            "target_reservations",
         }
         filtered = {k: v for k, v in updates.items() if k in allowed}
         if not filtered:
@@ -151,7 +153,7 @@ class SalesCRMService:
         set_parts = [f"{k} = :{k}" for k in filtered]
         set_parts.append("updated_at = now()")
         sql = f"""
-            UPDATE sales_targets SET {', '.join(set_parts)}
+            UPDATE sales_targets SET {", ".join(set_parts)}
             WHERE tenant_id = :tenant_id AND id = :target_id AND is_deleted = FALSE
         """
         filtered["tenant_id"] = str(tenant_id)
@@ -204,7 +206,7 @@ class SalesCRMService:
         """)
 
         sql = f"""
-            UPDATE sales_targets SET {', '.join(set_parts)}
+            UPDATE sales_targets SET {", ".join(set_parts)}
             WHERE tenant_id = :tenant_id AND id = :target_id AND is_deleted = FALSE
             RETURNING achievement_rate
         """
@@ -407,7 +409,7 @@ class SalesCRMService:
             params["won_order_id"] = str(won_order_id)
 
         sql = f"""
-            UPDATE sales_leads SET {', '.join(set_parts)}
+            UPDATE sales_leads SET {", ".join(set_parts)}
             WHERE tenant_id = :tenant_id AND id = :lead_id AND is_deleted = FALSE
         """
         await db.execute(text(sql), params)
@@ -880,16 +882,18 @@ class SalesCRMService:
             has_allergy = bool(cd.get("allergy"))
             has_service_req = bool(cd.get("service_req"))
 
-            score = sum([
-                weights["has_name"] if has_name else 0,
-                weights["has_phone"] if has_phone else 0,
-                weights["has_birthday"] if has_birthday else 0,
-                weights["has_anniversary"] if has_anniversary else 0,
-                weights["has_company"] if has_company else 0,
-                weights["has_preference"] if has_preference else 0,
-                weights["has_allergy"] if has_allergy else 0,
-                weights["has_service_req"] if has_service_req else 0,
-            ])
+            score = sum(
+                [
+                    weights["has_name"] if has_name else 0,
+                    weights["has_phone"] if has_phone else 0,
+                    weights["has_birthday"] if has_birthday else 0,
+                    weights["has_anniversary"] if has_anniversary else 0,
+                    weights["has_company"] if has_company else 0,
+                    weights["has_preference"] if has_preference else 0,
+                    weights["has_allergy"] if has_allergy else 0,
+                    weights["has_service_req"] if has_service_req else 0,
+                ]
+            )
 
             params[f"cid_{i}"] = str(cd["customer_id"])
             params[f"hn_{i}"] = has_name
@@ -913,7 +917,7 @@ class SalesCRMService:
                 has_name, has_phone, has_birthday, has_anniversary,
                 has_company, has_preference, has_allergy, has_service_req,
                 completeness_score
-            ) VALUES {', '.join(values_parts)}
+            ) VALUES {", ".join(values_parts)}
             ON CONFLICT (tenant_id, customer_id) DO UPDATE SET
                 has_name = EXCLUDED.has_name,
                 has_phone = EXCLUDED.has_phone,

@@ -742,6 +742,8 @@ async def list_city_tiers(
     is_system=True 为系统预置数据（北上广深等），租户可追加自定义城市映射。
     """
     try:
+        from sqlalchemy import select
+
         from ..models.expense_standard import StandardCityTier as _SCT
 
         where = [_SCT.tenant_id == tenant_id]

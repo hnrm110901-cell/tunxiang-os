@@ -110,9 +110,9 @@ from .api.promotion_rules_v3_routes import (
     router as promotion_rules_v3_router,  # 模块2.6 促销规则引擎V3（互斥组/执行顺序/总量限制/新类型）
 )
 from .api.referral_routes import router as referral_router
+from .api.sales_crm_routes import router as sales_crm_router  # v291 销售CRM
 from .api.segmentation_routes import router as segmentation_router
 from .api.touch_attribution_routes import router as touch_attribution_router
-from .api.sales_crm_routes import router as sales_crm_router  # v291 销售CRM
 from .api.wecom_scrm_agent_routes import router as wecom_scrm_agent_router  # P3-05 企微SCRM私域Agent
 
 _approval_service = _ApprovalService()
@@ -235,7 +235,7 @@ from services.growth_journey_service import GrowthJourneyService as _GrowthJourn
 
 # Feature Flag SDK — 控制 Growth Journey V2 / 沉默召回 等 cron 任务
 try:
-    from shared.feature_flags import FlagContext
+    from shared.feature_flags import FlagContext  # noqa: F401 — 下游 ctx 构造使用
     from shared.feature_flags import is_enabled as _ff_is_enabled
     from shared.feature_flags.flag_names import GrowthFlags as _GrowthFlags
 

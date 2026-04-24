@@ -23,6 +23,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 import httpx
+import redis.asyncio as aioredis  # type: ignore
 import structlog
 from models.journey_instance import JourneyInstance
 from services.journey_orchestrator import (

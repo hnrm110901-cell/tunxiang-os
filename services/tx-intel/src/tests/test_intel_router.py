@@ -20,6 +20,7 @@
     通过 sys.modules 预注入桩模块
   - 覆盖 happy path、参数过滤、错误场景（无更新字段、404）
 """
+
 import importlib.util
 import pathlib
 import sys
@@ -40,8 +41,10 @@ _fake_sa.text = lambda sql: sql
 
 _fake_sa_exc = types.ModuleType("sqlalchemy.exc")
 
+
 class _SQLAlchemyError(Exception):
     pass
+
 
 _fake_sa_exc.SQLAlchemyError = _SQLAlchemyError
 _fake_sa_async = types.ModuleType("sqlalchemy.ext.asyncio")
@@ -56,36 +59,46 @@ sys.modules.setdefault("sqlalchemy.ext.asyncio", _fake_sa_async)
 _svc_mod = types.ModuleType("services")
 sys.modules.setdefault("services", _svc_mod)
 
+
 # competitor_monitor_ext 桩
 class _CompetitorMonitorExtService:
     def __init__(self, db):
         pass
+
     async def run_competitor_snapshot(self, tenant_id, competitor_id):
         return {"ok": True, "snapshot_id": str(uuid.uuid4())}
+
 
 _competitor_ext_mod = types.ModuleType("services.competitor_monitor_ext")
 _competitor_ext_mod.CompetitorMonitorExtService = _CompetitorMonitorExtService
 sys.modules["services.competitor_monitor_ext"] = _competitor_ext_mod
 
+
 # review_collector 桩
 class _ReviewCollectorService:
     def __init__(self, db):
         pass
+
     async def collect_store_reviews(self, tenant_id, source, platform_store_id, is_own_store, days):
         return {"ok": True, "collected": 5}
+
 
 _review_collector_mod = types.ModuleType("services.review_collector")
 _review_collector_mod.ReviewCollectorService = _ReviewCollectorService
 sys.modules["services.review_collector"] = _review_collector_mod
 
+
 # trend_scanner 桩
 class _TrendScannerService:
     def __init__(self, db):
         pass
+
     async def scan_dish_trends(self, tenant_id, city, cuisine_type):
         return {"ok": True, "trends_found": 3}
+
     async def scan_ingredient_trends(self, tenant_id, category, region):
         return {"ok": True, "trends_found": 2}
+
 
 _trend_scanner_mod = types.ModuleType("services.trend_scanner")
 _trend_scanner_mod.TrendScannerService = _TrendScannerService
@@ -99,9 +112,10 @@ except ImportError:
 
 # ─── 加载被测路由 ────────────────────────────────────────────────────────────
 
+from unittest.mock import AsyncMock, MagicMock
+
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from unittest.mock import AsyncMock, MagicMock
 
 _route_path = pathlib.Path(__file__).parent.parent / "routers" / "intel_router.py"
 _spec = importlib.util.spec_from_file_location("intel_router", _route_path)
@@ -150,16 +164,19 @@ def _mapping_row(*values, keys=None):
 # 测试：GET /intel/competitors — 列出竞对品牌
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 class TestListCompetitors:
     """GET /intel/competitors — 3 个测试"""
 
     def test_list_competitors_empty(self):
         """无竞对品牌时返回空列表"""
         mock_db = AsyncMock()
-        mock_db.execute = AsyncMock(side_effect=[
-            _scalar_mock(0),         # COUNT
-            _fetchall_mock([]),       # SELECT rows
-        ])
+        mock_db.execute = AsyncMock(
+            side_effect=[
+                _scalar_mock(0),  # COUNT
+                _fetchall_mock([]),  # SELECT rows
+            ]
+        )
         client = _make_app(mock_db)
         resp = client.get("/intel/competitors", headers=HEADERS)
         assert resp.status_code == 200
@@ -171,12 +188,13 @@ class TestListCompetitors:
     def test_list_competitors_with_rows(self):
         """有数据时正确返回分页信息"""
         mock_db = AsyncMock()
-        row = _mapping_row("长沙麻辣香锅", "湘菜", "mid_range",
-                           keys=["name", "cuisine_type", "price_tier"])
-        mock_db.execute = AsyncMock(side_effect=[
-            _scalar_mock(1),
-            _fetchall_mock([row]),
-        ])
+        row = _mapping_row("长沙麻辣香锅", "湘菜", "mid_range", keys=["name", "cuisine_type", "price_tier"])
+        mock_db.execute = AsyncMock(
+            side_effect=[
+                _scalar_mock(1),
+                _fetchall_mock([row]),
+            ]
+        )
         client = _make_app(mock_db)
         resp = client.get("/intel/competitors", headers=HEADERS)
         assert resp.status_code == 200
@@ -195,6 +213,7 @@ class TestListCompetitors:
 # ═══════════════════════════════════════════════════════════════════════════════
 # 测试：POST /intel/competitors — 新增竞对品牌
 # ═══════════════════════════════════════════════════════════════════════════════
+
 
 class TestCreateCompetitor:
     """POST /intel/competitors — 2 个测试"""
@@ -240,16 +259,19 @@ class TestCreateCompetitor:
 # 测试：GET /intel/competitors/{id}/snapshots
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 class TestListCompetitorSnapshots:
     """GET /intel/competitors/{id}/snapshots — 1 个测试"""
 
     def test_list_snapshots(self):
         """正确分页返回竞对快照"""
         mock_db = AsyncMock()
-        mock_db.execute = AsyncMock(side_effect=[
-            _scalar_mock(0),
-            _fetchall_mock([]),
-        ])
+        mock_db.execute = AsyncMock(
+            side_effect=[
+                _scalar_mock(0),
+                _fetchall_mock([]),
+            ]
+        )
         client = _make_app(mock_db)
         resp = client.get(f"/intel/competitors/{COMP_ID}/snapshots", headers=HEADERS)
         assert resp.status_code == 200
@@ -261,16 +283,19 @@ class TestListCompetitorSnapshots:
 # 测试：GET /intel/reviews — 点评情报
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 class TestListReviews:
     """GET /intel/reviews — 2 个测试"""
 
     def test_list_reviews_no_filter(self):
         """无过滤参数时正常返回"""
         mock_db = AsyncMock()
-        mock_db.execute = AsyncMock(side_effect=[
-            _scalar_mock(2),
-            _fetchall_mock([]),
-        ])
+        mock_db.execute = AsyncMock(
+            side_effect=[
+                _scalar_mock(2),
+                _fetchall_mock([]),
+            ]
+        )
         client = _make_app(mock_db)
         resp = client.get("/intel/reviews", headers=HEADERS)
         assert resp.status_code == 200
@@ -279,10 +304,12 @@ class TestListReviews:
     def test_list_reviews_filter_own_store(self):
         """is_own_store=true 过滤时正常返回"""
         mock_db = AsyncMock()
-        mock_db.execute = AsyncMock(side_effect=[
-            _scalar_mock(1),
-            _fetchall_mock([]),
-        ])
+        mock_db.execute = AsyncMock(
+            side_effect=[
+                _scalar_mock(1),
+                _fetchall_mock([]),
+            ]
+        )
         client = _make_app(mock_db)
         resp = client.get("/intel/reviews?is_own_store=true&source=meituan", headers=HEADERS)
         assert resp.status_code == 200
@@ -293,16 +320,19 @@ class TestListReviews:
 # 测试：GET /intel/trends — 市场趋势
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 class TestListTrends:
     """GET /intel/trends — 1 个测试"""
 
     def test_list_trends_with_min_score(self):
         """min_score 过滤正常工作"""
         mock_db = AsyncMock()
-        mock_db.execute = AsyncMock(side_effect=[
-            _scalar_mock(5),
-            _fetchall_mock([]),
-        ])
+        mock_db.execute = AsyncMock(
+            side_effect=[
+                _scalar_mock(5),
+                _fetchall_mock([]),
+            ]
+        )
         client = _make_app(mock_db)
         resp = client.get("/intel/trends?min_score=60", headers=HEADERS)
         assert resp.status_code == 200
@@ -312,6 +342,7 @@ class TestListTrends:
 # ═══════════════════════════════════════════════════════════════════════════════
 # 测试：POST /intel/trends/scan/dishes — 菜品趋势扫描
 # ═══════════════════════════════════════════════════════════════════════════════
+
 
 class TestScanDishTrends:
     """POST /intel/trends/scan/dishes — 1 个测试"""
@@ -333,6 +364,7 @@ class TestScanDishTrends:
 # 测试：POST /intel/trends/scan/ingredients — 食材趋势扫描
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 class TestScanIngredientTrends:
     """POST /intel/trends/scan/ingredients — 1 个测试"""
 
@@ -352,6 +384,7 @@ class TestScanIngredientTrends:
 # ═══════════════════════════════════════════════════════════════════════════════
 # 测试：POST /intel/tasks — 创建采集任务
 # ═══════════════════════════════════════════════════════════════════════════════
+
 
 class TestCreateCrawlTask:
     """POST /intel/tasks — 2 个测试"""
@@ -393,16 +426,19 @@ class TestCreateCrawlTask:
 # 测试：GET /intel/tasks — 列出采集任务
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 class TestListCrawlTasks:
     """GET /intel/tasks — 1 个测试"""
 
     def test_list_tasks(self):
         """正常列出采集任务"""
         mock_db = AsyncMock()
-        mock_db.execute = AsyncMock(side_effect=[
-            _scalar_mock(3),
-            _fetchall_mock([]),
-        ])
+        mock_db.execute = AsyncMock(
+            side_effect=[
+                _scalar_mock(3),
+                _fetchall_mock([]),
+            ]
+        )
         client = _make_app(mock_db)
         resp = client.get("/intel/tasks", headers=HEADERS)
         assert resp.status_code == 200
@@ -412,6 +448,7 @@ class TestListCrawlTasks:
 # ═══════════════════════════════════════════════════════════════════════════════
 # 测试：PATCH /intel/tasks/{id} — 更新采集任务
 # ═══════════════════════════════════════════════════════════════════════════════
+
 
 class TestUpdateCrawlTask:
     """PATCH /intel/tasks/{id} — 2 个测试"""

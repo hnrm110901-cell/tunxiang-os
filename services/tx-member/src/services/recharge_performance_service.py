@@ -7,7 +7,6 @@
 import json
 import uuid
 from datetime import date
-from decimal import Decimal
 from typing import Optional
 
 import structlog
@@ -480,6 +479,7 @@ class RechargePerformanceService:
 
 
 # ── 内部辅助 ─────────────────────────────────────────────────
+
 
 def _calc_commission(
     *,

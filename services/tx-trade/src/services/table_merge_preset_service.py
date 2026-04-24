@@ -11,7 +11,6 @@
 
 import json
 import uuid
-from datetime import datetime, timezone
 from typing import Optional
 
 import sqlalchemy as sa
@@ -45,12 +44,21 @@ class TableMergePresetService:
             执行结果 {executed: [...], skipped: [...], log_id: str}
         """
         # 1. 读取预设
-        row = (await self.db.execute(sa.text(
-            "SELECT id, store_id, market_session_id, merge_rules "
-            "FROM table_merge_presets "
-            "WHERE id = :pid AND tenant_id = :tid "
-            "AND is_active = TRUE AND is_deleted = FALSE"
-        ), {"pid": str(preset_id), "tid": self.tenant_id})).mappings().first()
+        row = (
+            (
+                await self.db.execute(
+                    sa.text(
+                        "SELECT id, store_id, market_session_id, merge_rules "
+                        "FROM table_merge_presets "
+                        "WHERE id = :pid AND tenant_id = :tid "
+                        "AND is_active = TRUE AND is_deleted = FALSE"
+                    ),
+                    {"pid": str(preset_id), "tid": self.tenant_id},
+                )
+            )
+            .mappings()
+            .first()
+        )
 
         if not row:
             raise ValueError("预设不存在或已停用")
@@ -73,11 +81,13 @@ class TableMergePresetService:
             target_scene = rule.get("target_scene", "")
 
             if len(table_nos) < 2:
-                skipped_merges.append({
-                    "group_name": group_name,
-                    "table_nos": table_nos,
-                    "reason": "桌台数不足2张",
-                })
+                skipped_merges.append(
+                    {
+                        "group_name": group_name,
+                        "table_nos": table_nos,
+                        "reason": "桌台数不足2张",
+                    }
+                )
                 continue
 
             # 3. 查询桌台状态
@@ -87,12 +97,21 @@ class TableMergePresetService:
                 "tid": self.tenant_id,
                 **{f"tn{i}": tn for i, tn in enumerate(table_nos)},
             }
-            tables = (await self.db.execute(sa.text(
-                f"SELECT id, table_no, status FROM tables "
-                f"WHERE store_id = :store_id AND tenant_id = :tid "
-                f"AND table_no IN ({placeholders}) "
-                f"AND is_deleted = FALSE"
-            ), params)).mappings().all()
+            tables = (
+                (
+                    await self.db.execute(
+                        sa.text(
+                            f"SELECT id, table_no, status FROM tables "
+                            f"WHERE store_id = :store_id AND tenant_id = :tid "
+                            f"AND table_no IN ({placeholders}) "
+                            f"AND is_deleted = FALSE"
+                        ),
+                        params,
+                    )
+                )
+                .mappings()
+                .all()
+            )
 
             table_map = {t["table_no"]: t for t in tables}
 
@@ -109,11 +128,13 @@ class TableMergePresetService:
                     occupied_nos.append(f"{tn}({t['status']})")
 
             if not all_free:
-                skipped_merges.append({
-                    "group_name": group_name,
-                    "table_nos": table_nos,
-                    "reason": f"桌台不可用: {', '.join(occupied_nos)}",
-                })
+                skipped_merges.append(
+                    {
+                        "group_name": group_name,
+                        "table_nos": table_nos,
+                        "reason": f"桌台不可用: {', '.join(occupied_nos)}",
+                    }
+                )
                 continue
 
             # 4. 执行合并 — 标记 occupied + merge_group
@@ -128,43 +149,51 @@ class TableMergePresetService:
                 "mt": main_table_id,
                 **{f"tid{i}": tid for i, tid in enumerate(table_ids)},
             }
-            await self.db.execute(sa.text(
-                f"UPDATE tables SET status = 'occupied', "
-                f"merge_group_id = :mg, merged_into = :mt, "
-                f"updated_at = NOW() "
-                f"WHERE id IN ({id_placeholders})"
-            ), update_params)
+            await self.db.execute(
+                sa.text(
+                    f"UPDATE tables SET status = 'occupied', "
+                    f"merge_group_id = :mg, merged_into = :mt, "
+                    f"updated_at = NOW() "
+                    f"WHERE id IN ({id_placeholders})"
+                ),
+                update_params,
+            )
 
-            executed_merges.append({
-                "group_name": group_name,
-                "table_nos": table_nos,
-                "table_ids": table_ids,
-                "merge_group_id": merge_group_id,
-                "main_table_id": main_table_id,
-                "effective_seats": effective_seats,
-                "target_scene": target_scene,
-            })
+            executed_merges.append(
+                {
+                    "group_name": group_name,
+                    "table_nos": table_nos,
+                    "table_ids": table_ids,
+                    "merge_group_id": merge_group_id,
+                    "main_table_id": main_table_id,
+                    "effective_seats": effective_seats,
+                    "target_scene": target_scene,
+                }
+            )
 
         # 5. 写入执行日志
         log_id = str(uuid.uuid4())
-        await self.db.execute(sa.text(
-            "INSERT INTO table_merge_logs "
-            "(id, tenant_id, store_id, preset_id, trigger_type, "
-            "market_session_id, executed_merges, skipped_merges, "
-            "executed_by) "
-            "VALUES (:id, :tid, :sid, :pid, :tt, :msid, "
-            ":em::jsonb, :sm::jsonb, :eby)"
-        ), {
-            "id": log_id,
-            "tid": self.tenant_id,
-            "sid": store_id,
-            "pid": str(preset_id),
-            "tt": triggered_by,
-            "msid": str(market_session_id) if market_session_id else None,
-            "em": json.dumps(executed_merges, ensure_ascii=False),
-            "sm": json.dumps(skipped_merges, ensure_ascii=False),
-            "eby": str(operator_id) if operator_id else None,
-        })
+        await self.db.execute(
+            sa.text(
+                "INSERT INTO table_merge_logs "
+                "(id, tenant_id, store_id, preset_id, trigger_type, "
+                "market_session_id, executed_merges, skipped_merges, "
+                "executed_by) "
+                "VALUES (:id, :tid, :sid, :pid, :tt, :msid, "
+                ":em::jsonb, :sm::jsonb, :eby)"
+            ),
+            {
+                "id": log_id,
+                "tid": self.tenant_id,
+                "sid": store_id,
+                "pid": str(preset_id),
+                "tt": triggered_by,
+                "msid": str(market_session_id) if market_session_id else None,
+                "em": json.dumps(executed_merges, ensure_ascii=False),
+                "sm": json.dumps(skipped_merges, ensure_ascii=False),
+                "eby": str(operator_id) if operator_id else None,
+            },
+        )
 
         await self.db.commit()
 
@@ -192,11 +221,20 @@ class TableMergePresetService:
         Returns:
             回滚结果 {restored_tables: int}
         """
-        row = (await self.db.execute(sa.text(
-            "SELECT id, executed_merges, rollback_at "
-            "FROM table_merge_logs "
-            "WHERE id = :lid AND tenant_id = :tid"
-        ), {"lid": str(log_id), "tid": self.tenant_id})).mappings().first()
+        row = (
+            (
+                await self.db.execute(
+                    sa.text(
+                        "SELECT id, executed_merges, rollback_at "
+                        "FROM table_merge_logs "
+                        "WHERE id = :lid AND tenant_id = :tid"
+                    ),
+                    {"lid": str(log_id), "tid": self.tenant_id},
+                )
+            )
+            .mappings()
+            .first()
+        )
 
         if not row:
             raise ValueError("执行日志不存在")
@@ -216,19 +254,21 @@ class TableMergePresetService:
             id_placeholders = ", ".join(f":tid{i}" for i in range(len(table_ids)))
             params = {f"tid{i}": tid for i, tid in enumerate(table_ids)}
 
-            await self.db.execute(sa.text(
-                f"UPDATE tables SET status = 'free', "
-                f"merge_group_id = NULL, merged_into = NULL, "
-                f"updated_at = NOW() "
-                f"WHERE id IN ({id_placeholders})"
-            ), params)
+            await self.db.execute(
+                sa.text(
+                    f"UPDATE tables SET status = 'free', "
+                    f"merge_group_id = NULL, merged_into = NULL, "
+                    f"updated_at = NOW() "
+                    f"WHERE id IN ({id_placeholders})"
+                ),
+                params,
+            )
             restored_count += len(table_ids)
 
         # 更新日志回滚时间
-        await self.db.execute(sa.text(
-            "UPDATE table_merge_logs SET rollback_at = NOW() "
-            "WHERE id = :lid"
-        ), {"lid": str(log_id)})
+        await self.db.execute(
+            sa.text("UPDATE table_merge_logs SET rollback_at = NOW() WHERE id = :lid"), {"lid": str(log_id)}
+        )
 
         await self.db.commit()
 
@@ -258,18 +298,27 @@ class TableMergePresetService:
         Returns:
             汇总结果 {presets_triggered: int, total_executed: int, total_skipped: int}
         """
-        rows = (await self.db.execute(sa.text(
-            "SELECT id FROM table_merge_presets "
-            "WHERE store_id = :sid AND tenant_id = :tid "
-            "AND market_session_id = :msid "
-            "AND auto_trigger = TRUE "
-            "AND is_active = TRUE AND is_deleted = FALSE "
-            "ORDER BY priority DESC"
-        ), {
-            "sid": str(store_id),
-            "tid": self.tenant_id,
-            "msid": str(new_session_id),
-        })).mappings().all()
+        rows = (
+            (
+                await self.db.execute(
+                    sa.text(
+                        "SELECT id FROM table_merge_presets "
+                        "WHERE store_id = :sid AND tenant_id = :tid "
+                        "AND market_session_id = :msid "
+                        "AND auto_trigger = TRUE "
+                        "AND is_active = TRUE AND is_deleted = FALSE "
+                        "ORDER BY priority DESC"
+                    ),
+                    {
+                        "sid": str(store_id),
+                        "tid": self.tenant_id,
+                        "msid": str(new_session_id),
+                    },
+                )
+            )
+            .mappings()
+            .all()
+        )
 
         total_executed = 0
         total_skipped = 0

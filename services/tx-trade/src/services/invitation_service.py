@@ -205,9 +205,14 @@ async def update_template(
     params: dict = {"template_id": template_id, "tenant_id": tenant_id, "now": now}
 
     updatable_fields = [
-        "template_name", "banquet_type", "cover_image_url",
-        "background_color", "music_url", "animation_type",
-        "sort_order", "is_active",
+        "template_name",
+        "banquet_type",
+        "cover_image_url",
+        "background_color",
+        "music_url",
+        "animation_type",
+        "sort_order",
+        "is_active",
     ]
     for field in updatable_fields:
         if field in data:
@@ -221,7 +226,7 @@ async def update_template(
     await db.execute(
         text(f"""
             UPDATE invitation_templates
-            SET {', '.join(set_clauses)}
+            SET {", ".join(set_clauses)}
             WHERE id = :template_id AND tenant_id = :tenant_id AND is_deleted = false
         """),
         params,

@@ -67,7 +67,8 @@ class TablePeriodConfigItem(BaseModel):
     effective_seats: Optional[int] = Field(default=None, ge=1, description="时段可用座位数")
     time_limit_min: Optional[int] = Field(default=None, ge=1, description="用餐时限（分钟）")
     service_mode_override: Optional[str] = Field(
-        default=None, max_length=20,
+        default=None,
+        max_length=20,
         description="覆盖服务模式：dine_first/scan_and_pay",
     )
     pricing_override: Optional[dict] = Field(
@@ -229,7 +230,7 @@ async def get_matrix(
 
     # 按 (table_id, session_id) 和 (zone_id, session_id) 索引
     table_cfg_map: dict[str, dict[str, dict]] = {}  # table_id -> {session_id -> cfg}
-    zone_cfg_map: dict[str, dict[str, dict]] = {}   # zone_id  -> {session_id -> cfg}
+    zone_cfg_map: dict[str, dict[str, dict]] = {}  # zone_id  -> {session_id -> cfg}
 
     for c in cfg_rows:
         cfg_dict = {
@@ -267,17 +268,21 @@ async def get_matrix(
                 cfg_copy["_inherited_from"] = "zone"
                 configs_by_session[msid] = cfg_copy
 
-        zone_groups[zid]["tables"].append({
-            "table_id": tid_str,
-            "table_no": t.table_no,
-            "seats": t.seats,
-            "configs_by_session": configs_by_session,
-        })
+        zone_groups[zid]["tables"].append(
+            {
+                "table_id": tid_str,
+                "table_no": t.table_no,
+                "seats": t.seats,
+                "configs_by_session": configs_by_session,
+            }
+        )
 
-    return _ok({
-        "market_sessions": market_sessions,
-        "zones": list(zone_groups.values()),
-    })
+    return _ok(
+        {
+            "market_sessions": market_sessions,
+            "zones": list(zone_groups.values()),
+        }
+    )
 
 
 @router.post("", summary="批量创建/更新时段配置")
