@@ -1,3 +1,91 @@
+## 2026-04-24 Sprint E3：小红书核销（webhook 签名 + OAuth + canonical ingest）
+
+### 本次会话目标
+按 sprint plan 推进 Sprint E 第 3 批次：打通小红书团购核销链路。E1 的 `XiaohongshuTransformer` 和 E2 的 `XiaohongshuPublisher` 已就绪，本 PR 补齐：OAuth 2.0 token 管理 + HMAC-SHA256 webhook 签名校验 + store/shop 绑定 + webhook ingress 端到端（签名 → 幂等 → canonical transform → 持久化）。
+
+Tier 级别：Tier 2（外部平台对接，影响核销链路，不触收银资金）。
+
+### 完成状态
+- [x] **v287 迁移**：`xiaohongshu_shop_bindings` + `xiaohongshu_verify_events` 双表
+  - bindings：5 状态机 pending/active/expired/suspended/unbound + OAuth token 字段（access/refresh/expires/scope）+ webhook_secret + consecutive_auth_errors 告警（>3 自动 expired）+ 2 UNIQUE（同 store 一个 shop_code + shop_code 反查）
+  - verify_events：5 transform_status pending/transformed/skipped/failed/replayed + raw_payload + payload_sha256 UNIQUE（幂等）+ received_headers + signature_valid 布尔 + canonical_order_id 回指 + source_ip INET
+  - RLS + 7 索引（含失败事件快速定位 + verify_code 反查 + binding 历史）
+- [x] **`shared/adapters/xiaohongshu/src/webhook_signature.py`** — HMAC-SHA256 签名工具：
+  - `compute_signature(secret, timestamp, nonce, body)` — 拼接 `ts\nnonce\nbody` → HMAC-SHA256 hex
+  - `verify_signature(...)` — 返 `VerificationResult`，错误码 MISSING_HEADER / INVALID_TIMESTAMP / TIMESTAMP_TOO_OLD / HMAC_MISMATCH
+  - `extract_xhs_headers(headers)` — 大小写不敏感抽取 3 个 X-Xhs-* header
+  - 默认 max_skew 300s 防重放；hmac.compare_digest 常量时间比较防 timing attack
+- [x] **`shared/adapters/xiaohongshu/src/oauth_token_service.py`** — OAuth 2.0 token 管理：
+  - `XhsOAuthTokenService(app_id, app_secret, token_exchanger=...)` — exchanger 可注入（生产=真实 HTTP client，测试=stub）
+  - `exchange_code_for_token(code)` / `refresh_access_token(refresh_token)` / `ensure_fresh_token(pair)`（快到期才刷新）
+  - `TokenPair` dataclass（`needs_refresh` / `is_expired` 属性，REFRESH_BUFFER=10min）
+  - 错误响应触发 `XhsOAuthError`；缺字段也抛
+  - 默认 stub exchanger 在无真实凭证时返 deterministic fake token
+- [x] **`services/tx-trade/src/services/xiaohongshu_verification_service.py`** — webhook ingress 核心：
+  1. 按 `payload_sha256` 查重（幂等）
+  2. 按 `payload.shop_code` 查 binding + `webhook_secret`
+  3. 用 binding secret 验签；失败 → transform_status='skipped' + signature_valid=false
+  4. 成功 → E1 `transform("xiaohongshu", ...)` → 补 store_id/brand_id → UPSERT canonical
+  5. 更新 event.transform_status='transformed' + canonical_order_id + binding.last_webhook_at
+  6. 整个流程在单事务（异常 rollback，保持事件归档）
+- [x] **6 路 API**（`xiaohongshu_routes.py`）：
+  - `POST /webhook` — 平台推送入口（读 raw body + headers，即便签名错也 200 响应避免重试风暴）
+  - `POST /oauth/callback` — 授权回调 code → token
+  - `POST /oauth/{binding_id}/refresh` — 手动刷新 token（定时 worker 也可调）
+  - `POST /bindings` + `GET /bindings` + `DELETE /bindings/{id}` — 绑定 CRUD（创建自动生成 webhook_secret）
+  - `GET /events` — webhook 事件历史（审计）
+- [x] **47 TDD 测试全绿**（0.04s）：
+  - compute_signature 6（稳定性/body/nonce 影响/str-bytes 兼容/hex 格式/手动 HMAC 对齐）
+  - verify_signature 11（valid/missing 3 种/invalid_type/too_old/future/tampered/wrong_secret/custom_skew/default=300s）
+  - extract_xhs_headers 3（lowercase/mixed/missing）
+  - TokenPair 4（needs_refresh/fresh/expired/to_dict）
+  - XhsOAuthTokenService 8（stub code/stub refresh/custom exchanger/error/missing fields/ensure_fresh skip/refresh near expiry/TTL 常量）
+  - VerificationResult 2
+  - v287 迁移静态断言 12
+  - 1 杂项
+- [x] Ruff 全绿
+
+### 关键决策
+- **ingress 端点始终 200 响应** — 即便签名校验失败也返回 `{"ok": true, "data": {...transform_status: skipped}}`；避免平台 5xx 触发重试风暴。事件已归档，运维可在 GET /events 看到 signature_valid=false 排查
+- **签名拼接 `timestamp\\nnonce\\nbody`** — 与 GitHub/Stripe 同构约定；比单纯 HMAC(body) 多一层重放防护（timestamp + nonce 防同一 body 在不同时刻重用）
+- **constant-time 比较 hmac.compare_digest** — 防 timing attack；不用 `==` 比较签名字符串
+- **webhook_secret 创建时自动生成** — 商家无需关心 secret 生成；前端显示一次让商家贴到小红书后台，后端 DB 只存此值用于校验
+- **token 写入 DB 不加密（当前）** — 本 PR 暂不加密 access_token/refresh_token；生产部署通过 KMS envelope encryption，此处留 FIXME。已通过 `sanitize_headers` 过滤归档时的 Authorization
+- **`binding_id` 优先 shop_code** — webhook 推送不带 tenant_id；通过 payload.shop_code → binding → tenant_id 的链路定位。攻击者伪造 shop_code 会因为 binding 不存在而被拒（"BINDING_NOT_FOUND"）
+- **payload_sha256 UNIQUE 代替分布式锁** — 同 payload 重复推送依赖 DB UNIQUE 约束；service 先查后写（race 时 UNIQUE violation 由 caller 捕获重试）
+- **extract_xhs_headers 大小写不敏感** — FastAPI 默认 lowercase；但 nginx/gateway 可能保留原大小写
+- **`XhsOAuthError` 只在响应 error 或缺字段时抛** — 网络异常由 HTTP client 抛，不重新包装；调用方决定是否 retry
+- **ensure_fresh_token 节省调用** — 未到 buffer 窗口时直接返回原 pair，不调 exchanger；避免高频刷新浪费 API 额度
+
+### 交付清单
+```
+新建：
+  shared/db-migrations/versions/v287_xiaohongshu_verification.py          (~210 行，2 表 + 7 索引 + RLS)
+  shared/adapters/xiaohongshu/src/webhook_signature.py                    (~180 行：compute + verify + extract headers)
+  shared/adapters/xiaohongshu/src/oauth_token_service.py                  (~220 行：TokenPair + Service + stub exchanger)
+  services/tx-trade/src/services/xiaohongshu_verification_service.py     (~420 行：webhook ingress 核心)
+  services/tx-trade/src/api/xiaohongshu_routes.py                        (~380 行：6 端点)
+  shared/adapters/xiaohongshu/tests/test_e3_verification.py              (~480 行：47 测试)
+```
+
+### 下一步
+- **E4 异议工作流**（v288 + `delivery_disputes`）— 顾客投诉 → 平台退款请求 → 商家响应的状态机 + 自动响应模板
+- **真实 Anthropic / HTTP client 注入** — `XhsOAuthTokenService` 注入 httpx.AsyncClient 替代 stub exchanger
+- **KMS 加密 token** — access_token / refresh_token 写 DB 前加密；读取时解密（shared/security/ 已有 KMS 封装）
+- **canonical/xhs/publish 三条 route 挂载** — canonical_delivery_routes (E1) + dish_publish_routes (E2) + xiaohongshu_routes (E3) 都需要挂到 tx-trade/main.py
+- **XhsVerificationService integration test** — 需要 DB + FastAPI TestClient，本 PR 只覆盖工具层 unit test
+
+### 已知风险
+- **stub OAuth exchanger 不走真实平台** — 上线前需替换为 httpx 调 `https://ark.xiaohongshu.com/ark/open_api/v3/oauth/token`；凭证通过 KMS 解密
+- **webhook_secret 明文存 DB** — 2026-Q3 审计会要求 KMS 加密；当前通过 RLS + 内网隔离保护
+- **签名算法 `ts\\nnonce\\nbody`** 基于 2025 版文档假设 — 小红书 2026 可能改用 nested hash（如 SHA256(body) + HMAC）；上线前必须对齐官方最新签名示例
+- **重放窗口 5 分钟可能过长** — 业界同类（Stripe）用 5 分钟，GitHub 用 5 秒；根据平台文档调整
+- **XhsVerificationService 未 DI token service** — 当前刷新 token 需要 refresh_access_token 调用在 API 层；真实应在 webhook 收到 401 时自动刷新
+- **缺失 FastAPI integration test** — webhook 端到端（含真实 FastAPI request body parsing + DB）未测，留 follow-up
+- **source_ip INET 类型** — PostgreSQL 原生类型，其他 DB 迁移需要替代类型（目前 tunxiangOS 只支持 PG）
+
+---
+
 ## 2026-04-23 Sprint D4b：薪资异常检测 Sonnet 4.7 + Prompt Cache（城市基准共享）
 
 ### 本次会话目标

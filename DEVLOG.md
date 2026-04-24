@@ -1,3 +1,33 @@
+## 2026-04-24 Sprint E3 小红书核销 — webhook 签名 + OAuth + canonical ingest
+
+### 今日完成
+- [v287 迁移] `xiaohongshu_shop_bindings` + `xiaohongshu_verify_events` 双表：5 状态机 bindings + 5 transform_status events + OAuth token 字段 + HMAC 签名校验字段 + consecutive_auth_errors 告警 + 2 UNIQUE + RLS + 7 索引
+- [shared/adapters/xiaohongshu/src/webhook_signature.py] HMAC-SHA256：compute_signature + verify_signature（MISSING_HEADER/INVALID_TIMESTAMP/TIMESTAMP_TOO_OLD/HMAC_MISMATCH 4 种错误码）+ extract_xhs_headers（大小写不敏感）+ constant-time 比较防 timing
+- [shared/adapters/xiaohongshu/src/oauth_token_service.py] TokenPair + XhsOAuthTokenService（exchange_code / refresh / ensure_fresh）+ stub exchanger（测试/本地开发用）+ XhsOAuthError
+- [XhsVerificationService] webhook ingress 端到端：幂等查重 → binding 定位 → 签名校验 → E1 canonical transform → UPSERT canonical_delivery_orders → 回写 event.transform_status
+- [6 路 API] POST /webhook + POST /oauth/callback + POST /oauth/{id}/refresh + bindings CRUD（CREATE 自动生成 webhook_secret）+ GET /events（审计）
+- [47 测试全绿] 0.04s — compute 6 / verify 11 / extract 3 / TokenPair 4 / OAuth Service 8 / Result 2 / v287 migration 12 / 1
+
+### 数据变化
+- 迁移版本：v286 → v287
+- 新增 API 模块：1 个（tx-trade/xiaohongshu_routes，6 端点）
+- 新增共享工具：2 个（webhook_signature + oauth_token_service）
+- 新增测试：47 个
+
+### 遗留问题
+- stub OAuth exchanger 不走真实平台 — 上线前替换为 httpx 调真实 endpoint
+- webhook_secret 明文存 DB — 2026-Q3 审计要求 KMS 加密
+- 签名算法 `ts\\nnonce\\nbody` 基于 2025 版文档假设 — 2026 可能改用 nested hash
+- XhsVerificationService 无 integration test — 需 FastAPI TestClient + DB fixture
+- 三条 E1/E2/E3 route 仍未挂载到 tx-trade main.py
+
+### 明日计划
+- E4 异议工作流（v288 + delivery_disputes + 自动响应模板）
+- KMS 加密 token（shared/security/kms_envelope.py 已有封装）
+- 挂载 E1/E2/E3 路由
+
+---
+
 ## 2026-04-23 Sprint D1 批次 6 + Overflow — 14 Skill 冲 100% 覆盖 + CI 门禁
 
 ### 今日完成
