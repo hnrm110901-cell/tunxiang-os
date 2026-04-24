@@ -1,3 +1,38 @@
+## 2026-04-24 Sprint D4c — budget_forecast Skill + Sonnet 4.7 Prompt Cache（Tier2）
+
+### 今日完成
+- [services/tx-agent/src/prompts/budget_forecast.py] 新增。SYSTEM_PROMPT_BUDGET_FORECAST（预算预测专家身份+三条硬约束+置信度规则）+ BUDGET_SCHEMA_DOC（六大成本科目公式/行业基准 食材30-35%/人力20-25%/能耗3-5%/季节性因子 8 档/偏差阈值分 4 档 ±5/10/15%/根因 8 类）+ build_cached_system_blocks()。合计 6133 字符 > 4000 门槛（~1533 tokens，勾稳 Anthropic Prompt Cache）。
+- [services/tx-agent/src/agents/skills/budget_forecast.py] 新增 BudgetForecastAgent。agent_id="budget_forecast"，constraint_scope={"margin"}，agent_level=1（仅建议）。两个 action：forecast_monthly_budget / detect_budget_variance。调用 ModelRouter.complete_with_cache(task_type="budget_forecast") → Sonnet 4.7。Pydantic 输出 BudgetForecastOutput（forecasts 含 80%/95% 双置信区间 + variances + recommendations + risks + confidence）。temperature=0.2（预测类确定性要求高）。
+- [services/tx-agent/src/agents/skills/__init__.py] BudgetForecastAgent 导入 + ALL_SKILL_AGENTS 追加（注册表 53 → 54）。
+- [flags/agents/agent_flags.yaml] 注册 agent.budget_forecast.enable（默认全环境 off，tags=[agent, d4c, sprint-q2-2026]）。
+- [shared/feature_flags/flag_names.py] AgentFlags.BUDGET_FORECAST_ENABLE = "agent.budget_forecast.enable" 常量。
+- [services/tx-agent/src/tests/test_budget_forecast.py] 新增 10 条集成测试（全绿）：注册 / scope=margin / agent_metadata / system_blocks ≥4000 字符 + cache_control / forecast_monthly_budget Pydantic（含 CI 80%/95% 合理性断言）/ detect_budget_variance Pydantic / cache_hit_ratio > 0.75 / task_type="budget_forecast" + temperature=0.2 / roi.prevented_loss_fen = 180000+20000 = 200000 / ast 扫描无 broad except。
+- 验证：10/10 D4c 测试绿；38/38 test_constraint_context.py 绿（含 test_100_percent_registry_coverage CI 门禁）；8/8 D4a + 10/10 D4b 零回归（合计 66/66 绿）；ruff check 5 个 D4c 文件 All checks passed；ruff format 已应用。
+
+### 数据变化
+- 新增文件：3（budget_forecast Skill + prompts + 测试）
+- 修改文件：3（skills/__init__.py + agent_flags.yaml + flag_names.py）
+- ALL_SKILL_AGENTS / SKILL_REGISTRY：53 → 54（新增 budget_forecast）
+- agent 域 flag：46 → 47（agent.budget_forecast.enable，默认 off）
+- AgentFlags 常量：14 → 15（BUDGET_FORECAST_ENABLE）
+- 新增测试用例：10（D4c 集成测试 Tier2）
+- 系统提示 tokens 粗估：≈ 1533 tokens（6133 中英混排字符 / 4 ≈ 1533）
+- LLM 路由目标：task_type="budget_forecast" → claude-sonnet-4-7-20250929（已在 ModelSelectionStrategy.TASK_MODEL_MAP 登记，commit bb916707）
+
+### 遗留问题
+- 真实 DB 场景下的 DecisionLogService.log_skill_result 端到端验证未在本 PR 覆盖（与 D4b 同因：测试环境 sys.path=src 时相对导入 `from ...services.decision_log_service` 被 ImportError 吞掉；测试改为直接监听 _write_decision_log 调用，验证 ROI 四字段计算正确）。上线后需在 demo-xuji-seafood 数据集跑一次真实写入 agent_decision_logs，确认 prevented_loss_fen/improved_kpi{budget_accuracy_pct}/saved_labor_hours=3.0/roi_evidence 入库。
+- Prompt Cache 实际 hit_ratio 需 pilot 门店连续调用 > 10 次后观察；本地 mock 只断言计算逻辑。
+- 预算 schema 跨表字段引用（tx_finance.budget_plan/budget_actual、mv_store_pnl、tx_supply.purchase_order、tx_org.payroll_period、tx_ops.energy_reading）仅在 BUDGET_SCHEMA_DOC 里声明；真实数据落地需要后续 Sprint 把 payload 构造器接上 tx-finance 查询（本 PR 范围外）。
+- 新店（开业 < 6 个月）样本不足，置信度上限 0.5；需业务侧理解预测置信度分档逻辑。
+- flag 默认 off，上线前运维按 dev → test → pilot → prod 放量；无自动开启路径。
+
+### 明日计划
+- D4 Sprint 收尾：Master Agent 编排串联 budget_forecast → cost_root_cause → salary_anomaly（先预测预算、再诊断偏差根因、最后定位人力/食材异动）
+- pilot 灰度：徐记海鲜 17 号店连续 3 天运行 forecast_monthly_budget，观察 Prompt Cache 命中率与 Sonnet 4.7 latency + 预算准确度 pp
+- 接入 tx-finance budget_plan/budget_actual 真实数据（params.history_months 从 mv_store_pnl 拉取而非用户传入）
+
+---
+
 ## 2026-04-24 Sprint D4b — salary_anomaly Skill + Sonnet 4.7 Prompt Cache（Tier2）
 
 ### 今日完成
