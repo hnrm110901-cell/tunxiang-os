@@ -11,6 +11,9 @@ from .banquet_growth import BanquetGrowthAgent
 
 # 专项运营Agent (Phase 6)
 from .billing_anomaly import BillingAnomalyAgent
+
+# Sprint D4c：预算预测 Skill（Sonnet 4.7 + Prompt Cache）
+from .budget_forecast import BudgetForecastAgent
 from .cashier_audit import CashierAuditAgent
 from .closing_agent import ClosingAgent
 
@@ -166,6 +169,8 @@ ALL_SKILL_AGENTS = [
     RfmOutreachAgent,
     # Sprint D4b：薪资异常（Sonnet 4.7 + Prompt Cache）
     SalaryAnomalyAgent,
+    # Sprint D4c：预算预测（Sonnet 4.7 + Prompt Cache）
+    BudgetForecastAgent,
 ]
 
 
