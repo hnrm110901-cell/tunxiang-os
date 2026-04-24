@@ -181,6 +181,11 @@ class EdgeFlags:
     # Edge节点自动更新
     AUTO_UPDATE = "edge.mac_station.auto_update.enable"
 
+    # Sprint A2（Tier1）：Saga 本地 SQLite 缓冲 4h。
+    # off=legacy 直写云端（无缓冲），on=断网时 enqueue 到 /var/tunxiang/saga_buffer.db
+    # 5%→50%→100% 灰度，dead_letter 需人工确认不自动删除。
+    PAYMENT_SAGA_BUFFER = "edge.payment.saga_buffer"
+
 
 class SupplyFlags:
     """供应链域 Flag 名称。"""

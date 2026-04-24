@@ -91,3 +91,30 @@ flags:
         - dimension: edge_node_group
           values: []
     tags: [edge, mac-station, auto-update, launchd]
+
+  - identifier: edge_payment_saga_buffer
+    name: edge.payment.saga_buffer
+    description: >
+      Sprint A2 Saga 本地 SQLite 缓冲启用开关（Tier1）。
+      on=断网 4h 期间将结算请求 enqueue 到 /var/tunxiang/saga_buffer.db，
+      恢复联网后 SagaFlusher 补发到 tx-trade /api/v1/settle/retry；
+      off=legacy 直写（无缓冲，断网即失败）。
+      契约：与 A1 idempotency_key=settle:{orderId} 共享，防双扣费。
+      4h TTL 超期标 dead_letter 等人工介入，不自动删除。
+      磁盘满降级到内存队列（A1 R1 disk_io_error）。
+    defaultValue: false
+    environments:
+      dev: false
+      test: false
+      uat: false
+      pilot: false
+      prod: false
+    rollout: [5, 50, 100]
+    targeting_rules:
+      pilot:
+        - dimension: edge_node_group
+          values: [mac_mini_m4_pilot]
+      prod:
+        - dimension: store_id
+          values: []  # 5% 灰度门店审批后填入
+    tags: [edge, a2, sprint-q2-2026, tier1, saga, offline]
