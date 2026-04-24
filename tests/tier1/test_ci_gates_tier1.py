@@ -149,6 +149,57 @@ class TestTier1GateWorkflow:
         """如果 Tier 1 路径变更但未找到测试 → fail"""
         assert "未找到 Tier 1 测试" in source
 
+    # ── Review follow-up：补齐 Tier 1 盲区 paths ──
+
+    def test_paths_include_cashier_engine(self, source):
+        """CLAUDE.md § 17：订单状态机 Tier 1 — cashier_engine.py"""
+        assert "services/tx-trade/src/services/cashier_engine.py" in source
+
+    def test_paths_include_wine_storage(self, source):
+        """CLAUDE.md § 17：存酒/押金 Tier 1"""
+        assert "wine_storage_service.py" in source
+
+    def test_paths_include_stored_value(self, source):
+        """CLAUDE.md § 17：储值/挂账 Tier 1"""
+        assert "stored_value_service.py" in source
+
+    def test_paths_include_banquet_deposit(self, source):
+        """CLAUDE.md § 17：宴会押金 Tier 1"""
+        assert "banquet_deposit_service.py" in source
+
+    def test_paths_include_pos_adapters(self, source):
+        """CLAUDE.md § 17：POS 数据写入 Tier 1 — 6 大 adapter"""
+        for adapter in (
+            "shared/adapters/pinzhi/",
+            "shared/adapters/aiqiwei/",
+            "shared/adapters/meituan/",
+        ):
+            assert adapter in source, f"POS adapter {adapter} 未在 paths"
+
+    def test_paths_include_agent_constraints(self, source):
+        """CLAUDE.md § 17：三条硬约束 Tier 1"""
+        assert "services/tx-agent/src/constraints/" in source
+
+    def test_has_source_test_pairing_job(self, source):
+        """Review follow-up：源改动必须配对测试改动"""
+        assert "source-test-pairing:" in source
+
+    def test_pairing_job_has_strong_check(self, source):
+        """配对 job 必须强 fail（不是 warning）"""
+        assert "HAS_TIER1_SOURCE_CHANGE" in source
+        assert "HAS_TIER1_TEST_CHANGE" in source
+        assert "exit 1" in source
+
+    def test_gate_depends_on_pairing(self, source):
+        """gate job 的 needs 必须含 source-test-pairing"""
+        # 松散匹配：gate 在 source-test-pairing 之后
+        assert "needs: [discover, run, source-test-pairing]" in source
+
+    def test_gate_blocks_when_pairing_fails(self, source):
+        """PAIRING_RESULT == failure 时 gate 必须 exit 1"""
+        assert 'PAIRING_RESULT' in source
+        assert '"failure"' in source or "'failure'" in source
+
 
 # ─────────────────────────────────────────────────────────────
 # 3. rls-gate.yml

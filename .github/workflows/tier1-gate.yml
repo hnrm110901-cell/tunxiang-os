@@ -12,16 +12,42 @@ on:
   pull_request:
     branches: [main]
     paths:
+      # 测试文件位置（3 个 glob 与 demo_go_no_go.py 对齐）
       - 'services/**/tests/**/*tier1*.py'
       - 'services/**/src/tests/**/*tier1*.py'
       - 'tests/tier1/**'
+      # Tier 1 路径 — CLAUDE.md § 17 列表：
+      # 订单状态机 + 支付 Saga + 存酒/押金 + POS 数据 + 全电发票 +
+      # CRDT 冲突 + 三条硬约束 + RLS
       - 'services/tx-trade/src/services/order_service.py'
+      - 'services/tx-trade/src/services/cashier_engine.py'          # 订单状态机
       - 'services/tx-trade/src/services/payment_saga_service.py'
+      - 'services/tx-trade/src/services/wine_storage_service.py'    # 存酒押金
+      - 'services/tx-trade/src/services/stored_value_service.py'    # 储值 / 挂账
+      - 'services/tx-trade/src/services/banquet_deposit_service.py' # 宴会押金
       - 'services/tx-trade/src/models/**'
+      # 财务 Tier 1（发票 + 存酒 + 协议挂账）
       - 'services/tx-finance/src/services/invoice_service.py'
+      - 'services/tx-finance/src/services/wine_storage_service.py'
+      - 'services/tx-finance/src/services/stored_value_service.py'
+      - 'services/tx-finance/src/models/**'
+      # POS 数据写入（CLAUDE.md § 17 Tier 1）
+      - 'shared/adapters/pinzhi/**'
+      - 'shared/adapters/aiqiwei/**'
+      - 'shared/adapters/meituan/**'
+      - 'shared/adapters/meituan-saas/**'
+      - 'shared/adapters/eleme/**'
+      - 'shared/adapters/douyin/**'
+      # Agent 三条硬约束（毛利/食安/客户体验 checker）
+      - 'services/tx-agent/src/constraints/**'
+      - 'services/tx-agent/src/services/constraint_checker*.py'
+      # CRDT 冲突解析
       - 'edge/sync-engine/src/conflict_resolver.py'
       - 'edge/sync-engine/src/offline_sync_service.py'
+      - 'edge/sync-engine/src/sync_engine.py'
+      # Migration（新表必须 RLS，由 rls-gate 门禁，tier1 额外跑测试）
       - 'shared/db-migrations/versions/**'
+      # Workflow 自身
       - '.github/workflows/tier1-gate.yml'
   push:
     branches: [main]
@@ -116,25 +142,100 @@ jobs:
         run: |
           echo "::error title=Tier 1 测试失败::${{ matrix.group }} 必须全绿，否则不允许合入 main。参考 CLAUDE.md § 20"
 
+  source-test-pairing:
+    name: 源改动必须配对测试改动
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: 检查 Tier 1 源改动是否配对 tier1 测试改动
+        run: |
+          BASE="${{ github.event.pull_request.base.sha }}"
+          HEAD="${{ github.event.pull_request.head.sha }}"
+
+          # 本 PR 所有变更文件
+          CHANGED=$(git diff --name-only "$BASE" "$HEAD")
+          echo "Changed files:"
+          echo "$CHANGED"
+
+          # Tier 1 源文件前缀（对齐 paths 触发列表）
+          TIER1_SOURCE_PATTERNS=(
+            'services/tx-trade/src/services/order_service.py'
+            'services/tx-trade/src/services/cashier_engine.py'
+            'services/tx-trade/src/services/payment_saga_service.py'
+            'services/tx-trade/src/services/wine_storage_service.py'
+            'services/tx-trade/src/services/stored_value_service.py'
+            'services/tx-trade/src/services/banquet_deposit_service.py'
+            'services/tx-finance/src/services/invoice_service.py'
+            'services/tx-finance/src/services/wine_storage_service.py'
+            'services/tx-finance/src/services/stored_value_service.py'
+            'shared/adapters/pinzhi/'
+            'shared/adapters/aiqiwei/'
+            'shared/adapters/meituan/'
+            'services/tx-agent/src/constraints/'
+            'edge/sync-engine/src/conflict_resolver.py'
+            'edge/sync-engine/src/offline_sync_service.py'
+          )
+
+          # 检查是否有 Tier 1 源文件被改
+          HAS_TIER1_SOURCE_CHANGE=false
+          for pattern in "${TIER1_SOURCE_PATTERNS[@]}"; do
+              if echo "$CHANGED" | grep -qF "$pattern"; then
+                  HAS_TIER1_SOURCE_CHANGE=true
+                  echo "::notice::Tier 1 源变更检测到：匹配 $pattern"
+                  break
+              fi
+          done
+
+          # 检查是否有 *tier1*.py 测试文件被改
+          HAS_TIER1_TEST_CHANGE=false
+          if echo "$CHANGED" | grep -qE 'tier1.*\.py$|.*tier1.*\.py$'; then
+              HAS_TIER1_TEST_CHANGE=true
+              echo "::notice::Tier 1 测试变更检测到"
+          fi
+
+          # 源改动 + 无测试改动 = 强校验失败
+          if [ "$HAS_TIER1_SOURCE_CHANGE" = "true" ] && [ "$HAS_TIER1_TEST_CHANGE" = "false" ]; then
+              echo "::error title=Tier 1 源改动未配对测试::本 PR 修改了 Tier 1 源文件，但未修改对应 *tier1*.py 测试。CLAUDE.md § 20 要求 TDD：测试先于实现。"
+              echo "缺少的改动：新增或更新对应的 test_*tier1*.py"
+              exit 1
+          fi
+
+          # 源改动 + 测试改动 = OK（tier1-gate 会跑它们）
+          # 无源改动 = gate 被其他 path（如 migration）触发，继续跑不 block
+          echo "✅ 源/测试改动配对检查通过"
+
   gate:
     name: Tier 1 门禁判定
     runs-on: ubuntu-latest
-    needs: [discover, run]
+    needs: [discover, run, source-test-pairing]
     if: always()
     steps:
       - name: 校验
         run: |
           COUNT="${{ needs.discover.outputs.count }}"
           RUN_RESULT="${{ needs.run.result }}"
+          PAIRING_RESULT="${{ needs.source-test-pairing.result }}"
+
+          # 源/测试配对失败直接 block（即使下面 run 跳过也 block）
+          if [ "$PAIRING_RESULT" = "failure" ]; then
+              echo "::error title=源/测试配对失败::Tier 1 源改动必须配对测试改动"
+              exit 1
+          fi
 
           if [ -z "$COUNT" ] || [ "$COUNT" = "0" ]; then
               echo "::error title=未找到 Tier 1 测试::Tier 1 路径有变更但未跑测试。添加 *tier1*.py"
               exit 1
           fi
 
-          if [ "$RUN_RESULT" != "success" ]; then
+          # run job 可能 skipped（PR 未修改源、无 tier1 文件变更 → matrix 空）
+          # 但只要 COUNT > 0 且 run 非 failure，就算过
+          if [ "$RUN_RESULT" = "failure" ]; then
               echo "::error title=Tier 1 测试未全绿::任何 Tier 1 失败都阻塞 PR"
               exit 1
           fi
 
-          echo "✅ $COUNT 个 Tier 1 测试文件全绿"
+          echo "✅ $COUNT 个 Tier 1 测试文件全绿 + 源/测试配对 OK"
