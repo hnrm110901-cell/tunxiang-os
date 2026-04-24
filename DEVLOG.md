@@ -1,3 +1,26 @@
+## 2026-04-24 Sprint A1 TDD 工单 — POS ErrorBoundary + 3s 超时 + Toast
+
+### 今日完成
+- [docs/sprint-plans/sprint-a1-pos-error-boundary-tdd.md] 新增 Plan Agent 产出的 A1 TDD 工单（337 行）：10 条餐厅场景 TDD 用例 + 4 阶段文件变更清单 + 9 个原子 commit 顺序 + Flag 灰度路径 + R1-R6 风险
+- [现状核查发现] v260_pos_crash_reports 已存在但缺 6 列（timeout_reason/recovery_action/saga_id/order_no/severity/boundary_level）；ErrorBoundary/RootFallback/Toast 已存在但缺 3s 自动重置与联动；tradeApi 无 AbortController
+- [迁移号重排] 本工单锁定 **v265_pos_crash_reports_ext**（v264 已被本日 D2 agent_roi_fields 占用）；Sprint C3 edge_device_registry 原锁 v264 需让号至 **v266**（架构师对齐会裁决）
+
+### 数据变化
+- 新增文档：1（A1 TDD 工单）
+- 本次未改代码，未新增迁移
+- 迁移号池现状：v264 = agent_roi_fields（已落）/ v265 = 预留 A1 / v266 = 预留 C3
+
+### 遗留问题
+- A1 实装需独立新会话启动（§19 Tier 1 修改触发强制独立验证）
+- Sprint A/C 迁移号对齐会未开（影响 v265/v266 锁定）
+- Flag 默认值 yaml `defaultValue: true` 与 `environments.prod: false` 的优先级未手工验证
+
+### 明日计划
+- A1 实装或 A4 RBAC / D3a RFM / D4a 成本根因 四选一启动
+- 决策点 #1 签字后开 `agent.roi.writeback` flag（待创始人签字）
+
+---
+
 ## 2026-04-24 Sprint D2 — agent_decision_logs ROI 四字段 + mv_agent_roi_monthly
 
 ### 今日完成

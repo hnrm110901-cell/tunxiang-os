@@ -4,6 +4,49 @@
 
 ---
 
+## 2026-04-24 17:00 Sprint A1 TDD 工单：POS ErrorBoundary + 3s 超时 + Toast
+
+### 本次会话目标
+Plan Agent 为 Sprint A1（T1 收银链路首个子项）输出可执行 TDD 工单，锁定迁移号/Flag/风险，供下一会话实装启动。
+
+### 不得触碰的边界
+- [x] shared/ontology/ — 未触碰
+- [x] 已应用迁移 v001-v264 — 未触碰
+- [x] 生产代码 — 未触碰（Plan Agent 只读产出）
+
+### 本次涉及范围
+- 文档：docs/sprint-plans/sprint-a1-pos-error-boundary-tdd.md（new）
+- 迁移版本：**无代码改动**；仅锁定 v265（预留）
+- Tier 级别：工单本身 T3 文档；指导的任务 **Tier 1**
+
+### 完成状态
+- [x] A1 TDD 工单落盘（337 行）
+- [x] 现状核查：v260 基础表已建、ErrorBoundary/RootFallback/Toast 骨架已有、tradeApi 缺 AbortController、3s vs 8s 超时语义冲突已暴露
+- [x] 迁移号重排：A1 v260 → v265（因 D2 已占 v264），C3 需让号至 v266
+- [x] 10 条 TDD 用例（全餐厅场景命名，非技术边界值）
+- [x] 9 个原子 commit 顺序模板
+- [x] Flag 灰度路径 5%→50%→100%
+- [x] R1-R6 风险 + 独立验证新会话提示词模板
+
+### 关键决策
+- **Plan Agent 只读，不动生产代码**：本次会话明确限定 Plan Agent 只出 Markdown 工单，任何代码/迁移/测试由下一个具备写权限的会话按工单执行
+- **迁移号冲突动态处理**：规划 v260/v263 多处占用，运行时重排到 v264-v266；要求架构师对齐会 15 分钟内裁决 Sprint A/C 对齐
+- **3s vs 8s 超时统一**：规划原文 3s，但 flag 描述 8s；工单锁定双级 — UI 3s 提示（AbortController 软 abort）+ 8s 硬失败（降级给 ErrorBoundary）
+- **遥测端点不跨服务迁移**：规划原文 A1 边界含 tx-trade，但 /api/v1/telemetry/pos-crash 已在 tx-ops，工单维持现状避免 T1 路径大改
+- **字段协议锁定 order_id 格式**：R2 里明确 UUID v7 + `device_id:ms_epoch:counter`，A3 offline_order_mapping 继承
+
+### 下一步
+- 独立新会话启动 A1 实装（§19 强制）
+- Sprint A/C 对齐会裁决 v265/v266
+- 或并行开 A4 RBAC / D3a RFM / D4a 成本根因
+
+### 已知风险
+- A1 规划 Tier 1 与实际 D2 已 land 的 v264 之间**无字段重叠**，降低耦合风险
+- Plan Agent 未执行实地 Toast.tsx 5 类样式核查，工单标注为"T1.7 场景验证"待实装时覆盖
+- Sprint 规划文档 flag 描述 "8s 超时"与规划卡 "3s" 矛盾，需架构师在实装前做唯一来源决定
+
+---
+
 ## 2026-04-24 16:00 Sprint D2：agent_decision_logs ROI 四字段 + mv_agent_roi_monthly
 
 ### 本次会话目标
