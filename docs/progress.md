@@ -4,6 +4,64 @@
 
 ---
 
+## 2026-04-24 Sprint C3：KDS `/orders/delta` + device_kind + edge_device_registry（Tier1 零容忍）
+
+### 本次会话目标
+实装 Sprint C3：KDS 后端增量接口 `GET /api/v1/kds/orders/delta` + 设备心跳 `POST /api/v1/kds/device/heartbeat` + 迁移 v271 edge_device_registry（含 device_kind 六枚举 CHECK + RLS + 2 索引）+ 前端 pollOrdersDelta/sendHeartbeat 契约层。仅做 C3，不做 C1（IndexedDB）/C2（connectionHealth UI）/C4（Playwright E2E）。
+
+### 不得触碰的边界
+- [x] shared/ontology/ — 未触碰
+- [x] 已应用迁移 v001-v270 — 未修改（本次追加 v271）
+- [x] A1/A2/A3/A4 已 land 文件（tradeApi.ts / saga_buffer / offline_order_id / rbac） — 未修改
+- [x] services/tx-trade/src/api/kds_routes.py 原有路由 — 只追加 delta + heartbeat，不改既有
+- [x] apps/web-kds/src/api/kdsOpsApi.ts / shortageApi.ts / kdsRulesApi.ts — 未修改
+- [x] edge/sync-engine/ — 本 PR 不改（Phase 1 联调留后续）
+- [x] 规划 v264 (D2 agent_roi_fields 已占) — 跳过，锁 v271
+
+### 本次涉及范围
+- 服务：services/tx-trade + apps/web-kds + shared/feature_flags + shared/db-migrations + flags/edge
+- 迁移版本：v270 → **v271**（head 推进）
+- Tier 级别：**[x] Tier 1**
+
+### 完成状态
+- [x] 10 条徐记 Tier1 后端测试全绿（含 P99<100ms / 60s 500 单同步 / RLS / device_kind 枚举）
+- [x] 7 条前端 vitest 全绿（首次/续轮 cursor / 5xx 退避 / 4xx 直抛 / 枚举拦截 / 契约对齐）
+- [x] 既有 32/32（A1/A2/A3/A4 Tier1）零回归
+- [x] ruff check 5 py 文件 All checks passed；tsc 对 C3 新增文件零错误
+- [x] v271 迁移（6 枚举 CHECK + 健康 CHECK + RLS + 2 索引 + 可逆 downgrade）
+- [x] Flag `edge.kds.delta_sync` 注册（默认全 off，rollout [5,50,100]，tier1+c3 tag）
+- [ ] 未完成：C1 IndexedDB last-100 缓存（留下一子任务）
+- [ ] 未完成：C2 connectionHealth UI（留下一子任务）
+- [ ] 未完成：C4 Playwright 4h E2E（留下一子任务）
+- [ ] 未完成：KDSBoardPage 前端替换 legacy 全量轮询（flag on 时切换逻辑，C1 sub-task）
+- [ ] 未完成：orders (tenant_id, store_id, updated_at) 索引 — 若 mock 测试不能代表真 PG 执行计划，建议 v272 或并 PR 追加
+- [ ] 未完成：DeviceRegistryService.mark_offline_if_stale 挂接定时任务（sync-engine Phase 1 联调）
+- [ ] 未完成：gateway JWT 增发 `"kds"` 角色（若 pilot 现有 role 不含需单独确认）
+
+### 关键决策
+- device_kind 六枚举 hard-code（service 层 + CHECK + 前端 readonly tuple 三重拦截）—— 不开放扩展，防止 sync-engine 遇到未知终端类型崩溃
+- KDS_SAFE_FIELDS 白名单而非黑名单 —— 未来 orders 表新增字段默认不泄漏到 KDS
+- cursor 严格大于（`>` 而非 `>=`） —— 避免同 cursor 返回重复订单；同毫秒并发订单边界风险留 §19 审查点 #5
+- next_cursor 返回 ISO8601 Z 后缀（非 +00:00）—— 前端直接回传，后端 parse_cursor 两种都认
+- require_role 新增 `"kds"` 角色 —— 提前为专属设备账户预留
+- 迁移号 v271（规划 v264 被 D2 agent_roi_fields 占用）
+
+### 下一步
+- C1 sub-task：IndexedDB last-100 缓存 + KDSBoardPage 切换
+- C2 sub-task：connectionHealth UI（设备运维面板）
+- C4 sub-task：Playwright 4h 零卡顿 E2E
+- v272 追加 orders (tenant_id, store_id, updated_at) 索引（若 DEMO 真 PG 未达 P99）
+- §19 独立验证新会话（提示词见 DEVLOG）
+
+### 已知风险
+- orders 表索引缺失可能导致真 PG P99 超标（mock 测试不验证 SQL 执行计划）
+- 同毫秒并发订单 cursor `>` 严格大于可能跳过
+- gateway JWT 需包含 `"kds"` 角色字符串
+- KDS 离线 10 min 阈值需定时任务挂接才生效
+- UPSERT ON CONFLICT 在心跳风暴下的行锁代价（200 并发 × 30s 心跳 ≈ 6.7 QPS/店，应不形成瓶颈但需 DEMO 验证）
+
+---
+
 ## 2026-04-24 Sprint A3：离线订单号 UUID v7 + 死信待确认（Tier1 零容忍）
 
 ### 本次会话目标

@@ -1,3 +1,71 @@
+## 2026-04-24 Sprint C3 — KDS `/orders/delta` + device_kind + edge_device_registry（Tier1 零容忍）
+
+### 今日完成
+- [shared/db-migrations/versions/v271_edge_device_registry.py] 新增。edge_device_registry 表：PK (tenant_id, device_id)；device_kind CHECK 六枚举（pos/kds/crew_phone/tv_menu/reception/mac_mini）；health_status CHECK 四枚举（healthy/degraded/offline/unknown）；heartbeat_count 累加；索引 (tenant_id, store_id, device_kind) + partial (last_seen_at) WHERE health != offline。RLS `NULLIF(current_setting(...), '')::uuid` 非 NULL 强制。downgrade 可逆（幂等 DROP 索引 + 约束 + 表）。head v270 → v271（规划 v264 被 D2 agent_roi_fields 占用）。
+- [services/tx-trade/src/services/kds_delta_service.py] 新增。`KDSDeltaService.get_orders_delta(store_id, cursor, device_kind, limit)`：KDS_VISIBLE_STATUSES=('pending','confirmed','preparing','ready')；`updated_at > cursor` 增量查询；`device_kind='kds'` 自动剔除敏感字段（customer_phone / total_amount_fen）保留 KDS_SAFE_FIELDS；返回 `{orders, next_cursor, server_time}`。`parse_cursor()` 接受 ISO8601 / datetime / None 三种。所有 SELECT 显式带 tenant_id 过滤（service 层拦截）+ RLS 兜底。
+- [services/tx-trade/src/services/device_registry_service.py] 新增。`DeviceRegistryService.heartbeat(...)` UPSERT（ON CONFLICT DO UPDATE）；`get()` / `list_by_store()` / `mark_offline_if_stale(threshold_sec=600)` 后台任务接口。DeviceKind + HealthStatus 枚举与 v271 CHECK 对齐（service 层双拦）。`ALLOWED_DEVICE_KINDS` 常量暴露给前端类型。不自动删除 offline 设备（CLAUDE.md §13 禁止悄无声息吞数据）。
+- [services/tx-trade/src/api/kds_routes.py] 扩展。新增 `GET /api/v1/kds/orders/delta`：query=`store_id / cursor / device_id / device_kind / limit(<=500)`，返回 `{orders, next_cursor(ISO8601 Z), server_time(ISO8601 Z), poll_interval_ms=5000, device_id, device_kind}`，datetime 自动序列化为 Z 后缀字符串便于前端直接赋下一轮 cursor。新增 `POST /api/v1/kds/device/heartbeat`：body=DeviceHeartbeatReq（Pydantic），返回 `{device_id, device_kind, server_time, poll_interval_ms: kds=30000 / 其他=60000}`。两路由均 `require_role("cashier","kds","store_manager","admin")` + 三方租户一致性校验（X-Tenant-ID vs user.tenant_id）+ `ALLOWED_DEVICE_KINDS` 白名单校验。SQLAlchemyError → 500 DB_ERROR，ValueError → 400。
+- [apps/web-kds/src/api/kdsDeltaApi.ts] 新增。`DeviceKind` 类型 + `ALLOWED_DEVICE_KINDS`（readonly tuple，顺序与 v271 CHECK 严格对齐）。`pollOrdersDelta({store_id, cursor, device_id, device_kind='kds', limit=100})` 构造 URLSearchParams（cursor 为 null 时不追加 query）。`sendHeartbeat(payload)` 前端校验 device_kind 合法性再发请求。`pollOrdersDeltaWithRetry(params, {maxAttempts=3, baseDelayMs=1000})` 5xx 指数退避（1s/2s/4s），4xx（USER_TENANT_MISMATCH / INVALID_*）直接抛不退避。
+- [apps/web-kds/src/api/index.ts] export * from './kdsDeltaApi'（追加一行，零破坏）。
+- [shared/feature_flags/flag_names.py] EdgeFlags.KDS_DELTA_SYNC = "edge.kds.delta_sync" 常量。
+- [flags/edge/edge_flags.yaml] 注册 edge.kds.delta_sync Flag。defaultValue=false，各环境（dev/test/uat/pilot/prod）均 off；rollout=[5,50,100]；tags=[edge, c3, sprint-q2-2026, tier1, kds, delta-sync]。
+- [services/tx-trade/src/tests/test_kds_delta_tier1.py] 新增 8+2 条徐记 Tier1 场景（10/10 绿）：
+  1. kds_delta_returns_only_new_orders_since_cursor — cursor=18:00:00 只返回之后 preparing+ready，completed 剔除
+  2. kds_delta_respects_rls_cross_tenant — tenant_A vs tenant_B 互不可见 + SELECT 显式 tenant_id 过滤
+  3. kds_delta_bounded_by_store_id — 17 号店不看到 18 号店订单（同租户跨门店）
+  4. kds_delta_p99_under_100ms_at_200_orders — 200 单 50 次采样 P99<100ms 门禁
+  5. kds_reconnect_60s_full_sync — 500 单 limit=100 分 5 轮全同步 <60s（C1/C4 共用门禁）
+  6. device_registry_heartbeat_last_seen_updated — 首次 insert + 二次 update last_seen_at + heartbeat_count 累加
+  7. device_kind_enum_enforced — 六枚举全合法通过 + 非法（laptop）抛 ValueError
+  8. kds_delta_includes_device_kind_filter — `device_kind=kds` 剔除 customer_phone + total_amount_fen
+  9. parse_cursor_accepts_iso8601_and_empty — ISO8601 Z / +00:00 / datetime / None 兼容，非法抛
+  10. flag_edge_kds_delta_sync_registered_defaults_off — flag 注册 + 5 个环境 off + rollout [5,50,100] + tier1+c3 tag
+- [apps/web-kds/src/api/__tests__/kdsDelta.test.ts] 新增 7 条前端 vitest（7/7 绿）：
+  - 首次拉取无 cursor 参数；后续轮询 cursor URL encode 正确
+  - pollOrdersDeltaWithRetry 5xx 指数退避成功；4xx 直接抛不退避
+  - sendHeartbeat 合法 device_kind 透传 + 非法 device_kind 前端拦截不发请求
+  - ALLOWED_DEVICE_KINDS 六枚举严格顺序与 v271 CHECK 对齐
+- 验证：本 PR 10/10 后端 Tier1 + 7/7 前端 vitest + 既有 32/32（A1/A2/A3/A4 Tier1）零回归；ruff check 5 py 文件 All checks passed；tsc 对 C3 新增两文件零错误（设计系统/@tx/touch 既有错误与本 PR 无关）。
+
+### 数据变化
+- 新增文件：6（v271_edge_device_registry + kds_delta_service + device_registry_service + test_kds_delta_tier1 + kdsDeltaApi.ts + kdsDelta.test.ts）
+- 修改文件：4（kds_routes.py 追加两路由 + api/index.ts 导出 + flag_names.py 常量 + edge_flags.yaml 注册）
+- 迁移版本：v270 → **v271**（新 head；规划 v264 被 D2 占用）
+- 新增 Flag：1（edge.kds.delta_sync，默认全 off，rollout [5,50,100]）
+- EdgeFlags 常量：6 → 7（新增 KDS_DELTA_SYNC）
+- 新增测试用例：17（后端 10 + 前端 7，全徐记海鲜场景命名）
+- 新增 API 路由：2（GET /kds/orders/delta + POST /kds/device/heartbeat）
+
+### 遗留问题
+- orders 表可能缺 `(tenant_id, store_id, updated_at)` 联合索引 — 现有仅 `(store_id, status) / (store_id, order_time)`。真实 PG 200 并发 P99 达门禁需验证。建议独立 PR 追加索引（或 v272 追加）。当前 mock 测试不验证真 SQL 执行计划，本 PR 仅锁定 service 层无 O(n²) 路径。
+- C1 IndexedDB last-100 缓存 / C2 connectionHealth UI / C4 Playwright 4h E2E 本 PR 未实装（工单明确留后续 sub-task）。
+- KDS 前端 `KDSBoardPage.tsx` 尚未调用 `pollOrdersDelta` 替换 legacy 全量轮询——flag off 时仍走旧路径，flag on 时的前端切换逻辑留给 C1 sub-task。
+- `DeviceRegistryService.mark_offline_if_stale()` 后台任务尚未在 Mac mini sync-engine 或定时 scheduler 挂接（留给 sync-engine Phase 1 联调）。
+- rbac require_role 追加 `"kds"` 角色 — 若 gateway JWT claims 当前未发放该 role，pilot 阶段需先确认角色字典（见下文独立验证审查点 #4）。
+
+### 明日计划
+- 追加 orders (tenant_id, store_id, updated_at) 索引（v272 或并 PR）
+- C1/C2/C4 Sub-task 排期
+- DEMO 徐记 17 号店实机 4h 回归 + §19 独立验证
+
+### §19 独立验证触发（修改 ≥3 文件 + 涉及迁移 + Tier 1 + 跨服务契约 + 新增设备心跳协议）
+提示词模板（新会话视角）：
+
+> 你是屯象OS Sprint C3 的审查者。刚落地：KDS delta 增量接口 + edge_device_registry 设备注册表 + device_kind 六枚举 + 前端 pollOrdersDelta/heartbeat + Flag edge.kds.delta_sync。涉及文件：services/tx-trade/src/services/kds_delta_service.py / device_registry_service.py / api/kds_routes.py / shared/db-migrations/versions/v271_edge_device_registry.py / apps/web-kds/src/api/kdsDeltaApi.ts / shared/feature_flags/flag_names.py / flags/edge/edge_flags.yaml。
+>
+> 请从徐记海鲜收银员/后厨/系统架构师视角评估：
+> 1. 徐记 17 号店晚高峰 200 桌并发，KDS delta 查询路径 `orders WHERE tenant_id + store_id + updated_at > cursor AND status IN (...) ORDER BY updated_at LIMIT 100` —— 现有 orders 索引 `(store_id, status)` 和 `(store_id, order_time)` 够不够撑 P99<100ms？是否需要补 `(tenant_id, store_id, updated_at)` 索引？没索引的情况下 mock 测试绿不能代表真 PG 绿。
+> 2. 三台 KDS（炒锅/凉菜/打包）同时轮询 delta + 每 30s 心跳，HPE 200 桌并发下 /kds/orders/delta 和 /kds/device/heartbeat 是否会对 orders / edge_device_registry 产生锁争抢？UPSERT ON CONFLICT DO UPDATE 的行锁在心跳风暴下会不会导致事务排队？
+> 3. device_kind=kds 时响应剔除 customer_phone / total_amount_fen 是契约层设计 —— 但 KDS 通过 service 直接读 db 返回的 dict 时，`_project_kds_safe` 白名单是否穷举了所有敏感字段？orders 表新增字段（比如 v300 加了新的 PII 字段）时，默认是否会泄漏？
+> 4. require_role 新增 `"kds"` 角色 —— gateway JWT 当前发的 claims 里是否包含这个字符串？若门店 KDS 设备使用 edge_service / cashier 角色而非专属 "kds" 角色，pilot 灰度开启 flag 时会不会全部 403？
+> 5. `next_cursor` 为最后一条 `updated_at`（service 层返回 datetime，路由层序列化为 ISO8601 Z）。断网重连分页 500 单中若同一毫秒内有多条 updated_at（并发写入），`updated_at > cursor` 严格大于会跳过整批同秒订单；是否需要改为 `>=` + tie-break by id？徐记晚高峰毫秒级并发是否触发此边界？
+> 6. `DEFAULT_OFFLINE_THRESHOLD_SEC=600` (10 min) 未挂接定时任务。若 KDS 真离线但未被标 offline，`idx_edge_device_last_seen` partial index 效果不彰；徐记 17 号店炒锅 KDS 拔电源后，别的系统如何感知？
+
+### 本次会话目标
+实装 Sprint C3：KDS `/orders/delta` + device_kind 六枚举 + edge_device_registry 迁移 + 前端 pollOrdersDelta/heartbeat（Tier1）。不得触碰 shared/ontology/ / A1/A2/A3/A4 已 land 文件 / C1/C2/C4 留后续。仅实装契约层，E2E/IndexedDB/connectionHealth UI 留下一子任务。
+
+---
+
 ## 2026-04-24 Sprint A3 — 离线订单号 UUID v7 + 死信待确认（Tier1 零容忍）
 
 ### 今日完成
