@@ -199,6 +199,20 @@ flags:
           values: [L3]
     tags: [agent, l3, autonomy, critical-risk]
 
+  - identifier: agent_cost_root_cause_enable
+    name: agent.cost_root_cause.enable
+    description: >
+      D4a 成本根因 Skill Agent 启用开关。
+      基于 Claude Sonnet 4.7 + Prompt Cache，定位成本异动根因并给出降本建议。
+      默认关闭；合并后由运维按环境逐步开启（dev → test → pilot → prod）。
+    defaultValue: false
+    environments:
+      dev: false
+      test: false
+      pilot: false
+      prod: false
+    tags: [agent, d4a, sprint-q2-2026]
+
   - identifier: agent_roi_writeback
     name: agent.roi.writeback
     description: >

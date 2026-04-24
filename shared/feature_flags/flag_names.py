@@ -77,6 +77,9 @@ class AgentFlags:
     # （触发规划文档决策点 #1，需创始人签字后再开启）
     ROI_WRITEBACK = "agent.roi.writeback"
 
+    # Sprint D4a: 成本根因 Skill Agent 启用开关
+    COST_ROOT_CAUSE_ENABLE = "agent.cost_root_cause.enable"
+
 
 class TradeFlags:
     """交易履约域 Flag 名称。"""
