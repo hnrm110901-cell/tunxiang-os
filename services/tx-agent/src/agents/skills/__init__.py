@@ -62,6 +62,9 @@ from .review_summary import ReviewSummaryAgent
 # Sprint D3a：RFM 触达 Skill（Haiku 4.5 + Prompt Cache）
 from .rfm_outreach import RfmOutreachAgent
 from .salary_advisor import SalaryAdvisorAgent
+
+# Sprint D4b：薪资异常 Skill（Sonnet 4.7 + Prompt Cache）
+from .salary_anomaly import SalaryAnomalyAgent
 from .seasonal_campaign import SeasonalCampaignAgent
 from .serve_dispatch import ServeDispatchAgent
 from .smart_customer_service import SmartCustomerServiceAgent
@@ -161,6 +164,8 @@ ALL_SKILL_AGENTS = [
     CostRootCauseAgent,
     # Sprint D3a：RFM 触达（Haiku 4.5 + Prompt Cache）
     RfmOutreachAgent,
+    # Sprint D4b：薪资异常（Sonnet 4.7 + Prompt Cache）
+    SalaryAnomalyAgent,
 ]
 
 
