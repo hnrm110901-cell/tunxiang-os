@@ -1,3 +1,51 @@
+## 2026-04-24 Sprint E4：外卖异议工作流（Sprint E 收官）
+
+### 本次会话目标
+按 sprint plan 完成 Sprint E 最后一个子批次：打通外卖异议（顾客投诉 → 商家响应 → 平台裁决）全链路。E1 canonical schema + E2 一键发布 + E3 小红书核销 已交付，E4 补齐：状态机 + SLA 追踪 + 响应模板库 + 会话流水。
+
+Tier 级别：Tier 2（影响商家客诉响应 + 资金退款，不触 POS 收银路径）。
+
+### 完成状态
+- [x] **v288 迁移** `delivery_disputes` + `delivery_dispute_messages` 双表：11 dispute_type × 13 status × raised_at+merchant_deadline_at SLA × 三段金额 × raw_payload 保真 × 6 索引（含 pending SLA 队列 + 过期扫描）× RLS
+- [x] **`dispute_response_templates.py` 模板库** 15 个内置模板覆盖 11 类 dispute_type：ResponseTemplate dataclass + 自动 `*_fen → *_yuan` 换算 + 缺失 placeholder 保留 + `list_templates`/`get_template`/`recommend_template`（fall-back to other）/`render_template`
+- [x] **`dispute_service.py` DisputeService** 状态机 + SLA 追踪：`ingest_dispute` 幂等 + `draft_response` 推荐模板 + `submit_merchant_response` 状态迁移 + `record_platform_ruling` 自动判 full/partial/merchant_win + `escalate`/`withdraw` + `sweep_breached_slas` cron 批量过期
+- [x] **10 路 API**（`dispute_routes.py`）: CRUD + messages + draft + respond + ruling + escalate + withdraw + templates + sweep-sla
+- [x] **60 TDD 测试全绿**（0.11s）：ResponseTemplate 9 / Registry 9 / render 3 / Input validation 10 / State machine 14 / v288 migration 14 / SLA 1
+- [x] Ruff 全绿
+
+### 关键决策
+- **状态机 explicit `ALLOWED_TRANSITIONS` dict 而非散落 if 判断** — 12 态 × 多种转换集中声明；`_assert_transition` 是唯一入口
+- **ingest 直接 status='pending_merchant'** — 平台推送时商家已经需要响应；opened 留给未来手动草稿场景
+- **SLA deadline ingest 时一次性写入** — 便于加 index 和 cron 扫描（btree `merchant_deadline_at < NOW()`）
+- **`expired` 态可恢复** — 商家 SLA 过期后仍可人工补救（resolved_refund_full / escalated）
+- **`record_platform_ruling` 自动判目标** — 根据 `platform_refund_fen` vs `customer_claim_amount_fen` 判 full/partial；`merchant_win` 覆盖 refund 逻辑
+- **15 模板数据源**：徐记海鲜 2024 全年异议响应（~4000 条）话术 + 行业最佳实践
+- **模板推荐退款占比（ratio ∈ [0,1]）而非绝对值** — 跨不同客单价场景通用
+- **消息 5 种 sender_role 含 'agent'** — 留给未来 AI Agent 自动回复
+- **终态 `closed_at` 自动回填** — 便于"本月已关闭工单"报表
+
+### 交付清单
+```
+新建：
+  shared/db-migrations/versions/v288_delivery_disputes.py                (~220 行)
+  services/tx-trade/src/services/dispute_response_templates.py          (~310 行)
+  services/tx-trade/src/services/dispute_service.py                     (~560 行)
+  services/tx-trade/src/api/dispute_routes.py                           (~470 行)
+  services/tx-trade/src/tests/test_e4_disputes.py                       (~470 行，60 测试)
+```
+
+### 下一步（Sprint E 已收官）
+- **Sprint E 整体收尾**：E1 (#91) + E2 (#92) + E3 (#93) + E4 (本 PR) 全合入后挂载路由 + 集成测试
+- **建议进入 Sprint H 集成验证**（W7-10）：跑通徐记海鲜 DEMO，端到端验证 E1-E4
+
+### 已知风险
+- DisputeService 无 integration test（需 DB mock）— 留 AsyncSession fixture follow-up
+- 响应模板写死 15 个 — 未来需支持商家自定义模板
+- 状态机 `expired → resolved_refund_full` 可能和真实平台规则冲突
+- sweep_breached_slas 单租户单次调用 — 多租户 cron 需遍历
+
+---
+
 ## 2026-04-23 Sprint D4b：薪资异常检测 Sonnet 4.7 + Prompt Cache（城市基准共享）
 
 ### 本次会话目标

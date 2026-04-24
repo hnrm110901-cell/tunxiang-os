@@ -1,3 +1,32 @@
+## 2026-04-24 Sprint E4 外卖异议工作流 — Sprint E 收官
+
+### 今日完成
+- [v288 迁移] `delivery_disputes` + `delivery_dispute_messages` 双表：11 dispute_type × 13 status × SLA 双字段（raised_at + merchant_deadline_at）× 三段金额（customer_claim / merchant_offered / platform_refund）× raw_payload 保真 × 6 索引（含运营 pending SLA 队列 + 过期扫描）× RLS
+- [dispute_response_templates.py] 15 个内置模板覆盖 11 类 dispute_type（含徐记海鲜话术 + 行业最佳实践）+ `ResponseTemplate` dataclass + `*_fen → *_yuan` 自动换算 + 缺失 placeholder 保留
+- [DisputeService] 6 业务方法 + 12 态状态机 + SLA 追踪：`ingest_dispute` 幂等 + `draft_response` 推荐模板 + `submit_merchant_response` 三种 action + `record_platform_ruling` 自动判 full/partial/merchant_win + `escalate`/`withdraw` + `sweep_breached_slas` cron
+- [10 路 API] CRUD + draft + respond + ruling + escalate/withdraw + templates + sweep-sla
+- [60 测试全绿] 0.11s — Template 18 / render 3 / Input 10 / State machine 14 / migration 14 / 1
+
+### 数据变化
+- 迁移版本：v287 → v288
+- 新增 API 模块：1 个（tx-trade/dispute_routes，10 端点）
+- 新增 Service：2 个（dispute_service + dispute_response_templates）
+- 新增测试：60 个
+
+### 遗留问题
+- DisputeService 无 integration test（AsyncSession mock 工作量大）
+- 响应模板写死 15 个，未来需商家自定义 custom_dispute_templates
+- sweep_breached_slas 单租户单次调用，多租户 cron 需遍历
+- state machine `expired → resolved_refund_full` 可能和真实平台规则冲突
+- 4 个 Sprint E 路由（E1/E2/E3/E4 共 25+ 端点）尚未挂到 tx-trade main.py
+
+### 明日计划
+- Sprint H 集成验证：跑通徐记海鲜 DEMO 端到端验证 E1-E4
+- 挂载全部 E 系列 routes 到 tx-trade main.py（独立小 PR）
+- KMS 加密 XHS token（E3 遗留）
+
+---
+
 ## 2026-04-23 Sprint D1 批次 6 + Overflow — 14 Skill 冲 100% 覆盖 + CI 门禁
 
 ### 今日完成
