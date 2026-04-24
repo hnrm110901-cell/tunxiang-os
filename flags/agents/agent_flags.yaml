@@ -228,6 +228,22 @@ flags:
       prod: false
     tags: [agent, d4b, sprint-q2-2026]
 
+  - identifier: agent_budget_forecast_enable
+    name: agent.budget_forecast.enable
+    description: >
+      D4c 预算预测 Skill Agent 启用开关。
+      基于 Claude Sonnet 4.7 + Prompt Cache，预测下月各成本科目预算
+      并识别实际 vs 预算偏差超阈值（±5/10/15% 分档），给出根因
+      + 责任角色 + 可验证 KPI（Level 1，建议级）。
+      默认关闭；合并后由运维按环境逐步开启（dev → test → pilot → prod）。
+    defaultValue: false
+    environments:
+      dev: false
+      test: false
+      pilot: false
+      prod: false
+    tags: [agent, d4c, sprint-q2-2026]
+
   - identifier: agent_rfm_outreach_enable
     name: agent.rfm_outreach.enable
     description: >

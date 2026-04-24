@@ -86,6 +86,9 @@ class AgentFlags:
     # Sprint D4b: 薪资异常 Skill Agent 启用开关（加班/薪资环比稽核）
     SALARY_ANOMALY_ENABLE = "agent.salary_anomaly.enable"
 
+    # Sprint D4c: 预算预测 Skill Agent 启用开关（月度预测 + 偏差识别）
+    BUDGET_FORECAST_ENABLE = "agent.budget_forecast.enable"
+
 
 class TradeFlags:
     """交易履约域 Flag 名称。"""
