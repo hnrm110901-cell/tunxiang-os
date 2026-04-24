@@ -186,6 +186,12 @@ class EdgeFlags:
     # 5%→50%→100% 灰度，dead_letter 需人工确认不自动删除。
     PAYMENT_SAGA_BUFFER = "edge.payment.saga_buffer"
 
+    # Sprint A3（Tier1）：离线订单号 UUID v7 前端生成。
+    # off=legacy 服务端生成 order_id（TX+时间+uuid4.hex[:4]）
+    # on=前端生成 `{device_id}:{ms_epoch}:{counter}` + UUID v7 payload
+    # 5%→50%→100% 灰度，与 A2 saga_buffer idempotency_key 契约共享（settle:{order_id}）
+    OFFLINE_ORDER_ID_BRIDGE = "edge.offline.order_id_bridge"
+
 
 class SupplyFlags:
     """供应链域 Flag 名称。"""

@@ -118,3 +118,33 @@ flags:
         - dimension: store_id
           values: []  # 5% 灰度门店审批后填入
     tags: [edge, a2, sprint-q2-2026, tier1, saga, offline]
+
+  - identifier: edge_offline_order_id_bridge
+    name: edge.offline.order_id_bridge
+    description: >
+      Sprint A3 离线订单号 UUID v7 前端生成（Tier1）。
+      on=前端（商米 POS / iPad / 浏览器）离线时生成 order_id
+         = `{device_id}:{ms_epoch}:{counter}` 字符串 + UUID v7 payload，
+         请求头携带 X-Offline-Order-Id + X-Idempotency-Key=settle:{order_id}；
+         服务端恢复同步后写入 offline_order_mapping，cloud_order_id 由云端生成。
+      off=legacy 服务端生成 order_id（TX+时间+uuid4.hex[:4]，无离线能力）。
+      契约：与 A1 tradeApi.ts 的 idempotency_key=settle:{orderId} 共享，
+            与 A2 SagaBuffer 的 idempotency_key PK 去重兼容。
+      补发 20 次仍失败 → offline_order_mapping.state=dead_letter，
+      不自动删除，等店长在"离线订单异常"面板人工确认。
+    defaultValue: false
+    environments:
+      dev: false
+      test: false
+      uat: false
+      pilot: false
+      prod: false
+    rollout: [5, 50, 100]
+    targeting_rules:
+      pilot:
+        - dimension: edge_node_group
+          values: [mac_mini_m4_pilot]
+      prod:
+        - dimension: store_id
+          values: []  # 5% 灰度门店审批后填入
+    tags: [edge, a3, sprint-q2-2026, tier1, offline, uuid-v7]
