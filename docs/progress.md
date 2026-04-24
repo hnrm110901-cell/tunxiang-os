@@ -4,6 +4,76 @@
 
 ---
 
+## 2026-04-24 22:30 Sprint A4：RBAC 装饰器 + trade_audit_logs 扩列（Tier1 + §19）
+
+### 本次会话目标
+补齐 Sprint A4（RBAC 装饰器 + trade_audit_logs 扩列）：flag 注册、v267 扩 7 列、10 条徐记海鲜 Tier1 场景用例。门禁：越权 403 / audit 全覆盖 / 5%→50%→100% 灰度。
+
+### 不得触碰的边界
+- [x] shared/ontology/ — 未触碰
+- [x] v001-v264 已应用迁移 — 未修改
+- [x] v261_trade_audit_logs 父表 — 未修改（v267 仅扩列）
+- [x] 既有 require_role / require_mfa / write_audit 契约 — 未修改
+- [x] 11 个已套装饰器的路由文件 — 未修改
+- [x] shared/db-migrations/versions/v265 v266 — 预留未建（A1/C3 占位）
+
+### 本次涉及范围
+- 新增：services/tx-trade/src/tests/test_rbac_tier1.py（390 行，10 测试全绿）
+- 新增：shared/db-migrations/versions/v267_trade_audit_logs_ext.py（95 行）
+- 修改：flags/trade/trade_flags.yaml（追加 trade.rbac.strict 块）
+- 修改：shared/feature_flags/flag_names.py（TradeFlags.RBAC_STRICT）
+- 修改：DEVLOG.md + docs/progress.md 当日条目
+- Tier 级别：**Tier 1（零容忍）**
+
+### 完成状态
+- [x] 10 条 Tier1 徐记海鲜场景用例（全绿，P99 实测远低于 50ms）
+- [x] v267 扩列（result/reason/request_id/severity/session_id/before_state/after_state + idx_trade_audit_deny）
+- [x] flag 注册（默认 off，rollout=[5,50,100]）
+- [x] flag 常量导出（TradeFlags.RBAC_STRICT）
+- [x] 零回归（test_rbac_decorator 5 测试 + test_rbac_integration 4 测试 + 33 flag_client 测试全绿）
+- [ ] Phase 2：路由层在捕获 HTTPException 后补写 result/reason/severity — 下一 PR
+
+### 关键决策
+- **迁移号分配 v267**：规划预占 A4 为 v263（已被 kiosk_voice_count 占），现状 v261_trade_audit_logs 已建表，本 PR 扩列用 v267（跳 v265/v266 预留给 A1/C3），down_revision=v264（当前 head）
+- **扩列全 nullable**：向前兼容，不回填历史 10 列的行；Phase 2 路由层逐步填 result/reason
+- **flag 默认 off**：§14 要求新 flag 默认禁用，灰度由运维推进
+- **Tier1 用例命名徐记场景**：拒绝 "test_cashier_403"，采用 "test_xujihaixian_cashier_delete_order_403_with_deny_audit" 强制业务叙事
+- **v267 include idx_trade_audit_deny 部分索引**：仅对 result='deny' 行建索引，成本低，查合规场景（"过去 7 天谁被拒最多"）O(log n)
+
+### 下一步
+- [ ] DEMO 环境 demo-xuji-seafood.sql 手动跑通 6 条 Tier1 风险清单
+- [ ] §19 触发：开新会话按"徐记海鲜审查视角"检查 4 个审查点（见下方提示词）
+- [ ] Phase 2：路由层捕获 HTTPException 后写 deny 审计（扩 write_audit 增 result/reason/severity 入参）
+- [ ] pilot 5% 门店开 trade.rbac.strict 观察 24h，audit 查询性能回归
+
+### 已知风险（Tier 1 路径相关）
+- flag off/on 切换不触发重启，但 legacy bypass 生效于整个 tx-trade 进程，灰度时需按 store_id targeting_rules 精确控制
+- v267 JSONB 列（before_state/after_state）大对象写入在 PG 14 分区表上对 HOT update 有影响 — 由于本表 append-only 无 update，低风险
+- asyncio.create_task 审计失败静默（write_audit 内部 try/except SQLAlchemyError）— 已接 structlog 但需对接 SIEM 才能告警
+
+### §19 独立验证新会话提示词模板
+```
+你是屯象OS 的代码审查者，不是开发者。刚完成的修改是 Sprint A4 RBAC + trade_audit_logs 扩列。
+涉及：
+  - services/tx-trade/src/tests/test_rbac_tier1.py（新增 10 用例）
+  - shared/db-migrations/versions/v267_trade_audit_logs_ext.py（新增扩列）
+  - flags/trade/trade_flags.yaml + shared/feature_flags/flag_names.py（新 flag trade.rbac.strict）
+
+请从徐记海鲜收银员视角，评估以下 4 个审查点：
+1. 晚高峰 200 桌并发结账时，require_role/require_mfa 装饰器会不会出现锁竞争或 state 读取错误？
+   （目标：RBAC P99 < 50ms 是否在真实 FastAPI + JWT 注入路径下仍成立？）
+2. 长沙店 manager 持自店 JWT 尝试 /orders/{韶山订单ID}：RLS 返回零行后，路由是抛 404 还是 200+空体？
+   审计日志写到哪个 tenant？有没有"韶山订单 ID 泄露到长沙审计"的风险？
+3. trade.rbac.strict 从 off 切 on 时：进程内已在跑的请求会不会一半走 legacy 一半走 strict（半状态）？
+   灰度 5%→50%→100% 是否基于 store_id 稳定哈希（同一门店要么全新要么全旧）？
+4. v267 扩列的 before_state/after_state 是 JSONB，路由层若不幂等写入（同 request_id 重试），会不会导致审计重复？
+   idx_trade_audit_deny 部分索引在 deny 率 <1% 场景下是否真的有收益？
+
+只指出风险，不重复代码内容。
+```
+
+---
+
 ## 2026-04-24 19:00 Sprint D3a：RFM 触达 Skill Agent（Haiku 4.5 + Prompt Cache）
 
 ### 本次会话目标

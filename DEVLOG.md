@@ -1,3 +1,41 @@
+## 2026-04-24 Sprint A4 — RBAC 装饰器 + trade_audit_logs 扩列（Tier1，§19 独立验证触发）
+
+### 今日完成
+- [services/tx-trade/src/tests/test_rbac_tier1.py] 新增 10 条徐记海鲜真实场景 Tier1 用例（收银员小王/店长李姐/waiter/长沙 vs 韶山跨租户），覆盖：cashier 删单 403+deny audit / manager 删单 200+allow audit / 跨租户 RLS+RBAC 双拦截 / 35% 折扣 MFA 签核 / 改价 before-after / flag off legacy / flag on 阻断隐式权限 / 晚高峰 200 并发 RBAC P99<50ms / 审计 asyncio.create_task 非阻塞 / UserContext 元信息
+- [shared/db-migrations/versions/v267_trade_audit_logs_ext.py] 新迁移，扩 7 列（result/reason/request_id/severity/session_id/before_state/after_state JSONB）+ idx_trade_audit_deny 部分索引，全 nullable 向前兼容，down_revision=v264（跳过 v265/v266 预留号）
+- [flags/trade/trade_flags.yaml] 注册 trade.rbac.strict（默认全环境 off，rollout=[5,50,100]，tags=[trade, rbac, audit, sprint-a4, tier1]）
+- [shared/feature_flags/flag_names.py] TradeFlags.RBAC_STRICT 常量
+- 验证：10 Tier1 用例全绿（0.35s）；既有 test_rbac_decorator 5 测试 + test_rbac_integration 4 测试零回归；33 flag_client 测试绿；Trade 域 flag 总数 8→9
+- A4 现状确认：装饰器（src/security/rbac.py require_role / require_mfa）+ write_audit（src/services/trade_audit_log.py）+ v261 父表 + 11 个敏感路由已套装饰器（refund/scan_pay/payment_direct/discount_engine/discount_audit/banquet_payment/platform_coupon/enterprise_meal/douyin_voucher），本 PR 补齐 flag 注册 + v267 扩列 + Tier1 徐记用例
+
+### 数据变化
+- 迁移版本：v264 → v267（跳号 v265/v266 保留给 A1/C3）
+- 新增文件：2（test_rbac_tier1.py, v267_trade_audit_logs_ext.py）
+- 修改文件：2（trade_flags.yaml, flag_names.py）
+- 新增 flag：trade.rbac.strict（flag 总量 45→46）
+- 新增测试：10 条 Tier1（全绿）
+- trade_audit_logs 列数：11 → 18（+7 nullable 列）
+
+### 遗留问题（§19 独立验证审查点）
+- flag rollout=[5,50,100] 数组已写入 YAML，但 FeatureFlagClient.is_enabled 的百分比灰度消费逻辑需在 Sprint A4 灰度闸门脚本中配套（现阶段仅 flag 定义登记，实际灰度由运维手动调整 targeting_rules.store_id）
+- v267 before_state/after_state 字段已建表，write_audit 尚未写入（Phase 2 在路由层按"改价/退款"具体场景补）；本 PR 主链路不阻塞
+- 生产环境启用 trade.rbac.strict=on 前需：① DEMO 环境（demo-xuji-seafood.sql）200 桌并发跑通；② pilot 5% 门店先开 24h 观察 deny 率；③ audit 查询性能回归（idx_trade_audit_deny 部分索引真实数据验证）
+
+### Tier1 风险清单（合入前必须在 DEMO 环境验证）
+1. 长沙 vs 韶山跨租户：manager 持 tenant_A token 访问 tenant_B 订单，RLS 返回零行且审计只写 tenant_A
+2. 晚高峰 200 桌并发：RBAC 装饰器 P99 < 50ms，结算全链路 P99 < 200ms
+3. 收银员 35% 折扣走 require_mfa，未 MFA 返 403
+4. audit 日志 DB 抖动（模拟 50ms 慢查询）主业务不等待
+5. flag off → on 切换，legacy 请求不降级
+6. v267 upgrade 在已应用 v261 的库上零停机，downgrade 安全移除 7 列
+
+### 明日计划
+- Sprint A4 Phase 2：路由层捕获 HTTPException 后补写 result/reason/severity 字段（当前 write_audit 签名不变，路由层 try/except 包装后写 deny 审计）
+- DEMO 环境 demo-xuji-seafood.sql 手动验证 6 条风险清单
+- 触发 §19 独立验证新会话（提示词见 docs/progress.md 当日记录）
+
+---
+
 ## 2026-04-24 Sprint D3a — RFM 触达 Skill Agent（Haiku 4.5 + Prompt Cache）
 
 ### 今日完成
