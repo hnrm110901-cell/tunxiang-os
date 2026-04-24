@@ -13,6 +13,7 @@ from .etl.scheduler import get_etl_scheduler
 logger = structlog.get_logger()
 
 from .api.ai_evidence_chain_routes import router as ai_evidence_chain_router  # May W2: B-04
+from .api.banquet_analytics_routes import router as banquet_analytics_router  # S7 宴会分析报表（8端点）
 from .api.anomaly_routes import router as anomaly_router
 from .api.booking_report_routes import router as booking_report_router  # 预定报表（4端点）
 from .api.boss_bi_routes import router as boss_bi_router
@@ -41,6 +42,7 @@ from .api.report_config_routes import router as report_config_router
 from .api.report_routes import router as report_router
 from .api.reports_router import router as p0_reports_router
 from .api.seed_loader import load_p0_seeds
+from .api.report_builder_routes import router as report_builder_router  # S5: 报表配置化引擎（12端点）
 from .api.special_ops_report_routes import router as special_ops_report_router  # 特殊操作报表（14端点）
 from .api.store_analysis_routes import router as store_analysis_router
 from .api.stream_report_routes import router as stream_report_router
@@ -105,6 +107,8 @@ app.include_router(kitchen_report_router)  # 厨房管理报表：8端点
 app.include_router(delivery_report_router)  # 外卖报表：4端点
 app.include_router(booking_report_router)  # 预定报表：4端点
 app.include_router(special_ops_report_router)  # 特殊操作报表：14端点
+app.include_router(banquet_analytics_router)  # S7 宴会分析报表：8端点
+app.include_router(report_builder_router)  # S5 报表配置化引擎：12端点
 
 
 @app.get("/health")

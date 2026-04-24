@@ -218,6 +218,11 @@ app.include_router(cross_brand_router)  # 跨品牌会员智能
 app.include_router(recommendation_router)  # 实时推荐引擎
 app.include_router(subscription_router)  # 付费会员订阅
 
+# ── S4: 智能储值（推荐/绩效/提成）──
+from .api.smart_recharge_routes import router as smart_recharge_router
+
+app.include_router(smart_recharge_router)
+
 
 @app.get("/health")
 async def health():
