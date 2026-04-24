@@ -1,3 +1,54 @@
+## 2026-04-24 Sprint A1 — POS ErrorBoundary + 3s/8s 双级超时 + Toast 5 类（Tier1，§19 独立验证触发）
+
+### 今日完成
+- [apps/web-pos/src/components/__tests__/ErrorBoundary.test.tsx] 追加 3 条徐记 Tier1 场景：47 单崩溃 3s 内降级 / 17 桌网络抖动 resetAfterMs 自愈（onReset 自动触发）/ 钱箱状态一致性（boundary_level+saga_id+order_no+severity 上报 payload 校验）
+- [apps/web-pos/src/components/__tests__/Toast.test.tsx] 追加晚高峰 5 类 Toast 队列管理（含新增 warning 琥珀色）
+- [apps/web-pos/src/api/__tests__/tradeApi.test.ts] 追加 3s 软 abort + 重试 1 次 + 8s 硬失败 + 幂等键复用测试
+- [apps/web-pos/src/config/__tests__/featureFlags.test.ts] 追加灰度错误率 >0.1% 自动回退（远程下发 false → 运维 override 紧急打回）
+- [services/tx-ops/src/tests/test_telemetry_routes.py] 追加 saga_id/order_no 全字段覆盖 + 非阻塞审计钩子注入验证
+- [shared/db-migrations/versions/v268_pos_crash_reports_ext.py] 新迁移（down_revision=v267），pos_crash_reports 扩 6 列（timeout_reason/recovery_action/saga_id UUID/order_no/severity/boundary_level）+ idx_pos_crash_severity_tenant_time；R1 预留 disk_io_error 不建 CHECK；全 nullable 向前兼容；downgrade 倒序移除
+- [services/tx-ops/src/api/telemetry_routes.py] PosCrashReport 扩 6 Optional 字段 + 枚举白名单校验；INSERT 扩参；_audit_hook 模块级注入点 + asyncio.create_task 非阻塞调用（内层捕获 SQLAlchemyError/ValueError/KeyError/RuntimeError，§14 禁 broad except）
+- [apps/web-pos/src/components/ErrorBoundary.tsx] 扩 6 Optional props（boundary_level/severity/saga_id/order_no/timeout_reason/recovery_action）+ resetAfterMs（N ms 自动重置 + onReset 自愈通路）+ componentWillUnmount 清理 timer；reportCrashToTelemetry 序列化 6 字段上报
+- [apps/web-pos/src/api/tradeApi.ts] 新增常量 TIMEOUT_SETTLE_SOFT=3000 / TIMEOUT_SETTLE_HARD=8000（TIMEOUT_SETTLE 保留向前兼容）；TxFetchTradeOptions 新增 softTimeoutMs + idempotencyKey；txFetchTrade 实装双级超时（软 abort → 重试 1 次 → 硬失败，重试复用 X-Idempotency-Key 防 saga 双扣费）；TxTimeoutError 新类；settleOrder/createPayment 切换到双级超时 + idempotencyKey=`settle:${orderId}` / `payment:${orderId}:${method}`
+- [apps/web-pos/src/hooks/useToast.ts + components/Toast.tsx] ToastType 追加 'warning'（琥珀 #d97706 ! 图标），凑齐 5 类 success/error/info/warning/offline
+- [apps/web-pos/src/App.tsx] CashierBoundary 注入 boundary_level="cashier" + severity="fatal" + resetAfterMs=3000 + onReport=reportCrashToTelemetry（/settle/:orderId /order/:orderId 路由已有包裹，本轮只升 props）
+- 验证：web-pos vitest 43 测试全绿（ErrorBoundary 13 / Toast 7 / tradeApi 7 / offlineFlow 9 / featureFlags 7）；tx-ops telemetry_routes 7 测试全绿（含徐记 saga_id/order_no Tier1）
+
+### 数据变化
+- 迁移版本：v267 → v268（跳过 v265/v266 — v265 已被 A4 裁决占用，v266 预留给 C3 edge_device_registry）
+- 新增文件：1（v268_pos_crash_reports_ext.py）
+- 修改文件：9（2 前端组件 / 2 hooks/API / 1 App / 1 后端路由 / 4 测试追加）
+- 新增测试：5（web-pos 4 + tx-ops 1）
+- 无新增 flag（3 个 A1 flag 已在 Sprint A1 早期 commit 注册）
+- pos_crash_reports 列数：8 → 14（+6 nullable 列）
+- Toast 类型数：4 → 5（+warning）
+
+### 遗留问题（§19 独立验证审查点，跳过 A2/A3 基础设施依赖）
+- **跳过 test_200_tables_concurrent_checkout_p99_under_200ms** — 依赖 k6 脚本 + demo-xuji-seafood.sql 数据，属于 Sprint A1 DoD 验收步骤而非单测
+- **跳过 test_offline_4h_100_orders_zero_loss** — 依赖 A2 saga_buffer 基础设施（尚未落地），本 Sprint 不堵口
+- **跳过 test_settle_timeout_saga_rollback_clean** — 依赖 tx-trade payment_saga_service 的超时识别联动（A2 范围），本 Sprint 前端 3s 软 abort + 幂等键已兜底，服务端联动下 Sprint 补
+- **跳过 test_pos_crash_cross_tenant_403** — 真实 RLS 验证依赖 Postgres 实例；当前 telemetry_routes 单测已验证 set_config + INSERT 参数绑定契约，RLS 行为由 v260 迁移层保证
+- **审计钩子生产接线点未配**：_audit_hook 当前为模块变量 None，app 启动时需注入 tx-trade.write_audit 或 SIEM 客户端（本 Sprint 预留接口，不堵口）
+- **flag rollout 灰度闸门**：3 个 A1 flag 的 pilot/prod targeting_rules.store_id values=[]，等运维按徐记 5%/50%/100% 三档填入
+- **ErrorBoundary 自动重置后子组件再抛错**：当前循环由"重试 1 次 + 8s 硬失败 + onReset 路由跳转"三重兜底避免；生产需观察 recovery_action=reset 比例 > 10% 时触发告警
+
+### Tier1 风险清单（DEMO 环境 demo-xuji-seafood.sql 必过）
+1. **徐记 17 号桌 47 单崩溃**：3s 内降级到"结账失败，请扫桌重试"，非白屏；boundary_level=cashier 入库
+2. **晚高峰 200 桌并发结账**：P99 < 200ms，错误率 < 0.1%（需 k6 脚本 + demo 数据）
+3. **4G 抖动自愈**：resetAfterMs=3000 触发 onReset，收银员不需重启 POS；recovery_action=reset 入库
+4. **支付网关 3s 无响应**：软 abort + 重试 1 次（同一 X-Idempotency-Key），重试仍失败则 8s 硬失败；saga 服务端识别幂等键拒绝重复扣款
+5. **断网恢复 4 小时 100 单零丢失**：依赖 A2 saga_buffer，本 Sprint 仅确保前端 txFetchOffline 正确标记队列
+6. **跨租户 RLS**：pos_crash_reports_tenant 策略继承 v260，v268 扩列不破坏 USING 子句；长沙 tenant_A 查不到韶山 tenant_B 记录
+7. **灰度 5%→50%→100% 任一档错误率 > 0.1%**：/api/v1/flags 远程下发 false 触发 3 flag 联动 off
+
+### 明日计划
+- 触发 §19 独立验证新会话（见 docs/progress.md 当日末尾提示词模板，4 审查点）
+- DEMO 环境 demo-xuji-seafood.sql 手动跑通 6 条验收场景 + k6 200 桌并发基线
+- Sprint A2：saga_buffer 离线队列基础设施（让 A1 的 TxFetchOffline + idempotencyKey 真正端到端闭环）
+- 3 个 A1 flag pilot 5% 灰度放量到徐记 17 号店 1 天观察错误率
+
+---
+
 ## 2026-04-24 Sprint A4 — RBAC 装饰器 + trade_audit_logs 扩列（Tier1，§19 独立验证触发）
 
 ### 今日完成

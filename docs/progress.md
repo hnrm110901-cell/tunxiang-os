@@ -4,6 +4,85 @@
 
 ---
 
+## 2026-04-24 23:15 Sprint A1：POS ErrorBoundary + 3s/8s 双级超时 + Toast 5 类（Tier1 + §19）
+
+### 本次会话目标
+实装 Sprint A1 工单（`docs/sprint-plans/sprint-a1-pos-error-boundary-tdd.md`）：POS 前端在高峰期遇到崩溃/超时/网络抖动时不白屏/不丢单/不需要重启；v268 扩 pos_crash_reports 6 列 + 6 Optional 字段入遥测 + 非阻塞审计钩子 + 3s 软/8s 硬双级超时 + Toast 5 类。
+
+### 不得触碰的边界
+- [x] shared/ontology/ — 未触碰
+- [x] v001-v267 已应用迁移 — 未修改（v268 追加）
+- [x] 3 个 A1 flag（trade.pos.*）— 已注册不重建
+- [x] useOffline 内部逻辑 — 未触碰
+- [x] payment_saga_service 服务端超时（5min）— 属 A2 范围，不动
+- [x] `/api/v1/telemetry/pos-crash` 端点所在服务（tx-ops，非规划原文 tx-trade） — 维持现状不跨服务迁移
+
+### 本次涉及范围
+- 新增：1（shared/db-migrations/versions/v268_pos_crash_reports_ext.py，111 行）
+- 修改：9（2 ErrorBoundary 组件 / 2 hooks+API / 1 App 路由 / 1 tx-ops telemetry_routes / 4 测试追加）
+- Tier 级别：**Tier 1（零容忍）**
+- 迁移号：v267 → v268
+- Git commits：9（按 §21 原子化，每个可独立 revert）
+
+### 完成状态
+- [x] 5 条 Tier1 徐记场景测试用例（全绿）
+- [x] v268 pos_crash_reports 扩 6 列 + idx_pos_crash_severity_tenant_time
+- [x] 后端 PosCrashReport 扩 6 Optional + 枚举白名单 + asyncio.create_task 审计钩子
+- [x] 前端 ErrorBoundary 扩 6 props + resetAfterMs 自愈
+- [x] 前端 tradeApi 双级超时 + 幂等键 + 自动重试 1 次
+- [x] 前端 Toast 5 类（新增 warning）
+- [x] CashierBoundary 注入 boundary_level/severity/resetAfterMs props
+- [x] 零回归（所有既有用例全绿）
+- [ ] DEMO 环境 demo-xuji-seafood.sql 手动 6 场景走查 — 等独立验证会话
+- [ ] k6 200 桌并发 P99 基线跑 — 等 A2 saga_buffer 落地后一起
+- [ ] pilot 5% 放量徐记 17 号店 — 等运维执行
+
+### 关键决策
+- **迁移号 v268**（非工单 v265）：工单写 v265 但当前 head 已到 v267（A4 扩列），按"以当前 head 为准"顺延 v268
+- **v265/v266 预留**：v265 被 A4 裁决占用；v266 留给 C3 edge_device_registry（架构师对齐会已确认）
+- **非阻塞审计钩子设计**：_audit_hook 模块级 Optional[Callable]，生产由 app 启动时注入 tx-trade.write_audit 或 SIEM；路由内 asyncio.create_task 即发即忘；内层显式捕获 4 种具体异常（§14 禁 broad except）；RuntimeError 兜底覆盖"无运行事件循环"场景（TestClient 已自动处理）
+- **跳过测试的判定**：4 条工单用例（200 桌并发/4h 断网/saga 回滚/RLS 跨租户 403）依赖 A2/A3 基础设施或 k6 脚本，本 Sprint 不堵口，DEVLOG 明确标注"等 A2/A3"
+- **ErrorBoundary 自愈 vs 无限重抛**：resetAfterMs 只调用一次 reset + onReset；若子组件在重渲染时再抛，进入第二次 catch 但 timer 已清空（新一轮 3s 重计），避免死循环；生产需对 recovery_action=reset 占比告警
+- **TIMEOUT_SETTLE 保留**：向前兼容 6 处既有调用点（existing offlineFlow.test.ts import 未改）；新代码推荐用 TIMEOUT_SETTLE_SOFT + TIMEOUT_SETTLE_HARD 语义化配对
+
+### 下一步
+- [ ] §19 独立验证新会话（下方模板），4 审查点聚焦 Tier1 路径
+- [ ] DEMO 环境 demo-xuji-seafood.sql 手动跑通 7 条 Tier1 风险清单
+- [ ] Sprint A2：saga_buffer 离线队列（让 txFetchOffline + idempotencyKey 真正端到端闭环）
+- [ ] pilot 5% 放量徐记 17 号店 1 天，观察错误率 / boundary_level=cashier 占比 / recovery_action=reset 占比
+
+### 已知风险（Tier 1 路径相关）
+- 审计钩子生产接线未配（_audit_hook=None）— 本 PR 仅预留注入点，不堵口；app 启动需在 tx-ops 启动脚本中 `telemetry_routes._audit_hook = write_audit` 或调 SIEM
+- 3 个 A1 flag targeting_rules.store_id values=[] — 等运维按 5%/50%/100% 三档填
+- recovery_action=reset 过多（> 10%）意味着自愈循环，需 SRE 看板告警
+- flag off 时 CashierBoundary 降级为透传（no-op），此时白屏风险回退到 flag on 前的水位 — 灰度时务必三 flag 联动
+- 8s 硬失败后降级到 RootFallback，收银员必须手动点"返回桌台"— UX 压力在运营培训
+
+### §19 独立验证新会话提示词模板
+
+```
+你是屯象OS 的代码审查者，不是开发者。刚完成的修改是 Sprint A1 — POS ErrorBoundary + 3s/8s 双级超时 + Toast 5 类。
+涉及：
+  - apps/web-pos/src/components/ErrorBoundary.tsx（扩 6 props + resetAfterMs 自愈）
+  - apps/web-pos/src/api/tradeApi.ts（双级超时 + 幂等键 + 重试 1 次）
+  - apps/web-pos/src/components/Toast.tsx + hooks/useToast.ts（新增 warning 类型）
+  - apps/web-pos/src/App.tsx（CashierBoundary 注入新 props）
+  - services/tx-ops/src/api/telemetry_routes.py（接收 6 字段 + 非阻塞审计钩子）
+  - shared/db-migrations/versions/v268_pos_crash_reports_ext.py（扩 6 列）
+  - 5 条新测试用例（4 web-pos + 1 tx-ops）
+
+请从徐记海鲜收银员的视角评估：
+1. **200 桌并发高峰 ErrorBoundary 层叠**：顶层 + CashierBoundary 两层是否互相遮蔽？resetAfterMs=3000 在高频抖动下是否触发死循环？recovery_action=reset 占比多少才需告警？
+2. **支付 saga 双扣费风险**：3s 软 abort + 重试 1 次时，服务端 payment_saga (5min 超时) 可能仍在 paying 状态；X-Idempotency-Key=settle:{orderId} 是否足够防重？tx-trade 服务端是否正确识别 X-Idempotency-Key 并返回幂等响应？
+3. **v268 迁移**：upgrade 对已应用 v260 的库是否零停机？downgrade 倒序删除 6 列是否会触发 RLS 策略重建？idx_pos_crash_severity_tenant_time 在 100 万行表上的 CREATE INDEX 耗时？
+4. **审计钩子**：_audit_hook 为 None 时路由依然 200，是否掩盖了审计配置遗漏？asyncio.create_task 回调失败时 structlog 日志是否足以触发 SIEM 告警？
+5. **flag 三联动 off**：pilot 5% 错误率 > 0.1% 时，远程下发三 flag off，CashierBoundary 降级为透传 — 此时白屏风险是否超过硬化前水位？灰度回退决策阈值是否需要分 flag 设置？
+
+只指出风险，不重复描述代码内容。
+```
+
+---
+
 ## 2026-04-24 22:30 Sprint A4：RBAC 装饰器 + trade_audit_logs 扩列（Tier1 + §19）
 
 ### 本次会话目标
