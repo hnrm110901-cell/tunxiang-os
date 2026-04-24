@@ -58,6 +58,9 @@ from .queue_seating import QueueSeatingAgent
 from .referral_growth import ReferralGrowthAgent
 from .review_insight import ReviewInsightAgent
 from .review_summary import ReviewSummaryAgent
+
+# Sprint D3a：RFM 触达 Skill（Haiku 4.5 + Prompt Cache）
+from .rfm_outreach import RfmOutreachAgent
 from .salary_advisor import SalaryAdvisorAgent
 from .seasonal_campaign import SeasonalCampaignAgent
 from .serve_dispatch import ServeDispatchAgent
@@ -156,6 +159,8 @@ ALL_SKILL_AGENTS = [
     CashierAuditAgent,
     # Sprint D4a：成本根因（Sonnet 4.7 + Prompt Cache）
     CostRootCauseAgent,
+    # Sprint D3a：RFM 触达（Haiku 4.5 + Prompt Cache）
+    RfmOutreachAgent,
 ]
 
 

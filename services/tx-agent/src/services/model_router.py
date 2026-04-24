@@ -68,6 +68,8 @@ class ModelSelectionStrategy:
         "cost_root_cause": "claude-sonnet-4-7-20250929",
         "salary_anomaly": "claude-sonnet-4-7-20250929",
         "budget_forecast": "claude-sonnet-4-7-20250929",
+        # Sprint D3a：Haiku 4.5 + Prompt Cache（RFM 触达文案，高频轻量场景）
+        "rfm_outreach": "claude-haiku-4-5-20251001",
         "default": "claude-sonnet-4-6",
     }
 
