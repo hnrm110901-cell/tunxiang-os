@@ -1,3 +1,66 @@
+## 2026-04-24 v291 补齐历史 RLS 技术债（14 张表）
+
+### 本次会话目标
+基于 PR #98 tier1 RLS 扫描识别的历史违规，补齐 14 张真正缺 RLS 的业务表。CLAUDE.md § 13 禁止跳过 RLS，这是存量技术债。
+
+Tier 级别：Tier 1（RLS 多租户隔离硬约束）。
+
+### 完成状态
+- [x] **14 张真正缺 RLS 的业务表** 分 5 个历史 migration：
+  - v053 supply chain: receiving_items / stocktake_items
+  - v062 central kitchen: distribution_orders / production_orders / store_receiving_confirmations
+  - v064 WMS: stocktakes / warehouse_transfers / warehouse_transfer_items
+  - v067 three-way match: purchase_invoices / purchase_match_records
+  - v090 pilot tracking: pilot_programs / pilot_items / pilot_metrics / pilot_reviews
+- [x] **v291 迁移** `v291_fill_rls_historical_debt.py`：
+  - 统一模板 ENABLE RLS + FORCE RLS + DROP POLICY IF EXISTS + CREATE POLICY
+  - DO $$ 块 + `information_schema.tables` 守卫（legacy 环境容错）
+  - POLICY 用 `current_setting('app.tenant_id', true)` USING + WITH CHECK
+  - COMMENT ON POLICY 记录原 migration 来源
+  - downgrade 只 DISABLE RLS 不 DROP TABLE（保数据）
+- [x] **18 TDD 测试** (`tests/tier1/test_v291_rls_debt_tier1.py`)：
+  - v291 migration 静态校验 13（revision / TABLES_TO_FIX 14 张 / ENABLE+FORCE+POLICY / app.tenant_id / USING+WITH CHECK / idempotent / downgrade 不 DROP / COMMENT 追溯）
+  - 前提验证 5（5 个原 migration 确实无 ENABLE RLS）
+- [x] Ruff 全绿（2 处 S608 加 noqa：table 来自硬编码 tuple）
+
+### 关键决策
+- **DO $$ + information_schema guard** — 兼容 legacy 环境（部分 migration 跑起也 OK）
+- **FORCE RLS 统一加** — 防表 owner 绕过（CLAUDE.md § 13 硬约束）
+- **COMMENT ON POLICY 记录来源** — DB 元数据层跟踪历史 migration
+- **downgrade 不 DROP TABLE** — 业务数据保留，只回退 RLS 状态
+- **$POLICY$ dollar-quoted** — 避免 POLICY USING 子句内单引号转义
+- **DROP POLICY IF EXISTS** — 幂等重跑
+- **不动 36 张"假阳性"** — 原正则 `CREATE POLICY \w+` 无法匹配 f-string `{op_name}` 占位；改用 DOTALL + `\S+` 确认它们已有 policy；正则升级留给 PR #98
+- **不动 payment_events** — 历史按 FK 隔离，独立 PR 讨论
+
+### 审计发现
+| 类别 | 数量 | 处理 |
+|------|------|------|
+| 真正缺 RLS | 14 | ✅ v291 修复 |
+| 假阳性（f-string policy）| 36 | ⏭️ 实际已有 |
+| 合法豁免 | 31 | ⏭️ EXEMPT 白名单 |
+
+### 交付清单
+```
+新建：
+  shared/db-migrations/versions/v291_fill_rls_historical_debt.py   ~150 行
+  tests/tier1/test_v291_rls_debt_tier1.py                          ~180 行 18 测试
+```
+
+### 下一步
+- PR #98 regex 升级（DOTALL + `\S+`）消除 36 张假阳性告警
+- PR #100 rls-gate.yml 同步正则升级
+- payment_events 独立 PR 讨论（FK 隔离 vs RLS）
+- Week 7 真实 DB 用 scripts/check_rls_policies.py（PR #99）验证 14 张表
+
+### 已知风险
+- v291 depends_on v290（Sprint G）；实际合入顺序需协调
+- DO $$ f-string 拼接 14 张表名硬编码，无 SQL 注入（Ruff S608 noqa）
+- downgrade 只 DISABLE 不 DROP — 数据保留；如需完全回退需手动
+- 跨 migration 版本依赖：若原 v053/v062/... 被其他 PR 重建，本 v291 需手动 re-apply
+
+---
+
 ## 2026-04-24 Sprint H：集成验证基建（徐记海鲜 DEMO Go/No-Go）
 
 ### 本次会话目标
