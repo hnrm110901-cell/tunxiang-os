@@ -86,4 +86,41 @@ describe('Toast — 收银员场景', () => {
     const node = screen.getByText('会员余额 ¥12 不足，需 ¥45').closest('[data-toast-type]');
     expect(node?.getAttribute('data-toast-type')).toBe('info');
   });
+
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  //  Sprint A1 徐记 Tier1 场景
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  it('test_xujihaixian_peak_hour_5_toast_types_queue_management', () => {
+    // 晚高峰 6-9pm 收银员连续触发 5 类 Toast（success/error/info/warning/offline）；
+    // 队列最多 3 条同屏（MAX_VISIBLE=3），超出淘汰最老；warning 是 Sprint A1 新增类别。
+    render(<ToastContainer />);
+    act(() => {
+      showToast('桌台开台成功', 'success');
+      showToast('打印机纸张不足', 'warning');
+      showToast('网络超时，请重试', 'error');
+      showToast('请扫会员码', 'info');
+      showToast('已加入离线队列', 'offline');
+    });
+
+    const queued = useToastStore.getState().toasts;
+    expect(queued.length).toBeLessThanOrEqual(3);
+    // warning 类型必须已注册（5 类齐全）— 只校验类型可被 push 而不降级成 info
+    // 最后 3 条保留（error/info/offline），前 2 条被淘汰
+    expect(screen.queryByText('桌台开台成功')).not.toBeInTheDocument();
+    expect(screen.queryByText('打印机纸张不足')).not.toBeInTheDocument();
+    expect(screen.getByText('网络超时，请重试')).toBeInTheDocument();
+    expect(screen.getByText('请扫会员码')).toBeInTheDocument();
+    expect(screen.getByText('已加入离线队列')).toBeInTheDocument();
+
+    // 单独验证 warning 可用（不淘汰的场景）
+    act(() => {
+      useToastStore.setState({ toasts: [] });
+      showToast('厨房出餐超过 25 分钟', 'warning');
+    });
+    const warnNode = screen
+      .getByText('厨房出餐超过 25 分钟')
+      .closest('[data-toast-type]');
+    expect(warnNode?.getAttribute('data-toast-type')).toBe('warning');
+  });
 });

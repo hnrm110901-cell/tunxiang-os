@@ -7,7 +7,11 @@
  * - { ok, data, error } 标准响应
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { txFetchTrade } from '../tradeApi';
+import {
+  txFetchTrade,
+  TIMEOUT_SETTLE_SOFT,
+  TIMEOUT_SETTLE_HARD,
+} from '../tradeApi';
 
 type FetchSpy = ReturnType<typeof vi.fn>;
 
@@ -99,5 +103,53 @@ describe('tradeApi.txFetchTrade — Tier1 收银硬化', () => {
     expect(res.ok).toBe(true);
     expect(res.data?.order_id).toBe('o-1');
     expect(res.data?.order_no).toBe('T0001');
+  });
+
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  //  Sprint A1 — 徐记海鲜 Tier1 双级超时场景
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  it('test_xujihaixian_3s_abort_controller_retry_once_then_fallback_to_8s_hard_fail', async () => {
+    // 常量必须暴露：3s 软 abort（UI 提示 + 重试 1 次），8s 硬失败（降级 ErrorBoundary）
+    expect(TIMEOUT_SETTLE_SOFT).toBe(3000);
+    expect(TIMEOUT_SETTLE_HARD).toBe(8000);
+
+    vi.useFakeTimers();
+    // fetch 始终 hang，直到 abort
+    const fetchSpy: FetchSpy = vi.fn((_url: string, init?: RequestInit) => {
+      return new Promise((_resolve, reject) => {
+        const signal = init?.signal;
+        if (signal) {
+          signal.addEventListener('abort', () => {
+            reject(new DOMException('The operation was aborted', 'AbortError'));
+          });
+        }
+      });
+    });
+    installFetch(fetchSpy);
+
+    const pending = txFetchTrade('/api/v1/trade/orders/xj-47/settle', {
+      method: 'POST',
+      timeoutMs: TIMEOUT_SETTLE_HARD,
+      softTimeoutMs: TIMEOUT_SETTLE_SOFT,
+    });
+
+    // 3s 触发 soft abort + 自动重试 1 次（同一 idempotency_key）
+    await vi.advanceTimersByTimeAsync(3100);
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+    // 重试请求必须携带 idempotency_key（工单 R2）
+    const firstHeaders = fetchSpy.mock.calls[0][1].headers as Record<string, string>;
+    const retryHeaders = fetchSpy.mock.calls[1][1].headers as Record<string, string>;
+    expect(firstHeaders['X-Idempotency-Key']).toBeTruthy();
+    // 幂等键在重试时复用
+    expect(retryHeaders['X-Idempotency-Key']).toBe(firstHeaders['X-Idempotency-Key']);
+
+    // 再推进 8s 直到硬失败
+    await vi.advanceTimersByTimeAsync(8100);
+    const res = await pending;
+    expect(res.ok).toBe(false);
+    expect(res.error?.code).toBe('NET_TIMEOUT');
+    // 硬失败携带 timeout_reason 以便 ErrorBoundary 上报
+    expect(res.error?.timeout_ms).toBe(TIMEOUT_SETTLE_HARD);
   });
 });
