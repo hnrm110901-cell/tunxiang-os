@@ -4,6 +4,57 @@
 
 ---
 
+## 2026-04-24 Sprint A3：离线订单号 UUID v7 + 死信待确认（Tier1 零容忍）
+
+### 本次会话目标
+实装 Sprint A3：离线 order_id 采用 A1 工单 R2 锁定格式 `{device_id}:{ms_epoch}:{counter}`（人读） + UUID v7 payload（idempotency 强随机）；恢复联网批量同步到云端写入 offline_order_mapping，offline_id → cloud_id 映射供对账；连续 20 次补发失败 → state=dead_letter，不自动删除等店长确认。
+
+### 不得触碰的边界
+- [x] shared/ontology/ — 未触碰
+- [x] 已应用迁移 v001-v269 — 未修改（本次追加 v270）
+- [x] apps/web-pos/src/api/tradeApi.ts A1 已落幂等键 / 超时 / 离线队列逻辑 — 仅扩展 `generateOfflineOrderId`，不改既有流程
+- [x] services/tx-trade/src/api/settle_retry.py（A2 已落）— 未修改
+- [x] edge/mac-station/src/saga_buffer/（A2 已落）— 未修改
+- [x] services/tx-trade/src/services/trade_audit_log.py（A4 已落）— 未修改（只 import）
+- [x] services/tx-trade/src/security/rbac.py（A4 已落）— 未修改（只 import）
+- [x] v262 迁移（franchise_fee 已占用）— 跳过，锁 v270
+- [x] services/tx-trade/src/services/payment_saga_service.py — 仅追加可选 offline_order_id 透传参数，6 个 return 路径 dict 字段扩展；既有 41 测试零回归
+
+### 本次涉及范围
+- 服务：services/tx-trade + apps/web-pos + shared/feature_flags + shared/db-migrations + flags/edge
+- 迁移版本：v269 → **v270** （head 推进）
+- Tier 级别：**[x] Tier 1**
+
+### 完成状态
+- [x] 8+1 条徐记 Tier1 测试全绿（后端）+ 5 条前端 vitest 全绿
+- [x] 既有 43/43 A1/A2/A4 零回归
+- [x] ruff check 7 py 文件 All checks passed
+- [x] v270_offline_order_mapping 迁移（UNIQUE + CHECK + RLS + 2 索引 + 可逆 downgrade）
+- [x] Flag `edge.offline.order_id_bridge` 注册（默认全 off，rollout [5,50,100]，tier1 tag）
+- [ ] 未完成：路由挂接到 tx-trade main.py（与 A2 settle_retry 一致，留给统一挂接 PR）
+- [ ] 未完成：前端 settleOrderOffline 自动注入 X-Offline-Order-Id header（留 A3 下一子任务）
+- [ ] 未完成：死信人工确认 UI（店长端）
+- [ ] 未完成：DEMO 实机断网 100 单回归（需 §19 独立验证）
+
+### 关键决策
+- UUID v7 不加新依赖：手工按 RFC 9562 实现（Python 3.11 基线不含 uuid.uuid7）
+- order_id 不拼入 UUID v7：保持 A1 锁定格式人读，UUID v7 仅作后端 cloud_order_id 候选与 idempotency 随机源
+- 服务层必须显式带 tenant_id 过滤（不依赖 RLS 单层防线）
+- dead_letter 铁律：CLAUDE.md §13 禁止悄无声息吞单 → 保留等人工确认
+- 迁移号 v270（规划 v262 已被 franchise_fee 占用）
+
+### 下一步
+- 路由挂接 + 前端 header 注入 + 死信 UI + DEMO 回归
+- §19 独立验证新会话（提示词见 DEVLOG）
+
+### 已知风险
+- 5 min 死信窗口 vs 晚高峰堆积（需告警阈值）
+- cloud_order_id 悬挂映射（需 orders 表联动）
+- 128 字符 idempotency_key 上限足够（96 字符典型）
+- 前端 crypto 降级 Math.random（商米 POS 不触发）
+
+---
+
 ## 2026-04-24 Sprint A2：Saga 本地 SQLite 缓冲 4h（Tier1 零容忍）
 
 ### 本次会话目标

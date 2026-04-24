@@ -1,3 +1,65 @@
+## 2026-04-24 Sprint A3 — 离线订单号 UUID v7 + 死信待确认（Tier1 零容忍）
+
+### 今日完成
+- [services/tx-trade/src/services/offline_order_id.py] 新增。RFC 9562 UUID v7 手工实现（48-bit unix_ts_ms + ver=7 + 12-bit randA + variant=10 + 62-bit randB；`secrets.token_bytes(10)` CSPRNG）—— 不依赖 Python 3.14 原生 uuid.uuid7() 或第三方包。`generate_offline_order_id(device_id, counter, clock=time.time)` 返回 `(f"{device_id}:{ms_epoch}:{counter}", uuid_v7)`，严格遵守 A1 工单 R2 锁定格式。`parse_offline_order_id()` 反解；`idempotency_key_for_settle()` 统一 A1/A2 契约 `settle:{order_id}`。
+- [services/tx-trade/src/services/offline_order_mapping_service.py] 新增 OfflineOrderMappingService：upsert_mapping（INSERT ON CONFLICT DO NOTHING 幂等）/ mark_synced / mark_dead_letter（reason 必填 + 截断 500 字符）/ increment_sync_attempt（SQL `sync_attempts + 1`）/ get / list_pending（limit [1,500]）。所有 SQL 显式带 `tenant_id` 过滤（service 层拦截）+ RLS 兜底。DEAD_LETTER_MAX_ATTEMPTS=20（≈5 min 恢复窗口）。MappingState 枚举与 v270 CHECK 约束一致（pending/synced/dead_letter）。
+- [services/tx-trade/src/api/offline_sync_routes.py] 新增 POST `/api/v1/offline-orders/sync` 路由。require_role("cashier","store_manager","admin")；三方租户一致性校验（X-Tenant-ID vs body.tenant_id vs user.tenant_id）→ 403；批量校验 offline_order_id 格式（`device_id:ms_epoch:counter`）+ parsed device_id 与 body.device_id 严格一致（防伪造）；逐条 upsert→mark_synced（服务端生成 cloud_order_id = uuid4 若未随行）；整批一条 trade_audit_logs（action=offline_sync.batch）；SQLAlchemyError partial 语义（已 synced 条目保留，客户端幂等再试）。
+- [services/tx-trade/src/services/payment_saga_service.py] execute() 追加可选参数 `offline_order_id: Optional[str]=None`（仅透传至返回 dict，不触 offline_order_mapping 表，避免跨职责）。A2 返回格式不变（6 个 return 路径均加 offline_order_id 字段）。既有 41/41 test_payment_saga 测试零回归。
+- [shared/db-migrations/versions/v270_offline_order_mapping.py] 新增。offline_order_mapping 表：PK id UUID default gen_random_uuid()；(tenant_id, offline_order_id) 唯一约束；state CHECK ('pending','synced','dead_letter')；索引 (tenant_id, state, created_at) backlog 扫描 + partial index (cloud_order_id) WHERE NOT NULL 反查。RLS `app.tenant_id` 非 NULL 强制。downgrade 可逆。规划 v262 已被 franchise_fee 占用 → 本次锁 v270（当前 head v269 after A2）。
+- [apps/web-pos/src/api/tradeApi.ts] 新增 `generateOfflineOrderId()`：读 TXBridge.getDeviceInfo()?.device_id 或 localStorage('tx.device_id') fallback；crypto.getRandomValues 构造 16 字节 UUID v7（byte6 高 4 位=0x7 version，byte8 高 2 位=0b10 variant）；同毫秒 counter++，跨毫秒重置。`_resetOfflineOrderIdCounterForTest` 测试辅助。与后端 offline_order_id.py 完全对齐。
+- [shared/feature_flags/flag_names.py] EdgeFlags.OFFLINE_ORDER_ID_BRIDGE = "edge.offline.order_id_bridge" 常量。
+- [flags/edge/edge_flags.yaml] 注册 edge.offline.order_id_bridge Flag。defaultValue=false，各环境（dev/test/uat/pilot/prod）均 off；rollout=[5,50,100]；tags=[edge, a3, sprint-q2-2026, tier1, offline, uuid-v7]。
+- [services/tx-trade/src/tests/test_offline_order_id_tier1.py] 新增 8+1 条徐记海鲜 Tier1 场景测试（9/9 绿）：
+  1. offline_200_orders_unique_uuid_v7_zero_collision — 200 单 UUID v7/order_id 无碰撞 + ms_epoch 单调 + A1 格式校验
+  2. device_counter_resets_on_new_day_safe — 跨天 counter=1 仍唯一（ms_epoch 拉开）
+  3. two_devices_same_ms_no_collision — 两台 POS 同毫秒无碰撞（device_id 前缀兜底）
+  4. offline_order_resync_maps_to_cloud_id — upsert(pending) → mark_synced(cloud_id)
+  5. dead_letter_awaits_manual_confirm — 20 次失败 mark_dead_letter 保留不删除
+  6. idempotency_key_format_consistent_with_a2 — `settle:{order_id}` ≤128 字符，可被 A2 SagaBuffer UPSERT
+  7. cross_tenant_order_id_no_leak — tenant_B svc 读 tenant_A oid → None，SELECT 显式 tenant_id 过滤
+  8. flag_off_legacy_server_generated_order_id — flag 注册 + 5 个环境 off + rollout [5,50,100] + tier1 tag
+  9. generate_offline_order_id_performance_smoke — 500 次 < 500ms 平均 <1ms/次（附加）
+- [apps/web-pos/src/api/__tests__/offlineOrderId.test.ts] 新增 5 条前端测试（5/5 绿）：100 单 order_id/uuid 无碰撞 / order_id 格式严格 / UUID v7 version=7 variant=10 / idempotency_key 与 A1/A2 共享 / 同毫秒 counter 单调递增。
+- 验证：本 PR 9/9 新测试 + 既有 43/43（test_payment_saga + test_saga_buffer_tier1 + test_rbac_tier1）= 52/52 后端全绿；前端 vitest 3 文件 21/21（A1+A3）；ruff check 7 个 py 文件 All checks passed；tsc --noEmit 对 A3 改动零错误（设计系统既有错误与本 PR 无关）。
+
+### 数据变化
+- 新增文件：6（offline_order_id + offline_order_mapping_service + offline_sync_routes + v270 迁移 + test_offline_order_id_tier1 + offlineOrderId.test.ts）
+- 修改文件：3（flag_names.py + edge_flags.yaml + payment_saga_service.py 追加透传参数 + tradeApi.ts 扩展）
+- 迁移版本：v269 → **v270**（新 head，规划 v262 被 franchise_fee 占用）
+- 新增 Flag：1（edge.offline.order_id_bridge，默认全 off，rollout [5,50,100]）
+- EdgeFlags 常量：5 → 6（新增 OFFLINE_ORDER_ID_BRIDGE）
+- 新增测试用例：14（后端 9 + 前端 5，全徐记海鲜场景命名）
+- 新增 API 模块：1（tx-trade /api/v1/offline-orders/sync，尚未在 main.py 挂接）
+
+### 遗留问题
+- `/api/v1/offline-orders/sync` 尚未在 services/tx-trade/src/main.py include_router（与 A2 settle_retry 情况一致；留给统一挂接 PR）
+- 前端 tradeApi.ts 的 `generateOfflineOrderId()` 仅封装工具函数，未在 `settleOrderOffline()` 流程中自动生成 `X-Offline-Order-Id` header（需 A3 下一子任务在 flag on 且 navigator.onLine=false 时触发）
+- `offline_order_mapping` 表的 cloud_order_id 生成策略为 uuid4（本 PR 服务端兜底）；真实云端整合需要与 orders 表 INSERT 路径联动，避免悬挂 mapping（留给 A2 DEMO 联调后的跨服务打通）
+- 死信面板（店长在"离线订单异常"页面人工确认）UI 未实装，留给 Sprint A3 后续或 Sprint E 异议工作流
+- v270 迁移需在真实 PG 上测试 downgrade 回滚（DEMO 数据集跑 `alembic downgrade v269`）
+
+### 明日计划
+- offline_sync_routes 挂接到 tx-trade main.py（与 settle_retry 一起）
+- 前端 settleOrderOffline 在 flag on 时自动生成 offline_order_id 并注入 header
+- 死信人工确认 UI（店长端）
+- DEMO 实机断网 100 单回归（徐记海鲜 17 号店）+ §19 独立验证
+
+### §19 独立验证触发（修改 ≥3 文件 + 涉及迁移 + Tier 1 + 跨服务契约）
+提示词模板（新会话视角）：
+
+> 你是屯象OS Sprint A3 的审查者。刚落地：UUID v7 生成器 + offline_order_mapping 表 + `/api/v1/offline-orders/sync` 路由 + 前端 `generateOfflineOrderId()`。涉及文件：services/tx-trade/src/services/offline_order_id.py / offline_order_mapping_service.py / api/offline_sync_routes.py / shared/db-migrations/versions/v270_offline_order_mapping.py / apps/web-pos/src/api/tradeApi.ts。
+>
+> 请从徐记海鲜收银员/系统架构师视角评估：
+> 1. 徐记王府井店 17 号桌断网 2 小时生成 30 单，同毫秒同 counter 跨 POS 会不会碰撞？crypto.getRandomValues 降级 Math.random 是否安全？
+> 2. offline_order_mapping 表 UNIQUE(tenant_id, offline_order_id) 在高并发批量 sync（100 条）时会不会死锁？RLS 策略 `NULLIF(current_setting(...), '')::uuid` 在 NULL tenant_id 时是否真的 100% 阻断查询？
+> 3. A1 idempotency_key=`settle:{offline_order_id}` 与 A2 SagaBuffer UPSERT 在 offline_order_id 超过 SagaBuffer 字段长度时是否会截断导致 dedup 失败？128 字符上限够不够（device_id 最长 64 + 冒号 + ms_epoch 13 + 冒号 + counter 5 = 83）？
+> 4. 20 次失败 → dead_letter 时间窗口 ≈ 5 min（每次 15s 间隔），徐记晚高峰 200 桌并发下 Flusher 调度是否来得及 sweep？如果 dead_letter 条目没有被店长确认，当月会不会积累成千上万条？是否需要告警阈值？
+
+### 本次会话目标
+修复 Sprint A3 离线订单号 UUID v7 + 死信待确认（Tier1）。不得触碰 shared/ontology/ / A1 已落 tradeApi.ts 幂等键逻辑 / A2 SagaBuffer 表结构 / A4 trade_audit_logs 表结构。涉及 tx-trade + web-pos + 迁移 v270，Tier 1 级别。
+
+---
+
 ## 2026-04-24 Sprint A2 — Saga 本地 SQLite 缓冲 4h（Tier1 零容忍）
 
 ### 今日完成
