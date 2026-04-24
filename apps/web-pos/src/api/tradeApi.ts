@@ -2,9 +2,15 @@
  * tx-trade API 客户端
  * 收银全流程：开单→加菜→结算→支付→打印
  *
- * 超时分级（Sprint A1 修复 P1-3）：
- *   - TIMEOUT_SETTLE(8s)：结算/支付/退款/打印 等写操作（P99 约 1.8s，留足冗余）
+ * 超时分级（Sprint A1）：
+ *   - TIMEOUT_SETTLE_SOFT(3s)：UI 提示 + 软 abort + 自动重试 1 次（网络抖动自愈）
+ *   - TIMEOUT_SETTLE_HARD(8s)：硬失败，降级到 ErrorBoundary（收银员扫桌重试）
+ *   - TIMEOUT_SETTLE(8s)：兼容旧调用点，等价 HARD（P99 约 1.8s，留足冗余）
  *   - TIMEOUT_QUERY(3s)：查询类读操作
+ *
+ * 幂等性（Sprint A1 R2）：
+ *   - 每次请求自动生成 X-Idempotency-Key（crypto.randomUUID 优先）
+ *   - 软超时重试时复用同一 idempotency_key，防止 saga 双扣费
  *
  * 离线处理（Sprint A1 修复 P0-1）：
  *   - txFetchTrade 离线时返回 {ok:false, error.code:'OFFLINE_QUEUED'}（不 throw）
@@ -15,8 +21,25 @@ import { isEnabled } from '../config/featureFlags';
 const BASE = import.meta.env.VITE_API_BASE_URL || '';
 const TENANT_ID = import.meta.env.VITE_TENANT_ID || '';
 
-export const TIMEOUT_SETTLE = 8000;
+export const TIMEOUT_SETTLE_SOFT = 3000;
+export const TIMEOUT_SETTLE_HARD = 8000;
+export const TIMEOUT_SETTLE = TIMEOUT_SETTLE_HARD;
 export const TIMEOUT_QUERY = 3000;
+
+/**
+ * 专门用于双级超时触达硬上限后抛出的错误。ErrorBoundary 捕获后可据此定位
+ * timeout_reason=fetch_timeout / recovery_action=abort。
+ */
+export class TxTimeoutError extends Error {
+  readonly timeoutMs: number;
+  readonly attempts: number;
+  constructor(message: string, timeoutMs: number, attempts: number) {
+    super(message);
+    this.name = 'TxTimeoutError';
+    this.timeoutMs = timeoutMs;
+    this.attempts = attempts;
+  }
+}
 
 export type TradeErrorCode =
   | 'NET_TIMEOUT'
@@ -66,8 +89,28 @@ function buildAbortSignal(timeoutMs: number, external?: AbortSignal | null): { s
 }
 
 export interface TxFetchTradeOptions extends RequestInit {
-  /** 覆盖默认超时（毫秒）。未指定时默认用 TIMEOUT_QUERY(3s)。结算/支付应显式传 TIMEOUT_SETTLE。 */
+  /**
+   * 硬超时（毫秒）。未指定时默认用 TIMEOUT_QUERY(3s)。
+   * 结算/支付应显式传 TIMEOUT_SETTLE_HARD（=8s）。
+   */
   timeoutMs?: number;
+  /**
+   * 软超时（毫秒）。>0 时启用双级超时：
+   *   - 达到 softTimeoutMs → 软 abort 并自动重试 1 次（同一 idempotency_key）
+   *   - 达到 timeoutMs（硬） → 硬失败，返回 NET_TIMEOUT
+   * 默认不启用（= 单级超时）。Sprint A1 结算/支付推荐设为 TIMEOUT_SETTLE_SOFT(3s)。
+   */
+  softTimeoutMs?: number;
+  /** 自定义幂等键。未传时自动生成 UUID v4，保证同一次逻辑操作一致。 */
+  idempotencyKey?: string;
+}
+
+function _generateIdempotencyKey(): string {
+  const c = globalThis.crypto as Crypto | undefined;
+  if (c && typeof c.randomUUID === 'function') return c.randomUUID();
+  // 退化方案（旧浏览器）：时间戳 + 16 位随机
+  const rand = Math.random().toString(16).slice(2, 18);
+  return `idem-${Date.now().toString(16)}-${rand}`;
 }
 
 export async function txFetchTrade<T>(path: string, options: TxFetchTradeOptions = {}): Promise<TradeApiResult<T>> {
@@ -82,72 +125,113 @@ export async function txFetchTrade<T>(path: string, options: TxFetchTradeOptions
     };
   }
 
-  const headers: Record<string, string> = {
+  // 幂等键：调用方传入则复用，否则单次调用自动生成（重试时沿用，防 saga 双扣费）
+  const idempotencyKey = options.idempotencyKey ?? _generateIdempotencyKey();
+
+  const baseHeaders: Record<string, string> = {
     'Content-Type': 'application/json',
     'X-Request-Id': requestId,
+    'X-Idempotency-Key': idempotencyKey,
     ...(TENANT_ID ? { 'X-Tenant-ID': TENANT_ID } : {}),
     ...((options.headers as Record<string, string>) || {}),
   };
 
   const explicitTimeout = typeof options.timeoutMs === 'number' ? options.timeoutMs : undefined;
-  const timeoutMs = hardening ? (explicitTimeout ?? TIMEOUT_QUERY) : 30_000;
-  const { signal, cleanup } = buildAbortSignal(timeoutMs, options.signal);
+  const hardTimeoutMs = hardening ? (explicitTimeout ?? TIMEOUT_QUERY) : 30_000;
+  const softTimeoutMs =
+    hardening && typeof options.softTimeoutMs === 'number' && options.softTimeoutMs > 0
+      ? Math.min(options.softTimeoutMs, hardTimeoutMs)
+      : undefined;
 
-  try {
-    const resp = await fetch(`${BASE}${path}`, { ...options, headers, signal });
-    const status = resp.status;
-
-    let parsed: { ok?: boolean; data?: T; error?: { code?: string; message?: string } } = {};
+  // 单次 fetch 执行（用于软/硬两轮复用）
+  const doAttempt = async (attemptTimeoutMs: number): Promise<TradeApiResult<T> | { _retry: true }> => {
+    const { signal, cleanup } = buildAbortSignal(attemptTimeoutMs, options.signal);
     try {
-      parsed = await resp.json();
-    } catch {
-      parsed = {};
-    }
+      const resp = await fetch(`${BASE}${path}`, { ...options, headers: baseHeaders, signal });
+      const status = resp.status;
 
-    if (status >= 500) {
+      let parsed: { ok?: boolean; data?: T; error?: { code?: string; message?: string } } = {};
+      try {
+        parsed = await resp.json();
+      } catch {
+        parsed = {};
+      }
+
+      if (status >= 500) {
+        return {
+          ok: false,
+          request_id: requestId,
+          error: { code: 'SERVER_5XX', status, message: parsed.error?.message || '服务器繁忙' },
+        };
+      }
+      if (status >= 400) {
+        return {
+          ok: false,
+          request_id: requestId,
+          error: {
+            code: 'BUSINESS_REJECT',
+            status,
+            message: parsed.error?.message || '请求被拒绝',
+          },
+        };
+      }
+      if (parsed.ok === false) {
+        return {
+          ok: false,
+          request_id: requestId,
+          error: { code: 'BUSINESS_REJECT', status, message: parsed.error?.message || '业务校验失败' },
+        };
+      }
+      return { ok: true, data: parsed.data as T, request_id: requestId };
+    } catch (err) {
+      const isAbort = err instanceof DOMException && err.name === 'AbortError';
+      if (isAbort) {
+        // 本轮超时：由外层决定是重试（软）还是返回（硬）
+        return { _retry: true };
+      }
+      const msg = err instanceof Error ? err.message : 'network error';
       return {
         ok: false,
         request_id: requestId,
-        error: { code: 'SERVER_5XX', status, message: parsed.error?.message || '服务器繁忙' },
+        error: { code: 'NET_FAILURE', message: msg, cause: err },
       };
+    } finally {
+      cleanup();
     }
-    if (status >= 400) {
+  };
+
+  // 双级超时：软 abort → 重试 1 次（同一 idempotency_key）→ 硬失败
+  if (softTimeoutMs !== undefined) {
+    const softResult = await doAttempt(softTimeoutMs);
+    if (!('_retry' in softResult)) return softResult;
+    // 软 abort：重试 1 次，剩余预算 = hard - soft
+    const hardBudget = Math.max(hardTimeoutMs - softTimeoutMs, 0);
+    if (hardBudget === 0) {
       return {
         ok: false,
         request_id: requestId,
-        error: {
-          code: 'BUSINESS_REJECT',
-          status,
-          message: parsed.error?.message || '请求被拒绝',
-        },
+        error: { code: 'NET_TIMEOUT', message: '网络超时', timeout_ms: hardTimeoutMs },
       };
     }
-    if (parsed.ok === false) {
-      return {
-        ok: false,
-        request_id: requestId,
-        error: { code: 'BUSINESS_REJECT', status, message: parsed.error?.message || '业务校验失败' },
-      };
-    }
-    return { ok: true, data: parsed.data as T, request_id: requestId };
-  } catch (err) {
-    const isAbort = err instanceof DOMException && err.name === 'AbortError';
-    if (isAbort) {
-      return {
-        ok: false,
-        request_id: requestId,
-        error: { code: 'NET_TIMEOUT', message: '网络超时', timeout_ms: timeoutMs },
-      };
-    }
-    const msg = err instanceof Error ? err.message : 'network error';
+    const retryResult = await doAttempt(hardBudget);
+    if (!('_retry' in retryResult)) return retryResult;
     return {
       ok: false,
       request_id: requestId,
-      error: { code: 'NET_FAILURE', message: msg, cause: err },
+      error: { code: 'NET_TIMEOUT', message: '网络超时', timeout_ms: hardTimeoutMs },
     };
-  } finally {
-    cleanup();
   }
+
+  // 单级超时（兼容旧调用点）
+  const result = await doAttempt(hardTimeoutMs);
+  if ('_retry' in result) {
+    return {
+      ok: false,
+      request_id: requestId,
+      error: { code: 'NET_TIMEOUT', message: '网络超时', timeout_ms: hardTimeoutMs },
+    };
+  }
+  return result;
 }
 
 async function txFetch<T>(path: string, options: TxFetchTradeOptions = {}): Promise<T> {
@@ -321,7 +405,12 @@ export async function removeItem(orderId: string, itemId: string): Promise<void>
 }
 
 export async function settleOrder(orderId: string): Promise<{ order_no: string; final_amount_fen: number }> {
-  return txFetch(`/api/v1/trade/orders/${orderId}/settle`, { method: 'POST', timeoutMs: TIMEOUT_SETTLE });
+  return txFetch(`/api/v1/trade/orders/${orderId}/settle`, {
+    method: 'POST',
+    timeoutMs: TIMEOUT_SETTLE_HARD,
+    softTimeoutMs: TIMEOUT_SETTLE_SOFT,
+    idempotencyKey: `settle:${orderId}`,
+  });
 }
 
 /**
@@ -365,7 +454,9 @@ export async function createPayment(
 ): Promise<{ payment_id: string; payment_no: string }> {
   return txFetch(`/api/v1/trade/orders/${orderId}/payments`, {
     method: 'POST',
-    timeoutMs: TIMEOUT_SETTLE,
+    timeoutMs: TIMEOUT_SETTLE_HARD,
+    softTimeoutMs: TIMEOUT_SETTLE_SOFT,
+    idempotencyKey: `payment:${orderId}:${method}`,
     body: JSON.stringify({ method, amount_fen: amountFen, trade_no: tradeNo }),
   });
 }
