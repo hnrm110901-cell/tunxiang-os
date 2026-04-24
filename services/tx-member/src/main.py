@@ -219,6 +219,22 @@ app.include_router(recommendation_router)  # 实时推荐引擎
 app.include_router(subscription_router)  # 付费会员订阅
 
 
+# ── Sprint D3a/D3b 路由自动挂载（PR #82 #83 合入后自动生效）──
+from pathlib import Path as _Path  # noqa: E402
+
+from shared.service_utils import auto_mount_routes  # noqa: E402
+
+_sprint_d3_mount = auto_mount_routes(
+    app,
+    pkg=__package__,
+    api_dir=_Path(__file__).parent / "api",
+    modules=[
+        ("rfm_outreach_routes", "router"),            # D3a #82
+        ("campaign_roi_forecast_routes", "router"),    # D3b #83
+    ],
+)
+
+
 @app.get("/health")
 async def health():
     return {"ok": True, "data": {"service": "tx-member", "version": "4.0.0"}}

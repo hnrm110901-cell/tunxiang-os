@@ -1,3 +1,90 @@
+## 2026-04-24 shared/service_utils + 6 service main.py 路由自动挂载
+
+### 本次会话目标
+当前 11 个 OPEN PR（D3a/D3b/D3c/D4a/D4b/D4c/E1/E2/E3/E4/G）各自引入了新 `api/*_routes.py`，但合入后需要有人手动改 `main.py` 去 `include_router`。合入顺序不确定 + 需要分批改 main.py → 容易漏。
+
+本 PR 建立 `shared/service_utils.auto_mount_routes` 容错挂载机制：模块文件存在 → import + mount；不存在 → 静默 skip；import 失败 → WARNING 不阻塞启动。每个 service main.py 加一个 5-10 行 auto-mount 块，声明"期望的模块"；PR 合入后立即生效，无需再动 main.py。
+
+Tier 级别：Tier 2（影响服务启动路径，不直接触业务）。
+
+### 完成状态
+- [x] **`shared/service_utils/auto_mount.py`**（~120 行）：
+  - `auto_mount_routes(app, pkg, api_dir, modules, strict=False)` 核心函数
+  - `MountResult` dataclass 记录 mounted / skipped / failed 三类结果
+  - 文件存在检查 + import + getattr(router) + include_router 每步独立 try/except
+  - strict=True 可选抛异常；默认静默 + WARNING（不阻塞 service 启动）
+  - `mount_report(result)` 人类可读字符串
+- [x] **6 个 service main.py 加 auto-mount 块**（每个 ~15 行，插入 `/health` 端点前）：
+  - `tx-trade`：E1-E4 共 4 routes（canonical_delivery / dish_publish / xiaohongshu / dispute）
+  - `tx-member`：D3a + D3b 共 2 routes（rfm_outreach / campaign_roi_forecast）
+  - `tx-menu`：D3c 共 1 route（dish_pricing）
+  - `tx-finance`：D4a + D4c 共 2 routes（cost_root_cause / budget_forecast）
+  - `tx-org`：D4b 共 1 route（salary_anomaly）— **注意 pkg=None**（用绝对 import 风格 `from api.X`）
+  - `tx-brain`：G 共 1 route（ab_experiment）
+- [x] **13 auto_mount 单元测试** (`shared/service_utils/tests/test_auto_mount.py`)：
+  - MountResult 4（ok/failed/total/to_dict 契约）
+  - auto_mount 7（skip/mount/import_error/strict_raise/missing_attr/mixed/pkg_path）
+  - mount_report 2
+  - `sys.modules[api.*]` 清理 fixture 防止跨 tmp_path 污染
+- [x] **19 service 契约测试** (`tests/tier1/test_auto_mount_contracts_tier1.py`)：
+  - 所有 6 service 都 import `auto_mount_routes` 1
+  - 每 service modules 列表齐全（11 route 全覆盖）6
+  - pkg 参数对齐 import 风格（5 个 pkg=__package__ + 1 个 pkg=None）6
+  - api_dir 路径格式 1
+  - auto_mount 在 /health 之前（启动顺序正确）1
+  - shared/service_utils/ 模块契约 3
+  - EXPECTED_MOUNTS 覆盖 11 个 OPEN PR 1
+- [x] 所有 main.py 语法校验通过（`ast.parse`）
+- [x] Ruff 全绿（3 处 F401 feature_flags 历史 warning 非本 PR 变更）
+
+### 关键决策
+- **容错优先 而非 strict** — default strict=False 保证 service 启动不被"缺失路由"阻塞；生产部署 + 监控可选 strict=True
+- **`pkg=None` vs `pkg=__package__` 区分 import 风格** — tx-org 用 `from api.X`（绝对），其他用 `from .api.X`（相对），容错支持两种
+- **文件存在检查优先于 import** — `api_dir / f"{mod}.py"` 先 exists，不存在直接 skipped；避免 ImportError 掩盖真正的 bug
+- **import_module 失败分三类** — 文件不存在 skipped / 文件存在但 import 失败 failed WARNING / 缺 router attr failed WARNING
+- **`MountResult` dataclass 结构化** — service 启动日志可打印 `mount_report(result)` 便于运维排查
+- **auto-mount 块插在 `/health` 之前** — FastAPI 路由注册顺序影响；测试校验此顺序
+- **合入无顺序依赖** — 11 个 OPEN PR 任意顺序合入都正常；每合一个对应 route 自动上线
+- **strict=True 可选** — 生产环境上线后可在 env var 控制是否严格（比如 Week 8 前改 True 确保无漏）
+- **测试用 sys.modules 清理 fixture** — 避免 `api.X` 在不同 tmp_path 测试间污染
+- **不改 ci.yml 既有 matrix** — service 启动烟雾测试 (`test_main_import_smoke.py`) 走现有 CI，本 PR 不动
+
+### 交付清单
+```
+新建：
+  shared/service_utils/__init__.py                      17 行 exports
+  shared/service_utils/auto_mount.py                    ~150 行核心函数
+  shared/service_utils/tests/test_auto_mount.py         ~230 行 13 测试
+  tests/tier1/test_auto_mount_contracts_tier1.py        ~170 行 19 测试
+修改（6 个 service main.py，各 ~15 行末尾补 auto-mount 块）：
+  services/tx-trade/src/main.py                         E1-E4 4 routes
+  services/tx-member/src/main.py                        D3a+D3b 2 routes
+  services/tx-menu/src/main.py                          D3c 1 route
+  services/tx-finance/src/main.py                       D4a+D4c 2 routes
+  services/tx-org/src/main.py                           D4b 1 route（pkg=None）
+  services/tx-brain/src/main.py                         G 1 route
+```
+
+### 效果
+- **现在**：salary_anomaly_routes 已在 main（SOP contamination），其他 10 个 routes 的 py 文件不存在 → skipped
+- **D 批次合入后**（PR #82-88）：5 个 routes 自动挂载
+- **E 批次合入后**（PR #91-94）：4 个 routes 自动挂载
+- **Sprint G 合入后**（PR #97）：ab_experiment_routes 自动挂载
+
+### 下一步
+- PR 合入后 service 重启，可在日志看 `[auto-mount] mounted <module>` 确认生效
+- Week 8 前可选切 strict=True（启动时缺路由直接 fail，防止漏挂载）
+- 未来新增 routes 只需在对应 service main.py 的 modules 列表加一行即可
+
+### 已知风险
+- **auto-mount 块用 `from pathlib import Path as _Path` 别名** — 避免与既有 `Path` 冲突；测试用 literal 字符串断言时需注意
+- **sys.modules 清理只覆盖 `api.*` 前缀** — 如果未来 module 路径含其他前缀需扩展 fixture
+- **11 个 routes 硬编码在 main.py** — 未来 routes 增多时可考虑配置文件驱动
+- **pkg=None 和 pkg=__package__ 两种风格** — tx-org 特殊；未来 new service 若用绝对 import 需记得传 None
+- **import_module 失败 WARNING 非 ERROR** — 仰赖监控 / 日志告警发现；strict=True 可临时收紧
+
+---
+
 ## 2026-04-24 Sprint H：集成验证基建（徐记海鲜 DEMO Go/No-Go）
 
 ### 本次会话目标

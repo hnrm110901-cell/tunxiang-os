@@ -242,6 +242,22 @@ from api.franchise_fee_routes import router as franchise_fee_router
 app.include_router(franchise_fee_router)  # 加盟收费闭环（天财对标）账单/收款/出账规则/报表
 
 
+# ── Sprint D4b 路由自动挂载（PR #87 合入后自动生效）──
+# 注：tx-org 使用 `from api.X` 绝对 import 风格，pkg 传 None
+from pathlib import Path as _Path  # noqa: E402
+
+from shared.service_utils import auto_mount_routes  # noqa: E402
+
+_sprint_d4b_mount = auto_mount_routes(
+    app,
+    pkg=None,
+    api_dir=_Path(__file__).parent / "api",
+    modules=[
+        ("salary_anomaly_routes", "router"),  # D4b #87（file 已在 main via SOP contamination）
+    ],
+)
+
+
 @app.get("/health")
 async def health():
     return {"ok": True, "data": {"service": "tx-org", "version": "3.0.0"}}

@@ -1,3 +1,29 @@
+## 2026-04-24 shared/service_utils + 6 service main.py 路由自动挂载
+
+### 今日完成
+- [shared/service_utils/auto_mount.py] 核心函数 auto_mount_routes(app, pkg, api_dir, modules, strict=False) + MountResult dataclass + mount_report；文件存在检查 + 容错 import + WARNING 不阻塞
+- [6 service main.py auto-mount 块] tx-trade (E1-E4 4 routes) / tx-member (D3a+D3b) / tx-menu (D3c) / tx-finance (D4a+D4c) / tx-org (D4b, pkg=None) / tx-brain (G)
+- [13 auto_mount 单元测试] MountResult 契约 4 / auto_mount 行为 7（skip/mount/error/strict/missing_attr/mixed/pkg）/ mount_report 2
+- [19 service 契约测试] 6 service 都接入 + 11 route 名全覆盖 + pkg 参数风格 + api_dir + /health 顺序 + shared 模块契约
+
+### 数据变化
+- 新增共享模块：1 个（shared/service_utils/）
+- 新增测试：32 个（13 + 19）
+- 修改 6 个 service main.py（各 ~15 行末尾补）
+
+### 遗留问题
+- 11 routes 硬编码在 main.py；未来可改配置驱动
+- pkg=None vs __package__ 两种风格；tx-org 特殊
+- auto-mount 失败 WARNING 非 ERROR；仰赖日志告警
+- pre-existing F401 feature_flags warning 非本 PR
+
+### 明日计划
+- PR 合入后服务重启验证 `[auto-mount] mounted` 日志
+- Week 8 前评估切 strict=True
+- 未来新 route 只需加一行
+
+---
+
 ## 2026-04-24 Sprint H 集成验证基建 — 徐记海鲜 DEMO Go/No-Go
 
 ### 今日完成
