@@ -1,3 +1,50 @@
+## 2026-04-24 Sprint A2 — Saga 本地 SQLite 缓冲 4h（Tier1 零容忍）
+
+### 今日完成
+- [edge/mac-station/src/saga_buffer/__init__.py] 新增 saga_buffer 子包。
+- [edge/mac-station/src/saga_buffer/buffer.py] 新增 SagaBuffer（aiosqlite 异步 + 持久单连接）。enqueue 同 idempotency_key UPSERT 去重返回既有 saga_id（防 A1 abort→retry 双扣费）；4h TTL（14400s）；sweep_expired 标 dead_letter 不删除；/var/tunxiang 不可写时 parent mkdir/os.access 预检 → 降级到 memory dict（disk_io_error warn 对齐 A1 R1）；tenant_id 行级隔离 + device_id 过滤。
+- [edge/mac-station/src/saga_buffer/flusher.py] 新增 SagaFlusher 后台 Worker。扫 state=pending 且未到期条目 → POST tx-trade `/api/v1/settle/retry`（X-Idempotency-Key + X-Tenant-ID header）→ 2xx mark_sent / 4xx 直接 dead_letter / 5xx mark_failed 下轮重试 / attempts≥20 提前 dead_letter；heartbeat 定期 POST `/api/v1/edge/saga_buffer_meta` UPSERT 云端状态（buffer_count / dead_letter_count / health_status=healthy|degraded|stale）。
+- [services/tx-trade/src/api/settle_retry.py] 新增 POST `/api/v1/settle/retry` 路由。require_role("cashier","store_manager","admin")；三方租户一致性（X-Tenant-ID vs body.tenant_id vs user.tenant_id）→ 403 TENANT_MISMATCH/USER_TENANT_MISMATCH；查 payment_sagas 命中 done/compensated/failed → 直接返回既有 saga_id + payment_id（防双扣费）；命中 paying/completing/validating → in_flight；未命中 → 202 accepted（Flusher attempts++ 或 4h dead_letter 兜底，本 PR 不重建 saga 流程）；每次写 trade_audit_logs（A4 write_audit）。
+- [shared/db-migrations/versions/v269_saga_buffer_meta.py] 新增。saga_buffer_meta 表（云端 PG）：主键 (tenant_id, store_id, device_id)；列 buffer_count / dead_letter_count / last_flush_at / health_status + CHECK ('healthy','degraded','stale')；索引 (tenant_id, store_id, health_status)；RLS `app.tenant_id` 非 NULL 强制。downgrade 可逆。
+- [shared/feature_flags/flag_names.py] EdgeFlags.PAYMENT_SAGA_BUFFER = "edge.payment.saga_buffer" 常量。
+- [flags/edge/edge_flags.yaml] 注册 edge.payment.saga_buffer Flag。defaultValue=false，各环境（dev/test/uat/pilot/prod）均 off；rollout=[5,50,100]；tags=[edge, a2, sprint-q2-2026, tier1, saga, offline]。
+- [edge/mac-station/requirements.txt] 追加 `aiosqlite>=0.20.0`（Sprint A2 依赖）。
+- [services/tx-trade/src/tests/test_saga_buffer_tier1.py] 新增 8 条徐记海鲜 Tier1 场景测试（全绿）：
+  1. network_drop_100_orders_buffered_to_sqlite — 断网 4h 100 单 → 全部补发成功零丢失
+  2. idempotency_key_dedup_same_order_twice — 同 key 重复提交 UPSERT 去重 saga_id 复用
+  3. 4h_buffer_auto_expire_cleanup — TTL 过期 → dead_letter 不自动删除
+  4. saga_buffer_disk_full_safe_degrade — 路径不可写降级 memory 模式不崩溃
+  5. 200_concurrent_checkout_buffer_p99_under_200ms — 200 并发 enqueue+flush_ready P99<200ms
+  6. saga_id_consistency_front_to_back — abort 重试 saga_id 一致（防双扣费）
+  7. cross_tenant_buffer_isolation — tenant_A/B 行级隔离 + get 跨租户 None
+  8. flag_off_legacy_direct_write — edge.payment.saga_buffer 默认 off 校验（注册 + rollout 节奏 + tier1 tag）
+- 验证：本 PR 8/8 + 既有 41/41（test_payment_saga + test_trade_audit_log + test_rbac_tier1）= 49/49 全绿；ruff check 5 py 文件 All checks passed；sys.path append 而非 insert 避免 edge/mac-station/src/services 与 tx-trade/src/services 同名 shadow。
+
+### 数据变化
+- 新增文件：6（saga_buffer/__init__ + buffer + flusher + settle_retry + test_saga_buffer_tier1 + v269 迁移）
+- 修改文件：3（flag_names.py + edge_flags.yaml + mac-station/requirements.txt）
+- 迁移版本：v268 → **v269**（新 head）
+- 新增 Flag：1（edge.payment.saga_buffer，默认全 off，rollout [5,50,100]）
+- EdgeFlags 常量：4 → 5（新增 PAYMENT_SAGA_BUFFER）
+- 新增测试用例：8（徐记海鲜 Tier1）
+- 新增 API 模块：1（tx-trade /api/v1/settle/retry，尚未在 router main 中挂接）
+
+### 遗留问题
+- settle_retry 当 payment_sagas 无 idempotency_key 时返回 202 accepted 不重建 saga；Flusher 走 attempts=20 兜底进 dead_letter（运维必须配 alert rule）
+- mac-station main.py lifespan 未挂接 SagaFlusher 启动 + SagaBuffer.close；留给下一子任务（避免未经 DEMO 的后台任务污染主流程）
+- 云端 /api/v1/edge/saga_buffer_meta UPSERT 路由未落地（只有表和 Flusher heartbeat 调用）
+- Docker volume 映射 `/var/tunxiang/saga_buffer.db` 需 infra/docker/ compose 侧补；本 PR 仅代码预检 + 降级兜底
+- 前端 tradeApi.ts → Mac mini 本地缓冲入口路由未落地（当前 A1 仍直连云端，断网即失败；A2 生效需要 Mac mini 接手结算入口）
+- `edge/mac-station/src/services/` 与 `services/tx-trade/src/services/` 同名 shadow — 后续 edge 模块建议 `mac_station.services.xxx` 重构
+
+### 明日计划
+- mac-station main.py lifespan 挂接 SagaBuffer + SagaFlusher（flag on 时启动）
+- 云端 /api/v1/edge/saga_buffer_meta UPSERT 路由 + 云端 alert rule
+- 前端 tradeApi.ts 在 `isEnabled(edge.payment.saga_buffer)` 时走 `http://{mac_mini_lan_ip}/edge/settle/buffer` 入口
+- DEMO 实机断网 100 单回归（徐记海鲜 17 号店）
+
+---
+
 ## 2026-04-24 Sprint D4c — budget_forecast Skill + Sonnet 4.7 Prompt Cache（Tier2）
 
 ### 今日完成
