@@ -35,7 +35,7 @@ from shared.events.src.event_types import TableEventType
 
 logger = structlog.get_logger()
 
-# ─── 状态机：合法迁移矩阵 ────────────────────────────────────────────────────
+# ─── 状态机：按服务模式分支的合法迁移矩阵 ────────────────────────────────
 VALID_TRANSITIONS: dict[str, list[str]] = {
     "reserved": ["seated"],
     "seated": ["ordering"],
@@ -47,6 +47,22 @@ VALID_TRANSITIONS: dict[str, list[str]] = {
     "clearing": [],  # 终态
     "disabled": [],  # 管理员手动禁用，不参与正常流转
 }
+
+# scan_and_pay 模式：跳过 seated，下单后直接进入 billing
+VALID_TRANSITIONS_SCAN_AND_PAY: dict[str, list[str]] = {
+    "ordering": ["billing"],
+    "billing": ["paid"],
+    "paid": ["clearing"],
+    "clearing": [],
+}
+
+
+def get_valid_transitions(service_mode: str) -> dict[str, list[str]]:
+    """根据服务模式返回对应的状态迁移矩阵"""
+    if service_mode == "scan_and_pay":
+        return VALID_TRANSITIONS_SCAN_AND_PAY
+    # dine_first 和其他模式使用默认状态机
+    return VALID_TRANSITIONS
 
 # 终态集合：这些状态下桌台可以释放给下一批客人
 TERMINAL_STATUSES = {"paid", "clearing", "disabled"}
@@ -168,16 +184,25 @@ class DiningSessionService:
         if isinstance(extra_config, dict):
             room_config.update({k: v for k, v in extra_config.items() if k not in room_config})
 
-        # 获取区域支付模式（先付/后付），默认后付
+        # 获取区域支付模式和服务模式
         zone_pay_mode: str = "postpay"
+        zone_service_mode: str = "dine_first"
+        zone_pricing_snapshot: dict = {}
+        zone_coupon_config: dict = {}
         if zone_id:
             zone_row = await self._db.execute(
-                text("SELECT pay_mode FROM table_zones WHERE id = :zid AND tenant_id = :tid"),
+                text("""
+                    SELECT pay_mode, service_mode, pricing_policy, coupon_config
+                    FROM table_zones WHERE id = :zid AND tenant_id = :tid
+                """),
                 {"zid": zone_id, "tid": self._tenant_id},
             )
             zone_info = zone_row.mappings().one_or_none()
             if zone_info:
                 zone_pay_mode = zone_info["pay_mode"] or "postpay"
+                zone_service_mode = zone_info["service_mode"] or "dine_first"
+                zone_pricing_snapshot = zone_info["pricing_policy"] or {}
+                zone_coupon_config = zone_info["coupon_config"] or {}
 
         # 获取门店 store_code（用于生成 session_no）
         store_row = await self._db.execute(
@@ -194,9 +219,15 @@ class DiningSessionService:
         session_id = uuid.uuid4()
         now = _now_utc()
 
-        # 先付（prepay）模式：直接进入 ordering 状态（已付款，直接点单）
-        # 后付（postpay）模式：从 seated 开始（传统堂食流程）
-        initial_status = "ordering" if zone_pay_mode == "prepay" else "seated"
+        # 根据服务模式决定初始状态
+        # scan_and_pay: 直接进入 ordering（扫码即点即付）
+        # dine_first:   从 seated 开始（传统堂食流程）
+        # retail:       不应走到这里（retail模式不创建dining_session）
+        if zone_service_mode == "retail":
+            raise ValueError(
+                "retail 模式不创建堂食会话，请使用 /cashier/retail-sale 端点"
+            )
+        initial_status = "ordering" if zone_service_mode == "scan_and_pay" else "seated"
 
         # 插入 dining_sessions
         await self._db.execute(
@@ -208,14 +239,16 @@ class DiningSessionService:
                     opened_at, table_no_snapshot,
                     total_orders, total_items, total_amount_fen,
                     discount_amount_fen, final_amount_fen, per_capita_fen,
-                    service_call_count, room_config, pay_mode, order_type,
+                    service_call_count, room_config, pay_mode, service_mode,
+                    zone_pricing_snapshot, order_type,
                     created_at, updated_at, is_deleted
                 ) VALUES (
                     :id, :tenant_id, :store_id, :table_id, :session_no,
                     :guest_count, :vip_customer_id, :booking_id,
                     :initial_status, :lead_waiter_id, :zone_id, :session_type,
                     :now, :table_no_snapshot,
-                    0, 0, 0, 0, 0, 0, 0, :room_config, :pay_mode, :order_type,
+                    0, 0, 0, 0, 0, 0, 0, :room_config, :pay_mode, :service_mode,
+                    :zone_pricing_snapshot, :order_type,
                     :now, :now, FALSE
                 )
             """),
@@ -235,6 +268,8 @@ class DiningSessionService:
                 "table_no_snapshot": table_no_snapshot,
                 "room_config": room_config,
                 "pay_mode": zone_pay_mode,
+                "service_mode": zone_service_mode,
+                "zone_pricing_snapshot": zone_pricing_snapshot,
                 "order_type": session_type,  # 从 session_type 推导渠道类型
                 "initial_status": initial_status,
             },

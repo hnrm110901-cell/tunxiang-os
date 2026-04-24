@@ -389,6 +389,16 @@ from .api.kiosk_routes import router as kiosk_router
 app.include_router(kiosk_router)
 
 
+# ── v281-v283: 区域服务模式 + 时段拼桌预设 + 桌台时段配置 + 利用率分析 ──
+from .api.table_merge_preset_routes import router as table_merge_preset_router
+from .api.table_period_config_routes import router as table_period_config_router
+from .api.table_utilization_routes import router as table_utilization_router
+
+app.include_router(table_merge_preset_router)   # v284 时段拼桌预设（方案配置/执行/回滚）
+app.include_router(table_period_config_router)   # v286 桌台×时段配置矩阵
+app.include_router(table_utilization_router)     # v287 桌台利用率分析（Agent数据基础）
+
+
 @app.get("/health")
 async def health():
     return {"ok": True, "data": {"service": "tx-trade", "version": "4.0.0"}}
