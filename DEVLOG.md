@@ -1,3 +1,33 @@
+## 2026-04-24 Sprint G A/B 实验框架 — 平台 + 统计 + 熔断器
+
+### 今日完成
+- [v290 迁移] 4 张表：ab_experiments + arms + assignments + events；9 状态 + 3 策略 + 5 entity + 7 metric + 11 索引 + RLS
+- [shared/ab_testing/] 3 模块纯 Python：assignment（hash+稳定分配）+ statistics（z-test/Welch/Bayesian/Lehr）+ circuit_breaker（相对劣化+goal+min_samples）
+- [ABExperimentService] 6 业务方法：create/start/pause/terminate + assign（幂等）+ record_event + evaluate_significance + evaluate_circuit_breakers cron
+- [11 路 API] CRUD + 生命周期 + significance + assign + events + circuit-breaker/sweep + arm stats
+- [55 测试全绿] 0.05s — hash 5 / assign 10 / ArmDef 3 / normal 4 / z-test 5 / Bayesian 4 / sample_size 4 / circuit 6 / v290 12 / 其他 2
+
+### 数据变化
+- 迁移版本：v288 → v290（跳 v289 留给 S5-S8 coupon）
+- 新增共享模块：1 个（shared/ab_testing 3 子文件）
+- 新增 service：1 个
+- 新增 API 模块：1 个（11 端点）
+- 新增测试：55 个
+
+### 遗留问题
+- Service 无 integration test
+- Bayesian 精度 ±1%；需 UI 显示误差带
+- record_event 对未分配 entity 静默 skip 需监控
+- 熔断不结合统计显著性；多 treatment 1 trip 整实验终止
+- v290 depends_on v288（E4）链路依赖
+
+### 明日计划
+- AB Dashboard UI + integration test
+- Agent 决策自动实验化
+- 挂载 /ab 到 tx-brain main.py
+
+---
+
 ## 2026-04-23 Sprint D1 批次 6 + Overflow — 14 Skill 冲 100% 覆盖 + CI 门禁
 
 ### 今日完成

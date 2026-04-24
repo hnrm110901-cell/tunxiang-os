@@ -1,3 +1,67 @@
+## 2026-04-24 Sprint G：A/B 实验框架（平台 + 统计 + 熔断器）
+
+### 本次会话目标
+按 sprint plan Sprint G（W6-8）交付 A/B 实验平台：流量切分 + 统计显著性 + 熔断器。目标对齐 Week 8 Go/No-Go §9 "至少 1 个 A/B 实验 running 未熔断"。
+
+Tier 级别：Tier 2（影响决策可观测性 + 业务参数发布，不触 POS 收银资金）。
+
+### 完成状态
+- [x] **v290 迁移** 4 张表：`ab_experiments` + `ab_experiment_arms` + `ab_experiment_assignments` + `ab_experiment_events`
+  - experiments：9 状态机 + 3 分配策略 + 5 entity_type + 7 primary_metric + 熔断配置
+  - arms：is_control 约束（每实验唯一 control）+ 累计统计（exposure/conversion/revenue/numeric_metric + ssq）
+  - assignments：UNIQUE (tenant, experiment, entity_type, entity_id) 稳定
+  - events：5 event_type + idempotency_key UNIQUE + append-only
+  - 11 索引 + RLS 4 表
+- [x] **`shared/ab_testing/` 模块** — 纯 Python（不依赖 scipy/numpy）
+  - `assignment.py`：deterministic hash + arm_key 字典序稳定 + traffic_percentage 精度 0.01%
+  - `statistics.py`：frequentist z-test（比例）/ Welch's t-test（连续）+ Bayesian Beta-Binomial MC + Lehr 样本量
+  - `circuit_breaker.py`：maximize/minimize goal × threshold × min_samples × multi-arm + control=0 保护
+- [x] **`ABExperimentService`** (tx-brain) — 生命周期状态机 + 幂等 assign + 事件摄入 + 增量 arm stats + cron 熔断扫描
+- [x] **11 路 API** (`ab_experiment_routes.py`) — CRUD + start/pause/terminate + significance + assign + events + circuit-breaker/sweep + arm stats
+- [x] **55 TDD 测试全绿**（0.05s）
+- [x] Ruff 全绿
+
+### 关键决策
+- **`hash(entity + experiment)` 而非 `hash(entity) + experiment`** — 避免用户在多个实验里 arm 相关
+- **按 arm_key 字典序 + `hash >> 16 % total_weight`** — 新增 arm 不打乱已有分配；bucket 和 weight 用不同 hash bits
+- **frequentist + bayesian 并行** — 固定样本量用 z-test，早期决策用 posterior
+- **纯 Python math 实现** — 精度 ≤1e-4 vs scipy，部署 footprint 小
+- **熔断基于相对劣化（%）** — 统一处理 1%→0.8% 和 10%→8%（都是 20% 劣化）
+- **`idempotency_key` UNIQUE** — 防 retry 重复计数
+- **`sweep cron` 触发熔断** — 避免长 running thread，用 APScheduler/k8s CronJob 每 5 分钟
+- **`ArmStats.numeric_metric_ssq`** — 存平方和便于增量算方差（不需保留每事件原值）
+- **assignments 不软删** — 硬覆盖 = 重新分配（重跑实验语义）
+
+### 交付清单
+```
+新建：
+  shared/db-migrations/versions/v290_ab_experiments.py              ~330 行
+  shared/ab_testing/__init__.py                                     导出
+  shared/ab_testing/assignment.py                                   ~160 行
+  shared/ab_testing/statistics.py                                   ~330 行
+  shared/ab_testing/circuit_breaker.py                              ~180 行
+  shared/ab_testing/tests/test_ab_testing.py                        ~490 行 55 测试
+  services/tx-brain/src/services/ab_experiment_service.py           ~620 行
+  services/tx-brain/src/api/ab_experiment_routes.py                 ~400 行 11 端点
+```
+
+### 下一步
+- ABExperimentService integration test（AsyncSession mock）
+- AB Dashboard UI（web-admin/ab-experiments）
+- Agent 决策自动实验化（A=规则引擎，B=Sonnet 建议）
+- 挂载路由到 tx-brain main.py
+
+### 已知风险
+- ABExperimentService 无 integration test
+- Bayesian 精度 ±1%（2000 次采样）；UI 需显示误差带
+- `required_sample_size` 用查表而非解析 z 值
+- `record_event` 对未分配 entity 静默 skip — 加监控
+- 熔断不结合统计显著性 — 噪声大时可能误伤
+- 多 treatment 1 个 trip 整个实验终止 — 未来可改细粒度
+- v290 depends_on v288（E4） — 全链路合入顺序依赖
+
+---
+
 ## 2026-04-23 Sprint D4b：薪资异常检测 Sonnet 4.7 + Prompt Cache（城市基准共享）
 
 ### 本次会话目标
