@@ -1,3 +1,94 @@
+## 2026-04-24 GitHub Actions CI 门禁 — Go/No-Go + Tier 1 + RLS 三层自动化
+
+### 本次会话目标
+为 Week 8 Go/No-Go 10 项门槛 + Tier 1 测试 + RLS 合规建立 CI 自动化门禁。现状是：脚本存在但没有 CI workflow 拉起，PR 合并时无自动检查。本 PR 交付 3 个新 workflow 覆盖三个维度的硬约束。
+
+Tier 级别：Tier 3（CI 基建/门禁，不触业务路径）。
+
+### 完成状态
+- [x] **`demo-go-no-go.yml`** — 10 项 Go/No-Go checkpoint 自动化
+  - PR 触发：PR 修改 scripts/docs/demo/infra/scorecards 时跑（--skip-tests --json）
+  - 主干 push 触发：同上
+  - 手动 dispatch：可选 `strict` 全部 block
+  - PR 自动评论表格（`actions/github-script`），更新已有评论而非重复发
+  - Artifact 保留 30 天供 Grafana 订阅
+  - **BLOCKING_IDS** 默认 {1, 5, 6, 8, 10}（可控类）；strict 全开
+- [x] **`tier1-gate.yml`** — Tier 1 契约测试门禁
+  - 触发：`*tier1*.py` / Tier 1 核心服务 / migrations / edge sync-engine 变更
+  - 2-stage：`discover` job 扫文件 + 按父目录分组，`run` matrix job 分别跑
+  - matrix 避免不同 service 的 conftest.py 冲突
+  - 3 个 glob 位置（legacy + 新布局 + cross-service 顶层）
+  - 最终 `gate` job 校验 count > 0 且所有 group 绿
+- [x] **`rls-gate.yml`** — 新 migration RLS 严格门禁
+  - 触发：只有 `shared/db-migrations/versions/**` 变更时跑
+  - 用 `git diff --diff-filter=A base..head` 精确找本 PR 新增的 migration
+  - 对每个新 migration 扫：`CREATE TABLE` 必须配 `ENABLE RLS` + `CREATE POLICY`
+  - POLICY 必须用 `current_setting('app.tenant_id')`
+  - 禁止 `USING (true)` 绕过
+  - 豁免白名单 31 条（与 `tests/tier1/test_rls_all_tables_tier1.py` 一致）
+  - 额外跑 static tier1 测试作为保险
+- [x] **`demo_go_no_go.py` 同步改进**（本 PR 也carry）：
+  - Tier 1 glob 扩至 3 位置（与 tier1-gate.yml 一致）
+  - 按父目录分组跑 pytest（避免 conftest.py 冲突）
+- [x] **41 测试契约覆盖** (`tests/tier1/test_ci_gates_tier1.py`)：
+  - demo-go-no-go.yml 13 测试（触发 / inputs / --skip-tests / --json / artifact / PR 评论 / BLOCKING_IDS / permissions / timeout）
+  - tier1-gate.yml 10 测试（paths / discover job / matrix / 3 glob / gate job / pytest-asyncio / fail-fast false）
+  - rls-gate.yml 12 测试（migration paths / PR base/head diff / --diff-filter=A / v[0-9]+ pattern / 豁免列表 / RLS + POLICY + app.tenant_id / 禁止 USING (true) / 跑静态测试）
+  - 跨 workflow 一致性 6（都存在 / checkout@v6 / setup-python@v6 / python 3.11 / secrets 安全 / glob 一致）
+- [x] Ruff 全绿
+
+### 关键决策
+- **PR 模式默认 --skip-tests** — Tier 1 pytest 由专门的 `tier1-gate.yml` 跑（matrix 并行更快）；`demo-go-no-go.yml` 专注无 DB 依赖的 10 项 checkpoint（文档/脚本/scorecards）
+- **BLOCKING_IDS 可控集** — PR 默认只 block {1, 5, 6, 8, 10}（本 PR 可修复的），其他 SKIPPED 是环境依赖（DB/k6/nightly），不阻塞；strict 模式全开（Week 8 前 dispatch 跑）
+- **Tier 1 gate 用 matrix 按父目录分组** — 不同 service 的 conftest.py 会冲突，不能一次性 `pytest services/*/tests/*tier1*.py`；分组后并行还更快
+- **RLS gate 只看 PR 新增 migration** — 不回溯历史违规（由 `tests/tier1/test_rls_all_tables_tier1.py` 宽松跟踪）；新违规严格 block
+- **rls-gate.yml 豁免列表与 tier1 测试同步** — 两处写同一份是刻意的冗余：避免 shell 脚本 import Python，保持 CI workflow 可读可 diff
+- **PR 评论去重** — 用 `actions/github-script` 查找 bot 历史评论 + 更新，而非每次新建（避免评论刷屏）
+- **workflow 不加 secrets** — 都是静态扫 + pytest，不需要 secrets；避免 fork PR 泄露风险
+- **checkout@v6 + setup-python@v6 + python 3.11 统一** — 与既有 `ci.yml` 保持一致；测试强制校验
+- **rls-gate 用 regex 自扫而非 import Python script** — workflow 里 embed Python one-liner 比 checkout 全仓然后 `pip install` 更快，且不引依赖
+- **actions/github-script@v7 评论** — 原生 GitHub Action，无需加 token
+
+### 交付清单
+```
+新建（3 个 workflow）：
+  .github/workflows/demo-go-no-go.yml                   ~180 行
+  .github/workflows/tier1-gate.yml                      ~140 行
+  .github/workflows/rls-gate.yml                        ~180 行
+修改：
+  scripts/demo_go_no_go.py                              glob × 3 + 分组跑（与 tier1-gate.yml 对齐）
+新增测试：
+  tests/tier1/test_ci_gates_tier1.py                    41 测试
+```
+
+### 触发矩阵
+| Workflow | PR paths | Push paths | Dispatch |
+|----------|----------|------------|----------|
+| demo-go-no-go.yml | scripts/demo_*, docs/demo, infra/demo, tests/integration | 同上 | 有（含 strict 选项）|
+| tier1-gate.yml | *tier1*.py + Tier 1 源文件 + migrations + edge/sync-engine | main 全推 | — |
+| rls-gate.yml | shared/db-migrations/versions/** | — | — |
+
+### 下一步
+- **合并顺序**：
+  1. PR #99 RLS DSN fix 先合（tier1-gate.yml / rls-gate.yml 用它）
+  2. PR #98 Tier 1 tests 合（tier1-gate.yml matrix 发现它）
+  3. 本 PR（CI gates）合入后自动跑
+- **Branch protection** 配置（仓库 settings → Branches）：
+  - main 要求通过：demo-go-no-go / tier1-gate / rls-gate
+  - 不允许绕过（含 admin）
+- **CI dispatch 测试**：手动跑 `workflow_dispatch` + strict 验证 Week 8 前全套 checkpoint
+- **Nightly 工作流**：后续加 `.github/workflows/nightly-rls-audit.yml`，每日 3AM 跑 `check_rls_policies.py --strict` 对真实 DB
+
+### 已知风险
+- **PR 评论 race condition** — 如果两个 CI job 同时更新同一 PR 评论，可能出现覆盖；GitHub API 无并发锁；真实场景 bot 评论频率低，影响可忽略
+- **`fromJson(needs.discover.outputs.groups).include[0]`** — tier1-gate.yml 用这个判断有测试才跑；如果输出 JSON 格式偶尔错乱会导致 matrix 为空；通过强 validation 的 Python one-liner 缓解
+- **rls-gate.yml 豁免列表 duplicate** — 同时维护在 `tests/tier1/test_rls_all_tables_tier1.py` 和 workflow 内；双写容易漂移；可接受换 workflow 快速启动的简洁
+- **Tier 1 matrix 分组跑 3 次启动 pytest** — 比单次启动慢 10-20s；可接受
+- **Workflow YAML 缺 schema validation** — 没跑 `actionlint` 等；依赖测试 + 真实 CI 反馈
+- **demo-go-no-go BLOCKING_IDS 硬编码** — 未来增删 checkpoint 需同步改；可接受（变更低频）
+
+---
+
 ## 2026-04-24 Sprint H：集成验证基建（徐记海鲜 DEMO Go/No-Go）
 
 ### 本次会话目标

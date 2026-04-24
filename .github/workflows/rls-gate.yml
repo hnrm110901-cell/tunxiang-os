@@ -1,0 +1,175 @@
+name: RLS Gate (PR 新 migration)
+
+# 严格门禁：本 PR 新增的 migration 必须为每张新建业务表启用 RLS + POLICY
+# 覆盖 CLAUDE.md § 13 禁止事项第 6 条："禁止跳过 RLS — 所有 DB 操作必须带 tenant_id"
+#
+# 与 migration-ci.yml 互补：
+#   · migration-ci.yml 检查迁移链 + dangerous SQL + 粗查 tenant_id（informational）
+#   · 本工作流 仅针对 **本 PR 新增** 的 migration，strict block（新违规不允许）
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'shared/db-migrations/versions/**'
+      - 'tests/tier1/test_rls_all_tables_tier1.py'
+      - 'scripts/check_rls_policies.py'
+      - '.github/workflows/rls-gate.yml'
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  rls-gate:
+    name: RLS 严格门禁
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0  # 需要 git history 找 base branch
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+
+      - name: 安装 pytest
+        run: pip install --quiet pytest
+
+      - name: 识别本 PR 新增的 migration
+        id: diff
+        run: |
+          BASE="${{ github.event.pull_request.base.sha }}"
+          HEAD="${{ github.event.pull_request.head.sha }}"
+          echo "Base: $BASE / Head: $HEAD"
+
+          NEW_MIGRATIONS=$(git diff --name-only --diff-filter=A "$BASE" "$HEAD" \
+            | grep -E 'shared/db-migrations/versions/v[0-9]+_.*\.py$' \
+            | grep -v __pycache__ || true)
+
+          if [ -z "$NEW_MIGRATIONS" ]; then
+              echo "::notice title=RLS Gate::PR 未新增 migration，跳过 RLS strict check"
+              echo "has_new=false" >> $GITHUB_OUTPUT
+          else
+              echo "has_new=true" >> $GITHUB_OUTPUT
+              echo "New migrations:"
+              echo "$NEW_MIGRATIONS"
+              printf '%s\n' "$NEW_MIGRATIONS" > /tmp/new_migrations.txt
+          fi
+
+      - name: Strict RLS check — 新 migration 必须有 RLS + POLICY
+        if: steps.diff.outputs.has_new == 'true'
+        run: |
+          python - <<'PY'
+          import re
+          import sys
+          from pathlib import Path
+
+          # 豁免白名单（与 tests/tier1/test_rls_all_tables_tier1.py 保持一致）
+          EXEMPT = frozenset({
+              "alembic_version",
+              "events", "events_default",
+              "projector_checkpoints", "projector_rebuild_locks",
+              "system_config", "feature_flags_global", "skill_registry_global",
+              "adapter_registry", "currency_codes", "city_codes",
+              "industry_benchmarks", "role_level_defaults", "app_versions",
+              "refresh_tokens", "sync_checkpoints", "device_registry", "device_heartbeats",
+              "franchise_audits", "franchise_settlements", "franchise_settlement_items",
+              "central_kitchen_profiles", "brand_profiles", "brand_content_constraints",
+              "brand_seasonal_calendar", "competitor_brands", "competitor_snapshots",
+              "market_trend_signals", "supplier_profiles", "supplier_score_history",
+              "payment_events",
+          })
+          MV_PREFIXES = ("mv_",)
+          PARTITION_PATTERNS = (
+              "events_2024_", "events_2025_", "events_2026_", "events_2027_",
+          )
+          FALSE_POSITIVES = frozenset({"if"})
+
+          def is_exempt(table: str) -> bool:
+              if table in EXEMPT or table in FALSE_POSITIVES:
+                  return True
+              if any(table.startswith(p) for p in MV_PREFIXES):
+                  return True
+              if any(table.startswith(p) for p in PARTITION_PATTERNS):
+                  return True
+              return False
+
+          CREATE_RE = re.compile(
+              r"CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?([a-zA-Z_][a-zA-Z0-9_]*)",
+              re.IGNORECASE,
+          )
+          RLS_RE = re.compile(
+              r"ALTER\s+TABLE\s+([a-zA-Z_][a-zA-Z0-9_]*)\s+ENABLE\s+ROW\s+LEVEL\s+SECURITY",
+              re.IGNORECASE,
+          )
+          POLICY_RE = re.compile(
+              r"CREATE\s+POLICY\s+\w+\s+ON\s+([a-zA-Z_][a-zA-Z0-9_]*)",
+              re.IGNORECASE,
+          )
+
+          new_migrations = Path("/tmp/new_migrations.txt").read_text().strip().split("\n")
+          failures = []
+
+          for migration_path in new_migrations:
+              if not migration_path:
+                  continue
+              path = Path(migration_path)
+              if not path.exists():
+                  continue
+              source = path.read_text(encoding="utf-8")
+
+              created = {m.group(1).lower() for m in CREATE_RE.finditer(source)}
+              rls_enabled = {m.group(1).lower() for m in RLS_RE.finditer(source)}
+              policies = {m.group(1).lower() for m in POLICY_RE.finditer(source)}
+
+              # 本 migration 新建的表必须 ENABLE RLS
+              no_rls = {t for t in created if not is_exempt(t) and t not in rls_enabled}
+              if no_rls:
+                  failures.append(
+                      f"[{path.name}] 下列新建表未启用 RLS: {sorted(no_rls)}\n"
+                      f"  Fix: 在 migration 里添加 ALTER TABLE <t> ENABLE ROW LEVEL SECURITY"
+                  )
+
+              # 启用 RLS 的表必须有 POLICY
+              missing_policy = rls_enabled - policies
+              if missing_policy:
+                  failures.append(
+                      f"[{path.name}] 下列启用 RLS 的表无 POLICY: {sorted(missing_policy)}\n"
+                      f"  Fix: 添加 CREATE POLICY <name> ON <t> USING (tenant_id::text = current_setting('app.tenant_id', true))"
+                  )
+
+              # 含 POLICY 必须用 app.tenant_id
+              if policies and "app.tenant_id" not in source:
+                  failures.append(
+                      f"[{path.name}] POLICY 未使用 current_setting('app.tenant_id')\n"
+                      f"  Fix: POLICY USING 子句必须引用 current_setting('app.tenant_id', true)"
+                  )
+
+              # 禁止 USING (true) 绕过
+              if re.search(r"USING\s*\(\s*true\s*\)", source, re.IGNORECASE):
+                  failures.append(
+                      f"[{path.name}] 禁止 USING (true) 绕过 RLS"
+                  )
+
+          if failures:
+              print("::error title=RLS Gate 违规::新增 migration 不满足 RLS 硬约束")
+              for f in failures:
+                  print(f"::error::{f}")
+              sys.exit(1)
+
+          print(f"✅ {len(new_migrations)} 个新 migration 全部通过 RLS 严格检查")
+          PY
+
+      - name: 跑 tests/tier1/test_rls_all_tables_tier1.py
+        if: steps.diff.outputs.has_new == 'true'
+        run: |
+          # 额外保险：跑静态 RLS tier1 测试
+          PYTHONPATH=. python -m pytest -v --tb=short \
+            tests/tier1/test_rls_all_tables_tier1.py
+
+      - name: 成功 annotation
+        if: success() && steps.diff.outputs.has_new == 'true'
+        run: |
+          echo "::notice title=RLS Gate PASS::本 PR 新增的 migration 全部符合 RLS 要求"

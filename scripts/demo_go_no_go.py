@@ -93,7 +93,15 @@ class CheckResult:
 
 def check_tier1_tests(args: argparse.Namespace) -> CheckResult:
     """1. Tier 1 测试 100% 通过"""
-    tier1_files = list(REPO_ROOT.glob("services/*/src/tests/**/test_*tier1*.py"))
+    # 3 个支持的命名位置（对齐 .github/workflows/tier1-gate.yml）：
+    #   - services/*/tests/**/test_*tier1*.py         （legacy 布局）
+    #   - services/*/src/tests/**/test_*tier1*.py     （新布局）
+    #   - tests/tier1/**/test_*tier1*.py               （cross-service 顶层）
+    tier1_files = set()
+    tier1_files.update(REPO_ROOT.glob("services/*/tests/**/test_*tier1*.py"))
+    tier1_files.update(REPO_ROOT.glob("services/*/src/tests/**/test_*tier1*.py"))
+    tier1_files.update(REPO_ROOT.glob("tests/tier1/**/test_*tier1*.py"))
+    tier1_files = sorted(tier1_files)
     if not tier1_files:
         return CheckResult(
             checkpoint_id=1,
@@ -112,38 +120,60 @@ def check_tier1_tests(args: argparse.Namespace) -> CheckResult:
             evidence={"file_count": len(tier1_files)},
         )
 
-    try:
-        result = subprocess.run(  # noqa: S603
-            [sys.executable, "-m", "pytest", "-q", "--no-header", *[str(f) for f in tier1_files]],  # noqa: S603
-            cwd=REPO_ROOT,
-            capture_output=True,
-            text=True,
-            timeout=300,
-        )
-    except subprocess.TimeoutExpired:
-        return CheckResult(
-            checkpoint_id=1,
-            name="Tier 1 测试 100% 通过",
-            status=CheckStatus.NO_GO,
-            details="pytest 执行超过 5min，疑似死循环",
-        )
-    except FileNotFoundError:
-        return CheckResult(
-            checkpoint_id=1,
-            name="Tier 1 测试 100% 通过",
-            status=CheckStatus.SKIPPED,
-            details="python3/pytest 未安装",
-        )
+    # 按父目录分组避免 conftest.py 冲突（不同 service 的 conftest 不能混跑）
+    groups: dict[str, list[str]] = {}
+    for f in tier1_files:
+        group_key = str(f.parent)
+        groups.setdefault(group_key, []).append(str(f))
 
-    passed = result.returncode == 0
+    failed_groups: list[str] = []
+    passed_groups = 0
+    tail_lines: list[str] = []
+
+    for group_key, files in groups.items():
+        try:
+            result = subprocess.run(  # noqa: S603
+                [sys.executable, "-m", "pytest", "-q", "--no-header", *files],  # noqa: S603
+                cwd=REPO_ROOT,
+                capture_output=True,
+                text=True,
+                timeout=300,
+            )
+        except subprocess.TimeoutExpired:
+            return CheckResult(
+                checkpoint_id=1,
+                name="Tier 1 测试 100% 通过",
+                status=CheckStatus.NO_GO,
+                details=f"pytest 超时（{group_key}）",
+            )
+        except FileNotFoundError:
+            return CheckResult(
+                checkpoint_id=1,
+                name="Tier 1 测试 100% 通过",
+                status=CheckStatus.SKIPPED,
+                details="python3/pytest 未安装",
+            )
+        if result.returncode == 0:
+            passed_groups += 1
+        else:
+            failed_groups.append(group_key)
+            if result.stdout:
+                tail_lines.extend(result.stdout.splitlines()[-3:])
+
+    all_passed = not failed_groups
     return CheckResult(
         checkpoint_id=1,
         name="Tier 1 测试 100% 通过",
-        status=CheckStatus.GO if passed else CheckStatus.NO_GO,
-        details=f"{'全部通过' if passed else '有失败'}；{len(tier1_files)} 文件",
+        status=CheckStatus.GO if all_passed else CheckStatus.NO_GO,
+        details=(
+            f"{len(tier1_files)} 文件 / {len(groups)} 组"
+            + ("" if all_passed else f"；{len(failed_groups)} 组失败")
+        ),
         evidence={
-            "return_code": result.returncode,
-            "tail": result.stdout.splitlines()[-3:] if result.stdout else [],
+            "groups": len(groups),
+            "passed_groups": passed_groups,
+            "failed_groups": failed_groups,
+            "tail": tail_lines[-6:],
         },
     )
 

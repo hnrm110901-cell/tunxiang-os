@@ -1,0 +1,140 @@
+name: Tier 1 Gate
+
+# Tier 1 契约测试门禁（CLAUDE.md § 17 + § 20）
+#
+# Tier 1 路径：订单状态机 / 支付 Saga / RLS 隔离 / POS 数据 / 存酒押金 /
+#              全电发票 / CRDT 冲突 / 三条硬约束
+#
+# 任何修改 Tier 1 路径或其测试文件的 PR 必须全绿。
+# CI 分组跑（不同 service 的 conftest.py 会冲突，不能一次性全跑）。
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'services/**/tests/**/*tier1*.py'
+      - 'services/**/src/tests/**/*tier1*.py'
+      - 'tests/tier1/**'
+      - 'services/tx-trade/src/services/order_service.py'
+      - 'services/tx-trade/src/services/payment_saga_service.py'
+      - 'services/tx-trade/src/models/**'
+      - 'services/tx-finance/src/services/invoice_service.py'
+      - 'edge/sync-engine/src/conflict_resolver.py'
+      - 'edge/sync-engine/src/offline_sync_service.py'
+      - 'shared/db-migrations/versions/**'
+      - '.github/workflows/tier1-gate.yml'
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  discover:
+    name: 发现 Tier 1 测试文件
+    runs-on: ubuntu-latest
+    outputs:
+      groups: ${{ steps.find.outputs.groups }}
+      count: ${{ steps.find.outputs.count }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+
+      - name: 扫描 *tier1*.py
+        id: find
+        run: |
+          # 3 个命名位置（对齐 demo_go_no_go.py 的 glob）
+          # 按父目录分组（避免 conftest.py 冲突）
+          python - <<'PY' >> $GITHUB_OUTPUT
+          import json
+          from pathlib import Path
+          patterns = [
+              "services/*/tests/**/test_*tier1*.py",
+              "services/*/src/tests/**/test_*tier1*.py",
+              "tests/tier1/**/test_*tier1*.py",
+          ]
+          files = set()
+          for p in patterns:
+              files.update(Path(".").glob(p))
+          files = sorted(files)
+          # 按父目录分组
+          groups = {}
+          for f in files:
+              key = str(f.parent)
+              groups.setdefault(key, []).append(str(f))
+          matrix = [
+              {"group": key, "files": files}
+              for key, files in sorted(groups.items())
+          ]
+          print(f"groups={json.dumps({'include': matrix})}")
+          print(f"count={len(files)}")
+          PY
+
+      - name: Summary
+        run: |
+          echo "Found ${{ steps.find.outputs.count }} Tier 1 test files"
+
+  run:
+    name: Run Tier 1 ${{ matrix.group }}
+    runs-on: ubuntu-latest
+    needs: discover
+    if: ${{ fromJson(needs.discover.outputs.groups).include[0] != null }}
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.discover.outputs.groups) }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+
+      - name: 安装依赖
+        run: |
+          # 核心依赖（按 service requirements 最小化）
+          pip install --quiet \
+            pytest pytest-asyncio \
+            pydantic fastapi httpx \
+            sqlalchemy structlog
+
+      - name: Run ${{ matrix.group }}
+        run: |
+          FILES="${{ join(matrix.files, ' ') }}"
+          echo "Running: $FILES"
+
+          # PYTHONPATH 兼容 services/*/src 内部 import
+          PYTHONPATH=. python -m pytest -v --tb=short --no-header $FILES
+        env:
+          PYTHONDONTWRITEBYTECODE: 1
+
+      - name: Annotate 失败
+        if: failure()
+        run: |
+          echo "::error title=Tier 1 测试失败::${{ matrix.group }} 必须全绿，否则不允许合入 main。参考 CLAUDE.md § 20"
+
+  gate:
+    name: Tier 1 门禁判定
+    runs-on: ubuntu-latest
+    needs: [discover, run]
+    if: always()
+    steps:
+      - name: 校验
+        run: |
+          COUNT="${{ needs.discover.outputs.count }}"
+          RUN_RESULT="${{ needs.run.result }}"
+
+          if [ -z "$COUNT" ] || [ "$COUNT" = "0" ]; then
+              echo "::error title=未找到 Tier 1 测试::Tier 1 路径有变更但未跑测试。添加 *tier1*.py"
+              exit 1
+          fi
+
+          if [ "$RUN_RESULT" != "success" ]; then
+              echo "::error title=Tier 1 测试未全绿::任何 Tier 1 失败都阻塞 PR"
+              exit 1
+          fi
+
+          echo "✅ $COUNT 个 Tier 1 测试文件全绿"

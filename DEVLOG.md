@@ -1,3 +1,63 @@
+## 2026-04-24 GitHub Actions CI 门禁 — Go/No-Go + Tier 1 + RLS 三层自动化
+
+### 今日完成
+- [.github/workflows/demo-go-no-go.yml] PR / push / dispatch 触发 + --skip-tests --json + artifact + PR 评论表格 + BLOCKING_IDS {1,5,6,8,10} 可控集 + strict mode
+- [.github/workflows/tier1-gate.yml] 2-stage matrix：discover 扫文件按父目录分组 + run matrix 并行跑 + gate 校验；3 glob 位置与 demo_go_no_go.py 对齐
+- [.github/workflows/rls-gate.yml] PR base..head diff --diff-filter=A 找新 migration + 扫 CREATE TABLE/RLS/POLICY/app.tenant_id + 禁止 USING (true) + 豁免白名单 31 条
+- [scripts/demo_go_no_go.py] glob 扩 3 位置 + 按父目录分组跑 pytest（避免 conftest 冲突）— 与 tier1-gate.yml 对齐
+- [41 测试契约] demo-go-no-go 13 / tier1-gate 10 / rls-gate 12 / 跨 workflow 一致性 6
+
+### 数据变化
+- 新增 workflow：3 个
+- 修改脚本：demo_go_no_go.py
+- 新增测试：41 个
+
+### 遗留问题
+- PR 评论 race condition（GitHub API 无锁，影响可忽略）
+- rls-gate.yml 豁免列表与 test_rls_all_tables_tier1.py 双写（可接受）
+- workflow YAML 缺 schema validation（依赖真实 CI 反馈）
+
+### 明日计划
+- branch protection 配置：main 要求通过三个 workflow
+- dispatch 测试：strict mode 验证 Week 8 全套
+- nightly-rls-audit.yml：每日跑真实 DB
+
+---
+
+## 2026-04-24 桌台×时段服务模式架构升级（v281-v287）
+
+### 今日完成
+- [shared/db-migrations] 7个迁移（v281-v287）：区域服务模式/定价策略/会话继承/拼桌预设/拼桌日志/时段矩阵/利用率物化视图
+- [tx-trade/models/enums.py] 新增 ServiceMode 枚举（dine_first/scan_and_pay/retail）
+- [tx-trade/services/dining_session_service.py] 状态机按 service_mode 分支 + open_table() 继承区域服务模式/定价快照
+- [tx-trade/services/cashier_engine.py] 新增 create_retail_order() + create_pre_order() 两个方法
+- [tx-trade/services/voucher_redeem_service.py] 新建券核销服务（平台券/代金券/积分）
+- [tx-trade/services/table_merge_preset_service.py] 新建时段拼桌预设服务（执行/回滚/自动触发）
+- [tx-trade/api/cashier_api.py] 新增3端点：retail-sale/pre-order/redeem-voucher
+- [tx-trade/api/market_session_routes.py] 新增 POST /switch/{store_id} 市别切换+拼桌触发
+- [tx-trade/api/table_merge_preset_routes.py] 新建7端点
+- [tx-trade/api/table_period_config_routes.py] 新建4端点
+- [tx-trade/api/table_utilization_routes.py] 新建4端点
+- [tx-trade/main.py] 注册3个新路由模块
+
+### 数据变化
+- 迁移版本：v280 → v287（+7）
+- 新增表：3张 + 1物化视图
+- 新增字段：table_zones +4列, dining_sessions +2列
+- 新增端点：22个（3收银+1市别切换+7预设+4配置+4利用率+3已有文件）
+- 新建文件：12个，修改文件：6个
+
+### 架构决策
+- service_mode 三态挂在区域（非订单）— 区域决定全流程走向
+- retail 模式不创建 dining_session — 一步式零售最简路径
+- 拼桌预设复用已有 merge/split — 只加自动触发层
+- mv_table_utilization 不设 RLS — 查询时 WHERE 过滤
+
+### 遗留问题
+- VoucherRedeemService._redeem_member_points() 占位，待接入 tx-member
+
+---
+
 ## 2026-04-24 Sprint H 集成验证基建 — 徐记海鲜 DEMO Go/No-Go
 
 ### 今日完成
