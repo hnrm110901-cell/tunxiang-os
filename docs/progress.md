@@ -1,3 +1,87 @@
+## 2026-04-24 Sprint E2：菜品一键发布（canonical dish → 5 平台）
+
+### 本次会话目标
+按 sprint plan 继续 Sprint E 第 2 批次：一套菜品配置一次同步到 5 平台（美团/饿了么/抖音/小红书/微信）。核心价值：商家改个价/库存/停售只需一个 API 调用，不用在 5 个平台后台来回切。`DishPublishOrchestrator` 编排 + `registry` 记录状态 + `publish_tasks` 审计 trail + 每平台独立 `Publisher` 封装。
+
+与 E1 canonical schema 的关系：E1 是"入向"（平台 payload → canonical），E2 是"出向"（canonical dish → 平台 SKU），共用 5 平台枚举 + ALLOWED_PLATFORMS 常量。未来 canonical_delivery_items.platform_sku_id 可以反查 dish_publish_registry 找到内部 dish_id。
+
+Tier 级别：Tier 2（影响菜单发布链路，不触收银资金）。
+
+### 完成状态
+- [x] **v286 迁移**：`dish_publish_registry`（一菜一平台一条）+ `dish_publish_tasks`（异步任务队列）双表
+  - Registry：7 状态机 pending/publishing/published/paused/sold_out/unpublished/error + target vs published 价格/库存双字段 + consecutive_error_count 告警 + platform_metadata JSONB
+  - Tasks：7 操作 publish/update_price/update_stock/update_full/pause/resume/unpublish + 5 状态 queued/running/completed/failed/cancelled + attempts/max_attempts 重试 + scheduled_for 延时调度
+  - 2 UNIQUE 约束（registry 幂等 + tasks 队列）+ 4 索引（dish 查询 + errors 告警 + sku 反查 + tasks 队列）
+  - RLS app.tenant_id 双表
+- [x] **`shared/adapters/delivery_publish/` 新模块**：
+  - `base.py`：`DishPublishSpec` dataclass（含 platform_overrides） + `PublishResult`（success/failure 工厂） + `PublishStatus` + `PublishOperation` 枚举 + `DeliveryPublisher` ABC（4 必需方法 + 3 默认合成 pause/resume/update_full）
+  - `registry.py`：`register_publisher` / `get_publisher` / `publish_to_platform` 便捷函数（各 operation 分派，非 PUBLISH 强校验 platform_sku_id）
+  - `publishers.py`：5 平台 stub（MeituanPublisher / ElemePublisher / DouyinPublisher / XiaohongshuPublisher / WechatPublisher）— 生成 deterministic fake SKU + 失败模拟（dish_id 以 FAIL_ 开头）+ 每平台注释真实 SDK 要点
+- [x] **`DishPublishOrchestrator`** service（~470 行）：
+  - `orchestrate_publish(spec, targets[])` — 首次上架 / 全量更新，逐平台串行
+  - `orchestrate_operation(dish_id, operation, platforms[])` — 批量 pause/resume/unpublish/update_price/update_stock
+  - 幂等 UPSERT registry + 插入 task（状态 running）+ 调 publisher + 回写 registry/task
+  - 失败：registry.consecutive_error_count++ + last_error 记录；成功：reset 计数
+  - Worker 消费异步队列留作 follow-up PR
+- [x] **8 路 API**（`dish_publish_routes.py`）：
+  - `POST /publish`（首次/全量）
+  - `POST /{dish_id}/price` + `/stock` + `/pause` + `/resume` + `/unpublish`（5 个单操作）
+  - `GET /{dish_id}` 查一菜全平台状态
+  - `GET /` 分页列表（platform/status/errors_only 过滤）
+  - `GET /{dish_id}/tasks` 任务历史（审计）
+- [x] **50 TDD 测试全绿**（0.04s）：
+  - DishPublishSpec 合法性 7
+  - PublishResult 工厂 + to_dict 3
+  - Registry 3
+  - 5 平台 stub × publish × parametrize 5
+  - 5 平台 stub × failure FAIL_ × parametrize 5
+  - update_price × 3 平台 parametrize 3
+  - stock=0 sold_out / stock=None unlimited / unpublish / pause 默认合成 / update_full 默认合成 / wechat SKU=dish_id 6
+  - publish_to_platform 各 operation 分支 7
+  - 自定义 publisher 覆盖 stub 1
+  - v286 迁移静态断言 9
+  - 杂项 1
+- [x] Ruff 全绿
+
+### 关键决策
+- **Publisher 契约：4 必需 + 3 默认合成** — ABC 只强制 `publish/update_price/update_stock/unpublish`。`pause` 默认调 `update_stock(0)`，`resume` 默认调 `update_stock(stock)`，`update_full` 默认顺序调 `update_price + update_stock`。子类可覆盖以用平台专属 API（如美团 `pause` 有独立 endpoint 比 stock=0 更语义化）
+- **`registry` UPSERT 而非 INSERT** — 商家反复 publish 同一菜品（改描述/图片）不应累积多条；`UNIQUE (tenant, dish, platform, store)` 约束保证一菜一平台一条。只在首次时 platform_sku_id 从平台获取并写入，后续 update 保持不变
+- **`task` 审计 trail 与 registry 解耦** — registry 是"当前状态快照"，task 是"每次调用的流水"。失败排查时 task 告诉你"尝试了几次/每次错在哪里"，registry 告诉你"现在什么状态"。follow-up PR 的 worker 会 polling task 表实现异步重试
+- **stub 的 `FAIL_` 前缀** — 测试 hook，让测试能覆盖失败路径而不需要真 API 坏了。真实 publisher 的失败来自 4xx/5xx + 网络异常
+- **`WechatPublisher.platform_sku_id = dish_id`** — 微信自营没有独立 SKU 系统，内部 dish_id 就是 SKU。canonical 层看到的"平台 SKU"直接等于内部 ID，简化 canonical_delivery_items → dish 的 join
+- **串行 for-loop 而非 asyncio.gather** — 真实平台有 rate limit（美团 5/min，eleme 10/min），并发会触发限流；串行更保守。follow-up PR 可以按平台隔离并发：同平台串行、跨平台并发
+- **consecutive_error_count 与 error_count 分开** — 前者"连续"失败次数（成功后 reset），用来触发告警；后者"累计"失败次数，用来做 SLO 统计
+- **PAUSE / UNPUBLISH 不需要 spec** — 但 orchestrator 会从 registry 拼一个 minimal spec 传给 publisher，保持接口统一；RESUME 用 `StockUpdateRequest` 复用（可选 stock）
+
+### 交付清单
+```
+新建：
+  shared/db-migrations/versions/v286_dish_publish_registry.py           (~180 行，2 表 + 4 索引 + RLS)
+  shared/adapters/delivery_publish/__init__.py                          导出
+  shared/adapters/delivery_publish/base.py                              (~290 行：dataclass + ABC + 默认合成)
+  shared/adapters/delivery_publish/registry.py                          (~110 行：注册 + operation 分派)
+  shared/adapters/delivery_publish/publishers.py                        (~390 行：5 平台 stub)
+  services/tx-trade/src/services/dish_publish_orchestrator.py           (~470 行：UPSERT + task + publisher + 回写)
+  services/tx-trade/src/api/dish_publish_routes.py                      (~400 行：8 端点)
+  shared/adapters/delivery_publish/tests/test_publishers.py             (~420 行：50 测试)
+```
+
+### 下一步
+- **E3 小红书核销** — `XiaohongshuTransformer` (E1) + `XiaohongshuPublisher` (E2) stub 已就绪，差 OAuth + 签名校验 + webhook ingress
+- **E4 异议工作流**（v287 + delivery_disputes）— 状态机 + 自动响应模板
+- **publish_worker.py** — 消费 `dish_publish_tasks` 队列的 async worker，实现真实重试 + scheduled_for 调度
+- **真实 SDK 注入** — 每平台 adapter PR 提供 `RealMeituanPublisher` 等替换 stub
+- **路由挂载** — `canonical_delivery_routes` (E1) + `dish_publish_routes` (E2) 都需要挂到 tx-trade main.py
+
+### 已知风险
+- **真实平台审核延迟未建模** — 美团/抖音新菜品需要人工审核（~24h），本 PR 的 `publish` 返回 PUBLISHED 是乐观假设。真实 publisher 需增加 `AUDITING` 中间状态
+- **Publisher stub 不真实调用 API** — 上线前需替换为真实 SDK；stub 的 fake SKU 不会和真实平台对齐
+- **Orchestrator 未纳入单元测试** — 因依赖 DB session mock 工作量大；留 integration test 用 pytest-asyncio + sqlalchemy 内存 SQLite
+- **失败重试策略简单** — 当前是 per-call 一次失败即 `error`，不重试。真实应按 HTTP status 分 retry vs terminal（429/500 retry，400 terminal）
+- **修菜会同步到所有平台** — 如果商家只想改美团价，现有 API 强制传 `platforms: ["meituan"]` 而非自动推断；前端需要明确选择
+
+---
+
 ## 2026-04-23 Sprint D4b：薪资异常检测 Sonnet 4.7 + Prompt Cache（城市基准共享）
 
 ### 本次会话目标

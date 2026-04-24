@@ -1,3 +1,32 @@
+## 2026-04-24 Sprint E2 菜品一键发布 — canonical dish → 5 平台
+
+### 今日完成
+- [v286 迁移] `dish_publish_registry` + `dish_publish_tasks` 双表：7 状态机 + 7 操作 + target/published 双字段价格/库存 + consecutive_error_count 告警 + attempts 重试 + scheduled_for 延时 + RLS + 4 索引 + 2 UNIQUE
+- [shared/adapters/delivery_publish/] 新模块：`base.py`（DishPublishSpec + PublishResult + ABC 4 必需 + 3 默认合成）+ `registry.py`（注册 + operation 分派 + sku 强校验）+ `publishers.py`（5 平台 stub + FAIL_ 前缀测试 hook）
+- [DishPublishOrchestrator] ~470 行：orchestrate_publish / orchestrate_operation + UPSERT registry + task 审计 + publisher 调用 + 回写 + 失败 consecutive_error_count++
+- [8 路 API] POST /publish 首次/全量 + 5 个单操作（price/stock/pause/resume/unpublish） + GET 菜品状态 + GET 列表（errors_only 过滤） + GET tasks 历史
+- [50 测试全绿] 0.04s — Spec 7 / Result 3 / Registry 3 / 5 平台 publish parametrize 5 / 失败 5 / update_price 3 / 操作 6 / publish_to_platform 7 / 自定义 publisher 1 / v286 migration 9 / 杂 1
+
+### 数据变化
+- 迁移版本：v285 → v286
+- 新增 API 模块：1 个（tx-trade/dish_publish_routes，8 端点）
+- 新增共享模块：1 个（shared/adapters/delivery_publish/）
+- 新增测试：50 个
+
+### 遗留问题
+- 真实平台审核延迟（美团/抖音 ~24h）未建模，publish 直接返 PUBLISHED 乐观假设
+- Publisher stub 不真实调 API — 上线前需替换
+- Orchestrator 未纳入单元测试（依赖 DB mock 工作量）— 留 integration test
+- 失败重试策略简单，真实应按 HTTP status 分 retry vs terminal
+- canonical_delivery_routes (E1) + dish_publish_routes (E2) 都尚未挂到 tx-trade main.py
+
+### 明日计划
+- E3 小红书核销（OAuth + 签名 + webhook ingress）
+- E4 异议工作流（v287 + delivery_disputes + 自动响应模板）
+- publish_worker.py 消费 dish_publish_tasks 异步队列
+
+---
+
 ## 2026-04-23 Sprint D1 批次 6 + Overflow — 14 Skill 冲 100% 覆盖 + CI 门禁
 
 ### 今日完成
