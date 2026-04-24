@@ -14,11 +14,11 @@
 """
 from __future__ import annotations
 
-from datetime import datetime, timezone, date, time, timedelta
+from datetime import date, datetime, time, timedelta, timezone
 from uuid import UUID, uuid4
 
 import structlog
-from sqlalchemy import func, select, update, and_, or_, text, literal_column
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = structlog.get_logger(__name__)

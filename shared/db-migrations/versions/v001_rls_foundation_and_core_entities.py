@@ -10,10 +10,10 @@ from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import UUID, ARRAY, JSON
 
-revision: str = "v001"
-down_revision: Union[str, None] = None
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+revision = "v001"
+down_revision= None
+branch_labels= None
+depends_on= None
 
 # RLS 辅助函数
 RLS_TABLES = [

@@ -21,10 +21,10 @@ from typing import Sequence, Union
 import sqlalchemy as sa
 from alembic import op
 
-revision: str = "v110"
-down_revision: Union[str, None] = "v109"
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+revision = "v110"
+down_revision= "v109"
+branch_labels= None
+depends_on= None
 
 _TABLE = "delivery_orders"
 

@@ -16,8 +16,8 @@ from typing import Union
 from alembic import op
 import sqlalchemy as sa
 
-revision: str = "v083"
-down_revision: Union[str, None] = "v082"
+revision = "v083"
+down_revision= "v082"
 branch_labels = None
 depends_on = None
 

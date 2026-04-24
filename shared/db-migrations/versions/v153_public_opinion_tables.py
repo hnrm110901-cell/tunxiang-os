@@ -17,10 +17,10 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects.postgresql import JSONB, NUMERIC, UUID
 
-revision: str = "v153"
-down_revision: Union[str, None] = "v152"
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+revision = "v153"
+down_revision= "v152"
+branch_labels= None
+depends_on= None
 
 
 def upgrade() -> None:

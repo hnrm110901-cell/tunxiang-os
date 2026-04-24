@@ -1,7 +1,8 @@
 """节庆日历服务 — 节假日/纪念日/行业节点对增长策略的影响"""
-import structlog
 from datetime import date, timedelta
 from typing import Optional
+
+import structlog
 
 logger = structlog.get_logger(__name__)
 

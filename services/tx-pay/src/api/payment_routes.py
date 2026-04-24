@@ -10,15 +10,14 @@
 """
 from __future__ import annotations
 
-import uuid
-from datetime import date, datetime
+from datetime import date
 from typing import Optional
 
 import structlog
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Header, HTTPException
 from pydantic import BaseModel, Field
 
-from ..channels.base import PayMethod, PayStatus, TradeType
+from ..channels.base import PayMethod, TradeType
 
 logger = structlog.get_logger(__name__)
 

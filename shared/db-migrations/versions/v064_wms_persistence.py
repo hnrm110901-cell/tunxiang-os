@@ -27,10 +27,10 @@ from typing import Sequence, Union
 
 from alembic import op
 
-revision: str = "v064"
-down_revision: Union[str, None] = "v063"
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+revision = "v064"
+down_revision= "v063"
+branch_labels= None
+depends_on= None
 
 # ─────────────────────────────────────────────────────────────────────────────
 #  安全 RLS 条件 — NULLIF NULL-guard 防止空字符串绕过（v056+ 标准）

@@ -10,10 +10,10 @@ from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import UUID, JSON
 
-revision: str = "v002"
-down_revision: Union[str, None] = "v001"
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+revision = "v002"
+down_revision= "v001"
+branch_labels= None
+depends_on= None
 
 # 本次新增的 12 张表（按依赖顺序排列）
 NEW_TABLES = [

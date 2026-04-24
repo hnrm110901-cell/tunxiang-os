@@ -10,10 +10,10 @@ from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import UUID, JSON
 
-revision: str = "v006"
-down_revision: Union[str, None] = "v005"
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+revision = "v006"
+down_revision= "v005"
+branch_labels= None
+depends_on= None
 
 V001_TABLES = ["customers", "stores", "dish_categories", "dishes", "dish_ingredients", "orders", "order_items", "ingredient_masters", "ingredients", "ingredient_transactions", "employees"]
 V002_TABLES = ["tables", "payments", "refunds", "settlements", "shift_handovers", "receipt_templates", "receipt_logs", "production_depts", "dish_dept_mappings", "daily_ops_flows", "daily_ops_nodes", "agent_decision_logs"]

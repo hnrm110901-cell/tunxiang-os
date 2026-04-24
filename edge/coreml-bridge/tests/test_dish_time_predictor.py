@@ -16,6 +16,7 @@ Y-K3 出餐时间预测器测试
   7. test_predict_returns_p95                  — p95 > estimated
   8. test_discount_risk_evaluation             — 折扣风险规则三档判定
 """
+
 from __future__ import annotations
 
 import os
@@ -56,20 +57,28 @@ sys.modules.setdefault("structlog", _structlog)
 
 # ─── 正式 import ──────────────────────────────────────────────────────────────
 import pytest  # noqa: E402
-from fastapi import FastAPI  # noqa: E402
-from fastapi.testclient import TestClient  # noqa: E402
-
-from dish_time_predictor import DishTimePredictor, PredictionInput  # type: ignore[import]  # noqa: E402
-from rule_fallback import RuleBasedDiscountRisk, DiscountRiskInput  # type: ignore[import]  # noqa: E402
+from dish_time_predictor import (  # type: ignore[import]  # noqa: E402  # type: ignore[import]  # noqa: E402
+    DishTimePredictor,
+    PredictionInput,
+    get_predictor,
+)
+from dish_time_predictor import PredictionInput as _PI
 
 # main.py uses relative imports — build standalone FastAPI test app instead
-from fastapi import HTTPException  # noqa: E402
-from dish_time_predictor import get_predictor, PredictionInput as _PI  # type: ignore[import]  # noqa: E402
+from fastapi import (
+    FastAPI,  # noqa: E402
+)
+from fastapi.testclient import TestClient  # noqa: E402
+from rule_fallback import (  # type: ignore[import]  # noqa: E402
+    DiscountRiskInput,
+    RuleBasedDiscountRisk,
+    RuleBasedTrafficPredict,
+)
+from rule_fallback import (
+    DiscountRiskInput as _DRI,
+)
 from rule_fallback import (  # type: ignore[import]  # noqa: E402
     RuleBasedDiscountRisk as _RDR,
-    DiscountRiskInput as _DRI,
-    RuleBasedTrafficPredict,
-    TrafficPredictInput,
 )
 
 # ─── 独立测试 FastAPI App（避免相对导入问题）────────────────────────────────
@@ -87,11 +96,16 @@ async def _health():
 async def _model_status():
     predictor = get_predictor()
     method = "coreml" if predictor._coreml_available else "rule_fallback"
-    return {"ok": True, "data": {"models": {
-        "dish_time_predictor": {"method": method, "coreml_available": predictor._coreml_available},
-        "discount_risk": {"method": "rule_fallback", "coreml_available": False},
-        "traffic_predict": {"method": "rule_fallback", "coreml_available": False},
-    }}}
+    return {
+        "ok": True,
+        "data": {
+            "models": {
+                "dish_time_predictor": {"method": method, "coreml_available": predictor._coreml_available},
+                "discount_risk": {"method": "rule_fallback", "coreml_available": False},
+                "traffic_predict": {"method": "rule_fallback", "coreml_available": False},
+            }
+        },
+    }
 
 
 from pydantic import BaseModel, Field  # noqa: E402
@@ -116,38 +130,48 @@ class _DiscountRiskReq(BaseModel):
 @_app.post("/predict/dish-time")
 async def _predict_dish_time(req: _DishTimeReq):
     predictor = get_predictor()
-    result = predictor.predict(_PI(
-        dish_category=req.dish_category,
-        dish_complexity=req.dish_complexity,
-        current_queue_depth=req.current_queue_depth,
-        hour_of_day=req.hour_of_day,
-        concurrent_orders=req.concurrent_orders,
-    ))
-    return {"ok": True, "data": {
-        "estimated_minutes": result.estimated_minutes,
-        "confidence": result.confidence,
-        "method": result.method,
-        "p95_minutes": result.p95_minutes,
-        "inference_ms": round(result.inference_ms, 3),
-    }}
+    result = predictor.predict(
+        _PI(
+            dish_category=req.dish_category,
+            dish_complexity=req.dish_complexity,
+            current_queue_depth=req.current_queue_depth,
+            hour_of_day=req.hour_of_day,
+            concurrent_orders=req.concurrent_orders,
+        )
+    )
+    return {
+        "ok": True,
+        "data": {
+            "estimated_minutes": result.estimated_minutes,
+            "confidence": result.confidence,
+            "method": result.method,
+            "p95_minutes": result.p95_minutes,
+            "inference_ms": round(result.inference_ms, 3),
+        },
+    }
 
 
 @_app.post("/predict/discount-risk")
 async def _predict_discount_risk(req: _DiscountRiskReq):
-    result = _discount_risk.evaluate_discount(_DRI(
-        discount_rate=req.discount_rate,
-        hour_of_day=req.hour_of_day,
-        order_amount_fen=req.order_amount_fen,
-        employee_id=req.employee_id,
-        table_id=req.table_id,
-    ))
-    return {"ok": True, "data": {
-        "risk_level": result.risk_level,
-        "risk_score": result.risk_score,
-        "method": result.method,
-        "reasons": result.reasons,
-        "should_alert": result.should_alert,
-    }}
+    result = _discount_risk.evaluate_discount(
+        _DRI(
+            discount_rate=req.discount_rate,
+            hour_of_day=req.hour_of_day,
+            order_amount_fen=req.order_amount_fen,
+            employee_id=req.employee_id,
+            table_id=req.table_id,
+        )
+    )
+    return {
+        "ok": True,
+        "data": {
+            "risk_level": result.risk_level,
+            "risk_score": result.risk_score,
+            "method": result.method,
+            "reasons": result.reasons,
+            "should_alert": result.should_alert,
+        },
+    }
 
 
 client = TestClient(_app)
@@ -168,7 +192,6 @@ def _make_predictor() -> DishTimePredictor:
 
 
 class TestRuleEngine:
-
     def test_rule_fallback_hot_dish_normal_hours(self) -> None:
         """1. 正常时段热菜：base=12, complexity=3(×1.0), no queue, no peak → 12.0"""
         predictor = _make_predictor()
@@ -176,7 +199,7 @@ class TestRuleEngine:
             dish_category="hot_dishes",
             dish_complexity=3,
             current_queue_depth=0,
-            hour_of_day=10,   # 非高峰期
+            hour_of_day=10,  # 非高峰期
             concurrent_orders=1,
         )
         result = predictor._predict_rules(inp)
@@ -198,7 +221,7 @@ class TestRuleEngine:
             dish_category="hot_dishes",
             dish_complexity=3,
             current_queue_depth=0,
-            hour_of_day=12,   # 午市高峰
+            hour_of_day=12,  # 午市高峰
             concurrent_orders=1,
         )
         normal = predictor._predict_rules(inp_normal)
@@ -253,7 +276,7 @@ class TestRuleEngine:
             dish_category="cold_dishes",
             dish_complexity=1,
             current_queue_depth=0,
-            hour_of_day=3,   # 深夜，非高峰
+            hour_of_day=3,  # 深夜，非高峰
             concurrent_orders=1,
         )
         result = predictor._predict_rules(inp)
@@ -291,51 +314,60 @@ class TestRuleEngine:
 
 
 class TestDiscountRisk:
-
     def test_discount_risk_evaluation(self) -> None:
         """8. 折扣风险规则三档判定"""
         engine = RuleBasedDiscountRisk()
 
         # 低风险：折扣率 0.1
-        low = engine.evaluate_discount(DiscountRiskInput(
-            discount_rate=0.1,
-            hour_of_day=15,   # 非高峰
-            order_amount_fen=5000,
-        ))
+        low = engine.evaluate_discount(
+            DiscountRiskInput(
+                discount_rate=0.1,
+                hour_of_day=15,  # 非高峰
+                order_amount_fen=5000,
+            )
+        )
         assert low.risk_level == "low"
         assert low.should_alert is False
 
         # 中风险：折扣率 0.35
-        medium = engine.evaluate_discount(DiscountRiskInput(
-            discount_rate=0.35,
-            hour_of_day=15,
-            order_amount_fen=5000,
-        ))
+        medium = engine.evaluate_discount(
+            DiscountRiskInput(
+                discount_rate=0.35,
+                hour_of_day=15,
+                order_amount_fen=5000,
+            )
+        )
         assert medium.risk_level == "medium"
         assert medium.should_alert is True
 
         # 高风险：折扣率 0.6
-        high = engine.evaluate_discount(DiscountRiskInput(
-            discount_rate=0.6,
-            hour_of_day=15,
-            order_amount_fen=5000,
-        ))
+        high = engine.evaluate_discount(
+            DiscountRiskInput(
+                discount_rate=0.6,
+                hour_of_day=15,
+                order_amount_fen=5000,
+            )
+        )
         assert high.risk_level == "high"
         assert high.risk_score >= 60
         assert high.should_alert is True
         assert len(high.reasons) >= 1
 
         # 高峰期 + 折扣 > 0.4 → 额外加分
-        peak_high = engine.evaluate_discount(DiscountRiskInput(
-            discount_rate=0.45,
-            hour_of_day=12,  # 午市高峰
-            order_amount_fen=5000,
-        ))
-        non_peak = engine.evaluate_discount(DiscountRiskInput(
-            discount_rate=0.45,
-            hour_of_day=15,  # 非高峰
-            order_amount_fen=5000,
-        ))
+        peak_high = engine.evaluate_discount(
+            DiscountRiskInput(
+                discount_rate=0.45,
+                hour_of_day=12,  # 午市高峰
+                order_amount_fen=5000,
+            )
+        )
+        non_peak = engine.evaluate_discount(
+            DiscountRiskInput(
+                discount_rate=0.45,
+                hour_of_day=15,  # 非高峰
+                order_amount_fen=5000,
+            )
+        )
         assert peak_high.risk_score > non_peak.risk_score
 
 
@@ -358,13 +390,16 @@ class TestAPIRoutes:
         assert models["dish_time_predictor"]["method"] in ("coreml", "rule_fallback")
 
     def test_predict_dish_time_api(self) -> None:
-        resp = client.post("/predict/dish-time", json={
-            "dish_category": "hot_dishes",
-            "dish_complexity": 3,
-            "current_queue_depth": 2,
-            "hour_of_day": 12,
-            "concurrent_orders": 2,
-        })
+        resp = client.post(
+            "/predict/dish-time",
+            json={
+                "dish_category": "hot_dishes",
+                "dish_complexity": 3,
+                "current_queue_depth": 2,
+                "hour_of_day": 12,
+                "concurrent_orders": 2,
+            },
+        )
         assert resp.status_code == 200
         data = resp.json()["data"]
         assert "estimated_minutes" in data
@@ -373,13 +408,16 @@ class TestAPIRoutes:
         assert data["p95_minutes"] > data["estimated_minutes"]
 
     def test_predict_discount_risk_api(self) -> None:
-        resp = client.post("/predict/discount-risk", json={
-            "discount_rate": 0.55,
-            "hour_of_day": 12,
-            "order_amount_fen": 15000,
-            "employee_id": "emp_001",
-            "table_id": "T-05",
-        })
+        resp = client.post(
+            "/predict/discount-risk",
+            json={
+                "discount_rate": 0.55,
+                "hour_of_day": 12,
+                "order_amount_fen": 15000,
+                "employee_id": "emp_001",
+                "table_id": "T-05",
+            },
+        )
         assert resp.status_code == 200
         data = resp.json()["data"]
         assert data["risk_level"] == "high"

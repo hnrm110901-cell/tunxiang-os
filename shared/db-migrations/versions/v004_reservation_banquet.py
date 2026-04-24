@@ -20,10 +20,10 @@ from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import UUID, JSON, ARRAY
 
-revision: str = "v004"
-down_revision: Union[str, None] = "v003"
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+revision = "v004"
+down_revision= "v003"
+branch_labels= None
+depends_on= None
 
 NEW_TABLES = [
     "reservations",

@@ -8,8 +8,8 @@ Create Date: 2026-04-13
 """
 from alembic import op
 
-revision = "v252"
-down_revision = "v251"
+revision = "v293"
+down_revision = "v292"
 branch_labels = None
 depends_on = None
 

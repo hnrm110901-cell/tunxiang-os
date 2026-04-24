@@ -24,27 +24,21 @@ A3 差标合规 Agent + A5 差旅助手 Agent — 单元测试
 from __future__ import annotations
 
 import uuid
-from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-# ─── A5 独立函数（无DB依赖，可直接测试）──────────────────────────────────────
+# ─── A3 独立函数（部分无DB依赖）──────────────────────────────────────────────
+from services.tx_expense.src.agents.a3_standard_compliance import (
+    _extract_destination_city,
+    check_item_compliance,
+)
 
+# ─── A5 独立函数（无DB依赖，可直接测试）──────────────────────────────────────
 from services.tx_expense.src.agents.a5_travel_assistant import (
     estimate_travel_needed,
     handle_inspection_task_assigned,
 )
-
-
-# ─── A3 独立函数（部分无DB依赖）──────────────────────────────────────────────
-
-from services.tx_expense.src.agents.a3_standard_compliance import (
-    _extract_destination_city,
-    check_item_compliance,
-    run,
-)
-
 
 # ===========================================================================
 # A5 — estimate_travel_needed

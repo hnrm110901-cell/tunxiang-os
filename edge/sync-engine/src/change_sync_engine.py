@@ -24,6 +24,7 @@
   - 云端为主（cloud wins）冲突解决策略
   - 具体异常类型（禁止 broad except）
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -80,12 +81,14 @@ TABLE_PRIORITY: dict[str, int] = {
 
 # ─── 数据模型 ──────────────────────────────────────────────────────────────
 
+
 @dataclass
 class ChangeRecord:
     """单条变更记录"""
+
     table_name: str
     record_id: str
-    operation: str          # INSERT | UPDATE | DELETE
+    operation: str  # INSERT | UPDATE | DELETE
     data: dict[str, Any]
     tenant_id: str
     changed_at: datetime
@@ -125,15 +128,17 @@ class ChangeRecord:
 @dataclass
 class SyncResult:
     """推送到云端的结果"""
-    accepted: List[str] = field(default_factory=list)    # change_id 列表
-    conflicts: List[str] = field(default_factory=list)   # change_id 列表
-    errors: List[str] = field(default_factory=list)      # change_id 列表
+
+    accepted: List[str] = field(default_factory=list)  # change_id 列表
+    conflicts: List[str] = field(default_factory=list)  # change_id 列表
+    errors: List[str] = field(default_factory=list)  # change_id 列表
     error_messages: List[str] = field(default_factory=list)
 
 
 @dataclass
 class ApplyResult:
     """应用到本地的结果"""
+
     applied: int = 0
     skipped: int = 0
     failed: int = 0
@@ -141,6 +146,7 @@ class ApplyResult:
 
 
 # ─── 同步光标管理器 ────────────────────────────────────────────────────────
+
 
 class SyncCursorManager:
     """管理推送/拉取光标（持久化到本地 PG sync_cursors 表）
@@ -244,6 +250,7 @@ class SyncCursorManager:
 
 
 # ─── 断网重试队列 ──────────────────────────────────────────────────────────
+
 
 class RetryQueue:
     """断网续传：失败的变更持久化到本地 PG retry_queue 表
@@ -382,6 +389,7 @@ class RetryQueue:
 
 # ─── 核心同步引擎 ──────────────────────────────────────────────────────────
 
+
 class ChangeSyncEngine:
     """基于 ChangeRecord 的双向增量同步引擎
 
@@ -498,9 +506,7 @@ class ChangeSyncEngine:
 
                 # 推送失败的变更进入重试队列
                 if push_result.errors:
-                    failed_changes = [
-                        c for c in local_changes if c.change_id in set(push_result.errors)
-                    ]
+                    failed_changes = [c for c in local_changes if c.change_id in set(push_result.errors)]
                     if failed_changes:
                         await self._retry.enqueue(
                             failed_changes,
@@ -588,9 +594,7 @@ class ChangeSyncEngine:
         # 降级：扫描各表 updated_at > since
         return await self._scan_tables_for_changes(since)
 
-    async def _get_from_changelog(
-        self, since: datetime
-    ) -> Optional[List[ChangeRecord]]:
+    async def _get_from_changelog(self, since: datetime) -> Optional[List[ChangeRecord]]:
         """从 sync_changelog 表查询变更，表不存在则返回 None（触发降级）"""
         assert self._pool is not None
         try:
@@ -625,15 +629,17 @@ class ChangeSyncEngine:
                     changed_at = datetime.fromisoformat(changed_at)
                 if changed_at.tzinfo is None:
                     changed_at = changed_at.replace(tzinfo=timezone.utc)
-                changes.append(ChangeRecord(
-                    table_name=d["table_name"],
-                    record_id=str(d["record_id"]),
-                    operation=d["operation"],
-                    data=data,
-                    tenant_id=d["tenant_id"],
-                    changed_at=changed_at,
-                    change_id=d.get("change_id") or str(uuid.uuid4()),
-                ))
+                changes.append(
+                    ChangeRecord(
+                        table_name=d["table_name"],
+                        record_id=str(d["record_id"]),
+                        operation=d["operation"],
+                        data=data,
+                        tenant_id=d["tenant_id"],
+                        changed_at=changed_at,
+                        change_id=d.get("change_id") or str(uuid.uuid4()),
+                    )
+                )
             return changes
 
         except OperationalError:
@@ -687,14 +693,16 @@ class ChangeSyncEngine:
                         updated_at = updated_at.replace(tzinfo=timezone.utc)
                     # 将所有值序列化为可 JSON 化的形式
                     data = {k: _serialize_value(v) for k, v in d.items()}
-                    changes.append(ChangeRecord(
-                        table_name=table,
-                        record_id=str(d.get("id", "")),
-                        operation="UPDATE",  # 无法区分 INSERT/UPDATE，统一用 UPSERT 处理
-                        data=data,
-                        tenant_id=str(d.get("tenant_id", self._tenant_id)),
-                        changed_at=updated_at,
-                    ))
+                    changes.append(
+                        ChangeRecord(
+                            table_name=table,
+                            record_id=str(d.get("id", "")),
+                            operation="UPDATE",  # 无法区分 INSERT/UPDATE，统一用 UPSERT 处理
+                            data=data,
+                            tenant_id=str(d.get("tenant_id", self._tenant_id)),
+                            changed_at=updated_at,
+                        )
+                    )
 
             except OperationalError as exc:
                 logger.warning(
@@ -744,7 +752,7 @@ class ChangeSyncEngine:
 
         # 分批推送（每批 INGEST_BATCH_SIZE 条）
         for i in range(0, len(changes), INGEST_BATCH_SIZE):
-            batch = changes[i: i + INGEST_BATCH_SIZE]
+            batch = changes[i : i + INGEST_BATCH_SIZE]
             batch_result = await self._push_batch(batch)
             result.accepted.extend(batch_result.accepted)
             result.conflicts.extend(batch_result.conflicts)
@@ -819,9 +827,7 @@ class ChangeSyncEngine:
 
         return result
 
-    async def _record_conflicts(
-        self, changes: List[ChangeRecord], conflict_ids: List[str]
-    ) -> None:
+    async def _record_conflicts(self, changes: List[ChangeRecord], conflict_ids: List[str]) -> None:
         """将冲突记录到本地 sync_conflicts 表（云端版本更新，不覆盖）"""
         assert self._pool is not None
         conflict_set = set(conflict_ids)
@@ -831,7 +837,8 @@ class ChangeSyncEngine:
         try:
             async with self._pool.begin() as conn:
                 # 确保表存在
-                await conn.execute(text("""
+                await conn.execute(
+                    text("""
                     CREATE TABLE IF NOT EXISTS sync_conflicts (
                         id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
                         change_id   TEXT NOT NULL,
@@ -841,7 +848,8 @@ class ChangeSyncEngine:
                         reason      TEXT,
                         created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
                     )
-                """))
+                """)
+                )
                 for change in conflict_changes:
                     await conn.execute(
                         text("""
@@ -962,7 +970,7 @@ class ChangeSyncEngine:
 
         # 分批处理
         for batch_start in range(0, len(changes), APPLY_BATCH_SIZE):
-            batch = changes[batch_start: batch_start + APPLY_BATCH_SIZE]
+            batch = changes[batch_start : batch_start + APPLY_BATCH_SIZE]
             batch_result = await self._apply_batch(batch)
             result.applied += batch_result.applied
             result.skipped += batch_result.skipped
@@ -1027,13 +1035,11 @@ class ChangeSyncEngine:
         columns = list(data.keys())
         col_list = ", ".join(f'"{c}"' for c in columns)
         placeholders = ", ".join(f":{c}" for c in columns)
-        update_set = ", ".join(
-            f'"{c}" = EXCLUDED."{c}"' for c in columns if c != "id"
-        )
+        update_set = ", ".join(f'"{c}" = EXCLUDED."{c}"' for c in columns if c != "id")
         sql = (
             f'INSERT INTO "{change.table_name}" ({col_list}) '
             f"VALUES ({placeholders}) "
-            f'ON CONFLICT (id) DO UPDATE SET {update_set}'
+            f"ON CONFLICT (id) DO UPDATE SET {update_set}"
         )
         row = {c: data.get(c) for c in columns}
         await conn.execute(text(sql), row)
@@ -1073,7 +1079,8 @@ class ChangeSyncEngine:
         assert self._pool is not None
         try:
             async with self._pool.begin() as conn:
-                await conn.execute(text("""
+                await conn.execute(
+                    text("""
                     CREATE TABLE IF NOT EXISTS sync_stats (
                         id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
                         tenant_id   TEXT NOT NULL,
@@ -1087,7 +1094,8 @@ class ChangeSyncEngine:
                         is_offline  BOOLEAN DEFAULT FALSE,
                         created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
                     )
-                """))
+                """)
+                )
                 await conn.execute(
                     text("""
                         INSERT INTO sync_stats
@@ -1117,6 +1125,7 @@ class ChangeSyncEngine:
 
 
 # ─── 工具函数 ──────────────────────────────────────────────────────────────
+
 
 def _serialize_value(v: Any) -> Any:
     """将 PG 数据类型转换为 JSON 安全的 Python 类型"""

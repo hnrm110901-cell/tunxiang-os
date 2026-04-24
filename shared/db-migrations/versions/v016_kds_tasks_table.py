@@ -13,10 +13,10 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
 
-revision: str = "v016"
-down_revision: Union[str, None] = "v015"
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+revision = "v016"
+down_revision= "v015"
+branch_labels= None
+depends_on= None
 
 TABLE = "kds_tasks"
 

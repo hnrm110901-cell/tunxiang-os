@@ -29,10 +29,10 @@ from typing import Sequence, Union
 
 from alembic import op
 
-revision: str = "v017"
-down_revision: Union[str, None] = "v016"
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+revision = "v017"
+down_revision= "v016"
+branch_labels= None
+depends_on= None
 
 # KDS 相关表
 KDS_TABLES = ["production_depts", "dish_dept_mappings"]

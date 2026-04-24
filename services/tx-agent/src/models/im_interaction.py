@@ -3,10 +3,9 @@
 表：sop_im_interactions / sop_quick_actions
 """
 import uuid
-from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import Boolean, DateTime, String, Text, func
+from sqlalchemy import Boolean, Text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 

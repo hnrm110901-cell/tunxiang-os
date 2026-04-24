@@ -10,6 +10,7 @@
 
 Mock 模式：无可用更新时返回空结果，不会触发实际文件操作。
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -17,7 +18,7 @@ import hashlib
 import os
 import shutil
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
 from typing import Any
@@ -100,13 +101,9 @@ class OTAManager:
         current_version_code: int | None = None,
         install_dir: str | None = None,
     ) -> None:
-        self._cloud_api_url = cloud_api_url or os.getenv(
-            "CLOUD_API_URL", "http://localhost:8000"
-        )
+        self._cloud_api_url = cloud_api_url or os.getenv("CLOUD_API_URL", "http://localhost:8000")
         self._current_version = current_version or os.getenv("APP_VERSION", "0.0.0")
-        self._current_version_code = current_version_code or int(
-            os.getenv("APP_VERSION_CODE", "0")
-        )
+        self._current_version_code = current_version_code or int(os.getenv("APP_VERSION_CODE", "0"))
         self._tenant_id = os.getenv("TENANT_ID", "default_tenant")
         self._device_type = os.getenv("DEVICE_TYPE", "mac_mini")
 
@@ -276,10 +273,9 @@ class OTAManager:
             headers["Range"] = f"bytes={downloaded_bytes}-"
 
         try:
-            async with httpx.AsyncClient(timeout=None) as client:
-                async with client.stream(
-                    "GET", update.download_url, headers=headers
-                ) as resp:
+            # OTA 下载可能为大文件，设置较长超时（30 分钟）避免 broad timeout=None
+            async with httpx.AsyncClient(timeout=httpx.Timeout(1800.0, connect=30.0)) as client:
+                async with client.stream("GET", update.download_url, headers=headers) as resp:
                     if resp.status_code == 416:
                         # Range Not Satisfiable - 文件已完整下载
                         if temp_path.exists():
@@ -297,9 +293,7 @@ class OTAManager:
 
                     mode = "ab" if downloaded_bytes > 0 else "wb"
                     with open(temp_path, mode) as f:
-                        async for chunk in resp.aiter_bytes(
-                            chunk_size=_DOWNLOAD_CHUNK_SIZE
-                        ):
+                        async for chunk in resp.aiter_bytes(chunk_size=_DOWNLOAD_CHUNK_SIZE):
                             f.write(chunk)
                             downloaded_bytes += len(chunk)
                             if total_size > 0:
@@ -436,9 +430,7 @@ class OTAManager:
                 # 安全检查：防止路径遍历
                 for member in tar.getmembers():
                     member_path = Path(self._install_dir / member.name).resolve()
-                    if not str(member_path).startswith(
-                        str(self._install_dir.resolve())
-                    ):
+                    if not str(member_path).startswith(str(self._install_dir.resolve())):
                         logger.error(
                             "ota_apply_path_traversal_blocked",
                             member=member.name,
@@ -517,9 +509,7 @@ class OTAManager:
         """
         self._state = OTAState.RESTARTING
 
-        service_label = os.getenv(
-            "LAUNCHD_SERVICE_LABEL", "com.tunxiang.mac-station"
-        )
+        service_label = os.getenv("LAUNCHD_SERVICE_LABEL", "com.tunxiang.mac-station")
 
         try:
             proc = await asyncio.create_subprocess_exec(

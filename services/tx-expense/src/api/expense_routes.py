@@ -14,6 +14,7 @@ from uuid import UUID
 import structlog
 from fastapi import APIRouter, Depends, File, Header, HTTPException, Query, UploadFile, status
 from pydantic import BaseModel, Field
+from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 

@@ -19,13 +19,12 @@ from uuid import UUID, uuid4
 
 import httpx
 import structlog
-from sqlalchemy import select, func, and_, update
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from services.tx_agent.src.models.im_interaction import (
     SOPIMInteraction,
     SOPQuickAction,
 )
+from sqlalchemy import and_, func, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = structlog.get_logger(__name__)
 

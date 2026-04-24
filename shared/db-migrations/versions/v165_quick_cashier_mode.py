@@ -17,10 +17,10 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects.postgresql import UUID
 
-revision: str = "v165"
-down_revision: Union[str, None] = "v164"
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+revision = "v165"
+down_revision= "v164"
+branch_labels= None
+depends_on= None
 
 _SAFE_CONDITION = "tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::UUID"
 # call_number_sequences 不含 tenant_id，用 store_id 隔离（无 RLS，通过应用层控制）

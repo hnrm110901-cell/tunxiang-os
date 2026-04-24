@@ -31,10 +31,10 @@ from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 
-revision: str = "v149"
-down_revision: Union[str, None] = "v148"
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+revision = "v149"
+down_revision= "v148"
+branch_labels= None
+depends_on= None
 
 NEW_TABLES = [
     "table_zones",

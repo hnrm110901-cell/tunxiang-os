@@ -24,10 +24,10 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects.postgresql import UUID
 
-revision: str = "v169"
-down_revision: Union[str, None] = "v168"
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+revision = "v169"
+down_revision = "v168"
+branch_labels= None
+depends_on= None
 
 
 def _col_exists(table: str, column: str) -> bool:

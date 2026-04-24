@@ -264,7 +264,7 @@ class TestCacheWarm:
 class TestFuzzyMatch:
     def test_fuzzy_match_dish(self) -> None:
         """6. 模糊匹配：'酸菜鱼' 匹配 '酸菜鱼片' 且相似度 >= 0.6"""
-        cache = VoiceCommandCache(cache_path="/tmp/txos_voice_cache_test.json")
+        cache = VoiceCommandCache(cache_path="/tmp/txos_voice_cache_test.json")  # noqa: S108
         catalog = [
             {"dish_id": "D001", "name": "酸菜鱼片"},
             {"dish_id": "D002", "name": "宫保鸡丁"},
@@ -278,7 +278,7 @@ class TestFuzzyMatch:
 
     def test_fuzzy_match_no_match_returns_none(self) -> None:
         """完全不相关的文本 → 返回 None"""
-        cache = VoiceCommandCache(cache_path="/tmp/txos_voice_cache_test.json")
+        cache = VoiceCommandCache(cache_path="/tmp/txos_voice_cache_test.json")  # noqa: S108
         catalog = [
             {"dish_id": "D001", "name": "酸菜鱼"},
             {"dish_id": "D002", "name": "宫保鸡丁"},
@@ -288,6 +288,6 @@ class TestFuzzyMatch:
 
     def test_fuzzy_match_empty_inputs(self) -> None:
         """空输入 → 返回 None"""
-        cache = VoiceCommandCache(cache_path="/tmp/txos_voice_cache_test.json")
+        cache = VoiceCommandCache(cache_path="/tmp/txos_voice_cache_test.json")  # noqa: S108
         assert cache.fuzzy_match_dish("", []) is None
         assert cache.fuzzy_match_dish("酸菜鱼", []) is None

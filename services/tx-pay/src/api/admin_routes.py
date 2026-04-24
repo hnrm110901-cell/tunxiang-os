@@ -10,10 +10,9 @@ from __future__ import annotations
 
 import json
 from typing import Optional
-from uuid import UUID
 
 import structlog
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Header
 from pydantic import BaseModel, Field
 
 from ..channels.base import PayMethod

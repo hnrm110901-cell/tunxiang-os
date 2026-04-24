@@ -12,9 +12,9 @@ import asyncio
 import os
 import sys
 import uuid
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch, call
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 SRC = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src"))

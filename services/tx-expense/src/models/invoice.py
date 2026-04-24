@@ -14,7 +14,10 @@ from __future__ import annotations
 
 import uuid
 from datetime import date, datetime
-from typing import List, Optional
+from typing import TYPE_CHECKING, List, Optional
+
+if TYPE_CHECKING:
+    from .expense_application import ExpenseApplication
 
 from sqlalchemy import (
     Boolean,

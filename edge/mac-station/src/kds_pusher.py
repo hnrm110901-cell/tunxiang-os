@@ -2,6 +2,7 @@
 KDS 实时推送服务
 管理 KDS 终端 WebSocket 连接，推送订单票据和状态变更
 """
+
 from __future__ import annotations
 
 import structlog
@@ -161,8 +162,13 @@ class KDSPusher:
         logger.info("kds_rush_order_pushed", ticket_id=ticket_id, station_id=station_id)
 
     async def push_remake_order(
-        self, station_id: str, task_id: str, dish_name: str,
-        reason: str, table_number: str = "", remake_count: int = 1,
+        self,
+        station_id: str,
+        task_id: str,
+        dish_name: str,
+        reason: str,
+        table_number: str = "",
+        remake_count: int = 1,
     ) -> None:
         """
         重做推送 — 推送到对应档口 KDS 终端。
@@ -193,12 +199,16 @@ class KDSPusher:
             sent = -1
         logger.info(
             "kds_remake_order_pushed",
-            station_id=station_id, task_id=task_id,
-            dish_name=dish_name, sent_count=sent,
+            station_id=station_id,
+            task_id=task_id,
+            dish_name=dish_name,
+            sent_count=sent,
         )
 
     async def push_timeout_alert(
-        self, station_id: str, payload: dict,
+        self,
+        station_id: str,
+        payload: dict,
     ) -> None:
         """
         超时告警推送 — 推送到对应档口 KDS 终端。

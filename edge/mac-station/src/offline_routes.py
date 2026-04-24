@@ -10,6 +10,7 @@
   - 日期参数格式 YYYY-MM-DD；传 "today" 或省略则取当天
   - 本地 PG 由 sync-engine 定期从云端增量同步
 """
+
 from datetime import date, datetime, timezone
 
 import structlog
@@ -31,6 +32,7 @@ def _parse_date(date_str: str) -> date:
 
 
 # ─── 1. 营业额查询 ─────────────────────────────────────────────────────────────
+
 
 @router.get("/revenue", summary="离线查询当日营业额")
 async def query_revenue_offline(
@@ -63,8 +65,9 @@ async def query_revenue_offline(
     )
     row = result.fetchone()
 
-    log.info("offline_revenue_queried", store_id=store_id, date=str(target_date),
-             order_count=row.order_count if row else 0)
+    log.info(
+        "offline_revenue_queried", store_id=store_id, date=str(target_date), order_count=row.order_count if row else 0
+    )
     return {
         "ok": True,
         "data": {
@@ -79,6 +82,7 @@ async def query_revenue_offline(
 
 
 # ─── 2. 库存查询 ───────────────────────────────────────────────────────────────
+
 
 @router.get("/inventory", summary="离线查询食材库存")
 async def query_inventory_offline(
@@ -126,8 +130,7 @@ async def query_inventory_offline(
         for r in rows
     ]
 
-    log.info("offline_inventory_queried", store_id=store_id, item_count=len(items),
-             low_stock_only=low_stock_only)
+    log.info("offline_inventory_queried", store_id=store_id, item_count=len(items), low_stock_only=low_stock_only)
     return {
         "ok": True,
         "data": {
@@ -141,6 +144,7 @@ async def query_inventory_offline(
 
 
 # ─── 3. 订单查询 ───────────────────────────────────────────────────────────────
+
 
 @router.get("/orders", summary="离线查询订单列表")
 async def query_orders_offline(

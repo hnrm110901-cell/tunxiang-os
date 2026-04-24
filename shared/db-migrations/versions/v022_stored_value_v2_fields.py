@@ -37,10 +37,10 @@ from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import UUID, JSON
 
-revision: str = "v022b"
-down_revision: Union[str, None] = "v022a"
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+revision = "v022b"
+down_revision= "v022a"
+branch_labels= None
+depends_on= None
 
 _SAFE_CONDITION = (
     "current_setting('app.tenant_id', TRUE) IS NOT NULL "

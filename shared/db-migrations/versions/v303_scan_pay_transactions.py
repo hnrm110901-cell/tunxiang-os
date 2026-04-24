@@ -22,8 +22,8 @@ Revises: v167
 """
 from alembic import op
 
-revision = "v168"
-down_revision = "v167"
+revision = "v303"
+down_revision = "v302"
 
 branch_labels = None
 depends_on = None

@@ -23,10 +23,10 @@ from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import UUID
 
-revision: str = "v019"
-down_revision: Union[str, None] = "v018"
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+revision = "v019"
+down_revision= "v018"
+branch_labels= None
+depends_on= None
 
 TABLE_NAME = "cook_time_baselines"
 

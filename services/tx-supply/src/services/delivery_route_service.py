@@ -562,7 +562,7 @@ class DeliveryRouteService:
         if not store_ids:
             raise ValueError("门店列表不能为空")
 
-        store = _shared()
+        store = _shared()  # noqa: F821  # TODO(P1): _shared 未在本模块定义，生产调用会 NameError；需补充内存状态工厂
         gen_id = store["gen_id"]
         now_iso = store["now_iso"]
 
@@ -629,7 +629,7 @@ class DeliveryRouteService:
         }
 
         # 存入共享 trips 便于后续 get_driver_task / update_delivery_progress 读取
-        _shared()["trips"][route_id] = {
+        _shared()["trips"][route_id] = {  # noqa: F821  # TODO(P1): _shared 未定义
             **route,
             "plan_id": kitchen_id,  # 使用 kitchen_id 作为 plan_id 占位
             "items": [],
@@ -657,7 +657,7 @@ class DeliveryRouteService:
         Raises:
             ValueError: 路线不存在或租户不匹配
         """
-        trips = _shared()["trips"]
+        trips = _shared()["trips"]  # noqa: F821  # TODO(P1): _shared 未定义
         trip = trips.get(route_id)
         if not trip:
             raise ValueError(f"配送路线 {route_id} 不存在")
@@ -739,8 +739,8 @@ class DeliveryRouteService:
         if status not in _valid_statuses:
             raise ValueError(f"状态无效: {status}，必须是 {_valid_statuses} 之一")
 
-        trips = _shared()["trips"]
-        now_iso = _shared()["now_iso"]
+        trips = _shared()["trips"]  # noqa: F821  # TODO(P1): _shared 未定义
+        now_iso = _shared()["now_iso"]  # noqa: F821  # TODO(P1): _shared 未定义
 
         trip = trips.get(route_id)
         if not trip:

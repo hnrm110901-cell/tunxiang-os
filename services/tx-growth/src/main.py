@@ -234,7 +234,6 @@ from services.growth_journey_service import GrowthJourneyService as _GrowthJourn
 
 # Feature Flag SDK — 控制 Growth Journey V2 / 沉默召回 等 cron 任务
 try:
-    from shared.feature_flags import FlagContext
     from shared.feature_flags import is_enabled as _ff_is_enabled
     from shared.feature_flags.flag_names import GrowthFlags as _GrowthFlags
 

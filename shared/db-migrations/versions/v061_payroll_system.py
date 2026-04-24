@@ -21,8 +21,8 @@ from typing import Union
 
 from alembic import op
 
-revision: str = "v061"
-down_revision: Union[str, None] = "v060"
+revision = "v061"
+down_revision= "v060"
 branch_labels = None
 depends_on = None
 

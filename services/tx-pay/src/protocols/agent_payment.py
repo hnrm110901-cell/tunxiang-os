@@ -22,7 +22,7 @@ from typing import Optional
 import structlog
 from pydantic import BaseModel, Field
 
-from ..channels.base import PayMethod, PayStatus
+from ..channels.base import PayMethod
 
 logger = structlog.get_logger(__name__)
 

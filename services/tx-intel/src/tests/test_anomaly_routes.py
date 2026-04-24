@@ -42,16 +42,15 @@ sys.modules.setdefault("sqlalchemy.ext.asyncio", _fake_sa_async)
 
 # ─── 正式导入 ─────────────────────────────────────────────────────────────────
 
-from fastapi import FastAPI
-from fastapi.testclient import TestClient
-from unittest.mock import AsyncMock, MagicMock, patch
-
 import importlib
-import sys as _sys
 
 # 动态导入路由模块（路径通过文件系统而非包）
 import importlib.util
 import pathlib
+from unittest.mock import AsyncMock, MagicMock
+
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
 
 _route_path = pathlib.Path(__file__).parent.parent / "api" / "anomaly_routes.py"
 _spec = importlib.util.spec_from_file_location("anomaly_routes", _route_path)

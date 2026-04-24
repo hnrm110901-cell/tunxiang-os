@@ -16,7 +16,6 @@ from typing import Optional
 
 from pydantic import BaseModel, Field
 
-
 # ─── 支付方式枚举（全局统一） ───────────────────────────────────────────
 
 class PayMethod(str, Enum):

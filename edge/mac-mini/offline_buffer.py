@@ -9,12 +9,13 @@
 
 SQLite 文件路径通过环境变量 OFFLINE_BUFFER_DB 配置。
 """
-import aiosqlite
+
 import json
 import os
 from datetime import datetime, timezone
-from typing import Callable, Awaitable, List, Optional
+from typing import Awaitable, Callable, List, Optional
 
+import aiosqlite
 import structlog
 
 logger = structlog.get_logger()
@@ -46,9 +47,7 @@ class OfflineBuffer:
                     synced_at       TEXT
                 )
             """)
-            await db.execute(
-                "CREATE INDEX IF NOT EXISTS idx_buffered_orders_synced ON buffered_orders(synced)"
-            )
+            await db.execute("CREATE INDEX IF NOT EXISTS idx_buffered_orders_synced ON buffered_orders(synced)")
             await db.commit()
         logger.info("offline_buffer.db_initialized", db_path=self._db_path)
 
@@ -135,18 +134,14 @@ class OfflineBuffer:
         """查询所有未同步的订单记录"""
         async with aiosqlite.connect(self._db_path) as db:
             db.row_factory = aiosqlite.Row
-            cursor = await db.execute(
-                "SELECT * FROM buffered_orders WHERE synced = 0 ORDER BY created_at ASC"
-            )
+            cursor = await db.execute("SELECT * FROM buffered_orders WHERE synced = 0 ORDER BY created_at ASC")
             rows = await cursor.fetchall()
         return [dict(row) for row in rows]
 
     async def get_pending_count(self) -> int:
         """查询待同步订单数量，用于状态显示"""
         async with aiosqlite.connect(self._db_path) as db:
-            cursor = await db.execute(
-                "SELECT COUNT(*) FROM buffered_orders WHERE synced = 0"
-            )
+            cursor = await db.execute("SELECT COUNT(*) FROM buffered_orders WHERE synced = 0")
             row = await cursor.fetchone()
         return row[0] if row else 0
 
@@ -154,9 +149,7 @@ class OfflineBuffer:
         """查询所有订单（含已同步），用于调试"""
         async with aiosqlite.connect(self._db_path) as db:
             db.row_factory = aiosqlite.Row
-            cursor = await db.execute(
-                "SELECT * FROM buffered_orders ORDER BY created_at ASC"
-            )
+            cursor = await db.execute("SELECT * FROM buffered_orders ORDER BY created_at ASC")
             rows = await cursor.fetchall()
         return [dict(row) for row in rows]
 
@@ -174,8 +167,10 @@ class OfflineBuffer:
 
 def _default_post_fn() -> PostFn:
     """返回使用 httpx 的默认 POST 函数"""
+
     async def _post(url: str, json_data: dict) -> dict:
         import httpx
+
         try:
             async with httpx.AsyncClient(timeout=10) as client:
                 resp = await client.post(url, json=json_data)

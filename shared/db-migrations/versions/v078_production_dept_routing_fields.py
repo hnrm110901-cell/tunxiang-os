@@ -25,10 +25,10 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 
-revision: str = "v078"
-down_revision: Union[str, None] = "v077"
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+revision = "v078"
+down_revision= "v077"
+branch_labels= None
+depends_on= None
 
 # 安全 RLS 条件（与 v006/v014/v016/v017 保持一致）
 _SAFE_CONDITION = (

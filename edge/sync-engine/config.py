@@ -3,6 +3,7 @@
 从环境变量或 .env 文件读取，使用 pydantic-settings。
 必填项：CLOUD_PG_DSN / STORE_ID / TENANT_ID（无默认值，启动时报错提示）
 """
+
 from __future__ import annotations
 
 from pydantic_settings import BaseSettings

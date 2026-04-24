@@ -99,9 +99,10 @@ except ImportError:
 
 # ─── 加载被测路由 ────────────────────────────────────────────────────────────
 
+from unittest.mock import AsyncMock, MagicMock
+
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from unittest.mock import AsyncMock, MagicMock
 
 _route_path = pathlib.Path(__file__).parent.parent / "routers" / "intel_router.py"
 _spec = importlib.util.spec_from_file_location("intel_router", _route_path)

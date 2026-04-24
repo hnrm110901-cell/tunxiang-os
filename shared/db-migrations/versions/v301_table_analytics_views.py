@@ -21,10 +21,10 @@ Revision: v151
 from alembic import op
 from typing import Sequence, Union
 
-revision: str = "v151"
-down_revision: Union[str, None] = "v150"
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+revision = "v301"
+down_revision= "v150"
+branch_labels= None
+depends_on= None
 
 
 def upgrade() -> None:

@@ -11,6 +11,7 @@ from typing import Optional
 import httpx
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
+from services.calendar_signal import CalendarSignalService
 from services.competitor_monitor import CompetitorMonitorService
 from services.consumer_insight import ConsumerInsightService
 from services.intel_report_engine import IntelReportEngine
@@ -19,7 +20,6 @@ from services.pilot_suggestion import PilotSuggestionService
 from services.pricing_insight import PricingInsightService
 from services.review_topic_engine import ReviewTopicEngine
 from services.weather_signal import WeatherSignalService
-from services.calendar_signal import CalendarSignalService
 
 AGENT_SERVICE_URL = os.getenv("AGENT_SERVICE_URL", "http://tx-agent:8008")
 
@@ -90,10 +90,12 @@ app = FastAPI(
 )
 
 from prometheus_fastapi_instrumentator import Instrumentator
+
 Instrumentator().instrument(app).expose(app)
 
 # /api/v1/intel/competitor-monitor/* — 竞品监控（v207）
 from .api.competitor_monitoring_routes import router as competitor_monitoring_router
+
 app.include_router(competitor_monitoring_router)
 
 # ─── 服务实例 ───
@@ -686,6 +688,7 @@ def get_event_by_date(target_date: str) -> dict:
 # ─── 评价情感分析路由 ───
 
 from .api.sentiment_routes import router as sentiment_router
+
 app.include_router(sentiment_router)
 
 # ─── 健康检查 ───

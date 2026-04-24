@@ -17,10 +17,10 @@ from typing import Sequence, Union
 
 from alembic import op
 
-revision: str = "v014"
-down_revision: Union[str, None] = "v013"
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+revision = "v014"
+down_revision= "v013"
+branch_labels= None
+depends_on= None
 
 V013_TABLES = ["banquet_proposals", "banquet_quotations", "banquet_feedbacks", "banquet_cases"]
 

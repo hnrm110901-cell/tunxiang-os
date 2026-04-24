@@ -20,10 +20,10 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects.postgresql import UUID, ARRAY
 
-revision: str = "v042"
-down_revision: Union[str, None] = "v040"
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+revision = "v042"
+down_revision= "v040"
+branch_labels= None
+depends_on= None
 
 _TABLE_PROFILES = "group_member_profiles"
 _TABLE_TRANSACTIONS = "cross_brand_transactions"

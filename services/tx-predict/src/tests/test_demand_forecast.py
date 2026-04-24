@@ -10,13 +10,12 @@
 """
 from __future__ import annotations
 
-from datetime import date, timedelta, timezone
+from datetime import date
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
 from ..services.demand_predictor import (
-    PREP_SAFETY_FACTOR,
     SEASON_FACTORS,
     WEEKDAY_FACTORS,
     WMA_SUM,

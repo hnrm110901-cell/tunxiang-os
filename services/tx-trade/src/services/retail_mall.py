@@ -11,12 +11,20 @@ from datetime import datetime, timezone
 from typing import Any, Optional
 
 import structlog
-from sqlalchemy import func, select
+from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..models.retail_mall import RetailOrder, RetailOrderItem, RetailProduct
 
 logger = structlog.get_logger(__name__)
+
+
+async def _set_tenant(db: AsyncSession, tenant_id: str) -> None:
+    """设置 RLS 租户上下文。"""
+    await db.execute(
+        text("SELECT set_config('app.tenant_id', :tid, true)"),
+        {"tid": tenant_id},
+    )
 
 # ── 商品分类常量 ──────────────────────────────────────────────
 RETAIL_CATEGORIES = ("seafood_gift", "prepared_dish", "seasoning", "merchandise")

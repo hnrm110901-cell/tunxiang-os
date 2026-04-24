@@ -127,7 +127,7 @@ class BaseCityAdapter(ABC):
                 results[domain] = False
         return results
 
-    async def close(self) -> None:
+    async def close(self) -> None:  # noqa: B027 - intentional default hook for optional override
         """释放资源，子类可覆盖。"""
         pass
 

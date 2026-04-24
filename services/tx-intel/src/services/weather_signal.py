@@ -1,7 +1,8 @@
 """天气信号服务 — 天气变化对餐饮客流的影响评估"""
-import structlog
-from typing import Optional
 from datetime import date, timedelta
+from typing import Optional
+
+import structlog
 
 logger = structlog.get_logger(__name__)
 

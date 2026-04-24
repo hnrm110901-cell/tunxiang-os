@@ -15,16 +15,12 @@ SOP <-> IM双向桥接端点。
 """
 from __future__ import annotations
 
-from typing import Optional
-from uuid import UUID
-
-from fastapi import APIRouter, Depends, Header, HTTPException, Query
+from fastapi import APIRouter, Depends, Header, Query
 from pydantic import BaseModel, Field
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from services.tx_agent.src.services.im_sop_bridge_service import (
     IMSOPBridgeService,
 )
+from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter(prefix="/api/v1/agent/im-sop", tags=["im-sop"])
 

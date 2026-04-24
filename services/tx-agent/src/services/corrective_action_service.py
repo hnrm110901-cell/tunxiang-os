@@ -9,7 +9,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from uuid import UUID, uuid4
+from uuid import UUID
 
 import structlog
 from sqlalchemy import text

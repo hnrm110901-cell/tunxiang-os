@@ -8,15 +8,13 @@
 
 SQLite 文件路径通过环境变量 PRINT_QUEUE_DB 配置。
 """
-import asyncio
-import aiosqlite
-import base64
-import json
-import os
-from dataclasses import dataclass, field
-from datetime import datetime, timezone, timedelta
-from typing import Callable, Awaitable, List, Optional
 
+import os
+from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
+from typing import Awaitable, Callable, List, Optional
+
+import aiosqlite
 import structlog
 
 logger = structlog.get_logger()
@@ -37,9 +35,10 @@ class JobStatus:
 @dataclass
 class PrintJob:
     """打印任务数据对象"""
-    payload_base64: str           # ESC/POS 字节流的 base64 编码
-    printer_address: Optional[str] = None   # 打印机网络地址 host:port
-    printer_id: Optional[str] = None        # 打印机标识名
+
+    payload_base64: str  # ESC/POS 字节流的 base64 编码
+    printer_address: Optional[str] = None  # 打印机网络地址 host:port
+    printer_id: Optional[str] = None  # 打印机标识名
 
 
 # 发送函数类型：(payload_base64, printer_address, printer_id) -> bool
@@ -57,7 +56,7 @@ class PrintQueue:
     @staticmethod
     def backoff_seconds(attempt: int) -> int:
         """计算指数退避秒数：第 0 次=1s, 1次=2s, 2次=4s, 3次=8s, 4次=16s"""
-        return 2 ** attempt
+        return 2**attempt
 
     async def init_db(self) -> None:
         """初始化 SQLite 数据库，启用 WAL 模式"""

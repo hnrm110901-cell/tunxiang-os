@@ -8,25 +8,27 @@ OfflineBuffer — SQLite WAL 离线操作缓冲
   - 生产环境需要提前创建目录：mkdir -p /var/lib/tunxiang
   - 开发环境降级到 /tmp/tunxiang_offline_buffer.db
 """
+
 from __future__ import annotations
 
 import asyncio
 import json
 import os
 import sqlite3
+import tempfile
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
 import structlog
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 logger = structlog.get_logger(__name__)
 
-# SQLite 文件路径：生产用 /var/lib/tunxiang/，开发降级到 /tmp/
+# SQLite 文件路径：生产用 /var/lib/tunxiang/，开发降级到系统临时目录
 _PROD_PATH = Path("/var/lib/tunxiang/offline_buffer.db")
-_DEV_PATH = Path("/tmp/tunxiang_offline_buffer.db")
+_DEV_PATH = Path(tempfile.gettempdir()) / "tunxiang_offline_buffer.db"
 
 _DDL = """
 CREATE TABLE IF NOT EXISTS offline_buffer (
@@ -55,6 +57,7 @@ CREATE INDEX IF NOT EXISTS idx_offline_buffer_skill
 
 class BufferedOperation(BaseModel):
     """缓冲队列中的一条操作记录"""
+
     id: str
     skill_name: str
     action: str
@@ -69,11 +72,12 @@ class BufferedOperation(BaseModel):
 
 class BufferStats(BaseModel):
     """缓冲队列统计信息"""
+
     pending_count: int
     syncing_count: int
     failed_count: int
     total_count: int
-    oldest_entry: Optional[str] = None   # ISO8601 时间戳
+    oldest_entry: Optional[str] = None  # ISO8601 时间戳
     newest_entry: Optional[str] = None
     size_bytes: int = 0
 
@@ -181,7 +185,12 @@ class OfflineBuffer:
             await loop.run_in_executor(
                 None,
                 self._write_sync,
-                buffer_id, skill_name, action, payload, tenant_id, created_at,
+                buffer_id,
+                skill_name,
+                action,
+                payload,
+                tenant_id,
+                created_at,
             )
 
         logger.info(
@@ -224,12 +233,7 @@ class OfflineBuffer:
         """
         loop = asyncio.get_event_loop()
         rows = await loop.run_in_executor(None, self._get_pending_sync, limit)
-        return [
-            BufferedOperation(
-                **{**row, "payload": json.loads(row["payload"])}
-            )
-            for row in rows
-        ]
+        return [BufferedOperation(**{**row, "payload": json.loads(row["payload"])}) for row in rows]
 
     def _mark_synced_sync(self, ids: list[str]) -> None:
         if not ids:

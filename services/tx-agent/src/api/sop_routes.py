@@ -14,15 +14,15 @@ from datetime import date as date_type
 from datetime import datetime, timedelta, timezone
 
 import structlog
-from fastapi import APIRouter, Depends, Header, HTTPException, Query, Path
+from fastapi import APIRouter, Depends, Header, HTTPException, Path, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db_with_tenant
 
+from ..services.corrective_action_service import CorrectiveActionService
 from ..services.sop_scheduler_service import SOPSchedulerService
 from ..services.sop_task_service import SOPTaskService
-from ..services.corrective_action_service import CorrectiveActionService
 
 logger = structlog.get_logger(__name__)
 router = APIRouter(prefix="/api/v1/agent/sop", tags=["sop"])

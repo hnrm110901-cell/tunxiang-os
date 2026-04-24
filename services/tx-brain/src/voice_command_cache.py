@@ -11,16 +11,18 @@ from __future__ import annotations
 
 import json
 import os
+import tempfile
 import time
 from collections import OrderedDict
 from difflib import SequenceMatcher
+from pathlib import Path
 from typing import Any, Optional
 
 import structlog
 
 log: structlog.stdlib.BoundLogger = structlog.get_logger(__name__)
 
-_CACHE_PATH = os.environ.get("VOICE_CACHE_PATH", "/tmp/txos_voice_cache.json")
+_CACHE_PATH = os.environ.get("VOICE_CACHE_PATH", str(Path(tempfile.gettempdir()) / "txos_voice_cache.json"))
 _LRU_MAXSIZE = 50
 _FUZZY_THRESHOLD = 0.6  # 相似度阈值，低于此值不采用模糊匹配结果
 

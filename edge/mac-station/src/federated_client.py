@@ -8,6 +8,7 @@
 
 数据从不离开本地 — 只有模型参数（加噪后）上传到云端。
 """
+
 import math
 import random
 import time
@@ -48,9 +49,7 @@ class FederatedClient:
         """
         try:
             async with httpx.AsyncClient(timeout=self._http_timeout) as client:
-                resp = await client.get(
-                    f"{self.server_url}/api/v1/federated/models/{model_id}/global"
-                )
+                resp = await client.get(f"{self.server_url}/api/v1/federated/models/{model_id}/global")
                 data = resp.json()
 
             if not data.get("ok"):
@@ -449,9 +448,7 @@ class FederatedClient:
             return results
 
         # Step 2: 本地训练
-        train_result = await self.train_local(
-            model_id, training_data, epochs=epochs, learning_rate=learning_rate
-        )
+        train_result = await self.train_local(model_id, training_data, epochs=epochs, learning_rate=learning_rate)
         results["steps"]["train_local"] = train_result
         if not train_result.get("ok"):
             results["ok"] = False

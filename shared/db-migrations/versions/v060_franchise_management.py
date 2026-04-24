@@ -21,10 +21,10 @@ from typing import Sequence, Union
 
 from alembic import op
 
-revision: str = "v060"
-down_revision: Union[str, None] = "v047"
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+revision = "v060"
+down_revision= "v047"
+branch_labels= None
+depends_on= None
 
 # 标准 NULLIF NULL guard 条件
 _SAFE_CONDITION = "tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::UUID"

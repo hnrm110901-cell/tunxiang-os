@@ -31,8 +31,8 @@ from __future__ import annotations
 from alembic import op
 import sqlalchemy as sa
 
-revision: str = "v074"
-down_revision: str = "v073"
+revision = "v074"
+down_revision= "v073"
 branch_labels = None
 depends_on = None
 

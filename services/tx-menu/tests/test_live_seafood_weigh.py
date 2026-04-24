@@ -14,6 +14,7 @@
 
 依赖：FastAPI + httpx.AsyncClient + unittest.mock（全Mock，无真实DB连接）
 """
+
 import os
 import sys
 import uuid
@@ -30,10 +31,10 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../src"))
 # ─── 常量 ─────────────────────────────────────────────────────────────────────
 
 TENANT_ID = str(uuid.uuid4())
-STORE_ID  = str(uuid.uuid4())
-DISH_ID   = str(uuid.uuid4())
+STORE_ID = str(uuid.uuid4())
+DISH_ID = str(uuid.uuid4())
 RECORD_ID = str(uuid.uuid4())
-ORDER_ID  = str(uuid.uuid4())
+ORDER_ID = str(uuid.uuid4())
 
 HEADERS = {
     "X-Tenant-ID": TENANT_ID,
@@ -42,6 +43,7 @@ HEADERS = {
 
 
 # ─── App Fixture ──────────────────────────────────────────────────────────────
+
 
 @pytest.fixture
 def app_with_mock_db():
@@ -70,56 +72,66 @@ def app_with_mock_db():
 
 # ─── 工具函数直接测试（不依赖HTTP） ──────────────────────────────────────────
 
+
 class TestWeightUnitConversion:
     """单元测试：_to_grams 重量换算函数（无需DB/HTTP）"""
 
     def test_weight_unit_conversion_jin_to_grams(self):
         """斤→克：1斤=500克"""
         from api.live_seafood_routes import _to_grams
+
         assert _to_grams(1.0, "jin") == 500
 
     def test_weight_unit_conversion_liang_to_grams(self):
         """两→克：1两=50克"""
         from api.live_seafood_routes import _to_grams
+
         assert _to_grams(1.0, "liang") == 50
 
     def test_weight_unit_conversion_kg_to_grams(self):
         """千克→克：1kg=1000克"""
         from api.live_seafood_routes import _to_grams
+
         assert _to_grams(1.0, "kg") == 1000
 
     def test_weight_unit_conversion_g_to_grams(self):
         """克→克：1:1"""
         from api.live_seafood_routes import _to_grams
+
         assert _to_grams(500.0, "g") == 500
 
     def test_weight_unit_conversion_decimal_jin(self):
         """小数斤换算：1.35斤 = 675克（取整）"""
         from api.live_seafood_routes import _to_grams
+
         assert _to_grams(1.35, "jin") == 675
 
     def test_format_price_display_int_yuan(self):
         """整数元价格展示：18800分 → '188元/斤'"""
         from api.live_seafood_routes import _format_price_display
+
         result = _format_price_display("weight", 18800, "斤")
         assert result == "188元/斤"
 
     def test_format_price_display_float_yuan(self):
         """小数元价格展示：8850分 → '88.5元/条'"""
         from api.live_seafood_routes import _format_price_display
+
         result = _format_price_display("count", 8850, "条")
         assert result == "88.5元/条"
 
     def test_unit_display_mapping(self):
         """单位展示名映射完整"""
         from api.live_seafood_routes import _unit_display
-        assert _unit_display("jin")  == "斤"
+
+        assert _unit_display("jin") == "斤"
         assert _unit_display("liang") == "两"
-        assert _unit_display("kg")   == "千克"
-        assert _unit_display("g")    == "克"
+        assert _unit_display("kg") == "千克"
+        assert _unit_display("g") == "克"
 
 
 # ─── Pydantic 模型验证测试（不依赖HTTP） ──────────────────────────────────────
+
 
 class TestWeighRecordReqValidation:
     """验证 WeighRecordReq Pydantic 模型的业务约束"""
@@ -128,11 +140,12 @@ class TestWeighRecordReqValidation:
         """负数重量应被 Pydantic gt=0 校验拒绝（本地验证，不走HTTP）"""
         from api.live_seafood_routes import WeighRecordReq
         from pydantic import ValidationError
+
         with pytest.raises(ValidationError) as exc_info:
             WeighRecordReq(
                 store_id=STORE_ID,
                 dish_id=DISH_ID,
-                weighed_qty=-1.0,        # 非法：必须 > 0
+                weighed_qty=-1.0,  # 非法：必须 > 0
                 weight_unit="jin",
                 price_per_unit_fen=18800,
             )
@@ -143,6 +156,7 @@ class TestWeighRecordReqValidation:
         """零重量也应被拒绝（gt=0）"""
         from api.live_seafood_routes import WeighRecordReq
         from pydantic import ValidationError
+
         with pytest.raises(ValidationError):
             WeighRecordReq(
                 store_id=STORE_ID,
@@ -156,12 +170,13 @@ class TestWeighRecordReqValidation:
         """不在枚举内的重量单位应被拒绝"""
         from api.live_seafood_routes import WeighRecordReq
         from pydantic import ValidationError
+
         with pytest.raises(ValidationError):
             WeighRecordReq(
                 store_id=STORE_ID,
                 dish_id=DISH_ID,
                 weighed_qty=1.0,
-                weight_unit="pound",     # 非法单位
+                weight_unit="pound",  # 非法单位
                 price_per_unit_fen=18800,
             )
 
@@ -169,10 +184,11 @@ class TestWeighRecordReqValidation:
         """pricing_method=weight 时 weight_unit 为必填"""
         from api.live_seafood_routes import UpdateLiveSeafoodReq
         from pydantic import ValidationError
+
         with pytest.raises(ValidationError) as exc_info:
             UpdateLiveSeafoodReq(
                 pricing_method="weight",
-                weight_unit=None,        # 缺失
+                weight_unit=None,  # 缺失
                 price_per_unit_fen=18800,
                 display_unit="斤",
             )
@@ -180,6 +196,7 @@ class TestWeighRecordReqValidation:
 
 
 # ─── 金额计算逻辑测试（直接调用核心逻辑） ─────────────────────────────────────
+
 
 class TestWeighAmountCalculation:
     """称重金额计算逻辑测试（不依赖HTTP，直接验证业务公式）"""
@@ -190,8 +207,8 @@ class TestWeighAmountCalculation:
         测试场景：500g 鲈鱼，单价188元/斤（18800分），应得94元
         计算方式：qty=0.5斤 × price_per_unit_fen=18800 = 9400分
         """
-        qty = Decimal("0.5")           # 0.5斤 ≈ 500克（含义上的500g×188元/斤）
-        price_per_unit_fen = 18800     # 188元/斤
+        qty = Decimal("0.5")  # 0.5斤 ≈ 500克（含义上的500g×188元/斤）
+        price_per_unit_fen = 18800  # 188元/斤
         amount_fen = int(qty * price_per_unit_fen)
         assert amount_fen == 9400
         # 验证展示：9400分 = 94.00元
@@ -203,7 +220,7 @@ class TestWeighAmountCalculation:
         测试场景：3条石斑鱼，单价88元/条（8800分），应得264元
         """
         qty = Decimal("3")
-        price_per_unit_fen = 8800      # 88元/条
+        price_per_unit_fen = 8800  # 88元/条
         amount_fen = int(qty * price_per_unit_fen)
         assert amount_fen == 26400
         assert f"¥{amount_fen / 100:.2f}" == "¥264.00"
@@ -233,11 +250,13 @@ class TestWeighAmountCalculation:
     def test_stock_deduction_weight_in_grams(self):
         """确认称重后库存扣减量（按克计）：1.5斤 = 750克"""
         from api.live_seafood_routes import _to_grams
+
         weight_g = _to_grams(1.5, "jin")
         assert weight_g == 750
 
 
 # ─── HTTP 端点集成测试（全Mock DB） ───────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_create_weigh_record_weight_mode():
@@ -267,12 +286,14 @@ async def test_create_weigh_record_weight_mode():
     # Mock UPDATE dish_name 快照
     update_result = MagicMock()
 
-    mock_db.execute = AsyncMock(side_effect=[
-        rls_result,
-        dish_name_result,
-        insert_result,
-        update_result,
-    ])
+    mock_db.execute = AsyncMock(
+        side_effect=[
+            rls_result,
+            dish_name_result,
+            insert_result,
+            update_result,
+        ]
+    )
     mock_db.commit = AsyncMock()
 
     async def override_db():
@@ -288,9 +309,7 @@ async def test_create_weigh_record_weight_mode():
         "price_per_unit_fen": 18800,
     }
 
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as client:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         resp = await client.post(
             "/api/v1/menu/live-seafood/weigh",
             json=payload,
@@ -327,9 +346,7 @@ async def test_create_weigh_record_count_mode():
     insert_result = MagicMock()
     insert_result.fetchone.return_value = None
     update_result = MagicMock()
-    mock_db.execute = AsyncMock(
-        side_effect=[rls_result, dish_name_result, insert_result, update_result]
-    )
+    mock_db.execute = AsyncMock(side_effect=[rls_result, dish_name_result, insert_result, update_result])
     mock_db.commit = AsyncMock()
 
     async def override_db():
@@ -341,13 +358,11 @@ async def test_create_weigh_record_count_mode():
         "store_id": STORE_ID,
         "dish_id": DISH_ID,
         "weighed_qty": 3.0,
-        "weight_unit": "jin",           # count模式下weight_unit仍需传入（字段存在）
+        "weight_unit": "jin",  # count模式下weight_unit仍需传入（字段存在）
         "price_per_unit_fen": 8800,
     }
 
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as client:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         resp = await client.post(
             "/api/v1/menu/live-seafood/weigh",
             json=payload,
@@ -381,13 +396,13 @@ async def test_confirm_weigh_deducts_stock():
     rec_row = MagicMock()
     rec_row.__getitem__ = lambda self, i: [
         uuid.UUID(RECORD_ID),  # 0: id
-        uuid.UUID(DISH_ID),    # 1: dish_id
-        "活鲜鲈鱼",              # 2: dish_name
-        Decimal("0.5"),        # 3: weighed_qty
-        "jin",                 # 4: weight_unit
-        18800,                 # 5: price_per_unit_fen
-        9400,                  # 6: amount_fen
-        "pending",             # 7: status
+        uuid.UUID(DISH_ID),  # 1: dish_id
+        "活鲜鲈鱼",  # 2: dish_name
+        Decimal("0.5"),  # 3: weighed_qty
+        "jin",  # 4: weight_unit
+        18800,  # 5: price_per_unit_fen
+        9400,  # 6: amount_fen
+        "pending",  # 7: status
     ][i]
 
     rec_result = MagicMock()
@@ -400,12 +415,14 @@ async def test_confirm_weigh_deducts_stock():
     # Mock 扣减库存
     update_stock_result = MagicMock()
 
-    mock_db.execute = AsyncMock(side_effect=[
-        rls_result,
-        rec_result,
-        update_rec_result,
-        update_stock_result,
-    ])
+    mock_db.execute = AsyncMock(
+        side_effect=[
+            rls_result,
+            rec_result,
+            update_rec_result,
+            update_stock_result,
+        ]
+    )
     mock_db.commit = AsyncMock()
 
     async def override_db():
@@ -413,9 +430,7 @@ async def test_confirm_weigh_deducts_stock():
 
     app.dependency_overrides[get_db] = override_db
 
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as client:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         resp = await client.post(
             f"/api/v1/menu/live-seafood/weigh/{RECORD_ID}/confirm",
             json={"order_id": ORDER_ID},
@@ -461,9 +476,7 @@ async def test_confirm_weigh_updates_order():
     rec_result.fetchone.return_value = rec_row
 
     rls_result = MagicMock()
-    mock_db.execute = AsyncMock(
-        side_effect=[rls_result, rec_result, MagicMock(), MagicMock()]
-    )
+    mock_db.execute = AsyncMock(side_effect=[rls_result, rec_result, MagicMock(), MagicMock()])
     mock_db.commit = AsyncMock()
 
     async def override_db():
@@ -471,9 +484,7 @@ async def test_confirm_weigh_updates_order():
 
     app.dependency_overrides[get_db] = override_db
 
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as client:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         resp = await client.post(
             f"/api/v1/menu/live-seafood/weigh/{RECORD_ID}/confirm",
             json={"order_id": ORDER_ID},
@@ -503,17 +514,30 @@ async def test_weigh_pending_list():
 
     # 模拟2条待确认记录
     from datetime import datetime
+
     row1 = MagicMock()
     row1.__getitem__ = lambda self, i: [
-        uuid.UUID(RECORD_ID), uuid.UUID(DISH_ID), "鲈鱼",
-        Decimal("1.5"), "jin", 18800, 28200,
-        datetime(2026, 4, 1, 12, 0, 0), "海鲜区A缸",
+        uuid.UUID(RECORD_ID),
+        uuid.UUID(DISH_ID),
+        "鲈鱼",
+        Decimal("1.5"),
+        "jin",
+        18800,
+        28200,
+        datetime(2026, 4, 1, 12, 0, 0),
+        "海鲜区A缸",
     ][i]
     row2 = MagicMock()
     row2.__getitem__ = lambda self, i: [
-        uuid.uuid4(), uuid.UUID(DISH_ID), "石斑鱼",
-        Decimal("2.0"), "jin", 22000, 44000,
-        datetime(2026, 4, 1, 12, 5, 0), None,
+        uuid.uuid4(),
+        uuid.UUID(DISH_ID),
+        "石斑鱼",
+        Decimal("2.0"),
+        "jin",
+        22000,
+        44000,
+        datetime(2026, 4, 1, 12, 5, 0),
+        None,
     ][i]
 
     list_result = MagicMock()
@@ -528,9 +552,7 @@ async def test_weigh_pending_list():
 
     app.dependency_overrides[get_db] = override_db
 
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as client:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         resp = await client.get(
             f"/api/v1/menu/live-seafood/weigh/{STORE_ID}/pending",
             headers=HEADERS,
@@ -589,9 +611,7 @@ async def test_weigh_cancel_restores_stock():
 
     app.dependency_overrides[get_db] = override_db
 
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as client:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         resp = await client.post(
             "/api/v1/menu/live-seafood/weigh",
             json={
@@ -629,15 +649,13 @@ async def test_invalid_weigh_quantity_http_422():
 
     app.dependency_overrides[get_db] = override_db
 
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as client:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         resp = await client.post(
             "/api/v1/menu/live-seafood/weigh",
             json={
                 "store_id": STORE_ID,
                 "dish_id": DISH_ID,
-                "weighed_qty": -0.5,      # 非法：负数
+                "weighed_qty": -0.5,  # 非法：负数
                 "weight_unit": "jin",
                 "price_per_unit_fen": 18800,
             },
@@ -672,9 +690,7 @@ async def test_weigh_nonexistent_dish_returns_404():
 
     non_existent_dish_id = str(uuid.uuid4())
 
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as client:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         resp = await client.post(
             "/api/v1/menu/live-seafood/weigh",
             json={
@@ -710,8 +726,13 @@ async def test_weigh_confirm_already_confirmed():
     # 模拟已确认的称重记录
     rec_row = MagicMock()
     rec_row.__getitem__ = lambda self, i: [
-        uuid.UUID(RECORD_ID), uuid.UUID(DISH_ID), "活鲜鲈鱼",
-        Decimal("0.5"), "jin", 18800, 9400,
+        uuid.UUID(RECORD_ID),
+        uuid.UUID(DISH_ID),
+        "活鲜鲈鱼",
+        Decimal("0.5"),
+        "jin",
+        18800,
+        9400,
         "confirmed",  # 7: status - 已确认
     ][i]
 
@@ -726,9 +747,7 @@ async def test_weigh_confirm_already_confirmed():
 
     app.dependency_overrides[get_db] = override_db
 
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as client:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         resp = await client.post(
             f"/api/v1/menu/live-seafood/weigh/{RECORD_ID}/confirm",
             json={"order_id": ORDER_ID},
@@ -758,9 +777,7 @@ async def test_missing_tenant_id_header_returns_400():
 
     app.dependency_overrides[get_db] = override_db
 
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as client:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         resp = await client.post(
             "/api/v1/menu/live-seafood/weigh",
             json={

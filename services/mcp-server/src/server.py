@@ -64,7 +64,7 @@ def _init_agents() -> None:
     _ensure_agent_path()
 
     try:
-        from agents.event_bus import EventBus, create_default_event_bus
+        from agents.event_bus import create_default_event_bus
         from agents.master import MasterAgent
         from agents.planner import DailyPlannerAgent
         from agents.skills.discount_guard import DiscountGuardAgent
