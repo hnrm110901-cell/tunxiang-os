@@ -198,3 +198,21 @@ flags:
         - dimension: role_code
           values: [L3]
     tags: [agent, l3, autonomy, critical-risk]
+
+  - identifier: agent_roi_writeback
+    name: agent.roi.writeback
+    description: >
+      Sprint D2：Agent 决策写入 ROI 四字段（saved_labor_hours / prevented_loss_fen
+      / improved_kpi / roi_evidence）到 agent_decision_logs 表。
+      开启后各 Skill Agent 可按自身算法计算并回写 ROI 证据；
+      关闭时四字段保持 NULL，向前兼容旧代码。
+      注意：本 flag 触发规划文档 §4 决策点 #1（核心留痕变更），
+      需创始人签字后再由运维在指定环境开启，PR 合并不得自动打开。
+    defaultValue: false
+    environments:
+      dev: false
+      test: false
+      uat: false
+      pilot: false
+      prod: false
+    tags: [agent, roi, decision-log, writeback, founder-signoff-required]

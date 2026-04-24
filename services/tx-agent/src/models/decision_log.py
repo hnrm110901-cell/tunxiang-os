@@ -1,8 +1,9 @@
 """Agent 决策留痕 — 每个决策必须有完整审计记录"""
 
 import uuid
+from decimal import Decimal
 
-from sqlalchemy import DateTime, Float, String, Text, func
+from sqlalchemy import BigInteger, DateTime, Float, Numeric, String, Text, func
 from sqlalchemy.dialects.postgresql import JSON, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -38,3 +39,19 @@ class AgentDecisionLog(TenantBase):
     )
 
     decided_at: Mapped[str] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    # ── Sprint D2（v264）: ROI 四字段 ─────────────────────────────
+    # 受 flag `agent.roi.writeback` 守护；flag off 时这些字段保持 NULL，
+    # 完全向前兼容（旧代码读 AgentDecisionLog 不受影响）。
+    saved_labor_hours: Mapped[Decimal | None] = mapped_column(
+        Numeric(10, 2), nullable=True, comment="本次决策节省的人力工时（小时）"
+    )
+    prevented_loss_fen: Mapped[int | None] = mapped_column(
+        BigInteger, nullable=True, comment="本次决策阻止的资金损失（分）"
+    )
+    improved_kpi: Mapped[dict | None] = mapped_column(
+        JSON, nullable=True, comment='改善 KPI 的结构化证据 {"metric": ..., "delta_pct": ...}'
+    )
+    roi_evidence: Mapped[dict | None] = mapped_column(
+        JSON, nullable=True, comment="ROI 证据链：上游事件/算法版本/依赖参数"
+    )
