@@ -18,6 +18,7 @@ on_settle（dine_first 默认）：
 
 from __future__ import annotations
 
+import json as _json
 import os
 import uuid
 from typing import Optional
@@ -378,7 +379,11 @@ class VoucherRedeemService:
                 "oid": order_id,
                 "tid": self._tenant_id,
                 "deduct": deduct_amount_fen,
-                "meta": f'{{"points_redeemed": {points_amount}, "points_card_id": "{card_id}", "points_deduct_fen": {deduct_amount_fen}}}',
+                "meta": _json.dumps({
+                    "points_redeemed": points_amount,
+                    "points_card_id": card_id,
+                    "points_deduct_fen": deduct_amount_fen,
+                }, ensure_ascii=False),
             },
         )
 

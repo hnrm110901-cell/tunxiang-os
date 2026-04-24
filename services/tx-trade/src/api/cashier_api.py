@@ -821,9 +821,6 @@ async def retail_sale(
         return _ok(result)
     except ValueError as e:
         _err(str(e))
-    except AttributeError:
-        # CashierEngine 尚未实现 create_retail_order 时的优雅降级
-        _err("零售收银功能即将上线，当前请使用常规收银流程", 501)
 
 
 @router.post("/cashier/pre-order")
@@ -851,8 +848,6 @@ async def create_pre_order(
         return _ok(result)
     except ValueError as e:
         _err(str(e))
-    except AttributeError:
-        _err("预点单功能即将上线", 501)
 
 
 @router.post("/orders/{order_id}/redeem-voucher")
