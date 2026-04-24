@@ -102,6 +102,10 @@ class TradeFlags:
     # 分账引擎
     SPLIT_PAYMENT = "trade.split_payment.enable"
 
+    # Sprint A4（Tier1）：RBAC 严格模式开关。on=敏感路由要求显式授权，off=legacy 行为。
+    # 联动 tx-trade/src/security/rbac.py require_role/require_mfa 装饰器链路。
+    RBAC_STRICT = "trade.rbac.strict"
+
 
 class OrgFlags:
     """人力组织域 Flag 名称。"""
