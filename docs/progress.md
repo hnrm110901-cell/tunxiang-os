@@ -4,6 +4,51 @@
 
 ---
 
+## 2026-04-24 18:00 Sprint D4a：成本根因 Skill Agent（Sonnet 4.7 + Prompt Cache）
+
+### 本次会话目标
+接力 commit bb916707 完成 D4a 剩余部分（Skill Agent 实装、prompts 稳定前缀、flag 注册、集成测试）。
+
+### 不得触碰的边界
+- [x] services/tx-agent/src/services/model_router.py — 未触碰（commit bb916707 已落）
+- [x] shared/ontology/ — 未触碰
+- [x] 已应用迁移 v001-v264 — 未触碰
+
+### 本次涉及范围
+- 新增：services/tx-agent/src/prompts/__init__.py + prompts/cost_root_cause.py
+- 新增：services/tx-agent/src/agents/skills/cost_root_cause.py
+- 新增：services/tx-agent/src/tests/test_cost_root_cause.py
+- 修改：services/tx-agent/src/agents/skills/__init__.py（注册 CostRootCauseAgent）
+- 修改：flags/agents/agent_flags.yaml + shared/feature_flags/flag_names.py（加 flag）
+- 迁移：**无**
+- Tier 级别：Tier 2（Agent 建议级，不触碰 T1 资金路径）
+
+### 完成状态
+- [x] 系统提示 + schema 合计 4142 字符（门槛 4000，≥1024 tokens）
+- [x] Pydantic 输出模型严格校验（RootCauseItem / Recommendation / CostRootCauseOutput）
+- [x] ModelRouter.complete_with_cache(task_type="cost_root_cause") 走 Sonnet 4.7
+- [x] DecisionLogService.log_skill_result 写 ROI（saved_labor_hours + prevented_loss_fen）
+- [x] 8 个集成测试全绿
+- [x] 38 个 constraint_context CI 门禁测试全绿（100% SKILL_REGISTRY 覆盖）
+- [x] ruff 绿
+
+### 关键决策
+- **单一 ephemeral cache block**：按 Anthropic 官方建议，身份 + schema 合并为单块可提升命中率；若未来需要多块分级，升级到 2 层 cache_control 即可
+- **LLM 输出容错**：预留 markdown 代码块 ``` 剥离 + 子串提取，兼容 Sonnet 偶尔返回带解释的格式
+- **ROI 估算保守**：saved_labor_hours 每根因 0.5h；prevented_loss_fen 取建议累计节省额；等真实上线后按效果回归校准
+- **Flag 默认全 off**：dev/test/pilot/prod 均默认关闭，合并后由运维按环境灰度打开
+- **相对/绝对 import 双轨兼容**：prompts 模块优先相对导入，失败兜底 top-level（tests sys.path 注入）
+
+### 下一步
+- 合并本 PR 后，等 D4b 薪资异常 Skill 接力
+- 真实接入 Sonnet 4.7 后，观察首 72 小时 cache_hit_ratio（警戒 <0.60）
+
+### 已知风险
+- 未测试真实 Claude API 调用路径（只 mock complete_with_cache），需到 test 环境实测一次确认 cache 命中
+- Skill 尚未接入 Master Agent 编排（Orchestrator 侧后续 PR 再挂）
+
+---
+
 ## 2026-04-24 17:00 Sprint A1 TDD 工单：POS ErrorBoundary + 3s 超时 + Toast
 
 ### 本次会话目标

@@ -1,3 +1,32 @@
+## 2026-04-24 Sprint D4a — 成本根因 Skill Agent（Sonnet 4.7 + Prompt Cache）
+
+### 今日完成
+- [services/tx-agent/src/prompts/cost_root_cause.py] 新增稳定前缀：SYSTEM_PROMPT_COST_ROOT_CAUSE（1095 字符，Agent 身份 + 三条硬约束）+ FINANCE_SCHEMA_DOC（3048 字符，8 大成本科目 + 毛利公式 + 行业基准 + 屯象 MV 表）；合计 4142 字符（≥1024 tokens）；`build_cached_system_blocks()` 返回 `cache_control: ephemeral` 块
+- [services/tx-agent/src/agents/skills/cost_root_cause.py] CostRootCauseAgent：Level 1 建议级、scope={"margin"}、2 个 action（analyze_cost_spike / explain_margin_drop）；Pydantic 模型 RootCauseItem / Recommendation / CostRootCauseOutput 严格校验 LLM 输出；走 ModelRouter.complete_with_cache(task_type="cost_root_cause") 路由到 Sonnet 4.7；ROI 估算（saved_labor_hours + prevented_loss_fen）通过 DecisionLogService.log_skill_result 留痕
+- [services/tx-agent/src/agents/skills/__init__.py] 注册 CostRootCauseAgent 到 ALL_SKILL_AGENTS
+- [flags/agents/agent_flags.yaml + shared/feature_flags/flag_names.py] 新增 flag `agent.cost_root_cause.enable`（默认全环境 off）+ AgentFlags.COST_ROOT_CAUSE_ENABLE 常量
+- [services/tx-agent/src/tests/test_cost_root_cause.py] 8 个集成测试全绿：注册/scope/元信息/cache 门槛/Pydantic 解析/cache_hit_ratio>0.75/task_type=cost_root_cause/ast 扫描无 broad except
+- test_constraint_context.py 38 测试全绿（含 100% registry 覆盖门禁）；ruff 绿
+
+### 数据变化
+- 新增文件：4（prompts/__init__.py, prompts/cost_root_cause.py, skills/cost_root_cause.py, tests/test_cost_root_cause.py）
+- 修改文件：3（skills/__init__.py, flags/agents/agent_flags.yaml, shared/feature_flags/flag_names.py）
+- 新增 flag：agent.cost_root_cause.enable（flag 总量 11 → 12）
+- 新增测试：8（全绿）
+- SKILL_REGISTRY 规模：51 → 52
+- 无迁移
+
+### 遗留问题
+- 真实 Sonnet 4.7 调用的 cache_hit_ratio 需在接入后观察首 72 小时（model_router 已对 <0.60 打 warn 日志）
+- Skill 尚未接入总部后台触发入口（可在后续 PR 里通过 /api/agent/trigger 挂 route）
+- ROI writeback 效果需配合 `agent.roi.writeback` flag 开启后观察
+
+### 明日计划
+- D4b 薪资异常 Skill（同样 Sonnet 4.7 + cache 模式，scope 包含 margin + safety）
+- D4c 预算预测 Skill
+
+---
+
 ## 2026-04-24 Sprint A1 TDD 工单 — POS ErrorBoundary + 3s 超时 + Toast
 
 ### 今日完成
