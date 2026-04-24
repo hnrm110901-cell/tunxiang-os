@@ -4,6 +4,57 @@
 
 ---
 
+## 2026-04-24 Sprint D4b：salary_anomaly Skill + Sonnet 4.7 Prompt Cache（Tier2）
+
+### 本次会话目标
+实装 Sprint D4b：薪资异常 Skill Agent（Sonnet 4.7 + Prompt Cache，对标 D4a cost_root_cause 模板），覆盖加班时长异常 + 薪资环比异常两个 action，margin scope，Level 1 建议级。
+
+### 不得触碰的边界
+- [x] services/tx-agent/src/services/model_router.py — 未修改（Sonnet 4.7 映射 bb916707 已 land）
+- [x] shared/ontology/ — 未触碰
+- [x] 其他 Skill 文件 — 未触碰（只动 salary_anomaly.*）
+- [x] flag 默认开启 — 默认全环境 off，等运维灰度
+
+### 本次涉及范围
+- 新增：3（services/tx-agent/src/prompts/salary_anomaly.py / agents/skills/salary_anomaly.py / tests/test_salary_anomaly.py）
+- 修改：3（agents/skills/__init__.py 注册 / flags/agents/agent_flags.yaml / shared/feature_flags/flag_names.py）
+- Tier 级别：**Tier 2（高标准）**
+- 迁移号：无（纯代码 + flag + 注册）
+
+### 完成状态
+- [x] SalaryAnomalyAgent 实装（agent_id="salary_anomaly"，scope={"margin"}，2 个 action）
+- [x] SYSTEM_PROMPT_SALARY_ANOMALY + PAYROLL_SCHEMA_DOC 合计 4756 字符 > 4000 门槛
+- [x] build_cached_system_blocks() 返回 cache_control: ephemeral 单块
+- [x] ModelRouter.complete_with_cache(task_type="salary_anomaly") 调用（→ Sonnet 4.7）
+- [x] Pydantic 输出 SalaryAnomalyOutput（anomalies / suspect_employee_ids / recommendations / confidence）
+- [x] ROI 四字段：prevented_loss_fen / improved_kpi{labor_cost_ratio, delta_pct} / saved_labor_hours=2.0 / roi_evidence{model, cache_hit_ratio}
+- [x] __init__.py 注册 SalaryAnomalyAgent（SKILL_REGISTRY 53 → 54）
+- [x] flag agent.salary_anomaly.enable 注册（默认 off）+ AgentFlags.SALARY_ANOMALY_ENABLE 常量
+- [x] 10 条集成测试全绿（≥8 目标达成）
+- [x] ruff check 全绿 + ruff format 已应用
+- [x] test_100_percent_registry_coverage CI 门禁通过（test_constraint_context.py 38/38 绿）
+- [x] D4a cost_root_cause 8/8 零回归
+
+### 关键决策
+- **scope={"margin"}**：薪资异常直接冲击人力成本率（行业上限 22-28%），归为毛利底线而非独立 scope（与规划 D4b 对齐）。
+- **Level 1 仅建议**：薪资调整必须 HR 复核 + 员工书面同意，禁止 L2/L3 自动执行。
+- **PII 保护**：输出严格要求 employee_id（UUID 或 E-xxxx），禁用姓名；prompt schema 明确标注"禁止使用员工姓名或身份证号"。
+- **test_decision_log_records_prevented_loss_fen 改为监听 _write_decision_log**：因测试 sys.path=src 时 `from ...services.decision_log_service` 触发 ImportError beyond top-level package（被 except 吞掉），真实 DB 路径在上线后 demo 验证；测试聚焦 ROI 计算正确性。
+- **temperature=0.2**（D4a 为 0.3）：薪资稽核对确定性要求更高，温度下调。
+
+### 下一步
+- [ ] D4c：接入 tx-org payroll_period 真实数据（detect_payroll_variance 的 current_payroll/baseline_payroll 从 DB 拉取而非 params 传入）
+- [ ] pilot：徐记海鲜 17 号店灰度 3 天，观察 Prompt Cache 命中率与 Sonnet 4.7 latency
+- [ ] Master Agent 编排：cost_root_cause → salary_anomaly 串联（毛利漂移先定人力 vs 食材）
+
+### 已知风险（Tier 2 路径相关）
+- 真实 DB 下 DecisionLogService 写入未在单测验证（测试环境导入路径限制）—— 上线前 demo-xuji-seafood 数据集跑一次端到端。
+- Prompt Cache hit_ratio 本地仅 mock 验证，生产需连续 10+ 次调用后观察实际命中率（< 0.60 时 ModelRouter 自动 warn）。
+- flag 默认 off，灰度前不会有用户流量；无意外触发风险。
+- 薪资异常建议仅建议级（Level 1），不会自动调整员工工资，合规风险为零。
+
+---
+
 ## 2026-04-24 23:15 Sprint A1：POS ErrorBoundary + 3s/8s 双级超时 + Toast 5 类（Tier1 + §19）
 
 ### 本次会话目标
