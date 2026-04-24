@@ -15,6 +15,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import os
 import sys
 import uuid
@@ -762,6 +763,359 @@ async def test_decision_log_written_for_every_action(
 # ─────────────────────────────────────────────────────────────────────────
 # 8. 豁免与审批链顺序
 # ─────────────────────────────────────────────────────────────────────────
+
+
+# ─────────────────────────────────────────────────────────────────────────
+# 9. PR #90 CRITICAL 回归（C-1 / C-2 / C-3）
+# ─────────────────────────────────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_route_approval_trusts_db_not_params(
+    agent: BanquetContractAgent,
+    lead_api: FakeLeadApiClient,
+) -> None:
+    """C-1 回归：params 中的 total_amount_fen / banquet_type 必须被 DB 值覆盖。
+
+    场景：DB 存 500W 元 + wedding 的合同；恶意/误传 params 里是 0 元 + birthday。
+    预期：Agent 依 DB 真值走店长 + 区经两级审批链，不得 auto_passed。
+    """
+    lead_id = next(iter(lead_api._payloads.keys()))
+    # 创建 500W 元婚宴合同（DB 真值）
+    gen = await agent.run(
+        "generate_contract",
+        {
+            "tenant_id": TENANT_A,
+            "lead_id": lead_id,
+            "customer_id": uuid.uuid4(),
+            "banquet_type": "wedding",
+            "tables": 30,
+            "total_amount_fen": 5_500_000,  # 55W，触发区经阈值
+            "deposit_ratio": Decimal("0.30"),
+            "scheduled_date": date(2026, 10, 1),
+        },
+    )
+    contract_id = uuid.UUID(gen.data["contract_id"])
+
+    # 传入恶意低金额 + 非婚宴类型，试图绕过审批
+    route = await agent.run(
+        "route_approval",
+        {
+            "tenant_id": TENANT_A,
+            "contract_id": contract_id,
+            "total_amount_fen": 0,  # 恶意绕过
+            "banquet_type": "birthday",  # 恶意绕过
+        },
+    )
+    assert route.success, route.error
+    # 必须不能 auto_passed — 走店长审批链
+    assert route.data["auto_passed"] is False, (
+        "C-1 fail: params 覆盖了 DB 值，绕过了审批"
+    )
+    assert route.data["next_role"] == "store_manager"
+    assert route.data["final_status"] == "pending_approval"
+
+
+@pytest.mark.asyncio
+async def test_route_approval_contract_not_found_raises(
+    agent: BanquetContractAgent,
+) -> None:
+    """C-1 保护：contract 不存在 → get_contract 抛 NotFound，Agent 返回 success=False。"""
+    missing_contract_id = uuid.uuid4()
+    route = await agent.run(
+        "route_approval",
+        {
+            "tenant_id": TENANT_A,
+            "contract_id": missing_contract_id,
+            "total_amount_fen": 5_500_000,
+            "banquet_type": "wedding",
+        },
+    )
+    # SkillAgent.run 兜底捕获 → success=False
+    assert route.success is False
+    assert route.error is not None
+    # 错误消息中应包含 contract_id
+    assert str(missing_contract_id) in route.error or "not found" in route.error.lower()
+
+
+@pytest.mark.asyncio
+async def test_lock_schedule_concurrent_double_lock_prevented(
+    agent: BanquetContractAgent,
+    contract_service: BanquetContractService,
+    lead_api: FakeLeadApiClient,
+) -> None:
+    """C-2 回归：两个合同并发 lock 同档期，只有一个 locked=True。
+
+    场景：C1 / C2 均未签 + 同门店 + 同档期，asyncio.gather 并发调 lock_schedule。
+    通过 monkey-patch list_contracts 在前两次返回前 await sleep，强制两个
+    coroutine 都读到"无 signed 合同"的空快照 → 都尝试 mark_signed。
+    预期：一个 locked=True，另一个 locked=False + schedule_conflict=True。
+    """
+    lead_id = next(iter(lead_api._payloads.keys()))
+    sched = date(2026, 11, 11)
+
+    # 并发创建两份合同
+    c1_gen, c2_gen = await asyncio.gather(
+        agent.run(
+            "generate_contract",
+            {
+                "tenant_id": TENANT_A,
+                "lead_id": lead_id,
+                "customer_id": uuid.uuid4(),
+                "banquet_type": "wedding",
+                "tables": 20,
+                "total_amount_fen": 2_000_000,
+                "deposit_ratio": Decimal("0.30"),
+                "scheduled_date": sched,
+            },
+        ),
+        agent.run(
+            "generate_contract",
+            {
+                "tenant_id": TENANT_A,
+                "lead_id": lead_id,
+                "customer_id": uuid.uuid4(),
+                "banquet_type": "wedding",
+                "tables": 15,
+                "total_amount_fen": 1_600_000,
+                "deposit_ratio": Decimal("0.30"),
+                "scheduled_date": sched,
+            },
+        ),
+    )
+    c1_id = uuid.UUID(c1_gen.data["contract_id"])
+    c2_id = uuid.UUID(c2_gen.data["contract_id"])
+
+    # 注入 race：list_contracts 在前两次返回前 await sleep，
+    # 让两个 coroutine 都看到"无 signed 合同"
+    repo = contract_service._repo
+    original_list_contracts = repo.list_contracts
+
+    list_call_count = {"n": 0}
+
+    async def racy_list_contracts(**kwargs: Any) -> Any:
+        rows = await original_list_contracts(**kwargs)
+        list_call_count["n"] += 1
+        if list_call_count["n"] <= 2:
+            await asyncio.sleep(0.01)
+        return rows
+
+    repo.list_contracts = racy_list_contracts  # type: ignore[assignment]
+
+    # 并发 lock — 模拟两端几乎同时为同档期付订金
+    lock1, lock2 = await asyncio.gather(
+        agent.run(
+            "lock_schedule",
+            {
+                "tenant_id": TENANT_A,
+                "contract_id": c1_id,
+                "scheduled_date": sched,
+                "store_id": STORE_ID,
+                "deposit_paid_fen": 600_000,
+            },
+        ),
+        agent.run(
+            "lock_schedule",
+            {
+                "tenant_id": TENANT_A,
+                "contract_id": c2_id,
+                "scheduled_date": sched,
+                "store_id": STORE_ID,
+                "deposit_paid_fen": 500_000,
+            },
+        ),
+    )
+    # 恢复 repo
+    repo.list_contracts = original_list_contracts  # type: ignore[assignment]
+
+    assert lock1.success and lock2.success
+    # 只有一个 locked=True
+    locked_count = sum(1 for r in (lock1, lock2) if r.data.get("locked") is True)
+    assert locked_count == 1, (
+        f"C-2 fail: 双锁并发未被阻断（locked_count={locked_count}）"
+    )
+    # 失败方 schedule_conflict=True（进候补）
+    losers = [r for r in (lock1, lock2) if r.data.get("locked") is False]
+    assert len(losers) == 1
+    # 失败方因 v283 UNIQUE 冲突或候补队列命中（两种情况都合法）
+    # 若是 DB 冲突：schedule_conflict=True；若是 queue 命中：False 但 queued_contract_ids 非空
+    loser = losers[0]
+    assert (
+        loser.data.get("schedule_conflict") is True
+        or len(loser.data.get("queued_contract_ids", [])) > 0
+    ), "C-2 fail: 失败方既无 DB 冲突标记也无候补队列"
+
+
+@pytest.mark.asyncio
+async def test_route_approval_concurrent_store_manager_only_one_wins(
+    agent: BanquetContractAgent,
+    contract_service: BanquetContractService,
+    lead_api: FakeLeadApiClient,
+) -> None:
+    """C-3 回归：两个 store_manager 并发 approve 同合同，只能写入一条日志。
+
+    预期：一个 success + 推进；另一个 idempotent=True 幂等返回。
+
+    并发模拟：asyncio.gather 下 InMemory repo 各 await 立即完成，故通过
+    monkey-patch list_approval_logs 在首次返回后 await sleep，让两个
+    coroutine 都读到 empty → 同时尝试写 STORE_MANAGER。v283 UNIQUE 索引
+    由 InMemory insert_approval_log 的谓词检查模拟。
+    """
+    lead_id = next(iter(lead_api._payloads.keys()))
+    gen = await agent.run(
+        "generate_contract",
+        {
+            "tenant_id": TENANT_A,
+            "lead_id": lead_id,
+            "customer_id": uuid.uuid4(),
+            "banquet_type": "wedding",
+            "tables": 30,
+            "total_amount_fen": 5_500_000,  # 55W → 店长 + 区经
+            "deposit_ratio": Decimal("0.30"),
+            "scheduled_date": date(2026, 12, 12),
+        },
+    )
+    contract_id = uuid.UUID(gen.data["contract_id"])
+
+    # 先初始路由（写 PENDING_APPROVAL 链）
+    await agent.run(
+        "route_approval",
+        {
+            "tenant_id": TENANT_A,
+            "contract_id": contract_id,
+            "total_amount_fen": 5_500_000,
+            "banquet_type": "wedding",
+        },
+    )
+
+    # 注入 race：list_approval_logs 在返回前 await 一下，强制两个 coroutine
+    # 在 Agent 内完成 "读 → 判断" 阶段时都还未 insert → 都决策 STORE_MANAGER
+    repo = contract_service._repo
+    original_list = repo.list_approval_logs
+
+    call_count = {"n": 0}
+
+    async def racy_list(
+        contract_id_arg: uuid.UUID, tenant_id_arg: uuid.UUID
+    ) -> list[Any]:
+        rows = await original_list(contract_id_arg, tenant_id_arg)
+        call_count["n"] += 1
+        # 前两次返回前释放控制权，让两个并发请求都读到同样的"空 store_manager"状态
+        if call_count["n"] <= 2:
+            await asyncio.sleep(0.01)
+        return rows
+
+    repo.list_approval_logs = racy_list  # type: ignore[assignment]
+
+    # 两个 store_manager 并发 approve
+    approver_a = uuid.uuid4()
+    approver_b = uuid.uuid4()
+    res_a, res_b = await asyncio.gather(
+        agent.run(
+            "route_approval",
+            {
+                "tenant_id": TENANT_A,
+                "contract_id": contract_id,
+                "total_amount_fen": 5_500_000,
+                "banquet_type": "wedding",
+                "approver_id": approver_a,
+                "approval_action": "approve",
+            },
+        ),
+        agent.run(
+            "route_approval",
+            {
+                "tenant_id": TENANT_A,
+                "contract_id": contract_id,
+                "total_amount_fen": 5_500_000,
+                "banquet_type": "wedding",
+                "approver_id": approver_b,
+                "approval_action": "approve",
+            },
+        ),
+    )
+    # 恢复
+    repo.list_approval_logs = original_list  # type: ignore[assignment]
+
+    assert res_a.success and res_b.success
+    # 一个推进（next_role=district_manager），另一个 idempotent
+    idempotent_count = sum(
+        1 for r in (res_a, res_b) if r.data.get("idempotent") is True
+    )
+    advanced_count = sum(
+        1 for r in (res_a, res_b)
+        if r.data.get("idempotent") is not True
+        and r.data.get("next_role") == "district_manager"
+    )
+    assert idempotent_count == 1, (
+        f"C-3 fail: 并发双写未被阻断（idempotent_count={idempotent_count}） "
+        f"res_a.data={res_a.data} res_b.data={res_b.data}"
+    )
+    assert advanced_count == 1
+
+
+@pytest.mark.asyncio
+async def test_route_approval_skips_to_district_after_store_done(
+    agent: BanquetContractAgent,
+    lead_api: FakeLeadApiClient,
+) -> None:
+    """C-3 顺序化流程：店长 approve 后，再次 approve 应作为 district_manager 决策。"""
+    lead_id = next(iter(lead_api._payloads.keys()))
+    gen = await agent.run(
+        "generate_contract",
+        {
+            "tenant_id": TENANT_A,
+            "lead_id": lead_id,
+            "customer_id": uuid.uuid4(),
+            "banquet_type": "wedding",
+            "tables": 30,
+            "total_amount_fen": 5_500_000,
+            "deposit_ratio": Decimal("0.30"),
+            "scheduled_date": date(2026, 12, 20),
+        },
+    )
+    contract_id = uuid.UUID(gen.data["contract_id"])
+
+    # 首次路由
+    await agent.run(
+        "route_approval",
+        {
+            "tenant_id": TENANT_A,
+            "contract_id": contract_id,
+            "total_amount_fen": 5_500_000,
+            "banquet_type": "wedding",
+        },
+    )
+    # 店长审批
+    store_res = await agent.run(
+        "route_approval",
+        {
+            "tenant_id": TENANT_A,
+            "contract_id": contract_id,
+            "total_amount_fen": 5_500_000,
+            "banquet_type": "wedding",
+            "approver_id": uuid.uuid4(),
+            "approval_action": "approve",
+        },
+    )
+    assert store_res.success
+    assert store_res.data["next_role"] == "district_manager"
+
+    # 区经审批 → SIGNED
+    district_res = await agent.run(
+        "route_approval",
+        {
+            "tenant_id": TENANT_A,
+            "contract_id": contract_id,
+            "total_amount_fen": 5_500_000,
+            "banquet_type": "wedding",
+            "approver_id": uuid.uuid4(),
+            "approval_action": "approve",
+        },
+    )
+    assert district_res.success
+    assert district_res.data["next_role"] is None
+    assert district_res.data["final_status"] == "signed"
 
 
 @pytest.mark.asyncio

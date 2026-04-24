@@ -66,6 +66,18 @@ class SignatureRequiredError(BanquetContractError):
     code = "BANQUET_CONTRACT_SIGNATURE_REQUIRED"
 
 
+class ScheduleAlreadyLockedError(BanquetContractError):
+    """档期已被其它合同 signed 锁定（C-2 修复：v283 部分 UNIQUE 索引命中）。"""
+
+    code = "BANQUET_CONTRACT_SCHEDULE_LOCKED"
+
+
+class ApprovalAlreadyRecordedError(BanquetContractError):
+    """同合同同 role 的 approve/reject 日志已存在（C-3 修复：v283 部分 UNIQUE 索引命中）。"""
+
+    code = "BANQUET_CONTRACT_APPROVAL_ALREADY_RECORDED"
+
+
 # ──────────────────────────────────────────────────────────────────────────
 # 状态机
 # ──────────────────────────────────────────────────────────────────────────
@@ -263,6 +275,15 @@ class BanquetContractService:
         """将合同置为 signed。
 
         幂等：若已 signed 直接返回（不再发事件）。
+
+        并发保护（C-2 修复）：
+            - DB 层靠 v283 部分 UNIQUE 索引
+              (tenant_id, store_id, scheduled_date) WHERE status='signed'
+              保证同门店同档期只能有一张 signed 合同。
+            - Service 层在 update_contract 前先扫描已 signed 的同档期合同
+              （InMemory 实现）；Pg 实现在 asyncpg 抛 UniqueViolationError
+              时由 update_contract 转抛 ScheduleAlreadyLockedError。
+            - 若命中 → 抛 ScheduleAlreadyLockedError，调用方（Agent）转候补。
         """
         contract = await self.get_contract(contract_id, tenant_id)
         if contract.status == ContractStatus.SIGNED:
@@ -274,6 +295,27 @@ class BanquetContractService:
         if not signature_provider:
             raise SignatureRequiredError("signature_provider is required")
 
+        # C-2 修复：InMemory 层原子检查同档期是否已被 signed 合同锁定。
+        # 生产 Pg 实现依赖 v283 部分 UNIQUE 索引 + asyncpg UniqueViolationError。
+        if (
+            contract.store_id is not None
+            and contract.scheduled_date is not None
+        ):
+            existing_signed, _ = await self._repo.list_contracts(
+                tenant_id=tenant_id,
+                status=ContractStatus.SIGNED,
+                scheduled_date=contract.scheduled_date,
+                store_id=contract.store_id,
+                limit=1,
+            )
+            conflict = [
+                c for c in existing_signed if c.contract_id != contract_id
+            ]
+            if conflict:
+                raise ScheduleAlreadyLockedError(
+                    f"schedule already locked by contract_id={conflict[0].contract_id}"
+                )
+
         now = signed_at or datetime.now(timezone.utc)
         updated = contract.model_copy(
             update={
@@ -283,7 +325,16 @@ class BanquetContractService:
                 "updated_at": now,
             }
         )
-        await self._repo.update_contract(updated)
+        try:
+            await self._repo.update_contract(updated)
+        except Exception as exc:  # noqa: BLE001
+            # 生产 Pg 层：asyncpg.UniqueViolationError / IntegrityError
+            # 经 v283 部分 UNIQUE 索引抛出时转 ScheduleAlreadyLockedError
+            if _is_unique_violation(exc):
+                raise ScheduleAlreadyLockedError(
+                    f"schedule lock unique index violated for contract_id={contract_id}"
+                ) from exc
+            raise
 
         payload: dict[str, Any] = {
             "contract_id": str(contract_id),
@@ -347,6 +398,25 @@ class BanquetContractService:
             reason=reason,
         )
         return updated
+
+    # ─────────────────────────────────────────────────────────────────
+    # 审批日志写入（C-3 修复：幂等 + 唯一约束兜底）
+    # ─────────────────────────────────────────────────────────────────
+    async def insert_approval_log(self, log: Any) -> Any:
+        """写入审批日志；若 DB 层 UNIQUE 约束（v283）命中则抛
+        ApprovalAlreadyRecordedError。
+
+        调用方（Agent._route_approval）捕获后降级为幂等返回。
+        """
+        try:
+            return await self._repo.insert_approval_log(log)
+        except Exception as exc:  # noqa: BLE001
+            if _is_unique_violation(exc):
+                raise ApprovalAlreadyRecordedError(
+                    f"approval already recorded for contract_id={log.contract_id} "
+                    f"role={log.role.value}"
+                ) from exc
+            raise
 
     # ─────────────────────────────────────────────────────────────────
     # 写回审批链 / status
@@ -414,6 +484,28 @@ class BanquetContractService:
             )
 
 
+# ──────────────────────────────────────────────────────────────────────────
+# 工具：UNIQUE 约束违反识别（跨 asyncpg / psycopg2 / sqlite 的轻量兼容）
+# ──────────────────────────────────────────────────────────────────────────
+
+
+def _is_unique_violation(exc: BaseException) -> bool:
+    """识别 DB 驱动抛出的 UNIQUE 约束违反。
+
+    避免在 service 层 import asyncpg（tx-trade 测试 InMemory 不依赖 asyncpg）。
+    通过异常类名 + sqlstate 属性软探测，足够覆盖 asyncpg / psycopg2 / sqlite3。
+    """
+    # asyncpg.exceptions.UniqueViolationError / UniqueViolation
+    cls_name = type(exc).__name__
+    if "UniqueViolation" in cls_name:
+        return True
+    # asyncpg 统一基类 PostgresError 挂 sqlstate；23505 = unique_violation
+    sqlstate = getattr(exc, "sqlstate", None) or getattr(exc, "pgcode", None)
+    if sqlstate == "23505":
+        return True
+    return False
+
+
 __all__ = [
     "BanquetContractService",
     "BanquetContractError",
@@ -421,4 +513,6 @@ __all__ = [
     "InvalidContractTransitionError",
     "CancellationReasonMissingError",
     "SignatureRequiredError",
+    "ScheduleAlreadyLockedError",
+    "ApprovalAlreadyRecordedError",
 ]

@@ -416,13 +416,11 @@ class BanquetContractAgent(SkillAgent):
                 error="tenant_id / contract_id 必填",
             )
 
-        total_amount_fen = int(params.get("total_amount_fen", 0))
-        banquet_type_raw = params.get("banquet_type", "birthday")
-        banquet_type = (
-            banquet_type_raw
-            if isinstance(banquet_type_raw, BanquetType)
-            else BanquetType(str(banquet_type_raw))
-        )
+        # C-1 修复：trust boundary — params 仅作调用方意图提示，阈值判断
+        # 必须用 DB 真值，防止恶意/误传 total_amount_fen=0 + banquet_type=birthday
+        # 绕过店长 + 区经两级审批。
+        params_total_fen = int(params.get("total_amount_fen", 0))
+        params_banquet_type_raw = params.get("banquet_type")
         approver_id = _coerce_uuid(params.get("approver_id"))
         approval_action_raw = params.get("approval_action")
         approval_action: Optional[ApprovalAction] = None
@@ -437,7 +435,30 @@ class BanquetContractAgent(SkillAgent):
         contract_service = self._require_contract_service()
         repo = self._require_repo()
 
+        # 从 DB 读真值；contract_service.get_contract 不存在时抛
+        # BanquetContractNotFoundError（由调用方 HTTP 转 404）。
         contract = await contract_service.get_contract(contract_id, tenant_id)
+
+        # 阈值判断只信 DB 真值（C-1 fix）
+        total_amount_fen = int(contract.total_amount_fen)
+        banquet_type = contract.banquet_type
+
+        # 审计日志：记录 params 与 DB 是否一致，便于发现上游误用/攻击
+        logger.info(
+            "banquet_route_approval_using_contract_fields",
+            contract_id=str(contract_id),
+            tenant_id=str(tenant_id),
+            params_total_fen=params_total_fen,
+            db_total_fen=total_amount_fen,
+            total_match=params_total_fen == total_amount_fen,
+            params_banquet_type=(
+                params_banquet_type_raw
+                if params_banquet_type_raw is None
+                or isinstance(params_banquet_type_raw, str)
+                else getattr(params_banquet_type_raw, "value", str(params_banquet_type_raw))
+            ),
+            db_banquet_type=banquet_type.value,
+        )
 
         needs_store_manager = (
             total_amount_fen >= STORE_MANAGER_THRESHOLD_FEN
@@ -512,7 +533,73 @@ class BanquetContractAgent(SkillAgent):
                     source_event_id=None,
                     created_at=datetime.now(timezone.utc),
                 )
-                await repo.insert_approval_log(log)
+                # C-3 修复：通过 service 层 insert（含 UniqueViolation 捕获），
+                # 并发同 role approve/reject 的第二方抛 ApprovalAlreadyRecordedError
+                # → Agent 降级为幂等，读取当前链快照返回。
+                insert_via_service = getattr(
+                    contract_service, "insert_approval_log", None
+                )
+                try:
+                    if insert_via_service is not None:
+                        await insert_via_service(log)
+                    else:
+                        await repo.insert_approval_log(log)
+                except Exception as exc:  # noqa: BLE001
+                    if _is_approval_already_recorded(exc):
+                        logger.info(
+                            "banquet_route_approval_idempotent_skip",
+                            contract_id=str(contract_id),
+                            role=log_role.value,
+                            action=approval_action.value,
+                        )
+                        # 并发第二方：读当前链快照返回，不重复推进
+                        existing_chain = list(contract.approval_chain or full_chain)
+                        current = await contract_service.get_contract(
+                            contract_id, tenant_id
+                        )
+                        constraint_ctx = _build_constraint_context(
+                            total_amount_fen=total_amount_fen,
+                            banquet_type=banquet_type,
+                            purchase_batches=None,
+                            scope=self.constraint_scope,
+                        )
+                        decision_id = _new_decision_id()
+                        reasoning = (
+                            f"{log_role.value} 审批已记录（并发幂等） → 跳过"
+                        )
+                        self._record_decision(
+                            decision_id=decision_id,
+                            action="route_approval",
+                            input_context={
+                                "contract_id": str(contract_id),
+                                "total_amount_fen": total_amount_fen,
+                                "banquet_type": banquet_type.value,
+                                "approval_action": approval_action.value,
+                            },
+                            output_action={
+                                "idempotent": True,
+                                "final_status": current.status.value,
+                            },
+                            reasoning=reasoning,
+                        )
+                        return AgentResult(
+                            success=True,
+                            action="route_approval",
+                            data={
+                                "contract_id": str(contract_id),
+                                "auto_passed": False,
+                                "idempotent": True,
+                                "next_role": None,
+                                "final_status": current.status.value,
+                                "approval_chain": existing_chain,
+                                "decision_id": str(decision_id),
+                            },
+                            reasoning=reasoning,
+                            confidence=0.95,
+                            context=constraint_ctx,
+                            inference_layer="cloud",
+                        )
+                    raise
 
                 # 更新审批链快照（写回 decided_action）
                 chain_snapshot = list(contract.approval_chain or full_chain)
@@ -696,17 +783,35 @@ class BanquetContractAgent(SkillAgent):
         ]
 
         locked = False
+        schedule_conflict = False  # C-2：DB 层 UNIQUE 冲突命中标记
         if not locked_existing:
             # 无人锁定 — 本合同若已签 + 订金 > 0 → 直接锁定
             contract = await contract_service.get_contract(contract_id, tenant_id)
             if contract.status != ContractStatus.SIGNED:
-                # 代理自动签（必须满足已付订金且可签）
-                await contract_service.mark_signed(
-                    contract_id=contract_id,
-                    tenant_id=tenant_id,
-                    signature_provider="placeholder",
-                )
-            if deposit_paid_fen > 0 or contract.deposit_fen > 0:
+                # C-2 修复：mark_signed 内部靠 v283 部分 UNIQUE 索引
+                # (tenant_id, store_id, scheduled_date) WHERE status='signed'
+                # 原子保证同档期只能锁一张。并发第二方会抛
+                # ScheduleAlreadyLockedError → 降级为 locked=False + 进候补队列。
+                try:
+                    await contract_service.mark_signed(
+                        contract_id=contract_id,
+                        tenant_id=tenant_id,
+                        signature_provider="placeholder",
+                    )
+                except Exception as exc:  # noqa: BLE001
+                    if _is_schedule_already_locked(exc):
+                        schedule_conflict = True
+                        logger.info(
+                            "banquet_lock_schedule_concurrent_conflict",
+                            contract_id=str(contract_id),
+                            scheduled_date=scheduled_date.isoformat(),
+                            store_id=str(store_id),
+                        )
+                    else:
+                        raise
+            if not schedule_conflict and (
+                deposit_paid_fen > 0 or contract.deposit_fen > 0
+            ):
                 locked = True
         else:
             # 已有人先锁 — 本合同若是该 "first come" 则 locked=True
@@ -738,6 +843,10 @@ class BanquetContractAgent(SkillAgent):
         )
 
         decision_id = _new_decision_id()
+        reasoning = (
+            f"档期 {scheduled_date.isoformat()} 先到先得: locked={locked}"
+            + (" [DB_UNIQUE_CONFLICT]" if schedule_conflict else "")
+        )
         self._record_decision(
             decision_id=decision_id,
             action="lock_schedule",
@@ -749,8 +858,9 @@ class BanquetContractAgent(SkillAgent):
             output_action={
                 "locked": locked,
                 "queued_count": len(queued),
+                "schedule_conflict": schedule_conflict,
             },
-            reasoning=f"档期 {scheduled_date.isoformat()} 先到先得: locked={locked}",
+            reasoning=reasoning,
         )
         return AgentResult(
             success=True,
@@ -758,6 +868,7 @@ class BanquetContractAgent(SkillAgent):
             data={
                 "contract_id": str(contract_id),
                 "locked": locked,
+                "schedule_conflict": schedule_conflict,
                 "queued_contract_ids": queued,
                 "decision_id": str(decision_id),
             },
@@ -1040,6 +1151,29 @@ def _build_constraint_context(
         estimated_serve_minutes=None,
         constraint_scope=set(scope),
     )
+
+
+def _is_schedule_already_locked(exc: BaseException) -> bool:
+    """识别 contract_service.mark_signed 抛出的档期已锁错误（C-2）。
+
+    软探测：基于类名（tx-trade 侧 ScheduleAlreadyLockedError）。避免
+    tx-agent 硬 import tx-trade service 异常（r2-contracts §8.4）。
+    """
+    cls_name = type(exc).__name__
+    return cls_name == "ScheduleAlreadyLockedError" or getattr(
+        exc, "code", None
+    ) == "BANQUET_CONTRACT_SCHEDULE_LOCKED"
+
+
+def _is_approval_already_recorded(exc: BaseException) -> bool:
+    """识别 contract_service.insert_approval_log 抛出的审批已录入错误（C-3）。
+
+    同样通过类名 + code 软探测，避免跨 service 硬 import。
+    """
+    cls_name = type(exc).__name__
+    return cls_name == "ApprovalAlreadyRecordedError" or getattr(
+        exc, "code", None
+    ) == "BANQUET_CONTRACT_APPROVAL_ALREADY_RECORDED"
 
 
 def _import_tx_trade(module_suffix: str, attr: str) -> Any:

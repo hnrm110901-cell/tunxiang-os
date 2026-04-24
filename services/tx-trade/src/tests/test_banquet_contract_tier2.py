@@ -37,10 +37,12 @@ from src.repositories.banquet_contract_repo import (
     InMemoryBanquetContractRepository,
 )
 from src.services.banquet_contract_service import (
+    ApprovalAlreadyRecordedError,
     BanquetContractNotFoundError,
     BanquetContractService,
     CancellationReasonMissingError,
     InvalidContractTransitionError,
+    ScheduleAlreadyLockedError,
 )
 from src.services.banquet_eo_ticket_service import BanquetEOTicketService
 
@@ -491,3 +493,177 @@ class TestScheduleQueue:
         # created_at 升序 — FIFO
         ids_in_order = [c.contract_id for c in items]
         assert ids_in_order == [c1.contract_id, c2.contract_id, c3.contract_id]
+
+
+# ─────────────────────────────────────────────────────────────────────────
+# TX. PR #90 CRITICAL 回归（C-2 / C-3）— v283 唯一索引 + service 层兜底
+# ─────────────────────────────────────────────────────────────────────────
+
+
+class TestScheduleUniqueLock:
+    """C-2：同门店同档期 signed 合同唯一（v283 部分 UNIQUE 索引 + service 兜底）。"""
+
+    @pytest.mark.asyncio
+    async def test_mark_signed_second_same_schedule_raises(
+        self,
+        service: BanquetContractService,
+    ):
+        sched = date(2026, 10, 10)
+        c1 = await service.create_contract(
+            tenant_id=TENANT_A,
+            lead_id=uuid.uuid4(),
+            customer_id=uuid.uuid4(),
+            banquet_type=BanquetType.WEDDING,
+            tables=20,
+            total_amount_fen=2_000_000,
+            deposit_fen=600_000,
+            scheduled_date=sched,
+            store_id=STORE_ID,
+        )
+        c2 = await service.create_contract(
+            tenant_id=TENANT_A,
+            lead_id=uuid.uuid4(),
+            customer_id=uuid.uuid4(),
+            banquet_type=BanquetType.WEDDING,
+            tables=15,
+            total_amount_fen=1_600_000,
+            deposit_fen=500_000,
+            scheduled_date=sched,
+            store_id=STORE_ID,
+        )
+
+        await service.mark_signed(
+            contract_id=c1.contract_id, tenant_id=TENANT_A, signer_id=uuid.uuid4()
+        )
+
+        with pytest.raises(ScheduleAlreadyLockedError):
+            await service.mark_signed(
+                contract_id=c2.contract_id,
+                tenant_id=TENANT_A,
+                signer_id=uuid.uuid4(),
+            )
+
+    @pytest.mark.asyncio
+    async def test_mark_signed_different_store_ok(
+        self,
+        service: BanquetContractService,
+    ):
+        """不同门店同档期互不干扰（部分 UNIQUE 索引按 store_id 区分）。"""
+        sched = date(2026, 10, 10)
+        other_store = uuid.UUID("22222222-2222-2222-2222-222222222222")
+        c1 = await service.create_contract(
+            tenant_id=TENANT_A,
+            lead_id=uuid.uuid4(),
+            customer_id=uuid.uuid4(),
+            banquet_type=BanquetType.WEDDING,
+            tables=20,
+            total_amount_fen=2_000_000,
+            deposit_fen=600_000,
+            scheduled_date=sched,
+            store_id=STORE_ID,
+        )
+        c2 = await service.create_contract(
+            tenant_id=TENANT_A,
+            lead_id=uuid.uuid4(),
+            customer_id=uuid.uuid4(),
+            banquet_type=BanquetType.WEDDING,
+            tables=10,
+            total_amount_fen=1_000_000,
+            deposit_fen=300_000,
+            scheduled_date=sched,
+            store_id=other_store,
+        )
+        await service.mark_signed(contract_id=c1.contract_id, tenant_id=TENANT_A)
+        await service.mark_signed(contract_id=c2.contract_id, tenant_id=TENANT_A)
+        # 两个 signed 不冲突
+        assert True
+
+
+class TestApprovalLogUnique:
+    """C-3：同合同同 role 的 approve/reject 日志唯一。"""
+
+    @pytest.mark.asyncio
+    async def test_duplicate_approval_log_raises(
+        self,
+        service: BanquetContractService,
+    ):
+        contract = await service.create_contract(
+            tenant_id=TENANT_A,
+            lead_id=uuid.uuid4(),
+            customer_id=uuid.uuid4(),
+            banquet_type=BanquetType.WEDDING,
+            tables=30,
+            total_amount_fen=5_500_000,
+            deposit_fen=1_500_000,
+            scheduled_date=date(2026, 12, 12),
+            store_id=STORE_ID,
+        )
+        now = datetime.now(timezone.utc)
+        log1 = BanquetApprovalLog(
+            log_id=uuid.uuid4(),
+            tenant_id=TENANT_A,
+            contract_id=contract.contract_id,
+            approver_id=uuid.uuid4(),
+            role=ApprovalRole.STORE_MANAGER,
+            action=ApprovalAction.APPROVE,
+            notes=None,
+            source_event_id=None,
+            created_at=now,
+        )
+        log2 = BanquetApprovalLog(
+            log_id=uuid.uuid4(),
+            tenant_id=TENANT_A,
+            contract_id=contract.contract_id,
+            approver_id=uuid.uuid4(),
+            role=ApprovalRole.STORE_MANAGER,  # 同 role
+            action=ApprovalAction.APPROVE,
+            notes=None,
+            source_event_id=None,
+            created_at=now,
+        )
+        await service.insert_approval_log(log1)
+        with pytest.raises(ApprovalAlreadyRecordedError):
+            await service.insert_approval_log(log2)
+
+    @pytest.mark.asyncio
+    async def test_different_role_allowed(
+        self,
+        service: BanquetContractService,
+    ):
+        contract = await service.create_contract(
+            tenant_id=TENANT_A,
+            lead_id=uuid.uuid4(),
+            customer_id=uuid.uuid4(),
+            banquet_type=BanquetType.WEDDING,
+            tables=30,
+            total_amount_fen=5_500_000,
+            deposit_fen=1_500_000,
+            scheduled_date=date(2026, 12, 12),
+            store_id=STORE_ID,
+        )
+        now = datetime.now(timezone.utc)
+        log_store = BanquetApprovalLog(
+            log_id=uuid.uuid4(),
+            tenant_id=TENANT_A,
+            contract_id=contract.contract_id,
+            approver_id=uuid.uuid4(),
+            role=ApprovalRole.STORE_MANAGER,
+            action=ApprovalAction.APPROVE,
+            notes=None,
+            source_event_id=None,
+            created_at=now,
+        )
+        log_district = BanquetApprovalLog(
+            log_id=uuid.uuid4(),
+            tenant_id=TENANT_A,
+            contract_id=contract.contract_id,
+            approver_id=uuid.uuid4(),
+            role=ApprovalRole.DISTRICT_MANAGER,  # 不同 role
+            action=ApprovalAction.APPROVE,
+            notes=None,
+            source_event_id=None,
+            created_at=now,
+        )
+        await service.insert_approval_log(log_store)
+        # 不同 role 不冲突
+        await service.insert_approval_log(log_district)

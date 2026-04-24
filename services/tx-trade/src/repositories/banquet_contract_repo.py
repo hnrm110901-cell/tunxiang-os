@@ -31,6 +31,16 @@ from shared.ontology.src.extensions.banquet_contracts import (
 )
 from shared.ontology.src.extensions.banquet_leads import BanquetType
 
+
+class _UniqueViolationSim(Exception):
+    """InMemory Repo 模拟 asyncpg.UniqueViolationError。
+
+    命名含 `UniqueViolation` 子串，使 service 层 `_is_unique_violation`
+    能软探测识别（与 asyncpg / psycopg2 保持一致的识别逻辑）。
+    """
+
+    sqlstate = "23505"
+
 # ──────────────────────────────────────────────────────────────────────────
 # 抽象接口
 # ──────────────────────────────────────────────────────────────────────────
@@ -131,6 +141,30 @@ class InMemoryBanquetContractRepository(BanquetContractRepositoryBase):
     async def update_contract(
         self, contract: BanquetContract
     ) -> BanquetContract:
+        # C-2 修复：模拟 v283 部分 UNIQUE 索引
+        #   (tenant_id, store_id, scheduled_date) WHERE status='signed'
+        # 同 (tenant, store, date) 只能有一张 signed 合同。并发场景下
+        # 第二方在此处抛 _UniqueViolationSim → 上层 mark_signed 转抛
+        # ScheduleAlreadyLockedError。
+        if (
+            contract.status == ContractStatus.SIGNED
+            and contract.store_id is not None
+            and contract.scheduled_date is not None
+        ):
+            for existing in self._contracts.values():
+                if existing.contract_id == contract.contract_id:
+                    continue
+                if (
+                    existing.tenant_id == contract.tenant_id
+                    and existing.store_id == contract.store_id
+                    and existing.scheduled_date == contract.scheduled_date
+                    and existing.status == ContractStatus.SIGNED
+                ):
+                    raise _UniqueViolationSim(
+                        f"schedule lock violated for "
+                        f"(tenant={contract.tenant_id},store={contract.store_id},"
+                        f"date={contract.scheduled_date})"
+                    )
         self._contracts[contract.contract_id] = contract
         return contract
 
@@ -204,6 +238,24 @@ class InMemoryBanquetContractRepository(BanquetContractRepositoryBase):
     async def insert_approval_log(
         self, log: BanquetApprovalLog
     ) -> BanquetApprovalLog:
+        # C-3 修复：模拟 v283 部分 UNIQUE 索引
+        #   (tenant_id, contract_id, role) WHERE action IN ('approve','reject')
+        # 同合同同 role 只允许一条终结性决策日志（approve/reject）。
+        if log.action in (ApprovalAction.APPROVE, ApprovalAction.REJECT):
+            for existing in self._approval_logs.values():
+                if (
+                    existing.tenant_id == log.tenant_id
+                    and existing.contract_id == log.contract_id
+                    and existing.role == log.role
+                    and existing.action in (
+                        ApprovalAction.APPROVE,
+                        ApprovalAction.REJECT,
+                    )
+                ):
+                    raise _UniqueViolationSim(
+                        f"approval log already exists for contract_id={log.contract_id} "
+                        f"role={log.role.value}"
+                    )
         self._approval_logs[log.log_id] = log
         return log
 
