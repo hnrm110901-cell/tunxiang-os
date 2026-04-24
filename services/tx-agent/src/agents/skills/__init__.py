@@ -21,6 +21,9 @@ from .competitor_watch import CompetitorWatchAgent
 from .compliance_alert import ComplianceAlertAgent
 from .content_generation import ContentGenerationAgent
 from .cost_diagnosis import CostDiagnosisAgent
+
+# Sprint D4a：成本根因 Skill（Sonnet 4.7 + Prompt Cache）
+from .cost_root_cause import CostRootCauseAgent
 from .discount_guard import DiscountGuardAgent
 from .dormant_recall import DormantRecallAgent
 
@@ -151,6 +154,8 @@ ALL_SKILL_AGENTS = [
     GrowthCoachAgent,
     SmartCustomerServiceAgent,
     CashierAuditAgent,
+    # Sprint D4a：成本根因（Sonnet 4.7 + Prompt Cache）
+    CostRootCauseAgent,
 ]
 
 
