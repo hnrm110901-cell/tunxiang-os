@@ -9,14 +9,14 @@
   4. mrp_procurement_suggestions — 采购建议（外购原料）
   5. mrp_planned_issues — 按计划领料（生产建议→领料单）
 
-Revision ID: v283_mrp_forecast
-Revises: v282_zone_pricing
+Revision ID: v294_mrp_forecast
+Revises: v293
 Create Date: 2026-04-24
 """
 from alembic import op
 
-revision = "v283_mrp_forecast"
-down_revision = "v282_zone_pricing"
+revision = "v294_mrp_forecast"
+down_revision = "v293"
 branch_labels = None
 depends_on = None
 
