@@ -17,6 +17,7 @@ from .api.banquet_order_routes import router as banquet_order_router  # Y-A8 宴
 from .api.banquet_payment_routes import router as banquet_payment_router
 from .api.banquet_routes import router as banquet_router
 from .api.booking_api import router as booking_router
+from .api.call_center_routes import router as call_center_router
 from .api.booking_prep_routes import router as booking_prep_router
 from .api.booking_webhook_routes import router as booking_webhook_router
 from .api.cashier_api import router as cashier_router
@@ -199,6 +200,7 @@ app.include_router(printer_router)
 app.include_router(approval_router)
 app.include_router(booking_router)
 app.include_router(booking_webhook_router)  # 多平台预订 Webhook + Mock 生成
+app.include_router(call_center_router)  # v290 预订电话集成（来电弹屏/回拨任务/通话统计）
 app.include_router(kds_shortage_router)
 app.include_router(scan_order_router)
 app.include_router(order_ops_router)
@@ -367,6 +369,11 @@ from .api.wine_storage_routes import router as wine_storage_router
 
 app.include_router(wine_storage_router)
 
+# ── S7: 电子邀请函（模板/实例/发布/公开访问/RSVP）──
+from .api.invitation_routes import router as invitation_router
+
+app.include_router(invitation_router)
+
 
 try:
     from .api.table_card_api import router as table_card_router
@@ -397,6 +404,13 @@ from .api.table_utilization_routes import router as table_utilization_router
 app.include_router(table_merge_preset_router)   # v284 时段拼桌预设（方案配置/执行/回滚）
 app.include_router(table_period_config_router)   # v286 桌台×时段配置矩阵
 app.include_router(table_utilization_router)     # v287 桌台利用率分析（Agent数据基础）
+
+# ── S3: KDS计件配菜 + 显示配置 ──
+from .api.kds_piecework_routes import router as kds_piecework_router
+from .api.kds_display_config_routes import router as kds_display_config_router
+
+app.include_router(kds_piecework_router, prefix="/api/v1/kds-piecework")
+app.include_router(kds_display_config_router, prefix="/api/v1/kds-display")
 
 
 @app.get("/health")

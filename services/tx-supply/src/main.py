@@ -134,6 +134,11 @@ from .api.voice_count_routes import router as voice_count_router
 
 app.include_router(voice_count_router)  # 语音盘点：会话管理/语音录入/差异分析/提交盘点单
 
+# ── MRP智能预估（S6: 生产计划+采购计划联动）──
+from .api.mrp_routes import router as mrp_router
+
+app.include_router(mrp_router, prefix="/api/v1/supply/mrp")  # MRP预估：需求计算/生产建议/采购建议/领料（v282表）
+
 
 @app.get("/health")
 async def health():

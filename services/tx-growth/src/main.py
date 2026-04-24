@@ -112,6 +112,7 @@ from .api.promotion_rules_v3_routes import (
 from .api.referral_routes import router as referral_router
 from .api.segmentation_routes import router as segmentation_router
 from .api.touch_attribution_routes import router as touch_attribution_router
+from .api.sales_crm_routes import router as sales_crm_router  # v291 销售CRM
 from .api.wecom_scrm_agent_routes import router as wecom_scrm_agent_router  # P3-05 企微SCRM私域Agent
 
 _approval_service = _ApprovalService()
@@ -513,6 +514,53 @@ def _on_calendar_trigger_done(task: asyncio.Task) -> None:
         logger.error("calendar_trigger_check_unhandled", error=str(exc), exc_info=exc)
 
 
+# ---------------------------------------------------------------------------
+# APScheduler — Sales CRM Daily Scan（每日凌晨2:30）
+# ---------------------------------------------------------------------------
+
+from services.sales_task_scheduler import SalesTaskScheduler as _SalesTaskScheduler
+
+_sales_task_scheduler = _SalesTaskScheduler()
+
+
+async def _run_sales_daily_scan() -> None:
+    """每日凌晨2:30：扫描生日/纪念日/沉默客户/当日预订，创建销售任务。"""
+    logger.info("sales_daily_scan_started")
+    from sqlalchemy import text as _text
+
+    async with async_session_factory() as probe_db:
+        try:
+            result = await probe_db.execute(_text("SELECT DISTINCT tenant_id FROM stores WHERE is_active = true"))
+            tenant_ids = [str(row[0]) for row in result.fetchall()]
+        except (OSError, RuntimeError, ValueError) as exc:
+            logger.error("sales_daily_scan_fetch_tenants_error", error=str(exc), exc_info=True)
+            return
+
+    for tid in tenant_ids:
+        async with async_session_factory() as db:
+            try:
+                await db.execute(_text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": tid})
+                result = await _sales_task_scheduler.run_daily_scan(tid, db)
+                await db.commit()
+                logger.info("sales_daily_scan_tenant_done", tenant_id=tid, **result)
+            except (OSError, RuntimeError, ValueError) as exc:
+                await db.rollback()
+                logger.error("sales_daily_scan_tenant_error", tenant_id=tid, error=str(exc), exc_info=True)
+
+    logger.info("sales_daily_scan_finished", tenant_count=len(tenant_ids))
+
+
+def _schedule_sales_daily_scan() -> None:
+    task = asyncio.create_task(_run_sales_daily_scan())
+    task.add_done_callback(_on_sales_daily_scan_done)
+
+
+def _on_sales_daily_scan_done(task: asyncio.Task) -> None:
+    exc = task.exception() if not task.cancelled() else None
+    if exc is not None:
+        logger.error("sales_daily_scan_unhandled", error=str(exc), exc_info=exc)
+
+
 async def _run_journey_event_listener() -> None:
     """旅程事件监听后台任务：订阅 Redis Stream，实时触发旅程。
 
@@ -625,6 +673,18 @@ async def lifespan(app: FastAPI):
         misfire_grace_time=300,
     )
 
+    # Sales CRM Daily Scan — 每日凌晨2:30（生日/纪念日/沉默召回/预订确认/逾期标记）
+    _scheduler.add_job(
+        _schedule_sales_daily_scan,
+        trigger="cron",
+        hour=2,
+        minute=30,
+        id="sales_crm_daily_scan",
+        replace_existing=True,
+        max_instances=1,
+        misfire_grace_time=300,
+    )
+
     _scheduler.start()
     logger.info("journey_executor_scheduler_started", interval_seconds=60)
     logger.info("approval_expiry_scheduler_started", interval_hours=1)
@@ -634,6 +694,7 @@ async def lifespan(app: FastAPI):
     logger.info("growth_p1_computation_scheduler_started", trigger="cron_03:00")
     logger.info("growth_auto_iterate_scheduler_started", interval_hours=6)
     logger.info("growth_calendar_trigger_scheduler_started", trigger="cron_08:00")
+    logger.info("sales_crm_daily_scan_scheduler_started", trigger="cron_02:30")
 
     # 启动 EventBridge（桥接业务事件 → JourneyEngine）
     _bridge = _get_event_bridge(
@@ -701,6 +762,7 @@ app.include_router(wecom_scrm_agent_router)  # P3-05 企微SCRM私域Agent
 app.include_router(ai_marketing_router)  # /api/v1/growth/ai-marketing/* — AI营销自动化（v207）（生日/沉睡/回访）
 app.include_router(promotion_rules_v2_router)  # /api/v1/promotions/* — 促销规则引擎V2（模块2.5）
 app.include_router(promotion_rules_v3_router)  # /api/v1/promotions/v3/* — 促销规则引擎V3（模块2.6）
+app.include_router(sales_crm_router)  # /api/v1/growth/sales/* — 销售CRM（v291）
 
 # 服务实例
 brand_svc = BrandStrategyService()
