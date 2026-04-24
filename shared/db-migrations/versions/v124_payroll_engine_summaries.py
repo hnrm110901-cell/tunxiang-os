@@ -11,8 +11,8 @@ Revision ID: v124
 Revises: v123
 Create Date: 2026-04-02
 """
+
 from alembic import op
-import sqlalchemy as sa
 
 revision = "v124"
 down_revision = "v123"

@@ -3,17 +3,15 @@
 供 Gateway /api/v1/hub/deployment/push-update 写入推送通知，
 以及 hub 操作审计日志（跨租户，不启用 RLS）。
 """
-from typing import Sequence, Union
 
 import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects.postgresql import JSONB, UUID
-from sqlalchemy import text
 
 revision = "v145"
-down_revision= "v144"
-branch_labels= None
-depends_on= None
+down_revision = "v144"
+branch_labels = None
+depends_on = None
 
 
 def upgrade() -> None:

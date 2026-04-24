@@ -9,6 +9,7 @@
 
 金额单位：分(fen)
 """
+
 from __future__ import annotations
 
 import uuid
@@ -123,7 +124,8 @@ class XHSCouponAdapter:
 
         logger.info(
             "xhs.coupon_verified",
-            coupon_code=coupon_code, store_id=store_id,
+            coupon_code=coupon_code,
+            store_id=store_id,
             record_id=str(record_id),
         )
         return {
@@ -161,8 +163,11 @@ class XHSCouponAdapter:
                 LIMIT :lim OFFSET :off
             """),
             {
-                "tid": tid, "sid": uuid.UUID(store_id),
-                "status": status, "lim": size, "off": offset,
+                "tid": tid,
+                "sid": uuid.UUID(store_id),
+                "status": status,
+                "lim": size,
+                "off": offset,
             },
         )
 

@@ -9,10 +9,9 @@
 - 各语言完整性校验
 共 9 个测试用例 (>=6)
 """
-import pytest
-from shared.i18n import get_lang_module, get_text, get_supported_languages, DEFAULT_LANG
-from shared.i18n.translator import translate_menu, translate_receipt
 
+from shared.i18n import DEFAULT_LANG, get_lang_module, get_supported_languages, get_text
+from shared.i18n.translator import translate_menu, translate_receipt
 
 TENANT_ID = "test-tenant-001"
 

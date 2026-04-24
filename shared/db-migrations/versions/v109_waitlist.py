@@ -54,7 +54,9 @@ CREATE TABLE IF NOT EXISTS waitlist_entries (
     # 索引
     op.execute("CREATE INDEX IF NOT EXISTS idx_waitlist_entries_tenant_store ON waitlist_entries(tenant_id, store_id);")
     op.execute("CREATE INDEX IF NOT EXISTS idx_waitlist_entries_store_status ON waitlist_entries(store_id, status);")
-    op.execute("CREATE INDEX IF NOT EXISTS idx_waitlist_entries_priority_created ON waitlist_entries(store_id, priority DESC, created_at ASC);")
+    op.execute(
+        "CREATE INDEX IF NOT EXISTS idx_waitlist_entries_priority_created ON waitlist_entries(store_id, priority DESC, created_at ASC);"
+    )
     op.execute("CREATE INDEX IF NOT EXISTS idx_waitlist_entries_queue_no ON waitlist_entries(store_id, queue_no);")
 
     # updated_at 自动更新触发器

@@ -1,6 +1,7 @@
 """
 奥琦韦供应链适配器单元测试
 """
+
 import os
 import sys
 
@@ -10,9 +11,10 @@ _gateway_src = os.path.join(_repo_root, "apps", "api-gateway", "src")
 if _gateway_src not in sys.path:
     sys.path.insert(0, _gateway_src)
 
-import pytest
 from datetime import datetime
 from decimal import Decimal
+
+import pytest
 from src.adapter import AoqiweiAdapter
 
 
@@ -47,6 +49,7 @@ class TestAoqiweiAdapterInit:
 # ---------------------------------------------------------------------------
 # ARCH-001: to_order() / to_staff_action() 标准数据总线接口测试
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture
 def supply_chain_adapter():
@@ -169,4 +172,3 @@ class TestSignRegression:
         p1 = {"a": "1", "b": None, "d": "2"}
         p2 = {"a": "1", "d": "2"}
         assert supply_chain_adapter._sign(p1) == supply_chain_adapter._sign(p2)
-

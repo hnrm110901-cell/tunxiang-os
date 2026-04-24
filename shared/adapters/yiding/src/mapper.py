@@ -7,13 +7,10 @@
 from typing import Any, Dict, List, Optional
 
 from .types import (
-    UnifiedReservation,
-    UnifiedCustomer,
-    UnifiedTable,
-    UnifiedBill,
-    UnifiedDish,
     ReservationStats,
     ReservationStatus,
+    UnifiedCustomer,
+    UnifiedReservation,
 )
 
 
@@ -107,10 +104,7 @@ class YiDingMapper:
         store_id: Optional[str] = None,
     ) -> List[UnifiedReservation]:
         """批量转换预订订单"""
-        return [
-            self.to_unified_reservation(item, store_id)
-            for item in (data_list or [])
-        ]
+        return [self.to_unified_reservation(item, store_id) for item in (data_list or [])]
 
     # ============================================
     # 客户映射 Customer Mapping

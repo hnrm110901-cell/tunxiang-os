@@ -8,15 +8,16 @@
   - 初始化校验
   - 上下文管理器
 """
-import pytest
+
 from datetime import datetime, timedelta
 
+import pytest
+
 from shared.adapters.pinzhi_adapter import (
-    PinzhiPOSAdapter,
     PINZHI_ORDER_STATUS_MAP,
     TUNXIANG_TO_PINZHI_STATUS,
+    PinzhiPOSAdapter,
 )
-
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 #  Fixtures

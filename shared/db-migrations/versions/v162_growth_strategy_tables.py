@@ -12,16 +12,15 @@ Revision ID: v162
 Revises: v161
 Create Date: 2026-04-04
 """
-from typing import Sequence, Union
 
 import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 
 revision = "v162"
-down_revision= "v161"
-branch_labels= None
-depends_on= None
+down_revision = "v161"
+branch_labels = None
+depends_on = None
 
 _SAFE_CONDITION = "tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::UUID"
 
@@ -30,22 +29,13 @@ def _apply_rls(table_name: str) -> None:
     """标准三段式 RLS：ENABLE → FORCE → 四条策略"""
     op.execute(f"ALTER TABLE {table_name} ENABLE ROW LEVEL SECURITY")
     op.execute(f"ALTER TABLE {table_name} FORCE ROW LEVEL SECURITY")
-    op.execute(
-        f"CREATE POLICY {table_name}_rls_select ON {table_name} "
-        f"FOR SELECT USING ({_SAFE_CONDITION})"
-    )
-    op.execute(
-        f"CREATE POLICY {table_name}_rls_insert ON {table_name} "
-        f"FOR INSERT WITH CHECK ({_SAFE_CONDITION})"
-    )
+    op.execute(f"CREATE POLICY {table_name}_rls_select ON {table_name} FOR SELECT USING ({_SAFE_CONDITION})")
+    op.execute(f"CREATE POLICY {table_name}_rls_insert ON {table_name} FOR INSERT WITH CHECK ({_SAFE_CONDITION})")
     op.execute(
         f"CREATE POLICY {table_name}_rls_update ON {table_name} "
         f"FOR UPDATE USING ({_SAFE_CONDITION}) WITH CHECK ({_SAFE_CONDITION})"
     )
-    op.execute(
-        f"CREATE POLICY {table_name}_rls_delete ON {table_name} "
-        f"FOR DELETE USING ({_SAFE_CONDITION})"
-    )
+    op.execute(f"CREATE POLICY {table_name}_rls_delete ON {table_name} FOR DELETE USING ({_SAFE_CONDITION})")
 
 
 def upgrade() -> None:
@@ -130,10 +120,7 @@ def upgrade() -> None:
             sa.UniqueConstraint("tenant_id", "brand_id", name="uq_brand_strategies_tenant_brand"),
         )
 
-    op.execute(
-        "CREATE INDEX IF NOT EXISTS ix_brand_strategies_tenant "
-        "ON brand_strategies (tenant_id)"
-    )
+    op.execute("CREATE INDEX IF NOT EXISTS ix_brand_strategies_tenant ON brand_strategies (tenant_id)")
     _apply_rls("brand_strategies")
 
     # ── banners 营销横幅 ─────────────────────────────────────────────────
@@ -208,10 +195,7 @@ def upgrade() -> None:
             ),
         )
 
-    op.execute(
-        "CREATE INDEX IF NOT EXISTS ix_banners_tenant_active "
-        "ON banners (tenant_id, is_active, display_order)"
-    )
+    op.execute("CREATE INDEX IF NOT EXISTS ix_banners_tenant_active ON banners (tenant_id, is_active, display_order)")
     _apply_rls("banners")
 
     # ── journeys 营销旅程定义 ─────────────────────────────────────────────
@@ -281,10 +265,7 @@ def upgrade() -> None:
             ),
         )
 
-    op.execute(
-        "CREATE INDEX IF NOT EXISTS ix_journeys_tenant_status "
-        "ON journeys (tenant_id, status)"
-    )
+    op.execute("CREATE INDEX IF NOT EXISTS ix_journeys_tenant_status ON journeys (tenant_id, status)")
     _apply_rls("journeys")
 
     # ── journey_executions 旅程执行日志 ──────────────────────────────────
@@ -341,12 +322,10 @@ def upgrade() -> None:
         )
 
     op.execute(
-        "CREATE INDEX IF NOT EXISTS ix_journey_executions_tenant_journey "
-        "ON journey_executions (tenant_id, journey_id)"
+        "CREATE INDEX IF NOT EXISTS ix_journey_executions_tenant_journey ON journey_executions (tenant_id, journey_id)"
     )
     op.execute(
-        "CREATE INDEX IF NOT EXISTS ix_journey_executions_tenant_member "
-        "ON journey_executions (tenant_id, member_id)"
+        "CREATE INDEX IF NOT EXISTS ix_journey_executions_tenant_member ON journey_executions (tenant_id, member_id)"
     )
     _apply_rls("journey_executions")
 

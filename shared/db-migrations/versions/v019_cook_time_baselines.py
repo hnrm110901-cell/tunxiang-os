@@ -17,16 +17,15 @@ Revision ID: 20260330_cook_time_baselines
 Revises: v016
 Create Date: 2026-03-30
 """
-from typing import Sequence, Union
 
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 from sqlalchemy.dialects.postgresql import UUID
 
 revision = "v019"
-down_revision= "v018"
-branch_labels= None
-depends_on= None
+down_revision = "v018"
+branch_labels = None
+depends_on = None
 
 TABLE_NAME = "cook_time_baselines"
 
@@ -38,36 +37,38 @@ def upgrade() -> None:
     op.create_table(
         TABLE_NAME,
         # ── 基类字段（对齐 TenantBase）──
-        sa.Column("id", UUID(as_uuid=True), primary_key=True,
-                  comment="主键UUID"),
-        sa.Column("tenant_id", UUID(as_uuid=True), nullable=False, index=True,
-                  comment="租户ID（RLS隔离）"),
+        sa.Column("id", UUID(as_uuid=True), primary_key=True, comment="主键UUID"),
+        sa.Column("tenant_id", UUID(as_uuid=True), nullable=False, index=True, comment="租户ID（RLS隔离）"),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
         sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
         sa.Column("is_deleted", sa.Boolean, server_default="false"),
-
         # ── 分组维度 ──
-        sa.Column("dish_id", UUID(as_uuid=True), nullable=False, index=True,
-                  comment="菜品ID（关联 dishes 表）"),
-        sa.Column("dept_id", UUID(as_uuid=True), nullable=False, index=True,
-                  comment="出品档口ID（关联 production_depts 表）"),
-        sa.Column("hour_bucket", sa.Integer, nullable=False,
-                  comment="时段（0-23，提取自 kds_tasks.started_at 的小时）"),
-        sa.Column("day_type", sa.String(10), nullable=False, server_default="weekday",
-                  comment="日期类型：weekday（周一至周五）/ weekend（周六周日）"),
-
+        sa.Column("dish_id", UUID(as_uuid=True), nullable=False, index=True, comment="菜品ID（关联 dishes 表）"),
+        sa.Column(
+            "dept_id", UUID(as_uuid=True), nullable=False, index=True, comment="出品档口ID（关联 production_depts 表）"
+        ),
+        sa.Column(
+            "hour_bucket", sa.Integer, nullable=False, comment="时段（0-23，提取自 kds_tasks.started_at 的小时）"
+        ),
+        sa.Column(
+            "day_type",
+            sa.String(10),
+            nullable=False,
+            server_default="weekday",
+            comment="日期类型：weekday（周一至周五）/ weekend（周六周日）",
+        ),
         # ── 统计数据 ──
-        sa.Column("p50_seconds", sa.Integer, nullable=False,
-                  comment="制作时间中位数（秒），用于预估正常耗时"),
-        sa.Column("p90_seconds", sa.Integer, nullable=False,
-                  comment="制作时间P90（秒），用于动态warn/critical阈值"),
-        sa.Column("sample_count", sa.Integer, nullable=False, server_default="0",
-                  comment="样本数（<10时标记为不可靠，降级到dept默认值）"),
-
+        sa.Column("p50_seconds", sa.Integer, nullable=False, comment="制作时间中位数（秒），用于预估正常耗时"),
+        sa.Column("p90_seconds", sa.Integer, nullable=False, comment="制作时间P90（秒），用于动态warn/critical阈值"),
+        sa.Column(
+            "sample_count",
+            sa.Integer,
+            nullable=False,
+            server_default="0",
+            comment="样本数（<10时标记为不可靠，降级到dept默认值）",
+        ),
         # ── 元数据 ──
-        sa.Column("computed_at", sa.DateTime(timezone=True),
-                  comment="本条基准最后一次重算时间"),
-
+        sa.Column("computed_at", sa.DateTime(timezone=True), comment="本条基准最后一次重算时间"),
         comment="菜品制作时间统计基准（dish × 时段 P50/P90）",
     )
 
@@ -134,9 +135,7 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     for action in ("delete", "update", "insert", "select"):
-        op.execute(
-            f"DROP POLICY IF EXISTS {TABLE_NAME}_tenant_{action} ON {TABLE_NAME}"
-        )
+        op.execute(f"DROP POLICY IF EXISTS {TABLE_NAME}_tenant_{action} ON {TABLE_NAME}")
 
     op.execute(f"ALTER TABLE {TABLE_NAME} DISABLE ROW LEVEL SECURITY")
     op.drop_index("ix_cook_time_baselines_dept_computed", table_name=TABLE_NAME)

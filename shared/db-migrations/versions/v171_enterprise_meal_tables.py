@@ -32,7 +32,9 @@ def upgrade() -> None:
             is_deleted      BOOLEAN     NOT NULL DEFAULT FALSE
         )
     """)
-    op.execute("CREATE INDEX IF NOT EXISTS idx_enterprise_meal_menus_tenant_week ON enterprise_meal_menus (tenant_id, week_start DESC)")
+    op.execute(
+        "CREATE INDEX IF NOT EXISTS idx_enterprise_meal_menus_tenant_week ON enterprise_meal_menus (tenant_id, week_start DESC)"
+    )
     op.execute("ALTER TABLE enterprise_meal_menus ENABLE ROW LEVEL SECURITY")
     op.execute("""
         CREATE POLICY enterprise_meal_menus_rls ON enterprise_meal_menus
@@ -55,7 +57,9 @@ def upgrade() -> None:
             UNIQUE (tenant_id, employee_id)
         )
     """)
-    op.execute("CREATE INDEX IF NOT EXISTS idx_enterprise_meal_accounts_tenant ON enterprise_meal_accounts (tenant_id, employee_id)")
+    op.execute(
+        "CREATE INDEX IF NOT EXISTS idx_enterprise_meal_accounts_tenant ON enterprise_meal_accounts (tenant_id, employee_id)"
+    )
     op.execute("ALTER TABLE enterprise_meal_accounts ENABLE ROW LEVEL SECURITY")
     op.execute("""
         CREATE POLICY enterprise_meal_accounts_rls ON enterprise_meal_accounts
@@ -82,8 +86,12 @@ def upgrade() -> None:
             is_deleted      BOOLEAN     NOT NULL DEFAULT FALSE
         )
     """)
-    op.execute("CREATE INDEX IF NOT EXISTS idx_enterprise_meal_orders_tenant_date ON enterprise_meal_orders (tenant_id, meal_date DESC)")
-    op.execute("CREATE INDEX IF NOT EXISTS idx_enterprise_meal_orders_employee ON enterprise_meal_orders (tenant_id, employee_id, meal_date DESC)")
+    op.execute(
+        "CREATE INDEX IF NOT EXISTS idx_enterprise_meal_orders_tenant_date ON enterprise_meal_orders (tenant_id, meal_date DESC)"
+    )
+    op.execute(
+        "CREATE INDEX IF NOT EXISTS idx_enterprise_meal_orders_employee ON enterprise_meal_orders (tenant_id, employee_id, meal_date DESC)"
+    )
     op.execute("ALTER TABLE enterprise_meal_orders ENABLE ROW LEVEL SECURITY")
     op.execute("""
         CREATE POLICY enterprise_meal_orders_rls ON enterprise_meal_orders

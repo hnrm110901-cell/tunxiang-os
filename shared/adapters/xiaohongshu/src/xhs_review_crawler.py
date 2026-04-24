@@ -9,10 +9,10 @@
   3. 拉取每篇笔记的评论
   4. 输出标准化格式 → tx-intel consumer_insight 消费
 """
+
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
 from typing import Any
 
 import structlog
@@ -76,7 +76,13 @@ class XHSReviewCrawler:
         )
         poi = poi_row.fetchone()
         if not poi or not poi.xhs_poi_id:
-            return {"store_id": store_id, "notes_count": 0, "comments_count": 0, "reviews": [], "error": "store_not_bound"}
+            return {
+                "store_id": store_id,
+                "notes_count": 0,
+                "comments_count": 0,
+                "reviews": [],
+                "error": "store_not_bound",
+            }
 
         notes_resp = await self.client.get_store_notes(poi.xhs_poi_id, page=1, size=max_notes)
         notes_data = notes_resp.get("data", {}).get("notes", [])
@@ -90,24 +96,26 @@ class XHSReviewCrawler:
             comments_data = comments_resp.get("data", {}).get("comments", [])
             total_comments += len(comments_data)
 
-            reviews.append({
-                "source": "xiaohongshu",
-                "note_id": note_id,
-                "title": note.get("title", ""),
-                "author": note.get("author", ""),
-                "content": note.get("content", ""),
-                "likes": note.get("likes", 0),
-                "comments_count": len(comments_data),
-                "published_at": note.get("published_at", ""),
-                "comments": [
-                    {
-                        "author": c.get("author", ""),
-                        "content": c.get("content", ""),
-                        "created_at": c.get("created_at", ""),
-                    }
-                    for c in comments_data
-                ],
-            })
+            reviews.append(
+                {
+                    "source": "xiaohongshu",
+                    "note_id": note_id,
+                    "title": note.get("title", ""),
+                    "author": note.get("author", ""),
+                    "content": note.get("content", ""),
+                    "likes": note.get("likes", 0),
+                    "comments_count": len(comments_data),
+                    "published_at": note.get("published_at", ""),
+                    "comments": [
+                        {
+                            "author": c.get("author", ""),
+                            "content": c.get("content", ""),
+                            "created_at": c.get("created_at", ""),
+                        }
+                        for c in comments_data
+                    ],
+                }
+            )
 
         logger.info(
             "xhs.reviews_crawled",
@@ -181,24 +189,28 @@ class XHSReviewCrawler:
         """
         intel_records = []
         for review in reviews:
-            intel_records.append({
-                "platform": "xiaohongshu",
-                "text": review.get("title", "") + " " + review.get("content", ""),
-                "author": review.get("author", ""),
-                "rating": None,
-                "date": review.get("published_at", ""),
-                "metadata": {
-                    "note_id": review.get("note_id"),
-                    "likes": review.get("likes", 0),
-                },
-            })
-            for comment in review.get("comments", []):
-                intel_records.append({
+            intel_records.append(
+                {
                     "platform": "xiaohongshu",
-                    "text": comment.get("content", ""),
-                    "author": comment.get("author", ""),
+                    "text": review.get("title", "") + " " + review.get("content", ""),
+                    "author": review.get("author", ""),
                     "rating": None,
-                    "date": comment.get("created_at", ""),
-                    "metadata": {"note_id": review.get("note_id"), "type": "comment"},
-                })
+                    "date": review.get("published_at", ""),
+                    "metadata": {
+                        "note_id": review.get("note_id"),
+                        "likes": review.get("likes", 0),
+                    },
+                }
+            )
+            for comment in review.get("comments", []):
+                intel_records.append(
+                    {
+                        "platform": "xiaohongshu",
+                        "text": comment.get("content", ""),
+                        "author": comment.get("author", ""),
+                        "rating": None,
+                        "date": comment.get("created_at", ""),
+                        "metadata": {"note_id": review.get("note_id"), "type": "comment"},
+                    }
+                )
         return intel_records

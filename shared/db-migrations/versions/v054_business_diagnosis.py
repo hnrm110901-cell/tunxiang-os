@@ -79,8 +79,5 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.execute(
-        "DROP POLICY IF EXISTS business_diagnosis_reports_tenant_isolation "
-        "ON business_diagnosis_reports;"
-    )
+    op.execute("DROP POLICY IF EXISTS business_diagnosis_reports_tenant_isolation ON business_diagnosis_reports;")
     op.execute("DROP TABLE IF EXISTS business_diagnosis_reports;")

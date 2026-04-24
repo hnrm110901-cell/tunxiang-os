@@ -1,32 +1,25 @@
 """行业公共字典类型测试"""
-import pytest
-import sys
+
 import os
+import sys
 
 # 确保 packages/api-adapters 在 Python 路径中
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
-from base.src.types.enums import (
-    ReservationStatus,
-    OrderStatus,
-    TableType,
-    TableStatus,
-    MealPeriod,
-    PaymentMethod,
-    ChannelSource,
-    Gender,
-    CustomerLevel,
-    DishCategory,
-    ReservationType,
-)
-from base.src.types.reservation import UnifiedReservation, ReservationStats
-from base.src.types.customer import UnifiedCustomer
-from base.src.types.table import UnifiedTable
-from base.src.types.order import UnifiedOrder, UnifiedOrderItem
 from base.src.types.bill import UnifiedBill
+from base.src.types.customer import UnifiedCustomer
 from base.src.types.dish import UnifiedDish, UnifiedSetMeal
-from base.src.types.inventory import UnifiedIngredient, UnifiedInventoryRecord
-from base.src.types.supplier import UnifiedSupplier, UnifiedPurchaseOrder
+from base.src.types.enums import (
+    ChannelSource,
+    MealPeriod,
+    ReservationStatus,
+    ReservationType,
+    TableType,
+)
+from base.src.types.order import UnifiedOrder
+from base.src.types.reservation import UnifiedReservation
+from base.src.types.supplier import UnifiedSupplier
+from base.src.types.table import UnifiedTable
 
 
 class TestEnums:

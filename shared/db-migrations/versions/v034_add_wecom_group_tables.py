@@ -28,8 +28,9 @@ Revision ID: v031
 Revises: v030
 Create Date: 2026-03-30
 """
-from alembic import op
+
 import sqlalchemy as sa
+from alembic import op
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 
 revision = "v034"
@@ -51,7 +52,6 @@ def upgrade() -> None:
     # ----------------------------------------------------------------
     op.create_table(
         "wecom_group_configs",
-
         # 基础字段
         sa.Column("id", UUID(as_uuid=True), primary_key=True, nullable=False),
         sa.Column("tenant_id", UUID(as_uuid=True), nullable=False),
@@ -67,7 +67,6 @@ def upgrade() -> None:
             server_default=sa.func.now(),
             nullable=False,
         ),
-
         # 群基本信息
         sa.Column(
             "group_name",
@@ -81,7 +80,6 @@ def upgrade() -> None:
             nullable=True,
             comment="企微群 chatid（建群后回填）",
         ),
-
         # 目标分群
         sa.Column(
             "target_segment_id",
@@ -96,7 +94,6 @@ def upgrade() -> None:
             server_default=sa.text("'[]'"),
             comment="目标门店 UUID 列表（空数组=全部门店）",
         ),
-
         # 建群规则
         sa.Column(
             "max_members",
@@ -112,7 +109,6 @@ def upgrade() -> None:
             server_default="true",
             comment="是否自动邀请符合条件的新会员",
         ),
-
         # SOP 内容日历
         sa.Column(
             "sop_calendar",
@@ -121,10 +117,9 @@ def upgrade() -> None:
             server_default=sa.text("'[]'"),
             comment=(
                 "SOP 内容日历，JSONB 数组，支持 daily/weekly/holiday/new_dish 类型\n"
-                "示例：[{\"type\":\"daily\",\"time\":\"09:00\",\"content\":\"早安...\"}]"
+                '示例：[{"type":"daily","time":"09:00","content":"早安..."}]'
             ),
         ),
-
         # 状态
         sa.Column(
             "status",
@@ -133,7 +128,6 @@ def upgrade() -> None:
             server_default="'active'",
             comment="active | paused | disbanded",
         ),
-
         comment="企微群运营配置表",
     )
 
@@ -167,7 +161,6 @@ def upgrade() -> None:
     # ----------------------------------------------------------------
     op.create_table(
         "wecom_group_messages",
-
         # 基础字段
         sa.Column("id", UUID(as_uuid=True), primary_key=True, nullable=False),
         sa.Column("tenant_id", UUID(as_uuid=True), nullable=False),
@@ -183,7 +176,6 @@ def upgrade() -> None:
             nullable=False,
             comment="企微群 chatid",
         ),
-
         # 消息内容
         sa.Column(
             "message_type",
@@ -203,7 +195,6 @@ def upgrade() -> None:
             nullable=True,
             comment="daily | weekly | holiday | new_dish | manual",
         ),
-
         # 发送状态
         sa.Column(
             "sent_at",
@@ -232,7 +223,6 @@ def upgrade() -> None:
             nullable=True,
             comment="发送失败时的错误信息",
         ),
-
         comment="企微群消息发送历史记录表",
     )
 

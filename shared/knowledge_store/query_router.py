@@ -5,12 +5,13 @@
 - Medium（需要语义理解）: hybrid_search(top_20) → rerank(top_5)
 - Complex（多步推理/比较）: 分解子问题 → 逐步检索 → 合并去重 → rerank
 """
+
 from __future__ import annotations
 
 import re
 import time
 from enum import Enum
-from typing import Any, Optional
+from typing import Any
 
 import structlog
 

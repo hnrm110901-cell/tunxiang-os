@@ -14,16 +14,15 @@ Revision ID: v005
 Revises: v004
 Create Date: 2026-03-27
 """
-from typing import Sequence, Union
 
-from alembic import op
 import sqlalchemy as sa
-from sqlalchemy.dialects.postgresql import UUID, JSON, ARRAY
+from alembic import op
+from sqlalchemy.dialects.postgresql import ARRAY, JSON, UUID
 
 revision = "v005"
-down_revision= "v004"
-branch_labels= None
-depends_on= None
+down_revision = "v004"
+branch_labels = None
+depends_on = None
 
 NEW_TABLES = [
     "attendance_rules",
@@ -66,20 +65,19 @@ def upgrade() -> None:
         sa.Column("tenant_id", UUID(as_uuid=True), nullable=False),
         sa.Column("store_id", sa.String(64), nullable=False),
         sa.Column("rule_name", sa.String(128), nullable=False),
-        sa.Column("grace_period_minutes", sa.Integer, nullable=False, server_default="5",
-                  comment="迟到宽限分钟"),
+        sa.Column("grace_period_minutes", sa.Integer, nullable=False, server_default="5", comment="迟到宽限分钟"),
         sa.Column("early_leave_grace_minutes", sa.Integer, nullable=False, server_default="5"),
-        sa.Column("overtime_min_minutes", sa.Integer, nullable=False, server_default="30",
-                  comment="加班最低认定分钟"),
+        sa.Column("overtime_min_minutes", sa.Integer, nullable=False, server_default="30", comment="加班最低认定分钟"),
         sa.Column("max_hours_week", sa.Integer, nullable=False, server_default="40"),
         sa.Column("max_overtime_month_hours", sa.Integer, nullable=False, server_default="36"),
-        sa.Column("late_deduction_fen", sa.BigInteger, nullable=False, server_default="5000",
-                  comment="每次迟到扣款(分)"),
+        sa.Column(
+            "late_deduction_fen", sa.BigInteger, nullable=False, server_default="5000", comment="每次迟到扣款(分)"
+        ),
         sa.Column("early_leave_deduction_fen", sa.BigInteger, nullable=False, server_default="5000"),
-        sa.Column("full_attendance_bonus_fen", sa.BigInteger, nullable=False, server_default="30000",
-                  comment="全勤奖(分)"),
-        sa.Column("clock_methods", ARRAY(sa.String), server_default="{device,face,app}",
-                  comment="允许的打卡方式"),
+        sa.Column(
+            "full_attendance_bonus_fen", sa.BigInteger, nullable=False, server_default="30000", comment="全勤奖(分)"
+        ),
+        sa.Column("clock_methods", ARRAY(sa.String), server_default="{device,face,app}", comment="允许的打卡方式"),
         sa.Column("effective_from", sa.Date, nullable=False),
         sa.Column("effective_to", sa.Date, nullable=True),
         sa.Column("is_active", sa.Boolean, server_default="true"),
@@ -100,17 +98,18 @@ def upgrade() -> None:
         sa.Column("employee_id", sa.String(64), nullable=False),
         sa.Column("clock_type", sa.String(10), nullable=False, comment="in/out"),
         sa.Column("clock_time", sa.DateTime(timezone=True), nullable=False),
-        sa.Column("method", sa.String(20), nullable=False, server_default="device",
-                  comment="device/face/app/manual"),
+        sa.Column("method", sa.String(20), nullable=False, server_default="device", comment="device/face/app/manual"),
         sa.Column("scheduled_shift", sa.String(32), nullable=True, comment="排班班次名称"),
-        sa.Column("scheduled_time", sa.DateTime(timezone=True), nullable=True,
-                  comment="排班应到时间"),
-        sa.Column("status", sa.String(20), nullable=False, server_default="on_time",
-                  comment="on_time/late/early/early_leave/overtime/unscheduled"),
-        sa.Column("diff_minutes", sa.Integer, nullable=True,
-                  comment="与排班时间差异(分钟，正=迟到/加班)"),
-        sa.Column("paired_clock_id", UUID(as_uuid=True), nullable=True,
-                  comment="配对的打卡记录ID(out配in)"),
+        sa.Column("scheduled_time", sa.DateTime(timezone=True), nullable=True, comment="排班应到时间"),
+        sa.Column(
+            "status",
+            sa.String(20),
+            nullable=False,
+            server_default="on_time",
+            comment="on_time/late/early/early_leave/overtime/unscheduled",
+        ),
+        sa.Column("diff_minutes", sa.Integer, nullable=True, comment="与排班时间差异(分钟，正=迟到/加班)"),
+        sa.Column("paired_clock_id", UUID(as_uuid=True), nullable=True, comment="配对的打卡记录ID(out配in)"),
         sa.Column("work_hours", sa.Float, nullable=True, comment="实际工时(小时)"),
         sa.Column("device_info", sa.String(256), nullable=True),
         sa.Column("location", sa.String(256), nullable=True, comment="打卡位置"),
@@ -138,8 +137,13 @@ def upgrade() -> None:
         sa.Column("clock_out_id", UUID(as_uuid=True), nullable=True),
         sa.Column("clock_in_time", sa.DateTime(timezone=True), nullable=True),
         sa.Column("clock_out_time", sa.DateTime(timezone=True), nullable=True),
-        sa.Column("status", sa.String(32), nullable=False, server_default="pending",
-                  comment="normal/late/early_leave/absent/overtime/on_leave/day_off/missing_clock_out"),
+        sa.Column(
+            "status",
+            sa.String(32),
+            nullable=False,
+            server_default="pending",
+            comment="normal/late/early_leave/absent/overtime/on_leave/day_off/missing_clock_out",
+        ),
         sa.Column("work_hours", sa.Float, nullable=True),
         sa.Column("overtime_hours", sa.Float, server_default="0"),
         sa.Column("leave_type", sa.String(32), nullable=True),
@@ -166,12 +170,11 @@ def upgrade() -> None:
         sa.Column("employee_count", sa.Integer, nullable=False),
         sa.Column("total_gross_fen", sa.BigInteger, nullable=False),
         sa.Column("total_net_fen", sa.BigInteger, nullable=False),
-        sa.Column("total_company_si_fen", sa.BigInteger, nullable=False,
-                  comment="公司承担五险一金(分)"),
-        sa.Column("total_labor_cost_fen", sa.BigInteger, nullable=False,
-                  comment="总人力成本(分)=gross+company_si"),
-        sa.Column("status", sa.String(20), nullable=False, server_default="draft",
-                  comment="draft/approved/paid/cancelled"),
+        sa.Column("total_company_si_fen", sa.BigInteger, nullable=False, comment="公司承担五险一金(分)"),
+        sa.Column("total_labor_cost_fen", sa.BigInteger, nullable=False, comment="总人力成本(分)=gross+company_si"),
+        sa.Column(
+            "status", sa.String(20), nullable=False, server_default="draft", comment="draft/approved/paid/cancelled"
+        ),
         sa.Column("created_by", sa.String(64), nullable=True),
         sa.Column("approved_by", sa.String(64), nullable=True),
         sa.Column("approved_at", sa.DateTime(timezone=True), nullable=True),
@@ -192,7 +195,6 @@ def upgrade() -> None:
         sa.Column("batch_id", UUID(as_uuid=True), nullable=False),
         sa.Column("employee_id", sa.String(64), nullable=False),
         sa.Column("month", sa.String(7), nullable=False),
-
         # Income
         sa.Column("base_pay_fen", sa.BigInteger, nullable=False, server_default="0"),
         sa.Column("position_allowance_fen", sa.BigInteger, server_default="0"),
@@ -206,7 +208,6 @@ def upgrade() -> None:
         sa.Column("full_attendance_bonus_fen", sa.BigInteger, server_default="0"),
         sa.Column("other_income_fen", sa.BigInteger, server_default="0"),
         sa.Column("gross_salary_fen", sa.BigInteger, nullable=False),
-
         # Deductions
         sa.Column("absence_deduction_fen", sa.BigInteger, server_default="0"),
         sa.Column("late_deduction_fen", sa.BigInteger, server_default="0"),
@@ -218,7 +219,6 @@ def upgrade() -> None:
         sa.Column("tax_fen", sa.BigInteger, server_default="0"),
         sa.Column("other_deduction_fen", sa.BigInteger, server_default="0"),
         sa.Column("total_deduction_fen", sa.BigInteger, nullable=False),
-
         # Company costs
         sa.Column("pension_company_fen", sa.BigInteger, server_default="0"),
         sa.Column("medical_company_fen", sa.BigInteger, server_default="0"),
@@ -226,15 +226,12 @@ def upgrade() -> None:
         sa.Column("work_injury_company_fen", sa.BigInteger, server_default="0"),
         sa.Column("maternity_company_fen", sa.BigInteger, server_default="0"),
         sa.Column("housing_fund_company_fen", sa.BigInteger, server_default="0"),
-
         # Net
         sa.Column("net_pay_fen", sa.BigInteger, nullable=False),
-
         # Tax detail
         sa.Column("tax_rate", sa.Float, server_default="0"),
         sa.Column("cumulative_taxable_yuan", sa.Float, server_default="0"),
         sa.Column("cumulative_tax_yuan", sa.Float, server_default="0"),
-
         # Attendance summary
         sa.Column("work_days_in_month", sa.Integer, nullable=False),
         sa.Column("attendance_days", sa.Float, nullable=False),
@@ -242,7 +239,6 @@ def upgrade() -> None:
         sa.Column("late_count", sa.Integer, server_default="0"),
         sa.Column("early_leave_count", sa.Integer, server_default="0"),
         sa.Column("overtime_hours", sa.Float, server_default="0"),
-
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("NOW()")),
         sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("NOW()")),
         sa.Column("is_deleted", sa.Boolean, server_default="false"),
@@ -259,15 +255,24 @@ def upgrade() -> None:
         sa.Column("tenant_id", UUID(as_uuid=True), nullable=False),
         sa.Column("store_id", sa.String(64), nullable=False),
         sa.Column("employee_id", sa.String(64), nullable=False),
-        sa.Column("leave_type", sa.String(32), nullable=False,
-                  comment="annual/sick/personal/maternity/paternity/marriage/bereavement"),
+        sa.Column(
+            "leave_type",
+            sa.String(32),
+            nullable=False,
+            comment="annual/sick/personal/maternity/paternity/marriage/bereavement",
+        ),
         sa.Column("start_date", sa.Date, nullable=False),
         sa.Column("end_date", sa.Date, nullable=False),
         sa.Column("days_requested", sa.Float, nullable=False),
         sa.Column("reason", sa.Text, nullable=True),
         sa.Column("attachments", JSON, nullable=True, comment="附件（病假条等）URL列表"),
-        sa.Column("status", sa.String(20), nullable=False, server_default="pending",
-                  comment="pending/approved/rejected/cancelled"),
+        sa.Column(
+            "status",
+            sa.String(20),
+            nullable=False,
+            server_default="pending",
+            comment="pending/approved/rejected/cancelled",
+        ),
         sa.Column("approved_by", sa.String(64), nullable=True),
         sa.Column("approved_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("reject_reason", sa.Text, nullable=True),
@@ -292,13 +297,11 @@ def upgrade() -> None:
         sa.Column("total_days", sa.Float, nullable=False, comment="年度总额度"),
         sa.Column("used_days", sa.Float, nullable=False, server_default="0"),
         sa.Column("remaining_days", sa.Float, nullable=False),
-        sa.Column("carried_over_days", sa.Float, server_default="0",
-                  comment="上年结转天数"),
+        sa.Column("carried_over_days", sa.Float, server_default="0", comment="上年结转天数"),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("NOW()")),
         sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("NOW()")),
         sa.Column("is_deleted", sa.Boolean, server_default="false"),
-        sa.UniqueConstraint("tenant_id", "employee_id", "year", "leave_type",
-                            name="uq_leave_balance_emp_year_type"),
+        sa.UniqueConstraint("tenant_id", "employee_id", "year", "leave_type", name="uq_leave_balance_emp_year_type"),
     )
     op.create_index("ix_leave_balances_employee_year", "leave_balances", ["employee_id", "year"])
 
@@ -316,8 +319,13 @@ def upgrade() -> None:
         sa.Column("bank_name", sa.String(64), nullable=True),
         sa.Column("bank_account", sa.String(32), nullable=True, comment="银行卡号(脱敏)"),
         sa.Column("transfer_ref", sa.String(128), nullable=True, comment="银行流水号"),
-        sa.Column("status", sa.String(20), nullable=False, server_default="pending",
-                  comment="pending/processing/success/failed"),
+        sa.Column(
+            "status",
+            sa.String(20),
+            nullable=False,
+            server_default="pending",
+            comment="pending/processing/success/failed",
+        ),
         sa.Column("failure_reason", sa.Text, nullable=True),
         sa.Column("transferred_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("NOW()")),

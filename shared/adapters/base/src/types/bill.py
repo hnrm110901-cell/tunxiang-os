@@ -2,11 +2,12 @@
 屯象OS 行业公共字典 — 账单/支付统一模型
 """
 
-from typing import TypedDict, Optional, List, Dict
+from typing import Dict, List, TypedDict
 
 
 class UnifiedBill(TypedDict, total=False):
     """统一账单格式"""
+
     id: str
     external_id: str
     source: str

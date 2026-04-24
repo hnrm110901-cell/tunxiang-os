@@ -12,7 +12,6 @@ Create Date: 2026-04-12
 """
 
 from alembic import op
-import sqlalchemy as sa
 
 revision = "v236"
 down_revision = "v235b"

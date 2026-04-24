@@ -20,6 +20,7 @@ Revision ID: v261
 Revises: v260
 Create Date: 2026-04-18
 """
+
 import sqlalchemy as sa
 from alembic import op
 

@@ -31,9 +31,7 @@ _TABLES_TO_FIX = [
 ]
 
 # 标准安全条件（NULLIF 防空串 + UUID 强转）
-_SAFE_CONDITION = (
-    "tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid"
-)
+_SAFE_CONDITION = "tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid"
 
 
 def upgrade() -> None:

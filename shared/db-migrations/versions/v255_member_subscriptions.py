@@ -5,6 +5,7 @@
 Revision ID: v255
 Revises: v253
 """
+
 from __future__ import annotations
 
 import sqlalchemy as sa

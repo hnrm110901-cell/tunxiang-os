@@ -20,8 +20,6 @@ Notes:
 """
 
 from alembic import op
-import sqlalchemy as sa
-from sqlalchemy.dialects.postgresql import UUID, JSONB
 
 revision = "v070"
 down_revision = "v069"

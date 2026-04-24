@@ -7,6 +7,7 @@
 
 Revision: v187
 """
+
 from alembic import op
 
 revision = "v187b"

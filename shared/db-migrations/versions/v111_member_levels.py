@@ -11,15 +11,14 @@ Revision ID: v111
 Revises: v110
 Create Date: 2026-04-02
 """
-from typing import Sequence, Union
 
 import sqlalchemy as sa
 from alembic import op
 
 revision = "v111"
-down_revision= "v110"
-branch_labels= None
-depends_on= None
+down_revision = "v110"
+branch_labels = None
+depends_on = None
 
 
 def upgrade() -> None:
@@ -31,11 +30,33 @@ def upgrade() -> None:
         sa.Column("level_code", sa.VARCHAR(20), nullable=False, comment="等级编码: normal|silver|gold|diamond"),
         sa.Column("level_name", sa.VARCHAR(20), nullable=False, comment="等级名称，如：普通会员"),
         sa.Column("min_points", sa.Integer(), nullable=False, server_default=sa.text("0"), comment="升级所需最低积分"),
-        sa.Column("min_annual_spend_fen", sa.Integer(), nullable=False, server_default=sa.text("0"), comment="年消费门槛（分）"),
-        sa.Column("discount_rate", sa.Numeric(4, 2), nullable=False, server_default=sa.text("1.00"), comment="折扣率，0.95=95折"),
-        sa.Column("birthday_bonus_multiplier", sa.Numeric(4, 2), nullable=False, server_default=sa.text("1.0"), comment="生日积分倍率"),
-        sa.Column("priority_queue", sa.Boolean(), nullable=False, server_default=sa.text("FALSE"), comment="是否享有等位优先"),
-        sa.Column("free_delivery", sa.Boolean(), nullable=False, server_default=sa.text("FALSE"), comment="是否免外卖费"),
+        sa.Column(
+            "min_annual_spend_fen",
+            sa.Integer(),
+            nullable=False,
+            server_default=sa.text("0"),
+            comment="年消费门槛（分）",
+        ),
+        sa.Column(
+            "discount_rate",
+            sa.Numeric(4, 2),
+            nullable=False,
+            server_default=sa.text("1.00"),
+            comment="折扣率，0.95=95折",
+        ),
+        sa.Column(
+            "birthday_bonus_multiplier",
+            sa.Numeric(4, 2),
+            nullable=False,
+            server_default=sa.text("1.0"),
+            comment="生日积分倍率",
+        ),
+        sa.Column(
+            "priority_queue", sa.Boolean(), nullable=False, server_default=sa.text("FALSE"), comment="是否享有等位优先"
+        ),
+        sa.Column(
+            "free_delivery", sa.Boolean(), nullable=False, server_default=sa.text("FALSE"), comment="是否免外卖费"
+        ),
         sa.Column("sort_order", sa.Integer(), nullable=False, server_default=sa.text("0"), comment="显示顺序"),
         sa.Column("is_active", sa.Boolean(), nullable=False, server_default=sa.text("TRUE")),
         sa.Column("created_at", sa.TIMESTAMP(timezone=True), nullable=False, server_default=sa.text("NOW()")),
@@ -98,9 +119,27 @@ def upgrade() -> None:
             nullable=False,
             comment="积分类型: consumption|birthday|signup|referral|checkin",
         ),
-        sa.Column("points_per_100fen", sa.Integer(), nullable=False, server_default=sa.text("1"), comment="每消费100分得X积分（consumption用）"),
-        sa.Column("fixed_points", sa.Integer(), nullable=False, server_default=sa.text("0"), comment="固定积分（birthday/signup用）"),
-        sa.Column("multiplier", sa.Numeric(4, 2), nullable=False, server_default=sa.text("1.0"), comment="积分倍率（如双倍积分活动）"),
+        sa.Column(
+            "points_per_100fen",
+            sa.Integer(),
+            nullable=False,
+            server_default=sa.text("1"),
+            comment="每消费100分得X积分（consumption用）",
+        ),
+        sa.Column(
+            "fixed_points",
+            sa.Integer(),
+            nullable=False,
+            server_default=sa.text("0"),
+            comment="固定积分（birthday/signup用）",
+        ),
+        sa.Column(
+            "multiplier",
+            sa.Numeric(4, 2),
+            nullable=False,
+            server_default=sa.text("1.0"),
+            comment="积分倍率（如双倍积分活动）",
+        ),
         sa.Column("valid_from", sa.Date(), nullable=True, comment="活动开始日期，NULL=永久"),
         sa.Column("valid_to", sa.Date(), nullable=True, comment="活动结束日期，NULL=永久"),
         sa.Column("is_active", sa.Boolean(), nullable=False, server_default=sa.text("TRUE")),

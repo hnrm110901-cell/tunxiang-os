@@ -6,10 +6,11 @@
 - 租户隔离（RLS + app.tenant_id）
 - 优雅降级（数据库不可用时返回空结果）
 """
+
 from __future__ import annotations
 
 import json
-from typing import Any, Optional
+from typing import Any
 from uuid import uuid4
 
 import structlog
@@ -20,9 +21,7 @@ logger = structlog.get_logger()
 
 async def _set_rls(db: Any, tenant_id: str) -> None:
     """设置 RLS 租户上下文"""
-    await db.execute(sql_text(
-        "SELECT set_config('app.tenant_id', :tid, true)"
-    ), {"tid": tenant_id})
+    await db.execute(sql_text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": tenant_id})
 
 
 class PgVectorStore:
@@ -32,9 +31,7 @@ class PgVectorStore:
     async def health_check(db: Any) -> bool:
         """检查 pgvector 扩展是否可用"""
         try:
-            result = await db.execute(sql_text(
-                "SELECT 1 FROM pg_extension WHERE extname = 'vector'"
-            ))
+            result = await db.execute(sql_text("SELECT 1 FROM pg_extension WHERE extname = 'vector'"))
             return result.scalar() is not None
         except Exception:
             return False  # health_check: 静默降级
@@ -65,7 +62,8 @@ class PgVectorStore:
                     embedding = chunk.get("embedding", [])
                     embedding_str = f"[{','.join(str(x) for x in embedding)}]" if embedding else None
 
-                    await db.execute(sql_text("""
+                    await db.execute(
+                        sql_text("""
                         INSERT INTO knowledge_chunks (
                             id, tenant_id, document_id, collection, doc_id,
                             chunk_index, text, embedding, token_count, metadata
@@ -79,18 +77,20 @@ class PgVectorStore:
                             token_count = EXCLUDED.token_count,
                             metadata = EXCLUDED.metadata,
                             updated_at = NOW()
-                    """), {
-                        "id": chunk_id,
-                        "tenant_id": tenant_id,
-                        "document_id": chunk.get("document_id", str(uuid4())),
-                        "collection": chunk.get("collection", "ops_procedures"),
-                        "doc_id": chunk.get("doc_id", ""),
-                        "chunk_index": chunk.get("chunk_index", 0),
-                        "text": chunk.get("text", ""),
-                        "embedding": embedding_str,
-                        "token_count": chunk.get("token_count", 0),
-                        "metadata": _json_dumps(chunk.get("metadata", {})),
-                    })
+                    """),
+                        {
+                            "id": chunk_id,
+                            "tenant_id": tenant_id,
+                            "document_id": chunk.get("document_id", str(uuid4())),
+                            "collection": chunk.get("collection", "ops_procedures"),
+                            "doc_id": chunk.get("doc_id", ""),
+                            "chunk_index": chunk.get("chunk_index", 0),
+                            "text": chunk.get("text", ""),
+                            "embedding": embedding_str,
+                            "token_count": chunk.get("token_count", 0),
+                            "metadata": _json_dumps(chunk.get("metadata", {})),
+                        },
+                    )
                     success += 1
                 except Exception as exc:
                     logger.warning("upsert_chunk_failed", error=str(exc), doc_id=chunk.get("doc_id"), exc_info=True)
@@ -145,7 +145,8 @@ class PgVectorStore:
 
             where_sql = " AND ".join(where_clauses)
 
-            result = await db.execute(sql_text(f"""
+            result = await db.execute(
+                sql_text(f"""
                 SELECT
                     id::text AS chunk_id,
                     doc_id,
@@ -158,7 +159,9 @@ class PgVectorStore:
                 WHERE {where_sql}
                 ORDER BY embedding <=> :embedding::vector
                 LIMIT :top_k
-            """), params)
+            """),
+                params,
+            )
 
             rows = result.fetchall()
             return [
@@ -218,7 +221,8 @@ class PgVectorStore:
 
             where_sql = " AND ".join(where_clauses)
 
-            result = await db.execute(sql_text(f"""
+            result = await db.execute(
+                sql_text(f"""
                 SELECT
                     id::text AS chunk_id,
                     doc_id,
@@ -231,7 +235,9 @@ class PgVectorStore:
                 WHERE {where_sql}
                 ORDER BY score DESC
                 LIMIT :top_k
-            """), params)
+            """),
+                params,
+            )
 
             rows = result.fetchall()
             return [
@@ -261,11 +267,14 @@ class PgVectorStore:
         try:
             await _set_rls(db, tenant_id)
 
-            result = await db.execute(sql_text("""
+            result = await db.execute(
+                sql_text("""
                 DELETE FROM knowledge_chunks
                 WHERE document_id = :document_id::uuid
                 AND tenant_id = :tenant_id::uuid
-            """), {"document_id": document_id, "tenant_id": tenant_id})
+            """),
+                {"document_id": document_id, "tenant_id": tenant_id},
+            )
 
             await db.commit()
             return result.rowcount or 0
@@ -285,12 +294,15 @@ class PgVectorStore:
         try:
             await _set_rls(db, tenant_id)
 
-            result = await db.execute(sql_text("""
+            result = await db.execute(
+                sql_text("""
                 DELETE FROM knowledge_chunks
                 WHERE doc_id = :doc_id
                 AND collection = :collection
                 AND tenant_id = :tenant_id::uuid
-            """), {"doc_id": doc_id, "collection": collection, "tenant_id": tenant_id})
+            """),
+                {"doc_id": doc_id, "collection": collection, "tenant_id": tenant_id},
+            )
 
             await db.commit()
             return result.rowcount or 0

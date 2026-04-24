@@ -8,6 +8,7 @@
 
 当 COS_SECRET_ID 未配置时自动进入 Mock 模式，返回本地伪路径。
 """
+
 from __future__ import annotations
 
 import base64
@@ -44,8 +45,8 @@ ALL_ALLOWED_TYPES = IMAGE_TYPES | DOCUMENT_TYPES | VIDEO_TYPES | AUDIO_TYPES
 
 # ─── 上传大小限制（字节） ───
 
-IMAGE_MAX_SIZE = 10 * 1024 * 1024      # 10 MB
-FILE_MAX_SIZE = 50 * 1024 * 1024       # 50 MB
+IMAGE_MAX_SIZE = 10 * 1024 * 1024  # 10 MB
+FILE_MAX_SIZE = 50 * 1024 * 1024  # 50 MB
 
 # ─── 合法 folder 白名单 ───
 
@@ -259,16 +260,12 @@ class COSUploadService:
     @staticmethod
     def _validate_folder(folder: str) -> None:
         if folder not in ALLOWED_FOLDERS:
-            raise COSUploadError(
-                f"不允许的目录: {folder}，合法值: {', '.join(sorted(ALLOWED_FOLDERS))}"
-            )
+            raise COSUploadError(f"不允许的目录: {folder}，合法值: {', '.join(sorted(ALLOWED_FOLDERS))}")
 
     @staticmethod
     def _validate_content_type(content_type: str) -> None:
         if content_type not in ALL_ALLOWED_TYPES:
-            raise COSUploadError(
-                f"不允许的文件类型: {content_type}"
-            )
+            raise COSUploadError(f"不允许的文件类型: {content_type}")
 
     @staticmethod
     def _validate_file_size(file_bytes: bytes, content_type: str) -> None:
@@ -279,9 +276,7 @@ class COSUploadService:
                     f"图片大小超限: {size / 1024 / 1024:.1f}MB，上限 {IMAGE_MAX_SIZE / 1024 / 1024:.0f}MB"
                 )
         elif size > FILE_MAX_SIZE:
-            raise COSUploadError(
-                f"文件大小超限: {size / 1024 / 1024:.1f}MB，上限 {FILE_MAX_SIZE / 1024 / 1024:.0f}MB"
-            )
+            raise COSUploadError(f"文件大小超限: {size / 1024 / 1024:.1f}MB，上限 {FILE_MAX_SIZE / 1024 / 1024:.0f}MB")
 
     @staticmethod
     def _generate_key(folder: str, filename: str) -> str:
@@ -331,9 +326,7 @@ class COSUploadService:
                     "size": len(file_bytes),
                 }
 
-            raise COSUploadError(
-                f"COS 上传失败: HTTP {resp.status_code}, {resp.text[:500]}"
-            )
+            raise COSUploadError(f"COS 上传失败: HTTP {resp.status_code}, {resp.text[:500]}")
 
         except httpx.HTTPError as exc:
             raise COSUploadError(f"COS 请求异常: {exc}") from exc

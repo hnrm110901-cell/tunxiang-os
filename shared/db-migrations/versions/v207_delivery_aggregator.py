@@ -8,9 +8,9 @@ Revises: v206
 Create Date: 2026-04-09
 """
 
-from alembic import op
 import sqlalchemy as sa
-from sqlalchemy.dialects.postgresql import UUID, JSONB
+from alembic import op
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 
 revision = "v207"
 down_revision = "v206b"
@@ -22,10 +22,9 @@ def upgrade() -> None:
     conn = op.get_bind()
     existing = sa.inspect(conn).get_table_names()
 
-
     # ── aggregator_orders（外卖聚合订单）──
 
-    if 'aggregator_orders' not in existing:
+    if "aggregator_orders" not in existing:
         op.create_table(
             "aggregator_orders",
             sa.Column("id", UUID(as_uuid=True), primary_key=True, server_default=sa.text("gen_random_uuid()")),
@@ -38,8 +37,13 @@ def upgrade() -> None:
             sa.Column("customer_phone_hash", sa.String(16), nullable=True),
             sa.Column("customer_phone_masked", sa.String(15), nullable=True),
             sa.Column("estimated_delivery_at", sa.String(50), nullable=True),
-            sa.Column("status", sa.String(20), nullable=False, server_default="new",
-                      comment="new/accepted/ready/delivering/completed/cancelled"),
+            sa.Column(
+                "status",
+                sa.String(20),
+                nullable=False,
+                server_default="new",
+                comment="new/accepted/ready/delivering/completed/cancelled",
+            ),
             sa.Column("cancel_reason", sa.String(200), nullable=True),
             sa.Column("raw_payload", JSONB, nullable=True),
             sa.Column("extra", JSONB, server_default="{}"),
@@ -57,7 +61,7 @@ def upgrade() -> None:
 
         # ── aggregator_metrics（Webhook处理指标）──
 
-    if 'aggregator_metrics' not in existing:
+    if "aggregator_metrics" not in existing:
         op.create_table(
             "aggregator_metrics",
             sa.Column("id", UUID(as_uuid=True), primary_key=True, server_default=sa.text("gen_random_uuid()")),

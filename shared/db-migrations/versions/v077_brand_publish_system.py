@@ -16,16 +16,15 @@ Create Date: 2026-03-31
 RLS 策略遵循 v056+ 标准 NULLIF 模式：
   tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::UUID
 """
-from typing import Sequence, Union
 
-from alembic import op
 import sqlalchemy as sa
-from sqlalchemy.dialects.postgresql import UUID, JSON
+from alembic import op
+from sqlalchemy.dialects.postgresql import JSON, UUID
 
 revision = "v077"
-down_revision= "v076"
-branch_labels= None
-depends_on= None
+down_revision = "v076"
+branch_labels = None
+depends_on = None
 
 # 标准 NULLIF NULL guard 条件（v056+ 唯一正确模式）
 _SAFE = "tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::UUID"
@@ -34,18 +33,9 @@ _SAFE = "tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::UUID"
 def _rls(table: str) -> None:
     """标准三策略 RLS（SELECT/INSERT/UPDATE）"""
     op.execute(f"ALTER TABLE {table} ENABLE ROW LEVEL SECURITY")
-    op.execute(
-        f"CREATE POLICY tenant_isolation_{table} ON {table} "
-        f"FOR SELECT USING ({_SAFE})"
-    )
-    op.execute(
-        f"CREATE POLICY tenant_insert_{table} ON {table} "
-        f"FOR INSERT WITH CHECK ({_SAFE})"
-    )
-    op.execute(
-        f"CREATE POLICY tenant_update_{table} ON {table} "
-        f"FOR UPDATE USING ({_SAFE}) WITH CHECK ({_SAFE})"
-    )
+    op.execute(f"CREATE POLICY tenant_isolation_{table} ON {table} FOR SELECT USING ({_SAFE})")
+    op.execute(f"CREATE POLICY tenant_insert_{table} ON {table} FOR INSERT WITH CHECK ({_SAFE})")
+    op.execute(f"CREATE POLICY tenant_update_{table} ON {table} FOR UPDATE USING ({_SAFE}) WITH CHECK ({_SAFE})")
 
 
 def _drop_rls(table: str) -> None:
@@ -88,17 +78,20 @@ def upgrade() -> None:
         "menu_publish_plans",
         sa.Column("id", UUID(as_uuid=True), primary_key=True),
         sa.Column("tenant_id", UUID(as_uuid=True), nullable=False, index=True),
-        sa.Column("brand_id", UUID(as_uuid=True), nullable=True, index=True,
-                  comment="所属品牌ID，NULL=全租户通用"),
+        sa.Column("brand_id", UUID(as_uuid=True), nullable=True, index=True, comment="所属品牌ID，NULL=全租户通用"),
         sa.Column("plan_name", sa.String(200), nullable=False),
         sa.Column(
-            "target_type", sa.String(30), nullable=False,
+            "target_type",
+            sa.String(30),
+            nullable=False,
             comment="all_stores | region | stores",
         ),
-        sa.Column("target_ids", JSON, nullable=True,
-                  comment="目标区域或门店ID列表，all_stores时为NULL"),
+        sa.Column("target_ids", JSON, nullable=True, comment="目标区域或门店ID列表，all_stores时为NULL"),
         sa.Column(
-            "status", sa.String(20), nullable=False, server_default="draft",
+            "status",
+            sa.String(20),
+            nullable=False,
+            server_default="draft",
             comment="draft | published | archived",
         ),
         sa.Column("published_at", sa.DateTime(timezone=True), nullable=True),
@@ -115,8 +108,7 @@ def upgrade() -> None:
             name="ck_publish_plans_status",
         ),
     )
-    op.create_index("idx_publish_plans_tenant_status",
-                    "menu_publish_plans", ["tenant_id", "status"])
+    op.create_index("idx_publish_plans_tenant_status", "menu_publish_plans", ["tenant_id", "status"])
     _rls("menu_publish_plans")
 
     # ─── 3. menu_publish_plan_items — 方案内菜品 ───
@@ -126,15 +118,12 @@ def upgrade() -> None:
         sa.Column("tenant_id", UUID(as_uuid=True), nullable=False, index=True),
         sa.Column("plan_id", UUID(as_uuid=True), nullable=False, index=True),
         sa.Column("dish_id", UUID(as_uuid=True), nullable=False, index=True),
-        sa.Column("override_price_fen", sa.Integer, nullable=True,
-                  comment="可选覆盖价(分)，NULL=使用品牌标准价"),
+        sa.Column("override_price_fen", sa.Integer, nullable=True, comment="可选覆盖价(分)，NULL=使用品牌标准价"),
         sa.Column("is_available", sa.Boolean, nullable=False, server_default="true"),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
-        sa.UniqueConstraint("tenant_id", "plan_id", "dish_id",
-                            name="uq_publish_plan_items_plan_dish"),
+        sa.UniqueConstraint("tenant_id", "plan_id", "dish_id", name="uq_publish_plan_items_plan_dish"),
     )
-    op.create_index("idx_publish_plan_items_plan_id",
-                    "menu_publish_plan_items", ["plan_id"])
+    op.create_index("idx_publish_plan_items_plan_id", "menu_publish_plan_items", ["plan_id"])
     _rls("menu_publish_plan_items")
 
     # ─── 4. store_dish_overrides — 门店菜品本地微调 ───
@@ -143,24 +132,18 @@ def upgrade() -> None:
         sa.Column("id", UUID(as_uuid=True), primary_key=True),
         sa.Column("tenant_id", UUID(as_uuid=True), nullable=False, index=True),
         sa.Column("store_id", UUID(as_uuid=True), nullable=False, index=True),
-        sa.Column("dish_id", UUID(as_uuid=True), nullable=False, index=True,
-                  comment="引用 dishes.id（品牌菜品）"),
-        sa.Column("local_price_fen", sa.Integer, nullable=True,
-                  comment="门店售价(分)，NULL=使用品牌价"),
-        sa.Column("local_name", sa.String(200), nullable=True,
-                  comment="门店显示名，NULL=使用品牌名"),
+        sa.Column("dish_id", UUID(as_uuid=True), nullable=False, index=True, comment="引用 dishes.id（品牌菜品）"),
+        sa.Column("local_price_fen", sa.Integer, nullable=True, comment="门店售价(分)，NULL=使用品牌价"),
+        sa.Column("local_name", sa.String(200), nullable=True, comment="门店显示名，NULL=使用品牌名"),
         sa.Column("local_description", sa.Text, nullable=True),
         sa.Column("local_image_url", sa.String(500), nullable=True),
-        sa.Column("is_available", sa.Boolean, nullable=False, server_default="true",
-                  comment="门店是否销售此菜"),
+        sa.Column("is_available", sa.Boolean, nullable=False, server_default="true", comment="门店是否销售此菜"),
         sa.Column("sort_order", sa.Integer, nullable=False, server_default="0"),
         sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
         sa.Column("updated_by", UUID(as_uuid=True), nullable=True),
-        sa.UniqueConstraint("tenant_id", "store_id", "dish_id",
-                            name="uq_store_dish_overrides_store_dish"),
+        sa.UniqueConstraint("tenant_id", "store_id", "dish_id", name="uq_store_dish_overrides_store_dish"),
     )
-    op.create_index("idx_store_dish_overrides_store_dish",
-                    "store_dish_overrides", ["store_id", "dish_id"])
+    op.create_index("idx_store_dish_overrides_store_dish", "store_dish_overrides", ["store_id", "dish_id"])
     _rls("store_dish_overrides")
 
     # ─── 5. price_adjustment_rules — 时段/渠道调价规则 ───
@@ -168,29 +151,32 @@ def upgrade() -> None:
         "price_adjustment_rules",
         sa.Column("id", UUID(as_uuid=True), primary_key=True),
         sa.Column("tenant_id", UUID(as_uuid=True), nullable=False, index=True),
-        sa.Column("store_id", UUID(as_uuid=True), nullable=True, index=True,
-                  comment="NULL=品牌级规则"),
+        sa.Column("store_id", UUID(as_uuid=True), nullable=True, index=True, comment="NULL=品牌级规则"),
         sa.Column("rule_name", sa.String(200), nullable=False),
         sa.Column(
-            "rule_type", sa.String(30), nullable=False,
+            "rule_type",
+            sa.String(30),
+            nullable=False,
             comment="time_period | channel | date_range | holiday",
         ),
-        sa.Column("channel", sa.String(30), nullable=True,
-                  comment="dine_in|delivery|takeout|self_order，NULL=所有渠道"),
+        sa.Column(
+            "channel", sa.String(30), nullable=True, comment="dine_in|delivery|takeout|self_order，NULL=所有渠道"
+        ),
         sa.Column("time_start", sa.Time, nullable=True, comment="时段开始(时段规则)"),
         sa.Column("time_end", sa.Time, nullable=True, comment="时段结束(时段规则)"),
         sa.Column("date_start", sa.Date, nullable=True, comment="日期范围开始"),
         sa.Column("date_end", sa.Date, nullable=True, comment="日期范围结束"),
-        sa.Column("weekdays", JSON, nullable=True,
-                  comment="生效星期[1-7]，1=周一，7=周日"),
+        sa.Column("weekdays", JSON, nullable=True, comment="生效星期[1-7]，1=周一，7=周日"),
         sa.Column(
-            "adjustment_type", sa.String(20), nullable=False,
+            "adjustment_type",
+            sa.String(20),
+            nullable=False,
             comment="percentage | fixed_add | fixed_price",
         ),
-        sa.Column("adjustment_value", sa.Numeric(10, 2), nullable=False,
-                  comment="百分比/固定加减金额(分)/固定价格(分)"),
-        sa.Column("priority", sa.Integer, nullable=False, server_default="0",
-                  comment="优先级，值越大越先命中"),
+        sa.Column(
+            "adjustment_value", sa.Numeric(10, 2), nullable=False, comment="百分比/固定加减金额(分)/固定价格(分)"
+        ),
+        sa.Column("priority", sa.Integer, nullable=False, server_default="0", comment="优先级，值越大越先命中"),
         sa.Column("is_active", sa.Boolean, nullable=False, server_default="true"),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
         sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
@@ -203,10 +189,10 @@ def upgrade() -> None:
             name="ck_price_adj_rules_adj_type",
         ),
     )
-    op.create_index("idx_price_adj_rules_tenant_store",
-                    "price_adjustment_rules", ["tenant_id", "store_id"])
-    op.create_index("idx_price_adj_rules_active",
-                    "price_adjustment_rules", ["tenant_id", "store_id", "is_active", "priority"])
+    op.create_index("idx_price_adj_rules_tenant_store", "price_adjustment_rules", ["tenant_id", "store_id"])
+    op.create_index(
+        "idx_price_adj_rules_active", "price_adjustment_rules", ["tenant_id", "store_id", "is_active", "priority"]
+    )
     _rls("price_adjustment_rules")
 
     # ─── 6. dish_price_adjustments — 菜品与调价规则关联 ───
@@ -217,11 +203,9 @@ def upgrade() -> None:
         sa.Column("rule_id", UUID(as_uuid=True), nullable=False, index=True),
         sa.Column("dish_id", UUID(as_uuid=True), nullable=False, index=True),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
-        sa.UniqueConstraint("tenant_id", "rule_id", "dish_id",
-                            name="uq_dish_price_adjustments_rule_dish"),
+        sa.UniqueConstraint("tenant_id", "rule_id", "dish_id", name="uq_dish_price_adjustments_rule_dish"),
     )
-    op.create_index("idx_dish_price_adj_dish_id",
-                    "dish_price_adjustments", ["dish_id"])
+    op.create_index("idx_dish_price_adj_dish_id", "dish_price_adjustments", ["dish_id"])
     _rls("dish_price_adjustments")
 
 

@@ -42,25 +42,17 @@ def upgrade() -> None:
         )
     """)
     op.execute(
-        "CREATE INDEX IF NOT EXISTS idx_compliance_alerts_tenant_status "
-        "ON compliance_alerts (tenant_id, status)"
+        "CREATE INDEX IF NOT EXISTS idx_compliance_alerts_tenant_status ON compliance_alerts (tenant_id, status)"
     )
     op.execute(
-        "CREATE INDEX IF NOT EXISTS idx_compliance_alerts_tenant_type "
-        "ON compliance_alerts (tenant_id, alert_type)"
+        "CREATE INDEX IF NOT EXISTS idx_compliance_alerts_tenant_type ON compliance_alerts (tenant_id, alert_type)"
     )
     op.execute(
         "CREATE INDEX IF NOT EXISTS idx_compliance_alerts_tenant_store_status "
         "ON compliance_alerts (tenant_id, store_id, status)"
     )
-    op.execute(
-        "CREATE INDEX IF NOT EXISTS idx_compliance_alerts_severity "
-        "ON compliance_alerts (severity)"
-    )
-    op.execute(
-        "CREATE INDEX IF NOT EXISTS idx_compliance_alerts_due_date "
-        "ON compliance_alerts (due_date)"
-    )
+    op.execute("CREATE INDEX IF NOT EXISTS idx_compliance_alerts_severity ON compliance_alerts (severity)")
+    op.execute("CREATE INDEX IF NOT EXISTS idx_compliance_alerts_due_date ON compliance_alerts (due_date)")
     op.execute("ALTER TABLE compliance_alerts ENABLE ROW LEVEL SECURITY")
     op.execute("ALTER TABLE compliance_alerts FORCE ROW LEVEL SECURITY")
     op.execute("DROP POLICY IF EXISTS compliance_alerts_tenant_isolation ON compliance_alerts")

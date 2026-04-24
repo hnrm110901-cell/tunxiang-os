@@ -7,13 +7,14 @@
 生成的工具命名规范：{skill_name}__{action}
 例：order_core__create_order, deposit_management__collect_deposit
 """
+
 from __future__ import annotations
 
 from typing import Optional
 
 import structlog
 
-from .schemas import ApiEndpoint, SkillManifest, ScopePermission
+from .schemas import ApiEndpoint, ScopePermission, SkillManifest
 
 logger = structlog.get_logger(__name__)
 
@@ -65,11 +66,7 @@ class SkillMCPBridge:
         action_name 从 endpoint.description 转换（去空格下划线）
         """
         tools: list[MCPToolDef] = []
-        if (
-            not skill.triggers
-            or not skill.triggers.api
-            or not skill.triggers.api.endpoints
-        ):
+        if not skill.triggers or not skill.triggers.api or not skill.triggers.api.endpoints:
             return tools
 
         # skill 名称中的 "-" 转换为 "_"，构成工具名前缀
@@ -77,13 +74,7 @@ class SkillMCPBridge:
 
         for endpoint in skill.triggers.api.endpoints:
             # 从 description 生成 action_name：去除中文括号、空格转下划线、转小写
-            action_name = (
-                endpoint.description
-                .replace(" ", "_")
-                .replace("（", "_")
-                .replace("）", "")
-                .lower()
-            )
+            action_name = endpoint.description.replace(" ", "_").replace("（", "_").replace("）", "").lower()
             # 截取前 30 字符防止名称过长，并去除末尾下划线
             action_name = action_name[:30].rstrip("_")
 
@@ -171,10 +162,7 @@ class SkillMCPBridge:
             return tools
 
         # 按 action 交集过滤
-        filtered = [
-            t for t in tools
-            if any(a in role_perms for a in t.required_role_actions)
-        ]
+        filtered = [t for t in tools if any(a in role_perms for a in t.required_role_actions)]
         logger.debug(
             "tools_filtered_by_role",
             role=role,

@@ -2,11 +2,12 @@
 屯象OS 行业公共字典 — 桌位统一模型
 """
 
-from typing import TypedDict, Optional
+from typing import TypedDict
 
 
 class UnifiedTable(TypedDict, total=False):
     """统一桌位格式"""
+
     id: str
     external_id: str
     erp_desk_id: str

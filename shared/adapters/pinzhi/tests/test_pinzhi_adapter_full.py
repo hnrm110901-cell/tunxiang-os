@@ -9,6 +9,7 @@
 - 更新了 sys.path 设置以适配新项目目录结构
 - 适配器类名和方法签名保持一致，无需修改
 """
+
 import os
 import sys
 
@@ -18,19 +19,19 @@ _gateway_src = os.path.join(_repo_root, "apps", "api-gateway", "src")
 if _gateway_src not in sys.path:
     sys.path.insert(0, _gateway_src)
 
-import pytest
-import httpx
-from decimal import Decimal
 from datetime import datetime
-from unittest.mock import AsyncMock, patch, MagicMock
+from decimal import Decimal
+from unittest.mock import AsyncMock, MagicMock
 
+import httpx
+import pytest
 from src.adapter import PinzhiAdapter
 from src.signature import generate_sign
-
 
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture
 def adapter():
@@ -47,23 +48,27 @@ def adapter():
 @pytest.fixture
 def adapter_store_a():
     """门店A适配器（用于多门店隔离测试）"""
-    return PinzhiAdapter({
-        "base_url": "http://192.168.1.100:8080/pzcatering-gateway",
-        "token": "token_store_a",
-        "timeout": 5,
-        "retry_times": 1,
-    })
+    return PinzhiAdapter(
+        {
+            "base_url": "http://192.168.1.100:8080/pzcatering-gateway",
+            "token": "token_store_a",
+            "timeout": 5,
+            "retry_times": 1,
+        }
+    )
 
 
 @pytest.fixture
 def adapter_store_b():
     """门店B适配器（用于多门店隔离测试）"""
-    return PinzhiAdapter({
-        "base_url": "http://192.168.1.100:8080/pzcatering-gateway",
-        "token": "token_store_b",
-        "timeout": 5,
-        "retry_times": 1,
-    })
+    return PinzhiAdapter(
+        {
+            "base_url": "http://192.168.1.100:8080/pzcatering-gateway",
+            "token": "token_store_b",
+            "timeout": 5,
+            "retry_times": 1,
+        }
+    )
 
 
 def _mock_response(json_data, status_code=200):
@@ -84,6 +89,7 @@ def _mock_response(json_data, status_code=200):
 # ---------------------------------------------------------------------------
 # 正常路径
 # ---------------------------------------------------------------------------
+
 
 class TestPinzhiAdapterFetchOrders:
     """验证订单数据拉取后格式正确"""
@@ -246,6 +252,7 @@ class TestMultiStoreTokenIsolation:
 # 边界条件
 # ---------------------------------------------------------------------------
 
+
 class TestBoundaryConditions:
     """边界条件测试"""
 
@@ -285,6 +292,7 @@ class TestBoundaryConditions:
         }
 
         call_count = 0
+
         async def mock_post(endpoint, **kwargs):
             nonlocal call_count
             call_count += 1
@@ -346,6 +354,7 @@ class TestBoundaryConditions:
 # 错误处理
 # ---------------------------------------------------------------------------
 
+
 class TestErrorHandling:
     """错误处理测试"""
 
@@ -376,9 +385,7 @@ class TestErrorHandling:
     @pytest.mark.asyncio
     async def test_network_timeout_raises_error(self, adapter):
         """网络超时时抛出异常"""
-        adapter.client.post = AsyncMock(
-            side_effect=httpx.ConnectTimeout("连接超时")
-        )
+        adapter.client.post = AsyncMock(side_effect=httpx.ConnectTimeout("连接超时"))
 
         with pytest.raises(Exception):
             await adapter.query_orders(ognid="OGN001", business_date="2024-01-01")
@@ -434,12 +441,14 @@ class TestErrorHandling:
 # to_order 映射测试补充
 # ---------------------------------------------------------------------------
 
+
 class TestToOrderEdgeCases:
     """to_order 边界场景测试"""
 
     def test_order_status_cancelled(self, adapter):
         """billStatus=2 映射为 CANCELLED"""
         from schemas.restaurant_standard_schema import OrderStatus
+
         raw = {
             "billId": "B999",
             "billNo": "CANCEL001",
@@ -456,6 +465,7 @@ class TestToOrderEdgeCases:
     def test_order_status_pending(self, adapter):
         """billStatus=0 映射为 PENDING"""
         from schemas.restaurant_standard_schema import OrderStatus
+
         raw = {
             "billId": "B998",
             "billNo": "PEND001",
@@ -472,6 +482,7 @@ class TestToOrderEdgeCases:
     def test_order_delivery_type(self, adapter):
         """orderSource != 1 映射为 DELIVERY"""
         from schemas.restaurant_standard_schema import OrderType
+
         raw = {
             "billId": "B997",
             "billNo": "DEL001",
@@ -542,6 +553,7 @@ class TestToOrderEdgeCases:
 # 适配器初始化边界
 # ---------------------------------------------------------------------------
 
+
 class TestAdapterInitValidation:
     """适配器初始化校验"""
 
@@ -557,24 +569,29 @@ class TestAdapterInitValidation:
 
     def test_init_default_timeout(self):
         """未指定timeout使用默认值30"""
-        adapter = PinzhiAdapter({
-            "base_url": "http://example.com",
-            "token": "t",
-        })
+        adapter = PinzhiAdapter(
+            {
+                "base_url": "http://example.com",
+                "token": "t",
+            }
+        )
         assert adapter.timeout == 30
 
     def test_init_default_retry_times(self):
         """未指定retry_times使用默认值3"""
-        adapter = PinzhiAdapter({
-            "base_url": "http://example.com",
-            "token": "t",
-        })
+        adapter = PinzhiAdapter(
+            {
+                "base_url": "http://example.com",
+                "token": "t",
+            }
+        )
         assert adapter.retry_times == 3
 
 
 # ---------------------------------------------------------------------------
 # 签名功能测试补充
 # ---------------------------------------------------------------------------
+
 
 class TestSignatureIntegration:
     """签名在适配器中的集成测试"""
@@ -603,6 +620,7 @@ class TestSignatureIntegration:
 # run_all_checks 测试
 # ---------------------------------------------------------------------------
 
+
 class TestRunAllChecks:
     """run_all_checks 综合检测接口测试"""
 
@@ -615,9 +633,7 @@ class TestRunAllChecks:
         adapter.client.get = AsyncMock(return_value=_mock_response(success_response_list))
         adapter.client.post = AsyncMock(return_value=_mock_response(success_response_data))
 
-        results = await adapter.run_all_checks(
-            business_date="2024-01-01", ognid="OGN001"
-        )
+        results = await adapter.run_all_checks(business_date="2024-01-01", ognid="OGN001")
 
         assert isinstance(results, list)
         assert len(results) > 0
@@ -639,13 +655,9 @@ class TestRunAllChecks:
             return _mock_response({"success": 0, "res": [{"id": 1}]})
 
         adapter.client.get = mock_get
-        adapter.client.post = AsyncMock(
-            return_value=_mock_response({"success": 0, "res": [{"id": 1}]})
-        )
+        adapter.client.post = AsyncMock(return_value=_mock_response({"success": 0, "res": [{"id": 1}]}))
 
-        results = await adapter.run_all_checks(
-            business_date="2024-01-01", ognid="OGN001"
-        )
+        results = await adapter.run_all_checks(business_date="2024-01-01", ognid="OGN001")
 
         # 应该有失败的项
         failed = [r for r in results if not r["ok"]]
@@ -658,6 +670,7 @@ class TestRunAllChecks:
 # ---------------------------------------------------------------------------
 # 异步上下文管理器
 # ---------------------------------------------------------------------------
+
 
 class TestAsyncContextManager:
     """异步上下文管理器测试"""
@@ -673,6 +686,7 @@ class TestAsyncContextManager:
 # ---------------------------------------------------------------------------
 # P1-1: 菜品映射到屯象 Dish Model 测试
 # ---------------------------------------------------------------------------
+
 
 class TestFetchMenuItemsMapsToDishModel:
     """验证品智菜品通过 DishSync 映射到统一屯象 Dish 格式"""
@@ -771,20 +785,31 @@ class TestFetchMenuItemsMapsToDishModel:
 # P1-1: to_order 高级字段测试（做法/赠菜/套餐/服务费）
 # ---------------------------------------------------------------------------
 
+
 class TestToOrderAdvancedFields:
     """to_order 高级字段映射：做法/口味/赠菜/套餐/服务费"""
 
     def test_dish_with_practice_and_taste(self, adapter):
         """菜品含做法和口味时正确拼接 practice_names"""
         raw = {
-            "billId": "ADV001", "billNo": "ADV001", "billStatus": 1,
-            "orderSource": 1, "dishPriceTotal": 8800,
-            "specialOfferPrice": 0, "realPrice": 8800, "teaPrice": 0,
-            "dishList": [{
-                "dishId": "D010", "dishName": "红烧肉", "dishNum": 1, "dishPrice": 8800,
-                "practice": [{"name": "微辣"}],
-                "taste": [{"tasteName": "少盐"}],
-            }],
+            "billId": "ADV001",
+            "billNo": "ADV001",
+            "billStatus": 1,
+            "orderSource": 1,
+            "dishPriceTotal": 8800,
+            "specialOfferPrice": 0,
+            "realPrice": 8800,
+            "teaPrice": 0,
+            "dishList": [
+                {
+                    "dishId": "D010",
+                    "dishName": "红烧肉",
+                    "dishNum": 1,
+                    "dishPrice": 8800,
+                    "practice": [{"name": "微辣"}],
+                    "taste": [{"tasteName": "少盐"}],
+                }
+            ],
         }
         order = adapter.to_order(raw, "S1", "B1")
         assert order.items[0].practice_names == "微辣,少盐"
@@ -792,13 +817,24 @@ class TestToOrderAdvancedFields:
     def test_dish_gift_flag(self, adapter):
         """赠菜标记正确映射"""
         raw = {
-            "billId": "GIFT001", "billNo": "GIFT001", "billStatus": 1,
-            "orderSource": 1, "dishPriceTotal": 0,
-            "specialOfferPrice": 0, "realPrice": 0, "teaPrice": 0,
-            "dishList": [{
-                "dishId": "D011", "dishName": "赠菜", "dishNum": 1, "dishPrice": 0,
-                "isGift": True, "giftReason": "VIP客户赠送",
-            }],
+            "billId": "GIFT001",
+            "billNo": "GIFT001",
+            "billStatus": 1,
+            "orderSource": 1,
+            "dishPriceTotal": 0,
+            "specialOfferPrice": 0,
+            "realPrice": 0,
+            "teaPrice": 0,
+            "dishList": [
+                {
+                    "dishId": "D011",
+                    "dishName": "赠菜",
+                    "dishNum": 1,
+                    "dishPrice": 0,
+                    "isGift": True,
+                    "giftReason": "VIP客户赠送",
+                }
+            ],
         }
         order = adapter.to_order(raw, "S1", "B1")
         assert order.items[0].is_gift is True
@@ -807,13 +843,23 @@ class TestToOrderAdvancedFields:
     def test_dish_combo_id(self, adapter):
         """套餐ID正确映射"""
         raw = {
-            "billId": "COMBO001", "billNo": "COMBO001", "billStatus": 1,
-            "orderSource": 1, "dishPriceTotal": 19800,
-            "specialOfferPrice": 0, "realPrice": 19800, "teaPrice": 0,
-            "dishList": [{
-                "dishId": "D012", "dishName": "套餐主菜", "dishNum": 1, "dishPrice": 19800,
-                "comboId": "COMBO_A",
-            }],
+            "billId": "COMBO001",
+            "billNo": "COMBO001",
+            "billStatus": 1,
+            "orderSource": 1,
+            "dishPriceTotal": 19800,
+            "specialOfferPrice": 0,
+            "realPrice": 19800,
+            "teaPrice": 0,
+            "dishList": [
+                {
+                    "dishId": "D012",
+                    "dishName": "套餐主菜",
+                    "dishNum": 1,
+                    "dishPrice": 19800,
+                    "comboId": "COMBO_A",
+                }
+            ],
         }
         order = adapter.to_order(raw, "S1", "B1")
         assert order.items[0].combo_id == "COMBO_A"
@@ -821,9 +867,14 @@ class TestToOrderAdvancedFields:
     def test_service_charge_fen_field(self, adapter):
         """service_charge_fen 字段从 teaPrice 映射"""
         raw = {
-            "billId": "SVC001", "billNo": "SVC001", "billStatus": 1,
-            "orderSource": 1, "dishPriceTotal": 10000,
-            "specialOfferPrice": 0, "realPrice": 10500, "teaPrice": 500,
+            "billId": "SVC001",
+            "billNo": "SVC001",
+            "billStatus": 1,
+            "orderSource": 1,
+            "dishPriceTotal": 10000,
+            "specialOfferPrice": 0,
+            "realPrice": 10500,
+            "teaPrice": 500,
         }
         order = adapter.to_order(raw, "S1", "B1")
         assert order.service_charge_fen == 500
@@ -832,9 +883,14 @@ class TestToOrderAdvancedFields:
     def test_cashier_id_mapped(self, adapter):
         """收银员ID正确映射"""
         raw = {
-            "billId": "CASH001", "billNo": "CASH001", "billStatus": 1,
-            "orderSource": 1, "dishPriceTotal": 5000,
-            "specialOfferPrice": 0, "realPrice": 5000, "teaPrice": 0,
+            "billId": "CASH001",
+            "billNo": "CASH001",
+            "billStatus": 1,
+            "orderSource": 1,
+            "dishPriceTotal": 5000,
+            "specialOfferPrice": 0,
+            "realPrice": 5000,
+            "teaPrice": 0,
             "cashiers": "CASHIER_007",
         }
         order = adapter.to_order(raw, "S1", "B1")
@@ -843,9 +899,14 @@ class TestToOrderAdvancedFields:
     def test_order_source_preserved(self, adapter):
         """品智 orderSource 原始值保留为字符串"""
         raw = {
-            "billId": "SRC001", "billNo": "SRC001", "billStatus": 1,
-            "orderSource": 3, "dishPriceTotal": 5000,
-            "specialOfferPrice": 0, "realPrice": 5000, "teaPrice": 0,
+            "billId": "SRC001",
+            "billNo": "SRC001",
+            "billStatus": 1,
+            "orderSource": 3,
+            "dishPriceTotal": 5000,
+            "specialOfferPrice": 0,
+            "realPrice": 5000,
+            "teaPrice": 0,
         }
         order = adapter.to_order(raw, "S1", "B1")
         assert order.order_source == "3"
@@ -855,51 +916,42 @@ class TestToOrderAdvancedFields:
 # P1-1: 网络异常细分测试
 # ---------------------------------------------------------------------------
 
+
 class TestNetworkErrorDetails:
     """网络错误细分测试：区分超时、连接失败、解码失败"""
 
     @pytest.mark.asyncio
     async def test_connect_timeout_propagates(self, adapter):
         """连接超时异常透传"""
-        adapter.client.get = AsyncMock(
-            side_effect=httpx.ConnectTimeout("连接超时")
-        )
+        adapter.client.get = AsyncMock(side_effect=httpx.ConnectTimeout("连接超时"))
         with pytest.raises(httpx.ConnectTimeout):
             await adapter.get_store_info()
 
     @pytest.mark.asyncio
     async def test_connect_error_propagates(self, adapter):
         """连接失败（如DNS解析失败）异常透传"""
-        adapter.client.get = AsyncMock(
-            side_effect=httpx.ConnectError("DNS解析失败")
-        )
+        adapter.client.get = AsyncMock(side_effect=httpx.ConnectError("DNS解析失败"))
         with pytest.raises(httpx.ConnectError):
             await adapter.get_store_info()
 
     @pytest.mark.asyncio
     async def test_decoding_error_propagates(self, adapter):
         """响应解码失败异常透传"""
-        adapter.client.post = AsyncMock(
-            side_effect=httpx.DecodingError("UTF-8 decode failed")
-        )
+        adapter.client.post = AsyncMock(side_effect=httpx.DecodingError("UTF-8 decode failed"))
         with pytest.raises(httpx.DecodingError):
             await adapter.query_orders(business_date="2024-01-01")
 
     @pytest.mark.asyncio
     async def test_graceful_degradation_on_tables_timeout(self, adapter):
         """桌台查询超时时降级返回空列表（非核心接口有fallback）"""
-        adapter.client.get = AsyncMock(
-            side_effect=httpx.ConnectTimeout("timeout")
-        )
+        adapter.client.get = AsyncMock(side_effect=httpx.ConnectTimeout("timeout"))
         result = await adapter.get_tables()
         assert result == []
 
     @pytest.mark.asyncio
     async def test_graceful_degradation_on_employees_timeout(self, adapter):
         """员工查询超时时降级返回空列表"""
-        adapter.client.get = AsyncMock(
-            side_effect=httpx.ConnectTimeout("timeout")
-        )
+        adapter.client.get = AsyncMock(side_effect=httpx.ConnectTimeout("timeout"))
         result = await adapter.get_employees()
         assert result == []
 
@@ -907,6 +959,7 @@ class TestNetworkErrorDetails:
 # ---------------------------------------------------------------------------
 # P1-1: 多门店并发拉取隔离测试
 # ---------------------------------------------------------------------------
+
 
 class TestMultiStoreConcurrentIsolation:
     """验证多门店并发拉取时数据不混淆"""
@@ -936,9 +989,14 @@ class TestMultiStoreConcurrentIsolation:
     async def test_to_order_store_id_isolation(self, adapter):
         """to_order 映射时 store_id/brand_id 按参数注入，不混用"""
         raw = {
-            "billId": "ISO001", "billNo": "ISO001", "billStatus": 1,
-            "orderSource": 1, "dishPriceTotal": 1000,
-            "specialOfferPrice": 0, "realPrice": 1000, "teaPrice": 0,
+            "billId": "ISO001",
+            "billNo": "ISO001",
+            "billStatus": 1,
+            "orderSource": 1,
+            "dishPriceTotal": 1000,
+            "specialOfferPrice": 0,
+            "realPrice": 1000,
+            "teaPrice": 0,
         }
 
         order_a = adapter.to_order(raw, store_id="STORE_A", brand_id="BRAND_X")
@@ -953,6 +1011,7 @@ class TestMultiStoreConcurrentIsolation:
 # ---------------------------------------------------------------------------
 # P1-1: DishSync 集成测试
 # ---------------------------------------------------------------------------
+
 
 class TestDishSyncIntegration:
     """DishSync 拉取+映射完整流程测试"""

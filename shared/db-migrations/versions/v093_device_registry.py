@@ -61,12 +61,7 @@ def _enable_rls(table: str) -> None:
         policy_name = f"{table}_{action.lower()}_tenant"
         using_clause = f"USING ({_RLS_COND})" if action != "INSERT" else ""
         check_clause = f"WITH CHECK ({_RLS_COND})" if action in ("INSERT", "UPDATE") else ""
-        op.execute(
-            f"CREATE POLICY {policy_name} "
-            f"ON {table} FOR {action} "
-            f"{using_clause} "
-            f"{check_clause}"
-        )
+        op.execute(f"CREATE POLICY {policy_name} ON {table} FOR {action} {using_clause} {check_clause}")
 
 
 def upgrade() -> None:
@@ -98,19 +93,12 @@ def upgrade() -> None:
 
     # 唯一索引：同一租户内 MAC 地址唯一（跨租户可重复）
     op.execute(
-        "CREATE UNIQUE INDEX IF NOT EXISTS uq_device_registry_tenant_mac "
-        "ON device_registry(tenant_id, mac_address)"
+        "CREATE UNIQUE INDEX IF NOT EXISTS uq_device_registry_tenant_mac ON device_registry(tenant_id, mac_address)"
     )
 
     # 辅助查询索引
-    op.execute(
-        "CREATE INDEX IF NOT EXISTS idx_device_registry_store "
-        "ON device_registry(tenant_id, store_id)"
-    )
-    op.execute(
-        "CREATE INDEX IF NOT EXISTS idx_device_registry_status "
-        "ON device_registry(tenant_id, status)"
-    )
+    op.execute("CREATE INDEX IF NOT EXISTS idx_device_registry_store ON device_registry(tenant_id, store_id)")
+    op.execute("CREATE INDEX IF NOT EXISTS idx_device_registry_status ON device_registry(tenant_id, status)")
     op.execute(
         "CREATE INDEX IF NOT EXISTS idx_device_registry_heartbeat "
         "ON device_registry(tenant_id, last_heartbeat_at) "
@@ -141,13 +129,11 @@ def upgrade() -> None:
 
     # 按 device_id + created_at 查询最近心跳
     op.execute(
-        "CREATE INDEX IF NOT EXISTS idx_device_heartbeats_device_time "
-        "ON device_heartbeats(device_id, created_at DESC)"
+        "CREATE INDEX IF NOT EXISTS idx_device_heartbeats_device_time ON device_heartbeats(device_id, created_at DESC)"
     )
     # 按 tenant + created_at 支持7天清理
     op.execute(
-        "CREATE INDEX IF NOT EXISTS idx_device_heartbeats_tenant_time "
-        "ON device_heartbeats(tenant_id, created_at)"
+        "CREATE INDEX IF NOT EXISTS idx_device_heartbeats_tenant_time ON device_heartbeats(tenant_id, created_at)"
     )
 
     _enable_rls("device_heartbeats")

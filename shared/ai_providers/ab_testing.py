@@ -7,6 +7,7 @@
 4. LLM-as-Judge 自动质量评估（餐饮场景定制）
 5. 预设测试场景
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -19,8 +20,6 @@ from typing import Any
 
 import structlog
 
-from .types import ProviderName
-
 logger = structlog.get_logger(__name__)
 
 
@@ -28,48 +27,48 @@ logger = structlog.get_logger(__name__)
 # 数据类型
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class ABVariant:
     """A/B 测试中的一个模型变体。"""
-    variant_id: str                          # 变体标识
-    provider: str                            # Provider 名称（对应 ProviderName.value）
-    model: str                               # 模型 ID（对应 MODEL_REGISTRY key）
+
+    variant_id: str  # 变体标识
+    provider: str  # Provider 名称（对应 ProviderName.value）
+    model: str  # 模型 ID（对应 MODEL_REGISTRY key）
     system_prompt_override: str | None = None  # 可选的 prompt 变体
 
 
 @dataclass
 class ABTestConfig:
     """A/B 测试配置。"""
-    test_id: str                             # 测试标识
-    task_type: str                           # 任务类型（lite/standard/premium 等）
-    variants: list[ABVariant]                # 参与测试的模型变体
-    traffic_split: dict[str, float]          # 流量分配 {"variant_a": 0.5, ...}
-    sample_size: int = 100                   # 目标样本量（每变体）
+
+    test_id: str  # 测试标识
+    task_type: str  # 任务类型（lite/standard/premium 等）
+    variants: list[ABVariant]  # 参与测试的模型变体
+    traffic_split: dict[str, float]  # 流量分配 {"variant_a": 0.5, ...}
+    sample_size: int = 100  # 目标样本量（每变体）
     enabled: bool = True
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
     def __post_init__(self) -> None:
         total = sum(self.traffic_split.values())
         if not (0.99 <= total <= 1.01):
-            raise ValueError(
-                f"traffic_split 总和必须为 1.0, 当前: {total:.4f}"
-            )
+            raise ValueError(f"traffic_split 总和必须为 1.0, 当前: {total:.4f}")
         variant_ids = {v.variant_id for v in self.variants}
         split_ids = set(self.traffic_split.keys())
         if variant_ids != split_ids:
-            raise ValueError(
-                f"traffic_split keys {split_ids} 与 variants {variant_ids} 不匹配"
-            )
+            raise ValueError(f"traffic_split keys {split_ids} 与 variants {variant_ids} 不匹配")
 
 
 @dataclass
 class ABTestResult:
     """单次调用的测试结果。"""
+
     variant_id: str
     latency_ms: int
     cost_rmb: float
     success: bool
-    quality_score: float | None = None       # 0-1 手动/自动评分
+    quality_score: float | None = None  # 0-1 手动/自动评分
     error_type: str | None = None
     recorded_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
@@ -77,6 +76,7 @@ class ABTestResult:
 @dataclass
 class VariantStats:
     """某个变体的汇总统计。"""
+
     sample_count: int
     success_rate: float
     avg_latency_ms: float
@@ -88,9 +88,10 @@ class VariantStats:
 @dataclass
 class ABTestSummary:
     """测试汇总报告。"""
+
     test_id: str
     task_type: str
-    variants: dict[str, VariantStats]        # variant_id -> stats
+    variants: dict[str, VariantStats]  # variant_id -> stats
     total_samples: int = 0
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
@@ -99,19 +100,21 @@ class ABTestSummary:
 # 统计工具（z-test，不依赖 scipy）
 # ---------------------------------------------------------------------------
 
+
 def _normal_cdf(x: float) -> float:
     """标准正态分布 CDF 近似（Abramowitz & Stegun 7.1.26）。"""
     sign = 1.0 if x >= 0 else -1.0
     x = abs(x)
     t = 1.0 / (1.0 + 0.2316419 * x)
-    poly = t * (0.319381530 + t * (-0.356563782 + t * (1.781477937
-            + t * (-1.821255978 + t * 1.330274429))))
+    poly = t * (0.319381530 + t * (-0.356563782 + t * (1.781477937 + t * (-1.821255978 + t * 1.330274429))))
     return 0.5 + sign * 0.5 * (1.0 - poly * math.exp(-0.5 * x * x))
 
 
 def _z_test_proportions(
-    successes_a: int, n_a: int,
-    successes_b: int, n_b: int,
+    successes_a: int,
+    n_a: int,
+    successes_b: int,
+    n_b: int,
 ) -> tuple[float, float]:
     """双样本比例 z 检验。返回 (z_stat, p_value)。"""
     if n_a == 0 or n_b == 0:
@@ -130,8 +133,12 @@ def _z_test_proportions(
 
 
 def _z_test_means(
-    mean_a: float, var_a: float, n_a: int,
-    mean_b: float, var_b: float, n_b: int,
+    mean_a: float,
+    var_a: float,
+    n_a: int,
+    mean_b: float,
+    var_b: float,
+    n_b: int,
 ) -> tuple[float, float]:
     """双样本均值 z 检验（大样本近似）。返回 (z_stat, p_value)。"""
     if n_a < 2 or n_b < 2:
@@ -147,6 +154,7 @@ def _z_test_means(
 # ---------------------------------------------------------------------------
 # 内存结果存储（Redis 不可用时的降级方案）
 # ---------------------------------------------------------------------------
+
 
 class _InMemoryResultStore:
     """纯内存结果存储，用于单进程或 Redis 不可用时。"""
@@ -178,13 +186,13 @@ class _RedisResultStore:
         if self._redis is None:
             try:
                 import redis.asyncio as aioredis  # noqa: F811
+
                 self._redis = aioredis.from_url(
-                    self._redis_url, decode_responses=True,
+                    self._redis_url,
+                    decode_responses=True,
                 )
             except ImportError:
-                raise ImportError(
-                    "需要 redis 包: pip install redis"
-                )
+                raise ImportError("需要 redis 包: pip install redis")
         return self._redis
 
     def _key(self, test_id: str) -> str:
@@ -192,15 +200,17 @@ class _RedisResultStore:
 
     async def append(self, test_id: str, result: ABTestResult) -> None:
         r = await self._get_redis()
-        payload = json.dumps({
-            "variant_id": result.variant_id,
-            "latency_ms": result.latency_ms,
-            "cost_rmb": result.cost_rmb,
-            "success": result.success,
-            "quality_score": result.quality_score,
-            "error_type": result.error_type,
-            "recorded_at": result.recorded_at.isoformat(),
-        })
+        payload = json.dumps(
+            {
+                "variant_id": result.variant_id,
+                "latency_ms": result.latency_ms,
+                "cost_rmb": result.cost_rmb,
+                "success": result.success,
+                "quality_score": result.quality_score,
+                "error_type": result.error_type,
+                "recorded_at": result.recorded_at.isoformat(),
+            }
+        )
         await r.rpush(self._key(test_id), payload)
 
     async def get_all(self, test_id: str) -> list[ABTestResult]:
@@ -209,15 +219,17 @@ class _RedisResultStore:
         results: list[ABTestResult] = []
         for raw in raw_list:
             d = json.loads(raw)
-            results.append(ABTestResult(
-                variant_id=d["variant_id"],
-                latency_ms=d["latency_ms"],
-                cost_rmb=d["cost_rmb"],
-                success=d["success"],
-                quality_score=d.get("quality_score"),
-                error_type=d.get("error_type"),
-                recorded_at=datetime.fromisoformat(d["recorded_at"]),
-            ))
+            results.append(
+                ABTestResult(
+                    variant_id=d["variant_id"],
+                    latency_ms=d["latency_ms"],
+                    cost_rmb=d["cost_rmb"],
+                    success=d["success"],
+                    quality_score=d.get("quality_score"),
+                    error_type=d.get("error_type"),
+                    recorded_at=datetime.fromisoformat(d["recorded_at"]),
+                )
+            )
         return results
 
     async def count(self, test_id: str) -> int:
@@ -233,6 +245,7 @@ class _RedisResultStore:
 # ABTestManager
 # ---------------------------------------------------------------------------
 
+
 class ABTestManager:
     """A/B 测试管理器。
 
@@ -246,9 +259,7 @@ class ABTestManager:
     def __init__(self, redis_url: str | None = None) -> None:
         self._tests: dict[str, ABTestConfig] = {}
         if redis_url:
-            self._store: _InMemoryResultStore | _RedisResultStore = (
-                _RedisResultStore(redis_url)
-            )
+            self._store: _InMemoryResultStore | _RedisResultStore = _RedisResultStore(redis_url)
             logger.info("ab_test.store_init", backend="redis")
         else:
             self._store = _InMemoryResultStore()
@@ -324,7 +335,10 @@ class ABTestManager:
     # -- 结果收集 ------------------------------------------------------------
 
     async def record_result(
-        self, test_id: str, variant_id: str, result: ABTestResult,
+        self,
+        test_id: str,
+        variant_id: str,
+        result: ABTestResult,
     ) -> None:
         """记录一次测试结果。"""
         self._get_config(test_id)  # 确认 test 存在
@@ -345,9 +359,7 @@ class ABTestManager:
         all_results = await self._store.get_all(test_id)
 
         # 按 variant 分组
-        grouped: dict[str, list[ABTestResult]] = {
-            v.variant_id: [] for v in cfg.variants
-        }
+        grouped: dict[str, list[ABTestResult]] = {v.variant_id: [] for v in cfg.variants}
         for r in all_results:
             if r.variant_id in grouped:
                 grouped[r.variant_id].append(r)
@@ -366,7 +378,9 @@ class ABTestManager:
     # -- 胜出判定 ------------------------------------------------------------
 
     def check_winner(
-        self, summary: ABTestSummary, confidence: float = 0.95,
+        self,
+        summary: ABTestSummary,
+        confidence: float = 0.95,
     ) -> str | None:
         """统计显著性检验，返回胜出 variant_id 或 None。
 
@@ -401,8 +415,10 @@ class ABTestManager:
         successes_a = round(va.success_rate * va.sample_count)
         successes_b = round(vb.success_rate * vb.sample_count)
         z_sr, p_sr = _z_test_proportions(
-            successes_a, va.sample_count,
-            successes_b, vb.sample_count,
+            successes_a,
+            va.sample_count,
+            successes_b,
+            vb.sample_count,
         )
 
         if p_sr < alpha:
@@ -422,8 +438,12 @@ class ABTestManager:
             var_a = self._quality_variance_from_stats(va)
             var_b = self._quality_variance_from_stats(vb)
             z_qs, p_qs = _z_test_means(
-                va.avg_quality_score, var_a, va.sample_count,
-                vb.avg_quality_score, var_b, vb.sample_count,
+                va.avg_quality_score,
+                var_a,
+                va.sample_count,
+                vb.avg_quality_score,
+                var_b,
+                vb.sample_count,
             )
             if p_qs < alpha:
                 winner = va_id if va.avg_quality_score > vb.avg_quality_score else vb_id
@@ -477,10 +497,7 @@ class ABTestManager:
             success_rate=successes / n,
             avg_latency_ms=sum(latencies) / n,
             avg_cost_rmb=sum(costs) / n,
-            avg_quality_score=(
-                sum(quality_scores) / len(quality_scores)
-                if quality_scores else None
-            ),
+            avg_quality_score=(sum(quality_scores) / len(quality_scores) if quality_scores else None),
             p95_latency_ms=float(sorted_latencies[p95_idx]),
         )
 
@@ -498,6 +515,7 @@ class ABTestManager:
 # ---------------------------------------------------------------------------
 # AutoQualityEvaluator -- LLM-as-Judge
 # ---------------------------------------------------------------------------
+
 
 class AutoQualityEvaluator:
     """使用另一个 LLM 自动评估响应质量。
@@ -562,10 +580,7 @@ class AutoQualityEvaluator:
             logger.warning("ab_test.evaluator_no_adapter")
             return -1.0
 
-        input_text = "\n".join(
-            f"{m.get('role', 'user')}: {m.get('content', '')}"
-            for m in input_messages
-        )
+        input_text = "\n".join(f"{m.get('role', 'user')}: {m.get('content', '')}" for m in input_messages)
         prompt = self.JUDGE_PROMPT.format(
             task_type=task_type,
             input_text=input_text,
@@ -604,6 +619,7 @@ class AutoQualityEvaluator:
 # ---------------------------------------------------------------------------
 # 便捷装饰器 -- 自动记录 A/B 测试结果
 # ---------------------------------------------------------------------------
+
 
 def ab_test_wrapper(
     manager: ABTestManager,
@@ -669,10 +685,13 @@ def ab_test_wrapper(
                     error_type=error_type,
                 )
                 await manager.record_result(
-                    test_id, variant.variant_id, test_result,
+                    test_id,
+                    variant.variant_id,
+                    test_result,
                 )
 
         return wrapper
+
     return decorator
 
 

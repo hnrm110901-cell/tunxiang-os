@@ -1,8 +1,9 @@
 """食安追溯 — trace_suppliers + trace_inbound_records + trace_coldchain_logs
 Revision: v226
 """
-from alembic import op
+
 import sqlalchemy as sa
+from alembic import op
 from sqlalchemy.dialects import postgresql
 
 revision = "v226"
@@ -28,11 +29,9 @@ def upgrade() -> None:
             END$$;
         """)
 
-
-
     # --- trace_suppliers 供应商资质档案 ---
 
-    if 'trace_suppliers' not in existing:
+    if "trace_suppliers" not in existing:
         op.create_table(
             "trace_suppliers",
             sa.Column("id", postgresql.UUID(), server_default=sa.text("gen_random_uuid()"), primary_key=True),
@@ -57,7 +56,7 @@ def upgrade() -> None:
 
         # --- trace_inbound_records 进货台账 ---
 
-    if 'trace_inbound_records' not in existing:
+    if "trace_inbound_records" not in existing:
         op.create_table(
             "trace_inbound_records",
             sa.Column("id", postgresql.UUID(), server_default=sa.text("gen_random_uuid()"), primary_key=True),
@@ -90,7 +89,7 @@ def upgrade() -> None:
 
         # --- trace_coldchain_logs 冷链温控记录 ---
 
-    if 'trace_coldchain_logs' not in existing:
+    if "trace_coldchain_logs" not in existing:
         op.create_table(
             "trace_coldchain_logs",
             sa.Column("id", postgresql.UUID(), server_default=sa.text("gen_random_uuid()"), primary_key=True),
@@ -112,7 +111,6 @@ def upgrade() -> None:
         op.create_index("ix_tcl_tenant_store", "trace_coldchain_logs", ["tenant_id", "store_id"])
         op.create_index("ix_tcl_batch", "trace_coldchain_logs", ["tenant_id", "batch_id"])
         _add_rls("trace_coldchain_logs", "tcl")
-
 
 
 def downgrade() -> None:

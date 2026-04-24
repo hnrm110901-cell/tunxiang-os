@@ -10,8 +10,8 @@ Revises: v232
 Create Date: 2026-04-12
 """
 
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 
 revision = "v233c"
 down_revision = "v233b"
@@ -123,7 +123,7 @@ _SGC_CONFIG = """{
 def upgrade() -> None:
     conn = op.get_bind()
     existing = sa.inspect(conn).get_table_names()
-    if 'tenants' not in existing:
+    if "tenants" not in existing:
         return
 
     # 尝在一起

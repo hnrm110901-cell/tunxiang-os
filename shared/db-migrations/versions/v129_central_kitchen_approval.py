@@ -11,9 +11,10 @@ Revision ID: v129
 Revises: v128
 Create Date: 2026-04-02
 """
-from alembic import op
+
 import sqlalchemy as sa
-from sqlalchemy.dialects.postgresql import UUID, JSONB
+from alembic import op
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 
 revision = "v129"
 down_revision = "v128"
@@ -30,8 +31,7 @@ def upgrade() -> None:
     if "store_requisitions" not in _existing:
         op.create_table(
             "store_requisitions",
-            sa.Column("id", UUID(as_uuid=True), primary_key=True,
-                      server_default=sa.text("gen_random_uuid()")),
+            sa.Column("id", UUID(as_uuid=True), primary_key=True, server_default=sa.text("gen_random_uuid()")),
             sa.Column("tenant_id", UUID(as_uuid=True), nullable=False),
             sa.Column("store_id", UUID(as_uuid=True), nullable=False),
             sa.Column("delivery_date", sa.Date, nullable=False),
@@ -71,8 +71,7 @@ def upgrade() -> None:
     if "store_requisition_items" not in _existing:
         op.create_table(
             "store_requisition_items",
-            sa.Column("id", UUID(as_uuid=True), primary_key=True,
-                      server_default=sa.text("gen_random_uuid()")),
+            sa.Column("id", UUID(as_uuid=True), primary_key=True, server_default=sa.text("gen_random_uuid()")),
             sa.Column("tenant_id", UUID(as_uuid=True), nullable=False),
             sa.Column("requisition_id", UUID(as_uuid=True), nullable=False),
             sa.Column("ingredient_id", UUID(as_uuid=True), nullable=True),
@@ -107,19 +106,18 @@ def upgrade() -> None:
     # ── production_plans 排产计划 ────────────────────────────────
     if "production_plans" not in _existing:
         op.create_table(
-        "production_plans",
-        sa.Column("id", UUID(as_uuid=True), primary_key=True,
-                  server_default=sa.text("gen_random_uuid()")),
-        sa.Column("tenant_id", UUID(as_uuid=True), nullable=False),
-        sa.Column("plan_date", sa.Date, nullable=False),
-        sa.Column("shift", sa.String(20), nullable=False),
-        sa.Column("status", sa.String(20), nullable=False, server_default="'draft'"),
-        sa.Column("notes", sa.Text, nullable=True),
-        sa.Column("created_by", sa.String(100), nullable=True),
-        sa.Column("created_at", sa.TIMESTAMP(timezone=True), server_default=sa.text("now()")),
-        sa.Column("updated_at", sa.TIMESTAMP(timezone=True), server_default=sa.text("now()")),
-        sa.Column("is_deleted", sa.Boolean, nullable=False, server_default="false"),
-    )
+            "production_plans",
+            sa.Column("id", UUID(as_uuid=True), primary_key=True, server_default=sa.text("gen_random_uuid()")),
+            sa.Column("tenant_id", UUID(as_uuid=True), nullable=False),
+            sa.Column("plan_date", sa.Date, nullable=False),
+            sa.Column("shift", sa.String(20), nullable=False),
+            sa.Column("status", sa.String(20), nullable=False, server_default="'draft'"),
+            sa.Column("notes", sa.Text, nullable=True),
+            sa.Column("created_by", sa.String(100), nullable=True),
+            sa.Column("created_at", sa.TIMESTAMP(timezone=True), server_default=sa.text("now()")),
+            sa.Column("updated_at", sa.TIMESTAMP(timezone=True), server_default=sa.text("now()")),
+            sa.Column("is_deleted", sa.Boolean, nullable=False, server_default="false"),
+        )
     op.execute("""
         DO $$ BEGIN
             IF (SELECT COUNT(*) FROM information_schema.columns 
@@ -140,8 +138,7 @@ def upgrade() -> None:
     if "production_plan_items" not in _existing:
         op.create_table(
             "production_plan_items",
-            sa.Column("id", UUID(as_uuid=True), primary_key=True,
-                      server_default=sa.text("gen_random_uuid()")),
+            sa.Column("id", UUID(as_uuid=True), primary_key=True, server_default=sa.text("gen_random_uuid()")),
             sa.Column("tenant_id", UUID(as_uuid=True), nullable=False),
             sa.Column("plan_id", UUID(as_uuid=True), nullable=False),
             sa.Column("ingredient_id", UUID(as_uuid=True), nullable=True),
@@ -177,29 +174,28 @@ def upgrade() -> None:
     # ── approval_records 统一审批记录 ────────────────────────────
     if "approval_records" not in _existing:
         op.create_table(
-        "approval_records",
-        sa.Column("id", UUID(as_uuid=True), primary_key=True,
-                  server_default=sa.text("gen_random_uuid()")),
-        sa.Column("tenant_id", UUID(as_uuid=True), nullable=False),
-        sa.Column("approval_type", sa.String(30), nullable=False),
-        sa.Column("reference_id", UUID(as_uuid=True), nullable=True),
-        sa.Column("title", sa.String(200), nullable=False),
-        sa.Column("description", sa.Text, nullable=True),
-        sa.Column("amount_fen", sa.BigInteger, nullable=True),
-        sa.Column("applicant_id", UUID(as_uuid=True), nullable=True),
-        sa.Column("applicant_name", sa.String(100), nullable=True),
-        sa.Column("store_id", UUID(as_uuid=True), nullable=True),
-        sa.Column("urgency", sa.String(20), nullable=False, server_default="'normal'"),
-        sa.Column("status", sa.String(20), nullable=False, server_default="'pending'"),
-        sa.Column("approver_id", UUID(as_uuid=True), nullable=True),
-        sa.Column("approver_name", sa.String(100), nullable=True),
-        sa.Column("action_comment", sa.Text, nullable=True),
-        sa.Column("action_at", sa.TIMESTAMP(timezone=True), nullable=True),
-        sa.Column("extra_data", JSONB, nullable=True),
-        sa.Column("created_at", sa.TIMESTAMP(timezone=True), server_default=sa.text("now()")),
-        sa.Column("updated_at", sa.TIMESTAMP(timezone=True), server_default=sa.text("now()")),
-        sa.Column("is_deleted", sa.Boolean, nullable=False, server_default="false"),
-    )
+            "approval_records",
+            sa.Column("id", UUID(as_uuid=True), primary_key=True, server_default=sa.text("gen_random_uuid()")),
+            sa.Column("tenant_id", UUID(as_uuid=True), nullable=False),
+            sa.Column("approval_type", sa.String(30), nullable=False),
+            sa.Column("reference_id", UUID(as_uuid=True), nullable=True),
+            sa.Column("title", sa.String(200), nullable=False),
+            sa.Column("description", sa.Text, nullable=True),
+            sa.Column("amount_fen", sa.BigInteger, nullable=True),
+            sa.Column("applicant_id", UUID(as_uuid=True), nullable=True),
+            sa.Column("applicant_name", sa.String(100), nullable=True),
+            sa.Column("store_id", UUID(as_uuid=True), nullable=True),
+            sa.Column("urgency", sa.String(20), nullable=False, server_default="'normal'"),
+            sa.Column("status", sa.String(20), nullable=False, server_default="'pending'"),
+            sa.Column("approver_id", UUID(as_uuid=True), nullable=True),
+            sa.Column("approver_name", sa.String(100), nullable=True),
+            sa.Column("action_comment", sa.Text, nullable=True),
+            sa.Column("action_at", sa.TIMESTAMP(timezone=True), nullable=True),
+            sa.Column("extra_data", JSONB, nullable=True),
+            sa.Column("created_at", sa.TIMESTAMP(timezone=True), server_default=sa.text("now()")),
+            sa.Column("updated_at", sa.TIMESTAMP(timezone=True), server_default=sa.text("now()")),
+            sa.Column("is_deleted", sa.Boolean, nullable=False, server_default="false"),
+        )
     op.execute("""
         DO $$ BEGIN
             IF (SELECT COUNT(*) FROM information_schema.columns 

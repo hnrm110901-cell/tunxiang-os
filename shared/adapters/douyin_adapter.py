@@ -14,6 +14,7 @@
   - 直播间订单标记（is_livestream_order）
   - Webhook 回调处理（order.created / order.cancelled / order.refunded）
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -29,29 +30,27 @@ import structlog
 from .delivery_platform_base import (
     DeliveryPlatformAdapter,
     DeliveryPlatformError,
-    DeliveryPlatformSignError,
-    DeliveryPlatformTimeoutError,
 )
 
 logger = structlog.get_logger()
 
 # -- 抖音外卖订单状态 -> 屯象统一状态 --------------------------------
 DOUYIN_STATUS_MAP: Dict[int, str] = {
-    1: "pending",       # 待接单
-    2: "confirmed",     # 已接单
-    3: "preparing",     # 备餐中
-    4: "delivering",    # 骑手已取餐
-    5: "completed",     # 已完成
-    6: "cancelled",     # 已取消
-    9: "refunded",      # 已退款
+    1: "pending",  # 待接单
+    2: "confirmed",  # 已接单
+    3: "preparing",  # 备餐中
+    4: "delivering",  # 骑手已取餐
+    5: "completed",  # 已完成
+    6: "cancelled",  # 已取消
+    9: "refunded",  # 已退款
 }
 
 # -- 抖音外卖订单来源标记 --------------------------------------------
 DOUYIN_ORDER_SOURCE: Dict[int, str] = {
-    0: "normal",            # 普通下单
-    1: "influencer",        # 达人探店
-    2: "livestream",        # 直播间下单
-    3: "short_video",       # 短视频挂链
+    0: "normal",  # 普通下单
+    1: "influencer",  # 达人探店
+    2: "livestream",  # 直播间下单
+    3: "short_video",  # 短视频挂链
 }
 
 
@@ -156,14 +155,16 @@ class DouyinDeliveryAdapter(DeliveryPlatformAdapter):
 
         items: List[Dict[str, Any]] = []
         for food in food_list:
-            items.append({
-                "name": food.get("food_name", ""),
-                "quantity": int(food.get("quantity", 1)),
-                "price_fen": int(food.get("price", 0)),
-                "sku_id": str(food.get("sku_id", food.get("food_id", ""))),
-                "notes": food.get("remark", ""),
-                "internal_dish_id": "",  # 需要业务层映射
-            })
+            items.append(
+                {
+                    "name": food.get("food_name", ""),
+                    "quantity": int(food.get("quantity", 1)),
+                    "price_fen": int(food.get("price", 0)),
+                    "sku_id": str(food.get("sku_id", food.get("food_id", ""))),
+                    "notes": food.get("remark", ""),
+                    "internal_dish_id": "",  # 需要业务层映射
+                }
+            )
 
         status_code = int(raw.get("status", 1))
         order_source = int(raw.get("order_source", 0))
@@ -201,7 +202,10 @@ class DouyinDeliveryAdapter(DeliveryPlatformAdapter):
     # -- Webhook 处理 -----------------------------------------------
 
     def verify_webhook_signature(
-        self, payload: str, signature: str, timestamp: str,
+        self,
+        payload: str,
+        signature: str,
+        timestamp: str,
     ) -> bool:
         """验证抖音 Webhook 回调签名
 
@@ -225,7 +229,9 @@ class DouyinDeliveryAdapter(DeliveryPlatformAdapter):
         logger.info("douyin_webhook_handler_registered", event_type=event_type)
 
     async def handle_webhook_event(
-        self, event_type: str, data: dict,
+        self,
+        event_type: str,
+        data: dict,
     ) -> dict:
         """处理 Webhook 事件"""
         handler = self._webhook_handlers.get(event_type)
@@ -315,7 +321,9 @@ class DouyinDeliveryAdapter(DeliveryPlatformAdapter):
     # -- DeliveryPlatformAdapter 接口实现 ----------------------------
 
     async def pull_orders(
-        self, store_id: str, since: datetime,
+        self,
+        store_id: str,
+        since: datetime,
     ) -> list[dict]:
         """拉取抖音外卖新订单（Mock）"""
         shop_id = self._get_shop_id(store_id)
@@ -352,7 +360,9 @@ class DouyinDeliveryAdapter(DeliveryPlatformAdapter):
         return True
 
     async def sync_menu(
-        self, store_id: str, dishes: list[dict],
+        self,
+        store_id: str,
+        dishes: list[dict],
     ) -> dict:
         """同步菜品到抖音外卖（Mock）"""
         shop_id = self._get_shop_id(store_id)
@@ -374,10 +384,12 @@ class DouyinDeliveryAdapter(DeliveryPlatformAdapter):
                 synced += 1
             except (KeyError, ValueError, TypeError) as exc:
                 failed += 1
-                errors.append({
-                    "dish_id": dish.get("id", "unknown"),
-                    "error": str(exc),
-                })
+                errors.append(
+                    {
+                        "dish_id": dish.get("id", "unknown"),
+                        "error": str(exc),
+                    }
+                )
                 logger.warning(
                     "douyin_sync_dish_failed",
                     dish_id=dish.get("id"),
@@ -387,7 +399,10 @@ class DouyinDeliveryAdapter(DeliveryPlatformAdapter):
         return {"synced": synced, "failed": failed, "errors": errors}
 
     async def update_stock(
-        self, store_id: str, dish_id: str, available: bool,
+        self,
+        store_id: str,
+        dish_id: str,
+        available: bool,
     ) -> bool:
         """更新菜品上下架状态（Mock）"""
         shop_id = self._get_shop_id(store_id)

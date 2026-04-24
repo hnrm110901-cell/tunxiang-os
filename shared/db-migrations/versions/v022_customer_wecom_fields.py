@@ -12,8 +12,9 @@ Create Date: 2026-03-30
 
 RLS Policy：沿用 customers 表已有策略，新字段无需额外策略。
 """
-from alembic import op
+
 import sqlalchemy as sa
+from alembic import op
 
 revision = "v022a"
 down_revision = "v021"

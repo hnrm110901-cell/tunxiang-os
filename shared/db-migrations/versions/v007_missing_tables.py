@@ -43,26 +43,30 @@ Revision ID: v007
 Revises: v006
 Create Date: 2026-03-27
 """
-from typing import Sequence, Union
 
-from alembic import op
 import sqlalchemy as sa
-from sqlalchemy.dialects.postgresql import UUID, ARRAY, JSON
+from alembic import op
+from sqlalchemy.dialects.postgresql import JSON, UUID
 
 revision = "v007"
-down_revision= "v006"
-branch_labels= None
-depends_on= None
+down_revision = "v006"
+branch_labels = None
+depends_on = None
 
 # All new tables in this migration
 NEW_TABLES = [
-    "bom_templates", "bom_items",
+    "bom_templates",
+    "bom_items",
     "waste_events",
-    "suppliers", "supply_orders",
+    "suppliers",
+    "supply_orders",
     "member_transactions",
-    "notifications", "notification_preferences",
-    "training_courses", "training_enrollments",
-    "service_feedbacks", "complaints",
+    "notifications",
+    "notification_preferences",
+    "training_courses",
+    "training_enrollments",
+    "service_feedbacks",
+    "complaints",
     "tasks",
 ]
 
@@ -79,22 +83,13 @@ def _enable_rls_v7(table_name: str) -> None:
     op.execute(f"ALTER TABLE {table_name} ENABLE ROW LEVEL SECURITY")
     op.execute(f"ALTER TABLE {table_name} FORCE ROW LEVEL SECURITY")
 
-    op.execute(
-        f"CREATE POLICY {table_name}_rls_select ON {table_name} "
-        f"FOR SELECT USING ({_SAFE_CONDITION})"
-    )
-    op.execute(
-        f"CREATE POLICY {table_name}_rls_insert ON {table_name} "
-        f"FOR INSERT WITH CHECK ({_SAFE_CONDITION})"
-    )
+    op.execute(f"CREATE POLICY {table_name}_rls_select ON {table_name} FOR SELECT USING ({_SAFE_CONDITION})")
+    op.execute(f"CREATE POLICY {table_name}_rls_insert ON {table_name} FOR INSERT WITH CHECK ({_SAFE_CONDITION})")
     op.execute(
         f"CREATE POLICY {table_name}_rls_update ON {table_name} "
         f"FOR UPDATE USING ({_SAFE_CONDITION}) WITH CHECK ({_SAFE_CONDITION})"
     )
-    op.execute(
-        f"CREATE POLICY {table_name}_rls_delete ON {table_name} "
-        f"FOR DELETE USING ({_SAFE_CONDITION})"
-    )
+    op.execute(f"CREATE POLICY {table_name}_rls_delete ON {table_name} FOR DELETE USING ({_SAFE_CONDITION})")
 
 
 def _disable_rls_v7(table_name: str) -> None:
@@ -131,14 +126,13 @@ def upgrade() -> None:
         sa.Column("approved_by", sa.String(100)),
         sa.Column("approved_at", sa.DateTime(timezone=True)),
         # Scope / channel / inheritance
-        sa.Column("scope", sa.String(20), nullable=False, server_default="store",
-                  comment="store/region/brand/group"),
+        sa.Column("scope", sa.String(20), nullable=False, server_default="store", comment="store/region/brand/group"),
         sa.Column("scope_id", sa.String(100)),
         sa.Column("channel", sa.String(30), comment="NULL = all channels"),
-        sa.Column("parent_bom_id", UUID(as_uuid=True),
-                  sa.ForeignKey("bom_templates.id", ondelete="SET NULL")),
-        sa.Column("is_delta", sa.Boolean, nullable=False, server_default="false",
-                  comment="True=delta BOM, False=full BOM"),
+        sa.Column("parent_bom_id", UUID(as_uuid=True), sa.ForeignKey("bom_templates.id", ondelete="SET NULL")),
+        sa.Column(
+            "is_delta", sa.Boolean, nullable=False, server_default="false", comment="True=delta BOM, False=full BOM"
+        ),
         # Metadata
         sa.Column("notes", sa.Text),
         sa.Column("created_by", sa.String(100)),
@@ -156,8 +150,13 @@ def upgrade() -> None:
         "bom_items",
         sa.Column("id", UUID(as_uuid=True), primary_key=True),
         sa.Column("tenant_id", UUID(as_uuid=True), nullable=False, index=True),
-        sa.Column("bom_id", UUID(as_uuid=True),
-                  sa.ForeignKey("bom_templates.id", ondelete="CASCADE"), nullable=False, index=True),
+        sa.Column(
+            "bom_id",
+            UUID(as_uuid=True),
+            sa.ForeignKey("bom_templates.id", ondelete="CASCADE"),
+            nullable=False,
+            index=True,
+        ),
         sa.Column("store_id", UUID(as_uuid=True), sa.ForeignKey("stores.id"), nullable=False, index=True),
         # Ingredient reference (UUID FK to ingredients table)
         sa.Column("ingredient_id", UUID(as_uuid=True), sa.ForeignKey("ingredients.id"), nullable=False, index=True),
@@ -174,8 +173,7 @@ def upgrade() -> None:
         sa.Column("waste_factor", sa.Numeric(5, 4), server_default="0"),
         sa.Column("prep_notes", sa.Text),
         # Delta BOM action
-        sa.Column("item_action", sa.String(20), nullable=False, server_default="ADD",
-                  comment="ADD/OVERRIDE/REMOVE"),
+        sa.Column("item_action", sa.String(20), nullable=False, server_default="ADD", comment="ADD/OVERRIDE/REMOVE"),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
         sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
         sa.Column("is_deleted", sa.Boolean, server_default="false"),
@@ -191,14 +189,30 @@ def upgrade() -> None:
         "waste_events",
         sa.Column("id", UUID(as_uuid=True), primary_key=True),
         sa.Column("tenant_id", UUID(as_uuid=True), nullable=False, index=True),
-        sa.Column("event_id", sa.String(50), unique=True, nullable=False,
-                  comment="WE-XXXXXXXX business ID for cross-system ref"),
+        sa.Column(
+            "event_id",
+            sa.String(50),
+            unique=True,
+            nullable=False,
+            comment="WE-XXXXXXXX business ID for cross-system ref",
+        ),
         sa.Column("store_id", UUID(as_uuid=True), sa.ForeignKey("stores.id"), nullable=False, index=True),
         # Event classification
-        sa.Column("event_type", sa.String(30), nullable=False, server_default="unknown",
-                  comment="cooking_loss/spoilage/over_prep/drop_damage/quality_reject/transfer_loss/unknown"),
-        sa.Column("status", sa.String(20), nullable=False, server_default="pending", index=True,
-                  comment="pending/analyzing/analyzed/verified/closed"),
+        sa.Column(
+            "event_type",
+            sa.String(30),
+            nullable=False,
+            server_default="unknown",
+            comment="cooking_loss/spoilage/over_prep/drop_damage/quality_reject/transfer_loss/unknown",
+        ),
+        sa.Column(
+            "status",
+            sa.String(20),
+            nullable=False,
+            server_default="pending",
+            index=True,
+            comment="pending/analyzing/analyzed/verified/closed",
+        ),
         # Food references
         sa.Column("dish_id", UUID(as_uuid=True), sa.ForeignKey("dishes.id"), index=True),
         sa.Column("ingredient_id", UUID(as_uuid=True), sa.ForeignKey("ingredients.id"), nullable=False, index=True),
@@ -209,8 +223,7 @@ def upgrade() -> None:
         sa.Column("variance_qty", sa.Numeric(10, 4), comment="actual - theoretical"),
         sa.Column("variance_pct", sa.Float, comment="variance / theoretical"),
         # Timeline
-        sa.Column("occurred_at", sa.DateTime(timezone=True), nullable=False,
-                  server_default=sa.func.now(), index=True),
+        sa.Column("occurred_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now(), index=True),
         # Personnel
         sa.Column("reported_by", sa.String(100)),
         sa.Column("assigned_staff_id", sa.String(100)),
@@ -241,17 +254,22 @@ def upgrade() -> None:
         sa.Column("tenant_id", UUID(as_uuid=True), nullable=False, index=True),
         sa.Column("name", sa.String(200), nullable=False),
         sa.Column("code", sa.String(50), unique=True, index=True),
-        sa.Column("category", sa.String(50), nullable=False, server_default="food",
-                  comment="food/beverage/equipment/packaging/other"),
+        sa.Column(
+            "category",
+            sa.String(50),
+            nullable=False,
+            server_default="food",
+            comment="food/beverage/equipment/packaging/other",
+        ),
         sa.Column("contact_person", sa.String(100)),
         sa.Column("phone", sa.String(20)),
         sa.Column("email", sa.String(100)),
         sa.Column("address", sa.Text),
-        sa.Column("status", sa.String(20), nullable=False, server_default="active",
-                  comment="active/inactive/suspended"),
+        sa.Column(
+            "status", sa.String(20), nullable=False, server_default="active", comment="active/inactive/suspended"
+        ),
         sa.Column("rating", sa.Float, server_default="5.0", comment="1-5 supplier rating"),
-        sa.Column("payment_terms", sa.String(50), server_default="net30",
-                  comment="net30/net60/cod"),
+        sa.Column("payment_terms", sa.String(50), server_default="net30", comment="net30/net60/cod"),
         sa.Column("delivery_days", sa.Integer, server_default="3", comment="Average delivery time"),
         sa.Column("notes", sa.Text),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
@@ -267,11 +285,15 @@ def upgrade() -> None:
         sa.Column("order_number", sa.String(50), unique=True, nullable=False, index=True),
         sa.Column("supplier_id", UUID(as_uuid=True), sa.ForeignKey("suppliers.id"), nullable=False, index=True),
         sa.Column("store_id", UUID(as_uuid=True), sa.ForeignKey("stores.id"), nullable=False, index=True),
-        sa.Column("status", sa.String(20), nullable=False, server_default="pending",
-                  comment="pending/approved/ordered/shipped/delivered/completed/cancelled"),
+        sa.Column(
+            "status",
+            sa.String(20),
+            nullable=False,
+            server_default="pending",
+            comment="pending/approved/ordered/shipped/delivered/completed/cancelled",
+        ),
         sa.Column("total_amount_fen", sa.Integer, server_default="0", comment="Total amount (fen)"),
-        sa.Column("items", JSON, server_default="[]",
-                  comment='[{"ingredient_id","qty","unit","unit_price_fen"}]'),
+        sa.Column("items", JSON, server_default="[]", comment='[{"ingredient_id","qty","unit","unit_price_fen"}]'),
         sa.Column("expected_delivery", sa.DateTime(timezone=True)),
         sa.Column("actual_delivery", sa.DateTime(timezone=True)),
         sa.Column("notes", sa.Text),
@@ -295,12 +317,10 @@ def upgrade() -> None:
         sa.Column("tenant_id", UUID(as_uuid=True), nullable=False, index=True),
         sa.Column("customer_id", UUID(as_uuid=True), sa.ForeignKey("customers.id"), nullable=False, index=True),
         sa.Column("store_id", UUID(as_uuid=True), sa.ForeignKey("stores.id"), nullable=False, index=True),
-        sa.Column("transaction_type", sa.String(30), nullable=False,
-                  comment="earn/redeem/expire/adjust/refund/gift"),
+        sa.Column("transaction_type", sa.String(30), nullable=False, comment="earn/redeem/expire/adjust/refund/gift"),
         sa.Column("points", sa.Integer, nullable=False, server_default="0", comment="Points delta (+/-)"),
         sa.Column("balance_after", sa.Integer, comment="Points balance after transaction"),
-        sa.Column("amount_fen", sa.Integer, server_default="0",
-                  comment="Associated monetary amount (fen)"),
+        sa.Column("amount_fen", sa.Integer, server_default="0", comment="Associated monetary amount (fen)"),
         sa.Column("reference_type", sa.String(30), comment="order/campaign/manual/system"),
         sa.Column("reference_id", sa.String(100), comment="Related order_id / campaign_id"),
         sa.Column("description", sa.String(500)),
@@ -310,8 +330,7 @@ def upgrade() -> None:
         sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
         sa.Column("is_deleted", sa.Boolean, server_default="false"),
     )
-    op.create_index("idx_member_tx_customer_type", "member_transactions",
-                    ["customer_id", "transaction_type"])
+    op.create_index("idx_member_tx_customer_type", "member_transactions", ["customer_id", "transaction_type"])
 
     # =========================================================================
     # Domain E: System (Notifications)
@@ -325,13 +344,18 @@ def upgrade() -> None:
         # Content
         sa.Column("title", sa.String(200), nullable=False),
         sa.Column("message", sa.Text, nullable=False),
-        sa.Column("type", sa.String(20), nullable=False, server_default="info",
-                  comment="info/warning/error/success/alert"),
-        sa.Column("priority", sa.String(20), nullable=False, server_default="normal",
-                  comment="low/normal/high/urgent"),
+        sa.Column(
+            "type", sa.String(20), nullable=False, server_default="info", comment="info/warning/error/success/alert"
+        ),
+        sa.Column("priority", sa.String(20), nullable=False, server_default="normal", comment="low/normal/high/urgent"),
         # Recipient targeting
-        sa.Column("employee_id", UUID(as_uuid=True), sa.ForeignKey("employees.id"), index=True,
-                  comment="Specific employee (NULL=broadcast)"),
+        sa.Column(
+            "employee_id",
+            UUID(as_uuid=True),
+            sa.ForeignKey("employees.id"),
+            index=True,
+            comment="Specific employee (NULL=broadcast)",
+        ),
         sa.Column("role", sa.String(50), comment="Target role filter"),
         sa.Column("store_id", UUID(as_uuid=True), sa.ForeignKey("stores.id"), index=True),
         # Status
@@ -351,11 +375,9 @@ def upgrade() -> None:
         "notification_preferences",
         sa.Column("id", UUID(as_uuid=True), primary_key=True),
         sa.Column("tenant_id", UUID(as_uuid=True), nullable=False, index=True),
-        sa.Column("employee_id", UUID(as_uuid=True), sa.ForeignKey("employees.id"),
-                  nullable=False, index=True),
+        sa.Column("employee_id", UUID(as_uuid=True), sa.ForeignKey("employees.id"), nullable=False, index=True),
         sa.Column("notification_type", sa.String(20), comment="NULL = global default"),
-        sa.Column("channels", JSON, nullable=False, server_default="[]",
-                  comment='["system","wechat","sms","email"]'),
+        sa.Column("channels", JSON, nullable=False, server_default="[]", comment='["system","wechat","sms","email"]'),
         sa.Column("is_enabled", sa.Boolean, nullable=False, server_default="true"),
         sa.Column("quiet_hours_start", sa.String(5), comment="HH:MM e.g. 22:00"),
         sa.Column("quiet_hours_end", sa.String(5), comment="HH:MM e.g. 08:00"),
@@ -374,14 +396,15 @@ def upgrade() -> None:
         sa.Column("id", UUID(as_uuid=True), primary_key=True),
         sa.Column("tenant_id", UUID(as_uuid=True), nullable=False, index=True),
         sa.Column("brand_id", sa.String(50), index=True),
-        sa.Column("store_id", UUID(as_uuid=True), sa.ForeignKey("stores.id"), index=True,
-                  comment="NULL = brand-wide course"),
+        sa.Column(
+            "store_id", UUID(as_uuid=True), sa.ForeignKey("stores.id"), index=True, comment="NULL = brand-wide course"
+        ),
         sa.Column("title", sa.String(200), nullable=False),
         sa.Column("description", sa.Text),
-        sa.Column("category", sa.String(50), nullable=False,
-                  comment="safety/service/cooking/management/culture"),
-        sa.Column("course_type", sa.String(30), nullable=False, server_default="online",
-                  comment="online/offline/practice"),
+        sa.Column("category", sa.String(50), nullable=False, comment="safety/service/cooking/management/culture"),
+        sa.Column(
+            "course_type", sa.String(30), nullable=False, server_default="online", comment="online/offline/practice"
+        ),
         sa.Column("applicable_positions", JSON, comment='["waiter","chef","cashier"]'),
         sa.Column("duration_minutes", sa.Integer, nullable=False, server_default="60"),
         sa.Column("content_url", sa.String(500)),
@@ -401,12 +424,15 @@ def upgrade() -> None:
         sa.Column("id", UUID(as_uuid=True), primary_key=True),
         sa.Column("tenant_id", UUID(as_uuid=True), nullable=False, index=True),
         sa.Column("store_id", UUID(as_uuid=True), sa.ForeignKey("stores.id"), nullable=False, index=True),
-        sa.Column("employee_id", UUID(as_uuid=True), sa.ForeignKey("employees.id"),
-                  nullable=False, index=True),
-        sa.Column("course_id", UUID(as_uuid=True), sa.ForeignKey("training_courses.id"),
-                  nullable=False, index=True),
-        sa.Column("status", sa.String(20), nullable=False, server_default="enrolled",
-                  comment="enrolled/in_progress/completed/failed"),
+        sa.Column("employee_id", UUID(as_uuid=True), sa.ForeignKey("employees.id"), nullable=False, index=True),
+        sa.Column("course_id", UUID(as_uuid=True), sa.ForeignKey("training_courses.id"), nullable=False, index=True),
+        sa.Column(
+            "status",
+            sa.String(20),
+            nullable=False,
+            server_default="enrolled",
+            comment="enrolled/in_progress/completed/failed",
+        ),
         sa.Column("enrolled_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
         sa.Column("started_at", sa.DateTime(timezone=True)),
         sa.Column("completed_at", sa.DateTime(timezone=True)),
@@ -443,11 +469,21 @@ def upgrade() -> None:
         sa.Column("tags", JSON, comment='["fast_service","delicious","noisy"]'),
         sa.Column("photo_urls", JSON),
         # Source
-        sa.Column("source", sa.String(30), nullable=False, server_default="in_store",
-                  comment="in_store/wechat/meituan/dianping/douyin"),
+        sa.Column(
+            "source",
+            sa.String(30),
+            nullable=False,
+            server_default="in_store",
+            comment="in_store/wechat/meituan/dianping/douyin",
+        ),
         # Processing
-        sa.Column("status", sa.String(20), nullable=False, server_default="pending",
-                  comment="pending/reviewed/responded/closed"),
+        sa.Column(
+            "status",
+            sa.String(20),
+            nullable=False,
+            server_default="pending",
+            comment="pending/reviewed/responded/closed",
+        ),
         sa.Column("response", sa.Text),
         sa.Column("responded_by", sa.String(100)),
         sa.Column("responded_at", sa.DateTime(timezone=True)),
@@ -467,24 +503,29 @@ def upgrade() -> None:
         sa.Column("order_id", UUID(as_uuid=True), sa.ForeignKey("orders.id"), index=True),
         # Complaint details
         sa.Column("complaint_no", sa.String(50), unique=True, nullable=False),
-        sa.Column("category", sa.String(50), nullable=False,
-                  comment="food_quality/service/hygiene/wait_time/billing/other"),
-        sa.Column("severity", sa.String(20), nullable=False, server_default="normal",
-                  comment="low/normal/high/critical"),
+        sa.Column(
+            "category", sa.String(50), nullable=False, comment="food_quality/service/hygiene/wait_time/billing/other"
+        ),
+        sa.Column(
+            "severity", sa.String(20), nullable=False, server_default="normal", comment="low/normal/high/critical"
+        ),
         sa.Column("description", sa.Text, nullable=False),
         sa.Column("photo_urls", JSON),
         # Resolution
-        sa.Column("status", sa.String(20), nullable=False, server_default="open",
-                  comment="open/investigating/resolved/closed/escalated"),
+        sa.Column(
+            "status",
+            sa.String(20),
+            nullable=False,
+            server_default="open",
+            comment="open/investigating/resolved/closed/escalated",
+        ),
         sa.Column("assigned_to", UUID(as_uuid=True), sa.ForeignKey("employees.id"), index=True),
         sa.Column("resolution", sa.Text),
-        sa.Column("compensation_fen", sa.Integer, server_default="0",
-                  comment="Compensation amount (fen)"),
+        sa.Column("compensation_fen", sa.Integer, server_default="0", comment="Compensation amount (fen)"),
         sa.Column("resolved_at", sa.DateTime(timezone=True)),
         sa.Column("resolved_by", sa.String(100)),
         # Source
-        sa.Column("source", sa.String(30), server_default="in_store",
-                  comment="in_store/phone/wechat/meituan/12315"),
+        sa.Column("source", sa.String(30), server_default="in_store", comment="in_store/phone/wechat/meituan/12315"),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
         sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
         sa.Column("is_deleted", sa.Boolean, server_default="false"),
@@ -504,13 +545,17 @@ def upgrade() -> None:
         # Task info
         sa.Column("title", sa.String(200), nullable=False),
         sa.Column("content", sa.Text),
-        sa.Column("category", sa.String(50),
-                  comment="opening/closing/hygiene/equipment/inspection/custom"),
+        sa.Column("category", sa.String(50), comment="opening/closing/hygiene/equipment/inspection/custom"),
         # Status
-        sa.Column("status", sa.String(20), nullable=False, server_default="pending", index=True,
-                  comment="pending/in_progress/completed/cancelled/overdue"),
-        sa.Column("priority", sa.String(20), nullable=False, server_default="normal",
-                  comment="low/normal/high/urgent"),
+        sa.Column(
+            "status",
+            sa.String(20),
+            nullable=False,
+            server_default="pending",
+            index=True,
+            comment="pending/in_progress/completed/cancelled/overdue",
+        ),
+        sa.Column("priority", sa.String(20), nullable=False, server_default="normal", comment="low/normal/high/urgent"),
         # People
         sa.Column("creator_id", UUID(as_uuid=True), sa.ForeignKey("employees.id"), nullable=False),
         sa.Column("assignee_id", UUID(as_uuid=True), sa.ForeignKey("employees.id"), index=True),

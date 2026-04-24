@@ -2,20 +2,21 @@
 
 提取各适配器共用的重试、超时、错误处理逻辑。
 """
+
 from __future__ import annotations
 
 import asyncio
 import time
 import uuid
-from abc import ABC, abstractmethod
-from typing import Any, AsyncGenerator, Optional
+from abc import ABC
+from typing import Optional
 
 import structlog
 
 logger = structlog.get_logger()
 
 
-class BaseProviderAdapter(ABC):
+class BaseProviderAdapter(ABC):  # noqa: B024  # 基类暂无抽象方法，留作子类扩展
     """适配器基类，包含公共重试和超时逻辑。"""
 
     RETRY_DELAYS = [1, 2, 4]  # 指数退避
@@ -39,7 +40,7 @@ class BaseProviderAdapter(ABC):
                 last_exc = exc
                 logger.warning(
                     "provider_retry",
-                    provider=self.name.value if hasattr(self, 'name') else "unknown",
+                    provider=self.name.value if hasattr(self, "name") else "unknown",
                     attempt=attempt + 1,
                     error=str(exc),
                 )

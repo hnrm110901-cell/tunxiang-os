@@ -57,8 +57,7 @@ def upgrade() -> None:
         )
     """)
     op.execute(
-        "CREATE INDEX IF NOT EXISTS idx_cgp_tenant_customer "
-        "ON customer_growth_profiles (tenant_id, customer_id)"
+        "CREATE INDEX IF NOT EXISTS idx_cgp_tenant_customer ON customer_growth_profiles (tenant_id, customer_id)"
     )
     op.execute(
         "CREATE INDEX IF NOT EXISTS idx_cgp_reactivation "
@@ -71,8 +70,7 @@ def upgrade() -> None:
         "WHERE service_repair_status != 'none'"
     )
     op.execute(
-        "CREATE INDEX IF NOT EXISTS idx_cgp_repurchase "
-        "ON customer_growth_profiles (tenant_id, repurchase_stage)"
+        "CREATE INDEX IF NOT EXISTS idx_cgp_repurchase ON customer_growth_profiles (tenant_id, repurchase_stage)"
     )
     op.execute("ALTER TABLE customer_growth_profiles ENABLE ROW LEVEL SECURITY")
     op.execute("ALTER TABLE customer_growth_profiles FORCE ROW LEVEL SECURITY")
@@ -107,10 +105,7 @@ def upgrade() -> None:
             UNIQUE (tenant_id, code)
         )
     """)
-    op.execute(
-        "CREATE INDEX IF NOT EXISTS idx_gjt_tenant_type "
-        "ON growth_journey_templates (tenant_id, journey_type)"
-    )
+    op.execute("CREATE INDEX IF NOT EXISTS idx_gjt_tenant_type ON growth_journey_templates (tenant_id, journey_type)")
     op.execute(
         "CREATE INDEX IF NOT EXISTS idx_gjt_tenant_active "
         "ON growth_journey_templates (tenant_id, is_active) "
@@ -150,8 +145,7 @@ def upgrade() -> None:
         )
     """)
     op.execute(
-        "CREATE INDEX IF NOT EXISTS idx_gjts_template "
-        "ON growth_journey_template_steps (tenant_id, journey_template_id)"
+        "CREATE INDEX IF NOT EXISTS idx_gjts_template ON growth_journey_template_steps (tenant_id, journey_template_id)"
     )
     op.execute("ALTER TABLE growth_journey_template_steps ENABLE ROW LEVEL SECURITY")
     op.execute("ALTER TABLE growth_journey_template_steps FORCE ROW LEVEL SECURITY")
@@ -193,10 +187,7 @@ def upgrade() -> None:
         "ON growth_journey_enrollments (tenant_id, journey_state, next_execute_at) "
         "WHERE journey_state IN ('active','waiting_observe')"
     )
-    op.execute(
-        "CREATE INDEX IF NOT EXISTS idx_gje_customer "
-        "ON growth_journey_enrollments (tenant_id, customer_id)"
-    )
+    op.execute("CREATE INDEX IF NOT EXISTS idx_gje_customer ON growth_journey_enrollments (tenant_id, customer_id)")
     op.execute(
         "CREATE UNIQUE INDEX IF NOT EXISTS idx_gje_dedup "
         "ON growth_journey_enrollments (tenant_id, journey_template_id, customer_id) "
@@ -236,14 +227,8 @@ def upgrade() -> None:
             UNIQUE (tenant_id, code)
         )
     """)
-    op.execute(
-        "CREATE INDEX IF NOT EXISTS idx_gtt_family "
-        "ON growth_touch_templates (tenant_id, template_family)"
-    )
-    op.execute(
-        "CREATE INDEX IF NOT EXISTS idx_gtt_mechanism "
-        "ON growth_touch_templates (tenant_id, mechanism_type)"
-    )
+    op.execute("CREATE INDEX IF NOT EXISTS idx_gtt_family ON growth_touch_templates (tenant_id, template_family)")
+    op.execute("CREATE INDEX IF NOT EXISTS idx_gtt_mechanism ON growth_touch_templates (tenant_id, mechanism_type)")
     op.execute("ALTER TABLE growth_touch_templates ENABLE ROW LEVEL SECURITY")
     op.execute("ALTER TABLE growth_touch_templates FORCE ROW LEVEL SECURITY")
     op.execute("DROP POLICY IF EXISTS growth_touch_templates_tenant_isolation ON growth_touch_templates")
@@ -289,8 +274,7 @@ def upgrade() -> None:
         "ON growth_touch_executions (tenant_id, customer_id, created_at DESC)"
     )
     op.execute(
-        "CREATE INDEX IF NOT EXISTS idx_gtexec_enrollment "
-        "ON growth_touch_executions (tenant_id, journey_enrollment_id)"
+        "CREATE INDEX IF NOT EXISTS idx_gtexec_enrollment ON growth_touch_executions (tenant_id, journey_enrollment_id)"
     )
     op.execute(
         "CREATE INDEX IF NOT EXISTS idx_gtexec_attribution "
@@ -332,10 +316,7 @@ def upgrade() -> None:
             updated_at              TIMESTAMPTZ NOT NULL DEFAULT NOW()
         )
     """)
-    op.execute(
-        "CREATE INDEX IF NOT EXISTS idx_gsrc_customer "
-        "ON growth_service_repair_cases (tenant_id, customer_id)"
-    )
+    op.execute("CREATE INDEX IF NOT EXISTS idx_gsrc_customer ON growth_service_repair_cases (tenant_id, customer_id)")
     op.execute(
         "CREATE INDEX IF NOT EXISTS idx_gsrc_state "
         "ON growth_service_repair_cases (tenant_id, repair_state) "
@@ -389,12 +370,13 @@ def upgrade() -> None:
         "WHERE review_state IN ('pending_review','approved')"
     )
     op.execute(
-        "CREATE INDEX IF NOT EXISTS idx_gass_customer "
-        "ON growth_agent_strategy_suggestions (tenant_id, customer_id)"
+        "CREATE INDEX IF NOT EXISTS idx_gass_customer ON growth_agent_strategy_suggestions (tenant_id, customer_id)"
     )
     op.execute("ALTER TABLE growth_agent_strategy_suggestions ENABLE ROW LEVEL SECURITY")
     op.execute("ALTER TABLE growth_agent_strategy_suggestions FORCE ROW LEVEL SECURITY")
-    op.execute("DROP POLICY IF EXISTS growth_agent_strategy_suggestions_tenant_isolation ON growth_agent_strategy_suggestions")
+    op.execute(
+        "DROP POLICY IF EXISTS growth_agent_strategy_suggestions_tenant_isolation ON growth_agent_strategy_suggestions"
+    )
     op.execute("""
         CREATE POLICY growth_agent_strategy_suggestions_tenant_isolation ON growth_agent_strategy_suggestions
             USING (tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::UUID)

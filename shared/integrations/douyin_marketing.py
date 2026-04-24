@@ -14,11 +14,11 @@
 
 未配置时进入 Mock 模式。所有金额单位：分（整数）。
 """
+
 from __future__ import annotations
 
 import hashlib
 import hmac
-import json
 import os
 import time
 import uuid
@@ -157,8 +157,20 @@ class DouyinMarketingAdapter:
                 "content_roi": 5.8,
                 "avg_order_value_fen": 7500,
                 "top_creators": [
-                    {"creator_id": "MOCK_KOL_001", "nickname": "美食探店达人", "orders": 89, "revenue_fen": 667500, "commission_pct": 8.0},
-                    {"creator_id": "MOCK_KOL_002", "nickname": "长沙吃喝玩乐", "orders": 67, "revenue_fen": 502500, "commission_pct": 7.5},
+                    {
+                        "creator_id": "MOCK_KOL_001",
+                        "nickname": "美食探店达人",
+                        "orders": 89,
+                        "revenue_fen": 667500,
+                        "commission_pct": 8.0,
+                    },
+                    {
+                        "creator_id": "MOCK_KOL_002",
+                        "nickname": "长沙吃喝玩乐",
+                        "orders": 67,
+                        "revenue_fen": 502500,
+                        "commission_pct": 7.5,
+                    },
                 ],
                 "organic_vs_paid": {
                     "organic_views": 89600,
@@ -344,16 +356,20 @@ class DouyinMarketingAdapter:
             return self._access_token
 
         import aiohttp
+
         payload = {
             "client_key": self._app_key,
             "client_secret": self._app_secret,
             "grant_type": "client_credential",
         }
-        async with aiohttp.ClientSession() as session, session.post(
-            _DOUYIN_TOKEN_URL,
-            json=payload,
-            timeout=aiohttp.ClientTimeout(total=10),
-        ) as resp:
+        async with (
+            aiohttp.ClientSession() as session,
+            session.post(
+                _DOUYIN_TOKEN_URL,
+                json=payload,
+                timeout=aiohttp.ClientTimeout(total=10),
+            ) as resp,
+        ):
             result = await resp.json()
             data = result.get("data", {})
             if not data.get("access_token"):
@@ -374,12 +390,7 @@ class DouyinMarketingAdapter:
         nonce = uuid.uuid4().hex[:16]
 
         # 抖音 API 签名：按参数名字典序拼接 + HMAC-SHA256
-        sign_str = (
-            self._app_secret
-            + "".join(f"{k}{v}" for k, v in sorted(params.items()))
-            + timestamp
-            + nonce
-        )
+        sign_str = self._app_secret + "".join(f"{k}{v}" for k, v in sorted(params.items())) + timestamp + nonce
         signature = hmac.new(
             self._app_secret.encode("utf-8"),
             sign_str.encode("utf-8"),
@@ -396,6 +407,7 @@ class DouyinMarketingAdapter:
         url = f"{_DOUYIN_BASE_URL}{path}"
 
         import aiohttp
+
         async with aiohttp.ClientSession() as session:
             if method == "GET":
                 req = session.get(url, params=params, headers=headers, timeout=aiohttp.ClientTimeout(total=15))

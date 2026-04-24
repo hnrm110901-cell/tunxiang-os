@@ -7,6 +7,7 @@
 - 点餐量大，小料区自助
 - 通常有储值卡，团购活动多
 """
+
 from ..base import (
     AgentPolicySet,
     BaseTemplate,
@@ -37,10 +38,8 @@ class HotPotTemplate(BaseTemplate):
     def build_default(self) -> TenantConfigPackage:
         return TenantConfigPackage(
             restaurant_type=RestaurantType.HOT_POT,
-
             table_count=30,
             vip_room_count=0,
-
             printers=[
                 PrinterConfig(
                     name="收银台打印机",
@@ -52,21 +51,25 @@ class HotPotTemplate(BaseTemplate):
                     printer_type="kitchen",
                 ),
             ],
-
             # 火锅厨房分区较简单
             kds_zones=[
                 KDSZoneConfig(
-                    zone_code="prep", zone_name="配菜档",
-                    display_order=0, alert_minutes=6,
-                    color_warning="#FFC107", color_overdue="#F44336",
+                    zone_code="prep",
+                    zone_name="配菜档",
+                    display_order=0,
+                    alert_minutes=6,
+                    color_warning="#FFC107",
+                    color_overdue="#F44336",
                 ),
                 KDSZoneConfig(
-                    zone_code="soup", zone_name="底料区",
-                    display_order=1, alert_minutes=4,
-                    color_warning="#FFC107", color_overdue="#F44336",
+                    zone_code="soup",
+                    zone_name="底料区",
+                    display_order=1,
+                    alert_minutes=4,
+                    color_warning="#FFC107",
+                    color_overdue="#F44336",
                 ),
             ],
-
             # 全天候单班（或午晚两班）
             shifts=[
                 ShiftConfig(
@@ -83,33 +86,33 @@ class HotPotTemplate(BaseTemplate):
                     settlement_cutoff="02:00",
                 ),
             ],
-
             # 火锅通常无最低消费
             billing_rules=BillingRuleSet(
                 min_spend_fen=0,
                 service_fee_rate=0.0,
             ),
-
             member_tiers=[
                 MemberTierConfig(
-                    tier_code="standard", tier_name="普通会员",
-                    min_spend_fen=0, point_multiplier=1.0, discount_rate=1.0,
+                    tier_code="standard",
+                    tier_name="普通会员",
+                    min_spend_fen=0,
+                    point_multiplier=1.0,
+                    discount_rate=1.0,
                 ),
                 MemberTierConfig(
-                    tier_code="vip", tier_name="VIP会员",
-                    min_spend_fen=300000, point_multiplier=1.5, discount_rate=0.95,
+                    tier_code="vip",
+                    tier_name="VIP会员",
+                    min_spend_fen=300000,
+                    point_multiplier=1.5,
+                    discount_rate=0.95,
                     birthday_benefit="生日当月赠底料一份",
                 ),
             ],
             point_rate=1.0,
             point_redeem_rate=100.0,
-
             channels_enabled=["meituan", "eleme", "douyin"],
-
             payment_methods=["wechat", "alipay", "cash", "unionpay"],
-
             employee_roles=["cashier", "waiter", "manager", "chef"],
-
             agent_policies=AgentPolicySet(
                 discount_guard=DiscountPolicy(
                     employee_max_discount=0.90,
@@ -117,7 +120,7 @@ class HotPotTemplate(BaseTemplate):
                     min_gross_margin=0.35,  # 火锅毛利高，守护线可设高
                     require_reason_below=0.88,
                 ),
-                kds_target_minutes=8,   # 火锅出品快
+                kds_target_minutes=8,  # 火锅出品快
                 kds_warn_minutes=12,
                 inventory_alert_days=2,  # 鲜货多，预警更早
                 inventory_waste_alert_rate=0.03,

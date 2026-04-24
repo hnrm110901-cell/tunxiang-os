@@ -25,11 +25,11 @@ Revision ID: v161
 Revises: v160
 Create Date: 2026-04-04
 """
+
 from __future__ import annotations
 
 import sqlalchemy as sa
 from alembic import op
-from sqlalchemy.dialects.postgresql import TIMESTAMP
 
 revision = "v161"
 down_revision = "v160"

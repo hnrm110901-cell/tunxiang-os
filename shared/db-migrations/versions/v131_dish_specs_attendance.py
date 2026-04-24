@@ -10,8 +10,9 @@ Revision ID: v131
 Revises: v130
 Create Date: 2026-04-02
 """
-from alembic import op
+
 import sqlalchemy as sa
+from alembic import op
 from sqlalchemy.dialects.postgresql import UUID
 
 revision = "v131"
@@ -29,8 +30,7 @@ def upgrade() -> None:
     if "dish_spec_groups" not in _existing:
         op.create_table(
             "dish_spec_groups",
-            sa.Column("id", UUID(as_uuid=True), primary_key=True,
-                      server_default=sa.text("gen_random_uuid()")),
+            sa.Column("id", UUID(as_uuid=True), primary_key=True, server_default=sa.text("gen_random_uuid()")),
             sa.Column("tenant_id", UUID(as_uuid=True), nullable=False),
             sa.Column("dish_id", UUID(as_uuid=True), nullable=False),
             sa.Column("name", sa.String(50), nullable=False),
@@ -70,8 +70,7 @@ def upgrade() -> None:
     if "dish_spec_options" not in _existing:
         op.create_table(
             "dish_spec_options",
-            sa.Column("id", UUID(as_uuid=True), primary_key=True,
-                      server_default=sa.text("gen_random_uuid()")),
+            sa.Column("id", UUID(as_uuid=True), primary_key=True, server_default=sa.text("gen_random_uuid()")),
             sa.Column("tenant_id", UUID(as_uuid=True), nullable=False),
             sa.Column("group_id", UUID(as_uuid=True), nullable=False),
             sa.Column("name", sa.String(50), nullable=False),
@@ -118,8 +117,7 @@ def upgrade() -> None:
     if "attendance_records" not in _existing:
         op.create_table(
             "attendance_records",
-            sa.Column("id", UUID(as_uuid=True), primary_key=True,
-                      server_default=sa.text("gen_random_uuid()")),
+            sa.Column("id", UUID(as_uuid=True), primary_key=True, server_default=sa.text("gen_random_uuid()")),
             sa.Column("tenant_id", UUID(as_uuid=True), nullable=False),
             sa.Column("store_id", UUID(as_uuid=True), nullable=False),
             sa.Column("employee_id", UUID(as_uuid=True), nullable=False),
@@ -180,8 +178,7 @@ def upgrade() -> None:
     if "attendance_leave_requests" not in _existing:
         op.create_table(
             "attendance_leave_requests",
-            sa.Column("id", UUID(as_uuid=True), primary_key=True,
-                      server_default=sa.text("gen_random_uuid()")),
+            sa.Column("id", UUID(as_uuid=True), primary_key=True, server_default=sa.text("gen_random_uuid()")),
             sa.Column("tenant_id", UUID(as_uuid=True), nullable=False),
             sa.Column("store_id", UUID(as_uuid=True), nullable=False),
             sa.Column("employee_id", UUID(as_uuid=True), nullable=False),

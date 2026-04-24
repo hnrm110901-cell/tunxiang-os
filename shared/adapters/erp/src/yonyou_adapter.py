@@ -15,10 +15,12 @@
   路径：YONYOU_QUEUE_PATH（默认 /tmp/yonyou_push_queue.jsonl）
   通过 drain_queue() 方法批量重试
 """
+
 from __future__ import annotations
 
 import json
 import os
+import tempfile
 import time
 import uuid
 from datetime import datetime, timezone
@@ -52,7 +54,8 @@ class YonyouAdapter(ERPAdapter):
         self._base_url = os.environ["YONYOU_BASE_URL"].rstrip("/")
         self._tenant_code = os.environ.get("YONYOU_TENANT_CODE", "")
         # 离线队列路径（推送失败时写入，待后续重试）
-        queue_path = os.environ.get("YONYOU_QUEUE_PATH", "/tmp/yonyou_push_queue.jsonl")
+        default_queue_path = str(Path(tempfile.gettempdir()) / "yonyou_push_queue.jsonl")
+        queue_path = os.environ.get("YONYOU_QUEUE_PATH", default_queue_path)
         self._queue_path = Path(queue_path)
 
         self._client = httpx.AsyncClient(timeout=30)
@@ -129,14 +132,16 @@ class YonyouAdapter(ERPAdapter):
         """将屯象统一凭证格式转换为用友云凭证接口格式"""
         entries = []
         for entry in voucher.entries:
-            entries.append({
-                "accountCode": entry.account_code,
-                "accountName": entry.account_name,
-                "debitAmount": entry.debit_fen / 100,   # 分 → 元
-                "creditAmount": entry.credit_fen / 100,
-                "explanation": entry.summary,
-                "currencyCode": "CNY",
-            })
+            entries.append(
+                {
+                    "accountCode": entry.account_code,
+                    "accountName": entry.account_name,
+                    "debitAmount": entry.debit_fen / 100,  # 分 → 元
+                    "creditAmount": entry.credit_fen / 100,
+                    "explanation": entry.summary,
+                    "currencyCode": "CNY",
+                }
+            )
 
         return {
             "voucherType": voucher.voucher_type.value,
@@ -232,10 +237,7 @@ class YonyouAdapter(ERPAdapter):
     async def _do_push(self, voucher: ERPVoucher) -> ERPPushResult:
         payload = self._to_yonyou_payload(voucher)
         raw = await self._post("/api/v1/gl/vouchers", payload)
-        erp_voucher_id = str(
-            raw.get("data", {}).get("voucherId", "")
-            or raw.get("data", {}).get("id", "")
-        ) or None
+        erp_voucher_id = str(raw.get("data", {}).get("voucherId", "") or raw.get("data", {}).get("id", "")) or None
         return ERPPushResult(
             voucher_id=voucher.voucher_id,
             erp_voucher_id=erp_voucher_id,
@@ -296,15 +298,17 @@ class YonyouAdapter(ERPAdapter):
 
         accounts = []
         for item in items:
-            accounts.append(ERPAccount(
-                code=str(item.get("accountCode", item.get("code", ""))),
-                name=str(item.get("accountName", item.get("name", ""))),
-                account_type=str(item.get("accountType", "资产")),
-                parent_code=item.get("parentCode") or None,
-                is_leaf=bool(item.get("isLeaf", True)),
-                currency=item.get("currencyCode", "CNY"),
-                extra=item,
-            ))
+            accounts.append(
+                ERPAccount(
+                    code=str(item.get("accountCode", item.get("code", ""))),
+                    name=str(item.get("accountName", item.get("name", ""))),
+                    account_type=str(item.get("accountType", "资产")),
+                    parent_code=item.get("parentCode") or None,
+                    is_leaf=bool(item.get("isLeaf", True)),
+                    currency=item.get("currencyCode", "CNY"),
+                    extra=item,
+                )
+            )
         log.info("yonyou.sync_chart_of_accounts.ok", count=len(accounts))
         return accounts
 

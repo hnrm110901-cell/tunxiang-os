@@ -10,6 +10,7 @@
   KINGDEE_BASE_URL     — 金蝶 Cloud 实例地址，如 https://xxx.kingdeecloud.com
   KINGDEE_ENTITY_ID    — 账套 ID（金蝶多账套场景必填）
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -36,19 +37,19 @@ log = structlog.get_logger(__name__)
 
 # 金蝶标准科目表（K3 Cloud 默认科目编码，租户可在 tenant_config 中覆盖）
 _KINGDEE_DEFAULT_ACCOUNTS: list[dict[str, Any]] = [
-    {"code": "1001", "name": "库存现金",     "account_type": "资产"},
-    {"code": "1002", "name": "银行存款",     "account_type": "资产"},
-    {"code": "1012.01", "name": "微信收款",  "account_type": "资产"},
-    {"code": "1012.02", "name": "支付宝收款","account_type": "资产"},
-    {"code": "1122", "name": "应收账款",     "account_type": "资产"},
-    {"code": "1403", "name": "原材料",       "account_type": "资产"},
-    {"code": "1405", "name": "库存商品",     "account_type": "资产"},
-    {"code": "1406", "name": "在途物资",     "account_type": "资产"},
-    {"code": "2202", "name": "应付账款",     "account_type": "负债"},
+    {"code": "1001", "name": "库存现金", "account_type": "资产"},
+    {"code": "1002", "name": "银行存款", "account_type": "资产"},
+    {"code": "1012.01", "name": "微信收款", "account_type": "资产"},
+    {"code": "1012.02", "name": "支付宝收款", "account_type": "资产"},
+    {"code": "1122", "name": "应收账款", "account_type": "资产"},
+    {"code": "1403", "name": "原材料", "account_type": "资产"},
+    {"code": "1405", "name": "库存商品", "account_type": "资产"},
+    {"code": "1406", "name": "在途物资", "account_type": "资产"},
+    {"code": "2202", "name": "应付账款", "account_type": "负债"},
     {"code": "2211", "name": "应付职工薪酬", "account_type": "负债"},
     {"code": "5001", "name": "主营业务收入", "account_type": "收入"},
     {"code": "5401", "name": "主营业务成本", "account_type": "费用"},
-    {"code": "5602", "name": "管理费用",     "account_type": "费用"},
+    {"code": "5602", "name": "管理费用", "account_type": "费用"},
 ]
 
 
@@ -112,10 +113,7 @@ class KingdeeAdapter(ERPAdapter):
             else data.get("success", False)
         )
         if not result_flag:
-            error_msg = (
-                data.get("Result", {}).get("Message", "")
-                or data.get("Message", "未知错误")
-            )
+            error_msg = data.get("Result", {}).get("Message", "") or data.get("Message", "未知错误")
             raise RuntimeError(f"金蝶API业务错误: {error_msg}")
         return data
 
@@ -133,13 +131,15 @@ class KingdeeAdapter(ERPAdapter):
         """将屯象统一凭证格式转换为金蝶 Cloud 凭证接口格式"""
         entries = []
         for idx, entry in enumerate(voucher.entries, start=1):
-            entries.append({
-                "FEntryID": idx,
-                "FAccountID": {"FNumber": entry.account_code},
-                "FDEBIT": entry.debit_fen / 100,   # 分 → 元
-                "FCREDIT": entry.credit_fen / 100,
-                "FEXPLANATION": entry.summary,
-            })
+            entries.append(
+                {
+                    "FEntryID": idx,
+                    "FAccountID": {"FNumber": entry.account_code},
+                    "FDEBIT": entry.debit_fen / 100,  # 分 → 元
+                    "FCREDIT": entry.credit_fen / 100,
+                    "FEXPLANATION": entry.summary,
+                }
+            )
 
         return {
             "Model": {
@@ -171,10 +171,7 @@ class KingdeeAdapter(ERPAdapter):
         payload = self._to_kingdee_payload(voucher)
         raw = await self._post("/ierp/api/v2/gl/vouchers/save", payload)
 
-        erp_voucher_id = (
-            str(raw.get("Result", {}).get("Id", ""))
-            or raw.get("data", {}).get("VoucherId", "")
-        )
+        erp_voucher_id = str(raw.get("Result", {}).get("Id", "")) or raw.get("data", {}).get("VoucherId", "")
 
         log.info(
             "kingdee.push_voucher.ok",
@@ -202,14 +199,16 @@ class KingdeeAdapter(ERPAdapter):
                 items = []
             accounts = []
             for item in items:
-                accounts.append(ERPAccount(
-                    code=str(item.get("FNumber", item.get("code", ""))),
-                    name=str(item.get("FName", item.get("name", ""))),
-                    account_type=str(item.get("FAccountType", "资产")),
-                    parent_code=item.get("FParentNumber") or None,
-                    is_leaf=bool(item.get("FIsLeaf", True)),
-                    extra=item,
-                ))
+                accounts.append(
+                    ERPAccount(
+                        code=str(item.get("FNumber", item.get("code", ""))),
+                        name=str(item.get("FName", item.get("name", ""))),
+                        account_type=str(item.get("FAccountType", "资产")),
+                        parent_code=item.get("FParentNumber") or None,
+                        is_leaf=bool(item.get("FIsLeaf", True)),
+                        extra=item,
+                    )
+                )
             log.info("kingdee.sync_chart_of_accounts.ok", count=len(accounts))
             return accounts
         except httpx.HTTPError as exc:

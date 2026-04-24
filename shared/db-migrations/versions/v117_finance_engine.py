@@ -12,9 +12,10 @@ Revision ID: v117
 Revises: v116
 Create Date: 2026-04-02
 """
-from alembic import op
+
 import sqlalchemy as sa
-from sqlalchemy.dialects.postgresql import UUID, NUMERIC
+from alembic import op
+from sqlalchemy.dialects.postgresql import NUMERIC, UUID
 
 revision = "v117"
 down_revision = "v116"
@@ -32,80 +33,105 @@ def upgrade() -> None:
         op.create_table(
             "daily_pnl",
             sa.Column(
-                "id", UUID(as_uuid=True), primary_key=True,
+                "id",
+                UUID(as_uuid=True),
+                primary_key=True,
                 server_default=sa.text("gen_random_uuid()"),
             ),
             sa.Column("tenant_id", UUID(as_uuid=True), nullable=False),
             sa.Column("store_id", UUID(as_uuid=True), nullable=False),
             sa.Column("pnl_date", sa.Date, nullable=False),
-
             # 收入侧
-            sa.Column("gross_revenue_fen", sa.Integer, nullable=False, server_default="0",
-                      comment="合计营收（分）"),
-            sa.Column("dine_in_revenue_fen", sa.Integer, nullable=False, server_default="0",
-                      comment="堂食营收（分）"),
-            sa.Column("takeaway_revenue_fen", sa.Integer, nullable=False, server_default="0",
-                      comment="外卖营收（分）"),
-            sa.Column("banquet_revenue_fen", sa.Integer, nullable=False, server_default="0",
-                      comment="宴席营收（分）"),
-            sa.Column("discount_amount_fen", sa.Integer, nullable=False, server_default="0",
-                      comment="折扣金额（分）"),
-            sa.Column("net_revenue_fen", sa.Integer, nullable=False, server_default="0",
-                      comment="净营收 = gross_revenue - discount（分）"),
-
-            # 成本侧
-            sa.Column("food_cost_fen", sa.Integer, nullable=False, server_default="0",
-                      comment="食材成本（分，BOM展开+损耗）"),
-            sa.Column("labor_cost_fen", sa.Integer, nullable=False, server_default="0",
-                      comment="人工成本（分，从排班实际工时计算）"),
-            sa.Column("rent_cost_fen", sa.Integer, nullable=False, server_default="0",
-                      comment="房租分摊（分，月租/当月天数）"),
-            sa.Column("utilities_cost_fen", sa.Integer, nullable=False, server_default="0",
-                      comment="水电分摊（分）"),
-            sa.Column("other_cost_fen", sa.Integer, nullable=False, server_default="0",
-                      comment="其他成本（分）"),
-            sa.Column("total_cost_fen", sa.Integer, nullable=False, server_default="0",
-                      comment="总成本 = food+labor+rent+utilities+other（分）"),
-
-            # 利润侧
-            sa.Column("gross_profit_fen", sa.Integer, nullable=False, server_default="0",
-                      comment="毛利 = net_revenue - food_cost（分）"),
+            sa.Column("gross_revenue_fen", sa.Integer, nullable=False, server_default="0", comment="合计营收（分）"),
+            sa.Column("dine_in_revenue_fen", sa.Integer, nullable=False, server_default="0", comment="堂食营收（分）"),
+            sa.Column("takeaway_revenue_fen", sa.Integer, nullable=False, server_default="0", comment="外卖营收（分）"),
+            sa.Column("banquet_revenue_fen", sa.Integer, nullable=False, server_default="0", comment="宴席营收（分）"),
+            sa.Column("discount_amount_fen", sa.Integer, nullable=False, server_default="0", comment="折扣金额（分）"),
             sa.Column(
-                "gross_margin_pct", NUMERIC(5, 2), nullable=False, server_default="0.00",
+                "net_revenue_fen",
+                sa.Integer,
+                nullable=False,
+                server_default="0",
+                comment="净营收 = gross_revenue - discount（分）",
+            ),
+            # 成本侧
+            sa.Column(
+                "food_cost_fen", sa.Integer, nullable=False, server_default="0", comment="食材成本（分，BOM展开+损耗）"
+            ),
+            sa.Column(
+                "labor_cost_fen",
+                sa.Integer,
+                nullable=False,
+                server_default="0",
+                comment="人工成本（分，从排班实际工时计算）",
+            ),
+            sa.Column(
+                "rent_cost_fen", sa.Integer, nullable=False, server_default="0", comment="房租分摊（分，月租/当月天数）"
+            ),
+            sa.Column("utilities_cost_fen", sa.Integer, nullable=False, server_default="0", comment="水电分摊（分）"),
+            sa.Column("other_cost_fen", sa.Integer, nullable=False, server_default="0", comment="其他成本（分）"),
+            sa.Column(
+                "total_cost_fen",
+                sa.Integer,
+                nullable=False,
+                server_default="0",
+                comment="总成本 = food+labor+rent+utilities+other（分）",
+            ),
+            # 利润侧
+            sa.Column(
+                "gross_profit_fen",
+                sa.Integer,
+                nullable=False,
+                server_default="0",
+                comment="毛利 = net_revenue - food_cost（分）",
+            ),
+            sa.Column(
+                "gross_margin_pct",
+                NUMERIC(5, 2),
+                nullable=False,
+                server_default="0.00",
                 comment="毛利率（百分比，如 68.50 表示 68.50%）",
             ),
-            sa.Column("operating_profit_fen", sa.Integer, nullable=False, server_default="0",
-                      comment="经营利润 = gross_profit - labor - rent - utilities - other（分）"),
-            sa.Column("net_profit_fen", sa.Integer, nullable=False, server_default="0",
-                      comment="净利润（分，当前与 operating_profit 相同，预留税后使用）"),
             sa.Column(
-                "net_margin_pct", NUMERIC(5, 2), nullable=False, server_default="0.00",
+                "operating_profit_fen",
+                sa.Integer,
+                nullable=False,
+                server_default="0",
+                comment="经营利润 = gross_profit - labor - rent - utilities - other（分）",
+            ),
+            sa.Column(
+                "net_profit_fen",
+                sa.Integer,
+                nullable=False,
+                server_default="0",
+                comment="净利润（分，当前与 operating_profit 相同，预留税后使用）",
+            ),
+            sa.Column(
+                "net_margin_pct",
+                NUMERIC(5, 2),
+                nullable=False,
+                server_default="0.00",
                 comment="净利润率（百分比）",
             ),
-
             # 经营指标
-            sa.Column("orders_count", sa.Integer, nullable=False, server_default="0",
-                      comment="当日订单数"),
-            sa.Column("avg_order_value_fen", sa.Integer, nullable=False, server_default="0",
-                      comment="客单价（分）"),
+            sa.Column("orders_count", sa.Integer, nullable=False, server_default="0", comment="当日订单数"),
+            sa.Column("avg_order_value_fen", sa.Integer, nullable=False, server_default="0", comment="客单价（分）"),
             sa.Column(
-                "table_turnover_rate", NUMERIC(4, 2), nullable=False, server_default="0.00",
+                "table_turnover_rate",
+                NUMERIC(4, 2),
+                nullable=False,
+                server_default="0.00",
                 comment="翻台率",
             ),
-
             # 状态
-            sa.Column("status", sa.String(20), nullable=False, server_default="'draft'",
-                      comment="draft/confirmed/locked"),
-            sa.Column("calculated_at", sa.TIMESTAMP(timezone=True), nullable=True,
-                      comment="最近一次计算时间"),
-            sa.Column("confirmed_by", UUID(as_uuid=True), nullable=True,
-                      comment="确认人员ID"),
-            sa.Column("created_at", sa.TIMESTAMP(timezone=True),
-                      server_default=sa.text("now()"), nullable=False),
-            sa.Column("updated_at", sa.TIMESTAMP(timezone=True),
-                      server_default=sa.text("now()"), nullable=False),
+            sa.Column(
+                "status", sa.String(20), nullable=False, server_default="'draft'", comment="draft/confirmed/locked"
+            ),
+            sa.Column("calculated_at", sa.TIMESTAMP(timezone=True), nullable=True, comment="最近一次计算时间"),
+            sa.Column("confirmed_by", UUID(as_uuid=True), nullable=True, comment="确认人员ID"),
+            sa.Column("created_at", sa.TIMESTAMP(timezone=True), server_default=sa.text("now()"), nullable=False),
+            sa.Column("updated_at", sa.TIMESTAMP(timezone=True), server_default=sa.text("now()"), nullable=False),
             sa.Column("is_deleted", sa.Boolean, nullable=False, server_default="false"),
-
             sa.UniqueConstraint("tenant_id", "store_id", "pnl_date", name="uq_daily_pnl_store_date"),
         )
 
@@ -146,34 +172,33 @@ def upgrade() -> None:
         op.create_table(
             "cost_items",
             sa.Column(
-                "id", UUID(as_uuid=True), primary_key=True,
+                "id",
+                UUID(as_uuid=True),
+                primary_key=True,
                 server_default=sa.text("gen_random_uuid()"),
             ),
             sa.Column("tenant_id", UUID(as_uuid=True), nullable=False),
             sa.Column("store_id", UUID(as_uuid=True), nullable=False),
             sa.Column("cost_date", sa.Date, nullable=False),
             sa.Column(
-                "cost_type", sa.String(30), nullable=False,
+                "cost_type",
+                sa.String(30),
+                nullable=False,
                 comment="purchase/wastage/live_seafood_death/labor/rent/utilities/other",
             ),
-            sa.Column("reference_id", UUID(as_uuid=True), nullable=True,
-                      comment="关联采购单/损耗记录/排班等外键ID"),
-            sa.Column("description", sa.String(200), nullable=True,
-                      comment="成本描述"),
-            sa.Column("amount_fen", sa.Integer, nullable=False, server_default="0",
-                      comment="金额（分）"),
+            sa.Column("reference_id", UUID(as_uuid=True), nullable=True, comment="关联采购单/损耗记录/排班等外键ID"),
+            sa.Column("description", sa.String(200), nullable=True, comment="成本描述"),
+            sa.Column("amount_fen", sa.Integer, nullable=False, server_default="0", comment="金额（分）"),
             sa.Column(
-                "quantity", NUMERIC(10, 3), nullable=True,
+                "quantity",
+                NUMERIC(10, 3),
+                nullable=True,
                 comment="数量（kg/个/份等）",
             ),
-            sa.Column("unit", sa.String(20), nullable=True,
-                      comment="单位（kg/g/个/份）"),
-            sa.Column("unit_cost_fen", sa.Integer, nullable=True,
-                      comment="单位成本（分）"),
-            sa.Column("created_at", sa.TIMESTAMP(timezone=True),
-                      server_default=sa.text("now()"), nullable=False),
-            sa.Column("updated_at", sa.TIMESTAMP(timezone=True),
-                      server_default=sa.text("now()"), nullable=False),
+            sa.Column("unit", sa.String(20), nullable=True, comment="单位（kg/g/个/份）"),
+            sa.Column("unit_cost_fen", sa.Integer, nullable=True, comment="单位成本（分）"),
+            sa.Column("created_at", sa.TIMESTAMP(timezone=True), server_default=sa.text("now()"), nullable=False),
+            sa.Column("updated_at", sa.TIMESTAMP(timezone=True), server_default=sa.text("now()"), nullable=False),
             sa.Column("is_deleted", sa.Boolean, nullable=False, server_default="false"),
         )
 
@@ -222,34 +247,43 @@ def upgrade() -> None:
         op.create_table(
             "revenue_records",
             sa.Column(
-                "id", UUID(as_uuid=True), primary_key=True,
+                "id",
+                UUID(as_uuid=True),
+                primary_key=True,
                 server_default=sa.text("gen_random_uuid()"),
             ),
             sa.Column("tenant_id", UUID(as_uuid=True), nullable=False),
             sa.Column("store_id", UUID(as_uuid=True), nullable=False),
             sa.Column("record_date", sa.Date, nullable=False),
-            sa.Column("order_id", UUID(as_uuid=True), nullable=True,
-                      comment="关联订单ID"),
+            sa.Column("order_id", UUID(as_uuid=True), nullable=True, comment="关联订单ID"),
             sa.Column(
-                "channel", sa.String(30), nullable=False,
+                "channel",
+                sa.String(30),
+                nullable=False,
                 comment="dine_in/meituan/eleme/banquet/self_order/other",
             ),
-            sa.Column("gross_amount_fen", sa.Integer, nullable=False, server_default="0",
-                      comment="订单原始金额（分）"),
-            sa.Column("discount_fen", sa.Integer, nullable=False, server_default="0",
-                      comment="折扣金额（分）"),
-            sa.Column("net_amount_fen", sa.Integer, nullable=False, server_default="0",
-                      comment="净收入 = gross - discount（分）"),
-            sa.Column("payment_method", sa.String(30), nullable=True,
-                      comment="支付方式（wechat/alipay/cash/card/etc.）"),
-            sa.Column("is_actual_revenue", sa.Boolean, nullable=False, server_default="true",
-                      comment="是否为实际到账（团购券等可能有差异）"),
-            sa.Column("actual_revenue_fen", sa.Integer, nullable=True,
-                      comment="实际到账金额（分，团购结算后金额）"),
-            sa.Column("created_at", sa.TIMESTAMP(timezone=True),
-                      server_default=sa.text("now()"), nullable=False),
+            sa.Column("gross_amount_fen", sa.Integer, nullable=False, server_default="0", comment="订单原始金额（分）"),
+            sa.Column("discount_fen", sa.Integer, nullable=False, server_default="0", comment="折扣金额（分）"),
+            sa.Column(
+                "net_amount_fen",
+                sa.Integer,
+                nullable=False,
+                server_default="0",
+                comment="净收入 = gross - discount（分）",
+            ),
+            sa.Column(
+                "payment_method", sa.String(30), nullable=True, comment="支付方式（wechat/alipay/cash/card/etc.）"
+            ),
+            sa.Column(
+                "is_actual_revenue",
+                sa.Boolean,
+                nullable=False,
+                server_default="true",
+                comment="是否为实际到账（团购券等可能有差异）",
+            ),
+            sa.Column("actual_revenue_fen", sa.Integer, nullable=True, comment="实际到账金额（分，团购结算后金额）"),
+            sa.Column("created_at", sa.TIMESTAMP(timezone=True), server_default=sa.text("now()"), nullable=False),
             sa.Column("is_deleted", sa.Boolean, nullable=False, server_default="false"),
-
             sa.UniqueConstraint("tenant_id", "order_id", name="uq_revenue_records_order"),
         )
 
@@ -298,14 +332,17 @@ def upgrade() -> None:
         op.create_table(
             "finance_configs",
             sa.Column(
-                "id", UUID(as_uuid=True), primary_key=True,
+                "id",
+                UUID(as_uuid=True),
+                primary_key=True,
                 server_default=sa.text("gen_random_uuid()"),
             ),
             sa.Column("tenant_id", UUID(as_uuid=True), nullable=False),
-            sa.Column("store_id", UUID(as_uuid=True), nullable=True,
-                      comment="NULL=集团级通用配置 / 有值=门店专属配置"),
+            sa.Column("store_id", UUID(as_uuid=True), nullable=True, comment="NULL=集团级通用配置 / 有值=门店专属配置"),
             sa.Column(
-                "config_type", sa.String(50), nullable=False,
+                "config_type",
+                sa.String(50),
+                nullable=False,
                 comment=(
                     "labor_cost_pct         — 人工成本目标比率\n"
                     "rent_monthly_fen       — 月租金（分）\n"
@@ -314,20 +351,17 @@ def upgrade() -> None:
                     "other_daily_opex_fen   — 日其他运营费（分）"
                 ),
             ),
-            sa.Column("value_fen", sa.Integer, nullable=True,
-                      comment="金额类配置（分）"),
+            sa.Column("value_fen", sa.Integer, nullable=True, comment="金额类配置（分）"),
             sa.Column(
-                "value_pct", NUMERIC(5, 2), nullable=True,
+                "value_pct",
+                NUMERIC(5, 2),
+                nullable=True,
                 comment="百分比类配置（如 30.00 表示 30%）",
             ),
-            sa.Column("effective_from", sa.Date, nullable=True,
-                      comment="配置生效起始日期（NULL=立即生效）"),
-            sa.Column("effective_until", sa.Date, nullable=True,
-                      comment="配置失效日期（NULL=永久有效）"),
-            sa.Column("created_at", sa.TIMESTAMP(timezone=True),
-                      server_default=sa.text("now()"), nullable=False),
-            sa.Column("updated_at", sa.TIMESTAMP(timezone=True),
-                      server_default=sa.text("now()"), nullable=False),
+            sa.Column("effective_from", sa.Date, nullable=True, comment="配置生效起始日期（NULL=立即生效）"),
+            sa.Column("effective_until", sa.Date, nullable=True, comment="配置失效日期（NULL=永久有效）"),
+            sa.Column("created_at", sa.TIMESTAMP(timezone=True), server_default=sa.text("now()"), nullable=False),
+            sa.Column("updated_at", sa.TIMESTAMP(timezone=True), server_default=sa.text("now()"), nullable=False),
             sa.Column("is_deleted", sa.Boolean, nullable=False, server_default="false"),
         )
 

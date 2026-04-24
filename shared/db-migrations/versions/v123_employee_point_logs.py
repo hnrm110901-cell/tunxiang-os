@@ -5,6 +5,7 @@
 Revision ID: v123
 Revises: v122
 """
+
 from alembic import op
 
 revision = "v123"

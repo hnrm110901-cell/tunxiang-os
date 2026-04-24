@@ -16,6 +16,7 @@
     handler = DouyinOrderWebhookHandler(binding_service, tenant_id)
     result = await handler.handle(raw_payload, db)
 """
+
 import uuid
 from typing import Any
 

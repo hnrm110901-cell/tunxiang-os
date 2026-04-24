@@ -2,12 +2,17 @@
 API适配器基础类
 提供统一的接口规范和通用功能
 """
+
 import os
 from abc import ABC, abstractmethod
-from typing import Dict, Any, Optional
+from typing import TYPE_CHECKING, Any, Dict, Optional
+
 import httpx
 import structlog
 from tenacity import retry, stop_after_attempt, wait_exponential
+
+if TYPE_CHECKING:
+    from schemas.restaurant_standard_schema import OrderSchema, StaffAction  # type: ignore[import-not-found]
 
 logger = structlog.get_logger()
 
@@ -50,7 +55,11 @@ class BaseAdapter(ABC):
 
     @retry(
         stop=stop_after_attempt(int(os.getenv("ADAPTER_RETRY_ATTEMPTS", "3"))),
-        wait=wait_exponential(multiplier=int(os.getenv("ADAPTER_RETRY_MULTIPLIER", "1")), min=int(os.getenv("ADAPTER_RETRY_MIN", "2")), max=int(os.getenv("ADAPTER_RETRY_MAX", "10"))),
+        wait=wait_exponential(
+            multiplier=int(os.getenv("ADAPTER_RETRY_MULTIPLIER", "1")),
+            min=int(os.getenv("ADAPTER_RETRY_MIN", "2")),
+            max=int(os.getenv("ADAPTER_RETRY_MAX", "10")),
+        ),
     )
     async def request(
         self,
@@ -126,9 +135,7 @@ class BaseAdapter(ABC):
 
         except httpx.HTTPError as e:
             logger.error("HTTP请求失败", exc_info=e, system=self.__class__.__name__)
-            raise APIError(
-                code=500, message=str(e), system=self.__class__.__name__
-            )
+            raise APIError(code=500, message=str(e), system=self.__class__.__name__)
 
     @abstractmethod
     def handle_error(self, response: Dict[str, Any]) -> None:
@@ -184,4 +191,3 @@ class BaseAdapter(ABC):
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         """异步上下文管理器出口"""
         await self.close()
-

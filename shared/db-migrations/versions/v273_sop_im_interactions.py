@@ -7,6 +7,7 @@ Revision ID: v273_sop_im_interactions
 Revises: v272_sop_corrective
 Create Date: 2026-04-23
 """
+
 from alembic import op
 
 revision = "v273_sop_im_interactions"
@@ -55,9 +56,7 @@ def upgrade() -> None:
 
     # RLS
     op.execute("ALTER TABLE sop_im_interactions ENABLE ROW LEVEL SECURITY")
-    op.execute(
-        "DROP POLICY IF EXISTS sop_im_interactions_tenant ON sop_im_interactions"
-    )
+    op.execute("DROP POLICY IF EXISTS sop_im_interactions_tenant ON sop_im_interactions")
     op.execute("""
         CREATE POLICY sop_im_interactions_tenant ON sop_im_interactions
             USING (tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid)
@@ -77,12 +76,8 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.execute(
-        "DROP POLICY IF EXISTS sop_im_interactions_tenant ON sop_im_interactions"
-    )
-    op.execute(
-        "ALTER TABLE IF EXISTS sop_im_interactions DISABLE ROW LEVEL SECURITY"
-    )
+    op.execute("DROP POLICY IF EXISTS sop_im_interactions_tenant ON sop_im_interactions")
+    op.execute("ALTER TABLE IF EXISTS sop_im_interactions DISABLE ROW LEVEL SECURITY")
     op.execute("DROP INDEX IF EXISTS idx_sop_im_interactions_created")
     op.execute("DROP INDEX IF EXISTS idx_sop_im_interactions_action")
     op.execute("DROP INDEX IF EXISTS idx_sop_im_interactions_instance")

@@ -19,12 +19,11 @@ Revision: v151
 """
 
 from alembic import op
-from typing import Sequence, Union
 
 revision = "v301"
-down_revision= "v150"
-branch_labels= None
-depends_on= None
+down_revision = "v150"
+branch_labels = None
+depends_on = None
 
 
 def upgrade() -> None:
@@ -203,8 +202,10 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.execute("DELETE FROM projector_checkpoints WHERE projector_name IN ("
-               "'TableTurnoverProjector', 'SessionAnalyticsProjector', 'WaiterPerformanceProjector')")
+    op.execute(
+        "DELETE FROM projector_checkpoints WHERE projector_name IN ("
+        "'TableTurnoverProjector', 'SessionAnalyticsProjector', 'WaiterPerformanceProjector')"
+    )
     op.execute("DROP TABLE IF EXISTS mv_waiter_performance")
     op.execute("DROP TABLE IF EXISTS mv_session_analytics")
     op.execute("DROP TABLE IF EXISTS mv_table_turnover")

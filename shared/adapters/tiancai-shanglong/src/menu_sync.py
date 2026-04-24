@@ -20,12 +20,10 @@
   - 所有金额统一转换为分（整数），不使用浮点
   - 失败的单条记录记录到 migration_errors，不阻断整体迁移
 """
+
 from __future__ import annotations
 
-import asyncio
 from dataclasses import dataclass, field
-from decimal import Decimal
-from typing import Any, Optional
 
 import structlog
 
@@ -176,10 +174,12 @@ class TiancaiMenuSync:
             try:
                 dishes.append(self.to_dish_dict(raw, tenant_id, brand_id))
             except (KeyError, ValueError, TypeError) as exc:
-                result.errors.append({
-                    "item_code": raw.get("item_code"),
-                    "error": str(exc),
-                })
+                result.errors.append(
+                    {
+                        "item_code": raw.get("item_code"),
+                        "error": str(exc),
+                    }
+                )
 
         await self._upsert_dishes(dishes, result)
 
@@ -199,13 +199,15 @@ class TiancaiMenuSync:
     ) -> None:
         """批量 UPSERT dishes 表（ON CONFLICT dish_code 更新价格和状态）。"""
         try:
-            from shared.ontology.src.database import async_session_factory
             from sqlalchemy import text
+
+            from shared.ontology.src.database import async_session_factory
 
             async with async_session_factory() as db:
                 for d in dishes:
                     try:
-                        await db.execute(text("""
+                        await db.execute(
+                            text("""
                             INSERT INTO dishes
                               (tenant_id, brand_id, dish_code, dish_name,
                                category_name, current_price_fen, cost_fen,
@@ -226,13 +228,17 @@ class TiancaiMenuSync:
                               is_available       = EXCLUDED.is_available,
                               kds_zone_code      = EXCLUDED.kds_zone_code,
                               updated_at         = NOW()
-                        """), d)
+                        """),
+                            d,
+                        )
                         result.total_upserted += 1
                     except Exception as exc:  # noqa: BLE001
-                        result.errors.append({
-                            "dish_code": d.get("dish_code"),
-                            "error": str(exc),
-                        })
+                        result.errors.append(
+                            {
+                                "dish_code": d.get("dish_code"),
+                                "error": str(exc),
+                            }
+                        )
                         result.total_skipped += 1
 
                 await db.commit()

@@ -9,8 +9,9 @@ Revision ID: v127
 Revises: v126
 Create Date: 2026-04-02
 """
-from alembic import op
+
 import sqlalchemy as sa
+from alembic import op
 from sqlalchemy.dialects.postgresql import UUID
 
 revision = "v127"
@@ -28,28 +29,22 @@ def upgrade() -> None:
     if "purchase_orders" not in _existing:
         op.create_table(
             "purchase_orders",
-            sa.Column("id", UUID(as_uuid=True), primary_key=True,
-                      server_default=sa.text("gen_random_uuid()")),
+            sa.Column("id", UUID(as_uuid=True), primary_key=True, server_default=sa.text("gen_random_uuid()")),
             sa.Column("tenant_id", UUID(as_uuid=True), nullable=False),
             sa.Column("store_id", UUID(as_uuid=True), nullable=False),
             sa.Column("supplier_id", UUID(as_uuid=True), nullable=True),
             sa.Column("po_number", sa.String(50), nullable=False),
-            sa.Column("status", sa.String(30), nullable=False,
-                      server_default="'draft'"),
-            sa.Column("total_amount_fen", sa.Integer, nullable=False,
-                      server_default="0"),
+            sa.Column("status", sa.String(30), nullable=False, server_default="'draft'"),
+            sa.Column("total_amount_fen", sa.Integer, nullable=False, server_default="0"),
             sa.Column("expected_delivery_date", sa.Date, nullable=True),
             sa.Column("actual_delivery_date", sa.Date, nullable=True),
             sa.Column("approved_by", sa.String(100), nullable=True),
             sa.Column("approved_at", sa.TIMESTAMP(timezone=True), nullable=True),
             sa.Column("received_at", sa.TIMESTAMP(timezone=True), nullable=True),
             sa.Column("notes", sa.Text, nullable=True),
-            sa.Column("created_at", sa.TIMESTAMP(timezone=True),
-                      server_default=sa.text("now()")),
-            sa.Column("updated_at", sa.TIMESTAMP(timezone=True),
-                      server_default=sa.text("now()")),
-            sa.Column("is_deleted", sa.Boolean, nullable=False,
-                      server_default="false"),
+            sa.Column("created_at", sa.TIMESTAMP(timezone=True), server_default=sa.text("now()")),
+            sa.Column("updated_at", sa.TIMESTAMP(timezone=True), server_default=sa.text("now()")),
+            sa.Column("is_deleted", sa.Boolean, nullable=False, server_default="false"),
         )
 
     op.execute("""
@@ -81,8 +76,7 @@ def upgrade() -> None:
     if "purchase_order_items" not in _existing:
         op.create_table(
             "purchase_order_items",
-            sa.Column("id", UUID(as_uuid=True), primary_key=True,
-                      server_default=sa.text("gen_random_uuid()")),
+            sa.Column("id", UUID(as_uuid=True), primary_key=True, server_default=sa.text("gen_random_uuid()")),
             sa.Column("po_id", UUID(as_uuid=True), nullable=False),
             sa.Column("tenant_id", UUID(as_uuid=True), nullable=False),
             sa.Column("ingredient_id", UUID(as_uuid=True), nullable=True),
@@ -123,8 +117,7 @@ def upgrade() -> None:
     if "ingredient_batches" not in _existing:
         op.create_table(
             "ingredient_batches",
-            sa.Column("id", UUID(as_uuid=True), primary_key=True,
-                      server_default=sa.text("gen_random_uuid()")),
+            sa.Column("id", UUID(as_uuid=True), primary_key=True, server_default=sa.text("gen_random_uuid()")),
             sa.Column("tenant_id", UUID(as_uuid=True), nullable=False),
             sa.Column("ingredient_id", UUID(as_uuid=True), nullable=False),
             sa.Column("po_id", UUID(as_uuid=True), nullable=True),
@@ -133,8 +126,7 @@ def upgrade() -> None:
             sa.Column("unit", sa.String(20), nullable=False),
             sa.Column("cost_per_unit_fen", sa.Integer, nullable=False),
             sa.Column("expiry_date", sa.Date, nullable=True),
-            sa.Column("received_at", sa.TIMESTAMP(timezone=True),
-                      server_default=sa.text("now()")),
+            sa.Column("received_at", sa.TIMESTAMP(timezone=True), server_default=sa.text("now()")),
             sa.Column("notes", sa.Text, nullable=True),
         )
 

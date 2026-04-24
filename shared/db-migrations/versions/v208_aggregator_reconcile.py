@@ -7,9 +7,9 @@ Revises: v207
 Create Date: 2026-04-09
 """
 
-from alembic import op
 import sqlalchemy as sa
-from sqlalchemy.dialects.postgresql import UUID, JSONB
+from alembic import op
+from sqlalchemy.dialects.postgresql import UUID
 
 revision = "v208"
 down_revision = "v207b"
@@ -21,10 +21,9 @@ def upgrade() -> None:
     conn = op.get_bind()
     existing = sa.inspect(conn).get_table_names()
 
-
     # ── aggregator_reconcile_results（对账结果）──
 
-    if 'aggregator_reconcile_results' not in existing:
+    if "aggregator_reconcile_results" not in existing:
         op.create_table(
             "aggregator_reconcile_results",
             sa.Column("id", UUID(as_uuid=True), primary_key=True, server_default=sa.text("gen_random_uuid()")),
@@ -53,22 +52,29 @@ def upgrade() -> None:
 
         # ── aggregator_discrepancies（差异单）──
 
-    if 'aggregator_discrepancies' not in existing:
+    if "aggregator_discrepancies" not in existing:
         op.create_table(
             "aggregator_discrepancies",
             sa.Column("id", UUID(as_uuid=True), primary_key=True, server_default=sa.text("gen_random_uuid()")),
-            sa.Column("reconcile_result_id", UUID(as_uuid=True),
-                      sa.ForeignKey("aggregator_reconcile_results.id"), nullable=False),
+            sa.Column(
+                "reconcile_result_id",
+                UUID(as_uuid=True),
+                sa.ForeignKey("aggregator_reconcile_results.id"),
+                nullable=False,
+            ),
             sa.Column("tenant_id", sa.String(50), nullable=False, index=True),
             sa.Column("platform", sa.String(20), nullable=False),
             sa.Column("platform_order_id", sa.String(100), nullable=False),
-            sa.Column("discrepancy_type", sa.String(30), nullable=False,
-                      comment="amount_mismatch/local_only/platform_only/status_mismatch"),
+            sa.Column(
+                "discrepancy_type",
+                sa.String(30),
+                nullable=False,
+                comment="amount_mismatch/local_only/platform_only/status_mismatch",
+            ),
             sa.Column("local_amount_fen", sa.BigInteger, nullable=True),
             sa.Column("platform_amount_fen", sa.BigInteger, nullable=True),
             sa.Column("diff_fen", sa.BigInteger, server_default="0"),
-            sa.Column("status", sa.String(20), server_default="'pending'",
-                      comment="pending/resolved/ignored"),
+            sa.Column("status", sa.String(20), server_default="'pending'", comment="pending/resolved/ignored"),
             sa.Column("resolution", sa.Text, nullable=True),
             sa.Column("resolved_by", sa.String(100), nullable=True),
             sa.Column("resolved_at", sa.DateTime, nullable=True),

@@ -7,6 +7,7 @@
   materialId, materialName, unit, categoryName, specification,
   stockQty (可能为 None), unitPrice (分，可能缺失)
 """
+
 from __future__ import annotations
 
 import uuid

@@ -7,11 +7,11 @@ Round 64 Team D — 新增测试：
   - RLS set_config 调用验证
   - 空数据 / DB异常 降级路径
 """
+
 from __future__ import annotations
 
-import sys
 import os
-import uuid
+import sys
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -20,7 +20,6 @@ import pytest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
 from employee_sync import PinzhiEmployeeSync
-
 
 # ─── 辅助工厂 ───────────────────────────────────────────────────────────────
 
@@ -57,6 +56,7 @@ def _make_pinzhi_employee(**overrides) -> dict:
 
 
 # ─── 测试：map_to_tunxiang_employee 映射逻辑 ────────────────────────────────
+
 
 class TestMapToTunxiangEmployee:
     def test_basic_mapping(self):
@@ -176,6 +176,7 @@ class TestMapToTunxiangEmployee:
 
 # ─── 测试：fetch_employees ───────────────────────────────────────────────────
 
+
 class TestFetchEmployees:
     @pytest.mark.asyncio
     async def test_fetch_employees_calls_adapter(self):
@@ -200,6 +201,7 @@ class TestFetchEmployees:
 
 
 # ─── 测试：upsert_employees 集成 ─────────────────────────────────────────────
+
 
 class TestUpsertEmployees:
     @pytest.mark.asyncio

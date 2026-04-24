@@ -4,6 +4,7 @@
     adapter = get_erp_adapter("kingdee")
     adapter = get_erp_adapter("yonyou")
 """
+
 from __future__ import annotations
 
 from .base import ERPAdapter, ERPType
@@ -29,7 +30,4 @@ def get_erp_adapter(erp_type: str) -> ERPAdapter:
         return KingdeeAdapter()
     if normalized == ERPType.YONYOU.value:
         return YonyouAdapter()
-    raise ValueError(
-        f"不支持的 ERP 类型: {erp_type!r}。"
-        f"支持的类型: {[e.value for e in ERPType]}"
-    )
+    raise ValueError(f"不支持的 ERP 类型: {erp_type!r}。支持的类型: {[e.value for e in ERPType]}")

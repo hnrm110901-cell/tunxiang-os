@@ -139,9 +139,7 @@ class WechatPayService:
         """商户 API 证书序列号（请求微信 V3 接口 Authorization 必填）。"""
         if self._merchant_serial_no is not None:
             return self._merchant_serial_no
-        serial = (
-            os.environ.get("WECHAT_PAY_MCH_CERT_SERIAL") or os.environ.get("WECHAT_PAY_SERIAL_NO") or ""
-        ).strip()
+        serial = (os.environ.get("WECHAT_PAY_MCH_CERT_SERIAL") or os.environ.get("WECHAT_PAY_SERIAL_NO") or "").strip()
         if serial:
             self._merchant_serial_no = serial
             return serial
@@ -160,9 +158,7 @@ class WechatPayService:
             "或配置 WECHAT_PAY_MCH_X509_PATH 指向 apiclient_cert.pem"
         )
 
-    def _decrypt_aes_gcm_api_v3(
-        self, nonce: str, ciphertext: str, associated_data: str
-    ) -> bytes:
+    def _decrypt_aes_gcm_api_v3(self, nonce: str, ciphertext: str, associated_data: str) -> bytes:
         """APIv3 密钥 AES-256-GCM 解密（回调 resource / 平台证书 encrypt_certificate）。"""
         from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
@@ -347,10 +343,7 @@ class WechatPayService:
                 "amount": {"total": 100, "payer_total": 100, "currency": "CNY"},
             }
 
-        url_path = (
-            f"/v3/pay/transactions/out-trade-no/{out_trade_no}"
-            f"?mchid={_MCH_ID}"
-        )
+        url_path = f"/v3/pay/transactions/out-trade-no/{out_trade_no}?mchid={_MCH_ID}"
         return await self._request("GET", url_path)
 
     # ─── 申请退款 ───
@@ -425,9 +418,7 @@ class WechatPayService:
 
     # ─── V3 签名（RSA-SHA256） ───
 
-    def _sign_v3(
-        self, method: str, url: str, timestamp: str, nonce: str, body: str
-    ) -> str:
+    def _sign_v3(self, method: str, url: str, timestamp: str, nonce: str, body: str) -> str:
         """生成微信支付 V3 请求签名。
 
         签名格式：HTTP方法\\n URL路径\\n时间戳\\n随机串\\n请求体\\n
@@ -459,9 +450,7 @@ class WechatPayService:
 
     # ─── AES-256-GCM 解密回调 ───
 
-    def _decrypt_callback(
-        self, nonce: str, ciphertext: str, associated_data: str
-    ) -> dict:
+    def _decrypt_callback(self, nonce: str, ciphertext: str, associated_data: str) -> dict:
         """AES-256-GCM 解密微信支付回调通知。
 
         Args:
@@ -477,9 +466,7 @@ class WechatPayService:
 
     # ─── HTTP 请求（生产模式） ───
 
-    async def _request(
-        self, method: str, url_path: str, body: dict | None = None
-    ) -> dict:
+    async def _request(self, method: str, url_path: str, body: dict | None = None) -> dict:
         """发送微信支付 V3 HTTP 请求（带签名）。
 
         当前阶段：HTTP 请求通过 httpx 实现。
@@ -519,9 +506,7 @@ class WechatPayService:
                         resp.status_code,
                         resp.text,
                     )
-                    raise ValueError(
-                        f"微信支付 API 返回 {resp.status_code}: {resp.text}"
-                    )
+                    raise ValueError(f"微信支付 API 返回 {resp.status_code}: {resp.text}")
                 return resp.json()
         except ImportError:
             logger.warning("httpx 未安装，降级为 Mock 响应")

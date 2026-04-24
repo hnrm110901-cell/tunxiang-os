@@ -15,14 +15,12 @@ Revises: v065
 Create Date: 2026-03-31
 """
 
-from typing import Sequence, Union
-
 from alembic import op
 
 revision = "v066"
-down_revision= "v065"
-branch_labels= None
-depends_on= None
+down_revision = "v065"
+branch_labels = None
+depends_on = None
 
 # 标准 NULLIF NULL guard 条件（v006+ 安全标准）
 _SAFE_CONDITION = "tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::UUID"
@@ -38,25 +36,16 @@ def _apply_safe_rls(table: str) -> None:
     op.execute(f"ALTER TABLE {table} ENABLE ROW LEVEL SECURITY")
     op.execute(f"ALTER TABLE {table} FORCE ROW LEVEL SECURITY")
     op.execute(f"DROP POLICY IF EXISTS {table}_rls_select ON {table}")
-    op.execute(
-        f"CREATE POLICY {table}_rls_select ON {table} "
-        f"FOR SELECT USING ({_SAFE_CONDITION})"
-    )
+    op.execute(f"CREATE POLICY {table}_rls_select ON {table} FOR SELECT USING ({_SAFE_CONDITION})")
     op.execute(f"DROP POLICY IF EXISTS {table}_rls_insert ON {table}")
-    op.execute(
-        f"CREATE POLICY {table}_rls_insert ON {table} "
-        f"FOR INSERT WITH CHECK ({_SAFE_CONDITION})"
-    )
+    op.execute(f"CREATE POLICY {table}_rls_insert ON {table} FOR INSERT WITH CHECK ({_SAFE_CONDITION})")
     op.execute(f"DROP POLICY IF EXISTS {table}_rls_update ON {table}")
     op.execute(
         f"CREATE POLICY {table}_rls_update ON {table} "
         f"FOR UPDATE USING ({_SAFE_CONDITION}) WITH CHECK ({_SAFE_CONDITION})"
     )
     op.execute(f"DROP POLICY IF EXISTS {table}_rls_delete ON {table}")
-    op.execute(
-        f"CREATE POLICY {table}_rls_delete ON {table} "
-        f"FOR DELETE USING ({_SAFE_CONDITION})"
-    )
+    op.execute(f"CREATE POLICY {table}_rls_delete ON {table} FOR DELETE USING ({_SAFE_CONDITION})")
 
 
 def upgrade() -> None:
@@ -141,8 +130,7 @@ def upgrade() -> None:
         "ON franchise_settlement_items (settlement_id)"
     )
     op.execute(
-        "CREATE INDEX IF NOT EXISTS idx_franchise_settlement_items_tenant "
-        "ON franchise_settlement_items (tenant_id)"
+        "CREATE INDEX IF NOT EXISTS idx_franchise_settlement_items_tenant ON franchise_settlement_items (tenant_id)"
     )
 
     _apply_safe_rls("franchise_settlement_items")
@@ -170,13 +158,8 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     # 删除触发器和函数
-    op.execute(
-        "DROP TRIGGER IF EXISTS trg_franchise_settlements_updated_at "
-        "ON franchise_settlements"
-    )
-    op.execute(
-        "DROP FUNCTION IF EXISTS update_franchise_settlements_updated_at()"
-    )
+    op.execute("DROP TRIGGER IF EXISTS trg_franchise_settlements_updated_at ON franchise_settlements")
+    op.execute("DROP FUNCTION IF EXISTS update_franchise_settlements_updated_at()")
 
     # 删除 RLS 策略和表（逆序，先删明细表）
     for table in _SETTLEMENT_TABLES:

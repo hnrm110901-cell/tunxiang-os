@@ -7,8 +7,9 @@ Revision ID: v233
 Revises: v232
 Create Date: 2026-04-12
 """
-from alembic import op
+
 import sqlalchemy as sa
+from alembic import op
 from sqlalchemy.dialects import postgresql
 
 revision = "v233"
@@ -34,10 +35,9 @@ def upgrade() -> None:
     conn = op.get_bind()
     existing = sa.inspect(conn).get_table_names()
 
-
     # ── 1. 创建 agent_memories 表 ──
 
-    if 'agent_memories' not in existing:
+    if "agent_memories" not in existing:
         op.create_table(
             "agent_memories",
             sa.Column("id", postgresql.UUID(), server_default=sa.text("gen_random_uuid()"), primary_key=True),

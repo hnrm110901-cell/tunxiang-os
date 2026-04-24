@@ -12,8 +12,8 @@ Revises: v240
 Create Date: 2026-04-12
 """
 
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 from sqlalchemy.dialects.postgresql import UUID
 
 revision = "v241"
@@ -29,70 +29,53 @@ def upgrade() -> None:
     conn = op.get_bind()
     existing = sa.inspect(conn).get_table_names()
 
-
     # ------------------------------------------------------------------
     # 表1：contracts（合同主表）
     # ------------------------------------------------------------------
 
-    if 'contracts' not in existing:
+    if "contracts" not in existing:
         op.create_table(
             "contracts",
-            sa.Column("id", UUID(as_uuid=True), primary_key=True,
-                      server_default=sa.text("gen_random_uuid()"), nullable=False),
+            sa.Column(
+                "id", UUID(as_uuid=True), primary_key=True, server_default=sa.text("gen_random_uuid()"), nullable=False
+            ),
             sa.Column("tenant_id", UUID(as_uuid=True), nullable=False),
-
-            sa.Column("contract_no", sa.String(64), nullable=True,
-                      comment="合同编号（租户内唯一）"),
-            sa.Column("contract_name", sa.String(200), nullable=False,
-                      comment="合同名称"),
-            sa.Column("contract_type", sa.String(32), nullable=True,
-                      comment="合同类型：rental/equipment/service/labor/other"),
-
-            sa.Column("counterparty_name", sa.String(200), nullable=True,
-                      comment="乙方/甲方名称"),
-            sa.Column("counterparty_contact", sa.String(100), nullable=True,
-                      comment="对方联系人"),
-
-            sa.Column("total_amount", sa.BigInteger(), nullable=True,
-                      comment="合同总金额（分），展示时除以100转元"),
-            sa.Column("paid_amount", sa.BigInteger(), nullable=True,
-                      server_default="0",
-                      comment="已付金额（分），展示时除以100转元"),
-
-            sa.Column("start_date", sa.Date(), nullable=True,
-                      comment="合同开始日期"),
-            sa.Column("end_date", sa.Date(), nullable=True,
-                      comment="合同结束日期"),
-
-            sa.Column("auto_renew", sa.Boolean(), nullable=True,
-                      server_default="false",
-                      comment="是否自动续约"),
-            sa.Column("renewal_notice_days", sa.Integer(), nullable=True,
-                      server_default="30",
-                      comment="提前N天提醒续签"),
-
-            sa.Column("status", sa.String(32), nullable=False,
-                      server_default="active",
-                      comment="合同状态：draft/active/expired/terminated"),
-
-            sa.Column("store_id", UUID(as_uuid=True), nullable=True,
-                      comment="关联门店ID"),
-            sa.Column("responsible_person", UUID(as_uuid=True), nullable=True,
-                      comment="合同负责人员工ID"),
-
-            sa.Column("file_url", sa.Text(), nullable=True,
-                      comment="合同附件URL（Supabase Storage）"),
-            sa.Column("notes", sa.Text(), nullable=True,
-                      comment="备注"),
-
-            sa.Column("created_by", UUID(as_uuid=True), nullable=True,
-                      comment="创建人"),
-            sa.Column("created_at", sa.TIMESTAMP(timezone=True), nullable=True,
-                      server_default=sa.text("now()")),
-            sa.Column("updated_at", sa.TIMESTAMP(timezone=True), nullable=True,
-                      server_default=sa.text("now()")),
-            sa.Column("is_deleted", sa.Boolean(), nullable=True,
-                      server_default="false"),
+            sa.Column("contract_no", sa.String(64), nullable=True, comment="合同编号（租户内唯一）"),
+            sa.Column("contract_name", sa.String(200), nullable=False, comment="合同名称"),
+            sa.Column(
+                "contract_type", sa.String(32), nullable=True, comment="合同类型：rental/equipment/service/labor/other"
+            ),
+            sa.Column("counterparty_name", sa.String(200), nullable=True, comment="乙方/甲方名称"),
+            sa.Column("counterparty_contact", sa.String(100), nullable=True, comment="对方联系人"),
+            sa.Column("total_amount", sa.BigInteger(), nullable=True, comment="合同总金额（分），展示时除以100转元"),
+            sa.Column(
+                "paid_amount",
+                sa.BigInteger(),
+                nullable=True,
+                server_default="0",
+                comment="已付金额（分），展示时除以100转元",
+            ),
+            sa.Column("start_date", sa.Date(), nullable=True, comment="合同开始日期"),
+            sa.Column("end_date", sa.Date(), nullable=True, comment="合同结束日期"),
+            sa.Column("auto_renew", sa.Boolean(), nullable=True, server_default="false", comment="是否自动续约"),
+            sa.Column(
+                "renewal_notice_days", sa.Integer(), nullable=True, server_default="30", comment="提前N天提醒续签"
+            ),
+            sa.Column(
+                "status",
+                sa.String(32),
+                nullable=False,
+                server_default="active",
+                comment="合同状态：draft/active/expired/terminated",
+            ),
+            sa.Column("store_id", UUID(as_uuid=True), nullable=True, comment="关联门店ID"),
+            sa.Column("responsible_person", UUID(as_uuid=True), nullable=True, comment="合同负责人员工ID"),
+            sa.Column("file_url", sa.Text(), nullable=True, comment="合同附件URL（Supabase Storage）"),
+            sa.Column("notes", sa.Text(), nullable=True, comment="备注"),
+            sa.Column("created_by", UUID(as_uuid=True), nullable=True, comment="创建人"),
+            sa.Column("created_at", sa.TIMESTAMP(timezone=True), nullable=True, server_default=sa.text("now()")),
+            sa.Column("updated_at", sa.TIMESTAMP(timezone=True), nullable=True, server_default=sa.text("now()")),
+            sa.Column("is_deleted", sa.Boolean(), nullable=True, server_default="false"),
         )
 
         # 唯一约束：contract_no 在租户内唯一（忽略已删除）
@@ -139,11 +122,12 @@ def upgrade() -> None:
         # 表2：contract_payments（付款计划）
         # ------------------------------------------------------------------
 
-    if 'contract_payments' not in existing:
+    if "contract_payments" not in existing:
         op.create_table(
             "contract_payments",
-            sa.Column("id", UUID(as_uuid=True), primary_key=True,
-                      server_default=sa.text("gen_random_uuid()"), nullable=False),
+            sa.Column(
+                "id", UUID(as_uuid=True), primary_key=True, server_default=sa.text("gen_random_uuid()"), nullable=False
+            ),
             sa.Column("tenant_id", UUID(as_uuid=True), nullable=False),
             sa.Column("contract_id", UUID(as_uuid=True), nullable=False),
             sa.ForeignKeyConstraint(
@@ -152,30 +136,23 @@ def upgrade() -> None:
                 name="fk_contract_payments_contract_id",
                 ondelete="CASCADE",
             ),
-
-            sa.Column("period_name", sa.String(100), nullable=True,
-                      comment="期次名称，如'2026年Q1'"),
-            sa.Column("due_date", sa.Date(), nullable=False,
-                      comment="计划付款日期"),
-
-            sa.Column("planned_amount", sa.BigInteger(), nullable=False,
-                      comment="计划付款金额（分），展示时除以100转元"),
-            sa.Column("actual_amount", sa.BigInteger(), nullable=True,
-                      comment="实际付款金额（分），展示时除以100转元"),
-
-            sa.Column("status", sa.String(32), nullable=False,
-                      server_default="pending",
-                      comment="付款状态：pending/paid/overdue/cancelled"),
-
-            sa.Column("paid_at", sa.TIMESTAMP(timezone=True), nullable=True,
-                      comment="实际付款时间"),
-            sa.Column("notes", sa.Text(), nullable=True,
-                      comment="备注"),
-
-            sa.Column("created_at", sa.TIMESTAMP(timezone=True), nullable=True,
-                      server_default=sa.text("now()")),
-            sa.Column("is_deleted", sa.Boolean(), nullable=True,
-                      server_default="false"),
+            sa.Column("period_name", sa.String(100), nullable=True, comment="期次名称，如'2026年Q1'"),
+            sa.Column("due_date", sa.Date(), nullable=False, comment="计划付款日期"),
+            sa.Column(
+                "planned_amount", sa.BigInteger(), nullable=False, comment="计划付款金额（分），展示时除以100转元"
+            ),
+            sa.Column("actual_amount", sa.BigInteger(), nullable=True, comment="实际付款金额（分），展示时除以100转元"),
+            sa.Column(
+                "status",
+                sa.String(32),
+                nullable=False,
+                server_default="pending",
+                comment="付款状态：pending/paid/overdue/cancelled",
+            ),
+            sa.Column("paid_at", sa.TIMESTAMP(timezone=True), nullable=True, comment="实际付款时间"),
+            sa.Column("notes", sa.Text(), nullable=True, comment="备注"),
+            sa.Column("created_at", sa.TIMESTAMP(timezone=True), nullable=True, server_default=sa.text("now()")),
+            sa.Column("is_deleted", sa.Boolean(), nullable=True, server_default="false"),
         )
 
         # 索引
@@ -210,11 +187,12 @@ def upgrade() -> None:
         # 表3：contract_alerts（合同预警记录）
         # ------------------------------------------------------------------
 
-    if 'contract_alerts' not in existing:
+    if "contract_alerts" not in existing:
         op.create_table(
             "contract_alerts",
-            sa.Column("id", UUID(as_uuid=True), primary_key=True,
-                      server_default=sa.text("gen_random_uuid()"), nullable=False),
+            sa.Column(
+                "id", UUID(as_uuid=True), primary_key=True, server_default=sa.text("gen_random_uuid()"), nullable=False
+            ),
             sa.Column("tenant_id", UUID(as_uuid=True), nullable=False),
             sa.Column("contract_id", UUID(as_uuid=True), nullable=False),
             sa.ForeignKeyConstraint(
@@ -223,22 +201,14 @@ def upgrade() -> None:
                 name="fk_contract_alerts_contract_id",
                 ondelete="CASCADE",
             ),
-
-            sa.Column("alert_type", sa.String(32), nullable=True,
-                      comment="预警类型：expiry/payment_due/auto_renew/overspend"),
-            sa.Column("alert_days_before", sa.Integer(), nullable=True,
-                      comment="提前多少天触发预警"),
-            sa.Column("message", sa.Text(), nullable=True,
-                      comment="预警消息内容"),
-
-            sa.Column("is_sent", sa.Boolean(), nullable=True,
-                      server_default="false",
-                      comment="是否已推送"),
-            sa.Column("sent_at", sa.TIMESTAMP(timezone=True), nullable=True,
-                      comment="推送时间"),
-
-            sa.Column("created_at", sa.TIMESTAMP(timezone=True), nullable=True,
-                      server_default=sa.text("now()")),
+            sa.Column(
+                "alert_type", sa.String(32), nullable=True, comment="预警类型：expiry/payment_due/auto_renew/overspend"
+            ),
+            sa.Column("alert_days_before", sa.Integer(), nullable=True, comment="提前多少天触发预警"),
+            sa.Column("message", sa.Text(), nullable=True, comment="预警消息内容"),
+            sa.Column("is_sent", sa.Boolean(), nullable=True, server_default="false", comment="是否已推送"),
+            sa.Column("sent_at", sa.TIMESTAMP(timezone=True), nullable=True, comment="推送时间"),
+            sa.Column("created_at", sa.TIMESTAMP(timezone=True), nullable=True, server_default=sa.text("now()")),
         )
 
         # 索引

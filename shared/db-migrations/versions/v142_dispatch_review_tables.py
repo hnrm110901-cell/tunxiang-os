@@ -13,18 +13,16 @@ Revises: v141
 Create Date: 2026-04-04
 """
 
-from alembic import op
 import sqlalchemy as sa
-from sqlalchemy.dialects.postgresql import UUID, JSONB
+from alembic import op
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 
 revision = "v142"
 down_revision = "v141"
 branch_labels = None
 depends_on = None
 
-_SAFE_RLS = (
-    "tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid"
-)
+_SAFE_RLS = "tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid"
 
 
 def upgrade() -> None:
@@ -35,19 +33,18 @@ def upgrade() -> None:
     # ── dispatch_rules 派单规则配置 ──────────────────────────────────────
     if "dispatch_rules" not in _existing:
         op.create_table(
-        "dispatch_rules",
-        sa.Column("id", UUID(as_uuid=True), primary_key=True,
-                  server_default=sa.text("gen_random_uuid()")),
-        sa.Column("tenant_id", UUID(as_uuid=True), nullable=False),
-        sa.Column("alert_type", sa.String(50), nullable=False),
-        sa.Column("assignee_role", sa.String(50), nullable=False),
-        sa.Column("severity", sa.String(20), nullable=False, server_default="normal"),
-        sa.Column("escalation_minutes", sa.Integer, nullable=False, server_default="30"),
-        sa.Column("is_active", sa.Boolean, nullable=False, server_default="true"),
-        sa.Column("created_at", sa.TIMESTAMP(timezone=True), server_default=sa.text("now()")),
-        sa.Column("updated_at", sa.TIMESTAMP(timezone=True), server_default=sa.text("now()")),
-        sa.Column("is_deleted", sa.Boolean, nullable=False, server_default="false"),
-    )
+            "dispatch_rules",
+            sa.Column("id", UUID(as_uuid=True), primary_key=True, server_default=sa.text("gen_random_uuid()")),
+            sa.Column("tenant_id", UUID(as_uuid=True), nullable=False),
+            sa.Column("alert_type", sa.String(50), nullable=False),
+            sa.Column("assignee_role", sa.String(50), nullable=False),
+            sa.Column("severity", sa.String(20), nullable=False, server_default="normal"),
+            sa.Column("escalation_minutes", sa.Integer, nullable=False, server_default="30"),
+            sa.Column("is_active", sa.Boolean, nullable=False, server_default="true"),
+            sa.Column("created_at", sa.TIMESTAMP(timezone=True), server_default=sa.text("now()")),
+            sa.Column("updated_at", sa.TIMESTAMP(timezone=True), server_default=sa.text("now()")),
+            sa.Column("is_deleted", sa.Boolean, nullable=False, server_default="false"),
+        )
     op.execute("""
         DO $$ BEGIN
             IF (SELECT COUNT(*) FROM information_schema.columns 
@@ -68,8 +65,7 @@ def upgrade() -> None:
     if "dispatch_tasks" not in _existing:
         op.create_table(
             "dispatch_tasks",
-            sa.Column("id", UUID(as_uuid=True), primary_key=True,
-                      server_default=sa.text("gen_random_uuid()")),
+            sa.Column("id", UUID(as_uuid=True), primary_key=True, server_default=sa.text("gen_random_uuid()")),
             sa.Column("tenant_id", UUID(as_uuid=True), nullable=False),
             sa.Column("store_id", UUID(as_uuid=True), nullable=False),
             sa.Column("alert_type", sa.String(50), nullable=False),
@@ -130,8 +126,7 @@ def upgrade() -> None:
     if "review_reports" not in _existing:
         op.create_table(
             "review_reports",
-            sa.Column("id", UUID(as_uuid=True), primary_key=True,
-                      server_default=sa.text("gen_random_uuid()")),
+            sa.Column("id", UUID(as_uuid=True), primary_key=True, server_default=sa.text("gen_random_uuid()")),
             sa.Column("tenant_id", UUID(as_uuid=True), nullable=False),
             sa.Column("store_id", UUID(as_uuid=True), nullable=True),
             sa.Column("region_id", sa.String(50), nullable=True),
@@ -179,8 +174,7 @@ def upgrade() -> None:
     if "review_issues" not in _existing:
         op.create_table(
             "review_issues",
-            sa.Column("id", UUID(as_uuid=True), primary_key=True,
-                      server_default=sa.text("gen_random_uuid()")),
+            sa.Column("id", UUID(as_uuid=True), primary_key=True, server_default=sa.text("gen_random_uuid()")),
             sa.Column("tenant_id", UUID(as_uuid=True), nullable=False),
             sa.Column("store_id", UUID(as_uuid=True), nullable=False),
             sa.Column("issue_type", sa.String(50), nullable=False),
@@ -224,8 +218,7 @@ def upgrade() -> None:
     if "knowledge_cases" not in _existing:
         op.create_table(
             "knowledge_cases",
-            sa.Column("id", UUID(as_uuid=True), primary_key=True,
-                      server_default=sa.text("gen_random_uuid()")),
+            sa.Column("id", UUID(as_uuid=True), primary_key=True, server_default=sa.text("gen_random_uuid()")),
             sa.Column("tenant_id", UUID(as_uuid=True), nullable=False),
             sa.Column("store_id", UUID(as_uuid=True), nullable=True),
             sa.Column("category", sa.String(50), nullable=False, server_default="operations"),
@@ -266,13 +259,11 @@ def upgrade() -> None:
         WITH CHECK ({_SAFE_RLS});
     """)
 
-
     # ── regional_rectifications 区域整改任务 ─────────────────────────────
     if "regional_rectifications" not in _existing:
         op.create_table(
             "regional_rectifications",
-            sa.Column("id", UUID(as_uuid=True), primary_key=True,
-                      server_default=sa.text("gen_random_uuid()")),
+            sa.Column("id", UUID(as_uuid=True), primary_key=True, server_default=sa.text("gen_random_uuid()")),
             sa.Column("tenant_id", UUID(as_uuid=True), nullable=False),
             sa.Column("region_id", sa.String(50), nullable=False),
             sa.Column("store_id", UUID(as_uuid=True), nullable=False),

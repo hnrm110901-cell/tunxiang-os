@@ -4,12 +4,13 @@ Revision ID: v197
 Revises: v196
 Create Date: 2026-04-07
 """
-from alembic import op
+
 import sqlalchemy as sa
+from alembic import op
 from sqlalchemy.dialects import postgresql
 
-revision = 'v197'
-down_revision = 'v196'
+revision = "v197"
+down_revision = "v196"
 branch_labels = None
 depends_on = None
 
@@ -33,41 +34,45 @@ def upgrade() -> None:
 
     # ─── 2. supplier_rfq_requests — 询价单（RFQ） ─────────────────────────────
     op.create_table(
-        'supplier_rfq_requests',
-        sa.Column('id', postgresql.UUID(as_uuid=True), primary_key=True,
-                  server_default=sa.text('gen_random_uuid()')),
-        sa.Column('tenant_id', postgresql.UUID(as_uuid=True), nullable=False),
-        sa.Column('supplier_id', postgresql.UUID(as_uuid=True), nullable=False),
-        sa.Column('store_id', postgresql.UUID(as_uuid=True), nullable=True),
-        sa.Column('request_no', sa.VARCHAR(30), unique=True, nullable=True,
-                  comment='询价单号：RFQ-YYYYMM-XXXX'),
-        sa.Column('status', sa.VARCHAR(20), nullable=False, server_default='pending',
-                  comment='pending/quoted/accepted/rejected/expired'),
-        sa.Column('items', postgresql.JSONB(astext_type=sa.Text()), nullable=False,
-                  server_default='[]',
-                  comment='询价品目：[{ingredient_id, name, qty, unit}]'),
-        sa.Column('expected_delivery_date', sa.Date(), nullable=True),
-        sa.Column('quote_valid_until', sa.Date(), nullable=True),
-        sa.Column('quoted_price_fen', sa.BigInteger(), nullable=True,
-                  comment='供应商报价，单位：分'),
-        sa.Column('accepted_at', sa.TIMESTAMP(timezone=True), nullable=True),
-        sa.Column('notes', sa.Text(), nullable=True),
-        sa.Column('is_deleted', sa.Boolean(), nullable=False, server_default='false'),
-        sa.Column('created_at', sa.TIMESTAMP(timezone=True),
-                  server_default=sa.text('NOW()'), nullable=False),
-        sa.Column('updated_at', sa.TIMESTAMP(timezone=True),
-                  server_default=sa.text('NOW()'), nullable=False),
+        "supplier_rfq_requests",
+        sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True, server_default=sa.text("gen_random_uuid()")),
+        sa.Column("tenant_id", postgresql.UUID(as_uuid=True), nullable=False),
+        sa.Column("supplier_id", postgresql.UUID(as_uuid=True), nullable=False),
+        sa.Column("store_id", postgresql.UUID(as_uuid=True), nullable=True),
+        sa.Column("request_no", sa.VARCHAR(30), unique=True, nullable=True, comment="询价单号：RFQ-YYYYMM-XXXX"),
+        sa.Column(
+            "status",
+            sa.VARCHAR(20),
+            nullable=False,
+            server_default="pending",
+            comment="pending/quoted/accepted/rejected/expired",
+        ),
+        sa.Column(
+            "items",
+            postgresql.JSONB(astext_type=sa.Text()),
+            nullable=False,
+            server_default="[]",
+            comment="询价品目：[{ingredient_id, name, qty, unit}]",
+        ),
+        sa.Column("expected_delivery_date", sa.Date(), nullable=True),
+        sa.Column("quote_valid_until", sa.Date(), nullable=True),
+        sa.Column("quoted_price_fen", sa.BigInteger(), nullable=True, comment="供应商报价，单位：分"),
+        sa.Column("accepted_at", sa.TIMESTAMP(timezone=True), nullable=True),
+        sa.Column("notes", sa.Text(), nullable=True),
+        sa.Column("is_deleted", sa.Boolean(), nullable=False, server_default="false"),
+        sa.Column("created_at", sa.TIMESTAMP(timezone=True), server_default=sa.text("NOW()"), nullable=False),
+        sa.Column("updated_at", sa.TIMESTAMP(timezone=True), server_default=sa.text("NOW()"), nullable=False),
     )
 
     # 索引
-    op.create_index('idx_supplier_rfq_tenant', 'supplier_rfq_requests', ['tenant_id'])
-    op.create_index('idx_supplier_rfq_supplier', 'supplier_rfq_requests',
-                    ['tenant_id', 'supplier_id'])
-    op.create_index('idx_supplier_rfq_status', 'supplier_rfq_requests',
-                    ['tenant_id', 'status'])
+    op.create_index("idx_supplier_rfq_tenant", "supplier_rfq_requests", ["tenant_id"])
+    op.create_index("idx_supplier_rfq_supplier", "supplier_rfq_requests", ["tenant_id", "supplier_id"])
+    op.create_index("idx_supplier_rfq_status", "supplier_rfq_requests", ["tenant_id", "status"])
     op.create_index(
-        'idx_supplier_rfq_request_no', 'supplier_rfq_requests', ['request_no'],
-        postgresql_where=sa.text('request_no IS NOT NULL'),
+        "idx_supplier_rfq_request_no",
+        "supplier_rfq_requests",
+        ["request_no"],
+        postgresql_where=sa.text("request_no IS NOT NULL"),
     )
 
     # ─── 3. RLS 策略 ─────────────────────────────────────────────────────────
@@ -100,7 +105,7 @@ def downgrade() -> None:
     op.execute("DROP POLICY IF EXISTS supplier_rfq_requests_tenant_isolation ON supplier_rfq_requests")
 
     # 删除 supplier_rfq_requests 表
-    op.drop_table('supplier_rfq_requests')
+    op.drop_table("supplier_rfq_requests")
 
     # 回滚 supplier_accounts 新增字段
     op.execute("""

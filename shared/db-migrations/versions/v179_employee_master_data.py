@@ -44,22 +44,10 @@ def upgrade() -> None:
     op.execute("ALTER TABLE employees ADD COLUMN IF NOT EXISTS skill_tags JSONB DEFAULT '[]'::jsonb")
     op.execute("ALTER TABLE employees ADD COLUMN IF NOT EXISTS risk_level TEXT DEFAULT 'normal'")
 
-    op.execute(
-        "CREATE INDEX IF NOT EXISTS idx_employees_tenant_department "
-        "ON employees (tenant_id, department_id)"
-    )
-    op.execute(
-        "CREATE INDEX IF NOT EXISTS idx_employees_tenant_job_grade "
-        "ON employees (tenant_id, job_grade_id)"
-    )
-    op.execute(
-        "CREATE INDEX IF NOT EXISTS idx_employees_health_cert_expiry "
-        "ON employees (health_cert_expiry)"
-    )
-    op.execute(
-        "CREATE INDEX IF NOT EXISTS idx_employees_contract_end_date "
-        "ON employees (contract_end_date)"
-    )
+    op.execute("CREATE INDEX IF NOT EXISTS idx_employees_tenant_department ON employees (tenant_id, department_id)")
+    op.execute("CREATE INDEX IF NOT EXISTS idx_employees_tenant_job_grade ON employees (tenant_id, job_grade_id)")
+    op.execute("CREATE INDEX IF NOT EXISTS idx_employees_health_cert_expiry ON employees (health_cert_expiry)")
+    op.execute("CREATE INDEX IF NOT EXISTS idx_employees_contract_end_date ON employees (contract_end_date)")
 
 
 def downgrade() -> None:

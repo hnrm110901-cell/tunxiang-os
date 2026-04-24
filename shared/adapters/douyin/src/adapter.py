@@ -4,7 +4,8 @@
 
 底层 HTTP 调用委托给 DouyinClient，本类只做业务编排。
 """
-from typing import Any, Dict, List, Optional
+
+from typing import Any, Dict
 
 import structlog
 
@@ -45,12 +46,15 @@ class DouyinAdapter:
     # ==================== 团购券接口 ====================
 
     async def query_coupons(
-        self, page: int = 1, page_size: int = 20,
+        self,
+        page: int = 1,
+        page_size: int = 20,
     ) -> Dict[str, Any]:
         """查询团购券列表"""
         logger.info("查询团购券列表", page=page, page_size=page_size)
         result = await self.client.request(
-            "POST", "/api/apps/trade/v2/coupon/query_list/",
+            "POST",
+            "/api/apps/trade/v2/coupon/query_list/",
             data={"page": page, "page_size": page_size},
         )
         return result.get("data", {})
@@ -59,7 +63,8 @@ class DouyinAdapter:
         """查询团购券详情"""
         logger.info("查询团购券详情", coupon_id=coupon_id)
         result = await self.client.request(
-            "POST", "/api/apps/trade/v2/coupon/query_detail/",
+            "POST",
+            "/api/apps/trade/v2/coupon/query_detail/",
             data={"coupon_id": coupon_id},
         )
         return result.get("data", {})
@@ -98,7 +103,8 @@ class DouyinAdapter:
         """
         logger.info("查询团购订单", start_time=start_time, end_time=end_time, page=page)
         result = await self.client.request(
-            "POST", "/api/apps/trade/v2/order/query_list/",
+            "POST",
+            "/api/apps/trade/v2/order/query_list/",
             data={
                 "start_time": start_time,
                 "end_time": end_time,
@@ -119,7 +125,8 @@ class DouyinAdapter:
         """查询抖音门店信息"""
         logger.info("查询抖音门店信息", shop_id=shop_id)
         result = await self.client.request(
-            "POST", "/api/apps/trade/v2/shop/query/",
+            "POST",
+            "/api/apps/trade/v2/shop/query/",
             data={"shop_id": shop_id},
         )
         return result.get("data", {})
@@ -127,7 +134,9 @@ class DouyinAdapter:
     # ==================== 结算接口 ====================
 
     async def query_settlements(
-        self, start_date: str, end_date: str,
+        self,
+        start_date: str,
+        end_date: str,
     ) -> Dict[str, Any]:
         """
         查询结算单列表
@@ -138,7 +147,8 @@ class DouyinAdapter:
         """
         logger.info("查询结算单", start_date=start_date, end_date=end_date)
         result = await self.client.request(
-            "POST", "/api/apps/trade/v2/settlement/query_list/",
+            "POST",
+            "/api/apps/trade/v2/settlement/query_list/",
             data={"start_date": start_date, "end_date": end_date},
         )
         return result.get("data", {})

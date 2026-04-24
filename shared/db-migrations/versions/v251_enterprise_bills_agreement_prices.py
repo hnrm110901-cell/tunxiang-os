@@ -7,8 +7,8 @@
 背景：enterprise_billing.py / enterprise_account.py 仍使用内存 dict，
       此迁移完成 DB 持久化，配合 v250 enterprise_accounts/enterprise_sign_records 表。
 """
+
 from alembic import op
-import sqlalchemy as sa
 
 revision = "v251"
 down_revision = "v250"

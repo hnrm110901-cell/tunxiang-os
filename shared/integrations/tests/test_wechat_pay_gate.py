@@ -1,4 +1,5 @@
 """微信支付 Mock 门禁：生产环境禁止静默 Mock。"""
+
 from __future__ import annotations
 
 import importlib

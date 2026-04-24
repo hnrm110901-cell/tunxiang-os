@@ -1,4 +1,5 @@
 """屯象OS Skill Registry — 技能注册表（三级渐进加载）"""
+
 from __future__ import annotations
 
 import fnmatch
@@ -66,9 +67,7 @@ class SkillRegistry:
         """返回所有已注册 SkillManifest 列表"""
         return list(self._full_manifests.values())
 
-    def find_by_event_type(
-        self, event_type: str
-    ) -> list[tuple[SkillManifest, EventTrigger]]:
+    def find_by_event_type(self, event_type: str) -> list[tuple[SkillManifest, EventTrigger]]:
         """
         找到所有声明订阅该事件类型的 Skill。
 
@@ -95,10 +94,7 @@ class SkillRegistry:
 
     def find_by_category(self, category: str) -> list[SkillManifest]:
         """按 category 过滤技能列表"""
-        return [
-            m for m in self._full_manifests.values()
-            if m.meta.category == category
-        ]
+        return [m for m in self._full_manifests.values() if m.meta.category == category]
 
     def get_all_owned_entities(self) -> dict[str, str]:
         """

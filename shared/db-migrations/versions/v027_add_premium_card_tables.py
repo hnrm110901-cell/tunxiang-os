@@ -31,9 +31,10 @@ Revision ID: v027
 Revises: v025
 Create Date: 2026-03-30
 """
-from alembic import op
+
 import sqlalchemy as sa
-from sqlalchemy.dialects.postgresql import UUID, JSONB
+from alembic import op
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 
 revision = "v027"
 down_revision = "v026"
@@ -109,38 +110,38 @@ def upgrade() -> None:
     op.create_table(
         _T_TEMPLATES,
         *_base_cols(),
-
         sa.Column("name", sa.String(100), nullable=False, comment="模板名称，如「月度次卡·10次」"),
         sa.Column(
-            "card_type", sa.String(20), nullable=False,
+            "card_type",
+            sa.String(20),
+            nullable=False,
             comment="count_card | period_card",
         ),
         sa.Column("price_fen", sa.Integer(), nullable=False, comment="售价（分）"),
-
         # 次卡专属
         sa.Column("total_uses", sa.Integer(), nullable=True, comment="总次数（次卡）"),
-
         # 周期卡专属
         sa.Column(
-            "period_type", sa.String(20), nullable=True,
+            "period_type",
+            sa.String(20),
+            nullable=True,
             comment="monthly | quarterly | yearly",
         ),
-
         # 权益配置 JSONB
         # 示例：[{"type":"discount","value":0.9},
         #        {"type":"free_dish","dish_id":"xxx","quota_per_period":1},
         #        {"type":"priority_queue"},{"type":"free_parking"}]
         sa.Column(
-            "benefits", JSONB(), nullable=False, server_default=sa.text("'[]'::jsonb"),
+            "benefits",
+            JSONB(),
+            nullable=False,
+            server_default=sa.text("'[]'::jsonb"),
             comment="权益配置列表（JSONB）",
         ),
-
         # 有效天数（次卡用，购买后 N 天内有效）
         sa.Column("valid_days", sa.Integer(), nullable=True, comment="购买后有效天数（次卡）"),
-
         sa.Column("is_active", sa.Boolean(), nullable=False, server_default="true", comment="是否上架"),
         sa.Column("sort_order", sa.Integer(), nullable=False, server_default="0", comment="排序"),
-
         comment="付费卡模板（总部配置）",
     )
 
@@ -156,49 +157,53 @@ def upgrade() -> None:
     op.create_table(
         _T_CARDS,
         *_base_cols(),
-
         sa.Column(
-            "template_id", UUID(as_uuid=True),
+            "template_id",
+            UUID(as_uuid=True),
             sa.ForeignKey(f"{_T_TEMPLATES}.id", ondelete="RESTRICT"),
-            nullable=True,    # 旧版年卡未关联模板时允许 NULL
+            nullable=True,  # 旧版年卡未关联模板时允许 NULL
             comment="关联模板（null=旧版年卡兼容）",
         ),
         sa.Column("customer_id", UUID(as_uuid=True), nullable=False, comment="持卡会员"),
         sa.Column("store_id", UUID(as_uuid=True), nullable=True, comment="购买门店"),
-
         sa.Column(
-            "card_type", sa.String(20), nullable=False,
+            "card_type",
+            sa.String(20),
+            nullable=False,
             comment="count_card | period_card",
         ),
         sa.Column(
-            "status", sa.String(20), nullable=False, server_default="active",
+            "status",
+            sa.String(20),
+            nullable=False,
+            server_default="active",
             comment="active | expired | cancelled | suspended",
         ),
-
         # 次卡字段
         sa.Column("remaining_uses", sa.Integer(), nullable=True, comment="剩余次数（次卡）"),
         sa.Column("total_uses", sa.Integer(), nullable=True, comment="购买时总次数（次卡）"),
-
         # 周期卡字段
         sa.Column("period_start", sa.Date(), nullable=True, comment="当前周期开始日"),
         sa.Column("period_end", sa.Date(), nullable=True, comment="当前周期结束日"),
         sa.Column("next_renewal_at", sa.Date(), nullable=True, comment="下次续费日期"),
-
         # 有效期
         sa.Column(
-            "purchased_at", sa.DateTime(timezone=True),
-            server_default=sa.func.now(), nullable=False,
+            "purchased_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.func.now(),
+            nullable=False,
             comment="购买时间",
         ),
         sa.Column("expires_at", sa.DateTime(timezone=True), nullable=True, comment="到期时间"),
-
         # 当前周期已用权益（JSONB）
         # 示例：{"free_dish_used": 1, "parking_used": 0}
         sa.Column(
-            "period_used_benefits", JSONB(), nullable=False, server_default=sa.text("'{}'::jsonb"),
+            "period_used_benefits",
+            JSONB(),
+            nullable=False,
+            server_default=sa.text("'{}'::jsonb"),
             comment="当前周期已用权益计数（JSONB）",
         ),
-
         comment="会员持有的付费卡",
     )
 
@@ -236,36 +241,38 @@ def upgrade() -> None:
     op.create_table(
         _T_USAGES,
         *_base_cols(),
-
         sa.Column(
-            "card_id", UUID(as_uuid=True),
+            "card_id",
+            UUID(as_uuid=True),
             sa.ForeignKey(f"{_T_CARDS}.id", ondelete="RESTRICT"),
             nullable=False,
         ),
         sa.Column("customer_id", UUID(as_uuid=True), nullable=False),
         sa.Column("store_id", UUID(as_uuid=True), nullable=True),
         sa.Column("order_id", UUID(as_uuid=True), nullable=True),
-
         sa.Column(
-            "usage_type", sa.String(30), nullable=False,
+            "usage_type",
+            sa.String(30),
+            nullable=False,
             comment="count_deduct | benefit_use | period_renewal",
         ),
         sa.Column(
-            "benefit_type", sa.String(50), nullable=True,
+            "benefit_type",
+            sa.String(50),
+            nullable=True,
             comment="discount | free_dish | priority_queue 等（benefit_use 时填写）",
         ),
-
         # 次卡扣次快照
         sa.Column("uses_before", sa.Integer(), nullable=True, comment="扣减前剩余次数"),
         sa.Column("uses_after", sa.Integer(), nullable=True, comment="扣减后剩余次数"),
-
         sa.Column(
-            "used_at", sa.DateTime(timezone=True),
-            server_default=sa.func.now(), nullable=False,
+            "used_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.func.now(),
+            nullable=False,
             comment="使用时间",
         ),
         sa.Column("operator_id", UUID(as_uuid=True), nullable=True, comment="操作员"),
-
         comment="付费卡使用记录",
     )
 

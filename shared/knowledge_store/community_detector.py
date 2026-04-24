@@ -3,6 +3,7 @@
 使用 BFS 连通分量算法对图谱节点进行社区划分，
 然后为每个社区生成 LLM 摘要用于高层检索。
 """
+
 from __future__ import annotations
 
 import os
@@ -34,15 +35,21 @@ class CommunityDetector:
             await db.execute(sql_text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": tenant_id})
 
             # 1. 获取所有节点和边
-            nodes_result = await db.execute(sql_text("""
+            nodes_result = await db.execute(
+                sql_text("""
                 SELECT id::text FROM kg_nodes WHERE tenant_id = :tid::uuid AND is_deleted = false
-            """), {"tid": tenant_id})
+            """),
+                {"tid": tenant_id},
+            )
             all_nodes = [r[0] for r in nodes_result.fetchall()]
 
-            edges_result = await db.execute(sql_text("""
+            edges_result = await db.execute(
+                sql_text("""
                 SELECT from_node_id::text, to_node_id::text FROM kg_edges
                 WHERE tenant_id = :tid::uuid AND is_deleted = false
-            """), {"tid": tenant_id})
+            """),
+                {"tid": tenant_id},
+            )
             edges = [(r[0], r[1]) for r in edges_result.fetchall()]
 
             if not all_nodes:
@@ -77,32 +84,44 @@ class CommunityDetector:
 
             # 3. 写入 kg_communities + 更新节点的 community_id
             # 先清理旧社区
-            await db.execute(sql_text("""
+            await db.execute(
+                sql_text("""
                 DELETE FROM kg_communities WHERE tenant_id = :tid::uuid
-            """), {"tid": tenant_id})
+            """),
+                {"tid": tenant_id},
+            )
 
             for i, component in enumerate(communities):
                 # 创建社区记录
-                await db.execute(sql_text("""
+                await db.execute(
+                    sql_text("""
                     INSERT INTO kg_communities (tenant_id, label, node_count)
                     VALUES (:tid::uuid, :label, :count)
-                """), {"tid": tenant_id, "label": f"社区-{i + 1}", "count": len(component)})
+                """),
+                    {"tid": tenant_id, "label": f"社区-{i + 1}", "count": len(component)},
+                )
 
                 # 获取刚插入的 community_id
-                cid_result = await db.execute(sql_text("""
+                cid_result = await db.execute(
+                    sql_text("""
                     SELECT id FROM kg_communities
                     WHERE tenant_id = :tid::uuid AND label = :label
                     ORDER BY id DESC LIMIT 1
-                """), {"tid": tenant_id, "label": f"社区-{i + 1}"})
+                """),
+                    {"tid": tenant_id, "label": f"社区-{i + 1}"},
+                )
                 cid_row = cid_result.fetchone()
                 community_id = cid_row[0] if cid_row else i + 1
 
                 # 更新节点的 community_id
                 for node_id in component:
-                    await db.execute(sql_text("""
+                    await db.execute(
+                        sql_text("""
                         UPDATE kg_nodes SET community_id = :cid
                         WHERE id = :nid::uuid AND tenant_id = :tid::uuid
-                    """), {"cid": community_id, "nid": node_id, "tid": tenant_id})
+                    """),
+                        {"cid": community_id, "nid": node_id, "tid": tenant_id},
+                    )
 
             await db.commit()
 
@@ -130,20 +149,26 @@ class CommunityDetector:
             await db.execute(sql_text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": tenant_id})
 
             # 获取所有社区
-            result = await db.execute(sql_text("""
+            result = await db.execute(
+                sql_text("""
                 SELECT id, label, node_count FROM kg_communities
                 WHERE tenant_id = :tid::uuid AND is_deleted = false
-            """), {"tid": tenant_id})
+            """),
+                {"tid": tenant_id},
+            )
             communities = result.fetchall()
 
             updated = 0
             for comm_id, comm_label, node_count in communities:
                 # 获取社区中的节点
-                nodes_result = await db.execute(sql_text("""
+                nodes_result = await db.execute(
+                    sql_text("""
                     SELECT label, name FROM kg_nodes
                     WHERE community_id = :cid AND tenant_id = :tid::uuid AND is_deleted = false
                     LIMIT 20
-                """), {"cid": comm_id, "tid": tenant_id})
+                """),
+                    {"cid": comm_id, "tid": tenant_id},
+                )
                 nodes = nodes_result.fetchall()
 
                 if not nodes:
@@ -154,10 +179,13 @@ class CommunityDetector:
                 summary = await _generate_summary(node_descriptions, comm_label)
 
                 if summary:
-                    await db.execute(sql_text("""
+                    await db.execute(
+                        sql_text("""
                         UPDATE kg_communities SET summary = :summary, updated_at = NOW()
                         WHERE id = :cid AND tenant_id = :tid::uuid
-                    """), {"summary": summary, "cid": comm_id, "tid": tenant_id})
+                    """),
+                        {"summary": summary, "cid": comm_id, "tid": tenant_id},
+                    )
                     updated += 1
 
             await db.commit()

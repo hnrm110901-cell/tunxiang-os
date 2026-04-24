@@ -8,6 +8,7 @@ Revision ID: v272_sop_corrective
 Revises: v271_sop_tasks
 Create Date: 2026-04-23
 """
+
 from alembic import op
 
 revision = "v272_sop_corrective"

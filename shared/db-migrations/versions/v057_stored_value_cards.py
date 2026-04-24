@@ -16,16 +16,15 @@ Revision ID: v057
 Revises: v047
 Create Date: 2026-03-31
 """
-from typing import Sequence, Union
 
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 from sqlalchemy.dialects.postgresql import UUID
 
 revision = "v057"
-down_revision= "v047"
-branch_labels= None
-depends_on= None
+down_revision = "v047"
+branch_labels = None
+depends_on = None
 
 _NEW_TABLES = ["sv_transactions", "sv_charge_rules"]
 
@@ -50,10 +49,7 @@ def _enable_safe_rls(table_name: str) -> None:
         ),
         ("delete", f"FOR DELETE USING ({_RLS_CONDITION})"),
     ]:
-        op.execute(
-            f"CREATE POLICY {table_name}_rls_{action} ON {table_name} "
-            f"AS PERMISSIVE {clause}"
-        )
+        op.execute(f"CREATE POLICY {table_name}_rls_{action} ON {table_name} AS PERMISSIVE {clause}")
 
 
 def upgrade() -> None:
@@ -194,7 +190,5 @@ def upgrade() -> None:
 def downgrade() -> None:
     for table in reversed(_NEW_TABLES):
         for suffix in ("select", "insert", "update", "delete"):
-            op.execute(
-                f"DROP POLICY IF EXISTS {table}_rls_{suffix} ON {table}"
-            )
+            op.execute(f"DROP POLICY IF EXISTS {table}_rls_{suffix} ON {table}")
         op.drop_table(table)

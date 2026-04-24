@@ -24,10 +24,10 @@
   last_visit    → last_visit_at
   total_spend   → total_spend_fen（历史累计消费，分）
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Optional
 
 import structlog
 
@@ -43,8 +43,8 @@ _AUTO_MIGRATE_MAX_BALANCE_FEN = 0  # 默认只迁移零余额，有余额必须�
 @dataclass
 class MemberMigrationResult:
     total_fetched: int = 0
-    auto_migrated: int = 0      # 自动迁移（零余额）
-    pending_review: int = 0     # 待人工审核（有余额）
+    auto_migrated: int = 0  # 自动迁移（零余额）
+    pending_review: int = 0  # 待人工审核（有余额）
     total_skipped: int = 0
     errors: list[dict] = field(default_factory=list)
 
@@ -178,10 +178,12 @@ class TiancaiMemberSync:
                     pending_list.append(m)
                     result._pending_balance_fen += m["stored_value_fen"]
             except (KeyError, ValueError, TypeError) as exc:
-                result.errors.append({
-                    "card_no": raw.get("card_no"),
-                    "error": str(exc),
-                })
+                result.errors.append(
+                    {
+                        "card_no": raw.get("card_no"),
+                        "error": str(exc),
+                    }
+                )
 
         result.pending_review = len(pending_list)
 
@@ -223,8 +225,9 @@ class TiancaiMemberSync:
     ) -> None:
         """UPSERT customers 表，以 phone 为唯一键。"""
         try:
-            from shared.ontology.src.database import async_session_factory
             from sqlalchemy import text
+
+            from shared.ontology.src.database import async_session_factory
 
             async with async_session_factory() as db:
                 await db.execute(
@@ -233,7 +236,8 @@ class TiancaiMemberSync:
                 )
                 for m in members:
                     try:
-                        await db.execute(text("""
+                        await db.execute(
+                            text("""
                             INSERT INTO customers
                               (tenant_id, phone, display_name,
                                external_id_tiancai,
@@ -252,13 +256,17 @@ class TiancaiMemberSync:
                               total_spend_fen      = EXCLUDED.total_spend_fen,
                               updated_at           = NOW()
                             -- 有余额的 stored_value_fen 不自动覆写，需人工审核
-                        """), m)
+                        """),
+                            m,
+                        )
                         result.auto_migrated += 1
                     except Exception as exc:  # noqa: BLE001
-                        result.errors.append({
-                            "phone": m.get("phone"),
-                            "error": str(exc),
-                        })
+                        result.errors.append(
+                            {
+                                "phone": m.get("phone"),
+                                "error": str(exc),
+                            }
+                        )
                         result.total_skipped += 1
 
                 await db.commit()
@@ -277,12 +285,14 @@ class TiancaiMemberSync:
         等待财务人员人工核实后再执行余额迁移。
         """
         try:
-            from shared.ontology.src.database import async_session_factory
             from sqlalchemy import text
+
+            from shared.ontology.src.database import async_session_factory
 
             async with async_session_factory() as db:
                 for m in pending:
-                    await db.execute(text("""
+                    await db.execute(
+                        text("""
                         INSERT INTO member_migration_pending
                           (tenant_id, phone, display_name,
                            external_id_tiancai, stored_value_fen,
@@ -298,7 +308,9 @@ class TiancaiMemberSync:
                           stored_value_fen = EXCLUDED.stored_value_fen,
                           status           = 'pending_review',
                           updated_at       = NOW()
-                    """), m)
+                    """),
+                        m,
+                    )
                 await db.commit()
 
             logger.info(

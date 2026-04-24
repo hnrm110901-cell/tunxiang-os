@@ -9,6 +9,7 @@
   MEITUAN_DELIVERY_APP_SECRET
   MEITUAN_DELIVERY_STORE_MAP   JSON 格式: {"txos_store_001": "mt_poi_888"}
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -23,21 +24,19 @@ import structlog
 from .delivery_platform_base import (
     DeliveryPlatformAdapter,
     DeliveryPlatformError,
-    DeliveryPlatformSignError,
-    DeliveryPlatformTimeoutError,
 )
 
 logger = structlog.get_logger()
 
 # ── 美团订单状态 → 屯象统一状态 ──────────────────────────
 MEITUAN_STATUS_MAP: Dict[int, str] = {
-    1: "pending",       # 用户已下单
-    2: "confirmed",     # 商家已接单
-    3: "preparing",     # 备餐中
-    4: "delivering",    # 骑手已取餐
-    5: "completed",     # 已完成
-    6: "cancelled",     # 已取消
-    8: "refunded",      # 已退款
+    1: "pending",  # 用户已下单
+    2: "confirmed",  # 商家已接单
+    3: "preparing",  # 备餐中
+    4: "delivering",  # 骑手已取餐
+    5: "completed",  # 已完成
+    6: "cancelled",  # 已取消
+    8: "refunded",  # 已退款
 }
 
 
@@ -124,14 +123,16 @@ class MeituanDeliveryAdapter(DeliveryPlatformAdapter):
 
         items: List[Dict[str, Any]] = []
         for food in food_list:
-            items.append({
-                "name": food.get("food_name", ""),
-                "quantity": int(food.get("quantity", 1)),
-                "price_fen": int(food.get("price", 0)),
-                "sku_id": str(food.get("app_food_code", "")),
-                "notes": food.get("food_property", ""),
-                "internal_dish_id": "",  # 需要业务层映射
-            })
+            items.append(
+                {
+                    "name": food.get("food_name", ""),
+                    "quantity": int(food.get("quantity", 1)),
+                    "price_fen": int(food.get("price", 0)),
+                    "sku_id": str(food.get("app_food_code", "")),
+                    "notes": food.get("food_property", ""),
+                    "internal_dish_id": "",  # 需要业务层映射
+                }
+            )
 
         status_code = int(raw.get("status", 1))
         return {
@@ -170,22 +171,24 @@ class MeituanDeliveryAdapter(DeliveryPlatformAdapter):
                 "day_seq": "001",
                 "status": 1,
                 "order_total_price": 3500,
-                "detail": json.dumps([
-                    {
-                        "food_name": "宫保鸡丁",
-                        "quantity": 1,
-                        "price": 2800,
-                        "app_food_code": "FOOD_001",
-                        "food_property": "微辣",
-                    },
-                    {
-                        "food_name": "米饭",
-                        "quantity": 1,
-                        "price": 700,
-                        "app_food_code": "FOOD_002",
-                        "food_property": "",
-                    },
-                ]),
+                "detail": json.dumps(
+                    [
+                        {
+                            "food_name": "宫保鸡丁",
+                            "quantity": 1,
+                            "price": 2800,
+                            "app_food_code": "FOOD_001",
+                            "food_property": "微辣",
+                        },
+                        {
+                            "food_name": "米饭",
+                            "quantity": 1,
+                            "price": 700,
+                            "app_food_code": "FOOD_002",
+                            "food_property": "",
+                        },
+                    ]
+                ),
                 "recipient_phone": "138****8888",
                 "recipient_address": "长沙市天心区测试路1号",
                 "delivery_time": str(now_ts + 2400),
@@ -195,9 +198,7 @@ class MeituanDeliveryAdapter(DeliveryPlatformAdapter):
 
     # ── DeliveryPlatformAdapter 接口实现 ─────────────────────
 
-    async def pull_orders(
-        self, store_id: str, since: datetime
-    ) -> list[dict]:
+    async def pull_orders(self, store_id: str, since: datetime) -> list[dict]:
         """拉取美团新订单（Mock）"""
         poi_id = self._get_poi_id(store_id)
         logger.info(
@@ -235,9 +236,7 @@ class MeituanDeliveryAdapter(DeliveryPlatformAdapter):
         # Mock：直接返回成功
         return True
 
-    async def sync_menu(
-        self, store_id: str, dishes: list[dict]
-    ) -> dict:
+    async def sync_menu(self, store_id: str, dishes: list[dict]) -> dict:
         """同步菜品到美团（Mock）
 
         将屯象统一菜品格式转换为美团商品格式后上传。
@@ -262,10 +261,12 @@ class MeituanDeliveryAdapter(DeliveryPlatformAdapter):
                 synced += 1
             except (KeyError, ValueError, TypeError) as exc:
                 failed += 1
-                errors.append({
-                    "dish_id": dish.get("id", "unknown"),
-                    "error": str(exc),
-                })
+                errors.append(
+                    {
+                        "dish_id": dish.get("id", "unknown"),
+                        "error": str(exc),
+                    }
+                )
                 logger.warning(
                     "meituan_sync_dish_failed",
                     dish_id=dish.get("id"),
@@ -274,9 +275,7 @@ class MeituanDeliveryAdapter(DeliveryPlatformAdapter):
 
         return {"synced": synced, "failed": failed, "errors": errors}
 
-    async def update_stock(
-        self, store_id: str, dish_id: str, available: bool
-    ) -> bool:
+    async def update_stock(self, store_id: str, dish_id: str, available: bool) -> bool:
         """更新菜品上下架状态（Mock）"""
         poi_id = self._get_poi_id(store_id)
         action = "上架" if available else "售罄"
@@ -299,15 +298,17 @@ class MeituanDeliveryAdapter(DeliveryPlatformAdapter):
             "day_seq": "001",
             "status": 2,
             "order_total_price": 3500,
-            "detail": json.dumps([
-                {
-                    "food_name": "宫保鸡丁",
-                    "quantity": 1,
-                    "price": 2800,
-                    "app_food_code": "FOOD_001",
-                    "food_property": "微辣",
-                },
-            ]),
+            "detail": json.dumps(
+                [
+                    {
+                        "food_name": "宫保鸡丁",
+                        "quantity": 1,
+                        "price": 2800,
+                        "app_food_code": "FOOD_001",
+                        "food_property": "微辣",
+                    },
+                ]
+            ),
             "recipient_phone": "138****8888",
             "recipient_address": "长沙市天心区测试路1号",
             "delivery_time": str(now_ts + 2400),

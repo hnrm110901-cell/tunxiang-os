@@ -16,6 +16,7 @@
         {"order_no": "ORD001", "store_name": "长沙万达店", "status": "已完成"},
     )
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -77,9 +78,7 @@ class NotificationDispatcher:
             ValueError: 不支持的渠道
         """
         if channel not in VALID_CHANNELS:
-            raise ValueError(
-                f"Unsupported channel '{channel}'. Valid: {', '.join(VALID_CHANNELS)}"
-            )
+            raise ValueError(f"Unsupported channel '{channel}'. Valid: {', '.join(VALID_CHANNELS)}")
 
         dispatch_id = f"dispatch_{uuid.uuid4().hex[:10]}"
         dispatched_at = datetime.now(timezone.utc).isoformat()
@@ -134,10 +133,7 @@ class NotificationDispatcher:
         Returns:
             每个渠道的发送结果列表
         """
-        tasks = [
-            self.send(ch, target, template_code, variables)
-            for ch in channels
-        ]
+        tasks = [self.send(ch, target, template_code, variables) for ch in channels]
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
         final: list[dict[str, Any]] = []
@@ -148,12 +144,14 @@ class NotificationDispatcher:
                     channel=channels[i],
                     error=str(result),
                 )
-                final.append({
-                    "channel": channels[i],
-                    "status": "error",
-                    "detail": {"error": str(result)},
-                    "dispatched_at": datetime.now(timezone.utc).isoformat(),
-                })
+                final.append(
+                    {
+                        "channel": channels[i],
+                        "status": "error",
+                        "detail": {"error": str(result)},
+                        "dispatched_at": datetime.now(timezone.utc).isoformat(),
+                    }
+                )
             else:
                 final.append(result)
 
@@ -163,18 +161,14 @@ class NotificationDispatcher:
     #  内部分发方法
     # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-    async def _dispatch_sms(
-        self, phone: str, template_code: str, variables: dict[str, Any]
-    ) -> dict[str, Any]:
+    async def _dispatch_sms(self, phone: str, template_code: str, variables: dict[str, Any]) -> dict[str, Any]:
         """分发到 SMSService"""
         if not phone:
             return {"status": "skipped", "error": "No phone number provided"}
 
         # 根据 template_code 映射到具体的 SMS 方法
         if template_code == "verification_code":
-            return await self._sms_service.send_verification_code(
-                phone, variables.get("code", "")
-            )
+            return await self._sms_service.send_verification_code(phone, variables.get("code", ""))
         elif template_code == "order_notification":
             return await self._sms_service.send_order_notification(
                 phone=phone,
@@ -203,9 +197,7 @@ class NotificationDispatcher:
                 phone, variables.get("code", variables.get("content", ""))
             )
 
-    async def _dispatch_wechat(
-        self, openid: str, template_code: str, variables: dict[str, Any]
-    ) -> dict[str, Any]:
+    async def _dispatch_wechat(self, openid: str, template_code: str, variables: dict[str, Any]) -> dict[str, Any]:
         """分发到 WechatSubscribeService"""
         if not openid:
             return {"status": "skipped", "error": "No openid provided"}
@@ -247,9 +239,7 @@ class NotificationDispatcher:
                 "error": f"Unknown template_code '{template_code}' for wechat_subscribe",
             }
 
-    async def _dispatch_in_app(
-        self, user_id: str, template_code: str, variables: dict[str, Any]
-    ) -> dict[str, Any]:
+    async def _dispatch_in_app(self, user_id: str, template_code: str, variables: dict[str, Any]) -> dict[str, Any]:
         """分发到应用内通知（写入 DB 或内存）
 
         当前为 Mock 实现，生产环境需接入 notification_engine 或直接写 notifications 表。
@@ -272,9 +262,7 @@ class NotificationDispatcher:
             "template_code": template_code,
         }
 
-    async def _dispatch_email(
-        self, email: str, template_code: str, variables: dict[str, Any]
-    ) -> dict[str, Any]:
+    async def _dispatch_email(self, email: str, template_code: str, variables: dict[str, Any]) -> dict[str, Any]:
         """分发到邮件服务（占位，未实现）"""
         if not email:
             return {"status": "skipped", "error": "No email provided"}

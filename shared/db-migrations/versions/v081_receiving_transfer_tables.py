@@ -12,18 +12,17 @@ Revision ID: v078
 Revises: v077
 Create Date: 2026-03-31
 """
+
 from __future__ import annotations
 
-from typing import Sequence, Union
-
-from alembic import op
 import sqlalchemy as sa
-from sqlalchemy.dialects.postgresql import UUID, JSONB
+from alembic import op
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 
 revision = "v081"
-down_revision= "v080"
-branch_labels= None
-depends_on= None
+down_revision = "v080"
+branch_labels = None
+depends_on = None
 
 
 def upgrade() -> None:

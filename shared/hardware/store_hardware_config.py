@@ -9,6 +9,7 @@
 3. 门店运维微调（更换打印机IP等）
 4. 日常监控设备状态
 """
+
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Optional
@@ -16,7 +17,7 @@ from typing import Any, Optional
 import structlog
 
 from .device_registry import DEVICE_REGISTRY, get_device
-from .protocol_support import create_protocol_handler, ProtocolHandler
+from .protocol_support import ProtocolHandler, create_protocol_handler
 
 logger = structlog.get_logger()
 
@@ -287,11 +288,7 @@ class StoreHardwareConfig:
             设备实例列表
         """
         store_devices = self._store_devices.get(store_id, {})
-        return [
-            inst.to_dict()
-            for inst in store_devices.values()
-            if inst.tenant_id == tenant_id
-        ]
+        return [inst.to_dict() for inst in store_devices.values() if inst.tenant_id == tenant_id]
 
     # ─── 设备测试与状态 ───
 
@@ -383,12 +380,14 @@ class StoreHardwareConfig:
                 result = await self.test_device(store_id, instance_id, tenant_id)
                 results.append(result)
             except (ValueError, PermissionError) as exc:
-                results.append({
-                    "instance_id": instance_id,
-                    "device_key": instance.device_key,
-                    "status": "error",
-                    "error": str(exc),
-                })
+                results.append(
+                    {
+                        "instance_id": instance_id,
+                        "device_key": instance.device_key,
+                        "status": "error",
+                        "error": str(exc),
+                    }
+                )
 
         logger.info(
             "store_hardware.all_devices_tested",
@@ -477,11 +476,7 @@ class StoreHardwareConfig:
         Returns:
             模板列表
         """
-        return [
-            tpl.to_dict()
-            for tpl in self._templates.values()
-            if tpl.tenant_id == tenant_id
-        ]
+        return [tpl.to_dict() for tpl in self._templates.values() if tpl.tenant_id == tenant_id]
 
     async def apply_template(
         self,

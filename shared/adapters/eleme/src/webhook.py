@@ -2,10 +2,11 @@
 饿了么 Webhook 回调处理器
 处理饿了么开放平台推送的各类业务事件
 """
+
 import hashlib
 import hmac
 import time
-from typing import Any, Callable, Coroutine, Dict, Optional
+from typing import Any, Callable, Coroutine, Dict
 
 import structlog
 
@@ -26,9 +27,7 @@ class ElemeWebhookHandler:
             app_secret: 饿了么应用密钥，用于签名验证
         """
         self.app_secret = app_secret
-        self._handlers: Dict[
-            str, Callable[[Dict[str, Any]], Coroutine[Any, Any, None]]
-        ] = {}
+        self._handlers: Dict[str, Callable[[Dict[str, Any]], Coroutine[Any, Any, None]]] = {}
 
     def verify_signature(
         self,

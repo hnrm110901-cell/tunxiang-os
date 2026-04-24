@@ -2,11 +2,12 @@
 屯象OS 行业公共字典 — 预订统一模型
 """
 
-from typing import TypedDict, Optional, Dict, List, Any
+from typing import Any, Dict, List, TypedDict
 
 
 class UnifiedReservation(TypedDict, total=False):
     """统一预订格式 — 所有预订系统映射到此结构"""
+
     # ── 标识 ──
     id: str
     external_id: str
@@ -73,6 +74,7 @@ class UnifiedReservation(TypedDict, total=False):
 
 class ReservationStats(TypedDict, total=False):
     """预订统计"""
+
     store_id: str
     period_start: str
     period_end: str
@@ -88,6 +90,7 @@ class ReservationStats(TypedDict, total=False):
 
 class CreateReservationRequest(TypedDict, total=False):
     """创建/更新预订的请求DTO"""
+
     reservation_date: str
     reservation_time: str
     party_size: int

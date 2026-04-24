@@ -23,10 +23,13 @@ from __future__ import annotations
 import json
 import os
 from datetime import datetime, timezone
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 from uuid import UUID, uuid4
 
 import structlog
+
+if TYPE_CHECKING:
+    import redis.asyncio as aioredis  # type: ignore[import-not-found]
 
 logger = structlog.get_logger(__name__)
 

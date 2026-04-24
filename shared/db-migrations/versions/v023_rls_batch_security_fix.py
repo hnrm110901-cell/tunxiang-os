@@ -15,14 +15,13 @@ Revision ID: v023
 Revises: v022b
 Create Date: 2026-03-30
 """
-from typing import Sequence, Union
 
 from alembic import op
 
 revision = "v023"
-down_revision= "v022b"
-branch_labels= None
-depends_on= None
+down_revision = "v022b"
+branch_labels = None
+depends_on = None
 
 TABLES_TO_FIX = {
     "table_production_plans": {
@@ -68,22 +67,13 @@ def upgrade() -> None:
         for policy_name in info["old_policies"]:
             op.execute(f"DROP POLICY IF EXISTS {policy_name} ON {table}")
 
-        op.execute(
-            f"CREATE POLICY {table}_rls_select ON {table} "
-            f"FOR SELECT USING ({_SAFE_CONDITION})"
-        )
-        op.execute(
-            f"CREATE POLICY {table}_rls_insert ON {table} "
-            f"FOR INSERT WITH CHECK ({_SAFE_CONDITION})"
-        )
+        op.execute(f"CREATE POLICY {table}_rls_select ON {table} FOR SELECT USING ({_SAFE_CONDITION})")
+        op.execute(f"CREATE POLICY {table}_rls_insert ON {table} FOR INSERT WITH CHECK ({_SAFE_CONDITION})")
         op.execute(
             f"CREATE POLICY {table}_rls_update ON {table} "
             f"FOR UPDATE USING ({_SAFE_CONDITION}) WITH CHECK ({_SAFE_CONDITION})"
         )
-        op.execute(
-            f"CREATE POLICY {table}_rls_delete ON {table} "
-            f"FOR DELETE USING ({_SAFE_CONDITION})"
-        )
+        op.execute(f"CREATE POLICY {table}_rls_delete ON {table} FOR DELETE USING ({_SAFE_CONDITION})")
 
         op.execute(f"ALTER TABLE {table} ENABLE ROW LEVEL SECURITY")
         op.execute(f"ALTER TABLE {table} FORCE ROW LEVEL SECURITY")

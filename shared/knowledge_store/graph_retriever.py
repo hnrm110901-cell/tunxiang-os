@@ -4,6 +4,7 @@ Low-level: 实体匹配 + 1-hop 关系遍历（具体事实查询）
 High-level: 社区摘要匹配（主题/概述类查询）
 Hybrid: 图谱检索 + 向量检索融合
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -70,18 +71,20 @@ class GraphRetriever:
             )
             # 将节点和邻居组织为检索结果
             context = _format_node_context(node, neighbors)
-            results.append({
-                "doc_id": f"kg:{node['id']}",
-                "chunk_id": f"kg:{node['id']}",
-                "text": context,
-                "score": node.get("score", 0.5),
-                "metadata": {
-                    "source": "knowledge_graph",
-                    "node_label": node.get("label", ""),
-                    "node_name": node.get("name", ""),
-                    "neighbor_count": len(neighbors),
-                },
-            })
+            results.append(
+                {
+                    "doc_id": f"kg:{node['id']}",
+                    "chunk_id": f"kg:{node['id']}",
+                    "text": context,
+                    "score": node.get("score", 0.5),
+                    "metadata": {
+                        "source": "knowledge_graph",
+                        "node_label": node.get("label", ""),
+                        "node_name": node.get("name", ""),
+                        "neighbor_count": len(neighbors),
+                    },
+                }
+            )
 
         return results[:top_k]
 
@@ -106,17 +109,19 @@ class GraphRetriever:
             # 简单相关度：查询关键字与社区摘要的重叠
             relevance = _compute_text_relevance(query, summary)
             if relevance > 0.1:
-                results.append({
-                    "doc_id": f"community:{comm['id']}",
-                    "chunk_id": f"community:{comm['id']}",
-                    "text": summary,
-                    "score": relevance,
-                    "metadata": {
-                        "source": "community_summary",
-                        "community_label": comm.get("label", ""),
-                        "node_count": comm.get("node_count", 0),
-                    },
-                })
+                results.append(
+                    {
+                        "doc_id": f"community:{comm['id']}",
+                        "chunk_id": f"community:{comm['id']}",
+                        "text": summary,
+                        "score": relevance,
+                        "metadata": {
+                            "source": "community_summary",
+                            "community_label": comm.get("label", ""),
+                            "node_count": comm.get("node_count", 0),
+                        },
+                    }
+                )
 
         results.sort(key=lambda x: x["score"], reverse=True)
         return results[:5]
@@ -206,8 +211,8 @@ def _compute_text_relevance(query: str, text: str) -> float:
     """简单文本相关度（字符重叠率）"""
     if not query or not text:
         return 0.0
-    query_chars = set(c for c in query if '\u4e00' <= c <= '\u9fff')
-    text_chars = set(c for c in text[:500] if '\u4e00' <= c <= '\u9fff')
+    query_chars = set(c for c in query if "\u4e00" <= c <= "\u9fff")
+    text_chars = set(c for c in text[:500] if "\u4e00" <= c <= "\u9fff")
     if not query_chars:
         return 0.3
     return len(query_chars & text_chars) / len(query_chars)

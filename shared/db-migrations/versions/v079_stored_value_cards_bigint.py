@@ -17,17 +17,16 @@ Revision ID: v075
 Revises: v074
 Create Date: 2026-03-31
 """
-from __future__ import annotations
 
-from typing import Sequence, Union
+from __future__ import annotations
 
 import sqlalchemy as sa
 from alembic import op
 
 revision = "v079"
-down_revision= "v078"
-branch_labels= None
-depends_on= None
+down_revision = "v078"
+branch_labels = None
+depends_on = None
 
 # 需要升级为 BIGINT 的 (表, 列) 对
 _BIGINT_COLUMNS = [

@@ -2,11 +2,12 @@
 屯象OS 行业公共字典 — 菜品/套餐统一模型
 """
 
-from typing import TypedDict, Optional, List, Dict, Any
+from typing import List, TypedDict
 
 
 class UnifiedDishMethod(TypedDict, total=False):
     """菜品做法"""
+
     method_id: str
     method_name: str
     price: float
@@ -15,6 +16,7 @@ class UnifiedDishMethod(TypedDict, total=False):
 
 class UnifiedDish(TypedDict, total=False):
     """统一菜品格式"""
+
     id: str
     external_id: str
     source: str
@@ -37,6 +39,7 @@ class UnifiedDish(TypedDict, total=False):
 
 class UnifiedSetMeal(TypedDict, total=False):
     """统一套餐格式"""
+
     set_meal_id: str
     set_meal_name: str
     price: float

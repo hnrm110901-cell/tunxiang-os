@@ -16,16 +16,14 @@
 Revision: v150
 """
 
-from typing import Sequence, Union
-
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 from sqlalchemy.dialects.postgresql import UUID
 
 revision = "v300"
-down_revision= "v149"
-branch_labels= None
-depends_on= None
+down_revision = "v149"
+branch_labels = None
+depends_on = None
 
 
 def upgrade() -> None:

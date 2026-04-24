@@ -5,10 +5,11 @@ Reciprocal Rank Fusion (RRF):
 
 两路检索分别取 top-20，RRF 融合后返回 top-k。
 """
+
 from __future__ import annotations
 
 import asyncio
-from typing import Any, Optional
+from typing import Any
 
 import structlog
 

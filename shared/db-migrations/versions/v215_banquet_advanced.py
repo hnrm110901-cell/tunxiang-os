@@ -2,8 +2,9 @@
 
 Revision: v215
 """
-from alembic import op
+
 import sqlalchemy as sa
+from alembic import op
 from sqlalchemy.dialects import postgresql
 
 revision = "v215"
@@ -17,17 +18,23 @@ def upgrade() -> None:
     existing = sa.inspect(conn).get_table_names()
 
     # ── 排菜方案模板 ──
-    if 'banquet_menu_plans' not in existing:
+    if "banquet_menu_plans" not in existing:
         op.create_table(
             "banquet_menu_plans",
-            sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True,
-                      server_default=sa.text("gen_random_uuid()")),
+            sa.Column(
+                "id", postgresql.UUID(as_uuid=True), primary_key=True, server_default=sa.text("gen_random_uuid()")
+            ),
             sa.Column("tenant_id", postgresql.UUID(as_uuid=True), nullable=False),
             sa.Column("name", sa.VARCHAR(100), nullable=False, comment="方案名: 如 '8人商务宴'"),
             sa.Column("guest_count", sa.INTEGER, nullable=False, comment="标准人数"),
             sa.Column("budget_fen", sa.BIGINT, nullable=True, comment="预算(分)"),
-            sa.Column("dishes", postgresql.JSONB, nullable=False, server_default="[]",
-                      comment="[{dish_id, dish_name, qty, unit_price_fen, category}]"),
+            sa.Column(
+                "dishes",
+                postgresql.JSONB,
+                nullable=False,
+                server_default="[]",
+                comment="[{dish_id, dish_name, qty, unit_price_fen, category}]",
+            ),
             sa.Column("total_cost_fen", sa.BIGINT, server_default="0", comment="总成本(分)"),
             sa.Column("total_price_fen", sa.BIGINT, server_default="0", comment="总售价(分)"),
             sa.Column("margin_rate", sa.NUMERIC(5, 2), nullable=True, comment="毛利率%"),
@@ -50,11 +57,12 @@ def upgrade() -> None:
         """)
 
     # ── 宴席场次 ──
-    if 'banquet_sessions' not in existing:
+    if "banquet_sessions" not in existing:
         op.create_table(
             "banquet_sessions",
-            sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True,
-                      server_default=sa.text("gen_random_uuid()")),
+            sa.Column(
+                "id", postgresql.UUID(as_uuid=True), primary_key=True, server_default=sa.text("gen_random_uuid()")
+            ),
             sa.Column("tenant_id", postgresql.UUID(as_uuid=True), nullable=False),
             sa.Column("store_id", postgresql.UUID(as_uuid=True), nullable=False),
             sa.Column("menu_plan_id", postgresql.UUID(as_uuid=True), nullable=True),
@@ -65,8 +73,12 @@ def upgrade() -> None:
             sa.Column("guest_count", sa.INTEGER, nullable=False),
             sa.Column("contact_name", sa.VARCHAR(50), nullable=True),
             sa.Column("contact_phone", sa.VARCHAR(20), nullable=True),
-            sa.Column("status", sa.VARCHAR(20), server_default="confirmed",
-                      comment="confirmed/preparing/serving/completed/cancelled"),
+            sa.Column(
+                "status",
+                sa.VARCHAR(20),
+                server_default="confirmed",
+                comment="confirmed/preparing/serving/completed/cancelled",
+            ),
             sa.Column("total_amount_fen", sa.BIGINT, server_default="0"),
             sa.Column("deposit_fen", sa.BIGINT, server_default="0", comment="定金"),
             sa.Column("notes", sa.TEXT, nullable=True),
@@ -88,16 +100,16 @@ def upgrade() -> None:
         """)
 
     # ── 分席账单 ──
-    if 'banquet_split_bills' not in existing:
+    if "banquet_split_bills" not in existing:
         op.create_table(
             "banquet_split_bills",
-            sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True,
-                      server_default=sa.text("gen_random_uuid()")),
+            sa.Column(
+                "id", postgresql.UUID(as_uuid=True), primary_key=True, server_default=sa.text("gen_random_uuid()")
+            ),
             sa.Column("tenant_id", postgresql.UUID(as_uuid=True), nullable=False),
             sa.Column("session_id", postgresql.UUID(as_uuid=True), nullable=False),
             sa.Column("table_no", sa.INTEGER, nullable=False, comment="桌号/席号"),
-            sa.Column("split_mode", sa.VARCHAR(20), nullable=False,
-                      comment="by_table/by_person/custom_ratio"),
+            sa.Column("split_mode", sa.VARCHAR(20), nullable=False, comment="by_table/by_person/custom_ratio"),
             sa.Column("ratio", sa.NUMERIC(5, 2), nullable=True, comment="自定义比例"),
             sa.Column("amount_fen", sa.BIGINT, nullable=False),
             sa.Column("paid", sa.BOOLEAN, server_default="false"),

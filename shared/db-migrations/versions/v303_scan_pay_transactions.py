@@ -20,6 +20,7 @@ RLS：标准 NULLIF(current_setting('app.tenant_id', true), '')::UUID 模式
 Revision ID: v168
 Revises: v167
 """
+
 from alembic import op
 
 revision = "v303"

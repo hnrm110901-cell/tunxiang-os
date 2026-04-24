@@ -25,8 +25,9 @@ Revision ID: v031
 Revises: v030
 Create Date: 2026-03-30
 """
-from alembic import op
+
 import sqlalchemy as sa
+from alembic import op
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 
 revision = "v033"
@@ -63,31 +64,41 @@ def upgrade() -> None:
             onupdate=sa.func.now(),
             nullable=False,
         ),
+        sa.Column("is_deleted", sa.Boolean(), nullable=False, server_default="false"),
         sa.Column(
-            "is_deleted", sa.Boolean(), nullable=False, server_default="false"
-        ),
-
-        sa.Column(
-            "name", sa.String(100), nullable=False,
+            "name",
+            sa.String(100),
+            nullable=False,
             comment="审批流名称，如：大额优惠审批流",
         ),
         sa.Column(
-            "trigger_conditions", JSONB, nullable=False, server_default=sa.text("'{}'"),
+            "trigger_conditions",
+            JSONB,
+            nullable=False,
+            server_default=sa.text("'{}'"),
             comment="触发条件 JSONB: {type, conditions:[{field, op, value}]}",
         ),
         sa.Column(
-            "steps", JSONB, nullable=False, server_default=sa.text("'[]'"),
+            "steps",
+            JSONB,
+            nullable=False,
+            server_default=sa.text("'[]'"),
             comment="审批步骤列表 JSONB: [{step, role, timeout_hours, auto_approve_on_timeout}]",
         ),
         sa.Column(
-            "is_active", sa.Boolean(), nullable=False, server_default="true",
+            "is_active",
+            sa.Boolean(),
+            nullable=False,
+            server_default="true",
             comment="是否启用",
         ),
         sa.Column(
-            "priority", sa.Integer(), nullable=False, server_default="0",
+            "priority",
+            sa.Integer(),
+            nullable=False,
+            server_default="0",
             comment="优先级（值越大越优先），多个工作流匹配时取最高",
         ),
-
         comment="审批流模板表",
     )
 
@@ -127,69 +138,84 @@ def upgrade() -> None:
             onupdate=sa.func.now(),
             nullable=False,
         ),
-        sa.Column(
-            "is_deleted", sa.Boolean(), nullable=False, server_default="false"
-        ),
-
+        sa.Column("is_deleted", sa.Boolean(), nullable=False, server_default="false"),
         # 关联审批流模板（软关联，不设 FK 避免跨租户约束问题）
-        sa.Column("workflow_id", UUID(as_uuid=True), nullable=False,
-                  comment="所属审批流模板 ID"),
-
+        sa.Column("workflow_id", UUID(as_uuid=True), nullable=False, comment="所属审批流模板 ID"),
         # 审批对象
         sa.Column(
-            "object_type", sa.String(50), nullable=False,
+            "object_type",
+            sa.String(50),
+            nullable=False,
             comment="campaign | journey | referral_campaign | stored_value_plan",
         ),
         sa.Column(
-            "object_id", sa.String(64), nullable=False,
+            "object_id",
+            sa.String(64),
+            nullable=False,
             comment="被审批对象 ID",
         ),
         sa.Column(
-            "object_summary", JSONB, nullable=False, server_default=sa.text("'{}'"),
+            "object_summary",
+            JSONB,
+            nullable=False,
+            server_default=sa.text("'{}'"),
             comment="审批内容摘要 JSONB，冗余存储减少关联查询",
         ),
-
         # 申请人
         sa.Column(
-            "requester_id", UUID(as_uuid=True), nullable=False,
+            "requester_id",
+            UUID(as_uuid=True),
+            nullable=False,
             comment="申请人员工 ID",
         ),
         sa.Column(
-            "requester_name", sa.String(50), nullable=False,
+            "requester_name",
+            sa.String(50),
+            nullable=False,
             comment="申请人姓名（冗余存储）",
         ),
-
         # 状态
         sa.Column(
-            "status", sa.String(20), nullable=False, server_default="pending",
+            "status",
+            sa.String(20),
+            nullable=False,
+            server_default="pending",
             comment="pending | approved | rejected | cancelled | expired",
         ),
         sa.Column(
-            "current_step", sa.Integer(), nullable=False, server_default="1",
+            "current_step",
+            sa.Integer(),
+            nullable=False,
+            server_default="1",
             comment="当前审批步骤编号（从1开始）",
         ),
-
         # 审批历史（追加写，永不更新）
         sa.Column(
-            "approval_history", JSONB, nullable=False, server_default=sa.text("'[]'"),
+            "approval_history",
+            JSONB,
+            nullable=False,
+            server_default=sa.text("'[]'"),
             comment="审批操作历史列表 JSONB",
         ),
-
         sa.Column(
-            "reject_reason", sa.Text(), nullable=True,
+            "reject_reason",
+            sa.Text(),
+            nullable=True,
             comment="拒绝原因",
         ),
-
         # 时间戳
         sa.Column(
-            "approved_at", sa.DateTime(timezone=True), nullable=True,
+            "approved_at",
+            sa.DateTime(timezone=True),
+            nullable=True,
             comment="全部审批通过时间",
         ),
         sa.Column(
-            "expires_at", sa.DateTime(timezone=True), nullable=True,
+            "expires_at",
+            sa.DateTime(timezone=True),
+            nullable=True,
             comment="当前步骤超时时间（now + step.timeout_hours）",
         ),
-
         comment="审批单表",
     )
 

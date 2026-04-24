@@ -8,9 +8,9 @@ Revises: v239
 Create Date: 2026-04-12
 """
 
-from alembic import op
 import sqlalchemy as sa
-from sqlalchemy.dialects.postgresql import UUID, JSONB
+from alembic import op
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 
 revision = "v240"
 down_revision = "v239"
@@ -25,54 +25,59 @@ def upgrade() -> None:
     conn = op.get_bind()
     existing = sa.inspect(conn).get_table_names()
 
-
     # ------------------------------------------------------------------
     # 表1：franchise_common_codes（公共代码管理 — 新建）
     # ------------------------------------------------------------------
 
-    if 'franchise_common_codes' not in existing:
+    if "franchise_common_codes" not in existing:
         op.create_table(
             "franchise_common_codes",
-            sa.Column("id", UUID(as_uuid=True), primary_key=True,
-                      server_default=sa.text("gen_random_uuid()"), nullable=False),
+            sa.Column(
+                "id", UUID(as_uuid=True), primary_key=True, server_default=sa.text("gen_random_uuid()"), nullable=False
+            ),
             sa.Column("tenant_id", UUID(as_uuid=True), nullable=False),
-            sa.Column("code_type", sa.String(50), nullable=False,
-                      comment="编码类型：material（物料）/ dish（菜品）/ price（价格）"),
-            sa.Column("code_no", sa.String(100), nullable=False,
-                      comment="编码编号，在 tenant 内唯一"),
-            sa.Column("name", sa.String(200), nullable=False,
-                      comment="编码名称"),
-            sa.Column("description", sa.Text, nullable=True,
-                      comment="编码说明"),
-            sa.Column("unit", sa.String(30), nullable=True,
-                      comment="单位（物料/菜品用）"),
-            sa.Column("price_fen", sa.Integer, nullable=True,
-                      comment="参考价格（分，price类型用）"),
-            sa.Column("applicable_stores", JSONB, nullable=True,
-                      server_default=sa.text("'[]'::jsonb"),
-                      comment="适用门店ID列表，空数组=全部门店"),
-            sa.Column("is_synced", sa.Boolean, nullable=False,
-                      server_default=sa.text("false"),
-                      comment="是否已同步到加盟门店"),
+            sa.Column(
+                "code_type",
+                sa.String(50),
+                nullable=False,
+                comment="编码类型：material（物料）/ dish（菜品）/ price（价格）",
+            ),
+            sa.Column("code_no", sa.String(100), nullable=False, comment="编码编号，在 tenant 内唯一"),
+            sa.Column("name", sa.String(200), nullable=False, comment="编码名称"),
+            sa.Column("description", sa.Text, nullable=True, comment="编码说明"),
+            sa.Column("unit", sa.String(30), nullable=True, comment="单位（物料/菜品用）"),
+            sa.Column("price_fen", sa.Integer, nullable=True, comment="参考价格（分，price类型用）"),
+            sa.Column(
+                "applicable_stores",
+                JSONB,
+                nullable=True,
+                server_default=sa.text("'[]'::jsonb"),
+                comment="适用门店ID列表，空数组=全部门店",
+            ),
+            sa.Column(
+                "is_synced", sa.Boolean, nullable=False, server_default=sa.text("false"), comment="是否已同步到加盟门店"
+            ),
             sa.Column("synced_at", sa.TIMESTAMP(timezone=True), nullable=True),
-            sa.Column("status", sa.String(20), nullable=False,
-                      server_default=sa.text("'active'"),
-                      comment="active / deprecated"),
-            sa.Column("created_at", sa.TIMESTAMP(timezone=True), nullable=False,
-                      server_default=sa.text("NOW()")),
-            sa.Column("updated_at", sa.TIMESTAMP(timezone=True), nullable=False,
-                      server_default=sa.text("NOW()")),
-            sa.Column("is_deleted", sa.Boolean, nullable=False,
-                      server_default=sa.text("false")),
+            sa.Column(
+                "status",
+                sa.String(20),
+                nullable=False,
+                server_default=sa.text("'active'"),
+                comment="active / deprecated",
+            ),
+            sa.Column("created_at", sa.TIMESTAMP(timezone=True), nullable=False, server_default=sa.text("NOW()")),
+            sa.Column("updated_at", sa.TIMESTAMP(timezone=True), nullable=False, server_default=sa.text("NOW()")),
+            sa.Column("is_deleted", sa.Boolean, nullable=False, server_default=sa.text("false")),
         )
-        op.create_index("ix_franchise_common_codes_tenant",
-                        "franchise_common_codes", ["tenant_id"])
-        op.create_index("ix_franchise_common_codes_type",
-                        "franchise_common_codes", ["code_type"])
-        op.create_index("ix_franchise_common_codes_no",
-                        "franchise_common_codes", ["tenant_id", "code_no"],
-                        unique=True,
-                        postgresql_where=sa.text("is_deleted = false"))
+        op.create_index("ix_franchise_common_codes_tenant", "franchise_common_codes", ["tenant_id"])
+        op.create_index("ix_franchise_common_codes_type", "franchise_common_codes", ["code_type"])
+        op.create_index(
+            "ix_franchise_common_codes_no",
+            "franchise_common_codes",
+            ["tenant_id", "code_no"],
+            unique=True,
+            postgresql_where=sa.text("is_deleted = false"),
+        )
 
         # RLS Policy
         op.execute("ALTER TABLE franchise_common_codes ENABLE ROW LEVEL SECURITY")
@@ -87,9 +92,9 @@ def upgrade() -> None:
         # ------------------------------------------------------------------
         for col_name, col_type, nullable, default in [
             ("contract_start_date", "DATE", True, None),
-            ("contract_end_date",   "DATE", True, None),
-            ("contract_file_url",   "TEXT", True, None),
-            ("brand_id",            "UUID", True, None),
+            ("contract_end_date", "DATE", True, None),
+            ("contract_file_url", "TEXT", True, None),
+            ("brand_id", "UUID", True, None),
         ]:
             try:
                 kwargs: dict = {}
@@ -97,8 +102,7 @@ def upgrade() -> None:
                     kwargs["server_default"] = sa.text(default)
                 op.add_column(
                     "franchisees",
-                    sa.Column(col_name, sa.text(col_type),
-                              nullable=nullable, **kwargs),
+                    sa.Column(col_name, sa.text(col_type), nullable=nullable, **kwargs),
                 )
             except Exception:
                 pass  # 列已存在，跳过
@@ -109,8 +113,7 @@ def upgrade() -> None:
         try:
             op.add_column(
                 "franchise_fees",
-                sa.Column("overdue_days", sa.Integer, nullable=True,
-                          comment="逾期天数，由应用层计算写入"),
+                sa.Column("overdue_days", sa.Integer, nullable=True, comment="逾期天数，由应用层计算写入"),
             )
         except Exception:
             pass

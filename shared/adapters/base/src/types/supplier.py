@@ -2,11 +2,12 @@
 屯象OS 行业公共字典 — 供应商/采购统一模型
 """
 
-from typing import TypedDict, Optional, List, Dict
+from typing import Dict, List, TypedDict
 
 
 class UnifiedSupplier(TypedDict, total=False):
     """统一供应商格式"""
+
     id: str
     external_id: str
     source: str
@@ -21,6 +22,7 @@ class UnifiedSupplier(TypedDict, total=False):
 
 class UnifiedPurchaseOrder(TypedDict, total=False):
     """统一采购单格式"""
+
     id: str
     external_id: str
     source: str

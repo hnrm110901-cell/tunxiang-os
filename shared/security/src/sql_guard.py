@@ -17,21 +17,21 @@ from typing import List
 _SUSPICIOUS_PATTERNS: List[re.Pattern[str]] = [
     re.compile(p, re.IGNORECASE)
     for p in [
-        r"""(?:'|")\s*(?:OR|AND)\s+\d+\s*=\s*\d+""",   # ' OR 1=1
-        r""";\s*(?:DROP|DELETE|UPDATE|INSERT|ALTER)\s""", # SQL 命令注入
-        r"""UNION\s+(?:ALL\s+)?SELECT""",                # UNION 注入
-        r"""--\s*$""",                                    # SQL 行注释尾部
-        r"""/\*[\s\S]*?\*/""",                           # 块注释
-        r"""(?:'|")\s*;\s*""",                           # 引号 + 分号
-        r"""EXEC(?:UTE)?\s""",                           # EXECUTE
-        r"""xp_\w+""",                                   # SQL Server 扩展存储过程
-        r"""SLEEP\s*\(""",                               # 时间盲注
-        r"""BENCHMARK\s*\(""",                           # MySQL 时间盲注
-        r"""WAITFOR\s+DELAY""",                          # SQL Server 时间盲注
-        r"""LOAD_FILE\s*\(""",                           # 文件读取
-        r"""INTO\s+(?:OUT|DUMP)FILE""",                  # 文件写入
-        r"""INFORMATION_SCHEMA""",                       # 信息泄露
-        r"""(?:CHAR|CHR|CONCAT)\s*\(""",                 # 编码绕过函数
+        r"""(?:'|")\s*(?:OR|AND)\s+\d+\s*=\s*\d+""",  # ' OR 1=1
+        r""";\s*(?:DROP|DELETE|UPDATE|INSERT|ALTER)\s""",  # SQL 命令注入
+        r"""UNION\s+(?:ALL\s+)?SELECT""",  # UNION 注入
+        r"""--\s*$""",  # SQL 行注释尾部
+        r"""/\*[\s\S]*?\*/""",  # 块注释
+        r"""(?:'|")\s*;\s*""",  # 引号 + 分号
+        r"""EXEC(?:UTE)?\s""",  # EXECUTE
+        r"""xp_\w+""",  # SQL Server 扩展存储过程
+        r"""SLEEP\s*\(""",  # 时间盲注
+        r"""BENCHMARK\s*\(""",  # MySQL 时间盲注
+        r"""WAITFOR\s+DELAY""",  # SQL Server 时间盲注
+        r"""LOAD_FILE\s*\(""",  # 文件读取
+        r"""INTO\s+(?:OUT|DUMP)FILE""",  # 文件写入
+        r"""INFORMATION_SCHEMA""",  # 信息泄露
+        r"""(?:CHAR|CHR|CONCAT)\s*\(""",  # 编码绕过函数
     ]
 ]
 

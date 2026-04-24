@@ -7,6 +7,7 @@ Kimi API 兼容 OpenAI 格式，使用 openai SDK 调用。
   MOONSHOT_API_KEY   — Kimi API 密钥
   MOONSHOT_BASE_URL  — 自定义端点，默认 https://api.moonshot.cn/v1
 """
+
 from __future__ import annotations
 
 import time
@@ -14,6 +15,7 @@ from typing import Any, AsyncGenerator, Optional
 
 import structlog
 
+from ..registry import get_model_info, get_models_by_provider
 from ..types import (
     LLMResponse,
     ModelInfo,
@@ -21,7 +23,6 @@ from ..types import (
     ProviderHealth,
     ProviderName,
 )
-from ..registry import get_models_by_provider, get_model_info
 from .base import BaseProviderAdapter
 
 logger = structlog.get_logger()
@@ -52,6 +53,7 @@ class KimiAdapter(BaseProviderAdapter):
         max_retries: int = 3,
     ):
         import os
+
         resolved_key = api_key or os.environ.get("MOONSHOT_API_KEY")
         resolved_url = base_url or os.environ.get("MOONSHOT_BASE_URL", _DEFAULT_BASE_URL)
         super().__init__(resolved_key, resolved_url, timeout_s, max_retries)
@@ -64,9 +66,7 @@ class KimiAdapter(BaseProviderAdapter):
             try:
                 from openai import AsyncOpenAI
             except ImportError as exc:
-                raise ImportError(
-                    "Kimi 适配器需要 openai SDK。请安装: pip install openai>=1.0"
-                ) from exc
+                raise ImportError("Kimi 适配器需要 openai SDK。请安装: pip install openai>=1.0") from exc
             if not self._api_key:
                 raise ValueError("MOONSHOT_API_KEY 未配置")
             self._client = AsyncOpenAI(
@@ -117,7 +117,8 @@ class KimiAdapter(BaseProviderAdapter):
         async def _do_call():
             return await client.chat.completions.create(**kwargs)
 
-        from openai import APIConnectionError, APITimeoutError, APIStatusError
+        from openai import APIConnectionError, APIStatusError, APITimeoutError
+
         response = await self._retry_with_backoff(
             _do_call,
             retryable_exceptions=(APIConnectionError, APITimeoutError, APIStatusError),

@@ -13,16 +13,17 @@ Usage:
     tpl = get_template(RestaurantType.CASUAL_DINING)
     config_pkg = tpl.apply(answers)   # answers 来自 DeliveryAgent 20 问
 """
+
 from .base import (
-    RestaurantType,
+    AgentPolicySet,
     BaseTemplate,
-    PrinterConfig,
-    KDSZoneConfig,
-    ShiftConfig,
     BillingRuleSet,
     DiscountPolicy,
+    KDSZoneConfig,
     MemberTierConfig,
-    AgentPolicySet,
+    PrinterConfig,
+    RestaurantType,
+    ShiftConfig,
     TenantConfigPackage,
 )
 from .registry import get_template, list_templates

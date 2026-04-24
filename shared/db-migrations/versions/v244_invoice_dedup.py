@@ -14,8 +14,8 @@ Revises: v243
 Create Date: 2026-04-12
 """
 
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 from sqlalchemy.dialects.postgresql import UUID
 
 revision = "v244b"
@@ -28,61 +28,88 @@ def upgrade() -> None:
     conn = op.get_bind()
     existing = sa.inspect(conn).get_table_names()
 
-
     # ------------------------------------------------------------------
     # 表1：invoice_dedup_groups（集团级发票去重组）
     # 注意：故意不加 RLS，允许跨租户查询（通过应用层 SERVICE_DB_URL 超级账号连接）
     # ------------------------------------------------------------------
 
-    if 'invoice_dedup_groups' not in existing:
+    if "invoice_dedup_groups" not in existing:
         op.create_table(
             "invoice_dedup_groups",
             sa.Column(
-                "id", UUID(as_uuid=True), primary_key=True,
-                server_default=sa.text("gen_random_uuid()"), nullable=False,
+                "id",
+                UUID(as_uuid=True),
+                primary_key=True,
+                server_default=sa.text("gen_random_uuid()"),
+                nullable=False,
             ),
             sa.Column(
-                "group_id", sa.String(64), nullable=False, unique=True,
+                "group_id",
+                sa.String(64),
+                nullable=False,
+                unique=True,
                 comment="SHA-256(invoice_code + ':' + invoice_number)，不含金额，跨金额识别同一张发票",
             ),
             sa.Column(
-                "first_tenant_id", UUID(as_uuid=True), nullable=False,
+                "first_tenant_id",
+                UUID(as_uuid=True),
+                nullable=False,
                 comment="第一次报销该发票的租户ID",
             ),
             sa.Column(
-                "first_invoice_id", UUID(as_uuid=True), nullable=False,
+                "first_invoice_id",
+                UUID(as_uuid=True),
+                nullable=False,
                 comment="第一条发票记录ID（invoices 表）",
             ),
             sa.Column(
-                "first_reported_at", sa.TIMESTAMP(timezone=True), nullable=False,
+                "first_reported_at",
+                sa.TIMESTAMP(timezone=True),
+                nullable=False,
                 comment="第一次上报时间",
             ),
             sa.Column(
-                "total_usage_count", sa.Integer(), nullable=False, server_default="1",
+                "total_usage_count",
+                sa.Integer(),
+                nullable=False,
+                server_default="1",
                 comment="使用次数（> 1 表示跨品牌重复使用）",
             ),
             sa.Column(
-                "is_suspicious", sa.Boolean(), nullable=False, server_default="false",
+                "is_suspicious",
+                sa.Boolean(),
+                nullable=False,
+                server_default="false",
                 comment="是否标记为可疑跨品牌重复（first_tenant_id != 当前上报租户）",
             ),
             sa.Column(
-                "resolved_at", sa.TIMESTAMP(timezone=True), nullable=True,
+                "resolved_at",
+                sa.TIMESTAMP(timezone=True),
+                nullable=True,
                 comment="人工处理时间（NULL=待处理）",
             ),
             sa.Column(
-                "resolved_by", UUID(as_uuid=True), nullable=True,
+                "resolved_by",
+                UUID(as_uuid=True),
+                nullable=True,
                 comment="处理人员ID",
             ),
             sa.Column(
-                "resolve_note", sa.Text(), nullable=True,
+                "resolve_note",
+                sa.Text(),
+                nullable=True,
                 comment="处理备注（人工确认合规原因 或 驳回理由）",
             ),
             sa.Column(
-                "created_at", sa.TIMESTAMP(timezone=True), nullable=False,
+                "created_at",
+                sa.TIMESTAMP(timezone=True),
+                nullable=False,
                 server_default=sa.text("now()"),
             ),
             sa.Column(
-                "updated_at", sa.TIMESTAMP(timezone=True), nullable=False,
+                "updated_at",
+                sa.TIMESTAMP(timezone=True),
+                nullable=False,
                 server_default=sa.text("now()"),
             ),
         )
@@ -113,31 +140,44 @@ def upgrade() -> None:
         # 注意：同样不加 RLS，与 invoice_dedup_groups 同属跨租户查询范畴
         # ------------------------------------------------------------------
 
-    if 'group_invoice_cross_ref' not in existing:
+    if "group_invoice_cross_ref" not in existing:
         op.create_table(
             "group_invoice_cross_ref",
             sa.Column(
-                "id", UUID(as_uuid=True), primary_key=True,
-                server_default=sa.text("gen_random_uuid()"), nullable=False,
+                "id",
+                UUID(as_uuid=True),
+                primary_key=True,
+                server_default=sa.text("gen_random_uuid()"),
+                nullable=False,
             ),
             sa.Column(
-                "group_id", sa.String(64), nullable=False,
+                "group_id",
+                sa.String(64),
+                nullable=False,
                 comment="关联 invoice_dedup_groups.group_id",
             ),
             sa.Column(
-                "tenant_id", UUID(as_uuid=True), nullable=False,
+                "tenant_id",
+                UUID(as_uuid=True),
+                nullable=False,
                 comment="上报该发票的租户ID",
             ),
             sa.Column(
-                "invoice_id", UUID(as_uuid=True), nullable=False,
+                "invoice_id",
+                UUID(as_uuid=True),
+                nullable=False,
                 comment="发票记录ID（invoices 表）",
             ),
             sa.Column(
-                "expense_application_id", UUID(as_uuid=True), nullable=True,
+                "expense_application_id",
+                UUID(as_uuid=True),
+                nullable=True,
                 comment="关联的费控申请ID（可空，支持发票先上传后关联）",
             ),
             sa.Column(
-                "reported_at", sa.TIMESTAMP(timezone=True), nullable=False,
+                "reported_at",
+                sa.TIMESTAMP(timezone=True),
+                nullable=False,
                 server_default=sa.text("now()"),
                 comment="该租户上报该发票的时间",
             ),

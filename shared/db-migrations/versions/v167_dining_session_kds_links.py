@@ -8,7 +8,6 @@ Revision ID: v167
 Revises: v166
 Create Date: 2026-04-06
 """
-from typing import Sequence, Union
 
 import sqlalchemy as sa
 from alembic import op
@@ -16,16 +15,16 @@ from sqlalchemy.dialects.postgresql import UUID
 
 revision = "v167"
 down_revision = "v166"
-branch_labels= None
-depends_on= None
+branch_labels = None
+depends_on = None
 
 
 def _col_exists(table: str, column: str) -> bool:
     bind = op.get_bind()
-    result = bind.execute(sa.text(
-        "SELECT COUNT(*) FROM information_schema.columns "
-        "WHERE table_name = :t AND column_name = :c"
-    ), {"t": table, "c": column})
+    result = bind.execute(
+        sa.text("SELECT COUNT(*) FROM information_schema.columns WHERE table_name = :t AND column_name = :c"),
+        {"t": table, "c": column},
+    )
     return result.scalar() > 0
 
 
@@ -35,7 +34,9 @@ def upgrade() -> None:
         op.add_column(
             "kds_tasks",
             sa.Column(
-                "dining_session_id", UUID(as_uuid=True), nullable=True,
+                "dining_session_id",
+                UUID(as_uuid=True),
+                nullable=True,
                 comment="关联堂食会话ID（v167）— finish_cooking后回调record_dish_served",
             ),
         )
@@ -50,7 +51,9 @@ def upgrade() -> None:
         op.add_column(
             "live_seafood_weigh_records",
             sa.Column(
-                "dining_session_id", UUID(as_uuid=True), nullable=True,
+                "dining_session_id",
+                UUID(as_uuid=True),
+                nullable=True,
                 comment="关联堂食会话ID（v167）— 支持活鲜称重按会话聚合，AA分摊时定位人均",
             ),
         )
@@ -84,17 +87,8 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.execute(
-        "DROP INDEX IF EXISTS ix_live_seafood_weigh_records_session_id;"
-    )
-    op.execute(sa.text(
-        "ALTER TABLE live_seafood_weigh_records "
-        "DROP COLUMN IF EXISTS dining_session_id;"
-    ))
+    op.execute("DROP INDEX IF EXISTS ix_live_seafood_weigh_records_session_id;")
+    op.execute(sa.text("ALTER TABLE live_seafood_weigh_records DROP COLUMN IF EXISTS dining_session_id;"))
 
-    op.execute(
-        "DROP INDEX IF EXISTS ix_kds_tasks_dining_session_id;"
-    )
-    op.execute(sa.text(
-        "ALTER TABLE kds_tasks DROP COLUMN IF EXISTS dining_session_id;"
-    ))
+    op.execute("DROP INDEX IF EXISTS ix_kds_tasks_dining_session_id;")
+    op.execute(sa.text("ALTER TABLE kds_tasks DROP COLUMN IF EXISTS dining_session_id;"))

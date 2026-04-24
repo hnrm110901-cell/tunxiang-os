@@ -15,16 +15,15 @@ Revision ID: v024
 Revises: v023
 Create Date: 2026-03-30
 """
-from typing import Sequence, Union
 
 import sqlalchemy as sa
 from alembic import op
-from sqlalchemy.dialects.postgresql import UUID, JSONB
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 
 revision = "v024"
-down_revision= "v023"
-branch_labels= None
-depends_on= None
+down_revision = "v023"
+branch_labels = None
+depends_on = None
 
 _TABLE = "brand_groups"
 
@@ -113,22 +112,13 @@ def upgrade() -> None:
     op.execute(f"ALTER TABLE {_TABLE} ENABLE ROW LEVEL SECURITY")
     op.execute(f"ALTER TABLE {_TABLE} FORCE ROW LEVEL SECURITY")
 
-    op.execute(
-        f"CREATE POLICY {_TABLE}_rls_select ON {_TABLE} "
-        f"FOR SELECT USING ({_SAFE_CONDITION})"
-    )
-    op.execute(
-        f"CREATE POLICY {_TABLE}_rls_insert ON {_TABLE} "
-        f"FOR INSERT WITH CHECK ({_SAFE_CONDITION})"
-    )
+    op.execute(f"CREATE POLICY {_TABLE}_rls_select ON {_TABLE} FOR SELECT USING ({_SAFE_CONDITION})")
+    op.execute(f"CREATE POLICY {_TABLE}_rls_insert ON {_TABLE} FOR INSERT WITH CHECK ({_SAFE_CONDITION})")
     op.execute(
         f"CREATE POLICY {_TABLE}_rls_update ON {_TABLE} "
         f"FOR UPDATE USING ({_SAFE_CONDITION}) WITH CHECK ({_SAFE_CONDITION})"
     )
-    op.execute(
-        f"CREATE POLICY {_TABLE}_rls_delete ON {_TABLE} "
-        f"FOR DELETE USING ({_SAFE_CONDITION})"
-    )
+    op.execute(f"CREATE POLICY {_TABLE}_rls_delete ON {_TABLE} FOR DELETE USING ({_SAFE_CONDITION})")
 
 
 def downgrade() -> None:

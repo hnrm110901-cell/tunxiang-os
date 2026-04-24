@@ -14,6 +14,7 @@
 
 当环境变量未配置时，自动进入 Mock 模式。
 """
+
 from __future__ import annotations
 
 import os
@@ -30,6 +31,7 @@ logger = structlog.get_logger(__name__)
 # ─────────────────────────────────────────────────────────────────────────────
 # 公众号（OA）模板消息服务
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class WeChatOAService:
     """微信公众号（服务号）模板消息服务
@@ -99,11 +101,15 @@ class WeChatOAService:
                 payload["miniprogram"] = miniprogram
 
             import aiohttp
-            async with aiohttp.ClientSession() as session, session.post(
-                f"{self._OA_SEND_URL}?access_token={token}",
-                json=payload,
-                timeout=aiohttp.ClientTimeout(total=10),
-            ) as resp:
+
+            async with (
+                aiohttp.ClientSession() as session,
+                session.post(
+                    f"{self._OA_SEND_URL}?access_token={token}",
+                    json=payload,
+                    timeout=aiohttp.ClientTimeout(total=10),
+                ) as resp,
+            ):
                 result = await resp.json()
                 errcode = result.get("errcode", 0)
                 if errcode != 0:
@@ -136,7 +142,11 @@ class WeChatOAService:
         template_id = os.getenv("WX_OA_TPL_MARKETING", "")
         if not template_id and not self._is_mock:
             logger.warning("wechat_oa_no_marketing_template")
-            return {"msg_id": f"oa_{uuid.uuid4().hex[:8]}", "status": "skipped", "error": "WX_OA_TPL_MARKETING not configured"}
+            return {
+                "msg_id": f"oa_{uuid.uuid4().hex[:8]}",
+                "status": "skipped",
+                "error": "WX_OA_TPL_MARKETING not configured",
+            }
 
         data = {
             "thing1": {"value": title[:20]},
@@ -175,11 +185,15 @@ class WeChatOAService:
             return self._access_token
 
         import aiohttp
-        async with aiohttp.ClientSession() as session, session.get(
-            self._OA_TOKEN_URL,
-            params={"grant_type": "client_credential", "appid": self._appid, "secret": self._app_secret},
-            timeout=aiohttp.ClientTimeout(total=10),
-        ) as resp:
+
+        async with (
+            aiohttp.ClientSession() as session,
+            session.get(
+                self._OA_TOKEN_URL,
+                params={"grant_type": "client_credential", "appid": self._appid, "secret": self._app_secret},
+                timeout=aiohttp.ClientTimeout(total=10),
+            ) as resp,
+        ):
             result = await resp.json()
             if "access_token" not in result:
                 raise ValueError(f"OA token error: {result.get('errcode')} - {result.get('errmsg')}")
@@ -191,6 +205,7 @@ class WeChatOAService:
 # ─────────────────────────────────────────────────────────────────────────────
 # 企业微信（WeCom）外部联系人消息服务
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class WeComService:
     """企业微信外部联系人消息服务
@@ -267,11 +282,15 @@ class WeComService:
                 payload["sender"] = sender_list
 
             import aiohttp
-            async with aiohttp.ClientSession() as session, session.post(
-                f"{self._WECOM_EXTERNAL_SEND_URL}?access_token={token}",
-                json=payload,
-                timeout=aiohttp.ClientTimeout(total=15),
-            ) as resp:
+
+            async with (
+                aiohttp.ClientSession() as session,
+                session.post(
+                    f"{self._WECOM_EXTERNAL_SEND_URL}?access_token={token}",
+                    json=payload,
+                    timeout=aiohttp.ClientTimeout(total=15),
+                ) as resp,
+            ):
                 result = await resp.json()
                 errcode = result.get("errcode", 0)
                 if errcode != 0:
@@ -325,11 +344,15 @@ class WeComService:
                 payload["miniprogram"]["pic_media_id"] = pic_media_id  # type: ignore[index]
 
             import aiohttp
-            async with aiohttp.ClientSession() as session, session.post(
-                f"{self._WECOM_EXTERNAL_SEND_URL}?access_token={token}",
-                json=payload,
-                timeout=aiohttp.ClientTimeout(total=15),
-            ) as resp:
+
+            async with (
+                aiohttp.ClientSession() as session,
+                session.post(
+                    f"{self._WECOM_EXTERNAL_SEND_URL}?access_token={token}",
+                    json=payload,
+                    timeout=aiohttp.ClientTimeout(total=15),
+                ) as resp,
+            ):
                 result = await resp.json()
                 errcode = result.get("errcode", 0)
                 if errcode != 0:
@@ -364,11 +387,15 @@ class WeComService:
             }
 
             import aiohttp
-            async with aiohttp.ClientSession() as session, session.post(
-                f"{self._WECOM_AGENT_SEND_URL}?access_token={token}",
-                json=payload,
-                timeout=aiohttp.ClientTimeout(total=10),
-            ) as resp:
+
+            async with (
+                aiohttp.ClientSession() as session,
+                session.post(
+                    f"{self._WECOM_AGENT_SEND_URL}?access_token={token}",
+                    json=payload,
+                    timeout=aiohttp.ClientTimeout(total=10),
+                ) as resp,
+            ):
                 result = await resp.json()
                 errcode = result.get("errcode", 0)
                 if errcode != 0:
@@ -389,11 +416,15 @@ class WeComService:
             return self._access_token
 
         import aiohttp
-        async with aiohttp.ClientSession() as session, session.get(
-            self._WECOM_TOKEN_URL,
-            params={"corpid": self._corp_id, "corpsecret": self._corp_secret},
-            timeout=aiohttp.ClientTimeout(total=10),
-        ) as resp:
+
+        async with (
+            aiohttp.ClientSession() as session,
+            session.get(
+                self._WECOM_TOKEN_URL,
+                params={"corpid": self._corp_id, "corpsecret": self._corp_secret},
+                timeout=aiohttp.ClientTimeout(total=10),
+            ) as resp,
+        ):
             result = await resp.json()
             if "access_token" not in result:
                 raise ValueError(f"WeCom token error: {result.get('errcode')} - {result.get('errmsg')}")
@@ -405,6 +436,7 @@ class WeComService:
 # ─────────────────────────────────────────────────────────────────────────────
 # 工具函数
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 def _mask_openid(openid: str) -> str:
     """openid 脱敏: oXyz1234****abcd"""

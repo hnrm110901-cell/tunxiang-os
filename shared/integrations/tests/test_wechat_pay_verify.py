@@ -1,12 +1,13 @@
 """微信支付 V3 回调验签辅助函数单测。"""
+
 from __future__ import annotations
 
 import base64
 
 import pytest
-from starlette.datastructures import Headers
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import padding, rsa
+from starlette.datastructures import Headers
 
 
 def test_verify_rsa_sha256_pkcs1v15_accepts_valid_signature() -> None:

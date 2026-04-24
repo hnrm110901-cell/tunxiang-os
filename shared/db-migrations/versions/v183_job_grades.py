@@ -39,14 +39,8 @@ def upgrade() -> None:
             UNIQUE (tenant_id, name)
         )
     """)
-    op.execute(
-        "CREATE INDEX IF NOT EXISTS idx_job_grades_tenant_category "
-        "ON job_grades (tenant_id, category)"
-    )
-    op.execute(
-        "CREATE INDEX IF NOT EXISTS idx_job_grades_tenant_level "
-        "ON job_grades (tenant_id, level)"
-    )
+    op.execute("CREATE INDEX IF NOT EXISTS idx_job_grades_tenant_category ON job_grades (tenant_id, category)")
+    op.execute("CREATE INDEX IF NOT EXISTS idx_job_grades_tenant_level ON job_grades (tenant_id, level)")
     op.execute("ALTER TABLE job_grades ENABLE ROW LEVEL SECURITY")
     op.execute("ALTER TABLE job_grades FORCE ROW LEVEL SECURITY")
     op.execute("DROP POLICY IF EXISTS job_grades_tenant_isolation ON job_grades")

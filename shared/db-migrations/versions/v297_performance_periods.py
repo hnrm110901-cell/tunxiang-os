@@ -8,6 +8,7 @@
 Revision ID: v256
 Revises: v255
 """
+
 from __future__ import annotations
 
 import sqlalchemy as sa

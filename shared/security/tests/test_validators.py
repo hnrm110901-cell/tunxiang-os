@@ -8,21 +8,20 @@
 
 import pytest
 
-from shared.security.src.validators import (
-    sanitize_string,
-    validate_uuid,
-    validate_phone,
-    validate_email,
-    sanitize_filename,
-    validate_url,
-    sanitize_html,
-    validate_amount_fen,
-    validate_page_params,
-    validate_date_range,
-)
 from shared.security.src.sql_guard import check_sql_injection, sanitize_for_like
-from shared.security.src.xss_guard import escape_html, validate_no_script, get_csp_header
-
+from shared.security.src.validators import (
+    sanitize_filename,
+    sanitize_html,
+    sanitize_string,
+    validate_amount_fen,
+    validate_date_range,
+    validate_email,
+    validate_page_params,
+    validate_phone,
+    validate_url,
+    validate_uuid,
+)
+from shared.security.src.xss_guard import escape_html, get_csp_header, validate_no_script
 
 # ===========================================================================
 # sanitize_string
@@ -260,7 +259,7 @@ class TestSanitizeHtml:
         assert result == "<b>text</b>"
 
     def test_strips_img_tag(self) -> None:
-        result = sanitize_html('<img src=x onerror=alert(1)>')
+        result = sanitize_html("<img src=x onerror=alert(1)>")
         assert "<img" not in result
 
     def test_plain_text_unchanged(self) -> None:
@@ -463,7 +462,7 @@ class TestEscapeHtml:
         assert escape_html("a & b") == "a &amp; b"
 
     def test_escapes_quotes(self) -> None:
-        result = escape_html('"hello" \'world\'')
+        result = escape_html("\"hello\" 'world'")
         assert "&quot;" in result
         assert "&#x27;" in result
 

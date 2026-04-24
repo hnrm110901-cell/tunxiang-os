@@ -6,6 +6,7 @@ Revision ID: v255
 Revises: v254
 Create Date: 2026-04-13
 """
+
 from alembic import op
 
 revision = "v296"

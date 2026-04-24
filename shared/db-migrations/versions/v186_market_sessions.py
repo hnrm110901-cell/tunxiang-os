@@ -7,8 +7,9 @@
 
 Revision: v186
 """
-from alembic import op
+
 import sqlalchemy as sa
+from alembic import op
 from sqlalchemy.dialects import postgresql
 
 revision = "v186b"
@@ -21,14 +22,13 @@ def upgrade() -> None:
     # ── 市别模板表（集团/品牌级别定义）──
     op.create_table(
         "market_session_templates",
-        sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True,
-                  server_default=sa.text("gen_random_uuid()")),
+        sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True, server_default=sa.text("gen_random_uuid()")),
         sa.Column("tenant_id", postgresql.UUID(as_uuid=True), nullable=False),
-        sa.Column("brand_id", postgresql.UUID(as_uuid=True), nullable=True,
-                  comment="NULL=全集团通用，非NULL=仅对该品牌生效"),
+        sa.Column(
+            "brand_id", postgresql.UUID(as_uuid=True), nullable=True, comment="NULL=全集团通用，非NULL=仅对该品牌生效"
+        ),
         sa.Column("name", sa.VARCHAR(50), nullable=False, comment="如：早市/午市/晚市/夜宵"),
-        sa.Column("code", sa.VARCHAR(20), nullable=False,
-                  comment="如：breakfast/lunch/dinner/late_night"),
+        sa.Column("code", sa.VARCHAR(20), nullable=False, comment="如：breakfast/lunch/dinner/late_night"),
         sa.Column("display_order", sa.Integer(), nullable=False, server_default="0"),
         sa.Column("start_time", sa.Time(), nullable=False, comment="如 06:00"),
         sa.Column("end_time", sa.Time(), nullable=False, comment="如 11:00"),
@@ -37,32 +37,28 @@ def upgrade() -> None:
         sa.Column("updated_at", sa.TIMESTAMP(timezone=True), server_default=sa.text("NOW()")),
     )
     op.execute(
-        "CREATE INDEX IF NOT EXISTS idx_mst_tenant "
-        "ON market_session_templates (tenant_id, brand_id, display_order)"
+        "CREATE INDEX IF NOT EXISTS idx_mst_tenant ON market_session_templates (tenant_id, brand_id, display_order)"
     )
 
     # ── 门店市别配置表（门店级别覆盖）──
     op.create_table(
         "store_market_sessions",
-        sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True,
-                  server_default=sa.text("gen_random_uuid()")),
+        sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True, server_default=sa.text("gen_random_uuid()")),
         sa.Column("tenant_id", postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column("store_id", postgresql.UUID(as_uuid=True), nullable=False),
-        sa.Column("template_id", postgresql.UUID(as_uuid=True), nullable=True,
-                  comment="NULL=门店自定义，非NULL=引用模板"),
+        sa.Column(
+            "template_id", postgresql.UUID(as_uuid=True), nullable=True, comment="NULL=门店自定义，非NULL=引用模板"
+        ),
         sa.Column("name", sa.VARCHAR(50), nullable=False),
         sa.Column("start_time", sa.Time(), nullable=False),
         sa.Column("end_time", sa.Time(), nullable=False),
-        sa.Column("menu_plan_id", postgresql.UUID(as_uuid=True), nullable=True,
-                  comment="可选：绑定菜谱方案ID"),
+        sa.Column("menu_plan_id", postgresql.UUID(as_uuid=True), nullable=True, comment="可选：绑定菜谱方案ID"),
         sa.Column("is_active", sa.Boolean(), nullable=False, server_default="TRUE"),
         sa.Column("created_at", sa.TIMESTAMP(timezone=True), server_default=sa.text("NOW()")),
         sa.Column("updated_at", sa.TIMESTAMP(timezone=True), server_default=sa.text("NOW()")),
     )
     op.execute(
-        "CREATE INDEX IF NOT EXISTS idx_sms_store "
-        "ON store_market_sessions (tenant_id, store_id) "
-        "WHERE is_active = TRUE"
+        "CREATE INDEX IF NOT EXISTS idx_sms_store ON store_market_sessions (tenant_id, store_id) WHERE is_active = TRUE"
     )
 
     # ── RLS 策略：market_session_templates ──

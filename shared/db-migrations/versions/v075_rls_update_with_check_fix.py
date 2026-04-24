@@ -31,14 +31,13 @@ Create Date: 2026-03-31
   对每张涉及的表，DROP 旧 UPDATE 策略，以完整的 USING + WITH CHECK 重建。
   使用幂等的 DROP POLICY IF EXISTS，可安全重复执行。
 """
-from typing import Sequence, Union
 
 from alembic import op
 
 revision = "v075"
-down_revision= "v074"
-branch_labels= None
-depends_on= None
+down_revision = "v074"
+branch_labels = None
+depends_on = None
 
 # 标准 NULLIF NULL guard 条件（v056+ 唯一正确模式）
 _SAFE_CONDITION = "tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::UUID"
@@ -97,8 +96,4 @@ def downgrade() -> None:
     """回退：恢复只有 USING 的 UPDATE 策略（警告：回退后写入校验失效）。"""
     for table, policy_name in ALL_TABLES:
         op.execute(f"DROP POLICY IF EXISTS {policy_name} ON {table}")
-        op.execute(
-            f"CREATE POLICY {policy_name} ON {table} "
-            f"FOR UPDATE "
-            f"USING ({_SAFE_CONDITION})"
-        )
+        op.execute(f"CREATE POLICY {policy_name} ON {table} FOR UPDATE USING ({_SAFE_CONDITION})")

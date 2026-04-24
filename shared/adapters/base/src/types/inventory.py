@@ -2,11 +2,12 @@
 屯象OS 行业公共字典 — 库存/食材统一模型
 """
 
-from typing import TypedDict, Optional, List
+from typing import TypedDict
 
 
 class UnifiedIngredient(TypedDict, total=False):
     """统一食材格式"""
+
     id: str
     external_id: str
     source: str
@@ -24,6 +25,7 @@ class UnifiedIngredient(TypedDict, total=False):
 
 class UnifiedInventoryRecord(TypedDict, total=False):
     """统一库存记录"""
+
     id: str
     ingredient_id: str
     store_id: str

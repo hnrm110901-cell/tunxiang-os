@@ -16,6 +16,7 @@
     旧模块使用 "enc:v1:" 前缀，本模块使用 "ENC:" 前缀。
     两套前缀互不冲突，可在迁移期共存。新代码应使用本模块。
 """
+
 from __future__ import annotations
 
 import base64
@@ -84,10 +85,7 @@ class FieldEncryptor:
             key_bytes = key
 
         if len(key_bytes) != KEY_BYTES:
-            raise ValueError(
-                f"{label} 必须为 {KEY_BYTES} 字节（{KEY_BYTES * 2} 位 hex），"
-                f"实际为 {len(key_bytes)} 字节"
-            )
+            raise ValueError(f"{label} 必须为 {KEY_BYTES} 字节（{KEY_BYTES * 2} 位 hex），实际为 {len(key_bytes)} 字节")
         return key_bytes
 
     @property
@@ -133,9 +131,7 @@ class FieldEncryptor:
 
         raw = self._decode_payload(value)
         if len(raw) <= IV_BYTES:
-            raise ValueError(
-                f"加密字段数据长度不足，期望 > {IV_BYTES} 字节，实际 {len(raw)} 字节"
-            )
+            raise ValueError(f"加密字段数据长度不足，期望 > {IV_BYTES} 字节，实际 {len(raw)} 字节")
 
         iv, ciphertext_with_tag = raw[:IV_BYTES], raw[IV_BYTES:]
 
@@ -179,7 +175,7 @@ class FieldEncryptor:
     @staticmethod
     def _decode_payload(value: str) -> bytes:
         """从 ENC:xxx 提取并 base64 解码有效载荷。"""
-        encoded = value[len(PREFIX):]
+        encoded = value[len(PREFIX) :]
         try:
             return base64.b64decode(encoded)
         except (ValueError, TypeError) as exc:

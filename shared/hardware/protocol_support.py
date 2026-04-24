@@ -9,6 +9,7 @@
 - ZPL/TSPL: 标签打印机
 - ESC p: 钱箱触发（通过打印机RJ11接口）
 """
+
 import asyncio
 import re
 from abc import ABC, abstractmethod
@@ -23,6 +24,7 @@ logger = structlog.get_logger()
 
 # ─── 协议状态枚举 ───
 
+
 class ConnectionState(str, Enum):
     DISCONNECTED = "disconnected"
     CONNECTING = "connecting"
@@ -31,6 +33,7 @@ class ConnectionState(str, Enum):
 
 
 # ─── 协议处理基类 ───
+
 
 class ProtocolHandler(ABC):
     """协议处理基类。
@@ -72,6 +75,7 @@ class ProtocolHandler(ABC):
 
 # ─── ESC/POS 打印协议桥接 ───
 
+
 class ESCPOSProtocol(ProtocolHandler):
     """ESC/POS 打印协议 -- 桥接到 printer_driver.py 已有实现。
 
@@ -109,7 +113,8 @@ class ESCPOSProtocol(ProtocolHandler):
             self.last_error = None
             logger.info(
                 "escpos.connected",
-                ip=ip, port=port,
+                ip=ip,
+                port=port,
                 device_key=self.device_key,
                 tenant_id=self.tenant_id,
             )
@@ -156,7 +161,7 @@ class ESCPOSProtocol(ProtocolHandler):
             return False
         try:
             async with self._lock:
-                self._writer.write(b'\x10\x04\x01')
+                self._writer.write(b"\x10\x04\x01")
                 await self._writer.drain()
                 data = await asyncio.wait_for(
                     self._reader.read(1),  # type: ignore[union-attr]
@@ -168,6 +173,7 @@ class ESCPOSProtocol(ProtocolHandler):
 
 
 # ─── 电子秤串口协议 ───
+
 
 class SerialScaleProtocol(ProtocolHandler):
     """电子秤串口协议。
@@ -182,18 +188,10 @@ class SerialScaleProtocol(ProtocolHandler):
 
     # 各品牌数据帧解析正则
     FRAME_PATTERNS: dict[str, re.Pattern[str]] = {
-        "DIGI_SERIAL": re.compile(
-            r"(?P<sign>[+-])\s*(?P<weight>[\d.]+)\s*(?P<unit>[gk]g)\s*(?P<stable>[SM])"
-        ),
-        "DAHUA_SERIAL": re.compile(
-            r"(?P<sign>[+-])(?P<weight>[\d.]+)\s*(?P<unit>[gk]g)\s*(?P<stable>[SM])"
-        ),
-        "CAS_SERIAL": re.compile(
-            r"(?P<sign>[+-])\s*(?P<weight>[\d.]+)\s*(?P<unit>[gk]g)\s*(?P<stable>[SM])"
-        ),
-        "MT_SICS": re.compile(
-            r"S\s+(?P<stable>[SD])\s+(?P<weight>[\d.]+)\s+(?P<unit>[gk]g)"
-        ),
+        "DIGI_SERIAL": re.compile(r"(?P<sign>[+-])\s*(?P<weight>[\d.]+)\s*(?P<unit>[gk]g)\s*(?P<stable>[SM])"),
+        "DAHUA_SERIAL": re.compile(r"(?P<sign>[+-])(?P<weight>[\d.]+)\s*(?P<unit>[gk]g)\s*(?P<stable>[SM])"),
+        "CAS_SERIAL": re.compile(r"(?P<sign>[+-])\s*(?P<weight>[\d.]+)\s*(?P<unit>[gk]g)\s*(?P<stable>[SM])"),
+        "MT_SICS": re.compile(r"S\s+(?P<stable>[SD])\s+(?P<weight>[\d.]+)\s+(?P<unit>[gk]g)"),
     }
 
     def __init__(self, tenant_id: str, device_key: str, protocol: str = "DAHUA_SERIAL"):
@@ -230,7 +228,8 @@ class SerialScaleProtocol(ProtocolHandler):
         self.connected_at = datetime.now(timezone.utc)
         logger.info(
             "scale.connected",
-            port=port, baudrate=baudrate,
+            port=port,
+            baudrate=baudrate,
             protocol=self._protocol_type,
             device_key=self.device_key,
             tenant_id=self.tenant_id,
@@ -344,6 +343,7 @@ class SerialScaleProtocol(ProtocolHandler):
 
 # ─── 扫码枪 HID 协议 ───
 
+
 class HIDScannerProtocol(ProtocolHandler):
     """扫码枪 HID 协议。
 
@@ -419,7 +419,9 @@ class HIDScannerProtocol(ProtocolHandler):
         self._encoding = encoding
         logger.info(
             "scanner.configured",
-            prefix=prefix, suffix=suffix, encoding=encoding,
+            prefix=prefix,
+            suffix=suffix,
+            encoding=encoding,
             tenant_id=self.tenant_id,
         )
 
@@ -440,6 +442,7 @@ class HIDScannerProtocol(ProtocolHandler):
 
 # ─── 钱箱协议 ───
 
+
 class CashDrawerProtocol(ProtocolHandler):
     """钱箱协议 -- 通过打印机 ESC p 指令触发弹开。
 
@@ -453,7 +456,7 @@ class CashDrawerProtocol(ProtocolHandler):
     """
 
     # ESC p 0 25 250 — 触发引脚0，通电50ms，断电500ms
-    ESC_OPEN_DRAWER = b'\x1b\x70\x00\x19\xfa'
+    ESC_OPEN_DRAWER = b"\x1b\x70\x00\x19\xfa"
 
     def __init__(self, tenant_id: str, device_key: str):
         super().__init__(tenant_id, device_key)
@@ -473,7 +476,8 @@ class CashDrawerProtocol(ProtocolHandler):
         self.connected_at = datetime.now(timezone.utc)
         logger.info(
             "cash_drawer.connected",
-            printer_ip=printer_ip, printer_port=printer_port,
+            printer_ip=printer_ip,
+            printer_port=printer_port,
             tenant_id=self.tenant_id,
         )
 
@@ -528,6 +532,7 @@ class CashDrawerProtocol(ProtocolHandler):
 
 
 # ─── 商米设备 JS Bridge ───
+
 
 class SUNMIBridge(ProtocolHandler):
     """商米设备 JS Bridge -- 通过 WebView 调用安卓原生 SDK。
@@ -621,6 +626,7 @@ class SUNMIBridge(ProtocolHandler):
 
 # ─── 标签打印协议 ───
 
+
 class LabelPrinterProtocol(ProtocolHandler):
     """标签打印机协议。
 
@@ -669,7 +675,9 @@ class LabelPrinterProtocol(ProtocolHandler):
             self.connected_at = datetime.now(timezone.utc)
             logger.info(
                 "label_printer.connected",
-                ip=ip, port=port, protocol=self._protocol_type,
+                ip=ip,
+                port=port,
+                protocol=self._protocol_type,
                 tenant_id=self.tenant_id,
             )
         except asyncio.TimeoutError:
@@ -725,13 +733,19 @@ class LabelPrinterProtocol(ProtocolHandler):
 
         logger.info(
             "label_printer.printed",
-            item_name=item_name, copies=copies,
+            item_name=item_name,
+            copies=copies,
             protocol=self._protocol_type,
             tenant_id=self.tenant_id,
         )
 
     def _build_zpl_label(
-        self, name: str, barcode: str, price: str, date: str, copies: int,
+        self,
+        name: str,
+        barcode: str,
+        price: str,
+        date: str,
+        copies: int,
     ) -> bytes:
         """构建 ZPL 标签指令。"""
         zpl = f"""^XA
@@ -748,10 +762,15 @@ class LabelPrinterProtocol(ProtocolHandler):
         return zpl.encode("utf-8")
 
     def _build_tspl_label(
-        self, name: str, barcode: str, price: str, date: str, copies: int,
+        self,
+        name: str,
+        barcode: str,
+        price: str,
+        date: str,
+        copies: int,
     ) -> bytes:
         """构建 TSPL 标签指令。"""
-        tspl = 'SIZE 40 mm, 30 mm\nGAP 2 mm, 0 mm\nCLS\n'
+        tspl = "SIZE 40 mm, 30 mm\nGAP 2 mm, 0 mm\nCLS\n"
         tspl += f'TEXT 10,10,"TSS24.BF2",0,1,1,"{name}"\n'
         if price:
             tspl += f'TEXT 10,40,"TSS24.BF2",0,1,1,"价格: {price}"\n'
@@ -759,7 +778,7 @@ class LabelPrinterProtocol(ProtocolHandler):
             tspl += f'TEXT 10,65,"TSS16.BF2",0,1,1,"日期: {date}"\n'
         if barcode:
             tspl += f'BARCODE 10,90,"128",50,1,0,2,2,"{barcode}"\n'
-        tspl += f'PRINT {copies}\n'
+        tspl += f"PRINT {copies}\n"
         return tspl.encode("utf-8")
 
     async def health_check(self) -> bool:
@@ -768,6 +787,7 @@ class LabelPrinterProtocol(ProtocolHandler):
 
 
 # ─── HTTP API 协议（排队机 / 自助机） ───
+
 
 class HTTPDeviceProtocol(ProtocolHandler):
     """HTTP API 协议 -- 用于智能设备（排队机/自助机/KDS）。
@@ -869,10 +889,7 @@ def create_protocol_handler(
     """
     handler_cls = PROTOCOL_MAP.get(protocol)
     if handler_cls is None:
-        raise ValueError(
-            f"不支持的协议: {protocol}，"
-            f"可用协议: {', '.join(PROTOCOL_MAP.keys())}"
-        )
+        raise ValueError(f"不支持的协议: {protocol}，可用协议: {', '.join(PROTOCOL_MAP.keys())}")
 
     # SerialScaleProtocol 需要传递 protocol 参数
     if handler_cls is SerialScaleProtocol:

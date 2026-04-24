@@ -8,6 +8,7 @@
   5. emit_reconnected / emit_credential_expired / emit_webhook_received 各发一条
   6. 内部 emitter 失败（mock _get_publisher throws）→ track_sync 正常路径不受影响
 """
+
 from __future__ import annotations
 
 import os
@@ -33,6 +34,7 @@ from shared.events.src.event_types import AdapterEventType  # noqa: E402
 # Fixtures
 # ──────────────────────────────────────────────────────────────────────
 
+
 @pytest.fixture
 def tenant_id() -> UUID:
     return uuid4()
@@ -53,6 +55,7 @@ def emit_spy(monkeypatch):
 # ──────────────────────────────────────────────────────────────────────
 # 1. emit_adapter_event 函数式接口
 # ──────────────────────────────────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_emit_adapter_event_basic(emit_spy, tenant_id):
@@ -112,6 +115,7 @@ async def test_emit_adapter_event_name_too_long_rejected(tenant_id):
 # ──────────────────────────────────────────────────────────────────────
 # 2. AdapterEventMixin.track_sync
 # ──────────────────────────────────────────────────────────────────────
+
 
 class _FakeAdapter(AdapterEventMixin):
     adapter_name = "fake"
@@ -184,6 +188,7 @@ async def test_track_sync_correlation_id_is_shared(emit_spy, tenant_id):
 # 3. Mixin 辅助方法
 # ──────────────────────────────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_emit_reconnected(emit_spy, tenant_id):
     adapter = _FakeAdapter()
@@ -223,9 +228,11 @@ async def test_emit_webhook_received(emit_spy, tenant_id):
 # Utilities
 # ──────────────────────────────────────────────────────────────────────
 
+
 async def _drain_pending() -> None:
     """等待当前 event loop 里所有 create_task 排队任务完成。"""
     import asyncio
+
     tasks = [t for t in asyncio.all_tasks() if t is not asyncio.current_task()]
     if tasks:
         await asyncio.gather(*tasks, return_exceptions=True)

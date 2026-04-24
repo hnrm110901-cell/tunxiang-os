@@ -5,6 +5,7 @@
 - OAuth2 token 自动刷新
 - 订单确认/取消/查询、菜品上传、结算对账
 """
+
 import hashlib
 import os
 import time
@@ -20,9 +21,7 @@ logger = structlog.get_logger()
 MEITUAN_APP_ID = os.getenv("MEITUAN_APP_ID", "")
 MEITUAN_APP_SECRET = os.getenv("MEITUAN_APP_SECRET", "")
 MEITUAN_STORE_ID = os.getenv("MEITUAN_STORE_ID", "")
-MEITUAN_BASE_URL = os.getenv(
-    "MEITUAN_BASE_URL", "https://waimaiopen.meituan.com/api/v2"
-)
+MEITUAN_BASE_URL = os.getenv("MEITUAN_BASE_URL", "https://waimaiopen.meituan.com/api/v2")
 
 
 class MeituanAuthError(Exception):
@@ -102,9 +101,7 @@ class MeituanClient:
         return hashlib.md5(raw.encode("utf-8")).hexdigest().lower()
 
     @staticmethod
-    def verify_callback_sign(
-        params: dict[str, Any], sign: str, app_secret: str
-    ) -> bool:
+    def verify_callback_sign(params: dict[str, Any], sign: str, app_secret: str) -> bool:
         """验证美团回调签名：MD5(sorted_params_kv + app_secret)
 
         回调验签与请求签名略有不同，不含URL。
@@ -114,6 +111,7 @@ class MeituanClient:
         param_str = "".join(f"{k}={v}" for k, v in sorted_pairs)
         raw = param_str + app_secret
         import hmac as _hmac
+
         expected = hashlib.md5(raw.encode("utf-8")).hexdigest().lower()
         return _hmac.compare_digest(expected, sign.lower())
 
@@ -138,16 +136,12 @@ class MeituanClient:
             resp.raise_for_status()
             data = resp.json()
         except httpx.HTTPStatusError as exc:
-            raise MeituanAuthError(
-                f"Token 请求 HTTP 失败: {exc.response.status_code}"
-            ) from exc
+            raise MeituanAuthError(f"Token 请求 HTTP 失败: {exc.response.status_code}") from exc
         except httpx.TimeoutException as exc:
             raise MeituanAuthError(f"Token 请求超时: {exc}") from exc
 
         if data.get("error"):
-            raise MeituanAuthError(
-                f"Token 错误: {data.get('error_description', data.get('error'))}"
-            )
+            raise MeituanAuthError(f"Token 错误: {data.get('error_description', data.get('error'))}")
 
         self._access_token = data["access_token"]
         # 美团 token 有效期通常 7200 秒
@@ -255,9 +249,7 @@ class MeituanClient:
         """
         return await self._request("POST", "/order/confirm", {"order_id": order_id})
 
-    async def cancel_order(
-        self, order_id: str, reason_code: int, reason: str
-    ) -> dict[str, Any]:
+    async def cancel_order(self, order_id: str, reason_code: int, reason: str) -> dict[str, Any]:
         """取消订单
 
         Args:
@@ -307,9 +299,7 @@ class MeituanClient:
 
     async def query_store_info(self) -> dict[str, Any]:
         """查询门店信息"""
-        return await self._request(
-            "GET", "/store/info", {"app_poi_code": self.store_id}
-        )
+        return await self._request("GET", "/store/info", {"app_poi_code": self.store_id})
 
     # ─── 结算对账 ───
 

@@ -15,9 +15,10 @@
     if is_enabled(GrowthFlags.JOURNEY_V2, ctx):
         run_v2_logic()
 """
+
 import logging
 import os
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Optional
 
@@ -29,6 +30,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class FlagContext:
     """Feature Flag 评估上下文，包含所有支持的评估维度。"""
+
     tenant_id: Optional[str] = None
     brand_id: Optional[str] = None
     region_id: Optional[str] = None
@@ -73,9 +75,7 @@ class FeatureFlagClient:
         flags_dir: Optional[str] = None,
     ) -> None:
         self.env = env or os.getenv("TUNXIANG_ENV", "dev")
-        self.flags_dir = Path(
-            flags_dir or str(Path(__file__).parent.parent.parent / "flags")
-        )
+        self.flags_dir = Path(flags_dir or str(Path(__file__).parent.parent.parent / "flags"))
         # flag_name -> flag definition dict
         self._flag_cache: dict[str, dict[str, Any]] = {}
         self._load_flags()
@@ -93,9 +93,7 @@ class FeatureFlagClient:
             )
             return
 
-        yaml_files = list(self.flags_dir.rglob("*.yaml")) + list(
-            self.flags_dir.rglob("*.yml")
-        )
+        yaml_files = list(self.flags_dir.rglob("*.yaml")) + list(self.flags_dir.rglob("*.yml"))
 
         loaded_count = 0
         for yaml_file in sorted(yaml_files):
@@ -223,10 +221,7 @@ class FeatureFlagClient:
         """列出 `flags/` 目录下所有业务域名称（子目录）。"""
         if not self.flags_dir.exists():
             return []
-        return sorted(
-            p.name for p in self.flags_dir.iterdir()
-            if p.is_dir() and not p.name.startswith(".")
-        )
+        return sorted(p.name for p in self.flags_dir.iterdir() if p.is_dir() and not p.name.startswith("."))
 
     # ------------------------------------------------------------------
     # 内部：评估辅助方法

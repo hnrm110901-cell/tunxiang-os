@@ -6,12 +6,12 @@
 3. 三条硬约束提醒（毛利底线 / 食安合规 / 出餐时限）
 4. Few-shot 示例对话（展示推理过程与输出格式）
 """
+
 from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
 from typing import Any
-
 
 # ---------------------------------------------------------------------------
 # 1. 餐饮术语词典
@@ -34,7 +34,6 @@ CATERING_GLOSSARY: dict[str, str] = {
     "外卖占比": "外卖营业额 / 总营业额 x 100%",
     "净利润率": "税后净利润 / 营业总收入 x 100%",
     "盈亏平衡点": "营业额恰好覆盖全部成本的临界值",
-
     # === 菜品管理 ===
     "四象限分析": "按销量和毛利将菜品分为：明星（高销量高毛利）、金牛（低销量高毛利）、问题（高销量低毛利）、瘦狗（低销量低毛利）",
     "BOM": "Bill of Materials，菜品配方表，记录每道菜的原料名称、用量和成本",
@@ -47,7 +46,6 @@ CATERING_GLOSSARY: dict[str, str] = {
     "利润菜": "高毛利菜品，是门店利润的主要来源",
     "凑单菜": "低价小食，帮助顾客凑满减门槛",
     "预制菜": "在中央厨房预先加工好的半成品，门店只需简单加热或组装",
-
     # === 运营流程 ===
     "日清日结": "每日营业结束后的清理和结算流程，包含 E1-E8 八个标准步骤",
     "E1-E8": "日结八步：E1营业交接 → E2清点 → E3对账 → E4交款 → E5盘点 → E6环境 → E7记录 → E8交班",
@@ -61,7 +59,6 @@ CATERING_GLOSSARY: dict[str, str] = {
     "叫起": "通知后厨开始制作暂未烹饪的菜品（如等人齐了再做）",
     "划菜": "后厨出品后在 KDS 上标记菜品已完成",
     "档口": "后厨按菜品类型划分的制作区域，如热菜档、凉菜档、面点档",
-
     # === 会员营销 ===
     "RFM模型": "Recency（最近消费时间）、Frequency（消费频次）、Monetary（消费金额）三维度会员分层模型",
     "CDP": "Customer Data Platform，客户数据平台，整合全渠道顾客数据",
@@ -75,7 +72,6 @@ CATERING_GLOSSARY: dict[str, str] = {
     "全渠道归因": "追踪顾客从哪个渠道（堂食/外卖/小程序/抖音）完成消费转化",
     "Golden ID": "跨渠道统一的顾客唯一标识，将同一顾客的多个账号关联",
     "CLV": "Customer Lifetime Value，客户生命周期价值，预测顾客未来总贡献",
-
     # === 供应链 ===
     "中央厨房": "集中加工半成品后配送到各门店的中心工厂",
     "活鲜管理": "对海鲜、活禽等活体食材的特殊管理，包括暂养、损耗、称重",
@@ -90,14 +86,12 @@ CATERING_GLOSSARY: dict[str, str] = {
     "理论用量": "根据 BOM 配方和销售数量计算出的食材理论消耗量",
     "实际用量": "通过盘点得出的食材实际消耗量",
     "损耗差异": "实际用量 - 理论用量，反映浪费和管控水平",
-
     # === 财务 ===
     "P&L": "Profit & Loss 损益表，记录一段时间内的营收和成本",
     "四费": "连锁餐饮的四大成本：食材成本、人工成本、租金成本、能耗成本",
     "FLR比率": "Food + Labor + Rent 三项占营收比例，健康值通常 < 75%",
     "日流水": "门店当日全部营业收入（含堂食、外卖、储值等）",
     "应收应付": "品牌与加盟商/供应商之间的未结算款项",
-
     # === 渠道 ===
     "堂食": "顾客在门店内就餐的消费场景",
     "外卖": "通过美团/饿了么/抖音等平台配送到顾客手中的消费场景",
@@ -105,7 +99,6 @@ CATERING_GLOSSARY: dict[str, str] = {
     "扫码点餐": "顾客通过扫描桌台二维码自助下单",
     "小程序点餐": "顾客通过微信/抖音小程序自助下单",
     "团购核销": "顾客在美团/抖音购买团购券后到店使用",
-
     # === 食安 ===
     "食品经营许可证": "餐饮企业合法经营的基本证照",
     "健康证": "食品从业人员必须持有的健康检查合格证明",
@@ -178,7 +171,6 @@ AGENT_PROMPTS: dict[str, str] = {
 ```
 
 {constraints}""",
-
     # ----- 智能排菜 Agent -----
     "menu_optimizer": """你是屯象OS的**智能排菜Agent**，负责菜单结构优化和菜品经营分析。
 
@@ -221,7 +213,6 @@ AGENT_PROMPTS: dict[str, str] = {
 ```
 
 {constraints}""",
-
     # ----- 出餐调度 Agent -----
     "dispatch_predictor": """你是屯象OS的**出餐调度Agent**，负责预测出餐时间和优化后厨生产调度。
 
@@ -260,7 +251,6 @@ AGENT_PROMPTS: dict[str, str] = {
 ```
 
 {constraints}""",
-
     # ----- 会员洞察 Agent -----
     "member_insight": """你是屯象OS的**会员洞察Agent**，负责顾客数据分析和个性化营销建议。
 
@@ -301,7 +291,6 @@ AGENT_PROMPTS: dict[str, str] = {
 ```
 
 {constraints}""",
-
     # ----- 库存预警 Agent -----
     "inventory_alert": """你是屯象OS的**库存预警Agent**，负责食材库存监控、效期管理和采购建议。
 
@@ -345,7 +334,6 @@ AGENT_PROMPTS: dict[str, str] = {
 ```
 
 {constraints}""",
-
     # ----- 财务稽核 Agent -----
     "finance_audit": """你是屯象OS的**财务稽核Agent**，负责门店经营数据的财务分析和异常检测。
 
@@ -389,7 +377,6 @@ AGENT_PROMPTS: dict[str, str] = {
 ```
 
 {constraints}""",
-
     # ----- 巡店质检 Agent -----
     "inspection": """你是屯象OS的**巡店质检Agent**，负责门店运营质量巡检和合规检查。
 
@@ -429,7 +416,6 @@ AGENT_PROMPTS: dict[str, str] = {
 ```
 
 {constraints}""",
-
     # ----- 智能客服 Agent -----
     "customer_service": """你是屯象OS的**智能客服Agent**，负责处理顾客的咨询、投诉和售后请求。
 
@@ -469,7 +455,6 @@ AGENT_PROMPTS: dict[str, str] = {
 ```
 
 {constraints}""",
-
     # ----- 私域运营 Agent -----
     "private_domain": """你是屯象OS的**私域运营Agent**，负责品牌私域流量的运营策略和内容生成。
 
@@ -515,9 +500,11 @@ AGENT_PROMPTS: dict[str, str] = {
 # 4. Few-shot 示例池
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class FewShotExample:
     """单条 few-shot 示例。"""
+
     user_message: str
     assistant_response: str
 
@@ -526,8 +513,7 @@ FEW_SHOT_EXAMPLES: dict[str, list[FewShotExample]] = {
     "discount_guardian": [
         FewShotExample(
             user_message=(
-                "服务员小王对一桌 380 元的订单打了 6 折，备注说是老顾客。"
-                "这桌的食材成本是 152 元。门店毛利底线是 40%。"
+                "服务员小王对一桌 380 元的订单打了 6 折，备注说是老顾客。这桌的食材成本是 152 元。门店毛利底线是 40%。"
             ),
             assistant_response="""{
   "risk_level": "critical",
@@ -542,10 +528,7 @@ FEW_SHOT_EXAMPLES: dict[str, list[FewShotExample]] = {
 }""",
         ),
         FewShotExample(
-            user_message=(
-                "今天晚上22:15，收银员对一笔88元的订单做了抹零处理，"
-                "实收85元。食材成本35元。毛利底线40%。"
-            ),
+            user_message=("今天晚上22:15，收银员对一笔88元的订单做了抹零处理，实收85元。食材成本35元。毛利底线40%。"),
             assistant_response="""{
   "risk_level": "low",
   "action": "allow",
@@ -559,7 +542,6 @@ FEW_SHOT_EXAMPLES: dict[str, list[FewShotExample]] = {
 }""",
         ),
     ],
-
     "menu_optimizer": [
         FewShotExample(
             user_message=(
@@ -598,7 +580,6 @@ FEW_SHOT_EXAMPLES: dict[str, list[FewShotExample]] = {
 }""",
         ),
     ],
-
     "inventory_alert": [
         FewShotExample(
             user_message=(
@@ -633,12 +614,10 @@ FEW_SHOT_EXAMPLES: dict[str, list[FewShotExample]] = {
 }""",
         ),
     ],
-
     "finance_audit": [
         FewShotExample(
             user_message=(
-                "门店A本月数据：营收52万，食材成本19.5万，人工13万，"
-                "租金5万，能耗2.8万。上月营收58万。请分析。"
+                "门店A本月数据：营收52万，食材成本19.5万，人工13万，租金5万，能耗2.8万。上月营收58万。请分析。"
             ),
             assistant_response="""{
   "store_id": "store_A",
@@ -660,7 +639,6 @@ FEW_SHOT_EXAMPLES: dict[str, list[FewShotExample]] = {
 }""",
         ),
     ],
-
     "member_insight": [
         FewShotExample(
             user_message=(
@@ -691,6 +669,7 @@ FEW_SHOT_EXAMPLES: dict[str, list[FewShotExample]] = {
 # ---------------------------------------------------------------------------
 # 5. DomainEnhancer 类
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class DomainEnhancer:
@@ -753,13 +732,12 @@ class DomainEnhancer:
         """
         if task_type not in self.agent_prompts:
             available = ", ".join(sorted(self.agent_prompts.keys()))
-            raise KeyError(
-                f"未注册的 Agent 任务类型: {task_type!r}。可用类型: {available}"
-            )
+            raise KeyError(f"未注册的 Agent 任务类型: {task_type!r}。可用类型: {available}")
 
         # 填充硬约束
         prompt = self.agent_prompts[task_type].replace(
-            "{constraints}", HARD_CONSTRAINTS_BLOCK,
+            "{constraints}",
+            HARD_CONSTRAINTS_BLOCK,
         )
 
         # 注入租户配置
@@ -861,12 +839,16 @@ class DomainEnhancer:
             (system_prompt, messages) 二元组，可直接传给 ProviderAdapter.complete()。
         """
         system_prompt = self.enhance_system_prompt(
-            task_type, base_system=base_system, tenant_config=tenant_config,
+            task_type,
+            base_system=base_system,
+            tenant_config=tenant_config,
         )
 
         terms = self.detect_terms(user_message)
         context_block = self.build_context_block(
-            task_type, terms, include_few_shot=include_few_shot,
+            task_type,
+            terms,
+            include_few_shot=include_few_shot,
         )
 
         # 组装消息列表

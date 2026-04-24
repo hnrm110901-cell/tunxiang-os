@@ -7,6 +7,7 @@
   DASHSCOPE_API_KEY   — 阿里云百炼 API 密钥
   DASHSCOPE_BASE_URL  — 自定义端点，默认 https://dashscope.aliyuncs.com/compatible-mode/v1
 """
+
 from __future__ import annotations
 
 import time
@@ -14,8 +15,8 @@ from typing import Any, AsyncGenerator, Optional
 
 import structlog
 
+from ..registry import get_model_info, get_models_by_provider
 from ..types import LLMResponse, ModelInfo, ModelPricing, ProviderHealth, ProviderName
-from ..registry import get_models_by_provider, get_model_info
 from .base import BaseProviderAdapter
 
 logger = structlog.get_logger()
@@ -47,6 +48,7 @@ class QwenAdapter(BaseProviderAdapter):
         max_retries: int = 3,
     ):
         import os
+
         resolved_key = api_key or os.environ.get("DASHSCOPE_API_KEY")
         resolved_url = base_url or os.environ.get("DASHSCOPE_BASE_URL", _DEFAULT_BASE_URL)
         super().__init__(resolved_key, resolved_url, timeout_s, max_retries)
@@ -105,7 +107,8 @@ class QwenAdapter(BaseProviderAdapter):
         async def _do_call():
             return await client.chat.completions.create(**kwargs)
 
-        from openai import APIConnectionError, APITimeoutError, APIStatusError
+        from openai import APIConnectionError, APIStatusError, APITimeoutError
+
         response = await self._retry_with_backoff(
             _do_call,
             retryable_exceptions=(APIConnectionError, APITimeoutError, APIStatusError),

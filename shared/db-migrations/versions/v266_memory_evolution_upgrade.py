@@ -21,6 +21,7 @@ Revision ID: v266_mem_evo
 Revises: v263_kiosk_voice_count (v265_mv_roi was never merged to main)
 Create Date: 2026-04-23
 """
+
 from alembic import op
 
 revision = "v266_mem_evo"

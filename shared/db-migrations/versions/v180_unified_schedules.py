@@ -33,10 +33,7 @@ def upgrade() -> None:
             updated_at            TIMESTAMPTZ NOT NULL DEFAULT NOW()
         )
     """)
-    op.execute(
-        "CREATE INDEX IF NOT EXISTS idx_shift_templates_tenant "
-        "ON shift_templates (tenant_id)"
-    )
+    op.execute("CREATE INDEX IF NOT EXISTS idx_shift_templates_tenant ON shift_templates (tenant_id)")
     op.execute("ALTER TABLE shift_templates ENABLE ROW LEVEL SECURITY")
     op.execute("ALTER TABLE shift_templates FORCE ROW LEVEL SECURITY")
     op.execute("DROP POLICY IF EXISTS shift_templates_tenant_isolation ON shift_templates")
@@ -76,10 +73,7 @@ def upgrade() -> None:
         "CREATE INDEX IF NOT EXISTS idx_unified_schedules_tenant_employee_date "
         "ON unified_schedules (tenant_id, employee_id, schedule_date)"
     )
-    op.execute(
-        "CREATE INDEX IF NOT EXISTS idx_unified_schedules_status "
-        "ON unified_schedules (status)"
-    )
+    op.execute("CREATE INDEX IF NOT EXISTS idx_unified_schedules_status ON unified_schedules (status)")
     op.execute("ALTER TABLE unified_schedules ENABLE ROW LEVEL SECURITY")
     op.execute("ALTER TABLE unified_schedules FORCE ROW LEVEL SECURITY")
     op.execute("DROP POLICY IF EXISTS unified_schedules_tenant_isolation ON unified_schedules")
@@ -106,13 +100,9 @@ def upgrade() -> None:
         )
     """)
     op.execute(
-        "CREATE INDEX IF NOT EXISTS idx_shift_gaps_tenant_store_date "
-        "ON shift_gaps (tenant_id, store_id, schedule_date)"
+        "CREATE INDEX IF NOT EXISTS idx_shift_gaps_tenant_store_date ON shift_gaps (tenant_id, store_id, schedule_date)"
     )
-    op.execute(
-        "CREATE INDEX IF NOT EXISTS idx_shift_gaps_status "
-        "ON shift_gaps (status)"
-    )
+    op.execute("CREATE INDEX IF NOT EXISTS idx_shift_gaps_status ON shift_gaps (status)")
     op.execute("ALTER TABLE shift_gaps ENABLE ROW LEVEL SECURITY")
     op.execute("ALTER TABLE shift_gaps FORCE ROW LEVEL SECURITY")
     op.execute("DROP POLICY IF EXISTS shift_gaps_tenant_isolation ON shift_gaps")

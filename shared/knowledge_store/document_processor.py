@@ -7,13 +7,12 @@
 - TXT/MD（直接读取）
 - 手动输入文本
 """
+
 from __future__ import annotations
 
 import hashlib
-import os
 from pathlib import Path
 from typing import Any
-from uuid import uuid4
 
 import structlog
 
@@ -89,16 +88,18 @@ class DocumentProcessor:
         chunks_to_write: list[dict[str, Any]] = []
         for i, (cr, emb) in enumerate(zip(chunk_results, embeddings)):
             doc_id = f"{collection}:{document_id}:{i}"
-            chunks_to_write.append({
-                "text": cr.text,
-                "embedding": emb,
-                "metadata": metadata or {},
-                "doc_id": doc_id,
-                "document_id": document_id,
-                "collection": collection,
-                "chunk_index": i,
-                "token_count": cr.token_count,
-            })
+            chunks_to_write.append(
+                {
+                    "text": cr.text,
+                    "embedding": emb,
+                    "metadata": metadata or {},
+                    "doc_id": doc_id,
+                    "document_id": document_id,
+                    "collection": collection,
+                    "chunk_index": i,
+                    "token_count": cr.token_count,
+                }
+            )
 
         # 5. 写入 pgvector
         result = await PgVectorStore.upsert_chunks(chunks_to_write, tenant_id, db)
@@ -106,19 +107,23 @@ class DocumentProcessor:
         # 6. 更新文档状态
         try:
             from sqlalchemy import text as sql_text
-            await db.execute(sql_text("""
+
+            await db.execute(
+                sql_text("""
                 UPDATE knowledge_documents
                 SET chunk_count = :chunk_count,
                     status = :status,
                     updated_at = NOW()
                 WHERE id = :doc_id::uuid
                 AND tenant_id = :tenant_id::uuid
-            """), {
-                "chunk_count": result["success"],
-                "status": "published" if result["failed"] == 0 else "failed",
-                "doc_id": document_id,
-                "tenant_id": tenant_id,
-            })
+            """),
+                {
+                    "chunk_count": result["success"],
+                    "status": "published" if result["failed"] == 0 else "failed",
+                    "doc_id": document_id,
+                    "tenant_id": tenant_id,
+                },
+            )
             await db.commit()
         except Exception as exc:
             errors.append(f"更新文档状态失败: {str(exc)}")
@@ -185,6 +190,7 @@ def _parse_pdf(file_path: str) -> str:
     """解析 PDF 文件"""
     try:
         import pdfplumber
+
         texts = []
         with pdfplumber.open(file_path) as pdf:
             for page in pdf.pages:
@@ -209,6 +215,7 @@ def _parse_docx(file_path: str) -> str:
     """解析 DOCX 文件"""
     try:
         from docx import Document
+
         doc = Document(file_path)
         texts = [p.text for p in doc.paragraphs if p.text.strip()]
 
@@ -230,6 +237,7 @@ def _parse_xlsx(file_path: str) -> str:
 
     if ext == ".csv":
         import csv
+
         texts = []
         with open(file_path, encoding="utf-8") as f:
             reader = csv.reader(f)
@@ -239,6 +247,7 @@ def _parse_xlsx(file_path: str) -> str:
 
     try:
         from openpyxl import load_workbook
+
         wb = load_workbook(file_path, read_only=True)
         texts = []
         for ws in wb.worksheets:

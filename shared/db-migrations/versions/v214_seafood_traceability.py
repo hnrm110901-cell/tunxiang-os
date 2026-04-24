@@ -2,8 +2,9 @@
 
 Revision: v214
 """
-from alembic import op
+
 import sqlalchemy as sa
+from alembic import op
 from sqlalchemy.dialects import postgresql
 
 revision = "v214"
@@ -31,11 +32,12 @@ def upgrade() -> None:
 
     # ── 活鲜批次表 ──
 
-    if 'seafood_batches' not in existing:
+    if "seafood_batches" not in existing:
         op.create_table(
             "seafood_batches",
-            sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True,
-                      server_default=sa.text("gen_random_uuid()")),
+            sa.Column(
+                "id", postgresql.UUID(as_uuid=True), primary_key=True, server_default=sa.text("gen_random_uuid()")
+            ),
             sa.Column("tenant_id", postgresql.UUID(as_uuid=True), nullable=False),
             sa.Column("store_id", postgresql.UUID(as_uuid=True), nullable=False),
             sa.Column("supplier_id", postgresql.UUID(as_uuid=True), nullable=True),
@@ -47,8 +49,7 @@ def upgrade() -> None:
             sa.Column("unit_price_fen", sa.BIGINT, nullable=False, comment="进货单价(分/斤)"),
             sa.Column("total_cost_fen", sa.BIGINT, nullable=False),
             sa.Column("received_at", sa.TIMESTAMP(timezone=True), server_default=sa.text("now()")),
-            sa.Column("status", sa.VARCHAR(20), server_default="active",
-                      comment="active/depleted/expired"),
+            sa.Column("status", sa.VARCHAR(20), server_default="active", comment="active/depleted/expired"),
             sa.Column("remaining_qty", sa.INTEGER, nullable=False),
             sa.Column("remaining_weight_g", sa.INTEGER, nullable=False),
             sa.Column("origin", sa.VARCHAR(100), nullable=True, comment="产地"),
@@ -61,11 +62,12 @@ def upgrade() -> None:
 
         # ── 缸位表 ──
 
-    if 'seafood_tanks' not in existing:
+    if "seafood_tanks" not in existing:
         op.create_table(
             "seafood_tanks",
-            sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True,
-                      server_default=sa.text("gen_random_uuid()")),
+            sa.Column(
+                "id", postgresql.UUID(as_uuid=True), primary_key=True, server_default=sa.text("gen_random_uuid()")
+            ),
             sa.Column("tenant_id", postgresql.UUID(as_uuid=True), nullable=False),
             sa.Column("store_id", postgresql.UUID(as_uuid=True), nullable=False),
             sa.Column("tank_no", sa.VARCHAR(20), nullable=False, comment="缸号: A-01"),
@@ -76,8 +78,7 @@ def upgrade() -> None:
             sa.Column("temperature_c", sa.NUMERIC(4, 1), nullable=True),
             sa.Column("salinity_ppt", sa.NUMERIC(4, 1), nullable=True),
             sa.Column("survival_rate", sa.NUMERIC(5, 2), nullable=True, comment="存活率%"),
-            sa.Column("status", sa.VARCHAR(20), server_default="active",
-                      comment="active/empty/maintenance"),
+            sa.Column("status", sa.VARCHAR(20), server_default="active", comment="active/empty/maintenance"),
             sa.Column("updated_at", sa.TIMESTAMP(timezone=True), server_default=sa.text("now()")),
             sa.Column("is_deleted", sa.BOOLEAN, server_default="false", nullable=False),
         )
@@ -86,11 +87,12 @@ def upgrade() -> None:
 
         # ── 损耗日志 ──
 
-    if 'seafood_mortality_logs' not in existing:
+    if "seafood_mortality_logs" not in existing:
         op.create_table(
             "seafood_mortality_logs",
-            sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True,
-                      server_default=sa.text("gen_random_uuid()")),
+            sa.Column(
+                "id", postgresql.UUID(as_uuid=True), primary_key=True, server_default=sa.text("gen_random_uuid()")
+            ),
             sa.Column("tenant_id", postgresql.UUID(as_uuid=True), nullable=False),
             sa.Column("store_id", postgresql.UUID(as_uuid=True), nullable=False),
             sa.Column("batch_id", postgresql.UUID(as_uuid=True), nullable=True),
@@ -98,8 +100,7 @@ def upgrade() -> None:
             sa.Column("species", sa.VARCHAR(80), nullable=False),
             sa.Column("dead_qty", sa.INTEGER, nullable=False),
             sa.Column("dead_weight_g", sa.INTEGER, nullable=False),
-            sa.Column("cause", sa.VARCHAR(50), nullable=True,
-                      comment="natural/temperature/transport/unknown"),
+            sa.Column("cause", sa.VARCHAR(50), nullable=True, comment="natural/temperature/transport/unknown"),
             sa.Column("operator_id", postgresql.UUID(as_uuid=True), nullable=True),
             sa.Column("notes", sa.TEXT, nullable=True),
             sa.Column("recorded_at", sa.TIMESTAMP(timezone=True), server_default=sa.text("now()")),

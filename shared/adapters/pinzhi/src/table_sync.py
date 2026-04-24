@@ -2,6 +2,7 @@
 品智桌台同步模块
 拉取品智桌台数据并以 UPSERT 模式写入屯象 tables 表
 """
+
 from __future__ import annotations
 
 import uuid
@@ -57,10 +58,12 @@ class PinzhiTableSync:
         status = status_map.get(int(raw_status), "free")
 
         return {
-            "id": str(uuid.uuid5(
-                uuid.NAMESPACE_DNS,
-                f"pinzhi:{tenant_id}:{pinzhi_table.get('tableId', pinzhi_table.get('id', ''))}",
-            )),
+            "id": str(
+                uuid.uuid5(
+                    uuid.NAMESPACE_DNS,
+                    f"pinzhi:{tenant_id}:{pinzhi_table.get('tableId', pinzhi_table.get('id', ''))}",
+                )
+            ),
             "tenant_id": tenant_id,
             "store_id": store_uuid,
             "table_no": str(pinzhi_table.get("tableName", pinzhi_table.get("tableNo", ""))),

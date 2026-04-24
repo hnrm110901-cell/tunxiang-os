@@ -8,6 +8,7 @@
 
 订阅消息模板需在微信后台申请，模板ID通过环境变量或数据库配置注入。
 """
+
 from __future__ import annotations
 
 import os
@@ -189,14 +190,13 @@ class WechatSubscribeService:
             f"&secret={self._app_secret}"
         )
 
-        async with aiohttp.ClientSession() as session, session.get(
-            url, timeout=aiohttp.ClientTimeout(total=10)
-        ) as resp:
+        async with (
+            aiohttp.ClientSession() as session,
+            session.get(url, timeout=aiohttp.ClientTimeout(total=10)) as resp,
+        ):
             result = await resp.json()
             if "access_token" not in result:
-                raise ValueError(
-                    f"WeChat token error: {result.get('errcode')} - {result.get('errmsg')}"
-                )
+                raise ValueError(f"WeChat token error: {result.get('errcode')} - {result.get('errmsg')}")
             self._access_token = result["access_token"]
             # 提前 5 分钟过期
             self._token_expires_at = now + result.get("expires_in", 7200) - 300
@@ -249,9 +249,7 @@ class WechatSubscribeService:
 
         try:
             access_token = await self.get_access_token()
-            result = await self._call_subscribe_api(
-                access_token, openid, template_id, data, page
-            )
+            result = await self._call_subscribe_api(access_token, openid, template_id, data, page)
             logger.info(
                 "wechat_subscribe_sent",
                 msg_id=msg_id,
@@ -295,10 +293,7 @@ class WechatSubscribeService:
         """
         import aiohttp
 
-        api_url = (
-            f"https://api.weixin.qq.com/cgi-bin/message/subscribe/send"
-            f"?access_token={access_token}"
-        )
+        api_url = f"https://api.weixin.qq.com/cgi-bin/message/subscribe/send?access_token={access_token}"
 
         payload: dict[str, Any] = {
             "touser": openid,
@@ -308,17 +303,18 @@ class WechatSubscribeService:
         if page:
             payload["page"] = page
 
-        async with aiohttp.ClientSession() as session, session.post(
-            api_url,
-            json=payload,
-            timeout=aiohttp.ClientTimeout(total=10),
-        ) as resp:
+        async with (
+            aiohttp.ClientSession() as session,
+            session.post(
+                api_url,
+                json=payload,
+                timeout=aiohttp.ClientTimeout(total=10),
+            ) as resp,
+        ):
             result = await resp.json()
             errcode = result.get("errcode", 0)
             if errcode != 0:
-                raise ValueError(
-                    f"WeChat subscribe msg error: {errcode} - {result.get('errmsg')}"
-                )
+                raise ValueError(f"WeChat subscribe msg error: {errcode} - {result.get('errmsg')}")
             return result
 
     # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

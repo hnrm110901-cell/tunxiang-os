@@ -7,12 +7,12 @@ Round 64 Team D — 新增测试：
   - RLS set_config 调用验证
   - 空数据 / 映射失败 / DB异常 降级路径
 """
+
 from __future__ import annotations
 
-import sys
 import os
-import uuid
-from unittest.mock import AsyncMock, MagicMock, patch, call
+import sys
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -20,7 +20,6 @@ import pytest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
 from table_sync import PinzhiTableSync
-
 
 # ─── 辅助工厂 ───────────────────────────────────────────────────────────────
 
@@ -59,6 +58,7 @@ def _make_pinzhi_table(**overrides) -> dict:
 
 
 # ─── 测试：map_to_tunxiang_table 映射逻辑 ───────────────────────────────────
+
 
 class TestMapToTunxiangTable:
     def test_basic_mapping(self):
@@ -166,6 +166,7 @@ class TestMapToTunxiangTable:
 
 # ─── 测试：fetch_tables ───────────────────────────────────────────────────────
 
+
 class TestFetchTables:
     @pytest.mark.asyncio
     async def test_fetch_tables_calls_adapter(self):
@@ -190,6 +191,7 @@ class TestFetchTables:
 
 
 # ─── 测试：upsert_tables 集成 ────────────────────────────────────────────────
+
 
 class TestUpsertTables:
     @pytest.mark.asyncio

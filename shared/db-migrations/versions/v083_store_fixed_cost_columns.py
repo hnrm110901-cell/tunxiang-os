@@ -12,12 +12,11 @@
 Revision ID: v079
 Revises: v078
 """
-from typing import Union
+
 from alembic import op
-import sqlalchemy as sa
 
 revision = "v083"
-down_revision= "v082"
+down_revision = "v082"
 branch_labels = None
 depends_on = None
 

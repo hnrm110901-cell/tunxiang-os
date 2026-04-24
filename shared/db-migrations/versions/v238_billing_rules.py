@@ -11,7 +11,6 @@ Create Date: 2026-04-12
 """
 
 from alembic import op
-import sqlalchemy as sa
 
 revision = "v238"
 down_revision = "v237"
@@ -75,13 +74,15 @@ def upgrade() -> None:
     """)
 
     # ── RLS Policy ──────────────────────────────────────────────────────
-    op.execute("""
+    op.execute(
+        """
         ALTER TABLE billing_rules ENABLE ROW LEVEL SECURITY;
 
         DROP POLICY IF EXISTS billing_rules_tenant_isolation ON billing_rules;
         CREATE POLICY billing_rules_tenant_isolation ON billing_rules
             USING ({cond});
-    """.format(cond=_RLS_COND))
+    """.format(cond=_RLS_COND)
+    )
 
 
 def downgrade() -> None:

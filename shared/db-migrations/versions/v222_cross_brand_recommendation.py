@@ -5,8 +5,9 @@ Tables:
   - recommendation_logs         推荐日志（场景/推荐内容/是否采纳）
   - cross_brand_member_links    跨品牌会员关联（golden_id/brand_id/brand_member_id）
 """
-from alembic import op
+
 import sqlalchemy as sa
+from alembic import op
 from sqlalchemy.dialects import postgresql
 
 revision = "v222"
@@ -19,10 +20,9 @@ def upgrade() -> None:
     conn = op.get_bind()
     existing = sa.inspect(conn).get_table_names()
 
-
     # ── recommendation_logs 推荐日志表 ──
 
-    if 'recommendation_logs' not in existing:
+    if "recommendation_logs" not in existing:
         op.create_table(
             "recommendation_logs",
             sa.Column(
@@ -125,9 +125,7 @@ def upgrade() -> None:
         )
 
         # RLS: recommendation_logs
-        op.execute(
-            "ALTER TABLE recommendation_logs ENABLE ROW LEVEL SECURITY;"
-        )
+        op.execute("ALTER TABLE recommendation_logs ENABLE ROW LEVEL SECURITY;")
         op.execute(
             "CREATE POLICY recommendation_logs_tenant_isolation ON recommendation_logs"
             " USING (tenant_id = current_setting('app.tenant_id')::UUID);"
@@ -135,7 +133,7 @@ def upgrade() -> None:
 
         # ── cross_brand_member_links 跨品牌会员关联表 ──
 
-    if 'cross_brand_member_links' not in existing:
+    if "cross_brand_member_links" not in existing:
         op.create_table(
             "cross_brand_member_links",
             sa.Column(
@@ -207,9 +205,7 @@ def upgrade() -> None:
         )
 
         # RLS: cross_brand_member_links
-        op.execute(
-            "ALTER TABLE cross_brand_member_links ENABLE ROW LEVEL SECURITY;"
-        )
+        op.execute("ALTER TABLE cross_brand_member_links ENABLE ROW LEVEL SECURITY;")
         op.execute(
             "CREATE POLICY cross_brand_member_links_tenant_isolation ON cross_brand_member_links"
             " USING (tenant_id = current_setting('app.tenant_id')::UUID);"
@@ -217,14 +213,8 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.execute(
-        "DROP POLICY IF EXISTS cross_brand_member_links_tenant_isolation"
-        " ON cross_brand_member_links;"
-    )
+    op.execute("DROP POLICY IF EXISTS cross_brand_member_links_tenant_isolation ON cross_brand_member_links;")
     op.drop_table("cross_brand_member_links")
 
-    op.execute(
-        "DROP POLICY IF EXISTS recommendation_logs_tenant_isolation"
-        " ON recommendation_logs;"
-    )
+    op.execute("DROP POLICY IF EXISTS recommendation_logs_tenant_isolation ON recommendation_logs;")
     op.drop_table("recommendation_logs")

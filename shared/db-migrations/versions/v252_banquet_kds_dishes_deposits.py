@@ -9,6 +9,7 @@
 Revision ID: v252
 Revises: v251
 """
+
 from __future__ import annotations
 
 import sqlalchemy as sa

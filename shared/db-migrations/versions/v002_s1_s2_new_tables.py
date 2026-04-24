@@ -4,16 +4,15 @@ Revision ID: v002
 Revises: v001
 Create Date: 2026-03-23
 """
-from typing import Sequence, Union
 
-from alembic import op
 import sqlalchemy as sa
-from sqlalchemy.dialects.postgresql import UUID, JSON
+from alembic import op
+from sqlalchemy.dialects.postgresql import JSON, UUID
 
 revision = "v002"
-down_revision= "v001"
-branch_labels= None
-depends_on= None
+down_revision = "v001"
+branch_labels = None
+depends_on = None
 
 # 本次新增的 12 张表（按依赖顺序排列）
 NEW_TABLES = [
@@ -89,10 +88,8 @@ def upgrade() -> None:
         sa.Column("amount_fen", sa.Integer, nullable=False, comment="支付金额(分)"),
         sa.Column("status", sa.String(20), nullable=False, server_default="pending", index=True),
         sa.Column("is_actual_revenue", sa.Boolean, nullable=False, server_default="true", comment="是否计入实收"),
-        sa.Column("actual_revenue_ratio", sa.Float, nullable=False, server_default="1.0",
-                  comment="实收比例(0-1)"),
-        sa.Column("payment_category", sa.String(20), nullable=False, server_default="other",
-                  comment="支付类别"),
+        sa.Column("actual_revenue_ratio", sa.Float, nullable=False, server_default="1.0", comment="实收比例(0-1)"),
+        sa.Column("payment_category", sa.String(20), nullable=False, server_default="other", comment="支付类别"),
         sa.Column("trade_no", sa.String(128), comment="第三方交易号"),
         sa.Column("paid_at", sa.DateTime(timezone=True)),
         sa.Column("credit_account_name", sa.String(100), comment="挂账单位/人"),
@@ -252,8 +249,9 @@ def upgrade() -> None:
         sa.Column("id", UUID(as_uuid=True), primary_key=True),
         sa.Column("tenant_id", UUID(as_uuid=True), nullable=False, index=True),
         sa.Column("dish_id", UUID(as_uuid=True), nullable=False, index=True, comment="菜品ID"),
-        sa.Column("production_dept_id", UUID(as_uuid=True), sa.ForeignKey("production_depts.id"),
-                  nullable=False, index=True),
+        sa.Column(
+            "production_dept_id", UUID(as_uuid=True), sa.ForeignKey("production_depts.id"), nullable=False, index=True
+        ),
         sa.Column("printer_id", UUID(as_uuid=True), comment="关联打印机ID"),
         sa.Column("kds_terminal_id", UUID(as_uuid=True), comment="关联KDS终端ID"),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
@@ -270,8 +268,7 @@ def upgrade() -> None:
         sa.Column("tenant_id", UUID(as_uuid=True), nullable=False, index=True),
         sa.Column("store_id", UUID(as_uuid=True), sa.ForeignKey("stores.id"), nullable=False, index=True),
         sa.Column("ops_date", sa.Date, nullable=False, index=True),
-        sa.Column("status", sa.String(20), server_default="not_started",
-                  comment="not_started/in_progress/completed"),
+        sa.Column("status", sa.String(20), server_default="not_started", comment="not_started/in_progress/completed"),
         # 8 节点状态
         sa.Column("e1_open_store", sa.String(20), server_default="pending"),
         sa.Column("e2_cruise", sa.String(20), server_default="pending"),
@@ -297,12 +294,12 @@ def upgrade() -> None:
         "daily_ops_nodes",
         sa.Column("id", UUID(as_uuid=True), primary_key=True),
         sa.Column("tenant_id", UUID(as_uuid=True), nullable=False, index=True),
-        sa.Column("flow_id", UUID(as_uuid=True), sa.ForeignKey("daily_ops_flows.id"),
-                  nullable=False, index=True),
+        sa.Column("flow_id", UUID(as_uuid=True), sa.ForeignKey("daily_ops_flows.id"), nullable=False, index=True),
         sa.Column("node_code", sa.String(10), nullable=False, comment="E1-E8"),
         sa.Column("node_name", sa.String(50), nullable=False),
-        sa.Column("status", sa.String(20), server_default="pending",
-                  comment="pending/in_progress/completed/skipped/abnormal"),
+        sa.Column(
+            "status", sa.String(20), server_default="pending", comment="pending/in_progress/completed/skipped/abnormal"
+        ),
         sa.Column("check_items", JSON, comment="[{item, required, checked, result}]"),
         sa.Column("check_result", sa.String(20), comment="pass/fail/partial"),
         sa.Column("photo_urls", JSON),

@@ -16,6 +16,7 @@
     handler = MeituanOrderWebhookHandler(binding_service, tenant_id, store_id="xxx")
     result = await handler.handle(raw_payload, db, current_hour_count=5)
 """
+
 import uuid
 from typing import Any, Optional
 
@@ -24,7 +25,7 @@ import structlog
 logger = structlog.get_logger()
 
 # 美团核销状态码（order_verified 对应 status=5 已完成 / 自定义核销事件）
-_VERIFIED_STATUSES = {5, 9}   # 5=已完成, 9=核销（部分平台用此值）
+_VERIFIED_STATUSES = {5, 9}  # 5=已完成, 9=核销（部分平台用此值）
 
 
 class MeituanOrderWebhookHandler:
@@ -119,6 +120,7 @@ class MeituanOrderWebhookHandler:
                 from services.tx_trade.src.services.delivery_ops_service import (  # noqa: PLC0415
                     DeliveryOpsService,
                 )
+
                 ops_svc = DeliveryOpsService()
                 should_accept = await ops_svc.should_auto_accept(
                     store_id=store_id,

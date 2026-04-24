@@ -9,6 +9,7 @@
   ELEME_DELIVERY_APP_SECRET
   ELEME_DELIVERY_STORE_MAP   JSON 格式: {"txos_store_001": "eleme_shop_888"}
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -24,22 +25,20 @@ import structlog
 from .delivery_platform_base import (
     DeliveryPlatformAdapter,
     DeliveryPlatformError,
-    DeliveryPlatformSignError,
-    DeliveryPlatformTimeoutError,
 )
 
 logger = structlog.get_logger()
 
 # ── 饿了么订单状态 → 屯象统一状态 ────────────────────────
 ELEME_STATUS_MAP: Dict[int, str] = {
-    0: "pending",       # 待付款
-    1: "pending",       # 待接单
-    2: "confirmed",     # 已接单
-    3: "preparing",     # 备餐中
-    4: "delivering",    # 配送中
-    5: "completed",     # 已完成
-    6: "cancelled",     # 已取消
-    9: "refunded",      # 已退款
+    0: "pending",  # 待付款
+    1: "pending",  # 待接单
+    2: "confirmed",  # 已接单
+    3: "preparing",  # 备餐中
+    4: "delivering",  # 配送中
+    5: "completed",  # 已完成
+    6: "cancelled",  # 已取消
+    9: "refunded",  # 已退款
 }
 
 
@@ -81,9 +80,7 @@ class ElemeDeliveryAdapter(DeliveryPlatformAdapter):
         self._token_expires_at: float = 0
 
         # Webhook 事件处理器注册表
-        self._webhook_handlers: Dict[
-            str, Callable[[Dict[str, Any]], Coroutine[Any, Any, None]]
-        ] = {}
+        self._webhook_handlers: Dict[str, Callable[[Dict[str, Any]], Coroutine[Any, Any, None]]] = {}
 
         logger.info(
             "eleme_delivery_adapter_init",
@@ -108,11 +105,15 @@ class ElemeDeliveryAdapter(DeliveryPlatformAdapter):
             sign_str += f"{k}{v}"
         sign_str += self.app_secret
 
-        signature = hmac_mod.new(
-            self.app_secret.encode("utf-8"),
-            sign_str.encode("utf-8"),
-            hashlib.sha256,
-        ).hexdigest().upper()
+        signature = (
+            hmac_mod.new(
+                self.app_secret.encode("utf-8"),
+                sign_str.encode("utf-8"),
+                hashlib.sha256,
+            )
+            .hexdigest()
+            .upper()
+        )
         return signature
 
     # ── OAuth2 Token 管理（Mock）──────────────────────────────
@@ -148,14 +149,16 @@ class ElemeDeliveryAdapter(DeliveryPlatformAdapter):
 
         items: List[Dict[str, Any]] = []
         for food in food_list:
-            items.append({
-                "name": food.get("food_name", food.get("name", "")),
-                "quantity": int(food.get("quantity", food.get("count", 1))),
-                "price_fen": int(food.get("price", 0)),
-                "sku_id": str(food.get("food_id", food.get("sku_id", ""))),
-                "notes": food.get("remark", food.get("food_property", "")),
-                "internal_dish_id": "",  # 需要业务层映射
-            })
+            items.append(
+                {
+                    "name": food.get("food_name", food.get("name", "")),
+                    "quantity": int(food.get("quantity", food.get("count", 1))),
+                    "price_fen": int(food.get("price", 0)),
+                    "sku_id": str(food.get("food_id", food.get("sku_id", ""))),
+                    "notes": food.get("remark", food.get("food_property", "")),
+                    "internal_dish_id": "",  # 需要业务层映射
+                }
+            )
 
         status_code = int(raw.get("status", 1))
         return {
@@ -307,9 +310,7 @@ class ElemeDeliveryAdapter(DeliveryPlatformAdapter):
 
     # ── DeliveryPlatformAdapter 接口实现 ─────────────────────
 
-    async def pull_orders(
-        self, store_id: str, since: datetime
-    ) -> list[dict]:
+    async def pull_orders(self, store_id: str, since: datetime) -> list[dict]:
         """拉取饿了么新订单（Mock）"""
         shop_id = self._get_shop_id(store_id)
         logger.info(
@@ -353,9 +354,7 @@ class ElemeDeliveryAdapter(DeliveryPlatformAdapter):
         # Mock：直接返回成功
         return True
 
-    async def sync_menu(
-        self, store_id: str, dishes: list[dict]
-    ) -> dict:
+    async def sync_menu(self, store_id: str, dishes: list[dict]) -> dict:
         """同步菜品到饿了么（Mock）"""
         shop_id = self._get_shop_id(store_id)
         await self.get_access_token()
@@ -377,10 +376,12 @@ class ElemeDeliveryAdapter(DeliveryPlatformAdapter):
                 synced += 1
             except (KeyError, ValueError, TypeError) as exc:
                 failed += 1
-                errors.append({
-                    "dish_id": dish.get("id", "unknown"),
-                    "error": str(exc),
-                })
+                errors.append(
+                    {
+                        "dish_id": dish.get("id", "unknown"),
+                        "error": str(exc),
+                    }
+                )
                 logger.warning(
                     "eleme_sync_dish_failed",
                     dish_id=dish.get("id"),
@@ -389,9 +390,7 @@ class ElemeDeliveryAdapter(DeliveryPlatformAdapter):
 
         return {"synced": synced, "failed": failed, "errors": errors}
 
-    async def update_stock(
-        self, store_id: str, dish_id: str, available: bool
-    ) -> bool:
+    async def update_stock(self, store_id: str, dish_id: str, available: bool) -> bool:
         """更新菜品上下架状态（Mock）"""
         shop_id = self._get_shop_id(store_id)
         await self.get_access_token()

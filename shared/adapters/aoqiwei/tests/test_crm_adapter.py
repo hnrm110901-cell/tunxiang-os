@@ -7,13 +7,13 @@
   2. 请求体构建（appkey 不出现在发送体中）
   3. 业务方法入参校验
 """
+
 import hashlib
 import time
 from typing import Any, Dict
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
-
 from src.crm_adapter import (
     AoqiweiCrmAdapter,
     _compute_sig,
@@ -21,8 +21,8 @@ from src.crm_adapter import (
     _ksort_recursive,
 )
 
-
 # ── Fixtures ───────────────────────────────────────────────────────────────────
+
 
 @pytest.fixture
 def crm_adapter() -> AoqiweiCrmAdapter:
@@ -38,6 +38,7 @@ def crm_adapter() -> AoqiweiCrmAdapter:
 
 
 # ── _ksort_recursive ────────────────────────────────────────────────────────────
+
 
 class TestKsortRecursive:
     def test_flat_dict_sorted(self):
@@ -66,6 +67,7 @@ class TestKsortRecursive:
 
 
 # ── _http_build_query ────────────────────────────────────────────────────────────
+
 
 class TestHttpBuildQuery:
     def test_flat_params(self):
@@ -104,6 +106,7 @@ class TestHttpBuildQuery:
 
 
 # ── _compute_sig ────────────────────────────────────────────────────────────────
+
 
 class TestComputeSig:
     """
@@ -179,11 +182,10 @@ class TestComputeSig:
 
 # ── AoqiweiCrmAdapter 初始化 ────────────────────────────────────────────────────
 
+
 class TestCrmAdapterInit:
     def test_init_success(self):
-        adapter = AoqiweiCrmAdapter(
-            {"base_url": "https://welcrm.com", "appid": "AID", "appkey": "AKEY"}
-        )
+        adapter = AoqiweiCrmAdapter({"base_url": "https://welcrm.com", "appid": "AID", "appkey": "AKEY"})
         assert adapter.appid == "AID"
         assert adapter.appkey == "AKEY"
         assert adapter.base_url == "https://welcrm.com"
@@ -196,6 +198,7 @@ class TestCrmAdapterInit:
 
 
 # ── 请求体构建：appkey 不泄露 ─────────────────────────────────────────────────────
+
 
 class TestBuildRequestBody:
     def test_appkey_not_in_body(self, crm_adapter):
@@ -228,6 +231,7 @@ class TestBuildRequestBody:
 
 
 # ── get_member_info 入参校验 ──────────────────────────────────────────────────────
+
 
 class TestGetMemberInfoValidation:
     @pytest.mark.asyncio
@@ -263,6 +267,7 @@ class TestGetMemberInfoValidation:
 
 
 # ── deal_preview 业务流程 ─────────────────────────────────────────────────────────
+
 
 class TestDealPreview:
     @pytest.mark.asyncio
@@ -316,6 +321,7 @@ class TestDealPreview:
 
 # ── deal_reverse 入参 ─────────────────────────────────────────────────────────────
 
+
 class TestDealReverse:
     @pytest.mark.asyncio
     async def test_calls_correct_endpoint(self, crm_adapter):
@@ -340,8 +346,6 @@ class TestDealReverse:
     async def test_reverse_reason_included_when_set(self, crm_adapter):
         with patch.object(crm_adapter, "_request", new_callable=AsyncMock) as mock_req:
             mock_req.return_value = {}
-            await crm_adapter.deal_reverse(
-                biz_id="B", shop_id=1, cashier_id=-1, reverse_reason="误操作"
-            )
+            await crm_adapter.deal_reverse(biz_id="B", shop_id=1, cashier_id=-1, reverse_reason="误操作")
         params = mock_req.call_args[0][1]
         assert params["reverse_reason"] == "误操作"

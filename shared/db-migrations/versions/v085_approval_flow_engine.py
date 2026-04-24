@@ -28,11 +28,9 @@ Create Date: 2026-03-31
 """
 
 from alembic import op
-import sqlalchemy as sa
-from sqlalchemy.dialects.postgresql import JSONB, UUID
 
-revision = 'v085'
-down_revision = 'v084'
+revision = "v085"
+down_revision = "v084"
 branch_labels = None
 depends_on = None
 
@@ -367,8 +365,6 @@ def downgrade() -> None:
 
     # 回滚 approval_instances 新增字段（幂等）
     for col in ("flow_template_id", "store_id", "current_node_order", "summary", "completed_at"):
-        op.execute(
-            f"ALTER TABLE approval_instances DROP COLUMN IF EXISTS {col};"
-        )
+        op.execute(f"ALTER TABLE approval_instances DROP COLUMN IF EXISTS {col};")
     op.execute("DROP INDEX IF EXISTS ix_ai_flow_template;")
     op.execute("DROP INDEX IF EXISTS ix_ai_store_status;")

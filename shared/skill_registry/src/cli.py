@@ -1,11 +1,12 @@
 """屯象OS Skill CLI 工具 — tunxiang skill <command>"""
+
 from __future__ import annotations
 
 import argparse
 import sys
 
-from .registry import SkillRegistry
 from .ontology import OntologyRegistry
+from .registry import SkillRegistry
 
 
 def validate_cmd(args: argparse.Namespace) -> None:
@@ -35,10 +36,7 @@ def list_cmd(args: argparse.Namespace) -> None:
         return
 
     for skill in skills:
-        print(
-            f"  [{skill.meta.category}] {skill.meta.name} v{skill.meta.version}"
-            f" — {skill.meta.display_name}"
-        )
+        print(f"  [{skill.meta.category}] {skill.meta.name} v{skill.meta.version} — {skill.meta.display_name}")
 
 
 def report_cmd(args: argparse.Namespace) -> None:

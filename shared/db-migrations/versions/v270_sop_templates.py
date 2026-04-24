@@ -8,6 +8,7 @@ Revision ID: v270_sop_templates
 Revises: v269_mem_history
 Create Date: 2026-04-23
 """
+
 from alembic import op
 
 revision = "v270_sop_templates"

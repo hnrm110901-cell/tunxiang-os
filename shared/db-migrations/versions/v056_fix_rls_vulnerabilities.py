@@ -33,15 +33,14 @@ Create Date: 2026-03-31
   此迁移与 v055（巡台日志）并行，均以 v047 为基础。
   分支合并后请确认 alembic heads 状态正常。
 """
-from typing import Sequence, Union
 
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 
 revision = "v056"
-down_revision= "v047"
-branch_labels= None
-depends_on= None
+down_revision = "v047"
+branch_labels = None
+depends_on = None
 
 # 标准 NULLIF NULL guard 条件（单一表达式，不可绕过）
 _SAFE_CONDITION = "tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::UUID"
@@ -68,55 +67,114 @@ V032_TABLES = ["ab_tests", "ab_test_assignments"]
 # ─────────────────────────────────────────────────────────────────────────────
 LEGACY_CONDITION_TABLES = [
     # v006 修复的 v001-v005 全部表
-    "customers", "stores", "dish_categories", "dishes", "dish_ingredients",
-    "orders", "order_items", "ingredient_masters", "ingredients",
-    "ingredient_transactions", "employees",
-    "tables", "payments", "refunds", "settlements", "shift_handovers",
-    "receipt_templates", "receipt_logs", "production_depts", "dish_dept_mappings",
-    "daily_ops_flows", "daily_ops_nodes", "agent_decision_logs",
-    "payment_records", "reconciliation_batches", "reconciliation_diffs",
-    "tri_reconciliation_records", "store_daily_settlements", "payment_fees",
-    "reservations", "queues", "banquet_halls", "banquet_leads",
-    "banquet_orders", "banquet_contracts", "menu_packages", "banquet_checklists",
-    "attendance_rules", "clock_records", "daily_attendance",
-    "payroll_batches", "payroll_items", "leave_requests",
-    "leave_balances", "settlement_records",
+    "customers",
+    "stores",
+    "dish_categories",
+    "dishes",
+    "dish_ingredients",
+    "orders",
+    "order_items",
+    "ingredient_masters",
+    "ingredients",
+    "ingredient_transactions",
+    "employees",
+    "tables",
+    "payments",
+    "refunds",
+    "settlements",
+    "shift_handovers",
+    "receipt_templates",
+    "receipt_logs",
+    "production_depts",
+    "dish_dept_mappings",
+    "daily_ops_flows",
+    "daily_ops_nodes",
+    "agent_decision_logs",
+    "payment_records",
+    "reconciliation_batches",
+    "reconciliation_diffs",
+    "tri_reconciliation_records",
+    "store_daily_settlements",
+    "payment_fees",
+    "reservations",
+    "queues",
+    "banquet_halls",
+    "banquet_leads",
+    "banquet_orders",
+    "banquet_contracts",
+    "menu_packages",
+    "banquet_checklists",
+    "attendance_rules",
+    "clock_records",
+    "daily_attendance",
+    "payroll_batches",
+    "payroll_items",
+    "leave_requests",
+    "leave_balances",
+    "settlement_records",
     # v007 新增表
-    "bom_templates", "bom_items", "waste_events",
-    "suppliers", "supply_orders", "member_transactions",
-    "notifications", "notification_preferences",
-    "training_courses", "training_enrollments",
-    "service_feedbacks", "complaints", "tasks",
+    "bom_templates",
+    "bom_items",
+    "waste_events",
+    "suppliers",
+    "supply_orders",
+    "member_transactions",
+    "notifications",
+    "notification_preferences",
+    "training_courses",
+    "training_enrollments",
+    "service_feedbacks",
+    "complaints",
+    "tasks",
     # v008 修复的队列相关表
-    "reservation_queues", "queue_tickets",
+    "reservation_queues",
+    "queue_tickets",
     # v014 修复的 v013 宴会表
-    "banquet_proposals", "banquet_quotations", "banquet_feedbacks", "banquet_cases",
+    "banquet_proposals",
+    "banquet_quotations",
+    "banquet_feedbacks",
+    "banquet_cases",
     # v017 修复的 KDS 相关表
     "kds_tasks",
     # v023 修复的 v018-v021 表
-    "table_production_plans", "cook_time_baselines", "dispatch_rules", "shift_configs",
+    "table_production_plans",
+    "cook_time_baselines",
+    "dispatch_rules",
+    "shift_configs",
     # v024-v029 新增表
-    "brand_groups", "store_brand_mappings",
-    "referral_campaigns", "referral_records",
-    "journey_instances", "journey_steps",
-    "premium_cards", "premium_card_tiers", "premium_card_records",
-    "points_mall_items", "points_exchange_records",
-    "attribution_touchpoints", "attribution_conversions",
+    "brand_groups",
+    "store_brand_mappings",
+    "referral_campaigns",
+    "referral_records",
+    "journey_instances",
+    "journey_steps",
+    "premium_cards",
+    "premium_card_tiers",
+    "premium_card_records",
+    "points_mall_items",
+    "points_exchange_records",
+    "attribution_touchpoints",
+    "attribution_conversions",
     # v038 外卖运营表
-    "delivery_zones", "delivery_time_configs", "delivery_fee_rules",
+    "delivery_zones",
+    "delivery_time_configs",
+    "delivery_fee_rules",
     # v049 服务铃表
     "service_bell_records",
     # v054 经营诊断表
-    "business_diagnoses", "diagnosis_items",
+    "business_diagnoses",
+    "diagnosis_items",
 ]
 
 
 def _table_exists(table: str) -> bool:
     conn = op.get_bind()
-    result = conn.execute(sa.text(
-        "SELECT EXISTS (SELECT FROM information_schema.tables "
-        "WHERE table_schema = 'public' AND table_name = :t)"
-    ), {"t": table})
+    result = conn.execute(
+        sa.text(
+            "SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_schema = 'public' AND table_name = :t)"
+        ),
+        {"t": table},
+    )
     return result.scalar()
 
 
@@ -144,25 +202,16 @@ def _apply_safe_rls(table: str) -> None:
     op.execute(f"ALTER TABLE {table} ENABLE ROW LEVEL SECURITY")
     op.execute(f"ALTER TABLE {table} FORCE ROW LEVEL SECURITY")
     op.execute(f"DROP POLICY IF EXISTS {table}_rls_select ON {table}")
-    op.execute(
-        f"CREATE POLICY {table}_rls_select ON {table} "
-        f"FOR SELECT USING ({_SAFE_CONDITION})"
-    )
+    op.execute(f"CREATE POLICY {table}_rls_select ON {table} FOR SELECT USING ({_SAFE_CONDITION})")
     op.execute(f"DROP POLICY IF EXISTS {table}_rls_insert ON {table}")
-    op.execute(
-        f"CREATE POLICY {table}_rls_insert ON {table} "
-        f"FOR INSERT WITH CHECK ({_SAFE_CONDITION})"
-    )
+    op.execute(f"CREATE POLICY {table}_rls_insert ON {table} FOR INSERT WITH CHECK ({_SAFE_CONDITION})")
     op.execute(f"DROP POLICY IF EXISTS {table}_rls_update ON {table}")
     op.execute(
         f"CREATE POLICY {table}_rls_update ON {table} "
         f"FOR UPDATE USING ({_SAFE_CONDITION}) WITH CHECK ({_SAFE_CONDITION})"
     )
     op.execute(f"DROP POLICY IF EXISTS {table}_rls_delete ON {table}")
-    op.execute(
-        f"CREATE POLICY {table}_rls_delete ON {table} "
-        f"FOR DELETE USING ({_SAFE_CONDITION})"
-    )
+    op.execute(f"CREATE POLICY {table}_rls_delete ON {table} FOR DELETE USING ({_SAFE_CONDITION})")
 
 
 def upgrade() -> None:
@@ -211,21 +260,12 @@ def downgrade() -> None:
         op.execute(f"ALTER TABLE {table} NO FORCE ROW LEVEL SECURITY")
 
         # 恢复旧三段条件四操作策略
-        op.execute(
-            f"CREATE POLICY {table}_rls_select ON {table} "
-            f"FOR SELECT USING ({_OLD_CONDITION})"
-        )
-        op.execute(
-            f"CREATE POLICY {table}_rls_insert ON {table} "
-            f"FOR INSERT WITH CHECK ({_OLD_CONDITION})"
-        )
+        op.execute(f"CREATE POLICY {table}_rls_select ON {table} FOR SELECT USING ({_OLD_CONDITION})")
+        op.execute(f"CREATE POLICY {table}_rls_insert ON {table} FOR INSERT WITH CHECK ({_OLD_CONDITION})")
         op.execute(
             f"CREATE POLICY {table}_rls_update ON {table} "
             f"FOR UPDATE USING ({_OLD_CONDITION}) WITH CHECK ({_OLD_CONDITION})"
         )
-        op.execute(
-            f"CREATE POLICY {table}_rls_delete ON {table} "
-            f"FOR DELETE USING ({_OLD_CONDITION})"
-        )
+        op.execute(f"CREATE POLICY {table}_rls_delete ON {table} FOR DELETE USING ({_OLD_CONDITION})")
         op.execute(f"ALTER TABLE {table} ENABLE ROW LEVEL SECURITY")
         op.execute(f"ALTER TABLE {table} FORCE ROW LEVEL SECURITY")

@@ -11,16 +11,15 @@ Revision ID: v154
 Revises: v153
 Create Date: 2026-04-04
 """
-from typing import Sequence, Union
 
 import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects.postgresql import UUID
 
 revision = "v154"
-down_revision= "v153"
-branch_labels= None
-depends_on= None
+down_revision = "v153"
+branch_labels = None
+depends_on = None
 
 _SAFE_CONDITION = "tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::UUID"
 
@@ -47,7 +46,9 @@ def upgrade() -> None:
         op.create_table(
             "live_seafood_zones",
             sa.Column(
-                "id", UUID(as_uuid=True), primary_key=True,
+                "id",
+                UUID(as_uuid=True),
+                primary_key=True,
                 server_default=sa.text("gen_random_uuid()"),
             ),
             sa.Column("tenant_id", UUID(as_uuid=True), nullable=False),
@@ -58,11 +59,12 @@ def upgrade() -> None:
             sa.Column("capacity_weight_g", sa.Integer, nullable=False, server_default="0"),
             sa.Column("is_active", sa.Boolean, nullable=False, server_default="true"),
             sa.Column(
-                "created_at", sa.TIMESTAMP(timezone=True),
-                nullable=False, server_default=sa.text("now()"),
+                "created_at",
+                sa.TIMESTAMP(timezone=True),
+                nullable=False,
+                server_default=sa.text("now()"),
             ),
-            sa.UniqueConstraint("tenant_id", "store_id", "zone_code",
-                                name="uq_live_seafood_zones_tenant_store_code"),
+            sa.UniqueConstraint("tenant_id", "store_id", "zone_code", name="uq_live_seafood_zones_tenant_store_code"),
         )
     op.execute("""
         DO $$ BEGIN
@@ -79,7 +81,9 @@ def upgrade() -> None:
         op.create_table(
             "live_seafood_stocks",
             sa.Column(
-                "id", UUID(as_uuid=True), primary_key=True,
+                "id",
+                UUID(as_uuid=True),
+                primary_key=True,
                 server_default=sa.text("gen_random_uuid()"),
             ),
             sa.Column("tenant_id", UUID(as_uuid=True), nullable=False),
@@ -97,20 +101,24 @@ def upgrade() -> None:
             sa.Column("alive_rate_pct", sa.Integer, nullable=False, server_default="95"),
             sa.Column("is_active", sa.Boolean, nullable=False, server_default="true"),
             sa.Column(
-                "updated_at", sa.TIMESTAMP(timezone=True),
-                nullable=False, server_default=sa.text("now()"),
+                "updated_at",
+                sa.TIMESTAMP(timezone=True),
+                nullable=False,
+                server_default=sa.text("now()"),
             ),
             sa.Column(
-                "created_at", sa.TIMESTAMP(timezone=True),
-                nullable=False, server_default=sa.text("now()"),
+                "created_at",
+                sa.TIMESTAMP(timezone=True),
+                nullable=False,
+                server_default=sa.text("now()"),
             ),
             sa.ForeignKeyConstraint(
-                ["zone_id"], ["live_seafood_zones.id"],
+                ["zone_id"],
+                ["live_seafood_zones.id"],
                 name="fk_live_seafood_stocks_zone_id",
                 ondelete="SET NULL",
             ),
-            sa.UniqueConstraint("tenant_id", "store_id", "dish_id",
-                                name="uq_live_seafood_stocks_tenant_store_dish"),
+            sa.UniqueConstraint("tenant_id", "store_id", "dish_id", name="uq_live_seafood_stocks_tenant_store_dish"),
         )
     op.execute("""
         DO $$ BEGIN
@@ -135,7 +143,9 @@ def upgrade() -> None:
         op.create_table(
             "live_seafood_weigh_records",
             sa.Column(
-                "id", UUID(as_uuid=True), primary_key=True,
+                "id",
+                UUID(as_uuid=True),
+                primary_key=True,
                 server_default=sa.text("gen_random_uuid()"),
             ),
             sa.Column("tenant_id", UUID(as_uuid=True), nullable=False),
@@ -155,8 +165,10 @@ def upgrade() -> None:
             sa.Column("weighed_by", UUID(as_uuid=True), nullable=True),
             sa.Column("notes", sa.Text, nullable=True),
             sa.Column(
-                "created_at", sa.TIMESTAMP(timezone=True),
-                nullable=False, server_default=sa.text("now()"),
+                "created_at",
+                sa.TIMESTAMP(timezone=True),
+                nullable=False,
+                server_default=sa.text("now()"),
             ),
         )
     op.execute("""
@@ -187,20 +199,11 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.execute(
-        "DROP POLICY IF EXISTS live_seafood_weigh_records_tenant_isolation "
-        "ON live_seafood_weigh_records;"
-    )
+    op.execute("DROP POLICY IF EXISTS live_seafood_weigh_records_tenant_isolation ON live_seafood_weigh_records;")
     op.drop_table("live_seafood_weigh_records")
 
-    op.execute(
-        "DROP POLICY IF EXISTS live_seafood_stocks_tenant_isolation "
-        "ON live_seafood_stocks;"
-    )
+    op.execute("DROP POLICY IF EXISTS live_seafood_stocks_tenant_isolation ON live_seafood_stocks;")
     op.drop_table("live_seafood_stocks")
 
-    op.execute(
-        "DROP POLICY IF EXISTS live_seafood_zones_tenant_isolation "
-        "ON live_seafood_zones;"
-    )
+    op.execute("DROP POLICY IF EXISTS live_seafood_zones_tenant_isolation ON live_seafood_zones;")
     op.drop_table("live_seafood_zones")

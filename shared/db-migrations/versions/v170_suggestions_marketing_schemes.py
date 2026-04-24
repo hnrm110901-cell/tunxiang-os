@@ -35,7 +35,9 @@ def upgrade() -> None:
             is_deleted      BOOLEAN     NOT NULL DEFAULT FALSE
         )
     """)
-    op.execute("CREATE INDEX IF NOT EXISTS idx_customer_suggestions_tenant ON customer_suggestions (tenant_id, created_at DESC)")
+    op.execute(
+        "CREATE INDEX IF NOT EXISTS idx_customer_suggestions_tenant ON customer_suggestions (tenant_id, created_at DESC)"
+    )
     op.execute("ALTER TABLE customer_suggestions ENABLE ROW LEVEL SECURITY")
     op.execute("""
         CREATE POLICY customer_suggestions_tenant_isolation ON customer_suggestions
@@ -62,7 +64,9 @@ def upgrade() -> None:
             is_deleted      BOOLEAN     NOT NULL DEFAULT FALSE
         )
     """)
-    op.execute("CREATE INDEX IF NOT EXISTS idx_marketing_schemes_tenant ON marketing_schemes (tenant_id, is_active, priority DESC)")
+    op.execute(
+        "CREATE INDEX IF NOT EXISTS idx_marketing_schemes_tenant ON marketing_schemes (tenant_id, is_active, priority DESC)"
+    )
     op.execute("ALTER TABLE marketing_schemes ENABLE ROW LEVEL SECURITY")
     op.execute("""
         CREATE POLICY marketing_schemes_tenant_isolation ON marketing_schemes

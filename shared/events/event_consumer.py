@@ -10,13 +10,16 @@
 from __future__ import annotations
 
 import json
-from typing import Awaitable, Callable, Optional
+from typing import TYPE_CHECKING, Awaitable, Callable, Optional
 from uuid import UUID
 
 import structlog
 
 from .event_publisher import STREAM_KEY, MemberEventPublisher
 from .member_events import MemberEvent, MemberEventType
+
+if TYPE_CHECKING:
+    import redis.asyncio as aioredis  # type: ignore[import-not-found]
 
 logger = structlog.get_logger(__name__)
 

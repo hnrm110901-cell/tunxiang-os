@@ -61,8 +61,12 @@ ignore = [
 "__init__.py" = ["F401"]
 "**/tests/**/*.py" = ["S101", "S106", "S311"]  # allow assert, hardcoded passwords, random in tests
 "**/migrations/**/*.py" = ["E501"]     # migration files can be long
+# Migration files often have trailing whitespace inside multi-line SQL string literals
+"shared/db-migrations/**/*.py" = ["E501", "W291", "W293", "S608"]  # migrations use server-controlled SQL
 # Backend SQL f-strings are server-controlled (not user input) — suppress S608 broadly
 "services/**/*.py" = ["S608"]
+"shared/events/**/*.py" = ["S608"]  # Same justification — server-side SQL, not user input
+"shared/knowledge_store/**/*.py" = ["S608"]  # server-controlled graph/vector queries
 "edge/**/*.py" = ["S608"]
 
 [tool.pytest.ini_options]

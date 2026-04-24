@@ -8,8 +8,8 @@ Revises: v234
 Create Date: 2026-04-12
 """
 
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 
 revision = "v235b"
 down_revision = "v235"
@@ -22,7 +22,7 @@ _SAFE_COND = "tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uu
 def upgrade() -> None:
     conn = op.get_bind()
     existing = sa.inspect(conn).get_table_names()
-    if 'kg_nodes' in existing:
+    if "kg_nodes" in existing:
         return
 
     # ── 确保 pgvector 扩展可用 ────────────────────────────────────────────

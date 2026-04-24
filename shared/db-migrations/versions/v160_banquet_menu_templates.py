@@ -10,16 +10,15 @@ Revision ID: v160
 Revises: v159
 Create Date: 2026-04-04
 """
-from typing import Sequence, Union
 
 import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects.postgresql import UUID
 
 revision = "v160"
-down_revision= "v159"
-branch_labels= None
-depends_on= None
+down_revision = "v159"
+branch_labels = None
+depends_on = None
 
 _SAFE_CONDITION = "tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::UUID"
 
@@ -28,22 +27,13 @@ def _apply_rls(table_name: str) -> None:
     """标准三段式 RLS：ENABLE → FORCE → 四条策略"""
     op.execute(f"ALTER TABLE {table_name} ENABLE ROW LEVEL SECURITY")
     op.execute(f"ALTER TABLE {table_name} FORCE ROW LEVEL SECURITY")
-    op.execute(
-        f"CREATE POLICY {table_name}_rls_select ON {table_name} "
-        f"FOR SELECT USING ({_SAFE_CONDITION})"
-    )
-    op.execute(
-        f"CREATE POLICY {table_name}_rls_insert ON {table_name} "
-        f"FOR INSERT WITH CHECK ({_SAFE_CONDITION})"
-    )
+    op.execute(f"CREATE POLICY {table_name}_rls_select ON {table_name} FOR SELECT USING ({_SAFE_CONDITION})")
+    op.execute(f"CREATE POLICY {table_name}_rls_insert ON {table_name} FOR INSERT WITH CHECK ({_SAFE_CONDITION})")
     op.execute(
         f"CREATE POLICY {table_name}_rls_update ON {table_name} "
         f"FOR UPDATE USING ({_SAFE_CONDITION}) WITH CHECK ({_SAFE_CONDITION})"
     )
-    op.execute(
-        f"CREATE POLICY {table_name}_rls_delete ON {table_name} "
-        f"FOR DELETE USING ({_SAFE_CONDITION})"
-    )
+    op.execute(f"CREATE POLICY {table_name}_rls_delete ON {table_name} FOR DELETE USING ({_SAFE_CONDITION})")
 
 
 def upgrade() -> None:
@@ -153,18 +143,9 @@ def upgrade() -> None:
             ),
         )
 
-    op.execute(
-        "CREATE INDEX IF NOT EXISTS ix_bmt_tenant "
-        "ON banquet_menu_templates (tenant_id)"
-    )
-    op.execute(
-        "CREATE INDEX IF NOT EXISTS ix_bmt_tenant_category "
-        "ON banquet_menu_templates (tenant_id, category)"
-    )
-    op.execute(
-        "CREATE INDEX IF NOT EXISTS ix_bmt_tenant_store "
-        "ON banquet_menu_templates (tenant_id, store_id)"
-    )
+    op.execute("CREATE INDEX IF NOT EXISTS ix_bmt_tenant ON banquet_menu_templates (tenant_id)")
+    op.execute("CREATE INDEX IF NOT EXISTS ix_bmt_tenant_category ON banquet_menu_templates (tenant_id, category)")
+    op.execute("CREATE INDEX IF NOT EXISTS ix_bmt_tenant_store ON banquet_menu_templates (tenant_id, store_id)")
     _apply_rls("banquet_menu_templates")
 
     # ── banquet_template_items 套餐模板菜品明细 ──────────────────────────
@@ -242,14 +223,8 @@ def upgrade() -> None:
             ),
         )
 
-    op.execute(
-        "CREATE INDEX IF NOT EXISTS ix_bti_tenant "
-        "ON banquet_template_items (tenant_id)"
-    )
-    op.execute(
-        "CREATE INDEX IF NOT EXISTS ix_bti_template "
-        "ON banquet_template_items (template_id)"
-    )
+    op.execute("CREATE INDEX IF NOT EXISTS ix_bti_tenant ON banquet_template_items (tenant_id)")
+    op.execute("CREATE INDEX IF NOT EXISTS ix_bti_template ON banquet_template_items (template_id)")
     _apply_rls("banquet_template_items")
 
 

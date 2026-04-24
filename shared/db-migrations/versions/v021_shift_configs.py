@@ -7,8 +7,9 @@ Create Date: 2026-03-30
 RLS Policy：使用 app.tenant_id（符合 CLAUDE.md §14 审计约束）。
 禁止 NULL 绕过：tenant_id NOT NULL 已由 TenantBase 保证。
 """
-from alembic import op
+
 import sqlalchemy as sa
+from alembic import op
 from sqlalchemy.dialects.postgresql import UUID
 
 # revision identifiers

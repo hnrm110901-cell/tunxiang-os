@@ -19,8 +19,6 @@ Create Date: 2026-03-31
 from __future__ import annotations
 
 from alembic import op
-import sqlalchemy as sa
-from sqlalchemy.dialects.postgresql import JSONB, UUID
 
 # revision identifiers, used by Alembic.
 revision = "v065"
@@ -75,8 +73,12 @@ def upgrade() -> None:
     """)
 
     op.execute("CREATE INDEX IF NOT EXISTS ix_patrol_templates_tenant ON patrol_templates (tenant_id)")
-    op.execute("CREATE INDEX IF NOT EXISTS ix_patrol_templates_brand ON patrol_templates (brand_id) WHERE brand_id IS NOT NULL")
-    op.execute("CREATE INDEX IF NOT EXISTS ix_patrol_templates_active ON patrol_templates (tenant_id, is_active) WHERE is_deleted = FALSE")
+    op.execute(
+        "CREATE INDEX IF NOT EXISTS ix_patrol_templates_brand ON patrol_templates (brand_id) WHERE brand_id IS NOT NULL"
+    )
+    op.execute(
+        "CREATE INDEX IF NOT EXISTS ix_patrol_templates_active ON patrol_templates (tenant_id, is_active) WHERE is_deleted = FALSE"
+    )
 
     # ── 2. patrol_template_items（模板检查项） ────────────────────────────────
     op.execute("""
@@ -123,7 +125,9 @@ def upgrade() -> None:
             )
     """)
 
-    op.execute("CREATE INDEX IF NOT EXISTS ix_patrol_template_items_template ON patrol_template_items (template_id, sort_order)")
+    op.execute(
+        "CREATE INDEX IF NOT EXISTS ix_patrol_template_items_template ON patrol_template_items (template_id, sort_order)"
+    )
     op.execute("CREATE INDEX IF NOT EXISTS ix_patrol_template_items_tenant ON patrol_template_items (tenant_id)")
 
     # ── 3. patrol_records（巡检记录） ─────────────────────────────────────────
@@ -174,8 +178,12 @@ def upgrade() -> None:
 
     op.execute("CREATE INDEX IF NOT EXISTS ix_patrol_records_tenant ON patrol_records (tenant_id)")
     op.execute("CREATE INDEX IF NOT EXISTS ix_patrol_records_store ON patrol_records (tenant_id, store_id)")
-    op.execute("CREATE INDEX IF NOT EXISTS ix_patrol_records_date ON patrol_records (tenant_id, patrol_date DESC) WHERE is_deleted = FALSE")
-    op.execute("CREATE INDEX IF NOT EXISTS ix_patrol_records_patroller ON patrol_records (patroller_id) WHERE patroller_id IS NOT NULL")
+    op.execute(
+        "CREATE INDEX IF NOT EXISTS ix_patrol_records_date ON patrol_records (tenant_id, patrol_date DESC) WHERE is_deleted = FALSE"
+    )
+    op.execute(
+        "CREATE INDEX IF NOT EXISTS ix_patrol_records_patroller ON patrol_records (patroller_id) WHERE patroller_id IS NOT NULL"
+    )
 
     # ── 4. patrol_record_items（巡检结果明细） ────────────────────────────────
     op.execute("""
@@ -280,9 +288,15 @@ def upgrade() -> None:
 
     op.execute("CREATE INDEX IF NOT EXISTS ix_patrol_issues_tenant ON patrol_issues (tenant_id)")
     op.execute("CREATE INDEX IF NOT EXISTS ix_patrol_issues_store ON patrol_issues (tenant_id, store_id)")
-    op.execute("CREATE INDEX IF NOT EXISTS ix_patrol_issues_status ON patrol_issues (tenant_id, status) WHERE is_deleted = FALSE")
-    op.execute("CREATE INDEX IF NOT EXISTS ix_patrol_issues_assignee ON patrol_issues (assignee_id) WHERE assignee_id IS NOT NULL")
-    op.execute("CREATE INDEX IF NOT EXISTS ix_patrol_issues_record ON patrol_issues (record_id) WHERE record_id IS NOT NULL")
+    op.execute(
+        "CREATE INDEX IF NOT EXISTS ix_patrol_issues_status ON patrol_issues (tenant_id, status) WHERE is_deleted = FALSE"
+    )
+    op.execute(
+        "CREATE INDEX IF NOT EXISTS ix_patrol_issues_assignee ON patrol_issues (assignee_id) WHERE assignee_id IS NOT NULL"
+    )
+    op.execute(
+        "CREATE INDEX IF NOT EXISTS ix_patrol_issues_record ON patrol_issues (record_id) WHERE record_id IS NOT NULL"
+    )
 
 
 def downgrade() -> None:

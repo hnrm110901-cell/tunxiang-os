@@ -16,16 +16,15 @@ Revision ID: v003
 Revises: v002
 Create Date: 2026-03-27
 """
-from typing import Sequence, Union
 
-from alembic import op
 import sqlalchemy as sa
-from sqlalchemy.dialects.postgresql import UUID, JSON
+from alembic import op
+from sqlalchemy.dialects.postgresql import JSON, UUID
 
 revision = "v003"
-down_revision= "v002"
-branch_labels= None
-depends_on= None
+down_revision = "v002"
+branch_labels = None
+depends_on = None
 
 NEW_TABLES = [
     "payment_records",
@@ -72,12 +71,14 @@ def upgrade() -> None:
         sa.Column("id", UUID(as_uuid=True), primary_key=True),
         sa.Column("tenant_id", UUID(as_uuid=True), nullable=False, index=True),
         sa.Column("store_id", UUID(as_uuid=True), sa.ForeignKey("stores.id"), nullable=False, index=True),
-        sa.Column("channel", sa.String(30), nullable=False, index=True,
-                  comment="wechat/alipay/meituan/unionpay/douyin"),
+        sa.Column(
+            "channel", sa.String(30), nullable=False, index=True, comment="wechat/alipay/meituan/unionpay/douyin"
+        ),
         sa.Column("trade_no", sa.String(128), nullable=False, index=True, comment="第三方交易流水号"),
         sa.Column("merchant_no", sa.String(64), comment="商户号"),
-        sa.Column("trade_type", sa.String(30), nullable=False, server_default="payment",
-                  comment="payment/refund/transfer"),
+        sa.Column(
+            "trade_type", sa.String(30), nullable=False, server_default="payment", comment="payment/refund/transfer"
+        ),
         sa.Column("amount_fen", sa.Integer, nullable=False, comment="交易金额(分)"),
         sa.Column("fee_fen", sa.Integer, server_default="0", comment="手续费(分)"),
         sa.Column("net_amount_fen", sa.Integer, comment="到账金额(分)"),
@@ -88,8 +89,9 @@ def upgrade() -> None:
         sa.Column("raw_data", JSON, comment="原始CSV行数据"),
         sa.Column("import_batch_id", sa.String(64), index=True, comment="导入批次号"),
         sa.Column("matched_payment_id", UUID(as_uuid=True), comment="匹配的本地支付记录ID"),
-        sa.Column("match_status", sa.String(20), server_default="unmatched",
-                  comment="unmatched/matched/conflict/manual"),
+        sa.Column(
+            "match_status", sa.String(20), server_default="unmatched", comment="unmatched/matched/conflict/manual"
+        ),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
         sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
         sa.Column("is_deleted", sa.Boolean, server_default="false"),
@@ -107,8 +109,13 @@ def upgrade() -> None:
         sa.Column("batch_no", sa.String(64), unique=True, nullable=False, comment="对账批次号"),
         sa.Column("channel", sa.String(30), nullable=False, comment="对账渠道"),
         sa.Column("recon_date", sa.Date, nullable=False, index=True, comment="对账日期"),
-        sa.Column("status", sa.String(20), nullable=False, server_default="pending",
-                  comment="pending/processing/completed/failed"),
+        sa.Column(
+            "status",
+            sa.String(20),
+            nullable=False,
+            server_default="pending",
+            comment="pending/processing/completed/failed",
+        ),
         # 统计
         sa.Column("total_local_count", sa.Integer, server_default="0", comment="本地交易笔数"),
         sa.Column("total_remote_count", sa.Integer, server_default="0", comment="渠道交易笔数"),
@@ -138,10 +145,12 @@ def upgrade() -> None:
         "reconciliation_diffs",
         sa.Column("id", UUID(as_uuid=True), primary_key=True),
         sa.Column("tenant_id", UUID(as_uuid=True), nullable=False, index=True),
-        sa.Column("batch_id", UUID(as_uuid=True), sa.ForeignKey("reconciliation_batches.id"),
-                  nullable=False, index=True),
-        sa.Column("diff_type", sa.String(30), nullable=False,
-                  comment="local_only/remote_only/amount_mismatch/time_mismatch"),
+        sa.Column(
+            "batch_id", UUID(as_uuid=True), sa.ForeignKey("reconciliation_batches.id"), nullable=False, index=True
+        ),
+        sa.Column(
+            "diff_type", sa.String(30), nullable=False, comment="local_only/remote_only/amount_mismatch/time_mismatch"
+        ),
         sa.Column("local_payment_id", UUID(as_uuid=True), comment="本地支付记录ID"),
         sa.Column("local_payment_no", sa.String(64), comment="本地支付流水号"),
         sa.Column("remote_trade_no", sa.String(128), comment="渠道交易流水号"),
@@ -150,8 +159,12 @@ def upgrade() -> None:
         sa.Column("diff_amount_fen", sa.Integer, comment="差异金额(分)"),
         sa.Column("local_time", sa.DateTime(timezone=True), comment="本地交易时间"),
         sa.Column("remote_time", sa.DateTime(timezone=True), comment="渠道交易时间"),
-        sa.Column("resolution_status", sa.String(20), server_default="pending",
-                  comment="pending/resolved/written_off/escalated"),
+        sa.Column(
+            "resolution_status",
+            sa.String(20),
+            server_default="pending",
+            comment="pending/resolved/written_off/escalated",
+        ),
         sa.Column("resolution_action", sa.String(100), comment="处理动作"),
         sa.Column("resolved_by", sa.String(50), comment="处理人"),
         sa.Column("resolved_at", sa.DateTime(timezone=True)),
@@ -188,8 +201,13 @@ def upgrade() -> None:
         sa.Column("invoice_no", sa.String(64), comment="发票号码"),
         sa.Column("invoice_amount_fen", sa.Integer, comment="发票金额(分)"),
         # 三角对账结果
-        sa.Column("match_status", sa.String(20), nullable=False, server_default="pending",
-                  comment="pending/full_match/partial_match/mismatch"),
+        sa.Column(
+            "match_status",
+            sa.String(20),
+            nullable=False,
+            server_default="pending",
+            comment="pending/full_match/partial_match/mismatch",
+        ),
         sa.Column("order_payment_match", sa.Boolean, comment="订单↔支付是否匹配"),
         sa.Column("payment_bank_match", sa.Boolean, comment="支付↔银行是否匹配"),
         sa.Column("bank_invoice_match", sa.Boolean, comment="银行↔发票是否匹配"),
@@ -212,8 +230,9 @@ def upgrade() -> None:
         sa.Column("store_id", UUID(as_uuid=True), sa.ForeignKey("stores.id"), nullable=False, index=True),
         sa.Column("biz_date", sa.Date, nullable=False, index=True, comment="营业日期"),
         sa.Column("settlement_no", sa.String(64), unique=True, nullable=False, comment="日结单号"),
-        sa.Column("status", sa.String(20), nullable=False, server_default="draft",
-                  comment="draft/submitted/approved/rejected"),
+        sa.Column(
+            "status", sa.String(20), nullable=False, server_default="draft", comment="draft/submitted/approved/rejected"
+        ),
         # 订单统计
         sa.Column("total_orders", sa.Integer, server_default="0"),
         sa.Column("completed_orders", sa.Integer, server_default="0"),
@@ -265,8 +284,7 @@ def upgrade() -> None:
         sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
         sa.Column("is_deleted", sa.Boolean, server_default="false"),
     )
-    op.create_index("idx_daily_settlement_store_date", "store_daily_settlements",
-                    ["store_id", "biz_date"], unique=True)
+    op.create_index("idx_daily_settlement_store_date", "store_daily_settlements", ["store_id", "biz_date"], unique=True)
 
     # ---------------------------------------------------------------
     # 6. payment_fees — 支付手续费记录
@@ -276,14 +294,12 @@ def upgrade() -> None:
         sa.Column("id", UUID(as_uuid=True), primary_key=True),
         sa.Column("tenant_id", UUID(as_uuid=True), nullable=False, index=True),
         sa.Column("store_id", UUID(as_uuid=True), sa.ForeignKey("stores.id"), nullable=False, index=True),
-        sa.Column("payment_id", UUID(as_uuid=True), sa.ForeignKey("payments.id"), index=True,
-                  comment="关联支付记录"),
+        sa.Column("payment_id", UUID(as_uuid=True), sa.ForeignKey("payments.id"), index=True, comment="关联支付记录"),
         sa.Column("channel", sa.String(30), nullable=False, comment="支付渠道"),
         sa.Column("payment_amount_fen", sa.Integer, nullable=False, comment="交易金额(分)"),
         sa.Column("fee_rate", sa.Numeric(6, 4), nullable=False, comment="费率"),
         sa.Column("fee_fen", sa.Integer, nullable=False, comment="手续费(分)"),
-        sa.Column("fee_type", sa.String(30), server_default="transaction",
-                  comment="transaction/monthly/setup"),
+        sa.Column("fee_type", sa.String(30), server_default="transaction", comment="transaction/monthly/setup"),
         sa.Column("biz_date", sa.Date, nullable=False, index=True, comment="营业日期"),
         sa.Column("settle_date", sa.Date, comment="结算日期"),
         sa.Column("notes", sa.String(500)),

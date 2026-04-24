@@ -8,11 +8,12 @@
 
 所有操作带 tenant_id RLS 隔离。
 """
+
 from __future__ import annotations
 
 import uuid
 from datetime import datetime, timezone
-from typing import Any, Optional
+from typing import Any
 
 import structlog
 from sqlalchemy import text

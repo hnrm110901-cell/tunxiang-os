@@ -5,6 +5,7 @@ API KEY通过 QDRANT_API_KEY 配置
 
 所有方法在Qdrant不可用时优雅降级，不抛出异常。
 """
+
 from __future__ import annotations
 
 import os

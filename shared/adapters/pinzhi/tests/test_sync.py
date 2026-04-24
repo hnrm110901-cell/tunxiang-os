@@ -2,19 +2,18 @@
 品智同步模块测试
 覆盖 5 个同步模块的映射函数 + 签名认证
 """
-import sys
+
 import os
+import sys
 
 # 将 pinzhi/src 加入搜索路径
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
-import pytest
-from signature import generate_sign, pinzhi_sign, build_auth_headers
-from order_sync import PinzhiOrderSync
 from dish_sync import PinzhiDishSync
-from member_sync import PinzhiMemberSync
 from inventory_sync import PinzhiInventorySync
-
+from member_sync import PinzhiMemberSync
+from order_sync import PinzhiOrderSync
+from signature import build_auth_headers, generate_sign, pinzhi_sign
 
 # ─── B1: 签名认证 ───
 

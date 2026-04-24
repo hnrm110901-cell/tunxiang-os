@@ -24,8 +24,6 @@ Create Date: 2026-03-31
 """
 
 from alembic import op
-import sqlalchemy as sa
-from sqlalchemy.dialects.postgresql import UUID
 
 revision = "v091"
 down_revision = "v090"
@@ -47,12 +45,7 @@ def _enable_rls(table: str) -> None:
         policy_name = f"{table}_{action.lower()}_tenant"
         using_clause = f"USING ({_RLS_COND})" if action != "INSERT" else ""
         check_clause = f"WITH CHECK ({_RLS_COND})" if action in ("INSERT", "UPDATE") else ""
-        op.execute(
-            f"CREATE POLICY {policy_name} "
-            f"ON {table} FOR {action} "
-            f"{using_clause} "
-            f"{check_clause}"
-        )
+        op.execute(f"CREATE POLICY {policy_name} ON {table} FOR {action} {using_clause} {check_clause}")
 
 
 def upgrade() -> None:
@@ -78,14 +71,8 @@ def upgrade() -> None:
         )
     """)
 
-    op.execute(
-        "CREATE INDEX IF NOT EXISTS idx_payment_sagas_tenant_order "
-        "ON payment_sagas(tenant_id, order_id)"
-    )
-    op.execute(
-        "CREATE INDEX IF NOT EXISTS idx_payment_sagas_step "
-        "ON payment_sagas(tenant_id, step)"
-    )
+    op.execute("CREATE INDEX IF NOT EXISTS idx_payment_sagas_tenant_order ON payment_sagas(tenant_id, order_id)")
+    op.execute("CREATE INDEX IF NOT EXISTS idx_payment_sagas_step ON payment_sagas(tenant_id, step)")
     op.execute(
         "CREATE INDEX IF NOT EXISTS idx_payment_sagas_idempotency "
         "ON payment_sagas(tenant_id, idempotency_key) "

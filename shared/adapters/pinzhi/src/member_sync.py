@@ -2,9 +2,8 @@
 品智会员同步模块
 拉取品智会员数据并映射为屯象 Customer Golden ID 格式
 """
-from __future__ import annotations
 
-from typing import Any
+from __future__ import annotations
 
 import structlog
 
@@ -42,9 +41,7 @@ class PinzhiMemberSync:
         # 品智会员接口目前不支持分页，一次返回全部
         # 但保留 page 参数以备后续扩展
         try:
-            response = await self.adapter._request(
-                "GET", "/pinzhi/paymentCustomer.do", params=params
-            )
+            response = await self.adapter._request("GET", "/pinzhi/paymentCustomer.do", params=params)
             members = response.get("data", [])
             all_members.extend(members)
         except (ConnectionError, TimeoutError) as exc:
@@ -105,18 +102,12 @@ class PinzhiMemberSync:
             "level": level_map.get(raw_level, "normal"),
             "balance_fen": balance_fen,
             "points": points,
-            "total_consumption_fen": int(
-                pinzhi_member.get("totalConsume", pinzhi_member.get("consumeAmount", 0))
-            ),
-            "visit_count": int(
-                pinzhi_member.get("visitCount", pinzhi_member.get("consumeCount", 0))
-            ),
+            "total_consumption_fen": int(pinzhi_member.get("totalConsume", pinzhi_member.get("consumeAmount", 0))),
+            "visit_count": int(pinzhi_member.get("visitCount", pinzhi_member.get("consumeCount", 0))),
             "last_visit_date": pinzhi_member.get("lastConsumeDate"),
             "created_at": pinzhi_member.get("createTime", pinzhi_member.get("regTime")),
             "source_system": "pinzhi",
-            "source_id": str(
-                pinzhi_member.get("customerId", pinzhi_member.get("id", ""))
-            ),
+            "source_id": str(pinzhi_member.get("customerId", pinzhi_member.get("id", ""))),
         }
 
     @staticmethod
@@ -140,10 +131,7 @@ class PinzhiMemberSync:
         merged = {**existing}
 
         # 合并身份标识（去重）
-        existing_ids = {
-            (ident["type"], ident["value"])
-            for ident in existing.get("identities", [])
-        }
+        existing_ids = {(ident["type"], ident["value"]) for ident in existing.get("identities", [])}
         merged_identities = list(existing.get("identities", []))
         for ident in incoming.get("identities", []):
             key = (ident["type"], ident["value"])

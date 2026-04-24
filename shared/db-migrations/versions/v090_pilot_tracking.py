@@ -19,8 +19,6 @@ Create Date: 2026-03-31
 """
 
 from alembic import op
-import sqlalchemy as sa
-from sqlalchemy.dialects.postgresql import JSONB, UUID
 
 revision = "v090"
 down_revision = "v089"
@@ -41,14 +39,10 @@ def _enable_rls(table: str) -> None:
     for action in ("SELECT", "INSERT", "UPDATE", "DELETE"):
         if action == "INSERT":
             op.execute(
-                f"CREATE POLICY {table}_{action.lower()}_tenant "
-                f"ON {table} FOR {action} WITH CHECK ({_RLS_COND})"
+                f"CREATE POLICY {table}_{action.lower()}_tenant ON {table} FOR {action} WITH CHECK ({_RLS_COND})"
             )
         else:
-            op.execute(
-                f"CREATE POLICY {table}_{action.lower()}_tenant "
-                f"ON {table} FOR {action} USING ({_RLS_COND})"
-            )
+            op.execute(f"CREATE POLICY {table}_{action.lower()}_tenant ON {table} FOR {action} USING ({_RLS_COND})")
 
 
 def upgrade() -> None:
@@ -105,7 +99,9 @@ def upgrade() -> None:
     op.execute("CREATE INDEX IF NOT EXISTS idx_pilot_programs_status ON pilot_programs(tenant_id, status)")
     op.execute("CREATE INDEX IF NOT EXISTS idx_pilot_programs_type ON pilot_programs(tenant_id, pilot_type)")
     op.execute("CREATE INDEX IF NOT EXISTS idx_pilot_programs_dates ON pilot_programs(start_date, end_date)")
-    op.execute("CREATE INDEX IF NOT EXISTS idx_pilot_programs_source_ref ON pilot_programs(tenant_id, source_ref_id) WHERE source_ref_id IS NOT NULL")
+    op.execute(
+        "CREATE INDEX IF NOT EXISTS idx_pilot_programs_source_ref ON pilot_programs(tenant_id, source_ref_id) WHERE source_ref_id IS NOT NULL"
+    )
 
     _enable_rls("pilot_programs")
 
@@ -134,7 +130,9 @@ def upgrade() -> None:
     """)
 
     op.execute("CREATE INDEX IF NOT EXISTS idx_pilot_items_program ON pilot_items(tenant_id, pilot_program_id)")
-    op.execute("CREATE INDEX IF NOT EXISTS idx_pilot_items_ref ON pilot_items(tenant_id, item_ref_id) WHERE item_ref_id IS NOT NULL")
+    op.execute(
+        "CREATE INDEX IF NOT EXISTS idx_pilot_items_ref ON pilot_items(tenant_id, item_ref_id) WHERE item_ref_id IS NOT NULL"
+    )
 
     _enable_rls("pilot_items")
 
@@ -173,7 +171,9 @@ def upgrade() -> None:
     op.execute("CREATE INDEX IF NOT EXISTS idx_pilot_metrics_program ON pilot_metrics(tenant_id, pilot_program_id)")
     op.execute("CREATE INDEX IF NOT EXISTS idx_pilot_metrics_store ON pilot_metrics(tenant_id, store_id)")
     op.execute("CREATE INDEX IF NOT EXISTS idx_pilot_metrics_date ON pilot_metrics(pilot_program_id, metric_date)")
-    op.execute("CREATE INDEX IF NOT EXISTS idx_pilot_metrics_control ON pilot_metrics(pilot_program_id, is_control_store, metric_date)")
+    op.execute(
+        "CREATE INDEX IF NOT EXISTS idx_pilot_metrics_control ON pilot_metrics(pilot_program_id, is_control_store, metric_date)"
+    )
 
     _enable_rls("pilot_metrics")
 

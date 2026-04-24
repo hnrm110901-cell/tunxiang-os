@@ -7,8 +7,8 @@ Revises: v245
 Create Date: 2026-04-13
 """
 
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 
 revision = "v246"
 down_revision = "v245"

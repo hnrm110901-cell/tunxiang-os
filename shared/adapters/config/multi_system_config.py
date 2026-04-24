@@ -27,7 +27,9 @@ class PinzhiConfig(BaseModel):
     """
 
     enabled: bool = True
-    base_url: str = Field(default="", description="品智 API 基础 URL，例如 https://xxx.pinzhikeji.net/pzcatering-gateway")
+    base_url: str = Field(
+        default="", description="品智 API 基础 URL，例如 https://xxx.pinzhikeji.net/pzcatering-gateway"
+    )
     app_id: str = Field(default="", description="品智应用 ID（预留，当前版本不使用）")
     app_secret: str = Field(default="", description="品智 API Token / AppSecret")
     org_id: str = Field(default="", description="品智组织 ID（ognid，可选）")

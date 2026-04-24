@@ -21,9 +21,10 @@ Revision ID: v026
 Revises: v025
 Create Date: 2026-03-30
 """
-from alembic import op
+
 import sqlalchemy as sa
-from sqlalchemy.dialects.postgresql import UUID, JSONB
+from alembic import op
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 
 revision = "v026"
 down_revision = "v025"
@@ -65,7 +66,6 @@ def upgrade() -> None:
             nullable=False,
             server_default="false",
         ),
-
         # 关联字段
         sa.Column(
             "journey_id",
@@ -79,7 +79,6 @@ def upgrade() -> None:
             nullable=False,
             comment="目标会员 UUID",
         ),
-
         # 执行状态
         sa.Column(
             "status",
@@ -100,7 +99,6 @@ def upgrade() -> None:
             nullable=False,
             comment="下次允许执行的最早时间（wait 节点会推迟此时间）",
         ),
-
         # 执行统计
         sa.Column(
             "retry_count",
@@ -122,7 +120,6 @@ def upgrade() -> None:
             server_default=sa.text("'[]'::jsonb"),
             comment="已成功执行的节点 ID 列表（JSONB array of str）",
         ),
-
         # 生命周期时间戳
         sa.Column(
             "started_at",
@@ -136,7 +133,6 @@ def upgrade() -> None:
             nullable=True,
             comment="旅程完成或失败时间",
         ),
-
         comment="旅程实例表 — 每行代表一个会员在某条营销旅程中的执行进度",
     )
 

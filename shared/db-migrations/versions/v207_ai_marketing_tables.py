@@ -9,6 +9,7 @@ Create Date: 2026-04-11
   2. marketing_channel_accounts — 渠道账号配置（微信OA/企微/美团/抖音等）
   3. marketing_touch_log      — 营销触达记录（归因闭环核心）
 """
+
 import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
@@ -29,10 +30,9 @@ def upgrade() -> None:
     conn = op.get_bind()
     existing = sa.inspect(conn).get_table_names()
 
-
     # ─── 1. ai_content_cache — AIGC 内容缓存 ────────────────────────────────
 
-    if 'ai_content_cache' not in existing:
+    if "ai_content_cache" not in existing:
         op.create_table(
             "ai_content_cache",
             sa.Column(
@@ -120,7 +120,7 @@ def upgrade() -> None:
 
         # ─── 2. marketing_channel_accounts — 渠道账号配置 ────────────────────────
 
-    if 'marketing_channel_accounts' not in existing:
+    if "marketing_channel_accounts" not in existing:
         op.create_table(
             "marketing_channel_accounts",
             sa.Column(
@@ -130,8 +130,9 @@ def upgrade() -> None:
                 server_default=sa.text("gen_random_uuid()"),
             ),
             sa.Column("tenant_id", postgresql.UUID(as_uuid=True), nullable=False),
-            sa.Column("store_id", postgresql.UUID(as_uuid=True), nullable=True,
-                      comment="NULL 表示品牌级账号（全门店共用）"),
+            sa.Column(
+                "store_id", postgresql.UUID(as_uuid=True), nullable=True, comment="NULL 表示品牌级账号（全门店共用）"
+            ),
             sa.Column(
                 "channel_type",
                 sa.VARCHAR(50),
@@ -204,7 +205,7 @@ def upgrade() -> None:
 
         # ─── 3. marketing_touch_log — 营销触达记录 ────────────────────────────────
 
-    if 'marketing_touch_log' not in existing:
+    if "marketing_touch_log" not in existing:
         op.create_table(
             "marketing_touch_log",
             sa.Column(

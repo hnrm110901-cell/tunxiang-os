@@ -9,10 +9,10 @@ API Base: https://ark.xiaohongshu.com/ark/open_api/v3
   3. 追加 app_secret
   4. SHA256 哈希
 """
+
 from __future__ import annotations
 
 import hashlib
-import hmac
 import time
 import uuid
 from typing import Any, Optional
@@ -49,7 +49,10 @@ class XHSClient:
         }
 
     async def _request(
-        self, method: str, path: str, params: Optional[dict] = None,
+        self,
+        method: str,
+        path: str,
+        params: Optional[dict] = None,
         body: Optional[dict] = None,
     ) -> dict[str, Any]:
         """发送签名请求到小红书开放平台
@@ -65,7 +68,8 @@ class XHSClient:
         url = f"{XHS_API_BASE}{path}"
         logger.info(
             "xhs_api_request",
-            method=method, url=url,
+            method=method,
+            url=url,
             app_id=self.app_id,
         )
 
@@ -89,7 +93,8 @@ class XHSClient:
             {"verified": bool, "coupon_info": {...}, "error": str|None}
         """
         result = await self._request(
-            "POST", "/coupon/verify",
+            "POST",
+            "/coupon/verify",
             body={"coupon_code": coupon_code, "shop_id": shop_id},
         )
         if result.get("code") != 0:
@@ -106,44 +111,57 @@ class XHSClient:
     async def query_coupon(self, coupon_code: str) -> dict[str, Any]:
         """查询团购券状态"""
         return await self._request(
-            "GET", "/coupon/query",
+            "GET",
+            "/coupon/query",
             params={"coupon_code": coupon_code},
         )
 
     # ── POI 门店同步 ─────────────────────────────────────────
 
     async def sync_poi(
-        self, poi_id: str, store_info: dict,
+        self,
+        poi_id: str,
+        store_info: dict,
     ) -> dict[str, Any]:
         """同步门店信息到小红书 POI"""
         return await self._request(
-            "POST", "/poi/update",
+            "POST",
+            "/poi/update",
             body={"poi_id": poi_id, **store_info},
         )
 
     async def get_poi_info(self, poi_id: str) -> dict[str, Any]:
         """查询小红书 POI 信息"""
         return await self._request(
-            "GET", "/poi/info",
+            "GET",
+            "/poi/info",
             params={"poi_id": poi_id},
         )
 
     # ── 评论/笔记 ────────────────────────────────────────────
 
     async def get_store_notes(
-        self, poi_id: str, page: int = 1, size: int = 20,
+        self,
+        poi_id: str,
+        page: int = 1,
+        size: int = 20,
     ) -> dict[str, Any]:
         """获取门店关联的小红书笔记"""
         return await self._request(
-            "GET", "/content/notes",
+            "GET",
+            "/content/notes",
             params={"poi_id": poi_id, "page": page, "size": size},
         )
 
     async def get_note_comments(
-        self, note_id: str, page: int = 1, size: int = 20,
+        self,
+        note_id: str,
+        page: int = 1,
+        size: int = 20,
     ) -> dict[str, Any]:
         """获取笔记评论"""
         return await self._request(
-            "GET", "/content/comments",
+            "GET",
+            "/content/comments",
             params={"note_id": note_id, "page": page, "size": size},
         )

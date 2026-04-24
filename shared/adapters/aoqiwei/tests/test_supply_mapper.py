@@ -13,10 +13,11 @@
   - 缺失必填字段时抛出 ValueError
   - 金额单位转换（分 → 元）
 """
+
 from __future__ import annotations
 
-import sys
 import os
+import sys
 
 # 确保可以导入 supply_mapper（不依赖已安装包）
 _tests_dir = os.path.dirname(__file__)
@@ -28,9 +29,9 @@ for _p in [_src_dir, _base_types_dir]:
 
 import pytest
 from supply_mapper import (
-    aoqiwei_supplier_to_unified,
-    aoqiwei_purchase_order_to_unified,
     aoqiwei_dispatch_to_receiving,
+    aoqiwei_purchase_order_to_unified,
+    aoqiwei_supplier_to_unified,
 )
 
 TENANT_ID = "tenant-001"
@@ -41,8 +42,8 @@ STORE_ID = "store-001"
 # aoqiwei_supplier_to_unified
 # ══════════════════════════════════════════════════════════════
 
-class TestAoqiweiSupplierToUnified:
 
+class TestAoqiweiSupplierToUnified:
     def _make_raw(self, **overrides) -> dict:
         base = {
             "supplierCode": "SUP001",
@@ -150,15 +151,15 @@ class TestAoqiweiSupplierToUnified:
 # aoqiwei_purchase_order_to_unified
 # ══════════════════════════════════════════════════════════════
 
-class TestAoqiweiPurchaseOrderToUnified:
 
+class TestAoqiweiPurchaseOrderToUnified:
     def _make_raw(self, **overrides) -> dict:
         base = {
             "orderNo": "PO2026031200001",
             "depotCode": "DC001",
             "supplierCode": "SUP001",
             "orderDate": "2026-03-12",
-            "totalAmount": 158600,   # 1586.00 元（分）
+            "totalAmount": 158600,  # 1586.00 元（分）
             "status": 1,
             "goodList": [
                 {
@@ -166,14 +167,14 @@ class TestAoqiweiPurchaseOrderToUnified:
                     "goodName": "里脊肉",
                     "qty": 10,
                     "unit": "kg",
-                    "price": 8800,   # 88.00 元（分）
+                    "price": 8800,  # 88.00 元（分）
                 },
                 {
                     "goodCode": "G002",
                     "goodName": "西红柿",
                     "qty": 20,
                     "unit": "kg",
-                    "price": 350,    # 3.50 元（分）
+                    "price": 350,  # 3.50 元（分）
                 },
             ],
         }
@@ -249,24 +250,32 @@ class TestAoqiweiPurchaseOrderToUnified:
         assert result["items"] == []
 
     def test_item_with_none_price(self):
-        raw = self._make_raw(goodList=[{
-            "goodCode": "G003",
-            "goodName": "豆腐",
-            "qty": 5,
-            "unit": "块",
-            "price": None,
-        }])
+        raw = self._make_raw(
+            goodList=[
+                {
+                    "goodCode": "G003",
+                    "goodName": "豆腐",
+                    "qty": 5,
+                    "unit": "块",
+                    "price": None,
+                }
+            ]
+        )
         result = aoqiwei_purchase_order_to_unified(raw, TENANT_ID, STORE_ID)
         assert result["items"][0]["unit_price"] == pytest.approx(0.0)
 
     def test_item_with_none_qty(self):
-        raw = self._make_raw(goodList=[{
-            "goodCode": "G003",
-            "goodName": "豆腐",
-            "qty": None,
-            "unit": "块",
-            "price": 100,
-        }])
+        raw = self._make_raw(
+            goodList=[
+                {
+                    "goodCode": "G003",
+                    "goodName": "豆腐",
+                    "qty": None,
+                    "unit": "块",
+                    "price": 100,
+                }
+            ]
+        )
         result = aoqiwei_purchase_order_to_unified(raw, TENANT_ID, STORE_ID)
         assert result["items"][0]["quantity"] == pytest.approx(0.0)
 
@@ -310,8 +319,8 @@ class TestAoqiweiPurchaseOrderToUnified:
 # aoqiwei_dispatch_to_receiving
 # ══════════════════════════════════════════════════════════════
 
-class TestAoqiweiDispatchToReceiving:
 
+class TestAoqiweiDispatchToReceiving:
     def _make_raw(self, **overrides) -> dict:
         base = {
             "dispatchOrderNo": "DO20260312001",
@@ -375,32 +384,44 @@ class TestAoqiweiDispatchToReceiving:
         assert result["items"] == []
 
     def test_item_with_none_qty(self):
-        raw = self._make_raw(goodList=[{
-            "goodCode": "G003",
-            "goodName": "豆腐",
-            "qty": None,
-            "unit": "块",
-        }])
+        raw = self._make_raw(
+            goodList=[
+                {
+                    "goodCode": "G003",
+                    "goodName": "豆腐",
+                    "qty": None,
+                    "unit": "块",
+                }
+            ]
+        )
         result = aoqiwei_dispatch_to_receiving(raw, TENANT_ID, STORE_ID)
         assert result["items"][0]["ordered_qty"] == pytest.approx(0.0)
 
     def test_item_with_none_good_code(self):
-        raw = self._make_raw(goodList=[{
-            "goodCode": None,
-            "goodName": "未知货品",
-            "qty": 5,
-            "unit": "kg",
-        }])
+        raw = self._make_raw(
+            goodList=[
+                {
+                    "goodCode": None,
+                    "goodName": "未知货品",
+                    "qty": 5,
+                    "unit": "kg",
+                }
+            ]
+        )
         result = aoqiwei_dispatch_to_receiving(raw, TENANT_ID, STORE_ID)
         assert result["items"][0]["ingredient_id"] == ""
 
     def test_item_with_none_unit(self):
-        raw = self._make_raw(goodList=[{
-            "goodCode": "G001",
-            "goodName": "里脊肉",
-            "qty": 5,
-            "unit": None,
-        }])
+        raw = self._make_raw(
+            goodList=[
+                {
+                    "goodCode": "G001",
+                    "goodName": "里脊肉",
+                    "qty": 5,
+                    "unit": None,
+                }
+            ]
+        )
         result = aoqiwei_dispatch_to_receiving(raw, TENANT_ID, STORE_ID)
         assert result["items"][0]["unit"] == ""
 

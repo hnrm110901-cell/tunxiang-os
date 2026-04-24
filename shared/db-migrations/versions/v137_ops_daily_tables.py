@@ -13,9 +13,10 @@ Revision ID: v137
 Revises: v136
 Create Date: 2026-04-02
 """
-from alembic import op
+
 import sqlalchemy as sa
-from sqlalchemy.dialects.postgresql import UUID, JSONB
+from alembic import op
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 
 revision = "v137"
 down_revision = "v136"
@@ -48,26 +49,26 @@ def upgrade() -> None:
     # ── E1: shift_handovers ──────────────────────────────────────────────
     if "shift_handovers" not in _existing:
         op.create_table(
-        "shift_handovers",
-        sa.Column("id", UUID(as_uuid=True), primary_key=True),
-        sa.Column("tenant_id", UUID(as_uuid=True), nullable=False, index=True),
-        sa.Column("store_id", UUID(as_uuid=True), nullable=False, index=True),
-        sa.Column("shift_date", sa.Date, nullable=False),
-        sa.Column("shift_type", sa.String(20), nullable=False),
-        sa.Column("start_time", sa.DateTime(timezone=True), nullable=False),
-        sa.Column("end_time", sa.DateTime(timezone=True)),
-        sa.Column("handover_by", sa.String(100), nullable=False),
-        sa.Column("received_by", sa.String(100)),
-        sa.Column("cash_counted_fen", sa.Integer, server_default="0"),
-        sa.Column("pos_cash_fen", sa.Integer, server_default="0"),
-        sa.Column("cash_diff_fen", sa.Integer, server_default="0"),
-        sa.Column("device_checklist", JSONB),
-        sa.Column("notes", sa.Text),
-        sa.Column("status", sa.String(20), server_default="pending"),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
-        sa.Column("is_deleted", sa.Boolean, server_default="false"),
-    )
+            "shift_handovers",
+            sa.Column("id", UUID(as_uuid=True), primary_key=True),
+            sa.Column("tenant_id", UUID(as_uuid=True), nullable=False, index=True),
+            sa.Column("store_id", UUID(as_uuid=True), nullable=False, index=True),
+            sa.Column("shift_date", sa.Date, nullable=False),
+            sa.Column("shift_type", sa.String(20), nullable=False),
+            sa.Column("start_time", sa.DateTime(timezone=True), nullable=False),
+            sa.Column("end_time", sa.DateTime(timezone=True)),
+            sa.Column("handover_by", sa.String(100), nullable=False),
+            sa.Column("received_by", sa.String(100)),
+            sa.Column("cash_counted_fen", sa.Integer, server_default="0"),
+            sa.Column("pos_cash_fen", sa.Integer, server_default="0"),
+            sa.Column("cash_diff_fen", sa.Integer, server_default="0"),
+            sa.Column("device_checklist", JSONB),
+            sa.Column("notes", sa.Text),
+            sa.Column("status", sa.String(20), server_default="pending"),
+            sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
+            sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
+            sa.Column("is_deleted", sa.Boolean, server_default="false"),
+        )
     op.execute("""
         DO $$ BEGIN
             IF (SELECT COUNT(*) FROM information_schema.columns 
@@ -192,7 +193,10 @@ def upgrade() -> None:
             sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
             sa.Column("is_deleted", sa.Boolean, server_default="false"),
             sa.UniqueConstraint(
-                "tenant_id", "store_id", "perf_date", "employee_id",
+                "tenant_id",
+                "store_id",
+                "perf_date",
+                "employee_id",
                 name="uq_emp_perf_store_date_emp",
             ),
         )

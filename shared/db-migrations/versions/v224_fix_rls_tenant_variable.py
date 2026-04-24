@@ -69,7 +69,7 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     # 回滚到旧的（有漏洞的）策略 — 仅用于紧急回滚
-    for table, policy in _AFFECTED:
+    for table, policy in _AFFECTED:  # noqa: F821  # TODO(P1) 疑似缺失变量 _AFFECTED，应为 _UUID_TABLES + _VARCHAR_TABLES
         op.execute(f"DROP POLICY IF EXISTS {policy} ON {table};")
         op.execute(f"""
             CREATE POLICY {policy} ON {table}

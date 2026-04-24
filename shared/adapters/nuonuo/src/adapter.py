@@ -1,10 +1,12 @@
 """诺诺开放平台 — 电子发票适配器"""
+
 import hashlib
 import hmac
 import json
 import time
 import uuid
-from typing import Dict, Any, Optional
+from typing import Any, Dict, Optional
+
 import httpx
 import structlog
 
@@ -33,16 +35,15 @@ class NuonuoAdapter:
     async def _get_access_token(self) -> str:
         if self._access_token and time.time() < self._token_expires_at - 300:
             return self._access_token
-        url = (
-            "https://sandbox.nuonuocs.cn/accessToken"
-            if self.sandbox
-            else "https://open.nuonuo.com/accessToken"
+        url = "https://sandbox.nuonuocs.cn/accessToken" if self.sandbox else "https://open.nuonuo.com/accessToken"
+        resp = await self._client.post(
+            url,
+            json={
+                "client_id": self.app_key,
+                "client_secret": self.app_secret,
+                "grant_type": "client_credentials",
+            },
         )
-        resp = await self._client.post(url, json={
-            "client_id": self.app_key,
-            "client_secret": self.app_secret,
-            "grant_type": "client_credentials",
-        })
         data = resp.json()
         self._access_token = data.get("access_token", "")
         self._token_expires_at = time.time() + data.get("expires_in", 7200)
@@ -50,9 +51,7 @@ class NuonuoAdapter:
 
     def _generate_sign(self, params: str, timestamp: str, nonce: str) -> str:
         sign_str = f"{self.app_secret}{timestamp}{nonce}{params}"
-        return hmac.new(
-            self.app_secret.encode(), sign_str.encode(), hashlib.sha256
-        ).hexdigest().upper()
+        return hmac.new(self.app_secret.encode(), sign_str.encode(), hashlib.sha256).hexdigest().upper()
 
     async def _request(self, method: str, content: Dict[str, Any]) -> Dict[str, Any]:
         token = await self._get_access_token()
@@ -82,20 +81,27 @@ class NuonuoAdapter:
 
     async def query_invoice(self, serial_nos: list) -> Dict[str, Any]:
         """查询发票开票结果"""
-        return await self._request("nuonuo.ElectronInvoice.queryInvoiceResult", {
-            "serialNos": serial_nos,
-        })
+        return await self._request(
+            "nuonuo.ElectronInvoice.queryInvoiceResult",
+            {
+                "serialNos": serial_nos,
+            },
+        )
 
     async def void_invoice(self, invoice_id: str, invoice_code: str, invoice_number: str) -> Dict[str, Any]:
         """作废发票"""
-        return await self._request("nuonuo.ElectronInvoice.invoiceCancellation", {
-            "invoiceId": invoice_id,
-            "invoiceCode": invoice_code,
-            "invoiceNo": invoice_number,
-        })
+        return await self._request(
+            "nuonuo.ElectronInvoice.invoiceCancellation",
+            {
+                "invoiceId": invoice_id,
+                "invoiceCode": invoice_code,
+                "invoiceNo": invoice_number,
+            },
+        )
 
-    async def issue_red_invoice(self, original_invoice_code: str, original_invoice_number: str,
-                                 reason: str, invoice_data: Dict[str, Any]) -> Dict[str, Any]:
+    async def issue_red_invoice(
+        self, original_invoice_code: str, original_invoice_number: str, reason: str, invoice_data: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """开具红字发票（红冲）"""
         invoice_data["invoiceCode"] = original_invoice_code
         invoice_data["invoiceNo"] = original_invoice_number
@@ -104,10 +110,13 @@ class NuonuoAdapter:
 
     async def download_pdf(self, invoice_code: str, invoice_number: str) -> str:
         """获取发票PDF下载链接"""
-        result = await self._request("nuonuo.ElectronInvoice.getInvoicePDFUrl", {
-            "invoiceCode": invoice_code,
-            "invoiceNo": invoice_number,
-        })
+        result = await self._request(
+            "nuonuo.ElectronInvoice.getInvoicePDFUrl",
+            {
+                "invoiceCode": invoice_code,
+                "invoiceNo": invoice_number,
+            },
+        )
         return result.get("pdfUrl", "")
 
     async def close(self):

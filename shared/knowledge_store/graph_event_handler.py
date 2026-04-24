@@ -5,6 +5,7 @@
 - menu.dish_updated -> 更新菜品节点和食材关系
 - supply.supplier_updated -> 更新供应商节点
 """
+
 from __future__ import annotations
 
 from typing import Any

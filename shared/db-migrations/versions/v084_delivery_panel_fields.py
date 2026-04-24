@@ -22,16 +22,15 @@ Revision ID: v032
 Revises: v031
 Create Date: 2026-03-31
 """
-from typing import Sequence, Union
 
-from alembic import op
 import sqlalchemy as sa
-from sqlalchemy.dialects.postgresql import UUID, JSONB
+from alembic import op
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 
 revision = "v084"
-down_revision= "v083"
-branch_labels= None
-depends_on= None
+down_revision = "v083"
+branch_labels = None
+depends_on = None
 
 _DELIVERY_TABLE = "delivery_orders"
 _AUTO_ACCEPT_TABLE = "delivery_auto_accept_rules"
@@ -46,22 +45,13 @@ _SAFE_CONDITION = (
 def _enable_rls(table_name: str) -> None:
     op.execute(f"ALTER TABLE {table_name} ENABLE ROW LEVEL SECURITY")
     op.execute(f"ALTER TABLE {table_name} FORCE ROW LEVEL SECURITY")
-    op.execute(
-        f"CREATE POLICY {table_name}_rls_select ON {table_name} "
-        f"FOR SELECT USING ({_SAFE_CONDITION})"
-    )
-    op.execute(
-        f"CREATE POLICY {table_name}_rls_insert ON {table_name} "
-        f"FOR INSERT WITH CHECK ({_SAFE_CONDITION})"
-    )
+    op.execute(f"CREATE POLICY {table_name}_rls_select ON {table_name} FOR SELECT USING ({_SAFE_CONDITION})")
+    op.execute(f"CREATE POLICY {table_name}_rls_insert ON {table_name} FOR INSERT WITH CHECK ({_SAFE_CONDITION})")
     op.execute(
         f"CREATE POLICY {table_name}_rls_update ON {table_name} "
         f"FOR UPDATE USING ({_SAFE_CONDITION}) WITH CHECK ({_SAFE_CONDITION})"
     )
-    op.execute(
-        f"CREATE POLICY {table_name}_rls_delete ON {table_name} "
-        f"FOR DELETE USING ({_SAFE_CONDITION})"
-    )
+    op.execute(f"CREATE POLICY {table_name}_rls_delete ON {table_name} FOR DELETE USING ({_SAFE_CONDITION})")
 
 
 def _disable_rls(table_name: str) -> None:
@@ -75,28 +65,28 @@ def upgrade() -> None:
     # ── 1. 在 delivery_orders 补充接单面板所需字段 ──────────────────────────
     op.add_column(
         _DELIVERY_TABLE,
-        sa.Column("platform_order_no", sa.String(100), nullable=True,
-                  comment="平台展示给用户的订单号"),
+        sa.Column("platform_order_no", sa.String(100), nullable=True, comment="平台展示给用户的订单号"),
     )
     op.add_column(
         _DELIVERY_TABLE,
-        sa.Column("customer_name", sa.String(50), nullable=True,
-                  comment="顾客姓名"),
+        sa.Column("customer_name", sa.String(50), nullable=True, comment="顾客姓名"),
     )
     op.add_column(
         _DELIVERY_TABLE,
-        sa.Column("special_request", sa.Text(), nullable=True,
-                  comment="顾客特殊备注"),
+        sa.Column("special_request", sa.Text(), nullable=True, comment="顾客特殊备注"),
     )
     op.add_column(
         _DELIVERY_TABLE,
-        sa.Column("estimated_prep_time", sa.Integer(), nullable=True,
-                  comment="预计备餐分钟数"),
+        sa.Column("estimated_prep_time", sa.Integer(), nullable=True, comment="预计备餐分钟数"),
     )
     op.add_column(
         _DELIVERY_TABLE,
-        sa.Column("actual_revenue_fen", sa.Integer(), nullable=True,
-                  comment="实际到账金额（分），= total_fen - commission_fen"),
+        sa.Column(
+            "actual_revenue_fen",
+            sa.Integer(),
+            nullable=True,
+            comment="实际到账金额（分），= total_fen - commission_fen",
+        ),
     )
     op.add_column(
         _DELIVERY_TABLE,
@@ -110,18 +100,15 @@ def upgrade() -> None:
     )
     op.add_column(
         _DELIVERY_TABLE,
-        sa.Column("accepted_at", sa.DateTime(timezone=True), nullable=True,
-                  comment="接单时间"),
+        sa.Column("accepted_at", sa.DateTime(timezone=True), nullable=True, comment="接单时间"),
     )
     op.add_column(
         _DELIVERY_TABLE,
-        sa.Column("rejected_at", sa.DateTime(timezone=True), nullable=True,
-                  comment="拒单时间"),
+        sa.Column("rejected_at", sa.DateTime(timezone=True), nullable=True, comment="拒单时间"),
     )
     op.add_column(
         _DELIVERY_TABLE,
-        sa.Column("rejected_reason", sa.String(500), nullable=True,
-                  comment="拒单原因"),
+        sa.Column("rejected_reason", sa.String(500), nullable=True, comment="拒单原因"),
     )
 
     # ── 2. 新建 delivery_auto_accept_rules 表 ────────────────────────────────
@@ -137,10 +124,8 @@ def upgrade() -> None:
             server_default=sa.text("false"),
             comment="是否启用自动接单",
         ),
-        sa.Column("business_hours_start", sa.Time(), nullable=True,
-                  comment="自动接单营业开始时间"),
-        sa.Column("business_hours_end", sa.Time(), nullable=True,
-                  comment="自动接单营业结束时间"),
+        sa.Column("business_hours_start", sa.Time(), nullable=True, comment="自动接单营业开始时间"),
+        sa.Column("business_hours_end", sa.Time(), nullable=True, comment="自动接单营业结束时间"),
         sa.Column(
             "max_concurrent_orders",
             sa.Integer(),
@@ -153,7 +138,7 @@ def upgrade() -> None:
             JSONB,
             nullable=False,
             server_default=sa.text("'[]'::jsonb"),
-            comment="不自动接单的平台列表，如 [\"meituan\"]",
+            comment='不自动接单的平台列表，如 ["meituan"]',
         ),
         sa.Column(
             "created_at",
