@@ -15,9 +15,10 @@
 
 from __future__ import annotations
 
+import asyncio
 import time
 import uuid
-from typing import Any, Dict, Optional
+from typing import Any, Awaitable, Callable, Dict, Optional
 
 import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException
@@ -30,6 +31,14 @@ from shared.ontology.src.database import get_db
 
 router = APIRouter(prefix="/api/v1/telemetry", tags=["telemetry"])
 log = structlog.get_logger(__name__)
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+#  审计钩子（Sprint A1 — 非阻塞）
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# 约定：_audit_hook 是一个可选的 async 可调用对象，签名为 (**kwargs) -> Awaitable[None]。
+# 在 report_pos_crash 路由中通过 asyncio.create_task 调度，绝不阻塞主业务。
+# 生产接线点：app 启动时注入 tx-trade.write_audit 或 SIEM 客户端；测试可 monkeypatch。
+_audit_hook: Optional[Callable[..., Awaitable[None]]] = None
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -72,6 +81,21 @@ class PosCrashReport(BaseModel):
     error_stack: Optional[str] = Field(None, max_length=_MAX_STACK_LEN, description="前端捕获的错误堆栈")
     user_action: Optional[str] = Field(None, max_length=_MAX_FIELD_LEN, description="崩溃前最后用户动作摘要")
     store_id: Optional[str] = Field(None, max_length=64, description="门店 UUID（登录前可空）")
+    # ── Sprint A1 扩字段（v268），全部 Optional，向前兼容 ───────────────────
+    timeout_reason: Optional[str] = Field(
+        None, max_length=32,
+        description="超时原因：fetch_timeout/saga_timeout/gateway_timeout/rls_deny/disk_io_error/unknown",
+    )
+    recovery_action: Optional[str] = Field(
+        None, max_length=32,
+        description="恢复动作：reset/redirect_tables/retry/abort",
+    )
+    saga_id: Optional[str] = Field(None, max_length=64, description="关联 payment_sagas.saga_id")
+    order_no: Optional[str] = Field(None, max_length=64, description="订单号（软关联）")
+    severity: Optional[str] = Field(None, max_length=16, description="严重级：fatal/warn/info")
+    boundary_level: Optional[str] = Field(
+        None, max_length=16, description="ErrorBoundary 层级：root/cashier/unknown"
+    )
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -123,6 +147,46 @@ async def report_pos_crash(
                 detail={"code": "INVALID_PAYLOAD", "message": "store_id 必须是合法 UUID"},
             )
 
+    # saga_id 合法性（可空）
+    saga_uuid: Optional[str] = None
+    if body.saga_id:
+        try:
+            saga_uuid = str(uuid.UUID(body.saga_id))
+        except ValueError:
+            raise HTTPException(
+                status_code=400,
+                detail={"code": "INVALID_PAYLOAD", "message": "saga_id 必须是合法 UUID"},
+            )
+
+    # severity / boundary_level / timeout_reason / recovery_action 枚举白名单校验
+    if body.severity is not None and body.severity not in {"fatal", "warn", "info"}:
+        raise HTTPException(
+            status_code=400,
+            detail={"code": "INVALID_PAYLOAD", "message": "severity 必须是 fatal/warn/info"},
+        )
+    if body.boundary_level is not None and body.boundary_level not in {
+        "root", "cashier", "unknown",
+    }:
+        raise HTTPException(
+            status_code=400,
+            detail={"code": "INVALID_PAYLOAD", "message": "boundary_level 必须是 root/cashier/unknown"},
+        )
+    if body.timeout_reason is not None and body.timeout_reason not in {
+        "fetch_timeout", "saga_timeout", "gateway_timeout",
+        "rls_deny", "disk_io_error", "unknown",
+    }:
+        raise HTTPException(
+            status_code=400,
+            detail={"code": "INVALID_PAYLOAD", "message": "timeout_reason 枚举不合法"},
+        )
+    if body.recovery_action is not None and body.recovery_action not in {
+        "reset", "redirect_tables", "retry", "abort",
+    }:
+        raise HTTPException(
+            status_code=400,
+            detail={"code": "INVALID_PAYLOAD", "message": "recovery_action 枚举不合法"},
+        )
+
     # tenant_id 合法性：Header 若不是 UUID，RLS set_config 会在后续 ::uuid 转换失败
     try:
         uuid.UUID(x_tenant_id)
@@ -141,10 +205,14 @@ async def report_pos_crash(
                 """
                 INSERT INTO pos_crash_reports
                     (report_id, tenant_id, store_id, device_id, route,
-                     error_stack, user_action)
+                     error_stack, user_action,
+                     timeout_reason, recovery_action, saga_id, order_no,
+                     severity, boundary_level)
                 VALUES
                     (:rid::uuid, :tid::uuid, :sid::uuid, :did, :route,
-                     :stack, :action)
+                     :stack, :action,
+                     :timeout_reason, :recovery_action, :saga_id::uuid, :order_no,
+                     :severity, :boundary_level)
                 """
             ),
             {
@@ -155,6 +223,12 @@ async def report_pos_crash(
                 "route": body.route,
                 "stack": body.error_stack,
                 "action": body.user_action,
+                "timeout_reason": body.timeout_reason,
+                "recovery_action": body.recovery_action,
+                "saga_id": saga_uuid,
+                "order_no": body.order_no,
+                "severity": body.severity,
+                "boundary_level": body.boundary_level,
             },
         )
         await db.commit()
@@ -166,5 +240,47 @@ async def report_pos_crash(
             detail={"code": "INTERNAL_ERROR", "message": "上报暂时不可用，请稍后重试"},
         )
 
-    log.info("pos_crash_reported", report_id=report_id, tenant_id=x_tenant_id, device_id=device_id, route=body.route)
+    # Sprint A1：非阻塞审计钩子（§9 Agent 决策留痕 + CLAUDE.md §禁止 审计同步阻塞主业务）
+    # 审计钩子失败绝不影响 POS 主业务：create_task 即发即忘 + 内层 try/except
+    hook = _audit_hook
+    if hook is not None:
+        async def _run_audit_hook() -> None:
+            try:
+                await hook(
+                    action="pos_crash_report",
+                    tenant_id=x_tenant_id,
+                    report_id=report_id,
+                    device_id=device_id,
+                    route=body.route,
+                    saga_id=saga_uuid,
+                    order_no=body.order_no,
+                    severity=body.severity,
+                    boundary_level=body.boundary_level,
+                    timeout_reason=body.timeout_reason,
+                    recovery_action=body.recovery_action,
+                )
+            except (SQLAlchemyError, ValueError, KeyError, RuntimeError) as exc:
+                log.error(
+                    "pos_crash_audit_hook_failed",
+                    error=str(exc),
+                    report_id=report_id,
+                    tenant_id=x_tenant_id,
+                )
+        try:
+            asyncio.create_task(_run_audit_hook())
+        except RuntimeError as exc:
+            # 无运行中事件循环（极少出现，TestClient 已处理）— 退化为同步跳过
+            log.warning("pos_crash_audit_hook_schedule_failed", error=str(exc))
+
+    log.info(
+        "pos_crash_reported",
+        report_id=report_id,
+        tenant_id=x_tenant_id,
+        device_id=device_id,
+        route=body.route,
+        severity=body.severity,
+        boundary_level=body.boundary_level,
+        saga_id=saga_uuid,
+        order_no=body.order_no,
+    )
     return {"ok": True, "data": {"report_id": report_id}}
