@@ -1,3 +1,57 @@
+## 2026-04-24 Sprint H：集成验证基建（徐记海鲜 DEMO Go/No-Go）
+
+### 本次会话目标
+按 sprint plan Sprint H 交付 Week 8 DEMO Go/No-Go 10 项门槛自动化验证框架：种子数据 + 脚本 + 评分表 + 话术 + 文档 + 集成测试。本 PR 是"基建"，不跑通 E2E（需 D/E 系列 PR 合入后执行）。
+
+Tier 级别：Tier 3（基建/文档，不触业务路径）。
+
+### 完成状态
+- [x] `infra/demo/xuji_seafood/seed.sql` — 幂等种子：1 品牌 + 3 门店（长沙/北京/上海）+ 10 菜品 + 9 员工 + 10 会员（RFM 分层）+ E1 canonical 订单 + E2 publish_registry（3 平台）+ E4 disputes（pending/resolved/expired 3 态）
+- [x] `infra/demo/xuji_seafood/cleanup.sql` — RLS 感知软删
+- [x] `scripts/demo_go_no_go.py` — 10 项自动化检查：Tier 1 测试 / k6 P99 / 支付成功率 / 断网 4h / 收银员签字 / 3 商户 scorecard / RLS 审计 / demo-reset / A/B 实验 / 演示话术；`--json` `--strict` `--only` `--skip-tests` 选项
+- [x] 3 商户 scorecard：徐记海鲜 88 / 尝在一起 86 / 尚宫厨 85，6 维度评分 + 证据 + 风险
+- [x] 3 套演示话术：运营故事 45min + IT 架构 60min + 财务采购 40min
+- [x] 收银员签字模板（5 场景 × 3 收银员 × 见证人）
+- [x] Sprint H 运行手册（三步走 + 10 门槛详解 + 异常恢复）
+- [x] **40 集成测试**（36 passed + 4 skipped 等 DB）：seed 结构 / 脚本可执行 / scorecard 格式 / 话术存在 / 模板完整 / 文档就位
+- [x] Ruff 全绿
+
+### 关键决策
+- **Seed 用 psql 变量 + ON CONFLICT DO UPDATE + EXCEPTION 兜底** — 重跑不累积 + 兼容不同 migration 版本
+- **Deterministic UUID** — `10000000-...`、`20000000-...` 前缀规则，便于测试断言和跨环境 reference
+- **Go/No-Go 4 值状态（GO/NO_GO/WARNING/SKIPPED）** — 区分"阻塞" vs "环境缺依赖"；`--strict` 只看 NO_GO
+- **每个检查降级 SKIPPED 而非 NO_GO** — 未装 DB/k6/nightly 时不阻塞 CI
+- **Scorecard 6 维度统一** — technical_fit / data_migration_risk / operational_readiness / cost_effectiveness / regulatory_compliance / ai_value_realization
+- **3 套话术分别对应 3 类受众** — 董事长 / IT / CFO，按需组合
+- **签字页扫 "签字:" ≥ 3 才通过** — 防 CI 作弊（真实上线前可升级为纸质扫描归档）
+
+### 交付清单
+```
+新建：
+  infra/demo/xuji_seafood/{seed,cleanup}.sql             ~320 行
+  scripts/demo_go_no_go.py                                ~500 行（10 检查）
+  docs/demo/cashier-signoff.md                            签字模板
+  docs/demo/scripts/0{1,2,3}-*.md                         3 套话术
+  docs/demo/scorecards/{xuji-seafood,changzaiyiqi,shanggongchu}.json  3 scorecard
+  docs/sprint-h-integration-validation.md                 运行手册
+  tests/integration/test_sprint_h_demo.py                 40 测试
+```
+
+### 下一步
+- 等 D/E 合入（PR #82-94 共 11 个）后跑 seed.sql 验证
+- 补 Tier 1 测试（CLAUDE.md § 20 要求徐记场景）
+- 配置 k6 CI 定时 + 搭建 Nightly 断网 testbed
+- Week 8 DEMO 真实跑 + 收集签字
+
+### 已知风险
+- Seed schema 兼容性依赖 DO $$ EXCEPTION 兜底
+- 5 个 SKIPPED 检查项占 50%（环境缺 DB/k6/nightly log）
+- 话术是文字模板，真实需要 UI 截图 + 操作视频
+- scorecard 当前是 placeholder 估值，需 IT 总监亲自打分
+- cashier-signoff 扫描文本可被绕过，真实需纸质扫描归档
+
+---
+
 ## 2026-04-23 Sprint D4b：薪资异常检测 Sonnet 4.7 + Prompt Cache（城市基准共享）
 
 ### 本次会话目标

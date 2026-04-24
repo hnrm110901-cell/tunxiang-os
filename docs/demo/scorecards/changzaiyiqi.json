@@ -1,0 +1,72 @@
+{
+  "merchant": "尝在一起",
+  "merchant_id": "changzaiyiqi",
+  "evaluated_at": "2026-04-24",
+  "evaluator": "屯象产品 + 品智 POS 技术团队",
+  "environment": "Pilot Candidate",
+  "score": 86,
+  "dimensions": {
+    "technical_fit": {
+      "score": 88,
+      "notes": "当前使用品智 POS 单一系统，屯象全替代风险低",
+      "evidence": [
+        "品智 Adapter 已完成 90%（shared/adapters/pinzhi）",
+        "门店数 5 家，技术栈单一",
+        "无 23 系统整合难题"
+      ]
+    },
+    "data_migration_risk": {
+      "score": 92,
+      "notes": "品智 POS 单一数据源，迁移周期 45 天",
+      "evidence": [
+        "历史 2 年订单数据约 20 万条",
+        "会员数据 8000+",
+        "库存 SKU 300+"
+      ]
+    },
+    "operational_readiness": {
+      "score": 85,
+      "notes": "小型连锁，店长 / 收银员培训周期短",
+      "evidence": [
+        "5 家门店总员工 40 人",
+        "技术总监配合意愿强"
+      ]
+    },
+    "cost_effectiveness": {
+      "score": 90,
+      "notes": "替代品智 POS 费用节省 ¥5k/月/店",
+      "evidence": [
+        "品智年付 ¥48k/店",
+        "屯象基础设施分摊 ¥2.4k/月/店"
+      ]
+    },
+    "regulatory_compliance": {
+      "score": 88,
+      "notes": "金税四期基本覆盖",
+      "evidence": [
+        "全电发票日均 200+ 张",
+        "无跨省税务复杂度"
+      ]
+    },
+    "ai_value_realization": {
+      "score": 80,
+      "notes": "小店 AI 投入产出比较低，主要价值在管控自动化",
+      "evidence": [
+        "SOP 时间轴 + 巡店 Agent 为主",
+        "成本根因分析频次不高（月度 vs 连锁的周度）"
+      ]
+    }
+  },
+  "risks": [
+    {
+      "risk": "员工对 AI 接受度不确定",
+      "severity": "low",
+      "mitigation": "先从 SOP 任务推送开始，循序渐进"
+    }
+  ],
+  "go_no_go_recommendation": "GO",
+  "conditions": [
+    "Week 9 前完成 Pilot 一家门店（当前最成熟的长沙店）",
+    "Week 10 前评估 Pilot KPI，达标则全量 5 店"
+  ]
+}
