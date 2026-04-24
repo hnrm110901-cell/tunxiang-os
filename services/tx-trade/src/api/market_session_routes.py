@@ -506,3 +506,82 @@ async def update_template(
         _err("市别模板不存在", code=404)
     logger.info("market_session_template_updated", id=str(template_id))
     return _ok({"id": str(template_id)})
+
+
+# ─── 市别切换 + 拼桌自动触发 (v284) ───────────────────────────────────────────
+
+
+class SwitchMarketSessionReq(BaseModel):
+    new_session_id: str = Field(description="目标市别ID（store_market_sessions.id）")
+
+
+@router.post("/switch/{store_id}", summary="手动切换市别（触发拼桌预设）")
+async def switch_market_session(
+    store_id: uuid.UUID,
+    body: SwitchMarketSessionReq,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """手动切换市别，并自动触发关联的拼桌预设。
+
+    流程：
+    1. 验证目标市别存在
+    2. 调用 TableMergePresetService.on_market_session_switch()
+       - 回滚上一个市别的拼桌方案
+       - 执行新市别的 auto_trigger=TRUE 拼桌方案
+    3. 返回切换结果和拼桌执行摘要
+
+    注意：自动市别切换（按时间）由前端/定时任务调用此端点。
+    """
+    tid = _get_tenant_id(request)
+    await _set_rls(db, tid)
+
+    # 验证目标市别存在
+    session_result = await db.execute(
+        text("""
+            SELECT id, name, start_time, end_time
+            FROM store_market_sessions
+            WHERE id = :sid AND store_id = :store_id AND tenant_id = :tid AND is_active = TRUE
+        """),
+        {"sid": body.new_session_id, "store_id": str(store_id), "tid": tid},
+    )
+    session_row = session_result.mappings().one_or_none()
+    if not session_row:
+        _err("目标市别不存在或未激活", code=404)
+
+    # 触发拼桌预设
+    merge_result: dict = {"triggered": False, "detail": "无拼桌预设关联此市别"}
+    try:
+        from ..services.table_merge_preset_service import TableMergePresetService
+
+        merge_svc = TableMergePresetService(db, tid)
+        merge_result = await merge_svc.on_market_session_switch(
+            store_id=store_id,
+            new_session_id=uuid.UUID(body.new_session_id),
+        )
+    except ImportError:
+        logger.warning("table_merge_preset_service_not_available")
+    except ValueError as exc:
+        logger.warning("merge_preset_switch_error", error=str(exc))
+        merge_result = {"triggered": False, "error": str(exc)}
+
+    await db.commit()
+
+    logger.info(
+        "market_session_switched",
+        store_id=str(store_id),
+        new_session_id=body.new_session_id,
+        new_session_name=session_row["name"],
+        merge_triggered=merge_result.get("triggered", False),
+    )
+
+    return _ok({
+        "store_id": str(store_id),
+        "new_session": {
+            "id": str(session_row["id"]),
+            "name": session_row["name"],
+            "start_time": str(session_row["start_time"]),
+            "end_time": str(session_row["end_time"]),
+        },
+        "merge_preset_result": merge_result,
+    })

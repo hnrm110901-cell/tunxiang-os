@@ -766,3 +766,118 @@ async def checkout_with_discounts(
             "payment": payment_result,
         }
     )
+
+
+# ─── 新增：多模式收银端点 (Phase 2) ───
+
+
+class RetailSaleReq(BaseModel):
+    """零售模式请求 — 无桌台无会话"""
+    store_id: str
+    items: list[dict] = Field(..., description="商品列表: [{barcode, name, qty, unit_price_fen}]")
+    payment_method: str = "wechat"
+    payment_amount_fen: int = Field(ge=1)
+    auth_code: Optional[str] = None
+
+
+class PreOrderReq(BaseModel):
+    """预点单请求 — 包厢客人到店前预选菜品"""
+    store_id: str
+    table_no: str
+    booking_id: Optional[str] = None
+    items: list[dict] = Field(..., description="预点菜品: [{dish_id, dish_name, qty, unit_price_fen}]")
+    customer_phone: Optional[str] = None
+    expected_arrival: Optional[str] = None
+
+
+class RedeemVoucherReq(BaseModel):
+    """券核销请求"""
+    voucher_type: str = Field(..., description="券类型: platform_voucher / cash_voucher / member_points")
+    voucher_code: str
+    zone_id: Optional[str] = None
+
+
+@router.post("/cashier/retail-sale")
+async def retail_sale(
+    req: RetailSaleReq,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    """零售快速收银 — 无桌台无会话，扫码→付款→完成
+
+    适用场景：便利店窗口、外带柜台、伴手礼/预制菜零售
+    不创建 dining_session，直接创建 retail 类型订单并结算。
+    """
+    tenant_id = _get_tenant_id(request)
+    engine = CashierEngine(db, tenant_id)
+    try:
+        result = await engine.create_retail_order(
+            store_id=req.store_id,
+            items=req.items,
+            payment_method=req.payment_method,
+            payment_amount_fen=req.payment_amount_fen,
+            auth_code=req.auth_code,
+        )
+        return _ok(result)
+    except ValueError as e:
+        _err(str(e))
+
+
+@router.post("/cashier/pre-order")
+async def create_pre_order(
+    req: PreOrderReq,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    """预点单 — 包厢客人到店前预选菜品（dine_first 模式专属）
+
+    流程：客人电话/小程序预点 → 订单状态 pre_ordered → 客人到店 → fire-pre-order 起菜
+    预点单不锁桌（桌台仍为 reserved 状态），不扣库存。
+    """
+    tenant_id = _get_tenant_id(request)
+    engine = CashierEngine(db, tenant_id)
+    try:
+        result = await engine.create_pre_order(
+            store_id=req.store_id,
+            table_no=req.table_no,
+            booking_id=req.booking_id,
+            items=req.items,
+            customer_phone=req.customer_phone,
+            expected_arrival=req.expected_arrival,
+        )
+        return _ok(result)
+    except ValueError as e:
+        _err(str(e))
+
+
+@router.post("/orders/{order_id}/redeem-voucher")
+async def redeem_voucher(
+    order_id: str,
+    req: RedeemVoucherReq,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    """券核销 — 支持美团/抖音套餐券、代金券、会员积分抵扣
+
+    核销时机由区域 coupon_config.voucher_deduct_timing 决定：
+    - on_order:  下单时核销（scan_and_pay 模式默认，付款前抵扣）
+    - on_settle: 结账时核销（dine_first 模式默认，买单时出示券码）
+    """
+    tenant_id = _get_tenant_id(request)
+    from ..services.voucher_redeem_service import VoucherRedeemService
+
+    svc = VoucherRedeemService(db, tenant_id)
+    try:
+        zone_id_uuid = UUID(req.zone_id) if req.zone_id else None
+        result = await svc.redeem_voucher(
+            order_id=UUID(order_id),
+            voucher_type=req.voucher_type,
+            voucher_code=req.voucher_code,
+            zone_id=zone_id_uuid,
+        )
+        if result.get("redeemed"):
+            return _ok(result)
+        else:
+            _err(result.get("error", "核销失败"))
+    except ValueError as e:
+        _err(str(e))
