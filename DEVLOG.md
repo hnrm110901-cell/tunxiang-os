@@ -1,3 +1,31 @@
+## 2026-04-24 Sprint H 集成验证基建 — 徐记海鲜 DEMO Go/No-Go
+
+### 今日完成
+- [infra/demo/xuji_seafood/] 幂等种子 seed.sql + cleanup.sql：1 品牌 + 3 门店 + 10 菜 + 9 员工 + 10 会员 RFM 分层 + E1/E2/E4 示例，deterministic UUID + ON CONFLICT
+- [scripts/demo_go_no_go.py] 10 项自动化检查：Tier 1 / k6 / 支付成功率 / 断网 4h / 签字 / scorecard / RLS / reset / A/B / 话术；`--json/--strict/--only/--skip-tests` 选项
+- [docs/demo/] 3 商户 scorecard + 3 套话术 + 收银员签字模板
+- [docs/sprint-h-integration-validation.md] 运行手册
+- [40 集成测试] 36 passed + 4 skipped — seed/脚本/scorecard/话术/模板/文档
+
+### 数据变化
+- 新增 infra 模块：1 个（infra/demo/xuji_seafood）
+- 新增脚本：1 个（scripts/demo_go_no_go.py）
+- 新增文档：1 套（docs/demo + sprint-h-integration-validation.md）
+- 新增测试：40 个
+
+### 遗留问题
+- 5 个 SKIPPED 检查项（等 DB/k6/nightly log 配置）
+- Tier 1 测试未找到 *tier1*.py 命名文件（CLAUDE.md § 20 要求）
+- 话术文字版，需补 UI 截图 + 视频
+- scorecard 是 placeholder 估值
+
+### 明日计划
+- 等 D/E 系列 11 个 PR 合入后跑 seed 验证真实 DB
+- 补 Tier 1 测试（200 桌并发 / 断网 4h / 存酒多次续存 / RLS 跨租户）
+- 配置 k6 + Nightly testbed
+
+---
+
 ## 2026-04-23 Sprint D1 批次 6 + Overflow — 14 Skill 冲 100% 覆盖 + CI 门禁
 
 ### 今日完成

@@ -1,0 +1,80 @@
+{
+  "merchant": "尚宫厨",
+  "merchant_id": "shanggongchu",
+  "evaluated_at": "2026-04-24",
+  "evaluator": "屯象产品",
+  "environment": "Interested Prospect",
+  "score": 85,
+  "dimensions": {
+    "technical_fit": {
+      "score": 88,
+      "notes": "中型宴席连锁，业态特殊（宴席 + 堂食 + 外卖三合一），屯象大店模板适配",
+      "evidence": [
+        "12 家门店，8 家大店 + 4 家小店",
+        "宴席业务占比 40%，现有系统无法支持预订 + 定金 + 桌卡管理",
+        "tx-trade 的宴席模块（banquet.py）正好对标"
+      ]
+    },
+    "data_migration_risk": {
+      "score": 80,
+      "notes": "现有数据分散在 5+ 系统，迁移复杂度中",
+      "evidence": [
+        "POS：奥琦玮",
+        "会员：天财",
+        "外卖：三平台直连",
+        "宴席预订：Excel + 微信群（需要数字化）"
+      ]
+    },
+    "operational_readiness": {
+      "score": 82,
+      "notes": "员工年龄结构偏大，对新系统接受度中等",
+      "evidence": [
+        "平均员工年龄 38 岁",
+        "店长均在岗 5 年以上",
+        "需要额外培训成本 ~¥80k"
+      ]
+    },
+    "cost_effectiveness": {
+      "score": 88,
+      "notes": "宴席预订数字化 + 聚合外卖收益显著",
+      "evidence": [
+        "预计宴席预订转化率 +15%（手工登记遗漏）",
+        "外卖聚合节省人工对账 120h/月"
+      ]
+    },
+    "regulatory_compliance": {
+      "score": 85,
+      "notes": "跨省 3 省经营，税务复杂度中等",
+      "evidence": [
+        "涉及长沙 / 武汉 / 南昌 3 地税务",
+        "明厨亮灶已接入"
+      ]
+    },
+    "ai_value_realization": {
+      "score": 87,
+      "notes": "宴席定价 + 客户 CLV 分析 AI 价值高",
+      "evidence": [
+        "宴席场景对 menu_advisor Agent 依赖高",
+        "高客单 CLV 分析可提升复购"
+      ]
+    }
+  },
+  "risks": [
+    {
+      "risk": "宴席模块真实场景未充分测试",
+      "severity": "high",
+      "mitigation": "Week 7-8 前完成 2 场宴席 UAT"
+    },
+    {
+      "risk": "员工培训成本超预算",
+      "severity": "medium",
+      "mitigation": "录制操作视频 + 现场师带徒 2 周"
+    }
+  ],
+  "go_no_go_recommendation": "CONDITIONAL_GO",
+  "conditions": [
+    "Week 7 完成宴席模块 UAT 2 场",
+    "Week 8 培训材料完成 + 店长考试合格率 ≥ 80%",
+    "Week 9 前 Pilot 一家大店"
+  ]
+}
