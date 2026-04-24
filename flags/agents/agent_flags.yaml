@@ -213,6 +213,21 @@ flags:
       prod: false
     tags: [agent, d4a, sprint-q2-2026]
 
+  - identifier: agent_rfm_outreach_enable
+    name: agent.rfm_outreach.enable
+    description: >
+      D3a RFM 触达 Skill Agent 启用开关，目标复购率 +5pp。
+      基于 Claude Haiku 4.5 + Prompt Cache，为不同 RFM 分层客户群生成多版本触达文案
+      + 推送时段建议，并从业务目标推导分群筛选条件。
+      默认关闭；合并后由运维按环境逐步开启（dev → test → pilot → prod）。
+    defaultValue: false
+    environments:
+      dev: false
+      test: false
+      pilot: false
+      prod: false
+    tags: [agent, d3a, sprint-q2-2026, growth]
+
   - identifier: agent_roi_writeback
     name: agent.roi.writeback
     description: >

@@ -80,6 +80,9 @@ class AgentFlags:
     # Sprint D4a: 成本根因 Skill Agent 启用开关
     COST_ROOT_CAUSE_ENABLE = "agent.cost_root_cause.enable"
 
+    # Sprint D3a: RFM 触达 Skill Agent 启用开关（目标复购率 +5pp）
+    RFM_OUTREACH_ENABLE = "agent.rfm_outreach.enable"
+
 
 class TradeFlags:
     """交易履约域 Flag 名称。"""
