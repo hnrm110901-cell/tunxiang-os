@@ -113,6 +113,106 @@ function _generateIdempotencyKey(): string {
   return `idem-${Date.now().toString(16)}-${rand}`;
 }
 
+// ─── Sprint A3 离线订单号（UUID v7 + 人读前缀） ────────────────────────────
+//
+// 契约与后端 services/tx-trade/src/services/offline_order_id.py 一致：
+//   order_id = `${device_id}:${ms_epoch}:${counter}`
+//   idempotency_key = `settle:${order_id}`
+//
+// UUID v7 按 RFC 9562 手工构造：48-bit ms_epoch + 4-bit ver + 12-bit randA
+// + 2-bit var + 62-bit randB。采用 crypto.getRandomValues（CSPRNG）。
+
+let _offlineCounter = 0;
+let _lastOfflineMs = 0;
+
+function _deviceId(): string {
+  // 优先读 POS 壳层注入的 device_id；浏览器环境退化到 localStorage UUID
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const bridge = (globalThis as any).TXBridge;
+  if (bridge && typeof bridge.getDeviceInfo === 'function') {
+    try {
+      const info = JSON.parse(bridge.getDeviceInfo() || '{}');
+      if (info && typeof info.device_id === 'string' && info.device_id) {
+        return info.device_id;
+      }
+    } catch {
+      // TXBridge.getDeviceInfo 返回非 JSON — 退化到 localStorage
+    }
+  }
+  const LS_KEY = 'tx.device_id';
+  try {
+    const cached = localStorage.getItem(LS_KEY);
+    if (cached) return cached;
+    const fresh = `web-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+    localStorage.setItem(LS_KEY, fresh);
+    return fresh;
+  } catch {
+    // SSR / 隐身模式无 localStorage
+    return `web-ephemeral-${Math.random().toString(36).slice(2, 8)}`;
+  }
+}
+
+function _uuidV7(msEpoch: number): string {
+  const bytes = new Uint8Array(16);
+  const c = globalThis.crypto as Crypto | undefined;
+  if (c && typeof c.getRandomValues === 'function') {
+    c.getRandomValues(bytes);
+  } else {
+    for (let i = 0; i < 16; i += 1) bytes[i] = Math.floor(Math.random() * 256);
+  }
+  // 48-bit unix_ts_ms, big-endian
+  bytes[0] = (msEpoch / 2 ** 40) & 0xff;
+  bytes[1] = (msEpoch / 2 ** 32) & 0xff;
+  bytes[2] = (msEpoch >>> 24) & 0xff;
+  bytes[3] = (msEpoch >>> 16) & 0xff;
+  bytes[4] = (msEpoch >>> 8) & 0xff;
+  bytes[5] = msEpoch & 0xff;
+  // version = 7 (high nibble of byte 6)
+  bytes[6] = (bytes[6] & 0x0f) | 0x70;
+  // variant = 10xx (high 2 bits of byte 8)
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+
+  const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
+
+/**
+ * 生成离线订单号（Sprint A3）。
+ *
+ * - order_id = `${device_id}:${ms_epoch}:${counter}`（人读，收银员肉眼识别）
+ * - uuid_v7 作为随机 payload（客户端不拼入 order_id，服务端用作 cloud_order_id 候选）
+ * - 同毫秒多次调用 counter++，跨毫秒 counter 重置
+ * - 仅在 `edge.offline.order_id_bridge` flag on 时使用
+ *
+ * 契约：与后端 services/tx-trade/src/services/offline_order_id.py 完全对齐。
+ */
+export function generateOfflineOrderId(deviceId?: string): {
+  orderId: string;
+  uuidV7: string;
+  deviceId: string;
+  msEpoch: number;
+  counter: number;
+} {
+  const did = deviceId || _deviceId();
+  const msEpoch = Date.now();
+  if (msEpoch === _lastOfflineMs) {
+    _offlineCounter += 1;
+  } else {
+    _offlineCounter = 1;
+    _lastOfflineMs = msEpoch;
+  }
+  const counter = _offlineCounter;
+  const uuidV7 = _uuidV7(msEpoch);
+  const orderId = `${did}:${msEpoch}:${counter}`;
+  return { orderId, uuidV7, deviceId: did, msEpoch, counter };
+}
+
+/** 测试辅助：重置离线 counter 状态（不是公开契约）。 */
+export function _resetOfflineOrderIdCounterForTest(): void {
+  _offlineCounter = 0;
+  _lastOfflineMs = 0;
+}
+
 export async function txFetchTrade<T>(path: string, options: TxFetchTradeOptions = {}): Promise<TradeApiResult<T>> {
   const requestId = generateRequestId();
   const hardening = isEnabled('trade.pos.settle.hardening');
