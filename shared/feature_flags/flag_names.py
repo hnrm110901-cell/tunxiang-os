@@ -192,6 +192,13 @@ class EdgeFlags:
     # 5%→50%→100% 灰度，与 A2 saga_buffer idempotency_key 契约共享（settle:{order_id}）
     OFFLINE_ORDER_ID_BRIDGE = "edge.offline.order_id_bridge"
 
+    # Sprint C3（Tier1）：KDS delta 同步接口启用开关。
+    # off=保留全量轮询（legacy /api/v1/kds/tasks + WebSocket）
+    # on=web-kds 走 /api/v1/kds/orders/delta 增量轮询 + device heartbeat
+    #    共享 A3 device_id 格式；sync-engine Phase 1 依赖 edge_device_registry
+    # 5%→50%→100% 灰度，4h E2E 零卡顿 / 60s 断网恢复全同步为门禁
+    KDS_DELTA_SYNC = "edge.kds.delta_sync"
+
 
 class SupplyFlags:
     """供应链域 Flag 名称。"""

@@ -148,3 +148,31 @@ flags:
         - dimension: store_id
           values: []  # 5% 灰度门店审批后填入
     tags: [edge, a3, sprint-q2-2026, tier1, offline, uuid-v7]
+
+  - identifier: edge_kds_delta_sync
+    name: edge.kds.delta_sync
+    description: >
+      Sprint C3 KDS delta 同步接口启用开关（Tier1）。
+      on=web-kds 通过 GET /api/v1/kds/orders/delta 增量轮询 + POST /api/v1/kds/device/heartbeat 心跳；
+         sync-engine Phase 1 基于 edge_device_registry 决定 device_kind=kds 是否需要 push delta。
+      off=legacy 行为（全量轮询 /api/v1/kds/tasks + WebSocket /api/v1/kds/ws），
+         不写 edge_device_registry 心跳。
+      契约：与 A3 device_id（`{prefix}-{store}-{counter}`）共享；
+            与 sync-engine Phase 1 的 device_kind 六枚举（pos/kds/crew_phone/tv_menu/reception/mac_mini）统一。
+      门禁：4h E2E 零卡顿 / 断网 60s 恢复后 ≤500 单全同步 / P99<100ms。
+    defaultValue: false
+    environments:
+      dev: false
+      test: false
+      uat: false
+      pilot: false
+      prod: false
+    rollout: [5, 50, 100]
+    targeting_rules:
+      pilot:
+        - dimension: edge_node_group
+          values: [mac_mini_m4_pilot]
+      prod:
+        - dimension: store_id
+          values: []  # 5% 灰度门店审批后填入
+    tags: [edge, c3, sprint-q2-2026, tier1, kds, delta-sync]
