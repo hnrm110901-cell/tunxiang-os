@@ -1,3 +1,39 @@
+## 2026-04-24 Sprint D2 — agent_decision_logs ROI 四字段 + mv_agent_roi_monthly
+
+### 今日完成
+- [shared/db-migrations] v264_agent_roi_fields.py：ALTER agent_decision_logs ADD 四列（saved_labor_hours / prevented_loss_fen / improved_kpi / roi_evidence，均 NULL 向前兼容）+ 索引 idx_agent_decision_roi_tenant_month + 物化视图 mv_agent_roi_monthly（WITH NO DATA + 唯一索引支持 CONCURRENTLY REFRESH）
+- [services/tx-agent/src/models/decision_log.py] AgentDecisionLog ORM 模型扩 4 列（全部 Optional）
+- [services/tx-agent/src/services/decision_log_service.py] `_apply_roi_fields` 辅助 + `log_orchestrator_result` / `log_skill_result` 增加 `roi` 可选参数（默认 None）+ 自动从 result.data['roi'] 拾取；全部受 flag `agent.roi.writeback` 守护
+- [flags/agents/agent_flags.yaml + shared/feature_flags/flag_names.py] 新增 flag `agent.roi.writeback`（所有环境默认 off，tag 标注 founder-signoff-required）
+- [scripts/refresh_mv_agent_roi.sh] 物化视图刷新脚本（首次 REFRESH + 后续 REFRESH CONCURRENTLY）
+- [services/tx-agent/src/tests/test_roi_writeback.py] 23 个集成测试全绿（结构 8 + 模型 2 + helper 6 + service 3 + flag 2 + RLS 2）
+
+### 数据变化
+- 迁移版本：v263 → **v264**
+- agent_decision_logs 新增 4 列 + 1 个部分索引
+- 新增物化视图：mv_agent_roi_monthly（+唯一索引 idx_mv_agent_roi_monthly_pk）
+- 新增 flag：agent.roi.writeback（总量 11 个）
+- 新增测试：23（全部通过）
+- ruff：绿
+
+### 决策点 #1（需创始人签字）
+规划文档 §4 明确：agent_decision_logs 新增字段 = 核心留痕变更 = **需创始人签字**。
+本 PR 策略：
+- 所有 ALTER 均为 `ADD COLUMN NULL`，向前兼容，零破坏
+- 业务 writeback 由 flag 守护，默认 off；本 PR 不开 flag
+- 合并后创始人签字 → 运维在指定环境开启 flag → Skill Agent 逐步接入 ROI 计算
+
+### 遗留问题
+- Skill Agent 自身的 ROI 计算逻辑未实装（各 Skill 需在后续 PR 内按业务算法生成 `roi` dict）
+- mv_agent_roi_monthly cron 编排（`infra/cron` 接入）待后续 PR
+- 总部 ROI 看板 UI（读 mv 的前端页面）待后续 PR
+
+### 明日计划
+- PR 合入后等创始人签字
+- D3a RFM 触达 Haiku 4.5 或 D4 成本根因启动
+
+---
+
 ## 2026-04-23 Sprint D1 批次 6 + Overflow — 14 Skill 冲 100% 覆盖 + CI 门禁
 
 ### 今日完成

@@ -4,6 +4,53 @@
 
 ---
 
+## 2026-04-24 16:00 Sprint D2：agent_decision_logs ROI 四字段 + mv_agent_roi_monthly
+
+### 本次会话目标
+实装 Sprint D2：`agent_decision_logs` 新增 ROI 四字段 + 物化视图 `mv_agent_roi_monthly`，并提供 flag 守护的 writeback 入口。
+
+### 不得触碰的边界
+- [x] 已应用的迁移文件（v001–v263，禁止修改）— 未触碰
+- [x] RLS 策略文件 — 未触碰
+- [x] shared/ontology/ — 未触碰
+- [x] flag 不得在本 PR 开启 — 维持默认 off
+
+### 本次涉及范围
+- 服务：services/tx-agent
+- 迁移版本：v263 → **v264**（v264_agent_roi_fields）
+- Tier 级别：**Tier 2**（留痕增量、向前兼容、不触发 Tier 1 路径）
+
+### 完成状态
+- [x] v264_agent_roi_fields.py — ALTER agent_decision_logs ADD 四列 NULL + 索引 + mv_agent_roi_monthly + 唯一索引
+- [x] AgentDecisionLog ORM 模型扩字段（全部 Optional）
+- [x] DecisionLogService — `_apply_roi_fields` 辅助 + `log_*_result` 新 `roi` 参数 + flag 守护
+- [x] flag `agent.roi.writeback` 注册（YAML + flag_names.py 常量）
+- [x] scripts/refresh_mv_agent_roi.sh — 刷新脚本（首次 REFRESH + 后续 CONCURRENTLY）
+- [x] 23 个集成测试全绿（结构 8 + 模型 2 + helper 6 + service 3 + flag 2 + RLS 2）
+- [x] ruff 绿
+
+### 关键决策
+- **迁移号**：规划写 v263 但已被 kiosk_voice_count 占用，本次改分配 v264。
+- **签字触发点**：规划文档 §4 决策点 #1 明确本 PR 触发"需创始人签字"。处理策略：
+  1. 所有 ALTER 为 `ADD COLUMN NULL`，向前兼容零破坏 → 落盘安全
+  2. 业务 writeback 受 flag 守护，flag 默认 off
+  3. PR 描述显式列出此签字问题
+- **视图实现**：使用真 `CREATE MATERIALIZED VIEW`（与 v148 的 "mv_* 作为普通表" 不同）— 原始规划文本要求如此，且 MV + 唯一索引支持 `REFRESH CONCURRENTLY` 不阻塞读。
+- **RLS 双保险**：视图 WHERE 加 `tenant_id IS NOT NULL AND is_deleted = false`，防止任何脏数据绕过。
+
+### 下一步
+- 等 PR review + 创始人签字
+- Skill Agent 逐个接入 ROI 计算（按 Agent 业务算法生成 `roi` dict 传给 `log_skill_result`）
+- mv cron 编排（infra/cron 接入）
+- 总部 ROI 看板 UI 开发
+
+### 已知风险
+- Skill Agent 没有默认 ROI 计算 — 开 flag 后若 Skill 未提供 `roi`，字段仍是 NULL（降级安全）
+- mv 首次刷新依赖 `scripts/refresh_mv_agent_roi.sh` 手动执行一次（WITH NO DATA 初始化）
+- 视图使用 `date_trunc('month', ...)` 的是 timestamptz 时区：服务端默认 UTC，若跨时区需要在查询层 `AT TIME ZONE 'Asia/Shanghai'` 调整（非本 PR 范围）
+
+---
+
 ## 2026-04-23 Sprint D1 批次 6 + Overflow：14 Skill 冲 100% 覆盖 + CI 门禁
 
 ### 本次会话目标
