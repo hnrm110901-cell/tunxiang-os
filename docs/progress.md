@@ -4,6 +4,49 @@
 
 ---
 
+## 2026-04-24 19:00 Sprint D3a：RFM 触达 Skill Agent（Haiku 4.5 + Prompt Cache）
+
+### 本次会话目标
+实装 D3a RFM 触达 Skill，目标复购率 +5pp。由接力 Agent 完成（前一轮因 529 overloaded 中断，已落盘 8 文件未 commit）。
+
+### 不得触碰的边界
+- [x] commit bb916707 model_router 基础设施 — 仅追加 1 行 TASK_MODEL_MAP
+- [x] commit 68903953/86b8e1df/6074d4a1/545ea79b D4a 资产 — 未触碰
+- [x] shared/ontology/ — 未触碰
+- [x] 迁移 v001-v264 — 未触碰（D3a 无迁移）
+
+### 本次涉及范围
+- 新增：services/tx-agent/src/prompts/rfm_outreach.py（187 行）
+- 新增：services/tx-agent/src/agents/skills/rfm_outreach.py（465 行）
+- 新增：services/tx-agent/src/tests/test_rfm_outreach.py（443 行，11 测试全绿）
+- 修改：skills/__init__.py + model_router.py 单行 + agent_flags.yaml + flag_names.py
+- Tier 级别：Tier 2
+
+### 完成状态
+- [x] RfmOutreachAgent（scope={"margin","experience"}，两 action）
+- [x] Prompt Cache 稳定前缀 4939 字符（≥1024 tokens），含 cache_control: ephemeral
+- [x] Haiku 4.5 模型映射 + complete_with_cache(task_type="rfm_outreach")
+- [x] flag agent.rfm_outreach.enable 默认全环境 off
+- [x] 11 D3a tests + 38 constraint tests + 8 D4a tests 全绿
+- [x] ruff 绿；SKILL_REGISTRY 52→53，CI 门禁 test_100_percent_registry_coverage 通过
+
+### 关键决策
+- **scope 双维 margin+experience**：experience 硬约束防止 Agent 为追 KPI 高频推送
+- **ROI improved_kpi.metric=repurchase_rate / delta_pct=5.0**：与规划"+5pp"对齐
+- **不直接跨服务调 tx-member RFM API**：Skill 无状态；tx-member 对接在后续 PR
+- **Haiku 4.5 选型**：高频轻量场景成本敏感；Sonnet 4.7 留给 D4 分析类
+
+### 下一步
+- A4 RBAC + trade_audit_logs 扩展（Tier 1）
+- A1 POS ErrorBoundary+3s+Toast 实装（Tier 1）
+
+### 已知风险
+- 真实 Haiku 4.5 cache_hit_ratio 需接入后观察首 72 小时（<0.60 已有 warn）
+- tx-member RFM 分层 API 对接未含入本 PR
+- flag 开启需 growth 团队协同文案合规审查 + 频控熔断
+
+---
+
 ## 2026-04-24 18:00 Sprint D4a：成本根因 Skill Agent（Sonnet 4.7 + Prompt Cache）
 
 ### 本次会话目标

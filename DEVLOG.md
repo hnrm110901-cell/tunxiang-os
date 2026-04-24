@@ -1,3 +1,33 @@
+## 2026-04-24 Sprint D3a — RFM 触达 Skill Agent（Haiku 4.5 + Prompt Cache）
+
+### 今日完成
+- [services/tx-agent/src/prompts/rfm_outreach.py] 新增稳定前缀：SYSTEM_PROMPT_RFM_OUTREACH（RFM 文案专家身份 + 合规禁词库 + 推送时段禁时窗）+ CUSTOMER_RFM_SCHEMA_DOC（RFM 三维定义 + 8 象限 + 4 类触达场景 + 频控硬约束 + 4 渠道长度限制 + 3 风格模板）；合计 4939 字符（≥1024 tokens）；`build_cached_system_blocks()` 返回 `cache_control: ephemeral` 块
+- [services/tx-agent/src/agents/skills/rfm_outreach.py] RfmOutreachAgent：Level 1 建议级、scope={"margin", "experience"}、2 个 action（generate_outreach_copy / select_target_segment）；Pydantic 模型 OutreachCopyVersion / OutreachCopyOutput / RFMFilter / TargetSegmentOutput 严格校验 LLM 输出；走 ModelRouter.complete_with_cache(task_type="rfm_outreach") 路由到 Haiku 4.5；ROI improved_kpi={"metric":"repurchase_rate", "delta_pct":5.0} 通过 DecisionLogService.log_skill_result 留痕
+- [services/tx-agent/src/services/model_router.py] ModelSelectionStrategy.TASK_MODEL_MAP 追加 `"rfm_outreach": "claude-haiku-4-5-20251001"`（第 71 行，紧跟 D4 Sonnet 4.7 三 task_type 之后），仅追加 1 行不动其他逻辑
+- [services/tx-agent/src/agents/skills/__init__.py] 注册 RfmOutreachAgent 到 ALL_SKILL_AGENTS
+- [flags/agents/agent_flags.yaml + shared/feature_flags/flag_names.py] 新增 flag `agent.rfm_outreach.enable`（默认全环境 off，tags=[agent, d3a, sprint-q2-2026, growth]）+ AgentFlags.RFM_OUTREACH_ENABLE 常量
+- [services/tx-agent/src/tests/test_rfm_outreach.py] 11 个集成测试全绿：注册/scope/元信息/cache 门槛/两 Pydantic action/Haiku 4.5 模型映射/task_type=rfm_outreach/cache_hit_ratio 透传/decision log improved_kpi=repurchase_rate/ast 扫描无 broad except
+- test_constraint_context.py 38 测试 + test_cost_root_cause.py 8 测试全绿（57 测试合计零回归）；ruff 绿
+
+### 数据变化
+- 新增文件：3（prompts/rfm_outreach.py, skills/rfm_outreach.py, tests/test_rfm_outreach.py）
+- 修改文件：4（skills/__init__.py, services/model_router.py, flags/agents/agent_flags.yaml, shared/feature_flags/flag_names.py）
+- 新增 flag：agent.rfm_outreach.enable（flag 总量 12 → 13）
+- 新增测试：11（全绿）
+- SKILL_REGISTRY 规模：52 → 53
+- 无迁移
+
+### 遗留问题
+- 真实 Haiku 4.5 调用的 cache_hit_ratio 需在接入后观察首 72 小时（model_router 已对 <0.60 打 warn 日志）
+- 与 tx-member RFM 分层 API 的对接在后续 PR（本 Skill 通过用户 params 接收分群数据，不直接跨服务调用）
+- ROI writeback 效果需配合 `agent.roi.writeback` flag 开启后观察
+
+### 明日计划
+- D3b/c/d/e 其他 Haiku 场景（若规划有）
+- D4b 薪资异常 Skill / D4c 预算预测 Skill（Sonnet 4.7 路径）
+
+---
+
 ## 2026-04-24 Sprint D4a — 成本根因 Skill Agent（Sonnet 4.7 + Prompt Cache）
 
 ### 今日完成
