@@ -73,7 +73,7 @@ app.include_router(menu_plan_v2_router)  # 菜谱方案批量下发V2+门店Over
 # ── Sprint D3c 路由自动挂载（PR #84 合入后自动生效）──
 from pathlib import Path as _Path  # noqa: E402
 
-from shared.service_utils import auto_mount_routes  # noqa: E402
+from shared.service_utils import auto_mount_routes, validate_result  # noqa: E402
 
 _sprint_d3c_mount = auto_mount_routes(
     app,
@@ -83,6 +83,7 @@ _sprint_d3c_mount = auto_mount_routes(
         ("dish_pricing_routes", "router"),  # D3c #84
     ],
 )
+validate_result(_sprint_d3c_mount)
 
 
 @app.get("/health")

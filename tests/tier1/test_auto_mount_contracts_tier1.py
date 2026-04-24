@@ -66,6 +66,19 @@ def test_all_services_import_auto_mount_routes():
     )
 
 
+def test_all_services_call_validate_result():
+    """Review follow-up：6 service main.py 必须调 validate_result（失败不被忽视）"""
+    missing = []
+    for svc in EXPECTED_MOUNTS:
+        source = _read_main(svc)
+        if "validate_result" not in source:
+            missing.append(svc)
+    assert not missing, (
+        f"下列 service 未调 validate_result（挂载失败将被静默吞掉）: "
+        f"{sorted(set(missing))}"
+    )
+
+
 # ─────────────────────────────────────────────────────────────
 # 2. 每个 service 的 modules 列表齐全
 # ─────────────────────────────────────────────────────────────
@@ -191,6 +204,13 @@ class TestSharedServiceUtils:
         assert "auto_mount_routes" in src
         assert "MountResult" in src
 
+    def test_init_exports_validate_result(self):
+        """Review follow-up：validate_result 也需在 __init__ 导出"""
+        src = (
+            ROOT / "shared" / "service_utils" / "__init__.py"
+        ).read_text(encoding="utf-8")
+        assert "validate_result" in src
+
     def test_auto_mount_py_exists(self):
         path = ROOT / "shared" / "service_utils" / "auto_mount.py"
         assert path.exists()
@@ -204,6 +224,44 @@ class TestSharedServiceUtils:
         # 关键字参数必须存在
         for kw in ("pkg:", "api_dir:", "modules:", "strict:"):
             assert kw in src, f"auto_mount_routes 缺关键字 {kw}"
+
+    def test_catches_base_exception(self):
+        """Review follow-up：auto_mount.py 必须用 except BaseException 而非 Exception
+        （否则 SystemExit/KeyboardInterrupt 不被捕获，会静默杀进程）
+        """
+        src = (
+            ROOT / "shared" / "service_utils" / "auto_mount.py"
+        ).read_text(encoding="utf-8")
+        # 至少两处 except BaseException（import + include_router）
+        count = src.count("except BaseException")
+        assert count >= 2, (
+            f"auto_mount.py 期望至少 2 处 except BaseException，实际 {count}。"
+            f"若仅用 except Exception，SystemExit 等会穿透导致 service 静默崩溃。"
+        )
+
+    def test_has_router_type_check(self):
+        """router 必须有 .routes 属性（防止 router=dict/str 等误用）"""
+        src = (
+            ROOT / "shared" / "service_utils" / "auto_mount.py"
+        ).read_text(encoding="utf-8")
+        assert 'hasattr(router, "routes")' in src or "hasattr(router, 'routes')" in src, (
+            "auto_mount 未对 router 做类型检查"
+        )
+
+    def test_validate_result_exists(self):
+        """validate_result 函数必须存在"""
+        src = (
+            ROOT / "shared" / "service_utils" / "auto_mount.py"
+        ).read_text(encoding="utf-8")
+        assert "def validate_result(" in src
+
+    def test_validate_result_honors_env_strict(self):
+        """validate_result 必须根据 AUTO_MOUNT_STRICT env 决定是否 sys.exit"""
+        src = (
+            ROOT / "shared" / "service_utils" / "auto_mount.py"
+        ).read_text(encoding="utf-8")
+        assert "AUTO_MOUNT_STRICT" in src
+        assert "sys.exit" in src or "_sys.exit" in src
 
 
 # ─────────────────────────────────────────────────────────────

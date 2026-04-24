@@ -222,7 +222,7 @@ app.include_router(subscription_router)  # 付费会员订阅
 # ── Sprint D3a/D3b 路由自动挂载（PR #82 #83 合入后自动生效）──
 from pathlib import Path as _Path  # noqa: E402
 
-from shared.service_utils import auto_mount_routes  # noqa: E402
+from shared.service_utils import auto_mount_routes, validate_result  # noqa: E402
 
 _sprint_d3_mount = auto_mount_routes(
     app,
@@ -233,6 +233,7 @@ _sprint_d3_mount = auto_mount_routes(
         ("campaign_roi_forecast_routes", "router"),    # D3b #83
     ],
 )
+validate_result(_sprint_d3_mount)
 
 
 @app.get("/health")

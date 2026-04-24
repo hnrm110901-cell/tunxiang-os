@@ -119,7 +119,7 @@ app.include_router(vat_router)  # /api/v1/finance/vat/*
 # ── Sprint D4a/D4c 路由自动挂载（PR #85 #88 合入后自动生效）──
 from pathlib import Path as _Path  # noqa: E402
 
-from shared.service_utils import auto_mount_routes  # noqa: E402
+from shared.service_utils import auto_mount_routes, validate_result  # noqa: E402
 
 _sprint_d4_mount = auto_mount_routes(
     app,
@@ -130,6 +130,7 @@ _sprint_d4_mount = auto_mount_routes(
         ("budget_forecast_routes", "router"),     # D4c #88
     ],
 )
+validate_result(_sprint_d4_mount)
 
 
 @app.get("/health")

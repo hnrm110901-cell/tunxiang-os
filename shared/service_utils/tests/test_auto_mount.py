@@ -15,6 +15,7 @@ from shared.service_utils.auto_mount import (  # noqa: E402
     MountResult,
     auto_mount_routes,
     mount_report,
+    validate_result,
 )
 
 # ─────────────────────────────────────────────────────────────
@@ -179,7 +180,7 @@ class TestAutoMount:
         # 1. ok_routes
         (api_dir / "ok_routes.py").write_text(
             "class _R:\n"
-            "    def __init__(self): pass\n"
+            "    def __init__(self): self.routes = []\n"
             "router = _R()\n"
         )
         # 2. broken_routes（存在但 import 失败）
@@ -214,7 +215,7 @@ class TestAutoMount:
         (tmp_path / "mysvc" / "__init__.py").write_text("")
         (api_dir / "__init__.py").write_text("")
         (api_dir / "cool_routes.py").write_text(
-            "class _R:\n    pass\nrouter = _R()\n"
+            "class _R:\n    def __init__(self): self.routes = []\nrouter = _R()\n"
         )
         monkeypatch.syspath_prepend(str(tmp_path))
 
@@ -255,3 +256,206 @@ class TestMountReport:
         assert "⏭️  c" in report
         assert "❌ d" in report
         assert "oops" in report
+
+
+# ─────────────────────────────────────────────────────────────
+# Review follow-up：BaseException 捕获 + 类型校验 + validate_result
+# ─────────────────────────────────────────────────────────────
+
+
+class TestBaseExceptionCapture:
+    """关键：`except Exception` 无法捕获 SystemExit/KeyboardInterrupt。
+    未修复前 malicious/buggy route 含 `sys.exit(1)` 顶层调用会静默杀进程。
+    """
+
+    def test_system_exit_at_import_caught(self, tmp_path, monkeypatch):
+        api_dir = tmp_path / "api"
+        api_dir.mkdir()
+        (api_dir / "__init__.py").write_text("")
+        (api_dir / "sysexit_routes.py").write_text(
+            "import sys\nsys.exit(42)  # malicious/buggy\n"
+        )
+        monkeypatch.syspath_prepend(str(tmp_path))
+
+        app = MagicMock()
+        # 期望：不抛异常而是归入 failed
+        result = auto_mount_routes(
+            app, pkg=None, api_dir=api_dir,
+            modules=[("sysexit_routes", "router")],
+        )
+        assert result.mounted == []
+        assert len(result.failed) == 1
+        assert "SystemExit" in result.failed[0][1]
+
+    def test_keyboard_interrupt_at_import_caught(self, tmp_path, monkeypatch):
+        api_dir = tmp_path / "api"
+        api_dir.mkdir()
+        (api_dir / "__init__.py").write_text("")
+        (api_dir / "kbint_routes.py").write_text(
+            "raise KeyboardInterrupt()\n"
+        )
+        monkeypatch.syspath_prepend(str(tmp_path))
+
+        app = MagicMock()
+        result = auto_mount_routes(
+            app, pkg=None, api_dir=api_dir,
+            modules=[("kbint_routes", "router")],
+        )
+        assert result.mounted == []
+        assert len(result.failed) == 1
+        assert "KeyboardInterrupt" in result.failed[0][1]
+
+    def test_strict_still_raises_system_exit(self, tmp_path, monkeypatch):
+        """strict=True 时 SystemExit 应该重新抛出"""
+        api_dir = tmp_path / "api"
+        api_dir.mkdir()
+        (api_dir / "__init__.py").write_text("")
+        (api_dir / "exit_routes.py").write_text(
+            "import sys\nsys.exit(1)\n"
+        )
+        monkeypatch.syspath_prepend(str(tmp_path))
+
+        app = MagicMock()
+        with pytest.raises(SystemExit):
+            auto_mount_routes(
+                app, pkg=None, api_dir=api_dir,
+                modules=[("exit_routes", "router")],
+                strict=True,
+            )
+
+
+class TestRouterTypeCheck:
+    """router 属性必须是 FastAPI APIRouter（duck-typed 含 routes）"""
+
+    def test_router_is_none_rejected(self, tmp_path, monkeypatch):
+        api_dir = tmp_path / "api"
+        api_dir.mkdir()
+        (api_dir / "__init__.py").write_text("")
+        # 注：getattr 默认 None 时在旧逻辑是 "no 'router' attribute"
+        # 这里让 getattr 返回 None：显式写 router = None
+        (api_dir / "none_router.py").write_text("router = None\n")
+        monkeypatch.syspath_prepend(str(tmp_path))
+
+        app = MagicMock()
+        result = auto_mount_routes(
+            app, pkg=None, api_dir=api_dir,
+            modules=[("none_router", "router")],
+        )
+        assert len(result.failed) == 1
+        # router=None 走 "no attribute" 分支（getattr 默认返 None）
+        assert "no 'router' attribute" in result.failed[0][1]
+
+    def test_router_is_dict_rejected(self, tmp_path, monkeypatch):
+        """router 是 dict 而非 APIRouter → 类型校验 fail"""
+        api_dir = tmp_path / "api"
+        api_dir.mkdir()
+        (api_dir / "__init__.py").write_text("")
+        (api_dir / "dict_router.py").write_text(
+            "router = {'routes': 'fake'}  # looks like router but isn't\n"
+        )
+        monkeypatch.syspath_prepend(str(tmp_path))
+
+        app = MagicMock()
+        result = auto_mount_routes(
+            app, pkg=None, api_dir=api_dir,
+            modules=[("dict_router", "router")],
+        )
+        # dict 含 'routes' key 所以 hasattr(dict, 'routes') False
+        # 但 hasattr 对 dict 的 'routes' 检查的是属性，不是键
+        assert len(result.failed) == 1
+        assert "not a router" in result.failed[0][1]
+
+    def test_router_is_string_rejected(self, tmp_path, monkeypatch):
+        """router 是 str → 类型校验 fail"""
+        api_dir = tmp_path / "api"
+        api_dir.mkdir()
+        (api_dir / "__init__.py").write_text("")
+        (api_dir / "str_router.py").write_text("router = 'fake'\n")
+        monkeypatch.syspath_prepend(str(tmp_path))
+
+        app = MagicMock()
+        result = auto_mount_routes(
+            app, pkg=None, api_dir=api_dir,
+            modules=[("str_router", "router")],
+        )
+        assert len(result.failed) == 1
+        assert "not a router" in result.failed[0][1]
+
+    def test_router_with_routes_attr_accepted(self, tmp_path, monkeypatch):
+        """duck-typed: 只要有 .routes 属性就通过类型检查"""
+        api_dir = tmp_path / "api"
+        api_dir.mkdir()
+        (api_dir / "__init__.py").write_text("")
+        (api_dir / "duck_router.py").write_text(
+            "class _R:\n"
+            "    def __init__(self): self.routes = []\n"
+            "router = _R()\n"
+        )
+        monkeypatch.syspath_prepend(str(tmp_path))
+
+        app = MagicMock()
+        result = auto_mount_routes(
+            app, pkg=None, api_dir=api_dir,
+            modules=[("duck_router", "router")],
+        )
+        assert result.mounted == ["duck_router"]
+
+
+class TestValidateResult:
+    """validate_result: 失败时 stderr + WARNING，env strict 时 sys.exit"""
+
+    def test_all_green_no_exit(self, capsys, caplog):
+        import logging
+        caplog.set_level(logging.INFO)
+        result = MountResult(mounted=["a"], skipped=[], failed=[])
+        validate_result(result)  # 不应 sys.exit
+        captured = capsys.readouterr()
+        # INFO summary line logged, no stderr warning
+        assert "summary" in caplog.text
+        assert captured.err == ""  # 全绿不写 stderr
+
+    def test_failed_writes_to_stderr(self, capsys, caplog):
+        import logging
+        caplog.set_level(logging.WARNING)
+        result = MountResult(
+            mounted=["ok_route"],
+            failed=[("bad_route", "ImportError: nope")],
+        )
+        validate_result(result)  # 默认不 exit
+        captured = capsys.readouterr()
+        assert "bad_route" in captured.err
+        assert "WARNING" in captured.err
+        assert "ImportError" in captured.err
+
+    def test_env_strict_causes_exit(self, monkeypatch):
+        result = MountResult(failed=[("bad", "oops")])
+        monkeypatch.setenv("AUTO_MOUNT_STRICT", "1")
+        with pytest.raises(SystemExit) as exc_info:
+            validate_result(result)
+        assert exc_info.value.code == 1
+
+    def test_env_strict_case_insensitive(self, monkeypatch):
+        result = MountResult(failed=[("bad", "oops")])
+        for val in ("true", "yes", "on", "TRUE"):
+            monkeypatch.setenv("AUTO_MOUNT_STRICT", val)
+            with pytest.raises(SystemExit):
+                validate_result(result)
+
+    def test_env_strict_skipped_when_no_failures(self, monkeypatch):
+        """env 开但没有失败 → 不 exit"""
+        result = MountResult(mounted=["a"])
+        monkeypatch.setenv("AUTO_MOUNT_STRICT", "1")
+        validate_result(result)  # 不抛
+
+    def test_env_strict_off_by_default(self, monkeypatch):
+        """env 未设置 → 有失败也不 exit（仅 WARNING）"""
+        monkeypatch.delenv("AUTO_MOUNT_STRICT", raising=False)
+        result = MountResult(failed=[("bad", "oops")])
+        validate_result(result)  # 不抛
+
+    def test_custom_env_name(self, monkeypatch):
+        """支持自定义 env 变量名"""
+        result = MountResult(failed=[("bad", "oops")])
+        monkeypatch.setenv("MY_STRICT", "1")
+        with pytest.raises(SystemExit):
+            validate_result(result, env_strict="MY_STRICT")

@@ -7,10 +7,12 @@ from .auto_mount import (
     MountResult,
     auto_mount_routes,
     mount_report,
+    validate_result,
 )
 
 __all__ = [
     "MountResult",
     "auto_mount_routes",
     "mount_report",
+    "validate_result",
 ]

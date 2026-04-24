@@ -108,7 +108,10 @@ def auto_mount_routes(
 
         try:
             module = importlib.import_module(full_path)
-        except Exception as exc:  # noqa: BLE001 - import 失败的多种异常兜底
+        except BaseException as exc:  # noqa: BLE001 - 含 SystemExit/KeyboardInterrupt 等
+            # 关键：`except Exception` 无法捕获 SystemExit/KeyboardInterrupt/GeneratorExit
+            # 这些 BaseException 子类在模块顶层抛出会静默杀掉 service 启动
+            # 我们必须拦下来并转为 failed + WARNING（strict 时再 raise）
             msg = f"import failed: {type(exc).__name__}: {exc}"
             logger.warning(
                 "[auto-mount] %s exists but %s",
@@ -130,9 +133,23 @@ def auto_mount_routes(
                 )
             continue
 
+        # 类型检查：必须是 FastAPI APIRouter（或 duck-typed 含 routes 属性）
+        # 防止 `router = None` / `router = {}` / `router = SomeOtherObject()` 等
+        # 误用导致 include_router 抛深层异常
+        if not hasattr(router, "routes"):
+            msg = (
+                f"'{attr_name}' is not a router (type={type(router).__name__}, "
+                f"missing 'routes' attribute)"
+            )
+            logger.warning("[auto-mount] %s %s", module_name, msg)
+            result.failed.append((module_name, msg))
+            if strict:
+                raise TypeError(msg)
+            continue
+
         try:
             app.include_router(router)
-        except Exception as exc:  # noqa: BLE001
+        except BaseException as exc:  # noqa: BLE001 - 含 SystemExit 等
             msg = f"include_router failed: {type(exc).__name__}: {exc}"
             logger.warning("[auto-mount] %s %s", module_name, msg)
             result.failed.append((module_name, msg))
@@ -160,3 +177,53 @@ def mount_report(result: MountResult) -> str:
     for m, r in result.failed:
         lines.append(f"  ❌ {m}: {r}")
     return "\n".join(lines)
+
+
+def validate_result(
+    result: MountResult,
+    *,
+    env_strict: str = "AUTO_MOUNT_STRICT",
+    logger_override: Optional[logging.Logger] = None,
+) -> None:
+    """在 service 启动时校验 mount result，必要时打印到 stderr + 按 env 强制 exit。
+
+    调用方式（典型 service main.py）：
+        _result = auto_mount_routes(...)
+        validate_result(_result)       # WARNING only (default)
+        # or set env AUTO_MOUNT_STRICT=1 to sys.exit(1) on any failure
+
+    行为：
+      · result.failed 非空 → 总是打印完整报告到 stderr + WARNING log
+      · env AUTO_MOUNT_STRICT=1（或 true/yes）→ 有 failed 时 sys.exit(1)
+      · result 全绿 → INFO log 一行摘要
+
+    设计：默认不 sys.exit（服务仍可启动），但失败 **无法忽视**。
+    生产部署建议 env AUTO_MOUNT_STRICT=1（缺路由即启动失败）。
+    """
+    import os as _os
+    import sys as _sys
+
+    log = logger_override or logger
+    summary = (
+        f"auto-mount summary: mounted={len(result.mounted)} "
+        f"skipped={len(result.skipped)} failed={len(result.failed)}"
+    )
+
+    if not result.failed:
+        log.info("[auto-mount] %s", summary)
+        return
+
+    # 有失败时：always 打印到 stderr（不依赖日志级别），便于 k8s / docker logs 可见
+    report = mount_report(result)
+    log.warning("[auto-mount] %s\n%s", summary, report)
+    print(
+        f"\n[auto-mount] WARNING: {len(result.failed)} route(s) failed to mount\n"
+        f"{report}\n",
+        file=_sys.stderr,
+    )
+
+    # env 强制 exit
+    strict_env = _os.environ.get(env_strict, "").strip().lower()
+    if strict_env in ("1", "true", "yes", "on"):
+        log.error("[auto-mount] %s=%s → exit(1) on mount failures", env_strict, strict_env)
+        _sys.exit(1)

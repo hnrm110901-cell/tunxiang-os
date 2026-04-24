@@ -246,7 +246,7 @@ app.include_router(franchise_fee_router)  # 加盟收费闭环（天财对标）
 # 注：tx-org 使用 `from api.X` 绝对 import 风格，pkg 传 None
 from pathlib import Path as _Path  # noqa: E402
 
-from shared.service_utils import auto_mount_routes  # noqa: E402
+from shared.service_utils import auto_mount_routes, validate_result  # noqa: E402
 
 _sprint_d4b_mount = auto_mount_routes(
     app,
@@ -256,6 +256,7 @@ _sprint_d4b_mount = auto_mount_routes(
         ("salary_anomaly_routes", "router"),  # D4b #87（file 已在 main via SOP contamination）
     ],
 )
+validate_result(_sprint_d4b_mount)
 
 
 @app.get("/health")

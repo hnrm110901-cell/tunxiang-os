@@ -393,7 +393,7 @@ app.include_router(kiosk_router)
 # 容错：模块文件不存在时静默跳过；文件存在但 import 失败时 WARNING 不阻塞启动
 from pathlib import Path as _Path  # noqa: E402
 
-from shared.service_utils import auto_mount_routes  # noqa: E402
+from shared.service_utils import auto_mount_routes, validate_result  # noqa: E402
 
 _sprint_e_mount = auto_mount_routes(
     app,
@@ -406,6 +406,8 @@ _sprint_e_mount = auto_mount_routes(
         ("dispute_routes", "router"),              # E4 #94
     ],
 )
+# 校验：失败 → stderr + WARNING；env AUTO_MOUNT_STRICT=1 时 sys.exit(1)
+validate_result(_sprint_e_mount)
 
 
 @app.get("/health")
