@@ -365,13 +365,40 @@ def check_security_audit(args: argparse.Namespace) -> CheckResult:
             details="审计脚本执行异常",
         )
 
-    passed = result.returncode == 0
+    # Exit code 2 = DB 连接失败（SKIPPED，不阻塞）
+    if result.returncode == 2:
+        return CheckResult(
+            checkpoint_id=7,
+            name="RLS/凭证/端口/CORS/secrets 零告警",
+            status=CheckStatus.SKIPPED,
+            details="DB 连接失败（非 RLS 违规）",
+            evidence={"return_code": result.returncode},
+        )
+
+    # 尝试解析 JSON 获取结构化信息
+    details = "RLS 审计通过" if result.returncode == 0 else "RLS 审计失败"
+    evidence: dict[str, Any] = {"return_code": result.returncode}
+    try:
+        data = json.loads(result.stdout)
+        summary = data.get("summary", {})
+        if summary:
+            details = (
+                f"{summary.get('ok_count', 0)} OK / "
+                f"{summary.get('issue_tables', 0)} 问题 / "
+                f"critical={summary.get('critical', 0)} "
+                f"high={summary.get('high', 0)} "
+                f"medium={summary.get('medium', 0)}"
+            )
+            evidence["summary"] = summary
+    except (json.JSONDecodeError, TypeError):
+        pass
+
     return CheckResult(
         checkpoint_id=7,
         name="RLS/凭证/端口/CORS/secrets 零告警",
-        status=CheckStatus.GO if passed else CheckStatus.NO_GO,
-        details="RLS 审计通过" if passed else "RLS 审计失败",
-        evidence={"return_code": result.returncode},
+        status=CheckStatus.GO if result.returncode == 0 else CheckStatus.NO_GO,
+        details=details,
+        evidence=evidence,
     )
 
 
