@@ -54,13 +54,23 @@ const STORE_ID: string =
  * 结算专属 ErrorBoundary —— Sprint A1 审查收窄：
  * 顶层 ErrorBoundary 文案改为中性，结算相关路由（/settle /order）在内层用
  * "结账失败，请扫桌重试" 的专属降级 UI，避免收银员在非结算页崩溃时看到"结账失败"误导。
+ *
+ * Sprint A1 扩展：
+ * - boundary_level="cashier" 上报到遥测，与 root（顶层）区分
+ * - resetAfterMs=3000：网络抖动类短暂崩溃自愈，收银员无需重启 POS
+ * - severity="fatal"：结算路由崩溃默认视为最严重（业务损失风险）
  */
 function CashierBoundary({ children }: { children: ReactNode }): JSX.Element {
   if (!isEnabled('trade.pos.errorBoundary.enable')) {
     return <>{children}</>;
   }
   return (
-    <ErrorBoundary onReport={reportCrashToTelemetry}>
+    <ErrorBoundary
+      boundary_level="cashier"
+      severity="fatal"
+      resetAfterMs={3000}
+      onReport={reportCrashToTelemetry}
+    >
       {children}
     </ErrorBoundary>
   );
