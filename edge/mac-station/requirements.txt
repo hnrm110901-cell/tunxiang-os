@@ -5,3 +5,4 @@ asyncpg>=0.29.0
 httpx>=0.25.0
 structlog>=23.1.0
 websockets>=12.0
+aiosqlite>=0.20.0  # Sprint A2 Saga 本地 SQLite 缓冲（/var/tunxiang/saga_buffer.db）
