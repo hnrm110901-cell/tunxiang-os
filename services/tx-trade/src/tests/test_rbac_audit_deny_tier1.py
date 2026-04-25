@@ -357,3 +357,261 @@ async def test_audit_deny_synchronous_overhead_under_100ms(stub_db, captured_den
     dt_ms = (time.perf_counter() - t0) * 1000
     assert dt_ms < 100.0, f"deny audit overhead {dt_ms:.2f}ms >= 100ms"
     assert len(captured_deny_calls) == 1
+
+
+# ──────────────────────────────────────────────────────────────────────────
+#  R-补1-1 §19 复审追加场景（致命缺陷修复）：
+#    第 3 项 — 401 路径 tenant_id="" 在真 PG 上 UUID NOT NULL cast 失败丢审计
+#    第 6 项 — 测试盲点：原场景 3 用 _mk_request 传 tenant_id 不模拟真 401
+# ──────────────────────────────────────────────────────────────────────────
+
+
+NIL_TENANT_UUID = "00000000-0000-0000-0000-000000000000"
+
+
+def _mk_request_unauthenticated(
+    *,
+    forged_tenant_header: str | None = None,
+    forged_tenant_header_invalid: bool = False,
+    client_ip: str = "10.0.0.5",
+    path: str = "/api/v1/trade/orders/O-1/refund",
+    request_id: str = "req-xj-attack-001",
+):
+    """模拟 gateway middleware 拒绝 JWT 后的 request：state 不带任何字段。
+
+    生产环境真实 401 路径：gateway AuthMiddleware JWT 验证失败时
+    *不向 request.state 注入* user_id / tenant_id / role。原 test_unauthenticated_*
+    用 _mk_request(tenant_id=...) 仍向 state 写 tenant_id，**不模拟真实 401**。
+    """
+    state = SimpleNamespace()
+    client = SimpleNamespace(host=client_ip)
+    headers = {"X-Request-Id": request_id}
+    if forged_tenant_header_invalid:
+        headers["X-Tenant-ID"] = "not-a-uuid-payload"
+    elif forged_tenant_header is not None:
+        headers["X-Tenant-ID"] = forged_tenant_header
+    return SimpleNamespace(
+        state=state,
+        client=client,
+        headers=headers,
+        url=SimpleNamespace(path=path),
+    )
+
+
+@pytest.mark.asyncio
+async def test_truly_unauthenticated_uses_nil_tenant_uuid(stub_db, captured_deny_calls):
+    """无 JWT + 无 X-Tenant-ID → audit_deny 收到 NIL UUID（不能是 ""）。
+
+    §19 审查发现的致命缺陷：原实现把 tenant_id="" 传到 write_audit，
+    PG 上 trade_audit_logs.tenant_id 是 UUID NOT NULL → cast "" → SQLAlchemyError
+    → 被 broad except 吞 → 审计永久丢失。NIL UUID 兜底确保 INSERT 成功。
+    """
+    dep = require_role_audited(
+        "refund.apply", "store_manager", "admin", db_provider=lambda: stub_db,
+    )
+    req = _mk_request_unauthenticated()
+
+    with pytest.raises(HTTPException) as ei:
+        await dep(req, db=stub_db)
+    assert ei.value.status_code == 401
+    assert ei.value.detail == "AUTH_MISSING"
+
+    assert len(captured_deny_calls) == 1
+    call = captured_deny_calls[0]
+    # 关键：tenant_id 必须是 NIL UUID（PG 上能 cast 成功的有效 UUID）
+    assert call["tenant_id"] == NIL_TENANT_UUID, (
+        f"401 path must fall back to NIL UUID; got {call['tenant_id']!r}"
+    )
+    assert call["reason"] == "AUTH_MISSING"
+
+
+@pytest.mark.asyncio
+async def test_forged_x_tenant_id_does_not_pollute_victim_audit_table(
+    stub_db, captured_deny_calls,
+):
+    """攻击者无 JWT 但伪造 X-Tenant-ID=victim → audit 落 NIL UUID，不落 victim。
+
+    安全约束：永远不能让攻击者通过 X-Tenant-ID header 把行注入到任意租户的
+    audit 表（污染 + 误导取证）。但 forged value 必须保留为取证证据 → 进 reason。
+    """
+    dep = require_role_audited(
+        "refund.apply", "store_manager", "admin", db_provider=lambda: stub_db,
+    )
+    req = _mk_request_unauthenticated(forged_tenant_header=XUJI_CHANGSHA_TENANT)
+
+    with pytest.raises(HTTPException) as ei:
+        await dep(req, db=stub_db)
+    assert ei.value.status_code == 401
+
+    call = captured_deny_calls[0]
+    # tenant_id 走 NIL — 不写到 victim 租户表
+    assert call["tenant_id"] == NIL_TENANT_UUID
+    # forged 值保留在 reason 中作为证据
+    assert "probed_tenant" in call["reason"], (
+        f"forged X-Tenant-ID must be preserved in reason for forensics; "
+        f"got reason={call['reason']!r}"
+    )
+    assert XUJI_CHANGSHA_TENANT in call["reason"]
+
+
+@pytest.mark.asyncio
+async def test_invalid_x_tenant_id_header_dropped_no_log_poisoning(
+    stub_db, captured_deny_calls,
+):
+    """X-Tenant-ID 非 UUID → 直接丢弃，不进 reason（防 log poisoning / SQL 拼接）。"""
+    dep = require_role_audited(
+        "refund.apply", "store_manager", "admin", db_provider=lambda: stub_db,
+    )
+    req = _mk_request_unauthenticated(forged_tenant_header_invalid=True)
+
+    with pytest.raises(HTTPException):
+        await dep(req, db=stub_db)
+
+    call = captured_deny_calls[0]
+    assert call["tenant_id"] == NIL_TENANT_UUID
+    # 非 UUID 格式 header 不应进 reason
+    assert "probed_tenant" not in (call["reason"] or "")
+    assert "not-a-uuid" not in (call["reason"] or "")
+    assert call["reason"] == "AUTH_MISSING"
+
+
+@pytest.mark.asyncio
+async def test_audit_deny_internal_defense_for_empty_tenant_id(stub_db):
+    """audit_deny 内部防御层：调用方传 tenant_id="" 时仍兜底为 NIL UUID。
+
+    防御层 2 — 即使 wrapper 路径有 bug 漏了 resolve（如未来新增直接调用），
+    audit_deny 仍保证 PG INSERT 用合法 UUID，不静默丢审计。
+    """
+    from src.services.trade_audit_log import audit_deny
+
+    captured_tids: list[str] = []
+
+    async def _capture_execute(stmt, params=None):
+        if params and "tid" in params:
+            captured_tids.append(params["tid"])
+        # 返回一个 mock — 但 audit_deny 内部 db.execute 还会被 INSERT 调一次
+        m = AsyncMock()
+        m.first = lambda: None
+        return m
+
+    stub_db.execute.side_effect = _capture_execute
+
+    await audit_deny(
+        stub_db,
+        tenant_id="",  # 故意传空模拟漏 resolve
+        store_id=None,
+        user_id="",
+        user_role="",
+        action="refund.apply",
+        reason="AUTH_MISSING",
+    )
+
+    # set_config 必须收到 NIL UUID，不是空串
+    assert NIL_TENANT_UUID in captured_tids, (
+        f"audit_deny must defensively coerce empty tenant_id to NIL UUID; "
+        f"got captured tids={captured_tids}"
+    )
+    assert "" not in captured_tids
+
+
+@pytest.mark.asyncio
+async def test_authenticated_caller_tenant_id_unchanged(stub_db, captured_deny_calls):
+    """已认证 caller（ctx.tenant_id 非空）必须照样使用其真实 tenant_id，不退化为 NIL。
+
+    回归保护：NIL UUID 兜底只在 401 / 缺失场景生效，不能影响正常 deny 路径。
+    """
+    dep = require_role_audited(
+        "refund.apply", "store_manager", "admin", db_provider=lambda: stub_db,
+    )
+    req = _mk_request(
+        user_id=CASHIER_XIAOWANG_ID,
+        tenant_id=XUJI_CHANGSHA_TENANT,
+        role="cashier",
+    )
+
+    with pytest.raises(HTTPException):
+        await dep(req, db=stub_db)
+
+    call = captured_deny_calls[0]
+    assert call["tenant_id"] == XUJI_CHANGSHA_TENANT
+    assert "probed_tenant" not in (call["reason"] or "")
+
+
+# ──────────────────────────────────────────────────────────────────────────
+#  Integration test — 真 PG，验证 401 路径 NIL UUID 实际能落盘
+#
+#  跳过条件：环境变量 TX_INTEGRATION_DB_URL 未设置（本地默认）。
+#  CI 启用方式：export TX_INTEGRATION_DB_URL=postgresql+asyncpg://user:pwd@host/tx_test
+#               + alembic upgrade head 后跑 pytest -m integration
+#
+#  此测试是 R-补1-1 §19 复审第 6 项的修复 —— mock 测试无法覆盖 PG UUID 列对
+#  空字符串的 cast 行为，必须真 PG 才能验证 NIL UUID 兜底是否真的工作。
+# ──────────────────────────────────────────────────────────────────────────
+
+
+@pytest.mark.integration
+@pytest.mark.skipif(
+    not os.environ.get("TX_INTEGRATION_DB_URL"),
+    reason="需要 TX_INTEGRATION_DB_URL 才能跑真 PG 集成测试",
+)
+@pytest.mark.asyncio
+async def test_pg_integration_unauthenticated_audit_actually_persists():
+    """真 PG 验证：401 路径 NIL UUID 落盘 trade_audit_logs，UUID cast 不失败。
+
+    §19 复审第 3 项：原实现 tenant_id="" → PG UUID NOT NULL 列 cast 失败 →
+    SQLAlchemyError → broad except 吞 → 审计永久丢失。修复后用 NIL UUID 兜底，
+    本测试通过查询表验证 deny 行确实写入。
+
+    前置：alembic upgrade 至少到 v261（创建 trade_audit_logs + RLS）+ v290
+    （扩 result/reason 列）。
+    """
+    from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
+    from sqlalchemy.orm import sessionmaker
+
+    from src.services.trade_audit_log import audit_deny
+
+    db_url = os.environ["TX_INTEGRATION_DB_URL"]
+    engine = create_async_engine(db_url, echo=False)
+    SessionLocal = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+
+    try:
+        async with SessionLocal() as session:
+            # 必须先 set_config 到 NIL UUID（audit_deny 内部会做，这里测前置已干净）
+            await audit_deny(
+                session,
+                tenant_id="",  # ← R-补1-1 关键：故意传空，验证内部兜底为 NIL UUID
+                store_id=None,
+                user_id="",
+                user_role="",
+                action="refund.apply",
+                reason="AUTH_MISSING | probed_tenant=00000000-0000-0000-0000-0000000000a1",
+                severity="warn",
+                client_ip="10.0.0.5",
+                request_id="integ-test-001",
+            )
+
+            # 校验：用 NIL UUID 作为 RLS 上下文查这条记录
+            from sqlalchemy import text
+            await session.execute(
+                text("SELECT set_config('app.tenant_id', :tid, true)"),
+                {"tid": "00000000-0000-0000-0000-000000000000"},
+            )
+            row = (await session.execute(
+                text(
+                    "SELECT user_id, user_role, action, result, reason "
+                    "FROM trade_audit_logs "
+                    "WHERE tenant_id = '00000000-0000-0000-0000-000000000000'::uuid "
+                    "AND request_id = :rid "
+                    "ORDER BY created_at DESC LIMIT 1"
+                ),
+                {"rid": "integ-test-001"},
+            )).first()
+
+            assert row is not None, (
+                "401 路径 NIL UUID 兜底未落盘 — UUID cast 仍失败或 RLS 拒绝"
+            )
+            assert row.action == "refund.apply"
+            assert row.result == "deny"
+            assert "probed_tenant" in row.reason
+    finally:
+        await engine.dispose()

@@ -32,6 +32,7 @@
 from __future__ import annotations
 
 import os
+import uuid
 from dataclasses import dataclass
 from typing import Callable
 
@@ -39,6 +40,55 @@ import structlog
 from fastapi import HTTPException, Request
 
 logger = structlog.get_logger(__name__)
+
+
+# RFC 4122 NIL UUID — 用于未认证请求的 audit tenant_id 兜底。
+# 选择 NIL 而非任何真实租户 UUID 的理由：
+#   1. PG 上 trade_audit_logs.tenant_id 是 UUID NOT NULL；空串 cast 失败 → 审计永久丢失。
+#   2. 不能使用攻击者伪造的 X-Tenant-ID 作为 audit tenant_id —— 否则攻击者可往任意
+#      受害租户的 audit 表注入污染行（破坏取证 + 误导 SIEM）。
+#   3. NIL UUID 不与任何真实租户冲突（gen_random_uuid() 永远不返回 NIL）。
+#   4. audit_admin 可单独 SELECT NIL 租户的 audit 表，盘查所有未认证扫描痕迹。
+_NIL_TENANT_UUID: str = "00000000-0000-0000-0000-000000000000"
+
+
+def _is_valid_uuid_str(value: str | None) -> bool:
+    """检查字符串是否是合法 UUID（用于过滤 X-Tenant-ID header 防 log poisoning）。"""
+    if not value or not isinstance(value, str):
+        return False
+    try:
+        uuid.UUID(value)
+        return True
+    except (ValueError, AttributeError, TypeError):
+        return False
+
+
+def _resolve_audit_for_unauthenticated(
+    request: Request, ctx_tenant_id: str,
+) -> tuple[str, str | None]:
+    """为 deny 审计 resolve tenant_id + 取证后缀。
+
+    决策规则（401 与 ctx 缺 tenant_id 的合并路径）：
+      - ctx_tenant_id 非空（已认证或 gateway 注入了 state.tenant_id）→ 直接返回，不附加后缀
+      - ctx_tenant_id 空：
+          - 永远使用 NIL UUID 写入 audit（不让攻击者污染受害租户表）
+          - 若 X-Tenant-ID header 是合法 UUID → 作为 probed_tenant 进 reason 取证
+          - 若 X-Tenant-ID 非 UUID / 缺失 → 不附加后缀（防 log poisoning）
+
+    Returns:
+        (tenant_id_for_audit, reason_suffix_or_None)
+    """
+    if ctx_tenant_id:
+        return ctx_tenant_id, None
+
+    forged_tenant: str | None = None
+    if hasattr(request, "headers"):
+        candidate = (request.headers.get("X-Tenant-ID") or "").strip()
+        if _is_valid_uuid_str(candidate):
+            forged_tenant = candidate
+
+    suffix = f"probed_tenant={forged_tenant}" if forged_tenant else None
+    return _NIL_TENANT_UUID, suffix
 
 
 @dataclass(frozen=True)
@@ -243,13 +293,20 @@ def require_role_audited(
         except HTTPException as exc:
             # 拒绝路径：先写 deny 审计，再原样抛出（响应形状 / 状态码不变）
             ctx = extract_user_context(request)
-            reason = (
+            base_reason = (
                 str(exc.detail) if isinstance(exc.detail, str) else exc.detail.__class__.__name__
+            )
+            # 401 / ctx 缺 tenant 路径：用 NIL UUID + 把伪造的 X-Tenant-ID 进 reason
+            audit_tenant_id, reason_suffix = _resolve_audit_for_unauthenticated(
+                request, ctx.tenant_id,
+            )
+            reason = (
+                f"{base_reason} | {reason_suffix}" if reason_suffix else base_reason
             )
             try:
                 await _audit_deny_safe(
                     db=db,
-                    tenant_id=ctx.tenant_id,
+                    tenant_id=audit_tenant_id,
                     store_id=ctx.store_id,
                     user_id=ctx.user_id,
                     user_role=ctx.role,
@@ -295,13 +352,20 @@ def require_mfa_audited(
             return await base(request)
         except HTTPException as exc:
             ctx = extract_user_context(request)
-            reason = (
+            base_reason = (
                 str(exc.detail) if isinstance(exc.detail, str) else exc.detail.__class__.__name__
+            )
+            # 401 / ctx 缺 tenant 路径：用 NIL UUID + 把伪造的 X-Tenant-ID 进 reason
+            audit_tenant_id, reason_suffix = _resolve_audit_for_unauthenticated(
+                request, ctx.tenant_id,
+            )
+            reason = (
+                f"{base_reason} | {reason_suffix}" if reason_suffix else base_reason
             )
             try:
                 await _audit_deny_safe(
                     db=db,
-                    tenant_id=ctx.tenant_id,
+                    tenant_id=audit_tenant_id,
                     store_id=ctx.store_id,
                     user_id=ctx.user_id,
                     user_role=ctx.role,

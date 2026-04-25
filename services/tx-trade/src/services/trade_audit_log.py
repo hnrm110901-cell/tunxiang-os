@@ -39,6 +39,10 @@ logger = structlog.get_logger(__name__)
 _VALID_RESULTS: frozenset[str] = frozenset({"allow", "deny", "mfa_required"})
 _VALID_SEVERITIES: frozenset[str] = frozenset({"info", "warn", "error", "critical"})
 
+# RFC 4122 NIL UUID — audit_deny 401 路径 tenant_id 兜底（参见 rbac.py 同名常量）。
+# 与 v261 RLS 策略兼容：set_config('app.tenant_id', NIL) → INSERT tenant_id=NIL → policy 通过。
+_NIL_TENANT_UUID: str = "00000000-0000-0000-0000-000000000000"
+
 
 # ──────────────── target_id 跨租户校验（A4-R2 / Tier1） ────────────────
 #
@@ -406,10 +410,15 @@ async def audit_deny(
     # 入参兜底：user_id 缺失时仍要写一条（特别是 401 AUTH_MISSING 路径）
     safe_user_id = user_id or "(unauthenticated)"
     safe_user_role = user_role or "(unauthenticated)"
+    # 防御层 2 — tenant_id 空则用 NIL UUID。
+    # rbac.py wrapper 已经 resolve 过 tenant_id；此处兜底防止未来新增的直接
+    # 调用路径（绕过 wrapper）让空串到达 PG 上 UUID NOT NULL 列触发 cast 失败
+    # 静默丢审计。NIL UUID 是 PG 上合法值，trade_audit_logs RLS 策略允许。
+    safe_tenant_id = tenant_id or _NIL_TENANT_UUID
 
     await write_audit(
         db,
-        tenant_id=tenant_id,
+        tenant_id=safe_tenant_id,
         store_id=store_id,
         user_id=safe_user_id,
         user_role=safe_user_role,
