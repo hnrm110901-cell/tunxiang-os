@@ -139,6 +139,52 @@ def _dev_bypass() -> bool:
     return os.getenv("TX_AUTH_ENABLED", "true").lower() == "false"
 
 
+# 屯象 OS 项目环境约定（gitops/ + shared/feature_flags/flag_client.py 已采纳）：
+#   TUNXIANG_ENV ∈ {dev (默认), test, uat, pilot, edge, prod}
+# 仅 "prod" 视为生产环境；其他值（含未设置）允许 dev_bypass 以便单测 / staging。
+_PRODUCTION_ENV_VALUES: frozenset[str] = frozenset({"prod"})
+
+
+class DevBypassInProductionError(RuntimeError):
+    """tx-trade 在生产环境（TUNXIANG_ENV=prod）启动时拒绝 TX_AUTH_ENABLED=false。
+
+    §19 复审 R-A4-7：dev_bypass 短路会让所有 RBAC 检查失效**且不留任何
+    deny 审计**。一次 ConfigMap 误写、helm values 误覆盖、migration 脚本
+    临时设置忘恢复，整个 tx-trade 服务的权限闸门即静默失效——与
+    R-补2-1 请求重放伪造同等级的安全风险。
+
+    本异常在 lifespan startup 抛出，让 k8s readiness probe 失败 / 容器
+    Crashloop，运维必须修复配置才能恢复服务。fail loud > fail silent。
+    """
+
+
+def assert_no_dev_bypass_in_production() -> None:
+    """tx-trade 启动门禁：拒绝生产环境 TX_AUTH_ENABLED=false 配置漂移。
+
+    在 lifespan 早期同步调用。识别 "生产" 用项目约定的 TUNXIANG_ENV=prod；
+    其他环境 (dev/test/uat/pilot/edge) 仍允许 dev_bypass 以便单测 / staging
+    调试。值匹配大小写无关。
+
+    Raises:
+        DevBypassInProductionError: 当 TUNXIANG_ENV=prod 且 TX_AUTH_ENABLED=false。
+    """
+    env_raw = os.getenv("TUNXIANG_ENV", "dev")
+    env = (env_raw or "").strip().lower()
+    if env not in _PRODUCTION_ENV_VALUES:
+        return  # 非生产环境，不拦
+    if not _dev_bypass():
+        return  # TX_AUTH_ENABLED=true（或未设置），生产正常路径
+
+    auth_raw = os.getenv("TX_AUTH_ENABLED")
+    raise DevBypassInProductionError(
+        "Refusing to start tx-trade in production with TX_AUTH_ENABLED=false. "
+        "dev_bypass would silently disable all RBAC + deny audit. "
+        f"Current: TUNXIANG_ENV={env_raw!r}, TX_AUTH_ENABLED={auth_raw!r}. "
+        "If genuinely production, set TX_AUTH_ENABLED=true and use feature "
+        "flags / per-route bypass — never disable the global RBAC switch."
+    )
+
+
 def _mock_user_context() -> UserContext:
     return UserContext(
         user_id="dev-user-mock",

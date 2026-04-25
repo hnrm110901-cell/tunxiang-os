@@ -125,8 +125,13 @@ async def lifespan(app: FastAPI):
 
     from shared.ontology.src.database import async_session_factory
 
+    from .security.rbac import assert_no_dev_bypass_in_production
     from .services.cook_time_stats import start_daily_scheduler
     from .services.group_buy_scheduler import start_group_buy_expiry_scheduler
+
+    # 启动门禁（PR-2 / §19 R-A4-7）：拒绝生产环境 TX_AUTH_ENABLED=false 配置漂移。
+    # 必须在 init_db / scheduler 之前 — fail-loud，让 k8s readiness probe 失败。
+    assert_no_dev_bypass_in_production()
 
     await init_db()
     asyncio.create_task(start_daily_scheduler(async_session_factory))
