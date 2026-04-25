@@ -4,6 +4,71 @@
 
 ---
 
+## 2026-04-25 Wave 3 Sprint D3c — 菜品动态定价（边缘 Core ML stub + 云端 fallback）
+
+### 本次会话目标
+新增 `edge/coreml-bridge` 的 `/predict/dish-price` Swift 端点（v0 规则版）+
+`services/tx-brain/src/agents/dish_pricing/*` 云端服务（edge_client + cloud_fallback +
+service + HTTP route），完成 D3c 骨架。**v0 是规则版，毛利 +2pp 真实达成需 ML 模型上线后回测**。
+
+### 不得触碰的边界（已遵守）
+- [x] services/tx-trade/** — 未触碰（25 commits 等 §19 二次审查）
+- [x] shared/ontology/** — 未触碰
+- [x] coreml-bridge 现有 /predict/* 端点行为 — 仅新增 /predict/dish-price，不改动 dish-time/discount-risk/traffic
+- [x] 任何 Tier 1 路径 — 未触碰
+- [x] AgentDecisionLog schema — 未扩展，复用现有 8 字段
+
+### 本次涉及范围
+- `edge/coreml-bridge/Sources/CoreMLBridge/`：ModelManager.swift（top-level 即活跃文件）
+  + PredictHandlers.swift + main.swift 头注释/log
+- `services/tx-brain/src/agents/dish_pricing/`：新模块（schemas / edge_client / cloud_fallback / service）
+- `services/tx-brain/src/api/dish_pricing_routes.py`：新 HTTP 路由
+- `services/tx-brain/src/main.py`：include_router 接入
+- `services/tx-brain/src/tests/test_dish_pricing.py`：10 用例（全通过）
+- `docs/d3c-dish-pricing-training-pipeline-tbd.md`：训练管线设计
+- 迁移版本：无（不需要新表）
+- Tier 级别：**[x] Tier 2**
+
+### 关键决策
+
+- **毛利底线 GUARD 双层兜底**（铁律）：
+  - 边缘 Swift 层第一道：`recommendedFen >= cost / 0.85`（margin >= 15%）
+  - service.py 层第二道兜底（即使边缘说 floor_protected=False，service 也再 sanity-check 一遍）
+  - 测试 `test_gross_margin_floor_clamps_aggressive_discount` 证明：即使 edge 返回
+    rogue 价（cost=5000, recommend=2500，远低于 cost）也会被夹回 5883 + floor_protected=True
+
+- **Tier 2 短超时（200ms）**：边缘 P99 延迟目标，超时立即降级云端，不 hang 用户
+
+- **AgentDecisionLog 复用现有字段**：D2 ROI 4 列扩展（saved_labor_hours / prevented_loss_fen /
+  improved_kpi / roi_evidence）创始人未签字，本次只用现有 agent_id / decision_type /
+  input_context / output_action / constraints_check / confidence / inference_layer / model_id
+
+- **monkeypatch 用模块对象而不是字符串路径**：services.tx_brain（下划线 vs 短横线）字符串路径
+  在 pytest rootdir 下不可解析（预存问题，与 D3b activity_roi 测试同样 workaround）
+
+### 已知风险
+
+- **edge/coreml-bridge swift build 失败**：预存的 `Sources/CoreMLBridge/ModelManager.swift`
+  + `Sources/CoreMLBridge/Services/ModelManager.swift` 双重定义（不同字段）的源文件冲突。
+  - **本次未引入**（git stash 验证过 stash 后仍失败）
+  - 不影响 D3c Python 链路（HTTP 黑盒访问）
+  - 需独立 PR 清理（建议保留 top-level，删除 Services/ 因为 PredictHandlers.swift 用 top-level 字段）
+
+- **v0 规则版毛利 +2pp 目标无法达成**：仅是签名/边界正确的骨架；真实达标需 GBDT 模型 +
+  影子模式回测，时间预估 6.5 周（详见 docs/d3c-dish-pricing-training-pipeline-tbd.md）
+
+- **JWT 仅做 Bearer 形式校验**：与现有 brain_routes 风格一致（裸调防护），真正签名校验在
+  gateway。如 Wave 4 需要 service 内部强校验，独立审计
+
+### 下一步
+- D3c 二次独立验证（§19）— 涉及 5 commits，触发 §19 触发条件「修改 3+ 文件」
+- ModelRouter 实例真接入：tx-brain main.py 启动时注入 router 到 DishPricingCloudFallback
+  （当前默认 None → 走规则降级，与 D3b activity_roi 同样 TBD）
+- Swift 测试基础设施搭建（独立任务，不阻塞 D3c）
+- Wave 4 启动 ML 训练管线（依赖 events 表 90 天数据积累）
+
+---
+
 ## 2026-04-25 Wave 3 Sprint D3b — 活动 ROI 预测（Prophet baseline + Sonnet 叙述）
 
 ### 本次会话目标

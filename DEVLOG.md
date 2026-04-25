@@ -1,3 +1,39 @@
+## 2026-04-25 Wave 3 Sprint D3c — 菜品动态定价（边缘 + 云端骨架）（5 atomic commits / Tier 2）
+
+### 今日完成
+- [edge/coreml-bridge/Sources/CoreMLBridge/ModelManager.swift] 新增 DishPriceFeatures + DishPricePrediction + predictDishPrice 规则函数（cost-plus + time-of-day + traffic + inventory + 毛利底线 GUARD）
+- [edge/coreml-bridge/Sources/CoreMLBridge/PredictHandlers.swift] 新增 POST /predict/dish-price 路由 + DishPriceRequest/Response Content
+- [edge/coreml-bridge/Sources/CoreMLBridge/main.swift] log 行追加 dish-price 端点
+- [services/tx-brain/src/agents/dish_pricing/__init__.py] 新模块导出
+- [services/tx-brain/src/agents/dish_pricing/schemas.py] DishPricingRequest/Response/PricingSignal Pydantic V2，Literal 时段/客流/库存枚举
+- [services/tx-brain/src/agents/dish_pricing/edge_client.py] DishPricingEdgeClient（200ms 超时 + EdgeUnavailableError 抛出协议）
+- [services/tx-brain/src/agents/dish_pricing/cloud_fallback.py] DishPricingCloudFallback（注入 ModelRouter，prompt 嵌毛利底线红线，永不抛异常）
+- [services/tx-brain/src/agents/dish_pricing/service.py] DishPricingService.recommend 流水线 + 毛利底线服务层兜底 + 价格上限 1.5x 保护 + best-effort 决策留痕
+- [services/tx-brain/src/api/dish_pricing_routes.py] POST /api/v1/agents/dish-pricing/recommend，X-Tenant-ID + JWT 强校验 + body.tenant_id 强一致
+- [services/tx-brain/src/main.py] include_router 接入 dish_pricing_router
+- [services/tx-brain/src/tests/test_dish_pricing.py] 10 用例全部通过（边缘超时 / cloud fallback / 毛利底线 / 决策留痕 / 拒绝未认证 / 拒绝跨租户 / 输入级 sanity）
+- [docs/d3c-dish-pricing-training-pipeline-tbd.md] 训练管线设计（GBDT → Core ML，6.5 周预估，影子模式 Gate）
+
+### 数据变化
+- 迁移版本：无变更
+- 新增 API：1 个端点（/api/v1/agents/dish-pricing/recommend）+ 1 个边缘端点（coreml-bridge :8100/predict/dish-price）
+- 新增测试：10 条 dish_pricing Tier 2 用例
+- 新增 Python 模块：services/tx-brain/src/agents/dish_pricing/（5 文件）
+- 新增 Swift 类型：DishPriceFeatures / DishPricePrediction / DishPriceRequest / DishPriceResponse
+
+### 遗留问题
+- coreml-bridge swift build 预存在失败（双 ModelManager.swift 源文件冲突），不影响 Python HTTP 黑盒，需独立 PR 清理
+- ModelRouter 实例未在 main.py 启动时注入到 DishPricingCloudFallback，当前默认 None 走规则降级（与 D3b activity_roi 同样 TBD）
+- Swift 端 Tests/ 目录无 Swift 测试基础设施（需要 Package.swift 加 testTarget），文档化为 TBD
+- D3c 触发 §19 独立验证条件（5+ 文件 + 修改 ≥ 3 文件），新会话审查待启动
+- v0 仅是签名/边界正确的骨架，毛利 +2pp 目标需后续 GBDT 模型上线 + 14 天影子模式回测达成
+
+### 明日计划
+- D3c §19 独立验证（新会话从徐记海鲜收银员视角检查）
+- 评估 ModelRouter 注入是否能在不破坏 D3b 的前提下统一接入
+
+---
+
 ## 2026-04-25 Wave 3 Sprint D3b — 活动 ROI 预测（Prophet + Sonnet）（4 atomic commits / Tier 2）
 
 ### 今日完成
