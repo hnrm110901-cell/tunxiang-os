@@ -28,22 +28,32 @@ NEW_TABLES = [
 ]
 
 
+_RLS_CONDITION = (
+    "current_setting('app.tenant_id', TRUE) IS NOT NULL "
+    "AND current_setting('app.tenant_id', TRUE) <> '' "
+    "AND tenant_id = NULLIF(current_setting('app.tenant_id', TRUE), '')::UUID"
+)
+
+
 def _enable_rls(table_name: str) -> None:
-    """为表启用 RLS + 创建租户隔离策略"""
+    """为表启用 RLS + 创建租户隔离策略（v006+ safe pattern: NULL guard + FORCE）"""
     op.execute(f"ALTER TABLE {table_name} ENABLE ROW LEVEL SECURITY")
-    op.execute(
-        f"CREATE POLICY tenant_isolation_{table_name} ON {table_name} "
-        f"USING (tenant_id = current_setting('app.tenant_id')::UUID)"
-    )
-    op.execute(
-        f"CREATE POLICY tenant_insert_{table_name} ON {table_name} "
-        f"FOR INSERT WITH CHECK (tenant_id = current_setting('app.tenant_id')::UUID)"
-    )
+    op.execute(f"ALTER TABLE {table_name} FORCE ROW LEVEL SECURITY")
+    for action, clause in [
+        ("select", f"FOR SELECT USING ({_RLS_CONDITION})"),
+        ("insert", f"FOR INSERT WITH CHECK ({_RLS_CONDITION})"),
+        ("update", f"FOR UPDATE USING ({_RLS_CONDITION}) WITH CHECK ({_RLS_CONDITION})"),
+        ("delete", f"FOR DELETE USING ({_RLS_CONDITION})"),
+    ]:
+        op.execute(
+            f"CREATE POLICY {table_name}_rls_{action} ON {table_name} "
+            f"AS PERMISSIVE {clause}"
+        )
 
 
 def _disable_rls(table_name: str) -> None:
-    op.execute(f"DROP POLICY IF EXISTS tenant_insert_{table_name} ON {table_name}")
-    op.execute(f"DROP POLICY IF EXISTS tenant_isolation_{table_name} ON {table_name}")
+    for suffix in ("select", "insert", "update", "delete"):
+        op.execute(f"DROP POLICY IF EXISTS {table_name}_rls_{suffix} ON {table_name}")
     op.execute(f"ALTER TABLE {table_name} DISABLE ROW LEVEL SECURITY")
 
 

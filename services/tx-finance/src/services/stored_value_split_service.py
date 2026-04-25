@@ -68,14 +68,13 @@ class StoredValueSplitService:
             )
 
         store_ids = rule_data.get("applicable_store_ids")
-        store_ids_sql = (
-            "ARRAY[" + ",".join(f"'{s}'::UUID" for s in store_ids) + "]"
-            if store_ids
-            else "NULL"
-        )
+        # Validate UUIDs before use — prevent SQL injection
+        safe_store_ids = None
+        if store_ids:
+            safe_store_ids = [str(uuid.UUID(s)) for s in store_ids]
 
         await self.db.execute(
-            text(f"""
+            text("""
                 INSERT INTO stored_value_split_rules
                     (id, tenant_id, rule_name,
                      recharge_store_ratio, consume_store_ratio, hq_ratio,
@@ -84,7 +83,7 @@ class StoredValueSplitService:
                 VALUES
                     (:id, :tid, :name,
                      :r_ratio, :c_ratio, :h_ratio,
-                     :scope, {store_ids_sql}, :is_default,
+                     :scope, :store_ids::UUID[], :is_default,
                      :eff_from, :eff_to)
             """),
             {
@@ -95,6 +94,7 @@ class StoredValueSplitService:
                 "c_ratio": float(consume_ratio),
                 "h_ratio": float(hq_ratio),
                 "scope": rule_data.get("scope_type", "brand"),
+                "store_ids": safe_store_ids,
                 "is_default": rule_data.get("is_default", False),
                 "eff_from": rule_data.get("effective_from"),
                 "eff_to": rule_data.get("effective_to"),
@@ -124,21 +124,19 @@ class StoredValueSplitService:
             )
 
         store_ids = rule_data.get("applicable_store_ids")
-        store_ids_sql = (
-            "ARRAY[" + ",".join(f"'{s}'::UUID" for s in store_ids) + "]"
-            if store_ids
-            else "NULL"
-        )
+        safe_store_ids = None
+        if store_ids:
+            safe_store_ids = [str(uuid.UUID(s)) for s in store_ids]
 
         result = await self.db.execute(
-            text(f"""
+            text("""
                 UPDATE stored_value_split_rules
                 SET rule_name               = :name,
                     recharge_store_ratio    = :r_ratio,
                     consume_store_ratio     = :c_ratio,
                     hq_ratio               = :h_ratio,
                     scope_type             = :scope,
-                    applicable_store_ids   = {store_ids_sql},
+                    applicable_store_ids   = :store_ids::UUID[],
                     is_default             = :is_default,
                     effective_from         = :eff_from,
                     effective_to           = :eff_to,
@@ -153,6 +151,7 @@ class StoredValueSplitService:
                 "c_ratio": float(consume_ratio),
                 "h_ratio": float(hq_ratio),
                 "scope": rule_data.get("scope_type", "brand"),
+                "store_ids": safe_store_ids,
                 "is_default": rule_data.get("is_default", False),
                 "eff_from": rule_data.get("effective_from"),
                 "eff_to": rule_data.get("effective_to"),
