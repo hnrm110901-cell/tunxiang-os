@@ -12,6 +12,12 @@ POST /api/v1/offline-orders/sync
 A3 §19 P1 增补（本次工单）：
   GET  /api/v1/offline-orders/pending
        —— 列出 pending 条目（manager/admin），分页
+  GET  /api/v1/offline-orders/dead-letter
+       —— 列出 dead_letter 条目（store_manager/admin），分页
+  POST /api/v1/offline-orders/dead-letter/{offline_order_id}/resolve
+       —— 店长人工标记已确认死信（store_manager + audit log）
+  POST /api/v1/offline-orders/dead-letter/{offline_order_id}/retry
+       —— 店长人工触发重试（store_manager + audit log）
 
   以及 sync 路径补 dead_letter 触发链路：每条 entry 同步失败 →
   increment_attempts → 达 DEAD_LETTER_MAX_ATTEMPTS=20 → mark_dead_letter
@@ -35,7 +41,7 @@ import uuid
 from typing import Optional
 
 import structlog
-from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, Header, HTTPException, Path, Query, Request
 from pydantic import BaseModel, Field
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -413,7 +419,7 @@ async def _mark_dead_letter_safe(
 
 
 class OfflineMappingItem(BaseModel):
-    """list_pending / list_dead_letter 单条返回结构（共享 schema）。"""
+    """list_pending / list_dead_letter 单条返回结构。"""
 
     offline_order_id: str
     cloud_order_id: Optional[str] = None
@@ -438,6 +444,52 @@ class OfflineMappingPageResponse(BaseModel):
     ok: bool
     data: Optional[OfflineMappingPage] = None
     error: Optional[dict] = None
+
+
+class ManualResolveRequest(BaseModel):
+    tenant_id: str = Field(..., min_length=1)
+    resolution_note: str = Field(..., min_length=1, max_length=300)
+
+
+class ManualRetryRequest(BaseModel):
+    tenant_id: str = Field(..., min_length=1)
+
+
+class ManualOpResponse(BaseModel):
+    ok: bool
+    data: Optional[dict] = None
+    error: Optional[dict] = None
+
+
+def _enforce_tenant_match(
+    *,
+    body_tenant: str,
+    header_tenant: str,
+    user: UserContext,
+    path: str,
+) -> None:
+    """X-Tenant-ID / body.tenant_id / user.tenant_id 三方一致性校验。
+
+    跨租户漏洞防御（参考 A1 §19 #1）：仅匹配 header 不够，必须三方相等。
+    """
+    if header_tenant != body_tenant:
+        logger.warning(
+            "offline_admin_tenant_mismatch_header",
+            path=path,
+            header_tenant=header_tenant,
+            body_tenant=body_tenant,
+            user_id=user.user_id,
+        )
+        raise HTTPException(status_code=403, detail="TENANT_MISMATCH")
+    if user.tenant_id and user.tenant_id != body_tenant:
+        logger.warning(
+            "offline_admin_tenant_mismatch_user",
+            path=path,
+            user_tenant=user.tenant_id,
+            body_tenant=body_tenant,
+            user_id=user.user_id,
+        )
+        raise HTTPException(status_code=403, detail="USER_TENANT_MISMATCH")
 
 
 def _enforce_query_tenant(
@@ -536,3 +588,217 @@ async def list_pending_offline_orders(
     )
 
 
+@router.get("/offline-orders/dead-letter", response_model=OfflineMappingPageResponse)
+async def list_dead_letter_offline_orders(
+    request: Request,
+    tenant_id: str = Query(..., min_length=1),
+    store_id: Optional[str] = Query(None),
+    page: int = Query(1, ge=1),
+    size: int = Query(20, ge=1, le=200),
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
+    user: UserContext = Depends(require_role("store_manager", "admin")),
+) -> OfflineMappingPageResponse:
+    """列出当前租户（可选+门店）下 state=dead_letter 的条目。
+
+    店长在"离线订单异常"面板用此接口展示需要人工处理的死信单；
+    返回的 last_error_message 直接显示在 UI 卡片上。
+    """
+    _enforce_query_tenant(
+        query_tenant=tenant_id,
+        header_tenant=x_tenant_id,
+        user=user,
+        path="/offline-orders/dead-letter",
+    )
+
+    svc = OfflineOrderMappingService(db=db, tenant_id=tenant_id)
+    offset = (page - 1) * size
+    try:
+        items = await svc.list_dead_letter(store_id=store_id, limit=size, offset=offset)
+        total = await svc.count_dead_letters(store_id=store_id)
+    except SQLAlchemyError as exc:
+        logger.error(
+            "offline_orders_list_dead_letter_db_error",
+            tenant_id=tenant_id,
+            store_id=store_id,
+            error=str(exc),
+        )
+        return OfflineMappingPageResponse(
+            ok=False,
+            error={"code": "DB_ERROR", "message": "查询失败"},
+        )
+
+    return OfflineMappingPageResponse(
+        ok=True,
+        data=OfflineMappingPage(
+            items=[_row_to_item(r) for r in items],
+            total=int(total),
+            page=page,
+            size=size,
+        ),
+    )
+
+
+@router.post(
+    "/offline-orders/dead-letter/{offline_order_id}/resolve",
+    response_model=ManualOpResponse,
+)
+async def resolve_dead_letter(
+    body: ManualResolveRequest,
+    request: Request,
+    offline_order_id: str = Path(..., min_length=1, max_length=128),
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
+    user: UserContext = Depends(require_role("store_manager", "admin")),
+) -> ManualOpResponse:
+    """店长人工标记一条死信为"已确认"（state 仍为 dead_letter，仅在 reason
+    前缀追加 manual_resolved 标记）。
+
+    高敏感操作：必写 trade_audit_logs（action=offline_sync.manual_resolve）。
+    """
+    _enforce_tenant_match(
+        body_tenant=body.tenant_id,
+        header_tenant=x_tenant_id,
+        user=user,
+        path="/offline-orders/dead-letter/{id}/resolve",
+    )
+
+    svc = OfflineOrderMappingService(db=db, tenant_id=body.tenant_id)
+    try:
+        ok = await svc.manual_resolve(
+            offline_order_id=offline_order_id,
+            resolver_user_id=user.user_id,
+            resolution_note=body.resolution_note,
+        )
+    except SQLAlchemyError as exc:
+        logger.error(
+            "offline_orders_manual_resolve_db_error",
+            tenant_id=body.tenant_id,
+            offline_order_id=offline_order_id,
+            error=str(exc),
+        )
+        return ManualOpResponse(
+            ok=False, error={"code": "DB_ERROR", "message": "解决死信失败"}
+        )
+
+    if not ok:
+        # 条目不存在或非 dead_letter 状态
+        return ManualOpResponse(
+            ok=False,
+            error={"code": "NOT_DEAD_LETTER", "message": "条目不存在或非死信状态"},
+        )
+
+    # 高敏感写操作 → 写审计
+    try:
+        await write_audit(
+            db,
+            tenant_id=body.tenant_id,
+            store_id=user.store_id,
+            user_id=user.user_id,
+            user_role=user.role,
+            action="offline_sync.manual_resolve",
+            target_type="offline_order_mapping",
+            target_id=offline_order_id,
+            amount_fen=None,
+            client_ip=user.client_ip,
+        )
+    except (SQLAlchemyError, ValueError) as exc:
+        logger.error(
+            "offline_orders_manual_resolve_audit_failed",
+            tenant_id=body.tenant_id,
+            offline_order_id=offline_order_id,
+            error=str(exc),
+        )
+
+    logger.warning(
+        "offline_orders_manual_resolved",
+        tenant_id=body.tenant_id,
+        offline_order_id=offline_order_id,
+        resolver_user_id=user.user_id,
+    )
+
+    return ManualOpResponse(
+        ok=True,
+        data={"offline_order_id": offline_order_id, "resolved": True},
+    )
+
+
+@router.post(
+    "/offline-orders/dead-letter/{offline_order_id}/retry",
+    response_model=ManualOpResponse,
+)
+async def retry_dead_letter(
+    body: ManualRetryRequest,
+    request: Request,
+    offline_order_id: str = Path(..., min_length=1, max_length=128),
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
+    user: UserContext = Depends(require_role("store_manager", "admin")),
+) -> ManualOpResponse:
+    """店长人工触发死信重试：把条目从 dead_letter 推回 pending。
+
+    重试后下一轮 Flusher 扫描 pending 时会再次尝试同步。
+    高敏感操作：必写 trade_audit_logs（action=offline_sync.manual_retry）。
+    """
+    _enforce_tenant_match(
+        body_tenant=body.tenant_id,
+        header_tenant=x_tenant_id,
+        user=user,
+        path="/offline-orders/dead-letter/{id}/retry",
+    )
+
+    svc = OfflineOrderMappingService(db=db, tenant_id=body.tenant_id)
+    try:
+        ok = await svc.manual_retry(
+            offline_order_id=offline_order_id,
+            retry_user_id=user.user_id,
+        )
+    except SQLAlchemyError as exc:
+        logger.error(
+            "offline_orders_manual_retry_db_error",
+            tenant_id=body.tenant_id,
+            offline_order_id=offline_order_id,
+            error=str(exc),
+        )
+        return ManualOpResponse(
+            ok=False, error={"code": "DB_ERROR", "message": "重试调度失败"}
+        )
+
+    if not ok:
+        return ManualOpResponse(
+            ok=False,
+            error={"code": "NOT_DEAD_LETTER", "message": "条目不存在或非死信状态"},
+        )
+
+    try:
+        await write_audit(
+            db,
+            tenant_id=body.tenant_id,
+            store_id=user.store_id,
+            user_id=user.user_id,
+            user_role=user.role,
+            action="offline_sync.manual_retry",
+            target_type="offline_order_mapping",
+            target_id=offline_order_id,
+            amount_fen=None,
+            client_ip=user.client_ip,
+        )
+    except (SQLAlchemyError, ValueError) as exc:
+        logger.error(
+            "offline_orders_manual_retry_audit_failed",
+            tenant_id=body.tenant_id,
+            offline_order_id=offline_order_id,
+            error=str(exc),
+        )
+
+    logger.warning(
+        "offline_orders_manual_retry",
+        tenant_id=body.tenant_id,
+        offline_order_id=offline_order_id,
+        retry_user_id=user.user_id,
+    )
+
+    return ManualOpResponse(
+        ok=True,
+        data={"offline_order_id": offline_order_id, "state": "pending"},
+    )

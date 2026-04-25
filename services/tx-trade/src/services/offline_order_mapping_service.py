@@ -6,8 +6,12 @@
   - mark_dead_letter    — 多次补发失败，state=dead_letter（保留等人工确认）
   - increment_sync_attempt — 每次同步尝试累加 sync_attempts（legacy；保留兼容）
   - increment_attempts  — 同步失败累加 sync_attempts + last_error_message，返回新值
+  - count_dead_letters  — 统计死信条数（运营监控）
+  - manual_resolve      — 店长人工确认死信（state=dead_letter→保留 + 记录原因）
+  - manual_retry        — 店长人工触发重试（state→pending + sync_attempts=0）
   - get                 — 按 offline_order_id 读取（RLS 强制 tenant_id）
   - list_pending        — 列出租户+门店下的 pending 映射（backlog）
+  - list_dead_letter    — 列出租户+门店下的 dead_letter 映射（人工面板）
 
 设计约束（CLAUDE.md §17 Tier1）：
   - 所有查询必须显式带 tenant_id 过滤（service 层拦截）+ RLS 兜底
@@ -474,3 +478,246 @@ class OfflineOrderMappingService:
         existing = await self.get(offline_order_id)
         return int(existing.get("sync_attempts", 0)) if existing else 0
 
+    async def count_dead_letters(
+        self,
+        *,
+        store_id: Optional[str] = None,
+        since: Optional[datetime] = None,
+    ) -> int:
+        """统计当前租户下 dead_letter 条目数（运营监控）。
+
+        Args:
+            store_id: 可选门店过滤（None 表示全租户）
+            since:    可选时间过滤 created_at >= since（None 表示不限）
+
+        Returns:
+            int: 死信条数（>= 0）
+        """
+        await self._bind_rls()
+
+        sql_parts = [
+            "SELECT COUNT(*) AS cnt FROM offline_order_mapping",
+            "WHERE tenant_id = :tenant_id",
+            "AND state = :state",
+        ]
+        params: dict[str, Any] = {
+            "tenant_id": self._tenant_id,
+            "state": MappingState.DEAD_LETTER.value,
+        }
+        if store_id:
+            sql_parts.append("AND store_id = :store_id")
+            params["store_id"] = str(store_id)
+        if since is not None:
+            sql_parts.append("AND created_at >= :since")
+            params["since"] = since
+
+        sql = "\n".join(sql_parts)
+        try:
+            result = await self._db.execute(text(sql), params)
+            row = result.mappings().first() if hasattr(result, "mappings") else None
+            return int(row["cnt"]) if row and "cnt" in row else 0
+        except SQLAlchemyError as exc:
+            logger.error(
+                "offline_order_mapping_count_dead_letters_failed",
+                store_id=str(store_id) if store_id else None,
+                error=str(exc),
+            )
+            raise
+
+    async def list_dead_letter(
+        self,
+        *,
+        store_id: Optional[str] = None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> list[dict]:
+        """列出租户（可选+门店）下 state=dead_letter 的映射（人工解决面板）。
+
+        Args:
+            store_id: 可选门店 UUID 过滤
+            limit:    单页上限（默认 50，最大 500）
+            offset:   分页偏移
+        """
+        if limit <= 0 or limit > 500:
+            raise ValueError(f"limit out of range [1, 500]: {limit}")
+        if offset < 0:
+            raise ValueError(f"offset must be >= 0: {offset}")
+
+        await self._bind_rls()
+
+        sql_parts = [
+            """
+            SELECT tenant_id, store_id, device_id, offline_order_id,
+                   cloud_order_id, state, sync_attempts,
+                   dead_letter_reason, last_error_message,
+                   created_at, updated_at
+            FROM offline_order_mapping
+            WHERE tenant_id = :tenant_id
+              AND state = :state
+            """
+        ]
+        params: dict[str, Any] = {
+            "tenant_id": self._tenant_id,
+            "state": MappingState.DEAD_LETTER.value,
+            "limit": limit,
+            "offset": offset,
+        }
+        if store_id:
+            sql_parts.append("AND store_id = :store_id")
+            params["store_id"] = str(store_id)
+        sql_parts.append("ORDER BY updated_at DESC LIMIT :limit OFFSET :offset")
+        sql = "\n".join(sql_parts)
+
+        try:
+            result = await self._db.execute(text(sql), params)
+            rows = result.mappings().all() if hasattr(result, "mappings") else []
+            return [dict(r) for r in rows]
+        except SQLAlchemyError as exc:
+            logger.error(
+                "offline_order_mapping_list_dead_letter_failed",
+                store_id=str(store_id) if store_id else None,
+                error=str(exc),
+            )
+            raise
+
+    async def manual_resolve(
+        self,
+        *,
+        offline_order_id: str,
+        resolver_user_id: str,
+        resolution_note: str,
+    ) -> bool:
+        """店长人工确认死信：保留 state=dead_letter，但在 dead_letter_reason
+        前缀追加 `manual_resolved:{user_id}:{note}` 标记，作为人工已审计的视觉
+        信号。
+
+        本接口**不**删除条目（CLAUDE.md §13 禁止悄无声息吞单）。
+        审计留痕由路由层 write_audit 完成（操作 = manual_resolve）。
+
+        Args:
+            offline_order_id: 死信条目离线 order_id
+            resolver_user_id: 店长 UUID
+            resolution_note:  人工备注（300 字符截断）
+
+        Returns:
+            bool: True = UPDATE 命中（条目存在且 state=dead_letter）
+                  False = 条目不存在或 state 非 dead_letter（路由层应返回 404/409）
+        """
+        if not offline_order_id:
+            raise ValueError("offline_order_id is required")
+        if not resolver_user_id:
+            raise ValueError("resolver_user_id is required")
+        if not resolution_note:
+            raise ValueError("resolution_note is required")
+
+        await self._bind_rls()
+
+        # 形如 "manual_resolved:<uid>:<note>|<原 reason>"
+        new_reason_prefix = f"manual_resolved:{resolver_user_id}:{resolution_note[:300]}"
+
+        try:
+            result = await self._db.execute(
+                text(
+                    """
+                    UPDATE offline_order_mapping
+                    SET dead_letter_reason = :prefix || '|' || COALESCE(dead_letter_reason, ''),
+                        updated_at = NOW()
+                    WHERE tenant_id = :tenant_id
+                      AND offline_order_id = :offline_order_id
+                      AND state = :state
+                    """
+                ),
+                {
+                    "tenant_id": self._tenant_id,
+                    "offline_order_id": offline_order_id,
+                    "state": MappingState.DEAD_LETTER.value,
+                    "prefix": new_reason_prefix,
+                },
+            )
+        except SQLAlchemyError as exc:
+            logger.error(
+                "offline_order_mapping_manual_resolve_failed",
+                offline_order_id=offline_order_id,
+                error=str(exc),
+            )
+            raise
+
+        rowcount = getattr(result, "rowcount", None)
+        ok = rowcount is None or rowcount >= 1
+        if ok:
+            logger.warning(
+                "offline_order_mapping_manual_resolved",
+                offline_order_id=offline_order_id,
+                resolver_user_id=resolver_user_id,
+                tenant_id=self._tenant_id,
+            )
+        return ok
+
+    async def manual_retry(
+        self,
+        *,
+        offline_order_id: str,
+        retry_user_id: str,
+    ) -> bool:
+        """店长人工触发死信重试：sync_attempts=0 + state=pending。
+
+        语义：把死信条目重新放回补发队列；下一轮 Flusher 扫描 pending 时
+        会带上原 offline_order_id 重试同步。
+
+        Args:
+            offline_order_id: 死信条目离线 order_id
+            retry_user_id:    店长 UUID
+
+        Returns:
+            bool: True = 条目从 dead_letter 推回 pending；False = 条目不存在或 state
+                  非 dead_letter（路由层应返回 404/409）
+        """
+        if not offline_order_id:
+            raise ValueError("offline_order_id is required")
+        if not retry_user_id:
+            raise ValueError("retry_user_id is required")
+
+        await self._bind_rls()
+
+        try:
+            result = await self._db.execute(
+                text(
+                    """
+                    UPDATE offline_order_mapping
+                    SET state = :pending_state,
+                        sync_attempts = 0,
+                        last_error_message = NULL,
+                        dead_letter_reason = 'manual_retry_by:' || :retry_user_id ||
+                                             '|prev:' || COALESCE(dead_letter_reason, ''),
+                        updated_at = NOW()
+                    WHERE tenant_id = :tenant_id
+                      AND offline_order_id = :offline_order_id
+                      AND state = :dead_letter_state
+                    """
+                ),
+                {
+                    "tenant_id": self._tenant_id,
+                    "offline_order_id": offline_order_id,
+                    "pending_state": MappingState.PENDING.value,
+                    "dead_letter_state": MappingState.DEAD_LETTER.value,
+                    "retry_user_id": retry_user_id,
+                },
+            )
+        except SQLAlchemyError as exc:
+            logger.error(
+                "offline_order_mapping_manual_retry_failed",
+                offline_order_id=offline_order_id,
+                error=str(exc),
+            )
+            raise
+
+        rowcount = getattr(result, "rowcount", None)
+        ok = rowcount is None or rowcount >= 1
+        if ok:
+            logger.warning(
+                "offline_order_mapping_manual_retry",
+                offline_order_id=offline_order_id,
+                retry_user_id=retry_user_id,
+                tenant_id=self._tenant_id,
+            )
+        return ok
