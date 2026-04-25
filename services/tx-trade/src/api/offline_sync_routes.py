@@ -9,6 +9,14 @@ POST /api/v1/offline-orders/sync
     - 返回 offline_id → cloud_id 映射表
   审计：每条 sync 调用写一条 trade_audit_logs（A4 write_audit）
 
+A3 §19 P1 增补（本次工单）：
+  GET  /api/v1/offline-orders/pending
+       —— 列出 pending 条目（manager/admin），分页
+
+  以及 sync 路径补 dead_letter 触发链路：每条 entry 同步失败 →
+  increment_attempts → 达 DEAD_LETTER_MAX_ATTEMPTS=20 → mark_dead_letter
+  （reason='max_attempts_exceeded'）。
+
 RBAC：
   - require_role("cashier", "store_manager", "admin")
   - Mac mini Flusher 使用 edge_service JWT（role=cashier）
@@ -16,6 +24,7 @@ RBAC：
 
 关联：
   - v270_offline_order_mapping 迁移
+  - v275_offline_order_mapping_attempts 迁移（last_error_message）
   - offline_order_mapping_service.OfflineOrderMappingService
   - A2 settle_retry 路由（idempotency_key=settle:{offline_order_id}）
 """
@@ -26,7 +35,7 @@ import uuid
 from typing import Optional
 
 import structlog
-from fastapi import APIRouter, Depends, Header, HTTPException, Request
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -36,6 +45,7 @@ from shared.ontology.src.database import get_db
 from ..security.rbac import UserContext, require_role
 from ..services.offline_order_id import parse_offline_order_id
 from ..services.offline_order_mapping_service import (
+    DEAD_LETTER_MAX_ATTEMPTS,
     OfflineOrderMappingService,
 )
 from ..services.trade_audit_log import write_audit
@@ -151,6 +161,7 @@ async def sync_offline_orders(
     # ── 3. 写入映射 ──────────────────────────────────────────────────
     svc = OfflineOrderMappingService(db=db, tenant_id=body.tenant_id)
     results: list[dict] = []
+    dead_lettered: list[str] = []  # 本批触发死信的 offline_order_id
 
     try:
         for entry in body.offline_orders:
@@ -182,21 +193,67 @@ async def sync_offline_orders(
                     )
                     continue
 
+            # ── A3 §19 致命级 #1 dead_letter 触发链路 ──
+            # 单条 entry 已是 dead_letter 状态：跳过（不再覆盖 + 不重置计数）
+            # 等待店长人工 resolve / retry 路径推回 pending
+            if existing and existing.get("state") == "dead_letter":
+                logger.warning(
+                    "offline_sync_skipped_dead_letter",
+                    offline_order_id=entry.offline_order_id,
+                    tenant_id=body.tenant_id,
+                )
+                results.append(
+                    {
+                        "offline_order_id": entry.offline_order_id,
+                        "cloud_order_id": existing.get("cloud_order_id") or "",
+                        "state": "dead_letter",
+                    }
+                )
+                continue
+
             # 服务端若未随行 cloud_order_id 则本地生成一枚 UUID v4
             cloud_id = entry.cloud_order_id or str(uuid.uuid4())
 
-            # upsert pending（幂等：重复 offline_order_id 保持既有状态）
-            await svc.upsert_mapping(
-                store_id=body.store_id,
-                device_id=body.device_id,
-                offline_order_id=entry.offline_order_id,
-            )
-            # mark_synced：返回 False 说明并发竞争下被另一个请求抢先 synced
-            # 重新读取最新 cloud_order_id 复用（不报错、不再生成新 UUID）
-            advanced = await svc.mark_synced(
-                offline_order_id=entry.offline_order_id,
-                cloud_order_id=cloud_id,
-            )
+            # 按 entry 兜底捕 SQLAlchemyError（不含 IntegrityError；后者上抛
+            # 至外层批级 catch 走幂等成功分支）。任一 entry 同步失败时：
+            #   1) increment_attempts — sync_attempts +1，记录 last_error_message
+            #   2) 阈值检查：sync_attempts >= DEAD_LETTER_MAX_ATTEMPTS 则
+            #      mark_dead_letter('max_attempts_exceeded')
+            #   3) 失败后**重新抛出**让外层 SQLAlchemyError handler 报 DB_ERROR
+            #      （C2 OperationalError 测试场景行为不变）
+            try:
+                # upsert pending（幂等：重复 offline_order_id 保持既有状态）
+                await svc.upsert_mapping(
+                    store_id=body.store_id,
+                    device_id=body.device_id,
+                    offline_order_id=entry.offline_order_id,
+                )
+                # mark_synced：返回 False 说明并发竞争被另一个请求抢先 synced
+                # 重新读取最新 cloud_order_id 复用（不报错、不再生成新 UUID）
+                advanced = await svc.mark_synced(
+                    offline_order_id=entry.offline_order_id,
+                    cloud_order_id=cloud_id,
+                )
+            except IntegrityError:
+                raise  # 让外层批级 IntegrityError handler 接（C1 测试）
+            except SQLAlchemyError as exc:
+                # 记录失败计数 + 必要时升级为死信。任一步本身再失败，
+                # 用 best-effort try/except 兜底：计数链路绝不应因二次故障
+                # 而吞掉主报错。
+                attempts_now = await _record_sync_failure(
+                    svc=svc,
+                    offline_order_id=entry.offline_order_id,
+                    error_summary=type(exc).__name__,
+                )
+                if attempts_now >= DEAD_LETTER_MAX_ATTEMPTS:
+                    await _mark_dead_letter_safe(
+                        svc=svc,
+                        offline_order_id=entry.offline_order_id,
+                        attempts=attempts_now,
+                    )
+                    dead_lettered.append(entry.offline_order_id)
+                raise  # 让外层 SQLAlchemyError handler 接（C2 测试）
+
             if not advanced:
                 latest = await svc.get(entry.offline_order_id)
                 if latest and latest.get("cloud_order_id"):
@@ -241,6 +298,7 @@ async def sync_offline_orders(
             tenant_id=body.tenant_id,
             store_id=body.store_id,
             error=str(exc),
+            dead_lettered_count=len(dead_lettered),
             exc_info=True,
         )
         # 已写入的条目保留（幂等），告知客户端 partial 需重试
@@ -250,6 +308,7 @@ async def sync_offline_orders(
                 "code": "DB_ERROR",
                 "message": "部分条目落库失败，请重试（幂等安全）",
                 "partial": results,
+                "dead_lettered": dead_lettered,
             },
         )
 
@@ -285,5 +344,195 @@ async def sync_offline_orders(
 
     return OfflineSyncResponse(
         ok=True,
-        data={"synced": len(results), "mappings": results},
+        data={
+            "synced": len(results),
+            "mappings": results,
+            "dead_lettered": dead_lettered,
+        },
     )
+
+
+# ─── 内部 helper：dead_letter 触发链路 ──────────────────────────────────────
+
+
+async def _record_sync_failure(
+    *,
+    svc: OfflineOrderMappingService,
+    offline_order_id: str,
+    error_summary: str,
+) -> int:
+    """best-effort 累加 sync_attempts；记录 last_error_message。
+
+    返回新的 sync_attempts 值（用于阈值判断）。
+    任一步骤失败均吞掉日志（防御链路绝不能因二次故障而抢走主报错）。
+
+    Returns:
+        int: 累加后的 sync_attempts；二次故障兜底返回 0（不触发死信）
+    """
+    try:
+        return await svc.increment_attempts(
+            offline_order_id=offline_order_id,
+            last_error=error_summary[:500],
+        )
+    except SQLAlchemyError as exc:
+        logger.warning(
+            "offline_sync_increment_attempts_failed_secondary",
+            offline_order_id=offline_order_id,
+            secondary_error=str(exc),
+        )
+        return 0
+
+
+async def _mark_dead_letter_safe(
+    *,
+    svc: OfflineOrderMappingService,
+    offline_order_id: str,
+    attempts: int,
+) -> None:
+    """best-effort 把单条 entry 升级为死信。
+
+    路由层只在 sync_attempts >= DEAD_LETTER_MAX_ATTEMPTS 时调用此 helper。
+    reason='max_attempts_exceeded:{attempts}' 便于运维侧反查阈值触发瞬间。
+    """
+    reason = f"max_attempts_exceeded:{attempts}"
+    try:
+        await svc.mark_dead_letter(
+            offline_order_id=offline_order_id,
+            reason=reason,
+        )
+    except SQLAlchemyError as exc:
+        logger.error(
+            "offline_sync_mark_dead_letter_failed_secondary",
+            offline_order_id=offline_order_id,
+            attempts=attempts,
+            secondary_error=str(exc),
+        )
+
+
+# ─── A3 §19 P1：dead_letter 人工面板 HTTP 入口 ──────────────────────────────
+
+
+class OfflineMappingItem(BaseModel):
+    """list_pending / list_dead_letter 单条返回结构（共享 schema）。"""
+
+    offline_order_id: str
+    cloud_order_id: Optional[str] = None
+    store_id: str
+    device_id: str
+    state: str
+    sync_attempts: int = 0
+    dead_letter_reason: Optional[str] = None
+    last_error_message: Optional[str] = None
+
+
+class OfflineMappingPage(BaseModel):
+    """分页响应负载。"""
+
+    items: list[OfflineMappingItem]
+    total: int
+    page: int
+    size: int
+
+
+class OfflineMappingPageResponse(BaseModel):
+    ok: bool
+    data: Optional[OfflineMappingPage] = None
+    error: Optional[dict] = None
+
+
+def _enforce_query_tenant(
+    *,
+    query_tenant: str,
+    header_tenant: str,
+    user: UserContext,
+    path: str,
+) -> None:
+    """GET 路径下的三方一致性（query string 替代 body）。"""
+    if header_tenant != query_tenant:
+        logger.warning(
+            "offline_admin_tenant_mismatch_header",
+            path=path,
+            header_tenant=header_tenant,
+            query_tenant=query_tenant,
+            user_id=user.user_id,
+        )
+        raise HTTPException(status_code=403, detail="TENANT_MISMATCH")
+    if user.tenant_id and user.tenant_id != query_tenant:
+        logger.warning(
+            "offline_admin_tenant_mismatch_user",
+            path=path,
+            user_tenant=user.tenant_id,
+            query_tenant=query_tenant,
+            user_id=user.user_id,
+        )
+        raise HTTPException(status_code=403, detail="USER_TENANT_MISMATCH")
+
+
+def _row_to_item(row: dict) -> OfflineMappingItem:
+    return OfflineMappingItem(
+        offline_order_id=row.get("offline_order_id", ""),
+        cloud_order_id=(str(row["cloud_order_id"]) if row.get("cloud_order_id") else None),
+        store_id=str(row.get("store_id", "")),
+        device_id=row.get("device_id", ""),
+        state=row.get("state", ""),
+        sync_attempts=int(row.get("sync_attempts") or 0),
+        dead_letter_reason=row.get("dead_letter_reason"),
+        last_error_message=row.get("last_error_message"),
+    )
+
+
+@router.get("/offline-orders/pending", response_model=OfflineMappingPageResponse)
+async def list_pending_offline_orders(
+    request: Request,
+    tenant_id: str = Query(..., min_length=1),
+    store_id: str = Query(..., min_length=1),
+    page: int = Query(1, ge=1),
+    size: int = Query(20, ge=1, le=200),
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
+    user: UserContext = Depends(require_role("store_manager", "admin", "manager")),
+) -> OfflineMappingPageResponse:
+    """列出当前租户 + 门店下 state=pending 的离线映射条目。
+
+    用于运营侧观测同步 backlog；店长/总部 admin 可查。
+    """
+    _enforce_query_tenant(
+        query_tenant=tenant_id,
+        header_tenant=x_tenant_id,
+        user=user,
+        path="/offline-orders/pending",
+    )
+
+    svc = OfflineOrderMappingService(db=db, tenant_id=tenant_id)
+    try:
+        # service.list_pending 用 limit；页面分页用 size*page 做近似 offset
+        # （pending 数量通常小，无需复杂全表 count）
+        all_rows = await svc.list_pending(store_id=store_id, limit=500)
+    except SQLAlchemyError as exc:
+        logger.error(
+            "offline_orders_list_pending_db_error",
+            tenant_id=tenant_id,
+            store_id=store_id,
+            error=str(exc),
+        )
+        return OfflineMappingPageResponse(
+            ok=False,
+            error={"code": "DB_ERROR", "message": "查询失败"},
+        )
+
+    total = len(all_rows)
+    start = (page - 1) * size
+    end = start + size
+    page_rows = all_rows[start:end]
+
+    return OfflineMappingPageResponse(
+        ok=True,
+        data=OfflineMappingPage(
+            items=[_row_to_item(r) for r in page_rows],
+            total=total,
+            page=page,
+            size=size,
+        ),
+    )
+
+

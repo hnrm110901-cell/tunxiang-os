@@ -4,7 +4,8 @@
   - upsert_mapping      — 离线 order_id 首次入表（state=pending）
   - mark_synced         — 同步成功，写入 cloud_order_id + state=synced
   - mark_dead_letter    — 多次补发失败，state=dead_letter（保留等人工确认）
-  - increment_sync_attempt — 每次同步尝试累加 sync_attempts
+  - increment_sync_attempt — 每次同步尝试累加 sync_attempts（legacy；保留兼容）
+  - increment_attempts  — 同步失败累加 sync_attempts + last_error_message，返回新值
   - get                 — 按 offline_order_id 读取（RLS 强制 tenant_id）
   - list_pending        — 列出租户+门店下的 pending 映射（backlog）
 
@@ -401,3 +402,75 @@ class OfflineOrderMappingService:
                 error=str(exc),
             )
             raise
+
+    # ─── A3 §19 P1：dead_letter 触发链路 + 店长人工面板支撑接口 ─────────────
+
+    async def increment_attempts(
+        self,
+        *,
+        offline_order_id: str,
+        last_error: Optional[str] = None,
+    ) -> int:
+        """同步失败：sync_attempts +1 并刷新 last_error_message，返回新值。
+
+        与 legacy `increment_sync_attempt` 区别：
+          - 新 API 返回 RETURNING 的 sync_attempts 新值（路由层用其判断
+            是否达 DEAD_LETTER_MAX_ATTEMPTS 阈值）
+          - 接受 last_error 参数：每次失败都记录最近错误简述（500 字符截断）
+
+        Args:
+            offline_order_id: 离线 order_id 字符串
+            last_error: 失败原因简述（如 'edge_unreachable' / 'pos_adapter_500'）
+
+        Returns:
+            int: 自增后的 sync_attempts 值（用于阈值判断）。条目不存在时返回 0。
+
+        Note:
+            UPDATE 不带 state 守护：
+              - dead_letter 条目按理不会再触发 increment（路由层不会调用）
+              - 但若并发场景下 dead_letter 已设置，sync_attempts 仍累加无害
+                （只是计数失真，由 dead_letter_reason 主导决策）
+        """
+        if not offline_order_id:
+            raise ValueError("offline_order_id is required")
+
+        await self._bind_rls()
+        try:
+            result = await self._db.execute(
+                text(
+                    """
+                    UPDATE offline_order_mapping
+                    SET sync_attempts = sync_attempts + 1,
+                        last_error_message = :last_error,
+                        updated_at = NOW()
+                    WHERE tenant_id = :tenant_id
+                      AND offline_order_id = :offline_order_id
+                    RETURNING sync_attempts
+                    """
+                ),
+                {
+                    "tenant_id": self._tenant_id,
+                    "offline_order_id": offline_order_id,
+                    "last_error": (last_error or "")[:500] or None,
+                },
+            )
+        except SQLAlchemyError as exc:
+            logger.error(
+                "offline_order_mapping_increment_attempts_failed",
+                offline_order_id=offline_order_id,
+                error=str(exc),
+            )
+            raise
+
+        # MockDB / 真实 PG 都返回 rowcount；新值通过 RETURNING 抽出
+        try:
+            row = result.mappings().first() if hasattr(result, "mappings") else None
+        except Exception:  # noqa: BLE001 — Mock 兼容
+            row = None
+        if row and "sync_attempts" in row:
+            return int(row["sync_attempts"])
+
+        # 兜底：RETURNING 不可用时回查一次
+        existing = await self.get(offline_order_id)
+        return int(existing.get("sync_attempts", 0)) if existing else 0
+
