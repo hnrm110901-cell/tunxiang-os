@@ -118,57 +118,6 @@ from .routers.vision_router import router as vision_router
 from .routers.voice_order_router import router as voice_order_router
 
 
-async def _mark_offline_scheduler_loop(
-    session_factory,
-    *,
-    interval_sec: int = 60,
-) -> None:
-    """C3 周期任务：每 interval_sec 秒跨租户标记离线 KDS 设备。
-
-    背景：DeviceRegistryService.mark_offline_if_stale 默认 600s 阈值，
-    KDS 拔网线 11 分钟后必须翻 offline，否则运维面板永远停留 healthy。
-    本 loop 调用 mark_offline_if_stale_global，逐租户扫描 edge_device_registry。
-
-    异常处理：
-      - SQLAlchemyError / OSError：单轮失败仅记 warning，下一轮重试
-      - 其它 Exception：审计修复期允许的兜底（避免 task 死亡使整个服务失忆），
-        必须带 exc_info=True
-      - asyncio.CancelledError：lifespan exit 时取消，正常退出
-    """
-    import asyncio as _asyncio
-
-    import structlog as _structlog
-    from sqlalchemy.exc import SQLAlchemyError as _SQLAlchemyError
-
-    from .services.device_registry_service import DeviceRegistryService
-
-    log = _structlog.get_logger(__name__)
-    log.info("mark_offline_scheduler_started", interval_sec=interval_sec)
-
-    while True:
-        try:
-            await _asyncio.sleep(interval_sec)
-            summary = await DeviceRegistryService.mark_offline_if_stale_global(
-                session_factory,
-            )
-            log.info(
-                "mark_offline_scheduler_tick",
-                tenants_scanned=summary["tenants_scanned"],
-                devices_marked_offline=summary["devices_marked_offline"],
-            )
-        except _asyncio.CancelledError:
-            log.info("mark_offline_scheduler_stopped")
-            raise
-        except _SQLAlchemyError as exc:
-            log.warning(
-                "mark_offline_scheduler_db_error",
-                error=str(exc),
-            )
-        except Exception:  # noqa: BLE001 — scheduler 顶层兜底，防 task 死亡（CLAUDE.md §14 审计修复期例外）
-            log.exception("mark_offline_scheduler_unexpected_error", exc_info=True)
-            await _asyncio.sleep(5)
-
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     import asyncio
@@ -220,8 +169,10 @@ async def lifespan(app: FastAPI):
                 "mark_offline_scheduler_enabled",
                 flag=_EdgeFlags.MARK_OFFLINE_SCHEDULER,
             )
+            from .services.mark_offline_scheduler import mark_offline_scheduler_loop
+
             mark_offline_task = asyncio.create_task(
-                _mark_offline_scheduler_loop(async_session_factory, interval_sec=60),
+                mark_offline_scheduler_loop(async_session_factory, interval_sec=60),
                 name="mark_offline_scheduler",
             )
         else:
