@@ -39,9 +39,32 @@ logger = structlog.get_logger(__name__)
 _VALID_RESULTS: frozenset[str] = frozenset({"allow", "deny", "mfa_required"})
 _VALID_SEVERITIES: frozenset[str] = frozenset({"info", "warn", "error", "critical"})
 
-# RFC 4122 NIL UUID — audit_deny 401 路径 tenant_id 兜底（参见 rbac.py 同名常量）。
+# RFC 4122 NIL UUID — audit_deny 401 路径 tenant_id / user_id 兜底（参见 rbac.py 同名常量）。
 # 与 v261 RLS 策略兼容：set_config('app.tenant_id', NIL) → INSERT tenant_id=NIL → policy 通过。
+# 同时复用为 user_id 兜底：v261 user_id 是 UUID NOT NULL，原 "(unauthenticated)" 字符串
+# 给 PG 会触发 cast 失败 → SQLAlchemyError → broad except 吞 → 审计永久丢失（与 da70fd0c
+# 修复前 tenant_id="" 同根因）。NIL UUID 是合法 UUID，audit_deny 把语义"未认证"
+# 放在 user_role 列（TEXT，无 cast 限制），user_id 列只承担"是否合法 UUID"。
 _NIL_TENANT_UUID: str = "00000000-0000-0000-0000-000000000000"
+_NIL_USER_UUID: str = "00000000-0000-0000-0000-000000000000"
+
+# v295 字符串列长度限制 — 攻击者可通过 X-Request-Id / 自定义 session_id /
+# 长 exc.detail 让 PG 抛 StringDataRightTruncation（同样进 broad except → 静默丢审计）。
+# write_audit 在写入前主动截断到列限制 - 1（保留 1 位给 trailing marker '~'），
+# 让 INSERT 永远成功，丢失的尾部字节由 reason 末尾的 '~' 或 structlog 留痕。
+_REASON_MAX_LEN: int = 128
+_REQUEST_ID_MAX_LEN: int = 64
+_SESSION_ID_MAX_LEN: int = 64
+_USER_ROLE_MAX_LEN: int = 64  # TEXT 列无硬限，但留软限避免日志查询索引膨胀
+
+
+def _truncate(value: str | None, max_len: int) -> str | None:
+    """裁剪字符串到列限制；溢出时尾部加 '~' 标记，便于 SIEM 识别 truncation。"""
+    if value is None:
+        return None
+    if len(value) <= max_len:
+        return value
+    return value[: max_len - 1] + "~"
 
 
 # ──────────────── target_id 跨租户校验（A4-R2 / Tier1） ────────────────
@@ -290,6 +313,14 @@ async def write_audit(
                 elif not reason:
                     reason = _block_tag
 
+        # 1.7) 字符串列长度防御 — 见 _truncate 注释。攻击者可控的 X-Request-Id /
+        # 长 exc.detail / 拼接后的 reason 都可能溢出 PG VARCHAR → StringDataRightTruncation
+        # → broad except → 静默丢审计。在 INSERT 前主动截断让写入永远成功。
+        safe_reason = _truncate(reason, _REASON_MAX_LEN)
+        safe_request_id = _truncate(request_id, _REQUEST_ID_MAX_LEN)
+        safe_session_id = _truncate(session_id, _SESSION_ID_MAX_LEN)
+        safe_user_role = _truncate(user_role or "", _USER_ROLE_MAX_LEN)
+
         # 2) 插入审计行（v295 扩列在缺失时由 PG 自动填 NULL，不影响旧 schema）
         await db.execute(
             text(
@@ -313,17 +344,17 @@ async def write_audit(
                 "tenant_id": str(tenant_id),
                 "store_id": str(store_id) if store_id else None,
                 "user_id": str(user_id),
-                "user_role": user_role or "",
+                "user_role": safe_user_role,
                 "action": action,
                 "target_type": target_type,
                 "target_id": str(target_id) if target_id else None,
                 "amount_fen": int(amount_fen) if amount_fen is not None else None,
                 "client_ip": client_ip,
                 "result": result,
-                "reason": reason,
-                "request_id": request_id,
+                "reason": safe_reason,
+                "request_id": safe_request_id,
                 "severity": severity,
-                "session_id": session_id,
+                "session_id": safe_session_id,
                 "before_state": json.dumps(dict(before_state)) if before_state else None,
                 "after_state": json.dumps(dict(after_state)) if after_state else None,
             },
@@ -407,13 +438,14 @@ async def audit_deny(
         在审计写入之前发出 → 短暂时间窗内审计缺失。50ms 同步代价对 4xx 响应
         UX 无影响（用户已被拒）。
     """
-    # 入参兜底：user_id 缺失时仍要写一条（特别是 401 AUTH_MISSING 路径）
-    safe_user_id = user_id or "(unauthenticated)"
+    # 入参兜底（401 AUTH_MISSING / 未认证路径）：
+    #   user_id 列是 PG UUID NOT NULL → 字符串如 "(unauthenticated)" cast 失败 →
+    #     SQLAlchemyError → broad except → 静默丢审计（与 da70fd0c 修复前 tenant_id
+    #     同根因，但当时只兜底了 tenant_id 这一列；此处补上）。
+    #   语义"未认证"放在 user_role 列（TEXT 列无 cast 限制），user_id 用 NIL UUID。
+    #   tenant_id 同样兜底（防御 wrapper 漏 resolve / 直接调用绕过 wrapper）。
+    safe_user_id = user_id or _NIL_USER_UUID
     safe_user_role = user_role or "(unauthenticated)"
-    # 防御层 2 — tenant_id 空则用 NIL UUID。
-    # rbac.py wrapper 已经 resolve 过 tenant_id；此处兜底防止未来新增的直接
-    # 调用路径（绕过 wrapper）让空串到达 PG 上 UUID NOT NULL 列触发 cast 失败
-    # 静默丢审计。NIL UUID 是 PG 上合法值，trade_audit_logs RLS 策略允许。
     safe_tenant_id = tenant_id or _NIL_TENANT_UUID
 
     await write_audit(

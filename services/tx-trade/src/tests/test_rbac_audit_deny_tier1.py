@@ -613,5 +613,204 @@ async def test_pg_integration_unauthenticated_audit_actually_persists():
             assert row.action == "refund.apply"
             assert row.result == "deny"
             assert "probed_tenant" in row.reason
+            # 第二轮 §19 复审追加：user_id 列必须是 NIL UUID（不能是 "(unauthenticated)" 字符串）
+            assert str(row.user_id) == "00000000-0000-0000-0000-000000000000", (
+                f"user_id 应是 NIL UUID 兜底；得到 {row.user_id!r}"
+            )
+            assert row.user_role == "(unauthenticated)"
     finally:
         await engine.dispose()
+
+
+# ──────────────────────────────────────────────────────────────────────────
+#  R-补1-2 第二轮 §19 复审：补 da70fd0c 漏盖的 audit-loss 分支
+#    - safe_user_id "(unauthenticated)" 给 PG UUID NOT NULL 列 cast 失败
+#    - reason String(128) / request_id String(64) / session_id String(64) 溢出
+# ──────────────────────────────────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_audit_deny_empty_user_id_uses_nil_uuid_not_string_sentinel(stub_db):
+    """audit_deny user_id="" → user_id 列收到 NIL UUID（不是 "(unauthenticated)"）。
+
+    da70fd0c 修了 tenant_id 同根因，但 audit_deny 仍把 "(unauthenticated)" 当
+    user_id 给 PG UUID NOT NULL 列 → cast 失败 → broad except → 静默丢审计。
+    本测试断言 INSERT 参数里 user_id 是合法 UUID 字符串。
+    """
+    from src.services.trade_audit_log import audit_deny
+
+    captured_params: list[dict] = []
+
+    async def _capture_execute(stmt, params=None):
+        if params is not None:
+            captured_params.append(dict(params))
+        m = AsyncMock()
+        m.first = lambda: None
+        return m
+
+    stub_db.execute.side_effect = _capture_execute
+
+    await audit_deny(
+        stub_db,
+        tenant_id="",
+        store_id=None,
+        user_id="",  # 401 路径
+        user_role="",
+        action="refund.apply",
+        reason="AUTH_MISSING",
+    )
+
+    insert_params = [p for p in captured_params if "user_id" in p]
+    assert len(insert_params) == 1
+    p = insert_params[0]
+    # user_id 必须是合法 UUID 格式（NIL UUID）
+    assert p["user_id"] == NIL_TENANT_UUID, (
+        f"user_id 必须用 NIL UUID 兜底；得到 {p['user_id']!r}（这会让 PG cast 失败）"
+    )
+    # user_role 列保留 "(unauthenticated)" 语义（TEXT 列无 cast 限制）
+    assert p["user_role"] == "(unauthenticated)"
+
+
+@pytest.mark.asyncio
+async def test_write_audit_oversize_reason_truncated_not_dropped(stub_db):
+    """reason 超 128 字符 → 截断到 128（末尾 '~' 标记），不让 PG 抛 truncation error。
+
+    攻击者可通过组合长 exc.detail + cross_tenant_target_blocked tag + probed_tenant
+    后缀让 reason 溢出 → StringDataRightTruncation → broad except → 静默丢审计。
+    """
+    from src.services.trade_audit_log import audit_deny
+
+    captured_params: list[dict] = []
+
+    async def _capture_execute(stmt, params=None):
+        if params is not None:
+            captured_params.append(dict(params))
+        m = AsyncMock()
+        m.first = lambda: None
+        return m
+
+    stub_db.execute.side_effect = _capture_execute
+
+    long_reason = "X" * 200  # 远超 128
+    await audit_deny(
+        stub_db,
+        tenant_id=XUJI_CHANGSHA_TENANT,
+        store_id=None,
+        user_id=CASHIER_XIAOWANG_ID,
+        user_role="cashier",
+        action="refund.apply",
+        reason=long_reason,
+    )
+
+    insert_params = [p for p in captured_params if "reason" in p]
+    assert len(insert_params) == 1
+    truncated = insert_params[0]["reason"]
+    assert len(truncated) <= 128, f"reason 必须截断到 ≤128；得到 len={len(truncated)}"
+    assert truncated.endswith("~"), "truncation 必须在末尾留 '~' 标记"
+
+
+@pytest.mark.asyncio
+async def test_write_audit_oversize_request_id_truncated(stub_db):
+    """X-Request-Id 超 64 字符（攻击者可控 header）→ 截断不丢审计。"""
+    from src.services.trade_audit_log import audit_deny
+
+    captured_params: list[dict] = []
+
+    async def _capture_execute(stmt, params=None):
+        if params is not None:
+            captured_params.append(dict(params))
+        m = AsyncMock()
+        m.first = lambda: None
+        return m
+
+    stub_db.execute.side_effect = _capture_execute
+
+    long_request_id = "Z" * 200
+    await audit_deny(
+        stub_db,
+        tenant_id=XUJI_CHANGSHA_TENANT,
+        store_id=None,
+        user_id=CASHIER_XIAOWANG_ID,
+        user_role="cashier",
+        action="refund.apply",
+        reason="ROLE_FORBIDDEN",
+        request_id=long_request_id,
+    )
+
+    insert_params = [p for p in captured_params if "request_id" in p]
+    assert len(insert_params) == 1
+    truncated = insert_params[0]["request_id"]
+    assert len(truncated) <= 64
+    assert truncated.endswith("~")
+
+
+@pytest.mark.asyncio
+async def test_write_audit_oversize_session_id_truncated(stub_db):
+    """session_id 超 64 字符 → 截断不丢审计。"""
+    from src.services.trade_audit_log import audit_deny
+
+    captured_params: list[dict] = []
+
+    async def _capture_execute(stmt, params=None):
+        if params is not None:
+            captured_params.append(dict(params))
+        m = AsyncMock()
+        m.first = lambda: None
+        return m
+
+    stub_db.execute.side_effect = _capture_execute
+
+    long_session_id = "S" * 200
+    await audit_deny(
+        stub_db,
+        tenant_id=XUJI_CHANGSHA_TENANT,
+        store_id=None,
+        user_id=CASHIER_XIAOWANG_ID,
+        user_role="cashier",
+        action="refund.apply",
+        reason="ROLE_FORBIDDEN",
+        session_id=long_session_id,
+    )
+
+    insert_params = [p for p in captured_params if "session_id" in p]
+    assert len(insert_params) == 1
+    truncated = insert_params[0]["session_id"]
+    assert len(truncated) <= 64
+    assert truncated.endswith("~")
+
+
+@pytest.mark.asyncio
+async def test_write_audit_normal_length_passthrough_no_truncation_marker(stub_db):
+    """正常长度 reason / request_id / session_id 原样写入，不加 '~' 后缀。"""
+    from src.services.trade_audit_log import audit_deny
+
+    captured_params: list[dict] = []
+
+    async def _capture_execute(stmt, params=None):
+        if params is not None:
+            captured_params.append(dict(params))
+        m = AsyncMock()
+        m.first = lambda: None
+        return m
+
+    stub_db.execute.side_effect = _capture_execute
+
+    await audit_deny(
+        stub_db,
+        tenant_id=XUJI_CHANGSHA_TENANT,
+        store_id=None,
+        user_id=CASHIER_XIAOWANG_ID,
+        user_role="cashier",
+        action="refund.apply",
+        reason="ROLE_FORBIDDEN",
+        request_id="req-xj-001",
+        session_id="session-001",
+    )
+
+    insert_params = [p for p in captured_params if "reason" in p]
+    p = insert_params[0]
+    assert p["reason"] == "ROLE_FORBIDDEN"
+    assert not p["reason"].endswith("~")
+    assert p["request_id"] == "req-xj-001"
+    assert not p["request_id"].endswith("~")
+    assert p["session_id"] == "session-001"
