@@ -450,3 +450,124 @@ def test_extract_user_context_populates_request_metadata_for_audit():
     assert ctx.client_ip == "10.1.2.3"
     assert ctx.user_id == MANAGER_LIJIE_ID
     assert ctx.tenant_id == XUJI_CHANGSHA_TENANT
+
+
+# ──────────────── 场景 10：A4 (b) lifespan shutdown gather 不丢审计 ────────────────
+
+
+@pytest.mark.asyncio
+async def test_xujihaixian_lifespan_shutdown_gathers_audit_tasks_no_loss():
+    """Uvicorn SIGTERM 时 in-flight write_audit 必须被 gather，不能被 cancel。
+
+    场景：徐记河西店店长李姐 18:00 整删除一笔挂单（write_audit 50ms 慢），
+    18:00:00.030 运维滚动发布触发 SIGTERM。lifespan finally 必须 await 完成
+    审计写入，避免取证证据链断点。
+    """
+    from src.services.trade_audit_log import _register_audit_task, schedule_audit
+
+    # 模拟 main.py lifespan startup 注入的 app.state.background_tasks
+    fake_app = SimpleNamespace(state=SimpleNamespace(background_tasks=set()))
+
+    completion_log: list[str] = []
+
+    async def _slow_audit_work():
+        await asyncio.sleep(0.05)  # 50ms 审计 DB 写入
+        completion_log.append("audit_done")
+
+    # 路由层调度 fire-and-forget
+    task = asyncio.create_task(_slow_audit_work())
+    _register_audit_task(fake_app, task)
+
+    # 验证 task 已被跟踪
+    assert task in fake_app.state.background_tasks
+    assert len(fake_app.state.background_tasks) == 1
+
+    # 模拟 lifespan finally：await gather 5s 超时排空
+    pending = [t for t in list(fake_app.state.background_tasks) if not t.done()]
+    await asyncio.wait_for(
+        asyncio.gather(*pending, return_exceptions=True),
+        timeout=5.0,
+    )
+
+    # 审计已完成（未被 cancel） + done callback 自动清理 set
+    assert completion_log == ["audit_done"]
+    assert len(fake_app.state.background_tasks) == 0
+
+    # ── 退化路径：app=None 不应抛异常（test 环境）──
+    slow_db = AsyncMock()
+
+    async def _fast_execute(*a, **kw):
+        return AsyncMock()
+
+    slow_db.execute = _fast_execute
+    slow_db.commit = AsyncMock()
+    slow_db.rollback = AsyncMock()
+
+    fallback_task = schedule_audit(
+        None,  # app 不可用
+        db=slow_db,
+        tenant_id=XUJI_CHANGSHA_TENANT,
+        store_id=XUJI_CHANGSHA_STORE,
+        user_id=MANAGER_LIJIE_ID,
+        user_role="store_manager",
+        action="order.delete",
+        target_type="order",
+        target_id="00000000-0000-0000-0000-000000000099",
+        amount_fen=12800,
+        client_ip="10.0.0.5",
+    )
+    assert isinstance(fallback_task, asyncio.Task)
+    await fallback_task  # 不抛异常 = 退化路径正确
+
+
+# ──────────────── 场景 11：A4 (a) RLS WITH CHECK 防跨租户污染 ────────────────
+
+
+def test_xujihaixian_rls_with_check_blocks_cross_tenant_insert():
+    """v274 迁移必须给 trade_audit_logs 补 WITH CHECK 子句防止跨租户污染。
+
+    场景：长沙徐记 admin 拿到 db session 后尝试 INSERT 一行
+    tenant_id='韶山徐记' 的审计记录。v261 仅 USING 时 INSERT 通过 → 污染韶山
+    取证证据链。v274 加 WITH CHECK 后 PG 直接拒绝（new row violates RLS）。
+
+    本测试通过静态扫描 v274 迁移文件验证：
+      - 策略名 trade_audit_logs_tenant_isolation 包含 USING + WITH CHECK
+      - WITH CHECK 表达式与 USING 等价（相同 NULLIF/current_setting 模式）
+      - downgrade 还原 v261 仅 USING 形态
+    """
+    from pathlib import Path
+
+    # tests/ → src/ → tx-trade/ → services/ → repo_root
+    repo_root = Path(__file__).resolve().parents[4]
+    migration_path = (
+        repo_root
+        / "shared"
+        / "db-migrations"
+        / "versions"
+        / "v274_trade_audit_logs_rls_with_check.py"
+    )
+    assert migration_path.is_file(), f"v274 迁移文件不存在：{migration_path}"
+
+    src = migration_path.read_text(encoding="utf-8")
+
+    # 1. 必须 DROP v261 旧策略（仅 USING）
+    assert "DROP POLICY IF EXISTS trade_audit_logs_tenant ON trade_audit_logs" in src
+
+    # 2. 必须新建带 WITH CHECK 的策略
+    assert "CREATE POLICY trade_audit_logs_tenant_isolation ON trade_audit_logs" in src
+    assert "USING (" in src
+    assert "WITH CHECK (" in src
+
+    # 3. WITH CHECK 与 USING 必须用相同 RLS 表达式（NULLIF + current_setting('app.tenant_id'))
+    using_count = src.count("tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid")
+    assert using_count >= 2, (
+        f"USING + WITH CHECK 应共出现 >=2 次 RLS 表达式，实际 {using_count}"
+    )
+
+    # 4. revision/down_revision 衔接 v273
+    assert 'revision = "v274"' in src
+    assert 'down_revision = "v273"' in src
+
+    # 5. downgrade 还原 v261 仅 USING 形态
+    assert "DROP POLICY IF EXISTS trade_audit_logs_tenant_isolation" in src
+    assert "CREATE POLICY trade_audit_logs_tenant ON trade_audit_logs" in src
