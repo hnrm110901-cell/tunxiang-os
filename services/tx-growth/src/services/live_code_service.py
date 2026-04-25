@@ -10,6 +10,7 @@
   - store_bindings:    门店绑定/解绑管理
 """
 
+import json
 import math
 import uuid
 from datetime import date, datetime, timezone
@@ -87,11 +88,11 @@ class LiveCodeService:
                 "wecom_config_id": str(wecom_config_id) if wecom_config_id else None,
                 "welcome_msg": welcome_msg,
                 "welcome_media_url": welcome_media_url,
-                "target_group_ids": str(target_group_ids or []),
+                "target_group_ids": json.dumps(target_group_ids or []),
                 "lbs_radius_meters": lbs_radius_meters,
                 "daily_add_limit": daily_add_limit,
                 "total_add_limit": total_add_limit,
-                "auto_tag_ids": str(auto_tag_ids or []),
+                "auto_tag_ids": json.dumps(auto_tag_ids or []),
                 "channel_source": channel_source,
                 "qr_image_url": qr_image_url,
                 "expires_at": expires_at,
@@ -432,7 +433,7 @@ class LiveCodeService:
                 "longitude": longitude,
                 "matched_store_id": str(matched_store_id) if matched_store_id else None,
                 "result": result,
-                "device_info": str(device_info) if device_info else None,
+                "device_info": json.dumps(device_info) if device_info else None,
             },
         )
         return str(scan_id)

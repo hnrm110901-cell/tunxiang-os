@@ -427,14 +427,17 @@ class AudiencePackService:
                         COALESCE(SUM(total_amount_fen), 0) AS total_spend_fen,
                         MAX(created_at) AS last_order_at
                     FROM orders
-                    WHERE is_deleted = FALSE
+                    WHERE is_deleted = FALSE AND tenant_id = :tenant_id
                     GROUP BY customer_id
                 ) o_agg ON o_agg.customer_id = m.id
             """)
 
         if needs_sv:
             joins.append("""
-                LEFT JOIN stored_value_accounts sv ON sv.customer_id = m.id AND sv.is_deleted = FALSE
+                LEFT JOIN stored_value_accounts sv
+                    ON sv.customer_id = m.id
+                    AND sv.tenant_id = :tenant_id
+                    AND sv.is_deleted = FALSE
             """)
 
         where_clause = " AND ".join(conditions) if conditions else "TRUE"

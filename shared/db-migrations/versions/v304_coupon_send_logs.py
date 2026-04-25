@@ -61,8 +61,10 @@ def upgrade() -> None:
 
     op.execute("ALTER TABLE coupon_send_logs ENABLE ROW LEVEL SECURITY")
     op.execute("""
+        DROP POLICY IF EXISTS coupon_send_logs_tenant_isolation ON coupon_send_logs;
         CREATE POLICY coupon_send_logs_tenant_isolation ON coupon_send_logs
-            USING (tenant_id = current_setting('app.tenant_id')::uuid)
+            USING (tenant_id::text = current_setting('app.tenant_id', true))
+            WITH CHECK (tenant_id::text = current_setting('app.tenant_id', true));
     """)
     op.execute("ALTER TABLE coupon_send_logs FORCE ROW LEVEL SECURITY")
 
