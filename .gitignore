@@ -43,6 +43,11 @@ htmlcov/
 .mypy_cache/
 package-lock.json
 
+# Playwright
+playwright-report/
+test-results/
+playwright/.cache/
+
 # Temporary files
 *.tmp
 *.temp
