@@ -1,18 +1,35 @@
-"""交易域 API — 订单 CRUD + 支付 + 小票打印（已接通数据库）"""
+"""交易域 API — 订单 CRUD + 支付 + 小票打印（已接通数据库）
+
+R-A1-3 / Tier1（commit 5ec4660d 基建之上的路由集成）：
+  - settle_order / create_payment 接 X-Idempotency-Key header
+  - 闭环 apps/web-pos R-补2-1 (commit 48aba740) 客户端契约
+  - 防 saga 双扣 / 储值双扣 / 第三方支付双扣
+"""
 
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
 
+from ..services.api_idempotency import (
+    IdempotencyKeyConflict,
+    acquire_idempotency_lock,
+    compute_request_hash,
+    get_cached_response,
+    store_cached_response,
+)
 from ..services.order_service import OrderService
 from ..services.payment_service import PaymentService
 from ..services.receipt_service import ReceiptService
 
 router = APIRouter(prefix="/api/v1/trade", tags=["trade"])
+
+# 路由模板路径常量（用于 idempotency cache 的 route_path 字段，不带具体 order_id）
+_ROUTE_SETTLE = "/api/v1/trade/orders/{order_id}/settle"
+_ROUTE_PAYMENT = "/api/v1/trade/orders/{order_id}/payments"
 
 
 def _get_tenant_id(request: Request) -> str:
@@ -20,6 +37,55 @@ def _get_tenant_id(request: Request) -> str:
     if not tid:
         raise HTTPException(status_code=400, detail="X-Tenant-ID header required")
     return tid
+
+
+async def _check_idempotency_cache(
+    db: AsyncSession,
+    *,
+    tenant_id: str,
+    idempotency_key: Optional[str],
+    route_path: str,
+    body_for_hash: str,
+) -> tuple[Optional[dict], str]:
+    """路由进入时调用：取 advisory_lock + 检查 cache。
+
+    Returns:
+        (cached_body, request_hash) — cached_body 非 None 时直接返回给客户端
+        （路由 short-circuit）；否则继续业务处理。
+
+    Raises:
+        HTTPException(422) on IdempotencyKeyConflict（同 key 不同 body）
+    """
+    if not idempotency_key:
+        return None, ""
+
+    request_hash = compute_request_hash("POST", route_path, body_for_hash)
+
+    # 取事务级锁（同 key 并发自动串行，commit 自动释放）
+    await acquire_idempotency_lock(
+        db, tenant_id=tenant_id, idempotency_key=idempotency_key, route_path=route_path,
+    )
+
+    try:
+        cached = await get_cached_response(
+            db,
+            tenant_id=tenant_id,
+            idempotency_key=idempotency_key,
+            route_path=route_path,
+            request_hash=request_hash,
+        )
+    except IdempotencyKeyConflict as exc:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "code": "IDEMPOTENCY_KEY_CONFLICT",
+                "message": str(exc),
+            },
+        ) from exc
+
+    if cached is not None:
+        return cached.body, request_hash
+    return None, request_hash
 
 
 # ─── 请求模型 ───
@@ -120,10 +186,51 @@ async def apply_discount(order_id: str, req: ApplyDiscountReq, request: Request,
 
 
 @router.post("/orders/{order_id}/settle")
-async def settle_order(order_id: str, request: Request, db: AsyncSession = Depends(get_db)):
-    svc = OrderService(db, _get_tenant_id(request))
+async def settle_order(
+    order_id: str,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    x_idempotency_key: Optional[str] = Header(None, alias="X-Idempotency-Key"),
+):
+    """结算订单。R-A1-3 / Tier1：X-Idempotency-Key replay cache 防 saga 双扣。
+
+    客户端契约（apps/web-pos R-补2-1）：
+      - replay 时携带 `X-Idempotency-Key: settle:{order_id}`
+      - 同 key 重试 → 服务端读 cache → 返回原响应（不再处理业务）
+      - 同 key 不同 body → 422 IDEMPOTENCY_KEY_CONFLICT
+    """
+    tenant_id = _get_tenant_id(request)
+
+    # 路由进入：检 cache（命中则 short-circuit）
+    # settle_order 无 request body，body_for_hash 用空串
+    cached_body, request_hash = await _check_idempotency_cache(
+        db,
+        tenant_id=tenant_id,
+        idempotency_key=x_idempotency_key,
+        route_path=_ROUTE_SETTLE,
+        body_for_hash="",
+    )
+    if cached_body is not None:
+        return cached_body
+
+    # 业务处理
+    svc = OrderService(db, tenant_id)
     result = await svc.settle_order(order_id=order_id)
-    return {"ok": True, "data": result, "error": None}
+    response_body = {"ok": True, "data": result, "error": None}
+
+    # 落 cache（仍持 advisory_lock，事务尚未 commit）
+    if x_idempotency_key:
+        await store_cached_response(
+            db,
+            tenant_id=tenant_id,
+            idempotency_key=x_idempotency_key,
+            route_path=_ROUTE_SETTLE,
+            request_hash=request_hash,
+            response_status=200,
+            response_body=response_body,
+        )
+
+    return response_body
 
 
 @router.post("/orders/{order_id}/cancel")
@@ -146,8 +253,33 @@ async def get_order(order_id: str, request: Request, db: AsyncSession = Depends(
 
 
 @router.post("/orders/{order_id}/payments")
-async def create_payment(order_id: str, req: CreatePaymentReq, request: Request, db: AsyncSession = Depends(get_db)):
-    svc = PaymentService(db, _get_tenant_id(request))
+async def create_payment(
+    order_id: str,
+    req: CreatePaymentReq,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    x_idempotency_key: Optional[str] = Header(None, alias="X-Idempotency-Key"),
+):
+    """创建支付。R-A1-3 / Tier1：X-Idempotency-Key replay cache 防双扣。
+
+    客户端契约（apps/web-pos R-补2-1）：
+      - replay 时携带 `X-Idempotency-Key: payment:{order_id}:{method}`
+      - 同 key 重试 → cache 命中 → 不再扣会员储值/不再调第三方支付
+    """
+    tenant_id = _get_tenant_id(request)
+
+    # body_for_hash 用 pydantic 序列化，比 raw bytes 更稳定（字段顺序固定）
+    cached_body, request_hash = await _check_idempotency_cache(
+        db,
+        tenant_id=tenant_id,
+        idempotency_key=x_idempotency_key,
+        route_path=_ROUTE_PAYMENT,
+        body_for_hash=req.model_dump_json(),
+    )
+    if cached_body is not None:
+        return cached_body
+
+    svc = PaymentService(db, tenant_id)
     result = await svc.create_payment(
         order_id=order_id,
         method=req.method,
@@ -155,7 +287,20 @@ async def create_payment(order_id: str, req: CreatePaymentReq, request: Request,
         trade_no=req.trade_no,
         credit_account_name=req.credit_account_name,
     )
-    return {"ok": True, "data": result, "error": None}
+    response_body = {"ok": True, "data": result, "error": None}
+
+    if x_idempotency_key:
+        await store_cached_response(
+            db,
+            tenant_id=tenant_id,
+            idempotency_key=x_idempotency_key,
+            route_path=_ROUTE_PAYMENT,
+            request_hash=request_hash,
+            response_status=200,
+            response_body=response_body,
+        )
+
+    return response_body
 
 
 @router.post("/orders/{order_id}/refund")
