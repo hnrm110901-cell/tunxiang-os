@@ -4,6 +4,122 @@
 
 ---
 
+## 2026-04-25 Wave 4 Sprint G — 实验框架四件套（Tier 3，8 atomic commits）
+
+### 本次会话目标
+Sprint G 完整四件套：G1 纯函数分桶 + G2 Orchestrator 判桶 + G3 Welch's t-test 仪表板 + G4 熔断规则。为屯象OS 内部 A/B 测试 / 灰度发布 / 实验闭环提供基础设施（与 flags/ 并存，flags 管开关，experiment 管对照试验）。
+
+### 不得触碰的边界
+- [x] services/tx-trade/ 既有文件 — 零修改
+- [x] shared/ontology/ — 完全未触碰
+- [x] 现有 flags/{agents,edge,trade}/ 配置文件 — 完全只读，flag 状态零变化
+- [x] 已应用迁移 v001–v277 — 未触碰
+
+### 本次涉及范围
+- 迁移：v277 → v278（experiment_exposures + experiment_definitions，双表 RLS 加固）
+- 新增 module：services/tx-analytics/src/experiment/{assignment, orchestrator, metrics, dashboard, circuit_breaker}.py
+- 新增 routes：services/tx-analytics/src/api/experiment_routes.py（5 端点）
+- 事件类型注册：EXPERIMENT.EXPOSED / CIRCUIT_BREAKER_TRIPPED / CIRCUIT_BREAKER_RESET
+- Tier 级别：[x] Tier 3
+
+### 完成状态
+- [x] v278 experiment_exposures：(tenant, exp_key, subject_type, subject_id) 唯一约束 + 时间窗索引 + RLS USING/WITH CHECK
+- [x] v278 experiment_definitions：variants JSONB / circuit_breaker_threshold_pct（默认 -20% 可逐实验覆盖）/ enabled
+- [x] G1 assign_bucket 纯函数：SHA-256 → uint64 → mod 10000；空 variants/零权重 fallback control
+- [x] G2 ExperimentOrchestrator：5 分钟缓存 + idempotent expose + 熔断守卫 + EXPERIMENT.EXPOSED 旁路
+- [x] G3 welch_t_test：自实现不完全 beta 函数 + Welch–Satterthwaite df，单测 t 值与手算/scipy 一致到 1% 内
+- [x] G3 ExperimentDashboard：(metric × variant pair) 跑 Welch；依赖注入 MetricsRepository / ExposureLookup
+- [x] G4 CircuitBreakerEvaluator：1 小时窗对比 control vs variants；trip 三步独立失败：disable + flag 文件 + 事件
+- [x] HTTP 路由：5 端点（bucket / dashboard / exposures / circuit-breaker / circuit-breaker/reset），全部 X-Tenant-ID 校验，reset 额外要求 X-Role-Code=ADMIN
+- [x] tenant_id 三方一致性校验：header vs body 不一致 → 403
+- [x] 36 个测试全绿（assignment 8 + orchestrator 7 + metrics 7 + circuit 7 + routes 7）
+
+### 关键决策
+- **熔断阈值默认 -20%（决策点）**：`experiment_definitions.circuit_breaker_threshold_pct` 字段允许逐实验覆盖（更严苛的实验可设 -10%，更激进的实验可设 -30%）。本 sprint 不强制设阈值，运维需在创建实验时显式给值。
+- **flag 文件落 `flags/experiments/<key>.disabled.yaml`**：与既有 flags/agents 等目录隔离，本 sprint 严禁修改既有 flag 状态。新目录由熔断器首次熔断时自动创建。
+- **Orchestrator 永不抛异常**：DB / event_bus / cache 任一失败 → 兜底 control + structlog warning。理由：实验框架不能成为线上故障源。
+- **shared.events 软依赖**：单测不依赖 PYTHONPATH 含 shared/，emit 时 ImportError 降级为带 .value 的内部哑类，事件字符串值不变。
+- **Welch p-value 用 Hill 1970 不完全 beta 近似**：误差 < 1%，足够内部仪表板；正式发表用 scipy。
+- **idempotent 暴露的两层保证**：DB 唯一约束 (tenant, exp_key, subject_type, subject_id) + Orchestrator insert_if_absent 返回值 → 事件只在首次插入时发射。
+
+### 已知风险
+- experiment_routes.py 三个 Depends provider 默认抛 503，需要运维在 main.py 的 lifespan 中绑定真实实现（DefinitionRepo/ExposureRepo/MetricsRepository/CoreMetricsProvider 的 SQL 实现尚未补齐，预留下一个 PR）。本 PR 不挂 main.py，避免一次改动太多。
+- circuit_breaker 周期任务未挂调度。函数自身已可调；建议运维在后续 PR 中加 60 秒 background_task。
+- variant_subject 列表在仪表板传给 fetch_metric 时无分页；超 10000 主体的实验需要分块（后续 PR）。
+
+### 下一步
+- 补 SQL 实现：DefinitionRepo / ExposureRepo / MetricsRepository（连物化视图 mv_*）
+- main.py 注入 + 调度
+- 把现有 flag.checkout.v2 等接入 experiment（接入清单见 docs/sprint-g-experiment-framework.md）
+
+---
+
+## 2026-04-25 23:30 Wave 4 Sprint E / E1 + E4 — 渠道 canonical schema + 异议工作流（Tier 2，6 atomic commits）
+
+### 本次会话目标
+落地 Sprint E1（外卖 canonical schema 抽象层，v276）+ E4（异议工作流 + auto_accept 阈值，v277）。为 E2/E3 适配器映射改造预留契约边界，同时为渠道异议（缺单/错单/平台审核退款）建立统一审核流。
+
+### 不得触碰的边界
+- [x] services/tx-trade/ 既有文件 — 零修改（25 commits 仍等 §19 二审）
+  - 仅 main.py 追加 2 行 include_router（不改任何既有 include 行）
+- [x] shared/ontology/ — 完全未触碰（冻结）
+- [x] 现有适配器（pinjin/aiqiwei/meituan/eleme/douyin 等）— 完全只读
+- [x] mv_* 物化视图 — 未触碰
+- [x] 已应用迁移 v001–v275 — 未触碰
+
+### 本次涉及范围
+- 迁移：v275 → v276（channel_canonical_orders）→ v277（channel_disputes）
+- 新增 Pydantic schema：services/tx-trade/src/schemas/{channel_canonical,channel_dispute}.py
+- 新增 Service：services/tx-trade/src/services/{channel_canonical_service,channel_dispute_service}.py
+- 新增 Routes：services/tx-trade/src/api/{channel_canonical_routes,channel_dispute_routes}.py
+- 事件类型注册：CHANNEL.DISPUTE_OPENED / DISPUTE_AUTO_ACCEPTED / DISPUTE_RESOLVED
+- Tier 级别：[x] Tier 2（渠道集成路径，不直接影响资金安全）
+
+### 完成状态
+- [x] v276 channel_canonical_orders：RLS USING + WITH CHECK 双向对称，settlement_fen GENERATED STORED
+- [x] v277 channel_disputes：FK → canonical orders，state CHECK + dispute_type CHECK
+- [x] CanonicalOrderRequest / CanonicalOrderRecord（Pydantic V2，Literal ChannelCode 枚举）
+- [x] ChannelCanonicalService.ingest 幂等 + 旁路 CHANNEL.ORDER_SYNCED（不调 cashier_engine）
+- [x] ChannelDisputeService.open_dispute 自动接受 + ChannelDisputeService.resolve_dispute
+  - DisputeAlreadyResolvedError → 路由层 409
+  - DisputeNotFoundError → 路由层 404
+- [x] CHANNEL.DISPUTE_* 事件枚举（先注册再使用，§15 强制）
+- [x] 11 个 Tier 2 测试用例全绿（6 canonical + 5 dispute）
+- [x] ruff + pytest 全部通过
+
+### 关键决策
+- **决策点 #5（待创始人最终签字）**：异议自动接受上限暂用 5000 分（¥50）作默认。
+  - 该值通过 schemas.channel_dispute.DEFAULT_AUTO_ACCEPT_THRESHOLD_FEN 暴露
+  - 每条 dispute 落库时记录"裁决时刻的阈值快照"（auto_accept_threshold_fen 列），
+    便于将来阈值变更后历史决策可复盘
+  - 路由层暂直接读常量；后续接入 tenant_setting 后改为 per-tenant 覆盖
+- **NON_AUTO_ACCEPT_TYPES = {platform_audit, chargeback}**：这两类异议无论金额大小
+  都强制人工审核（平台审核退款是行政性，不能自动认账；chargeback 涉及银行通道，
+  必须人工跟进证据链）
+- **canonical_order_id FK ON DELETE RESTRICT**：异议必须挂在 canonical 订单上，
+  即使 canonical 订单需删除也必须先处理异议（保护证据链完整性）
+- **不引入 channel_canonical_orders → orders 的 FK**：避免与既有 orders 表的初始化
+  顺序耦合（orders 表分散在多个 v* 迁移），后续 E2/E3 通过事件源桥接
+
+### 下一步
+- E2：将既有 webhook（meituan/eleme/douyin）改写为生成 CanonicalOrderRequest
+  调用 POST /api/v1/channels/canonical/orders（适配器内部，不污染 webhook 路由）
+- E3：tenant_setting 增加 channel_dispute.auto_accept_threshold_fen 列，
+  路由层从配置读取覆盖默认值
+- 等待 §19 二审：26 commits（25 既有 + 本批 6）累积待审
+
+### 已知风险
+- ChannelCanonicalService.ingest 幂等命中时返回的 record.id 是既有记录 id；
+  调用方（适配器）若误以为是新建记录可能产生重复写入下游表。已在 service 返回
+  tuple[Record, created: bool]，调用方需检查 created 标志
+- v276 的 settlement_fen GENERATED STORED 列依赖 PostgreSQL ≥ 12；屯象 OS 当前
+  使用 PostgreSQL 16，安全
+- DEFAULT_AUTO_ACCEPT_THRESHOLD_FEN=5000 仅是占位值，徐记/最黔线/尚宫厨业态差异
+  极大（如尚宫厨宴席客单价 5000 元 = 500000 分，¥50 阈值毫无意义），必须等
+  创始人按业态/品牌签字
+
+---
+
 ## 2026-04-25 22:00 Wave 4 Sprint F / F1 + F3 — 14 适配器评分卡 + 三商户 playbook（Tier 3，4 atomic commits）
 
 ### 本次会话目标

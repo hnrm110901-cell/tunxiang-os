@@ -1,3 +1,84 @@
+## 2026-04-25 Wave 4 Sprint E / E1 + E4 — 渠道 canonical + 异议工作流（6 atomic commits / Tier 2）
+
+### 今日完成
+- [shared/db-migrations] v276 channel_canonical_orders：
+  - id / tenant_id / store_id / channel_code / external_order_id / canonical_order_id
+  - status / total_fen / subsidy_fen / merchant_share_fen / commission_fen
+  - settlement_fen GENERATED ALWAYS AS (total - subsidy - commission) STORED
+  - payload JSONB / received_at / created_at / updated_at / is_deleted
+  - UNIQUE (tenant_id, channel_code, external_order_id) WHERE NOT is_deleted
+  - 索引 (tenant_id, store_id, received_at) + (canonical_order_id) WHERE NOT NULL
+  - status CHECK + amounts >= 0 CHECK
+  - RLS USING + WITH CHECK 对称（严禁 NULL 绕过）
+- [shared/db-migrations] v277 channel_disputes：
+  - canonical_order_id FK → channel_canonical_orders ON DELETE RESTRICT
+  - state CHECK 6 值；dispute_type CHECK 8 值
+  - claimed_amount_fen / auto_accept_threshold_fen 非负 CHECK
+  - decision_by / decision_at / decision_reason 三件套用于裁决留痕
+  - UNIQUE (tenant_id, channel_code, external_dispute_id) WHERE NOT is_deleted
+  - 索引 (tenant_id, store_id, state, opened_at) + (canonical_order_id)
+  - RLS USING + WITH CHECK 对称
+- [services/tx-trade] 新增 src/schemas/ 子目录（首次引入）：
+  - channel_canonical.py：ChannelCode Literal 枚举 + Request/Record/Item 模型
+  - channel_dispute.py：DisputeType / DisputeState Literal + DEFAULT_AUTO_ACCEPT_THRESHOLD_FEN=5000
+- [services/tx-trade] 新增 src/services/channel_canonical_service.py：
+  - ChannelCanonicalRepository：RLS 绑定 + insert/get_by_external/list_by_store/get
+  - ChannelCanonicalService.ingest：幂等命中返回既有记录不重复发事件；
+    首次落库旁路 CHANNEL.ORDER_SYNCED（asyncio.create_task fire-and-forget）
+- [services/tx-trade] 新增 src/services/channel_dispute_service.py：
+  - DisputeAlreadyResolvedError / DisputeNotFoundError 自定义异常
+  - open_dispute：claim ≤ threshold 且 type 可 auto_accept → state=auto_accepted
+                 + decision_reason="auto_accept under threshold (claim=X <= threshold=Y)"
+                 + 旁路 DISPUTE_OPENED + DISPUTE_AUTO_ACCEPTED 两条事件
+  - resolve_dispute：仅 pending/manual_reviewing 可裁决，其他状态抛 ALREADY_RESOLVED
+                    SQLAlchemy bindparam(expanding=True) 处理 IN 子句
+                    decision_at = datetime.now(timezone.utc)
+                    旁路 DISPUTE_RESOLVED
+- [services/tx-trade] 新增 src/api/channel_canonical_routes.py：
+  - POST /api/v1/channels/canonical/orders        — ingest（JWT + tenant 三方一致）
+  - GET  /api/v1/channels/canonical/orders        — 分页（store_id 可选过滤）
+  - GET  /api/v1/channels/canonical/orders/{id}
+  - 鉴权 require_role("cashier","store_manager","admin","integration"[,"viewer"])
+  - 响应统一 {ok, data, error}
+- [services/tx-trade] 新增 src/api/channel_dispute_routes.py：
+  - POST /api/v1/channels/disputes/open
+  - POST /api/v1/channels/disputes/{id}/resolve   — 重复裁决 → 409 ALREADY_RESOLVED
+  - GET  /api/v1/channels/disputes                — 支持 state[]/store_id 过滤
+  - 三方租户一致性强校验（X-Tenant-ID = JWT.tenant_id = body.tenant_id）
+- [services/tx-trade/main.py] append 2 处 include_router（不改任何既有 include）
+- [shared/events/src/event_types.py] 注册 ChannelEventType.DISPUTE_OPENED /
+  DISPUTE_AUTO_ACCEPTED / DISPUTE_RESOLVED（仅 append，零修改其他枚举）
+- [services/tx-trade/src/tests] 新增 11 个 Tier 2 用例：
+  - test_channel_canonical_tier2.py（6）：幂等/事件/settlement/cross_tenant/分页/RLS 静态扫
+  - test_channel_dispute_tier2.py（5）：阈值上下/裁决/重复裁决 409/cross_tenant 403
+
+### 数据变化
+- 迁移版本：v275 → v277（新增 v276 + v277）
+- 新增 API 模块：2 个
+  - /api/v1/channels/canonical/orders（POST/GET/GET-by-id）
+  - /api/v1/channels/disputes（POST open / POST resolve / GET list）
+- 新增事件类型：3 个（CHANNEL.DISPUTE_OPENED / DISPUTE_AUTO_ACCEPTED / DISPUTE_RESOLVED）
+- 新增测试：11 个（全部通过，0.74s 总耗时）
+
+### 提交序列（§21 atomic）
+1. `feat(db): v276 channel_canonical_orders with RLS [Tier2]`
+2. `feat(tx-trade): channel canonical schema + service + ingest route [Tier2]`
+3. `feat(db): v277 channel_disputes with auto-accept threshold [Tier2]`
+4. `feat(events): register CHANNEL.DISPUTE_* event types`
+5. `feat(tx-trade): channel dispute service + open/resolve/list routes [Tier2]`
+6. `test(tx-trade): canonical + dispute Tier2 coverage`
+
+### 遗留问题
+- **决策点 #5**：DEFAULT_AUTO_ACCEPT_THRESHOLD_FEN=5000（¥50）仅是占位值，
+  必须等创始人按业态/品牌签字（尚宫厨宴席客单 5000 元，¥50 毫无意义）
+- E2/E3 等待：将既有 webhook 改写为调用 canonical ingest，tenant_setting 接入
+
+### 明日计划
+- 等待 §19 二审：累计 26 commits（既有 25 + 本批 6）待审
+- 若审过：启动 E2 适配器迁移（meituan webhook → CanonicalOrderRequest 桥接）
+
+---
+
 ## 2026-04-25 Wave 4 Sprint F / F1 + F3 — 14 适配器评分卡 + 三商户 playbook（4 atomic commits / Tier 3）
 
 ### 今日完成
