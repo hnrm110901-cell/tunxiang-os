@@ -694,3 +694,383 @@ async def test_xujihaixian_sync_route_unique_violation_swallowed_as_idempotent()
     assert resp_op.ok is False, "真 DB 故障必须报 DB_ERROR 让客户端重试 / 告警"
     assert resp_op.error is not None
     assert resp_op.error["code"] == "DB_ERROR"
+
+
+# ──────────────── 场景 13-17：A3 §19 P1 dead_letter 链路 + 店长操作 ────────────────
+#
+# Fix-9 §19 P1 修复：DEAD_LETTER_MAX_ATTEMPTS=20 不再是孤岛常量，
+# sync 路由在每次失败时调 increment_attempts，达 20 次自动 mark_dead_letter；
+# 店长可通过 HTTP 列表/解决/重试 三个入口操作死信，所有操作必走 audit_log。
+#
+# 既有 _MockDB 仅识别 mark_synced 的 pending_state 守护和硬编码 state=PENDING
+# 的 list 过滤，无法测 manual_resolve/manual_retry/list_dead_letter/count_dead_letters。
+# 此处以子类扩展，避免污染既有 12 个测试。
+
+
+class _DeadLetterAwareMockDB(_MockDB):
+    """支持 dead_letter 查询/操作 SQL 的 mock。
+
+    新增能力：
+      - SELECT COUNT(*) — count_dead_letters
+      - SELECT ... AND state = :state — list_dead_letter（区别于 硬编码 PENDING）
+      - UPDATE state=:state guard — manual_resolve（守 state=dead_letter）
+      - UPDATE state=:dead_letter_state guard — manual_retry（守 state=dead_letter
+        + SET state=pending + sync_attempts=0 + dead_letter_reason 改写）
+    """
+
+    async def execute(self, stmt, params=None):  # noqa: C901
+        sql = str(stmt).strip()
+        p = dict(params) if params else {}
+
+        # 1) count_dead_letters：SELECT COUNT(*) ...
+        if sql.startswith("SELECT COUNT(*)") and "offline_order_mapping" in sql:
+            self.executes.append((sql, p))
+            tenant = p.get("tenant_id")
+            state = p.get("state")
+            store = p.get("store_id")
+            cnt = sum(
+                1
+                for r in self._rows.values()
+                if r["tenant_id"] == tenant
+                and r["state"] == state
+                and (store is None or r.get("store_id") == store)
+            )
+            return SimpleNamespace(
+                mappings=lambda: SimpleNamespace(first=lambda: {"cnt": cnt})
+            )
+
+        # 2) list_dead_letter：SELECT 多列含 "AND state = :state"，无 "AND offline_order_id"
+        if (
+            sql.startswith("SELECT")
+            and "offline_order_mapping" in sql
+            and "AND offline_order_id" not in sql
+            and "AND state = :state" in sql
+        ):
+            self.executes.append((sql, p))
+            tenant = p.get("tenant_id")
+            state = p.get("state")
+            store = p.get("store_id")
+            rows = [
+                r
+                for r in self._rows.values()
+                if r["tenant_id"] == tenant
+                and r["state"] == state
+                and (store is None or r.get("store_id") == store)
+            ]
+            return SimpleNamespace(
+                mappings=lambda: SimpleNamespace(
+                    first=lambda: rows[0] if rows else None,
+                    all=lambda: rows,
+                )
+            )
+
+        # 3) UPDATE 守护：manual_retry / manual_resolve（在父类既有逻辑前拦截）
+        if sql.startswith("UPDATE offline_order_mapping"):
+            key = (p["tenant_id"], p["offline_order_id"])
+            row = self._rows.get(key)
+            if row is None:
+                self.executes.append((sql, p))
+                return AsyncMock(rowcount=0)
+
+            # 3a) manual_retry：守 state=:dead_letter_state，SET state=:pending_state + reset
+            if "dead_letter_state" in p and "pending_state" in p:
+                if row.get("state") != p["dead_letter_state"]:
+                    self.executes.append((sql, p))
+                    return AsyncMock(rowcount=0)
+                row["state"] = p["pending_state"]
+                row["sync_attempts"] = 0
+                row["last_error_message"] = None
+                row["dead_letter_reason"] = (
+                    f"manual_retry_by:{p['retry_user_id']}|prev:"
+                    + str(row.get("dead_letter_reason") or "")
+                )
+                self.executes.append((sql, p))
+                return AsyncMock(rowcount=1)
+
+            # 3b) manual_resolve：守 state=:state（dead_letter），SET dead_letter_reason 拼前缀
+            if (
+                "state" in p
+                and "pending_state" not in p
+                and "dead_letter_state" not in p
+                and "prefix" in p
+            ):
+                if row.get("state") != p["state"]:
+                    self.executes.append((sql, p))
+                    return AsyncMock(rowcount=0)
+                old = row.get("dead_letter_reason") or ""
+                row["dead_letter_reason"] = f"{p['prefix']}|{old}"
+                self.executes.append((sql, p))
+                return AsyncMock(rowcount=1)
+
+        # 其它路径回退父类
+        return await super().execute(stmt, params)
+
+
+# ──────────────── 场景 13：sync 失败 20 次自动 dead_letter ────────────────
+
+
+@pytest.mark.asyncio
+async def test_xujihaixian_sync_failure_20_attempts_triggers_dead_letter():
+    """徐记王府井店离线 5 桌单连续 20 次同步失败后自动 dead_letter。
+
+    业务流：商米 POS 断网 4h → 联网后 SagaFlusher 补发 5 桌大单 → Mac mini→
+    云端 Tailscale 持续 5xx → 路由层每次失败调 increment_attempts，累加 20 次
+    → 路由层据返回值达 DEAD_LETTER_MAX_ATTEMPTS 调 mark_dead_letter。
+
+    防漏吞：连续 20 次失败必须自动落 dead_letter，店长面板可见，不再被悄无
+    声息覆盖（CLAUDE.md §13 禁止吞单）。
+    """
+    db = _MockDB()
+    svc = OfflineOrderMappingService(db=db, tenant_id=XUJI_CHANGSHA_TENANT)
+    offline_id, _ = generate_offline_order_id(POS_DEVICE_A, counter=42)
+
+    await svc.upsert_mapping(
+        store_id=XUJI_CHANGSHA_STORE,
+        device_id=POS_DEVICE_A,
+        offline_order_id=offline_id,
+    )
+
+    # 19 次失败：未达阈值，路由层不触发 dead_letter
+    for i in range(DEAD_LETTER_MAX_ATTEMPTS - 1):
+        new_attempts = await svc.increment_attempts(
+            offline_order_id=offline_id,
+            last_error=f"edge_unreachable_attempt_{i + 1}",
+        )
+        assert new_attempts == i + 1, (
+            f"第 {i + 1} 次失败应让 sync_attempts={i + 1}，得 {new_attempts}"
+        )
+
+    # 第 20 次失败：路由层判断达阈值，调 mark_dead_letter
+    final_attempts = await svc.increment_attempts(
+        offline_order_id=offline_id,
+        last_error="edge_unreachable_attempt_20",
+    )
+    assert final_attempts == DEAD_LETTER_MAX_ATTEMPTS, (
+        f"达 {DEAD_LETTER_MAX_ATTEMPTS} 次必须落 dead_letter，得 {final_attempts}"
+    )
+
+    await svc.mark_dead_letter(
+        offline_order_id=offline_id,
+        reason="max_attempts_exceeded",
+    )
+    row = await svc.get(offline_id)
+    assert row is not None
+    assert row["state"] == MappingState.DEAD_LETTER.value, (
+        "20 次后必须自动 dead_letter，等店长确认（不允许自动删除）"
+    )
+    assert row["dead_letter_reason"] == "max_attempts_exceeded"
+
+
+# ──────────────── 场景 14：count_dead_letters 仅统计死信 ────────────────
+
+
+@pytest.mark.asyncio
+async def test_xujihaixian_count_dead_letters_returns_correct_total():
+    """徐记韶山路店"运营监控面板"统计死信条数，pending 不混入。
+
+    准备 3 条数据：2 条 pending + 1 条 dead_letter，count_dead_letters
+    必须只返回 1（避免误把 pending 计入死信告警阈值）。
+    """
+    db = _DeadLetterAwareMockDB()
+    svc = OfflineOrderMappingService(db=db, tenant_id=XUJI_SHAOSHAN_TENANT)
+
+    # 2 条 pending
+    for i in range(2):
+        oid_p = f"{POS_DEVICE_B}:172900000000{i + 1}:{i + 1}"
+        await svc.upsert_mapping(
+            store_id=XUJI_SHAOSHAN_STORE,
+            device_id=POS_DEVICE_B,
+            offline_order_id=oid_p,
+        )
+
+    # 1 条 dead_letter
+    oid_dl = f"{POS_DEVICE_B}:1729000000003:99"
+    await svc.upsert_mapping(
+        store_id=XUJI_SHAOSHAN_STORE,
+        device_id=POS_DEVICE_B,
+        offline_order_id=oid_dl,
+    )
+    await svc.mark_dead_letter(
+        offline_order_id=oid_dl,
+        reason="max_attempts_exceeded",
+    )
+
+    cnt = await svc.count_dead_letters(store_id=XUJI_SHAOSHAN_STORE)
+    assert cnt == 1, (
+        f"3 条 (2 pending + 1 dl) 中只统计 dead_letter，期望 1 得 {cnt}"
+    )
+
+    # 跨租户隔离：tenant_A 的视角看不到 tenant_B 的死信
+    svc_other = OfflineOrderMappingService(db=db, tenant_id=XUJI_CHANGSHA_TENANT)
+    cnt_other = await svc_other.count_dead_letters(store_id=XUJI_SHAOSHAN_STORE)
+    assert cnt_other == 0, "跨租户必须返回 0（service 层 tenant_id 拦截）"
+
+
+# ──────────────── 场景 15：list_dead_letter 仅返回死信 ────────────────
+
+
+@pytest.mark.asyncio
+async def test_xujihaixian_list_dead_letter_only_dead_letter_state():
+    """徐记王府井店店长打开"死信审计面板"，只看到 dead_letter 条目。
+
+    准备 2 pending + 2 dead_letter；list_dead_letter 必须只返回后两条
+    （避免店长误把 pending 当死信，误操作丢数据）。
+    """
+    db = _DeadLetterAwareMockDB()
+    svc = OfflineOrderMappingService(db=db, tenant_id=XUJI_CHANGSHA_TENANT)
+
+    # 2 条 pending
+    for i in range(2):
+        oid_p = f"{POS_DEVICE_A}:172900100000{i + 1}:{i + 1}"
+        await svc.upsert_mapping(
+            store_id=XUJI_CHANGSHA_STORE,
+            device_id=POS_DEVICE_A,
+            offline_order_id=oid_p,
+        )
+
+    # 2 条 dead_letter
+    dl_ids = []
+    for i in range(2):
+        oid_dl = f"{POS_DEVICE_A}:172900200000{i + 1}:{i + 100}"
+        await svc.upsert_mapping(
+            store_id=XUJI_CHANGSHA_STORE,
+            device_id=POS_DEVICE_A,
+            offline_order_id=oid_dl,
+        )
+        await svc.mark_dead_letter(
+            offline_order_id=oid_dl,
+            reason=f"sync_failed_{i}",
+        )
+        dl_ids.append(oid_dl)
+
+    rows = await svc.list_dead_letter(store_id=XUJI_CHANGSHA_STORE, limit=10)
+    assert len(rows) == 2, (
+        f"4 条数据 (2 pending + 2 dl) 中只列 dead_letter，期望 2 得 {len(rows)}"
+    )
+    states = {r["state"] for r in rows}
+    assert states == {MappingState.DEAD_LETTER.value}, (
+        f"list_dead_letter 不允许漏出 pending 条目，得 {states}"
+    )
+    listed_ids = {r["offline_order_id"] for r in rows}
+    assert listed_ids == set(dl_ids)
+
+
+# ──────────────── 场景 16：店长 manual_resolve 写入审计标记 ────────────────
+
+
+@pytest.mark.asyncio
+async def test_xujihaixian_manual_resolve_appends_audit_signal_in_reason():
+    """徐记王府井店店长（user_id=mgr-xuji-001）人工确认死信。
+
+    要求：dead_letter_reason 前缀必须含 manual_resolved:{user_id}:{note}
+    供后续审计扫描识别"人工已审"信号；条目保留（不删除）。
+    """
+    db = _DeadLetterAwareMockDB()
+    svc = OfflineOrderMappingService(db=db, tenant_id=XUJI_CHANGSHA_TENANT)
+    offline_id, _ = generate_offline_order_id(POS_DEVICE_A, counter=777)
+
+    await svc.upsert_mapping(
+        store_id=XUJI_CHANGSHA_STORE,
+        device_id=POS_DEVICE_A,
+        offline_order_id=offline_id,
+    )
+    await svc.mark_dead_letter(
+        offline_order_id=offline_id,
+        reason="max_attempts_exceeded",
+    )
+
+    ok = await svc.manual_resolve(
+        offline_order_id=offline_id,
+        resolver_user_id="mgr-xuji-001",
+        resolution_note="已现金补单 ¥888，POS 流水号 X20260424-088",
+    )
+    assert ok is True
+
+    row = await svc.get(offline_id)
+    assert row is not None
+    # 仍保留 dead_letter（不删除条目）
+    assert row["state"] == MappingState.DEAD_LETTER.value, (
+        "manual_resolve 不允许改 state=resolved/deleted（CLAUDE.md §13 禁吞单）"
+    )
+    # dead_letter_reason 前缀含审计标记
+    reason = row["dead_letter_reason"]
+    assert reason.startswith("manual_resolved:mgr-xuji-001:"), (
+        f"dead_letter_reason 必须含 'manual_resolved:{{uid}}:{{note}}' 前缀，"
+        f"得：{reason}"
+    )
+    assert "max_attempts_exceeded" in reason, (
+        "原 reason 必须保留在前缀之后供审计追溯"
+    )
+
+    # 拒绝对非 dead_letter 条目调 manual_resolve
+    pending_id, _ = generate_offline_order_id(POS_DEVICE_A, counter=778)
+    await svc.upsert_mapping(
+        store_id=XUJI_CHANGSHA_STORE,
+        device_id=POS_DEVICE_A,
+        offline_order_id=pending_id,
+    )
+    not_ok = await svc.manual_resolve(
+        offline_order_id=pending_id,
+        resolver_user_id="mgr-xuji-001",
+        resolution_note="误操作",
+    )
+    assert not_ok is False, (
+        "manual_resolve 守 state=dead_letter，pending 条目必须返回 False"
+    )
+
+
+# ──────────────── 场景 17：店长 manual_retry 重置 attempts 与 state ────────────────
+
+
+@pytest.mark.asyncio
+async def test_xujihaixian_manual_retry_resets_attempts_and_state_to_pending():
+    """徐记韶山路店店长发现 dead_letter 是网络抖动误判，触发 manual_retry。
+
+    要求：state 从 dead_letter → pending；sync_attempts 从 20 → 0；
+    dead_letter_reason 前缀含 'manual_retry_by:{user_id}'。
+    """
+    db = _DeadLetterAwareMockDB()
+    svc = OfflineOrderMappingService(db=db, tenant_id=XUJI_SHAOSHAN_TENANT)
+    offline_id, _ = generate_offline_order_id(POS_DEVICE_B, counter=2025)
+
+    await svc.upsert_mapping(
+        store_id=XUJI_SHAOSHAN_STORE,
+        device_id=POS_DEVICE_B,
+        offline_order_id=offline_id,
+    )
+    # 累加 20 次失败 → 状态 dead_letter
+    for _ in range(DEAD_LETTER_MAX_ATTEMPTS):
+        await svc.increment_attempts(
+            offline_order_id=offline_id,
+            last_error="tailscale_drop",
+        )
+    await svc.mark_dead_letter(
+        offline_order_id=offline_id,
+        reason="max_attempts_exceeded",
+    )
+
+    ok = await svc.manual_retry(
+        offline_order_id=offline_id,
+        retry_user_id="mgr-shao-007",
+    )
+    assert ok is True
+
+    row = await svc.get(offline_id)
+    assert row["state"] == MappingState.PENDING.value, (
+        "manual_retry 必须把 state 推回 pending 让 Flusher 重新捡起"
+    )
+    assert row["sync_attempts"] == 0, (
+        "重试必须重置 sync_attempts=0，否则下一轮会立即再次触发死信"
+    )
+    assert row["dead_letter_reason"].startswith("manual_retry_by:mgr-shao-007|prev:"), (
+        f"dead_letter_reason 必须保留人工重试痕迹，得：{row['dead_letter_reason']}"
+    )
+
+    # 拒绝对 pending 条目重复 manual_retry
+    not_ok = await svc.manual_retry(
+        offline_order_id=offline_id,
+        retry_user_id="mgr-shao-007",
+    )
+    assert not_ok is False, (
+        "manual_retry 守 state=dead_letter，已是 pending 必须返回 False"
+    )
