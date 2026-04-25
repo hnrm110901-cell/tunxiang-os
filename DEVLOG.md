@@ -1,3 +1,97 @@
+## 2026-04-25 Wave 4 Sprint H4 + F2 — Week 8 gate-check + toxiproxy 设施
+
+### 今日完成
+- [scripts] week8_gate_check.sh 主脚本 + 3 个子脚本（check_tier1_pass / check_secrets / check_signoffs）
+  - 覆盖 §22 Week 8 DEMO Go/No-Go 全部 10 项
+  - set -euo pipefail，幂等（两次运行结果一致），bash -n 通过
+  - --strict / --no-strict 两种模式
+  - 真实运行：strict 1/10 通过、no-strict 4/10 通过 — 是预期信号（数据未到位）
+- [infra/docker] docker-compose.toxiproxy.yml 追加 F2 区段
+  - 新增 3 个预置代理：pg_proxy:9001 / redis_proxy:9002 / coreml_proxy:9003
+  - 保留原有服务级代理（tx-trade/tx-menu/tx-agent — A2 在用）
+  - extra_hosts host-gateway 让 coreml_proxy 能解析宿主机 8100
+- [shared/test_infra] ToxiproxyClient async wrapper（~190 行）
+  - add_latency / add_packet_loss（timeout+toxicity 实现）/ add_bandwidth_limit / disable / enable / reset / list_*
+  - 自定义 ToxiproxyError；显式提示 "not entered"
+- [shared/test_infra/fixtures.py] pytest fixture toxiproxy()
+  - 容器不在线时自动 skip；yield 后自动 reset 兜底
+- [shared/test_infra/tests] 12 个测试用例
+  - 单元测试 8 个（httpx MockTransport，无需真容器）— 全绿
+  - 烟测 4 个（@toxiproxy_required，CI 默认 deselect）
+- [.github/workflows] toxiproxy-smoke.yml workflow_dispatch
+  - 启 toxiproxy 容器 → pytest -m toxiproxy_required → 拆容器
+- [docs] test-infra-toxiproxy.md 设施文档
+  - 启动命令、3 个预置代理、fixture 用法、3 个典型场景、未来接入 Tier 1 的合规路径
+- [pyproject.toml] 注册 marker：tier1 + toxiproxy_required
+
+### 数据变化
+- 迁移版本：无变化
+- 新增 API 模块：0
+- 新增脚本：4 个 shell（week8_gate_check + 3 子脚本）
+- 新增 Python 模块：3 个（toxiproxy_client / fixtures / __init__）+ 2 测试文件
+- 新增 CI workflow：1 个（manual dispatch）
+- 新增文档：1 份（test-infra-toxiproxy.md）
+- 新增测试用例：12 个（8 单测 + 4 烟测）
+
+### 遗留问题
+- gate-check 项 7（secrets/RLS/CORS）当前误报，需 H3 终查清洗
+- demo-reset.sh 缺 `set -e`（仅 -uo pipefail）— 红线 §19 待审，未修改
+- 收银员签字 / 演示话术签字 / 三商户 scorecard / k6-result.json / 支付率指标 / nightly e2e 报告 — 全是数据未到位，不是脚本问题
+
+### 明日计划
+- 等待 H1 k6 / F1 scorecard / nightly e2e / 签字到位后，gate-check 通过率从 1/10 逐步爬升
+- 在 GitHub Actions 上手动跑一次 toxiproxy-smoke workflow 确认 host-gateway 在 ubuntu-latest 工作
+
+---
+
+## 2026-04-25 Wave 4 Sprint G — 实验框架四件套（8 atomic commits / Tier 3）
+
+### 今日完成
+- [shared/db-migrations] 新建 v278 experiment_exposures + experiment_definitions
+  - experiment_exposures：(tenant, exp_key, subject_type, subject_id) 唯一索引保证 idempotent 暴露
+  - experiment_definitions：variants JSONB / circuit_breaker_threshold_pct（默认 -20%）/ enabled
+  - 双表 RLS USING + WITH CHECK（参考 v274 加固模式）
+- [shared/events] 注册 ExperimentEventType：EXPOSED / CIRCUIT_BREAKER_TRIPPED / CIRCUIT_BREAKER_RESET
+  - DOMAIN_STREAM_MAP + DOMAIN_STREAM_TYPE_MAP + ALL_EVENT_ENUMS 三处同步
+- [services/tx-analytics/src/experiment/assignment.py] G1 纯函数分桶 ~150 行
+  - SHA-256 → uint64 → mod 10000；纯函数无 I/O 无随机源
+  - 空 variants/0 weight/无效 subject_id 全部安全 fallback control
+- [services/tx-analytics/src/experiment/orchestrator.py] G2 Orchestrator ~330 行
+  - 5 分钟 in-process 缓存 + invalidate(tenant,key) admin 推平
+  - idempotent expose（DB 唯一约束 + insert_if_absent 返回值双层保证）
+  - 熔断守卫：tripped → 强制 control
+  - shared.events 软依赖：ImportError 时降级为字面量值
+- [services/tx-analytics/src/experiment/metrics.py] G3 Welch's t-test ~210 行
+  - 自实现不完全 beta 函数（Lentz 连分式）+ Welch–Satterthwaite df
+  - numpy 可选加速；不依赖 scipy
+- [services/tx-analytics/src/experiment/dashboard.py] G3 Dashboard ~190 行
+  - 依赖注入 ExposureLookup + MetricsRepository（Protocol）
+- [services/tx-analytics/src/experiment/circuit_breaker.py] G4 熔断器 ~280 行
+  - evaluate / trip / reset；trip 三步独立失败（disable / flag 文件 / 事件）
+  - flag 文件落 flags/experiments/<key>.disabled.yaml（不动既有 flags/ 目录）
+- [services/tx-analytics/src/api/experiment_routes.py] HTTP 5 端点 ~310 行
+  - bucket / dashboard / exposures / circuit-breaker / circuit-breaker/reset
+  - tenant_id 三方一致性校验；reset 要求 X-Role-Code ∈ {ADMIN, L3, OWNER}
+- [docs/sprint-g-experiment-framework.md] 新建架构文档（接入清单）
+
+### 数据变化
+- 迁移版本：v277 → v278
+- 新增 API 模块：1 个（services/tx-analytics）；5 个端点
+- 新增事件类型：3 个（experiment 域）
+- 新增测试：36 个（assignment 8 + orchestrator 7 + metrics 7 + circuit 7 + routes 7）— 全绿
+
+### 遗留问题
+- 实验定义/暴露/指标的 SQL Repository 尚未实现（本 PR 仅留 Protocol 接口）
+- experiment_routes.py 三个 Depends provider 默认抛 503，运维需在 main.py lifespan 内绑定
+- circuit_breaker 周期任务未挂调度（60 秒一轮）
+
+### 明日计划
+- 补 SQL Repository（连物化视图 mv_*）
+- main.py 注入 + scheduler 周期任务
+- 与 flag system 联动接入清单（参见 docs/sprint-g-experiment-framework.md）
+
+---
+
 ## 2026-04-25 Wave 4 Sprint E / E1 + E4 — 渠道 canonical + 异议工作流（6 atomic commits / Tier 2）
 
 ### 今日完成
