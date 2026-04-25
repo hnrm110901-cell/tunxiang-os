@@ -118,6 +118,57 @@ from .routers.vision_router import router as vision_router
 from .routers.voice_order_router import router as voice_order_router
 
 
+async def _mark_offline_scheduler_loop(
+    session_factory,
+    *,
+    interval_sec: int = 60,
+) -> None:
+    """C3 周期任务：每 interval_sec 秒跨租户标记离线 KDS 设备。
+
+    背景：DeviceRegistryService.mark_offline_if_stale 默认 600s 阈值，
+    KDS 拔网线 11 分钟后必须翻 offline，否则运维面板永远停留 healthy。
+    本 loop 调用 mark_offline_if_stale_global，逐租户扫描 edge_device_registry。
+
+    异常处理：
+      - SQLAlchemyError / OSError：单轮失败仅记 warning，下一轮重试
+      - 其它 Exception：审计修复期允许的兜底（避免 task 死亡使整个服务失忆），
+        必须带 exc_info=True
+      - asyncio.CancelledError：lifespan exit 时取消，正常退出
+    """
+    import asyncio as _asyncio
+
+    import structlog as _structlog
+    from sqlalchemy.exc import SQLAlchemyError as _SQLAlchemyError
+
+    from .services.device_registry_service import DeviceRegistryService
+
+    log = _structlog.get_logger(__name__)
+    log.info("mark_offline_scheduler_started", interval_sec=interval_sec)
+
+    while True:
+        try:
+            await _asyncio.sleep(interval_sec)
+            summary = await DeviceRegistryService.mark_offline_if_stale_global(
+                session_factory,
+            )
+            log.info(
+                "mark_offline_scheduler_tick",
+                tenants_scanned=summary["tenants_scanned"],
+                devices_marked_offline=summary["devices_marked_offline"],
+            )
+        except _asyncio.CancelledError:
+            log.info("mark_offline_scheduler_stopped")
+            raise
+        except _SQLAlchemyError as exc:
+            log.warning(
+                "mark_offline_scheduler_db_error",
+                error=str(exc),
+            )
+        except Exception:  # noqa: BLE001 — scheduler 顶层兜底，防 task 死亡（CLAUDE.md §14 审计修复期例外）
+            log.exception("mark_offline_scheduler_unexpected_error", exc_info=True)
+            await _asyncio.sleep(5)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     import asyncio
@@ -156,7 +207,49 @@ async def lifespan(app: FastAPI):
     except ImportError:
         pass  # feature_flags SDK不可用，外卖自动接单状态由环境变量控制
 
-    yield
+    # ── C3 §19：mark_offline_if_stale 60s 周期调度（受 EdgeFlags.MARK_OFFLINE_SCHEDULER 控制）──
+    mark_offline_task: asyncio.Task | None = None
+    try:
+        from shared.feature_flags import is_enabled as _ff_is_enabled
+        from shared.feature_flags.flag_names import EdgeFlags as _EdgeFlags
+
+        if _ff_is_enabled(_EdgeFlags.MARK_OFFLINE_SCHEDULER):
+            import structlog as _structlog
+
+            _structlog.get_logger(__name__).info(
+                "mark_offline_scheduler_enabled",
+                flag=_EdgeFlags.MARK_OFFLINE_SCHEDULER,
+            )
+            mark_offline_task = asyncio.create_task(
+                _mark_offline_scheduler_loop(async_session_factory, interval_sec=60),
+                name="mark_offline_scheduler",
+            )
+        else:
+            import structlog as _structlog
+
+            _structlog.get_logger(__name__).info(
+                "mark_offline_scheduler_disabled",
+                reason="feature_flag_disabled",
+                flag=_EdgeFlags.MARK_OFFLINE_SCHEDULER,
+            )
+    except ImportError:
+        # feature_flags SDK 不可用：保守默认关闭（不启动 task）
+        import structlog as _structlog
+
+        _structlog.get_logger(__name__).warning(
+            "mark_offline_scheduler_skipped_feature_flags_unavailable",
+        )
+
+    try:
+        yield
+    finally:
+        # graceful shutdown：cancel + await，避免事件循环退出时 task 仍在 sleep
+        if mark_offline_task is not None and not mark_offline_task.done():
+            mark_offline_task.cancel()
+            try:
+                await mark_offline_task
+            except asyncio.CancelledError:
+                pass
 
 
 app = FastAPI(

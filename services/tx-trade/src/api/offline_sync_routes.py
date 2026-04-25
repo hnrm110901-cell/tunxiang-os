@@ -28,7 +28,7 @@ from typing import Optional
 import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from pydantic import BaseModel, Field
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
@@ -154,6 +154,34 @@ async def sync_offline_orders(
 
     try:
         for entry in body.offline_orders:
+            # ── A3 §19 致命级 #2 防双扣费：ACK 丢失重试场景 ──
+            # 服务端首次 mark_synced 成功后响应在网络层丢失 → 客户端带原
+            # offline_order_id 重试 → 若此处直接生成新 UUID 并 mark_synced，
+            # 即便 service 层加了 state='pending' 守护，也会重新写一条
+            # mapping（旧的 cloud_id_A 已落账，新 cloud_id_B 又生成一单）
+            # → 同一离线单关联两个云端订单 → 资金双扣费。
+            #
+            # 正确做法：mark_synced 前先 SELECT 一次。如果条目已 synced，
+            # 直接返回既有 cloud_order_id（**绝不**重新生成 UUID）。
+            existing = await svc.get(entry.offline_order_id)
+            if existing and existing.get("state") == "synced":
+                existing_cloud_id = existing.get("cloud_order_id")
+                if existing_cloud_id:
+                    logger.info(
+                        "offline_sync_idempotent_replay",
+                        offline_order_id=entry.offline_order_id,
+                        cloud_order_id=existing_cloud_id,
+                        tenant_id=body.tenant_id,
+                    )
+                    results.append(
+                        {
+                            "offline_order_id": entry.offline_order_id,
+                            "cloud_order_id": existing_cloud_id,
+                            "state": "synced",
+                        }
+                    )
+                    continue
+
             # 服务端若未随行 cloud_order_id 则本地生成一枚 UUID v4
             cloud_id = entry.cloud_order_id or str(uuid.uuid4())
 
@@ -163,11 +191,23 @@ async def sync_offline_orders(
                 device_id=body.device_id,
                 offline_order_id=entry.offline_order_id,
             )
-            # mark_synced
-            await svc.mark_synced(
+            # mark_synced：返回 False 说明并发竞争下被另一个请求抢先 synced
+            # 重新读取最新 cloud_order_id 复用（不报错、不再生成新 UUID）
+            advanced = await svc.mark_synced(
                 offline_order_id=entry.offline_order_id,
                 cloud_order_id=cloud_id,
             )
+            if not advanced:
+                latest = await svc.get(entry.offline_order_id)
+                if latest and latest.get("cloud_order_id"):
+                    cloud_id = latest["cloud_order_id"]
+                    logger.info(
+                        "offline_sync_lost_race_reuse_cloud_id",
+                        offline_order_id=entry.offline_order_id,
+                        cloud_order_id=cloud_id,
+                        tenant_id=body.tenant_id,
+                    )
+
             results.append(
                 {
                     "offline_order_id": entry.offline_order_id,
@@ -175,6 +215,26 @@ async def sync_offline_orders(
                     "state": "synced",
                 }
             )
+    except IntegrityError as exc:
+        # 唯一约束撞车（并发同 offline_order_id 提交）= 幂等成功
+        # 不当作 DB_ERROR 报错；已写入的条目保留，下一轮重试将走"既有 synced"
+        # 分支返回旧 cloud_order_id。这里给客户端 partial 让它带原参数重试。
+        await db.rollback()
+        logger.warning(
+            "offline_sync_integrity_conflict",
+            tenant_id=body.tenant_id,
+            store_id=body.store_id,
+            error=str(exc),
+        )
+        return OfflineSyncResponse(
+            ok=True,
+            data={
+                "synced": len(results),
+                "mappings": results,
+                "partial": True,
+                "reason": "INTEGRITY_CONFLICT_RETRY_SAFE",
+            },
+        )
     except SQLAlchemyError as exc:
         logger.error(
             "offline_sync_db_error",
