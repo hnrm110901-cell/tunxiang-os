@@ -198,6 +198,26 @@ class SagaBuffer:
             await conn.executescript(_DDL)
             await conn.commit()
             self._conn = conn
+
+            # 启动时复位 flushing → pending（防进程崩溃后死单泄漏）
+            # 原 flushing 状态实际归属已丢失（写该状态的 worker 已死），
+            # 安全做法是重新 enqueue 让下一轮 flush_ready 重新选中。
+            now = int(self._clock())
+            cur = await conn.execute(
+                "UPDATE saga_buffer "
+                "SET state = 'pending', last_attempt_at = ? "
+                "WHERE state = 'flushing'",
+                (now,),
+            )
+            reset_count = cur.rowcount or 0
+            await cur.close()
+            await conn.commit()
+            if reset_count > 0:
+                logger.warning(
+                    "saga_buffer.flushing_reset_on_startup",
+                    count=reset_count,
+                    device_id=self._device_id,
+                )
         except (OSError, ImportError) as exc:
             # 磁盘写满 / 权限异常 / aiosqlite 缺失 → 降级（A1 R1 disk_io_error）
             logger.warning(
