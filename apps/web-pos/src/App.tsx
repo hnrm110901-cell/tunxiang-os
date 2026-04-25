@@ -2,9 +2,10 @@ import { useEffect, useState, ReactNode } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { getStoreToken } from './api/index';
 import { fetchTrainingModeStatus } from './api/trainingModeApi';
-import { ErrorBoundary, reportCrashToTelemetry } from './components/ErrorBoundary';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { isEnabled } from './config/featureFlags';
-import { registerOfflineEnqueue } from './api/tradeApi';
+// A1 安全修复：reportCrashToTelemetry 改从 api/tradeApi 导入（JWT-derived tenant_id）
+import { registerOfflineEnqueue, reportCrashToTelemetry } from './api/tradeApi';
 import { useOffline } from './hooks/useOffline';
 import { PosLoginPage } from './pages/PosLoginPage';
 import { InventoryAlertBanner } from './pages/InventoryAlertBanner';

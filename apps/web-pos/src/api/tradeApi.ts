@@ -625,3 +625,141 @@ export async function dispatchAgent(agentId: string, action: string, params: Rec
 export async function listAgents(): Promise<Array<{ agent_id: string; agent_name: string; priority: string }>> {
   return txFetch('/api/v1/agent/agents');
 }
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  POS 崩溃遥测上报（A1 安全修复 — 不再读 localStorage tenant_id）
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//
+// 漏洞背景（已修复）：
+//   旧版 reportCrashToTelemetry 直接读 localStorage.getItem('tenant_id') 作为
+//   X-Tenant-ID Header。任何 XSS / 恶意员工修改 localStorage 即可伪造跨租户
+//   crash 写入，用作探测竞争对手 saga_id/order_no。
+//
+// 修复策略（前端 + 后端联防）：
+//   1. 前端：tenant_id 仅从 JWT payload 解码（base64url decode），不再读 localStorage
+//   2. JWT 不存在或不可解析 → 拒绝上报（收敛攻击面，不再回退 localStorage）
+//   3. 后端：telemetry_routes.py 已加 JWT user.tenant_id 与 X-Tenant-ID Header
+//      强一致性校验，不一致返回 403 TENANT_MISMATCH（独立审计 deny 事件）。
+// ─────────────────────────────────────────────────────────────────────────
+
+// JWT 存储键（与 api/index.ts 的 STORE_TOKEN_KEY 同值；此处用 module-private 常量避免重复 export）
+const _STORE_TOKEN_KEY = 'tx_store_token';
+
+interface JwtPayload {
+  tenant_id?: string;
+  user_id?: string;
+  sub?: string;
+  exp?: number;
+  [k: string]: unknown;
+}
+
+/**
+ * 解析 JWT payload 中的 tenant_id（仅做客户端预读，最终以服务端校验为准）。
+ * - 仅做 base64url 解码 + JSON.parse，不验签（验签发生在 gateway 端）
+ * - 任意异常返回 null（调用方应据此拒绝上报）
+ */
+export function decodeTenantIdFromJwt(token: string | null | undefined): string | null {
+  if (!token || typeof token !== 'string') return null;
+  const parts = token.split('.');
+  if (parts.length !== 3) return null;
+  try {
+    // base64url → base64
+    const b64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    const padded = b64 + '==='.slice((b64.length + 3) % 4);
+    const json = typeof atob === 'function' ? atob(padded) : '';
+    if (!json) return null;
+    const payload = JSON.parse(json) as JwtPayload;
+    const t = payload.tenant_id;
+    if (typeof t !== 'string' || !t.trim()) return null;
+    return t.trim();
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * 崩溃上报载荷（与 services/tx-ops PosCrashReport schema 对齐）。
+ * 与 components/ErrorBoundary.tsx 的 ErrorReport 兼容。
+ */
+export interface CrashReportPayload {
+  error: { name: string; message: string; stack?: string };
+  componentStack?: string;
+  occurredAt?: string;
+  boundary_level?: 'root' | 'cashier' | 'unknown';
+  severity?: 'fatal' | 'warn' | 'info';
+  saga_id?: string;
+  order_no?: string;
+  timeout_reason?: 'fetch_timeout' | 'saga_timeout' | 'gateway_timeout' | 'rls_deny' | 'disk_io_error' | 'unknown';
+  recovery_action?: 'reset' | 'redirect_tables' | 'retry' | 'abort';
+}
+
+/**
+ * 上报 POS 前端崩溃到 tx-ops 遥测端点。
+ *
+ * 安全契约（A1 修复）：
+ *   - tenant_id 仅来自 JWT payload，绝不读 localStorage.getItem('tenant_id')
+ *   - 无 JWT 或 JWT 不含 tenant_id → 静默 abort（收敛攻击面）
+ *   - 设置 Authorization: Bearer 由后端二次校验（gateway/AuthMiddleware）
+ *
+ * 此函数失败时绝不抛异常，避免阻塞 UI 降级路径。
+ */
+export function reportCrashToTelemetry(report: CrashReportPayload): void {
+  try {
+    let token: string | null = null;
+    try {
+      token = typeof localStorage !== 'undefined' ? localStorage.getItem(_STORE_TOKEN_KEY) : null;
+    } catch {
+      // SSR / 隐身模式 / 沙箱化 iframe → 无 localStorage
+      token = null;
+    }
+
+    const tenantId = decodeTenantIdFromJwt(token);
+    if (!tenantId || !token) {
+      // 无可信 tenant_id 来源（未登录 / JWT 损坏 / localStorage 不可用）
+      // 拒绝上报：宁可丢一条遥测，也不允许跨租户写入。
+      return;
+    }
+
+    const base = import.meta.env.VITE_API_BASE_URL || '';
+    let deviceId: string;
+    try {
+      const w = window as unknown as { TXBridge?: { getDeviceInfo?: () => string } };
+      deviceId = w.TXBridge?.getDeviceInfo?.() || navigator.userAgent;
+    } catch {
+      deviceId = 'unknown-device';
+    }
+
+    let storeId: string | undefined;
+    try {
+      storeId = (typeof localStorage !== 'undefined' && localStorage.getItem('store_id')) || undefined;
+    } catch {
+      storeId = undefined;
+    }
+
+    const route = (typeof window !== 'undefined' && window.location?.pathname) || '/';
+
+    void fetch(`${base}/api/v1/telemetry/pos-crash`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Tenant-ID': tenantId,
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        device_id: deviceId,
+        route,
+        error_stack: report.error.stack ?? `${report.error.name}: ${report.error.message}`,
+        store_id: storeId,
+        boundary_level: report.boundary_level,
+        severity: report.severity,
+        saga_id: report.saga_id,
+        order_no: report.order_no,
+        timeout_reason: report.timeout_reason,
+        recovery_action: report.recovery_action,
+      }),
+      keepalive: true,
+    }).catch(() => {});
+  } catch {
+    // 遥测绝不阻塞 UI
+  }
+}
