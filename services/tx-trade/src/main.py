@@ -254,6 +254,9 @@ app.include_router(banquet_execution_router)
 app.include_router(banquet_live_order_router)
 app.include_router(banquet_settlement_routes_router)
 app.include_router(banquet_aftercare_router)
+# Phase 4 AI宴会大脑+经营看板
+from .api.banquet_ai_routes import router as banquet_ai_router
+app.include_router(banquet_ai_router)
 app.include_router(collab_order_router)
 app.include_router(table_layout_router)
 app.include_router(chef_at_home_router)
