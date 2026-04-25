@@ -4,6 +4,59 @@
 
 ---
 
+## 2026-04-25 Wave 3 Sprint D3b — 活动 ROI 预测（Prophet baseline + Sonnet 叙述）
+
+### 本次会话目标
+新增 services/tx-brain/src/agents/activity_roi/* 与 HTTP 端点 /api/v1/agents/activity-roi/predict，
+为门店经理提供活动启动**前**的 ROI 预测：增量 GMV / 增量毛利 / ROI 比率 / 80% CI / 中文叙述。
+
+### 不得触碰的边界
+- [x] services/tx-trade/** — 完全未触碰（25 commits 仍等 §19 二次审查）
+- [x] shared/ontology/** — 完全未触碰
+- [x] shared/ai_providers/router.py 现有 ModelRouter — 仅消费，未修改
+- [x] AgentDecisionLog schema — 未触碰
+
+### 本次涉及范围
+- 服务：tx-brain（新增 agents/activity_roi 子模块 + activity_roi_routes）
+- 迁移版本：无（D3b 是纯计算服务，不写新表）
+- Tier 级别：[x] Tier 2
+
+### 完成状态
+- [x] schemas.py（Pydantic V2，金额全分，90 天窗口校验）
+- [x] prophet_baseline.py（HistoricalGmvRepository 协议 + Holt-Winters fallback + estimate_mape_holdout）
+- [x] sonnet_narrator.py（ModelRouterLike 协议 + JSON schema 强约束 + fallback 模板）
+- [x] pipeline.py（ACTIVITY_LIFT_TABLE v1 + 完整预测装配）
+- [x] activity_roi_routes.py（POST /api/v1/agents/activity-roi/predict + JWT/X-Tenant-ID 校验）
+- [x] tests：9 个用例全部通过（pytest 1.00s）
+- [x] ruff All checks passed（仅本次新文件；main.py 既有 FlagContext 未用是历史问题）
+- [x] 4 atomic commits（feat schemas+baseline / feat sonnet / feat pipeline+route / test）
+
+### 关键决策
+- prophet 不在依赖中。**没有私自加 prophet 依赖**，在 prophet_baseline.py 内做 try/except 软导入：
+  prophet 装上后自动走 Prophet（含 weekly/yearly seasonality + 中国节假日 TODO）；
+  否则走纯 Python Holt-Winters 三参数指数平滑（α=0.3, β=0.1, γ=0.3, period=7）作 fallback baseline。
+- ModelRouter 已存在（shared.ai_providers.router.MultiProviderRouter / ModelRouterCompat）。
+  Sonnet narrator 通过 ModelRouterLike Protocol 注入，task_type=agent_decision，
+  路由首选 claude-sonnet-4-6 → qwen-max → deepseek-chat 故障转移。
+  Prompt Cache：当前 ModelRouter 未透传 cache_control 字段，narrator 已把"系统 Prompt + 商户档案"
+  打成稳定前缀以便未来 router 升级时直接受益（cache_hit_ratio=0.75 仅作估计标记）。
+- 增量模型 v1 用硬编码 ACTIVITY_LIFT_TABLE（满减 1.18 / 会员日 1.25 / 抖音团购 1.40 ...）+ margin_rate +
+  ci_width。TODO v2 接 mv_channel_margin / mv_store_pnl 后改为按门店/品牌动态学习。
+
+### 下一步
+- 接 model_router_singleton + 真实 GMV / 商户档案仓储（生产装配）
+- 真实 A/B 数据回灌后做 MAPE < 20% 的真实回测验证（**当前测试只在合成数据上跑通，
+  徐记真实数据回测仍需在 DEMO 环境完成**——未达就不应宣称达标）
+- 扩展 ACTIVITY_LIFT_TABLE 为按品牌学习的因果模型（causal lift estimator）
+
+### 已知风险
+- [Tier 2] MAPE < 20% 仅由合成季节性数据上的 holdout 验证（< 30% bound），
+  尚未在徐记海鲜真实订单序列上回测；上线前必须在 DEMO 环境跑一轮真实数据 MAPE
+- [Tier 2] _get_pipeline 默认抛 503，必须由应用启动代码注入；未注入时 /predict 全部 503
+- [无 Tier 1 影响] 未触及订单状态机/支付 saga/RLS；不影响现有 25 commits 等审查的 trade 改动
+
+---
+
 ## 2026-04-25 16:40 Wave 3 Sprint C1+C2 — IndexedDB 分区缓存 + connectionHealth 徽章
 
 ### 本次会话目标

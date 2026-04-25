@@ -1,3 +1,50 @@
+## 2026-04-25 Wave 3 Sprint D3b — 活动 ROI 预测（Prophet + Sonnet）（4 atomic commits / Tier 2）
+
+### 今日完成
+- [services/tx-brain/src/agents/activity_roi/__init__.py] 新增子包导出
+- [services/tx-brain/src/agents/activity_roi/schemas.py] Pydantic V2：ActivityROIRequest（含 90 天窗口
+  校验 + ≥14 天历史校验）/ ActivityROIPredictionPoint（baseline+lift+total，单位分）/ ActivityROIResponse
+  （含 mape_estimate + cache_hit_ratio + 80% CI）/ 8 类活动 ActivityType / InsufficientHistoricalDataError
+- [services/tx-brain/src/agents/activity_roi/prophet_baseline.py] ProphetBaselineService：
+  HistoricalGmvRepository Protocol（注入 fake repo 测试）+ try/except 软导入 prophet（**未私自加依赖**）
+  + 加性 Holt-Winters fallback（α=0.3 β=0.1 γ=0.3 period=7）+ _fill_missing_days 线性插值 +
+  estimate_mape_holdout 尾部 7 天回测函数
+- [services/tx-brain/src/agents/activity_roi/sonnet_narrator.py] ActivityROINarrator：
+  通过 ModelRouterLike Protocol 调用 ModelRouter（task_type=agent_decision，路由 claude-sonnet-4-6 →
+  qwen-max → deepseek-chat）+ SYSTEM_PROMPT_STATIC + 商户档案稳定排序拼装前缀（Prompt Cache 友好）+
+  _NarratorOutput Pydantic 强约束 narrative+caveats(1-5) + ```json``` 围栏宽容解析 +
+  TimeoutError/JSON 失败 → _fallback_narrative 模板（含数字与风险提示）
+- [services/tx-brain/src/agents/activity_roi/pipeline.py] ActivityROIPipeline：
+  ACTIVITY_LIFT_TABLE v1（满减 1.18 / 会员日 1.25 / 抖音团购 1.40 / 小红书 1.15 / 微信团购 1.22 /
+  第二份半价 1.20 / 满赠 1.10 / 限时 1.12 各自 lift_factor + margin_rate + ci_width）+ baseline → lift →
+  margin → CI → narrative 串接 + build_default_pipeline 工厂
+- [services/tx-brain/src/api/activity_roi_routes.py] POST /api/v1/agents/activity-roi/predict：
+  X-Tenant-ID 必填 + Authorization Bearer 必填 + body.tenant_id 与 header 强一致校验 +
+  InsufficientHistoricalDataError → 409 + ValidationError → 422 + 跨租户 → 403
+- [services/tx-brain/src/main.py] 挂载 activity_roi_router
+- [services/tx-brain/src/tests/test_activity_roi.py] 9 用例全过：Prophet baseline 周季节学习、insufficient
+  history（两条路径）、Sonnet narrator 中文+caveats+system 含商户档案、Sonnet fallback（Timeout 与解析失败）、
+  Pipeline full predict、ACTIVITY_LIFT_TABLE 完整性、MAPE holdout、路由鉴权（缺 JWT/缺 X-Tenant/跨租户/完整 200）、
+  short history → 409
+
+### 数据变化
+- 迁移版本：无（D3b 是纯计算服务）
+- 新增 API 模块：1 个（tx-brain / activity_roi）+ 1 路由（POST /api/v1/agents/activity-roi/predict）
+- 新增测试：9 个全部通过（pytest 1.00s）
+
+### 遗留问题
+- MAPE < 20% 目标尚未在徐记海鲜真实数据上回测（合成 holdout 仅证明 < 30% 区间）
+- _get_pipeline 默认抛 503，等 model_router_singleton + 真实 GMV repository 装配
+- ACTIVITY_LIFT_TABLE 是 v1 硬编码经验值，待 mv_channel_margin 数据回灌后改为因果模型
+- ModelRouter 当前不透传 cache_control 字段；narrator 前缀已为 cache 命中做好准备，等 router 升级即可见效
+
+### 明日计划
+- 接 model_router_singleton + 真实 GMV / merchant 仓储（注入 _get_pipeline）
+- DEMO 环境跑徐记真实数据回测，落地 MAPE 数字
+- 与 Wave 3 其他子项（D1/D2/D3a）汇合做集成测试
+
+---
+
 ## 2026-04-25 Wave 3 Sprint C1+C2 — IndexedDB 分区缓存 + connectionHealth 徽章（3 atomic commits / Tier 2）
 
 ### 今日完成
