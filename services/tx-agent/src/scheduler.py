@@ -164,6 +164,12 @@ INTERVAL_SCHEDULES: dict[str, dict[str, Any]] = {
         "task": "run_sop_tick",
         "description": "SOP 15分钟节拍：检查所有门店的待执行/超时任务",
     },
+    # ─── 客户触达SOP旅程定时任务 ───
+    "customer_journey_tick": {
+        "interval_seconds": 300,
+        "task": "run_customer_journey_tick",
+        "description": "客户触达SOP 5分钟节拍：扫描待执行的旅程步骤并发送消息",
+    },
 }
 
 # 所有调度必须包含的字段
@@ -445,6 +451,14 @@ async def _run_memory_evolution() -> None:
     await worker.run()
 
 
+async def _run_customer_journey_tick() -> None:
+    """客户触达SOP 5分钟节拍 — 扫描待执行的旅程步骤"""
+    from .workers.customer_journey_tick_worker import CustomerJourneyTickWorker
+
+    worker = CustomerJourneyTickWorker()
+    await worker.run()
+
+
 async def _run_baseline_update() -> None:
     """每周基线更新（周一凌晨3:00）— 基于过去4周数据更新门店基线"""
     from .workers.baseline_updater_worker import BaselineUpdaterWorker
@@ -473,6 +487,15 @@ def register_apscheduler_jobs(_scheduler: Any) -> None:
         "interval",
         minutes=15,
         id="sop_tick",
+        replace_existing=True,
+    )
+
+    # 客户触达SOP 5分钟节拍
+    _scheduler.add_job(
+        lambda: asyncio.create_task(_run_customer_journey_tick()),
+        "interval",
+        minutes=5,
+        id="customer_journey_tick",
         replace_existing=True,
     )
 
@@ -509,5 +532,5 @@ def register_apscheduler_jobs(_scheduler: Any) -> None:
 
     logger.info(
         "apscheduler_jobs_registered",
-        jobs=["sop_tick", "memory_evolution", "memory_consolidation", "baseline_update"],
+        jobs=["sop_tick", "customer_journey_tick", "memory_evolution", "memory_consolidation", "baseline_update"],
     )
