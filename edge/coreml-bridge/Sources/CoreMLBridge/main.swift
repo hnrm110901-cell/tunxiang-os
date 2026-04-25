@@ -7,6 +7,7 @@
 ///   POST /predict/dish-time       — 出餐时间预测
 ///   POST /predict/discount-risk   — 折扣异常检测评分
 ///   POST /predict/traffic         — 客流量预测
+///   POST /predict/dish-price      — 菜品动态定价（D3c，v0 规则版）
 ///   POST /transcribe              — 语音指令识别 (Whisper，v2实现)
 ///   GET  /health                  — 健康检查
 
@@ -35,7 +36,7 @@ ContentConfiguration.global.use(decoder: decoder, for: .json)
 registerRoutes(app)
 
 app.logger.info("CoreML Bridge starting on http://127.0.0.1:8100")
-app.logger.info("Endpoints: /health, /predict/dish-time, /predict/discount-risk, /predict/traffic, /transcribe")
+app.logger.info("Endpoints: /health, /predict/dish-time, /predict/discount-risk, /predict/traffic, /predict/dish-price, /transcribe")
 
 // 启动服务
 try app.run()

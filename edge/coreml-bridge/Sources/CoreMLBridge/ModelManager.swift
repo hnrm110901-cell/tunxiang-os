@@ -16,6 +16,21 @@ struct DishTimeFeatures {
     let queueLength: Int
 }
 
+/// D3c: 菜品动态定价输入特征
+/// time_of_day: "lunch_peak" | "dinner_peak" | "off_peak"
+/// traffic_forecast: "high" | "medium" | "low"
+/// inventory_status: "near_expiry" | "normal" | "low_stock"
+struct DishPriceFeatures {
+    let dishId: String
+    let storeId: String
+    let tenantId: String
+    let basePriceFen: Int
+    let costFen: Int
+    let timeOfDay: String
+    let trafficForecast: String
+    let inventoryStatus: String
+}
+
 struct DiscountFeatures {
     let discountRate: Double
     let orderAmount: Double
@@ -45,6 +60,16 @@ struct RiskScore {
 struct TrafficPrediction {
     let predictedCovers: Int
     let confidence: Double
+}
+
+/// D3c: 菜品动态定价输出
+struct DishPricePrediction {
+    let recommendedPriceFen: Int
+    let confidence: Double
+    let reasoningSignals: [String: String]   // {"traffic": "+0.05", "near_expiry": "-0.10"}
+    let modelVersion: String
+    let computedAtMs: Int64
+    let floorProtected: Bool                  // 毛利底线是否兜底过
 }
 
 // MARK: - ModelManager
@@ -180,6 +205,91 @@ final class ModelManager {
         return TrafficPrediction(
             predictedCovers: max(0, Int(predicted.rounded())),
             confidence: confidence
+        )
+    }
+
+    // MARK: - 菜品动态定价（D3c v0 — 规则引擎）
+
+    /// 推荐菜品定价（分）
+    /// - 生产: 加载 DishPricePredictor.mlmodel（GBDT → CoreML），Neural Engine 推理
+    /// - fallback (v0): cost-plus + time-of-day surcharge + traffic adjustment
+    ///
+    /// 三条硬约束之首：**毛利底线**（margin >= 15%）
+    /// 即使输入信号要求大幅降价，也会被夹回 cost / 0.85（保 15% 毛利率）
+    func predictDishPrice(features: DishPriceFeatures) -> DishPricePrediction {
+        // v0: 规则引擎 — 没有真实 ML 模型，等训练管线 ready（见 docs/d3c-dish-pricing-training-pipeline-tbd.md）
+        var multiplier = 1.0
+        var signals: [String: String] = [:]
+
+        // 时段调价
+        switch features.timeOfDay.lowercased() {
+        case "lunch_peak":
+            // 午高峰：基准价（不上调）
+            signals["lunch_peak"] = "+0.00"
+        case "dinner_peak":
+            // 晚高峰：基准价（不上调）
+            signals["dinner_peak"] = "+0.00"
+        case "off_peak":
+            multiplier -= 0.03
+            signals["off_peak"] = "-0.03"
+        default:
+            signals["time_of_day_unknown"] = "+0.00"
+        }
+
+        // 客流预测调价
+        switch features.trafficForecast.lowercased() {
+        case "high":
+            multiplier += 0.05
+            signals["traffic"] = "+0.05"
+        case "low":
+            multiplier -= 0.05
+            signals["traffic"] = "-0.05"
+        default:
+            signals["traffic"] = "+0.00"
+        }
+
+        // 库存状态调价
+        switch features.inventoryStatus.lowercased() {
+        case "near_expiry":
+            // 临期清仓：大幅降价
+            multiplier -= 0.10
+            signals["near_expiry"] = "-0.10"
+        case "low_stock":
+            // 低库存：稀缺性上调
+            multiplier += 0.03
+            signals["low_stock"] = "+0.03"
+        default:
+            signals["inventory_normal"] = "+0.00"
+        }
+
+        // 计算建议价
+        let rawPrice = Double(features.basePriceFen) * multiplier
+        var recommendedFen = Int(rawPrice.rounded())   // 四舍五入到整分
+
+        // ── 毛利底线 GUARD（铁律） ───────────────────────────────────
+        // 三条硬约束之首：margin = (price - cost) / price 必须 >= 15%
+        // 等价条件：price >= cost / 0.85
+        // 即使上游信号要求大幅降价，也必须夹回这条线
+        let minPriceForMargin = Int((Double(features.costFen) / 0.85).rounded(.up))
+        var floorProtected = false
+        if recommendedFen < minPriceForMargin {
+            recommendedFen = minPriceForMargin
+            floorProtected = true
+            signals["margin_floor_clamp"] = "applied"
+        }
+
+        // 置信度：v0 规则版固定较低；ML 上线后由模型输出
+        let confidence = floorProtected ? 0.60 : 0.78
+
+        let nowMs = Int64(Date().timeIntervalSince1970 * 1000)
+
+        return DishPricePrediction(
+            recommendedPriceFen: recommendedFen,
+            confidence: confidence,
+            reasoningSignals: signals,
+            modelVersion: "stub-v0",
+            computedAtMs: nowMs,
+            floorProtected: floorProtected
         )
     }
 

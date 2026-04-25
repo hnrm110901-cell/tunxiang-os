@@ -16,12 +16,15 @@
 """
 
 from .base import ConstraintCheck, ConstraintName, ConstraintResult, SkillContext
+from .decorator import ConstraintBlockedException, with_constraint_check
 from .runner import run_checks
 
 __all__ = [
+    "ConstraintBlockedException",
     "ConstraintCheck",
     "ConstraintName",
     "ConstraintResult",
     "SkillContext",
     "run_checks",
+    "with_constraint_check",
 ]
