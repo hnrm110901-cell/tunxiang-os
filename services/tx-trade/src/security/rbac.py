@@ -156,3 +156,171 @@ def require_mfa(*allowed_roles: str) -> Callable:
         return ctx
 
     return _dep
+
+
+# ──────────────────────────────────────────────────────────────────────────
+#  Audit-aware 包装（Sprint A4 R-补1-1 / Tier1）
+#  在拒绝路径（401/403）抛 HTTPException **之前** 写入 trade_audit_logs
+#  result='deny' 行，关闭 §19 审查发现的"deny 审计缺失"阻塞。
+# ──────────────────────────────────────────────────────────────────────────
+
+
+# 延迟 import 避免循环：rbac.py 是底层模块，trade_audit_log 依赖 sqlalchemy
+# 在生产 import 链路上是可用的；本模块仅在 wrapper 内部用到。
+def _audit_deny_safe(
+    *,
+    db,
+    tenant_id: str,
+    store_id: str | None,
+    user_id: str,
+    user_role: str,
+    action: str,
+    reason: str,
+    severity: str,
+    client_ip: str | None,
+    request_id: str | None,
+):
+    """同步触发 audit_deny。返回一个 awaitable；调用方决定是否 await。
+
+    单独成函数便于单测 monkeypatch（避免直接 import 路径绑定）。
+    """
+    from ..services.trade_audit_log import audit_deny  # noqa: PLC0415
+
+    return audit_deny(
+        db,
+        tenant_id=tenant_id,
+        store_id=store_id,
+        user_id=user_id,
+        user_role=user_role,
+        action=action,
+        reason=reason,
+        severity=severity,
+        client_ip=client_ip,
+        request_id=request_id,
+    )
+
+
+def _import_get_db() -> Callable:
+    """懒加载 shared.ontology.src.database.get_db。
+
+    rbac.py 不强依赖 ontology 模块（让单测更轻），仅在 audit-aware 装饰器
+    实际被调用时 import；测试可通过参数注入 db_provider 替换。
+    """
+    from shared.ontology.src.database import get_db  # noqa: PLC0415
+    return get_db
+
+
+def require_role_audited(
+    action: str,
+    *allowed_roles: str,
+    severity_on_deny: str = "warn",
+    db_provider: Callable | None = None,
+) -> Callable:
+    """audit-aware 版 require_role：拒绝时写入 trade_audit_logs result='deny'。
+
+    与 require_role 完全等价的成功语义；额外在 401/403 抛出 **之前** 写
+    一条 audit 行，让"谁在哪个时间点对哪个 action 被拒"可追溯。
+
+    Args:
+        action: 业务动作标识（refund.apply / discount.apply / payment.create）
+        allowed_roles: 允许的角色集合，转发给 require_role
+        severity_on_deny: SIEM 严重级，默认 warn；高敏感场景（高额折扣 / 跨租户
+            探测）调用方可传 error/critical
+        db_provider: 测试用 — 不为 None 时跳过 shared.ontology import，直接用注入。
+            生产保持 None，由 _import_get_db() 懒加载。
+
+    Returns:
+        FastAPI Dependency（接受 request + db）。
+    """
+    from fastapi import Depends  # noqa: PLC0415
+
+    base = require_role(*allowed_roles)
+    _get_db = db_provider if db_provider is not None else _import_get_db()
+
+    async def _dep(request: Request, db=Depends(_get_db)) -> UserContext:
+        try:
+            return await base(request)
+        except HTTPException as exc:
+            # 拒绝路径：先写 deny 审计，再原样抛出（响应形状 / 状态码不变）
+            ctx = extract_user_context(request)
+            reason = (
+                str(exc.detail) if isinstance(exc.detail, str) else exc.detail.__class__.__name__
+            )
+            try:
+                await _audit_deny_safe(
+                    db=db,
+                    tenant_id=ctx.tenant_id,
+                    store_id=ctx.store_id,
+                    user_id=ctx.user_id,
+                    user_role=ctx.role,
+                    action=action,
+                    reason=reason,
+                    severity=severity_on_deny,
+                    client_ip=ctx.client_ip,
+                    request_id=request.headers.get("X-Request-Id")
+                    if hasattr(request, "headers")
+                    else None,
+                )
+            except Exception:  # noqa: BLE001 — 审计失败绝不影响 403/401 响应
+                logger.error(
+                    "audit_deny_call_failed",
+                    action=action,
+                    user_id=ctx.user_id,
+                    reason=reason,
+                    exc_info=True,
+                )
+            raise
+
+    return _dep
+
+
+def require_mfa_audited(
+    action: str,
+    *allowed_roles: str,
+    severity_on_deny: str = "error",
+    db_provider: Callable | None = None,
+) -> Callable:
+    """audit-aware 版 require_mfa：MFA 缺失时写 deny 审计（severity 默认 error）。
+
+    高额减免 / 退款 / 跨租户探测等高风险动作在被拒时应触发 SIEM 告警，
+    severity_on_deny 默认 'error' 比 require_role_audited 高一档。
+    """
+    from fastapi import Depends  # noqa: PLC0415
+
+    base = require_mfa(*allowed_roles)
+    _get_db = db_provider if db_provider is not None else _import_get_db()
+
+    async def _dep(request: Request, db=Depends(_get_db)) -> UserContext:
+        try:
+            return await base(request)
+        except HTTPException as exc:
+            ctx = extract_user_context(request)
+            reason = (
+                str(exc.detail) if isinstance(exc.detail, str) else exc.detail.__class__.__name__
+            )
+            try:
+                await _audit_deny_safe(
+                    db=db,
+                    tenant_id=ctx.tenant_id,
+                    store_id=ctx.store_id,
+                    user_id=ctx.user_id,
+                    user_role=ctx.role,
+                    action=action,
+                    reason=reason,
+                    severity=severity_on_deny,
+                    client_ip=ctx.client_ip,
+                    request_id=request.headers.get("X-Request-Id")
+                    if hasattr(request, "headers")
+                    else None,
+                )
+            except Exception:  # noqa: BLE001
+                logger.error(
+                    "audit_deny_call_failed",
+                    action=action,
+                    user_id=ctx.user_id,
+                    reason=reason,
+                    exc_info=True,
+                )
+            raise
+
+    return _dep
