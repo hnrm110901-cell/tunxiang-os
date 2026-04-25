@@ -1,10 +1,11 @@
 """device_registry_service — Sprint C3 边缘设备注册表 CRUD
 
 职责：
-  - heartbeat        — 首次 insert / 后续 update last_seen_at（30s 一次）
-  - get              — 读单台设备（RLS 强制 tenant_id）
-  - list_by_store    — 列出某门店所有设备（用于运维面板）
-  - mark_offline     — 后台定时任务扫 10 min 无心跳设备 → health=offline
+  - heartbeat                  — 首次 insert / 后续 update last_seen_at（30s 一次）
+  - get                        — 读单台设备（RLS 强制 tenant_id）
+  - list_by_store              — 列出某门店所有设备（用于运维面板）
+  - mark_offline_if_stale      — 单租户：扫 10 min 无心跳设备 → health=offline
+  - mark_offline_if_stale_global— 跨租户：迭代所有活跃 tenants 调用上述（调度入口）
 
 设计约束（CLAUDE.md §6 + §17 Tier1）：
   - device_kind 必须 ∈ ALLOWED_DEVICE_KINDS（service 层拦截 + 迁移 CHECK 双层）
@@ -21,7 +22,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, Optional
+from typing import Any, Callable, Optional
 
 import structlog
 from sqlalchemy import text
@@ -322,3 +323,95 @@ class DeviceRegistryService:
                 threshold_sec=threshold_sec,
             )
         return affected
+
+    @staticmethod
+    async def mark_offline_if_stale_global(
+        session_factory: Callable,
+        *,
+        threshold_sec: int = DEFAULT_OFFLINE_THRESHOLD_SEC,
+        now: Optional[datetime] = None,
+    ) -> dict[str, int]:
+        """跨租户离线扫描入口（调度任务调用）。
+
+        实现思路：
+          1. 用 BYPASSRLS session 拉取所有活跃 tenant_id（来自 stores 表）
+          2. 对每个 tenant_id 开独立 session + bind RLS，调用单租户版本
+          3. 汇总命中数，便于 scheduler 写入 INFO 日志
+
+        与 hr_agent_scheduler / monthly_petty_cash 等已有跨租户任务的迭代模式对齐。
+
+        Args:
+            session_factory: async_session_factory（返回 AsyncSession）
+            threshold_sec: 无心跳阈值（默认 600s = 10 min）
+            now: 可注入"当前时间"，便于测试（默认 utcnow）
+
+        Returns:
+            {
+                "tenants_scanned": int,
+                "devices_marked_offline": int,
+            }
+        """
+        if threshold_sec <= 0:
+            raise ValueError("threshold_sec must be > 0")
+
+        from shared.ontology.src.database import get_db_no_rls
+
+        # ── Step 1: 拉取所有活跃租户 ──
+        tenant_ids: list[str] = []
+        try:
+            async for probe_db in get_db_no_rls():
+                result = await probe_db.execute(
+                    text(
+                        """
+                        SELECT DISTINCT tenant_id::text
+                        FROM stores
+                        WHERE is_deleted = FALSE
+                        ORDER BY 1
+                        """
+                    )
+                )
+                tenant_ids = [row[0] for row in result.fetchall()]
+                break
+        except SQLAlchemyError as exc:
+            logger.error(
+                "device_registry_mark_offline_global_tenant_query_failed",
+                error=str(exc),
+            )
+            return {"tenants_scanned": 0, "devices_marked_offline": 0}
+
+        if not tenant_ids:
+            logger.info("device_registry_mark_offline_global_no_tenants")
+            return {"tenants_scanned": 0, "devices_marked_offline": 0}
+
+        # ── Step 2: 逐租户调用单租户实现 ──
+        total_affected = 0
+        scanned = 0
+        for tid in tenant_ids:
+            try:
+                async with session_factory() as db:
+                    svc = DeviceRegistryService(db, tenant_id=tid)
+                    affected = await svc.mark_offline_if_stale(
+                        threshold_sec=threshold_sec,
+                        now=now,
+                    )
+                    await db.commit()
+                    total_affected += affected
+                    scanned += 1
+            except SQLAlchemyError as exc:
+                # 单租户失败不影响其余租户
+                logger.error(
+                    "device_registry_mark_offline_global_tenant_failed",
+                    tenant_id=tid,
+                    error=str(exc),
+                )
+
+        logger.info(
+            "device_registry_mark_offline_global_done",
+            tenants_scanned=scanned,
+            devices_marked_offline=total_affected,
+            threshold_sec=threshold_sec,
+        )
+        return {
+            "tenants_scanned": scanned,
+            "devices_marked_offline": total_affected,
+        }

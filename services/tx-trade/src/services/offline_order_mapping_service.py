@@ -157,12 +157,30 @@ class OfflineOrderMappingService:
         *,
         offline_order_id: str,
         cloud_order_id: str,
-    ) -> None:
+    ) -> bool:
         """同步成功：写入 cloud_order_id + state=synced + synced_at=now。
+
+        **Tier1 资金安全约束（A3 §19 致命级 #2）**：
+          UPDATE 语句必须带 `WHERE state='pending'` 守护，否则在以下场景将
+          导致同一离线单对应两个云端订单 → 资金双扣费：
+            1. 服务端首次调用 mark_synced 成功 → state=synced, cloud_order_id=A
+            2. 响应在网络层丢失，客户端带原 offline_order_id 重试
+            3. upsert_mapping ON CONFLICT DO NOTHING（保留既有 synced 行）
+            4. 若此处无 state='pending' 守护 → 用新生成的 cloud_order_id=B
+               覆盖原 cloud_order_id=A → 对账时同一离线单关联两个云端订单
+            5. 后续支付/打票按 cloud_order_id=B 执行，cloud_order_id=A 也已落账
+
+          加上守护后：state 已是 synced/dead_letter 的条目 UPDATE 0 行 →
+          返回 False；调用方应跳过新生成 cloud_order_id 的逻辑，复用既有的。
 
         Args:
             offline_order_id: 离线 order_id 字符串
             cloud_order_id:   云端生成的订单 UUID 字符串
+
+        Returns:
+            bool: True  = 确实把 pending → synced 推进了一步（首次成功）
+                  False = 条目已是 synced/dead_letter（幂等 no-op，调用方应
+                          通过 get() 读取既有 cloud_order_id 而非重新生成）
         """
         if not cloud_order_id:
             raise ValueError("cloud_order_id is required for mark_synced")
@@ -171,7 +189,7 @@ class OfflineOrderMappingService:
 
         now = datetime.now(timezone.utc)
         try:
-            await self._db.execute(
+            result = await self._db.execute(
                 text(
                     """
                     UPDATE offline_order_mapping
@@ -181,6 +199,7 @@ class OfflineOrderMappingService:
                         updated_at = :synced_at
                     WHERE tenant_id = :tenant_id
                       AND offline_order_id = :offline_order_id
+                      AND state = :pending_state
                     """
                 ),
                 {
@@ -188,6 +207,7 @@ class OfflineOrderMappingService:
                     "offline_order_id": offline_order_id,
                     "cloud_order_id": cloud_order_id,
                     "state": MappingState.SYNCED.value,
+                    "pending_state": MappingState.PENDING.value,
                     "synced_at": now,
                 },
             )
@@ -199,11 +219,27 @@ class OfflineOrderMappingService:
             )
             raise
 
+        # rowcount == 0 → 条目不在 pending（可能已 synced 或 dead_letter）
+        # 此为幂等 no-op，不是错误：上层重试场景的正确响应是返回既有 cloud_order_id
+        rowcount = getattr(result, "rowcount", None)
+        advanced = rowcount is None or rowcount >= 1
+
+        if not advanced:
+            logger.warning(
+                "offline_order_mapping_mark_synced_noop",
+                offline_order_id=offline_order_id,
+                tenant_id=self._tenant_id,
+                attempted_cloud_order_id=cloud_order_id,
+                reason="state_not_pending",
+            )
+            return False
+
         logger.info(
             "offline_order_mapping_synced",
             offline_order_id=offline_order_id,
             cloud_order_id=cloud_order_id,
         )
+        return True
 
     async def mark_dead_letter(
         self,
