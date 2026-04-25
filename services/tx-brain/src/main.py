@@ -29,6 +29,7 @@ except ImportError:
         return True  # noqa: E731
 
 
+from .api.activity_roi_routes import router as activity_roi_router  # D3b 活动 ROI 预测
 from .api.brain_routes import router as brain_router
 from .api.content_hub_routes import router as content_hub_router  # AI营销内容中枢（v207）
 from .api.voice_api import router as voice_router
@@ -114,6 +115,7 @@ app.include_router(voice_router)
 app.include_router(brain_router)
 app.include_router(voice_stable_router)
 app.include_router(content_hub_router)  # /api/v1/brain/content/* — AIGC 营销内容生成（v207）
+app.include_router(activity_roi_router)  # /api/v1/agents/activity-roi/* — 活动 ROI 预测（D3b）
 
 
 # ─── Health & Info ───────────────────────────────────────────────
