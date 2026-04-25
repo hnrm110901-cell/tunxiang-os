@@ -92,6 +92,10 @@ class ChannelEventType(str, Enum):
     SETTLEMENT = "channel.settlement"  # 渠道结算
     PROMOTION_APPLIED = "channel.promotion_applied"  # 平台活动补贴
     CHARGEBACK = "channel.chargeback"  # 渠道拒付
+    # 异议工作流（Sprint E4 / v277 channel_disputes）
+    DISPUTE_OPENED = "channel.dispute_opened"  # 异议打开（pending）
+    DISPUTE_AUTO_ACCEPTED = "channel.dispute_auto_accepted"  # 自动接受（≤ 阈值）
+    DISPUTE_RESOLVED = "channel.dispute_resolved"  # 人工裁决（accept/reject/escalate）
 
 
 class ReservationEventType(str, Enum):
