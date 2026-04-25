@@ -471,6 +471,11 @@ from .api.kiosk_routes import router as kiosk_router
 
 app.include_router(kiosk_router)
 
+# ── Sprint E1：渠道 canonical 订单（外卖统一抽象层，纯加法不影响适配器）──
+from .api.channel_canonical_routes import router as channel_canonical_router
+
+app.include_router(channel_canonical_router)
+
 
 @app.get("/health")
 async def health():
