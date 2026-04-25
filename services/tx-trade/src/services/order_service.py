@@ -234,7 +234,13 @@ class OrderService:
         customizations: Optional[dict] = None,
     ) -> dict:
         await self._set_tenant()
-        subtotal_fen = unit_price_fen * quantity
+
+        # 做法加价：从 customizations 中提取做法附加费用
+        practice_extra_fen = 0
+        if customizations:
+            practice_extra_fen = customizations.get("total_extra_price_fen", 0)
+
+        subtotal_fen = unit_price_fen * quantity + practice_extra_fen
         item = OrderItem(
             id=uuid.uuid4(),
             tenant_id=self.tenant_id,

@@ -165,6 +165,20 @@ async def dispatch_order_to_kds(
         dish_id = uuid.UUID(item["dish_id"]) if item.get("dish_id") else None
         dept_id = mappings.get(dish_id) if dish_id else None
 
+        # 提取做法信息用于厨打单展示
+        customizations = item.get("customizations") or {}
+        practices_display = []
+        if customizations.get("practices"):
+            for prac in customizations["practices"]:
+                label = prac.get("name", "")
+                qty = prac.get("quantity", 1)
+                price = prac.get("additional_price_fen", 0)
+                if qty > 1:
+                    label = f"{label}x{qty}"
+                if price > 0:
+                    label = f"{label}(+{price / 100:.0f}元)"
+                practices_display.append(label)
+
         task = {
             "task_id": str(uuid.uuid4()),
             "order_id": order_id,
@@ -173,6 +187,8 @@ async def dispatch_order_to_kds(
             "dish_name": item.get("item_name", ""),
             "quantity": item.get("quantity", 1),
             "notes": item.get("notes", ""),
+            "practices": practices_display,
+            "practices_raw": customizations.get("practices", []),
             "status": TASK_STATUS_PENDING,
             "urgent": False,
             "created_at": datetime.now(timezone.utc).isoformat(),

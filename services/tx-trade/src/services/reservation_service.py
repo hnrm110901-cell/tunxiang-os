@@ -7,7 +7,10 @@
 所有金额单位：分（fen）。
 
 修复:
-  - [HARDCODE] ROOM_CONFIG / TIME_SLOTS / duration_min 从硬编码改为可配置参数
+  - [HARDCODE] ROOM_CONFIG / TIME_SLOTS / duration_min 从硬编码改为数据库驱动
+    新增方法: get_available_rooms / get_available_time_slots / check_room_availability
+    通过 reservation_configs 和 reservation_time_slots 表读取配置
+    原 _DEFAULT_ROOM_CONFIG / _DEFAULT_TIME_SLOTS 仅作为 fallback
   - [ASYNCIO] 移除 asyncio.create_task 中使用 db session 的危险模式
     (session 在请求结束时关闭，create_task 里的协程可能在那之后才执行)
   - [STATE-MACHINE] customer_arrived 做了两次状态转换 (arrived->queuing) 但只验证了第一次
@@ -17,7 +20,7 @@
 """
 
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, time as dt_time, timedelta, timezone
 from typing import Optional
 
 import structlog
@@ -26,7 +29,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from shared.events import UniversalPublisher
 
 from ..models.reservation import Reservation
+from ..models.reservation_config import ReservationConfig, ReservationTimeSlot
 from ..repositories.reservation_repo import ReservationRepository
+from ..repositories.reservation_config_repo import ReservationConfigRepository
 from .attribution_hook import fire_reservation_attribution
 from .queue_service import QueueService
 from .reservation_flow import (
@@ -52,7 +57,7 @@ def _gen_confirmation_code() -> str:
 
 RESERVATION_TYPES = ["regular", "banquet", "private_room", "outdoor", "vip"]
 
-# 包间默认配置 — 实际应从 store 配置表读取，此处作为 fallback
+# 包间默认配置 — 仅在数据库中无配置时作为 fallback
 _DEFAULT_ROOM_CONFIG: dict[str, dict] = {
     "梅花厅": {"capacity": (4, 8), "features": ["独立空调", "投影"], "min_spend_fen": 80000},
     "兰花厅": {"capacity": (6, 12), "features": ["独立空调", "投影", "KTV"], "min_spend_fen": 120000},
@@ -69,7 +74,7 @@ _DEFAULT_ROOM_CONFIG: dict[str, dict] = {
     },
 }
 
-# 默认时段配置 — 实际应从 store 配置表读取
+# 默认时段配置 — 仅在数据库中无配置时作为 fallback
 _DEFAULT_TIME_SLOTS: dict[str, dict] = {
     "lunch": {"start": "11:00", "end": "14:00", "label": "午餐"},
     "dinner": {"start": "17:00", "end": "21:00", "label": "晚餐"},
@@ -99,8 +104,9 @@ class ReservationService:
         self.tenant_id = tenant_id
         self.store_id = store_id
         self._repo = ReservationRepository(db, tenant_id)
+        self._config_repo = ReservationConfigRepository(db, tenant_id)
         self._queue_service = QueueService(db=db, tenant_id=tenant_id, store_id=store_id)
-        # 可配置参数（修复硬编码问题）
+        # fallback 配置（数据库无数据时使用）
         self._room_config = room_config or _DEFAULT_ROOM_CONFIG
         self._time_slots = time_slots or _DEFAULT_TIME_SLOTS
         self._dining_duration_min = dining_duration_min
@@ -828,6 +834,189 @@ class ReservationService:
                 )
 
         return conflicts
+
+    # ─── 数据库驱动的配置查询方法 ───
+
+    async def get_available_rooms(
+        self,
+        store_id: str,
+        date: str,
+        guest_count: int,
+    ) -> list[dict]:
+        """查可用包间 — 从数据库读取配置，检查冲突
+
+        Args:
+            store_id: 门店ID
+            date: 预订日期 YYYY-MM-DD
+            guest_count: 就餐人数
+
+        Returns:
+            可用包间列表，每项包含 room_code, room_name, room_type, capacity, deposit_fen, available
+        """
+        db_rooms = await self._config_repo.list_rooms_for_guests(store_id, guest_count)
+
+        if not db_rooms:
+            # fallback 到硬编码配置
+            logger.info("get_available_rooms_fallback", store_id=store_id, reason="no_db_config")
+            results: list[dict] = []
+            for name, config in self._room_config.items():
+                min_cap, max_cap = config["capacity"]
+                if min_cap <= guest_count <= max_cap:
+                    conflicts = await self.check_conflicts(store_id, date, "11:00", room_name=name)
+                    results.append({
+                        "room_code": name,
+                        "room_name": name,
+                        "room_type": "private",
+                        "min_guests": min_cap,
+                        "max_guests": max_cap,
+                        "deposit_fen": config.get("min_spend_fen", 0),
+                        "available": len(conflicts) == 0,
+                        "conflict_count": len(conflicts),
+                    })
+            return results
+
+        results = []
+        for room in db_rooms:
+            # 检查该包间当天是否有冲突（全天任意时段）
+            active_records = await self._repo.list_by_store_date_active(store_id, date)
+            conflict_count = sum(
+                1 for r in active_records
+                if r.room_name == room.room_code or r.room_name == room.room_name
+            )
+            results.append({
+                "room_code": room.room_code,
+                "room_name": room.room_name,
+                "room_type": room.room_type,
+                "min_guests": room.min_guests,
+                "max_guests": room.max_guests,
+                "deposit_fen": room.deposit_fen,
+                "available": True,  # 包间在某些时段可用
+                "conflict_count": conflict_count,
+            })
+
+        return results
+
+    async def get_available_time_slots(
+        self,
+        store_id: str,
+        date: str,
+    ) -> list[dict]:
+        """查可用时段 — 从数据库读取时段配置
+
+        Args:
+            store_id: 门店ID
+            date: 查询日期 YYYY-MM-DD
+
+        Returns:
+            时段列表，每项包含 slot_name, start_time, end_time, dining_duration_min, available, reason
+        """
+        db_slots = await self._config_repo.list_time_slots(store_id)
+
+        if not db_slots:
+            # fallback 到硬编码配置
+            logger.info("get_available_time_slots_fallback", store_id=store_id, reason="no_db_config")
+            return await self.get_time_slots(store_id, date, party_size=2)
+
+        results: list[dict] = []
+        for slot in db_slots:
+            start_str = slot.start_time.strftime("%H:%M")
+            end_str = slot.end_time.strftime("%H:%M")
+
+            # 统计该时段已有预订数
+            reserved_count = await self._config_repo.count_reservations_in_slot(
+                store_id, date, start_str, end_str,
+            )
+
+            max_res = slot.max_reservations
+            available = True
+            reason = ""
+            if max_res > 0 and reserved_count >= max_res:
+                available = False
+                reason = f"该时段已满（{reserved_count}/{max_res}）"
+
+            results.append({
+                "id": str(slot.id),
+                "slot_name": slot.slot_name,
+                "start_time": start_str,
+                "end_time": end_str,
+                "dining_duration_min": slot.dining_duration_min,
+                "max_reservations": max_res,
+                "current_reservations": reserved_count,
+                "available": available,
+                "reason": reason,
+            })
+
+        return results
+
+    async def check_room_availability(
+        self,
+        store_id: str,
+        room_code: str,
+        date: str,
+        time_slot: str,
+    ) -> dict:
+        """检查包间在指定日期时段是否可用
+
+        Args:
+            store_id: 门店ID
+            room_code: 包间编码
+            date: 日期 YYYY-MM-DD
+            time_slot: 时间 HH:MM
+
+        Returns:
+            {available: bool, conflicts: [...], room_info: {...}}
+        """
+        # 先从数据库查包间配置
+        db_room = await self._config_repo.get_room_by_code(store_id, room_code)
+
+        if db_room:
+            duration = self._dining_duration_min
+            # 尝试从时段配置获取用餐时长
+            db_slots = await self._config_repo.list_time_slots(store_id)
+            slot_time = datetime.strptime(time_slot, "%H:%M").time()
+            for slot in db_slots:
+                if slot.start_time <= slot_time < slot.end_time:
+                    duration = slot.dining_duration_min
+                    break
+
+            conflicts = await self.check_conflicts(
+                store_id, date, time_slot,
+                duration_min=duration,
+                room_name=db_room.room_code,
+            )
+            # 也检查 room_name 匹配的冲突
+            if not conflicts:
+                conflicts = await self.check_conflicts(
+                    store_id, date, time_slot,
+                    duration_min=duration,
+                    room_name=db_room.room_name,
+                )
+
+            return {
+                "available": len(conflicts) == 0,
+                "conflicts": conflicts,
+                "room_info": db_room.to_dict(),
+            }
+
+        # fallback 到硬编码
+        room = self._room_config.get(room_code)
+        if not room:
+            raise ValueError(f"Unknown room: {room_code}")
+
+        conflicts = await self.check_conflicts(
+            store_id, date, time_slot,
+            room_name=room_code,
+        )
+        return {
+            "available": len(conflicts) == 0,
+            "conflicts": conflicts,
+            "room_info": {
+                "room_code": room_code,
+                "room_name": room_code,
+                "capacity": room["capacity"],
+                "min_spend_fen": room.get("min_spend_fen", 0),
+            },
+        }
 
     # ─── 内部辅助方法 ───
 

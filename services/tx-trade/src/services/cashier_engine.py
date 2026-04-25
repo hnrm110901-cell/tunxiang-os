@@ -371,6 +371,12 @@ class CashierEngine:
         else:
             subtotal_fen = unit_price_fen * qty
 
+        # 做法加价：从 customizations 中提取做法附加费用（加蛋/加芝士等）
+        practice_extra_fen = 0
+        if customizations and "total_extra_price_fen" in customizations:
+            practice_extra_fen = customizations["total_extra_price_fen"]
+            subtotal_fen += practice_extra_fen
+
         # BOM 成本（从已加载的 dish 对象取，无额外查询）
         food_cost_fen = None
         gross_margin = None

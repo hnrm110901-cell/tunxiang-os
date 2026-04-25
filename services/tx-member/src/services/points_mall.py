@@ -16,7 +16,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = structlog.get_logger(__name__)
 
-# ── 成就里程碑定义 ────────────────────────────────────────────
+# ── 成就里程碑定义（已迁移至 DB: points_mall_achievement_configs）──
+# 保留此常量用于向下兼容，新代码应使用 points_mall_v2.get_achievement_list()
 
 ACHIEVEMENT_DEFINITIONS = [
     {
