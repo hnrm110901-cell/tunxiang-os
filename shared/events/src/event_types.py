@@ -268,6 +268,8 @@ DOMAIN_STREAM_MAP: dict[str, str] = {
     "knowledge": "tx_knowledge_events",
     # 旧系统适配器域（Sprint F1 / PR F，14 个 POS / 外卖 / 物流 / 财税适配器统一入口）
     "adapter": "tx_adapter_events",
+    # 实验框架域（Sprint G）
+    "experiment": "tx_experiment_events",
     # 兼容旧域
     "trade": "trade_events",
     "supply": "supply_events",
@@ -306,6 +308,8 @@ DOMAIN_STREAM_TYPE_MAP: dict[str, str] = {
     "knowledge": "knowledge",
     # 旧系统适配器域（Sprint F1 / PR F）
     "adapter": "adapter",
+    # 实验框架域（Sprint G）
+    "experiment": "experiment",
 }
 
 # ──────────────────────────────────────────────────────────────────────
@@ -442,6 +446,19 @@ class GrowthEventType(str, Enum):
     STORE_READINESS_EVALUATED = "growth.store_readiness_evaluated"
 
 
+class ExperimentEventType(str, Enum):
+    """实验框架事件 — Sprint G
+
+    EXPOSED: subject 第一次进入某实验时写入（idempotent，同 subject 重复请求不重复发射）
+    CIRCUIT_BREAKER_TRIPPED: 监控指标跌幅超阈值触发熔断（强制 control 分桶 + 写 flag 文件）
+    CIRCUIT_BREAKER_RESET: 管理员手动重置熔断（重新允许变体分桶）
+    """
+
+    EXPOSED = "experiment.exposed"
+    CIRCUIT_BREAKER_TRIPPED = "experiment.circuit_breaker_tripped"
+    CIRCUIT_BREAKER_RESET = "experiment.circuit_breaker_reset"
+
+
 def resolve_stream_key(event_type: str) -> str:
     """根据事件类型字符串解析目标 Redis Stream key。
 
@@ -492,4 +509,6 @@ ALL_EVENT_ENUMS = (
     MenuEventType,
     # 旧系统适配器域（Sprint F1 / PR F）
     AdapterEventType,
+    # 实验框架域（Sprint G）
+    ExperimentEventType,
 )
