@@ -24,6 +24,7 @@ R-补1-1（§19 独立审查发现）：
 from __future__ import annotations
 
 import json
+import uuid
 from typing import Any, Mapping
 
 import structlog
@@ -37,6 +38,151 @@ logger = structlog.get_logger(__name__)
 
 _VALID_RESULTS: frozenset[str] = frozenset({"allow", "deny", "mfa_required"})
 _VALID_SEVERITIES: frozenset[str] = frozenset({"info", "warn", "error", "critical"})
+
+
+# ──────────────── target_id 跨租户校验（A4-R2 / Tier1） ────────────────
+#
+# 背景（§19 独立审查 R-A4-2）：
+#   长沙经理可在请求体中传入韶山店订单 UUID 作为 target_id。原 write_audit
+#   不校验 target 所属租户，会把跨租户 target_id 写入长沙审计行，构成探测信道
+#   （管理员查 audit 表可枚举其他租户订单是否存在）。
+#
+# 修复策略：
+#   1. write_audit 在执行 set_config 后、INSERT 前，向 target_type 对应的
+#      实体表发起 SELECT 1 LIMIT 1，依赖已绑定的 app.tenant_id RLS 自动 scope
+#      到 caller 租户：
+#        - 查到行 → target 在 caller 租户内，正常写入
+#        - 查不到 → 不在 caller 租户（跨租户 / 已删除 / 不存在）
+#        - 表/列不在或 cast 失败 → 试下一张表
+#   2. 检测到"不在 caller 租户"时：
+#        - target_id / amount_fen / before_state / after_state 全部置 NULL
+#        - result 升级为 'deny'，severity 升级为 'critical'，
+#          reason 拼上 cross_tenant_target_blocked:<target_type>
+#        - 额外记一条 structlog.error（带 'critical' 级别）触发 SIEM 告警
+#   3. fail-open 原则：如果 target_type 未注册（如 voucher / coupon /
+#      reconcile / retry_queue 这类无 DB 实体的）→ 跳过校验。
+#
+# 为什么不抛 raise（审查建议）：
+#   "审计不阻塞业务"是 Tier1 不变量。raise 会让 4xx/5xx 业务路径继续抛但
+#   审计写入失败，反而丢证据。降级 + 高严重性 structlog 既保留行为又留痕。
+#
+# 为什么不用 SECURITY DEFINER：
+#   RLS 自身就提供租户隔离。借力即可，无需新增 PG 函数（v290 已稳定，避免再
+#   加迁移）。
+
+# target_type → [(table, id_column, id_pg_type), ...]
+# id_pg_type 用于 CAST(:id AS <type>) 防 SQL 注入；只列允许值。
+_TARGET_TENANT_LOOKUPS: dict[str, list[tuple[str, str, str]]] = {
+    "order": [
+        ("orders", "id", "UUID"),
+        ("banquet_orders", "id", "UUID"),
+        ("enterprise_meal_orders", "id", "UUID"),
+    ],
+    "banquet": [
+        ("banquet_orders", "id", "UUID"),
+    ],
+    "banquet_deposit": [
+        ("banquet_deposits", "id", "UUID"),
+    ],
+    "banquet_confirmation": [
+        ("banquet_confirmations", "id", "UUID"),
+    ],
+    "discount_rule": [
+        ("discount_rules", "id", "UUID"),
+    ],
+    "payment": [
+        ("scan_pay_transactions", "payment_id", "TEXT"),
+    ],
+    "refund": [
+        ("refund_requests", "id", "UUID"),
+    ],
+    # 未注册类型（voucher / voucher_batch / coupon / reconcile / retry_queue
+    # / retry_task / store）→ 跳过校验，fail-open。这些类型在现有路由中
+    # target_id 多为 None 或非 DB 实体（如批次号、协调标识），无 cross-tenant
+    # 探测面。新增类型若涉及 DB 实体，应在此处补登记。
+}
+
+_ALLOWED_PG_TYPES: frozenset[str] = frozenset({"UUID", "TEXT", "BIGINT"})
+
+
+def _is_valid_uuid(s: str | None) -> bool:
+    if not s:
+        return False
+    try:
+        uuid.UUID(str(s))
+        return True
+    except (ValueError, AttributeError, TypeError):
+        return False
+
+
+async def _target_in_caller_tenant(
+    db,
+    *,
+    target_type: str,
+    target_id: str,
+) -> bool | None:
+    """检查 target_id 是否在 caller 当前 RLS 绑定的租户内。
+
+    前置条件：调用方必须已经 SELECT set_config('app.tenant_id', :tid, true)。
+    RLS 策略会自动让 SELECT 只看见 caller 租户的行，所以"查到"即"同租户"。
+
+    Returns:
+        True  — target 在 caller 租户内（正常审计）
+        False — 至少有一张候选表查询成功但都未命中（跨租户 / 已删除 / 不存在
+                统一视为"不允许把此 target_id 落到本租户审计行")
+        None  — target_type 未注册 / target_id 为空 / 所有候选表都查询失败
+                （fail-open：不阻塞合法审计）
+    """
+    if not target_type or not target_id:
+        return None
+    tables = _TARGET_TENANT_LOOKUPS.get(target_type)
+    if not tables:
+        return None
+
+    target_id_str = str(target_id)
+    is_uuid_format = _is_valid_uuid(target_id_str)
+    any_table_queried = False
+
+    for table, id_col, id_type in tables:
+        if id_type not in _ALLOWED_PG_TYPES:
+            # 防御：仅允许白名单类型，避免 f-string 拼接构成的 SQL 注入面
+            continue
+        if id_type == "UUID" and not is_uuid_format:
+            # 非 UUID 格式 id 不要喂给 UUID 列，CAST 必败 → 直接跳过
+            continue
+        # 表名 / 列名来自硬编码字典，非用户输入；id 通过参数化绑定
+        sql = (
+            f"SELECT 1 FROM {table} "  # noqa: S608 — table/col from hardcoded whitelist
+            f"WHERE {id_col} = CAST(:id AS {id_type}) LIMIT 1"
+        )
+        try:
+            result = await db.execute(text(sql), {"id": target_id_str})
+            row = result.first()
+        except SQLAlchemyError as exc:
+            # 单表查询失败（cast 错 / 表不存在）不影响其他表
+            logger.warning(
+                "trade_audit_target_check_table_error",
+                table=table,
+                target_type=target_type,
+                error=str(exc),
+            )
+            continue
+        except Exception as exc:  # noqa: BLE001 — 防御 mock / 异常 driver
+            logger.warning(
+                "trade_audit_target_check_unexpected_error",
+                table=table,
+                target_type=target_type,
+                error=str(exc),
+            )
+            continue
+        any_table_queried = True
+        if row is not None:
+            return True  # 在 caller 租户内找到
+
+    if any_table_queried:
+        # 至少一张表 SELECT 成功但没找到 → 不在 caller 租户
+        return False
+    return None  # 全部表 SELECT 都失败 → fail-open
 
 
 async def write_audit(
@@ -105,6 +251,40 @@ async def write_audit(
             text("SELECT set_config('app.tenant_id', :tid, true)"),
             {"tid": str(tenant_id)},
         )
+
+        # 1.5) A4-R2 / Tier1：跨租户 target_id 校验
+        # 借助已绑定的 app.tenant_id RLS：SELECT 只能看见 caller 租户的行。
+        # 查不到 → 不在 caller 租户 → 必须 sanitize 防止 target_id 探测信道。
+        if target_type and target_id:
+            ownership = await _target_in_caller_tenant(
+                db, target_type=target_type, target_id=str(target_id),
+            )
+            if ownership is False:
+                # 触发 SIEM critical 告警 + sanitize 落审计行
+                logger.error(
+                    "trade_audit_cross_tenant_target_blocked",
+                    tenant_id=str(tenant_id),
+                    user_id=user_id,
+                    user_role=user_role,
+                    action=action,
+                    target_type=target_type,
+                    target_id_blocked=str(target_id),  # 仅 log，不落 DB
+                    severity="critical",
+                )
+                # 清空 target 相关字段（防探测）
+                target_id = None
+                amount_fen = None
+                before_state = None
+                after_state = None
+                # 只升级 allow 路径；deny / mfa_required 保留原 result，仅追加 reason
+                if result not in {"deny", "mfa_required"}:
+                    result = "deny"
+                severity = "critical"
+                _block_tag = f"cross_tenant_target_blocked:{target_type}"
+                if reason and _block_tag not in reason:
+                    reason = f"{reason} | {_block_tag}"
+                elif not reason:
+                    reason = _block_tag
 
         # 2) 插入审计行（v290 扩列在缺失时由 PG 自动填 NULL，不影响旧 schema）
         await db.execute(
