@@ -58,6 +58,7 @@ from .api.stored_value_card_routes import router as stored_value_card_router
 from .api.stored_value_router import router as stored_value_v2_router
 from .api.stored_value_routes import router as stored_value_router
 from .api.subscription_routes import router as subscription_router  # 付费会员订阅
+from .api.profile360_routes import router as profile360_router  # 360°会员画像聚合
 
 logger = structlog.get_logger(__name__)
 
@@ -217,6 +218,7 @@ app.include_router(golden_id_router)  # Y-D9 全渠道 Golden ID 映射
 app.include_router(cross_brand_router)  # 跨品牌会员智能
 app.include_router(recommendation_router)  # 实时推荐引擎
 app.include_router(subscription_router)  # 付费会员订阅
+app.include_router(profile360_router)  # 360°会员画像聚合(企微侧边栏)
 
 # ── S4: 智能储值（推荐/绩效/提成）──
 from .api.smart_recharge_routes import router as smart_recharge_router

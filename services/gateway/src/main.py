@@ -27,6 +27,8 @@ from .response import ok
 from .sync_scheduler import create_sync_scheduler
 from .sync_scheduler import sync_router as sync_health_router
 from .wecom_bot_routes import router as wecom_bot_router
+from .group_ops_routes import router as group_ops_router
+from .material_routes import router as material_router
 from .wecom_group_routes import router as wecom_group_router
 from .wecom_internal import router as wecom_internal_router
 from .wecom_jssdk import router as wecom_jssdk_router
@@ -172,6 +174,11 @@ app.include_router(wecom_internal_router)
 
 # 企微群运营 SOP API
 app.include_router(wecom_group_router)
+
+# 社群运营工具 API（标签管理 + 群发任务）
+app.include_router(group_ops_router)
+# 企业素材库 API（分组 + 素材 CRUD + 时段匹配）
+app.include_router(material_router)
 
 # GDPR 个人信息保护合规 API
 app.include_router(gdpr_router)
