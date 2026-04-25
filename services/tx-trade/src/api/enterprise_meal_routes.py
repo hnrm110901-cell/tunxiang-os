@@ -15,7 +15,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..db import get_db
-from ..security.rbac import UserContext, require_role
+from ..security.rbac import UserContext, require_role_audited
 from ..services.trade_audit_log import write_audit
 
 router = APIRouter(
@@ -145,7 +145,7 @@ async def get_enterprise_account(
 async def create_enterprise_meal_order(
     req: CreateEnterpriseMealOrderReq,
     db: AsyncSession = Depends(get_db),
-    user: UserContext = Depends(require_role("store_manager", "admin", "cashier")),
+    user: UserContext = Depends(require_role_audited("enterprise_meal.order.create", "store_manager", "admin", "cashier")),
 ):
     """提交企业订餐订单，写入 enterprise_meal_orders（店长/管理员/收银员）"""
     meal_date = req.meal_date or date.today().isoformat()

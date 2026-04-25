@@ -30,7 +30,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
 
-from ..security.rbac import UserContext, require_role
+from ..security.rbac import UserContext, require_role_audited
 from ..services.trade_audit_log import write_audit
 
 logger = structlog.get_logger(__name__)
@@ -196,7 +196,7 @@ async def verify_voucher(
     body: VerifyVoucherRequest,
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
     db: AsyncSession = Depends(get_db),
-    user: UserContext = Depends(require_role("cashier", "store_manager", "admin")),
+    user: UserContext = Depends(require_role_audited("douyin_voucher.verify", "cashier", "store_manager", "admin")),
 ) -> dict:
     """
     核销团购券
@@ -330,7 +330,7 @@ async def batch_verify_vouchers(
     body: BatchVerifyRequest,
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
     db: AsyncSession = Depends(get_db),
-    user: UserContext = Depends(require_role("cashier", "store_manager", "admin")),
+    user: UserContext = Depends(require_role_audited("douyin_voucher.batch_verify", "cashier", "store_manager", "admin")),
 ) -> dict:
     """批量核销（最多50张）"""
     results = []
@@ -599,7 +599,7 @@ async def manual_retry(
     task_id: str,
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
     db: AsyncSession = Depends(get_db),
-    user: UserContext = Depends(require_role("store_manager", "admin")),
+    user: UserContext = Depends(require_role_audited("douyin_voucher.retry.manual", "store_manager", "admin")),
 ) -> dict:
     """手动重试失败核销（仅店长/管理员）"""
     task = _RETRY_QUEUE.get(task_id)
@@ -687,7 +687,7 @@ async def auto_retry_queue(
     background_tasks: BackgroundTasks,
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
     db: AsyncSession = Depends(get_db),
-    user: UserContext = Depends(require_role("store_manager", "admin")),
+    user: UserContext = Depends(require_role_audited("douyin_voucher.retry.auto", "store_manager", "admin")),
 ) -> dict:
     """触发批量自动重试（最大3次；仅店长/管理员）"""
     pending_tasks = [
@@ -777,7 +777,7 @@ async def authorize_store(
     body: AuthorizeStoreRequest,
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
     db: AsyncSession = Depends(get_db),
-    user: UserContext = Depends(require_role("admin", "tenant_admin")),
+    user: UserContext = Depends(require_role_audited("douyin_voucher.store.authorize", "admin", "tenant_admin")),
 ) -> dict:
     """门店授权（绑定抖音商户ID；仅 admin/tenant_admin）"""
     if store_id in _AUTHORIZED_STORES:
