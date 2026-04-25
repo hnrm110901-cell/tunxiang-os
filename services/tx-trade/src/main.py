@@ -476,6 +476,11 @@ from .api.channel_canonical_routes import router as channel_canonical_router
 
 app.include_router(channel_canonical_router)
 
+# ── Sprint E4：渠道异议工作流（auto_accept + 人工裁决）──
+from .api.channel_dispute_routes import router as channel_dispute_router
+
+app.include_router(channel_dispute_router)
+
 
 @app.get("/health")
 async def health():
