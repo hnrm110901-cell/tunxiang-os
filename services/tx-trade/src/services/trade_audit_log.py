@@ -12,7 +12,7 @@
 
 迁移：
   - v261_trade_audit_logs（按月分区 + RLS + 3 条覆盖索引）
-  - v290_trade_audit_logs_deny_ext（R-补1-1 / Tier1）：扩 result/reason/severity/
+  - v295_trade_audit_logs_deny_ext（R-补1-1 / Tier1）：扩 result/reason/severity/
     request_id/session_id/before_state/after_state 7 列 + idx_trade_audit_deny
 
 R-补1-1（§19 独立审查发现）：
@@ -34,7 +34,7 @@ from sqlalchemy.exc import SQLAlchemyError
 logger = structlog.get_logger(__name__)
 
 
-# ──────────────── result / severity 枚举（v290 列） ────────────────
+# ──────────────── result / severity 枚举（v295 列） ────────────────
 
 _VALID_RESULTS: frozenset[str] = frozenset({"allow", "deny", "mfa_required"})
 _VALID_SEVERITIES: frozenset[str] = frozenset({"info", "warn", "error", "critical"})
@@ -71,7 +71,7 @@ _NIL_TENANT_UUID: str = "00000000-0000-0000-0000-000000000000"
 #   审计写入失败，反而丢证据。降级 + 高严重性 structlog 既保留行为又留痕。
 #
 # 为什么不用 SECURITY DEFINER：
-#   RLS 自身就提供租户隔离。借力即可，无需新增 PG 函数（v290 已稳定，避免再
+#   RLS 自身就提供租户隔离。借力即可，无需新增 PG 函数（v295 已稳定，避免再
 #   加迁移）。
 
 # target_type → [(table, id_column, id_pg_type), ...]
@@ -201,7 +201,7 @@ async def write_audit(
     target_id: str | None,
     amount_fen: int | None,
     client_ip: str | None,
-    # ── v290 / R-补1-1 扩字段（全部可选，向后兼容） ─────────────────
+    # ── v295 / R-补1-1 扩字段（全部可选，向后兼容） ─────────────────
     result: str | None = None,
     reason: str | None = None,
     request_id: str | None = None,
@@ -223,13 +223,13 @@ async def write_audit(
         target_id: 目标对象 UUID 字符串
         amount_fen: 金额（分），查询/取消无金额时传 None
         client_ip: 客户端 IP（可空；优先用 X-Forwarded-For）
-        result: v290 — allow / deny / mfa_required（装饰器分支产物）
-        reason: v290 — 人类可读拒绝/通过原因（ROLE_FORBIDDEN / over_threshold 等）
-        request_id: v290 — 链路追踪 ID
-        severity: v290 — info / warn / error / critical（SIEM 标准 4 级）
-        session_id: v290 — 前端 session ID
-        before_state: v290 — 变更前快照（JSONB）
-        after_state: v290 — 变更后快照（JSONB）
+        result: v295 — allow / deny / mfa_required（装饰器分支产物）
+        reason: v295 — 人类可读拒绝/通过原因（ROLE_FORBIDDEN / over_threshold 等）
+        request_id: v295 — 链路追踪 ID
+        severity: v295 — info / warn / error / critical（SIEM 标准 4 级）
+        session_id: v295 — 前端 session ID
+        before_state: v295 — 变更前快照（JSONB）
+        after_state: v295 — 变更后快照（JSONB）
 
     Raises:
         ValueError: action 或 user_id 为空；result / severity 不在白名单。
@@ -290,7 +290,7 @@ async def write_audit(
                 elif not reason:
                     reason = _block_tag
 
-        # 2) 插入审计行（v290 扩列在缺失时由 PG 自动填 NULL，不影响旧 schema）
+        # 2) 插入审计行（v295 扩列在缺失时由 PG 自动填 NULL，不影响旧 schema）
         await db.execute(
             text(
                 """

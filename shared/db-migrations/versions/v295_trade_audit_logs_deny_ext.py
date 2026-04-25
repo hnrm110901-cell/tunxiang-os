@@ -1,4 +1,4 @@
-"""v290 — trade_audit_logs 扩列：deny 审计追溯（R-补1-1 / Tier1）
+"""v295 — trade_audit_logs 扩列：deny 审计追溯（R-补1-1 / Tier1）
 
 §19 审查发现：tx-trade 9 个套了 require_role/require_mfa 装饰器的路由
 **只在 allow 路径写审计**，cashier 被 403 拒绝时数据库无任何记录，违反 Tier1
@@ -24,14 +24,16 @@
 
 注意：
   - f53370 分支历史上有过 v267_trade_audit_logs_ext 占用 v267，但 main v267
-    已被 agent_episodes 占用 → 本迁移用 v290（main 当前 head）。
+    已被 agent_episodes 占用 → 本迁移最初打算用 v290。但 main 当前 head 已经
+    是 v294_mrp_forecast，且 v290 已被 v290_call_center_tables 占用，**为
+    避免 alembic 双 head 冲突**改 revision 至 v295（在 v294 之后）。
   - 当 f53370 分支后续合入 main 时，其 v267_trade_audit_logs_ext 已经
     inspect-and-skip 兼容 nullable 列存在的情况 → 预期合并不冲突。
   - severity 值域：info/warn/error/critical（SIEM 标准 4 级），不复用 deny 字面量
     避免与 result 列语义重叠。
 
-Revision ID: v290
-Revises: v289
+Revision ID: v295
+Revises: v294_mrp_forecast
 Create Date: 2026-04-25
 """
 from typing import Sequence, Union
@@ -40,8 +42,8 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
 
-revision: str = "v290"
-down_revision: Union[str, None] = "v289"
+revision: str = "v295"
+down_revision: Union[str, None] = "v294_mrp_forecast"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
