@@ -1,3 +1,49 @@
+## 2026-04-25 Wave 3 Sprint C / C4 — Playwright 4h 零卡顿 KDS E2E（4 atomic commits / Tier 1）
+
+### 今日完成
+- [apps/web-kds/playwright.config.ts] fast (60s) / nightly (4h) 双模式，retries=0 + workers=1，
+  KDS_E2E_DURATION_MS 切换；trace nightly off / fast retain-on-failure
+- [apps/web-kds/e2e/fixtures/mockDeltaServer.ts] 零依赖 node:http mock：
+  - listen(0) 随机端口（避免本地/CI 冲突）
+  - mock /api/v1/kds/orders/delta（churn 5-15 单 / 200 LRU）+ /heartbeat
+  - setOutage(true) 一键模拟 60s 路由器抖动
+  - 内置 KDS 风格静态测试页（worktree vite 待修，作为兼容方案）
+- [apps/web-kds/e2e/kds-4h-zero-jank.spec.ts] 三个 Tier 1 餐厅场景：
+  - test_kitchen_4h_continuous_polling_no_freeze（console.error=0 + longtaskRatio<5%）
+  - test_kitchen_polling_recovery_after_60s_outage（断网 60s 后 DOM 仍可访问）
+  - test_kitchen_memory_does_not_grow_past_50mb（JS 堆增长 ≤50MB）
+- [.github/workflows/nightly-kds-e2e.yml] 每日 UTC 18:00 schedule + workflow_dispatch，
+  timeout-minutes=270（4.5h），上传 HTML report 14d / trace on failure 14d
+- [apps/web-kds/e2e/README.md] fast/nightly 用法 + 本地命令 + CI artifacts 位置 +
+  vite worktree 限制说明
+- [.gitignore] 添加 playwright-report/ test-results/ playwright/.cache/
+
+### 数据变化
+- 迁移版本：无（纯前端 + CI）
+- 新增 npm devDependency：@playwright/test ^1.59.1、@types/node ^20
+- 新增测试：3 个 E2E 用例
+- 新增 CI workflow：1 个（nightly-kds-e2e.yml）
+- 新增 commits：4 个 atomic（ee6ce7f5 / f45659c2 / 1dd88a2f / 06f5cbea）
+
+### fast 模式实测（KDS_E2E_DURATION_MS=60000，本地 macOS arm64）
+- 3 用例全绿，总耗时 3.4 min
+- 22 次 polling、memMin/Max=9.5MB、longtaskRatio=0.00%
+- 60s outage 期间 console.error=20（正常 fetch 失败），DOM 健全
+- 内存增长 0.0MB（远低于 50MB 阈值）
+
+### 遗留问题
+- worktree 的 `apps/web-kds` vite dev server 因 `packages/*` 不在 `pnpm-workspace.yaml`
+  导致 import-analysis 失败（main.tsx 引用 `../../packages/tx-tokens/src/tokens.css`）。
+  作为正交问题，不在 C4 范围内修复，已用 mock server 内置测试页规避。
+  上游修复后 spec 无需改动，只需 `KDS_BASE_URL=http://localhost:5173` + 恢复 webServer 块。
+- 真实 KDS UI 的 React diff 成本未在本次 E2E 中验证（焦点是浏览器侧轮询/内存/帧率）。
+
+### 明日计划
+- 第一次 nightly run（4/26 02:00 BJ）观察 4h 真实曲线
+- 协助二审 25 commits（Sprint A/B 累积，等 §19 触发）
+
+---
+
 ## 2026-04-25 Wave 3 Sprint D3c — 菜品动态定价（边缘 + 云端骨架）（5 atomic commits / Tier 2）
 
 ### 今日完成

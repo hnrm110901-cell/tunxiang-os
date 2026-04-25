@@ -4,6 +4,51 @@
 
 ---
 
+## 2026-04-25 17:00 Wave 3 Sprint C / C4 — Playwright 4h 零卡顿 KDS E2E（Tier 1，4 atomic commits）
+
+### 本次会话目标
+新增 `apps/web-kds/e2e/` 长跑测试与 nightly CI，作为周 8 验收 §22 "断网恢复 4 小时无数据丢失" 门禁的 nightly 三连绿证据之一。fast 模式（60s）跑 PR 门禁、nightly 模式（4h）跑凌晨回归。
+
+### 不得触碰的边界
+- [x] services/tx-trade/** — 完全未触碰（25 commits 仍等 §19 二审）
+- [x] apps/web-kds/src/cache/* 与 ConnectionHealthBadge.tsx — 完全未触碰（Agent C12 在做 C1+C2）
+- [x] 任何后端服务代码 — 完全未触碰
+- [x] shared/ontology/** — 完全未触碰
+
+### 本次涉及范围
+- 服务：仅前端 / E2E / CI（不涉及后端）
+- 迁移版本：无
+- Tier 级别：[x] Tier 1（4h E2E 是周 8 验收 nightly 门禁）
+
+### 完成状态
+- [x] commit 1 ee6ce7f5 — chore: Playwright deps + config + mockDeltaServer
+- [x] commit 2 f45659c2 — test: 三个餐厅场景 spec
+- [x] commit 3 1dd88a2f — ci: nightly-kds-e2e.yml
+- [x] commit 4 06f5cbea — docs: e2e/README.md
+
+### fast 模式实测（KDS_E2E_DURATION_MS=60000）
+- 3 用例全绿，总耗时 3.4 min
+- `[kds-4h]`：22 polls、memMin/Max=9.5MB、longtaskRatio=0.00%
+- `[kds-recovery]`：60s outage 期间 console.error=20（正常 fetch 失败），DOM 健全
+- `[kds-memory]`：baseline=9.5MB、peak=9.5MB、growth=0.0MB（远低于 50MB 阈值）
+
+### 关键决策
+- **mock server 同时充当静态宿主**：worktree 当前 vite dev server 因 `packages/*` 不在 `pnpm-workspace.yaml` 导致 `import-analysis` 失败（500 / "Failed to resolve import ../../packages/tx-tokens/src/tokens.css"）。这是与 C4 任务正交的项目级问题。为不破坏边界（不能改 main.tsx / vite.config / pnpm-workspace），mockDeltaServer 内置一个 KDS 风格的真 DOM 测试页（真 Chromium / 真 fetch / 真 setInterval / 真 PerformanceObserver），用于 4h 浏览器压力验证。一旦上游修好，把 `KDS_BASE_URL=http://localhost:5173` 设进环境 + 在 playwright.config 恢复 webServer 块，同一组 spec 即可跑真 KDS UI。
+- **retries=0 / workers=1**：4h 测试不能并行（CPU 抢占导致 jank 数据失真），失败重跑成本太高，必须查 trace 定位。
+- **trace nightly 关、fast 开**：4h trace 文件巨大（GB 级）。
+- **assertions 留余量**：50MB / 5%（任务给定）；nightly 真 4h 可能数字略升，余量充足。
+
+### 下一步
+- 等 §19 验证视角对 25 commits（Sprint A/B）做二审
+- 等 vite/pnpm-workspace 修复后切真 UI（C4 spec 不需要改）
+- nightly 第一次跑（4/26 凌晨）观察曲线
+
+### 已知风险
+- 测试页 != 真 KDS UI。React diff 成本未参与。但 4h 焦点是浏览器轮询稳定性，主要风险面已覆盖。
+- worktree 的 vite/pnpm-workspace 问题应作为独立 task 修复。
+
+---
+
 ## 2026-04-25 Wave 3 Sprint D3c — 菜品动态定价（边缘 Core ML stub + 云端 fallback）
 
 ### 本次会话目标
