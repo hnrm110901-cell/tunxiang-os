@@ -4,6 +4,64 @@
 
 ---
 
+## 2026-04-25 16:40 Wave 3 Sprint C1+C2 — IndexedDB 分区缓存 + connectionHealth 徽章
+
+### 本次会话目标
+落地 Wave 3 子项 C1（apps/web-kds last-100 IndexedDB 缓存，按 tenant+store 分区）+
+C2（ConnectionHealthBadge 4 状态视觉 + Zustand 健康 store）。Tier 2 标准。
+
+### 不得触碰的边界
+- [x] services/tx-trade/** — 未触碰（Tier1 修复期，等 §19 二次审查）
+- [x] shared/ontology/ / shared/db-migrations/ — 未触碰
+- [x] services/tx-trade/src/services/offline_order_mapping_service.py / saga_buffer* — 未触碰
+- [x] services/tx-ops/src/api/telemetry_routes.py — 未触碰
+- [x] cashier_engine / payment_saga / trade_audit_logs — 未触碰
+- [x] 既有 src/db/kdsOrdersDB.ts 与 useOrdersCache 旧路径保持原契约不变（共存）
+
+### 本次涉及范围
+- 新增 apps/web-kds/src/cache/kdsOrderCache.ts（按 (tenantId,storeId) 分区，独立 IDB）
+- 新增 apps/web-kds/src/store/useKdsHealthStore.ts（Zustand）
+- 新增 apps/web-kds/src/components/ConnectionHealthBadge.tsx
+- 新增对应 vitest 用例 20 条（10 cache + 10 badge）
+- Tier 级别：[x] Tier 2（KDS 显示链路，不涉及资金）
+
+### 完成状态
+- [x] C1 IndexedDB last-100 缓存（按 tenantId+storeId 分区，容量淘汰 + 4h 回收 +
+      多租户/多门店隔离 + getApproxSizeBytes < 20MB 自检）
+- [x] C2 ConnectionHealthBadge 4 状态机（synced/syncing/stale/disconnected）+
+      失败计数 ≥3 升 disconnected + "x秒/分/小时前"显示 + 手动刷新按钮
+- [x] vitest 47/47 全绿（baseline 27 + 新增 20 零回归）
+- [x] 3 atomic commits（feat cache / feat badge+store / test 20 用例）
+- [ ] 未完成：在 KDSBoardPage 接线 delta poll → cache.upsertBatch → store 埋点
+      （现有 KDSBoardPage 仍走 WebSocket / 旧 db 路径；待 C3 与 KDSBoardPage 整体重构 PR）
+- [ ] 未完成：fake-indexeddb 真实包替换（当前共用 src/db/__tests__/fakeIndexedDB.ts shim，够本次场景）
+- [ ] 未完成：与 ConnectionContext 全局健康状态打通（当前 store 是独立单例）
+
+### 关键决策
+- **新文件分区缓存与旧 db/kdsOrdersDB.ts 共存而非合并**：旧实现是单店 WebSocket 链路、
+  按 status 加权 LRU；新实现按 (tenantId,storeId) 分区，面向 /kds/orders/delta 多店总部
+  场景。两条链路用不同 IDB（tunxiang_kds_cache vs tunxiang_kds_orders）避免互相污染，
+  待 KDSBoardPage 切到 delta-only 后再下线旧实现
+- **getApproxSizeBytes 用 JSON.stringify 而非 navigator.storage.estimate**：navigator API
+  返回浏览器配额而非真实占用；JSON.stringify(.length) 稳定可断言（100×5 单 ≈ 50KB）
+- **Zustand store 暴露 createKdsHealthStore() 工厂**：vitest 各用例可隔离实例，避免全局污染
+- **ConnectionHealthBadge useStore prop 可注入**：测试场景跳过单例 setState 仍能驱动 4 状态
+- **失败 streak ≥ 3 升 disconnected**：避免 60s 还没到但已经连失 3 次时 UI 仍显"已同步"
+- **不接入 KDSBoardPage**：现 KDSBoardPage 走 WebSocket 与 db/kdsOrdersDB；接线属于 KDSBoardPage
+  整体重构（独立 Tier 2 PR），不放本批以保持 atomic
+- **inline style 而非 Tailwind**：项目尚未引入 Tailwind（与 OfflineBanner 一致），任务说明的
+  "Tailwind 右上角 fixed" 用 fixed top:12 right:12 内联实现，效果相同
+
+### 已知风险
+- 当前两份缓存模块并存，未来 KDSBoardPage 切换到 delta-only 时需写迁移脚本
+  把旧 IDB（tunxiang_kds_cache）数据导入新 IDB（tunxiang_kds_orders），或直接清空（last-100 数据丢失影响小）
+- ConnectionHealthBadge 每秒 setInterval tick；多个实例同时挂载会重复触发，
+  需调用方约束只在主页面挂载一次
+- failureStreak 复位仅依赖 markPollSuccess；如果 poll 一直 stuck（既不 success 也不 failure），
+  badge 仍会卡在 syncing。对应缓解措施：调用方在请求层加 timeout (e.g. 30s) 触发 failure
+
+---
+
 ## 2026-04-25 §19 五项 Tier1 独立验证 + P0/P1 修复合集（24 atomic commits）
 
 ### 本次会话目标

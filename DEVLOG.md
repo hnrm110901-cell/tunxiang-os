@@ -1,3 +1,52 @@
+## 2026-04-25 Wave 3 Sprint C1+C2 — IndexedDB 分区缓存 + connectionHealth 徽章（3 atomic commits / Tier 2）
+
+### 今日完成
+- [apps/web-kds/src/cache/kdsOrderCache.ts] 新增。基于 IndexedDB 的 last-100 KDS 订单缓存，
+  按 (tenantId, storeId) 分区。Schema：DB tunxiang_kds_orders / Store orders / 复合索引
+  [tenantId,storeId] + updatedAt。API：hydrate / upsert / upsertBatch / evictOlderThan /
+  clear / size / getApproxSizeBytes。容量上限 100/分区，按 updatedAt 旧→新淘汰；
+  IDB 不可用降级内存 Map，API 不变；同批次重复 orderId 取 updatedAt 最大；
+  与既有 src/db/kdsOrdersDB.ts 共存（旧路径 WebSocket / 新路径 delta 轮询）。
+- [apps/web-kds/src/store/useKdsHealthStore.ts] 新增。Zustand store 记录 lastSuccessAt /
+  inFlight / failureStreak。三个 action：beforePoll（设 inFlight=true）/
+  markPollSuccess（lastSuccessAt=now, failureStreak=0, inFlight=false）/
+  markPollFailure（failureStreak++, inFlight=false, lastSuccessAt 不变）。
+  暴露 createKdsHealthStore() 工厂供测试隔离实例。
+- [apps/web-kds/src/components/ConnectionHealthBadge.tsx] 新增。右上角 fixed 浮动徽章，
+  基于 store 推导 4 状态机：synced（< 10s 成功）/ syncing（inFlight）/ stale（10s ≤ since ≤ 60s
+  且 streak < 3）/ disconnected（> 60s 或 streak ≥ 3）。每秒 setInterval tick 重算；
+  显示状态文字 + "x秒/分/小时前" + 手动刷新按钮（syncing 时禁用）；
+  inject 友好（nowProvider / useStore prop）便于 vitest 在隔离 store 下断言所有状态。
+- [apps/web-kds/src/cache/__tests__/kdsOrderCache.test.ts] 10 条 vitest（10/10 绿）：
+  hydrate 后厨开机；upsert 幂等性；早高峰 200 单淘汰；多 store/多租户隔离；
+  clear 切店；evictOlderThan 4h 回收；size；getApproxSizeBytes < 20MB；
+  同批次重复 orderId 取最新 updatedAt。
+- [apps/web-kds/src/components/__tests__/ConnectionHealthBadge.test.tsx] 10 条 vitest（10/10 绿）：
+  4 状态视觉；failureStreak ≥ 3 触发 disconnected；从未成功 → "—"；
+  90 分钟前 → "1小时前"；点击刷新触发回调；store 三个 action 语义。
+- 验证：47/47 vitest 全绿（baseline 27 + 新增 20 零回归）；tsc 对 4 个新文件零错误
+  （既有 KDSBoardPage / KitchenBoard / design-system 错误与本批无关）。
+
+### 数据变化
+- 新增文件：5（kdsOrderCache.ts + 测试 + useKdsHealthStore.ts + ConnectionHealthBadge.tsx + 测试）
+- 修改文件：0（与既有契约零耦合）
+- 新增测试：20（10 cache + 10 badge）
+- 迁移版本：v275（无新增）
+- 新增依赖：0（zustand 5.x 已存在 / 复用项目内置 fakeIndexedDB shim）
+
+### 遗留问题
+- KDSBoardPage 当前 WebSocket 链路未切到新 cache + delta poll，待 KDSBoardPage 整体重构 PR
+- 两份缓存（tunxiang_kds_cache + tunxiang_kds_orders）共存，待 delta-only 后再下线旧 IDB
+- ConnectionHealthBadge 未与 ConnectionContext（OfflineBanner 用的全局健康）联动，分别面向 WebSocket / delta 两条链路
+- C3 / C4 / D1 / D3b / D3c 仍未启动（按 progress.md 4-25 §19 决议 Wave 3 已解锁）
+
+### 明日计划
+- 在 KDSBoardPage 引入 delta poll 路径，把 cache.upsertBatch + store action 接线
+- 启动 C4 Playwright 4h E2E 验证缓存离线/复活
+- §19 二次独立验证新会话（24 commits 的整体一致性，参见 progress.md 4-25 末尾提示词）
+
+---
+
 ## 2026-04-25 §19 五项 Tier1 独立验证 + P0/P1 修复合集（24 atomic commits）
 
 ### 今日完成
