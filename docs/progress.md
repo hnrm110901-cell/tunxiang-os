@@ -4,6 +4,61 @@
 
 ---
 
+## 2026-04-25 22:00 Wave 4 Sprint F / F1 + F3 — 14 适配器评分卡 + 三商户 playbook（Tier 3，4 atomic commits）
+
+### 本次会话目标
+落地 Sprint F1（14 适配器 7 维评分卡 + 自动化脚本 + 报告）和 F3（czyz/zqx/sgc 三商户 DEMO playbook + 通用 reset 参考）。建立 Sprint F 演示前的适配器质量基线 + 演示脚本基线。
+
+### 不得触碰的边界
+- [x] services/tx-trade/** — 完全未触碰（25+ commits 仍等 §19 二审）
+- [x] shared/adapters/** 内的适配器实现 — 完全只读，零修改（评分脚本只 grep）
+- [x] shared/ontology/** — 完全未触碰（冻结）
+- [x] 既有 docs/demo-playbook-store-fullflow.md — 仅引用，未修改
+
+### 本次涉及范围
+- scripts/score_adapters.py（新建，~370 行，7 维度自动评分 + JSON/Markdown 输出）
+- docs/adapter-scorecard.md（新建评分报告，单适配器简评 + 三商户切片 + 过线优先级）
+- docs/merchant-playbooks/{czyz,zqx,sgc}.md（新建三商户 DEMO playbook，每份 9 段）
+- docs/merchant-playbooks/README.md（新建商户对比 + 通用 reset 参考）
+- Tier 级别：[x] Tier 3（演示/辅助路径）
+
+### 完成状态
+- [x] F1 评分脚本：python3 scripts/score_adapters.py 验证可运行；exit code = 失败适配器数
+- [x] F1 评分报告：14 适配器全部评分，0/14 过线（events / idempotency 是普遍洼地）
+- [x] F1 三商户切片：czyz/zqx/sgc 必装适配器与得分对应
+- [x] F3 czyz playbook：完整（pinzhi 主 POS + aoqiwei 会员 + nuonuo 发票）
+- [x] F3 zqx playbook：部分 TBD（POS 待创始人确认）
+- [x] F3 sgc playbook：部分 TBD（POS 待创始人确认）
+- [x] F3 README：通用 reset 命令清单 + flag 紧急关闭参考 + 跨商户红线
+- [x] 4 atomic commits（feat scripts → docs scorecard → docs playbooks → docs README）
+
+### 关键决策
+- **门禁线设为 22/35**：与 sprint plan 对齐；当前 0/14 过线，建立"未达标"基线，反映真实修复债务
+- **events / idempotency 给 0 分如实反映**：不美化数据，保留事实驱动 Sprint F 后续修复优先级
+- **半客观维度（contract / error_handling）标注"自动估算"**：不冒充客观，明确人工 review 边界
+- **三商户红线统一段落**：§17 Tier 1 待审项一处汇总，避免在三个 playbook 里重复维护
+- **zqx/sgc 主 POS 标 TBD 而非默认**：项目内资料不足时不臆测，留给创始人补全
+
+### 关键发现
+- 14 个目录形适配器全部未达标 22/35 门槛
+- aoqiwei (20) 最接近，补 events 即可破线
+- nuonuo (8) 是 Tier 1 金税四期路径但分数最低，演示前必修
+- weishenghuo / yiding 的 tenant_id=0 是跨租户隔离风险点
+- tiancai-shanglong 7 处 broad except 是错误处理重灾区
+
+### 下一步
+- pinzhi 推过 22 分（events ORDER.PAID + DISCOUNT.APPLIED + idempotency_key）
+- nuonuo 演示前修（错误处理 + RLS + idempotency）
+- 创始人补全 zqx / sgc TBD 项（主 POS / 门店数 / 演示场地）
+- 评分脚本接入 CI（exit code 作为门禁）
+
+### 已知风险
+- 评分维度有一定主观性：contract / error_handling 自动估算，可能与人工评分有偏差
+- 三商户演示红线段落与 §17 Tier 1 状态强耦合：Tier 1 项目状态变化时需同步刷新 playbook
+- weishenghuo 适配器 tenant_id=0 的实际影响未做 RLS smoke 测，zqx 演示前必须验证
+
+---
+
 ## 2026-04-25 17:30 Wave 3 Sprint D / D1 — 51 Skill ConstraintChecker 批次 1（Tier 2，5 atomic commits）
 
 ### 本次会话目标

@@ -1,3 +1,57 @@
+## 2026-04-25 Wave 4 Sprint F / F1 + F3 — 14 适配器评分卡 + 三商户 playbook（4 atomic commits / Tier 3）
+
+### 今日完成
+- [scripts/score_adapters.py] 新建 ~370 行：14 适配器 7 维自动评分
+  - 客观维度全自动（testing/rls/idempotency/events/docs）
+  - 半客观维度自动估算（contract/error_handling）+ 标注待人工确认
+  - 输出 markdown + JSON，exit code = 失败适配器数（CI 友好）
+  - 单适配器查询：`python3 scripts/score_adapters.py --adapter pinzhi --json -`
+- [docs/adapter-scorecard.md] 新建评分报告 171 行：
+  - 14 适配器评分快照表（pass/fail 列）
+  - 单适配器简评（≤200 字 × 14）+ 必补工作清单
+  - 三商户切片对应（czyz/zqx/sgc 必装哪些适配器、当前得分）
+  - 过线优先级排序（aoqiwei → base → pinzhi → meituan-saas → tiancai → nuonuo）
+- [docs/merchant-playbooks/czyz.md] 新建尝在一起 playbook 9 段：
+  - 10 步 DEMO 路径（翻台率 + 折扣健康度主线）
+  - 必装：pinzhi(16) + aoqiwei(20) + nuonuo(8) + base(17)
+  - 60 秒话术 + 5 类回退方案 + 3 个关键指标 + 6 条已知红线
+- [docs/merchant-playbooks/zqx.md] 新建最黔线 playbook 9 段（POS TBD）：
+  - 复购率 + 沉睡会员唤醒主线
+  - 必装会员系适配器（aoqiwei + weishenghuo）
+- [docs/merchant-playbooks/sgc.md] 新建尚宫厨 playbook 9 段（POS TBD）：
+  - 宴席全流程 + 定金回款主线
+  - 必装：tiancai-shanglong(候选) + yiding + nuonuo
+- [docs/merchant-playbooks/README.md] 新建商户索引 128 行：
+  - 三商户对比表（业态/痛点/主线/适配器/关键指标）
+  - 通用 DEMO reset 命令清单（8 步）
+  - 5 个 Agent flag 紧急关闭参考
+  - 跨商户统一红线（§17 Tier 1 待审项汇总）
+
+### 数据变化
+- 迁移版本：未变（v229，纯文档+脚本）
+- 新增脚本：1（scripts/score_adapters.py）
+- 新增文档：5（1 评分卡 + 3 商户 playbook + 1 README）
+- 新增测试：0（评分脚本本身用 grep 验证，无独立测试套件）
+- 评分快照：14 适配器全员未达标 22/35 门槛
+  - 最高：aoqiwei 20，base 17
+  - 中段：pinzhi/meituan-saas/tiancai-shanglong 16
+  - 最低：logistics 2，eleme 6，nuonuo 8
+
+### 遗留问题
+- 14 适配器零达标，需后续 sprint 推 events + idempotency 接入
+- nuonuo Tier 1（金税四期）8 分严重偏低，演示前必修
+- weishenghuo / yiding tenant_id=0 是跨租户漏查风险，演示前必须 RLS smoke
+- zqx / sgc 主用 POS 仍 TBD（创始人补全）
+- 评分脚本未接入 CI（exit code 已就绪，待 GH Actions workflow 配置）
+
+### 明日计划
+- F2 等其他 Sprint F 子任务推进
+- 创始人 review 评分卡，确认门禁线 22 是否合适
+- 评分脚本接入 CI 作为 PR 门禁
+- pinzhi 推过 22 分的具体改动（events + idempotency + 替换 broad except）
+
+---
+
 ## 2026-04-25 Wave 3 Sprint D / D1 — 51 Skill ConstraintChecker 批次 1（5 atomic commits / Tier 2）
 
 ### 今日完成
