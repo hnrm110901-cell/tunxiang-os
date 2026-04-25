@@ -10,16 +10,81 @@
   - amount_fen 单位为"分"（BIGINT），查询/取消等无金额操作传 None
   - ValueError 用于拒绝非法入参（空 action / 空 user_id）
 
+§19 A4 (b) lifespan shutdown 防丢日志：
+  - schedule_audit(app, ...) 在路由层创建 fire-and-forget task 并注册到
+    app.state.background_tasks（由 main.py lifespan startup 注入）
+  - lifespan shutdown 时 await asyncio.gather(*background_tasks) 排空，
+    避免 SIGTERM 部署窗口最后一笔审计被 cancel
+  - 若 app/app.state.background_tasks 不可用（test/单元测试 fixture），
+    退化为裸 asyncio.create_task（保留原有非阻塞行为）
+
 迁移：v261_trade_audit_logs（按月分区 + RLS + 3 条覆盖索引）
+迁移：v274_trade_audit_logs_rls_with_check（USING + WITH CHECK 防跨租户污染）
 """
 
 from __future__ import annotations
+
+import asyncio
+from typing import Any
 
 import structlog
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
 logger = structlog.get_logger(__name__)
+
+
+def _register_audit_task(app: Any, task: asyncio.Task) -> asyncio.Task:
+    """把审计写入 task 注册到 app.state.background_tasks（lifespan shutdown 排空）。
+
+    设计：
+      - app.state.background_tasks 由 tx-trade main.py lifespan startup 注入（set）
+      - 通过 task.add_done_callback(set.discard) 自动清理已完成项
+      - 若 app/state 不可用（test fixture / Mock app），退化为只 add 不跟踪
+        （保留原有 fire-and-forget 行为，但调用方应 await task 避免遗漏）
+
+    Args:
+        app: FastAPI 应用实例（routes 中通常通过 request.app 拿到）
+        task: 需要在 shutdown 时 gather 的 asyncio.Task
+
+    Returns:
+        原 task 对象（便于链式调用）
+    """
+    bg_set = None
+    try:
+        bg_set = getattr(app.state, "background_tasks", None)
+    except AttributeError:
+        bg_set = None
+
+    if bg_set is not None:
+        bg_set.add(task)
+        task.add_done_callback(bg_set.discard)
+    return task
+
+
+def schedule_audit(app: Any, **kwargs: Any) -> asyncio.Task:
+    """fire-and-forget 调度 write_audit 并注册到 app.state.background_tasks。
+
+    路由层应使用本 helper 取代 `asyncio.create_task(write_audit(...))`：
+
+        from ..services.trade_audit_log import schedule_audit
+        schedule_audit(
+            request.app,
+            db=db,
+            tenant_id=ctx.tenant_id,
+            ...
+        )
+
+    若 app 为 None 或 app.state.background_tasks 不存在（test 环境），退化为
+    裸 asyncio.create_task —— 行为与升级前一致，仅 shutdown 时不被 gather。
+    """
+    db = kwargs.pop("db", None)
+    if db is None:
+        raise ValueError("schedule_audit requires keyword 'db' (AsyncSession)")
+    task = asyncio.create_task(write_audit(db, **kwargs))
+    if app is not None:
+        _register_audit_task(app, task)
+    return task
 
 
 async def write_audit(
