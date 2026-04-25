@@ -4,6 +4,7 @@
 金额单位: 分(fen)。
 """
 
+import json
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Optional
@@ -106,11 +107,11 @@ class BanquetContractService:
                 "pb_name": party_b_name, "pb_license": party_b_license,
                 "edate": event_date, "ename": banquet["event_name"],
                 "tables": banquet["table_count"], "guests": banquet["guest_count"],
-                "menu": str(quote["menu_json"]).replace("'", '"') if quote["menu_json"] else "[]",
-                "terms": str(terms).replace("'", '"'),
+                "menu": json.dumps(quote["menu_json"], ensure_ascii=False) if quote["menu_json"] else "[]",
+                "terms": json.dumps(terms, ensure_ascii=False),
                 "total": total_fen, "ratio": deposit_ratio,
                 "deposit": deposit_fen,
-                "schedule": str(payment_schedule).replace("'", '"').replace("None", "null"),
+                "schedule": json.dumps(payment_schedule, ensure_ascii=False, default=str),
             },
         )
         await self.db.flush()
@@ -165,8 +166,8 @@ class BanquetContractService:
             {
                 "id": aid, "tid": self.tenant_id, "cid": contract_id, "no": next_no,
                 "ctype": change_type,
-                "old": str(old_value).replace("'", '"'),
-                "new": str(new_value).replace("'", '"'),
+                "old": json.dumps(old_value, ensure_ascii=False, default=str),
+                "new": json.dumps(new_value, ensure_ascii=False, default=str),
                 "reason": reason, "diff": price_diff_fen,
             },
         )

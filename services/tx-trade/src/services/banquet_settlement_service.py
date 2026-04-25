@@ -49,15 +49,18 @@ class BanquetSettlementService:
 
     async def finalize(self, settlement_id: str, payment_method: str, payment_ref: str = None) -> dict:
         now = datetime.now(timezone.utc)
-        await self.db.execute(text("""
+        result = await self.db.execute(text("""
             UPDATE banquet_settlements SET payment_method = :pm, payment_ref = :ref, settled_at = :now, updated_at = :now
-            WHERE id = :id AND tenant_id = :tid AND is_deleted = FALSE
+            WHERE id = :id AND tenant_id = :tid AND settled_at IS NULL AND is_deleted = FALSE
+            RETURNING id, banquet_id
         """), {"id": settlement_id, "tid": self.tenant_id, "pm": payment_method, "ref": payment_ref, "now": now})
-        # 更新宴会状态为settled
-        row = await self.db.execute(text("SELECT banquet_id FROM banquet_settlements WHERE id = :id AND tenant_id = :tid"), {"id": settlement_id, "tid": self.tenant_id})
-        bid = row.scalar_one_or_none()
+        row = result.mappings().first()
+        if not row:
+            raise ValueError(f"结算单不存在或已结算: {settlement_id}")
+        # 更新宴会状态为settled (原子性: 只有completed状态才能settled)
+        bid = row["banquet_id"]
         if bid:
-            await self.db.execute(text("UPDATE banquets SET status = 'settled', settled_at = :now, updated_at = :now WHERE id = :bid AND tenant_id = :tid"), {"bid": str(bid), "tid": self.tenant_id, "now": now})
+            await self.db.execute(text("UPDATE banquets SET status = 'settled', settled_at = :now, updated_at = :now WHERE id = :bid AND tenant_id = :tid AND status = 'completed'"), {"bid": str(bid), "tid": self.tenant_id, "now": now})
         await self.db.flush()
         logger.info("banquet_settlement_finalized", settlement_id=settlement_id)
         return {"id": settlement_id, "status": "settled", "payment_method": payment_method}

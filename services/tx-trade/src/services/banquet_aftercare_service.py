@@ -69,7 +69,9 @@ class BanquetAftercareService:
 
     async def convert_referral(self, referral_id: str, lead_id: str) -> dict:
         now = datetime.now(timezone.utc)
-        await self.db.execute(text("UPDATE banquet_referrals SET status = 'converted', referred_lead_id = :lid, converted_at = :now WHERE id = :id AND tenant_id = :tid AND status IN ('pending','contacted')"), {"id": referral_id, "tid": self.tenant_id, "lid": lead_id, "now": now})
+        result = await self.db.execute(text("UPDATE banquet_referrals SET status = 'converted', referred_lead_id = :lid, converted_at = :now WHERE id = :id AND tenant_id = :tid AND status IN ('pending','contacted') AND is_deleted = FALSE RETURNING id"), {"id": referral_id, "tid": self.tenant_id, "lid": lead_id, "now": now})
+        if not result.mappings().first():
+            raise ValueError(f"转介绍不存在或已处理: {referral_id}")
         await self.db.flush()
         return {"id": referral_id, "status": "converted", "lead_id": lead_id}
 

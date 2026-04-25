@@ -1,4 +1,5 @@
 """宴会运营优化Agent — 排产优化/产能预警/采购建议/排班"""
+import json
 import uuid
 from datetime import date, datetime, timedelta, timezone
 import structlog
@@ -44,7 +45,7 @@ class BanquetOperationsAgent:
         await self.db.execute(text("""
             INSERT INTO banquet_ai_decisions (id, tenant_id, banquet_id, agent_type, decision_type, recommendation_json, confidence)
             VALUES (:id, :tid, :bid, 'operations', 'capacity_optimization', :rec::jsonb, :conf)
-        """), {"id": str(uuid.uuid4()), "tid": self.tenant_id, "bid": banquet_id, "rec": str({"overall": overall, "checks": checks}).replace("'", '"').replace("True", "true").replace("False", "false").replace("None", "null"), "conf": 0.9 if all_pass else 0.6})
+        """), {"id": str(uuid.uuid4()), "tid": self.tenant_id, "bid": banquet_id, "rec": json.dumps({"overall": overall, "checks": checks}, ensure_ascii=False, default=str), "conf": 0.9 if all_pass else 0.6})
         await self.db.flush()
         logger.info("banquet_pre_event_check", banquet_id=banquet_id, overall=overall)
         return {"banquet_id": banquet_id, "overall": overall, "checks": checks}

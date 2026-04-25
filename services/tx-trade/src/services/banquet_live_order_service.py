@@ -1,4 +1,5 @@
 """宴会现场订单服务 — 加菜/加酒水/特殊需求/审批"""
+import json
 import uuid
 from datetime import datetime, timezone
 import structlog
@@ -16,7 +17,7 @@ class BanquetLiveOrderService:
         await self.db.execute(text("""
             INSERT INTO banquet_live_orders (id, tenant_id, banquet_id, order_type, items_json, amount_fen, quantity, requested_by, requested_name, notes, status)
             VALUES (:id, :tid, :bid, :otype, :items::jsonb, :amt, :qty, :rby, :rname, :notes, 'pending')
-        """), {"id": oid, "tid": self.tenant_id, "bid": banquet_id, "otype": order_type, "items": str(items_json).replace("'", '"'), "amt": amount_fen, "qty": quantity, "rby": requested_by, "rname": requested_name, "notes": notes})
+        """), {"id": oid, "tid": self.tenant_id, "bid": banquet_id, "otype": order_type, "items": json.dumps(items_json, ensure_ascii=False), "amt": amount_fen, "qty": quantity, "rby": requested_by, "rname": requested_name, "notes": notes})
         await self.db.flush()
         logger.info("banquet_live_order_created", id=oid, banquet_id=banquet_id, type=order_type, amount=amount_fen)
         return {"id": oid, "order_type": order_type, "amount_fen": amount_fen, "status": "pending"}

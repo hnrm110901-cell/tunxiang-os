@@ -2,6 +2,7 @@
 
 基于历史宴会数据、季节性因素、食材成本波动，为新宴会推荐最优报价。
 """
+import json
 import uuid
 from datetime import datetime, timezone
 from dataclasses import dataclass
@@ -67,7 +68,7 @@ class BanquetPricingAgent:
         await self.db.execute(text("""
             INSERT INTO banquet_ai_decisions (id, tenant_id, store_id, agent_type, decision_type, input_context_json, recommendation_json, reasoning, confidence)
             VALUES (:id, :tid, :sid, 'pricing', 'quote_pricing', :input::jsonb, :rec::jsonb, :reason, :conf)
-        """), {"id": str(uuid.uuid4()), "tid": self.tenant_id, "sid": store_id, "input": f'{{"event_type":"{event_type}","tables":{table_count},"month":{event_month}}}', "rec": str(result).replace("'", '"'), "reason": result["reasoning"], "conf": confidence})
+        """), {"id": str(uuid.uuid4()), "tid": self.tenant_id, "sid": store_id, "input": json.dumps({"event_type": event_type, "tables": table_count, "month": event_month}), "rec": json.dumps(result, ensure_ascii=False, default=str), "reason": result["reasoning"], "conf": confidence})
         await self.db.flush()
         logger.info("banquet_pricing_suggested", store_id=store_id, event_type=event_type, per_table=recommended_per_table)
         return result
