@@ -552,6 +552,42 @@ class SagaBuffer:
                     error=str(exc),
                 )
 
+    async def mark_jwt_expired_skip(self, idempotency_key: str) -> None:
+        """Fix-8a：401 JWT 过期。
+
+        与 mark_failed 的关键区别：
+          - 不增 attempts（凭证问题不消耗 20 次重试预算）
+          - 不写 last_error（401 是基础设施问题，不该触发死信告警）
+          - 把 state 从 flushing 复位回 pending（让下一轮可重新选中）
+          - 不更新 last_attempt_at（避免被卡死自检误判 stuck）
+        """
+        if not self._initialized:
+            await self.initialize()
+        async with self._lock:
+            if self._memory_mode:
+                e = self._memory_rows.get(idempotency_key)
+                if e is None:
+                    return
+                if e.state == _STATE_FLUSHING:
+                    e.state = _STATE_PENDING
+                return
+
+            try:
+                db = self._conn
+                await db.execute(
+                    "UPDATE saga_buffer "
+                    "SET state = 'pending' "
+                    "WHERE idempotency_key = ? AND state = 'flushing'",
+                    (idempotency_key,),
+                )
+                await db.commit()
+            except OSError as exc:
+                logger.error(
+                    "saga_buffer_mark_jwt_expired_skip_disk_io_error",
+                    idempotency_key=idempotency_key,
+                    error=str(exc),
+                )
+
     async def sweep_expired(
         self,
         *,

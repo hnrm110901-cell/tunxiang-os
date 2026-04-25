@@ -5,8 +5,17 @@
   - POST 到 tx-trade `/api/v1/settle/retry`（见 services/tx-trade/src/api/settle_retry.py）
   - 成功 → mark_sent，失败 → mark_failed（attempts++），4h 到期 → mark_dead_letter
   - 补发后心跳一次到云端 `/api/v1/edge/saga_buffer_meta`（UPSERT 本店状态）
-  - heartbeat 自检：发现 flushing 状态 last_attempt_at 距今 > 5min（进程没崩
-    但 flush 卡死的边缘场景）→ 强制复位 pending 让下一轮重试
+  - heartbeat 自检：
+      * 发现 flushing 状态 last_attempt_at 距今 > 5min（进程没崩但 flush 卡死的
+        边缘场景）→ 强制复位 pending 让下一轮重试
+      * memory_mode 时尝试 try_replay_memory_to_disk（A2 P1 #3 防丢失）
+
+HTTP 状态码分路（Fix-8a）：
+  - 2xx → mark_sent
+  - 401 → JWT 过期，跳过 30s 不增 attempts 不入死信，触发刷新（防 4h 后 4xx 直送
+    死信导致一次性写死、断网恰好 4h 恢复 JWT 已过期的场景）
+  - 4xx (其他) → mark_dead_letter（含 403 业务拒绝）
+  - 5xx / 网络错误 → mark_failed（attempts++ 重试）
 
 不改动 payment_saga_service 的 _PENDING_TIMEOUT_MINUTES=5：
   - 前端 3s soft timeout 与 saga 5min timeout 是两个独立时间轴
@@ -17,7 +26,8 @@
 from __future__ import annotations
 
 import asyncio
-from typing import Optional
+import time
+from typing import Awaitable, Callable, Optional
 
 import structlog
 
@@ -31,6 +41,9 @@ logger = structlog.get_logger(__name__)
 
 # flushing 状态卡死阈值：超过此值仍在 flushing 视为"进程没崩但 flush 卡死"，强制复位
 FLUSHING_STUCK_THRESHOLD_SEC = 300
+
+# 401 JWT 过期后跳过这个 entry 的最短间隔（秒），避免无效风暴
+JWT_EXPIRED_BACKOFF_SEC = 30
 
 
 class SagaFlusher:
@@ -47,6 +60,8 @@ class SagaFlusher:
         max_attempts_before_dead: int = 20,
         flush_interval_seconds: float = 15.0,
         batch_limit: int = 50,
+        token_refresher: Optional[Callable[[], Awaitable[None]]] = None,
+        clock: Optional[Callable[[], float]] = None,
     ) -> None:
         self._buffer = buffer
         self._tenant_id = tenant_id
@@ -57,6 +72,11 @@ class SagaFlusher:
         self._max_attempts = max_attempts_before_dead
         self._interval = flush_interval_seconds
         self._batch_limit = batch_limit
+        # Fix-8a: 可选 JWT 刷新回调（mac-station 暂未实装；接口先到位）
+        self._token_refresher = token_refresher
+        self._clock = clock or time.time
+        # 401 退避表 {idempotency_key: skip_until_ts}（Fix-8a 风暴防御）
+        self._jwt_expired_skip_until: dict[str, float] = {}
         self._stop_event = asyncio.Event()
 
     # ─── 主循环 ───────────────────────────────────────────────────────────────
@@ -117,27 +137,42 @@ class SagaFlusher:
         sent = 0
         failed = 0
         dead_letter = expired
+        jwt_expired_skip = 0
         for entry in ready:
             result = await self._flush_entry(entry)
             if result == "sent":
                 sent += 1
             elif result == "dead_letter":
                 dead_letter += 1
+            elif result == "jwt_expired_skip":
+                jwt_expired_skip += 1
             else:
                 failed += 1
 
-        if sent or failed or dead_letter:
+        if sent or failed or dead_letter or jwt_expired_skip:
             logger.info(
                 "saga_flusher_iteration_done",
                 tenant_id=self._tenant_id,
                 sent=sent,
                 failed=failed,
                 dead_letter=dead_letter,
+                jwt_expired_skip=jwt_expired_skip,
             )
-        return {"sent": sent, "failed": failed, "dead_letter": dead_letter}
+        return {
+            "sent": sent,
+            "failed": failed,
+            "dead_letter": dead_letter,
+            "jwt_expired_skip": jwt_expired_skip,
+        }
 
     async def _flush_entry(self, entry: SagaBufferEntry) -> str:
-        """补发单条。返回 'sent' / 'failed' / 'dead_letter'."""
+        """补发单条。返回 'sent' / 'failed' / 'dead_letter' / 'jwt_expired_skip'."""
+        # Fix-8a：401 风暴退避 — 上次 401 后 30s 内不再重试这个 entry
+        now_ts = self._clock()
+        skip_until = self._jwt_expired_skip_until.get(entry.idempotency_key, 0.0)
+        if skip_until > now_ts:
+            return "jwt_expired_skip"
+
         # attempts 达上限 → dead_letter（提前兜底）
         if entry.attempts >= self._max_attempts:
             await self._buffer.mark_dead_letter(
@@ -182,7 +217,33 @@ class SagaFlusher:
         if 200 <= status < 300:
             await self._buffer.mark_sent(entry.idempotency_key)
             return "sent"
-        # 4xx 业务拒绝（如 ROLE_FORBIDDEN 跨租户）→ 直接 dead_letter 等人工
+        # Fix-8a：401 = JWT 过期 → 不入死信、不增 attempts、不计 last_error
+        # 凭证问题不该消耗 20 次重试预算；下一轮 flush 再试
+        if status == 401:
+            # 复位为 pending，让下一轮 flush_ready 仍可选中（保证不卡 flushing）
+            await self._buffer.mark_jwt_expired_skip(entry.idempotency_key)
+            self._jwt_expired_skip_until[entry.idempotency_key] = (
+                now_ts + JWT_EXPIRED_BACKOFF_SEC
+            )
+            logger.warning(
+                "saga_flusher.jwt_expired_skip_retry",
+                saga_id=entry.saga_id,
+                idempotency_key=entry.idempotency_key,
+                tenant_id=entry.tenant_id,
+                backoff_sec=JWT_EXPIRED_BACKOFF_SEC,
+            )
+            # 触发 token 刷新（如果 mac-station 注入了刷新客户端）
+            if self._token_refresher is not None:
+                try:
+                    await self._token_refresher()
+                except (OSError, RuntimeError, ValueError) as refresh_exc:
+                    logger.warning(
+                        "saga_flusher.jwt_refresh_failed",
+                        tenant_id=self._tenant_id,
+                        error=str(refresh_exc),
+                    )
+            return "jwt_expired_skip"
+        # 4xx 业务拒绝（如 403 ROLE_FORBIDDEN 跨租户）→ 直接 dead_letter 等人工
         if 400 <= status < 500:
             try:
                 detail = resp.json()
