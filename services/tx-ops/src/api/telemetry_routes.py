@@ -12,18 +12,24 @@ A1 安全修复：限流键含 tenant_id，避免调试机一日内切多个 ten
   - 禁 broad except，统一捕获 SQLAlchemyError / ValueError / KeyError。
   - RLS 通过 set_config('app.tenant_id', ..., true) 隔离租户。
 
+A1 安全修复（2026-04-25）—— 跨租户 crash 写入漏洞拦截：
+  - X-Tenant-ID Header 必须等于 JWT 解析出的 user.tenant_id（UUID 字符串归一化比较）
+  - body 若携带 tenant_id 字段，亦必须等于 user.tenant_id
+  - 不一致 → 403 TENANT_MISMATCH，并 asyncio.create_task 写一条审计 deny 事件
+
 统一响应: {"ok": bool, "data": {}, "error": {}}
 """
 
 from __future__ import annotations
 
 import asyncio
+import os
 import time
 import uuid
 from typing import Any, Awaitable, Callable, Dict, Optional
 
 import structlog
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from pydantic import BaseModel, Field
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
@@ -41,6 +47,64 @@ log = structlog.get_logger(__name__)
 # 在 report_pos_crash 路由中通过 asyncio.create_task 调度，绝不阻塞主业务。
 # 生产接线点：app 启动时注入 tx-trade.write_audit 或 SIEM 客户端；测试可 monkeypatch。
 _audit_hook: Optional[Callable[..., Awaitable[None]]] = None
+
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+#  JWT 用户上下文依赖（A1 安全修复）
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# 与 services/tx-trade/src/security/rbac.py 同语义：
+#   - gateway/AuthMiddleware 已在 request.state 注入 user_id / tenant_id / role
+#   - 本服务直接读 state，不重复解 JWT
+#   - TX_AUTH_ENABLED=false 时返回 mock context（与 dev_bypass 对齐），允许单测/本地跳过
+#
+# 测试可通过 app.dependency_overrides[get_current_user] 注入自定义上下文。
+
+_DEV_TENANT_ID = "a0000000-0000-0000-0000-000000000001"
+
+
+def _normalize_uuid(value: str) -> str:
+    """归一化 UUID 字符串：去空白、转小写、保留连字符；非法则原样返回（由调用方再判定）。"""
+    s = (value or "").strip().lower()
+    try:
+        return str(uuid.UUID(s))
+    except (ValueError, AttributeError, TypeError):
+        return s
+
+
+async def get_current_user(request: Request) -> Dict[str, Any]:
+    """从 request.state 提取当前 JWT 用户上下文。
+
+    Returns:
+        dict: {"user_id": str, "tenant_id": str, "role": str}
+              tenant_id 已做 UUID 归一化（小写）。
+
+    Raises:
+        HTTPException 401: 未通过 gateway 认证（user_id 为空）。
+    """
+    if os.getenv("TX_AUTH_ENABLED", "true").lower() == "false":
+        # dev/test 环境：与 tx-trade.rbac._dev_bypass 对齐
+        return {
+            "user_id": "dev-user-mock",
+            "tenant_id": _DEV_TENANT_ID,
+            "role": "admin",
+        }
+    state = request.state
+    user_id = getattr(state, "user_id", "") or ""
+    tenant_id = getattr(state, "tenant_id", "") or ""
+    if not user_id or not tenant_id:
+        log.warning(
+            "telemetry_auth_missing",
+            path=getattr(request.url, "path", ""),
+        )
+        raise HTTPException(
+            status_code=401,
+            detail={"code": "AUTH_MISSING", "message": "缺少认证凭据"},
+        )
+    return {
+        "user_id": str(user_id),
+        "tenant_id": _normalize_uuid(str(tenant_id)),
+        "role": str(getattr(state, "role", "") or ""),
+    }
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -122,16 +186,137 @@ async def _set_rls(db: AsyncSession, tenant_id: str) -> None:
     )
 
 
+def _schedule_tenant_mismatch_audit(
+    *,
+    user_tenant_id: str,
+    header_tenant_id: str,
+    body_tenant_id: Optional[str],
+    user_id: str,
+    user_role: str,
+    device_id: str,
+    route_path: str,
+    client_ip: Optional[str],
+) -> None:
+    """跨租户拦截后异步写一条审计 deny 事件（_audit_hook 接 SIEM）。
+
+    约束（§9 + §禁止：审计同步阻塞主业务）：
+      - asyncio.create_task 即发即忘
+      - hook 失败仅 log.error，不向上抛
+    """
+    hook = _audit_hook
+    if hook is None:
+        log.warning(
+            "telemetry_tenant_mismatch_no_audit_hook",
+            user_tenant_id=user_tenant_id,
+            header_tenant_id=header_tenant_id,
+            body_tenant_id=body_tenant_id,
+            user_id=user_id,
+        )
+        return
+
+    async def _run() -> None:
+        try:
+            await hook(
+                action="pos_crash_report.deny.tenant_mismatch",
+                tenant_id=user_tenant_id,
+                user_id=user_id,
+                user_role=user_role,
+                device_id=device_id,
+                route=route_path,
+                header_tenant_id=header_tenant_id,
+                body_tenant_id=body_tenant_id,
+                client_ip=client_ip,
+                outcome="deny",
+            )
+        except (SQLAlchemyError, ValueError, KeyError, RuntimeError) as exc:
+            log.error(
+                "telemetry_tenant_mismatch_audit_failed",
+                error=str(exc),
+                user_id=user_id,
+            )
+
+    try:
+        asyncio.create_task(_run())
+    except RuntimeError as exc:
+        # 无运行中事件循环（极少出现） — 退化为同步跳过
+        log.warning("telemetry_audit_schedule_failed", error=str(exc))
+
+
 @router.post("/pos-crash")
 async def report_pos_crash(
     body: PosCrashReport,
+    request: Request,
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
     db: AsyncSession = Depends(get_db),
+    user: Dict[str, Any] = Depends(get_current_user),
 ) -> Dict[str, Any]:
     """接收 POS 前端崩溃上报。
 
+    A1 安全修复（2026-04-25）— 跨租户 crash 写入漏洞拦截：
+      1. JWT user.tenant_id 必须等于 X-Tenant-ID Header（UUID 归一化比较）
+      2. body 若携带 tenant_id（向前兼容字段），亦必须等于 user.tenant_id
+      3. 任一不一致 → 403 TENANT_MISMATCH，并 asyncio.create_task 写审计 deny 事件
+      4. RLS set_config 一律使用 user.tenant_id（不信任 Header），防御深度
+
     出于 §XIV 审计合规，500 场景仅返回通用提示，不把 SQLAlchemy 错误原文回显。
     """
+    user_tenant_id = _normalize_uuid(user.get("tenant_id", "") or "")
+    header_tenant_id_norm = _normalize_uuid(x_tenant_id)
+
+    # body.tenant_id 是向前兼容字段：当前 PosCrashReport schema 未声明，
+    # 但若客户端附带（如 dict 形式直传），从原始 JSON 中检出并校验。
+    body_tenant_id_raw: Optional[str] = None
+    try:
+        # FastAPI 已消费 body 流；这里仅在需要时再解析（非阻塞主路径，
+        # 失败则跳过并视为无 body tenant_id）。
+        raw_json = await request.json()
+        if isinstance(raw_json, dict) and "tenant_id" in raw_json:
+            val = raw_json.get("tenant_id")
+            if isinstance(val, str) and val.strip():
+                body_tenant_id_raw = val
+    except (ValueError, TypeError, RuntimeError):
+        body_tenant_id_raw = None
+    body_tenant_id_norm = _normalize_uuid(body_tenant_id_raw) if body_tenant_id_raw else None
+
+    client_ip: Optional[str] = None
+    client = getattr(request, "client", None)
+    if client is not None:
+        client_ip = getattr(client, "host", None)
+    fwd = request.headers.get("X-Forwarded-For")
+    if fwd:
+        client_ip = fwd.split(",", 1)[0].strip() or client_ip
+
+    # ── 跨租户校验（防 XSS / 恶意员工伪造 X-Tenant-ID 跨租户写入） ──
+    header_mismatch = header_tenant_id_norm != user_tenant_id
+    body_mismatch = body_tenant_id_norm is not None and body_tenant_id_norm != user_tenant_id
+    if header_mismatch or body_mismatch:
+        _schedule_tenant_mismatch_audit(
+            user_tenant_id=user_tenant_id,
+            header_tenant_id=header_tenant_id_norm,
+            body_tenant_id=body_tenant_id_norm,
+            user_id=str(user.get("user_id", "")),
+            user_role=str(user.get("role", "")),
+            device_id=body.device_id.strip(),
+            route_path=getattr(request.url, "path", ""),
+            client_ip=client_ip,
+        )
+        log.warning(
+            "telemetry_tenant_mismatch",
+            user_tenant_id=user_tenant_id,
+            header_tenant_id=header_tenant_id_norm,
+            body_tenant_id=body_tenant_id_norm,
+            user_id=user.get("user_id"),
+            header_mismatch=header_mismatch,
+            body_mismatch=body_mismatch,
+        )
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "code": "TENANT_MISMATCH",
+                "message": "Header/body tenant_id 与认证身份不一致",
+            },
+        )
+
     device_id = body.device_id.strip()
     if not device_id:
         raise HTTPException(
@@ -139,7 +324,7 @@ async def report_pos_crash(
             detail={"code": "INVALID_PAYLOAD", "message": "device_id 不能为空"},
         )
 
-    if not _rate_limit_check(x_tenant_id, device_id):
+    if not _rate_limit_check(user_tenant_id, device_id):
         raise HTTPException(
             status_code=429,
             detail={
@@ -199,19 +384,20 @@ async def report_pos_crash(
             detail={"code": "INVALID_PAYLOAD", "message": "recovery_action 枚举不合法"},
         )
 
-    # tenant_id 合法性：Header 若不是 UUID，RLS set_config 会在后续 ::uuid 转换失败
+    # tenant_id 合法性：A1 安全修复后以 JWT user.tenant_id 为唯一可信源。
+    # Header 已在跨租户校验中等同性比对过；此处再校验 UUID 合法性以兜底 RLS ::uuid 转换。
     try:
-        uuid.UUID(x_tenant_id)
+        uuid.UUID(user_tenant_id)
     except ValueError:
         raise HTTPException(
             status_code=400,
-            detail={"code": "INVALID_PAYLOAD", "message": "X-Tenant-ID 必须是合法 UUID"},
+            detail={"code": "INVALID_PAYLOAD", "message": "tenant_id 必须是合法 UUID"},
         )
 
     report_id = str(uuid.uuid4())
 
     try:
-        await _set_rls(db, x_tenant_id)
+        await _set_rls(db, user_tenant_id)
         await db.execute(
             text(
                 """
@@ -229,7 +415,7 @@ async def report_pos_crash(
             ),
             {
                 "rid": report_id,
-                "tid": x_tenant_id,
+                "tid": user_tenant_id,
                 "sid": store_uuid,
                 "did": device_id,
                 "route": body.route,
@@ -246,7 +432,12 @@ async def report_pos_crash(
         await db.commit()
     except SQLAlchemyError as exc:
         await db.rollback()
-        log.error("pos_crash_report_db_error", error=str(exc), tenant_id=x_tenant_id, device_id=device_id)
+        log.error(
+            "pos_crash_report_db_error",
+            error=str(exc),
+            tenant_id=user_tenant_id,
+            device_id=device_id,
+        )
         raise HTTPException(
             status_code=500,
             detail={"code": "INTERNAL_ERROR", "message": "上报暂时不可用，请稍后重试"},
@@ -260,7 +451,9 @@ async def report_pos_crash(
             try:
                 await hook(
                     action="pos_crash_report",
-                    tenant_id=x_tenant_id,
+                    tenant_id=user_tenant_id,
+                    user_id=str(user.get("user_id", "")),
+                    user_role=str(user.get("role", "")),
                     report_id=report_id,
                     device_id=device_id,
                     route=body.route,
@@ -276,7 +469,7 @@ async def report_pos_crash(
                     "pos_crash_audit_hook_failed",
                     error=str(exc),
                     report_id=report_id,
-                    tenant_id=x_tenant_id,
+                    tenant_id=user_tenant_id,
                 )
         try:
             asyncio.create_task(_run_audit_hook())
@@ -287,7 +480,8 @@ async def report_pos_crash(
     log.info(
         "pos_crash_reported",
         report_id=report_id,
-        tenant_id=x_tenant_id,
+        tenant_id=user_tenant_id,
+        user_id=user.get("user_id"),
         device_id=device_id,
         route=body.route,
         severity=body.severity,

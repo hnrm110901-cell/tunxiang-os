@@ -61,7 +61,8 @@ if "structlog" not in sys.modules:
 from shared.ontology.src.database import get_db  # noqa: E402
 
 from ..api import telemetry_routes  # noqa: E402
-from ..api.telemetry_routes import router as telemetry_router  # noqa: E402
+from ..api.telemetry_routes import get_current_user  # noqa: E402
+from ..api.telemetry_routes import router as telemetry_router
 
 app = FastAPI()
 app.include_router(telemetry_router)
@@ -75,6 +76,15 @@ STORE_ID = str(uuid.uuid4())
 def _override(db_mock: AsyncMock):
     async def _dep() -> AsyncGenerator:
         yield db_mock
+
+    return _dep
+
+
+def _override_user(tenant_id: str, user_id: str = "user-A1-test", role: str = "cashier"):
+    """A1 安全修复后路由强制 JWT 校验。测试通过 dependency_overrides
+    注入与 X-Tenant-ID Header 一致的用户上下文，避免触发 TENANT_MISMATCH。"""
+    async def _dep():
+        return {"user_id": user_id, "tenant_id": tenant_id, "role": role}
 
     return _dep
 
@@ -104,6 +114,7 @@ class TestPosCrashOk:
     def test_pos_crash_ok(self):
         db = _make_db()
         app.dependency_overrides[get_db] = _override(db)
+        app.dependency_overrides[get_current_user] = _override_user(TENANT_A)
         client = TestClient(app)
 
         resp = client.post(
@@ -139,6 +150,7 @@ class TestMissingDeviceId:
         # Pydantic 缺字段默认 422
         db = _make_db()
         app.dependency_overrides[get_db] = _override(db)
+        app.dependency_overrides[get_current_user] = _override_user(TENANT_A)
         client = TestClient(app)
 
         resp = client.post(
@@ -153,6 +165,7 @@ class TestMissingDeviceId:
         # 空白 device_id 触发路由内显式校验：INVALID_PAYLOAD / 400
         db = _make_db()
         app.dependency_overrides[get_db] = _override(db)
+        app.dependency_overrides[get_current_user] = _override_user(TENANT_A)
         client = TestClient(app)
 
         resp = client.post(
@@ -176,6 +189,7 @@ class TestRateLimited:
     def test_rate_limited_second_call_429(self):
         db = _make_db()
         app.dependency_overrides[get_db] = _override(db)
+        app.dependency_overrides[get_current_user] = _override_user(TENANT_A)
         client = TestClient(app)
 
         payload = {
@@ -222,16 +236,20 @@ class TestRlsIsolation:
 
         db.execute = AsyncMock(side_effect=_capture)
 
+        # 动态用户上下文：以 X-Tenant-ID Header 为参考切换 JWT 身份
+        # 实际上每个请求 client.post 之前重设 override 即可
         app.dependency_overrides[get_db] = _override(db)
         client = TestClient(app)
 
-        # tenant_A 上报
+        # tenant_A 上报（JWT 身份 = TENANT_A）
+        app.dependency_overrides[get_current_user] = _override_user(TENANT_A)
         resp_a = client.post(
             "/api/v1/telemetry/pos-crash",
             json={"device_id": "device-A"},
             headers={"X-Tenant-ID": TENANT_A},
         )
-        # tenant_B 上报（不同 device 避免限流）
+        # tenant_B 上报（JWT 身份 = TENANT_B；不同 device 避免限流）
+        app.dependency_overrides[get_current_user] = _override_user(TENANT_B)
         resp_b = client.post(
             "/api/v1/telemetry/pos-crash",
             json={"device_id": "device-B"},
@@ -281,6 +299,7 @@ class TestDbErrorNoLeak:
         db.execute = AsyncMock(side_effect=_execute)
 
         app.dependency_overrides[get_db] = _override(db)
+        app.dependency_overrides[get_current_user] = _override_user(TENANT_A)
         client = TestClient(app)
 
         resp = client.post(
@@ -331,6 +350,7 @@ class TestXujiSprintA1Extension:
         telemetry_routes._audit_hook = _fake_audit  # type: ignore[attr-defined]
 
         app.dependency_overrides[get_db] = _override(db)
+        app.dependency_overrides[get_current_user] = _override_user(TENANT_A)
         client = TestClient(app)
 
         saga_id = str(uuid.uuid4())
