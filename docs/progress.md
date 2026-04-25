@@ -378,6 +378,144 @@ src/tests/test_rbac_audit_deny_tier1.py       8/8 ✅（R-补1-1 配套）
 
 ---
 
+## 2026-04-25 18:30 §19 阻塞 A1-R3 + R-A1-4 复核
+
+承接 6fbad964 上轮工作。本会话再清两项 §19 阻塞：A1-R3 实施修复（4 commits），A1-R4 经复核为 false positive（仅在 f53370 分支，本分支无 audit_hook 模块级变量）。
+
+### A1-R4（audit hook 生产未接线）— **FALSE POSITIVE on this branch**
+
+§19 审查报告中 R-A1-4 描述的 `_audit_hook: Optional[Callable] = None` 模块级变量
+**只在 f53370 分支**（commits 73bf83f8 + c0adc6ab on `claude/naughty-zhukovsky-f53370`）。
+当前 `blissful-jemison-43822b` 分支的 `services/tx-ops/src/api/telemetry_routes.py`
+直接 `INSERT INTO pos_crash_reports` 内联（line 137-160），无可注入的钩子，
+SQLAlchemyError → 500 显式返回（不 silent skip）。
+
+裁决：A1-R4 在本分支无可执行修复。当 f53370 合入 main 时再做该校验。
+
+### A1-R3（服务端 X-Idempotency-Key replay cache）— **已修复**
+
+#### 攻击面
+3s soft abort + retry 场景下，无服务端 cache：
+1. 第一次请求服务端仍在跑 settle/payment（已扣会员储值或调起第三方支付）
+2. 客户端 retry 第二次到服务端 → 无 cache 拦截 → 第二次同样处理
+3. 结果：saga 双扣 / 储值双扣 / 第三方支付双扣
+
+徐记 200 桌晚高峰每分钟 5+ 次结算，双扣概率非零 → 必须 Tier1 处理。
+
+#### 修复（4 commits 落地）
+
+| commit | 内容 |
+|--------|------|
+| `c1ff3960` | 修 v290 双 head（590a582a 和 v290_call_center_tables 都 revision='v290'）→ 重命名为 v295，down_revision=v294_mrp_forecast |
+| `5ec4660d` | v296_api_idempotency_cache 迁移 + services/api_idempotency.py 服务模块 + 17 Tier1 单元测试 |
+| `e7650746` | settle_order + create_payment 路由集成 _check_idempotency_cache helper + 7 Tier1 集成测试 |
+| (本 commit) | progress.md 更新 |
+
+#### 设计要点
+
+1. **PG advisory_xact_lock 串行化并发同 key**
+   - lock_id = SHA256(tenant_id|key|route)[:8] (signed BIGINT)
+   - 跨租户 / 跨 key / 跨路由不互锁
+   - 事务 commit/rollback 自动释放
+
+2. **request_hash 检测同 key 不同 body**
+   - SHA256(method.upper() + '\n' + path + '\n' + body)
+   - settle 用 `body_for_hash=""`（无 request body）
+   - payment 用 `req.model_dump_json()` (pydantic 字段顺序确定)
+   - 不一致 → HTTP 422 IDEMPOTENCY_KEY_CONFLICT（客户端 bug 信号）
+
+3. **fail-open 哲学**
+   - cache 是"防双扣的优化层"，不是"业务必经路径"
+   - 任何 SQLAlchemyError → structlog warning + 路由继续业务
+   - 超长 key (>128) → 不取锁，不读 cache（防 DoS）
+
+4. **24h TTL**
+   - POS 离线队列 IndexedDB 默认 7 天但 24h 已够覆盖一个营业日
+   - 部分索引 `idx_api_idem_expired WHERE expires_at < NOW()` 支持 GC sweeper
+
+#### 测试覆盖
+
+```
+test_api_idempotency_tier1.py             17/17 ✅
+  T1   request_hash 稳定（method 大小写不影响）
+  T2   request_hash body 改 1 byte 即变
+  T1b  body=None / bytes / str 等价
+  T3   lock_id 跨租户不碰撞
+  T3b  lock_id 同 key 稳定
+  T3c  lock_id 不同 route 不互锁（settle/payment 独立）
+  T4   cache 命中 hash 一致 → CachedResponse
+  T5   cache 命中但 hash 不一致 → IdempotencyKeyConflict
+  T6   cache 未命中 → None
+  T6b  空 key → None 零 DB 调用
+  T7   DB 错误 → None + warning（fail-open）
+  T8   store 失败不抛 + warning
+  T9   store 含中文嵌套结构（ensure_ascii=False）
+  T10  lock 空 key → no-op
+  T11  lock 超长 key → no-op + warning（防 DoS）
+  T11b lock DB 错误 → no-op + warning
+  T12  集成 — 第一次 store + 第二次 get 命中 → 防双扣
+
+test_orders_idempotency_wiring_tier1.py    7/7 ✅
+  - 空 key → no-op，零 DB 调用
+  - 空字符串 key → 同 None 处理
+  - cache 未命中 → (None, hash) + advisory_lock + SELECT
+  - cache 命中 → (cached_body, hash) → 路由 short-circuit
+  - hash 冲突 → HTTPException(422)
+  - body_for_hash 一致性
+  - settle / payment 路由 path 不互锁
+
+总计 24/24 ✅
+```
+
+#### 本次未覆盖（留 Sprint H DEMO 真实 PG 阶段）
+
+- 真实 200 桌并发同 key advisory_lock 串行验证（需 asyncpg + pgbouncer 真实链路）
+- settle 中失败回滚 → cache 不应留 'completed' state（state='failed' 路径）
+- 24h TTL 过期后同 key 重新 store（time travel 测试）
+- 跨设备同 key（设备 A 离线缓存 → 设备 B 在线先到）真实场景
+
+### §19 阻塞清单（最终）
+
+| # | 项 | 状态 |
+|---|---|------|
+| R-A1-1 顶层 ErrorBoundary | ✅ false positive (main.tsx) |
+| R-A1-2 resetAfterMs 循环 | ✅ false positive |
+| R-A1-3 服务端幂等 cache | ✅ 本会话 4 commits 修复 (c1ff3960 / 5ec4660d / e7650746 / 本 commit) |
+| R-A1-4 audit hook 启动校验 | ✅ false positive on this branch（f53370 上才有） |
+| R-A4-2 write_audit 跨租户 target_id | ✅ bbd3259f |
+| R-A4-3 v267 docstring 矛盾 | ✅ R-补1-1 通过 v295 解决 |
+| R-补1-1 9 路由 deny 审计缺失 | ✅ 590a582a + 56308e46 |
+| R-补2-1 离线 replay 双扣 | ✅ 48aba740 |
+| R-A4-1 flag 未读取 | ⏳ f53370 分支 |
+| R-补3-1 ModelRouter 三段记账 | ⏳ f53370 分支 |
+
+**当前 main 分支 §19 阻塞已全部清空**（剩余 2 项均在 f53370 分支，待该分支合并后再处理）。
+
+### 关键决策记录
+
+- **不引入 SECURITY DEFINER**（A4-R2 同样原则）：RLS 自身提供边界，advisory_lock 已通过 PG 内置机制串行化并发
+- **不抛 raise**（A4-R2 同样原则）：cache 错误 fail-open + structlog，业务路径绝不阻塞
+- **v290 重命名为 v295**：590a582a 引入双 head 是迭代过程中的疏漏，已修正；后续新迁移用 v297+
+- **路由 helper 抽取**：settle 和 payment 路由共用 `_check_idempotency_cache`，避免 ~50 行重复代码
+
+### 已知风险
+
+- AsyncMock 测试基础设施仍是 fail-open 路径覆盖；真实 PG advisory_lock 并发行为靠 Sprint H 阶段验证
+- TTL 24h 是经验值；如发现回放延迟超过 24h 的真实 case，需重新评估
+- request_hash 用 SHA256 — 如果客户端某天换序列化（如 protobuf），hash 不再稳定。当前契约：客户端用 JSON，服务端用 JSON，pydantic v2 字段顺序固定
+- 路由集成只覆盖 settle / payment 两条 Tier1 路径；R-补2-1 客户端还会对 add_item / create_order 携带 X-Idempotency-Key，但这两条非 Tier1（不涉及金额扣减）
+
+### 下一步建议
+
+1. **开新会话独立审查本会话 commits**（§19 强制：4 commits + 1 迁移 + 跨服务安全 + Tier1 + 影响 settle 路由 → 完全命中 §19 阈值）。建议审查者重点验：
+   - PG advisory_lock 在真实 RLS 下的隔离边界
+   - 跨设备 / 跨进程同 key 场景
+   - cache 表 RLS 策略是否阻挡跨租户 SELECT
+   - request_hash 用 pydantic JSON 的字段顺序稳定性
+2. **f53370 合入 main 后**继续：A1-R4 audit_hook 启动校验、A4-R1 flag、R-补3-1 ModelRouter
+
+---
+
 ## 2026-04-24 Sprint H：集成验证基建（徐记海鲜 DEMO Go/No-Go）
 
 ### 本次会话目标
