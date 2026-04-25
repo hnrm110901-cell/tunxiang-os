@@ -331,12 +331,13 @@ class AllianceService:
         exchange_rate = partner["exchange_rate_out"]
         converted_points = int(points_amount * exchange_rate)
 
-        # 扣减客户积分（检查余额）
+        # 扣减客户积分（检查余额，FOR UPDATE 防止并发扣减导致负余额）
         result = await db.execute(
             text("""
                 SELECT COALESCE(SUM(CASE WHEN type = 'earn' THEN points ELSE -points END), 0) AS balance
                 FROM points_ledger
                 WHERE customer_id = :cid AND tenant_id = :tid AND is_deleted = false
+                FOR UPDATE
             """),
             {"cid": customer_id, "tid": tenant_id},
         )

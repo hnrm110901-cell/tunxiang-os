@@ -189,31 +189,7 @@ class GroupDealService:
         Raises:
             GroupDealError: 拼团不存在/已满/已过期/重复参团
         """
-        # 查拼团信息
-        result = await db.execute(
-            text("""
-                SELECT id, status, current_participants, max_participants,
-                       min_participants, expires_at
-                FROM group_deals
-                WHERE id = :deal_id AND tenant_id = :tenant_id AND is_deleted = false
-            """),
-            {"deal_id": str(deal_id), "tenant_id": str(tenant_id)},
-        )
-        deal = result.mappings().first()
-        if not deal:
-            raise GroupDealError("DEAL_NOT_FOUND", "拼团活动不存在")
-
-        if deal["status"] != "open":
-            raise GroupDealError("DEAL_NOT_OPEN", f"拼团状态为 {deal['status']}，无法参团")
-
-        now = datetime.now(timezone.utc)
-        if deal["expires_at"] and deal["expires_at"] <= now:
-            raise GroupDealError("DEAL_EXPIRED", "拼团已过期")
-
-        if deal["current_participants"] >= deal["max_participants"]:
-            raise GroupDealError("DEAL_FULL", "拼团人数已满")
-
-        # 检查重复参团
+        # 检查重复参团（UNIQUE约束兜底，这里提前报友好错误）
         dup_result = await db.execute(
             text("""
                 SELECT id FROM group_deal_participants
@@ -229,7 +205,60 @@ class GroupDealService:
         if dup_result.first():
             raise GroupDealError("ALREADY_JOINED", "已参加此拼团")
 
-        # 加入
+        # 原子递增 current_participants 并返回更新后状态
+        # WHERE 条件保证：open + 未满 + 未过期 + 未删除，防止并发超卖
+        now = datetime.now(timezone.utc)
+        update_result = await db.execute(
+            text("""
+                UPDATE group_deals
+                SET current_participants = current_participants + 1,
+                    status = CASE
+                        WHEN current_participants + 1 >= min_participants THEN 'filled'
+                        ELSE 'open'
+                    END,
+                    filled_at = CASE
+                        WHEN current_participants + 1 >= min_participants AND filled_at IS NULL
+                        THEN NOW()
+                        ELSE filled_at
+                    END,
+                    updated_at = NOW()
+                WHERE id = :deal_id
+                  AND tenant_id = :tenant_id
+                  AND status = 'open'
+                  AND current_participants < max_participants
+                  AND (expires_at IS NULL OR expires_at > :now)
+                  AND is_deleted = false
+                RETURNING id, current_participants, status, min_participants, max_participants
+            """),
+            {
+                "deal_id": str(deal_id),
+                "tenant_id": str(tenant_id),
+                "now": now,
+            },
+        )
+        deal = update_result.mappings().first()
+        if not deal:
+            # 原子更新失败 — 查原因给用户友好错误
+            check = await db.execute(
+                text("""
+                    SELECT status, current_participants, max_participants, expires_at
+                    FROM group_deals
+                    WHERE id = :deal_id AND tenant_id = :tenant_id AND is_deleted = false
+                """),
+                {"deal_id": str(deal_id), "tenant_id": str(tenant_id)},
+            )
+            info = check.mappings().first()
+            if not info:
+                raise GroupDealError("DEAL_NOT_FOUND", "拼团活动不存在")
+            if info["status"] != "open":
+                raise GroupDealError("DEAL_NOT_OPEN", f"拼团状态为 {info['status']}，无法参团")
+            if info["current_participants"] >= info["max_participants"]:
+                raise GroupDealError("DEAL_FULL", "拼团人数已满")
+            if info["expires_at"] and info["expires_at"] <= now:
+                raise GroupDealError("DEAL_EXPIRED", "拼团已过期")
+            raise GroupDealError("JOIN_FAILED", "参团失败，请重试")
+
+        # 插入参与者记录
         participant_id = uuid.uuid4()
         await db.execute(
             text("""
@@ -245,31 +274,8 @@ class GroupDealService:
             },
         )
 
-        new_count = deal["current_participants"] + 1
-        new_status = "open"
-        filled_at = None
-
-        if new_count >= deal["min_participants"]:
-            new_status = "filled"
-            filled_at = now
-
-        await db.execute(
-            text("""
-                UPDATE group_deals
-                SET current_participants = :count,
-                    status = :status,
-                    filled_at = :filled_at,
-                    updated_at = NOW()
-                WHERE id = :deal_id AND tenant_id = :tenant_id
-            """),
-            {
-                "count": new_count,
-                "status": new_status,
-                "filled_at": filled_at,
-                "deal_id": str(deal_id),
-                "tenant_id": str(tenant_id),
-            },
-        )
+        new_count = deal["current_participants"]
+        new_status = deal["status"]
         await db.commit()
 
         log.info(

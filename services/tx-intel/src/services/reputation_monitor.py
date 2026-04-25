@@ -56,7 +56,10 @@ class ReputationMonitor:
 
         # 构建 store 过滤条件
         store_filter = ""
-        params: dict[str, Any] = {"tenant_id": str(tenant_id)}
+        params: dict[str, Any] = {
+            "tenant_id": str(tenant_id),
+            "window_minutes": time_window_minutes,
+        }
         if store_id:
             store_filter = " AND store_id = :store_id"
             params["store_id"] = str(store_id)
@@ -84,7 +87,7 @@ class ReputationMonitor:
                 FROM public_opinion_mentions
                 WHERE tenant_id = :tenant_id
                   AND sentiment = 'negative'
-                  AND captured_at > NOW() - INTERVAL '{time_window_minutes} minutes'
+                  AND captured_at > NOW() - INTERVAL '1 minute' * :window_minutes
                   AND is_deleted = false
                   {store_filter}
             """),
@@ -114,7 +117,7 @@ class ReputationMonitor:
                 FROM public_opinion_mentions
                 WHERE tenant_id = :tenant_id
                   AND sentiment = 'negative'
-                  AND captured_at > NOW() - INTERVAL '{time_window_minutes} minutes'
+                  AND captured_at > NOW() - INTERVAL '1 minute' * :window_minutes
                   AND is_deleted = false
                   {store_filter}
                 ORDER BY captured_at DESC
@@ -141,7 +144,7 @@ class ReputationMonitor:
                 FROM public_opinion_mentions
                 WHERE tenant_id = :tenant_id
                   AND sentiment = 'negative'
-                  AND captured_at > NOW() - INTERVAL '{time_window_minutes} minutes'
+                  AND captured_at > NOW() - INTERVAL '1 minute' * :window_minutes
                   AND is_deleted = false
                   {store_filter}
                 GROUP BY platform
