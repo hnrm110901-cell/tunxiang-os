@@ -16,6 +16,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 import structlog
+from constraints.decorator import with_constraint_check
 
 from ..base import ActionConfig, AgentResult, SkillAgent
 from ..context import ConstraintContext, IngredientSnapshot
@@ -120,6 +121,9 @@ class InventoryAlertAgent(EdgeAwareMixin, SkillAgent):
         }
         return configs.get(action, ActionConfig())
 
+    # Sprint D1：硬阻断装饰器 — check_expiration 填 IngredientSnapshot 列表，
+    # 食安合规约束（remaining_hours < 24h）硬阻断含临期食材的决策
+    @with_constraint_check(skill_name="inventory_alert")
     async def execute(self, action: str, params: dict[str, Any]) -> AgentResult:
         dispatch = {
             "predict_consumption": self._predict_consumption,

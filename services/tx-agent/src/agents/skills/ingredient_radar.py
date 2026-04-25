@@ -5,6 +5,8 @@
 
 from typing import Any
 
+from constraints.decorator import with_constraint_check
+
 from ..base import AgentResult, SkillAgent
 
 # 原料品类
@@ -31,6 +33,9 @@ class IngredientRadarAgent(SkillAgent):
             "check_compliance",
         ]
 
+    # Sprint D1：硬阻断装饰器 — predict_ingredient_cost / check_compliance 携带价格与
+    # 食安证照数据时，毛利底线 + 食安合规自动生效；新原料发现/对比类 skipped
+    @with_constraint_check(skill_name="ingredient_radar")
     async def execute(self, action: str, params: dict[str, Any]) -> AgentResult:
         dispatch = {
             "discover_new_ingredients": self._discover_new,

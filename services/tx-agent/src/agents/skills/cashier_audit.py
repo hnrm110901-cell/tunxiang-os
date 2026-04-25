@@ -13,6 +13,7 @@
 from typing import Any
 
 import structlog
+from constraints.decorator import with_constraint_check
 
 from ..base import AgentResult, SkillAgent
 
@@ -45,6 +46,9 @@ class CashierAuditAgent(SkillAgent):
             "detect_cash_anomaly",
         ]
 
+    # Sprint D1：硬阻断装饰器 — audit_transaction 折扣/挂账核销直接关联毛利底线
+    # （discount_amount_fen + total_fen → margin 校验）
+    @with_constraint_check(skill_name="cashier_audit")
     async def execute(self, action: str, params: dict[str, Any]) -> AgentResult:
         dispatch = {
             "audit_transaction": self._audit_transaction,

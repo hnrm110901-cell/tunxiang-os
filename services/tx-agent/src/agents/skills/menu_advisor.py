@@ -5,6 +5,8 @@
 
 from typing import Any
 
+from constraints.decorator import with_constraint_check
+
 from ..base import AgentResult, SkillAgent
 from ..context import ConstraintContext
 
@@ -37,6 +39,9 @@ class MenuAdvisorAgent(SkillAgent):
             "design_ab_test",
         ]
 
+    # Sprint D1：硬阻断装饰器 — optimize_pricing 取最低毛利菜品作 margin 校验基准，
+    # 任何会让最差菜品毛利 < 15% 的定价建议被硬阻断
+    @with_constraint_check(skill_name="menu_advisor")
     async def execute(self, action: str, params: dict[str, Any]) -> AgentResult:
         dispatch = {
             "analyze_dish_quadrant": self._analyze_quadrant,

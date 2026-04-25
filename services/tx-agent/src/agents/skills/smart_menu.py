@@ -11,6 +11,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 import structlog
+from constraints.decorator import with_constraint_check
 
 from ..base import ActionConfig, AgentResult, SkillAgent
 from ..context import ConstraintContext
@@ -113,6 +114,9 @@ class SmartMenuAgent(SkillAgent):
         }
         return configs.get(action, ActionConfig())
 
+    # Sprint D1：硬阻断装饰器 — simulate_cost / optimize_menu / flag_high_cost_dishes
+    # 等填入 price_fen+cost_fen 时毛利底线生效，低毛利决策被拒
+    @with_constraint_check(skill_name="smart_menu")
     async def execute(self, action: str, params: dict[str, Any]) -> AgentResult:
         dispatch = {
             "simulate_cost": self._simulate_cost,

@@ -176,20 +176,37 @@ def _safe_jsonable(obj: Any, _depth: int = 0) -> Any:
     return repr(obj)[:200]
 
 
-def with_constraint_check(skill_name: str) -> Callable[[Callable[..., Awaitable[Any]]], Callable[..., Awaitable[Any]]]:
+def with_constraint_check(
+    skill_name: str,
+    raise_on_block: bool = False,
+) -> Callable[[Callable[..., Awaitable[Any]]], Callable[..., Awaitable[Any]]]:
     """装饰 Skill.execute()，对每次决策执行三条硬约束。
 
     Args:
-        skill_name: Skill 标识（用于异常 / 日志 / CI 扫描）
+        skill_name:       Skill 标识（用于异常 / 日志 / CI 扫描）
+        raise_on_block:   约束失败时的处理方式
+            False (默认) — 决策被拦截时记录留痕并将 result.success 置 False，
+                          填 result.data["blocked_at_constraint"] / ["constraint_result"]，
+                          兼容 base.py::SkillAgent.run() 既有 constraints_passed=False 路径
+            True         — 抛 ConstraintBlockedException，调用方必须 try/except 捕获
+                          （适用于绕过 run() 直接调 execute() 的外部业务代码）
 
     Returns:
         包装后的 async execute() 函数；CI 扫描通过 `__tx_constraint_check_skill__`
         类属性识别已覆盖的 Skill 类。
 
-    Behavior:
-        - happy path（result.success=True 且约束 passed/skipped）→ 原 result 透传
-        - result.success=False（execute 自身报错）→ 不再走约束（避免 None 数据误拦）
+    Behavior matrix（raise_on_block=False，默认）：
+        - happy path（result.success=True 且约束 passed/skipped） → 原 result 透传
+        - result.success=False（execute 自身报错）              → 原 result 透传，不叠加约束阻断
+        - constraints failed                                    → 写 blocked log + 在 result.data
+                                                                  注入 _constraint_blocked=True，
+                                                                  result 仍透传（base.py::run() 会
+                                                                  用同一份 ConstraintChecker 把
+                                                                  constraints_passed 标 False）
+
+    Behavior matrix（raise_on_block=True）：
         - constraints failed → 写 blocked log + raise ConstraintBlockedException
+                              （bypass base.py 的软告警路径，给 Master Agent / 业务路由用）
 
     Note: 本装饰器假设被包装方法签名为 `async def execute(self, action, params)`。
     """
@@ -207,13 +224,25 @@ def with_constraint_check(skill_name: str) -> Callable[[Callable[..., Awaitable[
             ctx = _build_context(self, params, skill_name)
             constraint_result = await run_checks(result, ctx)
 
-            # 通过或跳过 → 原样返回（约束细节由 base.py 的 ConstraintChecker 兜底打 scope 标签）
+            # 通过或跳过 → 原样返回（base.py::run() 会用既有 ConstraintChecker 打 scope 标签）
             if constraint_result.passed:
                 return result
 
-            # 违反约束 → 写留痕 + 抛异常
+            # 违反约束 → 写留痕
             await _write_blocked_log(self, skill_name, action, params, constraint_result)
-            raise ConstraintBlockedException(skill_name, action, constraint_result)
+
+            if raise_on_block:
+                raise ConstraintBlockedException(skill_name, action, constraint_result)
+
+            # 默认软通道：result 透传不动，base.py::SkillAgent.run() 会用既有
+            # ConstraintChecker 校验 result.data 字段并把 constraints_passed 设为 False
+            # （margin/safety/experience 三条同源逻辑，结果与本装饰器一致）。
+            # 装饰器仅作了：(1) 写 blocked log；(2) 在 result.data 注入 _constraint_blocked
+            # 标识便于 Master Agent / 路由层识别已被本层捕获过的违规。
+            if isinstance(result.data, dict):
+                result.data.setdefault("_constraint_blocked", True)
+                result.data.setdefault("_constraint_result", constraint_result.to_dict())
+            return result
 
         # CI 扫描标记：类属性形式（被装饰类继承时仍然可读）
         setattr(wrapper, DECORATOR_MARKER_ATTR, skill_name)
