@@ -12,9 +12,9 @@ Tier 1 测试：RLS 多租户隔离
 import os
 import sys
 import uuid
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 SRC = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src"))
@@ -57,7 +57,6 @@ class TestRLSTenantIsolationTier1:
     @pytest.mark.asyncio
     async def test_order_query_with_tenant_id_header(self):
         """所有订单查询必须在请求头携带 X-Tenant-ID，缺失时返回 422"""
-        from fastapi.testclient import TestClient
 
         # 验证路由层强制要求 X-Tenant-ID header
         # 此测试依赖 conftest.py 中的 async_client fixture
@@ -163,6 +162,6 @@ class TestRLSNullBypassTier1:
                 pass
 
         assert len(nullable_tenant_id_files) == 0, (
-            f"以下行存在 tenant_id nullable=True，可能绕过 RLS，请逐行确认：\n"
+            "以下行存在 tenant_id nullable=True，可能绕过 RLS，请逐行确认：\n"
             + "\n".join(nullable_tenant_id_files)
         )

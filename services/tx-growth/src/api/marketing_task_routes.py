@@ -290,7 +290,9 @@ async def schedule_task(
         await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": x_tenant_id})
         try:
             result = await _svc.schedule_task(
-                uuid.UUID(x_tenant_id), uuid.UUID(task_id), db,
+                uuid.UUID(x_tenant_id),
+                uuid.UUID(task_id),
+                db,
                 approved_by=uuid.UUID(req.approved_by) if req.approved_by else None,
             )
             await db.commit()
@@ -371,8 +373,10 @@ async def create_assignments(
         await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": x_tenant_id})
         try:
             result = await _svc.create_assignments(
-                uuid.UUID(x_tenant_id), uuid.UUID(task_id),
-                req.store_employee_map, db,
+                uuid.UUID(x_tenant_id),
+                uuid.UUID(task_id),
+                req.store_employee_map,
+                db,
             )
             await db.commit()
             return ok_response(result)
@@ -392,7 +396,10 @@ async def list_assignments(
 
         await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": x_tenant_id})
         result = await _svc.list_assignments(
-            uuid.UUID(x_tenant_id), uuid.UUID(task_id), db, status=status,
+            uuid.UUID(x_tenant_id),
+            uuid.UUID(task_id),
+            db,
+            status=status,
         )
         return ok_response(result)
 
@@ -446,8 +453,10 @@ async def batch_execute(
 
         await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": x_tenant_id})
         result = await _svc.batch_execute(
-            uuid.UUID(x_tenant_id), uuid.UUID(task_id),
-            req.executions, db,
+            uuid.UUID(x_tenant_id),
+            uuid.UUID(task_id),
+            req.executions,
+            db,
         )
         await db.commit()
         return ok_response(result)
@@ -533,8 +542,11 @@ async def get_leaderboard(
         await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": x_tenant_id})
         try:
             result = await _svc.get_execution_leaderboard(
-                uuid.UUID(x_tenant_id), uuid.UUID(task_id),
-                dimension, db, limit=limit,
+                uuid.UUID(x_tenant_id),
+                uuid.UUID(task_id),
+                dimension,
+                db,
+                limit=limit,
             )
             return ok_response(result)
         except MarketingTaskError as exc:

@@ -6,9 +6,10 @@
 - 任务定义管理（添加任务）
 - 任务实例操作（开始/完成/跳过/列表/详情）
 """
+
 from __future__ import annotations
 
-from datetime import date, datetime, timezone
+from datetime import datetime, timezone
 from uuid import UUID, uuid4
 
 import structlog
@@ -21,38 +22,168 @@ logger = structlog.get_logger(__name__)
 
 DEFAULT_TIME_SLOTS: dict[str, list[dict]] = {
     "full_service": [
-        {"slot_code": "morning_prep", "slot_name": "早间准备", "start_time": "06:00", "end_time": "09:30", "sort_order": 0},
-        {"slot_code": "lunch_buildup", "slot_name": "午市预备", "start_time": "09:30", "end_time": "11:00", "sort_order": 1},
-        {"slot_code": "lunch_peak", "slot_name": "午市高峰", "start_time": "11:00", "end_time": "14:00", "sort_order": 2},
-        {"slot_code": "afternoon_lull", "slot_name": "午后低峰", "start_time": "14:00", "end_time": "17:00", "sort_order": 3},
-        {"slot_code": "dinner_buildup", "slot_name": "晚市预备", "start_time": "17:00", "end_time": "18:00", "sort_order": 4},
-        {"slot_code": "dinner_peak", "slot_name": "晚市高峰", "start_time": "18:00", "end_time": "21:00", "sort_order": 5},
+        {
+            "slot_code": "morning_prep",
+            "slot_name": "早间准备",
+            "start_time": "06:00",
+            "end_time": "09:30",
+            "sort_order": 0,
+        },
+        {
+            "slot_code": "lunch_buildup",
+            "slot_name": "午市预备",
+            "start_time": "09:30",
+            "end_time": "11:00",
+            "sort_order": 1,
+        },
+        {
+            "slot_code": "lunch_peak",
+            "slot_name": "午市高峰",
+            "start_time": "11:00",
+            "end_time": "14:00",
+            "sort_order": 2,
+        },
+        {
+            "slot_code": "afternoon_lull",
+            "slot_name": "午后低峰",
+            "start_time": "14:00",
+            "end_time": "17:00",
+            "sort_order": 3,
+        },
+        {
+            "slot_code": "dinner_buildup",
+            "slot_name": "晚市预备",
+            "start_time": "17:00",
+            "end_time": "18:00",
+            "sort_order": 4,
+        },
+        {
+            "slot_code": "dinner_peak",
+            "slot_name": "晚市高峰",
+            "start_time": "18:00",
+            "end_time": "21:00",
+            "sort_order": 5,
+        },
         {"slot_code": "closing", "slot_name": "闭店收尾", "start_time": "21:00", "end_time": "23:00", "sort_order": 6},
     ],
     "qsr": [
-        {"slot_code": "morning_prep", "slot_name": "早间准备", "start_time": "06:00", "end_time": "08:00", "sort_order": 0},
-        {"slot_code": "morning_peak", "slot_name": "早餐高峰", "start_time": "08:00", "end_time": "10:00", "sort_order": 1},
-        {"slot_code": "lunch_peak", "slot_name": "午餐高峰", "start_time": "10:00", "end_time": "14:00", "sort_order": 2},
-        {"slot_code": "afternoon", "slot_name": "下午时段", "start_time": "14:00", "end_time": "17:00", "sort_order": 3},
-        {"slot_code": "dinner_peak", "slot_name": "晚餐高峰", "start_time": "17:00", "end_time": "21:00", "sort_order": 4},
+        {
+            "slot_code": "morning_prep",
+            "slot_name": "早间准备",
+            "start_time": "06:00",
+            "end_time": "08:00",
+            "sort_order": 0,
+        },
+        {
+            "slot_code": "morning_peak",
+            "slot_name": "早餐高峰",
+            "start_time": "08:00",
+            "end_time": "10:00",
+            "sort_order": 1,
+        },
+        {
+            "slot_code": "lunch_peak",
+            "slot_name": "午餐高峰",
+            "start_time": "10:00",
+            "end_time": "14:00",
+            "sort_order": 2,
+        },
+        {
+            "slot_code": "afternoon",
+            "slot_name": "下午时段",
+            "start_time": "14:00",
+            "end_time": "17:00",
+            "sort_order": 3,
+        },
+        {
+            "slot_code": "dinner_peak",
+            "slot_name": "晚餐高峰",
+            "start_time": "17:00",
+            "end_time": "21:00",
+            "sort_order": 4,
+        },
         {"slot_code": "closing", "slot_name": "闭店收尾", "start_time": "21:00", "end_time": "23:00", "sort_order": 5},
     ],
 }
 
 DEFAULT_TASKS: dict[str, list[dict]] = {
     "morning_prep": [
-        {"task_code": "morning_prep_equipment_startup", "task_name": "设备开机检查", "task_type": "checklist", "target_role": "kitchen_lead", "priority": "high", "duration_min": 15, "sort_order": 0},
-        {"task_code": "morning_prep_cold_storage_check", "task_name": "冷库验温", "task_type": "inspection", "target_role": "kitchen_lead", "priority": "critical", "duration_min": 10, "sort_order": 1},
-        {"task_code": "morning_prep_hygiene_check", "task_name": "卫生检查", "task_type": "checklist", "target_role": "store_manager", "priority": "high", "duration_min": 20, "sort_order": 2},
+        {
+            "task_code": "morning_prep_equipment_startup",
+            "task_name": "设备开机检查",
+            "task_type": "checklist",
+            "target_role": "kitchen_lead",
+            "priority": "high",
+            "duration_min": 15,
+            "sort_order": 0,
+        },
+        {
+            "task_code": "morning_prep_cold_storage_check",
+            "task_name": "冷库验温",
+            "task_type": "inspection",
+            "target_role": "kitchen_lead",
+            "priority": "critical",
+            "duration_min": 10,
+            "sort_order": 1,
+        },
+        {
+            "task_code": "morning_prep_hygiene_check",
+            "task_name": "卫生检查",
+            "task_type": "checklist",
+            "target_role": "store_manager",
+            "priority": "high",
+            "duration_min": 20,
+            "sort_order": 2,
+        },
     ],
     "lunch_buildup": [
-        {"task_code": "lunch_buildup_prep_level_check", "task_name": "备料充足度检查", "task_type": "inspection", "target_role": "kitchen_lead", "priority": "high", "duration_min": 10, "sort_order": 0},
-        {"task_code": "lunch_buildup_table_setup", "task_name": "台面布置", "task_type": "checklist", "target_role": "floor_lead", "priority": "normal", "duration_min": 15, "sort_order": 1},
+        {
+            "task_code": "lunch_buildup_prep_level_check",
+            "task_name": "备料充足度检查",
+            "task_type": "inspection",
+            "target_role": "kitchen_lead",
+            "priority": "high",
+            "duration_min": 10,
+            "sort_order": 0,
+        },
+        {
+            "task_code": "lunch_buildup_table_setup",
+            "task_name": "台面布置",
+            "task_type": "checklist",
+            "target_role": "floor_lead",
+            "priority": "normal",
+            "duration_min": 15,
+            "sort_order": 1,
+        },
     ],
     "closing": [
-        {"task_code": "closing_daily_settlement", "task_name": "日结对账", "task_type": "report", "target_role": "cashier", "priority": "critical", "duration_min": 30, "sort_order": 0},
-        {"task_code": "closing_inventory_check", "task_name": "收尾盘点", "task_type": "checklist", "target_role": "kitchen_lead", "priority": "high", "duration_min": 20, "sort_order": 1},
-        {"task_code": "closing_equipment_shutdown", "task_name": "设备关闭", "task_type": "checklist", "target_role": "kitchen_lead", "priority": "normal", "duration_min": 10, "sort_order": 2},
+        {
+            "task_code": "closing_daily_settlement",
+            "task_name": "日结对账",
+            "task_type": "report",
+            "target_role": "cashier",
+            "priority": "critical",
+            "duration_min": 30,
+            "sort_order": 0,
+        },
+        {
+            "task_code": "closing_inventory_check",
+            "task_name": "收尾盘点",
+            "task_type": "checklist",
+            "target_role": "kitchen_lead",
+            "priority": "high",
+            "duration_min": 20,
+            "sort_order": 1,
+        },
+        {
+            "task_code": "closing_equipment_shutdown",
+            "task_name": "设备关闭",
+            "task_type": "checklist",
+            "target_role": "kitchen_lead",
+            "priority": "normal",
+            "duration_min": 10,
+            "sort_order": 2,
+        },
     ],
 }
 
@@ -119,8 +250,10 @@ class SOPTaskService:
         }
 
     async def list_templates(
-        self, tenant_id: str,
-        *, store_format: str | None = None,
+        self,
+        tenant_id: str,
+        *,
+        store_format: str | None = None,
     ) -> list[dict]:
         """列出租户的所有SOP模板"""
         tid = UUID(tenant_id)
@@ -253,7 +386,9 @@ class SOPTaskService:
         }
 
     async def init_default_template(
-        self, tenant_id: str, store_format: str = "full_service",
+        self,
+        tenant_id: str,
+        store_format: str = "full_service",
     ) -> dict:
         """初始化默认SOP模板（含时段和任务）"""
         # 创建模板
@@ -577,7 +712,9 @@ class SOPTaskService:
         return {"items": items, "total": total}
 
     async def get_task_instance(
-        self, tenant_id: str, instance_id: str,
+        self,
+        tenant_id: str,
+        instance_id: str,
     ) -> dict | None:
         """获取单个任务实例详情"""
         tid = UUID(tenant_id)
@@ -650,7 +787,10 @@ class SOPTaskService:
         }
 
     async def start_task(
-        self, tenant_id: str, instance_id: str, assignee_id: str,
+        self,
+        tenant_id: str,
+        instance_id: str,
+        assignee_id: str,
     ) -> dict:
         """开始任务（pending → in_progress）"""
         tid = UUID(tenant_id)
@@ -680,7 +820,9 @@ class SOPTaskService:
         )
         if result.fetchone() is None:
             check = await self.db.execute(
-                text("SELECT status FROM sop_task_instances WHERE id = :id AND tenant_id = :tid AND is_deleted = FALSE"),
+                text(
+                    "SELECT status FROM sop_task_instances WHERE id = :id AND tenant_id = :tid AND is_deleted = FALSE"
+                ),
                 {"id": iid, "tid": tid},
             )
             row = check.fetchone()
@@ -739,7 +881,9 @@ class SOPTaskService:
         )
         if result.fetchone() is None:
             check = await self.db.execute(
-                text("SELECT status FROM sop_task_instances WHERE id = :id AND tenant_id = :tid AND is_deleted = FALSE"),
+                text(
+                    "SELECT status FROM sop_task_instances WHERE id = :id AND tenant_id = :tid AND is_deleted = FALSE"
+                ),
                 {"id": iid, "tid": tid},
             )
             row = check.fetchone()
@@ -762,7 +906,10 @@ class SOPTaskService:
         }
 
     async def skip_task(
-        self, tenant_id: str, instance_id: str, reason: str,
+        self,
+        tenant_id: str,
+        instance_id: str,
+        reason: str,
     ) -> dict:
         """跳过任务（pending/in_progress → skipped）"""
         tid = UUID(tenant_id)

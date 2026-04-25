@@ -33,7 +33,7 @@ from datetime import date, datetime
 from typing import Any, Optional
 
 import structlog
-from fastapi import APIRouter, Header, HTTPException
+from fastapi import APIRouter, Header
 from pydantic import BaseModel
 from services.live_code_service import LiveCodeError, LiveCodeService
 

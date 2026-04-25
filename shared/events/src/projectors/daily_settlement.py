@@ -77,7 +77,7 @@ class DailySettlementProjector(ProjectorBase):
                     last_event_id    = $5,
                     updated_at       = NOW()
                 WHERE tenant_id = $1 AND store_id = $2 AND stat_date = $3
-                """,
+                """,  # noqa: S608 — col 来自 col_map 白名单，非用户输入
                 self.tenant_id,
                 UUID(str(store_id)),
                 stat_date,

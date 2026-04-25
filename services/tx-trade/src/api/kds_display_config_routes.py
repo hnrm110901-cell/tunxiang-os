@@ -24,6 +24,7 @@ router = APIRouter(tags=["kds-display"])
 
 # ── 公共依赖 ─────────────────────────────────────────────────
 
+
 def _tenant_id(request: Request) -> str:
     tid = getattr(request.state, "tenant_id", None) or request.headers.get("X-Tenant-ID", "")
     if not tid:
@@ -32,6 +33,7 @@ def _tenant_id(request: Request) -> str:
 
 
 # ── 请求/响应模型 ────────────────────────────────────────────
+
 
 class UpdateConfigRequest(BaseModel):
     store_id: str
@@ -46,6 +48,7 @@ class ApplyFilterRequest(BaseModel):
 
 
 # ── 端点 ─────────────────────────────────────────────────────
+
 
 @router.get("/config")
 async def get_display_config(

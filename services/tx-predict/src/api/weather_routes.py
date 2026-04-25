@@ -4,6 +4,7 @@
   GET /api/v1/predict/weather/{city}    — 获取7天天气预报
   GET /api/v1/predict/weather/impact    — 天气对营业的影响分析
 """
+
 from typing import Optional
 
 import structlog
@@ -20,6 +21,7 @@ router = APIRouter(prefix="/api/v1/predict/weather", tags=["weather"])
 
 # ── 依赖注入 ──
 
+
 def _require_tenant(x_tenant_id: Optional[str] = Header(None, alias="X-Tenant-ID")) -> str:
     if not x_tenant_id:
         raise HTTPException(status_code=400, detail="X-Tenant-ID header 必填")
@@ -32,6 +34,7 @@ async def _get_tenant_db(x_tenant_id: str = Header(..., alias="X-Tenant-ID")):
 
 
 # ── 1. 7天天气预报 ──
+
 
 @router.get(
     "/{city}",
@@ -61,6 +64,7 @@ async def get_weather_forecast(
 
 
 # ── 2. 天气影响分析 ──
+
 
 @router.get(
     "/impact",

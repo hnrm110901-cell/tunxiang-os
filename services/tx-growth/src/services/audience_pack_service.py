@@ -20,7 +20,6 @@
 
 import json
 import uuid
-from datetime import date, datetime, timedelta, timezone
 from typing import Any, Optional
 
 import structlog
@@ -201,7 +200,8 @@ class AudiencePackService:
             params["store_id"] = str(store_id)
 
         count_result = await db.execute(
-            text(f"SELECT COUNT(*) FROM audience_packs WHERE {where}"), params,
+            text(f"SELECT COUNT(*) FROM audience_packs WHERE {where}"),
+            params,
         )
         total = count_result.scalar() or 0
 
@@ -226,8 +226,11 @@ class AudiencePackService:
     ) -> dict:
         """更新人群包"""
         allowed = {
-            "pack_name", "description", "rules",
-            "refresh_interval_hours", "store_id",
+            "pack_name",
+            "description",
+            "rules",
+            "refresh_interval_hours",
+            "store_id",
         }
         filtered = {k: v for k, v in updates.items() if k in allowed}
         if not filtered:
@@ -523,7 +526,9 @@ class AudiencePackService:
 
         rules = pack["rules"] if isinstance(pack["rules"], dict) else json.loads(pack["rules"])
         matched = await self.execute_rules(
-            tenant_id, rules, db,
+            tenant_id,
+            rules,
+            db,
             store_id=uuid.UUID(str(pack["store_id"])) if pack.get("store_id") else None,
         )
 
@@ -700,7 +705,12 @@ class AudiencePackService:
         rules = preset["rules"] if isinstance(preset["rules"], dict) else json.loads(preset["rules"])
 
         return await self.create_pack(
-            tenant_id, name, "dynamic", rules, created_by, db,
+            tenant_id,
+            name,
+            "dynamic",
+            rules,
+            created_by,
+            db,
             description=preset.get("description"),
             store_id=store_id,
         )
@@ -730,7 +740,8 @@ class AudiencePackService:
             params["is_active"] = is_active
 
         count_result = await db.execute(
-            text(f"SELECT COUNT(*) FROM audience_pack_members WHERE {where}"), params,
+            text(f"SELECT COUNT(*) FROM audience_pack_members WHERE {where}"),
+            params,
         )
         total = count_result.scalar() or 0
 

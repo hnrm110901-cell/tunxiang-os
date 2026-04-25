@@ -12,13 +12,11 @@ Tier 1 测试：存酒/押金业务
   services/tx-trade/src/api/stored_value_routes.py（存酒账户）
   services/tx-trade/src/api/banquet_deposit_routes.py（宴会押金）
 """
-import asyncio
 import os
 import sys
-import uuid
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 SRC = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src"))

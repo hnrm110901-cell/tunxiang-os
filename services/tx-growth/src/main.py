@@ -96,6 +96,7 @@ from .api.ab_test_routes import router as ab_test_router
 from .api.ai_marketing_routes import router as ai_marketing_router  # AI营销自动化（v207）
 from .api.approval_routes import router as approval_router
 from .api.attribution_routes import router as attribution_router
+from .api.audience_pack_routes import router as audience_pack_router  # v297 人群包引擎
 from .api.brand_strategy_routes import router as brand_strategy_router
 from .api.campaign_engine_db_routes import router as campaign_engine_db_router  # v193 活动引擎持久化
 from .api.campaign_routes import router as campaign_router
@@ -106,18 +107,17 @@ from .api.distribution_routes import router as distribution_router  # v191 三�
 from .api.growth_campaign_routes import router as growth_campaign_router
 from .api.growth_hub_routes import router as growth_hub_router
 from .api.journey_routes import router as journey_router
+from .api.live_code_routes import router as live_code_router  # v295 活码拉新引擎
+from .api.marketing_task_routes import router as marketing_task_router  # v299 营销任务日历
 from .api.offer_routes import router as offer_router  # v144 DB化
 from .api.promotion_rules_v2_routes import router as promotion_rules_v2_router  # 模块2.5 促销规则引擎V2
 from .api.promotion_rules_v3_routes import (
     router as promotion_rules_v3_router,  # 模块2.6 促销规则引擎V3（互斥组/执行顺序/总量限制/新类型）
 )
 from .api.referral_routes import router as referral_router
+from .api.sales_crm_routes import router as sales_crm_router  # v291 销售CRM
 from .api.segmentation_routes import router as segmentation_router
 from .api.touch_attribution_routes import router as touch_attribution_router
-from .api.sales_crm_routes import router as sales_crm_router  # v291 销售CRM
-from .api.live_code_routes import router as live_code_router  # v295 活码拉新引擎
-from .api.audience_pack_routes import router as audience_pack_router  # v297 人群包引擎
-from .api.marketing_task_routes import router as marketing_task_router  # v299 营销任务日历
 from .api.wecom_scrm_agent_routes import router as wecom_scrm_agent_router  # P3-05 企微SCRM私域Agent
 
 _approval_service = _ApprovalService()
@@ -240,7 +240,6 @@ from services.growth_journey_service import GrowthJourneyService as _GrowthJourn
 
 # Feature Flag SDK — 控制 Growth Journey V2 / 沉默召回 等 cron 任务
 try:
-    from shared.feature_flags import FlagContext
     from shared.feature_flags import is_enabled as _ff_is_enabled
     from shared.feature_flags.flag_names import GrowthFlags as _GrowthFlags
 

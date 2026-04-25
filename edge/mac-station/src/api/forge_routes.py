@@ -10,10 +10,11 @@ ForgeNode API 路由 — mac-station 离线感知决策接口
   POST /api/v1/forge/sync            — 手动触发离线缓冲同步
   POST /api/v1/forge/reload          — 热重载所有 SKILL.yaml 配置
 """
+
 from __future__ import annotations
 
 import asyncio
-from typing import Annotated, Optional
+from typing import Annotated
 
 import structlog
 from fastapi import APIRouter, Body, Query, Request

@@ -13,7 +13,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 try:
-    from shared.feature_flags import FlagContext, is_enabled
+    from shared.feature_flags import is_enabled
 
     _FLAG_SDK_AVAILABLE = True
 except ImportError:

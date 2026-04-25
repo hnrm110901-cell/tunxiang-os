@@ -8,27 +8,29 @@
 - 纠正动作（6端点）
 - 调度（2端点）
 """
+
 from __future__ import annotations
 
 from datetime import date as date_type
 from datetime import datetime, timedelta, timezone
 
 import structlog
-from fastapi import APIRouter, Depends, Header, HTTPException, Query, Path
+from fastapi import APIRouter, Depends, Header, HTTPException, Path, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db_with_tenant
 
+from ..services.corrective_action_service import CorrectiveActionService
 from ..services.sop_scheduler_service import SOPSchedulerService
 from ..services.sop_task_service import SOPTaskService
-from ..services.corrective_action_service import CorrectiveActionService
 
 logger = structlog.get_logger(__name__)
 router = APIRouter(prefix="/api/v1/agent/sop", tags=["sop"])
 
 
 # ── 依赖 ──
+
 
 async def _get_db(x_tenant_id: str = Header(..., alias="X-Tenant-ID")) -> AsyncSession:
     async for session in get_db_with_tenant(x_tenant_id):
@@ -38,6 +40,7 @@ async def _get_db(x_tenant_id: str = Header(..., alias="X-Tenant-ID")) -> AsyncS
 # ══════════════════════════════════════════════
 # Pydantic 请求模型
 # ══════════════════════════════════════════════
+
 
 class CreateTemplateRequest(BaseModel):
     template_name: str = Field(..., min_length=1, max_length=100)
@@ -121,6 +124,7 @@ class GenerateDailyRequest(BaseModel):
 # ══════════════════════════════════════════════
 # 模板管理（6端点）
 # ══════════════════════════════════════════════
+
 
 @router.post("/templates")
 async def create_template(
@@ -244,6 +248,7 @@ async def add_task(
 # 门店配置（3端点）
 # ══════════════════════════════════════════════
 
+
 @router.post("/stores/{store_id}/bind")
 async def bind_store(
     req: BindStoreRequest,
@@ -311,6 +316,7 @@ async def get_current_slot(
 # ══════════════════════════════════════════════
 # 任务实例（6端点）
 # ══════════════════════════════════════════════
+
 
 @router.post("/stores/{store_id}/generate-daily")
 async def generate_daily(
@@ -447,6 +453,7 @@ async def skip_task(
 # 概况（2端点）
 # ══════════════════════════════════════════════
 
+
 @router.get("/stores/{store_id}/daily-summary")
 async def daily_summary(
     store_id: str = Path(...),
@@ -498,6 +505,7 @@ async def slot_tasks(
 # ══════════════════════════════════════════════
 # 纠正动作（6端点）
 # ══════════════════════════════════════════════
+
 
 @router.get("/stores/{store_id}/corrective-actions")
 async def list_actions(
@@ -620,6 +628,7 @@ async def action_summary(
 # ══════════════════════════════════════════════
 # 调度（2端点 — 内部/手动）
 # ══════════════════════════════════════════════
+
 
 @router.post("/tick")
 async def manual_tick(

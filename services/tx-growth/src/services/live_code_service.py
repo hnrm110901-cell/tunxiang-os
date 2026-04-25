@@ -11,7 +11,6 @@
 """
 
 import json
-import math
 import uuid
 from datetime import date, datetime, timezone
 from typing import Any, Optional
@@ -150,9 +149,7 @@ class LiveCodeService:
             where += " AND channel_source = :channel_source"
             params["channel_source"] = channel_source
 
-        count_result = await db.execute(
-            text(f"SELECT COUNT(*) FROM live_codes WHERE {where}"), params
-        )
+        count_result = await db.execute(text(f"SELECT COUNT(*) FROM live_codes WHERE {where}"), params)
         total = count_result.scalar() or 0
 
         offset = (page - 1) * size
@@ -177,10 +174,17 @@ class LiveCodeService:
     ) -> dict:
         """更新活码配置"""
         allowed = {
-            "code_name", "welcome_msg", "welcome_media_url",
-            "target_group_ids", "lbs_radius_meters",
-            "daily_add_limit", "total_add_limit",
-            "auto_tag_ids", "channel_source", "qr_image_url", "expires_at",
+            "code_name",
+            "welcome_msg",
+            "welcome_media_url",
+            "target_group_ids",
+            "lbs_radius_meters",
+            "daily_add_limit",
+            "total_add_limit",
+            "auto_tag_ids",
+            "channel_source",
+            "qr_image_url",
+            "expires_at",
         }
         filtered = {k: v for k, v in updates.items() if k in allowed}
         if not filtered:
@@ -280,11 +284,14 @@ class LiveCodeService:
         # 2. 状态检查
         if code["status"] != "active":
             scan_id = await self._record_scan(
-                tenant_id, code_id, db,
+                tenant_id,
+                code_id,
+                db,
                 customer_id=customer_id,
                 wecom_external_userid=wecom_external_userid,
                 scan_source=scan_source,
-                latitude=latitude, longitude=longitude,
+                latitude=latitude,
+                longitude=longitude,
                 device_info=device_info,
                 result="expired",
             )
@@ -297,11 +304,14 @@ class LiveCodeService:
                 {"id": str(code_id)},
             )
             scan_id = await self._record_scan(
-                tenant_id, code_id, db,
+                tenant_id,
+                code_id,
+                db,
                 customer_id=customer_id,
                 wecom_external_userid=wecom_external_userid,
                 scan_source=scan_source,
-                latitude=latitude, longitude=longitude,
+                latitude=latitude,
+                longitude=longitude,
                 device_info=device_info,
                 result="expired",
             )
@@ -320,11 +330,14 @@ class LiveCodeService:
         daily_count = daily_count_result.scalar() or 0
         if daily_count >= code["daily_add_limit"]:
             scan_id = await self._record_scan(
-                tenant_id, code_id, db,
+                tenant_id,
+                code_id,
+                db,
                 customer_id=customer_id,
                 wecom_external_userid=wecom_external_userid,
                 scan_source=scan_source,
-                latitude=latitude, longitude=longitude,
+                latitude=latitude,
+                longitude=longitude,
                 device_info=device_info,
                 result="limit_reached",
             )
@@ -342,11 +355,14 @@ class LiveCodeService:
             total_count = total_result.scalar() or 0
             if total_count >= code["total_add_limit"]:
                 scan_id = await self._record_scan(
-                    tenant_id, code_id, db,
+                    tenant_id,
+                    code_id,
+                    db,
                     customer_id=customer_id,
                     wecom_external_userid=wecom_external_userid,
                     scan_source=scan_source,
-                    latitude=latitude, longitude=longitude,
+                    latitude=latitude,
+                    longitude=longitude,
                     device_info=device_info,
                     result="limit_reached",
                 )
@@ -356,18 +372,25 @@ class LiveCodeService:
         matched_store_id = None
         if code["code_type"] == "lbs" and latitude is not None and longitude is not None:
             matched = await self.match_nearest_store(
-                tenant_id, code_id, latitude, longitude,
-                code["lbs_radius_meters"], db,
+                tenant_id,
+                code_id,
+                latitude,
+                longitude,
+                code["lbs_radius_meters"],
+                db,
             )
             matched_store_id = matched.get("store_id") if matched else None
 
         # 7. 记录成功扫码
         scan_id = await self._record_scan(
-            tenant_id, code_id, db,
+            tenant_id,
+            code_id,
+            db,
             customer_id=customer_id,
             wecom_external_userid=wecom_external_userid,
             scan_source=scan_source,
-            latitude=latitude, longitude=longitude,
+            latitude=latitude,
+            longitude=longitude,
             matched_store_id=matched_store_id,
             device_info=device_info,
             result="success",
@@ -521,7 +544,8 @@ class LiveCodeService:
             params["date_to"] = date_to
 
         count_result = await db.execute(
-            text(f"SELECT COUNT(*) FROM live_code_channel_stats WHERE {where}"), params,
+            text(f"SELECT COUNT(*) FROM live_code_channel_stats WHERE {where}"),
+            params,
         )
         total = count_result.scalar() or 0
 

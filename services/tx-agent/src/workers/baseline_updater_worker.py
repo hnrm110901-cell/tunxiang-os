@@ -8,6 +8,7 @@
   2. 基于过去4周数据计算各指标基线
   3. 写入/更新 store_baselines 表
 """
+
 from __future__ import annotations
 
 import os
@@ -77,10 +78,12 @@ class BaselineUpdaterWorker:
             if db is None:
                 log.error("baseline_update.db_session_failed")
                 stats.tenants_failed += 1
-                stats.errors.append({
-                    "tenant_id": tenant_id,
-                    "error": "无法获取数据库会话",
-                })
+                stats.errors.append(
+                    {
+                        "tenant_id": tenant_id,
+                        "error": "无法获取数据库会话",
+                    }
+                )
                 return
 
             # TODO: 接入真实基线计算逻辑
@@ -99,10 +102,12 @@ class BaselineUpdaterWorker:
 
         except Exception as exc:  # 最外层兜底，单租户失败不影响其他
             stats.tenants_failed += 1
-            stats.errors.append({
-                "tenant_id": tenant_id,
-                "error": str(exc),
-            })
+            stats.errors.append(
+                {
+                    "tenant_id": tenant_id,
+                    "error": str(exc),
+                }
+            )
             log.error(
                 "baseline_update.tenant_failed",
                 error=str(exc),

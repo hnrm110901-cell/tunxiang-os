@@ -8,7 +8,7 @@ member_points_balance / coupons / member_level_configs / coupon_send_logs
 from __future__ import annotations
 
 import uuid
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, timezone
 from typing import Optional
 
 import structlog
@@ -100,7 +100,9 @@ class Profile360Service:
 
         # 口味标签(从 tags 中提取口味类)
         tags = member.get("tags") or []
-        taste_tags = [t for t in tags if any(k in t for k in ["辣", "甜", "酸", "咸", "海鲜", "素", "清淡", "重口", "尝新"])]
+        taste_tags = [
+            t for t in tags if any(k in t for k in ["辣", "甜", "酸", "咸", "海鲜", "素", "清淡", "重口", "尝新"])
+        ]
         scene_tags = [t for t in tags if any(k in t for k in ["商务", "家庭", "约会", "朋友", "聚餐", "宴请", "独食"])]
         other_tags = [t for t in tags if t not in taste_tags and t not in scene_tags]
 
@@ -172,9 +174,7 @@ class Profile360Service:
 
     # ─── 多入口查询 ──────────────────────────────────────────
 
-    async def get_profile_by_phone(
-        self, tenant_id: str, phone: str, db: AsyncSession
-    ) -> Optional[dict]:
+    async def get_profile_by_phone(self, tenant_id: str, phone: str, db: AsyncSession) -> Optional[dict]:
         """通过手机号查询(到店场景: 前台输入手机号)"""
         result = await db.execute(
             text(
@@ -208,9 +208,7 @@ class Profile360Service:
             return None
         return await self.get_full_profile(tenant_id, str(row[0]), db)
 
-    async def get_profile_by_card(
-        self, tenant_id: str, card_no: str, db: AsyncSession
-    ) -> Optional[dict]:
+    async def get_profile_by_card(self, tenant_id: str, card_no: str, db: AsyncSession) -> Optional[dict]:
         """通过会员卡号查询(扫码场景)
 
         查 member_level_history 或 customers.extra->'card_no' 定位客户.
@@ -615,9 +613,7 @@ class Profile360Service:
 
     # ─── 内部数据获取方法 ────────────────────────────────────
 
-    async def _fetch_member(
-        self, tenant_id: str, customer_id: str, db: AsyncSession
-    ) -> Optional[dict]:
+    async def _fetch_member(self, tenant_id: str, customer_id: str, db: AsyncSession) -> Optional[dict]:
         """获取客户基础信息"""
         try:
             result = await db.execute(
@@ -644,9 +640,7 @@ class Profile360Service:
             logger.error("profile360_fetch_member_error", error=str(exc))
             return None
 
-    async def _fetch_consumption(
-        self, tenant_id: str, customer_id: str, db: AsyncSession
-    ) -> dict:
+    async def _fetch_consumption(self, tenant_id: str, customer_id: str, db: AsyncSession) -> dict:
         """消费聚合统计"""
         try:
             result = await db.execute(
@@ -675,9 +669,7 @@ class Profile360Service:
             logger.error("profile360_fetch_consumption_error", error=str(exc))
             return {}
 
-    async def _fetch_recent_30d(
-        self, tenant_id: str, customer_id: str, db: AsyncSession
-    ) -> dict:
+    async def _fetch_recent_30d(self, tenant_id: str, customer_id: str, db: AsyncSession) -> dict:
         """最近30天消费统计"""
         try:
             result = await db.execute(
@@ -697,9 +689,7 @@ class Profile360Service:
             logger.error("profile360_fetch_recent_30d_error", error=str(exc))
             return {"count": 0, "amount_fen": 0}
 
-    async def _fetch_frequent_store(
-        self, tenant_id: str, customer_id: str, db: AsyncSession
-    ) -> Optional[dict]:
+    async def _fetch_frequent_store(self, tenant_id: str, customer_id: str, db: AsyncSession) -> Optional[dict]:
         """最常去门店"""
         try:
             result = await db.execute(
@@ -726,9 +716,7 @@ class Profile360Service:
             logger.error("profile360_fetch_frequent_store_error", error=str(exc))
             return None
 
-    async def _fetch_dish_preferences(
-        self, tenant_id: str, customer_id: str, db: AsyncSession
-    ) -> list[dict]:
+    async def _fetch_dish_preferences(self, tenant_id: str, customer_id: str, db: AsyncSession) -> list[dict]:
         """Top5 菜品偏好"""
         try:
             # 先拿总点菜次数用于百分比计算
@@ -768,9 +756,7 @@ class Profile360Service:
             logger.error("profile360_fetch_dish_prefs_error", error=str(exc))
             return []
 
-    async def _fetch_time_preference(
-        self, tenant_id: str, customer_id: str, db: AsyncSession
-    ) -> Optional[str]:
+    async def _fetch_time_preference(self, tenant_id: str, customer_id: str, db: AsyncSession) -> Optional[str]:
         """消费时段偏好: lunch(11-14) / dinner(17-21) / late_night(21-02)"""
         try:
             result = await db.execute(
@@ -798,9 +784,7 @@ class Profile360Service:
             logger.error("profile360_fetch_time_pref_error", error=str(exc))
             return None
 
-    async def _fetch_stored_value(
-        self, tenant_id: str, customer_id: str, db: AsyncSession
-    ) -> dict:
+    async def _fetch_stored_value(self, tenant_id: str, customer_id: str, db: AsyncSession) -> dict:
         """储值账户信息"""
         try:
             result = await db.execute(
@@ -834,24 +818,17 @@ class Profile360Service:
                 "balance_fen": row["balance_fen"],
                 "total_recharged_fen": row["total_recharged_fen"],
                 "recharge_count": recharge_row["cnt"] if recharge_row else 0,
-                "last_recharge_at": _safe_iso(
-                    recharge_row["last_recharge_at"] if recharge_row else None
-                ),
+                "last_recharge_at": _safe_iso(recharge_row["last_recharge_at"] if recharge_row else None),
             }
         except SQLAlchemyError as exc:
             logger.error("profile360_fetch_stored_value_error", error=str(exc))
             return {"balance_fen": 0, "total_recharged_fen": 0, "recharge_count": 0}
 
-    async def _fetch_points(
-        self, tenant_id: str, customer_id: str, db: AsyncSession
-    ) -> dict:
+    async def _fetch_points(self, tenant_id: str, customer_id: str, db: AsyncSession) -> dict:
         """积分余额"""
         try:
             result = await db.execute(
-                text(
-                    "SELECT points FROM member_points_balance"
-                    " WHERE tenant_id = :tid AND member_id = :cid"
-                ),
+                text("SELECT points FROM member_points_balance WHERE tenant_id = :tid AND member_id = :cid"),
                 {"tid": tenant_id, "cid": customer_id},
             )
             row = result.first()
@@ -866,9 +843,7 @@ class Profile360Service:
             logger.error("profile360_fetch_points_error", error=str(exc))
             return {"balance": 0, "total_earned": 0, "total_used": 0}
 
-    async def _fetch_member_card(
-        self, tenant_id: str, customer_id: str, db: AsyncSession
-    ) -> Optional[dict]:
+    async def _fetch_member_card(self, tenant_id: str, customer_id: str, db: AsyncSession) -> Optional[dict]:
         """会员卡/等级信息"""
         try:
             # 从 customers 取当前等级, 从 member_level_configs 取等级详情
@@ -955,21 +930,21 @@ class Profile360Service:
                     elif r["coupon_type"] == "discount" and r["discount_rate"]:
                         desc = f"{float(r['discount_rate']) * 10:.1f}折券"
 
-                items.append({
-                    "coupon_id": str(r["id"]),
-                    "name": r["name"],
-                    "discount_desc": desc,
-                    "expire_at": _safe_iso(r["end_date"]),
-                    "status": "available",
-                })
+                items.append(
+                    {
+                        "coupon_id": str(r["id"]),
+                        "name": r["name"],
+                        "discount_desc": desc,
+                        "expire_at": _safe_iso(r["end_date"]),
+                        "status": "available",
+                    }
+                )
             return items
         except SQLAlchemyError as exc:
             logger.error("profile360_fetch_coupons_error", error=str(exc))
             return []
 
-    async def _fetch_recent_coupon_sends(
-        self, tenant_id: str, customer_id: str, db: AsyncSession
-    ) -> list[dict]:
+    async def _fetch_recent_coupon_sends(self, tenant_id: str, customer_id: str, db: AsyncSession) -> list[dict]:
         """最近10条发券记录"""
         try:
             result = await db.execute(

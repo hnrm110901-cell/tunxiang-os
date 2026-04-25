@@ -2,12 +2,11 @@
 
 Sprint 9+ 实现：KnowledgeGraphService, StoreHealthService
 """
+
 import os
 import sys
 
-_TX_ANALYTICS_SRC = os.path.abspath(
-    os.path.join(os.path.dirname(__file__), "../../../../tx-analytics/src")
-)
+_TX_ANALYTICS_SRC = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../../tx-analytics/src"))
 if _TX_ANALYTICS_SRC not in sys.path:
     sys.path.insert(0, _TX_ANALYTICS_SRC)
 

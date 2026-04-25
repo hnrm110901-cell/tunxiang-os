@@ -29,6 +29,7 @@ Prompt Cache 策略（与 D4a 同模式）
 - **critical 级别自动 escalated**：薪资低于市场 P25 或加班超 36h → 状态机自动
   推到 HRD，不等手动 review
 """
+
 from __future__ import annotations
 
 import json
@@ -44,22 +45,24 @@ SONNET_CACHED_MODEL = "claude-sonnet-4-7"
 CACHE_HIT_TARGET = 0.75
 
 # 合规红线
-LEGAL_OVERTIME_LIMIT_HOURS = 36       # 法定月加班上限（B1 红线）
-BELOW_MARKET_THRESHOLD_PCT = 0.15     # 低于市场 P50 15%+ 判定 below_market
-SUDDEN_RAISE_THRESHOLD_PCT = 0.30     # 单次涨幅 > 30% 判定 sudden_raise
-COMMISSION_ABUSE_RATIO = 2.0          # 提成/底薪 > 200% 判定异常
+LEGAL_OVERTIME_LIMIT_HOURS = 36  # 法定月加班上限（B1 红线）
+BELOW_MARKET_THRESHOLD_PCT = 0.15  # 低于市场 P50 15%+ 判定 below_market
+SUDDEN_RAISE_THRESHOLD_PCT = 0.30  # 单次涨幅 > 30% 判定 sudden_raise
+COMMISSION_ABUSE_RATIO = 2.0  # 提成/底薪 > 200% 判定异常
 
 
 # ──────────────────────────────────────────────────────────────────────
 # 数据结构
 # ──────────────────────────────────────────────────────────────────────
 
+
 @dataclass
 class EmployeeSalarySignal:
     """单员工本月薪资信号"""
+
     employee_id: str
     emp_name: str
-    role: str                           # waiter / chef / cashier / manager / head_chef
+    role: str  # waiter / chef / cashier / manager / head_chef
     city: str
     seniority_months: int
     base_salary_fen: int
@@ -77,6 +80,7 @@ class EmployeeSalarySignal:
 @dataclass
 class SalarySignalBundle:
     """某店某月薪资异常信号包"""
+
     tenant_id: str
     store_id: Optional[str]
     store_name: Optional[str]
@@ -106,10 +110,7 @@ class SalarySignalBundle:
                     "overtime_pay_yuan": round(e.overtime_pay_fen / 100, 2),
                     "commission_yuan": round(e.commission_fen / 100, 2),
                     "total_pay_yuan": round(e.total_pay_fen / 100, 2),
-                    "prev_total_pay_yuan": (
-                        round(e.prev_total_pay_fen / 100, 2)
-                        if e.prev_total_pay_fen else None
-                    ),
+                    "prev_total_pay_yuan": (round(e.prev_total_pay_fen / 100, 2) if e.prev_total_pay_fen else None),
                     "social_insurance_paid": e.social_insurance_paid,
                     "housing_fund_paid": e.housing_fund_paid,
                 }
@@ -121,22 +122,23 @@ class SalarySignalBundle:
 @dataclass
 class SalaryAnomaly:
     """单条异常"""
+
     employee_id: str
     employee_name: str
-    anomaly_type: str        # below_market / overtime_excess / sudden_raise /
-                             # commission_abuse / social_insurance_missing / other
-    severity: str            # critical / high / medium / low
+    anomaly_type: str  # below_market / overtime_excess / sudden_raise /
+    # commission_abuse / social_insurance_missing / other
+    severity: str  # critical / high / medium / low
     evidence: str
-    impact_fen: int          # 正值=员工损失（低薪），或租户风险金额（罚款）
+    impact_fen: int  # 正值=员工损失（低薪），或租户风险金额（罚款）
     legal_risk: bool = False
 
 
 @dataclass
 class SalaryRemediationAction:
     action: str
-    owner_role: str          # hrd / store_manager / finance
+    owner_role: str  # hrd / store_manager / finance
     deadline_days: int
-    impact_fen: int          # 预期修复金额
+    impact_fen: int  # 预期修复金额
 
 
 @dataclass
@@ -167,6 +169,7 @@ class SalaryAnomalyAnalysisResult:
 # ──────────────────────────────────────────────────────────────────────
 # Cached Prompt Builder
 # ──────────────────────────────────────────────────────────────────────
+
 
 class CachedPromptBuilder:
     """构造 Anthropic Messages API request，带 cache_control。"""
@@ -292,6 +295,7 @@ class CachedPromptBuilder:
 # Response 解析
 # ──────────────────────────────────────────────────────────────────────
 
+
 def parse_sonnet_response(
     response: dict,
 ) -> tuple[str, list[SalaryAnomaly], list[SalaryRemediationAction], dict]:
@@ -355,6 +359,7 @@ def parse_sonnet_response(
 # Service
 # ──────────────────────────────────────────────────────────────────────
 
+
 class SalaryAnomalyService:
     """D4b 薪资异常检测服务。"""
 
@@ -402,87 +407,107 @@ class SalaryAnomalyService:
         for emp in b.employees:
             # 1. 合规红线：社保漏缴
             if not emp.social_insurance_paid:
-                anomalies.append(SalaryAnomaly(
-                    employee_id=emp.employee_id,
-                    employee_name=emp.emp_name,
-                    anomaly_type="social_insurance_missing",
-                    severity="critical",
-                    evidence=f"{emp.emp_name} 本月未缴社保，法律风险",
-                    impact_fen=emp.base_salary_fen * 10,  # 预估罚款 10 倍基薪
-                    legal_risk=True,
-                ))
-                actions.append(SalaryRemediationAction(
-                    action=f"立即为 {emp.emp_name} 补缴社保",
-                    owner_role="hrd",
-                    deadline_days=3,
-                    impact_fen=int(emp.base_salary_fen * 0.22),  # 22% 社保费率
-                ))
+                anomalies.append(
+                    SalaryAnomaly(
+                        employee_id=emp.employee_id,
+                        employee_name=emp.emp_name,
+                        anomaly_type="social_insurance_missing",
+                        severity="critical",
+                        evidence=f"{emp.emp_name} 本月未缴社保，法律风险",
+                        impact_fen=emp.base_salary_fen * 10,  # 预估罚款 10 倍基薪
+                        legal_risk=True,
+                    )
+                )
+                actions.append(
+                    SalaryRemediationAction(
+                        action=f"立即为 {emp.emp_name} 补缴社保",
+                        owner_role="hrd",
+                        deadline_days=3,
+                        impact_fen=int(emp.base_salary_fen * 0.22),  # 22% 社保费率
+                    )
+                )
                 continue  # 后续异常次要
 
             # 2. 加班超标（B1 红线）
             if emp.overtime_hours > LEGAL_OVERTIME_LIMIT_HOURS:
                 exceed = emp.overtime_hours - LEGAL_OVERTIME_LIMIT_HOURS
-                anomalies.append(SalaryAnomaly(
-                    employee_id=emp.employee_id,
-                    employee_name=emp.emp_name,
-                    anomaly_type="overtime_excess",
-                    severity="critical",
-                    evidence=f"月加班 {emp.overtime_hours:.1f}h 超法定上限 36h，超 {exceed:.1f}h",
-                    impact_fen=emp.overtime_pay_fen,
-                    legal_risk=True,
-                ))
-                actions.append(SalaryRemediationAction(
-                    action=f"调整 {emp.emp_name} 下月排班，消化 OT 时长",
-                    owner_role="store_manager",
-                    deadline_days=7,
-                    impact_fen=0,
-                ))
+                anomalies.append(
+                    SalaryAnomaly(
+                        employee_id=emp.employee_id,
+                        employee_name=emp.emp_name,
+                        anomaly_type="overtime_excess",
+                        severity="critical",
+                        evidence=f"月加班 {emp.overtime_hours:.1f}h 超法定上限 36h，超 {exceed:.1f}h",
+                        impact_fen=emp.overtime_pay_fen,
+                        legal_risk=True,
+                    )
+                )
+                actions.append(
+                    SalaryRemediationAction(
+                        action=f"调整 {emp.emp_name} 下月排班，消化 OT 时长",
+                        owner_role="store_manager",
+                        deadline_days=7,
+                        impact_fen=0,
+                    )
+                )
                 continue
 
             # 3. 提成异常
             if emp.base_salary_fen > 0 and emp.commission_fen > emp.base_salary_fen * COMMISSION_ABUSE_RATIO:
                 ratio = emp.commission_fen / emp.base_salary_fen
-                anomalies.append(SalaryAnomaly(
-                    employee_id=emp.employee_id,
-                    employee_name=emp.emp_name,
-                    anomaly_type="commission_abuse",
-                    severity="high",
-                    evidence=f"提成/底薪 = {ratio:.1f}，超 {COMMISSION_ABUSE_RATIO} 阈值",
-                    impact_fen=emp.commission_fen,
-                    legal_risk=False,
-                ))
-                actions.append(SalaryRemediationAction(
-                    action=f"核查 {emp.emp_name} 提成计算来源数据",
-                    owner_role="finance",
-                    deadline_days=5,
-                    impact_fen=0,
-                ))
+                anomalies.append(
+                    SalaryAnomaly(
+                        employee_id=emp.employee_id,
+                        employee_name=emp.emp_name,
+                        anomaly_type="commission_abuse",
+                        severity="high",
+                        evidence=f"提成/底薪 = {ratio:.1f}，超 {COMMISSION_ABUSE_RATIO} 阈值",
+                        impact_fen=emp.commission_fen,
+                        legal_risk=False,
+                    )
+                )
+                actions.append(
+                    SalaryRemediationAction(
+                        action=f"核查 {emp.emp_name} 提成计算来源数据",
+                        owner_role="finance",
+                        deadline_days=5,
+                        impact_fen=0,
+                    )
+                )
 
             # 4. 突然大幅涨薪
             if emp.prev_total_pay_fen and emp.prev_total_pay_fen > 0:
                 raise_pct = (emp.total_pay_fen - emp.prev_total_pay_fen) / emp.prev_total_pay_fen
                 if raise_pct > SUDDEN_RAISE_THRESHOLD_PCT:
-                    anomalies.append(SalaryAnomaly(
-                        employee_id=emp.employee_id,
-                        employee_name=emp.emp_name,
-                        anomaly_type="sudden_raise",
-                        severity="medium",
-                        evidence=f"月薪涨幅 {raise_pct:.1%} 超 {SUDDEN_RAISE_THRESHOLD_PCT:.0%} 阈值",
-                        impact_fen=emp.total_pay_fen - emp.prev_total_pay_fen,
-                        legal_risk=False,
-                    ))
-                    actions.append(SalaryRemediationAction(
-                        action=f"核实 {emp.emp_name} 调薪审批单",
-                        owner_role="hrd",
-                        deadline_days=10,
-                        impact_fen=0,
-                    ))
+                    anomalies.append(
+                        SalaryAnomaly(
+                            employee_id=emp.employee_id,
+                            employee_name=emp.emp_name,
+                            anomaly_type="sudden_raise",
+                            severity="medium",
+                            evidence=f"月薪涨幅 {raise_pct:.1%} 超 {SUDDEN_RAISE_THRESHOLD_PCT:.0%} 阈值",
+                            impact_fen=emp.total_pay_fen - emp.prev_total_pay_fen,
+                            legal_risk=False,
+                        )
+                    )
+                    actions.append(
+                        SalaryRemediationAction(
+                            action=f"核实 {emp.emp_name} 调薪审批单",
+                            owner_role="hrd",
+                            deadline_days=10,
+                            impact_fen=0,
+                        )
+                    )
 
         # 排序：legal_risk desc / severity desc / impact_fen desc
         severity_order = {"critical": 0, "high": 1, "medium": 2, "low": 3}
-        anomalies.sort(key=lambda a: (
-            not a.legal_risk, severity_order.get(a.severity, 9), -a.impact_fen,
-        ))
+        anomalies.sort(
+            key=lambda a: (
+                not a.legal_risk,
+                severity_order.get(a.severity, 9),
+                -a.impact_fen,
+            )
+        )
 
         if not anomalies:
             text = f"{b.store_name or '租户'} {b.analysis_month.isoformat()[:7]} 薪资表合规"
@@ -508,6 +533,7 @@ class SalaryAnomalyService:
 # 持久化
 # ──────────────────────────────────────────────────────────────────────
 
+
 async def save_analysis_to_db(
     db: Any,
     *,
@@ -523,7 +549,8 @@ async def save_analysis_to_db(
     # critical 异常自动 escalated
     status = "escalated" if result.has_critical or result.has_legal_risk else "analyzed"
 
-    await db.execute(text("""
+    await db.execute(
+        text("""
         INSERT INTO salary_anomaly_analyses (
             id, tenant_id, store_id, employee_id,
             analysis_month, analysis_scope, employee_count, total_payroll_fen, city,
@@ -557,52 +584,54 @@ async def save_analysis_to_db(
             status = EXCLUDED.status,
             updated_at = NOW()
         RETURNING id
-    """), {
-        "id": record_id,
-        "tenant_id": tenant_id,
-        "store_id": signal_bundle.store_id,
-        "employee_id": employee_id,
-        "analysis_month": signal_bundle.analysis_month,
-        "analysis_scope": analysis_scope,
-        "emp_count": len(signal_bundle.employees),
-        "total_payroll": signal_bundle.total_payroll_fen,
-        "city": signal_bundle.city,
-        "signals": json.dumps(signal_bundle.to_json_dict(), ensure_ascii=False),
-        "anomalies": json.dumps(
-            [
-                {
-                    "employee_id": a.employee_id,
-                    "employee_name": a.employee_name,
-                    "anomaly_type": a.anomaly_type,
-                    "severity": a.severity,
-                    "evidence": a.evidence,
-                    "impact_fen": a.impact_fen,
-                    "legal_risk": a.legal_risk,
-                }
-                for a in result.ranked_anomalies
-            ],
-            ensure_ascii=False,
-        ),
-        "actions": json.dumps(
-            [
-                {
-                    "action": a.action,
-                    "owner_role": a.owner_role,
-                    "deadline_days": a.deadline_days,
-                    "impact_fen": a.impact_fen,
-                }
-                for a in result.remediation_actions
-            ],
-            ensure_ascii=False,
-        ),
-        "sonnet_analysis": result.sonnet_analysis,
-        "model_id": result.model_id,
-        "cache_read": result.cache_read_tokens,
-        "cache_create": result.cache_creation_tokens,
-        "input_tokens": result.input_tokens,
-        "output_tokens": result.output_tokens,
-        "status": status,
-    })
+    """),
+        {
+            "id": record_id,
+            "tenant_id": tenant_id,
+            "store_id": signal_bundle.store_id,
+            "employee_id": employee_id,
+            "analysis_month": signal_bundle.analysis_month,
+            "analysis_scope": analysis_scope,
+            "emp_count": len(signal_bundle.employees),
+            "total_payroll": signal_bundle.total_payroll_fen,
+            "city": signal_bundle.city,
+            "signals": json.dumps(signal_bundle.to_json_dict(), ensure_ascii=False),
+            "anomalies": json.dumps(
+                [
+                    {
+                        "employee_id": a.employee_id,
+                        "employee_name": a.employee_name,
+                        "anomaly_type": a.anomaly_type,
+                        "severity": a.severity,
+                        "evidence": a.evidence,
+                        "impact_fen": a.impact_fen,
+                        "legal_risk": a.legal_risk,
+                    }
+                    for a in result.ranked_anomalies
+                ],
+                ensure_ascii=False,
+            ),
+            "actions": json.dumps(
+                [
+                    {
+                        "action": a.action,
+                        "owner_role": a.owner_role,
+                        "deadline_days": a.deadline_days,
+                        "impact_fen": a.impact_fen,
+                    }
+                    for a in result.remediation_actions
+                ],
+                ensure_ascii=False,
+            ),
+            "sonnet_analysis": result.sonnet_analysis,
+            "model_id": result.model_id,
+            "cache_read": result.cache_read_tokens,
+            "cache_create": result.cache_creation_tokens,
+            "input_tokens": result.input_tokens,
+            "output_tokens": result.output_tokens,
+            "status": status,
+        },
+    )
     await db.commit()
     logger.info(
         "salary_anomaly_saved store=%s anomalies=%d legal_risk=%s status=%s",

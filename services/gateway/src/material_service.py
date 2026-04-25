@@ -164,7 +164,7 @@ class MaterialService:
         result = await db.execute(
             text(f"""
                 UPDATE material_groups
-                SET {', '.join(sets)}
+                SET {", ".join(sets)}
                 WHERE id = :group_id AND tenant_id = :tenant_id AND is_deleted = false
             """),
             params,
@@ -313,9 +313,17 @@ class MaterialService:
     ) -> dict[str, Any]:
         """更新素材（只更新传入的字段）"""
         allowed_fields = {
-            "title", "group_id", "content", "media_url", "thumbnail_url",
-            "link_url", "link_title", "miniapp_appid", "miniapp_path",
-            "is_template", "sort_order",
+            "title",
+            "group_id",
+            "content",
+            "media_url",
+            "thumbnail_url",
+            "link_url",
+            "link_title",
+            "miniapp_appid",
+            "miniapp_path",
+            "is_template",
+            "sort_order",
         }
         jsonb_fields = {"metadata", "time_slots", "tags"}
 
@@ -342,7 +350,7 @@ class MaterialService:
         result = await db.execute(
             text(f"""
                 UPDATE material_library
-                SET {', '.join(sets)}
+                SET {", ".join(sets)}
                 WHERE id = :material_id AND tenant_id = :tenant_id AND is_deleted = false
             """),
             params,

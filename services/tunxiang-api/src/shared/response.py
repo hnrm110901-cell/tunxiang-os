@@ -2,6 +2,7 @@
 
 与 gateway/src/response.py 保持一致。
 """
+
 from typing import Any
 
 from fastapi.responses import JSONResponse

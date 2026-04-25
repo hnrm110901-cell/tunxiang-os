@@ -328,9 +328,16 @@ async def update_material(
 
     update_data: dict[str, Any] = {}
     for field_name in (
-        "title", "content", "media_url", "thumbnail_url",
-        "link_url", "link_title", "miniapp_appid", "miniapp_path",
-        "is_template", "sort_order",
+        "title",
+        "content",
+        "media_url",
+        "thumbnail_url",
+        "link_url",
+        "link_title",
+        "miniapp_appid",
+        "miniapp_path",
+        "is_template",
+        "sort_order",
     ):
         val = getattr(req, field_name, None)
         if val is not None:

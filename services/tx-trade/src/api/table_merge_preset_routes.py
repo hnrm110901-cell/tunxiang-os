@@ -8,12 +8,11 @@ import json
 import uuid
 from typing import Optional
 
+import sqlalchemy as sa
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
-
-import sqlalchemy as sa
 
 from shared.ontology.src.database import get_db
 
@@ -59,7 +58,8 @@ class CreatePresetReq(BaseModel):
     store_id: uuid.UUID
     preset_name: str = Field(..., max_length=50, description="方案名称")
     market_session_id: Optional[uuid.UUID] = Field(
-        default=None, description="关联市别ID（NULL=仅手动触发）",
+        default=None,
+        description="关联市别ID（NULL=仅手动触发）",
     )
     merge_rules: list[MergeRuleItem] = Field(..., min_length=1)
     auto_trigger: bool = Field(default=False, description="市别切换时是否自动执行")
@@ -86,14 +86,23 @@ async def list_presets(
 ):
     """列出门店所有拼桌预设（不含已删除）"""
     tenant_id = _get_tenant_id(request)
-    rows = (await db.execute(sa.text(
-        "SELECT id, store_id, preset_name, market_session_id, "
-        "merge_rules, auto_trigger, priority, is_active, "
-        "created_at, updated_at "
-        "FROM table_merge_presets "
-        "WHERE store_id = :sid AND tenant_id = :tid AND is_deleted = FALSE "
-        "ORDER BY priority DESC, created_at DESC"
-    ), {"sid": str(store_id), "tid": str(tenant_id)})).mappings().all()
+    rows = (
+        (
+            await db.execute(
+                sa.text(
+                    "SELECT id, store_id, preset_name, market_session_id, "
+                    "merge_rules, auto_trigger, priority, is_active, "
+                    "created_at, updated_at "
+                    "FROM table_merge_presets "
+                    "WHERE store_id = :sid AND tenant_id = :tid AND is_deleted = FALSE "
+                    "ORDER BY priority DESC, created_at DESC"
+                ),
+                {"sid": str(store_id), "tid": str(tenant_id)},
+            )
+        )
+        .mappings()
+        .all()
+    )
 
     items = [
         {
@@ -126,24 +135,28 @@ async def create_preset(
     tenant_id = _get_tenant_id(request)
     preset_id = str(uuid.uuid4())
     rules_json = json.dumps(
-        [r.model_dump() for r in req.merge_rules], ensure_ascii=False,
+        [r.model_dump() for r in req.merge_rules],
+        ensure_ascii=False,
     )
 
-    await db.execute(sa.text(
-        "INSERT INTO table_merge_presets "
-        "(id, tenant_id, store_id, preset_name, market_session_id, "
-        "merge_rules, auto_trigger, priority) "
-        "VALUES (:id, :tid, :sid, :name, :msid, :rules::jsonb, :at, :pri)"
-    ), {
-        "id": preset_id,
-        "tid": str(tenant_id),
-        "sid": str(req.store_id),
-        "name": req.preset_name,
-        "msid": str(req.market_session_id) if req.market_session_id else None,
-        "rules": rules_json,
-        "at": req.auto_trigger,
-        "pri": req.priority,
-    })
+    await db.execute(
+        sa.text(
+            "INSERT INTO table_merge_presets "
+            "(id, tenant_id, store_id, preset_name, market_session_id, "
+            "merge_rules, auto_trigger, priority) "
+            "VALUES (:id, :tid, :sid, :name, :msid, :rules::jsonb, :at, :pri)"
+        ),
+        {
+            "id": preset_id,
+            "tid": str(tenant_id),
+            "sid": str(req.store_id),
+            "name": req.preset_name,
+            "msid": str(req.market_session_id) if req.market_session_id else None,
+            "rules": rules_json,
+            "at": req.auto_trigger,
+            "pri": req.priority,
+        },
+    )
     await db.commit()
 
     logger.info(
@@ -184,7 +197,8 @@ async def update_preset(
     if req.merge_rules is not None:
         set_parts.append("merge_rules = :rules::jsonb")
         params["rules"] = json.dumps(
-            [r.model_dump() for r in req.merge_rules], ensure_ascii=False,
+            [r.model_dump() for r in req.merge_rules],
+            ensure_ascii=False,
         )
     if req.auto_trigger is not None:
         set_parts.append("auto_trigger = :at")
@@ -202,10 +216,12 @@ async def update_preset(
     set_parts.append("updated_at = NOW()")
     set_clause = ", ".join(set_parts)
 
-    result = await db.execute(sa.text(
-        f"UPDATE table_merge_presets SET {set_clause} "
-        f"WHERE id = :pid AND tenant_id = :tid AND is_deleted = FALSE"
-    ), params)
+    result = await db.execute(
+        sa.text(
+            f"UPDATE table_merge_presets SET {set_clause} WHERE id = :pid AND tenant_id = :tid AND is_deleted = FALSE"
+        ),
+        params,
+    )
 
     if result.rowcount == 0:
         _err("预设不存在", 404)
@@ -226,11 +242,14 @@ async def delete_preset(
     """软删除拼桌预设"""
     tenant_id = _get_tenant_id(request)
 
-    result = await db.execute(sa.text(
-        "UPDATE table_merge_presets "
-        "SET is_deleted = TRUE, is_active = FALSE, updated_at = NOW() "
-        "WHERE id = :pid AND tenant_id = :tid AND is_deleted = FALSE"
-    ), {"pid": str(preset_id), "tid": str(tenant_id)})
+    result = await db.execute(
+        sa.text(
+            "UPDATE table_merge_presets "
+            "SET is_deleted = TRUE, is_active = FALSE, updated_at = NOW() "
+            "WHERE id = :pid AND tenant_id = :tid AND is_deleted = FALSE"
+        ),
+        {"pid": str(preset_id), "tid": str(tenant_id)},
+    )
 
     if result.rowcount == 0:
         _err("预设不存在", 404)
@@ -309,26 +328,37 @@ async def list_logs(
     offset = (page - 1) * size
 
     # 总数
-    total_row = (await db.execute(sa.text(
-        "SELECT COUNT(*) FROM table_merge_logs "
-        "WHERE store_id = :sid AND tenant_id = :tid"
-    ), {"sid": str(store_id), "tid": str(tenant_id)})).scalar()
+    total_row = (
+        await db.execute(
+            sa.text("SELECT COUNT(*) FROM table_merge_logs WHERE store_id = :sid AND tenant_id = :tid"),
+            {"sid": str(store_id), "tid": str(tenant_id)},
+        )
+    ).scalar()
 
     # 分页数据
-    rows = (await db.execute(sa.text(
-        "SELECT id, preset_id, trigger_type, market_session_id, "
-        "executed_merges, skipped_merges, executed_at, "
-        "executed_by, rollback_at, created_at "
-        "FROM table_merge_logs "
-        "WHERE store_id = :sid AND tenant_id = :tid "
-        "ORDER BY executed_at DESC "
-        "LIMIT :lim OFFSET :off"
-    ), {
-        "sid": str(store_id),
-        "tid": str(tenant_id),
-        "lim": size,
-        "off": offset,
-    })).mappings().all()
+    rows = (
+        (
+            await db.execute(
+                sa.text(
+                    "SELECT id, preset_id, trigger_type, market_session_id, "
+                    "executed_merges, skipped_merges, executed_at, "
+                    "executed_by, rollback_at, created_at "
+                    "FROM table_merge_logs "
+                    "WHERE store_id = :sid AND tenant_id = :tid "
+                    "ORDER BY executed_at DESC "
+                    "LIMIT :lim OFFSET :off"
+                ),
+                {
+                    "sid": str(store_id),
+                    "tid": str(tenant_id),
+                    "lim": size,
+                    "off": offset,
+                },
+            )
+        )
+        .mappings()
+        .all()
+    )
 
     items = [
         {

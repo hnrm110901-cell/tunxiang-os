@@ -2,6 +2,7 @@
 
 Sprint 1-2+ 逐步填充真实逻辑。
 """
+
 from fastapi import APIRouter
 
 from ...shared.response import ok

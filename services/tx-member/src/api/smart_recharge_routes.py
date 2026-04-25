@@ -7,7 +7,7 @@ ROUTER REGISTRATION（在 main.py 中添加）：
 """
 
 from datetime import date
-from typing import List, Optional
+from typing import Optional
 
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
@@ -26,6 +26,7 @@ router = APIRouter(prefix="/api/v1/member/smart-recharge", tags=["smart-recharge
 
 # ── 公共依赖 ─────────────────────────────────────────────────
 
+
 def _tenant_id(request: Request) -> str:
     tid = getattr(request.state, "tenant_id", None) or request.headers.get("X-Tenant-ID", "")
     if not tid:
@@ -34,6 +35,7 @@ def _tenant_id(request: Request) -> str:
 
 
 # ── 请求模型 ─────────────────────────────────────────────────
+
 
 class RecommendRequest(BaseModel):
     store_id: str
@@ -85,6 +87,7 @@ class CreateCommissionRuleRequest(BaseModel):
 
 
 # ── 推荐端点 ─────────────────────────────────────────────────
+
 
 @router.post("/recommend")
 async def generate_recommendation(
@@ -163,6 +166,7 @@ async def list_recommendations(
 
 
 # ── 规则 CRUD ────────────────────────────────────────────────
+
 
 @router.post("/rules")
 async def create_rule(
@@ -260,6 +264,7 @@ async def delete_rule(
 
 # ── 统计 + 绩效 ─────────────────────────────────────────────
 
+
 @router.get("/stats")
 async def get_stats(
     store_id: str = Query(...),
@@ -341,6 +346,7 @@ async def calculate_commission(
 
 
 # ── 提成规则 ─────────────────────────────────────────────────
+
 
 @router.post("/commission-rules")
 async def create_commission_rule(

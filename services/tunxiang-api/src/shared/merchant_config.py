@@ -16,6 +16,7 @@
     for m in get_all_merchants():
         print(m.code, m.brand_name)
 """
+
 from __future__ import annotations
 
 import os
@@ -188,9 +189,7 @@ class MerchantConfig:
             # 卡券中心非必须，静默跳过
             return None
 
-        base_url = os.getenv(
-            f"{prefix}_COUPON_BASE_URL", "https://apigateway.acewill.net"
-        )
+        base_url = os.getenv(f"{prefix}_COUPON_BASE_URL", "https://apigateway.acewill.net")
         platforms_raw = os.getenv(f"{prefix}_COUPON_PLATFORMS", "")
         platforms = [p.strip() for p in platforms_raw.split(",") if p.strip()]
 
@@ -205,11 +204,7 @@ class MerchantConfig:
         pos = "OK" if self.pinzhi else "MISSING"
         crm = "OK" if self.aoqiwei else "MISSING"
         coupon = "OK" if self.coupon else "N/A"
-        return (
-            f"MerchantConfig({self.code!r}, "
-            f"brand={self.brand_name!r}, "
-            f"pos={pos}, crm={crm}, coupon={coupon})"
-        )
+        return f"MerchantConfig({self.code!r}, brand={self.brand_name!r}, pos={pos}, crm={crm}, coupon={coupon})"
 
 
 # ── 模块级缓存（进程内单例） ──────────────────────────────────

@@ -56,6 +56,7 @@ async def _get_db(
 
 class TemplateCreateRequest(BaseModel):
     """创建报表模板请求"""
+
     template_code: str = Field(..., max_length=50, description="模板编码(唯一)")
     template_name: str = Field(..., max_length=200, description="模板名称")
     category: str = Field(default="custom", description="分类")
@@ -71,6 +72,7 @@ class TemplateCreateRequest(BaseModel):
 
 class TemplateUpdateRequest(BaseModel):
     """更新报表模板请求"""
+
     template_name: Optional[str] = None
     description: Optional[str] = None
     category: Optional[str] = None
@@ -86,6 +88,7 @@ class TemplateUpdateRequest(BaseModel):
 
 class ExecuteRequest(BaseModel):
     """执行报表请求"""
+
     template_id: str = Field(..., description="模板ID")
     filters: Optional[dict[str, Any]] = Field(default=None, description="筛选条件")
     dimensions: Optional[list[str]] = Field(default=None, description="维度列")
@@ -97,6 +100,7 @@ class ExecuteRequest(BaseModel):
 
 class InstanceCreateRequest(BaseModel):
     """创建报表实例请求"""
+
     template_id: str = Field(..., description="模板ID")
     instance_name: str = Field(..., max_length=200, description="实例名称")
     custom_filters: Optional[dict[str, Any]] = Field(default=None, description="自定义筛选")
@@ -107,6 +111,7 @@ class InstanceCreateRequest(BaseModel):
 
 class ScheduleRequest(BaseModel):
     """设置定时推送请求"""
+
     schedule_type: str = Field(default="none", description="定时类型: none/daily/weekly/monthly")
     config: Optional[dict[str, Any]] = Field(default=None, description="定时配置")
     recipients: Optional[list[dict[str, Any]]] = Field(default=None, description="接收人列表")
@@ -114,6 +119,7 @@ class ScheduleRequest(BaseModel):
 
 class ExportRequest(BaseModel):
     """导出报表请求"""
+
     template_id: str = Field(..., description="模板ID")
     filters: Optional[dict[str, Any]] = Field(default=None, description="筛选条件")
     export_format: str = Field(default="csv", description="导出格式: pdf/excel/csv")
@@ -122,6 +128,7 @@ class ExportRequest(BaseModel):
 
 class SubscribeRequest(BaseModel):
     """订阅请求"""
+
     instance_id: str = Field(..., description="实例ID")
     subscriber_id: str = Field(..., description="订阅人ID")
     channel: str = Field(..., description="渠道: email/wechat/dingtalk/im")
@@ -142,7 +149,8 @@ async def list_templates(
     """获取报表模板列表（系统预置 + 租户自定义）"""
     try:
         result = await _service.list_templates(
-            db, x_tenant_id,
+            db,
+            x_tenant_id,
             category=category,
             search=search,
             page=page,
@@ -176,7 +184,8 @@ async def create_template(
     """创建自定义报表模板"""
     try:
         result = await _service.create_template(
-            db, x_tenant_id,
+            db,
+            x_tenant_id,
             body.model_dump(exclude_none=True),
         )
         return {"ok": True, "data": result}
@@ -196,7 +205,9 @@ async def update_template(
     """更新报表模板（仅租户自定义模板可修改）"""
     try:
         result = await _service.update_template(
-            db, x_tenant_id, template_id,
+            db,
+            x_tenant_id,
+            template_id,
             body.model_dump(exclude_none=True),
         )
         return {"ok": True, "data": result}
@@ -218,7 +229,9 @@ async def execute_report(
     """执行报表查询（动态SQL生成）"""
     try:
         result = await _service.execute_report(
-            db, x_tenant_id, body.template_id,
+            db,
+            x_tenant_id,
+            body.template_id,
             filters=body.filters,
             dimensions=body.dimensions,
             measures=body.measures,
@@ -245,7 +258,9 @@ async def create_instance(
     """创建报表实例（保存筛选条件组合）"""
     try:
         result = await _service.create_instance(
-            db, x_tenant_id, body.template_id,
+            db,
+            x_tenant_id,
+            body.template_id,
             body.model_dump(),
         )
         return {"ok": True, "data": result}
@@ -265,7 +280,8 @@ async def list_instances(
 ) -> dict[str, Any]:
     """获取报表实例列表"""
     result = await _service.list_instances(
-        db, x_tenant_id,
+        db,
+        x_tenant_id,
         template_id=template_id,
         page=page,
         size=size,
@@ -283,7 +299,9 @@ async def schedule_instance(
     """设置报表实例定时推送"""
     try:
         result = await _service.schedule_instance(
-            db, x_tenant_id, instance_id,
+            db,
+            x_tenant_id,
+            instance_id,
             body.model_dump(),
         )
         return {"ok": True, "data": result}
@@ -305,7 +323,9 @@ async def export_report(
     """导出报表为 PDF/Excel/CSV"""
     try:
         result = await _service.export_report(
-            db, x_tenant_id, body.template_id,
+            db,
+            x_tenant_id,
+            body.template_id,
             filters=body.filters,
             export_format=body.export_format,
             requested_by=body.requested_by or x_tenant_id,
@@ -342,7 +362,8 @@ async def subscribe(
     """订阅报表实例推送"""
     try:
         result = await _service.subscribe(
-            db, x_tenant_id,
+            db,
+            x_tenant_id,
             body.instance_id,
             body.subscriber_id,
             body.channel,
@@ -374,7 +395,10 @@ async def get_dimension_options(
     """获取维度可选值"""
     try:
         options = await _service.get_dimension_options(
-            db, x_tenant_id, source, dimension_key,
+            db,
+            x_tenant_id,
+            source,
+            dimension_key,
         )
         return {"ok": True, "data": options}
     except DataSourceNotAllowedError as exc:

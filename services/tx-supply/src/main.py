@@ -9,7 +9,7 @@ from fastapi import FastAPI
 
 # Feature Flag SDK（try/except 保护，SDK不可用时自动降级为全量开启）
 try:
-    from shared.feature_flags import FlagContext, is_enabled
+    from shared.feature_flags import is_enabled
     from shared.feature_flags.flag_names import SupplyFlags
 
     _FLAG_SDK_AVAILABLE = True

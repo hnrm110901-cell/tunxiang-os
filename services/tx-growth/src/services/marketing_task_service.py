@@ -14,7 +14,7 @@
 
 import json
 import uuid
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, timezone
 from typing import Any, Optional
 
 import structlog
@@ -163,7 +163,8 @@ class MarketingTaskService:
             params["priority"] = priority
 
         count_result = await db.execute(
-            text(f"SELECT COUNT(*) FROM marketing_tasks WHERE {where}"), params,
+            text(f"SELECT COUNT(*) FROM marketing_tasks WHERE {where}"),
+            params,
         )
         total = count_result.scalar() or 0
 
@@ -192,10 +193,18 @@ class MarketingTaskService:
             raise MarketingTaskError("INVALID_STATE", "仅草稿状态可编辑")
 
         allowed = {
-            "task_name", "description", "channel", "content",
-            "audience_pack_id", "audience_filter",
-            "schedule_at", "schedule_end_at", "recurrence_rule",
-            "target_store_ids", "target_employee_ids", "priority",
+            "task_name",
+            "description",
+            "channel",
+            "content",
+            "audience_pack_id",
+            "audience_filter",
+            "schedule_at",
+            "schedule_end_at",
+            "recurrence_rule",
+            "target_store_ids",
+            "target_employee_ids",
+            "priority",
         }
         filtered = {k: v for k, v in updates.items() if k in allowed}
         if not filtered:
@@ -488,7 +497,9 @@ class MarketingTaskService:
         for exec_item in executions:
             try:
                 await self.record_execution(
-                    tenant_id, task_id, db,
+                    tenant_id,
+                    task_id,
+                    db,
                     store_id=uuid.UUID(exec_item["store_id"]) if exec_item.get("store_id") else None,
                     employee_id=uuid.UUID(exec_item["employee_id"]) if exec_item.get("employee_id") else None,
                     customer_id=uuid.UUID(exec_item["customer_id"]) if exec_item.get("customer_id") else None,

@@ -34,26 +34,21 @@ PRESET_JOURNEYS: list[dict] = [
                 "delay_minutes": 1440,
                 "channel": "wecom_private",
                 "content": {
-                    "text": "亲爱的{{customer_name}}，感谢您到店用餐！"
-                    "诚邀您进行满意度打分，点击反馈即可获得100积分。"
+                    "text": "亲爱的{{customer_name}}，感谢您到店用餐！诚邀您进行满意度打分，点击反馈即可获得100积分。"
                 },
             },
             {
                 "name": "新品推荐",
                 "delay_minutes": 10080,
                 "channel": "wecom_private",
-                "content": {
-                    "text": "亲爱的{{customer_name}}，门店最近上新特色菜品，"
-                    "新品9折优惠，欢迎到店品尝！"
-                },
+                "content": {"text": "亲爱的{{customer_name}}，门店最近上新特色菜品，新品9折优惠，欢迎到店品尝！"},
             },
             {
                 "name": "活动邀约",
                 "delay_minutes": 20160,
                 "channel": "wecom_private",
                 "content": {
-                    "text": "亲爱的{{customer_name}}，{{store_name}}正在举行"
-                    "会员回馈活动，到店享免费饮品一份！"
+                    "text": "亲爱的{{customer_name}}，{{store_name}}正在举行会员回馈活动，到店享免费饮品一份！"
                 },
             },
         ],
@@ -67,18 +62,14 @@ PRESET_JOURNEYS: list[dict] = [
                 "name": "温情召回",
                 "delay_minutes": 0,
                 "channel": "wecom_private",
-                "content": {
-                    "text": "亲爱的{{customer_name}}，好久不见！"
-                    "我们为您准备了专属回归礼券，期待光临。"
-                },
+                "content": {"text": "亲爱的{{customer_name}}，好久不见！我们为您准备了专属回归礼券，期待光临。"},
             },
             {
                 "name": "店长亲邀",
                 "delay_minutes": 10080,
                 "channel": "wecom_private",
                 "content": {
-                    "text": "{{customer_name}}您好，我是{{store_name}}店长，"
-                    "诚邀您体验新菜品，已为您留了老友专享券。"
+                    "text": "{{customer_name}}您好，我是{{store_name}}店长，诚邀您体验新菜品，已为您留了老友专享券。"
                 },
             },
         ],
@@ -93,8 +84,7 @@ PRESET_JOURNEYS: list[dict] = [
                 "delay_minutes": 0,
                 "channel": "wecom_private",
                 "content": {
-                    "text": "生日快乐！亲爱的{{customer_name}}，"
-                    "您的生日惊喜已发放到小程序卡包，到店消费使用哦。"
+                    "text": "生日快乐！亲爱的{{customer_name}}，您的生日惊喜已发放到小程序卡包，到店消费使用哦。"
                 },
             },
         ],
@@ -793,13 +783,15 @@ class CustomerJourneyService:
                 },
             )
 
-            created_enrollments.append({
-                "enrollment_id": str(enrollment_id),
-                "template_id": str(tpl.id),
-                "template_name": tpl.template_name,
-                "customer_id": customer_id,
-                "next_action_at": next_action_at.isoformat(),
-            })
+            created_enrollments.append(
+                {
+                    "enrollment_id": str(enrollment_id),
+                    "template_id": str(tpl.id),
+                    "template_name": tpl.template_name,
+                    "customer_id": customer_id,
+                    "next_action_at": next_action_at.isoformat(),
+                }
+            )
 
         if created_enrollments:
             await self.db.flush()
@@ -902,8 +894,13 @@ class CustomerJourneyService:
             if responded_result.fetchone() is not None:
                 # 客户已响应, 跳过此步骤
                 await self._log_step(
-                    tid, enrollment_id, step_id,
-                    enrollment.channel, None, "skipped", now,
+                    tid,
+                    enrollment_id,
+                    step_id,
+                    enrollment.channel,
+                    None,
+                    "skipped",
+                    now,
                 )
                 await self._advance_to_next_step(tid, enrollment, now)
                 return
@@ -916,8 +913,13 @@ class CustomerJourneyService:
             )
             if not condition_met:
                 await self._log_step(
-                    tid, enrollment_id, step_id,
-                    enrollment.channel, None, "skipped", now,
+                    tid,
+                    enrollment_id,
+                    step_id,
+                    enrollment.channel,
+                    None,
+                    "skipped",
+                    now,
                 )
                 await self._advance_to_next_step(tid, enrollment, now)
                 return
@@ -949,8 +951,13 @@ class CustomerJourneyService:
 
         # 记日志
         await self._log_step(
-            tid, enrollment_id, step_id,
-            enrollment.channel, content, send_status, now,
+            tid,
+            enrollment_id,
+            step_id,
+            enrollment.channel,
+            content,
+            send_status,
+            now,
             failure_reason=failure_reason,
         )
 
@@ -1533,12 +1540,14 @@ class CustomerJourneyService:
                     content_template=step_def["content"],
                 )
 
-            created_templates.append({
-                "template_id": template_id,
-                "template_name": preset["name"],
-                "trigger_type": preset["trigger_type"],
-                "steps_count": len(preset["steps"]),
-            })
+            created_templates.append(
+                {
+                    "template_id": template_id,
+                    "template_name": preset["name"],
+                    "trigger_type": preset["trigger_type"],
+                    "steps_count": len(preset["steps"]),
+                }
+            )
 
         logger.info(
             "customer_journey.presets_created",

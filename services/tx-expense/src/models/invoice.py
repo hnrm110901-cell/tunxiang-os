@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import date, datetime
-from typing import List, Optional
+from typing import TYPE_CHECKING, List, Optional
 
 from sqlalchemy import (
     Boolean,
@@ -32,6 +32,9 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from shared.ontology.src.base import TenantBase
 
 from .expense_enums import InvoiceType, OcrStatus, VerifyStatus
+
+if TYPE_CHECKING:
+    from .expense_application import ExpenseApplication
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Invoice — 发票主档

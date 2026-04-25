@@ -161,7 +161,9 @@ async def list_presets(
 
         await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": x_tenant_id})
         result = await _svc.list_presets(
-            uuid.UUID(x_tenant_id), db, category=category,
+            uuid.UUID(x_tenant_id),
+            db,
+            category=category,
         )
         return ok_response(result)
 
@@ -307,7 +309,9 @@ async def list_pack_members(
 
         await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": x_tenant_id})
         result = await _svc.list_pack_members(
-            uuid.UUID(x_tenant_id), uuid.UUID(pack_id), db,
+            uuid.UUID(x_tenant_id),
+            uuid.UUID(pack_id),
+            db,
             is_active=is_active,
             page=page,
             size=size,
@@ -326,7 +330,9 @@ async def export_pack_members(
 
         await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": x_tenant_id})
         result = await _svc.export_pack_members(
-            uuid.UUID(x_tenant_id), uuid.UUID(pack_id), db,
+            uuid.UUID(x_tenant_id),
+            uuid.UUID(pack_id),
+            db,
         )
         return ok_response({"members": result, "total": len(result)})
 
@@ -348,6 +354,9 @@ async def get_pack_trend(
 
         await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": x_tenant_id})
         result = await _svc.get_pack_trend(
-            uuid.UUID(x_tenant_id), uuid.UUID(pack_id), db, days=days,
+            uuid.UUID(x_tenant_id),
+            uuid.UUID(pack_id),
+            db,
+            days=days,
         )
         return ok_response(result)

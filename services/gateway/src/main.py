@@ -17,8 +17,10 @@ from .api.onboarding_routes import router as onboarding_router
 from .api.open_api_routes import router as open_api_router
 from .auth import router as auth_router
 from .gdpr_routes import router as gdpr_router
+from .group_ops_routes import router as group_ops_router
 from .growth_intel_relay import router as relay_router
 from .hub_api import router as hub_router
+from .material_routes import router as material_router
 from .middleware import AuthMiddleware, RequestLogMiddleware, TenantMiddleware
 from .middleware.audit_middleware import AuditMiddleware
 from .personalization_middleware import PersonalizationMiddleware
@@ -27,8 +29,6 @@ from .response import ok
 from .sync_scheduler import create_sync_scheduler
 from .sync_scheduler import sync_router as sync_health_router
 from .wecom_bot_routes import router as wecom_bot_router
-from .group_ops_routes import router as group_ops_router
-from .material_routes import router as material_router
 from .wecom_group_routes import router as wecom_group_router
 from .wecom_internal import router as wecom_internal_router
 from .wecom_jssdk import router as wecom_jssdk_router

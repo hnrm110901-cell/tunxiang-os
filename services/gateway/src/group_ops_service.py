@@ -14,7 +14,7 @@ from typing import Any
 from uuid import UUID
 
 import structlog
-from sqlalchemy import delete, func, select, text, update
+from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -411,6 +411,7 @@ class GroupOpsService:
         fail_count = 0
 
         import json
+
         content = json.loads(row["content"]) if isinstance(row["content"], str) else row["content"]
 
         # 逐群发送
@@ -660,4 +661,5 @@ class GroupOpsService:
 def _json_dumps(obj: Any) -> str:
     """JSON 序列化辅助"""
     import json
+
     return json.dumps(obj, ensure_ascii=False)

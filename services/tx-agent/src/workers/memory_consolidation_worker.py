@@ -3,6 +3,7 @@
 调度建议: cron 表达式 "0 3 * * *" (每日凌晨3点)
 注册方式: 在 scheduler 中注册 MemoryConsolidationWorker().run
 """
+
 from __future__ import annotations
 
 import os
@@ -56,8 +57,7 @@ class MemoryConsolidationWorker:
         """
         raw = os.environ.get("ACTIVE_TENANT_IDS", "")
         if not raw.strip():
-            logger.warning("memory_consolidation.no_active_tenants",
-                           hint="设置环境变量 ACTIVE_TENANT_IDS")
+            logger.warning("memory_consolidation.no_active_tenants", hint="设置环境变量 ACTIVE_TENANT_IDS")
             return []
         return [tid.strip() for tid in raw.split(",") if tid.strip()]
 
@@ -79,10 +79,12 @@ class MemoryConsolidationWorker:
             if db is None:
                 log.error("memory_consolidation.db_session_failed")
                 stats.tenants_failed += 1
-                stats.errors.append({
-                    "tenant_id": tenant_id,
-                    "error": "无法获取数据库会话",
-                })
+                stats.errors.append(
+                    {
+                        "tenant_id": tenant_id,
+                        "error": "无法获取数据库会话",
+                    }
+                )
                 return
 
             svc = MemoryEvolutionService(db)
@@ -104,19 +106,17 @@ class MemoryConsolidationWorker:
 
             await db.commit()
             stats.tenants_processed += 1
-            log.info("memory_consolidation.tenant_done",
-                     decayed=decayed,
-                     consolidated=consolidated,
-                     expired=expired)
+            log.info("memory_consolidation.tenant_done", decayed=decayed, consolidated=consolidated, expired=expired)
 
         except Exception as exc:  # 最外层兜底，单租户失败不影响其他
             stats.tenants_failed += 1
-            stats.errors.append({
-                "tenant_id": tenant_id,
-                "error": str(exc),
-            })
-            log.error("memory_consolidation.tenant_failed",
-                      error=str(exc), exc_info=True)
+            stats.errors.append(
+                {
+                    "tenant_id": tenant_id,
+                    "error": str(exc),
+                }
+            )
+            log.error("memory_consolidation.tenant_failed", error=str(exc), exc_info=True)
             if db is not None:
                 await db.rollback()
 

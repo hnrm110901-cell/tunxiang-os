@@ -15,6 +15,7 @@ ResolutionResult 字段：
   reason                 — 决策理由（可读文字，供日志/审计）
   requires_manual_review — True 时 sync-engine 应暂停该订单，推送到人工队列
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -29,6 +30,7 @@ log = structlog.get_logger(__name__)
 
 # ─── 策略枚举 ─────────────────────────────────────────────────────────────────
 
+
 class ConflictStrategy(str, Enum):
     CLOUD_WINS = "cloud_wins"
     LOCAL_WINS = "local_wins"
@@ -36,6 +38,7 @@ class ConflictStrategy(str, Enum):
 
 
 # ─── 结果模型 ─────────────────────────────────────────────────────────────────
+
 
 @dataclass
 class ResolutionResult:
@@ -50,8 +53,9 @@ class ResolutionResult:
         cloud_order_id: 云端订单 ID（若存在）
         metadata: 附加调试信息
     """
+
     strategy: ConflictStrategy
-    winner: str                              # "cloud" | "local" | "manual_review"
+    winner: str  # "cloud" | "local" | "manual_review"
     reason: str
     requires_manual_review: bool
     local_order_id: str = ""
@@ -60,6 +64,7 @@ class ResolutionResult:
 
 
 # ─── 解析器 ───────────────────────────────────────────────────────────────────
+
 
 class ConflictResolver:
     """离线订单同步冲突解决器。
@@ -139,9 +144,7 @@ class ConflictResolver:
 
     # ── 策略实现 ──────────────────────────────────────────────────────────────
 
-    def _resolve_cloud_wins(
-        self, local_id: str, cloud_id: str, ikey: str
-    ) -> ResolutionResult:
+    def _resolve_cloud_wins(self, local_id: str, cloud_id: str, ikey: str) -> ResolutionResult:
         """云端优先：本地记录标记 conflict，不推送。"""
         return ResolutionResult(
             strategy=self.strategy,
@@ -156,9 +159,7 @@ class ConflictResolver:
             metadata={"idempotency_key": ikey},
         )
 
-    def _resolve_local_wins(
-        self, local_id: str, cloud_id: str, ikey: str
-    ) -> ResolutionResult:
+    def _resolve_local_wins(self, local_id: str, cloud_id: str, ikey: str) -> ResolutionResult:
         """本地优先：推送本地记录覆盖云端，但标记需人工确认（高风险）。"""
         return ResolutionResult(
             strategy=self.strategy,

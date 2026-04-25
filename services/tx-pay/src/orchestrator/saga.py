@@ -15,6 +15,7 @@ Saga 步骤：
   executing → 查询渠道确认是否已扣款 → 已扣则继续 S3 或补偿
   confirming → 重试 S3 → 失败则补偿
 """
+
 from __future__ import annotations
 
 import uuid
@@ -97,7 +98,9 @@ class PaymentSaga:
 
         # S3: confirm（通知业务方）
         await self._update_step(
-            saga_id, request, SagaStep.CONFIRMING,
+            saga_id,
+            request,
+            SagaStep.CONFIRMING,
             payment_id=result.payment_id,
             trade_no=result.trade_no,
         )

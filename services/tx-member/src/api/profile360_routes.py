@@ -19,17 +19,16 @@
 from __future__ import annotations
 
 import uuid
-from datetime import date
 from typing import Optional
 
 import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel, Field
+from services.profile360_service import Profile360Service
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from services.profile360_service import Profile360Service
 from shared.ontology.src.database import get_db
 
 logger = structlog.get_logger(__name__)
@@ -319,7 +318,16 @@ async def get_employee_send_stats(
         data = await _service.get_employee_send_stats(tenant_id, employee_id, start_date, end_date, db)
     except SQLAlchemyError as exc:
         logger.error("profile360_employee_stats_error", error=str(exc), employee_id=employee_id)
-        return {"ok": True, "data": {"employee_id": employee_id, "total_sent": 0, "total_used": 0, "use_rate": 0.0, "total_revenue_fen": 0}}
+        return {
+            "ok": True,
+            "data": {
+                "employee_id": employee_id,
+                "total_sent": 0,
+                "total_used": 0,
+                "use_rate": 0.0,
+                "total_revenue_fen": 0,
+            },
+        }
 
     return {"ok": True, "data": data}
 
@@ -343,6 +351,9 @@ async def get_store_send_stats(
         data = await _service.get_store_send_stats(tenant_id, store_id, start_date, end_date, db)
     except SQLAlchemyError as exc:
         logger.error("profile360_store_stats_error", error=str(exc), store_id=store_id)
-        return {"ok": True, "data": {"store_id": store_id, "total_sent": 0, "total_used": 0, "use_rate": 0.0, "total_revenue_fen": 0}}
+        return {
+            "ok": True,
+            "data": {"store_id": store_id, "total_sent": 0, "total_used": 0, "use_rate": 0.0, "total_revenue_fen": 0},
+        }
 
     return {"ok": True, "data": data}

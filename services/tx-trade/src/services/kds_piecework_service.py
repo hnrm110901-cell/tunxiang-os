@@ -5,8 +5,7 @@
 """
 
 import uuid
-from datetime import date, datetime, timezone
-from decimal import Decimal
+from datetime import date
 from typing import Optional
 
 import structlog
@@ -297,10 +296,7 @@ class KdsPieceworkService:
             "total_commission_fen": total_commission_fen,
             "scheme_count": len(schemes),
             "record_count": len(records),
-            "schemes_applied": [
-                {"id": str(s.id), "name": s.scheme_name, "type": s.scheme_type}
-                for s in schemes
-            ],
+            "schemes_applied": [{"id": str(s.id), "name": s.scheme_name, "type": s.scheme_type} for s in schemes],
         }
 
     # ── 方案 CRUD ────────────────────────────────────────────
@@ -379,7 +375,7 @@ class KdsPieceworkService:
         await db.execute(
             text(f"""
                 UPDATE kds_piecework_schemes
-                SET {', '.join(sets)}
+                SET {", ".join(sets)}
                 WHERE tenant_id = :tenant_id AND id = :scheme_id AND is_deleted = FALSE
             """),
             params,
