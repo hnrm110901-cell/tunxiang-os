@@ -191,28 +191,30 @@ class SettlementScheduler:
         await self._set_tenant()
         bid = uuid.UUID(batch_id)
 
-        # 原子更新：WHERE status = 'draft' 防止并发重复确认
-        update_result = await self.db.execute(
+        # 验证批次
+        result = await self.db.execute(
             text("""
-                UPDATE sv_settlement_batches
-                SET status = 'confirmed', updated_at = NOW()
+                SELECT id, batch_no, status, total_records, total_amount_fen
+                FROM sv_settlement_batches
                 WHERE id = :id AND tenant_id = :tid AND is_deleted = FALSE
-                  AND status = 'draft'
-                RETURNING id, batch_no, status, total_records, total_amount_fen
             """),
             {"id": bid, "tid": self._tid},
         )
-        batch = update_result.fetchone()
+        batch = result.fetchone()
         if not batch:
-            # 区分不存在 vs 状态不对
-            check = await self.db.execute(
-                text("SELECT status FROM sv_settlement_batches WHERE id = :id AND tenant_id = :tid AND is_deleted = FALSE"),
-                {"id": bid, "tid": self._tid},
-            )
-            existing = check.fetchone()
-            if not existing:
-                raise ValueError(f"结算批次不存在: {batch_id}")
-            raise ValueError(f"只能确认 draft 状态的批次，当前状态: {existing.status}")
+            raise ValueError(f"结算批次不存在: {batch_id}")
+        if batch.status != "draft":
+            raise ValueError(f"只能确认 draft 状态的批次，当前状态: {batch.status}")
+
+        # 更新批次状态
+        await self.db.execute(
+            text("""
+                UPDATE sv_settlement_batches
+                SET status = 'confirmed', updated_at = NOW()
+                WHERE id = :id AND tenant_id = :tid
+            """),
+            {"id": bid, "tid": self._tid},
+        )
 
         # 关联流水标记为 settled
         now = datetime.now(timezone.utc)
@@ -257,28 +259,28 @@ class SettlementScheduler:
         await self._set_tenant()
         bid = uuid.UUID(batch_id)
 
-        # 原子更新：WHERE status = 'confirmed' 防止并发
-        update_result = await self.db.execute(
+        result = await self.db.execute(
             text("""
-                UPDATE sv_settlement_batches
-                SET status = 'settled', updated_at = NOW()
+                SELECT id, batch_no, status
+                FROM sv_settlement_batches
                 WHERE id = :id AND tenant_id = :tid AND is_deleted = FALSE
-                  AND status = 'confirmed'
-                RETURNING id, batch_no
             """),
             {"id": bid, "tid": self._tid},
         )
-        batch = update_result.fetchone()
+        batch = result.fetchone()
         if not batch:
-            check = await self.db.execute(
-                text("SELECT status FROM sv_settlement_batches WHERE id = :id AND tenant_id = :tid AND is_deleted = FALSE"),
-                {"id": bid, "tid": self._tid},
-            )
-            existing = check.fetchone()
-            if not existing:
-                raise ValueError(f"结算批次不存在: {batch_id}")
-            raise ValueError(f"只能将 confirmed 状态的批次标记为 settled，当前: {existing.status}")
+            raise ValueError(f"结算批次不存在: {batch_id}")
+        if batch.status != "confirmed":
+            raise ValueError(f"只能将 confirmed 状态的批次标记为 settled，当前: {batch.status}")
 
+        await self.db.execute(
+            text("""
+                UPDATE sv_settlement_batches
+                SET status = 'settled', updated_at = NOW()
+                WHERE id = :id AND tenant_id = :tid
+            """),
+            {"id": bid, "tid": self._tid},
+        )
         await self.db.flush()
 
         log.info(
