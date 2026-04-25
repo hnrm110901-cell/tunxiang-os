@@ -2,6 +2,11 @@
 
 每道菜可配置多种做法（如辣度、温度、加料），按 practice_group 分组。
 金额统一存分（fen）。
+
+v345 扩展：
+  - is_temporary:  临时做法（有价做法，顾客自定义）
+  - practice_type:  standard | temporary | addon
+  - max_quantity:   加料可多份（如加蛋x2）
 """
 
 import uuid
@@ -50,4 +55,22 @@ class DishPractice(TenantBase):
         Integer,
         default=0,
         comment="排序权重，越小越靠前",
+    )
+
+    # ── v345 新增字段 ──
+
+    is_temporary: Mapped[bool] = mapped_column(
+        Boolean,
+        default=False,
+        comment="是否临时做法（有价做法，顾客下单时自定义）",
+    )
+    practice_type: Mapped[str] = mapped_column(
+        String(20),
+        default="standard",
+        comment="做法类型：standard=标准做法, temporary=临时做法, addon=加料",
+    )
+    max_quantity: Mapped[int] = mapped_column(
+        Integer,
+        default=1,
+        comment="该做法可选最大数量（加料场景：加蛋x3）",
     )

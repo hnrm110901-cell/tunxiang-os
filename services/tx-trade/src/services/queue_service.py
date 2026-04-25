@@ -653,6 +653,108 @@ class QueueService:
         next_item = waiting[0]
         return await self.call_number(next_item.queue_id)
 
+    # ─── 排队大屏数据 ───
+
+    async def get_queue_display(self, store_id: str) -> dict:
+        """排队大屏数据 — 面向顾客显示屏的综合信息
+
+        包含：各桌型排队概况、下一位叫号信息、预估等待时间、
+        今日接待统计。适用于门店排队显示大屏。
+
+        Args:
+            store_id: 门店ID
+
+        Returns:
+            {
+                store_id, date, groups: [{prefix, label, waiting, next_numbers, est_wait_min}],
+                summary: {total_waiting, total_seated_today, avg_wait_min},
+                recent_called: [{queue_number, customer_name, called_at}]
+            }
+        """
+        today = _today_str()
+        all_records = await self._repo.list_by_store_date(store_id, today)
+
+        waiting = [q for q in all_records if q.status == "waiting"]
+        called = [q for q in all_records if q.status == "called"]
+        seated = [q for q in all_records if q.status == "seated"]
+
+        # 按桌型分组构建大屏数据
+        groups: list[dict] = []
+        for prefix in ["A", "B", "C"]:
+            prefix_waiting = sorted(
+                [q for q in waiting if q.prefix == prefix],
+                key=lambda x: x.priority_ts,
+            )
+            prefix_called = sorted(
+                [q for q in called if q.prefix == prefix],
+                key=lambda x: x.called_at or "",
+                reverse=True,
+            )
+
+            est = self._calculate_wait_time(prefix, len(prefix_waiting))
+
+            # 下一批待叫号码（最多5个）
+            next_numbers = [q.queue_number for q in prefix_waiting[:5]]
+
+            # 最近叫号（最多3个）
+            recent = []
+            for q in prefix_called[:3]:
+                recent.append({
+                    "queue_number": q.queue_number,
+                    "customer_name": q.customer_name[:1] + "**" if len(q.customer_name) > 1 else q.customer_name,
+                    "called_at": q.called_at,
+                })
+
+            groups.append({
+                "prefix": prefix,
+                "label": SIZE_CATEGORY_LABELS[prefix],
+                "waiting_count": len(prefix_waiting),
+                "called_count": len(prefix_called),
+                "est_wait_min": est["estimated_wait_min"],
+                "next_numbers": next_numbers,
+                "recent_called": recent,
+            })
+
+        # 全部最近叫号记录（按时间倒序，最多10条）
+        all_called_sorted = sorted(called, key=lambda x: x.called_at or "", reverse=True)
+        recent_called = []
+        for q in all_called_sorted[:10]:
+            recent_called.append({
+                "queue_number": q.queue_number,
+                "customer_name": q.customer_name[:1] + "**" if len(q.customer_name) > 1 else q.customer_name,
+                "party_size": q.party_size,
+                "called_at": q.called_at,
+            })
+
+        # 平均等位时间（已入座的等位时间均值）
+        avg_wait_min = 0
+        if seated:
+            total_wait = 0
+            count = 0
+            for q in seated:
+                if q.taken_at and q.seated_at:
+                    taken_dt = datetime.fromisoformat(q.taken_at)
+                    seated_dt = datetime.fromisoformat(q.seated_at)
+                    total_wait += int((seated_dt - taken_dt).total_seconds() / 60)
+                    count += 1
+            if count > 0:
+                avg_wait_min = round(total_wait / count)
+
+        return {
+            "store_id": store_id,
+            "date": today,
+            "groups": groups,
+            "summary": {
+                "total_waiting": len(waiting),
+                "total_called": len(called),
+                "total_seated_today": len(seated),
+                "total_today": len(all_records),
+                "avg_wait_min": avg_wait_min,
+            },
+            "recent_called": recent_called,
+            "updated_at": _now_iso(),
+        }
+
     # ─── 内部辅助方法 ───
 
     def _calculate_wait_time(self, prefix: str, ahead_count: int) -> dict:

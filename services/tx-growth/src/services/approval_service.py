@@ -80,6 +80,7 @@ _OP_MAP: dict[str, str] = {
     "lte": "<=",
     "eq": "==",
     "neq": "!=",
+    "in": "in",
 }
 
 
@@ -88,7 +89,7 @@ def _evaluate_condition(field: str, op: str, value: object, data: dict) -> bool:
 
     Args:
         field: 数据字段名（对应 object_data 的 key）
-        op:    比较运算符（gt/gte/lt/lte/eq/neq）
+        op:    比较运算符（gt/gte/lt/lte/eq/neq/in）
         value: 阈值
         data:  被审批对象数据字典
 
@@ -111,9 +112,36 @@ def _evaluate_condition(field: str, op: str, value: object, data: dict) -> bool:
         return actual == value
     if op == "neq":
         return actual != value
+    if op == "in":
+        if isinstance(value, (list, tuple, set)):
+            return actual in value
+        return False
 
     log.warning("approval.unknown_op", op=op)
     return False
+
+
+def _evaluate_conditions(conditions: list[dict], data: dict) -> bool:
+    """评估一组条件（AND 逻辑，所有条件必须全部满足）。
+
+    Args:
+        conditions: 条件列表 [{field, op, value}, ...]
+        data: 被审批对象数据字典
+
+    Returns:
+        True 表示所有条件均满足。空条件列表返回 False。
+    """
+    if not conditions:
+        return False
+
+    for cond in conditions:
+        field = cond.get("field", "")
+        op = cond.get("op", "eq")
+        threshold = cond.get("value")
+        if not _evaluate_condition(field, op, threshold, data):
+            return False
+
+    return True
 
 
 def _match_workflow(workflow: ApprovalWorkflow, object_type: str, object_data: dict) -> bool:
@@ -151,6 +179,47 @@ class ApprovalService:
     # ------------------------------------------------------------------
     # 核心业务方法
     # ------------------------------------------------------------------
+
+    async def check_trigger(
+        self,
+        tenant_id: uuid.UUID,
+        object_type: str,
+        object_data: dict,
+        db: AsyncSession,
+    ) -> dict:
+        """触发条件评估引擎 — 检查对象数据是否匹配审批流模板。
+
+        扫描租户下所有启用的审批流模板，按优先级降序逐个匹配。
+        使用 _evaluate_conditions 对触发条件进行 AND 评估。
+
+        Args:
+            tenant_id: 租户 ID
+            object_type: 对象类型，如 campaign/journey
+            object_data: 对象数据字典
+            db: 数据库会话
+
+        Returns:
+            {"needs_approval": True, "workflow_id": UUID, "workflow_name": str}
+            或 {"needs_approval": False}
+        """
+        needs, workflow_id = await self.check_needs_approval(
+            object_type=object_type,
+            object_data=object_data,
+            tenant_id=tenant_id,
+            db=db,
+        )
+        if needs and workflow_id is not None:
+            # 获取工作流名称
+            try:
+                wf = await self._get_workflow(workflow_id, tenant_id, db)
+                return {
+                    "needs_approval": True,
+                    "workflow_id": workflow_id,
+                    "workflow_name": wf.name,
+                }
+            except ValueError:
+                return {"needs_approval": True, "workflow_id": workflow_id}
+        return {"needs_approval": False}
 
     async def check_needs_approval(
         self,
@@ -428,6 +497,13 @@ class ApprovalService:
             tenant_id=tenant_id,
         )
 
+        # 驳回回调：将关联对象状态改为 rejected
+        await self._reject_callback(
+            object_type=request.object_type,
+            object_id=request.object_id,
+            tenant_id=tenant_id,
+        )
+
         return {
             "ok": True,
             "status": "rejected",
@@ -477,6 +553,68 @@ class ApprovalService:
         )
 
         return {"ok": True, "status": "cancelled"}
+
+    async def batch_approve(
+        self,
+        request_ids: list[uuid.UUID],
+        approver_id: uuid.UUID,
+        comment: Optional[str],
+        tenant_id: uuid.UUID,
+        db: AsyncSession,
+    ) -> dict:
+        """批量审批通过。
+
+        逐条调用 approve()，汇总结果。单条失败不影响其他审批单。
+
+        Returns:
+            {
+                "total": int,
+                "succeeded": int,
+                "failed": int,
+                "results": [{"request_id": str, "ok": bool, ...}, ...]
+            }
+        """
+        results: list[dict] = []
+        succeeded = 0
+        failed = 0
+
+        for request_id in request_ids:
+            try:
+                result = await self.approve(
+                    request_id=request_id,
+                    approver_id=approver_id,
+                    comment=comment,
+                    tenant_id=tenant_id,
+                    db=db,
+                )
+                result["request_id"] = str(request_id)
+                results.append(result)
+                if result.get("ok"):
+                    succeeded += 1
+                else:
+                    failed += 1
+            except ValueError as exc:
+                results.append({
+                    "request_id": str(request_id),
+                    "ok": False,
+                    "reason": str(exc),
+                })
+                failed += 1
+
+        log.info(
+            "approval.batch_approve",
+            total=len(request_ids),
+            succeeded=succeeded,
+            failed=failed,
+            tenant_id=str(tenant_id),
+        )
+
+        return {
+            "total": len(request_ids),
+            "succeeded": succeeded,
+            "failed": failed,
+            "results": results,
+        }
 
     async def check_expired_requests(
         self,
@@ -812,6 +950,65 @@ class ApprovalService:
         data = resp.json()
         employees: list[dict] = data.get("data", {}).get("items", [])
         return [emp["wecom_user_id"] for emp in employees if emp.get("wecom_user_id")]
+
+    async def _reject_callback(
+        self,
+        object_type: str,
+        object_id: str,
+        tenant_id: uuid.UUID,
+    ) -> None:
+        """驳回回调：将关联对象状态改为 rejected。
+
+        object_type=campaign → POST /internal/growth/campaigns/{id}/reject
+        其他类型暂不处理（仅记录日志）。
+        """
+        url_map = {
+            "campaign": f"{self.GATEWAY_URL}/internal/growth/campaigns/{object_id}/reject",
+            "journey": f"{self.GATEWAY_URL}/internal/growth/journeys/{object_id}/reject",
+        }
+        url = url_map.get(object_type)
+        if url is None:
+            log.info(
+                "approval.reject_callback_no_handler",
+                object_type=object_type,
+                object_id=object_id,
+            )
+            return
+
+        try:
+            async with httpx.AsyncClient(timeout=15) as client:
+                resp = await client.post(
+                    url,
+                    headers={"X-Tenant-ID": str(tenant_id)},
+                )
+                resp.raise_for_status()
+            log.info(
+                "approval.object_rejected",
+                object_type=object_type,
+                object_id=object_id,
+                tenant_id=str(tenant_id),
+            )
+        except httpx.HTTPStatusError as exc:
+            log.error(
+                "approval.reject_callback_http_error",
+                status=exc.response.status_code,
+                object_type=object_type,
+                object_id=object_id,
+            )
+        except httpx.ConnectError as exc:
+            log.error(
+                "approval.reject_callback_connect_error",
+                error=str(exc),
+                object_type=object_type,
+                object_id=object_id,
+            )
+        except httpx.TimeoutException as exc:
+            log.error(
+                "approval.reject_callback_timeout",
+                error=str(exc),
+                object_type=object_type,
+                object_id=object_id,
+            )
 
     async def _activate_approved_object(
         self,

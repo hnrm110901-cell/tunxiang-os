@@ -25,10 +25,12 @@ log = structlog.get_logger(__name__)
 
 # 合法状态转换（与 campaign_engine.py 保持一致）
 _VALID_TRANSITIONS: dict[str, list[str]] = {
-    "draft": ["active"],
+    "draft": ["active", "pending_approval", "rejected"],
+    "pending_approval": ["active", "rejected", "draft"],
     "active": ["paused", "ended"],
     "paused": ["active", "ended"],
     "ended": [],
+    "rejected": ["draft"],
 }
 
 
