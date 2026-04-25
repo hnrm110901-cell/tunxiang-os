@@ -102,6 +102,11 @@ try:
 except ImportError:
     feedback_router = None
 
+try:
+    from .api.customer_journey_routes import router as customer_journey_router
+except ImportError:
+    customer_journey_router = None
+
 
 async def get_db_with_tenant_factory(
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
@@ -283,6 +288,8 @@ if coaching_router is not None:
     app.include_router(coaching_router)
 if feedback_router is not None:
     app.include_router(feedback_router)
+if customer_journey_router is not None:
+    app.include_router(customer_journey_router)  # /api/v1/agent/customer-journey/* — 客户触达SOP旅程
 
 
 @app.get("/health")

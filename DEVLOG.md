@@ -1,3 +1,51 @@
+## 2026-04-25 Sprint P — 私域增长6大模块(对标iCC Grow)
+
+### 今日完成
+- [tx-growth] 活码拉新引擎: 4表(live_codes/scans/channel_stats/store_bindings) + LiveCodeService(733行) + 15端点(/api/v1/growth/live-codes/*)
+- [tx-growth] 精准人群包引擎: 3表(audience_packs/pack_members/pack_presets) + AudiencePackService(796行) + 12端点(/api/v1/growth/audience-packs/*) + 8个系统预设(生日/沉睡/高价值等)
+- [tx-growth] 营销任务日历: 4表(marketing_tasks/assignments/executions/effects) + MarketingTaskService(762行) + 18端点(/api/v1/growth/marketing-tasks/*) + 日历视图
+- [gateway] 社群运营工具: 2表(group_tags/group_tag_bindings) + 1表(group_mass_sends) + GroupOpsService(663行) + 14端点(/api/v1/wecom/group-ops/*)
+- [gateway] 企业素材库: 2表(material_groups/material_library) + MaterialService(564行) + 10端点(/api/v1/materials/*) + 分时段匹配
+- [tx-agent] 客户触达SOP: 4表(customer_journey_templates/steps/enrollments/step_logs) + CustomerJourneyService(1550行) + 18端点(/api/v1/agent/customer-journey/*) + 3个预设旅程(消费后关怀链/沉睡召回/生日关怀)
+
+### 数据变化
+- 迁移版本: v294 → v303 (9个新迁移, 含3个桥接)
+- 新增表: 20张 (全部含RLS策略)
+- 新增API端点: ~87个
+- 新增代码: 8,734行(5,068服务+2,635路由+1,031迁移)
+- 3个main.py已注册路由+定时任务
+
+### 竞品对标(iCC Grow差距修复)
+| 模块 | 差距修复前 | 修复后 |
+|------|----------|--------|
+| 活码拉新矩阵 | 完全缺失 | 成员/社群/LBS三类活码+渠道统计 |
+| 人群包引擎 | 基础member_tags | 5维度17条件+动态/静态+8预设 |
+| 营销任务日历 | 无 | 总部→门店闭环+效果追踪+排行榜 |
+| 社群运营工具 | 基础群管理 | 群标签+群发+批量操作 |
+| 素材库 | 无 | 分组+分时段+7种类型 |
+| 客户触达SOP | 门店运营SOP | 客户生命周期触达链+3预设旅程 |
+
+### 模块6: 企微侧边栏360画像(同日追加)
+- [tx-member] 360°画像聚合API: v304迁移(coupon_send_logs) + Profile360Service(995行) + 11端点(/api/v1/member/profile360/*)
+  - 4种入口: by-wecom/by-phone/by-card/by-id
+  - 聚合8+张表: customers/orders/order_items/stored_value/points/coupons/coupon_send_logs/member_level
+  - 1v1发券追踪: 发放/核销/ROI + 员工/门店统计
+  - AI话术建议: 规则引擎(生日/常点菜/可用券/储值/回访)
+  - 手机号脱敏
+- [web-wecom-sidebar] 前端增强: 11个文件(6修改+5新增, 1712行TypeScript)
+  - 4Tab布局: 会员信息/会员标签/会员卡/券包
+  - 紫色横向菜品偏好柱状图
+  - 渐变色会员卡视觉(按等级配色)
+  - AI话术建议琥珀色卡片
+  - 生日提醒粉色徽章
+  - 1v1发券+状态追踪(已发/已领/已用/过期/失败)
+
+### 遗留项
+- [ ] 前端页面: web-admin总部后台(活码/人群包/营销任务/社群管理页面)
+
+### 明日计划
+- web-admin 总部后台私域管理页面开发
+
 ## 2026-04-24 Sprint H 集成验证基建 — 徐记海鲜 DEMO Go/No-Go
 
 ### 今日完成
