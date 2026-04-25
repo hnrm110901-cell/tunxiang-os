@@ -457,7 +457,35 @@ class SagaBuffer:
             return [_row_to_entry(r) for r in rows]
 
     async def mark_flushing(self, idempotency_key: str) -> None:
-        await self._update_state(idempotency_key, _STATE_FLUSHING)
+        """标记 flushing 时同步打 last_attempt_at 时间戳，
+        供 SagaFlusher.reset_stuck_flushing 计算卡死时长。"""
+        if not self._initialized:
+            await self.initialize()
+        now = int(self._clock())
+        async with self._lock:
+            if self._memory_mode:
+                e = self._memory_rows.get(idempotency_key)
+                if e is None:
+                    return
+                e.state = _STATE_FLUSHING
+                e.last_attempt_at = now
+                return
+
+            try:
+                db = self._conn
+                await db.execute(
+                    "UPDATE saga_buffer "
+                    "SET state = 'flushing', last_attempt_at = ? "
+                    "WHERE idempotency_key = ?",
+                    (now, idempotency_key),
+                )
+                await db.commit()
+            except OSError as exc:
+                logger.error(
+                    "saga_buffer_mark_flushing_disk_io_error",
+                    idempotency_key=idempotency_key,
+                    error=str(exc),
+                )
 
     async def mark_sent(self, idempotency_key: str) -> None:
         await self._update_state(idempotency_key, _STATE_SENT)
@@ -575,6 +603,67 @@ class SagaBuffer:
             except OSError as exc:
                 logger.error(
                     "saga_buffer_sweep_disk_io_error",
+                    error=str(exc),
+                )
+                return 0
+
+    async def reset_stuck_flushing(
+        self,
+        *,
+        threshold_seconds: int,
+        tenant_id: Optional[str] = None,
+    ) -> int:
+        """运行期保护：扫描 state=flushing 且 last_attempt_at 距今超过
+        threshold_seconds 的条目，强制复位为 pending（针对进程没崩但
+        flush 卡死的边缘场景）。
+
+        返回：被复位的条数。由 SagaFlusher heartbeat 周期性调用。
+        """
+        if not self._initialized:
+            await self.initialize()
+        now = int(self._clock())
+        cutoff = now - max(0, threshold_seconds)
+
+        async with self._lock:
+            if self._memory_mode:
+                count = 0
+                for e in self._memory_rows.values():
+                    if (
+                        e.state == _STATE_FLUSHING
+                        and (tenant_id is None or e.tenant_id == tenant_id)
+                        and (e.last_attempt_at is None or e.last_attempt_at <= cutoff)
+                    ):
+                        e.state = _STATE_PENDING
+                        e.last_attempt_at = now
+                        count += 1
+                return count
+
+            try:
+                db = self._conn
+                if tenant_id is None:
+                    cur = await db.execute(
+                        "UPDATE saga_buffer "
+                        "SET state = 'pending', last_attempt_at = ? "
+                        "WHERE state = 'flushing' "
+                        "  AND (last_attempt_at IS NULL OR last_attempt_at <= ?)",
+                        (now, cutoff),
+                    )
+                else:
+                    cur = await db.execute(
+                        "UPDATE saga_buffer "
+                        "SET state = 'pending', last_attempt_at = ? "
+                        "WHERE state = 'flushing' "
+                        "  AND tenant_id = ? "
+                        "  AND (last_attempt_at IS NULL OR last_attempt_at <= ?)",
+                        (now, tenant_id, cutoff),
+                    )
+                count = cur.rowcount or 0
+                await cur.close()
+                await db.commit()
+                return count
+            except OSError as exc:
+                logger.error(
+                    "saga_buffer_reset_stuck_flushing_disk_io_error",
                     error=str(exc),
                 )
                 return 0

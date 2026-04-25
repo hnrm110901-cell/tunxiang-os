@@ -5,6 +5,8 @@
   - POST 到 tx-trade `/api/v1/settle/retry`（见 services/tx-trade/src/api/settle_retry.py）
   - 成功 → mark_sent，失败 → mark_failed（attempts++），4h 到期 → mark_dead_letter
   - 补发后心跳一次到云端 `/api/v1/edge/saga_buffer_meta`（UPSERT 本店状态）
+  - heartbeat 自检：发现 flushing 状态 last_attempt_at 距今 > 5min（进程没崩
+    但 flush 卡死的边缘场景）→ 强制复位 pending 让下一轮重试
 
 不改动 payment_saga_service 的 _PENDING_TIMEOUT_MINUTES=5：
   - 前端 3s soft timeout 与 saga 5min timeout 是两个独立时间轴
@@ -25,6 +27,10 @@ from .buffer import (
 )
 
 logger = structlog.get_logger(__name__)
+
+
+# flushing 状态卡死阈值：超过此值仍在 flushing 视为"进程没崩但 flush 卡死"，强制复位
+FLUSHING_STUCK_THRESHOLD_SEC = 300
 
 
 class SagaFlusher:
@@ -197,7 +203,23 @@ class SagaFlusher:
     # ─── heartbeat 回传云端 saga_buffer_meta ──────────────────────────────────
 
     async def heartbeat(self) -> Optional[dict]:
-        """向云端 PG saga_buffer_meta 汇报本店缓冲状态。"""
+        """向云端 PG saga_buffer_meta 汇报本店缓冲状态。
+
+        汇报前先做一次卡死自检：把 flushing > FLUSHING_STUCK_THRESHOLD_SEC
+        的条目强制复位为 pending，防止"进程没崩但 flush 卡死"导致死单。
+        """
+        stuck_reset = await self._buffer.reset_stuck_flushing(
+            threshold_seconds=FLUSHING_STUCK_THRESHOLD_SEC,
+            tenant_id=self._tenant_id,
+        )
+        if stuck_reset:
+            logger.warning(
+                "saga_flusher_stuck_flushing_reset",
+                tenant_id=self._tenant_id,
+                count=stuck_reset,
+                threshold_seconds=FLUSHING_STUCK_THRESHOLD_SEC,
+            )
+
         stats = await self._buffer.stats(tenant_id=self._tenant_id)
         health = _compute_health(stats)
         body = {
