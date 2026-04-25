@@ -3,8 +3,10 @@
 端点:
   POST /api/v1/telemetry/pos-crash   接收 apps/web-pos ErrorBoundary 上报
 
-限流维度 device_id：每 60 秒最多 1 条。理由是崩溃后 ErrorBoundary 常在同一渲染
+限流维度 (tenant_id, device_id)：每 60 秒最多 1 条。理由是崩溃后 ErrorBoundary 常在同一渲染
 循环内重复触发，若不节流会瞬间淹没入库链路，真实高价值样本反被稀释。
+A1 安全修复：限流键含 tenant_id，避免调试机一日内切多个 tenant 登录因共享 device_id
+误伤限流（tenant_A 和 tenant_B 同一物理设备各自独立计窗）。
 
 §XIV 审计约束：
   - 禁 broad except，统一捕获 SQLAlchemyError / ValueError / KeyError。
@@ -48,16 +50,26 @@ _audit_hook: Optional[Callable[..., Awaitable[None]]] = None
 # 若未来切 Redis，仅替换 _rate_limit_check 实现即可，调用点保持不变。
 
 _RATE_LIMIT_WINDOW_SEC = 60
+# A1 安全修复：限流键由纯 device_id 改为 "tenant_id:device_id"。
+# 多租户调试机一日内切换登录不会因共享 device_id 误伤限流。
 _rate_limit_cache: Dict[str, float] = {}
 
 
-def _rate_limit_check(device_id: str) -> bool:
-    """返回 True 表示通过，False 表示被限流。副作用：写入时间戳。"""
+def _rate_limit_key(tenant_id: str, device_id: str) -> str:
+    return f"{tenant_id}:{device_id}"
+
+
+def _rate_limit_check(tenant_id: str, device_id: str) -> bool:
+    """返回 True 表示通过，False 表示被限流。副作用：写入时间戳。
+
+    限流键含 tenant_id：tenant_A 与 tenant_B 同一物理设备各自独立计窗。
+    """
     now = time.monotonic()
-    last = _rate_limit_cache.get(device_id)
+    key = _rate_limit_key(tenant_id, device_id)
+    last = _rate_limit_cache.get(key)
     if last is not None and (now - last) < _RATE_LIMIT_WINDOW_SEC:
         return False
-    _rate_limit_cache[device_id] = now
+    _rate_limit_cache[key] = now
     # 粗略 GC：当缓存超过 10k 条时丢弃过期项，避免长期内存膨胀
     if len(_rate_limit_cache) > 10000:
         cutoff = now - _RATE_LIMIT_WINDOW_SEC
@@ -127,7 +139,7 @@ async def report_pos_crash(
             detail={"code": "INVALID_PAYLOAD", "message": "device_id 不能为空"},
         )
 
-    if not _rate_limit_check(device_id):
+    if not _rate_limit_check(x_tenant_id, device_id):
         raise HTTPException(
             status_code=429,
             detail={
