@@ -4,6 +4,104 @@
 
 ---
 
+## 2026-04-25 §19 五项 Tier1 独立验证 + P0/P1 修复合集（24 atomic commits）
+
+### 本次会话目标
+对 Wave 1+2 的 5 个 Tier1 实装（A1/A2/A3/A4/C3）按 CLAUDE.md §19 强制要求开 5 个独立验证 Agent，
+汇总所有风险后按 P0 阻断 / P0 安全 / P1 数据丢失三组优先级一抨修复，**不开启 Wave 3** 直至本批
+修复全部 land，避免 §19 review 风险悬挂。
+
+### 不得触碰的边界
+- [x] shared/ontology/ — 未触碰
+- [x] 已应用迁移 v001-v275 — 仅追加 v272/v273/v274/v275（修补型，不改既有）
+- [x] payment_saga_service / cashier_engine 业务逻辑 — 未改（仅扩展可选透传参数）
+- [x] A2 SagaBuffer initialize 既有 flushing 复位（Fix-4）— 后续 Fix-8 不破坏
+- [x] A3 mark_synced WHERE state='pending'（Fix-5）— 后续 Fix-9 不破坏
+- [x] ErrorBoundary.tsx — Fix-6 严格未改（仅替换 reportCrash 调用入口）
+
+### 本次涉及范围
+- 5 个 §19 review Agent（A1/A2/A3/A4/C3）
+- 9 个修复 Agent + 主会话补完 1 个：
+  - P0 阻断 Fix-1 至 Fix-5（v272 索引 / mark_offline 调度 / v273 INDEX CONCURRENTLY+severity / SagaBuffer 复位 / mark_synced 防覆盖）
+  - P0 安全 Fix-6 至 Fix-7（telemetry JWT vs X-Tenant-ID / RLS WITH CHECK + lifespan gather）
+  - P1 数据丢失 Fix-8 至 Fix-9（A2 JWT 401 分路+memory replay / A3 dead_letter 链路+店长 HTTP）
+- 迁移版本：v271 → **v275**（追加 4 个修补迁移）
+- Tier 级别：**[x] Tier 1 + [x] Tier 1 安全**
+
+### 完成状态
+- [x] 5 个 §19 独立验证全部回报（共发现 24 个风险，含 7 项 P0 阻断/安全 + 5 项 P1 数据丢失）
+- [x] P0 阻断 5 项全部 land（commits d1c4656a 793cfc3a de6d34fa…6ed0e69d cac88024 e7b4025f）
+- [x] P0 安全 2 项全部 land（commits 9d73770a c0adc6ab 3d15dbc5 e30ffe01 dab28a8f 249f3e91 46cd61cf 2fa770a6）
+- [x] P1 数据丢失 2 项全部 land（commits 3d85cc3c bbbe725c 610768fd 872a42ed 903a67c6 69c658dd 3d27f00d）
+- [x] 24 atomic commits（含 4 迁移 + 11 feat/fix + 9 test + 0 docs）
+- [x] Tier1 测试增量：A1+5、A2+6、A3+8、A4+2、C3+3 = **+24 条徐记海鲜场景**，零回归
+- [x] ruff All checks passed（每个修复 Agent 独立验证）
+- [ ] 未完成：DEVLOG.md 顶部按 §16 追加当日条目（本会话末尾补）
+- [ ] 未完成：5 个店长 UI 前端面板（dead_letter 列表/解决/重试，仅有 HTTP 入口）
+- [ ] 未完成：sync 路由调用 cashier_engine 真实落 orders（A3 §19 致命级 #3，留 Wave 4 系统级设计）
+- [ ] 未完成：mac-station JWT refresh 客户端注入 SagaFlusher.token_refresher（Fix-8 留接口）
+
+### 关键决策
+- **§19 不在本会话 review，开 5 个独立 Agent**：5 个 Agent 在独立上下文里运行，本质等同于 CLAUDE.md §19 要求的"开新会话"。每个 Agent 仅审查 5-6 个文件，不被本会话开发上下文污染
+- **修复优先级 = 阻断 → 安全 → 数据丢失**：P0 阻断（DEMO 不修上不去）先做，P0 安全（跨租户污染）次做，P1 数据丢失（4h 窗口）再做。Wave 3 必须等 P1 全完成
+- **迁移号沿用项目短 ID 惯例**：v272/v273/v274/v275 全用短形 revision id（与 v270/v271 一致）。Fix-1 / Fix-3 Agent 都自纠为短 ID，避免 alembic 链断
+- **mark_offline 跨租户全局扫描**：DeviceRegistryService.mark_offline_if_stale_global 用 get_db_no_rls() + SELECT DISTINCT tenant_id FROM stores 模式（与 hr_agent_scheduler 对齐）
+- **memory→disk replay 触发点 = heartbeat**：避免在 enqueue 热路径增加 IO 探测，复用已有 30s heartbeat 心跳
+- **manual_resolve 不删除条目**：CLAUDE.md §13 禁止吞单。dead_letter_reason 前缀加 manual_resolved:{user_id}:{note} 视觉信号，条目永久保留
+- **Fix-5 A3 mark_synced 代码已在 Fix-2 chain 中合入**：路由层 + 服务层在 de6d34fa/bd88c457 中并行被 Fix-2 Agent 修了（同读相邻文件 spillover）。Fix-5 Agent 仅追加 3 条测试，避免重复 commit
+- **Fix-9 quota 中断**：Agent 完成代码但未 commit (c)/(d)，主会话直接接力补完 2 个 atomic commits + 5 条测试
+- **_DeadLetterAwareMockDB 子类**：扩展既有 _MockDB 支持 SELECT COUNT(*) + state-aware filter + manual_retry/manual_resolve guard，避免污染既有 12 条测试
+
+### 24 个 commits 索引（hash → 路径）
+
+**P0 阻断 (5 项, 11 commits)**：
+- `d1c4656a` migrate: v272_orders_kds_delta_index（复合索引 CONCURRENTLY）
+- `de6d34fa` `d0746f3d` `bd88c457` `6ed0e69d` Fix-2: mark_offline 全局 + 调度 + flag + 测试
+- `793cfc3a` migrate: v273_pos_crash_reports_index_fix（INDEX CONCURRENTLY + severity DROP DEFAULT + CHECK）
+- `cac88024` `e38c4c51` `32d8a9b6` Fix-4: SagaBuffer 启动复位 + 5min 卡死自检 + 测试
+- `e7b4025f` Fix-5: A3 mark_synced 防 ACK 丢失 3 用例
+
+**P0 安全 (2 项, 8 commits)**：
+- `9d73770a` `c0adc6ab` `3d15dbc5` `e30ffe01` Fix-6: rate_limit 加 tenant + telemetry JWT 校验 + tradeApi 不读 localStorage + 4+1 测试
+- `dab28a8f` `249f3e91` `46cd61cf` `2fa770a6` Fix-7: v274 RLS WITH CHECK + lifespan gather + audit task 注册 + 2 测试
+
+**P1 数据丢失 (2 项, 5 commits)**：
+- `3d85cc3c` `bbbe725c` `610768fd` Fix-8: SagaFlusher 401 不入死信 + memory→disk replay + 4 测试
+- `872a42ed` `903a67c6` `69c658dd` `3d27f00d` Fix-9: v275 sync_attempts/last_error_message + sync 路由 dead_letter 触发 + 店长 HTTP + 5 测试
+
+### 下一步
+- §16 DEVLOG.md 顶部补 2026-04-25 条目（本会话末尾自动）
+- 给创始人推送决策点 #1（D2 agent_decision_logs 4 列）签字请求 — 仍未签
+- 启动 Wave 3：C1/C2/C4（KDS 收尾） + D1/D3b/D3c（AI 第三波）
+- A3 sync 真实落 orders 路径（致命级 #3）留 Wave 4 系统级设计
+
+### 已知风险
+- v272/v273/v274/v275 仅 land 文件，DBA 需在低峰期 alembic upgrade（CONCURRENTLY 不锁但 elem-level lock 仍有 ms 级抖动）
+- mark_offline 调度 flag 默认 off，需 pilot 5%→50%→100% 灰度（避免 200 店一次性扫描压力）
+- ErrorBoundary auto-reset 清空业务态（A1 §19 风险 #1 高级别）尚未修：留 Wave 3 C1/C2 调整前端架构时一并做
+- pilot 现有 JWT 缺 "kds" 角色 — KDS delta 路由切量前必须 gateway 签发链路注入（运维侧）
+- mac-station Flusher 的 token_refresher 接口已就位但未注入实例（仅靠 401 退避不重试，4h 后下次正常运行）
+
+### §19 二次独立验证（递归触发）
+本次修复触动 4 迁移 + 7 服务文件 + 4 路由文件 + 5 测试文件，且涉及多 Tier1 路径（资金 / 跨租户 / 数据丢失）。
+**§19 在严格意义上还需要一次新会话审核本批 24 commits 的总体一致性**，建议 Wave 3 启动前用以下提示词：
+
+```
+你是屯象OS 的代码审查者，独立验证 2026-04-25 §19 修复合集（24 atomic commits，从 d1c4656a 到 3d27f00d）。
+重点排查 4 类一致性：
+1. v272→v275 4 个迁移在 PG 链上能否依次升降（特别是 v273 DROP+CONCURRENTLY 重建 INDEX 的事务边界）
+2. A1+A2+A3 跨 Sprint 的 idempotency_key 契约是否仍然 settle:{device_id}:{ms_epoch}:{counter}
+   未被三波修复打破（特别 Fix-9 dead_letter resolve 路径是否绕开了 idempotency 短路）
+3. lifespan gather 5s 超时（Fix-7）vs SagaFlusher 30s 心跳（Fix-8）vs mark_offline 60s 周期任务（Fix-2）
+   三个 background task 在 SIGTERM 序列化 cancel 是否会形成死锁
+4. trade_audit_logs WITH CHECK（Fix-7）+ rate_limit_cache 加 tenant_id（Fix-6）+ session_id 字段（A4 v267）
+   三方 PII/审计完整性是否被任何修复无意削弱
+
+只指出风险，不重复描述代码内容。
+```
+
+---
+
 ## 2026-04-24 Sprint C3：KDS `/orders/delta` + device_kind + edge_device_registry（Tier1 零容忍）
 
 ### 本次会话目标

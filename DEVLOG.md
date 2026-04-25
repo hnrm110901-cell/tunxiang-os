@@ -1,3 +1,44 @@
+## 2026-04-25 §19 五项 Tier1 独立验证 + P0/P1 修复合集（24 atomic commits）
+
+### 今日完成
+- 5 个 §19 独立验证 Agent（A1 ErrorBoundary / A2 SagaBuffer / A3 UUID v7 / A4 RBAC / C3 KDS delta）并行运行，共发现 24 个风险（7 P0 阻断/安全 + 5 P1 数据丢失 + 12 P2/P3）
+- **P0 阻断 5 项 11 commits**：
+  - v272 orders (tenant_id, store_id, updated_at) 复合索引 CONCURRENTLY（C3 P99 真 PG 阻断 → DEMO 演示无法跑过）
+  - v273 pos_crash_reports INDEX 改 CONCURRENTLY + severity DROP DEFAULT + 历史 fatal 回填 NULL + 加 CHECK 枚举
+  - DeviceRegistryService.mark_offline_if_stale_global（跨租户全局扫描）+ tx-trade main.py 60s 周期 task + flag gate + 测试
+  - SagaBuffer.initialize 启动复位 flushing→pending（防进程崩溃后死单泄漏）+ SagaFlusher 5min 卡死自检 + 跨租户隔离 + 测试
+  - mark_synced 加 WHERE state='pending' 防 ACK 丢失 cloud_id 漂移双扣费 + IntegrityError 与 DB_ERROR 分桶 + 测试
+- **P0 安全 2 项 8 commits**：
+  - tx-ops telemetry_routes JWT vs X-Tenant-ID 强一致性校验（防 localStorage 改写跨租户写）+ rate_limit_cache 加 tenant_id 维度（防多租户切换误限流）+ web-pos tradeApi reportCrash 不再读 localStorage tenant + 4+1 测试
+  - v274 trade_audit_logs RLS 加 WITH CHECK（防跨租户审计污染）+ tx-trade main.py lifespan 跟踪 background tasks gather 5s（防 SIGTERM 丢审计）+ trade_audit_log task 注册 helper + 2 测试
+- **P1 数据丢失 2 项 5 commits**：
+  - SagaFlusher 401 JWT 过期单独分支：不入死信 / 不增 attempts / 30s 退避 / 可选 token_refresher 注入接口 + SagaBuffer memory→disk 自动 replay（heartbeat 触发探测）+ 4 测试
+  - v275 offline_order_mapping ADD COLUMN sync_attempts/last_error_message + sync 路由 dead_letter 计数链路接入（达 20 次自动落 dead_letter）+ list_pending HTTP + dead-letter list/resolve/retry 三个店长 HTTP 入口（三方租户校验 + audit log）+ 5 测试
+
+### 数据变化
+- 迁移版本：v271 → **v275**（追加 4 个修补迁移 v272/v273/v274/v275）
+- 新增测试：A1+5 / A2+6 / A3+8 / A4+2 / C3+3 = **+24 条徐记海鲜 Tier1 场景**
+- 新增 service 方法：DeviceRegistryService.mark_offline_if_stale_global / OfflineOrderMappingService.{count_dead_letters,list_dead_letter,manual_resolve,manual_retry,increment_attempts}
+- 新增路由：GET /offline-orders/dead-letter / POST /dead-letter/{id}/resolve / POST /dead-letter/{id}/retry
+- 新增 background task：tx-trade main.py 60s mark_offline 周期任务 + lifespan gather 5s 兜底
+- 新增 flag：edge.kds.mark_offline_scheduler（默认 off，rollout [5,50,100]）
+
+### 遗留问题
+- §19 二次独立验证（递归触发）：本批 24 commits 总体一致性需新会话审查（4 类一致性：迁移链 / idempotency 跨 Sprint / 三 background task SIGTERM / RLS+rate_limit+session_id PII）
+- 决策点 #1（D2 agent_decision_logs 4 列）创始人签字仍未到位
+- A3 sync 真实落 orders 路径（致命级 #3，空映射问题）— 留 Wave 4 系统级设计
+- 5 个店长前端 UI 面板（dead_letter 列表/解决/重试）— 仅有 HTTP 入口
+- mac-station Flusher token_refresher 实例注入（接口已就位，注入留下一 Sprint）
+- ErrorBoundary auto-reset 清空业务态（A1 §19 风险 #1）— 留 Wave 3 C1/C2 一并修
+- pilot JWT 缺 "kds" 角色 — KDS delta 切量前必须 gateway 签发链路注入
+
+### 明日计划
+- 启动 §19 二次独立验证新会话（按 progress.md 末尾提示词）
+- Wave 3 启动：C1 IndexedDB last-100 / C2 connectionHealth UI / C4 Playwright 4h E2E / D1 ConstraintChecker 批量覆盖 / D3b 活动 ROI Prophet+Sonnet / D3c 菜品动态定价 边缘 Core ML
+- 推送 D2 决策点 #1 给创始人
+
+---
+
 ## 2026-04-24 Sprint C3 — KDS `/orders/delta` + device_kind + edge_device_registry（Tier1 零容忍）
 
 ### 今日完成
