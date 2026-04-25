@@ -107,6 +107,10 @@ class _MockDB:
             key = (p["tenant_id"], p["offline_order_id"])
             if key in self._rows:
                 row = self._rows[key]
+                # mark_synced 守护：WHERE state='pending'（A3 §19 #2 防双扣费）。
+                # mock 必须忠实模拟生产 SQL，否则 test A 无法验证幂等 no-op。
+                if "pending_state" in p and row.get("state") != p["pending_state"]:
+                    return AsyncMock(rowcount=0)
                 # service 层把 dead_letter_reason 作为 :reason 传入；sync_attempts
                 # 递增在生产 SQL 中用表达式完成（非参数），此处 mock 代为 +1
                 if "reason" in p:
@@ -423,3 +427,270 @@ def test_generate_offline_order_id_performance_smoke():
     elapsed_ms = (time.perf_counter() - t0) * 1000
     # 500 次 < 500ms 即可（平均 < 1ms/次）
     assert elapsed_ms < 500, f"生成性能超预算: {elapsed_ms:.1f}ms/500 次"
+
+
+# ──────────────── A3 §19 致命级 #2 防双扣费场景（追加 3 用例） ────────────────
+#
+# 背景：服务端 mark_synced 成功 → 响应在网络层丢失 → 客户端重试 → 若服务端
+# 用新生成的 cloud_order_id 覆盖原有 synced 行，对账时同一离线单关联两个
+# 云端订单 → 资金双扣费。
+#
+# 防御层级：
+#   1) 服务层：mark_synced UPDATE 加 WHERE state='pending'（rowcount=0 → False）
+#   2) 路由层：mark_synced 前 SELECT；若已 synced 直接返回既有 cloud_order_id
+#   3) DB 层：唯一约束 IntegrityError 视为幂等成功，不报 DB_ERROR
+
+
+@pytest.mark.asyncio
+async def test_xujihaixian_mark_synced_already_synced_returns_false_no_overwrite():
+    """场景 A：徐记王府井店 ACK 丢失重试链路第一环 ── service 层守护
+
+    mark_synced 已是 synced 的条目时：
+      - 必须返回 False（rowcount=0；生产 SQL 的 WHERE state='pending' 守护）
+      - 既有 cloud_order_id 必须保持不变（不被新 cloud_order_id 覆盖）
+      - 既有 state 必须保持 SYNCED（不回退）
+
+    本用例锁定 A3 §19 #2 致命级修复行为契约：服务层是最后一道资金安全防线。
+    """
+    db = _MockDB()
+    svc = OfflineOrderMappingService(db=db, tenant_id=XUJI_CHANGSHA_TENANT)
+
+    offline_id, _ = generate_offline_order_id(POS_DEVICE_A, counter=51)
+    original_cloud = "a1111111-1111-1111-1111-111111111111"
+    attempted_cloud = "b2222222-2222-2222-2222-222222222222"
+
+    # Step1：首次 sync 成功
+    await svc.upsert_mapping(
+        store_id=XUJI_CHANGSHA_STORE,
+        device_id=POS_DEVICE_A,
+        offline_order_id=offline_id,
+    )
+    first_advanced = await svc.mark_synced(
+        offline_order_id=offline_id,
+        cloud_order_id=original_cloud,
+    )
+    assert first_advanced is True, "首次 mark_synced 必须推进状态（pending → synced）"
+
+    row_after_first = await svc.get(offline_id)
+    assert row_after_first["state"] == MappingState.SYNCED.value
+    assert row_after_first["cloud_order_id"] == original_cloud
+
+    # Step2：模拟 ACK 丢失重试 ── 客户端带原 offline_order_id 再次提交，
+    # 服务端（错误地）生成了新 cloud_id 又调 mark_synced。
+    # 守护必须把它挡在外面。
+    second_advanced = await svc.mark_synced(
+        offline_order_id=offline_id,
+        cloud_order_id=attempted_cloud,
+    )
+    assert second_advanced is False, (
+        "已 synced 条目的 mark_synced 必须返回 False（幂等 no-op），"
+        "否则下层会用新 cloud_order_id 覆盖原有，造成同一离线单两个云端订单 → 双扣费"
+    )
+
+    # Step3：cloud_order_id 必须保持原值（双扣费防护核心断言）
+    row_after_retry = await svc.get(offline_id)
+    assert row_after_retry["cloud_order_id"] == original_cloud, (
+        f"cloud_order_id 被覆盖：原={original_cloud} 现={row_after_retry['cloud_order_id']} "
+        "→ 资金双扣费风险！"
+    )
+    assert row_after_retry["state"] == MappingState.SYNCED.value, "state 不得回退"
+
+    # Step4：dead_letter 条目同样不可被 mark_synced 推进（白名单只有 pending）
+    dl_offline_id, _ = generate_offline_order_id(POS_DEVICE_A, counter=52)
+    await svc.upsert_mapping(
+        store_id=XUJI_CHANGSHA_STORE,
+        device_id=POS_DEVICE_A,
+        offline_order_id=dl_offline_id,
+    )
+    await svc.mark_dead_letter(offline_order_id=dl_offline_id, reason="test_dl")
+    dl_advanced = await svc.mark_synced(
+        offline_order_id=dl_offline_id,
+        cloud_order_id="cccccccc-cccc-cccc-cccc-cccccccccccc",
+    )
+    assert dl_advanced is False, "dead_letter 条目不得被 mark_synced 推进"
+    dl_row = await svc.get(dl_offline_id)
+    assert dl_row["state"] == MappingState.DEAD_LETTER.value
+    assert dl_row["cloud_order_id"] is None or dl_row["cloud_order_id"] != "cccccccc-cccc-cccc-cccc-cccccccccccc"
+
+
+@pytest.mark.asyncio
+async def test_xujihaixian_sync_route_ack_lost_replay_returns_original_cloud_id():
+    """场景 B：徐记王府井店 ACK 丢失重试链路第二环 ── 路由层幂等
+
+    /api/v1/offline-orders/sync 收到重复 offline_order_id：
+      - 路由层先 SELECT，发现已 synced → 直接复用既有 cloud_order_id
+      - **绝不**生成新 UUID，**绝不**第二次 mark_synced 推进
+      - 响应里返回的 cloud_order_id 与首次相同（客户端对账无歧义）
+
+    此为路由层防御 ── 即便服务层守护被绕过（如未来重构破坏 WHERE state），
+    路由层仍能拦截重复请求。
+    """
+    from src.api.offline_sync_routes import (  # noqa: PLC0415
+        OfflineOrderEntry,
+        OfflineSyncRequest,
+        sync_offline_orders,
+    )
+    from src.security.rbac import UserContext  # noqa: PLC0415
+
+    db = _MockDB()
+
+    # 生成离线 order_id（device 必须与 body.device_id 一致，路由层会校验）
+    offline_id, _ = generate_offline_order_id(POS_DEVICE_A, counter=77)
+
+    # Step1：首次提交 ── 服务端生成 cloud_id_A
+    body1 = OfflineSyncRequest(
+        tenant_id=XUJI_CHANGSHA_TENANT,
+        store_id=XUJI_CHANGSHA_STORE,
+        device_id=POS_DEVICE_A,
+        offline_orders=[OfflineOrderEntry(offline_order_id=offline_id)],
+    )
+    user = UserContext(
+        user_id="00000000-0000-0000-0000-0000000000c1",
+        tenant_id=XUJI_CHANGSHA_TENANT,
+        role="cashier",
+        mfa_verified=True,
+        store_id=XUJI_CHANGSHA_STORE,
+        client_ip="10.0.0.1",
+    )
+    # Request 仅供路由方法签名，内部未使用属性 → SimpleNamespace 即可
+    fake_req = SimpleNamespace(state=SimpleNamespace(), client=SimpleNamespace(host="10.0.0.1"))
+
+    resp1 = await sync_offline_orders(
+        body=body1,
+        request=fake_req,
+        x_tenant_id=XUJI_CHANGSHA_TENANT,
+        db=db,
+        user=user,
+    )
+    assert resp1.ok is True
+    assert resp1.data is not None
+    mapping1 = resp1.data["mappings"][0]
+    cloud_id_first = mapping1["cloud_order_id"]
+    assert mapping1["offline_order_id"] == offline_id
+    assert mapping1["state"] == "synced"
+    assert cloud_id_first  # 非空
+
+    # Step2：ACK 丢失，客户端带原 offline_order_id 重试（无 cloud_order_id）
+    body2 = OfflineSyncRequest(
+        tenant_id=XUJI_CHANGSHA_TENANT,
+        store_id=XUJI_CHANGSHA_STORE,
+        device_id=POS_DEVICE_A,
+        offline_orders=[OfflineOrderEntry(offline_order_id=offline_id)],
+    )
+    resp2 = await sync_offline_orders(
+        body=body2,
+        request=fake_req,
+        x_tenant_id=XUJI_CHANGSHA_TENANT,
+        db=db,
+        user=user,
+    )
+    assert resp2.ok is True
+    assert resp2.data is not None
+    mapping2 = resp2.data["mappings"][0]
+
+    # 双扣费防护核心断言：返回值必须是首次的 cloud_order_id（不是新 UUID）
+    assert mapping2["cloud_order_id"] == cloud_id_first, (
+        f"重试响应 cloud_order_id 不一致：首次={cloud_id_first} 重试={mapping2['cloud_order_id']} "
+        "→ 客户端会以为是新订单 → 双扣费！"
+    )
+    assert mapping2["state"] == "synced"
+
+    # 数据层验证：mapping 表里依然只有一行，cloud_order_id 仍是首次值
+    final_row = next(
+        r for k, r in db._rows.items() if k[1] == offline_id and k[0] == XUJI_CHANGSHA_TENANT
+    )
+    assert final_row["cloud_order_id"] == cloud_id_first, (
+        "DB 中 cloud_order_id 已被覆盖 → 资金双扣费"
+    )
+
+
+@pytest.mark.asyncio
+async def test_xujihaixian_sync_route_unique_violation_swallowed_as_idempotent():
+    """场景 C：徐记王府井店并发同 offline_order_id 提交 ── DB 层幂等
+
+    场景：两台 Mac mini Flusher 工人同毫秒提交同一 offline_order_id（极端
+    边界：边缘网卡抖动后重传 + flusher worker 间分布式锁竞态失败）。
+      - upsert 的 ON CONFLICT DO NOTHING 已能 dedup，但生产 SQL 也可能因为
+        idx/触发器在 INSERT 阶段抛 IntegrityError（PG 唯一约束并发竞争）
+      - 路由必须 catch IntegrityError 在 SQLAlchemyError 之前（更具体的异常先），
+        视为"幂等成功"返回 ok=True，**不**报 DB_ERROR
+      - 真正的 DB 故障（连接断 / 死锁 / 表损坏 = SQLAlchemyError 非 IntegrityError）
+        仍走 DB_ERROR 分支告警
+    """
+    from sqlalchemy.exc import IntegrityError, OperationalError  # noqa: PLC0415
+
+    from src.api.offline_sync_routes import (  # noqa: PLC0415
+        OfflineOrderEntry,
+        OfflineSyncRequest,
+        sync_offline_orders,
+    )
+    from src.security.rbac import UserContext  # noqa: PLC0415
+
+    offline_id, _ = generate_offline_order_id(POS_DEVICE_A, counter=88)
+
+    user = UserContext(
+        user_id="00000000-0000-0000-0000-0000000000c1",
+        tenant_id=XUJI_CHANGSHA_TENANT,
+        role="cashier",
+        mfa_verified=True,
+        store_id=XUJI_CHANGSHA_STORE,
+        client_ip="10.0.0.1",
+    )
+    fake_req = SimpleNamespace(state=SimpleNamespace(), client=SimpleNamespace(host="10.0.0.1"))
+    body = OfflineSyncRequest(
+        tenant_id=XUJI_CHANGSHA_TENANT,
+        store_id=XUJI_CHANGSHA_STORE,
+        device_id=POS_DEVICE_A,
+        offline_orders=[OfflineOrderEntry(offline_order_id=offline_id)],
+    )
+
+    # ── Sub-case C1：IntegrityError 视为幂等成功 ──
+    class _IntegrityRaisingDB(_MockDB):
+        async def execute(self, stmt, params=None):
+            sql = str(stmt).strip()
+            # SELECT/SET 走父类正常路径
+            if sql.startswith("SELECT") or "set_config" in sql:
+                return await super().execute(stmt, params)
+            # 第一次 INSERT/UPDATE 抛唯一约束（模拟并发竞争）
+            raise IntegrityError(
+                "duplicate key value violates unique constraint",
+                params=params,
+                orig=Exception("uniq_offline_order_mapping"),
+            )
+
+    db_uniq = _IntegrityRaisingDB()
+    resp_uniq = await sync_offline_orders(
+        body=body,
+        request=fake_req,
+        x_tenant_id=XUJI_CHANGSHA_TENANT,
+        db=db_uniq,
+        user=user,
+    )
+    # 关键断言：IntegrityError 被吞 → ok=True，不是 DB_ERROR
+    assert resp_uniq.ok is True, (
+        f"IntegrityError 被错误归类为 DB_ERROR：error={resp_uniq.error}"
+    )
+    assert resp_uniq.error is None, "幂等冲突不应填 error 字段"
+    # rollback 至少一次
+    assert db_uniq.rollbacks >= 1, "IntegrityError 必须触发 rollback 释放事务"
+
+    # ── Sub-case C2：真 DB 故障仍归类 DB_ERROR ──
+    class _OperationalDB(_MockDB):
+        async def execute(self, stmt, params=None):
+            sql = str(stmt).strip()
+            if sql.startswith("SELECT") or "set_config" in sql:
+                return await super().execute(stmt, params)
+            raise OperationalError("db connection lost", params=None, orig=Exception("conn"))
+
+    db_op = _OperationalDB()
+    resp_op = await sync_offline_orders(
+        body=body,
+        request=fake_req,
+        x_tenant_id=XUJI_CHANGSHA_TENANT,
+        db=db_op,
+        user=user,
+    )
+    # 关键断言：非 IntegrityError 的 SQLAlchemyError → DB_ERROR（不能被静悄悄吞）
+    assert resp_op.ok is False, "真 DB 故障必须报 DB_ERROR 让客户端重试 / 告警"
+    assert resp_op.error is not None
+    assert resp_op.error["code"] == "DB_ERROR"
