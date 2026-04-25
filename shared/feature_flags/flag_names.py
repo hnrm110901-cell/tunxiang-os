@@ -199,6 +199,13 @@ class EdgeFlags:
     # 5%→50%→100% 灰度，4h E2E 零卡顿 / 60s 断网恢复全同步为门禁
     KDS_DELTA_SYNC = "edge.kds.delta_sync"
 
+    # Sprint C3 §19（Tier1）：mark_offline_if_stale 60s 周期调度。
+    # off=不启动调度任务（DEMO 演示拔 KDS 网线 11min 后 health_status 永远停留 healthy）
+    # on=tx-trade lifespan 启动 60s 周期 task → 跨租户调用
+    #    DeviceRegistryService.mark_offline_if_stale_global，超 600s 心跳标 offline
+    # 默认 off：先在 DEMO 环境验证后再灰度，避免误标 offline 干扰真实运维
+    MARK_OFFLINE_SCHEDULER = "edge.kds.mark_offline_scheduler"
+
 
 class SupplyFlags:
     """供应链域 Flag 名称。"""

@@ -176,3 +176,32 @@ flags:
         - dimension: store_id
           values: []  # 5% 灰度门店审批后填入
     tags: [edge, c3, sprint-q2-2026, tier1, kds, delta-sync]
+
+  - identifier: edge_kds_mark_offline_scheduler
+    name: edge.kds.mark_offline_scheduler
+    description: >
+      Sprint C3 §19 KDS 离线扫描周期调度（Tier1）。
+      on=tx-trade lifespan 启动 60s 周期 task →
+         DeviceRegistryService.mark_offline_if_stale_global 跨租户扫描
+         edge_device_registry，超 600s 心跳的设备 health_status → offline。
+      off=不启动调度任务（DEMO 演示拔 KDS 网线 11min 后 health_status
+         永远停留 healthy，运维面板假象一切正常）。
+      默认 off：DEMO 环境先开启验证 → 灰度 5% 门店 → 再全量。
+      与 edge.kds.delta_sync 配合：delta_sync on 才有 heartbeat 数据，
+      mark_offline_scheduler 才有意义。
+    defaultValue: false
+    environments:
+      dev: false
+      test: false
+      uat: false
+      pilot: false
+      prod: false
+    rollout: [5, 50, 100]
+    targeting_rules:
+      pilot:
+        - dimension: edge_node_group
+          values: [mac_mini_m4_pilot]
+      prod:
+        - dimension: store_id
+          values: []  # 5% 灰度门店审批后填入
+    tags: [edge, c3, sprint-q2-2026, tier1, kds, scheduler, offline-detection]
