@@ -281,6 +281,26 @@ class SagaFlusher:
                 threshold_seconds=FLUSHING_STUCK_THRESHOLD_SEC,
             )
 
+        # Fix-8b：memory_mode 时尝试把内存条目 replay 回磁盘
+        # （磁盘恢复后不再有进程重启丢数据风险，对齐 §22 断网 4h 零数据丢失）
+        if self._buffer.is_memory_mode:
+            try:
+                replayed = await self._buffer.try_replay_memory_to_disk()
+            except (OSError, RuntimeError, ValueError) as exc:
+                # 防御：try_replay 内部已 swallow OSError，这里兜底未预期异常
+                logger.warning(
+                    "saga_flusher.memory_replay_unexpected_error",
+                    tenant_id=self._tenant_id,
+                    error=str(exc),
+                )
+                replayed = 0
+            if replayed > 0:
+                logger.info(
+                    "saga_flusher.memory_replay_triggered",
+                    tenant_id=self._tenant_id,
+                    count=replayed,
+                )
+
         stats = await self._buffer.stats(tenant_id=self._tenant_id)
         health = _compute_health(stats)
         body = {

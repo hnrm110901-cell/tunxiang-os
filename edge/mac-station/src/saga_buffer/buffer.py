@@ -26,6 +26,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import tempfile
 import time
 import uuid
 from dataclasses import dataclass
@@ -587,6 +588,131 @@ class SagaBuffer:
                     idempotency_key=idempotency_key,
                     error=str(exc),
                 )
+
+    async def try_replay_memory_to_disk(self) -> int:
+        """Fix-8b：memory 降级模式下把内存条目 replay 回磁盘。
+
+        触发时机：SagaFlusher.heartbeat 每分钟调用一次（仅 memory_mode）。
+        语义：
+          1. 不在 memory_mode → 返回 0（no-op）
+          2. 探测磁盘是否可写（tempfile 试写）
+          3. 可写 → 重新 connect aiosqlite + 把 _memory_rows 全量 INSERT 回 SQLite
+          4. 写完后清空 _memory_rows，关闭 _memory_mode
+          5. 失败 → 返回 0，保持 memory 模式（warning 日志，不抛）
+        """
+        if not self._memory_mode:
+            return 0
+
+        async with self._lock:
+            if not self._memory_mode:
+                # 双重检查（避免并发调用重复 replay）
+                return 0
+
+            # 1. 磁盘可写探测
+            parent = self._db_path.parent
+            try:
+                parent.mkdir(parents=True, exist_ok=True)
+            except OSError as exc:
+                logger.warning(
+                    "saga_buffer.memory_replay_parent_unwritable",
+                    path=str(self._db_path),
+                    error=str(exc),
+                )
+                return 0
+            if not os.access(parent, os.W_OK):
+                logger.warning(
+                    "saga_buffer.memory_replay_parent_not_writable",
+                    path=str(self._db_path),
+                )
+                return 0
+            try:
+                # tempfile 试写：在父目录创建并立刻删除一个 0 字节文件
+                with tempfile.NamedTemporaryFile(
+                    dir=str(parent), prefix=".saga_buffer_probe_", delete=True
+                ):
+                    pass
+            except OSError as exc:
+                logger.warning(
+                    "saga_buffer.memory_replay_disk_probe_failed",
+                    path=str(self._db_path),
+                    error=str(exc),
+                )
+                return 0
+
+            # 2. connect + DDL
+            try:
+                import aiosqlite
+
+                conn = await aiosqlite.connect(str(self._db_path))
+                conn.row_factory = aiosqlite.Row
+                await conn.execute("PRAGMA journal_mode=WAL")
+                await conn.execute("PRAGMA synchronous=NORMAL")
+                await conn.executescript(_DDL)
+                await conn.commit()
+            except (OSError, ImportError) as exc:
+                logger.warning(
+                    "saga_buffer.memory_replay_connect_failed",
+                    path=str(self._db_path),
+                    error=str(exc),
+                )
+                return 0
+
+            # 3. INSERT 内存条目（OR IGNORE：磁盘已有同 key 时保留磁盘版本）
+            replayed = 0
+            try:
+                for entry in self._memory_rows.values():
+                    payload_json = json.dumps(
+                        entry.payload, ensure_ascii=False, sort_keys=True
+                    )
+                    await conn.execute(
+                        "INSERT OR IGNORE INTO saga_buffer "
+                        "(idempotency_key, tenant_id, store_id, device_id, "
+                        " saga_id, payload_json, attempts, last_attempt_at, "
+                        " state, last_error, created_at, expires_at) "
+                        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                        (
+                            entry.idempotency_key,
+                            entry.tenant_id,
+                            entry.store_id,
+                            entry.device_id,
+                            entry.saga_id,
+                            payload_json,
+                            entry.attempts,
+                            entry.last_attempt_at,
+                            entry.state,
+                            entry.last_error,
+                            entry.created_at,
+                            entry.expires_at,
+                        ),
+                    )
+                    replayed += 1
+                await conn.commit()
+            except OSError as exc:
+                # 写中途磁盘又满 → 关闭 conn，保留 memory 模式
+                logger.warning(
+                    "saga_buffer.memory_replay_write_failed",
+                    error=str(exc),
+                    replayed=replayed,
+                )
+                try:
+                    await conn.close()
+                except OSError:
+                    pass
+                return 0
+
+            # 4. replay 成功 → 切换到 sqlite 模式，清空 memory dict
+            self._conn = conn
+            count = len(self._memory_rows)
+            self._memory_rows.clear()
+            self._memory_mode = False
+            logger.info(
+                "saga_buffer.memory_replay_success",
+                count=count,
+                replayed=replayed,
+                path=str(self._db_path),
+                device_id=self._device_id,
+            )
+            return replayed
 
     async def sweep_expired(
         self,
