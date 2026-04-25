@@ -256,6 +256,128 @@
 
 ---
 
+## 2026-04-25 17:00 §19 修复落地（A4-R2 + A1-R1 复核）
+
+> 接 2026-04-24 §19 审查报告。本会话对 §19 列出的两个未修阻塞做处置：A1-R1 经复核后是 false positive；A4-R2 实施修复 + 11 测试。
+
+### A1-R1（顶层 ErrorBoundary 缺失）— 复核为 **FALSE POSITIVE**
+
+原审查只看了 `apps/web-pos/src/App.tsx` 没看 `main.tsx`。实际顶层 boundary 在 `main.tsx::Root`：
+
+```tsx
+// apps/web-pos/src/main.tsx L24-34
+if (boundaryEnabled) {
+  return (
+    <ErrorBoundary
+      onReport={reportCrashToTelemetry}
+      onReset={navigateToTables}
+      fallback={rootFallback}     // 顶层文案 "遇到意外错误"，非 "结账失败"
+    >
+      <App />
+      <ToastContainer />
+    </ErrorBoundary>
+  );
+}
+```
+
+- `RootFallback.tsx` 使用中性文案 "遇到意外错误" + "返回桌台" 跳 `/tables`
+- `App.tsx::CashierBoundary` 仍提供专属 "结账失败，请扫桌重试" 文案给 `/order/:orderId` 和 `/settle/:orderId`
+- featureFlag `trade.pos.errorBoundary.enable` 默认 `true`
+- 现有 `ErrorBoundary.test.tsx` 10 测试全绿；`rootFallback —— 顶层 ErrorBoundary 降级 UI` 章节 3 个测试已对中性文案、`/tables` 跳转、`navigateToTables` 做断言
+- `ErrorBoundary.tsx` 当前实现**无 `resetAfterMs` 自愈循环**——R-A1-2 提到的 "3s 无限循环风险" 也是 false positive（早已简化为 `resetKey` 触发的手动 reset，无 setTimeout）
+
+**裁决**：A1-R1 + A1-R2 均无需代码改动。审查报告应在原文件标注为 false positive 而非要求修复。
+
+### A4-R2（write_audit 跨租户 target_id 探测信道）— **已修复**（commit bbd3259f）
+
+#### 攻击面回顾
+长沙店 manager 的合法凭据 + 韶山店订单 UUID 作为 `target_id` 调 `/api/v1/payment-direct/alipay`：
+1. `create_alipay_payment` 走 RLS 看不到该单 → 业务层抛错 / 失败
+2. **但** 路由代码的 `await write_audit(..., target_id=body.order_id)` 仍把跨租户 UUID 写入长沙审计行
+3. 攻击者后续查 audit 表（自己租户内可见）→ 回查 target_id 命中情况 → 枚举其他租户订单 ID
+
+#### 修复方案
+**关键洞察**：RLS 自身就提供租户隔离，借力即可，无需新增 SECURITY DEFINER。
+
+`services/tx-trade/src/services/trade_audit_log.py`：
+
+1. `_TARGET_TENANT_LOOKUPS` map：`target_type → [(table, id_col, pg_type)]`
+   - 覆盖 7 类：`order` / `banquet` / `banquet_deposit` / `banquet_confirmation` / `discount_rule` / `payment` / `refund`
+   - 未注册类型（voucher / coupon / reconcile / retry_queue 等）→ fail-open
+
+2. `_target_in_caller_tenant(db, target_type, target_id) -> bool | None`
+   - 借助已绑定的 `app.tenant_id` RLS：`SELECT 1 FROM <table> WHERE <id_col> = CAST(:id AS <type>) LIMIT 1`
+   - True：在 caller 租户内（正常审计）
+   - False：候选表查询成功但都未命中（跨租户 / 已删除 / 不存在）
+   - None：未注册类型 / 候选表全部 SQLAlchemyError（fail-open，审计不阻塞）
+
+3. `write_audit` 在 `set_config` 后、`INSERT` 前调用此检查
+   - 检测到 cross-tenant：
+     - `target_id` / `amount_fen` / `before_state` / `after_state` 全部 → NULL
+     - `result` 升级为 `'deny'`（若原非 deny / mfa_required）
+     - `severity` 升级为 `'critical'`
+     - `reason` 拼接 `cross_tenant_target_blocked:<target_type>`
+     - `logger.error("trade_audit_cross_tenant_target_blocked", severity="critical", ...)` → SIEM 告警链路
+
+#### 关键决策记录
+- **不抛 raise**：审查建议 "raise"，实施时改为 sanitize + structlog critical。理由：CLAUDE.md "审计不阻塞业务" 是 Tier1 不变量，raise 会让业务路径继续抛但审计 record 丢失，反而丢证据
+- **不引入 SECURITY DEFINER**：v290 已稳定，避免再加迁移；RLS 自身提供边界
+- **fail-open 哲学**：lookup 抖动 / 表不存在 / 未注册类型 → 走原审计写入。审计基础设施的可用性优先于"绝对正确性"
+- **AsyncMock 兼容**：`_target_in_caller_tenant` 内部容忍 mock 返回的 MagicMock；现有 6 个 `test_trade_audit_log.py` 单元测试零回归
+
+#### 测试覆盖
+新文件 `services/tx-trade/src/tests/test_trade_audit_cross_tenant_tier1.py`，11 测试全绿：
+
+| # | 场景 | 断言重点 |
+|---|------|---------|
+| T1 | 长沙→韶山订单 UUID（核心攻击） | sanitize + result='deny' + severity='critical' + reason 含 'cross_tenant_target_blocked:order' |
+| T2 | 同租户订单 UUID | target_id 保留，result/severity 仍 None |
+| T3 | 未注册 target_type='voucher' | fail-open，无 lookup SQL |
+| T4 | 候选表全部 SQLAlchemyError | fail-open，原 target_id 保留 |
+| T5 | target_id=None | 完全跳过 lookup |
+| T6 | 已是 deny + 跨租户 target | 保留 result='deny'，sanitize target_id，severity 升 critical，reason 拼接 |
+| T7 | order + 'EMO20260425...' 非 UUID | UUID 表全部跳过，fail-open |
+| T8 | SIEM critical structlog 必发出 | logger.error 带 severity='critical' + 完整上下文 |
+| T9-T11 | helper 单元测试 | _is_valid_uuid + _target_in_caller_tenant 边界值 |
+
+#### 跨测试套件复核
+```
+src/tests/test_trade_audit_log.py            6/6 ✅（原有）
+src/tests/test_trade_audit_cross_tenant_tier1.py  11/11 ✅（新增）
+src/tests/test_rbac_audit_deny_tier1.py       8/8 ✅（R-补1-1 配套）
+                                            ─────
+                                              25/25 ✅
+```
+
+### §19 阻塞清单更新
+
+| # | 项 | 状态 |
+|---|---|------|
+| R-A1-1 顶层 ErrorBoundary | ✅ 复核为 false positive（main.tsx 已挂载） |
+| R-A1-2 resetAfterMs 自愈循环 | ✅ 复核为 false positive（已简化） |
+| R-A4-2 write_audit 跨租户 target_id | ✅ 本次修复 + 11 测试（commit bbd3259f） |
+| R-A4-3 v267 docstring 矛盾 | ✅ R-补1-1 中通过 v290 解决（severity 4 级 SIEM 标准） |
+| R-补1-1 9 路由 deny 审计缺失 | ✅ 590a582a + 56308e46 |
+| R-补2-1 离线 replay 双扣 | ✅ 48aba740 |
+| R-A1-3 服务端幂等 cache | ⏳ 待办（需 tx-trade 服务端独立 PR） |
+| R-A1-4 audit hook 启动校验 | ⏳ 待办（tx-ops 启动 lifecycle） |
+| R-A4-1 flag `trade.rbac.strict` 未读取 | ⏳ 待办（D3a/f53370 上） |
+| R-补3-1 ModelRouter cost 三段记账 | ⏳ 仅 f53370 分支，待合并后处理 |
+
+**当前 main 分支 §19 阻塞剩 2 项**（A1-R3 服务端幂等 + A1-R4 audit hook 启动校验），其余 2 项在 f53370 分支。
+
+### 已知风险
+- AsyncMock 默认行为让 `_target_in_caller_tenant` 在测试中走"找到→True"路径。生产环境真实 PG 不会出现此 ambiguity，但若未来换 mock 框架，需保持"`.first()` 返回 None / 真实 row 二选一"的契约
+- `_TARGET_TENANT_LOOKUPS` 是显式注册：新增涉及 DB 实体的 target_type 时必须同步加 entry，否则该类型默认 fail-open（无防护）。已在文件头注释中说明
+- lookup 增加每次审计 1~3 次 SELECT 1（带 LIMIT 1 + 索引主键命中），徐记 200 桌晚高峰 TPS 估算 +0.5~1.5ms 延迟。审计本身在主链路异步分支，可接受
+- 没有 e2e 真实 PG fixture 验证 RLS 行为（用 mock 模拟 RLS 返回）。建议 Sprint H DEMO 阶段加 1 个真实 PG 跨租户 e2e 测试
+
+### 下一步
+- 开新会话独立审查 commit bbd3259f（§19 触发条件：Tier1 + 跨服务安全 + 1 文件 → 略低于强制阈值，但建议）
+- 或继续推进剩余 2 项 §19 阻塞中的 A1-R4（audit hook 启动校验，工作量小）
+
+---
+
 ## 2026-04-24 Sprint H：集成验证基建（徐记海鲜 DEMO Go/No-Go）
 
 ### 本次会话目标
