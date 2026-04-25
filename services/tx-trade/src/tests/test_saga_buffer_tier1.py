@@ -604,3 +604,320 @@ async def test_xujihaixian_flushing_stuck_self_check_resets_after_5min(
         )
     finally:
         await buf.close()
+
+
+# ─── 11. 401 JWT 过期不入死信、不增 attempts（Fix-8a） ──────────────────────
+
+
+class _FakeResponse:
+    """SagaFlusher._flush_entry 只用 status_code 与 .json()，构造极简 mock."""
+
+    def __init__(self, status_code: int, body: dict | None = None) -> None:
+        self.status_code = status_code
+        self._body = body or {}
+
+    def json(self) -> dict:
+        return self._body
+
+
+class _FakeHttpClient:
+    """记录 POST 调用并按预设序列返回 _FakeResponse。"""
+
+    def __init__(self, responses: list[_FakeResponse]) -> None:
+        self._responses = list(responses)
+        self.calls: list[tuple[str, dict, dict]] = []
+
+    async def post(self, url, *, json, headers, timeout):  # noqa: A002
+        self.calls.append((url, json, headers))
+        if not self._responses:
+            return _FakeResponse(500)
+        return self._responses.pop(0)
+
+
+@pytest.mark.asyncio
+async def test_xujihaixian_flush_401_skips_dead_letter_no_attempt_increment(
+    tmp_buffer_path: Path,
+):
+    """徐记海鲜长沙店断网恰好 4h 后 Mac mini 重连云端，但 edge_service JWT
+    已过期 → tx-trade 返回 401。Fix-8a 铁律：
+
+      - 不入 dead_letter（凭证过期不该一次性写死，等人工补救）
+      - 不增 attempts（凭证问题不消耗 20 次重试预算）
+      - state 从 flushing 复位回 pending（下一轮可重新选中）
+      - 30s 风暴退避：紧接着的 flush_once 不再 POST 该 entry
+      - 调一次 token_refresher（如有注入）
+      - 第二轮 flush_once 用刷新后的 JWT 直接 200 → mark_sent
+    """
+    from saga_buffer.flusher import SagaFlusher  # noqa: E402
+
+    fake_now = [1_700_000_000.0]
+
+    def clock():
+        return fake_now[0]
+
+    buf = await _make_buffer(tmp_buffer_path)
+    try:
+        ikey = "settle:XJ20260424-JWT-401-001"
+        await buf.enqueue(
+            idempotency_key=ikey,
+            tenant_id=XUJI_CHANGSHA_TENANT,
+            store_id=XUJI_CHANGSHA_STORE,
+            saga_id=generate_saga_id(),
+            payload={"amount_fen": 18800},
+        )
+
+        # 第 1 轮：401（JWT 过期）
+        # 第 2 轮：风暴窗口内不应 POST，calls 计数不增
+        # 第 3 轮：刷新后 JWT 有效 → 200 sent
+        http = _FakeHttpClient(
+            [
+                _FakeResponse(401, {"detail": "token_expired"}),
+                _FakeResponse(200, {"ok": True}),  # 备用，第二轮不应被取
+            ]
+        )
+
+        refresh_calls = {"count": 0}
+
+        async def token_refresher() -> None:
+            refresh_calls["count"] += 1
+
+        flusher = SagaFlusher(
+            buffer=buf,
+            tenant_id=XUJI_CHANGSHA_TENANT,
+            http_client=http,
+            base_url="https://tx-trade.local",
+            token_refresher=token_refresher,
+            clock=clock,
+        )
+
+        # 轮 1：触发 401 路径
+        result = await flusher.flush_once()
+        assert result["sent"] == 0
+        assert result["failed"] == 0
+        assert result["dead_letter"] == 0
+        assert result["jwt_expired_skip"] == 1, (
+            f"401 必须计入 jwt_expired_skip，实际 result={result}"
+        )
+
+        # 状态机断言
+        e = await buf.get(ikey, tenant_id=XUJI_CHANGSHA_TENANT)
+        assert e is not None
+        assert e.state == SagaBufferState.PENDING, (
+            "401 后必须复位 pending（不能停留 flushing 否则下一轮永远死单）"
+        )
+        assert e.attempts == 0, (
+            f"401 不增 attempts，实际 attempts={e.attempts}"
+        )
+        assert e.last_error is None, (
+            "401 不写 last_error（不是业务失败，是凭证过期）"
+        )
+
+        # token_refresher 必须被调用一次
+        assert refresh_calls["count"] == 1
+
+        # 轮 2：仍在 30s 风暴窗口内，flusher 应跳过该 entry，不再 POST
+        fake_now[0] += 5  # +5s，仍在 30s 内
+        result2 = await flusher.flush_once()
+        assert result2["jwt_expired_skip"] == 1, "风暴窗口内仍计 skip"
+        assert len(http.calls) == 1, (
+            f"30s 风暴窗口内不应再发 POST，实际 calls={len(http.calls)}"
+        )
+
+        # 轮 3：30s 窗口结束 + 模拟 JWT 已刷新 → 200 sent
+        fake_now[0] += 30  # 累计 +35s 超过 backoff
+        result3 = await flusher.flush_once()
+        assert result3["sent"] == 1
+        assert len(http.calls) == 2, (
+            "30s 窗口外应重新 POST"
+        )
+
+        e_final = await buf.get(ikey, tenant_id=XUJI_CHANGSHA_TENANT)
+        assert e_final is not None
+        assert e_final.state == SagaBufferState.SENT
+        # 全程 attempts 不增（凭证问题不消耗预算）
+        assert e_final.attempts == 0, (
+            f"成功 sent 时 attempts 仍应为 0，实际={e_final.attempts}"
+        )
+    finally:
+        await buf.close()
+
+
+# ─── 12. 403 业务拒绝仍入死信（Fix-8a 反向校验） ─────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_xujihaixian_flush_403_business_rejection_marks_dead_letter(
+    tmp_buffer_path: Path,
+):
+    """徐记海鲜韶山店错配 RBAC：tx-trade 对 settle/retry 返回 403
+    ROLE_FORBIDDEN（真业务拒绝，与 401 凭证过期是不同性质）。Fix-8a 必须
+    保持现行行为：403 直接 dead_letter 等人工。"""
+    from saga_buffer.flusher import SagaFlusher  # noqa: E402
+
+    buf = await _make_buffer(tmp_buffer_path)
+    try:
+        ikey = "settle:XJ20260424-RBAC-403-001"
+        await buf.enqueue(
+            idempotency_key=ikey,
+            tenant_id=XUJI_SHAOSHAN_TENANT,
+            store_id=XUJI_SHAOSHAN_STORE,
+            saga_id=generate_saga_id(),
+            payload={"amount_fen": 9800},
+        )
+
+        http = _FakeHttpClient(
+            [_FakeResponse(403, {"detail": "ROLE_FORBIDDEN"})]
+        )
+        flusher = SagaFlusher(
+            buffer=buf,
+            tenant_id=XUJI_SHAOSHAN_TENANT,
+            http_client=http,
+            base_url="https://tx-trade.local",
+        )
+
+        result = await flusher.flush_once()
+        assert result["dead_letter"] == 1, (
+            f"403 必须直接 dead_letter，实际 result={result}"
+        )
+        assert result["jwt_expired_skip"] == 0, (
+            "403 不应被误判为 401 路径"
+        )
+        assert result["sent"] == 0
+        assert result["failed"] == 0
+
+        e = await buf.get(ikey, tenant_id=XUJI_SHAOSHAN_TENANT)
+        assert e is not None
+        assert e.state == SagaBufferState.DEAD_LETTER, (
+            "403 业务拒绝必须 dead_letter（与 401 凭证过期分路）"
+        )
+        assert e.last_error is not None and "403" in e.last_error
+    finally:
+        await buf.close()
+
+
+# ─── 13. memory→disk replay 成功（Fix-8b） ───────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_xujihaixian_memory_mode_disk_recovery_replays_to_sqlite(
+    tmp_buffer_path: Path,
+):
+    """徐记海鲜门店 Mac mini /var 满 → SagaBuffer 降级 memory；运维清理出
+    空间后磁盘恢复可写。Fix-8b 铁律：
+
+      1. SagaFlusher.heartbeat 调一次 try_replay_memory_to_disk
+      2. 内存条目全部 INSERT 进 SQLite，状态/attempts/saga_id 不丢
+      3. _memory_mode 复位为 False，stats.mode 回到 sqlite
+      4. 重启进程后能从 SQLite 重建（验证持久化生效）
+    """
+    # 第 1 步：构造 memory_mode buffer（用不可写路径）
+    unwritable_path = Path("/_readonly_root/saga_buffer.db")
+    buf_mem = SagaBuffer(device_id=POS_DEVICE_A, db_path=unwritable_path)
+    await buf_mem.initialize()
+    assert buf_mem.is_memory_mode, "前置条件：必须先在 memory 模式"
+
+    # 注入两条内存条目（模拟断网期间收银 2 单）
+    ikey1 = "settle:XJ20260424-MEM-REPLAY-001"
+    ikey2 = "settle:XJ20260424-MEM-REPLAY-002"
+    await buf_mem.enqueue(
+        idempotency_key=ikey1,
+        tenant_id=XUJI_CHANGSHA_TENANT,
+        store_id=XUJI_CHANGSHA_STORE,
+        saga_id=generate_saga_id(),
+        payload={"amount_fen": 12300, "order_no": "MEM-001"},
+    )
+    saga2 = generate_saga_id()
+    await buf_mem.enqueue(
+        idempotency_key=ikey2,
+        tenant_id=XUJI_CHANGSHA_TENANT,
+        store_id=XUJI_CHANGSHA_STORE,
+        saga_id=saga2,
+        payload={"amount_fen": 6800, "order_no": "MEM-002"},
+    )
+
+    # 第 2 步：把 db_path 切换到可写路径（模拟运维清理磁盘后）
+    buf_mem._db_path = tmp_buffer_path
+
+    # 第 3 步：触发 replay
+    replayed = await buf_mem.try_replay_memory_to_disk()
+    assert replayed == 2, f"应 replay 2 条，实际 {replayed}"
+    assert buf_mem.is_memory_mode is False, (
+        "replay 成功后必须退出 memory 模式"
+    )
+    assert buf_mem._memory_rows == {}, "内存字典必须清空"
+
+    # 第 4 步：当前 buf 仍可读到这两条（已切到 sqlite 模式）
+    stats = await buf_mem.stats(tenant_id=XUJI_CHANGSHA_TENANT)
+    assert stats.mode == "sqlite"
+    assert stats.pending_count == 2
+
+    e1 = await buf_mem.get(ikey1, tenant_id=XUJI_CHANGSHA_TENANT)
+    assert e1 is not None
+    assert e1.state == SagaBufferState.PENDING
+    assert e1.payload["order_no"] == "MEM-001"
+
+    e2 = await buf_mem.get(ikey2, tenant_id=XUJI_CHANGSHA_TENANT)
+    assert e2 is not None
+    assert e2.saga_id == saga2, "saga_id 必须保留（防双扣费铁律）"
+
+    await buf_mem.close()
+
+    # 第 5 步：模拟进程重启 → 重新打开同一 SQLite 文件，数据仍在
+    buf_restart = SagaBuffer(device_id=POS_DEVICE_A, db_path=tmp_buffer_path)
+    await buf_restart.initialize()
+    try:
+        assert buf_restart.is_memory_mode is False
+        ready = await buf_restart.flush_ready(
+            tenant_id=XUJI_CHANGSHA_TENANT, limit=10
+        )
+        keys = sorted(e.idempotency_key for e in ready)
+        assert keys == [ikey1, ikey2], (
+            f"重启后必须能从 SQLite 取回两条 replay 数据（防数据丢失），"
+            f"实际 keys={keys}"
+        )
+    finally:
+        await buf_restart.close()
+
+
+# ─── 14. memory→disk replay 失败（仍 memory）（Fix-8b 失败路径） ─────────────
+
+
+@pytest.mark.asyncio
+async def test_xujihaixian_memory_mode_disk_still_full_stays_in_memory():
+    """徐记海鲜门店磁盘仍满 → try_replay_memory_to_disk 必须探测失败，
+    返回 0，保持 memory 模式（warning 日志，不抛异常，不删数据）。"""
+    unwritable_path = Path("/_readonly_root/saga_buffer.db")
+    buf = SagaBuffer(device_id=POS_DEVICE_A, db_path=unwritable_path)
+    await buf.initialize()
+    try:
+        assert buf.is_memory_mode
+
+        ikey = "settle:XJ20260424-MEM-STILL-FULL-001"
+        await buf.enqueue(
+            idempotency_key=ikey,
+            tenant_id=XUJI_CHANGSHA_TENANT,
+            store_id=XUJI_CHANGSHA_STORE,
+            saga_id=generate_saga_id(),
+            payload={"amount_fen": 8800},
+        )
+
+        # 磁盘仍不可写：replay 必须返回 0 + 保持 memory 模式
+        replayed = await buf.try_replay_memory_to_disk()
+        assert replayed == 0, (
+            f"磁盘仍不可写时 replay 必须 0 命中，实际 {replayed}"
+        )
+        assert buf.is_memory_mode is True, (
+            "replay 失败后必须保持 memory 模式（绝不能丢数据）"
+        )
+
+        # 数据仍然在内存里，可继续 flush_ready
+        ready = await buf.flush_ready(tenant_id=XUJI_CHANGSHA_TENANT)
+        assert len(ready) == 1
+        assert ready[0].idempotency_key == ikey
+
+        # stats 仍报 memory mode（运维监控据此判断需扩盘）
+        stats = await buf.stats(tenant_id=XUJI_CHANGSHA_TENANT)
+        assert stats.mode == "memory"
+        assert stats.pending_count == 1
+    finally:
+        await buf.close()
