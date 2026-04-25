@@ -127,9 +127,29 @@ async def lifespan(app: FastAPI):
     from .services.cook_time_stats import start_daily_scheduler
     from .services.group_buy_scheduler import start_group_buy_expiry_scheduler
 
+    # ── §19 A4 (b)：lifespan shutdown 跟踪后台任务，避免审计日志在 SIGTERM 时丢失 ──
+    # background_tasks 集合用于跟踪所有 fire-and-forget 后台 task（典型如 write_audit）
+    # shutdown 时 await asyncio.gather(...) 5s 超时排空，避免部署窗口最后一笔审计被取消。
+    app.state.background_tasks = set()
+
+    def _register_background_task(task: asyncio.Task) -> asyncio.Task:
+        """注册后台 task 到 app.state.background_tasks 并自动 done 后清理。
+
+        路由层应通过此 helper 创建 fire-and-forget task：
+            task = asyncio.create_task(write_audit(...))
+            app.state.register_background_task(task)
+        """
+        app.state.background_tasks.add(task)
+        task.add_done_callback(app.state.background_tasks.discard)
+        return task
+
+    app.state.register_background_task = _register_background_task
+
     await init_db()
-    asyncio.create_task(start_daily_scheduler(async_session_factory))
-    asyncio.create_task(start_group_buy_expiry_scheduler(async_session_factory))
+    _register_background_task(asyncio.create_task(start_daily_scheduler(async_session_factory)))
+    _register_background_task(
+        asyncio.create_task(start_group_buy_expiry_scheduler(async_session_factory))
+    )
 
     # Feature Flag 检查：TradeFlags.DELIVERY_AUTO_ACCEPT（外卖自动接单）
     # 关闭时跳过自动接单初始化，外卖订单须人工在接单面板手动接单
@@ -201,6 +221,25 @@ async def lifespan(app: FastAPI):
                 await mark_offline_task
             except asyncio.CancelledError:
                 pass
+
+        # ── §19 A4 (b)：gather in-flight 后台任务，5s 超时（避免无限挂起） ──
+        # Uvicorn SIGTERM 时若不显式排空 background_tasks，asyncio.create_task
+        # 注入的最后一笔审计写入（如删单 write_audit）会被 cancel → 30s 部署窗口丢日志。
+        # gather 收集仍在运行的 task；超时后 SIGKILL 兜底，至少给业务 5s 完成 in-flight。
+        bg_tasks = getattr(app.state, "background_tasks", None)
+        if bg_tasks:
+            pending = [t for t in list(bg_tasks) if not t.done()]
+            if pending:
+                try:
+                    await asyncio.wait_for(
+                        asyncio.gather(*pending, return_exceptions=True),
+                        timeout=5.0,
+                    )
+                except asyncio.TimeoutError:
+                    # 5s 内未完成的任务 cancel 释放（避免事件循环退出时报 warning）
+                    for t in pending:
+                        if not t.done():
+                            t.cancel()
 
 
 app = FastAPI(
