@@ -1,3 +1,65 @@
+## 2026-04-25 Wave 3 Sprint D / D1 — 51 Skill ConstraintChecker 批次 1（5 atomic commits / Tier 2）
+
+### 今日完成
+- [services/tx-agent/src/constraints/] 新建包：6 文件 467 行
+  - base.py: SkillContext / ConstraintCheck / ConstraintResult 协议
+  - gross_margin.py: 毛利底线（price_fen / cost_fen, 默认 15%）
+  - food_safety.py: 食安合规（ingredients 快照 / ingredient_ids+repository 双路径，默认 24h）
+  - customer_experience.py: 客户体验（estimated_serve_minutes 或秒兼容，默认 30min）
+  - runner.py: run_checks() 异步聚合三条约束 → ConstraintResult
+  - __init__.py: 公开 API
+- [services/tx-agent/src/constraints/decorator.py] @with_constraint_check 装饰器：
+  - 软模式 (raise_on_block=False，默认): 写 blocked log + result.data 注入 _constraint_blocked，
+    result 透传，由 base.py::run() 兜底设 constraints_passed=False（兼容既有 38 测试契约）
+  - 硬模式 (raise_on_block=True): 抛 ConstraintBlockedException 给外部业务路由
+  - DECORATOR_MARKER_ATTR = "__tx_constraint_check_skill__" (CI 扫描用类属性)
+- [10 P0/关键 Skill 接入]: discount_guard / smart_menu / serve_dispatch / inventory_alert /
+  finance_audit / cashier_audit / member_insight / compliance_alert / ingredient_radar /
+  menu_advisor — 每个仅加 1 import + 1 装饰器 + 1 行说明注释，业务逻辑零改动
+- [services/tx-agent/src/tests/test_constraint_coverage.py] CI 门禁：13 用例（全绿）
+  - test_constraint_coverage_all_p0_skills_decorated: 扫描 D1_BATCH_1_DECORATED_SKILLS = 10 Skill 都打了 marker
+  - test_constraint_coverage_decorator_marker_attr_is_stable: 标记字符串契约稳定
+  - 三条约束 happy + block 各 2 用例（gross_margin/food_safety/customer_experience）
+  - test_skipped_when_no_data: 数据缺失全 skipped
+  - test_constraint_block_raises_and_logs_decision: 硬模式 ConstraintBlockedException
+  - test_constraint_block_soft_mode_marks_data: 软模式注入 _constraint_blocked
+  - test_constraint_passes_does_not_mark_data: 通过时不污染 result.data
+  - test_decorator_does_not_alter_failed_execute_result: execute 自身失败时装饰器不叠加
+- [docs/d1-constraint-checker-batch-plan.md] 批次推进计划：41 个剩余 Skill 按业务影响分 6 批次
+  （W22 出餐体验 7 / W23 库存原料 7 / W24 定价营销 7 / W25 合规 HR 8 / W26 内容洞察 7 / W27 边缘剩余 5+4）
+
+### 数据变化
+- 新增文件：8（constraints 包 6 + 测试 1 + 文档 1）
+- 修改文件：10（10 个 Skill 各加 import + 装饰器）
+- 新增测试：13（CI 门禁 + 三约束单测 + 装饰器集成）
+- 迁移版本：未涉及（D2 决策点 #1 创始人签字 pending，AgentDecisionLog schema 严格未改）
+- 既有测试零回归（38 个 constraint_context 全绿；广测 154/170 通过，16 个失败均 pre-existing 与本 PR 无关）
+
+### 5 atomic commits 索引
+- (P1) `a084542b`（并行 session 提前 commit，框架 6 文件含在内）
+- (P2) `472ca68a` feat(tx-agent): with_constraint_check decorator + ConstraintBlockedException [Tier2]
+- (P2.1) 并行 session merge `__init__.py` 公开导出
+- (P3) `982f5c9d` feat(tx-agent): apply ConstraintChecker to 10 P0 Skills [Tier2]
+- (P4) `4f86d4df` test(tx-agent): constraint coverage CI gate + 3 constraint unit tests [Tier2]
+- (P5) `7e991aed` docs: D1 51-Skill ConstraintChecker batch plan
+
+### 遗留问题
+- D2 决策点 #1（agent_decision_logs 加 4 列：saved_labor_hours / prevented_loss_fen / improved_kpi / roi_evidence）
+  创始人签字仍未到位 — 本任务严格未改 schema
+- raise_on_block=True 硬阻断路径目前无调用方（Master Agent 仍走 run() 软告警）— D5/D6 评估切量
+- 41 个剩余 Skill 待 W22-W27 按批次推进；批次 7 落地后追加 SKILL_REGISTRY 100% 覆盖 CI 卡新 Skill
+- compliance_alert 等 waived Skill 装饰器仅作 CI 标识用，未来若 waived_reason 黑名单升级需同步检查不被误伤
+- 16 个 pre-existing failures（cost_analysis_fallback / inventory monitoring / discount_guard_enhanced
+  member 类）— 与 D1 无关，留对应 Skill 维护方处理
+
+### 明日计划
+- 批次 2 (W22)：出餐体验 + 资金补强 7 Skill（ai_waiter / voice_order / smart_service /
+  queue_seating / kitchen_overtime / table_dispatch / billing_anomaly）
+- 推送 D2 决策点 #1 给创始人（Wave 3 收尾会话）
+- 启动 D3b 活动 ROI Prophet+Sonnet 与 D3c 菜品动态定价边缘 Core ML
+
+---
+
 ## 2026-04-25 Wave 3 Sprint C / C4 — Playwright 4h 零卡顿 KDS E2E（4 atomic commits / Tier 1）
 
 ### 今日完成

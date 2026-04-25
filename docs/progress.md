@@ -4,6 +4,63 @@
 
 ---
 
+## 2026-04-25 17:30 Wave 3 Sprint D / D1 — 51 Skill ConstraintChecker 批次 1（Tier 2，5 atomic commits）
+
+### 本次会话目标
+落地 services/tx-agent/src/constraints/ 框架（per-constraint 模块化）+ @with_constraint_check
+装饰器（软/硬阻断双模式）+ 10 个 P0/关键 Skill 接入 + CI 门禁，建立 51 Skill 三条硬约束
+覆盖的可演进基线。剩余 41 个 Skill 出批次推进文档。
+
+### 不得触碰的边界
+- [x] services/tx-trade/** — 完全未触碰（25 commits 仍等 §19 二审）
+- [x] shared/ontology/** — 完全未触碰（冻结）
+- [x] AgentDecisionLog 表结构 — D2 决策点 #1 创始人签字 pending，schema 严格未改
+- [x] 任一 Skill 的 happy path / dispatch / handler 业务逻辑 — 装饰器只在外层套约束
+
+### 本次涉及范围
+- services/tx-agent/src/constraints/（新建包，6 文件）
+- services/tx-agent/src/agents/skills/（10 个 Skill 各加 1 import + 1 装饰器）
+- services/tx-agent/src/tests/test_constraint_coverage.py（新建，13 用例）
+- docs/d1-constraint-checker-batch-plan.md（新建批次推进计划）
+- Tier 级别：[x] Tier 2
+
+### 完成状态
+- [x] Phase 1 框架：base.py / gross_margin.py / food_safety.py / customer_experience.py / runner.py / __init__.py（6 文件 467 行）
+- [x] Phase 2 装饰器：with_constraint_check + ConstraintBlockedException + DECORATOR_MARKER_ATTR + raise_on_block 双模式
+- [x] Phase 3 接入：10 个 P0/关键 Skill execute() 全部打装饰器（discount_guard / smart_menu / serve_dispatch / inventory_alert / finance_audit / cashier_audit / member_insight / compliance_alert / ingredient_radar / menu_advisor）
+- [x] Phase 4 CI 门禁：13 用例（覆盖扫描 + 三条约束 happy/block + 装饰器集成）全绿
+- [x] Phase 5 批次推进计划：41 个剩余 Skill 按业务影响分 6 批次（W22-W27）
+- [x] ruff All checks passed
+- [x] 既有 38 + 13 + 154 个相关测试零回归（16 个 pre-existing failures 与本 PR 无关，已用 git stash 验证）
+- [x] DEVLOG.md / progress.md 顶部追加（按 §16 / §18）
+
+### 关键决策
+- **不重新实现校验逻辑**：constraints/ 包复用 agents/constraints.py 的 ConstraintChecker 阈值与语义，避免双源真相。本包只做 (a) per-constraint 模块化 (b) 协议化输入 (c) 装饰器化硬阻断
+- **装饰器默认软模式**：raise_on_block=False 时仅写 blocked log + 在 result.data 注入 _constraint_blocked，不动 success；raise_on_block=True 显式硬阻断为外部业务路由设计。如此既兼容既有 38 个测试契约（success=True + constraints_passed=False），又给 Master Agent 升级硬阻断留口子
+- **不改 AgentDecisionLog schema**：blocked 信息塞 input_context (JSON)，等 D2 决策点 #1 签字后 D2 周再扩 4 列
+- **CI 门禁用 D1_BATCH_1_DECORATED_SKILLS 列表驱动**：批次推进唯一改动点是该列表（追加 agent_id），不需要修改测试逻辑
+- **compliance_alert 仍装饰**：虽然类级 constraint_scope=set() 已豁免，装饰器作为 CI 覆盖标识无副作用（run_checks 因 payload 无相关字段全 skipped → result 透传），让 CI 看到的覆盖率与 SKILL_REGISTRY 一致
+
+### 5 个 commits 索引
+- (Phase 1) `a084542b`（被并行 session 提前 commit，框架 6 文件已合入）
+- (Phase 2) `472ca68a` feat(tx-agent): with_constraint_check decorator + ConstraintBlockedException [Tier2]
+- (Phase 2.1) 并行 session merge `__init__.py` 公开导出
+- (Phase 3) `982f5c9d` feat(tx-agent): apply ConstraintChecker to 10 P0 Skills [Tier2]
+- (Phase 4) `4f86d4df` test(tx-agent): constraint coverage CI gate + 3 constraint unit tests [Tier2]
+- (Phase 5) `7e991aed` docs: D1 51-Skill ConstraintChecker batch plan
+
+### 下一步
+- 批次 2 (W22)：出餐体验 + 资金补强 7 Skill（ai_waiter / voice_order / smart_service / queue_seating / kitchen_overtime / table_dispatch / billing_anomaly）
+- 决策点 #1（D2 agent_decision_logs 4 列）创始人签字仍 pending — 不阻塞 D1 推进
+- 批次 7 落地后追加 SKILL_REGISTRY 100% 覆盖 CI（自动卡新 Skill）
+
+### 已知风险
+- D2 决策点 #1 签字到位前，blocked 决策的 ROI 字段（saved_labor_hours/prevented_loss_fen）暂无地方落，需在 D2 一并追上
+- raise_on_block=True 路径目前没有调用方（Master Agent 仍走 run() 软告警），D5/D6 评估硬阻断切量
+- compliance_alert 类型 Skill（waived）的装饰器属于"CI 标识"用途，无业务副作用，但若未来 reason 黑名单升级（禁用更多空洞说辞）需同步检查这类 Skill 不被误伤
+
+---
+
 ## 2026-04-25 17:00 Wave 3 Sprint C / C4 — Playwright 4h 零卡顿 KDS E2E（Tier 1，4 atomic commits）
 
 ### 本次会话目标
