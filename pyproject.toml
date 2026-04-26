@@ -67,4 +67,8 @@ ignore = [
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
-testpaths = ["services/*/src/tests", "edge/*/src/tests", "shared/*/tests"]
+testpaths = ["services/*/src/tests", "edge/*/src/tests", "shared/*/tests", "shared/test_infra/tests"]
+markers = [
+    "tier1: Tier 1 路径测试（CLAUDE.md §17）— 零容忍，必须 100% 通过",
+    "toxiproxy_required: 需 toxiproxy 容器在线（Sprint F2）— CI 默认跳过，手动 dispatch 触发",
+]

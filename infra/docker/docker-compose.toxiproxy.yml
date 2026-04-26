@@ -1,24 +1,38 @@
 # ============================================================
-# 屯象OS 故障注入环境（Sprint A2 / PR E）
+# 屯象OS 故障注入环境（Sprint A2 / PR E + Sprint F2）
 #
 # 用途：
-#   - Playwright E2E 离线/弱网场景的服务端代理
+#   - Playwright E2E 离线/弱网场景的服务端代理（A2/PR E）
 #   - 夜跑 4 小时断网马拉松（nightly offline-e2e）
+#   - F2 通用 toxiproxy 测试设施（pg/redis/coreml 预置代理）
 #
-# 用法：
+# 用法（与 dev 主 compose 组合启动）：
+#   docker compose \
+#     -f infra/docker/docker-compose.dev.yml \
+#     -f infra/docker/docker-compose.toxiproxy.yml \
+#     up -d toxiproxy
+#
+# 单独启动（不需要主服务时）：
 #   docker compose -f infra/docker/docker-compose.toxiproxy.yml up -d
-#   pnpm --dir e2e run test:offline
 #
-# toxiproxy 监听：
+# toxiproxy 监听端口分配：
 #   8474/tcp   管理 API（POST /proxies, /proxies/{name}/toxics）
-#   18001/tcp  → tx-trade:8001  （默认直通，脚本按场景注入 toxic）
-#   18002/tcp  → tx-menu:8002
-#   18008/tcp  → tx-agent:8008
 #
-# 注：toxiproxy 只影响经过 proxy 的 TCP 流量。浏览器端 `navigator.onLine`
-# 由 Playwright 的 context.setOffline(true) 控制，不依赖 toxiproxy。
-# 两者在 CI 中组合使用：先 setOffline 确保前端走离线队列，再用 toxiproxy
-# 模拟"服务端仍在运转但链路慢/丢包"的场景。
+#   服务级（Sprint A2）：
+#     18001/tcp  → tx-trade:8001
+#     18002/tcp  → tx-menu:8002
+#     18008/tcp  → tx-agent:8008
+#
+#   基础设施级（Sprint F2，9000-9020 区间预留给后续扩展）：
+#     9001/tcp   → postgres:5432    (proxy name: pg_proxy)
+#     9002/tcp   → redis:6379       (proxy name: redis_proxy)
+#     9003/tcp   → host.docker.internal:8100  (proxy name: coreml_proxy)
+#
+# 注：
+#   1) toxiproxy 只影响经过 proxy 的 TCP 流量。浏览器端 `navigator.onLine`
+#      由 Playwright 的 context.setOffline(true) 控制，不依赖 toxiproxy。
+#   2) F2 阶段不接入任何 Tier 1 测试套件——这是裸设施。
+#      接入路径请等待 §19 二次审查通过后再做（参见 docs/test-infra-toxiproxy.md）。
 # ============================================================
 
 services:
@@ -27,12 +41,18 @@ services:
     container_name: tx-toxiproxy
     ports:
       - "8474:8474"        # 管理 API
-      - "18001:18001"      # tx-trade 代理
-      - "18002:18002"      # tx-menu 代理
-      - "18008:18008"      # tx-agent 代理
+      - "18001:18001"      # tx-trade 代理（A2）
+      - "18002:18002"      # tx-menu 代理（A2）
+      - "18008:18008"      # tx-agent 代理（A2）
+      - "9001:9001"        # pg_proxy（F2）
+      - "9002:9002"        # redis_proxy（F2）
+      - "9003:9003"        # coreml_proxy（F2）
     command: ["-host", "0.0.0.0", "-config", "/config/proxies.json"]
     volumes:
       - ./toxiproxy/proxies.json:/config/proxies.json:ro
+    extra_hosts:
+      # 让 coreml_proxy 能解析到宿主机 8100（macOS 上 Mac mini Core ML 桥接）
+      - "host.docker.internal:host-gateway"
     networks:
       - txos-dev
     healthcheck:
