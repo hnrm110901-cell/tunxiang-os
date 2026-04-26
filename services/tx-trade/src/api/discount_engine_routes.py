@@ -32,7 +32,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
 
-from ..security.rbac import UserContext, require_role_audited
+from ..security.rbac import UserContext, require_mfa_audited, require_role_audited
 from ..services.trade_audit_log import write_audit
 
 router = APIRouter(prefix="/api/v1/discount", tags=["discount-engine"])
@@ -488,7 +488,7 @@ async def create_discount_rule(
     req: CreateRuleRequest,
     request: Request,
     db: AsyncSession = Depends(get_db),
-    user: UserContext = Depends(require_role_audited("discount.rule.create", "admin")),
+    user: UserContext = Depends(require_mfa_audited("discount.rule.create", "admin")),
 ):
     """POST /api/v1/discount/rules — 新建折扣规则（需管理员权限）"""
     tenant_id = _get_tenant_id(request)
@@ -555,7 +555,7 @@ async def update_discount_rule(
     req: UpdateRuleRequest,
     request: Request,
     db: AsyncSession = Depends(get_db),
-    user: UserContext = Depends(require_role_audited("discount.rule.update", "admin")),
+    user: UserContext = Depends(require_mfa_audited("discount.rule.update", "admin")),
 ):
     """PUT /api/v1/discount/rules/{rule_id} — 更新折扣规则（需管理员权限）"""
     tenant_id = _get_tenant_id(request)

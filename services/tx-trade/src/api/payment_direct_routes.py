@@ -14,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
 
-from ..security.rbac import UserContext, require_role_audited
+from ..security.rbac import UserContext, require_mfa_audited, require_role_audited
 from ..services.payment_direct import (
     create_alipay_payment,
     create_unionpay_payment,
@@ -207,7 +207,7 @@ async def api_query_status(
 async def api_refund(
     body: RefundReq,
     request: Request,
-    user: UserContext = Depends(require_role_audited("payment.refund", "store_manager", "admin")),
+    user: UserContext = Depends(require_mfa_audited("payment.refund", "store_manager", "admin")),
     db: AsyncSession = Depends(get_db),
 ):
     """退款 — 仅店长/管理员可操作（收银员不能直接退）"""

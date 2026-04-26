@@ -20,7 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
 
-from ..security.rbac import UserContext, require_role_audited
+from ..security.rbac import UserContext, require_mfa_audited
 from ..services.trade_audit_log import write_audit
 
 logger = logging.getLogger(__name__)
@@ -61,7 +61,7 @@ async def submit_refund(
     req: SubmitRefundRequest,
     x_tenant_id: Optional[str] = Header(None, alias="X-Tenant-ID"),
     db: AsyncSession = Depends(get_db),
-    user: UserContext = Depends(require_role_audited("refund.apply", "store_manager", "admin")),
+    user: UserContext = Depends(require_mfa_audited("refund.apply", "store_manager", "admin")),
 ):
     """提交退款申请，写入 refund_requests 表（仅店长/管理员）"""
     if req.refund_amount_fen <= 0:
