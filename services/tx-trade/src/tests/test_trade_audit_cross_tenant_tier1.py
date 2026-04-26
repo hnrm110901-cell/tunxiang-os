@@ -26,16 +26,15 @@ audit 表回查 target_id 命中情况，可枚举其他租户的订单 ID。
 
 from __future__ import annotations
 
-import uuid
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from sqlalchemy.exc import SQLAlchemyError
 
 from src.services.trade_audit_log import (
+    _TARGET_TENANT_LOOKUPS,
     _is_valid_uuid,
     _target_in_caller_tenant,
-    _TARGET_TENANT_LOOKUPS,
     write_audit,
 )
 

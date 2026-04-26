@@ -28,17 +28,16 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from sqlalchemy.exc import SQLAlchemyError
 
 from src.services.api_idempotency import (
-    CachedResponse,
-    DEFAULT_TTL_HOURS,
-    IdempotencyKeyConflict,
     MAX_KEY_LENGTH,
+    CachedResponse,
+    IdempotencyKeyConflict,
     _compute_lock_id,
     _compute_request_hash,
     acquire_idempotency_lock,
