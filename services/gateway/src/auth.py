@@ -96,7 +96,7 @@ async def _get_mfa_temp_secret(user_id: str) -> Optional[str]:
         except OSError as exc:
             logger.warning("mfa_temp_secret_get_failed", user_id=user_id, error=str(exc))
     # fallback: 尝试内存
-    return _mfa_temp_fallback.pop(user_id, None)
+    return _mfa_temp_fallback.get(user_id)
 
 
 # 内存fallback（Redis不可用时的降级方案，仅限开发环境）

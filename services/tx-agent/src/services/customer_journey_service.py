@@ -1246,8 +1246,8 @@ class CustomerJourneyService:
         customer_id: str,
         content: dict,
         tenant_id: str = "",
-    ) -> None:
-        """通过IM推送网关发送消息
+    ) -> bool:
+        """通过IM推送网关发送消息，返回是否发送成功
 
         支持渠道:
         - wecom_private: 企微私聊API
@@ -1263,10 +1263,10 @@ class CustomerJourneyService:
             tenant_id=tenant_id,
             content_keys=list(content.keys()),
         )
-        # 对接 IM 推送网关
         import httpx
+        import os
 
-        gateway_url = "http://gateway:8000/api/v1/bff/im/push"
+        gateway_url = os.getenv("GATEWAY_URL", "http://gateway:8000") + "/api/v1/bff/im/push"
         payload = {
             "tenant_id": tenant_id,
             "member_id": customer_id,
@@ -1284,13 +1284,14 @@ class CustomerJourneyService:
                         channel=channel,
                         customer_id=customer_id,
                     )
-                else:
-                    logger.info(
-                        "customer_journey.send_message.sent",
-                        channel=channel,
-                        customer_id=customer_id,
-                        status_code=resp.status_code,
-                    )
+                    return False
+                logger.info(
+                    "customer_journey.send_message.sent",
+                    channel=channel,
+                    customer_id=customer_id,
+                    status_code=resp.status_code,
+                )
+                return True
         except httpx.HTTPError as exc:
             logger.warning(
                 "customer_journey.send_message.http_error",
@@ -1298,6 +1299,7 @@ class CustomerJourneyService:
                 channel=channel,
                 customer_id=customer_id,
             )
+            return False
 
     # ══════════════════════════════════════════════
     # 手动操作: 暂停/恢复/取消

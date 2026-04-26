@@ -210,17 +210,21 @@ async def update_challenge(
     if not updates:
         return _err("NO_CHANGES", "no fields to update")
 
+    ALLOWED_COLUMNS = {"name", "description", "type", "rules", "reward", "goal_value",
+                       "start_date", "end_date", "max_participants", "is_active"}
     set_parts: list[str] = ["updated_at = NOW()"]
     params: dict[str, Any] = {"tid": x_tenant_id, "cid": challenge_id}
     for key, val in updates.items():
+        if key not in ALLOWED_COLUMNS:
+            continue
         if key in ("rules", "reward"):
-            set_parts.append(f"{key} = :{key}::jsonb")
+            set_parts.append(f'"{key}" = :{key}::jsonb')
             params[key] = json.dumps(val)
         elif key in ("start_date", "end_date"):
-            set_parts.append(f"{key} = :{key}::timestamptz")
+            set_parts.append(f'"{key}" = :{key}::timestamptz')
             params[key] = val
         else:
-            set_parts.append(f"{key} = :{key}")
+            set_parts.append(f'"{key}" = :{key}')
             params[key] = val
 
     set_clause = ", ".join(set_parts)

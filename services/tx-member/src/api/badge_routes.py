@@ -171,15 +171,19 @@ async def update_badge(
     if not updates:
         return _err("NO_CHANGES", "no fields to update")
 
-    # 动态构建 SET 子句
+    # 动态构建 SET 子句（allowlist防止SQL注入）
+    ALLOWED_COLUMNS = {"name", "description", "category", "unlock_rule", "rarity",
+                       "points_reward", "icon_url", "display_order", "is_active"}
     set_parts: list[str] = ["updated_at = NOW()"]
     params: dict[str, Any] = {"tid": x_tenant_id, "bid": badge_id}
     for key, val in updates.items():
+        if key not in ALLOWED_COLUMNS:
+            continue
         if key == "unlock_rule":
-            set_parts.append(f"{key} = :{key}::jsonb")
+            set_parts.append(f'"{key}" = :{key}::jsonb')
             params[key] = json.dumps(val)
         else:
-            set_parts.append(f"{key} = :{key}")
+            set_parts.append(f'"{key}" = :{key}')
             params[key] = val
 
     set_clause = ", ".join(set_parts)
