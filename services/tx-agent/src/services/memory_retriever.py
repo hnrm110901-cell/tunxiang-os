@@ -5,6 +5,7 @@
 
 被 MemoryEvolutionService.recall() 组合调用，不对外直接暴露。
 """
+
 from __future__ import annotations
 
 import math
@@ -54,23 +55,35 @@ class MemoryRetriever:
         # 1. 向量语义搜索（需要 embedding）
         if embedding:
             vector_results = await self._vector_search(
-                tenant_id, store_id, user_id, embedding,
-                memory_types=memory_types, limit=top_k * 2,
+                tenant_id,
+                store_id,
+                user_id,
+                embedding,
+                memory_types=memory_types,
+                limit=top_k * 2,
             )
             result_sets.append(("vector", vector_results, 0.5))
 
         # 2. 全文关键词搜索
         text_results = await self._text_search(
-            tenant_id, store_id, user_id, query,
-            memory_types=memory_types, limit=top_k * 2,
+            tenant_id,
+            store_id,
+            user_id,
+            query,
+            memory_types=memory_types,
+            limit=top_k * 2,
         )
         result_sets.append(("text", text_results, 0.3))
 
         # 3. 精确分类匹配
         if categories:
             cat_results = await self._category_match(
-                tenant_id, store_id, user_id, categories,
-                memory_types=memory_types, limit=top_k * 2,
+                tenant_id,
+                store_id,
+                user_id,
+                categories,
+                memory_types=memory_types,
+                limit=top_k * 2,
             )
             result_sets.append(("category", cat_results, 0.2))
 
@@ -200,19 +213,13 @@ class MemoryRetriever:
                 AgentMemory.is_deleted == False,  # noqa: E712
                 (AgentMemory.valid_until.is_(None)) | (AgentMemory.valid_until > now),
             )
-            .where(
-                AgentMemory.memory_key.ilike(f"%{safe_query}%")
-            )
+            .where(AgentMemory.memory_key.ilike(f"%{safe_query}%"))
         )
 
         if store_id:
-            stmt = stmt.where(
-                (AgentMemory.store_id == UUID(store_id)) | (AgentMemory.store_id.is_(None))
-            )
+            stmt = stmt.where((AgentMemory.store_id == UUID(store_id)) | (AgentMemory.store_id.is_(None)))
         if user_id:
-            stmt = stmt.where(
-                (AgentMemory.user_id == UUID(user_id)) | (AgentMemory.user_id.is_(None))
-            )
+            stmt = stmt.where((AgentMemory.user_id == UUID(user_id)) | (AgentMemory.user_id.is_(None)))
         if memory_types:
             stmt = stmt.where(AgentMemory.memory_type.in_(memory_types))
 
@@ -255,24 +262,17 @@ class MemoryRetriever:
         """按 category 精确匹配"""
         now = datetime.now(timezone.utc)
 
-        stmt = (
-            select(AgentMemory)
-            .where(
-                AgentMemory.tenant_id == UUID(tenant_id),
-                AgentMemory.is_deleted == False,  # noqa: E712
-                (AgentMemory.valid_until.is_(None)) | (AgentMemory.valid_until > now),
-                AgentMemory.category.in_(categories),
-            )
+        stmt = select(AgentMemory).where(
+            AgentMemory.tenant_id == UUID(tenant_id),
+            AgentMemory.is_deleted == False,  # noqa: E712
+            (AgentMemory.valid_until.is_(None)) | (AgentMemory.valid_until > now),
+            AgentMemory.category.in_(categories),
         )
 
         if store_id:
-            stmt = stmt.where(
-                (AgentMemory.store_id == UUID(store_id)) | (AgentMemory.store_id.is_(None))
-            )
+            stmt = stmt.where((AgentMemory.store_id == UUID(store_id)) | (AgentMemory.store_id.is_(None)))
         if user_id:
-            stmt = stmt.where(
-                (AgentMemory.user_id == UUID(user_id)) | (AgentMemory.user_id.is_(None))
-            )
+            stmt = stmt.where((AgentMemory.user_id == UUID(user_id)) | (AgentMemory.user_id.is_(None)))
         if memory_types:
             stmt = stmt.where(AgentMemory.memory_type.in_(memory_types))
 

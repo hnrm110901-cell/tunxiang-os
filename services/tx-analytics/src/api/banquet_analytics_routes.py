@@ -142,9 +142,7 @@ async def api_order_analysis(
     d_from = _parse_date(date_from, date.today() - timedelta(days=90))
     d_to = _parse_date(date_to)
 
-    data = await get_banquet_order_analysis(
-        db, tenant_id, sid, d_from, d_to, banquet_type=banquet_type
-    )
+    data = await get_banquet_order_analysis(db, tenant_id, sid, d_from, d_to, banquet_type=banquet_type)
     return _ok(data)
 
 
@@ -169,9 +167,7 @@ async def api_salesperson_ranking(
     d_from = _parse_date(date_from, date.today() - timedelta(days=30))
     d_to = _parse_date(date_to)
 
-    data = await get_salesperson_ranking(
-        db, tenant_id, sid, d_from, d_to, sort_by=sort_by, limit=limit
-    )
+    data = await get_salesperson_ranking(db, tenant_id, sid, d_from, d_to, sort_by=sort_by, limit=limit)
     return _ok(data)
 
 
@@ -195,9 +191,7 @@ async def api_lost_reasons(
     d_from = _parse_date(date_from, date.today() - timedelta(days=90))
     d_to = _parse_date(date_to)
 
-    data = await get_lost_reason_analysis(
-        db, tenant_id, sid, d_from, d_to, top_n=top_n
-    )
+    data = await get_lost_reason_analysis(db, tenant_id, sid, d_from, d_to, top_n=top_n)
     return _ok(data)
 
 
@@ -224,9 +218,7 @@ async def api_revenue_trend(
     if granularity not in ("day", "week", "month"):
         raise HTTPException(status_code=422, detail="granularity must be day, week or month")
 
-    data = await get_banquet_revenue_trend(
-        db, tenant_id, sid, d_from, d_to, granularity=granularity
-    )
+    data = await get_banquet_revenue_trend(db, tenant_id, sid, d_from, d_to, granularity=granularity)
     return _ok(data)
 
 

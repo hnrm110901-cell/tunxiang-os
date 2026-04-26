@@ -11,6 +11,7 @@
 
 TODO: 当前使用模拟数据，待对接 tx-trade / tx-supply / tx-analytics 真实数据源
 """
+
 from __future__ import annotations
 
 import random
@@ -37,19 +38,25 @@ SLOT_NAMES: dict[str, str] = {
 }
 
 # 教练类型枚举
-COACHING_TYPES = frozenset({
-    "morning_brief",
-    "peak_alert",
-    "post_rush_review",
-    "closing_summary",
-})
+COACHING_TYPES = frozenset(
+    {
+        "morning_brief",
+        "peak_alert",
+        "post_rush_review",
+        "closing_summary",
+    }
+)
 
 # 天气枚举（模拟用）
 WEATHER_OPTIONS = ["晴", "多云", "阴", "小雨", "大雨", "雪"]
 
 # 特殊事件（模拟用）
 SPECIAL_EVENTS = [
-    None, None, None, None, None,  # 大多数日子无特殊事件
+    None,
+    None,
+    None,
+    None,
+    None,  # 大多数日子无特殊事件
     "周边商场促销活动",
     "学校开学季",
     "节假日前一天",
@@ -94,7 +101,8 @@ class AICoachService:
 
         # 检测昨日异常
         yesterday_anomalies = await self._baseline_svc.detect_anomalies(
-            tenant_id, store_id,
+            tenant_id,
+            store_id,
             current_metrics={
                 "lunch_covers": float(yesterday["covers"]) * 0.55,
                 "dinner_covers": float(yesterday["covers"]) * 0.45,
@@ -105,12 +113,16 @@ class AICoachService:
 
         # 生成优先事项
         priorities = self._generate_morning_priorities(
-            yesterday, forecast, yesterday_anomalies,
+            yesterday,
+            forecast,
+            yesterday_anomalies,
         )
 
         # 生成AI洞察
         ai_insight = self._generate_morning_insight(
-            yesterday, forecast, yesterday_anomalies,
+            yesterday,
+            forecast,
+            yesterday_anomalies,
         )
 
         result = {
@@ -150,7 +162,8 @@ class AICoachService:
         result["coaching_id"] = coaching_id
         logger.info(
             "coaching.morning_briefing",
-            store_id=store_id, anomalies=len(yesterday_anomalies),
+            store_id=store_id,
+            anomalies=len(yesterday_anomalies),
             priorities=len(priorities),
         )
         return result
@@ -180,11 +193,14 @@ class AICoachService:
         """
         # TODO: 对接实时指标源（tx-trade POS流水/tx-analytics实时看板）
         current_metrics = await self._get_slot_metrics(
-            tenant_id, store_id, slot_code,
+            tenant_id,
+            store_id,
+            slot_code,
         )
 
         anomalies = await self._baseline_svc.detect_anomalies(
-            tenant_id, store_id,
+            tenant_id,
+            store_id,
             current_metrics=current_metrics,
             slot_code=slot_code,
             threshold_sigma=2.0,
@@ -194,7 +210,8 @@ class AICoachService:
         if not anomalies:
             logger.debug(
                 "coaching.peak_alert_normal",
-                store_id=store_id, slot_code=slot_code,
+                store_id=store_id,
+                slot_code=slot_code,
             )
             return None
 
@@ -202,7 +219,8 @@ class AICoachService:
         similar_episodes = self._find_similar_episodes(anomalies)
         suggested_actions = self._generate_peak_actions(anomalies, slot_code)
         ai_analysis = self._generate_peak_analysis(
-            anomalies, slot_code,
+            anomalies,
+            slot_code,
         )
 
         result = {
@@ -235,7 +253,8 @@ class AICoachService:
         result["coaching_id"] = coaching_id
         logger.info(
             "coaching.peak_alert_triggered",
-            store_id=store_id, slot_code=slot_code,
+            store_id=store_id,
+            slot_code=slot_code,
             anomalies=len(anomalies),
             critical=[a["metric"] for a in anomalies if a["severity"] == "critical"],
         )
@@ -270,7 +289,10 @@ class AICoachService:
 
         # 对比基线
         vs_baseline = await self._compare_with_baseline(
-            tenant_id, store_id, metrics, slot_code=slot_code,
+            tenant_id,
+            store_id,
+            metrics,
+            slot_code=slot_code,
         )
 
         # TODO: 对接 SOP 任务完成度（sop_task_instances 表）
@@ -311,8 +333,10 @@ class AICoachService:
         result["coaching_id"] = coaching_id
         logger.info(
             "coaching.post_rush_review",
-            store_id=store_id, slot_code=slot_code,
-            highlights=len(highlights), improvements=len(improvements),
+            store_id=store_id,
+            slot_code=slot_code,
+            highlights=len(highlights),
+            improvements=len(improvements),
         )
         return result
 
@@ -345,7 +369,9 @@ class AICoachService:
 
         # 对比基线
         vs_baseline = await self._compare_with_baseline(
-            tenant_id, store_id, daily_metrics,
+            tenant_id,
+            store_id,
+            daily_metrics,
         )
 
         # TODO: 对接 SOP 全天统计
@@ -356,12 +382,15 @@ class AICoachService:
 
         # 生成经验教训
         lessons = self._generate_daily_lessons(
-            vs_baseline, sop_report, corrective_summary,
+            vs_baseline,
+            sop_report,
+            corrective_summary,
         )
 
         # 生成明日建议
         tomorrow = self._generate_tomorrow_suggestions(
-            daily_metrics, vs_baseline,
+            daily_metrics,
+            vs_baseline,
         )
 
         result = {
@@ -420,9 +449,7 @@ class AICoachService:
         """
         valid_feedback = {"helpful", "not_helpful", "ignored"}
         if feedback not in valid_feedback:
-            raise ValueError(
-                f"feedback 必须是 {valid_feedback} 之一，收到: {feedback}"
-            )
+            raise ValueError(f"feedback 必须是 {valid_feedback} 之一，收到: {feedback}")
 
         now = datetime.now(timezone.utc)
         cid = UUID(coaching_id)
@@ -453,7 +480,8 @@ class AICoachService:
         await self.db.flush()
         logger.info(
             "coaching.feedback_submitted",
-            coaching_id=coaching_id, feedback=feedback,
+            coaching_id=coaching_id,
+            feedback=feedback,
         )
         return {
             "coaching_id": coaching_id,
@@ -544,17 +572,19 @@ class AICoachService:
 
         items = []
         for row in rows:
-            items.append({
-                "id": str(row.id),
-                "store_id": str(row.store_id),
-                "user_id": str(row.user_id) if row.user_id else None,
-                "coaching_type": row.coaching_type,
-                "slot_code": row.slot_code,
-                "coaching_date": row.coaching_date.isoformat() if row.coaching_date else None,
-                "user_feedback": row.user_feedback,
-                "feedback_at": row.feedback_at.isoformat() if row.feedback_at else None,
-                "created_at": row.created_at.isoformat() if row.created_at else None,
-            })
+            items.append(
+                {
+                    "id": str(row.id),
+                    "store_id": str(row.store_id),
+                    "user_id": str(row.user_id) if row.user_id else None,
+                    "coaching_type": row.coaching_type,
+                    "slot_code": row.slot_code,
+                    "coaching_date": row.coaching_date.isoformat() if row.coaching_date else None,
+                    "user_feedback": row.user_feedback,
+                    "feedback_at": row.feedback_at.isoformat() if row.feedback_at else None,
+                    "created_at": row.created_at.isoformat() if row.created_at else None,
+                }
+            )
 
         return {
             "items": items,
@@ -825,7 +855,9 @@ class AICoachService:
             [{metric, metric_name, actual, baseline, diff_pct, status}]
         """
         baselines = await self._baseline_svc.get_all_baselines(
-            tenant_id, store_id, slot_code=slot_code,
+            tenant_id,
+            store_id,
+            slot_code=slot_code,
         )
         baseline_map = {b["metric_code"]: b for b in baselines}
 
@@ -852,14 +884,16 @@ class AICoachService:
             else:
                 status = "good" if diff_pct < 0 else "concern"
 
-            comparisons.append({
-                "metric": metric_code,
-                "metric_name": meta.get("name", metric_code),
-                "actual": round(actual, 2),
-                "baseline": round(baseline_val, 2),
-                "diff_pct": diff_pct,
-                "status": status,
-            })
+            comparisons.append(
+                {
+                    "metric": metric_code,
+                    "metric_name": meta.get("name", metric_code),
+                    "actual": round(actual, 2),
+                    "baseline": round(baseline_val, 2),
+                    "diff_pct": diff_pct,
+                    "status": status,
+                }
+            )
 
         return comparisons
 
@@ -879,46 +913,56 @@ class AICoachService:
             is_positive = anomaly.get("is_positive", False)
 
             if not is_positive:
-                priorities.append({
-                    "task": f"关注{metric_name}指标 — 昨日偏离基线{anomaly['sigma']:.1f}σ",
-                    "reason": f"{metric_name}异常需关注，{severity}级别",
-                    "importance": "high" if severity == "critical" else "medium",
-                })
+                priorities.append(
+                    {
+                        "task": f"关注{metric_name}指标 — 昨日偏离基线{anomaly['sigma']:.1f}σ",
+                        "reason": f"{metric_name}异常需关注，{severity}级别",
+                        "importance": "high" if severity == "critical" else "medium",
+                    }
+                )
 
         # 基于预订量
         reservations = forecast.get("reservations", 0)
         if reservations >= 25:
-            priorities.append({
-                "task": f"今日预订{reservations}桌，提前备料+排班确认",
-                "reason": "预订量较大，需确保服务质量",
-                "importance": "high",
-            })
+            priorities.append(
+                {
+                    "task": f"今日预订{reservations}桌，提前备料+排班确认",
+                    "reason": "预订量较大，需确保服务质量",
+                    "importance": "high",
+                }
+            )
 
         # 天气影响
         weather = forecast.get("weather", "晴")
         if weather in ("大雨", "雪"):
-            priorities.append({
-                "task": f"今日{weather}，关注到店率 + 外卖单量",
-                "reason": "恶劣天气影响堂食客流，可能带动外卖需求",
-                "importance": "medium",
-            })
+            priorities.append(
+                {
+                    "task": f"今日{weather}，关注到店率 + 外卖单量",
+                    "reason": "恶劣天气影响堂食客流，可能带动外卖需求",
+                    "importance": "medium",
+                }
+            )
 
         # 特殊事件
         special_events = forecast.get("special_events", [])
         for event in special_events:
-            priorities.append({
-                "task": f"注意: {event}",
-                "reason": "特殊事件可能影响客流和运营",
-                "importance": "medium",
-            })
+            priorities.append(
+                {
+                    "task": f"注意: {event}",
+                    "reason": "特殊事件可能影响客流和运营",
+                    "importance": "medium",
+                }
+            )
 
         # 如果没有异常和特殊事件，给出标准建议
         if not priorities:
-            priorities.append({
-                "task": "常规运营 — 按SOP执行即可",
-                "reason": "昨日各项指标正常，今日无特殊事件",
-                "importance": "low",
-            })
+            priorities.append(
+                {
+                    "task": "常规运营 — 按SOP执行即可",
+                    "reason": "昨日各项指标正常，今日无特殊事件",
+                    "importance": "low",
+                }
+            )
 
         return priorities
 
@@ -934,10 +978,7 @@ class AICoachService:
         food_cost_pct = yesterday["food_cost_rate"] * 100
 
         parts: list[str] = []
-        parts.append(
-            f"昨日营收{revenue_yuan:.0f}元，接待{covers}位客人，"
-            f"食材成本率{food_cost_pct:.1f}%。"
-        )
+        parts.append(f"昨日营收{revenue_yuan:.0f}元，接待{covers}位客人，食材成本率{food_cost_pct:.1f}%。")
 
         critical = [a for a in anomalies if a["severity"] == "critical"]
         warning = [a for a in anomalies if a["severity"] == "warning"]
@@ -969,11 +1010,12 @@ class AICoachService:
         if anomalies:
             top = anomalies[0]
             metric_name = top.get("metric_name", top["metric"])
-            episodes.append({
-                "date": "2026-04-15",
-                "description": f"上周同日也出现{metric_name}异常，"
-                               f"当时通过增加备料和调整排班解决",
-            })
+            episodes.append(
+                {
+                    "date": "2026-04-15",
+                    "description": f"上周同日也出现{metric_name}异常，当时通过增加备料和调整排班解决",
+                }
+            )
         return episodes
 
     @staticmethod
@@ -996,47 +1038,61 @@ class AICoachService:
 
             if is_positive:
                 # 积极异常：提醒把握机会
-                actions.append({
-                    "action": f"{metric_name}表现优于基线，保持当前策略",
-                    "reason": f"当前{metric_name}高于基线{anomaly['sigma']:.1f}σ，是好兆头",
-                    "urgency": "info",
-                })
+                actions.append(
+                    {
+                        "action": f"{metric_name}表现优于基线，保持当前策略",
+                        "reason": f"当前{metric_name}高于基线{anomaly['sigma']:.1f}σ，是好兆头",
+                        "urgency": "info",
+                    }
+                )
             elif metric == "serve_time_min" and direction == "above":
-                actions.append({
-                    "action": "出餐速度偏慢 — 检查后厨备料和人手",
-                    "reason": f"{slot_name}出餐时长超标{anomaly['sigma']:.1f}σ",
-                    "urgency": urgency,
-                })
+                actions.append(
+                    {
+                        "action": "出餐速度偏慢 — 检查后厨备料和人手",
+                        "reason": f"{slot_name}出餐时长超标{anomaly['sigma']:.1f}σ",
+                        "urgency": urgency,
+                    }
+                )
             elif metric == "customer_complaints" and direction == "above":
-                actions.append({
-                    "action": "顾客投诉偏高 — 加强前厅巡台和催菜跟进",
-                    "reason": f"投诉数超过基线{anomaly['sigma']:.1f}个标准差",
-                    "urgency": urgency,
-                })
+                actions.append(
+                    {
+                        "action": "顾客投诉偏高 — 加强前厅巡台和催菜跟进",
+                        "reason": f"投诉数超过基线{anomaly['sigma']:.1f}个标准差",
+                        "urgency": urgency,
+                    }
+                )
             elif metric == "food_cost_rate" and direction == "above":
-                actions.append({
-                    "action": "食材成本率偏高 — 检查废弃量和出品标准",
-                    "reason": f"食材成本率超标{anomaly['sigma']:.1f}σ",
-                    "urgency": urgency,
-                })
+                actions.append(
+                    {
+                        "action": "食材成本率偏高 — 检查废弃量和出品标准",
+                        "reason": f"食材成本率超标{anomaly['sigma']:.1f}σ",
+                        "urgency": urgency,
+                    }
+                )
             elif metric == "waste_rate" and direction == "above":
-                actions.append({
-                    "action": "废弃率偏高 — 减少预制量或调整备料计划",
-                    "reason": f"废弃率超标{anomaly['sigma']:.1f}σ，直接影响毛利",
-                    "urgency": urgency,
-                })
+                actions.append(
+                    {
+                        "action": "废弃率偏高 — 减少预制量或调整备料计划",
+                        "reason": f"废弃率超标{anomaly['sigma']:.1f}σ，直接影响毛利",
+                        "urgency": urgency,
+                    }
+                )
             elif "covers" in metric and direction == "below":
-                actions.append({
-                    "action": f"{metric_name}偏低 — 考虑外卖平台推广或限时优惠",
-                    "reason": f"客数低于基线{anomaly['sigma']:.1f}σ",
-                    "urgency": urgency,
-                })
+                actions.append(
+                    {
+                        "action": f"{metric_name}偏低 — 考虑外卖平台推广或限时优惠",
+                        "reason": f"客数低于基线{anomaly['sigma']:.1f}σ",
+                        "urgency": urgency,
+                    }
+                )
             else:
-                actions.append({
-                    "action": f"关注{metric_name}（偏{('高' if direction == 'above' else '低')}）",
-                    "reason": f"偏离基线{anomaly['sigma']:.1f}σ",
-                    "urgency": urgency,
-                })
+                actions.append(
+                    {
+                        "action": f"关注{metric_name}（偏{('高' if direction == 'above' else '低')}）",
+                        "reason": f"偏离基线{anomaly['sigma']:.1f}σ",
+                        "urgency": urgency,
+                    }
+                )
 
         return actions
 
@@ -1130,9 +1186,7 @@ class AICoachService:
                 name = item["metric_name"]
                 diff = item["diff_pct"]
                 direction = "提升" if diff > 0 else "降低"
-                highlights.append(
-                    f"{name}{direction}{abs(diff):.1f}%，优于基线表现"
-                )
+                highlights.append(f"{name}{direction}{abs(diff):.1f}%，优于基线表现")
         if not highlights:
             highlights.append("各项指标表现平稳，与基线基本持平")
         return highlights
@@ -1148,21 +1202,15 @@ class AICoachService:
             if item["status"] == "concern":
                 name = item["metric_name"]
                 diff = item["diff_pct"]
-                improvements.append(
-                    f"{name}偏离基线{abs(diff):.1f}%，建议复查原因"
-                )
+                improvements.append(f"{name}偏离基线{abs(diff):.1f}%，建议复查原因")
 
         overdue = sop_completion.get("overdue", 0)
         if overdue > 0:
-            improvements.append(
-                f"有{overdue}项SOP任务超时未完成，请关注执行纪律"
-            )
+            improvements.append(f"有{overdue}项SOP任务超时未完成，请关注执行纪律")
 
         skipped = sop_completion.get("skipped", 0)
         if skipped > 0:
-            improvements.append(
-                f"有{skipped}项SOP任务被跳过，请确认是否合理"
-            )
+            improvements.append(f"有{skipped}项SOP任务被跳过，请确认是否合理")
 
         if not improvements:
             improvements.append("本时段无明显改进项，继续保持")
@@ -1185,9 +1233,7 @@ class AICoachService:
         if goods:
             top_good = goods[0]
             lessons.append(
-                f"今日{top_good['metric_name']}表现突出，"
-                f"超越基线{abs(top_good['diff_pct']):.1f}%，"
-                f"可总结经验推广"
+                f"今日{top_good['metric_name']}表现突出，超越基线{abs(top_good['diff_pct']):.1f}%，可总结经验推广"
             )
 
         if concerns:
@@ -1202,9 +1248,7 @@ class AICoachService:
         if completion_rate >= 95:
             lessons.append(f"SOP执行率{completion_rate}%，纪律优秀")
         elif completion_rate < 85:
-            lessons.append(
-                f"SOP执行率仅{completion_rate}%，需加强团队管理"
-            )
+            lessons.append(f"SOP执行率仅{completion_rate}%，需加强团队管理")
 
         # 纠正动作
         pending = corrective_summary.get("pending", 0)
@@ -1227,10 +1271,7 @@ class AICoachService:
         # 基于今日数据推断
         concerns = [item for item in vs_baseline if item["status"] == "concern"]
         for item in concerns[:2]:
-            suggestions.append(
-                f"重点监控{item['metric_name']}，"
-                f"今日偏离{abs(item['diff_pct']):.1f}%"
-            )
+            suggestions.append(f"重点监控{item['metric_name']}，今日偏离{abs(item['diff_pct']):.1f}%")
 
         # 通用建议
         food_cost = daily_metrics.get("food_cost_rate", 35.0)

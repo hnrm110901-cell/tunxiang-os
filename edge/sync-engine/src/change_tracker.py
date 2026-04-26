@@ -8,6 +8,7 @@
   get_last_sync_time(table)         -- 从 sync_state 表读取上次同步时间
   update_sync_time(table, timestamp) -- 更新同步时间戳
 """
+
 from __future__ import annotations
 
 from datetime import datetime, timezone
@@ -24,18 +25,15 @@ _EPOCH = datetime(1970, 1, 1, tzinfo=timezone.utc)
 
 # ─── 数据库连接协议（可替换接口）────────────────────────────────────────────
 
+
 class DBConnection(Protocol):
     """数据库连接抽象接口，支持 Mock 替换"""
 
-    async def fetch_all(
-        self, query: str, params: dict[str, Any]
-    ) -> List[dict[str, Any]]:
+    async def fetch_all(self, query: str, params: dict[str, Any]) -> List[dict[str, Any]]:
         """执行查询并返回所有结果行"""
         ...
 
-    async def fetch_one(
-        self, query: str, params: dict[str, Any]
-    ) -> dict[str, Any] | None:
+    async def fetch_one(self, query: str, params: dict[str, Any]) -> dict[str, Any] | None:
         """执行查询并返回单行结果"""
         ...
 
@@ -45,6 +43,7 @@ class DBConnection(Protocol):
 
 
 # ─── Mock 数据库连接（当前阶段使用）────────────────────────────────────────
+
 
 class MockDBConnection:
     """Mock 数据库连接，用于开发/测试阶段
@@ -57,9 +56,7 @@ class MockDBConnection:
         self._sync_state: dict[str, datetime] = {}
         self._data_store: dict[str, list[dict[str, Any]]] = {}
 
-    async def fetch_all(
-        self, query: str, params: dict[str, Any]
-    ) -> List[dict[str, Any]]:
+    async def fetch_all(self, query: str, params: dict[str, Any]) -> List[dict[str, Any]]:
         logger.debug(
             "mock_db.fetch_all",
             db=self._name,
@@ -68,9 +65,7 @@ class MockDBConnection:
         )
         return []
 
-    async def fetch_one(
-        self, query: str, params: dict[str, Any]
-    ) -> dict[str, Any] | None:
+    async def fetch_one(self, query: str, params: dict[str, Any]) -> dict[str, Any] | None:
         logger.debug(
             "mock_db.fetch_one",
             db=self._name,
@@ -101,6 +96,7 @@ class MockDBConnection:
 
 
 # ─── 变更追踪器 ────────────────────────────────────────────────────────────
+
 
 class ChangeTracker:
     """基于 updated_at 时间戳的增量变更检测器
@@ -220,10 +216,7 @@ class ChangeTracker:
         Returns:
             上次同步的 UTC 时间戳，不存在则返回 epoch
         """
-        query = (
-            "SELECT last_synced_at FROM sync_state "
-            "WHERE table_name = :table_name AND tenant_id = :tenant_id"
-        )
+        query = "SELECT last_synced_at FROM sync_state WHERE table_name = :table_name AND tenant_id = :tenant_id"
         params = {"table_name": table, "tenant_id": self._tenant_id}
 
         row = await self._local_db.fetch_one(query, params)
@@ -238,9 +231,7 @@ class ChangeTracker:
         ts = row.get("last_synced_at")
         return _ensure_tz(ts)
 
-    async def update_sync_time(
-        self, table: str, timestamp: datetime
-    ) -> None:
+    async def update_sync_time(self, table: str, timestamp: datetime) -> None:
         """更新 sync_state 表中指定表的同步时间戳
 
         使用 UPSERT 语义：不存在则插入，存在则更新。
@@ -271,6 +262,7 @@ class ChangeTracker:
 
 
 # ─── 工具函数 ──────────────────────────────────────────────────────────────
+
 
 def _sanitize_table(table: str) -> str:
     """校验表名，防止 SQL 注入（仅允许字母/数字/下划线）"""

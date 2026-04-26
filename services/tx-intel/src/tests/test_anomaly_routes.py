@@ -9,6 +9,7 @@
   - 所有 DB 调用均使用 AsyncMock 模拟
   - 覆盖 happy path + DB 异常回落 + 参数校验场景
 """
+
 import sys
 import types
 import uuid
@@ -77,6 +78,7 @@ def _make_app(mock_db: AsyncMock) -> TestClient:
 # 工具函数：构建 execute side_effect 队列
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 def _scalar_mock(value):
     m = MagicMock()
     m.scalar.return_value = value
@@ -92,6 +94,7 @@ def _fetchone_mock(row):
 # ═══════════════════════════════════════════════════════════════════════════════
 # GET /api/v1/intel/anomalies — 异常列表
 # ═══════════════════════════════════════════════════════════════════════════════
+
 
 class TestListAnomalies:
     """GET /api/v1/intel/anomalies"""
@@ -112,12 +115,12 @@ class TestListAnomalies:
         side_effects.append(MagicMock())
         # revenue_drop: 7天, 每天 this=0, yoy=0 → 不触发
         for _ in range(7):
-            side_effects.append(_scalar_mock(0))   # this_rev
-            side_effects.append(_scalar_mock(0))   # yoy_rev
+            side_effects.append(_scalar_mock(0))  # this_rev
+            side_effects.append(_scalar_mock(0))  # yoy_rev
         # cost_spike: 7天, 每天 revenue=0, cost=0 → 不触发
         for _ in range(7):
-            side_effects.append(_scalar_mock(0))   # revenue
-            side_effects.append(_scalar_mock(0))   # cost
+            side_effects.append(_scalar_mock(0))  # revenue
+            side_effects.append(_scalar_mock(0))  # cost
         # high_refund: completed=100, refunded=0 → rate=0 → 不触发
         side_effects.append(_fetchone_mock((100, 0)))
         # slow_kitchen: avg_min=18 ≤ 30 → 不触发
@@ -145,13 +148,13 @@ class TestListAnomalies:
         """库存临期数超阈值 → 返回 expiry_risk 异常"""
         mock_db = AsyncMock()
         side_effects = [MagicMock()]  # set_config
-        for _ in range(7):           # revenue_drop: yoy=0 → 不触发
+        for _ in range(7):  # revenue_drop: yoy=0 → 不触发
             side_effects += [_scalar_mock(0), _scalar_mock(0)]
-        for _ in range(7):           # cost_spike: revenue=0 → 不触发
+        for _ in range(7):  # cost_spike: revenue=0 → 不触发
             side_effects += [_scalar_mock(0), _scalar_mock(0)]
         side_effects.append(_fetchone_mock((100, 0)))  # high_refund: 不触发
-        side_effects.append(_scalar_mock(18))          # slow_kitchen: 不触发
-        side_effects.append(_scalar_mock(15))          # expiry_risk: 15 > 10 → 触发
+        side_effects.append(_scalar_mock(18))  # slow_kitchen: 不触发
+        side_effects.append(_scalar_mock(15))  # expiry_risk: 15 > 10 → 触发
 
         mock_db.execute = AsyncMock(side_effect=side_effects)
         client = _make_app(mock_db)
@@ -170,9 +173,9 @@ class TestListAnomalies:
             side_effects += [_scalar_mock(0), _scalar_mock(0)]  # revenue_drop
         for _ in range(7):
             side_effects += [_scalar_mock(0), _scalar_mock(0)]  # cost_spike
-        side_effects.append(_fetchone_mock((100, 0)))   # high_refund
-        side_effects.append(_scalar_mock(35))           # slow_kitchen: 35 > 30 触发
-        side_effects.append(_scalar_mock(5))            # expiry_risk
+        side_effects.append(_fetchone_mock((100, 0)))  # high_refund
+        side_effects.append(_scalar_mock(35))  # slow_kitchen: 35 > 30 触发
+        side_effects.append(_scalar_mock(5))  # expiry_risk
 
         mock_db.execute = AsyncMock(side_effect=side_effects)
         client = _make_app(mock_db)
@@ -313,6 +316,7 @@ class TestListAnomalies:
 # ═══════════════════════════════════════════════════════════════════════════════
 # POST /api/v1/intel/anomalies/{id}/dismiss — 标记异常已知悉
 # ═══════════════════════════════════════════════════════════════════════════════
+
 
 class TestDismissAnomaly:
     """POST /api/v1/intel/anomalies/{id}/dismiss"""

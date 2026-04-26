@@ -147,17 +147,13 @@ class ReportBuilderService:
     def _validate_identifier(name: str, label: str = "标识符") -> None:
         """校验标识符是否安全（防 SQL 注入）"""
         if not _SAFE_IDENTIFIER.match(name):
-            raise ReportBuilderValidationError(
-                f"非法{label}: {name!r}，只允许小写字母/数字/下划线"
-            )
+            raise ReportBuilderValidationError(f"非法{label}: {name!r}，只允许小写字母/数字/下划线")
 
     @staticmethod
     def _validate_data_source(source: str) -> None:
         """校验数据源是否在白名单"""
         if source not in ALLOWED_DATA_SOURCES:
-            raise DataSourceNotAllowedError(
-                f"数据源 {source!r} 不在允许列表中"
-            )
+            raise DataSourceNotAllowedError(f"数据源 {source!r} 不在允许列表中")
 
     # ═══════════════════════════════════════════════════════════════════════
     # 模板 CRUD
@@ -546,18 +542,22 @@ class ReportBuilderService:
         # 5. 构建列定义（供前端渲染）
         columns = []
         for d in dim_defs:
-            columns.append({
-                "key": d["key"],
-                "label": d.get("label", d["key"]),
-                "type": "dimension",
-            })
+            columns.append(
+                {
+                    "key": d["key"],
+                    "label": d.get("label", d["key"]),
+                    "type": "dimension",
+                }
+            )
         for m in mea_defs:
-            columns.append({
-                "key": m["key"],
-                "label": m.get("label", m["key"]),
-                "type": "measure",
-                "format": m.get("format"),
-            })
+            columns.append(
+                {
+                    "key": m["key"],
+                    "label": m.get("label", m["key"]),
+                    "type": "measure",
+                    "format": m.get("format"),
+                }
+            )
 
         return {
             "columns": columns,
@@ -606,7 +606,9 @@ class ReportBuilderService:
                 "template_id": template_id,
                 "instance_name": data["instance_name"],
                 "custom_filters": json.dumps(data.get("custom_filters") or {}, ensure_ascii=False),
-                "custom_dimensions": json.dumps(data.get("custom_dimensions")) if data.get("custom_dimensions") else None,
+                "custom_dimensions": json.dumps(data.get("custom_dimensions"))
+                if data.get("custom_dimensions")
+                else None,
                 "custom_measures": json.dumps(data.get("custom_measures")) if data.get("custom_measures") else None,
                 "created_by": data["created_by"],
                 "now": now,
@@ -708,9 +710,7 @@ class ReportBuilderService:
         schedule_type = data.get("schedule_type", "none")
         valid_types = ("none", "daily", "weekly", "monthly")
         if schedule_type not in valid_types:
-            raise ReportBuilderValidationError(
-                f"schedule_type 必须为 {valid_types} 之一"
-            )
+            raise ReportBuilderValidationError(f"schedule_type 必须为 {valid_types} 之一")
 
         # 校验实例存在
         check_result = await db.execute(
@@ -770,13 +770,13 @@ class ReportBuilderService:
           {content, content_type, file_name, export_id, rows_exported}
         """
         if export_format not in ("pdf", "excel", "csv"):
-            raise ReportBuilderValidationError(
-                f"导出格式必须为 pdf/excel/csv，收到: {export_format!r}"
-            )
+            raise ReportBuilderValidationError(f"导出格式必须为 pdf/excel/csv，收到: {export_format!r}")
 
         # 执行报表获取全量数据（导出不分页，限制 50000 行上限）
         result = await self.execute_report(
-            db, tenant_id, template_id,
+            db,
+            tenant_id,
+            template_id,
             filters=filters,
             page=1,
             size=50000,
@@ -886,10 +886,7 @@ class ReportBuilderService:
             from openpyxl import Workbook
             from openpyxl.styles import Alignment, Font, numbers
         except ImportError as exc:
-            raise ImportError(
-                "openpyxl is required for Excel export. "
-                "Install: pip install openpyxl"
-            ) from exc
+            raise ImportError("openpyxl is required for Excel export. Install: pip install openpyxl") from exc
 
         wb = Workbook()
         ws = wb.active
@@ -989,6 +986,7 @@ class ReportBuilderService:
         # 尝试用 weasyprint 生成真正 PDF
         try:
             from weasyprint import HTML  # type: ignore[import-untyped]
+
             pdf_bytes = HTML(string=html_content).write_pdf()
             return pdf_bytes, "application/pdf", "pdf"
         except ImportError:
@@ -1017,9 +1015,7 @@ class ReportBuilderService:
 
         valid_channels = ("email", "wechat", "dingtalk", "im")
         if channel not in valid_channels:
-            raise ReportBuilderValidationError(
-                f"channel 必须为 {valid_channels} 之一"
-            )
+            raise ReportBuilderValidationError(f"channel 必须为 {valid_channels} 之一")
 
         # 校验实例存在
         check_result = await db.execute(
@@ -1115,10 +1111,7 @@ class ReportBuilderService:
         result = await db.execute(text(sql))
         rows = result.mappings().all()
 
-        return [
-            {"value": r["value"], "label": str(r["value"])}
-            for r in rows
-        ]
+        return [{"value": r["value"], "label": str(r["value"])} for r in rows]
 
     # ═══════════════════════════════════════════════════════════════════════
     # 内部辅助方法

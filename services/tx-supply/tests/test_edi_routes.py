@@ -15,7 +15,7 @@
 import os
 import sys
 import uuid
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 sys.path.insert(
@@ -183,6 +183,7 @@ app = FastAPI()
 app.include_router(edi_router)
 
 from shared.ontology.src.database import get_db_with_tenant
+
 app.dependency_overrides[get_db_with_tenant] = _fake_get_db_with_tenant
 
 

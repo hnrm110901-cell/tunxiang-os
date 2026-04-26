@@ -18,6 +18,7 @@
 - method (str): "coreml" | "rule_fallback"
 - p95_minutes (float): 95百分位上限
 """
+
 from __future__ import annotations
 
 import os
@@ -74,6 +75,7 @@ class DishTimePredictor:
         model_path = os.environ.get("DISH_TIME_MODEL_PATH", "models/dish_time_v1.mlpackage")
         try:
             import coremltools as ct  # type: ignore[import]
+
             if os.path.exists(model_path):
                 self._model = ct.models.MLModel(model_path)
                 self._coreml_available = True
@@ -104,13 +106,15 @@ class DishTimePredictor:
     def _predict_coreml(self, inp: PredictionInput) -> PredictionResult:
         """CoreML 推理路径（M4 Neural Engine）"""
         # 真实部署时传入特征向量给 .mlmodel
-        prediction = self._model.predict({  # type: ignore[union-attr]
-            "dish_category": inp.dish_category,
-            "dish_complexity": float(inp.dish_complexity),
-            "queue_depth": float(inp.current_queue_depth),
-            "hour_of_day": float(inp.hour_of_day),
-            "concurrent_orders": float(inp.concurrent_orders),
-        })
+        prediction = self._model.predict(
+            {  # type: ignore[union-attr]
+                "dish_category": inp.dish_category,
+                "dish_complexity": float(inp.dish_complexity),
+                "queue_depth": float(inp.current_queue_depth),
+                "hour_of_day": float(inp.hour_of_day),
+                "concurrent_orders": float(inp.concurrent_orders),
+            }
+        )
         estimated = float(prediction["estimated_minutes"])
         return PredictionResult(
             estimated_minutes=estimated,
@@ -123,9 +127,7 @@ class DishTimePredictor:
     def _predict_rules(self, inp: PredictionInput) -> PredictionResult:
         """规则引擎降级路径"""
         base = _BASE_TIMES.get(inp.dish_category, _BASE_TIMES["default"])
-        complexity_mult = _COMPLEXITY_MULTIPLIER.get(
-            max(1, min(5, inp.dish_complexity)), 1.0
-        )
+        complexity_mult = _COMPLEXITY_MULTIPLIER.get(max(1, min(5, inp.dish_complexity)), 1.0)
         queue_penalty = min(inp.current_queue_depth * 0.8, 8.0)
         concurrent_penalty = max(0.0, (inp.concurrent_orders - 3) * 0.5)
         peak_penalty = 2.0 if inp.hour_of_day in _PEAK_HOURS else 0.0

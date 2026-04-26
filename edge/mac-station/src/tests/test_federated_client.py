@@ -8,6 +8,7 @@
 - 训练历史记录
 - FastAPI 路由
 """
+
 import os
 import sys
 
@@ -42,6 +43,7 @@ def client_with_model(client: FederatedClient) -> FederatedClient:
 def make_training_data(n: int = 50, feature_count: int = 6) -> list[dict]:
     """生成模拟训练数据"""
     import random
+
     data = []
     for _ in range(n):
         features = [random.random() for _ in range(feature_count)]
@@ -72,6 +74,7 @@ class TestClientInit:
 
     def test_get_federated_client_singleton(self):
         import federated_client
+
         # 重置单例
         federated_client._client_instance = None
         c1 = get_federated_client("s1", "http://localhost:9000")
@@ -127,9 +130,7 @@ class TestLocalTraining:
 
     @pytest.mark.asyncio
     async def test_train_local_model_not_loaded(self, client: FederatedClient):
-        result = await client.train_local(
-            "nonexistent_model", make_training_data(10)
-        )
+        result = await client.train_local("nonexistent_model", make_training_data(10))
         assert result["ok"] is False
         assert "未加载" in result["error"]
 
@@ -144,16 +145,11 @@ class TestLocalTraining:
         client = client_with_model
         original_weights = list(client.local_models["discount_anomaly"]["weights"])
 
-        await client.train_local(
-            "discount_anomaly", make_training_data(20), epochs=3
-        )
+        await client.train_local("discount_anomaly", make_training_data(20), epochs=3)
 
         new_weights = client.local_models["discount_anomaly"]["weights"]
         # 权重应该有所变化
-        diffs = sum(
-            abs(new_weights[i] - original_weights[i])
-            for i in range(len(original_weights))
-        )
+        diffs = sum(abs(new_weights[i] - original_weights[i]) for i in range(len(original_weights)))
         assert diffs > 0
 
     @pytest.mark.asyncio
@@ -220,9 +216,7 @@ class TestModelEvaluation:
         assert "为空" in result["error"]
 
     @pytest.mark.asyncio
-    async def test_evaluate_after_training_improves(
-        self, client_with_model: FederatedClient
-    ):
+    async def test_evaluate_after_training_improves(self, client_with_model: FederatedClient):
         """训练后评估应该比训练前好（或至少不差太多）"""
         client = client_with_model
         test_data = make_test_data(30)
@@ -244,9 +238,7 @@ class TestModelEvaluation:
 
     @pytest.mark.asyncio
     async def test_evaluate_returns_version(self, client_with_model: FederatedClient):
-        result = await client_with_model.evaluate_model(
-            "discount_anomaly", make_test_data(5)
-        )
+        result = await client_with_model.evaluate_model("discount_anomaly", make_test_data(5))
         assert result["version"] == "1.0.0"
 
 
@@ -269,9 +261,7 @@ class TestSubmitUpdate:
         assert "未加载" in result["error"]
 
     @pytest.mark.asyncio
-    async def test_submit_after_training_gets_sample_count(
-        self, client_with_model: FederatedClient
-    ):
+    async def test_submit_after_training_gets_sample_count(self, client_with_model: FederatedClient):
         """训练后提交应能找到正确的样本数"""
         client = client_with_model
         training_data = make_training_data(42)
@@ -309,9 +299,7 @@ class TestParticipateInRound:
         test_data = make_test_data(15)
 
         # 直接测试训练 + 评估部分（不需要网络）
-        train_result = await client.train_local(
-            "discount_anomaly", training_data, epochs=5
-        )
+        train_result = await client.train_local("discount_anomaly", training_data, epochs=5)
         assert train_result["ok"] is True
 
         eval_result = await client.evaluate_model("discount_anomaly", test_data)
@@ -326,10 +314,7 @@ class TestMultiClientSimulation:
     @pytest.mark.asyncio
     async def test_three_stores_train_independently(self):
         """3家门店各自独立训练，验证权重不同"""
-        clients = [
-            FederatedClient(f"store_{i}", "http://localhost:8000")
-            for i in range(3)
-        ]
+        clients = [FederatedClient(f"store_{i}", "http://localhost:8000") for i in range(3)]
 
         # 给每个客户端加载相同的初始模型
         initial_weights = [0.1] * 52
@@ -345,6 +330,7 @@ class TestMultiClientSimulation:
         all_weights = []
         for i, c in enumerate(clients):
             import random
+
             random.seed(i * 42)
             data = make_training_data(50 + i * 20)
             await c.train_local("model_a", data, epochs=3)
@@ -353,19 +339,13 @@ class TestMultiClientSimulation:
         # 三组权重应该不同（各自用不同数据训练）
         for i in range(len(all_weights)):
             for j in range(i + 1, len(all_weights)):
-                diff = sum(
-                    abs(all_weights[i][k] - all_weights[j][k])
-                    for k in range(len(all_weights[i]))
-                )
+                diff = sum(abs(all_weights[i][k] - all_weights[j][k]) for k in range(len(all_weights[i])))
                 assert diff > 0, f"Store {i} and {j} should have different weights"
 
     @pytest.mark.asyncio
     async def test_fedavg_simulation_without_server(self):
         """在本地模拟 FedAvg 聚合（不需要服务器）"""
-        clients = [
-            FederatedClient(f"store_{i}", "http://localhost:8000")
-            for i in range(3)
-        ]
+        clients = [FederatedClient(f"store_{i}", "http://localhost:8000") for i in range(3)]
 
         weight_count = 52
         initial_weights = [0.1] * weight_count
@@ -381,6 +361,7 @@ class TestMultiClientSimulation:
                 "source": "global",
             }
             import random
+
             random.seed(i * 100)
             data = make_training_data(sample_counts[i])
             await c.train_local("model_a", data, epochs=5)
@@ -394,9 +375,7 @@ class TestMultiClientSimulation:
 
         # 聚合后的权重应该在各客户端权重的范围内
         for j in range(weight_count):
-            client_vals = [
-                c.local_models["model_a"]["weights"][j] for c in clients
-            ]
+            client_vals = [c.local_models["model_a"]["weights"][j] for c in clients]
             min_val = min(client_vals)
             max_val = max(client_vals)
             # 加权平均应在 min 和 max 之间

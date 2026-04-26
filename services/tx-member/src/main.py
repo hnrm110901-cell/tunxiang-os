@@ -8,7 +8,7 @@ from contextlib import asynccontextmanager
 
 # Feature Flag SDK（try/except 保护，SDK不可用时自动降级为全量开启）
 try:
-    from shared.feature_flags import FlagContext, is_enabled
+    from shared.feature_flags import is_enabled
     from shared.feature_flags.flag_names import MemberFlags
 
     _FLAG_SDK_AVAILABLE = True
@@ -49,6 +49,7 @@ from .api.points_mall_routes import router as points_mall_router
 from .api.points_routes import router as points_router
 from .api.premium_card_routes import router as premium_card_router
 from .api.premium_membership_card_routes import router as premium_membership_router  # Y-D7 付费会员卡产品化
+from .api.profile360_routes import router as profile360_router  # 360°会员画像聚合
 from .api.recommendation_routes import router as recommendation_router  # 实时推荐引擎
 from .api.rfm_routes import router as rfm_router
 from .api.smart_dispatch_routes import router as smart_dispatch_router
@@ -217,6 +218,7 @@ app.include_router(golden_id_router)  # Y-D9 全渠道 Golden ID 映射
 app.include_router(cross_brand_router)  # 跨品牌会员智能
 app.include_router(recommendation_router)  # 实时推荐引擎
 app.include_router(subscription_router)  # 付费会员订阅
+app.include_router(profile360_router)  # 360°会员画像聚合(企微侧边栏)
 
 # ── S4: 智能储值（推荐/绩效/提成）──
 from .api.smart_recharge_routes import router as smart_recharge_router

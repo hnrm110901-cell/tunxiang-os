@@ -25,6 +25,7 @@ svc = CallCenterService()
 
 # ── Request / Response Models ──
 
+
 class IncomingCallReq(BaseModel):
     store_id: UUID
     caller_phone: str = Field(..., max_length=20)
@@ -55,6 +56,7 @@ class CallbackCompleteReq(BaseModel):
 
 # ── Endpoints ──
 
+
 @router.post("/api/v1/trade/calls/incoming")
 async def incoming_call(
     body: IncomingCallReq,
@@ -64,7 +66,11 @@ async def incoming_call(
     """来电处理：创建通话记录 + 客户匹配 + 弹屏数据"""
     try:
         result = await svc.handle_incoming_call(
-            db, x_tenant_id, body.store_id, body.caller_phone, body.agent_ext,
+            db,
+            x_tenant_id,
+            body.store_id,
+            body.caller_phone,
+            body.agent_ext,
         )
         return {"ok": True, "data": result}
     except ValueError as e:
@@ -80,8 +86,12 @@ async def hangup_call(
     """通话挂断：更新时长/录音/状态，未接自动创建回拨任务"""
     try:
         result = await svc.record_call_hangup(
-            db, x_tenant_id, body.call_id, body.duration_sec,
-            body.recording_url, body.status,
+            db,
+            x_tenant_id,
+            body.call_id,
+            body.duration_sec,
+            body.recording_url,
+            body.status,
         )
         return {"ok": True, "data": result}
     except ValueError as e:
@@ -137,7 +147,10 @@ async def create_callback(
     """创建回拨任务"""
     try:
         result = await svc.create_callback_task(
-            db, x_tenant_id, body.store_id, body.model_dump(),
+            db,
+            x_tenant_id,
+            body.store_id,
+            body.model_dump(),
         )
         return {"ok": True, "data": result}
     except ValueError as e:
@@ -154,7 +167,11 @@ async def callback_tasks(
 ):
     """回拨任务列表"""
     result = await svc.get_callback_tasks(
-        db, x_tenant_id, store_id, assigned_to, status,
+        db,
+        x_tenant_id,
+        store_id,
+        assigned_to,
+        status,
     )
     return {"ok": True, "data": result}
 

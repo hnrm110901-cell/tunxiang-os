@@ -9,6 +9,7 @@
 所有端点要求 X-Tenant-ID header。
 统一响应格式：{"ok": bool, "data": {}, "error": {}}
 """
+
 from __future__ import annotations
 
 from datetime import datetime
@@ -25,6 +26,7 @@ router = APIRouter(prefix="/sync", tags=["sync"])
 
 # ─── 依赖：获取 OfflineSyncService 实例 ───────────────────────────────────
 
+
 def _get_service(request: Request) -> OfflineSyncService:
     """从 app.state 获取已初始化的 OfflineSyncService 实例"""
     svc: OfflineSyncService | None = getattr(request.app.state, "offline_sync_service", None)
@@ -40,6 +42,7 @@ def _require_tenant(x_tenant_id: str | None) -> str:
 
 
 # ─── 请求/响应模型 ────────────────────────────────────────────────────────
+
 
 class OrderItemPayload(BaseModel):
     item_name: str
@@ -59,6 +62,7 @@ class PaymentPayload(BaseModel):
 
 class PushOrderReq(BaseModel):
     """单条离线订单推送请求"""
+
     store_id: str
     order_data: dict[str, Any] = Field(description="完整订单快照，金额字段单位：分")
     items_data: list[OrderItemPayload]
@@ -74,6 +78,7 @@ class PushOrderReq(BaseModel):
 
 class PushBatchReq(BaseModel):
     """批量推送请求"""
+
     store_id: str
     orders: list[PushOrderReq] = Field(min_length=1, max_length=100)
 
@@ -123,13 +128,13 @@ class CheckpointResp(BaseModel):
 
 # ─── 路由实现 ─────────────────────────────────────────────────────────────
 
+
 @router.post(
     "/push",
     response_model=dict,
     summary="推送离线订单到云端",
     description=(
-        "将本地离线队列中的订单批量推送到云端。"
-        "若已有网络则直接同步；若仍离线则存入本地队列并返回 local_order_id。"
+        "将本地离线队列中的订单批量推送到云端。若已有网络则直接同步；若仍离线则存入本地队列并返回 local_order_id。"
     ),
 )
 async def push_offline_orders(
@@ -165,9 +170,7 @@ async def push_offline_orders(
     # 尝试立即同步
     if local_ids:
         try:
-            batch_result = await svc.sync_pending_orders(
-                store_id=req.store_id, tenant_id=tenant_id
-            )
+            batch_result = await svc.sync_pending_orders(store_id=req.store_id, tenant_id=tenant_id)
             sync_result.success_count += batch_result.success_count
             sync_result.failed_count += batch_result.failed_count
             sync_result.conflict_count += batch_result.conflict_count

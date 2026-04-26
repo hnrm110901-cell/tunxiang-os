@@ -66,7 +66,7 @@ if "structlog" not in sys.modules:
 from shared.ontology.src.database import get_db  # noqa: E402 — 用存根模块
 
 # 为 get_db 提供默认实现（存根模块原来没有）
-if not hasattr(get_db, "__call__"):
+if not callable(get_db):
 
     async def get_db():  # type: ignore[misc]
         yield None

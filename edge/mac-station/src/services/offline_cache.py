@@ -8,6 +8,7 @@
 
 Mock 模式：不依赖真实 PG 连接，内存模拟全部行为。
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -30,13 +31,13 @@ class QueueEntry:
     """离线写入队列中的一条操作记录。"""
 
     entry_id: str
-    operation: str          # "create_order" | "update_order" | "update_inventory" | ...
-    endpoint: str           # 云端目标 API 路径
-    method: str             # "POST" | "PUT" | "PATCH"
+    operation: str  # "create_order" | "update_order" | "update_inventory" | ...
+    endpoint: str  # 云端目标 API 路径
+    method: str  # "POST" | "PUT" | "PATCH"
     payload: dict[str, Any]
     store_id: str
     tenant_id: str
-    created_at: float       # UNIX 时间戳
+    created_at: float  # UNIX 时间戳
     retry_count: int = 0
     max_retries: int = 5
     last_error: str = ""
@@ -136,15 +137,17 @@ class OfflineCache:
         for i, entry in enumerate(self._write_queue):
             if i >= limit:
                 break
-            items.append({
-                "entry_id": entry.entry_id,
-                "operation": entry.operation,
-                "endpoint": entry.endpoint,
-                "method": entry.method,
-                "created_at": entry.created_at,
-                "retry_count": entry.retry_count,
-                "last_error": entry.last_error,
-            })
+            items.append(
+                {
+                    "entry_id": entry.entry_id,
+                    "operation": entry.operation,
+                    "endpoint": entry.endpoint,
+                    "method": entry.method,
+                    "created_at": entry.created_at,
+                    "retry_count": entry.retry_count,
+                    "last_error": entry.last_error,
+                }
+            )
         return items
 
     # ── 读取缓存 ──
@@ -304,11 +307,7 @@ class OfflineCache:
     def stats(self) -> dict[str, Any]:
         """返回缓存命中率和队列统计。"""
         total_reads = self._stats["cache_hits"] + self._stats["cache_misses"]
-        hit_rate = (
-            round(self._stats["cache_hits"] / total_reads * 100, 1)
-            if total_reads > 0
-            else 0.0
-        )
+        hit_rate = round(self._stats["cache_hits"] / total_reads * 100, 1) if total_reads > 0 else 0.0
         return {
             "cache_hit_rate_pct": hit_rate,
             "cache_hits": self._stats["cache_hits"],

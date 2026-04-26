@@ -142,9 +142,7 @@ class VoucherRedeemService:
         else:
             return {"redeemed": False, "deduct_amount_fen": 0, "error": f"未知券类型: {voucher_type}"}
 
-    async def _redeem_platform_voucher(
-        self, order_id: uuid.UUID, voucher_code: str
-    ) -> dict:
+    async def _redeem_platform_voucher(self, order_id: uuid.UUID, voucher_code: str) -> dict:
         """核销美团/抖音平台券
 
         TODO: 对接 tx-trade/webhook_routes.py 的平台核销接口
@@ -193,9 +191,7 @@ class VoucherRedeemService:
             },
         }
 
-    async def _redeem_cash_voucher(
-        self, order_id: uuid.UUID, voucher_code: str
-    ) -> dict:
+    async def _redeem_cash_voucher(self, order_id: uuid.UUID, voucher_code: str) -> dict:
         """核销内部代金券
 
         查询 coupons 表（tx-member 发行的代金券），验证并标记核销。
@@ -241,9 +237,7 @@ class VoucherRedeemService:
             },
         }
 
-    async def _redeem_member_points(
-        self, order_id: uuid.UUID, points_code: str
-    ) -> dict:
+    async def _redeem_member_points(self, order_id: uuid.UUID, points_code: str) -> dict:
         """会员积分抵扣 — 调用 tx-member POST /api/v1/member/points/spend
 
         points_code 格式: "{card_id}:{points_amount}"
@@ -379,11 +373,14 @@ class VoucherRedeemService:
                 "oid": order_id,
                 "tid": self._tenant_id,
                 "deduct": deduct_amount_fen,
-                "meta": _json.dumps({
-                    "points_redeemed": points_amount,
-                    "points_card_id": card_id,
-                    "points_deduct_fen": deduct_amount_fen,
-                }, ensure_ascii=False),
+                "meta": _json.dumps(
+                    {
+                        "points_redeemed": points_amount,
+                        "points_card_id": card_id,
+                        "points_deduct_fen": deduct_amount_fen,
+                    },
+                    ensure_ascii=False,
+                ),
             },
         )
 

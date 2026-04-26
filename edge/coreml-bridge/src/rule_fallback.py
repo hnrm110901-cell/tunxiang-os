@@ -7,6 +7,7 @@
 - 折扣率 < 0.3 → low risk
 - 高峰期 + 折扣 > 0.4 → risk_score += 20
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -38,18 +39,18 @@ class RuleBasedPredictor:
 
 @dataclass
 class DiscountRiskInput:
-    discount_rate: float       # 折扣率 0.0-1.0（0.0=无折扣, 1.0=全免）
-    hour_of_day: int           # 当前小时 0-23
-    order_amount_fen: int      # 订单金额（分）
-    employee_id: str = ""      # 操作员 ID（用于异常检测）
-    table_id: str = ""         # 桌台 ID
+    discount_rate: float  # 折扣率 0.0-1.0（0.0=无折扣, 1.0=全免）
+    hour_of_day: int  # 当前小时 0-23
+    order_amount_fen: int  # 订单金额（分）
+    employee_id: str = ""  # 操作员 ID（用于异常检测）
+    table_id: str = ""  # 桌台 ID
 
 
 @dataclass
 class DiscountRiskResult:
-    risk_level: str            # "low" | "medium" | "high"
-    risk_score: int            # 0-100
-    method: str                # "rule_fallback"
+    risk_level: str  # "low" | "medium" | "high"
+    risk_score: int  # 0-100
+    method: str  # "rule_fallback"
     reasons: list[str]
     should_alert: bool
 
@@ -143,30 +144,40 @@ class RuleBasedDiscountRisk(RuleBasedPredictor):
 
 @dataclass
 class TrafficPredictInput:
-    hour_of_day: int           # 预测时段（0-23）
-    day_of_week: int           # 星期几（0=周一, 6=周日）
-    seats_total: int           # 门店总座位数
+    hour_of_day: int  # 预测时段（0-23）
+    day_of_week: int  # 星期几（0=周一, 6=周日）
+    seats_total: int  # 门店总座位数
     weather_score: float = 1.0  # 天气系数（0.5=极端天气, 1.0=正常, 1.2=节假日）
 
 
 @dataclass
 class TrafficPredictResult:
-    expected_covers: int       # 预计就餐人数
-    turnover_rate: float       # 预计翻台率
-    confidence: float          # 置信度
-    method: str                # "rule_fallback"
-    peak_label: str            # "lunch_peak" | "dinner_peak" | "off_peak"
+    expected_covers: int  # 预计就餐人数
+    turnover_rate: float  # 预计翻台率
+    confidence: float  # 置信度
+    method: str  # "rule_fallback"
+    peak_label: str  # "lunch_peak" | "dinner_peak" | "off_peak"
 
 
 _HOURLY_LOAD: dict[int, float] = {
     # 早市
-    7: 0.15, 8: 0.20, 9: 0.10,
+    7: 0.15,
+    8: 0.20,
+    9: 0.10,
     # 午市
-    11: 0.55, 12: 0.90, 13: 0.75, 14: 0.35,
+    11: 0.55,
+    12: 0.90,
+    13: 0.75,
+    14: 0.35,
     # 下午茶
-    15: 0.15, 16: 0.10,
+    15: 0.15,
+    16: 0.10,
     # 晚市
-    17: 0.50, 18: 0.85, 19: 0.95, 20: 0.80, 21: 0.45,
+    17: 0.50,
+    18: 0.85,
+    19: 0.95,
+    20: 0.80,
+    21: 0.45,
     22: 0.20,
 }
 

@@ -12,9 +12,9 @@ import asyncio
 import os
 import sys
 import uuid
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
 
 # 确保 src/ 和 shared/ 在 Python path 中
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
@@ -185,7 +185,6 @@ class TestOrderStateMachineTier1:
               以及 table_service.py 中的状态回滚方法。
         """
         # 验证状态机中台位待结账可以回退
-        from services.tx_trade.src.services.state_machine import can_table_transition
         # 支付超时回滚路径：pending_checkout 应该能回到 dining（或 empty）
         # 当前状态机可能不支持此回退，这是一个已知缺口
         # assert can_table_transition("pending_checkout", "dining") is True

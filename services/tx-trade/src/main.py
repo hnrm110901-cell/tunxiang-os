@@ -13,9 +13,18 @@ from shared.ontology.src.database import init_db
 
 from .api.allergen_routes import router as allergen_router
 from .api.approval_routes import router as approval_router
+from .api.banquet_capacity_routes import router as banquet_capacity_router
+from .api.banquet_contract_routes import router as banquet_contract_router
+from .api.banquet_lead_routes import router as banquet_lead_router
+from .api.banquet_material_routes import router as banquet_material_router
 from .api.banquet_order_routes import router as banquet_order_router  # Y-A8 宴席支付闭环
+from .api.banquet_order_v2_routes import router as banquet_order_v2_router
 from .api.banquet_payment_routes import router as banquet_payment_router
+from .api.banquet_production_routes import router as banquet_production_router
+from .api.banquet_quote_routes import router as banquet_quote_router
 from .api.banquet_routes import router as banquet_router
+from .api.banquet_schedule_routes import router as banquet_schedule_router
+from .api.banquet_venue_routes import router as banquet_venue_router
 from .api.booking_api import router as booking_router
 from .api.booking_prep_routes import router as booking_prep_router
 from .api.booking_webhook_routes import router as booking_webhook_router
@@ -247,6 +256,28 @@ app.include_router(delivery_ops_router)
 app.include_router(omni_channel_router, prefix="/api/v1")
 app.include_router(banquet_payment_router)
 app.include_router(banquet_order_router)  # Y-A8 /api/v1/trade/banquet — 定金/尾款状态机
+# Phase 1+2 宴会全流程模块
+app.include_router(banquet_lead_router)
+app.include_router(banquet_quote_router)
+app.include_router(banquet_venue_router)
+app.include_router(banquet_order_v2_router)
+app.include_router(banquet_contract_router)
+app.include_router(banquet_production_router)
+app.include_router(banquet_material_router)
+app.include_router(banquet_capacity_router)
+app.include_router(banquet_schedule_router)
+# Phase 3 宴会执行+结算+售后
+from .api.banquet_execution_routes import router as banquet_execution_router
+from .api.banquet_live_order_routes import router as banquet_live_order_router
+from .api.banquet_settlement_routes import router as banquet_settlement_routes_router
+from .api.banquet_aftercare_routes import router as banquet_aftercare_router
+app.include_router(banquet_execution_router)
+app.include_router(banquet_live_order_router)
+app.include_router(banquet_settlement_routes_router)
+app.include_router(banquet_aftercare_router)
+# Phase 4 AI宴会大脑+经营看板
+from .api.banquet_ai_routes import router as banquet_ai_router
+app.include_router(banquet_ai_router)
 app.include_router(collab_order_router)
 app.include_router(table_layout_router)
 app.include_router(chef_at_home_router)
@@ -422,9 +453,9 @@ from .api.table_merge_preset_routes import router as table_merge_preset_router
 from .api.table_period_config_routes import router as table_period_config_router
 from .api.table_utilization_routes import router as table_utilization_router
 
-app.include_router(table_merge_preset_router)   # v284 时段拼桌预设（方案配置/执行/回滚）
-app.include_router(table_period_config_router)   # v286 桌台×时段配置矩阵
-app.include_router(table_utilization_router)     # v287 桌台利用率分析（Agent数据基础）
+app.include_router(table_merge_preset_router)  # v284 时段拼桌预设（方案配置/执行/回滚）
+app.include_router(table_period_config_router)  # v286 桌台×时段配置矩阵
+app.include_router(table_utilization_router)  # v287 桌台利用率分析（Agent数据基础）
 
 # ── S3: KDS计件配菜 + 显示配置 ──
 from .api.kds_display_config_routes import router as kds_display_config_router

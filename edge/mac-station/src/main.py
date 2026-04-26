@@ -7,6 +7,7 @@
 4. 代理 Core ML 桥接请求
 5. ForgeNode 离线感知决策引擎（读取 SKILL.yaml degradation.offline 配置）
 """
+
 import asyncio
 import base64
 import json
@@ -33,6 +34,7 @@ COREML_URL = os.getenv("COREML_BRIDGE_URL", "http://localhost:8100")
 
 
 # ─── ForgeNode 生命周期 ───────────────────────────────────────────────────────
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -100,12 +102,14 @@ app.include_router(forge_router)
 
 # ─── 健康检查 ───
 
+
 @app.get("/health")
 async def health() -> dict:
     return {"ok": True, "data": {"service": "mac-station", "version": "4.2.0"}}
 
 
 # ─── Core ML 代理 ───
+
 
 @app.post("/api/v1/predict/{model_name}")
 async def predict(model_name: str, data: dict) -> dict:
@@ -116,7 +120,11 @@ async def predict(model_name: str, data: dict) -> dict:
             return resp.json()
     except httpx.ConnectError:
         logger.warning("coreml_bridge_unavailable", model=model_name)
-        return {"ok": False, "data": None, "error": {"code": "COREML_UNAVAILABLE", "message": "Core ML bridge not running"}}
+        return {
+            "ok": False,
+            "data": None,
+            "error": {"code": "COREML_UNAVAILABLE", "message": "Core ML bridge not running"},
+        }
 
 
 # ─── WebSocket 推送（Agent → 安卓 POS） ───
@@ -160,9 +168,7 @@ pos_pusher = POSPusher()
 
 
 @app.websocket("/ws/pos/{store_id}/{terminal_id}")
-async def pos_ws_endpoint(
-    websocket: WebSocket, store_id: str, terminal_id: str
-) -> None:
+async def pos_ws_endpoint(websocket: WebSocket, store_id: str, terminal_id: str) -> None:
     """POS 收银终端 WebSocket 连接端点。
 
     收银端连接后可接收：
@@ -370,10 +376,12 @@ async def admin_alert(data: dict) -> dict:
     logger.warning("admin_alert_received", alert_type=alert_type, severity=data.get("severity"))
 
     # 广播到所有 Agent 推送连接（管理员终端）
-    await broadcast_agent_decision({
-        "type": "admin_alert",
-        "payload": data,
-    })
+    await broadcast_agent_decision(
+        {
+            "type": "admin_alert",
+            "payload": data,
+        }
+    )
 
     # TODO: 转发到企微/钉钉/短信
     return {"ok": True, "data": {"forwarded": True, "channels": ["websocket"]}}
@@ -458,11 +466,11 @@ async def test_printer(printer_id: str) -> dict:
 
     if printer["type"] == "network":
         # 发送一行测试文本 + 切纸
-        test_data = b'\x1b\x40'  # ESC @ 初始化
+        test_data = b"\x1b\x40"  # ESC @ 初始化
         test_data += "---- 打印机测试 ----\n".encode("gbk", errors="replace")
         test_data += f"打印机: {printer['name']}\n".encode("gbk", errors="replace")
         test_data += f"地址: {printer['address']}\n".encode("gbk", errors="replace")
-        test_data += b'\x1d\x56\x00'  # GS V 0 切纸
+        test_data += b"\x1d\x56\x00"  # GS V 0 切纸
         ok = await _send_to_network_printer(printer["address"], test_data)
         return {"ok": ok, "data": {"message": "测试打印已发送" if ok else "打印机连接失败"}}
 
@@ -566,6 +574,7 @@ async def _subscribe_menu_board_redis(channel: str, websocket: WebSocket) -> Non
     """
     try:
         import redis.asyncio as aioredis  # type: ignore
+
         redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
         async with aioredis.from_url(redis_url, decode_responses=True) as client, client.pubsub() as pubsub:
             await pubsub.subscribe(channel)

@@ -52,9 +52,7 @@ class SalesTaskScheduler:
         )
         return results
 
-    async def _create_birthday_reminders(
-        self, tenant_id: str, today: date, db: Any
-    ) -> int:
+    async def _create_birthday_reminders(self, tenant_id: str, today: date, db: Any) -> int:
         """生日提醒：3天前瞻，查找即将过生日的客户并创建提醒任务
 
         避免重复：同一客户同一天不重复创建。
@@ -65,8 +63,7 @@ class SalesTaskScheduler:
 
         # 构建 OR 条件
         conditions = " OR ".join(
-            [f"(EXTRACT(MONTH FROM birthday) = {m} AND EXTRACT(DAY FROM birthday) = {d})"
-             for m, d in month_day_pairs]
+            [f"(EXTRACT(MONTH FROM birthday) = {m} AND EXTRACT(DAY FROM birthday) = {d})" for m, d in month_day_pairs]
         )
 
         sql = f"""
@@ -124,14 +121,14 @@ class SalesTaskScheduler:
 
         return created
 
-    async def _create_anniversary_reminders(
-        self, tenant_id: str, today: date, db: Any
-    ) -> int:
+    async def _create_anniversary_reminders(self, tenant_id: str, today: date, db: Any) -> int:
         """纪念日提醒：3天前瞻"""
         lookahead_dates = [(today + timedelta(days=i)) for i in range(4)]
         conditions = " OR ".join(
-            [f"(EXTRACT(MONTH FROM anniversary) = {d.month} AND EXTRACT(DAY FROM anniversary) = {d.day})"
-             for d in lookahead_dates]
+            [
+                f"(EXTRACT(MONTH FROM anniversary) = {d.month} AND EXTRACT(DAY FROM anniversary) = {d.day})"
+                for d in lookahead_dates
+            ]
         )
 
         sql = f"""
@@ -187,9 +184,7 @@ class SalesTaskScheduler:
 
         return created
 
-    async def _create_dormant_recalls(
-        self, tenant_id: str, today: date, db: Any
-    ) -> int:
+    async def _create_dormant_recalls(self, tenant_id: str, today: date, db: Any) -> int:
         """沉默客户召回：30+天未到店"""
         cutoff = today - timedelta(days=30)
         sql = """
@@ -246,9 +241,7 @@ class SalesTaskScheduler:
 
         return created
 
-    async def _create_reservation_confirms(
-        self, tenant_id: str, today: date, db: Any
-    ) -> int:
+    async def _create_reservation_confirms(self, tenant_id: str, today: date, db: Any) -> int:
         """当日预订确认任务"""
         sql = """
             SELECT r.id as reservation_id, r.customer_id, r.customer_name,

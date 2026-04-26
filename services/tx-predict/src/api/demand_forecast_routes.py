@@ -5,6 +5,7 @@
   GET /api/v1/predict/demand/{store_id}/prep      — 备餐建议（半成品提前准备量）
   GET /api/v1/predict/demand/accuracy             — 预测准确率追踪
 """
+
 from typing import Optional
 
 import structlog
@@ -21,6 +22,7 @@ router = APIRouter(prefix="/api/v1/predict/demand", tags=["demand-forecast"])
 
 # ── 依赖注入 ──
 
+
 def _require_tenant(x_tenant_id: Optional[str] = Header(None, alias="X-Tenant-ID")) -> str:
     if not x_tenant_id:
         raise HTTPException(status_code=400, detail="X-Tenant-ID header 必填")
@@ -33,6 +35,7 @@ async def _get_tenant_db(x_tenant_id: str = Header(..., alias="X-Tenant-ID")):
 
 
 # ── 1. 未来3天SKU级需求预测 ──
+
 
 @router.get(
     "/{store_id}",
@@ -49,7 +52,11 @@ async def get_demand_forecast(
     predictor = DemandPredictor()
     try:
         result = await predictor.forecast_demand(
-            store_id, tenant_id, db, forecast_days=days, city=city,
+            store_id,
+            tenant_id,
+            db,
+            forecast_days=days,
+            city=city,
         )
     except (ValueError, KeyError) as exc:
         logger.warning("demand_forecast.error", store_id=store_id, error=str(exc))
@@ -59,6 +66,7 @@ async def get_demand_forecast(
 
 
 # ── 2. 备餐建议 ──
+
 
 @router.get(
     "/{store_id}/prep",
@@ -82,6 +90,7 @@ async def get_prep_suggestions(
 
 
 # ── 3. 预测准确率追踪 ──
+
 
 @router.get(
     "/accuracy",

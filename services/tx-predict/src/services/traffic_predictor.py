@@ -9,6 +9,7 @@
 
 输出单位：预测客流数（整数）
 """
+
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
@@ -23,24 +24,24 @@ from .weather_service import WeatherService
 log = structlog.get_logger(__name__)
 
 # 默认参数
-LOOKBACK_DAYS = 30          # 回溯30天历史数据
-FORECAST_DAYS = 7           # 预测未来7天
+LOOKBACK_DAYS = 30  # 回溯30天历史数据
+FORECAST_DAYS = 7  # 预测未来7天
 HOURS_PER_DAY = 24
-BUSINESS_HOURS_START = 9    # 营业时间开始（24h）
-BUSINESS_HOURS_END = 22     # 营业时间结束（24h）
+BUSINESS_HOURS_START = 9  # 营业时间开始（24h）
+BUSINESS_HOURS_END = 22  # 营业时间结束（24h）
 
 # 节假日系数（可外部配置覆盖）
 HOLIDAY_FACTORS: dict[str, float] = {
-    "01-01": 1.30,   # 元旦
-    "02-14": 1.25,   # 情人节
-    "05-01": 1.40,   # 劳动节
-    "06-01": 1.15,   # 儿童节
-    "10-01": 1.50,   # 国庆节
+    "01-01": 1.30,  # 元旦
+    "02-14": 1.25,  # 情人节
+    "05-01": 1.40,  # 劳动节
+    "06-01": 1.15,  # 儿童节
+    "10-01": 1.50,  # 国庆节
     "10-02": 1.45,
     "10-03": 1.40,
-    "12-24": 1.20,   # 平安夜
-    "12-25": 1.15,   # 圣诞
-    "12-31": 1.25,   # 跨年
+    "12-24": 1.20,  # 平安夜
+    "12-25": 1.15,  # 圣诞
+    "12-31": 1.25,  # 跨年
 }
 
 # 星期权重（周末客流通常高于工作日）
@@ -142,25 +143,29 @@ class TrafficPredictor:
                 # 置信度：有历史数据 -> 较高；无数据 -> 低
                 confidence = 0.75 if base > 0 else 0.40
 
-                hourly.append({
-                    "hour": hour,
-                    "traffic": predicted,
-                    "confidence": confidence,
-                })
+                hourly.append(
+                    {
+                        "hour": hour,
+                        "traffic": predicted,
+                        "confidence": confidence,
+                    }
+                )
                 day_total += predicted
 
                 if predicted > peak_hour_info["traffic"]:
                     peak_hour_info = {"date": date_str, "hour": hour, "traffic": predicted}
 
-            daily_forecasts.append({
-                "date": date_str,
-                "weekday": weekday,
-                "weekday_name": ["周一", "周二", "周三", "周四", "周五", "周六", "周日"][weekday],
-                "is_holiday": is_holiday,
-                "weather_factor": weather_factor,
-                "total_traffic": day_total,
-                "hourly": hourly,
-            })
+            daily_forecasts.append(
+                {
+                    "date": date_str,
+                    "weekday": weekday,
+                    "weekday_name": ["周一", "周二", "周三", "周四", "周五", "周六", "周日"][weekday],
+                    "is_holiday": is_holiday,
+                    "weather_factor": weather_factor,
+                    "total_traffic": day_total,
+                    "hourly": hourly,
+                }
+            )
 
             total_7d += day_total
             if day_total > peak_day_traffic:
@@ -235,11 +240,13 @@ class TrafficPredictor:
             predicted = max(0, round(base * holiday_factor * weather_factor * weekday_factor))
             confidence = 0.80 if base > 0 else 0.40
 
-            remaining_hours.append({
-                "hour": hour,
-                "traffic": predicted,
-                "confidence": confidence,
-            })
+            remaining_hours.append(
+                {
+                    "hour": hour,
+                    "traffic": predicted,
+                    "confidence": confidence,
+                }
+            )
             remaining_total += predicted
 
         return {
@@ -267,6 +274,7 @@ class TrafficPredictor:
 
         # 缓存训练结果到 prediction_results 表
         import json
+
         serialized = {f"{k[0]}_{k[1]}": v for k, v in baseline.items()}
         try:
             await db.execute(

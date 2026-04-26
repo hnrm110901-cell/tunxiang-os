@@ -6,6 +6,7 @@
 - 基线管理（4端点）: 查询 / 检测 / 更新 / 重建
 - 日志查询（2端点）: 分页列表 / 详情
 """
+
 from __future__ import annotations
 
 from datetime import date as date_type
@@ -26,6 +27,7 @@ router = APIRouter(prefix="/api/v1/agent/coaching", tags=["coaching"])
 
 # ── 依赖 ──
 
+
 async def _get_db(
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
 ) -> AsyncSession:
@@ -36,6 +38,7 @@ async def _get_db(
 # ══════════════════════════════════════════════
 # Pydantic 请求/响应模型
 # ══════════════════════════════════════════════
+
 
 class MorningBriefingRequest(BaseModel):
     store_id: str = Field(..., description="门店ID")
@@ -89,7 +92,8 @@ class UpdateBaselineRequest(BaseModel):
 class RebuildBaselineRequest(BaseModel):
     metric_code: str = Field(..., description="指标代码")
     values: list[float] = Field(
-        ..., min_length=1,
+        ...,
+        min_length=1,
         description="历史数据值列表（至少1个）",
     )
     day_of_week: int | None = Field(None, ge=0, le=6, description="星期几(0-6)")
@@ -99,6 +103,7 @@ class RebuildBaselineRequest(BaseModel):
 # ══════════════════════════════════════════════
 # 1. 教练模式端点
 # ══════════════════════════════════════════════
+
 
 @router.post("/morning-briefing")
 async def morning_briefing(
@@ -192,6 +197,7 @@ async def closing_summary(
 # 2. 反馈
 # ══════════════════════════════════════════════
 
+
 @router.post("/feedback/{coaching_id}")
 async def submit_feedback(
     coaching_id: str = Path(..., description="教练日志ID"),
@@ -219,6 +225,7 @@ async def submit_feedback(
 # ══════════════════════════════════════════════
 # 3. 基线管理
 # ══════════════════════════════════════════════
+
 
 @router.get("/baselines/{store_id}")
 async def get_baselines(
@@ -320,6 +327,7 @@ async def rebuild_baseline(
 # ══════════════════════════════════════════════
 # 4. 教练日志查询
 # ══════════════════════════════════════════════
+
 
 @router.get("/logs/{store_id}")
 async def list_coaching_logs(

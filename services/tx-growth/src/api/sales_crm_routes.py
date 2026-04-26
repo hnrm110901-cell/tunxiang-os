@@ -71,6 +71,7 @@ def error_response(msg: str, code: str = "ERROR") -> dict:
 async def _get_db(tenant_id: str):
     """创建带 RLS tenant_id 的 DB session"""
     from sqlalchemy import text
+
     db = async_session_factory()
     session = await db.__aenter__()
     await session.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": tenant_id})
@@ -175,6 +176,7 @@ async def create_target(
     """创建销售目标"""
     async with async_session_factory() as db:
         from sqlalchemy import text
+
         await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": x_tenant_id})
         try:
             result = await _svc.create_target(
@@ -207,6 +209,7 @@ async def list_targets(
     """查询销售目标列表"""
     async with async_session_factory() as db:
         from sqlalchemy import text
+
         await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": x_tenant_id})
         result = await _svc.list_targets(
             tenant_id=uuid.UUID(x_tenant_id),
@@ -227,6 +230,7 @@ async def update_target(
     """更新销售目标设定值"""
     async with async_session_factory() as db:
         from sqlalchemy import text
+
         await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": x_tenant_id})
         try:
             updates = req.model_dump(exclude_none=True)
@@ -246,6 +250,7 @@ async def update_actuals(
     """更新实际值（自动计算达成率）"""
     async with async_session_factory() as db:
         from sqlalchemy import text
+
         await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": x_tenant_id})
         try:
             result = await _svc.update_actuals(
@@ -274,6 +279,7 @@ async def get_achievement_ranking(
     """获取达成率排名"""
     async with async_session_factory() as db:
         from sqlalchemy import text
+
         await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": x_tenant_id})
         result = await _svc.get_achievement_ranking(
             tenant_id=uuid.UUID(x_tenant_id),
@@ -299,6 +305,7 @@ async def create_lead(
     """创建销售线索"""
     async with async_session_factory() as db:
         from sqlalchemy import text
+
         await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": x_tenant_id})
         try:
             result = await _svc.create_lead(
@@ -336,6 +343,7 @@ async def list_leads(
     """线索列表（分页+筛选）"""
     async with async_session_factory() as db:
         from sqlalchemy import text
+
         await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": x_tenant_id})
         result = await _svc.list_leads(
             tenant_id=uuid.UUID(x_tenant_id),
@@ -359,6 +367,7 @@ async def get_funnel(
     """漏斗统计"""
     async with async_session_factory() as db:
         from sqlalchemy import text
+
         await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": x_tenant_id})
         result = await _svc.get_funnel(
             tenant_id=uuid.UUID(x_tenant_id),
@@ -377,6 +386,7 @@ async def get_conversion_stats(
     """转化率统计"""
     async with async_session_factory() as db:
         from sqlalchemy import text
+
         await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": x_tenant_id})
         result = await _svc.get_conversion_stats(
             tenant_id=uuid.UUID(x_tenant_id),
@@ -396,6 +406,7 @@ async def get_lost_reasons(
     """流失原因统计"""
     async with async_session_factory() as db:
         from sqlalchemy import text
+
         await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": x_tenant_id})
         result = await _svc.get_lost_reasons(
             tenant_id=uuid.UUID(x_tenant_id),
@@ -414,6 +425,7 @@ async def get_lead(
     """线索详情"""
     async with async_session_factory() as db:
         from sqlalchemy import text
+
         await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": x_tenant_id})
         try:
             result = await _svc.get_lead(uuid.UUID(x_tenant_id), uuid.UUID(lead_id), db)
@@ -431,6 +443,7 @@ async def advance_stage(
     """推进线索阶段"""
     async with async_session_factory() as db:
         from sqlalchemy import text
+
         await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": x_tenant_id})
         try:
             result = await _svc.advance_stage(
@@ -456,10 +469,14 @@ async def assign_lead(
     """分配线索"""
     async with async_session_factory() as db:
         from sqlalchemy import text
+
         await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": x_tenant_id})
         try:
             result = await _svc.assign_lead(
-                uuid.UUID(x_tenant_id), uuid.UUID(lead_id), uuid.UUID(req.assigned_to), db,
+                uuid.UUID(x_tenant_id),
+                uuid.UUID(lead_id),
+                uuid.UUID(req.assigned_to),
+                db,
             )
             await db.commit()
             return ok_response(result)
@@ -480,6 +497,7 @@ async def create_task(
     """创建销售任务"""
     async with async_session_factory() as db:
         from sqlalchemy import text
+
         await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": x_tenant_id})
         try:
             result = await _svc.create_task(
@@ -515,6 +533,7 @@ async def list_tasks(
     """任务列表"""
     async with async_session_factory() as db:
         from sqlalchemy import text
+
         await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": x_tenant_id})
         result = await _svc.list_tasks(
             tenant_id=uuid.UUID(x_tenant_id),
@@ -540,6 +559,7 @@ async def get_my_tasks(
         raise HTTPException(status_code=400, detail="employee_id is required")
     async with async_session_factory() as db:
         from sqlalchemy import text
+
         await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": x_tenant_id})
         result = await _svc.get_my_tasks(
             tenant_id=uuid.UUID(x_tenant_id),
@@ -559,10 +579,13 @@ async def complete_task(
     """完成任务"""
     async with async_session_factory() as db:
         from sqlalchemy import text
+
         await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": x_tenant_id})
         try:
             result = await _svc.complete_task(
-                uuid.UUID(x_tenant_id), uuid.UUID(task_id), db,
+                uuid.UUID(x_tenant_id),
+                uuid.UUID(task_id),
+                db,
                 result_text=req.result,
             )
             await db.commit()
@@ -580,6 +603,7 @@ async def get_task_stats(
     """任务统计"""
     async with async_session_factory() as db:
         from sqlalchemy import text
+
         await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": x_tenant_id})
         result = await _svc.get_task_stats(
             tenant_id=uuid.UUID(x_tenant_id),
@@ -603,6 +627,7 @@ async def create_visit(
     """创建拜访记录"""
     async with async_session_factory() as db:
         from sqlalchemy import text
+
         await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": x_tenant_id})
         try:
             result = await _svc.create_visit(
@@ -635,6 +660,7 @@ async def list_visits(
     """拜访记录列表"""
     async with async_session_factory() as db:
         from sqlalchemy import text
+
         await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": x_tenant_id})
         result = await _svc.list_visits(
             tenant_id=uuid.UUID(x_tenant_id),
@@ -656,9 +682,13 @@ async def get_customer_visits(
     """获取指定客户的拜访记录"""
     async with async_session_factory() as db:
         from sqlalchemy import text
+
         await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": x_tenant_id})
         result = await _svc.get_customer_visits(
-            uuid.UUID(x_tenant_id), uuid.UUID(customer_id), db, limit=limit,
+            uuid.UUID(x_tenant_id),
+            uuid.UUID(customer_id),
+            db,
+            limit=limit,
         )
         return ok_response(result)
 
@@ -679,10 +709,15 @@ async def get_profile_ranking(
     """画像完整度排名"""
     async with async_session_factory() as db:
         from sqlalchemy import text
+
         await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": x_tenant_id})
         result = await _svc.get_profile_ranking(
-            uuid.UUID(x_tenant_id), db,
-            limit=limit, min_score=min_score, max_score=max_score, order=order,
+            uuid.UUID(x_tenant_id),
+            db,
+            limit=limit,
+            min_score=min_score,
+            max_score=max_score,
+            order=order,
         )
         return ok_response(result)
 
@@ -700,9 +735,11 @@ async def get_sales_dashboard(
     """销售仪表盘（聚合所有维度）"""
     async with async_session_factory() as db:
         from sqlalchemy import text
+
         await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": x_tenant_id})
         result = await _svc.get_sales_dashboard(
-            uuid.UUID(x_tenant_id), db,
+            uuid.UUID(x_tenant_id),
+            db,
             store_id=uuid.UUID(store_id) if store_id else None,
         )
         return ok_response(result)

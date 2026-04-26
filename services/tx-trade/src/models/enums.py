@@ -100,6 +100,7 @@ class QueueSource(str, enum.Enum):
 
 class ServiceMode(str, enum.Enum):
     """服务模式 — 区域级别，决定订单全流程走向"""
-    dine_first = "dine_first"      # 先吃后付（包厢/卡座/正餐堂食）
+
+    dine_first = "dine_first"  # 先吃后付（包厢/卡座/正餐堂食）
     scan_and_pay = "scan_and_pay"  # 扫码即付（大厅快餐/茶饮/自助）
-    retail = "retail"              # 纯零售（便利店窗口/外带柜台，无桌台无会话）
+    retail = "retail"  # 纯零售（便利店窗口/外带柜台，无桌台无会话）

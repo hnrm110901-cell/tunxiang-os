@@ -4,6 +4,7 @@
   GET /api/v1/predict/revenue/{store_id}  — 日/周/月营收预测
   GET /api/v1/predict/revenue/group       — 集团级营收预测汇总
 """
+
 from typing import Optional
 
 import structlog
@@ -20,6 +21,7 @@ router = APIRouter(prefix="/api/v1/predict/revenue", tags=["revenue-forecast"])
 
 
 # ── 依赖注入 ──
+
 
 def _require_tenant(x_tenant_id: Optional[str] = Header(None, alias="X-Tenant-ID")) -> str:
     if not x_tenant_id:
@@ -73,6 +75,7 @@ async def _get_store_list(tenant_id: str, db: AsyncSession) -> list[dict]:
 
 # ── 1. 单店营收预测 ──
 
+
 @router.get(
     "/{store_id}",
     summary="日/周/月营收预测",
@@ -109,13 +112,15 @@ async def get_revenue_forecast(
         day_traffic = day.get("total_traffic", 0)
         day_revenue_fen = round(day_traffic * avg_check_fen)
 
-        daily_revenue.append({
-            "date": day["date"],
-            "weekday_name": day.get("weekday_name", ""),
-            "predicted_traffic": day_traffic,
-            "predicted_revenue_fen": day_revenue_fen,
-            "predicted_revenue_yuan": round(day_revenue_fen / 100, 2),
-        })
+        daily_revenue.append(
+            {
+                "date": day["date"],
+                "weekday_name": day.get("weekday_name", ""),
+                "predicted_traffic": day_traffic,
+                "predicted_revenue_fen": day_revenue_fen,
+                "predicted_revenue_yuan": round(day_revenue_fen / 100, 2),
+            }
+        )
         week_total_fen += day_revenue_fen
 
     # 月预测（7天 x 4.3）
@@ -137,6 +142,7 @@ async def get_revenue_forecast(
 
 
 # ── 2. 集团级营收预测汇总 ──
+
 
 @router.get(
     "/group",
@@ -175,27 +181,31 @@ async def get_group_revenue_forecast(
             week_traffic = traffic.get("summary", {}).get("total_7d", 0)
             week_revenue = round(week_traffic * avg_check)
 
-            store_summaries.append({
-                "store_id": sid,
-                "store_name": store.get("store_name", ""),
-                "week_traffic": week_traffic,
-                "avg_check_fen": round(avg_check),
-                "week_revenue_fen": week_revenue,
-                "week_revenue_yuan": round(week_revenue / 100, 2),
-            })
+            store_summaries.append(
+                {
+                    "store_id": sid,
+                    "store_name": store.get("store_name", ""),
+                    "week_traffic": week_traffic,
+                    "avg_check_fen": round(avg_check),
+                    "week_revenue_fen": week_revenue,
+                    "week_revenue_yuan": round(week_revenue / 100, 2),
+                }
+            )
             group_week_total += week_revenue
 
         except (ValueError, KeyError) as exc:
             logger.warning("revenue_forecast.group_store_error", store_id=sid, error=str(exc))
-            store_summaries.append({
-                "store_id": sid,
-                "store_name": store.get("store_name", ""),
-                "week_traffic": 0,
-                "avg_check_fen": 0,
-                "week_revenue_fen": 0,
-                "week_revenue_yuan": 0,
-                "error": str(exc),
-            })
+            store_summaries.append(
+                {
+                    "store_id": sid,
+                    "store_name": store.get("store_name", ""),
+                    "week_traffic": 0,
+                    "avg_check_fen": 0,
+                    "week_revenue_fen": 0,
+                    "week_revenue_yuan": 0,
+                    "error": str(exc),
+                }
+            )
 
     # 按周营收降序
     store_summaries.sort(key=lambda x: x.get("week_revenue_fen", 0), reverse=True)

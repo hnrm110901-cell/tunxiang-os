@@ -10,6 +10,7 @@
 断点续传：同步中断后从上次成功的表继续。
 健康检查：通过 get_status() 暴露上次同步时间/成功/失败/队列长度。
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -33,13 +34,12 @@ _BACKOFF_MAX: int = 3600
 
 # ─── 同步结果数据类 ────────────────────────────────────────────────────────
 
+
 @dataclass
 class SyncRoundResult:
     """一轮同步的结果摘要"""
 
-    started_at: datetime = field(
-        default_factory=lambda: datetime.now(timezone.utc)
-    )
+    started_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     finished_at: datetime | None = None
     tables_synced: List[str] = field(default_factory=list)
     tables_failed: List[str] = field(default_factory=list)
@@ -69,6 +69,7 @@ class SyncRoundResult:
 
 
 # ─── 同步调度器 ────────────────────────────────────────────────────────────
+
 
 class SyncScheduler:
     """同步调度器：管理增量同步的主循环
@@ -270,20 +271,10 @@ class SyncScheduler:
         return {
             "running": self._running,
             "sync_count": self._sync_count,
-            "last_success_at": (
-                self._last_success_at.isoformat()
-                if self._last_success_at
-                else None
-            ),
-            "last_failure_at": (
-                self._last_failure_at.isoformat()
-                if self._last_failure_at
-                else None
-            ),
+            "last_success_at": (self._last_success_at.isoformat() if self._last_success_at else None),
+            "last_failure_at": (self._last_failure_at.isoformat() if self._last_failure_at else None),
             "consecutive_failures": self._consecutive_failures,
-            "last_result": (
-                self._last_result.to_dict() if self._last_result else None
-            ),
+            "last_result": (self._last_result.to_dict() if self._last_result else None),
             "interval_seconds": self._interval,
             "tables": self._tables,
             "resume_index": self._resume_index,
@@ -300,16 +291,11 @@ class SyncScheduler:
         """
         if self._last_result is None:
             return []
-        return [
-            c.to_dict()
-            for c in self._last_result.conflict_records[:limit]
-        ]
+        return [c.to_dict() for c in self._last_result.conflict_records[:limit]]
 
     # ─── 内部方法 ──────────────────────────────────────────────────────────
 
-    async def _sync_table(
-        self, table: str
-    ) -> tuple[int, int, List[ConflictRecord]]:
+    async def _sync_table(self, table: str) -> tuple[int, int, List[ConflictRecord]]:
         """同步单张表的完整流程
 
         Returns:
@@ -319,35 +305,25 @@ class SyncScheduler:
         since = await self._tracker.get_last_sync_time(table)
 
         # 2. 获取本地和云端的变更
-        local_changes = await self._collect_all_changes(
-            self._tracker.get_local_changes, table, since
-        )
-        cloud_changes = await self._collect_all_changes(
-            self._tracker.get_cloud_changes, table, since
-        )
+        local_changes = await self._collect_all_changes(self._tracker.get_local_changes, table, since)
+        cloud_changes = await self._collect_all_changes(self._tracker.get_cloud_changes, table, since)
 
         if not local_changes and not cloud_changes:
             logger.debug("scheduler.table_no_changes", table=table)
             return 0, 0, []
 
         # 3. 冲突解决
-        conflict_result = ConflictResolver.resolve_conflicts(
-            local_changes, cloud_changes
-        )
+        conflict_result = ConflictResolver.resolve_conflicts(local_changes, cloud_changes)
 
         # 4. 推送本地变更到云端
         pushed = 0
         if conflict_result.to_push:
-            pushed = await self._executor.push_to_cloud(
-                table, conflict_result.to_push
-            )
+            pushed = await self._executor.push_to_cloud(table, conflict_result.to_push)
 
         # 5. 拉取云端变更到本地
         pulled = 0
         if conflict_result.to_pull:
-            pulled = await self._executor.pull_to_local(
-                table, conflict_result.to_pull
-            )
+            pulled = await self._executor.pull_to_local(table, conflict_result.to_pull)
 
         # 6. 更新同步时间戳（取所有变更中最大的 updated_at）
         all_records = local_changes + cloud_changes
@@ -397,6 +373,7 @@ class SyncScheduler:
 
 
 # ─── 工具函数 ──────────────────────────────────────────────────────────────
+
 
 def _max_updated_at(records: List[dict[str, Any]]) -> datetime | None:
     """提取记录列表中最大的 updated_at"""

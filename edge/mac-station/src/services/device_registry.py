@@ -7,6 +7,7 @@
 
 Mock 模式：CLOUD_API_URL 不可达时本地缓存，恢复后补报。
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -131,9 +132,7 @@ class DeviceRegistry:
     """
 
     def __init__(self, cloud_api_url: str | None = None) -> None:
-        self._cloud_api_url = cloud_api_url or os.getenv(
-            "CLOUD_API_URL", "http://localhost:8000"
-        )
+        self._cloud_api_url = cloud_api_url or os.getenv("CLOUD_API_URL", "http://localhost:8000")
         self._device_info: DeviceInfo | None = None
         self._device_id: str | None = None
         self._registered: bool = False
@@ -320,11 +319,13 @@ class DeviceRegistry:
 
         except (httpx.ConnectError, httpx.TimeoutException, httpx.HTTPStatusError) as exc:
             self._heartbeat_failures += 1
-            self._heartbeat_history.append({
-                "timestamp": time.time(),
-                "success": False,
-                "error": str(exc),
-            })
+            self._heartbeat_history.append(
+                {
+                    "timestamp": time.time(),
+                    "success": False,
+                    "error": str(exc),
+                }
+            )
             if len(self._heartbeat_history) > 100:
                 self._heartbeat_history = self._heartbeat_history[-100:]
 

@@ -480,6 +480,7 @@ class RechargePerformanceService:
 
 # ── 内部辅助 ─────────────────────────────────────────────────
 
+
 def _calc_commission(
     *,
     commission_type: str,

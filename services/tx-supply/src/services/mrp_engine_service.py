@@ -83,6 +83,7 @@ def _now_iso() -> str:
 
 class MRPPlanCreate(BaseModel):
     """创建预估计划请求"""
+
     plan_name: str = Field(..., min_length=1, max_length=200)
     plan_type: str = Field(default="demand_driven", pattern="^(demand_driven|manual|hybrid)$")
     store_id: Optional[str] = None  # null=集团级别
@@ -93,6 +94,7 @@ class MRPPlanCreate(BaseModel):
 
 class MRPPlanInfo(BaseModel):
     """计划信息"""
+
     id: str
     tenant_id: str
     store_id: Optional[str] = None
@@ -111,6 +113,7 @@ class MRPPlanInfo(BaseModel):
 
 class DemandLineInfo(BaseModel):
     """需求行"""
+
     id: str
     plan_id: str
     ingredient_id: str
@@ -126,6 +129,7 @@ class DemandLineInfo(BaseModel):
 
 class ProductionSuggestionInfo(BaseModel):
     """生产建议"""
+
     id: str
     plan_id: str
     product_id: str
@@ -140,6 +144,7 @@ class ProductionSuggestionInfo(BaseModel):
 
 class ProcurementSuggestionInfo(BaseModel):
     """采购建议"""
+
     id: str
     plan_id: str
     ingredient_id: str
@@ -157,6 +162,7 @@ class ProcurementSuggestionInfo(BaseModel):
 
 class PlannedIssueInfo(BaseModel):
     """领料单"""
+
     id: str
     production_suggestion_id: str
     ingredient_id: str
@@ -172,6 +178,7 @@ class PlannedIssueInfo(BaseModel):
 
 class PlanSummary(BaseModel):
     """计划总览"""
+
     plan: MRPPlanInfo
     demand_lines_count: int
     total_forecast_demand_qty: float
@@ -187,6 +194,7 @@ class PlanSummary(BaseModel):
 
 class VarianceItem(BaseModel):
     """差异行"""
+
     ingredient_id: str
     ingredient_name: str
     planned_qty: float
@@ -197,6 +205,7 @@ class VarianceItem(BaseModel):
 
 class VarianceReport(BaseModel):
     """差异报告"""
+
     plan_id: str
     items: List[VarianceItem]
     total_planned: float
@@ -237,10 +246,7 @@ class MRPEngineService:
         """校验计划状态转换"""
         allowed = PLAN_TRANSITIONS.get(current, [])
         if target not in allowed:
-            raise ValueError(
-                f"计划状态不允许从 '{current}' 转换到 '{target}'，"
-                f"允许的目标状态: {allowed}"
-            )
+            raise ValueError(f"计划状态不允许从 '{current}' 转换到 '{target}'，允许的目标状态: {allowed}")
 
     # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     #  1. 创建预估计划
@@ -474,12 +480,20 @@ class MRPEngineService:
         try:
             # Step 1: 获取历史销售数据，计算日均消耗
             ingredient_demand = await self._calc_forecast_demand(
-                db, tenant_id, plan.store_id, lookback_days, forecast_days,
+                db,
+                tenant_id,
+                plan.store_id,
+                lookback_days,
+                forecast_days,
             )
 
             # Step 2: BOM展开补充（菜品级预测→原料级需求）
             bom_demand = await self._bom_explosion(
-                db, tenant_id, plan.store_id, lookback_days, forecast_days,
+                db,
+                tenant_id,
+                plan.store_id,
+                lookback_days,
+                forecast_days,
             )
             # 合并BOM展开的需求
             for iid, info in bom_demand.items():
@@ -505,10 +519,16 @@ class MRPEngineService:
                 return []
 
             current_stocks = await self._fetch_current_stocks(
-                db, tenant_id, plan.store_id, ingredient_ids,
+                db,
+                tenant_id,
+                plan.store_id,
+                ingredient_ids,
             )
             in_transit = await self._fetch_in_transit(
-                db, tenant_id, plan.store_id, ingredient_ids,
+                db,
+                tenant_id,
+                plan.store_id,
+                ingredient_ids,
             )
 
             # Step 4: 计算净需求并写入 demand_lines
@@ -553,19 +573,21 @@ class MRPEngineService:
                 )
                 row = result.mappings().fetchone()
 
-                demand_lines.append(DemandLineInfo(
-                    id=str(row["id"]),
-                    plan_id=plan_id,
-                    ingredient_id=iid,
-                    ingredient_name=info.get("name", ""),
-                    unit=info.get("unit", ""),
-                    forecast_demand_qty=round(forecast_qty, 3),
-                    safety_stock_qty=round(safety_qty, 3),
-                    current_stock_qty=round(current_qty, 3),
-                    in_transit_qty=round(transit_qty, 3),
-                    net_requirement_qty=round(net_req, 3),
-                    source=info.get("source", "sales_forecast"),
-                ))
+                demand_lines.append(
+                    DemandLineInfo(
+                        id=str(row["id"]),
+                        plan_id=plan_id,
+                        ingredient_id=iid,
+                        ingredient_name=info.get("name", ""),
+                        unit=info.get("unit", ""),
+                        forecast_demand_qty=round(forecast_qty, 3),
+                        safety_stock_qty=round(safety_qty, 3),
+                        current_stock_qty=round(current_qty, 3),
+                        in_transit_qty=round(transit_qty, 3),
+                        net_requirement_qty=round(net_req, 3),
+                        source=info.get("source", "sales_forecast"),
+                    )
+                )
 
             # 更新状态为 calculated
             await db.execute(
@@ -914,18 +936,20 @@ class MRPEngineService:
             )
             ins_row = ins_result.mappings().fetchone()
 
-            suggestions.append(ProductionSuggestionInfo(
-                id=str(ins_row["id"]),
-                plan_id=plan_id,
-                product_id=str(row["ingredient_id"]),
-                product_name=row["product_name"] or row["ingredient_name"],
-                suggested_qty=float(row["net_requirement_qty"]),
-                unit=row["unit"] or "",
-                bom_id=str(row["bom_id"]),
-                required_date=required_date,
-                priority=priority,
-                status="suggested",
-            ))
+            suggestions.append(
+                ProductionSuggestionInfo(
+                    id=str(ins_row["id"]),
+                    plan_id=plan_id,
+                    product_id=str(row["ingredient_id"]),
+                    product_name=row["product_name"] or row["ingredient_name"],
+                    suggested_qty=float(row["net_requirement_qty"]),
+                    unit=row["unit"] or "",
+                    bom_id=str(row["bom_id"]),
+                    required_date=required_date,
+                    priority=priority,
+                    status="suggested",
+                )
+            )
 
         await db.commit()
 
@@ -1065,21 +1089,23 @@ class MRPEngineService:
             )
             ins_row = ins_result.mappings().fetchone()
 
-            suggestions.append(ProcurementSuggestionInfo(
-                id=str(ins_row["id"]),
-                plan_id=plan_id,
-                ingredient_id=iid,
-                ingredient_name=row["ingredient_name"],
-                suggested_qty=round(net_qty, 3),
-                unit=row["unit"] or "",
-                supplier_id=supplier_id,
-                supplier_name=supplier_name,
-                estimated_cost_fen=estimated_cost_fen,
-                required_date=required_date,
-                lead_time_days=actual_lead_time,
-                status="suggested",
-                purchase_order_id=None,
-            ))
+            suggestions.append(
+                ProcurementSuggestionInfo(
+                    id=str(ins_row["id"]),
+                    plan_id=plan_id,
+                    ingredient_id=iid,
+                    ingredient_name=row["ingredient_name"],
+                    suggested_qty=round(net_qty, 3),
+                    unit=row["unit"] or "",
+                    supplier_id=supplier_id,
+                    supplier_name=supplier_name,
+                    estimated_cost_fen=estimated_cost_fen,
+                    required_date=required_date,
+                    lead_time_days=actual_lead_time,
+                    status="suggested",
+                    purchase_order_id=None,
+                )
+            )
 
         await db.commit()
 
@@ -1345,9 +1371,7 @@ class MRPEngineService:
                         "ingredient_name": item["ingredient_name"],
                         "quantity": float(item["suggested_qty"]),
                         "unit": item["unit"] or "",
-                        "unit_price_fen": int(
-                            item["estimated_cost_fen"] / max(float(item["suggested_qty"]), 0.001)
-                        ),
+                        "unit_price_fen": int(item["estimated_cost_fen"] / max(float(item["suggested_qty"]), 0.001)),
                     },
                 )
 
@@ -1363,14 +1387,16 @@ class MRPEngineService:
                     {"po_id": po_id, "sug_id": str(item["id"])},
                 )
 
-            created_orders.append({
-                "purchase_order_id": po_id,
-                "order_no": po_no,
-                "supplier_id": supplier_id,
-                "supplier_name": supplier_name,
-                "items_count": len(items),
-                "total_amount_fen": total_fen,
-            })
+            created_orders.append(
+                {
+                    "purchase_order_id": po_id,
+                    "order_no": po_no,
+                    "supplier_id": supplier_id,
+                    "supplier_name": supplier_name,
+                    "items_count": len(items),
+                    "total_amount_fen": total_fen,
+                }
+            )
 
         await db.commit()
         _log.info("mrp.procurement.converted", orders_count=len(created_orders))
@@ -1463,14 +1489,16 @@ class MRPEngineService:
                 {"sug_id": str(row["id"])},
             )
 
-            created_tasks.append({
-                "production_task_id": str(task_row["id"]),
-                "task_no": task_no,
-                "product_name": row["product_name"],
-                "planned_qty": float(row["suggested_qty"]),
-                "required_date": str(row["required_date"]),
-                "priority": row["priority"],
-            })
+            created_tasks.append(
+                {
+                    "production_task_id": str(task_row["id"]),
+                    "task_no": task_no,
+                    "product_name": row["product_name"],
+                    "planned_qty": float(row["suggested_qty"]),
+                    "required_date": str(row["required_date"]),
+                    "priority": row["priority"],
+                }
+            )
 
         await db.commit()
         _log.info("mrp.production.converted", tasks_count=len(created_tasks))
@@ -1580,19 +1608,21 @@ class MRPEngineService:
             )
             ins_row = ins_result.mappings().fetchone()
 
-            issues.append(PlannedIssueInfo(
-                id=str(ins_row["id"]),
-                production_suggestion_id=production_suggestion_id,
-                ingredient_id=str(bom["ingredient_id"]),
-                ingredient_name=bom["ingredient_name"],
-                planned_qty=planned_qty,
-                actual_qty=None,
-                unit=bom["unit"] or "",
-                issued_at=None,
-                issued_by=None,
-                status="planned",
-                variance_qty=None,
-            ))
+            issues.append(
+                PlannedIssueInfo(
+                    id=str(ins_row["id"]),
+                    production_suggestion_id=production_suggestion_id,
+                    ingredient_id=str(bom["ingredient_id"]),
+                    ingredient_name=bom["ingredient_name"],
+                    planned_qty=planned_qty,
+                    actual_qty=None,
+                    unit=bom["unit"] or "",
+                    issued_at=None,
+                    issued_by=None,
+                    status="planned",
+                    variance_qty=None,
+                )
+            )
 
         await db.commit()
         _log.info("mrp.material_issue.planned", count=len(issues))
@@ -1997,14 +2027,16 @@ class MRPEngineService:
             total_planned += planned
             total_actual += actual
 
-            items.append(VarianceItem(
-                ingredient_id=str(row["ingredient_id"]),
-                ingredient_name=row["ingredient_name"],
-                planned_qty=planned,
-                actual_qty=actual,
-                variance_qty=variance,
-                variance_pct=variance_pct,
-            ))
+            items.append(
+                VarianceItem(
+                    ingredient_id=str(row["ingredient_id"]),
+                    ingredient_name=row["ingredient_name"],
+                    planned_qty=planned,
+                    actual_qty=actual,
+                    variance_qty=variance,
+                    variance_pct=variance_pct,
+                )
+            )
 
         overall_pct = round(
             ((total_actual - total_planned) / total_planned * 100) if total_planned > 0 else 0,

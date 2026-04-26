@@ -8,6 +8,7 @@
   - 营收预测（客流 x 客单价）
   - 天气数据集成（和风天气 API）
 """
+
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 

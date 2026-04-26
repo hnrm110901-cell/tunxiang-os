@@ -575,13 +575,15 @@ async def switch_market_session(
         merge_triggered=merge_result.get("triggered", False),
     )
 
-    return _ok({
-        "store_id": str(store_id),
-        "new_session": {
-            "id": str(session_row["id"]),
-            "name": session_row["name"],
-            "start_time": str(session_row["start_time"]),
-            "end_time": str(session_row["end_time"]),
-        },
-        "merge_preset_result": merge_result,
-    })
+    return _ok(
+        {
+            "store_id": str(store_id),
+            "new_session": {
+                "id": str(session_row["id"]),
+                "name": session_row["name"],
+                "start_time": str(session_row["start_time"]),
+                "end_time": str(session_row["end_time"]),
+            },
+            "merge_preset_result": merge_result,
+        }
+    )

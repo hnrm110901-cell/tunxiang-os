@@ -6,6 +6,7 @@
 3. 对每个门店执行scheduler.tick()
 4. 统计处理结果
 """
+
 from __future__ import annotations
 
 import os

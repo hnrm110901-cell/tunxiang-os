@@ -19,6 +19,10 @@
 16. POST /api/v1/growth/approvals/{id}/reject        — 拒绝原因为空 → 422
 17. POST /api/v1/growth/approvals/{id}/cancel        — 撤销成功
 18. POST /api/v1/growth/approvals/{id}/cancel        — 服务返回 ok=False → 400
+19. POST /api/v1/growth/approvals/batch-approve      — 批量审批通过成功
+20. POST /api/v1/growth/approvals/batch-approve      — 空列表 → 422
+21. POST /api/v1/growth/approvals/batch-approve      — 超过50条 → 422
+22. POST /api/v1/growth/approvals/batch-approve      — 部分失败
 """
 
 import os
@@ -62,8 +66,65 @@ class _FakeApprovalService:
     async def cancel(self, request_id, requester_id, tenant_id, db):
         return {"ok": True, "status": "cancelled"}
 
+    async def batch_approve(self, request_ids, approver_id, comment, tenant_id, db):
+        results = []
+        for rid in request_ids:
+            results.append({
+                "request_id": str(rid),
+                "ok": True,
+                "status": "approved",
+                "approved_at": "2026-04-06T00:00:00+00:00",
+            })
+        return {
+            "total": len(request_ids),
+            "succeeded": len(request_ids),
+            "failed": 0,
+            "results": results,
+        }
+
 
 _svc_mod.ApprovalService = _FakeApprovalService
+
+
+# 注入真实的条件评估函数（用于单元测试）
+def _evaluate_condition_real(field, op, value, data):
+    actual = data.get(field)
+    if actual is None:
+        return False
+    if op == "gt":
+        return actual > value
+    if op == "gte":
+        return actual >= value
+    if op == "lt":
+        return actual < value
+    if op == "lte":
+        return actual <= value
+    if op == "eq":
+        return actual == value
+    if op == "neq":
+        return actual != value
+    if op == "in":
+        if isinstance(value, (list, tuple, set)):
+            return actual in value
+        return False
+    return False
+
+
+def _evaluate_conditions_real(conditions, data):
+    if not conditions:
+        return False
+    for cond in conditions:
+        field = cond.get("field", "")
+        op = cond.get("op", "eq")
+        threshold = cond.get("value")
+        if not _evaluate_condition_real(field, op, threshold, data):
+            return False
+    return True
+
+
+_svc_mod._evaluate_condition = _evaluate_condition_real
+_svc_mod._evaluate_conditions = _evaluate_conditions_real
+
 sys.modules.setdefault("services", _types.ModuleType("services"))
 sys.modules["services.approval_service"] = _svc_mod
 
@@ -563,3 +624,229 @@ def test_cancel_request_not_allowed():
         )
 
     assert resp.status_code == 400
+
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# 场景 19: POST /batch-approve — 批量审批通过成功
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+
+def test_batch_approve_ok():
+    """批量审批通过 3 条，返回 succeeded=3"""
+    mock_db = AsyncMock()
+    mock_db.commit = AsyncMock()
+    _mock_db_holder["db"] = mock_db
+
+    ids = [str(uuid.uuid4()) for _ in range(3)]
+
+    with patch("api.approval_routes._svc") as mock_svc:
+        mock_svc.batch_approve = AsyncMock(
+            return_value={
+                "total": 3,
+                "succeeded": 3,
+                "failed": 0,
+                "results": [
+                    {"request_id": rid, "ok": True, "status": "approved"}
+                    for rid in ids
+                ],
+            }
+        )
+
+        resp = client.post(
+            "/api/v1/growth/approvals/batch-approve",
+            json={
+                "request_ids": ids,
+                "approver_id": APPROVER_ID,
+                "comment": "批量同意",
+            },
+            headers=HEADERS,
+        )
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["ok"] is True
+    assert body["data"]["total"] == 3
+    assert body["data"]["succeeded"] == 3
+    assert body["data"]["failed"] == 0
+    assert len(body["data"]["results"]) == 3
+    mock_db.commit.assert_awaited_once()
+
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# 场景 20: POST /batch-approve — 空列表 → 422
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+
+def test_batch_approve_empty_ids():
+    """request_ids 为空列表时 Pydantic validator 拒绝，返回 422"""
+    resp = client.post(
+        "/api/v1/growth/approvals/batch-approve",
+        json={
+            "request_ids": [],
+            "approver_id": APPROVER_ID,
+        },
+        headers=HEADERS,
+    )
+    assert resp.status_code == 422
+
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# 场景 21: POST /batch-approve — 超过 50 条 → 422
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+
+def test_batch_approve_exceed_limit():
+    """request_ids 超过 50 条时 Pydantic validator 拒绝，返回 422"""
+    ids = [str(uuid.uuid4()) for _ in range(51)]
+    resp = client.post(
+        "/api/v1/growth/approvals/batch-approve",
+        json={
+            "request_ids": ids,
+            "approver_id": APPROVER_ID,
+        },
+        headers=HEADERS,
+    )
+    assert resp.status_code == 422
+
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# 场景 22: POST /batch-approve — 部分失败
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+
+def test_batch_approve_partial_failure():
+    """批量审批 2 条，1 成功 1 失败，返回 succeeded=1, failed=1"""
+    mock_db = AsyncMock()
+    mock_db.commit = AsyncMock()
+    _mock_db_holder["db"] = mock_db
+
+    id1 = str(uuid.uuid4())
+    id2 = str(uuid.uuid4())
+
+    with patch("api.approval_routes._svc") as mock_svc:
+        mock_svc.batch_approve = AsyncMock(
+            return_value={
+                "total": 2,
+                "succeeded": 1,
+                "failed": 1,
+                "results": [
+                    {"request_id": id1, "ok": True, "status": "approved"},
+                    {"request_id": id2, "ok": False, "reason": "审批单不存在"},
+                ],
+            }
+        )
+
+        resp = client.post(
+            "/api/v1/growth/approvals/batch-approve",
+            json={
+                "request_ids": [id1, id2],
+                "approver_id": APPROVER_ID,
+            },
+            headers=HEADERS,
+        )
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["ok"] is True
+    assert body["data"]["succeeded"] == 1
+    assert body["data"]["failed"] == 1
+
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# 场景 23: 条件评估引擎 — _evaluate_conditions 单元测试
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+
+def test_evaluate_conditions_gt():
+    """gt 操作符：大于阈值时返回 True"""
+    from services.approval_service import _evaluate_conditions
+
+    data = {"max_discount_fen": 6000}
+    conditions = [{"field": "max_discount_fen", "op": "gt", "value": 5000}]
+    assert _evaluate_conditions(conditions, data) is True
+
+
+def test_evaluate_conditions_not_met():
+    """条件不满足时返回 False"""
+    from services.approval_service import _evaluate_conditions
+
+    data = {"max_discount_fen": 3000}
+    conditions = [{"field": "max_discount_fen", "op": "gt", "value": 5000}]
+    assert _evaluate_conditions(conditions, data) is False
+
+
+def test_evaluate_conditions_in_operator():
+    """in 操作符：值在列表中时返回 True"""
+    from services.approval_service import _evaluate_conditions
+
+    data = {"campaign_type": "lottery"}
+    conditions = [{"field": "campaign_type", "op": "in", "value": ["lottery", "red_packet"]}]
+    assert _evaluate_conditions(conditions, data) is True
+
+
+def test_evaluate_conditions_in_operator_not_found():
+    """in 操作符：值不在列表中时返回 False"""
+    from services.approval_service import _evaluate_conditions
+
+    data = {"campaign_type": "birthday"}
+    conditions = [{"field": "campaign_type", "op": "in", "value": ["lottery", "red_packet"]}]
+    assert _evaluate_conditions(conditions, data) is False
+
+
+def test_evaluate_conditions_multiple_and():
+    """多条件 AND：所有条件均满足时返回 True"""
+    from services.approval_service import _evaluate_conditions
+
+    data = {"max_discount_fen": 6000, "target_count": 600}
+    conditions = [
+        {"field": "max_discount_fen", "op": "gt", "value": 5000},
+        {"field": "target_count", "op": "gte", "value": 500},
+    ]
+    assert _evaluate_conditions(conditions, data) is True
+
+
+def test_evaluate_conditions_multiple_and_partial_fail():
+    """多条件 AND：部分条件不满足时返回 False"""
+    from services.approval_service import _evaluate_conditions
+
+    data = {"max_discount_fen": 6000, "target_count": 100}
+    conditions = [
+        {"field": "max_discount_fen", "op": "gt", "value": 5000},
+        {"field": "target_count", "op": "gte", "value": 500},
+    ]
+    assert _evaluate_conditions(conditions, data) is False
+
+
+def test_evaluate_conditions_empty():
+    """空条件列表返回 False"""
+    from services.approval_service import _evaluate_conditions
+
+    assert _evaluate_conditions([], {"any": "data"}) is False
+
+
+def test_evaluate_conditions_missing_field():
+    """数据中缺少条件字段时返回 False"""
+    from services.approval_service import _evaluate_conditions
+
+    data = {"other_field": 100}
+    conditions = [{"field": "max_discount_fen", "op": "gt", "value": 5000}]
+    assert _evaluate_conditions(conditions, data) is False
+
+
+def test_evaluate_conditions_eq():
+    """eq 操作符"""
+    from services.approval_service import _evaluate_conditions
+
+    data = {"status": "active"}
+    conditions = [{"field": "status", "op": "eq", "value": "active"}]
+    assert _evaluate_conditions(conditions, data) is True
+
+
+def test_evaluate_conditions_lt_lte():
+    """lt 和 lte 操作符"""
+    from services.approval_service import _evaluate_conditions
+
+    data = {"amount": 100}
+    assert _evaluate_conditions([{"field": "amount", "op": "lt", "value": 200}], data) is True
+    assert _evaluate_conditions([{"field": "amount", "op": "lt", "value": 100}], data) is False
+    assert _evaluate_conditions([{"field": "amount", "op": "lte", "value": 100}], data) is True

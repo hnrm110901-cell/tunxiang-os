@@ -8,6 +8,7 @@
   5. WMA边界 — 只有1天数据
   6. 准确率追踪接口结构
 """
+
 from __future__ import annotations
 
 from datetime import date
@@ -45,9 +46,9 @@ class TestDemandPredictor:
     def test_wma_weights_correct(self):
         """加权移动平均权重配置正确"""
         assert len(WMA_WEIGHTS) == 7
-        assert WMA_WEIGHTS[0] == 7   # 最近一天权重最高
+        assert WMA_WEIGHTS[0] == 7  # 最近一天权重最高
         assert WMA_WEIGHTS[-1] == 1  # 最早一天权重最低
-        assert WMA_SUM == 28         # 总权重
+        assert WMA_SUM == 28  # 总权重
 
     def test_wma_calculation(self, predictor: DemandPredictor):
         """WMA计算 — 近日数据权重更高"""
@@ -70,12 +71,12 @@ class TestDemandPredictor:
         today = date(2026, 4, 9)
         daily_sales = {
             "2026-04-08": 100,  # day-1, weight=7: 700
-            "2026-04-07": 0,    # day-2, weight=6: 0
-            "2026-04-06": 0,    # day-3, weight=5: 0
-            "2026-04-05": 0,    # day-4, weight=4: 0
-            "2026-04-04": 0,    # day-5, weight=3: 0
-            "2026-04-03": 0,    # day-6, weight=2: 0
-            "2026-04-02": 0,    # day-7, weight=1: 0
+            "2026-04-07": 0,  # day-2, weight=6: 0
+            "2026-04-06": 0,  # day-3, weight=5: 0
+            "2026-04-05": 0,  # day-4, weight=4: 0
+            "2026-04-04": 0,  # day-5, weight=3: 0
+            "2026-04-03": 0,  # day-6, weight=2: 0
+            "2026-04-02": 0,  # day-7, weight=1: 0
         }
         result = predictor._calc_wma(daily_sales, today)
         # WMA = 700 / 28 = 25.0

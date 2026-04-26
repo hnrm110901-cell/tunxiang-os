@@ -7,6 +7,7 @@
   - 返回标准化 Pydantic V2 模型
   - 适配器失败只记录日志，不抛出到上层
 """
+
 import asyncio
 from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
@@ -28,18 +29,20 @@ _RETRY_BASE_WAIT = 1.0
 
 # ─── 标准化返回模型 ───
 
+
 class MeituanStoreInfo(BaseModel):
     """美团门店基本信息"""
+
     platform_store_id: str
     name: str
     address: str
     city: str
     district: str
     cuisine_type: str
-    price_tier: str          # 'economy' | 'mid_range' | 'mid_premium' | 'premium' | 'luxury'
+    price_tier: str  # 'economy' | 'mid_range' | 'mid_premium' | 'premium' | 'luxury'
     avg_rating: Decimal
     review_count: int
-    price_per_person_fen: int    # 人均消费（分）
+    price_per_person_fen: int  # 人均消费（分）
     is_open: bool
     business_hours: dict[str, Any]
     fetched_at: datetime
@@ -47,10 +50,11 @@ class MeituanStoreInfo(BaseModel):
 
 class MeituanReview(BaseModel):
     """美团单条点评"""
+
     review_id: str
     content: str
-    rating: Decimal             # 1.0 ~ 5.0
-    author_level: str           # 'regular' | 'vip' | 'kol'
+    rating: Decimal  # 1.0 ~ 5.0
+    author_level: str  # 'regular' | 'vip' | 'kol'
     review_date: date
     reply: str | None = None
     tags: list[str] = Field(default_factory=list)
@@ -58,6 +62,7 @@ class MeituanReview(BaseModel):
 
 class MeituanDish(BaseModel):
     """美团菜单菜品"""
+
     dish_id: str
     name: str
     category: str
@@ -69,6 +74,7 @@ class MeituanDish(BaseModel):
 
 
 # ─── HTTP 工具 ───
+
 
 async def _request_with_retry(
     client: httpx.AsyncClient,
@@ -119,6 +125,7 @@ async def _request_with_retry(
 
 
 # ─── 适配器主体 ───
+
 
 class MeituanAdapter:
     """美团平台适配器（异步）"""
@@ -171,6 +178,7 @@ class MeituanAdapter:
         """采集门店基本信息"""
         log = logger.bind(adapter="meituan", action="fetch_store_info", store_id=platform_store_id)
         import time
+
         t0 = time.monotonic()
 
         client = await self._get_client()
@@ -206,6 +214,7 @@ class MeituanAdapter:
         """采集最近 N 天的点评列表"""
         log = logger.bind(adapter="meituan", action="fetch_recent_reviews", store_id=platform_store_id, days=days)
         import time
+
         t0 = time.monotonic()
 
         client = await self._get_client()
@@ -214,11 +223,13 @@ class MeituanAdapter:
         page = 1
 
         while True:
-            params = self._build_signed_params({
-                "store_id": platform_store_id,
-                "page": page,
-                "page_size": 50,
-            })
+            params = self._build_signed_params(
+                {
+                    "store_id": platform_store_id,
+                    "page": page,
+                    "page_size": 50,
+                }
+            )
             raw = await _request_with_retry(client, "GET", f"{self._BASE_URL}/review/list", params=params)
             items: list[dict] = raw.get("data", {}).get("reviews", [])
             if not items:
@@ -236,15 +247,17 @@ class MeituanAdapter:
                     log.debug("meituan_adapter.reviews.cutoff_reached", page=page)
                     break
 
-                reviews.append(MeituanReview(
-                    review_id=str(item.get("reviewId", "")),
-                    content=item.get("comment", ""),
-                    rating=Decimal(str(item.get("star", "0"))),
-                    author_level=_map_author_level(item.get("userLevel", 0)),
-                    review_date=review_date,
-                    reply=item.get("reply") or None,
-                    tags=item.get("tags", []),
-                ))
+                reviews.append(
+                    MeituanReview(
+                        review_id=str(item.get("reviewId", "")),
+                        content=item.get("comment", ""),
+                        rating=Decimal(str(item.get("star", "0"))),
+                        author_level=_map_author_level(item.get("userLevel", 0)),
+                        review_date=review_date,
+                        reply=item.get("reply") or None,
+                        tags=item.get("tags", []),
+                    )
+                )
             else:
                 page += 1
                 continue
@@ -262,6 +275,7 @@ class MeituanAdapter:
         """采集竞对菜单快照"""
         log = logger.bind(adapter="meituan", action="fetch_competitor_menu", store_id=platform_store_id)
         import time
+
         t0 = time.monotonic()
 
         client = await self._get_client()
@@ -270,16 +284,18 @@ class MeituanAdapter:
 
         dishes: list[MeituanDish] = []
         for item in raw.get("data", {}).get("foodList", []):
-            dishes.append(MeituanDish(
-                dish_id=str(item.get("spuId", "")),
-                name=item.get("name", ""),
-                category=item.get("category", ""),
-                price_fen=int(item.get("price", 0) * 100),
-                monthly_sales=item.get("monthlySales", 0),
-                is_active=item.get("status", 1) == 1,
-                is_recommended=item.get("isRecommend", False),
-                image_url=item.get("imageUrl") or None,
-            ))
+            dishes.append(
+                MeituanDish(
+                    dish_id=str(item.get("spuId", "")),
+                    name=item.get("name", ""),
+                    category=item.get("category", ""),
+                    price_fen=int(item.get("price", 0) * 100),
+                    monthly_sales=item.get("monthlySales", 0),
+                    is_active=item.get("status", 1) == 1,
+                    is_recommended=item.get("isRecommend", False),
+                    image_url=item.get("imageUrl") or None,
+                )
+            )
 
         elapsed = time.monotonic() - t0
         log.info(
@@ -291,6 +307,7 @@ class MeituanAdapter:
 
 
 # ─── 内部辅助函数 ───
+
 
 def _map_price_tier(avg_price_yuan: float) -> str:
     """将美团人均消费（元）映射到内部价格档位"""

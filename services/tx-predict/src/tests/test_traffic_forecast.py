@@ -6,6 +6,7 @@
   3. 节假日系数修正 — 国庆节客流提升
   4. 天气修正 — 雨天客流下降
 """
+
 from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock

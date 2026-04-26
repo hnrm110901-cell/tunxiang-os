@@ -20,14 +20,12 @@ patch 路径：services.tx_supply.src.services.food_safety.UniversalPublisher.pu
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-
 from services.tx_supply.src.api.food_safety_routes import router as food_safety_router
+
 from shared.ontology.src.database import get_db
 
 # ── 应用组装 ──────────────────────────────────────────────────────────────────

@@ -371,6 +371,12 @@ class CashierEngine:
         else:
             subtotal_fen = unit_price_fen * qty
 
+        # 做法加价：从 customizations 中提取做法附加费用（加蛋/加芝士等）
+        practice_extra_fen = 0
+        if customizations and "total_extra_price_fen" in customizations:
+            practice_extra_fen = customizations["total_extra_price_fen"]
+            subtotal_fen += practice_extra_fen
+
         # BOM 成本（从已加载的 dish 对象取，无额外查询）
         food_cost_fen = None
         gross_margin = None
@@ -1462,11 +1468,13 @@ class CashierEngine:
         # 自动结算
         payment_result = await self.settle_order(
             order_id=str(order_id),
-            payments=[{
-                "method": payment_method,
-                "amount_fen": payment_amount_fen or total_fen,
-                "trade_no": auth_code,
-            }],
+            payments=[
+                {
+                    "method": payment_method,
+                    "amount_fen": payment_amount_fen or total_fen,
+                    "trade_no": auth_code,
+                }
+            ],
         )
 
         # 旁路事件
@@ -1547,10 +1555,7 @@ class CashierEngine:
 
         # 预点单允许 free 和 reserved 两种桌态
         if table.status not in (TableStatus.free.value, TableStatus.reserved.value):
-            raise ValueError(
-                f"桌台 {table_no} 当前状态 {table.status}，"
-                f"预点单仅允许空闲或已预订状态的桌台"
-            )
+            raise ValueError(f"桌台 {table_no} 当前状态 {table.status}，预点单仅允许空闲或已预订状态的桌台")
 
         # 创建预点订单（status=pre_ordered，不锁桌）
         order_no = _gen_order_no()

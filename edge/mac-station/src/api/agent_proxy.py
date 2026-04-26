@@ -7,6 +7,7 @@
 降级策略：
   coreml-bridge 不可用时用简单规则引擎兜底。
 """
+
 from __future__ import annotations
 
 import time
@@ -134,7 +135,7 @@ def _discount_check_rule_engine(data: dict[str, Any]) -> dict[str, Any]:
     # 规则2: 大额折扣
     if amount_fen > 5000:
         risk_score += 0.3
-        reasons.append(f"折扣金额 {amount_fen/100:.2f}元 超过50元上限")
+        reasons.append(f"折扣金额 {amount_fen / 100:.2f}元 超过50元上限")
 
     # 规则3: 折扣率本身过高
     if discount_rate > 0.7:

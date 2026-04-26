@@ -6,6 +6,7 @@
 状态流转：open → resolved → verified
                 → escalated → resolved → verified
 """
+
 from __future__ import annotations
 
 from datetime import datetime, timezone
@@ -113,7 +114,9 @@ class CorrectiveActionService:
         return {"items": items, "total": total}
 
     async def get_action(
-        self, tenant_id: str, action_id: str,
+        self,
+        tenant_id: str,
+        action_id: str,
     ) -> dict | None:
         """获取单个纠正动作详情"""
         tid = UUID(tenant_id)
@@ -157,7 +160,10 @@ class CorrectiveActionService:
     # ──────────────────────────────────────────────
 
     async def resolve(
-        self, tenant_id: str, action_id: str, resolution: dict,
+        self,
+        tenant_id: str,
+        action_id: str,
+        resolution: dict,
     ) -> dict:
         """解决纠正动作（open/escalated → resolved）"""
         tid = UUID(tenant_id)
@@ -203,7 +209,10 @@ class CorrectiveActionService:
         }
 
     async def verify(
-        self, tenant_id: str, action_id: str, verified_by: str,
+        self,
+        tenant_id: str,
+        action_id: str,
+        verified_by: str,
     ) -> dict:
         """验证纠正动作（resolved → verified）"""
         tid = UUID(tenant_id)
@@ -252,7 +261,10 @@ class CorrectiveActionService:
         }
 
     async def escalate(
-        self, tenant_id: str, action_id: str, escalated_to: str,
+        self,
+        tenant_id: str,
+        action_id: str,
+        escalated_to: str,
     ) -> dict:
         """升级纠正动作（open → escalated）"""
         tid = UUID(tenant_id)
@@ -301,7 +313,9 @@ class CorrectiveActionService:
     # ──────────────────────────────────────────────
 
     async def get_summary(
-        self, tenant_id: str, store_id: str,
+        self,
+        tenant_id: str,
+        store_id: str,
     ) -> dict:
         """纠正动作统计概况"""
         tid = UUID(tenant_id)

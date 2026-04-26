@@ -6,7 +6,9 @@
 """
 
 import asyncio
+import uuid
 from contextlib import asynccontextmanager
+from datetime import timedelta
 from typing import Any, Optional
 
 import structlog
@@ -94,6 +96,7 @@ from .api.ab_test_routes import router as ab_test_router
 from .api.ai_marketing_routes import router as ai_marketing_router  # AI营销自动化（v207）
 from .api.approval_routes import router as approval_router
 from .api.attribution_routes import router as attribution_router
+from .api.audience_pack_routes import router as audience_pack_router  # v297 人群包引擎
 from .api.brand_strategy_routes import router as brand_strategy_router
 from .api.campaign_engine_db_routes import router as campaign_engine_db_router  # v193 活动引擎持久化
 from .api.campaign_routes import router as campaign_router
@@ -104,6 +107,8 @@ from .api.distribution_routes import router as distribution_router  # v191 三�
 from .api.growth_campaign_routes import router as growth_campaign_router
 from .api.growth_hub_routes import router as growth_hub_router
 from .api.journey_routes import router as journey_router
+from .api.live_code_routes import router as live_code_router  # v295 活码拉新引擎
+from .api.marketing_task_routes import router as marketing_task_router  # v299 营销任务日历
 from .api.offer_routes import router as offer_router  # v144 DB化
 from .api.promotion_rules_v2_routes import router as promotion_rules_v2_router  # 模块2.5 促销规则引擎V2
 from .api.promotion_rules_v3_routes import (
@@ -235,7 +240,6 @@ from services.growth_journey_service import GrowthJourneyService as _GrowthJourn
 
 # Feature Flag SDK — 控制 Growth Journey V2 / 沉默召回 等 cron 任务
 try:
-    from shared.feature_flags import FlagContext
     from shared.feature_flags import is_enabled as _ff_is_enabled
     from shared.feature_flags.flag_names import GrowthFlags as _GrowthFlags
 
@@ -561,6 +565,160 @@ def _on_sales_daily_scan_done(task: asyncio.Task) -> None:
         logger.error("sales_daily_scan_unhandled", error=str(exc), exc_info=exc)
 
 
+# ---------------------------------------------------------------------------
+# APScheduler — Live Code Daily Stats（每日凌晨1:00）
+# ---------------------------------------------------------------------------
+
+from services.live_code_service import LiveCodeService as _LiveCodeService
+
+_live_code_svc = _LiveCodeService()
+
+
+async def _run_live_code_daily_stats() -> None:
+    """每日凌晨1:00：聚合活码扫码统计数据。"""
+    logger.info("live_code_daily_stats_started")
+    from datetime import date as _date
+
+    from sqlalchemy import text as _text
+
+    yesterday = _date.today() - timedelta(days=1)
+
+    async with async_session_factory() as probe_db:
+        try:
+            result = await probe_db.execute(_text("SELECT DISTINCT tenant_id FROM stores WHERE is_active = true"))
+            tenant_ids = [str(row[0]) for row in result.fetchall()]
+        except (OSError, RuntimeError, ValueError) as exc:
+            logger.error("live_code_stats_fetch_tenants_error", error=str(exc), exc_info=True)
+            return
+
+    for tid in tenant_ids:
+        async with async_session_factory() as db:
+            try:
+                await db.execute(_text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": tid})
+                result = await _live_code_svc.aggregate_daily_stats(uuid.UUID(tid), yesterday, db)
+                await db.commit()
+                logger.info("live_code_stats_tenant_done", tenant_id=tid, **result)
+            except (OSError, RuntimeError, ValueError) as exc:
+                await db.rollback()
+                logger.error("live_code_stats_tenant_error", tenant_id=tid, error=str(exc), exc_info=True)
+
+    logger.info("live_code_daily_stats_finished", tenant_count=len(tenant_ids))
+
+
+def _schedule_live_code_daily_stats() -> None:
+    task = asyncio.create_task(_run_live_code_daily_stats())
+    task.add_done_callback(_on_live_code_daily_stats_done)
+
+
+def _on_live_code_daily_stats_done(task: asyncio.Task) -> None:
+    exc = task.exception() if not task.cancelled() else None
+    if exc is not None:
+        logger.error("live_code_daily_stats_unhandled", error=str(exc), exc_info=exc)
+
+
+# ---------------------------------------------------------------------------
+# APScheduler — Audience Pack Batch Refresh（每日凌晨4:00）
+# ---------------------------------------------------------------------------
+
+from services.audience_pack_service import AudiencePackService as _AudiencePackService
+
+_audience_pack_svc = _AudiencePackService()
+
+
+async def _run_audience_pack_refresh() -> None:
+    """每日凌晨4:00：批量刷新所有到期的动态人群包。"""
+    logger.info("audience_pack_refresh_started")
+    from sqlalchemy import text as _text
+
+    async with async_session_factory() as probe_db:
+        try:
+            result = await probe_db.execute(_text("SELECT DISTINCT tenant_id FROM stores WHERE is_active = true"))
+            tenant_ids = [str(row[0]) for row in result.fetchall()]
+        except (OSError, RuntimeError, ValueError) as exc:
+            logger.error("audience_pack_refresh_fetch_tenants_error", error=str(exc), exc_info=True)
+            return
+
+    for tid in tenant_ids:
+        async with async_session_factory() as db:
+            try:
+                await db.execute(_text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": tid})
+                result = await _audience_pack_svc.batch_refresh_dynamic_packs(uuid.UUID(tid), db)
+                await db.commit()
+                logger.info("audience_pack_refresh_tenant_done", tenant_id=tid, **result)
+            except (OSError, RuntimeError, ValueError) as exc:
+                await db.rollback()
+                logger.error("audience_pack_refresh_tenant_error", tenant_id=tid, error=str(exc), exc_info=True)
+
+    logger.info("audience_pack_refresh_finished", tenant_count=len(tenant_ids))
+
+
+def _schedule_audience_pack_refresh() -> None:
+    task = asyncio.create_task(_run_audience_pack_refresh())
+    task.add_done_callback(_on_audience_pack_refresh_done)
+
+
+def _on_audience_pack_refresh_done(task: asyncio.Task) -> None:
+    exc = task.exception() if not task.cancelled() else None
+    if exc is not None:
+        logger.error("audience_pack_refresh_unhandled", error=str(exc), exc_info=exc)
+
+
+# ---------------------------------------------------------------------------
+# APScheduler — Marketing Task Schedule Check（每5分钟）
+# ---------------------------------------------------------------------------
+
+from services.marketing_task_service import MarketingTaskService as _MarketingTaskService
+
+_marketing_task_svc = _MarketingTaskService()
+
+
+async def _run_marketing_task_check() -> None:
+    """每5分钟：检查到期的 scheduled 营销任务，自动转为 executing。"""
+    logger.info("marketing_task_check_started")
+    from sqlalchemy import text as _text
+
+    async with async_session_factory() as probe_db:
+        try:
+            result = await probe_db.execute(_text("SELECT DISTINCT tenant_id FROM stores WHERE is_active = true"))
+            tenant_ids = [str(row[0]) for row in result.fetchall()]
+        except (OSError, RuntimeError, ValueError) as exc:
+            logger.error("marketing_task_check_fetch_tenants_error", error=str(exc), exc_info=True)
+            return
+
+    total_started = 0
+    total_completed = 0
+    for tid in tenant_ids:
+        async with async_session_factory() as db:
+            try:
+                await db.execute(_text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": tid})
+                result = await _marketing_task_svc.check_scheduled_tasks(uuid.UUID(tid), db)
+                await db.commit()
+                total_started += result.get("started", 0)
+                total_completed += result.get("completed", 0)
+            except (OSError, RuntimeError, ValueError) as exc:
+                await db.rollback()
+                logger.error("marketing_task_check_tenant_error", tenant_id=tid, error=str(exc), exc_info=True)
+
+    if total_started or total_completed:
+        logger.info(
+            "marketing_task_check_finished",
+            tenant_count=len(tenant_ids),
+            started=total_started,
+            completed=total_completed,
+        )
+
+
+def _schedule_marketing_task_check() -> None:
+    task = asyncio.create_task(_run_marketing_task_check())
+    task.add_done_callback(_on_marketing_task_check_done)
+
+
+def _on_marketing_task_check_done(task: asyncio.Task) -> None:
+    exc = task.exception() if not task.cancelled() else None
+    if exc is not None:
+        logger.error("marketing_task_check_unhandled", error=str(exc), exc_info=exc)
+
+
 async def _run_journey_event_listener() -> None:
     """旅程事件监听后台任务：订阅 Redis Stream，实时触发旅程。
 
@@ -685,6 +843,39 @@ async def lifespan(app: FastAPI):
         misfire_grace_time=300,
     )
 
+    # Live Code Daily Stats — 每日凌晨1:00（活码扫码统计聚合）
+    _scheduler.add_job(
+        _schedule_live_code_daily_stats,
+        trigger="cron",
+        hour=1,
+        id="live_code_daily_stats",
+        replace_existing=True,
+        max_instances=1,
+        misfire_grace_time=300,
+    )
+
+    # Audience Pack Batch Refresh — 每日凌晨4:00（动态人群包刷新）
+    _scheduler.add_job(
+        _schedule_audience_pack_refresh,
+        trigger="cron",
+        hour=4,
+        id="audience_pack_refresh",
+        replace_existing=True,
+        max_instances=1,
+        misfire_grace_time=300,
+    )
+
+    # Marketing Task Schedule Check — 每5分钟（到期任务自动执行）
+    _scheduler.add_job(
+        _schedule_marketing_task_check,
+        trigger="interval",
+        minutes=5,
+        id="marketing_task_check",
+        replace_existing=True,
+        max_instances=1,
+        misfire_grace_time=60,
+    )
+
     _scheduler.start()
     logger.info("journey_executor_scheduler_started", interval_seconds=60)
     logger.info("approval_expiry_scheduler_started", interval_hours=1)
@@ -695,6 +886,9 @@ async def lifespan(app: FastAPI):
     logger.info("growth_auto_iterate_scheduler_started", interval_hours=6)
     logger.info("growth_calendar_trigger_scheduler_started", trigger="cron_08:00")
     logger.info("sales_crm_daily_scan_scheduler_started", trigger="cron_02:30")
+    logger.info("live_code_daily_stats_scheduler_started", trigger="cron_01:00")
+    logger.info("audience_pack_refresh_scheduler_started", trigger="cron_04:00")
+    logger.info("marketing_task_check_scheduler_started", interval_minutes=5)
 
     # 启动 EventBridge（桥接业务事件 → JourneyEngine）
     _bridge = _get_event_bridge(
@@ -763,6 +957,9 @@ app.include_router(ai_marketing_router)  # /api/v1/growth/ai-marketing/* — AI�
 app.include_router(promotion_rules_v2_router)  # /api/v1/promotions/* — 促销规则引擎V2（模块2.5）
 app.include_router(promotion_rules_v3_router)  # /api/v1/promotions/v3/* — 促销规则引擎V3（模块2.6）
 app.include_router(sales_crm_router)  # /api/v1/growth/sales/* — 销售CRM（v291）
+app.include_router(live_code_router)  # /api/v1/growth/live-codes/* — 活码拉新引擎（v295）
+app.include_router(audience_pack_router)  # /api/v1/growth/audience-packs/* — 人群包引擎（v297）
+app.include_router(marketing_task_router)  # /api/v1/growth/marketing-tasks/* — 营销任务日历（v299）
 
 # 服务实例
 brand_svc = BrandStrategyService()

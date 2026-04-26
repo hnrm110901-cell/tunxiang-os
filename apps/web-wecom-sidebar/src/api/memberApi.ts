@@ -44,7 +44,7 @@ async function txFetch<T>(
 // ─────────────────────────────────────────────────────────────────
 
 /**
- * 通过企微 externalUserId 查询会员档案
+ * 通过企微 externalUserId 查询会员档案（旧接口，保留兼容）
  * GET /api/v1/member/customers?wecom_external_userid={id}
  */
 export async function fetchCustomerByWecomId(
@@ -55,6 +55,19 @@ export async function fetchCustomerByWecomId(
   );
   if (!result.ok || result.data.total === 0) return null;
   return result.data.items[0] ?? null;
+}
+
+/**
+ * 通过企微 externalUserId 获取360画像（新接口）
+ * GET /api/v1/member/profile360/by-wecom/{externalUserId}
+ */
+export async function fetchProfile360(
+  externalUserId: string,
+): Promise<CustomerProfile | null> {
+  const result = await txFetch<CustomerProfile>(
+    `/api/v1/member/profile360/by-wecom/${encodeURIComponent(externalUserId)}`,
+  );
+  return result.ok ? result.data : null;
 }
 
 /**
@@ -122,7 +135,7 @@ export async function fetchIssuableCoupons(): Promise<Coupon[]> {
 }
 
 /**
- * 向客户发放优惠券
+ * 向客户发放优惠券（旧接口，保留兼容）
  * POST /api/v1/member/coupons/issue
  */
 export async function issueCoupon(
@@ -133,6 +146,27 @@ export async function issueCoupon(
     method: 'POST',
     body: JSON.stringify({ customer_id: customerId, coupon_id: couponId }),
   });
+}
+
+/**
+ * 1v1发券（带日志追踪）
+ * POST /api/v1/member/profile360/{customerId}/send-coupon
+ */
+export async function sendCouponWithLog(
+  customerId: string,
+  couponId: string,
+  employeeId: string,
+  storeId: string,
+): Promise<{ send_id: string }> {
+  const result = await txFetch<{ send_id: string }>(
+    `/api/v1/member/profile360/${customerId}/send-coupon`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ coupon_id: couponId, employee_id: employeeId, store_id: storeId }),
+    },
+  );
+  if (!result.ok) throw new Error(result.error?.message ?? '发券失败');
+  return result.data;
 }
 
 // ─────────────────────────────────────────────────────────────────

@@ -33,14 +33,14 @@ logger = structlog.get_logger(__name__)
 # ─── 宴会类型常量 ──────────────────────────────────────────────────────────────
 
 BANQUET_TYPES = [
-    "wedding",       # 婚宴
-    "birthday",      # 生日宴
-    "baby",          # 宝宝宴
-    "longevity",     # 寿宴
-    "corporate",     # 商务宴
-    "graduation",    # 升学宴
+    "wedding",  # 婚宴
+    "birthday",  # 生日宴
+    "baby",  # 宝宝宴
+    "longevity",  # 寿宴
+    "corporate",  # 商务宴
+    "graduation",  # 升学宴
     "housewarming",  # 乔迁宴
-    "other",         # 其他
+    "other",  # 其他
 ]
 
 BANQUET_TYPE_LABELS = {
@@ -55,14 +55,14 @@ BANQUET_TYPE_LABELS = {
 }
 
 SOURCE_CHANNELS = [
-    "walk_in",        # 到店
-    "phone",          # 电话
-    "wechat",         # 微信
-    "miniapp",        # 小程序
-    "referral",       # 转介绍
-    "wedding_planner", # 婚庆公司
-    "douyin",         # 抖音
-    "other",          # 其他
+    "walk_in",  # 到店
+    "phone",  # 电话
+    "wechat",  # 微信
+    "miniapp",  # 小程序
+    "referral",  # 转介绍
+    "wedding_planner",  # 婚庆公司
+    "douyin",  # 抖音
+    "other",  # 其他
 ]
 
 
@@ -483,16 +483,20 @@ async def get_banquet_dashboard(
         },
     )
     overview_row = overview_result.mappings().first()
-    overview = dict(overview_row) if overview_row else {
-        "total_orders": 0,
-        "total_tables": 0,
-        "total_guests": 0,
-        "total_revenue_fen": 0,
-        "avg_order_fen": 0,
-        "avg_table_price_fen": 0,
-        "total_deposit_fen": 0,
-        "total_final_fen": 0,
-    }
+    overview = (
+        dict(overview_row)
+        if overview_row
+        else {
+            "total_orders": 0,
+            "total_tables": 0,
+            "total_guests": 0,
+            "total_revenue_fen": 0,
+            "avg_order_fen": 0,
+            "avg_table_price_fen": 0,
+            "total_deposit_fen": 0,
+            "total_final_fen": 0,
+        }
+    )
 
     # 2) 商机漏斗
     funnel_result = await db.execute(
@@ -526,19 +530,21 @@ async def get_banquet_dashboard(
         },
     )
     funnel_row = funnel_result.mappings().first()
-    funnel = dict(funnel_row) if funnel_row else {
-        "total_leads": 0,
-        "followed": 0,
-        "quoted": 0,
-        "converted": 0,
-        "lost": 0,
-        "conversion_rate_pct": 0.0,
-    }
+    funnel = (
+        dict(funnel_row)
+        if funnel_row
+        else {
+            "total_leads": 0,
+            "followed": 0,
+            "quoted": 0,
+            "converted": 0,
+            "lost": 0,
+            "conversion_rate_pct": 0.0,
+        }
+    )
 
     # 3) 按类型分布（饼图数据）
-    type_distribution = await get_banquet_order_analysis(
-        db, tenant_id, store_id, date_from, date_to
-    )
+    type_distribution = await get_banquet_order_analysis(db, tenant_id, store_id, date_from, date_to)
 
     # 4) 近期宴会（未来7天）
     upcoming_result = await db.execute(

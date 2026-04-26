@@ -3,6 +3,7 @@
 当前为 Mock 实现。正式对接时替换为支付宝 V3 SDK 调用。
 接口与 BasePaymentChannel 完全兼容，切换无感。
 """
+
 from __future__ import annotations
 
 import uuid

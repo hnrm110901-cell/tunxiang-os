@@ -12,6 +12,7 @@
   - Agent 不能超过预设的单笔/日累计限额
   - 所有 Agent 支付记录标记 source="agent"
 """
+
 from __future__ import annotations
 
 import uuid
@@ -27,40 +28,43 @@ from ..channels.base import PayMethod
 logger = structlog.get_logger(__name__)
 
 # Agent 支付限额（分）
-_AGENT_SINGLE_LIMIT_FEN = 100_000   # 单笔上限 1000 元
-_AGENT_DAILY_LIMIT_FEN = 500_000    # 日累计上限 5000 元
+_AGENT_SINGLE_LIMIT_FEN = 100_000  # 单笔上限 1000 元
+_AGENT_DAILY_LIMIT_FEN = 500_000  # 日累计上限 5000 元
 
 
 class AgentPaymentStatus(str, Enum):
-    PREPARED = "prepared"           # Agent 已准备，等待人类确认
-    HUMAN_CONFIRMED = "confirmed"   # 人类已确认，执行中
-    COMPLETED = "completed"         # 支付完成
-    REJECTED = "rejected"           # 人类拒绝
-    EXPIRED = "expired"             # 超时未确认
-    FAILED = "failed"               # 执行失败
+    PREPARED = "prepared"  # Agent 已准备，等待人类确认
+    HUMAN_CONFIRMED = "confirmed"  # 人类已确认，执行中
+    COMPLETED = "completed"  # 支付完成
+    REJECTED = "rejected"  # 人类拒绝
+    EXPIRED = "expired"  # 超时未确认
+    FAILED = "failed"  # 执行失败
 
 
 class PaymentIntent(BaseModel):
     """Agent 支付意图"""
+
     order_id: str
     amount_fen: int = Field(..., gt=0)
     method: PayMethod
     description: str = ""
-    reason: str = ""                    # Agent 发起支付的理由
+    reason: str = ""  # Agent 发起支付的理由
     confidence: float = Field(0.0, ge=0.0, le=1.0)  # Agent 置信度
     metadata: dict = Field(default_factory=dict)
 
 
 class HumanAuthProof(BaseModel):
     """人类授权证明"""
-    auth_type: str = "biometric"        # biometric / password / sms_code
-    auth_token: str = ""                # 授权凭证（由前端获取）
-    operator_id: str = ""               # 操作员 ID
+
+    auth_type: str = "biometric"  # biometric / password / sms_code
+    auth_token: str = ""  # 授权凭证（由前端获取）
+    operator_id: str = ""  # 操作员 ID
     confirmed_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class PreparedPayment(BaseModel):
     """Agent 准备好的支付（等待人类确认）"""
+
     prepared_id: str
     agent_id: str
     intent: PaymentIntent
@@ -121,8 +125,7 @@ class AgentPaymentProtocol:
         # 限额校验
         if intent.amount_fen > _AGENT_SINGLE_LIMIT_FEN:
             raise ValueError(
-                f"Agent 单笔限额 {_AGENT_SINGLE_LIMIT_FEN / 100} 元，"
-                f"请求金额 {intent.amount_fen / 100} 元"
+                f"Agent 单笔限额 {_AGENT_SINGLE_LIMIT_FEN / 100} 元，请求金额 {intent.amount_fen / 100} 元"
             )
 
         prepared_id = f"AGENT_{uuid.uuid4().hex[:12].upper()}"
@@ -225,7 +228,7 @@ class AgentPaymentProtocol:
     async def list_pending(self, agent_id: Optional[str] = None) -> list[PreparedPayment]:
         """列出待确认的 Agent 支付"""
         return [
-            p for p in self._prepared.values()
-            if p.status == AgentPaymentStatus.PREPARED
-            and (agent_id is None or p.agent_id == agent_id)
+            p
+            for p in self._prepared.values()
+            if p.status == AgentPaymentStatus.PREPARED and (agent_id is None or p.agent_id == agent_id)
         ]

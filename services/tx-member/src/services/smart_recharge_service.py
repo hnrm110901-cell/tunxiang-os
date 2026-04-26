@@ -403,7 +403,7 @@ class SmartRechargeService:
         await db.execute(
             text(f"""
                 UPDATE smart_recharge_rules
-                SET {', '.join(sets)}
+                SET {", ".join(sets)}
                 WHERE tenant_id = :tenant_id AND id = :rule_id AND is_deleted = FALSE
             """),
             params,
@@ -524,6 +524,7 @@ class SmartRechargeService:
 
 # ── 内部辅助 ─────────────────────────────────────────────────
 
+
 def _default_tiers(order_amount_fen: int) -> list[dict]:
     """默认倍数推荐：2x / 3x / 5x 客单价（取整到百元）"""
     tiers = []
@@ -533,13 +534,15 @@ def _default_tiers(order_amount_fen: int) -> list[dict]:
         rounded = ((raw + 9999) // 10000) * 10000
         bonus_rate = 5 + (multiplier - 2) * 3  # 5% / 8% / 14%
         bonus_fen = int(rounded * bonus_rate / 100)
-        tiers.append({
-            "multiplier": multiplier,
-            "recharge_amount_fen": rounded,
-            "bonus_amount_fen": bonus_fen,
-            "bonus_rate_pct": bonus_rate,
-            "label": f"充{rounded // 100}元 送{bonus_fen // 100}元",
-        })
+        tiers.append(
+            {
+                "multiplier": multiplier,
+                "recharge_amount_fen": rounded,
+                "bonus_amount_fen": bonus_fen,
+                "bonus_rate_pct": bonus_rate,
+                "label": f"充{rounded // 100}元 送{bonus_fen // 100}元",
+            }
+        )
     return tiers
 
 
@@ -570,11 +573,13 @@ def _calculate_tiers(
         else:
             bonus_fen = 0  # coupon 模式不计算金额赠送
 
-        tiers.append({
-            "multiplier": multiplier,
-            "recharge_amount_fen": rounded,
-            "bonus_amount_fen": bonus_fen,
-            "bonus_rate_pct": tier_bonus_rate,
-            "label": f"充{rounded // 100}元 送{bonus_fen // 100}元",
-        })
+        tiers.append(
+            {
+                "multiplier": multiplier,
+                "recharge_amount_fen": rounded,
+                "bonus_amount_fen": bonus_fen,
+                "bonus_rate_pct": tier_bonus_rate,
+                "label": f"充{rounded // 100}元 送{bonus_fen // 100}元",
+            }
+        )
     return tiers

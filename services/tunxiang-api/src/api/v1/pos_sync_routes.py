@@ -8,6 +8,7 @@
   POST /sync-today/{merchant_code} — 同步今日数据
   POST /sync-menu/{merchant_code}/{store_id} — 同步菜品数据
 """
+
 from __future__ import annotations
 
 from datetime import date
