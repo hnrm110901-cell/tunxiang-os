@@ -37,6 +37,17 @@ const DURATION_MS = Number(process.env.KDS_E2E_DURATION_MS ?? 60_000);
 const SAMPLE_INTERVAL_MS = 5_000; // 每 5s 采样一次内存与长任务
 const POLL_INTERVAL_MS = 3_000; // 模拟 KDS 默认 3s 轮询节奏
 
+// KDS_BASE_URL 设置时切到真 vite dev server（webServer 由 playwright.config 自动起）
+// /api/v1/kds/** 通过 page.route 转发到本地 mockDeltaServer，不依赖 vite 的 proxy 配置
+const KDS_BASE_URL = process.env.KDS_BASE_URL;
+
+async function routeApiToMock(page: Page, mockBaseURL: string): Promise<void> {
+  await page.route('**/api/v1/kds/**', async (route) => {
+    const reqURL = new URL(route.request().url());
+    await route.continue({ url: mockBaseURL + reqURL.pathname + reqURL.search });
+  });
+}
+
 // 内存增长上限（MB）。50MB 是任务给定阈值。
 const MEMORY_GROWTH_LIMIT_MB = 50;
 
@@ -126,7 +137,9 @@ test.describe('后厨 KDS 4 小时零卡顿 (Tier 1)', () => {
     page.on('pageerror', (err) => consoleErrors.push(`pageerror: ${err.message}`));
 
     // 进入 KDS 看板 demo 模式（不需要登录，自带演示数据 + 真 mock 请求）
-    await page.goto(`${mockBaseURL}/board`, { waitUntil: 'domcontentloaded' });
+    if (KDS_BASE_URL) await routeApiToMock(page, mockBaseURL);
+    const boardURL = KDS_BASE_URL ? `${KDS_BASE_URL}/board` : `${mockBaseURL}/board`;
+    await page.goto(boardURL, { waitUntil: 'domcontentloaded' });
     // 等首屏稳定
     await page.waitForTimeout(2_000);
 
@@ -173,7 +186,9 @@ test.describe('后厨 KDS 4 小时零卡顿 (Tier 1)', () => {
       if (msg.type() === 'error') consoleErrors.push(msg.text());
     });
 
-    await page.goto(`${mockBaseURL}/board`, { waitUntil: 'domcontentloaded' });
+    if (KDS_BASE_URL) await routeApiToMock(page, mockBaseURL);
+    const boardURL = KDS_BASE_URL ? `${KDS_BASE_URL}/board` : `${mockBaseURL}/board`;
+    await page.goto(boardURL, { waitUntil: 'domcontentloaded' });
     await page.waitForTimeout(3_000);
 
     // 触发"后端断网"60s（路由器抖动场景）
@@ -199,7 +214,9 @@ test.describe('后厨 KDS 4 小时零卡顿 (Tier 1)', () => {
   test('test_kitchen_memory_does_not_grow_past_50mb', async ({ page }) => {
     await installObservers(page);
 
-    await page.goto(`${mockBaseURL}/board`, { waitUntil: 'domcontentloaded' });
+    if (KDS_BASE_URL) await routeApiToMock(page, mockBaseURL);
+    const boardURL = KDS_BASE_URL ? `${KDS_BASE_URL}/board` : `${mockBaseURL}/board`;
+    await page.goto(boardURL, { waitUntil: 'domcontentloaded' });
     // 给应用首次渲染足够稳定时间，再开始采样基线
     await page.waitForTimeout(5_000);
 

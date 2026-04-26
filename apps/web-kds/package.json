@@ -19,6 +19,8 @@
   },
   "dependencies": {
     "@tunxiang/design-system": "workspace:*",
+    "@tx/tokens": "workspace:*",
+    "@tx/touch": "workspace:*",
     "antd": "^5.12.0",
     "dayjs": "^1.11.0",
     "echarts": "^6.0.0",

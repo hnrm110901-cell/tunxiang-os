@@ -30,6 +30,11 @@ const IS_NIGHTLY = DURATION_MS >= 60 * 60 * 1000; // ≥1h 视为 nightly
 // 测试用例本身的超时 = 跑测时长 + 60s buffer（启动/截图/收集指标）
 const TEST_TIMEOUT_MS = DURATION_MS + 60_000;
 
+// 真 vite dev server 模式：设 KDS_BASE_URL=http://localhost:5173 自动起服
+// （上游 packages/* 已加入 pnpm-workspace，vite import-analysis 不再失败）
+const KDS_BASE_URL = process.env.KDS_BASE_URL;
+const USE_REAL_VITE = !!KDS_BASE_URL;
+
 export default defineConfig({
   testDir: './e2e',
   testMatch: /.*\.spec\.ts$/,
@@ -50,7 +55,24 @@ export default defineConfig({
     screenshot: 'only-on-failure',
     trace: IS_NIGHTLY ? 'off' : 'retain-on-failure', // 4h trace 文件太大，nightly 关掉
     video: 'off',
+    ...(USE_REAL_VITE ? { baseURL: KDS_BASE_URL } : {}),
   },
+
+  // 真 vite 模式下自动起 dev server；mock 模式下不需要任何外部服务
+  ...(USE_REAL_VITE
+    ? {
+        webServer: {
+          // 在 worktree 根跑，避免 monorepo workspace 解析问题
+          command: 'pnpm --filter web-kds dev',
+          cwd: '../..',
+          url: KDS_BASE_URL,
+          reuseExistingServer: !process.env.CI,
+          timeout: 60_000,
+          stdout: 'pipe',
+          stderr: 'pipe',
+        },
+      }
+    : {}),
 
   projects: [
     {
