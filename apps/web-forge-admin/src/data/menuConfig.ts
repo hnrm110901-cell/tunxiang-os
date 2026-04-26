@@ -1,0 +1,82 @@
+import type { MenuItem } from '@/types/menu'
+
+// 14 个一级菜单 · single source of truth
+// 任何菜单变更都改这里,Sidebar / Router / 面包屑 自动同步
+export const MENU: MenuItem[] = [
+  { id: 'overview',      path: '/overview',      icon: '⊕', label: '总览仪表板', domain: 'CORE',
+    subItems: [{ label: '实时 KPI', path: '#kpi' }, { label: '待办中心', path: '#todo' }, { label: '平台健康', path: '#health' }] },
+  { id: 'catalog',       path: '/catalog',       icon: '▢', label: '商品管理',   domain: 'CORE',
+    subItems: [{ label: '全部商品', path: '#all' }, { label: '推荐位', path: '#feature' }, { label: '分类', path: '#category' }, { label: '标签', path: '#tag' }] },
+  { id: 'review',        path: '/review',        icon: '⊞', label: '审核中心',   domain: 'CORE',
+    badge: { text: '12', tone: 'danger' },
+    subItems: [{ label: '待审 12', path: '#pending' }, { label: '扫描中 4', path: '#scanning' }, { label: '已通过', path: '#passed' }, { label: '已拒', path: '#rejected' }, { label: 'SLA 看板', path: '#sla' }] },
+
+  { id: 'makers',        path: '/makers',        icon: '⌗', label: 'ISV 作坊主', domain: 'ECOSYSTEM',
+    subItems: [{ label: '全部作坊主', path: '#all' }, { label: '实名审核', path: '#verify' }, { label: '等级体系', path: '#tier' }, { label: '黑名单', path: '#blacklist' }, { label: '邀请码', path: '#invite' }] },
+  { id: 'subscriptions', path: '/subscriptions', icon: '⊠', label: '安装订阅',   domain: 'ECOSYSTEM',
+    subItems: [{ label: '订阅大盘', path: '#dashboard' }, { label: '试用转化', path: '#trial' }, { label: '退订原因', path: '#churn' }, { label: '关联工单', path: '#tickets' }] },
+  { id: 'labs',          path: '/labs',          icon: '⌬', label: 'Labs 实验区', domain: 'ECOSYSTEM',
+    badge: { text: '3', tone: 'info' },
+    subItems: [{ label: 'Alpha 提交', path: '#alpha' }, { label: '试用反馈', path: '#feedback' }, { label: '毕业评审', path: '#graduation' }, { label: 'GA 转化', path: '#ga' }] },
+  { id: 'builder',       path: '/builder',       icon: '⚒', label: 'Forge 构建器', domain: 'ECOSYSTEM',
+    badge: { text: '24', tone: 'info' },
+    subItems: [{ label: '模板库', path: '#templates' }, { label: '活跃项目', path: '#projects' }, { label: '开发者漏斗', path: '#funnel' }] },
+  { id: 'discovery',     path: '/discovery',     icon: '◎', label: '智能发现',   domain: 'ECOSYSTEM',
+    subItems: [{ label: '意图搜索', path: '#search' }, { label: '组合推荐', path: '#combo' }, { label: '场景推荐', path: '#scenario' }, { label: '热门搜索', path: '#hot' }] },
+  { id: 'adapters',      path: '/adapters',      icon: '⌭', label: '旧系统 Adapter', domain: 'ECOSYSTEM',
+    subItems: [{ label: '15 套矩阵', path: '#matrix' }, { label: '兼容测试', path: '#compat' }, { label: '升级历史', path: '#history' }, { label: '错误率监控', path: '#errors' }] },
+  { id: 'alliance',      path: '/alliance',      icon: '⊕', label: '联盟市场',   domain: 'ECOSYSTEM',
+    subItems: [{ label: '共享清单', path: '#listings' }, { label: '参与品牌', path: '#brands' }, { label: '联盟收入', path: '#revenue' }] },
+
+  { id: 'finance',       path: '/finance',       icon: '¥', label: '财务结算',   domain: 'BUSINESS',
+    subItems: [{ label: '抽佣账本', path: '#ledger' }, { label: '月度结算单', path: '#statement' }, { label: '发票管理', path: '#invoice' }, { label: '退款', path: '#refund' }, { label: '税务报表', path: '#tax' }] },
+  { id: 'analytics',     path: '/analytics',     icon: '⌢', label: '数据分析',   domain: 'BUSINESS',
+    subItems: [{ label: '商品热度', path: '#products' }, { label: 'GMV 趋势', path: '#gmv' }, { label: '流失分析', path: '#churn' }, { label: '自定义报表', path: '#custom' }] },
+  { id: 'outcomes',      path: '/outcomes',      icon: '◈', label: '结果计价',   domain: 'BUSINESS',
+    badge: { text: '¥', tone: 'info' },
+    subItems: [{ label: '结果定义', path: '#defs' }, { label: '归因报告', path: '#attribution' }, { label: '收入趋势', path: '#trend' }, { label: '定价模型', path: '#pricing' }] },
+  { id: 'tokens',        path: '/tokens',        icon: '◇', label: 'Token 计量', domain: 'BUSINESS',
+    subItems: [{ label: '用量排行', path: '#ranking' }, { label: '定价配置', path: '#config' }, { label: '预算预警', path: '#budget' }, { label: '优化建议', path: '#optimize' }] },
+  { id: 'content',       path: '/content',       icon: '★', label: '内容运营',   domain: 'BUSINESS',
+    subItems: [{ label: "Editor's Pick", path: '#pick' }, { label: 'Hero 日历', path: '#hero' }, { label: '案例故事', path: '#cases' }, { label: '开发者博客', path: '#blog' }] },
+
+  { id: 'agent-observatory', path: '/agent-observatory', icon: '◉', label: 'Agent 天眼', domain: 'AI_OPS',
+    badge: { text: 'LIVE', tone: 'info' },
+    subItems: [{ label: '9 大 Agent 状态', path: '#agents' }, { label: '执行追踪', path: '#traces' }, { label: '决策审计', path: '#decisions' }, { label: '异常检测', path: '#anomaly' }] },
+  { id: 'model-registry', path: '/model-registry', icon: '◈', label: '模型注册表', domain: 'AI_OPS',
+    subItems: [{ label: '模型目录', path: '#catalog' }, { label: '版本管理', path: '#versions' }, { label: '性能基准', path: '#benchmark' }, { label: '漂移检测', path: '#drift' }] },
+  { id: 'llm-observability', path: '/llm-observability', icon: '◇', label: 'LLM 可观测', domain: 'AI_OPS',
+    badge: { text: '¥', tone: 'warn' },
+    subItems: [{ label: 'Token 用量', path: '#tokens' }, { label: '延迟 & 吞吐', path: '#latency' }, { label: '幻觉检测', path: '#hallucination' }, { label: '成本分析', path: '#cost' }] },
+
+  { id: 'trust', path: '/trust', icon: '◆', label: '信任治理', domain: 'AI_OPS',
+    badge: { text: '3', tone: 'warn' },
+    subItems: [{ label: '信任矩阵', path: '#matrix' }, { label: '升级审核', path: '#audit' }, { label: '降级历史', path: '#history' }] },
+  { id: 'runtime', path: '/runtime', icon: '◇', label: '运行时策略', domain: 'AI_OPS',
+    badge: { text: '1', tone: 'danger' },
+    subItems: [{ label: '策略概览', path: '#policies' }, { label: '违规记录', path: '#violations' }, { label: 'OWASP检查', path: '#owasp' }] },
+  { id: 'mcp', path: '/mcp', icon: '◎', label: 'MCP 注册表', domain: 'AI_OPS',
+    subItems: [{ label: 'Server 列表', path: '#servers' }, { label: 'Tool 目录', path: '#tools' }, { label: '健康监控', path: '#health' }] },
+  { id: 'ontology', path: '/ontology', icon: '◉', label: 'Ontology 绑定', domain: 'AI_OPS',
+    subItems: [{ label: '实体映射', path: '#map' }, { label: '绑定矩阵', path: '#bindings' }, { label: '清单历史', path: '#manifests' }] },
+
+  { id: 'evidence',      path: '/evidence',      icon: '◆', label: '证据卡片',   domain: 'GUARDRAIL',
+    subItems: [{ label: '证据矩阵', path: '#matrix' }, { label: '卡片明细', path: '#detail' }, { label: '过期管理', path: '#expiry' }, { label: '信任画像', path: '#profile' }] },
+  { id: 'security',      path: '/security',      icon: '⛨', label: '安全合规',   domain: 'GUARDRAIL',
+    badge: { text: '3', tone: 'warn' },
+    subItems: [{ label: '漏洞披露', path: '#vuln' }, { label: 'CVE 跟踪', path: '#cve' }, { label: '应急下架', path: '#emergency' }, { label: '数据流向审计', path: '#audit' }] },
+  { id: 'integrations',  path: '/integrations',  icon: '⌖', label: '集成监控',   domain: 'GUARDRAIL',
+    subItems: [{ label: 'OS / Agent / Hub / Labs 同步', path: '#sync' }, { label: '事件总线', path: '#bus' }, { label: 'API 配额', path: '#quota' }] },
+  { id: 'settings',      path: '/settings',      icon: '⚙', label: '系统配置',   domain: 'GUARDRAIL',
+    subItems: [{ label: '抽佣比例', path: '#rate' }, { label: '审核 SLA', path: '#sla' }, { label: '自动化规则', path: '#rules' }, { label: '通知模板', path: '#notify' }] },
+  { id: 'rbac',          path: '/rbac',          icon: '⌘', label: 'RBAC 权限',  domain: 'GUARDRAIL',
+    subItems: [{ label: '角色', path: '#roles' }, { label: '用户分配', path: '#users' }, { label: '权限矩阵', path: '#matrix' }, { label: '审计日志', path: '#audit' }] }
+]
+
+export const DOMAIN_LABELS: Record<string, string> = {
+  CORE: 'CORE · 核心',
+  ECOSYSTEM: 'ECOSYSTEM · 生态',
+  BUSINESS: 'BUSINESS · 商业',
+  AI_OPS: 'AI OPS · 智能运维',
+  GUARDRAIL: 'GUARDRAIL · 保障'
+}

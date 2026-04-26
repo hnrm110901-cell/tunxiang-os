@@ -1,0 +1,37 @@
+{
+  "name": "@tunxiang/web-forge-admin",
+  "version": "2.0.0",
+  "private": true,
+  "type": "module",
+  "description": "屯象 Forge 管理后台 · 14 模块",
+  "scripts": {
+    "dev": "vite --port 5176",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview --port 5176",
+    "lint": "eslint . --ext .ts,.tsx",
+    "test": "vitest",
+    "test:e2e": "playwright test",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "react": "^18.3.0",
+    "react-dom": "^18.3.0",
+    "react-router-dom": "^6.26.0",
+    "zustand": "^4.5.0",
+    "@tanstack/react-query": "^5.50.0",
+    "@tunxiang/design-tokens": "workspace:*",
+    "@tunxiang/api-client": "workspace:*",
+    "@tunxiang/ui": "workspace:*",
+    "antd": "^5.20.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.0",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.3.0",
+    "typescript": "^5.5.0",
+    "vite": "^5.4.0",
+    "vitest": "^2.0.0",
+    "@playwright/test": "^1.46.0",
+    "eslint": "^9.9.0"
+  }
+}
