@@ -26,7 +26,6 @@ from shared.ontology.src.database import get_db_with_tenant
 
 from ..services.settlement_notify_service import SettlementNotifyService
 from ..services.stored_value_split_service import (
-    NoApplicableRuleError,
     StoredValueSplitService,
 )
 from ..tasks.settlement_scheduler import SettlementScheduler

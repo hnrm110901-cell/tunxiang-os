@@ -1,10 +1,11 @@
 """宴会KPI看板服务 — 快照生成/趋势/对标排名"""
 import uuid
-from datetime import date, datetime, timedelta, timezone
-from decimal import Decimal
+from datetime import date, timedelta
+
 import structlog
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
+
 logger = structlog.get_logger()
 
 class BanquetKPIService:

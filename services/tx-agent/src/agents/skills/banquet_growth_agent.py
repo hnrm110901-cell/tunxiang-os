@@ -1,6 +1,7 @@
 """宴会增长Agent — 需求预测/复购提醒/转介绍激励/流失预警"""
 import uuid
-from datetime import date, datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone
+
 import structlog
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession

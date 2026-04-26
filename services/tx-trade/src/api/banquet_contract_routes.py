@@ -1,9 +1,11 @@
 """宴会合同 API"""
 
 from typing import AsyncGenerator, Optional
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from pydantic import BaseModel, Field
+
+from fastapi import APIRouter, Depends, HTTPException, Request
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from shared.ontology.src.database import get_db_with_tenant
 
 

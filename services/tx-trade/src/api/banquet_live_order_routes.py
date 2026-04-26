@@ -1,10 +1,14 @@
 """宴会现场订单 API"""
 from typing import AsyncGenerator, Optional
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from shared.ontology.src.database import get_db_with_tenant
+
 from ..services.banquet_live_order_service import BanquetLiveOrderService
+
 
 def _tid(r: Request) -> str:
     t = getattr(r.state, "tenant_id", None) or r.headers.get("X-Tenant-ID", "")

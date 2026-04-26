@@ -7,8 +7,7 @@
 
 import json
 import uuid
-from datetime import datetime, time, timedelta, timezone
-from typing import Optional
+from datetime import datetime, time, timezone
 
 import structlog
 from sqlalchemy import text

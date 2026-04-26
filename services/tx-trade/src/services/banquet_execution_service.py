@@ -1,10 +1,12 @@
 """宴会执行SOP服务 — 当日执行计划/检查点打卡/延迟处理/升级"""
-import json, uuid
-from datetime import datetime, time, timezone
-from typing import Optional
+import json
+import uuid
+from datetime import datetime, timezone
+
 import structlog
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
+
 logger = structlog.get_logger()
 
 WEDDING_SOP = [

@@ -19,7 +19,6 @@
 
 import os
 import uuid
-from typing import Optional
 
 import httpx
 import structlog

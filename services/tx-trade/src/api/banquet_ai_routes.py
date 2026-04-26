@@ -1,10 +1,13 @@
 """宴会AI + KPI看板 API"""
-from typing import AsyncGenerator, Optional
 from datetime import date as date_cls
+from typing import AsyncGenerator, Optional
+
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from shared.ontology.src.database import get_db_with_tenant
+
 
 def _tid(r: Request) -> str:
     t = getattr(r.state, "tenant_id", None) or r.headers.get("X-Tenant-ID", "")

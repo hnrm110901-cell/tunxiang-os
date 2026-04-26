@@ -9,16 +9,13 @@
   6. practice_routes 请求模型验证
 """
 
-import uuid
 
 import pytest
-
 from services.tx_trade.src.services.dish_practice_service import (
     DEFAULT_PRACTICE_TEMPLATES,
     build_customizations,
     calc_practice_extra_fen,
 )
-
 
 # ─── build_customizations 测试 ───
 

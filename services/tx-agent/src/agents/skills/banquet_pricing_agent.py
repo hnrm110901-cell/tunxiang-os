@@ -4,8 +4,8 @@
 """
 import json
 import uuid
-from datetime import datetime, timezone
-from dataclasses import dataclass
+from datetime import datetime
+
 import structlog
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
