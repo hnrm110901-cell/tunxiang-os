@@ -77,13 +77,25 @@ def _stub_module(full_name: str, **attrs: Any) -> types.ModuleType:
 
 
 # Stub heavy dependencies
-_stub_module("structlog", get_logger=lambda: MagicMock())
+_stub_module("structlog", get_logger=lambda *a, **kw: MagicMock())
 _stub_module("httpx")
 _stub_module("sqlalchemy")
 _stub_module("sqlalchemy.ext", asyncio=MagicMock())
 _stub_module("sqlalchemy.ext.asyncio", AsyncSession=MagicMock)
 _stub_module("sqlalchemy.dialects", postgresql=MagicMock())
-_stub_module("sqlalchemy.dialects.postgresql", UUID=MagicMock)
+# 注意：本 stub 通过 sys.modules 污染会泄漏到同 pytest session 后续测试文件，
+# 字母序在前的本文件若仅 stub 部分符号 → 后续 test_booking_*/test_cashier_*/...
+# 集体 collection 失败（"cannot import name 'ARRAY'"）。补齐 ORM 全套常用类型。
+_stub_module(
+    "sqlalchemy.dialects.postgresql",
+    UUID=MagicMock,
+    ARRAY=MagicMock,
+    JSON=MagicMock,
+    JSONB=MagicMock,
+    INET=MagicMock,
+    BYTEA=MagicMock,
+    TIMESTAMP=MagicMock,
+)
 _stub_module("sqlalchemy.orm", Mapped=Any, mapped_column=MagicMock, relationship=MagicMock, DeclarativeBase=type)
 
 # ═══════════════════════════════════════════════════════════════════════════════
