@@ -22,7 +22,8 @@
     "react-dom": "^18.3.0",
     "react-router-dom": "^7.14.0",
     "zustand": "^4.4.0",
-    "@tunxiang/design-system": "workspace:*"
+    "@tunxiang/design-system": "workspace:*",
+    "@tx/tokens": "workspace:*"
   },
   "devDependencies": {
     "@types/dompurify": "^3.0.0",

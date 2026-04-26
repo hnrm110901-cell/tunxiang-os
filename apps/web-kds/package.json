@@ -21,7 +21,9 @@
     "echarts": "^6.0.0",
     "echarts-for-react": "^3.0.0",
     "dayjs": "^1.11.0",
-    "@tunxiang/design-system": "workspace:*"
+    "@tunxiang/design-system": "workspace:*",
+    "@tx/tokens": "workspace:*",
+    "@tx/touch": "workspace:*"
   },
   "devDependencies": {
     "@types/react": "^18.3.0",
