@@ -19,14 +19,16 @@ import os
 
 import pytest
 
-# 这个测试文件本身不应触发 dev_bypass — 它只是测**门禁函数**自身的逻辑。
-# 设置 TX_AUTH_ENABLED=true 是基线，单测内部用 monkeypatch 改值。
-os.environ.setdefault("TX_AUTH_ENABLED", "true")
-
-from src.security.rbac import (  # noqa: E402
+from src.security.rbac import (
     DevBypassInProductionError,
     assert_no_dev_bypass_in_production,
 )
+
+# 这个测试文件本身不应触发 dev_bypass — 它只是测**门禁函数**自身的逻辑。
+# 设置 TX_AUTH_ENABLED=true 是基线，单测内部用 monkeypatch 改值。
+# 放在 import 之后是 isort 友好的写法 — 安全前提：assert_no_dev_bypass_in_production
+# 在每次调用时读 os.environ，不在 import 期间求值。
+os.environ.setdefault("TX_AUTH_ENABLED", "true")
 
 
 # ──────────────────────────────────────────────────────────────────────────
