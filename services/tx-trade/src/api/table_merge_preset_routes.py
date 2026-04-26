@@ -8,12 +8,11 @@ import json
 import uuid
 from typing import Optional
 
+import sqlalchemy as sa
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
-
-import sqlalchemy as sa
 
 from shared.ontology.src.database import get_db
 

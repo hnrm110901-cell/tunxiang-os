@@ -14,7 +14,6 @@ from __future__ import annotations
 from typing import Any, List
 
 import structlog
-
 from change_tracker import DBConnection, MockDBConnection
 from config import BATCH_SIZE
 

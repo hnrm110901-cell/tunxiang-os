@@ -36,9 +36,6 @@ def set_protocol(protocol) -> None:
 
 def _get_protocol():
     if _protocol is None:
-        from ..protocols.agent_payment import AgentPaymentProtocol
-        from ..deps import get_payment_service
-        import asyncio
         # 延迟初始化
         raise RuntimeError("AgentPaymentProtocol 未初始化")
     return _protocol

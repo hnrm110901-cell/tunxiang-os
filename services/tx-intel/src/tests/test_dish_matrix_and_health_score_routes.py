@@ -56,9 +56,10 @@ _hs_spec = importlib.util.spec_from_file_location("health_score_routes", _base /
 _hs_mod = importlib.util.module_from_spec(_hs_spec)
 _hs_spec.loader.exec_module(_hs_mod)
 
+from unittest.mock import AsyncMock, MagicMock
+
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from unittest.mock import AsyncMock, MagicMock
 
 TENANT_ID = str(uuid.uuid4())
 HEADERS = {"X-Tenant-ID": TENANT_ID}

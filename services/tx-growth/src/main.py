@@ -110,9 +110,9 @@ from .api.promotion_rules_v3_routes import (
     router as promotion_rules_v3_router,  # 模块2.6 促销规则引擎V3（互斥组/执行顺序/总量限制/新类型）
 )
 from .api.referral_routes import router as referral_router
+from .api.sales_crm_routes import router as sales_crm_router  # v291 销售CRM
 from .api.segmentation_routes import router as segmentation_router
 from .api.touch_attribution_routes import router as touch_attribution_router
-from .api.sales_crm_routes import router as sales_crm_router  # v291 销售CRM
 from .api.wecom_scrm_agent_routes import router as wecom_scrm_agent_router  # P3-05 企微SCRM私域Agent
 
 _approval_service = _ApprovalService()

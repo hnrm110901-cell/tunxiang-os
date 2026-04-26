@@ -19,7 +19,6 @@ from datetime import datetime, timezone
 from typing import Any, List
 
 import structlog
-
 from change_tracker import ChangeTracker
 from config import BATCH_SIZE, SYNC_INTERVAL_SECONDS, SYNC_TABLES
 from conflict_resolver import ConflictRecord, ConflictResolver

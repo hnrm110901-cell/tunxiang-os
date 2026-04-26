@@ -15,18 +15,17 @@ from contextlib import asynccontextmanager
 
 import httpx
 import structlog
+from api.forge_routes import router as forge_router
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from federated_client import router as federated_router
 from forge_node import ForgeNode
 from heartbeat_routes import router as heartbeat_router
-from offline_routes import router as offline_router
 from offline_cashier import router as offline_cashier_router
+from offline_routes import router as offline_router
 from ota_routes import router as ota_router
 from vision_service import router as vision_router
 from voice_service import router as voice_router
-
-from api.forge_routes import router as forge_router
 
 logger = structlog.get_logger()
 

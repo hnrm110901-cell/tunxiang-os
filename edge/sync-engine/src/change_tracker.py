@@ -14,7 +14,6 @@ from datetime import datetime, timezone
 from typing import Any, List, Protocol
 
 import structlog
-
 from config import BATCH_SIZE, TENANT_ID
 
 logger = structlog.get_logger()

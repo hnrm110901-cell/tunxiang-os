@@ -18,10 +18,10 @@ from datetime import date, datetime, timezone
 from uuid import UUID, uuid4
 
 import structlog
-from sqlalchemy import and_, text
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from .baseline_service import BaselineService, METRIC_META
+from .baseline_service import METRIC_META, BaselineService
 
 logger = structlog.get_logger(__name__)
 

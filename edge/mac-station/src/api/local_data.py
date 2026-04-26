@@ -11,15 +11,13 @@ Mock 模式：不依赖真实 PG，返回模拟数据。
 """
 from __future__ import annotations
 
-import time
 import uuid
 from datetime import datetime, timezone
 from typing import Any
 
 import structlog
-from fastapi import APIRouter, Query
-
 from config import get_config
+from fastapi import APIRouter, Query
 from services.offline_cache import get_offline_cache
 
 logger = structlog.get_logger(__name__)

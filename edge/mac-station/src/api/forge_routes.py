@@ -13,7 +13,7 @@ ForgeNode API 路由 — mac-station 离线感知决策接口
 from __future__ import annotations
 
 import asyncio
-from typing import Annotated, Optional
+from typing import Annotated
 
 import structlog
 from fastapi import APIRouter, Body, Query, Request

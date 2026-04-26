@@ -434,3 +434,110 @@ def require_mfa_audited(
             raise
 
     return _dep
+
+
+# ──────────────────────────────────────────────────────────────────────────
+#  PR-7 — 金额阈值动态 MFA 门禁（运行时检查，handler 内调用）
+#
+#  适用场景：banquet.deposit.create 这类大部分单据 < 阈值（cashier 友好），
+#  少部分 ≥ 阈值（高敏感，需 MFA）的混合路由。FastAPI Dependency 装饰器层
+#  无法看到 request body，所以放在 handler 里手动调。
+#
+#  与 require_mfa_audited 的区别：
+#    - require_mfa_audited：装饰器层强制 MFA（每个调用都拦），UX 友好度低
+#      但适合纯高敏感动作（refund / discount.rule.* 等）
+#    - assert_mfa_for_high_value：handler 内按金额阈值动态拦，UX 友好度高
+#      适合"主要是低额，少数高额"的混合路由（banquet 定金 / 大额企业团餐 等）
+# ──────────────────────────────────────────────────────────────────────────
+
+
+def _high_value_threshold_fen(action: str, default_fen: int) -> int:
+    """读取 action 专属或全局阈值环境变量；非数字 / 缺失时用 default。
+
+    优先级：
+      TX_MFA_THRESHOLD_FEN__<action>  （e.g. TX_MFA_THRESHOLD_FEN__BANQUET_DEPOSIT_CREATE）
+      TX_MFA_THRESHOLD_FEN_DEFAULT
+      传入的 default_fen
+    """
+    action_key = (
+        "TX_MFA_THRESHOLD_FEN__"
+        + action.upper().replace(".", "_").replace("-", "_")
+    )
+    for var in (action_key, "TX_MFA_THRESHOLD_FEN_DEFAULT"):
+        raw = os.getenv(var, "")
+        if raw and raw.lstrip("-").isdigit():
+            try:
+                value = int(raw)
+                if value > 0:
+                    return value
+            except ValueError:
+                pass
+    return default_fen
+
+
+async def assert_mfa_for_high_value(
+    user: UserContext,
+    db,
+    *,
+    action: str,
+    amount_fen: int,
+    threshold_fen: int = 500_000,
+    request_id: str | None = None,
+) -> None:
+    """金额阈值 MFA 门禁 — handler 内调用（require_role_audited 之外的运行时检查）。
+
+    行为：
+      - amount_fen < threshold → 直接放行（无 audit 写入）
+      - amount_fen ≥ threshold + user 已 MFA → 放行
+      - amount_fen ≥ threshold + user 未 MFA → 写 deny 审计 + 抛 403 MFA_REQUIRED
+
+    阈值优先级：环境变量 TX_MFA_THRESHOLD_FEN__<ACTION> > TX_MFA_THRESHOLD_FEN_DEFAULT
+    > 入参 threshold_fen（默认 ¥5000 = 500_000 fen）。
+
+    Args:
+        user: UserContext（来自 require_role_audited Depends 注入）
+        db: SQLAlchemy AsyncSession
+        action: 业务动作标识（与 audit 表 action 列对齐）
+        amount_fen: 本次动作涉及的金额（分；金额来自 request body）
+        threshold_fen: 默认阈值（分）；环境变量可覆盖
+        request_id: 链路追踪 ID（可空）
+
+    Raises:
+        HTTPException(403, "MFA_REQUIRED"): 高额且未 MFA
+    """
+    effective_threshold = _high_value_threshold_fen(action, threshold_fen)
+    if amount_fen < effective_threshold:
+        return
+    if user.mfa_verified:
+        return
+
+    # 写 deny 审计（与 require_mfa_audited 装饰器同 severity=error）
+    try:
+        from ..services.trade_audit_log import audit_deny  # noqa: PLC0415
+
+        await audit_deny(
+            db,
+            tenant_id=user.tenant_id,
+            store_id=user.store_id,
+            user_id=user.user_id,
+            user_role=user.role,
+            action=action,
+            amount_fen=amount_fen,
+            client_ip=user.client_ip,
+            reason=(
+                f"MFA_REQUIRED_FOR_HIGH_VALUE "
+                f"amount_fen={amount_fen} threshold_fen={effective_threshold}"
+            ),
+            severity="error",
+            request_id=request_id,
+        )
+    except Exception:  # noqa: BLE001 — 审计失败不能阻塞 4xx 响应抛出
+        logger.error(
+            "high_value_mfa_audit_failed",
+            action=action,
+            user_id=user.user_id,
+            amount_fen=amount_fen,
+            exc_info=True,
+        )
+
+    raise HTTPException(status_code=403, detail="MFA_REQUIRED")

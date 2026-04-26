@@ -20,9 +20,9 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .channels.base import (
-    PayMethod,
     PaymentRequest,
     PaymentResult,
+    PayMethod,
     PayStatus,
     RefundResult,
     TradeType,
@@ -300,9 +300,10 @@ class PaymentNexusService:
     ) -> None:
         """发射支付确认事件到事件总线"""
         try:
+            import asyncio
+
             from shared.events.src.emitter import emit_event
             from shared.events.src.event_types import PaymentEventType
-            import asyncio
 
             asyncio.create_task(emit_event(
                 event_type=PaymentEventType.CONFIRMED,

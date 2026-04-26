@@ -14,9 +14,8 @@ from typing import Any
 
 import httpx
 import structlog
-from fastapi import APIRouter
-
 from config import get_config
+from fastapi import APIRouter
 
 logger = structlog.get_logger(__name__)
 

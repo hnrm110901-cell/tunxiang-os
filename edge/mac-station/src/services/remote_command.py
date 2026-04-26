@@ -405,8 +405,9 @@ class RemoteCommandService:
 
     async def _handle_sync_now(self, params: dict[str, Any]) -> dict[str, Any]:
         """立即触发同步。"""
-        from services.offline_cache import get_offline_cache
         from config import get_config
+
+        from services.offline_cache import get_offline_cache
 
         cache = get_offline_cache()
         cfg = get_config()
@@ -419,7 +420,6 @@ class RemoteCommandService:
 
     async def _handle_collect_logs(self, params: dict[str, Any]) -> dict[str, Any]:
         """收集并上传日志到云端。"""
-        import glob
         from pathlib import Path
 
         log_dir = params.get("log_dir", "/var/log/tunxiang")

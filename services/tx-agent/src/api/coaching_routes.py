@@ -9,10 +9,9 @@
 from __future__ import annotations
 
 from datetime import date as date_type
-from typing import Optional
 
 import structlog
-from fastapi import APIRouter, Depends, Header, HTTPException, Query, Path
+from fastapi import APIRouter, Depends, Header, HTTPException, Path, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 

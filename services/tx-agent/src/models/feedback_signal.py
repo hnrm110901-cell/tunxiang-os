@@ -8,10 +8,9 @@
 TenantBase 自带这些字段，ORM层保留但业务层不使用。
 """
 import uuid
-from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import DateTime, Text, func
+from sqlalchemy import Text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 

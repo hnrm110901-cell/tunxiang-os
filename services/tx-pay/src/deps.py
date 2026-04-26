@@ -8,8 +8,8 @@ from __future__ import annotations
 from typing import Optional
 
 from .channels.registry import ChannelRegistry
-from .routing.engine import PaymentRoutingEngine
 from .payment_service import PaymentNexusService
+from .routing.engine import PaymentRoutingEngine
 
 # 全局单例（由 lifespan 初始化）
 _registry: Optional[ChannelRegistry] = None

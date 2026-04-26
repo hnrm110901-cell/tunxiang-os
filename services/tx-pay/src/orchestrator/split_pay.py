@@ -18,8 +18,8 @@ from ..channels.base import (
     BasePaymentChannel,
     PaymentRequest,
     PaymentResult,
-    PayStatus,
     PayMethod,
+    PayStatus,
     TradeType,
 )
 

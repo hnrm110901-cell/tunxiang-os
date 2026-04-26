@@ -14,7 +14,7 @@ import os
 import platform
 import time
 import uuid
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
 
 import httpx

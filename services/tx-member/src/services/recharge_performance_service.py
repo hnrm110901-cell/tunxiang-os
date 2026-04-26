@@ -7,7 +7,6 @@
 import json
 import uuid
 from datetime import date
-from decimal import Decimal
 from typing import Optional
 
 import structlog

@@ -1,9 +1,9 @@
 """AgentEpisode — Agent 情景记忆（门店运营关键事件片段）"""
 import uuid
-from datetime import date, datetime
+from datetime import date
 from typing import List
 
-from sqlalchemy import Boolean, Date, DateTime, String, Text
+from sqlalchemy import Date, Text
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 

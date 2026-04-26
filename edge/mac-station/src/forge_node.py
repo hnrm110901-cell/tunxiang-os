@@ -21,9 +21,8 @@ from typing import Optional
 
 import httpx
 import structlog
-from pydantic import BaseModel, Field
-
 from offline_buffer import BufferedOperation, BufferStats, OfflineBuffer
+from pydantic import BaseModel, Field
 
 logger = structlog.get_logger(__name__)
 
@@ -139,8 +138,9 @@ class ForgeNode:
 
         使用 pathlib.glob 避免依赖 shell，出错时单个文件跳过，不影响全局。
         """
-        import yaml  # type: ignore[import-untyped]
         from pathlib import Path
+
+        import yaml  # type: ignore[import-untyped]
 
         root = Path(self._skills_root)
         if not root.exists():

@@ -16,6 +16,8 @@ from uuid import UUID
 import structlog
 from fastapi import APIRouter, Depends
 
+from shared.tenant_registry import MERCHANT_CODE_TO_TENANT_UUID
+
 from ...modules.gateway.integrations.pos_sync_schemas import (
     BackfillRequest,
     SyncTodayRequest,
@@ -23,7 +25,6 @@ from ...modules.gateway.integrations.pos_sync_schemas import (
 from ...modules.gateway.integrations.pos_sync_service import POSSyncService
 from ...shared.core.exceptions import POSAdapterError
 from ...shared.response import err, ok
-from shared.tenant_registry import MERCHANT_CODE_TO_TENANT_UUID
 
 logger = structlog.get_logger(__name__)
 

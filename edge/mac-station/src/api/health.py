@@ -14,9 +14,8 @@ from typing import Any
 
 import psutil
 import structlog
-from fastapi import APIRouter
-
 from config import get_config
+from fastapi import APIRouter
 from services.offline_cache import get_offline_cache
 
 logger = structlog.get_logger(__name__)

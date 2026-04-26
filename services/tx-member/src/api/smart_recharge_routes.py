@@ -7,7 +7,7 @@ ROUTER REGISTRATION（在 main.py 中添加）：
 """
 
 from datetime import date
-from typing import List, Optional
+from typing import Optional
 
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
