@@ -19,7 +19,7 @@ import uuid
 # ─── 注入假模块 ───────────────────────────────────────────────────────────────
 
 _fake_structlog = types.ModuleType("structlog")
-_fake_structlog.get_logger = lambda: types.SimpleNamespace(
+_fake_structlog.get_logger = lambda *a, **kw: types.SimpleNamespace(
     warning=lambda *a, **kw: None,
     info=lambda *a, **kw: None,
 )
