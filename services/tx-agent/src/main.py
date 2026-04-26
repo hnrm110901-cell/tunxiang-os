@@ -103,6 +103,11 @@ except ImportError:
     feedback_router = None
 
 try:
+    from .api.budget_forecast_routes import router as budget_forecast_router
+except ImportError:
+    budget_forecast_router = None
+
+try:
     from .api.customer_journey_routes import router as customer_journey_router
 except ImportError:
     customer_journey_router = None
@@ -290,6 +295,8 @@ if feedback_router is not None:
     app.include_router(feedback_router)
 if customer_journey_router is not None:
     app.include_router(customer_journey_router)  # /api/v1/agent/customer-journey/* — 客户触达SOP旅程
+if budget_forecast_router is not None:
+    app.include_router(budget_forecast_router)  # /api/v1/agent/budget/* — D4c AI预算预测
 
 
 @app.get("/health")

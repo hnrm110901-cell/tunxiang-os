@@ -17,6 +17,7 @@ from uuid import UUID, uuid4
 
 import structlog
 from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = structlog.get_logger(__name__)
@@ -701,8 +702,21 @@ class CustomerJourneyService:
         now = datetime.now(timezone.utc)
 
         for tpl in templates:
-            # 2. audience_filter检查(预留, 当前直接通过)
-            # TODO: 实现受众过滤逻辑(基于会员标签/等级/RFM)
+            # 2. audience_filter检查
+            audience_filter = tpl.audience_filter or {}
+            if audience_filter:
+                passed = await self._check_audience_filter(
+                    cid, tid, audience_filter,
+                )
+                if not passed:
+                    logger.debug(
+                        "customer_journey.trigger.audience_filtered",
+                        tenant_id=tenant_id,
+                        template_id=str(tpl.id),
+                        customer_id=customer_id,
+                        filter_keys=list(audience_filter.keys()),
+                    )
+                    continue
 
             # 3. 检查max_concurrent
             active_count_result = await self.db.execute(
@@ -935,9 +949,10 @@ class CustomerJourneyService:
         failure_reason = None
         try:
             await self._send_message(
-                enrollment.channel,
-                str(enrollment.customer_id),
-                content,
+                channel=enrollment.channel,
+                customer_id=str(enrollment.customer_id),
+                content=content,
+                tenant_id=str(tid),
             )
         except (OSError, RuntimeError, ValueError, ConnectionError) as exc:
             send_status = "failed"
@@ -1133,15 +1148,108 @@ class CustomerJourneyService:
 
         return True
 
+    async def _check_audience_filter(
+        self,
+        customer_id: UUID,
+        tenant_id: UUID,
+        criteria: dict,
+    ) -> bool:
+        """检查会员是否满足受众过滤条件
+
+        支持的条件:
+          - member_level: ["gold", "silver"]  → members.level IN (...)
+          - tags: ["high_value", "frequent"]  → member_tags.tag_name IN (...)
+          - rfm_segment: ["champion", "loyal"] → members.rfm_segment IN (...)
+          - min_total_spend_fen: 100000       → members.total_spend_fen >= N
+          - last_visit_days: 30              → members.last_visit_at >= NOW() - N days
+        """
+        try:
+            # 基础会员信息检查
+            member_result = await self.db.execute(
+                text("""
+                    SELECT level, rfm_segment, total_spend_fen, last_visit_at
+                    FROM members
+                    WHERE id = :cid AND tenant_id = :tid AND is_deleted = FALSE
+                """),
+                {"cid": customer_id, "tid": tenant_id},
+            )
+            member = member_result.fetchone()
+            if member is None:
+                logger.debug(
+                    "customer_journey.audience_filter.member_not_found",
+                    customer_id=str(customer_id),
+                )
+                return False
+
+            # member_level 检查
+            if "member_level" in criteria:
+                allowed_levels = criteria["member_level"]
+                if member.level not in allowed_levels:
+                    return False
+
+            # rfm_segment 检查
+            if "rfm_segment" in criteria:
+                allowed_segments = criteria["rfm_segment"]
+                if member.rfm_segment not in allowed_segments:
+                    return False
+
+            # min_total_spend_fen 检查(金额用分)
+            if "min_total_spend_fen" in criteria:
+                min_spend = int(criteria["min_total_spend_fen"])
+                if (member.total_spend_fen or 0) < min_spend:
+                    return False
+
+            # last_visit_days 检查
+            if "last_visit_days" in criteria:
+                max_days = int(criteria["last_visit_days"])
+                if member.last_visit_at is None:
+                    return False
+                cutoff = datetime.now(timezone.utc) - timedelta(days=max_days)
+                if member.last_visit_at < cutoff:
+                    return False
+
+            # tags 检查 — 需要查 member_tags 表
+            if "tags" in criteria:
+                required_tags = criteria["tags"]
+                tag_result = await self.db.execute(
+                    text("""
+                        SELECT tag_name FROM member_tags
+                        WHERE member_id = :cid
+                          AND tenant_id = :tid
+                          AND tag_name = ANY(:tags)
+                          AND is_deleted = FALSE
+                    """),
+                    {
+                        "cid": customer_id,
+                        "tid": tenant_id,
+                        "tags": required_tags,
+                    },
+                )
+                matched_tags = [row.tag_name for row in tag_result.fetchall()]
+                if not matched_tags:
+                    return False
+
+            return True
+
+        except SQLAlchemyError:
+            logger.exception(
+                "customer_journey.audience_filter.db_error",
+                customer_id=str(customer_id),
+                tenant_id=str(tenant_id),
+            )
+            # fail-closed: DB故障时跳过发送，防止无差别群发
+            return False
+
     async def _send_message(
         self,
         channel: str,
         customer_id: str,
         content: dict,
-    ) -> None:
-        """发送消息(预留接口, 实际集成消息网关)
+        tenant_id: str = "",
+    ) -> bool:
+        """通过IM推送网关发送消息，返回是否发送成功
 
-        当前为占位实现, 后续对接:
+        支持渠道:
         - wecom_private: 企微私聊API
         - wecom_group: 企微群发API
         - sms: 短信网关
@@ -1152,9 +1260,46 @@ class CustomerJourneyService:
             "customer_journey.send_message",
             channel=channel,
             customer_id=customer_id,
+            tenant_id=tenant_id,
             content_keys=list(content.keys()),
         )
-        # TODO: 对接消息网关
+        import httpx
+        import os
+
+        gateway_url = os.getenv("GATEWAY_URL", "http://gateway:8000") + "/api/v1/bff/im/push"
+        payload = {
+            "tenant_id": tenant_id,
+            "member_id": customer_id,
+            "channel": channel,
+            "content": content,
+        }
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                resp = await client.post(gateway_url, json=payload)
+                if resp.status_code >= 400:
+                    logger.warning(
+                        "customer_journey.send_message.gateway_error",
+                        status_code=resp.status_code,
+                        body=resp.text[:500],
+                        channel=channel,
+                        customer_id=customer_id,
+                    )
+                    return False
+                logger.info(
+                    "customer_journey.send_message.sent",
+                    channel=channel,
+                    customer_id=customer_id,
+                    status_code=resp.status_code,
+                )
+                return True
+        except httpx.HTTPError as exc:
+            logger.warning(
+                "customer_journey.send_message.http_error",
+                error=str(exc),
+                channel=channel,
+                customer_id=customer_id,
+            )
+            return False
 
     # ══════════════════════════════════════════════
     # 手动操作: 暂停/恢复/取消

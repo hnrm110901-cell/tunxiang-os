@@ -1,0 +1,23 @@
+* { box-sizing: border-box; margin: 0; padding: 0 }
+html, body { height: 100% }
+body {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+button { font-family: inherit; cursor: pointer; border: 0; background: none }
+a { color: inherit; text-decoration: none }
+input, select, textarea { font-family: inherit }
+::-webkit-scrollbar { width: 6px; height: 6px }
+::-webkit-scrollbar-thumb { background: var(--border-secondary); border-radius: 3px }
+
+/* 全局工具类 */
+.lbl { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.12em; color: var(--text-tertiary); text-transform: uppercase }
+.h-serif { font-family: var(--font-serif); font-weight: 500; color: #fff }
+.mono { font-family: var(--font-mono) }
+.ember { color: var(--ember-500) }
+.ember-soft { color: var(--ember-300) }
+.muted { color: var(--text-tertiary) }

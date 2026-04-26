@@ -1,0 +1,127 @@
+name: k6 Nightly Performance Test
+
+on:
+  schedule:
+    # 北京时间 02:30 = UTC 18:30
+    - cron: "30 18 * * *"
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: "Target base URL for k6 tests"
+        required: false
+        default: "http://localhost:8000"
+
+permissions:
+  contents: write
+
+jobs:
+  k6-load-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: tunxiang
+          POSTGRES_PASSWORD: tunxiang_test
+          POSTGRES_DB: tunxiang_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U tunxiang"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install Python dependencies
+        run: |
+          pip install --upgrade pip
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          if [ -f services/gateway/requirements.txt ]; then pip install -r services/gateway/requirements.txt; fi
+
+      - name: Install k6
+        run: |
+          sudo gpg -k
+          sudo gpg --no-default-keyring \
+            --keyring /usr/share/keyrings/k6-archive-keyring.gpg \
+            --keyserver hkp://keyserver.ubuntu.com:80 \
+            --recv-keys C5AD17C747E3415A3642D57D77C6C491D6AC1D68
+          echo "deb [signed-by=/usr/share/keyrings/k6-archive-keyring.gpg] https://dl.k6.io/deb stable main" \
+            | sudo tee /etc/apt/sources.list.d/k6.list
+          sudo apt-get update
+          sudo apt-get install -y k6
+          k6 version
+
+      - name: Start gateway service
+        run: |
+          cd services/gateway
+          export DATABASE_URL="postgresql+asyncpg://tunxiang:tunxiang_test@localhost:5432/tunxiang_test"
+          export ENVIRONMENT=test
+          python -m uvicorn main:app --host 0.0.0.0 --port 8000 &
+          # 等待服务启动
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:8000/health > /dev/null 2>&1; then
+              echo "Gateway started successfully"
+              break
+            fi
+            echo "Waiting for gateway... ($i/30)"
+            sleep 2
+          done
+
+      - name: Run k6 load test
+        env:
+          K6_BASE_URL: ${{ github.event.inputs.base_url || 'http://localhost:8000' }}
+        run: |
+          chmod +x infra/performance/run-k6.sh
+          infra/performance/run-k6.sh "${K6_BASE_URL}" || true
+
+      - name: Verify results file
+        run: |
+          if [ -f infra/performance/k6-latest-results.json ]; then
+            echo "Results file generated successfully"
+            python3 -c "
+          import json
+          with open('infra/performance/k6-latest-results.json') as f:
+              d = json.load(f)
+          p99 = d.get('metrics', {}).get('http_req_duration', {}).get('p(99)', 'N/A')
+          print(f'P99 latency: {p99}ms (threshold: <200ms)')
+          "
+          else
+            echo "WARNING: Results file not generated"
+            exit 1
+          fi
+
+      - name: Commit results to nightly-results branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git stash -- infra/performance/k6-latest-results.json
+          git fetch origin nightly-results 2>/dev/null && git checkout nightly-results || git checkout -b nightly-results
+          git checkout stash -- infra/performance/k6-latest-results.json 2>/dev/null || git stash pop
+          git add infra/performance/k6-latest-results.json
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "perf: update k6 nightly results $(date -u +%Y-%m-%dT%H:%M:%SZ) [skip ci]"
+            git push origin nightly-results
+          fi
+
+      - name: Upload raw results as artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: k6-raw-results
+          path: infra/performance/raw-results.json
+          retention-days: 30
+          if-no-files-found: ignore
