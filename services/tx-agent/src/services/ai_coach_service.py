@@ -121,15 +121,15 @@ class AICoachService:
         """
         client = _get_http_client()
         resp = await client.get(
-                f"{service_url}{path}",
-                params=params,
-                headers={
-                    "X-Tenant-ID": tenant_id,
-                    "X-Internal-Call": "true",
-                },
-            )
-            resp.raise_for_status()
-            return resp.json()
+            f"{service_url}{path}",
+            params=params,
+            headers={
+                "X-Tenant-ID": tenant_id,
+                "X-Internal-Call": "true",
+            },
+        )
+        resp.raise_for_status()
+        return resp.json()
 
     # ══════════════════════════════════════════════════════════════════
     # 1. 晨会简报
