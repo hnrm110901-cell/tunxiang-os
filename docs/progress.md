@@ -4,6 +4,64 @@
 
 ---
 
+## 2026-04-25 17:15 Wave 4 Sprint H4 + F2 — Week 8 gate-check 脚本 + toxiproxy 设施
+
+### 本次会话目标
+H4：scripts/week8_gate_check.sh 自动检查 §22 + sprint-plan §3 的 10 项 Go/No-Go。
+F2：toxiproxy 测试设施骨架（不接入任何 Tier 1 测试，等 §19 二审通过后再做）。
+
+### 不得触碰的边界
+- [x] services/tx-trade/ 既有文件 — 零修改（§19 待审）
+- [x] shared/ontology/ — 完全未触碰
+- [x] infra/docker/docker-compose.yml（主文件） — 未触碰
+- [x] 现有 toxiproxy 服务级代理（tx-trade/tx-menu/tx-agent，A2 在用） — 不删不改，仅追加 pg/redis/coreml
+
+### 本次涉及范围
+- 服务：无（纯设施 + 脚本）
+- 迁移版本：无
+- Tier 级别：[x] Tier 3（gate-check 是元工具，不直接跑业务）
+- 新增脚本：scripts/{week8_gate_check, check_tier1_pass, check_secrets, check_signoffs}.sh
+- 新增模块：shared/test_infra/{__init__, toxiproxy_client, fixtures}.py + 2 个测试文件
+- 新增 CI workflow：.github/workflows/toxiproxy-smoke.yml（manual dispatch）
+- 新增文档：docs/test-infra-toxiproxy.md
+- 修改：infra/docker/docker-compose.toxiproxy.yml（追加 9001-9003 端口 + extra_hosts）+ proxies.json（追加 3 个预置代理）+ pyproject.toml（注册 marker tier1 + toxiproxy_required）
+
+### 完成状态
+- [x] week8_gate_check.sh 10 项全部实现，set -euo pipefail，幂等（两次运行结果一致）
+- [x] 真实运行结果：strict 模式 1/10 通过（仅项 8 demo-reset.sh 真 PASS，其余因数据未到位失败）
+- [x] no-strict 模式 4/10 通过（项 3/6/9 因数据缺失被算 PASS — 用于 sprint 早期跟踪）
+- [x] check_tier1_pass.sh 解析 JUnit XML，无文件时退 2 表示"未运行"
+- [x] check_secrets.sh 复用 git-secrets + grep 兜底（AWS/SSH/sk-/Slack/GitHub token 模式）
+- [x] check_signoffs.sh 数 docs/cashier-signoff/*.md ≥ 3 + docs/demo-script-signoff.md
+- [x] demo-reset.sh 已存在 --dry-run，gate-check 验证通过
+- [x] toxiproxy 三预置代理（pg_proxy:9001 / redis_proxy:9002 / coreml_proxy:9003）+ extra_hosts host-gateway
+- [x] ToxiproxyClient async wrapper：add_latency / add_packet_loss（用 timeout+toxicity 实现）/ disable / enable / reset / health
+- [x] pytest fixture toxiproxy() — yield 后自动 reset，容器不在线时 skip
+- [x] 单元测试 8/8 通过（httpx MockTransport 注入，无需真容器）
+- [x] toxiproxy_required marker 注册在 pyproject.toml；smoke 测试 4 个用例（list_proxies/add_latency/disable-enable/reset）
+- [x] CI workflow workflow_dispatch 触发，启 docker → 跑 marker → 拆容器
+- [x] ruff 全部通过
+
+### 关键决策
+- **保留 A2 既有 toxiproxy 配置不动**：A2/PR E 已在用 18001/18002/18008，删除会破坏 nightly offline-e2e。F2 只在同一 compose 文件追加 9001-9003，proxies.json 同样追加而不替换。
+- **gate-check 严格模式**：默认 STRICT=true，人工签字项缺失视为 NO-GO。--no-strict 用于 sprint 早期跟踪进度，避免每天都看 NO-GO 失去信号。
+- **packet_loss 用 timeout toxic + toxicity**：toxiproxy 没有原生 packet_loss toxic，标准做法是 timeout=0 + toxicity=percent/100，按比例立即断连。
+- **F2 不接入 Tier 1 是硬约束**：smoke 测试只测 toxiproxy 自身，没有任何业务路径。文档 §5 明确说"接入 Tier 1 必须经 §19 审查 + 创始人签字"。
+
+### 下一步
+- H1 k6 16k TPS 跑出 build/k6-result.json（项 2 数据）
+- H3 安全终查跑出 secrets/RLS/CORS 报告（项 7 数据）
+- F1 三商户 scorecard 落到 docs/adapter-scorecard.md 格式 `czyz: 87`（项 6 数据）
+- 收银员 3 位签字落 docs/cashier-signoff/*.md（项 5 数据）
+- 演示话术签字落 docs/demo-script-signoff.md（项 10 数据）
+
+### 已知风险
+- **gate-check 项 7 secrets 误报**：当前实测在 worktree 跑 check_secrets.sh 报"secrets RLS CORS-wildcard"——其中 RLS 是因 check_rls_policies.py --check-only 不一定支持，CORS 是历史 grep 命中（不在新增代码内）。这是 H3 终查的范围，不在本次修复期。
+- **现有 demo-reset.sh 的 set -uo pipefail 缺 -e**：已观察但未修改（红线"§19 待审"）；--dry-run 仍能工作。
+- **toxiproxy_smoke CI 用 docker compose**：在 GitHub Actions runner 上 host.docker.internal 解析靠 host-gateway，理论可工作但需手动 dispatch 跑过一次确认（W7-W8 内排）。
+
+---
+
 ## 2026-04-25 Wave 4 Sprint G — 实验框架四件套（Tier 3，8 atomic commits）
 
 ### 本次会话目标
