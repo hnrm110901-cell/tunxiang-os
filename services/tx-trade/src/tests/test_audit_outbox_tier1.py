@@ -415,6 +415,158 @@ async def test_flush_outbox_unparseable_lines_go_to_poison(temp_outbox):
 
 
 # ──────────────────────────────────────────────────────────────────────────
+# P1 #2 修复回归保护：retained .flushing 文件被自动重试（不卡死）
+# PR #111 chatgpt-codex-connector review #2
+# ──────────────────────────────────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_flush_outbox_retains_flushing_file_after_writeback_failure(
+    temp_outbox, tmp_path, monkeypatch
+):
+    """leftover writeback 失败 → .flushing 文件保留，下次 flush 必须自动重试它。
+
+    模拟：
+      1. write_audit_to_outbox 写 5 行
+      2. 第一次 flush：max_rows=10（够全部成功），但模拟 _append_lines_to_outbox
+         给主 outbox 写 leftover 时失败 → .flushing 文件保留
+      3. 第二次 flush：主 outbox 不存在（无新 audit），但有 retained .flushing →
+         必须仍然处理它（不能 return 0 直接退出）
+
+    P1 修复回归保护：原代码看 path.exists() 为 False 即 return 0，retained
+    .flushing 永远不被处理。修复后扫描 .flushing.* glob 自动重试。
+    """
+    # 准备 5 行（其中 2 行 max_rows=2 会触发 leftover）
+    for i in range(5):
+        write_audit_to_outbox({
+            "tenant_id": "00000000-0000-0000-0000-0000000000a1",
+            "user_id": f"00000000-0000-0000-0000-{i:012d}",
+            "action": f"test.row_{i}",
+        })
+
+    db = AsyncMock()
+    db.execute = AsyncMock()
+    db.commit = AsyncMock()
+    db.rollback = AsyncMock()
+
+    # 第一次 flush：max_rows=2，会产 3 行 leftover
+    # 注入 _append_lines_to_outbox 失败 → 保留 .flushing
+    from src.services import audit_outbox as outbox_mod
+
+    original_append = outbox_mod._append_lines_to_outbox
+    append_failures = {"count": 0}
+
+    def failing_append(path, lines):
+        # 主 outbox 写入失败（模拟磁盘满 / 权限错）
+        if str(path) == str(temp_outbox):
+            append_failures["count"] += 1
+            return False
+        # 其他文件（.poison）正常写
+        return original_append(path, lines)
+
+    monkeypatch.setattr(outbox_mod, "_append_lines_to_outbox", failing_append)
+
+    rows_first = await flush_outbox_to_pg(db, max_rows=2)
+    assert rows_first == 2  # 前 2 行 INSERT 成功
+    assert append_failures["count"] >= 1  # leftover writeback 至少试了一次
+
+    # 主 outbox 不存在（rename 走了），剩 3 行卡在 .flushing
+    assert not temp_outbox.exists()
+    flushing_files = list(temp_outbox.parent.glob(temp_outbox.name + ".flushing.*"))
+    assert len(flushing_files) == 1, "leftover writeback 失败 → .flushing 必须保留"
+
+    # 第二次 flush：恢复 _append_lines_to_outbox 正常工作
+    monkeypatch.setattr(outbox_mod, "_append_lines_to_outbox", original_append)
+
+    # 关键回归保护：主 outbox 不存在 + 有 retained .flushing → 必须处理它
+    rows_second = await flush_outbox_to_pg(db, max_rows=10)
+    assert rows_second == 3, "retained .flushing 的 3 行必须在第二次 flush 被处理"
+
+    # .flushing 已被消费删除
+    flushing_files_after = list(
+        temp_outbox.parent.glob(temp_outbox.name + ".flushing.*")
+    )
+    assert len(flushing_files_after) == 0
+
+
+@pytest.mark.asyncio
+async def test_flush_outbox_processes_retained_when_main_missing(
+    temp_outbox, tmp_path
+):
+    """主 outbox 不存在但有 retained .flushing → 仍然处理（不 short-circuit return 0）。
+
+    最直接的回归保护：手动伪造一个 .flushing 文件（模拟前次失败遗留），
+    主 outbox 完全不存在 → 调 flush 必须 INSERT retained 行。
+    """
+    # 手动创建 retained .flushing 文件（模拟前次写回失败保留下来）
+    retained = temp_outbox.with_suffix(temp_outbox.suffix + ".flushing.1700000000000")
+    retained.write_text(
+        json.dumps({
+            "_outbox_ts": "2026-04-26T00:00:00Z",
+            "_outbox_seq": 1,
+            "audit": {
+                "tenant_id": "00000000-0000-0000-0000-0000000000a1",
+                "user_id": "00000000-0000-0000-0000-000000000011",
+                "action": "retained.row",
+            },
+        }) + "\n",
+        encoding="utf-8",
+    )
+    assert retained.exists()
+    assert not temp_outbox.exists()
+
+    db = AsyncMock()
+    db.execute = AsyncMock()
+    db.commit = AsyncMock()
+    db.rollback = AsyncMock()
+
+    rows = await flush_outbox_to_pg(db)
+    assert rows == 1, "retained 行必须被消费（即便主 outbox 不存在）"
+    assert not retained.exists(), "消费后 .flushing 必须删除"
+    assert db.commit.call_count == 1
+
+
+@pytest.mark.asyncio
+async def test_flush_outbox_processes_retained_in_fifo_order(temp_outbox, tmp_path):
+    """多个 .flushing 文件 → 按 ts 升序处理（旧的先入库）。"""
+    # 创建 3 个 retained .flushing，时间戳递增
+    for ts, action in [(1000, "old.row"), (2000, "mid.row"), (3000, "new.row")]:
+        flushing = temp_outbox.with_suffix(temp_outbox.suffix + f".flushing.{ts}")
+        flushing.write_text(
+            json.dumps({
+                "_outbox_ts": "2026-04-26T00:00:00Z",
+                "_outbox_seq": 1,
+                "audit": {
+                    "tenant_id": "00000000-0000-0000-0000-0000000000a1",
+                    "user_id": "00000000-0000-0000-0000-000000000011",
+                    "action": action,
+                },
+            }) + "\n",
+            encoding="utf-8",
+        )
+
+    inserted_actions: list[str] = []
+    db = AsyncMock()
+    db.commit = AsyncMock()
+    db.rollback = AsyncMock()
+
+    async def execute_side_effect(query, params=None):
+        sql = str(query)
+        if "INSERT INTO trade_audit_logs" in sql and params:
+            inserted_actions.append(params.get("action", ""))
+        return MagicMock()
+
+    db.execute = AsyncMock(side_effect=execute_side_effect)
+
+    rows = await flush_outbox_to_pg(db)
+    assert rows == 3
+    # 旧文件（ts=1000）的行先 INSERT
+    assert inserted_actions == ["old.row", "mid.row", "new.row"], (
+        f"FIFO 顺序错误: {inserted_actions}"
+    )
+
+
+# ──────────────────────────────────────────────────────────────────────────
 # 场景 8：concurrent process write — append-only 不撕裂
 # ──────────────────────────────────────────────────────────────────────────
 

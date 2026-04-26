@@ -234,11 +234,15 @@ async def flush_outbox_to_pg(db, *, max_rows: int = 1000) -> int:
     sync-engine 应周期性调用（建议 60s 间隔）。本函数在 audit_outbox.py 内部
     暴露接口，但调度由外部完成（避免在 tx-trade 进程内做后台 IO）。
 
-    at-least-once 保证（PR #111 chatgpt-codex-connector P1 review #1 修复）：
-      - rename-first 把活跃 outbox 冻结为 .flushing-{ts}（concurrent 写入自动转
-        到新建的 outbox.jsonl，不会被本批次锁住，也不会被本批次截断丢失）
-      - 读冻结文件全部行进内存，按 max_rows 上限处理
-      - 三类输出：
+    at-least-once 保证（两轮 §19 P1 复审修复）：
+      - rename-first 把活跃 outbox 冻结为 .flushing.<ts>（concurrent 写入自动
+        转到新建的 outbox.jsonl，不会被本批次锁住，也不会被本批次截断丢失）
+      - **每次进入都先扫描 retained .flushing.* 文件**（PR #111 codex P1 #2
+        修复）：如果上次 flush 在写回 leftover/poison 时失败 → 当时保留了
+        .flushing 文件，本次必须自动重试它们。否则一旦没有新 audit 写入主
+        outbox，retained 文件永远不被处理，形成"数据在盘上但被排除在 flush
+        循环外"的卡死状态。
+      - 单 .flushing 文件三类输出：
           * processed   — 已 INSERT；commit 成功后丢弃，commit 失败回收为 leftover
           * leftover    — 超出 max_rows / 单行 transient 失败 / commit 失败 →
                           append 回主 outbox（保持顺序），下次 flush 重试
@@ -246,63 +250,143 @@ async def flush_outbox_to_pg(db, *, max_rows: int = 1000) -> int:
                           文件供运维 triage（不再无限重试）
       - 单行 transient 失败时 rollback + 整批 retry（避免部分 commit）：所有
         已 INSERT 但未 commit 的行 + 失败行 + 后续行 都进 leftover
-      - leftover 写回失败 → 保留 .flushing-{ts} 文件，不丢
+      - leftover/poison 写回失败 → 保留 .flushing.<ts> 文件，下次 flush 自动
+        把它当作 retained 重试
 
     Args:
         db: SQLAlchemy AsyncSession
-        max_rows: 单次最大成功 INSERT 行数（不含 poison）
+        max_rows: 单次成功 INSERT 行数上限（跨多个 .flushing 文件共享预算）
 
     Returns:
-        实际成功 INSERT 并 commit 的行数（不含 leftover / poison）
+        本轮 flush 跨所有 .flushing 文件累计成功 INSERT + commit 的行数
     """
     path = _outbox_path()
-    if not path.exists():
-        return 0
 
-    # ── Step 1: rename-first，冻结待处理批次（concurrent append 转新文件）
+    # ── Step 1: 收集所有待处理的 .flushing 文件
+    # 来源 A：retained .flushing.<ts>（上次 flush 写回失败留下，必须优先重试）
+    # 来源 B：当前活跃 outbox（rename → 新 .flushing.<now-ts>）
+    flushing_files = _gather_flushing_files(path)
+
+    # 总是同时尝试 adopt 当前主 outbox（即便 retained 存在，也别让新 audit 排队太久）
     flush_ts = int(datetime.now(timezone.utc).timestamp() * 1000)
-    flushing_path = path.with_suffix(path.suffix + f".flushing.{flush_ts}")
+    if path.exists():
+        new_flushing = path.with_suffix(path.suffix + f".flushing.{flush_ts}")
+        try:
+            os.rename(str(path), str(new_flushing))
+            flushing_files.append(new_flushing)
+        except FileNotFoundError:
+            pass  # 并发 flush 已经 adopt
+        except OSError as exc:
+            logger.error("audit_outbox_flush_rename_failed", error=str(exc))
+            # 不 return 0：可能仍有 retained .flushing 要处理
+
+    if not flushing_files:
+        return 0  # 真正没数据要处理
+
+    # ── Step 2: FIFO 顺序处理（旧 .flushing 优先，retained 数据先入库）
+    flushing_files.sort(key=lambda p: _flushing_ts_or_zero(p, path))
+
+    total_ingested = 0
+    for flushing_path in flushing_files:
+        if total_ingested >= max_rows:
+            # 预算耗尽：剩余 .flushing 文件留到下次 flush 自动重试
+            logger.info(
+                "audit_outbox_flush_budget_exhausted",
+                ingested=total_ingested,
+                remaining_files=len(flushing_files) - flushing_files.index(flushing_path),
+            )
+            break
+        remaining_budget = max_rows - total_ingested
+        ingested = await _process_one_flushing_file(
+            db,
+            outbox_path=path,
+            flushing_path=flushing_path,
+            max_rows=remaining_budget,
+        )
+        total_ingested += ingested
+
+    return total_ingested
+
+
+def _gather_flushing_files(outbox_path: Path) -> list[Path]:
+    """扫 outbox 父目录里所有 retained .flushing.* 文件（不含 .read-failed）。"""
+    parent = outbox_path.parent
+    if not parent.exists():
+        return []
+    pattern = outbox_path.name + ".flushing.*"
     try:
-        os.rename(str(path), str(flushing_path))
-    except FileNotFoundError:
-        return 0
+        return [p for p in parent.glob(pattern) if p.is_file()]
     except OSError as exc:
-        logger.error("audit_outbox_flush_rename_failed", error=str(exc))
+        logger.warning("audit_outbox_flush_scan_failed", error=str(exc))
+        return []
+
+
+def _flushing_ts_or_zero(flushing_path: Path, outbox_path: Path) -> int:
+    """从 .flushing.<ts> 后缀解析 ts；解析失败返回 0（视为最旧）。"""
+    name = flushing_path.name
+    prefix = outbox_path.name + ".flushing."
+    if not name.startswith(prefix):
+        return 0
+    suffix = name[len(prefix):]
+    try:
+        return int(suffix)
+    except ValueError:
         return 0
 
-    # ── Step 2: 读全部行进内存
+
+async def _process_one_flushing_file(
+    db,
+    *,
+    outbox_path: Path,
+    flushing_path: Path,
+    max_rows: int,
+) -> int:
+    """处理一个 .flushing 文件：读取 → INSERT → commit → 写回 leftover/poison。
+
+    leftover 写回**主 outbox** path（不是 flushing_path），所以 retained 文件
+    在被消费后就不再存在。下次 flush 看到主 outbox 有 leftover 时按正常流程
+    再 rename + 处理。
+
+    Returns:
+        本次 flushing 文件成功 INSERT + commit 的行数
+    """
+    flush_ts = int(datetime.now(timezone.utc).timestamp() * 1000)
+
+    # ── Step 1: 读全部行进内存
     try:
         with flushing_path.open("r", encoding="utf-8") as f:
             all_lines = f.readlines()
     except OSError as exc:
-        logger.error("audit_outbox_flush_read_failed", error=str(exc))
-        # 读失败 — 把 .flushing 改名为 .read-failed 让运维 triage（不丢）
+        logger.error(
+            "audit_outbox_flush_read_failed",
+            flushing_path=str(flushing_path),
+            error=str(exc),
+        )
+        # 读失败 — 改名为 .read-failed 让运维 triage（不丢、不再被本函数 retain）
         try:
             os.rename(
                 str(flushing_path),
-                str(path.with_suffix(path.suffix + f".read-failed.{flush_ts}")),
+                str(outbox_path.with_suffix(outbox_path.suffix + f".read-failed.{flush_ts}")),
             )
         except OSError:
             pass
         return 0
 
-    # ── Step 3: 处理每一行，分流到 processed / leftover / poison
-    processed_lines: list[str] = []  # 已 INSERT 且尚未 commit；commit 后丢弃
-    leftover_lines: list[str] = []   # 留给下次 flush（max_rows 上限 / transient 失败）
-    poison_lines: list[str] = []     # 永远无法成功 — 移到 .poison 供 triage
+    # ── Step 2: 处理每一行，分流到 processed / leftover / poison
+    processed_lines: list[str] = []
+    leftover_lines: list[str] = []
+    poison_lines: list[str] = []
 
-    aborted_at_index = len(all_lines)  # 默认全部处理完
+    aborted_at_index = len(all_lines)
     for i, raw_line in enumerate(all_lines):
         line_with_nl = raw_line if raw_line.endswith("\n") else raw_line + "\n"
         stripped = raw_line.strip()
         if not stripped:
-            continue  # 空行忽略
+            continue
         if len(processed_lines) >= max_rows:
-            # 超出本批次上限 — 当前及后续行全部进 leftover
             aborted_at_index = i
             break
 
-        # 解析 JSON envelope
         try:
             wrapped = json.loads(stripped)
             audit = wrapped.get("audit") or {}
@@ -316,17 +400,14 @@ async def flush_outbox_to_pg(db, *, max_rows: int = 1000) -> int:
             continue
 
         if not audit:
-            # 空 audit envelope — 永远不会成功，进 poison
             poison_lines.append(line_with_nl)
             logger.warning("audit_outbox_flush_empty_audit", line_no=i)
             continue
 
-        # 尝试 INSERT
         try:
             await _insert_one_audit(db, audit)
             processed_lines.append(line_with_nl)
         except SQLAlchemyError as exc:
-            # transient 失败：rollback 整批，所有已处理 + 当前 + 后续全部回收
             try:
                 await db.rollback()
             except SQLAlchemyError:
@@ -336,19 +417,19 @@ async def flush_outbox_to_pg(db, *, max_rows: int = 1000) -> int:
                 line_no=i,
                 error=str(exc),
             )
-            leftover_lines.extend(processed_lines)  # 已 INSERT 但未 commit，需重试
-            leftover_lines.append(line_with_nl)     # 当前失败行
+            leftover_lines.extend(processed_lines)
+            leftover_lines.append(line_with_nl)
             processed_lines = []
-            aborted_at_index = i + 1                # 后续行从 i+1 开始进 leftover
+            aborted_at_index = i + 1
             break
 
-    # 处理超出 max_rows 或 transient 中断后的剩余行
+    # 超出 max_rows / transient 中断后的剩余行
     for raw_line in all_lines[aborted_at_index:]:
         line_with_nl = raw_line if raw_line.endswith("\n") else raw_line + "\n"
         if raw_line.strip():
             leftover_lines.append(line_with_nl)
 
-    # ── Step 4: commit（仅 processed_lines 非空时）
+    # ── Step 3: commit
     rows_ingested = 0
     if processed_lines:
         try:
@@ -364,43 +445,85 @@ async def flush_outbox_to_pg(db, *, max_rows: int = 1000) -> int:
                 rows_attempted=len(processed_lines),
                 error=str(exc),
             )
-            # commit 失败 — processed 全部回收为 leftover
             leftover_lines = list(processed_lines) + leftover_lines
             processed_lines = []
             rows_ingested = 0
 
-    # ── Step 5: 写回 leftover 到主 outbox（append；保持顺序）
-    if leftover_lines:
-        if not _append_lines_to_outbox(path, leftover_lines):
-            # 写回失败 → 保留 .flushing 文件不删，等下次 flush 重试
-            logger.error(
-                "audit_outbox_flush_leftover_writeback_failed_keeping_flushing",
-                flushing_path=str(flushing_path),
-                leftover_count=len(leftover_lines),
-            )
-            return rows_ingested
-
-    # ── Step 6: poison 行 append 到 .poison 文件供运维 triage
-    if poison_lines:
-        poison_path = path.with_suffix(path.suffix + ".poison")
-        if not _append_lines_to_outbox(poison_path, poison_lines):
-            # poison 写回失败：保留 .flushing 不删（poison 行也在里面）
-            logger.error(
-                "audit_outbox_flush_poison_writeback_failed_keeping_flushing",
-                flushing_path=str(flushing_path),
-                poison_count=len(poison_lines),
-            )
-            return rows_ingested
-
-    # ── Step 7: 全部 leftover/poison 都已写回 → 安全删除 .flushing
-    try:
-        flushing_path.unlink()
-    except OSError as exc:
-        logger.warning(
-            "audit_outbox_flush_cleanup_failed",
-            path=str(flushing_path),
-            error=str(exc),
+    # ── Step 4: 写回 leftover 到主 outbox
+    leftover_ok = (
+        _append_lines_to_outbox(outbox_path, leftover_lines)
+        if leftover_lines else True
+    )
+    if not leftover_ok:
+        logger.error(
+            "audit_outbox_flush_leftover_writeback_failed",
+            flushing_path=str(flushing_path),
+            leftover_count=len(leftover_lines),
         )
+
+    # ── Step 5: poison 行 append 到 .poison
+    poison_path = outbox_path.with_suffix(outbox_path.suffix + ".poison")
+    poison_ok = (
+        _append_lines_to_outbox(poison_path, poison_lines)
+        if poison_lines else True
+    )
+    if not poison_ok:
+        logger.error(
+            "audit_outbox_flush_poison_writeback_failed",
+            flushing_path=str(flushing_path),
+            poison_count=len(poison_lines),
+        )
+
+    # ── Step 6: 决定如何处理 .flushing 文件
+    if leftover_ok and poison_ok:
+        # 全部 leftover/poison 落盘成功 → 安全删除 .flushing
+        try:
+            flushing_path.unlink()
+        except OSError as exc:
+            logger.warning(
+                "audit_outbox_flush_cleanup_failed",
+                path=str(flushing_path),
+                error=str(exc),
+            )
+        return rows_ingested
+
+    # leftover/poison 写回失败 → 必须保留未处理行供下次 retry。
+    # 关键：如果有 partial commit (rows_ingested > 0)，必须把 .flushing 重写为
+    # 只含"写回失败的未处理行"，否则下次 retry 会重新 INSERT 已 commit 行（重复审计）。
+    unprocessed: list[str] = []
+    if not leftover_ok:
+        unprocessed.extend(leftover_lines)
+    if not poison_ok:
+        unprocessed.extend(poison_lines)
+
+    if rows_ingested > 0 and unprocessed:
+        # 原子重写：tmp + rename 替换 .flushing 内容
+        # 失败时回退到"保留原 .flushing"（at-least-once，retry 时已 commit 行重复 INSERT，
+        # 在 PG 层依靠 trade_audit_logs id 自动唯一接受重复，运维通过 audit_outbox_flush_*
+        # log 关联 ID 排查）
+        rewrite_tmp = flushing_path.with_suffix(flushing_path.suffix + ".rewriting")
+        try:
+            rewrite_tmp.write_text("".join(unprocessed), encoding="utf-8")
+            os.rename(str(rewrite_tmp), str(flushing_path))
+            logger.info(
+                "audit_outbox_flush_rewrote_after_partial_commit",
+                flushing_path=str(flushing_path),
+                committed=rows_ingested,
+                retained=len(unprocessed),
+            )
+        except OSError as exc:
+            logger.error(
+                "audit_outbox_flush_rewrite_failed",
+                flushing_path=str(flushing_path),
+                error=str(exc),
+            )
+            # 清理 tmp 文件
+            try:
+                rewrite_tmp.unlink()
+            except OSError:
+                pass
+            # 回退：保留原 .flushing（含已 commit 行）。下次 retry 重复 INSERT 由
+            # PG / 运维侧解决（不丢审计 > 重复审计）
 
     return rows_ingested
 
