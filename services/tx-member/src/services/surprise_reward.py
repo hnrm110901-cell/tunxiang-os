@@ -7,13 +7,16 @@
   4. 奖励类型：积分/优惠券/徽章/免单折扣
 
 防刷：同一顾客同一规则只触发一次。
+
+数据源：
+  surprise_rules — 规则持久化（v325迁移）
+  member_badges  — 触发记录（防重复）
 """
 
 from __future__ import annotations
 
 import json
 import random
-import uuid
 from datetime import datetime, timezone
 
 import structlog
@@ -24,31 +27,118 @@ from sqlalchemy.ext.asyncio import AsyncSession
 logger = structlog.get_logger(__name__)
 
 
-# ─── 内存规则存储（生产环境应从数据库加载） ─────────────────────────────────
-
-_surprise_rules: dict[str, list[dict]] = {}
+# ─── RLS ────────────────────────────────────────────────────────────────────
 
 
-def register_surprise_rule(tenant_id: str, rule: dict) -> str:
-    """注册惊喜规则，返回 rule_id"""
-    rule_id = str(uuid.uuid4())
-    rule["rule_id"] = rule_id
-    _surprise_rules.setdefault(tenant_id, []).append(rule)
-    logger.info("surprise_rule_registered", tenant_id=tenant_id, rule_id=rule_id)
-    return rule_id
+async def _set_rls(db: AsyncSession, tenant_id: str) -> None:
+    """设置RLS租户上下文"""
+    await db.execute(
+        text("SELECT set_config('app.tenant_id', :tid, true)"),
+        {"tid": str(tenant_id)},
+    )
 
 
-def get_surprise_rules(tenant_id: str) -> list[dict]:
-    """获取租户所有惊喜规则"""
-    return _surprise_rules.get(tenant_id, [])
+# ─── 规则 CRUD（DB持久化） ──────────────────────────────────────────────────
 
 
-def clear_surprise_rules(tenant_id: str | None = None) -> None:
-    """清除规则（测试用）"""
-    if tenant_id:
-        _surprise_rules.pop(tenant_id, None)
-    else:
-        _surprise_rules.clear()
+async def register_surprise_rule(
+    db: AsyncSession,
+    tenant_id: str,
+    rule: dict,
+) -> str:
+    """注册惊喜规则到数据库，返回 rule_id"""
+    await _set_rls(db, tenant_id)
+    try:
+        result = await db.execute(
+            text("""
+                INSERT INTO surprise_rules
+                    (tenant_id, store_id, name, nth_visit, probability, reward, is_active)
+                VALUES
+                    (:tenant_id, :store_id, :name, :nth_visit, :probability, :reward ::jsonb, :is_active)
+                RETURNING id
+            """),
+            {
+                "tenant_id": str(tenant_id),
+                "store_id": str(rule["store_id"]) if rule.get("store_id") else None,
+                "name": rule.get("name", ""),
+                "nth_visit": rule.get("nth_visit", 1),
+                "probability": rule.get("probability", 1.0),
+                "reward": json.dumps(rule.get("reward", {})),
+                "is_active": rule.get("is_active", True),
+            },
+        )
+        row = result.mappings().fetchone()
+        await db.commit()
+        rule_id = str(row["id"])
+        logger.info("surprise_rule_registered", tenant_id=tenant_id, rule_id=rule_id)
+        return rule_id
+    except SQLAlchemyError:
+        await db.rollback()
+        logger.exception("surprise_rule_register_error")
+        raise
+
+
+async def get_surprise_rules(
+    db: AsyncSession,
+    tenant_id: str,
+    store_id: str | None = None,
+) -> list[dict]:
+    """从数据库获取租户活跃的惊喜规则"""
+    await _set_rls(db, tenant_id)
+
+    conditions = ["tenant_id = :tid", "is_active = true", "is_deleted = false"]
+    params: dict = {"tid": str(tenant_id)}
+
+    if store_id:
+        conditions.append("(store_id = :sid OR store_id IS NULL)")
+        params["sid"] = str(store_id)
+
+    where = " AND ".join(conditions)
+    result = await db.execute(
+        text(f"""
+            SELECT id, nth_visit, probability, reward, name, store_id
+            FROM surprise_rules
+            WHERE {where}
+            ORDER BY display_order ASC, created_at ASC
+        """),
+        params,
+    )
+    rows = result.mappings().all()
+    return [
+        {
+            "rule_id": str(r["id"]),
+            "nth_visit": r["nth_visit"],
+            "probability": float(r["probability"]),
+            "reward": r["reward"] if isinstance(r["reward"], dict) else json.loads(r["reward"]),
+            "name": r["name"],
+            "store_id": str(r["store_id"]) if r["store_id"] else None,
+        }
+        for r in rows
+    ]
+
+
+async def delete_surprise_rule(
+    db: AsyncSession,
+    tenant_id: str,
+    rule_id: str,
+) -> bool:
+    """软删除惊喜规则"""
+    await _set_rls(db, tenant_id)
+    try:
+        result = await db.execute(
+            text("""
+                UPDATE surprise_rules
+                SET is_deleted = true, updated_at = NOW()
+                WHERE id = :rid AND tenant_id = :tid AND is_deleted = false
+            """),
+            {"rid": str(rule_id), "tid": str(tenant_id)},
+        )
+        await db.commit()
+        return result.rowcount > 0
+    except SQLAlchemyError:
+        await db.rollback()
+        logger.exception("surprise_rule_delete_error")
+        raise
 
 
 # ─── 核心逻辑 ────────────────────────────────────────────────────────────────
@@ -59,6 +149,7 @@ async def check_surprise(
     tenant_id: str,
     customer_id: str,
     visit_count: int | None = None,
+    store_id: str | None = None,
 ) -> dict | None:
     """检查是否触发惊喜奖励，返回奖励详情或 None
 
@@ -67,7 +158,9 @@ async def check_surprise(
         tenant_id: 租户ID
         customer_id: 顾客ID
         visit_count: 当前访问次数（如不传则从DB查）
+        store_id: 门店ID（用于筛选门店级规则）
     """
+    await _set_rls(db, tenant_id)
     logger.info("surprise_check", tenant_id=tenant_id, customer_id=customer_id)
 
     if visit_count is None:
@@ -83,7 +176,7 @@ async def check_surprise(
         r = row.mappings().first()
         visit_count = int(r["cnt"]) if r else 0
 
-    rules = get_surprise_rules(tenant_id)
+    rules = await get_surprise_rules(db, tenant_id, store_id=store_id)
     if not rules:
         return None
 

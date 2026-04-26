@@ -102,6 +102,31 @@ class GamificationCoachAgent(SkillAgent):
     priority: str = "P2"
     run_location: str = "cloud"
 
+    def get_supported_actions(self) -> list[str]:
+        return ["suggest_challenges", "evaluate_seasonal_event"]
+
+    async def execute(self, action: str, params: dict[str, Any]) -> AgentResult:
+        """路由到对应的skill方法"""
+        if action == "suggest_challenges":
+            return await self.suggest_challenges(
+                tenant_id=params.get("tenant_id", self.tenant_id),
+                store_id=params.get("store_id", self.store_id),
+                member_segment=params.get("member_segment"),
+                max_suggestions=params.get("max_suggestions", 3),
+            )
+        if action == "evaluate_seasonal_event":
+            return await self.evaluate_seasonal_event(
+                tenant_id=params.get("tenant_id", self.tenant_id),
+                event_plan=params.get("event_plan", {}),
+                store_id=params.get("store_id", self.store_id),
+            )
+        return AgentResult(
+            success=False,
+            action=action,
+            error=f"未知动作: {action}",
+            reasoning=f"gamification_coach不支持动作 '{action}'",
+        )
+
     async def suggest_challenges(
         self,
         tenant_id: str,
@@ -172,8 +197,8 @@ class GamificationCoachAgent(SkillAgent):
 
         return AgentResult(
             success=True,
+            action="suggest_challenges",
             data={"suggestions": suggestions, "constraints": constraints},
-            decision_log=decision_log,
         )
 
     async def evaluate_seasonal_event(
@@ -277,6 +302,7 @@ class GamificationCoachAgent(SkillAgent):
 
         return AgentResult(
             success=True,
+            action="evaluate_seasonal_event",
             data={
                 "feasible": feasible and all_pass,
                 "overall_score": round(overall_score, 1),
@@ -284,7 +310,6 @@ class GamificationCoachAgent(SkillAgent):
                 "constraints": constraints,
                 "recommendations": recommendations,
             },
-            decision_log=decision_log,
         )
 
     # ─── 私有方法 ─────────────────────────────────────────────────────────────
@@ -294,13 +319,65 @@ class GamificationCoachAgent(SkillAgent):
         tenant_id: str,
         store_id: str | None,
     ) -> dict[str, Any]:
-        """获取门店经营统计（简化版，生产走物化视图）"""
-        return {
-            "active_member_count": 200,
-            "avg_order_fen": 8800,
-            "monthly_orders": 3000,
-            "avg_margin_pct": 62,
+        """获取门店经营统计 — 从DB物化视图/原始表查询"""
+        defaults = {
+            "active_member_count": 0,
+            "avg_order_fen": 0,
+            "monthly_orders": 0,
+            "avg_margin_pct": 60,
         }
+        if self._db is None:
+            logger.warning("gamification_coach_no_db", msg="DB不可用，返回默认统计")
+            return defaults
+
+        from sqlalchemy import text as sa_text
+        from sqlalchemy.exc import SQLAlchemyError as _SAError
+
+        try:
+            await self._db.execute(
+                sa_text("SELECT set_config('app.tenant_id', :tid, true)"),
+                {"tid": str(tenant_id)},
+            )
+
+            # 活跃会员数（近30天有订单）
+            member_q = sa_text("""
+                SELECT COUNT(DISTINCT customer_id) AS cnt
+                FROM orders
+                WHERE tenant_id = :tid
+                  AND (:sid IS NULL OR store_id = :sid::uuid)
+                  AND status = 'paid' AND is_deleted = false
+                  AND created_at >= NOW() - INTERVAL '30 days'
+            """)
+            r1 = await self._db.execute(member_q, {"tid": str(tenant_id), "sid": store_id})
+            row1 = r1.mappings().first()
+            defaults["active_member_count"] = int(row1["cnt"]) if row1 else 0
+
+            # 近30天订单数 + 平均客单价
+            order_q = sa_text("""
+                SELECT COUNT(*) AS order_count,
+                       COALESCE(AVG(total_fen), 0) AS avg_fen
+                FROM orders
+                WHERE tenant_id = :tid
+                  AND (:sid IS NULL OR store_id = :sid::uuid)
+                  AND status = 'paid' AND is_deleted = false
+                  AND created_at >= NOW() - INTERVAL '30 days'
+            """)
+            r2 = await self._db.execute(order_q, {"tid": str(tenant_id), "sid": store_id})
+            row2 = r2.mappings().first()
+            if row2:
+                defaults["monthly_orders"] = int(row2["order_count"])
+                defaults["avg_order_fen"] = int(row2["avg_fen"])
+
+            logger.info(
+                "gamification_store_stats",
+                tenant_id=tenant_id,
+                store_id=store_id,
+                stats=defaults,
+            )
+        except _SAError:
+            logger.exception("gamification_store_stats_db_error")
+
+        return defaults
 
     def _check_constraints(
         self,
