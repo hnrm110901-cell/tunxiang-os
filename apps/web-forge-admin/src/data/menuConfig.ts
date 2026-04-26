@@ -10,6 +10,9 @@ export const MENU: MenuItem[] = [
   { id: 'review',        path: '/review',        icon: '⊞', label: '审核中心',   domain: 'CORE',
     badge: { text: '12', tone: 'danger' },
     subItems: [{ label: '待审 12', path: '#pending' }, { label: '扫描中 4', path: '#scanning' }, { label: '已通过', path: '#passed' }, { label: '已拒', path: '#rejected' }, { label: 'SLA 看板', path: '#sla' }] },
+  { id: 'auto-review',   path: '/auto-review',   icon: '⊡', label: 'AI 审核官',  domain: 'CORE',
+    badge: { text: 'AI', tone: 'info' },
+    subItems: [{ label: '自动检查', path: '#auto' }, { label: '人工必须', path: '#manual' }, { label: '审核报告', path: '#report' }] },
 
   { id: 'makers',        path: '/makers',        icon: '⌗', label: 'ISV 作坊主', domain: 'ECOSYSTEM',
     subItems: [{ label: '全部作坊主', path: '#all' }, { label: '实名审核', path: '#verify' }, { label: '等级体系', path: '#tier' }, { label: '黑名单', path: '#blacklist' }, { label: '邀请码', path: '#invite' }] },
@@ -32,6 +35,8 @@ export const MENU: MenuItem[] = [
     subItems: [{ label: '抽佣账本', path: '#ledger' }, { label: '月度结算单', path: '#statement' }, { label: '发票管理', path: '#invoice' }, { label: '退款', path: '#refund' }, { label: '税务报表', path: '#tax' }] },
   { id: 'analytics',     path: '/analytics',     icon: '⌢', label: '数据分析',   domain: 'BUSINESS',
     subItems: [{ label: '商品热度', path: '#products' }, { label: 'GMV 趋势', path: '#gmv' }, { label: '流失分析', path: '#churn' }, { label: '自定义报表', path: '#custom' }] },
+  { id: 'ecosystem',     path: '/ecosystem',     icon: '◎', label: '生态健康',   domain: 'BUSINESS',
+    subItems: [{ label: '综合评分', path: '#score' }, { label: '8 大指标', path: '#kpi' }, { label: '飞轮效应', path: '#flywheel' }, { label: '历史趋势', path: '#trend' }] },
   { id: 'outcomes',      path: '/outcomes',      icon: '◈', label: '结果计价',   domain: 'BUSINESS',
     badge: { text: '¥', tone: 'info' },
     subItems: [{ label: '结果定义', path: '#defs' }, { label: '归因报告', path: '#attribution' }, { label: '收入趋势', path: '#trend' }, { label: '定价模型', path: '#pricing' }] },
@@ -59,6 +64,9 @@ export const MENU: MenuItem[] = [
     subItems: [{ label: 'Server 列表', path: '#servers' }, { label: 'Tool 目录', path: '#tools' }, { label: '健康监控', path: '#health' }] },
   { id: 'ontology', path: '/ontology', icon: '◉', label: 'Ontology 绑定', domain: 'AI_OPS',
     subItems: [{ label: '实体映射', path: '#map' }, { label: '绑定矩阵', path: '#bindings' }, { label: '清单历史', path: '#manifests' }] },
+  { id: 'workflows', path: '/workflows', icon: '⊶', label: '工作流编排', domain: 'AI_OPS',
+    badge: { text: '12', tone: 'info' },
+    subItems: [{ label: '工作流目录', path: '#catalog' }, { label: '执行日志', path: '#logs' }, { label: '示例模板', path: '#examples' }] },
 
   { id: 'evidence',      path: '/evidence',      icon: '◆', label: '证据卡片',   domain: 'GUARDRAIL',
     subItems: [{ label: '证据矩阵', path: '#matrix' }, { label: '卡片明细', path: '#detail' }, { label: '过期管理', path: '#expiry' }, { label: '信任画像', path: '#profile' }] },
