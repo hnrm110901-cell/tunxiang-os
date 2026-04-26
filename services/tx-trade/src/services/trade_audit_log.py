@@ -31,7 +31,25 @@ import structlog
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
+from .audit_outbox import write_audit_to_outbox
+
 logger = structlog.get_logger(__name__)
+
+
+def _spill_to_outbox_safe(**audit_row: Any) -> None:
+    """PR-3 / R-A4-2：把一条审计行送到本地 JSONL outbox（最后一道防线）。
+
+    write_audit 的 except 分支调用本函数：PG 写入失败时，至少保证审计落本地，
+    sync-engine 后续重放到 PG。本函数自身永远不抛 — outbox 模块内部已 fail-safe，
+    最坏情况只 log.critical（仍比静默丢失好）。
+
+    截断（防 outbox 文件被超长字符串撑爆）由 outbox 模块的 PIPE_BUF guard 处理：
+    单行编码 > 4000 字节会被拒绝并 log.critical。
+    """
+    try:
+        write_audit_to_outbox(audit_row)
+    except Exception:  # noqa: BLE001 — outbox 失败也不能让 write_audit 抛出
+        logger.critical("audit_outbox_spill_failed", exc_info=True)
 
 
 # ──────────────── result / severity 枚举（v295 列） ────────────────
@@ -371,6 +389,17 @@ async def write_audit(
                 action=action,
                 user_id=user_id,
             )
+        # PR-3 / R-A4-2：PG 写入失败 → 落本地 JSONL outbox（sync-engine 后续重放）
+        # 不让 broad except 静默丢审计；本地落盘是最后一道防线
+        _spill_to_outbox_safe(
+            tenant_id=tenant_id, store_id=store_id, user_id=user_id,
+            user_role=user_role, action=action,
+            target_type=target_type, target_id=target_id,
+            amount_fen=amount_fen, client_ip=client_ip,
+            result=result, reason=reason, request_id=request_id,
+            severity=severity, session_id=session_id,
+            before_state=before_state, after_state=after_state,
+        )
         logger.error(
             "trade_audit_log_write_failed",
             error=str(exc),
@@ -387,6 +416,16 @@ async def write_audit(
             await db.rollback()
         except Exception:  # noqa: BLE001
             pass
+        # PR-3 / R-A4-2：连接池 / mock 异常 → 也走 outbox 兜底
+        _spill_to_outbox_safe(
+            tenant_id=tenant_id, store_id=store_id, user_id=user_id,
+            user_role=user_role, action=action,
+            target_type=target_type, target_id=target_id,
+            amount_fen=amount_fen, client_ip=client_ip,
+            result=result, reason=reason, request_id=request_id,
+            severity=severity, session_id=session_id,
+            before_state=before_state, after_state=after_state,
+        )
         logger.error(
             "trade_audit_log_write_unexpected_error",
             error=str(exc),
