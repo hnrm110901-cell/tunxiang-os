@@ -23,6 +23,7 @@ POSIX atomicity 假设：
 """
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 import threading
@@ -361,3 +362,106 @@ async def _insert_one_audit(db, audit: Mapping[str, Any]) -> None:
             ),
         },
     )
+
+
+# ──────────────────────────────────────────────────────────────────────────
+#  PR-4 — 后台 flusher 循环
+#
+#  PR-3 落了 outbox 写入侧；本节负责让 outbox 真正被消费。tx-trade 在云端
+#  跑，outbox 是 cloud PVC，flusher 也跑在 tx-trade 同 pod（不走 sync-engine
+#  —— sync-engine 仅处理 Mac mini ↔ cloud 跨机同步，云端 pod 内的 PVC →
+#  PG flush 应该自包含）。
+#
+#  生产配置（k8s helm values 推荐）：
+#    - 60s 间隔（默认）— 200 桌并发场景下 deny 率 < 1%，单次 flush ~10ms
+#    - 单实例运行（每个 pod 自己的 PVC + 自己的 flusher，避免跨 pod 锁竞争）
+#    - 紧急关停：环境变量 TX_AUDIT_OUTBOX_FLUSHER_DISABLED=true（运维手动
+#      关闭以便排查 outbox 文件，不需要重新部署）
+# ──────────────────────────────────────────────────────────────────────────
+
+
+_FLUSHER_DEFAULT_INTERVAL_SECONDS: float = 60.0
+
+
+async def _flusher_loop(
+    session_factory,
+    stop_event: asyncio.Event,
+    interval_seconds: float,
+) -> None:
+    """后台 task：周期性 flush outbox 到 PG。
+
+    永不 raise — 每次迭代独立异常处理，PG 临时不可用 / 网络抖动 / 文件系统
+    瞬时错误都不能让 loop 死掉。stop_event 触发时立刻唤醒并优雅退出。
+
+    Args:
+        session_factory: 异步上下文管理器，async with session_factory() as s
+        stop_event: 外部传入；.set() 后下次 sleep 立刻返回，loop 退出
+        interval_seconds: 两次 flush 之间的最小间隔（成功 flush 时也按此 sleep）
+    """
+    logger.info(
+        "audit_outbox_flusher_loop_started",
+        interval_seconds=interval_seconds,
+    )
+    while not stop_event.is_set():
+        try:
+            async with session_factory() as session:
+                rows = await flush_outbox_to_pg(session)
+                if rows > 0:
+                    logger.info(
+                        "audit_outbox_flusher_iteration",
+                        rows_ingested=rows,
+                    )
+        except Exception:  # noqa: BLE001 — loop 必须永生
+            logger.warning(
+                "audit_outbox_flusher_iteration_failed",
+                exc_info=True,
+            )
+        # 可中断 sleep — stop_event.set() 立即唤醒
+        try:
+            await asyncio.wait_for(stop_event.wait(), timeout=interval_seconds)
+            # stop_event 触发了，跳出 loop
+            break
+        except asyncio.TimeoutError:
+            # 正常的 interval 到期，进入下一轮
+            continue
+    logger.info("audit_outbox_flusher_loop_stopped")
+
+
+def _flusher_disabled_by_env() -> bool:
+    return os.getenv("TX_AUDIT_OUTBOX_FLUSHER_DISABLED", "").strip().lower() in {
+        "true", "1", "yes",
+    }
+
+
+def start_audit_outbox_flusher(
+    session_factory,
+    *,
+    interval_seconds: float = _FLUSHER_DEFAULT_INTERVAL_SECONDS,
+) -> tuple[asyncio.Task, asyncio.Event]:
+    """启动 outbox flusher 后台 task。lifespan 调用方应保留 (task, event) 对，
+    在 yield 结束后 event.set() + await task 完成 graceful shutdown。
+
+    紧急关停：环境变量 TX_AUDIT_OUTBOX_FLUSHER_DISABLED=true → 返回一个
+    立即完成的 noop task + 已 set 的 event，调用方 lifespan 代码无需 if-else。
+    （outbox 写入仍正常工作，只是不自动重放；运维可手动 SCP 文件 + 跑 cron 工具）
+
+    Returns:
+        (task, stop_event) — 配套使用：
+            stop_event.set()
+            await asyncio.wait_for(task, timeout=10)
+    """
+    stop_event = asyncio.Event()
+    if _flusher_disabled_by_env():
+        stop_event.set()
+
+        async def _noop() -> None:
+            return
+
+        task = asyncio.create_task(_noop())
+        logger.info("audit_outbox_flusher_disabled_by_env")
+        return task, stop_event
+
+    task = asyncio.create_task(
+        _flusher_loop(session_factory, stop_event, interval_seconds),
+    )
+    return task, stop_event

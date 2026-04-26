@@ -126,6 +126,7 @@ async def lifespan(app: FastAPI):
     from shared.ontology.src.database import async_session_factory
 
     from .security.rbac import assert_no_dev_bypass_in_production
+    from .services.audit_outbox import start_audit_outbox_flusher
     from .services.cook_time_stats import start_daily_scheduler
     from .services.group_buy_scheduler import start_group_buy_expiry_scheduler
 
@@ -136,6 +137,12 @@ async def lifespan(app: FastAPI):
     await init_db()
     asyncio.create_task(start_daily_scheduler(async_session_factory))
     asyncio.create_task(start_group_buy_expiry_scheduler(async_session_factory))
+
+    # PR-4 / R-A4-2：audit JSONL outbox 后台 flusher（消费 PR-3 落本地的审计行）。
+    # 60s 间隔（默认）；TX_AUDIT_OUTBOX_FLUSHER_DISABLED=true 可紧急关停。
+    audit_outbox_flusher_task, audit_outbox_flusher_stop = start_audit_outbox_flusher(
+        async_session_factory,
+    )
 
     # Feature Flag 检查：TradeFlags.DELIVERY_AUTO_ACCEPT（外卖自动接单）
     # 关闭时跳过自动接单初始化，外卖订单须人工在接单面板手动接单
@@ -163,6 +170,15 @@ async def lifespan(app: FastAPI):
         pass  # feature_flags SDK不可用，外卖自动接单状态由环境变量控制
 
     yield
+
+    # ── Graceful shutdown ─────────────────────────────────────────────
+    # PR-4：通知 audit outbox flusher 停止 + 等待最后一次 flush 完成（最多 10s），
+    # 防止 SIGTERM 时 outbox 文件残留几秒未消费的 audit 行。
+    audit_outbox_flusher_stop.set()
+    try:
+        await asyncio.wait_for(audit_outbox_flusher_task, timeout=10.0)
+    except asyncio.TimeoutError:
+        audit_outbox_flusher_task.cancel()
 
 
 app = FastAPI(
