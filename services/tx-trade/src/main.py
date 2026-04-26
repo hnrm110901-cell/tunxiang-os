@@ -17,9 +17,9 @@ from .api.banquet_order_routes import router as banquet_order_router  # Y-A8 宴
 from .api.banquet_payment_routes import router as banquet_payment_router
 from .api.banquet_routes import router as banquet_router
 from .api.booking_api import router as booking_router
-from .api.call_center_routes import router as call_center_router
 from .api.booking_prep_routes import router as booking_prep_router
 from .api.booking_webhook_routes import router as booking_webhook_router
+from .api.call_center_routes import router as call_center_router
 from .api.cashier_api import router as cashier_router
 from .api.chef_at_home_routes import router as chef_at_home_router
 from .api.collab_order_routes import router as collab_order_router
@@ -427,8 +427,8 @@ app.include_router(table_period_config_router)   # v286 桌台×时段配置矩�
 app.include_router(table_utilization_router)     # v287 桌台利用率分析（Agent数据基础）
 
 # ── S3: KDS计件配菜 + 显示配置 ──
-from .api.kds_piecework_routes import router as kds_piecework_router
 from .api.kds_display_config_routes import router as kds_display_config_router
+from .api.kds_piecework_routes import router as kds_piecework_router
 
 app.include_router(kds_piecework_router, prefix="/api/v1/kds-piecework")
 app.include_router(kds_display_config_router, prefix="/api/v1/kds-display")
