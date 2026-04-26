@@ -234,81 +234,205 @@ async def flush_outbox_to_pg(db, *, max_rows: int = 1000) -> int:
     sync-engine 应周期性调用（建议 60s 间隔）。本函数在 audit_outbox.py 内部
     暴露接口，但调度由外部完成（避免在 tx-trade 进程内做后台 IO）。
 
-    设计：
-      - 读取活跃文件 + .1 / .2 / ... 归档（按时间倒序补齐）
-      - 单次最多 max_rows 行，避免长事务
-      - 单行 JSON 解析失败 / INSERT 失败 → 跳过，继续下一行（已 log）
-      - 全部成功后通过 rename 把消费过的文件标记为 .processed
-        （sync-engine 后续清理 .processed 文件，留 24h 兜底取证）
-      - 不删除原文件直到 commit 成功（at-least-once 语义，重复由 PG 主键去重）
+    at-least-once 保证（PR #111 chatgpt-codex-connector P1 review #1 修复）：
+      - rename-first 把活跃 outbox 冻结为 .flushing-{ts}（concurrent 写入自动转
+        到新建的 outbox.jsonl，不会被本批次锁住，也不会被本批次截断丢失）
+      - 读冻结文件全部行进内存，按 max_rows 上限处理
+      - 三类输出：
+          * processed   — 已 INSERT；commit 成功后丢弃，commit 失败回收为 leftover
+          * leftover    — 超出 max_rows / 单行 transient 失败 / commit 失败 →
+                          append 回主 outbox（保持顺序），下次 flush 重试
+          * poison      — JSON 解析失败 / 缺 audit envelope → append 到 .poison
+                          文件供运维 triage（不再无限重试）
+      - 单行 transient 失败时 rollback + 整批 retry（避免部分 commit）：所有
+        已 INSERT 但未 commit 的行 + 失败行 + 后续行 都进 leftover
+      - leftover 写回失败 → 保留 .flushing-{ts} 文件，不丢
 
     Args:
         db: SQLAlchemy AsyncSession
-        max_rows: 单次最大消费行数
+        max_rows: 单次最大成功 INSERT 行数（不含 poison）
 
     Returns:
-        实际成功 INSERT 的行数
+        实际成功 INSERT 并 commit 的行数（不含 leftover / poison）
     """
     path = _outbox_path()
     if not path.exists():
         return 0
 
-    # 简单实现：只读活跃文件，逐行 INSERT，全部成功后 rename 为 .processed
-    # 复杂归档（rotate 文件 + 多个 .processed）由 sync-engine 后续完善
-    rows_ingested = 0
-    failed_lines: list[str] = []
-
+    # ── Step 1: rename-first，冻结待处理批次（concurrent append 转新文件）
+    flush_ts = int(datetime.now(timezone.utc).timestamp() * 1000)
+    flushing_path = path.with_suffix(path.suffix + f".flushing.{flush_ts}")
     try:
-        with path.open("r", encoding="utf-8") as f:
-            for i, line in enumerate(f):
-                if i >= max_rows:
-                    break
-                line = line.strip()
-                if not line:
-                    continue
-                try:
-                    wrapped = json.loads(line)
-                    audit = wrapped.get("audit", {})
-                    if not audit:
-                        continue
-                    await _insert_one_audit(db, audit)
-                    rows_ingested += 1
-                except (json.JSONDecodeError, SQLAlchemyError, KeyError) as exc:
-                    logger.warning(
-                        "audit_outbox_flush_row_failed",
-                        line_no=i,
-                        error=str(exc),
-                    )
-                    failed_lines.append(line)
-                    continue
+        os.rename(str(path), str(flushing_path))
+    except FileNotFoundError:
+        return 0
+    except OSError as exc:
+        logger.error("audit_outbox_flush_rename_failed", error=str(exc))
+        return 0
+
+    # ── Step 2: 读全部行进内存
+    try:
+        with flushing_path.open("r", encoding="utf-8") as f:
+            all_lines = f.readlines()
     except OSError as exc:
         logger.error("audit_outbox_flush_read_failed", error=str(exc))
-        return rows_ingested
+        # 读失败 — 把 .flushing 改名为 .read-failed 让运维 triage（不丢）
+        try:
+            os.rename(
+                str(flushing_path),
+                str(path.with_suffix(path.suffix + f".read-failed.{flush_ts}")),
+            )
+        except OSError:
+            pass
+        return 0
 
-    if rows_ingested > 0:
+    # ── Step 3: 处理每一行，分流到 processed / leftover / poison
+    processed_lines: list[str] = []  # 已 INSERT 且尚未 commit；commit 后丢弃
+    leftover_lines: list[str] = []   # 留给下次 flush（max_rows 上限 / transient 失败）
+    poison_lines: list[str] = []     # 永远无法成功 — 移到 .poison 供 triage
+
+    aborted_at_index = len(all_lines)  # 默认全部处理完
+    for i, raw_line in enumerate(all_lines):
+        line_with_nl = raw_line if raw_line.endswith("\n") else raw_line + "\n"
+        stripped = raw_line.strip()
+        if not stripped:
+            continue  # 空行忽略
+        if len(processed_lines) >= max_rows:
+            # 超出本批次上限 — 当前及后续行全部进 leftover
+            aborted_at_index = i
+            break
+
+        # 解析 JSON envelope
+        try:
+            wrapped = json.loads(stripped)
+            audit = wrapped.get("audit") or {}
+        except (json.JSONDecodeError, AttributeError, TypeError) as exc:
+            poison_lines.append(line_with_nl)
+            logger.warning(
+                "audit_outbox_flush_poison_line",
+                line_no=i,
+                error=str(exc),
+            )
+            continue
+
+        if not audit:
+            # 空 audit envelope — 永远不会成功，进 poison
+            poison_lines.append(line_with_nl)
+            logger.warning("audit_outbox_flush_empty_audit", line_no=i)
+            continue
+
+        # 尝试 INSERT
+        try:
+            await _insert_one_audit(db, audit)
+            processed_lines.append(line_with_nl)
+        except SQLAlchemyError as exc:
+            # transient 失败：rollback 整批，所有已处理 + 当前 + 后续全部回收
+            try:
+                await db.rollback()
+            except SQLAlchemyError:
+                pass
+            logger.warning(
+                "audit_outbox_flush_row_failed",
+                line_no=i,
+                error=str(exc),
+            )
+            leftover_lines.extend(processed_lines)  # 已 INSERT 但未 commit，需重试
+            leftover_lines.append(line_with_nl)     # 当前失败行
+            processed_lines = []
+            aborted_at_index = i + 1                # 后续行从 i+1 开始进 leftover
+            break
+
+    # 处理超出 max_rows 或 transient 中断后的剩余行
+    for raw_line in all_lines[aborted_at_index:]:
+        line_with_nl = raw_line if raw_line.endswith("\n") else raw_line + "\n"
+        if raw_line.strip():
+            leftover_lines.append(line_with_nl)
+
+    # ── Step 4: commit（仅 processed_lines 非空时）
+    rows_ingested = 0
+    if processed_lines:
         try:
             await db.commit()
+            rows_ingested = len(processed_lines)
         except SQLAlchemyError as exc:
-            await db.rollback()
+            try:
+                await db.rollback()
+            except SQLAlchemyError:
+                pass
             logger.error(
                 "audit_outbox_flush_commit_failed",
-                rows_ingested=rows_ingested,
+                rows_attempted=len(processed_lines),
                 error=str(exc),
             )
-            return 0
-        # 成功消费：rename 为 .processed（保留 24h 取证由外部 cron 清理）
-        try:
-            processed_path = path.with_suffix(
-                path.suffix + f".processed.{int(datetime.now(timezone.utc).timestamp())}"
+            # commit 失败 — processed 全部回收为 leftover
+            leftover_lines = list(processed_lines) + leftover_lines
+            processed_lines = []
+            rows_ingested = 0
+
+    # ── Step 5: 写回 leftover 到主 outbox（append；保持顺序）
+    if leftover_lines:
+        if not _append_lines_to_outbox(path, leftover_lines):
+            # 写回失败 → 保留 .flushing 文件不删，等下次 flush 重试
+            logger.error(
+                "audit_outbox_flush_leftover_writeback_failed_keeping_flushing",
+                flushing_path=str(flushing_path),
+                leftover_count=len(leftover_lines),
             )
-            os.rename(str(path), str(processed_path))
-        except OSError as exc:
-            logger.warning(
-                "audit_outbox_flush_archive_failed",
-                error=str(exc),
+            return rows_ingested
+
+    # ── Step 6: poison 行 append 到 .poison 文件供运维 triage
+    if poison_lines:
+        poison_path = path.with_suffix(path.suffix + ".poison")
+        if not _append_lines_to_outbox(poison_path, poison_lines):
+            # poison 写回失败：保留 .flushing 不删（poison 行也在里面）
+            logger.error(
+                "audit_outbox_flush_poison_writeback_failed_keeping_flushing",
+                flushing_path=str(flushing_path),
+                poison_count=len(poison_lines),
             )
+            return rows_ingested
+
+    # ── Step 7: 全部 leftover/poison 都已写回 → 安全删除 .flushing
+    try:
+        flushing_path.unlink()
+    except OSError as exc:
+        logger.warning(
+            "audit_outbox_flush_cleanup_failed",
+            path=str(flushing_path),
+            error=str(exc),
+        )
 
     return rows_ingested
+
+
+def _append_lines_to_outbox(path: Path, lines: list[str]) -> bool:
+    """append 一组行到 outbox 风格文件（POSIX O_APPEND 多进程安全）。
+
+    返回 True 表示全部成功；False 表示有 OSError，调用方需保留源文件不删。
+    """
+    if not lines:
+        return True
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        encoded = "".join(lines).encode("utf-8")
+        fd = os.open(
+            str(path),
+            os.O_WRONLY | os.O_APPEND | os.O_CREAT,
+            0o640,
+        )
+        try:
+            os.write(fd, encoded)
+        finally:
+            os.close(fd)
+        return True
+    except OSError as exc:
+        logger.error(
+            "audit_outbox_append_failed",
+            path=str(path),
+            count=len(lines),
+            error=str(exc),
+        )
+        return False
 
 
 async def _insert_one_audit(db, audit: Mapping[str, Any]) -> None:

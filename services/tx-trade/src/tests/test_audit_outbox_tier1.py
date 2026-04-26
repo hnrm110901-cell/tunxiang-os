@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import json
 import os
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from sqlalchemy.exc import OperationalError
@@ -238,8 +238,15 @@ def test_outbox_unwritable_path_returns_false_does_not_raise(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_flush_outbox_ingests_rows_then_archives(temp_outbox):
-    """flush_outbox_to_pg 读 outbox → INSERT → 归档为 .processed.<ts>。"""
+async def test_flush_outbox_ingests_rows_then_cleans_up(temp_outbox):
+    """flush_outbox_to_pg 读 outbox → INSERT → commit 后删除 .flushing 文件。
+
+    P1 修复（PR #111 codex review #1）：
+      - 旧行为：成功后整个 outbox rename 为 .processed.<ts>，但若 max_rows
+        截断 / 行解析失败 → 剩余行被永久 archive 成 .processed → 数据丢失
+      - 新行为：rename-first 冻结 → 处理 → leftover/poison 分流 → 全部消费
+        完成后 .flushing 文件直接 unlink（不再保留 .processed 归档）。
+    """
     # 准备 outbox 内容（手动写两条）
     write_audit_to_outbox({
         "tenant_id": "00000000-0000-0000-0000-0000000000a1",
@@ -258,7 +265,6 @@ async def test_flush_outbox_ingests_rows_then_archives(temp_outbox):
     })
     assert temp_outbox.exists()
 
-    # mock db — 只验证 execute 被调用了 4 次（2 行 × 2 SELECT/INSERT）+ 1 次 commit
     db = AsyncMock()
     db.execute = AsyncMock()
     db.commit = AsyncMock()
@@ -268,10 +274,144 @@ async def test_flush_outbox_ingests_rows_then_archives(temp_outbox):
     assert rows == 2
     assert db.commit.call_count == 1
 
-    # 原文件已被重命名为 .processed.<ts>
+    # 原文件被 rename + 处理后 unlink（不再保留 .processed 归档）
     assert not temp_outbox.exists()
-    processed_files = list(temp_outbox.parent.glob(temp_outbox.name + ".processed.*"))
-    assert len(processed_files) == 1
+    flushing_files = list(temp_outbox.parent.glob(temp_outbox.name + ".flushing.*"))
+    assert len(flushing_files) == 0, "flushing file should be unlinked after successful flush"
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# P1 修复回归保护：max_rows 上限不丢余下行
+# ──────────────────────────────────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_flush_outbox_max_rows_preserves_leftover(temp_outbox):
+    """outbox 有 5 行 + max_rows=3 → 只 INSERT 前 3 行，剩 2 行回写 outbox。
+
+    P1 修复回归保护（PR #111 codex review #1 第 1 条）：
+    旧代码 break out 后无条件 archive 整个文件 → 行 4/5 永久丢失。
+    新代码必须把行 4/5 append 回 outbox.jsonl 等下次 flush。
+    """
+    for i in range(5):
+        write_audit_to_outbox({
+            "tenant_id": "00000000-0000-0000-0000-0000000000a1",
+            "user_id": f"00000000-0000-0000-0000-{i:012d}",
+            "action": f"test.row_{i}",
+            "result": "allow",
+        })
+    assert len([l for l in temp_outbox.read_text("utf-8").splitlines() if l.strip()]) == 5
+
+    db = AsyncMock()
+    db.execute = AsyncMock()
+    db.commit = AsyncMock()
+    db.rollback = AsyncMock()
+
+    rows = await flush_outbox_to_pg(db, max_rows=3)
+    assert rows == 3, "前 3 行应该 INSERT 成功"
+
+    # 剩 2 行回写到主 outbox
+    assert temp_outbox.exists(), "主 outbox 必须存在（写回 leftover 重建文件）"
+    remaining = [l for l in temp_outbox.read_text("utf-8").splitlines() if l.strip()]
+    assert len(remaining) == 2, f"剩余 2 行必须回写，实际 {len(remaining)}"
+    # 行序保持
+    for i, line in enumerate(remaining):
+        parsed = json.loads(line)
+        assert parsed["audit"]["action"] == f"test.row_{i + 3}"
+
+    # .flushing 文件已删除
+    flushing_files = list(temp_outbox.parent.glob(temp_outbox.name + ".flushing.*"))
+    assert len(flushing_files) == 0
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# P1 修复回归保护：transient INSERT 失败 → 整批 retry，已 INSERT 行也回收
+# ──────────────────────────────────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_flush_outbox_transient_failure_rolls_back_and_requeues_all(temp_outbox):
+    """前 2 行 INSERT 成功，第 3 行触发 SQLAlchemyError → rollback 整批 → 全部 5 行回写。
+
+    避免部分提交语义混乱：只有"全部 commit 成功"或"全部留待下次"两个稳态。
+    """
+    from sqlalchemy.exc import SQLAlchemyError
+
+    for i in range(5):
+        write_audit_to_outbox({
+            "tenant_id": "00000000-0000-0000-0000-0000000000a1",
+            "user_id": f"00000000-0000-0000-0000-{i:012d}",
+            "action": f"test.row_{i}",
+        })
+
+    db = AsyncMock()
+    db.commit = AsyncMock()
+    db.rollback = AsyncMock()
+
+    # 模拟 _insert_one_audit 的两次 execute 调用（set_config + INSERT）
+    # 第 3 行的 INSERT 抛 SQLAlchemyError
+    insert_call_count = {"n": 0}
+
+    async def execute_side_effect(query, params=None):
+        sql = str(query)
+        if "INSERT INTO trade_audit_logs" in sql:
+            insert_call_count["n"] += 1
+            if insert_call_count["n"] == 3:
+                raise SQLAlchemyError("simulated transient failure")
+        return MagicMock()
+
+    db.execute = AsyncMock(side_effect=execute_side_effect)
+
+    rows = await flush_outbox_to_pg(db)
+    assert rows == 0, "transient 失败必须 rollback 整批"
+    db.rollback.assert_awaited()
+
+    # 5 行全部回写到主 outbox
+    assert temp_outbox.exists()
+    remaining = [l for l in temp_outbox.read_text("utf-8").splitlines() if l.strip()]
+    assert len(remaining) == 5, f"全部 5 行必须回收为 leftover，实际 {len(remaining)}"
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# P1 修复回归保护：JSON 解析失败 → poison 文件不无限重试
+# ──────────────────────────────────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_flush_outbox_unparseable_lines_go_to_poison(temp_outbox):
+    """损坏行 / 空 audit envelope → 移到 .poison 文件，不再重试。
+
+    避免一条永远失败的行让 outbox 永远清不空（类似 Kafka 的死信队列模式）。
+    """
+    # 写 1 条好行
+    write_audit_to_outbox({
+        "tenant_id": "00000000-0000-0000-0000-0000000000a1",
+        "user_id": "00000000-0000-0000-0000-000000000011",
+        "action": "good.row",
+    })
+    # 手动追加：1 条 JSON 解析失败 + 1 条空 audit envelope
+    with temp_outbox.open("a", encoding="utf-8") as f:
+        f.write("this is not json{\n")
+        f.write('{"_outbox_ts":"2026-04-26T00:00:00Z","_outbox_seq":1,"audit":{}}\n')
+
+    db = AsyncMock()
+    db.execute = AsyncMock()
+    db.commit = AsyncMock()
+    db.rollback = AsyncMock()
+
+    rows = await flush_outbox_to_pg(db)
+    assert rows == 1, "好行成功 INSERT"
+
+    # 主 outbox 应该被清空（好行已入库，2 条坏行进 poison 不回流）
+    if temp_outbox.exists():
+        remaining = [l for l in temp_outbox.read_text("utf-8").splitlines() if l.strip()]
+        assert len(remaining) == 0, "坏行不应回流到主 outbox"
+
+    # poison 文件存在且包含 2 条坏行
+    poison_path = temp_outbox.with_suffix(temp_outbox.suffix + ".poison")
+    assert poison_path.exists(), "坏行必须移到 .poison 文件"
+    poison_lines = [l for l in poison_path.read_text("utf-8").splitlines() if l.strip()]
+    assert len(poison_lines) == 2
 
 
 # ──────────────────────────────────────────────────────────────────────────
