@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import asyncio
+import json
 import re
 import uuid
-from datetime import date
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 from typing import Any, Optional
 
@@ -476,3 +478,546 @@ async def hub_platform_stats(db: AsyncSession) -> dict[str, Any]:
         "agent_calls_today": int(agent.get("total_executions_today", 0)),
         "avg_response_ms": avg_response_ms,
     }
+
+
+# ─── Wave 1: Today 今日看板 ───
+
+
+async def hub_today(db: AsyncSession) -> dict[str, Any]:
+    """聚合今日待办、活跃告警、Incident、续约提醒、关键指标"""
+    # 紧急/高优先工单
+    urgent_sql = text(
+        """
+        SELECT id, merchant_name AS merchant, title, priority, status,
+               to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS') AS created
+        FROM hub_tickets
+        WHERE NOT COALESCE(is_deleted, false)
+          AND status IN ('open', 'in_progress')
+          AND priority IN ('urgent', 'high')
+        ORDER BY CASE priority WHEN 'urgent' THEN 0 ELSE 1 END, created_at DESC
+        LIMIT 10
+        """
+    )
+    urgent_rows = await db.execute(urgent_sql)
+    todos = [_row_to_dict(r) for r in urgent_rows.fetchall()]
+
+    # 离线边缘节点
+    offline_sql = text(
+        """
+        SELECT store_label AS store, ip, tailscale_status AS tailscale,
+               to_char(last_heartbeat AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS') AS last_heartbeat
+        FROM hub_edge_devices
+        WHERE NOT COALESCE(is_deleted, false)
+          AND (last_heartbeat IS NULL
+               OR last_heartbeat < NOW() - INTERVAL '10 minutes')
+        ORDER BY store_label
+        """
+    )
+    offline_rows = await db.execute(offline_sql)
+    alerts = [
+        {**_row_to_dict(r), "alert_type": "edge.offline"}
+        for r in offline_rows.fetchall()
+    ]
+
+    # 即将到期的商户（30 天内）
+    renewal_sql = text(
+        """
+        SELECT tenant_id::text AS id, name, plan_template AS template,
+               subscription_expires_at::text AS expires
+        FROM platform_tenants
+        WHERE NOT COALESCE(is_deleted, false)
+          AND subscription_expires_at IS NOT NULL
+          AND subscription_expires_at <= CURRENT_DATE + INTERVAL '30 days'
+          AND subscription_expires_at >= CURRENT_DATE
+        ORDER BY subscription_expires_at
+        LIMIT 10
+        """
+    )
+    renewal_rows = await db.execute(renewal_sql)
+    renewals = [_row_to_dict(r) for r in renewal_rows.fetchall()]
+
+    # 关键指标复用
+    stats = await hub_platform_stats(db)
+
+    return {
+        "todos": todos,
+        "alerts": alerts,
+        "incidents": [],  # TODO: 接入 Incident 表（hub_incidents）
+        "renewals": renewals,
+        "stats": stats,
+    }
+
+
+# ─── Wave 1: Edges 边缘节点 ───
+
+
+async def hub_list_edges(
+    db: AsyncSession,
+    status: Optional[str],
+    page: int,
+    size: int,
+) -> dict[str, Any]:
+    """边缘节点列表（hub_edge_devices），替代 hub_list_mac_minis"""
+    offset = max(0, (page - 1) * size)
+    where = "NOT COALESCE(is_deleted, false)"
+    params: dict[str, Any] = {}
+    if status:
+        where += " AND tailscale_status = :st"
+        params["st"] = status
+    count_sql = text(f"SELECT COUNT(*) FROM hub_edge_devices WHERE {where}")
+    list_sql = text(
+        f"""
+        SELECT sn,
+               store_label AS store,
+               ip,
+               tailscale_status AS tailscale,
+               COALESCE(client_version, '—') AS version,
+               to_char(last_heartbeat AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS') AS last_heartbeat,
+               cpu_pct,
+               mem_pct,
+               CASE
+                 WHEN last_heartbeat >= NOW() - INTERVAL '5 minutes' THEN 'online'
+                 WHEN last_heartbeat >= NOW() - INTERVAL '30 minutes' THEN 'degraded'
+                 ELSE 'offline'
+               END AS computed_status
+        FROM hub_edge_devices
+        WHERE {where}
+        ORDER BY store_label
+        LIMIT :limit OFFSET :offset
+        """
+    )
+    total_r = await db.execute(count_sql, params)
+    total = int(total_r.scalar_one())
+    rows = await db.execute(list_sql, {**params, "limit": size, "offset": offset})
+    items = [_row_to_dict(r) for r in rows.fetchall()]
+    return {"items": items, "total": total}
+
+
+async def hub_get_edge(db: AsyncSession, sn: str) -> Optional[dict[str, Any]]:
+    """单个边缘节点详情"""
+    sql = text(
+        """
+        SELECT sn,
+               store_label AS store,
+               ip,
+               tailscale_status AS tailscale,
+               COALESCE(client_version, '—') AS version,
+               to_char(last_heartbeat AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS') AS last_heartbeat,
+               cpu_pct,
+               mem_pct,
+               CASE
+                 WHEN last_heartbeat >= NOW() - INTERVAL '5 minutes' THEN 'online'
+                 WHEN last_heartbeat >= NOW() - INTERVAL '30 minutes' THEN 'degraded'
+                 ELSE 'offline'
+               END AS computed_status
+        FROM hub_edge_devices
+        WHERE sn = :sn AND NOT COALESCE(is_deleted, false)
+        LIMIT 1
+        """
+    )
+    rows = await db.execute(sql, {"sn": sn})
+    row = rows.fetchone()
+    if not row:
+        return None
+    return _row_to_dict(row)
+
+
+async def hub_edge_timeline(db: AsyncSession, sn: str) -> list[dict[str, Any]]:
+    """节点事件时间线"""
+    # TODO: 接入真实事件表（events），目前返回 mock
+    now = datetime.utcnow()
+    return [
+        {
+            "timestamp": (now - timedelta(minutes=2)).isoformat(),
+            "event": "heartbeat",
+            "detail": {"cpu_pct": 12.3, "mem_pct": 45.6},
+        },
+        {
+            "timestamp": (now - timedelta(hours=1)).isoformat(),
+            "event": "sync_complete",
+            "detail": {"tables_synced": 8, "rows": 142},
+        },
+        {
+            "timestamp": (now - timedelta(hours=6)).isoformat(),
+            "event": "client_update",
+            "detail": {"from_version": "0.9.1", "to_version": "0.9.2"},
+        },
+    ]
+
+
+async def hub_edge_wake(db: AsyncSession, sn: str) -> dict[str, Any]:
+    """唤醒边缘节点（WOL）"""
+    # TODO: 接入真实 WOL 实现（发送 magic packet via Tailscale）
+    edge = await hub_get_edge(db, sn)
+    if not edge:
+        return {"success": False, "error": "节点不存在"}
+    return {
+        "success": True,
+        "sn": sn,
+        "action": "wake_on_lan",
+        "message": f"WOL magic packet 已发送至 {edge.get('ip', 'unknown')}",
+    }
+
+
+async def hub_edge_reboot(db: AsyncSession, sn: str) -> dict[str, Any]:
+    """重启边缘节点"""
+    # TODO: 接入真实 SSH/Tailscale 远程重启
+    edge = await hub_get_edge(db, sn)
+    if not edge:
+        return {"success": False, "error": "节点不存在"}
+    return {
+        "success": True,
+        "sn": sn,
+        "action": "reboot",
+        "message": f"重启指令已发送至 {edge.get('store', sn)}",
+    }
+
+
+async def hub_edge_push(
+    db: AsyncSession, sn: str, target_version: str, force: bool,
+) -> dict[str, Any]:
+    """推送更新到单个边缘节点"""
+    sql = text(
+        """
+        UPDATE hub_edge_devices
+        SET client_version = :ver, updated_at = NOW()
+        WHERE sn = :sn AND NOT COALESCE(is_deleted, false)
+        """
+    )
+    result = await db.execute(sql, {"ver": target_version, "sn": sn})
+    await db.commit()
+    if result.rowcount == 0:
+        return {"success": False, "error": "节点不存在"}
+    return {
+        "success": True,
+        "sn": sn,
+        "action": "push_update",
+        "target_version": target_version,
+        "force": force,
+    }
+
+
+async def hub_edges_topology(db: AsyncSession) -> dict[str, Any]:
+    """Tailscale 拓扑视图"""
+    # 读取真实节点列表
+    sql = text(
+        """
+        SELECT sn,
+               store_label AS store,
+               ip,
+               tailscale_status AS tailscale,
+               CASE
+                 WHEN last_heartbeat >= NOW() - INTERVAL '5 minutes' THEN 'online'
+                 WHEN last_heartbeat >= NOW() - INTERVAL '30 minutes' THEN 'degraded'
+                 ELSE 'offline'
+               END AS computed_status
+        FROM hub_edge_devices
+        WHERE NOT COALESCE(is_deleted, false)
+        ORDER BY store_label
+        """
+    )
+    rows = await db.execute(sql)
+    nodes = [_row_to_dict(r) for r in rows.fetchall()]
+    # TODO: 接入真实 Tailscale API 获取对等连接和延迟
+    return {
+        "hub": {
+            "name": "tunxiang-hub",
+            "ip": "100.64.0.1",
+            "role": "hub",
+            "status": "online",
+        },
+        "nodes": nodes,
+        "links": [
+            {"from": "tunxiang-hub", "to": n.get("sn", ""), "latency_ms": 4 + i * 2}
+            for i, n in enumerate(nodes)
+        ],
+    }
+
+
+# ─── Wave 1: Services 微服务 ───
+
+_SERVICES = [
+    "gateway", "tx-trade", "tx-menu", "tx-member", "tx-growth",
+    "tx-ops", "tx-supply", "tx-finance", "tx-agent", "tx-analytics",
+    "tx-brain", "tx-intel", "tx-org", "tx-civic", "mcp-server",
+]
+
+_SERVICE_PORTS = {
+    "gateway": 8000, "tx-trade": 8001, "tx-menu": 8002, "tx-member": 8003,
+    "tx-growth": 8004, "tx-ops": 8005, "tx-supply": 8006, "tx-finance": 8007,
+    "tx-agent": 8008, "tx-analytics": 8009, "tx-brain": 8010, "tx-intel": 8011,
+    "tx-org": 8012, "tx-civic": 8014, "mcp-server": 8020,
+}
+
+
+async def hub_list_services() -> list[dict[str, Any]]:
+    """17 个微服务列表 + 健康状态"""
+    # TODO: 接入真实健康检查（HTTP ping 各服务 /health）
+    now = datetime.utcnow().isoformat()
+    services = []
+    for name in _SERVICES:
+        services.append({
+            "name": name,
+            "port": _SERVICE_PORTS.get(name),
+            "status": "healthy",
+            "uptime_pct": 99.9,
+            "last_check": now,
+            "version": "0.9.2",
+            "instances": 1,
+        })
+    return services
+
+
+async def hub_get_service(name: str) -> Optional[dict[str, Any]]:
+    """单个服务详情"""
+    if name not in _SERVICES:
+        return None
+    # TODO: 接入真实服务发现 + 指标
+    now = datetime.utcnow().isoformat()
+    return {
+        "name": name,
+        "port": _SERVICE_PORTS.get(name),
+        "status": "healthy",
+        "uptime_pct": 99.9,
+        "last_check": now,
+        "version": "0.9.2",
+        "instances": 1,
+        "endpoints_count": 15,
+        "avg_latency_ms": 23,
+        "p99_latency_ms": 89,
+        "error_rate_pct": 0.02,
+        "last_deploy": (datetime.utcnow() - timedelta(days=2)).isoformat(),
+    }
+
+
+async def hub_service_slos(name: str) -> Optional[list[dict[str, Any]]]:
+    """服务 SLO 列表"""
+    if name not in _SERVICES:
+        return None
+    # TODO: 接入真实 SLO 监控数据
+    return [
+        {
+            "slo": "availability",
+            "target": 99.9,
+            "current": 99.95,
+            "status": "met",
+            "window": "30d",
+        },
+        {
+            "slo": "latency_p99",
+            "target": 200,
+            "current": 89,
+            "unit": "ms",
+            "status": "met",
+            "window": "30d",
+        },
+        {
+            "slo": "error_rate",
+            "target": 0.1,
+            "current": 0.02,
+            "unit": "%",
+            "status": "met",
+            "window": "30d",
+        },
+    ]
+
+
+async def hub_service_timeline(name: str) -> Optional[list[dict[str, Any]]]:
+    """服务事件时间线"""
+    if name not in _SERVICES:
+        return None
+    # TODO: 接入真实事件表
+    now = datetime.utcnow()
+    return [
+        {
+            "timestamp": (now - timedelta(hours=2)).isoformat(),
+            "event": "deploy",
+            "detail": {"version": "0.9.2", "commit": "abc1234"},
+        },
+        {
+            "timestamp": (now - timedelta(days=1)).isoformat(),
+            "event": "health_check_recovered",
+            "detail": {"downtime_seconds": 12},
+        },
+        {
+            "timestamp": (now - timedelta(days=3)).isoformat(),
+            "event": "config_change",
+            "detail": {"key": "max_connections", "old": 50, "new": 100},
+        },
+    ]
+
+
+# ─── Wave 1: Stream 全局事件流 ───
+
+
+async def hub_stream_events():
+    """全局 SSE 事件流生成器"""
+    # TODO: 从 Redis Streams / PG NOTIFY 读取真实事件
+    _mock_events = [
+        {
+            "type": "edge.heartbeat",
+            "data": {"sn": "MM-A012", "status": "online", "latency_ms": 4},
+        },
+        {
+            "type": "ticket.created",
+            "data": {"id": "T042", "title": "POS打印机离线", "priority": "high"},
+        },
+        {
+            "type": "service.health_change",
+            "data": {"name": "tx-trade", "from": "degraded", "to": "healthy"},
+        },
+        {
+            "type": "agent.decision",
+            "data": {"agent": "discount_guard", "action": "block", "confidence": 0.94},
+        },
+        {
+            "type": "adapter.sync_complete",
+            "data": {"adapter": "meituan", "merchant": "尝在一起", "rows": 56},
+        },
+    ]
+    idx = 0
+    while True:
+        event = _mock_events[idx % len(_mock_events)]
+        payload = {
+            **event,
+            "timestamp": datetime.utcnow().isoformat(),
+        }
+        yield f"event: {event['type']}\ndata: {json.dumps(payload, ensure_ascii=False)}\n\n"
+        idx += 1
+        await asyncio.sleep(5)
+
+
+# ─── Wave 1: Copilot Chat ───
+
+
+async def hub_copilot_chat(
+    message: str,
+    context: dict[str, Any],
+    thread_id: Optional[str],
+):
+    """Copilot 对话 SSE 流式响应生成器"""
+    # TODO: 接入 tx-brain Claude API
+    workspace = context.get("workspace", "Hub")
+    response = f"收到关于 {workspace} 的问题：「{message}」\n\n正在分析中... 这是 Copilot v1 的 mock 响应。实际版本将接入 tx-brain 服务进行智能推理。"
+
+    tid = thread_id or str(uuid.uuid4())
+
+    # 发送 thread_id
+    yield f"data: {json.dumps({'type': 'thread', 'thread_id': tid}, ensure_ascii=False)}\n\n"
+
+    # 逐字符流式输出
+    for char in response:
+        yield f"data: {json.dumps({'type': 'token', 'content': char}, ensure_ascii=False)}\n\n"
+        await asyncio.sleep(0.03)
+
+    # 完成信号
+    yield f"data: {json.dumps({'type': 'done'})}\n\n"
+
+
+# ─── Wave 1: Customers 客户扩展 ───
+
+
+async def hub_customer_health(db: AsyncSession, customer_id: str) -> Optional[dict[str, Any]]:
+    """客户健康分构成（多维模型）"""
+    # 检查商户是否存在
+    check_sql = text(
+        """
+        SELECT tenant_id::text AS id, name, plan_template AS template, status
+        FROM platform_tenants
+        WHERE tenant_id = :cid::uuid AND NOT COALESCE(is_deleted, false)
+        LIMIT 1
+        """
+    )
+    rows = await db.execute(check_sql, {"cid": customer_id})
+    row = rows.fetchone()
+    if not row:
+        return None
+    merchant = _row_to_dict(row)
+
+    # TODO: 接入真实多维健康分计算
+    dimensions = {
+        "sla_hit_rate": {
+            "label": "SLA命中率",
+            "score": 92.0,
+            "weight": 0.25,
+            "detail": "过去30天API可用性99.2%，响应时间达标率92%",
+        },
+        "nps": {
+            "label": "NPS满意度",
+            "score": 78.0,
+            "weight": 0.20,
+            "detail": "最近调研NPS=+45，推荐者62%，贬损者17%",
+        },
+        "adapter_latency": {
+            "label": "Adapter延迟",
+            "score": 85.0,
+            "weight": 0.20,
+            "detail": "美团Adapter P99=120ms，品智POS同步延迟<2s",
+        },
+        "activity": {
+            "label": "活跃度",
+            "score": 88.0,
+            "weight": 0.20,
+            "detail": "日均登录3.2次，周活跃率95%，功能使用覆盖率68%",
+        },
+        "ticket_volume": {
+            "label": "工单量",
+            "score": 70.0,
+            "weight": 0.15,
+            "detail": "近30天8张工单，其中2张高优先，平均解决时间4.2h",
+        },
+    }
+
+    weighted_total = sum(
+        d["score"] * d["weight"] for d in dimensions.values()
+    )
+
+    return {
+        "customer_id": customer_id,
+        "merchant": merchant,
+        "health_score": round(weighted_total, 1),
+        "risk_level": "low" if weighted_total >= 80 else ("medium" if weighted_total >= 60 else "high"),
+        "dimensions": dimensions,
+        "computed_at": datetime.utcnow().isoformat(),
+    }
+
+
+async def hub_customer_timeline(db: AsyncSession, customer_id: str) -> Optional[list[dict[str, Any]]]:
+    """客户生命周期时间线"""
+    # 检查商户是否存在
+    check_sql = text(
+        "SELECT 1 FROM platform_tenants WHERE tenant_id = :cid::uuid AND NOT COALESCE(is_deleted, false)"
+    )
+    rows = await db.execute(check_sql, {"cid": customer_id})
+    if not rows.fetchone():
+        return None
+
+    # TODO: 接入真实事件表
+    now = datetime.utcnow()
+    return [
+        {
+            "timestamp": (now - timedelta(days=90)).isoformat(),
+            "event": "onboarding.started",
+            "detail": {"plan": "standard", "source": "线下拜访"},
+        },
+        {
+            "timestamp": (now - timedelta(days=85)).isoformat(),
+            "event": "onboarding.completed",
+            "detail": {"stores_activated": 3, "adapters_connected": 2},
+        },
+        {
+            "timestamp": (now - timedelta(days=60)).isoformat(),
+            "event": "subscription.renewed",
+            "detail": {"plan": "standard", "period": "annual"},
+        },
+        {
+            "timestamp": (now - timedelta(days=30)).isoformat(),
+            "event": "expansion.store_added",
+            "detail": {"store_name": "天心区新店", "total_stores": 4},
+        },
+        {
+            "timestamp": (now - timedelta(days=7)).isoformat(),
+            "event": "ticket.resolved",
+            "detail": {"ticket_id": "T038", "title": "美团订单同步延迟"},
+        },
+    ]

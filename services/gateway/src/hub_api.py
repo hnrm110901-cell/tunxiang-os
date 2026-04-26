@@ -6,10 +6,11 @@
 
 from __future__ import annotations
 
-from typing import Optional
+from typing import Any, Optional
 
 import structlog
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.exc import IntegrityError, ProgrammingError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -259,6 +260,234 @@ async def platform_stats(db: AsyncSession = Depends(get_db_no_rls)):
     """平台运营数据（聚合 + hub_agent_metrics_daily）"""
     try:
         data = await hub_service.hub_platform_stats(db)
+        return {"ok": True, "data": data}
+    except ProgrammingError as e:
+        raise _pg_unavailable(e) from e
+
+
+# ─── Today 今日看板 ───
+
+
+@router.get("/today")
+async def today_dashboard(db: AsyncSession = Depends(get_db_no_rls)):
+    """今日看板：待办、告警、Incident、续约提醒、关键指标"""
+    try:
+        data = await hub_service.hub_today(db)
+        return {"ok": True, "data": data}
+    except ProgrammingError as e:
+        raise _pg_unavailable(e) from e
+
+
+# ─── Stream 全局事件流 (SSE) ───
+
+
+@router.get("/stream")
+async def global_stream():
+    """全局事件流（SSE）— edge/service/ticket/agent/adapter 事件"""
+    logger.info("hub.stream.connect")
+    return StreamingResponse(
+        hub_service.hub_stream_events(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+# ─── Edges 边缘节点 ───
+
+
+@router.get("/edges/topology")
+async def edges_topology(db: AsyncSession = Depends(get_db_no_rls)):
+    """Tailscale 拓扑视图"""
+    try:
+        data = await hub_service.hub_edges_topology(db)
+        return {"ok": True, "data": data}
+    except ProgrammingError as e:
+        raise _pg_unavailable(e) from e
+
+
+@router.get("/edges")
+async def list_edges(
+    status: Optional[str] = None,
+    page: int = 1,
+    size: int = 20,
+    db: AsyncSession = Depends(get_db_no_rls),
+):
+    """边缘节点列表（替代 /deployment/mac-minis）"""
+    try:
+        data = await hub_service.hub_list_edges(db, status, page, size)
+        return {"ok": True, "data": data}
+    except ProgrammingError as e:
+        raise _pg_unavailable(e) from e
+
+
+@router.get("/edges/{sn}")
+async def get_edge(sn: str, db: AsyncSession = Depends(get_db_no_rls)):
+    """单个边缘节点详情"""
+    try:
+        data = await hub_service.hub_get_edge(db, sn)
+        if not data:
+            raise HTTPException(status_code=404, detail=f"边缘节点 {sn} 不存在")
+        return {"ok": True, "data": data}
+    except ProgrammingError as e:
+        raise _pg_unavailable(e) from e
+
+
+@router.get("/edges/{sn}/timeline")
+async def edge_timeline(sn: str, db: AsyncSession = Depends(get_db_no_rls)):
+    """节点事件时间线"""
+    try:
+        # 先验证节点存在
+        edge = await hub_service.hub_get_edge(db, sn)
+        if not edge:
+            raise HTTPException(status_code=404, detail=f"边缘节点 {sn} 不存在")
+        data = await hub_service.hub_edge_timeline(db, sn)
+        return {"ok": True, "data": data}
+    except ProgrammingError as e:
+        raise _pg_unavailable(e) from e
+
+
+@router.post("/edges/{sn}/wake")
+async def edge_wake(sn: str, db: AsyncSession = Depends(get_db_no_rls)):
+    """唤醒边缘节点（WOL）"""
+    try:
+        data = await hub_service.hub_edge_wake(db, sn)
+        if not data.get("success"):
+            raise HTTPException(status_code=404, detail=data.get("error", "操作失败"))
+        logger.info("hub.edge.wake", sn=sn)
+        return {"ok": True, "data": data}
+    except ProgrammingError as e:
+        raise _pg_unavailable(e) from e
+
+
+@router.post("/edges/{sn}/reboot")
+async def edge_reboot(sn: str, db: AsyncSession = Depends(get_db_no_rls)):
+    """重启边缘节点"""
+    try:
+        data = await hub_service.hub_edge_reboot(db, sn)
+        if not data.get("success"):
+            raise HTTPException(status_code=404, detail=data.get("error", "操作失败"))
+        logger.info("hub.edge.reboot", sn=sn)
+        return {"ok": True, "data": data}
+    except ProgrammingError as e:
+        raise _pg_unavailable(e) from e
+
+
+class EdgePushBody(BaseModel):
+    target_version: str = Field(..., min_length=1, max_length=32)
+    force: bool = Field(default=False)
+
+
+@router.post("/edges/{sn}/push")
+async def edge_push(
+    sn: str,
+    body: EdgePushBody,
+    db: AsyncSession = Depends(get_db_no_rls),
+):
+    """推送更新到单个边缘节点"""
+    try:
+        data = await hub_service.hub_edge_push(db, sn, body.target_version, body.force)
+        if not data.get("success"):
+            raise HTTPException(status_code=404, detail=data.get("error", "操作失败"))
+        logger.info("hub.edge.push", sn=sn, target_version=body.target_version, force=body.force)
+        return {"ok": True, "data": data}
+    except ProgrammingError as e:
+        raise _pg_unavailable(e) from e
+
+
+# ─── Services 微服务 ───
+
+
+@router.get("/services")
+async def list_services():
+    """17 个微服务列表 + 健康状态"""
+    data = await hub_service.hub_list_services()
+    return {"ok": True, "data": data}
+
+
+@router.get("/services/{name}")
+async def get_service(name: str):
+    """单个服务详情"""
+    data = await hub_service.hub_get_service(name)
+    if not data:
+        raise HTTPException(status_code=404, detail=f"服务 {name} 不存在")
+    return {"ok": True, "data": data}
+
+
+@router.get("/services/{name}/slos")
+async def service_slos(name: str):
+    """服务 SLO 列表"""
+    data = await hub_service.hub_service_slos(name)
+    if data is None:
+        raise HTTPException(status_code=404, detail=f"服务 {name} 不存在")
+    return {"ok": True, "data": data}
+
+
+@router.get("/services/{name}/timeline")
+async def service_timeline(name: str):
+    """服务事件时间线"""
+    data = await hub_service.hub_service_timeline(name)
+    if data is None:
+        raise HTTPException(status_code=404, detail=f"服务 {name} 不存在")
+    return {"ok": True, "data": data}
+
+
+# ─── Copilot Chat ───
+
+
+class CopilotChatContext(BaseModel):
+    workspace: str = Field(default="Hub", max_length=64)
+    object_id: Optional[str] = Field(default=None, max_length=128)
+    tab: Optional[str] = Field(default=None, max_length=64)
+
+
+class CopilotChatBody(BaseModel):
+    message: str = Field(..., min_length=1, max_length=4096)
+    context: CopilotChatContext = Field(default_factory=CopilotChatContext)
+    thread_id: Optional[str] = Field(default=None, max_length=64)
+
+
+@router.post("/copilot/chat")
+async def copilot_chat(body: CopilotChatBody):
+    """Copilot 对话（SSE 流式响应）"""
+    logger.info(
+        "hub.copilot.chat",
+        message_len=len(body.message),
+        workspace=body.context.workspace,
+        thread_id=body.thread_id,
+    )
+    return StreamingResponse(
+        hub_service.hub_copilot_chat(
+            message=body.message,
+            context=body.context.model_dump(),
+            thread_id=body.thread_id,
+        ),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+# ─── Customers 客户扩展 ───
+
+
+@router.get("/customers/{customer_id}/health")
+async def customer_health(customer_id: str, db: AsyncSession = Depends(get_db_no_rls)):
+    """客户健康分构成（多维模型：SLA/NPS/Adapter延迟/活跃度/工单量）"""
+    try:
+        data = await hub_service.hub_customer_health(db, customer_id)
+        if not data:
+            raise HTTPException(status_code=404, detail=f"客户 {customer_id} 不存在")
+        return {"ok": True, "data": data}
+    except ProgrammingError as e:
+        raise _pg_unavailable(e) from e
+
+
+@router.get("/customers/{customer_id}/timeline")
+async def customer_timeline(customer_id: str, db: AsyncSession = Depends(get_db_no_rls)):
+    """客户生命周期时间线"""
+    try:
+        data = await hub_service.hub_customer_timeline(db, customer_id)
+        if data is None:
+            raise HTTPException(status_code=404, detail=f"客户 {customer_id} 不存在")
         return {"ok": True, "data": data}
     except ProgrammingError as e:
         raise _pg_unavailable(e) from e
