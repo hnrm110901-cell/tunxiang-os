@@ -1,14 +1,12 @@
 """Agent编排市场 — 卖工作流不只卖零件 (v3.0)"""
 
 import json
-from datetime import datetime, timezone
 from uuid import uuid4
 
+import structlog
 from fastapi import HTTPException
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
-
-import structlog
 
 log = structlog.get_logger(__name__)
 
@@ -110,9 +108,7 @@ class ForgeWorkflowService:
 
         where = " AND ".join(conditions)
 
-        total_row = await db.execute(
-            text(f"SELECT count(*) FROM forge_workflows WHERE {where}"), params
-        )
+        total_row = await db.execute(text(f"SELECT count(*) FROM forge_workflows WHERE {where}"), params)
         total = total_row.scalar() or 0
 
         rows = await db.execute(
@@ -163,9 +159,7 @@ class ForgeWorkflowService:
         return workflow
 
     # ── 更新工作流 ─────────────────────────────────────────────
-    async def update_workflow(
-        self, db: AsyncSession, workflow_id: str, updates: dict
-    ) -> dict:
+    async def update_workflow(self, db: AsyncSession, workflow_id: str, updates: dict) -> dict:
         invalid_keys = set(updates.keys()) - _ALLOWED_UPDATE_FIELDS
         if invalid_keys:
             raise HTTPException(
@@ -199,7 +193,7 @@ class ForgeWorkflowService:
         result = await db.execute(
             text(f"""
                 UPDATE forge_workflows
-                SET {', '.join(set_parts)}
+                SET {", ".join(set_parts)}
                 WHERE workflow_id = :wid AND is_deleted = false
                 RETURNING workflow_id, workflow_name, status, updated_at
             """),
@@ -310,7 +304,7 @@ class ForgeWorkflowService:
         row = await db.execute(
             text(f"""
                 UPDATE forge_workflow_runs
-                SET {', '.join(set_parts)}
+                SET {", ".join(set_parts)}
                 WHERE run_id = :rid AND is_deleted = false
                 RETURNING run_id, workflow_id, status, steps_completed,
                           total_tokens, total_cost_fen, started_at, finished_at
@@ -363,9 +357,7 @@ class ForgeWorkflowService:
 
         where = " AND ".join(conditions)
 
-        total_row = await db.execute(
-            text(f"SELECT count(*) FROM forge_workflow_runs WHERE {where}"), params
-        )
+        total_row = await db.execute(text(f"SELECT count(*) FROM forge_workflow_runs WHERE {where}"), params)
         total = total_row.scalar() or 0
 
         rows = await db.execute(

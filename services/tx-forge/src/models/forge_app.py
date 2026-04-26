@@ -1,11 +1,10 @@
 """应用 ORM"""
 
-import uuid
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import String, Text, Integer, BigInteger, Numeric, DateTime
-from sqlalchemy.dialects.postgresql import UUID, JSONB
+from sqlalchemy import BigInteger, DateTime, Integer, Numeric, String, Text
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from shared.ontology.src.base import TenantBase

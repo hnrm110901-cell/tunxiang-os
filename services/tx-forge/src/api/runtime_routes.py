@@ -1,10 +1,12 @@
 from __future__ import annotations
+
 from typing import Any, Dict, Optional
-from uuid import UUID
+
 import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from shared.ontology.src.database import get_db
 
 router = APIRouter(prefix="/api/v1/forge/runtime", tags=["运行时策略"])
@@ -37,8 +39,14 @@ class ForgeRuntimeService:
 
     async def update_policy(self, app_id: str, policy: Dict[str, Any]) -> Dict[str, Any]:
         sets, params = [], {"tid": self.tenant_id, "app_id": app_id}
-        for field in ("allowed_entities", "allowed_actions", "denied_actions",
-                      "token_budget_daily", "rate_limit_rpm", "sandbox_mode"):
+        for field in (
+            "allowed_entities",
+            "allowed_actions",
+            "denied_actions",
+            "token_budget_daily",
+            "rate_limit_rpm",
+            "sandbox_mode",
+        ):
             if field in policy:
                 if field in ("allowed_entities", "allowed_actions", "denied_actions"):
                     sets.append(f"{field} = :{field}::jsonb")
@@ -49,7 +57,7 @@ class ForgeRuntimeService:
             raise HTTPException(status_code=400, detail="no fields to update")
         sets.append("updated_at = NOW()")
         result = await self.db.execute(
-            text(f"""UPDATE forge.runtime_policies SET {', '.join(sets)}
+            text(f"""UPDATE forge.runtime_policies SET {", ".join(sets)}
                      WHERE tenant_id = :tid AND app_id = :app_id RETURNING *"""),
             params,
         )
@@ -88,28 +96,43 @@ class ForgeRuntimeService:
         return dict(row)
 
     async def get_violations(
-        self, app_id: Optional[str], severity: Optional[str],
-        resolved: Optional[bool], page: int, size: int,
+        self,
+        app_id: Optional[str],
+        severity: Optional[str],
+        resolved: Optional[bool],
+        page: int,
+        size: int,
     ) -> Dict[str, Any]:
         clauses, params = ["tenant_id = :tid"], {"tid": self.tenant_id, "limit": size, "offset": (page - 1) * size}
         if app_id:
-            clauses.append("app_id = :app_id"); params["app_id"] = app_id
+            clauses.append("app_id = :app_id")
+            params["app_id"] = app_id
         if severity:
-            clauses.append("severity = :severity"); params["severity"] = severity
+            clauses.append("severity = :severity")
+            params["severity"] = severity
         if resolved is not None:
-            clauses.append("resolved = :resolved"); params["resolved"] = resolved
+            clauses.append("resolved = :resolved")
+            params["resolved"] = resolved
         where = " AND ".join(clauses)
         rows = await self.db.execute(
-            text(f"SELECT * FROM forge.runtime_violations WHERE {where} ORDER BY created_at DESC LIMIT :limit OFFSET :offset"),
+            text(
+                f"SELECT * FROM forge.runtime_violations WHERE {where} ORDER BY created_at DESC LIMIT :limit OFFSET :offset"
+            ),
             params,
         )
         total_row = await self.db.execute(text(f"SELECT count(*) FROM forge.runtime_violations WHERE {where}"), params)
-        return {"items": [dict(r) for r in rows.mappings().all()], "total": total_row.scalar(), "page": page, "size": size}
+        return {
+            "items": [dict(r) for r in rows.mappings().all()],
+            "total": total_row.scalar(),
+            "page": page,
+            "size": size,
+        }
 
 
 # ---------------------------------------------------------------------------
 # Routes
 # ---------------------------------------------------------------------------
+
 
 @router.get("/{app_id}/policy")
 async def get_policy(

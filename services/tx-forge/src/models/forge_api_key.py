@@ -1,11 +1,10 @@
 """API 密钥 ORM"""
 
-import uuid
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import String, Integer, DateTime
-from sqlalchemy.dialects.postgresql import UUID, JSONB
+from sqlalchemy import DateTime, Integer, String
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from shared.ontology.src.base import TenantBase

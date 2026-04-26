@@ -12,14 +12,12 @@
 
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import date
 
 import structlog
 from fastapi import HTTPException
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
-
-from ..constants import PRICING_MODELS
 
 logger = structlog.get_logger(__name__)
 
@@ -105,9 +103,7 @@ class ForgeTokenService:
         threshold = daily_row.get("alert_threshold") or 80
         alert_sent = daily_row.get("alert_sent") or False
 
-        usage_pct = round(
-            (daily_row["cost_fen"] / budget_fen * 100), 2
-        ) if budget_fen > 0 else 0.0
+        usage_pct = round((daily_row["cost_fen"] / budget_fen * 100), 2) if budget_fen > 0 else 0.0
 
         if budget_fen > 0 and usage_pct >= threshold and not alert_sent:
             await db.execute(
@@ -164,11 +160,7 @@ class ForgeTokenService:
             )
 
         if period_key is None:
-            period_key = (
-                date.today().isoformat()
-                if period_type == "daily"
-                else date.today().strftime("%Y-%m")
-            )
+            period_key = date.today().isoformat() if period_type == "daily" else date.today().strftime("%Y-%m")
 
         result = await db.execute(
             text("""
@@ -203,9 +195,7 @@ class ForgeTokenService:
 
         row_dict = dict(row)
         budget = row_dict.get("budget_fen") or 0
-        row_dict["usage_pct"] = round(
-            (row_dict["cost_fen"] / budget * 100), 2
-        ) if budget > 0 else 0.0
+        row_dict["usage_pct"] = round((row_dict["cost_fen"] / budget * 100), 2) if budget > 0 else 0.0
         return row_dict
 
     # ── 3. 日用量趋势 ──────────────────────────────────────────
@@ -318,11 +308,7 @@ class ForgeTokenService:
                 detail="period_type 必须为 daily 或 monthly",
             )
 
-        period_key = (
-            date.today().isoformat()
-            if period_type == "daily"
-            else date.today().strftime("%Y-%m")
-        )
+        period_key = date.today().isoformat() if period_type == "daily" else date.today().strftime("%Y-%m")
 
         result = await db.execute(
             text("""
@@ -378,7 +364,5 @@ class ForgeTokenService:
         )
         rows = [dict(r) for r in result.mappings().all()]
         for row in rows:
-            row["usage_pct"] = round(
-                (row["cost_fen"] / row["budget_fen"] * 100), 2
-            ) if row["budget_fen"] > 0 else 0.0
+            row["usage_pct"] = round((row["cost_fen"] / row["budget_fen"] * 100), 2) if row["budget_fen"] > 0 else 0.0
         return rows

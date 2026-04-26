@@ -706,7 +706,9 @@ class CustomerJourneyService:
             audience_filter = tpl.audience_filter or {}
             if audience_filter:
                 passed = await self._check_audience_filter(
-                    cid, tid, audience_filter,
+                    cid,
+                    tid,
+                    audience_filter,
                 )
                 if not passed:
                     logger.debug(
@@ -1263,8 +1265,9 @@ class CustomerJourneyService:
             tenant_id=tenant_id,
             content_keys=list(content.keys()),
         )
-        import httpx
         import os
+
+        import httpx
 
         gateway_url = os.getenv("GATEWAY_URL", "http://gateway:8000") + "/api/v1/bff/im/push"
         payload = {

@@ -2,11 +2,10 @@
 
 from uuid import uuid4
 
+import structlog
 from fastapi import HTTPException
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
-
-import structlog
 
 from ..constants import DEV_TYPES
 
@@ -89,9 +88,7 @@ class ForgeDeveloperService:
         return dict(row)
 
     # ── 更新 ─────────────────────────────────────────────────
-    async def update_developer(
-        self, db: AsyncSession, developer_id: str, updates: dict
-    ) -> dict:
+    async def update_developer(self, db: AsyncSession, developer_id: str, updates: dict) -> dict:
         filtered = {k: v for k, v in updates.items() if k in self._ALLOWED_UPDATE_FIELDS}
         if not filtered:
             raise HTTPException(

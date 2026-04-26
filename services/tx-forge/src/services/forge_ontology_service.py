@@ -4,11 +4,10 @@ import hashlib
 import json
 from uuid import uuid4
 
+import structlog
 from fastapi import HTTPException
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
-
-import structlog
 
 log = structlog.get_logger(__name__)
 
@@ -21,7 +20,12 @@ class ForgeOntologyService:
     """Ontology 绑定管理 — 对标 Palantir AIP"""
 
     CORE_ENTITIES: list[str] = [
-        "Store", "Order", "Customer", "Dish", "Ingredient", "Employee",
+        "Store",
+        "Order",
+        "Customer",
+        "Dish",
+        "Ingredient",
+        "Employee",
     ]
 
     # ── 获取绑定关系 ─────────────────────────────────────────────
@@ -155,9 +159,7 @@ class ForgeOntologyService:
         return dict(row)
 
     # ── 查询实体关联的所有应用 ─────────────────────────────────────
-    async def get_entity_apps(
-        self, db: AsyncSession, entity_name: str
-    ) -> list[dict]:
+    async def get_entity_apps(self, db: AsyncSession, entity_name: str) -> list[dict]:
         """获取所有访问指定实体的应用，包含应用详情和信任等级"""
         if entity_name not in self.CORE_ENTITIES:
             raise HTTPException(
@@ -211,23 +213,16 @@ class ForgeOntologyService:
                 errors.append(f"ontology.bindings[{i}]: 缺少 entity 字段")
                 continue
             if entity not in self.CORE_ENTITIES:
-                errors.append(
-                    f"ontology.bindings[{i}]: 无效实体 '{entity}'，"
-                    f"可选: {self.CORE_ENTITIES}"
-                )
+                errors.append(f"ontology.bindings[{i}]: 无效实体 '{entity}'，可选: {self.CORE_ENTITIES}")
             access_mode = binding.get("access_mode")
             if access_mode and access_mode not in VALID_ACCESS_MODES:
                 errors.append(
-                    f"ontology.bindings[{i}]: 无效访问模式 '{access_mode}'，"
-                    f"可选: {sorted(VALID_ACCESS_MODES)}"
+                    f"ontology.bindings[{i}]: 无效访问模式 '{access_mode}'，可选: {sorted(VALID_ACCESS_MODES)}"
                 )
             # 校验约束可解析性
             for j, constraint in enumerate(binding.get("constraints", [])):
                 if not isinstance(constraint, dict):
-                    errors.append(
-                        f"ontology.bindings[{i}].constraints[{j}]: "
-                        f"约束必须是对象类型"
-                    )
+                    errors.append(f"ontology.bindings[{i}].constraints[{j}]: 约束必须是对象类型")
 
         # 3. 校验 MCP 工具
         mcp_section = manifest_content.get("mcp", {})
@@ -237,9 +232,7 @@ class ForgeOntologyService:
                 errors.append(f"mcp.tools[{i}]: 缺少 name 字段")
             tier = tool.get("trust_tier_required")
             if tier and tier not in ("T0", "T1", "T2", "T3", "T4"):
-                errors.append(
-                    f"mcp.tools[{i}]: 无效信任等级 '{tier}'"
-                )
+                errors.append(f"mcp.tools[{i}]: 无效信任等级 '{tier}'")
 
         # 4. 校验 triggers
         triggers = manifest_content.get("triggers", [])
@@ -277,7 +270,9 @@ class ForgeOntologyService:
         """提交 Manifest：校验、存储版本、同步绑定和工具"""
         # 1. 先校验
         validation = await self.validate_manifest(
-            db, app_id=app_id, manifest_content=manifest_content,
+            db,
+            app_id=app_id,
+            manifest_content=manifest_content,
         )
         if not validation["valid"]:
             raise HTTPException(
@@ -387,9 +382,7 @@ class ForgeOntologyService:
                         input_schema=tool_def.get("input_schema", {}),
                         output_schema=tool_def.get("output_schema", {}),
                         ontology_bindings=tool_def.get("ontology_bindings", []),
-                        trust_tier_required=tool_def.get(
-                            "trust_tier_required", "T1"
-                        ),
+                        trust_tier_required=tool_def.get("trust_tier_required", "T1"),
                     )
                     tools_synced += 1
 
@@ -413,9 +406,7 @@ class ForgeOntologyService:
         }
 
     # ── Manifest 历史 ────────────────────────────────────────────
-    async def get_manifest_history(
-        self, db: AsyncSession, app_id: str
-    ) -> list[dict]:
+    async def get_manifest_history(self, db: AsyncSession, app_id: str) -> list[dict]:
         """获取应用的 Manifest 提交历史"""
         result = await db.execute(
             text("""

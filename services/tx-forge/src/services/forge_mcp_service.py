@@ -3,11 +3,10 @@
 import json
 from uuid import uuid4
 
+import structlog
 from fastapi import HTTPException
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
-
-import structlog
 
 log = structlog.get_logger(__name__)
 
@@ -246,9 +245,7 @@ class ForgeMCPService:
             params["server_id"] = server_id
         if entity is not None:
             # JSONB 包含查询：ontology_bindings 中有指定 entity
-            where_parts.append(
-                """t.ontology_bindings @> :entity_filter::jsonb"""
-            )
+            where_parts.append("""t.ontology_bindings @> :entity_filter::jsonb""")
             params["entity_filter"] = json.dumps([{"entity": entity}])
         if trust_tier is not None:
             where_parts.append("t.trust_tier_required = :trust_tier")

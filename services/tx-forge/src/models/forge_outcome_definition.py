@@ -1,6 +1,6 @@
 """成果定义 ORM"""
 
-from sqlalchemy import String, Text, Integer, Boolean
+from sqlalchemy import Boolean, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from shared.ontology.src.base import TenantBase

@@ -1,11 +1,9 @@
 """应用版本 ORM"""
 
-import uuid
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import String, Text, DateTime
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import DateTime, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from shared.ontology.src.base import TenantBase

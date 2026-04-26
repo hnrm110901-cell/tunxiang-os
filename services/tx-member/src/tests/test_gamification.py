@@ -347,8 +347,6 @@ class TestClaimReward:
 
 import asyncio
 
-import pytest
-
 
 def _run(coro):
     """Helper to run async in sync test context"""
@@ -371,14 +369,14 @@ class TestSurpriseReward:
         """通过API注册惊喜规则（如果API端点已就绪）"""
         # 注：surprise_rules API 端点尚在路由层补齐中
         # 此处验证 service 函数签名已改为 async + db
+        # 验证函数签名要求 db 参数
+        import inspect
+
         from services.surprise_reward import (
             delete_surprise_rule,
             get_surprise_rules,
             register_surprise_rule,
         )
-
-        # 验证函数签名要求 db 参数
-        import inspect
 
         sig = inspect.signature(register_surprise_rule)
         assert "db" in sig.parameters
@@ -392,14 +390,14 @@ class TestSurpriseReward:
 
     def test_function_signatures_async(self):
         """验证所有核心函数已改为 async"""
+        import inspect
+
         from services.surprise_reward import (
             check_surprise,
             delete_surprise_rule,
             get_surprise_rules,
             register_surprise_rule,
         )
-
-        import inspect
 
         assert inspect.iscoroutinefunction(register_surprise_rule)
         assert inspect.iscoroutinefunction(get_surprise_rules)

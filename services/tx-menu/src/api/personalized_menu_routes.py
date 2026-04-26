@@ -322,8 +322,9 @@ async def get_personalized_menu(
     user_segment = "S3"  # 默认RFM分层
     if customer_id:
         try:
-            import httpx
             import os
+
+            import httpx
 
             tx_member_url = os.getenv("TX_MEMBER_URL", "http://tx-member:8003")
             async with httpx.AsyncClient(timeout=3.0) as client:

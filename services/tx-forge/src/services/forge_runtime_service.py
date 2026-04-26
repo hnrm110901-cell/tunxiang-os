@@ -3,11 +3,10 @@
 import json
 from uuid import uuid4
 
+import structlog
 from fastapi import HTTPException
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
-
-import structlog
 
 log = structlog.get_logger(__name__)
 
@@ -88,9 +87,7 @@ class ForgeRuntimeService:
         return dict(new_row)
 
     # ── 更新运行时策略 ───────────────────────────────────────────
-    async def update_policy(
-        self, db: AsyncSession, app_id: str, updates: dict
-    ) -> dict:
+    async def update_policy(self, db: AsyncSession, app_id: str, updates: dict) -> dict:
         """更新运行时策略（不可直接改 trust_tier / kill_switch）"""
         # 拦截受保护字段
         protected_in_request = _PROTECTED_FIELDS & set(updates.keys())
@@ -402,7 +399,7 @@ class ForgeRuntimeService:
             {"app_id": app_id},
         )
         threshold_row = threshold_result.mappings().first()
-        auto_threshold = (threshold_row["auto_downgrade_threshold"] if threshold_row else 3)
+        auto_threshold = threshold_row["auto_downgrade_threshold"] if threshold_row else 3
 
         count_result = await db.execute(
             text("""

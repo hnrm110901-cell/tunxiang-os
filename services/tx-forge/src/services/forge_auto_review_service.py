@@ -3,11 +3,10 @@
 import json
 from uuid import uuid4
 
+import structlog
 from fastapi import HTTPException
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
-
-import structlog
 
 log = structlog.get_logger(__name__)
 
@@ -246,9 +245,7 @@ class ForgeAutoReviewService:
 
         where = " AND ".join(conditions)
 
-        total_row = await db.execute(
-            text(f"SELECT count(*) FROM forge_auto_reviews WHERE {where}"), params
-        )
+        total_row = await db.execute(text(f"SELECT count(*) FROM forge_auto_reviews WHERE {where}"), params)
         total = total_row.scalar() or 0
 
         rows = await db.execute(
@@ -265,9 +262,7 @@ class ForgeAutoReviewService:
         return {"items": items, "total": total, "page": page, "size": size}
 
     # ── 审核模板列表 ─────────────────────────────────────────
-    async def get_review_templates(
-        self, db: AsyncSession, *, app_category: str | None = None
-    ) -> list[dict]:
+    async def get_review_templates(self, db: AsyncSession, *, app_category: str | None = None) -> list[dict]:
         conditions = ["is_deleted = false"]
         params: dict = {}
 

@@ -1,10 +1,12 @@
 from __future__ import annotations
+
 from typing import Any, Dict, Optional
-from uuid import UUID
+
 import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from shared.ontology.src.database import get_db
 
 router = APIRouter(prefix="/api/v1/forge/ontology", tags=["Ontology绑定"])
@@ -28,9 +30,11 @@ class ForgeOntologyService:
     async def get_bindings(self, app_id: Optional[str], entity: Optional[str]) -> list[Dict[str, Any]]:
         clauses, params = ["tenant_id = :tid"], {"tid": self.tenant_id}
         if app_id:
-            clauses.append("app_id = :app_id"); params["app_id"] = app_id
+            clauses.append("app_id = :app_id")
+            params["app_id"] = app_id
         if entity:
-            clauses.append("entity_name = :entity"); params["entity"] = entity
+            clauses.append("entity_name = :entity")
+            params["entity"] = entity
         where = " AND ".join(clauses)
         rows = await self.db.execute(
             text(f"SELECT * FROM forge.ontology_bindings WHERE {where} ORDER BY entity_name, app_id"),
@@ -111,6 +115,7 @@ class ForgeOntologyService:
 # ---------------------------------------------------------------------------
 # Routes
 # ---------------------------------------------------------------------------
+
 
 @router.get("/bindings")
 async def get_bindings(

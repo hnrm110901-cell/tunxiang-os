@@ -99,9 +99,7 @@ class ForgeSDKService:
         logger.info("api_key_revoked", key_id=key_id)
         return dict(row)
 
-    async def list_api_keys(
-        self, db: AsyncSession, developer_id: str
-    ) -> list[dict]:
+    async def list_api_keys(self, db: AsyncSession, developer_id: str) -> list[dict]:
         """列出开发者的所有密钥（前缀脱敏显示）。"""
         result = await db.execute(
             text("""
@@ -114,10 +112,7 @@ class ForgeSDKService:
             {"developer_id": developer_id},
         )
         rows = result.mappings().all()
-        return [
-            {**dict(r), "api_key_display": f"{r['api_key_prefix']}..."}
-            for r in rows
-        ]
+        return [{**dict(r), "api_key_display": f"{r['api_key_prefix']}..."} for r in rows]
 
     async def get_api_usage(
         self,

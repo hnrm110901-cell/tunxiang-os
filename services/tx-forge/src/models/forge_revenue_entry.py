@@ -1,10 +1,8 @@
 """收入流水 ORM"""
 
 import uuid
-from datetime import datetime
-from typing import Optional
 
-from sqlalchemy import String, BigInteger, Numeric, Text
+from sqlalchemy import BigInteger, Numeric, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 

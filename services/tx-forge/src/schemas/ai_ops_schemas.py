@@ -1,9 +1,9 @@
 """AI 运维 Pydantic schemas"""
 
-from datetime import datetime, date
+from datetime import date, datetime
 from typing import Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 
 class AgentStatus(BaseModel):

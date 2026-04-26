@@ -8,12 +8,10 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
+
 from ..schemas.outcome_schemas import (
     OutcomeDefinitionCreate,
-    OutcomeDefinitionOut,
-    OutcomeDashboard,
     OutcomeEventCreate,
-    OutcomeEventOut,
     OutcomeVerify,
 )
 
@@ -249,9 +247,7 @@ async def list_outcome_events(
         params["verified"] = verified
     where = " AND ".join(clauses)
 
-    total_row = await db.execute(
-        text(f"SELECT COUNT(*) FROM forge.outcome_events WHERE {where}"), params
-    )
+    total_row = await db.execute(text(f"SELECT COUNT(*) FROM forge.outcome_events WHERE {where}"), params)
     total = total_row.scalar() or 0
 
     rows = await db.execute(

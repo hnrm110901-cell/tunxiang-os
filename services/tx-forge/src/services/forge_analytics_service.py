@@ -51,9 +51,7 @@ class ForgeAnalyticsService:
         category_distribution = [
             {
                 "category": r["category"],
-                "category_name": APP_CATEGORIES.get(
-                    r["category"], {}
-                ).get("name", r["category"]),
+                "category_name": APP_CATEGORIES.get(r["category"], {}).get("name", r["category"]),
                 "app_count": r["app_count"],
             }
             for r in cat_result.mappings().all()
@@ -62,9 +60,7 @@ class ForgeAnalyticsService:
         agg["avg_rating"] = round(float(agg["avg_rating"]), 2)
         agg["category_distribution"] = category_distribution
 
-        logger.info("marketplace_stats_queried", **{
-            k: v for k, v in agg.items() if k != "category_distribution"
-        })
+        logger.info("marketplace_stats_queried", **{k: v for k, v in agg.items() if k != "category_distribution"})
         return agg
 
     async def get_trending_apps(
@@ -124,9 +120,7 @@ class ForgeAnalyticsService:
         return [
             {
                 **dict(r),
-                "category_name": APP_CATEGORIES.get(
-                    r["category"], {}
-                ).get("name", r["category"]),
+                "category_name": APP_CATEGORIES.get(r["category"], {}).get("name", r["category"]),
                 "avg_rating": round(float(r["avg_rating"]), 2),
             }
             for r in result.mappings().all()

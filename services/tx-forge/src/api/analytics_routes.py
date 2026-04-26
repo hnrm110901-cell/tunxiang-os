@@ -1,10 +1,12 @@
 from __future__ import annotations
-from typing import Any, Dict, Optional
-from uuid import UUID
+
+from typing import Any, Dict
+
 import structlog
-from fastapi import APIRouter, Depends, Header, HTTPException, Query
+from fastapi import APIRouter, Depends, Header, Query
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from shared.ontology.src.database import get_db
 
 router = APIRouter(prefix="/api/v1/forge/analytics", tags=["analytics"])
@@ -56,7 +58,9 @@ async def category_stats(
 ) -> Dict[str, Any]:
     await _set_tenant(db, x_tenant_id)
     rows = await db.execute(
-        text("SELECT category, COUNT(*) AS app_count FROM forge.apps WHERE tenant_id = :tid GROUP BY category ORDER BY app_count DESC"),
+        text(
+            "SELECT category, COUNT(*) AS app_count FROM forge.apps WHERE tenant_id = :tid GROUP BY category ORDER BY app_count DESC"
+        ),
         {"tid": x_tenant_id},
     )
     return {"items": [dict(r) for r in rows.mappings().all()]}

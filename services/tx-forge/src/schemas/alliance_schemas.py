@@ -1,7 +1,6 @@
 """跨品牌联盟 Pydantic schemas"""
 
-from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 from uuid import UUID
 
 from pydantic import BaseModel, Field

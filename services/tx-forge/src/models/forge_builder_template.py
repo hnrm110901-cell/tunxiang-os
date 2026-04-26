@@ -2,7 +2,7 @@
 
 from typing import Optional
 
-from sqlalchemy import String, Text, Integer
+from sqlalchemy import Integer, String, Text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
