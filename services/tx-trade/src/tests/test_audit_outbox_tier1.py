@@ -9,6 +9,7 @@
   - outbox 文件可被 sync-engine 后续 flush 到 PG
   - 截断 / 文件不可写 / 长行等 edge case fail-safe
 """
+
 from __future__ import annotations
 
 import json
@@ -248,21 +249,25 @@ async def test_flush_outbox_ingests_rows_then_cleans_up(temp_outbox):
         完成后 .flushing 文件直接 unlink（不再保留 .processed 归档）。
     """
     # 准备 outbox 内容（手动写两条）
-    write_audit_to_outbox({
-        "tenant_id": "00000000-0000-0000-0000-0000000000a1",
-        "user_id": "00000000-0000-0000-0000-000000000011",
-        "action": "refund.apply",
-        "result": "deny",
-        "reason": "ROLE_FORBIDDEN",
-        "severity": "warn",
-    })
-    write_audit_to_outbox({
-        "tenant_id": "00000000-0000-0000-0000-0000000000a1",
-        "user_id": "00000000-0000-0000-0000-000000000012",
-        "action": "discount.apply",
-        "result": "allow",
-        "severity": "info",
-    })
+    write_audit_to_outbox(
+        {
+            "tenant_id": "00000000-0000-0000-0000-0000000000a1",
+            "user_id": "00000000-0000-0000-0000-000000000011",
+            "action": "refund.apply",
+            "result": "deny",
+            "reason": "ROLE_FORBIDDEN",
+            "severity": "warn",
+        }
+    )
+    write_audit_to_outbox(
+        {
+            "tenant_id": "00000000-0000-0000-0000-0000000000a1",
+            "user_id": "00000000-0000-0000-0000-000000000012",
+            "action": "discount.apply",
+            "result": "allow",
+            "severity": "info",
+        }
+    )
     assert temp_outbox.exists()
 
     db = AsyncMock()
@@ -294,12 +299,14 @@ async def test_flush_outbox_max_rows_preserves_leftover(temp_outbox):
     新代码必须把行 4/5 append 回 outbox.jsonl 等下次 flush。
     """
     for i in range(5):
-        write_audit_to_outbox({
-            "tenant_id": "00000000-0000-0000-0000-0000000000a1",
-            "user_id": f"00000000-0000-0000-0000-{i:012d}",
-            "action": f"test.row_{i}",
-            "result": "allow",
-        })
+        write_audit_to_outbox(
+            {
+                "tenant_id": "00000000-0000-0000-0000-0000000000a1",
+                "user_id": f"00000000-0000-0000-0000-{i:012d}",
+                "action": f"test.row_{i}",
+                "result": "allow",
+            }
+        )
     assert len([l for l in temp_outbox.read_text("utf-8").splitlines() if l.strip()]) == 5
 
     db = AsyncMock()
@@ -338,11 +345,13 @@ async def test_flush_outbox_transient_failure_rolls_back_and_requeues_all(temp_o
     from sqlalchemy.exc import SQLAlchemyError
 
     for i in range(5):
-        write_audit_to_outbox({
-            "tenant_id": "00000000-0000-0000-0000-0000000000a1",
-            "user_id": f"00000000-0000-0000-0000-{i:012d}",
-            "action": f"test.row_{i}",
-        })
+        write_audit_to_outbox(
+            {
+                "tenant_id": "00000000-0000-0000-0000-0000000000a1",
+                "user_id": f"00000000-0000-0000-0000-{i:012d}",
+                "action": f"test.row_{i}",
+            }
+        )
 
     db = AsyncMock()
     db.commit = AsyncMock()
@@ -384,11 +393,13 @@ async def test_flush_outbox_unparseable_lines_go_to_poison(temp_outbox):
     避免一条永远失败的行让 outbox 永远清不空（类似 Kafka 的死信队列模式）。
     """
     # 写 1 条好行
-    write_audit_to_outbox({
-        "tenant_id": "00000000-0000-0000-0000-0000000000a1",
-        "user_id": "00000000-0000-0000-0000-000000000011",
-        "action": "good.row",
-    })
+    write_audit_to_outbox(
+        {
+            "tenant_id": "00000000-0000-0000-0000-0000000000a1",
+            "user_id": "00000000-0000-0000-0000-000000000011",
+            "action": "good.row",
+        }
+    )
     # 手动追加：1 条 JSON 解析失败 + 1 条空 audit envelope
     with temp_outbox.open("a", encoding="utf-8") as f:
         f.write("this is not json{\n")
@@ -421,9 +432,7 @@ async def test_flush_outbox_unparseable_lines_go_to_poison(temp_outbox):
 
 
 @pytest.mark.asyncio
-async def test_flush_outbox_retains_flushing_file_after_writeback_failure(
-    temp_outbox, tmp_path, monkeypatch
-):
+async def test_flush_outbox_retains_flushing_file_after_writeback_failure(temp_outbox, tmp_path, monkeypatch):
     """leftover writeback 失败 → .flushing 文件保留，下次 flush 必须自动重试它。
 
     模拟：
@@ -438,11 +447,13 @@ async def test_flush_outbox_retains_flushing_file_after_writeback_failure(
     """
     # 准备 5 行（其中 2 行 max_rows=2 会触发 leftover）
     for i in range(5):
-        write_audit_to_outbox({
-            "tenant_id": "00000000-0000-0000-0000-0000000000a1",
-            "user_id": f"00000000-0000-0000-0000-{i:012d}",
-            "action": f"test.row_{i}",
-        })
+        write_audit_to_outbox(
+            {
+                "tenant_id": "00000000-0000-0000-0000-0000000000a1",
+                "user_id": f"00000000-0000-0000-0000-{i:012d}",
+                "action": f"test.row_{i}",
+            }
+        )
 
     db = AsyncMock()
     db.execute = AsyncMock()
@@ -483,16 +494,12 @@ async def test_flush_outbox_retains_flushing_file_after_writeback_failure(
     assert rows_second == 3, "retained .flushing 的 3 行必须在第二次 flush 被处理"
 
     # .flushing 已被消费删除
-    flushing_files_after = list(
-        temp_outbox.parent.glob(temp_outbox.name + ".flushing.*")
-    )
+    flushing_files_after = list(temp_outbox.parent.glob(temp_outbox.name + ".flushing.*"))
     assert len(flushing_files_after) == 0
 
 
 @pytest.mark.asyncio
-async def test_flush_outbox_processes_retained_when_main_missing(
-    temp_outbox, tmp_path
-):
+async def test_flush_outbox_processes_retained_when_main_missing(temp_outbox, tmp_path):
     """主 outbox 不存在但有 retained .flushing → 仍然处理（不 short-circuit return 0）。
 
     最直接的回归保护：手动伪造一个 .flushing 文件（模拟前次失败遗留），
@@ -501,15 +508,18 @@ async def test_flush_outbox_processes_retained_when_main_missing(
     # 手动创建 retained .flushing 文件（模拟前次写回失败保留下来）
     retained = temp_outbox.with_suffix(temp_outbox.suffix + ".flushing.1700000000000")
     retained.write_text(
-        json.dumps({
-            "_outbox_ts": "2026-04-26T00:00:00Z",
-            "_outbox_seq": 1,
-            "audit": {
-                "tenant_id": "00000000-0000-0000-0000-0000000000a1",
-                "user_id": "00000000-0000-0000-0000-000000000011",
-                "action": "retained.row",
-            },
-        }) + "\n",
+        json.dumps(
+            {
+                "_outbox_ts": "2026-04-26T00:00:00Z",
+                "_outbox_seq": 1,
+                "audit": {
+                    "tenant_id": "00000000-0000-0000-0000-0000000000a1",
+                    "user_id": "00000000-0000-0000-0000-000000000011",
+                    "action": "retained.row",
+                },
+            }
+        )
+        + "\n",
         encoding="utf-8",
     )
     assert retained.exists()
@@ -533,15 +543,18 @@ async def test_flush_outbox_processes_retained_in_fifo_order(temp_outbox, tmp_pa
     for ts, action in [(1000, "old.row"), (2000, "mid.row"), (3000, "new.row")]:
         flushing = temp_outbox.with_suffix(temp_outbox.suffix + f".flushing.{ts}")
         flushing.write_text(
-            json.dumps({
-                "_outbox_ts": "2026-04-26T00:00:00Z",
-                "_outbox_seq": 1,
-                "audit": {
-                    "tenant_id": "00000000-0000-0000-0000-0000000000a1",
-                    "user_id": "00000000-0000-0000-0000-000000000011",
-                    "action": action,
-                },
-            }) + "\n",
+            json.dumps(
+                {
+                    "_outbox_ts": "2026-04-26T00:00:00Z",
+                    "_outbox_seq": 1,
+                    "audit": {
+                        "tenant_id": "00000000-0000-0000-0000-0000000000a1",
+                        "user_id": "00000000-0000-0000-0000-000000000011",
+                        "action": action,
+                    },
+                }
+            )
+            + "\n",
             encoding="utf-8",
         )
 
@@ -561,9 +574,7 @@ async def test_flush_outbox_processes_retained_in_fifo_order(temp_outbox, tmp_pa
     rows = await flush_outbox_to_pg(db)
     assert rows == 3
     # 旧文件（ts=1000）的行先 INSERT
-    assert inserted_actions == ["old.row", "mid.row", "new.row"], (
-        f"FIFO 顺序错误: {inserted_actions}"
-    )
+    assert inserted_actions == ["old.row", "mid.row", "new.row"], f"FIFO 顺序错误: {inserted_actions}"
 
 
 # ──────────────────────────────────────────────────────────────────────────

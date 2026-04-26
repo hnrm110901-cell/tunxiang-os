@@ -155,9 +155,7 @@ async def test_t4_get_cached_hit_returns_response():
     """同 key 同 hash → 返回 CachedResponse 含原 status/body。"""
     request_hash = _compute_request_hash("POST", _ROUTE_SETTLE, _REAL_SETTLE_BODY)
     cached_body_str = json.dumps({"ok": True, "data": {"order_no": "X1", "final_amount_fen": 88800}, "error": None})
-    db = _mk_db_with_select(
-        row=(200, cached_body_str, "completed", request_hash, datetime.now(timezone.utc))
-    )
+    db = _mk_db_with_select(row=(200, cached_body_str, "completed", request_hash, datetime.now(timezone.utc)))
 
     cached = await get_cached_response(
         db,
@@ -262,7 +260,9 @@ async def test_t8_store_db_error_does_not_raise():
             response_body={"ok": True, "data": {}, "error": None},
         )
         # 错误必须 log warning
-        warns = [c for c in mock_logger.warning.call_args_list if c.args and c.args[0] == "api_idempotency_store_failed"]
+        warns = [
+            c for c in mock_logger.warning.call_args_list if c.args and c.args[0] == "api_idempotency_store_failed"
+        ]
         assert len(warns) == 1
 
 
@@ -295,10 +295,7 @@ async def test_t9_store_serializes_chinese_and_nested():
     )
 
     # 找到 INSERT 调用，检查 body 参数确实是 JSON 字符串且包含中文
-    insert_calls = [
-        c for c in db.execute.await_args_list
-        if "INSERT INTO api_idempotency_cache" in str(c.args[0])
-    ]
+    insert_calls = [c for c in db.execute.await_args_list if "INSERT INTO api_idempotency_cache" in str(c.args[0])]
     assert len(insert_calls) == 1
     params = insert_calls[0].args[1]
     assert "毛氏红烧肉" in params["body"]
@@ -344,7 +341,9 @@ async def test_t11_acquire_lock_oversize_key_is_noop_with_warning():
             idempotency_key=overlong_key,
             route_path=_ROUTE_SETTLE,
         )
-        warns = [c for c in mock_logger.warning.call_args_list if c.args and c.args[0] == "api_idempotency_key_too_long"]
+        warns = [
+            c for c in mock_logger.warning.call_args_list if c.args and c.args[0] == "api_idempotency_key_too_long"
+        ]
         assert len(warns) == 1
 
     db.execute.assert_not_called()
@@ -407,9 +406,7 @@ async def test_t12_xuji_settle_replay_first_stores_second_hits_cache():
     )
 
     # ── 第二次请求（重试）：cache hit
-    db_second = _mk_db_with_select(
-        row=(200, cached_body_str, "completed", request_hash, datetime.now(timezone.utc))
-    )
+    db_second = _mk_db_with_select(row=(200, cached_body_str, "completed", request_hash, datetime.now(timezone.utc)))
     cached2 = await get_cached_response(
         db_second,
         tenant_id=_TENANT_CHANGSHA,

@@ -11,6 +11,7 @@ cfd117a0 合入）。本测试补回测试覆盖（cfd117a0 合并时漏掉了�
 阈值优先级：
   TX_MFA_THRESHOLD_FEN__<ACTION>  > TX_MFA_THRESHOLD_FEN_DEFAULT > 入参 default
 """
+
 from __future__ import annotations
 
 import os
@@ -46,8 +47,11 @@ def _clean_env(monkeypatch):
 
 def _user(*, mfa_verified: bool = False, role: str = "store_manager") -> UserContext:
     return UserContext(
-        user_id=MANAGER_ID, tenant_id=XUJI_TENANT, role=role,
-        mfa_verified=mfa_verified, store_id="00000000-0000-0000-0000-0000000000a2",
+        user_id=MANAGER_ID,
+        tenant_id=XUJI_TENANT,
+        role=role,
+        mfa_verified=mfa_verified,
+        store_id="00000000-0000-0000-0000-0000000000a2",
         client_ip="10.0.0.5",
     )
 
@@ -65,6 +69,7 @@ def stub_db():
 def captured_audit_deny(monkeypatch):
     """拦截 trade_audit_log.audit_deny 调用记录参数。"""
     from src.services import trade_audit_log
+
     captured: list[dict] = []
 
     async def _fake_audit_deny(db, **kwargs):
@@ -84,7 +89,8 @@ async def test_low_amount_without_mfa_passes(stub_db, captured_audit_deny):
     """¥4999 (499_900 fen) 低于默认阈值 ¥5000 → 不要求 MFA。"""
     user = _user(mfa_verified=False)
     await assert_mfa_for_high_value(
-        user, stub_db,
+        user,
+        stub_db,
         action="banquet.deposit.create",
         amount_fen=499_900,
     )
@@ -104,7 +110,8 @@ async def test_high_amount_without_mfa_returns_403(stub_db, captured_audit_deny)
 
     with pytest.raises(HTTPException) as ei:
         await assert_mfa_for_high_value(
-            user, stub_db,
+            user,
+            stub_db,
             action="banquet.deposit.create",
             amount_fen=1_000_000,
             request_id="req-banquet-001",
@@ -133,7 +140,8 @@ async def test_high_amount_with_mfa_passes(stub_db, captured_audit_deny):
     """高额且 MFA 验证通过 → 放行；不写 audit（不污染索引）。"""
     user = _user(mfa_verified=True)
     await assert_mfa_for_high_value(
-        user, stub_db,
+        user,
+        stub_db,
         action="banquet.deposit.create",
         amount_fen=1_000_000,
     )
@@ -151,7 +159,8 @@ async def test_amount_equal_to_threshold_treated_as_high(stub_db, captured_audit
     user = _user(mfa_verified=False)
     with pytest.raises(HTTPException) as ei:
         await assert_mfa_for_high_value(
-            user, stub_db,
+            user,
+            stub_db,
             action="banquet.deposit.create",
             amount_fen=500_000,
         )
@@ -165,14 +174,17 @@ async def test_amount_equal_to_threshold_treated_as_high(stub_db, captured_audit
 
 @pytest.mark.asyncio
 async def test_action_specific_env_threshold_overrides_default(
-    monkeypatch, stub_db, captured_audit_deny,
+    monkeypatch,
+    stub_db,
+    captured_audit_deny,
 ):
     """TX_MFA_THRESHOLD_FEN__BANQUET_DEPOSIT_CREATE 覆盖默认 ¥5000。"""
     monkeypatch.setenv("TX_MFA_THRESHOLD_FEN__BANQUET_DEPOSIT_CREATE", "200000")  # ¥2000
     user = _user(mfa_verified=False)
     with pytest.raises(HTTPException):
         await assert_mfa_for_high_value(
-            user, stub_db,
+            user,
+            stub_db,
             action="banquet.deposit.create",
             amount_fen=300_000,  # ¥3000 ≥ ¥2000 自定义阈值
         )
@@ -180,14 +192,17 @@ async def test_action_specific_env_threshold_overrides_default(
 
 @pytest.mark.asyncio
 async def test_global_default_env_threshold_applies_when_no_action_specific(
-    monkeypatch, stub_db, captured_audit_deny,
+    monkeypatch,
+    stub_db,
+    captured_audit_deny,
 ):
     """TX_MFA_THRESHOLD_FEN_DEFAULT 在没有 action 专属变量时生效。"""
     monkeypatch.setenv("TX_MFA_THRESHOLD_FEN_DEFAULT", "100000")  # ¥1000
     user = _user(mfa_verified=False)
     with pytest.raises(HTTPException):
         await assert_mfa_for_high_value(
-            user, stub_db,
+            user,
+            stub_db,
             action="some.other.action",
             amount_fen=150_000,
         )
@@ -195,17 +210,21 @@ async def test_global_default_env_threshold_applies_when_no_action_specific(
 
 @pytest.mark.asyncio
 async def test_action_specific_takes_precedence_over_global(
-    monkeypatch, stub_db, captured_audit_deny,
+    monkeypatch,
+    stub_db,
+    captured_audit_deny,
 ):
     """action 专属阈值优先于全局；金额低于 action 专属阈值 → 放行。"""
     monkeypatch.setenv("TX_MFA_THRESHOLD_FEN_DEFAULT", "100000")
     monkeypatch.setenv(
-        "TX_MFA_THRESHOLD_FEN__BANQUET_DEPOSIT_CREATE", "10000000",
+        "TX_MFA_THRESHOLD_FEN__BANQUET_DEPOSIT_CREATE",
+        "10000000",
     )
     user = _user(mfa_verified=False)
     # ¥50000 高于全局 ¥1000 但低于 action 专属 ¥100000 → 应放行
     await assert_mfa_for_high_value(
-        user, stub_db,
+        user,
+        stub_db,
         action="banquet.deposit.create",
         amount_fen=5_000_000,
     )
@@ -242,7 +261,8 @@ async def test_audit_deny_failure_does_not_block_403(monkeypatch, stub_db):
     user = _user(mfa_verified=False)
     with pytest.raises(HTTPException) as ei:
         await assert_mfa_for_high_value(
-            user, stub_db,
+            user,
+            stub_db,
             action="banquet.deposit.create",
             amount_fen=1_000_000,
         )
@@ -261,7 +281,8 @@ async def test_custom_threshold_argument_overrides_default(stub_db, captured_aud
     user = _user(mfa_verified=False)
     with pytest.raises(HTTPException):
         await assert_mfa_for_high_value(
-            user, stub_db,
+            user,
+            stub_db,
             action="custom.action",
             amount_fen=300_000,
             threshold_fen=200_000,
@@ -269,7 +290,8 @@ async def test_custom_threshold_argument_overrides_default(stub_db, captured_aud
 
     captured_audit_deny.clear()
     await assert_mfa_for_high_value(
-        user, stub_db,
+        user,
+        stub_db,
         action="custom.action",
         amount_fen=150_000,
         threshold_fen=200_000,

@@ -330,7 +330,9 @@ async def batch_verify_vouchers(
     body: BatchVerifyRequest,
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
     db: AsyncSession = Depends(get_db),
-    user: UserContext = Depends(require_role_audited("douyin_voucher.batch_verify", "cashier", "store_manager", "admin")),
+    user: UserContext = Depends(
+        require_role_audited("douyin_voucher.batch_verify", "cashier", "store_manager", "admin")
+    ),
 ) -> dict:
     """批量核销（最多50张）"""
     results = []

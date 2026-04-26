@@ -64,7 +64,8 @@ def _is_valid_uuid_str(value: str | None) -> bool:
 
 
 def _resolve_audit_for_unauthenticated(
-    request: Request, ctx_tenant_id: str,
+    request: Request,
+    ctx_tenant_id: str,
 ) -> tuple[str, str | None]:
     """为 deny 审计 resolve tenant_id + 取证后缀。
 
@@ -303,6 +304,7 @@ def _import_get_db() -> Callable:
     实际被调用时 import；测试可通过参数注入 db_provider 替换。
     """
     from shared.ontology.src.database import get_db  # noqa: PLC0415
+
     return get_db
 
 
@@ -339,16 +341,13 @@ def require_role_audited(
         except HTTPException as exc:
             # 拒绝路径：先写 deny 审计，再原样抛出（响应形状 / 状态码不变）
             ctx = extract_user_context(request)
-            base_reason = (
-                str(exc.detail) if isinstance(exc.detail, str) else exc.detail.__class__.__name__
-            )
+            base_reason = str(exc.detail) if isinstance(exc.detail, str) else exc.detail.__class__.__name__
             # 401 / ctx 缺 tenant 路径：用 NIL UUID + 把伪造的 X-Tenant-ID 进 reason
             audit_tenant_id, reason_suffix = _resolve_audit_for_unauthenticated(
-                request, ctx.tenant_id,
+                request,
+                ctx.tenant_id,
             )
-            reason = (
-                f"{base_reason} | {reason_suffix}" if reason_suffix else base_reason
-            )
+            reason = f"{base_reason} | {reason_suffix}" if reason_suffix else base_reason
             try:
                 await _audit_deny_safe(
                     db=db,
@@ -360,9 +359,7 @@ def require_role_audited(
                     reason=reason,
                     severity=severity_on_deny,
                     client_ip=ctx.client_ip,
-                    request_id=request.headers.get("X-Request-Id")
-                    if hasattr(request, "headers")
-                    else None,
+                    request_id=request.headers.get("X-Request-Id") if hasattr(request, "headers") else None,
                 )
             except Exception:  # noqa: BLE001 — 审计失败绝不影响 403/401 响应
                 logger.error(
@@ -398,16 +395,13 @@ def require_mfa_audited(
             return await base(request)
         except HTTPException as exc:
             ctx = extract_user_context(request)
-            base_reason = (
-                str(exc.detail) if isinstance(exc.detail, str) else exc.detail.__class__.__name__
-            )
+            base_reason = str(exc.detail) if isinstance(exc.detail, str) else exc.detail.__class__.__name__
             # 401 / ctx 缺 tenant 路径：用 NIL UUID + 把伪造的 X-Tenant-ID 进 reason
             audit_tenant_id, reason_suffix = _resolve_audit_for_unauthenticated(
-                request, ctx.tenant_id,
+                request,
+                ctx.tenant_id,
             )
-            reason = (
-                f"{base_reason} | {reason_suffix}" if reason_suffix else base_reason
-            )
+            reason = f"{base_reason} | {reason_suffix}" if reason_suffix else base_reason
             try:
                 await _audit_deny_safe(
                     db=db,
@@ -419,9 +413,7 @@ def require_mfa_audited(
                     reason=reason,
                     severity=severity_on_deny,
                     client_ip=ctx.client_ip,
-                    request_id=request.headers.get("X-Request-Id")
-                    if hasattr(request, "headers")
-                    else None,
+                    request_id=request.headers.get("X-Request-Id") if hasattr(request, "headers") else None,
                 )
             except Exception:  # noqa: BLE001
                 logger.error(
@@ -459,10 +451,7 @@ def _high_value_threshold_fen(action: str, default_fen: int) -> int:
       TX_MFA_THRESHOLD_FEN_DEFAULT
       传入的 default_fen
     """
-    action_key = (
-        "TX_MFA_THRESHOLD_FEN__"
-        + action.upper().replace(".", "_").replace("-", "_")
-    )
+    action_key = "TX_MFA_THRESHOLD_FEN__" + action.upper().replace(".", "_").replace("-", "_")
     for var in (action_key, "TX_MFA_THRESHOLD_FEN_DEFAULT"):
         raw = os.getenv(var, "")
         if raw and raw.lstrip("-").isdigit():
@@ -524,10 +513,7 @@ async def assert_mfa_for_high_value(
             action=action,
             amount_fen=amount_fen,
             client_ip=user.client_ip,
-            reason=(
-                f"MFA_REQUIRED_FOR_HIGH_VALUE "
-                f"amount_fen={amount_fen} threshold_fen={effective_threshold}"
-            ),
+            reason=(f"MFA_REQUIRED_FOR_HIGH_VALUE amount_fen={amount_fen} threshold_fen={effective_threshold}"),
             severity="error",
             request_id=request_id,
         )

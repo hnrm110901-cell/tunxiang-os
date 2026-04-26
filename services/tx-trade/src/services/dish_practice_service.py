@@ -22,22 +22,126 @@ logger = structlog.get_logger()
 
 DEFAULT_PRACTICE_TEMPLATES: list[dict] = [
     # 辣度
-    {"practice_name": "不辣", "practice_group": "辣度", "additional_price_fen": 0, "practice_type": "standard", "sort_order": 0, "is_default": True, "max_quantity": 1},
-    {"practice_name": "微辣", "practice_group": "辣度", "additional_price_fen": 0, "practice_type": "standard", "sort_order": 1, "is_default": False, "max_quantity": 1},
-    {"practice_name": "中辣", "practice_group": "辣度", "additional_price_fen": 0, "practice_type": "standard", "sort_order": 2, "is_default": False, "max_quantity": 1},
-    {"practice_name": "特辣", "practice_group": "辣度", "additional_price_fen": 200, "practice_type": "standard", "sort_order": 3, "is_default": False, "max_quantity": 1},
+    {
+        "practice_name": "不辣",
+        "practice_group": "辣度",
+        "additional_price_fen": 0,
+        "practice_type": "standard",
+        "sort_order": 0,
+        "is_default": True,
+        "max_quantity": 1,
+    },
+    {
+        "practice_name": "微辣",
+        "practice_group": "辣度",
+        "additional_price_fen": 0,
+        "practice_type": "standard",
+        "sort_order": 1,
+        "is_default": False,
+        "max_quantity": 1,
+    },
+    {
+        "practice_name": "中辣",
+        "practice_group": "辣度",
+        "additional_price_fen": 0,
+        "practice_type": "standard",
+        "sort_order": 2,
+        "is_default": False,
+        "max_quantity": 1,
+    },
+    {
+        "practice_name": "特辣",
+        "practice_group": "辣度",
+        "additional_price_fen": 200,
+        "practice_type": "standard",
+        "sort_order": 3,
+        "is_default": False,
+        "max_quantity": 1,
+    },
     # 甜度
-    {"practice_name": "不加糖", "practice_group": "甜度", "additional_price_fen": 0, "practice_type": "standard", "sort_order": 0, "is_default": True, "max_quantity": 1},
-    {"practice_name": "半糖", "practice_group": "甜度", "additional_price_fen": 0, "practice_type": "standard", "sort_order": 1, "is_default": False, "max_quantity": 1},
-    {"practice_name": "全糖", "practice_group": "甜度", "additional_price_fen": 0, "practice_type": "standard", "sort_order": 2, "is_default": False, "max_quantity": 1},
+    {
+        "practice_name": "不加糖",
+        "practice_group": "甜度",
+        "additional_price_fen": 0,
+        "practice_type": "standard",
+        "sort_order": 0,
+        "is_default": True,
+        "max_quantity": 1,
+    },
+    {
+        "practice_name": "半糖",
+        "practice_group": "甜度",
+        "additional_price_fen": 0,
+        "practice_type": "standard",
+        "sort_order": 1,
+        "is_default": False,
+        "max_quantity": 1,
+    },
+    {
+        "practice_name": "全糖",
+        "practice_group": "甜度",
+        "additional_price_fen": 0,
+        "practice_type": "standard",
+        "sort_order": 2,
+        "is_default": False,
+        "max_quantity": 1,
+    },
     # 忌口
-    {"practice_name": "不要香菜", "practice_group": "忌口", "additional_price_fen": 0, "practice_type": "standard", "sort_order": 0, "is_default": False, "max_quantity": 1},
-    {"practice_name": "不要葱", "practice_group": "忌口", "additional_price_fen": 0, "practice_type": "standard", "sort_order": 1, "is_default": False, "max_quantity": 1},
-    {"practice_name": "不要蒜", "practice_group": "忌口", "additional_price_fen": 0, "practice_type": "standard", "sort_order": 2, "is_default": False, "max_quantity": 1},
-    {"practice_name": "不加味精", "practice_group": "忌口", "additional_price_fen": 0, "practice_type": "standard", "sort_order": 3, "is_default": False, "max_quantity": 1},
+    {
+        "practice_name": "不要香菜",
+        "practice_group": "忌口",
+        "additional_price_fen": 0,
+        "practice_type": "standard",
+        "sort_order": 0,
+        "is_default": False,
+        "max_quantity": 1,
+    },
+    {
+        "practice_name": "不要葱",
+        "practice_group": "忌口",
+        "additional_price_fen": 0,
+        "practice_type": "standard",
+        "sort_order": 1,
+        "is_default": False,
+        "max_quantity": 1,
+    },
+    {
+        "practice_name": "不要蒜",
+        "practice_group": "忌口",
+        "additional_price_fen": 0,
+        "practice_type": "standard",
+        "sort_order": 2,
+        "is_default": False,
+        "max_quantity": 1,
+    },
+    {
+        "practice_name": "不加味精",
+        "practice_group": "忌口",
+        "additional_price_fen": 0,
+        "practice_type": "standard",
+        "sort_order": 3,
+        "is_default": False,
+        "max_quantity": 1,
+    },
     # 加料
-    {"practice_name": "加蛋", "practice_group": "加料", "additional_price_fen": 200, "practice_type": "addon", "sort_order": 0, "is_default": False, "max_quantity": 3},
-    {"practice_name": "加芝士", "practice_group": "加料", "additional_price_fen": 300, "practice_type": "addon", "sort_order": 1, "is_default": False, "max_quantity": 2},
+    {
+        "practice_name": "加蛋",
+        "practice_group": "加料",
+        "additional_price_fen": 200,
+        "practice_type": "addon",
+        "sort_order": 0,
+        "is_default": False,
+        "max_quantity": 3,
+    },
+    {
+        "practice_name": "加芝士",
+        "practice_group": "加料",
+        "additional_price_fen": 300,
+        "practice_type": "addon",
+        "sort_order": 1,
+        "is_default": False,
+        "max_quantity": 2,
+    },
 ]
 
 
@@ -245,16 +349,18 @@ async def get_practice_templates(
     if rows:
         groups: dict[str, list[dict]] = defaultdict(list)
         for r in rows:
-            groups[r["practice_group"]].append({
-                "id": str(r["id"]),
-                "practice_name": r["practice_name"],
-                "practice_group": r["practice_group"],
-                "additional_price_fen": r["additional_price_fen"],
-                "is_default": r["is_default"],
-                "sort_order": r["sort_order"],
-                "practice_type": r["practice_type"],
-                "max_quantity": r["max_quantity"],
-            })
+            groups[r["practice_group"]].append(
+                {
+                    "id": str(r["id"]),
+                    "practice_name": r["practice_name"],
+                    "practice_group": r["practice_group"],
+                    "additional_price_fen": r["additional_price_fen"],
+                    "is_default": r["is_default"],
+                    "sort_order": r["sort_order"],
+                    "practice_type": r["practice_type"],
+                    "max_quantity": r["max_quantity"],
+                }
+            )
         logger.info("practice_templates_queried", source="db", count=len(rows))
         return dict(groups)
 
@@ -418,16 +524,18 @@ def build_customizations(
         line_price = unit_price * qty
         total_extra_fen += line_price
 
-        practices_out.append({
-            "practice_id": p.get("practice_id") or p.get("id", ""),
-            "name": p.get("name") or p.get("practice_name", ""),
-            "additional_price_fen": unit_price,
-            "quantity": qty,
-            "line_price_fen": line_price,
-            "materials": p.get("materials", []),
-            "practice_type": p.get("practice_type", "standard"),
-            "is_temporary": p.get("is_temporary", False),
-        })
+        practices_out.append(
+            {
+                "practice_id": p.get("practice_id") or p.get("id", ""),
+                "name": p.get("name") or p.get("practice_name", ""),
+                "additional_price_fen": unit_price,
+                "quantity": qty,
+                "line_price_fen": line_price,
+                "materials": p.get("materials", []),
+                "practice_type": p.get("practice_type", "standard"),
+                "is_temporary": p.get("is_temporary", False),
+            }
+        )
 
     return {
         "practices": practices_out,

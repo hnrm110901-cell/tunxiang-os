@@ -70,10 +70,7 @@ class SettlementScheduler:
         period_end = settlement_date
 
         # 生成批次号: SV-SETTLE-YYYYMMDD-XXXXXX
-        batch_no = (
-            f"SV-SETTLE-{settlement_date.strftime('%Y%m%d')}-"
-            f"{str(uuid.uuid4())[:6].upper()}"
-        )
+        batch_no = f"SV-SETTLE-{settlement_date.strftime('%Y%m%d')}-{str(uuid.uuid4())[:6].upper()}"
 
         # 查询当天 pending 的分账流水
         count_result = await self.db.execute(
@@ -206,7 +203,9 @@ class SettlementScheduler:
         if not batch:
             # 区分不存在 vs 状态不对
             check = await self.db.execute(
-                text("SELECT status FROM sv_settlement_batches WHERE id = :id AND tenant_id = :tid AND is_deleted = FALSE"),
+                text(
+                    "SELECT status FROM sv_settlement_batches WHERE id = :id AND tenant_id = :tid AND is_deleted = FALSE"
+                ),
                 {"id": bid, "tid": self._tid},
             )
             existing = check.fetchone()
@@ -271,7 +270,9 @@ class SettlementScheduler:
         batch = update_result.fetchone()
         if not batch:
             check = await self.db.execute(
-                text("SELECT status FROM sv_settlement_batches WHERE id = :id AND tenant_id = :tid AND is_deleted = FALSE"),
+                text(
+                    "SELECT status FROM sv_settlement_batches WHERE id = :id AND tenant_id = :tid AND is_deleted = FALSE"
+                ),
                 {"id": bid, "tid": self._tid},
             )
             existing = check.fetchone()

@@ -20,6 +20,7 @@
   - banquet.deposit.create — 需观测生产实际频次后决定（保守暂留）
   - platform_coupon.verify/redeem — cashier 标准核销动作
 """
+
 from __future__ import annotations
 
 import os
@@ -54,8 +55,11 @@ def _force_auth_enabled(monkeypatch):
 
 def _mk_request(*, user_id, tenant_id, role, mfa_verified=False):
     state = SimpleNamespace(
-        user_id=user_id, tenant_id=tenant_id, role=role,
-        mfa_verified=mfa_verified, store_id="00000000-0000-0000-0000-0000000000a2",
+        user_id=user_id,
+        tenant_id=tenant_id,
+        role=role,
+        mfa_verified=mfa_verified,
+        store_id="00000000-0000-0000-0000-0000000000a2",
     )
     return SimpleNamespace(
         state=state,
@@ -100,10 +104,15 @@ async def test_refund_apply_without_mfa_returns_403(stub_db, captured_deny_calls
     退款是资金出口最高敏感动作，必须 MFA。审计 severity 默认 error（高一档）。
     """
     dep = require_mfa_audited(
-        "refund.apply", "store_manager", "admin", db_provider=lambda: stub_db,
+        "refund.apply",
+        "store_manager",
+        "admin",
+        db_provider=lambda: stub_db,
     )
     req = _mk_request(
-        user_id=MANAGER_ID, tenant_id=XUJI_TENANT, role="store_manager",
+        user_id=MANAGER_ID,
+        tenant_id=XUJI_TENANT,
+        role="store_manager",
         mfa_verified=False,
     )
 
@@ -124,10 +133,15 @@ async def test_refund_apply_without_mfa_returns_403(stub_db, captured_deny_calls
 async def test_refund_apply_with_mfa_passes(stub_db, captured_deny_calls):
     """已 MFA 的店长 refund.apply 应正常通过，不写 deny。"""
     dep = require_mfa_audited(
-        "refund.apply", "store_manager", "admin", db_provider=lambda: stub_db,
+        "refund.apply",
+        "store_manager",
+        "admin",
+        db_provider=lambda: stub_db,
     )
     req = _mk_request(
-        user_id=MANAGER_ID, tenant_id=XUJI_TENANT, role="store_manager",
+        user_id=MANAGER_ID,
+        tenant_id=XUJI_TENANT,
+        role="store_manager",
         mfa_verified=True,
     )
 
@@ -146,10 +160,15 @@ async def test_refund_apply_with_mfa_passes(stub_db, captured_deny_calls):
 async def test_payment_refund_without_mfa_returns_403(stub_db, captured_deny_calls):
     """payment.refund（支付通道退款）也必须 MFA — 与 refund.apply 同等敏感。"""
     dep = require_mfa_audited(
-        "payment.refund", "store_manager", "admin", db_provider=lambda: stub_db,
+        "payment.refund",
+        "store_manager",
+        "admin",
+        db_provider=lambda: stub_db,
     )
     req = _mk_request(
-        user_id=MANAGER_ID, tenant_id=XUJI_TENANT, role="store_manager",
+        user_id=MANAGER_ID,
+        tenant_id=XUJI_TENANT,
+        role="store_manager",
         mfa_verified=False,
     )
 
@@ -169,14 +188,19 @@ async def test_payment_refund_without_mfa_returns_403(stub_db, captured_deny_cal
 
 @pytest.mark.asyncio
 async def test_discount_rule_create_admin_without_mfa_returns_403(
-    stub_db, captured_deny_calls,
+    stub_db,
+    captured_deny_calls,
 ):
     """折扣规则创建影响所有未来订单（系统性风险），admin 无 MFA 也必须拒。"""
     dep = require_mfa_audited(
-        "discount.rule.create", "admin", db_provider=lambda: stub_db,
+        "discount.rule.create",
+        "admin",
+        db_provider=lambda: stub_db,
     )
     req = _mk_request(
-        user_id=ADMIN_ID, tenant_id=XUJI_TENANT, role="admin",
+        user_id=ADMIN_ID,
+        tenant_id=XUJI_TENANT,
+        role="admin",
         mfa_verified=False,
     )
 
@@ -189,14 +213,19 @@ async def test_discount_rule_create_admin_without_mfa_returns_403(
 
 @pytest.mark.asyncio
 async def test_discount_rule_update_admin_without_mfa_returns_403(
-    stub_db, captured_deny_calls,
+    stub_db,
+    captured_deny_calls,
 ):
     """折扣规则更新同等敏感（旧规则改阈值同样影响所有订单）。"""
     dep = require_mfa_audited(
-        "discount.rule.update", "admin", db_provider=lambda: stub_db,
+        "discount.rule.update",
+        "admin",
+        db_provider=lambda: stub_db,
     )
     req = _mk_request(
-        user_id=ADMIN_ID, tenant_id=XUJI_TENANT, role="admin",
+        user_id=ADMIN_ID,
+        tenant_id=XUJI_TENANT,
+        role="admin",
         mfa_verified=False,
     )
 
@@ -220,11 +249,15 @@ async def test_enterprise_meal_create_rejects_cashier(stub_db, captured_deny_cal
     """
     # 模拟新的 require_role_audited 配置（与生产代码一致）
     dep = require_role_audited(
-        "enterprise_meal.order.create", "store_manager", "admin",
+        "enterprise_meal.order.create",
+        "store_manager",
+        "admin",
         db_provider=lambda: stub_db,
     )
     req = _mk_request(
-        user_id=CASHIER_ID, tenant_id=XUJI_TENANT, role="cashier",
+        user_id=CASHIER_ID,
+        tenant_id=XUJI_TENANT,
+        role="cashier",
     )
 
     with pytest.raises(HTTPException) as ei:
@@ -240,11 +273,15 @@ async def test_enterprise_meal_create_rejects_cashier(stub_db, captured_deny_cal
 async def test_enterprise_meal_create_allows_store_manager(stub_db, captured_deny_calls):
     """店长正常通过 enterprise_meal.order.create（无 MFA 要求）。"""
     dep = require_role_audited(
-        "enterprise_meal.order.create", "store_manager", "admin",
+        "enterprise_meal.order.create",
+        "store_manager",
+        "admin",
         db_provider=lambda: stub_db,
     )
     req = _mk_request(
-        user_id=MANAGER_ID, tenant_id=XUJI_TENANT, role="store_manager",
+        user_id=MANAGER_ID,
+        tenant_id=XUJI_TENANT,
+        role="store_manager",
     )
 
     ctx = await dep(req, db=stub_db)
@@ -260,7 +297,8 @@ async def test_enterprise_meal_create_allows_store_manager(stub_db, captured_den
 
 @pytest.mark.asyncio
 async def test_payment_wechat_create_still_role_only_no_mfa_required(
-    stub_db, captured_deny_calls,
+    stub_db,
+    captured_deny_calls,
 ):
     """收银员日常微信收款不应触发 MFA — 回归保护。
 
@@ -270,11 +308,15 @@ async def test_payment_wechat_create_still_role_only_no_mfa_required(
     """
     dep = require_role_audited(
         "payment.wechat.create",
-        "cashier", "store_manager", "admin",
+        "cashier",
+        "store_manager",
+        "admin",
         db_provider=lambda: stub_db,
     )
     req = _mk_request(
-        user_id=CASHIER_ID, tenant_id=XUJI_TENANT, role="cashier",
+        user_id=CASHIER_ID,
+        tenant_id=XUJI_TENANT,
+        role="cashier",
         mfa_verified=False,  # 关键：cashier 永远不会 MFA 验证
     )
 
@@ -305,6 +347,7 @@ def test_fund_out_routes_use_require_mfa_audited(route_file, action_name):
     require_role_audited（CI 立即报红）。
     """
     from pathlib import Path
+
     src_path = Path(__file__).resolve().parents[4] / route_file
     src = src_path.read_text(encoding="utf-8")
     target = f'require_mfa_audited("{action_name}"'
@@ -319,15 +362,12 @@ def test_enterprise_meal_create_no_cashier_role_in_source():
     出现在 require_role_audited("enterprise_meal.order.create", ...) 调用里。
     """
     from pathlib import Path
+
     src_path = Path(__file__).resolve().parents[4] / "services/tx-trade/src/api/enterprise_meal_routes.py"
     src = src_path.read_text(encoding="utf-8")
     # 寻找 enterprise_meal.order.create 那一行
     for line in src.splitlines():
         if "enterprise_meal.order.create" in line and "require_role_audited" in line:
-            assert '"cashier"' not in line, (
-                f"enterprise_meal.order.create 不应再允许 cashier 角色（R-A4-4）：{line!r}"
-            )
+            assert '"cashier"' not in line, f"enterprise_meal.order.create 不应再允许 cashier 角色（R-A4-4）：{line!r}"
             return
-    raise AssertionError(
-        "未找到 enterprise_meal.order.create 的 require_role_audited 调用"
-    )
+    raise AssertionError("未找到 enterprise_meal.order.create 的 require_role_audited 调用")

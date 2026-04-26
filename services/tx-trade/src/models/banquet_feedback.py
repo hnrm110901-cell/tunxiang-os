@@ -1,4 +1,5 @@
 """宴会售后 ORM模型"""
+
 import uuid
 from datetime import datetime
 from typing import Optional
@@ -30,8 +31,21 @@ class BanquetFeedback(TenantBase):
     reply_content: Mapped[Optional[str]] = mapped_column(Text)
     replied_by: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True))
     __table_args__ = (Index("idx_bf_banquet", "tenant_id", "banquet_id"), {"comment": "宴会评价"})
+
     def to_dict(self) -> dict:
-        return {"id": str(self.id), "banquet_id": str(self.banquet_id), "customer_name": self.customer_name, "overall_score": self.overall_score, "food_score": self.food_score, "service_score": self.service_score, "venue_score": self.venue_score, "comments": self.comments, "would_recommend": self.would_recommend, "created_at": self.created_at.isoformat() if self.created_at else None}
+        return {
+            "id": str(self.id),
+            "banquet_id": str(self.banquet_id),
+            "customer_name": self.customer_name,
+            "overall_score": self.overall_score,
+            "food_score": self.food_score,
+            "service_score": self.service_score,
+            "venue_score": self.venue_score,
+            "comments": self.comments,
+            "would_recommend": self.would_recommend,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+        }
+
 
 class BanquetReferral(TenantBase):
     __tablename__ = "banquet_referrals"
@@ -48,5 +62,14 @@ class BanquetReferral(TenantBase):
     converted_at: Mapped[Optional[datetime]] = mapped_column()
     rewarded_at: Mapped[Optional[datetime]] = mapped_column()
     __table_args__ = (Index("idx_br_referrer", "tenant_id", "referrer_banquet_id"), {"comment": "转介绍"})
+
     def to_dict(self) -> dict:
-        return {"id": str(self.id), "referrer_banquet_id": str(self.referrer_banquet_id), "referrer_name": self.referrer_name, "referred_name": self.referred_name, "referrer_reward_type": self.referrer_reward_type, "referrer_reward_value_fen": self.referrer_reward_value_fen, "status": self.status}
+        return {
+            "id": str(self.id),
+            "referrer_banquet_id": str(self.referrer_banquet_id),
+            "referrer_name": self.referrer_name,
+            "referred_name": self.referred_name,
+            "referrer_reward_type": self.referrer_reward_type,
+            "referrer_reward_value_fen": self.referrer_reward_value_fen,
+            "status": self.status,
+        }

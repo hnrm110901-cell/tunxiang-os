@@ -699,32 +699,38 @@ class QueueService:
             # 最近叫号（最多3个）
             recent = []
             for q in prefix_called[:3]:
-                recent.append({
-                    "queue_number": q.queue_number,
-                    "customer_name": q.customer_name[:1] + "**" if len(q.customer_name) > 1 else q.customer_name,
-                    "called_at": q.called_at,
-                })
+                recent.append(
+                    {
+                        "queue_number": q.queue_number,
+                        "customer_name": q.customer_name[:1] + "**" if len(q.customer_name) > 1 else q.customer_name,
+                        "called_at": q.called_at,
+                    }
+                )
 
-            groups.append({
-                "prefix": prefix,
-                "label": SIZE_CATEGORY_LABELS[prefix],
-                "waiting_count": len(prefix_waiting),
-                "called_count": len(prefix_called),
-                "est_wait_min": est["estimated_wait_min"],
-                "next_numbers": next_numbers,
-                "recent_called": recent,
-            })
+            groups.append(
+                {
+                    "prefix": prefix,
+                    "label": SIZE_CATEGORY_LABELS[prefix],
+                    "waiting_count": len(prefix_waiting),
+                    "called_count": len(prefix_called),
+                    "est_wait_min": est["estimated_wait_min"],
+                    "next_numbers": next_numbers,
+                    "recent_called": recent,
+                }
+            )
 
         # 全部最近叫号记录（按时间倒序，最多10条）
         all_called_sorted = sorted(called, key=lambda x: x.called_at or "", reverse=True)
         recent_called = []
         for q in all_called_sorted[:10]:
-            recent_called.append({
-                "queue_number": q.queue_number,
-                "customer_name": q.customer_name[:1] + "**" if len(q.customer_name) > 1 else q.customer_name,
-                "party_size": q.party_size,
-                "called_at": q.called_at,
-            })
+            recent_called.append(
+                {
+                    "queue_number": q.queue_number,
+                    "customer_name": q.customer_name[:1] + "**" if len(q.customer_name) > 1 else q.customer_name,
+                    "party_size": q.party_size,
+                    "called_at": q.called_at,
+                }
+            )
 
         # 平均等位时间（已入座的等位时间均值）
         avg_wait_min = 0

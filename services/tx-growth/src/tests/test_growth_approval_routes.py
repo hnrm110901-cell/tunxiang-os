@@ -69,12 +69,14 @@ class _FakeApprovalService:
     async def batch_approve(self, request_ids, approver_id, comment, tenant_id, db):
         results = []
         for rid in request_ids:
-            results.append({
-                "request_id": str(rid),
-                "ok": True,
-                "status": "approved",
-                "approved_at": "2026-04-06T00:00:00+00:00",
-            })
+            results.append(
+                {
+                    "request_id": str(rid),
+                    "ok": True,
+                    "status": "approved",
+                    "approved_at": "2026-04-06T00:00:00+00:00",
+                }
+            )
         return {
             "total": len(request_ids),
             "succeeded": len(request_ids),
@@ -645,10 +647,7 @@ def test_batch_approve_ok():
                 "total": 3,
                 "succeeded": 3,
                 "failed": 0,
-                "results": [
-                    {"request_id": rid, "ok": True, "status": "approved"}
-                    for rid in ids
-                ],
+                "results": [{"request_id": rid, "ok": True, "status": "approved"} for rid in ids],
             }
         )
 

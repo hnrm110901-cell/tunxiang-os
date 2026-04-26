@@ -14,6 +14,7 @@
   6. audit_deny 内部抛错时不影响 403 抛出（审计绝不阻塞业务）
   7. cross-tenant probe 场景：长沙 cashier 探韶山 order，severity 升级 error
 """
+
 from __future__ import annotations
 
 import os
@@ -113,7 +114,10 @@ async def test_xujihaixian_cashier_refund_403_writes_deny_audit(stub_db, capture
     必须在抛 403 之前写一条 trade_audit_logs result=deny reason=ROLE_FORBIDDEN。
     """
     dep = require_role_audited(
-        "refund.apply", "store_manager", "admin", db_provider=lambda: stub_db,
+        "refund.apply",
+        "store_manager",
+        "admin",
+        db_provider=lambda: stub_db,
     )
     req = _mk_request(
         user_id=CASHIER_XIAOWANG_ID,
@@ -146,13 +150,16 @@ async def test_xujihaixian_cashier_refund_403_writes_deny_audit(stub_db, capture
 
 @pytest.mark.asyncio
 async def test_xujihaixian_manager_discount_no_mfa_writes_deny_with_error_severity(
-    stub_db, captured_deny_calls,
+    stub_db,
+    captured_deny_calls,
 ):
     """徐记河西店店长李姐对 ¥500 订单打 35% 折（高于 30% 阈值），未 MFA。
     require_mfa_audited 必须默认 severity='error'（高敏感场景）。
     """
     dep = require_mfa_audited(
-        "discount.apply.over_threshold", "store_manager", "admin",
+        "discount.apply.over_threshold",
+        "store_manager",
+        "admin",
         db_provider=lambda: stub_db,
     )
     req = _mk_request(
@@ -186,7 +193,10 @@ async def test_xujihaixian_manager_discount_no_mfa_writes_deny_with_error_severi
 async def test_unauthenticated_request_still_writes_deny_audit(stub_db, captured_deny_calls):
     """无 JWT 的攻击/扫描请求 → 401 AUTH_MISSING。安全审计场景必须留痕。"""
     dep = require_role_audited(
-        "refund.apply", "store_manager", "admin", db_provider=lambda: stub_db,
+        "refund.apply",
+        "store_manager",
+        "admin",
+        db_provider=lambda: stub_db,
     )
     req = _mk_request(
         user_id=None,  # 未认证
@@ -214,13 +224,18 @@ async def test_unauthenticated_request_still_writes_deny_audit(stub_db, captured
 
 @pytest.mark.asyncio
 async def test_dev_bypass_skips_audit_when_TX_AUTH_ENABLED_false(
-    monkeypatch, stub_db, captured_deny_calls,
+    monkeypatch,
+    stub_db,
+    captured_deny_calls,
 ):
     """TX_AUTH_ENABLED=false 时 require_role 直接返回 mock admin（dev_bypass）。
     audit-aware 装饰器不应在这种情况下也写 deny（会污染本地开发数据）。"""
     monkeypatch.setenv("TX_AUTH_ENABLED", "false")
     dep = require_role_audited(
-        "refund.apply", "store_manager", "admin", db_provider=lambda: stub_db,
+        "refund.apply",
+        "store_manager",
+        "admin",
+        db_provider=lambda: stub_db,
     )
     req = _mk_request(
         user_id=None,
@@ -242,12 +257,16 @@ async def test_dev_bypass_skips_audit_when_TX_AUTH_ENABLED_false(
 
 @pytest.mark.asyncio
 async def test_manager_refund_allow_path_does_not_write_deny_audit(
-    stub_db, captured_deny_calls,
+    stub_db,
+    captured_deny_calls,
 ):
     """店长李姐有权 refund → require_role_audited 通过 → 不写 deny。
     allow 审计仍由路由层 write_audit(action='refund.apply', result='allow') 写。"""
     dep = require_role_audited(
-        "refund.apply", "store_manager", "admin", db_provider=lambda: stub_db,
+        "refund.apply",
+        "store_manager",
+        "admin",
+        db_provider=lambda: stub_db,
     )
     req = _mk_request(
         user_id=MANAGER_LIJIE_ID,
@@ -279,7 +298,10 @@ async def test_audit_deny_error_does_not_block_403_response(monkeypatch, stub_db
     monkeypatch.setattr(rbac, "_audit_deny_safe", _shim)
 
     dep = require_role_audited(
-        "refund.apply", "store_manager", "admin", db_provider=lambda: stub_db,
+        "refund.apply",
+        "store_manager",
+        "admin",
+        db_provider=lambda: stub_db,
     )
     req = _mk_request(
         user_id=CASHIER_XIAOWANG_ID,
@@ -301,14 +323,17 @@ async def test_audit_deny_error_does_not_block_403_response(monkeypatch, stub_db
 
 @pytest.mark.asyncio
 async def test_xujihaixian_cross_tenant_probe_audit_uses_caller_tenant(
-    stub_db, captured_deny_calls,
+    stub_db,
+    captured_deny_calls,
 ):
     """长沙店 cashier 持自店 token 试图访问韶山店退款。RBAC 拒绝（角色不够）→
     audit 写入的 tenant_id 必须是来自 request.state（=长沙），绝不能是请求 body 里
     伪造的 tenant_id。同时 idx_trade_audit_deny 部分索引能命中。
     """
     dep = require_role_audited(
-        "refund.apply", "store_manager", "admin",
+        "refund.apply",
+        "store_manager",
+        "admin",
         severity_on_deny="error",  # 跨租户探测属高敏感
         db_provider=lambda: stub_db,
     )
@@ -341,7 +366,10 @@ async def test_audit_deny_synchronous_overhead_under_100ms(stub_db, captured_den
     Mock DB 下 P99 应 < 10ms；真实 DB 下目标 < 100ms。
     """
     dep = require_role_audited(
-        "refund.apply", "store_manager", "admin", db_provider=lambda: stub_db,
+        "refund.apply",
+        "store_manager",
+        "admin",
+        db_provider=lambda: stub_db,
     )
     req = _mk_request(
         user_id=CASHIER_XIAOWANG_ID,
@@ -350,6 +378,7 @@ async def test_audit_deny_synchronous_overhead_under_100ms(stub_db, captured_den
     )
 
     import time
+
     t0 = time.perf_counter()
     with pytest.raises(HTTPException):
         await dep(req, db=stub_db)
@@ -406,7 +435,10 @@ async def test_truly_unauthenticated_uses_nil_tenant_uuid(stub_db, captured_deny
     → 被 broad except 吞 → 审计永久丢失。NIL UUID 兜底确保 INSERT 成功。
     """
     dep = require_role_audited(
-        "refund.apply", "store_manager", "admin", db_provider=lambda: stub_db,
+        "refund.apply",
+        "store_manager",
+        "admin",
+        db_provider=lambda: stub_db,
     )
     req = _mk_request_unauthenticated()
 
@@ -418,15 +450,14 @@ async def test_truly_unauthenticated_uses_nil_tenant_uuid(stub_db, captured_deny
     assert len(captured_deny_calls) == 1
     call = captured_deny_calls[0]
     # 关键：tenant_id 必须是 NIL UUID（PG 上能 cast 成功的有效 UUID）
-    assert call["tenant_id"] == NIL_TENANT_UUID, (
-        f"401 path must fall back to NIL UUID; got {call['tenant_id']!r}"
-    )
+    assert call["tenant_id"] == NIL_TENANT_UUID, f"401 path must fall back to NIL UUID; got {call['tenant_id']!r}"
     assert call["reason"] == "AUTH_MISSING"
 
 
 @pytest.mark.asyncio
 async def test_forged_x_tenant_id_does_not_pollute_victim_audit_table(
-    stub_db, captured_deny_calls,
+    stub_db,
+    captured_deny_calls,
 ):
     """攻击者无 JWT 但伪造 X-Tenant-ID=victim → audit 落 NIL UUID，不落 victim。
 
@@ -434,7 +465,10 @@ async def test_forged_x_tenant_id_does_not_pollute_victim_audit_table(
     audit 表（污染 + 误导取证）。但 forged value 必须保留为取证证据 → 进 reason。
     """
     dep = require_role_audited(
-        "refund.apply", "store_manager", "admin", db_provider=lambda: stub_db,
+        "refund.apply",
+        "store_manager",
+        "admin",
+        db_provider=lambda: stub_db,
     )
     req = _mk_request_unauthenticated(forged_tenant_header=XUJI_CHANGSHA_TENANT)
 
@@ -447,19 +481,22 @@ async def test_forged_x_tenant_id_does_not_pollute_victim_audit_table(
     assert call["tenant_id"] == NIL_TENANT_UUID
     # forged 值保留在 reason 中作为证据
     assert "probed_tenant" in call["reason"], (
-        f"forged X-Tenant-ID must be preserved in reason for forensics; "
-        f"got reason={call['reason']!r}"
+        f"forged X-Tenant-ID must be preserved in reason for forensics; got reason={call['reason']!r}"
     )
     assert XUJI_CHANGSHA_TENANT in call["reason"]
 
 
 @pytest.mark.asyncio
 async def test_invalid_x_tenant_id_header_dropped_no_log_poisoning(
-    stub_db, captured_deny_calls,
+    stub_db,
+    captured_deny_calls,
 ):
     """X-Tenant-ID 非 UUID → 直接丢弃，不进 reason（防 log poisoning / SQL 拼接）。"""
     dep = require_role_audited(
-        "refund.apply", "store_manager", "admin", db_provider=lambda: stub_db,
+        "refund.apply",
+        "store_manager",
+        "admin",
+        db_provider=lambda: stub_db,
     )
     req = _mk_request_unauthenticated(forged_tenant_header_invalid=True)
 
@@ -507,8 +544,7 @@ async def test_audit_deny_internal_defense_for_empty_tenant_id(stub_db):
 
     # set_config 必须收到 NIL UUID，不是空串
     assert NIL_TENANT_UUID in captured_tids, (
-        f"audit_deny must defensively coerce empty tenant_id to NIL UUID; "
-        f"got captured tids={captured_tids}"
+        f"audit_deny must defensively coerce empty tenant_id to NIL UUID; got captured tids={captured_tids}"
     )
     assert "" not in captured_tids
 
@@ -520,7 +556,10 @@ async def test_authenticated_caller_tenant_id_unchanged(stub_db, captured_deny_c
     回归保护：NIL UUID 兜底只在 401 / 缺失场景生效，不能影响正常 deny 路径。
     """
     dep = require_role_audited(
-        "refund.apply", "store_manager", "admin", db_provider=lambda: stub_db,
+        "refund.apply",
+        "store_manager",
+        "admin",
+        db_provider=lambda: stub_db,
     )
     req = _mk_request(
         user_id=CASHIER_XIAOWANG_ID,
@@ -591,24 +630,25 @@ async def test_pg_integration_unauthenticated_audit_actually_persists():
 
             # 校验：用 NIL UUID 作为 RLS 上下文查这条记录
             from sqlalchemy import text
+
             await session.execute(
                 text("SELECT set_config('app.tenant_id', :tid, true)"),
                 {"tid": "00000000-0000-0000-0000-000000000000"},
             )
-            row = (await session.execute(
-                text(
-                    "SELECT user_id, user_role, action, result, reason "
-                    "FROM trade_audit_logs "
-                    "WHERE tenant_id = '00000000-0000-0000-0000-000000000000'::uuid "
-                    "AND request_id = :rid "
-                    "ORDER BY created_at DESC LIMIT 1"
-                ),
-                {"rid": "integ-test-001"},
-            )).first()
+            row = (
+                await session.execute(
+                    text(
+                        "SELECT user_id, user_role, action, result, reason "
+                        "FROM trade_audit_logs "
+                        "WHERE tenant_id = '00000000-0000-0000-0000-000000000000'::uuid "
+                        "AND request_id = :rid "
+                        "ORDER BY created_at DESC LIMIT 1"
+                    ),
+                    {"rid": "integ-test-001"},
+                )
+            ).first()
 
-            assert row is not None, (
-                "401 路径 NIL UUID 兜底未落盘 — UUID cast 仍失败或 RLS 拒绝"
-            )
+            assert row is not None, "401 路径 NIL UUID 兜底未落盘 — UUID cast 仍失败或 RLS 拒绝"
             assert row.action == "refund.apply"
             assert row.result == "deny"
             assert "probed_tenant" in row.reason

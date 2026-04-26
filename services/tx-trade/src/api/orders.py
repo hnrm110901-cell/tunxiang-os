@@ -86,7 +86,10 @@ async def _check_idempotency_cache(
 
     # 取事务级锁（同 (tenant, key, route_path) 并发自动串行，commit 自动释放）
     await acquire_idempotency_lock(
-        db, tenant_id=tenant_id, idempotency_key=idempotency_key, route_path=route_path,
+        db,
+        tenant_id=tenant_id,
+        idempotency_key=idempotency_key,
+        route_path=route_path,
     )
 
     try:

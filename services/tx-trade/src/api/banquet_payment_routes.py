@@ -131,7 +131,8 @@ async def create_deposit(
     """
     # 高额定金强制 MFA — 防 store_manager token 泄漏被批量盗刷大额定金
     await assert_mfa_for_high_value(
-        user, db,
+        user,
+        db,
         action="banquet.deposit.create",
         amount_fen=body.total_deposit_fen,
         request_id=request.headers.get("X-Request-Id") if hasattr(request, "headers") else None,

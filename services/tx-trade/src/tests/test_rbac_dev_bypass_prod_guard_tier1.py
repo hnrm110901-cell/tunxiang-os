@@ -13,6 +13,7 @@
   3. 抛 DevBypassInProductionError → k8s 容器启动失败 → readiness probe 失败
      → 运维强制修复配置才能恢复服务。fail loud > fail silent。
 """
+
 from __future__ import annotations
 
 import os

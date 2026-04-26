@@ -140,11 +140,13 @@ async def get_store_configs(
         rooms = await repo.list_rooms(store_id, active_only=False)
         time_slots = await repo.list_time_slots(store_id, active_only=False)
 
-        return _ok({
-            "store_id": store_id,
-            "rooms": [r.to_dict() for r in rooms],
-            "time_slots": [s.to_dict() for s in time_slots],
-        })
+        return _ok(
+            {
+                "store_id": store_id,
+                "rooms": [r.to_dict() for r in rooms],
+                "time_slots": [s.to_dict() for s in time_slots],
+            }
+        )
     except SQLAlchemyError as exc:
         logger.error("reservation_config_list_error", exc_info=True)
         _err("查询预订配置失败", 500)
@@ -295,10 +297,12 @@ async def list_time_slots(
         repo = ReservationConfigRepository(db, tenant_id)
         slots = await repo.list_time_slots(store_id, active_only=False)
 
-        return _ok({
-            "store_id": store_id,
-            "time_slots": [s.to_dict() for s in slots],
-        })
+        return _ok(
+            {
+                "store_id": store_id,
+                "time_slots": [s.to_dict() for s in slots],
+            }
+        )
     except SQLAlchemyError as exc:
         logger.error("reservation_time_slots_list_error", exc_info=True)
         _err("查询时段配置失败", 500)
@@ -429,13 +433,15 @@ async def get_available(
         rooms = await svc.get_available_rooms(store_id, date, guest_count)
         time_slots = await svc.get_available_time_slots(store_id, date)
 
-        return _ok({
-            "store_id": store_id,
-            "date": date,
-            "guest_count": guest_count,
-            "rooms": rooms,
-            "time_slots": time_slots,
-        })
+        return _ok(
+            {
+                "store_id": store_id,
+                "date": date,
+                "guest_count": guest_count,
+                "rooms": rooms,
+                "time_slots": time_slots,
+            }
+        )
     except ValueError as exc:
         _err(str(exc))
     except SQLAlchemyError as exc:

@@ -39,7 +39,7 @@ logger = structlog.get_logger(__name__)
 # ─── 常量 ──────────────────────────────────────────────────────────────────
 
 DEFAULT_TTL_HOURS = 24
-MAX_KEY_LENGTH = 128       # v296 schema 一致
+MAX_KEY_LENGTH = 128  # v296 schema 一致
 MAX_ROUTE_LENGTH = 128
 
 
@@ -102,9 +102,7 @@ async def _set_rls(db, tenant_id: str) -> None:
     )
 
 
-async def _acquire_advisory_lock(
-    db, *, tenant_id: str, key: str, route: str
-) -> None:
+async def _acquire_advisory_lock(db, *, tenant_id: str, key: str, route: str) -> None:
     """事务级 advisory lock；commit/rollback 自动释放。
 
     注意：必须与读 cache + 写 cache 在同一事务内调用，否则锁脱节。

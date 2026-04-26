@@ -286,9 +286,7 @@ async def write_audit(
     if result is not None and result not in _VALID_RESULTS:
         raise ValueError(f"result must be one of {sorted(_VALID_RESULTS)}; got {result!r}")
     if severity is not None and severity not in _VALID_SEVERITIES:
-        raise ValueError(
-            f"severity must be one of {sorted(_VALID_SEVERITIES)}; got {severity!r}"
-        )
+        raise ValueError(f"severity must be one of {sorted(_VALID_SEVERITIES)}; got {severity!r}")
 
     try:
         # 1) 绑定 RLS tenant
@@ -302,7 +300,9 @@ async def write_audit(
         # 查不到 → 不在 caller 租户 → 必须 sanitize 防止 target_id 探测信道。
         if target_type and target_id:
             ownership = await _target_in_caller_tenant(
-                db, target_type=target_type, target_id=str(target_id),
+                db,
+                target_type=target_type,
+                target_id=str(target_id),
             )
             if ownership is False:
                 # 触发 SIEM critical 告警 + sanitize 落审计行
@@ -392,13 +392,22 @@ async def write_audit(
         # PR-3 / R-A4-2：PG 写入失败 → 落本地 JSONL outbox（sync-engine 后续重放）
         # 不让 broad except 静默丢审计；本地落盘是最后一道防线
         _spill_to_outbox_safe(
-            tenant_id=tenant_id, store_id=store_id, user_id=user_id,
-            user_role=user_role, action=action,
-            target_type=target_type, target_id=target_id,
-            amount_fen=amount_fen, client_ip=client_ip,
-            result=result, reason=reason, request_id=request_id,
-            severity=severity, session_id=session_id,
-            before_state=before_state, after_state=after_state,
+            tenant_id=tenant_id,
+            store_id=store_id,
+            user_id=user_id,
+            user_role=user_role,
+            action=action,
+            target_type=target_type,
+            target_id=target_id,
+            amount_fen=amount_fen,
+            client_ip=client_ip,
+            result=result,
+            reason=reason,
+            request_id=request_id,
+            severity=severity,
+            session_id=session_id,
+            before_state=before_state,
+            after_state=after_state,
         )
         logger.error(
             "trade_audit_log_write_failed",
@@ -418,13 +427,22 @@ async def write_audit(
             pass
         # PR-3 / R-A4-2：连接池 / mock 异常 → 也走 outbox 兜底
         _spill_to_outbox_safe(
-            tenant_id=tenant_id, store_id=store_id, user_id=user_id,
-            user_role=user_role, action=action,
-            target_type=target_type, target_id=target_id,
-            amount_fen=amount_fen, client_ip=client_ip,
-            result=result, reason=reason, request_id=request_id,
-            severity=severity, session_id=session_id,
-            before_state=before_state, after_state=after_state,
+            tenant_id=tenant_id,
+            store_id=store_id,
+            user_id=user_id,
+            user_role=user_role,
+            action=action,
+            target_type=target_type,
+            target_id=target_id,
+            amount_fen=amount_fen,
+            client_ip=client_ip,
+            result=result,
+            reason=reason,
+            request_id=request_id,
+            severity=severity,
+            session_id=session_id,
+            before_state=before_state,
+            after_state=after_state,
         )
         logger.error(
             "trade_audit_log_write_unexpected_error",

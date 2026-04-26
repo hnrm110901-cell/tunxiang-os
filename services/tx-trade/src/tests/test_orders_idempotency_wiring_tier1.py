@@ -168,9 +168,7 @@ async def test_cache_hit_returns_cached_body():
     import json
 
     cached_body_str = json.dumps(cached_response, ensure_ascii=False)
-    db = _mk_db_for_lookup(
-        row=(200, cached_body_str, "completed", request_hash, datetime.now(timezone.utc))
-    )
+    db = _mk_db_for_lookup(row=(200, cached_body_str, "completed", request_hash, datetime.now(timezone.utc)))
 
     cached_body, returned_hash, route_path = await _check_idempotency_cache(
         db,
@@ -229,9 +227,7 @@ async def test_p1_cross_order_same_key_does_not_collide():
 async def test_hash_conflict_raises_http_422():
     """同 key 同 order 但 body 不同 → raise HTTPException(422 IDEMPOTENCY_KEY_CONFLICT)。"""
     cached_hash = "different_hash_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-    db = _mk_db_for_lookup(
-        row=(200, "{}", "completed", cached_hash, datetime.now(timezone.utc))
-    )
+    db = _mk_db_for_lookup(row=(200, "{}", "completed", cached_hash, datetime.now(timezone.utc)))
 
     with pytest.raises(HTTPException) as exc_info:
         await _check_idempotency_cache(

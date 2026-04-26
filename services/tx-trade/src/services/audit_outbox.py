@@ -21,6 +21,7 @@ POSIX atomicity 假设：
   - JSONL 行 99% 场景 < 1KB（payload 极少 > 4KB）
   - 长行（> 4KB）会触发警告 + 跳过 outbox（fail-open，至少 log.critical 留痕）
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -190,7 +191,8 @@ def _rotate_outbox(path: Path) -> None:
             except OSError as exc:
                 logger.warning(
                     "audit_outbox_rotate_unlink_failed",
-                    file=str(oldest), error=str(exc),
+                    file=str(oldest),
+                    error=str(exc),
                 )
                 return  # 放弃 rotate（不影响后续追加）
 
@@ -204,7 +206,9 @@ def _rotate_outbox(path: Path) -> None:
                 except OSError as exc:
                     logger.warning(
                         "audit_outbox_rotate_rename_failed",
-                        src=str(src), dst=str(dst), error=str(exc),
+                        src=str(src),
+                        dst=str(dst),
+                        error=str(exc),
                     )
                     return
 
@@ -215,7 +219,8 @@ def _rotate_outbox(path: Path) -> None:
             except OSError as exc:
                 logger.warning(
                     "audit_outbox_rotate_active_failed",
-                    path=str(path), error=str(exc),
+                    path=str(path),
+                    error=str(exc),
                 )
     except Exception as exc:  # noqa: BLE001
         logger.warning(
@@ -327,7 +332,7 @@ def _flushing_ts_or_zero(flushing_path: Path, outbox_path: Path) -> int:
     prefix = outbox_path.name + ".flushing."
     if not name.startswith(prefix):
         return 0
-    suffix = name[len(prefix):]
+    suffix = name[len(prefix) :]
     try:
         return int(suffix)
     except ValueError:
@@ -450,10 +455,7 @@ async def _process_one_flushing_file(
             rows_ingested = 0
 
     # ── Step 4: 写回 leftover 到主 outbox
-    leftover_ok = (
-        _append_lines_to_outbox(outbox_path, leftover_lines)
-        if leftover_lines else True
-    )
+    leftover_ok = _append_lines_to_outbox(outbox_path, leftover_lines) if leftover_lines else True
     if not leftover_ok:
         logger.error(
             "audit_outbox_flush_leftover_writeback_failed",
@@ -463,10 +465,7 @@ async def _process_one_flushing_file(
 
     # ── Step 5: poison 行 append 到 .poison
     poison_path = outbox_path.with_suffix(outbox_path.suffix + ".poison")
-    poison_ok = (
-        _append_lines_to_outbox(poison_path, poison_lines)
-        if poison_lines else True
-    )
+    poison_ok = _append_lines_to_outbox(poison_path, poison_lines) if poison_lines else True
     if not poison_ok:
         logger.error(
             "audit_outbox_flush_poison_writeback_failed",
@@ -601,12 +600,8 @@ async def _insert_one_audit(db, audit: Mapping[str, Any]) -> None:
             "request_id": audit.get("request_id"),
             "severity": audit.get("severity"),
             "session_id": audit.get("session_id"),
-            "before_state": (
-                json.dumps(audit["before_state"]) if audit.get("before_state") else None
-            ),
-            "after_state": (
-                json.dumps(audit["after_state"]) if audit.get("after_state") else None
-            ),
+            "before_state": (json.dumps(audit["before_state"]) if audit.get("before_state") else None),
+            "after_state": (json.dumps(audit["after_state"]) if audit.get("after_state") else None),
         },
     )
 
@@ -676,7 +671,9 @@ async def _flusher_loop(
 
 def _flusher_disabled_by_env() -> bool:
     return os.getenv("TX_AUDIT_OUTBOX_FLUSHER_DISABLED", "").strip().lower() in {
-        "true", "1", "yes",
+        "true",
+        "1",
+        "yes",
     }
 
 

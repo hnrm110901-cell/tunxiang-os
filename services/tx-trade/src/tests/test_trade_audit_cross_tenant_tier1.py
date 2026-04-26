@@ -197,10 +197,7 @@ async def test_t3_unknown_target_type_skips_check():
     assert params["target_id"] == "DY12345", "未注册 target_type 应 fail-open"
     assert params["amount_fen"] == 4900
     # 没有 lookup SELECT 发生
-    lookup_calls = [
-        c for c in db.execute.await_args_list
-        if "SELECT 1 FROM" in str(c.args[0])
-    ]
+    lookup_calls = [c for c in db.execute.await_args_list if "SELECT 1 FROM" in str(c.args[0])]
     assert len(lookup_calls) == 0, "未注册 target_type 不应触发 lookup"
 
 
@@ -261,10 +258,7 @@ async def test_t5_no_target_id_skips_lookup():
     params = _captured_insert_params(db)
     assert params is not None
     assert params["target_id"] is None
-    lookup_calls = [
-        c for c in db.execute.await_args_list
-        if "SELECT 1 FROM" in str(c.args[0])
-    ]
+    lookup_calls = [c for c in db.execute.await_args_list if "SELECT 1 FROM" in str(c.args[0])]
     assert len(lookup_calls) == 0
 
 
@@ -337,10 +331,7 @@ async def test_t7_order_with_non_uuid_target_id_skips_uuid_tables():
     assert params is not None
     assert params["target_id"] == fallback_id, "非 UUID 应 fail-open"
     # 验证没有 lookup 真的发起（UUID 检查在 SQL 之前已挡）
-    lookup_calls = [
-        c for c in db.execute.await_args_list
-        if "SELECT 1 FROM" in str(c.args[0])
-    ]
+    lookup_calls = [c for c in db.execute.await_args_list if "SELECT 1 FROM" in str(c.args[0])]
     assert len(lookup_calls) == 0
 
 
@@ -370,7 +361,8 @@ async def test_t8_cross_tenant_emits_critical_structlog():
 
         # 必须发出 trade_audit_cross_tenant_target_blocked 这条 error 级别 log
         critical_logs = [
-            c for c in mock_logger.error.call_args_list
+            c
+            for c in mock_logger.error.call_args_list
             if c.args and c.args[0] == "trade_audit_cross_tenant_target_blocked"
         ]
         assert len(critical_logs) == 1, "必须发出 1 条 critical SIEM log"

@@ -92,7 +92,9 @@ class BanquetContractAmendment(TenantBase):
 
     contract_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
     amendment_no: Mapped[int] = mapped_column(Integer, nullable=False)
-    change_type: Mapped[str] = mapped_column(String(30), nullable=False, comment="menu/table_count/guest_count/date/venue/price/terms/other")
+    change_type: Mapped[str] = mapped_column(
+        String(30), nullable=False, comment="menu/table_count/guest_count/date/venue/price/terms/other"
+    )
     old_value_json: Mapped[dict] = mapped_column(JSON, default=dict)
     new_value_json: Mapped[dict] = mapped_column(JSON, default=dict)
     reason: Mapped[str] = mapped_column(Text, nullable=False)

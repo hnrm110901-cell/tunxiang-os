@@ -123,7 +123,9 @@ async def get_redemption_report(
     end_date: str,
     request: Request,
     db: AsyncSession = Depends(get_db),
-    user: UserContext = Depends(require_role_audited("platform_coupon.report.read", "store_manager", "admin", "auditor", "audit_admin")),
+    user: UserContext = Depends(
+        require_role_audited("platform_coupon.report.read", "store_manager", "admin", "auditor", "audit_admin")
+    ),
 ):
     """核销报告 — 按平台/日期汇总（只读）"""
     tenant_id = _get_tenant_id(request)

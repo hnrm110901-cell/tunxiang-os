@@ -1,4 +1,5 @@
 """宴会执行SOP ORM模型"""
+
 import uuid
 from datetime import datetime, time
 from typing import Optional
@@ -23,8 +24,21 @@ class BanquetExecutionPlan(TenantBase):
     started_at: Mapped[Optional[datetime]] = mapped_column()
     completed_at: Mapped[Optional[datetime]] = mapped_column()
     __table_args__ = (Index("idx_bep_banquet", "tenant_id", "banquet_id"), {"comment": "宴会执行计划"})
+
     def to_dict(self) -> dict:
-        return {"id": str(self.id), "banquet_id": str(self.banquet_id), "store_id": str(self.store_id), "checkpoints_json": self.checkpoints_json, "total_checkpoints": self.total_checkpoints, "completed_checkpoints": self.completed_checkpoints, "status": self.status, "started_at": self.started_at.isoformat() if self.started_at else None, "completed_at": self.completed_at.isoformat() if self.completed_at else None, "created_at": self.created_at.isoformat() if self.created_at else None}
+        return {
+            "id": str(self.id),
+            "banquet_id": str(self.banquet_id),
+            "store_id": str(self.store_id),
+            "checkpoints_json": self.checkpoints_json,
+            "total_checkpoints": self.total_checkpoints,
+            "completed_checkpoints": self.completed_checkpoints,
+            "status": self.status,
+            "started_at": self.started_at.isoformat() if self.started_at else None,
+            "completed_at": self.completed_at.isoformat() if self.completed_at else None,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+        }
+
 
 class BanquetExecutionLog(TenantBase):
     __tablename__ = "banquet_execution_logs"
@@ -41,5 +55,17 @@ class BanquetExecutionLog(TenantBase):
     issue_note: Mapped[Optional[str]] = mapped_column(Text)
     photos_json: Mapped[dict] = mapped_column(JSON, default=list)
     __table_args__ = (Index("idx_bel_plan", "tenant_id", "plan_id"), {"comment": "执行日志"})
+
     def to_dict(self) -> dict:
-        return {"id": str(self.id), "plan_id": str(self.plan_id), "checkpoint_index": self.checkpoint_index, "checkpoint_name": self.checkpoint_name, "scheduled_time": self.scheduled_time.isoformat() if self.scheduled_time else None, "actual_time": self.actual_time.isoformat() if self.actual_time else None, "delay_min": self.delay_min, "executor_name": self.executor_name, "status": self.status, "issue_note": self.issue_note}
+        return {
+            "id": str(self.id),
+            "plan_id": str(self.plan_id),
+            "checkpoint_index": self.checkpoint_index,
+            "checkpoint_name": self.checkpoint_name,
+            "scheduled_time": self.scheduled_time.isoformat() if self.scheduled_time else None,
+            "actual_time": self.actual_time.isoformat() if self.actual_time else None,
+            "delay_min": self.delay_min,
+            "executor_name": self.executor_name,
+            "status": self.status,
+            "issue_note": self.issue_note,
+        }
