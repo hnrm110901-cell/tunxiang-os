@@ -76,7 +76,7 @@ class ForgeEcosystemService:
                     (SELECT count(*) FROM forge_installations
                      WHERE status = 'active' AND is_deleted = false) AS active_installs,
                     GREATEST(
-                        (SELECT count(DISTINCT store_id) FROM forge_installations
+                        (SELECT count(*) FROM forge_installations
                          WHERE status = 'active' AND is_deleted = false), 1
                     ) AS active_stores
             """),
@@ -106,10 +106,11 @@ class ForgeEcosystemService:
         # 5. Token效率: outcomes / (total_tokens / 1000)
         token_row = await db.execute(
             text("""
-                SELECT COALESCE(SUM(tokens_used), 0) AS total_tokens
+                SELECT COALESCE(SUM(input_tokens + output_tokens), 0) AS total_tokens
                 FROM forge_token_meters
                 WHERE is_deleted = false
-                  AND period_start >= :d::date - INTERVAL '30 days'
+                  AND period_type = 'daily'
+                  AND period_key >= to_char(:d::date - INTERVAL '30 days', 'YYYY-MM-DD')
             """),
             {"d": str(metric_date)},
         )
