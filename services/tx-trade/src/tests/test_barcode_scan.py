@@ -104,7 +104,9 @@ _stub_module("sqlalchemy.ext", asyncio=MagicMock())  # no-op
 _stub_module("sqlalchemy.ext.asyncio", AsyncSession=MagicMock)  # no-op
 _stub_module("sqlalchemy.dialects", postgresql=MagicMock())  # no-op
 _stub_module("sqlalchemy.dialects.postgresql", UUID=MagicMock)  # no-op
-_stub_module("sqlalchemy.orm", Mapped=Any, mapped_column=MagicMock, relationship=MagicMock, DeclarativeBase=type)  # no-op
+_stub_module(
+    "sqlalchemy.orm", Mapped=Any, mapped_column=MagicMock, relationship=MagicMock, DeclarativeBase=type
+)  # no-op
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # 测试1: 条码生成器
