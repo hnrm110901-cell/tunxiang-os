@@ -1,12 +1,22 @@
 """挑战 API — 8端点
 
 /api/v1/member/challenges
+
+从内存存储迁移至 v310(challenges) + v311(challenge_progress) 数据库表。
+通过 challenge_engine 模块操作 DB，tenant_id RLS 隔离。
 """
 
-from typing import Optional
+import json
+from typing import Any, Optional
 
-from fastapi import APIRouter, Header, Query
+from fastapi import APIRouter, Depends, Header, Query
 from pydantic import BaseModel, Field
+from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from shared.ontology.src.database import get_db
+from services.tx_member.src.services import challenge_engine
 
 router = APIRouter(prefix="/api/v1/member/challenges", tags=["challenge-engine"])
 
@@ -61,10 +71,15 @@ class ClaimRewardReq(BaseModel):
     challenge_id: str
 
 
-# ─── 内存存储 ────────────────────────────────────────────────────────────────
+# ─── 辅助函数 ────────────────────────────────────────────────────────────────
 
-_challenge_store: dict[str, dict] = {}
-_progress_store: dict[str, dict] = {}  # key: f"{customer_id}:{challenge_id}"
+
+def _ok(data: Any) -> dict:
+    return {"ok": True, "data": data}
+
+
+def _err(code: str, message: str) -> dict:
+    return {"ok": False, "error": {"code": code, "message": message}}
 
 
 # ─── 端点 ─────────────────────────────────────────────────────────────────────
@@ -74,20 +89,45 @@ _progress_store: dict[str, dict] = {}  # key: f"{customer_id}:{challenge_id}"
 async def create_challenge(
     req: CreateChallengeReq,
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ):
-    """1. 创建挑战"""
-    import uuid
-
-    challenge_id = str(uuid.uuid4())
-    challenge = {
-        "id": challenge_id,
-        "tenant_id": x_tenant_id,
-        "current_participants": 0,
-        "is_active": True,
-        **req.model_dump(),
-    }
-    _challenge_store[challenge_id] = challenge
-    return {"ok": True, "data": challenge}
+    """1. 创建挑战 → INSERT INTO challenges"""
+    try:
+        row = await db.execute(
+            text("""
+                INSERT INTO challenges (tenant_id, name, description, type,
+                                        rules, reward, badge_id,
+                                        start_date, end_date,
+                                        max_participants, icon_url, display_order)
+                VALUES (:tid, :name, :desc, :type, :rules::jsonb, :reward::jsonb,
+                        :badge_id, :start_date::timestamptz, :end_date::timestamptz,
+                        :max_p, :icon, :ord)
+                RETURNING id, tenant_id, name, description, type, rules, reward,
+                          badge_id, start_date, end_date, max_participants,
+                          current_participants, is_active, display_order, icon_url,
+                          created_at, updated_at
+            """),
+            {
+                "tid": x_tenant_id,
+                "name": req.name,
+                "desc": req.description,
+                "type": req.type,
+                "rules": json.dumps(req.rules),
+                "reward": json.dumps(req.reward),
+                "badge_id": req.badge_id,
+                "start_date": req.start_date,
+                "end_date": req.end_date,
+                "max_p": req.max_participants,
+                "icon": req.icon_url,
+                "ord": req.display_order,
+            },
+        )
+        await db.commit()
+        challenge = dict(row.mappings().first())
+        return _ok(challenge)
+    except SQLAlchemyError:
+        await db.rollback()
+        raise
 
 
 @router.get("")
@@ -97,29 +137,65 @@ async def list_challenges(
     is_active: Optional[bool] = Query(None),
     page: int = Query(1, ge=1),
     size: int = Query(20, ge=1, le=100),
+    db: AsyncSession = Depends(get_db),
 ):
-    """2. 列出挑战"""
-    items = [
-        c
-        for c in _challenge_store.values()
-        if c["tenant_id"] == x_tenant_id
-        and (type is None or c.get("type") == type)
-        and (is_active is None or c.get("is_active") == is_active)
-    ]
-    start = (page - 1) * size
-    return {"ok": True, "data": {"items": items[start : start + size], "total": len(items)}}
+    """2. 列出挑战 → SELECT FROM challenges"""
+    offset = (page - 1) * size
+    where_parts = ["tenant_id = :tid", "is_deleted = false"]
+    params: dict[str, Any] = {"tid": x_tenant_id, "lim": size, "off": offset}
+
+    if type is not None:
+        where_parts.append("type = :type")
+        params["type"] = type
+    if is_active is not None:
+        where_parts.append("is_active = :active")
+        params["active"] = is_active
+
+    where_clause = " AND ".join(where_parts)
+
+    count_row = await db.execute(
+        text(f"SELECT COUNT(*) FROM challenges WHERE {where_clause}"),
+        params,
+    )
+    total = int(count_row.scalar() or 0)
+
+    rows = await db.execute(
+        text(f"""
+            SELECT id, name, description, type, rules, reward, badge_id,
+                   start_date, end_date, max_participants, current_participants,
+                   is_active, display_order, icon_url, created_at, updated_at
+            FROM challenges
+            WHERE {where_clause}
+            ORDER BY display_order, start_date
+            LIMIT :lim OFFSET :off
+        """),
+        params,
+    )
+    items = [dict(r) for r in rows.mappings().all()]
+    return _ok({"items": items, "total": total})
 
 
 @router.get("/{challenge_id}")
 async def get_challenge(
     challenge_id: str,
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ):
-    """3. 获取挑战详情"""
-    ch = _challenge_store.get(challenge_id)
-    if not ch or ch["tenant_id"] != x_tenant_id:
-        return {"ok": False, "error": {"code": "NOT_FOUND", "message": "challenge not found"}}
-    return {"ok": True, "data": ch}
+    """3. 获取挑战详情 → SELECT ... WHERE id = ..."""
+    row = await db.execute(
+        text("""
+            SELECT id, name, description, type, rules, reward, badge_id,
+                   start_date, end_date, max_participants, current_participants,
+                   is_active, display_order, icon_url, created_at, updated_at
+            FROM challenges
+            WHERE tenant_id = :tid AND id = :cid AND is_deleted = false
+        """),
+        {"tid": x_tenant_id, "cid": challenge_id},
+    )
+    ch = row.mappings().first()
+    if not ch:
+        return _err("NOT_FOUND", "challenge not found")
+    return _ok(dict(ch))
 
 
 @router.put("/{challenge_id}")
@@ -127,95 +203,122 @@ async def update_challenge(
     challenge_id: str,
     req: UpdateChallengeReq,
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ):
-    """4. 更新挑战"""
-    ch = _challenge_store.get(challenge_id)
-    if not ch or ch["tenant_id"] != x_tenant_id:
-        return {"ok": False, "error": {"code": "NOT_FOUND", "message": "challenge not found"}}
+    """4. 更新挑战 → UPDATE challenges SET ..."""
     updates = {k: v for k, v in req.model_dump().items() if v is not None}
-    ch.update(updates)
-    return {"ok": True, "data": ch}
+    if not updates:
+        return _err("NO_CHANGES", "no fields to update")
+
+    set_parts: list[str] = ["updated_at = NOW()"]
+    params: dict[str, Any] = {"tid": x_tenant_id, "cid": challenge_id}
+    for key, val in updates.items():
+        if key in ("rules", "reward"):
+            set_parts.append(f"{key} = :{key}::jsonb")
+            params[key] = json.dumps(val)
+        elif key in ("start_date", "end_date"):
+            set_parts.append(f"{key} = :{key}::timestamptz")
+            params[key] = val
+        else:
+            set_parts.append(f"{key} = :{key}")
+            params[key] = val
+
+    set_clause = ", ".join(set_parts)
+    try:
+        row = await db.execute(
+            text(f"""
+                UPDATE challenges
+                SET {set_clause}
+                WHERE tenant_id = :tid AND id = :cid AND is_deleted = false
+                RETURNING id, name, description, type, rules, reward, badge_id,
+                          start_date, end_date, max_participants, current_participants,
+                          is_active, display_order, icon_url, created_at, updated_at
+            """),
+            params,
+        )
+        await db.commit()
+        result = row.mappings().first()
+        if not result:
+            return _err("NOT_FOUND", "challenge not found")
+        return _ok(dict(result))
+    except SQLAlchemyError:
+        await db.rollback()
+        raise
 
 
 @router.delete("/{challenge_id}")
 async def delete_challenge(
     challenge_id: str,
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ):
-    """5. 删除挑战（软删除）"""
-    ch = _challenge_store.get(challenge_id)
-    if not ch or ch["tenant_id"] != x_tenant_id:
-        return {"ok": False, "error": {"code": "NOT_FOUND", "message": "challenge not found"}}
-    ch["is_deleted"] = True
-    ch["is_active"] = False
-    return {"ok": True, "data": {"deleted": True}}
+    """5. 删除挑战（软删除） → UPDATE challenges SET is_deleted = true"""
+    try:
+        result = await db.execute(
+            text("""
+                UPDATE challenges
+                SET is_deleted = true, is_active = false, updated_at = NOW()
+                WHERE tenant_id = :tid AND id = :cid AND is_deleted = false
+            """),
+            {"tid": x_tenant_id, "cid": challenge_id},
+        )
+        await db.commit()
+        if result.rowcount == 0:
+            return _err("NOT_FOUND", "challenge not found")
+        return _ok({"deleted": True})
+    except SQLAlchemyError:
+        await db.rollback()
+        raise
 
 
 @router.post("/join")
-async def join_challenge(
+async def join_challenge_api(
     req: JoinChallengeReq,
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ):
-    """6. 会员参加挑战"""
-    ch = _challenge_store.get(req.challenge_id)
-    if not ch or ch["tenant_id"] != x_tenant_id:
-        return {"ok": False, "error": {"code": "NOT_FOUND", "message": "challenge not found"}}
-
-    key = f"{req.customer_id}:{req.challenge_id}"
-    if key in _progress_store:
-        return {"ok": True, "data": _progress_store[key]}
-
-    target = ch.get("rules", {}).get("target", 1)
-    progress = {
-        "customer_id": req.customer_id,
-        "challenge_id": req.challenge_id,
-        "current_value": 0,
-        "target_value": target,
-        "status": "active",
-    }
-    _progress_store[key] = progress
-    ch["current_participants"] = ch.get("current_participants", 0) + 1
-    return {"ok": True, "data": progress}
+    """6. 会员参加挑战 → challenge_engine.join_challenge"""
+    try:
+        progress = await challenge_engine.join_challenge(
+            db, x_tenant_id, req.customer_id, req.challenge_id
+        )
+        return _ok(progress)
+    except ValueError as e:
+        return _err("JOIN_FAILED", str(e))
 
 
 @router.post("/progress")
 async def update_progress(
     req: UpdateProgressReq,
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ):
-    """7. 更新挑战进度"""
-    key = f"{req.customer_id}:{req.challenge_id}"
-    progress = _progress_store.get(key)
-    if not progress:
-        return {"ok": False, "error": {"code": "NOT_JOINED", "message": "not joined this challenge"}}
-
-    if progress["status"] in ("completed", "claimed"):
-        return {"ok": True, "data": progress}
-
-    progress["current_value"] = min(
-        progress["current_value"] + req.increment,
-        progress["target_value"],
-    )
-    if progress["current_value"] >= progress["target_value"]:
-        progress["status"] = "completed"
-    return {"ok": True, "data": progress}
+    """7. 更新挑战进度 → challenge_engine.update_progress"""
+    try:
+        progress = await challenge_engine.update_progress(
+            db,
+            x_tenant_id,
+            req.customer_id,
+            req.challenge_id,
+            increment=req.increment,
+            detail=req.detail if req.detail else None,
+        )
+        return _ok(progress)
+    except ValueError as e:
+        return _err("NOT_JOINED", str(e))
 
 
 @router.post("/claim")
 async def claim_reward(
     req: ClaimRewardReq,
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
 ):
-    """8. 领取挑战奖励"""
-    key = f"{req.customer_id}:{req.challenge_id}"
-    progress = _progress_store.get(key)
-    if not progress:
-        return {"ok": False, "error": {"code": "NOT_JOINED", "message": "not joined"}}
-
-    if progress["status"] != "completed":
-        return {"ok": False, "error": {"code": "NOT_COMPLETED", "message": f"status is {progress['status']}"}}
-
-    ch = _challenge_store.get(req.challenge_id, {})
-    reward = ch.get("reward", {})
-    progress["status"] = "claimed"
-    return {"ok": True, "data": {"claimed": True, "reward": reward}}
+    """8. 领取挑战奖励 → challenge_engine.claim_reward"""
+    try:
+        result = await challenge_engine.claim_reward(
+            db, x_tenant_id, req.customer_id, req.challenge_id
+        )
+        return _ok(result)
+    except ValueError as e:
+        return _err("CLAIM_FAILED", str(e))

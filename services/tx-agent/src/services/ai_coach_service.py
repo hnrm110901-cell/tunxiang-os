@@ -9,20 +9,28 @@
   - 复盘分析（post_rush_review）: 午后/晚后复盘指标 vs 基线
   - 闭店日报（closing_summary）: 21:00-23:00推送，全天汇总 + 经验 + 明日建议
 
-TODO: 当前使用模拟数据，待对接 tx-trade / tx-supply / tx-analytics 真实数据源
+数据源：跨服务HTTP调用 tx-trade / tx-analytics / tx-ops，失败时降级为模拟数据
 """
 
 from __future__ import annotations
 
+import os
 import random
 from datetime import date, datetime, timezone
 from uuid import UUID, uuid4
 
+import httpx
 import structlog
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .baseline_service import METRIC_META, BaselineService
+
+# ── 跨服务URL（环境变量配置，默认本地开发地址） ──
+TX_TRADE_URL = os.getenv("TX_TRADE_URL", "http://localhost:8001")
+TX_ANALYTICS_URL = os.getenv("TX_ANALYTICS_URL", "http://localhost:8009")
+TX_OPS_URL = os.getenv("TX_OPS_URL", "http://localhost:8005")
+TX_AGENT_URL = os.getenv("TX_AGENT_URL", "http://localhost:8008")
 
 logger = structlog.get_logger(__name__)
 
@@ -71,6 +79,45 @@ class AICoachService:
         self.db = db
         self._baseline_svc = BaselineService(db)
 
+    # ── 通用跨服务HTTP调用 ──────────────────────────────────────────
+
+    @staticmethod
+    async def _call_service(
+        service_url: str,
+        path: str,
+        *,
+        tenant_id: str,
+        params: dict | None = None,
+        timeout: float = 10.0,
+    ) -> dict:
+        """跨服务HTTP GET调用（统一入口）
+
+        Args:
+            service_url: 目标服务基础URL，如 TX_ANALYTICS_URL
+            path: API路径，如 "/api/v1/analytics/daily-summary"
+            tenant_id: 租户ID（必传，写入X-Tenant-ID header）
+            params: 查询参数
+            timeout: 超时秒数
+
+        Returns:
+            响应JSON dict
+
+        Raises:
+            httpx.HTTPStatusError: 非2xx响应
+            httpx.TimeoutException: 超时
+        """
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            resp = await client.get(
+                f"{service_url}{path}",
+                params=params,
+                headers={
+                    "X-Tenant-ID": tenant_id,
+                    "X-Internal-Call": "true",
+                },
+            )
+            resp.raise_for_status()
+            return resp.json()
+
     # ══════════════════════════════════════════════════════════════════
     # 1. 晨会简报
     # ══════════════════════════════════════════════════════════════════
@@ -95,7 +142,6 @@ class AICoachService:
         today = date.today()
         coaching_date = today
 
-        # TODO: 对接 tx-trade / tx-analytics 真实数据
         yesterday = await self._get_yesterday_metrics(tenant_id, store_id)
         forecast = await self._get_today_forecast(tenant_id, store_id)
 
@@ -191,7 +237,6 @@ class AICoachService:
             ai_analysis: str,
           }
         """
-        # TODO: 对接实时指标源（tx-trade POS流水/tx-analytics实时看板）
         current_metrics = await self._get_slot_metrics(
             tenant_id,
             store_id,
@@ -216,7 +261,7 @@ class AICoachService:
             return None
 
         # 异常论述
-        similar_episodes = self._find_similar_episodes(anomalies)
+        similar_episodes = await self._find_similar_episodes(anomalies, tenant_id=tenant_id)
         suggested_actions = self._generate_peak_actions(anomalies, slot_code)
         ai_analysis = self._generate_peak_analysis(
             anomalies,
@@ -284,7 +329,6 @@ class AICoachService:
         """
         today = date.today()
 
-        # TODO: 对接真实时段指标
         metrics = await self._get_slot_metrics(tenant_id, store_id, slot_code)
 
         # 对比基线
@@ -295,8 +339,7 @@ class AICoachService:
             slot_code=slot_code,
         )
 
-        # TODO: 对接 SOP 任务完成度（sop_task_instances 表）
-        sop_completion = self._get_mock_sop_completion(slot_code)
+        sop_completion = await self._get_sop_completion(tenant_id, store_id, slot_code)
 
         # 生成亮点和改进建议
         highlights = self._extract_highlights(vs_baseline)
@@ -364,7 +407,6 @@ class AICoachService:
         """
         today = date.today()
 
-        # TODO: 对接全天指标汇总
         daily_metrics = await self._get_daily_metrics(tenant_id, store_id)
 
         # 对比基线
@@ -374,11 +416,9 @@ class AICoachService:
             daily_metrics,
         )
 
-        # TODO: 对接 SOP 全天统计
-        sop_report = self._get_mock_daily_sop_report()
+        sop_report = await self._get_daily_sop_report(tenant_id, store_id)
 
-        # TODO: 对接纠正动作统计
-        corrective_summary = self._get_mock_corrective_summary()
+        corrective_summary = await self._get_corrective_summary(tenant_id, store_id)
 
         # 生成经验教训
         lessons = self._generate_daily_lessons(
@@ -646,7 +686,7 @@ class AICoachService:
         }
 
     # ══════════════════════════════════════════════════════════════════
-    # 内部方法 — 模拟数据（TODO: 对接真实数据源）
+    # 内部方法 — 跨服务数据获取（真实API + mock fallback）
     # ══════════════════════════════════════════════════════════════════
 
     async def _get_yesterday_metrics(
@@ -654,11 +694,43 @@ class AICoachService:
         tenant_id: str,
         store_id: str,
     ) -> dict:
-        """获取昨日经营指标
+        """获取昨日经营指标 — 对接 tx-analytics daily-summary API
 
-        TODO: 对接 tx-trade 订单汇总 / tx-analytics 日报
-        当前使用模拟数据（合理的中式正餐门店范围）
+        调用: GET tx-analytics/api/v1/analytics/daily-summary?date=yesterday&store_id=...
+        失败时降级为模拟数据
         """
+        try:
+            data = await self._call_service(
+                TX_ANALYTICS_URL,
+                "/api/v1/analytics/daily-summary",
+                tenant_id=tenant_id,
+                params={"date": "yesterday", "store_id": store_id},
+            )
+            # 从API响应中提取数据（兼容 {"ok": true, "data": {...}} 格式）
+            metrics = data.get("data", data)
+            return {
+                "revenue_fen": metrics["revenue_fen"],
+                "covers": metrics["covers"],
+                "avg_ticket_fen": metrics.get("avg_ticket_fen", metrics["revenue_fen"] // max(metrics["covers"], 1)),
+                "food_cost_rate": metrics["food_cost_rate"],
+                "labor_cost_rate": metrics.get("labor_cost_rate", 0.25),
+                "table_turnover": metrics.get("table_turnover", 2.0),
+                "serve_time_min": metrics.get("serve_time_min", 15.0),
+                "waste_rate": metrics.get("waste_rate", 0.03),
+                "takeout_count": metrics.get("takeout_count", 0),
+                "customer_complaints": metrics.get("customer_complaints", 0),
+            }
+        except Exception:
+            logger.warning(
+                "coaching.analytics_yesterday_call_failed",
+                store_id=store_id,
+                exc_info=True,
+            )
+            return self._mock_yesterday_metrics()
+
+    @staticmethod
+    def _mock_yesterday_metrics() -> dict:
+        """模拟昨日指标（fallback）"""
         revenue_fen = random.randint(280000, 350000)  # 2800-3500元
         covers = random.randint(180, 220)
         avg_ticket_fen = revenue_fen // covers if covers > 0 else 16000
@@ -683,11 +755,36 @@ class AICoachService:
         tenant_id: str,
         store_id: str,
     ) -> dict:
-        """获取今日预测
+        """获取今日预测 — 对接 tx-analytics forecast API
 
-        TODO: 对接 tx-analytics 预测引擎 / 天气API / 预订系统
-        当前使用模拟数据
+        调用: GET tx-analytics/api/v1/analytics/forecast?store_id=...&date=today
+        失败时降级为模拟数据
         """
+        try:
+            data = await self._call_service(
+                TX_ANALYTICS_URL,
+                "/api/v1/analytics/forecast",
+                tenant_id=tenant_id,
+                params={"store_id": store_id, "date": "today"},
+            )
+            forecast = data.get("data", data)
+            return {
+                "expected_covers": forecast.get("expected_covers", 200),
+                "reservations": forecast.get("reservations", 0),
+                "weather": forecast.get("weather", "晴"),
+                "special_events": forecast.get("special_events", []),
+            }
+        except Exception:
+            logger.warning(
+                "coaching.analytics_forecast_call_failed",
+                store_id=store_id,
+                exc_info=True,
+            )
+            return self._mock_today_forecast()
+
+    @staticmethod
+    def _mock_today_forecast() -> dict:
+        """模拟今日预测（fallback）"""
         expected_covers = random.randint(180, 230)
         reservations = random.randint(15, 30)
         weather = random.choice(WEATHER_OPTIONS)
@@ -711,12 +808,45 @@ class AICoachService:
         store_id: str,
         slot_code: str,
     ) -> dict[str, float]:
-        """获取时段指标
+        """获取时段指标 — 对接 tx-trade slot-summary API
 
-        TODO: 对接 tx-trade 实时流水 + tx-analytics 时段聚合
-        当前使用模拟数据
+        调用: GET tx-trade/api/v1/orders/slot-summary?store_id=...&slot=current
+        失败时降级为模拟数据
         """
-        # 根据时段调整模拟值的范围
+        try:
+            data = await self._call_service(
+                TX_TRADE_URL,
+                "/api/v1/orders/slot-summary",
+                tenant_id=tenant_id,
+                params={"store_id": store_id, "slot": slot_code},
+            )
+            slot = data.get("data", data)
+            covers = float(slot.get("covers", 0))
+            revenue_fen = float(slot.get("revenue_fen", 0))
+            avg_ticket = revenue_fen / covers if covers > 0 else 16000.0
+
+            return {
+                "lunch_covers": covers if "lunch" in slot_code else 0.0,
+                "dinner_covers": covers if "dinner" in slot_code else 0.0,
+                "avg_ticket_fen": avg_ticket,
+                "food_cost_rate": float(slot.get("food_cost_rate", 35.0)),
+                "serve_time_min": float(slot.get("serve_time_min", 15.0)),
+                "table_turnover": float(slot.get("table_turnover", 2.0)),
+                "waste_rate": float(slot.get("waste_rate", 3.0)),
+                "customer_complaints": float(slot.get("customer_complaints", 0)),
+            }
+        except Exception:
+            logger.warning(
+                "coaching.trade_slot_call_failed",
+                store_id=store_id,
+                slot_code=slot_code,
+                exc_info=True,
+            )
+            return self._mock_slot_metrics(slot_code)
+
+    @staticmethod
+    def _mock_slot_metrics(slot_code: str) -> dict[str, float]:
+        """模拟时段指标（fallback）"""
         if slot_code in ("lunch_peak", "lunch_buildup"):
             covers = float(random.randint(80, 130))
             revenue_fen = float(random.randint(130000, 190000))
@@ -745,11 +875,48 @@ class AICoachService:
         tenant_id: str,
         store_id: str,
     ) -> dict[str, float]:
-        """获取全天指标汇总
+        """获取全天指标汇总 — 对接 tx-analytics daily-summary API
 
-        TODO: 对接 tx-trade 日结 / tx-analytics 日报
-        当前使用模拟数据
+        调用: GET tx-analytics/api/v1/analytics/daily-summary?date=today&store_id=...
+        失败时降级为模拟数据
         """
+        try:
+            data = await self._call_service(
+                TX_ANALYTICS_URL,
+                "/api/v1/analytics/daily-summary",
+                tenant_id=tenant_id,
+                params={"date": "today", "store_id": store_id},
+            )
+            metrics = data.get("data", data)
+            revenue_fen = float(metrics["revenue_fen"])
+            covers = float(metrics["covers"])
+            avg_ticket = revenue_fen / covers if covers > 0 else 16000.0
+
+            return {
+                "revenue_fen": revenue_fen,
+                "covers": covers,
+                "lunch_covers": float(metrics.get("lunch_covers", 0)),
+                "dinner_covers": float(metrics.get("dinner_covers", 0)),
+                "avg_ticket_fen": round(avg_ticket, 0),
+                "food_cost_rate": float(metrics.get("food_cost_rate", 35.0)),
+                "labor_cost_rate": float(metrics.get("labor_cost_rate", 25.0)),
+                "table_turnover": float(metrics.get("table_turnover", 2.0)),
+                "serve_time_min": float(metrics.get("serve_time_min", 15.0)),
+                "waste_rate": float(metrics.get("waste_rate", 3.0)),
+                "takeout_count": float(metrics.get("takeout_count", 0)),
+                "customer_complaints": float(metrics.get("customer_complaints", 0)),
+            }
+        except Exception:
+            logger.warning(
+                "coaching.analytics_daily_call_failed",
+                store_id=store_id,
+                exc_info=True,
+            )
+            return self._mock_daily_metrics()
+
+    @staticmethod
+    def _mock_daily_metrics() -> dict[str, float]:
+        """模拟全天指标（fallback）"""
         revenue_fen = float(random.randint(280000, 380000))
         covers = float(random.randint(180, 250))
         avg_ticket = revenue_fen / covers if covers > 0 else 16000.0
@@ -999,13 +1166,47 @@ class AICoachService:
 
         return "".join(parts)
 
-    @staticmethod
-    def _find_similar_episodes(anomalies: list[dict]) -> list[dict]:
-        """查找相似历史案例
+    async def _find_similar_episodes(
+        self,
+        anomalies: list[dict],
+        tenant_id: str | None = None,
+    ) -> list[dict]:
+        """查找相似历史案例 — 对接本服务 memory-evolution API
 
-        TODO: 对接记忆系统（agent_memories）检索相似episode
-        当前返回模拟数据
+        调用: GET tx-agent/api/v1/agent/memory-evolution/search?query=...&scope=store
+        失败时降级为模拟数据
         """
+        if not anomalies:
+            return []
+
+        top = anomalies[0]
+        metric_name = top.get("metric_name", top["metric"])
+        query = f"{metric_name}异常"
+
+        try:
+            data = await self._call_service(
+                TX_AGENT_URL,
+                "/api/v1/agent/memory-evolution/search",
+                tenant_id=tenant_id or "",
+                params={"query": query, "scope": "store"},
+            )
+            memories = data.get("data", data)
+            episodes: list[dict] = []
+            for mem in (memories if isinstance(memories, list) else memories.get("items", [])):
+                episodes.append(
+                    {
+                        "date": mem.get("created_at", "")[:10],
+                        "description": mem.get("content", mem.get("summary", "")),
+                    }
+                )
+            return episodes[:3]  # 最多返回3条
+        except Exception:
+            logger.warning("coaching.memory_search_failed", exc_info=True)
+            return self._mock_similar_episodes(anomalies)
+
+    @staticmethod
+    def _mock_similar_episodes(anomalies: list[dict]) -> list[dict]:
+        """模拟相似案例（fallback）"""
         episodes: list[dict] = []
         if anomalies:
             top = anomalies[0]
@@ -1123,12 +1324,47 @@ class AICoachService:
 
         return "".join(parts)
 
-    @staticmethod
-    def _get_mock_sop_completion(slot_code: str) -> dict:
-        """模拟SOP完成度
+    async def _get_sop_completion(
+        self,
+        tenant_id: str,
+        store_id: str,
+        slot_code: str,
+    ) -> dict:
+        """获取SOP任务完成度 — 对接 tx-ops SOP API
 
-        TODO: 对接 sop_task_instances 表实时查询
+        调用: GET tx-ops/api/v1/ops/sop/tasks/completion?store_id=...&date=today&slot_code=...
+        失败时降级为模拟数据
         """
+        try:
+            data = await self._call_service(
+                TX_OPS_URL,
+                "/api/v1/ops/sop/tasks/completion",
+                tenant_id=tenant_id,
+                params={
+                    "store_id": store_id,
+                    "date": "today",
+                    "slot_code": slot_code,
+                },
+            )
+            sop = data.get("data", data)
+            return {
+                "total": sop.get("total", 0),
+                "completed": sop.get("completed", 0),
+                "skipped": sop.get("skipped", 0),
+                "overdue": sop.get("overdue", 0),
+            }
+        except Exception:
+            logger.warning(
+                "coaching.ops_sop_completion_call_failed",
+                store_id=store_id,
+                slot_code=slot_code,
+                exc_info=True,
+            )
+            return self._mock_sop_completion(slot_code)
+
+    @staticmethod
+    def _mock_sop_completion(slot_code: str) -> dict:
+        """模拟SOP完成度（fallback）"""
         total = random.randint(5, 10)
         completed = random.randint(max(3, total - 3), total)
         skipped = random.randint(0, min(2, total - completed))
@@ -1141,12 +1377,46 @@ class AICoachService:
             "overdue": max(0, overdue),
         }
 
-    @staticmethod
-    def _get_mock_daily_sop_report() -> dict:
-        """模拟全天SOP报告
+    async def _get_daily_sop_report(
+        self,
+        tenant_id: str,
+        store_id: str,
+    ) -> dict:
+        """获取全天SOP报告 — 对接 tx-ops SOP API
 
-        TODO: 对接 sop_task_instances 日汇总
+        调用: GET tx-ops/api/v1/ops/sop/tasks/completion?store_id=...&date=today
+        （不传slot_code表示全天汇总）
+        失败时降级为模拟数据
         """
+        try:
+            data = await self._call_service(
+                TX_OPS_URL,
+                "/api/v1/ops/sop/tasks/completion",
+                tenant_id=tenant_id,
+                params={"store_id": store_id, "date": "today"},
+            )
+            sop = data.get("data", data)
+            total = sop.get("total", 0)
+            completed = sop.get("completed", 0)
+            completion_rate = round(completed / total * 100, 1) if total > 0 else 0.0
+            return {
+                "total": total,
+                "completed": completed,
+                "skipped": sop.get("skipped", 0),
+                "overdue": sop.get("overdue", 0),
+                "completion_rate": completion_rate,
+            }
+        except Exception:
+            logger.warning(
+                "coaching.ops_daily_sop_call_failed",
+                store_id=store_id,
+                exc_info=True,
+            )
+            return self._mock_daily_sop_report()
+
+    @staticmethod
+    def _mock_daily_sop_report() -> dict:
+        """模拟全天SOP报告（fallback）"""
         total = random.randint(25, 40)
         completed = random.randint(max(20, total - 5), total)
         skipped = random.randint(0, min(3, total - completed))
@@ -1161,12 +1431,40 @@ class AICoachService:
             "completion_rate": completion_rate,
         }
 
-    @staticmethod
-    def _get_mock_corrective_summary() -> dict:
-        """模拟纠正动作汇总
+    async def _get_corrective_summary(
+        self,
+        tenant_id: str,
+        store_id: str,
+    ) -> dict:
+        """获取纠正动作汇总 — 对接 tx-ops corrective-actions API
 
-        TODO: 对接 sop_corrective_actions 日汇总
+        调用: GET tx-ops/api/v1/ops/sop/corrective-actions/summary?store_id=...&date=today
+        失败时降级为模拟数据
         """
+        try:
+            data = await self._call_service(
+                TX_OPS_URL,
+                "/api/v1/ops/sop/corrective-actions/summary",
+                tenant_id=tenant_id,
+                params={"store_id": store_id, "date": "today"},
+            )
+            summary = data.get("data", data)
+            return {
+                "total": summary.get("total", 0),
+                "resolved": summary.get("resolved", 0),
+                "pending": summary.get("pending", 0),
+            }
+        except Exception:
+            logger.warning(
+                "coaching.ops_corrective_call_failed",
+                store_id=store_id,
+                exc_info=True,
+            )
+            return self._mock_corrective_summary()
+
+    @staticmethod
+    def _mock_corrective_summary() -> dict:
+        """模拟纠正动作汇总（fallback）"""
         total = random.randint(0, 5)
         resolved = random.randint(0, total)
         pending = total - resolved

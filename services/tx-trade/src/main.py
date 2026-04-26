@@ -63,6 +63,7 @@ from .api.kds_analytics_routes import router as kds_analytics_router
 from .api.kds_by_session_routes import router as kds_by_session_router
 from .api.kds_chef_stats_routes import router as kds_chef_stats_router
 from .api.kds_config_routes import router as kds_config_router
+from .api.kds_delta_routes import router as kds_delta_router
 from .api.kds_pause_grab_routes import router as kds_pause_grab_router
 from .api.kds_prep_routes import router as kds_prep_router
 from .api.kds_routes import router as kds_router
@@ -442,6 +443,7 @@ from .api.kds_piecework_routes import router as kds_piecework_router
 
 app.include_router(kds_piecework_router, prefix="/api/v1/kds-piecework")
 app.include_router(kds_display_config_router, prefix="/api/v1/kds-display")
+app.include_router(kds_delta_router)  # KDS Delta增量同步 + 设备心跳
 
 
 @app.get("/health")
