@@ -1237,8 +1237,8 @@ class CustomerJourneyService:
                 customer_id=str(customer_id),
                 tenant_id=str(tenant_id),
             )
-            # graceful degradation: 查询失败时放行，避免阻断旅程
-            return True
+            # fail-closed: DB故障时跳过发送，防止无差别群发
+            return False
 
     async def _send_message(
         self,

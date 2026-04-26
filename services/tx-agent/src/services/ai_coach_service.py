@@ -34,6 +34,19 @@ TX_AGENT_URL = os.getenv("TX_AGENT_URL", "http://localhost:8008")
 
 logger = structlog.get_logger(__name__)
 
+# ── 跨服务HTTP客户端（进程级单例，连接池复用） ──
+_http_client: httpx.AsyncClient | None = None
+
+
+def _get_http_client() -> httpx.AsyncClient:
+    global _http_client
+    if _http_client is None or _http_client.is_closed:
+        _http_client = httpx.AsyncClient(
+            timeout=10.0,
+            limits=httpx.Limits(max_connections=20, max_keepalive_connections=10),
+        )
+    return _http_client
+
 # 时段名称映射
 SLOT_NAMES: dict[str, str] = {
     "morning_prep": "早间准备",
@@ -106,8 +119,8 @@ class AICoachService:
             httpx.HTTPStatusError: 非2xx响应
             httpx.TimeoutException: 超时
         """
-        async with httpx.AsyncClient(timeout=timeout) as client:
-            resp = await client.get(
+        client = _get_http_client()
+        resp = await client.get(
                 f"{service_url}{path}",
                 params=params,
                 headers={

@@ -102,16 +102,19 @@ jobs:
             exit 1
           fi
 
-      - name: Commit results back to repository
+      - name: Commit results to nightly-results branch
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+          git stash -- infra/performance/k6-latest-results.json
+          git fetch origin nightly-results 2>/dev/null && git checkout nightly-results || git checkout -b nightly-results
+          git checkout stash -- infra/performance/k6-latest-results.json 2>/dev/null || git stash pop
           git add infra/performance/k6-latest-results.json
           if git diff --cached --quiet; then
             echo "No changes to commit"
           else
-            git commit -m "perf: update k6 nightly results $(date -u +%Y-%m-%dT%H:%M:%SZ)"
-            git push
+            git commit -m "perf: update k6 nightly results $(date -u +%Y-%m-%dT%H:%M:%SZ) [skip ci]"
+            git push origin nightly-results
           fi
 
       - name: Upload raw results as artifact

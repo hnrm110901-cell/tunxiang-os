@@ -79,9 +79,13 @@ async def _store_mfa_temp_secret(user_id: str, encrypted_secret: str) -> None:
             return
         except OSError as exc:
             logger.warning("mfa_temp_secret_store_failed", user_id=user_id, error=str(exc))
-    # fallback: Redis不可用时存入内存（仅限开发环境）
-    _mfa_temp_fallback[user_id] = encrypted_secret
-    logger.warning("mfa_temp_secret_stored_in_memory_fallback", user_id=user_id)
+    # Redis不可用 — 仅开发环境允许内存fallback，生产环境直接报错
+    if os.getenv("TX_ENV", "dev") in ("dev", "test"):
+        _mfa_temp_fallback[user_id] = encrypted_secret
+        logger.warning("mfa_temp_secret_stored_in_memory_fallback", user_id=user_id)
+    else:
+        logger.error("mfa_temp_secret_redis_required", user_id=user_id)
+        raise RuntimeError("MFA requires Redis in production")
 
 
 async def _get_mfa_temp_secret(user_id: str) -> Optional[str]:

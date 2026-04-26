@@ -105,14 +105,17 @@ jobs:
           chmod +x scripts/collect-offline-results.sh
           ./scripts/collect-offline-results.sh e2e/playwright-report/
 
-      - name: Commit nightly results
+      - name: Commit nightly results to nightly-results branch
         if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+          git stash -- infra/nightly/offline-e2e-results.json
+          git fetch origin nightly-results 2>/dev/null && git checkout nightly-results || git checkout -b nightly-results
+          git checkout stash -- infra/nightly/offline-e2e-results.json 2>/dev/null || git stash pop
           git add infra/nightly/offline-e2e-results.json
           git diff --cached --quiet || git commit -m "ci(nightly): update offline E2E results [skip ci]"
-          git push || echo "Push failed — results will be committed next run"
+          git push origin nightly-results || echo "Push failed — results will be committed next run"
 
       - name: Stop dev server
         if: always()

@@ -323,10 +323,12 @@ async def get_personalized_menu(
     if customer_id:
         try:
             import httpx
+            import os
 
+            tx_member_url = os.getenv("TX_MEMBER_URL", "http://tx-member:8003")
             async with httpx.AsyncClient(timeout=3.0) as client:
                 profile_resp = await client.get(
-                    f"http://tx-member:8003/api/v1/members/{customer_id}/profile",
+                    f"{tx_member_url}/api/v1/members/{customer_id}/profile",
                     headers={"X-Tenant-ID": x_tenant_id},
                 )
                 if profile_resp.status_code == 200:
