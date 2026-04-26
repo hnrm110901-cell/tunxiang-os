@@ -90,12 +90,18 @@ def upgrade() -> None:
         """
     )
 
-    # ── 索引：过期清理（部分索引，体积只占活跃 entry 的 ~5%）
+    # ── 索引：过期清理（PR #111 codex P1 review #1 修复）
+    # 原设计用 WHERE expires_at < NOW() 部分索引，但 PG 要求 index predicate 表达式
+    # IMMUTABLE，NOW()/CURRENT_TIMESTAMP 是 STABLE 不是 IMMUTABLE → CREATE INDEX
+    # 在执行时报 "functions in index predicate must be marked IMMUTABLE" 失败，
+    # 阻塞整个 v296 迁移链。
+    # 改为普通索引，cleanup sweeper 在 SELECT 时用 WHERE expires_at < NOW() 过滤即可。
+    # 索引体积代价：从"活跃 entry 的 ~5%"扩到"100%"，但 24h TTL 下绝对体积仍很小
+    # （单租户日活跃 cache 行 ~100k，索引 ~3MB），完全可接受。
     op.execute(
         """
         CREATE INDEX idx_api_idem_expired
         ON api_idempotency_cache (expires_at)
-        WHERE expires_at < NOW()
         """
     )
 
