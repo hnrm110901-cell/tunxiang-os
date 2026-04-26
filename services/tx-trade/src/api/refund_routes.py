@@ -7,11 +7,11 @@
 
 import asyncio
 import json
-import logging
 import uuid as uuid_mod
 from typing import List, Optional
 from uuid import UUID
 
+import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel
 from sqlalchemy import text
@@ -23,7 +23,10 @@ from shared.ontology.src.database import get_db
 from ..security.rbac import UserContext, require_mfa_audited
 from ..services.trade_audit_log import write_audit
 
-logger = logging.getLogger(__name__)
+# 用 structlog 替换 stdlib logging — Python 3.14 stdlib logger 在收到 error=
+# 等 reserved kwargs 时抛 TypeError；structlog 接受任意结构化字段。项目其他
+# 模块（trade_audit_log / audit_outbox / rbac 等）已统一用 structlog。
+logger = structlog.get_logger(__name__)
 router = APIRouter(prefix="/api/v1/trade/refunds", tags=["refund"])
 
 
