@@ -3,14 +3,14 @@
 新增：
   manager_discount_requests — 服务员发起的折扣/优惠申请（经理端审批）
 
-Revision ID: v150
+Revision ID: v150b
 Revises: v149
 Create Date: 2026-04-04
 """
 
 from alembic import op
 
-revision = "v150"
+revision = "v150b"
 down_revision = "v148"
 branch_labels = None
 depends_on = None

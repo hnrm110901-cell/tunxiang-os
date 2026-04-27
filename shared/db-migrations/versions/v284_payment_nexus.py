@@ -38,10 +38,18 @@ def upgrade() -> None:
             config_data     JSONB NOT NULL DEFAULT '{}',
             created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
             updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-            is_deleted      BOOLEAN NOT NULL DEFAULT FALSE,
-
-            UNIQUE (tenant_id, COALESCE(store_id, '00000000-0000-0000-0000-000000000000'::UUID), method)
+            is_deleted      BOOLEAN NOT NULL DEFAULT FALSE
         )
+    """)
+
+    # 唯一索引：UNIQUE 约束不允许 COALESCE 表达式，改用 UNIQUE INDEX
+    op.execute("""
+        CREATE UNIQUE INDEX IF NOT EXISTS uq_pcc_tenant_store_method
+            ON payment_channel_configs (
+                tenant_id,
+                COALESCE(store_id, '00000000-0000-0000-0000-000000000000'::UUID),
+                method
+            )
     """)
 
     # 索引

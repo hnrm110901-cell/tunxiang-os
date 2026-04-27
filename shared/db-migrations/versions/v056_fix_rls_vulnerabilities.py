@@ -35,7 +35,7 @@ Create Date: 2026-03-31
 """
 
 import sqlalchemy as sa
-from alembic import op
+from alembic import context, op
 
 revision = "v056"
 down_revision = "v047"
@@ -168,6 +168,10 @@ LEGACY_CONDITION_TABLES = [
 
 
 def _table_exists(table: str) -> bool:
+    if context.is_offline_mode():
+        # offline --sql 模式：假设表存在，让 RLS 修复 SQL 全部输出（脚本会被 psql 跑，
+        # 表真不存在时 ALTER TABLE 直接报错而非静默跳过）
+        return True
     conn = op.get_bind()
     result = conn.execute(
         sa.text(

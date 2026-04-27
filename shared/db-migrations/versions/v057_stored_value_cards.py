@@ -18,7 +18,7 @@ Create Date: 2026-03-31
 """
 from typing import Sequence, Union
 
-from alembic import op
+from alembic import context, op
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import UUID
 
@@ -32,6 +32,8 @@ _NEW_TABLES = ["sv_transactions", "sv_charge_rules"]
 
 def _table_exists(name: str) -> bool:
     """幂等保护：v383 chain consolidation 后此 migration 可能在已建表的环境重跑。"""
+    if context.is_offline_mode():
+        return False  # offline --sql 模式假设全新环境
     return bool(op.get_bind().execute(sa.text(
         "SELECT 1 FROM information_schema.tables "
         "WHERE table_schema = 'public' AND table_name = :t"
@@ -39,6 +41,8 @@ def _table_exists(name: str) -> bool:
 
 
 def _index_exists(name: str) -> bool:
+    if context.is_offline_mode():
+        return False
     return bool(op.get_bind().execute(sa.text(
         "SELECT 1 FROM pg_indexes WHERE schemaname = 'public' AND indexname = :n"
     ), {"n": name}).first())

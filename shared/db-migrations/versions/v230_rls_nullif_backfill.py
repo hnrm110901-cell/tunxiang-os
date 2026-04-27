@@ -130,23 +130,36 @@ def upgrade() -> None:
     for table, old_policy in _AFFECTED:
         new_policy = f"{table}_rls_v230"
 
-        # 1. 强制表所有者也受 RLS 约束
-        op.execute(f"ALTER TABLE {table} FORCE ROW LEVEL SECURITY;")
-
-        # 2. 删除旧策略（幂等）
-        op.execute(f"DROP POLICY IF EXISTS {old_policy} ON {table};")
-
-        # 3. 创建标准策略（幂等，IF NOT EXISTS 防重复）
+        # 整体包在 DO 块里 + 表存在检查：v383 chain consolidation 后某些 dup
+        # 重命名分支（manager_discount_requests / orders_link 等）在 v230 时点
+        # 尚未合并到主线，需要跳过缺失的表，等 v383 merge 后链路统一。
         op.execute(f"""
             DO $$ BEGIN
+                IF NOT EXISTS (
+                    SELECT 1 FROM information_schema.tables
+                    WHERE table_schema = 'public' AND table_name = '{table}'
+                ) THEN
+                    RAISE NOTICE '[v230] skip %: table not present yet', '{table}';
+                    RETURN;
+                END IF;
+
+                -- 1. FORCE RLS（owner 也受约束）
+                EXECUTE 'ALTER TABLE {table} FORCE ROW LEVEL SECURITY';
+
+                -- 2. 删旧策略（幂等）
+                EXECUTE 'DROP POLICY IF EXISTS {old_policy} ON {table}';
+
+                -- 3. 建新策略（幂等）
                 IF NOT EXISTS (
                     SELECT 1 FROM pg_policies
                     WHERE tablename = '{table}' AND policyname = '{new_policy}'
                 ) THEN
-                    CREATE POLICY {new_policy} ON {table}
-                        AS PERMISSIVE FOR ALL TO PUBLIC
-                        USING ({_SAFE_COND})
-                        WITH CHECK ({_SAFE_COND});
+                    EXECUTE $POLICY$
+                        CREATE POLICY {new_policy} ON {table}
+                            AS PERMISSIVE FOR ALL TO PUBLIC
+                            USING ({_SAFE_COND})
+                            WITH CHECK ({_SAFE_COND})
+                    $POLICY$;
                 END IF;
             END $$;
         """)

@@ -159,12 +159,9 @@ def upgrade() -> None:
         ["employee_id", "shift_date"],
     )
     # waiter_zone_assignments 无 is_deleted，记录为历史数据保留
-    # RLS 策略基于 store_id 关联的 tenant_id —— 用宽松策略（join stores）
-    # 简化：复用 tenant_id 列
-    op.execute(
-        "ALTER TABLE waiter_zone_assignments ADD COLUMN tenant_id UUID NOT NULL DEFAULT '00000000-0000-0000-0000-000000000000'"
-    )
-    # 注：实际写入时业务层必须传入正确 tenant_id，此处 DEFAULT 只用于约束
+    # 注：tenant_id 列已在上方 op.create_table 中创建（line 116），无需 ALTER TABLE 重复添加。
+    # 历史 v149 曾误以 ALTER TABLE 重复添加 tenant_id，导致 fresh-DB 部署时
+    # `column "tenant_id" of relation already exists`。此次 v383 链条整理时一并修复。
     _enable_rls("waiter_zone_assignments")
 
     # ---------------------------------------------------------------
