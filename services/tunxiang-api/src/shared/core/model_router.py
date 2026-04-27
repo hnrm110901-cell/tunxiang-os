@@ -69,9 +69,12 @@ class ModelRouter:
         "growth_plan_generation": TaskComplexity.COMPLEX,
         "salary_competitiveness": TaskComplexity.COMPLEX,
         "calibration_insight": TaskComplexity.COMPLEX,
-        # Sprint D4b：薪资异常检测（Sonnet 4.7 + Prompt Cache 共享城市基准）
-        # Service 层显式覆盖 model_id=claude-sonnet-4-7 走 Prompt Cache beta
+        # Sprint D4：成本根因 / 薪资异常 / 预算预测（Sonnet 4.7 + Prompt Cache ≥75%）
+        # 这三个任务走 MODERATE 路由到 sonnet-4-6 的默认，但 service 层会
+        # 显式覆盖 model_id=claude-sonnet-4-7 以走 prompt cache beta 能力
+        "cost_root_cause_analysis": TaskComplexity.COMPLEX,
         "salary_anomaly_detection": TaskComplexity.COMPLEX,
+        "budget_forecast_analysis": TaskComplexity.COMPLEX,
     }
 
     # 复杂度 -> 模型映射
