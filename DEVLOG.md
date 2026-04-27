@@ -1,3 +1,29 @@
+## 2026-04-24 Tier 1 契约测试补齐 — Go/No-Go §1 转 GO
+
+### 今日完成
+- [tests/tier1/test_offline_crdt_tier1.py] 21 测试：断网 4h 终态保护 + 时间戳多格式 + CRDT 乱序/幂等 + offline_sync_service 静态契约
+- [tests/tier1/test_rls_all_tables_tier1.py] 12 测试：cross-service RLS 扫描（严格最近 20 migration + 宽松历史跟踪 + 豁免白名单 31 条 + 禁止模式扫描）
+- [scripts/demo_go_no_go.py] glob 扩 3 位置（services/*/tests/ + services/*/src/tests/ + tests/tier1/）+ 按父目录分组跑 pytest 避免 conftest 冲突 + RLS 审计 DB 连接失败降级为 SKIPPED
+- [Go/No-Go §1] Tier 1 checkpoint 从 WARNING 转 ✅ GO（9 文件 / 3 组 全绿）
+- [项目总计 tier1 测试] 92 通过（existing 59 + new 33）
+
+### 数据变化
+- 新增测试：33 个（21 CRDT + 12 RLS）
+- 修改 Go/No-Go 脚本：glob + 分组 + DB 容错
+
+### 遗留问题
+- 9 个 tier1 文件分布 3 目录；未来可统一到 tests/tier1/
+- RLS 豁免白名单 31 条需季度 audit
+- check_rls_policies.py DSN 不兼容 postgresql+asyncpg
+- 历史 RLS 技术债 ~40 张表需补
+
+### 明日计划
+- Week 7 真实 DEMO 环境：DB seed + k6 + nightly
+- Tier 1 CI 门禁：GitHub Actions `demo_go_no_go.py --strict --skip-tests`
+- check_rls_policies.py DSN 修复
+
+---
+
 ## 2026-04-24 RLS 审计脚本 DSN 兼容 + JSON 输出 — Go/No-Go §7 可跑
 
 ### 今日完成
