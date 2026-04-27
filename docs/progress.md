@@ -1863,3 +1863,209 @@ Sprint A1 属 Tier 1，严格测试先行：
 - 5 个决策点未签字前，Sprint B/D2/E 代码不可落地
 
 ---
+
+## 2026-04-19 23:30 — Wave 1 PR-W1.0: financial_vouchers Schema ↔ ORM 对齐 [Tier1]
+
+> **分支**: `feat/fct-wave1-voucher`（branched from `feat/fct-agent-2.0`）
+> **会话身份**: FCT 反向集成主会话（zhilian-os main → tx-finance Wave 1）
+> **并行 session**: FCT Agent 2.0 在 `feat/fct-agent-2.0` 跑 T5.1.x EventBus
+> **协调约定**: 本 PR 用 v264；v265 由并行 session 占用，本 PR 合入后对方改 v265 down_revision=v264
+
+### 完成状态
+- [x] **PR-W1.0 代码完成**（v264 迁移 + ORM 对齐 + 金额统一 fen）
+- [x] 15/15 Tier 1 测试全绿（0.19s）
+- [x] 回归：`test_voucher.py` 3/3 仍绿；23 个 pre-existing 收集错误与本次无关（已用 git stash 对照验证）
+- [ ] 未 commit（CLAUDE.md Tier 1 原则：等独立验证）
+- [ ] CLAUDE.md §19 触发：修改 3 文件 + DB 迁移 + Tier 1 路径 → **必须开新会话做独立验证**
+
+### 本次交付清单（3 文件）
+| 文件 | 类型 | 说明 |
+|---|---|---|
+| `shared/db-migrations/versions/v264_financial_vouchers_sync_orm.py` | 新增 | ADD 7 列 / DROP NOT NULL 旧 period 字段 / 回填 voucher_date / DEPRECATED 注释 / 索引 |
+| `services/tx-finance/src/models/voucher.py` | 修改 | 加 `total_amount_fen BigInteger`, `total_amount` 标 DEPRECATED, `store_id/voucher_date` 改 nullable 匹配物理 schema |
+| `services/tx-finance/src/tests/test_financial_vouchers_tier1.py` | 新增 | 15 个 Tier 1 测试(场景式: 门店日结/不平衡凭证/历史行兼容 + 迁移文件结构契约) |
+
+### 关键决策
+- **金额单位**：选定 `total_amount_fen BIGINT` 为 SSOT，保留 `total_amount NUMERIC` 作向前兼容双写字段（v270+ 再 drop）
+- **历史行兼容**：ORM `store_id/voucher_date` 改为 nullable，物理 schema 允许 NULL；应用层仍强制新建凭证必填（业务层校验）
+- **entries JSONB 分录单位不变**（仍元）：ERP 金蝶/用友推送契约保持零改动，由 W1.1 后续 PR 统一治理
+- **迁移风格对齐**：参照 v263 使用 `op.execute` raw SQL + `IF NOT EXISTS` 幂等
+
+### 反向集成映射（zhilian-os main → tunxiang-os tx-finance）
+源 | 目标
+:--|:--
+`apps/api-gateway/src/models/fct.py::Voucher`（fct_vouchers 表，NUMERIC 元）| 本 PR 不移植（tx-finance 的 `financial_vouchers` 已是主表，本 PR 只做 Schema 对齐）
+`apps/api-gateway/src/models/fct.py::VoucherLine` | 延后至 W1.1 PR：新表 `financial_voucher_lines`（BIGINT fen）
+
+### 测试要点（CLAUDE.md §20 场景化 Tier 1）
+```
+TestDailySettlementVoucherScenario
+  test_voucher_stores_amount_in_fen             PASS  # ¥3,456.78 → 345678 fen
+  test_legacy_total_amount_field_optional...    PASS  # 允许只写 fen
+  test_to_dict_exposes_both_amount_fields       PASS  # 双字段兼容
+TestUnbalancedVoucherScenario
+  test_unbalanced_voucher_detected              PASS  # 借 100 / 贷 99 → 拦住
+  test_rounding_tolerance_under_1_cent          PASS  # 尾差 < 0.001 容忍
+TestHistoricalRowCompatibilityScenario
+  test_orm_allows_null_store_id_...             PASS  # v031 老行 NULL 可读
+  test_to_dict_handles_null_fields_gracefully   PASS
+TestV264MigrationFileStructure（结构契约,防漂移）
+  test_revision_is_v264                         PASS
+  test_down_revision_is_v263                    PASS  # 与 v265 并行约定
+  test_adds_all_7_expected_columns              PASS
+  test_total_amount_fen_uses_bigint             PASS
+  test_drops_not_null_on_legacy_period_columns  PASS
+  test_backfills_voucher_date_from_period_start PASS
+  test_deprecated_columns_have_comments         PASS
+  test_downgrade_is_not_empty                   PASS
+```
+
+### 已知风险
+- ~~未在真实 Postgres 执行过 upgrade()~~ ✅ **2026-04-19 已在 DEV Postgres 16 验证**（见下方 DEV 验证记录）
+- **voucher_generator.py 等下游尚未改**：当前仍写 `total_amount`（元），未双写 `total_amount_fen`；W1.3 PR 处理
+- **pl_report.py 查询路径未改**：`total_amount_fen` 目前只是 ORM 字段，无人读写，下游切换延后到 W1.3
+- **ERP 推送路径零改动**：entries JSONB 保持元单位，金蝶/用友 sandbox 回归可延后到 W1.3
+- **downgrade 的边界约束**：downgrade 前如果已有新行（period_start 为 NULL），`SET NOT NULL` 会失败。生产回滚 runbook 必须包含：先 `SELECT COUNT(*) WHERE period_start IS NULL` 检查 → 决定 backfill 或删除
+
+### DBA/SRE 独立验证响应（第 2 轮 §19, 2026-04-19）
+
+第 2 轮独立验证从 DBA/SRE 视角提 8 条风险。优先级处置:
+
+#### 🔴 #1 CREATE INDEX 改为 CONCURRENTLY（已修）
+- **问题**: 非 CONCURRENTLY 建索引持 ShareLock, 千万级表阻塞 INSERT 3-5 分钟
+- **修复**: 用 `op.get_context().autocommit_block()` 把 CREATE INDEX 脱离 alembic 主事务
+  ```python
+  with op.get_context().autocommit_block():
+      op.execute("CREATE INDEX CONCURRENTLY IF NOT EXISTS ...")
+  ```
+- **验证**: DEV Postgres 16 跑通, 事务外成功创建 2 个索引
+- **副作用**: downgrade 的 DROP INDEX 也用 CONCURRENTLY 对称
+
+#### 🔴 #2 Runbook 里 DO $$ pg_sleep 是错的（已修）
+- **问题**: 上一版文档建议 `DO $$ LOOP ... pg_sleep(0.5) END $$` 做大表分批回填,
+  但 DO 块是单事务, pg_sleep 只挂事务不 COMMIT, 主从不追齐, WAL 不释放
+- **修复**: Runbook 里删除 DO $$ 版本, 改为外部 bash 脚本 + `FOR UPDATE SKIP LOCKED`
+  + 每批独立事务 + 批间 sleep 0.5s, 才能真正让主从追上
+- **验证**: 脚本模板写入 migration docstring, Tier 1 测试校验 `SKIP LOCKED` 出现
+
+#### 🟡 #5 migration 可观测性（已修）
+- **问题**: 无任何进度标记, 出故障时只能猜哪一步卡
+- **修复**: 每步前加 `RAISE NOTICE 'v264 step N/5: ...'`, upgrade 5 步 + downgrade 3 步 + 2 complete = 10 个 notice 点
+- **验证**: DEV 执行时 NOTICE 逐步打印
+
+#### 🟡 #7 downgrade guard（已修）
+- **问题**: downgrade 的 `SET NOT NULL` 若发现 period_start 有 NULL 会失败, 但是半途失败会让 schema 和代码状态分裂（索引已 DROP / 列已 DROP / NOT NULL 没恢复）
+- **修复**: downgrade 首步加前置检查 DO 块, 发现 NULL 直接 RAISE EXCEPTION 带恢复指令
+  ```
+  v264 downgrade blocked: 1 rows have period_start IS NULL.
+  Run: UPDATE financial_vouchers SET period_start=voucher_date,
+  period_end=voucher_date WHERE period_start IS NULL; then retry downgrade.
+  ```
+- **验证**: DEV 插新行 → 尝试 downgrade → guard 精准拦截 → backfill → 重试 downgrade 成功 → schema 100% 回 v031 原状
+
+#### 🟡 #3 Alembic 单事务锁（文档化, 不改代码）
+- 索引改 CONCURRENTLY 后, 主事务只剩 ALTER + UPDATE + COMMENT, 总锁时间从 "分钟级" 降到 "UPDATE 耗时"
+- 超 100 万行时, Runbook 要求 SKIP migration 里的 UPDATE, 改外部 bash 脚本
+
+#### 🟡 #4 alembic 链 15 个重名（另立项）
+- 项目遗留: v206/v207/v208/v235-v237/v250-v256/v260/v261 全重名
+- `alembic upgrade head` 在 "Multiple heads" 报错, DEV 库 alembic_version 是空的
+- 不阻塞 PR-W1.0 代码 review, 但**阻塞 v264 上线**
+- **新 Issue**: 建立 `fix/alembic-chain-dedup` 独立 PR, 优先级 P0
+
+#### 🟡 #6 应用层熔断（Runbook 文档化）
+- 已在 v264 docstring 加入 "🚦 应用层熔断" 章节:
+  - `kubectl scale deploy/tx-finance --replicas=0` 切流量
+  - 或 feature flag 把财务写路径熔断到只读
+- 没有代码改动, 运维 runbook 指南
+
+#### 🟢 #8 VARCHAR vs TEXT（忽略）
+- PG 里 VARCHAR(n) = TEXT + CHECK, 无性能差异, 跳过
+
+#### 测试增强
+- 新增 4 个契约测试锁定修复:
+  - `test_index_uses_concurrently` — 索引必须 CONCURRENTLY
+  - `test_downgrade_has_null_period_guard` — downgrade 必须前置检查
+  - `test_migration_has_raise_notice_for_observability` — 进度可观测
+  - `test_runbook_removes_broken_pg_sleep_pattern` — 旧错误方案不能回来
+- **测试总数 17 → 21, 全绿 0.19s**
+
+---
+
+### CFO 独立验证响应（第 1 轮 §19, 2026-04-19）
+
+独立验证者从徐记海鲜 CFO 视角提出 4 条风险, 按优先级处理:
+
+#### 🔴 #2 借贷平衡容忍度（会计红线, 已立即修复）
+- **问题**: 原 `is_balanced()` 用 `abs(total_debit - total_credit) < 0.001` (~0.1 分容忍)
+- **危害**:
+  - 借贷平衡是会计绝对约束, 证监会/四大审计师不接受"容忍度"
+  - 单张 0.0001 元安全, 但 10 万张月汇后误差累计到数十元, 每张都"合规"
+  - 0.005 元税额四舍五入方向错误会被放行
+  - IEEE 754 浮点坑: `0.1 + 0.2 = 0.30000000000000004` 直接比较不可靠
+- **修复** (本 PR 直接改):
+  ```python
+  def is_balanced(self) -> bool:
+      total_debit_fen  = sum(round(e.get("debit", 0) * 100) for e in self.entries)
+      total_credit_fen = sum(round(e.get("credit", 0) * 100) for e in self.entries)
+      return total_debit_fen == total_credit_fen  # 零容忍, 精确 fen 整数相等
+  ```
+- **新增测试**:
+  - `test_rejects_1_cent_discrepancy`: 1 分钱错账必须拦住
+  - `test_ieee_754_float_arithmetic_no_false_reject`: 0.1 + 0.2 + 0.3 场景通过
+  - `test_exact_fen_equality_required`: 精确相等校验
+- 测试从 15 → 17 个, 全绿
+
+#### 🟡 #1 ALTER TABLE 锁表风险（runbook 文档化）
+- 已在 v264 migration docstring 加入**上线 Runbook**:
+  - 禁止窗口: 20:00–02:00（日结高峰）
+  - 推荐窗口: 03:00–06:00（低峰 + 回滚余量）
+  - 长事务预检 SQL
+  - 大表回填替代方案（行数 > 100 万时的分批 DO $$ 模板）
+  - downgrade 边界约束（period_start 为 NULL 的新行需预处理）
+- PG 11+ 优化确认: 8 列全 nullable 或带 stable DEFAULT → ADD COLUMN 元数据瞬时
+- 真实风险点: `UPDATE SET voucher_date = period_start` 是全表扫, 千万级行需分批
+
+#### 🟡 #3 双写漏同步（W1.3 PR 设计, 文档预告）
+- 已在 `voucher.py` 模块 docstring 加入"双写漏同步防护"章节:
+  - 列举 5 大高风险漏同步点（第三方 ETL / Celery raw SQL / 运维手工 / 红冲取负 / 报表读不一致）
+  - 推荐 W1.3 落地方案:
+    - **A. DB 层 GENERATED 列强制同步**（把 total_amount 改为 generated from total_amount_fen）
+    - **B. CI lint 规则**禁止新代码只写元不写 fen
+    - **C. 端到端回归**校验两字段同步
+- 本 PR 不落地（保持 Schema 对齐纯粹）, 但已记入 W1.3 必做项
+
+#### 🟢 #4 RLS 深度防御（未来 PR 加回归测试）
+- 本 PR 未引入 SECURITY DEFINER 函数, 未建 MV, 零新增攻击面
+- 索引统计信息泄露路径已知风险, 建议未来加跨租户回归:
+  - 门店 A 查询 EXPLAIN / pg_stats 不能看到门店 B 的 total_amount_fen 值域
+- 记入 Wave 2 PR 验收清单
+
+---
+
+### DEV Postgres 验证（2026-04-19, v264 Schema SQL）
+- 环境：docker-compose `postgres:16-alpine`（`zhilian-os-postgres-1` 容器）
+- 初始：按 v031 schema 建表 + 3 行历史数据
+- **🔴 发现并修复 Bug**：原 v264 COMMENT 引用 `total_amount` 但 v031 从未建过该列（ORM 悬空 2 年）→ 补 `ADD COLUMN total_amount NUMERIC(12,2)`，从 7 列扩至 8 列
+- upgrade 结果：
+  - 8 新列全部 ADD 成功
+  - `period_start/end` DROP NOT NULL 成功
+  - 3/3 历史行 `voucher_date=period_start` 回填成功
+  - 2 新索引建成
+  - DEPRECATED 注释 `\d+` 可见
+  - 新行只写 `total_amount_fen=345678`（fen 约定）可 INSERT
+- downgrade 结果：
+  - 所有新列 DROP 成功
+  - 新索引 DROP 成功
+  - NOT NULL 恢复成功
+  - schema 100% 回到 v031 原状，3 行历史数据保留
+- Tier 1 测试：15/15 全绿（含 Bug 修复后的 `test_adds_all_8_expected_columns`）
+
+### 下一步（下一会话）
+1. **🔴 独立验证视角重检本 PR**（CLAUDE.md §19 强制）— 新 session 角色：徐记海鲜收银员 + 财务总监视角，检查 200 桌并发 + 断网 4h + 月结场景
+2. 在 DEV 环境跑 `alembic upgrade v264` + `alembic downgrade v263` 双向验证（需要 docker-compose 起 Postgres）
+3. 与 FCT Agent 2.0 session 确认 v265 的 down_revision 切换时机
+4. 完成独立验证后 commit → push → 开 PR（feat/fct-wave1-voucher → feat/fct-agent-2.0）
+5. 启动 PR-W1.1：`financial_voucher_lines` 新表（BIGINT fen + RLS）
+
+---
