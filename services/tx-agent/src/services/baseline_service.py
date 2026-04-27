@@ -12,6 +12,7 @@
   - > 2σ = warning（黄色预警）
   - > 3σ = critical（红色预警，需立即处理）
 """
+
 from __future__ import annotations
 
 import math
@@ -20,7 +21,7 @@ from datetime import datetime, timezone
 from uuid import UUID
 
 import structlog
-from sqlalchemy import and_, select, update
+from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..models.coaching import StoreBaseline
@@ -99,8 +100,12 @@ class BaselineService:
         if slot_code is not None:
             conditions.append(StoreBaseline.slot_code == slot_code)
 
-        stmt = select(StoreBaseline).where(and_(*conditions)).order_by(
-            StoreBaseline.metric_code,
+        stmt = (
+            select(StoreBaseline)
+            .where(and_(*conditions))
+            .order_by(
+                StoreBaseline.metric_code,
+            )
         )
         result = await self.db.execute(stmt)
         rows = result.scalars().all()
@@ -130,8 +135,11 @@ class BaselineService:
           new_std = sqrt(new_variance)
         """
         existing = await self._get_baseline_row(
-            tenant_id, store_id, metric_code,
-            day_of_week=day_of_week, slot_code=slot_code,
+            tenant_id,
+            store_id,
+            metric_code,
+            day_of_week=day_of_week,
+            slot_code=slot_code,
         )
 
         now = datetime.now(timezone.utc)
@@ -155,7 +163,9 @@ class BaselineService:
             await self.db.flush()
             logger.info(
                 "baseline.created",
-                store_id=store_id, metric=metric_code, value=value,
+                store_id=store_id,
+                metric=metric_code,
+                value=value,
             )
             return self._to_dict(baseline)
 
@@ -165,7 +175,7 @@ class BaselineService:
 
         # 重建 M2 from 已有 std_deviation 和 sample_count
         # M2 = variance * n = std^2 * n
-        old_m2 = (existing.std_deviation ** 2) * n if n > 0 else 0.0
+        old_m2 = (existing.std_deviation**2) * n if n > 0 else 0.0
 
         n_new = n + 1
         delta = value - old_mean
@@ -188,8 +198,10 @@ class BaselineService:
 
         logger.info(
             "baseline.updated",
-            store_id=store_id, metric=metric_code,
-            new_mean=round(new_mean, 4), new_std=round(new_std, 4),
+            store_id=store_id,
+            metric=metric_code,
+            new_mean=round(new_mean, 4),
+            new_std=round(new_std, 4),
             sample_count=n_new,
         )
         return self._to_dict(existing)
@@ -220,8 +232,11 @@ class BaselineService:
         now = datetime.now(timezone.utc)
 
         existing = await self._get_baseline_row(
-            tenant_id, store_id, metric_code,
-            day_of_week=day_of_week, slot_code=slot_code,
+            tenant_id,
+            store_id,
+            metric_code,
+            day_of_week=day_of_week,
+            slot_code=slot_code,
         )
 
         if existing is None:
@@ -254,8 +269,10 @@ class BaselineService:
 
         logger.info(
             "baseline.rebuilt",
-            store_id=store_id, metric=metric_code,
-            mean=round(mean_val, 4), std=round(std_val, 4),
+            store_id=store_id,
+            metric=metric_code,
+            mean=round(mean_val, 4),
+            std=round(std_val, 4),
             samples=len(values),
         )
         return self._to_dict(result)
@@ -283,7 +300,9 @@ class BaselineService:
           }]
         """
         baselines = await self.get_all_baselines(
-            tenant_id, store_id, slot_code=slot_code,
+            tenant_id,
+            store_id,
+            slot_code=slot_code,
         )
 
         # 构建 metric_code → baseline 映射
@@ -321,20 +340,23 @@ class BaselineService:
 
             meta = METRIC_META.get(metric_code, {})
 
-            anomalies.append({
-                "metric": metric_code,
-                "metric_name": meta.get("name", metric_code),
-                "unit": meta.get("unit", ""),
-                "current": current_value,
-                "baseline": round(baseline_val, 2),
-                "std_dev": round(std_dev, 4),
-                "sigma": round(sigma, 2),
-                "direction": direction,
-                "severity": severity,
-                "is_positive": self._is_positive_anomaly(
-                    metric_code, direction,
-                ),
-            })
+            anomalies.append(
+                {
+                    "metric": metric_code,
+                    "metric_name": meta.get("name", metric_code),
+                    "unit": meta.get("unit", ""),
+                    "current": current_value,
+                    "baseline": round(baseline_val, 2),
+                    "std_dev": round(std_dev, 4),
+                    "sigma": round(sigma, 2),
+                    "direction": direction,
+                    "severity": severity,
+                    "is_positive": self._is_positive_anomaly(
+                        metric_code,
+                        direction,
+                    ),
+                }
+            )
 
         # 按 sigma 降序排列（最异常的在前）
         anomalies.sort(key=lambda x: x["sigma"], reverse=True)
@@ -342,7 +364,8 @@ class BaselineService:
         if anomalies:
             logger.info(
                 "baseline.anomalies_detected",
-                store_id=store_id, count=len(anomalies),
+                store_id=store_id,
+                count=len(anomalies),
                 metrics=[a["metric"] for a in anomalies],
             )
 
@@ -367,19 +390,26 @@ class BaselineService:
         for metric_code, value in metrics.items():
             try:
                 await self.upsert_baseline(
-                    tenant_id, store_id, metric_code, value,
-                    day_of_week=day_of_week, slot_code=slot_code,
+                    tenant_id,
+                    store_id,
+                    metric_code,
+                    value,
+                    day_of_week=day_of_week,
+                    slot_code=slot_code,
                 )
                 updated += 1
             except ValueError as e:
                 logger.warning(
                     "baseline.batch_update_skip",
-                    metric=metric_code, error=str(e),
+                    metric=metric_code,
+                    error=str(e),
                 )
 
         logger.info(
             "baseline.batch_updated",
-            store_id=store_id, updated=updated, total=len(metrics),
+            store_id=store_id,
+            updated=updated,
+            total=len(metrics),
         )
         return updated
 

@@ -93,9 +93,7 @@ class ModelRouter:
 
     def get_model(self, task_type: str) -> str:
         """根据任务类型返回推荐模型 ID"""
-        complexity = self.DEFAULT_TASK_MODEL_MAP.get(
-            task_type, TaskComplexity.MODERATE
-        )
+        complexity = self.DEFAULT_TASK_MODEL_MAP.get(task_type, TaskComplexity.MODERATE)
         model = self.COMPLEXITY_MODEL_MAP[complexity]
         logger.debug(
             "model_router_resolve",
@@ -107,9 +105,7 @@ class ModelRouter:
 
     def get_complexity(self, task_type: str) -> TaskComplexity:
         """返回任务复杂度（供调用方决定是否需要 Tool Use 等高级能力）"""
-        return self.DEFAULT_TASK_MODEL_MAP.get(
-            task_type, TaskComplexity.MODERATE
-        )
+        return self.DEFAULT_TASK_MODEL_MAP.get(task_type, TaskComplexity.MODERATE)
 
     def log_call(
         self,

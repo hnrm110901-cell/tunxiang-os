@@ -2,6 +2,7 @@
 
 信号来源：评价、反馈、搜索趋势、社交媒体、预订备注、员工上报。
 """
+
 import uuid
 from collections import Counter
 from dataclasses import dataclass, field
@@ -26,8 +27,12 @@ INSIGHT_CATEGORIES = {
 }
 
 SOURCE_TYPES = [
-    "review", "feedback", "search_trend", "social_media",
-    "reservation_note", "staff_report",
+    "review",
+    "feedback",
+    "search_trend",
+    "social_media",
+    "reservation_note",
+    "staff_report",
 ]
 
 # ─── 关键词 → 主题映射（模拟 NLP） ───
@@ -84,9 +89,11 @@ _KEYWORD_TOPIC_MAP: dict[str, tuple[str, str]] = {
 
 # ─── 数据模型 ───
 
+
 @dataclass
 class Signal:
     """消费信号"""
+
     signal_id: str
     source_type: str
     content: str
@@ -101,6 +108,7 @@ class Signal:
 @dataclass
 class InsightTopic:
     """洞察主题"""
+
     topic_id: str
     category: str
     topic_name: str
@@ -119,22 +127,62 @@ _SEED_SIGNALS: list[dict] = [
     {"source_type": "review", "content": "带小孩来吃，希望有儿童套餐，等位太久了", "city": "长沙", "store_id": "S001"},
     {"source_type": "review", "content": "辣椒炒肉很好吃但太辣了，希望有微辣选项", "city": "长沙", "store_id": "S001"},
     {"source_type": "review", "content": "朋友聚会很开心，环境不错，性价比高", "city": "深圳", "store_id": "S005"},
-    {"source_type": "feedback", "content": "能不能出减脂餐套餐？现在很多人都在控制饮食", "city": "深圳", "store_id": "S005"},
+    {
+        "source_type": "feedback",
+        "content": "能不能出减脂餐套餐？现在很多人都在控制饮食",
+        "city": "深圳",
+        "store_id": "S005",
+    },
     {"source_type": "search_trend", "content": "酸汤火锅搜索量本周环比增长35%", "city": "全国", "store_id": ""},
-    {"source_type": "social_media", "content": "小红书上低糖湘菜的笔记增长200%，年轻女性关注", "city": "全国", "store_id": ""},
-    {"source_type": "reservation_note", "content": "商务宴请8人，需要包间，预算人均150", "city": "广州", "store_id": "S010"},
-    {"source_type": "staff_report", "content": "最近很多客人问有没有一人食套餐，尤其午市", "city": "长沙", "store_id": "S002"},
+    {
+        "source_type": "social_media",
+        "content": "小红书上低糖湘菜的笔记增长200%，年轻女性关注",
+        "city": "全国",
+        "store_id": "",
+    },
+    {
+        "source_type": "reservation_note",
+        "content": "商务宴请8人，需要包间，预算人均150",
+        "city": "广州",
+        "store_id": "S010",
+    },
+    {
+        "source_type": "staff_report",
+        "content": "最近很多客人问有没有一人食套餐，尤其午市",
+        "city": "长沙",
+        "store_id": "S002",
+    },
     {"source_type": "review", "content": "停车太难了，转了三圈才找到车位", "city": "深圳", "store_id": "S006"},
     {"source_type": "review", "content": "年夜饭套餐很丰盛，全家都满意，明年还来", "city": "长沙", "store_id": "S001"},
-    {"source_type": "social_media", "content": "抖音上养生湘菜话题播放量破亿，枸杞煲汤系列火了", "city": "全国", "store_id": ""},
+    {
+        "source_type": "social_media",
+        "content": "抖音上养生湘菜话题播放量破亿，枸杞煲汤系列火了",
+        "city": "全国",
+        "store_id": "",
+    },
     {"source_type": "review", "content": "服务态度很好，但菜量有点少，性价比一般", "city": "广州", "store_id": "S010"},
     {"source_type": "feedback", "content": "外卖包装希望能改进，汤洒了一桌", "city": "武汉", "store_id": "S015"},
     {"source_type": "review", "content": "团购套餐品质下降了，和正价点的不一样", "city": "深圳", "store_id": "S005"},
-    {"source_type": "search_trend", "content": "预制菜负面搜索增加，消费者对预制菜排斥情绪上升", "city": "全国", "store_id": ""},
-    {"source_type": "staff_report", "content": "周末家庭客群明显增多，儿童椅不够用", "city": "长沙", "store_id": "S003"},
+    {
+        "source_type": "search_trend",
+        "content": "预制菜负面搜索增加，消费者对预制菜排斥情绪上升",
+        "city": "全国",
+        "store_id": "",
+    },
+    {
+        "source_type": "staff_report",
+        "content": "周末家庭客群明显增多，儿童椅不够用",
+        "city": "长沙",
+        "store_id": "S003",
+    },
     {"source_type": "review", "content": "清淡口味选择太少，不是所有人都能吃辣", "city": "上海", "store_id": "S020"},
     {"source_type": "social_media", "content": "微博上生日宴打卡湘菜馆成为新趋势", "city": "全国", "store_id": ""},
-    {"source_type": "review", "content": "排队等了40分钟，体验很差，建议增加预订功能", "city": "长沙", "store_id": "S001"},
+    {
+        "source_type": "review",
+        "content": "排队等了40分钟，体验很差，建议增加预订功能",
+        "city": "长沙",
+        "store_id": "S001",
+    },
     {"source_type": "feedback", "content": "希望有健康轻食系列，现在的菜偏油腻", "city": "深圳", "store_id": "S006"},
 ]
 
@@ -155,8 +203,7 @@ class ConsumerInsightService:
                 city=seed.get("city", ""),
                 store_id=seed.get("store_id", ""),
             )
-        logger.info("consumer_insight_seed_loaded", signals=len(self._signals),
-                     topics=len(self._topics))
+        logger.info("consumer_insight_seed_loaded", signals=len(self._signals), topics=len(self._topics))
 
     # ─── 信号摄入 ───
 
@@ -271,12 +318,14 @@ class ConsumerInsightService:
         for topic_name, count in counter.most_common():
             idx = all_topics.index(topic_name)
             cat = all_categories[idx] if idx < len(all_categories) else "scenario"
-            results.append({
-                "topic_name": topic_name,
-                "category": cat,
-                "category_cn": INSIGHT_CATEGORIES.get(cat, cat),
-                "mention_count": count,
-            })
+            results.append(
+                {
+                    "topic_name": topic_name,
+                    "category": cat,
+                    "category_cn": INSIGHT_CATEGORIES.get(cat, cat),
+                    "mention_count": count,
+                }
+            )
         return results
 
     # ─── 趋势主题 ───
@@ -294,16 +343,18 @@ class ConsumerInsightService:
                 continue
             if city and city not in t.cities:
                 continue
-            results.append({
-                "topic_id": t.topic_id,
-                "category": t.category,
-                "category_cn": INSIGHT_CATEGORIES.get(t.category, t.category),
-                "topic_name": t.topic_name,
-                "signal_count": t.signal_count,
-                "trend_direction": t.trend_direction,
-                "trend_score": t.trend_score,
-                "cities": t.cities,
-            })
+            results.append(
+                {
+                    "topic_id": t.topic_id,
+                    "category": t.category,
+                    "category_cn": INSIGHT_CATEGORIES.get(t.category, t.category),
+                    "topic_name": t.topic_name,
+                    "signal_count": t.signal_count,
+                    "trend_direction": t.trend_direction,
+                    "trend_score": t.trend_score,
+                    "cities": t.cities,
+                }
+            )
         results.sort(key=lambda x: x["signal_count"], reverse=True)
         return results
 
@@ -347,8 +398,7 @@ class ConsumerInsightService:
             "total_topics": len(self._topics),
             "category_distribution": cat_counts,
             "top_topics": [
-                {"topic_name": t.topic_name, "category": t.category, "signal_count": t.signal_count}
-                for t in top_topics
+                {"topic_name": t.topic_name, "category": t.category, "signal_count": t.signal_count} for t in top_topics
             ],
             "rising_topics": rising_names,
             "summary": (
@@ -393,15 +443,17 @@ class ConsumerInsightService:
         emerging: list[dict] = []
         for t in self._topics.values():
             if t.trend_direction == "rising" and t.signal_count >= 2:
-                emerging.append({
-                    "topic_id": t.topic_id,
-                    "topic_name": t.topic_name,
-                    "category": t.category,
-                    "category_cn": INSIGHT_CATEGORIES.get(t.category, t.category),
-                    "signal_count": t.signal_count,
-                    "cities": t.cities,
-                    "recommendation": self._generate_recommendation(t),
-                })
+                emerging.append(
+                    {
+                        "topic_id": t.topic_id,
+                        "topic_name": t.topic_name,
+                        "category": t.category,
+                        "category_cn": INSIGHT_CATEGORIES.get(t.category, t.category),
+                        "signal_count": t.signal_count,
+                        "cities": t.cities,
+                        "recommendation": self._generate_recommendation(t),
+                    }
+                )
 
         emerging.sort(key=lambda x: x["signal_count"], reverse=True)
         return emerging

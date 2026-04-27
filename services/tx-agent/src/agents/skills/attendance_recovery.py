@@ -215,8 +215,7 @@ class AttendanceRecoveryAgent(SkillAgent):
     # Sprint D1 / PR 批次 5：补位推荐不直接决定资金/食材/出餐，仅 HR 排班事件驱动，豁免
     constraint_scope = set()
     constraint_waived_reason = (
-        "缺勤补位纯事件驱动排班缺口补救，输出候选人推荐供店长决策，"
-        "不直接操作毛利/食安/客户体验三条业务约束维度"
+        "缺勤补位纯事件驱动排班缺口补救，输出候选人推荐供店长决策，不直接操作毛利/食安/客户体验三条业务约束维度"
     )
 
     def get_supported_actions(self) -> list[str]:

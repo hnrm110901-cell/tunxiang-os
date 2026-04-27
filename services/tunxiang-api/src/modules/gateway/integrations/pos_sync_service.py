@@ -10,6 +10,7 @@
   1. store.config["pinzhi_base_url"] / ["pinzhi_token"]  ← 门店级覆盖
   2. 环境变量 PINZHI_BASE_URL / PINZHI_TOKEN             ← 全局兜底
 """
+
 from __future__ import annotations
 
 import json
@@ -47,14 +48,20 @@ def _get_pinzhi_adapter_class():
         adapter_src = os.path.abspath(
             os.path.join(
                 os.path.dirname(__file__),
-                "..", "..", "..", "..", "..", "..",  # tunxiang-os/
-                "shared", "adapters", "pinzhi", "src",
+                "..",
+                "..",
+                "..",
+                "..",
+                "..",
+                "..",  # tunxiang-os/
+                "shared",
+                "adapters",
+                "pinzhi",
+                "src",
             )
         )
         if not os.path.isdir(adapter_src):
-            raise FileNotFoundError(
-                f"品智适配器源码目录未找到: {adapter_src}"
-            )
+            raise FileNotFoundError(f"品智适配器源码目录未找到: {adapter_src}")
 
         pkg = types.ModuleType(pkg_key)
         pkg.__path__ = [adapter_src]
@@ -64,9 +71,7 @@ def _get_pinzhi_adapter_class():
 
         for mod_name in ("signature", "adapter"):
             mod_key = f"{pkg_key}.{mod_name}"
-            spec = importlib.util.spec_from_file_location(
-                mod_key, os.path.join(adapter_src, f"{mod_name}.py")
-            )
+            spec = importlib.util.spec_from_file_location(mod_key, os.path.join(adapter_src, f"{mod_name}.py"))
             if spec and spec.loader:
                 mod = importlib.util.module_from_spec(spec)
                 mod.__package__ = pkg_key
@@ -80,9 +85,9 @@ def _get_pinzhi_adapter_class():
 # ── 商户配置映射 ─────────────────────────────────────────────────────────────
 
 MERCHANT_ENV_PREFIX: dict[str, str] = {
-    "czyz": "CZYZ",   # 尝在一起
-    "zqx": "ZQX",     # 最黔线
-    "sgc": "SGC",     # 尚宫厨
+    "czyz": "CZYZ",  # 尝在一起
+    "zqx": "ZQX",  # 最黔线
+    "sgc": "SGC",  # 尚宫厨
 }
 
 
@@ -127,9 +132,7 @@ class POSSyncService:
         store_name = await self._get_store_name(store_id, db)
 
         # 1) 获取凭证
-        base_url, token, ognid = await self._resolve_credentials(
-            merchant_code, store_id, db
-        )
+        base_url, token, ognid = await self._resolve_credentials(merchant_code, store_id, db)
         if not base_url or not token:
             return StoreSyncSummary(
                 store_id=store_id,
@@ -139,12 +142,14 @@ class POSSyncService:
 
         # 2) 创建适配器
         PinzhiAdapter = _get_pinzhi_adapter_class()
-        adapter = PinzhiAdapter({
-            "base_url": base_url,
-            "token": token,
-            "timeout": int(os.getenv("PINZHI_TIMEOUT", "30")),
-            "retry_times": int(os.getenv("PINZHI_RETRY_TIMES", "3")),
-        })
+        adapter = PinzhiAdapter(
+            {
+                "base_url": base_url,
+                "token": token,
+                "timeout": int(os.getenv("PINZHI_TIMEOUT", "30")),
+                "retry_times": int(os.getenv("PINZHI_RETRY_TIMES", "3")),
+            }
+        )
 
         # 3) 分页拉取订单
         date_str = sync_date.isoformat()
@@ -263,9 +268,7 @@ class POSSyncService:
             )
 
         # 获取门店列表
-        active_store_ids = await self._get_active_store_ids(
-            merchant_code, store_ids, db
-        )
+        active_store_ids = await self._get_active_store_ids(merchant_code, store_ids, db)
         if not active_store_ids:
             return SyncResult(
                 success=False,
@@ -337,19 +340,19 @@ class POSSyncService:
         Returns:
             同步结果摘要
         """
-        base_url, token, ognid = await self._resolve_credentials(
-            merchant_code, store_id, db
-        )
+        base_url, token, ognid = await self._resolve_credentials(merchant_code, store_id, db)
         if not base_url or not token:
             return {"success": False, "error": "品智凭证未配置"}
 
         PinzhiAdapter = _get_pinzhi_adapter_class()
-        adapter = PinzhiAdapter({
-            "base_url": base_url,
-            "token": token,
-            "timeout": int(os.getenv("PINZHI_TIMEOUT", "30")),
-            "retry_times": int(os.getenv("PINZHI_RETRY_TIMES", "3")),
-        })
+        adapter = PinzhiAdapter(
+            {
+                "base_url": base_url,
+                "token": token,
+                "timeout": int(os.getenv("PINZHI_TIMEOUT", "30")),
+                "retry_times": int(os.getenv("PINZHI_RETRY_TIMES", "3")),
+            }
+        )
 
         try:
             dishes = await adapter.query_dishes(ognid=ognid)
@@ -358,7 +361,7 @@ class POSSyncService:
             return {"success": False, "error": str(e), "dishes_count": 0}
 
         synced = 0
-        for dish in (dishes or []):
+        for dish in dishes or []:
             dish_name = dish.get("dishName", "")
             pinzhi_dish_id = str(dish.get("dishId", ""))
             price_fen = _safe_int_from_mapper(dish.get("dishPrice", 0))
@@ -454,12 +457,8 @@ class POSSyncService:
                 cfg = row[0] if isinstance(row[0], dict) else {}
                 store_code = row[1] or store_id
 
-                base_url = cfg.get("pinzhi_base_url") or _get_merchant_env(
-                    merchant_code, "BASE_URL"
-                )
-                token = cfg.get("pinzhi_token") or _get_merchant_env(
-                    merchant_code, "TOKEN"
-                )
+                base_url = cfg.get("pinzhi_base_url") or _get_merchant_env(merchant_code, "BASE_URL")
+                token = cfg.get("pinzhi_token") or _get_merchant_env(merchant_code, "TOKEN")
                 ognid = (
                     cfg.get("pinzhi_ognid")
                     or cfg.get("pinzhi_store_id")
@@ -546,17 +545,13 @@ class POSSyncService:
             """),
             {
                 **order_dict,
-                "order_metadata": json.dumps(
-                    order_dict.get("order_metadata") or {}, ensure_ascii=False
-                ),
+                "order_metadata": json.dumps(order_dict.get("order_metadata") or {}, ensure_ascii=False),
             },
         )
         row = result.fetchone()
         return bool(row and row[0]) if row else True
 
-    async def _upsert_order_item(
-        self, item_dict: dict[str, Any], db: AsyncSession
-    ) -> None:
+    async def _upsert_order_item(self, item_dict: dict[str, Any], db: AsyncSession) -> None:
         """UPSERT单条订单明细"""
         await db.execute(
             text("""
@@ -575,9 +570,7 @@ class POSSyncService:
             """),
             {
                 **item_dict,
-                "customizations": json.dumps(
-                    item_dict.get("customizations") or {}, ensure_ascii=False
-                ),
+                "customizations": json.dumps(item_dict.get("customizations") or {}, ensure_ascii=False),
             },
         )
 

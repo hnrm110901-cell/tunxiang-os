@@ -117,11 +117,13 @@ class AgentMemoryService:
         """模糊搜索记忆（当前基于 memory_key ILIKE，后续接入向量搜索）"""
         now = datetime.now(timezone.utc)
 
+        # Py3.11 f-string 不允许反斜杠，先转义再拼接
+        escaped_query = query_text.replace("%", "\\%").replace("_", "\\_")
         stmt = select(AgentMemory).where(
             AgentMemory.tenant_id == UUID(tenant_id),
             AgentMemory.is_deleted == False,  # noqa: E712
             (AgentMemory.expires_at.is_(None)) | (AgentMemory.expires_at > now),
-            AgentMemory.memory_key.ilike(f"%{query_text.replace('%', '\\%').replace('_', '\\_')}%"),
+            AgentMemory.memory_key.ilike(f"%{escaped_query}%"),
         )
         if agent_id is not None:
             stmt = stmt.where(AgentMemory.agent_id == agent_id)

@@ -98,3 +98,4 @@ DerivedData/
 *.mlpackage
 *.onnx
 !shared/ontology/**
+shared/ontology/src/__pycache__/

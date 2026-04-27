@@ -20,7 +20,7 @@ from datetime import datetime
 from typing import Optional
 
 import structlog
-from fastapi import APIRouter, Depends, Header, HTTPException, Query
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
@@ -208,6 +208,7 @@ def _score_dishes(
 
 @router.get("")
 async def get_personalized_menu(
+    request: Request,
     store_id: str = Query(..., description="门店ID"),
     customer_id: str = Query("", description="客户ID（未登录为空）"),
     cart_items: str = Query("", description="购物车菜品ID,逗号分隔"),
@@ -315,12 +316,63 @@ async def get_personalized_menu(
         logger.exception("personalized_menu.hot_dishes_query_failed", tenant_id=x_tenant_id, store_id=store_id)
         hot_dishes = []
 
-    # TODO: 从 tx-member 读取用户画像（Phase 3 feature）
-    user_allergies: list[str] = []  # 用户过敏原
-    is_subscriber = False  # 是否付费会员
-    user_segment = "S3"  # RFM分层
+    # 从 tx-member 读取用户画像
+    user_allergies: list[str] = []
+    is_subscriber = False
+    user_segment = "S3"  # 默认RFM分层
+    if customer_id:
+        try:
+            import os
 
-    # TODO: 从 X-User-Segment / X-User-Prefs headers读取（Phase 3中间件注入）
+            import httpx
+
+            tx_member_url = os.getenv("TX_MEMBER_URL", "http://tx-member:8003")
+            async with httpx.AsyncClient(timeout=3.0) as client:
+                profile_resp = await client.get(
+                    f"{tx_member_url}/api/v1/members/{customer_id}/profile",
+                    headers={"X-Tenant-ID": x_tenant_id},
+                )
+                if profile_resp.status_code == 200:
+                    profile_data = profile_resp.json().get("data", {})
+                    user_allergies = profile_data.get("allergies", [])
+                    is_subscriber = profile_data.get("level", "") in ("gold", "platinum", "vip")
+                    user_segment = profile_data.get("rfm_segment", "S3")
+                else:
+                    logger.warning(
+                        "personalized_menu.member_profile_error",
+                        tenant_id=x_tenant_id,
+                        customer_id=customer_id,
+                        status_code=profile_resp.status_code,
+                    )
+        except (httpx.HTTPError, OSError, ValueError) as exc:
+            logger.warning(
+                "personalized_menu.member_profile_unavailable",
+                tenant_id=x_tenant_id,
+                customer_id=customer_id,
+                error=str(exc),
+            )
+
+    # 从 API Gateway 注入的 header 中读取用户偏好
+    header_segment = request.headers.get("X-User-Segment", "")
+    if header_segment:
+        user_segment = header_segment
+    user_prefs_raw = request.headers.get("X-User-Prefs", "")
+    if user_prefs_raw:
+        # 解析 prefs: "spicy=high,sweet=low,seafood=love"
+        try:
+            for pair in user_prefs_raw.split(","):
+                pair = pair.strip()
+                if "=" in pair:
+                    key, _val = pair.split("=", 1)
+                    # 将偏好中标注为"hate"/"allergy"的加入过敏列表
+                    if _val.strip().lower() in ("hate", "allergy", "avoid"):
+                        if key.strip() not in user_allergies:
+                            user_allergies.append(key.strip())
+        except (ValueError, AttributeError):
+            logger.warning(
+                "personalized_menu.prefs_parse_failed",
+                raw=user_prefs_raw[:200],
+            )
 
     # 从请求参数提取购物车
     cart_list = [c.strip() for c in cart_items.split(",") if c.strip()]

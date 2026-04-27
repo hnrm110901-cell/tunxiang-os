@@ -12,6 +12,7 @@
   - 异步运行，不阻塞收银业务
   - 冲突策略：服务端为主（server-wins），本地记录冲突原因
 """
+
 from __future__ import annotations
 
 import os
@@ -43,9 +44,11 @@ PUSH_BATCH_SIZE: int = int(os.getenv("OFFLINE_PUSH_BATCH_SIZE", "50"))
 
 # ─── 数据模型 ──────────────────────────────────────────────────────────────
 
+
 @dataclass
 class SyncResult:
     """批量同步结果"""
+
     success_count: int = 0
     failed_count: int = 0
     conflict_count: int = 0
@@ -55,6 +58,7 @@ class SyncResult:
 @dataclass
 class SyncStatus:
     """设备同步状态"""
+
     is_connected: bool
     pending_orders: int
     last_sync_at: Optional[datetime]
@@ -64,6 +68,7 @@ class SyncStatus:
 @dataclass
 class ConflictResolution:
     """冲突解决结果"""
+
     local_order_id: str
     server_order_id: Optional[str]
     resolution: str  # "server_wins" | "local_backup"
@@ -71,6 +76,7 @@ class ConflictResolution:
 
 
 # ─── 核心服务 ──────────────────────────────────────────────────────────────
+
 
 class OfflineSyncService:
     """离线收银同步服务
@@ -464,9 +470,7 @@ class OfflineSyncService:
 
     # ─── 内部：离线队列查询 ────────────────────────────────────────────────
 
-    async def _fetch_pending_rows(
-        self, store_id: str, tenant_id: str, limit: int, offset: int
-    ) -> list[dict[str, Any]]:
+    async def _fetch_pending_rows(self, store_id: str, tenant_id: str, limit: int, offset: int) -> list[dict[str, Any]]:
         """查询待同步行"""
         async with self._get_conn() as conn:
             result = await conn.execute(
@@ -559,9 +563,7 @@ class OfflineSyncService:
 
     # ─── 内部：云端推送单条 ────────────────────────────────────────────────
 
-    async def _push_single_order(
-        self, row: dict[str, Any], tenant_id: str
-    ) -> dict[str, Any]:
+    async def _push_single_order(self, row: dict[str, Any], tenant_id: str) -> dict[str, Any]:
         """推送单条离线订单到云端
 
         POST /api/v1/sync/offline-orders
@@ -605,9 +607,7 @@ class OfflineSyncService:
 
     # ─── 内部：sync_checkpoints CRUD ──────────────────────────────────────
 
-    async def _get_checkpoint(
-        self, store_id: str, device_id: str, tenant_id: str
-    ) -> dict[str, Any]:
+    async def _get_checkpoint(self, store_id: str, device_id: str, tenant_id: str) -> dict[str, Any]:
         """读取设备同步检查点，不存在时返回空字典"""
         async with self._get_conn() as conn:
             result = await conn.execute(
@@ -639,9 +639,7 @@ class OfflineSyncService:
                 {"now": now, "tenant_id": tenant_id, "store_id": store_id},
             )
 
-    async def _update_checkpoint_pull(
-        self, store_id: str, device_id: str, tenant_id: str, last_seq: int
-    ) -> None:
+    async def _update_checkpoint_pull(self, store_id: str, device_id: str, tenant_id: str, last_seq: int) -> None:
         """UPSERT 同步检查点（last_pull_seq / last_pull_at）"""
         now = datetime.now(timezone.utc)
         async with self._get_conn() as conn:
@@ -675,6 +673,7 @@ class OfflineSyncService:
 
 
 # ─── 工具函数 ──────────────────────────────────────────────────────────────
+
 
 def _json_dumps(obj: Any) -> str:
     """序列化为 JSON 字符串（供 PostgreSQL JSONB 类型使用）"""

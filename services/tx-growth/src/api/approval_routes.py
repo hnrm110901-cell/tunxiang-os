@@ -65,6 +65,21 @@ class RejectRequest(BaseModel):
         return v.strip()
 
 
+class BatchApproveRequest(BaseModel):
+    request_ids: list[uuid.UUID]
+    approver_id: uuid.UUID
+    comment: Optional[str] = None
+
+    @field_validator("request_ids")
+    @classmethod
+    def validate_request_ids(cls, v: list) -> list:
+        if not v:
+            raise ValueError("审批单 ID 列表不能为空")
+        if len(v) > 50:
+            raise ValueError("单次批量审批不能超过 50 条")
+        return v
+
+
 class CancelRequest(BaseModel):
     requester_id: uuid.UUID
 
@@ -235,6 +250,36 @@ async def list_pending_approvals(
             "size": size,
         }
     )
+
+
+@router.post("/batch-approve")
+async def batch_approve_requests(
+    req: BatchApproveRequest,
+    request: Request,
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+) -> dict:
+    """批量审批通过（最多 50 条）"""
+    tenant_id = uuid.UUID(x_tenant_id)
+    db = request.state.db
+
+    result = await _svc.batch_approve(
+        request_ids=req.request_ids,
+        approver_id=req.approver_id,
+        comment=req.comment,
+        tenant_id=tenant_id,
+        db=db,
+    )
+    await db.commit()
+
+    log.info(
+        "approval.batch_approved_via_api",
+        total=result["total"],
+        succeeded=result["succeeded"],
+        failed=result["failed"],
+        approver_id=str(req.approver_id),
+        tenant_id=x_tenant_id,
+    )
+    return ok_response(result)
 
 
 @router.get("/my-requests")

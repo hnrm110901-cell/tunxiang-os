@@ -37,8 +37,7 @@ class TrendDiscoveryAgent(SkillAgent):
     # Sprint D1 / PR 批次 4：纯洞察报告类，不直接决策，豁免三约束
     constraint_scope = set()
     constraint_waived_reason = (
-        "纯搜索趋势洞察报告，不触发任何业务决策；"
-        "毛利/食安/客户体验三维度不涉及，仅输出趋势分析供运营人工决策参考"
+        "纯搜索趋势洞察报告，不触发任何业务决策；毛利/食安/客户体验三维度不涉及，仅输出趋势分析供运营人工决策参考"
     )
 
     def get_supported_actions(self) -> list[str]:

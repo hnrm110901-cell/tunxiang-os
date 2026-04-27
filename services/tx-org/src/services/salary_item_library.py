@@ -942,11 +942,9 @@ async def init_salary_items_for_tenant(
     """
 
     inserted = 0
-    sort_idx = 0
     all_items = get_all_items()
 
-    for item in all_items:
-        sort_idx += 1
+    for sort_idx, item in enumerate(all_items, start=1):
         is_enabled = item.item_code in enabled_set
         default_val = overrides.get(item.item_code, item.default_value_fen)
 

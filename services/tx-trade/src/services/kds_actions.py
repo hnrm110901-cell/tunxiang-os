@@ -995,6 +995,246 @@ async def report_shortage(task_id: str, ingredient_id: str, db: AsyncSession) ->
     }
 
 
+async def scan_complete_dish(
+    barcode: str,
+    scanned_by: str,
+    db: AsyncSession,
+    *,
+    tenant_id: str = "",
+) -> dict:
+    """扫码划菜 — 扫描条码确认单个菜品出品完成。
+
+    流程：
+    1. 通过 barcode 查找 order_item
+    2. 更新 order_item 的 barcode_scanned_at 和 scanned_by
+    3. 查找关联的 KDS Task，标记为 done
+    4. 记录 dish_scan_log（含出品耗时）
+    5. 检查订单是否全部完成
+
+    Args:
+        barcode: 菜品条码
+        scanned_by: 扫码人ID
+        db: 数据库会话
+        tenant_id: 租户ID
+
+    Returns:
+        {"ok": True/False, "data": {...}}
+    """
+    from ..models.dish_scan_log import DishScanLog
+
+    log = logger.bind(barcode=barcode, scanned_by=scanned_by)
+
+    if not tenant_id:
+        return {"ok": False, "error": "缺少 tenant_id"}
+
+    try:
+        tid = uuid.UUID(tenant_id)
+    except ValueError:
+        return {"ok": False, "error": f"无效的 tenant_id: {tenant_id}"}
+
+    # ── 1. 通过 barcode 查找 order_item ──
+    item_stmt = (
+        select(OrderItem)
+        .where(
+            and_(
+                OrderItem.barcode == barcode,
+                OrderItem.tenant_id == tid,
+                OrderItem.is_deleted == False,  # noqa: E712
+            )
+        )
+        .limit(1)
+    )
+    order_item = (await db.execute(item_stmt)).scalar_one_or_none()
+
+    if order_item is None:
+        log.warning("kds_actions.scan_complete.barcode_not_found")
+        return {"ok": False, "error": f"条码 {barcode} 未找到对应菜品"}
+
+    if order_item.barcode_scanned_at is not None:
+        log.warning("kds_actions.scan_complete.already_scanned")
+        return {
+            "ok": False,
+            "error": f"条码 {barcode} 已被扫描确认",
+            "data": {"scanned_at": order_item.barcode_scanned_at.isoformat()},
+        }
+
+    # ── 2. 更新 order_item 扫码状态 ──
+    now = datetime.now(timezone.utc)
+    scanned_by_uuid = None
+    if scanned_by and scanned_by != "unknown":
+        try:
+            scanned_by_uuid = uuid.UUID(scanned_by)
+        except ValueError:
+            pass
+
+    order_item.barcode_scanned_at = now
+    order_item.scanned_by = scanned_by_uuid
+
+    # ── 3. 查找并完成关联的 KDS Task ──
+    kds_stmt = select(KDSTask).where(
+        and_(
+            KDSTask.order_item_id == order_item.id,
+            KDSTask.tenant_id == tid,
+            KDSTask.status.in_([STATUS_PENDING, STATUS_COOKING]),
+            KDSTask.is_deleted == False,  # noqa: E712
+        )
+    )
+    kds_task = (await db.execute(kds_stmt)).scalar_one_or_none()
+
+    duration_sec: int | None = None
+    dept_id: str | None = None
+
+    if kds_task is not None:
+        kds_task.status = STATUS_DONE
+        kds_task.completed_at = now
+        if kds_task.started_at:
+            duration_sec = int((now - kds_task.started_at).total_seconds())
+        dept_id = str(kds_task.dept_id) if kds_task.dept_id else None
+
+        # 推送到 KDS
+        if dept_id:
+            await _push_to_kds_station(
+                dept_id,
+                {
+                    "type": "scan_complete",
+                    "barcode": barcode,
+                    "task_id": str(kds_task.id),
+                    "new_status": STATUS_DONE,
+                    "scanned_by": scanned_by,
+                },
+            )
+
+    # ── 4. 记录 dish_scan_log ──
+    # 查询订单获取 store_id 和 ordered_at
+    order_stmt = select(Order).where(
+        and_(
+            Order.id == order_item.order_id,
+            Order.tenant_id == tid,
+        )
+    )
+    order = (await db.execute(order_stmt)).scalar_one_or_none()
+
+    ordered_at = order.order_time if order else order_item.created_at
+    store_id = order.store_id if order else None
+
+    if ordered_at and now:
+        duration_sec = duration_sec or int((now - ordered_at).total_seconds())
+
+    scan_log = DishScanLog(
+        tenant_id=tid,
+        store_id=store_id or tid,  # fallback
+        order_id=order_item.order_id,
+        order_item_id=order_item.id,
+        barcode=barcode,
+        dish_id=order_item.dish_id,
+        dish_name=order_item.item_name,
+        dept_id=uuid.UUID(dept_id) if dept_id else None,
+        ordered_at=ordered_at,
+        scanned_at=now,
+        duration_seconds=duration_sec,
+        scanned_by=scanned_by_uuid,
+    )
+    db.add(scan_log)
+
+    # ── 5. 检查订单是否全部完成 ──
+    all_items_stmt = select(OrderItem).where(
+        and_(
+            OrderItem.order_id == order_item.order_id,
+            OrderItem.tenant_id == tid,
+            OrderItem.is_deleted == False,  # noqa: E712
+        )
+    )
+    all_items = (await db.execute(all_items_stmt)).scalars().all()
+    total_items = len(all_items)
+    scanned_items = sum(1 for i in all_items if i.barcode_scanned_at is not None)
+    # 当前这个也算已扫描（刚设置的还没flush）
+    order_complete = scanned_items >= total_items
+
+    await db.commit()
+
+    log.info(
+        "kds_actions.scan_complete.ok",
+        order_item_id=str(order_item.id),
+        duration_sec=duration_sec,
+        order_complete=order_complete,
+    )
+
+    return {
+        "ok": True,
+        "data": {
+            "barcode": barcode,
+            "order_item_id": str(order_item.id),
+            "dish_name": order_item.item_name,
+            "scanned_at": now.isoformat(),
+            "duration_seconds": duration_sec,
+            "order_complete": order_complete,
+            "progress": f"{scanned_items}/{total_items}",
+        },
+    }
+
+
+async def batch_scan_complete(
+    barcodes: list[str],
+    scanned_by: str,
+    db: AsyncSession,
+    *,
+    tenant_id: str = "",
+) -> dict:
+    """批量扫码划菜 — 一次确认多个菜品出品完成。
+
+    逐个调用 scan_complete_dish，汇总结果。
+
+    Args:
+        barcodes: 条码列表
+        scanned_by: 扫码人ID
+        db: 数据库会话
+        tenant_id: 租户ID
+
+    Returns:
+        {"ok": True, "data": {"results": [...], "success": N, "failed": N}}
+    """
+    log = logger.bind(barcode_count=len(barcodes), scanned_by=scanned_by)
+
+    if not barcodes:
+        return {"ok": False, "error": "条码列表不能为空"}
+
+    if len(barcodes) > 50:
+        return {"ok": False, "error": "单次批量扫码最多50个"}
+
+    results: list[dict] = []
+    success_count = 0
+    failed_count = 0
+
+    for barcode in barcodes:
+        result = await scan_complete_dish(
+            barcode=barcode,
+            scanned_by=scanned_by,
+            db=db,
+            tenant_id=tenant_id,
+        )
+        results.append({"barcode": barcode, **result})
+        if result.get("ok"):
+            success_count += 1
+        else:
+            failed_count += 1
+
+    log.info(
+        "kds_actions.batch_scan_complete.done",
+        success=success_count,
+        failed=failed_count,
+    )
+
+    return {
+        "ok": True,
+        "data": {
+            "results": results,
+            "success": success_count,
+            "failed": failed_count,
+            "total": len(barcodes),
+        },
+    }
+
+
 async def get_task_timeline(task_id: str, db: AsyncSession) -> dict:
     """获取任务完整时间线。
 

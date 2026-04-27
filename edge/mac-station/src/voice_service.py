@@ -106,9 +106,7 @@ class VoiceService:
             return await self._transcribe_whisper(audio_bytes, language, start)
         return self._transcribe_mock(language, start)
 
-    async def _transcribe_whisper(
-        self, audio_bytes: bytes, language: str, start: float
-    ) -> TranscriptionResult:
+    async def _transcribe_whisper(self, audio_bytes: bytes, language: str, start: float) -> TranscriptionResult:
         """使用本地 Whisper 模型进行转写。"""
         import os
         import tempfile
@@ -170,59 +168,96 @@ class VoiceService:
         """构建中文意图识别的正则模式列表。"""
         return [
             # ── open_table: 开台 / 开桌 ──
-            ("open_table", [
-                re.compile(r"(?P<table_no>\d+)\s*号?\s*桌?\s*(开台|开桌)"),
-                re.compile(r"(开台|开桌)\s*(?P<table_no>\d+)\s*号?\s*桌?"),
-                re.compile(r"(开台|开桌)"),
-            ]),
+            (
+                "open_table",
+                [
+                    re.compile(r"(?P<table_no>\d+)\s*号?\s*桌?\s*(开台|开桌)"),
+                    re.compile(r"(开台|开桌)\s*(?P<table_no>\d+)\s*号?\s*桌?"),
+                    re.compile(r"(开台|开桌)"),
+                ],
+            ),
             # ── checkout: 买单 / 结账 ──
-            ("checkout", [
-                re.compile(r"(?P<table_no>\d+)\s*号?\s*桌?\s*(买单|结账|结帐|埋单)"),
-                re.compile(r"(买单|结账|结帐|埋单)\s*(?P<table_no>\d+)\s*号?\s*桌?"),
-                re.compile(r"(买单|结账|结帐|埋单)"),
-            ]),
+            (
+                "checkout",
+                [
+                    re.compile(r"(?P<table_no>\d+)\s*号?\s*桌?\s*(买单|结账|结帐|埋单)"),
+                    re.compile(r"(买单|结账|结帐|埋单)\s*(?P<table_no>\d+)\s*号?\s*桌?"),
+                    re.compile(r"(买单|结账|结帐|埋单)"),
+                ],
+            ),
             # ── rush_order: 催菜 / 催一下 ──
-            ("rush_order", [
-                re.compile(r"(?P<table_no>\d+)\s*号?\s*桌?\s*(催菜|催一下|催单)"),
-                re.compile(r"(催菜|催一下|催单)\s*(?P<table_no>\d+)\s*号?\s*桌?"),
-                re.compile(r"(催菜|催一下|催单)"),
-            ]),
+            (
+                "rush_order",
+                [
+                    re.compile(r"(?P<table_no>\d+)\s*号?\s*桌?\s*(催菜|催一下|催单)"),
+                    re.compile(r"(催菜|催一下|催单)\s*(?P<table_no>\d+)\s*号?\s*桌?"),
+                    re.compile(r"(催菜|催一下|催单)"),
+                ],
+            ),
             # ── cancel_dish: 退菜 / 取消 ──
-            ("cancel_dish", [
-                re.compile(r"(退|取消)\s*(?P<quantity>[一二两三四五六七八九十\d]+)?\s*[份个道]?\s*(?P<dish_name>[\u4e00-\u9fff]{2,})"),
-                re.compile(r"(?P<dish_name>[\u4e00-\u9fff]{2,})\s*(退了|不要了|取消)"),
-                re.compile(r"(退菜|退掉)"),
-            ]),
+            (
+                "cancel_dish",
+                [
+                    re.compile(
+                        r"(退|取消)\s*(?P<quantity>[一二两三四五六七八九十\d]+)?\s*[份个道]?\s*(?P<dish_name>[\u4e00-\u9fff]{2,})"
+                    ),
+                    re.compile(r"(?P<dish_name>[\u4e00-\u9fff]{2,})\s*(退了|不要了|取消)"),
+                    re.compile(r"(退菜|退掉)"),
+                ],
+            ),
             # ── add_dish: 加菜 / 来个 / 加一份 ──
-            ("add_dish", [
-                re.compile(r"(?P<table_no>\d+)\s*号?\s*桌?\s*(加|来|上)\s*(?P<quantity>[一二两三四五六七八九十\d]+)?\s*[份个道]?\s*(?P<dish_name>[\u4e00-\u9fff]{2,})"),
-                re.compile(r"(加|来|上|再来)\s*(?P<quantity>[一二两三四五六七八九十\d]+)\s*[份个道]\s*(?P<dish_name>[\u4e00-\u9fff]{2,})"),
-                re.compile(r"(?P<dish_name>[\u4e00-\u9fff]{2,})\s*(来|要)\s*(?P<quantity>[一二两三四五六七八九十\d]+)\s*[份个道]"),
-                re.compile(r"(加菜|加个|来个|来一个|来份|来一份|上一份)\s*(?P<dish_name>[\u4e00-\u9fff]{2,})?"),
-            ]),
+            (
+                "add_dish",
+                [
+                    re.compile(
+                        r"(?P<table_no>\d+)\s*号?\s*桌?\s*(加|来|上)\s*(?P<quantity>[一二两三四五六七八九十\d]+)?\s*[份个道]?\s*(?P<dish_name>[\u4e00-\u9fff]{2,})"
+                    ),
+                    re.compile(
+                        r"(加|来|上|再来)\s*(?P<quantity>[一二两三四五六七八九十\d]+)\s*[份个道]\s*(?P<dish_name>[\u4e00-\u9fff]{2,})"
+                    ),
+                    re.compile(
+                        r"(?P<dish_name>[\u4e00-\u9fff]{2,})\s*(来|要)\s*(?P<quantity>[一二两三四五六七八九十\d]+)\s*[份个道]"
+                    ),
+                    re.compile(r"(加菜|加个|来个|来一个|来份|来一份|上一份)\s*(?P<dish_name>[\u4e00-\u9fff]{2,})?"),
+                ],
+            ),
             # ── call_service: 叫服务员 ──
-            ("call_service", [
-                re.compile(r"(服务员|叫一下服务员|呼叫服务员|叫服务员)"),
-            ]),
+            (
+                "call_service",
+                [
+                    re.compile(r"(服务员|叫一下服务员|呼叫服务员|叫服务员)"),
+                ],
+            ),
             # ── query_status: 查询状态 ──
-            ("query_status", [
-                re.compile(r"(?P<table_no>\d+)\s*号?\s*桌?\s*(什么情况|什么状态|怎么样了|状态|情况)"),
-                re.compile(r"(查一下|查看|查询)\s*(订单|桌台|状态|情况)"),
-                re.compile(r"(订单|桌台).*(查|看|状态)"),
-            ]),
+            (
+                "query_status",
+                [
+                    re.compile(r"(?P<table_no>\d+)\s*号?\s*桌?\s*(什么情况|什么状态|怎么样了|状态|情况)"),
+                    re.compile(r"(查一下|查看|查询)\s*(订单|桌台|状态|情况)"),
+                    re.compile(r"(订单|桌台).*(查|看|状态)"),
+                ],
+            ),
             # ── daily_report: 营业额查询 ──
-            ("daily_report", [
-                re.compile(r"(今天|今日|昨天|昨日|本周|这周|本月|这个月)\s*(营业额|收入|流水|卖了多少|营收|销售额)"),
-                re.compile(r"(营业额|收入|流水|营收|销售额)\s*(多少|是多少|怎么样|如何|报表|报告)"),
-                re.compile(r"(日报|日结|营业报表|经营报表|营业报告)"),
-            ]),
+            (
+                "daily_report",
+                [
+                    re.compile(
+                        r"(今天|今日|昨天|昨日|本周|这周|本月|这个月)\s*(营业额|收入|流水|卖了多少|营收|销售额)"
+                    ),
+                    re.compile(r"(营业额|收入|流水|营收|销售额)\s*(多少|是多少|怎么样|如何|报表|报告)"),
+                    re.compile(r"(日报|日结|营业报表|经营报表|营业报告)"),
+                ],
+            ),
             # ── stock_check: 库存查询 ──
-            ("stock_check", [
-                re.compile(r"(?P<dish_name>[\u4e00-\u9fff]{2,})\s*(还有多少|还有吗|还有没有|库存|剩多少|还剩)"),
-                re.compile(r"(库存|存货)\s*(查一下|查看|查询|怎么样|多少)"),
-                re.compile(r"(查一下|查看|查询)\s*(库存|存货)"),
-                re.compile(r"(?P<dish_name>[\u4e00-\u9fff]{2,})\s*(有没有|有多少|够不够)"),
-            ]),
+            (
+                "stock_check",
+                [
+                    re.compile(r"(?P<dish_name>[\u4e00-\u9fff]{2,})\s*(还有多少|还有吗|还有没有|库存|剩多少|还剩)"),
+                    re.compile(r"(库存|存货)\s*(查一下|查看|查询|怎么样|多少)"),
+                    re.compile(r"(查一下|查看|查询)\s*(库存|存货)"),
+                    re.compile(r"(?P<dish_name>[\u4e00-\u9fff]{2,})\s*(有没有|有多少|够不够)"),
+                ],
+            ),
         ]
 
     async def parse_intent(self, text: str) -> IntentResult:
@@ -324,8 +359,18 @@ class VoiceService:
 # ─── 辅助函数 ───
 
 _CN_NUM_MAP: dict[str, int] = {
-    "零": 0, "一": 1, "二": 2, "两": 2, "三": 3, "四": 4,
-    "五": 5, "六": 6, "七": 7, "八": 8, "九": 9, "十": 10,
+    "零": 0,
+    "一": 1,
+    "二": 2,
+    "两": 2,
+    "三": 3,
+    "四": 4,
+    "五": 5,
+    "六": 6,
+    "七": 7,
+    "八": 8,
+    "九": 9,
+    "十": 10,
 }
 
 
@@ -383,9 +428,14 @@ async def transcribe_audio(
     """POST /api/v1/voice/transcribe — 语音转文字"""
     # 校验文件类型
     allowed_types = {
-        "audio/wav", "audio/x-wav", "audio/wave",
-        "audio/mp3", "audio/mpeg",
-        "audio/m4a", "audio/x-m4a", "audio/mp4",
+        "audio/wav",
+        "audio/x-wav",
+        "audio/wave",
+        "audio/mp3",
+        "audio/mpeg",
+        "audio/m4a",
+        "audio/x-m4a",
+        "audio/mp4",
         "application/octet-stream",  # 兜底：部分客户端不设 MIME
     }
     content_type = file.content_type or "application/octet-stream"

@@ -12,10 +12,10 @@
   - 最黔线   → 拉卡拉（微信/支付宝）+ 银联直连
   - 徐记海鲜 → 微信直连V3 + 支付宝直连
 """
+
 from __future__ import annotations
 
 from typing import Optional
-from uuid import UUID
 
 import structlog
 from pydantic import BaseModel, Field
@@ -30,13 +30,14 @@ logger = structlog.get_logger(__name__)
 
 class ChannelConfig(BaseModel):
     """渠道配置记录"""
+
     id: Optional[str] = None
     tenant_id: str
     brand_id: Optional[str] = None
     store_id: Optional[str] = None
     method: PayMethod
-    channel_name: str                       # 对应 ChannelRegistry 中的 channel_name
-    priority: int = 0                       # 优先级，数字越大越优先
+    channel_name: str  # 对应 ChannelRegistry 中的 channel_name
+    priority: int = 0  # 优先级，数字越大越优先
     is_active: bool = True
     config_data: dict = Field(default_factory=dict)  # 渠道特有配置（商户号/密钥路径等）
 
@@ -153,10 +154,7 @@ class PaymentRoutingEngine:
             self._cache.clear()
             return count
 
-        keys_to_remove = [
-            k for k in self._cache
-            if k[0] == tenant_id and (store_id is None or k[1] == store_id)
-        ]
+        keys_to_remove = [k for k in self._cache if k[0] == tenant_id and (store_id is None or k[1] == store_id)]
         for k in keys_to_remove:
             del self._cache[k]
         return len(keys_to_remove)

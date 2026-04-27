@@ -26,6 +26,10 @@ from shared.events.src.event_types import InventoryEventType
 from shared.ontology.src.database import get_db
 
 from ..services.auto_deduction import deduct_for_order, rollback_deduction
+from ..services.stocktake_loss_service import (
+    CaseValidationError,
+    auto_create_loss_case_from_stocktake,
+)
 from ..services.stocktake_service import (
     create_stocktake,
     finalize_stocktake,
@@ -194,9 +198,14 @@ async def record_count_route(
 async def finalize_stocktake_route(
     stocktake_id: str,
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    x_user_id: str | None = Header(default=None, alias="X-User-ID"),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
-    """完成盘点：对比系统库存 vs 实盘，生成差异报告"""
+    """完成盘点：对比系统库存 vs 实盘，生成差异报告。
+
+    若净亏损金额超过 AUTO_CREATE_THRESHOLD_FEN，则异步自动建盘亏案件
+    （tx-finance 通过事件订阅自动准备凭证；详见 v370）。
+    """
     await _set_rls(db, x_tenant_id)
     try:
         data = await finalize_stocktake(stocktake_id, x_tenant_id, db)
@@ -223,6 +232,21 @@ async def finalize_stocktake_route(
                     causation_id=stocktake_id,
                 )
             )
+        # ─── v370 集成：盘点完成后自动建盘亏案件 ───
+        # 异步触发，不阻塞响应；失败仅记录日志，不影响盘点本身
+        async def _try_auto_create() -> None:
+            try:
+                await auto_create_loss_case_from_stocktake(
+                    stocktake_id=stocktake_id,
+                    tenant_id=x_tenant_id,
+                    db=db,
+                    created_by=x_user_id or x_tenant_id,
+                )
+            except CaseValidationError:
+                # 盘点未完成或不存在等业务校验失败；不打断主流程
+                pass
+
+        asyncio.create_task(_try_auto_create())
         return {"ok": True, "data": data}
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))

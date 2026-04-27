@@ -1,21 +1,18 @@
 /**
- * CustomerProfile.tsx — 会员档案主卡片
+ * CustomerProfile.tsx — 会员档案主卡片（iCC Grow 风格4Tab布局）
  *
- * 展示内容：
- *   - 头像 + 姓名 + 会员等级徽章
- *   - RFM 等级（含 R/F/M 分值）
- *   - 消费统计（累计金额 / 订单数 / 最后到店）
- *   - 偏好标签 + 常点菜品
- *   - 流失风险条
- *   - 导购快捷操作（发优惠券 / 打标签 / 写备注）
- *   - 导购备注展示
+ * Tab结构：
+ *   - 会员信息（默认）: 基础信息+消费统计+菜品偏好+RFM+流失风险+AI话术
+ *   - 会员标签: 偏好标签+口味标签+场景标签+打标操作
+ *   - 会员卡: 卡号+等级+积分+储值+升级进度
+ *   - 会员券包: 可用券列表+发券历史+发券操作
  */
-import React from 'react';
-import type { CustomerProfile as CustomerProfileType, MemberLevel } from '../types';
-import { RFMBadge } from './RFMBadge';
-import { ConsumptionStats } from './ConsumptionStats';
-import { PreferenceTags } from './PreferenceTags';
-import { ChurnRiskBar } from './ChurnRiskBar';
+import React, { useState } from 'react';
+import type { CustomerProfile as CustomerProfileType, MemberLevel, ProfileTab } from '../types';
+import { ProfileInfoTab } from './ProfileInfoTab';
+import { ProfileTagsTab } from './ProfileTagsTab';
+import { ProfileCardTab } from './ProfileCardTab';
+import { ProfileCouponsTab } from './ProfileCouponsTab';
 import { ActionPanel } from './ActionPanel';
 
 // 会员等级配置
@@ -29,17 +26,12 @@ const MEMBER_LEVEL_CONFIG: Record<
   diamond: { label: '钻石会员', bgClass: 'bg-purple-100',  textClass: 'text-purple-700' },
 };
 
-function SectionTitle({ children }: { children: React.ReactNode }): React.ReactElement {
-  return (
-    <h3 className="text-xs font-semibold text-tx-text-3 uppercase tracking-wide mb-2">
-      {children}
-    </h3>
-  );
-}
-
-function Divider(): React.ReactElement {
-  return <div className="border-t border-tx-border my-3" />;
-}
+const TAB_LABELS: Record<ProfileTab, string> = {
+  info: '会员信息',
+  tags: '会员标签',
+  card: '会员卡',
+  coupons: '券包',
+};
 
 interface CustomerProfileProps {
   customer: CustomerProfileType;
@@ -50,12 +42,13 @@ export function CustomerProfile({
   customer,
   onRefresh,
 }: CustomerProfileProps): React.ReactElement {
+  const [activeTab, setActiveTab] = useState<ProfileTab>('info');
   const levelConfig = MEMBER_LEVEL_CONFIG[customer.member_level] ?? MEMBER_LEVEL_CONFIG.normal;
   const avatarUrl = customer.wechat_avatar_url;
 
   return (
     <div className="bg-tx-bg-1 rounded-tx-lg shadow-tx-sm overflow-hidden">
-      {/* ── 头部：头像 + 姓名 + 等级 ──────────────────────────── */}
+      {/* ── 头部：头像 + 姓名 + 等级 + 快捷操作 ──────────── */}
       <div className="p-4 pb-3">
         <div className="flex items-start gap-3">
           {/* 头像 */}
@@ -72,7 +65,7 @@ export function CustomerProfile({
                 }}
               />
             ) : null}
-            {/* 默认头像（头像加载失败时显示，或无头像时显示） */}
+            {/* 默认头像 */}
             <div
               className={`w-14 h-14 rounded-full bg-tx-bg-3 flex items-center
                           justify-center text-2xl ${avatarUrl ? 'hidden' : 'flex'}`}
@@ -95,66 +88,60 @@ export function CustomerProfile({
               </span>
             </div>
 
+            {/* 手机号（若有） */}
+            {customer.phone && (
+              <p className="text-xs text-tx-text-2 mt-0.5">{customer.phone}</p>
+            )}
+
             {/* 企微备注（若有） */}
             {customer.wecom_remark && (
-              <p className="text-xs text-tx-text-3 mt-1 line-clamp-1">
+              <p className="text-xs text-tx-text-3 mt-0.5 line-clamp-1">
                 备注：{customer.wecom_remark}
               </p>
             )}
           </div>
+
+          {/* 右侧快捷操作按钮 */}
+          <div className="flex flex-col gap-1.5 flex-shrink-0">
+            <ActionPanel customer={customer} onActionDone={onRefresh} />
+          </div>
         </div>
       </div>
 
-      <Divider />
-
-      {/* ── RFM 等级 ──────────────────────────────────────────── */}
-      <div className="px-4 pb-3">
-        <SectionTitle>客户价值</SectionTitle>
-        <RFMBadge
-          rfmLevel={customer.rfm_level}
-          rScore={customer.r_score}
-          fScore={customer.f_score}
-          mScore={customer.m_score}
-        />
+      {/* ── Tab导航栏 ────────────────────────────────────── */}
+      <div className="flex border-b border-tx-border">
+        {(['info', 'tags', 'card', 'coupons'] as ProfileTab[]).map((tab) => (
+          <button
+            key={tab}
+            className={`flex-1 py-2.5 text-sm font-medium transition-colors relative
+              ${activeTab === tab
+                ? 'text-tx-primary'
+                : 'text-tx-text-3'
+              }`}
+            onClick={() => setActiveTab(tab)}
+          >
+            {TAB_LABELS[tab]}
+            {tab === 'coupons' && customer.available_coupon_count != null && customer.available_coupon_count > 0 && (
+              <span className="absolute -top-0.5 right-1/4 min-w-[16px] h-4 px-1
+                               bg-tx-danger text-white text-[10px] font-bold
+                               rounded-full flex items-center justify-center">
+                {customer.available_coupon_count > 99 ? '99+' : customer.available_coupon_count}
+              </span>
+            )}
+            {/* active下划线 */}
+            {activeTab === tab && (
+              <span className="absolute bottom-0 left-1/4 right-1/4 h-0.5 bg-tx-primary rounded-full" />
+            )}
+          </button>
+        ))}
       </div>
 
-      <Divider />
-
-      {/* ── 消费统计 ──────────────────────────────────────────── */}
-      <div className="px-4 pb-3">
-        <SectionTitle>消费记录</SectionTitle>
-        <ConsumptionStats
-          totalOrderAmountFen={customer.total_order_amount_fen}
-          totalOrderCount={customer.total_order_count}
-          lastOrderAt={customer.last_order_at}
-        />
-      </div>
-
-      <Divider />
-
-      {/* ── 偏好标签 ──────────────────────────────────────────── */}
-      <div className="px-4 pb-3">
-        <SectionTitle>偏好 &amp; 标签</SectionTitle>
-        <PreferenceTags
-          tags={customer.tags}
-          favoriteDishes={customer.favorite_dishes}
-        />
-      </div>
-
-      <Divider />
-
-      {/* ── 流失风险 ──────────────────────────────────────────── */}
-      <div className="px-4 pb-3">
-        <SectionTitle>流失风险</SectionTitle>
-        <ChurnRiskBar riskScore={customer.risk_score} />
-      </div>
-
-      <Divider />
-
-      {/* ── 快捷操作 ──────────────────────────────────────────── */}
-      <div className="px-4 pb-4">
-        <SectionTitle>快捷操作</SectionTitle>
-        <ActionPanel customer={customer} onActionDone={onRefresh} />
+      {/* ── Tab内容区 ────────────────────────────────────── */}
+      <div className="pt-3">
+        {activeTab === 'info' && <ProfileInfoTab customer={customer} />}
+        {activeTab === 'tags' && <ProfileTagsTab customer={customer} onRefresh={onRefresh} />}
+        {activeTab === 'card' && <ProfileCardTab customer={customer} />}
+        {activeTab === 'coupons' && <ProfileCouponsTab customer={customer} onRefresh={onRefresh} />}
       </div>
     </div>
   );

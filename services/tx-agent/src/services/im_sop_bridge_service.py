@@ -11,6 +11,7 @@
 - webhook URL从环境变量读取
 - 通过httpx异步POST，3次重试，5秒超时
 """
+
 from __future__ import annotations
 
 import os
@@ -19,13 +20,12 @@ from uuid import UUID, uuid4
 
 import httpx
 import structlog
-from sqlalchemy import select, func, and_, update
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from services.tx_agent.src.models.im_interaction import (
     SOPIMInteraction,
     SOPQuickAction,
 )
+from sqlalchemy import and_, func, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = structlog.get_logger(__name__)
 
@@ -618,9 +618,7 @@ class IMSOPBridgeService:
             conditions.append(SOPIMInteraction.instance_id == UUID(instance_id))
 
         # 总数
-        count_stmt = select(func.count()).select_from(SOPIMInteraction).where(
-            and_(*conditions)
-        )
+        count_stmt = select(func.count()).select_from(SOPIMInteraction).where(and_(*conditions))
         total_result = await self.db.execute(count_stmt)
         total = total_result.scalar() or 0
 
@@ -739,9 +737,7 @@ class IMSOPBridgeService:
         """
         for attempt in range(1, HTTP_MAX_RETRIES + 1):
             try:
-                async with httpx.AsyncClient(
-                    timeout=HTTP_TIMEOUT
-                ) as client:
+                async with httpx.AsyncClient(timeout=HTTP_TIMEOUT) as client:
                     resp = await client.post(
                         webhook_url,
                         json=message,
@@ -876,9 +872,7 @@ class IMSOPBridgeService:
             "channel": channel,
         }
 
-    async def _get_available_quick_actions(
-        self, tenant_id: str
-    ) -> list[dict]:
+    async def _get_available_quick_actions(self, tenant_id: str) -> list[dict]:
         """获取可用的快捷操作列表（用于卡片按钮）"""
         actions = await self.list_quick_actions(tenant_id)
         return [
@@ -892,9 +886,7 @@ class IMSOPBridgeService:
             for a in actions
         ]
 
-    async def _find_quick_action(
-        self, tenant_id: str, action_code: str
-    ) -> dict | None:
+    async def _find_quick_action(self, tenant_id: str, action_code: str) -> dict | None:
         """查找指定的快捷操作定义"""
         tenant_ids = [UUID(tenant_id), UUID(SYSTEM_TENANT_ID)]
         stmt = (
@@ -949,23 +941,15 @@ class IMSOPBridgeService:
         action_type = quick_action["action_type"]
 
         if action_type == "confirm":
-            return await self._action_confirm_task(
-                tenant_id, store_id, user_id, instance_id
-            )
+            return await self._action_confirm_task(tenant_id, store_id, user_id, instance_id)
         elif action_type == "photo":
             return await self._action_request_photo(instance_id)
         elif action_type == "flag":
-            return await self._action_flag_issue(
-                tenant_id, store_id, user_id, instance_id, note
-            )
+            return await self._action_flag_issue(tenant_id, store_id, user_id, instance_id, note)
         elif action_type == "escalate":
-            return await self._action_escalate(
-                tenant_id, store_id, user_id, instance_id, action_id
-            )
+            return await self._action_escalate(tenant_id, store_id, user_id, instance_id, action_id)
         elif action_type == "data_entry":
-            return await self._action_data_entry(
-                tenant_id, store_id, user_id, instance_id, note
-            )
+            return await self._action_data_entry(tenant_id, store_id, user_id, instance_id, note)
         else:
             return {"ok": False, "error": f"未知操作类型: {action_type}"}
 
@@ -1010,9 +994,7 @@ class IMSOPBridgeService:
             await self.db.rollback()
             return {"ok": False, "error": str(exc)}
 
-    async def _action_request_photo(
-        self, instance_id: str | None
-    ) -> dict:
+    async def _action_request_photo(self, instance_id: str | None) -> dict:
         """拍照确认：返回需要上传照片的指示"""
         return {
             "ok": True,
@@ -1205,9 +1187,7 @@ class IMSOPBridgeService:
                 for a in quick_actions
             ],
             "task_count": len(tasks),
-            "pending_count": sum(
-                1 for t in tasks if t.get("status") == "pending"
-            ),
+            "pending_count": sum(1 for t in tasks if t.get("status") == "pending"),
         }
         if ai_insight:
             card_data["ai_insight"] = ai_insight
@@ -1244,9 +1224,7 @@ class IMSOPBridgeService:
                     "title": a.get("title", ""),
                     "description": a.get("description", ""),
                     "severity": a.get("severity", "warning"),
-                    "emoji": severity_emoji.get(
-                        a.get("severity", "warning"), "🟡"
-                    ),
+                    "emoji": severity_emoji.get(a.get("severity", "warning"), "🟡"),
                 }
                 for a in anomalies
             ],
@@ -1310,9 +1288,7 @@ class IMSOPBridgeService:
             "card_type": "corrective_card",
             "title": f"🔧 纠正动作 — {action.get('title', '')}",
             "severity": action.get("severity", "warning"),
-            "severity_label": severity_emoji.get(
-                action.get("severity", "warning"), "🟡 警告"
-            ),
+            "severity_label": severity_emoji.get(action.get("severity", "warning"), "🟡 警告"),
             "description": action.get("description", ""),
             "due_at": action.get("due_at", ""),
             "action_id": action.get("id"),
@@ -1349,9 +1325,7 @@ class IMSOPBridgeService:
             lines.append("")
             for t in card_data["tasks"]:
                 status_icon = "✅" if t["status"] == "completed" else "⏳"
-                lines.append(
-                    f"{status_icon} **{t['name']}** — {t.get('due_at', '')}"
-                )
+                lines.append(f"{status_icon} **{t['name']}** — {t.get('due_at', '')}")
 
         if card_data.get("anomalies"):
             lines.append("")
@@ -1401,10 +1375,12 @@ class IMSOPBridgeService:
         btns = []
         if card_data.get("quick_actions"):
             for a in card_data["quick_actions"][:3]:
-                btns.append({
-                    "title": a["name"],
-                    "actionURL": f"txos://action/{a['code']}",
-                })
+                btns.append(
+                    {
+                        "title": a["name"],
+                        "actionURL": f"txos://action/{a['code']}",
+                    }
+                )
 
         return {
             "msgtype": "actionCard",
@@ -1423,44 +1399,52 @@ class IMSOPBridgeService:
 
         # 标题后的描述
         if card_data.get("ai_insight"):
-            elements.append({
-                "tag": "div",
-                "text": {
-                    "tag": "lark_md",
-                    "content": f"💡 {card_data['ai_insight']}",
-                },
-            })
+            elements.append(
+                {
+                    "tag": "div",
+                    "text": {
+                        "tag": "lark_md",
+                        "content": f"💡 {card_data['ai_insight']}",
+                    },
+                }
+            )
 
         if card_data.get("tasks"):
             for t in card_data["tasks"]:
                 status_icon = "✅" if t["status"] == "completed" else "⏳"
-                elements.append({
-                    "tag": "div",
-                    "text": {
-                        "tag": "lark_md",
-                        "content": f"{status_icon} **{t['name']}** — {t.get('due_at', '')}",
-                    },
-                })
+                elements.append(
+                    {
+                        "tag": "div",
+                        "text": {
+                            "tag": "lark_md",
+                            "content": f"{status_icon} **{t['name']}** — {t.get('due_at', '')}",
+                        },
+                    }
+                )
 
         if card_data.get("anomalies"):
             for a in card_data["anomalies"]:
-                elements.append({
-                    "tag": "div",
-                    "text": {
-                        "tag": "lark_md",
-                        "content": f"{a.get('emoji', '🟡')} **{a['title']}**: {a['description']}",
-                    },
-                })
+                elements.append(
+                    {
+                        "tag": "div",
+                        "text": {
+                            "tag": "lark_md",
+                            "content": f"{a.get('emoji', '🟡')} **{a['title']}**: {a['description']}",
+                        },
+                    }
+                )
 
         actions = []
         if card_data.get("quick_actions"):
             for a in card_data["quick_actions"][:4]:
-                actions.append({
-                    "tag": "button",
-                    "text": {"tag": "plain_text", "content": a["name"]},
-                    "value": {"action_code": a["code"]},
-                    "type": "primary" if a.get("type") == "confirm" else "default",
-                })
+                actions.append(
+                    {
+                        "tag": "button",
+                        "text": {"tag": "plain_text", "content": a["name"]},
+                        "value": {"action_code": a["code"]},
+                        "type": "primary" if a.get("type") == "confirm" else "default",
+                    }
+                )
 
         if actions:
             elements.append({"tag": "action", "actions": actions})

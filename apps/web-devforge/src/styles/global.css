@@ -1,0 +1,61 @@
+/* DevForge 全局样式 */
+
+/*
+ * Tailwind 与 AntD v5 共存：
+ * preflight 已在 tailwind.config.ts 中关闭，避免与 AntD reset 冲突。
+ * 仅启用 components + utilities 层，让我们能用 className="flex gap-2" 等工具类。
+ */
+@tailwind components;
+@tailwind utilities;
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  background: #0f172a;
+  color: #e2e8f0;
+  font-family: Inter, 'PingFang SC', 'Source Han Sans CN', 'Noto Sans SC',
+    system-ui, -apple-system, sans-serif;
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* 滚动条 */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #334155;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #475569;
+}
+
+/* 生产环境红框警示 */
+.devforge-prod-warning {
+  outline: 2px solid #dc2626;
+  outline-offset: -2px;
+}
+
+/* 顶栏在 prod 时的额外边框 */
+.devforge-topbar-prod {
+  border-bottom: 1px solid #dc2626 !important;
+  box-shadow: inset 0 -2px 0 #dc2626;
+}
+
+/* 等宽数字 */
+.mono {
+  font-family: 'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace;
+  font-variant-numeric: tabular-nums;
+}

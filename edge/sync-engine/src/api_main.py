@@ -11,6 +11,7 @@
 
 注：后台同步守护进程（main.py）仍独立运行，本文件专为 HTTP API 服务。
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -36,6 +37,7 @@ DEVICE_ID: str = os.getenv("DEVICE_ID", "mac-mini-01")
 
 # ─── 后台同步任务 ──────────────────────────────────────────────────────────
 
+
 async def _background_sync_loop(svc: OfflineSyncService) -> None:
     """后台定时同步：每 SYNC_INTERVAL 秒推送待同步离线订单"""
     logger.info(
@@ -58,9 +60,7 @@ async def _background_sync_loop(svc: OfflineSyncService) -> None:
                 logger.info("api_main.sync_loop_offline", msg="cloud unreachable, skipping push")
                 continue
 
-            result = await svc.sync_pending_orders(
-                store_id=STORE_ID, tenant_id=TENANT_ID
-            )
+            result = await svc.sync_pending_orders(store_id=STORE_ID, tenant_id=TENANT_ID)
             if result.success_count > 0 or result.failed_count > 0:
                 logger.info(
                     "api_main.sync_loop_done",
@@ -77,6 +77,7 @@ async def _background_sync_loop(svc: OfflineSyncService) -> None:
 
 
 # ─── 应用生命周期 ──────────────────────────────────────────────────────────
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
@@ -128,6 +129,7 @@ app.include_router(sync_router, prefix="/api/v1")
 
 
 # ─── 健康检查 ──────────────────────────────────────────────────────────────
+
 
 @app.get("/health", tags=["infra"])
 async def health_check() -> dict:

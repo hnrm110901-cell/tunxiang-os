@@ -18,6 +18,7 @@ from .event_types import (
     # 核心业务域（七条因果链）
     AgentEventType,
     ChannelEventType,
+    DeliveryTempEventType,
     DiscountEventType,
     EnergyEventType,
     InventoryEventType,
@@ -60,6 +61,7 @@ __all__ = [
     "SettlementEventType",
     "SafetyEventType",
     "EnergyEventType",
+    "DeliveryTempEventType",
     "ReviewEventType",
     "OpinionEventType",
     "RecipeEventType",

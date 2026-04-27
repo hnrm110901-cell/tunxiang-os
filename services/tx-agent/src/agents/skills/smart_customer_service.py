@@ -122,8 +122,7 @@ class SmartCustomerServiceAgent(SkillAgent):
     # Sprint D1 / PR 批次 6：纯客服问答与建议生成，不触发业务决策，豁免
     constraint_scope = set()
     constraint_waived_reason = (
-        "智能客服输出 FAQ 回答与客诉处理建议，由客服人员最终决策，"
-        "不直接操作毛利/食安/客户体验三条业务约束维度"
+        "智能客服输出 FAQ 回答与客诉处理建议，由客服人员最终决策，不直接操作毛利/食安/客户体验三条业务约束维度"
     )
 
     def get_supported_actions(self) -> list[str]:
