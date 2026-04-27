@@ -65,6 +65,8 @@ class ModelRouter:
         "cypher_generation": TaskComplexity.MODERATE,
         # Sprint D3b：营销活动 ROI 分析 + 推荐（时序预测结果 + Sonnet 解读）
         "campaign_roi_forecast": TaskComplexity.MODERATE,
+        # Sprint D3c：菜品动态定价分析 + 毛利底线校验（Core ML 给弹性，Sonnet 给判断）
+        "dish_dynamic_pricing": TaskComplexity.MODERATE,
         # 复杂任务
         "root_cause_analysis": TaskComplexity.COMPLEX,
         "decision_recommendation": TaskComplexity.COMPLEX,
