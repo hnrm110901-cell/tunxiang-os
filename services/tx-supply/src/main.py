@@ -55,6 +55,7 @@ from .api.supplier_portal_v2_routes import router as supplier_portal_v2_router
 from .api.supplier_scoring_routes import router as supplier_scoring_router
 from .api.trace_routes import router as trace_router
 from .api.transfer_routes import router as transfer_router
+from .api.warehouse_location_routes import router as warehouse_location_router
 from .api.warehouse_ops_routes import router as warehouse_ops_router
 
 app = FastAPI(title="TunxiangOS tx-supply", version="3.0.0")
@@ -106,6 +107,7 @@ app.include_router(kingdee_router)
 app.include_router(requisition_router)
 app.include_router(dept_issue_router)
 app.include_router(warehouse_ops_router)
+app.include_router(warehouse_location_router)  # 库位/库区/温区编码（v367 TASK-2）
 app.include_router(period_close_router)
 app.include_router(craft_router)
 app.include_router(distribution_router)
