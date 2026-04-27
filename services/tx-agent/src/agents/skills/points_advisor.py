@@ -34,9 +34,7 @@ async def _svc_auto_award_monthly(
 ) -> dict[str, Any]:
     """月度自动积分发放：扫描全勤/卫生合格/培训完成员工，批量发放积分。"""
     bound_uuid = _bind_store(store_id)
-    store_clause = (
-        "AND e.store_id = CAST(:bound_uuid AS uuid)" if bound_uuid else ""
-    )
+    store_clause = "AND e.store_id = CAST(:bound_uuid AS uuid)" if bound_uuid else ""
     params: dict[str, Any] = {"tenant_id": tenant_id, "bound_uuid": bound_uuid}
 
     # 1. 扫描本月全勤员工（daily_attendance 无 absent 且出勤天数 >= 22）
@@ -69,14 +67,16 @@ async def _svc_auto_award_monthly(
         """)
         result = await db.execute(q_attendance, params)
         for row in result.mappings():
-            awards.append({
-                "employee_id": str(row["employee_id"]),
-                "emp_name": row["emp_name"],
-                "rule_code": "attendance_perfect",
-                "rule_name": "全勤",
-                "points": 100,
-                "present_days": int(row["present_days"]),
-            })
+            awards.append(
+                {
+                    "employee_id": str(row["employee_id"]),
+                    "emp_name": row["emp_name"],
+                    "rule_code": "attendance_perfect",
+                    "rule_name": "全勤",
+                    "points": 100,
+                    "present_days": int(row["present_days"]),
+                }
+            )
     except (OperationalError, ProgrammingError) as exc:
         logger.warning("points_advisor.attendance_scan_failed", error=str(exc))
 
@@ -95,9 +95,7 @@ async def _svc_generate_race_report(
 ) -> dict[str, Any]:
     """赛马周报：本周积分排名变化+亮点+风险员工。"""
     bound_uuid = _bind_store(store_id)
-    store_clause = (
-        "AND e.store_id = CAST(:bound_uuid AS uuid)" if bound_uuid else ""
-    )
+    store_clause = "AND e.store_id = CAST(:bound_uuid AS uuid)" if bound_uuid else ""
     today = date.today()
     week_start = today - timedelta(days=today.weekday())
     last_week_start = week_start - timedelta(days=7)
@@ -162,14 +160,8 @@ async def _svc_generate_race_report(
             }
             for r in rows
         ],
-        "highlights": [
-            {"emp_name": r["emp_name"], "change": int(r["change"])}
-            for r in highlights
-        ],
-        "risk_employees": [
-            {"emp_name": r["emp_name"], "this_week": int(r["this_week_points"])}
-            for r in risks
-        ],
+        "highlights": [{"emp_name": r["emp_name"], "change": int(r["change"])} for r in highlights],
+        "risk_employees": [{"emp_name": r["emp_name"], "this_week": int(r["this_week_points"])} for r in risks],
     }
 
 
@@ -180,9 +172,7 @@ async def _svc_suggest_incentive(
 ) -> dict[str, Any]:
     """基于积分走势推荐激励策略。"""
     bound_uuid = _bind_store(store_id)
-    store_clause = (
-        "AND e.store_id = CAST(:bound_uuid AS uuid)" if bound_uuid else ""
-    )
+    store_clause = "AND e.store_id = CAST(:bound_uuid AS uuid)" if bound_uuid else ""
     today = date.today()
     days_30 = today - timedelta(days=30)
     params: dict[str, Any] = {
@@ -212,15 +202,16 @@ async def _svc_suggest_incentive(
         low_employees = [dict(r) for r in result.mappings()]
 
         if low_employees:
-            suggestions.append({
-                "type": "attention",
-                "title": "低积分员工关注",
-                "detail": f"{len(low_employees)} 名员工积分低于100，建议一对一辅导",
-                "employees": [
-                    {"emp_name": r["emp_name"], "total_points": int(r["total_points"])}
-                    for r in low_employees
-                ],
-            })
+            suggestions.append(
+                {
+                    "type": "attention",
+                    "title": "低积分员工关注",
+                    "detail": f"{len(low_employees)} 名员工积分低于100，建议一对一辅导",
+                    "employees": [
+                        {"emp_name": r["emp_name"], "total_points": int(r["total_points"])} for r in low_employees
+                    ],
+                }
+            )
 
         # 近30天无积分变动的员工
         q_inactive = text(f"""
@@ -241,22 +232,26 @@ async def _svc_suggest_incentive(
         inactive = [dict(r) for r in result2.mappings()]
 
         if inactive:
-            suggestions.append({
-                "type": "inactive",
-                "title": "30天无积分变动",
-                "detail": f"{len(inactive)} 名员工近30天无积分变动，建议设置挑战目标",
-                "employees": [{"emp_name": r["emp_name"]} for r in inactive],
-            })
+            suggestions.append(
+                {
+                    "type": "inactive",
+                    "title": "30天无积分变动",
+                    "detail": f"{len(inactive)} 名员工近30天无积分变动，建议设置挑战目标",
+                    "employees": [{"emp_name": r["emp_name"]} for r in inactive],
+                }
+            )
     except (OperationalError, ProgrammingError) as exc:
         logger.warning("points_advisor.suggest_failed", error=str(exc))
 
     # 通用建议
-    suggestions.append({
-        "type": "general",
-        "title": "周期性激励建议",
-        "detail": "建议每月举办一次积分兑换日，提高员工参与积极性",
-        "employees": [],
-    })
+    suggestions.append(
+        {
+            "type": "general",
+            "title": "周期性激励建议",
+            "detail": "建议每月举办一次积分兑换日，提高员工参与积极性",
+            "employees": [],
+        }
+    )
 
     return {"suggestions": suggestions, "generated_at": datetime.now(timezone.utc).isoformat()}
 
@@ -268,8 +263,22 @@ def _mock_auto_award() -> dict[str, Any]:
     return {
         "month": date.today().strftime("%Y-%m"),
         "awards": [
-            {"employee_id": "mock-e001", "emp_name": "张三", "rule_code": "attendance_perfect", "rule_name": "全勤", "points": 100, "present_days": 22},
-            {"employee_id": "mock-e002", "emp_name": "李四", "rule_code": "attendance_perfect", "rule_name": "全勤", "points": 100, "present_days": 23},
+            {
+                "employee_id": "mock-e001",
+                "emp_name": "张三",
+                "rule_code": "attendance_perfect",
+                "rule_name": "全勤",
+                "points": 100,
+                "present_days": 22,
+            },
+            {
+                "employee_id": "mock-e002",
+                "emp_name": "李四",
+                "rule_code": "attendance_perfect",
+                "rule_name": "全勤",
+                "points": 100,
+                "present_days": 23,
+            },
         ],
         "total_employees": 2,
         "total_points": 200,
@@ -292,7 +301,12 @@ def _mock_race_report() -> dict[str, Any]:
 def _mock_suggest() -> dict[str, Any]:
     return {
         "suggestions": [
-            {"type": "attention", "title": "低积分员工关注", "detail": "3 名员工积分低于100", "employees": [{"emp_name": "王五", "total_points": 45}]},
+            {
+                "type": "attention",
+                "title": "低积分员工关注",
+                "detail": "3 名员工积分低于100",
+                "employees": [{"emp_name": "王五", "total_points": 45}],
+            },
             {"type": "general", "title": "周期性激励建议", "detail": "建议每月举办一次积分兑换日", "employees": []},
         ],
         "generated_at": datetime.now(timezone.utc).isoformat(),

@@ -2,6 +2,7 @@
 
 入库/出库/盘点/效期/安全库存/沽清预测/供应商/损耗/需求预测 路由。
 """
+
 import asyncio
 from datetime import date
 from typing import Optional
@@ -68,7 +69,11 @@ async def list_inventory(
 ):
     """库存列表"""
     result = await inventory_io.get_store_inventory(
-        store_id=store_id, tenant_id=x_tenant_id, db=db, page=page, size=size,
+        store_id=store_id,
+        tenant_id=x_tenant_id,
+        db=db,
+        page=page,
+        size=size,
     )
     return {"ok": True, "data": result}
 
@@ -85,8 +90,10 @@ async def get_inventory_item(
         raise HTTPException(status_code=400, detail="store_id 必传")
     try:
         result = await inventory_io.get_stock_balance(
-            ingredient_id=item_id, store_id=store_id,
-            tenant_id=x_tenant_id, db=db,
+            ingredient_id=item_id,
+            store_id=store_id,
+            tenant_id=x_tenant_id,
+            db=db,
         )
         return {"ok": True, "data": result}
     except ValueError as e:
@@ -103,24 +110,30 @@ async def adjust_inventory(
     """盘点调整"""
     try:
         result = await inventory_io.adjust_stock(
-            ingredient_id=item_id, quantity=body.quantity, reason=body.reason,
-            store_id=body.store_id, tenant_id=x_tenant_id, db=db,
+            ingredient_id=item_id,
+            quantity=body.quantity,
+            reason=body.reason,
+            store_id=body.store_id,
+            tenant_id=x_tenant_id,
+            db=db,
             performed_by=body.performed_by,
         )
         # ─── Phase 1 平行事件写入：盘点调整 ───
-        asyncio.create_task(emit_event(
-            event_type=InventoryEventType.ADJUSTED,
-            tenant_id=x_tenant_id,
-            stream_id=item_id,
-            payload={
-                "ingredient_id": item_id,
-                "quantity_g": body.quantity,  # 正=盘盈，负=盘亏
-                "reason": body.reason,
-            },
-            store_id=body.store_id,
-            source_service="tx-supply",
-            metadata={"performed_by": body.performed_by},
-        ))
+        asyncio.create_task(
+            emit_event(
+                event_type=InventoryEventType.ADJUSTED,
+                tenant_id=x_tenant_id,
+                stream_id=item_id,
+                payload={
+                    "ingredient_id": item_id,
+                    "quantity_g": body.quantity,  # 正=盘盈，负=盘亏
+                    "reason": body.reason,
+                },
+                store_id=body.store_id,
+                source_service="tx-supply",
+                metadata={"performed_by": body.performed_by},
+            )
+        )
         return {"ok": True, "data": result}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -134,10 +147,14 @@ async def get_inventory_alerts(
 ):
     """库存预警列表（低库存 + 临期）"""
     safety = await stock_forecast.check_safety_stock(
-        store_id=store_id, tenant_id=x_tenant_id, db=db,
+        store_id=store_id,
+        tenant_id=x_tenant_id,
+        db=db,
     )
     expiry = await expiry_monitor.generate_expiry_report(
-        store_id=store_id, tenant_id=x_tenant_id, db=db,
+        store_id=store_id,
+        tenant_id=x_tenant_id,
+        db=db,
     )
     low_stock = [i for i in safety if i["status"] != "ok"]
     return {
@@ -174,21 +191,23 @@ async def receive_stock(
             performed_by=body.performed_by,
         )
         # ─── Phase 1 平行事件写入：入库 ───
-        asyncio.create_task(emit_event(
-            event_type=InventoryEventType.RECEIVED,
-            tenant_id=x_tenant_id,
-            stream_id=body.ingredient_id,
-            payload={
-                "ingredient_id": body.ingredient_id,
-                "quantity_g": body.quantity,
-                "unit_cost_fen": body.unit_cost_fen,
-                "batch_no": body.batch_no,
-                "expiry_date": body.expiry_date.isoformat() if body.expiry_date else None,
-            },
-            store_id=body.store_id,
-            source_service="tx-supply",
-            metadata={"performed_by": body.performed_by},
-        ))
+        asyncio.create_task(
+            emit_event(
+                event_type=InventoryEventType.RECEIVED,
+                tenant_id=x_tenant_id,
+                stream_id=body.ingredient_id,
+                payload={
+                    "ingredient_id": body.ingredient_id,
+                    "quantity_g": body.quantity,
+                    "unit_cost_fen": body.unit_cost_fen,
+                    "batch_no": body.batch_no,
+                    "expiry_date": body.expiry_date.isoformat() if body.expiry_date else None,
+                },
+                store_id=body.store_id,
+                source_service="tx-supply",
+                metadata={"performed_by": body.performed_by},
+            )
+        )
         return {"ok": True, "data": result}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -213,26 +232,24 @@ async def issue_stock(
             reference_id=body.reference_id,
         )
         # ─── Phase 1 平行事件写入：出库/损耗 ───
-        event_type = (
-            InventoryEventType.WASTED
-            if body.reason == "waste"
-            else InventoryEventType.CONSUMED
+        event_type = InventoryEventType.WASTED if body.reason == "waste" else InventoryEventType.CONSUMED
+        asyncio.create_task(
+            emit_event(
+                event_type=event_type,
+                tenant_id=x_tenant_id,
+                stream_id=body.ingredient_id,
+                payload={
+                    "ingredient_id": body.ingredient_id,
+                    "quantity_g": body.quantity,
+                    "reason": body.reason,
+                    "reference_id": body.reference_id,
+                },
+                store_id=body.store_id,
+                source_service="tx-supply",
+                metadata={"performed_by": body.performed_by},
+                causation_id=body.reference_id,  # 关联订单ID（如有）
+            )
         )
-        asyncio.create_task(emit_event(
-            event_type=event_type,
-            tenant_id=x_tenant_id,
-            stream_id=body.ingredient_id,
-            payload={
-                "ingredient_id": body.ingredient_id,
-                "quantity_g": body.quantity,
-                "reason": body.reason,
-                "reference_id": body.reference_id,
-            },
-            store_id=body.store_id,
-            source_service="tx-supply",
-            metadata={"performed_by": body.performed_by},
-            causation_id=body.reference_id,  # 关联订单ID（如有）
-        ))
         return {"ok": True, "data": result}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -253,8 +270,10 @@ async def get_balance(
         raise HTTPException(status_code=400, detail="store_id 必传")
     try:
         result = await inventory_io.get_stock_balance(
-            ingredient_id=ingredient_id, store_id=store_id,
-            tenant_id=x_tenant_id, db=db,
+            ingredient_id=ingredient_id,
+            store_id=store_id,
+            tenant_id=x_tenant_id,
+            db=db,
         )
         return {"ok": True, "data": result}
     except ValueError as e:
@@ -271,8 +290,11 @@ async def get_store_inventory(
 ):
     """门店全部库存清单"""
     result = await inventory_io.get_store_inventory(
-        store_id=store_id, tenant_id=x_tenant_id, db=db,
-        page=page, size=size,
+        store_id=store_id,
+        tenant_id=x_tenant_id,
+        db=db,
+        page=page,
+        size=size,
     )
     return {"ok": True, "data": result}
 
@@ -288,7 +310,9 @@ async def get_expiry_report(
 ):
     """效期报告（过期 + 3天内 + 7天内）"""
     result = await expiry_monitor.generate_expiry_report(
-        store_id=store_id, tenant_id=x_tenant_id, db=db,
+        store_id=store_id,
+        tenant_id=x_tenant_id,
+        db=db,
     )
     return {"ok": True, "data": result}
 
@@ -305,7 +329,9 @@ async def get_safety_stock(
 ):
     """安全库存检查"""
     result = await stock_forecast.check_safety_stock(
-        store_id=store_id, tenant_id=x_tenant_id, db=db,
+        store_id=store_id,
+        tenant_id=x_tenant_id,
+        db=db,
         safety_days=safety_days,
     )
     return {"ok": True, "data": {"items": result}}
@@ -321,8 +347,10 @@ async def get_stockout_forecast(
     """沽清预测"""
     try:
         result = await stock_forecast.predict_stockout(
-            store_id=store_id, ingredient_id=ingredient_id,
-            tenant_id=x_tenant_id, db=db,
+            store_id=store_id,
+            ingredient_id=ingredient_id,
+            tenant_id=x_tenant_id,
+            db=db,
         )
         return {"ok": True, "data": result}
     except ValueError as e:
@@ -338,7 +366,9 @@ async def get_reorder_suggestions(
 ):
     """采购建议"""
     result = await stock_forecast.suggest_reorder(
-        store_id=store_id, tenant_id=x_tenant_id, db=db,
+        store_id=store_id,
+        tenant_id=x_tenant_id,
+        db=db,
         safety_days=safety_days,
     )
     return {"ok": True, "data": {"suggestions": result}}
@@ -372,7 +402,8 @@ async def list_procurement_plans(
             params["status"] = status
 
         count_result = await db.execute(
-            text(f"SELECT COUNT(*) FROM purchase_orders WHERE {where}"), params,
+            text(f"SELECT COUNT(*) FROM purchase_orders WHERE {where}"),
+            params,
         )
         total = count_result.scalar_one()
 
@@ -412,13 +443,15 @@ async def create_procurement_plan(
 
     po_items = []
     for item in items:
-        po_items.append(POItemIn(
-            ingredient_id=item.get("ingredient_id", ""),
-            ingredient_name=item.get("name", ""),
-            quantity=item.get("quantity", 1),
-            unit=item.get("unit", ""),
-            unit_price_fen=item.get("unit_price_fen", 0),
-        ))
+        po_items.append(
+            POItemIn(
+                ingredient_id=item.get("ingredient_id", ""),
+                ingredient_name=item.get("name", ""),
+                quantity=item.get("quantity", 1),
+                unit=item.get("unit", ""),
+                unit_price_fen=item.get("unit_price_fen", 0),
+            )
+        )
     body = CreatePurchaseOrderRequest(store_id=store_id, items=po_items)
     return await create_purchase_order(body=body, x_tenant_id=x_tenant_id, db=db)
 

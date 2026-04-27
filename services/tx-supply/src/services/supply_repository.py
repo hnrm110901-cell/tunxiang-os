@@ -3,6 +3,7 @@
 将 inventory.py 中的 Mock 端点升级为真实 DB 查询。
 Repository 模式，async/await，type hints，graceful fallback。
 """
+
 from __future__ import annotations
 
 import uuid
@@ -10,7 +11,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 
 import structlog
-from sqlalchemy import Date, cast, desc, func, select, text
+from sqlalchemy import desc, func, select, text
 from sqlalchemy.exc import ProgrammingError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -41,7 +42,9 @@ class SupplyRepository:
     # ─── 供应商列表（从 ingredients 聚合） ───
 
     async def list_suppliers(
-        self, page: int = 1, size: int = 20,
+        self,
+        page: int = 1,
+        size: int = 20,
     ) -> dict[str, Any]:
         """供应商列表 -- 从 ingredients 表聚合去重 supplier_name
 
@@ -69,9 +72,7 @@ class SupplyRepository:
 
             # 计算总数
             count_subq = query.subquery()
-            count_result = await self.db.execute(
-                select(func.count()).select_from(count_subq)
-            )
+            count_result = await self.db.execute(select(func.count()).select_from(count_subq))
             total = count_result.scalar() or 0
 
             # 分页
@@ -85,11 +86,13 @@ class SupplyRepository:
                 categories = row.categories or []
                 # array_agg 可能包含 None
                 categories = [c for c in categories if c]
-                items.append({
-                    "supplier_name": row.supplier_name,
-                    "ingredient_count": row.ingredient_count,
-                    "categories": categories,
-                })
+                items.append(
+                    {
+                        "supplier_name": row.supplier_name,
+                        "ingredient_count": row.ingredient_count,
+                        "categories": categories,
+                    }
+                )
 
             return {"items": items, "total": total}
         except ProgrammingError as exc:
@@ -99,7 +102,8 @@ class SupplyRepository:
     # ─── 供应商评分（从 supplier_score_history 表） ───
 
     async def get_supplier_rating(
-        self, supplier_id: str,
+        self,
+        supplier_id: str,
     ) -> Optional[dict[str, Any]]:
         """从 supplier_score_history 表查询最新评分
 
@@ -134,7 +138,8 @@ class SupplyRepository:
     # ─── 供应商价格对比 ───
 
     async def compare_supplier_prices(
-        self, ingredient_id: str,
+        self,
+        ingredient_id: str,
     ) -> list[dict[str, Any]]:
         """同一食材不同供应商的价格对比
 
@@ -176,7 +181,9 @@ class SupplyRepository:
     # ─── 损耗 Top5 ───
 
     async def get_waste_top5(
-        self, store_id: str, period: str = "month",
+        self,
+        store_id: str,
+        period: str = "month",
     ) -> list[dict[str, Any]]:
         """损耗 Top5（按金额排序 + 归因）
 
@@ -232,16 +239,18 @@ class SupplyRepository:
                 unit_price = row.unit_price_fen or 0
                 total_qty = float(row.total_qty) if row.total_qty else 0.0
                 cost_fen = int(total_qty * unit_price)
-                items.append({
-                    "ingredient_id": str(row.ingredient_id),
-                    "ingredient_name": row.ingredient_name,
-                    "category": row.category,
-                    "unit": row.unit,
-                    "total_waste_qty": round(total_qty, 2),
-                    "total_waste_fen": cost_fen,
-                    "total_waste_yuan": round(cost_fen / 100, 2),
-                    "event_count": row.event_count,
-                })
+                items.append(
+                    {
+                        "ingredient_id": str(row.ingredient_id),
+                        "ingredient_name": row.ingredient_name,
+                        "category": row.category,
+                        "unit": row.unit,
+                        "total_waste_qty": round(total_qty, 2),
+                        "total_waste_fen": cost_fen,
+                        "total_waste_yuan": round(cost_fen / 100, 2),
+                        "event_count": row.event_count,
+                    }
+                )
 
             items.sort(key=lambda x: x["total_waste_fen"], reverse=True)
             return items[:5]
@@ -252,7 +261,8 @@ class SupplyRepository:
     # ─── 损耗率 ───
 
     async def get_waste_rate(
-        self, store_id: str,
+        self,
+        store_id: str,
     ) -> dict[str, Any]:
         """损耗率 -- 近30天损耗金额 / 近30天出库总金额
 
@@ -265,23 +275,17 @@ class SupplyRepository:
 
         try:
             # 损耗总额
-            waste_q = (
-                select(
-                    func.coalesce(
-                        func.sum(
-                            func.abs(IngredientTransaction.quantity)
-                            * IngredientTransaction.unit_cost_fen
-                        ),
-                        0,
-                    ).label("waste_fen"),
-                )
-                .where(
-                    IngredientTransaction.tenant_id == self._tenant_uuid,
-                    IngredientTransaction.store_id == store_uuid,
-                    IngredientTransaction.transaction_type == TransactionType.waste.value,
-                    IngredientTransaction.is_deleted == False,  # noqa: E712
-                    IngredientTransaction.created_at >= since,
-                )
+            waste_q = select(
+                func.coalesce(
+                    func.sum(func.abs(IngredientTransaction.quantity) * IngredientTransaction.unit_cost_fen),
+                    0,
+                ).label("waste_fen"),
+            ).where(
+                IngredientTransaction.tenant_id == self._tenant_uuid,
+                IngredientTransaction.store_id == store_uuid,
+                IngredientTransaction.transaction_type == TransactionType.waste.value,
+                IngredientTransaction.is_deleted == False,  # noqa: E712
+                IngredientTransaction.created_at >= since,
             )
             waste_result = await self.db.execute(waste_q)
             waste_fen = int(waste_result.scalar() or 0)
@@ -292,23 +296,17 @@ class SupplyRepository:
                 TransactionType.waste.value,
                 TransactionType.transfer.value,
             ]
-            total_q = (
-                select(
-                    func.coalesce(
-                        func.sum(
-                            func.abs(IngredientTransaction.quantity)
-                            * IngredientTransaction.unit_cost_fen
-                        ),
-                        0,
-                    ).label("total_fen"),
-                )
-                .where(
-                    IngredientTransaction.tenant_id == self._tenant_uuid,
-                    IngredientTransaction.store_id == store_uuid,
-                    IngredientTransaction.transaction_type.in_(out_types),
-                    IngredientTransaction.is_deleted == False,  # noqa: E712
-                    IngredientTransaction.created_at >= since,
-                )
+            total_q = select(
+                func.coalesce(
+                    func.sum(func.abs(IngredientTransaction.quantity) * IngredientTransaction.unit_cost_fen),
+                    0,
+                ).label("total_fen"),
+            ).where(
+                IngredientTransaction.tenant_id == self._tenant_uuid,
+                IngredientTransaction.store_id == store_uuid,
+                IngredientTransaction.transaction_type.in_(out_types),
+                IngredientTransaction.is_deleted == False,  # noqa: E712
+                IngredientTransaction.created_at >= since,
             )
             total_result = await self.db.execute(total_q)
             total_fen = int(total_result.scalar() or 0)
@@ -330,7 +328,9 @@ class SupplyRepository:
             return {"waste_rate": 0, "trend": []}
 
     async def _get_waste_trend(
-        self, store_uuid: uuid.UUID, weeks: int = 4,
+        self,
+        store_uuid: uuid.UUID,
+        weeks: int = 4,
     ) -> list[dict[str, Any]]:
         """近 N 周损耗趋势"""
         trend = []
@@ -342,14 +342,10 @@ class SupplyRepository:
             result = await self.db.execute(
                 select(
                     func.coalesce(
-                        func.sum(
-                            func.abs(IngredientTransaction.quantity)
-                            * IngredientTransaction.unit_cost_fen
-                        ),
+                        func.sum(func.abs(IngredientTransaction.quantity) * IngredientTransaction.unit_cost_fen),
                         0,
                     )
-                )
-                .where(
+                ).where(
                     IngredientTransaction.tenant_id == self._tenant_uuid,
                     IngredientTransaction.store_id == store_uuid,
                     IngredientTransaction.transaction_type == TransactionType.waste.value,
@@ -359,17 +355,21 @@ class SupplyRepository:
                 )
             )
             fen = int(result.scalar() or 0)
-            trend.append({
-                "week_start": week_start.date().isoformat(),
-                "week_end": week_end.date().isoformat(),
-                "waste_fen": fen,
-            })
+            trend.append(
+                {
+                    "week_start": week_start.date().isoformat(),
+                    "week_end": week_end.date().isoformat(),
+                    "waste_fen": fen,
+                }
+            )
         return trend
 
     # ─── 需求预测 ───
 
     async def forecast_demand(
-        self, store_id: str, days: int = 7,
+        self,
+        store_id: str,
+        days: int = 7,
     ) -> list[dict[str, Any]]:
         """需求预测 -- 基于近7天日均消耗 x days 预测
 
@@ -387,9 +387,7 @@ class SupplyRepository:
                     Ingredient.ingredient_name,
                     Ingredient.unit,
                     Ingredient.current_quantity,
-                    func.coalesce(
-                        func.sum(func.abs(IngredientTransaction.quantity)), 0
-                    ).label("total_usage"),
+                    func.coalesce(func.sum(func.abs(IngredientTransaction.quantity)), 0).label("total_usage"),
                 )
                 .outerjoin(
                     IngredientTransaction,
@@ -422,18 +420,18 @@ class SupplyRepository:
                     continue
                 daily_avg = total_usage / 7
                 forecast_qty = daily_avg * days
-                forecast.append({
-                    "ingredient_id": str(row.ingredient_id),
-                    "ingredient_name": row.ingredient_name,
-                    "unit": row.unit,
-                    "current_quantity": row.current_quantity,
-                    "daily_avg": round(daily_avg, 2),
-                    "forecast_qty": round(forecast_qty, 2),
-                    "forecast_days": days,
-                    "coverage_days": round(row.current_quantity / daily_avg, 1)
-                    if daily_avg > 0
-                    else None,
-                })
+                forecast.append(
+                    {
+                        "ingredient_id": str(row.ingredient_id),
+                        "ingredient_name": row.ingredient_name,
+                        "unit": row.unit,
+                        "current_quantity": row.current_quantity,
+                        "daily_avg": round(daily_avg, 2),
+                        "forecast_qty": round(forecast_qty, 2),
+                        "forecast_days": days,
+                        "coverage_days": round(row.current_quantity / daily_avg, 1) if daily_avg > 0 else None,
+                    }
+                )
 
             return forecast
         except ProgrammingError as exc:

@@ -38,6 +38,7 @@ def _get_tenant_id(request: Request) -> str:
 
 # ─── 请求模型 ───
 
+
 class RegisterTaskReq(BaseModel):
     task_id: str
     store_id: str
@@ -47,6 +48,7 @@ class RegisterTaskReq(BaseModel):
 
 
 # ─── 队列与历史 ───
+
 
 @router.get("/{store_id}/queue")
 async def api_runner_queue(
@@ -76,6 +78,7 @@ async def api_runner_history(
 
 
 # ─── 任务操作 ───
+
 
 @router.post("/task/{task_id}/ready")
 async def api_mark_ready(

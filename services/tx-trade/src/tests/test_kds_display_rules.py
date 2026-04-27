@@ -7,15 +7,15 @@
 4. GET  /display-rules/{store_id} — 缺少 X-Tenant-ID → 400
 5. PUT  /display-rules/{store_id} — timeout_warning_seconds 校验失败 → 422
 """
+
 import os
 import sys
 import types
-import json
 
 # ─── 路径准备 ─────────────────────────────────────────────────────────────────
 _TESTS_DIR = os.path.dirname(__file__)
-_SRC_DIR   = os.path.abspath(os.path.join(_TESTS_DIR, ".."))
-_ROOT_DIR  = os.path.abspath(os.path.join(_TESTS_DIR, "..", "..", "..", ".."))
+_SRC_DIR = os.path.abspath(os.path.join(_TESTS_DIR, ".."))
+_ROOT_DIR = os.path.abspath(os.path.join(_TESTS_DIR, "..", "..", "..", ".."))
 
 for _p in [_SRC_DIR, _ROOT_DIR]:
     if _p not in sys.path:
@@ -23,6 +23,7 @@ for _p in [_SRC_DIR, _ROOT_DIR]:
 
 
 # ─── 建立 src 包层级 ──────────────────────────────────────────────────────────
+
 
 def _ensure_pkg(name: str, path: str) -> None:
     if name not in sys.modules:
@@ -32,30 +33,30 @@ def _ensure_pkg(name: str, path: str) -> None:
         sys.modules[name] = mod
 
 
-_ensure_pkg("src",     _SRC_DIR)
+_ensure_pkg("src", _SRC_DIR)
 _ensure_pkg("src.api", os.path.join(_SRC_DIR, "api"))
 
 
 # ─── 正式导入 ──────────────────────────────────────────────────────────────────
 import uuid
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
-import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.api.kds_display_rules_routes import router  # type: ignore[import]
 from shared.ontology.src.database import get_db  # noqa: E402
+from src.api.kds_display_rules_routes import router  # type: ignore[import]
 
 # ─── 常量 ─────────────────────────────────────────────────────────────────────
 
 TENANT_ID = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
-STORE_ID  = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
-HEADERS   = {"X-Tenant-ID": TENANT_ID}
+STORE_ID = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+HEADERS = {"X-Tenant-ID": TENANT_ID}
 
 
 # ─── 测试辅助 ──────────────────────────────────────────────────────────────────
+
 
 def _make_app() -> FastAPI:
     app = FastAPI()
@@ -65,13 +66,14 @@ def _make_app() -> FastAPI:
 
 def _make_mock_db() -> AsyncMock:
     db = AsyncMock(spec=AsyncSession)
-    db.commit   = AsyncMock()
+    db.commit = AsyncMock()
     db.rollback = AsyncMock()
-    db.execute  = AsyncMock(return_value=MagicMock())
+    db.execute = AsyncMock(return_value=MagicMock())
     return db
 
 
 # ─── 测试用例 ──────────────────────────────────────────────────────────────────
+
 
 class TestGetDisplayRulesDefault:
     """1. 无配置时返回默认值"""

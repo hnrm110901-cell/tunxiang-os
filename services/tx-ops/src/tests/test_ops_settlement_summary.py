@@ -25,6 +25,7 @@
   - app.dependency_overrides[get_db] + AsyncMock side_effect
   - 全部 mock，不需要真实 DB
 """
+
 from __future__ import annotations
 
 import sys
@@ -36,7 +37,6 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-
 
 # ══════════════════════════════════════════════════════════════════════════════════
 #  sys.modules 存根注入（必须在导入路由前完成）
@@ -60,14 +60,19 @@ _ensure_stub("shared.ontology")
 _ensure_stub("shared.ontology.src")
 _db_mod = _ensure_stub("shared.ontology.src.database")
 if not hasattr(_db_mod, "get_db"):
+
     async def _placeholder_get_db():  # pragma: no cover
         yield None
+
     _db_mod.get_db = _placeholder_get_db
 
 _entities_mod = _ensure_stub("shared.ontology.src.entities")
 for _entity_name in [
-    "DailySummary", "EmployeeDailyPerformance", "InspectionReport",
-    "OpsIssue", "ShiftHandover",
+    "DailySummary",
+    "EmployeeDailyPerformance",
+    "InspectionReport",
+    "OpsIssue",
+    "ShiftHandover",
 ]:
     if not hasattr(_entities_mod, _entity_name):
         setattr(_entities_mod, _entity_name, MagicMock())
@@ -79,14 +84,18 @@ _ensure_stub("shared.events.src.emitter", {"emit_event": AsyncMock()})
 _ev_types = _ensure_stub("shared.events.src.event_types")
 
 if not hasattr(_ev_types, "SettlementEventType"):
+
     class _FakeSettlementEventType:
         DAILY_CLOSED = "settlement.daily_closed"
+
     _ev_types.SettlementEventType = _FakeSettlementEventType
 
 if not hasattr(_ev_types, "SafetyEventType"):
+
     class _FakeSafetyEventType:
         SAMPLE_LOGGED = "safety.sample_logged"
         TEMPERATURE_RECORDED = "safety.temperature_recorded"
+
     _ev_types.SafetyEventType = _FakeSafetyEventType
 
 # ── structlog ────────────────────────────────────────────────────────────────────
@@ -122,9 +131,7 @@ _wx_stub.send_booking_reminder = AsyncMock(return_value={"ok": True})
 _dispatcher_stub = MagicMock()
 _dispatcher_stub.sms_service = _sms_stub
 _dispatcher_stub.wechat_service = _wx_stub
-_dispatcher_stub.send_multi_channel = AsyncMock(return_value=[
-    {"channel": "sms", "success": True}
-])
+_dispatcher_stub.send_multi_channel = AsyncMock(return_value=[{"channel": "sms", "success": True}])
 
 _dispatcher_mod = _ensure_stub(
     "shared.integrations.notification_dispatcher",
@@ -155,39 +162,51 @@ from ..api.notification_center_routes import template_router  # noqa: E402
 # settlement_routes 依赖兄弟模块
 try:
     from ..api import daily_summary_routes as _dsm
+
     if not hasattr(_dsm, "_aggregate_orders"):
+
         async def _noop_aggregate(*a, **kw):
             return {}
+
         _dsm._aggregate_orders = _noop_aggregate
 
     from ..api import inspection_routes as _ir
+
     if not hasattr(_ir, "_reports"):
         _ir._reports = {}
 
     from ..api import issues_routes as _isr
+
     if not hasattr(_isr, "_issues"):
         _isr._issues = {}
     for _fn_name in ["_scan_discount_abuse", "_scan_kds_timeout", "_scan_low_inventory"]:
         if not hasattr(_isr, _fn_name):
+
             async def _noop_scan(*a, **kw):
                 return []
+
             setattr(_isr, _fn_name, _noop_scan)
 
     from ..api import performance_routes as _pr
+
     if not hasattr(_pr, "_performance"):
         _pr._performance = {}
     for _fn_name in [
-        "_aggregate_cashier_performance", "_aggregate_chef_performance",
+        "_aggregate_cashier_performance",
+        "_aggregate_chef_performance",
         "_aggregate_waiter_performance",
     ]:
         if not hasattr(_pr, _fn_name):
+
             async def _noop_perf(*a, **kw):
                 return []
+
             setattr(_pr, _fn_name, _noop_perf)
     if not hasattr(_pr, "_calc_commission_fen"):
         _pr._calc_commission_fen = lambda *a, **kw: 0
 
     from ..api.daily_settlement_routes import router as settlement_router  # noqa: E402
+
     _settlement_available = True
 except Exception:  # pragma: no cover
     _settlement_available = False
@@ -244,6 +263,7 @@ def _make_db(side_effects: list) -> AsyncMock:
 def _override(db_mock: AsyncMock):
     async def _dep() -> AsyncGenerator:
         yield db_mock
+
     return _dep
 
 
@@ -268,27 +288,31 @@ class TestDailySummaryGenerate:
         # 2. 检查是否已存在（返回 None — 不存在）
         # 3. _aggregate_orders 内部 execute（聚合 SQL）
         # 4. INSERT daily_summaries
-        aggregate_row = _mapping_row({
-            "total_orders": 50,
-            "dine_in_orders": 30,
-            "takeaway_orders": 15,
-            "banquet_orders": 5,
-            "total_revenue_fen": 500000,
-            "actual_revenue_fen": 480000,
-            "total_discount_fen": 20000,
-            "max_discount_pct": 15.0,
-            "abnormal_discounts": 2,
-            "avg_table_value_fen": 9600,
-        })
+        aggregate_row = _mapping_row(
+            {
+                "total_orders": 50,
+                "dine_in_orders": 30,
+                "takeaway_orders": 15,
+                "banquet_orders": 5,
+                "total_revenue_fen": 500000,
+                "actual_revenue_fen": 480000,
+                "total_discount_fen": 20000,
+                "max_discount_pct": 15.0,
+                "abnormal_discounts": 2,
+                "avg_table_value_fen": 9600,
+            }
+        )
         aggregate_result = MagicMock()
         aggregate_result.fetchone = MagicMock(return_value=aggregate_row)
 
-        db = _make_db([
-            _make_execute_result(),        # _set_rls
-            _make_execute_result(None),    # 检查既有记录 → None
-            aggregate_result,              # _aggregate_orders SQL
-            MagicMock(),                   # INSERT
-        ])
+        db = _make_db(
+            [
+                _make_execute_result(),  # _set_rls
+                _make_execute_result(None),  # 检查既有记录 → None
+                aggregate_result,  # _aggregate_orders SQL
+                MagicMock(),  # INSERT
+            ]
+        )
         app.dependency_overrides[get_db] = _override(db)
 
         payload = {
@@ -315,19 +339,23 @@ class TestDailySummaryGenerate:
 
     def test_generate_summary_locked_returns_409(self):
         """日汇总已锁定时，返回 409。"""
-        locked_row = _mapping_row({
-            "id": str(uuid.uuid4()),
-            "status": "locked",
-            "created_at": "2026-04-04T10:00:00+00:00",
-        })
+        locked_row = _mapping_row(
+            {
+                "id": str(uuid.uuid4()),
+                "status": "locked",
+                "created_at": "2026-04-04T10:00:00+00:00",
+            }
+        )
         # fetchone 直接返回 locked 记录
         check_result = MagicMock()
         check_result.fetchone = MagicMock(return_value=locked_row)
 
-        db = _make_db([
-            _make_execute_result(),   # _set_rls
-            check_result,             # 检查既有记录 → locked
-        ])
+        db = _make_db(
+            [
+                _make_execute_result(),  # _set_rls
+                check_result,  # 检查既有记录 → locked
+            ]
+        )
         app.dependency_overrides[get_db] = _override(db)
 
         payload = {"store_id": STORE_ID, "summary_date": "2026-04-04"}
@@ -375,10 +403,12 @@ class TestDailySummaryGet:
             "created_at": "2026-04-04T08:00:00+00:00",
             "updated_at": "2026-04-04T08:00:00+00:00",
         }
-        db = _make_db([
-            _make_execute_result(),              # _set_rls
-            _make_execute_result(row_data),      # SELECT
-        ])
+        db = _make_db(
+            [
+                _make_execute_result(),  # _set_rls
+                _make_execute_result(row_data),  # SELECT
+            ]
+        )
         app.dependency_overrides[get_db] = _override(db)
 
         with TestClient(app) as client:
@@ -396,10 +426,12 @@ class TestDailySummaryGet:
 
     def test_get_summary_not_found_404(self):
         """记录不存在时，返回 404。"""
-        db = _make_db([
-            _make_execute_result(),   # _set_rls
-            _make_execute_result(None),  # SELECT → None
-        ])
+        db = _make_db(
+            [
+                _make_execute_result(),  # _set_rls
+                _make_execute_result(None),  # SELECT → None
+            ]
+        )
         app.dependency_overrides[get_db] = _override(db)
 
         with TestClient(app) as client:
@@ -427,34 +459,40 @@ class TestDailySummaryConfirm:
         summary_id = str(uuid.uuid4())
         confirmed_by = str(uuid.uuid4())
 
-        check_row = _mapping_row({
-            "id": summary_id,
-            "store_id": STORE_ID,
-            "status": "draft",
-        })
+        check_row = _mapping_row(
+            {
+                "id": summary_id,
+                "store_id": STORE_ID,
+                "status": "draft",
+            }
+        )
         check_result = MagicMock()
         check_result.fetchone = MagicMock(return_value=check_row)
 
-        updated_row = _mapping_row({
-            "id": summary_id,
-            "store_id": STORE_ID,
-            "summary_date": "2026-04-04",
-            "total_orders": 80,
-            "actual_revenue_fen": 600000,
-            "status": "locked",
-            "confirmed_by": confirmed_by,
-            "confirmed_at": "2026-04-04T20:00:00+00:00",
-            "updated_at": "2026-04-04T20:00:00+00:00",
-        })
+        updated_row = _mapping_row(
+            {
+                "id": summary_id,
+                "store_id": STORE_ID,
+                "summary_date": "2026-04-04",
+                "total_orders": 80,
+                "actual_revenue_fen": 600000,
+                "status": "locked",
+                "confirmed_by": confirmed_by,
+                "confirmed_at": "2026-04-04T20:00:00+00:00",
+                "updated_at": "2026-04-04T20:00:00+00:00",
+            }
+        )
         updated_result = MagicMock()
         updated_result.fetchone = MagicMock(return_value=updated_row)
 
-        db = _make_db([
-            _make_execute_result(),   # _set_rls
-            check_result,             # SELECT 检查
-            MagicMock(),              # UPDATE
-            updated_result,           # SELECT 返回已锁定记录
-        ])
+        db = _make_db(
+            [
+                _make_execute_result(),  # _set_rls
+                check_result,  # SELECT 检查
+                MagicMock(),  # UPDATE
+                updated_result,  # SELECT 返回已锁定记录
+            ]
+        )
         app.dependency_overrides[get_db] = _override(db)
 
         with TestClient(app) as client:
@@ -510,11 +548,13 @@ class TestNotificationList:
         # for row in rows_result: 需要可迭代
         rows_result.__iter__ = MagicMock(return_value=iter([notif_row]))
 
-        db = _make_db([
-            _make_execute_result(),   # _set_rls
-            count_result,             # COUNT
-            rows_result,              # SELECT rows
-        ])
+        db = _make_db(
+            [
+                _make_execute_result(),  # _set_rls
+                count_result,  # COUNT
+                rows_result,  # SELECT rows
+            ]
+        )
         app.dependency_overrides[get_db] = _override(db)
 
         with TestClient(app) as client:
@@ -552,10 +592,12 @@ class TestNotificationUnreadCount:
         count_result = MagicMock()
         count_result.scalar = MagicMock(return_value=7)
 
-        db = _make_db([
-            _make_execute_result(),   # _set_rls
-            count_result,             # COUNT
-        ])
+        db = _make_db(
+            [
+                _make_execute_result(),  # _set_rls
+                count_result,  # COUNT
+            ]
+        )
         app.dependency_overrides[get_db] = _override(db)
 
         with TestClient(app) as client:
@@ -583,10 +625,12 @@ class TestNotificationMarkRead:
         returning_row = MagicMock()
         returning_row.fetchone = MagicMock(return_value=_mapping_row({"id": notif_id}))
 
-        db = _make_db([
-            _make_execute_result(),   # _set_rls
-            returning_row,            # UPDATE RETURNING
-        ])
+        db = _make_db(
+            [
+                _make_execute_result(),  # _set_rls
+                returning_row,  # UPDATE RETURNING
+            ]
+        )
         app.dependency_overrides[get_db] = _override(db)
 
         with TestClient(app) as client:
@@ -616,10 +660,12 @@ class TestNotificationMarkAllRead:
         update_result = MagicMock()
         update_result.rowcount = 5
 
-        db = _make_db([
-            _make_execute_result(),   # _set_rls
-            update_result,            # UPDATE
-        ])
+        db = _make_db(
+            [
+                _make_execute_result(),  # _set_rls
+                update_result,  # UPDATE
+            ]
+        )
         app.dependency_overrides[get_db] = _override(db)
 
         with TestClient(app) as client:

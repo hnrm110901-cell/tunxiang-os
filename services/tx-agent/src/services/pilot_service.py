@@ -5,6 +5,7 @@
   - 生成 AI 复盘报告（Claude API）
   - 执行复盘建议（rollout / abort / extend）
 """
+
 from __future__ import annotations
 
 import json
@@ -38,12 +39,8 @@ class StoreRef(BaseModel):
 class PilotProgramCreate(BaseModel):
     name: str
     description: str | None = None
-    pilot_type: Literal[
-        "new_dish", "new_ingredient", "new_combo", "price_change", "menu_restructure"
-    ]
-    recommendation_source: Literal[
-        "intel_report", "competitor_watch", "trend_signal", "manual"
-    ] = "manual"
+    pilot_type: Literal["new_dish", "new_ingredient", "new_combo", "price_change", "menu_restructure"]
+    recommendation_source: Literal["intel_report", "competitor_watch", "trend_signal", "manual"] = "manual"
     source_ref_id: uuid.UUID | None = None
     hypothesis: str | None = None
     target_stores: list[StoreRef]
@@ -104,6 +101,7 @@ class PilotReview(BaseModel):
 # PilotService
 # ---------------------------------------------------------------------------
 
+
 class PilotService:
     """试点验证闭环核心服务"""
 
@@ -134,7 +132,9 @@ class PilotService:
             "source_ref_id": str(pilot_data.source_ref_id) if pilot_data.source_ref_id else None,
             "hypothesis": pilot_data.hypothesis,
             "target_stores": [s.model_dump() for s in pilot_data.target_stores],
-            "control_stores": [s.model_dump() for s in pilot_data.control_stores] if pilot_data.control_stores else None,
+            "control_stores": [s.model_dump() for s in pilot_data.control_stores]
+            if pilot_data.control_stores
+            else None,
             "start_date": pilot_data.start_date.isoformat(),
             "end_date": pilot_data.end_date.isoformat(),
             "status": "draft",
@@ -254,19 +254,19 @@ class PilotService:
               {date_filter}
             ORDER BY metric_date ASC, is_control_store ASC
             """.format(
-                date_filter=(
-                    "AND metric_date BETWEEN :start_date AND :end_date"
-                    if start_date and end_date
-                    else ""
-                )
+                date_filter=("AND metric_date BETWEEN :start_date AND :end_date" if start_date and end_date else "")
             ),
             {
                 "tenant_id": str(tenant_id),
                 "pilot_id": str(pilot_id),
-                **({} if not (start_date and end_date) else {
-                    "start_date": start_date.isoformat(),
-                    "end_date": end_date.isoformat(),
-                }),
+                **(
+                    {}
+                    if not (start_date and end_date)
+                    else {
+                        "start_date": start_date.isoformat(),
+                        "end_date": end_date.isoformat(),
+                    }
+                ),
             },
         )
 
@@ -305,9 +305,7 @@ class PilotService:
         ai_analysis = await self._generate_ai_analysis(program, metrics_summary, baseline, review_type)
 
         # 4. 推断 verdict 和 recommendations
-        verdict, key_findings, recommendations = self._derive_verdict(
-            program, metrics_summary, baseline
-        )
+        verdict, key_findings, recommendations = self._derive_verdict(program, metrics_summary, baseline)
 
         review_id = uuid.uuid4()
         now = datetime.now(timezone.utc)
@@ -401,6 +399,7 @@ class PilotService:
 
         elif recommendation == "extend":
             from datetime import timedelta
+
             current_end = date.fromisoformat(str(program["end_date"]))
             new_end = current_end + timedelta(days=extend_days)
             await self._db.execute(
@@ -454,9 +453,7 @@ class PilotService:
             where += " AND status = :status"
             params["status"] = status
 
-        total = await self._db.fetch_val(
-            f"SELECT COUNT(*) FROM pilot_programs {where}", params
-        )
+        total = await self._db.fetch_val(f"SELECT COUNT(*) FROM pilot_programs {where}", params)
         rows = await self._db.fetch_all(
             f"""
             SELECT * FROM pilot_programs {where}
@@ -539,6 +536,7 @@ class PilotService:
             return {}
 
         from datetime import timedelta
+
         baseline_end = (start - timedelta(days=1)).isoformat()
         baseline_start = (start - timedelta(days=15)).isoformat()
 
@@ -576,19 +574,25 @@ class PilotService:
                 key_findings.append({"metric": metric, "status": "no_data", "message": f"{metric} 暂无数据"})
                 continue
 
-            ops = {"gt": actual_value > threshold, "gte": actual_value >= threshold,
-                   "lt": actual_value < threshold, "lte": actual_value <= threshold,
-                   "eq": actual_value == threshold}
+            ops = {
+                "gt": actual_value > threshold,
+                "gte": actual_value >= threshold,
+                "lt": actual_value < threshold,
+                "lte": actual_value <= threshold,
+                "eq": actual_value == threshold,
+            }
             met = ops.get(operator, False)
             passed += 1 if met else 0
-            key_findings.append({
-                "metric": metric,
-                "actual": actual_value,
-                "threshold": threshold,
-                "operator": operator,
-                "met": met,
-                "status": "pass" if met else "fail",
-            })
+            key_findings.append(
+                {
+                    "metric": metric,
+                    "actual": actual_value,
+                    "threshold": threshold,
+                    "operator": operator,
+                    "met": met,
+                    "status": "pass" if met else "fail",
+                }
+            )
 
         # 总体 verdict
         if total_criteria == 0:
@@ -605,8 +609,10 @@ class PilotService:
         # 默认 recommendations
         rec_map = {
             "success": [{"action": "rollout", "priority": "high", "reason": "全部成功标准达成，建议推广至全门店"}],
-            "partial_success": [{"action": "modify", "priority": "medium", "reason": "部分指标未达标，建议优化后扩大试点"},
-                                 {"action": "extend", "priority": "low", "reason": "也可延长观察期"}],
+            "partial_success": [
+                {"action": "modify", "priority": "medium", "reason": "部分指标未达标，建议优化后扩大试点"},
+                {"action": "extend", "priority": "low", "reason": "也可延长观察期"},
+            ],
             "failed": [{"action": "abort", "priority": "high", "reason": "指标未达预期，建议取消并总结教训"}],
             "inconclusive": [{"action": "extend", "priority": "medium", "reason": "数据不足，建议延长观察期"}],
         }
@@ -639,18 +645,18 @@ class PilotService:
 
         user_content = f"""试点计划复盘请求
 
-试点名称：{program.get('name', '')}
-试点类型：{program.get('pilot_type', '')}
-试点假设：{program.get('hypothesis', '未设定')}
-复盘类型：{'期中' if review_type == 'interim' else '最终'}
-目标门店数：{len(program.get('target_stores') or [])}
-对照门店数：{len(program.get('control_stores') or [])}
+试点名称：{program.get("name", "")}
+试点类型：{program.get("pilot_type", "")}
+试点假设：{program.get("hypothesis", "未设定")}
+复盘类型：{"期中" if review_type == "interim" else "最终"}
+目标门店数：{len(program.get("target_stores") or [])}
+对照门店数：{len(program.get("control_stores") or [])}
 
 指标汇总数据：
 {json.dumps(metrics_summary, ensure_ascii=False, indent=2)}
 
 成功标准：
-{json.dumps(program.get('success_criteria', []), ensure_ascii=False, indent=2)}
+{json.dumps(program.get("success_criteria", []), ensure_ascii=False, indent=2)}
 
 请按分析框架生成复盘报告。"""
 

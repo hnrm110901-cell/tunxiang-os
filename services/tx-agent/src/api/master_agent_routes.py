@@ -8,11 +8,12 @@ prefix: /api/v1/agent
   GET  /health       — 9个 Agent 健康状态
   POST /chat         — 自然语言对话接口
 """
+
 from __future__ import annotations
 
 import time
 import uuid
-from typing import Any, Optional
+from typing import Any
 
 import httpx
 import structlog
@@ -84,6 +85,7 @@ _task_store: dict[str, dict[str, Any]] = {}
 # 工具函数
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def _detect_intent(instruction: str) -> str | None:
     """纯 Python 关键词匹配，识别指令意图，不调用 Claude。
 
@@ -102,12 +104,15 @@ def _build_constraints_check(result_data: dict) -> dict:
 
     tx-brain 可能直接返回 constraints_check 字段；若无，则默认通过。
     """
-    return result_data.get("constraints_check", {
-        "margin_check": None,
-        "food_safety_check": None,
-        "experience_check": None,
-        "passed": True,
-    })
+    return result_data.get(
+        "constraints_check",
+        {
+            "margin_check": None,
+            "food_safety_check": None,
+            "experience_check": None,
+            "passed": True,
+        },
+    )
 
 
 def _result_to_natural_language(intent: str, result_data: dict) -> str:
@@ -128,11 +133,12 @@ def _result_to_natural_language(intent: str, result_data: dict) -> str:
 # Request / Response Schemas
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 class ExecuteRequest(BaseModel):
     tenant_id: str
     store_id: str
-    instruction: str          # 自然语言指令，如"分析今日库存风险"
-    context: dict = {}        # 上下文数据（门店状态/员工信息等）
+    instruction: str  # 自然语言指令，如"分析今日库存风险"
+    context: dict = {}  # 上下文数据（门店状态/员工信息等）
     priority: str = "medium"  # "high" | "medium" | "low"
     async_mode: bool = False  # False=同步等待，True=立即返回 task_id
 
@@ -147,6 +153,7 @@ class ChatRequest(BaseModel):
 # ─────────────────────────────────────────────────────────────────────────────
 # 核心：调用 tx-brain
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 async def _call_brain_agent(
     intent: str,
@@ -194,6 +201,7 @@ async def _call_brain_agent(
 # POST /execute
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 @router.post("/execute")
 async def execute_agent(
     req: ExecuteRequest,
@@ -240,6 +248,7 @@ async def execute_agent(
         }
 
         import asyncio
+
         asyncio.create_task(
             _execute_async_task(
                 task_id=task_id,
@@ -289,7 +298,7 @@ async def execute_agent(
                 "constraints_check": constraints_check,
                 "execution_ms": execution_ms,
             },
-            "error": f"无法识别指令意图，请包含明确关键词（如：库存、折扣、出餐等）",
+            "error": "无法识别指令意图，请包含明确关键词（如：库存、折扣、出餐等）",
         }
 
     result_data = await _call_brain_agent(
@@ -343,13 +352,15 @@ async def _execute_async_task(
     start_ts = time.perf_counter()
 
     if not intent:
-        _task_store[task_id].update({
-            "status": "failed",
-            "result": None,
-            "constraints_check": {"passed": True},
-            "execution_ms": int((time.perf_counter() - start_ts) * 1000),
-            "error": "no_intent_matched",
-        })
+        _task_store[task_id].update(
+            {
+                "status": "failed",
+                "result": None,
+                "constraints_check": {"passed": True},
+                "execution_ms": int((time.perf_counter() - start_ts) * 1000),
+                "error": "no_intent_matched",
+            }
+        )
         return
 
     result_data = await _call_brain_agent(
@@ -365,12 +376,14 @@ async def _execute_async_task(
     status = "failed" if is_fallback else "completed"
     agent_name = INTENT_AGENT_NAME.get(intent, intent)
 
-    _task_store[task_id].update({
-        "status": status,
-        "result": result_data,
-        "constraints_check": constraints_check,
-        "execution_ms": execution_ms,
-    })
+    _task_store[task_id].update(
+        {
+            "status": status,
+            "result": result_data,
+            "constraints_check": constraints_check,
+            "execution_ms": execution_ms,
+        }
+    )
 
     logger.info(
         "agent_decision_log",
@@ -387,6 +400,7 @@ async def _execute_async_task(
 # ─────────────────────────────────────────────────────────────────────────────
 # GET /tasks/{task_id}
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @router.get("/tasks/{task_id}")
 async def get_task_status(task_id: str) -> dict[str, Any]:
@@ -409,6 +423,7 @@ async def get_task_status(task_id: str) -> dict[str, Any]:
 # GET /health
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 @router.get("/health")
 async def agent_health() -> dict[str, Any]:
     """Master Agent 健康状态，同时探测 tx-brain 各 Agent 端点可用性。
@@ -430,10 +445,7 @@ async def agent_health() -> dict[str, Any]:
         except httpx.RequestError as exc:
             brain_detail = {"error": f"tx-brain unreachable: {exc}"}
 
-    agent_statuses = {
-        name: "ready" if brain_healthy else "degraded"
-        for name in INTENT_AGENT_NAME.values()
-    }
+    agent_statuses = dict.fromkeys(INTENT_AGENT_NAME.values(), "ready" if brain_healthy else "degraded")
 
     return {
         "ok": True,
@@ -451,6 +463,7 @@ async def agent_health() -> dict[str, Any]:
 # ─────────────────────────────────────────────────────────────────────────────
 # POST /chat
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @router.post("/chat")
 async def chat(
@@ -470,10 +483,7 @@ async def chat(
     actions_taken: list[str] = []
 
     if not intent:
-        reply = (
-            "您好！我是屯象OS智能助手。请告诉我您想了解什么，"
-            "例如：库存情况、折扣分析、出餐调度、会员洞察等。"
-        )
+        reply = "您好！我是屯象OS智能助手。请告诉我您想了解什么，例如：库存情况、折扣分析、出餐调度、会员洞察等。"
         return {
             "ok": True,
             "data": {

@@ -36,6 +36,7 @@
 所有接口需要 X-Tenant-ID header。
 金额全部用分（整数）。
 """
+
 import asyncio
 from datetime import date, datetime, timezone
 from typing import Optional
@@ -43,7 +44,8 @@ from uuid import UUID, uuid4
 
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from sqlalchemy import select, text, func as sa_func
+from sqlalchemy import func as sa_func
+from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.events.src.emitter import emit_event
@@ -51,18 +53,18 @@ from shared.events.src.event_types import OrderEventType
 from shared.ontology.src.database import get_db
 
 from ..models.food_court import (
+    CreateFoodCourtOrderReq,
+    CreateFoodCourtReq,
+    CreateVendorReq,
     FoodCourt,
-    FoodCourtVendor,
     FoodCourtOrder,
     FoodCourtOrderItem,
+    FoodCourtVendor,
     FoodCourtVendorSettlement,
-    CreateFoodCourtReq,
-    UpdateFoodCourtReq,
-    CreateVendorReq,
-    UpdateVendorReq,
-    CreateFoodCourtOrderReq,
-    PayFoodCourtOrderReq,
     GenerateSettlementReq,
+    PayFoodCourtOrderReq,
+    UpdateFoodCourtReq,
+    UpdateVendorReq,
 )
 
 logger = structlog.get_logger(__name__)
@@ -297,11 +299,13 @@ async def get_food_court(
         _err("商街不存在", 404)
 
     vendors_result = await db.execute(
-        select(FoodCourtVendor).where(
+        select(FoodCourtVendor)
+        .where(
             FoodCourtVendor.food_court_id == UUID(fc_id),
             FoodCourtVendor.tenant_id == UUID(tenant_id),
             FoodCourtVendor.is_deleted == False,
-        ).order_by(FoodCourtVendor.display_order)
+        )
+        .order_by(FoodCourtVendor.display_order)
     )
     vendors = vendors_result.scalars().all()
 
@@ -384,6 +388,7 @@ async def create_vendor(
         _err(f"档口编号 {req.vendor_code} 在本商街已存在")
 
     from decimal import Decimal
+
     vendor = FoodCourtVendor(
         id=uuid4(),
         tenant_id=UUID(tenant_id),
@@ -455,6 +460,7 @@ async def update_vendor(
         _err("档口不存在", 404)
 
     from decimal import Decimal
+
     if req.vendor_name is not None:
         vendor.vendor_name = req.vendor_name
     if req.category is not None:
@@ -523,27 +529,31 @@ async def get_food_court_menu(
     tenant_id = _get_tenant_id(request)
 
     vendors_result = await db.execute(
-        select(FoodCourtVendor).where(
+        select(FoodCourtVendor)
+        .where(
             FoodCourtVendor.food_court_id == UUID(fc_id),
             FoodCourtVendor.tenant_id == UUID(tenant_id),
             FoodCourtVendor.status == "active",
             FoodCourtVendor.is_deleted == False,
-        ).order_by(FoodCourtVendor.display_order)
+        )
+        .order_by(FoodCourtVendor.display_order)
     )
     vendors = vendors_result.scalars().all()
 
-    return _ok({
-        "food_court_id": fc_id,
-        "vendors": [
-            {
-                **_vendor_row_to_dict(v),
-                # 前端凭此 URL 调 tx-menu 服务拉取各档口菜单
-                "menu_url": f"/api/v1/dishes?store_id={v.kds_station_id}" if v.kds_station_id else None,
-            }
-            for v in vendors
-        ],
-        "vendor_count": len(vendors),
-    })
+    return _ok(
+        {
+            "food_court_id": fc_id,
+            "vendors": [
+                {
+                    **_vendor_row_to_dict(v),
+                    # 前端凭此 URL 调 tx-menu 服务拉取各档口菜单
+                    "menu_url": f"/api/v1/dishes?store_id={v.kds_station_id}" if v.kds_station_id else None,
+                }
+                for v in vendors
+            ],
+            "vendor_count": len(vendors),
+        }
+    )
 
 
 @router.post("/{fc_id}/orders")
@@ -656,10 +666,12 @@ async def get_food_court_order(
         _err("订单不存在", 404)
 
     items_result = await db.execute(
-        select(FoodCourtOrderItem).where(
+        select(FoodCourtOrderItem)
+        .where(
             FoodCourtOrderItem.order_id == UUID(order_id),
             FoodCourtOrderItem.tenant_id == UUID(tenant_id),
-        ).order_by(FoodCourtOrderItem.vendor_id, FoodCourtOrderItem.created_at)
+        )
+        .order_by(FoodCourtOrderItem.vendor_id, FoodCourtOrderItem.created_at)
     )
     items = items_result.scalars().all()
 
@@ -772,9 +784,9 @@ async def pay_food_court_order(
 
     # ── 6. 查询订单行，按 vendor 分组 ────────────────────────────────────────
     items_result = await db.execute(
-        select(FoodCourtOrderItem, FoodCourtVendor).join(
-            FoodCourtVendor, FoodCourtOrderItem.vendor_id == FoodCourtVendor.id
-        ).where(
+        select(FoodCourtOrderItem, FoodCourtVendor)
+        .join(FoodCourtVendor, FoodCourtOrderItem.vendor_id == FoodCourtVendor.id)
+        .where(
             FoodCourtOrderItem.order_id == UUID(order_id),
             FoodCourtOrderItem.tenant_id == UUID(tenant_id),
         )
@@ -851,20 +863,22 @@ async def pay_food_court_order(
         asyncio.create_task(_push_kds_event(tenant_id, vendor, items, row.order_no))
 
     # ── 9. 统一事件总线 ORDER.PAID ────────────────────────────────────────────
-    asyncio.create_task(emit_event(
-        event_type=OrderEventType.PAID,
-        tenant_id=tenant_id,
-        stream_id=order_id,
-        payload={
-            "order_no": row.order_no,
-            "total_fen": row.total_amount_fen,
-            "payment_method": req.payment_method,
-            "fc_id": fc_id,
-            "vendor_count": len(vendor_items),
-        },
-        source_service="tx-trade",
-        metadata={"channel": "food_court"},
-    ))
+    asyncio.create_task(
+        emit_event(
+            event_type=OrderEventType.PAID,
+            tenant_id=tenant_id,
+            stream_id=order_id,
+            payload={
+                "order_no": row.order_no,
+                "total_fen": row.total_amount_fen,
+                "payment_method": req.payment_method,
+                "fc_id": fc_id,
+                "vendor_count": len(vendor_items),
+            },
+            source_service="tx-trade",
+            metadata={"channel": "food_court"},
+        )
+    )
 
     logger.info(
         "food_court_order_paid",
@@ -876,16 +890,18 @@ async def pay_food_court_order(
         tenant_id=tenant_id,
     )
 
-    return _ok({
-        "order_id": order_id,
-        "order_no": row.order_no,
-        "status": "paid",
-        "paid_at": now.isoformat(),
-        "total_amount_fen": row.total_amount_fen,
-        "payment_method": req.payment_method,
-        "kds_pushed_vendors": len(vendor_items),
-        "settlement_records": settlement_ids,
-    })
+    return _ok(
+        {
+            "order_id": order_id,
+            "order_no": row.order_no,
+            "status": "paid",
+            "paid_at": now.isoformat(),
+            "total_amount_fen": row.total_amount_fen,
+            "payment_method": req.payment_method,
+            "kds_pushed_vendors": len(vendor_items),
+            "settlement_records": settlement_ids,
+        }
+    )
 
 
 @router.post("/{fc_id}/orders/{order_id}/cancel")
@@ -941,14 +957,16 @@ async def get_vendor_kds_queue(
     tenant_id = _get_tenant_id(request)
 
     result = await db.execute(
-        select(FoodCourtOrderItem, FoodCourtOrder).join(
-            FoodCourtOrder, FoodCourtOrderItem.order_id == FoodCourtOrder.id
-        ).where(
+        select(FoodCourtOrderItem, FoodCourtOrder)
+        .join(FoodCourtOrder, FoodCourtOrderItem.order_id == FoodCourtOrder.id)
+        .where(
             FoodCourtOrderItem.vendor_id == UUID(v_id),
             FoodCourtOrderItem.tenant_id == UUID(tenant_id),
             FoodCourtOrderItem.status.in_(["pending", "preparing"]),
             FoodCourtOrder.status.in_(["paid"]),
-        ).order_by(FoodCourtOrder.paid_at.asc()).limit(limit)
+        )
+        .order_by(FoodCourtOrder.paid_at.asc())
+        .limit(limit)
     )
     rows = result.all()
 
@@ -959,12 +977,14 @@ async def get_vendor_kds_queue(
         d["order_paid_at"] = order.paid_at.isoformat() if order.paid_at else None
         queue.append(d)
 
-    return _ok({
-        "vendor_id": v_id,
-        "queue": queue,
-        "pending_count": sum(1 for item, _ in rows if item.status == "pending"),
-        "preparing_count": sum(1 for item, _ in rows if item.status == "preparing"),
-    })
+    return _ok(
+        {
+            "vendor_id": v_id,
+            "queue": queue,
+            "pending_count": sum(1 for item, _ in rows if item.status == "pending"),
+            "preparing_count": sum(1 for item, _ in rows if item.status == "preparing"),
+        }
+    )
 
 
 @router.post("/vendor/{v_id}/items/{item_id}/ready")
@@ -1014,12 +1034,14 @@ async def mark_item_ready(
         all_vendor_items_ready=all_ready,
     )
 
-    return _ok({
-        "item_id": item_id,
-        "status": "ready",
-        "ready_at": now.isoformat(),
-        "all_vendor_items_ready": all_ready,
-    })
+    return _ok(
+        {
+            "item_id": item_id,
+            "status": "ready",
+            "ready_at": now.isoformat(),
+            "all_vendor_items_ready": all_ready,
+        }
+    )
 
 
 @router.get("/vendor/{v_id}/stats")
@@ -1075,18 +1097,20 @@ async def get_vendor_stats(
     )
     pending_in_queue = pending_count_result.scalar_one()
 
-    return _ok({
-        "vendor_id": v_id,
-        "date": query_date.isoformat(),
-        "order_count": settlement.order_count if settlement else 0,
-        "item_count": settlement.item_count if settlement else 0,
-        "gross_amount_fen": settlement.gross_amount_fen if settlement else 0,
-        "commission_fen": settlement.commission_fen if settlement else 0,
-        "net_amount_fen": settlement.net_amount_fen if settlement else 0,
-        "settlement_status": settlement.status if settlement else "no_data",
-        "queue_pending": pending_in_queue,
-        "items_ready_today": ready_count,
-    })
+    return _ok(
+        {
+            "vendor_id": v_id,
+            "date": query_date.isoformat(),
+            "order_count": settlement.order_count if settlement else 0,
+            "item_count": settlement.item_count if settlement else 0,
+            "gross_amount_fen": settlement.gross_amount_fen if settlement else 0,
+            "commission_fen": settlement.commission_fen if settlement else 0,
+            "net_amount_fen": settlement.net_amount_fen if settlement else 0,
+            "settlement_status": settlement.status if settlement else "no_data",
+            "queue_pending": pending_in_queue,
+            "items_ready_today": ready_count,
+        }
+    )
 
 
 # ─── 结算端点（总部财务） ─────────────────────────────────────────────────────
@@ -1205,12 +1229,14 @@ async def generate_settlements(
 
         if existing:
             if existing.status == "settled":
-                generated.append({
-                    "vendor_id": str(vendor.id),
-                    "vendor_name": vendor.vendor_name,
-                    "action": "skipped_already_settled",
-                    "settlement_id": str(existing.id),
-                })
+                generated.append(
+                    {
+                        "vendor_id": str(vendor.id),
+                        "vendor_name": vendor.vendor_name,
+                        "action": "skipped_already_settled",
+                        "settlement_id": str(existing.id),
+                    }
+                )
                 continue
             # 覆盖更新 pending 记录
             existing.order_count = order_count
@@ -1218,14 +1244,16 @@ async def generate_settlements(
             existing.gross_amount_fen = gross_amount_fen
             existing.commission_fen = commission_fen
             existing.net_amount_fen = net_amount_fen
-            generated.append({
-                "vendor_id": str(vendor.id),
-                "vendor_name": vendor.vendor_name,
-                "action": "updated",
-                "settlement_id": str(existing.id),
-                "gross_amount_fen": gross_amount_fen,
-                "net_amount_fen": net_amount_fen,
-            })
+            generated.append(
+                {
+                    "vendor_id": str(vendor.id),
+                    "vendor_name": vendor.vendor_name,
+                    "action": "updated",
+                    "settlement_id": str(existing.id),
+                    "gross_amount_fen": gross_amount_fen,
+                    "net_amount_fen": net_amount_fen,
+                }
+            )
         else:
             new_s = FoodCourtVendorSettlement(
                 id=uuid4(),
@@ -1241,13 +1269,15 @@ async def generate_settlements(
                 status="pending",
             )
             db.add(new_s)
-            generated.append({
-                "vendor_id": str(vendor.id),
-                "vendor_name": vendor.vendor_name,
-                "action": "created",
-                "gross_amount_fen": gross_amount_fen,
-                "net_amount_fen": net_amount_fen,
-            })
+            generated.append(
+                {
+                    "vendor_id": str(vendor.id),
+                    "vendor_name": vendor.vendor_name,
+                    "action": "created",
+                    "gross_amount_fen": gross_amount_fen,
+                    "net_amount_fen": net_amount_fen,
+                }
+            )
 
     await db.commit()
 
@@ -1259,11 +1289,13 @@ async def generate_settlements(
         tenant_id=tenant_id,
     )
 
-    return _ok({
-        "settlement_date": req.settlement_date,
-        "generated_count": len(generated),
-        "results": generated,
-    })
+    return _ok(
+        {
+            "settlement_date": req.settlement_date,
+            "generated_count": len(generated),
+            "results": generated,
+        }
+    )
 
 
 @router.post("/{fc_id}/settlements/{s_id}/confirm")
@@ -1382,9 +1414,11 @@ async def get_settlement_summary(
         "total_orders": sum(v["total_orders"] for v in vendor_summaries),
     }
 
-    return _ok({
-        "food_court_id": fc_id,
-        "period": {"start_date": start_date, "end_date": end_date},
-        "fc_totals": fc_totals,
-        "vendors": vendor_summaries,
-    })
+    return _ok(
+        {
+            "food_court_id": fc_id,
+            "period": {"start_date": start_date, "end_date": end_date},
+            "fc_totals": fc_totals,
+            "vendors": vendor_summaries,
+        }
+    )

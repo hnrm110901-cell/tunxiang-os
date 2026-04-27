@@ -192,10 +192,7 @@ async def mark_as_paid(
 @router.get(
     "/settlements/overdue",
     summary="逾期预警列表",
-    description=(
-        "查询超期未付款的结算单（confirmed 且超期 N 天）。"
-        "默认超期阈值 15 天，可通过 ?overdue_days=N 调整。"
-    ),
+    description=("查询超期未付款的结算单（confirmed 且超期 N 天）。默认超期阈值 15 天，可通过 ?overdue_days=N 调整。"),
 )
 async def get_overdue_settlements(
     overdue_days: int = Query(default=15, ge=1, le=365, description="逾期天数阈值"),
@@ -208,11 +205,13 @@ async def get_overdue_settlements(
         overdue_days=overdue_days,
         db=db,
     )
-    return _ok({
-        "overdue_days": overdue_days,
-        "count": len(settlements),
-        "items": [s.model_dump(mode="json") for s in settlements],
-    })
+    return _ok(
+        {
+            "overdue_days": overdue_days,
+            "count": len(settlements),
+            "items": [s.model_dump(mode="json") for s in settlements],
+        }
+    )
 
 
 @router.get(

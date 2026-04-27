@@ -2,6 +2,7 @@
 
 5 个端点：正向追溯、反向追溯、追溯时间线、追溯报告、原料关系图。
 """
+
 from fastapi import APIRouter, Header
 from pydantic import BaseModel
 from services.tx_supply.src.services import traceability

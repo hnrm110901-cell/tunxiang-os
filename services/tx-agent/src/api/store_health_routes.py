@@ -4,6 +4,7 @@
 GET /api/v1/store-health/overview   — 所有门店健康汇总（用于列表页）
 GET /api/v1/store-health/{store_id} — 单门店详细健康报告
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -298,10 +299,7 @@ async def get_store_health_overview(
         return {"ok": True, "data": {"stores": [], "summary": _empty_summary()}}
 
     # 逐门店并发聚合（异常已在 _build_store_health_item 内降级）
-    tasks = [
-        _build_store_health_item(db, tenant_id, s, today)
-        for s in stores
-    ]
+    tasks = [_build_store_health_item(db, tenant_id, s, today) for s in stores]
     results = await asyncio.gather(*tasks, return_exceptions=True)
 
     items: list[dict] = []
@@ -391,6 +389,7 @@ async def get_store_health_detail(
 
 # ─── 内部工具函数 ──────────────────────────────────────────────────────────────
 
+
 def _empty_summary() -> dict:
     return {
         "total_stores": 0,
@@ -406,7 +405,7 @@ def _degraded_item(store_info: dict) -> dict:
         "store_id": store_info["store_id"],
         "store_name": store_info["store_name"],
         "status": "unknown",
-        "health_score": -1,       # -1 表示数据降级，前端显示灰色
+        "health_score": -1,  # -1 表示数据降级，前端显示灰色
         "health_grade": "-",
         "today_revenue_fen": 0,
         "revenue_rate": 0.0,

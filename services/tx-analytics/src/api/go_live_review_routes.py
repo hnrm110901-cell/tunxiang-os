@@ -6,6 +6,7 @@ GET  /api/v1/analytics/go-live-review           — 三商户全量评审
 GET  /api/v1/analytics/go-live-review/{code}    — 单商户评审详情
 POST /api/v1/analytics/go-live-review/{code}/approve  — 手动批准（需填 approver）
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -26,9 +27,7 @@ logger = structlog.get_logger(__name__)
 _ANALYTICS_BASE = os.getenv("ANALYTICS_BASE_URL", "http://localhost:8009")
 
 # 允许使用批准端点的操作员名单（生产部署时通过环境变量覆盖，逗号分隔）
-_ALLOWED_APPROVERS: set[str] = set(
-    filter(None, os.getenv("GO_LIVE_APPROVERS", "未了已,admin").split(","))
-)
+_ALLOWED_APPROVERS: set[str] = set(filter(None, os.getenv("GO_LIVE_APPROVERS", "未了已,admin").split(",")))
 
 router = APIRouter(prefix="/api/v1/analytics", tags=["go-live-review"])
 
@@ -161,8 +160,8 @@ def _build_review(
 
     # GO/NO-GO 判定：评分达标 + 所有Gap关闭 + 数据质量≥70
     score_ok = total_score >= target_score
-    gaps_ok  = gap_closed == gap_total
-    dq_ok    = dq_score >= 70
+    gaps_ok = gap_closed == gap_total
+    dq_ok = dq_score >= 70
 
     approval = _approvals.get(code)
     manually_approved = approval is not None
@@ -217,10 +216,7 @@ def _build_review(
 @router.get("/go-live-review")
 async def list_go_live_reviews():
     """三商户 GO-TO-LIVE 最终评审汇总"""
-    tasks = [
-        asyncio.gather(_fetch_scorecard(c), _fetch_data_quality(c))
-        for c in ("czyz", "zqx", "sgc")
-    ]
+    tasks = [asyncio.gather(_fetch_scorecard(c), _fetch_data_quality(c)) for c in ("czyz", "zqx", "sgc")]
     results_raw = await asyncio.gather(*tasks)
 
     reviews = []
@@ -228,7 +224,7 @@ async def list_go_live_reviews():
         reviews.append(_build_review(code, sc, dq))
 
     go_count = sum(1 for r in reviews if r["final_verdict"].startswith("GO"))
-    all_go   = go_count == 3
+    all_go = go_count == 3
 
     return {
         "ok": True,
@@ -288,7 +284,7 @@ async def approve_go_live(
         )
 
     approver = body.get("approver", "")
-    notes    = body.get("notes", "")
+    notes = body.get("notes", "")
     if not approver:
         return {"ok": False, "error": {"code": "VALIDATION_ERROR", "message": "approver 不能为空"}}
 

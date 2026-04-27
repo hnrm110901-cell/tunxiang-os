@@ -3,6 +3,7 @@
 8种渠道独立毛利核算。
 金额统一存分（fen），展示时 /100 转元。
 """
+
 import asyncio
 import math
 from datetime import date
@@ -63,12 +64,12 @@ class SalesChannelEngine:
 
     # 支付渠道手续费率
     PAYMENT_FEE_RATES = {
-        "wechat": 0.006,       # 微信支付 0.6%
-        "alipay": 0.006,       # 支付宝 0.6%
-        "unionpay": 0.006,     # 银联 0.6%
-        "cash": 0.0,           # 现金无手续费
-        "member_balance": 0.0, # 会员余额无手续费
-        "credit": 0.0,         # 挂账无手续费
+        "wechat": 0.006,  # 微信支付 0.6%
+        "alipay": 0.006,  # 支付宝 0.6%
+        "unionpay": 0.006,  # 银联 0.6%
+        "cash": 0.0,  # 现金无手续费
+        "member_balance": 0.0,  # 会员余额无手续费
+        "credit": 0.0,  # 挂账无手续费
     }
 
     def calculate_channel_profit(
@@ -140,25 +141,27 @@ class SalesChannelEngine:
         tenant_id = order.get("tenant_id", "")
         store_id = order.get("store_id", "")
         if tenant_id and store_id:
-            asyncio.create_task(emit_event(
-                event_type=ChannelEventType.COMMISSION_CALC,
-                tenant_id=tenant_id,
-                stream_id=str(order.get("order_id", "")),
-                payload={
-                    "channel": channel,
-                    "gross_revenue_fen": gross_revenue_fen,
-                    "commission_fen": platform_commission_fen,     # ChannelMarginProjector 读取此字段
-                    "platform_commission_fen": platform_commission_fen,  # 保留原名便于审计
-                    "commission_rate": commission_rate,
-                    "payment_fee_fen": payment_fee_fen,
-                    "food_cost_fen": food_cost_fen,
-                    "net_profit_fen": net_profit_fen,
-                    "net_margin_rate": round(net_margin_rate, 4),
-                },
-                store_id=store_id,
-                source_service="tx-trade",
-                metadata={"channel": channel},
-            ))
+            asyncio.create_task(
+                emit_event(
+                    event_type=ChannelEventType.COMMISSION_CALC,
+                    tenant_id=tenant_id,
+                    stream_id=str(order.get("order_id", "")),
+                    payload={
+                        "channel": channel,
+                        "gross_revenue_fen": gross_revenue_fen,
+                        "commission_fen": platform_commission_fen,  # ChannelMarginProjector 读取此字段
+                        "platform_commission_fen": platform_commission_fen,  # 保留原名便于审计
+                        "commission_rate": commission_rate,
+                        "payment_fee_fen": payment_fee_fen,
+                        "food_cost_fen": food_cost_fen,
+                        "net_profit_fen": net_profit_fen,
+                        "net_margin_rate": round(net_margin_rate, 4),
+                    },
+                    store_id=store_id,
+                    source_service="tx-trade",
+                    metadata={"channel": channel},
+                )
+            )
 
         return result
 
@@ -199,7 +202,9 @@ class SalesChannelEngine:
 
             ch = channels[channel]
             profit = self.calculate_channel_profit(
-                order, channel, order.get("payment_method", "wechat"),
+                order,
+                channel,
+                order.get("payment_method", "wechat"),
             )
 
             ch["order_count"] += 1
@@ -212,9 +217,7 @@ class SalesChannelEngine:
 
         # 计算客单价和毛利率
         for ch in channels.values():
-            ch["avg_check_fen"] = (
-                ch["revenue_fen"] // ch["order_count"] if ch["order_count"] > 0 else 0
-            )
+            ch["avg_check_fen"] = ch["revenue_fen"] // ch["order_count"] if ch["order_count"] > 0 else 0
             ch["margin_rate"] = round(
                 ch["net_profit_fen"] / ch["revenue_fen"] if ch["revenue_fen"] > 0 else 0.0,
                 4,
@@ -236,9 +239,7 @@ class SalesChannelEngine:
                 "total_orders": total_orders,
                 "total_guests": total_guests,
                 "avg_check_fen": total_revenue // total_orders if total_orders > 0 else 0,
-                "overall_margin_rate": round(
-                    total_profit / total_revenue if total_revenue > 0 else 0.0, 4
-                ),
+                "overall_margin_rate": round(total_profit / total_revenue if total_revenue > 0 else 0.0, 4),
             },
         }
 
@@ -304,23 +305,25 @@ class SalesChannelEngine:
 
             for order in orders:
                 profit = self.calculate_channel_profit(
-                    order, channel, order.get("payment_method", "wechat"),
+                    order,
+                    channel,
+                    order.get("payment_method", "wechat"),
                 )
                 total_revenue += profit["gross_revenue_fen"]
                 total_profit += profit["net_profit_fen"]
                 total_commission += profit["platform_commission_fen"]
 
-            comparisons.append({
-                "channel": channel,
-                "channel_name": self.CHANNELS.get(channel, {}).get("name", channel),
-                "order_count": len(orders),
-                "total_revenue_fen": total_revenue,
-                "total_profit_fen": total_profit,
-                "avg_margin_rate": round(
-                    total_profit / total_revenue if total_revenue > 0 else 0.0, 4
-                ),
-                "commission_impact_fen": total_commission,
-            })
+            comparisons.append(
+                {
+                    "channel": channel,
+                    "channel_name": self.CHANNELS.get(channel, {}).get("name", channel),
+                    "order_count": len(orders),
+                    "total_revenue_fen": total_revenue,
+                    "total_profit_fen": total_profit,
+                    "avg_margin_rate": round(total_profit / total_revenue if total_revenue > 0 else 0.0, 4),
+                    "commission_impact_fen": total_commission,
+                }
+            )
 
         # 按毛利率降序排列
         comparisons.sort(key=lambda x: x["avg_margin_rate"], reverse=True)

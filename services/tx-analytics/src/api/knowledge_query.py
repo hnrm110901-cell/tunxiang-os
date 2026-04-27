@@ -1,4 +1,5 @@
 """知识图谱自然语言查询 API"""
+
 from typing import Optional
 
 from fastapi import APIRouter, Query

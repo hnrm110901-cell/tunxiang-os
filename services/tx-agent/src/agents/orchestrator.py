@@ -14,6 +14,7 @@
 
 关键约束：三条硬约束（毛利底线 / 食安合规 / 客户体验）在 synthesize 阶段校验。
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -36,6 +37,7 @@ logger = structlog.get_logger()
 # 数据结构
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 class StepStatus(str, Enum):
     PENDING = "pending"
     RUNNING = "running"
@@ -48,10 +50,11 @@ class StepStatus(str, Enum):
 @dataclass
 class ExecutionStep:
     """执行计划中的单个步骤"""
+
     step_id: str
-    agent_id: str                          # 要调用的 Skill Agent ID
-    action: str                            # Agent 的动作名
-    params: dict                           # 传给 Agent 的参数
+    agent_id: str  # 要调用的 Skill Agent ID
+    action: str  # Agent 的动作名
+    params: dict  # 传给 Agent 的参数
     depends_on: list[str] = field(default_factory=list)  # 依赖哪些 step_id（空=可并行）
     timeout_seconds: int = 30
     status: StepStatus = StepStatus.PENDING
@@ -67,24 +70,26 @@ class ExecutionStep:
 @dataclass
 class ExecutionPlan:
     """Orchestrator 生成的执行计划"""
+
     plan_id: str = field(default_factory=lambda: str(uuid.uuid4()))
-    trigger_summary: str = ""              # 触发原因摘要（用于日志）
+    trigger_summary: str = ""  # 触发原因摘要（用于日志）
     steps: list[ExecutionStep] = field(default_factory=list)
-    estimated_impact: str = ""            # 预估影响范围描述
-    planning_model: str = ""              # 使用的规划模型
+    estimated_impact: str = ""  # 预估影响范围描述
+    planning_model: str = ""  # 使用的规划模型
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 @dataclass
 class OrchestratorResult:
     """编排器最终输出"""
+
     plan_id: str
     success: bool
-    completed_steps: list[str]             # 成功完成的 step_id 列表
+    completed_steps: list[str]  # 成功完成的 step_id 列表
     failed_steps: list[str]
-    synthesis: str                         # 综合分析文本
-    recommended_actions: list[dict]        # 推荐给前端展示的动作列表
-    constraints_passed: bool               # 三条硬约束是否全部通过
+    synthesis: str  # 综合分析文本
+    recommended_actions: list[dict]  # 推荐给前端展示的动作列表
+    constraints_passed: bool  # 三条硬约束是否全部通过
     confidence: float
     plan_steps: list = field(default_factory=list)  # ExecutionPlan.steps 摘要（用于决策留痕）
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
@@ -106,29 +111,30 @@ def _generate_session_id() -> str:
 # AgentOrchestrator
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 class AgentOrchestrator:
     """AI 驱动的多 Agent 编排器"""
 
     # 所有已注册 Agent 的描述（用于规划提示词）
     AGENT_CATALOG: dict[str, str] = {
-        "discount_guard":  "折扣守护：检测和拦截不合规折扣，记录违规",
-        "smart_menu":      "智能排菜：推荐菜品组合、推送今日特价、标记售罄替代",
-        "serve_dispatch":  "出餐调度：安排出菜优先级、分配服务员、KDS指令",
-        "member_insight":  "会员洞察：更新RFM分层、流失预警、消费行为分析",
+        "discount_guard": "折扣守护：检测和拦截不合规折扣，记录违规",
+        "smart_menu": "智能排菜：推荐菜品组合、推送今日特价、标记售罄替代",
+        "serve_dispatch": "出餐调度：安排出菜优先级、分配服务员、KDS指令",
+        "member_insight": "会员洞察：更新RFM分层、流失预警、消费行为分析",
         "inventory_alert": "库存预警：评估库存不足严重程度、触发紧急补货",
-        "finance_audit":   "财务稽核：P&L分析、成本率检测、收入异常标记",
-        "store_inspect":   "巡店质检：门店评分、问题记录、整改跟踪",
-        "smart_service":   "智能客服：处理投诉、生成回复建议",
-        "private_ops":     "私域运营：触发旅程、发送消息、管理优惠活动",
+        "finance_audit": "财务稽核：P&L分析、成本率检测、收入异常标记",
+        "store_inspect": "巡店质检：门店评分、问题记录、整改跟踪",
+        "smart_service": "智能客服：处理投诉、生成回复建议",
+        "private_ops": "私域运营：触发旅程、发送消息、管理优惠活动",
     }
 
     def __init__(
         self,
-        master_agent: Any,          # MasterAgent 实例（用于 dispatch）
-        model_router: Any,          # ModelRouter 实例
+        master_agent: Any,  # MasterAgent 实例（用于 dispatch）
+        model_router: Any,  # ModelRouter 实例
         tenant_id: str,
         store_id: Optional[str] = None,
-        db: Any = None,             # P0-5: AsyncSession（可选，无DB时降级为无状态模式）
+        db: Any = None,  # P0-5: AsyncSession（可选，无DB时降级为无状态模式）
     ) -> None:
         self.master = master_agent
         self.router = model_router
@@ -183,6 +189,7 @@ class AgentOrchestrator:
     ) -> None:
         """更新 SessionRun 状态"""
         from sqlalchemy import update
+
         from ..models.session_run import SessionRun
 
         values: dict[str, Any] = {"status": status}
@@ -193,11 +200,7 @@ class AgentOrchestrator:
         elif status == "running":
             values["started_at"] = datetime.now(timezone.utc)
 
-        stmt = (
-            update(SessionRun)
-            .where(SessionRun.session_id == session_id)
-            .values(**values)
-        )
+        stmt = update(SessionRun).where(SessionRun.session_id == session_id).values(**values)
         await self.db.execute(stmt)
         await self.db.flush()
 
@@ -296,7 +299,8 @@ class AgentOrchestrator:
             # P0-5: 记录 plan_id 到 SessionRun
             if self.db is not None and session_id:
                 await self._update_session_status(
-                    session_id, "running",
+                    session_id,
+                    "running",
                     plan_id=plan.plan_id,
                     total_steps=len(plan.steps),
                     trigger_summary=plan.trigger_summary,
@@ -317,8 +321,7 @@ class AgentOrchestrator:
                     else None
                 )
                 completed = [
-                    sid for sid, r in results.items() if r.success
-                    and not (r.data and r.data.get("checkpoint_created"))
+                    sid for sid, r in results.items() if r.success and not (r.data and r.data.get("checkpoint_created"))
                 ]
                 return OrchestratorResult(
                     plan_id=plan.plan_id,
@@ -363,7 +366,8 @@ class AgentOrchestrator:
             if self.db is not None and session_id:
                 try:
                     await self._update_session_status(
-                        session_id, "failed",
+                        session_id,
+                        "failed",
                         result_json={"error": str(exc)},
                     )
                 except Exception:  # noqa: BLE001 — 状态更新失败不应掩盖原始异常
@@ -388,9 +392,7 @@ class AgentOrchestrator:
             trigger_desc = f"用户指令: {trigger}"
 
         # 构建 Agent 目录文本
-        catalog_text = "\n".join(
-            f"- {aid}: {desc}" for aid, desc in self.AGENT_CATALOG.items()
-        )
+        catalog_text = "\n".join(f"- {aid}: {desc}" for aid, desc in self.AGENT_CATALOG.items())
 
         prompt = f"""你是屯象OS的智能调度员。根据以下触发信息，规划需要调用哪些Agent以及调用顺序。
 
@@ -486,10 +488,7 @@ class AgentOrchestrator:
             # 找出所有依赖已满足的步骤（可并行执行）
             # P0-6: paused 的步骤也算"完成"以解除下游依赖检查，
             # 但 paused 步骤的下游不应执行（在下面的 break 处理）
-            ready = [
-                s for s in pending
-                if all(dep in completed_ids for dep in s.depends_on)
-            ]
+            ready = [s for s in pending if all(dep in completed_ids for dep in s.depends_on)]
             if not ready:
                 # 无法继续（循环依赖或所有步骤都在等待），退出
                 logger.warning(
@@ -500,9 +499,7 @@ class AgentOrchestrator:
                 break
 
             # 并行执行所有就绪步骤
-            batch_results = await asyncio.gather(
-                *[self._run_step(plan, step, session_id) for step in ready]
-            )
+            batch_results = await asyncio.gather(*[self._run_step(plan, step, session_id) for step in ready])
 
             for step_id, result in batch_results:
                 results[step_id] = result
@@ -670,9 +667,7 @@ class AgentOrchestrator:
                     detail={"retry_count": step.retry_count, "max_retries": step.max_retries},
                 )
 
-            return step.step_id, AgentResult(
-                success=False, action=step.action, error=last_error
-            )
+            return step.step_id, AgentResult(success=False, action=step.action, error=last_error)
 
     # ─────────────────────────────────────────────────────────────────────────
     # Phase 3: 综合
@@ -713,11 +708,7 @@ class AgentOrchestrator:
         confidence = len(completed) / total if total > 0 else 0.0
 
         # 综合摘要
-        constraint_note = (
-            "硬约束全部通过。"
-            if constraints_passed
-            else "警告：发现硬约束违反，已阻断相关动作。"
-        )
+        constraint_note = "硬约束全部通过。" if constraints_passed else "警告：发现硬约束违反，已阻断相关动作。"
         synthesis = (
             f"编排计划 {plan.plan_id[:8]} 完成。"
             f"触发：{plan.trigger_summary}。"

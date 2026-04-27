@@ -1,4 +1,5 @@
 """AnalyticsRepository 单元测试 — 使用 mock AsyncSession"""
+
 import uuid
 from unittest.mock import AsyncMock, MagicMock
 

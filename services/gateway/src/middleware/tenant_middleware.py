@@ -77,18 +77,14 @@ class TenantMiddleware(BaseHTTPMiddleware):
                 return await call_next(request)
 
             logger.warning("missing_tenant_id", path=path, method=request.method)
-            return _error_response(
-                403, "MISSING_TENANT", "X-Tenant-ID header is required"
-            )
+            return _error_response(403, "MISSING_TENANT", "X-Tenant-ID header is required")
 
         # 验证 UUID 格式
         try:
             uuid.UUID(str(tenant_id))
         except ValueError:
             logger.warning("invalid_tenant_id", path=path, tenant_id=tenant_id)
-            return _error_response(
-                400, "INVALID_TENANT", "tenant_id must be a valid UUID"
-            )
+            return _error_response(400, "INVALID_TENANT", "tenant_id must be a valid UUID")
 
         # 如果 header 和 JWT 中都有 tenant_id，优先 JWT（防止 header 篡改）
         if jwt_tenant_id and header_tenant_id and str(jwt_tenant_id) != str(header_tenant_id):

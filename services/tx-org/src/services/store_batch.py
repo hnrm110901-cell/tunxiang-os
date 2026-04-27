@@ -42,6 +42,7 @@ def _validate_batch_size(items: list, label: str = "操作") -> None:
 #  批量创建
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def batch_create_stores(
     stores: List[Dict[str, str]],
     tenant_id: str,
@@ -112,6 +113,7 @@ def batch_create_stores(
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 #  批量激活 / 停用
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 def batch_activate(
     store_ids: List[str],
@@ -305,9 +307,7 @@ def export_stores_to_excel(
     log = logger.bind(tenant_id=tenant_id)
     log.info("store_batch.export_started")
 
-    tenant_stores = [
-        s for s in _stores.values() if s["tenant_id"] == tenant_id
-    ]
+    tenant_stores = [s for s in _stores.values() if s["tenant_id"] == tenant_id]
 
     output = io.StringIO()
     writer = csv.DictWriter(output, fieldnames=EXPORT_COLUMNS, extrasaction="ignore")

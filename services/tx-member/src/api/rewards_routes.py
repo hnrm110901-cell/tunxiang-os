@@ -7,6 +7,7 @@
   GET  /         兑换商品列表（is_active=true，tenant_id 过滤）
   POST /redeem   执行兑换（原子事务：检查积分→减库存→扣积分→生成兑换记录）
 """
+
 from __future__ import annotations
 
 import uuid
@@ -28,6 +29,7 @@ router = APIRouter(prefix="/api/v1/member/rewards", tags=["member-rewards"])
 
 # ── 工具函数 ──────────────────────────────────────────────────
 
+
 def _require_tenant(x_tenant_id: str) -> str:
     if not x_tenant_id:
         raise HTTPException(status_code=400, detail="X-Tenant-ID header is required")
@@ -48,12 +50,14 @@ def _now_utc() -> datetime:
 
 # ── 请求模型 ──────────────────────────────────────────────────
 
+
 class RedeemRequest(BaseModel):
     reward_id: str = Field(..., description="兑换商品 UUID（points_mall_products.id）")
     customer_id: str = Field(..., description="顾客 UUID")
 
 
 # ── 1. 兑换商品列表 ──────────────────────────────────────────
+
 
 @router.get("/")
 async def list_rewards(
@@ -144,6 +148,7 @@ async def list_rewards(
 #   3. 减库存（stock-=1，若 stock=-1 跳过）
 #   4. 扣积分（UPDATE WHERE points >= pts）
 #   5. 生成兑换记录
+
 
 @router.post("/redeem")
 async def redeem_reward(
@@ -319,13 +324,15 @@ async def redeem_reward(
         order_id=order_id,
     )
 
-    return _ok({
-        "order_id": order_id,
-        "order_no": order_no,
-        "reward_id": body.reward_id,
-        "reward_name": p_name,
-        "points_spent": points_required,
-        "new_balance": new_balance,
-        "status": "pending",
-        "created_at": now.isoformat(),
-    })
+    return _ok(
+        {
+            "order_id": order_id,
+            "order_no": order_no,
+            "reward_id": body.reward_id,
+            "reward_name": p_name,
+            "points_spent": points_required,
+            "new_balance": new_balance,
+            "status": "pending",
+            "created_at": now.isoformat(),
+        }
+    )

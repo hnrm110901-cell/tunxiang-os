@@ -1,15 +1,14 @@
 from __future__ import annotations
 
-from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict
 from uuid import uuid4
 
 import structlog
-from fastapi import APIRouter, Depends, Header, HTTPException, Query
+from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel, Field
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
 
@@ -28,6 +27,7 @@ async def _set_tenant(db: AsyncSession, tenant_id: str) -> None:
 # Pydantic Models
 # ---------------------------------------------------------------------------
 
+
 class CityActivateRequest(BaseModel):
     store_id: str
     platform_credentials: Dict[str, Any] = Field(default_factory=dict)
@@ -36,6 +36,7 @@ class CityActivateRequest(BaseModel):
 # ---------------------------------------------------------------------------
 # Endpoints
 # ---------------------------------------------------------------------------
+
 
 @router.get("/cities")
 async def list_supported_cities(
@@ -73,10 +74,7 @@ async def activate_city(
     try:
         # Verify city adapter exists
         adapter = await db.execute(
-            text(
-                "SELECT id, city_name, adapter_name FROM civic_city_adapters "
-                "WHERE city_code = :code"
-            ),
+            text("SELECT id, city_name, adapter_name FROM civic_city_adapters WHERE city_code = :code"),
             {"code": city_code},
         )
         adapter_row = adapter.fetchone()

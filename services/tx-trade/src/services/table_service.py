@@ -7,12 +7,12 @@ Integrates context resolver and learning engine.
 """
 
 import logging
-from typing import Any, Dict, List, Optional
 from datetime import datetime
 from enum import Enum
+from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, Field, ConfigDict
-from sqlalchemy import select, and_, func, text, update
+from pydantic import BaseModel, ConfigDict, Field
+from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -21,6 +21,7 @@ logger = logging.getLogger(__name__)
 
 class ViewMode(str, Enum):
     """Table display view modes."""
+
     CARD = "card"
     LIST = "list"
     MAP = "map"
@@ -28,6 +29,7 @@ class ViewMode(str, Enum):
 
 class TableFilters(BaseModel):
     """Filters for table queries."""
+
     model_config = ConfigDict(from_attributes=True)
 
     store_id: str
@@ -43,6 +45,7 @@ class TableFilters(BaseModel):
 
 class TableStatistics(BaseModel):
     """Statistics about table statuses."""
+
     empty_count: int = 0
     dining_count: int = 0
     reserved_count: int = 0
@@ -55,6 +58,7 @@ class TableStatistics(BaseModel):
 
 class ResolvedTableCard(BaseModel):
     """Resolved table card with context-aware fields."""
+
     model_config = ConfigDict(from_attributes=True)
 
     table_id: str
@@ -71,6 +75,7 @@ class ResolvedTableCard(BaseModel):
 
 class TableDetailResponse(BaseModel):
     """Detailed response for single table."""
+
     table: ResolvedTableCard
     order_summary: Optional[Dict[str, Any]] = None
     customer_info: Optional[Dict[str, Any]] = None
@@ -79,6 +84,7 @@ class TableDetailResponse(BaseModel):
 
 class TableListResponse(BaseModel):
     """Response for table list queries."""
+
     summary: TableStatistics
     meal_period: str
     tables: List[ResolvedTableCard]
@@ -88,6 +94,7 @@ class TableListResponse(BaseModel):
 # ============================================================================
 # Table Service
 # ============================================================================
+
 
 class TableCardService:
     """
@@ -382,15 +389,11 @@ class TableCardService:
                     extra={"table_id": table_id, "new_status": new_status},
                 )
             else:
-                logger.warning(
-                    f"update_table_status: table {table_id} not found or not modified"
-                )
+                logger.warning(f"update_table_status: table {table_id} not found or not modified")
             return updated
 
         except SQLAlchemyError as e:
-            logger.error(
-                f"DB error updating table {table_id} status: {e}", exc_info=True
-            )
+            logger.error(f"DB error updating table {table_id} status: {e}", exc_info=True)
             await self.db.rollback()
             return False
         except Exception as e:
@@ -440,10 +443,7 @@ class TableCardService:
                 pending_cleanup_count=counts.get("cleaning", 0) + counts.get("pending_cleanup", 0),
             )
             stats.total_occupied = (
-                stats.dining_count
-                + stats.reserved_count
-                + stats.pending_checkout_count
-                + stats.pending_cleanup_count
+                stats.dining_count + stats.reserved_count + stats.pending_checkout_count + stats.pending_cleanup_count
             )
             stats.total_available = stats.empty_count
 
@@ -543,10 +543,7 @@ class TableCardService:
                     pending_cleanup_count=counts.get("cleaning", 0) + counts.get("pending_cleanup", 0),
                 )
                 s.total_occupied = (
-                    s.dining_count
-                    + s.reserved_count
-                    + s.pending_checkout_count
-                    + s.pending_cleanup_count
+                    s.dining_count + s.reserved_count + s.pending_checkout_count + s.pending_cleanup_count
                 )
                 s.total_available = s.empty_count
                 area_stats[area] = s
@@ -715,11 +712,7 @@ class TableCardService:
             response = await self.get_tables_with_context(filters)
 
             # Filter to tables with critical alerts
-            urgent = [
-                t
-                for t in response.tables
-                if any(f.get("alert") == "critical" for f in t.card_fields)
-            ]
+            urgent = [t for t in response.tables if any(f.get("alert") == "critical" for f in t.card_fields)]
 
             return urgent
 

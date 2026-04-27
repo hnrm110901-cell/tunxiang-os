@@ -1,4 +1,5 @@
 """角色级别体系测试"""
+
 import os
 import sys
 
@@ -60,16 +61,19 @@ class TestRoleAPI:
 
     def test_create_role(self):
         """创建角色"""
-        r = client.post("/api/v1/org/roles", json={
-            "role_name": "收银员",
-            "role_code": "cashier",
-            "role_level": 3,
-            "max_discount_pct": 95,
-            "max_tip_off_fen": 500,
-            "max_gift_fen": 0,
-            "max_order_gift_fen": 0,
-            "data_query_limit": "7d",
-        })
+        r = client.post(
+            "/api/v1/org/roles",
+            json={
+                "role_name": "收银员",
+                "role_code": "cashier",
+                "role_level": 3,
+                "max_discount_pct": 95,
+                "max_tip_off_fen": 500,
+                "max_gift_fen": 0,
+                "max_order_gift_fen": 0,
+                "data_query_limit": "7d",
+            },
+        )
         assert r.status_code == 200
         data = r.json()
         assert data["ok"] is True
@@ -78,20 +82,26 @@ class TestRoleAPI:
 
     def test_create_role_invalid_level(self):
         """创建角色时级别超范围应报错"""
-        r = client.post("/api/v1/org/roles", json={
-            "role_name": "测试",
-            "role_code": "test",
-            "role_level": 15,
-        })
+        r = client.post(
+            "/api/v1/org/roles",
+            json={
+                "role_name": "测试",
+                "role_code": "test",
+                "role_level": 15,
+            },
+        )
         assert r.status_code == 422
 
     def test_create_role_defaults(self):
         """创建角色时默认值正确"""
-        r = client.post("/api/v1/org/roles", json={
-            "role_name": "基础角色",
-            "role_code": "basic",
-            "role_level": 1,
-        })
+        r = client.post(
+            "/api/v1/org/roles",
+            json={
+                "role_name": "基础角色",
+                "role_code": "basic",
+                "role_level": 1,
+            },
+        )
         data = r.json()["data"]
         assert data["max_discount_pct"] == 100
         assert data["max_tip_off_fen"] == 0

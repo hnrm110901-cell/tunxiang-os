@@ -5,9 +5,9 @@
   2. test_anomaly_aggregation_structure          — 异常汇总返回分类+数量
   3. test_mobile_data_within_tenant              — tenant隔离验证
 """
+
 import os
 import sys
-from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -17,6 +17,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 # ════════════════════════════════════════
 # Test 1: 仪表盘 API 返回必需字段
 # ════════════════════════════════════════
+
 
 class TestDashboardApiReturnsRequiredFields:
     """仪表盘API必须返回 revenue_fen 和 customer_count 字段。"""
@@ -108,6 +109,7 @@ class TestDashboardApiReturnsRequiredFields:
 # Test 2: 异常汇总结构验证
 # ════════════════════════════════════════
 
+
 class TestAnomalyAggregationStructure:
     """异常汇总 API 返回的数据结构验证。"""
 
@@ -124,10 +126,10 @@ class TestAnomalyAggregationStructure:
         """异常汇总必须包含4个分类：折扣/退单/库存/Agent。"""
         required_categories = {"discount", "refund", "inventory", "agent"}
         groups = [
-            self._make_anomaly_group("discount",  "折扣异常", 2, []),
-            self._make_anomaly_group("refund",    "退单异常", 0, []),
+            self._make_anomaly_group("discount", "折扣异常", 2, []),
+            self._make_anomaly_group("refund", "退单异常", 0, []),
             self._make_anomaly_group("inventory", "库存预警", 1, []),
-            self._make_anomaly_group("agent",     "Agent预警", 0, []),
+            self._make_anomaly_group("agent", "Agent预警", 0, []),
         ]
         actual_categories = {g["category"] for g in groups}
         assert actual_categories == required_categories
@@ -172,10 +174,22 @@ class TestAnomalyAggregationStructure:
     def test_anomaly_count_matches_items_length(self):
         """count 字段必须与 items 数组长度一致。"""
         items = [
-            {"id": "a1", "store_name": "五一广场店", "time": "13:42",
-             "description": "折扣异常", "severity": "high", "handled": False},
-            {"id": "a2", "store_name": "解放西路店", "time": "11:15",
-             "description": "整单免单", "severity": "high", "handled": False},
+            {
+                "id": "a1",
+                "store_name": "五一广场店",
+                "time": "13:42",
+                "description": "折扣异常",
+                "severity": "high",
+                "handled": False,
+            },
+            {
+                "id": "a2",
+                "store_name": "解放西路店",
+                "time": "11:15",
+                "description": "整单免单",
+                "severity": "high",
+                "handled": False,
+            },
         ]
         group = self._make_anomaly_group("discount", "折扣异常", len(items), items)
         assert group["count"] == len(group["items"])
@@ -193,21 +207,19 @@ class TestAnomalyAggregationStructure:
     def test_total_unhandled_aggregation(self):
         """跨所有分类的未处理总数计算正确。"""
         groups = [
-            {"category": "discount",  "items": [{"handled": False}, {"handled": True}]},
+            {"category": "discount", "items": [{"handled": False}, {"handled": True}]},
             {"category": "inventory", "items": [{"handled": False}]},
-            {"category": "refund",    "items": []},
-            {"category": "agent",     "items": []},
+            {"category": "refund", "items": []},
+            {"category": "agent", "items": []},
         ]
-        total = sum(
-            sum(1 for i in g["items"] if not i["handled"])
-            for g in groups
-        )
+        total = sum(sum(1 for i in g["items"] if not i["handled"]) for g in groups)
         assert total == 2
 
 
 # ════════════════════════════════════════
 # Test 3: Tenant 隔离验证
 # ════════════════════════════════════════
+
 
 class TestMobileDataWithinTenant:
     """移动端 API 必须严格按 tenant_id 隔离数据。"""
@@ -268,6 +280,7 @@ class TestMobileDataWithinTenant:
 
     def test_tenant_id_required_in_api_header(self):
         """API 请求必须携带 X-Tenant-ID header，否则拒绝。"""
+
         def validate_request(headers: dict) -> bool:
             return bool(headers.get("X-Tenant-ID"))
 
@@ -293,6 +306,7 @@ class TestMobileDataWithinTenant:
 
     def test_store_belongs_to_tenant_before_data_access(self):
         """访问门店桌态前，必须先验证门店归属当前租户。"""
+
         def fetch_table_data(tenant_id: str, store_id: str) -> dict:
             # 模拟: 先校验归属，再返回数据
             store_tenant_map = {"s1": "tenant-a", "s2": "tenant-a", "s3": "tenant-b"}

@@ -10,6 +10,7 @@
   GET  /api/v1/wine-storage/report/expiring           — 7天内到期存酒报表
   GET  /api/v1/wine-storage/report/summary            — 存酒汇总报表
 """
+
 import asyncio
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -34,6 +35,7 @@ router = APIRouter(prefix="/api/v1/wine-storage", tags=["存酒管理"])
 
 # ─── 工具函数 ──────────────────────────────────────────────────────────────────
 
+
 def _parse_uuid(val: str, field_name: str) -> uuid.UUID:
     try:
         return uuid.UUID(val)
@@ -57,6 +59,7 @@ def _serialize_row(row: dict) -> dict:
 
 # ─── 依赖注入 ──────────────────────────────────────────────────────────────────
 
+
 async def _get_tenant_db(x_tenant_id: str = Header(..., alias="X-Tenant-ID")):
     async for session in get_db_with_tenant(x_tenant_id):
         yield session
@@ -64,33 +67,35 @@ async def _get_tenant_db(x_tenant_id: str = Header(..., alias="X-Tenant-ID")):
 
 # ─── 请求模型 ──────────────────────────────────────────────────────────────────
 
+
 class WineStoreRequest(BaseModel):
     store_id: uuid.UUID
-    customer_id: uuid.UUID                    # 存酒必须绑定会员
-    source_order_id: uuid.UUID                # 来源订单
+    customer_id: uuid.UUID  # 存酒必须绑定会员
+    source_order_id: uuid.UUID  # 来源订单
     wine_name: str
-    wine_category: str                        # 白酒/红酒/啤酒/洋酒/其他
-    quantity: float                           # 存入数量（支持小数瓶）
+    wine_category: str  # 白酒/红酒/啤酒/洋酒/其他
+    quantity: float  # 存入数量（支持小数瓶）
     unit: str = "瓶"
     estimated_value_fen: Optional[int] = None  # 酒水估值（分），可空
     cabinet_position: Optional[str] = None
-    expires_days: int = 180                   # 有效期天数，默认 180 天
+    expires_days: int = 180  # 有效期天数，默认 180 天
     photo_url: Optional[str] = None
     notes: Optional[str] = None
 
 
 class WineRetrieveRequest(BaseModel):
-    quantity: float                           # 取出数量（可部分取出）
+    quantity: float  # 取出数量（可部分取出）
     related_order_id: Optional[uuid.UUID] = None  # 关联订单（可空）
     remark: Optional[str] = None
 
 
 class WineExtendRequest(BaseModel):
-    extend_days: int                          # 延长天数
+    extend_days: int  # 延长天数
     remark: Optional[str] = None
 
 
 # ─── POST / — 存酒 ────────────────────────────────────────────────────────────
+
 
 @router.post("/", summary="存酒")
 async def store_wine(
@@ -173,29 +178,35 @@ async def store_wine(
         )
         await db.commit()
     except (OperationalError, SQLAlchemyError) as exc:
-        logger.error("store_wine.failed", customer_id=str(body.customer_id),
-                     error=str(exc), exc_info=True)
+        logger.error("store_wine.failed", customer_id=str(body.customer_id), error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="存酒失败") from exc
 
-    logger.info("wine_stored", storage_id=storage_id, wine_name=body.wine_name,
-                quantity=body.quantity, customer_id=str(body.customer_id))
+    logger.info(
+        "wine_stored",
+        storage_id=storage_id,
+        wine_name=body.wine_name,
+        quantity=body.quantity,
+        customer_id=str(body.customer_id),
+    )
 
-    asyncio.create_task(emit_event(
-        event_type=WineStorageEventType.STORED,
-        tenant_id=tid,
-        stream_id=storage_id,
-        payload={
-            "storage_id": storage_id,
-            "customer_id": str(body.customer_id),
-            "wine_name": body.wine_name,
-            "wine_category": body.wine_category,
-            "quantity": body.quantity,
-            "store_id": str(body.store_id),
-        },
-        store_id=body.store_id,
-        source_service="tx-finance",
-        metadata={"operator_id": str(op_id)},
-    ))
+    asyncio.create_task(
+        emit_event(
+            event_type=WineStorageEventType.STORED,
+            tenant_id=tid,
+            stream_id=storage_id,
+            payload={
+                "storage_id": storage_id,
+                "customer_id": str(body.customer_id),
+                "wine_name": body.wine_name,
+                "wine_category": body.wine_category,
+                "quantity": body.quantity,
+                "store_id": str(body.store_id),
+            },
+            store_id=body.store_id,
+            source_service="tx-finance",
+            metadata={"operator_id": str(op_id)},
+        )
+    )
 
     return {
         "ok": True,
@@ -211,6 +222,7 @@ async def store_wine(
 
 
 # ─── POST /{id}/retrieve — 取酒 ───────────────────────────────────────────────
+
 
 @router.post("/{storage_id}/retrieve", summary="取酒")
 async def retrieve_wine(
@@ -239,8 +251,7 @@ async def retrieve_wine(
         )
         storage = fetch.mappings().first()
     except (OperationalError, SQLAlchemyError) as exc:
-        logger.error("retrieve_wine.fetch_failed", storage_id=storage_id,
-                     error=str(exc), exc_info=True)
+        logger.error("retrieve_wine.fetch_failed", storage_id=storage_id, error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="查询存酒记录失败") from exc
 
     if storage is None:
@@ -296,37 +307,35 @@ async def retrieve_wine(
                 "tenant_id": str(tid),
                 "storage_id": storage_id,
                 "quantity_change": -body.quantity,
-                "related_order_id": (
-                    str(body.related_order_id) if body.related_order_id else None
-                ),
+                "related_order_id": (str(body.related_order_id) if body.related_order_id else None),
                 "operator_id": str(op_id),
                 "remark": body.remark,
             },
         )
         await db.commit()
     except (OperationalError, SQLAlchemyError) as exc:
-        logger.error("retrieve_wine.update_failed", storage_id=storage_id,
-                     error=str(exc), exc_info=True)
+        logger.error("retrieve_wine.update_failed", storage_id=storage_id, error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="取酒失败") from exc
 
-    logger.info("wine_retrieved", storage_id=storage_id, quantity_retrieved=body.quantity,
-                quantity_remaining=new_qty)
+    logger.info("wine_retrieved", storage_id=storage_id, quantity_retrieved=body.quantity, quantity_remaining=new_qty)
 
-    asyncio.create_task(emit_event(
-        event_type=WineStorageEventType.RETRIEVED,
-        tenant_id=tid,
-        stream_id=storage_id,
-        payload={
-            "storage_id": storage_id,
-            "customer_id": str(storage["customer_id"]),
-            "quantity_retrieved": body.quantity,
-            "quantity_remaining": new_qty,
-            "new_status": new_status,
-        },
-        store_id=storage["store_id"],
-        source_service="tx-finance",
-        metadata={"operator_id": str(op_id)},
-    ))
+    asyncio.create_task(
+        emit_event(
+            event_type=WineStorageEventType.RETRIEVED,
+            tenant_id=tid,
+            stream_id=storage_id,
+            payload={
+                "storage_id": storage_id,
+                "customer_id": str(storage["customer_id"]),
+                "quantity_retrieved": body.quantity,
+                "quantity_remaining": new_qty,
+                "new_status": new_status,
+            },
+            store_id=storage["store_id"],
+            source_service="tx-finance",
+            metadata={"operator_id": str(op_id)},
+        )
+    )
 
     return {
         "ok": True,
@@ -341,6 +350,7 @@ async def retrieve_wine(
 
 
 # ─── POST /{id}/extend — 续存 ─────────────────────────────────────────────────
+
 
 @router.post("/{storage_id}/extend", summary="续存（延长有效期）")
 async def extend_storage(
@@ -369,8 +379,7 @@ async def extend_storage(
         )
         storage = fetch.mappings().first()
     except (OperationalError, SQLAlchemyError) as exc:
-        logger.error("extend_storage.fetch_failed", storage_id=storage_id,
-                     error=str(exc), exc_info=True)
+        logger.error("extend_storage.fetch_failed", storage_id=storage_id, error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="查询存酒记录失败") from exc
 
     if storage is None:
@@ -419,13 +428,15 @@ async def extend_storage(
         )
         await db.commit()
     except (OperationalError, SQLAlchemyError) as exc:
-        logger.error("extend_storage.update_failed", storage_id=storage_id,
-                     error=str(exc), exc_info=True)
+        logger.error("extend_storage.update_failed", storage_id=storage_id, error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="续存失败") from exc
 
-    logger.info("wine_storage_extended", storage_id=storage_id,
-                extend_days=body.extend_days,
-                new_expires=new_expires.isoformat())
+    logger.info(
+        "wine_storage_extended",
+        storage_id=storage_id,
+        extend_days=body.extend_days,
+        new_expires=new_expires.isoformat(),
+    )
 
     return {
         "ok": True,
@@ -441,6 +452,7 @@ async def extend_storage(
 
 
 # ─── GET /{id} — 存酒详情 ─────────────────────────────────────────────────────
+
 
 @router.get("/{storage_id}", summary="存酒详情")
 async def get_storage(
@@ -467,8 +479,7 @@ async def get_storage(
         )
         row = result.mappings().first()
     except (OperationalError, SQLAlchemyError) as exc:
-        logger.error("get_storage.failed", storage_id=storage_id,
-                     error=str(exc), exc_info=True)
+        logger.error("get_storage.failed", storage_id=storage_id, error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="查询存酒记录失败") from exc
 
     if row is None:
@@ -497,6 +508,7 @@ async def get_storage(
 
 
 # ─── GET /customer/{customer_id} — 客户存酒列表 ──────────────────────────────
+
 
 @router.get("/customer/{customer_id}", summary="客户存酒列表")
 async def list_by_customer(
@@ -543,8 +555,7 @@ async def list_by_customer(
         )
         items = [_serialize_row(dict(row)) for row in items_result.mappings().all()]
     except (OperationalError, SQLAlchemyError) as exc:
-        logger.error("list_wine_by_customer.failed", customer_id=customer_id,
-                     error=str(exc), exc_info=True)
+        logger.error("list_wine_by_customer.failed", customer_id=customer_id, error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="查询客户存酒列表失败") from exc
 
     return {
@@ -555,6 +566,7 @@ async def list_by_customer(
 
 
 # ─── GET /store/{store_id} — 门店存酒列表 ────────────────────────────────────
+
 
 @router.get("/store/{store_id}", summary="门店存酒列表")
 async def list_by_store(
@@ -606,8 +618,7 @@ async def list_by_store(
         )
         items = [_serialize_row(dict(row)) for row in items_result.mappings().all()]
     except (OperationalError, SQLAlchemyError) as exc:
-        logger.error("list_wine_by_store.failed", store_id=store_id,
-                     error=str(exc), exc_info=True)
+        logger.error("list_wine_by_store.failed", store_id=store_id, error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="查询门店存酒列表失败") from exc
 
     return {
@@ -618,6 +629,7 @@ async def list_by_store(
 
 
 # ─── GET /report/expiring — 7天内到期报表 ────────────────────────────────────
+
 
 @router.get("/report/expiring", summary="即将到期存酒报表")
 async def expiring_report(
@@ -673,6 +685,7 @@ async def expiring_report(
 
 # ─── GET /report/summary — 存酒汇总报表 ──────────────────────────────────────
 
+
 @router.get("/report/summary", summary="存酒汇总报表")
 async def summary_report(
     store_id: str = Query(..., description="门店ID"),
@@ -717,8 +730,7 @@ async def summary_report(
         )
         totals = _serialize_row(dict(total_result.mappings().first()))
     except (OperationalError, SQLAlchemyError) as exc:
-        logger.error("wine_summary_report.failed", store_id=store_id,
-                     error=str(exc), exc_info=True)
+        logger.error("wine_summary_report.failed", store_id=store_id, error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="存酒汇总报表生成失败") from exc
 
     return {

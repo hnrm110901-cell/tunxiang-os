@@ -3,6 +3,7 @@
 提供套餐模板的增删改查，以及从模板生成报价单的能力。
 所有方法 async，纯 ORM，金额单位：分（整数）。
 """
+
 import uuid
 from decimal import Decimal
 from typing import Any
@@ -17,6 +18,7 @@ logger = structlog.get_logger(__name__)
 
 
 # ─── 内部序列化辅助 ──────────────────────────────────────────────────────────
+
 
 def _item_to_dict(item: BanquetTemplateItem) -> dict:
     return {
@@ -57,6 +59,7 @@ def _template_to_dict(tpl: BanquetMenuTemplate, include_items: bool = True) -> d
 
 
 # ─── 公开 API ────────────────────────────────────────────────────────────────
+
 
 async def create_template(
     name: str,
@@ -129,7 +132,7 @@ async def list_templates(
         select(BanquetMenuTemplate)
         .where(
             BanquetMenuTemplate.is_deleted == False,  # noqa: E712
-            BanquetMenuTemplate.is_active == True,    # noqa: E712
+            BanquetMenuTemplate.is_active == True,  # noqa: E712
         )
         .order_by(BanquetMenuTemplate.sort_order, BanquetMenuTemplate.created_at)
     )
@@ -140,8 +143,7 @@ async def list_templates(
     if store_id:
         # 门店专属 + 集团通用
         stmt = stmt.where(
-            (BanquetMenuTemplate.store_id == uuid.UUID(store_id))
-            | (BanquetMenuTemplate.store_id.is_(None))
+            (BanquetMenuTemplate.store_id == uuid.UUID(store_id)) | (BanquetMenuTemplate.store_id.is_(None))
         )
     else:
         # 不限门店时，只返回集团通用
@@ -199,10 +201,16 @@ async def update_template(
 
     # 标量字段更新
     scalar_fields = {
-        "name", "category", "description",
-        "guest_count_min", "guest_count_max",
-        "price_per_table_fen", "price_per_person_fen",
-        "min_table_count", "is_active", "sort_order",
+        "name",
+        "category",
+        "description",
+        "guest_count_min",
+        "guest_count_max",
+        "price_per_table_fen",
+        "price_per_person_fen",
+        "min_table_count",
+        "is_active",
+        "sort_order",
     }
     for field in scalar_fields:
         if field in updates:
@@ -295,7 +303,7 @@ async def build_quotation_from_template(
         select(BanquetMenuTemplate).where(
             BanquetMenuTemplate.id == uuid.UUID(template_id),
             BanquetMenuTemplate.is_deleted == False,  # noqa: E712
-            BanquetMenuTemplate.is_active == True,    # noqa: E712
+            BanquetMenuTemplate.is_active == True,  # noqa: E712
         )
     )
     tpl = result.scalar_one_or_none()
@@ -303,9 +311,7 @@ async def build_quotation_from_template(
         raise ValueError(f"套餐模板不存在或已停用：{template_id}")
 
     if table_count < tpl.min_table_count:
-        raise ValueError(
-            f"桌数不足：最低 {tpl.min_table_count} 桌，当前 {table_count} 桌"
-        )
+        raise ValueError(f"桌数不足：最低 {tpl.min_table_count} 桌，当前 {table_count} 桌")
 
     subtotal_fen = tpl.price_per_table_fen * table_count
     deposit_fen = int(subtotal_fen * float(tpl.deposit_rate))

@@ -16,16 +16,16 @@ A4 预算预警 Agent
 未配置预算时降级返回 is_placeholder: True，不触发预警。
 预警通知通过 notification_service 推送。
 """
+
 from __future__ import annotations
 
-import asyncio
 import os
 import uuid
 from datetime import date, datetime, timezone
-from typing import Any, Optional
+from typing import Any
 
-import structlog
 import httpx
+import structlog
 from sqlalchemy import func, select
 from sqlalchemy.exc import OperationalError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -36,7 +36,7 @@ from ..models.expense_enums import ExpenseStatus
 logger = structlog.get_logger(__name__)
 
 # 预警阈值
-_ALERT_WARN_RATE = 0.80      # 80%：预算预警
+_ALERT_WARN_RATE = 0.80  # 80%：预算预警
 _ALERT_OVERSPEND_RATE = 1.00  # 100%：预算超支（紧急）
 
 # 通知 webhook（从环境变量读取，不硬编码）
@@ -47,6 +47,7 @@ _HTTP_TIMEOUT = 5.0
 # ─────────────────────────────────────────────────────────────────────────────
 # 内部工具
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 def _now_utc() -> datetime:
     return datetime.now(tz=timezone.utc)
@@ -98,6 +99,7 @@ async def _push_webhook(message: str, urgent: bool = False) -> bool:
 # ─────────────────────────────────────────────────────────────────────────────
 # A4BudgetAlertAgent
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class A4BudgetAlertAgent:
     """
@@ -164,6 +166,7 @@ class A4BudgetAlertAgent:
 
         # ── P2：从预算管理系统查询真实月度/年度预算 ───────────────────────────
         from ..services.budget_service import BudgetService
+
         _budget_svc = BudgetService()
 
         # 查找当前周期的 active 预算（优先月度，无月度则取年度）
@@ -191,14 +194,16 @@ class A4BudgetAlertAgent:
 
             if current_budget is None:
                 # 降级：未找到预算配置，返回 placeholder 标志
-                output.append({
-                    "category_code": row["category_code"],
-                    "category_name": row["category_name"],
-                    "budget_fen": 0,
-                    "actual_fen": actual,
-                    "rate": -1.0,
-                    "is_placeholder": True,
-                })
+                output.append(
+                    {
+                        "category_code": row["category_code"],
+                        "category_name": row["category_name"],
+                        "budget_fen": 0,
+                        "actual_fen": actual,
+                        "rate": -1.0,
+                        "is_placeholder": True,
+                    }
+                )
                 continue
 
             # 优先使用科目分配额度，无分配则使用预算总额
@@ -212,15 +217,17 @@ class A4BudgetAlertAgent:
             budget_fen = alloc_fen if alloc_fen > 0 else current_budget.total_amount
             rate = actual / budget_fen if budget_fen > 0 else -1.0
 
-            output.append({
-                "category_code": row["category_code"],
-                "category_name": row["category_name"],
-                "budget_fen": budget_fen,
-                "actual_fen": actual,
-                "rate": round(rate, 4),
-                "is_placeholder": False,
-                "budget_id": str(current_budget.id),
-            })
+            output.append(
+                {
+                    "category_code": row["category_code"],
+                    "category_name": row["category_name"],
+                    "budget_fen": budget_fen,
+                    "actual_fen": actual,
+                    "rate": round(rate, 4),
+                    "is_placeholder": False,
+                    "budget_id": str(current_budget.id),
+                }
+            )
 
         logger.info(
             "a4_expense_rate_calculated",
@@ -256,9 +263,7 @@ class A4BudgetAlertAgent:
 
         # ── 1. 费用执行率检查 ───────────────────────────────────────────────
         try:
-            rates = await self.calculate_expense_rate(
-                db=db, tenant_id=tenant_id, year=today.year, month=today.month
-            )
+            rates = await self.calculate_expense_rate(db=db, tenant_id=tenant_id, year=today.year, month=today.month)
             for item in rates:
                 rate = item["rate"]
                 if rate < 0:
@@ -343,9 +348,7 @@ class A4BudgetAlertAgent:
 
         today = _today()
         try:
-            rates = await self.calculate_expense_rate(
-                db=db, tenant_id=tenant_id, year=today.year, month=today.month
-            )
+            rates = await self.calculate_expense_rate(db=db, tenant_id=tenant_id, year=today.year, month=today.month)
             for item in rates:
                 rate = item["rate"]
                 if rate < 0:
@@ -365,10 +368,7 @@ class A4BudgetAlertAgent:
                     )
 
                 elif rate > _ALERT_WARN_RATE:
-                    msg = (
-                        f"**实时预算预警** 审批通过后，科目【{item['category_name']}】"
-                        f"执行率已达 {rate * 100:.1f}%。"
-                    )
+                    msg = f"**实时预算预警** 审批通过后，科目【{item['category_name']}】执行率已达 {rate * 100:.1f}%。"
                     await _push_webhook(msg, urgent=False)
                     log.info(
                         "a4_realtime_warn",
@@ -447,9 +447,7 @@ class A4BudgetAlertAgent:
             return await self.run_daily_check(db=db, tenant_id=tenant_id)
 
         elif event_type == "expense_approved":
-            await self.handle_expense_approved(
-                event_data=event_data, db=db, tenant_id=tenant_id
-            )
+            await self.handle_expense_approved(event_data=event_data, db=db, tenant_id=tenant_id)
             return {"event_type": event_type, "status": "handled"}
 
         else:

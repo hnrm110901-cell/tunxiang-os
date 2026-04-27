@@ -8,6 +8,7 @@
   - C扫B（precreate 生成二维码）
   - 退款 / 查询 / 撤单
 """
+
 from __future__ import annotations
 
 import uuid

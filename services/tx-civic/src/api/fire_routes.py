@@ -1,15 +1,15 @@
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import date
 from typing import Any, Dict, List, Optional
 from uuid import uuid4
 
 import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel, Field
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
 
@@ -27,6 +27,7 @@ async def _set_tenant(db: AsyncSession, tenant_id: str) -> None:
 # ---------------------------------------------------------------------------
 # Pydantic Models
 # ---------------------------------------------------------------------------
+
 
 class FireEquipmentCreate(BaseModel):
     store_id: str
@@ -52,6 +53,7 @@ class InspectionCreate(BaseModel):
 # ---------------------------------------------------------------------------
 # Endpoints
 # ---------------------------------------------------------------------------
+
 
 @router.post("/equipment")
 async def create_equipment(
@@ -160,10 +162,7 @@ async def list_inspections(
         offset = (page - 1) * size
 
         count_result = await db.execute(
-            text(
-                "SELECT COUNT(*) FROM civic_fire_inspections "
-                "WHERE tenant_id = :tid AND store_id = :sid"
-            ),
+            text("SELECT COUNT(*) FROM civic_fire_inspections WHERE tenant_id = :tid AND store_id = :sid"),
             {"tid": x_tenant_id, "sid": store_id},
         )
         total = count_result.scalar() or 0

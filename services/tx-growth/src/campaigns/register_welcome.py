@@ -3,6 +3,7 @@
 典型场景: 新会员注册送10元无门槛券 + 100积分
 支持多种奖励组合: 券/积分/储值
 """
+
 from typing import Any
 
 import structlog

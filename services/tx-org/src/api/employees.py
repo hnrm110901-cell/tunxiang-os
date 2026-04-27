@@ -30,7 +30,7 @@ from __future__ import annotations
 
 from datetime import date, datetime, timezone
 from typing import Any, List, Optional
-from uuid import UUID, uuid4
+from uuid import uuid4
 
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
@@ -50,9 +50,7 @@ router = APIRouter(tags=["employees"])
 
 
 def _get_tenant_id(request: Request) -> str:
-    tid = getattr(request.state, "tenant_id", None) or request.headers.get(
-        "X-Tenant-ID", ""
-    )
+    tid = getattr(request.state, "tenant_id", None) or request.headers.get("X-Tenant-ID", "")
     if not tid:
         raise HTTPException(status_code=400, detail="X-Tenant-ID header required")
     return tid
@@ -246,33 +244,36 @@ async def create_employee(
         RETURNING id::text AS employee_id
     """)
 
-    result = await db.execute(sql, {
-        "id": employee_id,
-        "tenant_id": tenant_id,
-        "emp_name": req.emp_name,
-        "phone": req.phone,
-        "id_card_number": req.id_card_number,
-        "gender": req.gender,
-        "birth_date": req.birth_date,
-        "store_id": req.store_id,
-        "department_id": req.department_id,
-        "job_grade_id": req.job_grade_id,
-        "position": req.position,
-        "employment_type": req.employment_type,
-        "hire_date": req.hire_date or now.date(),
-        "base_salary": req.base_salary,
-        "health_cert_number": req.health_cert_number,
-        "health_cert_expiry": req.health_cert_expiry,
-        "food_safety_cert": req.food_safety_cert,
-        "food_safety_cert_expiry": req.food_safety_cert_expiry,
-        "contract_start_date": req.contract_start_date,
-        "contract_end_date": req.contract_end_date,
-        "emergency_contact": req.emergency_contact,
-        "emergency_phone": req.emergency_phone,
-        "avatar_url": req.avatar_url,
-        "status": req.status,
-        "now": now,
-    })
+    result = await db.execute(
+        sql,
+        {
+            "id": employee_id,
+            "tenant_id": tenant_id,
+            "emp_name": req.emp_name,
+            "phone": req.phone,
+            "id_card_number": req.id_card_number,
+            "gender": req.gender,
+            "birth_date": req.birth_date,
+            "store_id": req.store_id,
+            "department_id": req.department_id,
+            "job_grade_id": req.job_grade_id,
+            "position": req.position,
+            "employment_type": req.employment_type,
+            "hire_date": req.hire_date or now.date(),
+            "base_salary": req.base_salary,
+            "health_cert_number": req.health_cert_number,
+            "health_cert_expiry": req.health_cert_expiry,
+            "food_safety_cert": req.food_safety_cert,
+            "food_safety_cert_expiry": req.food_safety_cert_expiry,
+            "contract_start_date": req.contract_start_date,
+            "contract_end_date": req.contract_end_date,
+            "emergency_contact": req.emergency_contact,
+            "emergency_phone": req.emergency_phone,
+            "avatar_url": req.avatar_url,
+            "status": req.status,
+            "now": now,
+        },
+    )
     await db.commit()
     row = result.fetchone()
 
@@ -327,19 +328,21 @@ async def get_employee_statistics(
     dept_items = [dict(r._mapping) for r in dept_result.fetchall()]
 
     log.info("employee_statistics", tenant_id=tenant_id, total=status_row.get("total", 0))
-    return _ok({
-        "status_summary": {
-            "total": int(status_row.get("total") or 0),
-            "active": int(status_row.get("active_count") or 0),
-            "inactive": int(status_row.get("inactive_count") or 0),
-            "probation": int(status_row.get("probation_count") or 0),
-        },
-        "employment_type_summary": {
-            "full_time": int(status_row.get("full_time_count") or 0),
-            "part_time": int(status_row.get("part_time_count") or 0),
-        },
-        "department_distribution": dept_items,
-    })
+    return _ok(
+        {
+            "status_summary": {
+                "total": int(status_row.get("total") or 0),
+                "active": int(status_row.get("active_count") or 0),
+                "inactive": int(status_row.get("inactive_count") or 0),
+                "probation": int(status_row.get("probation_count") or 0),
+            },
+            "employment_type_summary": {
+                "full_time": int(status_row.get("full_time_count") or 0),
+                "part_time": int(status_row.get("part_time_count") or 0),
+            },
+            "department_distribution": dept_items,
+        }
+    )
 
 
 @router.post("/api/v1/employees/batch-import")
@@ -378,33 +381,36 @@ async def batch_import_employees(
                     :now, :now, FALSE
                 )
             """)
-            await db.execute(sql, {
-                "id": employee_id,
-                "tenant_id": tenant_id,
-                "emp_name": emp.emp_name,
-                "phone": emp.phone,
-                "id_card_number": emp.id_card_number,
-                "gender": emp.gender,
-                "birth_date": emp.birth_date,
-                "store_id": emp.store_id,
-                "department_id": emp.department_id,
-                "job_grade_id": emp.job_grade_id,
-                "position": emp.position,
-                "employment_type": emp.employment_type,
-                "hire_date": emp.hire_date or now.date(),
-                "base_salary": emp.base_salary,
-                "health_cert_number": emp.health_cert_number,
-                "health_cert_expiry": emp.health_cert_expiry,
-                "food_safety_cert": emp.food_safety_cert,
-                "food_safety_cert_expiry": emp.food_safety_cert_expiry,
-                "contract_start_date": emp.contract_start_date,
-                "contract_end_date": emp.contract_end_date,
-                "emergency_contact": emp.emergency_contact,
-                "emergency_phone": emp.emergency_phone,
-                "avatar_url": emp.avatar_url,
-                "status": emp.status,
-                "now": now,
-            })
+            await db.execute(
+                sql,
+                {
+                    "id": employee_id,
+                    "tenant_id": tenant_id,
+                    "emp_name": emp.emp_name,
+                    "phone": emp.phone,
+                    "id_card_number": emp.id_card_number,
+                    "gender": emp.gender,
+                    "birth_date": emp.birth_date,
+                    "store_id": emp.store_id,
+                    "department_id": emp.department_id,
+                    "job_grade_id": emp.job_grade_id,
+                    "position": emp.position,
+                    "employment_type": emp.employment_type,
+                    "hire_date": emp.hire_date or now.date(),
+                    "base_salary": emp.base_salary,
+                    "health_cert_number": emp.health_cert_number,
+                    "health_cert_expiry": emp.health_cert_expiry,
+                    "food_safety_cert": emp.food_safety_cert,
+                    "food_safety_cert_expiry": emp.food_safety_cert_expiry,
+                    "contract_start_date": emp.contract_start_date,
+                    "contract_end_date": emp.contract_end_date,
+                    "emergency_contact": emp.emergency_contact,
+                    "emergency_phone": emp.emergency_phone,
+                    "avatar_url": emp.avatar_url,
+                    "status": emp.status,
+                    "now": now,
+                },
+            )
             created_ids.append(employee_id)
         except (SQLAlchemyError, ValueError, TypeError) as exc:
             log.warning("batch_import_row_error", index=idx, name=emp.emp_name, error=str(exc))
@@ -412,12 +418,14 @@ async def batch_import_employees(
 
     await db.commit()
     log.info("batch_import_employees", tenant_id=tenant_id, success=len(created_ids), errors=len(errors))
-    return _ok({
-        "imported_count": len(created_ids),
-        "imported_ids": created_ids,
-        "error_count": len(errors),
-        "errors": errors,
-    })
+    return _ok(
+        {
+            "imported_count": len(created_ids),
+            "imported_ids": created_ids,
+            "error_count": len(errors),
+            "errors": errors,
+        }
+    )
 
 
 @router.get("/api/v1/employees/{employee_id}")
@@ -475,8 +483,16 @@ async def get_employee_detail(
 
     data = dict(row._mapping)
     # 序列化日期字段
-    for key in ("birth_date", "hire_date", "health_cert_expiry", "food_safety_cert_expiry",
-                "contract_start_date", "contract_end_date", "created_at", "updated_at"):
+    for key in (
+        "birth_date",
+        "hire_date",
+        "health_cert_expiry",
+        "food_safety_cert_expiry",
+        "contract_start_date",
+        "contract_end_date",
+        "created_at",
+        "updated_at",
+    ):
         if data.get(key):
             data[key] = str(data[key])
 
@@ -709,15 +725,17 @@ async def get_employee_profile_tabs(
         perf_items.append(d)
 
     log.info("get_employee_profile_tabs", tenant_id=tenant_id, employee_id=employee_id)
-    return _ok({
-        "basic_info": basic_info,
-        "department": dept_info,
-        "job_grade": grade_info,
-        "attendance": {"items": attendance_items, "period": "近30天"},
-        "leave": {"items": leave_items, "period": "近6个月"},
-        "payroll": {"items": payroll_items, "period": "近6个月"},
-        "performance": {"items": perf_items, "period": "近12个月"},
-    })
+    return _ok(
+        {
+            "basic_info": basic_info,
+            "department": dept_info,
+            "job_grade": grade_info,
+            "attendance": {"items": attendance_items, "period": "近30天"},
+            "leave": {"items": leave_items, "period": "近6个月"},
+            "payroll": {"items": payroll_items, "period": "近6个月"},
+            "performance": {"items": perf_items, "period": "近12个月"},
+        }
+    )
 
 
 # ── 保留原有端点（/api/v1/org 前缀） ────────────────────────────────────────────

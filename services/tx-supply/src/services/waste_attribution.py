@@ -7,6 +7,7 @@
 
 金额单位：分(fen)
 """
+
 from __future__ import annotations
 
 import uuid
@@ -106,16 +107,18 @@ async def analyze_waste(
         total_waste_cost_fen += cost_fen
         total_waste_qty += total_qty
 
-        by_ingredient.append({
-            "ingredient_id": str(row.ing_id),
-            "name": ing_name,
-            "category": row.category,
-            "unit": row.unit,
-            "total_qty": round(total_qty, 4),
-            "total_cost_fen": cost_fen,
-            "total_cost_yuan": round(cost_fen / 100, 2),
-            "count": row.event_count,
-        })
+        by_ingredient.append(
+            {
+                "ingredient_id": str(row.ing_id),
+                "name": ing_name,
+                "category": row.category,
+                "unit": row.unit,
+                "total_qty": round(total_qty, 4),
+                "total_cost_fen": cost_fen,
+                "total_cost_yuan": round(cost_fen / 100, 2),
+                "count": row.event_count,
+            }
+        )
 
     # ─── 按时段汇总（小时段） ───
     hour_query = (
@@ -141,12 +144,14 @@ async def analyze_waste(
     for row in hour_rows:
         hour = int(row.hour) if row.hour is not None else 0
         qty = float(row.total_qty) if row.total_qty else 0.0
-        by_time_slot.append({
-            "hour": hour,
-            "time_range": f"{hour:02d}:00-{hour:02d}:59",
-            "event_count": row.event_count,
-            "total_qty": round(qty, 4),
-        })
+        by_time_slot.append(
+            {
+                "hour": hour,
+                "time_range": f"{hour:02d}:00-{hour:02d}:59",
+                "event_count": row.event_count,
+                "total_qty": round(qty, 4),
+            }
+        )
 
     # ─── 按损耗类型汇总 ───
     # 从 notes 字段解析或使用 waste_events 表
@@ -167,12 +172,15 @@ async def analyze_waste(
             GROUP BY event_type
             ORDER BY total_qty DESC
         """)
-        type_result = await db.execute(type_query, {
-            "tenant_id": tenant_id,
-            "store_id": store_id,
-            "date_from": date_from,
-            "date_to": date_to,
-        })
+        type_result = await db.execute(
+            type_query,
+            {
+                "tenant_id": tenant_id,
+                "store_id": store_id,
+                "date_from": date_from,
+                "date_to": date_to,
+            },
+        )
         type_rows = type_result.all()
         for row in type_rows:
             event_type = row[0]
@@ -239,9 +247,13 @@ async def get_top_waste_items(
     await _set_tenant(db, tenant_id)
 
     since = datetime.now(timezone.utc).replace(
-        hour=0, minute=0, second=0, microsecond=0,
+        hour=0,
+        minute=0,
+        second=0,
+        microsecond=0,
     )
     from datetime import timedelta
+
     since = since - timedelta(days=days)
 
     query = (
@@ -276,15 +288,17 @@ async def get_top_waste_items(
         unit_price = row.unit_price_fen or 0
         total_qty = float(row.total_qty) if row.total_qty else 0.0
         cost_fen = int(total_qty * unit_price)
-        items_with_cost.append({
-            "name": row.ingredient_name,
-            "category": row.category,
-            "unit": row.unit,
-            "total_qty": round(total_qty, 4),
-            "total_cost_fen": cost_fen,
-            "total_cost_yuan": round(cost_fen / 100, 2),
-            "count": row.event_count,
-        })
+        items_with_cost.append(
+            {
+                "name": row.ingredient_name,
+                "category": row.category,
+                "unit": row.unit,
+                "total_qty": round(total_qty, 4),
+                "total_cost_fen": cost_fen,
+                "total_cost_yuan": round(cost_fen / 100, 2),
+                "count": row.event_count,
+            }
+        )
 
     items_with_cost.sort(key=lambda x: x["total_cost_fen"], reverse=True)
     top_items = items_with_cost[:limit]

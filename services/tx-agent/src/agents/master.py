@@ -7,6 +7,7 @@
 4. 双层推理路由：边缘(Core ML) vs 云端(Claude API)
 5. 支持从 DB 动态加载已启用 Agent（按门店/品牌灰度）
 """
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, Optional
@@ -61,6 +62,7 @@ def _build_agent_class_map() -> dict[str, type[SkillAgent]]:
     from .skills.off_peak_traffic import OffPeakTrafficAgent
     from .skills.personalization_agent import PersonalizationAgent
     from .skills.pilot_recommender import PilotRecommenderAgent
+    from .skills.points_advisor import PointsAdvisorAgent
     from .skills.private_ops import PrivateOpsAgent
     from .skills.queue_seating import QueueSeatingAgent
     from .skills.referral_growth import ReferralGrowthAgent
@@ -78,7 +80,6 @@ def _build_agent_class_map() -> dict[str, type[SkillAgent]]:
     from .skills.trend_discovery import TrendDiscoveryAgent
     from .skills.turnover_risk import TurnoverRiskAgent
     from .skills.voice_order import VoiceOrderAgent
-    from .skills.points_advisor import PointsAdvisorAgent
     from .skills.workforce_planner import WorkforcePlannerAgent
 
     return {
@@ -306,11 +307,11 @@ class MasterAgent:
             # 成本核算 Agent 接管所有成本类意图
             "cost": "cost_diagnosis",
             "stocktake": "cost_diagnosis",
-            "break": "cost_diagnosis",      # break_even
+            "break": "cost_diagnosis",  # break_even
             "contribution": "cost_diagnosis",
             "scenario": "cost_diagnosis",
-            "price": "cost_diagnosis",      # price_trend_alert
-            "channel": "cost_diagnosis",    # channel_cost_compare
+            "price": "cost_diagnosis",  # price_trend_alert
+            "channel": "cost_diagnosis",  # channel_cost_compare
             "inspect": "store_inspect",
             "quality": "store_inspect",
             "service": "smart_service",
@@ -387,9 +388,7 @@ class MasterAgent:
         import asyncio
 
         async def _run(task: dict) -> AgentResult:
-            return await self.dispatch(
-                task["agent_id"], task["action"], task.get("params", {})
-            )
+            return await self.dispatch(task["agent_id"], task["action"], task.get("params", {}))
 
         results = await asyncio.gather(*[_run(t) for t in tasks], return_exceptions=True)
 
@@ -412,6 +411,7 @@ class MasterAgent:
         与 route_intent / dispatch 向后兼容，不影响现有调用路径。
         """
         from .orchestrator import AgentOrchestrator
+
         effective_tenant = tenant_id or self.tenant_id
         orchestrator = AgentOrchestrator(
             master_agent=self,
@@ -424,6 +424,7 @@ class MasterAgent:
     def _get_model_router(self) -> Any:
         """获取 ModelRouter 实例（延迟导入避免循环依赖）"""
         from ..services.model_router import ModelRouter
+
         return ModelRouter()
 
     def get_system_context(self) -> dict:

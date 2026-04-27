@@ -9,6 +9,7 @@
 运行：
   pytest services/tx-agent/src/tests/test_model_router.py -v
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -37,6 +38,7 @@ from services.model_router import (
 # Fixtures
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 @pytest.fixture
 def strategy() -> ModelSelectionStrategy:
     return ModelSelectionStrategy()
@@ -63,6 +65,7 @@ def router(circuit: CircuitBreaker) -> ModelRouter:
 # ─────────────────────────────────────────────────────────────────────────────
 # 1. ModelSelectionStrategy
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class TestModelSelectionStrategy:
     def test_quick_classification_returns_haiku(self, strategy: ModelSelectionStrategy):
@@ -110,6 +113,7 @@ class TestModelSelectionStrategy:
 # 2. CostTracker
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 class TestCostTracker:
     def test_calculate_cost_haiku(self, cost_tracker: CostTracker):
         """haiku: $0.80/M input + $4.00/M output"""
@@ -135,7 +139,7 @@ class TestCostTracker:
     def test_calculate_cost_unknown_model_falls_back_to_sonnet(self, cost_tracker: CostTracker):
         """未知模型按 sonnet 价格计算"""
         cost_unknown = cost_tracker.calculate_cost("claude-future-model", 1_000_000, 1_000_000)
-        cost_sonnet  = cost_tracker.calculate_cost("claude-sonnet-4-6", 1_000_000, 1_000_000)
+        cost_sonnet = cost_tracker.calculate_cost("claude-sonnet-4-6", 1_000_000, 1_000_000)
         assert cost_unknown == cost_sonnet
 
     @pytest.mark.asyncio
@@ -143,7 +147,7 @@ class TestCostTracker:
         """record_call 应以正确参数调用 db.execute"""
         mock_db = AsyncMock()
         mock_db.execute = AsyncMock()
-        mock_db.commit  = AsyncMock()
+        mock_db.commit = AsyncMock()
 
         record = ModelCallRecord(
             tenant_id="tenant-001",
@@ -165,37 +169,37 @@ class TestCostTracker:
         # 检查传入的绑定参数包含关键字段
         call_args = mock_db.execute.call_args
         params = call_args[0][1]
-        assert params["tenant_id"]     == "tenant-001"
-        assert params["task_type"]     == "standard_analysis"
-        assert params["model"]         == "claude-sonnet-4-6"
-        assert params["input_tokens"]  == 500
+        assert params["tenant_id"] == "tenant-001"
+        assert params["task_type"] == "standard_analysis"
+        assert params["model"] == "claude-sonnet-4-6"
+        assert params["input_tokens"] == 500
         assert params["output_tokens"] == 200
-        assert params["cost_usd"]      == pytest.approx(0.004500)
-        assert params["success"]       is True
-        assert params["error_type"]    is None
-        assert params["request_id"]    == "req-abc123"
+        assert params["cost_usd"] == pytest.approx(0.004500)
+        assert params["success"] is True
+        assert params["error_type"] is None
+        assert params["request_id"] == "req-abc123"
 
     @pytest.mark.asyncio
     async def test_get_tenant_usage_aggregates_correctly(self, cost_tracker: CostTracker):
         """get_tenant_usage 返回正确聚合结构"""
         # 模拟 DB aggregate 行
         agg_row = {
-            "call_count":          10,
-            "success_count":       9,
-            "total_input_tokens":  50000,
+            "call_count": 10,
+            "success_count": 9,
+            "total_input_tokens": 50000,
             "total_output_tokens": 20000,
-            "total_cost_usd":      0.85,
+            "total_cost_usd": 0.85,
         }
         model_row = {
-            "model":      "claude-sonnet-4-6",
+            "model": "claude-sonnet-4-6",
             "call_count": 10,
-            "cost_usd":   0.85,
+            "cost_usd": 0.85,
         }
 
-        mock_agg_result   = MagicMock()
+        mock_agg_result = MagicMock()
         mock_model_result = MagicMock()
-        mock_agg_result.mappings.return_value.one.return_value    = agg_row
-        mock_model_result.mappings.return_value.all.return_value  = [model_row]
+        mock_agg_result.mappings.return_value.one.return_value = agg_row
+        mock_model_result.mappings.return_value.all.return_value = [model_row]
 
         mock_db = AsyncMock()
         mock_db.execute = AsyncMock(side_effect=[mock_agg_result, mock_model_result])
@@ -207,13 +211,13 @@ class TestCostTracker:
             db=mock_db,
         )
 
-        assert result["tenant_id"]            == "tenant-001"
-        assert result["call_count"]           == 10
-        assert result["success_count"]        == 9
-        assert result["total_input_tokens"]   == 50000
-        assert result["total_output_tokens"]  == 20000
-        assert result["total_cost_usd"]       == pytest.approx(0.85)
-        assert len(result["by_model"])        == 1
+        assert result["tenant_id"] == "tenant-001"
+        assert result["call_count"] == 10
+        assert result["success_count"] == 9
+        assert result["total_input_tokens"] == 50000
+        assert result["total_output_tokens"] == 20000
+        assert result["total_cost_usd"] == pytest.approx(0.85)
+        assert len(result["by_model"]) == 1
         assert result["by_model"][0]["model"] == "claude-sonnet-4-6"
 
 
@@ -221,8 +225,8 @@ class TestCostTracker:
 # 3. CircuitBreaker
 # ─────────────────────────────────────────────────────────────────────────────
 
-class TestCircuitBreaker:
 
+class TestCircuitBreaker:
     @pytest.mark.asyncio
     async def test_initial_state_is_closed(self, circuit: CircuitBreaker):
         state = await circuit.get_state()
@@ -332,17 +336,17 @@ class TestCircuitBreaker:
 # 4. ModelRouter 集成测试
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def _make_mock_response(text: str = "分析结果", input_tokens: int = 100, output_tokens: int = 50):
     """构造 Anthropic SDK response mock 对象"""
     mock_response = MagicMock()
     mock_response.content = [MagicMock(text=text)]
-    mock_response.usage.input_tokens  = input_tokens
+    mock_response.usage.input_tokens = input_tokens
     mock_response.usage.output_tokens = output_tokens
     return mock_response
 
 
 class TestModelRouterComplete:
-
     @pytest.mark.asyncio
     async def test_complete_returns_text_on_success(self, router: ModelRouter):
         """正常成功调用返回模型文本"""
@@ -448,7 +452,7 @@ class TestModelRouterComplete:
     async def test_complete_records_cost_when_db_provided(self, router: ModelRouter):
         """传入 db session 时，成功调用后应调用 cost_tracker.record_call"""
         mock_resp = _make_mock_response(input_tokens=200, output_tokens=100)
-        mock_db   = AsyncMock()
+        mock_db = AsyncMock()
 
         with patch.object(router._client.messages, "create", new=AsyncMock(return_value=mock_resp)):
             with patch.object(router._cost_tracker, "record_call", new=AsyncMock()) as mock_record:
@@ -461,12 +465,12 @@ class TestModelRouterComplete:
 
                 mock_record.assert_called_once()
                 record_arg: ModelCallRecord = mock_record.call_args[0][0]
-                assert record_arg.tenant_id     == "tenant-001"
-                assert record_arg.task_type     == "standard_analysis"
-                assert record_arg.input_tokens  == 200
+                assert record_arg.tenant_id == "tenant-001"
+                assert record_arg.task_type == "standard_analysis"
+                assert record_arg.input_tokens == 200
                 assert record_arg.output_tokens == 100
-                assert record_arg.success       is True
-                assert record_arg.cost_usd      > 0
+                assert record_arg.success is True
+                assert record_arg.cost_usd > 0
 
     @pytest.mark.asyncio
     async def test_complete_does_not_record_cost_when_no_db(self, router: ModelRouter):

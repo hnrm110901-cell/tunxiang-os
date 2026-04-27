@@ -5,6 +5,7 @@
   GET  /api/v1/agent/diagnosis/reports      — 查询历史诊断报告列表
   GET  /api/v1/agent/diagnosis/reports/{report_id} — 查询单条报告详情
 """
+
 from __future__ import annotations
 
 from datetime import date
@@ -64,9 +65,7 @@ async def run_diagnosis(
         )
         report = await agent.run(target_date=body.target_date)
 
-        critical_count = sum(
-            1 for a in report.anomalies if a.severity.value == "critical"
-        )
+        critical_count = sum(1 for a in report.anomalies if a.severity.value == "critical")
         return {
             "ok": True,
             "data": RunDiagnosisResponse(
@@ -128,8 +127,9 @@ async def list_reports(
 
     list_sql = (
         "SELECT id, store_id, report_date, anomalies, summary_text, created_at "
-        "FROM business_diagnosis_reports WHERE " + where_clauses +
-        " ORDER BY report_date DESC LIMIT :size OFFSET :offset"
+        "FROM business_diagnosis_reports WHERE "
+        + where_clauses
+        + " ORDER BY report_date DESC LIMIT :size OFFSET :offset"
     )
     rows = await db.execute(text(list_sql), params)
     items = [dict(r._mapping) for r in rows.fetchall()]

@@ -10,6 +10,7 @@
 - get_runner_queue: 按桌号聚合所有ready状态菜品，传菜员工作列表
 - get_runner_history: 查询今日传菜记录
 """
+
 import asyncio
 import os
 from collections import OrderedDict
@@ -28,10 +29,10 @@ MAC_STATION_URL = os.getenv("MAC_STATION_URL", "http://localhost:8000")
 
 STATUS_PENDING = "pending"
 STATUS_COOKING = "cooking"
-STATUS_DONE = "done"        # KDS完成出品
-STATUS_READY = "ready"      # 等待传菜员领取
+STATUS_DONE = "done"  # KDS完成出品
+STATUS_READY = "ready"  # 等待传菜员领取
 STATUS_DELIVERING = "delivering"  # 传菜中
-STATUS_SERVED = "served"    # 已送达
+STATUS_SERVED = "served"  # 已送达
 
 # ─── 内存任务存储 ───
 # key: task_id, value: RunnerTask dict
@@ -44,8 +45,10 @@ _runner_store_lock = asyncio.Lock()
 
 # ─── RunnerTask TypedDict（用于文档说明，不强制） ───
 
+
 class RunnerTask:
     """传菜任务结构（参考字段）"""
+
     task_id: str
     status: str
     store_id: str
@@ -103,12 +106,14 @@ def _add_timeline_event(
 ) -> None:
     """向任务时间线追加事件"""
     task = _get_task(task_id)
-    task["timeline"].append({
-        "event": event_type,
-        "operator_id": operator_id,
-        "detail": detail,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-    })
+    task["timeline"].append(
+        {
+            "event": event_type,
+            "operator_id": operator_id,
+            "detail": detail,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+    )
 
 
 async def _push_to_runner_station(store_id: str, message: dict) -> bool:
@@ -175,6 +180,7 @@ async def _check_table_all_served(order_id: str, tenant_id: str) -> bool:
 
 
 # ─── 核心业务函数 ───
+
 
 async def mark_ready(task_id: str, operator_id: str) -> dict:
     """KDS完成出品时调用，将任务标记为ready并推送到RunnerStation。
@@ -327,11 +333,7 @@ async def get_runner_queue(store_id: str, tenant_id: str) -> list[dict]:
     result = [
         dict(task)
         for task in _runner_store.values()
-        if (
-            task["status"] == STATUS_READY
-            and task["store_id"] == store_id
-            and task["tenant_id"] == tenant_id
-        )
+        if (task["status"] == STATUS_READY and task["store_id"] == store_id and task["tenant_id"] == tenant_id)
     ]
     # 按等待时间升序（出品最早的优先）
     result.sort(key=lambda t: t.get("ready_at") or "")

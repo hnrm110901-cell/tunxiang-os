@@ -11,6 +11,7 @@
 
 统一响应格式: {"ok": bool, "data": {}, "error": {}}
 """
+
 from __future__ import annotations
 
 import datetime
@@ -33,7 +34,7 @@ router = APIRouter(prefix="/api/v1/supply/ck", tags=["ck_production"])
 
 # 状态转移规则：key=当前状态，value=允许转入的目标状态集合
 _PRODUCTION_STATUS_TRANSITIONS: dict[str, set[str]] = {
-    "draft":     {"confirmed", "cancelled"},
+    "draft": {"confirmed", "cancelled"},
     "confirmed": {"producing", "cancelled"},
     "producing": {"completed", "cancelled"},
     "completed": set(),
@@ -41,9 +42,9 @@ _PRODUCTION_STATUS_TRANSITIONS: dict[str, set[str]] = {
 }
 
 _DISTRIBUTION_STATUS_TRANSITIONS: dict[str, set[str]] = {
-    "pending":   {"shipped", "cancelled"},
-    "shipped":   {"received"},
-    "received":  {"confirmed"},
+    "pending": {"shipped", "cancelled"},
+    "shipped": {"received"},
+    "received": {"confirmed"},
     "confirmed": set(),
     "cancelled": set(),
 }
@@ -130,9 +131,7 @@ def _row_to_dict(row) -> dict:
     return d
 
 
-async def _fetch_production_order(
-    db: AsyncSession, order_id: str, tenant_id: str
-) -> Optional[dict]:
+async def _fetch_production_order(db: AsyncSession, order_id: str, tenant_id: str) -> Optional[dict]:
     row = await db.execute(
         text("""
             SELECT id, tenant_id, order_no, store_id, production_date,
@@ -162,9 +161,7 @@ async def _fetch_production_order(
     return result
 
 
-async def _fetch_distribution_order(
-    db: AsyncSession, dist_id: str, tenant_id: str
-) -> Optional[dict]:
+async def _fetch_distribution_order(db: AsyncSession, dist_id: str, tenant_id: str) -> Optional[dict]:
     row = await db.execute(
         text("""
             SELECT id, tenant_id, order_no, from_kitchen_id, to_store_id,
@@ -315,9 +312,7 @@ async def list_production_orders(
 
         where = " AND ".join(conditions)
 
-        count_row = await db.execute(
-            text(f"SELECT COUNT(*) FROM ck_production_orders WHERE {where}"), params
-        )
+        count_row = await db.execute(text(f"SELECT COUNT(*) FROM ck_production_orders WHERE {where}"), params)
         total = count_row.scalar() or 0
 
         rows = await db.execute(
@@ -401,8 +396,13 @@ async def update_production_order_status(
                         notes = COALESCE(:extra_notes, notes)
                     WHERE id = :oid AND tenant_id = :tid
                 """),
-                {"target": target, "count": completed_count,
-                 "extra_notes": body.notes, "oid": order_id, "tid": x_tenant_id},
+                {
+                    "target": target,
+                    "count": completed_count,
+                    "extra_notes": body.notes,
+                    "oid": order_id,
+                    "tid": x_tenant_id,
+                },
             )
         else:
             await db.execute(
@@ -412,14 +412,15 @@ async def update_production_order_status(
                         notes = COALESCE(:extra_notes, notes)
                     WHERE id = :oid AND tenant_id = :tid
                 """),
-                {"target": target, "extra_notes": body.notes,
-                 "oid": order_id, "tid": x_tenant_id},
+                {"target": target, "extra_notes": body.notes, "oid": order_id, "tid": x_tenant_id},
             )
 
         await db.commit()
         log.info(
             "ck_production_order.status_updated",
-            order_id=order_id, from_=current, to=target,
+            order_id=order_id,
+            from_=current,
+            to=target,
         )
 
         data = await _fetch_production_order(db, order_id, x_tenant_id)
@@ -518,28 +519,34 @@ async def smart_plan(
 
             suggested = round(avg_qty * 1.1 * weekend_factor, 1) if avg_qty > 0 else None
 
-            suggestions.append({
-                "item_id": str(item["id"]),
-                "dish_id": dish_id,
-                "dish_name": item["dish_name"],
-                "planned_qty": str(item["planned_qty"]),
-                "unit": item["unit"],
-                "avg_daily_sales_7d": round(avg_qty, 2),
-                "suggested_qty": suggested,
-                "is_weekend": is_weekend,
-                "weekend_factor": weekend_factor,
-                "note": (
-                    "建议数量 = 7日均值 × 1.1（安全系数）"
-                    + (" × 1.3（周末加成）" if is_weekend else "")
-                ) if suggested else "近7天无销售数据，建议手动填写",
-            })
+            suggestions.append(
+                {
+                    "item_id": str(item["id"]),
+                    "dish_id": dish_id,
+                    "dish_name": item["dish_name"],
+                    "planned_qty": str(item["planned_qty"]),
+                    "unit": item["unit"],
+                    "avg_daily_sales_7d": round(avg_qty, 2),
+                    "suggested_qty": suggested,
+                    "is_weekend": is_weekend,
+                    "weekend_factor": weekend_factor,
+                    "note": ("建议数量 = 7日均值 × 1.1（安全系数）" + (" × 1.3（周末加成）" if is_weekend else ""))
+                    if suggested
+                    else "近7天无销售数据，建议手动填写",
+                }
+            )
 
-        return {"ok": True, "data": {
-            "order_id": order_id,
-            "production_date": production_date.isoformat() if hasattr(production_date, "isoformat") else str(production_date),
-            "is_weekend": is_weekend,
-            "suggestions": suggestions,
-        }}
+        return {
+            "ok": True,
+            "data": {
+                "order_id": order_id,
+                "production_date": production_date.isoformat()
+                if hasattr(production_date, "isoformat")
+                else str(production_date),
+                "is_weekend": is_weekend,
+                "suggestions": suggestions,
+            },
+        }
 
     except HTTPException:
         raise
@@ -584,9 +591,7 @@ async def list_distribution_orders(
 
         where = " AND ".join(conditions)
 
-        count_row = await db.execute(
-            text(f"SELECT COUNT(*) FROM ck_distribution_orders WHERE {where}"), params
-        )
+        count_row = await db.execute(text(f"SELECT COUNT(*) FROM ck_distribution_orders WHERE {where}"), params)
         total = count_row.scalar() or 0
 
         rows = await db.execute(
@@ -747,10 +752,7 @@ async def receive_distribution_order(
             if planned > 0:
                 diff_pct = abs(received - planned) / planned
                 if diff_pct > 0.05:
-                    variance_msg = (
-                        f"[差异提醒] 计划{planned}，实收{received}，"
-                        f"偏差{round(diff_pct * 100, 1)}%"
-                    )
+                    variance_msg = f"[差异提醒] 计划{planned}，实收{received}，偏差{round(diff_pct * 100, 1)}%"
                     item_notes = f"{item_notes} {variance_msg}".strip()
 
             await db.execute(

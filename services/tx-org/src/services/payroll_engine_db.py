@@ -46,8 +46,9 @@ log = structlog.get_logger(__name__)
 @dataclass
 class SIResult:
     """五险一金计算结果"""
-    personal_total_fen: int      # 个人合计（分）
-    employer_total_fen: int      # 企业合计（分）
+
+    personal_total_fen: int  # 个人合计（分）
+    employer_total_fen: int  # 企业合计（分）
     pension_personal_fen: int
     pension_employer_fen: int
     medical_personal_fen: int
@@ -61,6 +62,7 @@ class SIResult:
 @dataclass
 class SocialInsuranceConfig:
     """从 DB 读取的社保配置"""
+
     region: str
     pension_rate_employee: float
     pension_rate_employer: float
@@ -74,6 +76,7 @@ class SocialInsuranceConfig:
 @dataclass
 class PayrollRecord:
     """月度薪资计算结果（对应 payroll_records_v2 表）"""
+
     tenant_id: UUID
     store_id: UUID
     employee_id: UUID
@@ -87,8 +90,8 @@ class PayrollRecord:
     overtime_pay_fen: int
     bonus_fen: int
     deductions_fen: int
-    social_insurance_fen: int     # 个人五险
-    housing_fund_fen: int         # 个人公积金
+    social_insurance_fen: int  # 个人五险
+    housing_fund_fen: int  # 个人公积金
     gross_salary_fen: int
     net_salary_fen: int
     status: str = "draft"
@@ -100,6 +103,7 @@ class PayrollRecord:
 @dataclass
 class PayrollSummary:
     """门店月度薪资汇总"""
+
     tenant_id: UUID
     store_id: UUID
     period_year: int
@@ -107,19 +111,20 @@ class PayrollSummary:
     employee_count: int
     total_gross_fen: int
     total_net_fen: int
-    total_si_fen: int             # 个人五险一金合计
-    total_employer_si_fen: int    # 企业承担社保合计（人力成本用）
+    total_si_fen: int  # 个人五险一金合计
+    total_employer_si_fen: int  # 企业承担社保合计（人力成本用）
     by_position: List[Dict[str, Any]] = field(default_factory=list)
 
 
 @dataclass
 class Payslip:
     """个人工资条详情"""
+
     employee_id: UUID
     period_year: int
     period_month: int
     record: PayrollRecord
-    items: List[Dict[str, Any]] = field(default_factory=list)   # 明细行
+    items: List[Dict[str, Any]] = field(default_factory=list)  # 明细行
 
 
 # ── 引擎 ─────────────────────────────────────────────────────────────────────
@@ -172,9 +177,7 @@ class PayrollEngine:
         period_start = date(year, month, 1)
         period_end = date(year, month, calendar.monthrange(year, month)[1])
 
-        emp_configs = await self._fetch_employee_salary_configs(
-            db, tenant_id, store_id, period_start
-        )
+        emp_configs = await self._fetch_employee_salary_configs(db, tenant_id, store_id, period_start)
         if not emp_configs:
             log.warning(
                 "payroll.calculate_monthly_payroll.no_employees",
@@ -183,9 +186,7 @@ class PayrollEngine:
             return []
 
         # 2. 考勤汇总
-        attendance_map = await self._fetch_attendance_summary(
-            db, tenant_id, store_id, year, month
-        )
+        attendance_map = await self._fetch_attendance_summary(db, tenant_id, store_id, year, month)
 
         # 3. 社保配置
         si_config = await self._fetch_si_config(db, tenant_id, period_start)
@@ -230,14 +231,20 @@ class PayrollEngine:
 
         if records:
             total_amount_fen = sum(r.net_salary_fen for r in records)
-            asyncio.create_task(UniversalPublisher.publish(
-                event_type=OrgEventType.PAYROLL_GENERATED,
-                tenant_id=tenant_id,
-                store_id=store_id,
-                entity_id=store_id,
-                event_data={"year_month": f"{year}-{month:02d}", "employee_count": len(records), "total_amount_fen": total_amount_fen},
-                source_service="tx-org",
-            ))
+            asyncio.create_task(
+                UniversalPublisher.publish(
+                    event_type=OrgEventType.PAYROLL_GENERATED,
+                    tenant_id=tenant_id,
+                    store_id=store_id,
+                    entity_id=store_id,
+                    event_data={
+                        "year_month": f"{year}-{month:02d}",
+                        "employee_count": len(records),
+                        "total_amount_fen": total_amount_fen,
+                    },
+                    source_service="tx-org",
+                )
+            )
 
         return records
 
@@ -467,6 +474,7 @@ class PayrollEngine:
         Returns:
             SIResult（个人+企业各险种分项及合计）
         """
+
         def _fen(rate: float) -> int:
             return int(base_fen * rate)
 
@@ -479,12 +487,8 @@ class PayrollEngine:
         housing_personal = _fen(config.housing_fund_rate)
         housing_employer = _fen(config.housing_fund_rate)
 
-        personal_total = (
-            pension_personal + medical_personal + unemployment_personal + housing_personal
-        )
-        employer_total = (
-            pension_employer + medical_employer + unemployment_employer + housing_employer
-        )
+        personal_total = pension_personal + medical_personal + unemployment_personal + housing_personal
+        employer_total = pension_employer + medical_employer + unemployment_employer + housing_employer
         return SIResult(
             personal_total_fen=personal_total,
             employer_total_fen=employer_total,
@@ -549,7 +553,10 @@ class PayrollEngine:
 
         # ── 全勤奖（无缺勤/迟到/早退）
         full_attend_fen = compute_full_attendance_bonus(
-            absence_days, late_count, early_leave_count, 30_000  # 默认 300元全勤奖
+            absence_days,
+            late_count,
+            early_leave_count,
+            30_000,  # 默认 300元全勤奖
         )
 
         # ── 考勤扣款
@@ -568,9 +575,7 @@ class PayrollEngine:
         if si_config:
             si_result = self.calculate_social_insurance(si_base_fen, si_config)
             social_insurance_fen = (
-                si_result.pension_personal_fen
-                + si_result.medical_personal_fen
-                + si_result.unemployment_personal_fen
+                si_result.pension_personal_fen + si_result.medical_personal_fen + si_result.unemployment_personal_fen
             )
             housing_fund_fen = si_result.housing_fund_personal_fen
         else:
@@ -693,9 +698,7 @@ class PayrollEngine:
                 "month": month,
             },
         )
-        base_map: Dict[str, Dict[str, Any]] = {
-            str(r["employee_id"]): dict(r) for r in rows.mappings().all()
-        }
+        base_map: Dict[str, Dict[str, Any]] = {str(r["employee_id"]): dict(r) for r in rows.mappings().all()}
 
         # 尝试从 clock_records 补充迟到/早退次数（表可能不存在，安全降级）
         try:
@@ -883,12 +886,14 @@ def _build_payslip_items(record: PayrollRecord) -> List[Dict[str, Any]]:
 
     def _add(label: str, fen: int, is_deduction: bool = False) -> None:
         if fen != 0:
-            items.append({
-                "label": label,
-                "amount_fen": fen,
-                "amount_yuan": round(fen / 100, 2),
-                "is_deduction": is_deduction,
-            })
+            items.append(
+                {
+                    "label": label,
+                    "amount_fen": fen,
+                    "amount_yuan": round(fen / 100, 2),
+                    "is_deduction": is_deduction,
+                }
+            )
 
     _add("基本工资", record.base_salary_fen)
     _add("提成", record.commission_fen)
@@ -897,18 +902,22 @@ def _build_payslip_items(record: PayrollRecord) -> List[Dict[str, Any]]:
     _add("考勤扣款", record.deductions_fen, is_deduction=True)
     _add("养老/医疗/失业险（个人）", record.social_insurance_fen, is_deduction=True)
     _add("住房公积金（个人）", record.housing_fund_fen, is_deduction=True)
-    items.append({
-        "label": "应发合计",
-        "amount_fen": record.gross_salary_fen,
-        "amount_yuan": round(record.gross_salary_fen / 100, 2),
-        "is_deduction": False,
-        "is_summary": True,
-    })
-    items.append({
-        "label": "实发合计",
-        "amount_fen": record.net_salary_fen,
-        "amount_yuan": round(record.net_salary_fen / 100, 2),
-        "is_deduction": False,
-        "is_summary": True,
-    })
+    items.append(
+        {
+            "label": "应发合计",
+            "amount_fen": record.gross_salary_fen,
+            "amount_yuan": round(record.gross_salary_fen / 100, 2),
+            "is_deduction": False,
+            "is_summary": True,
+        }
+    )
+    items.append(
+        {
+            "label": "实发合计",
+            "amount_fen": record.net_salary_fen,
+            "amount_yuan": round(record.net_salary_fen / 100, 2),
+            "is_deduction": False,
+            "is_summary": True,
+        }
+    )
     return items

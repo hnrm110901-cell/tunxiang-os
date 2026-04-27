@@ -10,6 +10,7 @@ POST   /pilots/{id}/review         — 生成复盘报告
 GET    /pilots/{id}/review         — 获取最新复盘报告
 POST   /pilots/{id}/execute        — 执行复盘建议（rollout/abort/extend）
 """
+
 from __future__ import annotations
 
 import uuid
@@ -28,6 +29,7 @@ router = APIRouter(prefix="/api/v1/pilots", tags=["pilot-tracking"])
 # ---------------------------------------------------------------------------
 # 依赖项 / 工具函数
 # ---------------------------------------------------------------------------
+
 
 def _require_tenant(x_tenant_id: Optional[str]) -> uuid.UUID:
     if not x_tenant_id:
@@ -53,12 +55,14 @@ def _get_db():
 def _get_pilot_service(db: Any = None) -> Any:
     """获取 PilotService 实例"""
     from ..services.pilot_service import PilotService
+
     return PilotService(db_session=db)
 
 
 # ---------------------------------------------------------------------------
 # 请求 / 响应模型
 # ---------------------------------------------------------------------------
+
 
 class SuccessCriterionRequest(BaseModel):
     metric: str
@@ -116,6 +120,7 @@ def _err(msg: str, status: int = 400):
 # 路由实现
 # ---------------------------------------------------------------------------
 
+
 @router.get("", summary="试点列表")
 async def list_pilots(
     status: Optional[str] = Query(None, description="状态过滤: draft/active/paused/completed/cancelled"),
@@ -141,6 +146,7 @@ async def create_pilot(
     created_by = uuid.UUID(x_user_id) if x_user_id else None
 
     from ..services.pilot_service import PilotItemCreate, PilotProgramCreate, StoreRef, SuccessCriterion
+
     pilot_data = PilotProgramCreate(
         name=body.name,
         description=body.description,
@@ -149,7 +155,9 @@ async def create_pilot(
         source_ref_id=body.source_ref_id,
         hypothesis=body.hypothesis,
         target_stores=[StoreRef(store_id=s.store_id, store_name=s.store_name) for s in body.target_stores],
-        control_stores=[StoreRef(store_id=s.store_id, store_name=s.store_name) for s in body.control_stores] if body.control_stores else None,
+        control_stores=[StoreRef(store_id=s.store_id, store_name=s.store_name) for s in body.control_stores]
+        if body.control_stores
+        else None,
         start_date=body.start_date,
         end_date=body.end_date,
         success_criteria=[
@@ -158,8 +166,11 @@ async def create_pilot(
         ],
         items=[
             PilotItemCreate(
-                item_type=i.item_type, item_ref_id=i.item_ref_id,
-                item_name=i.item_name, action=i.action, action_config=i.action_config,
+                item_type=i.item_type,
+                item_ref_id=i.item_ref_id,
+                item_name=i.item_name,
+                action=i.action,
+                action_config=i.action_config,
             )
             for i in body.items
         ],
@@ -304,7 +315,8 @@ async def execute_recommendation(
     svc = _get_pilot_service(db)
     try:
         result = await svc.execute_recommendation(
-            tenant_id, pid,
+            tenant_id,
+            pid,
             recommendation=body.recommendation,
             extend_days=body.extend_days,
         )

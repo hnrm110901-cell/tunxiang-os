@@ -3,6 +3,7 @@
 对账 = 系统收款记录 vs 支付渠道回单，逐笔匹配。
 所有金额单位：分（fen）。
 """
+
 import uuid
 from datetime import datetime, timezone
 
@@ -66,10 +67,12 @@ class ShiftReconciliationService:
         payments_result = await self.db.execute(
             select(Payment).where(
                 Payment.order_id.in_(order_ids),
-                Payment.status.in_([
-                    PaymentStatus.paid.value,
-                    PaymentStatus.partial_refund.value,
-                ]),
+                Payment.status.in_(
+                    [
+                        PaymentStatus.paid.value,
+                        PaymentStatus.partial_refund.value,
+                    ]
+                ),
             )
         )
         payments = payments_result.scalars().all()
@@ -129,9 +132,7 @@ class ShiftReconciliationService:
         cash_count = details.get("cash_count", {})
         variance_info = details.get("variance", {})
 
-        cash_expected_fen = variance_info.get(
-            "cash_expected_fen", snapshot.get("cash_fen", 0)
-        )
+        cash_expected_fen = variance_info.get("cash_expected_fen", snapshot.get("cash_fen", 0))
         cash_actual_fen = handover.cash_on_hand_fen or 0
         variance_fen = cash_actual_fen - cash_expected_fen
 
@@ -182,31 +183,29 @@ class ShiftReconciliationService:
             }
 
         # 1. 检查退款异常
-        refunds_result = await self.db.execute(
-            select(Refund).where(Refund.order_id.in_(order_ids))
-        )
+        refunds_result = await self.db.execute(select(Refund).where(Refund.order_id.in_(order_ids)))
         refunds = refunds_result.scalars().all()
 
         for r in refunds:
             # 查对应订单
-            order_result = await self.db.execute(
-                select(Order).where(Order.id == r.order_id)
-            )
+            order_result = await self.db.execute(select(Order).where(Order.id == r.order_id))
             order = order_result.scalar_one_or_none()
             if order and order.final_amount_fen > 0:
                 ratio = r.amount_fen / order.final_amount_fen
                 if ratio > REFUND_RATIO_THRESHOLD:
-                    suspicious.append({
-                        "type": "refund_anomaly",
-                        "severity": "high",
-                        "order_id": str(r.order_id),
-                        "refund_id": str(r.id),
-                        "refund_amount_fen": r.amount_fen,
-                        "order_amount_fen": order.final_amount_fen,
-                        "ratio": round(ratio, 4),
-                        "reason": r.reason,
-                        "message": f"退款 {r.amount_fen / 100:.2f}元 占订单 {ratio:.0%}，超过阈值 {REFUND_RATIO_THRESHOLD:.0%}",
-                    })
+                    suspicious.append(
+                        {
+                            "type": "refund_anomaly",
+                            "severity": "high",
+                            "order_id": str(r.order_id),
+                            "refund_id": str(r.id),
+                            "refund_amount_fen": r.amount_fen,
+                            "order_amount_fen": order.final_amount_fen,
+                            "ratio": round(ratio, 4),
+                            "reason": r.reason,
+                            "message": f"退款 {r.amount_fen / 100:.2f}元 占订单 {ratio:.0%}，超过阈值 {REFUND_RATIO_THRESHOLD:.0%}",
+                        }
+                    )
 
         # 2. 检查折扣异常
         orders_result = await self.db.execute(
@@ -221,16 +220,18 @@ class ShiftReconciliationService:
             if o.total_amount_fen > 0 and o.discount_amount_fen > 0:
                 discount_rate = o.discount_amount_fen / o.total_amount_fen
                 if discount_rate > DISCOUNT_RATIO_THRESHOLD:
-                    suspicious.append({
-                        "type": "discount_anomaly",
-                        "severity": "medium",
-                        "order_id": str(o.id),
-                        "order_no": o.order_no,
-                        "total_amount_fen": o.total_amount_fen,
-                        "discount_amount_fen": o.discount_amount_fen,
-                        "discount_rate": round(discount_rate, 4),
-                        "message": f"折扣率 {discount_rate:.0%} 超过阈值 {DISCOUNT_RATIO_THRESHOLD:.0%}",
-                    })
+                    suspicious.append(
+                        {
+                            "type": "discount_anomaly",
+                            "severity": "medium",
+                            "order_id": str(o.id),
+                            "order_no": o.order_no,
+                            "total_amount_fen": o.total_amount_fen,
+                            "discount_amount_fen": o.discount_amount_fen,
+                            "discount_rate": round(discount_rate, 4),
+                            "message": f"折扣率 {discount_rate:.0%} 超过阈值 {DISCOUNT_RATIO_THRESHOLD:.0%}",
+                        }
+                    )
 
         # 3. 检查大额现金支付异常
         payments_result = await self.db.execute(
@@ -244,14 +245,16 @@ class ShiftReconciliationService:
 
         for p in large_cash:
             if not p.notes:
-                suspicious.append({
-                    "type": "large_cash_no_note",
-                    "severity": "low",
-                    "order_id": str(p.order_id),
-                    "payment_id": str(p.id),
-                    "amount_fen": p.amount_fen,
-                    "message": f"大额现金 {p.amount_fen / 100:.2f}元 无备注说明",
-                })
+                suspicious.append(
+                    {
+                        "type": "large_cash_no_note",
+                        "severity": "low",
+                        "order_id": str(p.order_id),
+                        "payment_id": str(p.id),
+                        "amount_fen": p.amount_fen,
+                        "message": f"大额现金 {p.amount_fen / 100:.2f}元 无备注说明",
+                    }
+                )
 
         result = {
             "handover_id": handover_id,

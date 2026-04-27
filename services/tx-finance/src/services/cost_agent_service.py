@@ -8,21 +8,21 @@
 
 金额单位：分（fen, int）。
 """
+
 from __future__ import annotations
 
-import uuid
 from datetime import date, timedelta
 from typing import Any
 
 import structlog
-from sqlalchemy import and_, desc, select, text
+from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 log = structlog.get_logger(__name__)
 
 # 成本率预警阈值
-_HIGH_COST_RATE_THRESHOLD = 0.36   # 超过36%触发高成本预警
+_HIGH_COST_RATE_THRESHOLD = 0.36  # 超过36%触发高成本预警
 _CRITICAL_COST_RATE_THRESHOLD = 0.42  # 超过42%触发严重预警
 
 # 价格漂移检测：连续N次采购价上涨
@@ -127,14 +127,16 @@ class CostAgentService:
                 theoretical = int(row["theoretical_cost_fen"])
                 actual = int(row["actual_cost_fen"])
                 variance = (actual - theoretical) / theoretical if theoretical > 0 else 0.0
-                comparison.append({
-                    "dish_name": row["dish_name"],
-                    "theoretical_cost_fen": theoretical,
-                    "actual_cost_fen": actual,
-                    "variance_rate": round(variance, 4),
-                    "quantity_sold": int(row["quantity_sold"]),
-                    "selling_price_fen": int(row["selling_price_fen"]),
-                })
+                comparison.append(
+                    {
+                        "dish_name": row["dish_name"],
+                        "theoretical_cost_fen": theoretical,
+                        "actual_cost_fen": actual,
+                        "variance_rate": round(variance, 4),
+                        "quantity_sold": int(row["quantity_sold"]),
+                        "selling_price_fen": int(row["selling_price_fen"]),
+                    }
+                )
 
             return comparison
 
@@ -185,23 +187,23 @@ class CostAgentService:
             prev_price = None
             for row in rows:
                 price = int(row["unit_cost_fen"])
-                change_pct = (
-                    round((price - prev_price) / prev_price, 4)
-                    if prev_price and prev_price > 0
-                    else 0.0
+                change_pct = round((price - prev_price) / prev_price, 4) if prev_price and prev_price > 0 else 0.0
+                trend.append(
+                    {
+                        "date": str(row["purchase_date"]),
+                        "unit_cost_fen": price,
+                        "supplier_name": row["supplier_name"],
+                        "change_pct": change_pct,
+                    }
                 )
-                trend.append({
-                    "date": str(row["purchase_date"]),
-                    "unit_cost_fen": price,
-                    "supplier_name": row["supplier_name"],
-                    "change_pct": change_pct,
-                })
                 prev_price = price
 
             return trend
 
         except Exception as exc:
-            log.error("cost_agent_service.price_trend_error", ingredient_id=ingredient_id, error=str(exc), exc_info=True)
+            log.error(
+                "cost_agent_service.price_trend_error", ingredient_id=ingredient_id, error=str(exc), exc_info=True
+            )
             return []
 
     async def emit_cost_alert(
@@ -248,9 +250,7 @@ class CostAgentService:
 
     # ─── 内部查询 ──────────────────────────────────────────────────────────────
 
-    async def _get_daily_pnl(
-        self, store_id: str, target_date: date, tenant_id: str
-    ) -> dict:
+    async def _get_daily_pnl(self, store_id: str, target_date: date, tenant_id: str) -> dict:
         """从 daily_pnl 取当日P&L数据"""
         sql = text("""
             SELECT
@@ -330,9 +330,7 @@ class CostAgentService:
             "threshold_critical": _CRITICAL_COST_RATE_THRESHOLD,
         }
 
-    async def _detect_price_drift(
-        self, store_id: str, tenant_id: str, lookback_days: int = 14
-    ) -> list[dict]:
+    async def _detect_price_drift(self, store_id: str, tenant_id: str, lookback_days: int = 14) -> list[dict]:
         """检测连续N次采购价上涨的食材（价格漂移）
 
         Returns: list of {ingredient_name, ingredient_id, consecutive_rises, last_price_fen, drift_pct}
@@ -377,14 +375,16 @@ class CostAgentService:
                 is_drifting = all(prices[i] > prices[i + 1] for i in range(len(prices) - 1))
                 if is_drifting:
                     drift_pct = (prices[0] - prices[-1]) / prices[-1] if prices[-1] > 0 else 0.0
-                    alerts.append({
-                        "ingredient_id": str(row["ingredient_id"]),
-                        "ingredient_name": row["ingredient_name"],
-                        "consecutive_rises": len(prices) - 1,
-                        "last_price_fen": prices[0],
-                        "first_price_fen": prices[-1],
-                        "drift_pct": round(drift_pct, 4),
-                    })
+                    alerts.append(
+                        {
+                            "ingredient_id": str(row["ingredient_id"]),
+                            "ingredient_name": row["ingredient_name"],
+                            "consecutive_rises": len(prices) - 1,
+                            "last_price_fen": prices[0],
+                            "first_price_fen": prices[-1],
+                            "drift_pct": round(drift_pct, 4),
+                        }
+                    )
             return alerts
         except SQLAlchemyError as exc:
             log.warning("cost_agent_service._detect_price_drift_failed", error=str(exc))

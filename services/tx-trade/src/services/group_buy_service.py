@@ -3,6 +3,7 @@
 所有金额单位：分(fen)。
 并发安全：参团使用 SELECT ... FOR UPDATE 行锁防止超员。
 """
+
 from __future__ import annotations
 
 import uuid
@@ -30,6 +31,7 @@ async def _set_tenant(db: AsyncSession, tenant_id: str) -> None:
 # ═══════════════════════════════════════════════════════════════
 # 1. 拼团活动 CRUD
 # ═══════════════════════════════════════════════════════════════
+
 
 async def create_activity(
     name: str,
@@ -139,24 +141,27 @@ async def list_activities(
 
     items = []
     for r in rows:
-        items.append({
-            "activity_id": str(r.id),
-            "name": r.name,
-            "product_id": str(r.product_id),
-            "product_name": r.product_name,
-            "original_price_fen": r.original_price_fen,
-            "group_price_fen": r.group_price_fen,
-            "group_size": r.group_size,
-            "status": r.status,
-            "team_count": r.team_count,
-            "success_count": r.success_count,
-        })
+        items.append(
+            {
+                "activity_id": str(r.id),
+                "name": r.name,
+                "product_id": str(r.product_id),
+                "product_name": r.product_name,
+                "original_price_fen": r.original_price_fen,
+                "group_price_fen": r.group_price_fen,
+                "group_size": r.group_size,
+                "status": r.status,
+                "team_count": r.team_count,
+                "success_count": r.success_count,
+            }
+        )
     return {"items": items, "total": total, "page": page, "size": size}
 
 
 # ═══════════════════════════════════════════════════════════════
 # 2. 开团 / 参团
 # ═══════════════════════════════════════════════════════════════
+
 
 async def create_team(
     activity_id: str,
@@ -201,10 +206,13 @@ async def create_team(
                 (:id, :tid, :aid, :uid, :target, 1, 'forming', :expired, :now, :now)
         """),
         {
-            "id": team_id, "tid": tid, "aid": aid,
+            "id": team_id,
+            "tid": tid,
+            "aid": aid,
             "uid": uuid.UUID(initiator_id),
             "target": activity.group_size,
-            "expired": expired_at, "now": now,
+            "expired": expired_at,
+            "now": now,
         },
     )
 
@@ -217,8 +225,11 @@ async def create_team(
                 (:id, :tid, :team_id, :uid, false, :now)
         """),
         {
-            "id": uuid.uuid4(), "tid": tid, "team_id": team_id,
-            "uid": uuid.UUID(initiator_id), "now": now,
+            "id": uuid.uuid4(),
+            "tid": tid,
+            "team_id": team_id,
+            "uid": uuid.UUID(initiator_id),
+            "now": now,
         },
     )
 
@@ -328,8 +339,10 @@ async def join_team(
     await db.flush()
     logger.info(
         "group_buy.member_joined",
-        team_id=team_id, customer_id=customer_id,
-        new_size=new_size, succeeded=succeeded,
+        team_id=team_id,
+        customer_id=customer_id,
+        new_size=new_size,
+        succeeded=succeeded,
     )
 
     return {
@@ -343,7 +356,9 @@ async def join_team(
 
 
 async def get_team_detail(
-    team_id: str, tenant_id: str, db: AsyncSession,
+    team_id: str,
+    tenant_id: str,
+    db: AsyncSession,
 ) -> Optional[dict[str, Any]]:
     """查询拼团详情（含成员列表）"""
     await _set_tenant(db, tenant_id)
@@ -405,8 +420,10 @@ async def get_team_detail(
 # 3. 超时处理（定时任务调用）
 # ═══════════════════════════════════════════════════════════════
 
+
 async def expire_teams(
-    tenant_id: str, db: AsyncSession,
+    tenant_id: str,
+    db: AsyncSession,
 ) -> dict[str, Any]:
     """批量过期超时未成团的团队 — 定时任务每分钟调用"""
     await _set_tenant(db, tenant_id)

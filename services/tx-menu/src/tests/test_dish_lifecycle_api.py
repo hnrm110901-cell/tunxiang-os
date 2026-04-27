@@ -11,6 +11,7 @@
 
 使用 FastAPI TestClient + dependency_overrides，不连接真实数据库。
 """
+
 import uuid
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -30,8 +31,9 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "..", ".."))
 
+from api.dish_lifecycle_routes import lifecycle_router, router
+
 from shared.ontology.src.database import get_db
-from api.dish_lifecycle_routes import router, lifecycle_router
 
 app.include_router(router, prefix="/dish-lifecycle")
 app.include_router(lifecycle_router)  # lifecycle_router 自带 /api/v1 前缀
@@ -98,9 +100,7 @@ class TestHealthScores:
         mock_score.total_score = 75.0
         mock_score.to_dict.return_value = {"dish_id": DISH_ID, "total_score": 75.0}
 
-        with patch(
-            "api.dish_lifecycle_routes.DishHealthScoreEngine"
-        ) as MockEngine:
+        with patch("api.dish_lifecycle_routes.DishHealthScoreEngine") as MockEngine:
             instance = MockEngine.return_value
             instance.score_all_dishes = AsyncMock(return_value=[mock_score])
 
@@ -134,9 +134,7 @@ class TestHealthScores:
             "review_score": 15.0,
         }
 
-        with patch(
-            "api.dish_lifecycle_routes.DishHealthScoreEngine"
-        ) as MockEngine:
+        with patch("api.dish_lifecycle_routes.DishHealthScoreEngine") as MockEngine:
             instance = MockEngine.return_value
             instance.score_dish = AsyncMock(return_value=mock_score)
 
@@ -153,9 +151,7 @@ class TestHealthScores:
 
     def test_get_single_health_score_not_found(self, client):
         """GET /dish-lifecycle/health-scores/{dish_id} 菜品不存在时返回 ok=False"""
-        with patch(
-            "api.dish_lifecycle_routes.DishHealthScoreEngine"
-        ) as MockEngine:
+        with patch("api.dish_lifecycle_routes.DishHealthScoreEngine") as MockEngine:
             instance = MockEngine.return_value
             instance.score_dish = AsyncMock(return_value=None)
 
@@ -184,9 +180,7 @@ class TestSelloutWarnings:
             "warning_level": "critical",
         }
 
-        with patch(
-            "api.dish_lifecycle_routes.DishLifecycleService"
-        ) as MockSvc:
+        with patch("api.dish_lifecycle_routes.DishLifecycleService") as MockSvc:
             instance = MockSvc.return_value
             instance.check_sellout_warnings = AsyncMock(return_value=[mock_warning])
 
@@ -203,9 +197,7 @@ class TestSelloutWarnings:
 
     def test_sellout_warnings_empty_list(self, client):
         """无预警时返回空列表"""
-        with patch(
-            "api.dish_lifecycle_routes.DishLifecycleService"
-        ) as MockSvc:
+        with patch("api.dish_lifecycle_routes.DishLifecycleService") as MockSvc:
             instance = MockSvc.return_value
             instance.check_sellout_warnings = AsyncMock(return_value=[])
 
@@ -300,10 +292,10 @@ class TestAdvanceLifecycle:
         mock_db = _make_mock_db()
         mock_result = MagicMock()
         mock_result.fetchone.return_value = (
-            dish_uuid,       # id
-            "剁椒鱼头",      # dish_name
-            "testing",       # lifecycle_stage
-            False,           # is_deleted
+            dish_uuid,  # id
+            "剁椒鱼头",  # dish_name
+            "testing",  # lifecycle_stage
+            False,  # is_deleted
         )
         mock_db.execute.return_value = mock_result
 

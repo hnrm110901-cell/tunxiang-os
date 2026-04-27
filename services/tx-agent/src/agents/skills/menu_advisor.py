@@ -2,9 +2,11 @@
 
 菜品四象限分析、菜单结构诊断、定价优化、上下架建议、套餐组合优化、菜单AB测试。
 """
+
 from typing import Any
 
 from ..base import AgentResult, SkillAgent
+from ..context import ConstraintContext
 
 # 四象限定义
 QUADRANTS = {
@@ -76,27 +78,31 @@ class MenuAdvisorAgent(SkillAgent):
             else:
                 q = "dog"
 
-            quadrant_results[q].append({
-                "dish_name": d.get("dish_name", ""),
-                "monthly_sales": s,
-                "margin_pct": m,
-                "revenue_yuan": round(d.get("revenue_fen", 0) / 100, 2),
-                "quadrant": q,
-                "quadrant_name": QUADRANTS[q]["name"],
-                "action": QUADRANTS[q]["action"],
-            })
+            quadrant_results[q].append(
+                {
+                    "dish_name": d.get("dish_name", ""),
+                    "monthly_sales": s,
+                    "margin_pct": m,
+                    "revenue_yuan": round(d.get("revenue_fen", 0) / 100, 2),
+                    "quadrant": q,
+                    "quadrant_name": QUADRANTS[q]["name"],
+                    "action": QUADRANTS[q]["action"],
+                }
+            )
 
         return AgentResult(
-            success=True, action="analyze_dish_quadrant",
+            success=True,
+            action="analyze_dish_quadrant",
             data={
-                "quadrants": {k: {"count": len(v), "dishes": v[:10], "info": QUADRANTS[k]}
-                             for k, v in quadrant_results.items()},
+                "quadrants": {
+                    k: {"count": len(v), "dishes": v[:10], "info": QUADRANTS[k]} for k, v in quadrant_results.items()
+                },
                 "total_dishes": len(dishes),
                 "sales_median": sales_median,
                 "margin_median": margin_median,
             },
             reasoning=f"四象限分析: 明星{len(quadrant_results['star'])}、利润{len(quadrant_results['cash_cow'])}、"
-                      f"引流{len(quadrant_results['traffic'])}、淘汰{len(quadrant_results['dog'])}",
+            f"引流{len(quadrant_results['traffic'])}、淘汰{len(quadrant_results['dog'])}",
             confidence=0.85,
         )
 
@@ -115,14 +121,16 @@ class MenuAdvisorAgent(SkillAgent):
             contribution_pct = cat.get("revenue_contribution_pct", 0)
 
             pct = round(count / max(1, total_dishes) * 100, 1)
-            diagnostics.append({
-                "category": name,
-                "dish_count": count,
-                "share_pct": pct,
-                "avg_margin_pct": avg_margin,
-                "revenue_contribution_pct": contribution_pct,
-                "efficiency": round(contribution_pct / max(0.1, pct), 2),
-            })
+            diagnostics.append(
+                {
+                    "category": name,
+                    "dish_count": count,
+                    "share_pct": pct,
+                    "avg_margin_pct": avg_margin,
+                    "revenue_contribution_pct": contribution_pct,
+                    "efficiency": round(contribution_pct / max(0.1, pct), 2),
+                }
+            )
 
             if pct > 30:
                 issues.append({"category": name, "issue": "品类占比过高", "suggestion": f"精简至{count // 2}道以内"})
@@ -137,12 +145,27 @@ class MenuAdvisorAgent(SkillAgent):
         too_few = total_dishes < ideal_count_range[0]
 
         if too_many:
-            issues.insert(0, {"category": "整体", "issue": f"菜品总数偏多({total_dishes}道)", "suggestion": f"精简至{ideal_count_range[1]}道以内"})
+            issues.insert(
+                0,
+                {
+                    "category": "整体",
+                    "issue": f"菜品总数偏多({total_dishes}道)",
+                    "suggestion": f"精简至{ideal_count_range[1]}道以内",
+                },
+            )
         if too_few:
-            issues.insert(0, {"category": "整体", "issue": f"菜品总数偏少({total_dishes}道)", "suggestion": f"补充至{ideal_count_range[0]}道以上"})
+            issues.insert(
+                0,
+                {
+                    "category": "整体",
+                    "issue": f"菜品总数偏少({total_dishes}道)",
+                    "suggestion": f"补充至{ideal_count_range[0]}道以上",
+                },
+            )
 
         return AgentResult(
-            success=True, action="diagnose_menu_structure",
+            success=True,
+            action="diagnose_menu_structure",
             data={
                 "diagnostics": diagnostics,
                 "total_dishes": total_dishes,
@@ -176,22 +199,36 @@ class MenuAdvisorAgent(SkillAgent):
                 change_pct = round((optimal_price - current_price_fen) / max(1, current_price_fen) * 100, 1)
 
             if abs(change_pct) >= 3:
-                suggestions.append({
-                    "dish_name": d.get("dish_name", ""),
-                    "current_price_yuan": round(current_price_fen / 100, 2),
-                    "suggested_price_yuan": round(optimal_price / 100, 2),
-                    "change_pct": change_pct,
-                    "current_margin_pct": current_margin,
-                    "target_margin_pct": target_margin_pct,
-                    "category_avg_yuan": round(category_avg_fen / 100, 2),
-                    "direction": "提价" if change_pct > 0 else "降价",
-                    "priority": "高" if abs(change_pct) >= 10 else "中",
-                })
+                suggestions.append(
+                    {
+                        "dish_name": d.get("dish_name", ""),
+                        "current_price_yuan": round(current_price_fen / 100, 2),
+                        "suggested_price_yuan": round(optimal_price / 100, 2),
+                        "change_pct": change_pct,
+                        "current_margin_pct": current_margin,
+                        "target_margin_pct": target_margin_pct,
+                        "category_avg_yuan": round(category_avg_fen / 100, 2),
+                        "direction": "提价" if change_pct > 0 else "降价",
+                        "priority": "高" if abs(change_pct) >= 10 else "中",
+                    }
+                )
 
         suggestions.sort(key=lambda x: abs(x["change_pct"]), reverse=True)
 
+        # Sprint D1 / PR 批次 3：取最低毛利建议项作 margin 校验基准
+        # （若 checker 对此组合判 fail，整份定价建议都会被拦截）
+        worst = None
+        for d in dishes:
+            cp = d.get("price_fen", 0)
+            cc = d.get("cost_fen", 0)
+            if cp > 0 and cc >= 0:
+                m = (cp - cc) / cp
+                if worst is None or m < worst[2]:
+                    worst = (cp, cc, m)
+
         return AgentResult(
-            success=True, action="optimize_pricing",
+            success=True,
+            action="optimize_pricing",
             data={
                 "suggestions": suggestions[:20],
                 "total_adjustments": len(suggestions),
@@ -201,6 +238,11 @@ class MenuAdvisorAgent(SkillAgent):
             },
             reasoning=f"定价优化: {len(suggestions)} 道菜需调价，提价 {sum(1 for s in suggestions if s['direction'] == '提价')} 道",
             confidence=0.8,
+            context=ConstraintContext(
+                price_fen=worst[0] if worst else None,
+                cost_fen=worst[1] if worst else None,
+                constraint_scope={"margin"},
+            ),
         )
 
     async def _suggest_changes(self, params: dict) -> AgentResult:
@@ -219,27 +261,35 @@ class MenuAdvisorAgent(SkillAgent):
             trend = d.get("sales_trend", "持平")
 
             if sales <= 5 and margin < 50 and rating < 4.0:
-                to_remove.append({
-                    "dish_name": d.get("dish_name", ""),
-                    "reason": f"月销{sales}份、毛利{margin}%、评分{rating}",
-                    "priority": "高",
-                })
+                to_remove.append(
+                    {
+                        "dish_name": d.get("dish_name", ""),
+                        "reason": f"月销{sales}份、毛利{margin}%、评分{rating}",
+                        "priority": "高",
+                    }
+                )
             elif sales <= 10 and (margin < 45 or rating < 3.5):
-                to_improve.append({
-                    "dish_name": d.get("dish_name", ""),
-                    "issue": "低销量" if sales <= 10 else "低毛利" if margin < 45 else "低评分",
-                    "suggestion": "优化配方" if rating < 3.5 else "调整定价" if margin < 45 else "加强推广",
-                })
+                to_improve.append(
+                    {
+                        "dish_name": d.get("dish_name", ""),
+                        "issue": "低销量" if sales <= 10 else "低毛利" if margin < 45 else "低评分",
+                        "suggestion": "优化配方" if rating < 3.5 else "调整定价" if margin < 45 else "加强推广",
+                    }
+                )
 
         # 季节性建议
         seasonal_add = []
         if season == "夏":
             seasonal_add = [{"dish_name": "凉面", "reason": "夏季热销"}, {"dish_name": "绿豆汤", "reason": "消暑饮品"}]
         elif season == "冬":
-            seasonal_add = [{"dish_name": "羊肉汤", "reason": "冬季暖身"}, {"dish_name": "火锅套餐", "reason": "冬季热销"}]
+            seasonal_add = [
+                {"dish_name": "羊肉汤", "reason": "冬季暖身"},
+                {"dish_name": "火锅套餐", "reason": "冬季热销"},
+            ]
 
         return AgentResult(
-            success=True, action="suggest_dish_changes",
+            success=True,
+            action="suggest_dish_changes",
             data={
                 "to_remove": to_remove[:10],
                 "to_improve": to_improve[:10],
@@ -271,14 +321,18 @@ class MenuAdvisorAgent(SkillAgent):
             total_cost = sum(d.get("cost_fen", 0) for d in popular_combo)
             combo_price = int(target_price_fen)
             margin = round((combo_price - total_cost) / max(1, combo_price) * 100, 1)
-            combos.append({
-                "combo_name": "人气畅销套餐",
-                "dishes": [d.get("dish_name", "") for d in popular_combo],
-                "original_total_yuan": round(sum(d.get("price_fen", 0) for d in popular_combo) / 100, 2),
-                "combo_price_yuan": round(combo_price / 100, 2),
-                "margin_pct": margin,
-                "discount_pct": round((1 - combo_price / max(1, sum(d.get("price_fen", 0) for d in popular_combo))) * 100, 1),
-            })
+            combos.append(
+                {
+                    "combo_name": "人气畅销套餐",
+                    "dishes": [d.get("dish_name", "") for d in popular_combo],
+                    "original_total_yuan": round(sum(d.get("price_fen", 0) for d in popular_combo) / 100, 2),
+                    "combo_price_yuan": round(combo_price / 100, 2),
+                    "margin_pct": margin,
+                    "discount_pct": round(
+                        (1 - combo_price / max(1, sum(d.get("price_fen", 0) for d in popular_combo))) * 100, 1
+                    ),
+                }
+            )
 
         # 组合2：高毛利套餐
         if len(high_margin) >= 3:
@@ -286,17 +340,22 @@ class MenuAdvisorAgent(SkillAgent):
             total_cost = sum(d.get("cost_fen", 0) for d in margin_combo)
             combo_price = int(total_cost / (1 - target_margin_pct / 100))
             margin = round((combo_price - total_cost) / max(1, combo_price) * 100, 1)
-            combos.append({
-                "combo_name": "精选超值套餐",
-                "dishes": [d.get("dish_name", "") for d in margin_combo],
-                "original_total_yuan": round(sum(d.get("price_fen", 0) for d in margin_combo) / 100, 2),
-                "combo_price_yuan": round(combo_price / 100, 2),
-                "margin_pct": margin,
-                "discount_pct": round((1 - combo_price / max(1, sum(d.get("price_fen", 0) for d in margin_combo))) * 100, 1),
-            })
+            combos.append(
+                {
+                    "combo_name": "精选超值套餐",
+                    "dishes": [d.get("dish_name", "") for d in margin_combo],
+                    "original_total_yuan": round(sum(d.get("price_fen", 0) for d in margin_combo) / 100, 2),
+                    "combo_price_yuan": round(combo_price / 100, 2),
+                    "margin_pct": margin,
+                    "discount_pct": round(
+                        (1 - combo_price / max(1, sum(d.get("price_fen", 0) for d in margin_combo))) * 100, 1
+                    ),
+                }
+            )
 
         return AgentResult(
-            success=True, action="optimize_combo",
+            success=True,
+            action="optimize_combo",
             data={
                 "combos": combos,
                 "total_combos": len(combos),
@@ -322,8 +381,8 @@ class MenuAdvisorAgent(SkillAgent):
             "variant_b": variant_b,
             "duration_days": test_duration_days,
             "stores": {
-                "group_a": test_stores[:len(test_stores) // 2],
-                "group_b": test_stores[len(test_stores) // 2:],
+                "group_a": test_stores[: len(test_stores) // 2],
+                "group_b": test_stores[len(test_stores) // 2 :],
             },
             "metrics_to_track": ["日销量", "客单价", "毛利率", "顾客满意度"],
             "min_sample_size": 100,
@@ -336,9 +395,9 @@ class MenuAdvisorAgent(SkillAgent):
         }
 
         return AgentResult(
-            success=True, action="design_ab_test",
+            success=True,
+            action="design_ab_test",
             data=test_plan,
-            reasoning=f"设计菜单AB测试: {dish_name}，{test_type}维度，{test_duration_days}天，"
-                      f"{len(test_stores)}家门店",
+            reasoning=f"设计菜单AB测试: {dish_name}，{test_type}维度，{test_duration_days}天，{len(test_stores)}家门店",
             confidence=0.8,
         )

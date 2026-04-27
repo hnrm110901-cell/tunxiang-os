@@ -37,6 +37,7 @@ _engine = JourneyEngine()
 # 统一响应
 # ---------------------------------------------------------------------------
 
+
 def ok(data: Any) -> dict:
     return {"ok": True, "data": data}
 
@@ -48,6 +49,7 @@ def err(msg: str) -> dict:
 # ---------------------------------------------------------------------------
 # 请求/响应模型
 # ---------------------------------------------------------------------------
+
 
 class TriggerCondition(BaseModel):
     field: str
@@ -93,6 +95,7 @@ class ImportTemplateRequest(BaseModel):
 # ---------------------------------------------------------------------------
 # 旅程定义端点
 # ---------------------------------------------------------------------------
+
 
 @router.get("/definitions")
 async def list_journey_definitions(
@@ -243,19 +246,21 @@ async def get_journey_definition(
     if not row:
         raise HTTPException(status_code=404, detail="旅程定义不存在")
 
-    return ok({
-        "id": str(row[0]),
-        "name": row[1],
-        "description": row[2],
-        "trigger_event": row[3],
-        "trigger_conditions": row[4] or [],
-        "steps": row[5] or [],
-        "target_segment": row[6],
-        "is_active": row[7],
-        "version": row[8],
-        "created_at": row[9].isoformat() if row[9] else None,
-        "updated_at": row[10].isoformat() if row[10] else None,
-    })
+    return ok(
+        {
+            "id": str(row[0]),
+            "name": row[1],
+            "description": row[2],
+            "trigger_event": row[3],
+            "trigger_conditions": row[4] or [],
+            "steps": row[5] or [],
+            "target_segment": row[6],
+            "is_active": row[7],
+            "version": row[8],
+            "created_at": row[9].isoformat() if row[9] else None,
+            "updated_at": row[10].isoformat() if row[10] else None,
+        }
+    )
 
 
 @router.put("/definitions/{def_id}")
@@ -271,6 +276,7 @@ async def update_journey_definition(
         raise HTTPException(status_code=400, detail="X-Tenant-ID 格式错误")
 
     import json
+
     set_clauses = ["updated_at = NOW()", "version = version + 1"]
     params: dict[str, Any] = {"id": str(def_id), "tenant_id": str(tenant_id)}
 
@@ -282,14 +288,10 @@ async def update_journey_definition(
         params["description"] = body.description
     if body.trigger_conditions is not None:
         set_clauses.append("trigger_conditions = :conditions::jsonb")
-        params["conditions"] = json.dumps(
-            [c.model_dump() for c in body.trigger_conditions], ensure_ascii=False
-        )
+        params["conditions"] = json.dumps([c.model_dump() for c in body.trigger_conditions], ensure_ascii=False)
     if body.steps is not None:
         set_clauses.append("steps = :steps::jsonb")
-        params["steps"] = json.dumps(
-            [s.model_dump() for s in body.steps], ensure_ascii=False
-        )
+        params["steps"] = json.dumps([s.model_dump() for s in body.steps], ensure_ascii=False)
         # 更新步骤时自动停用，防止正在运行的 enrollment 读到旧步骤
         set_clauses.append("is_active = FALSE")
     if body.target_segment is not None:
@@ -431,6 +433,7 @@ async def import_journey_template(
         raise HTTPException(status_code=400, detail="X-Tenant-ID 格式错误")
 
     from templates.journey_templates import TEMPLATES
+
     template = TEMPLATES.get(body.template_name)
     if not template:
         available = list(TEMPLATES.keys())
@@ -440,6 +443,7 @@ async def import_journey_template(
         )
 
     import json
+
     def_id = uuid.uuid4()
     async with async_session_factory() as db:
         await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
@@ -471,18 +475,21 @@ async def import_journey_template(
         def_id=str(def_id),
         tenant_id=str(tenant_id),
     )
-    return ok({
-        "id": str(def_id),
-        "name": template["name"],
-        "template_name": body.template_name,
-        "is_active": False,
-        "message": "模板已导入，请检查配置后激活",
-    })
+    return ok(
+        {
+            "id": str(def_id),
+            "name": template["name"],
+            "template_name": body.template_name,
+            "is_active": False,
+            "message": "模板已导入，请检查配置后激活",
+        }
+    )
 
 
 # ---------------------------------------------------------------------------
 # Enrollment 端点
 # ---------------------------------------------------------------------------
+
 
 @router.get("/enrollments")
 async def list_enrollments(
@@ -588,20 +595,22 @@ async def get_enrollment(
     if not row:
         raise HTTPException(status_code=404, detail="enrollment 不存在")
 
-    return ok({
-        "id": str(row[0]),
-        "journey_definition_id": str(row[1]),
-        "customer_id": str(row[2]),
-        "phone": row[3],
-        "current_step_id": row[4],
-        "status": row[5],
-        "enrolled_at": row[6].isoformat() if row[6] else None,
-        "completed_at": row[7].isoformat() if row[7] else None,
-        "exited_at": row[8].isoformat() if row[8] else None,
-        "context_data": row[9] or {},
-        "next_step_at": row[10].isoformat() if row[10] else None,
-        "journey_name": row[11],
-    })
+    return ok(
+        {
+            "id": str(row[0]),
+            "journey_definition_id": str(row[1]),
+            "customer_id": str(row[2]),
+            "phone": row[3],
+            "current_step_id": row[4],
+            "status": row[5],
+            "enrolled_at": row[6].isoformat() if row[6] else None,
+            "completed_at": row[7].isoformat() if row[7] else None,
+            "exited_at": row[8].isoformat() if row[8] else None,
+            "context_data": row[9] or {},
+            "next_step_at": row[10].isoformat() if row[10] else None,
+            "journey_name": row[11],
+        }
+    )
 
 
 @router.get("/enrollments/{enrollment_id}/steps")
@@ -651,6 +660,7 @@ async def get_enrollment_steps(
 # ---------------------------------------------------------------------------
 # 手动触发测试事件
 # ---------------------------------------------------------------------------
+
 
 @router.post("/trigger")
 async def manual_trigger(

@@ -12,6 +12,7 @@
   POST   /api/v1/suppliers/{supplier_id}/delivery 记录交付结果
   GET    /api/v1/suppliers/risk-assessment        供应链风险评估
 """
+
 from __future__ import annotations
 
 from datetime import date
@@ -62,9 +63,7 @@ def _bad_request(msg: str) -> HTTPException:
 
 class RegisterSupplierRequest(BaseModel):
     name: str = Field(min_length=1, max_length=200)
-    category: str = Field(
-        description="seafood/meat/vegetable/seasoning/frozen/dry_goods/beverage/other"
-    )
+    category: str = Field(description="seafood/meat/vegetable/seasoning/frozen/dry_goods/beverage/other")
     contact: dict = Field(
         default_factory=dict,
         description='{"person":"张三","phone":"138xxx","address":"长沙市xxx"}',

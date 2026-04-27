@@ -158,6 +158,7 @@ def _make_mapping(**kwargs):
 @pytest.fixture
 def engine():
     from services.approval_engine import ApprovalEngine
+
     return ApprovalEngine()
 
 
@@ -167,24 +168,28 @@ class TestApprovalEngineConditions:
     def test_engine_importable(self):
         """引擎可以正常导入"""
         from services.approval_engine import ApprovalEngine
+
         engine = ApprovalEngine()
         assert engine is not None
 
     def test_parse_jsonb_dict(self):
         """_parse_jsonb 处理 dict 输入"""
         from services.approval_engine import _parse_jsonb
+
         result = _parse_jsonb({"key": "value"})
         assert result == {"key": "value"}
 
     def test_parse_jsonb_str(self):
         """_parse_jsonb 处理 str 输入"""
         from services.approval_engine import _parse_jsonb
+
         result = _parse_jsonb('{"key": "value"}')
         assert result == {"key": "value"}
 
     def test_parse_jsonb_none(self):
         """_parse_jsonb 处理 None 输入"""
         from services.approval_engine import _parse_jsonb
+
         result = _parse_jsonb(None)
         assert result == {}
 

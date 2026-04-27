@@ -10,7 +10,7 @@ import csv
 import io
 import json
 import uuid
-from datetime import date, datetime, timezone
+from datetime import date
 from decimal import ROUND_HALF_UP, Decimal
 from typing import List, Optional
 
@@ -29,6 +29,7 @@ router = APIRouter(prefix="/api/v1/trade/corporate", tags=["corporate-orders"])
 
 # ─── DB 依赖 ─────────────────────────────────────────────────────────────────
 
+
 def _get_tenant_id(request: Request) -> str:
     return request.headers.get("X-Tenant-Id", "default")
 
@@ -41,6 +42,7 @@ async def _get_db(request: Request):
 
 # ─── 工具函数 ─────────────────────────────────────────────────────────────────
 
+
 def _ok(data) -> dict:
     return {"ok": True, "data": data, "error": None}
 
@@ -50,6 +52,7 @@ def _available_credit(credit_limit_fen: int, used_credit_fen: int) -> int:
 
 
 # ─── 请求/响应模型 ────────────────────────────────────────────────────────────
+
 
 class CreateCustomerReq(BaseModel):
     company_name: str = Field(..., min_length=1, max_length=100, description="企业名称")
@@ -99,6 +102,7 @@ class BulkBillReq(BaseModel):
 
 # ─── 1. 企业客户列表 ──────────────────────────────────────────────────────────
 
+
 @router.get("/customers", summary="企业客户列表")
 async def list_customers(
     request: Request,
@@ -138,9 +142,11 @@ async def list_customers(
 
 # ─── 2. 新增企业客户 ──────────────────────────────────────────────────────────
 
+
 @router.post("/customers", summary="新增企业客户", status_code=201)
 async def create_customer(
-    request: Request, req: CreateCustomerReq,
+    request: Request,
+    req: CreateCustomerReq,
     db: AsyncSession = Depends(_get_db),
 ) -> dict:
     tenant_id = _get_tenant_id(request)
@@ -165,11 +171,17 @@ async def create_customer(
             RETURNING *, credit_limit_fen - used_credit_fen AS available_credit_fen
         """),
         {
-            "tenant_id": tenant_id, "name": req.company_name, "code": req.company_code,
-            "contact": req.contact_name, "phone": req.contact_phone,
-            "billing": req.billing_type, "credit": req.credit_limit_fen,
-            "tax": req.tax_no, "invoice": req.invoice_title,
-            "discount": req.discount_rate, "menu_ids": json.dumps(req.approved_menu_ids),
+            "tenant_id": tenant_id,
+            "name": req.company_name,
+            "code": req.company_code,
+            "contact": req.contact_name,
+            "phone": req.contact_phone,
+            "billing": req.billing_type,
+            "credit": req.credit_limit_fen,
+            "tax": req.tax_no,
+            "invoice": req.invoice_title,
+            "discount": req.discount_rate,
+            "menu_ids": json.dumps(req.approved_menu_ids),
         },
     )
     await db.commit()
@@ -180,9 +192,11 @@ async def create_customer(
 
 # ─── 3. 更新企业客户 ──────────────────────────────────────────────────────────
 
+
 @router.put("/customers/{customer_id}", summary="更新企业客户")
 async def update_customer(
-    customer_id: str, req: UpdateCustomerReq,
+    customer_id: str,
+    req: UpdateCustomerReq,
     db: AsyncSession = Depends(_get_db),
 ) -> dict:
     updates = req.model_dump(exclude_none=True)
@@ -204,7 +218,7 @@ async def update_customer(
     row = await db.execute(
         text(f"""
             UPDATE corporate_customers
-            SET {', '.join(set_parts)}
+            SET {", ".join(set_parts)}
             WHERE id = :cid AND is_deleted = FALSE
             RETURNING *, credit_limit_fen - used_credit_fen AS available_credit_fen
         """),
@@ -218,6 +232,7 @@ async def update_customer(
 
 
 # ─── 4. 授信额度查询 ──────────────────────────────────────────────────────────
+
 
 @router.get("/customers/{customer_id}/credit", summary="授信额度查询")
 async def get_credit(customer_id: str, db: AsyncSession = Depends(_get_db)) -> dict:
@@ -241,9 +256,11 @@ async def get_credit(customer_id: str, db: AsyncSession = Depends(_get_db)) -> d
 
 # ─── 5. 创建企业订单 ──────────────────────────────────────────────────────────
 
+
 @router.post("/orders", summary="创建企业订单", status_code=201)
 async def create_corporate_order(
-    request: Request, req: CreateCorporateOrderReq,
+    request: Request,
+    req: CreateCorporateOrderReq,
     db: AsyncSession = Depends(_get_db),
 ) -> dict:
     tenant_id = _get_tenant_id(request)
@@ -297,9 +314,14 @@ async def create_corporate_order(
             RETURNING id, order_no, final_amount_fen, ordered_at
         """),
         {
-            "tid": tenant_id, "sid": req.store_id, "cid": req.corporate_customer_id,
-            "no": order_no, "items": json.dumps([i.model_dump() for i in req.items]),
-            "original": original_fen, "discount": float(discount_rate), "final": final_fen,
+            "tid": tenant_id,
+            "sid": req.store_id,
+            "cid": req.corporate_customer_id,
+            "no": order_no,
+            "items": json.dumps([i.model_dump() for i in req.items]),
+            "original": original_fen,
+            "discount": float(discount_rate),
+            "final": final_fen,
         },
     )
 
@@ -316,17 +338,21 @@ async def create_corporate_order(
 
     order = order_row.fetchone()
     logger.info("corporate_order.created", order_no=order_no, final_fen=final_fen)
-    return _ok({
-        "order_id": str(order.id), "order_no": order.order_no,
-        "company_name": customer.company_name,
-        "original_amount_fen": original_fen,
-        "discount_rate": float(discount_rate),
-        "final_amount_fen": final_fen,
-        "ordered_at": str(order.ordered_at),
-    })
+    return _ok(
+        {
+            "order_id": str(order.id),
+            "order_no": order.order_no,
+            "company_name": customer.company_name,
+            "original_amount_fen": original_fen,
+            "discount_rate": float(discount_rate),
+            "final_amount_fen": final_fen,
+            "ordered_at": str(order.ordered_at),
+        }
+    )
 
 
 # ─── 6. 企业订单列表 ──────────────────────────────────────────────────────────
+
 
 @router.get("/orders", summary="企业订单列表")
 async def list_corporate_orders(
@@ -371,9 +397,11 @@ async def list_corporate_orders(
 
 # ─── 7. 批量账单生成 ──────────────────────────────────────────────────────────
 
+
 @router.post("/orders/bulk-bill", summary="批量账单生成")
 async def bulk_bill(
-    request: Request, req: BulkBillReq,
+    request: Request,
+    req: BulkBillReq,
     db: AsyncSession = Depends(_get_db),
 ) -> dict:
     tenant_id = _get_tenant_id(request)
@@ -414,9 +442,13 @@ async def bulk_bill(
             RETURNING id
         """),
         {
-            "tid": tenant_id, "cid": req.corporate_customer_id, "bno": bill_no,
-            "start": req.billing_period_start, "end": req.billing_period_end,
-            "cnt": summary.cnt, "total": summary.total,
+            "tid": tenant_id,
+            "cid": req.corporate_customer_id,
+            "bno": bill_no,
+            "start": req.billing_period_start,
+            "end": req.billing_period_end,
+            "cnt": summary.cnt,
+            "total": summary.total,
         },
     )
     bill_id = bill_row.scalar()
@@ -430,24 +462,32 @@ async def bulk_bill(
               AND billed = FALSE
               AND ordered_at::date BETWEEN :start AND :end
         """),
-        {"bill_id": bill_id, "cid": req.corporate_customer_id,
-         "start": req.billing_period_start, "end": req.billing_period_end},
+        {
+            "bill_id": bill_id,
+            "cid": req.corporate_customer_id,
+            "start": req.billing_period_start,
+            "end": req.billing_period_end,
+        },
     )
     await db.commit()
 
     logger.info("corporate.bulk_bill.created", bill_no=bill_no, orders=summary.cnt, total_fen=summary.total)
-    return _ok({
-        "bill_id": str(bill_id), "bill_no": bill_no,
-        "company_name": customer.company_name,
-        "period_start": str(req.billing_period_start),
-        "period_end": str(req.billing_period_end),
-        "order_count": summary.cnt,
-        "total_amount_fen": summary.total,
-        "total_amount_yuan": round(summary.total / 100, 2),
-    })
+    return _ok(
+        {
+            "bill_id": str(bill_id),
+            "bill_no": bill_no,
+            "company_name": customer.company_name,
+            "period_start": str(req.billing_period_start),
+            "period_end": str(req.billing_period_end),
+            "order_count": summary.cnt,
+            "total_amount_fen": summary.total,
+            "total_amount_yuan": round(summary.total / 100, 2),
+        }
+    )
 
 
 # ─── 8. 对账导出 CSV ──────────────────────────────────────────────────────────
+
 
 @router.get("/export", summary="对账导出（CSV）")
 async def export_reconciliation(
@@ -477,11 +517,18 @@ async def export_reconciliation(
     writer = csv.writer(output)
     writer.writerow(["订单号", "企业名称", "门店ID", "原始金额(分)", "折扣率", "实际金额(分)", "账单状态", "下单时间"])
     for o in orders:
-        writer.writerow([
-            o.order_no, o.company_name, o.store_id,
-            o.original_amount_fen, o.discount_rate, o.final_amount_fen,
-            o.billing_status, str(o.ordered_at),
-        ])
+        writer.writerow(
+            [
+                o.order_no,
+                o.company_name,
+                o.store_id,
+                o.original_amount_fen,
+                o.discount_rate,
+                o.final_amount_fen,
+                o.billing_status,
+                str(o.ordered_at),
+            ]
+        )
 
     filename = f"corporate_bill_{corporate_customer_id}_{date_from}_{date_to}.csv"
     return PlainTextResponse(

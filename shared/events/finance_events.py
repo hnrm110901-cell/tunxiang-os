@@ -3,6 +3,7 @@
 财务域所有跨服务事件均通过 FinanceEvent 传递，事件类型由 FinanceEventType 枚举定义。
 Redis Stream key: finance_events
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -20,20 +21,20 @@ class FinanceEventType(str, Enum):
     """
 
     # ── 日报类 ─────────────────────────────────────────────────────
-    DAILY_PL_GENERATED = "finance.daily_pl.generated"       # 日P&L生成
+    DAILY_PL_GENERATED = "finance.daily_pl.generated"  # 日P&L生成
 
     # ── 成本类 ─────────────────────────────────────────────────────
-    COST_RATE_EXCEEDED = "finance.cost_rate.exceeded"        # 成本率超标
-    GROSS_MARGIN_WARNING = "finance.gross_margin.warning"    # 毛利率预警
+    COST_RATE_EXCEEDED = "finance.cost_rate.exceeded"  # 成本率超标
+    GROSS_MARGIN_WARNING = "finance.gross_margin.warning"  # 毛利率预警
 
     # ── 月结类 ─────────────────────────────────────────────────────
     MONTHLY_CLOSE_COMPLETED = "finance.monthly_close.completed"  # 月结完成
 
     # ── 预算类 ─────────────────────────────────────────────────────
-    BUDGET_OVERRUN = "finance.budget.overrun"                # 预算超支
+    BUDGET_OVERRUN = "finance.budget.overrun"  # 预算超支
 
     # ── 发票类 ─────────────────────────────────────────────────────
-    INVOICE_PENDING = "finance.invoice.pending"              # 发票待处理
+    INVOICE_PENDING = "finance.invoice.pending"  # 发票待处理
 
 
 @dataclass
@@ -57,7 +58,5 @@ class FinanceEvent:
     entity_id: UUID
     event_data: dict
     event_id: str = field(default_factory=lambda: str(uuid4()))
-    occurred_at: datetime = field(
-        default_factory=lambda: datetime.now(timezone.utc)
-    )
+    occurred_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     source_service: str = "tx-finance"

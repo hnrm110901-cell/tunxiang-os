@@ -3,6 +3,7 @@
 流程: 申购单 → 店长审批 → 区域审批 → 总部审批(按金额分级) → 转采购订单
 状态机: draft → pending_approval → store_approved → region_approved → approved → converted → rejected
 """
+
 from __future__ import annotations
 
 import uuid
@@ -15,9 +16,9 @@ log = structlog.get_logger(__name__)
 
 # 审批金额分级阈值 (单位: 分)
 APPROVAL_THRESHOLDS = {
-    "store": 500_000,       # <= 5000 元: 店长即可审批
-    "region": 2_000_000,    # <= 20000 元: 区域审批
-    "hq": float("inf"),     # > 20000 元: 总部审批
+    "store": 500_000,  # <= 5000 元: 店长即可审批
+    "region": 2_000_000,  # <= 20000 元: 区域审批
+    "hq": float("inf"),  # > 20000 元: 总部审批
 }
 
 REQUISITION_STATES = {
@@ -89,9 +90,7 @@ async def create_requisition(
 
     req_id = _gen_id("req")
     now = _now_iso()
-    total_fen = sum(
-        i.get("estimated_price_fen", 0) * i.get("quantity", 1) for i in items
-    )
+    total_fen = sum(i.get("estimated_price_fen", 0) * i.get("quantity", 1) for i in items)
     approval_level = _determine_approval_level(total_fen)
 
     record: Dict[str, Any] = {
@@ -158,13 +157,15 @@ async def create_replenishment(
             target = max(daily_usage * 7, safety * 2)
             qty = max(0, target - current)
             if qty > 0:
-                replenish_items.append({
-                    "ingredient_id": item.get("ingredient_id"),
-                    "name": item.get("name", ""),
-                    "quantity": round(qty, 2),
-                    "unit": item.get("unit", ""),
-                    "estimated_price_fen": item.get("estimated_price_fen", 0),
-                })
+                replenish_items.append(
+                    {
+                        "ingredient_id": item.get("ingredient_id"),
+                        "name": item.get("name", ""),
+                        "quantity": round(qty, 2),
+                        "unit": item.get("unit", ""),
+                        "estimated_price_fen": item.get("estimated_price_fen", 0),
+                    }
+                )
 
     if not replenish_items:
         log.info(
@@ -181,9 +182,7 @@ async def create_replenishment(
             "message": "所有商品库存充足, 无需补货",
         }
 
-    record = await create_requisition(
-        store_id, replenish_items, "system_auto", tenant_id, db
-    )
+    record = await create_requisition(store_id, replenish_items, "system_auto", tenant_id, db)
     record["source"] = "auto_replenishment"
 
     log.info(
@@ -221,9 +220,7 @@ async def submit_for_approval(
     """
     if requisition is not None:
         if requisition.get("status") != "draft":
-            raise ValueError(
-                f"只有草稿状态可提交审批, 当前状态: {requisition.get('status')}"
-            )
+            raise ValueError(f"只有草稿状态可提交审批, 当前状态: {requisition.get('status')}")
         requisition["status"] = "pending_approval"
         requisition["submitted_at"] = _now_iso()
         requisition["updated_at"] = _now_iso()
@@ -299,19 +296,11 @@ async def approve_requisition(
 
         # 根据审批角色和金额级别决定下一状态
         if approver_role == "store_manager":
-            new_status = (
-                "approved" if approval_level == "store" else "store_approved"
-            )
+            new_status = "approved" if approval_level == "store" else "store_approved"
         elif approver_role == "region_manager":
             if current_status not in ("pending_approval", "store_approved"):
-                raise ValueError(
-                    f"区域审批要求状态为 pending_approval 或 store_approved, "
-                    f"当前: {current_status}"
-                )
-            new_status = (
-                "approved" if approval_level in ("store", "region")
-                else "region_approved"
-            )
+                raise ValueError(f"区域审批要求状态为 pending_approval 或 store_approved, 当前: {current_status}")
+            new_status = "approved" if approval_level in ("store", "region") else "region_approved"
         elif approver_role == "hq_manager":
             new_status = "approved"
 
@@ -376,9 +365,7 @@ async def convert_to_purchase(
     """
     if requisition is not None:
         if requisition.get("status") != "approved":
-            raise ValueError(
-                f"只有已审批状态可转采购, 当前状态: {requisition.get('status')}"
-            )
+            raise ValueError(f"只有已审批状态可转采购, 当前状态: {requisition.get('status')}")
         requisition["status"] = "converted"
         requisition["updated_at"] = _now_iso()
 

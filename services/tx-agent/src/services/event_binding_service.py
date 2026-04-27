@@ -2,6 +2,7 @@
 
 从 DB 读取 event_agent_bindings 表，支持动态增删改查映射规则。
 """
+
 from __future__ import annotations
 
 from uuid import UUID
@@ -146,7 +147,9 @@ class EventBindingService:
             [{"agent_id": "...", "action": "...", "priority": N, "condition": {...}}, ...]
         """
         bindings = await self.list_bindings(
-            tenant_id, event_type=event_type, enabled_only=True,
+            tenant_id,
+            event_type=event_type,
+            enabled_only=True,
         )
         return [
             {

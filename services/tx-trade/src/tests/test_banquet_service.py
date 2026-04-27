@@ -2,6 +2,7 @@
 
 测试数据基于徐记海鲜典型宴会场景。
 """
+
 import pytest
 
 from ..services.banquet_service import (
@@ -39,6 +40,7 @@ def svc():
 
 
 # ─── 1. 线索管理 ───
+
 
 class TestInquiry:
     def test_create_wedding_inquiry(self, svc: BanquetService):
@@ -128,6 +130,7 @@ class TestInquiry:
 
 
 # ─── 2. AI方案推荐 ───
+
 
 class TestProposal:
     def test_generate_wedding_proposal(self, svc: BanquetService):
@@ -228,6 +231,7 @@ class TestProposal:
 
 # ─── 3. 成本测算 ───
 
+
 class TestCostEstimate:
     def test_estimate_cost(self, svc: BanquetService):
         inq = svc.create_inquiry("张先生", "wedding", 200, (10000000, 20000000), "2026-05-18")
@@ -256,6 +260,7 @@ class TestCostEstimate:
 
 
 # ─── 4. 合同确认 ───
+
 
 class TestBooking:
     def _create_proposal(self, svc: BanquetService) -> tuple[str, str]:
@@ -339,6 +344,7 @@ class TestBooking:
 
 # ─── 5. 执行检查清单 ───
 
+
 class TestChecklist:
     def _create_booking(self, svc: BanquetService) -> str:
         inq = svc.create_inquiry("张先生", "wedding", 200, (10000000, 20000000), "2026-05-18")
@@ -384,6 +390,7 @@ class TestChecklist:
 
 
 # ─── 6. 结算与复盘 ───
+
 
 class TestSettlement:
     def _full_booking(self, svc: BanquetService) -> str:
@@ -474,6 +481,7 @@ class TestSettlement:
 
 # ─── 7. 数据配置完整性 ───
 
+
 class TestConfig:
     def test_all_event_types_have_config(self):
         for event_type in ["wedding", "birthday", "business", "team_building", "anniversary"]:
@@ -487,8 +495,7 @@ class TestConfig:
     def test_all_event_types_have_tier_pricing(self):
         for tier in ["economy", "standard", "premium"]:
             for event_type in EVENT_TYPE_CONFIG:
-                assert event_type in TIER_PRICING[tier], \
-                    f"Missing pricing for {tier}/{event_type}"
+                assert event_type in TIER_PRICING[tier], f"Missing pricing for {tier}/{event_type}"
 
     def test_all_event_types_have_menu_templates(self):
         for event_type in EVENT_TYPE_CONFIG:
@@ -502,11 +509,11 @@ class TestConfig:
             economy = TIER_PRICING["economy"][event_type]
             standard = TIER_PRICING["standard"][event_type]
             premium = TIER_PRICING["premium"][event_type]
-            assert economy < standard < premium, \
-                f"{event_type}: pricing not ordered correctly"
+            assert economy < standard < premium, f"{event_type}: pricing not ordered correctly"
 
 
 # ─── 8. 端到端流程 ───
+
 
 class TestEndToEnd:
     def test_full_banquet_lifecycle(self, svc: BanquetService):

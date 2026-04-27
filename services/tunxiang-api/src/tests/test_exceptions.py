@@ -15,6 +15,7 @@ import pytest
 # 辅助：一次性导入全部异常类
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture()
 def all_exception_classes():
     from shared.core.exceptions import (
@@ -42,6 +43,7 @@ def all_exception_classes():
         VectorDBError,
         WeComWebhookError,
     )
+
     return {
         "TunxiangBaseError": TunxiangBaseError,
         "ExternalAPIError": ExternalAPIError,
@@ -73,20 +75,24 @@ def all_exception_classes():
 # 基本实例化与 context
 # ---------------------------------------------------------------------------
 
+
 class TestTunxiangBaseError:
     def test_instantiate_with_message(self):
         from shared.core.exceptions import TunxiangBaseError
+
         err = TunxiangBaseError("something went wrong")
         assert str(err) == "something went wrong"
         assert err.message == "something went wrong"
 
     def test_default_context_is_empty_dict(self):
         from shared.core.exceptions import TunxiangBaseError
+
         err = TunxiangBaseError("oops")
         assert err.context == {}
 
     def test_custom_context(self):
         from shared.core.exceptions import TunxiangBaseError
+
         ctx = {"store_id": "S001", "amount": 12345}
         err = TunxiangBaseError("oops", context=ctx)
         assert err.context["store_id"] == "S001"
@@ -94,12 +100,14 @@ class TestTunxiangBaseError:
 
     def test_has_timestamp(self):
         from shared.core.exceptions import TunxiangBaseError
+
         err = TunxiangBaseError("oops")
         assert err.timestamp is not None
         assert isinstance(err.timestamp, str)
 
     def test_is_exception_subclass(self):
         from shared.core.exceptions import TunxiangBaseError
+
         assert issubclass(TunxiangBaseError, Exception)
 
 
@@ -107,15 +115,18 @@ class TestTunxiangBaseError:
 # to_dict() 序列化
 # ---------------------------------------------------------------------------
 
+
 class TestToDict:
     def test_to_dict_keys(self):
         from shared.core.exceptions import TunxiangBaseError
+
         err = TunxiangBaseError("fail", context={"key": "val"})
         d = err.to_dict()
         assert set(d.keys()) == {"error_type", "message", "context", "timestamp"}
 
     def test_to_dict_error_type(self):
         from shared.core.exceptions import PinzhiAPIError
+
         err = PinzhiAPIError("timeout", context={"url": "/api/orders"})
         d = err.to_dict()
         assert d["error_type"] == "PinzhiAPIError"
@@ -124,6 +135,7 @@ class TestToDict:
 
     def test_to_dict_on_leaf_class(self):
         from shared.core.exceptions import AgentConstraintViolation
+
         err = AgentConstraintViolation("budget exceeded", context={"budget": 5000})
         d = err.to_dict()
         assert d["error_type"] == "AgentConstraintViolation"
@@ -134,10 +146,12 @@ class TestToDict:
 # TenantIsolationError 自动 logger.critical
 # ---------------------------------------------------------------------------
 
+
 class TestTenantIsolationError:
     def test_logs_critical_on_init(self):
         with patch("shared.core.exceptions.logger") as mock_logger:
             from shared.core.exceptions import TenantIsolationError
+
             TenantIsolationError(
                 "跨租户访问",
                 context={"source_tenant": "T001", "target_tenant": "T002"},
@@ -150,12 +164,14 @@ class TestTenantIsolationError:
     def test_is_tunxiang_base_error(self):
         with patch("shared.core.exceptions.logger"):
             from shared.core.exceptions import TenantIsolationError, TunxiangBaseError
+
             err = TenantIsolationError("breach")
             assert isinstance(err, TunxiangBaseError)
 
     def test_to_dict_works(self):
         with patch("shared.core.exceptions.logger"):
             from shared.core.exceptions import TenantIsolationError
+
             err = TenantIsolationError("breach", context={"detail": "x"})
             d = err.to_dict()
             assert d["error_type"] == "TenantIsolationError"
@@ -164,6 +180,7 @@ class TestTenantIsolationError:
 # ---------------------------------------------------------------------------
 # 继承关系 (isinstance)
 # ---------------------------------------------------------------------------
+
 
 class TestInheritanceHierarchy:
     """验证完整的继承树"""
@@ -180,6 +197,7 @@ class TestInheritanceHierarchy:
             TunxiangBaseError,
             WeComWebhookError,
         )
+
         # POSAdapterError 子类
         for cls in [PinzhiAPIError, AoqiweiAPIError, MeituanAPIError]:
             err = cls("test")
@@ -201,6 +219,7 @@ class TestInheritanceHierarchy:
             ReconciliationMismatchError,
             TunxiangBaseError,
         )
+
         err = ReconciliationMismatchError("mismatch")
         assert isinstance(err, DataValidationError)
         assert isinstance(err, TunxiangBaseError)
@@ -213,6 +232,7 @@ class TestInheritanceHierarchy:
             ServiceTimeoutError,
             TunxiangBaseError,
         )
+
         for cls in [MarginViolationError, FoodSafetyError, ServiceTimeoutError]:
             err = cls("test")
             assert isinstance(err, BusinessRuleError)
@@ -226,6 +246,7 @@ class TestInheritanceHierarchy:
             TunxiangBaseError,
             VectorDBError,
         )
+
         for cls in [CacheConnectionError, VectorDBError, ModelRouterError]:
             err = cls("test")
             assert isinstance(err, InfrastructureError)
@@ -238,6 +259,7 @@ class TestInheritanceHierarchy:
             AgentError,
             TunxiangBaseError,
         )
+
         for cls in [AgentDecisionError, AgentConstraintViolation]:
             err = cls("test")
             assert isinstance(err, AgentError)
@@ -246,6 +268,7 @@ class TestInheritanceHierarchy:
     def test_tenant_isolation_is_direct_child(self):
         with patch("shared.core.exceptions.logger"):
             from shared.core.exceptions import TenantIsolationError, TunxiangBaseError
+
             err = TenantIsolationError("breach")
             assert isinstance(err, TunxiangBaseError)
             from shared.core.exceptions import (
@@ -254,6 +277,7 @@ class TestInheritanceHierarchy:
                 ExternalAPIError,
                 InfrastructureError,
             )
+
             assert not isinstance(err, ExternalAPIError)
             assert not isinstance(err, BusinessRuleError)
             assert not isinstance(err, InfrastructureError)
@@ -263,6 +287,7 @@ class TestInheritanceHierarchy:
 # ---------------------------------------------------------------------------
 # 全部异常可实例化
 # ---------------------------------------------------------------------------
+
 
 class TestAllExceptionsInstantiable:
     def test_all_classes_instantiate_with_context(self, all_exception_classes):

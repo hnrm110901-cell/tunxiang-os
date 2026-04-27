@@ -16,6 +16,7 @@
   语义标记端点：{"ok": true, "data": {"content": "...", "printer_hint": "receipt"}}
 前端调用：TXBridge.print(data.base64) 或 TXBridge.print(data.content)
 """
+
 from typing import Optional
 
 import structlog
@@ -51,12 +52,14 @@ def _ok(data: dict) -> dict:
 
 # ─── 请求模型 ──────────────────────────────────────────────────────────────────
 
+
 class StoreConfigModel(BaseModel):
     paper_width_mm: int = Field(default=80, description="纸宽毫米：58 或 80")
 
 
 class WeighTicketReq(BaseModel):
     """活鲜称重单请求。"""
+
     store_name: str = Field(..., description="门店名称")
     table_no: Optional[str] = Field(default="", description="桌号")
     waiter_name: Optional[str] = Field(default="", description="服务员姓名")
@@ -143,6 +146,7 @@ class CreditTicketReq(BaseModel):
 
 # ─── 端点 ──────────────────────────────────────────────────────────────────────
 
+
 @router.post("/weigh-ticket", summary="生成活鲜称重单打印数据")
 async def gen_weigh_ticket(req: WeighTicketReq, request: Request) -> dict:
     """生成活鲜称重单 ESC/POS base64 数据。
@@ -154,28 +158,30 @@ async def gen_weigh_ticket(req: WeighTicketReq, request: Request) -> dict:
     try:
         store_cfg = req.store_config.model_dump() if req.store_config else None
         record = {
-            "store_name":      req.store_name,
-            "table_no":        req.table_no or "",
-            "waiter_name":     req.waiter_name or "",
-            "weigh_time":      req.weigh_time,
-            "dish_name":       req.dish_name,
-            "tank_name":       req.tank_name or "",
-            "weight_gram":     req.weight_gram,
-            "unit_price_fen":  req.unit_price_fen,
-            "price_unit":      req.price_unit,
-            "amount_fen":      req.amount_fen,
-            "ticket_no":       req.ticket_no or "",
+            "store_name": req.store_name,
+            "table_no": req.table_no or "",
+            "waiter_name": req.waiter_name or "",
+            "weigh_time": req.weigh_time,
+            "dish_name": req.dish_name,
+            "tank_name": req.tank_name or "",
+            "weight_gram": req.weight_gram,
+            "unit_price_fen": req.unit_price_fen,
+            "price_unit": req.price_unit,
+            "amount_fen": req.amount_fen,
+            "ticket_no": req.ticket_no or "",
         }
         b64 = generate_weigh_ticket(record, store_config=store_cfg)
     except (ValueError, KeyError, UnicodeEncodeError) as exc:
         logger.error("weigh_ticket_error", error=str(exc))
         raise HTTPException(status_code=422, detail=f"生成称重单失败: {exc}") from exc
 
-    return _ok({
-        "base64": b64,
-        "content_type": "application/escpos",
-        "description": f"活鲜称重单 - {req.dish_name} - {req.weight_gram}g",
-    })
+    return _ok(
+        {
+            "base64": b64,
+            "content_type": "application/escpos",
+            "description": f"活鲜称重单 - {req.dish_name} - {req.weight_gram}g",
+        }
+    )
 
 
 @router.post("/banquet-notice", summary="生成宴席通知单打印数据")
@@ -190,8 +196,8 @@ async def gen_banquet_notice(req: BanquetNoticeReq, request: Request) -> dict:
             {
                 "section_type": sec.section_type,
                 "section_name": sec.section_name,
-                "sort_order":   sec.sort_order,
-                "dishes":       [d.model_dump() for d in sec.dishes],
+                "sort_order": sec.sort_order,
+                "dishes": [d.model_dump() for d in sec.dishes],
             }
             for sec in req.menu_sections
         ]
@@ -200,11 +206,13 @@ async def gen_banquet_notice(req: BanquetNoticeReq, request: Request) -> dict:
         logger.error("banquet_notice_error", error=str(exc))
         raise HTTPException(status_code=422, detail=f"生成宴席通知单失败: {exc}") from exc
 
-    return _ok({
-        "base64": b64,
-        "content_type": "application/escpos",
-        "description": f"宴席通知单 - {req.session.customer_name} - {req.session.start_time}",
-    })
+    return _ok(
+        {
+            "base64": b64,
+            "content_type": "application/escpos",
+            "description": f"宴席通知单 - {req.session.customer_name} - {req.session.start_time}",
+        }
+    )
 
 
 @router.post("/credit-ticket", summary="生成企业挂账单打印数据")
@@ -221,11 +229,13 @@ async def gen_credit_ticket(req: CreditTicketReq, request: Request) -> dict:
         logger.error("credit_ticket_error", error=str(exc))
         raise HTTPException(status_code=422, detail=f"生成挂账单失败: {exc}") from exc
 
-    return _ok({
-        "base64": b64,
-        "content_type": "application/escpos",
-        "description": f"企业挂账单 - {req.credit_info.company_name} - {req.order.order_no}",
-    })
+    return _ok(
+        {
+            "base64": b64,
+            "content_type": "application/escpos",
+            "description": f"企业挂账单 - {req.credit_info.company_name} - {req.order.order_no}",
+        }
+    )
 
 
 # ─── 新格式端点：语义标记文本（语义DSL，供 TXBridge.print(content) 使用）──────
@@ -233,6 +243,7 @@ async def gen_credit_ticket(req: CreditTicketReq, request: Request) -> dict:
 
 class LiveSeafoodReceiptItemReq(BaseModel):
     """活鲜称重单单项。"""
+
     dish_name: str = Field(..., description="菜品名称")
     tank_zone: str = Field(..., description="鱼缸区域，如'A1鱼缸'")
     weight_kg: float = Field(..., ge=0, description="重量（千克）")
@@ -244,6 +255,7 @@ class LiveSeafoodReceiptItemReq(BaseModel):
 
 class LiveSeafoodReceiptReq(BaseModel):
     """活鲜称重单请求（语义标记版本）。"""
+
     store_name: str = Field(..., description="门店名称")
     table_no: str = Field(default="", description="桌台编号")
     printed_at: str = Field(default="", description="打印时间，如'2026-04-02 18:35'")
@@ -254,6 +266,7 @@ class LiveSeafoodReceiptReq(BaseModel):
 
 class BanquetSectionItemReq(BaseModel):
     """宴席节次菜品条目。"""
+
     name: str = Field(..., description="菜品名称")
     qty_per_table: int = Field(default=1, ge=1, description="每桌份数")
     note: str = Field(default="", description="备注，如'提前1小时腌制'")
@@ -261,6 +274,7 @@ class BanquetSectionItemReq(BaseModel):
 
 class BanquetSectionReq(BaseModel):
     """宴席出品节次。"""
+
     section_name: str = Field(..., description="节次名称，如'冷盘'")
     serve_time: str = Field(default="", description="上桌时间，如'18:30'")
     items: list[BanquetSectionItemReq] = Field(default_factory=list)
@@ -268,6 +282,7 @@ class BanquetSectionReq(BaseModel):
 
 class BanquetNoticeV2Req(BaseModel):
     """宴席通知单请求（语义标记版本，新字段结构）。"""
+
     store_name: str = Field(..., description="门店名称")
     banquet_name: str = Field(default="", description="宴席名称")
     session_no: int = Field(default=1, ge=1, description="场次编号")
@@ -305,11 +320,13 @@ async def gen_live_seafood_receipt(req: LiveSeafoodReceiptReq, request: Request)
         item_count=len(req.items),
         total_fen=req.total_fen,
     )
-    return _ok({
-        "content": content,
-        "printer_hint": "receipt",
-        "description": f"活鲜称重单 - {req.table_no} - {req.total_fen}分",
-    })
+    return _ok(
+        {
+            "content": content,
+            "printer_hint": "receipt",
+            "description": f"活鲜称重单 - {req.table_no} - {req.total_fen}分",
+        }
+    )
 
 
 @router.get("/live-seafood-receipt/preview", summary="活鲜称重单 Mock 预览")
@@ -320,12 +337,14 @@ async def preview_live_seafood_receipt(
     mock = _mock_live_seafood_receipt()
     mock["table_no"] = table_no
     content = render_live_seafood_receipt(mock)
-    return _ok({
-        "content": content,
-        "printer_hint": "receipt",
-        "mock": True,
-        "description": f"[MOCK] 活鲜称重单预览 - 桌号{table_no}",
-    })
+    return _ok(
+        {
+            "content": content,
+            "printer_hint": "receipt",
+            "mock": True,
+            "description": f"[MOCK] 活鲜称重单预览 - 桌号{table_no}",
+        }
+    )
 
 
 @router.post("/banquet-notice-v2", summary="生成宴席通知单（语义标记文本，新格式）")
@@ -349,11 +368,13 @@ async def gen_banquet_notice_v2(req: BanquetNoticeV2Req, request: Request) -> di
         dept=req.dept,
         table_count=req.table_count,
     )
-    return _ok({
-        "content": content,
-        "printer_hint": "receipt",
-        "description": f"宴席通知单 - {req.banquet_name} - {req.dept or '全档口'}",
-    })
+    return _ok(
+        {
+            "content": content,
+            "printer_hint": "receipt",
+            "description": f"宴席通知单 - {req.banquet_name} - {req.dept or '全档口'}",
+        }
+    )
 
 
 @router.get("/banquet-notice-v2/preview", summary="宴席通知单 Mock 预览")
@@ -363,9 +384,11 @@ async def preview_banquet_notice_v2(
     """返回 Mock 数据渲染的宴席通知单预览，供开发调试使用。不需要 X-Tenant-ID。"""
     mock = _mock_banquet_notice(dept=dept)
     content = render_banquet_notice(mock)
-    return _ok({
-        "content": content,
-        "printer_hint": "receipt",
-        "mock": True,
-        "description": f"[MOCK] 宴席通知单预览 - 档口:{dept}",
-    })
+    return _ok(
+        {
+            "content": content,
+            "printer_hint": "receipt",
+            "mock": True,
+            "description": f"[MOCK] 宴席通知单预览 - 档口:{dept}",
+        }
+    )

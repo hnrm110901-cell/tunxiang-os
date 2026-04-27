@@ -24,6 +24,7 @@
 # CREATE POLICY financial_vouchers_tenant_isolation ON financial_vouchers
 #     USING (tenant_id = current_setting('app.tenant_id')::UUID);
 """
+
 import uuid
 from datetime import date, datetime
 from typing import Any
@@ -61,77 +62,48 @@ class FinancialVoucher(Base):
     - confirmed : 已确认（财务审核通过）
     - exported  : 已导出（推送金蝶/用友等ERP）
     """
+
     __tablename__ = "financial_vouchers"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
-    tenant_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), nullable=False, index=True
-    )
-    store_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), nullable=False, index=True
-    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False, index=True)
+    store_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False, index=True)
 
     # 凭证标识
     voucher_no: Mapped[str] = mapped_column(
-        String(50), nullable=False, unique=True,
-        comment="凭证编号，格式: V{store_short}{YYYYMMDD}{SEQ}"
+        String(50), nullable=False, unique=True, comment="凭证编号，格式: V{store_short}{YYYYMMDD}{SEQ}"
     )
-    voucher_date: Mapped[date] = mapped_column(
-        Date, nullable=False, index=True,
-        comment="凭证日期（业务日期）"
-    )
+    voucher_date: Mapped[date] = mapped_column(Date, nullable=False, index=True, comment="凭证日期（业务日期）")
     voucher_type: Mapped[str] = mapped_column(
-        String(20), nullable=False,
-        comment="凭证类型: sales/cost/payment/receipt"
+        String(20), nullable=False, comment="凭证类型: sales/cost/payment/receipt"
     )
 
     # 金额
-    total_amount: Mapped[float] = mapped_column(
-        Numeric(12, 2), nullable=False,
-        comment="凭证总金额（元）"
-    )
+    total_amount: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False, comment="凭证总金额（元）")
 
     # 分录（JSONB）
     entries: Mapped[list[dict[str, Any]]] = mapped_column(
-        JSONB, nullable=False, default=list,
-        comment="会计分录列表 [{account_code, debit, credit, summary}]"
+        JSONB, nullable=False, default=list, comment="会计分录列表 [{account_code, debit, credit, summary}]"
     )
 
     # 来源追溯
-    source_type: Mapped[str | None] = mapped_column(
-        String(30),
-        comment="来源类型: order/settlement/payment"
-    )
-    source_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True),
-        comment="来源单据ID（订单ID/日结ID等）"
-    )
+    source_type: Mapped[str | None] = mapped_column(String(30), comment="来源类型: order/settlement/payment")
+    source_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), comment="来源单据ID（订单ID/日结ID等）")
 
     # 状态
     status: Mapped[str] = mapped_column(
-        String(20), default="draft", index=True,
-        comment="状态: draft/confirmed/exported"
+        String(20), default="draft", index=True, comment="状态: draft/confirmed/exported"
     )
-    exported_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True),
-        comment="导出到ERP的时间"
-    )
+    exported_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), comment="导出到ERP的时间")
 
     # 时间戳
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
 
     __table_args__ = (
-        Index(
-            "idx_financial_vouchers_tenant_store_date",
-            "tenant_id", "store_id", "voucher_date"
-        ),
+        Index("idx_financial_vouchers_tenant_store_date", "tenant_id", "store_id", "voucher_date"),
         Index("idx_financial_vouchers_status", "tenant_id", "status"),
     )
 

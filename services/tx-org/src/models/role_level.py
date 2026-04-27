@@ -1,4 +1,5 @@
 """角色级别体系 — 角色权限配置与校验"""
+
 from typing import Literal
 
 from sqlalchemy import Integer, String
@@ -11,6 +12,7 @@ DataQueryLimit = Literal["unlimited", "7d", "30d", "90d", "1y"]
 
 class RoleConfig(TenantBase):
     """角色权限配置"""
+
     __tablename__ = "role_configs"
 
     role_name: Mapped[str] = mapped_column(String(50), nullable=False, comment="角色名称")
@@ -20,7 +22,9 @@ class RoleConfig(TenantBase):
     max_tip_off_fen: Mapped[int] = mapped_column(Integer, default=0, comment="最大抹零金额(分)")
     max_gift_fen: Mapped[int] = mapped_column(Integer, default=0, comment="最大赠送金额(分)")
     max_order_gift_fen: Mapped[int] = mapped_column(Integer, default=0, comment="最大整单赠送金额(分)")
-    data_query_limit: Mapped[str] = mapped_column(String(20), default="7d", comment="数据查询范围: unlimited/7d/30d/90d/1y")
+    data_query_limit: Mapped[str] = mapped_column(
+        String(20), default="7d", comment="数据查询范围: unlimited/7d/30d/90d/1y"
+    )
 
 
 # ---- 纯函数：角色权限校验 ----

@@ -5,6 +5,7 @@
   - live_seafood_query_routes.py (2 endpoints: GET /tanks, GET /tanks/{zone_code}/dishes)
 测试数量：≥ 12
 """
+
 import sys
 import types
 import unittest.mock as _mock
@@ -14,9 +15,11 @@ _structlog = types.ModuleType("structlog")
 _structlog.get_logger = lambda *a, **kw: _mock.MagicMock()
 sys.modules.setdefault("structlog", _structlog)
 
+
 # ── Mock shared.ontology.src.database ────────────────────────────────
 async def _fake_get_db():
     yield None
+
 
 _shared = types.ModuleType("shared")
 _shared_onto = types.ModuleType("shared.ontology")
@@ -33,6 +36,7 @@ _src_pkg = types.ModuleType("src")
 _src_svc = types.ModuleType("src.services")
 _pub_svc = types.ModuleType("src.services.publish_service")
 
+
 def _fake_create_publish_plan(plan_name, dish_ids, target_store_ids, schedule_time=None):
     return {
         "plan_id": "plan-001",
@@ -43,8 +47,10 @@ def _fake_create_publish_plan(plan_name, dish_ids, target_store_ids, schedule_ti
         "status": "pending",
     }
 
+
 def _fake_execute_publish(plan_id, dish_data, target_stores):
     return {"plan_id": plan_id, "published_count": len(target_stores), "status": "published"}
+
 
 def _fake_create_price_adjustment(store_id, adjustment_type, rules):
     return {
@@ -54,6 +60,7 @@ def _fake_create_price_adjustment(store_id, adjustment_type, rules):
         "rules": rules,
     }
 
+
 _pub_svc.create_publish_plan = _fake_create_publish_plan
 _pub_svc.execute_publish = _fake_execute_publish
 _pub_svc.create_price_adjustment = _fake_create_price_adjustment
@@ -61,12 +68,13 @@ sys.modules.setdefault("src", _src_pkg)
 sys.modules.setdefault("src.services", _src_svc)
 sys.modules.setdefault("src.services.publish_service", _pub_svc)
 
-import pytest
 import importlib.util
 import pathlib
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from unittest.mock import AsyncMock, MagicMock, patch
 
 MENU_SRC = pathlib.Path(__file__).parent.parent
 
@@ -84,6 +92,7 @@ def _load_module(rel_path: str, name: str):
 # ════════════════════════════════════════════════════════════════════
 # PART A — search_routes.py  (3 endpoints)
 # ════════════════════════════════════════════════════════════════════
+
 
 @pytest.fixture(scope="module")
 def search_client():
@@ -109,9 +118,7 @@ class TestSearchRoutes:
         async def fake_get_db():
             yield mock_db
 
-        with patch.object(
-            sys.modules["shared.ontology.src.database"], "get_db", fake_get_db
-        ):
+        with patch.object(sys.modules["shared.ontology.src.database"], "get_db", fake_get_db):
             r = search_client.get(
                 "/api/v1/menu/search/hot-keywords",
                 headers={"X-Tenant-ID": TENANT_ID},
@@ -143,9 +150,7 @@ class TestSearchRoutes:
         async def fake_get_db():
             yield mock_db
 
-        with patch.object(
-            sys.modules["shared.ontology.src.database"], "get_db", fake_get_db
-        ):
+        with patch.object(sys.modules["shared.ontology.src.database"], "get_db", fake_get_db):
             r = search_client.get(
                 "/api/v1/menu/search",
                 params={"q": "海鲜"},
@@ -174,9 +179,7 @@ class TestSearchRoutes:
         async def fake_get_db():
             yield mock_db
 
-        with patch.object(
-            sys.modules["shared.ontology.src.database"], "get_db", fake_get_db
-        ):
+        with patch.object(sys.modules["shared.ontology.src.database"], "get_db", fake_get_db):
             r = search_client.post(
                 "/api/v1/menu/search/record",
                 json={"keyword": "清蒸鱼", "source": "miniapp"},
@@ -192,6 +195,7 @@ class TestSearchRoutes:
 # ════════════════════════════════════════════════════════════════════
 # PART B — publish.py  (4 endpoints)
 # ════════════════════════════════════════════════════════════════════
+
 
 @pytest.fixture(scope="module")
 def publish_client():
@@ -258,9 +262,7 @@ class TestPublishRoutes:
         payload = {
             "store_id": STORE_ID,
             "adjustment_type": "percentage",
-            "rules": [
-                {"condition": "weekend", "price_modifier": 10, "description": "周末加价10%"}
-            ],
+            "rules": [{"condition": "weekend", "price_modifier": 10, "description": "周末加价10%"}],
         }
         r = publish_client.post("/api/v1/menu/price-adjustments", json=payload)
         assert r.status_code == 200
@@ -293,6 +295,7 @@ class TestPublishRoutes:
 # PART C — live_seafood_query_routes.py  (2 endpoints)
 # ════════════════════════════════════════════════════════════════════
 
+
 @pytest.fixture(scope="module")
 def seafood_query_client():
     mod = _load_module("api/live_seafood_query_routes.py", "live_seafood_query_routes")
@@ -320,9 +323,7 @@ class TestLiveSeafoodQueryRoutes:
         async def fake_get_db():
             yield mock_db
 
-        with patch.object(
-            sys.modules["shared.ontology.src.database"], "get_db", fake_get_db
-        ):
+        with patch.object(sys.modules["shared.ontology.src.database"], "get_db", fake_get_db):
             r = seafood_query_client.get(
                 "/api/v1/live-seafood/tanks",
                 params={"store_id": STORE_ID},
@@ -356,9 +357,7 @@ class TestLiveSeafoodQueryRoutes:
         async def fake_get_db():
             yield mock_db
 
-        with patch.object(
-            sys.modules["shared.ontology.src.database"], "get_db", fake_get_db
-        ):
+        with patch.object(sys.modules["shared.ontology.src.database"], "get_db", fake_get_db):
             r = seafood_query_client.get(
                 "/api/v1/live-seafood/tanks/NOTEXIST/dishes",
                 params={"store_id": STORE_ID},

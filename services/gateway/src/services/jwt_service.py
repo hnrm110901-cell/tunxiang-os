@@ -12,9 +12,10 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
-import structlog
 import jwt
-from jwt.exceptions import ExpiredSignatureError, InvalidTokenError as JWTError
+import structlog
+from jwt.exceptions import ExpiredSignatureError
+from jwt.exceptions import InvalidTokenError as JWTError
 
 logger = structlog.get_logger(__name__)
 

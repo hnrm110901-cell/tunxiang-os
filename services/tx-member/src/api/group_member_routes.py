@@ -8,6 +8,7 @@
 
 响应格式统一：{ "ok": bool, "data": {}, "error": {} }
 """
+
 from __future__ import annotations
 
 from typing import Optional
@@ -39,6 +40,7 @@ router = APIRouter(prefix="/api/v1/group", tags=["group-member"])
 # 请求体模型
 # ─────────────────────────────────────────────────────────────────
 
+
 class EarnPointsBody(BaseModel):
     group_id: UUID = Field(..., description="集团 ID")
     points: int = Field(..., gt=0, description="积分数量（正整数）")
@@ -63,6 +65,7 @@ class TransferPointsBody(BaseModel):
 # ─────────────────────────────────────────────────────────────────
 # 依赖项：解析 X-Group-ID / X-Tenant-ID header
 # ─────────────────────────────────────────────────────────────────
+
 
 def _require_group_id(
     x_group_id: str = Header(..., alias="X-Group-ID"),
@@ -100,6 +103,7 @@ def _optional_operator_id(
 # 统一响应包装 & 异常处理
 # ─────────────────────────────────────────────────────────────────
 
+
 def _ok(data: object) -> dict:
     return {"ok": True, "data": data}
 
@@ -122,6 +126,7 @@ def _handle_service_error(exc: Exception) -> None:
 # ─────────────────────────────────────────────────────────────────
 # 路由
 # ─────────────────────────────────────────────────────────────────
+
 
 @router.get(
     "/members/{phone}/profile",
@@ -217,10 +222,7 @@ async def earn_group_points(
 @router.post(
     "/members/{phone}/points/use",
     summary="使用集团积分",
-    description=(
-        "在指定品牌消费集团积分。使用行锁防止并发超扣。\n"
-        "写入 cross_brand_transactions（type=points_use）。"
-    ),
+    description=("在指定品牌消费集团积分。使用行锁防止并发超扣。\n写入 cross_brand_transactions（type=points_use）。"),
 )
 async def use_group_points(
     phone: str,

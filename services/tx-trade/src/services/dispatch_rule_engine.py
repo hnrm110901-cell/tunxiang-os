@@ -6,6 +6,7 @@
 缓存策略：每个 (tenant_id, store_id) 的规则列表缓存5分钟，
 规则增删改时通过 invalidate_store_cache() 失效。
 """
+
 import uuid
 from datetime import datetime
 from typing import Optional
@@ -40,6 +41,7 @@ def invalidate_store_cache(tenant_id: str, store_id: str) -> None:
 
 def _is_cache_valid(key: str) -> bool:
     import time as _time
+
     if key not in _rule_cache:
         return False
     _, expire_ts = _rule_cache[key]
@@ -53,6 +55,7 @@ async def _load_rules(
 ) -> list[DispatchRule]:
     """加载门店所有启用规则（按 priority DESC），优先从缓存读取。"""
     import time as _time
+
     key = _cache_key(tenant_id, store_id)
 
     if _is_cache_valid(key):
@@ -169,8 +172,10 @@ class DispatchRuleEngine:
             fallback，若DishDeptMapping也无映射则返回 (None, None)。
         """
         log = logger.bind(
-            tenant_id=tenant_id, store_id=store_id,
-            dish_id=dish_id, channel=channel,
+            tenant_id=tenant_id,
+            store_id=store_id,
+            dish_id=dish_id,
+            channel=channel,
         )
 
         dish_uuid = uuid.UUID(dish_id) if dish_id else None
@@ -272,6 +277,7 @@ class DispatchRuleEngine:
             order_time = datetime.fromisoformat(order_time_str)
         else:
             from datetime import timezone
+
             order_time = datetime.now(timezone.utc)
 
         matched = _rule_matches(rule, dish_uuid, dish_category, brand_uuid, channel, order_time)

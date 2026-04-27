@@ -273,7 +273,7 @@ class OTAManager:
             headers["Range"] = f"bytes={downloaded_bytes}-"
 
         try:
-            async with httpx.AsyncClient(timeout=None) as client:
+            async with httpx.AsyncClient(timeout=None) as client:  # noqa: S113 — OTA 大文件流式下载，故意 disable 总超时
                 async with client.stream("GET", update.download_url, headers=headers) as resp:
                     if resp.status_code == 416:
                         # Range Not Satisfiable - 文件已完整下载

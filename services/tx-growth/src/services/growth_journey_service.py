@@ -5,6 +5,7 @@ growth_journey_enrollments 三张表。
 
 金额单位：分(fen)
 """
+
 import asyncio
 import json
 import uuid as uuid_module
@@ -34,8 +35,13 @@ class GrowthJourneyService:
     VALID_JOURNEY_TYPES = ("repurchase", "reactivation", "repair", "upsell", "referral")
     VALID_STEP_TYPES = ("touch", "wait", "decision", "observe", "offer", "exit")
     VALID_ENROLLMENT_STATES = (
-        "eligible", "active", "paused", "waiting_observe",
-        "completed", "exited", "cancelled",
+        "eligible",
+        "active",
+        "paused",
+        "waiting_observe",
+        "completed",
+        "exited",
+        "cancelled",
     )
     # enrollment 允许的状态转换
     _ACTIVE_STATES = ("eligible", "active", "paused", "waiting_observe")
@@ -54,9 +60,7 @@ class GrowthJourneyService:
     # A. 模板 CRUD
     # ==================================================================
 
-    async def create_template(
-        self, data: dict, tenant_id: str, db: AsyncSession
-    ) -> dict:
+    async def create_template(self, data: dict, tenant_id: str, db: AsyncSession) -> dict:
         """INSERT growth_journey_templates + batch INSERT steps"""
         await self._set_tenant(db, tenant_id)
 
@@ -183,9 +187,7 @@ class GrowthJourneyService:
         items = [dict(r._mapping) for r in rows_result.fetchall()]
         return {"items": items, "total": total}
 
-    async def get_template(
-        self, template_id: UUID, tenant_id: str, db: AsyncSession
-    ) -> Optional[dict]:
+    async def get_template(self, template_id: UUID, tenant_id: str, db: AsyncSession) -> Optional[dict]:
         """SELECT template + JOIN steps ORDER BY step_no"""
         await self._set_tenant(db, tenant_id)
 
@@ -220,9 +222,7 @@ class GrowthJourneyService:
         template["steps"] = [dict(s._mapping) for s in steps_result.fetchall()]
         return template
 
-    async def update_template(
-        self, template_id: UUID, data: dict, tenant_id: str, db: AsyncSession
-    ) -> dict:
+    async def update_template(self, template_id: UUID, data: dict, tenant_id: str, db: AsyncSession) -> dict:
         """UPDATE template + 重建steps"""
         await self._set_tenant(db, tenant_id)
 
@@ -318,9 +318,7 @@ class GrowthJourneyService:
         logger.info("journey_template_updated", template_id=str(template_id), tenant_id=tenant_id)
         return template
 
-    async def activate_template(
-        self, template_id: UUID, tenant_id: str, db: AsyncSession
-    ) -> dict:
+    async def activate_template(self, template_id: UUID, tenant_id: str, db: AsyncSession) -> dict:
         """UPDATE is_active=true"""
         await self._set_tenant(db, tenant_id)
         result = await db.execute(
@@ -338,9 +336,7 @@ class GrowthJourneyService:
         logger.info("journey_template_activated", template_id=str(template_id), tenant_id=tenant_id)
         return dict(row._mapping)
 
-    async def deactivate_template(
-        self, template_id: UUID, tenant_id: str, db: AsyncSession
-    ) -> dict:
+    async def deactivate_template(self, template_id: UUID, tenant_id: str, db: AsyncSession) -> dict:
         """UPDATE is_active=false"""
         await self._set_tenant(db, tenant_id)
         result = await db.execute(
@@ -417,9 +413,7 @@ class GrowthJourneyService:
         items = [dict(r._mapping) for r in rows_result.fetchall()]
         return {"items": items, "total": total}
 
-    async def get_enrollment(
-        self, enrollment_id: UUID, tenant_id: str, db: AsyncSession
-    ) -> Optional[dict]:
+    async def get_enrollment(self, enrollment_id: UUID, tenant_id: str, db: AsyncSession) -> Optional[dict]:
         """获取单个enrollment详情"""
         await self._set_tenant(db, tenant_id)
 
@@ -464,10 +458,13 @@ class GrowthJourneyService:
         # ── 门店能力校验（V2.3）──
         # 如果指定了store_id，检查门店是否存在且活跃
         if store_id:
-            store_check = await db.execute(text("""
+            store_check = await db.execute(
+                text("""
                 SELECT id, is_active FROM stores
                 WHERE id = :sid AND tenant_id = :tid AND is_deleted = FALSE
-            """), {"sid": str(store_id), "tid": tenant_id})
+            """),
+                {"sid": str(store_id), "tid": tenant_id},
+            )
             store_row = store_check.fetchone()
             if not store_row:
                 raise ValueError(f"Store {store_id} not found")
@@ -475,11 +472,14 @@ class GrowthJourneyService:
                 raise ValueError(f"Store {store_id} is inactive")
 
         # 如果模板有brand_scope=specific，校验brand_id在allowed_brand_ids中
-        template_scope = await db.execute(text("""
+        template_scope = await db.execute(
+            text("""
             SELECT brand_scope, allowed_brand_ids
             FROM growth_journey_templates
             WHERE id = :tid AND is_deleted = FALSE
-        """), {"tid": str(template_id)})
+        """),
+            {"tid": str(template_id)},
+        )
         scope_row = template_scope.fetchone()
         if scope_row and scope_row[0] == "specific":
             allowed_raw = scope_row[1] or []
@@ -501,23 +501,25 @@ class GrowthJourneyService:
             {"tid": tenant_id, "tmpl_id": str(template_id), "cid": str(customer_id)},
         )
         if dup.fetchone() is not None:
-            raise ValueError(
-                f"Customer {customer_id} already has an active enrollment for template {template_id}"
-            )
+            raise ValueError(f"Customer {customer_id} already has an active enrollment for template {template_id}")
 
         # ── A/B测试分组（如果模板关联了ab_test） ──
         ab_test_id = None
         ab_variant = None
 
-        template_ab = await db.execute(text("""
+        template_ab = await db.execute(
+            text("""
             SELECT ab_test_id FROM growth_journey_templates
             WHERE id = :tid AND is_deleted = FALSE
-        """), {"tid": str(template_id)})
+        """),
+            {"tid": str(template_id)},
+        )
         ab_row = template_ab.fetchone()
         if ab_row and ab_row[0]:
             ab_test_id = str(ab_row[0])
             try:
                 from services.ab_test_service import ABTestService
+
                 ab_svc = ABTestService()
                 ab_variant = await ab_svc.assign_variant(
                     test_id=uuid_module.UUID(ab_test_id),
@@ -526,14 +528,11 @@ class GrowthJourneyService:
                     tenant_id=uuid_module.UUID(tenant_id),
                     db=db,
                 )
-                logger.info("ab_test_assigned",
-                            enrollment_customer=str(customer_id),
-                            ab_test_id=ab_test_id,
-                            variant=ab_variant)
+                logger.info(
+                    "ab_test_assigned", enrollment_customer=str(customer_id), ab_test_id=ab_test_id, variant=ab_variant
+                )
             except (ValueError, RuntimeError, OSError) as exc:
-                logger.warning("ab_test_assignment_failed",
-                               error=str(exc),
-                               ab_test_id=ab_test_id)
+                logger.warning("ab_test_assignment_failed", error=str(exc), ab_test_id=ab_test_id)
                 ab_variant = "control"  # 分组失败默认走control
 
         enrollment_id = str(uuid4())
@@ -597,9 +596,7 @@ class GrowthJourneyService:
         )
         return enrollment
 
-    async def advance_enrollment(
-        self, enrollment_id: UUID, tenant_id: str, db: AsyncSession
-    ) -> dict:
+    async def advance_enrollment(self, enrollment_id: UUID, tenant_id: str, db: AsyncSession) -> dict:
         """核心推进逻辑 — 根据当前step类型分派执行"""
         await self._set_tenant(db, tenant_id)
 
@@ -620,9 +617,7 @@ class GrowthJourneyService:
         enr = dict(enr_row._mapping)
         current_state = enr["journey_state"]
         if current_state not in ("eligible", "active", "waiting_observe"):
-            raise ValueError(
-                f"Cannot advance enrollment in state '{current_state}'"
-            )
+            raise ValueError(f"Cannot advance enrollment in state '{current_state}'")
 
         template_id = enr["template_id"]
         current_step_no = enr["current_step_no"]
@@ -699,36 +694,51 @@ class GrowthJourneyService:
 
                 # 安全：只允许查询白名单字段
                 _ALLOWED_FIELDS = {
-                    "psych_distance_level", "super_user_level", "growth_milestone_stage",
-                    "referral_scenario", "repurchase_stage", "reactivation_priority",
-                    "service_repair_status", "has_active_owned_benefit",
+                    "psych_distance_level",
+                    "super_user_level",
+                    "growth_milestone_stage",
+                    "referral_scenario",
+                    "repurchase_stage",
+                    "reactivation_priority",
+                    "service_repair_status",
+                    "has_active_owned_benefit",
                 }
                 if field_name in _ALLOWED_FIELDS:
-                    profile_result = await db.execute(text(
-                        f"SELECT {field_name} FROM customer_growth_profiles"  # noqa: S608
-                        " WHERE customer_id = :cid AND is_deleted = FALSE"
-                    ), {"cid": str(customer_id)})
+                    profile_result = await db.execute(
+                        text(
+                            f"SELECT {field_name} FROM customer_growth_profiles"  # noqa: S608
+                            " WHERE customer_id = :cid AND is_deleted = FALSE"
+                        ),
+                        {"cid": str(customer_id)},
+                    )
                     row = profile_result.fetchone()
                     actual_value = row[0] if row else None
 
                     matched = False
                     if op == "eq":
-                        matched = (actual_value == expected_value)
+                        matched = actual_value == expected_value
                     elif op == "ne":
-                        matched = (actual_value != expected_value)
+                        matched = actual_value != expected_value
                     elif op == "in":
-                        matched = (actual_value in (expected_value if isinstance(expected_value, list) else [expected_value]))
+                        matched = actual_value in (
+                            expected_value if isinstance(expected_value, list) else [expected_value]
+                        )
                     elif op == "not_in":
-                        matched = (actual_value not in (expected_value if isinstance(expected_value, list) else [expected_value]))
+                        matched = actual_value not in (
+                            expected_value if isinstance(expected_value, list) else [expected_value]
+                        )
 
                     goto_step = decision_rule.get("true_next") if matched else decision_rule.get("false_next")
 
             elif check_type == "has_active_owned_benefit":
                 # 检查客户是否持有有效权益
-                profile_result = await db.execute(text("""
+                profile_result = await db.execute(
+                    text("""
                     SELECT has_active_owned_benefit FROM customer_growth_profiles
                     WHERE customer_id = :cid AND is_deleted = FALSE
-                """), {"cid": str(customer_id)})
+                """),
+                    {"cid": str(customer_id)},
+                )
                 row = profile_result.fetchone()
                 has_benefit = row[0] if row else False
                 goto_step = decision_rule.get("true_next") if has_benefit else decision_rule.get("false_next")
@@ -737,43 +747,54 @@ class GrowthJourneyService:
                 # 检查某步骤的触达是否已被打开
                 touch_step = decision_rule.get("touch_step_no")
                 if touch_step and enrollment_id:
-                    touch_result = await db.execute(text("""
+                    touch_result = await db.execute(
+                        text("""
                         SELECT execution_state FROM growth_touch_executions
                         WHERE journey_enrollment_id = :eid AND step_no = :sno AND is_deleted = FALSE
                         ORDER BY created_at DESC LIMIT 1
-                    """), {"eid": str(enrollment_id), "sno": touch_step})
+                    """),
+                        {"eid": str(enrollment_id), "sno": touch_step},
+                    )
                     trow = touch_result.fetchone()
                     opened = trow is not None and trow[0] in ("opened", "clicked", "replied")
                     goto_step = decision_rule.get("true_next") if opened else decision_rule.get("false_next")
 
             elif check_type == "ab_variant":
                 # A/B测试变体分支
-                enr_ab = await db.execute(text("""
+                enr_ab = await db.execute(
+                    text("""
                     SELECT ab_variant FROM growth_journey_enrollments
                     WHERE id = :eid AND is_deleted = FALSE
-                """), {"eid": str(enrollment_id)})
+                """),
+                    {"eid": str(enrollment_id)},
+                )
                 ab_row = enr_ab.fetchone()
                 enrollment_variant = ab_row[0] if ab_row and ab_row[0] else "control"
                 expected_variant = decision_rule.get("value", "control")
-                matched = (enrollment_variant == expected_variant)
+                matched = enrollment_variant == expected_variant
                 goto_step = decision_rule.get("true_next") if matched else decision_rule.get("false_next")
 
             elif check_type == "has_revisited":
                 # 查客户是否在旅程期间有新订单
-                profile_result = await db.execute(text("""
+                profile_result = await db.execute(
+                    text("""
                     SELECT last_order_at FROM customer_growth_profiles
                     WHERE customer_id = :cid AND is_deleted = FALSE
-                """), {"cid": str(customer_id)})
+                """),
+                    {"cid": str(customer_id)},
+                )
                 row = profile_result.fetchone()
                 # 读enrollment的entered_at作为基准
-                enr_entered = await db.execute(text("""
+                enr_entered = await db.execute(
+                    text("""
                     SELECT entered_at FROM growth_journey_enrollments
                     WHERE id = :eid AND is_deleted = FALSE
-                """), {"eid": str(enrollment_id)})
+                """),
+                    {"eid": str(enrollment_id)},
+                )
                 enr_row = enr_entered.fetchone()
                 entered_at = enr_row[0] if enr_row else None
-                revisited = (row is not None and row[0] is not None
-                             and entered_at is not None and row[0] > entered_at)
+                revisited = row is not None and row[0] is not None and entered_at is not None and row[0] > entered_at
                 goto_step = decision_rule.get("true_next") if revisited else decision_rule.get("false_next")
 
             # 如果没有匹配的check_type，走默认success分支
@@ -855,9 +876,7 @@ class GrowthJourneyService:
         )
         return updated
 
-    async def pause_enrollment(
-        self, enrollment_id: UUID, reason: str, tenant_id: str, db: AsyncSession
-    ) -> dict:
+    async def pause_enrollment(self, enrollment_id: UUID, reason: str, tenant_id: str, db: AsyncSession) -> dict:
         """state -> paused"""
         await self._set_tenant(db, tenant_id)
 
@@ -873,9 +892,7 @@ class GrowthJourneyService:
         if cur_row is None:
             raise ValueError(f"Enrollment {enrollment_id} not found")
         if cur_row._mapping["journey_state"] not in ("eligible", "active", "waiting_observe"):
-            raise ValueError(
-                f"Cannot pause enrollment in state '{cur_row._mapping['journey_state']}'"
-            )
+            raise ValueError(f"Cannot pause enrollment in state '{cur_row._mapping['journey_state']}'")
 
         result = await db.execute(
             text("""
@@ -904,9 +921,7 @@ class GrowthJourneyService:
         logger.info("enrollment_paused", enrollment_id=str(enrollment_id), reason=reason)
         return updated
 
-    async def resume_enrollment(
-        self, enrollment_id: UUID, tenant_id: str, db: AsyncSession
-    ) -> dict:
+    async def resume_enrollment(self, enrollment_id: UUID, tenant_id: str, db: AsyncSession) -> dict:
         """state -> active"""
         await self._set_tenant(db, tenant_id)
 
@@ -948,9 +963,7 @@ class GrowthJourneyService:
         logger.info("enrollment_resumed", enrollment_id=str(enrollment_id))
         return updated
 
-    async def cancel_enrollment(
-        self, enrollment_id: UUID, tenant_id: str, db: AsyncSession
-    ) -> dict:
+    async def cancel_enrollment(self, enrollment_id: UUID, tenant_id: str, db: AsyncSession) -> dict:
         """state -> cancelled"""
         await self._set_tenant(db, tenant_id)
 
@@ -995,9 +1008,7 @@ class GrowthJourneyService:
     # C. 批量处理到期enrollment
     # ==================================================================
 
-    async def process_pending(
-        self, tenant_id: Optional[str], db: AsyncSession
-    ) -> dict:
+    async def process_pending(self, tenant_id: Optional[str], db: AsyncSession) -> dict:
         """批量处理到期enrollment: state IN ('active','waiting_observe') AND next_execute_at <= NOW()"""
         if tenant_id is not None:
             await self._set_tenant(db, tenant_id)

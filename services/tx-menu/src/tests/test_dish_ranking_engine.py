@@ -2,9 +2,10 @@
 P3-04 菜品5因子动态排名引擎测试
 测试：排名评分完整性 / 权重校验 / 四象限矩阵完整性
 """
+
 import pytest
-from fastapi.testclient import TestClient
 from fastapi import FastAPI
+from fastapi.testclient import TestClient
 
 from ..api.dish_ranking_engine_routes import router
 
@@ -16,6 +17,7 @@ STORE_ID = "store-test-001"
 
 
 # ─── Test 1: 获取排名，验证5因子评分完整性 ────────────────────────────────────
+
 
 class TestRankingReturnScores:
     """test_ranking_returns_scores — 每道菜含5因子scores，composite_score在0-1之间，rank从1开始递增"""
@@ -34,24 +36,23 @@ class TestRankingReturnScores:
         required_factors = {"volume", "margin", "reorder", "satisfaction", "trend"}
         for dish in items:
             assert "scores" in dish, f"菜品 {dish.get('dish_name')} 缺少 scores 字段"
-            assert required_factors == set(dish["scores"].keys()), \
+            assert required_factors == set(dish["scores"].keys()), (
                 f"菜品 {dish.get('dish_name')} 因子不完整: {dish['scores'].keys()}"
+            )
 
     def test_composite_score_between_0_and_1(self):
         resp = client.get(f"/api/v1/menu/ranking/dishes?store_id={STORE_ID}")
         items = resp.json()["data"]["items"]
         for dish in items:
             score = dish["composite_score"]
-            assert 0.0 <= score <= 1.0, \
-                f"菜品 {dish['dish_name']} 综合分 {score} 超出 [0, 1] 范围"
+            assert 0.0 <= score <= 1.0, f"菜品 {dish['dish_name']} 综合分 {score} 超出 [0, 1] 范围"
 
     def test_individual_factor_scores_in_range(self):
         resp = client.get(f"/api/v1/menu/ranking/dishes?store_id={STORE_ID}")
         items = resp.json()["data"]["items"]
         for dish in items:
             for factor, val in dish["scores"].items():
-                assert 0.0 <= val <= 1.0, \
-                    f"菜品 {dish['dish_name']} 因子 {factor} 得分 {val} 超出范围"
+                assert 0.0 <= val <= 1.0, f"菜品 {dish['dish_name']} 因子 {factor} 得分 {val} 超出范围"
 
     def test_rank_starts_from_1_and_increments(self):
         resp = client.get(f"/api/v1/menu/ranking/dishes?store_id={STORE_ID}")
@@ -59,8 +60,7 @@ class TestRankingReturnScores:
         ranks = [d["rank"] for d in items]
         assert ranks[0] == 1, f"第一名应为1，实际为 {ranks[0]}"
         for i in range(len(ranks) - 1):
-            assert ranks[i] < ranks[i + 1], \
-                f"排名必须递增，第{i+1}名={ranks[i]}，第{i+2}名={ranks[i+1]}"
+            assert ranks[i] < ranks[i + 1], f"排名必须递增，第{i + 1}名={ranks[i]}，第{i + 2}名={ranks[i + 1]}"
 
     def test_rank_change_field_exists(self):
         resp = client.get(f"/api/v1/menu/ranking/dishes?store_id={STORE_ID}")
@@ -75,8 +75,9 @@ class TestRankingReturnScores:
         valid_tags = {"明星菜品", "现金牛", "问题菜品", "瘦狗", "潜力菜品"}
         for dish in items:
             assert "recommendation_tag" in dish
-            assert dish["recommendation_tag"] in valid_tags, \
+            assert dish["recommendation_tag"] in valid_tags, (
                 f"菜品 {dish['dish_name']} 标签 {dish['recommendation_tag']} 不在允许集合中"
+            )
 
     def test_limit_parameter_works(self):
         resp = client.get(f"/api/v1/menu/ranking/dishes?store_id={STORE_ID}&limit=5")
@@ -93,6 +94,7 @@ class TestRankingReturnScores:
 
 
 # ─── Test 2: 权重更新校验 ─────────────────────────────────────────────────────
+
 
 class TestWeightUpdateValidation:
     """test_weight_update_validation — 5因子和=1.00时OK，和≠1.00时400"""
@@ -172,6 +174,7 @@ class TestWeightUpdateValidation:
 
 # ─── Test 3: 四象限矩阵完整性 ────────────────────────────────────────────────
 
+
 class TestMatrixQuadrantCoverage:
     """test_matrix_quadrant_coverage — 返回4个象限key，各象限含dishes列表"""
 
@@ -180,8 +183,7 @@ class TestMatrixQuadrantCoverage:
         assert resp.status_code == 200
         data = resp.json()["data"]
         required_keys = {"star", "cash_cow", "question", "dog"}
-        assert required_keys == set(data.keys()), \
-            f"四象限key不完整，实际: {set(data.keys())}"
+        assert required_keys == set(data.keys()), f"四象限key不完整，实际: {set(data.keys())}"
 
     def test_each_quadrant_has_dishes_list(self):
         resp = client.get(f"/api/v1/menu/ranking/matrix?store_id={STORE_ID}")
@@ -213,8 +215,7 @@ class TestMatrixQuadrantCoverage:
         for quadrant in data.values():
             all_dish_names.extend([d["dish_name"] for d in quadrant["dishes"]])
         # 每道菜只能属于一个象限
-        assert len(all_dish_names) == len(set(all_dish_names)), \
-            "存在菜品跨象限出现"
+        assert len(all_dish_names) == len(set(all_dish_names)), "存在菜品跨象限出现"
 
     def test_health_report_returns_all_sections(self):
         resp = client.get(f"/api/v1/menu/ranking/health-report?store_id={STORE_ID}")
@@ -230,8 +231,9 @@ class TestMatrixQuadrantCoverage:
         resp = client.get(f"/api/v1/menu/ranking/health-report?store_id={STORE_ID}")
         items = resp.json()["data"]["attention_needed"]
         for item in items:
-            assert item["composite_score"] < 0.30, \
+            assert item["composite_score"] < 0.30, (
                 f"菜品 {item['dish_name']} 综合分 {item['composite_score']} 不应进入关注列表（应 < 0.30）"
+            )
 
     def test_trends_endpoint_returns_series(self):
         resp = client.get("/api/v1/menu/ranking/trends?dish_id=dish-001&days=7")

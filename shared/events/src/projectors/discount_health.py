@@ -15,10 +15,11 @@
 设计：
   每条 discount.applied 事件到达，更新当日统计，增量计算，不全量重扫
 """
+
 from __future__ import annotations
 
 import json
-from datetime import date, datetime, timezone
+from datetime import date, datetime
 from typing import Any
 from uuid import UUID
 
@@ -39,7 +40,7 @@ class DiscountHealthProjector(ProjectorBase):
         "discount.revoked",
         "discount.threshold_exceeded",
         "discount.leak_detected",
-        "order.paid",   # 用于分母（总订单数）
+        "order.paid",  # 用于分母（总订单数）
     }
 
     async def handle(self, event: dict[str, Any], conn: object) -> None:
@@ -172,6 +173,7 @@ class DiscountHealthProjector(ProjectorBase):
 # 辅助函数
 # ──────────────────────────────────────────────────────────────────────
 
+
 def _classify_leak_type(payload: dict) -> str:
     """根据折扣事件 payload 分类泄漏类型。"""
     discount_type = payload.get("discount_type", "unknown")
@@ -181,9 +183,9 @@ def _classify_leak_type(payload: dict) -> str:
     if not has_approval and not margin_passed:
         return "unauthorized_margin_breach"  # 无授权且低于毛利底线
     if not has_approval:
-        return "unauthorized_discount"        # 无授权折扣
+        return "unauthorized_discount"  # 无授权折扣
     if not margin_passed:
-        return "authorized_margin_breach"     # 有授权但低于毛利底线
+        return "authorized_margin_breach"  # 有授权但低于毛利底线
     if discount_type == "free_item":
         return "free_item"
     if discount_type == "percent_off":

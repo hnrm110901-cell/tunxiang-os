@@ -10,6 +10,7 @@
 - 隐私合规检查
 - 多门店联合训练模拟
 """
+
 import math
 import os
 import sys
@@ -36,8 +37,7 @@ def registered_service(service: FederatedLearningService) -> FederatedLearningSe
         model_id="test_discount",
         model_type="discount_anomaly",
         description="测试折扣异常检测",
-        input_schema=["discount_rate", "order_amount", "time_of_day",
-                      "waiter_id", "table_type", "payment_method"],
+        input_schema=["discount_rate", "order_amount", "time_of_day", "waiter_id", "table_type", "payment_method"],
         output_schema="anomaly_score (0-1)",
     )
     return service
@@ -243,9 +243,7 @@ class TestGradientAggregation:
         assert "维度不匹配" in result["error"]
 
     def test_submit_to_nonexistent_round(self, service: FederatedLearningService):
-        result = service.submit_local_update(
-            "fake_round", "store_a", [0.1], {}, 10
-        )
+        result = service.submit_local_update("fake_round", "store_a", [0.1], {}, 10)
         assert result["ok"] is False
 
     def test_submit_by_non_participant(self, training_service: tuple):
@@ -271,19 +269,25 @@ class TestGradientAggregation:
         # FedAvg: (100*1.0 + 150*2.0 + 200*3.0) / 450 = 1000/450 ≈ 2.222
         # (但实际值会因差分隐私噪声偏离)
         svc.submit_local_update(
-            round_id, "store_a",
+            round_id,
+            "store_a",
             [1.0] * weight_count,
-            {"accuracy": 0.80}, 100,
+            {"accuracy": 0.80},
+            100,
         )
         svc.submit_local_update(
-            round_id, "store_b",
+            round_id,
+            "store_b",
             [2.0] * weight_count,
-            {"accuracy": 0.85}, 150,
+            {"accuracy": 0.85},
+            150,
         )
         svc.submit_local_update(
-            round_id, "store_c",
+            round_id,
+            "store_c",
             [3.0] * weight_count,
-            {"accuracy": 0.90}, 200,
+            {"accuracy": 0.90},
+            200,
         )
 
         result = svc.aggregate_updates(round_id)
@@ -318,9 +322,11 @@ class TestGradientAggregation:
 
         for store in ["store_a", "store_b", "store_c"]:
             svc.submit_local_update(
-                round_id, store,
+                round_id,
+                store,
                 [0.5] * weight_count,
-                {"accuracy": 0.80}, 100,
+                {"accuracy": 0.80},
+                100,
             )
 
         result = svc.aggregate_updates(round_id)
@@ -331,9 +337,7 @@ class TestGradientAggregation:
 
     def test_round_completes_on_target_reached(self, registered_service: FederatedLearningService):
         svc = registered_service
-        r = svc.create_training_round(
-            "test_discount", min_participants=2, target_metric="accuracy", target_value=0.80
-        )
+        r = svc.create_training_round("test_discount", min_participants=2, target_metric="accuracy", target_value=0.80)
         round_id = r["round"]["round_id"]
         svc.join_training_round(round_id, "s1", 100)
         svc.join_training_round(round_id, "s2", 100)
@@ -350,8 +354,11 @@ class TestGradientAggregation:
     def test_round_completes_on_max_rounds(self, registered_service: FederatedLearningService):
         svc = registered_service
         r = svc.create_training_round(
-            "test_discount", min_participants=2, max_rounds=1,
-            target_metric="accuracy", target_value=0.99,  # 不可能达到
+            "test_discount",
+            min_participants=2,
+            max_rounds=1,
+            target_metric="accuracy",
+            target_value=0.99,  # 不可能达到
         )
         round_id = r["round"]["round_id"]
         svc.join_training_round(round_id, "s1", 50)
@@ -395,9 +402,7 @@ class TestDifferentialPrivacy:
         diffs = [abs(noised[i] - gradients[i]) for i in range(5)]
         assert sum(diffs) > 0  # 至少有一些噪声
 
-    def test_noise_scale_increases_with_lower_epsilon(
-        self, service: FederatedLearningService
-    ):
+    def test_noise_scale_increases_with_lower_epsilon(self, service: FederatedLearningService):
         gradients = [1.0] * 10
         r1 = service.add_noise(gradients, epsilon=2.0)
         r2 = service.add_noise(gradients, epsilon=0.5)
@@ -419,9 +424,11 @@ class TestDifferentialPrivacy:
 
         # 提交一次，消耗 epsilon=1.0
         svc.submit_local_update(
-            round_id, "store_a",
+            round_id,
+            "store_a",
             [0.5] * weight_count,
-            {"accuracy": 0.8}, 100,
+            {"accuracy": 0.8},
+            100,
         )
 
         budget = svc.compute_privacy_budget("test_discount", "store_a")
@@ -439,9 +446,11 @@ class TestDifferentialPrivacy:
             round_id = r["round"]["round_id"]
             svc.join_training_round(round_id, "store_x", 100)
             svc.submit_local_update(
-                round_id, "store_x",
+                round_id,
+                "store_x",
                 [0.5] * weight_count,
-                {"accuracy": 0.8}, 100,
+                {"accuracy": 0.8},
+                100,
             )
 
         budget = svc.compute_privacy_budget("test_discount", "store_x")
@@ -453,9 +462,7 @@ class TestDifferentialPrivacy:
         assert result["total_epsilon_spent"] == 0.0
         assert len(result["violations"]) == 0
 
-    def test_check_privacy_compliance_exceeded(
-        self, registered_service: FederatedLearningService
-    ):
+    def test_check_privacy_compliance_exceeded(self, registered_service: FederatedLearningService):
         svc = registered_service
         # 直接设置已消耗预算超过上限
         svc._privacy_budgets[("test_discount", "store_exhaust")] = 10.0
@@ -464,9 +471,7 @@ class TestDifferentialPrivacy:
         assert result["compliant"] is False
         assert len(result["violations"]) > 0
 
-    def test_submit_blocked_when_budget_exhausted(
-        self, registered_service: FederatedLearningService
-    ):
+    def test_submit_blocked_when_budget_exhausted(self, registered_service: FederatedLearningService):
         svc = registered_service
         weight_count = svc._global_models["test_discount"]["weight_count"]
 
@@ -478,8 +483,11 @@ class TestDifferentialPrivacy:
         svc.join_training_round(round_id, "store_broke", 100)
 
         result = svc.submit_local_update(
-            round_id, "store_broke",
-            [0.5] * weight_count, {"accuracy": 0.8}, 100,
+            round_id,
+            "store_broke",
+            [0.5] * weight_count,
+            {"accuracy": 0.8},
+            100,
         )
         assert result["ok"] is False
         assert "隐私预算" in result["error"]
@@ -522,9 +530,7 @@ class TestModelDistribution:
         assert result["installed_version"] == "1.0.0"
         assert result["is_latest"] is True
 
-    def test_get_store_model_version_not_installed(
-        self, service: FederatedLearningService
-    ):
+    def test_get_store_model_version_not_installed(self, service: FederatedLearningService):
         result = service.get_store_model_version("unknown_store", "unknown_model")
         assert result["ok"] is False
 
@@ -537,9 +543,7 @@ class TestModelDistribution:
 
         # 然后做一轮聚合，版本变成 1.0.1
         for store in ["store_a", "store_b", "store_c"]:
-            svc.submit_local_update(
-                round_id, store, [0.5] * weight_count, {"accuracy": 0.8}, 100
-            )
+            svc.submit_local_update(round_id, store, [0.5] * weight_count, {"accuracy": 0.8}, 100)
         svc.aggregate_updates(round_id)
 
         # store_a 的版本应该过时了
@@ -570,7 +574,8 @@ class TestModelDistribution:
 class TestPerformanceTracking:
     def test_report_local_performance(self, service: FederatedLearningService):
         result = service.report_local_performance(
-            "store_1", "model_1",
+            "store_1",
+            "model_1",
             {"accuracy": 0.88, "loss": 0.15},
         )
         assert result["ok"] is True
@@ -594,9 +599,7 @@ class TestPerformanceTracking:
         # 平均 loss = 0.2
         assert abs(result["aggregated_metrics"]["loss"] - 0.2) < 0.01
 
-    def test_get_federated_performance_no_reports(
-        self, service: FederatedLearningService
-    ):
+    def test_get_federated_performance_no_reports(self, service: FederatedLearningService):
         result = service.get_federated_performance("nonexistent")
         assert result["ok"] is False
 
@@ -635,9 +638,7 @@ class TestMultiStoreSimulation:
         weight_count = svc._global_models[model_id]["weight_count"]
 
         # 创建训练轮次
-        round_result = svc.create_training_round(
-            model_id, min_participants=3, max_rounds=3
-        )
+        round_result = svc.create_training_round(model_id, min_participants=3, max_rounds=3)
         round_id = round_result["round"]["round_id"]
 
         # 5家门店加入
@@ -650,9 +651,7 @@ class TestMultiStoreSimulation:
         }
 
         for store_id, info in stores.items():
-            join_result = svc.join_training_round(
-                round_id, store_id, info["samples"]
-            )
+            join_result = svc.join_training_round(round_id, store_id, info["samples"])
             assert join_result["ok"] is True
 
         # 验证轮次已开始
@@ -664,11 +663,11 @@ class TestMultiStoreSimulation:
         for store_id, info in stores.items():
             # 模拟不同质量的权重
             base_weight = info["quality"]
-            weights = [
-                base_weight + (i * 0.01) for i in range(weight_count)
-            ]
+            weights = [base_weight + (i * 0.01) for i in range(weight_count)]
             svc.submit_local_update(
-                round_id, store_id, weights,
+                round_id,
+                store_id,
+                weights,
                 {"accuracy": info["quality"], "loss": 1.0 - info["quality"]},
                 info["samples"],
             )
@@ -698,8 +697,11 @@ class TestMultiStoreSimulation:
         weight_count = svc._global_models[model_id]["weight_count"]
 
         r = svc.create_training_round(
-            model_id, min_participants=2, max_rounds=5,
-            target_metric="accuracy", target_value=0.95,
+            model_id,
+            min_participants=2,
+            max_rounds=5,
+            target_metric="accuracy",
+            target_value=0.95,
         )
         round_id = r["round"]["round_id"]
         svc.join_training_round(round_id, "s1", 200)
@@ -712,12 +714,18 @@ class TestMultiStoreSimulation:
             acc2 = 0.72 + round_num * 0.06
 
             svc.submit_local_update(
-                round_id, "s1",
-                [acc1] * weight_count, {"accuracy": acc1}, 200,
+                round_id,
+                "s1",
+                [acc1] * weight_count,
+                {"accuracy": acc1},
+                200,
             )
             svc.submit_local_update(
-                round_id, "s2",
-                [acc2] * weight_count, {"accuracy": acc2}, 200,
+                round_id,
+                "s2",
+                [acc2] * weight_count,
+                {"accuracy": acc2},
+                200,
             )
 
             agg = svc.aggregate_updates(round_id)
@@ -731,9 +739,7 @@ class TestMultiStoreSimulation:
         for i in range(1, len(accuracies)):
             assert accuracies[i] > accuracies[i - 1]
 
-    def test_privacy_budget_across_rounds(
-        self, registered_service: FederatedLearningService
-    ):
+    def test_privacy_budget_across_rounds(self, registered_service: FederatedLearningService):
         """验证跨轮次隐私预算累积"""
         svc = registered_service
         model_id = "test_discount"
@@ -746,8 +752,11 @@ class TestMultiStoreSimulation:
             rid = r["round"]["round_id"]
             svc.join_training_round(rid, "store_privacy", 100)
             svc.submit_local_update(
-                rid, "store_privacy",
-                [0.5] * weight_count, {"accuracy": 0.8}, 100,
+                rid,
+                "store_privacy",
+                [0.5] * weight_count,
+                {"accuracy": 0.8},
+                100,
             )
             svc.aggregate_updates(rid)
 
@@ -755,9 +764,7 @@ class TestMultiStoreSimulation:
         assert budget["epsilon_spent"] == epsilon * total_rounds
         assert budget["epsilon_remaining"] == svc._max_privacy_budget - (epsilon * total_rounds)
 
-    def test_heterogeneous_sample_counts(
-        self, registered_service: FederatedLearningService
-    ):
+    def test_heterogeneous_sample_counts(self, registered_service: FederatedLearningService):
         """验证不同样本量下 FedAvg 加权正确性"""
         svc = registered_service
         model_id = "test_discount"
@@ -771,12 +778,18 @@ class TestMultiStoreSimulation:
         svc.join_training_round(rid, "small_store", 10)
 
         svc.submit_local_update(
-            rid, "big_store",
-            [1.0] * weight_count, {"accuracy": 0.90}, 1000,
+            rid,
+            "big_store",
+            [1.0] * weight_count,
+            {"accuracy": 0.90},
+            1000,
         )
         svc.submit_local_update(
-            rid, "small_store",
-            [5.0] * weight_count, {"accuracy": 0.60}, 10,
+            rid,
+            "small_store",
+            [5.0] * weight_count,
+            {"accuracy": 0.60},
+            10,
         )
 
         agg = svc.aggregate_updates(rid)

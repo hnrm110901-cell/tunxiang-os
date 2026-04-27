@@ -6,6 +6,7 @@
 全部 7 个 action 已实现。
 迁移自 tunxiang V2.x schedule/agent.py + ops_flow/agent.py
 """
+
 import statistics
 from typing import Any
 
@@ -26,9 +27,13 @@ class ServeDispatchAgent(SkillAgent):
 
     def get_supported_actions(self) -> list[str]:
         return [
-            "predict_serve_time", "optimize_schedule", "analyze_traffic",
-            "predict_staffing_needs", "detect_order_anomaly",
-            "trigger_chain_alert", "balance_workload",
+            "predict_serve_time",
+            "optimize_schedule",
+            "analyze_traffic",
+            "predict_staffing_needs",
+            "detect_order_anomaly",
+            "trigger_chain_alert",
+            "balance_workload",
         ]
 
     async def execute(self, action: str, params: dict[str, Any]) -> AgentResult:
@@ -56,11 +61,17 @@ class ServeDispatchAgent(SkillAgent):
         estimated = round(base + queue_delay)
 
         return AgentResult(
-            success=True, action="predict_serve_time",
-            data={"estimated_serve_minutes": estimated, "dish_count": dish_count,
-                  "queue_delay_minutes": round(queue_delay), "has_complex_dish": has_complex},
+            success=True,
+            action="predict_serve_time",
+            data={
+                "estimated_serve_minutes": estimated,
+                "dish_count": dish_count,
+                "queue_delay_minutes": round(queue_delay),
+                "has_complex_dish": has_complex,
+            },
             reasoning=f"预计出餐 {estimated} 分钟（{dish_count}道菜，队列{current_queue}单）",
-            confidence=0.85, inference_layer="edge",
+            confidence=0.85,
+            inference_layer="edge",
             # Sprint D1 / PR H 批次 2：填结构化 context 让 experience 约束真实生效
             # （checker 会验证 estimated <= max_serve_minutes 否则决策被拦截）
             context=ConstraintContext(
@@ -88,15 +99,20 @@ class ServeDispatchAgent(SkillAgent):
                 hours = peak_hours[:8] if peak_hours else list(range(10, 18))
             else:
                 hours = (off_peak + peak_hours)[:8]
-            schedule.append({"employee": emp.get("name", f"员工{i+1}"), "hours": hours})
+            schedule.append({"employee": emp.get("name", f"员工{i + 1}"), "hours": hours})
 
         cost_estimate = len(employees) * 15000  # 简化：150元/天/人
 
         return AgentResult(
-            success=True, action="optimize_schedule",
-            data={"schedule": schedule, "peak_hours": peak_hours,
-                  "staff_count": len(employees), "estimated_cost_fen": cost_estimate,
-                  "cost_within_budget": cost_estimate <= budget_fen if budget_fen else True},
+            success=True,
+            action="optimize_schedule",
+            data={
+                "schedule": schedule,
+                "peak_hours": peak_hours,
+                "staff_count": len(employees),
+                "estimated_cost_fen": cost_estimate,
+                "cost_within_budget": cost_estimate <= budget_fen if budget_fen else True,
+            },
             reasoning=f"为 {len(employees)} 人排班，高峰 {len(peak_hours)} 小时",
             confidence=0.75,
         )
@@ -115,10 +131,15 @@ class ServeDispatchAgent(SkillAgent):
         valleys = [{"hour": i, "customers": c} for i, c in enumerate(hourly_data) if c <= valley_threshold]
 
         return AgentResult(
-            success=True, action="analyze_traffic",
-            data={"total_customers": sum(hourly_data), "avg_hourly": round(avg, 1),
-                  "peak_hours": peaks, "valley_hours": valleys,
-                  "peak_ratio": round(max(hourly_data) / avg, 2) if avg > 0 else 0},
+            success=True,
+            action="analyze_traffic",
+            data={
+                "total_customers": sum(hourly_data),
+                "avg_hourly": round(avg, 1),
+                "peak_hours": peaks,
+                "valley_hours": valleys,
+                "peak_ratio": round(max(hourly_data) / avg, 2) if avg > 0 else 0,
+            },
             reasoning=f"日均时客流 {avg:.0f}，{len(peaks)} 个高峰，{len(valleys)} 个低谷",
             confidence=0.8,
         )
@@ -139,10 +160,14 @@ class ServeDispatchAgent(SkillAgent):
         total_staff_hours = sum(n["staff_needed"] for n in needs)
 
         return AgentResult(
-            success=True, action="predict_staffing_needs",
-            data={"staffing_needs": needs, "total_staff_hours": total_staff_hours,
-                  "max_concurrent": max(n["staff_needed"] for n in needs),
-                  "service_ratio": service_ratio},
+            success=True,
+            action="predict_staffing_needs",
+            data={
+                "staffing_needs": needs,
+                "total_staff_hours": total_staff_hours,
+                "max_concurrent": max(n["staff_needed"] for n in needs),
+                "service_ratio": service_ratio,
+            },
             reasoning=f"总需 {total_staff_hours} 人时，峰值 {max(n['staff_needed'] for n in needs)} 人",
             confidence=0.8,
         )
@@ -170,7 +195,8 @@ class ServeDispatchAgent(SkillAgent):
             anomalies.append({"type": "high_discount", "detail": f"折扣率 {discount_rate:.0%}", "severity": "medium"})
 
         return AgentResult(
-            success=True, action="detect_order_anomaly",
+            success=True,
+            action="detect_order_anomaly",
             data={"anomalies": anomalies, "is_anomaly": len(anomalies) > 0, "anomaly_count": len(anomalies)},
             reasoning=f"检测到 {len(anomalies)} 个异常" if anomalies else "无异常",
             confidence=0.85,
@@ -203,13 +229,19 @@ class ServeDispatchAgent(SkillAgent):
 
         # 发布到 Memory Bus
         bus = MemoryBus.get_instance()
-        bus.publish(Finding(
-            agent_id=self.agent_id, finding_type="chain_alert",
-            data=chain, confidence=0.9, store_id=self.store_id,
-        ))
+        bus.publish(
+            Finding(
+                agent_id=self.agent_id,
+                finding_type="chain_alert",
+                data=chain,
+                confidence=0.9,
+                store_id=self.store_id,
+            )
+        )
 
         return AgentResult(
-            success=True, action="trigger_chain_alert",
+            success=True,
+            action="trigger_chain_alert",
             data=chain,
             reasoning=f"链式告警：{event_type} → {len(chain['L2_related'])} 关联检查 → {len(chain['L3_actions'])} 行动",
             confidence=0.9,
@@ -233,17 +265,24 @@ class ServeDispatchAgent(SkillAgent):
         suggestions = []
         for over in overloaded:
             for under in underloaded:
-                suggestions.append({
-                    "from": over["name"], "to": under["name"],
-                    "transfer_orders": round(over["current_orders"] - avg_load),
-                })
+                suggestions.append(
+                    {
+                        "from": over["name"],
+                        "to": under["name"],
+                        "transfer_orders": round(over["current_orders"] - avg_load),
+                    }
+                )
 
         return AgentResult(
-            success=True, action="balance_workload",
-            data={"balance_score": round(balance_score, 1), "avg_load": round(avg_load, 1),
-                  "overloaded": [s["name"] for s in overloaded],
-                  "underloaded": [s["name"] for s in underloaded],
-                  "suggestions": suggestions},
+            success=True,
+            action="balance_workload",
+            data={
+                "balance_score": round(balance_score, 1),
+                "avg_load": round(avg_load, 1),
+                "overloaded": [s["name"] for s in overloaded],
+                "underloaded": [s["name"] for s in underloaded],
+                "suggestions": suggestions,
+            },
             reasoning=f"负载均衡度 {balance_score:.0f}%，{len(overloaded)} 人超载，{len(underloaded)} 人空闲",
             confidence=0.8,
         )

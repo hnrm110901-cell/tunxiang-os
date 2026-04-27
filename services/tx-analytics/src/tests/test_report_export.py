@@ -10,6 +10,7 @@
 7. to_excel 带金额列转换
 8. to_excel 自定义工作表名
 """
+
 import os
 import sys
 
@@ -74,7 +75,8 @@ class TestToExcel:
 
     def test_excel_with_money_columns(self):
         xlsx_bytes = to_excel(
-            SAMPLE_DATA, COLUMNS,
+            SAMPLE_DATA,
+            COLUMNS,
             money_columns={"revenue_fen"},
         )
         assert isinstance(xlsx_bytes, bytes)
@@ -82,7 +84,8 @@ class TestToExcel:
 
     def test_excel_custom_sheet_name(self):
         xlsx_bytes = to_excel(
-            SAMPLE_DATA, COLUMNS,
+            SAMPLE_DATA,
+            COLUMNS,
             sheet_name="营收报表",
         )
         assert isinstance(xlsx_bytes, bytes)
@@ -90,6 +93,7 @@ class TestToExcel:
         import io
 
         from openpyxl import load_workbook
+
         wb = load_workbook(io.BytesIO(xlsx_bytes))
         assert wb.sheetnames[0] == "营收报表"
         ws = wb.active
@@ -98,12 +102,14 @@ class TestToExcel:
 
     def test_excel_with_labels(self):
         xlsx_bytes = to_excel(
-            SAMPLE_DATA, COLUMNS,
+            SAMPLE_DATA,
+            COLUMNS,
             column_labels=LABELS,
         )
         import io
 
         from openpyxl import load_workbook
+
         wb = load_workbook(io.BytesIO(xlsx_bytes))
         ws = wb.active
         assert ws.cell(row=1, column=1).value == "门店名称"
@@ -113,6 +119,7 @@ class TestToExcel:
         import io
 
         from openpyxl import load_workbook
+
         wb = load_workbook(io.BytesIO(xlsx_bytes))
         ws = wb.active
         # 只有表头

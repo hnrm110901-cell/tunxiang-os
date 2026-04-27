@@ -3,6 +3,7 @@
 表：contract_templates / contract_signing_records (v252 迁移)
 合同编号格式：TX-{TYPE}-{YYYYMMDD}-{4位序号}  如 TX-LABOR-20260413-0001
 """
+
 from __future__ import annotations
 
 import json
@@ -178,19 +179,21 @@ class ESignatureService:
         )
         items = []
         for row in result.mappings().all():
-            items.append({
-                "id": str(row["id"]),
-                "template_name": row["template_name"],
-                "contract_type": row["contract_type"],
-                "contract_type_label": CONTRACT_TYPES.get(row["contract_type"], row["contract_type"]),
-                "content_html": row["content_html"],
-                "variables": row["variables"],
-                "is_active": row["is_active"],
-                "version": row["version"],
-                "created_by": str(row["created_by"]) if row["created_by"] else None,
-                "created_at": _serialize_dt(row["created_at"]),
-                "updated_at": _serialize_dt(row["updated_at"]),
-            })
+            items.append(
+                {
+                    "id": str(row["id"]),
+                    "template_name": row["template_name"],
+                    "contract_type": row["contract_type"],
+                    "contract_type_label": CONTRACT_TYPES.get(row["contract_type"], row["contract_type"]),
+                    "content_html": row["content_html"],
+                    "variables": row["variables"],
+                    "is_active": row["is_active"],
+                    "version": row["version"],
+                    "created_by": str(row["created_by"]) if row["created_by"] else None,
+                    "created_at": _serialize_dt(row["created_at"]),
+                    "updated_at": _serialize_dt(row["updated_at"]),
+                }
+            )
         return {"items": items, "total": total}
 
     async def get_template(self, template_id: str) -> dict[str, Any]:
@@ -299,6 +302,7 @@ class ESignatureService:
 
         # 日期校验
         from datetime import date as _date
+
         parsed_start = _date.fromisoformat(start_date)
         parsed_end = _date.fromisoformat(end_date)
         if parsed_end < parsed_start:
@@ -589,18 +593,20 @@ class ESignatureService:
         for row in result.mappings().all():
             end_d = row["end_date"]
             days_remaining = (end_d - today).days if isinstance(end_d, date) else 0
-            items.append({
-                "id": str(row["id"]),
-                "employee_id": str(row["employee_id"]),
-                "employee_name": row["employee_name"],
-                "contract_no": row["contract_no"],
-                "contract_type": row["contract_type"],
-                "contract_type_label": CONTRACT_TYPES.get(row["contract_type"], row["contract_type"]),
-                "store_id": str(row["store_id"]) if row["store_id"] else None,
-                "start_date": _serialize_dt(row["start_date"]),
-                "end_date": _serialize_dt(end_d),
-                "days_remaining": days_remaining,
-            })
+            items.append(
+                {
+                    "id": str(row["id"]),
+                    "employee_id": str(row["employee_id"]),
+                    "employee_name": row["employee_name"],
+                    "contract_no": row["contract_no"],
+                    "contract_type": row["contract_type"],
+                    "contract_type_label": CONTRACT_TYPES.get(row["contract_type"], row["contract_type"]),
+                    "store_id": str(row["store_id"]) if row["store_id"] else None,
+                    "start_date": _serialize_dt(row["start_date"]),
+                    "end_date": _serialize_dt(end_d),
+                    "days_remaining": days_remaining,
+                }
+            )
         return items
 
     # ────────────────────── 统计 ──────────────────────────

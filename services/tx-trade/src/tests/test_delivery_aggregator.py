@@ -3,18 +3,19 @@ Y-A5 外卖聚合深度 — 测试套件
 测试目标：delivery_aggregator_routes + aggregator_reconcile_routes
 共 15 个测试用例
 """
+
 import pytest
-from fastapi.testclient import TestClient
 from fastapi import FastAPI
+from fastapi.testclient import TestClient
+
+from ..api import aggregator_reconcile_routes as rec_mod
+from ..api import delivery_aggregator_routes as agg_mod
+from ..api.aggregator_reconcile_routes import router as reconcile_router
 
 # ──────────────────────────────────────────────────────────────────────────────
 # 测试 App 初始化（隔离内存存储，避免测试互相污染）
 # ──────────────────────────────────────────────────────────────────────────────
-
 from ..api.delivery_aggregator_routes import router as aggregator_router
-from ..api.aggregator_reconcile_routes import router as reconcile_router
-from ..api import delivery_aggregator_routes as agg_mod
-from ..api import aggregator_reconcile_routes as rec_mod
 
 
 @pytest.fixture(autouse=True)
@@ -80,6 +81,7 @@ def _make_payload(**overrides):
 # 1. test_webhook_meituan_new_order
 # ──────────────────────────────────────────────────────────────────────────────
 
+
 def test_webhook_meituan_new_order(client):
     """美团新订单 Webhook → 落库成功，is_new=True"""
     resp = client.post(
@@ -100,6 +102,7 @@ def test_webhook_meituan_new_order(client):
 # 2. test_webhook_eleme_new_order
 # ──────────────────────────────────────────────────────────────────────────────
 
+
 def test_webhook_eleme_new_order(client):
     """饿了么新订单 Webhook → 落库成功，ACK 格式符合饿了么规范"""
     resp = client.post(
@@ -118,6 +121,7 @@ def test_webhook_eleme_new_order(client):
 # ──────────────────────────────────────────────────────────────────────────────
 # 3. test_webhook_douyin_new_order
 # ──────────────────────────────────────────────────────────────────────────────
+
 
 def test_webhook_douyin_new_order(client):
     """抖音新订单 Webhook → 落库成功，ACK 格式符合抖音规范"""
@@ -138,6 +142,7 @@ def test_webhook_douyin_new_order(client):
 # 4. test_webhook_missing_sign_returns_401
 # ──────────────────────────────────────────────────────────────────────────────
 
+
 def test_webhook_missing_sign_returns_401(client):
     """缺少 X-Platform-Sign header → 401 SIGN_INVALID"""
     resp = client.post(
@@ -153,6 +158,7 @@ def test_webhook_missing_sign_returns_401(client):
 # ──────────────────────────────────────────────────────────────────────────────
 # 5. test_webhook_idempotent_duplicate
 # ──────────────────────────────────────────────────────────────────────────────
+
 
 def test_webhook_idempotent_duplicate(client):
     """相同平台单号重复推送 → 第二次 is_new=False，内存中只有一条订单"""
@@ -189,6 +195,7 @@ def test_webhook_idempotent_duplicate(client):
 # 6. test_accept_order
 # ──────────────────────────────────────────────────────────────────────────────
 
+
 def test_accept_order(client):
     """接单：new → accepted 状态流转"""
     # 先推一条新单
@@ -214,6 +221,7 @@ def test_accept_order(client):
 # 7. test_cancel_order
 # ──────────────────────────────────────────────────────────────────────────────
 
+
 def test_cancel_order(client):
     """取消单：new → cancelled 状态流转"""
     resp = client.post(
@@ -238,6 +246,7 @@ def test_cancel_order(client):
 # 8. test_aggregator_orders_list
 # ──────────────────────────────────────────────────────────────────────────────
 
+
 def test_aggregator_orders_list(client):
     """聚合订单列表：推入3条单（美团/饿了么/抖音各一），分页查询全部返回"""
     for platform, oid in [("meituan", "MT-L001"), ("eleme", "EL-L001"), ("douyin", "DY-L001")]:
@@ -261,6 +270,7 @@ def test_aggregator_orders_list(client):
 # ──────────────────────────────────────────────────────────────────────────────
 # 9. test_aggregator_order_detail
 # ──────────────────────────────────────────────────────────────────────────────
+
 
 def test_aggregator_order_detail(client):
     """聚合订单详情：包含 items、platform_label 等完整字段"""
@@ -288,6 +298,7 @@ def test_aggregator_order_detail(client):
 # ──────────────────────────────────────────────────────────────────────────────
 # 10. test_platforms_status
 # ──────────────────────────────────────────────────────────────────────────────
+
 
 def test_platforms_status(client):
     """平台状态：返回3个平台，字段结构正确"""
@@ -322,6 +333,7 @@ def test_platforms_status(client):
 # 11. test_metrics_success_rate
 # ──────────────────────────────────────────────────────────────────────────────
 
+
 def test_metrics_success_rate(client):
     """监控指标：推入成功 Webhook 后，success_rate 应为 1.0"""
     client.post(
@@ -350,6 +362,7 @@ def test_metrics_success_rate(client):
 # 12. test_metrics_by_platform
 # ──────────────────────────────────────────────────────────────────────────────
 
+
 def test_metrics_by_platform(client):
     """监控指标 by_platform：各平台细分统计"""
     for platform, oid in [("meituan", "MT-BP-001"), ("eleme", "EL-BP-001")]:
@@ -377,6 +390,7 @@ def test_metrics_by_platform(client):
 # 13. test_reconcile_run
 # ──────────────────────────────────────────────────────────────────────────────
 
+
 def test_reconcile_run(client):
     """手动触发对账：返回 task_id，状态为 running"""
     resp = client.post(
@@ -395,6 +409,7 @@ def test_reconcile_run(client):
 # ──────────────────────────────────────────────────────────────────────────────
 # 14. test_reconcile_discrepancies
 # ──────────────────────────────────────────────────────────────────────────────
+
 
 def test_reconcile_discrepancies(client):
     """
@@ -430,6 +445,7 @@ def test_reconcile_discrepancies(client):
 # ──────────────────────────────────────────────────────────────────────────────
 # 15. test_reconcile_discrepancy_amount_is_integer
 # ──────────────────────────────────────────────────────────────────────────────
+
 
 def test_reconcile_discrepancy_amount_is_integer(client):
     """差异金额必须是整数（分），不允许浮点数"""

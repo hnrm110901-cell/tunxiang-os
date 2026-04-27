@@ -1,4 +1,5 @@
 """员工深度 API — 业绩归因、提成计算、培训管理、培训进度、绩效卡"""
+
 from typing import Optional
 
 from fastapi import APIRouter
@@ -29,7 +30,9 @@ class TrainingPlanReq(BaseModel):
 # ── 1. 业绩归因 ──
 @router.post("/employees/{employee_id}/performance-attribution")
 async def calculate_performance_attribution(
-    employee_id: str, req: PerformanceReq, tenant_id: str = "default",
+    employee_id: str,
+    req: PerformanceReq,
+    tenant_id: str = "default",
 ):
     """业绩归因: 服务桌数/推荐菜品/加单率"""
     return {
@@ -48,7 +51,9 @@ async def calculate_performance_attribution(
 # ── 2. 提成计算 ──
 @router.post("/employees/{employee_id}/commission")
 async def calculate_commission(
-    employee_id: str, req: CommissionReq, tenant_id: str = "default",
+    employee_id: str,
+    req: CommissionReq,
+    tenant_id: str = "default",
 ):
     """提成计算: 基础+推菜+开瓶+加单 (单位: 分)"""
     return {
@@ -68,7 +73,9 @@ async def calculate_commission(
 # ── 3. 培训管理 ──
 @router.post("/employees/{employee_id}/training")
 async def manage_training(
-    employee_id: str, req: TrainingPlanReq, tenant_id: str = "default",
+    employee_id: str,
+    req: TrainingPlanReq,
+    tenant_id: str = "default",
 ):
     """培训管理: 课程分配/完成/认证"""
     return {

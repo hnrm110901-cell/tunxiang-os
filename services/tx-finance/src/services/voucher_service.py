@@ -9,6 +9,7 @@
   贷：主营业务收入（菜品收入）
   贷：其他业务收入（服务费/茶位费）
 """
+
 from datetime import date
 
 # 科目映射
@@ -53,38 +54,44 @@ def generate_voucher_from_settlement(settlement: dict, store_name: str = "") -> 
         amount_fen = settlement.get(field, 0)
         if amount_fen > 0:
             account = ACCOUNT_MAPPING[account_key]
-            entries.append({
-                "direction": "debit",
-                "account_code": account["code"],
-                "account_name": account["name"],
-                "amount_fen": amount_fen,
-                "amount_yuan": round(amount_fen / 100, 2),
-                "summary": f"{store_name}{voucher_date}收入",
-            })
+            entries.append(
+                {
+                    "direction": "debit",
+                    "account_code": account["code"],
+                    "account_name": account["name"],
+                    "amount_fen": amount_fen,
+                    "amount_yuan": round(amount_fen / 100, 2),
+                    "summary": f"{store_name}{voucher_date}收入",
+                }
+            )
 
     # 贷方：营业收入
     net_revenue = settlement.get("net_revenue_fen", 0)
     if net_revenue > 0:
-        entries.append({
-            "direction": "credit",
-            "account_code": ACCOUNT_MAPPING["food_revenue"]["code"],
-            "account_name": ACCOUNT_MAPPING["food_revenue"]["name"],
-            "amount_fen": net_revenue,
-            "amount_yuan": round(net_revenue / 100, 2),
-            "summary": f"{store_name}{voucher_date}营业收入",
-        })
+        entries.append(
+            {
+                "direction": "credit",
+                "account_code": ACCOUNT_MAPPING["food_revenue"]["code"],
+                "account_name": ACCOUNT_MAPPING["food_revenue"]["name"],
+                "amount_fen": net_revenue,
+                "amount_yuan": round(net_revenue / 100, 2),
+                "summary": f"{store_name}{voucher_date}营业收入",
+            }
+        )
 
     # 折扣抵减
     discount_fen = settlement.get("total_discount_fen", 0)
     if discount_fen > 0:
-        entries.append({
-            "direction": "credit",
-            "account_code": ACCOUNT_MAPPING["discount"]["code"],
-            "account_name": ACCOUNT_MAPPING["discount"]["name"],
-            "amount_fen": -discount_fen,
-            "amount_yuan": -round(discount_fen / 100, 2),
-            "summary": f"{store_name}{voucher_date}折扣",
-        })
+        entries.append(
+            {
+                "direction": "credit",
+                "account_code": ACCOUNT_MAPPING["discount"]["code"],
+                "account_name": ACCOUNT_MAPPING["discount"]["name"],
+                "amount_fen": -discount_fen,
+                "amount_yuan": -round(discount_fen / 100, 2),
+                "summary": f"{store_name}{voucher_date}折扣",
+            }
+        )
 
     # 验证借贷平衡
     debit_total = sum(e["amount_fen"] for e in entries if e["direction"] == "debit")

@@ -6,9 +6,9 @@
 
 维护视图：mv_public_opinion（按ISO周聚合）
 """
+
 from __future__ import annotations
 
-import json
 from datetime import datetime, timedelta
 from typing import Any
 from uuid import UUID
@@ -23,7 +23,6 @@ def _iso_week_monday(dt: datetime) -> "datetime.date":
 
 
 class PublicOpinionProjector(ProjectorBase):
-
     name = "public_opinion"
     event_types = {
         "opinion.mention_captured",
@@ -71,7 +70,10 @@ class PublicOpinionProjector(ProjectorBase):
             VALUES ($1, $2, $3, $4, NOW())
             ON CONFLICT (tenant_id, store_id, stat_week, platform) DO NOTHING
             """,
-            self.tenant_id, UUID(str(store_id)), stat_week, platform,
+            self.tenant_id,
+            UUID(str(store_id)),
+            stat_week,
+            platform,
         )
 
         # 情感计数增量
@@ -88,14 +90,21 @@ class PublicOpinionProjector(ProjectorBase):
                 updated_at      = NOW()
             WHERE tenant_id = $1 AND store_id = $2
               AND stat_week = $3 AND platform = $4
-            """,
-            self.tenant_id, UUID(str(store_id)), stat_week, platform,
+            """,  # noqa: S608 — sentiment_col 来自白名单
+            self.tenant_id,
+            UUID(str(store_id)),
+            stat_week,
+            platform,
         )
 
         # 重算平均评分（仅当本次带有 rating/sentiment_score 时更新）
         if rating is not None or sentiment_score is not None:
             await _recalc_averages(
-                conn, self.tenant_id, UUID(str(store_id)), stat_week, platform,
+                conn,
+                self.tenant_id,
+                UUID(str(store_id)),
+                stat_week,
+                platform,
                 new_rating=float(rating) if rating is not None else None,
                 new_sentiment_score=float(sentiment_score) if sentiment_score is not None else None,
             )
@@ -160,7 +169,11 @@ async def _recalc_averages(
             WHERE tenant_id = $1 AND store_id = $2
               AND stat_week = $3 AND platform = $4
             """,
-            tenant_id, store_id, stat_week, platform, new_rating,
+            tenant_id,
+            store_id,
+            stat_week,
+            platform,
+            new_rating,
         )
 
     if new_sentiment_score is not None:
@@ -180,5 +193,9 @@ async def _recalc_averages(
             WHERE tenant_id = $1 AND store_id = $2
               AND stat_week = $3 AND platform = $4
             """,
-            tenant_id, store_id, stat_week, platform, new_sentiment_score,
+            tenant_id,
+            store_id,
+            stat_week,
+            platform,
+            new_sentiment_score,
         )

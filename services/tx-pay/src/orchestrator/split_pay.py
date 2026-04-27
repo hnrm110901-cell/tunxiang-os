@@ -6,6 +6,7 @@
   2. 任一笔失败 → 已成功的全部退款（补偿）
   3. 全部成功 → 返回合并结果
 """
+
 from __future__ import annotations
 
 import uuid
@@ -18,8 +19,8 @@ from ..channels.base import (
     BasePaymentChannel,
     PaymentRequest,
     PaymentResult,
-    PayStatus,
     PayMethod,
+    PayStatus,
     TradeType,
 )
 
@@ -28,6 +29,7 @@ logger = structlog.get_logger(__name__)
 
 class SplitEntry(BaseModel):
     """拆单项"""
+
     method: PayMethod
     amount_fen: int = Field(..., gt=0)
     auth_code: Optional[str] = None
@@ -36,6 +38,7 @@ class SplitEntry(BaseModel):
 
 class SplitPayResult(BaseModel):
     """拆单支付结果"""
+
     success: bool
     total_fen: int
     entries: list[PaymentResult]

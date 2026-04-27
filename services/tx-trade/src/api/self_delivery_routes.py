@@ -4,9 +4,10 @@ Y-M4
 
 配送单管理（6状态机）+ 配送员管理 + 配送统计
 """
+
 import uuid
 from datetime import date, datetime, timezone
-from typing import List, Optional
+from typing import Optional
 
 import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
@@ -37,6 +38,7 @@ _FORWARD_MAP: dict[str, set[str]] = {
 
 # ─── 工具函数 ─────────────────────────────────────────────────────────────────
 
+
 def _ok(data: dict | list) -> dict:
     return {"ok": True, "data": data, "error": None}
 
@@ -63,6 +65,7 @@ def _row_to_dict(row) -> dict:
 
 # ─── 请求模型 ─────────────────────────────────────────────────────────────────
 
+
 class CreateDeliveryOrderReq(BaseModel):
     order_id: str = Field(..., description="关联交易订单ID")
     store_id: str = Field(..., description="门店ID")
@@ -85,6 +88,7 @@ class FailReq(BaseModel):
 
 
 # ─── 1. 配送单列表 ────────────────────────────────────────────────────────────
+
 
 @router.get("/orders", summary="配送单列表")
 async def list_delivery_orders(
@@ -147,6 +151,7 @@ async def list_delivery_orders(
 
 
 # ─── 2. 创建配送单 ────────────────────────────────────────────────────────────
+
 
 @router.post("/orders", summary="创建配送单", status_code=201)
 async def create_delivery_order(
@@ -241,6 +246,7 @@ async def create_delivery_order(
 
 # ─── 3. 派单给配送员 ──────────────────────────────────────────────────────────
 
+
 @router.post("/orders/{delivery_id}/assign", summary="派单给配送员")
 async def assign_rider(
     delivery_id: str,
@@ -304,14 +310,16 @@ async def assign_rider(
         logger.error("self_delivery.assign.update_error", error=str(exc))
         raise HTTPException(status_code=500, detail="派单更新失败")
 
-    order.update({
-        "rider_id": req.rider_id,
-        "rider_name": req.rider_name,
-        "rider_phone": req.rider_phone,
-        "status": "assigned",
-        "dispatch_at": now.isoformat(),
-        "updated_at": now.isoformat(),
-    })
+    order.update(
+        {
+            "rider_id": req.rider_id,
+            "rider_name": req.rider_name,
+            "rider_phone": req.rider_phone,
+            "status": "assigned",
+            "dispatch_at": now.isoformat(),
+            "updated_at": now.isoformat(),
+        }
+    )
 
     logger.info(
         "self_delivery.assigned",
@@ -323,6 +331,7 @@ async def assign_rider(
 
 
 # ─── 4. 确认取货 ──────────────────────────────────────────────────────────────
+
 
 @router.post("/orders/{delivery_id}/pickup", summary="确认取货")
 async def confirm_pickup(
@@ -377,17 +386,20 @@ async def confirm_pickup(
         logger.error("self_delivery.pickup.update_error", error=str(exc))
         raise HTTPException(status_code=500, detail="取货确认更新失败")
 
-    order.update({
-        "status": "picked_up",
-        "picked_up_at": now.isoformat(),
-        "updated_at": now.isoformat(),
-    })
+    order.update(
+        {
+            "status": "picked_up",
+            "picked_up_at": now.isoformat(),
+            "updated_at": now.isoformat(),
+        }
+    )
 
     logger.info("self_delivery.picked_up", delivery_id=delivery_id)
     return _ok(order)
 
 
 # ─── 5. 确认送达 ──────────────────────────────────────────────────────────────
+
 
 @router.post("/orders/{delivery_id}/complete", summary="确认送达")
 async def complete_delivery(
@@ -457,12 +469,14 @@ async def complete_delivery(
         logger.error("self_delivery.complete.update_error", error=str(exc))
         raise HTTPException(status_code=500, detail="送达确认更新失败")
 
-    order.update({
-        "status": "delivered",
-        "delivered_at": now.isoformat(),
-        "actual_minutes": actual_minutes,
-        "updated_at": now.isoformat(),
-    })
+    order.update(
+        {
+            "status": "delivered",
+            "delivered_at": now.isoformat(),
+            "actual_minutes": actual_minutes,
+            "updated_at": now.isoformat(),
+        }
+    )
 
     logger.info(
         "self_delivery.completed",
@@ -473,6 +487,7 @@ async def complete_delivery(
 
 
 # ─── 6. 配送失败 ──────────────────────────────────────────────────────────────
+
 
 @router.post("/orders/{delivery_id}/fail", summary="配送失败")
 async def fail_delivery(
@@ -526,11 +541,13 @@ async def fail_delivery(
         logger.error("self_delivery.fail.update_error", error=str(exc))
         raise HTTPException(status_code=500, detail="失败标记更新失败")
 
-    order.update({
-        "status": "failed",
-        "failed_reason": req.reason,
-        "updated_at": now.isoformat(),
-    })
+    order.update(
+        {
+            "status": "failed",
+            "failed_reason": req.reason,
+            "updated_at": now.isoformat(),
+        }
+    )
 
     logger.info("self_delivery.failed", delivery_id=delivery_id, reason=req.reason)
     return _ok(order)
@@ -538,11 +555,10 @@ async def fail_delivery(
 
 # ─── 7. 配送员列表 ────────────────────────────────────────────────────────────
 
+
 @router.get("/riders", summary="配送员列表（在线/离线/配送中）")
 async def list_riders(
-    status: Optional[str] = Query(
-        None, description="状态过滤：online/offline/delivering"
-    ),
+    status: Optional[str] = Query(None, description="状态过滤：online/offline/delivering"),
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
     db: AsyncSession = Depends(get_db),
 ) -> dict:
@@ -579,14 +595,16 @@ async def list_riders(
             current = int(r.current_orders or 0)
             today_done = int(r.today_completed or 0)
             derived_status = "delivering" if current > 0 else ("online" if today_done > 0 else "offline")
-            riders.append({
-                "id": str(r.rider_id),
-                "name": r.rider_name,
-                "phone": r.rider_phone,
-                "status": derived_status,
-                "current_orders": current,
-                "today_completed": today_done,
-            })
+            riders.append(
+                {
+                    "id": str(r.rider_id),
+                    "name": r.rider_name,
+                    "phone": r.rider_phone,
+                    "status": derived_status,
+                    "current_orders": current,
+                    "today_completed": today_done,
+                }
+            )
     except SQLAlchemyError as exc:
         logger.warning("self_delivery.list_riders.db_error", error=str(exc))
         riders = []
@@ -598,6 +616,7 @@ async def list_riders(
 
 
 # ─── 8. 配送员工作量 ──────────────────────────────────────────────────────────
+
 
 @router.get("/riders/{rider_id}/workload", summary="配送员当前工作量")
 async def get_rider_workload(
@@ -647,18 +666,21 @@ async def get_rider_workload(
     in_transit_ids = [str(i) for i in (rider_row.in_transit_ids or []) if i]
     derived_status = "delivering" if current > 0 else ("online" if today_done > 0 else "offline")
 
-    return _ok({
-        "rider_id": rider_id,
-        "name": rider_row.rider_name,
-        "phone": rider_row.rider_phone,
-        "status": derived_status,
-        "current_orders": current,
-        "today_completed": today_done,
-        "in_transit_order_ids": in_transit_ids,
-    })
+    return _ok(
+        {
+            "rider_id": rider_id,
+            "name": rider_row.rider_name,
+            "phone": rider_row.rider_phone,
+            "status": derived_status,
+            "current_orders": current,
+            "today_completed": today_done,
+            "in_transit_order_ids": in_transit_ids,
+        }
+    )
 
 
 # ─── 9. 配送统计 ──────────────────────────────────────────────────────────────
+
 
 @router.get("/stats", summary="配送统计（今日）")
 async def get_delivery_stats(
@@ -708,16 +730,18 @@ async def get_delivery_stats(
         stats_row = None
 
     if stats_row is None:
-        return _ok({
-            "date": _today_str(),
-            "dispatched_count": 0,
-            "completed_count": 0,
-            "failed_count": 0,
-            "pending_count": 0,
-            "avg_delivery_minutes": 0.0,
-            "on_time_rate_percent": 0.0,
-            "rider_count_online": 0,
-        })
+        return _ok(
+            {
+                "date": _today_str(),
+                "dispatched_count": 0,
+                "completed_count": 0,
+                "failed_count": 0,
+                "pending_count": 0,
+                "avg_delivery_minutes": 0.0,
+                "on_time_rate_percent": 0.0,
+                "rider_count_online": 0,
+            }
+        )
 
     dispatched = int(stats_row.dispatched_count or 0)
     completed = int(stats_row.completed_count or 0)
@@ -728,13 +752,15 @@ async def get_delivery_stats(
     on_time_rate = round(on_time / completed * 100, 1) if completed > 0 else 0.0
     rider_online = int(stats_row.rider_count_online or 0)
 
-    return _ok({
-        "date": _today_str(),
-        "dispatched_count": dispatched,
-        "completed_count": completed,
-        "failed_count": failed,
-        "pending_count": pending,
-        "avg_delivery_minutes": avg_minutes,
-        "on_time_rate_percent": on_time_rate,
-        "rider_count_online": rider_online,
-    })
+    return _ok(
+        {
+            "date": _today_str(),
+            "dispatched_count": dispatched,
+            "completed_count": completed,
+            "failed_count": failed,
+            "pending_count": pending,
+            "avg_delivery_minutes": avg_minutes,
+            "on_time_rate_percent": on_time_rate,
+            "rider_count_online": rider_online,
+        }
+    )

@@ -5,6 +5,7 @@
 - 品牌B: 徐记·南洋（东南亚菜）
 - 品牌C: 徐记·海鲜工坊（快餐/外卖）
 """
+
 import os
 import sys
 
@@ -33,7 +34,9 @@ class TestBrandRegistry:
     def test_create_brand(self):
         svc = BrandManagementService()
         brand = svc.create_brand(
-            GROUP_ID, "徐记海鲜", "fine_dining",
+            GROUP_ID,
+            "徐记海鲜",
+            "fine_dining",
             description="高端海鲜正餐",
             logo_url="https://cdn.xuji.com/logo.png",
             theme_colors={"primary": "#1E3A5F", "secondary": "#C0963C"},
@@ -99,31 +102,47 @@ class TestMenuInheritance:
         svc, b1, b2, b3 = _make_service_with_brands()
 
         # 集团主菜单
-        master = svc.create_master_menu(GROUP_ID, "徐记集团标准菜单", [
-            {"dish_id": "d001", "name": "红烧肉", "price_fen": 6800, "category": "热菜"},
-            {"dish_id": "d002", "name": "剁椒鱼头", "price_fen": 16800, "category": "招牌"},
-            {"dish_id": "d003", "name": "蒜蓉虾", "price_fen": 12800, "category": "海鲜"},
-        ])
+        master = svc.create_master_menu(
+            GROUP_ID,
+            "徐记集团标准菜单",
+            [
+                {"dish_id": "d001", "name": "红烧肉", "price_fen": 6800, "category": "热菜"},
+                {"dish_id": "d002", "name": "剁椒鱼头", "price_fen": 16800, "category": "招牌"},
+                {"dish_id": "d003", "name": "蒜蓉虾", "price_fen": 12800, "category": "海鲜"},
+            ],
+        )
 
         # 品牌A覆盖
-        brand_menu = svc.create_brand_menu(b1["brand_id"], master["menu_id"], [
-            {"dish_id": "d001", "action": "override", "price_fen": 7800},
-            {"dish_id": "d_lobster", "action": "add", "name": "龙虾刺身", "price_fen": 38800, "category": "刺身"},
-        ])
+        brand_menu = svc.create_brand_menu(
+            b1["brand_id"],
+            master["menu_id"],
+            [
+                {"dish_id": "d001", "action": "override", "price_fen": 7800},
+                {"dish_id": "d_lobster", "action": "add", "name": "龙虾刺身", "price_fen": 38800, "category": "刺身"},
+            ],
+        )
 
         # 门店覆盖
-        store_menu = svc.create_store_menu("store_furong", brand_menu["menu_id"], [
-            {"dish_id": "d002", "action": "override", "price_fen": 18800},
-            {"dish_id": "d003", "action": "remove"},
-        ])
+        store_menu = svc.create_store_menu(
+            "store_furong",
+            brand_menu["menu_id"],
+            [
+                {"dish_id": "d002", "action": "override", "price_fen": 18800},
+                {"dish_id": "d003", "action": "remove"},
+            ],
+        )
 
         return svc, master, brand_menu, store_menu
 
     def test_create_master_menu(self):
         svc = BrandManagementService()
-        master = svc.create_master_menu(GROUP_ID, "测试菜单", [
-            {"dish_id": "d1", "name": "测试菜", "price_fen": 1000},
-        ])
+        master = svc.create_master_menu(
+            GROUP_ID,
+            "测试菜单",
+            [
+                {"dish_id": "d1", "name": "测试菜", "price_fen": 1000},
+            ],
+        )
         assert master["menu_id"].startswith("mm_")
         assert master["item_count"] == 1
         assert master["menu_level"] == "master"
@@ -284,29 +303,32 @@ class TestCrossBrandMember:
 class TestUnifiedProcurement:
     def _make_plan(self):
         svc = BrandManagementService()
-        plan = svc.create_group_procurement_plan(GROUP_ID, [
-            {
-                "ingredient_id": "ing_bass",
-                "name": "鲈鱼",
-                "unit": "kg",
-                "demands": [
-                    {"brand_id": "b1", "store_id": "s_furong", "quantity": 50},
-                    {"brand_id": "b1", "store_id": "s_wuyi", "quantity": 30},
-                    {"brand_id": "b2", "store_id": "s_nanyang", "quantity": 20},
-                ],
-                "estimated_unit_price_fen": 3500,
-            },
-            {
-                "ingredient_id": "ing_shrimp",
-                "name": "基围虾",
-                "unit": "kg",
-                "demands": [
-                    {"brand_id": "b1", "store_id": "s_furong", "quantity": 40},
-                    {"brand_id": "b2", "store_id": "s_nanyang", "quantity": 25},
-                ],
-                "estimated_unit_price_fen": 5600,
-            },
-        ])
+        plan = svc.create_group_procurement_plan(
+            GROUP_ID,
+            [
+                {
+                    "ingredient_id": "ing_bass",
+                    "name": "鲈鱼",
+                    "unit": "kg",
+                    "demands": [
+                        {"brand_id": "b1", "store_id": "s_furong", "quantity": 50},
+                        {"brand_id": "b1", "store_id": "s_wuyi", "quantity": 30},
+                        {"brand_id": "b2", "store_id": "s_nanyang", "quantity": 20},
+                    ],
+                    "estimated_unit_price_fen": 3500,
+                },
+                {
+                    "ingredient_id": "ing_shrimp",
+                    "name": "基围虾",
+                    "unit": "kg",
+                    "demands": [
+                        {"brand_id": "b1", "store_id": "s_furong", "quantity": 40},
+                        {"brand_id": "b2", "store_id": "s_nanyang", "quantity": 25},
+                    ],
+                    "estimated_unit_price_fen": 5600,
+                },
+            ],
+        )
         return svc, plan
 
     def test_create_procurement_plan(self):
@@ -376,39 +398,48 @@ class TestBrandComparison:
         svc, b1, b2, b3 = _make_service_with_brands()
 
         # 注入经营数据
-        svc._set_brand_metrics(b1["brand_id"], {
-            "revenue": 5000000,
-            "profit_margin": 28.5,
-            "table_turnover": 3.2,
-            "customer_satisfaction": 92,
-            "labor_efficiency": 85,
-            "waste_rate": 3.1,
-            "revenue_fen": 500000000,
-            "employee_count": 320,
-            "member_count": 50000,
-        })
-        svc._set_brand_metrics(b2["brand_id"], {
-            "revenue": 2000000,
-            "profit_margin": 22.0,
-            "table_turnover": 4.1,
-            "customer_satisfaction": 88,
-            "labor_efficiency": 78,
-            "waste_rate": 4.5,
-            "revenue_fen": 200000000,
-            "employee_count": 120,
-            "member_count": 18000,
-        })
-        svc._set_brand_metrics(b3["brand_id"], {
-            "revenue": 800000,
-            "profit_margin": 18.0,
-            "table_turnover": 6.5,
-            "customer_satisfaction": 82,
-            "labor_efficiency": 90,
-            "waste_rate": 2.0,
-            "revenue_fen": 80000000,
-            "employee_count": 45,
-            "member_count": 8000,
-        })
+        svc._set_brand_metrics(
+            b1["brand_id"],
+            {
+                "revenue": 5000000,
+                "profit_margin": 28.5,
+                "table_turnover": 3.2,
+                "customer_satisfaction": 92,
+                "labor_efficiency": 85,
+                "waste_rate": 3.1,
+                "revenue_fen": 500000000,
+                "employee_count": 320,
+                "member_count": 50000,
+            },
+        )
+        svc._set_brand_metrics(
+            b2["brand_id"],
+            {
+                "revenue": 2000000,
+                "profit_margin": 22.0,
+                "table_turnover": 4.1,
+                "customer_satisfaction": 88,
+                "labor_efficiency": 78,
+                "waste_rate": 4.5,
+                "revenue_fen": 200000000,
+                "employee_count": 120,
+                "member_count": 18000,
+            },
+        )
+        svc._set_brand_metrics(
+            b3["brand_id"],
+            {
+                "revenue": 800000,
+                "profit_margin": 18.0,
+                "table_turnover": 6.5,
+                "customer_satisfaction": 82,
+                "labor_efficiency": 90,
+                "waste_rate": 2.0,
+                "revenue_fen": 80000000,
+                "employee_count": 45,
+                "member_count": 8000,
+            },
+        )
 
         b1["store_count"] = 15
         b2["store_count"] = 8
@@ -451,8 +482,12 @@ class TestBrandComparison:
         svc = BrandManagementService()
         b1 = svc.create_brand(GROUP_ID, "品牌A", "casual")
         b2 = svc.create_brand(GROUP_ID, "品牌B", "casual")
-        svc._set_brand_metrics(b1["brand_id"], {"revenue": 1000, "profit_margin": 25, "customer_satisfaction": 90, "table_turnover": 3})
-        svc._set_brand_metrics(b2["brand_id"], {"revenue": 1100, "profit_margin": 26, "customer_satisfaction": 91, "table_turnover": 3})
+        svc._set_brand_metrics(
+            b1["brand_id"], {"revenue": 1000, "profit_margin": 25, "customer_satisfaction": 90, "table_turnover": 3}
+        )
+        svc._set_brand_metrics(
+            b2["brand_id"], {"revenue": 1100, "profit_margin": 26, "customer_satisfaction": 91, "table_turnover": 3}
+        )
         anomalies = svc.detect_brand_anomaly(GROUP_ID)
         assert len(anomalies) == 0
 
@@ -466,24 +501,33 @@ class TestGroupDashboard:
     def test_get_group_overview(self):
         svc, b1, b2, b3 = _make_service_with_brands()
 
-        svc._set_brand_metrics(b1["brand_id"], {
-            "revenue_fen": 500000000,
-            "employee_count": 320,
-            "member_count": 50000,
-            "profit_margin": 28.5,
-        })
-        svc._set_brand_metrics(b2["brand_id"], {
-            "revenue_fen": 200000000,
-            "employee_count": 120,
-            "member_count": 18000,
-            "profit_margin": 22.0,
-        })
-        svc._set_brand_metrics(b3["brand_id"], {
-            "revenue_fen": 80000000,
-            "employee_count": 45,
-            "member_count": 8000,
-            "profit_margin": 12.0,  # 低于15%警戒线
-        })
+        svc._set_brand_metrics(
+            b1["brand_id"],
+            {
+                "revenue_fen": 500000000,
+                "employee_count": 320,
+                "member_count": 50000,
+                "profit_margin": 28.5,
+            },
+        )
+        svc._set_brand_metrics(
+            b2["brand_id"],
+            {
+                "revenue_fen": 200000000,
+                "employee_count": 120,
+                "member_count": 18000,
+                "profit_margin": 22.0,
+            },
+        )
+        svc._set_brand_metrics(
+            b3["brand_id"],
+            {
+                "revenue_fen": 80000000,
+                "employee_count": 45,
+                "member_count": 8000,
+                "profit_margin": 12.0,  # 低于15%警戒线
+            },
+        )
 
         overview = svc.get_group_overview(GROUP_ID)
 

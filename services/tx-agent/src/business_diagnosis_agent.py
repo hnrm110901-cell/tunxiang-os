@@ -11,6 +11,7 @@
   5. 员工绩效异常   — 某员工接单量 < 团队均值 × 0.5
   6. 食材浪费       — 今日食材损耗 > 近 7 日均值 × 1.5
 """
+
 from __future__ import annotations
 
 import json
@@ -32,8 +33,7 @@ logger = structlog.get_logger()
 # ─────────────────────────────────────────────────────────────────────────────
 CLAUDE_MODEL = "claude-haiku-4-5-20251001"
 CLAUDE_SYSTEM_PROMPT = (
-    "你是一位经验丰富的餐饮经营顾问，请根据以下数据异常生成简洁的经营诊断报告，"
-    "重点突出问题和改进建议"
+    "你是一位经验丰富的餐饮经营顾问，请根据以下数据异常生成简洁的经营诊断报告，重点突出问题和改进建议"
 )
 ANALYTICS_API_BASE = "http://localhost:8000/api/v1/analytics"
 MAC_STATION_BASE = "http://localhost:9000"
@@ -71,6 +71,7 @@ class DiagnosisReport(BaseModel):
 
 class DailySummary(BaseModel):
     """从 tx-analytics 拉取的日汇总数据结构（字段缺失时安全降级为 None）"""
+
     revenue_today: Optional[float] = None
     revenue_7d_avg: Optional[float] = None
     table_turn_rate_today: Optional[float] = None
@@ -215,18 +216,20 @@ class BusinessDiagnosisAgent:
             return []
         threshold = s.revenue_7d_avg * 0.7
         if s.revenue_today < threshold:
-            return [Anomaly(
-                rule_id="R01",
-                rule_name="营业额异常",
-                severity=AnomalySeverity.WARNING,
-                description=(
-                    f"今日营业额 ¥{s.revenue_today:.0f} 低于近7日均值 "
-                    f"¥{s.revenue_7d_avg:.0f} 的 70%（阈值 ¥{threshold:.0f}）"
-                ),
-                actual_value=s.revenue_today,
-                threshold_value=threshold,
-                context={"revenue_7d_avg": s.revenue_7d_avg},
-            )]
+            return [
+                Anomaly(
+                    rule_id="R01",
+                    rule_name="营业额异常",
+                    severity=AnomalySeverity.WARNING,
+                    description=(
+                        f"今日营业额 ¥{s.revenue_today:.0f} 低于近7日均值 "
+                        f"¥{s.revenue_7d_avg:.0f} 的 70%（阈值 ¥{threshold:.0f}）"
+                    ),
+                    actual_value=s.revenue_today,
+                    threshold_value=threshold,
+                    context={"revenue_7d_avg": s.revenue_7d_avg},
+                )
+            ]
         return []
 
     @staticmethod
@@ -240,18 +243,20 @@ class BusinessDiagnosisAgent:
             return []
         threshold = s.table_turn_rate_history_avg * 0.8
         if s.table_turn_rate_today < threshold:
-            return [Anomaly(
-                rule_id="R02",
-                rule_name="翻台率下滑",
-                severity=AnomalySeverity.WARNING,
-                description=(
-                    f"今日翻台率 {s.table_turn_rate_today:.2f} 低于历史均值 "
-                    f"{s.table_turn_rate_history_avg:.2f} 的 80%（阈值 {threshold:.2f}）"
-                ),
-                actual_value=s.table_turn_rate_today,
-                threshold_value=threshold,
-                context={"history_avg": s.table_turn_rate_history_avg},
-            )]
+            return [
+                Anomaly(
+                    rule_id="R02",
+                    rule_name="翻台率下滑",
+                    severity=AnomalySeverity.WARNING,
+                    description=(
+                        f"今日翻台率 {s.table_turn_rate_today:.2f} 低于历史均值 "
+                        f"{s.table_turn_rate_history_avg:.2f} 的 80%（阈值 {threshold:.2f}）"
+                    ),
+                    actual_value=s.table_turn_rate_today,
+                    threshold_value=threshold,
+                    context={"history_avg": s.table_turn_rate_history_avg},
+                )
+            ]
         return []
 
     @staticmethod
@@ -260,17 +265,17 @@ class BusinessDiagnosisAgent:
         anomalies: list[Anomaly] = []
         for dish_id, last_week_avg in s.dish_sales_last_week_daily_avg.items():
             if last_week_avg > 3 and s.dish_sales_today.get(dish_id, 0) == 0:
-                anomalies.append(Anomaly(
-                    rule_id="R03",
-                    rule_name="菜品滞销",
-                    severity=AnomalySeverity.WARNING,
-                    description=(
-                        f"菜品 {dish_id} 今日零销量，但上周日均售出 {last_week_avg:.1f} 份"
-                    ),
-                    actual_value=0.0,
-                    threshold_value=last_week_avg,
-                    context={"dish_id": dish_id, "last_week_daily_avg": last_week_avg},
-                ))
+                anomalies.append(
+                    Anomaly(
+                        rule_id="R03",
+                        rule_name="菜品滞销",
+                        severity=AnomalySeverity.WARNING,
+                        description=(f"菜品 {dish_id} 今日零销量，但上周日均售出 {last_week_avg:.1f} 份"),
+                        actual_value=0.0,
+                        threshold_value=last_week_avg,
+                        context={"dish_id": dish_id, "last_week_daily_avg": last_week_avg},
+                    )
+                )
         return anomalies
 
     @staticmethod
@@ -279,17 +284,16 @@ class BusinessDiagnosisAgent:
         if s.return_dish_rate is None:
             return []
         if s.return_dish_rate > 0.05:
-            return [Anomaly(
-                rule_id="R04",
-                rule_name="退菜率异常",
-                severity=AnomalySeverity.CRITICAL,
-                description=(
-                    f"今日退菜率 {s.return_dish_rate * 100:.1f}% 超过警戒线 5%，"
-                    "请立即排查品控和服务问题"
-                ),
-                actual_value=s.return_dish_rate * 100,
-                threshold_value=5.0,
-            )]
+            return [
+                Anomaly(
+                    rule_id="R04",
+                    rule_name="退菜率异常",
+                    severity=AnomalySeverity.CRITICAL,
+                    description=(f"今日退菜率 {s.return_dish_rate * 100:.1f}% 超过警戒线 5%，请立即排查品控和服务问题"),
+                    actual_value=s.return_dish_rate * 100,
+                    threshold_value=5.0,
+                )
+            ]
         return []
 
     @staticmethod
@@ -303,43 +307,43 @@ class BusinessDiagnosisAgent:
         anomalies: list[Anomaly] = []
         for emp_id, count in s.employee_order_count.items():
             if count < threshold:
-                anomalies.append(Anomaly(
-                    rule_id="R05",
-                    rule_name="员工绩效异常",
-                    severity=AnomalySeverity.INFO,
-                    description=(
-                        f"员工 {emp_id} 今日接单 {count} 单，"
-                        f"低于团队均值 {team_avg:.1f} 单的 50%（阈值 {threshold:.1f} 单）"
-                    ),
-                    actual_value=float(count),
-                    threshold_value=threshold,
-                    context={"employee_id": emp_id, "team_avg": team_avg},
-                ))
+                anomalies.append(
+                    Anomaly(
+                        rule_id="R05",
+                        rule_name="员工绩效异常",
+                        severity=AnomalySeverity.INFO,
+                        description=(
+                            f"员工 {emp_id} 今日接单 {count} 单，"
+                            f"低于团队均值 {team_avg:.1f} 单的 50%（阈值 {threshold:.1f} 单）"
+                        ),
+                        actual_value=float(count),
+                        threshold_value=threshold,
+                        context={"employee_id": emp_id, "team_avg": team_avg},
+                    )
+                )
         return anomalies
 
     @staticmethod
     def _rule_ingredient_waste(s: DailySummary) -> list[Anomaly]:
         """规则 6：今日食材损耗 > 近 7 日均值 × 1.5"""
-        if (
-            s.ingredient_waste_today is None
-            or s.ingredient_waste_7d_avg is None
-            or s.ingredient_waste_7d_avg == 0
-        ):
+        if s.ingredient_waste_today is None or s.ingredient_waste_7d_avg is None or s.ingredient_waste_7d_avg == 0:
             return []
         threshold = s.ingredient_waste_7d_avg * 1.5
         if s.ingredient_waste_today > threshold:
-            return [Anomaly(
-                rule_id="R06",
-                rule_name="食材浪费",
-                severity=AnomalySeverity.WARNING,
-                description=(
-                    f"今日食材损耗 ¥{s.ingredient_waste_today:.0f} 超过近7日均值 "
-                    f"¥{s.ingredient_waste_7d_avg:.0f} 的 1.5 倍（阈值 ¥{threshold:.0f}）"
-                ),
-                actual_value=s.ingredient_waste_today,
-                threshold_value=threshold,
-                context={"waste_7d_avg": s.ingredient_waste_7d_avg},
-            )]
+            return [
+                Anomaly(
+                    rule_id="R06",
+                    rule_name="食材浪费",
+                    severity=AnomalySeverity.WARNING,
+                    description=(
+                        f"今日食材损耗 ¥{s.ingredient_waste_today:.0f} 超过近7日均值 "
+                        f"¥{s.ingredient_waste_7d_avg:.0f} 的 1.5 倍（阈值 ¥{threshold:.0f}）"
+                    ),
+                    actual_value=s.ingredient_waste_today,
+                    threshold_value=threshold,
+                    context={"waste_7d_avg": s.ingredient_waste_7d_avg},
+                )
+            ]
         return []
 
     # ──────────────────────────────────────────────
@@ -349,16 +353,14 @@ class BusinessDiagnosisAgent:
         """调用 Claude API 生成三段式自然语言诊断报告。"""
         if not self._claude_api_key:
             import os
+
             self._claude_api_key = os.environ.get("ANTHROPIC_API_KEY", "")
 
         if not self._claude_api_key:
             logger.warning("claude_api_key_missing", action="skip_summary_generation")
             return ""
 
-        anomaly_text = "\n".join(
-            f"[{a.severity.value.upper()}] {a.rule_name}：{a.description}"
-            for a in anomalies
-        )
+        anomaly_text = "\n".join(f"[{a.severity.value.upper()}] {a.rule_name}：{a.description}" for a in anomalies)
         user_message = (
             f"以下是今日经营异常数据（共 {len(anomalies)} 条）：\n\n"
             f"{anomaly_text}\n\n"
@@ -402,9 +404,7 @@ class BusinessDiagnosisAgent:
         """将诊断报告写入 business_diagnosis_reports 表。"""
         from shared.ontology.src.database import get_db_with_tenant
 
-        anomalies_json = json.dumps(
-            [a.model_dump() for a in report.anomalies], ensure_ascii=False, default=str
-        )
+        anomalies_json = json.dumps([a.model_dump() for a in report.anomalies], ensure_ascii=False, default=str)
         raw_data_json = json.dumps(report.raw_data, ensure_ascii=False, default=str)
 
         async for db in get_db_with_tenant(self.tenant_id):
@@ -439,9 +439,7 @@ class BusinessDiagnosisAgent:
         if not report.anomalies:
             return
 
-        critical_count = sum(
-            1 for a in report.anomalies if a.severity == AnomalySeverity.CRITICAL
-        )
+        critical_count = sum(1 for a in report.anomalies if a.severity == AnomalySeverity.CRITICAL)
         payload = {
             "tenant_id": report.tenant_id,
             "store_id": report.store_id,

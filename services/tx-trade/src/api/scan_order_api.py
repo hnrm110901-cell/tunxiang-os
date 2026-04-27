@@ -10,6 +10,7 @@
 7. POST /scan-order/sync-kds            — 手动同步KDS
 8. GET  /scan-order/stats               — 扫码点餐统计
 """
+
 from datetime import date
 from typing import Optional
 

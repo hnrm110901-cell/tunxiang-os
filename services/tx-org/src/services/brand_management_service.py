@@ -70,9 +70,7 @@ async def list_brands(
 
     where = " AND ".join(conditions)
 
-    count_result = await db.execute(
-        text(f"SELECT COUNT(*) FROM brands b WHERE {where}"), params
-    )
+    count_result = await db.execute(text(f"SELECT COUNT(*) FROM brands b WHERE {where}"), params)
     total = count_result.scalar() or 0
 
     result = await db.execute(
@@ -263,8 +261,13 @@ async def update_brand(
         raise HTTPException(status_code=404, detail="品牌不存在")
 
     allowed_fields = {
-        "name", "brand_type", "logo_url", "primary_color",
-        "description", "status", "hq_store_id",
+        "name",
+        "brand_type",
+        "logo_url",
+        "primary_color",
+        "description",
+        "status",
+        "hq_store_id",
     }
     update_parts: list[str] = []
     params: dict[str, Any] = {

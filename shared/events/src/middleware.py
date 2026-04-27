@@ -8,6 +8,7 @@
     wrapped = apply_middleware(my_handler, [LoggingMiddleware(), TenantIsolationMiddleware("t1"), DeduplicationMiddleware()])
     consumer.subscribe("order.created", wrapped)
 """
+
 from __future__ import annotations
 
 import time

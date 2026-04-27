@@ -12,6 +12,7 @@ dish_dept_mappings 表（v115 创建）：
   GET    /api/v1/kds/dish-dept-mappings/by-dish/{dish_id}    查询某菜品的所有映射
   GET    /api/v1/kds/departments                             查询门店档口列表
 """
+
 import uuid
 from typing import Optional
 
@@ -28,6 +29,7 @@ router = APIRouter(prefix="/api/v1/kds", tags=["dish-dept-mapping"])
 
 
 # ─── 工具函数 ─────────────────────────────────────────────────────────────────
+
 
 def _tenant(request: Request) -> str:
     tid = getattr(request.state, "tenant_id", None) or request.headers.get("X-Tenant-ID", "")
@@ -46,20 +48,21 @@ async def _rls(db: AsyncSession, tid: str) -> None:
 
 def _row_to_mapping(row) -> dict:
     return {
-        "id":         str(row.id),
-        "tenant_id":  str(row.tenant_id),
-        "store_id":   str(row.store_id) if row.store_id else None,
-        "dish_id":    str(row.dish_id),
-        "dept_id":    str(row.dept_id),
-        "dept_name":  row.dept_name,
+        "id": str(row.id),
+        "tenant_id": str(row.tenant_id),
+        "store_id": str(row.store_id) if row.store_id else None,
+        "dish_id": str(row.dish_id),
+        "dept_id": str(row.dept_id),
+        "dept_name": row.dept_name,
         "is_primary": row.is_primary,
-        "priority":   row.priority,
+        "priority": row.priority,
         "created_at": row.created_at.isoformat() if row.created_at else None,
         "updated_at": row.updated_at.isoformat() if row.updated_at else None,
     }
 
 
 # ─── 请求模型 ─────────────────────────────────────────────────────────────────
+
 
 class MappingCreateReq(BaseModel):
     dish_id: str = Field(..., description="菜品ID")
@@ -89,6 +92,7 @@ class BatchMappingReq(BaseModel):
 
 
 # ─── GET /dish-dept-mappings ──────────────────────────────────────────────────
+
 
 @router.get("/dish-dept-mappings", summary="查询菜品-档口映射列表")
 async def list_dish_dept_mappings(
@@ -146,6 +150,7 @@ async def list_dish_dept_mappings(
 
 # ─── POST /dish-dept-mappings ─────────────────────────────────────────────────
 
+
 @router.post("/dish-dept-mappings", summary="创建/更新菜品-档口映射（upsert）")
 async def upsert_dish_dept_mapping(
     req: MappingCreateReq,
@@ -172,12 +177,15 @@ async def upsert_dish_dept_mapping(
           AND (store_id = :store_id OR (store_id IS NULL AND :store_id IS NULL))
         LIMIT 1
     """)
-    check_result = await db.execute(check_sql, {
-        "tenant_id": tid,
-        "dish_id":   req.dish_id,
-        "dept_id":   req.dept_id,
-        "store_id":  req.store_id,
-    })
+    check_result = await db.execute(
+        check_sql,
+        {
+            "tenant_id": tid,
+            "dish_id": req.dish_id,
+            "dept_id": req.dept_id,
+            "store_id": req.store_id,
+        },
+    )
     existing = check_result.fetchone()
 
     if existing:
@@ -193,13 +201,16 @@ async def upsert_dish_dept_mapping(
             RETURNING id, tenant_id, store_id, dish_id, dept_id, dept_name,
                       is_primary, priority, created_at, updated_at
         """)
-        result = await db.execute(update_sql, {
-            "dept_name":  req.dept_name,
-            "is_primary": req.is_primary,
-            "priority":   req.priority,
-            "now":        now,
-            "id":         mapping_id,
-        })
+        result = await db.execute(
+            update_sql,
+            {
+                "dept_name": req.dept_name,
+                "is_primary": req.is_primary,
+                "priority": req.priority,
+                "now": now,
+                "id": mapping_id,
+            },
+        )
         row = result.fetchone()
         action = "updated"
     else:
@@ -214,17 +225,20 @@ async def upsert_dish_dept_mapping(
             RETURNING id, tenant_id, store_id, dish_id, dept_id, dept_name,
                       is_primary, priority, created_at, updated_at
         """)
-        result = await db.execute(insert_sql, {
-            "id":         new_id,
-            "tenant_id":  tid,
-            "store_id":   req.store_id,
-            "dish_id":    req.dish_id,
-            "dept_id":    req.dept_id,
-            "dept_name":  req.dept_name,
-            "is_primary": req.is_primary,
-            "priority":   req.priority,
-            "now":        now,
-        })
+        result = await db.execute(
+            insert_sql,
+            {
+                "id": new_id,
+                "tenant_id": tid,
+                "store_id": req.store_id,
+                "dish_id": req.dish_id,
+                "dept_id": req.dept_id,
+                "dept_name": req.dept_name,
+                "is_primary": req.is_primary,
+                "priority": req.priority,
+                "now": now,
+            },
+        )
         row = result.fetchone()
         action = "created"
 
@@ -234,6 +248,7 @@ async def upsert_dish_dept_mapping(
 
 
 # ─── DELETE /dish-dept-mappings/{mapping_id} ─────────────────────────────────
+
 
 @router.delete("/dish-dept-mappings/{mapping_id}", summary="软删除菜品-档口映射")
 async def delete_dish_dept_mapping(
@@ -266,6 +281,7 @@ async def delete_dish_dept_mapping(
 
 
 # ─── POST /dish-dept-mappings/batch ──────────────────────────────────────────
+
 
 @router.post("/dish-dept-mappings/batch", summary="批量导入菜品-档口映射")
 async def batch_set_dish_dept_mappings(
@@ -310,12 +326,15 @@ async def batch_set_dish_dept_mappings(
                   AND (store_id = :store_id OR (store_id IS NULL AND :store_id IS NULL))
                 LIMIT 1
             """)
-            check_result = await db.execute(check_sql, {
-                "tenant_id": tid,
-                "dish_id":   item.dish_id,
-                "dept_id":   item.dept_id,
-                "store_id":  effective_store_id,
-            })
+            check_result = await db.execute(
+                check_sql,
+                {
+                    "tenant_id": tid,
+                    "dish_id": item.dish_id,
+                    "dept_id": item.dept_id,
+                    "store_id": effective_store_id,
+                },
+            )
             existing = check_result.fetchone()
 
             if existing:
@@ -328,13 +347,16 @@ async def batch_set_dish_dept_mappings(
                         updated_at = :now
                     WHERE id = :id
                 """)
-                await db.execute(upd_sql, {
-                    "dept_name":  item.dept_name,
-                    "is_primary": item.is_primary,
-                    "priority":   item.priority,
-                    "now":        now,
-                    "id":         existing.id,
-                })
+                await db.execute(
+                    upd_sql,
+                    {
+                        "dept_name": item.dept_name,
+                        "is_primary": item.is_primary,
+                        "priority": item.priority,
+                        "now": now,
+                        "id": existing.id,
+                    },
+                )
                 updated_count += 1
             else:
                 ins_sql = text("""
@@ -345,17 +367,20 @@ async def batch_set_dish_dept_mappings(
                       (:id, :tenant_id, :store_id, :dish_id, :dept_id, :dept_name,
                        :is_primary, :priority, :now, :now, false)
                 """)
-                await db.execute(ins_sql, {
-                    "id":         str(uuid.uuid4()),
-                    "tenant_id":  tid,
-                    "store_id":   effective_store_id,
-                    "dish_id":    item.dish_id,
-                    "dept_id":    item.dept_id,
-                    "dept_name":  item.dept_name,
-                    "is_primary": item.is_primary,
-                    "priority":   item.priority,
-                    "now":        now,
-                })
+                await db.execute(
+                    ins_sql,
+                    {
+                        "id": str(uuid.uuid4()),
+                        "tenant_id": tid,
+                        "store_id": effective_store_id,
+                        "dish_id": item.dish_id,
+                        "dept_id": item.dept_id,
+                        "dept_name": item.dept_name,
+                        "is_primary": item.is_primary,
+                        "priority": item.priority,
+                        "now": now,
+                    },
+                )
                 created_count += 1
         except Exception as exc:  # noqa: BLE001 — 批量操作允许部分失败，收集错误
             errors.append({"index": idx, "dish_id": item.dish_id, "error": str(exc)})
@@ -367,15 +392,18 @@ async def batch_set_dish_dept_mappings(
         updated=updated_count,
         errors=len(errors),
     )
-    return _ok({
-        "created": created_count,
-        "updated": updated_count,
-        "total":   len(req.mappings),
-        "errors":  errors,
-    })
+    return _ok(
+        {
+            "created": created_count,
+            "updated": updated_count,
+            "total": len(req.mappings),
+            "errors": errors,
+        }
+    )
 
 
 # ─── GET /dish-dept-mappings/by-dish/{dish_id} ───────────────────────────────
+
 
 @router.get("/dish-dept-mappings/by-dish/{dish_id}", summary="查询某菜品的所有档口映射")
 async def get_mappings_by_dish(
@@ -407,14 +435,17 @@ async def get_mappings_by_dish(
     rows = result.fetchall()
 
     items = [_row_to_mapping(r) for r in rows]
-    return _ok({
-        "dish_id":  dish_id,
-        "mappings": items,
-        "total":    len(items),
-    })
+    return _ok(
+        {
+            "dish_id": dish_id,
+            "mappings": items,
+            "total": len(items),
+        }
+    )
 
 
 # ─── GET /departments ─────────────────────────────────────────────────────────
+
 
 @router.get("/departments", summary="查询门店档口列表")
 async def list_departments(
@@ -453,12 +484,12 @@ async def list_departments(
         if rows:
             items = [
                 {
-                    "id":            str(r.id),
-                    "store_id":      str(r.store_id) if r.store_id else None,
-                    "dept_name":     r.dept_name,
-                    "dept_code":     r.dept_code if hasattr(r, "dept_code") else None,
+                    "id": str(r.id),
+                    "store_id": str(r.store_id) if r.store_id else None,
+                    "dept_name": r.dept_name,
+                    "dept_code": r.dept_code if hasattr(r, "dept_code") else None,
                     "display_order": r.display_order if hasattr(r, "display_order") else 0,
-                    "is_active":     r.is_active if hasattr(r, "is_active") else True,
+                    "is_active": r.is_active if hasattr(r, "is_active") else True,
                 }
                 for r in rows
             ]
@@ -486,12 +517,12 @@ async def list_departments(
 
     items2 = [
         {
-            "id":            str(r.dept_id),
-            "store_id":      store_id,
-            "dept_name":     r.dept_name,
-            "dept_code":     None,
+            "id": str(r.dept_id),
+            "store_id": store_id,
+            "dept_name": r.dept_name,
+            "dept_code": None,
             "display_order": 0,
-            "is_active":     True,
+            "is_active": True,
         }
         for r in rows2
     ]

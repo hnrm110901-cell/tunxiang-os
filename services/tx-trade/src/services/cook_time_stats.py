@@ -10,6 +10,7 @@
 - kds_tasks 表由 P1-A 并行开发创建，本服务对其不存在的情况做优雅降级
 - 所有查询必须显式传入 tenant_id，禁止通过上下文隐式传递
 """
+
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Optional
@@ -147,15 +148,17 @@ class CookTimeStatsService:
                 computed_at=now,
             )
 
-            baselines.append({
-                "dish_id": str(dish_id_val),
-                "dept_id": str(dept_id_val),
-                "hour_bucket": hour_bucket,
-                "day_type": day_type,
-                "p50_seconds": p50,
-                "p90_seconds": p90,
-                "sample_count": sample_count,
-            })
+            baselines.append(
+                {
+                    "dish_id": str(dish_id_val),
+                    "dept_id": str(dept_id_val),
+                    "hour_bucket": hour_bucket,
+                    "day_type": day_type,
+                    "p50_seconds": p50,
+                    "p90_seconds": p90,
+                    "sample_count": sample_count,
+                }
+            )
 
         log.info(
             "cook_time_stats.recompute.done",
@@ -218,13 +221,13 @@ class CookTimeStatsService:
         day_type = _get_day_type(now)
 
         log = logger.bind(
-            dish_id=dish_id, dept_id=dept_id,
-            tenant_id=tenant_id, hour_bucket=hour_bucket,
+            dish_id=dish_id,
+            dept_id=dept_id,
+            tenant_id=tenant_id,
+            hour_bucket=hour_bucket,
         )
 
-        baseline = await self._get_baseline_from_db(
-            dish_id, dept_id, tenant_id, hour_bucket, day_type
-        )
+        baseline = await self._get_baseline_from_db(dish_id, dept_id, tenant_id, hour_bucket, day_type)
 
         if baseline is not None and baseline["sample_count"] >= MIN_RELIABLE_SAMPLES:
             log.debug("cook_time_stats.duration.from_baseline")
@@ -305,10 +308,13 @@ class CookTimeStatsService:
                   AND kt.tenant_id = :tenant_id::uuid
                   AND kt.status IN ('pending', 'cooking')
             """)
-            result = await self._db.execute(pending_sql, {
-                "dept_id": dept_id,
-                "tenant_id": tenant_id,
-            })
+            result = await self._db.execute(
+                pending_sql,
+                {
+                    "dept_id": dept_id,
+                    "tenant_id": tenant_id,
+                },
+            )
             rows = result.all()
         except SQLAlchemyError as exc:  # MLPS3-P0: 异常收窄
             log.warning("cook_time_stats.queue_estimate.query_failed", error=str(exc))
@@ -366,9 +372,7 @@ class CookTimeStatsService:
         hour_bucket = now.hour
         day_type = _get_day_type(now)
 
-        baseline = await self._get_baseline_from_db(
-            dish_id, dept_id, tenant_id, hour_bucket, day_type
-        )
+        baseline = await self._get_baseline_from_db(dish_id, dept_id, tenant_id, hour_bucket, day_type)
 
         if baseline is not None and baseline["sample_count"] >= MIN_RELIABLE_SAMPLES:
             p90 = baseline["p90_seconds"]

@@ -13,6 +13,7 @@ Boss（集团总裁/CFO）专用移动端驾驶舱接口，提供跨品牌、跨
 鉴权：X-Tenant-ID header 必填
 响应格式：{ "ok": bool, "data": {}, "error": {} }
 """
+
 from typing import Optional
 
 import structlog
@@ -41,6 +42,7 @@ def _get_model_router():
     """获取 ModelRouter 实例（不可用时返回 None，降级处理）"""
     try:
         from tx_agent.model_router import ModelRouter  # type: ignore[import]
+
         return ModelRouter()
     except ImportError:
         log.warning("boss_bi_routes.model_router_not_available")

@@ -4,6 +4,7 @@
   - ``orders``：堂食 / 小程序 / 已落库的 omni 单等
   - ``delivery_orders``：仅 **未** 关联 ``orders.id`` 的外卖行（避免与 omni 落库重复）
 """
+
 from __future__ import annotations
 
 import re

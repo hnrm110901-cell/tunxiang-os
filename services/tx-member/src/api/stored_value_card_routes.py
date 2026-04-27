@@ -16,6 +16,7 @@
   该端点使用 SELECT FOR UPDATE 防并发超扣，赠送余额优先扣减。
   响应包含 txn_id 供收银系统存档关联。
 """
+
 from __future__ import annotations
 
 import uuid
@@ -43,6 +44,7 @@ _svc = StoredValueService()
 # 租户依赖
 # ──────────────────────────────────────────────────────────────────
 
+
 async def _get_tenant_db(x_tenant_id: str = Header(..., alias="X-Tenant-ID")):
     async for session in get_db_with_tenant(x_tenant_id):
         yield session
@@ -58,6 +60,7 @@ def _parse_tenant_id(x_tenant_id: str = Header(..., alias="X-Tenant-ID")) -> uui
 # ──────────────────────────────────────────────────────────────────
 # 请求 / 响应模型
 # ──────────────────────────────────────────────────────────────────
+
 
 class CreateCardReq(BaseModel):
     customer_id: uuid.UUID = Field(..., description="会员 ID")
@@ -104,6 +107,7 @@ class FreezeReq(BaseModel):
 # 开卡
 # ──────────────────────────────────────────────────────────────────
 
+
 @router.post("", status_code=201, summary="开卡（可含初始充值）")
 async def create_card(
     req: CreateCardReq,
@@ -147,7 +151,9 @@ async def create_card(
 
         # 刷新余额数据
         updated = await _svc.get_card_by_id(
-            db=db, card_id=uuid.UUID(card_data["id"]), tenant_id=tenant_id,
+            db=db,
+            card_id=uuid.UUID(card_data["id"]),
+            tenant_id=tenant_id,
         )
         card_data = updated or card_data
 
@@ -164,6 +170,7 @@ async def create_card(
 # ──────────────────────────────────────────────────────────────────
 # 查询会员所有卡
 # ──────────────────────────────────────────────────────────────────
+
 
 @router.get("", summary="查会员名下所有储值卡")
 async def list_cards(
@@ -189,6 +196,7 @@ async def list_cards(
 # 卡详情 + 余额
 # ──────────────────────────────────────────────────────────────────
 
+
 @router.get("/{card_id}", summary="卡详情+余额")
 async def get_card(
     card_id: uuid.UUID,
@@ -205,6 +213,7 @@ async def get_card(
 # ──────────────────────────────────────────────────────────────────
 # 充值
 # ──────────────────────────────────────────────────────────────────
+
 
 @router.post("/{card_id}/recharge", summary="充值")
 async def recharge(
@@ -238,6 +247,7 @@ async def recharge(
 # ──────────────────────────────────────────────────────────────────
 # 消费（收银调用）
 # ──────────────────────────────────────────────────────────────────
+
 
 @router.post("/{card_id}/consume", summary="消费核销（收银调用）")
 async def consume(
@@ -277,6 +287,7 @@ async def consume(
 # 退款（仅退本金）
 # ──────────────────────────────────────────────────────────────────
 
+
 @router.post("/{card_id}/refund", summary="退款（仅退本金）")
 async def refund(
     card_id: uuid.UUID,
@@ -306,6 +317,7 @@ async def refund(
 # ──────────────────────────────────────────────────────────────────
 # 流水（分页）
 # ──────────────────────────────────────────────────────────────────
+
 
 @router.get("/{card_id}/transactions", summary="流水分页查询")
 async def get_transactions(
@@ -341,6 +353,7 @@ async def get_transactions(
 # 冻结
 # ──────────────────────────────────────────────────────────────────
 
+
 @router.post("/{card_id}/freeze", summary="冻结储值卡")
 async def freeze_card(
     card_id: uuid.UUID,
@@ -370,6 +383,7 @@ async def freeze_card(
 # ──────────────────────────────────────────────────────────────────
 # 解冻
 # ──────────────────────────────────────────────────────────────────
+
 
 @router.post("/{card_id}/unfreeze", summary="解冻储值卡")
 async def unfreeze_card(

@@ -45,9 +45,7 @@ router = APIRouter(tags=["approvals"])
 
 
 def _get_tenant_id(request: Request) -> str:
-    tid = getattr(request.state, "tenant_id", None) or request.headers.get(
-        "X-Tenant-ID", ""
-    )
+    tid = getattr(request.state, "tenant_id", None) or request.headers.get("X-Tenant-ID", "")
     if not tid:
         raise HTTPException(status_code=400, detail="X-Tenant-ID header required")
     return tid
@@ -95,9 +93,7 @@ class CreateInstanceReq(BaseModel):
     business_id: str = Field(..., description="关联业务单据 ID")
     title: str = Field(..., max_length=200, description="审批标题")
     initiator_id: str = Field(..., description="发起人员工 ID")
-    context_data: dict[str, Any] = Field(
-        default_factory=dict, description="业务上下文，用于条件路由"
-    )
+    context_data: dict[str, Any] = Field(default_factory=dict, description="业务上下文，用于条件路由")
 
 
 class ApproveReq(BaseModel):
@@ -155,10 +151,7 @@ async def get_pending_count(
 
     # 查询审批人角色
     emp_row = await db.execute(
-        text(
-            "SELECT role FROM employees "
-            "WHERE id = :aid AND tenant_id = :tid AND is_deleted = FALSE"
-        ),
+        text("SELECT role FROM employees WHERE id = :aid AND tenant_id = :tid AND is_deleted = FALSE"),
         {"aid": approver_id, "tid": tenant_id},
     )
     emp = emp_row.mappings().first()
@@ -233,10 +226,7 @@ async def list_approvals(
     else:
         # 查询审批人角色
         emp_row = await db.execute(
-            text(
-                "SELECT role FROM employees "
-                "WHERE id = :aid AND tenant_id = :tid AND is_deleted = FALSE"
-            ),
+            text("SELECT role FROM employees WHERE id = :aid AND tenant_id = :tid AND is_deleted = FALSE"),
             {"aid": approver_id, "tid": tenant_id},
         )
         emp = emp_row.mappings().first()
@@ -441,13 +431,10 @@ async def create_template(
     if req.business_type not in VALID_BUSINESS_TYPES:
         raise HTTPException(
             status_code=400,
-            detail=f"不支持的业务类型: {req.business_type}，"
-            f"支持: {', '.join(sorted(VALID_BUSINESS_TYPES))}",
+            detail=f"不支持的业务类型: {req.business_type}，支持: {', '.join(sorted(VALID_BUSINESS_TYPES))}",
         )
 
-    steps_json = json.dumps(
-        [s.model_dump(exclude_none=False) for s in req.steps], ensure_ascii=False
-    )
+    steps_json = json.dumps([s.model_dump(exclude_none=False) for s in req.steps], ensure_ascii=False)
     conditions_json = json.dumps(req.conditions, ensure_ascii=False)
 
     result = await db.execute(
@@ -484,8 +471,7 @@ async def update_template(
     # 检查存在
     exist_row = await db.execute(
         text(
-            "SELECT id FROM approval_workflow_templates "
-            "WHERE id = :tid_tpl AND tenant_id = :tid AND is_deleted = FALSE"
+            "SELECT id FROM approval_workflow_templates WHERE id = :tid_tpl AND tenant_id = :tid AND is_deleted = FALSE"
         ),
         {"tid_tpl": template_id, "tid": tenant_id},
     )
@@ -500,9 +486,7 @@ async def update_template(
         params["name"] = req.name
     if req.steps is not None:
         set_parts.append("steps = :steps::jsonb")
-        params["steps"] = json.dumps(
-            [s.model_dump(exclude_none=False) for s in req.steps], ensure_ascii=False
-        )
+        params["steps"] = json.dumps([s.model_dump(exclude_none=False) for s in req.steps], ensure_ascii=False)
     if req.conditions is not None:
         set_parts.append("conditions = :conditions::jsonb")
         params["conditions"] = json.dumps(req.conditions, ensure_ascii=False)
@@ -511,11 +495,7 @@ async def update_template(
         params["is_active"] = req.is_active
 
     await db.execute(
-        text(
-            f"UPDATE approval_workflow_templates "
-            f"SET {', '.join(set_parts)} "
-            f"WHERE id = :tid_tpl AND tenant_id = :tid"
-        ),
+        text(f"UPDATE approval_workflow_templates SET {', '.join(set_parts)} WHERE id = :tid_tpl AND tenant_id = :tid"),
         params,
     )
     await db.commit()

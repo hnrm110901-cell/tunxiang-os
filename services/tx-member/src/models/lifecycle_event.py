@@ -49,6 +49,7 @@
 # CREATE POLICY lifecycle_configs_tenant_isolation ON lifecycle_configs
 #     USING (tenant_id = (current_setting('app.tenant_id', true))::uuid);
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -78,19 +79,13 @@ class LifecycleEvent:
     from_stage: Optional[str] = None
     trigger_reason: Optional[str] = None
     action_taken: str = "none"
-    created_at: datetime = field(
-        default_factory=lambda: datetime.now(timezone.utc)
-    )
+    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
     def __post_init__(self) -> None:
         if self.to_stage not in LIFECYCLE_STAGES:
-            raise ValueError(
-                f"to_stage 必须是 {LIFECYCLE_STAGES} 之一，got: {self.to_stage!r}"
-            )
+            raise ValueError(f"to_stage 必须是 {LIFECYCLE_STAGES} 之一，got: {self.to_stage!r}")
         if self.from_stage is not None and self.from_stage not in LIFECYCLE_STAGES:
-            raise ValueError(
-                f"from_stage 必须是 {LIFECYCLE_STAGES} 之一，got: {self.from_stage!r}"
-            )
+            raise ValueError(f"from_stage 必须是 {LIFECYCLE_STAGES} 之一，got: {self.from_stage!r}")
 
     def to_dict(self) -> dict:
         return {
@@ -127,14 +122,10 @@ class LifecycleConfig:
 
     def __post_init__(self) -> None:
         if self.stage not in LIFECYCLE_STAGES:
-            raise ValueError(
-                f"stage 必须是 {LIFECYCLE_STAGES} 之一，got: {self.stage!r}"
-            )
+            raise ValueError(f"stage 必须是 {LIFECYCLE_STAGES} 之一，got: {self.stage!r}")
         valid_actions = ("coupon", "wecom_message", "sms", "none")
         if self.auto_action not in valid_actions:
-            raise ValueError(
-                f"auto_action 必须是 {valid_actions} 之一，got: {self.auto_action!r}"
-            )
+            raise ValueError(f"auto_action 必须是 {valid_actions} 之一，got: {self.auto_action!r}")
 
     def to_dict(self) -> dict:
         return {
@@ -142,9 +133,7 @@ class LifecycleConfig:
             "stage": self.stage,
             "days_threshold": self.days_threshold,
             "auto_action": self.auto_action,
-            "coupon_template_id": (
-                str(self.coupon_template_id) if self.coupon_template_id else None
-            ),
+            "coupon_template_id": (str(self.coupon_template_id) if self.coupon_template_id else None),
             "message_template": self.message_template,
             "is_active": self.is_active,
         }

@@ -3,6 +3,7 @@
 所有金额单位：分(fen)。
 RFM分层: R(1-5) x F(1-5) x M(1-5) → 高价值(>=12)/成长(8-11)/沉睡(5-7)/流失(<5)
 """
+
 from __future__ import annotations
 
 import uuid
@@ -18,9 +19,9 @@ from shared.ontology.src.entities import Customer, Order, OrderItem
 logger = structlog.get_logger(__name__)
 
 # ── RFM 分层阈值 ─────────────────────────────────────────────
-RFM_HIGH_VALUE_MIN = 12       # R+F+M >= 12 → 高价值
-RFM_GROWTH_MIN = 8            # 8-11 → 成长
-RFM_DORMANT_MIN = 5           # 5-7 → 沉睡
+RFM_HIGH_VALUE_MIN = 12  # R+F+M >= 12 → 高价值
+RFM_GROWTH_MIN = 8  # 8-11 → 成长
+RFM_DORMANT_MIN = 5  # 5-7 → 沉睡
 # < 5 → 流失
 
 RFM_LEVEL_MAP = {
@@ -257,9 +258,7 @@ async def channel_attribution(
     if not rows:
         # 无订单，从 Customer.source 推断
         cust_result = await db.execute(
-            select(Customer.source)
-            .where(Customer.id == cid)
-            .where(Customer.tenant_id == tid)
+            select(Customer.source).where(Customer.id == cid).where(Customer.tenant_id == tid)
         )
         source = cust_result.scalar() or "unknown"
         logger.info(
@@ -334,6 +333,7 @@ async def tag_customer_scene(
     now = datetime.now(timezone.utc)
     lookback = now.replace(day=1)  # 近3个月近似
     from datetime import timedelta
+
     lookback = now - timedelta(days=90)
 
     orders_result = await db.execute(
@@ -375,7 +375,7 @@ async def tag_customer_scene(
     for o in orders:
         if o.order_time:
             ot = o.order_time
-            if hasattr(ot, 'weekday'):
+            if hasattr(ot, "weekday"):
                 # 0=Monday ... 4=Friday
                 if ot.weekday() < 5 and 11 <= ot.hour <= 14:
                     weekday_lunch_count += 1
@@ -409,43 +409,53 @@ async def tag_customer_scene(
 
     # 宴请: 平均人数 >= 8 且人均消费较高
     if avg_guest >= 8 and per_capita_fen >= 10000:  # 人均 >= 100元
-        scenes.append({
-            "scene": "banquet",
-            "label": "宴请",
-            "confidence": min(0.6 + (avg_guest - 8) * 0.05, 1.0),
-        })
+        scenes.append(
+            {
+                "scene": "banquet",
+                "label": "宴请",
+                "confidence": min(0.6 + (avg_guest - 8) * 0.05, 1.0),
+            }
+        )
 
     # 家庭: 3-7 人且有儿童菜
     if 3 <= avg_guest <= 7 and kid_dish_count > 0:
-        scenes.append({
-            "scene": "family",
-            "label": "家庭",
-            "confidence": min(0.5 + kid_dish_count * 0.1, 1.0),
-        })
+        scenes.append(
+            {
+                "scene": "family",
+                "label": "家庭",
+                "confidence": min(0.5 + kid_dish_count * 0.1, 1.0),
+            }
+        )
     elif 3 <= avg_guest <= 7:
         # 3-7 人但无儿童菜，低置信度家庭
-        scenes.append({
-            "scene": "family",
-            "label": "家庭",
-            "confidence": 0.3,
-        })
+        scenes.append(
+            {
+                "scene": "family",
+                "label": "家庭",
+                "confidence": 0.3,
+            }
+        )
 
     # 商务: 工作日午餐 2-4 人占比高
     weekday_lunch_ratio = weekday_lunch_count / len(orders) if orders else 0
     if 2 <= avg_guest <= 4 and weekday_lunch_ratio >= 0.4:
-        scenes.append({
-            "scene": "business",
-            "label": "商务",
-            "confidence": min(0.4 + weekday_lunch_ratio * 0.5, 1.0),
-        })
+        scenes.append(
+            {
+                "scene": "business",
+                "label": "商务",
+                "confidence": min(0.4 + weekday_lunch_ratio * 0.5, 1.0),
+            }
+        )
 
     # 独食: 平均人数 <= 1
     if avg_guest <= 1.2:
-        scenes.append({
-            "scene": "solo",
-            "label": "独食",
-            "confidence": 0.8 if avg_guest <= 1.0 else 0.5,
-        })
+        scenes.append(
+            {
+                "scene": "solo",
+                "label": "独食",
+                "confidence": 0.8 if avg_guest <= 1.0 else 0.5,
+            }
+        )
 
     # 按置信度排序
     scenes.sort(key=lambda s: s["confidence"], reverse=True)
@@ -453,11 +463,7 @@ async def tag_customer_scene(
 
     # 更新客户标签
     if scenes:
-        cust_result = await db.execute(
-            select(Customer)
-            .where(Customer.id == cid)
-            .where(Customer.tenant_id == tid)
-        )
+        cust_result = await db.execute(select(Customer).where(Customer.id == cid).where(Customer.tenant_id == tid))
         customer = cust_result.scalar_one_or_none()
         if customer:
             existing_tags = set(customer.tags or [])
@@ -510,10 +516,7 @@ async def calculate_customer_value(
     cid = _to_uuid(customer_id)
 
     cust_result = await db.execute(
-        select(Customer)
-        .where(Customer.id == cid)
-        .where(Customer.tenant_id == tid)
-        .where(Customer.is_deleted == False)  # noqa: E712
+        select(Customer).where(Customer.id == cid).where(Customer.tenant_id == tid).where(Customer.is_deleted == False)  # noqa: E712
     )
     customer = cust_result.scalar_one_or_none()
     if not customer:
@@ -556,13 +559,13 @@ async def calculate_customer_value(
 
     # ── 计算 M 分 (Monetary) ──
     total_fen = customer.total_order_amount_fen or 0
-    if total_fen >= 500000:        # >= 5000 元
+    if total_fen >= 500000:  # >= 5000 元
         m_score = 5
-    elif total_fen >= 200000:      # >= 2000 元
+    elif total_fen >= 200000:  # >= 2000 元
         m_score = 4
-    elif total_fen >= 80000:       # >= 800 元
+    elif total_fen >= 80000:  # >= 800 元
         m_score = 3
-    elif total_fen >= 30000:       # >= 300 元
+    elif total_fen >= 30000:  # >= 300 元
         m_score = 2
     else:
         m_score = 1
@@ -641,10 +644,7 @@ async def get_customer_360(
 
     # 基础信息
     cust_result = await db.execute(
-        select(Customer)
-        .where(Customer.id == cid)
-        .where(Customer.tenant_id == tid)
-        .where(Customer.is_deleted == False)  # noqa: E712
+        select(Customer).where(Customer.id == cid).where(Customer.tenant_id == tid).where(Customer.is_deleted == False)  # noqa: E712
     )
     customer = cust_result.scalar_one_or_none()
     if not customer:
@@ -670,10 +670,7 @@ async def get_customer_360(
         .order_by(func.sum(OrderItem.quantity).desc())
         .limit(5)
     )
-    favorite_dishes = [
-        {"name": row[0], "total_qty": int(row[1]), "order_times": row[2]}
-        for row in dish_result.all()
-    ]
+    favorite_dishes = [{"name": row[0], "total_qty": int(row[1]), "order_times": row[2]} for row in dish_result.all()]
 
     # 最近5笔订单时间线
     recent_orders_result = await db.execute(

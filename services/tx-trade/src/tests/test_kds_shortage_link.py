@@ -2,6 +2,7 @@
 
 使用 SQLite 内存数据库模拟 PostgreSQL。
 """
+
 import uuid
 from datetime import date, datetime, timedelta, timezone
 from unittest.mock import MagicMock
@@ -216,7 +217,10 @@ async def test_production_rhythm_empty(db_session):
     """测试无出品数据"""
     today = date.today()
     result = await kds_shortage_link.get_production_rhythm(
-        STORE_ID, (today, today), TENANT_ID, db_session,
+        STORE_ID,
+        (today, today),
+        TENANT_ID,
+        db_session,
     )
     assert result["departments"] == []
     assert result["bottleneck_dept"] is None
@@ -231,8 +235,11 @@ async def test_production_rhythm_with_data(db_session):
     # 添加两个档口的出品记录
     for i in range(5):
         kds_shortage_link.add_production_record(
-            STORE_ID, "hot-kitchen", TENANT_ID,
-            f"task-hot-{i}", "宫保鸡丁",
+            STORE_ID,
+            "hot-kitchen",
+            TENANT_ID,
+            f"task-hot-{i}",
+            "宫保鸡丁",
             (now - timedelta(minutes=10 * i + 8)).isoformat(),
             (now - timedelta(minutes=10 * i)).isoformat(),
             duration_sec=480,
@@ -240,8 +247,11 @@ async def test_production_rhythm_with_data(db_session):
 
     for i in range(3):
         kds_shortage_link.add_production_record(
-            STORE_ID, "cold-kitchen", TENANT_ID,
-            f"task-cold-{i}", "凉拌黄瓜",
+            STORE_ID,
+            "cold-kitchen",
+            TENANT_ID,
+            f"task-cold-{i}",
+            "凉拌黄瓜",
             (now - timedelta(minutes=5 * i + 3)).isoformat(),
             (now - timedelta(minutes=5 * i)).isoformat(),
             duration_sec=180,
@@ -249,7 +259,10 @@ async def test_production_rhythm_with_data(db_session):
 
     today = date.today()
     result = await kds_shortage_link.get_production_rhythm(
-        STORE_ID, (today - timedelta(days=1), today), TENANT_ID, db_session,
+        STORE_ID,
+        (today - timedelta(days=1), today),
+        TENANT_ID,
+        db_session,
     )
 
     assert len(result["departments"]) == 2
@@ -267,8 +280,11 @@ async def test_production_rhythm_date_filter(db_session):
     old_time = datetime.now(timezone.utc) - timedelta(days=30)
 
     kds_shortage_link.add_production_record(
-        STORE_ID, "hot-kitchen", TENANT_ID,
-        "task-old", "红烧肉",
+        STORE_ID,
+        "hot-kitchen",
+        TENANT_ID,
+        "task-old",
+        "红烧肉",
         old_time.isoformat(),
         (old_time + timedelta(minutes=10)).isoformat(),
         duration_sec=600,
@@ -276,7 +292,10 @@ async def test_production_rhythm_date_filter(db_session):
 
     today = date.today()
     result = await kds_shortage_link.get_production_rhythm(
-        STORE_ID, (today, today), TENANT_ID, db_session,
+        STORE_ID,
+        (today, today),
+        TENANT_ID,
+        db_session,
     )
     # 30天前的记录应被过滤掉
     assert result["departments"] == []
@@ -289,7 +308,9 @@ async def test_production_rhythm_date_filter(db_session):
 async def test_optimize_sequence_empty(db_session):
     """测试无数据优化"""
     result = await kds_shortage_link.optimize_production_sequence(
-        "hot-kitchen", TENANT_ID, db_session,
+        "hot-kitchen",
+        TENANT_ID,
+        db_session,
     )
     assert result["optimized_sequence"] == []
     assert result["strategy"] == "shortest_job_first"
@@ -302,20 +323,40 @@ async def test_optimize_sequence_sjf(db_session):
 
     # 添加不同耗时的菜品记录
     kds_shortage_link.add_production_record(
-        STORE_ID, "hot-kitchen", TENANT_ID,
-        "task-1", "宫保鸡丁", now.isoformat(), now.isoformat(), duration_sec=480,
+        STORE_ID,
+        "hot-kitchen",
+        TENANT_ID,
+        "task-1",
+        "宫保鸡丁",
+        now.isoformat(),
+        now.isoformat(),
+        duration_sec=480,
     )
     kds_shortage_link.add_production_record(
-        STORE_ID, "hot-kitchen", TENANT_ID,
-        "task-2", "蒜蓉蒸虾", now.isoformat(), now.isoformat(), duration_sec=120,
+        STORE_ID,
+        "hot-kitchen",
+        TENANT_ID,
+        "task-2",
+        "蒜蓉蒸虾",
+        now.isoformat(),
+        now.isoformat(),
+        duration_sec=120,
     )
     kds_shortage_link.add_production_record(
-        STORE_ID, "hot-kitchen", TENANT_ID,
-        "task-3", "红烧肉", now.isoformat(), now.isoformat(), duration_sec=900,
+        STORE_ID,
+        "hot-kitchen",
+        TENANT_ID,
+        "task-3",
+        "红烧肉",
+        now.isoformat(),
+        now.isoformat(),
+        duration_sec=900,
     )
 
     result = await kds_shortage_link.optimize_production_sequence(
-        "hot-kitchen", TENANT_ID, db_session,
+        "hot-kitchen",
+        TENANT_ID,
+        db_session,
     )
 
     seq = result["optimized_sequence"]

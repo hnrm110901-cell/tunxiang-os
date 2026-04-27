@@ -8,6 +8,7 @@
   - 离线时通过 OfflineSyncService 将订单快照存入本地队列
   - 在线时走正常 SQLAlchemy 流程（不受影响）
 """
+
 import uuid
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any, Optional
@@ -39,6 +40,7 @@ class OrderService:
         self.db = db
         self.tenant_id = uuid.UUID(tenant_id)
         self._tenant_id_str = tenant_id
+
     """收银核心服务
 
     离线模式：
@@ -60,8 +62,16 @@ class OrderService:
     async def _set_tenant(self) -> None:
         await self.db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": self._tenant_id_str})
 
-    async def create_order(self, store_id: str, order_type: str = OrderType.dine_in.value, table_no: Optional[str] = None, customer_id: Optional[str] = None, waiter_id: Optional[str] = None) -> dict:
+    async def create_order(
+        self,
+        store_id: str,
+        order_type: str = OrderType.dine_in.value,
+        table_no: Optional[str] = None,
+        customer_id: Optional[str] = None,
+        waiter_id: Optional[str] = None,
+    ) -> dict:
         await self._set_tenant()
+
     async def create_order(
         self,
         store_id: str,
@@ -96,9 +106,7 @@ class OrderService:
         # ── 离线降级路径 ──────────────────────────────────────────────────
         if is_offline:
             if not self._offline_sync:
-                raise RuntimeError(
-                    "offline_sync_service is required for offline order creation"
-                )
+                raise RuntimeError("offline_sync_service is required for offline order creation")
             order_no = _gen_order_no()
             temp_order_id = str(uuid.uuid4())
             now_iso = datetime.now(timezone.utc).isoformat()
@@ -200,55 +208,114 @@ class OrderService:
         # v149：回调 DiningSessionService，更新会话汇总 + 推进状态
         if dining_session_id:
             import asyncio
+
             from .dining_session_service import DiningSessionService
+
             asyncio.create_task(
                 DiningSessionService(self.db, str(self.tenant_id)).record_order_placed(
                     session_id=uuid.UUID(dining_session_id),
                     order_id=order.id,
                     is_add_order=is_add_order,
-                    order_amount_fen=0,   # 下单时金额为0，加菜后由 cashier_engine 更新
+                    order_amount_fen=0,  # 下单时金额为0，加菜后由 cashier_engine 更新
                     item_count=0,
                 )
             )
 
         return {"order_id": str(order.id), "order_no": order_no}
 
-    async def add_item(self, order_id: str, dish_id: str, dish_name: str, quantity: int, unit_price_fen: int, notes: Optional[str] = None, customizations: Optional[dict] = None) -> dict:
+    async def add_item(
+        self,
+        order_id: str,
+        dish_id: str,
+        dish_name: str,
+        quantity: int,
+        unit_price_fen: int,
+        notes: Optional[str] = None,
+        customizations: Optional[dict] = None,
+    ) -> dict:
         await self._set_tenant()
-        subtotal_fen = unit_price_fen * quantity
-        item = OrderItem(id=uuid.uuid4(), tenant_id=self.tenant_id, order_id=uuid.UUID(order_id), dish_id=uuid.UUID(dish_id) if dish_id else None, item_name=dish_name, quantity=quantity, unit_price_fen=unit_price_fen, subtotal_fen=subtotal_fen, notes=notes, customizations=customizations or {})
+
+        # 做法加价：从 customizations 中提取做法附加费用
+        practice_extra_fen = 0
+        if customizations:
+            practice_extra_fen = customizations.get("total_extra_price_fen", 0)
+
+        subtotal_fen = unit_price_fen * quantity + practice_extra_fen
+        item = OrderItem(
+            id=uuid.uuid4(),
+            tenant_id=self.tenant_id,
+            order_id=uuid.UUID(order_id),
+            dish_id=uuid.UUID(dish_id) if dish_id else None,
+            item_name=dish_name,
+            quantity=quantity,
+            unit_price_fen=unit_price_fen,
+            subtotal_fen=subtotal_fen,
+            notes=notes,
+            customizations=customizations or {},
+        )
         self.db.add(item)
-        await self.db.execute(update(Order).where(Order.id == uuid.UUID(order_id)).where(Order.tenant_id == self.tenant_id).values(total_amount_fen=Order.total_amount_fen + subtotal_fen, final_amount_fen=Order.total_amount_fen + subtotal_fen - Order.discount_amount_fen, status=OrderStatus.confirmed.value))
+        await self.db.execute(
+            update(Order)
+            .where(Order.id == uuid.UUID(order_id))
+            .where(Order.tenant_id == self.tenant_id)
+            .values(
+                total_amount_fen=Order.total_amount_fen + subtotal_fen,
+                final_amount_fen=Order.total_amount_fen + subtotal_fen - Order.discount_amount_fen,
+                status=OrderStatus.confirmed.value,
+            )
+        )
         await self.db.flush()
         return {"item_id": str(item.id), "subtotal_fen": subtotal_fen}
 
     async def update_item_quantity(self, item_id: str, new_quantity: int) -> dict:
         await self._set_tenant()
-        result = await self.db.execute(select(OrderItem).where(OrderItem.id == uuid.UUID(item_id)).where(OrderItem.tenant_id == self.tenant_id))
+        result = await self.db.execute(
+            select(OrderItem).where(OrderItem.id == uuid.UUID(item_id)).where(OrderItem.tenant_id == self.tenant_id)
+        )
         item = result.scalar_one_or_none()
         if not item:
             raise ValueError(f"OrderItem not found: {item_id}")
         diff = item.unit_price_fen * new_quantity - item.subtotal_fen
         item.quantity = new_quantity
         item.subtotal_fen = item.unit_price_fen * new_quantity
-        await self.db.execute(update(Order).where(Order.id == item.order_id).where(Order.tenant_id == self.tenant_id).values(total_amount_fen=Order.total_amount_fen + diff, final_amount_fen=Order.total_amount_fen + diff - Order.discount_amount_fen))
+        await self.db.execute(
+            update(Order)
+            .where(Order.id == item.order_id)
+            .where(Order.tenant_id == self.tenant_id)
+            .values(
+                total_amount_fen=Order.total_amount_fen + diff,
+                final_amount_fen=Order.total_amount_fen + diff - Order.discount_amount_fen,
+            )
+        )
         await self.db.flush()
         return {"item_id": item_id, "new_quantity": new_quantity, "diff_fen": diff}
 
     async def remove_item(self, item_id: str) -> dict:
         await self._set_tenant()
-        result = await self.db.execute(select(OrderItem).where(OrderItem.id == uuid.UUID(item_id)).where(OrderItem.tenant_id == self.tenant_id))
+        result = await self.db.execute(
+            select(OrderItem).where(OrderItem.id == uuid.UUID(item_id)).where(OrderItem.tenant_id == self.tenant_id)
+        )
         item = result.scalar_one_or_none()
         if not item:
             raise ValueError(f"OrderItem not found: {item_id}")
-        await self.db.execute(update(Order).where(Order.id == item.order_id).where(Order.tenant_id == self.tenant_id).values(total_amount_fen=Order.total_amount_fen - item.subtotal_fen, final_amount_fen=Order.total_amount_fen - item.subtotal_fen - Order.discount_amount_fen))
+        await self.db.execute(
+            update(Order)
+            .where(Order.id == item.order_id)
+            .where(Order.tenant_id == self.tenant_id)
+            .values(
+                total_amount_fen=Order.total_amount_fen - item.subtotal_fen,
+                final_amount_fen=Order.total_amount_fen - item.subtotal_fen - Order.discount_amount_fen,
+            )
+        )
         await self.db.delete(item)
         await self.db.flush()
         return {"removed_item_id": item_id, "deducted_fen": item.subtotal_fen}
 
     async def apply_discount(self, order_id: str, discount_fen: int, reason: str = "") -> dict:
         await self._set_tenant()
-        result = await self.db.execute(select(Order).where(Order.id == uuid.UUID(order_id)).where(Order.tenant_id == self.tenant_id))
+        result = await self.db.execute(
+            select(Order).where(Order.id == uuid.UUID(order_id)).where(Order.tenant_id == self.tenant_id)
+        )
         order = result.scalar_one_or_none()
         if not order:
             raise ValueError(f"Order not found: {order_id}")
@@ -262,7 +329,10 @@ class OrderService:
 
     async def settle_order(self, order_id: str) -> dict:
         await self._set_tenant()
-        result = await self.db.execute(select(Order).where(Order.id == uuid.UUID(order_id)).where(Order.tenant_id == self.tenant_id))
+        result = await self.db.execute(
+            select(Order).where(Order.id == uuid.UUID(order_id)).where(Order.tenant_id == self.tenant_id)
+        )
+
     # ─── 结算 ───
 
     async def settle_order(
@@ -290,9 +360,7 @@ class OrderService:
         # ── 离线降级路径 ──────────────────────────────────────────────────
         if is_offline:
             if not self._offline_sync:
-                raise RuntimeError(
-                    "offline_sync_service is required for offline settle"
-                )
+                raise RuntimeError("offline_sync_service is required for offline settle")
             if not order_snapshot:
                 raise ValueError("order_snapshot is required for offline settle")
 
@@ -327,9 +395,7 @@ class OrderService:
             }
 
         # ── 在线正常路径 ──────────────────────────────────────────────────
-        result = await self.db.execute(
-            select(Order).where(Order.id == uuid.UUID(order_id))
-        )
+        result = await self.db.execute(select(Order).where(Order.id == uuid.UUID(order_id)))
         order = result.scalar_one_or_none()
         if not order:
             raise ValueError(f"Order not found: {order_id}")
@@ -340,7 +406,12 @@ class OrderService:
         if order.table_number:
             await self._release_table(str(order.store_id), order.table_number)
         await self.db.flush()
-        return {"order_id": order_id, "order_no": order.order_no, "final_amount_fen": order.final_amount_fen, "settled_at": order.completed_at.isoformat()}
+        return {
+            "order_id": order_id,
+            "order_no": order.order_no,
+            "final_amount_fen": order.final_amount_fen,
+            "settled_at": order.completed_at.isoformat(),
+        }
         logger.info("order_settled", order_no=order.order_no, final_fen=order.final_amount_fen)
 
         # 触发归因检查（fire-and-forget，不阻断结算流程）
@@ -364,7 +435,9 @@ class OrderService:
 
     async def cancel_order(self, order_id: str, reason: str = "") -> dict:
         await self._set_tenant()
-        result = await self.db.execute(select(Order).where(Order.id == uuid.UUID(order_id)).where(Order.tenant_id == self.tenant_id))
+        result = await self.db.execute(
+            select(Order).where(Order.id == uuid.UUID(order_id)).where(Order.tenant_id == self.tenant_id)
+        )
         order = result.scalar_one_or_none()
         if not order:
             raise ValueError(f"Order not found: {order_id}")
@@ -377,16 +450,52 @@ class OrderService:
 
     async def get_order(self, order_id: str) -> dict | None:
         await self._set_tenant()
-        result = await self.db.execute(select(Order).where(Order.id == uuid.UUID(order_id)).where(Order.tenant_id == self.tenant_id))
+        result = await self.db.execute(
+            select(Order).where(Order.id == uuid.UUID(order_id)).where(Order.tenant_id == self.tenant_id)
+        )
         order = result.scalar_one_or_none()
         if not order:
             return None
-        items_result = await self.db.execute(select(OrderItem).where(OrderItem.order_id == order.id).where(OrderItem.tenant_id == self.tenant_id))
+        items_result = await self.db.execute(
+            select(OrderItem).where(OrderItem.order_id == order.id).where(OrderItem.tenant_id == self.tenant_id)
+        )
         items = items_result.scalars().all()
-        return {"id": str(order.id), "order_no": order.order_no, "store_id": str(order.store_id), "table_number": order.table_number, "status": order.status, "total_amount_fen": order.total_amount_fen, "discount_amount_fen": order.discount_amount_fen, "final_amount_fen": order.final_amount_fen, "order_time": order.order_time.isoformat() if order.order_time else None, "items": [{"id": str(i.id), "item_name": i.item_name, "quantity": i.quantity, "unit_price_fen": i.unit_price_fen, "subtotal_fen": i.subtotal_fen} for i in items]}
+        return {
+            "id": str(order.id),
+            "order_no": order.order_no,
+            "store_id": str(order.store_id),
+            "table_number": order.table_number,
+            "status": order.status,
+            "total_amount_fen": order.total_amount_fen,
+            "discount_amount_fen": order.discount_amount_fen,
+            "final_amount_fen": order.final_amount_fen,
+            "order_time": order.order_time.isoformat() if order.order_time else None,
+            "items": [
+                {
+                    "id": str(i.id),
+                    "item_name": i.item_name,
+                    "quantity": i.quantity,
+                    "unit_price_fen": i.unit_price_fen,
+                    "subtotal_fen": i.subtotal_fen,
+                }
+                for i in items
+            ],
+        }
 
     async def _lock_table(self, store_id: str, table_no: str, order_id: uuid.UUID) -> None:
-        await self.db.execute(update(Table).where(Table.tenant_id == self.tenant_id).where(Table.store_id == uuid.UUID(store_id)).where(Table.table_no == table_no).values(status=TableStatus.occupied.value, current_order_id=order_id))
+        await self.db.execute(
+            update(Table)
+            .where(Table.tenant_id == self.tenant_id)
+            .where(Table.store_id == uuid.UUID(store_id))
+            .where(Table.table_no == table_no)
+            .values(status=TableStatus.occupied.value, current_order_id=order_id)
+        )
 
     async def _release_table(self, store_id: str, table_no: str) -> None:
-        await self.db.execute(update(Table).where(Table.tenant_id == self.tenant_id).where(Table.store_id == uuid.UUID(store_id)).where(Table.table_no == table_no).values(status=TableStatus.free.value, current_order_id=None))
+        await self.db.execute(
+            update(Table)
+            .where(Table.tenant_id == self.tenant_id)
+            .where(Table.store_id == uuid.UUID(store_id))
+            .where(Table.table_no == table_no)
+            .values(status=TableStatus.free.value, current_order_id=None)
+        )

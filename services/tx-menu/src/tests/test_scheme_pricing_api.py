@@ -8,12 +8,13 @@
 - 通过 app.dependency_overrides[get_db] 注入 AsyncMock DB Session
 - PricingEngine 及 SQLAlchemy 调用全部 mock，不依赖真实数据库
 """
+
 import os
 import sys
 import types
 import uuid
 from datetime import datetime, timezone
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 # ─── Mock 模块前置注入 ─────────────────────────────────────────────────────────
 for _mod in [
@@ -61,14 +62,13 @@ for _p in [_tx_menu_dir, _repo_root]:
     if _p not in sys.path:
         sys.path.insert(0, _p)
 
-import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from src.api.scheme_routes import get_db as scheme_get_db
-from src.api.scheme_routes import router as scheme_router
 from src.api.pricing_routes import get_db as pricing_get_db
 from src.api.pricing_routes import router as pricing_router
+from src.api.scheme_routes import get_db as scheme_get_db
+from src.api.scheme_routes import router as scheme_router
 
 # ─── 测试常量 ──────────────────────────────────────────────────────────────────
 TENANT = str(uuid.uuid4())
@@ -79,6 +79,7 @@ HEADERS = {"X-Tenant-ID": TENANT}
 
 
 # ─── 辅助 ──────────────────────────────────────────────────────────────────────
+
 
 def _make_mock_session():
     session = AsyncMock()
@@ -91,6 +92,7 @@ def _make_mock_session():
 def _async_dep(session):
     async def _dep():
         yield session
+
     return _dep
 
 
@@ -142,6 +144,7 @@ def _rows_result(rows):
 
 # ─── 1. GET /api/v1/menu-schemes/ — 方案列表 ───────────────────────────────────
 
+
 def test_list_schemes_success():
     """GET /api/v1/menu-schemes/ — 正常返回空列表。"""
     session = _make_mock_session()
@@ -176,6 +179,7 @@ def test_list_schemes_invalid_tenant():
 
 # ─── 2. POST /api/v1/menu-schemes/ — 新建方案 ─────────────────────────────────
 
+
 def test_create_scheme_success():
     """POST /api/v1/menu-schemes/ — 成功创建方案，返回 201 ok=True。"""
     session = _make_mock_session()
@@ -207,6 +211,7 @@ def test_create_scheme_missing_name():
 
 # ─── 3. GET /api/v1/menu-schemes/{scheme_id} — 方案详情 ───────────────────────
 
+
 def test_get_scheme_not_found():
     """GET /api/v1/menu-schemes/{id} — 方案不存在返回 404。"""
     session = _make_mock_session()
@@ -228,6 +233,7 @@ def test_get_scheme_invalid_id():
 
 
 # ─── 4. PUT /api/v1/menu-schemes/{scheme_id} — 更新方案 ───────────────────────
+
 
 def test_update_scheme_success():
     """PUT /api/v1/menu-schemes/{id} — 成功更新方案基本信息。"""
@@ -260,6 +266,7 @@ def test_update_scheme_not_found():
 
 
 # ─── 5. POST /api/v1/menu-schemes/{scheme_id}/publish — 发布方案 ───────────────
+
 
 def test_publish_scheme_already_published():
     """POST /publish — 已发布方案重复发布返回 400。"""
@@ -298,6 +305,7 @@ def test_publish_scheme_no_items():
 
 # ─── 6. POST /api/v1/menu-schemes/{scheme_id}/distribute — 下发到门店 ──────────
 
+
 def test_distribute_scheme_not_published():
     """POST /distribute — 未发布方案下发返回 400。"""
     session = _make_mock_session()
@@ -315,6 +323,7 @@ def test_distribute_scheme_not_published():
 
 
 # ─── 7. GET /api/v1/menu-schemes/{scheme_id}/stores — 已下发门店 ───────────────
+
 
 def test_get_scheme_stores_empty():
     """GET /stores — 尚未下发任何门店时返回空列表。"""
@@ -335,6 +344,7 @@ def test_get_scheme_stores_empty():
 
 # ─── 8. POST /api/v1/menu-schemes/{scheme_id}/items — 批量设置菜品 ─────────────
 
+
 def test_set_scheme_items_archived():
     """POST /items — 已归档方案不可编辑，返回 400。"""
     session = _make_mock_session()
@@ -346,16 +356,13 @@ def test_set_scheme_items_archived():
 
     app = _make_scheme_app(_async_dep(session))
     client = TestClient(app)
-    payload = {
-        "items": [
-            {"dish_id": DISH_ID, "is_available": True, "sort_order": 0}
-        ]
-    }
+    payload = {"items": [{"dish_id": DISH_ID, "is_available": True, "sort_order": 0}]}
     resp = client.post(f"/api/v1/menu-schemes/{SCHEME_ID}/items", json=payload, headers=HEADERS)
     assert resp.status_code == 400
 
 
 # ─── 9. GET /api/v1/store-menu/{store_id} — 门店菜谱 ─────────────────────────
+
 
 def test_get_store_menu_no_scheme():
     """GET /store-menu/{id} — 门店尚无方案时返回空列表提示。"""
@@ -374,6 +381,7 @@ def test_get_store_menu_no_scheme():
 
 
 # ─── 10. PUT /api/v1/store-menu/{store_id}/override — 门店覆盖 ────────────────
+
 
 def test_set_store_override_no_assignment():
     """PUT /store-menu/override — 门店未分配该方案时拒绝覆盖（400）。"""
@@ -395,6 +403,7 @@ def test_set_store_override_no_assignment():
 
 
 # ─── 11. DELETE /api/v1/store-menu/{store_id}/override/{dish_id} ─────────────
+
 
 def test_delete_store_override_success():
     """DELETE /store-menu/override/{dish_id} — 成功删除门店覆盖。"""
@@ -418,6 +427,7 @@ def test_delete_store_override_success():
 # pricing_routes 测试
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 def _pricing_engine_returning(value):
     """让 PricingEngine 实例的所有 async 方法返回给定值。"""
     inst = AsyncMock()
@@ -435,6 +445,7 @@ def _pricing_engine_returning(value):
 
 # ─── 1. GET /api/v1/pricing/standard-price/{dish_id} ─────────────────────────
 
+
 def test_get_standard_price():
     """GET /standard-price/{dish_id} — 成功返回标准价数据。"""
     expected = {"dish_id": DISH_ID, "price_fen": 5800, "channel": "dine_in"}
@@ -451,6 +462,7 @@ def test_get_standard_price():
 
 
 # ─── 2. POST /api/v1/pricing/market-price ────────────────────────────────────
+
 
 def test_set_market_price():
     """POST /market-price — 时价设置成功。"""
@@ -472,6 +484,7 @@ def test_set_market_price():
 
 # ─── 3. POST /api/v1/pricing/weighing-price ──────────────────────────────────
 
+
 def test_calculate_weighing_price():
     """POST /weighing-price — 称重计价成功。"""
     expected = {"dish_id": DISH_ID, "weight_g": 300, "price_fen": 3600}
@@ -487,6 +500,7 @@ def test_calculate_weighing_price():
 
 
 # ─── 4. POST /api/v1/pricing/combo-price ─────────────────────────────────────
+
 
 def test_create_combo_price():
     """POST /combo-price — 套餐组合定价计算成功。"""
@@ -507,6 +521,7 @@ def test_create_combo_price():
 
 # ─── 5. POST /api/v1/pricing/channel-price ───────────────────────────────────
 
+
 def test_set_channel_price():
     """POST /channel-price — 多渠道差异价设置成功。"""
     expected = {"dish_id": DISH_ID, "channels_updated": 2}
@@ -525,6 +540,7 @@ def test_set_channel_price():
 
 
 # ─── 6. POST /api/v1/pricing/promotion-price ─────────────────────────────────
+
 
 def test_set_promotion_price():
     """POST /promotion-price — 限时促销价设置成功。"""
@@ -546,6 +562,7 @@ def test_set_promotion_price():
 
 # ─── 7. POST /api/v1/pricing/validate-margin ─────────────────────────────────
 
+
 def test_validate_margin_pass():
     """POST /validate-margin — 毛利校验通过。"""
     expected = {"dish_id": DISH_ID, "margin_ok": True, "margin_rate": 0.55}
@@ -564,6 +581,7 @@ def test_validate_margin_pass():
 
 # ─── 8. POST /api/v1/pricing/approve-change ──────────────────────────────────
 
+
 def test_approve_price_change():
     """POST /approve-change — 审批调价申请成功。"""
     expected = {"change_id": "chg-001", "status": "approved"}
@@ -579,6 +597,7 @@ def test_approve_price_change():
 
 
 # ─── 9. GET /api/v1/pricing/matrix ───────────────────────────────────────────
+
 
 def test_get_pricing_matrix_empty():
     """GET /matrix — 无菜品时返回空矩阵。"""
@@ -607,6 +626,7 @@ def test_get_pricing_matrix_missing_store():
 
 # ─── 10. PUT /api/v1/pricing/batch ───────────────────────────────────────────
 
+
 def test_batch_price_update():
     """PUT /batch — 批量调价成功。"""
     session = _make_mock_session()
@@ -626,6 +646,7 @@ def test_batch_price_update():
 
 # ─── 11. GET /api/v1/pricing/rules ───────────────────────────────────────────
 
+
 def test_get_pricing_rules():
     """GET /rules — 加价规则查询成功，返回列表。"""
     session = _make_mock_session()
@@ -640,6 +661,7 @@ def test_get_pricing_rules():
 
 
 # ─── 12. POST /api/v1/pricing/rules — 创建加价规则 ───────────────────────────
+
 
 def test_create_pricing_rule():
     """POST /rules — 创建加价规则成功（201）。"""
@@ -662,6 +684,7 @@ def test_create_pricing_rule():
 
 
 # ─── 13. POST /api/v1/pricing/preview — 调价预览 ─────────────────────────────
+
 
 def test_preview_pricing():
     """POST /preview — 加价规则预览成功。"""

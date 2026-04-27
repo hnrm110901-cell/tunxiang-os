@@ -17,6 +17,7 @@
 14. GET  /gift-card/list                   — received 方向正常路径
 15. GET  /gift-card/list                   — DB 异常 fallback 返回空列表
 """
+
 import os
 import sys
 
@@ -33,6 +34,7 @@ from sqlalchemy.exc import OperationalError
 
 # ─── 工具类 ────────────────────────────────────────────────
 
+
 def _uid() -> str:
     return str(uuid.uuid4())
 
@@ -45,6 +47,7 @@ _HEADERS = {"X-Tenant-ID": TENANT_ID}
 
 class FakeMappingsResult:
     """模拟 result.mappings().first() 和 .all()"""
+
     def __init__(self, rows=None):
         self._rows = rows or []
 
@@ -79,6 +82,7 @@ def _seq_db(*results):
 # ─── 加载路由 ──────────────────────────────────────────────
 
 from api.stored_value_miniapp_routes import _MOCK_PLANS, router
+
 from shared.ontology.src.database import get_db
 
 app = FastAPI()
@@ -88,12 +92,14 @@ app.include_router(router)
 def _override(db):
     def _dep():
         return db
+
     return _dep
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 场景 1: GET balance — 账户存在，返回真实余额
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 @pytest.mark.asyncio
 async def test_get_balance_account_exists():
@@ -134,11 +140,12 @@ async def test_get_balance_account_exists():
 # 场景 2: GET balance — 账户不存在，返回全零
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 @pytest.mark.asyncio
 async def test_get_balance_account_not_found():
     """账户不存在时余额全零，ok=True"""
     set_cfg = AsyncMock()
-    empty_result = FakeExecuteResult(mapping_rows=[])   # first() → None
+    empty_result = FakeExecuteResult(mapping_rows=[])  # first() → None
 
     db = _seq_db(set_cfg, empty_result)
     app.dependency_overrides[get_db] = _override(db)
@@ -161,12 +168,13 @@ async def test_get_balance_account_not_found():
 # 注：_set_rls（第 1 次 execute）需正常；第 2 次查询才抛异常
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 @pytest.mark.asyncio
 async def test_get_balance_db_error_fallback():
     """DB 查询异常时 graceful 返回全零，HTTP 200"""
     db = _seq_db(
-        AsyncMock(),                                                    # _set_rls 正常
-        OperationalError("stmt", {}, Exception("conn refused")),       # 查询抛异常
+        AsyncMock(),  # _set_rls 正常
+        OperationalError("stmt", {}, Exception("conn refused")),  # 查询抛异常
     )
     app.dependency_overrides[get_db] = _override(db)
     client = TestClient(app)
@@ -184,6 +192,7 @@ async def test_get_balance_db_error_fallback():
 # 场景 4: GET balance — 缺少 X-Tenant-ID → 422
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_get_balance_missing_tenant_header():
     db = AsyncMock()
     app.dependency_overrides[get_db] = _override(db)
@@ -198,6 +207,7 @@ def test_get_balance_missing_tenant_header():
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 场景 5: GET plans — DB 有方案，返回真实列表
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 @pytest.mark.asyncio
 async def test_get_plans_from_db():
@@ -227,6 +237,7 @@ async def test_get_plans_from_db():
 # 场景 6: GET plans — DB 返回空列表时使用 mock 兜底
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 @pytest.mark.asyncio
 async def test_get_plans_empty_db_uses_mock():
     """DB 无方案时 fallback 到 _MOCK_PLANS"""
@@ -242,19 +253,20 @@ async def test_get_plans_empty_db_uses_mock():
     assert resp.status_code == 200
     items = resp.json()["data"]["items"]
     assert items == _MOCK_PLANS
-    assert len(items) == 5   # _MOCK_PLANS 有 5 条预置方案
+    assert len(items) == 5  # _MOCK_PLANS 有 5 条预置方案
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 场景 7: GET plans — DB 异常 fallback 到 mock
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 @pytest.mark.asyncio
 async def test_get_plans_db_error_fallback_to_mock():
     """DB 查询异常时 fallback 到 _MOCK_PLANS，ok=True"""
     db = _seq_db(
-        AsyncMock(),                                                # _set_rls 正常
-        OperationalError("stmt", {}, Exception("timeout")),        # 查询抛异常
+        AsyncMock(),  # _set_rls 正常
+        OperationalError("stmt", {}, Exception("timeout")),  # 查询抛异常
     )
     app.dependency_overrides[get_db] = _override(db)
     client = TestClient(app)
@@ -269,6 +281,7 @@ async def test_get_plans_db_error_fallback_to_mock():
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 场景 8: POST /recharge — 正常路径
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 def test_recharge_returns_order_id():
     """充值请求返回 order_id，amount_fen 匹配"""
@@ -294,6 +307,7 @@ def test_recharge_returns_order_id():
 # 场景 9: POST /recharge — amount_fen=0 → 422
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_recharge_invalid_amount_fen():
     """amount_fen 必须 > 0，传 0 应返回 422"""
     db = AsyncMock()
@@ -311,6 +325,7 @@ def test_recharge_invalid_amount_fen():
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 场景 10: GET /transactions/{mid} — 有流水记录
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 @pytest.mark.asyncio
 async def test_get_transactions_with_records():
@@ -356,11 +371,12 @@ async def test_get_transactions_with_records():
 # 场景 11: GET /transactions/{mid} — 账户不存在
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 @pytest.mark.asyncio
 async def test_get_transactions_no_account():
     """账户不存在时直接返回空列表，total=0"""
     set_cfg = AsyncMock()
-    acct_result = FakeExecuteResult(mapping_rows=[])   # first() → None
+    acct_result = FakeExecuteResult(mapping_rows=[])  # first() → None
 
     db = _seq_db(set_cfg, acct_result)
     app.dependency_overrides[get_db] = _override(db)
@@ -381,12 +397,13 @@ async def test_get_transactions_no_account():
 # 场景 12: GET /transactions/{mid} — DB 异常 fallback
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 @pytest.mark.asyncio
 async def test_get_transactions_db_error_fallback():
     """DB 查询异常时返回空列表，ok=True"""
     db = _seq_db(
-        AsyncMock(),                                                # _set_rls 正常
-        OperationalError("stmt", {}, Exception("conn error")),     # account 查询抛异常
+        AsyncMock(),  # _set_rls 正常
+        OperationalError("stmt", {}, Exception("conn error")),  # account 查询抛异常
     )
     app.dependency_overrides[get_db] = _override(db)
     client = TestClient(app)
@@ -405,6 +422,7 @@ async def test_get_transactions_db_error_fallback():
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 场景 13: POST /gift-card/purchase — 正常路径
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 def test_gift_card_purchase_returns_ids():
     """购买礼品卡返回 order_id 和 card_id"""
@@ -437,6 +455,7 @@ def test_gift_card_purchase_returns_ids():
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 场景 14: GET /gift-card/list — received 方向正常
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 @pytest.mark.asyncio
 async def test_list_gift_cards_received():
@@ -477,12 +496,13 @@ async def test_list_gift_cards_received():
 # 场景 15: GET /gift-card/list — DB 异常 fallback
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 @pytest.mark.asyncio
 async def test_list_gift_cards_db_error_fallback():
     """DB 查询异常时返回空列表，ok=True"""
     db = _seq_db(
-        AsyncMock(),                                                # _set_rls 正常
-        OperationalError("stmt", {}, Exception("timeout")),        # 查询抛异常
+        AsyncMock(),  # _set_rls 正常
+        OperationalError("stmt", {}, Exception("timeout")),  # 查询抛异常
     )
     app.dependency_overrides[get_db] = _override(db)
     client = TestClient(app)

@@ -13,6 +13,7 @@
 统一响应格式: {"ok": bool, "data": {}, "error": {}}
 认证头：X-Tenant-ID（所有接口必填）
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -116,17 +117,17 @@ class ReceiveConfirmIn(BaseModel):
 # ─── 状态转移规则 ────────────────────────────────────────────────────────────
 
 _PLAN_STATUS_TRANSITIONS: dict[str, set[str]] = {
-    "draft":       {"confirmed"},
-    "confirmed":   {"in_progress"},
+    "draft": {"confirmed"},
+    "confirmed": {"in_progress"},
     "in_progress": {"done"},
-    "done":        set(),
+    "done": set(),
 }
 
 _DISPATCH_STATUS_TRANSITIONS: dict[str, set[str]] = {
-    "pending":    {"dispatched"},
+    "pending": {"dispatched"},
     "dispatched": {"received", "rejected"},
-    "received":   set(),
-    "rejected":   set(),
+    "received": set(),
+    "rejected": set(),
 }
 
 
@@ -264,17 +265,19 @@ async def create_recipe(
                     "loss_rate": ing.loss_rate,
                 },
             )
-            ingredients.append({
-                "id": ing_id,
-                "tenant_id": x_tenant_id,
-                "recipe_id": recipe_id,
-                "ingredient_name": ing.ingredient_name,
-                "ingredient_id": ing.ingredient_id,
-                "qty": ing.qty,
-                "unit": ing.unit,
-                "loss_rate": ing.loss_rate,
-                "is_deleted": False,
-            })
+            ingredients.append(
+                {
+                    "id": ing_id,
+                    "tenant_id": x_tenant_id,
+                    "recipe_id": recipe_id,
+                    "ingredient_name": ing.ingredient_name,
+                    "ingredient_id": ing.ingredient_id,
+                    "qty": ing.qty,
+                    "unit": ing.unit,
+                    "loss_rate": ing.loss_rate,
+                    "is_deleted": False,
+                }
+            )
 
         await db.commit()
 
@@ -288,19 +291,21 @@ async def create_recipe(
 
         log.info("recipe.created", recipe_id=recipe_id, tenant_id=x_tenant_id)
 
-        asyncio.create_task(emit_event(
-            tenant_id=x_tenant_id,
-            store_id=None,
-            event_type="supply.bom_updated",
-            stream_id=str(recipe_id),
-            payload={
-                "recipe_id": str(recipe_id),
-                "dish_id": body.dish_id,
-                "action": "created",
-                "ingredient_count": len(body.ingredients),
-            },
-            source_service="tx-supply",
-        ))
+        asyncio.create_task(
+            emit_event(
+                tenant_id=x_tenant_id,
+                store_id=None,
+                event_type="supply.bom_updated",
+                stream_id=str(recipe_id),
+                payload={
+                    "recipe_id": str(recipe_id),
+                    "dish_id": body.dish_id,
+                    "action": "created",
+                    "ingredient_count": len(body.ingredients),
+                },
+                source_service="tx-supply",
+            )
+        )
 
         return {"ok": True, "data": recipe}
     except SQLAlchemyError as exc:
@@ -321,10 +326,7 @@ async def get_recipe(
         {"tid": x_tenant_id},
     )
     rec_result = await db.execute(
-        text(
-            "SELECT * FROM dish_recipes "
-            "WHERE id = :id AND tenant_id = :tenant_id AND is_deleted = false"
-        ),
+        text("SELECT * FROM dish_recipes WHERE id = :id AND tenant_id = :tenant_id AND is_deleted = false"),
         {"id": recipe_id, "tenant_id": x_tenant_id},
     )
     row = rec_result.fetchone()
@@ -334,10 +336,7 @@ async def get_recipe(
     recipe = _row_to_dict(row)
 
     ing_result = await db.execute(
-        text(
-            "SELECT * FROM recipe_ingredients "
-            "WHERE recipe_id = :recipe_id AND is_deleted = false"
-        ),
+        text("SELECT * FROM recipe_ingredients WHERE recipe_id = :recipe_id AND is_deleted = false"),
         {"recipe_id": recipe_id},
     )
     recipe["ingredients"] = [_row_to_dict(r) for r in ing_result.fetchall()]
@@ -360,10 +359,7 @@ async def update_recipe(
 
     # 查验存在
     check_result = await db.execute(
-        text(
-            "SELECT id, dish_id FROM dish_recipes "
-            "WHERE id = :id AND tenant_id = :tenant_id AND is_deleted = false"
-        ),
+        text("SELECT id, dish_id FROM dish_recipes WHERE id = :id AND tenant_id = :tenant_id AND is_deleted = false"),
         {"id": recipe_id, "tenant_id": x_tenant_id},
     )
     row = check_result.fetchone()
@@ -390,10 +386,7 @@ async def update_recipe(
             params["is_active"] = body.is_active
 
         await db.execute(
-            text(
-                f"UPDATE dish_recipes SET {', '.join(set_parts)} "
-                "WHERE id = :id AND tenant_id = :tenant_id"
-            ),
+            text(f"UPDATE dish_recipes SET {', '.join(set_parts)} WHERE id = :id AND tenant_id = :tenant_id"),
             params,
         )
 
@@ -435,26 +428,25 @@ async def update_recipe(
         recipe = _row_to_dict(rec_result.fetchone())
 
         ing_result = await db.execute(
-            text(
-                "SELECT * FROM recipe_ingredients "
-                "WHERE recipe_id = :recipe_id AND is_deleted = false"
-            ),
+            text("SELECT * FROM recipe_ingredients WHERE recipe_id = :recipe_id AND is_deleted = false"),
             {"recipe_id": recipe_id},
         )
         recipe["ingredients"] = [_row_to_dict(r) for r in ing_result.fetchall()]
 
-        asyncio.create_task(emit_event(
-            tenant_id=x_tenant_id,
-            store_id=None,
-            event_type="supply.bom_updated",
-            stream_id=recipe_id,
-            payload={
-                "recipe_id": recipe_id,
-                "dish_id": dish_id,
-                "action": "updated",
-            },
-            source_service="tx-supply",
-        ))
+        asyncio.create_task(
+            emit_event(
+                tenant_id=x_tenant_id,
+                store_id=None,
+                event_type="supply.bom_updated",
+                stream_id=recipe_id,
+                payload={
+                    "recipe_id": recipe_id,
+                    "dish_id": dish_id,
+                    "action": "updated",
+                },
+                source_service="tx-supply",
+            )
+        )
 
         return {"ok": True, "data": recipe}
     except SQLAlchemyError as exc:
@@ -480,10 +472,7 @@ async def calculate_recipe(
     )
 
     rec_result = await db.execute(
-        text(
-            "SELECT * FROM dish_recipes "
-            "WHERE id = :id AND tenant_id = :tenant_id AND is_deleted = false"
-        ),
+        text("SELECT * FROM dish_recipes WHERE id = :id AND tenant_id = :tenant_id AND is_deleted = false"),
         {"id": recipe_id, "tenant_id": x_tenant_id},
     )
     row = rec_result.fetchone()
@@ -496,10 +485,7 @@ async def calculate_recipe(
         raise HTTPException(status_code=400, detail="配方 yield_qty 无效（必须>0）")
 
     ing_result = await db.execute(
-        text(
-            "SELECT * FROM recipe_ingredients "
-            "WHERE recipe_id = :recipe_id AND is_deleted = false"
-        ),
+        text("SELECT * FROM recipe_ingredients WHERE recipe_id = :recipe_id AND is_deleted = false"),
         {"recipe_id": recipe_id},
     )
     ingredients = [_row_to_dict(r) for r in ing_result.fetchall()]
@@ -508,14 +494,16 @@ async def calculate_recipe(
     calculated = []
     for ing in ingredients:
         actual_qty = round(scale * float(ing["qty"]) * (1.0 + float(ing["loss_rate"])), 4)
-        calculated.append({
-            "ingredient_name": ing["ingredient_name"],
-            "ingredient_id": ing["ingredient_id"],
-            "unit": ing["unit"],
-            "standard_qty": ing["qty"],
-            "loss_rate": ing["loss_rate"],
-            "calculated_qty": actual_qty,
-        })
+        calculated.append(
+            {
+                "ingredient_name": ing["ingredient_name"],
+                "ingredient_id": ing["ingredient_id"],
+                "unit": ing["unit"],
+                "standard_qty": ing["qty"],
+                "loss_rate": ing["loss_rate"],
+                "calculated_qty": actual_qty,
+            }
+        )
 
     return {
         "ok": True,
@@ -643,18 +631,20 @@ async def create_production_plan(
                     "unit": item.unit,
                 },
             )
-            plan_items.append({
-                "id": item_id,
-                "tenant_id": x_tenant_id,
-                "plan_id": plan_id,
-                "dish_id": item.dish_id,
-                "recipe_id": recipe_id,
-                "planned_qty": item.planned_qty,
-                "actual_qty": None,
-                "unit": item.unit,
-                "status": "pending",
-                "is_deleted": False,
-            })
+            plan_items.append(
+                {
+                    "id": item_id,
+                    "tenant_id": x_tenant_id,
+                    "plan_id": plan_id,
+                    "dish_id": item.dish_id,
+                    "recipe_id": recipe_id,
+                    "planned_qty": item.planned_qty,
+                    "actual_qty": None,
+                    "unit": item.unit,
+                    "status": "pending",
+                    "is_deleted": False,
+                }
+            )
 
         await db.commit()
 
@@ -688,10 +678,7 @@ async def update_plan_status(
     )
 
     plan_result = await db.execute(
-        text(
-            "SELECT * FROM ck_production_plans "
-            "WHERE id = :id AND tenant_id = :tenant_id AND is_deleted = false"
-        ),
+        text("SELECT * FROM ck_production_plans WHERE id = :id AND tenant_id = :tenant_id AND is_deleted = false"),
         {"id": plan_id, "tenant_id": x_tenant_id},
     )
     row = plan_result.fetchone()
@@ -732,10 +719,7 @@ async def update_plan_status(
     updated_plan = _row_to_dict(updated_result.fetchone())
 
     items_result = await db.execute(
-        text(
-            "SELECT * FROM ck_plan_items "
-            "WHERE plan_id = :plan_id AND is_deleted = false"
-        ),
+        text("SELECT * FROM ck_plan_items WHERE plan_id = :plan_id AND is_deleted = false"),
         {"plan_id": plan_id},
     )
     updated_plan["items"] = [_row_to_dict(r) for r in items_result.fetchall()]
@@ -763,10 +747,7 @@ async def get_material_list(
     )
 
     plan_result = await db.execute(
-        text(
-            "SELECT * FROM ck_production_plans "
-            "WHERE id = :id AND tenant_id = :tenant_id AND is_deleted = false"
-        ),
+        text("SELECT * FROM ck_production_plans WHERE id = :id AND tenant_id = :tenant_id AND is_deleted = false"),
         {"id": plan_id, "tenant_id": x_tenant_id},
     )
     row = plan_result.fetchone()
@@ -904,16 +885,18 @@ async def create_dispatch_order(
                     "unit": item.unit,
                 },
             )
-            dispatch_items.append({
-                "id": item_id,
-                "tenant_id": x_tenant_id,
-                "dispatch_id": order_id,
-                "dish_id": item.dish_id,
-                "planned_qty": item.planned_qty,
-                "actual_qty": None,
-                "unit": item.unit,
-                "is_deleted": False,
-            })
+            dispatch_items.append(
+                {
+                    "id": item_id,
+                    "tenant_id": x_tenant_id,
+                    "dispatch_id": order_id,
+                    "dish_id": item.dish_id,
+                    "planned_qty": item.planned_qty,
+                    "actual_qty": None,
+                    "unit": item.unit,
+                    "is_deleted": False,
+                }
+            )
 
         await db.commit()
 
@@ -925,8 +908,7 @@ async def create_dispatch_order(
         order = _row_to_dict(order_result.fetchone())
         order["items"] = dispatch_items
 
-        log.info("dispatch_order.created", order_id=order_id,
-                 dispatch_no=dispatch_no, tenant_id=x_tenant_id)
+        log.info("dispatch_order.created", order_id=order_id, dispatch_no=dispatch_no, tenant_id=x_tenant_id)
         return {"ok": True, "data": order}
     except SQLAlchemyError as exc:
         await db.rollback()
@@ -951,10 +933,7 @@ async def receive_dispatch_order(
     )
 
     order_result = await db.execute(
-        text(
-            "SELECT * FROM ck_dispatch_orders "
-            "WHERE id = :id AND tenant_id = :tenant_id AND is_deleted = false"
-        ),
+        text("SELECT * FROM ck_dispatch_orders WHERE id = :id AND tenant_id = :tenant_id AND is_deleted = false"),
         {"id": order_id, "tenant_id": x_tenant_id},
     )
     row = order_result.fetchone()
@@ -1017,10 +996,7 @@ async def receive_dispatch_order(
     updated_order = _row_to_dict(updated_order_result.fetchone())
 
     items_result = await db.execute(
-        text(
-            "SELECT * FROM ck_dispatch_items "
-            "WHERE dispatch_id = :dispatch_id AND is_deleted = false"
-        ),
+        text("SELECT * FROM ck_dispatch_items WHERE dispatch_id = :dispatch_id AND is_deleted = false"),
         {"dispatch_id": order_id},
     )
     items = [_row_to_dict(r) for r in items_result.fetchall()]
@@ -1035,10 +1011,7 @@ async def receive_dispatch_order(
         if planned > 0 and actual is not None:
             diff_pct = abs(float(actual) - planned) / planned
             if diff_pct > 0.05:
-                item["variance_note"] = (
-                    f"[差异提醒] 计划{planned}，实收{actual}，"
-                    f"偏差{round(diff_pct * 100, 1)}%"
-                )
+                item["variance_note"] = f"[差异提醒] 计划{planned}，实收{actual}，偏差{round(diff_pct * 100, 1)}%"
 
     log.info("dispatch_order.received", order_id=order_id, tenant_id=x_tenant_id)
     updated_order["items"] = items
@@ -1066,10 +1039,7 @@ async def print_dispatch_order(
     )
 
     order_result = await db.execute(
-        text(
-            "SELECT * FROM ck_dispatch_orders "
-            "WHERE id = :id AND tenant_id = :tenant_id AND is_deleted = false"
-        ),
+        text("SELECT * FROM ck_dispatch_orders WHERE id = :id AND tenant_id = :tenant_id AND is_deleted = false"),
         {"id": order_id, "tenant_id": x_tenant_id},
     )
     row = order_result.fetchone()
@@ -1079,23 +1049,20 @@ async def print_dispatch_order(
     order = _row_to_dict(row)
 
     items_result = await db.execute(
-        text(
-            "SELECT * FROM ck_dispatch_items "
-            "WHERE dispatch_id = :dispatch_id AND is_deleted = false"
-        ),
+        text("SELECT * FROM ck_dispatch_items WHERE dispatch_id = :dispatch_id AND is_deleted = false"),
         {"dispatch_id": order_id},
     )
     items = [_row_to_dict(r) for r in items_result.fetchall()]
 
     print_blocks: List[Dict[str, Any]] = [
-        {"type": "title",   "value": "屯象OS — 调拨单"},
+        {"type": "title", "value": "屯象OS — 调拨单"},
         {"type": "divider"},
-        {"type": "kv",      "key": "单号",   "value": order["dispatch_no"]},
-        {"type": "kv",      "key": "日期",   "value": order["dispatch_date"]},
-        {"type": "kv",      "key": "状态",   "value": order["status"]},
-        {"type": "kv",      "key": "目标门店", "value": order["to_store_id"]},
-        {"type": "kv",      "key": "司机",   "value": order.get("driver_name") or "-"},
-        {"type": "kv",      "key": "车牌号", "value": order.get("vehicle_no") or "-"},
+        {"type": "kv", "key": "单号", "value": order["dispatch_no"]},
+        {"type": "kv", "key": "日期", "value": order["dispatch_date"]},
+        {"type": "kv", "key": "状态", "value": order["status"]},
+        {"type": "kv", "key": "目标门店", "value": order["to_store_id"]},
+        {"type": "kv", "key": "司机", "value": order.get("driver_name") or "-"},
+        {"type": "kv", "key": "车牌号", "value": order.get("vehicle_no") or "-"},
         {"type": "divider"},
         {
             "type": "table",
@@ -1112,7 +1079,7 @@ async def print_dispatch_order(
         },
         {"type": "divider"},
         {"type": "barcode", "value": order["dispatch_no"]},
-        {"type": "kv",      "key": "收货签名", "value": "_____________"},
+        {"type": "kv", "key": "收货签名", "value": "_____________"},
     ]
 
     return {

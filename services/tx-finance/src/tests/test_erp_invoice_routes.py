@@ -13,6 +13,7 @@ ERP 路由 + 电子发票路由测试
     cd /Users/lichun/tunxiang-os/services/tx-finance
     pytest src/tests/test_erp_invoice_routes.py -v
 """
+
 from __future__ import annotations
 
 import sys
@@ -20,10 +21,7 @@ import types
 import uuid
 from datetime import date
 from decimal import Decimal
-from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
-
-import pytest
 
 # ─── 存根工具 ────────────────────────────────────────────────────────────────
 
@@ -38,9 +36,7 @@ def _make_stub(name: str, **attrs) -> types.ModuleType:
 # ── structlog 存根 ────────────────────────────────────────────────────────────
 if "structlog" not in sys.modules:
     _stub_log = MagicMock()
-    _stub_log.get_logger.return_value = MagicMock(
-        info=MagicMock(), error=MagicMock(), warning=MagicMock()
-    )
+    _stub_log.get_logger.return_value = MagicMock(info=MagicMock(), error=MagicMock(), warning=MagicMock())
     sys.modules["structlog"] = _stub_log
 
 # ── httpx 存根 ────────────────────────────────────────────────────────────────
@@ -100,10 +96,12 @@ class _FakeERPType:
 # 最简单的 ERPType enum 模拟
 _ERPTypeEnum = MagicMock()
 _ERPTypeEnum.__iter__ = MagicMock(
-    return_value=iter([
-        MagicMock(value="kingdee"),
-        MagicMock(value="yonyou"),
-    ])
+    return_value=iter(
+        [
+            MagicMock(value="kingdee"),
+            MagicMock(value="yonyou"),
+        ]
+    )
 )
 
 _erp_adapter_mock = AsyncMock()
@@ -144,12 +142,8 @@ _push_result_mock.erp_voucher_id = "KD-001"
 _push_result_mock.error_message = None
 
 _VoucherGeneratorMock = MagicMock()
-_VoucherGeneratorMock.return_value.generate_from_purchase_order = AsyncMock(
-    return_value=_voucher_mock
-)
-_VoucherGeneratorMock.return_value.generate_from_daily_revenue = AsyncMock(
-    return_value=_voucher_mock
-)
+_VoucherGeneratorMock.return_value.generate_from_purchase_order = AsyncMock(return_value=_voucher_mock)
+_VoucherGeneratorMock.return_value.generate_from_daily_revenue = AsyncMock(return_value=_voucher_mock)
 _VoucherGeneratorMock.return_value.push_to_erp = AsyncMock(return_value=_push_result_mock)
 
 _voucher_gen_stub = _make_stub(
@@ -185,9 +179,7 @@ def _invoice_to_dict(inv):
 _InvoiceServiceMock = MagicMock()
 _invoice_svc_inst = AsyncMock()
 _invoice_svc_inst.request_invoice = AsyncMock(return_value=_invoice_mock)
-_invoice_svc_inst.get_invoice_status = AsyncMock(
-    return_value={"id": str(uuid.uuid4()), "status": "issued"}
-)
+_invoice_svc_inst.get_invoice_status = AsyncMock(return_value={"id": str(uuid.uuid4()), "status": "issued"})
 _invoice_svc_inst.retry_failed = AsyncMock(return_value=_invoice_mock)
 _invoice_svc_inst.reprint = AsyncMock(return_value={"pdf_url": "https://example.com/invoice.pdf"})
 _invoice_svc_inst.cancel_invoice = AsyncMock(return_value=_invoice_mock)
@@ -213,7 +205,8 @@ sys.modules.setdefault("models", _models_stub)
 sys.modules["models.invoice"] = _models_invoice_stub
 
 # ─── 加载被测路由模块 ─────────────────────────────────────────────────────────
-import importlib.util, pathlib
+import importlib.util
+import pathlib
 
 _api_base = pathlib.Path(__file__).parent.parent / "api"
 
@@ -223,9 +216,7 @@ _erp_routes = importlib.util.module_from_spec(_erp_spec)
 _erp_spec.loader.exec_module(_erp_routes)
 
 # 加载 e_invoice_routes
-_inv_spec = importlib.util.spec_from_file_location(
-    "e_invoice_routes_mod", _api_base / "e_invoice_routes.py"
-)
+_inv_spec = importlib.util.spec_from_file_location("e_invoice_routes_mod", _api_base / "e_invoice_routes.py")
 _e_invoice_routes = importlib.util.module_from_spec(_inv_spec)
 _inv_spec.loader.exec_module(_e_invoice_routes)
 
@@ -333,9 +324,7 @@ class TestErpRoutes:
     def test_sync_chart_of_accounts_success(self):
         """正常同步科目表应返回 count 和 accounts 列表。"""
         mock_account = MagicMock()
-        mock_account.model_dump = MagicMock(
-            return_value={"code": "1001", "name": "现金", "type": "asset"}
-        )
+        mock_account.model_dump = MagicMock(return_value={"code": "1001", "name": "现金", "type": "asset"})
         adapter = AsyncMock()
         adapter.sync_chart_of_accounts = AsyncMock(return_value=[mock_account])
         adapter.close = AsyncMock()
@@ -439,9 +428,7 @@ class TestEInvoiceRoutes:
         app = self._build_app(db)
 
         with patch.object(_e_invoice_routes, "_invoice_service") as svc:
-            svc.request_invoice = AsyncMock(
-                side_effect=_InvoiceAmountMismatchError("金额不匹配")
-            )
+            svc.request_invoice = AsyncMock(side_effect=_InvoiceAmountMismatchError("金额不匹配"))
             client = TestClient(app)
             resp = client.post(
                 "/request",
@@ -463,9 +450,7 @@ class TestEInvoiceRoutes:
         app = self._build_app(db)
 
         with patch.object(_e_invoice_routes, "_invoice_service") as svc:
-            svc.get_invoice_status = AsyncMock(
-                return_value={"id": INVOICE_ID, "status": "issued"}
-            )
+            svc.get_invoice_status = AsyncMock(return_value={"id": INVOICE_ID, "status": "issued"})
             client = TestClient(app)
             resp = client.get(
                 f"/{INVOICE_ID}/status",
@@ -484,9 +469,7 @@ class TestEInvoiceRoutes:
         app = self._build_app(db)
 
         with patch.object(_e_invoice_routes, "_invoice_service") as svc:
-            svc.get_invoice_status = AsyncMock(
-                side_effect=_InvoiceNotFoundError("发票不存在")
-            )
+            svc.get_invoice_status = AsyncMock(side_effect=_InvoiceNotFoundError("发票不存在"))
             client = TestClient(app)
             resp = client.get(
                 f"/{INVOICE_ID}/status",

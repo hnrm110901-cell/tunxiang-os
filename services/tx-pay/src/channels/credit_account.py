@@ -8,6 +8,7 @@
   2. tx-finance 校验额度 → 记录挂账消费 → 返回结果
   3. 还款/核销走 tx-finance 独立流程
 """
+
 from __future__ import annotations
 
 import uuid

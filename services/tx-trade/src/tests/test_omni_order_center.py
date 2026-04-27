@@ -2,9 +2,9 @@
 Y-A12 全渠道订单中心 — 单元测试
 测试全渠道列表、渠道过滤、快速搜索、统计、会员历史、详情等端点。
 """
-import pytest
-from fastapi.testclient import TestClient
+
 from fastapi import FastAPI
+from fastapi.testclient import TestClient
 
 from ..api.omni_order_center_routes import router
 
@@ -20,6 +20,7 @@ ALL_CHANNELS = {"dine_in", "takeaway", "miniapp", "group_meal", "banquet"}
 
 
 # ─── 辅助函数 ────────────────────────────────────────────────────────────────
+
 
 def list_orders(**kwargs):
     return client.get("/api/v1/trade/omni-orders", params=kwargs, headers=HEADERS)
@@ -52,6 +53,7 @@ def get_detail(order_id: str):
 
 
 # ─── Test 1: 全渠道列表 ──────────────────────────────────────────────────────
+
 
 class TestOmniListAllChannels:
     def test_response_ok(self):
@@ -110,8 +112,14 @@ class TestOmniListAllChannels:
         resp = list_orders()
         data = resp.json()["data"]
         required_fields = {
-            "order_id", "channel", "channel_label", "order_no",
-            "total_fen", "paid_fen", "status", "status_label",
+            "order_id",
+            "channel",
+            "channel_label",
+            "order_no",
+            "total_fen",
+            "paid_fen",
+            "status",
+            "status_label",
         }
         for item in data["items"]:
             for field in required_fields:
@@ -142,6 +150,7 @@ class TestOmniListAllChannels:
 
 
 # ─── Test 2: 渠道过滤 ────────────────────────────────────────────────────────
+
 
 class TestOmniChannelFilter:
     def test_filter_takeaway_only(self):
@@ -193,11 +202,11 @@ class TestOmniChannelFilter:
     def test_channel_label_matches_channel(self):
         """channel_label 与 channel 对应正确"""
         channel_label_map = {
-            "dine_in":    "堂食",
-            "takeaway":   "美团外卖",
-            "miniapp":    "小程序自助",
+            "dine_in": "堂食",
+            "takeaway": "美团外卖",
+            "miniapp": "小程序自助",
             "group_meal": "团餐企业",
-            "banquet":    "宴席预订",
+            "banquet": "宴席预订",
         }
         resp = list_orders(size=100)
         for item in resp.json()["data"]["items"]:
@@ -207,6 +216,7 @@ class TestOmniChannelFilter:
 
 
 # ─── Test 3: 快速搜索 ────────────────────────────────────────────────────────
+
 
 class TestOmniSearch:
     def test_search_response_ok(self):
@@ -280,6 +290,7 @@ class TestOmniSearch:
 
 # ─── Test 4: 统计端点 ────────────────────────────────────────────────────────
 
+
 class TestOmniStats:
     def test_stats_response_ok(self):
         resp = get_stats()
@@ -310,6 +321,7 @@ class TestOmniStats:
 
 
 # ─── Test 5: 订单详情 ────────────────────────────────────────────────────────
+
 
 class TestOmniOrderDetail:
     def test_detail_existing_order(self):
@@ -347,6 +359,7 @@ class TestOmniOrderDetail:
 
 
 # ─── Test 6: 会员跨渠道历史 ─────────────────────────────────────────────────
+
 
 class TestCustomerOrderHistory:
     def test_existing_customer(self):

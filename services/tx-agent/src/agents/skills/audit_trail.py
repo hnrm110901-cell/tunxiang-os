@@ -6,6 +6,7 @@
 
 输出写入 agent_decision_logs 表（v002已创建）。
 """
+
 from datetime import datetime, timezone
 from typing import Any
 
@@ -22,6 +23,12 @@ class AuditTrailAgent(SkillAgent):
     description = "记录Agent决策审计日志，支持按时间/操作人/类型查询回溯"
     priority = "P1"
     run_location = "cloud"
+
+    # Sprint D1 / PR 批次 6：仅记录其他 Agent 的决策审计日志，自身不做业务决策，豁免
+    constraint_scope = set()
+    constraint_waived_reason = (
+        "审计留痕纯日志记录与查询工具，不触发任何业务决策；记录的是其他 Agent 的决策过程，自身不涉及毛利/食安/体验维度"
+    )
 
     def get_supported_actions(self) -> list[str]:
         return [
@@ -58,7 +65,8 @@ class AuditTrailAgent(SkillAgent):
 
         if not agent_id or not decision_type:
             return AgentResult(
-                success=False, action="log_decision",
+                success=False,
+                action="log_decision",
                 error="agent_id 和 decision_type 不可为空",
                 reasoning="审计日志必须包含 agent_id 和 decision_type",
                 confidence=1.0,
@@ -97,8 +105,7 @@ class AuditTrailAgent(SkillAgent):
                 "log_entry": log_entry,
                 "table": "agent_decision_logs",
             },
-            reasoning=f"已记录 {agent_id} 的 {decision_type} 决策，"
-                      f"操作人 {operator_id}，置信度 {confidence:.2f}",
+            reasoning=f"已记录 {agent_id} 的 {decision_type} 决策，操作人 {operator_id}，置信度 {confidence:.2f}",
             confidence=0.99,
         )
 
@@ -174,7 +181,8 @@ class AuditTrailAgent(SkillAgent):
 
         if not log_id and not log_entry:
             return AgentResult(
-                success=False, action="get_decision_detail",
+                success=False,
+                action="get_decision_detail",
                 error="需要提供 log_id 或 log_entry",
                 reasoning="查询决策详情需要指定记录",
                 confidence=1.0,
@@ -258,7 +266,6 @@ class AuditTrailAgent(SkillAgent):
                 "constraint_violations": violation_count,
                 "avg_confidence": avg_confidence,
             },
-            reasoning=f"{period} 共 {total} 条决策，{violation_count} 条约束违规，"
-                      f"平均置信度 {avg_confidence:.2f}",
+            reasoning=f"{period} 共 {total} 条决策，{violation_count} 条约束违规，平均置信度 {avg_confidence:.2f}",
             confidence=0.92,
         )

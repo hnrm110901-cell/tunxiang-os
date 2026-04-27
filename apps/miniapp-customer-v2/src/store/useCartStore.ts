@@ -94,7 +94,7 @@ const { totalFen: initTotalFen, totalCount: initTotalCount } = computeTotals(res
 
 // ─── Store ───────────────────────────────────────────────────────────────────
 
-export const useCartStore = create<CartStore>((set, _get) => ({
+export const useCartStore = create<CartStore>()((set, _get) => ({
   // state
   items: restoredItems,
   storeId: '',

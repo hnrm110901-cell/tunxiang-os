@@ -5,6 +5,7 @@
   - generate_weekly_report  — 周度安全报告汇总
   - check_compliance_status — 合规检查清单（实时）
 """
+
 from __future__ import annotations
 
 from datetime import date, datetime, timedelta, timezone
@@ -82,8 +83,7 @@ class SecurityReportService:
             },
         )
         login_failures = [
-            {"actor_id": row["actor_id"], "count": row["cnt"]}
-            for row in login_fail_rows.mappings().all()
+            {"actor_id": row["actor_id"], "count": row["cnt"]} for row in login_fail_rows.mappings().all()
         ]
 
         # 2. API 调用量（actor_type = api_app，按 actor_id 分组）
@@ -106,8 +106,7 @@ class SecurityReportService:
             },
         )
         api_calls_by_app = [
-            {"app_id": row["actor_id"], "call_count": row["cnt"]}
-            for row in api_call_rows.mappings().all()
+            {"app_id": row["actor_id"], "call_count": row["cnt"]} for row in api_call_rows.mappings().all()
         ]
 
         # 3. 数据导出次数

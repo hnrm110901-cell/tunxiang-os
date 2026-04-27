@@ -15,6 +15,7 @@
 
 统一响应格式: {"ok": bool, "data": {}, "error": {}}
 """
+
 from __future__ import annotations
 
 import json
@@ -122,7 +123,7 @@ def _row_to_rule(row: Any) -> Dict[str, Any]:
         "conditions": detail.get("conditions", []),
         "notify_channels": detail.get("notify_channels", ["app"]),
         "notify_roles": detail.get("notify_roles", ["store_manager"]),
-        "apply_stores": detail.get("apply_stores", None),
+        "apply_stores": detail.get("apply_stores"),
         "cooldown_minutes": detail.get("cooldown_minutes", 30),
         "enabled": row.status not in ("dismissed",),
         "trigger_count_today": row.trigger_count_today or 0,
@@ -282,8 +283,7 @@ async def create_alert_rule(
         "created_at": now.isoformat(),
         "updated_at": now.isoformat(),
     }
-    log.info("alert_rule_created", rule_id=rule_id, name=body.name,
-             category=body.category, tenant_id=x_tenant_id)
+    log.info("alert_rule_created", rule_id=rule_id, name=body.name, category=body.category, tenant_id=x_tenant_id)
     return {"ok": True, "data": new_rule}
 
 
@@ -328,8 +328,15 @@ async def update_alert_rule(
         new_severity_api = update_data.get("severity", _SEVERITY_MAP.get(row.severity, "medium"))
         new_db_severity = _SEVERITY_RMAP.get(new_severity_api, "info")
 
-        for field in ("description", "category", "conditions", "notify_channels",
-                      "notify_roles", "apply_stores", "cooldown_minutes"):
+        for field in (
+            "description",
+            "category",
+            "conditions",
+            "notify_channels",
+            "notify_roles",
+            "apply_stores",
+            "cooldown_minutes",
+        ):
             if field in update_data:
                 val = update_data[field]
                 if field == "conditions" and val:
@@ -415,9 +422,7 @@ async def toggle_alert_rule(
         new_status = "open" if body.enabled else "dismissed"
 
         await db.execute(
-            text(
-                "UPDATE compliance_alerts SET status = :status, updated_at = :now WHERE id = :rid"
-            ),
+            text("UPDATE compliance_alerts SET status = :status, updated_at = :now WHERE id = :rid"),
             {"status": new_status, "now": now, "rid": rule_id},
         )
         await db.commit()
@@ -516,7 +521,9 @@ async def test_alert_rule(
                 "message": f"[测试] {row.title} - 今日触发 {count_row.cnt if count_row else 0} 次",
                 "severity": _SEVERITY_MAP.get(row.severity, "medium"),
                 "threshold": threshold,
-            } if is_enabled else None,
+            }
+            if is_enabled
+            else None,
             "tested_at": datetime.now(tz=timezone.utc).isoformat(),
         },
     }

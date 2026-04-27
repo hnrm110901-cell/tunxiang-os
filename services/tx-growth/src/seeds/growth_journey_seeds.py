@@ -16,6 +16,7 @@ P2 三条场景旅程 (V2.1 Sprint A):
 9. 宴席复购·高质量复访旅程
 10. 渠道回流·平台客转品牌客旅程
 """
+
 from typing import Any
 
 SYSTEM_JOURNEY_TEMPLATES: list[dict[str, Any]] = [
@@ -30,22 +31,16 @@ SYSTEM_JOURNEY_TEMPLATES: list[dict[str, Any]] = [
         "journey_type": "first_to_second",
         "mechanism_family": "hook",
         # 进入条件: 首单完成
-        "entry_rule_json": {
-            "conditions": [
-                {"field": "repurchase_stage", "op": "eq", "value": "first_order_done"}
-            ]
-        },
+        "entry_rule_json": {"conditions": [{"field": "repurchase_stage", "op": "eq", "value": "first_order_done"}]},
         # 退出条件: 已完成二单或进入稳定复购
         "exit_rule_json": {
-            "conditions": [
-                {"field": "repurchase_stage", "op": "in", "value": ["second_order_done", "stable_repeat"]}
-            ]
+            "conditions": [{"field": "repurchase_stage", "op": "in", "value": ["second_order_done", "stable_repeat"]}]
         },
         # 暂停条件: 正在投诉中 或 用户主动退出增长触达
         "pause_rule_json": {
             "conditions": [
                 {"field": "service_repair_status", "op": "eq", "value": "complaint_open"},
-                {"field": "growth_opt_out", "op": "eq", "value": True}
+                {"field": "growth_opt_out", "op": "eq", "value": True},
             ]
         },
         "priority": 90,
@@ -90,7 +85,7 @@ SYSTEM_JOURNEY_TEMPLATES: list[dict[str, Any]] = [
                 "decision_rule_json": {
                     "check": "touch_opened",
                     "touch_step_no": 3,
-                    "true_next": 6,   # 已打开 → 给随机惊喜奖励
+                    "true_next": 6,  # 已打开 → 给随机惊喜奖励
                     "false_next": 7,  # 未打开 → 损失厌恶提醒
                 },
             },
@@ -126,7 +121,6 @@ SYSTEM_JOURNEY_TEMPLATES: list[dict[str, Any]] = [
             },
         ],
     },
-
     # ──────────────────────────────────────────────────────────
     # 旅程2: 沉默召回·权益到期型 V2
     # 目的: 对沉默高/危客户，优先利用已有权益触发损失厌恶，
@@ -139,22 +133,12 @@ SYSTEM_JOURNEY_TEMPLATES: list[dict[str, Any]] = [
         "mechanism_family": "loss_aversion",
         # 进入条件: 召回优先级为high或critical
         "entry_rule_json": {
-            "conditions": [
-                {"field": "reactivation_priority", "op": "in", "value": ["high", "critical"]}
-            ]
+            "conditions": [{"field": "reactivation_priority", "op": "in", "value": ["high", "critical"]}]
         },
         # 退出条件: 召回优先级降为none（已回访）
-        "exit_rule_json": {
-            "conditions": [
-                {"field": "reactivation_priority", "op": "eq", "value": "none"}
-            ]
-        },
+        "exit_rule_json": {"conditions": [{"field": "reactivation_priority", "op": "eq", "value": "none"}]},
         # 暂停条件: 正在投诉中
-        "pause_rule_json": {
-            "conditions": [
-                {"field": "service_repair_status", "op": "eq", "value": "complaint_open"}
-            ]
-        },
+        "pause_rule_json": {"conditions": [{"field": "service_repair_status", "op": "eq", "value": "complaint_open"}]},
         "priority": 80,
         "is_system": True,
         "steps": [
@@ -165,7 +149,7 @@ SYSTEM_JOURNEY_TEMPLATES: list[dict[str, Any]] = [
                 "step_type": "decision",
                 "decision_rule_json": {
                     "check": "has_active_owned_benefit",
-                    "true_next": 2,   # 有权益 → 损失厌恶
+                    "true_next": 2,  # 有权益 → 损失厌恶
                     "false_next": 3,  # 无权益 → 关系唤醒
                 },
             },
@@ -201,7 +185,7 @@ SYSTEM_JOURNEY_TEMPLATES: list[dict[str, Any]] = [
                 "decision_rule_json": {
                     "check": "touch_opened",
                     "touch_step_no": 2,  # 检查Step2或Step3（实际运行时引擎按实际执行路径判断）
-                    "true_next": 7,   # 已打开 → 直接进入观察期
+                    "true_next": 7,  # 已打开 → 直接进入观察期
                     "false_next": 6,  # 未打开 → 最小行动
                 },
             },
@@ -227,7 +211,6 @@ SYSTEM_JOURNEY_TEMPLATES: list[dict[str, Any]] = [
             },
         ],
     },
-
     # ──────────────────────────────────────────────────────────
     # 旅程3: 服务修复·四阶协议 V2
     # 目的: 投诉关闭后的主动修复，通过四个阶段重建客户信任:
@@ -241,15 +224,11 @@ SYSTEM_JOURNEY_TEMPLATES: list[dict[str, Any]] = [
         "mechanism_family": "repair",
         # 进入条件: 投诉已关闭、等待修复
         "entry_rule_json": {
-            "conditions": [
-                {"field": "service_repair_status", "op": "eq", "value": "complaint_closed_pending_repair"}
-            ]
+            "conditions": [{"field": "service_repair_status", "op": "eq", "value": "complaint_closed_pending_repair"}]
         },
         # 退出条件: 修复完成 或 修复状态清除
         "exit_rule_json": {
-            "conditions": [
-                {"field": "service_repair_status", "op": "in", "value": ["repair_completed", "none"]}
-            ]
+            "conditions": [{"field": "service_repair_status", "op": "in", "value": ["repair_completed", "none"]}]
         },
         "priority": 100,  # 最高优先级 — 服务修复优于一切增长动作
         "is_system": True,
@@ -304,7 +283,7 @@ SYSTEM_JOURNEY_TEMPLATES: list[dict[str, Any]] = [
                 "step_type": "decision",
                 "decision_rule_json": {
                     "check": "has_revisited",
-                    "true_next": 7,   # 已回访 → 修复成功，结束
+                    "true_next": 7,  # 已回访 → 修复成功，结束
                     "false_next": 8,  # 未回访 → 最后轻触达
                 },
             },
@@ -328,7 +307,6 @@ SYSTEM_JOURNEY_TEMPLATES: list[dict[str, Any]] = [
             },
         ],
     },
-
     # ──────────────────────────────────────────────────────────
     # 旅程4: 超级用户·关系经营旅程
     # 目的: 对active/advocate超级用户进行关系深化经营，
@@ -339,21 +317,9 @@ SYSTEM_JOURNEY_TEMPLATES: list[dict[str, Any]] = [
         "name": "超级用户·关系经营旅程",
         "journey_type": "super_user",
         "mechanism_family": "relationship",
-        "entry_rule_json": {
-            "conditions": [
-                {"field": "super_user_level", "op": "in", "value": ["active", "advocate"]}
-            ]
-        },
-        "exit_rule_json": {
-            "conditions": [
-                {"field": "super_user_level", "op": "eq", "value": "none"}
-            ]
-        },
-        "pause_rule_json": {
-            "conditions": [
-                {"field": "service_repair_status", "op": "eq", "value": "complaint_open"}
-            ]
-        },
+        "entry_rule_json": {"conditions": [{"field": "super_user_level", "op": "in", "value": ["active", "advocate"]}]},
+        "exit_rule_json": {"conditions": [{"field": "super_user_level", "op": "eq", "value": "none"}]},
+        "pause_rule_json": {"conditions": [{"field": "service_repair_status", "op": "eq", "value": "complaint_open"}]},
         "priority": 70,
         "is_system": True,
         "steps": [
@@ -392,7 +358,7 @@ SYSTEM_JOURNEY_TEMPLATES: list[dict[str, Any]] = [
                     "field": "referral_scenario",
                     "op": "in",
                     "value": ["super_referrer", "birthday_organizer", "family_host"],
-                    "true_next": 6,   # 有裂变潜力 → 赋能推荐
+                    "true_next": 6,  # 有裂变潜力 → 赋能推荐
                     "false_next": 7,  # 无裂变潜力 → 季节性专属体验
                 },
             },
@@ -425,7 +391,6 @@ SYSTEM_JOURNEY_TEMPLATES: list[dict[str, Any]] = [
             },
         ],
     },
-
     # ──────────────────────────────────────────────────────────
     # 旅程5: 心理距离·关系修复旅程
     # 目的: 对fading/abstracted客户，通过轻触达或关系唤醒修复心理距离，
@@ -437,14 +402,10 @@ SYSTEM_JOURNEY_TEMPLATES: list[dict[str, Any]] = [
         "journey_type": "psych_distance",
         "mechanism_family": "relationship",
         "entry_rule_json": {
-            "conditions": [
-                {"field": "psych_distance_level", "op": "in", "value": ["fading", "abstracted"]}
-            ]
+            "conditions": [{"field": "psych_distance_level", "op": "in", "value": ["fading", "abstracted"]}]
         },
         "exit_rule_json": {
-            "conditions": [
-                {"field": "psych_distance_level", "op": "in", "value": ["near", "habit_break"]}
-            ]
+            "conditions": [{"field": "psych_distance_level", "op": "in", "value": ["near", "habit_break"]}]
         },
         "priority": 65,
         "is_system": True,
@@ -458,7 +419,7 @@ SYSTEM_JOURNEY_TEMPLATES: list[dict[str, Any]] = [
                     "field": "psych_distance_level",
                     "op": "eq",
                     "value": "abstracted",
-                    "true_next": 2,   # abstracted → 更轻触达
+                    "true_next": 2,  # abstracted → 更轻触达
                     "false_next": 3,  # fading → 关系唤醒
                 },
             },
@@ -491,7 +452,7 @@ SYSTEM_JOURNEY_TEMPLATES: list[dict[str, Any]] = [
                 "decision_rule_json": {
                     "check": "touch_opened",
                     "touch_step_no": 2,
-                    "true_next": 6,   # 已打开 → 给最小承诺
+                    "true_next": 6,  # 已打开 → 给最小承诺
                     "false_next": 7,  # 未打开 → 进入观察期
                 },
             },
@@ -515,7 +476,6 @@ SYSTEM_JOURNEY_TEMPLATES: list[dict[str, Any]] = [
             },
         ],
     },
-
     # ──────────────────────────────────────────────────────────
     # 旅程6: 成长里程碑·进阶庆祝旅程
     # 目的: 客户达到新里程碑时，及时庆祝+展示下一级进度，
@@ -567,7 +527,6 @@ SYSTEM_JOURNEY_TEMPLATES: list[dict[str, Any]] = [
             },
         ],
     },
-
     # ──────────────────────────────────────────────────────────
     # 旅程7: 裂变场景·社交激活旅程
     # 目的: 识别具备裂变潜力的客户场景（生日组织者/家庭聚餐/企业宴请/超级推荐者），
@@ -580,7 +539,11 @@ SYSTEM_JOURNEY_TEMPLATES: list[dict[str, Any]] = [
         "mechanism_family": "referral",
         "entry_rule_json": {
             "conditions": [
-                {"field": "referral_scenario", "op": "in", "value": ["birthday_organizer", "family_host", "corporate_host", "super_referrer"]}
+                {
+                    "field": "referral_scenario",
+                    "op": "in",
+                    "value": ["birthday_organizer", "family_host", "corporate_host", "super_referrer"],
+                }
             ]
         },
         "priority": 55,
@@ -595,7 +558,7 @@ SYSTEM_JOURNEY_TEMPLATES: list[dict[str, Any]] = [
                     "field": "referral_scenario",
                     "op": "eq",
                     "value": "birthday_organizer",
-                    "true_next": 2,   # 生日组织者 → 生日裂变
+                    "true_next": 2,  # 生日组织者 → 生日裂变
                     "false_next": 3,  # 其他 → 继续判断
                 },
             },
@@ -616,7 +579,7 @@ SYSTEM_JOURNEY_TEMPLATES: list[dict[str, Any]] = [
                     "field": "referral_scenario",
                     "op": "eq",
                     "value": "family_host",
-                    "true_next": 4,   # 家庭聚餐 → 家庭裂变
+                    "true_next": 4,  # 家庭聚餐 → 家庭裂变
                     "false_next": 6,  # 其他 → 通用裂变
                 },
             },
@@ -654,11 +617,9 @@ SYSTEM_JOURNEY_TEMPLATES: list[dict[str, Any]] = [
             },
         ],
     },
-
     # ══════════════════════════════════════════════════════════
     # P2 场景旅程 (V2.1 Sprint A)
     # ══════════════════════════════════════════════════════════
-
     # ──────────────────────────────────────────────────────────
     # 旅程8: 储值续航·余额唤醒旅程
     # 目的: 对持有储值卡且开始沉默的客户，利用损失厌恶提醒余额使用，
@@ -676,16 +637,8 @@ SYSTEM_JOURNEY_TEMPLATES: list[dict[str, Any]] = [
             ],
             "description": "持有储值卡且开始沉默的客户",
         },
-        "exit_rule_json": {
-            "conditions": [
-                {"field": "reactivation_priority", "op": "eq", "value": "none"}
-            ]
-        },
-        "pause_rule_json": {
-            "conditions": [
-                {"field": "service_repair_status", "op": "eq", "value": "complaint_open"}
-            ]
-        },
+        "exit_rule_json": {"conditions": [{"field": "reactivation_priority", "op": "eq", "value": "none"}]},
+        "pause_rule_json": {"conditions": [{"field": "service_repair_status", "op": "eq", "value": "complaint_open"}]},
         "priority": 75,
         "is_system": True,
         "steps": [
@@ -710,7 +663,7 @@ SYSTEM_JOURNEY_TEMPLATES: list[dict[str, Any]] = [
                 "decision_rule_json": {
                     "check": "touch_opened",
                     "touch_step_no": 1,
-                    "true_next": 4,   # 打开了 → 专属体验邀请
+                    "true_next": 4,  # 打开了 → 专属体验邀请
                     "false_next": 5,  # 没打开 → 换渠道再触达一次
                 },
             },
@@ -744,7 +697,6 @@ SYSTEM_JOURNEY_TEMPLATES: list[dict[str, Any]] = [
             },
         ],
     },
-
     # ──────────────────────────────────────────────────────────
     # 旅程9: 宴席复购·高质量复访旅程
     # 目的: 对有宴席/包厢消费历史的高价值客户，通过关系经营驱动复购，
@@ -757,15 +709,15 @@ SYSTEM_JOURNEY_TEMPLATES: list[dict[str, Any]] = [
         "mechanism_family": "relationship",
         "entry_rule_json": {
             "conditions": [
-                {"field": "referral_scenario", "op": "in", "value": ["corporate_host", "family_host", "birthday_organizer"]}
+                {
+                    "field": "referral_scenario",
+                    "op": "in",
+                    "value": ["corporate_host", "family_host", "birthday_organizer"],
+                }
             ],
             "description": "有宴席/包厢消费历史的高价值客户",
         },
-        "exit_rule_json": {
-            "conditions": [
-                {"field": "reactivation_priority", "op": "eq", "value": "none"}
-            ]
-        },
+        "exit_rule_json": {"conditions": [{"field": "reactivation_priority", "op": "eq", "value": "none"}]},
         "pause_rule_json": {
             "conditions": [
                 {"field": "service_repair_status", "op": "eq", "value": "complaint_open"},
@@ -812,7 +764,7 @@ SYSTEM_JOURNEY_TEMPLATES: list[dict[str, Any]] = [
                     "field": "referral_scenario",
                     "op": "eq",
                     "value": "birthday_organizer",
-                    "true_next": 6,   # 生日组织者 → 节庆提醒
+                    "true_next": 6,  # 生日组织者 → 节庆提醒
                     "false_next": 7,  # 非生日 → 通用再订台
                 },
             },
@@ -847,7 +799,6 @@ SYSTEM_JOURNEY_TEMPLATES: list[dict[str, Any]] = [
             },
         ],
     },
-
     # ──────────────────────────────────────────────────────────
     # 旅程10: 渠道回流·平台客转品牌客旅程
     # 目的: 将通过美团/抖音/饿了么等平台首次消费的客户，
@@ -866,9 +817,7 @@ SYSTEM_JOURNEY_TEMPLATES: list[dict[str, Any]] = [
             "description": "通过外卖/团购平台首次消费的客户",
         },
         "exit_rule_json": {
-            "conditions": [
-                {"field": "repurchase_stage", "op": "in", "value": ["second_order_done", "stable_repeat"]}
-            ]
+            "conditions": [{"field": "repurchase_stage", "op": "in", "value": ["second_order_done", "stable_repeat"]}]
         },
         "priority": 68,
         "is_system": True,
@@ -908,7 +857,7 @@ SYSTEM_JOURNEY_TEMPLATES: list[dict[str, Any]] = [
                 "decision_rule_json": {
                     "check": "touch_opened",
                     "touch_step_no": 3,
-                    "true_next": 6,   # 打开了 → 惊喜奖励加速到店
+                    "true_next": 6,  # 打开了 → 惊喜奖励加速到店
                     "false_next": 7,  # 没打开 → 权益到期提醒
                 },
             },

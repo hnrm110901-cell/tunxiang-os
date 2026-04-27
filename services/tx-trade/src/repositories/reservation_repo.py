@@ -4,6 +4,7 @@
   - [PAGINATION] list_by_store 增加分页支持，防止全表扫描
   - [PAGINATION] list_by_date_range 增加 LIMIT 上限保护
 """
+
 import uuid
 from typing import Optional
 
@@ -193,11 +194,15 @@ class ReservationRepository:
 
     async def count_no_shows(self, phone: str) -> int:
         """统计某手机号爽约次数"""
-        stmt = select(func.count()).select_from(NoShowRecord).where(
-            and_(
-                NoShowRecord.tenant_id == self.tenant_id,
-                NoShowRecord.phone == phone,
-                NoShowRecord.is_deleted.is_(False),
+        stmt = (
+            select(func.count())
+            .select_from(NoShowRecord)
+            .where(
+                and_(
+                    NoShowRecord.tenant_id == self.tenant_id,
+                    NoShowRecord.phone == phone,
+                    NoShowRecord.is_deleted.is_(False),
+                )
             )
         )
         result = await self.db.execute(stmt)

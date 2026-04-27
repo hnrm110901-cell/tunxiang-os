@@ -19,6 +19,7 @@ print_template_routes
   9.  POST /live-seafood-receipt — 正常生成语义标记文本
   10. GET  /live-seafood-receipt/preview — 无需 tenant，返回 mock 内容
 """
+
 import os
 import sys
 import types
@@ -33,14 +34,15 @@ from sqlalchemy.exc import OperationalError
 # ─── 路径准备 ──────────────────────────────────────────────────────────────────
 
 _TESTS_DIR = os.path.dirname(__file__)
-_SRC_DIR   = os.path.join(_TESTS_DIR, "..")
-_ROOT_DIR  = os.path.abspath(os.path.join(_TESTS_DIR, "..", "..", "..", ".."))
+_SRC_DIR = os.path.join(_TESTS_DIR, "..")
+_ROOT_DIR = os.path.abspath(os.path.join(_TESTS_DIR, "..", "..", "..", ".."))
 
 for _p in [_SRC_DIR, _ROOT_DIR]:
     if _p not in sys.path:
         sys.path.insert(0, _p)
 
 # ─── 建立 src 包层级（让相对导入能正确解析） ──────────────────────────────────────
+
 
 def _ensure_pkg(name: str, path: str) -> None:
     if name not in sys.modules:
@@ -50,41 +52,59 @@ def _ensure_pkg(name: str, path: str) -> None:
         sys.modules[name] = mod
 
 
-_ensure_pkg("src",           _SRC_DIR)
-_ensure_pkg("src.api",       os.path.join(_SRC_DIR, "api"))
-_ensure_pkg("src.services",  os.path.join(_SRC_DIR, "services"))
-_ensure_pkg("src.utils",     os.path.join(_SRC_DIR, "utils"))
+_ensure_pkg("src", _SRC_DIR)
+_ensure_pkg("src.api", os.path.join(_SRC_DIR, "api"))
+_ensure_pkg("src.services", os.path.join(_SRC_DIR, "services"))
+_ensure_pkg("src.utils", os.path.join(_SRC_DIR, "utils"))
 
 # ─── 注入 src.services.print_template_service 存根 ────────────────────────────
 
 _pts_mod = types.ModuleType("src.services.print_template_service")
-_pts_mod.generate_weigh_ticket         = MagicMock(return_value="MOCK_BASE64_WEIGH==")
-_pts_mod.generate_banquet_notice       = MagicMock(return_value="MOCK_BASE64_BANQUET==")
+_pts_mod.generate_weigh_ticket = MagicMock(return_value="MOCK_BASE64_WEIGH==")
+_pts_mod.generate_banquet_notice = MagicMock(return_value="MOCK_BASE64_BANQUET==")
 _pts_mod.generate_credit_account_ticket = MagicMock(return_value="MOCK_BASE64_CREDIT==")
 sys.modules["src.services.print_template_service"] = _pts_mod
 
 # ─── 注入 src.utils.print_templates 存根 ──────────────────────────────────────
 
 _put_mod = types.ModuleType("src.utils.print_templates")
-_put_mod._mock_live_seafood_receipt = MagicMock(return_value={
-    "store_name": "Mock门店", "table_no": "A8", "printed_at": "",
-    "operator": "", "items": [], "total_fen": 0,
-})
-_put_mod._mock_banquet_notice = MagicMock(return_value={
-    "store_name": "Mock宴席馆", "banquet_name": "婚宴", "session_no": 1,
-    "table_count": 10, "party_size": 100, "arrive_time": "", "start_time": "",
-    "printed_at": "", "contact_name": "", "contact_phone": "",
-    "package_name": "", "sections": [], "special_notes": "", "dept": "热菜档口",
-})
+_put_mod._mock_live_seafood_receipt = MagicMock(
+    return_value={
+        "store_name": "Mock门店",
+        "table_no": "A8",
+        "printed_at": "",
+        "operator": "",
+        "items": [],
+        "total_fen": 0,
+    }
+)
+_put_mod._mock_banquet_notice = MagicMock(
+    return_value={
+        "store_name": "Mock宴席馆",
+        "banquet_name": "婚宴",
+        "session_no": 1,
+        "table_count": 10,
+        "party_size": 100,
+        "arrive_time": "",
+        "start_time": "",
+        "printed_at": "",
+        "contact_name": "",
+        "contact_phone": "",
+        "package_name": "",
+        "sections": [],
+        "special_notes": "",
+        "dept": "热菜档口",
+    }
+)
 _put_mod.render_live_seafood_receipt = MagicMock(return_value="MOCK_SEAFOOD_CONTENT")
-_put_mod.render_banquet_notice       = MagicMock(return_value="MOCK_BANQUET_CONTENT")
+_put_mod.render_banquet_notice = MagicMock(return_value="MOCK_BANQUET_CONTENT")
 sys.modules["src.utils.print_templates"] = _put_mod
 
 # ─── 加载路由 ─────────────────────────────────────────────────────────────────
 
+from shared.ontology.src.database import get_db  # noqa: E402
 from src.api.calling_screen_routes import router as cs_router  # type: ignore[import]  # noqa: E402
-from src.api.print_template_routes  import router as pt_router  # type: ignore[import]  # noqa: E402
-from shared.ontology.src.database   import get_db               # noqa: E402
+from src.api.print_template_routes import router as pt_router  # type: ignore[import]  # noqa: E402
 
 # ─── 两个独立 FastAPI 应用 ──────────────────────────────────────────────────────
 
@@ -97,8 +117,8 @@ pt_app.include_router(pt_router)
 # ─── 常量 ─────────────────────────────────────────────────────────────────────
 
 TENANT_ID = str(uuid.uuid4())
-STORE_ID  = str(uuid.uuid4())
-HEADERS   = {"X-Tenant-ID": TENANT_ID}
+STORE_ID = str(uuid.uuid4())
+HEADERS = {"X-Tenant-ID": TENANT_ID}
 
 # ─── DB Mock 工具 ──────────────────────────────────────────────────────────────
 
@@ -131,8 +151,10 @@ def _make_db(*results):
 
 def _override(db):
     """生成依赖覆盖函数。"""
+
     def _dep():
         return db
+
     return _dep
 
 
@@ -235,9 +257,7 @@ async def test_calling_recent_returns_items_list():
 async def test_calling_recent_db_error_raises_500():
     """场景5: GET /recent — DB 抛 OperationalError，路由无 fallback → 500"""
     db = AsyncMock()
-    db.execute = AsyncMock(
-        side_effect=OperationalError("stmt", {}, Exception("connection refused"))
-    )
+    db.execute = AsyncMock(side_effect=OperationalError("stmt", {}, Exception("connection refused")))
 
     cs_app.dependency_overrides[get_db] = _override(db)
     client = TestClient(cs_app, raise_server_exceptions=False)
@@ -385,8 +405,12 @@ def test_live_seafood_receipt_preview_no_tenant_required():
     _put_mod.render_live_seafood_receipt.side_effect = None
     _put_mod.render_live_seafood_receipt.return_value = "MOCK_SEAFOOD_PREVIEW"
     _put_mod._mock_live_seafood_receipt.return_value = {
-        "store_name": "Mock门店", "table_no": "T99", "printed_at": "",
-        "operator": "", "items": [], "total_fen": 0,
+        "store_name": "Mock门店",
+        "table_no": "T99",
+        "printed_at": "",
+        "operator": "",
+        "items": [],
+        "total_fen": 0,
     }
 
     client = TestClient(pt_app)

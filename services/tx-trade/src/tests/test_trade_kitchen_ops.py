@@ -4,13 +4,12 @@
 避免真实数据库依赖。
 测试以 `src` 为包根（services/tx-trade 作为工作目录）运行。
 """
+
 import sys
 import uuid
 from datetime import datetime, timezone
-from typing import Optional
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
@@ -70,6 +69,7 @@ RULE_ID = str(uuid.uuid4())
 def _async_db_override(db: AsyncMock):
     async def _override():
         yield db
+
     return _override
 
 
@@ -145,9 +145,7 @@ class TestAllergenRoutes:
                 {
                     "dish_id": DISH_ID,
                     "dish_name": "麻辣小龙虾",
-                    "alerts": [
-                        {"allergen_code": "shellfish", "allergen_label": "甲壳类", "severity": "critical"}
-                    ],
+                    "alerts": [{"allergen_code": "shellfish", "allergen_label": "甲壳类", "severity": "critical"}],
                 }
             ]
         )

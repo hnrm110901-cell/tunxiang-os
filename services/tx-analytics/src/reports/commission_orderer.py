@@ -57,8 +57,13 @@ ORDER BY total_dish_revenue_fen DESC
 
 DIMENSIONS = ["store_name", "orderer_name", "employee_id", "grade_level"]
 METRICS = [
-    "order_count", "total_dishes", "total_dish_revenue_fen",
-    "high_margin_dish_pct", "recommended_dish_qty", "gift_dish_qty",
-    "commission_fen", "revenue_rank",
+    "order_count",
+    "total_dishes",
+    "total_dish_revenue_fen",
+    "high_margin_dish_pct",
+    "recommended_dish_qty",
+    "gift_dish_qty",
+    "commission_fen",
+    "revenue_rank",
 ]
 FILTERS = ["start_date", "end_date", "store_id"]

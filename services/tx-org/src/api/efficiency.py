@@ -1,14 +1,10 @@
 """人效指标 API"""
+
 from datetime import date, timedelta
 from typing import Optional
 
 import structlog
 from fastapi import APIRouter, Depends, Header, Query
-from sqlalchemy import text
-from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy.ext.asyncio import AsyncSession
-
-from shared.ontology.src.database import get_db
 from services.labor_efficiency_service import (
     INDUSTRY_BENCHMARKS,
     compare_stores,
@@ -18,6 +14,11 @@ from services.labor_efficiency_service import (
     get_manager_view,
     get_staff_view,
 )
+from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from shared.ontology.src.database import get_db
 
 log: structlog.stdlib.BoundLogger = structlog.get_logger(__name__)
 
@@ -25,6 +26,7 @@ router = APIRouter(prefix="/api/v1/org/efficiency", tags=["efficiency"])
 
 
 # ── DB 辅助 ───────────────────────────────────────────────────────────────────
+
 
 async def _set_rls(db: AsyncSession, tenant_id: str) -> None:
     await db.execute(
@@ -34,6 +36,7 @@ async def _set_rls(db: AsyncSession, tenant_id: str) -> None:
 
 
 # ── 真实数据查询函数 ──────────────────────────────────────────────────────────
+
 
 async def _get_store_data(
     store_id: str,
@@ -358,6 +361,7 @@ async def _get_employee_data(
 
 # ── API 端点 ──────────────────────────────────────────────────────────────────
 
+
 @router.get("/benchmark")
 async def get_benchmark():
     """行业基准值。"""
@@ -420,7 +424,10 @@ async def get_dashboard(
     elif role == "staff":
         data = get_staff_view(await _get_employee_data(emp_id or "", x_tenant_id, db))
     else:
-        return {"ok": False, "error": {"code": "INVALID_ROLE", "message": f"不支持的角色: {role}，请使用 boss|hr|manager|staff"}}
+        return {
+            "ok": False,
+            "error": {"code": "INVALID_ROLE", "message": f"不支持的角色: {role}，请使用 boss|hr|manager|staff"},
+        }
     return {"ok": True, "data": data}
 
 

@@ -5,6 +5,7 @@
 温控标准：冷藏 0-4C, 冷冻 <-18C, 热链 >60C。
 食安事件：severity=critical 时自动通知区域经理。
 """
+
 import asyncio
 import json
 import uuid
@@ -76,10 +77,7 @@ def _check_temperature(location: str, temperature: float) -> dict:
     message = (
         f"{threshold['label']}温度合规"
         if compliant
-        else (
-            f"{threshold['label']}温度异常: {temperature}C, "
-            f"允许范围 {threshold['min']}~{threshold['max']}C"
-        )
+        else (f"{threshold['label']}温度异常: {temperature}C, 允许范围 {threshold['min']}~{threshold['max']}C")
     )
     return {
         "compliant": compliant,
@@ -91,7 +89,10 @@ def _check_temperature(location: str, temperature: float) -> dict:
 
 
 async def _notify_regional_manager(
-    store_id: str, event_type: str, detail: str, tenant_id: str,
+    store_id: str,
+    event_type: str,
+    detail: str,
+    tenant_id: str,
 ) -> None:
     """severity=critical 时通知区域经理（异步推送占位）"""
     logger.critical(
@@ -193,11 +194,7 @@ async def check_banned_ingredients(
     if not order_items:
         return {"passed": True, "banned_items": []}
 
-    ingredient_ids = [
-        _uuid(item["ingredient_id"])
-        for item in order_items
-        if item.get("ingredient_id")
-    ]
+    ingredient_ids = [_uuid(item["ingredient_id"]) for item in order_items if item.get("ingredient_id")]
     if not ingredient_ids:
         return {"passed": True, "banned_items": []}
 
@@ -248,11 +245,13 @@ async def trace_batch(
 
     # 查询该批次所有事务
     result = await db.execute(
-        select(IngredientTransaction).where(
+        select(IngredientTransaction)
+        .where(
             IngredientTransaction.tenant_id == tid,
             IngredientTransaction.reference_id == batch_no,
             IngredientTransaction.is_deleted == False,  # noqa: E712
-        ).order_by(IngredientTransaction.created_at.asc())
+        )
+        .order_by(IngredientTransaction.created_at.asc())
     )
     transactions = result.scalars().all()
 
@@ -267,18 +266,20 @@ async def trace_batch(
     trace = []
     for txn in transactions:
         notes_data = _parse_notes(txn.notes)
-        trace.append({
-            "transaction_id": str(txn.id),
-            "transaction_type": txn.transaction_type,
-            "ingredient_id": str(txn.ingredient_id),
-            "store_id": str(txn.store_id),
-            "quantity": float(txn.quantity),
-            "performed_by": notes_data.get("performed_by"),
-            "supplier": notes_data.get("supplier"),
-            "expiry_date": notes_data.get("expiry_date"),
-            "created_at": txn.created_at.isoformat() if txn.created_at else None,
-            "notes": notes_data,
-        })
+        trace.append(
+            {
+                "transaction_id": str(txn.id),
+                "transaction_type": txn.transaction_type,
+                "ingredient_id": str(txn.ingredient_id),
+                "store_id": str(txn.store_id),
+                "quantity": float(txn.quantity),
+                "performed_by": notes_data.get("performed_by"),
+                "supplier": notes_data.get("supplier"),
+                "expiry_date": notes_data.get("expiry_date"),
+                "created_at": txn.created_at.isoformat() if txn.created_at else None,
+                "notes": notes_data,
+            }
+        )
 
     # 按事务类型分组汇总
     type_summary = {}
@@ -542,44 +543,51 @@ async def get_responsibility_chain(
         trace_result = await trace_batch(batch_no, tenant_id, db)
         if trace_result["found"]:
             for t in trace_result["trace"]:
-                chain.append({
-                    "step": t["transaction_type"],
-                    "operator": t.get("performed_by"),
-                    "time": t.get("created_at"),
-                    "quantity": t.get("quantity"),
-                    "store_id": t.get("store_id"),
-                })
+                chain.append(
+                    {
+                        "step": t["transaction_type"],
+                        "operator": t.get("performed_by"),
+                        "time": t.get("created_at"),
+                        "quantity": t.get("quantity"),
+                        "store_id": t.get("store_id"),
+                    }
+                )
 
     # 如果有 ingredient_id + store_id，查询该原料最近事务
     elif ingredient_id and store_id:
         sid = _uuid(store_id)
         iid = _uuid(ingredient_id)
         result = await db.execute(
-            select(IngredientTransaction).where(
+            select(IngredientTransaction)
+            .where(
                 IngredientTransaction.tenant_id == tid,
                 IngredientTransaction.store_id == sid,
                 IngredientTransaction.ingredient_id == iid,
                 IngredientTransaction.is_deleted == False,  # noqa: E712
-            ).order_by(IngredientTransaction.created_at.desc()).limit(20)
+            )
+            .order_by(IngredientTransaction.created_at.desc())
+            .limit(20)
         )
         transactions = result.scalars().all()
         for txn in transactions:
             notes_data = _parse_notes(txn.notes)
-            chain.append({
-                "step": txn.transaction_type,
-                "operator": notes_data.get("performed_by"),
-                "time": txn.created_at.isoformat() if txn.created_at else None,
-                "quantity": float(txn.quantity),
-                "store_id": str(txn.store_id),
-            })
+            chain.append(
+                {
+                    "step": txn.transaction_type,
+                    "operator": notes_data.get("performed_by"),
+                    "time": txn.created_at.isoformat() if txn.created_at else None,
+                    "quantity": float(txn.quantity),
+                    "store_id": str(txn.store_id),
+                }
+            )
         chain.reverse()
 
     # 按责任链阶段分类
     responsibility = {
-        "procurement": [],    # 采购
-        "receiving": [],      # 验收入库
-        "requisition": [],    # 领用
-        "production": [],     # 出品
+        "procurement": [],  # 采购
+        "receiving": [],  # 验收入库
+        "requisition": [],  # 领用
+        "production": [],  # 出品
     }
 
     step_mapping = {

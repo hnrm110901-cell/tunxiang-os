@@ -1,7 +1,7 @@
 """顾客评价管理 API — 提交/查询/商家回复/统计"""
+
 from datetime import datetime, timezone
-from typing import Optional, List
-from uuid import uuid4
+from typing import List, Optional
 
 import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
@@ -18,8 +18,8 @@ router = APIRouter(prefix="/api/v1/trade/reviews", tags=["reviews"])
 
 class ReviewCreate(BaseModel):
     order_id: str
-    overall_rating: int              # 1-5
-    sub_ratings: dict                # {food: 4, service: 5, environment: 4, speed: 3}
+    overall_rating: int  # 1-5
+    sub_ratings: dict  # {food: 4, service: 5, environment: 4, speed: 3}
     content: Optional[str] = None
     tags: List[str] = []
     image_urls: List[str] = []
@@ -64,13 +64,9 @@ async def list_reviews(
         if has_image is not None:
             # review_media joined — check existence
             if has_image:
-                conditions.append(
-                    "EXISTS (SELECT 1 FROM review_media m WHERE m.review_id = r.id)"
-                )
+                conditions.append("EXISTS (SELECT 1 FROM review_media m WHERE m.review_id = r.id)")
             else:
-                conditions.append(
-                    "NOT EXISTS (SELECT 1 FROM review_media m WHERE m.review_id = r.id)"
-                )
+                conditions.append("NOT EXISTS (SELECT 1 FROM review_media m WHERE m.review_id = r.id)")
         if replied is not None:
             if replied:
                 conditions.append("r.merchant_reply IS NOT NULL")
@@ -155,14 +151,8 @@ async def list_reviews(
                     "is_anonymous": row.is_anonymous,
                     "status": row.status,
                     "merchant_reply": row.merchant_reply,
-                    "merchant_replied_at": (
-                        row.merchant_replied_at.isoformat()
-                        if row.merchant_replied_at
-                        else None
-                    ),
-                    "created_at": (
-                        row.created_at.isoformat() if row.created_at else None
-                    ),
+                    "merchant_replied_at": (row.merchant_replied_at.isoformat() if row.merchant_replied_at else None),
+                    "created_at": (row.created_at.isoformat() if row.created_at else None),
                 }
             )
 
@@ -175,9 +165,7 @@ async def list_reviews(
         # Count matching rows for pagination
         count_row = (
             await db.execute(
-                text(
-                    f"SELECT COUNT(*) AS cnt FROM order_reviews r WHERE {where_clause}"
-                ),
+                text(f"SELECT COUNT(*) AS cnt FROM order_reviews r WHERE {where_clause}"),
                 params,
             )
         ).fetchone()
@@ -421,9 +409,7 @@ async def review_stats(
 
         total = stats_row.total_reviews or 0
         avg_rating = float(stats_row.avg_rating) if stats_row.avg_rating else 0.0
-        positive_rate = (
-            round(stats_row.positive_count / total * 100, 1) if total else 0.0
-        )
+        positive_rate = round(stats_row.positive_count / total * 100, 1) if total else 0.0
 
         # Top tags — unnest JSONB array of tags and count
         tag_rows = (
@@ -464,9 +450,7 @@ async def review_stats(
                 },
                 "positive_rate": positive_rate,
                 "unreplied_count": stats_row.unreplied_count or 0,
-                "top_tags": [
-                    {"tag": row.tag, "count": row.cnt} for row in tag_rows
-                ],
+                "top_tags": [{"tag": row.tag, "count": row.cnt} for row in tag_rows],
             },
         }
 

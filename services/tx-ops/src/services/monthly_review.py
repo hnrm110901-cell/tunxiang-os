@@ -2,6 +2,7 @@
 
 生成门店月度经营复盘与区域维度汇总。
 """
+
 from __future__ import annotations
 
 import uuid
@@ -52,7 +53,10 @@ async def generate_monthly_review(
     cost_analysis = _build_cost_analysis(month_summary)
     staff_performance = _build_monthly_staff_performance(staff_data or [])
     action_plan = _generate_monthly_action_plan(
-        month_summary, trend_analysis, target_achievement, cost_analysis,
+        month_summary,
+        trend_analysis,
+        target_achievement,
+        cost_analysis,
     )
 
     result = {
@@ -116,7 +120,8 @@ async def generate_regional_review(
     common_issues = _find_common_issues(reviews)
     best_practices = _find_best_practices(reviews)
     regional_action_plan = _generate_regional_action_plan(
-        region_summary, common_issues,
+        region_summary,
+        common_issues,
     )
 
     result = {
@@ -190,12 +195,14 @@ def _build_trend_analysis(
     weekly_trend: List[Dict[str, Any]] = []
     for week in weekly_reviews:
         ws = week.get("week_summary", {})
-        weekly_trend.append({
-            "week_start": week.get("week_start", ""),
-            "revenue_fen": ws.get("total_revenue_fen", 0),
-            "orders": ws.get("total_orders", 0),
-            "margin_pct": ws.get("avg_margin_pct", 0.0),
-        })
+        weekly_trend.append(
+            {
+                "week_start": week.get("week_start", ""),
+                "revenue_fen": ws.get("total_revenue_fen", 0),
+                "orders": ws.get("total_orders", 0),
+                "margin_pct": ws.get("avg_margin_pct", 0.0),
+            }
+        )
 
     revenue_values = [w["revenue_fen"] for w in weekly_trend]
     trend_direction = "stable"
@@ -216,6 +223,7 @@ def _calc_target_achievement(
     targets: Dict[str, Any],
 ) -> Dict[str, Any]:
     """计算月度目标达成情况。"""
+
     def _pct(actual: int | float, target: int | float) -> float:
         if target == 0:
             return 0.0
@@ -227,13 +235,16 @@ def _calc_target_achievement(
 
     return {
         "revenue_achievement_pct": _pct(
-            month_summary.get("total_revenue_fen", 0), revenue_target,
+            month_summary.get("total_revenue_fen", 0),
+            revenue_target,
         ),
         "orders_achievement_pct": _pct(
-            month_summary.get("total_orders", 0), orders_target,
+            month_summary.get("total_orders", 0),
+            orders_target,
         ),
         "margin_vs_target_pp": round(
-            month_summary.get("gross_margin_pct", 0.0) - margin_target, 2,
+            month_summary.get("gross_margin_pct", 0.0) - margin_target,
+            2,
         ),
         "targets": targets,
     }
@@ -259,16 +270,18 @@ def _build_monthly_staff_performance(
     """构建月度员工绩效汇总。"""
     result: List[Dict[str, Any]] = []
     for s in staff_data:
-        result.append({
-            "staff_id": s.get("staff_id", ""),
-            "name": s.get("name", ""),
-            "role": s.get("role", ""),
-            "total_orders_served": s.get("total_orders_served", 0),
-            "total_revenue_fen": s.get("total_revenue_fen", 0),
-            "complaint_count": s.get("complaint_count", 0),
-            "attendance_days": s.get("attendance_days", 0),
-            "rating": s.get("rating", 0.0),
-        })
+        result.append(
+            {
+                "staff_id": s.get("staff_id", ""),
+                "name": s.get("name", ""),
+                "role": s.get("role", ""),
+                "total_orders_served": s.get("total_orders_served", 0),
+                "total_revenue_fen": s.get("total_revenue_fen", 0),
+                "complaint_count": s.get("complaint_count", 0),
+                "attendance_days": s.get("attendance_days", 0),
+                "rating": s.get("rating", 0.0),
+            }
+        )
     result.sort(key=lambda x: x["total_revenue_fen"], reverse=True)
     return result
 
@@ -284,29 +297,35 @@ def _generate_monthly_action_plan(
 
     rev_ach = target_achievement.get("revenue_achievement_pct", 100)
     if 0 < rev_ach < 90:
-        plan.append({
-            "type": "revenue",
-            "priority": "high",
-            "title": f"营收达成率 {rev_ach}%，低于90%目标线",
-            "actions": ["分析客流量变化", "评估促销策略效果", "制定下月引流方案"],
-        })
+        plan.append(
+            {
+                "type": "revenue",
+                "priority": "high",
+                "title": f"营收达成率 {rev_ach}%，低于90%目标线",
+                "actions": ["分析客流量变化", "评估促销策略效果", "制定下月引流方案"],
+            }
+        )
 
     if trend_analysis.get("revenue_trend") == "down":
-        plan.append({
-            "type": "trend",
-            "priority": "high",
-            "title": "月内营收呈下降趋势",
-            "actions": ["分析下降原因（竞品/季节/口碑）", "制定止损方案"],
-        })
+        plan.append(
+            {
+                "type": "trend",
+                "priority": "high",
+                "title": "月内营收呈下降趋势",
+                "actions": ["分析下降原因（竞品/季节/口碑）", "制定止损方案"],
+            }
+        )
 
     waste_ratio = cost_analysis.get("waste_ratio_pct", 0)
     if waste_ratio > 3:
-        plan.append({
-            "type": "waste",
-            "priority": "medium",
-            "title": f"月损耗率 {waste_ratio}%，需改善",
-            "actions": ["按品类分析损耗原因", "优化备料标准", "加强库存管理"],
-        })
+        plan.append(
+            {
+                "type": "waste",
+                "priority": "medium",
+                "title": f"月损耗率 {waste_ratio}%，需改善",
+                "actions": ["按品类分析损耗原因", "优化备料标准", "加强库存管理"],
+            }
+        )
 
     return plan
 
@@ -352,12 +371,14 @@ def _rank_stores(store_reviews: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     ranking: List[Dict[str, Any]] = []
     for review in store_reviews:
         ms = review.get("month_summary", {})
-        ranking.append({
-            "store_id": ms.get("store_id", review.get("store_id", "")),
-            "revenue_fen": ms.get("total_revenue_fen", 0),
-            "margin_pct": ms.get("gross_margin_pct", 0.0),
-            "orders": ms.get("total_orders", 0),
-        })
+        ranking.append(
+            {
+                "store_id": ms.get("store_id", review.get("store_id", "")),
+                "revenue_fen": ms.get("total_revenue_fen", 0),
+                "margin_pct": ms.get("gross_margin_pct", 0.0),
+                "orders": ms.get("total_orders", 0),
+            }
+        )
     ranking.sort(key=lambda x: x["revenue_fen"], reverse=True)
     for i, r in enumerate(ranking):
         r["rank"] = i + 1
@@ -374,9 +395,7 @@ def _find_common_issues(store_reviews: List[Dict[str, Any]]) -> List[Dict[str, A
             issue_map[atype] = issue_map.get(atype, 0) + 1
 
     common = [
-        {"type": k, "store_count": v}
-        for k, v in sorted(issue_map.items(), key=lambda x: x[1], reverse=True)
-        if v >= 2
+        {"type": k, "store_count": v} for k, v in sorted(issue_map.items(), key=lambda x: x[1], reverse=True) if v >= 2
     ]
     return common[:5]
 
@@ -388,12 +407,14 @@ def _find_best_practices(store_reviews: List[Dict[str, Any]]) -> List[Dict[str, 
         ms = review.get("month_summary", {})
         margin = ms.get("gross_margin_pct", 0.0)
         if margin >= 60:
-            practices.append({
-                "store_id": ms.get("store_id", ""),
-                "metric": "gross_margin_pct",
-                "value": margin,
-                "note": "毛利率优秀，可作为标杆门店",
-            })
+            practices.append(
+                {
+                    "store_id": ms.get("store_id", ""),
+                    "metric": "gross_margin_pct",
+                    "value": margin,
+                    "note": "毛利率优秀，可作为标杆门店",
+                }
+            )
     return practices
 
 
@@ -404,10 +425,12 @@ def _generate_regional_action_plan(
     """区域级整改计划。"""
     plan: List[Dict[str, Any]] = []
     for issue in common_issues:
-        plan.append({
-            "type": issue["type"],
-            "scope": "regional",
-            "title": f"区域共性问题「{issue['type']}」涉及 {issue['store_count']} 家门店",
-            "actions": ["制定统一整改方案", "组织区域培训", "跟踪整改效果"],
-        })
+        plan.append(
+            {
+                "type": issue["type"],
+                "scope": "regional",
+                "title": f"区域共性问题「{issue['type']}」涉及 {issue['store_count']} 家门店",
+                "actions": ["制定统一整改方案", "组织区域培训", "跟踪整改效果"],
+            }
+        )
     return plan

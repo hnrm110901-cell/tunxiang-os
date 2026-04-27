@@ -135,9 +135,7 @@ async def _apply_payment_and_maybe_complete(
     amount_fen: int,
     order_snapshot: dict[str, Any],
 ) -> dict[str, Any]:
-    res = await db.execute(
-        select(Order).where(Order.id == order_uuid).with_for_update()
-    )
+    res = await db.execute(select(Order).where(Order.id == order_uuid).with_for_update())
     order = res.scalar_one()
 
     dup = await db.execute(

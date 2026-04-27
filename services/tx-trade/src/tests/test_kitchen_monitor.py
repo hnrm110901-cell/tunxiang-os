@@ -8,6 +8,7 @@
 5. 今日趋势按小时分桶，数据结构正确
 6. 租户隔离：set_config 携带正确 tenant_id，不混用
 """
+
 import os
 import sys
 
@@ -20,6 +21,7 @@ import pytest
 from fastapi import FastAPI
 
 # ─── 工具 ───
+
 
 def _uid() -> str:
     return str(uuid.uuid4())
@@ -67,29 +69,40 @@ app.include_router(router, prefix="/api/v1/kitchen-monitor")
 #  场景 1: 综合面板返回三类异常
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 @pytest.mark.asyncio
 async def test_dashboard_returns_all_three_anomaly_types():
     """dashboard 端点返回 overtime_tasks, shortage_alerts, remake_tasks"""
     overtime = [
-        {"task_id": "t1", "table_no": "A01", "dish_name": "红烧肉",
-         "elapsed_min": 25.0, "standard_min": 15, "overtime_min": 10.0,
-         "status": "warning", "dept": "热菜"}
+        {
+            "task_id": "t1",
+            "table_no": "A01",
+            "dish_name": "红烧肉",
+            "elapsed_min": 25.0,
+            "standard_min": 15,
+            "overtime_min": 10.0,
+            "status": "warning",
+            "dept": "热菜",
+        }
     ]
-    shortage = [
-        {"dish_id": "d1", "dish_name": "三文鱼", "shortage_count": 2,
-         "latest_at": "2026-03-30T12:00:00+00:00"}
-    ]
+    shortage = [{"dish_id": "d1", "dish_name": "三文鱼", "shortage_count": 2, "latest_at": "2026-03-30T12:00:00+00:00"}]
     remake = [
-        {"task_id": "r1", "table_no": "B02", "dish_name": "小炒肉",
-         "reason": "顾客不满", "created_at": "2026-03-30T11:30:00+00:00"}
+        {
+            "task_id": "r1",
+            "table_no": "B02",
+            "dish_name": "小炒肉",
+            "reason": "顾客不满",
+            "created_at": "2026-03-30T11:30:00+00:00",
+        }
     ]
 
     db = AsyncMock()
 
-    with patch("api.kitchen_monitor_routes._get_overtime_tasks", AsyncMock(return_value=overtime)), \
-         patch("api.kitchen_monitor_routes._get_shortage_alerts", AsyncMock(return_value=shortage)), \
-         patch("api.kitchen_monitor_routes._get_remake_tasks", AsyncMock(return_value=remake)):
-
+    with (
+        patch("api.kitchen_monitor_routes._get_overtime_tasks", AsyncMock(return_value=overtime)),
+        patch("api.kitchen_monitor_routes._get_shortage_alerts", AsyncMock(return_value=shortage)),
+        patch("api.kitchen_monitor_routes._get_remake_tasks", AsyncMock(return_value=remake)),
+    ):
         from fastapi.testclient import TestClient as SyncClient
 
         def _override_db():
@@ -97,6 +110,7 @@ async def test_dashboard_returns_all_three_anomaly_types():
 
         app.dependency_overrides = {}
         from api.kitchen_monitor_routes import _get_db
+
         app.dependency_overrides[_get_db] = _override_db
 
         client = SyncClient(app)
@@ -117,15 +131,17 @@ async def test_dashboard_returns_all_three_anomaly_types():
 #  场景 2: 无异常时各列为空列表，summary 全 0
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 @pytest.mark.asyncio
 async def test_dashboard_empty_when_no_anomalies():
     """无异常时面板返回空列表，summary 全为 0"""
     db = AsyncMock()
 
-    with patch("api.kitchen_monitor_routes._get_overtime_tasks", AsyncMock(return_value=[])), \
-         patch("api.kitchen_monitor_routes._get_shortage_alerts", AsyncMock(return_value=[])), \
-         patch("api.kitchen_monitor_routes._get_remake_tasks", AsyncMock(return_value=[])):
-
+    with (
+        patch("api.kitchen_monitor_routes._get_overtime_tasks", AsyncMock(return_value=[])),
+        patch("api.kitchen_monitor_routes._get_shortage_alerts", AsyncMock(return_value=[])),
+        patch("api.kitchen_monitor_routes._get_remake_tasks", AsyncMock(return_value=[])),
+    ):
         from api.kitchen_monitor_routes import _get_db
         from fastapi.testclient import TestClient as SyncClient
 
@@ -154,6 +170,7 @@ async def test_dashboard_empty_when_no_anomalies():
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 #  场景 3: 超时工单正确计算 elapsed_min 和 overtime_min
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 @pytest.mark.asyncio
 async def test_overtime_elapsed_and_overtime_min_calculation():
@@ -195,13 +212,21 @@ async def test_overtime_elapsed_and_overtime_min_calculation():
 #  场景 4: 各类单独过滤端点
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 @pytest.mark.asyncio
 async def test_individual_overtime_endpoint():
     """GET /overtime/{store_id} 只返回超时工单"""
     overtime = [
-        {"task_id": "t1", "table_no": "A01", "dish_name": "外婆鸡",
-         "elapsed_min": 30.0, "standard_min": 20, "overtime_min": 10.0,
-         "status": "warning", "dept": "热菜"}
+        {
+            "task_id": "t1",
+            "table_no": "A01",
+            "dish_name": "外婆鸡",
+            "elapsed_min": 30.0,
+            "standard_min": 20,
+            "overtime_min": 10.0,
+            "status": "warning",
+            "dept": "热菜",
+        }
     ]
     db = AsyncMock()
 
@@ -225,10 +250,7 @@ async def test_individual_overtime_endpoint():
 @pytest.mark.asyncio
 async def test_individual_shortage_endpoint():
     """GET /shortage/{store_id} 只返回沽清告警"""
-    shortage = [
-        {"dish_id": "d1", "dish_name": "象拔蚌", "shortage_count": 3,
-         "latest_at": "2026-03-30T14:00:00+00:00"}
-    ]
+    shortage = [{"dish_id": "d1", "dish_name": "象拔蚌", "shortage_count": 3, "latest_at": "2026-03-30T14:00:00+00:00"}]
     db = AsyncMock()
 
     with patch("api.kitchen_monitor_routes._get_shortage_alerts", AsyncMock(return_value=shortage)):
@@ -252,8 +274,13 @@ async def test_individual_shortage_endpoint():
 async def test_individual_remake_endpoint():
     """GET /remake/{store_id} 只返回退菜工单"""
     remake = [
-        {"task_id": "r1", "table_no": "C03", "dish_name": "鱼香肉丝",
-         "reason": "咸了", "created_at": "2026-03-30T13:00:00+00:00"}
+        {
+            "task_id": "r1",
+            "table_no": "C03",
+            "dish_name": "鱼香肉丝",
+            "reason": "咸了",
+            "created_at": "2026-03-30T13:00:00+00:00",
+        }
     ]
     db = AsyncMock()
 
@@ -278,16 +305,22 @@ async def test_individual_remake_endpoint():
 #  场景 5: 今日趋势按小时分桶
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 @pytest.mark.asyncio
 async def test_trend_hourly_bucketing():
     """GET /trend/{store_id} 返回按小时分桶的趋势数据"""
     db = AsyncMock()
 
-    with patch("api.kitchen_monitor_routes._get_hourly_trend", AsyncMock(return_value=[
-        {"hour": 0, "overtime_count": 0, "shortage_count": 0, "remake_count": 0},
-        {"hour": 1, "overtime_count": 1, "shortage_count": 0, "remake_count": 0},
-        {"hour": 2, "overtime_count": 0, "shortage_count": 2, "remake_count": 1},
-    ])):
+    with patch(
+        "api.kitchen_monitor_routes._get_hourly_trend",
+        AsyncMock(
+            return_value=[
+                {"hour": 0, "overtime_count": 0, "shortage_count": 0, "remake_count": 0},
+                {"hour": 1, "overtime_count": 1, "shortage_count": 0, "remake_count": 0},
+                {"hour": 2, "overtime_count": 0, "shortage_count": 2, "remake_count": 1},
+            ]
+        ),
+    ):
         from api.kitchen_monitor_routes import _get_db
         from fastapi.testclient import TestClient as SyncClient
 
@@ -339,6 +372,7 @@ async def test_trend_internal_query_structure():
 #  场景 6: 租户隔离
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 @pytest.mark.asyncio
 async def test_tenant_isolation_in_shortage_query():
     """_get_shortage_alerts 查询参数中必须包含正确的 tenant_id"""
@@ -355,10 +389,7 @@ async def test_tenant_isolation_in_shortage_query():
 
     await _get_shortage_alerts(STORE_ID, TENANT_X, db)
 
-    tenant_params = [
-        p for p in captured_params
-        if "tenant_id" in p or "tid" in p
-    ]
+    tenant_params = [p for p in captured_params if "tenant_id" in p or "tid" in p]
     assert len(tenant_params) > 0, "应有 tenant_id 参数传入查询"
 
     # 所有 tenant_id/tid 参数必须是 TENANT_X，不能是别的租户

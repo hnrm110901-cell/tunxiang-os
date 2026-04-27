@@ -1,4 +1,5 @@
 """工序步骤定义模型（泳道模式）"""
+
 import uuid
 
 from sqlalchemy import Boolean, Integer, String

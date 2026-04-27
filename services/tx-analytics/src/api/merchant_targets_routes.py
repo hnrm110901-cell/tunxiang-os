@@ -7,6 +7,7 @@ AI 分析推荐将与每个商户的 KPI 目标基准进行对比，实现目标
   PUT /api/v1/analytics/merchant-targets/{merchant_code}         — 更新商户目标
   GET /api/v1/analytics/merchant-targets/{merchant_code}/gap     — 实际 vs 目标差距分析
 """
+
 from __future__ import annotations
 
 import copy
@@ -31,13 +32,13 @@ _DEFAULT_TARGETS: dict[str, dict] = {
         "merchant_name": "尝在一起",
         "focus": "翻台率优先",
         "targets": {
-            "table_turnover_rate": 4.5,          # 次/天
-            "avg_dish_time_minutes": 18,          # 分钟
-            "seat_utilization_pct": 75,           # %
-            "avg_ticket_fen": 8500,               # 分
-            "member_repurchase_rate_pct": 35,     # %
-            "monthly_revenue_growth_pct": 8,      # %
-            "gross_margin_pct": 62,               # %
+            "table_turnover_rate": 4.5,  # 次/天
+            "avg_dish_time_minutes": 18,  # 分钟
+            "seat_utilization_pct": 75,  # %
+            "avg_ticket_fen": 8500,  # 分
+            "member_repurchase_rate_pct": 35,  # %
+            "monthly_revenue_growth_pct": 8,  # %
+            "gross_margin_pct": 62,  # %
         },
     },
     "zqx": {
@@ -105,9 +106,7 @@ async def _load_overrides_from_db() -> None:
                     for row in rows:
                         # _fen 字段保持整数，其余比率/指标用 float
                         val = row.target_value
-                        base["targets"][row.target_key] = (
-                            int(val) if row.target_key.endswith("_fen") else float(val)
-                        )
+                        base["targets"][row.target_key] = int(val) if row.target_key.endswith("_fen") else float(val)
                     _overrides[merchant_code] = base
                     logger.info(
                         "merchant_targets_loaded_from_db",
@@ -120,6 +119,7 @@ async def _load_overrides_from_db() -> None:
                 merchant_code=merchant_code,
                 error=str(exc),
             )
+
 
 # 演示商户 → 租户 ID 映射
 _DEMO_TENANTS: dict[str, str] = {
@@ -171,7 +171,7 @@ _LOWER_IS_BETTER = {"avg_dish_time_minutes"}
 
 async def _fetch_actuals(tenant_id: str, kpi_keys: list[str]) -> dict[str, Optional[float]]:
     """从数据库查询近 30 天实际 KPI 值，查询失败返回 None（调用方负责 fallback）。"""
-    actuals: dict[str, Optional[float]] = {k: None for k in kpi_keys}
+    actuals: dict[str, Optional[float]] = dict.fromkeys(kpi_keys)
 
     async with async_session_factory() as session:
         await session.execute(
@@ -199,8 +199,9 @@ async def _fetch_actuals(tenant_id: str, kpi_keys: list[str]) -> dict[str, Optio
                     if "avg_ticket_fen" in kpi_keys:
                         actuals["avg_ticket_fen"] = float(r.avg_ticket or 0)
             except SQLAlchemyError as exc:
-                logger.warning("merchant_targets_actuals_query_failed", kpi="avg_ticket_fen",
-                               tenant_id=tenant_id, error=str(exc))
+                logger.warning(
+                    "merchant_targets_actuals_query_failed", kpi="avg_ticket_fen", tenant_id=tenant_id, error=str(exc)
+                )
 
         # 翻台率：近 30 天订单数 / (桌台数 × 30)
         if "table_turnover_rate" in kpi_keys:
@@ -229,8 +230,12 @@ async def _fetch_actuals(tenant_id: str, kpi_keys: list[str]) -> dict[str, Optio
                 if table_cnt > 0 and order_cnt > 0:
                     actuals["table_turnover_rate"] = round(order_cnt / (table_cnt * 30), 2)
             except SQLAlchemyError as exc:
-                logger.warning("merchant_targets_actuals_query_failed", kpi="table_turnover_rate",
-                               tenant_id=tenant_id, error=str(exc))
+                logger.warning(
+                    "merchant_targets_actuals_query_failed",
+                    kpi="table_turnover_rate",
+                    tenant_id=tenant_id,
+                    error=str(exc),
+                )
 
     return actuals
 
@@ -251,7 +256,7 @@ def _build_gap_item(kpi: str, target: float, actual: Optional[float]) -> dict:
     if is_lower_better:
         effective_gap = -gap_pct  # 正数 = 超出目标（差）
     else:
-        effective_gap = gap_pct   # 正数 = 超出目标（好）
+        effective_gap = gap_pct  # 正数 = 超出目标（好）
 
     if effective_gap >= 5:
         status = "✅ 超出目标"
@@ -274,8 +279,7 @@ def _build_gap_item(kpi: str, target: float, actual: Optional[float]) -> dict:
     }
 
 
-def _generate_recommendation(kpi: str, target: float, actual: float,
-                              effective_gap: float, data_note: str) -> str:
+def _generate_recommendation(kpi: str, target: float, actual: float, effective_gap: float, data_note: str) -> str:
     """根据 KPI 类型和差距生成 AI 建议文本。"""
     pct_str = f"{abs(effective_gap):.1f}%"
     suffix = data_note
@@ -325,6 +329,7 @@ def _generate_recommendation(kpi: str, target: float, actual: float,
 
 # ── 1. 获取商户目标 ───────────────────────────────────────────────────────────────
 
+
 @router.get("/merchant-targets/{merchant_code}", summary="获取商户 KPI 目标配置")
 async def get_merchant_targets(
     merchant_code: str,
@@ -343,6 +348,7 @@ async def get_merchant_targets(
 
 
 # ── 2. 更新商户目标 ───────────────────────────────────────────────────────────────
+
 
 @router.put("/merchant-targets/{merchant_code}", summary="更新商户 KPI 目标配置")
 async def update_merchant_targets(
@@ -413,8 +419,9 @@ async def update_merchant_targets(
                 error=str(exc),
             )
 
-    logger.info("merchant_targets_updated", merchant_code=merchant_code,
-                updated_keys=list(payload.get("targets", {}).keys()))
+    logger.info(
+        "merchant_targets_updated", merchant_code=merchant_code, updated_keys=list(payload.get("targets", {}).keys())
+    )
 
     return {
         "ok": True,
@@ -427,6 +434,7 @@ async def update_merchant_targets(
 
 
 # ── 3. 差距分析 ───────────────────────────────────────────────────────────────────
+
 
 @router.get("/merchant-targets/{merchant_code}/gap", summary="实际 vs 目标差距分析")
 async def get_merchant_target_gap(
@@ -444,7 +452,7 @@ async def get_merchant_target_gap(
         actuals = await _fetch_actuals(tenant_id, kpi_keys)
     except SQLAlchemyError as exc:
         logger.warning("merchant_targets_gap_db_error", merchant_code=merchant_code, error=str(exc))
-        actuals = {k: None for k in kpi_keys}
+        actuals = dict.fromkeys(kpi_keys)
 
     # 构建差距列表
     gaps: list[dict] = []

@@ -12,6 +12,7 @@
 9.  POST /api/v1/stamp-cards/{id}/redeem       — 正常核销返回 ok=True
 10. POST /api/v1/stamp-cards/{id}/redeem       — 缺少 customer_id → 422
 """
+
 import os
 import sys
 
@@ -20,7 +21,6 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 import uuid
 from unittest.mock import AsyncMock, patch
 
-import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
@@ -29,6 +29,7 @@ _HEADERS = {"X-Tenant-ID": TENANT_ID, "Authorization": "Bearer test"}
 
 
 # ── Mock 数据库 session ──────────────────────────────────────────────────────
+
 
 def _make_db():
     db = AsyncMock()
@@ -46,10 +47,14 @@ _mock_redeem_result = {"reward": "coupon-001", "status": "redeemed"}
 _mock_auto_stamp_result = {"stamped": True, "current_stamps": 2}
 
 
-with patch.dict("sys.modules", {
-    "services.stamp_card_service": type(sys)("services.stamp_card_service"),
-}):
+with patch.dict(
+    "sys.modules",
+    {
+        "services.stamp_card_service": type(sys)("services.stamp_card_service"),
+    },
+):
     import types
+
     fake_svc = types.ModuleType("services.stamp_card_service")
     fake_svc.create_template = AsyncMock(return_value=_mock_template_result)
     fake_svc.list_templates = AsyncMock(return_value=[_mock_template_result])
@@ -58,7 +63,7 @@ with patch.dict("sys.modules", {
     fake_svc.redeem_card = AsyncMock(return_value=_mock_redeem_result)
     sys.modules["services.stamp_card_service"] = fake_svc
 
-    from api.stamp_card_routes import router, get_db
+    from api.stamp_card_routes import get_db, router
 
 app = FastAPI()
 app.include_router(router)
@@ -67,12 +72,14 @@ app.include_router(router)
 def _override_db(db):
     def _dep():
         return db
+
     return _dep
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 场景 1: POST /templates — 正常创建
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 def test_create_template_ok():
     """正常创建模板，返回 ok=True"""
@@ -97,6 +104,7 @@ def test_create_template_ok():
 # 场景 2: POST /templates — 缺少 name → 422
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_create_template_missing_name():
     """name 为必填，缺少时应返回 422"""
     db = _make_db()
@@ -114,6 +122,7 @@ def test_create_template_missing_name():
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 场景 3: POST /templates — 服务层 ValueError fallback
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 def test_create_template_service_error():
     """服务层抛 ValueError 时返回 ok=False"""
@@ -138,6 +147,7 @@ def test_create_template_service_error():
 # 场景 4: GET /templates — 正常返回列表
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_list_templates_ok():
     """返回模板数组，元素含 name 字段"""
     db = _make_db()
@@ -158,6 +168,7 @@ def test_list_templates_ok():
 # 场景 5: GET /templates — 服务层异常（不崩溃）
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_list_templates_service_returns_empty():
     """服务层返回空列表时，API 正常返回空数组"""
     db = _make_db()
@@ -176,6 +187,7 @@ def test_list_templates_service_returns_empty():
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 场景 6: POST /auto-stamp — 正常盖章
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 def test_auto_stamp_ok():
     """自动盖章返回 ok=True"""
@@ -205,6 +217,7 @@ def test_auto_stamp_ok():
 # 场景 7: POST /auto-stamp — 缺少 customer_id → 422
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_auto_stamp_missing_customer_id():
     """customer_id 为必填，缺少时应返回 422"""
     db = _make_db()
@@ -222,6 +235,7 @@ def test_auto_stamp_missing_customer_id():
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 场景 8: GET /my — 我的集章卡
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 def test_my_cards_ok():
     """返回会员集章卡列表"""
@@ -247,6 +261,7 @@ def test_my_cards_ok():
 # 场景 9: POST /{id}/redeem — 正常核销
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_redeem_ok():
     """集章卡满章核销，返回 ok=True"""
     db = _make_db()
@@ -271,6 +286,7 @@ def test_redeem_ok():
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 场景 10: POST /{id}/redeem — 缺少 customer_id → 422
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 def test_redeem_missing_customer_id():
     """customer_id 为必填，缺少时应返回 422"""

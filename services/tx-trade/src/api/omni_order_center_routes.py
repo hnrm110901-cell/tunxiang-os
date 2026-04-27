@@ -11,10 +11,12 @@ Y-A12 Mock→DB 改造
   GET  /api/v1/trade/omni-orders/customer/{golden_id} — 会员跨渠道历史
   GET  /api/v1/trade/omni-orders/{order_id}           — 订单详情
 """
-import structlog
-from fastapi import APIRouter, Depends, Header, Path, Query, Request
-from typing import Optional
+
 from datetime import date
+from typing import Optional
+
+import structlog
+from fastapi import APIRouter, Depends, Path, Query, Request
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -24,11 +26,11 @@ logger = structlog.get_logger()
 router = APIRouter(prefix="/api/v1/trade/omni-orders", tags=["omni-order-center"])
 
 CHANNEL_CONFIG: dict[str, dict] = {
-    "dine_in":    {"label": "堂食",     "color": "blue",   "icon": "🍽️"},
-    "takeaway":   {"label": "外卖",     "color": "orange", "icon": "🛵"},
-    "miniapp":    {"label": "小程序",   "color": "green",  "icon": "📱"},
+    "dine_in": {"label": "堂食", "color": "blue", "icon": "🍽️"},
+    "takeaway": {"label": "外卖", "color": "orange", "icon": "🛵"},
+    "miniapp": {"label": "小程序", "color": "green", "icon": "📱"},
     "group_meal": {"label": "团餐企业", "color": "purple", "icon": "🏢"},
-    "banquet":    {"label": "宴席预订", "color": "gold",   "icon": "🥂"},
+    "banquet": {"label": "宴席预订", "color": "gold", "icon": "🥂"},
 }
 
 
@@ -92,28 +94,36 @@ async def list_omni_orders(
     conds = ["1=1"]
     params: dict = {"limit": size, "offset": (page - 1) * size}
     if channel:
-        conds.append("channel = :channel"); params["channel"] = channel
+        conds.append("channel = :channel")
+        params["channel"] = channel
     if status:
-        conds.append("status = :status"); params["status"] = status
+        conds.append("status = :status")
+        params["status"] = status
     if store_id:
-        conds.append("store_id = :store_id"); params["store_id"] = store_id
+        conds.append("store_id = :store_id")
+        params["store_id"] = store_id
     if date_from:
-        conds.append("created_at::date >= :date_from"); params["date_from"] = date_from
+        conds.append("created_at::date >= :date_from")
+        params["date_from"] = date_from
     if date_to:
-        conds.append("created_at::date <= :date_to"); params["date_to"] = date_to
+        conds.append("created_at::date <= :date_to")
+        params["date_to"] = date_to
 
     where = " AND ".join(conds)
 
     total = (await db.execute(text(f"{_OMNI_CTE} SELECT COUNT(*) FROM omni WHERE {where}"), params)).scalar() or 0
 
-    rows = await db.execute(text(f"""
+    rows = await db.execute(
+        text(f"""
         {_OMNI_CTE}
         SELECT order_id, channel, order_no, store_id, amount_fen,
                golden_id, customer_name, customer_phone,
                status, covers, created_at
         FROM omni WHERE {where}
         ORDER BY created_at DESC LIMIT :limit OFFSET :offset
-    """), params)
+    """),
+        params,
+    )
 
     items = []
     for r in rows.fetchall():
@@ -137,38 +147,47 @@ async def get_omni_stats(
     conds = ["1=1"]
     params: dict = {}
     if date_from:
-        conds.append("created_at::date >= :date_from"); params["date_from"] = date_from
+        conds.append("created_at::date >= :date_from")
+        params["date_from"] = date_from
     if date_to:
-        conds.append("created_at::date <= :date_to"); params["date_to"] = date_to
+        conds.append("created_at::date <= :date_to")
+        params["date_to"] = date_to
     where = " AND ".join(conds)
 
-    rows = await db.execute(text(f"""
+    rows = await db.execute(
+        text(f"""
         {_OMNI_CTE}
         SELECT channel, COUNT(*) AS order_count, COALESCE(SUM(amount_fen), 0) AS total_fen
         FROM omni WHERE {where} GROUP BY channel
-    """), params)
+    """),
+        params,
+    )
     stats = []
     grand_total_fen = 0
     grand_count = 0
     for r in rows.fetchall():
         cfg = CHANNEL_CONFIG.get(r.channel, {})
-        stats.append({
-            "channel": r.channel,
-            "label": cfg.get("label", r.channel),
-            "color": cfg.get("color", "default"),
-            "order_count": r.order_count,
-            "total_fen": r.total_fen,
-            "total_yuan": round(r.total_fen / 100, 2),
-        })
+        stats.append(
+            {
+                "channel": r.channel,
+                "label": cfg.get("label", r.channel),
+                "color": cfg.get("color", "default"),
+                "order_count": r.order_count,
+                "total_fen": r.total_fen,
+                "total_yuan": round(r.total_fen / 100, 2),
+            }
+        )
         grand_total_fen += r.total_fen
         grand_count += r.order_count
 
-    return _ok({
-        "channels": stats,
-        "grand_total_fen": grand_total_fen,
-        "grand_total_yuan": round(grand_total_fen / 100, 2),
-        "grand_order_count": grand_count,
-    })
+    return _ok(
+        {
+            "channels": stats,
+            "grand_total_fen": grand_total_fen,
+            "grand_total_yuan": round(grand_total_fen / 100, 2),
+            "grand_order_count": grand_count,
+        }
+    )
 
 
 @router.get("/search", summary="快速搜索（订单号/手机号）")
@@ -177,13 +196,16 @@ async def search_orders(
     limit: int = Query(10, ge=1, le=50),
     db: AsyncSession = Depends(_get_db),
 ) -> dict:
-    rows = await db.execute(text(f"""
+    rows = await db.execute(
+        text(f"""
         {_OMNI_CTE}
         SELECT order_id, channel, order_no, store_id, amount_fen, status, created_at
         FROM omni
         WHERE order_no ILIKE :q OR customer_phone ILIKE :q
         ORDER BY created_at DESC LIMIT :limit
-    """), {"q": f"%{q}%", "limit": limit})
+    """),
+        {"q": f"%{q}%", "limit": limit},
+    )
     items = [dict(r._mapping) for r in rows.fetchall()]
     return _ok(items)
 
@@ -194,12 +216,15 @@ async def get_customer_orders(
     limit: int = Query(50, ge=1, le=200),
     db: AsyncSession = Depends(_get_db),
 ) -> dict:
-    rows = await db.execute(text(f"""
+    rows = await db.execute(
+        text(f"""
         {_OMNI_CTE}
         SELECT order_id, channel, order_no, store_id, amount_fen, status, created_at
         FROM omni WHERE golden_id = :gid
         ORDER BY created_at DESC LIMIT :limit
-    """), {"gid": golden_id, "limit": limit})
+    """),
+        {"gid": golden_id, "limit": limit},
+    )
     items = [dict(r._mapping) for r in rows.fetchall()]
     return _ok({"golden_id": golden_id, "orders": items, "total": len(items)})
 
@@ -234,4 +259,5 @@ async def get_order_detail(order_id: str = Path(...), db: AsyncSession = Depends
         return _ok(d)
 
     from fastapi import HTTPException
+
     raise HTTPException(status_code=404, detail={"ok": False, "error": {"code": "ORDER_NOT_FOUND"}})

@@ -29,10 +29,11 @@
   ── 叫号集成 ─────────────────────────────────────────────────────────────────
   GET    /api/v1/kiosk/{terminal_id}/calling/current                — 当前叫号状态
 """
+
 import asyncio
 from datetime import datetime, timezone
 from typing import Optional
-from uuid import UUID, uuid4
+from uuid import uuid4
 
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
@@ -75,6 +76,7 @@ def _err(msg: str, code: int = 400) -> None:
 
 class KioskTerminalReq(BaseModel):
     """注册或更新速点终端"""
+
     store_id: str = Field(description="门店ID")
     terminal_code: str = Field(max_length=50, description="终端编号，如：KIOSK-01")
     terminal_name: str = Field(max_length=100, description="终端名称，如：1号自助点单机")
@@ -108,6 +110,7 @@ class KioskTerminalReq(BaseModel):
 
 class UpdateKioskTerminalReq(BaseModel):
     """更新终端配置（部分更新）"""
+
     terminal_name: Optional[str] = Field(default=None, max_length=100)
     type: Optional[str] = None
     display_mode: Optional[str] = None
@@ -119,6 +122,7 @@ class UpdateKioskTerminalReq(BaseModel):
 
 class CartItemReq(BaseModel):
     """购物车单项"""
+
     dish_id: str = Field(description="菜品ID")
     quantity: int = Field(ge=1, description="数量")
     specs: Optional[dict] = Field(
@@ -130,12 +134,14 @@ class CartItemReq(BaseModel):
 
 class CartRequest(BaseModel):
     """创建/更新购物车"""
+
     session_token: str = Field(description="顾客会话Token（终端生成或扫码获取）")
     items: list[CartItemReq] = Field(min_length=1, description="购物车明细")
 
 
 class KioskOrderRequest(BaseModel):
     """速点下单请求（购物车 → 订单）"""
+
     cart_id: str = Field(description="购物车ID")
     member_code: Optional[str] = Field(
         default=None,
@@ -154,6 +160,7 @@ class KioskOrderRequest(BaseModel):
 
 class ScanPayRequest(BaseModel):
     """主扫支付（顾客出示付款码，终端扫码）"""
+
     scan_code: str = Field(description="顾客付款码内容（微信/支付宝二维码）")
 
 
@@ -414,19 +421,21 @@ async def get_terminal_config(
     )
     menu_categories = [r[0] for r in cats.fetchall()]
 
-    return _ok({
-        "terminal_id": t["id"],
-        "terminal_code": t["terminal_code"],
-        "terminal_name": t["terminal_name"],
-        "type": t["type"],
-        "display_mode": t["display_mode"],
-        "status": t["status"],
-        "menu_categories": menu_categories,
-        "payment_modes": t["payment_modes"],
-        "welcome_screen_config": t["welcome_screen_config"],
-        "idle_timeout_seconds": t["idle_timeout_seconds"],
-        "ad_images": t["ad_images"],
-    })
+    return _ok(
+        {
+            "terminal_id": t["id"],
+            "terminal_code": t["terminal_code"],
+            "terminal_name": t["terminal_name"],
+            "type": t["type"],
+            "display_mode": t["display_mode"],
+            "status": t["status"],
+            "menu_categories": menu_categories,
+            "payment_modes": t["payment_modes"],
+            "welcome_screen_config": t["welcome_screen_config"],
+            "idle_timeout_seconds": t["idle_timeout_seconds"],
+            "ad_images": t["ad_images"],
+        }
+    )
 
 
 # ─── 点单流程端点 ─────────────────────────────────────────────────────────────
@@ -482,18 +491,18 @@ async def get_kiosk_menu(
 
     # 按分类分组
     from collections import defaultdict
+
     grouped: dict = defaultdict(list)
     for dish in items:
         grouped[dish["category_name"]].append(dish)
 
-    return _ok({
-        "store_id": store_id,
-        "categories": [
-            {"category_name": cat, "dishes": dishes_list}
-            for cat, dishes_list in grouped.items()
-        ],
-        "total_dishes": len(items),
-    })
+    return _ok(
+        {
+            "store_id": store_id,
+            "categories": [{"category_name": cat, "dishes": dishes_list} for cat, dishes_list in grouped.items()],
+            "total_dishes": len(items),
+        }
+    )
 
 
 @router.post("/{terminal_id}/cart")
@@ -550,21 +559,24 @@ async def upsert_cart(
             _err(f"菜品「{dish['dish_name']}」已沽清，请重新选择")
         line_total = dish["price_fen"] * item.quantity
         subtotal_fen += line_total
-        cart_items.append({
-            "dish_id": item.dish_id,
-            "dish_name": dish["dish_name"],
-            "price_fen": dish["price_fen"],
-            "quantity": item.quantity,
-            "specs": item.specs,
-            "notes": item.notes,
-            "line_total_fen": line_total,
-        })
+        cart_items.append(
+            {
+                "dish_id": item.dish_id,
+                "dish_name": dish["dish_name"],
+                "price_fen": dish["price_fen"],
+                "quantity": item.quantity,
+                "specs": item.specs,
+                "notes": item.notes,
+                "line_total_fen": line_total,
+            }
+        )
 
     # 简单折扣计算（预留接入折扣引擎，当前直接返回0折扣）
     discount_fen = 0
     total_fen = subtotal_fen - discount_fen
 
     import json
+
     now = datetime.now(timezone.utc)
     cart_id = str(uuid4())
 
@@ -610,16 +622,18 @@ async def upsert_cart(
         logger.error("kiosk_cart_upsert_failed", error=str(exc), exc_info=True)
         _err(f"购物车操作失败：{exc}", code=500)
 
-    return _ok({
-        "cart_id": cart_id,
-        "terminal_id": terminal_id,
-        "session_token": req.session_token,
-        "items": cart_items,
-        "subtotal_fen": subtotal_fen,
-        "discounts": [],
-        "discount_fen": discount_fen,
-        "total_fen": total_fen,
-    })
+    return _ok(
+        {
+            "cart_id": cart_id,
+            "terminal_id": terminal_id,
+            "session_token": req.session_token,
+            "items": cart_items,
+            "subtotal_fen": subtotal_fen,
+            "discounts": [],
+            "discount_fen": discount_fen,
+            "total_fen": total_fen,
+        }
+    )
 
 
 @router.get("/{terminal_id}/cart/{cart_id}")
@@ -747,29 +761,33 @@ async def kiosk_place_order(
         logger.error("kiosk_place_order_failed", error=str(exc), exc_info=True)
         _err(f"下单失败：{exc}", code=500)
 
-    asyncio.create_task(emit_event(
-        event_type=OrderEventType.CREATED,
-        tenant_id=tenant_id,
-        stream_id=order_id,
-        payload={
-            "order_no": order_no,
-            "total_fen": cart["total_fen"],
-            "queue_number": queue_number,
-            "source": "kiosk",
-        },
-        store_id=store_id,
-        source_service="tx-trade",
-    ))
+    asyncio.create_task(
+        emit_event(
+            event_type=OrderEventType.CREATED,
+            tenant_id=tenant_id,
+            stream_id=order_id,
+            payload={
+                "order_no": order_no,
+                "total_fen": cart["total_fen"],
+                "queue_number": queue_number,
+                "source": "kiosk",
+            },
+            store_id=store_id,
+            source_service="tx-trade",
+        )
+    )
 
     logger.info("kiosk_order_placed", order_id=order_id, order_no=order_no, queue_number=queue_number)
-    return _ok({
-        "order_id": order_id,
-        "order_no": order_no,
-        "queue_number": queue_number,
-        "total_amount_fen": cart["total_fen"],
-        "payment_required": True,
-        "status": "pending_payment",
-    })
+    return _ok(
+        {
+            "order_id": order_id,
+            "order_no": order_no,
+            "queue_number": queue_number,
+            "total_amount_fen": cart["total_fen"],
+            "payment_required": True,
+            "status": "pending_payment",
+        }
+    )
 
 
 @router.get("/{terminal_id}/orders/{order_id}/status")
@@ -804,15 +822,17 @@ async def get_kiosk_order_status(
     # 简单预估：每单约3分钟出餐，最多显示15分钟
     estimated_wait = max(1, min(15, 5 - waiting_minutes)) if o["status"] == "preparing" else 0
 
-    return _ok({
-        "order_id": order_id,
-        "order_no": o["order_no"],
-        "status": o["status"],
-        "queue_number": o["queue_number"],
-        "estimated_wait_minutes": estimated_wait,
-        "total_amount_fen": o["total_amount_fen"],
-        "items_status": o["items"],  # 各菜品出餐状态由KDS推送更新
-    })
+    return _ok(
+        {
+            "order_id": order_id,
+            "order_no": o["order_no"],
+            "status": o["status"],
+            "queue_number": o["queue_number"],
+            "estimated_wait_minutes": estimated_wait,
+            "total_amount_fen": o["total_amount_fen"],
+            "items_status": o["items"],  # 各菜品出餐状态由KDS推送更新
+        }
+    )
 
 
 # ─── 支付端点 ─────────────────────────────────────────────────────────────────
@@ -888,12 +908,14 @@ async def kiosk_scan_pay(
         _err(f"支付请求失败：{exc}", code=500)
 
     logger.info("kiosk_scan_pay_initiated", order_id=order_id, receipt_no=receipt_no)
-    return _ok({
-        "payment_status": "processing",
-        "receipt_no": receipt_no,
-        "amount_fen": order["total_amount_fen"],
-        "message": "支付请求已提交，等待支付网关确认",
-    })
+    return _ok(
+        {
+            "payment_status": "processing",
+            "receipt_no": receipt_no,
+            "amount_fen": order["total_amount_fen"],
+            "message": "支付请求已提交，等待支付网关确认",
+        }
+    )
 
 
 @router.post("/{terminal_id}/orders/{order_id}/qr-pay")
@@ -955,7 +977,9 @@ async def kiosk_qr_pay(
             },
         )
         await db.execute(
-            text("UPDATE kiosk_orders SET status = 'paying', updated_at = :now WHERE id = :order_id AND tenant_id = :tenant_id"),
+            text(
+                "UPDATE kiosk_orders SET status = 'paying', updated_at = :now WHERE id = :order_id AND tenant_id = :tenant_id"
+            ),
             {"order_id": order_id, "tenant_id": tenant_id, "now": datetime.now(timezone.utc)},
         )
         await db.commit()
@@ -964,12 +988,14 @@ async def kiosk_qr_pay(
         logger.error("kiosk_qr_pay_failed", error=str(exc), exc_info=True)
         _err(f"生成支付二维码失败：{exc}", code=500)
 
-    return _ok({
-        "qr_code_url": qr_code_url,
-        "expire_seconds": expire_seconds,
-        "polling_key": polling_key,
-        "amount_fen": order["total_amount_fen"],
-    })
+    return _ok(
+        {
+            "qr_code_url": qr_code_url,
+            "expire_seconds": expire_seconds,
+            "polling_key": polling_key,
+            "amount_fen": order["total_amount_fen"],
+        }
+    )
 
 
 @router.get("/{terminal_id}/pay-result/{polling_key}")
@@ -997,13 +1023,15 @@ async def get_pay_result(
         _err("支付记录不存在", code=404)
 
     p = dict(payment._mapping)
-    return _ok({
-        "polling_key": polling_key,
-        "payment_status": p["status"],
-        "order_id": p["order_id"],
-        "receipt_no": p["receipt_no"],
-        "amount_fen": p["amount_fen"],
-    })
+    return _ok(
+        {
+            "polling_key": polling_key,
+            "payment_status": p["status"],
+            "order_id": p["order_id"],
+            "receipt_no": p["receipt_no"],
+            "amount_fen": p["amount_fen"],
+        }
+    )
 
 
 # ─── 叫号集成 ─────────────────────────────────────────────────────────────────
@@ -1065,9 +1093,11 @@ async def get_calling_current(
     waiting_count = int(stats[0] or 0)
     avg_wait_minutes = round(float(stats[1] or 0))
 
-    return _ok({
-        "store_id": store_id,
-        "now_calling": now_calling,
-        "waiting_count": waiting_count,
-        "avg_wait_minutes": avg_wait_minutes,
-    })
+    return _ok(
+        {
+            "store_id": store_id,
+            "now_calling": now_calling,
+            "waiting_count": waiting_count,
+            "avg_wait_minutes": avg_wait_minutes,
+        }
+    )

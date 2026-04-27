@@ -3,6 +3,7 @@
 所有金额单位：分(fen)。
 等级升降级支持：按消费金额/次数/成长值。
 """
+
 from __future__ import annotations
 
 import json
@@ -26,6 +27,7 @@ BATCH_OP_TYPES = ("recharge", "deduct", "transfer")
 
 
 # ── 工具函数 ──────────────────────────────────────────────────
+
 
 def _to_uuid(val: str) -> uuid.UUID:
     return uuid.UUID(val)
@@ -273,6 +275,7 @@ async def set_card_levels(
         raise ValueError("invalid_level_rules")
 
     import json
+
     now = _now_utc()
 
     await db.execute(
@@ -452,6 +455,7 @@ async def upgrade_level(
         raise ValueError("card_not_found")
 
     import json
+
     current_rank = row["level_rank"]
     levels = json.loads(row["levels"]) if row["levels"] else []
     growth_value = row["growth_value"] or 0
@@ -522,6 +526,7 @@ async def downgrade_level(
         raise ValueError("card_not_found")
 
     import json
+
     current_rank = row["level_rank"]
     levels = json.loads(row["levels"]) if row["levels"] else []
     growth_value = row["growth_value"] or 0
@@ -582,6 +587,7 @@ async def set_member_day(
         raise ValueError("invalid_member_day_config")
 
     import json
+
     now = _now_utc()
 
     await db.execute(
@@ -638,6 +644,7 @@ async def get_card_benefits(
         raise ValueError("card_not_found")
 
     import json
+
     level_rank = card["level_rank"]
     levels = json.loads(card["levels"]) if card["levels"] else []
     rules = json.loads(card["rules"]) if card["rules"] else {}
@@ -748,7 +755,9 @@ async def batch_card_operations(
             results.append({"index": len(results), "card_id": card_id, "type": op_type, "status": "ok"})
         except ValueError as e:
             failed_count += 1
-            results.append({"index": len(results), "card_id": card_id, "type": op_type, "status": "failed", "error": str(e)})
+            results.append(
+                {"index": len(results), "card_id": card_id, "type": op_type, "status": "failed", "error": str(e)}
+            )
 
     await db.flush()
 

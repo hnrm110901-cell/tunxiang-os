@@ -10,6 +10,7 @@
 
 维护视图：mv_member_clv
 """
+
 from __future__ import annotations
 
 from datetime import datetime
@@ -20,7 +21,6 @@ from ..projector import ProjectorBase
 
 
 class MemberClvProjector(ProjectorBase):
-
     name = "member_clv"
     event_types = {
         "member.registered",
@@ -49,7 +49,8 @@ class MemberClvProjector(ProjectorBase):
             VALUES ($1, $2, NOW())
             ON CONFLICT (tenant_id, customer_id) DO NOTHING
             """,
-            self.tenant_id, UUID(str(customer_id)),
+            self.tenant_id,
+            UUID(str(customer_id)),
         )
 
         if event_type == "order.paid":
@@ -65,8 +66,11 @@ class MemberClvProjector(ProjectorBase):
                     updated_at      = NOW()
                 WHERE tenant_id = $1 AND customer_id = $2
                 """,
-                self.tenant_id, UUID(str(customer_id)),
-                amount_fen, occurred_at, UUID(str(event["event_id"])),
+                self.tenant_id,
+                UUID(str(customer_id)),
+                amount_fen,
+                occurred_at,
+                UUID(str(event["event_id"])),
             )
 
         elif event_type == "member.recharged":
@@ -80,8 +84,10 @@ class MemberClvProjector(ProjectorBase):
                     updated_at               = NOW()
                 WHERE tenant_id = $1 AND customer_id = $2
                 """,
-                self.tenant_id, UUID(str(customer_id)),
-                amount_fen + gift_fen, UUID(str(event["event_id"])),
+                self.tenant_id,
+                UUID(str(customer_id)),
+                amount_fen + gift_fen,
+                UUID(str(event["event_id"])),
             )
 
         elif event_type == "member.consumed":
@@ -94,8 +100,10 @@ class MemberClvProjector(ProjectorBase):
                     updated_at               = NOW()
                 WHERE tenant_id = $1 AND customer_id = $2
                 """,
-                self.tenant_id, UUID(str(customer_id)),
-                amount_fen, UUID(str(event["event_id"])),
+                self.tenant_id,
+                UUID(str(customer_id)),
+                amount_fen,
+                UUID(str(event["event_id"])),
             )
 
         elif event_type == "member.voucher_used":
@@ -109,8 +117,10 @@ class MemberClvProjector(ProjectorBase):
                     updated_at         = NOW()
                 WHERE tenant_id = $1 AND customer_id = $2
                 """,
-                self.tenant_id, UUID(str(customer_id)),
-                voucher_cost_fen, UUID(str(event["event_id"])),
+                self.tenant_id,
+                UUID(str(customer_id)),
+                voucher_cost_fen,
+                UUID(str(event["event_id"])),
             )
 
         elif event_type == "member.churn_predicted":
@@ -125,6 +135,9 @@ class MemberClvProjector(ProjectorBase):
                     updated_at        = NOW()
                 WHERE tenant_id = $1 AND customer_id = $2
                 """,
-                self.tenant_id, UUID(str(customer_id)),
-                churn_prob, next_visit, UUID(str(event["event_id"])),
+                self.tenant_id,
+                UUID(str(customer_id)),
+                churn_prob,
+                next_visit,
+                UUID(str(event["event_id"])),
             )

@@ -6,6 +6,7 @@
   - 等位拥堵指标
   - 高峰事件处理
 """
+
 import uuid
 from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock
@@ -46,10 +47,12 @@ async def test_detect_peak_is_peak():
     # 上座率: 40/50 = 80%
     occ_result = MagicMock()
     occ_mappings = MagicMock()
-    occ_mappings.first.return_value = _make_mapping({
-        "occupied_count": 40,
-        "total_tables": 50,
-    })
+    occ_mappings.first.return_value = _make_mapping(
+        {
+            "occupied_count": 40,
+            "total_tables": 50,
+        }
+    )
     occ_result.mappings.return_value = occ_mappings
 
     # 等位: 15
@@ -84,10 +87,12 @@ async def test_detect_peak_not_peak():
 
     occ_result = MagicMock()
     occ_mappings = MagicMock()
-    occ_mappings.first.return_value = _make_mapping({
-        "occupied_count": 10,
-        "total_tables": 50,
-    })
+    occ_mappings.first.return_value = _make_mapping(
+        {
+            "occupied_count": 10,
+            "total_tables": 50,
+        }
+    )
     occ_result.mappings.return_value = occ_mappings
 
     queue_result = MagicMock()
@@ -120,13 +125,15 @@ async def test_get_dept_load_monitor():
     query_result = MagicMock()
     query_mappings = MagicMock()
     query_mappings.all.return_value = [
-        _make_mapping({
-            "dept_id": uuid.UUID(DEPT_ID),
-            "dept_name": "热炒档",
-            "capacity_per_hour": 30,
-            "pending_count": 8,
-            "avg_wait_seconds": 300.0,
-        }),
+        _make_mapping(
+            {
+                "dept_id": uuid.UUID(DEPT_ID),
+                "dept_name": "热炒档",
+                "capacity_per_hour": 30,
+                "pending_count": 8,
+                "avg_wait_seconds": 300.0,
+            }
+        ),
     ]
     query_result.mappings.return_value = query_mappings
 
@@ -164,20 +171,24 @@ async def test_get_queue_pressure():
     queue_result = MagicMock()
     queue_mappings = MagicMock()
     queue_mappings.all.return_value = [
-        _make_mapping({
-            "table_type": "4人桌",
-            "queue_count": 8,
-            "avg_wait_seconds": 1200.0,
-            "max_wait_seconds": 2400.0,
-            "earliest_ticket": datetime.now(timezone.utc),
-        }),
-        _make_mapping({
-            "table_type": "包间",
-            "queue_count": 3,
-            "avg_wait_seconds": 600.0,
-            "max_wait_seconds": 900.0,
-            "earliest_ticket": datetime.now(timezone.utc),
-        }),
+        _make_mapping(
+            {
+                "table_type": "4人桌",
+                "queue_count": 8,
+                "avg_wait_seconds": 1200.0,
+                "max_wait_seconds": 2400.0,
+                "earliest_ticket": datetime.now(timezone.utc),
+            }
+        ),
+        _make_mapping(
+            {
+                "table_type": "包间",
+                "queue_count": 3,
+                "avg_wait_seconds": 600.0,
+                "max_wait_seconds": 900.0,
+                "earliest_ticket": datetime.now(timezone.utc),
+            }
+        ),
     ]
     queue_result.mappings.return_value = queue_mappings
 

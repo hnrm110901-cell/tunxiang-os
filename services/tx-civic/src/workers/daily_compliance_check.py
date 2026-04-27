@@ -8,22 +8,19 @@
 - 生成巡检摘要（哪些门店有风险、最紧急的待办）
 - 发射事件通知 IM 工作台
 """
+
 from __future__ import annotations
 
 import asyncio
-import uuid
 from datetime import date, datetime, timedelta, timezone
 from typing import Any
 
 import structlog
-from sqlalchemy import select, func, text
+from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..models.civic_enums import (
-    CivicDomain,
-    LicenseType,
-    RenewalStatus,
     RiskLevel,
 )
 from ..models.civic_events import CivicEventType
@@ -47,9 +44,11 @@ class DailyComplianceChecker:
     async def _fetch_tenant_ids(self, db: AsyncSession) -> list[str]:
         """获取所有租户 ID 列表。"""
         result = await db.execute(
-            text("SELECT DISTINCT tenant_id FROM civic_licenses WHERE is_deleted = FALSE "
-                 "UNION SELECT DISTINCT tenant_id FROM civic_health_certs WHERE is_deleted = FALSE "
-                 "UNION SELECT DISTINCT tenant_id FROM civic_fire_equipment WHERE is_deleted = FALSE")
+            text(
+                "SELECT DISTINCT tenant_id FROM civic_licenses WHERE is_deleted = FALSE "
+                "UNION SELECT DISTINCT tenant_id FROM civic_health_certs WHERE is_deleted = FALSE "
+                "UNION SELECT DISTINCT tenant_id FROM civic_fire_equipment WHERE is_deleted = FALSE"
+            )
         )
         return [str(row[0]) for row in result.all()]
 
@@ -103,9 +102,7 @@ class DailyComplianceChecker:
         fire_result = all_fire
 
         # 计算门店合规评分
-        score_result = await self._calculate_store_scores(
-            db, license_result, health_result, fire_result
-        )
+        score_result = await self._calculate_store_scores(db, license_result, health_result, fire_result)
 
         # 汇总巡检摘要
         elapsed = (datetime.now(timezone.utc) - started_at).total_seconds()
@@ -174,14 +171,10 @@ class DailyComplianceChecker:
         """)
 
         try:
-            expiring_result = await db.execute(
-                expiring_sql, {"today": today, "warn_date": warn_date}
-            )
+            expiring_result = await db.execute(expiring_sql, {"today": today, "warn_date": warn_date})
             expiring_rows = expiring_result.all()
 
-            expired_result = await db.execute(
-                expired_sql, {"today": today}
-            )
+            expired_result = await db.execute(expired_sql, {"today": today})
             expired_rows = expired_result.all()
         except SQLAlchemyError as exc:
             logger.error("license_check_failed", error=str(exc), exc_info=True)
@@ -421,14 +414,16 @@ class DailyComplianceChecker:
                 risk_level = RiskLevel.red
                 red_count += 1
 
-            scores.append({
-                "store_id": store_id,
-                "score": total,
-                "risk_level": risk_level.value,
-                "license_score": license_score,
-                "health_score": health_score,
-                "fire_score": fire_score,
-            })
+            scores.append(
+                {
+                    "store_id": store_id,
+                    "score": total,
+                    "risk_level": risk_level.value,
+                    "license_score": license_score,
+                    "health_score": health_score,
+                    "fire_score": fire_score,
+                }
+            )
 
         # 按评分升序排列（最差的在前面）
         scores.sort(key=lambda s: s["score"])
@@ -453,36 +448,39 @@ class DailyComplianceChecker:
             # 发射评分更新事件
             score_result = summary.get("store_scores", {})
             if score_result.get("red_count", 0) > 0 or score_result.get("yellow_count", 0) > 0:
-                asyncio.create_task(emit_event(
-                    event_type=CivicEventType.SCORE_UPDATED.value,
-                    tenant_id=None,
-                    stream_id="daily_compliance_check",
-                    payload={
-                        "check_date": summary["check_date"],
-                        "red_count": score_result.get("red_count", 0),
-                        "yellow_count": score_result.get("yellow_count", 0),
-                        "green_count": score_result.get("green_count", 0),
-                        "risk_stores": [
-                            s for s in score_result.get("scores", [])
-                            if s["risk_level"] in ("red", "yellow")
-                        ],
-                    },
-                    source_service="tx-civic",
-                ))
+                asyncio.create_task(
+                    emit_event(
+                        event_type=CivicEventType.SCORE_UPDATED.value,
+                        tenant_id=None,
+                        stream_id="daily_compliance_check",
+                        payload={
+                            "check_date": summary["check_date"],
+                            "red_count": score_result.get("red_count", 0),
+                            "yellow_count": score_result.get("yellow_count", 0),
+                            "green_count": score_result.get("green_count", 0),
+                            "risk_stores": [
+                                s for s in score_result.get("scores", []) if s["risk_level"] in ("red", "yellow")
+                            ],
+                        },
+                        source_service="tx-civic",
+                    )
+                )
 
             # 发射证照到期事件
             license_result = summary.get("licenses", {})
             if license_result.get("expiring_count", 0) > 0:
-                asyncio.create_task(emit_event(
-                    event_type=CivicEventType.LICENSE_EXPIRING.value,
-                    tenant_id=None,
-                    stream_id="daily_compliance_check",
-                    payload={
-                        "expiring_count": license_result["expiring_count"],
-                        "items": license_result.get("expiring_items", []),
-                    },
-                    source_service="tx-civic",
-                ))
+                asyncio.create_task(
+                    emit_event(
+                        event_type=CivicEventType.LICENSE_EXPIRING.value,
+                        tenant_id=None,
+                        stream_id="daily_compliance_check",
+                        payload={
+                            "expiring_count": license_result["expiring_count"],
+                            "items": license_result.get("expiring_items", []),
+                        },
+                        source_service="tx-civic",
+                    )
+                )
 
         except ImportError:
             logger.warning("event_emitter_not_available", hint="shared.events not installed")

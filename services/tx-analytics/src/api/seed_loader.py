@@ -3,6 +3,7 @@
 启动时幂等加载 20 张 P0 报表种子到 report_configs 表。
 使用 ON CONFLICT(id) DO NOTHING 保证幂等。
 """
+
 from __future__ import annotations
 
 import json

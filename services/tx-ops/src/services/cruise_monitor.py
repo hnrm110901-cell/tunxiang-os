@@ -2,6 +2,7 @@
 
 持续监控营业状态，发现异常自动告警。
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -20,25 +21,25 @@ log = structlog.get_logger(__name__)
 ALERT_LEVELS = ("info", "warning", "critical")
 
 ALERT_TYPES = {
-    "table_overtime":      "桌台超时未结账",
-    "table_uncleaned":     "空桌未清台",
-    "cooking_timeout":     "出餐超时",
-    "cooking_backlog":     "出餐堆积",
-    "stockout_new":        "新增沽清",
-    "stockout_risk":       "即将沽清预警",
-    "low_table_usage":     "桌台利用率低",
-    "high_wait_time":      "等位时间过长",
+    "table_overtime": "桌台超时未结账",
+    "table_uncleaned": "空桌未清台",
+    "cooking_timeout": "出餐超时",
+    "cooking_backlog": "出餐堆积",
+    "stockout_new": "新增沽清",
+    "stockout_risk": "即将沽清预警",
+    "low_table_usage": "桌台利用率低",
+    "high_wait_time": "等位时间过长",
 }
 
 # ─── 默认阈值 ───
 
 DEFAULT_THRESHOLDS = {
-    "table_overtime_minutes": 120,       # 桌台超时: 2小时
-    "table_unclean_minutes": 10,         # 清台超时: 10分钟
-    "cooking_timeout_minutes": 25,       # 出餐超时: 25分钟（海鲜标准）
-    "cooking_backlog_count": 15,         # 堆积订单数
-    "low_table_usage_pct": 30,           # 低利用率阈值
-    "high_wait_minutes": 20,             # 等位超时
+    "table_overtime_minutes": 120,  # 桌台超时: 2小时
+    "table_unclean_minutes": 10,  # 清台超时: 10分钟
+    "cooking_timeout_minutes": 25,  # 出餐超时: 25分钟（海鲜标准）
+    "cooking_backlog_count": 15,  # 堆积订单数
+    "low_table_usage_pct": 30,  # 低利用率阈值
+    "high_wait_minutes": 20,  # 等位超时
 }
 
 
@@ -125,7 +126,7 @@ async def check_table_cruise(
     alerts: List[Dict[str, Any]] = []
     now = datetime.utcnow()
 
-    for table in (tables or []):
+    for table in tables or []:
         table_id = table.get("table_id", "")
         status = table.get("status", "")
         occupied_since = table.get("occupied_since")
@@ -137,15 +138,17 @@ async def check_table_cruise(
                 occupied_since = datetime.fromisoformat(occupied_since)
             elapsed = (now - occupied_since).total_seconds() / 60
             if elapsed > thr["table_overtime_minutes"]:
-                alerts.append({
-                    "alert_type": "table_overtime",
-                    "level": "warning",
-                    "table_id": table_id,
-                    "elapsed_min": round(elapsed, 1),
-                    "threshold_min": thr["table_overtime_minutes"],
-                    "message": f"桌台 {table_id} 已用餐 {round(elapsed)}分钟，超出 {thr['table_overtime_minutes']}分钟阈值",
-                    "detected_at": now.isoformat(),
-                })
+                alerts.append(
+                    {
+                        "alert_type": "table_overtime",
+                        "level": "warning",
+                        "table_id": table_id,
+                        "elapsed_min": round(elapsed, 1),
+                        "threshold_min": thr["table_overtime_minutes"],
+                        "message": f"桌台 {table_id} 已用餐 {round(elapsed)}分钟，超出 {thr['table_overtime_minutes']}分钟阈值",
+                        "detected_at": now.isoformat(),
+                    }
+                )
 
         # 空桌未清台
         if status == "needs_cleaning" and cleared_at:
@@ -153,15 +156,17 @@ async def check_table_cruise(
                 cleared_at = datetime.fromisoformat(cleared_at)
             idle = (now - cleared_at).total_seconds() / 60
             if idle > thr["table_unclean_minutes"]:
-                alerts.append({
-                    "alert_type": "table_uncleaned",
-                    "level": "warning",
-                    "table_id": table_id,
-                    "idle_min": round(idle, 1),
-                    "threshold_min": thr["table_unclean_minutes"],
-                    "message": f"桌台 {table_id} 已空闲 {round(idle)}分钟未清台",
-                    "detected_at": now.isoformat(),
-                })
+                alerts.append(
+                    {
+                        "alert_type": "table_uncleaned",
+                        "level": "warning",
+                        "table_id": table_id,
+                        "idle_min": round(idle, 1),
+                        "threshold_min": thr["table_unclean_minutes"],
+                        "message": f"桌台 {table_id} 已空闲 {round(idle)}分钟未清台",
+                        "detected_at": now.isoformat(),
+                    }
+                )
 
     if alerts:
         log.warning(
@@ -205,14 +210,16 @@ async def check_cooking_cruise(
 
     # 出餐堆积
     if len(pending_orders) > thr["cooking_backlog_count"]:
-        alerts.append({
-            "alert_type": "cooking_backlog",
-            "level": "critical",
-            "pending_count": len(pending_orders),
-            "threshold": thr["cooking_backlog_count"],
-            "message": f"待出餐订单 {len(pending_orders)} 单，超出 {thr['cooking_backlog_count']} 单阈值",
-            "detected_at": now.isoformat(),
-        })
+        alerts.append(
+            {
+                "alert_type": "cooking_backlog",
+                "level": "critical",
+                "pending_count": len(pending_orders),
+                "threshold": thr["cooking_backlog_count"],
+                "message": f"待出餐订单 {len(pending_orders)} 单，超出 {thr['cooking_backlog_count']} 单阈值",
+                "detected_at": now.isoformat(),
+            }
+        )
 
     # 逐单检测超时
     for order in pending_orders:
@@ -223,15 +230,17 @@ async def check_cooking_cruise(
                 created_at = datetime.fromisoformat(created_at)
             elapsed = (now - created_at).total_seconds() / 60
             if elapsed > thr["cooking_timeout_minutes"]:
-                alerts.append({
-                    "alert_type": "cooking_timeout",
-                    "level": "warning",
-                    "order_id": order_id,
-                    "elapsed_min": round(elapsed, 1),
-                    "threshold_min": thr["cooking_timeout_minutes"],
-                    "message": f"订单 {order_id} 已等待 {round(elapsed)}分钟出餐",
-                    "detected_at": now.isoformat(),
-                })
+                alerts.append(
+                    {
+                        "alert_type": "cooking_timeout",
+                        "level": "warning",
+                        "order_id": order_id,
+                        "elapsed_min": round(elapsed, 1),
+                        "threshold_min": thr["cooking_timeout_minutes"],
+                        "message": f"订单 {order_id} 已等待 {round(elapsed)}分钟出餐",
+                        "detected_at": now.isoformat(),
+                    }
+                )
 
     if alerts:
         log.warning(
@@ -269,33 +278,37 @@ async def check_stockout_cruise(
     alerts: List[Dict[str, Any]] = []
     now = datetime.utcnow()
 
-    for dish in (dishes or []):
+    for dish in dishes or []:
         dish_id = dish.get("dish_id", "")
         dish_name = dish.get("name", "")
         remaining = dish.get("remaining_qty", 0)
         daily_avg = dish.get("daily_avg_sales", 0)
 
         if remaining <= 0:
-            alerts.append({
-                "alert_type": "stockout_new",
-                "level": "critical",
-                "dish_id": dish_id,
-                "dish_name": dish_name,
-                "remaining_qty": remaining,
-                "message": f"菜品 {dish_name} 已沽清",
-                "detected_at": now.isoformat(),
-            })
+            alerts.append(
+                {
+                    "alert_type": "stockout_new",
+                    "level": "critical",
+                    "dish_id": dish_id,
+                    "dish_name": dish_name,
+                    "remaining_qty": remaining,
+                    "message": f"菜品 {dish_name} 已沽清",
+                    "detected_at": now.isoformat(),
+                }
+            )
         elif daily_avg > 0 and remaining < daily_avg * 0.3:
-            alerts.append({
-                "alert_type": "stockout_risk",
-                "level": "warning",
-                "dish_id": dish_id,
-                "dish_name": dish_name,
-                "remaining_qty": remaining,
-                "daily_avg_sales": daily_avg,
-                "message": f"菜品 {dish_name} 余量 {remaining}，低于日均销量30%",
-                "detected_at": now.isoformat(),
-            })
+            alerts.append(
+                {
+                    "alert_type": "stockout_risk",
+                    "level": "warning",
+                    "dish_id": dish_id,
+                    "dish_name": dish_name,
+                    "remaining_qty": remaining,
+                    "daily_avg_sales": daily_avg,
+                    "message": f"菜品 {dish_name} 余量 {remaining}，低于日均销量30%",
+                    "detected_at": now.isoformat(),
+                }
+            )
 
     if alerts:
         log.warning(
@@ -336,14 +349,16 @@ async def record_patrol(
 
     enriched_findings = []
     for idx, finding in enumerate(findings):
-        enriched_findings.append({
-            "finding_id": f"{patrol_id}_f{idx:03d}",
-            "type": finding.get("type", "observation"),
-            "description": finding.get("description", ""),
-            "severity": finding.get("severity", "info"),
-            "location": finding.get("location", ""),
-            "recorded_at": datetime.utcnow().isoformat(),
-        })
+        enriched_findings.append(
+            {
+                "finding_id": f"{patrol_id}_f{idx:03d}",
+                "type": finding.get("type", "observation"),
+                "description": finding.get("description", ""),
+                "severity": finding.get("severity", "info"),
+                "location": finding.get("location", ""),
+                "recorded_at": datetime.utcnow().isoformat(),
+            }
+        )
 
     record = {
         "patrol_id": patrol_id,
@@ -364,16 +379,16 @@ async def record_patrol(
         findings_count=len(enriched_findings),
     )
 
-    issues_count = sum(
-        1 for f in enriched_findings if f.get("severity") in ("warning", "critical")
+    issues_count = sum(1 for f in enriched_findings if f.get("severity") in ("warning", "critical"))
+    asyncio.create_task(
+        UniversalPublisher.publish(
+            event_type=OpsEventType.INSPECTION_COMPLETED,
+            tenant_id=uuid.UUID(tenant_id),
+            store_id=uuid.UUID(store_id),
+            entity_id=None,
+            event_data={"inspection_id": patrol_id, "score": None, "issues_count": issues_count},
+            source_service="tx-ops",
+        )
     )
-    asyncio.create_task(UniversalPublisher.publish(
-        event_type=OpsEventType.INSPECTION_COMPLETED,
-        tenant_id=uuid.UUID(tenant_id),
-        store_id=uuid.UUID(store_id),
-        entity_id=None,
-        event_data={"inspection_id": patrol_id, "score": None, "issues_count": issues_count},
-        source_service="tx-ops",
-    ))
 
     return record

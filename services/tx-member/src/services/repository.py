@@ -2,6 +2,7 @@
 
 封装 Customer 的 CRUD + RFM 分析查询 + 企微 SCRM 绑定操作。
 """
+
 import uuid
 from datetime import datetime, timezone
 from typing import Optional
@@ -204,6 +205,7 @@ class CustomerRepository:
 # ─────────────────────────────────────────────────────────────────
 # 企微 SCRM 绑定 Repository
 # ─────────────────────────────────────────────────────────────────
+
 
 class WecomRepository:
     """企微客户联系绑定操作 — 封装 wecom_* 字段的读写"""
@@ -417,9 +419,7 @@ class WecomRepository:
         rows = result.all()
 
         # 构建 external_userid → row 的映射
-        found_map: dict[str, object] = {
-            row.wecom_external_userid: row for row in rows
-        }
+        found_map: dict[str, object] = {row.wecom_external_userid: row for row in rows}
 
         items: list[dict] = []
         for eid in query_ids:
@@ -427,18 +427,18 @@ class WecomRepository:
             if row is None:
                 items.append({"external_userid": eid, "found": False})
             else:
-                items.append({
-                    "external_userid": eid,
-                    "found": True,
-                    "customer_id": str(row.id),
-                    "display_name": row.display_name,
-                    "rfm_level": row.rfm_level,
-                    "total_order_amount_fen": row.total_order_amount_fen,
-                    "last_order_at": (
-                        row.last_order_at.isoformat() if row.last_order_at else None
-                    ),
-                    "risk_score": row.risk_score,
-                })
+                items.append(
+                    {
+                        "external_userid": eid,
+                        "found": True,
+                        "customer_id": str(row.id),
+                        "display_name": row.display_name,
+                        "rfm_level": row.rfm_level,
+                        "total_order_amount_fen": row.total_order_amount_fen,
+                        "last_order_at": (row.last_order_at.isoformat() if row.last_order_at else None),
+                        "risk_score": row.risk_score,
+                    }
+                )
 
         log.info("wecom_batch_query_ok", found=len(found_map), total=len(query_ids))
         return items
@@ -473,9 +473,7 @@ class WecomRepository:
             "is_bound": row.wecom_external_userid is not None,
             "external_userid": row.wecom_external_userid,
             "follow_user": row.wecom_follow_user,
-            "follow_at": (
-                row.wecom_follow_at.isoformat() if row.wecom_follow_at else None
-            ),
+            "follow_at": (row.wecom_follow_at.isoformat() if row.wecom_follow_at else None),
             "remark": row.wecom_remark,
         }
 

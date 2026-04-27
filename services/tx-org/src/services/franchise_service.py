@@ -333,8 +333,7 @@ class FranchiseService:
 
         if set_clauses and db is not None:
             await db.execute(
-                f"UPDATE franchisees SET {', '.join(set_clauses)} "
-                f"WHERE id = :franchisee_id AND tenant_id = :tenant_id",
+                f"UPDATE franchisees SET {', '.join(set_clauses)} WHERE id = :franchisee_id AND tenant_id = :tenant_id",
                 params,
             )
 
@@ -503,6 +502,7 @@ class FranchiseService:
         """月度特许权费用汇总报表。"""
         bill_month = f"{year:04d}-{month:02d}"
         import calendar as _cal
+
         period_start = date(year, month, 1)
         period_end = date(year, month, _cal.monthrange(year, month)[1])
 
@@ -510,8 +510,7 @@ class FranchiseService:
         total_franchisees = 0
         if db is not None:
             row = await db.fetch_one(
-                "SELECT COUNT(*) AS cnt FROM franchisees "
-                "WHERE tenant_id = :tenant_id AND status = 'active'",
+                "SELECT COUNT(*) AS cnt FROM franchisees WHERE tenant_id = :tenant_id AND status = 'active'",
                 {"tenant_id": str(tenant_id)},
             )
             total_franchisees = int(row["cnt"]) if row else 0
@@ -604,6 +603,7 @@ class FranchiseService:
             params["status"] = status
         if year and month:
             import calendar as _cal
+
             params["period_start"] = date(year, month, 1)
             params["period_end"] = date(year, month, _cal.monthrange(year, month)[1])
             conditions.append("rb.period_start = :period_start AND rb.period_end = :period_end")
@@ -710,6 +710,7 @@ class FranchiseService:
         返回已标记条数。
         """
         from datetime import date as _date
+
         cutoff = _date.today()
         return await RoyaltyCalculator.mark_overdue_bills(tenant_id, cutoff, db)
 

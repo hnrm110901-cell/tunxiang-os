@@ -10,6 +10,7 @@ AB测试集成：活动若设置了 ab_test_id，在发送内容前自动通过 
 金额单位: 分(fen)
 存储后端: PostgreSQL（通过 CampaignRepository，v097 迁移）
 """
+
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Optional
@@ -31,6 +32,7 @@ def _get_approval_service():
     global _approval_service_instance
     if _approval_service_instance is None:
         from .approval_service import ApprovalService  # noqa: PLC0415
+
         _approval_service_instance = ApprovalService()
     return _approval_service_instance
 
@@ -39,18 +41,37 @@ def _get_approval_service():
 # CampaignEngine
 # ---------------------------------------------------------------------------
 
+
 class CampaignEngine:
     """营销活动引擎 — 活动全生命周期管理"""
 
     CAMPAIGN_TYPES = [
-        "stored_value_gift", "register_welcome", "referral", "scan_coupon",
-        "spend_reward", "cumulative_amount", "cumulative_count", "recharge_coupon",
-        "fixed_dish", "precision_marketing", "paid_coupon_pack", "points_exchange",
-        "paid_privilege", "birthday", "churn_recovery", "upgrade_gift",
-        "profile_reward", "coupon_return", "sign_in", "lottery",
-        "red_packet", "report_draw",
-        "group_buy", "stamp_card",
-        "consumption_cashback", "nth_item_discount",
+        "stored_value_gift",
+        "register_welcome",
+        "referral",
+        "scan_coupon",
+        "spend_reward",
+        "cumulative_amount",
+        "cumulative_count",
+        "recharge_coupon",
+        "fixed_dish",
+        "precision_marketing",
+        "paid_coupon_pack",
+        "points_exchange",
+        "paid_privilege",
+        "birthday",
+        "churn_recovery",
+        "upgrade_gift",
+        "profile_reward",
+        "coupon_return",
+        "sign_in",
+        "lottery",
+        "red_packet",
+        "report_draw",
+        "group_buy",
+        "stamp_card",
+        "consumption_cashback",
+        "nth_item_discount",
     ]
 
     async def create_campaign(
@@ -59,19 +80,75 @@ class CampaignEngine:
         config: dict,
         tenant_id: str,
         db: Any = None,
+        operator_id: str = "",
+        operator_name: str = "",
     ) -> dict:
-        """创建营销活动"""
+        """创建营销活动 — 创建后自动检查是否需要审批
+
+        如果匹配到审批流模板，status 设为 pending_approval 并创建审批单。
+        如果无需审批，status 保持 draft。
+        """
         if campaign_type not in self.CAMPAIGN_TYPES:
             return {"error": f"不支持的活动类型: {campaign_type}"}
         if db is None:
             return {"error": "db 参数不能为空（v097 已切换到 DB 模式）"}
 
         repo = CampaignRepository(db, tenant_id)
-        return await repo.create_campaign(campaign_type, config)
+        result = await repo.create_campaign(campaign_type, config)
+        if "error" in result:
+            return result
 
-    async def start_campaign(
-        self, campaign_id: str, tenant_id: str, db: Any = None
-    ) -> dict:
+        campaign_id = result.get("campaign_id", "")
+
+        # 自动检查审批流触发条件
+        if operator_id and campaign_id:
+            approval_svc = _get_approval_service()
+            try:
+                trigger_result = await approval_svc.check_trigger(
+                    tenant_id=uuid.UUID(tenant_id),
+                    object_type="campaign",
+                    object_data={
+                        "max_discount_fen": config.get("max_discount_fen", 0),
+                        "target_count": config.get("target_count", 0),
+                        **{k: v for k, v in config.items() if k not in ("max_discount_fen", "target_count")},
+                    },
+                    db=db,
+                )
+                if trigger_result.get("needs_approval") and trigger_result.get("workflow_id"):
+                    # 将活动状态改为 pending_approval
+                    await repo.transition_status(campaign_id, "pending_approval")
+                    # 创建审批单
+                    request = await approval_svc.create_request(
+                        workflow_id=trigger_result["workflow_id"],
+                        object_type="campaign",
+                        object_id=campaign_id,
+                        object_summary={
+                            "name": config.get("name", ""),
+                            "type": campaign_type,
+                        },
+                        requester_id=uuid.UUID(operator_id),
+                        requester_name=operator_name or "未知",
+                        tenant_id=uuid.UUID(tenant_id),
+                        db=db,
+                    )
+                    result["status"] = "pending_approval"
+                    result["approval_request_id"] = str(request.id)
+                    log.info(
+                        "campaign.create_pending_approval",
+                        campaign_id=campaign_id,
+                        request_id=str(request.id),
+                        tenant_id=tenant_id,
+                    )
+            except (ValueError, TypeError) as exc:
+                log.warning(
+                    "campaign.create_approval_check_failed",
+                    campaign_id=campaign_id,
+                    error=str(exc),
+                )
+
+        return result
+
+    async def start_campaign(self, campaign_id: str, tenant_id: str, db: Any = None) -> dict:
         """启动活动 (draft -> active)"""
         if db is None:
             return {"error": "db 参数不能为空"}
@@ -104,6 +181,7 @@ class CampaignEngine:
 
         current = campaign["status"]
         from .campaign_repository import _VALID_TRANSITIONS
+
         if "active" not in _VALID_TRANSITIONS.get(current, []):
             return {"error": f"活动状态 {current} 不允许激活"}
 
@@ -123,8 +201,7 @@ class CampaignEngine:
                 db=db,
             )
         except (ValueError, TypeError) as exc:
-            log.warning("campaign.activate_approval_check_failed",
-                        campaign_id=campaign_id, error=str(exc))
+            log.warning("campaign.activate_approval_check_failed", campaign_id=campaign_id, error=str(exc))
             needs_approval = False
             workflow_id = None
 
@@ -143,9 +220,12 @@ class CampaignEngine:
                     tenant_id=tenant_uuid,
                     db=db,
                 )
-                log.info("campaign.activation_pending_approval",
-                         campaign_id=campaign_id, request_id=str(request.id),
-                         tenant_id=tenant_id)
+                log.info(
+                    "campaign.activation_pending_approval",
+                    campaign_id=campaign_id,
+                    request_id=str(request.id),
+                    tenant_id=tenant_id,
+                )
                 return {
                     "status": "pending_approval",
                     "campaign_id": campaign_id,
@@ -153,8 +233,7 @@ class CampaignEngine:
                     "message": "活动已提交审批，等待审批通过后自动激活",
                 }
             except (ValueError, TypeError) as exc:
-                log.error("campaign.activate_create_request_failed",
-                          campaign_id=campaign_id, error=str(exc))
+                log.error("campaign.activate_create_request_failed", campaign_id=campaign_id, error=str(exc))
                 log.warning("campaign.activate_fallback_direct", campaign_id=campaign_id)
 
         return await self._do_activate(campaign_id, tenant_id, db)
@@ -171,9 +250,7 @@ class CampaignEngine:
         log.info("campaign.activated", campaign_id=campaign_id, tenant_id=tenant_id)
         return result
 
-    async def pause_campaign(
-        self, campaign_id: str, tenant_id: str, db: Any = None
-    ) -> dict:
+    async def pause_campaign(self, campaign_id: str, tenant_id: str, db: Any = None) -> dict:
         """暂停活动 (active -> paused)"""
         if db is None:
             return {"error": "db 参数不能为空"}
@@ -187,9 +264,7 @@ class CampaignEngine:
         log.info("campaign.paused", campaign_id=campaign_id, tenant_id=tenant_id)
         return result
 
-    async def end_campaign(
-        self, campaign_id: str, tenant_id: str, db: Any = None
-    ) -> dict:
+    async def end_campaign(self, campaign_id: str, tenant_id: str, db: Any = None) -> dict:
         """结束活动 (active/paused -> ended)"""
         if db is None:
             return {"error": "db 参数不能为空"}
@@ -266,6 +341,7 @@ class CampaignEngine:
         if ab_test_id and db is not None:
             try:
                 from .ab_test_service import ABTestService
+
                 ab_svc = ABTestService()
                 customer_uuid = uuid.UUID(str(customer_id))
                 tenant_uuid = uuid.UUID(str(tenant_id))
@@ -282,13 +358,21 @@ class CampaignEngine:
                     if v.get("variant") == variant_used:
                         config = {**config, **v.get("content", {})}
                         break
-                log.info("campaign.ab_test_variant_selected",
-                         campaign_id=campaign_id, ab_test_id=ab_test_id,
-                         customer_id=str(customer_id), variant=variant_used)
+                log.info(
+                    "campaign.ab_test_variant_selected",
+                    campaign_id=campaign_id,
+                    ab_test_id=ab_test_id,
+                    customer_id=str(customer_id),
+                    variant=variant_used,
+                )
             except (ValueError, KeyError) as exc:
-                log.warning("campaign.ab_test_assign_failed",
-                            campaign_id=campaign_id, ab_test_id=ab_test_id,
-                            customer_id=str(customer_id), error=str(exc))
+                log.warning(
+                    "campaign.ab_test_assign_failed",
+                    campaign_id=campaign_id,
+                    ab_test_id=ab_test_id,
+                    customer_id=str(customer_id),
+                    error=str(exc),
+                )
 
         reward_config = config.get("reward", {})
         reward_engine = RewardEngine()
@@ -304,9 +388,13 @@ class CampaignEngine:
             reward_cost_fen=reward_cost,
         )
 
-        log.info("campaign.reward_triggered", campaign_id=campaign_id,
-                 customer_id=customer_id,
-                 reward_type=reward_config.get("type"), tenant_id=tenant_id)
+        log.info(
+            "campaign.reward_triggered",
+            campaign_id=campaign_id,
+            customer_id=customer_id,
+            reward_type=reward_config.get("type"),
+            tenant_id=tenant_id,
+        )
         return {
             "rewarded": True,
             "campaign_id": campaign_id,
@@ -315,9 +403,7 @@ class CampaignEngine:
             "ab_variant": variant_used,
         }
 
-    async def get_campaign_analytics(
-        self, campaign_id: str, tenant_id: str, db: Any = None
-    ) -> dict:
+    async def get_campaign_analytics(self, campaign_id: str, tenant_id: str, db: Any = None) -> dict:
         """获取活动效果分析"""
         if db is None:
             return {"error": "db 参数不能为空"}
@@ -332,15 +418,14 @@ class CampaignEngine:
 # TriggerEngine — 触发引擎
 # ---------------------------------------------------------------------------
 
+
 class TriggerEngine:
     """触发引擎: 消费/注册/生日/时间/累计"""
 
     def __init__(self) -> None:
         self._campaign_engine = CampaignEngine()
 
-    async def on_consume(
-        self, order: dict, tenant_id: str, db: Any = None
-    ) -> list[dict]:
+    async def on_consume(self, order: dict, tenant_id: str, db: Any = None) -> list[dict]:
         """消费触发"""
         results: list[dict] = []
         customer_id = order.get("customer_id", "")
@@ -349,9 +434,13 @@ class TriggerEngine:
 
         repo = CampaignRepository(db, tenant_id)
         consume_types = {
-            "spend_reward", "cumulative_amount", "cumulative_count",
-            "coupon_return", "fixed_dish",
-            "consumption_cashback", "nth_item_discount",
+            "spend_reward",
+            "cumulative_amount",
+            "cumulative_count",
+            "coupon_return",
+            "fixed_dish",
+            "consumption_cashback",
+            "nth_item_discount",
         }
         active_campaigns = await repo.get_active_by_types(consume_types)
 
@@ -386,19 +475,20 @@ class TriggerEngine:
 
             if triggered:
                 result = await self._campaign_engine.trigger_reward(
-                    customer_id, campaign["campaign_id"],
+                    customer_id,
+                    campaign["campaign_id"],
                     {"type": "consume", "order": order},
-                    tenant_id, db,
+                    tenant_id,
+                    db,
                 )
                 results.append(result)
-                log.info("trigger.consume", campaign_id=campaign["campaign_id"],
-                         customer_id=customer_id, tenant_id=tenant_id)
+                log.info(
+                    "trigger.consume", campaign_id=campaign["campaign_id"], customer_id=customer_id, tenant_id=tenant_id
+                )
 
         return results
 
-    async def on_register(
-        self, customer: dict, tenant_id: str, db: Any = None
-    ) -> list[dict]:
+    async def on_register(self, customer: dict, tenant_id: str, db: Any = None) -> list[dict]:
         """注册触发"""
         results: list[dict] = []
         customer_id = customer.get("customer_id", "")
@@ -410,19 +500,20 @@ class TriggerEngine:
 
         for campaign in active_campaigns:
             result = await self._campaign_engine.trigger_reward(
-                customer_id, campaign["campaign_id"],
+                customer_id,
+                campaign["campaign_id"],
                 {"type": "register", "customer": customer},
-                tenant_id, db,
+                tenant_id,
+                db,
             )
             results.append(result)
-            log.info("trigger.register", campaign_id=campaign["campaign_id"],
-                     customer_id=customer_id, tenant_id=tenant_id)
+            log.info(
+                "trigger.register", campaign_id=campaign["campaign_id"], customer_id=customer_id, tenant_id=tenant_id
+            )
 
         return results
 
-    async def on_birthday(
-        self, customer: dict, tenant_id: str, db: Any = None
-    ) -> list[dict]:
+    async def on_birthday(self, customer: dict, tenant_id: str, db: Any = None) -> list[dict]:
         """生日触发"""
         results: list[dict] = []
         customer_id = customer.get("customer_id", "")
@@ -434,19 +525,20 @@ class TriggerEngine:
 
         for campaign in active_campaigns:
             result = await self._campaign_engine.trigger_reward(
-                customer_id, campaign["campaign_id"],
+                customer_id,
+                campaign["campaign_id"],
                 {"type": "birthday", "customer": customer},
-                tenant_id, db,
+                tenant_id,
+                db,
             )
             results.append(result)
-            log.info("trigger.birthday", campaign_id=campaign["campaign_id"],
-                     customer_id=customer_id, tenant_id=tenant_id)
+            log.info(
+                "trigger.birthday", campaign_id=campaign["campaign_id"], customer_id=customer_id, tenant_id=tenant_id
+            )
 
         return results
 
-    async def on_schedule(
-        self, tenant_id: str, db: Any = None
-    ) -> list[dict]:
+    async def on_schedule(self, tenant_id: str, db: Any = None) -> list[dict]:
         """定时触发 — precision_marketing"""
         results: list[dict] = []
         if db is None:
@@ -465,19 +557,31 @@ class TriggerEngine:
             schedule_type = schedule.get("type", "")
 
             should_run = False
-            if schedule_type == "weekly" and weekday in schedule.get("weekdays", []) or schedule_type == "monthly" and day_of_month in schedule.get("days_of_month", []) or schedule_type == "daily":
+            if (
+                schedule_type == "weekly"
+                and weekday in schedule.get("weekdays", [])
+                or schedule_type == "monthly"
+                and day_of_month in schedule.get("days_of_month", [])
+                or schedule_type == "daily"
+            ):
                 should_run = True
 
             if should_run:
-                results.append({
-                    "campaign_id": campaign["campaign_id"],
-                    "campaign_type": "precision_marketing",
-                    "action": "send_to_segments",
-                    "target_segments": campaign.get("target_segments", []),
-                    "triggered_at": now.isoformat(),
-                })
-                log.info("trigger.schedule", campaign_id=campaign["campaign_id"],
-                         schedule_type=schedule_type, tenant_id=tenant_id)
+                results.append(
+                    {
+                        "campaign_id": campaign["campaign_id"],
+                        "campaign_type": "precision_marketing",
+                        "action": "send_to_segments",
+                        "target_segments": campaign.get("target_segments", []),
+                        "triggered_at": now.isoformat(),
+                    }
+                )
+                log.info(
+                    "trigger.schedule",
+                    campaign_id=campaign["campaign_id"],
+                    schedule_type=schedule_type,
+                    tenant_id=tenant_id,
+                )
 
         return results
 
@@ -485,6 +589,7 @@ class TriggerEngine:
 # ---------------------------------------------------------------------------
 # RewardEngine — 奖励引擎（无状态，不依赖 DB）
 # ---------------------------------------------------------------------------
+
 
 class RewardEngine:
     """奖励引擎: 券/积分/储值/实物（奖励发放逻辑保持无状态）"""
@@ -532,8 +637,9 @@ class RewardEngine:
             reward["days"] = reward_config.get("days", 30)
             reward["cost_fen"] = reward_config.get("cost_fen", 0)
 
-        log.info("reward.granted", reward_id=reward_id, customer_id=customer_id,
-                 reward_type=reward_type, tenant_id=tenant_id)
+        log.info(
+            "reward.granted", reward_id=reward_id, customer_id=customer_id, reward_type=reward_type, tenant_id=tenant_id
+        )
         return reward
 
 
@@ -541,6 +647,7 @@ class RewardEngine:
 # 模块级便捷函数（供 campaign_routes.py 的 get_campaign / list_campaigns 调用）
 # 注意：DB 化后这两个函数需要 db + tenant_id 参数，路由层已更新为使用 engine 方法
 # ---------------------------------------------------------------------------
+
 
 def clear_all_campaigns() -> None:
     """已废弃：v097 DB 化后此函数无效（仅保留供旧测试引用）"""

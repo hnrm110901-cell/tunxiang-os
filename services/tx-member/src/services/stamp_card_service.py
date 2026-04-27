@@ -3,6 +3,7 @@
 所有金额单位：分(fen)。
 自动盖章：订单完成事件 → auto_stamp() → 检查活跃集点卡 → 盖章 → 集满发奖。
 """
+
 from __future__ import annotations
 
 import uuid
@@ -30,6 +31,7 @@ async def _set_tenant(db: AsyncSession, tenant_id: str) -> None:
 # ═══════════════════════════════════════════════════════════════
 # 1. 集点卡模板 CRUD
 # ═══════════════════════════════════════════════════════════════
+
 
 async def create_template(
     name: str,
@@ -65,10 +67,14 @@ async def create_template(
                  :now, :now)
         """),
         {
-            "id": template_id, "tid": tid, "name": name,
-            "target": target_stamps, "rtype": reward_type,
+            "id": template_id,
+            "tid": tid,
+            "name": name,
+            "target": target_stamps,
+            "rtype": reward_type,
             "rconfig": json.dumps(reward_config),
-            "vdays": validity_days, "min_order": min_order_fen,
+            "vdays": validity_days,
+            "min_order": min_order_fen,
             "stores": json.dumps(applicable_stores),
             "now": now,
         },
@@ -86,7 +92,9 @@ async def create_template(
 
 
 async def list_templates(
-    tenant_id: str, db: AsyncSession, status: Optional[str] = None,
+    tenant_id: str,
+    db: AsyncSession,
+    status: Optional[str] = None,
 ) -> list[dict[str, Any]]:
     """列出集点卡模板"""
     await _set_tenant(db, tenant_id)
@@ -123,6 +131,7 @@ async def list_templates(
 # ═══════════════════════════════════════════════════════════════
 # 2. 自动盖章（核心链路）
 # ═══════════════════════════════════════════════════════════════
+
 
 async def auto_stamp(
     customer_id: str,
@@ -177,6 +186,7 @@ async def auto_stamp(
         stores = inst.applicable_stores if hasattr(inst, "applicable_stores") else []
         if isinstance(stores, str):
             import json
+
             stores = json.loads(stores)
         if stores and store_id not in [str(s) for s in stores]:
             continue
@@ -196,11 +206,13 @@ async def auto_stamp(
                     (:id, :tid, :iid, :oid, :sid, :sno, :now)
             """),
             {
-                "id": uuid.uuid4(), "tid": tid,
+                "id": uuid.uuid4(),
+                "tid": tid,
                 "iid": instance_id,
                 "oid": uuid.UUID(order_id),
                 "sid": uuid.UUID(store_id),
-                "sno": stamp_no, "now": now,
+                "sno": stamp_no,
+                "now": now,
             },
         )
 
@@ -225,24 +237,30 @@ async def auto_stamp(
                 {"iid": instance_id, "tid": tid},
             )
 
-        stamped_results.append({
-            "instance_id": str(instance_id),
-            "stamp_count": new_count,
-            "target_stamps": target,
-            "completed": completed,
-        })
+        stamped_results.append(
+            {
+                "instance_id": str(instance_id),
+                "stamp_count": new_count,
+                "target_stamps": target,
+                "completed": completed,
+            }
+        )
 
     await db.flush()
     if stamped_results:
         logger.info(
             "stamp_card.auto_stamped",
-            customer_id=customer_id, results=len(stamped_results),
+            customer_id=customer_id,
+            results=len(stamped_results),
         )
     return {"stamped": bool(stamped_results), "results": stamped_results}
 
 
 async def _auto_issue_card(
-    uid: uuid.UUID, tid: uuid.UUID, now: datetime, db: AsyncSession,
+    uid: uuid.UUID,
+    tid: uuid.UUID,
+    now: datetime,
+    db: AsyncSession,
 ) -> Optional[Any]:
     """自动为用户发放活跃模板的新集点卡"""
     row = await db.execute(
@@ -283,9 +301,13 @@ async def _auto_issue_card(
                 (:id, :tid, :tmpl, :uid, 0, :target, 'active', :exp, :now, :now)
         """),
         {
-            "id": instance_id, "tid": tid, "tmpl": template.id,
-            "uid": uid, "target": template.target_stamps,
-            "exp": expired_at, "now": now,
+            "id": instance_id,
+            "tid": tid,
+            "tmpl": template.id,
+            "uid": uid,
+            "target": template.target_stamps,
+            "exp": expired_at,
+            "now": now,
         },
     )
     await db.execute(
@@ -305,8 +327,11 @@ async def _auto_issue_card(
 # 3. 用户查询
 # ═══════════════════════════════════════════════════════════════
 
+
 async def get_my_cards(
-    customer_id: str, tenant_id: str, db: AsyncSession,
+    customer_id: str,
+    tenant_id: str,
+    db: AsyncSession,
 ) -> list[dict[str, Any]]:
     """查询用户的集点卡列表（含进度）"""
     await _set_tenant(db, tenant_id)
@@ -342,7 +367,10 @@ async def get_my_cards(
 
 
 async def redeem_card(
-    instance_id: str, customer_id: str, tenant_id: str, db: AsyncSession,
+    instance_id: str,
+    customer_id: str,
+    tenant_id: str,
+    db: AsyncSession,
 ) -> dict[str, Any]:
     """手动兑换集满奖励（备用：auto_stamp 已自动发放）"""
     await _set_tenant(db, tenant_id)
@@ -368,6 +396,7 @@ async def redeem_card(
         raise ValueError("reward_already_issued")
 
     import json
+
     reward = inst.reward_config
     if isinstance(reward, str):
         reward = json.loads(reward)

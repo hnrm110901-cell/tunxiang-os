@@ -11,6 +11,7 @@
 
 所有金额单位：分（fen）。
 """
+
 from __future__ import annotations
 
 import uuid
@@ -103,18 +104,20 @@ class ApprovalService:
                     f"原因: {reason}"
                 ),
                 "sid": str(store_uuid) if store_uuid else None,
-                "extra": json.dumps({
-                    "approval_id": approval_id,
-                    "order_id": order_id,
-                    "status": "pending",
-                    "discount_info": discount_info,
-                    "reason": reason,
-                    "requester_id": requester_id,
-                    "approver_id": None,
-                    "approved_at": None,
-                    "rejected_at": None,
-                    "reject_reason": None,
-                }),
+                "extra": json.dumps(
+                    {
+                        "approval_id": approval_id,
+                        "order_id": order_id,
+                        "status": "pending",
+                        "discount_info": discount_info,
+                        "reason": reason,
+                        "requester_id": requester_id,
+                        "approver_id": None,
+                        "approved_at": None,
+                        "rejected_at": None,
+                        "reject_reason": None,
+                    }
+                ),
             },
         )
 
@@ -173,16 +176,12 @@ class ApprovalService:
 
         extra = record["extra_data"]
         if extra.get("status") != "pending":
-            raise ValueError(
-                f"审批单 {approval_id} 当前状态为 {extra.get('status')}，无法批准"
-            )
+            raise ValueError(f"审批单 {approval_id} 当前状态为 {extra.get('status')}，无法批准")
 
         # 检查审批是否已过期
         await self._check_and_expire(record, extra)
         if extra.get("status") == "expired":
-            raise ValueError(
-                f"审批单 {approval_id} 已超时（{self.APPROVAL_TIMEOUT_MIN}分钟），自动过期"
-            )
+            raise ValueError(f"审批单 {approval_id} 已超时（{self.APPROVAL_TIMEOUT_MIN}分钟），自动过期")
 
         now = datetime.now(timezone.utc).isoformat()
         extra["status"] = "approved"
@@ -259,16 +258,12 @@ class ApprovalService:
 
         extra = record["extra_data"]
         if extra.get("status") != "pending":
-            raise ValueError(
-                f"审批单 {approval_id} 当前状态为 {extra.get('status')}，无法拒绝"
-            )
+            raise ValueError(f"审批单 {approval_id} 当前状态为 {extra.get('status')}，无法拒绝")
 
         # 检查审批是否已过期
         await self._check_and_expire(record, extra)
         if extra.get("status") == "expired":
-            raise ValueError(
-                f"审批单 {approval_id} 已超时（{self.APPROVAL_TIMEOUT_MIN}分钟），自动过期"
-            )
+            raise ValueError(f"审批单 {approval_id} 已超时（{self.APPROVAL_TIMEOUT_MIN}分钟），自动过期")
 
         now = datetime.now(timezone.utc).isoformat()
         extra["status"] = "rejected"
@@ -368,18 +363,20 @@ class ApprovalService:
         items = []
         for row in rows:
             extra = row[4] if isinstance(row[4], dict) else json_lib.loads(row[4] or "{}")
-            items.append({
-                "id": str(row[0]),
-                "approval_id": extra.get("approval_id"),
-                "order_id": extra.get("order_id"),
-                "status": extra.get("status"),
-                "discount_info": extra.get("discount_info"),
-                "reason": extra.get("reason"),
-                "requester_id": extra.get("requester_id"),
-                "approver_id": extra.get("approver_id"),
-                "store_id": str(row[3]) if row[3] else None,
-                "created_at": row[5].isoformat() if row[5] else None,
-            })
+            items.append(
+                {
+                    "id": str(row[0]),
+                    "approval_id": extra.get("approval_id"),
+                    "order_id": extra.get("order_id"),
+                    "status": extra.get("status"),
+                    "discount_info": extra.get("discount_info"),
+                    "reason": extra.get("reason"),
+                    "requester_id": extra.get("requester_id"),
+                    "approver_id": extra.get("approver_id"),
+                    "store_id": str(row[3]) if row[3] else None,
+                    "created_at": row[5].isoformat() if row[5] else None,
+                }
+            )
 
         return {
             "items": items,
@@ -392,9 +389,7 @@ class ApprovalService:
     #  内部方法
     # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-    async def _check_and_expire(
-        self, record: dict[str, Any], extra: dict[str, Any]
-    ) -> None:
+    async def _check_and_expire(self, record: dict[str, Any], extra: dict[str, Any]) -> None:
         """检查审批单是否已超时，超时则自动标记为 expired"""
         from datetime import timedelta
 
@@ -420,9 +415,7 @@ class ApprovalService:
                 created_at=created_at.isoformat(),
             )
 
-    async def _get_approval_record(
-        self, approval_id: str
-    ) -> Optional[dict[str, Any]]:
+    async def _get_approval_record(self, approval_id: str) -> Optional[dict[str, Any]]:
         """根据 approval_id 从 notifications 表查找审批记录"""
         import json as json_lib
 
@@ -475,10 +468,7 @@ class ApprovalService:
             set_clauses.append("read_at = NOW()")
 
         await self.db.execute(
-            text(
-                f"UPDATE notifications SET {', '.join(set_clauses)} "
-                f"WHERE id = :rid::uuid"
-            ),
+            text(f"UPDATE notifications SET {', '.join(set_clauses)} WHERE id = :rid::uuid"),
             params,
         )
 
@@ -561,6 +551,5 @@ class ApprovalService:
             "rejected_at": extra.get("rejected_at"),
             "reject_reason": extra.get("reject_reason"),
             "store_id": record.get("store_id"),
-            "created_at": record["created_at"].isoformat()
-            if record.get("created_at") else None,
+            "created_at": record["created_at"].isoformat() if record.get("created_at") else None,
         }

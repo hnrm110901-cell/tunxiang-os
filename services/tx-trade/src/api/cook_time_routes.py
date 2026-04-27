@@ -5,6 +5,7 @@
 
 所有接口需要 X-Tenant-ID header。
 """
+
 import asyncio
 from datetime import datetime, timezone
 
@@ -22,6 +23,7 @@ router = APIRouter(prefix="/api/v1/cook-time", tags=["cook-time"])
 
 
 # ─── 工具函数 ───
+
 
 def _get_tenant_id(request: Request) -> str:
     tid = getattr(request.state, "tenant_id", None) or request.headers.get("X-Tenant-ID", "")
@@ -47,6 +49,7 @@ async def _daily_recompute_job(db_factory) -> None:
         # 计算到下一个凌晨2:00（UTC+8即北京时间18:00 UTC）的秒数
         # 默认使用 UTC 02:00，部署时可通过 RECOMPUTE_HOUR_UTC 环境变量调整
         import os
+
         target_hour = int(os.getenv("RECOMPUTE_HOUR_UTC", "18"))  # 默认18:00 UTC = 北京时间02:00
 
         next_run = now.replace(hour=target_hour, minute=0, second=0, microsecond=0)
@@ -83,6 +86,7 @@ def start_daily_scheduler(db_factory) -> None:
 
 
 # ─── API 路由 ───
+
 
 @router.get(
     "/expected/{dish_id}",
@@ -161,14 +165,10 @@ async def estimate_queue_clear_time(
     tenant_id = _get_tenant_id(request)
 
     service = CookTimeStatsService(db)
-    result = await service.estimate_queue_clear_time(
-        dept_id, tenant_id, concurrent_capacity=concurrent_capacity
-    )
+    result = await service.estimate_queue_clear_time(dept_id, tenant_id, concurrent_capacity=concurrent_capacity)
 
     now = datetime.now(timezone.utc)
-    wait_minutes = round(
-        (result["estimated_clear_at"] - now).total_seconds() / 60, 1
-    )
+    wait_minutes = round((result["estimated_clear_at"] - now).total_seconds() / 60, 1)
 
     return {
         "ok": True,

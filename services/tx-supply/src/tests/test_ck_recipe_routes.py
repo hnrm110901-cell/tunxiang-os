@@ -15,6 +15,7 @@
   - 每个测试用独立 TENANT_ID 隔离 in-memory 状态，避免测试间污染
   - emit_event 通过 asyncio.create_task 旁路，patch create_task 验证调用
 """
+
 from __future__ import annotations
 
 import os
@@ -23,22 +24,13 @@ import uuid
 from typing import Any
 from unittest.mock import patch
 
-import pytest
-
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from fastapi import FastAPI
-from fastapi.testclient import TestClient
-
 from api.ck_recipe_routes import (
-    _DISPATCH_ITEMS,
-    _DISPATCH_ORDERS,
-    _PLAN_ITEMS,
-    _PLANS,
-    _RECIPE_INGREDIENTS,
-    _RECIPES,
     router as ck_recipe_router,
 )
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
 
 # ─── App 组装 ─────────────────────────────────────────────────────────────────
 

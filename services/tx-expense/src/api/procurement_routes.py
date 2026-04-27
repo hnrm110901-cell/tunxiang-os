@@ -4,6 +4,7 @@
 负责采购付款单的创建、查询、审批、付款标记、发票匹配、对账等操作。
 共 8 个端点，覆盖采购付款全生命周期。
 """
+
 from __future__ import annotations
 
 from datetime import date
@@ -19,6 +20,7 @@ from shared.ontology.src.database import get_db
 
 try:
     from src.services.procurement_payment_service import ProcurementPaymentService
+
     _procurement_svc = ProcurementPaymentService()
 except ImportError:
     _procurement_svc = None  # type: ignore[assignment]
@@ -30,6 +32,7 @@ log = structlog.get_logger(__name__)
 # ---------------------------------------------------------------------------
 # 依赖注入
 # ---------------------------------------------------------------------------
+
 
 async def get_tenant_id(x_tenant_id: str = Header(..., alias="X-Tenant-ID")) -> UUID:
     try:
@@ -55,11 +58,12 @@ def _get_svc() -> "ProcurementPaymentService":
 # Pydantic Schema
 # ---------------------------------------------------------------------------
 
+
 class PaymentItemCreate(BaseModel):
     order_item_id: Optional[UUID] = None
     product_name: Optional[str] = None
     quantity: Optional[float] = None
-    unit_price: Optional[int] = None   # 分
+    unit_price: Optional[int] = None  # 分
     amount: int = Field(..., description="金额，单位：分(fen)")
 
 
@@ -101,6 +105,7 @@ class PaginatedResponse(BaseModel):
 # ---------------------------------------------------------------------------
 # 端点实现
 # ---------------------------------------------------------------------------
+
 
 @router.post("/payments", status_code=status.HTTP_201_CREATED)
 async def create_payment(
@@ -150,8 +155,9 @@ async def create_payment(
 
 @router.get("/payments")
 async def list_payments(
-    payment_status: Optional[str] = Query(None, alias="status",
-                                          description="状态过滤：pending/approved/paid/cancelled"),
+    payment_status: Optional[str] = Query(
+        None, alias="status", description="状态过滤：pending/approved/paid/cancelled"
+    ),
     supplier_id: Optional[UUID] = Query(None, description="供应商ID过滤"),
     payment_type: Optional[str] = Query(None, description="付款类型过滤"),
     page: int = Query(1, ge=1, description="页码"),

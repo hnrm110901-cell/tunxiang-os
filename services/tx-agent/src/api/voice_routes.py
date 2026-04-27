@@ -88,11 +88,14 @@ async def voice_match_dishes(
     from ..agents.skills.voice_order import VoiceOrderAgent
 
     agent = VoiceOrderAgent(tenant_id=x_tenant_id, store_id=req.store_id)
-    result = await agent.run("match_dishes", {
-        "dish": req.dish,
-        "menu_items": req.menu_items,
-        "top_n": req.top_n,
-    })
+    result = await agent.run(
+        "match_dishes",
+        {
+            "dish": req.dish,
+            "menu_items": req.menu_items,
+            "top_n": req.top_n,
+        },
+    )
     return {
         "ok": result.success,
         "data": result.data,
@@ -109,10 +112,13 @@ async def voice_confirm_order(
     from ..agents.skills.voice_order import VoiceOrderAgent
 
     agent = VoiceOrderAgent(tenant_id=x_tenant_id)
-    result = await agent.run("confirm_and_order", {
-        "matched_items": req.matched_items,
-        "table_id": req.table_id,
-    })
+    result = await agent.run(
+        "confirm_and_order",
+        {
+            "matched_items": req.matched_items,
+            "table_id": req.table_id,
+        },
+    )
     return {
         "ok": result.success,
         "data": result.data,
@@ -130,10 +136,13 @@ async def voice_order_stats(
     from ..agents.skills.voice_order import VoiceOrderAgent
 
     agent = VoiceOrderAgent(tenant_id=x_tenant_id, store_id=store_id)
-    result = await agent.run("get_stats", {
-        "store_id": store_id,
-        "period": period,
-    })
+    result = await agent.run(
+        "get_stats",
+        {
+            "store_id": store_id,
+            "period": period,
+        },
+    )
     return {
         "ok": result.success,
         "data": result.data,

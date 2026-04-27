@@ -76,9 +76,7 @@ class ComputeAllocationReq(BaseModel):
     month: str = Field(..., pattern=r"^\d{4}-\d{2}$")
     salary_data: dict = Field(
         ...,
-        description="{"
-        '"base_fen": int, "overtime_fen": int, "social_fen": int, "bonus_fen": int'
-        "}",
+        description='{"base_fen": int, "overtime_fen": int, "social_fen": int, "bonus_fen": int}',
     )
 
 

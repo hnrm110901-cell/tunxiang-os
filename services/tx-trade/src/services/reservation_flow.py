@@ -6,6 +6,7 @@
 与桌台状态机联动：
   empty → reserved(预订确认) → waiting_seat(到店) → dining(入座开台)
 """
+
 from datetime import datetime, timezone
 
 # ─── 预订状态机 ───
@@ -38,6 +39,7 @@ def can_reservation_transition(current: str, target: str) -> bool:
 
 
 # ─── 排队管理 ───
+
 
 def generate_queue_number(store_id: str, guest_count: int, queue_data: list) -> dict:
     """生成排队号
@@ -83,6 +85,7 @@ def call_next(queue_data: list, prefix: str = "") -> dict | None:
 
 # ─── 全链路联动 ───
 
+
 def reservation_to_queue(reservation: dict) -> dict:
     """预订到店 → 自动加入排队"""
     return generate_queue_number(
@@ -95,8 +98,7 @@ def reservation_to_queue(reservation: dict) -> dict:
 def queue_to_table(queue_item: dict, available_tables: list) -> dict | None:
     """排队叫号 → 分配最合适的桌台"""
     guest_count = queue_item.get("guest_count", 2)
-    candidates = [t for t in available_tables
-                  if t.get("status") == "free" and t.get("seats", 0) >= guest_count]
+    candidates = [t for t in available_tables if t.get("status") == "free" and t.get("seats", 0) >= guest_count]
     if not candidates:
         return None
 

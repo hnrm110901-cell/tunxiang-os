@@ -28,6 +28,7 @@
 统一响应格式: {"ok": bool, "data": {}, "error": {}}
 金额单位：分（int）。
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -60,10 +61,11 @@ edi_ext_router = APIRouter(prefix="/api/v1/supply/edi", tags=["supply-edi-ext"])
 
 # ── 采购申请 ──────────────────────────────────────────────
 
+
 class MobilePurchaseRequestIn(BaseModel):
     store_id: str
-    barcode: Optional[str] = None          # 条码（扫码或手动）
-    ingredient_id: Optional[str] = None    # 食材ID（已知时直传）
+    barcode: Optional[str] = None  # 条码（扫码或手动）
+    ingredient_id: Optional[str] = None  # 食材ID（已知时直传）
     ingredient_name: str
     quantity: float = Field(gt=0)
     unit: str
@@ -76,12 +78,13 @@ class MobilePurchaseRequestIn(BaseModel):
 
 class ApprovePurchaseRequestIn(BaseModel):
     approved_by: str
-    approved_quantity: Optional[float] = None   # None 时按申请数量全量审批
+    approved_quantity: Optional[float] = None  # None 时按申请数量全量审批
     unit_price_fen: Optional[int] = None
     notes: Optional[str] = None
 
 
 # ── 移动收货 ──────────────────────────────────────────────
+
 
 class MobileReceiveItemIn(BaseModel):
     ingredient_id: str
@@ -91,7 +94,7 @@ class MobileReceiveItemIn(BaseModel):
     unit: str
     unit_price_fen: int = Field(ge=0)
     batch_no: Optional[str] = None
-    expiry_date: Optional[str] = None      # YYYY-MM-DD
+    expiry_date: Optional[str] = None  # YYYY-MM-DD
 
 
 class MobileReceiveIn(BaseModel):
@@ -103,6 +106,7 @@ class MobileReceiveIn(BaseModel):
 
 
 # ── 移动盘点 ──────────────────────────────────────────────
+
 
 class StartStocktakeIn(BaseModel):
     store_id: str
@@ -127,6 +131,7 @@ class SubmitStocktakeIn(BaseModel):
 
 # ── 调拨（扩展执行端点） ──────────────────────────────────
 
+
 class ExecuteTransferIn(BaseModel):
     operator_id: Optional[str] = None
     notes: Optional[str] = None
@@ -148,10 +153,11 @@ class ApproveTransferExtIn(BaseModel):
 
 # ── EDI 扩展 ─────────────────────────────────────────────
 
+
 class EDIOrderConfirmIn(BaseModel):
     supplier_id: str
     tracking_no: Optional[str] = None
-    estimated_delivery: Optional[str] = None   # YYYY-MM-DD
+    estimated_delivery: Optional[str] = None  # YYYY-MM-DD
     notes: Optional[str] = None
 
 
@@ -275,8 +281,7 @@ async def list_purchase_requests(
         params["offset"] = (page - 1) * size
         rows = await _fetch_all(
             db,
-            f"SELECT * FROM mobile_purchase_requests {filters} "
-            f"ORDER BY created_at DESC LIMIT :limit OFFSET :offset",
+            f"SELECT * FROM mobile_purchase_requests {filters} ORDER BY created_at DESC LIMIT :limit OFFSET :offset",
             params,
         )
     except (OperationalError, ProgrammingError) as e:
@@ -324,9 +329,13 @@ async def approve_purchase_request(
             WHERE id = :id AND tenant_id = :tid
             """,
             {
-                "id": req_id, "tid": x_tenant_id, "approved_by": body.approved_by,
-                "qty": approved_qty, "price": unit_price,
-                "now": now, "notes": body.notes,
+                "id": req_id,
+                "tid": x_tenant_id,
+                "approved_by": body.approved_by,
+                "qty": approved_qty,
+                "price": unit_price,
+                "now": now,
+                "notes": body.notes,
             },
         )
         await db.commit()
@@ -392,38 +401,48 @@ async def mobile_receive(
                      :receiver_id, :notes, :now)
                 """,
                 {
-                    "id": item_id, "tid": x_tenant_id, "receive_id": receive_id,
-                    "store_id": body.store_id, "req_id": body.purchase_request_id,
-                    "ingredient_id": item.ingredient_id, "ingredient_name": item.ingredient_name,
+                    "id": item_id,
+                    "tid": x_tenant_id,
+                    "receive_id": receive_id,
+                    "store_id": body.store_id,
+                    "req_id": body.purchase_request_id,
+                    "ingredient_id": item.ingredient_id,
+                    "ingredient_name": item.ingredient_name,
                     "barcode": item.barcode,
-                    "received_qty": item.received_quantity, "unit": item.unit,
-                    "unit_price_fen": item.unit_price_fen, "batch_no": item.batch_no,
+                    "received_qty": item.received_quantity,
+                    "unit": item.unit,
+                    "unit_price_fen": item.unit_price_fen,
+                    "batch_no": item.batch_no,
                     "expiry_date": item.expiry_date,
-                    "receiver_id": body.receiver_id, "notes": body.notes, "now": now,
+                    "receiver_id": body.receiver_id,
+                    "notes": body.notes,
+                    "now": now,
                 },
             )
             received_items.append(item.ingredient_id)
 
             # Phase 1 平行事件写入：收货入库
-            asyncio.create_task(emit_event(
-                event_type=InventoryEventType.RECEIVED,
-                tenant_id=x_tenant_id,
-                stream_id=item.ingredient_id,
-                payload={
-                    "ingredient_id": item.ingredient_id,
-                    "quantity": item.received_quantity,
-                    "unit_price_fen": item.unit_price_fen,
-                    "batch_no": item.batch_no,
-                    "source": "mobile_receive",
-                },
-                store_id=body.store_id,
-                source_service="tx-supply",
-                metadata={
-                    "receive_id": receive_id,
-                    "purchase_request_id": body.purchase_request_id,
-                    "receiver_id": body.receiver_id,
-                },
-            ))
+            asyncio.create_task(
+                emit_event(
+                    event_type=InventoryEventType.RECEIVED,
+                    tenant_id=x_tenant_id,
+                    stream_id=item.ingredient_id,
+                    payload={
+                        "ingredient_id": item.ingredient_id,
+                        "quantity": item.received_quantity,
+                        "unit_price_fen": item.unit_price_fen,
+                        "batch_no": item.batch_no,
+                        "source": "mobile_receive",
+                    },
+                    store_id=body.store_id,
+                    source_service="tx-supply",
+                    metadata={
+                        "receive_id": receive_id,
+                        "purchase_request_id": body.purchase_request_id,
+                        "receiver_id": body.receiver_id,
+                    },
+                )
+            )
 
         await db.commit()
     except (OperationalError, ProgrammingError, InterfaceError) as e:
@@ -467,8 +486,7 @@ async def list_pending_receipts(
         params["offset"] = (page - 1) * size
         rows = await _fetch_all(
             db,
-            f"SELECT * FROM mobile_purchase_requests {filters} "
-            f"ORDER BY approved_at ASC LIMIT :limit OFFSET :offset",
+            f"SELECT * FROM mobile_purchase_requests {filters} ORDER BY approved_at ASC LIMIT :limit OFFSET :offset",
             params,
         )
     except (OperationalError, ProgrammingError) as e:
@@ -502,8 +520,12 @@ async def start_stocktake(
                 (:id, :tid, :store_id, 'open', :operator_id, :notes, :now, :now)
             """,
             {
-                "id": session_id, "tid": x_tenant_id, "store_id": body.store_id,
-                "operator_id": body.operator_id, "notes": body.notes, "now": now,
+                "id": session_id,
+                "tid": x_tenant_id,
+                "store_id": body.store_id,
+                "operator_id": body.operator_id,
+                "notes": body.notes,
+                "now": now,
             },
         )
         await db.commit()
@@ -561,11 +583,17 @@ async def add_stocktake_item(
                 updated_at      = EXCLUDED.updated_at
             """,
             {
-                "id": item_id, "tid": x_tenant_id, "sid": body.stocktake_id,
-                "ingredient_id": body.ingredient_id, "ingredient_name": body.ingredient_name,
-                "barcode": body.barcode, "actual_qty": body.actual_quantity,
-                "unit": body.unit, "unit_cost_fen": body.unit_cost_fen,
-                "notes": body.notes, "now": now,
+                "id": item_id,
+                "tid": x_tenant_id,
+                "sid": body.stocktake_id,
+                "ingredient_id": body.ingredient_id,
+                "ingredient_name": body.ingredient_name,
+                "barcode": body.barcode,
+                "actual_qty": body.actual_quantity,
+                "unit": body.unit,
+                "unit_cost_fen": body.unit_cost_fen,
+                "notes": body.notes,
+                "now": now,
             },
         )
         await db.commit()
@@ -625,8 +653,10 @@ async def submit_stocktake(
             WHERE id = :id AND tenant_id = :tid
             """,
             {
-                "id": session_id, "tid": x_tenant_id,
-                "operator_id": body.operator_id, "now": now,
+                "id": session_id,
+                "tid": x_tenant_id,
+                "operator_id": body.operator_id,
+                "now": now,
             },
         )
         await db.commit()
@@ -636,24 +666,26 @@ async def submit_stocktake(
 
     # Phase 1 平行事件写入：每个差异条目发射 ADJUSTED 事件
     for item in items:
-        asyncio.create_task(emit_event(
-            event_type=InventoryEventType.ADJUSTED,
-            tenant_id=x_tenant_id,
-            stream_id=item["ingredient_id"],
-            payload={
-                "ingredient_id": item["ingredient_id"],
-                "actual_quantity": float(item["actual_quantity"]),
-                "unit_cost_fen": int(item["unit_cost_fen"]),
-                "reason": "mobile_stocktake",
-                "stocktake_id": session_id,
-            },
-            store_id=session["store_id"],
-            source_service="tx-supply",
-            metadata={
-                "operator_id": body.operator_id or session.get("operator_id"),
-                "submitted_at": now,
-            },
-        ))
+        asyncio.create_task(
+            emit_event(
+                event_type=InventoryEventType.ADJUSTED,
+                tenant_id=x_tenant_id,
+                stream_id=item["ingredient_id"],
+                payload={
+                    "ingredient_id": item["ingredient_id"],
+                    "actual_quantity": float(item["actual_quantity"]),
+                    "unit_cost_fen": int(item["unit_cost_fen"]),
+                    "reason": "mobile_stocktake",
+                    "stocktake_id": session_id,
+                },
+                store_id=session["store_id"],
+                source_service="tx-supply",
+                metadata={
+                    "operator_id": body.operator_id or session.get("operator_id"),
+                    "submitted_at": now,
+                },
+            )
+        )
 
     return {
         "ok": True,
@@ -719,25 +751,29 @@ async def execute_transfer(
     for item in items:
         qty = float(item.get("approved_quantity") or item.get("requested_quantity", 0))
         # 发出方扣减
-        asyncio.create_task(emit_event(
-            event_type=InventoryEventType.CONSUMED,
-            tenant_id=x_tenant_id,
-            stream_id=item["ingredient_id"],
-            payload={"ingredient_id": item["ingredient_id"], "quantity": qty, "reason": "transfer_out"},
-            store_id=transfer["from_store_id"],
-            source_service="tx-supply",
-            metadata={"transfer_id": transfer_id, "operator_id": body.operator_id},
-        ))
+        asyncio.create_task(
+            emit_event(
+                event_type=InventoryEventType.CONSUMED,
+                tenant_id=x_tenant_id,
+                stream_id=item["ingredient_id"],
+                payload={"ingredient_id": item["ingredient_id"], "quantity": qty, "reason": "transfer_out"},
+                store_id=transfer["from_store_id"],
+                source_service="tx-supply",
+                metadata={"transfer_id": transfer_id, "operator_id": body.operator_id},
+            )
+        )
         # 接收方增加
-        asyncio.create_task(emit_event(
-            event_type=InventoryEventType.RECEIVED,
-            tenant_id=x_tenant_id,
-            stream_id=item["ingredient_id"],
-            payload={"ingredient_id": item["ingredient_id"], "quantity": qty, "reason": "transfer_in"},
-            store_id=transfer["to_store_id"],
-            source_service="tx-supply",
-            metadata={"transfer_id": transfer_id, "operator_id": body.operator_id},
-        ))
+        asyncio.create_task(
+            emit_event(
+                event_type=InventoryEventType.RECEIVED,
+                tenant_id=x_tenant_id,
+                stream_id=item["ingredient_id"],
+                payload={"ingredient_id": item["ingredient_id"], "quantity": qty, "reason": "transfer_in"},
+                store_id=transfer["to_store_id"],
+                source_service="tx-supply",
+                metadata={"transfer_id": transfer_id, "operator_id": body.operator_id},
+            )
+        )
 
     return {
         "ok": True,
@@ -831,7 +867,8 @@ async def edi_confirm_order(
             WHERE id = :id AND tenant_id = :tid
             """,
             {
-                "id": order_id, "tid": x_tenant_id,
+                "id": order_id,
+                "tid": x_tenant_id,
                 "tracking_no": body.tracking_no,
                 "est_delivery": body.estimated_delivery,
                 "now": now,

@@ -22,15 +22,16 @@ trace_routes TestClient 测试 (12 个):
 
 总计: 24 个测试
 """
+
 from __future__ import annotations
 
 import os
 import sys
 import types
 import uuid
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-from unittest.mock import AsyncMock, MagicMock
 from sqlalchemy.exc import ProgrammingError
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
@@ -70,8 +71,8 @@ def _reset_wt_mode():
 
 # ─── 1. create_transfer_order ──────────────────────────────────────────────────
 
-class TestWarehouseCreateTransferOrder:
 
+class TestWarehouseCreateTransferOrder:
     @pytest.mark.asyncio
     async def test_create_basic_success_memory_mode(self):
         """内存降级模式：返回 transfer_id/status/from/to/item_count/total_qty。"""
@@ -130,8 +131,8 @@ class TestWarehouseCreateTransferOrder:
 
 # ─── 2. create_split_assembly ─────────────────────────────────────────────────
 
-class TestWarehouseCreateSplitAssembly:
 
+class TestWarehouseCreateSplitAssembly:
     @pytest.mark.asyncio
     async def test_split_success(self):
         """op_type=split 正常拆分，返回 op_id/op_type/component_count。"""
@@ -167,8 +168,8 @@ class TestWarehouseCreateSplitAssembly:
 
 # ─── 3. create_bom_split ──────────────────────────────────────────────────────
 
-class TestWarehouseCreateBomSplit:
 
+class TestWarehouseCreateBomSplit:
     @pytest.mark.asyncio
     async def test_bom_split_success(self):
         """正常 BOM 拆分（传入 bom 参数），返回 split_id/dish_id/quantity。"""
@@ -207,20 +208,19 @@ _svc_tx_src = types.ModuleType("services.tx_supply.src")
 _svc_tx_src_svc = types.ModuleType("services.tx_supply.src.services")
 _trace_mod = types.ModuleType("services.tx_supply.src.services.traceability")
 
-_trace_mod.full_trace_forward = lambda batch_no, tenant_id: {
-    "batch_no": batch_no, "direction": "forward", "nodes": []
-}
+_trace_mod.full_trace_forward = lambda batch_no, tenant_id: {"batch_no": batch_no, "direction": "forward", "nodes": []}
 _trace_mod.full_trace_backward = lambda order_id, dish_id, tenant_id: {
-    "order_id": order_id, "dish_id": dish_id, "direction": "backward", "nodes": []
+    "order_id": order_id,
+    "dish_id": dish_id,
+    "direction": "backward",
+    "nodes": [],
 }
-_trace_mod.get_trace_timeline = lambda batch_no, tenant_id: {
-    "batch_no": batch_no, "timeline": []
-}
-_trace_mod.generate_trace_report = lambda batch_no, tenant_id: {
-    "batch_no": batch_no, "report": "generated"
-}
+_trace_mod.get_trace_timeline = lambda batch_no, tenant_id: {"batch_no": batch_no, "timeline": []}
+_trace_mod.generate_trace_report = lambda batch_no, tenant_id: {"batch_no": batch_no, "report": "generated"}
 _trace_mod.build_ingredient_graph = lambda ingredient_id, tenant_id: {
-    "ingredient_id": ingredient_id, "edges": [], "nodes": []
+    "ingredient_id": ingredient_id,
+    "edges": [],
+    "nodes": [],
 }
 
 sys.modules.setdefault("services", _svc_pkg)
@@ -230,10 +230,9 @@ sys.modules.setdefault("services.tx_supply.src.services", _svc_tx_src_svc)
 sys.modules["services.tx_supply.src.services.traceability"] = _trace_mod
 _svc_tx_src_svc.traceability = _trace_mod
 
+from api.trace_routes import router as trace_router
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-
-from api.trace_routes import router as trace_router
 
 _trace_app = FastAPI()
 _trace_app.include_router(trace_router)
@@ -248,7 +247,6 @@ DISH_ID = str(uuid.uuid4())
 
 
 class TestTraceForward:
-
     def test_trace_forward_ok(self):
         """正向追溯返回 ok=True + data.batch_no。"""
         resp = _trace_client.get(
@@ -267,7 +265,6 @@ class TestTraceForward:
 
 
 class TestTraceBackward:
-
     def test_trace_backward_ok(self):
         """反向追溯返回 ok=True + data.order_id + data.dish_id。"""
         resp = _trace_client.post(
@@ -300,7 +297,6 @@ class TestTraceBackward:
 
 
 class TestTraceTimeline:
-
     def test_trace_timeline_ok(self):
         """时间线返回 ok=True + data.batch_no + data.timeline。"""
         resp = _trace_client.get(
@@ -320,7 +316,6 @@ class TestTraceTimeline:
 
 
 class TestTraceReport:
-
     def test_trace_report_ok(self):
         """追溯报告返回 ok=True + data.batch_no + data.report。"""
         resp = _trace_client.get(
@@ -340,7 +335,6 @@ class TestTraceReport:
 
 
 class TestIngredientGraph:
-
     def test_ingredient_graph_ok(self):
         """原料关系图返回 ok=True + data.ingredient_id + data.edges。"""
         resp = _trace_client.get(

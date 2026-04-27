@@ -526,9 +526,7 @@ async def auto_score_from_data(
 ) -> dict[str, Any]:
     """基于业务数据自动生成打分建议（AI 辅助）。"""
     start, end = _month_bounds(month)
-    present, absent, leave, late_like = await _attendance_month_stats(
-        db, tenant_id, employee_id, start, end
-    )
+    present, absent, leave, late_like = await _attendance_month_stats(db, tenant_id, employee_id, start, end)
     att_score = _score_from_attendance(present, absent, leave, late_like)
     commission = await _fetch_commission_fen(db, tenant_id, employee_id, month)
     if commission is None:
@@ -639,7 +637,8 @@ async def list_review_cycles(
         params["status"] = status
     where = " AND ".join(conds)
     count_row = await db.execute(
-        text(f"SELECT COUNT(*) FROM review_cycles WHERE {where}"), params,
+        text(f"SELECT COUNT(*) FROM review_cycles WHERE {where}"),
+        params,
     )
     total = int(count_row.scalar() or 0)
     offset = (page - 1) * size
@@ -818,7 +817,9 @@ async def submit_review_score(
             weighted_score += s * (weight / 100.0)
             total_weight += weight
         if total_weight > 0:
-            weighted_score = round(weighted_score * (100.0 / total_weight) if total_weight != 100 else weighted_score, 2)
+            weighted_score = round(
+                weighted_score * (100.0 / total_weight) if total_weight != 100 else weighted_score, 2
+            )
         total_score = round(total_score / len(dims_config), 2) if dims_config else 0
     else:
         # 无维度配置时取平均
@@ -902,7 +903,8 @@ async def get_employee_scores(
         params["eid"] = employee_id
     where = " AND ".join(conds)
     count_row = await db.execute(
-        text(f"SELECT COUNT(*) FROM review_scores WHERE {where}"), params,
+        text(f"SELECT COUNT(*) FROM review_scores WHERE {where}"),
+        params,
     )
     total = int(count_row.scalar() or 0)
     offset = (page - 1) * size
@@ -950,8 +952,12 @@ async def aggregate_cycle_scores(
 ) -> list[dict[str, Any]]:
     """汇总评审周期所有员工的加权平均分并排名。"""
     await _set_tenant(db, tenant_id)
-    conds = ["rs.tenant_id = :tid", "rs.cycle_id = :cid", "rs.is_deleted = FALSE",
-             "rs.status IN ('submitted', 'calibrated')"]
+    conds = [
+        "rs.tenant_id = :tid",
+        "rs.cycle_id = :cid",
+        "rs.is_deleted = FALSE",
+        "rs.status IN ('submitted', 'calibrated')",
+    ]
     params: dict[str, Any] = {"tid": tenant_id, "cid": cycle_id}
     if store_id is not None:
         conds.append("rs.store_id = :sid")
@@ -980,14 +986,16 @@ async def aggregate_cycle_scores(
         if prev is None or abs(avg_s - prev) > 1e-9:
             rank = i
             prev = avg_s
-        items.append({
-            "rank": rank,
-            "employee_id": str(r["employee_id"]),
-            "employee_name": r["employee_name"],
-            "store_id": str(r["store_id"]) if r["store_id"] else None,
-            "avg_score": avg_s,
-            "reviewer_count": int(r["reviewer_count"]),
-        })
+        items.append(
+            {
+                "rank": rank,
+                "employee_id": str(r["employee_id"]),
+                "employee_name": r["employee_name"],
+                "store_id": str(r["store_id"]) if r["store_id"] else None,
+                "avg_score": avg_s,
+                "reviewer_count": int(r["reviewer_count"]),
+            }
+        )
     return items
 
 

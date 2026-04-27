@@ -31,14 +31,15 @@
   GET  /dashboard                          日看板（query-param 版）
   GET  /demand-forecast                    需求预测
 """
+
 from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
+import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
-import structlog
 
 from shared.ontology.src.database import get_db
 
@@ -137,6 +138,7 @@ class StoreReceivingRequest(BaseModel):
 
 class StoreAssignmentInput(BaseModel):
     """计划维度配送分配：一个门店分配一批菜品"""
+
     store_id: str = Field(..., description="目标门店 ID")
     items: List[DistributionItemInput] = Field(..., min_length=1, description="该门店配送明细")
     scheduled_at: str = Field(..., description="计划配送时间（ISO 8601）")
@@ -146,9 +148,8 @@ class StoreAssignmentInput(BaseModel):
 
 class PlanDistributeRequest(BaseModel):
     """从生产计划创建多门店配送单"""
-    store_assignments: List[StoreAssignmentInput] = Field(
-        ..., min_length=1, description="各门店配送分配"
-    )
+
+    store_assignments: List[StoreAssignmentInput] = Field(..., min_length=1, description="各门店配送分配")
 
 
 # ─── 厨房档案 ──────────────────────────────────────────────────────────────
@@ -546,9 +547,7 @@ async def plan_distribute(
         # 先校验计划存在且属于当前租户
         plan = await svc.get_production_plan(plan_id=plan_id)
         if plan.status not in ("confirmed", "in_progress"):
-            raise ValueError(
-                f"计划状态为 {plan.status}，只有 confirmed 或 in_progress 状态可创建配送单"
-            )
+            raise ValueError(f"计划状态为 {plan.status}，只有 confirmed 或 in_progress 状态可创建配送单")
 
         created_orders = []
         for assignment in body.store_assignments:

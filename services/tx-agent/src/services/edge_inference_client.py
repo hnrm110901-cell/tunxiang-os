@@ -12,6 +12,7 @@ and adds:
 Environment variables:
     COREML_BRIDGE_URL: CoreML Bridge address, default http://localhost:8100
 """
+
 from __future__ import annotations
 
 import os
@@ -41,10 +42,7 @@ class EdgeInferenceClient:
     """
 
     def __init__(self, base_url: str | None = None) -> None:
-        self.base_url = (
-            base_url
-            or os.environ.get("COREML_BRIDGE_URL", _DEFAULT_BRIDGE_URL)
-        ).rstrip("/")
+        self.base_url = (base_url or os.environ.get("COREML_BRIDGE_URL", _DEFAULT_BRIDGE_URL)).rstrip("/")
         self._available: bool | None = None
         self._available_checked_at: float = 0.0
         # Prediction stats
@@ -59,10 +57,7 @@ class EdgeInferenceClient:
     async def is_available(self) -> bool:
         """Check if edge inference is reachable. Caches result for 60 seconds."""
         now = time.monotonic()
-        if (
-            self._available is not None
-            and (now - self._available_checked_at) < _HEALTH_CACHE_TTL_SECONDS
-        ):
+        if self._available is not None and (now - self._available_checked_at) < _HEALTH_CACHE_TTL_SECONDS:
             return self._available
 
         try:
@@ -188,6 +183,7 @@ class EdgeInferenceClient:
         """
         # Derive day_of_week from date string
         from datetime import date as date_cls
+
         try:
             dt = date_cls.fromisoformat(date)
             day_of_week = dt.weekday()  # 0=Monday, 6=Sunday

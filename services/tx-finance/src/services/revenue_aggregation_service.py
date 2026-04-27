@@ -8,6 +8,7 @@
 所有金额单位：分（fen）。
 禁止 broad except，最外层兜底带 exc_info=True。
 """
+
 from __future__ import annotations
 
 import uuid
@@ -23,17 +24,17 @@ from .revenue_aggregation_repository import RevenueAggregationRepository
 logger = structlog.get_logger(__name__)
 
 _PAYMENT_LABELS: dict[str, str] = {
-    "cash":           "现金",
-    "wechat":         "微信",
-    "alipay":         "支付宝",
-    "unionpay":       "银联",
-    "meituan":        "美团",
-    "eleme":          "饿了么",
-    "douyin":         "抖音",
-    "credit":         "挂账",
+    "cash": "现金",
+    "wechat": "微信",
+    "alipay": "支付宝",
+    "unionpay": "银联",
+    "meituan": "美团",
+    "eleme": "饿了么",
+    "douyin": "抖音",
+    "credit": "挂账",
     "member_balance": "会员余额",
-    "coupon":         "优惠券",
-    "unknown":        "未知",
+    "coupon": "优惠券",
+    "unknown": "未知",
 }
 
 
@@ -47,9 +48,11 @@ def _payment_label(method: str) -> str:
 
 # ─── 数据类 ──────────────────────────────────────────────────────────────────
 
+
 @dataclass
 class PaymentMethodSummary:
     """单个支付方式汇总"""
+
     method: str
     label: str
     amount_fen: int
@@ -60,6 +63,7 @@ class PaymentMethodSummary:
 @dataclass
 class HourlyBucket:
     """单小时营收桶"""
+
     hour: int
     order_count: int
     revenue_fen: int
@@ -68,6 +72,7 @@ class HourlyBucket:
 @dataclass
 class DailyRevenueFast:
     """日营收快报"""
+
     store_id: str
     biz_date: str
     gross_revenue_fen: int
@@ -113,6 +118,7 @@ class DailyRevenueFast:
 @dataclass
 class RevenueTrendPoint:
     """营收趋势时序数据点"""
+
     period: str
     revenue_fen: int
     discount_fen: int
@@ -122,6 +128,7 @@ class RevenueTrendPoint:
 @dataclass
 class RevenueRangeReport:
     """多日期范围营收报表"""
+
     store_id: str
     start_date: str
     end_date: str
@@ -163,19 +170,21 @@ class RevenueRangeReport:
 @dataclass
 class PaymentReconciliationRow:
     """单个支付方式对账行"""
+
     method: str
     label: str
     order_count: int
-    order_amount_fen: int   # 应收（来自 orders.final_amount_fen 汇总）
-    paid_amount_fen: int    # 实收（来自 payments.amount_fen 汇总）
+    order_amount_fen: int  # 应收（来自 orders.final_amount_fen 汇总）
+    paid_amount_fen: int  # 实收（来自 payments.amount_fen 汇总）
     refund_amount_fen: int  # 退款（来自 refunds.amount_fen 汇总）
-    net_fen: int            # 净实收 = paid - refund
-    diff_fen: int           # 差异 = paid - order_amount（正=多收，负=少收）
+    net_fen: int  # 净实收 = paid - refund
+    diff_fen: int  # 差异 = paid - order_amount（正=多收，负=少收）
 
 
 @dataclass
 class PaymentReconciliationReport:
     """支付方式对账报表"""
+
     store_id: str
     start_date: str
     end_date: str
@@ -216,6 +225,7 @@ class PaymentReconciliationReport:
 
 # ─── Service ─────────────────────────────────────────────────────────────────
 
+
 class RevenueAggregationService:
     """营收聚合服务
 
@@ -250,17 +260,13 @@ class RevenueAggregationService:
         )
 
         # 1. 订单汇总
-        summary = await self._repo.fetch_daily_order_summary(
-            tenant_id, store_id, biz_date, db
-        )
+        summary = await self._repo.fetch_daily_order_summary(tenant_id, store_id, biz_date, db)
         gross_revenue_fen = summary["gross_revenue_fen"]
         discount_fen = summary["discount_fen"]
         order_count = summary["order_count"]
 
         # 2. 支付方式分布
-        payment_rows = await self._repo.fetch_payment_breakdown(
-            tenant_id, store_id, biz_date, db
-        )
+        payment_rows = await self._repo.fetch_payment_breakdown(tenant_id, store_id, biz_date, db)
         total_paid = sum(r["amount_fen"] for r in payment_rows)
         payment_breakdown = [
             PaymentMethodSummary(
@@ -275,26 +281,20 @@ class RevenueAggregationService:
 
         # 3. 退款（优先从 refunds 表，fallback 到 order_items.return_flag）
         try:
-            refund_fen = await self._repo.fetch_daily_refund_from_payments(
-                tenant_id, store_id, biz_date, db
-            )
+            refund_fen = await self._repo.fetch_daily_refund_from_payments(tenant_id, store_id, biz_date, db)
         except Exception as exc:  # noqa: BLE001 — DB driver 级别可能有多种异常
             log.warning(
                 "daily_revenue_fast.refund_from_payments_failed_fallback",
                 error=str(exc),
             )
-            refund_fen = await self._repo.fetch_daily_refund_from_items(
-                tenant_id, store_id, biz_date, db
-            )
+            refund_fen = await self._repo.fetch_daily_refund_from_items(tenant_id, store_id, biz_date, db)
 
         # 4. 净营收
         net_revenue_fen = gross_revenue_fen - discount_fen - refund_fen
         avg_ticket_fen = net_revenue_fen // order_count if order_count > 0 else 0
 
         # 5. 小时分布
-        hourly_rows = await self._repo.fetch_hourly_breakdown(
-            tenant_id, store_id, biz_date, db
-        )
+        hourly_rows = await self._repo.fetch_hourly_breakdown(tenant_id, store_id, biz_date, db)
         hourly_breakdown = [
             HourlyBucket(
                 hour=r["hour"],
@@ -353,9 +353,7 @@ class RevenueAggregationService:
         )
 
         # 区间汇总
-        summary = await self._repo.fetch_range_order_summary(
-            tenant_id, store_id, start_date, end_date, db
-        )
+        summary = await self._repo.fetch_range_order_summary(tenant_id, store_id, start_date, end_date, db)
         gross_revenue_fen = summary["gross_revenue_fen"]
         discount_fen = summary["discount_fen"]
         order_count = summary["order_count"]
@@ -432,9 +430,7 @@ class RevenueAggregationService:
             end_date=str(end_date),
         )
 
-        rows_raw = await self._repo.fetch_payment_reconciliation(
-            tenant_id, store_id, start_date, end_date, db
-        )
+        rows_raw = await self._repo.fetch_payment_reconciliation(tenant_id, store_id, start_date, end_date, db)
 
         rows: list[PaymentReconciliationRow] = []
         for r in rows_raw:

@@ -3,6 +3,7 @@
 收货验收流程: 采购单到货 → 逐项验收 → 入库/退货
 调拨流程: 发起调拨 → 双方确认 (发方确认发出 + 收方确认收到)
 """
+
 from __future__ import annotations
 
 import uuid
@@ -15,7 +16,11 @@ log = structlog.get_logger(__name__)
 
 # 调拨状态
 TRANSFER_STATUSES = (
-    "pending", "sender_confirmed", "receiver_confirmed", "completed", "cancelled",
+    "pending",
+    "sender_confirmed",
+    "receiver_confirmed",
+    "completed",
+    "cancelled",
 )
 
 
@@ -301,9 +306,7 @@ async def get_central_warehouse_stock(
 
     total_items = len(items)
     low_stock = [i for i in items if i.get("quantity", 0) <= i.get("min_quantity", 0)]
-    total_value_fen = sum(
-        i.get("quantity", 0) * i.get("unit_price_fen", 0) for i in items
-    )
+    total_value_fen = sum(i.get("quantity", 0) * i.get("unit_price_fen", 0) for i in items)
 
     log.info(
         "central_warehouse_queried",

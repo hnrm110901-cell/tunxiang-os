@@ -21,16 +21,15 @@
   - ck_production_routes 的 services.supplier_scoring_engine 也注入存根
   - mock execute 使用 side_effect 列表按顺序排列多次调用结果
 """
+
 from __future__ import annotations
 
 import os
 import sys
 import types
 import uuid
-from decimal import Decimal
 from unittest.mock import AsyncMock, MagicMock
 
-import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from sqlalchemy.exc import ProgrammingError, SQLAlchemyError
@@ -100,16 +99,16 @@ _make_shared_stubs()
 
 # ─── 导入路由模块 ──────────────────────────────────────────────────────────────
 
-from api.purchase_order_routes import router as po_router  # noqa: E402
 from api.purchase_order_routes import _get_db as po_get_db  # noqa: E402
+from api.purchase_order_routes import router as po_router  # noqa: E402
 
 # ck_production_routes 使用顶层 `from shared.ontology.src.database import get_db`
 # 以及内部服务注入（services.supplier_scoring_engine 等），注入存根
 _ck_services_pkg = types.ModuleType("services")
 sys.modules.setdefault("services", _ck_services_pkg)
 
-from api.ck_production_routes import router as ck_router  # noqa: E402
 from api.ck_production_routes import get_db as ck_get_db  # noqa: E402
+from api.ck_production_routes import router as ck_router  # noqa: E402
 
 # ─── 公共常量 ──────────────────────────────────────────────────────────────────
 
@@ -152,10 +151,12 @@ def _rows_result(rows: list):
         m._mapping = row_data
         mapping_rows.append(m)
     r.__iter__ = MagicMock(return_value=iter(mapping_rows))
-    r.mappings = MagicMock(return_value=MagicMock(
-        all=MagicMock(return_value=mapping_rows),
-        first=MagicMock(return_value=mapping_rows[0] if mapping_rows else None),
-    ))
+    r.mappings = MagicMock(
+        return_value=MagicMock(
+            all=MagicMock(return_value=mapping_rows),
+            first=MagicMock(return_value=mapping_rows[0] if mapping_rows else None),
+        )
+    )
     r.fetchall = MagicMock(return_value=mapping_rows)
     r.fetchone = MagicMock(return_value=mapping_rows[0] if mapping_rows else None)
     return r
@@ -167,10 +168,12 @@ def _none_result():
     r.fetchone = MagicMock(return_value=None)
     r.scalar_one = MagicMock(return_value=0)
     r.scalar = MagicMock(return_value=0)
-    r.mappings = MagicMock(return_value=MagicMock(
-        first=MagicMock(return_value=None),
-        all=MagicMock(return_value=[]),
-    ))
+    r.mappings = MagicMock(
+        return_value=MagicMock(
+            first=MagicMock(return_value=None),
+            all=MagicMock(return_value=[]),
+        )
+    )
     return r
 
 
@@ -199,12 +202,20 @@ class TestPurchaseOrderRoutes:
         """GET /api/v1/supply/purchase-orders — 正常返回分页数据。"""
         db = _mock_db()
         po_row = {
-            "id": PO_ID, "store_id": STORE_ID, "supplier_id": SUPPLIER_ID,
-            "po_number": "PO-20260404-ABCDEF", "status": "draft",
-            "total_amount_fen": 10000, "expected_delivery_date": None,
-            "actual_delivery_date": None, "approved_by": None,
-            "approved_at": None, "received_at": None, "notes": None,
-            "created_at": "2026-04-04T00:00:00Z", "updated_at": "2026-04-04T00:00:00Z",
+            "id": PO_ID,
+            "store_id": STORE_ID,
+            "supplier_id": SUPPLIER_ID,
+            "po_number": "PO-20260404-ABCDEF",
+            "status": "draft",
+            "total_amount_fen": 10000,
+            "expected_delivery_date": None,
+            "actual_delivery_date": None,
+            "approved_by": None,
+            "approved_at": None,
+            "received_at": None,
+            "notes": None,
+            "created_at": "2026-04-04T00:00:00Z",
+            "updated_at": "2026-04-04T00:00:00Z",
         }
         # side_effect 顺序：
         #   1. _set_tenant → set_config 执行（忽略返回值）
@@ -270,18 +281,31 @@ class TestPurchaseOrderRoutes:
         set_tenant_result = MagicMock()
 
         po_data = {
-            "id": PO_ID, "store_id": STORE_ID, "supplier_id": SUPPLIER_ID,
-            "po_number": "PO-20260404-XYZABC", "status": "approved",
-            "total_amount_fen": 20000, "expected_delivery_date": None,
-            "actual_delivery_date": None, "approved_by": None,
-            "approved_at": None, "received_at": None, "notes": None,
-            "created_at": "2026-04-04T00:00:00Z", "updated_at": "2026-04-04T00:00:00Z",
+            "id": PO_ID,
+            "store_id": STORE_ID,
+            "supplier_id": SUPPLIER_ID,
+            "po_number": "PO-20260404-XYZABC",
+            "status": "approved",
+            "total_amount_fen": 20000,
+            "expected_delivery_date": None,
+            "actual_delivery_date": None,
+            "approved_by": None,
+            "approved_at": None,
+            "received_at": None,
+            "notes": None,
+            "created_at": "2026-04-04T00:00:00Z",
+            "updated_at": "2026-04-04T00:00:00Z",
         }
         item_data = {
-            "id": str(uuid.uuid4()), "ingredient_id": INGREDIENT_ID,
-            "ingredient_name": "猪肉", "quantity": "5.0", "unit": "kg",
-            "unit_price_fen": 4000, "subtotal_fen": 20000,
-            "received_quantity": "0.0", "notes": None,
+            "id": str(uuid.uuid4()),
+            "ingredient_id": INGREDIENT_ID,
+            "ingredient_name": "猪肉",
+            "quantity": "5.0",
+            "unit": "kg",
+            "unit_price_fen": 4000,
+            "subtotal_fen": 20000,
+            "received_quantity": "0.0",
+            "notes": None,
         }
         po_result = _rows_result([po_data])
         items_result = _rows_result([item_data])
@@ -372,22 +396,30 @@ class TestCKProductionRoutes:
 
         # 查询 BOM（无 BOM 返回 None）
         bom_result = MagicMock()
-        bom_result.mappings = MagicMock(return_value=MagicMock(
-            first=MagicMock(return_value=None)
-        ))
+        bom_result.mappings = MagicMock(return_value=MagicMock(first=MagicMock(return_value=None)))
 
         # INSERT production_item（1 个菜品）
         insert_item_result = MagicMock()
 
         # _fetch_production_order → SELECT main + SELECT items
         order_row_data = MagicMock()
-        order_row_data.__iter__ = MagicMock(return_value=iter([
-            ("id", ORDER_ID), ("tenant_id", TENANT_ID),
-            ("order_no", "CK-20260404-ABC123"), ("store_id", STORE_ID),
-            ("production_date", "2026-04-04"), ("status", "draft"),
-            ("total_items", 1), ("completed_items", 0), ("notes", None),
-            ("created_at", "2026-04-04T00:00:00"), ("updated_at", "2026-04-04T00:00:00"),
-        ]))
+        order_row_data.__iter__ = MagicMock(
+            return_value=iter(
+                [
+                    ("id", ORDER_ID),
+                    ("tenant_id", TENANT_ID),
+                    ("order_no", "CK-20260404-ABC123"),
+                    ("store_id", STORE_ID),
+                    ("production_date", "2026-04-04"),
+                    ("status", "draft"),
+                    ("total_items", 1),
+                    ("completed_items", 0),
+                    ("notes", None),
+                    ("created_at", "2026-04-04T00:00:00"),
+                    ("updated_at", "2026-04-04T00:00:00"),
+                ]
+            )
+        )
 
         main_mapping = MagicMock()
         main_mapping.first = MagicMock(return_value=order_row_data)
@@ -444,14 +476,22 @@ class TestCKProductionRoutes:
 
         # 列表行数据
         row_data = MagicMock()
-        row_data.__iter__ = MagicMock(return_value=iter([
-            ("id", ORDER_ID), ("order_no", "CK-20260404-AABBCC"),
-            ("store_id", STORE_ID), ("production_date", "2026-04-04"),
-            ("status", "draft"), ("total_items", 2),
-            ("completed_items", 0), ("notes", None),
-            ("created_at", "2026-04-04T00:00:00"),
-            ("updated_at", "2026-04-04T00:00:00"),
-        ]))
+        row_data.__iter__ = MagicMock(
+            return_value=iter(
+                [
+                    ("id", ORDER_ID),
+                    ("order_no", "CK-20260404-AABBCC"),
+                    ("store_id", STORE_ID),
+                    ("production_date", "2026-04-04"),
+                    ("status", "draft"),
+                    ("total_items", 2),
+                    ("completed_items", 0),
+                    ("notes", None),
+                    ("created_at", "2026-04-04T00:00:00"),
+                    ("updated_at", "2026-04-04T00:00:00"),
+                ]
+            )
+        )
         list_mapping = MagicMock()
         list_mapping.all = MagicMock(return_value=[row_data])
         list_result = MagicMock()

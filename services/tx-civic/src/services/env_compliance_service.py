@@ -21,15 +21,16 @@ logger = structlog.get_logger(__name__)
 # HJ 1240 标准阈值 (mg/m3)
 # ---------------------------------------------------------------------------
 EMISSION_LIMITS = {
-    "oil_fume": 1.0,    # 油烟排放浓度上限 mg/m3
-    "pm25": 0.075,      # PM2.5 日均浓度限值 mg/m3
-    "nmhc": 10.0,       # 非甲烷总烃上限 mg/m3
+    "oil_fume": 1.0,  # 油烟排放浓度上限 mg/m3
+    "pm25": 0.075,  # PM2.5 日均浓度限值 mg/m3
+    "nmhc": 10.0,  # 非甲烷总烃上限 mg/m3
 }
 
 
 # ---------------------------------------------------------------------------
 # 纯函数
 # ---------------------------------------------------------------------------
+
 
 def is_emission_compliant(
     oil_fume: float | None = None,
@@ -43,28 +44,34 @@ def is_emission_compliant(
     violations = []
 
     if oil_fume is not None and oil_fume > EMISSION_LIMITS["oil_fume"]:
-        violations.append({
-            "metric": "oil_fume",
-            "value": oil_fume,
-            "limit": EMISSION_LIMITS["oil_fume"],
-            "unit": "mg/m3",
-        })
+        violations.append(
+            {
+                "metric": "oil_fume",
+                "value": oil_fume,
+                "limit": EMISSION_LIMITS["oil_fume"],
+                "unit": "mg/m3",
+            }
+        )
 
     if pm25 is not None and pm25 > EMISSION_LIMITS["pm25"]:
-        violations.append({
-            "metric": "pm25",
-            "value": pm25,
-            "limit": EMISSION_LIMITS["pm25"],
-            "unit": "mg/m3",
-        })
+        violations.append(
+            {
+                "metric": "pm25",
+                "value": pm25,
+                "limit": EMISSION_LIMITS["pm25"],
+                "unit": "mg/m3",
+            }
+        )
 
     if nmhc is not None and nmhc > EMISSION_LIMITS["nmhc"]:
-        violations.append({
-            "metric": "nmhc",
-            "value": nmhc,
-            "limit": EMISSION_LIMITS["nmhc"],
-            "unit": "mg/m3",
-        })
+        violations.append(
+            {
+                "metric": "nmhc",
+                "value": nmhc,
+                "limit": EMISSION_LIMITS["nmhc"],
+                "unit": "mg/m3",
+            }
+        )
 
     return {"compliant": len(violations) == 0, "violations": violations}
 
@@ -91,6 +98,7 @@ def calculate_compliance_rate(records: list[dict]) -> float:
 # ---------------------------------------------------------------------------
 # 业务服务
 # ---------------------------------------------------------------------------
+
 
 async def record_emission(
     tenant_id: str,
@@ -134,8 +142,10 @@ async def record_emission(
     log_level = "info" if compliance["compliant"] else "warning"
     getattr(logger, log_level)(
         "emission_recorded",
-        tenant_id=tenant_id, store_id=store_id,
-        compliant=compliance["compliant"], record_id=record_id,
+        tenant_id=tenant_id,
+        store_id=store_id,
+        compliant=compliance["compliant"],
+        record_id=record_id,
     )
     return {"id": record_id, "compliant": compliance["compliant"], "violations": compliance["violations"]}
 
@@ -167,8 +177,7 @@ async def get_emission_trend(
         for r in rows.mappings().all():
             row = dict(r)
             row["compliance_rate"] = (
-                round(row["compliant_count"] / row["sample_count"] * 100, 1)
-                if row["sample_count"] else 0.0
+                round(row["compliant_count"] / row["sample_count"] * 100, 1) if row["sample_count"] else 0.0
             )
             trend.append(row)
 
@@ -234,8 +243,7 @@ async def get_waste_summary(
                 "  AND recorded_date >= :date_from AND recorded_date <= :date_to "
                 "GROUP BY waste_type"
             ),
-            {"tenant_id": tenant_id, "store_id": store_id,
-             "date_from": date_from, "date_to": date_to},
+            {"tenant_id": tenant_id, "store_id": store_id, "date_from": date_from, "date_to": date_to},
         )
         by_type = [dict(r) for r in rows.mappings().all()]
 
@@ -246,8 +254,7 @@ async def get_waste_summary(
                 "WHERE tenant_id = :tenant_id AND store_id = :store_id "
                 "  AND recorded_date >= :date_from AND recorded_date <= :date_to"
             ),
-            {"tenant_id": tenant_id, "store_id": store_id,
-             "date_from": date_from, "date_to": date_to},
+            {"tenant_id": tenant_id, "store_id": store_id, "date_from": date_from, "date_to": date_to},
         )
         totals = dict(total_row.mappings().first() or {})
 
@@ -294,11 +301,13 @@ async def check_emission_compliance(tenant_id: str, store_id: str) -> dict:
             nmhc=r.get("nmhc"),
         )
         if not check["compliant"]:
-            violations.append({
-                "record_id": r["id"],
-                "recorded_at": r["recorded_at"],
-                "violations": check["violations"],
-            })
+            violations.append(
+                {
+                    "record_id": r["id"],
+                    "recorded_at": r["recorded_at"],
+                    "violations": check["violations"],
+                }
+            )
 
     status = "compliant" if rate >= 90.0 else ("warning" if rate >= 70.0 else "non_compliant")
 

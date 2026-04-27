@@ -11,11 +11,12 @@
 金额约定：所有金额字段单位为分(fen)，1 元 = 100 分，展示层负责转换。
 所有查询显式传入 tenant_id，确保 RLS 安全隔离。
 """
+
 from __future__ import annotations
 
 import calendar
-from datetime import date, datetime, timezone
-from typing import List, Optional
+from datetime import date
+from typing import Optional
 from uuid import UUID
 
 import structlog
@@ -34,6 +35,7 @@ log = structlog.get_logger(__name__)
 # 依赖注入
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 async def get_tenant_id(x_tenant_id: str = Header(..., alias="X-Tenant-ID")) -> UUID:
     try:
         return UUID(x_tenant_id)
@@ -51,6 +53,7 @@ async def get_current_user(x_user_id: str = Header(..., alias="X-User-ID")) -> U
 # ─────────────────────────────────────────────────────────────────────────────
 # 辅助函数
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 def _ok(data: object) -> dict:
     return {"ok": True, "data": data, "error": None}
@@ -82,6 +85,7 @@ def _quarter_bounds(year: int, month: int) -> tuple[date, date]:
 # GET /overview — 费控总览
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 @router.get(
     "/overview",
     summary="费控总览",
@@ -107,7 +111,8 @@ async def get_overview(
 
     try:
         # 1) 本月费用汇总（已审批+已付款）
-        r = await db.execute(text("""
+        r = await db.execute(
+            text("""
             SELECT
                 COALESCE(SUM(total_amount), 0)                          AS month_total_fen,
                 COUNT(*)                                                AS month_count,
@@ -118,32 +123,40 @@ async def get_overview(
               AND is_deleted = false
               AND status IN ('approved', 'paid')
               AND created_at::date BETWEEN :s AND :e
-        """), {"tid": str(tenant_id), "s": m_start, "e": m_end})
+        """),
+            {"tid": str(tenant_id), "s": m_start, "e": m_end},
+        )
         row = r.mappings().one()
         month_total_fen = int(row["month_total_fen"])
         month_count = int(row["month_count"])
         month_paid_fen = int(row["month_paid_fen"])
 
         # 2) 本季度费用汇总
-        r = await db.execute(text("""
+        r = await db.execute(
+            text("""
             SELECT COALESCE(SUM(total_amount), 0) AS quarter_total_fen
             FROM expense_applications
             WHERE tenant_id = :tid
               AND is_deleted = false
               AND status IN ('approved', 'paid')
               AND created_at::date BETWEEN :s AND :e
-        """), {"tid": str(tenant_id), "s": q_start, "e": q_end})
+        """),
+            {"tid": str(tenant_id), "s": q_start, "e": q_end},
+        )
         quarter_total_fen = int(r.scalar() or 0)
 
         # 3) 上月费用（环比）
-        r = await db.execute(text("""
+        r = await db.execute(
+            text("""
             SELECT COALESCE(SUM(total_amount), 0) AS prev_total_fen
             FROM expense_applications
             WHERE tenant_id = :tid
               AND is_deleted = false
               AND status IN ('approved', 'paid')
               AND created_at::date BETWEEN :s AND :e
-        """), {"tid": str(tenant_id), "s": pm_start, "e": pm_end})
+        """),
+            {"tid": str(tenant_id), "s": pm_start, "e": pm_end},
+        )
         prev_total_fen = int(r.scalar() or 0)
 
         mom_rate = None
@@ -151,19 +164,23 @@ async def get_overview(
             mom_rate = round((month_total_fen - prev_total_fen) / prev_total_fen * 100, 2)
 
         # 4) 待审批单据
-        r = await db.execute(text("""
+        r = await db.execute(
+            text("""
             SELECT COUNT(*) AS cnt, COALESCE(SUM(total_amount), 0) AS pending_fen
             FROM expense_applications
             WHERE tenant_id = :tid
               AND is_deleted = false
               AND status = 'pending_review'
-        """), {"tid": str(tenant_id)})
+        """),
+            {"tid": str(tenant_id)},
+        )
         row = r.mappings().one()
         pending_count = int(row["cnt"])
         pending_fen = int(row["pending_fen"])
 
         # 5) 本月预算执行率（取月度预算，不存在时取年度）
-        r = await db.execute(text("""
+        r = await db.execute(
+            text("""
             SELECT total_amount, used_amount
             FROM budgets
             WHERE tenant_id = :tid
@@ -173,11 +190,14 @@ async def get_overview(
               AND budget_month = :mo
             ORDER BY created_at DESC
             LIMIT 1
-        """), {"tid": str(tenant_id), "yr": year, "mo": month})
+        """),
+            {"tid": str(tenant_id), "yr": year, "mo": month},
+        )
         budget_row = r.mappings().first()
         if not budget_row:
             # fallback: 年度预算
-            r = await db.execute(text("""
+            r = await db.execute(
+                text("""
                 SELECT total_amount, used_amount
                 FROM budgets
                 WHERE tenant_id = :tid
@@ -187,7 +207,9 @@ async def get_overview(
                   AND budget_month IS NULL
                 ORDER BY created_at DESC
                 LIMIT 1
-            """), {"tid": str(tenant_id), "yr": year})
+            """),
+                {"tid": str(tenant_id), "yr": year},
+            )
             budget_row = r.mappings().first()
 
         budget_total = int(budget_row["total_amount"]) if budget_row else None
@@ -197,7 +219,8 @@ async def get_overview(
             budget_rate = round(budget_used / budget_total * 100, 2)
 
         # 6) 发票状态（本月）
-        r = await db.execute(text("""
+        r = await db.execute(
+            text("""
             SELECT
                 COUNT(*) AS total_invoices,
                 COUNT(*) FILTER (WHERE verification_status = 'pending_verification') AS pending_verify,
@@ -207,7 +230,9 @@ async def get_overview(
             WHERE tenant_id = :tid
               AND is_deleted = false
               AND created_at::date BETWEEN :s AND :e
-        """), {"tid": str(tenant_id), "s": m_start, "e": m_end})
+        """),
+            {"tid": str(tenant_id), "s": m_start, "e": m_end},
+        )
         inv_row = r.mappings().first()
         invoice_stats = {
             "total": int(inv_row["total_invoices"]) if inv_row else 0,
@@ -216,29 +241,31 @@ async def get_overview(
             "invalid": int(inv_row["invalid"]) if inv_row else 0,
         }
 
-        return _ok({
-            "period": {"year": year, "month": month},
-            "month_expense": {
-                "total_fen": month_total_fen,
-                "paid_fen": month_paid_fen,
-                "count": month_count,
-                "mom_rate": mom_rate,
-            },
-            "quarter_expense": {
-                "total_fen": quarter_total_fen,
-                "quarter": (month - 1) // 3 + 1,
-            },
-            "pending_approval": {
-                "count": pending_count,
-                "total_fen": pending_fen,
-            },
-            "budget": {
-                "total_fen": budget_total,
-                "used_fen": budget_used,
-                "execution_rate": budget_rate,
-            },
-            "invoices": invoice_stats,
-        })
+        return _ok(
+            {
+                "period": {"year": year, "month": month},
+                "month_expense": {
+                    "total_fen": month_total_fen,
+                    "paid_fen": month_paid_fen,
+                    "count": month_count,
+                    "mom_rate": mom_rate,
+                },
+                "quarter_expense": {
+                    "total_fen": quarter_total_fen,
+                    "quarter": (month - 1) // 3 + 1,
+                },
+                "pending_approval": {
+                    "count": pending_count,
+                    "total_fen": pending_fen,
+                },
+                "budget": {
+                    "total_fen": budget_total,
+                    "used_fen": budget_used,
+                    "execution_rate": budget_rate,
+                },
+                "invoices": invoice_stats,
+            }
+        )
 
     except SQLAlchemyError as e:
         log.error("dashboard_overview_error", error=str(e), tenant_id=str(tenant_id))
@@ -248,6 +275,7 @@ async def get_overview(
 # ─────────────────────────────────────────────────────────────────────────────
 # GET /by-store — 按门店维度汇总
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @router.get(
     "/by-store",
@@ -267,7 +295,8 @@ async def get_by_store(
 
     try:
         # 费控申请按门店汇总
-        r = await db.execute(text("""
+        r = await db.execute(
+            text("""
             SELECT
                 store_id::text,
                 COUNT(*) AS application_count,
@@ -281,11 +310,14 @@ async def get_by_store(
               AND created_at::date BETWEEN :s AND :e
             GROUP BY store_id
             ORDER BY total_fen DESC
-        """), {"tid": str(tenant_id), "s": m_start, "e": m_end})
+        """),
+            {"tid": str(tenant_id), "s": m_start, "e": m_end},
+        )
         expense_rows = r.mappings().all()
 
         # 成本日报（本月均值）按门店
-        r = await db.execute(text("""
+        r = await db.execute(
+            text("""
             SELECT
                 store_id::text,
                 ROUND(AVG(food_cost_rate)::numeric, 4)     AS avg_food_cost_rate,
@@ -298,34 +330,48 @@ async def get_by_store(
               AND report_date BETWEEN :s AND :e
               AND data_status != 'pending'
             GROUP BY store_id
-        """), {"tid": str(tenant_id), "s": m_start, "e": m_end})
+        """),
+            {"tid": str(tenant_id), "s": m_start, "e": m_end},
+        )
         cost_rows = {str(r["store_id"]): r for r in r.mappings().all()}
 
         stores = []
         for row in expense_rows:
             sid = row["store_id"]
             cr = cost_rows.get(sid, {})
-            stores.append({
-                "store_id": sid,
-                "expense": {
-                    "total_fen": int(row["total_fen"]),
-                    "paid_fen": int(row["paid_fen"]),
-                    "pending_fen": int(row["pending_fen"]),
-                    "application_count": int(row["application_count"]),
-                },
-                "cost_report": {
-                    "month_revenue_fen": int(cr["month_revenue_fen"]) if cr else None,
-                    "avg_food_cost_rate": float(cr["avg_food_cost_rate"]) if cr and cr["avg_food_cost_rate"] else None,
-                    "avg_labor_cost_rate": float(cr["avg_labor_cost_rate"]) if cr and cr["avg_labor_cost_rate"] else None,
-                    "avg_gross_margin_rate": float(cr["avg_gross_margin_rate"]) if cr and cr["avg_gross_margin_rate"] else None,
-                } if cr else None,
-            })
+            stores.append(
+                {
+                    "store_id": sid,
+                    "expense": {
+                        "total_fen": int(row["total_fen"]),
+                        "paid_fen": int(row["paid_fen"]),
+                        "pending_fen": int(row["pending_fen"]),
+                        "application_count": int(row["application_count"]),
+                    },
+                    "cost_report": {
+                        "month_revenue_fen": int(cr["month_revenue_fen"]) if cr else None,
+                        "avg_food_cost_rate": float(cr["avg_food_cost_rate"])
+                        if cr and cr["avg_food_cost_rate"]
+                        else None,
+                        "avg_labor_cost_rate": float(cr["avg_labor_cost_rate"])
+                        if cr and cr["avg_labor_cost_rate"]
+                        else None,
+                        "avg_gross_margin_rate": float(cr["avg_gross_margin_rate"])
+                        if cr and cr["avg_gross_margin_rate"]
+                        else None,
+                    }
+                    if cr
+                    else None,
+                }
+            )
 
-        return _ok({
-            "period": {"year": year, "month": month},
-            "stores": stores,
-            "total_stores": len(stores),
-        })
+        return _ok(
+            {
+                "period": {"year": year, "month": month},
+                "stores": stores,
+                "total_stores": len(stores),
+            }
+        )
 
     except SQLAlchemyError as e:
         log.error("dashboard_by_store_error", error=str(e), tenant_id=str(tenant_id))
@@ -335,6 +381,7 @@ async def get_by_store(
 # ─────────────────────────────────────────────────────────────────────────────
 # GET /by-category — 按科目维度汇总
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @router.get(
     "/by-category",
@@ -353,7 +400,8 @@ async def get_by_category(
     m_start, m_end = _month_bounds(year, month)
 
     try:
-        r = await db.execute(text("""
+        r = await db.execute(
+            text("""
             SELECT
                 ea.category_id::text,
                 ec.name            AS category_name,
@@ -369,7 +417,9 @@ async def get_by_category(
               AND ea.created_at::date BETWEEN :s AND :e
             GROUP BY ea.category_id, ec.name, ec.parent_id
             ORDER BY total_fen DESC
-        """), {"tid": str(tenant_id), "s": m_start, "e": m_end})
+        """),
+            {"tid": str(tenant_id), "s": m_start, "e": m_end},
+        )
         rows = r.mappings().all()
 
         grand_total = sum(int(r["total_fen"]) for r in rows)
@@ -377,20 +427,24 @@ async def get_by_category(
         categories = []
         for row in rows:
             total = int(row["total_fen"])
-            categories.append({
-                "category_id": row["category_id"],
-                "category_name": row["category_name"],
-                "parent_id": row["parent_id"],
-                "total_fen": total,
-                "ratio": round(total / grand_total * 100, 2) if grand_total > 0 else 0,
-                "application_count": int(row["application_count"]),
-            })
+            categories.append(
+                {
+                    "category_id": row["category_id"],
+                    "category_name": row["category_name"],
+                    "parent_id": row["parent_id"],
+                    "total_fen": total,
+                    "ratio": round(total / grand_total * 100, 2) if grand_total > 0 else 0,
+                    "application_count": int(row["application_count"]),
+                }
+            )
 
-        return _ok({
-            "period": {"year": year, "month": month},
-            "grand_total_fen": grand_total,
-            "categories": categories,
-        })
+        return _ok(
+            {
+                "period": {"year": year, "month": month},
+                "grand_total_fen": grand_total,
+                "categories": categories,
+            }
+        )
 
     except SQLAlchemyError as e:
         log.error("dashboard_by_category_error", error=str(e), tenant_id=str(tenant_id))
@@ -400,6 +454,7 @@ async def get_by_category(
 # ─────────────────────────────────────────────────────────────────────────────
 # GET /trend — 费用趋势
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @router.get(
     "/trend",
@@ -428,7 +483,8 @@ async def get_trend(
         month_ends = [date(p[0], p[1], calendar.monthrange(p[0], p[1])[1]) for p in periods]
 
         # 批量查询所有月份
-        r = await db.execute(text("""
+        r = await db.execute(
+            text("""
             SELECT
                 DATE_TRUNC('month', created_at)::date AS month_start,
                 COALESCE(SUM(total_amount), 0)        AS total_fen,
@@ -440,11 +496,13 @@ async def get_trend(
               AND created_at::date BETWEEN :start AND :end
             GROUP BY DATE_TRUNC('month', created_at)
             ORDER BY month_start
-        """), {
-            "tid": str(tenant_id),
-            "start": month_starts[0],
-            "end": month_ends[-1],
-        })
+        """),
+            {
+                "tid": str(tenant_id),
+                "start": month_starts[0],
+                "end": month_ends[-1],
+            },
+        )
         rows_by_month = {row["month_start"]: row for row in r.mappings().all()}
 
         trend = []
@@ -456,13 +514,15 @@ async def get_trend(
             mom = None
             if prev_total is not None and prev_total > 0:
                 mom = round((total - prev_total) / prev_total * 100, 2)
-            trend.append({
-                "year": y2,
-                "month": m2,
-                "total_fen": total,
-                "application_count": count,
-                "mom_rate": mom,
-            })
+            trend.append(
+                {
+                    "year": y2,
+                    "month": m2,
+                    "total_fen": total,
+                    "application_count": count,
+                    "mom_rate": mom,
+                }
+            )
             prev_total = total
 
         return _ok({"months": months, "trend": trend})
@@ -475,6 +535,7 @@ async def get_trend(
 # ─────────────────────────────────────────────────────────────────────────────
 # GET /top-applicants — 高频申请人排行
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @router.get(
     "/top-applicants",
@@ -494,7 +555,8 @@ async def get_top_applicants(
     m_start, m_end = _month_bounds(year, month)
 
     try:
-        r = await db.execute(text("""
+        r = await db.execute(
+            text("""
             SELECT
                 applicant_id::text,
                 COUNT(*)                          AS application_count,
@@ -512,28 +574,34 @@ async def get_top_applicants(
             GROUP BY applicant_id
             ORDER BY total_fen DESC
             LIMIT :lim
-        """), {"tid": str(tenant_id), "s": m_start, "e": m_end, "lim": limit})
+        """),
+            {"tid": str(tenant_id), "s": m_start, "e": m_end, "lim": limit},
+        )
         rows = r.mappings().all()
 
         applicants = []
         for i, row in enumerate(rows):
-            applicants.append({
-                "rank": i + 1,
-                "applicant_id": row["applicant_id"],
-                "application_count": int(row["application_count"]),
-                "total_fen": int(row["total_fen"]),
-                "avg_fen": int(row["avg_fen"]),
-                "pending_count": int(row["pending_count"]),
-                "approved_count": int(row["approved_count"]),
-                "rejected_count": int(row["rejected_count"]),
-                "last_applied_at": row["last_applied_at"].isoformat() if row["last_applied_at"] else None,
-            })
+            applicants.append(
+                {
+                    "rank": i + 1,
+                    "applicant_id": row["applicant_id"],
+                    "application_count": int(row["application_count"]),
+                    "total_fen": int(row["total_fen"]),
+                    "avg_fen": int(row["avg_fen"]),
+                    "pending_count": int(row["pending_count"]),
+                    "approved_count": int(row["approved_count"]),
+                    "rejected_count": int(row["rejected_count"]),
+                    "last_applied_at": row["last_applied_at"].isoformat() if row["last_applied_at"] else None,
+                }
+            )
 
-        return _ok({
-            "period": {"year": year, "month": month},
-            "limit": limit,
-            "applicants": applicants,
-        })
+        return _ok(
+            {
+                "period": {"year": year, "month": month},
+                "limit": limit,
+                "applicants": applicants,
+            }
+        )
 
     except SQLAlchemyError as e:
         log.error("dashboard_top_applicants_error", error=str(e), tenant_id=str(tenant_id))

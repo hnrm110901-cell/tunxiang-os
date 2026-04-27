@@ -25,13 +25,13 @@ lifecycle_router.py（3个）：
 14. GET  /api/v1/members/lifecycle/at-risk      — 正常风险列表
 15. GET  /api/v1/members/{id}/lifecycle         — 会员不存在 → 404
 """
+
 import os
 import sys
 import types
 import uuid
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
@@ -115,6 +115,7 @@ _MOCK_LC_SVC = _inject_stubs()
 
 # ─── 辅助 ─────────────────────────────────────────────────────────────────
 
+
 def _uid() -> str:
     return str(uuid.uuid4())
 
@@ -135,6 +136,7 @@ addr_app.include_router(addr_mod.router)
 def _addr_override(db_mock):
     async def _dep():
         return db_mock
+
     addr_app.dependency_overrides[addr_mod.get_db] = _dep
 
 
@@ -147,14 +149,18 @@ invite_app.include_router(invite_mod.router)
 def _invite_override(db_mock):
     async def _dep():
         return db_mock
+
     invite_app.dependency_overrides[invite_mod.get_db] = _dep
 
 
 # --- lifecycle_routes (相对导入 ..services.lifecycle_service) ---
 # 需要通过 patch 注入服务单例
-with patch.dict(sys.modules, {
-    "services.lifecycle_service": sys.modules["services.lifecycle_service"],
-}):
+with patch.dict(
+    sys.modules,
+    {
+        "services.lifecycle_service": sys.modules["services.lifecycle_service"],
+    },
+):
     lc_mod = importlib.import_module("api.lifecycle_routes")
 
 lc_app = FastAPI()
@@ -166,13 +172,17 @@ lc_mod._service = _MOCK_LC_SVC
 def _lc_override(db_mock):
     async def _dep():
         return db_mock
+
     lc_app.dependency_overrides[lc_mod.get_db] = _dep
 
 
 # --- lifecycle_router ---
-with patch.dict(sys.modules, {
-    "services.lifecycle_service": sys.modules["services.lifecycle_service"],
-}):
+with patch.dict(
+    sys.modules,
+    {
+        "services.lifecycle_service": sys.modules["services.lifecycle_service"],
+    },
+):
     lcr_mod = importlib.import_module("api.lifecycle_router")
 
 lcr_app = FastAPI()
@@ -183,12 +193,14 @@ lcr_mod._service = _MOCK_LC_SVC
 def _lcr_override(db_mock):
     async def _dep():
         return db_mock
+
     lcr_app.dependency_overrides[lcr_mod.get_db] = _dep
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # ★ address_routes — 5 个测试
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 # 场景 1: GET /addresses — 正常列表
 def test_addr_list_ok():
@@ -218,7 +230,7 @@ def test_addr_create_missing_fields():
     client = TestClient(addr_app)
     resp = client.post(
         "/api/v1/member/addresses",
-        json={"customer_id": _uid()},   # 缺少 name, phone
+        json={"customer_id": _uid()},  # 缺少 name, phone
         headers=HEADERS,
     )
     assert resp.status_code == 422
@@ -271,11 +283,13 @@ def test_addr_set_default_not_found():
     clear_result = MagicMock()
     not_found_result = MagicMock()
     not_found_result.first.return_value = None
-    db.execute = AsyncMock(side_effect=[
-        MagicMock(),    # _set_rls
-        clear_result,   # _clear_default
-        not_found_result,  # UPDATE ... RETURNING id
-    ])
+    db.execute = AsyncMock(
+        side_effect=[
+            MagicMock(),  # _set_rls
+            clear_result,  # _clear_default
+            not_found_result,  # UPDATE ... RETURNING id
+        ]
+    )
     _addr_override(db)
 
     client = TestClient(addr_app)
@@ -292,6 +306,7 @@ def test_addr_set_default_not_found():
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # ★ invite_routes — 4 个测试
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 # 场景 6: GET /invite/my-code — 已有邀请码
 def test_invite_my_code_existing():
@@ -333,12 +348,14 @@ def test_invite_records_ok():
     rows_result = MagicMock()
     rows_result.all.return_value = []
 
-    db.execute = AsyncMock(side_effect=[
-        MagicMock(),     # _set_rls
-        summary_result,  # summary 汇总
-        cnt_result,      # COUNT(*)
-        rows_result,     # 明细
-    ])
+    db.execute = AsyncMock(
+        side_effect=[
+            MagicMock(),  # _set_rls
+            summary_result,  # summary 汇总
+            cnt_result,  # COUNT(*)
+            rows_result,  # 明细
+        ]
+    )
     _invite_override(db)
 
     client = TestClient(invite_app)
@@ -390,11 +407,13 @@ def test_invite_claim_duplicate():
     code_result = MagicMock()
     code_result.first.return_value = code_rec
 
-    db.execute = AsyncMock(side_effect=[
-        MagicMock(),    # _set_rls
-        code_result,    # SELECT invite_codes
-        IntegrityError("", None, None),  # INSERT invite_records 冲突
-    ])
+    db.execute = AsyncMock(
+        side_effect=[
+            MagicMock(),  # _set_rls
+            code_result,  # SELECT invite_codes
+            IntegrityError("", None, None),  # INSERT invite_records 冲突
+        ]
+    )
 
     _invite_override(db)
 
@@ -412,6 +431,7 @@ def test_invite_claim_duplicate():
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # ★ lifecycle_routes — 3 个测试
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 # 场景 10: GET /lifecycle/stats — 正常统计
 def test_lifecycle_stats_ok():
@@ -444,11 +464,13 @@ def test_lifecycle_members_active_ok():
     count_result.scalar.return_value = 0
     rows_result = MagicMock()
     rows_result.fetchall.return_value = []
-    db.execute = AsyncMock(side_effect=[
-        MagicMock(),   # _set_rls
-        count_result,  # COUNT(*)
-        rows_result,   # SELECT list
-    ])
+    db.execute = AsyncMock(
+        side_effect=[
+            MagicMock(),  # _set_rls
+            count_result,  # COUNT(*)
+            rows_result,  # SELECT list
+        ]
+    )
     _lc_override(db)
 
     client = TestClient(lc_app)
@@ -481,6 +503,7 @@ def test_lifecycle_members_invalid_stage():
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # ★ lifecycle_router — 3 个测试
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 # 场景 13: GET /members/lifecycle/distribution — 正常分布
 def test_lcr_distribution_ok():

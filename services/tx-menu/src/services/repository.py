@@ -3,6 +3,7 @@
 封装 Dish / DishCategory 的 CRUD，使用 SQLAlchemy async 查询。
 所有方法设置 RLS tenant context 后执行查询。
 """
+
 import uuid
 from typing import Optional
 
@@ -40,14 +41,10 @@ class DishRepository:
         await self._set_tenant()
 
         base = (
-            select(Dish)
-            .where(Dish.tenant_id == self._tenant_uuid)
-            .where(Dish.is_deleted == False)  # noqa: E712
+            select(Dish).where(Dish.tenant_id == self._tenant_uuid).where(Dish.is_deleted == False)  # noqa: E712
         )
         count_base = (
-            select(func.count(Dish.id))
-            .where(Dish.tenant_id == self._tenant_uuid)
-            .where(Dish.is_deleted == False)  # noqa: E712
+            select(func.count(Dish.id)).where(Dish.tenant_id == self._tenant_uuid).where(Dish.is_deleted == False)  # noqa: E712
         )
 
         if category_id:
@@ -120,10 +117,22 @@ class DishRepository:
             raise ValueError(f"Dish not found: {dish_id}")
 
         updatable_fields = [
-            "dish_name", "price_fen", "original_price_fen", "cost_fen",
-            "description", "image_url", "kitchen_station", "preparation_time",
-            "unit", "spicy_level", "is_available", "is_recommended", "sort_order",
-            "tags", "allergens", "calories",
+            "dish_name",
+            "price_fen",
+            "original_price_fen",
+            "cost_fen",
+            "description",
+            "image_url",
+            "kitchen_station",
+            "preparation_time",
+            "unit",
+            "spicy_level",
+            "is_available",
+            "is_recommended",
+            "sort_order",
+            "tags",
+            "allergens",
+            "calories",
         ]
         for field in updatable_fields:
             if field in data:

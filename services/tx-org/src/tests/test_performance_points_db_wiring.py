@@ -1,4 +1,5 @@
 """绩效积分 API 已接 DB：静态检查（不启动 app）。"""
+
 from pathlib import Path
 
 

@@ -1,0 +1,93 @@
+{
+  "merchant": "尝在一起",
+  "merchant_id": "changzaiyiqi",
+  "evaluated_at": "2026-04-26",
+  "evaluator": "屯象产品 + 品智 POS 技术团队",
+  "environment": "Pilot Candidate",
+  "score": 88,
+  "dimensions": {
+    "transaction_fulfillment": {
+      "weight": 0.25,
+      "score": 95,
+      "notes": "品智 POS 适配器成熟，快餐连锁核心链路全覆盖",
+      "evidence": [
+        "品智 Adapter 已完成 100%（shared/adapters/pinzhi）",
+        "门店数 5 家，技术栈单一，替代风险低",
+        "支付宝 V3 + 多方结算引擎已交付",
+        "卡券内核持久化完成"
+      ]
+    },
+    "supply_chain": {
+      "weight": 0.15,
+      "score": 80,
+      "notes": "快餐 SKU 少，库存管理简单，统一商品中心满足需求",
+      "evidence": [
+        "库存 SKU 300+，BOM 简单",
+        "统一商品中心 Phase 1-5 + Sprint B1-B7 交付",
+        "tx-supply 覆盖库存/BOM/采购/食安"
+      ]
+    },
+    "financial_settlement": {
+      "weight": 0.15,
+      "score": 85,
+      "notes": "小型连锁财务需求适中，费控系统满足日常管控",
+      "evidence": [
+        "费控管理系统 27 表 + 6 AI Agent 交付",
+        "全电发票日均 200+ 张",
+        "无跨省税务复杂度"
+      ]
+    },
+    "member_growth": {
+      "weight": 0.15,
+      "score": 90,
+      "notes": "Sprint P 私域6模块 + S1-S4 全量交付，快餐会员运营场景全覆盖",
+      "evidence": [
+        "活码/人群包/营销任务/社群/素材库/客户旅程SOP",
+        "流失预测 + 游戏化 + 拼团适配快餐高频消费",
+        "3 个营销 Agent（策略/路由/优化）",
+        "会员数据 8000+ 可直接导入 CDP"
+      ]
+    },
+    "ai_intelligence": {
+      "weight": 0.15,
+      "score": 90,
+      "notes": "SOP 时间轴 + 巡店 Agent 为主，AI 运营教练提升管控自动化",
+      "evidence": [
+        "SOP 时间轴引擎 + 记忆进化系统",
+        "AI 运营教练 4 模式上线",
+        "小店 AI 投入产出比通过管控自动化提升"
+      ]
+    },
+    "organization_hr": {
+      "weight": 0.10,
+      "score": 80,
+      "notes": "5 家门店 40 人，排班/角色管理需求简单",
+      "evidence": [
+        "tx-org 45 路由文件覆盖员工/排班/角色/绩效/薪资",
+        "技术总监配合意愿强，培训周期短"
+      ]
+    },
+    "compliance_security": {
+      "weight": 0.05,
+      "score": 85,
+      "notes": "单城市运营，合规复杂度低",
+      "evidence": [
+        "等保三级合规 Phase 0-5 完成",
+        "RLS 租户隔离完整",
+        "金税四期基本覆盖"
+      ]
+    }
+  },
+  "risks": [
+    {
+      "risk": "员工对 AI 接受度不确定",
+      "severity": "low",
+      "mitigation": "先从 SOP 任务推送开始，循序渐进"
+    }
+  ],
+  "go_no_go_recommendation": "GO",
+  "conditions": [
+    "Week 9 前完成 Pilot 一家门店（当前最成熟的长沙店）",
+    "Week 10 前评估 Pilot KPI，达标则全量 5 店"
+  ]
+}

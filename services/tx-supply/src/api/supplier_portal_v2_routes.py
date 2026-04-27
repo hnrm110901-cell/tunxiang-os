@@ -7,17 +7,18 @@ Y-E10
 - 所有写操作有结构化审计日志
 - 所有端点均查询真实数据库（supplier_accounts / supplier_rfq_requests / purchase_orders）
 """
+
 from __future__ import annotations
 
 import uuid
 from datetime import date, datetime, timezone
-from typing import Optional, List
+from typing import Optional
 
 import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from fastapi import status as http_status
 from pydantic import BaseModel, Field
-from sqlalchemy.exc import OperationalError, ProgrammingError, InterfaceError
+from sqlalchemy.exc import InterfaceError, OperationalError, ProgrammingError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql import text
 
@@ -34,6 +35,7 @@ router = APIRouter(
 # ──────────────────────────────────────────────────────────────────────────────
 # 通用工具
 # ──────────────────────────────────────────────────────────────────────────────
+
 
 def _db_unavailable_response() -> dict:
     """显式 DB 不可用响应 — 禁止静默降级"""
@@ -71,6 +73,7 @@ async def _set_tenant(db: AsyncSession, tenant_id: str) -> None:
 # ──────────────────────────────────────────────────────────────────────────────
 # 请求体
 # ──────────────────────────────────────────────────────────────────────────────
+
 
 class SupplierLoginRequest(BaseModel):
     phone: str = Field(min_length=11, max_length=11, description="供应商手机号")
@@ -425,8 +428,10 @@ async def submit_rfq_quote(
     except (OperationalError, InterfaceError) as exc:
         await db.rollback()
         logger.error(
-            "rfq_quote_db_error", error=str(exc),
-            rfq_id=rfq_id, tenant_id=x_tenant_id,
+            "rfq_quote_db_error",
+            error=str(exc),
+            rfq_id=rfq_id,
+            tenant_id=x_tenant_id,
         )
         raise HTTPException(
             status_code=http_status.HTTP_503_SERVICE_UNAVAILABLE,

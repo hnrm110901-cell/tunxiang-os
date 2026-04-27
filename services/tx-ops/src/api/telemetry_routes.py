@@ -12,6 +12,7 @@
 
 统一响应: {"ok": bool, "data": {}, "error": {}}
 """
+
 from __future__ import annotations
 
 import time
@@ -66,16 +67,11 @@ _MAX_FIELD_LEN = 512
 
 
 class PosCrashReport(BaseModel):
-    device_id: str = Field(..., min_length=1, max_length=_MAX_FIELD_LEN,
-                           description="POS 设备指纹或商米 SN")
-    route: Optional[str] = Field(None, max_length=_MAX_FIELD_LEN,
-                                 description="崩溃时前端路由")
-    error_stack: Optional[str] = Field(None, max_length=_MAX_STACK_LEN,
-                                       description="前端捕获的错误堆栈")
-    user_action: Optional[str] = Field(None, max_length=_MAX_FIELD_LEN,
-                                       description="崩溃前最后用户动作摘要")
-    store_id: Optional[str] = Field(None, max_length=64,
-                                    description="门店 UUID（登录前可空）")
+    device_id: str = Field(..., min_length=1, max_length=_MAX_FIELD_LEN, description="POS 设备指纹或商米 SN")
+    route: Optional[str] = Field(None, max_length=_MAX_FIELD_LEN, description="崩溃时前端路由")
+    error_stack: Optional[str] = Field(None, max_length=_MAX_STACK_LEN, description="前端捕获的错误堆栈")
+    user_action: Optional[str] = Field(None, max_length=_MAX_FIELD_LEN, description="崩溃前最后用户动作摘要")
+    store_id: Optional[str] = Field(None, max_length=64, description="门店 UUID（登录前可空）")
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -164,14 +160,11 @@ async def report_pos_crash(
         await db.commit()
     except SQLAlchemyError as exc:
         await db.rollback()
-        log.error("pos_crash_report_db_error",
-                  error=str(exc), tenant_id=x_tenant_id, device_id=device_id)
+        log.error("pos_crash_report_db_error", error=str(exc), tenant_id=x_tenant_id, device_id=device_id)
         raise HTTPException(
             status_code=500,
             detail={"code": "INTERNAL_ERROR", "message": "上报暂时不可用，请稍后重试"},
         )
 
-    log.info("pos_crash_reported",
-             report_id=report_id, tenant_id=x_tenant_id,
-             device_id=device_id, route=body.route)
+    log.info("pos_crash_reported", report_id=report_id, tenant_id=x_tenant_id, device_id=device_id, route=body.route)
     return {"ok": True, "data": {"report_id": report_id}}

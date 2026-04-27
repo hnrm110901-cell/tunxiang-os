@@ -13,6 +13,7 @@
   - emit_event 通过 patch("asyncio.create_task") 拦截
   - 测试全部同步（TestClient）
 """
+
 from __future__ import annotations
 
 import uuid
@@ -20,12 +21,12 @@ from datetime import date
 from typing import AsyncGenerator
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from ..api.haccp_routes import router as haccp_router
 from shared.ontology.src.database import get_db
+
+from ..api.haccp_routes import router as haccp_router
 
 # ── 应用组装 ──────────────────────────────────────────────────────────────────
 
@@ -42,6 +43,7 @@ HEADERS = {"X-Tenant-ID": TENANT_ID}
 
 
 # ── DB Mock 工具 ──────────────────────────────────────────────────────────────
+
 
 def _make_db_mock(
     scalar_value=0,
@@ -95,6 +97,7 @@ def _make_db_mock(
 
 def _override_db(db_mock):
     """返回一个替换 get_db 依赖的覆盖函数（生成器形式）。"""
+
     async def _override() -> AsyncGenerator:
         yield db_mock
 
@@ -381,9 +384,7 @@ class TestCreateRecord:
     def _make_plan_row_mock(self):
         """模拟查询计划 checklist 的 DB 返回。"""
         plan_mapping = MagicMock()
-        plan_mapping.__getitem__ = MagicMock(
-            side_effect=lambda k: self._plan_checklist if k == "checklist" else None
-        )
+        plan_mapping.__getitem__ = MagicMock(side_effect=lambda k: self._plan_checklist if k == "checklist" else None)
         plan_mapping.__contains__ = MagicMock(side_effect=lambda k: k in {"checklist"})
 
         plan_result = MagicMock()
@@ -461,9 +462,7 @@ class TestCreateRecord:
         mappings_none.first = MagicMock(return_value=None)
         plan_result_none.mappings = MagicMock(return_value=mappings_none)
 
-        db_mock.execute = AsyncMock(
-            side_effect=[AsyncMock(), plan_result_none, SQLAlchemyError("insert failed")]
-        )
+        db_mock.execute = AsyncMock(side_effect=[AsyncMock(), plan_result_none, SQLAlchemyError("insert failed")])
 
         app.dependency_overrides[get_db] = _override_db(db_mock)
         try:

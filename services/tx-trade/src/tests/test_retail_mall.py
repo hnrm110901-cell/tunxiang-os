@@ -9,6 +9,7 @@
 6. 礼品卡列表 (正常)
 7. 校验函数单元测试
 """
+
 import os
 import sys
 
@@ -27,6 +28,7 @@ TENANT_HEADER = {"X-Tenant-ID": "test-tenant-001"}
 
 
 # ── 1. 商品列表 ──────────────────────────────────────────────
+
 
 class TestListProducts:
     def test_list_all_products(self):
@@ -60,6 +62,7 @@ class TestListProducts:
 
 # ── 2. 商品详情 ──────────────────────────────────────────────
 
+
 class TestProductDetail:
     def test_get_product_detail(self):
         r = client.get(
@@ -73,6 +76,7 @@ class TestProductDetail:
 
 
 # ── 3. 创建零售订单 ──────────────────────────────────────────
+
 
 class TestCreateRetailOrder:
     def test_create_order_ok(self):
@@ -145,6 +149,7 @@ class TestCreateRetailOrder:
 
 # ── 4. 会员折扣 ──────────────────────────────────────────────
 
+
 class TestMemberDiscount:
     def test_apply_discount(self):
         r = client.post(
@@ -161,6 +166,7 @@ class TestMemberDiscount:
 
 # ── 5. 快递追踪 ──────────────────────────────────────────────
 
+
 class TestDeliveryTracking:
     def test_track_delivery(self):
         r = client.get(
@@ -175,6 +181,7 @@ class TestDeliveryTracking:
 
 # ── 6. 礼品卡列表 ────────────────────────────────────────────
 
+
 class TestGiftCards:
     def test_list_gift_cards(self):
         r = client.get("/api/v1/retail/gift-cards", headers=TENANT_HEADER)
@@ -186,46 +193,62 @@ class TestGiftCards:
 
 # ── 7. 服务层校验函数单元测试 ────────────────────────────────
 
+
 class TestValidationHelpers:
     def test_validate_retail_items_ok(self):
         from services.retail_mall import validate_retail_items
-        ok, msg = validate_retail_items([
-            {"product_id": "p1", "sku_id": "s1", "quantity": 2},
-        ])
+
+        ok, msg = validate_retail_items(
+            [
+                {"product_id": "p1", "sku_id": "s1", "quantity": 2},
+            ]
+        )
         assert ok is True
         assert msg == "ok"
 
     def test_validate_retail_items_empty(self):
         from services.retail_mall import validate_retail_items
+
         ok, msg = validate_retail_items([])
         assert ok is False
         assert msg == "items_empty"
 
     def test_validate_retail_items_missing_product_id(self):
         from services.retail_mall import validate_retail_items
+
         ok, msg = validate_retail_items([{"sku_id": "s1", "quantity": 1}])
         assert ok is False
         assert "missing_product_id" in msg
 
     def test_validate_retail_items_invalid_quantity(self):
         from services.retail_mall import validate_retail_items
-        ok, msg = validate_retail_items([
-            {"product_id": "p1", "sku_id": "s1", "quantity": -1},
-        ])
+
+        ok, msg = validate_retail_items(
+            [
+                {"product_id": "p1", "sku_id": "s1", "quantity": -1},
+            ]
+        )
         assert ok is False
         assert "invalid_quantity" in msg
 
     def test_validate_address_ok(self):
         from services.retail_mall import validate_address
-        ok, msg = validate_address({
-            "name": "张三", "phone": "13800138000",
-            "province": "湖南省", "city": "长沙市",
-            "district": "岳麓区", "detail": "银盆南路xxx号",
-        })
+
+        ok, msg = validate_address(
+            {
+                "name": "张三",
+                "phone": "13800138000",
+                "province": "湖南省",
+                "city": "长沙市",
+                "district": "岳麓区",
+                "detail": "银盆南路xxx号",
+            }
+        )
         assert ok is True
 
     def test_validate_address_missing_field(self):
         from services.retail_mall import validate_address
+
         ok, msg = validate_address({"name": "张三"})
         assert ok is False
         assert "missing_address_field" in msg

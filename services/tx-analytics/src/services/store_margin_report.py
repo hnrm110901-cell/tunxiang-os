@@ -6,6 +6,7 @@ TOP 成本菜品、异常预警等。
 金额单位: 分(fen), int
 毛利率: 百分比, Decimal(5,2)
 """
+
 import uuid
 from datetime import date, timedelta
 from decimal import ROUND_HALF_UP, Decimal
@@ -15,13 +16,14 @@ import structlog
 log = structlog.get_logger()
 
 # ─── 默认配置 ───
-COST_VARIANCE_WARNING_PCT = Decimal("5.00")    # 成本偏差 >5% 预警
+COST_VARIANCE_WARNING_PCT = Decimal("5.00")  # 成本偏差 >5% 预警
 COST_VARIANCE_CRITICAL_PCT = Decimal("10.00")  # 成本偏差 >10% 严重
-TARGET_MARGIN_RATE = Decimal("60.00")          # 目标毛利率 60%
-TOP_COST_DISH_COUNT = 5                        # TOP 成本菜品数量
+TARGET_MARGIN_RATE = Decimal("60.00")  # 目标毛利率 60%
+TOP_COST_DISH_COUNT = 5  # TOP 成本菜品数量
 
 
 # ─── 纯函数 ───
+
 
 def compute_margin_rate(revenue_fen: int, cost_fen: int) -> Decimal:
     """计算毛利率（百分比）"""
@@ -48,9 +50,9 @@ def compute_cost_variance(
     variance_fen = actual_cost_fen - theoretical_cost_fen
 
     if theoretical_cost_fen > 0:
-        variance_rate = (
-            Decimal(abs(variance_fen)) / Decimal(theoretical_cost_fen) * 100
-        ).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        variance_rate = (Decimal(abs(variance_fen)) / Decimal(theoretical_cost_fen) * 100).quantize(
+            Decimal("0.01"), rounding=ROUND_HALF_UP
+        )
     else:
         variance_rate = Decimal("0.00")
 
@@ -84,17 +86,21 @@ def build_daily_report(
     # 生成预警
     alerts = []
     if actual_margin_rate < TARGET_MARGIN_RATE:
-        alerts.append({
-            "type": "low_margin",
-            "message": f"实际毛利率 {actual_margin_rate}% 低于目标 {TARGET_MARGIN_RATE}%",
-            "severity": "warning" if actual_margin_rate >= TARGET_MARGIN_RATE - 10 else "critical",
-        })
+        alerts.append(
+            {
+                "type": "low_margin",
+                "message": f"实际毛利率 {actual_margin_rate}% 低于目标 {TARGET_MARGIN_RATE}%",
+                "severity": "warning" if actual_margin_rate >= TARGET_MARGIN_RATE - 10 else "critical",
+            }
+        )
     if variance["status"] != "ok":
-        alerts.append({
-            "type": "cost_variance",
-            "message": f"成本偏差 {variance['variance_rate']}%（{variance['status']}）",
-            "severity": variance["status"],
-        })
+        alerts.append(
+            {
+                "type": "cost_variance",
+                "message": f"成本偏差 {variance['variance_rate']}%（{variance['status']}）",
+                "severity": variance["status"],
+            }
+        )
 
     return {
         "store_id": store_id,
@@ -113,6 +119,7 @@ def build_daily_report(
 
 
 # ─── 业务函数 ───
+
 
 def generate_daily_margin_report(
     store_id: uuid.UUID,
@@ -196,12 +203,14 @@ def generate_period_margin_trend(
         cost = _get_daily_actual_cost(store_id, current, tenant_id, db)
         margin_rate = compute_margin_rate(revenue, cost)
 
-        daily_data.append({
-            "date": str(current),
-            "revenue_fen": revenue,
-            "cost_fen": cost,
-            "margin_rate": margin_rate,
-        })
+        daily_data.append(
+            {
+                "date": str(current),
+                "revenue_fen": revenue,
+                "cost_fen": cost,
+                "margin_rate": margin_rate,
+            }
+        )
         current += timedelta(days=1)
 
     # 汇总
@@ -252,6 +261,7 @@ def generate_period_margin_trend(
 
 # ─── DB 访问桩 ───
 
+
 def _get_daily_revenue(
     store_id: uuid.UUID,
     target_date: date,
@@ -263,7 +273,9 @@ def _get_daily_revenue(
         return 0
     try:
         from sqlalchemy import text
-        result = db.execute(text("""
+
+        result = db.execute(
+            text("""
             SELECT COALESCE(SUM(final_amount_fen), 0)
             FROM orders
             WHERE store_id = :store_id
@@ -271,7 +283,9 @@ def _get_daily_revenue(
               AND DATE(order_time) = :target_date
               AND status IN ('completed', 'paid')
               AND is_deleted = FALSE
-        """), {"store_id": store_id, "tenant_id": tenant_id, "target_date": target_date})
+        """),
+            {"store_id": store_id, "tenant_id": tenant_id, "target_date": target_date},
+        )
         return result.scalar_one_or_none() or 0
     except (ImportError, AttributeError):
         return 0
@@ -292,7 +306,9 @@ def _get_daily_theoretical_cost(
         return 0
     try:
         from sqlalchemy import text
-        result = db.execute(text("""
+
+        result = db.execute(
+            text("""
             SELECT COALESCE(SUM(oi.food_cost_fen * oi.quantity), 0)
             FROM order_items oi
             JOIN orders o ON oi.order_id = o.id
@@ -303,7 +319,9 @@ def _get_daily_theoretical_cost(
               AND o.is_deleted = FALSE
               AND oi.is_deleted = FALSE
               AND oi.food_cost_fen IS NOT NULL
-        """), {"store_id": store_id, "tenant_id": tenant_id, "target_date": target_date})
+        """),
+            {"store_id": store_id, "tenant_id": tenant_id, "target_date": target_date},
+        )
         return result.scalar_one_or_none() or 0
     except (ImportError, AttributeError):
         return 0
@@ -320,7 +338,9 @@ def _get_daily_actual_cost(
         return 0
     try:
         from sqlalchemy import text
-        result = db.execute(text("""
+
+        result = db.execute(
+            text("""
             SELECT COALESCE(SUM(ABS(total_cost_fen)), 0)
             FROM ingredient_transactions
             WHERE store_id = :store_id
@@ -328,7 +348,9 @@ def _get_daily_actual_cost(
               AND transaction_type = 'usage'
               AND DATE(transaction_time) = :target_date
               AND is_deleted = FALSE
-        """), {"store_id": store_id, "tenant_id": tenant_id, "target_date": target_date})
+        """),
+            {"store_id": store_id, "tenant_id": tenant_id, "target_date": target_date},
+        )
         return result.scalar_one_or_none() or 0
     except (ImportError, AttributeError):
         return 0
@@ -346,7 +368,9 @@ def _get_top_cost_dishes(
         return []
     try:
         from sqlalchemy import text
-        result = db.execute(text("""
+
+        result = db.execute(
+            text("""
             SELECT oi.dish_id, d.dish_name,
                    SUM(oi.quantity) as qty,
                    SUM(COALESCE(oi.food_cost_fen, 0) * oi.quantity) as total_cost_fen,
@@ -363,12 +387,14 @@ def _get_top_cost_dishes(
             GROUP BY oi.dish_id, d.dish_name
             ORDER BY total_cost_fen DESC
             LIMIT :limit
-        """), {
-            "store_id": store_id,
-            "tenant_id": tenant_id,
-            "target_date": target_date,
-            "limit": limit,
-        })
+        """),
+            {
+                "store_id": store_id,
+                "tenant_id": tenant_id,
+                "target_date": target_date,
+                "limit": limit,
+            },
+        )
         return [dict(row) for row in result.mappings().all()]
     except (ImportError, AttributeError):
         return []

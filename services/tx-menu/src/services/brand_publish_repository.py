@@ -3,6 +3,7 @@
 所有方法先调用 _set_tenant() 设置 RLS context，严格多租户隔离。
 金额统一用 int（分）。
 """
+
 import json
 import uuid
 from datetime import datetime
@@ -188,14 +189,16 @@ class BrandPublishRepository:
             )
             row = result.fetchone()
             if row:
-                results.append({
-                    "id": str(row[0]),
-                    "plan_id": str(row[1]),
-                    "dish_id": str(row[2]),
-                    "override_price_fen": row[3],
-                    "is_available": row[4],
-                    "created_at": row[5].isoformat() if row[5] else None,
-                })
+                results.append(
+                    {
+                        "id": str(row[0]),
+                        "plan_id": str(row[1]),
+                        "dish_id": str(row[2]),
+                        "override_price_fen": row[3],
+                        "is_available": row[4],
+                        "created_at": row[5].isoformat() if row[5] else None,
+                    }
+                )
         return results
 
     async def get_plan_items(self, plan_id: str) -> list[dict]:
@@ -229,9 +232,7 @@ class BrandPublishRepository:
             for r in rows
         ]
 
-    async def get_plan_override_for_dish(
-        self, dish_id: str, store_id: str
-    ) -> Optional[dict]:
+    async def get_plan_override_for_dish(self, dish_id: str, store_id: str) -> Optional[dict]:
         """查找最新一个已发布的方案中，指定菜品针对该门店的覆盖价。"""
         await self._set_tenant()
         result = await self.db.execute(
@@ -336,8 +337,12 @@ class BrandPublishRepository:
 
         # 构建动态 UPDATE SET 子句（只更新非 None 字段）
         allowed = {
-            "local_price_fen", "local_name", "local_description",
-            "local_image_url", "is_available", "sort_order",
+            "local_price_fen",
+            "local_name",
+            "local_description",
+            "local_image_url",
+            "is_available",
+            "sort_order",
         }
         updates = {k: v for k, v in data.items() if k in allowed}
 
@@ -384,9 +389,7 @@ class BrandPublishRepository:
         row = result.fetchone()
         return self._override_row_to_dict(row)
 
-    async def get_store_dish_override(
-        self, store_id: str, dish_id: str
-    ) -> Optional[dict]:
+    async def get_store_dish_override(self, store_id: str, dish_id: str) -> Optional[dict]:
         await self._set_tenant()
         result = await self.db.execute(
             text("""
@@ -577,9 +580,17 @@ class BrandPublishRepository:
     async def update_price_rule(self, rule_id: str, data: dict) -> Optional[dict]:
         await self._set_tenant()
         allowed = {
-            "rule_name", "channel", "time_start", "time_end",
-            "date_start", "date_end", "weekdays",
-            "adjustment_type", "adjustment_value", "priority", "is_active",
+            "rule_name",
+            "channel",
+            "time_start",
+            "time_end",
+            "date_start",
+            "date_end",
+            "weekdays",
+            "adjustment_type",
+            "adjustment_value",
+            "priority",
+            "is_active",
         }
         updates = {k: v for k, v in data.items() if k in allowed}
         if not updates:
@@ -605,9 +616,7 @@ class BrandPublishRepository:
     # 菜品调价规则关联 (dish_price_adjustments)
     # ══════════════════════════════════════════════════════
 
-    async def bind_dishes_to_rule(
-        self, rule_id: str, dish_ids: list[str]
-    ) -> list[dict]:
+    async def bind_dishes_to_rule(self, rule_id: str, dish_ids: list[str]) -> list[dict]:
         await self._set_tenant()
         rule_uuid = uuid.UUID(rule_id)
         results = []
@@ -631,12 +640,14 @@ class BrandPublishRepository:
             )
             row = result.fetchone()
             if row:
-                results.append({
-                    "id": str(row[0]),
-                    "rule_id": str(row[1]),
-                    "dish_id": str(row[2]),
-                    "created_at": row[3].isoformat() if row[3] else None,
-                })
+                results.append(
+                    {
+                        "id": str(row[0]),
+                        "rule_id": str(row[1]),
+                        "dish_id": str(row[2]),
+                        "created_at": row[3].isoformat() if row[3] else None,
+                    }
+                )
         return results
 
     async def get_active_rules_for_dish(

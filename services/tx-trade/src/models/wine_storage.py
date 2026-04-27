@@ -9,23 +9,25 @@
          → expired（过期）
          → written_off（核销）
 """
+
 import uuid
 from datetime import date, datetime
 from decimal import Decimal
 from typing import Optional
 
-from pydantic import BaseModel, Field, computed_field
-from sqlalchemy import BigInteger, Date, ForeignKey, Integer, Numeric, String, Text
+from pydantic import BaseModel, Field
+from sqlalchemy import Date, ForeignKey, Integer, Numeric, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from shared.ontology.src.base import TenantBase
 
-
 # ─── SQLAlchemy ORM ───────────────────────────────────────────────────────────
+
 
 class WineStorageRecord(TenantBase):
     """存酒主记录 — 每次存入一瓶/批酒水对应一条记录"""
+
     __tablename__ = "wine_storage_records"
 
     # 关联维度
@@ -50,12 +52,13 @@ class WineStorageRecord(TenantBase):
 
     # 状态与金额
     status: Mapped[str] = mapped_column(
-        String(32), nullable=False, default="stored", index=True,
+        String(32),
+        nullable=False,
+        default="stored",
+        index=True,
         comment="stored/partial_taken/fully_taken/expired/written_off",
     )
-    storage_price: Mapped[Decimal | None] = mapped_column(
-        Numeric(12, 2), nullable=True, comment="存入时金额（元）"
-    )
+    storage_price: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True, comment="存入时金额（元）")
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # 操作人
@@ -64,6 +67,7 @@ class WineStorageRecord(TenantBase):
 
 class WineStorageTransaction(TenantBase):
     """存酒操作流水 — 每次取酒/续存/转台等操作对应一条流水"""
+
     __tablename__ = "wine_storage_transactions"
 
     # 关联主记录
@@ -77,7 +81,9 @@ class WineStorageTransaction(TenantBase):
 
     # 操作类型
     trans_type: Mapped[str] = mapped_column(
-        String(32), nullable=False, index=True,
+        String(32),
+        nullable=False,
+        index=True,
         comment="store_in/take_out/extend/transfer_in/transfer_out/write_off/adjustment",
     )
 
@@ -101,8 +107,10 @@ class WineStorageTransaction(TenantBase):
 
 # ─── Pydantic Schemas ─────────────────────────────────────────────────────────
 
+
 class WineStoreRequest(BaseModel):
     """存酒入库请求"""
+
     store_id: str = Field(..., description="门店 ID")
     table_id: Optional[str] = Field(None, description="台位 ID（可选）")
     member_id: Optional[str] = Field(None, description="会员 ID（可选）")
@@ -121,6 +129,7 @@ class WineStoreRequest(BaseModel):
 
 class WineTakeRequest(BaseModel):
     """取酒请求"""
+
     quantity: int = Field(..., gt=0, description="取出数量")
     table_id: Optional[str] = Field(None, description="关联台位")
     order_id: Optional[str] = Field(None, description="关联订单 ID")
@@ -130,6 +139,7 @@ class WineTakeRequest(BaseModel):
 
 class WineExtendRequest(BaseModel):
     """续存请求"""
+
     new_expiry_date: date = Field(..., description="新到期日")
     fee: Optional[Decimal] = Field(None, ge=0, description="续存费用（元，可选）")
     operated_by: Optional[str] = Field(None, description="操作员 ID")
@@ -138,6 +148,7 @@ class WineExtendRequest(BaseModel):
 
 class WineTransferRequest(BaseModel):
     """转台请求"""
+
     to_table_id: str = Field(..., description="目标台位 ID")
     operated_by: Optional[str] = Field(None, description="操作员 ID")
     notes: Optional[str] = Field(None, max_length=500)
@@ -145,6 +156,7 @@ class WineTransferRequest(BaseModel):
 
 class WineWriteOffRequest(BaseModel):
     """核销请求"""
+
     reason: str = Field(..., min_length=1, max_length=500, description="核销原因")
     order_id: Optional[str] = Field(None, description="关联订单 ID（可选）")
     approved_by: Optional[str] = Field(None, description="审批人 ID")
@@ -153,6 +165,7 @@ class WineWriteOffRequest(BaseModel):
 
 class WineStorageTransactionResponse(BaseModel):
     """存酒流水响应"""
+
     id: str
     record_id: str
     trans_type: str
@@ -172,6 +185,7 @@ class WineStorageTransactionResponse(BaseModel):
 
 class WineStorageResponse(BaseModel):
     """存酒主记录响应（含计算字段）"""
+
     id: str
     tenant_id: str
     store_id: str
@@ -206,6 +220,7 @@ class WineStorageResponse(BaseModel):
 
 class WineStorageListQuery(BaseModel):
     """存酒列表查询参数"""
+
     store_id: Optional[str] = Field(None, description="按门店过滤")
     member_id: Optional[str] = Field(None, description="按会员过滤")
     status: Optional[str] = Field(None, description="按状态过滤，多个用逗号分隔")

@@ -7,6 +7,7 @@
 4. 品牌级 P&L 多店汇总
 5. 边界：零营收、跨月计算
 """
+
 from __future__ import annotations
 
 import uuid
@@ -25,6 +26,7 @@ from services.tx_finance.src.services.pl_service import (
 )
 
 # ─── 测试夹具 ────────────────────────────────────────────────────────────────
+
 
 @pytest.fixture
 def tenant_id() -> uuid.UUID:
@@ -48,8 +50,8 @@ def service() -> PLService:
 
 # ─── 工具函数测试 ─────────────────────────────────────────────────────────────
 
-class TestUtilFunctions:
 
+class TestUtilFunctions:
     def test_days_in_period_single_day(self):
         d = date(2026, 3, 31)
         assert _days_in_period(d, d) == 1
@@ -80,6 +82,7 @@ class TestUtilFunctions:
 
 
 # ─── PLStatement 属性计算测试 ─────────────────────────────────────────────────
+
 
 class TestPLStatementProperties:
     """验证 PLStatement 各项加减计算的正确性"""
@@ -131,17 +134,19 @@ class TestPLStatementProperties:
 
     def test_total_opex(self):
         """经营费用合计 = 人工 + 房租 + 水电 + 其他"""
-        pl = self._make_pl(
-            labor_fen=25_000, rent_fen=10_000, utility_fen=3_000, other_fen=2_000
-        )
+        pl = self._make_pl(labor_fen=25_000, rent_fen=10_000, utility_fen=3_000, other_fen=2_000)
         assert pl.opex.total_fen == 40_000
 
     def test_operating_profit(self):
         """经营利润 = 毛利 - 经营费用"""
         pl = self._make_pl(
             revenue_fen=100_000,
-            food_cost_fen=30_000, waste_fen=0,
-            labor_fen=20_000, rent_fen=10_000, utility_fen=3_000, other_fen=2_000,
+            food_cost_fen=30_000,
+            waste_fen=0,
+            labor_fen=20_000,
+            rent_fen=10_000,
+            utility_fen=3_000,
+            other_fen=2_000,
         )
         # 毛利 = 70_000，费用 = 35_000
         assert pl.operating_profit_fen == 35_000
@@ -150,8 +155,12 @@ class TestPLStatementProperties:
         """经营利润率 = 经营利润 / 营收"""
         pl = self._make_pl(
             revenue_fen=100_000,
-            food_cost_fen=30_000, waste_fen=0,
-            labor_fen=20_000, rent_fen=10_000, utility_fen=3_000, other_fen=2_000,
+            food_cost_fen=30_000,
+            waste_fen=0,
+            labor_fen=20_000,
+            rent_fen=10_000,
+            utility_fen=3_000,
+            other_fen=2_000,
         )
         assert abs(pl.operating_margin_rate - 0.35) < 0.001
 
@@ -159,8 +168,12 @@ class TestPLStatementProperties:
         """高费用 → 经营亏损（负数）"""
         pl = self._make_pl(
             revenue_fen=50_000,
-            food_cost_fen=20_000, waste_fen=5_000,
-            labor_fen=30_000, rent_fen=10_000, utility_fen=5_000, other_fen=5_000,
+            food_cost_fen=20_000,
+            waste_fen=5_000,
+            labor_fen=30_000,
+            rent_fen=10_000,
+            utility_fen=5_000,
+            other_fen=5_000,
         )
         assert pl.operating_profit_fen < 0
 
@@ -168,8 +181,12 @@ class TestPLStatementProperties:
         """零营收不产生除零错误"""
         pl = self._make_pl(
             revenue_fen=0,
-            food_cost_fen=0, waste_fen=0,
-            labor_fen=0, rent_fen=0, utility_fen=0, other_fen=0,
+            food_cost_fen=0,
+            waste_fen=0,
+            labor_fen=0,
+            rent_fen=0,
+            utility_fen=0,
+            other_fen=0,
         )
         assert pl.gross_margin_rate == 0.0
         assert pl.food_cost_rate == 0.0
@@ -180,10 +197,19 @@ class TestPLStatementProperties:
         pl = self._make_pl()
         d = pl.to_dict()
         required_top_keys = {
-            "store_id", "start_date", "end_date", "period_days",
-            "revenue", "cost", "gross_profit_fen", "gross_margin_rate",
-            "food_cost_rate", "opex", "operating_profit_fen",
-            "operating_margin_rate", "cost_health",
+            "store_id",
+            "start_date",
+            "end_date",
+            "period_days",
+            "revenue",
+            "cost",
+            "gross_profit_fen",
+            "gross_margin_rate",
+            "food_cost_rate",
+            "opex",
+            "operating_profit_fen",
+            "operating_margin_rate",
+            "cost_health",
         }
         assert required_top_keys.issubset(set(d.keys()))
 
@@ -233,34 +259,34 @@ class TestPLStatementProperties:
 
 # ─── PLService 集成测试（Mock DB）────────────────────────────────────────────
 
+
 class TestPLServiceGetStorePL:
     """测试 PLService.get_store_pl（Mock 数据库层）"""
 
     @pytest.mark.asyncio
-    async def test_basic_store_pl_happy_path(
-        self, service, store_id, tenant_id, mock_db
-    ):
+    async def test_basic_store_pl_happy_path(self, service, store_id, tenant_id, mock_db):
         """正常路径：有营收、有快照成本、有固定费用"""
         start = date(2026, 3, 1)
         end = date(2026, 3, 31)
 
-        with patch.object(
-            service, "_fetch_revenue_breakdown",
-            new=AsyncMock(return_value=RevenueBreakdown(dine_in_fen=100_000))
-        ), patch.object(
-            service, "_fetch_food_cost",
-            new=AsyncMock(return_value=(30_000, False, ""))
-        ), patch.object(
-            service._repo, "fetch_waste_cost",
-            new=AsyncMock(return_value=1_000)
-        ), patch.object(
-            service, "_fetch_operating_expenses",
-            new=AsyncMock(return_value=OperatingExpenses(
-                labor_cost_fen=20_000,
-                rent_fen=10_000,
-                utility_fen=3_000,
-                other_fixed_fen=2_000,
-            ))
+        with (
+            patch.object(
+                service, "_fetch_revenue_breakdown", new=AsyncMock(return_value=RevenueBreakdown(dine_in_fen=100_000))
+            ),
+            patch.object(service, "_fetch_food_cost", new=AsyncMock(return_value=(30_000, False, ""))),
+            patch.object(service._repo, "fetch_waste_cost", new=AsyncMock(return_value=1_000)),
+            patch.object(
+                service,
+                "_fetch_operating_expenses",
+                new=AsyncMock(
+                    return_value=OperatingExpenses(
+                        labor_cost_fen=20_000,
+                        rent_fen=10_000,
+                        utility_fen=3_000,
+                        other_fixed_fen=2_000,
+                    )
+                ),
+            ),
         ):
             pl = await service.get_store_pl(store_id, start, end, tenant_id, mock_db)
 
@@ -273,25 +299,22 @@ class TestPLServiceGetStorePL:
         assert pl.operating_profit_fen == 34_000
 
     @pytest.mark.asyncio
-    async def test_no_snapshots_estimated(
-        self, service, store_id, tenant_id, mock_db
-    ):
+    async def test_no_snapshots_estimated(self, service, store_id, tenant_id, mock_db):
         """无快照时估算并标注"""
         start = date(2026, 3, 1)
         end = date(2026, 3, 31)
 
-        with patch.object(
-            service, "_fetch_revenue_breakdown",
-            new=AsyncMock(return_value=RevenueBreakdown(dine_in_fen=80_000))
-        ), patch.object(
-            service, "_fetch_food_cost",
-            new=AsyncMock(return_value=(24_000, True, "无BOM成本快照，使用行业均值30%估算"))
-        ), patch.object(
-            service._repo, "fetch_waste_cost",
-            new=AsyncMock(return_value=0)
-        ), patch.object(
-            service, "_fetch_operating_expenses",
-            new=AsyncMock(return_value=OperatingExpenses())
+        with (
+            patch.object(
+                service, "_fetch_revenue_breakdown", new=AsyncMock(return_value=RevenueBreakdown(dine_in_fen=80_000))
+            ),
+            patch.object(
+                service,
+                "_fetch_food_cost",
+                new=AsyncMock(return_value=(24_000, True, "无BOM成本快照，使用行业均值30%估算")),
+            ),
+            patch.object(service._repo, "fetch_waste_cost", new=AsyncMock(return_value=0)),
+            patch.object(service, "_fetch_operating_expenses", new=AsyncMock(return_value=OperatingExpenses())),
         ):
             pl = await service.get_store_pl(store_id, start, end, tenant_id, mock_db)
 
@@ -300,6 +323,7 @@ class TestPLServiceGetStorePL:
 
 
 # ─── 摊销计算正确性测试 ───────────────────────────────────────────────────────
+
 
 class TestProrateCalculations:
     """独立测试按天摊销逻辑"""

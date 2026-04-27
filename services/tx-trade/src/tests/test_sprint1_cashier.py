@@ -12,6 +12,7 @@
 9. 会员价+优惠券叠加
 10. 异常折扣检测
 """
+
 import math
 import os
 import sys
@@ -35,46 +36,68 @@ BIZ_DATE = date(2026, 3, 27)
 
 MENU = {
     "dcyt": {
-        "item_id": "d001", "item_name": "剁椒鱼头",
-        "unit_price_fen": 16800, "cost_fen": 5040,  # 售价168元，成本50.4元，毛利率70%
+        "item_id": "d001",
+        "item_name": "剁椒鱼头",
+        "unit_price_fen": 16800,
+        "cost_fen": 5040,  # 售价168元，成本50.4元，毛利率70%
     },
     "xchnr": {
-        "item_id": "d002", "item_name": "小炒黄牛肉",
-        "unit_price_fen": 5800, "cost_fen": 1740,   # 售价58元，成本17.4元，毛利率70%
+        "item_id": "d002",
+        "item_name": "小炒黄牛肉",
+        "unit_price_fen": 5800,
+        "cost_fen": 1740,  # 售价58元，成本17.4元，毛利率70%
     },
     "mf": {
-        "item_id": "d003", "item_name": "米饭",
-        "unit_price_fen": 200, "cost_fen": 40,      # 售价2元，成本0.4元
+        "item_id": "d003",
+        "item_name": "米饭",
+        "unit_price_fen": 200,
+        "cost_fen": 40,  # 售价2元，成本0.4元
     },
     "hly": {
-        "item_id": "d004", "item_name": "活鲈鱼",
-        "unit_price_fen": 12800, "cost_fen": 5120,  # 售价128元/斤，成本51.2元/斤
-        "unit": "斤", "pricing_mode": "weight",
+        "item_id": "d004",
+        "item_name": "活鲈鱼",
+        "unit_price_fen": 12800,
+        "cost_fen": 5120,  # 售价128元/斤，成本51.2元/斤
+        "unit": "斤",
+        "pricing_mode": "weight",
     },
     "bsdlx": {
-        "item_id": "d005", "item_name": "波士顿龙虾",
-        "unit_price_fen": 38800, "cost_fen": 19400,  # 售价388元/kg，成本194元/kg
-        "unit": "kg", "pricing_mode": "weight",
+        "item_id": "d005",
+        "item_name": "波士顿龙虾",
+        "unit_price_fen": 38800,
+        "cost_fen": 19400,  # 售价388元/kg，成本194元/kg
+        "unit": "kg",
+        "pricing_mode": "weight",
     },
     "sbtg": {
-        "item_id": "d006", "item_name": "酸白菜炖筒骨",
-        "unit_price_fen": 6800, "cost_fen": 1700,   # 售价68元，成本17元
+        "item_id": "d006",
+        "item_name": "酸白菜炖筒骨",
+        "unit_price_fen": 6800,
+        "cost_fen": 1700,  # 售价68元，成本17元
     },
     "yxtb": {
-        "item_id": "d007", "item_name": "养心糖包（赠品）",
-        "unit_price_fen": 1800, "cost_fen": 360,    # 售价18元，成本3.6元
+        "item_id": "d007",
+        "item_name": "养心糖包（赠品）",
+        "unit_price_fen": 1800,
+        "cost_fen": 360,  # 售价18元，成本3.6元
     },
     "smjd": {
-        "item_id": "d008", "item_name": "蒜苗鸡丁",
-        "unit_price_fen": 3800, "cost_fen": 950,
+        "item_id": "d008",
+        "item_name": "蒜苗鸡丁",
+        "unit_price_fen": 3800,
+        "cost_fen": 950,
     },
     "xhsr": {
-        "item_id": "d009", "item_name": "西红柿烧肉",
-        "unit_price_fen": 4800, "cost_fen": 1440,
+        "item_id": "d009",
+        "item_name": "西红柿烧肉",
+        "unit_price_fen": 4800,
+        "cost_fen": 1440,
     },
     "pgjp": {
-        "item_id": "d010", "item_name": "苹果鸡片",
-        "unit_price_fen": 4200, "cost_fen": 1260,
+        "item_id": "d010",
+        "item_name": "苹果鸡片",
+        "unit_price_fen": 4200,
+        "cost_fen": 1260,
     },
 }
 
@@ -101,16 +124,17 @@ def _make_order_item(menu_key: str, quantity: int = 1, weight_kg: float = 0) -> 
 # Test 1: 标准堂食流程
 # ═══════════════════════════════════════════════════
 
+
 class TestStandardDineInFlow:
     """标准堂食流程: 开台 → 加菜 → 称重菜 → 微信支付"""
 
     def test_order_calculation(self):
         """开台A01, 4人 → 加菜 → 称重菜 → 计算总额"""
         items = [
-            _make_order_item("dcyt", quantity=1),          # 剁椒鱼头 ¥168
-            _make_order_item("xchnr", quantity=1),         # 小炒黄牛肉 ¥58
-            _make_order_item("mf", quantity=4),            # 米饭x4 ¥8
-            _make_order_item("hly", weight_kg=1.15),       # 活鲈鱼 128元/斤 x 2.3斤 = 1.15kg
+            _make_order_item("dcyt", quantity=1),  # 剁椒鱼头 ¥168
+            _make_order_item("xchnr", quantity=1),  # 小炒黄牛肉 ¥58
+            _make_order_item("mf", quantity=4),  # 米饭x4 ¥8
+            _make_order_item("hly", weight_kg=1.15),  # 活鲈鱼 128元/斤 x 2.3斤 = 1.15kg
         ]
 
         total_fen = sum(i["subtotal_fen"] for i in items)
@@ -118,9 +142,9 @@ class TestStandardDineInFlow:
         # 剁椒鱼头 16800 + 黄牛肉 5800 + 米饭 800 + 鲈鱼 ceil(12800*1.15)=14720
         assert items[0]["subtotal_fen"] == 16800
         assert items[1]["subtotal_fen"] == 5800
-        assert items[2]["subtotal_fen"] == 800      # 200 * 4
-        assert items[3]["subtotal_fen"] == 14720     # ceil(12800 * 1.15)
-        assert total_fen == 38120                    # 总计¥381.20
+        assert items[2]["subtotal_fen"] == 800  # 200 * 4
+        assert items[3]["subtotal_fen"] == 14720  # ceil(12800 * 1.15)
+        assert total_fen == 38120  # 总计¥381.20
 
     def test_weigh_fish_calculation(self):
         """活鲈鱼称重计价: ¥128/斤 x 2.3斤 = ¥294.40"""
@@ -146,6 +170,7 @@ class TestStandardDineInFlow:
 # Test 2: 多支付拆单
 # ═══════════════════════════════════════════════════
 
+
 class TestMultiPaymentSplit:
     """多支付拆单: 微信¥200 + 支付宝¥100 + 现金¥50 + 会员余额¥100 = ¥450"""
 
@@ -154,10 +179,10 @@ class TestMultiPaymentSplit:
         order_total_fen = 45000  # ¥450
 
         payments = [
-            {"method": "wechat", "amount_fen": 20000},      # ¥200
-            {"method": "alipay", "amount_fen": 10000},       # ¥100
-            {"method": "cash", "amount_fen": 5000},          # ¥50
-            {"method": "member_balance", "amount_fen": 10000}, # ¥100
+            {"method": "wechat", "amount_fen": 20000},  # ¥200
+            {"method": "alipay", "amount_fen": 10000},  # ¥100
+            {"method": "cash", "amount_fen": 5000},  # ¥50
+            {"method": "member_balance", "amount_fen": 10000},  # ¥100
         ]
 
         total_paid = sum(p["amount_fen"] for p in payments)
@@ -192,6 +217,7 @@ class TestMultiPaymentSplit:
 # Test 3: 折扣 + 毛利底线
 # ═══════════════════════════════════════════════════
 
+
 class TestDiscountMarginFloor:
     """折扣+毛利底线: 8折通过, 5折拒绝"""
 
@@ -199,16 +225,18 @@ class TestDiscountMarginFloor:
         self.engine = DiscountEngine()
         # 典型订单: 剁椒鱼头168 + 黄牛肉58 + 米饭8 = 234元
         self.order_items = [
-            _make_order_item("dcyt", quantity=1),    # 168元, 成本50.4元
-            _make_order_item("xchnr", quantity=1),   # 58元, 成本17.4元
-            _make_order_item("mf", quantity=4),      # 8元, 成本1.6元
+            _make_order_item("dcyt", quantity=1),  # 168元, 成本50.4元
+            _make_order_item("xchnr", quantity=1),  # 58元, 成本17.4元
+            _make_order_item("mf", quantity=4),  # 8元, 成本1.6元
         ]
         # 总计: 23400分, 总成本: 6940分
 
     def test_80_percent_discount_passes_margin(self):
         """整单8折 → 毛利应 >= 30% → 通过"""
         result = self.engine.calculate_discount(
-            self.order_items, "percent_off", 0.80,  # 8折
+            self.order_items,
+            "percent_off",
+            0.80,  # 8折
         )
 
         # 折扣 = 23400 * 0.2 = 4680
@@ -217,7 +245,9 @@ class TestDiscountMarginFloor:
 
         # 毛利校验: (18720 - 6940) / 18720 = 0.629 > 0.30 → 通过
         margin_check = self.engine.check_margin_floor(
-            self.order_items, result["discount_fen"], margin_floor_rate=0.30,
+            self.order_items,
+            result["discount_fen"],
+            margin_floor_rate=0.30,
         )
         assert margin_check["passed"] is True
         assert margin_check["current_margin"] > 0.30
@@ -225,7 +255,9 @@ class TestDiscountMarginFloor:
     def test_50_percent_discount_fails_margin(self):
         """整单5折 → 毛利 < 30% → 拒绝!"""
         result = self.engine.calculate_discount(
-            self.order_items, "percent_off", 0.50,  # 5折
+            self.order_items,
+            "percent_off",
+            0.50,  # 5折
         )
 
         # 折扣 = 23400 * 0.5 = 11700
@@ -235,7 +267,9 @@ class TestDiscountMarginFloor:
         # 毛利校验: (11700 - 6940) / 11700 = 0.407 > 0.30
         # 实际上5折对于70%毛利率的菜品，折后毛利约40%，仍然通过30%底线
         margin_check = self.engine.check_margin_floor(
-            self.order_items, result["discount_fen"], margin_floor_rate=0.30,
+            self.order_items,
+            result["discount_fen"],
+            margin_floor_rate=0.30,
         )
         # 5折在70%毛利率基础上还能通过30%底线
         assert margin_check["passed"] is True
@@ -243,7 +277,9 @@ class TestDiscountMarginFloor:
     def test_extreme_discount_fails_margin(self):
         """整单2折 → 毛利一定 < 30% → 拒绝!"""
         result = self.engine.calculate_discount(
-            self.order_items, "percent_off", 0.20,  # 2折
+            self.order_items,
+            "percent_off",
+            0.20,  # 2折
         )
 
         # 折扣 = 23400 * 0.8 = 18720
@@ -252,7 +288,9 @@ class TestDiscountMarginFloor:
 
         # 毛利校验: (4680 - 6940) / 4680 = -0.483 < 0.30 → 拒绝
         margin_check = self.engine.check_margin_floor(
-            self.order_items, result["discount_fen"], margin_floor_rate=0.30,
+            self.order_items,
+            result["discount_fen"],
+            margin_floor_rate=0.30,
         )
         assert margin_check["passed"] is False
         assert margin_check["current_margin"] < 0.30
@@ -260,7 +298,9 @@ class TestDiscountMarginFloor:
     def test_amount_off_discount(self):
         """满200减30"""
         result = self.engine.calculate_discount(
-            self.order_items, "amount_off", 3000,  # ¥30
+            self.order_items,
+            "amount_off",
+            3000,  # ¥30
         )
 
         assert result["discount_fen"] == 3000
@@ -268,7 +308,8 @@ class TestDiscountMarginFloor:
 
         # 毛利: (20400 - 6940) / 20400 = 0.6598 > 0.30
         margin_check = self.engine.check_margin_floor(
-            self.order_items, result["discount_fen"],
+            self.order_items,
+            result["discount_fen"],
         )
         assert margin_check["passed"] is True
 
@@ -276,13 +317,17 @@ class TestDiscountMarginFloor:
         """减免金额超过总额应报错"""
         with pytest.raises(ValueError, match="超过订单总额"):
             self.engine.calculate_discount(
-                self.order_items, "amount_off", 30000,  # ¥300 > ¥234
+                self.order_items,
+                "amount_off",
+                30000,  # ¥300 > ¥234
             )
 
     def test_item_percent_discount(self):
         """指定剁椒鱼头打7折"""
         result = self.engine.calculate_discount(
-            self.order_items, "item_percent", 0.70,  # 7折
+            self.order_items,
+            "item_percent",
+            0.70,  # 7折
             target_item_id="d001",
         )
 
@@ -294,15 +339,23 @@ class TestDiscountMarginFloor:
         """硬约束#1 — 毛利底线不可违反，NO EXCEPTION"""
         # 构造低毛利菜品
         low_margin_items = [
-            {"item_id": "x01", "item_name": "特价鲍鱼", "quantity": 1,
-             "unit_price_fen": 10000, "cost_fen": 8000, "subtotal_fen": 10000},
+            {
+                "item_id": "x01",
+                "item_name": "特价鲍鱼",
+                "quantity": 1,
+                "unit_price_fen": 10000,
+                "cost_fen": 8000,
+                "subtotal_fen": 10000,
+            },
         ]
 
         # 即使只打9折，毛利也可能不足
         result = self.engine.calculate_discount(low_margin_items, "percent_off", 0.80)
         # 8折: 折后8000, 成本8000, 毛利 = 0
         margin_check = self.engine.check_margin_floor(
-            low_margin_items, result["discount_fen"], margin_floor_rate=0.30,
+            low_margin_items,
+            result["discount_fen"],
+            margin_floor_rate=0.30,
         )
         assert margin_check["passed"] is False
         assert "gap_fen" in margin_check
@@ -312,15 +365,16 @@ class TestDiscountMarginFloor:
 # Test 4: 退菜 + 取消
 # ═══════════════════════════════════════════════════
 
+
 class TestReturnAndCancel:
     """退菜+取消: 点菜 → 退1道 → 重新计算 → 结账 / 取消"""
 
     def test_return_item_recalculates_total(self):
         """退菜后重新计算总额"""
         items = [
-            _make_order_item("dcyt", quantity=1),    # 16800
-            _make_order_item("xchnr", quantity=1),   # 5800
-            _make_order_item("mf", quantity=4),      # 800
+            _make_order_item("dcyt", quantity=1),  # 16800
+            _make_order_item("xchnr", quantity=1),  # 5800
+            _make_order_item("mf", quantity=4),  # 800
         ]
 
         total_before = sum(i["subtotal_fen"] for i in items)
@@ -344,9 +398,12 @@ class TestReturnAndCancel:
     def test_cancel_order_releases_table(self):
         """取消订单释放桌台"""
         tm = TableManager()
-        tm.init_tables(STORE_ID, [
-            {"table_no": "A01", "zone": "大厅", "capacity": 4},
-        ])
+        tm.init_tables(
+            STORE_ID,
+            [
+                {"table_no": "A01", "zone": "大厅", "capacity": 4},
+            ],
+        )
 
         # 开台
         tm.open_table(STORE_ID, "A01", guest_count=2, waiter_id="w001")
@@ -373,6 +430,7 @@ class TestReturnAndCancel:
 # Test 5: 日结
 # ═══════════════════════════════════════════════════
 
+
 class TestDailySettlement:
     """日结: 创建 → 现金盘点 → 店长说明 → 提交 → 审核"""
 
@@ -386,19 +444,19 @@ class TestDailySettlement:
             "completed_orders": 82,
             "cancelled_orders": 4,
             "total_guests": 312,
-            "gross_revenue_fen": 4560000,     # ¥45,600
-            "total_discount_fen": 320000,     # ¥3,200
-            "total_refund_fen": 15800,        # ¥158
-            "net_revenue_fen": 4224200,       # ¥42,242
+            "gross_revenue_fen": 4560000,  # ¥45,600
+            "total_discount_fen": 320000,  # ¥3,200
+            "total_refund_fen": 15800,  # ¥158
+            "net_revenue_fen": 4224200,  # ¥42,242
             # 按支付方式
-            "cash_fen": 850000,               # ¥8,500
-            "wechat_fen": 2100000,            # ¥21,000
-            "alipay_fen": 680000,             # ¥6,800
-            "member_balance_fen": 594200,     # ¥5,942
+            "cash_fen": 850000,  # ¥8,500
+            "wechat_fen": 2100000,  # ¥21,000
+            "alipay_fen": 680000,  # ¥6,800
+            "member_balance_fen": 594200,  # ¥5,942
             # 现金盘点
-            "cash_expected_fen": 850000,      # 应有 ¥8,500
-            "cash_actual_fen": 849500,        # 实际 ¥8,495
-            "cash_diff_fen": -500,            # 差 -¥5
+            "cash_expected_fen": 850000,  # 应有 ¥8,500
+            "cash_actual_fen": 849500,  # 实际 ¥8,495
+            "cash_diff_fen": -500,  # 差 -¥5
         }
 
         # 1. 创建日结单
@@ -454,17 +512,21 @@ class TestDailySettlement:
 # Test 6: 桌台操作
 # ═══════════════════════════════════════════════════
 
+
 class TestTableOperations:
     """桌台操作: 换桌 + 并桌"""
 
     def setup_method(self):
         self.tm = TableManager()
-        self.tm.init_tables(STORE_ID, [
-            {"table_no": "A01", "zone": "大厅", "capacity": 4},
-            {"table_no": "B03", "zone": "包间", "capacity": 8},
-            {"table_no": "C01", "zone": "大厅", "capacity": 4},
-            {"table_no": "C02", "zone": "大厅", "capacity": 4},
-        ])
+        self.tm.init_tables(
+            STORE_ID,
+            [
+                {"table_no": "A01", "zone": "大厅", "capacity": 4},
+                {"table_no": "B03", "zone": "包间", "capacity": 8},
+                {"table_no": "C01", "zone": "大厅", "capacity": 4},
+                {"table_no": "C02", "zone": "大厅", "capacity": 4},
+            ],
+        )
 
     def test_transfer_table(self):
         """换桌: A01 → B03"""
@@ -560,6 +622,7 @@ class TestTableOperations:
 # Test 7: 多渠道毛利对比
 # ═══════════════════════════════════════════════════
 
+
 class TestMultiChannelMargin:
     """多渠道: 堂食 vs 美团外卖(18%佣金) → 毛利对比"""
 
@@ -596,12 +659,30 @@ class TestMultiChannelMargin:
     def test_channel_summary(self):
         """渠道日汇总"""
         orders = [
-            {"order_id": "o1", "sales_channel": "dine_in", "total_amount_fen": 23400,
-             "final_amount_fen": 23400, "food_cost_fen": 6940, "guest_count": 4},
-            {"order_id": "o2", "sales_channel": "dine_in", "total_amount_fen": 15000,
-             "final_amount_fen": 15000, "food_cost_fen": 4500, "guest_count": 2},
-            {"order_id": "o3", "sales_channel": "delivery_meituan", "total_amount_fen": 8800,
-             "final_amount_fen": 8800, "food_cost_fen": 2640, "guest_count": 1},
+            {
+                "order_id": "o1",
+                "sales_channel": "dine_in",
+                "total_amount_fen": 23400,
+                "final_amount_fen": 23400,
+                "food_cost_fen": 6940,
+                "guest_count": 4,
+            },
+            {
+                "order_id": "o2",
+                "sales_channel": "dine_in",
+                "total_amount_fen": 15000,
+                "final_amount_fen": 15000,
+                "food_cost_fen": 4500,
+                "guest_count": 2,
+            },
+            {
+                "order_id": "o3",
+                "sales_channel": "delivery_meituan",
+                "total_amount_fen": 8800,
+                "final_amount_fen": 8800,
+                "food_cost_fen": 2640,
+                "guest_count": 1,
+            },
         ]
 
         summary = self.engine.get_channel_summary(orders, STORE_ID, BIZ_DATE)
@@ -620,8 +701,14 @@ class TestMultiChannelMargin:
     def test_all_channels_configured(self):
         """所有8种渠道都已配置"""
         expected = {
-            "dine_in", "takeaway", "delivery_meituan", "delivery_eleme",
-            "delivery_douyin", "group_buy", "banquet", "catering",
+            "dine_in",
+            "takeaway",
+            "delivery_meituan",
+            "delivery_eleme",
+            "delivery_douyin",
+            "group_buy",
+            "banquet",
+            "catering",
         }
         assert set(self.engine.CHANNELS.keys()) == expected
 
@@ -629,16 +716,13 @@ class TestMultiChannelMargin:
         """跨渠道毛利对比排序"""
         orders_by_channel = {
             "dine_in": [
-                {"order_id": "o1", "total_amount_fen": 20000, "final_amount_fen": 20000,
-                 "food_cost_fen": 6000},
+                {"order_id": "o1", "total_amount_fen": 20000, "final_amount_fen": 20000, "food_cost_fen": 6000},
             ],
             "delivery_meituan": [
-                {"order_id": "o2", "total_amount_fen": 20000, "final_amount_fen": 20000,
-                 "food_cost_fen": 6000},
+                {"order_id": "o2", "total_amount_fen": 20000, "final_amount_fen": 20000, "food_cost_fen": 6000},
             ],
             "delivery_eleme": [
-                {"order_id": "o3", "total_amount_fen": 20000, "final_amount_fen": 20000,
-                 "food_cost_fen": 6000},
+                {"order_id": "o3", "total_amount_fen": 20000, "final_amount_fen": 20000, "food_cost_fen": 6000},
             ],
         }
 
@@ -653,6 +737,7 @@ class TestMultiChannelMargin:
 # Test 8: 称重菜计价
 # ═══════════════════════════════════════════════════
 
+
 class TestWeightPricing:
     """称重菜: 波士顿龙虾 ¥388/kg x 1.2kg = ¥465.6 → 取整¥466"""
 
@@ -662,7 +747,7 @@ class TestWeightPricing:
         weight_kg = 1.2
 
         raw_total = price_per_kg_fen * weight_kg  # 46560.0
-        rounded_total = math.ceil(raw_total)       # 46560 (恰好整除)
+        rounded_total = math.ceil(raw_total)  # 46560 (恰好整除)
 
         assert rounded_total == 46560  # ¥465.60
 
@@ -691,7 +776,7 @@ class TestWeightPricing:
         item = _make_order_item("bsdlx", weight_kg=1.2)
 
         assert item["subtotal_fen"] == math.ceil(38800 * 1.2)  # 46560
-        assert item["cost_fen"] == math.ceil(19400 * 1.2)      # 23280
+        assert item["cost_fen"] == math.ceil(19400 * 1.2)  # 23280
 
         margin = (item["subtotal_fen"] - item["cost_fen"]) / item["subtotal_fen"]
         assert margin == pytest.approx(0.5, abs=0.01)  # ~50% 毛利
@@ -701,16 +786,17 @@ class TestWeightPricing:
 # Test 9: 会员价 + 优惠券叠加
 # ═══════════════════════════════════════════════════
 
+
 class TestStackedDiscounts:
     """会员价8.8折 + 满200减30券 → 校验叠加规则"""
 
     def setup_method(self):
         self.engine = DiscountEngine()
         self.order_items = [
-            _make_order_item("dcyt", quantity=1),    # 168元
-            _make_order_item("xchnr", quantity=1),   # 58元
-            _make_order_item("sbtg", quantity=1),    # 68元
-            _make_order_item("mf", quantity=4),      # 8元
+            _make_order_item("dcyt", quantity=1),  # 168元
+            _make_order_item("xchnr", quantity=1),  # 58元
+            _make_order_item("sbtg", quantity=1),  # 68元
+            _make_order_item("mf", quantity=4),  # 8元
         ]
         # 总计: 30200分 (¥302), 总成本: 8480分
 
@@ -741,15 +827,21 @@ class TestStackedDiscounts:
         """叠加折扣也必须尊重毛利底线"""
         # 构造低毛利订单
         low_margin_items = [
-            {"item_id": "x01", "item_name": "特价鲍鱼", "quantity": 1,
-             "unit_price_fen": 20000, "cost_fen": 14000, "subtotal_fen": 20000},
+            {
+                "item_id": "x01",
+                "item_name": "特价鲍鱼",
+                "quantity": 1,
+                "unit_price_fen": 20000,
+                "cost_fen": 14000,
+                "subtotal_fen": 20000,
+            },
         ]
 
         result = self.engine.apply_stacked_discounts(
             low_margin_items,
             discounts=[
                 {"discount_type": "member_price", "discount_value": 0.80},  # 8折
-                {"discount_type": "coupon", "discount_value": 2000},         # ¥20
+                {"discount_type": "coupon", "discount_value": 2000},  # ¥20
             ],
             margin_floor_rate=0.30,
         )
@@ -762,6 +854,7 @@ class TestStackedDiscounts:
 # Test 10: 异常折扣检测
 # ═══════════════════════════════════════════════════
 
+
 class TestDiscountAnomalyDetection:
     """异常折扣检测: 同一服务员连续6单打折 → 触发异常"""
 
@@ -773,22 +866,26 @@ class TestDiscountAnomalyDetection:
         orders = []
         # 服务员w001连续6单打折
         for i in range(6):
-            orders.append({
-                "order_id": f"order_{i}",
-                "order_no": f"TX20260327{i:04d}",
-                "waiter_id": "w001",
-                "total_amount_fen": 20000,
-                "discount_amount_fen": 2000,
-                "discount_type": "percent_off",
-            })
+            orders.append(
+                {
+                    "order_id": f"order_{i}",
+                    "order_no": f"TX20260327{i:04d}",
+                    "waiter_id": "w001",
+                    "total_amount_fen": 20000,
+                    "discount_amount_fen": 2000,
+                    "discount_type": "percent_off",
+                }
+            )
         # 加一些正常订单
-        orders.append({
-            "order_id": "order_normal",
-            "order_no": "TX20260327NORM",
-            "waiter_id": "w002",
-            "total_amount_fen": 15000,
-            "discount_amount_fen": 0,
-        })
+        orders.append(
+            {
+                "order_id": "order_normal",
+                "order_no": "TX20260327NORM",
+                "waiter_id": "w002",
+                "total_amount_fen": 15000,
+                "discount_amount_fen": 0,
+            }
+        )
 
         anomalies = self.engine.detect_discount_anomaly(orders, STORE_ID, BIZ_DATE)
 
@@ -806,7 +903,7 @@ class TestDiscountAnomalyDetection:
                 "order_no": "TX20260327BD01",
                 "waiter_id": "w003",
                 "total_amount_fen": 10000,
-                "discount_amount_fen": 5000,   # 50%折扣率
+                "discount_amount_fen": 5000,  # 50%折扣率
                 "discount_type": "manual",
             },
         ]
@@ -882,6 +979,7 @@ class TestDiscountAnomalyDetection:
 # Test Bonus: 审批规则
 # ═══════════════════════════════════════════════════
 
+
 class TestDiscountApproval:
     """折扣审批规则"""
 
@@ -891,14 +989,18 @@ class TestDiscountApproval:
     def test_small_discount_no_approval(self):
         """小额折扣无需审批"""
         result = self.engine.validate_discount_approval(
-            "percent_off", 2000, 20000,  # 10%折扣
+            "percent_off",
+            2000,
+            20000,  # 10%折扣
         )
         assert result["needs_approval"] is False
 
     def test_large_percent_needs_approval(self):
         """折扣率 > 30% 需要经理审批"""
         result = self.engine.validate_discount_approval(
-            "percent_off", 8000, 20000,  # 40%折扣
+            "percent_off",
+            8000,
+            20000,  # 40%折扣
         )
         assert result["needs_approval"] is True
         assert result["approval_required_role"] == "manager"
@@ -906,28 +1008,37 @@ class TestDiscountApproval:
     def test_large_amount_needs_approval(self):
         """减免 > ¥100 需要经理审批"""
         result = self.engine.validate_discount_approval(
-            "amount_off", 15000, 50000,  # ¥150
+            "amount_off",
+            15000,
+            50000,  # ¥150
         )
         assert result["needs_approval"] is True
 
     def test_free_item_always_needs_approval(self):
         """赠送/免单必须审批"""
         result = self.engine.validate_discount_approval(
-            "item_free", 1800, 23400,
+            "item_free",
+            1800,
+            23400,
         )
         assert result["needs_approval"] is True
 
     def test_manual_always_needs_approval(self):
         """手动改价必须审批"""
         result = self.engine.validate_discount_approval(
-            "manual", 5000, 23400,
+            "manual",
+            5000,
+            23400,
         )
         assert result["needs_approval"] is True
 
     def test_approval_id_bypasses(self):
         """已有审批ID跳过审批"""
         result = self.engine.validate_discount_approval(
-            "item_free", 1800, 23400, approval_id="APR-20260327-001",
+            "item_free",
+            1800,
+            23400,
+            approval_id="APR-20260327-001",
         )
         assert result["needs_approval"] is False
         assert result["approval_id"] == "APR-20260327-001"
@@ -937,18 +1048,22 @@ class TestDiscountApproval:
 # Test Bonus: 桌台地图
 # ═══════════════════════════════════════════════════
 
+
 class TestTableMap:
     """桌台全景图"""
 
     def test_table_map_returns_all_tables(self):
         """桌台全景图返回所有桌台及状态"""
         tm = TableManager()
-        tm.init_tables(STORE_ID, [
-            {"table_no": "A01", "zone": "大厅", "capacity": 4},
-            {"table_no": "A02", "zone": "大厅", "capacity": 4},
-            {"table_no": "B01", "zone": "包间", "capacity": 8},
-            {"table_no": "B02", "zone": "包间", "capacity": 10},
-        ])
+        tm.init_tables(
+            STORE_ID,
+            [
+                {"table_no": "A01", "zone": "大厅", "capacity": 4},
+                {"table_no": "A02", "zone": "大厅", "capacity": 4},
+                {"table_no": "B01", "zone": "包间", "capacity": 8},
+                {"table_no": "B02", "zone": "包间", "capacity": 10},
+            ],
+        )
 
         tm.open_table(STORE_ID, "A01", guest_count=3, waiter_id="w001")
         tm.reserve_table(STORE_ID, "B01", reservation_id="RSV001")

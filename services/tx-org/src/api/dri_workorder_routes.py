@@ -26,11 +26,11 @@
 
 from __future__ import annotations
 
+import json
 from datetime import date, datetime, timezone
 from typing import Any, List, Optional
 from uuid import uuid4
 
-import json
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
@@ -47,12 +47,12 @@ router = APIRouter(prefix="/api/v1/dri-workorders", tags=["dri-workorders"])
 # ── 状态机 ──────────────────────────────────────────────────────────────────
 
 VALID_TRANSITIONS: dict[str, list[str]] = {
-    "draft":       ["assigned"],
-    "assigned":    ["in_progress", "draft"],        # draft = 退回
+    "draft": ["assigned"],
+    "assigned": ["in_progress", "draft"],  # draft = 退回
     "in_progress": ["completed", "cancelled", "assigned"],  # assigned = 退回
-    "completed":   ["closed"],
-    "closed":      [],
-    "cancelled":   [],
+    "completed": ["closed"],
+    "closed": [],
+    "cancelled": [],
 }
 
 VALID_STATUSES = {"draft", "assigned", "in_progress", "completed", "closed", "cancelled"}
@@ -65,9 +65,7 @@ VALID_SOURCES = {"manual", "ai_alert", "system"}
 
 
 def _get_tenant_id(request: Request) -> str:
-    tid = getattr(request.state, "tenant_id", None) or request.headers.get(
-        "X-Tenant-ID", ""
-    )
+    tid = getattr(request.state, "tenant_id", None) or request.headers.get("X-Tenant-ID", "")
     if not tid:
         raise HTTPException(status_code=400, detail="X-Tenant-ID header required")
     return tid
@@ -178,6 +176,7 @@ class CompleteActionReq(BaseModel):
 
 # ---- 1. 工单列表 ----
 
+
 @router.get("")
 async def list_work_orders(
     request: Request,
@@ -280,6 +279,7 @@ async def list_work_orders(
 
 # ---- 2. 创建工单 ----
 
+
 @router.post("")
 async def create_work_order(
     request: Request,
@@ -354,16 +354,19 @@ async def create_work_order(
         order_type=req.order_type,
         store_id=req.store_id,
     )
-    return _ok({
-        "order_id": row._mapping["order_id"],
-        "order_no": row._mapping["order_no"],
-        "status": "draft",
-        "created_at": now.isoformat(),
-    })
+    return _ok(
+        {
+            "order_id": row._mapping["order_id"],
+            "order_no": row._mapping["order_no"],
+            "status": "draft",
+            "created_at": now.isoformat(),
+        }
+    )
 
 
 # ---- 7. 工单统计看板 ----
 # 注意：statistics 和 my-orders 路由必须在 {order_id} 之前注册
+
 
 @router.get("/statistics")
 async def get_work_order_statistics(
@@ -456,16 +459,19 @@ async def get_work_order_statistics(
     avg_resolution_days = round(float(avg_result.scalar() or 0), 2)
 
     log.info("dri_workorder_statistics", tenant_id=tenant_id)
-    return _ok({
-        "by_status": by_status,
-        "by_type": by_type,
-        "by_severity": by_severity,
-        "overdue_count": overdue_count,
-        "avg_resolution_days": avg_resolution_days,
-    })
+    return _ok(
+        {
+            "by_status": by_status,
+            "by_type": by_type,
+            "by_severity": by_severity,
+            "overdue_count": overdue_count,
+            "avg_resolution_days": avg_resolution_days,
+        }
+    )
 
 
 # ---- 8. 我的工单 ----
+
 
 @router.get("/my-orders")
 async def list_my_work_orders(
@@ -548,6 +554,7 @@ async def list_my_work_orders(
 
 # ---- 3. 工单详情 ----
 
+
 @router.get("/{order_id}")
 async def get_work_order_detail(
     request: Request,
@@ -602,6 +609,7 @@ async def get_work_order_detail(
 
 
 # ---- 4. 更新工单 ----
+
 
 @router.put("/{order_id}")
 async def update_work_order(
@@ -688,6 +696,7 @@ async def update_work_order(
 
 
 # ---- 5. 状态流转 ----
+
 
 @router.put("/{order_id}/transition")
 async def transition_work_order(
@@ -789,15 +798,18 @@ async def transition_work_order(
         to_status=target,
         reason=req.reason,
     )
-    return _ok({
-        "order_id": order_id,
-        "from_status": current_status,
-        "to_status": target,
-        "updated_at": now.isoformat(),
-    })
+    return _ok(
+        {
+            "order_id": order_id,
+            "from_status": current_status,
+            "to_status": target,
+            "updated_at": now.isoformat(),
+        }
+    )
 
 
 # ---- 9. 添加行动项 ----
+
 
 @router.post("/{order_id}/actions")
 async def add_action_item(
@@ -850,14 +862,17 @@ async def add_action_item(
         order_id=order_id,
         action=req.action,
     )
-    return _ok({
-        "order_id": order_id,
-        "actions": updated_actions,
-        "added_action": new_action,
-    })
+    return _ok(
+        {
+            "order_id": order_id,
+            "actions": updated_actions,
+            "added_action": new_action,
+        }
+    )
 
 
 # ---- 10. 完成行动项 ----
+
 
 @router.put("/{order_id}/actions/{action_index}/complete")
 async def complete_action_item(
@@ -939,17 +954,20 @@ async def complete_action_item(
         order_id=order_id,
         action_index=action_index,
     )
-    return _ok({
-        "order_id": order_id,
-        "action_index": action_index,
-        "status": "done",
-        "result": req.result,
-        "completed_at": now.isoformat(),
-        "actions": updated_actions,
-    })
+    return _ok(
+        {
+            "order_id": order_id,
+            "action_index": action_index,
+            "status": "done",
+            "result": req.result,
+            "completed_at": now.isoformat(),
+            "actions": updated_actions,
+        }
+    )
 
 
 # ---- 6. 软删除 ----
+
 
 @router.delete("/{order_id}")
 async def delete_work_order(

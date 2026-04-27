@@ -12,8 +12,8 @@
 
 from __future__ import annotations
 
-from datetime import date, datetime
-from typing import Any, Optional
+from datetime import date
+from typing import Any
 
 import structlog
 from sqlalchemy import text
@@ -104,17 +104,19 @@ class LaborMarginService:
             margin_rate = round(real_margin / revenue, 4) if revenue > 0 else 0.0
             revenue_per_staff = int(revenue / staff_count) if staff_count > 0 else 0
 
-            result.append({
-                "hour": hour,
-                "revenue_fen": revenue,
-                "food_cost_fen": food_cost,
-                "channel_fee_fen": channel_fee,
-                "labor_cost_fen": labor_cost,
-                "real_margin_fen": real_margin,
-                "margin_rate": margin_rate,
-                "staff_count": staff_count,
-                "revenue_per_staff_fen": revenue_per_staff,
-            })
+            result.append(
+                {
+                    "hour": hour,
+                    "revenue_fen": revenue,
+                    "food_cost_fen": food_cost,
+                    "channel_fee_fen": channel_fee,
+                    "labor_cost_fen": labor_cost,
+                    "real_margin_fen": real_margin,
+                    "margin_rate": margin_rate,
+                    "staff_count": staff_count,
+                    "revenue_per_staff_fen": revenue_per_staff,
+                }
+            )
         return result
 
     # ── 月度趋势 ─────────────────────────────────────────────────────────────
@@ -141,11 +143,14 @@ class LaborMarginService:
             ORDER BY pnl_date
         """)
         try:
-            result = await db.execute(q, {
-                "tenant_id": tenant_id,
-                "store_id": store_id,
-                "month": month,
-            })
+            result = await db.execute(
+                q,
+                {
+                    "tenant_id": tenant_id,
+                    "store_id": store_id,
+                    "month": month,
+                },
+            )
             rows = [dict(r) for r in result.mappings()]
             trend: list[dict[str, Any]] = []
             for row in rows:
@@ -155,15 +160,17 @@ class LaborMarginService:
                 lc = int(row["labor_cost_fen"])
                 margin = rev - fc - cf - lc
                 rate = round(margin / rev, 4) if rev > 0 else 0.0
-                trend.append({
-                    "date": row["pnl_date"],
-                    "revenue_fen": rev,
-                    "food_cost_fen": fc,
-                    "channel_fee_fen": cf,
-                    "labor_cost_fen": lc,
-                    "real_margin_fen": margin,
-                    "margin_rate": rate,
-                })
+                trend.append(
+                    {
+                        "date": row["pnl_date"],
+                        "revenue_fen": rev,
+                        "food_cost_fen": fc,
+                        "channel_fee_fen": cf,
+                        "labor_cost_fen": lc,
+                        "real_margin_fen": margin,
+                        "margin_rate": rate,
+                    }
+                )
             if trend:
                 return trend
         except (OperationalError, ProgrammingError) as exc:
@@ -200,11 +207,14 @@ class LaborMarginService:
             ORDER BY s.store_name
         """)
         try:
-            result = await db.execute(q, {
-                "tenant_id": tenant_id,
-                "store_ids": store_ids,
-                "month": month,
-            })
+            result = await db.execute(
+                q,
+                {
+                    "tenant_id": tenant_id,
+                    "store_ids": store_ids,
+                    "month": month,
+                },
+            )
             rows = [dict(r) for r in result.mappings()]
             comparison: list[dict[str, Any]] = []
             for row in rows:
@@ -215,17 +225,19 @@ class LaborMarginService:
                 margin = rev - fc - cf - lc
                 rate = round(margin / rev, 4) if rev > 0 else 0.0
                 labor_rate = round(lc / rev, 4) if rev > 0 else 0.0
-                comparison.append({
-                    "store_id": row["store_id"],
-                    "store_name": row["store_name"],
-                    "revenue_fen": rev,
-                    "food_cost_fen": fc,
-                    "channel_fee_fen": cf,
-                    "labor_cost_fen": lc,
-                    "real_margin_fen": margin,
-                    "margin_rate": rate,
-                    "labor_cost_rate": labor_rate,
-                })
+                comparison.append(
+                    {
+                        "store_id": row["store_id"],
+                        "store_name": row["store_name"],
+                        "revenue_fen": rev,
+                        "food_cost_fen": fc,
+                        "channel_fee_fen": cf,
+                        "labor_cost_fen": lc,
+                        "real_margin_fen": margin,
+                        "margin_rate": rate,
+                        "labor_cost_rate": labor_rate,
+                    }
+                )
             return comparison
         except (OperationalError, ProgrammingError) as exc:
             logger.warning("labor_margin_comparison_failed", error=str(exc))
@@ -247,10 +259,12 @@ class LaborMarginService:
         for h in hourly:
             if h["revenue_fen"] > 0 and h["real_margin_fen"] < 0:
                 suggestion = self._generate_loss_suggestion(h)
-                loss_hours.append({
-                    **h,
-                    "suggestion": suggestion,
-                })
+                loss_hours.append(
+                    {
+                        **h,
+                        "suggestion": suggestion,
+                    }
+                )
 
         # 低效时段（毛利率 < 15% 但不亏损）
         low_margin_hours: list[dict[str, Any]] = []
@@ -274,7 +288,11 @@ class LaborMarginService:
     # ── 内部查询方法 ─────────────────────────────────────────────────────────
 
     async def _query_hourly_revenue(
-        self, db: AsyncSession, tenant_id: str, store_id: str, target_date: date,
+        self,
+        db: AsyncSession,
+        tenant_id: str,
+        store_id: str,
+        target_date: date,
     ) -> dict[int, int]:
         """A. 营收：查orders表按小时聚合"""
         q = text("""
@@ -288,18 +306,25 @@ class LaborMarginService:
             GROUP BY EXTRACT(HOUR FROM created_at)
         """)
         try:
-            result = await db.execute(q, {
-                "tenant_id": tenant_id,
-                "store_id": store_id,
-                "target_date": target_date,
-            })
+            result = await db.execute(
+                q,
+                {
+                    "tenant_id": tenant_id,
+                    "store_id": store_id,
+                    "target_date": target_date,
+                },
+            )
             return {int(r["hour"]): int(r["revenue_fen"]) for r in result.mappings()}
         except (OperationalError, ProgrammingError) as exc:
             logger.warning("labor_margin_revenue_query_failed", error=str(exc))
             return {}
 
     async def _query_hourly_food_cost(
-        self, db: AsyncSession, tenant_id: str, store_id: str, target_date: date,
+        self,
+        db: AsyncSession,
+        tenant_id: str,
+        store_id: str,
+        target_date: date,
     ) -> dict[int, int]:
         """B. 食材成本：查orders.cost_fen或mv_inventory_bom"""
         # 先尝试 orders.cost_fen
@@ -315,11 +340,14 @@ class LaborMarginService:
             GROUP BY EXTRACT(HOUR FROM created_at)
         """)
         try:
-            result = await db.execute(q, {
-                "tenant_id": tenant_id,
-                "store_id": store_id,
-                "target_date": target_date,
-            })
+            result = await db.execute(
+                q,
+                {
+                    "tenant_id": tenant_id,
+                    "store_id": store_id,
+                    "target_date": target_date,
+                },
+            )
             data = {int(r["hour"]): int(r["food_cost_fen"]) for r in result.mappings()}
             if data:
                 return data
@@ -329,7 +357,11 @@ class LaborMarginService:
         return {}
 
     async def _query_hourly_channel_fee(
-        self, db: AsyncSession, tenant_id: str, store_id: str, target_date: date,
+        self,
+        db: AsyncSession,
+        tenant_id: str,
+        store_id: str,
+        target_date: date,
     ) -> dict[int, int]:
         """C. 渠道佣金：查channel_commissions或降级为0"""
         q = text("""
@@ -342,18 +374,25 @@ class LaborMarginService:
             GROUP BY EXTRACT(HOUR FROM created_at)
         """)
         try:
-            result = await db.execute(q, {
-                "tenant_id": tenant_id,
-                "store_id": store_id,
-                "target_date": target_date,
-            })
+            result = await db.execute(
+                q,
+                {
+                    "tenant_id": tenant_id,
+                    "store_id": store_id,
+                    "target_date": target_date,
+                },
+            )
             return {int(r["hour"]): int(r["channel_fee_fen"]) for r in result.mappings()}
         except (OperationalError, ProgrammingError) as exc:
             logger.debug("labor_margin_channel_fee_unavailable", error=str(exc))
             return {}
 
     async def _query_hourly_labor_cost(
-        self, db: AsyncSession, tenant_id: str, store_id: str, target_date: date,
+        self,
+        db: AsyncSession,
+        tenant_id: str,
+        store_id: str,
+        target_date: date,
     ) -> dict[int, dict[str, int]]:
         """D. 人力成本：查unified_schedules JOIN employees"""
         q = text("""
@@ -380,12 +419,15 @@ class LaborMarginService:
             ORDER BY gs.hour_slot
         """)
         try:
-            result = await db.execute(q, {
-                "tenant_id": tenant_id,
-                "store_id": store_id,
-                "target_date": target_date,
-                "default_hourly": DEFAULT_HOURLY_WAGE_FEN,
-            })
+            result = await db.execute(
+                q,
+                {
+                    "tenant_id": tenant_id,
+                    "store_id": store_id,
+                    "target_date": target_date,
+                    "default_hourly": DEFAULT_HOURLY_WAGE_FEN,
+                },
+            )
             return {
                 int(r["hour_slot"]): {
                     "cost_fen": int(r["labor_cost_fen"]),
@@ -415,8 +457,5 @@ class LaborMarginService:
                 f"或推出该时段特价套餐拉动客流。"
             )
         if revenue > 0:
-            return (
-                f"{hour}:00-{hour + 1}:00 毛利为负。"
-                f"建议优化排班或推出限时折扣拉升客单价。"
-            )
+            return f"{hour}:00-{hour + 1}:00 毛利为负。建议优化排班或推出限时折扣拉升客单价。"
         return f"{hour}:00-{hour + 1}:00 无营收但有人力成本，建议调整排班。"

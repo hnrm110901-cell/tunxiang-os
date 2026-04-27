@@ -10,6 +10,7 @@
 7. query_returns 汇总退菜数据
 8. query_alerts_today 返回排序后告警
 """
+
 import os
 import sys
 from datetime import date, datetime, timezone
@@ -31,6 +32,7 @@ from services.sql_queries import (
 )
 
 # ─── Mock 数据库会话工具 ───
+
 
 def _make_mock_db(rows: list[dict], scalar_value=None):
     """构建 mock AsyncSession，返回预设行数据"""
@@ -67,6 +69,7 @@ def _make_multi_execute_db(results_list: list):
 # ═══════════════════════════════════════════════
 # 1. query_daily_revenue
 # ═══════════════════════════════════════════════
+
 
 class TestQueryDailyRevenue:
     @pytest.mark.asyncio
@@ -106,16 +109,21 @@ class TestQueryDailyRevenue:
 # 2. query_order_count
 # ═══════════════════════════════════════════════
 
+
 class TestQueryOrderCount:
     @pytest.mark.asyncio
     async def test_returns_status_breakdown(self):
         """返回各状态订单数"""
-        db = _make_mock_db([{
-            "total": 150,
-            "paid": 128,
-            "cancelled": 12,
-            "refunded": 10,
-        }])
+        db = _make_mock_db(
+            [
+                {
+                    "total": 150,
+                    "paid": 128,
+                    "cancelled": 12,
+                    "refunded": 10,
+                }
+            ]
+        )
 
         result = await query_order_count("store-001", date(2026, 3, 27), "tenant-01", db)
 
@@ -129,26 +137,29 @@ class TestQueryOrderCount:
 # 3. query_dish_sales
 # ═══════════════════════════════════════════════
 
+
 class TestQueryDishSales:
     @pytest.mark.asyncio
     async def test_returns_dish_list(self):
         """返回菜品销售明细"""
-        db = _make_mock_db([
-            {
-                "dish_id": "dish-001",
-                "dish_name": "剁椒鱼头",
-                "category": "招牌菜",
-                "sales_qty": 45,
-                "sales_amount_fen": 585000,
-            },
-            {
-                "dish_id": "dish-002",
-                "dish_name": "小炒肉",
-                "category": "湘菜",
-                "sales_qty": 38,
-                "sales_amount_fen": 228000,
-            },
-        ])
+        db = _make_mock_db(
+            [
+                {
+                    "dish_id": "dish-001",
+                    "dish_name": "剁椒鱼头",
+                    "category": "招牌菜",
+                    "sales_qty": 45,
+                    "sales_amount_fen": 585000,
+                },
+                {
+                    "dish_id": "dish-002",
+                    "dish_name": "小炒肉",
+                    "category": "湘菜",
+                    "sales_qty": 38,
+                    "sales_amount_fen": 228000,
+                },
+            ]
+        )
 
         result = await query_dish_sales(
             "store-001",
@@ -167,15 +178,18 @@ class TestQueryDishSales:
 # 4. query_hourly_distribution
 # ═══════════════════════════════════════════════
 
+
 class TestQueryHourlyDistribution:
     @pytest.mark.asyncio
     async def test_returns_hourly_data(self):
         """返回按小时分布"""
-        db = _make_mock_db([
-            {"hour": 11, "revenue_fen": 120000, "order_count": 15},
-            {"hour": 12, "revenue_fen": 280000, "order_count": 35},
-            {"hour": 18, "revenue_fen": 202000, "order_count": 28},
-        ])
+        db = _make_mock_db(
+            [
+                {"hour": 11, "revenue_fen": 120000, "order_count": 15},
+                {"hour": 12, "revenue_fen": 280000, "order_count": 35},
+                {"hour": 18, "revenue_fen": 202000, "order_count": 28},
+            ]
+        )
 
         result = await query_hourly_distribution("store-001", date(2026, 3, 27), "tenant-01", db)
 
@@ -188,15 +202,18 @@ class TestQueryHourlyDistribution:
 # 5. query_payment_breakdown
 # ═══════════════════════════════════════════════
 
+
 class TestQueryPaymentBreakdown:
     @pytest.mark.asyncio
     async def test_calculates_pct(self):
         """支付方式占比正确计算"""
-        db = _make_mock_db([
-            {"payment_method": "wechat", "amount_fen": 600000, "count": 80},
-            {"payment_method": "alipay", "amount_fen": 300000, "count": 35},
-            {"payment_method": "cash", "amount_fen": 100000, "count": 13},
-        ])
+        db = _make_mock_db(
+            [
+                {"payment_method": "wechat", "amount_fen": 600000, "count": 80},
+                {"payment_method": "alipay", "amount_fen": 300000, "count": 35},
+                {"payment_method": "cash", "amount_fen": 100000, "count": 13},
+            ]
+        )
 
         result = await query_payment_breakdown("store-001", date(2026, 3, 27), "tenant-01", db)
 
@@ -209,15 +226,18 @@ class TestQueryPaymentBreakdown:
 # 6. query_table_sessions
 # ═══════════════════════════════════════════════
 
+
 class TestQueryTableSessions:
     @pytest.mark.asyncio
     async def test_calculates_turnover(self):
         """翻台率正确计算"""
         # 两次 execute: 第一次查桌台总数，第二次查会话
-        db = _make_multi_execute_db([
-            ([], 20),  # total_tables = 20
-            ([{"occupied_sessions": 36, "avg_duration_minutes": 45.5}], None),
-        ])
+        db = _make_multi_execute_db(
+            [
+                ([], 20),  # total_tables = 20
+                ([{"occupied_sessions": 36, "avg_duration_minutes": 45.5}], None),
+            ]
+        )
 
         result = await query_table_sessions("store-001", date(2026, 3, 27), "tenant-01", db)
 
@@ -231,22 +251,31 @@ class TestQueryTableSessions:
 # 7. query_returns
 # ═══════════════════════════════════════════════
 
+
 class TestQueryReturns:
     @pytest.mark.asyncio
     async def test_returns_summary(self):
         """退菜汇总正确"""
-        db = _make_multi_execute_db([
-            # 按菜品汇总
-            ([
-                {"dish_id": "d1", "dish_name": "剁椒鱼头", "return_qty": 3, "return_amount_fen": 39000},
-                {"dish_id": "d2", "dish_name": "小炒肉", "return_qty": 1, "return_amount_fen": 6000},
-            ], None),
-            # 按原因汇总
-            ([
-                {"reason": "taste", "count": 2},
-                {"reason": "slow", "count": 2},
-            ], None),
-        ])
+        db = _make_multi_execute_db(
+            [
+                # 按菜品汇总
+                (
+                    [
+                        {"dish_id": "d1", "dish_name": "剁椒鱼头", "return_qty": 3, "return_amount_fen": 39000},
+                        {"dish_id": "d2", "dish_name": "小炒肉", "return_qty": 1, "return_amount_fen": 6000},
+                    ],
+                    None,
+                ),
+                # 按原因汇总
+                (
+                    [
+                        {"reason": "taste", "count": 2},
+                        {"reason": "slow", "count": 2},
+                    ],
+                    None,
+                ),
+            ]
+        )
 
         result = await query_returns(
             "store-001",
@@ -265,33 +294,36 @@ class TestQueryReturns:
 # 8. query_alerts_today
 # ═══════════════════════════════════════════════
 
+
 class TestQueryAlertsToday:
     @pytest.mark.asyncio
     async def test_returns_sorted_alerts(self):
         """告警按严重级别排序返回"""
         now = datetime(2026, 3, 27, 12, 0, tzinfo=timezone.utc)
-        db = _make_mock_db([
-            {
-                "id": "a1",
-                "type": "discount_anomaly",
-                "severity": "critical",
-                "title": "异常折扣",
-                "detail": "8号桌全单5折",
-                "time": now,
-                "status": "pending",
-                "action_required": True,
-            },
-            {
-                "id": "a2",
-                "type": "stockout",
-                "severity": "warning",
-                "title": "临近售罄",
-                "detail": "小龙虾剩3份",
-                "time": now,
-                "status": "acknowledged",
-                "action_required": False,
-            },
-        ])
+        db = _make_mock_db(
+            [
+                {
+                    "id": "a1",
+                    "type": "discount_anomaly",
+                    "severity": "critical",
+                    "title": "异常折扣",
+                    "detail": "8号桌全单5折",
+                    "time": now,
+                    "status": "pending",
+                    "action_required": True,
+                },
+                {
+                    "id": "a2",
+                    "type": "stockout",
+                    "severity": "warning",
+                    "title": "临近售罄",
+                    "detail": "小龙虾剩3份",
+                    "time": now,
+                    "status": "acknowledged",
+                    "action_required": False,
+                },
+            ]
+        )
 
         result = await query_alerts_today("store-001", "tenant-01", db)
 

@@ -17,6 +17,7 @@
 所有接口需 X-Tenant-ID header。
 金额全部用分（整数），不使用浮点。
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -77,6 +78,7 @@ def _jsonb(obj) -> str:
 
 class BillingRuleItem(BaseModel):
     """单条账单规则配置"""
+
     rule_type: str = Field(..., description="规则类型: min_spend / service_fee")
     calc_method: str = Field(default="fixed", description="计算方式: fixed / per_person / percentage")
     threshold_fen: int = Field(default=0, ge=0, description="阈值金额（分）")
@@ -102,11 +104,13 @@ class BillingRuleItem(BaseModel):
 
 class SetBillingRulesReq(BaseModel):
     """配置门店账单规则请求（替换现有所有规则）"""
+
     rules: list[BillingRuleItem] = Field(..., min_length=1, description="规则列表，替换该门店全部规则")
 
 
 class ApplyBillingRulesReq(BaseModel):
     """结账时应用账单规则请求"""
+
     store_id: str = Field(..., description="门店ID")
     order_amount_fen: int = Field(..., ge=0, description="订单金额（分，折扣前）")
     guest_count: int = Field(default=1, ge=1, description="就餐人数")
@@ -126,8 +130,9 @@ async def get_billing_rules(
     """获取指定门店的所有启用账单规则（min_spend + service_fee）。无配置时返回空列表。"""
     tenant_id = _get_tenant_id(request)
 
-    rows = (await db.execute(
-        text("""
+    rows = (
+        await db.execute(
+            text("""
             SELECT id, store_id, rule_type, calc_method, threshold_fen,
                    service_fee_rate, exempt_member_tiers, exempt_agreement_units,
                    is_active, created_at, updated_at
@@ -135,8 +140,9 @@ async def get_billing_rules(
             WHERE tenant_id = :tid AND store_id = :sid AND is_deleted = false
             ORDER BY rule_type, created_at
         """),
-        {"tid": tenant_id, "sid": store_id},
-    )).fetchall()
+            {"tid": tenant_id, "sid": store_id},
+        )
+    ).fetchall()
 
     items = [
         {
@@ -240,11 +246,13 @@ async def set_billing_rules(
         inserted_ids=inserted_ids,
     )
 
-    return _ok({
-        "store_id": store_id,
-        "rules_count": len(body.rules),
-        "ids": inserted_ids,
-    })
+    return _ok(
+        {
+            "store_id": store_id,
+            "rules_count": len(body.rules),
+            "ids": inserted_ids,
+        }
+    )
 
 
 # ─── POST /api/v1/orders/{order_id}/apply-billing-rules ──────────────────────
@@ -272,8 +280,9 @@ async def apply_billing_rules(
     tenant_id = _get_tenant_id(request)
 
     # 拉取该门店所有启用规则
-    rows = (await db.execute(
-        text("""
+    rows = (
+        await db.execute(
+            text("""
             SELECT id, rule_type, calc_method, threshold_fen, service_fee_rate,
                    exempt_member_tiers, exempt_agreement_units
             FROM billing_rules
@@ -281,20 +290,23 @@ async def apply_billing_rules(
               AND is_active = true AND is_deleted = false
             ORDER BY rule_type, id
         """),
-        {"tid": tenant_id, "sid": body.store_id},
-    )).fetchall()
+            {"tid": tenant_id, "sid": body.store_id},
+        )
+    ).fetchall()
 
     if not rows:
-        return _ok({
-            "service_fee_items": [],
-            "service_fee_fen": 0,
-            "min_spend_shortfall_fen": 0,
-            "min_spend_required_fen": 0,
-            "total_extra_fen": 0,
-            "exempted": False,
-            "exemption_reason": None,
-            "message": "该门店未配置账单规则",
-        })
+        return _ok(
+            {
+                "service_fee_items": [],
+                "service_fee_fen": 0,
+                "min_spend_shortfall_fen": 0,
+                "min_spend_required_fen": 0,
+                "total_extra_fen": 0,
+                "exempted": False,
+                "exemption_reason": None,
+                "message": "该门店未配置账单规则",
+            }
+        )
 
     # ── 豁免检查（任一规则命中豁免条件即全局豁免）──────────────────────────
     exempted = False
@@ -331,25 +343,22 @@ async def apply_billing_rules(
                 description = f"服务费（固定）¥{fee_fen / 100:.2f}"
             elif method == "per_person":
                 fee_fen = int(row.threshold_fen) * body.guest_count
-                description = (
-                    f"服务费（{body.guest_count}人 × ¥{row.threshold_fen / 100:.2f}）"
-                    f"¥{fee_fen / 100:.2f}"
-                )
+                description = f"服务费（{body.guest_count}人 × ¥{row.threshold_fen / 100:.2f}）¥{fee_fen / 100:.2f}"
             elif method == "percentage":
                 rate = float(row.service_fee_rate)
                 fee_fen = round(body.order_amount_fen * rate)
                 pct = rate * 100
-                description = (
-                    f"服务费（{pct:.0f}%）¥{fee_fen / 100:.2f}"
-                )
+                description = f"服务费（{pct:.0f}%）¥{fee_fen / 100:.2f}"
 
             if fee_fen > 0:
-                service_fee_items.append({
-                    "rule_id": str(row.id),
-                    "calc_method": method,
-                    "fee_fen": fee_fen,
-                    "description": description,
-                })
+                service_fee_items.append(
+                    {
+                        "rule_id": str(row.id),
+                        "calc_method": method,
+                        "fee_fen": fee_fen,
+                        "description": description,
+                    }
+                )
                 service_fee_fen += fee_fen
 
     # ── 最低消费计算 ────────────────────────────────────────────────────────
@@ -382,27 +391,29 @@ async def apply_billing_rules(
         from shared.events.src.emitter import emit_event
         from shared.events.src.event_types import OrderEventType
 
-        asyncio.create_task(emit_event(
-            event_type=OrderEventType.BILLING_RULE_APPLIED,
-            tenant_id=tenant_id,
-            stream_id=order_id,
-            payload={
-                "store_id": body.store_id,
-                "order_amount_fen": body.order_amount_fen,
-                "service_fee_fen": service_fee_fen,
-                "min_spend_required_fen": min_spend_required_fen,
-                "min_spend_shortfall_fen": min_spend_shortfall_fen,
-                "total_extra_fen": total_extra_fen,
-                "exempted": exempted,
-                "guest_count": body.guest_count,
-            },
-            store_id=body.store_id,
-            source_service="tx-trade",
-            metadata={
-                "member_tier": body.member_tier,
-                "agreement_unit_id": body.agreement_unit_id,
-            },
-        ))
+        asyncio.create_task(
+            emit_event(
+                event_type=OrderEventType.BILLING_RULE_APPLIED,
+                tenant_id=tenant_id,
+                stream_id=order_id,
+                payload={
+                    "store_id": body.store_id,
+                    "order_amount_fen": body.order_amount_fen,
+                    "service_fee_fen": service_fee_fen,
+                    "min_spend_required_fen": min_spend_required_fen,
+                    "min_spend_shortfall_fen": min_spend_shortfall_fen,
+                    "total_extra_fen": total_extra_fen,
+                    "exempted": exempted,
+                    "guest_count": body.guest_count,
+                },
+                store_id=body.store_id,
+                source_service="tx-trade",
+                metadata={
+                    "member_tier": body.member_tier,
+                    "agreement_unit_id": body.agreement_unit_id,
+                },
+            )
+        )
     except ImportError:
         pass  # 事件总线不可用时降级，不影响结账主流程
 
@@ -422,17 +433,17 @@ async def apply_billing_rules(
         actual_yuan = body.order_amount_fen / 100
         required_yuan = min_spend_required_fen / 100
         gap_yuan = min_spend_shortfall_fen / 100
-        message_parts.append(
-            f"本桌消费¥{actual_yuan:.2f}，最低消费¥{required_yuan:.2f}，差额¥{gap_yuan:.2f}"
-        )
+        message_parts.append(f"本桌消费¥{actual_yuan:.2f}，最低消费¥{required_yuan:.2f}，差额¥{gap_yuan:.2f}")
 
-    return _ok({
-        "service_fee_items": service_fee_items,
-        "service_fee_fen": service_fee_fen,
-        "min_spend_shortfall_fen": min_spend_shortfall_fen,
-        "min_spend_required_fen": min_spend_required_fen,
-        "total_extra_fen": total_extra_fen,
-        "exempted": exempted,
-        "exemption_reason": exemption_reason,
-        "message": "、".join(message_parts) if message_parts else "无额外账单规则",
-    })
+    return _ok(
+        {
+            "service_fee_items": service_fee_items,
+            "service_fee_fen": service_fee_fen,
+            "min_spend_shortfall_fen": min_spend_shortfall_fen,
+            "min_spend_required_fen": min_spend_required_fen,
+            "total_extra_fen": total_extra_fen,
+            "exempted": exempted,
+            "exemption_reason": exemption_reason,
+            "message": "、".join(message_parts) if message_parts else "无额外账单规则",
+        }
+    )

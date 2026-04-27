@@ -19,6 +19,7 @@
 
 输出格式：CampaignContentPackage，包含所有渠道的内容变体
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -37,14 +38,14 @@ logger = structlog.get_logger(__name__)
 # ─── Channel max character constraints ───────────────────────────────────────
 
 CHANNEL_MAX_CHARS: dict[str, int] = {
-    "sms":               70,
+    "sms": 70,
     "wechat_oa_template": 200,
-    "wechat_moments":    500,
-    "wecom_chat":        300,
-    "miniapp_banner":    50,
-    "douyin_caption":    150,
-    "xiaohongshu":       1000,
-    "xiaohongshu_note":  1500,
+    "wechat_moments": 500,
+    "wecom_chat": 300,
+    "miniapp_banner": 50,
+    "douyin_caption": 150,
+    "xiaohongshu": 1000,
+    "xiaohongshu_note": 1500,
     "store_announcement": 100,
 }
 
@@ -145,10 +146,7 @@ class ContentHub:
             ValueError: 非法的 campaign_type 或 target_channels 为空
         """
         if request.campaign_type not in VALID_CAMPAIGN_TYPES:
-            raise ValueError(
-                f"非法活动类型: {request.campaign_type!r}. "
-                f"支持: {sorted(VALID_CAMPAIGN_TYPES)}"
-            )
+            raise ValueError(f"非法活动类型: {request.campaign_type!r}. 支持: {sorted(VALID_CAMPAIGN_TYPES)}")
         if not request.target_channels:
             raise ValueError("target_channels 不能为空")
 
@@ -345,9 +343,7 @@ class ContentHub:
         if not dish_name.strip():
             raise ValueError("dish_name 不能为空")
 
-        cache_key = hashlib.sha256(
-            f"xiaohongshu_note:{store_name}:{dish_name}:{campaign_type}".encode()
-        ).hexdigest()
+        cache_key = hashlib.sha256(f"xiaohongshu_note:{store_name}:{dish_name}:{campaign_type}".encode()).hexdigest()
 
         # 无 ModelRouter 时返回 mock 响应
         if self._model_router is None:
@@ -374,7 +370,7 @@ class ContentHub:
 品牌信息：
 - 餐厅名：{store_name}
 - 城市：{city}
-- 品牌调性：{brand_voice.get('tone', '亲切温暖')}
+- 品牌调性：{brand_voice.get("tone", "亲切温暖")}
 - 主推内容：{dish_name}
 - 活动类型：{campaign_type}
 - 目标受众：{target_audience}
@@ -403,10 +399,7 @@ class ContentHub:
             tenant_id=tenant_id,
             task_type="standard_analysis",
             messages=[{"role": "user", "content": prompt}],
-            system=(
-                "你是屯象OS的AI营销文案专家，专注中国连锁餐饮行业。"
-                "你的输出必须是合法JSON。"
-            ),
+            system=("你是屯象OS的AI营销文案专家，专注中国连锁餐饮行业。你的输出必须是合法JSON。"),
             max_tokens=800,
         )
 
@@ -608,12 +601,12 @@ class ContentHub:
                     """
                 ),
                 {
-                    "tid":      tenant_id,
-                    "key":      cache_key,
-                    "ctype":    campaign_type,
+                    "tid": tenant_id,
+                    "key": cache_key,
+                    "ctype": campaign_type,
                     "pkg_json": pkg_json,
-                    "tokens":   tokens_used,
-                    "expires":  expires_at,
+                    "tokens": tokens_used,
+                    "expires": expires_at,
                 },
             )
             await db.commit()
@@ -690,10 +683,10 @@ class ContentHub:
         signature_str = f"\n落款/标语: {bv.signature}" if bv.signature else ""
 
         emoji_guidance = {
-            "none":     "不使用任何表情符号",
-            "light":    "少量使用表情符号（1-2个）",
+            "none": "不使用任何表情符号",
+            "light": "少量使用表情符号（1-2个）",
             "moderate": "适量使用表情符号（3-5个）",
-            "heavy":    "大量使用表情符号营造活跃氛围",
+            "heavy": "大量使用表情符号营造活跃氛围",
         }.get(bv.emoji_style, "适量使用表情符号")
 
         prompt = f"""你是中国连锁餐饮行业顶级营销文案专家。请为以下活动生成全渠道营销内容。
@@ -704,26 +697,26 @@ class ContentHub:
 表情风格: {emoji_guidance}{taboo_str}{signature_str}
 
 ## 门店信息
-门店名称: {sc.get('store_name', bv.brand_name)}
-所在城市: {sc.get('city', '未知')}
-招牌菜品: {', '.join(sc.get('specialty_dishes', [])) or '特色美食'}
-当前促销: {sc.get('current_promotions', '无')}
+门店名称: {sc.get("store_name", bv.brand_name)}
+所在城市: {sc.get("city", "未知")}
+招牌菜品: {", ".join(sc.get("specialty_dishes", [])) or "特色美食"}
+当前促销: {sc.get("current_promotions", "无")}
 
 ## 活动类型
 {request.campaign_type}{member_info}{offer_info}
 
 ## 生成要求
-1. 为以下 {len(request.target_channels)} 个渠道生成内容，共 {len(variant_labels)} 个变体（{'/'.join(variant_labels)}）
+1. 为以下 {len(request.target_channels)} 个渠道生成内容，共 {len(variant_labels)} 个变体（{"/".join(variant_labels)}）
 2. 每个渠道的字数约束（严格遵守，尤其短信≤70字）：
 {chr(10).join(channel_constraints)}
 3. 内容必须符合品牌调性，真实自然，不夸张不违规
 4. 短信内容必须≤70个中文字符（含标点），超出会发送失败
 
 ## 目标渠道
-{', '.join(request.target_channels)}
+{", ".join(request.target_channels)}
 
 ## 变体列表
-{', '.join(variant_labels)}
+{", ".join(variant_labels)}
 
 ## 输出格式（严格JSON，不带markdown代码块）
 {{
@@ -832,14 +825,14 @@ class ContentHub:
         """基于请求内容的 SHA256 摘要生成缓存 key。"""
         payload = json.dumps(
             {
-                "campaign_type":  request.campaign_type,
-                "brand_name":     request.brand_voice.brand_name,
-                "tone":           request.brand_voice.tone,
-                "store_context":  request.store_context,
+                "campaign_type": request.campaign_type,
+                "brand_name": request.brand_voice.brand_name,
+                "tone": request.brand_voice.tone,
+                "store_context": request.store_context,
                 "member_segment": request.member_segment,
-                "offer_detail":   request.offer_detail,
-                "channels":       sorted(request.target_channels),
-                "ab_variants":    request.ab_variants,
+                "offer_detail": request.offer_detail,
+                "channels": sorted(request.target_channels),
+                "ab_variants": request.ab_variants,
             },
             ensure_ascii=False,
             sort_keys=True,

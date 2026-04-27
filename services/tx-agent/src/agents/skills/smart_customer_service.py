@@ -3,6 +3,7 @@
 自动回答常见问题、客诉处理建议、评价情感分析、生成个性化回复。
 通过 ModelRouter (MODERATE) 调用 LLM 生成自然语言回复。
 """
+
 from typing import Any
 
 import structlog
@@ -74,10 +75,40 @@ COMPLAINT_LEVELS = {
 
 # 情感关键词
 SENTIMENT_KEYWORDS = {
-    "positive": ["好吃", "美味", "满意", "推荐", "赞", "棒", "喜欢", "下次再来",
-                  "不错", "环境好", "服务好", "新鲜", "分量足", "实惠", "划算"],
-    "negative": ["难吃", "差", "不好", "太贵", "不新鲜", "慢", "态度差", "脏",
-                 "失望", "差评", "不推荐", "坑", "不值", "冷了", "量少"],
+    "positive": [
+        "好吃",
+        "美味",
+        "满意",
+        "推荐",
+        "赞",
+        "棒",
+        "喜欢",
+        "下次再来",
+        "不错",
+        "环境好",
+        "服务好",
+        "新鲜",
+        "分量足",
+        "实惠",
+        "划算",
+    ],
+    "negative": [
+        "难吃",
+        "差",
+        "不好",
+        "太贵",
+        "不新鲜",
+        "慢",
+        "态度差",
+        "脏",
+        "失望",
+        "差评",
+        "不推荐",
+        "坑",
+        "不值",
+        "冷了",
+        "量少",
+    ],
 }
 
 
@@ -87,6 +118,12 @@ class SmartCustomerServiceAgent(SkillAgent):
     description = "FAQ自动回答、客诉处理建议、评价情感分析、个性化回复生成"
     priority = "P2"
     run_location = "cloud"
+
+    # Sprint D1 / PR 批次 6：纯客服问答与建议生成，不触发业务决策，豁免
+    constraint_scope = set()
+    constraint_waived_reason = (
+        "智能客服输出 FAQ 回答与客诉处理建议，由客服人员最终决策，不直接操作毛利/食安/客户体验三条业务约束维度"
+    )
 
     def get_supported_actions(self) -> list[str]:
         return ["answer_faq", "handle_complaint", "analyze_sentiment", "generate_reply"]
@@ -235,9 +272,7 @@ class SmartCustomerServiceAgent(SkillAgent):
                 "estimated_cost_yuan": round(estimated_cost_fen / 100, 2),
                 "need_escalation": level_info["escalation"],
                 "escalation_to": "店长" if level_info["escalation"] else None,
-                "response_template": _build_complaint_response(
-                    complaint_level, compensation
-                ),
+                "response_template": _build_complaint_response(complaint_level, compensation),
             },
             reasoning=(
                 f"客诉等级: {level_info['label']}，"
@@ -295,13 +330,15 @@ class SmartCustomerServiceAgent(SkillAgent):
                 if kw in text:
                     found_keywords.append({"keyword": kw, "type": "negative"})
 
-            results.append({
-                "id": item_id,
-                "text": text[:200],
-                "sentiment": sentiment,
-                "score": round(score, 2),
-                "keywords": found_keywords,
-            })
+            results.append(
+                {
+                    "id": item_id,
+                    "text": text[:200],
+                    "sentiment": sentiment,
+                    "score": round(score, 2),
+                    "keywords": found_keywords,
+                }
+            )
 
         total = len(results)
         positive_rate = round(sentiment_counts["positive"] / max(1, total) * 100, 1)
@@ -314,9 +351,7 @@ class SmartCustomerServiceAgent(SkillAgent):
                 "total": total,
                 "sentiment_distribution": sentiment_counts,
                 "positive_rate_pct": positive_rate,
-                "avg_score": round(
-                    sum(r["score"] for r in results) / max(1, total), 2
-                ),
+                "avg_score": round(sum(r["score"] for r in results) / max(1, total), 2),
             },
             reasoning=(
                 f"分析 {total} 条评价：好评 {sentiment_counts['positive']}、"
@@ -400,8 +435,4 @@ def _build_complaint_response(level: str, compensation: list[str]) -> str:
             "感谢您的反馈，我们会尽快改进。"
         )
     else:
-        return (
-            "很抱歉给您带来了不便！"
-            f"我们已为您准备：{'、'.join(compensation)}。"
-            "感谢您的理解与支持。"
-        )
+        return f"很抱歉给您带来了不便！我们已为您准备：{'、'.join(compensation)}。感谢您的理解与支持。"

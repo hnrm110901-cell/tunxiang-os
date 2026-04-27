@@ -1,15 +1,16 @@
 """Store Readiness Scores — 门店就绪度评分 API"""
 
+import json
+from datetime import date, datetime, timezone
+from decimal import Decimal
+from typing import Any, List, Optional
+from uuid import uuid4
+
+import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
-from typing import Any, Optional, List
-from uuid import uuid4
-from datetime import datetime, date, timezone
-from decimal import Decimal
-import json
-import structlog
 
 from shared.ontology.src.database import get_db
 
@@ -83,11 +84,13 @@ def _calc_score_and_risk(dimensions: dict) -> tuple[float, str, list]:
     # Auto-extract risk positions from shift_coverage < 80
     risk_positions: list[dict] = []
     if sc < 80:
-        risk_positions.append({
-            "position": "shift",
-            "gap": round(80 - sc, 2),
-            "reason": "排班覆盖率不足",
-        })
+        risk_positions.append(
+            {
+                "position": "shift",
+                "gap": round(80 - sc, 2),
+                "reason": "排班覆盖率不足",
+            }
+        )
 
     return overall, risk, risk_positions
 
@@ -150,10 +153,16 @@ async def list_readiness(
     where = " AND ".join(conditions)
 
     # count
-    cnt_row = (await db.execute(
-        text(f"SELECT COUNT(*)::int AS total FROM store_readiness_scores WHERE {where}"),
-        params,
-    )).mappings().first()
+    cnt_row = (
+        (
+            await db.execute(
+                text(f"SELECT COUNT(*)::int AS total FROM store_readiness_scores WHERE {where}"),
+                params,
+            )
+        )
+        .mappings()
+        .first()
+    )
     total = cnt_row["total"] if cnt_row else 0
 
     # data
@@ -161,16 +170,22 @@ async def list_readiness(
     params["lim"] = size
     params["off"] = offset
 
-    rows = (await db.execute(
-        text(f"""
+    rows = (
+        (
+            await db.execute(
+                text(f"""
             SELECT {_FIELDS}
             FROM store_readiness_scores
             WHERE {where}
             ORDER BY score_date DESC, risk_level DESC
             LIMIT :lim OFFSET :off
         """),
-        params,
-    )).mappings().all()
+                params,
+            )
+        )
+        .mappings()
+        .all()
+    )
 
     items = [_row_to_dict(r) for r in rows]
     return _ok({"items": items, "total": total, "page": page, "size": size})
@@ -221,27 +236,40 @@ async def upsert_readiness(
             updated_at      = EXCLUDED.updated_at
         RETURNING id::text, overall_score, risk_level
     """)
-    result = (await db.execute(sql, {
-        "id": rec_id, "tid": tenant_id, "store_id": body.store_id,
-        "score_date": s_date, "shift": body.shift,
-        "overall_score": overall,
-        "dimensions": json.dumps(dims),
-        "risk_level": risk,
-        "risk_positions": json.dumps(risk_positions),
-        "action_items": json.dumps(action_items),
-        "now": now,
-    })).mappings().first()
+    result = (
+        (
+            await db.execute(
+                sql,
+                {
+                    "id": rec_id,
+                    "tid": tenant_id,
+                    "store_id": body.store_id,
+                    "score_date": s_date,
+                    "shift": body.shift,
+                    "overall_score": overall,
+                    "dimensions": json.dumps(dims),
+                    "risk_level": risk,
+                    "risk_positions": json.dumps(risk_positions),
+                    "action_items": json.dumps(action_items),
+                    "now": now,
+                },
+            )
+        )
+        .mappings()
+        .first()
+    )
 
     await db.commit()
 
-    log.info("store_readiness.upserted",
-             store_id=body.store_id, score_date=str(s_date), tenant_id=tenant_id)
+    log.info("store_readiness.upserted", store_id=body.store_id, score_date=str(s_date), tenant_id=tenant_id)
 
-    return _ok({
-        "id": result["id"] if result else rec_id,
-        "overall_score": float(result["overall_score"]) if result else overall,
-        "risk_level": result["risk_level"] if result else risk,
-    })
+    return _ok(
+        {
+            "id": result["id"] if result else rec_id,
+            "overall_score": float(result["overall_score"]) if result else overall,
+            "risk_level": result["risk_level"] if result else risk,
+        }
+    )
 
 
 # -- 3. GET /dashboard -- 就绪度总览 ----------------------------------------
@@ -278,11 +306,14 @@ async def readiness_dashboard(
     """)
     worst_rows = (await db.execute(worst_sql, {"tid": tenant_id, "sd": s_date})).mappings().all()
 
-    worst_stores = [{
-        "store_id": r["store_id"],
-        "overall_score": float(r["overall_score"]),
-        "risk_level": r["risk_level"],
-    } for r in worst_rows]
+    worst_stores = [
+        {
+            "store_id": r["store_id"],
+            "overall_score": float(r["overall_score"]),
+            "risk_level": r["risk_level"],
+        }
+        for r in worst_rows
+    ]
 
     # Dimension averages
     dim_sql = text("""
@@ -297,19 +328,21 @@ async def readiness_dashboard(
     """)
     dim_row = (await db.execute(dim_sql, {"tid": tenant_id, "sd": s_date})).mappings().first()
 
-    return _ok({
-        "green_count": summary["green_count"] if summary else 0,
-        "yellow_count": summary["yellow_count"] if summary else 0,
-        "red_count": summary["red_count"] if summary else 0,
-        "avg_score": float(summary["avg_score"]) if summary else 0,
-        "worst_stores": worst_stores,
-        "dimension_averages": {
-            "shift_coverage": float(dim_row["avg_shift_coverage"]) if dim_row else 0,
-            "skill_coverage": float(dim_row["avg_skill_coverage"]) if dim_row else 0,
-            "newbie_ratio": float(dim_row["avg_newbie_ratio"]) if dim_row else 0,
-            "training_completion": float(dim_row["avg_training_completion"]) if dim_row else 0,
-        },
-    })
+    return _ok(
+        {
+            "green_count": summary["green_count"] if summary else 0,
+            "yellow_count": summary["yellow_count"] if summary else 0,
+            "red_count": summary["red_count"] if summary else 0,
+            "avg_score": float(summary["avg_score"]) if summary else 0,
+            "worst_stores": worst_stores,
+            "dimension_averages": {
+                "shift_coverage": float(dim_row["avg_shift_coverage"]) if dim_row else 0,
+                "skill_coverage": float(dim_row["avg_skill_coverage"]) if dim_row else 0,
+                "newbie_ratio": float(dim_row["avg_newbie_ratio"]) if dim_row else 0,
+                "training_completion": float(dim_row["avg_training_completion"]) if dim_row else 0,
+            },
+        }
+    )
 
 
 # -- 4. GET /today -- 今日全部门店就绪度概览 ----------------------------------
@@ -359,16 +392,30 @@ async def readiness_trend(
           AND is_deleted = FALSE
         ORDER BY score_date ASC
     """)
-    rows = (await db.execute(sql, {
-        "tid": tenant_id, "sid": store_id, "days": days,
-    })).mappings().all()
+    rows = (
+        (
+            await db.execute(
+                sql,
+                {
+                    "tid": tenant_id,
+                    "sid": store_id,
+                    "days": days,
+                },
+            )
+        )
+        .mappings()
+        .all()
+    )
 
-    series = [{
-        "score_date": str(r["score_date"]),
-        "overall_score": float(r["overall_score"]),
-        "risk_level": r["risk_level"],
-        "shift": r["shift"],
-    } for r in rows]
+    series = [
+        {
+            "score_date": str(r["score_date"]),
+            "overall_score": float(r["overall_score"]),
+            "risk_level": r["risk_level"],
+            "shift": r["shift"],
+        }
+        for r in rows
+    ]
 
     return _ok({"store_id": store_id, "days": days, "series": series})
 
@@ -391,13 +438,16 @@ async def readiness_heatmap(
     """)
     rows = (await db.execute(sql, {"tid": tenant_id})).mappings().all()
 
-    items = [{
-        "store_id": r["store_id"],
-        "overall_score": float(r["overall_score"]),
-        "risk_level": r["risk_level"],
-        "score_date": str(r["score_date"]),
-        "shift": r["shift"],
-    } for r in rows]
+    items = [
+        {
+            "store_id": r["store_id"],
+            "overall_score": float(r["overall_score"]),
+            "risk_level": r["risk_level"],
+            "score_date": str(r["score_date"]),
+            "shift": r["shift"],
+        }
+        for r in rows
+    ]
 
     return _ok({"items": items, "total": len(items)})
 
@@ -516,20 +566,28 @@ async def append_action_items(
         WHERE id = :rid AND tenant_id = :tid AND is_deleted = FALSE
         RETURNING id::text, action_items
     """)
-    result = (await db.execute(sql, {
-        "rid": record_id,
-        "tid": tenant_id,
-        "new_items": json.dumps(body.items),
-        "now": now,
-    })).mappings().first()
+    result = (
+        (
+            await db.execute(
+                sql,
+                {
+                    "rid": record_id,
+                    "tid": tenant_id,
+                    "new_items": json.dumps(body.items),
+                    "now": now,
+                },
+            )
+        )
+        .mappings()
+        .first()
+    )
 
     if not result:
         raise HTTPException(status_code=404, detail="Readiness record not found")
 
     await db.commit()
 
-    log.info("store_readiness.actions_appended",
-             record_id=record_id, count=len(body.items), tenant_id=tenant_id)
+    log.info("store_readiness.actions_appended", record_id=record_id, count=len(body.items), tenant_id=tenant_id)
 
     action_items = result["action_items"]
     if isinstance(action_items, str):

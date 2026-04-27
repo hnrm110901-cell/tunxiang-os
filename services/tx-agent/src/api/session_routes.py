@@ -15,10 +15,11 @@ prefix: /api/v1/sessions
   GET    /cost/summary                     — 成本汇总
   GET    /cost/trend                       — 每日成本趋势
 """
+
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any
 from uuid import UUID
 
 import structlog
@@ -44,6 +45,7 @@ router = APIRouter(prefix="/api/v1/sessions", tags=["session-runtime"])
 # 依赖
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 async def _get_db(
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
 ) -> AsyncSession:
@@ -55,6 +57,7 @@ async def _get_db(
 # ─────────────────────────────────────────────────────────────────────────────
 # Request / Response Schemas
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class CreateSessionRequest(BaseModel):
     agent_template_name: str | None = None
@@ -92,6 +95,7 @@ class FailSessionRequest(BaseModel):
 # ─────────────────────────────────────────────────────────────────────────────
 # 序列化辅助
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 def _serialize_session(s: Any) -> dict:
     """将 SessionRun ORM 实例序列化为 dict。"""
@@ -163,6 +167,7 @@ def _serialize_checkpoint(c: Any) -> dict:
 # 成本路由（放在参数化路由之前，避免被 /{session_id} 拦截）
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 @router.get("/cost/summary")
 async def get_cost_summary(
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
@@ -205,6 +210,7 @@ async def get_daily_cost_trend(
 # Checkpoint 路由（放在参数化路由之前）
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 @router.post("/checkpoints/{checkpoint_id}/resolve")
 async def resolve_checkpoint(
     checkpoint_id: UUID,
@@ -235,6 +241,7 @@ async def resolve_checkpoint(
 # ─────────────────────────────────────────────────────────────────────────────
 # Session CRUD 路由
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @router.post("")
 async def create_session(
@@ -369,6 +376,7 @@ async def cancel_session(
 # Checkpoint 查询
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 @router.get("/{session_id}/checkpoints")
 async def get_session_checkpoints(
     session_id: UUID,
@@ -388,6 +396,7 @@ async def get_session_checkpoints(
 # ─────────────────────────────────────────────────────────────────────────────
 # Timeline
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @router.get("/{session_id}/timeline")
 async def get_session_timeline(

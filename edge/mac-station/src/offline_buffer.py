@@ -27,7 +27,7 @@ logger = structlog.get_logger(__name__)
 
 # SQLite 文件路径：生产用 /var/lib/tunxiang/，开发降级到 /tmp/
 _PROD_PATH = Path("/var/lib/tunxiang/offline_buffer.db")
-_DEV_PATH = Path("/tmp/tunxiang_offline_buffer.db")
+_DEV_PATH = Path("/tmp/tunxiang_offline_buffer.db")  # noqa: S108 — dev fallback; 生产走 _PROD_PATH
 
 _DDL = """
 CREATE TABLE IF NOT EXISTS offline_buffer (

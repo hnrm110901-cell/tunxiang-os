@@ -3,6 +3,7 @@
 系统金额 vs POS记录，按渠道生成对账报告。
 所有金额单位：分（fen）。
 """
+
 import uuid
 from datetime import datetime, timezone
 
@@ -73,26 +74,24 @@ class ChannelVerifyService:
 
         for channel in channels_to_check:
             result = await self._verify_channel(store_id, target_date, channel)
-            channel_results.append({
-                "name": channel,
-                "system_total_fen": result["system_total_fen"],
-                "pos_total_fen": result["pos_total_fen"],
-                "variance_fen": result["variance_fen"],
-                "match_rate": result["match_rate"],
-                "transaction_count": result["transaction_count"],
-                "matched_count": result["matched_count"],
-                "unmatched_count": result["unmatched_count"],
-            })
+            channel_results.append(
+                {
+                    "name": channel,
+                    "system_total_fen": result["system_total_fen"],
+                    "pos_total_fen": result["pos_total_fen"],
+                    "variance_fen": result["variance_fen"],
+                    "match_rate": result["match_rate"],
+                    "transaction_count": result["transaction_count"],
+                    "matched_count": result["matched_count"],
+                    "unmatched_count": result["unmatched_count"],
+                }
+            )
 
         # 汇总
         total_system = sum(c["system_total_fen"] for c in channel_results)
         total_pos = sum(c["pos_total_fen"] for c in channel_results)
         total_variance = total_system - total_pos
-        overall_match_rate = (
-            round(total_pos / total_system, 4)
-            if total_system > 0
-            else 1.0
-        )
+        overall_match_rate = round(total_pos / total_system, 4) if total_system > 0 else 1.0
 
         report = {
             "store_id": store_id,
@@ -166,10 +165,12 @@ class ChannelVerifyService:
             select(Payment).where(
                 Payment.order_id.in_(order_ids),
                 Payment.method == channel,
-                Payment.status.in_([
-                    PaymentStatus.paid.value,
-                    PaymentStatus.partial_refund.value,
-                ]),
+                Payment.status.in_(
+                    [
+                        PaymentStatus.paid.value,
+                        PaymentStatus.partial_refund.value,
+                    ]
+                ),
             )
         )
         payments = payments_result.scalars().all()
@@ -190,11 +191,7 @@ class ChannelVerifyService:
         pos_total_fen = sum(p.amount_fen for p in matched_payments)
         variance_fen = system_total_fen - pos_total_fen
 
-        match_rate = (
-            round(pos_total_fen / system_total_fen, 4)
-            if system_total_fen > 0
-            else 1.0
-        )
+        match_rate = round(pos_total_fen / system_total_fen, 4) if system_total_fen > 0 else 1.0
 
         unmatched_items = [
             {

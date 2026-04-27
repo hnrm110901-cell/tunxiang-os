@@ -1,4 +1,5 @@
 """GDPR / 个人信息保护合规 — Pydantic 模型定义"""
+
 from __future__ import annotations
 
 import enum
@@ -10,6 +11,7 @@ from pydantic import BaseModel, Field
 
 class DataRequestType(str, enum.Enum):
     """数据主体请求类型（GDPR Article 15-17, 16）"""
+
     ACCESS = "access"
     EXPORT = "export"
     DELETE = "delete"

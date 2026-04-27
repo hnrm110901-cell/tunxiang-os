@@ -2,10 +2,11 @@
 
 提供 Agent 间消息发送、接收、广播、回复、会话追踪等核心操作。
 """
+
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from uuid import UUID, uuid4
+from uuid import UUID
 
 import structlog
 from sqlalchemy import select
@@ -81,10 +82,7 @@ class AgentMessageService:
                 AgentMessage.status == "pending",
                 # 发给该 agent 或广播消息（排除自己发的广播）
                 (AgentMessage.to_agent_id == agent_id)
-                | (
-                    AgentMessage.to_agent_id.is_(None)
-                    & (AgentMessage.from_agent_id != agent_id)
-                ),
+                | (AgentMessage.to_agent_id.is_(None) & (AgentMessage.from_agent_id != agent_id)),
             )
             .where(
                 # 跳过已过期

@@ -10,6 +10,7 @@
 所有方法调用 _set_tenant() 设置 RLS context，确保多租户隔离。
 金额统一用 int（分）。
 """
+
 import json
 import uuid
 from datetime import datetime, timezone
@@ -93,8 +94,9 @@ class MenuTemplateRepository:
 
         await self.db.flush()
         result = await self.get_template(str(template_id))
-        log.info("menu_template.created", tenant_id=self.tenant_id,
-                 template_id=str(template_id), dish_count=len(dishes))
+        log.info(
+            "menu_template.created", tenant_id=self.tenant_id, template_id=str(template_id), dish_count=len(dishes)
+        )
         return result  # type: ignore[return-value]
 
     async def get_template(self, template_id: str) -> Optional[dict]:
@@ -245,8 +247,13 @@ class MenuTemplateRepository:
         dish_count = dish_count_result.scalar() or 0
 
         await self.db.flush()
-        log.info("menu_template.published", tenant_id=self.tenant_id,
-                 template_id=template_id, store_id=store_id, dish_count=dish_count)
+        log.info(
+            "menu_template.published",
+            tenant_id=self.tenant_id,
+            template_id=template_id,
+            store_id=store_id,
+            dish_count=dish_count,
+        )
         return {
             "store_id": store_id,
             "template_id": template_id,
@@ -307,9 +314,7 @@ class MenuTemplateRepository:
                 extra = d.dish_data if isinstance(d.dish_data, dict) else json.loads(d.dish_data)
                 dish_entry.update(extra)
             dish_id_str = str(d.dish_id)
-            dish_entry["channel_price_fen"] = channel_prices.get(
-                dish_id_str, dish_entry.get("price_fen", 0)
-            )
+            dish_entry["channel_price_fen"] = channel_prices.get(dish_id_str, dish_entry.get("price_fen", 0))
             dish_entry["channel"] = channel
             dishes.append(dish_entry)
 
@@ -341,8 +346,7 @@ class MenuTemplateRepository:
             },
         )
         await self.db.flush()
-        log.info("channel_price.set", tenant_id=self.tenant_id,
-                 dish_id=dish_id, channel=channel, price_fen=price_fen)
+        log.info("channel_price.set", tenant_id=self.tenant_id, dish_id=dish_id, channel=channel, price_fen=price_fen)
         return {
             "dish_id": dish_id,
             "channel": channel,
@@ -355,9 +359,7 @@ class MenuTemplateRepository:
     # 季节菜单
     # ══════════════════════════════════════════════════════
 
-    async def set_seasonal_menu(
-        self, store_id: str, season: str, dishes: list[dict]
-    ) -> dict:
+    async def set_seasonal_menu(self, store_id: str, season: str, dishes: list[dict]) -> dict:
         """设置门店季节菜单（UPSERT）"""
         await self._set_tenant()
         now = datetime.now(timezone.utc)
@@ -385,8 +387,9 @@ class MenuTemplateRepository:
             },
         )
         await self.db.flush()
-        log.info("seasonal_menu.set", tenant_id=self.tenant_id,
-                 store_id=store_id, season=season, dish_count=len(dishes))
+        log.info(
+            "seasonal_menu.set", tenant_id=self.tenant_id, store_id=store_id, season=season, dish_count=len(dishes)
+        )
         return {
             "store_id": store_id,
             "season": season,
@@ -425,9 +428,7 @@ class MenuTemplateRepository:
     # 包厢菜单
     # ══════════════════════════════════════════════════════
 
-    async def set_room_menu(
-        self, store_id: str, room_type: str, dishes: list[dict]
-    ) -> dict:
+    async def set_room_menu(self, store_id: str, room_type: str, dishes: list[dict]) -> dict:
         """设置门店包厢专属菜单（UPSERT）"""
         await self._set_tenant()
         now = datetime.now(timezone.utc)
@@ -455,8 +456,9 @@ class MenuTemplateRepository:
             },
         )
         await self.db.flush()
-        log.info("room_menu.set", tenant_id=self.tenant_id,
-                 store_id=store_id, room_type=room_type, dish_count=len(dishes))
+        log.info(
+            "room_menu.set", tenant_id=self.tenant_id, store_id=store_id, room_type=room_type, dish_count=len(dishes)
+        )
         return {
             "store_id": store_id,
             "room_type": room_type,
@@ -514,7 +516,11 @@ class MenuTemplateRepository:
         template["package_price_fen"] = package_price_fen
         template["guest_count"] = guest_count
         template["description"] = description
-        log.info("banquet_package.created", tenant_id=self.tenant_id,
-                 template_id=template["template_id"], guest_count=guest_count,
-                 price_fen=package_price_fen)
+        log.info(
+            "banquet_package.created",
+            tenant_id=self.tenant_id,
+            template_id=template["template_id"],
+            guest_count=guest_count,
+            price_fen=package_price_fen,
+        )
         return template

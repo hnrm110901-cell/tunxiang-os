@@ -10,6 +10,7 @@ Also covers pure-function helpers:
 
 Total: 17 test cases
 """
+
 import os
 import sys
 import types
@@ -18,8 +19,10 @@ import types
 _src_mod = types.ModuleType("src")
 _db_mod = types.ModuleType("src.db")
 
+
 async def _fake_get_db():
     yield None
+
 
 _db_mod.get_db = _fake_get_db
 sys.modules.setdefault("src", _src_mod)
@@ -31,8 +34,10 @@ _shared_ont = types.ModuleType("shared.ontology")
 _shared_ont_src = types.ModuleType("shared.ontology.src")
 _shared_db = types.ModuleType("shared.ontology.src.database")
 
+
 async def _fake_get_db_with_tenant(tenant_id: str):
     yield None
+
 
 _shared_db.get_db_with_tenant = _fake_get_db_with_tenant
 sys.modules.setdefault("shared", _shared)
@@ -42,21 +47,23 @@ sys.modules.setdefault("shared.ontology.src.database", _shared_db)
 
 # stub structlog
 import logging
+
 _structlog = types.ModuleType("structlog")
 _structlog.get_logger = lambda *a, **kw: logging.getLogger("test")
 sys.modules.setdefault("structlog", _structlog)
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
-from unittest.mock import AsyncMock, MagicMock, patch
-
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Helper: stub DailyReviewService
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 def _stub_daily_review_service(completion_rate: float = 0.8):
     """Return a MagicMock that mimics DailyReviewService.get_multi_store_summary."""
@@ -69,8 +76,10 @@ def _stub_daily_review_service(completion_rate: float = 0.8):
 # Pure-function unit tests (store_health_routes helpers)
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def test_calc_health_score_perfect():
     from api.store_health_routes import _calc_health_score
+
     score = _calc_health_score(revenue_rate=1.0, cost_rate=0.20, daily_review_rate=1.0)
     # revenue_score=100*0.4=40, cost_score=100*0.3=30, review_score=100*0.3=30 → 100
     assert score == 100
@@ -78,6 +87,7 @@ def test_calc_health_score_perfect():
 
 def test_calc_health_score_poor():
     from api.store_health_routes import _calc_health_score
+
     # revenue_rate=0.0 → revenue_score=0; cost_rate=0.60 → cost_score=0; review=0.0
     score = _calc_health_score(revenue_rate=0.0, cost_rate=0.60, daily_review_rate=0.0)
     assert score == 0
@@ -85,6 +95,7 @@ def test_calc_health_score_poor():
 
 def test_health_grade_mapping():
     from api.store_health_routes import _health_grade
+
     assert _health_grade(100) == "A"
     assert _health_grade(80) == "A"
     assert _health_grade(79) == "B"
@@ -96,12 +107,14 @@ def test_health_grade_mapping():
 
 def test_build_alerts_offline_store():
     from api.store_health_routes import _build_alerts
+
     alerts = _build_alerts(revenue_rate=1.0, cost_rate=0.25, daily_review_rate=1.0, store_status="offline")
     assert "门店离线" in alerts
 
 
 def test_build_alerts_high_cost_and_low_revenue():
     from api.store_health_routes import _build_alerts
+
     alerts = _build_alerts(revenue_rate=0.5, cost_rate=0.55, daily_review_rate=0.8, store_status="online")
     assert any("成本率过高" in a for a in alerts)
     assert any("营收仅达目标" in a for a in alerts)
@@ -109,20 +122,22 @@ def test_build_alerts_high_cost_and_low_revenue():
 
 def test_calc_summary_basic():
     from api.store_health_routes import _calc_summary
+
     items = [
-        {"status": "online",  "health_score": 80, "today_revenue_fen": 10000},
+        {"status": "online", "health_score": 80, "today_revenue_fen": 10000},
         {"status": "offline", "health_score": 50, "today_revenue_fen": 0},
-        {"status": "online",  "health_score": -1, "today_revenue_fen": 5000},
+        {"status": "online", "health_score": -1, "today_revenue_fen": 5000},
     ]
     summary = _calc_summary(items)
     assert summary["total_stores"] == 3
     assert summary["online_stores"] == 2
-    assert summary["avg_health_score"] == 65   # (80+50)/2, -1 excluded
+    assert summary["avg_health_score"] == 65  # (80+50)/2, -1 excluded
     assert summary["total_revenue_fen"] == 15000
 
 
 def test_degraded_item_structure():
     from api.store_health_routes import _degraded_item
+
     item = _degraded_item({"store_id": "s1", "store_name": "测试店"})
     assert item["health_score"] == -1
     assert item["health_grade"] == "-"
@@ -133,8 +148,10 @@ def test_degraded_item_structure():
 # Integration: GET /api/v1/store-health/overview
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def _build_store_health_app():
     from api.store_health_routes import router
+
     app = FastAPI()
     app.include_router(router)
     return app
@@ -168,16 +185,25 @@ async def test_overview_with_stores(store_health_client):
         {"store_id": "s2", "store_name": "上海店", "status": "online", "daily_target_fen": 80000},
     ]
     fake_item = {
-        "store_id": "s1", "store_name": "北京店", "status": "online",
-        "health_score": 85, "health_grade": "A", "today_revenue_fen": 90000,
-        "revenue_rate": 0.9, "cost_rate": 0.28, "daily_review_completion": 0.9, "alerts": [],
+        "store_id": "s1",
+        "store_name": "北京店",
+        "status": "online",
+        "health_score": 85,
+        "health_grade": "A",
+        "today_revenue_fen": 90000,
+        "revenue_rate": 0.9,
+        "cost_rate": 0.28,
+        "daily_review_completion": 0.9,
+        "alerts": [],
     }
 
     async def fake_build_item(*args, **kwargs):
         return fake_item
 
-    with patch("api.store_health_routes._fetch_all_stores", new=AsyncMock(return_value=fake_stores)), \
-         patch("api.store_health_routes._build_store_health_item", side_effect=fake_build_item):
+    with (
+        patch("api.store_health_routes._fetch_all_stores", new=AsyncMock(return_value=fake_stores)),
+        patch("api.store_health_routes._build_store_health_item", side_effect=fake_build_item),
+    ):
         async with store_health_client as c:
             resp = await c.get("/api/v1/store-health/overview", headers={"X-Tenant-ID": "t1"})
     assert resp.status_code == 200
@@ -190,6 +216,7 @@ async def test_overview_with_stores(store_health_client):
 async def test_overview_db_error_returns_empty(store_health_client):
     """When _fetch_all_stores raises SQLAlchemyError, return empty summary gracefully."""
     from sqlalchemy.exc import SQLAlchemyError
+
     with patch("api.store_health_routes._fetch_all_stores", new=AsyncMock(side_effect=SQLAlchemyError("db err"))):
         async with store_health_client as c:
             resp = await c.get("/api/v1/store-health/overview", headers={"X-Tenant-ID": "t1"})
@@ -202,6 +229,7 @@ async def test_overview_db_error_returns_empty(store_health_client):
 # ─────────────────────────────────────────────────────────────────────────────
 # Integration: GET /api/v1/store-health/{store_id}
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_detail_store_not_found(store_health_client):
@@ -232,12 +260,21 @@ async def test_detail_happy_path(store_health_client):
     mock_db.execute = AsyncMock(return_value=mock_result)
 
     fake_item = {
-        "store_id": "s1", "store_name": "测试店", "status": "online",
-        "health_score": 88, "health_grade": "A", "today_revenue_fen": 88000,
-        "revenue_rate": 0.88, "cost_rate": 0.28, "daily_review_completion": 0.9, "alerts": [],
+        "store_id": "s1",
+        "store_name": "测试店",
+        "status": "online",
+        "health_score": 88,
+        "health_grade": "A",
+        "today_revenue_fen": 88000,
+        "revenue_rate": 0.88,
+        "cost_rate": 0.28,
+        "daily_review_completion": 0.9,
+        "alerts": [],
     }
-    with patch("api.store_health_routes._get_db_with_tenant", return_value=mock_db), \
-         patch("api.store_health_routes._build_store_health_item", new=AsyncMock(return_value=fake_item)):
+    with (
+        patch("api.store_health_routes._get_db_with_tenant", return_value=mock_db),
+        patch("api.store_health_routes._build_store_health_item", new=AsyncMock(return_value=fake_item)),
+    ):
         async with store_health_client as c:
             resp = await c.get("/api/v1/store-health/s1", headers={"X-Tenant-ID": "t1"})
     assert resp.status_code == 200
@@ -250,8 +287,10 @@ async def test_detail_happy_path(store_health_client):
 # Integration: GET /api/v1/dashboard/summary
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def _build_dashboard_app():
     from api.dashboard_routes import router
+
     app = FastAPI()
     app.include_router(router)
     return app
@@ -272,15 +311,18 @@ def _make_fetch_kpi_mock(revenue_fen=50000, order_count=30, avg_order_fen=1666, 
             "avg_order_fen": avg_order_fen,
             "cost_rate": cost_rate,
         }
+
     return _mock
 
 
 @pytest.mark.asyncio
 async def test_dashboard_summary_happy_path(dashboard_client):
     """Happy path: kpi + stores + decisions all returned."""
-    with patch("api.dashboard_routes._fetch_today_kpi", side_effect=_make_fetch_kpi_mock()), \
-         patch("api.dashboard_routes._fetch_store_health", new=AsyncMock(return_value=[])), \
-         patch("api.dashboard_routes._fetch_recent_decisions", new=AsyncMock(return_value=[])):
+    with (
+        patch("api.dashboard_routes._fetch_today_kpi", side_effect=_make_fetch_kpi_mock()),
+        patch("api.dashboard_routes._fetch_store_health", new=AsyncMock(return_value=[])),
+        patch("api.dashboard_routes._fetch_recent_decisions", new=AsyncMock(return_value=[])),
+    ):
         async with dashboard_client as c:
             resp = await c.get("/api/v1/dashboard/summary", headers={"X-Tenant-ID": "t1"})
     assert resp.status_code == 200
@@ -296,9 +338,11 @@ async def test_dashboard_summary_with_store_data(dashboard_client):
     fake_stores = [
         {"store_id": "s1", "store_name": "店A", "today_revenue_fen": 30000, "today_orders": 20, "status": "online"},
     ]
-    with patch("api.dashboard_routes._fetch_today_kpi", side_effect=_make_fetch_kpi_mock()), \
-         patch("api.dashboard_routes._fetch_store_health", new=AsyncMock(return_value=fake_stores)), \
-         patch("api.dashboard_routes._fetch_recent_decisions", new=AsyncMock(return_value=[])):
+    with (
+        patch("api.dashboard_routes._fetch_today_kpi", side_effect=_make_fetch_kpi_mock()),
+        patch("api.dashboard_routes._fetch_store_health", new=AsyncMock(return_value=fake_stores)),
+        patch("api.dashboard_routes._fetch_recent_decisions", new=AsyncMock(return_value=[])),
+    ):
         async with dashboard_client as c:
             resp = await c.get("/api/v1/dashboard/summary", headers={"X-Tenant-ID": "t1"})
     body = resp.json()
@@ -310,14 +354,22 @@ async def test_dashboard_summary_with_store_data(dashboard_client):
 async def test_dashboard_summary_decisions_included(dashboard_client):
     """Recent agent decisions are included in the response."""
     from datetime import datetime, timezone
+
     fake_decisions = [
-        {"id": "d1", "agent_id": "inventory_alert", "action": "restock",
-         "decision_type": "generate_restock_alerts", "confidence": 0.92,
-         "created_at": datetime.now(timezone.utc).isoformat()},
+        {
+            "id": "d1",
+            "agent_id": "inventory_alert",
+            "action": "restock",
+            "decision_type": "generate_restock_alerts",
+            "confidence": 0.92,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        },
     ]
-    with patch("api.dashboard_routes._fetch_today_kpi", side_effect=_make_fetch_kpi_mock()), \
-         patch("api.dashboard_routes._fetch_store_health", new=AsyncMock(return_value=[])), \
-         patch("api.dashboard_routes._fetch_recent_decisions", new=AsyncMock(return_value=fake_decisions)):
+    with (
+        patch("api.dashboard_routes._fetch_today_kpi", side_effect=_make_fetch_kpi_mock()),
+        patch("api.dashboard_routes._fetch_store_health", new=AsyncMock(return_value=[])),
+        patch("api.dashboard_routes._fetch_recent_decisions", new=AsyncMock(return_value=fake_decisions)),
+    ):
         async with dashboard_client as c:
             resp = await c.get("/api/v1/dashboard/summary", headers={"X-Tenant-ID": "t1"})
     body = resp.json()

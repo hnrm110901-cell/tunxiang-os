@@ -3,6 +3,7 @@
 典型场景: 集满5杯送1杯, 消费满30元自动盖章, 集满后自动发放奖励券
 支持按消费次数或按消费金额门槛盖章。
 """
+
 from typing import Any
 
 import structlog

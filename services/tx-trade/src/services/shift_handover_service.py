@@ -3,6 +3,7 @@
 交班流程：start_handover → record_cash_count → finalize_handover → get_shift_summary
 所有金额单位：分（fen）。
 """
+
 import asyncio
 import uuid
 from datetime import datetime, timezone
@@ -206,18 +207,20 @@ class ShiftHandoverService:
 
         await self.db.flush()
 
-        asyncio.create_task(UniversalPublisher.publish(
-            event_type=TradeEventType.SHIFT_HANDOVER,
-            tenant_id=self.tenant_id,
-            store_id=handover.store_id,
-            entity_id=handover.id,
-            event_data={
-                "shift_id": str(handover.id),
-                "from_employee_id": handover.from_employee_id,
-                "to_employee_id": handover.to_employee_id,
-            },
-            source_service="tx-trade",
-        ))
+        asyncio.create_task(
+            UniversalPublisher.publish(
+                event_type=TradeEventType.SHIFT_HANDOVER,
+                tenant_id=self.tenant_id,
+                store_id=handover.store_id,
+                entity_id=handover.id,
+                event_data={
+                    "shift_id": str(handover.id),
+                    "from_employee_id": handover.from_employee_id,
+                    "to_employee_id": handover.to_employee_id,
+                },
+                source_service="tx-trade",
+            )
+        )
 
         report = {
             "handover_id": handover_id,
@@ -324,10 +327,12 @@ class ShiftHandoverService:
             payments_result = await self.db.execute(
                 select(Payment).where(
                     Payment.order_id.in_(order_ids),
-                    Payment.status.in_([
-                        PaymentStatus.paid.value,
-                        PaymentStatus.partial_refund.value,
-                    ]),
+                    Payment.status.in_(
+                        [
+                            PaymentStatus.paid.value,
+                            PaymentStatus.partial_refund.value,
+                        ]
+                    ),
                 )
             )
             payments = payments_result.scalars().all()
@@ -336,9 +341,7 @@ class ShiftHandoverService:
                     method_totals[p.method] += p.amount_fen
 
             # 退款汇总
-            refunds_result = await self.db.execute(
-                select(Refund).where(Refund.order_id.in_(order_ids))
-            )
+            refunds_result = await self.db.execute(select(Refund).where(Refund.order_id.in_(order_ids)))
             refunds = refunds_result.scalars().all()
             total_refund = sum(r.amount_fen for r in refunds)
 

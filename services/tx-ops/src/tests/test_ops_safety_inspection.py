@@ -17,6 +17,7 @@
   - asyncio.create_task 通过 patch 屏蔽
   - sys.modules 存根注入
 """
+
 from __future__ import annotations
 
 import sys
@@ -48,8 +49,10 @@ _ensure_stub("shared.ontology")
 _ensure_stub("shared.ontology.src")
 _db_mod = _ensure_stub("shared.ontology.src.database")
 if not hasattr(_db_mod, "get_db"):
+
     async def _placeholder_get_db():  # pragma: no cover
         yield None
+
     _db_mod.get_db = _placeholder_get_db
 
 # shared.events.*
@@ -59,11 +62,13 @@ _ensure_stub("shared.events.src.emitter", {"emit_event": AsyncMock()})
 _ev_types = _ensure_stub("shared.events.src.event_types")
 
 if not hasattr(_ev_types, "SafetyInspectionEventType"):
+
     class _FakeSafetyInspectionEventType:
         INSPECTION_STARTED = "safety.inspection.started"
         INSPECTION_COMPLETED = "safety.inspection.completed"
         INSPECTION_FAILED = "safety.inspection.failed"
         CRITICAL_ITEM_FAILED = "safety.inspection.critical_item_failed"
+
     _ev_types.SafetyInspectionEventType = _FakeSafetyInspectionEventType
 
 # structlog 存根
@@ -418,10 +423,12 @@ class TestCompleteInspection:
     def test_complete_inspection_passed(self):
         """全部 pass，平均分 90 >= 80 阈值 → is_passed=True，status=completed。"""
         inspection_row = _make_inspection_row(status="in_progress", pass_threshold=80.0)
-        items = self._make_item_rows([
-            {"score": 90.0, "weight": 1.0, "is_critical": False, "result": "pass"},
-            {"score": 85.0, "weight": 1.0, "is_critical": False, "result": "pass"},
-        ])
+        items = self._make_item_rows(
+            [
+                {"score": 90.0, "weight": 1.0, "is_critical": False, "result": "pass"},
+                {"score": 85.0, "weight": 1.0, "is_critical": False, "result": "pass"},
+            ]
+        )
 
         conn1 = AsyncMock()
         conn1.execute = AsyncMock(return_value="ok")
@@ -455,9 +462,11 @@ class TestCompleteInspection:
     def test_complete_inspection_failed_low_score(self):
         """得分 60 < 80 阈值 → is_passed=False，status=failed。"""
         inspection_row = _make_inspection_row(status="in_progress", pass_threshold=80.0)
-        items = self._make_item_rows([
-            {"score": 60.0, "weight": 1.0, "is_critical": False, "result": "pass"},
-        ])
+        items = self._make_item_rows(
+            [
+                {"score": 60.0, "weight": 1.0, "is_critical": False, "result": "pass"},
+            ]
+        )
 
         conn1 = AsyncMock()
         conn1.execute = AsyncMock(return_value="ok")
@@ -486,10 +495,12 @@ class TestCompleteInspection:
     def test_complete_inspection_critical_fail_veto(self):
         """关键项 fail → 一票否决，即使平均分 >= 阈值也 is_passed=False。"""
         inspection_row = _make_inspection_row(status="in_progress", pass_threshold=80.0)
-        items = self._make_item_rows([
-            {"score": 95.0, "weight": 1.0, "is_critical": True, "result": "fail"},   # 关键项不合格
-            {"score": 90.0, "weight": 1.0, "is_critical": False, "result": "pass"},
-        ])
+        items = self._make_item_rows(
+            [
+                {"score": 95.0, "weight": 1.0, "is_critical": True, "result": "fail"},  # 关键项不合格
+                {"score": 90.0, "weight": 1.0, "is_critical": False, "result": "pass"},
+            ]
+        )
 
         conn1 = AsyncMock()
         conn1.execute = AsyncMock(return_value="ok")
@@ -609,7 +620,6 @@ class TestListTemplates:
 
     def test_list_templates_success(self):
         """正常返回模板列表，total=1，含 item_count。"""
-        import json as _json
 
         tpl_items = [{"code": "FS-001", "name": "冰箱温度", "weight": 1.0}]
         tpl_row = MagicMock()

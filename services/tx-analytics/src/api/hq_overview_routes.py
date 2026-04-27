@@ -9,6 +9,7 @@
 RLS 安全：使用 X-Tenant-ID header，通过 get_db_with_tenant 设置 app.tenant_id。
 容错：DB 查询失败或表不存在时返回 mock 数据，确保驾驶舱始终可展示。
 """
+
 import logging
 import uuid
 from datetime import date, datetime, timedelta, timezone
@@ -208,9 +209,7 @@ async def _query_overview(
                 .where(Order.order_time < yesterday_end)
             )
         ).scalar() or 0
-        yesterday_turnover_rate = (
-            round(yesterday_turnover_count / total_seats, 2) if total_seats > 0 else 0.0
-        )
+        yesterday_turnover_rate = round(yesterday_turnover_count / total_seats, 2) if total_seats > 0 else 0.0
 
         return {
             "date": target_date.isoformat(),
@@ -336,11 +335,13 @@ async def _query_category_sales(
 
         if no_cat_fen > 0:
             total_fen += no_cat_fen
-            categories.append({
-                "category": "其他",
-                "revenue_fen": no_cat_fen,
-                "percentage": round(no_cat_fen / total_fen, 4) if total_fen > 0 else 0.0,
-            })
+            categories.append(
+                {
+                    "category": "其他",
+                    "revenue_fen": no_cat_fen,
+                    "percentage": round(no_cat_fen / total_fen, 4) if total_fen > 0 else 0.0,
+                }
+            )
             for cat in categories:
                 cat["percentage"] = round(cat["revenue_fen"] / total_fen, 4) if total_fen > 0 else 0.0
 

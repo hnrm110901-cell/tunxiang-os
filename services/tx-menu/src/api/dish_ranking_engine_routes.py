@@ -9,13 +9,13 @@ P3-04: 差异化护城河
   dishes       — id, tenant_id, store_id, dish_name, price_fen, cost_fen, category_id
   dish_categories — id, name
 """
-import structlog
-from fastapi import APIRouter, Query, HTTPException, Depends, Header
-from pydantic import BaseModel, field_validator
-from typing import Optional, Dict, Any, List
-from datetime import date, timedelta
-import uuid
 
+from datetime import date, timedelta
+from typing import Any, Dict, List, Optional
+
+import structlog
+from fastapi import APIRouter, Depends, Header, HTTPException, Query
+from pydantic import BaseModel, field_validator
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -57,6 +57,7 @@ BRAND_WEIGHT_PRESETS = {
 
 # ─── Pydantic Models ────────────────────────────────────────────────────────
 
+
 class WeightConfig(BaseModel):
     volume: float
     margin: float
@@ -78,6 +79,7 @@ class CalibrateRequest(BaseModel):
 
 
 # ─── 内部辅助 ────────────────────────────────────────────────────────────────
+
 
 async def _set_rls(db: AsyncSession, tenant_id: str) -> None:
     await db.execute(
@@ -268,23 +270,26 @@ async def _fetch_dish_scores(
             "trend": trend_score,
         }
 
-        dish_list.append({
-            "dish_id": str(r.dish_id),
-            "dish_name": r.dish_name or "",
-            "category": r.category_name or "",
-            "category_id": str(r.category_id) if r.category_id else None,
-            "price_fen": int(r.price_fen or 0),
-            "scores": scores,
-            "composite_score": _apply_weights(scores, _CURRENT_WEIGHTS),
-            "rank": 0,           # will be set after sort
-            "rank_change": 0,    # historical rank delta not tracked in this call
-            "recommendation_tag": QUADRANT_LABELS[_get_quadrant(volume_score, margin_score)],
-        })
+        dish_list.append(
+            {
+                "dish_id": str(r.dish_id),
+                "dish_name": r.dish_name or "",
+                "category": r.category_name or "",
+                "category_id": str(r.category_id) if r.category_id else None,
+                "price_fen": int(r.price_fen or 0),
+                "scores": scores,
+                "composite_score": _apply_weights(scores, _CURRENT_WEIGHTS),
+                "rank": 0,  # will be set after sort
+                "rank_change": 0,  # historical rank delta not tracked in this call
+                "recommendation_tag": QUADRANT_LABELS[_get_quadrant(volume_score, margin_score)],
+            }
+        )
 
     return dish_list
 
 
 # ─── 端点 ────────────────────────────────────────────────────────────────────
+
 
 @router.get("/dishes")
 async def get_dish_ranking(
@@ -359,14 +364,16 @@ async def get_dish_matrix(
         quadrants: dict[str, list] = {"star": [], "cash_cow": [], "question": [], "dog": []}
         for d in dishes:
             q = _get_quadrant(d["scores"]["volume"], d["scores"]["margin"])
-            quadrants[q].append({
-                "dish_id": d["dish_id"],
-                "dish_name": d["dish_name"],
-                "volume_score": d["scores"]["volume"],
-                "margin_score": d["scores"]["margin"],
-                "composite_score": d["composite_score"],
-                "price_fen": d["price_fen"],
-            })
+            quadrants[q].append(
+                {
+                    "dish_id": d["dish_id"],
+                    "dish_name": d["dish_name"],
+                    "volume_score": d["scores"]["volume"],
+                    "margin_score": d["scores"]["margin"],
+                    "composite_score": d["composite_score"],
+                    "price_fen": d["price_fen"],
+                }
+            )
 
         result = {}
         for key, items in quadrants.items():
@@ -404,7 +411,9 @@ async def get_dish_trends(
 
         # Fetch dish name
         dish_result = await db.execute(
-            text("SELECT dish_name, price_fen, cost_fen FROM dishes WHERE id = :did AND tenant_id = :tid AND is_deleted = FALSE"),
+            text(
+                "SELECT dish_name, price_fen, cost_fen FROM dishes WHERE id = :did AND tenant_id = :tid AND is_deleted = FALSE"
+            ),
             {"did": dish_id, "tid": x_tenant_id},
         )
         dish_row = dish_result.fetchone()
@@ -445,18 +454,28 @@ async def get_dish_trends(
             day_str = str(day)
             qty = daily_rows.get(day_str, 0)
             vol = round(min(qty / max_qty, 1.0), 3)
-            composite = round(_apply_weights(
-                {"volume": vol, "margin": round(margin_rate, 3), "reorder": vol * 0.8,
-                 "satisfaction": round(0.5 * vol + 0.5 * margin_rate, 3), "trend": vol},
-                _CURRENT_WEIGHTS,
-            ), 3)
-            trend_data.append({
-                "date": day_str,
-                "composite_score": composite,
-                "volume": vol,
-                "margin": round(margin_rate, 3),
-                "satisfaction": round(0.5 * vol + 0.5 * margin_rate, 3),
-            })
+            composite = round(
+                _apply_weights(
+                    {
+                        "volume": vol,
+                        "margin": round(margin_rate, 3),
+                        "reorder": vol * 0.8,
+                        "satisfaction": round(0.5 * vol + 0.5 * margin_rate, 3),
+                        "trend": vol,
+                    },
+                    _CURRENT_WEIGHTS,
+                ),
+                3,
+            )
+            trend_data.append(
+                {
+                    "date": day_str,
+                    "composite_score": composite,
+                    "volume": vol,
+                    "margin": round(margin_rate, 3),
+                    "satisfaction": round(0.5 * vol + 0.5 * margin_rate, 3),
+                }
+            )
 
         return {
             "ok": True,

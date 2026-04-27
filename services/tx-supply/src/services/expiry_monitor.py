@@ -3,6 +3,7 @@
 三条硬约束之一：食安合规 — 临期/过期食材不可用于出品。
 过期原料 = food safety violation，必须处理。
 """
+
 import asyncio
 import json
 import uuid
@@ -26,6 +27,7 @@ def _uuid(val: str | uuid.UUID) -> uuid.UUID:
 
 async def _set_tenant(db: AsyncSession, tenant_id: str) -> None:
     from sqlalchemy import text
+
     await db.execute(
         text("SELECT set_config('app.tenant_id', :tid, true)"),
         {"tid": tenant_id},
@@ -45,7 +47,9 @@ def _parse_notes_expiry(notes: Optional[str]) -> Optional[date]:
 
 
 async def _get_active_batches(
-    store_id: str, tenant_id: str, db: AsyncSession,
+    store_id: str,
+    tenant_id: str,
+    db: AsyncSession,
 ) -> list[dict]:
     """获取门店所有有剩余库存的批次
 
@@ -56,13 +60,10 @@ async def _get_active_batches(
     sid = _uuid(store_id)
 
     # 获取门店所有原料
-    ing_q = (
-        select(Ingredient)
-        .where(
-            Ingredient.tenant_id == tid,
-            Ingredient.store_id == sid,
-            Ingredient.is_deleted == False,  # noqa: E712
-        )
+    ing_q = select(Ingredient).where(
+        Ingredient.tenant_id == tid,
+        Ingredient.store_id == sid,
+        Ingredient.is_deleted == False,  # noqa: E712
     )
     ing_result = await db.execute(ing_q)
     ingredients = {str(i.id): i for i in ing_result.scalars().all()}
@@ -131,17 +132,19 @@ async def _get_active_batches(
         if not ing:
             continue
 
-        batches.append({
-            "ingredient_id": str(p.ingredient_id),
-            "ingredient_name": ing.ingredient_name,
-            "category": ing.category,
-            "unit": ing.unit,
-            "batch_no": batch_no,
-            "expiry_date": expiry,
-            "remaining": remaining,
-            "unit_cost_fen": p.unit_cost_fen,
-            "created_at": p.created_at,
-        })
+        batches.append(
+            {
+                "ingredient_id": str(p.ingredient_id),
+                "ingredient_name": ing.ingredient_name,
+                "category": ing.category,
+                "unit": ing.unit,
+                "batch_no": batch_no,
+                "expiry_date": expiry,
+                "remaining": remaining,
+                "unit_cost_fen": p.unit_cost_fen,
+                "created_at": p.created_at,
+            }
+        )
 
     return batches
 
@@ -173,17 +176,19 @@ async def check_expiring_items(
         if today <= exp <= cutoff:
             remaining_days = (exp - today).days
             cost = round((b["unit_cost_fen"] or 0) * b["remaining"])
-            expiring.append({
-                "ingredient_id": b["ingredient_id"],
-                "ingredient_name": b["ingredient_name"],
-                "category": b["category"],
-                "batch_no": b["batch_no"],
-                "expiry_date": exp.isoformat(),
-                "remaining_days": remaining_days,
-                "quantity": b["remaining"],
-                "unit": b["unit"],
-                "cost_fen": cost,
-            })
+            expiring.append(
+                {
+                    "ingredient_id": b["ingredient_id"],
+                    "ingredient_name": b["ingredient_name"],
+                    "category": b["category"],
+                    "batch_no": b["batch_no"],
+                    "expiry_date": exp.isoformat(),
+                    "remaining_days": remaining_days,
+                    "quantity": b["remaining"],
+                    "unit": b["unit"],
+                    "cost_fen": cost,
+                }
+            )
 
     expiring.sort(key=lambda x: x["remaining_days"])
 
@@ -197,19 +202,21 @@ async def check_expiring_items(
 
     # ── 事件总线：食材临期预警 ──────────────────────────────
     for item in expiring:
-        asyncio.create_task(UniversalPublisher.publish(
-            event_type=SupplyEventType.INGREDIENT_EXPIRING,
-            tenant_id=_uuid(tenant_id),
-            store_id=_uuid(store_id),
-            entity_id=_uuid(item["ingredient_id"]),
-            event_data={
-                "ingredient_id": item["ingredient_id"],
-                "expire_date": item["expiry_date"],
-                "days_remaining": item["remaining_days"],
-                "qty": item["quantity"],
-            },
-            source_service="tx-supply",
-        ))
+        asyncio.create_task(
+            UniversalPublisher.publish(
+                event_type=SupplyEventType.INGREDIENT_EXPIRING,
+                tenant_id=_uuid(tenant_id),
+                store_id=_uuid(store_id),
+                entity_id=_uuid(item["ingredient_id"]),
+                event_data={
+                    "ingredient_id": item["ingredient_id"],
+                    "expire_date": item["expiry_date"],
+                    "days_remaining": item["remaining_days"],
+                    "qty": item["quantity"],
+                },
+                source_service="tx-supply",
+            )
+        )
 
     return expiring
 
@@ -236,17 +243,19 @@ async def check_expired_items(
         if exp < today:
             days_overdue = (today - exp).days
             cost = round((b["unit_cost_fen"] or 0) * b["remaining"])
-            expired.append({
-                "ingredient_id": b["ingredient_id"],
-                "ingredient_name": b["ingredient_name"],
-                "category": b["category"],
-                "batch_no": b["batch_no"],
-                "expiry_date": exp.isoformat(),
-                "days_overdue": days_overdue,
-                "quantity": b["remaining"],
-                "unit": b["unit"],
-                "cost_fen": cost,
-            })
+            expired.append(
+                {
+                    "ingredient_id": b["ingredient_id"],
+                    "ingredient_name": b["ingredient_name"],
+                    "category": b["category"],
+                    "batch_no": b["batch_no"],
+                    "expiry_date": exp.isoformat(),
+                    "days_overdue": days_overdue,
+                    "quantity": b["remaining"],
+                    "unit": b["unit"],
+                    "cost_fen": cost,
+                }
+            )
 
     expired.sort(key=lambda x: x["days_overdue"], reverse=True)
 

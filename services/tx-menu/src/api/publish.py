@@ -1,4 +1,5 @@
 """菜品发布方案 API"""
+
 from typing import Optional
 
 from fastapi import APIRouter
@@ -14,6 +15,7 @@ router = APIRouter(prefix="/api/v1/menu", tags=["publish"])
 
 
 # ---------- Request Models ----------
+
 
 class CreatePublishPlanReq(BaseModel):
     plan_name: str
@@ -46,6 +48,7 @@ _price_adjustments: dict[str, dict] = {}
 
 
 # ---------- Publish Plan Endpoints ----------
+
 
 @router.post("/publish-plans")
 async def api_create_publish_plan(req: CreatePublishPlanReq):
@@ -92,6 +95,7 @@ async def api_list_publish_plans(page: int = 1, size: int = 20):
 
 
 # ---------- Price Adjustment Endpoints ----------
+
 
 @router.post("/price-adjustments")
 async def api_create_price_adjustment(req: CreatePriceAdjustmentReq):

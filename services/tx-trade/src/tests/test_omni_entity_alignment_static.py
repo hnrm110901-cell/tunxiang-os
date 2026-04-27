@@ -1,4 +1,5 @@
 """Omni 落库与 Order 实体对齐：静态断言（无 ORM 导入链）。"""
+
 from pathlib import Path
 
 

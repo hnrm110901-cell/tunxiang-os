@@ -10,6 +10,7 @@
 - 试点生命周期（建议 → 审批 → 跟踪 → 评审 → 推广）
 - 端到端：竞对动态 → 情报检测 → 试点建议
 """
+
 import pytest
 from services.competitor_monitor import CompetitorMonitorService
 from services.consumer_insight import ConsumerInsightService
@@ -22,6 +23,7 @@ from services.review_topic_engine import ReviewTopicEngine
 # ═══════════════════════════════════════
 # 竞对监测测试
 # ═══════════════════════════════════════
+
 
 class TestCompetitorMonitor:
     """竞对监测引擎测试"""
@@ -41,8 +43,11 @@ class TestCompetitorMonitor:
     def test_register_competitor(self) -> None:
         """注册新竞对"""
         result = self.svc.register_competitor(
-            name="呷哺呷哺", category="火锅", price_tier="mid_range",
-            cities=["北京", "上海"], stores_count=800,
+            name="呷哺呷哺",
+            category="火锅",
+            price_tier="mid_range",
+            cities=["北京", "上海"],
+            stores_count=800,
             monitor_level="basic",
         )
         assert result["status"] == "registered"
@@ -54,8 +59,12 @@ class TestCompetitorMonitor:
         """无效价格带应报错"""
         with pytest.raises(ValueError, match="Invalid price_tier"):
             self.svc.register_competitor(
-                name="Test", category="火锅", price_tier="超级贵",
-                cities=["北京"], stores_count=1, monitor_level="basic",
+                name="Test",
+                category="火锅",
+                price_tier="超级贵",
+                cities=["北京"],
+                stores_count=1,
+                monitor_level="basic",
             )
 
     def test_list_competitors_filter_by_category(self) -> None:
@@ -105,8 +114,12 @@ class TestCompetitorMonitor:
         cid = competitors[0]["competitor_id"]
         with pytest.raises(ValueError, match="Invalid action_type"):
             self.svc.record_competitor_action(
-                competitor_id=cid, action_type="invalid_type",
-                title="测试", detail="测试", impact_level="low", source="测试",
+                competitor_id=cid,
+                action_type="invalid_type",
+                title="测试",
+                detail="测试",
+                impact_level="low",
+                source="测试",
             )
 
     def test_get_recent_actions(self) -> None:
@@ -168,6 +181,7 @@ class TestCompetitorMonitor:
 # ═══════════════════════════════════════
 # 消费需求洞察测试
 # ═══════════════════════════════════════
+
 
 class TestConsumerInsight:
     """消费需求洞察引擎测试"""
@@ -259,6 +273,7 @@ class TestConsumerInsight:
 # ═══════════════════════════════════════
 # 口碑主题分析测试
 # ═══════════════════════════════════════
+
 
 class TestReviewTopicEngine:
     """口碑主题抽取引擎测试"""
@@ -366,6 +381,7 @@ class TestReviewTopicEngine:
 # 新品雷达测试
 # ═══════════════════════════════════════
 
+
 class TestNewProductRadar:
     """新品/新原料雷达测试"""
 
@@ -384,10 +400,14 @@ class TestNewProductRadar:
     def test_register_opportunity(self) -> None:
         """注册新机会"""
         result = self.radar.register_opportunity(
-            name="椰子鸡", category="trending_dish", source="市场调研",
+            name="椰子鸡",
+            category="trending_dish",
+            source="市场调研",
             description="椰子鸡火锅持续增长",
-            market_heat_score=0.80, brand_fit_score=0.50,
-            audience_fit_score=0.70, cost_feasibility_score=0.65,
+            market_heat_score=0.80,
+            brand_fit_score=0.50,
+            audience_fit_score=0.70,
+            cost_feasibility_score=0.65,
         )
         assert "opportunity_id" in result
         assert result["overall_score"] > 0
@@ -489,6 +509,7 @@ class TestNewProductRadar:
 # 价格洞察测试
 # ═══════════════════════════════════════
 
+
 class TestPricingInsight:
     """价格带与套餐洞察引擎测试"""
 
@@ -575,6 +596,7 @@ class TestPricingInsight:
 # ═══════════════════════════════════════
 # 情报报告测试
 # ═══════════════════════════════════════
+
 
 class TestIntelReportEngine:
     """情报周报/月报引擎测试"""
@@ -720,6 +742,7 @@ class TestIntelReportEngine:
 # 试点建议测试
 # ═══════════════════════════════════════
 
+
 class TestPilotSuggestion:
     """试点建议引擎测试"""
 
@@ -750,10 +773,14 @@ class TestPilotSuggestion:
         """无效建议类型应报错"""
         with pytest.raises(ValueError, match="Invalid suggestion_type"):
             self.svc.create_suggestion(
-                source_type="consumer_insight", source_id="test",
-                suggestion_type="invalid", title="测试",
-                description="测试", recommended_stores=["S001"],
-                period_days=14, success_metrics=[],
+                source_type="consumer_insight",
+                source_id="test",
+                suggestion_type="invalid",
+                title="测试",
+                description="测试",
+                recommended_stores=["S001"],
+                period_days=14,
+                success_metrics=[],
             )
 
     def test_list_suggestions(self) -> None:
@@ -879,6 +906,7 @@ class TestPilotSuggestion:
 # 端到端测试
 # ═══════════════════════════════════════
 
+
 class TestEndToEnd:
     """端到端集成测试"""
 
@@ -904,8 +932,7 @@ class TestEndToEnd:
         threats = comp_svc.detect_threats()
         assert len(threats) > 0
         has_expansion_threat = any(
-            t["threat_type"] == "同品类扩张" and t["competitor_name"] == "费大厨辣椒炒肉"
-            for t in threats
+            t["threat_type"] == "同品类扩张" and t["competitor_name"] == "费大厨辣椒炒肉" for t in threats
         )
         assert has_expansion_threat
 
@@ -937,7 +964,9 @@ class TestEndToEnd:
             "酸汤口味的菜太少了",
         ]:
             insight_svc.ingest_signal(
-                source_type="review", content=content, city="长沙",
+                source_type="review",
+                content=content,
+                city="长沙",
             )
 
         emerging = insight_svc.detect_emerging_needs()

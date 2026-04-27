@@ -11,6 +11,7 @@ Y-C4
   GET    /api/v1/menu/channel-overrides/conflicts      冲突检测
   GET    /api/v1/menu/channel-overrides/stats          发布统计
 """
+
 from __future__ import annotations
 
 import uuid as _uuid
@@ -31,9 +32,17 @@ router = APIRouter(prefix="/api/v1/menu/channel-overrides", tags=["channel-menu"
 
 # ─── 有效渠道 ────────────────────────────────────────────────────────────────
 
-_VALID_CHANNELS = frozenset({
-    "dine_in", "takeaway", "meituan", "eleme", "douyin", "miniapp", "all",
-})
+_VALID_CHANNELS = frozenset(
+    {
+        "dine_in",
+        "takeaway",
+        "meituan",
+        "eleme",
+        "douyin",
+        "miniapp",
+        "all",
+    }
+)
 
 _CHANNEL_DISPLAY = {
     "dine_in": "堂食",
@@ -74,8 +83,7 @@ class UpsertOverrideReq(BaseModel):
     is_available: bool = Field(True, description="是否在该渠道该门店可见")
     available_from: Optional[str] = Field(None, description="时段起始 HH:MM，NULL=全天")
     available_until: Optional[str] = Field(None, description="时段结束 HH:MM")
-    override_reason: Optional[str] = Field(None, max_length=100,
-                                           description="regional_price/stock/promotion")
+    override_reason: Optional[str] = Field(None, max_length=100, description="regional_price/stock/promotion")
     approved_by: Optional[str] = None
     effective_date: Optional[date] = None
     expires_date: Optional[date] = None
@@ -442,18 +450,20 @@ async def get_effective_menu(
             except (ValueError, AttributeError):
                 pass
 
-        menu_items.append({
-            "dish_id": str(r[0]),
-            "dish_name": r[1],
-            "brand_price_fen": brand_price,
-            "effective_price_fen": effective_price,
-            "has_override": r[4] is not None,
-            "override_id": str(r[4]) if r[4] else None,
-            "price_overridden": override_price is not None,
-            "is_available": is_available,
-            "override_reason": r[9],
-            "time_restricted": bool(available_from and available_until),
-        })
+        menu_items.append(
+            {
+                "dish_id": str(r[0]),
+                "dish_name": r[1],
+                "brand_price_fen": brand_price,
+                "effective_price_fen": effective_price,
+                "has_override": r[4] is not None,
+                "override_id": str(r[4]) if r[4] else None,
+                "price_overridden": override_price is not None,
+                "is_available": is_available,
+                "override_reason": r[9],
+                "time_restricted": bool(available_from and available_until),
+            }
+        )
 
     log.info(
         "effective_menu.fetched",
@@ -573,8 +583,7 @@ async def batch_set_overrides(
 @router.get("/conflicts", summary="渠道价格冲突检测")
 async def detect_conflicts(
     store_id: Optional[str] = Query(None, description="门店ID，不传则检查所有门店"),
-    threshold_rate: float = Query(0.30, ge=0.01, le=2.0,
-                                  description="价差阈值：外卖比堂食高X%则告警，默认0.30=30%"),
+    threshold_rate: float = Query(0.30, ge=0.01, le=2.0, description="价差阈值：外卖比堂食高X%则告警，默认0.30=30%"),
     request: Request = None,
     db: AsyncSession = Depends(get_db),
 ) -> dict:
@@ -658,22 +667,24 @@ async def detect_conflicts(
             if ch in _delivery_channels and dine_in_price and ch_price:
                 diff_rate = (ch_price - dine_in_price) / dine_in_price
                 if diff_rate > threshold_rate:
-                    conflict_dishes.append({
-                        "store_id": dish_info["store_id"],
-                        "dish_name": dish_info["dish_name"],
-                        "dish_id": dish_info["dish_id"],
-                        "conflict_channel": ch,
-                        "conflict_channel_display": _CHANNEL_DISPLAY.get(ch, ch),
-                        "dine_in_price_fen": dine_in_price,
-                        "delivery_price_fen": ch_price,
-                        "diff_rate": round(diff_rate, 4),
-                        "diff_rate_pct": f"{diff_rate * 100:.1f}%",
-                        "severity": "critical" if diff_rate > 0.5 else "warning",
-                        "suggestion": (
-                            f"外卖价比堂食高{diff_rate * 100:.0f}%，"
-                            f"建议调整至¥{dine_in_price * (1 + threshold_rate) / 100:.0f}以内"
-                        ),
-                    })
+                    conflict_dishes.append(
+                        {
+                            "store_id": dish_info["store_id"],
+                            "dish_name": dish_info["dish_name"],
+                            "dish_id": dish_info["dish_id"],
+                            "conflict_channel": ch,
+                            "conflict_channel_display": _CHANNEL_DISPLAY.get(ch, ch),
+                            "dine_in_price_fen": dine_in_price,
+                            "delivery_price_fen": ch_price,
+                            "diff_rate": round(diff_rate, 4),
+                            "diff_rate_pct": f"{diff_rate * 100:.1f}%",
+                            "severity": "critical" if diff_rate > 0.5 else "warning",
+                            "suggestion": (
+                                f"外卖价比堂食高{diff_rate * 100:.0f}%，"
+                                f"建议调整至¥{dine_in_price * (1 + threshold_rate) / 100:.0f}以内"
+                            ),
+                        }
+                    )
 
     log.info(
         "conflict_detection.done",

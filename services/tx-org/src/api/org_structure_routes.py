@@ -37,9 +37,7 @@ router = APIRouter(prefix="/api/v1/org-structure", tags=["org-structure"])
 
 
 def _get_tenant_id(request: Request) -> str:
-    tid = getattr(request.state, "tenant_id", None) or request.headers.get(
-        "X-Tenant-ID", ""
-    )
+    tid = getattr(request.state, "tenant_id", None) or request.headers.get("X-Tenant-ID", "")
     if not tid:
         raise HTTPException(status_code=400, detail="X-Tenant-ID header required")
     return tid
@@ -215,20 +213,23 @@ async def create_department(
         RETURNING id::text AS department_id
     """)
 
-    result = await db.execute(sql, {
-        "id": dept_id,
-        "tenant_id": tenant_id,
-        "name": req.name,
-        "parent_id": req.parent_id,
-        "dept_type": req.dept_type,
-        "store_id": req.store_id,
-        "manager_id": req.manager_id,
-        "sort_order": req.sort_order,
-        "level": level,
-        "path": path,
-        "description": req.description,
-        "now": now,
-    })
+    result = await db.execute(
+        sql,
+        {
+            "id": dept_id,
+            "tenant_id": tenant_id,
+            "name": req.name,
+            "parent_id": req.parent_id,
+            "dept_type": req.dept_type,
+            "store_id": req.store_id,
+            "manager_id": req.manager_id,
+            "sort_order": req.sort_order,
+            "level": level,
+            "path": path,
+            "description": req.description,
+            "now": now,
+        },
+    )
     await db.commit()
     row = result.fetchone()
 
@@ -356,7 +357,9 @@ async def delete_department(
 
     # 检查是否有在职员工
     emp_check = await db.execute(
-        text("SELECT COUNT(*) FROM employees WHERE department_id = :dept_id AND is_deleted = FALSE AND status = 'active'"),
+        text(
+            "SELECT COUNT(*) FROM employees WHERE department_id = :dept_id AND is_deleted = FALSE AND status = 'active'"
+        ),
         {"dept_id": dept_id},
     )
     emp_count = emp_check.scalar() or 0
@@ -499,7 +502,13 @@ async def move_department(
             SET parent_id = :new_parent_id, level = :new_level, path = :new_path, updated_at = :now
             WHERE id = :dept_id AND is_active = TRUE
         """),
-        {"new_parent_id": req.new_parent_id, "new_level": new_level, "new_path": new_path, "now": now, "dept_id": dept_id},
+        {
+            "new_parent_id": req.new_parent_id,
+            "new_level": new_level,
+            "new_path": new_path,
+            "now": now,
+            "dept_id": dept_id,
+        },
     )
 
     # 递归更新子部门的 level 和 path
@@ -535,12 +544,14 @@ async def move_department(
     await db.commit()
 
     log.info("move_department", tenant_id=tenant_id, dept_id=dept_id, new_parent_id=req.new_parent_id)
-    return _ok({
-        "department_id": dept_id,
-        "new_parent_id": req.new_parent_id,
-        "new_level": new_level,
-        "new_path": new_path,
-    })
+    return _ok(
+        {
+            "department_id": dept_id,
+            "new_parent_id": req.new_parent_id,
+            "new_level": new_level,
+            "new_path": new_path,
+        }
+    )
 
 
 @router.get("/statistics")
@@ -591,11 +602,13 @@ async def get_org_statistics(
         items.append(d)
 
     log.info("get_org_statistics", tenant_id=tenant_id, departments=len(items))
-    return _ok({
-        "departments": items,
-        "summary": {
-            "total_departments": len(items),
-            "total_employees": total_all,
-            "total_active": total_active,
-        },
-    })
+    return _ok(
+        {
+            "departments": items,
+            "summary": {
+                "total_departments": len(items),
+                "total_employees": total_all,
+                "total_active": total_active,
+            },
+        }
+    )

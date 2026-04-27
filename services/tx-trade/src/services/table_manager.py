@@ -6,6 +6,7 @@ States: free -> occupied -> settling -> cleaning -> free
 
 金额统一存分（fen），展示时 /100 转元。
 """
+
 import uuid
 from datetime import datetime, timezone
 from typing import Optional
@@ -76,8 +77,8 @@ class TableManager:
                 "guest_count": 0,
                 "open_time": None,
                 "waiter_id": None,
-                "merged_with": [],      # 并桌的其他桌号
-                "is_main_table": True,   # 并桌时的主桌
+                "merged_with": [],  # 并桌的其他桌号
+                "is_main_table": True,  # 并桌时的主桌
             }
             tables[table_no] = table_data
             results.append(dict(table_data))
@@ -131,9 +132,7 @@ class TableManager:
         table = self._get_table(store_id, table_no)
 
         if table["status"] not in ("free", "reserved"):
-            raise ValueError(
-                f"桌台{table_no}当前状态为{table['status']}，无法开台（需free或reserved）"
-            )
+            raise ValueError(f"桌台{table_no}当前状态为{table['status']}，无法开台（需free或reserved）")
 
         now = datetime.now(timezone.utc)
         table["status"] = "occupied"
@@ -157,9 +156,7 @@ class TableManager:
         table = self._get_table(store_id, table_no)
 
         if table["status"] not in ("cleaning", "occupied", "settling"):
-            raise ValueError(
-                f"桌台{table_no}当前状态为{table['status']}，无法释放"
-            )
+            raise ValueError(f"桌台{table_no}当前状态为{table['status']}，无法释放")
 
         duration_min = 0
         if table["open_time"]:
@@ -209,9 +206,7 @@ class TableManager:
         table = self._get_table(store_id, table_no)
 
         if table["status"] not in ("occupied", "settling"):
-            raise ValueError(
-                f"桌台{table_no}当前状态为{table['status']}，无法清台（需occupied或settling）"
-            )
+            raise ValueError(f"桌台{table_no}当前状态为{table['status']}，无法清台（需occupied或settling）")
 
         table["status"] = "cleaning"
 
@@ -223,9 +218,7 @@ class TableManager:
         table = self._get_table(store_id, table_no)
 
         if table["status"] != "occupied":
-            raise ValueError(
-                f"桌台{table_no}当前状态为{table['status']}，无法结账（需occupied）"
-            )
+            raise ValueError(f"桌台{table_no}当前状态为{table['status']}，无法结账（需occupied）")
 
         table["status"] = "settling"
 
@@ -401,11 +394,7 @@ class TableManager:
 
         # 翻台率 = occupied / (total - disabled) — 简化计算
         usable = stats["total"] - stats["disabled"]
-        stats["occupancy_rate"] = round(
-            stats["occupied"] / usable if usable > 0 else 0.0, 4
-        )
-        stats["avg_duration_min"] = (
-            round(sum(durations) / len(durations), 1) if durations else 0
-        )
+        stats["occupancy_rate"] = round(stats["occupied"] / usable if usable > 0 else 0.0, 4)
+        stats["avg_duration_min"] = round(sum(durations) / len(durations), 1) if durations else 0
 
         return stats

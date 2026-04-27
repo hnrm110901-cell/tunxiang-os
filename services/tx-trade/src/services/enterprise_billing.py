@@ -5,6 +5,7 @@
 
 v251 迁移后全部操作持久化到 enterprise_bills 表，内存存储已完全移除。
 """
+
 import json
 from datetime import datetime, timezone
 from typing import Optional
@@ -87,12 +88,15 @@ class EnterpriseBillingService:
                 "order_id": r["order_id"],
                 "signer_name": r["signer_name"],
                 "amount_fen": r["amount_fen"],
-                "signed_at": r["created_at"].isoformat() if hasattr(r["created_at"], "isoformat") else str(r["created_at"]),
+                "signed_at": r["created_at"].isoformat()
+                if hasattr(r["created_at"], "isoformat")
+                else str(r["created_at"]),
             }
             for r in month_signs
         ]
 
         import uuid as _uuid
+
         bill_no = f"BILL{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}{_uuid.uuid4().hex[:4].upper()}"
 
         try:
@@ -179,9 +183,7 @@ class EnterpriseBillingService:
         if pay_amount <= 0:
             raise ValueError("收款金额必须大于0")
         if pay_amount > bill["outstanding_fen"]:
-            raise ValueError(
-                f"收款金额 {pay_amount} 超过未结余额 {bill['outstanding_fen']}"
-            )
+            raise ValueError(f"收款金额 {pay_amount} 超过未结余额 {bill['outstanding_fen']}")
 
         new_paid = bill["paid_amount_fen"] + pay_amount
         new_outstanding = bill["outstanding_fen"] - pay_amount
@@ -287,16 +289,15 @@ class EnterpriseBillingService:
                 "outstanding_fen": target_bill["outstanding_fen"],
                 "status": target_bill["status"],
                 "order_count": target_bill["order_count"],
-                "issued_at": target_bill["issued_at"].isoformat() if hasattr(target_bill["issued_at"], "isoformat") else str(target_bill["issued_at"]),
+                "issued_at": target_bill["issued_at"].isoformat()
+                if hasattr(target_bill["issued_at"], "isoformat")
+                else str(target_bill["issued_at"]),
             },
             "line_items": line_items,
             "summary": {
                 "total_signs": len(line_items),
                 "total_amount_fen": target_bill["total_amount_fen"],
-                "avg_per_sign_fen": (
-                    target_bill["total_amount_fen"] // len(line_items)
-                    if line_items else 0
-                ),
+                "avg_per_sign_fen": (target_bill["total_amount_fen"] // len(line_items) if line_items else 0),
             },
             "generated_at": datetime.now(timezone.utc).isoformat(),
             "format": "pdf_data",
@@ -387,7 +388,8 @@ class EnterpriseBillingService:
             "credit_used_fen": enterprise["used_fen"],
             "credit_utilization": (
                 round(enterprise["used_fen"] / enterprise["credit_limit_fen"], 4)
-                if enterprise["credit_limit_fen"] > 0 else 0
+                if enterprise["credit_limit_fen"] > 0
+                else 0
             ),
             "total_sign_amount_fen": total_sign_amount_fen,
             "total_sign_count": sign_count,
@@ -398,9 +400,7 @@ class EnterpriseBillingService:
             "total_outstanding_fen": total_outstanding_fen,
             "monthly_count": monthly_count,
             "avg_monthly_fen": avg_monthly_fen,
-            "payment_compliance_rate": (
-                round(paid_bills / total_bills, 4) if total_bills > 0 else 1.0
-            ),
+            "payment_compliance_rate": (round(paid_bills / total_bills, 4) if total_bills > 0 else 1.0),
         }
 
         logger.info(

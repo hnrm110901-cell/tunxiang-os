@@ -6,14 +6,14 @@
   POST /api/v1/pay/admin/configs               — 创建/更新渠道配置
   POST /api/v1/pay/admin/cache/invalidate      — 清除路由缓存
 """
+
 from __future__ import annotations
 
 import json
 from typing import Optional
-from uuid import UUID
 
 import structlog
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Header
 from pydantic import BaseModel, Field
 
 from ..channels.base import PayMethod
@@ -25,6 +25,7 @@ router = APIRouter(prefix="/api/v1/pay/admin", tags=["支付管理"])
 
 class ChannelConfigReq(BaseModel):
     """渠道配置请求"""
+
     brand_id: Optional[str] = None
     store_id: Optional[str] = None
     method: PayMethod
@@ -40,6 +41,7 @@ class CacheInvalidateReq(BaseModel):
 
 
 # ─── 端点 ───────────────────────────────────────────────────────────
+
 
 @router.get("/channels")
 async def list_channels():
@@ -60,6 +62,7 @@ async def list_configs(
 
     db = await get_db()
     from sqlalchemy import text
+
     query = """
         SELECT id, tenant_id, brand_id, store_id, method, channel_name,
                priority, is_active, config_data, created_at
@@ -101,6 +104,7 @@ async def upsert_config(
 
     db = await get_db()
     from sqlalchemy import text
+
     await db.execute(
         text("""
             INSERT INTO payment_channel_configs (

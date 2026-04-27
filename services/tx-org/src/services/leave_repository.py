@@ -119,6 +119,7 @@ async def create_leave_request(
 ) -> dict[str, Any]:
     """创建请假申请（status=pending）"""
     import json as _json
+
     row = await db.execute(
         text(
             "INSERT INTO leave_requests "
@@ -225,9 +226,7 @@ async def list_leave_requests(
         ),
         {**params, "size": size, "offset": offset},
     )
-    count_row = await db.execute(
-        text(f"SELECT COUNT(*) FROM leave_requests WHERE {where}"), params
-    )
+    count_row = await db.execute(text(f"SELECT COUNT(*) FROM leave_requests WHERE {where}"), params)
     total = count_row.scalar() or 0
     items = [dict(r) for r in rows.mappings().fetchall()]
     return {"items": items, "total": total}
@@ -289,16 +288,17 @@ async def on_leave_approved(
 
     # 2. 更新 status = approved
     await db.execute(
-        text(
-            "UPDATE leave_requests SET status = 'approved', updated_at = NOW() "
-            "WHERE id = :lid AND tenant_id = :tid"
-        ),
+        text("UPDATE leave_requests SET status = 'approved', updated_at = NOW() WHERE id = :lid AND tenant_id = :tid"),
         {"lid": leave_request_id, "tid": tenant_id},
     )
 
     # 3. 扣减余额（年假/调休）
     if lr["leave_type"] in BALANCE_CHECKED_TYPES:
-        start_year = lr["start_date"].year if isinstance(lr["start_date"], date) else date.fromisoformat(str(lr["start_date"])).year
+        start_year = (
+            lr["start_date"].year
+            if isinstance(lr["start_date"], date)
+            else date.fromisoformat(str(lr["start_date"])).year
+        )
         await deduct_leave_balance(
             employee_id=lr["employee_id"],
             year=start_year,

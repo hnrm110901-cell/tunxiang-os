@@ -3,6 +3,7 @@
 能力：日经营总结生成、经营规律发现、改进行动计划
 通过 ModelRouter (MODERATE) 调用 LLM 生成自然语言总结。
 """
+
 import statistics
 from typing import Any
 
@@ -19,11 +20,11 @@ logger = structlog.get_logger()
 
 # 经营指标基准 (可被门店配置覆盖)
 BENCHMARK = {
-    "avg_revenue_fen": 5000000,     # 日均营收 5 万元
-    "avg_covers": 200,              # 日均客流 200 人
+    "avg_revenue_fen": 5000000,  # 日均营收 5 万元
+    "avg_covers": 200,  # 日均客流 200 人
     "avg_per_customer_fen": 25000,  # 客单价 250 元
-    "target_margin_rate": 0.30,     # 目标毛利率 30%
-    "target_turnover_rate": 2.5,    # 翻台率 2.5
+    "target_margin_rate": 0.30,  # 目标毛利率 30%
+    "target_turnover_rate": 2.5,  # 翻台率 2.5
 }
 
 
@@ -33,6 +34,12 @@ class ReviewSummaryAgent(SkillAgent):
     description = "自动生成日经营总结、发现经营规律、生成改进行动计划"
     priority = "P1"
     run_location = "cloud"
+
+    # Sprint D1 / PR 批次 6：纯报告生成，不触发业务决策，豁免
+    constraint_scope = set()
+    constraint_waived_reason = (
+        "复盘总结纯日经营文本汇总与改进行动计划建议，不直接操作毛利/食安/客户体验三条业务约束维度，属报告类 Skill"
+    )
 
     def get_supported_actions(self) -> list[str]:
         return ["daily_summary", "weekly_pattern", "action_plan"]
@@ -56,7 +63,8 @@ class ReviewSummaryAgent(SkillAgent):
 
         if not metrics:
             return AgentResult(
-                success=False, action="daily_summary",
+                success=False,
+                action="daily_summary",
                 error="无经营数据",
             )
 
@@ -81,9 +89,13 @@ class ReviewSummaryAgent(SkillAgent):
         benchmark = params.get("benchmark", BENCHMARK)
 
         if revenue_fen > benchmark["avg_revenue_fen"] * 1.1:
-            highlights.append(f"营收 ¥{revenue_fen/100:.0f} 超基准 {(revenue_fen/benchmark['avg_revenue_fen']-1)*100:.0f}%")
+            highlights.append(
+                f"营收 ¥{revenue_fen / 100:.0f} 超基准 {(revenue_fen / benchmark['avg_revenue_fen'] - 1) * 100:.0f}%"
+            )
         elif revenue_fen < benchmark["avg_revenue_fen"] * 0.9:
-            warnings.append(f"营收 ¥{revenue_fen/100:.0f} 低于基准 {(1-revenue_fen/benchmark['avg_revenue_fen'])*100:.0f}%")
+            warnings.append(
+                f"营收 ¥{revenue_fen / 100:.0f} 低于基准 {(1 - revenue_fen / benchmark['avg_revenue_fen']) * 100:.0f}%"
+            )
 
         if margin_rate < benchmark["target_margin_rate"] - 0.03:
             warnings.append(f"毛利率 {margin_rate:.1%} 低于目标 {benchmark['target_margin_rate']:.1%}")
@@ -99,7 +111,7 @@ class ReviewSummaryAgent(SkillAgent):
             warnings.append(f"投诉 {complaints} 单，需关注")
 
         if waste_fen > food_cost_fen * 0.05 and food_cost_fen > 0:
-            warnings.append(f"浪费金额 ¥{waste_fen/100:.0f}，占食材成本 {waste_fen/food_cost_fen*100:.1f}%")
+            warnings.append(f"浪费金额 ¥{waste_fen / 100:.0f}，占食材成本 {waste_fen / food_cost_fen * 100:.1f}%")
 
         # 总结评级
         score = 70
@@ -118,12 +130,17 @@ class ReviewSummaryAgent(SkillAgent):
 
         if model_router:
             model_router.log_call(
-                task_type="kpi_summary", model=model,
-                input_tokens=0, output_tokens=0, latency_ms=0, success=True,
+                task_type="kpi_summary",
+                model=model,
+                input_tokens=0,
+                output_tokens=0,
+                latency_ms=0,
+                success=True,
             )
 
         return AgentResult(
-            success=True, action="daily_summary",
+            success=True,
+            action="daily_summary",
             data={
                 "store_id": store_id,
                 "date": date,
@@ -146,7 +163,7 @@ class ReviewSummaryAgent(SkillAgent):
                 "top_dishes": top_dishes[:5],
             },
             reasoning=f"门店 {store_id} {date} 经营评级: {grade}({score}分)，"
-                      f"亮点{len(highlights)}项，预警{len(warnings)}项",
+            f"亮点{len(highlights)}项，预警{len(warnings)}项",
             confidence=0.85,
         )
 
@@ -158,7 +175,8 @@ class ReviewSummaryAgent(SkillAgent):
 
         if len(daily_data) < 7:
             return AgentResult(
-                success=False, action="weekly_pattern",
+                success=False,
+                action="weekly_pattern",
                 error=f"数据不足，至少需要7天数据，当前仅 {len(daily_data)} 天",
             )
 
@@ -188,39 +206,45 @@ class ReviewSummaryAgent(SkillAgent):
             we_avg = statistics.mean(weekend_revenues)
             diff_pct = (we_avg - wd_avg) / wd_avg if wd_avg > 0 else 0
 
-            patterns.append({
-                "type": "weekday_vs_weekend",
-                "weekday_avg_revenue_fen": round(wd_avg),
-                "weekend_avg_revenue_fen": round(we_avg),
-                "weekend_uplift_pct": round(diff_pct * 100, 1),
-                "insight": f"周末营收{'高于' if diff_pct > 0 else '低于'}工作日 {abs(diff_pct)*100:.0f}%",
-            })
+            patterns.append(
+                {
+                    "type": "weekday_vs_weekend",
+                    "weekday_avg_revenue_fen": round(wd_avg),
+                    "weekend_avg_revenue_fen": round(we_avg),
+                    "weekend_uplift_pct": round(diff_pct * 100, 1),
+                    "insight": f"周末营收{'高于' if diff_pct > 0 else '低于'}工作日 {abs(diff_pct) * 100:.0f}%",
+                }
+            )
 
             if weekday_covers and weekend_covers:
                 wd_cov = statistics.mean(weekday_covers)
                 we_cov = statistics.mean(weekend_covers)
-                patterns.append({
-                    "type": "cover_distribution",
-                    "weekday_avg_covers": round(wd_cov),
-                    "weekend_avg_covers": round(we_cov),
-                    "insight": f"工作日均客流 {wd_cov:.0f}，周末 {we_cov:.0f}",
-                })
+                patterns.append(
+                    {
+                        "type": "cover_distribution",
+                        "weekday_avg_covers": round(wd_cov),
+                        "weekend_avg_covers": round(we_cov),
+                        "insight": f"工作日均客流 {wd_cov:.0f}，周末 {we_cov:.0f}",
+                    }
+                )
 
         # 趋势分析 (简单线性)
         if len(daily_data) >= 14:
-            first_half = [d.get("revenue_fen", 0) for d in daily_data[:len(daily_data)//2]]
-            second_half = [d.get("revenue_fen", 0) for d in daily_data[len(daily_data)//2:]]
+            first_half = [d.get("revenue_fen", 0) for d in daily_data[: len(daily_data) // 2]]
+            second_half = [d.get("revenue_fen", 0) for d in daily_data[len(daily_data) // 2 :]]
             first_avg = statistics.mean(first_half)
             second_avg = statistics.mean(second_half)
             trend_pct = (second_avg - first_avg) / first_avg if first_avg > 0 else 0
 
             trend_direction = "上升" if trend_pct > 0.03 else "下降" if trend_pct < -0.03 else "平稳"
-            patterns.append({
-                "type": "trend",
-                "direction": trend_direction,
-                "change_pct": round(trend_pct * 100, 1),
-                "insight": f"近期营收趋势{trend_direction} {abs(trend_pct)*100:.1f}%",
-            })
+            patterns.append(
+                {
+                    "type": "trend",
+                    "direction": trend_direction,
+                    "change_pct": round(trend_pct * 100, 1),
+                    "insight": f"近期营收趋势{trend_direction} {abs(trend_pct) * 100:.1f}%",
+                }
+            )
 
         # 天气影响 (如果数据中包含天气)
         weather_data = [d for d in daily_data if d.get("weather")]
@@ -232,18 +256,25 @@ class ReviewSummaryAgent(SkillAgent):
 
             weather_impact = []
             for w, revs in weather_groups.items():
-                weather_impact.append({
-                    "weather": w, "avg_revenue_fen": round(statistics.mean(revs)), "days": len(revs),
-                })
+                weather_impact.append(
+                    {
+                        "weather": w,
+                        "avg_revenue_fen": round(statistics.mean(revs)),
+                        "days": len(revs),
+                    }
+                )
             weather_impact.sort(key=lambda x: x["avg_revenue_fen"], reverse=True)
-            patterns.append({
-                "type": "weather_impact",
-                "breakdown": weather_impact,
-                "insight": f"最佳天气: {weather_impact[0]['weather']}" if weather_impact else "",
-            })
+            patterns.append(
+                {
+                    "type": "weather_impact",
+                    "breakdown": weather_impact,
+                    "insight": f"最佳天气: {weather_impact[0]['weather']}" if weather_impact else "",
+                }
+            )
 
         return AgentResult(
-            success=True, action="weekly_pattern",
+            success=True,
+            action="weekly_pattern",
             data={
                 "store_id": store_id,
                 "analysis_days": len(daily_data),
@@ -269,37 +300,45 @@ class ReviewSummaryAgent(SkillAgent):
         warnings = summary.get("warnings", [])
         for w in warnings:
             if "毛利" in w:
-                actions.append({
-                    "category": "成本控制",
-                    "action": "启动成本偏差诊断，排查毛利下降原因",
-                    "priority": "high",
-                    "timeline": "本周内",
-                    "owner": "店长+厨师长",
-                })
+                actions.append(
+                    {
+                        "category": "成本控制",
+                        "action": "启动成本偏差诊断，排查毛利下降原因",
+                        "priority": "high",
+                        "timeline": "本周内",
+                        "owner": "店长+厨师长",
+                    }
+                )
             elif "翻台" in w:
-                actions.append({
-                    "category": "运营效率",
-                    "action": "优化桌台配置和出餐流程，提升翻台率",
-                    "priority": "medium",
-                    "timeline": "两周内",
-                    "owner": "店长",
-                })
+                actions.append(
+                    {
+                        "category": "运营效率",
+                        "action": "优化桌台配置和出餐流程，提升翻台率",
+                        "priority": "medium",
+                        "timeline": "两周内",
+                        "owner": "店长",
+                    }
+                )
             elif "投诉" in w:
-                actions.append({
-                    "category": "服务质量",
-                    "action": "分析投诉原因，针对性培训服务员",
-                    "priority": "high",
-                    "timeline": "本周内",
-                    "owner": "前厅主管",
-                })
+                actions.append(
+                    {
+                        "category": "服务质量",
+                        "action": "分析投诉原因，针对性培训服务员",
+                        "priority": "high",
+                        "timeline": "本周内",
+                        "owner": "前厅主管",
+                    }
+                )
             elif "浪费" in w:
-                actions.append({
-                    "category": "损耗控制",
-                    "action": "盘点高损耗食材，优化采购量和储存方式",
-                    "priority": "medium",
-                    "timeline": "两周内",
-                    "owner": "后厨主管",
-                })
+                actions.append(
+                    {
+                        "category": "损耗控制",
+                        "action": "盘点高损耗食材，优化采购量和储存方式",
+                        "priority": "medium",
+                        "timeline": "两周内",
+                        "owner": "后厨主管",
+                    }
+                )
 
         # 从规律中提取行动
         for p in patterns:
@@ -307,31 +346,37 @@ class ReviewSummaryAgent(SkillAgent):
             if ptype == "weekday_vs_weekend":
                 uplift = p.get("weekend_uplift_pct", 0)
                 if uplift > 30:
-                    actions.append({
-                        "category": "营销策略",
-                        "action": "工作日客流不足，建议推出工作日午市套餐或工作日会员折扣",
-                        "priority": "medium",
-                        "timeline": "下周启动",
-                        "owner": "营销经理",
-                    })
+                    actions.append(
+                        {
+                            "category": "营销策略",
+                            "action": "工作日客流不足，建议推出工作日午市套餐或工作日会员折扣",
+                            "priority": "medium",
+                            "timeline": "下周启动",
+                            "owner": "营销经理",
+                        }
+                    )
             elif ptype == "trend" and p.get("direction") == "下降":
-                actions.append({
-                    "category": "经营预警",
-                    "action": f"营收呈下降趋势({p.get('change_pct', 0):.1f}%)，建议全面复盘菜品和服务",
-                    "priority": "high",
-                    "timeline": "立即",
-                    "owner": "区域经理+店长",
-                })
+                actions.append(
+                    {
+                        "category": "经营预警",
+                        "action": f"营收呈下降趋势({p.get('change_pct', 0):.1f}%)，建议全面复盘菜品和服务",
+                        "priority": "high",
+                        "timeline": "立即",
+                        "owner": "区域经理+店长",
+                    }
+                )
 
         # 如果无具体行动，给出通用建议
         if not actions:
-            actions.append({
-                "category": "持续优化",
-                "action": "经营指标正常，建议保持现有策略，关注客流变化",
-                "priority": "low",
-                "timeline": "持续",
-                "owner": "店长",
-            })
+            actions.append(
+                {
+                    "category": "持续优化",
+                    "action": "经营指标正常，建议保持现有策略，关注客流变化",
+                    "priority": "low",
+                    "timeline": "持续",
+                    "owner": "店长",
+                }
+            )
 
         # 按优先级排序
         priority_order = {"high": 0, "medium": 1, "low": 2}
@@ -339,12 +384,17 @@ class ReviewSummaryAgent(SkillAgent):
 
         if model_router:
             model_router.log_call(
-                task_type="kpi_summary", model=model,
-                input_tokens=0, output_tokens=0, latency_ms=0, success=True,
+                task_type="kpi_summary",
+                model=model,
+                input_tokens=0,
+                output_tokens=0,
+                latency_ms=0,
+                success=True,
             )
 
         return AgentResult(
-            success=True, action="action_plan",
+            success=True,
+            action="action_plan",
             data={
                 "store_id": store_id,
                 "actions": actions,
@@ -352,6 +402,6 @@ class ReviewSummaryAgent(SkillAgent):
                 "high_priority_count": sum(1 for a in actions if a.get("priority") == "high"),
             },
             reasoning=f"生成 {len(actions)} 条行动计划，"
-                      f"其中 {sum(1 for a in actions if a.get('priority') == 'high')} 条高优先级",
+            f"其中 {sum(1 for a in actions if a.get('priority') == 'high')} 条高优先级",
             confidence=0.8,
         )

@@ -1,4 +1,5 @@
 """桌位图形化布局服务 — 布局管理 + 实时状态 + 换台 + WebSocket广播"""
+
 from __future__ import annotations
 
 import asyncio
@@ -36,8 +37,8 @@ class TableNode(BaseModel):
 
 class LayoutJson(BaseModel):
     tables: list[TableNode]
-    walls: list[dict]   # [{x1, y1, x2, y2}]
-    areas: list[dict]   # [{x, y, width, height, label, color}]
+    walls: list[dict]  # [{x1, y1, x2, y2}]
+    areas: list[dict]  # [{x, y, width, height, label, color}]
 
 
 class TableLayout(BaseModel):
@@ -413,6 +414,7 @@ class TableLayoutService:
         raw_json = record["layout_json"]
         if isinstance(raw_json, str):
             import json
+
             raw_json = json.loads(raw_json)
         return TableLayout(
             id=UUID(str(record["id"])),

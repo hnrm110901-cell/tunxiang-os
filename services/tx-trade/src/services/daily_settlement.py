@@ -3,6 +3,7 @@
 日结 = 营业日收尾：汇总→盘点→对账→店长说明→审核。
 所有金额单位：分（fen）。
 """
+
 import asyncio
 import uuid
 from datetime import date, datetime, timedelta, timezone
@@ -281,18 +282,20 @@ class DailySettlementService:
             reviewer_id=reviewer_id,
         )
 
-        asyncio.create_task(UniversalPublisher.publish(
-            event_type=TradeEventType.DAILY_SETTLEMENT_COMPLETED,
-            tenant_id=self.tenant_id,
-            store_id=settlement.store_id,
-            entity_id=settlement.id,
-            event_data={
-                "revenue_fen": settlement.total_revenue_fen,
-                "order_count": settlement.total_orders,
-                "store_id": str(settlement.store_id),
-            },
-            source_service="tx-trade",
-        ))
+        asyncio.create_task(
+            UniversalPublisher.publish(
+                event_type=TradeEventType.DAILY_SETTLEMENT_COMPLETED,
+                tenant_id=self.tenant_id,
+                store_id=settlement.store_id,
+                entity_id=settlement.id,
+                event_data={
+                    "revenue_fen": settlement.total_revenue_fen,
+                    "order_count": settlement.total_orders,
+                    "store_id": str(settlement.store_id),
+                },
+                source_service="tx-trade",
+            )
+        )
 
         return {
             "settlement_id": settlement_id,
@@ -333,11 +336,13 @@ class DailySettlementService:
         cutoff = date.today() - timedelta(days=days)
 
         result = await self.db.execute(
-            select(Settlement).where(
+            select(Settlement)
+            .where(
                 Settlement.store_id == store_uuid,
                 Settlement.tenant_id == self.tenant_id,
                 Settlement.settlement_date >= cutoff,
-            ).order_by(Settlement.settlement_date.desc())
+            )
+            .order_by(Settlement.settlement_date.desc())
         )
         settlements = result.scalars().all()
 
@@ -361,54 +366,64 @@ class DailySettlementService:
         # 1. 现金差异
         if settlement.cash_diff_fen is not None:
             if abs(settlement.cash_diff_fen) > self.CASH_VARIANCE_THRESHOLD_FEN:
-                warnings.append({
-                    "type": "cash_variance",
-                    "severity": "high",
-                    "message": f"现金差异 ¥{settlement.cash_diff_fen / 100:.2f}，超过阈值 ¥{self.CASH_VARIANCE_THRESHOLD_FEN / 100:.2f}",
-                    "value": settlement.cash_diff_fen,
-                    "threshold": self.CASH_VARIANCE_THRESHOLD_FEN,
-                })
+                warnings.append(
+                    {
+                        "type": "cash_variance",
+                        "severity": "high",
+                        "message": f"现金差异 ¥{settlement.cash_diff_fen / 100:.2f}，超过阈值 ¥{self.CASH_VARIANCE_THRESHOLD_FEN / 100:.2f}",
+                        "value": settlement.cash_diff_fen,
+                        "threshold": self.CASH_VARIANCE_THRESHOLD_FEN,
+                    }
+                )
 
         # 2. 折扣率异常
         if settlement.total_revenue_fen > 0:
             discount_rate = settlement.total_discount_fen / settlement.total_revenue_fen
             if discount_rate > 0.15:
-                warnings.append({
-                    "type": "high_discount_rate",
-                    "severity": "medium",
-                    "message": f"折扣率 {discount_rate:.1%} 超过15%",
-                    "value": round(discount_rate, 4),
-                    "threshold": 0.15,
-                })
+                warnings.append(
+                    {
+                        "type": "high_discount_rate",
+                        "severity": "medium",
+                        "message": f"折扣率 {discount_rate:.1%} 超过15%",
+                        "value": round(discount_rate, 4),
+                        "threshold": 0.15,
+                    }
+                )
 
         # 3. 退款异常
         if settlement.total_revenue_fen > 0:
             refund_rate = settlement.total_refund_fen / settlement.total_revenue_fen
             if refund_rate > 0.10:
-                warnings.append({
-                    "type": "high_refund_rate",
-                    "severity": "high",
-                    "message": f"退款率 {refund_rate:.1%} 超过10%",
-                    "value": round(refund_rate, 4),
-                    "threshold": 0.10,
-                })
+                warnings.append(
+                    {
+                        "type": "high_refund_rate",
+                        "severity": "high",
+                        "message": f"退款率 {refund_rate:.1%} 超过10%",
+                        "value": round(refund_rate, 4),
+                        "threshold": 0.10,
+                    }
+                )
 
         # 4. 缺少确认
         details = settlement.details or {}
         status = details.get("status", "draft")
         if status in ("draft", "counting", "reviewing"):
             if "manager_comment" not in details:
-                warnings.append({
-                    "type": "missing_manager_comment",
-                    "severity": "low",
-                    "message": "缺少店长经营说明",
-                })
+                warnings.append(
+                    {
+                        "type": "missing_manager_comment",
+                        "severity": "low",
+                        "message": "缺少店长经营说明",
+                    }
+                )
             if "chef_comment" not in details:
-                warnings.append({
-                    "type": "missing_chef_comment",
-                    "severity": "low",
-                    "message": "缺少厨师长说明",
-                })
+                warnings.append(
+                    {
+                        "type": "missing_chef_comment",
+                        "severity": "low",
+                        "message": "缺少厨师长说明",
+                    }
+                )
 
         return warnings
 
@@ -474,9 +489,7 @@ class DailySettlementService:
                     method_totals[p.method] += p.amount_fen
 
             # 退款汇总
-            refunds_result = await self.db.execute(
-                select(Refund).where(Refund.order_id.in_(order_ids))
-            )
+            refunds_result = await self.db.execute(select(Refund).where(Refund.order_id.in_(order_ids)))
             refunds = refunds_result.scalars().all()
             total_refund = sum(r.amount_fen for r in refunds)
 
@@ -504,7 +517,9 @@ class DailySettlementService:
         return {
             "id": str(s.id),
             "store_id": str(s.store_id),
-            "settlement_date": s.settlement_date.isoformat() if isinstance(s.settlement_date, date) else str(s.settlement_date),
+            "settlement_date": s.settlement_date.isoformat()
+            if isinstance(s.settlement_date, date)
+            else str(s.settlement_date),
             "settlement_type": s.settlement_type,
             "status": (s.details or {}).get("status", "draft"),
             "total_revenue_fen": s.total_revenue_fen,

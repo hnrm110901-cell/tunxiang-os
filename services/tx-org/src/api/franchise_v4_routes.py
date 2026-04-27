@@ -3,6 +3,7 @@
 前缀：/api/v1/franchise/v4（避免与 franchise_routes.py 冲突）
 数据源：franchisees（v060）/ franchise_contracts（v135）/ franchise_fees（v155）
 """
+
 from datetime import datetime
 from typing import Optional
 from uuid import uuid4
@@ -22,6 +23,7 @@ router = APIRouter(prefix="/api/v1/franchise/v4", tags=["franchise-v4"])
 
 # ─── RLS 辅助 ─────────────────────────────────────────────────────────────────
 
+
 async def _set_rls(db: AsyncSession, tenant_id: str) -> None:
     await db.execute(
         text("SELECT set_config('app.tenant_id', :tid, true)"),
@@ -31,16 +33,17 @@ async def _set_rls(db: AsyncSession, tenant_id: str) -> None:
 
 # ─── Pydantic Models ──────────────────────────────────────────────────────────
 
+
 class FranchiseeCreate(BaseModel):
-    name: str                          # 加盟商名称/法人姓名
-    company_name: Optional[str] = None # 公司名称
+    name: str  # 加盟商名称/法人姓名
+    company_name: Optional[str] = None  # 公司名称
     contact_phone: str
     contact_email: Optional[str] = None
-    region: str                        # 省市区
-    store_name: str                    # 门店名称（加盟门店）
+    region: str  # 省市区
+    store_name: str  # 门店名称（加盟门店）
     store_address: str
-    brand_id: Optional[str] = None    # 加盟的品牌
-    join_date: Optional[str] = None   # 正式加盟日期 YYYY-MM-DD
+    brand_id: Optional[str] = None  # 加盟的品牌
+    join_date: Optional[str] = None  # 正式加盟日期 YYYY-MM-DD
     franchise_type: str = "standard"  # standard/premium/master（普通/高级/区域代理）
     notes: Optional[str] = None
 
@@ -49,31 +52,32 @@ class FranchiseeUpdate(BaseModel):
     name: Optional[str] = None
     contact_phone: Optional[str] = None
     contact_email: Optional[str] = None
-    status: Optional[str] = None     # active/suspended/terminated
+    status: Optional[str] = None  # active/suspended/terminated
     notes: Optional[str] = None
 
 
 class ContractCreate(BaseModel):
     franchisee_id: str
-    contract_no: str                  # 合同编号
-    sign_date: str                    # 签署日期 YYYY-MM-DD
-    start_date: str                   # 合同开始 YYYY-MM-DD
-    end_date: str                     # 合同结束 YYYY-MM-DD
-    franchise_fee_fen: int            # 加盟费（分）
-    royalty_rate: float               # 管理费率（如0.05=5%）
-    deposit_fen: int = 0              # 保证金（分）
-    terms: Optional[str] = None      # 合同条款摘要
+    contract_no: str  # 合同编号
+    sign_date: str  # 签署日期 YYYY-MM-DD
+    start_date: str  # 合同开始 YYYY-MM-DD
+    end_date: str  # 合同结束 YYYY-MM-DD
+    franchise_fee_fen: int  # 加盟费（分）
+    royalty_rate: float  # 管理费率（如0.05=5%）
+    deposit_fen: int = 0  # 保证金（分）
+    terms: Optional[str] = None  # 合同条款摘要
 
 
 class FeeRecordCreate(BaseModel):
     franchisee_id: str
-    fee_type: str                     # royalty/management/brand/training
+    fee_type: str  # royalty/management/brand/training
     amount_fen: int
-    due_date: str                     # 应缴日期 YYYY-MM-DD
+    due_date: str  # 应缴日期 YYYY-MM-DD
     notes: Optional[str] = None
 
 
 # ─── Endpoints ────────────────────────────────────────────────────────────────
+
 
 @router.get("/franchisees")
 async def list_franchisees(
@@ -119,14 +123,18 @@ async def get_franchisee(
 
         # 附带合同
         c_result = await db.execute(
-            text("SELECT * FROM franchise_contracts WHERE franchisee_id = :fid AND is_deleted = false ORDER BY created_at DESC"),
+            text(
+                "SELECT * FROM franchise_contracts WHERE franchisee_id = :fid AND is_deleted = false ORDER BY created_at DESC"
+            ),
             {"fid": franchisee_id},
         )
         item["contracts"] = [dict(r._mapping) for r in c_result.fetchall()]
 
         # 附带费用
         f_result = await db.execute(
-            text("SELECT * FROM franchise_fees WHERE franchisee_id = :fid AND is_deleted = false ORDER BY due_date DESC"),
+            text(
+                "SELECT * FROM franchise_fees WHERE franchisee_id = :fid AND is_deleted = false ORDER BY due_date DESC"
+            ),
             {"fid": franchisee_id},
         )
         item["fees"] = [dict(r._mapping) for r in f_result.fetchall()]
@@ -258,9 +266,12 @@ async def list_fees(
         return {
             "ok": True,
             "data": {
-                "items": [], "total": 0,
-                "overdue_count": 0, "overdue_amount_fen": 0,
-                "pending_amount_fen": 0, "paid_ytd_fen": 0,
+                "items": [],
+                "total": 0,
+                "overdue_count": 0,
+                "overdue_amount_fen": 0,
+                "pending_amount_fen": 0,
+                "paid_ytd_fen": 0,
             },
         }
 
@@ -344,9 +355,12 @@ async def franchise_stats(
         return {
             "ok": True,
             "data": {
-                "total_franchisees": 0, "active_count": 0,
-                "suspended_count": 0, "terminated_count": 0,
-                "overdue_fee_count": 0, "overdue_fee_amount_fen": 0,
+                "total_franchisees": 0,
+                "active_count": 0,
+                "suspended_count": 0,
+                "terminated_count": 0,
+                "overdue_fee_count": 0,
+                "overdue_fee_amount_fen": 0,
             },
         }
 

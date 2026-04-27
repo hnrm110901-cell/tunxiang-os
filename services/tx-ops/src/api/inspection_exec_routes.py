@@ -20,6 +20,7 @@
 
 统一响应格式: {"ok": bool, "data": {}, "error": {}}
 """
+
 from __future__ import annotations
 
 import json
@@ -223,13 +224,15 @@ async def get_today_inspection(
         stores_summary = []
         for r in records:
             api_status = _map_record_status(r.status)
-            stores_summary.append({
-                "store_id": str(r.store_id),
-                "store_name": r.store_name or str(r.store_id),
-                "status": api_status,
-                "score": float(r.total_score) if r.total_score is not None else None,
-                "inspector": str(r.patroller_id) if r.patroller_id else None,
-            })
+            stores_summary.append(
+                {
+                    "store_id": str(r.store_id),
+                    "store_name": r.store_name or str(r.store_id),
+                    "status": api_status,
+                    "score": float(r.total_score) if r.total_score is not None else None,
+                    "inspector": str(r.patroller_id) if r.patroller_id else None,
+                }
+            )
 
         return {
             "ok": True,
@@ -453,8 +456,7 @@ async def submit_inspection(
     db: AsyncSession = Depends(get_db),
 ) -> Dict[str, Any]:
     """提交巡检报告——将 patrol_records 状态更新为 submitted。"""
-    log.info("inspection_submitted", store_id=body.store_id,
-             inspector_id=body.inspector_id, tenant_id=x_tenant_id)
+    log.info("inspection_submitted", store_id=body.store_id, inspector_id=body.inspector_id, tenant_id=x_tenant_id)
 
     try:
         await _set_rls(db, x_tenant_id)
@@ -658,8 +660,9 @@ async def submit_rectification_feedback(
     if body.feedback_type not in {"progress", "completed", "need_help"}:
         raise HTTPException(status_code=400, detail="feedback_type 必须是 progress/completed/need_help 之一")
 
-    log.info("rectification_feedback_submitted", task_id=task_id,
-             feedback_type=body.feedback_type, tenant_id=x_tenant_id)
+    log.info(
+        "rectification_feedback_submitted", task_id=task_id, feedback_type=body.feedback_type, tenant_id=x_tenant_id
+    )
 
     try:
         await _set_rls(db, x_tenant_id)
@@ -685,7 +688,11 @@ async def submit_rectification_feedback(
         existing_notes: List[Dict[str, Any]] = []
         if task_row.resolution_notes:
             try:
-                parsed = json.loads(task_row.resolution_notes) if isinstance(task_row.resolution_notes, str) else task_row.resolution_notes
+                parsed = (
+                    json.loads(task_row.resolution_notes)
+                    if isinstance(task_row.resolution_notes, str)
+                    else task_row.resolution_notes
+                )
                 if isinstance(parsed, list):
                     existing_notes = parsed
             except (ValueError, TypeError):

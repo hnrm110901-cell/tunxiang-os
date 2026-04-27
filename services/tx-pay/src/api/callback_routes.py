@@ -11,6 +11,7 @@
   - 验签失败返回 4xx，不处理
   - 成功处理后发射 payment.confirmed 事件
 """
+
 from __future__ import annotations
 
 import structlog
@@ -42,6 +43,7 @@ async def wechat_callback(request: Request) -> Response:
 
     # 发射事件
     from ..events import emit_payment_confirmed
+
     await emit_payment_confirmed(payload)
 
     logger.info(

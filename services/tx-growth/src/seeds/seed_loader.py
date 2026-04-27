@@ -3,6 +3,7 @@
 幂等加载: ON CONFLICT DO NOTHING，可重复执行。
 加载顺序: 先加载触达模板（被旅程步骤引用），再加载旅程模板和步骤。
 """
+
 import json
 
 import structlog
@@ -56,7 +57,7 @@ async def seed_growth_templates(tenant_id: str, db: AsyncSession) -> dict:
                 "variables_schema_json": json.dumps(tmpl["variables_schema_json"], ensure_ascii=False),
                 "forbidden_phrases_json": json.dumps(tmpl["forbidden_phrases_json"], ensure_ascii=False),
                 "requires_human_review": tmpl["requires_human_review"],
-            }
+            },
         )
         if result.fetchone():
             touch_loaded += 1
@@ -91,7 +92,7 @@ async def seed_growth_templates(tenant_id: str, db: AsyncSession) -> dict:
                 "exit_rule_json": json.dumps(jtmpl["exit_rule_json"], ensure_ascii=False),
                 "pause_rule_json": json.dumps(jtmpl.get("pause_rule_json", {}), ensure_ascii=False),
                 "priority": jtmpl.get("priority", 100),
-            }
+            },
         )
         row = result.fetchone()
         if row:
@@ -120,14 +121,18 @@ async def seed_growth_templates(tenant_id: str, db: AsyncSession) -> dict:
                         "step_type": step["step_type"],
                         "mechanism_type": step.get("mechanism_type"),
                         "wait_minutes": step.get("wait_minutes"),
-                        "decision_rule_json": json.dumps(step["decision_rule_json"], ensure_ascii=False) if step.get("decision_rule_json") else None,
-                        "offer_rule_json": json.dumps(step["offer_rule_json"], ensure_ascii=False) if step.get("offer_rule_json") else None,
+                        "decision_rule_json": json.dumps(step["decision_rule_json"], ensure_ascii=False)
+                        if step.get("decision_rule_json")
+                        else None,
+                        "offer_rule_json": json.dumps(step["offer_rule_json"], ensure_ascii=False)
+                        if step.get("offer_rule_json")
+                        else None,
                         "touch_code": step.get("touch_template_code"),
                         "observe_window_hours": step.get("observe_window_hours"),
                         "success_next": step.get("success_next_step_no"),
                         "fail_next": step.get("fail_next_step_no"),
                         "skip_next": step.get("skip_next_step_no"),
-                    }
+                    },
                 )
 
     logger.info(

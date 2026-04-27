@@ -6,10 +6,11 @@
   GET /api/v1/finance/cashier-receipts        — 收银员收款统计
   GET /api/v1/finance/crm-reconciliation      — CRM储值卡对账
 """
+
 from __future__ import annotations
 
 import uuid
-from datetime import date, datetime, timezone
+from datetime import date
 from typing import Optional
 
 import structlog
@@ -182,14 +183,16 @@ async def get_payment_reconciliation(
         ch = str(row.channel) if row.channel else "other"
         fee = int(row.fee_fen)
         total = int(row.total_amount_fen)
-        channel_summaries.append({
-            "channel": ch,
-            "channel_name": CHANNEL_NAMES.get(ch, ch),
-            "transaction_count": int(row.transaction_count),
-            "total_amount_fen": total,
-            "fee_fen": fee,
-            "net_amount_fen": total - fee,
-        })
+        channel_summaries.append(
+            {
+                "channel": ch,
+                "channel_name": CHANNEL_NAMES.get(ch, ch),
+                "transaction_count": int(row.transaction_count),
+                "total_amount_fen": total,
+                "fee_fen": fee,
+                "net_amount_fen": total - fee,
+            }
+        )
 
     grand_total_fen = sum(c["total_amount_fen"] for c in channel_summaries)
     total_transactions = sum(c["transaction_count"] for c in channel_summaries)
@@ -348,21 +351,23 @@ async def get_cashier_receipts(
 
     cashiers: list[dict] = []
     for row in rows:
-        cashiers.append({
-            "cashier_id": str(row.cashier_id) if row.cashier_id else "unknown",
-            "cashier_name": row.cashier_name or "未知",
-            "shift_count": int(row.shift_count),
-            "total_amount_fen": int(row.total_amount_fen),
-            "order_count": int(row.order_count),
-            "channel_breakdown": {
-                "wechat":      int(row.wechat_fen),
-                "alipay":      int(row.alipay_fen),
-                "cash":        int(row.cash_fen),
-                "card":        int(row.card_fen),
-                "member_card": int(row.member_card_fen),
-                "other":       int(row.other_fen),
-            },
-        })
+        cashiers.append(
+            {
+                "cashier_id": str(row.cashier_id) if row.cashier_id else "unknown",
+                "cashier_name": row.cashier_name or "未知",
+                "shift_count": int(row.shift_count),
+                "total_amount_fen": int(row.total_amount_fen),
+                "order_count": int(row.order_count),
+                "channel_breakdown": {
+                    "wechat": int(row.wechat_fen),
+                    "alipay": int(row.alipay_fen),
+                    "cash": int(row.cash_fen),
+                    "card": int(row.card_fen),
+                    "member_card": int(row.member_card_fen),
+                    "other": int(row.other_fen),
+                },
+            }
+        )
 
     logger.info("cashier_receipts.ok", tenant_id=tenant_id, cashier_count=len(cashiers))
 
@@ -465,13 +470,15 @@ async def get_crm_reconciliation(
     mismatch_items = []
     for row in mismatch_rows:
         m = row._mapping
-        mismatch_items.append({
-            "member_id": str(m["member_id"]) if m["member_id"] else "unknown",
-            "crm_amount_fen": int(m["crm_amount_fen"]),
-            "finance_amount_fen": int(m["finance_amount_fen"]),
-            "diff_fen": int(m["diff_fen"]),
-            "type": m["txn_type"] or "unknown",
-        })
+        mismatch_items.append(
+            {
+                "member_id": str(m["member_id"]) if m["member_id"] else "unknown",
+                "crm_amount_fen": int(m["crm_amount_fen"]),
+                "finance_amount_fen": int(m["finance_amount_fen"]),
+                "diff_fen": int(m["diff_fen"]),
+                "type": m["txn_type"] or "unknown",
+            }
+        )
 
     total_diff_fen = sum(abs(item["diff_fen"]) for item in mismatch_items)
 

@@ -12,6 +12,7 @@
 - QUEUE.TICKET_CREATED → 新排队时预测等位时间
 - RESERVATION.NO_SHOW → 爽约后释放预留桌位
 """
+
 from typing import Any
 
 import structlog
@@ -75,6 +76,7 @@ class QueueSeatingAgent(SkillAgent):
 
         # 高峰修正：12:00-13:00 和 18:00-19:30 翻台更慢
         import datetime
+
         now = datetime.datetime.now()
         if (12 <= now.hour < 13) or (18 <= now.hour < 20):
             estimated_minutes = int(estimated_minutes * 1.2)
@@ -89,7 +91,7 @@ class QueueSeatingAgent(SkillAgent):
                 "matching_tables": tables_for_size,
             },
             reasoning=f"队列第{queue_position}位，{party_size}人桌可用{tables_for_size}张，"
-                      f"平均翻台{avg_turn_minutes}分钟，预计等位{estimated_minutes}分钟",
+            f"平均翻台{avg_turn_minutes}分钟，预计等位{estimated_minutes}分钟",
             confidence=0.75,
             inference_layer="edge",
         )
@@ -103,10 +105,12 @@ class QueueSeatingAgent(SkillAgent):
 
         if not available_tables:
             return AgentResult(
-                success=True, action="suggest_seating",
+                success=True,
+                action="suggest_seating",
                 data={"suggestion": None, "reason": "no_available_tables"},
                 reasoning="当前无可用桌位",
-                confidence=1.0, inference_layer="edge",
+                confidence=1.0,
+                inference_layer="edge",
             )
 
         # 评分逻辑：容量匹配度 + VIP偏好 + 翻台目标
@@ -139,15 +143,16 @@ class QueueSeatingAgent(SkillAgent):
         best = scored[0]
 
         return AgentResult(
-            success=True, action="suggest_seating",
+            success=True,
+            action="suggest_seating",
             data={
                 "recommended_table": best["table"],
                 "score": best["score"],
                 "alternatives": [s["table"] for s in scored[1:3]],
             },
             reasoning=f"推荐桌位 {best['table'].get('code', '?')}，"
-                      f"容量{best['table'].get('seat_capacity', '?')}人，"
-                      f"匹配度评分{best['score']:.0f}",
+            f"容量{best['table'].get('seat_capacity', '?')}人，"
+            f"匹配度评分{best['score']:.0f}",
             confidence=0.85,
             inference_layer="edge",
         )
@@ -159,9 +164,12 @@ class QueueSeatingAgent(SkillAgent):
 
         if not queue:
             return AgentResult(
-                success=True, action="auto_call_next",
+                success=True,
+                action="auto_call_next",
                 data={"called": None, "reason": "queue_empty"},
-                reasoning="排队队列为空，无需叫号", confidence=1.0, inference_layer="edge",
+                reasoning="排队队列为空，无需叫号",
+                confidence=1.0,
+                inference_layer="edge",
             )
 
         table_capacity = freed_table.get("seat_capacity", 4)
@@ -182,26 +190,34 @@ class QueueSeatingAgent(SkillAgent):
 
         if not candidates:
             return AgentResult(
-                success=True, action="auto_call_next",
+                success=True,
+                action="auto_call_next",
                 data={"called": None, "reason": "no_matching_party"},
                 reasoning=f"桌位容量{table_capacity}人，队列中无匹配客人",
-                confidence=0.9, inference_layer="edge",
+                confidence=0.9,
+                inference_layer="edge",
             )
 
         candidates.sort(key=lambda x: x["priority"], reverse=True)
         called = candidates[0]["ticket"]
 
-        logger.info("queue_auto_call", table=freed_table.get("code"), ticket=called.get("ticket_no"),
-                     party_size=called.get("party_size"), is_vip=called.get("is_vip"))
+        logger.info(
+            "queue_auto_call",
+            table=freed_table.get("code"),
+            ticket=called.get("ticket_no"),
+            party_size=called.get("party_size"),
+            is_vip=called.get("is_vip"),
+        )
 
         return AgentResult(
-            success=True, action="auto_call_next",
+            success=True,
+            action="auto_call_next",
             data={
                 "called_ticket": called,
                 "assigned_table": freed_table,
             },
             reasoning=f"叫号 {called.get('ticket_no', '?')}（{called.get('party_size', '?')}人）→ "
-                      f"桌位 {freed_table.get('code', '?')}",
+            f"桌位 {freed_table.get('code', '?')}",
             confidence=0.9,
             inference_layer="edge",
         )
@@ -227,10 +243,12 @@ class QueueSeatingAgent(SkillAgent):
             label = "VIP大包/宴会厅"
 
         return AgentResult(
-            success=True, action="match_table_type",
+            success=True,
+            action="match_table_type",
             data={"party_size": party_size, "recommended_type": table_type, "label": label},
             reasoning=f"{party_size}人就餐，推荐{label}",
-            confidence=0.95, inference_layer="edge",
+            confidence=0.95,
+            inference_layer="edge",
         )
 
     async def _handle_no_show_release(self, params: dict) -> AgentResult:
@@ -239,14 +257,16 @@ class QueueSeatingAgent(SkillAgent):
         table_code = params.get("table_code", "")
 
         return AgentResult(
-            success=True, action="handle_no_show_release",
+            success=True,
+            action="handle_no_show_release",
             data={
                 "reservation_id": reservation_id,
                 "released_table": table_code,
                 "action": "release_to_queue",
             },
             reasoning=f"预定 {reservation_id} 爽约，释放桌位 {table_code} 给排队队列",
-            confidence=1.0, inference_layer="edge",
+            confidence=1.0,
+            inference_layer="edge",
         )
 
     async def _peak_diversion_suggest(self, params: dict) -> AgentResult:
@@ -261,7 +281,9 @@ class QueueSeatingAgent(SkillAgent):
         if nearby_stores:
             for store in nearby_stores[:2]:
                 if store.get("estimated_wait", 60) < current_wait_minutes:
-                    suggestions.append(f"可引导至 {store.get('name', '?')}（预计等位{store.get('estimated_wait', '?')}分钟）")
+                    suggestions.append(
+                        f"可引导至 {store.get('name', '?')}（预计等位{store.get('estimated_wait', '?')}分钟）"
+                    )
 
         if not suggestions:
             suggestions.append("当前等位时间在可接受范围内，暂无分流建议")
@@ -279,7 +301,8 @@ class QueueSeatingAgent(SkillAgent):
                 pass
 
         return AgentResult(
-            success=True, action="peak_diversion_suggest",
+            success=True,
+            action="peak_diversion_suggest",
             data={
                 "current_wait_minutes": current_wait_minutes,
                 "queue_length": queue_length,

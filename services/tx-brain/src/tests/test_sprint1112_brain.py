@@ -7,6 +7,7 @@
 - CFO: 现金流/合并报表/税务/KPI/预算对比/预测/高管摘要
 - 2030: Feature Flags/Multi-region/Currency/Agent Levels
 """
+
 from __future__ import annotations
 
 import pytest
@@ -19,6 +20,7 @@ from ..services.voice_session import VoiceSessionManager
 # ═══════════════════════════════════════════════════════════════════
 # Fixtures
 # ═══════════════════════════════════════════════════════════════════
+
 
 @pytest.fixture
 def orchestrator() -> VoiceOrchestrator:
@@ -43,6 +45,7 @@ def evo() -> Evolution2030Service:
 # ═══════════════════════════════════════════════════════════════════
 # Voice: 完整流水线测试
 # ═══════════════════════════════════════════════════════════════════
+
 
 @pytest.mark.asyncio
 async def test_voice_full_pipeline_order_add(orchestrator: VoiceOrchestrator) -> None:
@@ -91,7 +94,9 @@ async def test_voice_full_pipeline_query_revenue(orchestrator: VoiceOrchestrator
     response = await orchestrator.generate_response(action)
     assert "营收" in response["response_text"]
     assert "元" in response["response_text"]
-    assert "增长" in response["response_text"] or "下降" in response["response_text"] or "单" in response["response_text"]
+    assert (
+        "增长" in response["response_text"] or "下降" in response["response_text"] or "单" in response["response_text"]
+    )
 
 
 @pytest.mark.asyncio
@@ -121,10 +126,9 @@ async def test_voice_full_pipeline_report_waste(orchestrator: VoiceOrchestrator)
 # Voice: 多轮对话测试
 # ═══════════════════════════════════════════════════════════════════
 
+
 @pytest.mark.asyncio
-async def test_voice_multi_turn_dialog(
-    orchestrator: VoiceOrchestrator, session_mgr: VoiceSessionManager
-) -> None:
+async def test_voice_multi_turn_dialog(orchestrator: VoiceOrchestrator, session_mgr: VoiceSessionManager) -> None:
     """多轮对话: "加菜" → "什么菜？" → "酸菜鱼" → "辣度？" → confirmed"""
     # 创建会话
     session = session_mgr.create_session("E001", "S001")
@@ -143,10 +147,13 @@ async def test_voice_multi_turn_dialog(
     session_mgr.add_turn(sid, "system", dialog1["prompt_text"])
 
     # Turn 2: "酸菜鱼" — 补全菜名，上下文接续
-    session_mgr.update_context(sid, {
-        "last_intent": "order_add",
-        "entities": {"dish_name": "酸菜鱼"},
-    })
+    session_mgr.update_context(
+        sid,
+        {
+            "last_intent": "order_add",
+            "entities": {"dish_name": "酸菜鱼"},
+        },
+    )
     ctx = session_mgr.get_context(sid)
     nlu2 = await orchestrator.understand("酸菜鱼", context=ctx)
     # 上下文补全应该识别出 order_add
@@ -167,6 +174,7 @@ async def test_voice_multi_turn_dialog(
 # ═══════════════════════════════════════════════════════════════════
 # Voice: 15种意图全覆盖
 # ═══════════════════════════════════════════════════════════════════
+
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
@@ -194,9 +202,7 @@ async def test_voice_multi_turn_dialog(
         ("3号桌和5号桌合并", "merge_table"),
     ],
 )
-async def test_voice_all_intents(
-    orchestrator: VoiceOrchestrator, text: str, expected_intent: str
-) -> None:
+async def test_voice_all_intents(orchestrator: VoiceOrchestrator, text: str, expected_intent: str) -> None:
     """测试所有16种意图识别"""
     nlu = await orchestrator.understand(text)
     assert nlu["intent"] == expected_intent, (
@@ -208,6 +214,7 @@ async def test_voice_all_intents(
 # ═══════════════════════════════════════════════════════════════════
 # Voice: 实体抽取细节
 # ═══════════════════════════════════════════════════════════════════
+
 
 @pytest.mark.asyncio
 async def test_voice_entity_extraction(orchestrator: VoiceOrchestrator) -> None:
@@ -242,6 +249,7 @@ def test_chinese_num_conversion() -> None:
 # ═══════════════════════════════════════════════════════════════════
 # Voice: Session Management
 # ═══════════════════════════════════════════════════════════════════
+
 
 def test_voice_session_lifecycle(session_mgr: VoiceSessionManager) -> None:
     """会话完整生命周期"""
@@ -290,6 +298,7 @@ def test_voice_session_lifecycle(session_mgr: VoiceSessionManager) -> None:
 # Voice: Process Voice Command (Full Pipeline with audio bytes)
 # ═══════════════════════════════════════════════════════════════════
 
+
 @pytest.mark.asyncio
 async def test_process_voice_command_mock(orchestrator: VoiceOrchestrator) -> None:
     """完整流水线（Mock ASR）"""
@@ -310,6 +319,7 @@ async def test_process_voice_command_mock(orchestrator: VoiceOrchestrator) -> No
 # ═══════════════════════════════════════════════════════════════════
 # CFO Dashboard: Cash Flow
 # ═══════════════════════════════════════════════════════════════════
+
 
 def test_cfo_cash_flow(cfo: CFODashboardService) -> None:
     """现金流量表结构完整性"""
@@ -352,6 +362,7 @@ def test_cfo_cash_flow(cfo: CFODashboardService) -> None:
 # ═══════════════════════════════════════════════════════════════════
 # CFO Dashboard: Multi-brand Consolidation
 # ═══════════════════════════════════════════════════════════════════
+
 
 def test_cfo_multi_brand_consolidation(cfo: CFODashboardService) -> None:
     """3个品牌合并报表"""
@@ -421,6 +432,7 @@ def test_cfo_multi_brand_consolidation(cfo: CFODashboardService) -> None:
 # CFO Dashboard: Tax Summary
 # ═══════════════════════════════════════════════════════════════════
 
+
 def test_cfo_tax_summary_vat_and_corporate(cfo: CFODashboardService) -> None:
     """税务总览: 增值税 + 企业所得税"""
     data = {
@@ -458,6 +470,7 @@ def test_cfo_tax_summary_vat_and_corporate(cfo: CFODashboardService) -> None:
 # ═══════════════════════════════════════════════════════════════════
 # CFO Dashboard: Financial KPIs
 # ═══════════════════════════════════════════════════════════════════
+
 
 def test_cfo_financial_kpis(cfo: CFODashboardService) -> None:
     """财务KPI计算"""
@@ -507,6 +520,7 @@ def test_cfo_financial_kpis(cfo: CFODashboardService) -> None:
 # CFO Dashboard: Budget vs Actual
 # ═══════════════════════════════════════════════════════════════════
 
+
 def test_cfo_budget_vs_actual(cfo: CFODashboardService) -> None:
     """预算 vs 实际差异分析"""
     data = {
@@ -553,15 +567,31 @@ def test_cfo_budget_vs_actual(cfo: CFODashboardService) -> None:
 # CFO Dashboard: Forecast
 # ═══════════════════════════════════════════════════════════════════
 
+
 def test_cfo_forecast(cfo: CFODashboardService) -> None:
     """财务预测（3个月）"""
     historical = [
-        {"month": "2026-01", "revenue": 400_0000_00, "cogs": 120_0000_00,
-         "opex": 160_0000_00, "net_profit": 80_0000_00},
-        {"month": "2026-02", "revenue": 420_0000_00, "cogs": 126_0000_00,
-         "opex": 165_0000_00, "net_profit": 86_0000_00},
-        {"month": "2026-03", "revenue": 450_0000_00, "cogs": 130_0000_00,
-         "opex": 170_0000_00, "net_profit": 95_0000_00},
+        {
+            "month": "2026-01",
+            "revenue": 400_0000_00,
+            "cogs": 120_0000_00,
+            "opex": 160_0000_00,
+            "net_profit": 80_0000_00,
+        },
+        {
+            "month": "2026-02",
+            "revenue": 420_0000_00,
+            "cogs": 126_0000_00,
+            "opex": 165_0000_00,
+            "net_profit": 86_0000_00,
+        },
+        {
+            "month": "2026-03",
+            "revenue": 450_0000_00,
+            "cogs": 130_0000_00,
+            "opex": 170_0000_00,
+            "net_profit": 95_0000_00,
+        },
     ]
 
     result = cfo.generate_forecast("B001", months_ahead=3, historical_data=historical)
@@ -580,6 +610,7 @@ def test_cfo_forecast(cfo: CFODashboardService) -> None:
 # ═══════════════════════════════════════════════════════════════════
 # CFO Dashboard: Executive Summary
 # ═══════════════════════════════════════════════════════════════════
+
 
 def test_cfo_executive_summary(cfo: CFODashboardService) -> None:
     """高管摘要自动生成"""
@@ -619,6 +650,7 @@ def test_cfo_executive_summary(cfo: CFODashboardService) -> None:
 # ═══════════════════════════════════════════════════════════════════
 # 2030 Evolution: Feature Flags
 # ═══════════════════════════════════════════════════════════════════
+
 
 def test_evolution_feature_flags_by_store_type(evo: Evolution2030Service) -> None:
     """按业态初始化功能集"""
@@ -662,6 +694,7 @@ def test_evolution_set_feature_flag(evo: Evolution2030Service) -> None:
 # 2030 Evolution: Multi-region
 # ═══════════════════════════════════════════════════════════════════
 
+
 def test_evolution_multi_region(evo: Evolution2030Service) -> None:
     """区域联邦配置"""
     config = evo.get_region_config("华中")
@@ -670,11 +703,14 @@ def test_evolution_multi_region(evo: Evolution2030Service) -> None:
     assert config["timezone"] == "Asia/Shanghai"
 
     # 设置区域策略
-    result = evo.set_region_policy("华东", {
-        "timezone": "Asia/Shanghai",
-        "data_residency": "cn-shanghai",
-        "sync_interval_seconds": 180,
-    })
+    result = evo.set_region_policy(
+        "华东",
+        {
+            "timezone": "Asia/Shanghai",
+            "data_residency": "cn-shanghai",
+            "sync_interval_seconds": 180,
+        },
+    )
     assert result["ok"] is True
     assert "data_residency" in result["updated_fields"]
 
@@ -686,6 +722,7 @@ def test_evolution_multi_region(evo: Evolution2030Service) -> None:
 # ═══════════════════════════════════════════════════════════════════
 # 2030 Evolution: Currency Conversion
 # ═══════════════════════════════════════════════════════════════════
+
 
 def test_evolution_currency_conversion(evo: Evolution2030Service) -> None:
     """货币转换"""
@@ -715,6 +752,7 @@ def test_evolution_currency_conversion(evo: Evolution2030Service) -> None:
 # ═══════════════════════════════════════════════════════════════════
 # 2030 Evolution: Agent Level Registry
 # ═══════════════════════════════════════════════════════════════════
+
 
 def test_evolution_agent_levels(evo: Evolution2030Service) -> None:
     """Agent放权追踪"""
@@ -748,6 +786,7 @@ def test_evolution_agent_levels(evo: Evolution2030Service) -> None:
 # 2030 Evolution: System Maturity Score
 # ═══════════════════════════════════════════════════════════════════
 
+
 def test_evolution_system_maturity_score(evo: Evolution2030Service) -> None:
     """系统成熟度评分"""
     # 初始状态（无Agent、无门店、无区域）
@@ -776,6 +815,7 @@ def test_evolution_system_maturity_score(evo: Evolution2030Service) -> None:
 # ═══════════════════════════════════════════════════════════════════
 # Voice: Response Generation
 # ═══════════════════════════════════════════════════════════════════
+
 
 @pytest.mark.asyncio
 async def test_voice_response_ssml(orchestrator: VoiceOrchestrator) -> None:
@@ -808,6 +848,7 @@ async def test_voice_response_error(orchestrator: VoiceOrchestrator) -> None:
 # ═══════════════════════════════════════════════════════════════════
 # CFO Dashboard: Cost Structure
 # ═══════════════════════════════════════════════════════════════════
+
 
 def test_cfo_cost_structure(cfo: CFODashboardService) -> None:
     """成本结构分析"""

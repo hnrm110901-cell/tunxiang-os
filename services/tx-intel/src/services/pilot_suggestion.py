@@ -3,6 +3,7 @@
 从情报洞察生成可执行的试点建议，管理试点生命周期：
 建议 → 审批 → 执行 → 跟踪 → 评审 → 推广/终止。
 """
+
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
@@ -16,19 +17,35 @@ logger = structlog.get_logger()
 # ─── 常量 ───
 
 SUGGESTION_STATUSES = [
-    "draft", "proposed", "approved", "piloting",
-    "reviewing", "scale_up", "completed", "rejected", "cancelled",
+    "draft",
+    "proposed",
+    "approved",
+    "piloting",
+    "reviewing",
+    "scale_up",
+    "completed",
+    "rejected",
+    "cancelled",
 ]
 
 SUGGESTION_TYPES = [
-    "new_product", "price_adjustment", "service_improvement",
-    "marketing_campaign", "menu_optimization", "store_upgrade",
-    "competitor_response", "trend_capture",
+    "new_product",
+    "price_adjustment",
+    "service_improvement",
+    "marketing_campaign",
+    "menu_optimization",
+    "store_upgrade",
+    "competitor_response",
+    "trend_capture",
 ]
 
 SOURCE_TYPES = [
-    "competitor_action", "consumer_insight", "review_analysis",
-    "new_product_radar", "pricing_insight", "manual",
+    "competitor_action",
+    "consumer_insight",
+    "review_analysis",
+    "new_product_radar",
+    "pricing_insight",
+    "manual",
 ]
 
 
@@ -47,9 +64,11 @@ _STORE_INFO: dict[str, dict] = {
 
 # ─── 数据模型 ───
 
+
 @dataclass
 class PilotSuggestion:
     """试点建议"""
+
     suggestion_id: str
     source_type: str
     source_id: str
@@ -196,16 +215,18 @@ class PilotSuggestionService:
                 continue
             if suggestion_type and s.suggestion_type != suggestion_type:
                 continue
-            results.append({
-                "suggestion_id": s.suggestion_id,
-                "title": s.title,
-                "suggestion_type": s.suggestion_type,
-                "source_type": s.source_type,
-                "status": s.status,
-                "recommended_stores": s.recommended_stores,
-                "period_days": s.period_days,
-                "created_at": s.created_at,
-            })
+            results.append(
+                {
+                    "suggestion_id": s.suggestion_id,
+                    "title": s.title,
+                    "suggestion_type": s.suggestion_type,
+                    "source_type": s.source_type,
+                    "status": s.status,
+                    "recommended_stores": s.recommended_stores,
+                    "period_days": s.period_days,
+                    "created_at": s.created_at,
+                }
+            )
         results.sort(key=lambda x: x["created_at"], reverse=True)
         return results
 
@@ -266,23 +287,27 @@ class PilotSuggestionService:
 
         # 模拟进度数据
         metrics_progress = []
-        for metric in (s.adjusted_metrics or s.success_metrics):
+        for metric in s.adjusted_metrics or s.success_metrics:
             target = metric.get("target", 0)
             # 模拟当前进度（70%-110%的达成率）
             achievement_pct = 70 + (hash(metric.get("metric", "")) % 40)
             current = target * achievement_pct / 100
 
-            metrics_progress.append({
-                "metric": metric.get("metric", ""),
-                "target": target,
-                "current": round(current, 2),
-                "achievement_pct": achievement_pct,
-                "unit": metric.get("unit", ""),
-                "status": "on_track" if achievement_pct >= 80 else "at_risk",
-            })
+            metrics_progress.append(
+                {
+                    "metric": metric.get("metric", ""),
+                    "target": target,
+                    "current": round(current, 2),
+                    "achievement_pct": achievement_pct,
+                    "unit": metric.get("unit", ""),
+                    "status": "on_track" if achievement_pct >= 80 else "at_risk",
+                }
+            )
 
-        overall_health = "healthy" if all(m["achievement_pct"] >= 80 for m in metrics_progress) else (
-            "at_risk" if any(m["achievement_pct"] < 60 for m in metrics_progress) else "warning"
+        overall_health = (
+            "healthy"
+            if all(m["achievement_pct"] >= 80 for m in metrics_progress)
+            else ("at_risk" if any(m["achievement_pct"] < 60 for m in metrics_progress) else "warning")
         )
 
         return {
@@ -357,14 +382,16 @@ class PilotSuggestionService:
         for store_id, info in _STORE_INFO.items():
             if store_id in pilot_stores:
                 continue
-            expansion_stores.append({
-                "store_id": store_id,
-                "store_name": info["name"],
-                "city": info["city"],
-                "store_type": info["type"],
-                "priority": "high" if info["type"] in ("flagship", "premium") else "medium",
-                "reason": self._scale_reason(info, s),
-            })
+            expansion_stores.append(
+                {
+                    "store_id": store_id,
+                    "store_name": info["name"],
+                    "city": info["city"],
+                    "store_type": info["type"],
+                    "priority": "high" if info["type"] in ("flagship", "premium") else "medium",
+                    "reason": self._scale_reason(info, s),
+                }
+            )
 
         # 按优先级排序
         expansion_stores.sort(key=lambda x: {"high": 0, "medium": 1, "low": 2}[x["priority"]])
@@ -390,7 +417,7 @@ class PilotSuggestionService:
             return "高端店客群匹配度高"
         city = store_info.get("city", "")
         pilot_cities = set()
-        for sid in (suggestion.approved_stores or suggestion.recommended_stores):
+        for sid in suggestion.approved_stores or suggestion.recommended_stores:
             si = _STORE_INFO.get(sid, {})
             pilot_cities.add(si.get("city", ""))
         if city in pilot_cities:
@@ -408,32 +435,33 @@ class PilotSuggestionService:
         for s in self._suggestions.values():
             status_counts[s.status] = status_counts.get(s.status, 0) + 1
             if s.status in ("approved", "piloting"):
-                active_pilots.append({
-                    "suggestion_id": s.suggestion_id,
-                    "title": s.title,
-                    "status": s.status,
-                    "stores": s.approved_stores or s.recommended_stores,
-                    "period_days": s.period_days,
-                })
+                active_pilots.append(
+                    {
+                        "suggestion_id": s.suggestion_id,
+                        "title": s.title,
+                        "status": s.status,
+                        "stores": s.approved_stores or s.recommended_stores,
+                        "period_days": s.period_days,
+                    }
+                )
             elif s.status in ("reviewing", "scale_up", "completed"):
                 success_rate = 0
                 if s.results:
                     met = s.results.get("metrics_met", 0)
                     total = s.results.get("metrics_total", 1)
                     success_rate = met / total if total > 0 else 0
-                completed_pilots.append({
-                    "suggestion_id": s.suggestion_id,
-                    "title": s.title,
-                    "status": s.status,
-                    "conclusion": s.conclusion,
-                    "success_rate": round(success_rate, 2),
-                })
+                completed_pilots.append(
+                    {
+                        "suggestion_id": s.suggestion_id,
+                        "title": s.title,
+                        "status": s.status,
+                        "conclusion": s.conclusion,
+                        "success_rate": round(success_rate, 2),
+                    }
+                )
 
         total_completed = len(completed_pilots)
-        avg_success = (
-            sum(p["success_rate"] for p in completed_pilots) / total_completed
-            if total_completed > 0 else 0
-        )
+        avg_success = sum(p["success_rate"] for p in completed_pilots) / total_completed if total_completed > 0 else 0
 
         return {
             "total_suggestions": len(self._suggestions),

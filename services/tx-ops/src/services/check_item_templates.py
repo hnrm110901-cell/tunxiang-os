@@ -7,6 +7,7 @@
   - standard_chinese: 标准中餐
   - fast_food       : 快餐/简餐
 """
+
 from __future__ import annotations
 
 from copy import deepcopy
@@ -15,7 +16,7 @@ from typing import Dict, List, Optional
 # ─── 类型别名 ───
 
 CheckItem = Dict  # {"item": str, "required": bool}
-NodeDef = Dict    # {"name": str, "check_items": list[CheckItem], "estimated_minutes": int, ...}
+NodeDef = Dict  # {"name": str, "check_items": list[CheckItem], "estimated_minutes": int, ...}
 TemplateDef = Dict[str, NodeDef]  # {"E1": NodeDef, ..., "E8": NodeDef}
 
 
@@ -395,14 +396,16 @@ def list_templates() -> List[Dict[str, str]]:
     for key, meta in TEMPLATE_META.items():
         template = TEMPLATE_REGISTRY[key]
         total_items = sum(len(node.get("check_items", [])) for node in template.values())
-        result.append({
-            "key": key,
-            "name": meta["name"],
-            "description": meta["description"],
-            "industry": meta["industry"],
-            "node_count": len(template),
-            "total_check_items": total_items,
-        })
+        result.append(
+            {
+                "key": key,
+                "name": meta["name"],
+                "description": meta["description"],
+                "industry": meta["industry"],
+                "node_count": len(template),
+                "total_check_items": total_items,
+            }
+        )
     return result
 
 

@@ -3,6 +3,7 @@
 约 15 个端点，覆盖开店、巡航、异常、闭店、复盘。
 统一响应格式: {"ok": bool, "data": {}, "error": {}}
 """
+
 from __future__ import annotations
 
 from datetime import date
@@ -126,8 +127,14 @@ async def check_opening_item(
 
     try:
         result = await svc(
-            checklist_id, item_id, body.status, body.result,
-            db=db, result=body.result, note=body.note, tenant_id=x_tenant_id,
+            checklist_id,
+            item_id,
+            body.status,
+            body.result,
+            db=db,
+            result=body.result,
+            note=body.note,
+            tenant_id=x_tenant_id,
         )
         return {"ok": True, "data": result}
     except ValueError as e:

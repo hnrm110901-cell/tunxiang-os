@@ -19,6 +19,7 @@
 
 测试数量: 25 个测试用例
 """
+
 from __future__ import annotations
 
 import sys
@@ -59,22 +60,30 @@ _src_svc_pkg.inventory_io = _inv_io_mod
 _src_svc_pkg.expiry_monitor = _exp_mod
 _src_svc_pkg.stock_forecast = _forecast_mod
 
+
 # SupplyRepository stub
 class _FakeSupplyRepository:
     def __init__(self, db, tenant_id):
         pass
+
     async def list_suppliers(self, page=1, size=20):
         return {}
+
     async def get_supplier_rating(self, supplier_id):
         return None
+
     async def compare_supplier_prices(self, ingredient_id):
         return []
+
     async def get_waste_top5(self, store_id, period="month"):
         return []
+
     async def get_waste_rate(self, store_id):
         return {}
+
     async def forecast_demand(self, store_id, days=7):
         return []
+
 
 _repo_mod.SupplyRepository = _FakeSupplyRepository
 
@@ -99,8 +108,10 @@ _shared_ont = types.ModuleType("shared.ontology")
 _shared_ont_src = types.ModuleType("shared.ontology.src")
 _shared_db_mod = types.ModuleType("shared.ontology.src.database")
 
+
 async def _placeholder_get_db():
     yield None
+
 
 _shared_db_mod.get_db = _placeholder_get_db
 sys.modules.setdefault("shared", _shared)
@@ -113,16 +124,20 @@ _shared_events_src = types.ModuleType("shared.events.src")
 _shared_emitter = types.ModuleType("shared.events.src.emitter")
 _shared_event_types = types.ModuleType("shared.events.src.event_types")
 
+
 async def _fake_emit_event(**kwargs):
     pass
 
+
 _shared_emitter.emit_event = _fake_emit_event
+
 
 class _FakeInventoryEventType:
     RECEIVED = "RECEIVED"
     CONSUMED = "CONSUMED"
     WASTED = "WASTED"
     ADJUSTED = "ADJUSTED"
+
 
 _shared_event_types.InventoryEventType = _FakeInventoryEventType
 
@@ -141,21 +156,21 @@ _structlog.get_logger = lambda *a, **kw: types.SimpleNamespace(
 sys.modules.setdefault("structlog", _structlog)
 
 import os
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
-
-from fastapi import FastAPI
-from fastapi.testclient import TestClient
-
-# Import inventory module; because relative imports resolve via src.services stubs
-# we import directly using the api package path
-import api.inventory as _inv_module
-from api.inventory import router, _get_db as inventory_get_db
 
 # Patch the service attributes the router code resolves at call time
 import api.inventory
+from api.inventory import _get_db as inventory_get_db
+
+# Import inventory module; because relative imports resolve via src.services stubs
+# we import directly using the api package path
+from api.inventory import router
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
+
 api.inventory.inventory_io = _inv_io_mod
 api.inventory.expiry_monitor = _exp_mod
 api.inventory.stock_forecast = _forecast_mod
@@ -167,6 +182,7 @@ HEADERS = {"X-Tenant-ID": TENANT_ID}
 
 
 # ─── App factory ───────────────────────────────────────────────────────────────
+
 
 def _make_app(db_mock):
     app = FastAPI()
@@ -193,12 +209,12 @@ def _mock_db():
 
 # ─── List Inventory ─────────────────────────────────────────────────────────────
 
+
 class TestListInventory:
     def test_list_inventory_success(self):
         db = _mock_db()
         expected = [{"ingredient_id": "ing_001", "quantity": 500.0}]
-        with patch.object(api.inventory.inventory_io, "get_store_inventory",
-                          new=AsyncMock(return_value=expected)):
+        with patch.object(api.inventory.inventory_io, "get_store_inventory", new=AsyncMock(return_value=expected)):
             resp = _client(db).get(
                 "/api/v1/supply/inventory",
                 params={"store_id": STORE_ID},
@@ -219,12 +235,12 @@ class TestListInventory:
 
 # ─── Get Inventory Item ─────────────────────────────────────────────────────────
 
+
 class TestGetInventoryItem:
     def test_get_item_success(self):
         db = _mock_db()
         result = {"ingredient_id": "ing_bass", "quantity": 200.0}
-        with patch.object(api.inventory.inventory_io, "get_stock_balance",
-                          new=AsyncMock(return_value=result)):
+        with patch.object(api.inventory.inventory_io, "get_stock_balance", new=AsyncMock(return_value=result)):
             resp = _client(db).get(
                 "/api/v1/supply/inventory/ing_bass",
                 params={"store_id": STORE_ID},
@@ -244,8 +260,9 @@ class TestGetInventoryItem:
 
     def test_get_item_not_found(self):
         db = _mock_db()
-        with patch.object(api.inventory.inventory_io, "get_stock_balance",
-                          new=AsyncMock(side_effect=ValueError("not found"))):
+        with patch.object(
+            api.inventory.inventory_io, "get_stock_balance", new=AsyncMock(side_effect=ValueError("not found"))
+        ):
             resp = _client(db).get(
                 "/api/v1/supply/inventory/nonexistent",
                 params={"store_id": STORE_ID},
@@ -256,13 +273,15 @@ class TestGetInventoryItem:
 
 # ─── Receive Stock ──────────────────────────────────────────────────────────────
 
+
 class TestReceiveStock:
     def test_receive_success(self):
         db = _mock_db()
         result = {"batch_id": "batch_001", "quantity": 50.0}
-        with patch.object(api.inventory.inventory_io, "receive_stock",
-                          new=AsyncMock(return_value=result)), \
-             patch("api.inventory.asyncio.create_task", return_value=None):
+        with (
+            patch.object(api.inventory.inventory_io, "receive_stock", new=AsyncMock(return_value=result)),
+            patch("api.inventory.asyncio.create_task", return_value=None),
+        ):
             resp = _client(db).post(
                 "/api/v1/supply/inventory/receive",
                 json={
@@ -279,9 +298,12 @@ class TestReceiveStock:
 
     def test_receive_value_error(self):
         db = _mock_db()
-        with patch.object(api.inventory.inventory_io, "receive_stock",
-                          new=AsyncMock(side_effect=ValueError("duplicate batch"))), \
-             patch("api.inventory.asyncio.create_task", return_value=None):
+        with (
+            patch.object(
+                api.inventory.inventory_io, "receive_stock", new=AsyncMock(side_effect=ValueError("duplicate batch"))
+            ),
+            patch("api.inventory.asyncio.create_task", return_value=None),
+        ):
             resp = _client(db).post(
                 "/api/v1/supply/inventory/receive",
                 json={
@@ -313,13 +335,15 @@ class TestReceiveStock:
 
 # ─── Issue Stock ────────────────────────────────────────────────────────────────
 
+
 class TestIssueStock:
     def test_issue_success(self):
         db = _mock_db()
         result = {"issued": True, "quantity": 10.0}
-        with patch.object(api.inventory.inventory_io, "issue_stock",
-                          new=AsyncMock(return_value=result)), \
-             patch("api.inventory.asyncio.create_task", return_value=None):
+        with (
+            patch.object(api.inventory.inventory_io, "issue_stock", new=AsyncMock(return_value=result)),
+            patch("api.inventory.asyncio.create_task", return_value=None),
+        ):
             resp = _client(db).post(
                 "/api/v1/supply/inventory/issue",
                 json={
@@ -335,9 +359,12 @@ class TestIssueStock:
 
     def test_issue_insufficient_stock(self):
         db = _mock_db()
-        with patch.object(api.inventory.inventory_io, "issue_stock",
-                          new=AsyncMock(side_effect=ValueError("insufficient stock"))), \
-             patch("api.inventory.asyncio.create_task", return_value=None):
+        with (
+            patch.object(
+                api.inventory.inventory_io, "issue_stock", new=AsyncMock(side_effect=ValueError("insufficient stock"))
+            ),
+            patch("api.inventory.asyncio.create_task", return_value=None),
+        ):
             resp = _client(db).post(
                 "/api/v1/supply/inventory/issue",
                 json={
@@ -353,13 +380,15 @@ class TestIssueStock:
 
 # ─── Adjust Inventory ───────────────────────────────────────────────────────────
 
+
 class TestAdjustInventory:
     def test_adjust_success(self):
         db = _mock_db()
         result = {"adjusted": True}
-        with patch.object(api.inventory.inventory_io, "adjust_stock",
-                          new=AsyncMock(return_value=result)), \
-             patch("api.inventory.asyncio.create_task", return_value=None):
+        with (
+            patch.object(api.inventory.inventory_io, "adjust_stock", new=AsyncMock(return_value=result)),
+            patch("api.inventory.asyncio.create_task", return_value=None),
+        ):
             resp = _client(db).post(
                 "/api/v1/supply/inventory/ing_bass/adjust",
                 json={
@@ -375,9 +404,12 @@ class TestAdjustInventory:
 
     def test_adjust_error(self):
         db = _mock_db()
-        with patch.object(api.inventory.inventory_io, "adjust_stock",
-                          new=AsyncMock(side_effect=ValueError("item not found"))), \
-             patch("api.inventory.asyncio.create_task", return_value=None):
+        with (
+            patch.object(
+                api.inventory.inventory_io, "adjust_stock", new=AsyncMock(side_effect=ValueError("item not found"))
+            ),
+            patch("api.inventory.asyncio.create_task", return_value=None),
+        ):
             resp = _client(db).post(
                 "/api/v1/supply/inventory/fake_item/adjust",
                 json={
@@ -393,6 +425,7 @@ class TestAdjustInventory:
 
 # ─── Alerts ─────────────────────────────────────────────────────────────────────
 
+
 class TestInventoryAlerts:
     def test_alerts_filters_low_stock(self):
         db = _mock_db()
@@ -401,10 +434,12 @@ class TestInventoryAlerts:
             {"ingredient_id": "ing_002", "status": "ok"},
         ]
         expiry_result = [{"ingredient_id": "ing_001", "days_left": 2}]
-        with patch.object(api.inventory.stock_forecast, "check_safety_stock",
-                          new=AsyncMock(return_value=safety_result)), \
-             patch.object(api.inventory.expiry_monitor, "generate_expiry_report",
-                          new=AsyncMock(return_value=expiry_result)):
+        with (
+            patch.object(api.inventory.stock_forecast, "check_safety_stock", new=AsyncMock(return_value=safety_result)),
+            patch.object(
+                api.inventory.expiry_monitor, "generate_expiry_report", new=AsyncMock(return_value=expiry_result)
+            ),
+        ):
             resp = _client(db).get(
                 "/api/v1/supply/inventory/alerts",
                 params={"store_id": STORE_ID},
@@ -420,12 +455,12 @@ class TestInventoryAlerts:
 
 # ─── Balance / Store ────────────────────────────────────────────────────────────
 
+
 class TestGetBalance:
     def test_get_balance_success(self):
         db = _mock_db()
         result = {"total_qty": 300.0, "batches": []}
-        with patch.object(api.inventory.inventory_io, "get_stock_balance",
-                          new=AsyncMock(return_value=result)):
+        with patch.object(api.inventory.inventory_io, "get_stock_balance", new=AsyncMock(return_value=result)):
             resp = _client(db).get(
                 "/api/v1/supply/inventory/balance/ing_bass",
                 params={"store_id": STORE_ID},
@@ -445,8 +480,7 @@ class TestGetBalance:
     def test_get_store_inventory_success(self):
         db = _mock_db()
         result = [{"ingredient_id": "ing_001", "qty": 100}]
-        with patch.object(api.inventory.inventory_io, "get_store_inventory",
-                          new=AsyncMock(return_value=result)):
+        with patch.object(api.inventory.inventory_io, "get_store_inventory", new=AsyncMock(return_value=result)):
             resp = _client(db).get(
                 f"/api/v1/supply/inventory/store/{STORE_ID}",
                 headers=HEADERS,
@@ -457,12 +491,12 @@ class TestGetBalance:
 
 # ─── Expiry / Safety / Forecast / Reorder ───────────────────────────────────────
 
+
 class TestExpiryAndForecast:
     def test_get_expiry_report(self):
         db = _mock_db()
         result = [{"ingredient_id": "ing_001", "days_left": 1}]
-        with patch.object(api.inventory.expiry_monitor, "generate_expiry_report",
-                          new=AsyncMock(return_value=result)):
+        with patch.object(api.inventory.expiry_monitor, "generate_expiry_report", new=AsyncMock(return_value=result)):
             resp = _client(db).get(
                 f"/api/v1/supply/inventory/expiry/{STORE_ID}",
                 headers=HEADERS,
@@ -473,8 +507,7 @@ class TestExpiryAndForecast:
     def test_get_safety_stock(self):
         db = _mock_db()
         result = [{"ingredient_id": "ing_001", "status": "low"}]
-        with patch.object(api.inventory.stock_forecast, "check_safety_stock",
-                          new=AsyncMock(return_value=result)):
+        with patch.object(api.inventory.stock_forecast, "check_safety_stock", new=AsyncMock(return_value=result)):
             resp = _client(db).get(
                 f"/api/v1/supply/inventory/safety/{STORE_ID}",
                 headers=HEADERS,
@@ -485,8 +518,7 @@ class TestExpiryAndForecast:
     def test_get_stockout_forecast_success(self):
         db = _mock_db()
         result = {"days_remaining": 5}
-        with patch.object(api.inventory.stock_forecast, "predict_stockout",
-                          new=AsyncMock(return_value=result)):
+        with patch.object(api.inventory.stock_forecast, "predict_stockout", new=AsyncMock(return_value=result)):
             resp = _client(db).get(
                 f"/api/v1/supply/inventory/forecast/{STORE_ID}/ing_bass",
                 headers=HEADERS,
@@ -496,8 +528,9 @@ class TestExpiryAndForecast:
 
     def test_get_stockout_forecast_not_found(self):
         db = _mock_db()
-        with patch.object(api.inventory.stock_forecast, "predict_stockout",
-                          new=AsyncMock(side_effect=ValueError("no data"))):
+        with patch.object(
+            api.inventory.stock_forecast, "predict_stockout", new=AsyncMock(side_effect=ValueError("no data"))
+        ):
             resp = _client(db).get(
                 f"/api/v1/supply/inventory/forecast/{STORE_ID}/nonexistent",
                 headers=HEADERS,
@@ -507,8 +540,7 @@ class TestExpiryAndForecast:
     def test_get_reorder_suggestions(self):
         db = _mock_db()
         result = [{"ingredient_id": "ing_001", "suggested_qty": 50}]
-        with patch.object(api.inventory.stock_forecast, "suggest_reorder",
-                          new=AsyncMock(return_value=result)):
+        with patch.object(api.inventory.stock_forecast, "suggest_reorder", new=AsyncMock(return_value=result)):
             resp = _client(db).get(
                 f"/api/v1/supply/inventory/reorder/{STORE_ID}",
                 headers=HEADERS,
@@ -519,6 +551,7 @@ class TestExpiryAndForecast:
 
 # ─── Suppliers / Waste / Demand ─────────────────────────────────────────────────
 
+
 class TestSuppliersAndWaste:
     def _make_repo(self, method: str, value):
         repo = MagicMock()
@@ -528,8 +561,7 @@ class TestSuppliersAndWaste:
     def test_list_suppliers_success(self):
         db = _mock_db()
         data = {"items": [{"supplier_id": "sup_001"}], "total": 1}
-        with patch.object(api.inventory, "SupplyRepository",
-                          return_value=self._make_repo("list_suppliers", data)):
+        with patch.object(api.inventory, "SupplyRepository", return_value=self._make_repo("list_suppliers", data)):
             resp = _client(db).get(
                 "/api/v1/supply/suppliers",
                 headers=HEADERS,
@@ -540,8 +572,7 @@ class TestSuppliersAndWaste:
     def test_get_waste_top5(self):
         db = _mock_db()
         top5 = [{"ingredient": "鲈鱼", "waste_fen": 15000}]
-        with patch.object(api.inventory, "SupplyRepository",
-                          return_value=self._make_repo("get_waste_top5", top5)):
+        with patch.object(api.inventory, "SupplyRepository", return_value=self._make_repo("get_waste_top5", top5)):
             resp = _client(db).get(
                 "/api/v1/supply/waste/top5",
                 params={"store_id": STORE_ID},
@@ -553,8 +584,7 @@ class TestSuppliersAndWaste:
     def test_forecast_demand(self):
         db = _mock_db()
         forecast = [{"ingredient_id": "ing_001", "predicted_qty": 300}]
-        with patch.object(api.inventory, "SupplyRepository",
-                          return_value=self._make_repo("forecast_demand", forecast)):
+        with patch.object(api.inventory, "SupplyRepository", return_value=self._make_repo("forecast_demand", forecast)):
             resp = _client(db).get(
                 "/api/v1/supply/demand/forecast",
                 params={"store_id": STORE_ID},

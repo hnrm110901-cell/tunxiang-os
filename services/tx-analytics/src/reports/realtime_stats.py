@@ -61,8 +61,15 @@ ORDER BY s.store_name, hour
 
 DIMENSIONS = ["store_name"]
 METRICS = [
-    "order_count", "paid_count", "cancelled_count", "refunded_count",
-    "total_amount_fen", "discount_fen", "actual_fen", "avg_ticket_fen",
-    "latest_order_hour", "latest_order_at",
+    "order_count",
+    "paid_count",
+    "cancelled_count",
+    "refunded_count",
+    "total_amount_fen",
+    "discount_fen",
+    "actual_fen",
+    "avg_ticket_fen",
+    "latest_order_hour",
+    "latest_order_at",
 ]
 FILTERS = ["store_id"]

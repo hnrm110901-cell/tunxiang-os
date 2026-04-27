@@ -4,6 +4,7 @@
 - POST /api/v1/crew/patrol-checkin   — 记录巡台（BLE自动或手动）
 - GET  /api/v1/crew/patrol-summary   — 今日巡台统计与时间线
 """
+
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -16,6 +17,7 @@ logger = structlog.get_logger(__name__)
 router = APIRouter(tags=["crew-patrol"])
 
 # ---------- Pydantic 模型 ----------
+
 
 class PatrolCheckinRequest(BaseModel):
     table_no: str = Field(..., description="桌台号，如 A03")
@@ -36,6 +38,7 @@ _DEDUP_SECONDS = 300  # 5 分钟内同一人同一桌不重复记录
 
 def _build_checkin_id() -> str:
     import uuid
+
     return str(uuid.uuid4())
 
 
@@ -45,12 +48,13 @@ def _now_iso() -> str:
 
 # ---------- 路由 ----------
 
+
 @router.post("/api/v1/crew/patrol-checkin")
 async def patrol_checkin(
     body: PatrolCheckinRequest,
     x_operator_id: str = Header(default="op-001", alias="X-Operator-ID"),
-    x_tenant_id: str   = Header(default="",       alias="X-Tenant-ID"),
-    x_store_id: str    = Header(default="",       alias="X-Store-ID"),
+    x_tenant_id: str = Header(default="", alias="X-Tenant-ID"),
+    x_store_id: str = Header(default="", alias="X-Store-ID"),
 ):
     """
     记录服务员巡台。
@@ -67,6 +71,7 @@ async def patrol_checkin(
     )
     try:
         import time
+
         now_ts = time.time()
         dedup_key = (x_tenant_id, x_operator_id, body.table_no)
         last_ts = _dedup_cache.get(dedup_key, 0.0)
@@ -120,7 +125,7 @@ async def patrol_checkin(
 async def patrol_summary(
     date: Optional[str] = Query(None, description="日期 YYYY-MM-DD，默认今日"),
     x_operator_id: str = Header(default="op-001", alias="X-Operator-ID"),
-    x_tenant_id: str   = Header(default="",       alias="X-Tenant-ID"),
+    x_tenant_id: str = Header(default="", alias="X-Tenant-ID"),
 ):
     """
     返回服务员今日巡台统计。
@@ -133,15 +138,15 @@ async def patrol_summary(
     log = logger.bind(operator_id=x_operator_id, tenant_id=x_tenant_id, date=date)
     try:
         from datetime import date as date_cls
+
         target_date = date_cls.fromisoformat(date) if date else date_cls.today()
 
         # 生产环境：SELECT ... FROM patrol_logs WHERE tenant_id=... AND crew_id=... AND checked_at::date=...
         date_str = target_date.isoformat()
         logs = [
-            r for r in _patrol_logs
-            if r["tenant_id"] == x_tenant_id
-            and r["crew_id"] == x_operator_id
-            and r["checked_at"].startswith(date_str)
+            r
+            for r in _patrol_logs
+            if r["tenant_id"] == x_tenant_id and r["crew_id"] == x_operator_id and r["checked_at"].startswith(date_str)
         ]
 
         # 去重计数（按 table_no）

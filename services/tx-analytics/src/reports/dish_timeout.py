@@ -49,7 +49,10 @@ ORDER BY timeout_count DESC
 
 DIMENSIONS = ["dish_id", "dish_name", "department"]
 METRICS = [
-    "timeout_count", "timeout_qty", "avg_overtime_minutes",
-    "max_cook_minutes_actual", "timeout_pct",
+    "timeout_count",
+    "timeout_qty",
+    "avg_overtime_minutes",
+    "max_cook_minutes_actual",
+    "timeout_pct",
 ]
 FILTERS = ["start_date", "end_date", "store_id", "default_max_minutes"]

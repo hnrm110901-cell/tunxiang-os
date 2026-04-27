@@ -15,6 +15,7 @@
   compliance_rate  — 合规率（0-1）
   composite_score  — 加权综合分（0-100）
 """
+
 from __future__ import annotations
 
 from datetime import date
@@ -33,18 +34,18 @@ log = structlog.get_logger(__name__)
 # ─────────────────────────────────────────────────────────────────────────────
 
 SCORE_WEIGHTS: dict[str, float] = {
-    "delivery_rate": 0.30,      # 交货率（最重要）
-    "quality_rate": 0.25,       # 品质合格率
-    "price_stability": 0.20,    # 价格稳定性
-    "response_speed": 0.15,     # 响应速度
-    "compliance_rate": 0.10,    # 合规率
+    "delivery_rate": 0.30,  # 交货率（最重要）
+    "quality_rate": 0.25,  # 品质合格率
+    "price_stability": 0.20,  # 价格稳定性
+    "response_speed": 0.15,  # 响应速度
+    "compliance_rate": 0.10,  # 合规率
 }
 
 TIER_THRESHOLDS: dict[str, int] = {
-    "premium": 85,    # 优质供应商
+    "premium": 85,  # 优质供应商
     "qualified": 70,  # 合格
-    "watch": 55,      # 观察期
-    "eliminate": 0,   # 淘汰候选
+    "watch": 55,  # 观察期
+    "eliminate": 0,  # 淘汰候选
 }
 
 # AI 洞察触发阈值：低于此分数才触发（或首次月报）
@@ -62,8 +63,10 @@ _AI_SYSTEM_PROMPT = (
 # Pydantic 数据模型
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 class DimensionScores(BaseModel):
     """五维度原始评分（均为 0-1 小数）"""
+
     delivery_rate: float = Field(ge=0.0, le=1.0, description="交货率")
     quality_rate: float = Field(ge=0.0, le=1.0, description="品质合格率")
     price_stability: float = Field(ge=0.0, le=1.0, description="价格稳定性")
@@ -73,6 +76,7 @@ class DimensionScores(BaseModel):
 
 class SupplierScoreResult(BaseModel):
     """calculate_period_score 返回值"""
+
     supplier_id: str
     tenant_id: str
     period_start: date
@@ -88,6 +92,7 @@ class SupplierScoreResult(BaseModel):
 # SupplierScoringEngine
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 class SupplierScoringEngine:
     """供应商评分引擎：规则评分 + AI 洞察
 
@@ -102,8 +107,8 @@ class SupplierScoringEngine:
     def _compute_composite(self, dims: DimensionScores) -> float:
         """加权计算综合分，结果为 0-100 浮点数。"""
         raw = (
-            dims.delivery_rate    * SCORE_WEIGHTS["delivery_rate"]
-            + dims.quality_rate   * SCORE_WEIGHTS["quality_rate"]
+            dims.delivery_rate * SCORE_WEIGHTS["delivery_rate"]
+            + dims.quality_rate * SCORE_WEIGHTS["quality_rate"]
             + dims.price_stability * SCORE_WEIGHTS["price_stability"]
             + dims.response_speed * SCORE_WEIGHTS["response_speed"]
             + dims.compliance_rate * SCORE_WEIGHTS["compliance_rate"]
@@ -427,11 +432,16 @@ class SupplierScoringEngine:
             LIMIT :limit
         """)
         try:
-            rows = (await db.execute(sql, {
-                "tenant_id": tenant_id,
-                "supplier_id": supplier_id,
-                "limit": limit,
-            })).fetchall()
+            rows = (
+                await db.execute(
+                    sql,
+                    {
+                        "tenant_id": tenant_id,
+                        "supplier_id": supplier_id,
+                        "limit": limit,
+                    },
+                )
+            ).fetchall()
             return [dict(r._mapping) for r in rows]
         except (ProgrammingError, OperationalError) as exc:
             log.warning(
@@ -457,11 +467,16 @@ class SupplierScoringEngine:
               AND is_deleted = FALSE
         """)
         try:
-            row = (await db.execute(sql, {
-                "tenant_id": tenant_id,
-                "supplier_id": supplier_id,
-                "period_start": period_start,
-            })).fetchone()
+            row = (
+                await db.execute(
+                    sql,
+                    {
+                        "tenant_id": tenant_id,
+                        "supplier_id": supplier_id,
+                        "period_start": period_start,
+                    },
+                )
+            ).fetchone()
             return (row.cnt == 0) if row else True
         except (ProgrammingError, OperationalError):
             return True  # 无法查询时默认触发
@@ -515,9 +530,7 @@ class SupplierScoringEngine:
         )
 
         # ── 2. 聚合五维度原始数据 ──
-        dims = await self._aggregate_dimensions_from_db(
-            supplier_id, tenant_id, period_start, period_end, db
-        )
+        dims = await self._aggregate_dimensions_from_db(supplier_id, tenant_id, period_start, period_end, db)
         if dims is None:
             # 优雅降级：DB 聚合失败，使用 0 值（表示无数据）
             log.warning(
@@ -540,9 +553,7 @@ class SupplierScoringEngine:
         # ── 4. 判断是否触发 AI 洞察 ──
         ai_insight: Optional[str] = None
         if model_router is not None:
-            is_first_monthly = await self._is_first_monthly_score(
-                supplier_id, tenant_id, period_start, db
-            )
+            is_first_monthly = await self._is_first_monthly_score(supplier_id, tenant_id, period_start, db)
             if self._should_trigger_ai(composite_score, is_first_monthly):
                 history = await self._fetch_recent_history(supplier_id, tenant_id, 3, db)
                 ai_insight = await self.generate_ai_insight(

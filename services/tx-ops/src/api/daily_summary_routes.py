@@ -8,6 +8,7 @@
 
 统一响应格式: {"ok": bool, "data": {}, "error": {}}
 """
+
 from __future__ import annotations
 
 import uuid
@@ -109,8 +110,9 @@ async def _aggregate_orders(
                 "abnormal_discounts": row.abnormal_discounts or 0,
             }
     except SQLAlchemyError as exc:
-        log.error("daily_summary_aggregate_error", exc_info=True, error=str(exc),
-                  store_id=store_id, tenant_id=tenant_id)
+        log.error(
+            "daily_summary_aggregate_error", exc_info=True, error=str(exc), store_id=store_id, tenant_id=tenant_id
+        )
 
     return {
         "total_orders": 0,
@@ -243,16 +245,22 @@ async def generate_daily_summary(
             "status": "draft",
             "confirmed_by": None,
             "confirmed_at": None,
-            "created_at": existing.created_at.isoformat() if existing and hasattr(existing.created_at, "isoformat") else now.isoformat(),
+            "created_at": existing.created_at.isoformat()
+            if existing and hasattr(existing.created_at, "isoformat")
+            else now.isoformat(),
             "updated_at": now.isoformat(),
         }
 
-        log.info("daily_summary_generated",
-                 summary_id=summary_id, store_id=body.store_id,
-                 summary_date=body.summary_date.isoformat(), tenant_id=x_tenant_id,
-                 total_orders=aggregated["total_orders"],
-                 actual_revenue_fen=aggregated["actual_revenue_fen"],
-                 abnormal_discounts=aggregated["abnormal_discounts"])
+        log.info(
+            "daily_summary_generated",
+            summary_id=summary_id,
+            store_id=body.store_id,
+            summary_date=body.summary_date.isoformat(),
+            tenant_id=x_tenant_id,
+            total_orders=aggregated["total_orders"],
+            actual_revenue_fen=aggregated["actual_revenue_fen"],
+            abnormal_discounts=aggregated["abnormal_discounts"],
+        )
         return {"ok": True, "data": record}
 
     except HTTPException:
@@ -436,9 +444,13 @@ async def confirm_daily_summary(
         updated = row_result.fetchone()
         data = _serialize_row(dict(updated._mapping)) if updated else {"id": summary_id}
 
-        log.info("daily_summary_confirmed", summary_id=summary_id,
-                 store_id=record.store_id, confirmed_by=body.confirmed_by,
-                 tenant_id=x_tenant_id)
+        log.info(
+            "daily_summary_confirmed",
+            summary_id=summary_id,
+            store_id=record.store_id,
+            confirmed_by=body.confirmed_by,
+            tenant_id=x_tenant_id,
+        )
         return {"ok": True, "data": data}
 
     except HTTPException:

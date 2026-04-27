@@ -2,15 +2,15 @@
 
 通过 MasterAgent.dispatch 路由调用，支持审计日志记录。
 """
+
 from __future__ import annotations
 
 import time
-from datetime import datetime, timezone
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import structlog
 
-from .tool_registry import ToolDefinition, ToolRegistry
+from .tool_registry import ToolRegistry
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession

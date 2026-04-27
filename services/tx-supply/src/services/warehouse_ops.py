@@ -9,6 +9,7 @@ BOM拆分: 成品按配方拆分为原料
 - warehouse_transfer_items 表 — 移库明细
 - 若 v064 迁移未运行（表不存在），create_transfer_order 自动降级为内存返回并记录 WARNING
 """
+
 from __future__ import annotations
 
 import uuid
@@ -426,9 +427,7 @@ async def create_split_assembly(
         "status": "completed",
         "components": components,
         "component_count": len(components),
-        "total_component_qty": round(
-            sum(c.get("quantity", 0) for c in components), 4
-        ),
+        "total_component_qty": round(sum(c.get("quantity", 0) for c in components), 4),
         "created_at": now,
     }
 
@@ -483,13 +482,15 @@ async def create_bom_split(
     for item in bom_data:
         qty = round(item.get("qty_per_dish", 0) * quantity, 4)
         cost = int(item.get("cost_fen", 0) * quantity)
-        ingredients.append({
-            "ingredient_id": item.get("ingredient_id"),
-            "name": item.get("name", ""),
-            "required_qty": qty,
-            "unit": item.get("unit", ""),
-            "estimated_cost_fen": cost,
-        })
+        ingredients.append(
+            {
+                "ingredient_id": item.get("ingredient_id"),
+                "name": item.get("name", ""),
+                "required_qty": qty,
+                "unit": item.get("unit", ""),
+                "estimated_cost_fen": cost,
+            }
+        )
         total_cost_fen += cost
 
     record: Dict[str, Any] = {

@@ -52,11 +52,7 @@ class SubmissionResult:
         self.raw_response = raw_response or {}
 
     def __repr__(self) -> str:
-        return (
-            f"SubmissionResult(success={self.success}, "
-            f"platform_ref={self.platform_ref!r}, "
-            f"message={self.message!r})"
-        )
+        return f"SubmissionResult(success={self.success}, platform_ref={self.platform_ref!r}, message={self.message!r})"
 
 
 class BaseCityAdapter(ABC):
@@ -131,9 +127,9 @@ class BaseCityAdapter(ABC):
                 results[domain] = False
         return results
 
-    async def close(self) -> None:
+    async def close(self) -> None:  # noqa: B027 — 空钩子，子类按需实现
         """释放资源，子类可覆盖。"""
-        pass
+        return None
 
     # ------------------------------------------------------------------
     # 异步上下文管理器

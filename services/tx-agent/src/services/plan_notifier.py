@@ -4,6 +4,7 @@
 1. 企业微信 Webhook（主渠道）
 2. 系统内部消息（备用，写入 Redis 供前端 WebSocket 推送）
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -69,7 +70,7 @@ class OperationPlanNotifier:
                 "content": (
                     f"## ⚠️ 高风险操作待确认\n\n"
                     f"> **操作类型**：{plan.operation_type}\n"
-                    f"> **风险等级**：<font color=\"{color}\">{plan.impact.risk_level.upper()}</font>\n"
+                    f'> **风险等级**：<font color="{color}">{plan.impact.risk_level.upper()}</font>\n'
                     f"> **影响范围**：{plan.impact.impact_summary}\n"
                     f"> **财务影响**：{impact_text}\n"
                     f"> **注意事项**：{'；'.join(plan.impact.warnings) if plan.impact.warnings else '无'}\n\n"

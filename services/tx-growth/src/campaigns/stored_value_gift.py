@@ -4,6 +4,7 @@
 支持多档位配置, 每个档位独立的充值金额和赠送金额。
 金额单位: 分(fen)
 """
+
 from typing import Any
 
 import structlog

@@ -15,15 +15,21 @@
 - Redis 不可用时降级（记录日志，不抛异常，不影响主业务）
 - Stream MAXLEN ~ 100_000，自动修剪旧事件
 """
+
 from __future__ import annotations
 
 import json
 import os
 from datetime import datetime, timezone
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 from uuid import UUID, uuid4
 
 import structlog
+
+if TYPE_CHECKING:
+    import redis.asyncio as aioredis  # noqa: F401 — 仅供类型注解
+
+    from .member_events import MemberEventType  # noqa: F401
 
 logger = structlog.get_logger(__name__)
 
@@ -82,9 +88,7 @@ class MemberEventPublisher:
 
             fields: dict[str, str] = {
                 "event_id": str(uuid4()),
-                "event_type": event_type.value
-                if hasattr(event_type, "value")
-                else str(event_type),
+                "event_type": event_type.value if hasattr(event_type, "value") else str(event_type),
                 "tenant_id": str(tenant_id),
                 "customer_id": str(customer_id),
                 "event_data": json.dumps(event_data, ensure_ascii=False),

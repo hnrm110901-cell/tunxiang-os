@@ -6,6 +6,7 @@
   3. test_requisition_workflow          — 领用单创建/确认流程
   4. test_bar_counter_report            — 盘点报表数据聚合
 """
+
 from __future__ import annotations
 
 import uuid
@@ -14,8 +15,8 @@ from typing import Any
 
 import pytest
 
-
 # ─── 工具函数 ────────────────────────────────────────────────────────────────
+
 
 def _make_stock_item(
     name: str = "可乐 330ml",
@@ -42,6 +43,7 @@ def _compute_variance(book_qty: float, actual_qty: float) -> float:
 
 
 # ─── Test 1: 按 location_type=bar 过滤库存 ───────────────────────────────────
+
 
 class TestInventoryQueryByLocation:
     """库存列表应能按 location_type 过滤，只返回吧台库存。"""
@@ -84,8 +86,7 @@ class TestInventoryQueryByLocation:
             {**_make_stock_item("鸡腿", location_type="kitchen"), "store_id": store_a},
         ]
 
-        store_a_bar = [i for i in all_items
-                       if i["location_type"] == "bar" and i["store_id"] == store_a]
+        store_a_bar = [i for i in all_items if i["location_type"] == "bar" and i["store_id"] == store_a]
         assert len(store_a_bar) == 1
         assert store_a_bar[0]["name"] == "可乐"
 
@@ -109,6 +110,7 @@ class TestInventoryQueryByLocation:
 
 
 # ─── Test 2: 盘点单创建，差异 = 实际 - 账面 ──────────────────────────────────
+
 
 class TestStocktakeCreateAndVariance:
     """盘点单：差异计算正确，盘盈为正，盘亏为负。"""
@@ -139,15 +141,12 @@ class TestStocktakeCreateAndVariance:
     def test_stocktake_aggregates_total_variance_fen(self):
         """盘点单总损益金额 = 各品项差异数量 × 单价。"""
         stocktake_items = [
-            {"name": "可乐",  "variance": 2.0,  "unit_cost_fen": 300},   # 盘盈 600分
-            {"name": "百威",  "variance": -1.0, "unit_cost_fen": 15000}, # 盘亏 -15000分
-            {"name": "气泡水","variance": 0.0,  "unit_cost_fen": 500},   # 无差异
+            {"name": "可乐", "variance": 2.0, "unit_cost_fen": 300},  # 盘盈 600分
+            {"name": "百威", "variance": -1.0, "unit_cost_fen": 15000},  # 盘亏 -15000分
+            {"name": "气泡水", "variance": 0.0, "unit_cost_fen": 500},  # 无差异
         ]
 
-        total_variance_fen = sum(
-            int(item["variance"] * item["unit_cost_fen"])
-            for item in stocktake_items
-        )
+        total_variance_fen = sum(int(item["variance"] * item["unit_cost_fen"]) for item in stocktake_items)
 
         assert total_variance_fen == -14400  # 600 - 15000 = -14400
 
@@ -170,6 +169,7 @@ class TestStocktakeCreateAndVariance:
 
 
 # ─── Test 3: 领用单创建/确认流程 ─────────────────────────────────────────────
+
 
 class TestRequisitionWorkflow:
     """领用单：创建 → 待审批 → 审批通过后扣减库存。"""
@@ -242,6 +242,7 @@ class TestRequisitionWorkflow:
 
 # ─── Test 4: 盘点报表数据聚合 ────────────────────────────────────────────────
 
+
 class TestBarCounterReport:
     """盘点报表：近 N 天损益汇总，按品项分组。"""
 
@@ -249,23 +250,26 @@ class TestBarCounterReport:
         """构造模拟的盘点调整记录。"""
         return [
             # 可乐：2 次盘点，1次盈2罐，1次亏1罐，单价3元
-            {"ingredient_id": "i1", "name": "可乐 330ml", "unit": "罐",
-             "quantity": 2.0, "unit_cost_fen": 300},
-            {"ingredient_id": "i1", "name": "可乐 330ml", "unit": "罐",
-             "quantity": -1.0, "unit_cost_fen": 300},
+            {"ingredient_id": "i1", "name": "可乐 330ml", "unit": "罐", "quantity": 2.0, "unit_cost_fen": 300},
+            {"ingredient_id": "i1", "name": "可乐 330ml", "unit": "罐", "quantity": -1.0, "unit_cost_fen": 300},
             # 百威：1 次盘点，亏1箱，单价150元
-            {"ingredient_id": "i2", "name": "百威啤酒", "unit": "箱",
-             "quantity": -1.0, "unit_cost_fen": 15000},
+            {"ingredient_id": "i2", "name": "百威啤酒", "unit": "箱", "quantity": -1.0, "unit_cost_fen": 15000},
         ]
 
     def _aggregate_report(self, adjustments: list[dict]) -> list[dict]:
         """按品项聚合盘点记录，计算盈亏数量和金额。"""
         from collections import defaultdict
-        groups: dict[str, dict] = defaultdict(lambda: {
-            "gain_qty": 0.0, "loss_qty": 0.0,
-            "gain_fen": 0, "loss_fen": 0,
-            "unit": "", "name": "",
-        })
+
+        groups: dict[str, dict] = defaultdict(
+            lambda: {
+                "gain_qty": 0.0,
+                "loss_qty": 0.0,
+                "gain_fen": 0,
+                "loss_fen": 0,
+                "unit": "",
+                "name": "",
+            }
+        )
 
         for adj in adjustments:
             key = adj["ingredient_id"]
@@ -299,8 +303,8 @@ class TestBarCounterReport:
         cola = report_map["i1"]
         assert cola["gain_qty"] == 2.0
         assert cola["loss_qty"] == 1.0
-        assert cola["gain_fen"] == 600    # 2 * 300
-        assert cola["loss_fen"] == 300    # 1 * 300
+        assert cola["gain_fen"] == 600  # 2 * 300
+        assert cola["loss_fen"] == 300  # 1 * 300
 
         # 百威：亏1箱
         beer = report_map["i2"]
@@ -319,8 +323,8 @@ class TestBarCounterReport:
         net = total_gain - total_loss
 
         assert total_gain == 600
-        assert total_loss == 15300   # 300 + 15000
-        assert net == -14700         # 净亏
+        assert total_loss == 15300  # 300 + 15000
+        assert net == -14700  # 净亏
 
     def test_report_empty_when_no_adjustments(self):
         """无盘点调整时，报表返回空列表。"""

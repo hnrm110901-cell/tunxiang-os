@@ -8,6 +8,7 @@ channel_type 分类:
   catering  — 外烩/大厨到家
   b2b       — 中央厨房B2B
 """
+
 from dataclasses import dataclass, field
 
 
@@ -16,11 +17,11 @@ class SalesChannel:
     """销售渠道配置 — 数据驱动，非枚举硬编码"""
 
     channel_id: str
-    channel_name: str           # "堂食"/"美团外卖"/"预制菜零售"
-    channel_type: str           # dine_in/delivery/retail/banquet/catering/b2b
-    commission_rate: float      # 平台抽成率 (0.0 ~ 1.0)
-    settlement_days: int        # T+N结算周期
-    payment_fee_rate: float     # 支付手续费率
+    channel_name: str  # "堂食"/"美团外卖"/"预制菜零售"
+    channel_type: str  # dine_in/delivery/retail/banquet/catering/b2b
+    commission_rate: float  # 平台抽成率 (0.0 ~ 1.0)
+    settlement_days: int  # T+N结算周期
+    payment_fee_rate: float  # 支付手续费率
     margin_rules: dict = field(default_factory=dict)  # 毛利核算规则
     is_active: bool = True
     created_at: str = ""

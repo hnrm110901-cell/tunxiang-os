@@ -5,6 +5,7 @@
   方案A（Core ML Bridge 可用）：转发到 http://localhost:8100/vision/recognize
   方案B（fallback）：调用 Claude Vision API，结合门店菜单做匹配
 """
+
 from __future__ import annotations
 
 import json
@@ -100,10 +101,7 @@ async def _recognize_via_claude(image_base64: str, store_id: str, tenant_id: str
         logger.warning("no_menu_items_found", store_id=store_id)
         return []
 
-    menu_text = "\n".join(
-        f"- id={item['id']}, name={item['name']}, price={item['price']}"
-        for item in menu_items
-    )
+    menu_text = "\n".join(f"- id={item['id']}, name={item['name']}, price={item['price']}" for item in menu_items)
 
     prompt = (
         "这是一道餐厅菜品的图片。请从以下菜单中找出最匹配的菜品名称（返回JSON）：\n"

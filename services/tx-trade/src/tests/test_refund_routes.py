@@ -8,6 +8,7 @@
 5. GET  /api/v1/trade/refunds/{id}    — 退款申请不存在 → 404
 6. GET  /api/v1/trade/refunds/{id}    — refund_id 非 UUID 格式 → 400
 """
+
 import datetime
 import os
 import sys
@@ -15,8 +16,8 @@ import types
 
 # ─── 路径准备 ─────────────────────────────────────────────────────────────────
 _TESTS_DIR = os.path.dirname(__file__)
-_SRC_DIR   = os.path.join(_TESTS_DIR, "..")
-_ROOT_DIR  = os.path.abspath(os.path.join(_TESTS_DIR, "..", "..", "..", ".."))
+_SRC_DIR = os.path.join(_TESTS_DIR, "..")
+_ROOT_DIR = os.path.abspath(os.path.join(_TESTS_DIR, "..", "..", "..", ".."))
 
 for _p in [_SRC_DIR, _ROOT_DIR]:
     if _p not in sys.path:
@@ -24,6 +25,7 @@ for _p in [_SRC_DIR, _ROOT_DIR]:
 
 
 # ─── 建立 src 包层级 ──────────────────────────────────────────────────────────
+
 
 def _ensure_pkg(name: str, path: str) -> None:
     if name not in sys.modules:
@@ -33,25 +35,25 @@ def _ensure_pkg(name: str, path: str) -> None:
         sys.modules[name] = mod
 
 
-_ensure_pkg("src",      _SRC_DIR)
-_ensure_pkg("src.api",  os.path.join(_SRC_DIR, "api"))
+_ensure_pkg("src", _SRC_DIR)
+_ensure_pkg("src.api", os.path.join(_SRC_DIR, "api"))
 
 # ─── 导入 ─────────────────────────────────────────────────────────────────────
 
-import pytest  # noqa: E402
 from unittest.mock import AsyncMock, MagicMock  # noqa: E402
+
 from fastapi import FastAPI  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 from sqlalchemy.exc import SQLAlchemyError  # noqa: E402
 
-from src.api.refund_routes import router as refund_router  # type: ignore[import]  # noqa: E402
 from shared.ontology.src.database import get_db  # noqa: E402
+from src.api.refund_routes import router as refund_router  # type: ignore[import]  # noqa: E402
 
 # ─── 常量 ─────────────────────────────────────────────────────────────────────
 
-TENANT_ID  = "11111111-1111-1111-1111-111111111111"
-ORDER_ID   = "33333333-3333-3333-3333-333333333333"
-REFUND_ID  = "44444444-4444-4444-4444-444444444444"
+TENANT_ID = "11111111-1111-1111-1111-111111111111"
+ORDER_ID = "33333333-3333-3333-3333-333333333333"
+REFUND_ID = "44444444-4444-4444-4444-444444444444"
 
 HEADERS = {"X-Tenant-ID": TENANT_ID}
 
@@ -61,7 +63,7 @@ HEADERS = {"X-Tenant-ID": TENANT_ID}
 def _make_mock_db() -> AsyncMock:
     """创建最小化的 mock AsyncSession。"""
     db = AsyncMock()
-    db.commit   = AsyncMock()
+    db.commit = AsyncMock()
     db.rollback = AsyncMock()
     return db
 
@@ -105,13 +107,13 @@ def _make_app_with_db(db: AsyncMock) -> FastAPI:
 def _submit_payload(**kwargs) -> dict:
     """生成提交退款的基准请求体，可用 kwargs 覆盖字段。"""
     base = {
-        "order_id":          ORDER_ID,
-        "refund_type":       "partial",
+        "order_id": ORDER_ID,
+        "refund_type": "partial",
         "refund_amount_fen": 2000,
-        "reasons":           ["菜品与描述不符"],
-        "description":       "牛肉面里没有牛肉",
-        "items":             [],
-        "image_urls":        [],
+        "reasons": ["菜品与描述不符"],
+        "description": "牛肉面里没有牛肉",
+        "items": [],
+        "image_urls": [],
     }
     base.update(kwargs)
     return base
@@ -121,15 +123,18 @@ def _submit_payload(**kwargs) -> dict:
 # 场景 1: POST /api/v1/trade/refunds — 正常提交退款申请
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_submit_refund_success():
     """正常提交退款，DB INSERT 返回新 refund_id 和 created_at。"""
     db = _make_mock_db()
 
-    set_cfg   = MagicMock()
-    new_row   = _fake_row({
-        "id":         REFUND_ID,
-        "created_at": datetime.datetime(2026, 4, 4, 12, 0, 0),
-    })
+    set_cfg = MagicMock()
+    new_row = _fake_row(
+        {
+            "id": REFUND_ID,
+            "created_at": datetime.datetime(2026, 4, 4, 12, 0, 0),
+        }
+    )
     insert_result = _mappings_one(new_row)
 
     db.execute = AsyncMock(side_effect=[set_cfg, insert_result])
@@ -154,6 +159,7 @@ def test_submit_refund_success():
 # 场景 2: POST /api/v1/trade/refunds — refund_amount_fen=0 → 400
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_submit_refund_invalid_amount():
     """退款金额为 0 时路由层应提前校验并返回 400。"""
     db = _make_mock_db()
@@ -171,6 +177,7 @@ def test_submit_refund_invalid_amount():
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 场景 3: POST /api/v1/trade/refunds — DB 抛 SQLAlchemyError → 500
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 def test_submit_refund_db_error():
     """DB 写入失败时应回滚并返回 500。"""
@@ -199,21 +206,24 @@ def test_submit_refund_db_error():
 # 场景 4: GET /api/v1/trade/refunds/{id} — 正常查询，status=pending
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_get_refund_status_success():
     """存在的退款申请应返回完整字段，status=pending。"""
     db = _make_mock_db()
 
     set_cfg = MagicMock()
-    row     = _fake_row({
-        "id":                REFUND_ID,
-        "order_id":          ORDER_ID,
-        "status":            "pending",
-        "refund_amount_fen": 2000,
-        "refund_type":       "partial",
-        "review_note":       None,
-        "reviewed_at":       None,
-        "created_at":        datetime.datetime(2026, 4, 4, 12, 0, 0),
-    })
+    row = _fake_row(
+        {
+            "id": REFUND_ID,
+            "order_id": ORDER_ID,
+            "status": "pending",
+            "refund_amount_fen": 2000,
+            "refund_type": "partial",
+            "review_note": None,
+            "reviewed_at": None,
+            "created_at": datetime.datetime(2026, 4, 4, 12, 0, 0),
+        }
+    )
     select_result = _mappings_one_or_none(row)
 
     db.execute = AsyncMock(side_effect=[set_cfg, select_result])
@@ -236,11 +246,12 @@ def test_get_refund_status_success():
 # 场景 5: GET /api/v1/trade/refunds/{id} — 退款申请不存在 → 404
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_get_refund_status_not_found():
     """查询不存在的退款申请时应返回 404。"""
     db = _make_mock_db()
 
-    set_cfg       = MagicMock()
+    set_cfg = MagicMock()
     select_result = _mappings_one_or_none(None)
 
     db.execute = AsyncMock(side_effect=[set_cfg, select_result])
@@ -259,6 +270,7 @@ def test_get_refund_status_not_found():
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 场景 6: GET /api/v1/trade/refunds/{id} — 非 UUID 格式 → 400
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 def test_get_refund_status_invalid_uuid():
     """refund_id 不是合法 UUID 格式时路由应返回 400。"""

@@ -9,6 +9,7 @@
   POST /api/v1/banquet/deposits/{session_id}/apply  — 结账时抵扣定金（返回剩余应付）
   POST /api/v1/banquet/deposits/{session_id}/refund — 退定金
 """
+
 import asyncio
 import uuid
 from datetime import date, datetime, timezone
@@ -30,6 +31,7 @@ router = APIRouter(prefix="/api/v1/banquet/deposits", tags=["宴会定金抵扣"
 
 # ─── 依赖注入 ────────────────────────────────────────────────────────────────
 
+
 async def _get_tenant_db(x_tenant_id: str = Header(..., alias="X-Tenant-ID")):
     async for session in get_db_with_tenant(x_tenant_id):
         yield session
@@ -40,6 +42,7 @@ def _tid(x_tenant_id: str = Header(..., alias="X-Tenant-ID")) -> str:
 
 
 # ─── 请求模型 ─────────────────────────────────────────────────────────────────
+
 
 class DepositCreateRequest(BaseModel):
     session_id: str = Field(..., description="宴席场次 ID")
@@ -63,6 +66,7 @@ class DepositRefundRequest(BaseModel):
 
 # ─── 工具 ─────────────────────────────────────────────────────────────────────
 
+
 def _serialize(d: dict) -> dict:
     out = {}
     for k, v in d.items():
@@ -76,6 +80,7 @@ def _serialize(d: dict) -> dict:
 
 
 # ─── 收取定金 ────────────────────────────────────────────────────────────────
+
 
 @router.post("", summary="收取宴会定金（关联 session_id）")
 async def collect_deposit(
@@ -157,6 +162,7 @@ async def collect_deposit(
 
 # ─── 查询定金余额 ─────────────────────────────────────────────────────────────
 
+
 @router.get("/{session_id}", summary="查询场次定金余额")
 async def get_deposit_balance(
     session_id: str,
@@ -224,6 +230,7 @@ async def get_deposit_balance(
 
 
 # ─── 结账抵扣定金 ─────────────────────────────────────────────────────────────
+
 
 @router.post("/{session_id}/apply", summary="结账时抵扣定金（返回剩余应付）")
 async def apply_deposit(
@@ -330,6 +337,7 @@ async def apply_deposit(
 
 
 # ─── 退定金 ──────────────────────────────────────────────────────────────────
+
 
 @router.post("/{session_id}/refund", summary="退定金")
 async def refund_deposit(

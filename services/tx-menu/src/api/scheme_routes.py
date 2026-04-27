@@ -18,6 +18,7 @@
 统一响应格式: {"ok": bool, "data": {}, "error": {}}
 所有接口需 X-Tenant-ID header。
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -131,9 +132,7 @@ async def list_schemes(
             where += " AND ms.name ILIKE :kw"
             params["kw"] = f"%{keyword}%"
 
-        count_res = await db.execute(
-            text(f"SELECT COUNT(*) FROM menu_schemes ms {where}"), params
-        )
+        count_res = await db.execute(text(f"SELECT COUNT(*) FROM menu_schemes ms {where}"), params)
         total = count_res.scalar() or 0
 
         params["limit"] = size
@@ -453,13 +452,16 @@ async def publish_scheme(
     try:
         from shared.events.src.emitter import emit_event
         from shared.events.src.event_types import MenuEventType
-        asyncio.create_task(emit_event(
-            event_type=MenuEventType.PLAN_PUBLISHED,
-            tenant_id=str(tid),
-            stream_id=scheme_id,
-            payload={"version": next_version, "item_count": len(snapshot)},
-            source_service="tx-menu",
-        ))
+
+        asyncio.create_task(
+            emit_event(
+                event_type=MenuEventType.PLAN_PUBLISHED,
+                tenant_id=str(tid),
+                stream_id=scheme_id,
+                payload={"version": next_version, "item_count": len(snapshot)},
+                source_service="tx-menu",
+            )
+        )
     except Exception:  # noqa: BLE001 — 事件发射失败不影响主业务
         pass
 
@@ -572,17 +574,20 @@ async def distribute_scheme(
     try:
         from shared.events.src.emitter import emit_event
         from shared.events.src.event_types import MenuEventType
-        asyncio.create_task(emit_event(
-            event_type=MenuEventType.PLAN_DISTRIBUTED,
-            tenant_id=str(tid),
-            stream_id=scheme_id,
-            payload={
-                "store_ids": distributed_store_ids,
-                "version": current_version,
-                "distributed_by": req.operator,
-            },
-            source_service="tx-menu",
-        ))
+
+        asyncio.create_task(
+            emit_event(
+                event_type=MenuEventType.PLAN_DISTRIBUTED,
+                tenant_id=str(tid),
+                stream_id=scheme_id,
+                payload={
+                    "store_ids": distributed_store_ids,
+                    "version": current_version,
+                    "distributed_by": req.operator,
+                },
+                source_service="tx-menu",
+            )
+        )
     except Exception:  # noqa: BLE001 — 事件发射失败不影响主业务
         pass
 
@@ -760,8 +765,10 @@ async def get_store_menu(
         )
         row = latest.fetchone()
         if not row:
-            return {"ok": True, "data": {"items": [], "total": 0, "scheme_id": None,
-                                          "message": "该门店尚未下发任何菜谱方案"}}
+            return {
+                "ok": True,
+                "data": {"items": [], "total": 0, "scheme_id": None, "message": "该门店尚未下发任何菜谱方案"},
+            }
         sid = row[0]
 
     count_res = await db.execute(

@@ -20,6 +20,7 @@ Webhook 接收（外卖平台推送）：
   POST /api/v1/delivery/platforms          添加平台配置
   PUT  /api/v1/delivery/platforms/{id}     更新配置（费率等）
 """
+
 from __future__ import annotations
 
 import uuid
@@ -54,8 +55,7 @@ class PlatformConfigCreate(BaseModel):
     app_id: str = Field(..., min_length=1, max_length=100)
     app_secret: str = Field(..., min_length=1)
     shop_id: str = Field(..., min_length=1, max_length=100)
-    commission_rate: float = Field(default=0.18, ge=0.0, le=1.0,
-                                   description="佣金费率，如 0.18 表示 18%")
+    commission_rate: float = Field(default=0.18, ge=0.0, le=1.0, description="佣金费率，如 0.18 表示 18%")
 
 
 class PlatformConfigUpdate(BaseModel):
@@ -68,6 +68,7 @@ class PlatformConfigUpdate(BaseModel):
 # ─────────────────────────────────────────────────────────────────
 # Webhook：外卖平台订单推送
 # ─────────────────────────────────────────────────────────────────
+
 
 async def _handle_webhook(
     platform: str,
@@ -106,10 +107,12 @@ async def _handle_webhook(
     #   3. 如签名不通过 → return {"code": 1, "msg": "签名校验失败"}（各平台有不同错误协议）
     #   4. 调用 _aggregator.receive_order(platform, payload, tenant_id, ...)
 
-    log.info("delivery_webhook_received",
-             platform=platform,
-             body_size=len(raw_body),
-             note="生产环境需查询配置、验证签名、写入DB")
+    log.info(
+        "delivery_webhook_received",
+        platform=platform,
+        body_size=len(raw_body),
+        note="生产环境需查询配置、验证签名、写入DB",
+    )
 
     # 骨架响应（各平台均接受此格式，生产环境按平台要求调整）
     return {"ok": True, "data": {"platform": platform, "status": "received"}}
@@ -192,14 +195,13 @@ async def webhook_douyin(
 # 订单管理
 # ─────────────────────────────────────────────────────────────────
 
+
 @router.get("/orders", summary="外卖订单列表")
 async def list_delivery_orders(
-    platform: Optional[str] = Query(None, pattern="^(meituan|eleme|douyin)$",
-                                    description="按平台筛选"),
+    platform: Optional[str] = Query(None, pattern="^(meituan|eleme|douyin)$", description="按平台筛选"),
     status: Optional[str] = Query(None, description="按状态筛选"),
     store_id: Optional[UUID] = Query(None, description="按门店筛选"),
-    date_str: Optional[str] = Query(None, alias="date",
-                                    description="日期筛选 YYYY-MM-DD"),
+    date_str: Optional[str] = Query(None, alias="date", description="日期筛选 YYYY-MM-DD"),
     page: int = Query(default=1, ge=1),
     size: int = Query(default=20, ge=1, le=100),
     x_tenant_id: str = Header(default="", alias="X-Tenant-ID"),
@@ -326,12 +328,11 @@ async def reject_delivery_order(
 # 数据统计
 # ─────────────────────────────────────────────────────────────────
 
+
 @router.get("/stats/daily", summary="外卖日统计（各平台汇总）")
 async def delivery_daily_stats(
     store_id: UUID = Query(..., description="门店 ID"),
-    date_str: Optional[str] = Query(
-        None, alias="date", description="日期 YYYY-MM-DD，默认今日"
-    ),
+    date_str: Optional[str] = Query(None, alias="date", description="日期 YYYY-MM-DD，默认今日"),
     x_tenant_id: str = Header(default="", alias="X-Tenant-ID"),
 ):
     """
@@ -432,6 +433,7 @@ async def delivery_commission_stats(
 # 平台配置管理
 # ─────────────────────────────────────────────────────────────────
 
+
 @router.get("/platforms", summary="平台配置列表")
 async def list_platform_configs(
     store_id: Optional[UUID] = Query(None, description="按门店筛选"),
@@ -478,9 +480,11 @@ async def create_platform_config(
             raise HTTPException(status_code=400, detail="缺少 X-Tenant-ID")
 
         config_id = str(uuid.uuid4())
-        log.info("delivery_create_platform_config",
-                 config_id=config_id,
-                 note="生产环境需加密 app_secret 后写入 delivery_platform_configs")
+        log.info(
+            "delivery_create_platform_config",
+            config_id=config_id,
+            note="生产环境需加密 app_secret 后写入 delivery_platform_configs",
+        )
 
         return {
             "ok": True,
@@ -526,9 +530,11 @@ async def update_platform_config(
         if body.model_dump(exclude_none=True) == {}:
             raise HTTPException(status_code=400, detail="未提供任何更新字段")
 
-        log.info("delivery_update_platform_config",
-                 update_fields=list(body.model_dump(exclude_none=True).keys()),
-                 note="生产环境需更新 delivery_platform_configs 表")
+        log.info(
+            "delivery_update_platform_config",
+            update_fields=list(body.model_dump(exclude_none=True).keys()),
+            note="生产环境需更新 delivery_platform_configs 表",
+        )
 
         return {
             "ok": True,

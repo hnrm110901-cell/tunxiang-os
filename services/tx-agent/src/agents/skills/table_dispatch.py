@@ -3,6 +3,7 @@
 能力：桌台利用率分析、最优桌台推荐、等位时间预测
 通过 ModelRouter (MODERATE) 调用 LLM 生成调度建议。
 """
+
 from typing import Any
 
 import structlog
@@ -62,7 +63,8 @@ class TableDispatchAgent(SkillAgent):
 
         if not tables:
             return AgentResult(
-                success=True, action="suggest_seating",
+                success=True,
+                action="suggest_seating",
                 data={"recommended_table": None, "reason": "无可用桌台，建议等位"},
                 reasoning="当前无空闲桌台",
                 confidence=0.9,
@@ -106,7 +108,8 @@ class TableDispatchAgent(SkillAgent):
         best = scored[0] if scored else None
 
         return AgentResult(
-            success=True, action="suggest_seating",
+            success=True,
+            action="suggest_seating",
             data={
                 "recommended_table": best,
                 "alternatives": scored[1:3],
@@ -115,7 +118,7 @@ class TableDispatchAgent(SkillAgent):
                 "total_evaluated": len(scored),
             },
             reasoning=f"为 {party_size} 人{'VIP' if is_vip else ''}推荐桌台 {best.get('table_id', '?') if best else '无'}，"
-                      f"评分 {best.get('match_score', 0) if best else 0}",
+            f"评分 {best.get('match_score', 0) if best else 0}",
             confidence=0.85,
         )
 
@@ -127,7 +130,8 @@ class TableDispatchAgent(SkillAgent):
 
         if not tables:
             return AgentResult(
-                success=False, action="analyze_utilization",
+                success=False,
+                action="analyze_utilization",
                 error="无桌台数据",
             )
 
@@ -148,8 +152,13 @@ class TableDispatchAgent(SkillAgent):
             total_capacity_minutes += capacity_min
 
             if ttype not in type_stats:
-                type_stats[ttype] = {"count": 0, "total_occupied_min": 0, "total_capacity_min": 0,
-                                     "total_seats": 0, "total_covers": 0}
+                type_stats[ttype] = {
+                    "count": 0,
+                    "total_occupied_min": 0,
+                    "total_capacity_min": 0,
+                    "total_seats": 0,
+                    "total_covers": 0,
+                }
             type_stats[ttype]["count"] += 1
             type_stats[ttype]["total_occupied_min"] += occupied_min
             type_stats[ttype]["total_capacity_min"] += capacity_min
@@ -171,12 +180,17 @@ class TableDispatchAgent(SkillAgent):
 
         if model_router:
             model_router.log_call(
-                task_type="kpi_summary", model=model,
-                input_tokens=0, output_tokens=0, latency_ms=0, success=True,
+                task_type="kpi_summary",
+                model=model,
+                input_tokens=0,
+                output_tokens=0,
+                latency_ms=0,
+                success=True,
             )
 
         return AgentResult(
-            success=True, action="analyze_utilization",
+            success=True,
+            action="analyze_utilization",
             data={
                 "store_id": store_id,
                 "overall_utilization": round(overall_utilization, 4),
@@ -185,8 +199,7 @@ class TableDispatchAgent(SkillAgent):
                 "period_hours": period_hours,
                 "total_tables": len(tables),
             },
-            reasoning=f"门店 {store_id} 整体桌台利用率 {overall_utilization:.0%}，"
-                      f"共 {len(suggestions)} 条优化建议",
+            reasoning=f"门店 {store_id} 整体桌台利用率 {overall_utilization:.0%}，共 {len(suggestions)} 条优化建议",
             confidence=0.8,
         )
 
@@ -220,7 +233,8 @@ class TableDispatchAgent(SkillAgent):
         suggestion = "预计等待时间可接受" if is_acceptable else "建议引导顾客到附近门店或提供等位优惠"
 
         return AgentResult(
-            success=True, action="predict_wait",
+            success=True,
+            action="predict_wait",
             data={
                 "store_id": store_id,
                 "predicted_wait_minutes": predicted_wait,
@@ -230,6 +244,6 @@ class TableDispatchAgent(SkillAgent):
                 "party_size": party_size,
             },
             reasoning=f"门店 {store_id} 预计等位 {predicted_wait} 分钟，"
-                      f"排队 {current_queue} 组，{'可接受' if is_acceptable else '超阈值'}",
+            f"排队 {current_queue} 组，{'可接受' if is_acceptable else '超阈值'}",
             confidence=0.75 if current_queue > 0 else 0.9,
         )

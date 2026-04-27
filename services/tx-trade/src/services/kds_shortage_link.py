@@ -8,6 +8,7 @@
 
 同时提供出品节拍分析和出品顺序优化。
 """
+
 import uuid
 from datetime import date, datetime, timezone
 
@@ -83,22 +84,28 @@ def register_ingredient_dishes(ingredient_id: str, dish_ids: list[str]) -> None:
 
 
 def add_production_record(
-    store_id: str, dept_id: str, tenant_id: str,
-    task_id: str, dish_name: str,
-    started_at: str, finished_at: str,
+    store_id: str,
+    dept_id: str,
+    tenant_id: str,
+    task_id: str,
+    dish_name: str,
+    started_at: str,
+    finished_at: str,
     duration_sec: int,
 ) -> None:
     """添加出品记录（供 KDS 动作回调使用）。"""
     key = _dept_key(store_id, dept_id, tenant_id)
     records = _production_records.setdefault(key, [])
-    records.append({
-        "task_id": task_id,
-        "dept_id": dept_id,
-        "dish_name": dish_name,
-        "started_at": started_at,
-        "finished_at": finished_at,
-        "duration_sec": duration_sec,
-    })
+    records.append(
+        {
+            "task_id": task_id,
+            "dept_id": dept_id,
+            "dish_name": dish_name,
+            "started_at": started_at,
+            "finished_at": finished_at,
+            "duration_sec": duration_sec,
+        }
+    )
 
 
 # ─── B4-1: 缺料上报联动 ───
@@ -132,8 +139,10 @@ async def on_shortage_reported(
          "notification_sent": bool, "purchase_suggestion": dict|None}
     """
     log = logger.bind(
-        task_id=task_id, ingredient_id=ingredient_id,
-        store_id=store_id, tenant_id=tenant_id,
+        task_id=task_id,
+        ingredient_id=ingredient_id,
+        store_id=store_id,
+        tenant_id=tenant_id,
     )
 
     await _set_tenant(db, tenant_id)
@@ -197,7 +206,7 @@ async def on_shortage_reported(
         "actual_quantity": actual_quantity,
         "dishes_sold_out": dishes_sold_out,
         "message": f"{'已确认缺料' if stock_verified else '库存尚有余量，请人工核实'}: "
-                   f"{ingredient_name or ingredient_id}",
+        f"{ingredient_name or ingredient_id}",
         "severity": "critical" if stock_verified else "warning",
         "created_at": _now().isoformat(),
     }
@@ -389,12 +398,14 @@ async def optimize_production_sequence(
 
     optimized_sequence = []
     for i, (dish, avg_time) in enumerate(sorted_dishes):
-        optimized_sequence.append({
-            "rank": i + 1,
-            "dish_name": dish,
-            "avg_duration_sec": avg_time,
-            "priority": "high" if avg_time <= 120 else "normal",
-        })
+        optimized_sequence.append(
+            {
+                "rank": i + 1,
+                "dish_name": dish,
+                "avg_duration_sec": avg_time,
+                "priority": "high" if avg_time <= 120 else "normal",
+            }
+        )
 
     # 估算节省时间（SJF vs FCFS）
     if len(sorted_dishes) > 1:

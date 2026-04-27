@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from datetime import date, datetime
 from typing import Any, Optional
 
 import structlog
@@ -21,10 +20,8 @@ _ROLE_SKILLS: dict[str, list[str]] = {
     "waiter": ["服务礼仪", "菜品知识", "点单操作", "客诉处理", "卫生规范"],
     "chef": ["刀工", "烹饪技术", "食品安全", "成本控制", "出品标准"],
     "cashier": ["收银操作", "支付方式", "会员系统", "对账结算", "基础服务"],
-    "manager": ["团队管理", "排班调度", "成本分析", "客户关系", "合规管理",
-                 "数据分析", "培训带教"],
-    "head_chef": ["菜品研发", "厨房管理", "供应链协调", "食品安全", "成本控制",
-                   "出品标准", "团队带教"],
+    "manager": ["团队管理", "排班调度", "成本分析", "客户关系", "合规管理", "数据分析", "培训带教"],
+    "head_chef": ["菜品研发", "厨房管理", "供应链协调", "食品安全", "成本控制", "出品标准", "团队带教"],
 }
 
 # 晋升路径
@@ -36,18 +33,72 @@ _PROMOTION_PATH: dict[str, str] = {
 
 # 培训课程库（简化）
 _TRAINING_COURSES: list[dict[str, Any]] = [
-    {"id": "TC001", "name": "服务礼仪与沟通", "skills": ["服务礼仪", "客诉处理"], "duration_hours": 8, "level": "basic"},
-    {"id": "TC002", "name": "菜品知识深度学习", "skills": ["菜品知识", "出品标准"], "duration_hours": 12, "level": "basic"},
-    {"id": "TC003", "name": "食品安全与卫生", "skills": ["食品安全", "卫生规范"], "duration_hours": 6, "level": "basic"},
-    {"id": "TC004", "name": "收银系统操作", "skills": ["收银操作", "支付方式", "会员系统"], "duration_hours": 4, "level": "basic"},
-    {"id": "TC005", "name": "门店管理基础", "skills": ["团队管理", "排班调度"], "duration_hours": 16, "level": "intermediate"},
-    {"id": "TC006", "name": "成本分析与控制", "skills": ["成本分析", "成本控制"], "duration_hours": 12, "level": "intermediate"},
+    {
+        "id": "TC001",
+        "name": "服务礼仪与沟通",
+        "skills": ["服务礼仪", "客诉处理"],
+        "duration_hours": 8,
+        "level": "basic",
+    },
+    {
+        "id": "TC002",
+        "name": "菜品知识深度学习",
+        "skills": ["菜品知识", "出品标准"],
+        "duration_hours": 12,
+        "level": "basic",
+    },
+    {
+        "id": "TC003",
+        "name": "食品安全与卫生",
+        "skills": ["食品安全", "卫生规范"],
+        "duration_hours": 6,
+        "level": "basic",
+    },
+    {
+        "id": "TC004",
+        "name": "收银系统操作",
+        "skills": ["收银操作", "支付方式", "会员系统"],
+        "duration_hours": 4,
+        "level": "basic",
+    },
+    {
+        "id": "TC005",
+        "name": "门店管理基础",
+        "skills": ["团队管理", "排班调度"],
+        "duration_hours": 16,
+        "level": "intermediate",
+    },
+    {
+        "id": "TC006",
+        "name": "成本分析与控制",
+        "skills": ["成本分析", "成本控制"],
+        "duration_hours": 12,
+        "level": "intermediate",
+    },
     {"id": "TC007", "name": "数据分析入门", "skills": ["数据分析"], "duration_hours": 10, "level": "intermediate"},
-    {"id": "TC008", "name": "客户关系管理", "skills": ["客户关系", "客诉处理"], "duration_hours": 8, "level": "intermediate"},
-    {"id": "TC009", "name": "培训带教方法", "skills": ["培训带教", "团队带教"], "duration_hours": 8, "level": "advanced"},
+    {
+        "id": "TC008",
+        "name": "客户关系管理",
+        "skills": ["客户关系", "客诉处理"],
+        "duration_hours": 8,
+        "level": "intermediate",
+    },
+    {
+        "id": "TC009",
+        "name": "培训带教方法",
+        "skills": ["培训带教", "团队带教"],
+        "duration_hours": 8,
+        "level": "advanced",
+    },
     {"id": "TC010", "name": "合规管理实务", "skills": ["合规管理"], "duration_hours": 6, "level": "advanced"},
     {"id": "TC011", "name": "菜品研发与创新", "skills": ["菜品研发"], "duration_hours": 16, "level": "advanced"},
-    {"id": "TC012", "name": "厨房管理与协调", "skills": ["厨房管理", "供应链协调"], "duration_hours": 12, "level": "advanced"},
+    {
+        "id": "TC012",
+        "name": "厨房管理与协调",
+        "skills": ["厨房管理", "供应链协调"],
+        "duration_hours": 12,
+        "level": "advanced",
+    },
 ]
 
 _LEVEL_ORDER = {"basic": 1, "intermediate": 2, "advanced": 3}
@@ -89,11 +140,13 @@ def _match_courses(skill_gaps: list[str]) -> list[dict[str, Any]]:
     for course in _TRAINING_COURSES:
         overlap = gap_set & set(course["skills"])
         if overlap:
-            matched.append({
-                **course,
-                "matched_skills": sorted(overlap),
-                "relevance": len(overlap) / max(1, len(course["skills"])),
-            })
+            matched.append(
+                {
+                    **course,
+                    "matched_skills": sorted(overlap),
+                    "relevance": len(overlap) / max(1, len(course["skills"])),
+                }
+            )
     matched.sort(key=lambda c: (_LEVEL_ORDER.get(c["level"], 99), -c["relevance"]))
     return matched
 
@@ -111,13 +164,15 @@ def _build_growth_plan(
     current_gaps = gaps.get("current_role_gaps", [])
     current_courses = [c for c in courses if set(c["matched_skills"]) & set(current_gaps)]
     if current_courses:
-        phases.append({
-            "phase": 1,
-            "name": "岗位技能补齐",
-            "description": f"补齐{role}岗位所需的基础技能",
-            "courses": current_courses[:3],
-            "estimated_hours": sum(c["duration_hours"] for c in current_courses[:3]),
-        })
+        phases.append(
+            {
+                "phase": 1,
+                "name": "岗位技能补齐",
+                "description": f"补齐{role}岗位所需的基础技能",
+                "courses": current_courses[:3],
+                "estimated_hours": sum(c["duration_hours"] for c in current_courses[:3]),
+            }
+        )
 
     # Phase 2: 晋升技能准备
     promotion_gaps = gaps.get("promotion_gaps", [])
@@ -128,13 +183,15 @@ def _build_growth_plan(
         phase1_ids = {c["id"] for c in (phases[0]["courses"] if phases else [])}
         promo_courses = [c for c in promo_courses if c["id"] not in phase1_ids]
         if promo_courses:
-            phases.append({
-                "phase": 2,
-                "name": f"晋升{promotion_role}准备",
-                "description": f"为晋升{promotion_role}岗位储备所需技能",
-                "courses": promo_courses[:4],
-                "estimated_hours": sum(c["duration_hours"] for c in promo_courses[:4]),
-            })
+            phases.append(
+                {
+                    "phase": 2,
+                    "name": f"晋升{promotion_role}准备",
+                    "description": f"为晋升{promotion_role}岗位储备所需技能",
+                    "courses": promo_courses[:4],
+                    "estimated_hours": sum(c["duration_hours"] for c in promo_courses[:4]),
+                }
+            )
 
     total_hours = sum(p["estimated_hours"] for p in phases)
     return {
@@ -214,6 +271,12 @@ class GrowthCoachAgent(SkillAgent):
     priority = "P2"
     run_location = "cloud"
 
+    # Sprint D1 / PR 批次 6：纯培训路径推荐，不触发业务决策，豁免
+    constraint_scope = set()
+    constraint_waived_reason = (
+        "成长教练纯员工技能差距分析与个性化培训路径推荐，不直接操作毛利/食安/客户体验三条业务约束维度"
+    )
+
     def get_supported_actions(self) -> list[str]:
         return [
             "analyze_skill_gaps",
@@ -250,8 +313,7 @@ class GrowthCoachAgent(SkillAgent):
         """分析技能差距。"""
         employee_id = params.get("employee_id")
         if not employee_id:
-            return AgentResult(success=False, action="analyze_skill_gaps",
-                               error="缺少 employee_id")
+            return AgentResult(success=False, action="analyze_skill_gaps", error="缺少 employee_id")
 
         if not self._db:
             logger.warning("growth_gaps_no_db", tenant_id=self.tenant_id)
@@ -330,8 +392,7 @@ class GrowthCoachAgent(SkillAgent):
         """创建完整成长计划。"""
         employee_id = params.get("employee_id")
         if not employee_id:
-            return AgentResult(success=False, action="create_growth_plan",
-                               error="缺少 employee_id")
+            return AgentResult(success=False, action="create_growth_plan", error="缺少 employee_id")
 
         if not self._db:
             logger.warning("growth_plan_no_db", tenant_id=self.tenant_id)
@@ -343,8 +404,7 @@ class GrowthCoachAgent(SkillAgent):
 
         emp = await _load_employee_skills(self._db, self.tenant_id, employee_id)
         if not emp:
-            return AgentResult(success=False, action="create_growth_plan",
-                               error=f"未找到员工 {employee_id}")
+            return AgentResult(success=False, action="create_growth_plan", error=f"未找到员工 {employee_id}")
 
         role = str(emp.get("role") or "waiter").lower()
         emp_name = emp.get("emp_name") or employee_id
@@ -431,9 +491,7 @@ class GrowthCoachAgent(SkillAgent):
             )
 
         # 1. 映射技能需求
-        required_skills = self._CUISINE_SKILL_MAP.get(
-            cuisine_type, []
-        )
+        required_skills = self._CUISINE_SKILL_MAP.get(cuisine_type, [])
         if not required_skills:
             return AgentResult(
                 success=False,
@@ -442,9 +500,7 @@ class GrowthCoachAgent(SkillAgent):
             )
 
         # 2. 扫描门店厨师技能
-        store_coverage = await self._scan_store_chef_skills(
-            required_skills, store_ids
-        )
+        store_coverage = await self._scan_store_chef_skills(required_skills, store_ids)
 
         # 3. 识别技能缺口
         gaps: list[dict[str, Any]] = []
@@ -454,62 +510,64 @@ class GrowthCoachAgent(SkillAgent):
         for store in store_coverage:
             missing = store.get("missing_skills", [])
             if missing:
-                gaps.append({
-                    "store_id": store["store_id"],
-                    "store_name": store["store_name"],
-                    "missing_skills": missing,
-                    "missing_labels": [
-                        self._SKILL_LABELS.get(s, s) for s in missing
-                    ],
-                    "gap_count": len(missing),
-                    "action": "需要培训" if len(missing) <= 2 else "需要招聘",
-                })
+                gaps.append(
+                    {
+                        "store_id": store["store_id"],
+                        "store_name": store["store_name"],
+                        "missing_skills": missing,
+                        "missing_labels": [self._SKILL_LABELS.get(s, s) for s in missing],
+                        "gap_count": len(missing),
+                        "action": "需要培训" if len(missing) <= 2 else "需要招聘",
+                    }
+                )
                 # 为每个缺失技能匹配培训课程
                 for skill in missing:
                     label = self._SKILL_LABELS.get(skill, skill)
-                    training_plans.append({
-                        "store_id": store["store_id"],
-                        "store_name": store["store_name"],
-                        "skill": skill,
-                        "skill_label": label,
-                        "course_name": f"{label}专项培训",
-                        "target_trainees": store.get("chef_count", 0),
-                        "estimated_hours": 16,
-                    })
+                    training_plans.append(
+                        {
+                            "store_id": store["store_id"],
+                            "store_name": store["store_name"],
+                            "skill": skill,
+                            "skill_label": label,
+                            "course_name": f"{label}专项培训",
+                            "target_trainees": store.get("chef_count", 0),
+                            "estimated_hours": 16,
+                        }
+                    )
 
             # 收集可借调厨师
             for chef in store.get("qualified_chefs", []):
-                transferable_chefs.append({
-                    "employee_id": chef["employee_id"],
-                    "emp_name": chef["emp_name"],
-                    "store_id": store["store_id"],
-                    "store_name": store["store_name"],
-                    "matched_skills": chef.get("matched_skills", []),
-                    "matched_labels": [
-                        self._SKILL_LABELS.get(s, s) for s in chef.get("matched_skills", [])
-                    ],
-                })
+                transferable_chefs.append(
+                    {
+                        "employee_id": chef["employee_id"],
+                        "emp_name": chef["emp_name"],
+                        "store_id": store["store_id"],
+                        "store_name": store["store_name"],
+                        "matched_skills": chef.get("matched_skills", []),
+                        "matched_labels": [self._SKILL_LABELS.get(s, s) for s in chef.get("matched_skills", [])],
+                    }
+                )
 
         # 构建热力图数据（门店 x 技能）
         heatmap: list[dict[str, Any]] = []
         for store in store_coverage:
             for skill in required_skills:
                 count = store.get("skill_counts", {}).get(skill, 0)
-                heatmap.append({
-                    "store_id": store["store_id"],
-                    "store_name": store["store_name"],
-                    "skill": skill,
-                    "skill_label": self._SKILL_LABELS.get(skill, skill),
-                    "count": count,
-                })
+                heatmap.append(
+                    {
+                        "store_id": store["store_id"],
+                        "store_name": store["store_name"],
+                        "skill": skill,
+                        "skill_label": self._SKILL_LABELS.get(skill, skill),
+                        "count": count,
+                    }
+                )
 
         data = {
             "cuisine_type": cuisine_type,
             "dish_name": dish_name,
             "required_skills": required_skills,
-            "required_skill_labels": [
-                self._SKILL_LABELS.get(s, s) for s in required_skills
-            ],
+            "required_skill_labels": [self._SKILL_LABELS.get(s, s) for s in required_skills],
             "store_count": len(store_coverage),
             "gap_store_count": len(gaps),
             "store_gaps": gaps,
@@ -593,11 +651,13 @@ class GrowthCoachAgent(SkillAgent):
             if isinstance(tags, str):
                 tags = [t.strip() for t in tags.split(",") if t.strip()]
 
-            store_map[sid]["chefs"].append({
-                "employee_id": r["employee_id"],
-                "emp_name": r.get("emp_name", ""),
-                "skills": tags,
-            })
+            store_map[sid]["chefs"].append(
+                {
+                    "employee_id": r["employee_id"],
+                    "emp_name": r.get("emp_name", ""),
+                    "skills": tags,
+                }
+            )
             store_map[sid]["chef_count"] += 1
             for tag in tags:
                 store_map[sid]["skill_counts"][tag] += 1
@@ -610,18 +670,21 @@ class GrowthCoachAgent(SkillAgent):
             for chef in store["chefs"]:
                 matched = [s for s in required_skills if s in chef["skills"]]
                 if matched:
-                    qualified.append({
-                        "employee_id": chef["employee_id"],
-                        "emp_name": chef["emp_name"],
-                        "matched_skills": matched,
-                    })
-            results.append({
-                "store_id": store["store_id"],
-                "store_name": store["store_name"],
-                "chef_count": store["chef_count"],
-                "skill_counts": dict(counts),
-                "missing_skills": missing,
-                "qualified_chefs": qualified,
-            })
+                    qualified.append(
+                        {
+                            "employee_id": chef["employee_id"],
+                            "emp_name": chef["emp_name"],
+                            "matched_skills": matched,
+                        }
+                    )
+            results.append(
+                {
+                    "store_id": store["store_id"],
+                    "store_name": store["store_name"],
+                    "chef_count": store["chef_count"],
+                    "skill_counts": dict(counts),
+                    "missing_skills": missing,
+                    "qualified_chefs": qualified,
+                }
+            )
         return results
-

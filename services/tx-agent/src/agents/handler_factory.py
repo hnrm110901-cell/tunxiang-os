@@ -3,6 +3,7 @@
 使用工厂模式创建 handler 函数，每个 handler 调用 MasterAgent.dispatch()
 执行对应 Skill Agent 的动作。
 """
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Callable

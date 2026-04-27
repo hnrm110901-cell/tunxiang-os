@@ -1,4 +1,5 @@
 """日计划 Agent 测试"""
+
 import asyncio
 import os
 import sys
@@ -70,7 +71,10 @@ class TestGeneratePlan:
         agent = DailyPlannerAgent(tenant_id="t1", store_id="s1")
         plan = asyncio.run(agent.generate_daily_plan())
         s = plan["summary"]
-        assert s["total_items"] == s["menu_count"] + s["procurement_count"] + s["staffing_count"] + s["marketing_count"] + s["risk_count"]
+        assert (
+            s["total_items"]
+            == s["menu_count"] + s["procurement_count"] + s["staffing_count"] + s["marketing_count"] + s["risk_count"]
+        )
 
     def test_expected_saving(self):
         agent = DailyPlannerAgent(tenant_id="t1", store_id="s1")

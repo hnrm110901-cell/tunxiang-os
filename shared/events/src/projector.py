@@ -24,13 +24,13 @@
     projector = DiscountHealthProjector(tenant_id=uuid)
     await projector.run()  # 启动监听循环
 """
+
 from __future__ import annotations
 
 import asyncio
 import json
 import os
 from abc import ABC, abstractmethod
-from datetime import datetime, timezone
 from typing import Any, Optional, Set
 from uuid import UUID
 
@@ -43,8 +43,8 @@ DATABASE_URL: str = os.getenv(
     "postgresql://postgres:postgres@localhost:5432/tunxiang",
 )
 
-_BATCH_SIZE = 100          # 每批处理事件数
-_POLL_INTERVAL = 5.0       # 无通知时轮询间隔（秒）
+_BATCH_SIZE = 100  # 每批处理事件数
+_POLL_INTERVAL = 5.0  # 无通知时轮询间隔（秒）
 _NOTIFY_CHANNEL = "event_inserted"
 
 
@@ -212,9 +212,7 @@ class ProjectorBase(ABC):
                     for row in batch:
                         event = dict(row)
                         event["payload"] = (
-                            json.loads(event["payload"])
-                            if isinstance(event["payload"], str)
-                            else event["payload"]
+                            json.loads(event["payload"]) if isinstance(event["payload"], str) else event["payload"]
                         )
                         event["metadata"] = (
                             json.loads(event["metadata"])
@@ -296,8 +294,8 @@ class ProjectorBase(ABC):
                 params.append(last_occurred_at)
                 params.append(str(last_event_id) if last_event_id else "")
                 time_clause = (
-                    f"AND (occurred_at > ${len(params)-1} OR "
-                    f"(occurred_at = ${len(params)-1} AND event_id::TEXT > ${len(params)}))"
+                    f"AND (occurred_at > ${len(params) - 1} OR "
+                    f"(occurred_at = ${len(params) - 1} AND event_id::TEXT > ${len(params)}))"
                 )
 
             params.append(_BATCH_SIZE)
@@ -312,7 +310,7 @@ class ProjectorBase(ABC):
                   {time_clause}
                 ORDER BY occurred_at ASC, event_id ASC
                 LIMIT ${len(params)}
-                """,
+                """,  # noqa: S608 — type_filter/time_clause 由本模块构造，非用户输入
                 *params,
             )
 

@@ -16,13 +16,13 @@ stored_value_card_routes.py (9 端点，选5个代表性场景):
 9.  POST /stored-value-cards/{card_id}/consume                   — 余额不足 → 400
 10. POST /stored-value-cards/{card_id}/recharge                  — 缺少 X-Tenant-ID → 422
 """
+
 import os
 import sys
 import types
 import uuid
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
-import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from sqlalchemy.exc import OperationalError
@@ -32,6 +32,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 
 # ─── 共享存根：在导入路由前注入 ──────────────────────────────────────────────
+
 
 def _inject_stubs():
     """向 sys.modules 注入所有相对导入所需的存根模块。"""
@@ -85,12 +86,28 @@ def _make_sv_svc_stub():
     svc = MagicMock()
     # 默认所有异步方法返回空 dict
     for method in (
-        "get_balance", "recharge_direct", "consume_by_id", "refund_direct",
-        "transfer", "get_transactions_by_id", "process_expiry_batch",
-        "create_card", "get_card_by_id", "recharge_by_plan",
-        "refund_by_transaction", "get_card", "recharge", "consume",
-        "refund", "freeze", "unfreeze", "freeze_by_id", "unfreeze_by_id",
-        "list_cards_by_customer", "list_recharge_plans", "create_recharge_plan",
+        "get_balance",
+        "recharge_direct",
+        "consume_by_id",
+        "refund_direct",
+        "transfer",
+        "get_transactions_by_id",
+        "process_expiry_batch",
+        "create_card",
+        "get_card_by_id",
+        "recharge_by_plan",
+        "refund_by_transaction",
+        "get_card",
+        "recharge",
+        "consume",
+        "refund",
+        "freeze",
+        "unfreeze",
+        "freeze_by_id",
+        "unfreeze_by_id",
+        "list_cards_by_customer",
+        "list_recharge_plans",
+        "create_recharge_plan",
     ):
         setattr(svc, method, AsyncMock(return_value={}))
     return svc
@@ -99,14 +116,18 @@ def _make_sv_svc_stub():
 # ─── 注入 services.stored_value_service 存根 ────────────────────────────────
 #    stored_value_card_routes 用裸的 `services.stored_value_service`（非相对导入）
 
+
 class CardNotActiveError(Exception):
     pass
+
 
 class InsufficientBalanceError(Exception):
     pass
 
+
 class PlanNotFoundError(Exception):
     pass
+
 
 class TransferNotAllowedError(Exception):
     pass
@@ -147,6 +168,7 @@ sys.modules["src.services.stored_value_service"] = _src_svc
 
 # ─── 辅助 ───────────────────────────────────────────────────────────────────
 
+
 def _uid() -> str:
     return str(uuid.uuid4())
 
@@ -163,7 +185,7 @@ import importlib  # noqa: E402
 
 # --- stored_value_routes ---
 sv_routes_mod = importlib.import_module("api.stored_value_routes")
-sv_svc: MagicMock = sv_routes_mod.svc          # 路由文件中模块级单例
+sv_svc: MagicMock = sv_routes_mod.svc  # 路由文件中模块级单例
 
 sv_app = FastAPI()
 sv_app.include_router(sv_routes_mod.router)
@@ -171,14 +193,16 @@ sv_app.include_router(sv_routes_mod.router)
 
 def _sv_db_override(db_mock):
     """替换 _get_tenant_db 依赖。"""
+
     async def _dep():
         return db_mock
+
     sv_app.dependency_overrides[sv_routes_mod._get_tenant_db] = _dep
 
 
 # --- stored_value_card_routes ---
 svc_routes_mod = importlib.import_module("api.stored_value_card_routes")
-svc_svc: MagicMock = svc_routes_mod._svc       # 路由文件中模块级单例
+svc_svc: MagicMock = svc_routes_mod._svc  # 路由文件中模块级单例
 
 svc_app = FastAPI()
 svc_app.include_router(svc_routes_mod.router)
@@ -187,6 +211,7 @@ svc_app.include_router(svc_routes_mod.router)
 def _svc_db_override(db_mock):
     async def _dep():
         return db_mock
+
     svc_app.dependency_overrides[svc_routes_mod._get_tenant_db] = _dep
 
 
@@ -195,6 +220,7 @@ def _svc_db_override(db_mock):
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 # ── 场景 1: GET /accounts/{card_id}/balance — 正常查询 ─────────────────────
+
 
 def test_sv_account_balance_ok():
     """账户余额查询成功，返回 ok=True 及余额字段。"""
@@ -223,6 +249,7 @@ def test_sv_account_balance_ok():
 
 # ── 场景 2: GET /accounts/{card_id}/balance — 卡不存在 → 404 ───────────────
 
+
 def test_sv_account_balance_not_found():
     """get_balance 抛 ValueError（卡不存在）时应返回 404。"""
     db = AsyncMock()
@@ -240,6 +267,7 @@ def test_sv_account_balance_not_found():
 
 
 # ── 场景 3: POST /accounts/{card_id}/recharge — 正常充值 ───────────────────
+
 
 def test_sv_account_recharge_ok(monkeypatch):
     """充值成功时返回 ok=True 及新余额。"""
@@ -270,12 +298,11 @@ def test_sv_account_recharge_ok(monkeypatch):
 
 # ── 场景 4: POST /accounts/{card_id}/recharge — DB 错误 → 500 ──────────────
 
+
 def test_sv_account_recharge_db_error(monkeypatch):
     """数据库 OperationalError 未被业务层捕获时，FastAPI 应返回 500。"""
     db = AsyncMock()
-    sv_svc.recharge_direct = AsyncMock(
-        side_effect=OperationalError("connection lost", None, None)
-    )
+    sv_svc.recharge_direct = AsyncMock(side_effect=OperationalError("connection lost", None, None))
     monkeypatch.setattr("api.stored_value_routes.asyncio.create_task", lambda coro: None)
     _sv_db_override(db)
 
@@ -291,12 +318,13 @@ def test_sv_account_recharge_db_error(monkeypatch):
 
 # ── 场景 5: POST /cards — 缺少必填字段 → 422 ──────────────────────────────
 
+
 def test_sv_create_card_missing_field():
     """POST /cards 缺少 customer_id（必填）时，Pydantic 校验失败返回 422。"""
     client = TestClient(sv_app)
     resp = client.post(
         "/api/v1/member/stored-value/cards",
-        json={"scope_type": "brand"},   # 缺少 customer_id
+        json={"scope_type": "brand"},  # 缺少 customer_id
         headers=HEADERS,
     )
 
@@ -311,6 +339,7 @@ def test_sv_create_card_missing_field():
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 # ── 场景 6: POST /stored-value-cards — 正常开卡（无初始充值） ─────────────────
+
 
 def test_svc_create_card_ok():
     """正常开卡（initial_amount_fen=0）返回 ok=True 和卡 ID。"""
@@ -334,6 +363,7 @@ def test_svc_create_card_ok():
 
 
 # ── 场景 7: GET /stored-value-cards/{card_id} — 正常卡详情 ──────────────────
+
 
 def test_svc_get_card_ok():
     """按 card_id 查询储值卡详情，返回 ok=True 及余额。"""
@@ -361,6 +391,7 @@ def test_svc_get_card_ok():
 
 # ── 场景 8: GET /stored-value-cards/{card_id} — 卡不存在 → 404 ─────────────
 
+
 def test_svc_get_card_not_found():
     """get_card_by_id 返回 None 时路由应返回 404。"""
     db = AsyncMock()
@@ -380,12 +411,11 @@ def test_svc_get_card_not_found():
 
 # ── 场景 9: POST /{card_id}/consume — 余额不足 → 400 ──────────────────────
 
+
 def test_svc_consume_insufficient_balance():
     """consume_by_id 抛 InsufficientBalanceError 时路由应返回 400。"""
     db = AsyncMock()
-    svc_svc.consume_by_id = AsyncMock(
-        side_effect=svc_routes_mod.InsufficientBalanceError("余额不足")
-    )
+    svc_svc.consume_by_id = AsyncMock(side_effect=svc_routes_mod.InsufficientBalanceError("余额不足"))
     _svc_db_override(db)
 
     client = TestClient(svc_app)
@@ -400,6 +430,7 @@ def test_svc_consume_insufficient_balance():
 
 
 # ── 场景 10: POST /{card_id}/recharge — 缺少 X-Tenant-ID → 422 ─────────────
+
 
 def test_svc_recharge_missing_tenant_header():
     """POST recharge 未传 X-Tenant-ID 时，FastAPI 依赖校验返回 422。"""

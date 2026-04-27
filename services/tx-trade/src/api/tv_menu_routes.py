@@ -1,4 +1,5 @@
 """电视点菜墙 API 路由"""
+
 from typing import Optional
 
 from fastapi import APIRouter, Header, HTTPException, Query
@@ -22,7 +23,9 @@ async def get_layout(store_id: str, screens: int = Query(4), tenant_id: str = He
 
 
 @router.get("/screen/{store_id}/{screen_id}")
-async def get_screen(store_id: str, screen_id: int, zone: str = "signature", tenant_id: str = Header(alias="X-Tenant-ID")):
+async def get_screen(
+    store_id: str, screen_id: int, zone: str = "signature", tenant_id: str = Header(alias="X-Tenant-ID")
+):
     data = await tv_menu_service.get_screen_content(store_id, screen_id, zone, tenant_id, db=None)
     return {"ok": True, "data": data}
 
@@ -61,7 +64,8 @@ class TVOrderRequest(BaseModel):
 @router.post("/order")
 async def tv_order(req: TVOrderRequest, tenant_id: str = Header(alias="X-Tenant-ID")):
     data = await tv_menu_service.trigger_order_from_tv(
-        req.store_id, req.table_id, req.items, req.customer_id, tenant_id, db=None)
+        req.store_id, req.table_id, req.items, req.customer_id, tenant_id, db=None
+    )
     return {"ok": True, "data": data}
 
 
@@ -76,7 +80,8 @@ class ScreenRegisterRequest(BaseModel):
 @router.post("/screen/register")
 async def register_screen(req: ScreenRegisterRequest, tenant_id: str = Header(alias="X-Tenant-ID")):
     data = await tv_menu_service.register_screen(
-        req.store_id, req.screen_id, req.ip, req.position, req.size_inches, tenant_id, db=None)
+        req.store_id, req.screen_id, req.ip, req.position, req.size_inches, tenant_id, db=None
+    )
     return {"ok": True, "data": data}
 
 

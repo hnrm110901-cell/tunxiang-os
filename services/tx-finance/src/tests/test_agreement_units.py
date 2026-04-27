@@ -9,13 +9,12 @@
 
 Mock 路径：shared.ontology.src.database.get_db_with_tenant
 """
+
 import sys
 import types
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
-
-import pytest
 
 # ─── Bootstrap: mock 所有外部依赖 ─────────────────────────────────────────────
 
@@ -25,8 +24,10 @@ _shared_onto = types.ModuleType("shared.ontology")
 _shared_onto_src = types.ModuleType("shared.ontology.src")
 _shared_onto_db = types.ModuleType("shared.ontology.src.database")
 
+
 async def _fake_get_db_with_tenant(tenant_id: str):
     yield None
+
 
 _shared_onto_db.get_db_with_tenant = _fake_get_db_with_tenant
 sys.modules.setdefault("shared", _shared_pkg)
@@ -36,22 +37,34 @@ sys.modules.setdefault("shared.ontology.src.database", _shared_onto_db)
 
 # structlog
 _structlog = types.ModuleType("structlog")
+
+
 class _FakeLogger:
-    def info(self, *a, **kw): pass
-    def error(self, *a, **kw): pass
-    def warning(self, *a, **kw): pass
-    def debug(self, *a, **kw): pass
+    def info(self, *a, **kw):
+        pass
+
+    def error(self, *a, **kw):
+        pass
+
+    def warning(self, *a, **kw):
+        pass
+
+    def debug(self, *a, **kw):
+        pass
+
+
 _structlog.get_logger = lambda *a, **kw: _FakeLogger()
 sys.modules.setdefault("structlog", _structlog)
 
 # ─── 现在才能 import 被测模块 ──────────────────────────────────────────────────
-from fastapi.testclient import TestClient
 from fastapi import FastAPI
+from fastapi.testclient import TestClient
 
 app = FastAPI()
 
 # 延迟 import（依赖已 mock）
 from api.agreement_unit_routes import router  # noqa: E402
+
 app.include_router(router)
 
 client = TestClient(app, raise_server_exceptions=False)
@@ -72,6 +85,7 @@ NOW = datetime.now(timezone.utc)
 
 # ─── 工具：构造 DB mock ───────────────────────────────────────────────────────
 
+
 def _make_db_mock():
     """返回一个 AsyncMock，模拟 AsyncSession 的常见操作。"""
     db = AsyncMock()
@@ -87,19 +101,17 @@ def _make_mappings(rows: list[dict]):
     """将 dict 列表包装成 SQLAlchemy mappings 风格的 mock。"""
     result = MagicMock()
     result.mappings.return_value.all.return_value = [
-        MagicMock(**{k: v for k, v in r.items()}, **{"__getitem__": lambda s, k: r[k]})
-        for r in rows
+        MagicMock(**{k: v for k, v in r.items()}, **{"__getitem__": lambda s, k: r[k]}) for r in rows
     ]
     result.mappings.return_value.first.return_value = (
-        MagicMock(**{k: v for k, v in rows[0].items()},
-                  **{"__getitem__": lambda s, k: rows[0][k]})
-        if rows else None
+        MagicMock(**{k: v for k, v in rows[0].items()}, **{"__getitem__": lambda s, k: rows[0][k]}) if rows else None
     )
     result.scalar.return_value = len(rows)
     return result
 
 
 # ─── Test 1: 新建协议单位，授信额度正确存储 ───────────────────────────────────
+
 
 def test_create_unit_with_credit_limit():
     """POST /api/v1/agreement-units — 创建协议单位，响应中包含正确 unit_id 和 status。"""
@@ -148,6 +160,7 @@ def test_create_unit_with_credit_limit():
 
 # ─── Test 2: 挂账金额在授信内成功 ────────────────────────────────────────────
 
+
 def test_charge_within_credit_limit():
     """POST /{unit_id}/charge — 挂账金额 ≤ 可用授信时返回 200 + txn_id。"""
     txn_at = NOW
@@ -189,7 +202,7 @@ def test_charge_within_credit_limit():
         resp = client.post(
             f"/api/v1/agreement-units/{UNIT_ID}/charge",
             json={
-                "amount_fen": 5_000_00,   # 5千元，远小于可用额度 8万元
+                "amount_fen": 5_000_00,  # 5千元，远小于可用额度 8万元
                 "notes": "手动挂账测试",
                 "print_voucher": False,
             },
@@ -206,6 +219,7 @@ def test_charge_within_credit_limit():
 
 
 # ─── Test 3: 超授信额度挂账被拒绝（返回400） ──────────────────────────────────
+
 
 def test_charge_exceeds_credit_limit():
     """POST /{unit_id}/charge — 挂账金额 > 可用授信时返回 400。"""
@@ -234,7 +248,7 @@ def test_charge_exceeds_credit_limit():
         resp = client.post(
             f"/api/v1/agreement-units/{UNIT_ID}/charge",
             json={
-                "amount_fen": 20_000_00,   # 2万元，超出可用额度1万元
+                "amount_fen": 20_000_00,  # 2万元，超出可用额度1万元
                 "notes": "超限挂账测试",
             },
             headers=BASE_HEADERS,
@@ -246,6 +260,7 @@ def test_charge_exceeds_credit_limit():
 
 
 # ─── Test 4: 还款后余额正确减少 ──────────────────────────────────────────────
+
 
 def test_repay_updates_balance():
     """POST /{unit_id}/repay — 普通还款后 new_credit_used_fen 减少正确金额。"""
@@ -287,7 +302,7 @@ def test_repay_updates_balance():
             f"/api/v1/agreement-units/{UNIT_ID}/repay",
             json={
                 "repay_mode": "normal",
-                "amount_fen": 10_000_00,    # 还1万
+                "amount_fen": 10_000_00,  # 还1万
                 "repay_method": "cash",
                 "notes": "现金还款测试",
                 "print_voucher": False,
@@ -304,6 +319,7 @@ def test_repay_updates_balance():
 
 
 # ─── Test 5: 账龄按天数分组正确 ──────────────────────────────────────────────
+
 
 def test_aging_report_categorization():
     """GET /report/aging — 各区间金额分组正确，汇总和与各区间之和一致。"""
@@ -358,12 +374,5 @@ def test_aging_report_categorization():
     assert item["aged_90plus_fen"] == 10_000_00
 
     # 验证各区间之和 == total_owed_fen（本 mock 中完全一致）
-    sum_parts = (
-        item["aged_0_30_fen"]
-        + item["aged_31_60_fen"]
-        + item["aged_61_90_fen"]
-        + item["aged_90plus_fen"]
-    )
-    assert sum_parts == item["total_owed_fen"], (
-        f"各区间之和 {sum_parts} 不等于总欠款 {item['total_owed_fen']}"
-    )
+    sum_parts = item["aged_0_30_fen"] + item["aged_31_60_fen"] + item["aged_61_90_fen"] + item["aged_90plus_fen"]
+    assert sum_parts == item["total_owed_fen"], f"各区间之和 {sum_parts} 不等于总欠款 {item['total_owed_fen']}"

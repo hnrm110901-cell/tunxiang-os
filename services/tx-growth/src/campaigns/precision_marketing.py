@@ -6,6 +6,7 @@
 - 每周几/每月几号自动循环
 - 多通道触达(短信/微信/APP推送)
 """
+
 from typing import Any
 
 import structlog

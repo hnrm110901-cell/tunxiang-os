@@ -10,6 +10,7 @@ WecomGroupService 负责：
 
 SOP 模板常量 DEFAULT_SOP_TEMPLATES 定义在本文件，可被 sop_calendar 配置覆盖。
 """
+
 from __future__ import annotations
 
 import json
@@ -34,21 +35,11 @@ logger = structlog.get_logger(__name__)
 # ─────────────────────────────────────────────────────────────────
 
 DEFAULT_SOP_TEMPLATES: dict[str, str] = {
-    "daily_morning": (
-        "早安！今日为您精选 {today_special}，堂食/外卖均可享会员专属价。"
-    ),
-    "weekly_friday": (
-        "{store_name} 为您准备了精彩菜品，记得预约您的专属座位。"
-    ),
-    "new_dish": (
-        "【新品上市】{dish_name} 正式上线！前50位品鉴客户可享{offer_desc}，立即预约 →"
-    ),
-    "holiday_generic": (
-        "节日快乐！{store_name} 全体员工祝您{holiday_name}愉快，特为您准备了{offer_desc}"
-    ),
-    "member_upgrade": (
-        "恭喜 {display_name} 升级为{level_name}！专属权益已解锁，快来体验吧。"
-    ),
+    "daily_morning": ("早安！今日为您精选 {today_special}，堂食/外卖均可享会员专属价。"),
+    "weekly_friday": ("{store_name} 为您准备了精彩菜品，记得预约您的专属座位。"),
+    "new_dish": ("【新品上市】{dish_name} 正式上线！前50位品鉴客户可享{offer_desc}，立即预约 →"),
+    "holiday_generic": ("节日快乐！{store_name} 全体员工祝您{holiday_name}愉快，特为您准备了{offer_desc}"),
+    "member_upgrade": ("恭喜 {display_name} 升级为{level_name}！专属权益已解锁，快来体验吧。"),
 }
 
 # ─────────────────────────────────────────────────────────────────
@@ -343,10 +334,7 @@ class WecomGroupService:
                 skip_count += 1
                 continue
 
-            has_daily = any(
-                entry.get("type") == "daily"
-                for entry in (config.sop_calendar or [])
-            )
+            has_daily = any(entry.get("type") == "daily" for entry in (config.sop_calendar or []))
             if not has_daily:
                 skip_count += 1
                 continue
@@ -485,9 +473,7 @@ class WecomGroupService:
             log.error("wecom_group_sync_get_info_request_error", error=str(exc))
             return {"success": False, "error": str(exc)}
 
-        current_member_ids: set[str] = {
-            m["userid"] for m in chat_info.get("member_list", []) if m.get("userid")
-        }
+        current_member_ids: set[str] = {m["userid"] for m in chat_info.get("member_list", []) if m.get("userid")}
 
         # 获取分群符合条件的成员（企微 external_userid）
         segment_userids = await self._fetch_segment_wecom_userids(
@@ -575,11 +561,7 @@ class WecomGroupService:
         data = resp.json()
         # 兼容 {data: [{wecom_external_userid: ...}]} 和 {items: [...]} 两种响应格式
         items = data.get("data") or data.get("items") or []
-        userids = [
-            item["wecom_external_userid"]
-            for item in items
-            if item.get("wecom_external_userid")
-        ]
+        userids = [item["wecom_external_userid"] for item in items if item.get("wecom_external_userid")]
         log.info("wecom_group_fetch_segment_ok", count=len(userids))
         return userids
 

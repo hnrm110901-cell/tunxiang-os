@@ -11,20 +11,21 @@
   GET  /api/v1/franchise/v4/fees/overdue        - 逾期费用
   GET  /api/v1/franchise/v4/stats               - 聚合统计
 """
+
 import os
 import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "..", "..", ".."))
 
-import pytest
-from contextlib import asynccontextmanager
-from fastapi import FastAPI
-from httpx import AsyncClient, ASGITransport
 from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
+import pytest
 from api.franchise_v4_routes import router as franchise_v4_router
+from fastapi import FastAPI
+from httpx import ASGITransport, AsyncClient
+
 from shared.ontology.src.database import get_db
 
 app = FastAPI()
@@ -49,8 +50,10 @@ def _make_mock_session() -> MagicMock:
 
 def _override_db(mock_session):
     """返回一个可以替换 get_db 的 async generator。"""
+
     async def _mock_get_db():
         yield mock_session
+
     return _mock_get_db
 
 
@@ -61,6 +64,7 @@ def _make_row(data: dict):
 
 
 # ─── GET /franchisees ─────────────────────────────────────────────────────────
+
 
 @pytest.mark.anyio
 async def test_list_franchisees_ok(headers):
@@ -114,6 +118,7 @@ async def test_list_franchisees_db_error_fallback(headers):
 
 # ─── GET /franchisees/{id} ─────────────────────────────────────────────────────
 
+
 @pytest.mark.anyio
 async def test_get_franchisee_detail_ok(headers):
     """正常路径：返回加盟商详情（含合同和费用）。"""
@@ -133,9 +138,7 @@ async def test_get_franchisee_detail_ok(headers):
     fee_result.fetchall.return_value = [fee_row]
 
     # execute 依次：RLS set_config → 主查询 → 合同查询 → 费用查询
-    mock_session.execute = AsyncMock(
-        side_effect=[MagicMock(), main_result, contract_result, fee_result]
-    )
+    mock_session.execute = AsyncMock(side_effect=[MagicMock(), main_result, contract_result, fee_result])
 
     app.dependency_overrides[get_db] = _override_db(mock_session)
     try:
@@ -163,9 +166,7 @@ async def test_get_franchisee_not_found(headers):
     app.dependency_overrides[get_db] = _override_db(mock_session)
     try:
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-            r = await client.get(
-                "/api/v1/franchise/v4/franchisees/nonexistent", headers=headers
-            )
+            r = await client.get("/api/v1/franchise/v4/franchisees/nonexistent", headers=headers)
     finally:
         app.dependency_overrides.clear()
 
@@ -173,6 +174,7 @@ async def test_get_franchisee_not_found(headers):
 
 
 # ─── POST /franchisees ─────────────────────────────────────────────────────────
+
 
 @pytest.mark.anyio
 async def test_create_franchisee_ok(headers):
@@ -226,6 +228,7 @@ async def test_create_franchisee_missing_required_fields(headers):
 
 # ─── GET /contracts ─────────────────────────────────────────────────────────────
 
+
 @pytest.mark.anyio
 async def test_list_contracts_ok(headers):
     """正常路径：返回合同列表。"""
@@ -274,6 +277,7 @@ async def test_list_contracts_db_error_fallback(headers):
 
 # ─── POST /contracts ─────────────────────────────────────────────────────────────
 
+
 @pytest.mark.anyio
 async def test_create_contract_missing_fields(headers):
     """缺少必填字段 → 422。"""
@@ -294,6 +298,7 @@ async def test_create_contract_missing_fields(headers):
 
 
 # ─── GET /fees ─────────────────────────────────────────────────────────────────
+
 
 @pytest.mark.anyio
 async def test_list_fees_with_stats_ok(headers):
@@ -349,6 +354,7 @@ async def test_list_fees_db_error_fallback(headers):
 
 
 # ─── GET /stats ─────────────────────────────────────────────────────────────────
+
 
 @pytest.mark.anyio
 async def test_franchise_stats_ok(headers):

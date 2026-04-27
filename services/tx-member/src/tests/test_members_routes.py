@@ -12,15 +12,14 @@
 9.  GET  /api/v1/member/campaigns               — 正常路径返回 campaigns 字段
 10. POST /api/v1/member/campaigns               — 正常路径返回 campaign_id
 """
+
 import os
 import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 import uuid
-from unittest.mock import AsyncMock, patch, MagicMock
 
-import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
@@ -40,6 +39,7 @@ client = TestClient(app, raise_server_exceptions=False)
 # 场景 1: GET /customers — 正常路径
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_list_customers_ok():
     """返回 ok=True 及 items/total 字段"""
     resp = client.get("/api/v1/member/customers?store_id=store-001", headers=_HEADERS)
@@ -53,6 +53,7 @@ def test_list_customers_ok():
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 场景 2: POST /customers — 正常创建
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 def test_create_customer_ok():
     """传入 phone 字段，返回 ok=True 及 customer_id"""
@@ -71,6 +72,7 @@ def test_create_customer_ok():
 # 场景 3: POST /customers — 缺少 phone → 422
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_create_customer_missing_phone():
     """phone 为必填字段，缺少时应返回 422"""
     resp = client.post(
@@ -85,6 +87,7 @@ def test_create_customer_missing_phone():
 # 场景 4: GET /customers/{id} — 360 画像
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_get_customer_ok():
     """返回 ok=True，data 字段存在"""
     cid = str(uuid.uuid4())
@@ -96,6 +99,7 @@ def test_get_customer_ok():
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 场景 5: GET /customers/{id}/orders — 订单分页
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 def test_get_customer_orders_ok():
     """返回 items/total 分页结构"""
@@ -111,6 +115,7 @@ def test_get_customer_orders_ok():
 # 场景 6: GET /rfm/segments — RFM 分层
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_get_rfm_segments_ok():
     """返回 segments 字段"""
     resp = client.get("/api/v1/member/rfm/segments?store_id=store-001", headers=_HEADERS)
@@ -124,6 +129,7 @@ def test_get_rfm_segments_ok():
 # 场景 7: GET /rfm/at-risk — 流失风险
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_get_at_risk_customers_ok():
     """返回 customers 字段"""
     resp = client.get("/api/v1/member/rfm/at-risk?store_id=store-001", headers=_HEADERS)
@@ -136,6 +142,7 @@ def test_get_at_risk_customers_ok():
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 场景 8: POST /customers/merge — Golden ID 合并
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 def test_merge_customers_ok():
     """返回 merged_into 为 primary_id"""
@@ -155,6 +162,7 @@ def test_merge_customers_ok():
 # 场景 9: GET /campaigns — 活动列表
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_list_campaigns_ok():
     """返回 campaigns 字段"""
     resp = client.get("/api/v1/member/campaigns?store_id=store-001", headers=_HEADERS)
@@ -167,6 +175,7 @@ def test_list_campaigns_ok():
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 场景 10: POST /campaigns — 创建活动
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 def test_create_campaign_ok():
     """返回 campaign_id"""

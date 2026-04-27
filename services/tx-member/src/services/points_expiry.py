@@ -2,6 +2,7 @@
 
 每年固定日期清零（可配置），支持定时任务批量处理。
 """
+
 from __future__ import annotations
 
 import uuid
@@ -21,14 +22,15 @@ _cleared_log: list[dict] = []  # 清零日志
 
 # 默认到期配置
 DEFAULT_EXPIRY_CONFIG = {
-    "expiry_month": 12,    # 到期月份
-    "expiry_day": 31,      # 到期日期
+    "expiry_month": 12,  # 到期月份
+    "expiry_day": 31,  # 到期日期
     "reminder_days": [30, 7, 3, 1],  # 提前N天提醒
     "batch_validity_days": 365,  # 每批积分有效天数
 }
 
 
 # ── 工具函数 ──────────────────────────────────────────────────
+
 
 def _now_utc() -> datetime:
     return datetime.now(timezone.utc)
@@ -69,10 +71,7 @@ async def get_expiring_points(
     batches = _points_batches.get(customer_id, [])
 
     # 筛选该租户的批次
-    tenant_batches = [
-        b for b in batches
-        if b.get("tenant_id") == tenant_id and not b.get("cleared", False)
-    ]
+    tenant_batches = [b for b in batches if b.get("tenant_id") == tenant_id and not b.get("cleared", False)]
 
     # 计算总积分和即将到期的积分
     total_points = sum(b.get("remaining_points", 0) for b in tenant_batches)
@@ -93,12 +92,14 @@ async def get_expiring_points(
         days_left = (expiry_date - now).days
         if 0 < days_left <= 90:  # 90天内到期的算即将到期
             expiring_points += remaining
-            expiring_batches.append({
-                "batch_id": batch["batch_id"],
-                "remaining_points": remaining,
-                "expiry_date": expiry_date.isoformat(),
-                "days_remaining": days_left,
-            })
+            expiring_batches.append(
+                {
+                    "batch_id": batch["batch_id"],
+                    "remaining_points": remaining,
+                    "expiry_date": expiry_date.isoformat(),
+                    "days_remaining": days_left,
+                }
+            )
             if nearest_expiry is None or expiry_date < nearest_expiry:
                 nearest_expiry = expiry_date
 
@@ -252,12 +253,14 @@ async def batch_clear_expired(
                 cleared_count += 1
                 cleared_points_total += remaining
                 affected_customers.add(customer_id)
-                details.append({
-                    "customer_id": customer_id,
-                    "batch_id": batch["batch_id"],
-                    "cleared_points": remaining,
-                    "expiry_date": expiry_date.isoformat(),
-                })
+                details.append(
+                    {
+                        "customer_id": customer_id,
+                        "batch_id": batch["batch_id"],
+                        "cleared_points": remaining,
+                        "expiry_date": expiry_date.isoformat(),
+                    }
+                )
 
     cleared_record = {
         "clear_id": str(uuid.uuid4()),

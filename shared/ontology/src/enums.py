@@ -1,4 +1,5 @@
 """Ontology 枚举定义"""
+
 import enum
 
 
@@ -33,9 +34,9 @@ class TransactionType(str, enum.Enum):
     waste = "waste"
     adjustment = "adjustment"
     transfer = "transfer"
-    receiving = "receiving"        # 验收入库
+    receiving = "receiving"  # 验收入库
     transfer_out = "transfer_out"  # 调拨出库
-    transfer_in = "transfer_in"    # 调拨入库
+    transfer_in = "transfer_in"  # 调拨入库
 
 
 class ReceivingOrderStatus(str, enum.Enum):

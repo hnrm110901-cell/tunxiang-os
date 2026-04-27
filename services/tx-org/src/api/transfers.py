@@ -2,6 +2,7 @@
 
 持久化：employee_transfers 表（v140 创建，v208 补全字段）
 """
+
 import uuid
 from datetime import datetime, timezone
 from typing import AsyncGenerator, List, Optional
@@ -9,10 +10,6 @@ from typing import AsyncGenerator, List, Optional
 import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel
-from sqlalchemy import text
-from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from services.store_transfer_service import (
     compute_cost_split,
     compute_time_split,
@@ -20,6 +17,10 @@ from services.store_transfer_service import (
     generate_detail_report,
     generate_summary_report,
 )
+from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from shared.ontology.src.database import TenantIDInvalid, TenantIDMissing, get_db_with_tenant
 
 logger = structlog.get_logger(__name__)
@@ -52,8 +53,7 @@ def _row_to_dict(row: object) -> dict:
     for key in ("start_date", "end_date", "created_at", "updated_at", "approved_at", "effective_date"):
         if d.get(key) is not None and hasattr(d[key], "isoformat"):
             d[key] = d[key].isoformat()
-    for key in ("id", "tenant_id", "employee_id", "from_store_id", "to_store_id",
-                "requested_by", "approved_by"):
+    for key in ("id", "tenant_id", "employee_id", "from_store_id", "to_store_id", "requested_by", "approved_by"):
         if d.get(key) is not None:
             d[key] = str(d[key])
     return d
@@ -121,6 +121,7 @@ async def api_create_transfer(
     # 业务校验（利用原有纯函数服务）
     try:
         from services.store_transfer_service import create_transfer_order as _validate
+
         _validate(
             employee_id=req.employee_id,
             employee_name=req.employee_name,
@@ -365,18 +366,12 @@ async def api_cost_report(req: CostReportReq) -> dict:
         return {"ok": True, "data": report}
 
     if req.report_type == "summary":
-        all_emp = [
-            {"employee_id": eid, "cost_split": ecost}
-            for eid, ecost in cost_split.items()
-        ]
+        all_emp = [{"employee_id": eid, "cost_split": ecost} for eid, ecost in cost_split.items()]
         report = generate_summary_report(all_emp)
         return {"ok": True, "data": report}
 
     if req.report_type == "analysis":
-        all_emp = [
-            {"employee_id": eid, "cost_split": ecost}
-            for eid, ecost in cost_split.items()
-        ]
+        all_emp = [{"employee_id": eid, "cost_split": ecost} for eid, ecost in cost_split.items()]
         summary = generate_summary_report(all_emp)
         budget = req.budget_data or {}
         report = generate_cost_analysis_report(summary, budget)

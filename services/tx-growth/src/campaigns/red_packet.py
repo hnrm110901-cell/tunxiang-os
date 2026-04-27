@@ -3,6 +3,7 @@
 典型场景: 午市12:00开始红包雨, 限时5分钟, 随机金额红包
 支持固定金额和随机金额两种模式。
 """
+
 import random
 from typing import Any
 

@@ -10,6 +10,7 @@
   GET   /api/v1/finance/settlements/{batch_id}/summary — 结算汇总
   POST  /api/v1/finance/settlements/{batch_id}/confirm — 确认结算
 """
+
 import uuid
 from datetime import date
 from typing import Optional
@@ -20,6 +21,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db_with_tenant
+
 from ..services.fund_settlement_service import FundSettlementService
 
 logger = structlog.get_logger(__name__)
@@ -30,6 +32,7 @@ _service = FundSettlementService()
 
 
 # ─── 请求模型 ─────────────────────────────────────────────────────────────────
+
 
 class CreateSplitRuleRequest(BaseModel):
     store_id: str = Field(..., description="门店ID")
@@ -54,6 +57,7 @@ class CreateSettlementRequest(BaseModel):
 
 # ─── 依赖注入 ─────────────────────────────────────────────────────────────────
 
+
 async def _get_tenant_db(x_tenant_id: str = Header(..., alias="X-Tenant-ID")):
     async for session in get_db_with_tenant(x_tenant_id):
         yield session
@@ -77,6 +81,7 @@ def _parse_date(val: str, field_name: str) -> date:
 
 
 # ─── POST /split-rules ───────────────────────────────────────────────────────
+
 
 @router.post("/split-rules", summary="创建分账规则")
 async def create_split_rule(
@@ -114,6 +119,7 @@ async def create_split_rule(
 
 # ─── GET /split-rules ────────────────────────────────────────────────────────
 
+
 @router.get("/split-rules", summary="查询分账规则")
 async def list_split_rules(
     store_id: Optional[str] = Query(None, description="门店ID"),
@@ -142,6 +148,7 @@ async def list_split_rules(
 
 # ─── POST /split/order/{order_id} ────────────────────────────────────────────
 
+
 @router.post("/split/order/{order_id}", summary="单笔订单分账")
 async def split_order(
     order_id: str = Path(..., description="订单ID"),
@@ -161,6 +168,7 @@ async def split_order(
 
 
 # ─── POST /split/batch ───────────────────────────────────────────────────────
+
 
 @router.post("/split/batch", summary="批量分账")
 async def batch_split(
@@ -190,6 +198,7 @@ async def batch_split(
 
 # ─── POST /settlements ───────────────────────────────────────────────────────
 
+
 @router.post("/settlements", summary="生成结算批次")
 async def create_settlement(
     body: CreateSettlementRequest,
@@ -217,6 +226,7 @@ async def create_settlement(
 
 
 # ─── GET /settlements ────────────────────────────────────────────────────────
+
 
 @router.get("/settlements", summary="结算批次列表")
 async def list_settlements(
@@ -248,6 +258,7 @@ async def list_settlements(
 
 # ─── GET /settlements/{batch_id}/summary ─────────────────────────────────────
 
+
 @router.get("/settlements/{batch_id}/summary", summary="结算汇总")
 async def get_settlement_summary(
     batch_id: str = Path(..., description="结算批次ID"),
@@ -259,9 +270,7 @@ async def get_settlement_summary(
     bid = _parse_uuid(batch_id, "batch_id")
 
     try:
-        result = await _service.get_settlement_summary(
-            db=db, tenant_id=tid, batch_id=bid
-        )
+        result = await _service.get_settlement_summary(db=db, tenant_id=tid, batch_id=bid)
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
@@ -269,6 +278,7 @@ async def get_settlement_summary(
 
 
 # ─── POST /settlements/{batch_id}/confirm ────────────────────────────────────
+
 
 @router.post("/settlements/{batch_id}/confirm", summary="确认结算")
 async def confirm_settlement(
@@ -281,9 +291,7 @@ async def confirm_settlement(
     bid = _parse_uuid(batch_id, "batch_id")
 
     try:
-        result = await _service.confirm_settlement(
-            db=db, tenant_id=tid, batch_id=bid
-        )
+        result = await _service.confirm_settlement(db=db, tenant_id=tid, batch_id=bid)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 

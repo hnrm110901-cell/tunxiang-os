@@ -1,4 +1,5 @@
 """支付服务 — 多方式支付 + 退款"""
+
 import uuid
 from datetime import datetime, timezone
 from typing import Optional
@@ -72,9 +73,7 @@ class PaymentService:
     ) -> dict:
         """处理退款 — 支持整单退和部分退"""
         # 校验支付记录
-        result = await self.db.execute(
-            select(Payment).where(Payment.id == uuid.UUID(payment_id))
-        )
+        result = await self.db.execute(select(Payment).where(Payment.id == uuid.UUID(payment_id)))
         payment = result.scalar_one_or_none()
         if not payment:
             raise ValueError(f"Payment not found: {payment_id}")
@@ -97,7 +96,9 @@ class PaymentService:
         self.db.add(refund)
 
         # 更新支付状态
-        new_status = PaymentStatus.refunded.value if amount_fen == payment.amount_fen else PaymentStatus.partial_refund.value
+        new_status = (
+            PaymentStatus.refunded.value if amount_fen == payment.amount_fen else PaymentStatus.partial_refund.value
+        )
         payment.status = new_status
 
         await self.db.flush()
@@ -110,9 +111,7 @@ class PaymentService:
 
     async def get_order_payments(self, order_id: str) -> list[dict]:
         """查询订单所有支付记录"""
-        result = await self.db.execute(
-            select(Payment).where(Payment.order_id == uuid.UUID(order_id))
-        )
+        result = await self.db.execute(select(Payment).where(Payment.order_id == uuid.UUID(order_id)))
         payments = result.scalars().all()
         return [
             {

@@ -1,12 +1,13 @@
 """Team A: discount_guardian 和 inventory_sentinel 的 analyze_from_mv 测试"""
+
 from __future__ import annotations
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 
 from ..agents.discount_guardian import DiscountGuardianAgent
 from ..agents.inventory_sentinel import InventorySentinelAgent
-
 
 # ─── discount_guardian ─────────────────────────────────────────────────────
 
@@ -109,6 +110,7 @@ async def test_discount_guardian_mv_empty():
 async def test_discount_guardian_mv_db_error():
     """DB 异常时返回 error 字段"""
     from sqlalchemy.exc import SQLAlchemyError
+
     agent = DiscountGuardianAgent()
 
     mock_db = AsyncMock()
@@ -227,6 +229,7 @@ async def test_inventory_sentinel_mv_empty():
 async def test_inventory_sentinel_mv_db_error():
     """DB 异常时返回 error 字段"""
     from sqlalchemy.exc import SQLAlchemyError
+
     agent = InventorySentinelAgent()
 
     mock_db = AsyncMock()

@@ -11,6 +11,7 @@
 失败重试 3 次，重试间隔 5 分钟。
 同步结果写入 sync_logs 表。
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -44,13 +45,12 @@ def _get_tenant_id(merchant_code: str) -> str:
     env_var = _TENANT_ID_ENVS[merchant_code]
     tenant_id = os.getenv(env_var)
     if not tenant_id:
-        raise ValueError(
-            f"商户 {merchant_code} 的租户ID环境变量 {env_var} 未配置"
-        )
+        raise ValueError(f"商户 {merchant_code} 的租户ID环境变量 {env_var} 未配置")
     return tenant_id
 
 
 # ── 辅助：写入 sync_logs ────────────────────────────────────────────────────
+
 
 async def _write_sync_log(
     db: Any,
@@ -122,6 +122,7 @@ async def _write_sync_log(
 
 # ── 各类型同步任务 ──────────────────────────────────────────────────────────
 
+
 async def _sync_dishes_for_merchant(merchant_code: str) -> dict:
     """全量拉取指定商户所有门店的菜品，返回统计信息。"""
     from shared.adapters.pinzhi.src.dish_sync import PinzhiDishSync
@@ -139,10 +140,7 @@ async def _sync_dishes_for_merchant(merchant_code: str) -> dict:
         syncer = PinzhiDishSync(adapter)
 
         # 全商户所有门店并行拉取（品智菜品接口不区分门店，逐门店拉避免遗漏）
-        tasks = [
-            syncer.sync_dishes(f"{merchant_code}:{store_id}")
-            for store_id in merchant_cfg["stores"]
-        ]
+        tasks = [syncer.sync_dishes(f"{merchant_code}:{store_id}") for store_id in merchant_cfg["stores"]]
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
         for store_id, result in zip(merchant_cfg["stores"], results):
@@ -168,10 +166,10 @@ async def _sync_dishes_for_merchant(merchant_code: str) -> dict:
 
 async def _sync_tables_for_merchant(merchant_code: str, db: Any) -> dict:
     """全量拉取指定商户所有门店的桌台，UPSERT 写入数据库。"""
+
     from shared.adapters.pinzhi.src.factory import PinzhiAdapterFactory
     from shared.adapters.pinzhi.src.merchants import MERCHANT_CONFIG
     from shared.adapters.pinzhi.src.table_sync import PinzhiTableSync
-    from sqlalchemy import text
 
     log = logger.bind(merchant_code=merchant_code, sync_type="tables")
     tenant_id = _get_tenant_id(merchant_code)
@@ -186,9 +184,7 @@ async def _sync_tables_for_merchant(merchant_code: str, db: Any) -> dict:
 
         for store_id in merchant_cfg["stores"]:
             # store_uuid：用确定性 UUID 对应品智门店ID（真实项目需从 stores 表查）
-            store_uuid = str(uuid.uuid5(
-                uuid.NAMESPACE_DNS, f"pinzhi:store:{tenant_id}:{store_id}"
-            ))
+            store_uuid = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"pinzhi:store:{tenant_id}:{store_id}"))
             result = await syncer.upsert_tables(db, tenant_id, store_uuid, store_id)
             total_upserted += result.get("upserted", 0)
 
@@ -223,9 +219,7 @@ async def _sync_employees_for_merchant(merchant_code: str, db: Any) -> dict:
         syncer = PinzhiEmployeeSync(adapter)
 
         for store_id in merchant_cfg["stores"]:
-            store_uuid = str(uuid.uuid5(
-                uuid.NAMESPACE_DNS, f"pinzhi:store:{tenant_id}:{store_id}"
-            ))
+            store_uuid = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"pinzhi:store:{tenant_id}:{store_id}"))
             result = await syncer.upsert_employees(db, tenant_id, store_uuid, store_id)
             total_upserted += result.get("upserted", 0)
 
@@ -304,10 +298,7 @@ async def _sync_members_incremental_for_merchant(merchant_code: str, db: Any) ->
         adapter = PinzhiAdapterFactory.create_for_merchant(merchant_code)
         syncer = PinzhiMemberSync(adapter)
 
-        tasks = [
-            syncer.fetch_members(store_id=store_id)
-            for store_id in merchant_cfg["stores"]
-        ]
+        tasks = [syncer.fetch_members(store_id=store_id) for store_id in merchant_cfg["stores"]]
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
         for store_id, result in zip(merchant_cfg["stores"], results):
@@ -331,6 +322,7 @@ async def _sync_members_incremental_for_merchant(merchant_code: str, db: Any) ->
 
 
 # ── 带重试的包装器 ───────────────────────────────────────────────────────────
+
 
 async def _with_retry(coro_factory: Any, sync_type: str, merchant_code: str) -> dict:
     """
@@ -372,6 +364,7 @@ async def _with_retry(coro_factory: Any, sync_type: str, merchant_code: str) -> 
             )
         except (ValueError, RuntimeError, OSError) as exc:
             import traceback
+
             log.error("sync_attempt_exception", attempt=attempt, error=str(exc), exc_info=True)
             last_result = {
                 "status": "failed",
@@ -403,6 +396,7 @@ async def _with_retry(coro_factory: Any, sync_type: str, merchant_code: str) -> 
 
 # ── 调度任务入口 ─────────────────────────────────────────────────────────────
 
+
 async def _run_dishes_sync() -> None:
     """每日 02:00 — 全量拉取三商户菜品（并行）。"""
     log = logger.bind(job="daily_dishes_sync")
@@ -412,6 +406,7 @@ async def _run_dishes_sync() -> None:
 
     tasks = []
     for merchant_code in MERCHANTS:
+
         async def _task(mc: str = merchant_code) -> None:
             started_at = datetime.utcnow()
             result = await _with_retry(
@@ -422,9 +417,14 @@ async def _run_dishes_sync() -> None:
             async with async_session_factory() as db:
                 tenant_id = _get_tenant_id(mc)
                 await _write_sync_log(
-                    db, tenant_id, mc, "dishes",
-                    result["status"], result["records_synced"],
-                    result.get("error_msg"), started_at,
+                    db,
+                    tenant_id,
+                    mc,
+                    "dishes",
+                    result["status"],
+                    result["records_synced"],
+                    result.get("error_msg"),
+                    started_at,
                     error_detail=result.get("error_detail"),
                     retry_count=result.get("retry_count", 0),
                     next_retry_at=result.get("next_retry_at"),
@@ -434,9 +434,6 @@ async def _run_dishes_sync() -> None:
 
     await asyncio.gather(*tasks, return_exceptions=True)
     log.info("daily_dishes_sync_finished")
-
-
-
 
 
 async def _run_master_data_sync() -> None:
@@ -459,9 +456,14 @@ async def _run_master_data_sync() -> None:
                 merchant_code=merchant_code,
             )
             await _write_sync_log(
-                db, tenant_id, merchant_code, "tables",
-                table_result["status"], table_result["records_synced"],
-                table_result.get("error_msg"), started_at,
+                db,
+                tenant_id,
+                merchant_code,
+                "tables",
+                table_result["status"],
+                table_result["records_synced"],
+                table_result.get("error_msg"),
+                started_at,
                 error_detail=table_result.get("error_detail"),
                 retry_count=table_result.get("retry_count", 0),
                 next_retry_at=table_result.get("next_retry_at"),
@@ -474,9 +476,14 @@ async def _run_master_data_sync() -> None:
                 merchant_code=merchant_code,
             )
             await _write_sync_log(
-                db, tenant_id, merchant_code, "employees",
-                employee_result["status"], employee_result["records_synced"],
-                employee_result.get("error_msg"), started_at,
+                db,
+                tenant_id,
+                merchant_code,
+                "employees",
+                employee_result["status"],
+                employee_result["records_synced"],
+                employee_result.get("error_msg"),
+                started_at,
                 error_detail=employee_result.get("error_detail"),
                 retry_count=employee_result.get("retry_count", 0),
                 next_retry_at=employee_result.get("next_retry_at"),
@@ -504,9 +511,14 @@ async def _run_orders_incremental_sync() -> None:
         async with async_session_factory() as db:
             tenant_id = _get_tenant_id(merchant_code)
             await _write_sync_log(
-                db, tenant_id, merchant_code, "orders_incremental",
-                result["status"], result["records_synced"],
-                result.get("error_msg"), started_at,
+                db,
+                tenant_id,
+                merchant_code,
+                "orders_incremental",
+                result["status"],
+                result["records_synced"],
+                result.get("error_msg"),
+                started_at,
                 error_detail=result.get("error_detail"),
                 retry_count=result.get("retry_count", 0),
                 next_retry_at=result.get("next_retry_at"),
@@ -539,9 +551,14 @@ async def _run_members_incremental_sync() -> None:
                 merchant_code=merchant_code,
             )
             await _write_sync_log(
-                db, tenant_id, merchant_code, "members_incremental",
-                result["status"], result["records_synced"],
-                result.get("error_msg"), started_at,
+                db,
+                tenant_id,
+                merchant_code,
+                "members_incremental",
+                result["status"],
+                result["records_synced"],
+                result.get("error_msg"),
+                started_at,
                 error_detail=result.get("error_detail"),
                 retry_count=result.get("retry_count", 0),
                 next_retry_at=result.get("next_retry_at"),
@@ -558,6 +575,7 @@ async def _run_members_incremental_sync() -> None:
 
 
 # ── 调度器工厂 ───────────────────────────────────────────────────────────────
+
 
 def create_sync_scheduler() -> AsyncIOScheduler:
     """

@@ -7,6 +7,7 @@
   - BOM 版本管理（合法转换 / 非法转换 / 模板不存在）
   - 多租户隔离
 """
+
 import uuid
 from unittest.mock import AsyncMock, MagicMock
 

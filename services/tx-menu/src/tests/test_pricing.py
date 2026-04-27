@@ -2,6 +2,7 @@
 
 使用 mock DB 模拟 SQLAlchemy AsyncSession，验证 PricingEngine 逻辑。
 """
+
 import uuid
 from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock
@@ -49,6 +50,7 @@ def _scalar_result(value):
 
 # ─── 1. 标准定价 — 返回基础售价 ───
 
+
 @pytest.mark.asyncio
 async def test_get_standard_price_base():
     """无时价/渠道价/促销价时，返回基础售价"""
@@ -57,11 +59,11 @@ async def test_get_standard_price_base():
 
     # 四次查询: set_tenant, market_price(空), channel(空), promo(空), base_price
     db.execute.side_effect = [
-        AsyncMock(),                                    # set_tenant
-        _mapping_result([]),                            # market_price -> 空
-        _scalar_result(None),                           # channel_price -> 空
-        _scalar_result(None),                           # promo_price -> 空
-        _scalar_result(5800),                           # base_price -> 5800 分
+        AsyncMock(),  # set_tenant
+        _mapping_result([]),  # market_price -> 空
+        _scalar_result(None),  # channel_price -> 空
+        _scalar_result(None),  # promo_price -> 空
+        _scalar_result(5800),  # base_price -> 5800 分
     ]
 
     result = await engine.get_standard_price(DISH_ID, "dine_in")
@@ -74,6 +76,7 @@ async def test_get_standard_price_base():
 
 # ─── 2. 时价查询 — 海鲜时价优先 ───
 
+
 @pytest.mark.asyncio
 async def test_get_standard_price_market():
     """有生效中的时价时，优先返回时价"""
@@ -81,11 +84,15 @@ async def test_get_standard_price_market():
     engine = _make_engine(db)
 
     db.execute.side_effect = [
-        AsyncMock(),                                    # set_tenant
-        _mapping_result([{                              # market_price -> 有效
-            "price_fen": 12800,
-            "effective_from": datetime.utcnow(),
-        }]),
+        AsyncMock(),  # set_tenant
+        _mapping_result(
+            [
+                {  # market_price -> 有效
+                    "price_fen": 12800,
+                    "effective_from": datetime.utcnow(),
+                }
+            ]
+        ),
     ]
 
     result = await engine.get_standard_price(DISH_ID, "dine_in")
@@ -96,6 +103,7 @@ async def test_get_standard_price_market():
 
 # ─── 3. 设置时价 ───
 
+
 @pytest.mark.asyncio
 async def test_set_market_price():
     """设置海鲜时价"""
@@ -103,8 +111,8 @@ async def test_set_market_price():
     engine = _make_engine(db)
 
     db.execute.side_effect = [
-        AsyncMock(),                                    # set_tenant
-        AsyncMock(),                                    # INSERT
+        AsyncMock(),  # set_tenant
+        AsyncMock(),  # INSERT
     ]
 
     effective = datetime(2026, 3, 27, 8, 0, 0)
@@ -127,6 +135,7 @@ async def test_set_market_price_invalid():
 
 # ─── 4. 称重计价 ───
 
+
 @pytest.mark.asyncio
 async def test_calculate_weighing_price():
     """称重计价：单价 6800分/500g，重量 750g -> 10200分"""
@@ -134,11 +143,15 @@ async def test_calculate_weighing_price():
     engine = _make_engine(db)
 
     db.execute.side_effect = [
-        AsyncMock(),                                    # set_tenant
-        _mapping_result([{                              # dish info
-            "price_fen": 6800,
-            "unit": "斤",
-        }]),
+        AsyncMock(),  # set_tenant
+        _mapping_result(
+            [
+                {  # dish info
+                    "price_fen": 6800,
+                    "unit": "斤",
+                }
+            ]
+        ),
     ]
 
     result = await engine.calculate_weighing_price(DISH_ID, 750)
@@ -162,6 +175,7 @@ async def test_calculate_weighing_price_invalid_weight():
 
 # ─── 5. 套餐组合定价 ───
 
+
 @pytest.mark.asyncio
 async def test_create_combo_price():
     """套餐定价：两道菜合计 10000 分，85 折 = 8500 分"""
@@ -172,15 +186,23 @@ async def test_create_combo_price():
     dish_b = str(uuid.uuid4())
 
     db.execute.side_effect = [
-        AsyncMock(),                                    # set_tenant
-        _mapping_result([{                              # dish_a
-            "price_fen": 5800,
-            "dish_name": "宫保鸡丁",
-        }]),
-        _mapping_result([{                              # dish_b
-            "price_fen": 4200,
-            "dish_name": "麻婆豆腐",
-        }]),
+        AsyncMock(),  # set_tenant
+        _mapping_result(
+            [
+                {  # dish_a
+                    "price_fen": 5800,
+                    "dish_name": "宫保鸡丁",
+                }
+            ]
+        ),
+        _mapping_result(
+            [
+                {  # dish_b
+                    "price_fen": 4200,
+                    "dish_name": "麻婆豆腐",
+                }
+            ]
+        ),
     ]
 
     result = await engine.create_combo_price(
@@ -200,6 +222,7 @@ async def test_create_combo_price():
 
 # ─── 6. 毛利校验通过 ───
 
+
 @pytest.mark.asyncio
 async def test_validate_margin_passed():
     """售价 10000 分，成本 5000 分，毛利率 50% >= 30%，通过"""
@@ -208,10 +231,10 @@ async def test_validate_margin_passed():
 
     # set_tenant + BOM查询(无BOM) + 回退到 dishes.cost_fen
     db.execute.side_effect = [
-        AsyncMock(),                                    # set_tenant (validate_margin)
-        AsyncMock(),                                    # set_tenant (_get_dish_cost)
-        _mapping_result([]),                            # BOM -> 空
-        _scalar_result(5000),                           # dishes.cost_fen -> 5000
+        AsyncMock(),  # set_tenant (validate_margin)
+        AsyncMock(),  # set_tenant (_get_dish_cost)
+        _mapping_result([]),  # BOM -> 空
+        _scalar_result(5000),  # dishes.cost_fen -> 5000
     ]
 
     result = await engine.validate_margin(DISH_ID, 10000)
@@ -224,6 +247,7 @@ async def test_validate_margin_passed():
 
 # ─── 7. 毛利校验不通过 ───
 
+
 @pytest.mark.asyncio
 async def test_validate_margin_failed():
     """售价 6000 分，成本 5000 分，毛利率 16.7% < 30%，不通过"""
@@ -231,10 +255,10 @@ async def test_validate_margin_failed():
     engine = _make_engine(db)
 
     db.execute.side_effect = [
-        AsyncMock(),                                    # set_tenant (validate_margin)
-        AsyncMock(),                                    # set_tenant (_get_dish_cost)
-        _mapping_result([]),                            # BOM -> 空
-        _scalar_result(5000),                           # dishes.cost_fen -> 5000
+        AsyncMock(),  # set_tenant (validate_margin)
+        AsyncMock(),  # set_tenant (_get_dish_cost)
+        _mapping_result([]),  # BOM -> 空
+        _scalar_result(5000),  # dishes.cost_fen -> 5000
     ]
 
     result = await engine.validate_margin(DISH_ID, 6000)
@@ -249,6 +273,7 @@ async def test_validate_margin_failed():
 
 # ─── 8. 促销价设置 ───
 
+
 @pytest.mark.asyncio
 async def test_set_promotion_price():
     """设置限时促销价"""
@@ -256,8 +281,8 @@ async def test_set_promotion_price():
     engine = _make_engine(db)
 
     db.execute.side_effect = [
-        AsyncMock(),                                    # set_tenant
-        AsyncMock(),                                    # INSERT
+        AsyncMock(),  # set_tenant
+        AsyncMock(),  # INSERT
     ]
 
     start = datetime(2026, 4, 1, 0, 0, 0)
@@ -284,6 +309,7 @@ async def test_set_promotion_price_invalid_time():
 
 # ─── 9. 多渠道差异价 ───
 
+
 @pytest.mark.asyncio
 async def test_set_channel_price():
     """设置多渠道差异价"""
@@ -291,10 +317,10 @@ async def test_set_channel_price():
     engine = _make_engine(db)
 
     db.execute.side_effect = [
-        AsyncMock(),                                    # set_tenant
-        AsyncMock(),                                    # UPSERT dine_in
-        AsyncMock(),                                    # UPSERT takeaway
-        AsyncMock(),                                    # UPSERT delivery
+        AsyncMock(),  # set_tenant
+        AsyncMock(),  # UPSERT dine_in
+        AsyncMock(),  # UPSERT takeaway
+        AsyncMock(),  # UPSERT delivery
     ]
 
     channel_prices = {"dine_in": 5800, "takeaway": 5500, "delivery": 6200}
@@ -305,6 +331,7 @@ async def test_set_channel_price():
 
 
 # ─── 10. 称重计价 — 精确到分 ───
+
 
 @pytest.mark.asyncio
 async def test_weighing_price_rounding():

@@ -4,6 +4,7 @@
 多渠道差异价、促销价、毛利校验、调价审批。
 扩展：价格矩阵、批量调价、加价规则、调价预览。
 """
+
 import uuid as _uuid
 from datetime import datetime
 from typing import Optional
@@ -28,6 +29,7 @@ _CHANNELS = ("dine_in", "meituan", "eleme", "miniapp", "douyin")
 
 # ─── 请求/响应模型 ───
 
+
 class SetMarketPriceReq(BaseModel):
     dish_id: str
     price_fen: int = Field(gt=0, description="时价（分）")
@@ -51,9 +53,7 @@ class CreateComboReq(BaseModel):
 
 class SetChannelPriceReq(BaseModel):
     dish_id: str
-    channel_prices: dict[str, int] = Field(
-        description="渠道价格映射，如 {'dine_in': 5800, 'takeaway': 5500}"
-    )
+    channel_prices: dict[str, int] = Field(description="渠道价格映射，如 {'dine_in': 5800, 'takeaway': 5500}")
 
 
 class SetPromotionReq(BaseModel):
@@ -76,6 +76,7 @@ class ApprovePriceChangeReq(BaseModel):
 
 # ─── 1. 查询标准售价 ───
 
+
 @router.get("/standard-price/{dish_id}")
 async def get_standard_price(
     dish_id: str,
@@ -90,6 +91,7 @@ async def get_standard_price(
 
 
 # ─── 2. 设置时价（海鲜/活鲜） ───
+
 
 @router.post("/market-price")
 async def set_market_price(
@@ -109,6 +111,7 @@ async def set_market_price(
 
 # ─── 3. 称重计价 ───
 
+
 @router.post("/weighing-price")
 async def calculate_weighing_price(
     req: CalculateWeighingReq,
@@ -125,6 +128,7 @@ async def calculate_weighing_price(
 
 
 # ─── 4. 套餐组合定价 ───
+
 
 @router.post("/combo-price")
 async def create_combo_price(
@@ -144,6 +148,7 @@ async def create_combo_price(
 
 # ─── 5. 多渠道差异价 ───
 
+
 @router.post("/channel-price")
 async def set_channel_price(
     req: SetChannelPriceReq,
@@ -160,6 +165,7 @@ async def set_channel_price(
 
 
 # ─── 6. 促销价 ───
+
 
 @router.post("/promotion-price")
 async def set_promotion_price(
@@ -180,6 +186,7 @@ async def set_promotion_price(
 
 # ─── 7. 毛利底线校验 ───
 
+
 @router.post("/validate-margin")
 async def validate_margin(
     req: ValidateMarginReq,
@@ -197,6 +204,7 @@ async def validate_margin(
 
 
 # ─── 8. 调价审批 ───
+
 
 @router.post("/approve-change")
 async def approve_price_change(
@@ -254,6 +262,7 @@ async def _set_tenant(db: AsyncSession, tenant_id: str) -> None:
 
 
 # ─── 9. 全菜品×全渠道价格矩阵 ───
+
 
 @router.get("/matrix")
 async def get_pricing_matrix(
@@ -341,6 +350,7 @@ async def get_pricing_matrix(
 
 # ─── 10. 批量更新价格 ───
 
+
 @router.put("/batch")
 async def batch_update_prices(
     req: BatchPriceUpdateReq,
@@ -394,6 +404,7 @@ async def batch_update_prices(
 
 # ─── 11. 加价规则列表 ───
 
+
 @router.get("/rules")
 async def list_pricing_rules(
     store_id: str,
@@ -432,6 +443,7 @@ async def list_pricing_rules(
 
 
 # ─── 12. 创建加价规则 ───
+
 
 @router.post("/rules", status_code=201)
 async def create_pricing_rule(
@@ -478,7 +490,9 @@ async def create_pricing_rule(
     )
     row = result.fetchone()
     await db.commit()
-    log.info("pricing_rule.created", channel=req.channel, store_id=req.store_id, rule_type=req.rule_type, value=req.value)
+    log.info(
+        "pricing_rule.created", channel=req.channel, store_id=req.store_id, rule_type=req.rule_type, value=req.value
+    )
     return {
         "ok": True,
         "data": {
@@ -495,6 +509,7 @@ async def create_pricing_rule(
 
 
 # ─── 13. 预览调价结果 ───
+
 
 @router.post("/preview")
 async def preview_pricing(
@@ -549,14 +564,16 @@ async def preview_pricing(
         new_price = max(1, new_price)  # 至少 1 分
         diff = new_price - current_price
 
-        previews.append({
-            "dish_id": str(r[0]),
-            "dish_name": r[1],
-            "base_price_fen": base_price,
-            "current_channel_price_fen": current_price,
-            "preview_price_fen": new_price,
-            "diff_fen": diff,
-        })
+        previews.append(
+            {
+                "dish_id": str(r[0]),
+                "dish_name": r[1],
+                "base_price_fen": base_price,
+                "current_channel_price_fen": current_price,
+                "preview_price_fen": new_price,
+                "diff_fen": diff,
+            }
+        )
 
     log.info("pricing.preview", channel=req.channel, store_id=req.store_id, dish_count=len(previews))
     return {

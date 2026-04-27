@@ -23,6 +23,7 @@ Schema SQL（在数据库中手动执行）:
     from .api.booking_prep_routes import router as booking_prep_router
     app.include_router(booking_prep_router, prefix="/api/v1/booking-prep")
 """
+
 from __future__ import annotations
 
 import uuid
@@ -69,6 +70,7 @@ def _resolve_dept(dish_name: str) -> str:
 
 
 # ─── 数据模型 ───
+
 
 @dataclass
 class BookingPrepTask:
@@ -159,6 +161,7 @@ def _register_booking(
 
 
 # ─── 服务类 ───
+
 
 class BookingPrepService:
     """预订备餐联动服务。
@@ -283,10 +286,7 @@ class BookingPrepService:
         now = datetime.now(timezone.utc)
 
         # 检查是否已存在（幂等）
-        existing = [
-            t for t in _tasks.values()
-            if t.tenant_id == tenant_id and t.booking_id == booking_id
-        ]
+        existing = [t for t in _tasks.values() if t.tenant_id == tenant_id and t.booking_id == booking_id]
         if existing:
             logger.info(
                 "booking_prep.generate_tasks.idempotent",
@@ -347,10 +347,9 @@ class BookingPrepService:
             状态为 pending 或 started 的 BookingPrepTask 列表
         """
         result = [
-            t for t in _tasks.values()
-            if t.tenant_id == tenant_id
-            and t.store_id == store_id
-            and t.status in ("pending", "started")
+            t
+            for t in _tasks.values()
+            if t.tenant_id == tenant_id and t.store_id == store_id and t.status in ("pending", "started")
         ]
 
         # 按预订的 dining_at 排序（最近开餐时间优先）
@@ -383,9 +382,7 @@ class BookingPrepService:
         if task is None:
             raise ValueError(f"备餐任务 {task_id} 不存在（tenant={tenant_id}）")
         if task.status != "pending":
-            raise ValueError(
-                f"任务 {task_id} 当前状态为 '{task.status}'，只有 pending 状态可开始备餐"
-            )
+            raise ValueError(f"任务 {task_id} 当前状态为 '{task.status}'，只有 pending 状态可开始备餐")
         task.status = "started"
         task.prep_start_at = datetime.now(timezone.utc)
         logger.info("booking_prep.task_started", task_id=task_id, tenant_id=tenant_id)
@@ -406,9 +403,7 @@ class BookingPrepService:
         if task is None:
             raise ValueError(f"备餐任务 {task_id} 不存在（tenant={tenant_id}）")
         if task.status != "started":
-            raise ValueError(
-                f"任务 {task_id} 当前状态为 '{task.status}'，只有 started 状态可完成备餐"
-            )
+            raise ValueError(f"任务 {task_id} 当前状态为 '{task.status}'，只有 started 状态可完成备餐")
         task.status = "done"
         logger.info("booking_prep.task_done", task_id=task_id, tenant_id=tenant_id)
         return task

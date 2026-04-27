@@ -11,6 +11,7 @@
 - tenant_id 显式传入，不从 session 读取
 - 不硬编码密钥，不静默吞没异常
 """
+
 import uuid
 from dataclasses import dataclass, field
 from datetime import date, datetime, time, timedelta
@@ -66,7 +67,7 @@ class OperatorStats:
 class ShiftSummary:
     shift_id: str
     shift_name: str
-    date: str                           # ISO 日期 YYYY-MM-DD
+    date: str  # ISO 日期 YYYY-MM-DD
     total_tasks: int = 0
     finished_tasks: int = 0
     avg_duration_seconds: float = 0.0
@@ -113,10 +114,7 @@ def _shift_window(target_date: date, start_time: time, end_time: time) -> tuple[
 async def _table_exists(db: AsyncSession, table_name: str) -> bool:
     """检查表是否存在，用于 kds_tasks 优雅降级。"""
     result = await db.execute(
-        text(
-            "SELECT EXISTS(SELECT 1 FROM information_schema.tables "
-            "WHERE table_name = :name)"
-        ),
+        text("SELECT EXISTS(SELECT 1 FROM information_schema.tables WHERE table_name = :name)"),
         {"name": table_name},
     )
     return bool(result.scalar())

@@ -37,6 +37,7 @@
   GET  /api/v1/quick-cashier/flow-control/{store_id}         — 查看限流配置
   PUT  /api/v1/quick-cashier/flow-control/{store_id}         — 设置各时段最大并发订单数
 """
+
 import asyncio
 from datetime import date, datetime, timezone
 from typing import Optional
@@ -276,14 +277,16 @@ async def create_quick_order(
         total_fen=total_fen,
     )
 
-    return _ok({
-        "quick_order_id": str(quick_order_id),
-        "call_number": call_number,
-        "order_type": req.order_type,
-        "total_fen": total_fen,
-        "status": "pending",
-        "items": [item.model_dump() for item in req.items],
-    })
+    return _ok(
+        {
+            "quick_order_id": str(quick_order_id),
+            "call_number": call_number,
+            "order_type": req.order_type,
+            "total_fen": total_fen,
+            "status": "pending",
+            "items": [item.model_dump() for item in req.items],
+        }
+    )
 
 
 # ─── 2. 快速支付 ─────────────────────────────────────────────────────────────
@@ -374,15 +377,17 @@ async def quick_pay(
         call_number=quick_order["call_number"],
     )
 
-    return _ok({
-        "quick_order_id": quick_order_id,
-        "call_number": quick_order["call_number"],
-        "method": req.method,
-        "amount_fen": req.amount_fen,
-        "change_fen": change_fen,
-        "status": "pending",
-        "paid_at": now.isoformat(),
-    })
+    return _ok(
+        {
+            "quick_order_id": quick_order_id,
+            "call_number": quick_order["call_number"],
+            "method": req.method,
+            "amount_fen": req.amount_fen,
+            "change_fen": change_fen,
+            "status": "pending",
+            "paid_at": now.isoformat(),
+        }
+    )
 
 
 # ─── 3. 获取待叫号列表 ───────────────────────────────────────────────────────
@@ -466,12 +471,14 @@ async def call_number(
         call_number=updated["call_number"],
     )
 
-    return _ok({
-        "quick_order_id": quick_order_id,
-        "call_number": updated["call_number"],
-        "status": "calling",
-        "called_at": updated["called_at"].isoformat() if updated["called_at"] else None,
-    })
+    return _ok(
+        {
+            "quick_order_id": quick_order_id,
+            "call_number": updated["call_number"],
+            "status": "calling",
+            "called_at": updated["called_at"].isoformat() if updated["called_at"] else None,
+        }
+    )
 
 
 # ─── 5. 取餐完成 ─────────────────────────────────────────────────────────────
@@ -516,12 +523,14 @@ async def complete_order(
         call_number=updated["call_number"],
     )
 
-    return _ok({
-        "quick_order_id": quick_order_id,
-        "call_number": updated["call_number"],
-        "status": "completed",
-        "completed_at": updated["completed_at"].isoformat() if updated["completed_at"] else None,
-    })
+    return _ok(
+        {
+            "quick_order_id": quick_order_id,
+            "call_number": updated["call_number"],
+            "status": "completed",
+            "completed_at": updated["completed_at"].isoformat() if updated["completed_at"] else None,
+        }
+    )
 
 
 # ─── 6. 获取快餐配置 ─────────────────────────────────────────────────────────
@@ -552,22 +561,26 @@ async def get_config(
 
     if not config:
         # 返回默认配置（尚未初始化）
-        return _ok({
-            "store_id": store_id,
-            "is_enabled": False,
-            "call_mode": "number",
-            "prefix": "",
-            "daily_reset": True,
-            "max_number": 999,
-            "auto_print_receipt": True,
-            "configured": False,
-        })
+        return _ok(
+            {
+                "store_id": store_id,
+                "is_enabled": False,
+                "call_mode": "number",
+                "prefix": "",
+                "daily_reset": True,
+                "max_number": 999,
+                "auto_print_receipt": True,
+                "configured": False,
+            }
+        )
 
-    return _ok({
-        "store_id": store_id,
-        **dict(config),
-        "configured": True,
-    })
+    return _ok(
+        {
+            "store_id": store_id,
+            **dict(config),
+            "configured": True,
+        }
+    )
 
 
 # ─── 7. 保存快餐配置 ─────────────────────────────────────────────────────────
@@ -628,16 +641,18 @@ async def save_config(
         call_mode=req.call_mode,
     )
 
-    return _ok({
-        "store_id": store_id,
-        "is_enabled": req.is_enabled,
-        "call_mode": req.call_mode,
-        "prefix": req.prefix,
-        "daily_reset": req.daily_reset,
-        "max_number": req.max_number,
-        "auto_print_receipt": req.auto_print_receipt,
-        "updated_at": now.isoformat(),
-    })
+    return _ok(
+        {
+            "store_id": store_id,
+            "is_enabled": req.is_enabled,
+            "call_mode": req.call_mode,
+            "prefix": req.prefix,
+            "daily_reset": req.daily_reset,
+            "max_number": req.max_number,
+            "auto_print_receipt": req.auto_print_receipt,
+            "updated_at": now.isoformat(),
+        }
+    )
 
 
 # ─── 8. 获取下一个取餐号 ─────────────────────────────────────────────────────
@@ -683,13 +698,15 @@ async def get_next_sequence(
     next_seq = (current % max_number) + 1
     next_number = f"{prefix}{str(next_seq).zfill(3)}"
 
-    return _ok({
-        "store_id": store_id,
-        "biz_date": biz_date,
-        "next_number": next_number,
-        "current_seq": current,
-        "prefix": prefix,
-    })
+    return _ok(
+        {
+            "store_id": store_id,
+            "biz_date": biz_date,
+            "next_number": next_number,
+            "current_seq": current,
+            "prefix": prefix,
+        }
+    )
 
 
 # ─── 内部工具：原子性分配取餐号 ─────────────────────────────────────────────
@@ -865,7 +882,7 @@ async def update_counter(
         text(
             f"""
             UPDATE quick_cashier_counters
-            SET {', '.join(set_parts)}
+            SET {", ".join(set_parts)}
             WHERE id = :id AND tenant_id = :tenant_id AND is_deleted = FALSE
             RETURNING id, name, status, display_order, operator_id, max_queue_size, updated_at
             """
@@ -1042,14 +1059,16 @@ async def join_queue(
     await db.commit()
 
     logger.info("queue_joined", queue_id=str(queue_id), counter_id=counter_id, queue_number=queue_number)
-    return _ok({
-        "queue_id": str(queue_id),
-        "counter_id": counter_id,
-        "counter_name": counter_state["name"],
-        "queue_number": queue_number,
-        "status": "waiting",
-        "joined_at": now.isoformat(),
-    })
+    return _ok(
+        {
+            "queue_id": str(queue_id),
+            "counter_id": counter_id,
+            "counter_name": counter_state["name"],
+            "queue_number": queue_number,
+            "status": "waiting",
+            "joined_at": now.isoformat(),
+        }
+    )
 
 
 @router.get("/queue/status")
@@ -1132,15 +1151,17 @@ async def process_queue_item(
     )
     await db.commit()
 
-    return _ok({
-        "queue_id": queue_id,
-        "counter_id": str(updated["counter_id"]),
-        "queue_number": updated["queue_number"],
-        "member_id": updated["member_id"],
-        "party_size": updated["party_size"],
-        "status": "processing",
-        "processed_at": now.isoformat(),
-    })
+    return _ok(
+        {
+            "queue_id": queue_id,
+            "counter_id": str(updated["counter_id"]),
+            "queue_number": updated["queue_number"],
+            "member_id": updated["member_id"],
+            "party_size": updated["party_size"],
+            "status": "processing",
+            "processed_at": now.isoformat(),
+        }
+    )
 
 
 @router.delete("/queue/{queue_id}")
@@ -1222,17 +1243,19 @@ async def get_calling_config(
     config = row.mappings().first()
 
     if not config:
-        return _ok({
-            "store_id": store_id,
-            "prefix": "A",
-            "number_start": 1,
-            "number_end": 999,
-            "broadcast_mode": "screen",
-            "recall_times": 3,
-            "skip_after_seconds": 120,
-            "daily_reset": True,
-            "configured": False,
-        })
+        return _ok(
+            {
+                "store_id": store_id,
+                "prefix": "A",
+                "number_start": 1,
+                "number_end": 999,
+                "broadcast_mode": "screen",
+                "recall_times": 3,
+                "skip_after_seconds": 120,
+                "daily_reset": True,
+                "configured": False,
+            }
+        )
 
     return _ok({"store_id": store_id, **dict(config), "configured": True})
 
@@ -1293,17 +1316,19 @@ async def save_calling_config(
     await db.commit()
 
     logger.info("calling_config_saved", store_id=store_id, broadcast_mode=req.broadcast_mode)
-    return _ok({
-        "store_id": store_id,
-        "prefix": req.prefix,
-        "number_start": req.number_start,
-        "number_end": req.number_end,
-        "broadcast_mode": req.broadcast_mode,
-        "recall_times": req.recall_times,
-        "skip_after_seconds": req.skip_after_seconds,
-        "daily_reset": req.daily_reset,
-        "updated_at": now.isoformat(),
-    })
+    return _ok(
+        {
+            "store_id": store_id,
+            "prefix": req.prefix,
+            "number_start": req.number_start,
+            "number_end": req.number_end,
+            "broadcast_mode": req.broadcast_mode,
+            "recall_times": req.recall_times,
+            "skip_after_seconds": req.skip_after_seconds,
+            "daily_reset": req.daily_reset,
+            "updated_at": now.isoformat(),
+        }
+    )
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -1376,10 +1401,7 @@ async def member_quick_pay(
     # ── Step 4: 检查余额是否充足 ──
     balance_fen = int(member["balance_fen"] or 0)
     if balance_fen < discounted_amount_fen:
-        _err(
-            f"会员余额不足。余额：{balance_fen / 100:.2f} 元，"
-            f"需支付：{discounted_amount_fen / 100:.2f} 元"
-        )
+        _err(f"会员余额不足。余额：{balance_fen / 100:.2f} 元，需支付：{discounted_amount_fen / 100:.2f} 元")
 
     # ── Step 5: 扣减余额 + 标记订单支付 + 发放积分 ──
     points_earned = discounted_amount_fen // 100  # 每消费1元积1分
@@ -1446,21 +1468,23 @@ async def member_quick_pay(
         points_earned=points_earned,
     )
 
-    return _ok({
-        "quick_order_id": req.quick_order_id,
-        "call_number": quick_order["call_number"],
-        "member_id": str(member["id"]),
-        "member_level": member["level_name"],
-        "original_amount_fen": req.amount_fen,
-        "discount_rate": discount_rate,
-        "discount_amount_fen": discount_amount_fen,
-        "paid_amount_fen": discounted_amount_fen,
-        "remaining_balance_fen": balance_fen - discounted_amount_fen,
-        "points_earned": points_earned,
-        "method": "member_balance",
-        "status": "pending",
-        "paid_at": now.isoformat(),
-    })
+    return _ok(
+        {
+            "quick_order_id": req.quick_order_id,
+            "call_number": quick_order["call_number"],
+            "member_id": str(member["id"]),
+            "member_level": member["level_name"],
+            "original_amount_fen": req.amount_fen,
+            "discount_rate": discount_rate,
+            "discount_amount_fen": discount_amount_fen,
+            "paid_amount_fen": discounted_amount_fen,
+            "remaining_balance_fen": balance_fen - discounted_amount_fen,
+            "points_earned": points_earned,
+            "method": "member_balance",
+            "status": "pending",
+            "paid_at": now.isoformat(),
+        }
+    )
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -1493,21 +1517,25 @@ async def get_flow_control(
     config = row.mappings().first()
 
     if not config:
-        return _ok({
-            "store_id": store_id,
-            "is_enabled": False,
-            "rules": [],
-            "configured": False,
-        })
+        return _ok(
+            {
+                "store_id": store_id,
+                "is_enabled": False,
+                "rules": [],
+                "configured": False,
+            }
+        )
 
-    return _ok({
-        "store_id": store_id,
-        "is_enabled": config["is_enabled"],
-        "rules": config["rules"] or [],
-        "created_at": config["created_at"].isoformat() if config["created_at"] else None,
-        "updated_at": config["updated_at"].isoformat() if config["updated_at"] else None,
-        "configured": True,
-    })
+    return _ok(
+        {
+            "store_id": store_id,
+            "is_enabled": config["is_enabled"],
+            "rules": config["rules"] or [],
+            "created_at": config["created_at"].isoformat() if config["created_at"] else None,
+            "updated_at": config["updated_at"].isoformat() if config["updated_at"] else None,
+            "configured": True,
+        }
+    )
 
 
 @router.put("/flow-control/{store_id}")
@@ -1529,6 +1557,7 @@ async def save_flow_control(
     for rule in req.rules:
         try:
             from datetime import time as dtime
+
             dtime.fromisoformat(rule.time_from)
             dtime.fromisoformat(rule.time_to)
         except ValueError:
@@ -1564,9 +1593,11 @@ async def save_flow_control(
     await db.commit()
 
     logger.info("flow_control_saved", store_id=store_id, is_enabled=req.is_enabled, rule_count=len(req.rules))
-    return _ok({
-        "store_id": store_id,
-        "is_enabled": req.is_enabled,
-        "rules": [r.model_dump() for r in req.rules],
-        "updated_at": now.isoformat(),
-    })
+    return _ok(
+        {
+            "store_id": store_id,
+            "is_enabled": req.is_enabled,
+            "rules": [r.model_dump() for r in req.rules],
+            "updated_at": now.isoformat(),
+        }
+    )

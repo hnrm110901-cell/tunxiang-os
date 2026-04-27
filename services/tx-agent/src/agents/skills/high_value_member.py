@@ -2,6 +2,7 @@
 
 高价值会员识别、专属权益设计、流失预警、个性化服务、生命周期管理、价值提升策略。
 """
+
 from typing import Any
 
 from ..base import AgentResult, SkillAgent
@@ -16,7 +17,14 @@ MEMBER_TIERS = {
 
 # 专属权益池
 EXCLUSIVE_PERKS = {
-    "diamond": ["专属管家服务", "生日免单（限2000元）", "优先包间预订", "新品优先试吃", "年度答谢宴邀请", "免费代客泊车"],
+    "diamond": [
+        "专属管家服务",
+        "生日免单（限2000元）",
+        "优先包间预订",
+        "新品优先试吃",
+        "年度答谢宴邀请",
+        "免费代客泊车",
+    ],
     "gold": ["生日8折", "优先排队", "新品试吃", "季度赠券"],
     "silver": ["生日9折", "积分翻倍日", "节日赠券"],
 }
@@ -28,6 +36,9 @@ class HighValueMemberAgent(SkillAgent):
     description = "高价值会员识别、专属权益设计、流失预警、个性化服务、生命周期管理、价值提升"
     priority = "P0"
     run_location = "cloud"
+
+    # Sprint D1 / PR Overflow：专属权益/折扣 + 流失预警触发召回券 → margin
+    constraint_scope = {"margin"}
 
     def get_supported_actions(self) -> list[str]:
         return [
@@ -69,20 +80,23 @@ class HighValueMemberAgent(SkillAgent):
             else:
                 tier = "regular"
 
-            results[tier].append({
-                "customer_id": m.get("customer_id"),
-                "name": m.get("name", ""),
-                "tier": tier,
-                "tier_name": MEMBER_TIERS[tier]["name"],
-                "annual_spend_yuan": round(annual_spend / 100, 2),
-                "visit_count": m.get("visit_count", 0),
-            })
+            results[tier].append(
+                {
+                    "customer_id": m.get("customer_id"),
+                    "name": m.get("name", ""),
+                    "tier": tier,
+                    "tier_name": MEMBER_TIERS[tier]["name"],
+                    "annual_spend_yuan": round(annual_spend / 100, 2),
+                    "visit_count": m.get("visit_count", 0),
+                }
+            )
 
         hv_count = len(results["diamond"]) + len(results["gold"])
         total = len(members)
 
         return AgentResult(
-            success=True, action="identify_high_value_members",
+            success=True,
+            action="identify_high_value_members",
             data={
                 "tier_distribution": {k: len(v) for k, v in results.items()},
                 "diamond_members": results["diamond"][:20],
@@ -92,7 +106,7 @@ class HighValueMemberAgent(SkillAgent):
                 "total_members": total,
             },
             reasoning=f"识别高价值会员 {hv_count} 人（钻石{len(results['diamond'])}、金卡{len(results['gold'])}），"
-                      f"占比 {hv_count / max(1, total) * 100:.1f}%",
+            f"占比 {hv_count / max(1, total) * 100:.1f}%",
             confidence=0.9,
         )
 
@@ -114,7 +128,8 @@ class HighValueMemberAgent(SkillAgent):
             personalized_perks.append("红酒开瓶费免除")
 
         return AgentResult(
-            success=True, action="design_exclusive_perks",
+            success=True,
+            action="design_exclusive_perks",
             data={
                 "customer_id": customer_id,
                 "tier": tier,
@@ -125,7 +140,7 @@ class HighValueMemberAgent(SkillAgent):
                 "personalized_count": len(personalized_perks) - len(base_perks),
             },
             reasoning=f"为{MEMBER_TIERS.get(tier, {}).get('name', tier)}设计 {len(personalized_perks)} 项权益，"
-                      f"含 {len(personalized_perks) - len(base_perks)} 项个性化权益",
+            f"含 {len(personalized_perks) - len(base_perks)} 项个性化权益",
             confidence=0.85,
         )
 
@@ -159,22 +174,34 @@ class HighValueMemberAgent(SkillAgent):
                 signals.append("近期有投诉")
 
             if risk >= 0.3:
-                alerts.append({
-                    "customer_id": m.get("customer_id"),
-                    "name": m.get("name", ""),
-                    "tier": "diamond" if annual_spend >= MEMBER_TIERS["diamond"]["min_annual_spend_fen"] else "gold",
-                    "risk_score": round(min(1.0, risk), 2),
-                    "signals": signals,
-                    "annual_spend_yuan": round(annual_spend / 100, 2),
-                    "recommended_action": "店长亲自回访" if risk >= 0.7 else "专属管家致电" if risk >= 0.5 else "推送关怀权益",
-                })
+                alerts.append(
+                    {
+                        "customer_id": m.get("customer_id"),
+                        "name": m.get("name", ""),
+                        "tier": "diamond"
+                        if annual_spend >= MEMBER_TIERS["diamond"]["min_annual_spend_fen"]
+                        else "gold",
+                        "risk_score": round(min(1.0, risk), 2),
+                        "signals": signals,
+                        "annual_spend_yuan": round(annual_spend / 100, 2),
+                        "recommended_action": "店长亲自回访"
+                        if risk >= 0.7
+                        else "专属管家致电"
+                        if risk >= 0.5
+                        else "推送关怀权益",
+                    }
+                )
 
         alerts.sort(key=lambda x: x["risk_score"], reverse=True)
 
         return AgentResult(
-            success=True, action="alert_high_value_churn",
-            data={"alerts": alerts[:30], "total_alerts": len(alerts),
-                  "critical_count": sum(1 for a in alerts if a["risk_score"] >= 0.7)},
+            success=True,
+            action="alert_high_value_churn",
+            data={
+                "alerts": alerts[:30],
+                "total_alerts": len(alerts),
+                "critical_count": sum(1 for a in alerts if a["risk_score"] >= 0.7),
+            },
             reasoning=f"高价值会员流失预警 {len(alerts)} 条，严重 {sum(1 for a in alerts if a['risk_score'] >= 0.7)} 条",
             confidence=0.8,
         )
@@ -208,7 +235,8 @@ class HighValueMemberAgent(SkillAgent):
             service_notes.append(f"辣度: {preferences['spice_level']}")
 
         return AgentResult(
-            success=True, action="personalize_service",
+            success=True,
+            action="personalize_service",
             data={
                 "customer_id": customer_id,
                 "name": name,
@@ -254,7 +282,8 @@ class HighValueMemberAgent(SkillAgent):
             gap_fen = max(0, MEMBER_TIERS[next_tier]["min_annual_spend_fen"] - annual_spend_fen)
 
         return AgentResult(
-            success=True, action="manage_member_lifecycle",
+            success=True,
+            action="manage_member_lifecycle",
             data={
                 "customer_id": customer_id,
                 "current_tier": current_tier,
@@ -283,30 +312,38 @@ class HighValueMemberAgent(SkillAgent):
             strategies = []
             # 提频策略
             if frequency <= 2:
-                strategies.append({"type": "提频", "detail": "推送限时优惠，提升到店频次",
-                                   "expected_lift_pct": 15})
+                strategies.append({"type": "提频", "detail": "推送限时优惠，提升到店频次", "expected_lift_pct": 15})
             # 提客单策略
             if avg_ticket_fen <= 15000:
-                strategies.append({"type": "提客单", "detail": "推荐套餐/加菜引导，提升客单价",
-                                   "expected_lift_pct": 10})
+                strategies.append(
+                    {"type": "提客单", "detail": "推荐套餐/加菜引导，提升客单价", "expected_lift_pct": 10}
+                )
             # 升级策略
             next_tier = {"regular": "silver", "silver": "gold", "gold": "diamond"}.get(current_tier)
             if next_tier:
                 gap = MEMBER_TIERS[next_tier]["min_annual_spend_fen"] - annual_spend
                 if 0 < gap <= annual_spend * 0.3:
-                    strategies.append({"type": "升级激励", "detail": f"距{MEMBER_TIERS[next_tier]['name']}仅差 ¥{gap / 100:.0f}",
-                                       "expected_lift_pct": 20})
+                    strategies.append(
+                        {
+                            "type": "升级激励",
+                            "detail": f"距{MEMBER_TIERS[next_tier]['name']}仅差 ¥{gap / 100:.0f}",
+                            "expected_lift_pct": 20,
+                        }
+                    )
 
             if strategies:
-                suggestions.append({
-                    "customer_id": m.get("customer_id"),
-                    "name": m.get("name", ""),
-                    "current_tier": current_tier,
-                    "strategies": strategies,
-                })
+                suggestions.append(
+                    {
+                        "customer_id": m.get("customer_id"),
+                        "name": m.get("name", ""),
+                        "current_tier": current_tier,
+                        "strategies": strategies,
+                    }
+                )
 
         return AgentResult(
-            success=True, action="suggest_value_upgrade",
+            success=True,
+            action="suggest_value_upgrade",
             data={"suggestions": suggestions[:50], "total": len(suggestions)},
             reasoning=f"为 {len(suggestions)} 位会员生成价值提升策略",
             confidence=0.75,

@@ -1,4 +1,5 @@
 """全渠道统一订单：源码与 main 挂载检查。"""
+
 from pathlib import Path
 
 
@@ -16,7 +17,7 @@ def test_main_includes_omni_channel_router():
     main_py = Path(__file__).resolve().parent.parent / "main.py"
     text = main_py.read_text(encoding="utf-8")
     assert "omni_channel_router" in text
-    assert "omni_channel_router, prefix=\"/api/v1\"" in text
+    assert 'omni_channel_router, prefix="/api/v1"' in text
 
 
 def test_omni_routes_expose_unified_orders():

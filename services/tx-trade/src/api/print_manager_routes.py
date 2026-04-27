@@ -10,14 +10,13 @@
   GET  /api/v1/print/config/export/{store_id} — 导出打印机配置（JSON）
   POST /api/v1/print/config/import       — 导入打印机配置（新门店克隆）
 """
-import json
+
 import uuid
 from datetime import datetime
 from typing import Optional
 
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -29,6 +28,7 @@ logger = structlog.get_logger()
 
 
 # ─── 工具函数 ─────────────────────────────────────────────────────────────────
+
 
 def _get_tenant_id(request: Request) -> str:
     tid = getattr(request.state, "tenant_id", None) or request.headers.get("X-Tenant-ID", "")
@@ -60,6 +60,7 @@ class ConfigImportRequest(BaseModel):
 
 # ─── 序列化辅助 ───────────────────────────────────────────────────────────────
 
+
 def _row_to_task(row) -> dict:
     return {
         "id": str(row.id),
@@ -76,6 +77,7 @@ def _row_to_task(row) -> dict:
 
 
 # ─── 打印任务队列 ────────────────────────────────────────────────────────────
+
 
 @router.get("/tasks")
 async def list_print_tasks(
@@ -290,6 +292,7 @@ async def send_test_page(
     # 尝试通过 print_manager 实际触发打印（可选，失败不影响任务记录）
     try:
         from ..services.print_manager import get_print_manager
+
         mgr = get_print_manager()
         await mgr.test_print(body.printer_id)
     except (ValueError, AttributeError, ImportError):
@@ -302,6 +305,7 @@ async def send_test_page(
 
 
 # ─── 配置导入导出 ─────────────────────────────────────────────────────────────
+
 
 @router.get("/config/export/{store_id}")
 async def export_printer_config(
@@ -362,14 +366,16 @@ async def export_printer_config(
     # 路由规则（用打印机名称代替ID，方便跨门店迁移）
     routes_export = []
     for r in routes:
-        routes_export.append({
-            "printer_name": printer_id_map.get(str(r.printer_id), str(r.printer_id)),
-            "category_id": str(r.category_id) if r.category_id else None,
-            "category_name": r.category_name,
-            "dish_tag": r.dish_tag,
-            "priority": r.priority,
-            "is_default": r.is_default,
-        })
+        routes_export.append(
+            {
+                "printer_name": printer_id_map.get(str(r.printer_id), str(r.printer_id)),
+                "category_id": str(r.category_id) if r.category_id else None,
+                "category_name": r.category_name,
+                "dish_tag": r.dish_tag,
+                "priority": r.priority,
+                "is_default": r.is_default,
+            }
+        )
 
     config_payload = {
         "version": "1.0",
@@ -379,8 +385,7 @@ async def export_printer_config(
         "routes": routes_export,
     }
 
-    logger.info("printer_config.exported", store_id=store_id, tenant_id=tenant_id,
-                printer_count=len(printers_export))
+    logger.info("printer_config.exported", store_id=store_id, tenant_id=tenant_id, printer_count=len(printers_export))
     return {
         "ok": True,
         "data": config_payload,

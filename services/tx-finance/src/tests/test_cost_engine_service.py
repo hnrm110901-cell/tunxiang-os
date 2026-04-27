@@ -7,6 +7,7 @@
 4. 多租户隔离（不同 tenant_id 返回不同结果）
 5. 成本率计算正确性
 """
+
 from __future__ import annotations
 
 import uuid
@@ -21,6 +22,7 @@ from services.tx_finance.src.services.cost_engine_service import (
 )
 
 # ─── 测试夹具 ────────────────────────────────────────────────────────────────
+
 
 @pytest.fixture
 def tenant_id() -> uuid.UUID:
@@ -48,6 +50,7 @@ def service() -> CostEngineService:
 
 
 # ─── 成本健康度评分测试 ───────────────────────────────────────────────────────
+
 
 class TestCalculateCostHealthScore:
     """测试成本健康度评分纯函数，覆盖所有边界值"""
@@ -132,7 +135,7 @@ class TestCalculateCostHealthScore:
         scores = [calculate_cost_health_score(r).score for r in rates]
         for i in range(len(scores) - 1):
             assert scores[i] >= scores[i + 1], (
-                f"score({rates[i]})={scores[i]} should >= score({rates[i+1]})={scores[i+1]}"
+                f"score({rates[i]})={scores[i]} should >= score({rates[i + 1]})={scores[i + 1]}"
             )
 
     def test_to_dict_structure(self):
@@ -140,42 +143,46 @@ class TestCalculateCostHealthScore:
         result = calculate_cost_health_score(0.30)
         d = result.to_dict()
         required_keys = {
-            "food_cost_rate", "food_cost_rate_pct", "score",
-            "status", "status_label", "color",
-            "target_rate", "gap_to_target", "gap_to_target_pct",
+            "food_cost_rate",
+            "food_cost_rate_pct",
+            "score",
+            "status",
+            "status_label",
+            "color",
+            "target_rate",
+            "gap_to_target",
+            "gap_to_target_pct",
         }
         assert required_keys.issubset(set(d.keys()))
 
 
 # ─── 日成本快报测试 ───────────────────────────────────────────────────────────
 
+
 class TestGetDailyCostReport:
     """测试 CostEngineService.get_daily_cost_report"""
 
     @pytest.mark.asyncio
-    async def test_has_snapshots_returns_actual_cost(
-        self, service, store_id, tenant_id, mock_db
-    ):
+    async def test_has_snapshots_returns_actual_cost(self, service, store_id, tenant_id, mock_db):
         """有 cost_snapshots 快照时返回实际食材成本"""
         biz_date = date(2026, 3, 31)
 
-        with patch.object(
-            service._repo, "fetch_daily_cost_from_snapshots",
-            new=AsyncMock(return_value={
-                "total_food_cost_fen": 30000,
-                "order_count": 10,
-                "snapshot_count": 10,
-            })
-        ), patch.object(
-            service._repo, "fetch_daily_revenue_for_cost",
-            new=AsyncMock(return_value=100000)
-        ), patch.object(
-            service._repo, "fetch_dish_cost_breakdown",
-            new=AsyncMock(return_value=[])
+        with (
+            patch.object(
+                service._repo,
+                "fetch_daily_cost_from_snapshots",
+                new=AsyncMock(
+                    return_value={
+                        "total_food_cost_fen": 30000,
+                        "order_count": 10,
+                        "snapshot_count": 10,
+                    }
+                ),
+            ),
+            patch.object(service._repo, "fetch_daily_revenue_for_cost", new=AsyncMock(return_value=100000)),
+            patch.object(service._repo, "fetch_dish_cost_breakdown", new=AsyncMock(return_value=[])),
         ):
-            report = await service.get_daily_cost_report(
-                store_id, biz_date, tenant_id, mock_db
-            )
+            report = await service.get_daily_cost_report(store_id, biz_date, tenant_id, mock_db)
 
         assert report.food_cost_fen == 30000
         assert report.revenue_fen == 100000
@@ -185,29 +192,26 @@ class TestGetDailyCostReport:
         assert report.is_estimated is False
 
     @pytest.mark.asyncio
-    async def test_no_snapshots_uses_estimate(
-        self, service, store_id, tenant_id, mock_db
-    ):
+    async def test_no_snapshots_uses_estimate(self, service, store_id, tenant_id, mock_db):
         """无 cost_snapshots 时使用 30% 估算值并标注 is_estimated=True"""
         biz_date = date(2026, 3, 31)
 
-        with patch.object(
-            service._repo, "fetch_daily_cost_from_snapshots",
-            new=AsyncMock(return_value={
-                "total_food_cost_fen": 0,
-                "order_count": 5,
-                "snapshot_count": 0,
-            })
-        ), patch.object(
-            service._repo, "fetch_daily_revenue_for_cost",
-            new=AsyncMock(return_value=80000)
-        ), patch.object(
-            service._repo, "fetch_dish_cost_breakdown",
-            new=AsyncMock(return_value=[])
+        with (
+            patch.object(
+                service._repo,
+                "fetch_daily_cost_from_snapshots",
+                new=AsyncMock(
+                    return_value={
+                        "total_food_cost_fen": 0,
+                        "order_count": 5,
+                        "snapshot_count": 0,
+                    }
+                ),
+            ),
+            patch.object(service._repo, "fetch_daily_revenue_for_cost", new=AsyncMock(return_value=80000)),
+            patch.object(service._repo, "fetch_dish_cost_breakdown", new=AsyncMock(return_value=[])),
         ):
-            report = await service.get_daily_cost_report(
-                store_id, biz_date, tenant_id, mock_db
-            )
+            report = await service.get_daily_cost_report(store_id, biz_date, tenant_id, mock_db)
 
         assert report.is_estimated is True
         assert report.estimated_reason != ""
@@ -216,98 +220,99 @@ class TestGetDailyCostReport:
         assert abs(report.food_cost_rate - 0.30) < 0.001
 
     @pytest.mark.asyncio
-    async def test_zero_revenue_no_division_error(
-        self, service, store_id, tenant_id, mock_db
-    ):
+    async def test_zero_revenue_no_division_error(self, service, store_id, tenant_id, mock_db):
         """营收为零时不产生除零错误"""
         biz_date = date(2026, 3, 31)
 
-        with patch.object(
-            service._repo, "fetch_daily_cost_from_snapshots",
-            new=AsyncMock(return_value={
-                "total_food_cost_fen": 0,
-                "order_count": 0,
-                "snapshot_count": 0,
-            })
-        ), patch.object(
-            service._repo, "fetch_daily_revenue_for_cost",
-            new=AsyncMock(return_value=0)
-        ), patch.object(
-            service._repo, "fetch_dish_cost_breakdown",
-            new=AsyncMock(return_value=[])
+        with (
+            patch.object(
+                service._repo,
+                "fetch_daily_cost_from_snapshots",
+                new=AsyncMock(
+                    return_value={
+                        "total_food_cost_fen": 0,
+                        "order_count": 0,
+                        "snapshot_count": 0,
+                    }
+                ),
+            ),
+            patch.object(service._repo, "fetch_daily_revenue_for_cost", new=AsyncMock(return_value=0)),
+            patch.object(service._repo, "fetch_dish_cost_breakdown", new=AsyncMock(return_value=[])),
         ):
-            report = await service.get_daily_cost_report(
-                store_id, biz_date, tenant_id, mock_db
-            )
+            report = await service.get_daily_cost_report(store_id, biz_date, tenant_id, mock_db)
 
         assert report.food_cost_rate == 0.0
         assert report.gross_margin_rate == 0.0
         assert report.is_estimated is False
 
     @pytest.mark.asyncio
-    async def test_health_score_included_in_report(
-        self, service, store_id, tenant_id, mock_db
-    ):
+    async def test_health_score_included_in_report(self, service, store_id, tenant_id, mock_db):
         """日成本快报中包含健康度评分"""
         biz_date = date(2026, 3, 31)
 
-        with patch.object(
-            service._repo, "fetch_daily_cost_from_snapshots",
-            new=AsyncMock(return_value={
-                "total_food_cost_fen": 35000,
-                "order_count": 8,
-                "snapshot_count": 8,
-            })
-        ), patch.object(
-            service._repo, "fetch_daily_revenue_for_cost",
-            new=AsyncMock(return_value=100000)
-        ), patch.object(
-            service._repo, "fetch_dish_cost_breakdown",
-            new=AsyncMock(return_value=[])
+        with (
+            patch.object(
+                service._repo,
+                "fetch_daily_cost_from_snapshots",
+                new=AsyncMock(
+                    return_value={
+                        "total_food_cost_fen": 35000,
+                        "order_count": 8,
+                        "snapshot_count": 8,
+                    }
+                ),
+            ),
+            patch.object(service._repo, "fetch_daily_revenue_for_cost", new=AsyncMock(return_value=100000)),
+            patch.object(service._repo, "fetch_dish_cost_breakdown", new=AsyncMock(return_value=[])),
         ):
-            report = await service.get_daily_cost_report(
-                store_id, biz_date, tenant_id, mock_db
-            )
+            report = await service.get_daily_cost_report(store_id, biz_date, tenant_id, mock_db)
 
         assert report.health is not None
         assert report.health.status == "high"  # 35% 超出 32% 上限
 
     @pytest.mark.asyncio
-    async def test_to_dict_all_fields_present(
-        self, service, store_id, tenant_id, mock_db
-    ):
+    async def test_to_dict_all_fields_present(self, service, store_id, tenant_id, mock_db):
         """to_dict 包含所有必要字段"""
         biz_date = date(2026, 3, 31)
 
-        with patch.object(
-            service._repo, "fetch_daily_cost_from_snapshots",
-            new=AsyncMock(return_value={
-                "total_food_cost_fen": 28000,
-                "order_count": 10,
-                "snapshot_count": 10,
-            })
-        ), patch.object(
-            service._repo, "fetch_daily_revenue_for_cost",
-            new=AsyncMock(return_value=100000)
-        ), patch.object(
-            service._repo, "fetch_dish_cost_breakdown",
-            new=AsyncMock(return_value=[])
+        with (
+            patch.object(
+                service._repo,
+                "fetch_daily_cost_from_snapshots",
+                new=AsyncMock(
+                    return_value={
+                        "total_food_cost_fen": 28000,
+                        "order_count": 10,
+                        "snapshot_count": 10,
+                    }
+                ),
+            ),
+            patch.object(service._repo, "fetch_daily_revenue_for_cost", new=AsyncMock(return_value=100000)),
+            patch.object(service._repo, "fetch_dish_cost_breakdown", new=AsyncMock(return_value=[])),
         ):
-            report = await service.get_daily_cost_report(
-                store_id, biz_date, tenant_id, mock_db
-            )
+            report = await service.get_daily_cost_report(store_id, biz_date, tenant_id, mock_db)
 
         d = report.to_dict()
         required_keys = {
-            "store_id", "biz_date", "revenue_fen", "food_cost_fen",
-            "food_cost_rate", "food_cost_rate_pct", "gross_profit_fen",
-            "gross_margin_rate", "gross_margin_rate_pct",
-            "is_estimated", "estimated_reason", "cost_breakdown", "health",
+            "store_id",
+            "biz_date",
+            "revenue_fen",
+            "food_cost_fen",
+            "food_cost_rate",
+            "food_cost_rate_pct",
+            "gross_profit_fen",
+            "gross_margin_rate",
+            "gross_margin_rate_pct",
+            "is_estimated",
+            "estimated_reason",
+            "cost_breakdown",
+            "health",
         }
         assert required_keys.issubset(set(d.keys()))
 
 
 # ─── 成本率计算正确性测试 ─────────────────────────────────────────────────────
+
 
 class TestCostRateCalculations:
     """验证成本率计算的数学正确性"""
@@ -339,13 +344,12 @@ class TestCostRateCalculations:
 
 # ─── 多租户隔离测试 ──────────────────────────────────────────────────────────
 
+
 class TestMultiTenantIsolation:
     """验证多租户隔离：不同 tenant_id 查询相互独立"""
 
     @pytest.mark.asyncio
-    async def test_different_tenants_independent_results(
-        self, service, store_id, tenant_id, other_tenant_id, mock_db
-    ):
+    async def test_different_tenants_independent_results(self, service, store_id, tenant_id, other_tenant_id, mock_db):
         """不同租户的查询结果相互独立"""
         biz_date = date(2026, 3, 31)
         call_count = {"count": 0}
@@ -363,22 +367,21 @@ class TestMultiTenantIsolation:
             else:
                 return 150000
 
-        with patch.object(
-            service._repo, "fetch_daily_cost_from_snapshots",
-            side_effect=mock_snapshot,
-        ), patch.object(
-            service._repo, "fetch_daily_revenue_for_cost",
-            side_effect=mock_revenue,
-        ), patch.object(
-            service._repo, "fetch_dish_cost_breakdown",
-            new=AsyncMock(return_value=[])
+        with (
+            patch.object(
+                service._repo,
+                "fetch_daily_cost_from_snapshots",
+                side_effect=mock_snapshot,
+            ),
+            patch.object(
+                service._repo,
+                "fetch_daily_revenue_for_cost",
+                side_effect=mock_revenue,
+            ),
+            patch.object(service._repo, "fetch_dish_cost_breakdown", new=AsyncMock(return_value=[])),
         ):
-            report1 = await service.get_daily_cost_report(
-                store_id, biz_date, tenant_id, mock_db
-            )
-            report2 = await service.get_daily_cost_report(
-                store_id, biz_date, other_tenant_id, mock_db
-            )
+            report1 = await service.get_daily_cost_report(store_id, biz_date, tenant_id, mock_db)
+            report2 = await service.get_daily_cost_report(store_id, biz_date, other_tenant_id, mock_db)
 
         # 两个租户的数据相互独立
         assert report1.food_cost_fen != report2.food_cost_fen

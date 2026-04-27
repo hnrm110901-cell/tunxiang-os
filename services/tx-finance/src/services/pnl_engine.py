@@ -24,6 +24,7 @@ P&L 结构（全部以分为单位）：
 禁止 broad except；最外层兜底必须带 exc_info=True。
 所有金额：分（fen）。
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -56,7 +57,7 @@ _CHANNEL_BANQUET = ("banquet", "private_room")
 _WEIGHT_TO_GRAM: dict[str, float] = {
     "kg": 1000.0,
     "g": 1.0,
-    "jin": 500.0,   # 斤 = 500g
+    "jin": 500.0,  # 斤 = 500g
     "liang": 50.0,  # 两 = 50g
 }
 
@@ -65,9 +66,7 @@ def _safe_ratio(numerator: int | float, denominator: int | float) -> float:
     """防零除，返回保留4位小数的浮点数。"""
     if denominator == 0:
         return 0.0
-    return float(Decimal(str(numerator / denominator)).quantize(
-        Decimal("0.0001"), rounding=ROUND_HALF_UP
-    ))
+    return float(Decimal(str(numerator / denominator)).quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP))
 
 
 def _pct(ratio: float) -> Decimal:
@@ -83,9 +82,11 @@ def _day_window(biz_date: date) -> tuple[datetime, datetime]:
 
 # ─── 结果数据类 ───────────────────────────────────────────────────────────────
 
+
 @dataclass
 class ChannelRevenue:
     """按渠道分类的收入明细。"""
+
     dine_in_revenue_fen: int = 0
     takeaway_revenue_fen: int = 0
     banquet_revenue_fen: int = 0
@@ -97,14 +98,16 @@ class ChannelRevenue:
 @dataclass
 class FoodCostBreakdown:
     """食材成本明细。"""
-    bom_cost_fen: int = 0           # BOM 理论成本（来自 order_items.food_cost_fen）
-    wastage_cost_fen: int = 0       # 损耗成本（cost_items 中的 wastage 记录）
-    live_seafood_death_fen: int = 0 # 活鲜死亡损耗成本
+
+    bom_cost_fen: int = 0  # BOM 理论成本（来自 order_items.food_cost_fen）
+    wastage_cost_fen: int = 0  # 损耗成本（cost_items 中的 wastage 记录）
+    live_seafood_death_fen: int = 0  # 活鲜死亡损耗成本
 
 
 @dataclass
 class DailyPnLResult:
     """日 P&L 计算结果，用于写入 daily_pnl 表。"""
+
     store_id: uuid.UUID
     pnl_date: date
 
@@ -187,6 +190,7 @@ class DailyPnLResult:
 
 # ─── PnLEngine ────────────────────────────────────────────────────────────────
 
+
 class PnLEngine:
     """
     日 P&L 自动计算引擎。
@@ -225,9 +229,7 @@ class PnLEngine:
         try:
             async with db.begin_nested():
                 # ── 1. 收入聚合 ──────────────────────────────────────────
-                channel_rev = await self._aggregate_revenue(
-                    tenant_id, store_id, pnl_date, db
-                )
+                channel_rev = await self._aggregate_revenue(tenant_id, store_id, pnl_date, db)
 
                 gross_revenue_fen = (
                     channel_rev.dine_in_revenue_fen
@@ -238,9 +240,7 @@ class PnLEngine:
                 net_revenue_fen = gross_revenue_fen - channel_rev.discount_amount_fen
 
                 # ── 2. 食材成本 ──────────────────────────────────────────
-                food_breakdown = await self._calculate_food_cost_breakdown(
-                    tenant_id, store_id, pnl_date, db
-                )
+                food_breakdown = await self._calculate_food_cost_breakdown(tenant_id, store_id, pnl_date, db)
                 food_cost_fen = (
                     food_breakdown.bom_cost_fen
                     + food_breakdown.wastage_cost_fen
@@ -258,37 +258,19 @@ class PnLEngine:
                 utilities_cost_fen = store_cfg.get("utilities_daily_fen", 0)
                 other_cost_fen = store_cfg.get("other_daily_opex_fen", 0)
 
-                total_cost_fen = (
-                    food_cost_fen
-                    + labor_cost_fen
-                    + rent_cost_fen
-                    + utilities_cost_fen
-                    + other_cost_fen
-                )
+                total_cost_fen = food_cost_fen + labor_cost_fen + rent_cost_fen + utilities_cost_fen + other_cost_fen
 
                 # ── 4. 利润计算 ──────────────────────────────────────────
                 gross_profit_fen = net_revenue_fen - food_cost_fen
                 operating_profit_fen = (
-                    gross_profit_fen
-                    - labor_cost_fen
-                    - rent_cost_fen
-                    - utilities_cost_fen
-                    - other_cost_fen
+                    gross_profit_fen - labor_cost_fen - rent_cost_fen - utilities_cost_fen - other_cost_fen
                 )
                 net_profit_fen = operating_profit_fen  # 预留税后字段
 
-                gross_margin_pct = _pct(
-                    _safe_ratio(gross_profit_fen, net_revenue_fen)
-                )
-                net_margin_pct = _pct(
-                    _safe_ratio(net_profit_fen, net_revenue_fen)
-                )
+                gross_margin_pct = _pct(_safe_ratio(gross_profit_fen, net_revenue_fen))
+                net_margin_pct = _pct(_safe_ratio(net_profit_fen, net_revenue_fen))
 
-                avg_order_value_fen = (
-                    net_revenue_fen // channel_rev.orders_count
-                    if channel_rev.orders_count > 0
-                    else 0
-                )
+                avg_order_value_fen = net_revenue_fen // channel_rev.orders_count if channel_rev.orders_count > 0 else 0
 
                 # 翻台率：从 store 实体读取桌位数
                 table_turnover_rate = await self._compute_table_turnover(
@@ -342,21 +324,23 @@ class PnLEngine:
         )
 
         # ── 6. 发布事件（fire-and-forget，不阻塞主流程）─────────────────
-        asyncio.create_task(UniversalPublisher.publish(
-            event_type=FinanceEventType.DAILY_PL_GENERATED,
-            tenant_id=tenant_id,
-            store_id=store_id,
-            entity_id=store_id,
-            event_data={
-                "date": str(pnl_date),
-                "net_revenue_fen": net_revenue_fen,
-                "food_cost_fen": food_cost_fen,
-                "gross_profit_fen": gross_profit_fen,
-                "gross_margin_pct": float(gross_margin_pct),
-                "operating_profit_fen": operating_profit_fen,
-            },
-            source_service="tx-finance",
-        ))
+        asyncio.create_task(
+            UniversalPublisher.publish(
+                event_type=FinanceEventType.DAILY_PL_GENERATED,
+                tenant_id=tenant_id,
+                store_id=store_id,
+                entity_id=store_id,
+                event_data={
+                    "date": str(pnl_date),
+                    "net_revenue_fen": net_revenue_fen,
+                    "food_cost_fen": food_cost_fen,
+                    "gross_profit_fen": gross_profit_fen,
+                    "gross_margin_pct": float(gross_margin_pct),
+                    "operating_profit_fen": operating_profit_fen,
+                },
+                source_service="tx-finance",
+            )
+        )
 
         return result
 
@@ -395,8 +379,7 @@ class PnLEngine:
                 Order.discount_amount_fen,
                 Order.payment_method,
                 Order.order_time,
-            )
-            .where(
+            ).where(
                 and_(
                     Order.tenant_id == tenant_id,
                     Order.store_id == store_id,
@@ -444,9 +427,7 @@ class PnLEngine:
             # 团购渠道（meituan/eleme）实际到账率约 85%
             is_group_buy_channel = channel in ("meituan", "eleme")
             is_actual_revenue = not is_group_buy_channel
-            actual_revenue_fen = (
-                int(net_amount * 0.85) if is_group_buy_channel else net_amount
-            )
+            actual_revenue_fen = int(net_amount * 0.85) if is_group_buy_channel else net_amount
 
             await db.execute(
                 text("""
@@ -499,14 +480,8 @@ class PnLEngine:
 
         返回总食材成本（分）。
         """
-        breakdown = await self._calculate_food_cost_breakdown(
-            tenant_id, store_id, cost_date, db
-        )
-        return (
-            breakdown.bom_cost_fen
-            + breakdown.wastage_cost_fen
-            + breakdown.live_seafood_death_fen
-        )
+        breakdown = await self._calculate_food_cost_breakdown(tenant_id, store_id, cost_date, db)
+        return breakdown.bom_cost_fen + breakdown.wastage_cost_fen + breakdown.live_seafood_death_fen
 
     async def get_live_seafood_loss(
         self,
@@ -714,9 +689,7 @@ class PnLEngine:
         wastage_cost_fen = int(wastage_result.scalar() or 0)
 
         # 3. 活鲜死亡损耗
-        live_seafood_death_fen = await self.get_live_seafood_loss(
-            tenant_id, store_id, cost_date, db
-        )
+        live_seafood_death_fen = await self.get_live_seafood_loss(tenant_id, store_id, cost_date, db)
 
         return FoodCostBreakdown(
             bom_cost_fen=bom_cost_fen,
@@ -779,8 +752,7 @@ class PnLEngine:
         # Fallback：从 Store.config JSON 字段补充缺失的配置
         if len(seen_types) < 3:
             store_result = await db.execute(
-                select(Store.config, Store.labor_cost_ratio_target)
-                .where(
+                select(Store.config, Store.labor_cost_ratio_target).where(
                     and_(
                         Store.id == store_id,
                         Store.tenant_id == tenant_id,
@@ -876,8 +848,7 @@ class PnLEngine:
         """
         try:
             store_result = await db.execute(
-                select(Store.config)
-                .where(
+                select(Store.config).where(
                     and_(
                         Store.id == store_id,
                         Store.tenant_id == tenant_id,
@@ -889,9 +860,7 @@ class PnLEngine:
             if store_row and isinstance(store_row.config, dict):
                 table_count = int(store_row.config.get("table_count", 0))
                 if table_count > 0:
-                    ratio = Decimal(str(orders_count / table_count)).quantize(
-                        Decimal("0.01"), rounding=ROUND_HALF_UP
-                    )
+                    ratio = Decimal(str(orders_count / table_count)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
                     return ratio
         except SQLAlchemyError as exc:
             logger.warning(
@@ -987,6 +956,7 @@ class PnLEngine:
 
 
 # ─── 工具函数 ─────────────────────────────────────────────────────────────────
+
 
 def _normalize_channel(raw_channel: str) -> str:
     """将订单渠道原始值归一化为标准渠道名。"""

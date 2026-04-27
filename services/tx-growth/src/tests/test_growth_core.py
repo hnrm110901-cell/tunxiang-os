@@ -12,7 +12,6 @@
 import sys
 import types
 import uuid
-from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -52,9 +51,11 @@ _ontology_pkg = types.ModuleType("shared.ontology")
 _ontology_src = types.ModuleType("shared.ontology.src")
 _database_mod = types.ModuleType("shared.ontology.src.database")
 
+
 # 真实 get_db 占位符 — 测试中会被 dependency_overrides 替换
 async def _placeholder_get_db():
     yield MagicMock()
+
 
 _database_mod.get_db = _placeholder_get_db
 _database_mod.async_session_factory = MagicMock()
@@ -101,16 +102,19 @@ sys.modules.setdefault("services.campaign_repository", _campaign_repo_mod)
 
 # 把 src 加入 path，使相对导入能定位到正确包
 import os
+
 _src_dir = os.path.join(os.path.dirname(__file__), "..")
 if _src_dir not in sys.path:
     sys.path.insert(0, _src_dir)
 
 # journey_routes 使用 async_session_factory（上下文管理器），不走 get_db
 # 我们需要 patch async_session_factory；在此先导入以备用
-from api import journey_routes  # noqa: E402
-from api import growth_campaign_routes  # noqa: E402
-from shared.ontology.src.database import get_db  # noqa: E402
+from api import (
+    growth_campaign_routes,  # noqa: E402
+    journey_routes,  # noqa: E402
+)
 
+from shared.ontology.src.database import get_db  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # ③ 构建 FastAPI 测试应用
@@ -131,6 +135,7 @@ HEADERS = {"X-Tenant-ID": TENANT_ID}
 # ---------------------------------------------------------------------------
 # ④ Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_mock_db():
     """返回一个完整 mock AsyncSession，支持 async with / execute / commit。"""
@@ -167,8 +172,8 @@ def _fetchall_result(rows):
 # ⑤ 测试：journey_routes.py（5 个）
 # ---------------------------------------------------------------------------
 
-class TestJourneyRoutes:
 
+class TestJourneyRoutes:
     # ------------------------------------------------------------------
     # J-1 GET /definitions — 正常返回空列表
     # ------------------------------------------------------------------
@@ -193,12 +198,8 @@ class TestJourneyRoutes:
         ctx.__aexit__ = AsyncMock(return_value=False)
 
         with patch.object(journey_routes, "async_session_factory", return_value=ctx):
-            async with AsyncClient(
-                transport=ASGITransport(app=app), base_url="http://test"
-            ) as client:
-                resp = await client.get(
-                    "/api/v1/journey/definitions", headers=HEADERS
-                )
+            async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+                resp = await client.get("/api/v1/journey/definitions", headers=HEADERS)
 
         assert resp.status_code == 200
         body = resp.json()
@@ -233,12 +234,8 @@ class TestJourneyRoutes:
         }
 
         with patch.object(journey_routes, "async_session_factory", return_value=ctx):
-            async with AsyncClient(
-                transport=ASGITransport(app=app), base_url="http://test"
-            ) as client:
-                resp = await client.post(
-                    "/api/v1/journey/definitions", json=payload, headers=HEADERS
-                )
+            async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+                resp = await client.post("/api/v1/journey/definitions", json=payload, headers=HEADERS)
 
         assert resp.status_code == 200
         body = resp.json()
@@ -259,12 +256,8 @@ class TestJourneyRoutes:
             "steps": [],
         }
 
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as client:
-            resp = await client.post(
-                "/api/v1/journey/definitions", json=payload, headers=HEADERS
-            )
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            resp = await client.post("/api/v1/journey/definitions", json=payload, headers=HEADERS)
 
         assert resp.status_code == 422
 
@@ -281,12 +274,8 @@ class TestJourneyRoutes:
         ctx.__aexit__ = AsyncMock(return_value=False)
 
         with patch.object(journey_routes, "async_session_factory", return_value=ctx):
-            async with AsyncClient(
-                transport=ASGITransport(app=app), base_url="http://test"
-            ) as client:
-                resp = await client.get(
-                    f"/api/v1/journey/definitions/{DEF_ID}", headers=HEADERS
-                )
+            async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+                resp = await client.get(f"/api/v1/journey/definitions/{DEF_ID}", headers=HEADERS)
 
         assert resp.status_code == 404
 
@@ -317,12 +306,8 @@ class TestJourneyRoutes:
         ctx.__aexit__ = AsyncMock(return_value=False)
 
         with patch.object(journey_routes, "async_session_factory", return_value=ctx):
-            async with AsyncClient(
-                transport=ASGITransport(app=app), base_url="http://test"
-            ) as client:
-                resp = await client.delete(
-                    f"/api/v1/journey/definitions/{DEF_ID}", headers=HEADERS
-                )
+            async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+                resp = await client.delete(f"/api/v1/journey/definitions/{DEF_ID}", headers=HEADERS)
 
         assert resp.status_code == 200
         body = resp.json()
@@ -334,13 +319,16 @@ class TestJourneyRoutes:
 # ⑥ 测试：growth_campaign_routes.py（5 个）
 # ---------------------------------------------------------------------------
 
+
 class TestGrowthCampaignRoutes:
     """growth_campaign_routes 使用 Depends(get_db)，通过 app.dependency_overrides 注入 mock。"""
 
     def _override_db(self, mock_db):
         """返回一个可注册为依赖覆盖的异步生成器函数。"""
+
         async def _get_mock_db():
             yield mock_db
+
         app.dependency_overrides[get_db] = _get_mock_db
 
     def teardown_method(self):
@@ -359,18 +347,16 @@ class TestGrowthCampaignRoutes:
             nonlocal call_count
             call_count += 1
             if call_count == 1:
-                return MagicMock()          # set_config
+                return MagicMock()  # set_config
             elif call_count == 2:
-                return _scalar_result(0)    # COUNT
+                return _scalar_result(0)  # COUNT
             else:
-                return _fetchall_result([]) # SELECT rows
+                return _fetchall_result([])  # SELECT rows
 
         mock_db.execute = AsyncMock(side_effect=_execute_side)
         self._override_db(mock_db)
 
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as client:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             resp = await client.get("/api/v1/growth/campaigns", headers=HEADERS)
 
         assert resp.status_code == 200
@@ -386,17 +372,13 @@ class TestGrowthCampaignRoutes:
     async def test_create_campaign_success(self):
         cid = str(uuid.uuid4())
         mock_engine = MagicMock()
-        mock_engine.create_campaign = AsyncMock(
-            return_value={"campaign_id": cid, "status": "draft"}
-        )
+        mock_engine.create_campaign = AsyncMock(return_value={"campaign_id": cid, "status": "draft"})
 
         mock_db = _make_mock_db()
         self._override_db(mock_db)
 
         with patch.object(growth_campaign_routes, "_engine", mock_engine):
-            async with AsyncClient(
-                transport=ASGITransport(app=app), base_url="http://test"
-            ) as client:
+            async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
                 resp = await client.post(
                     "/api/v1/growth/campaigns",
                     json={
@@ -422,9 +404,7 @@ class TestGrowthCampaignRoutes:
         mock_db = _make_mock_db()
         self._override_db(mock_db)
 
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as client:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             resp = await client.post(
                 "/api/v1/growth/campaigns",
                 json={"name": "测试", "type": "not_a_valid_type"},
@@ -448,12 +428,8 @@ class TestGrowthCampaignRoutes:
         mock_db.execute.return_value = MagicMock()
         self._override_db(mock_db)
 
-        with patch.object(
-            growth_campaign_routes, "CampaignRepository", return_value=mock_repo
-        ):
-            async with AsyncClient(
-                transport=ASGITransport(app=app), base_url="http://test"
-            ) as client:
+        with patch.object(growth_campaign_routes, "CampaignRepository", return_value=mock_repo):
+            async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
                 resp = await client.get(
                     f"/api/v1/growth/campaigns/{CAMPAIGN_ID}/stats",
                     headers=HEADERS,
@@ -477,16 +453,14 @@ class TestGrowthCampaignRoutes:
             nonlocal call_count
             call_count += 1
             if call_count == 1:
-                return MagicMock()      # set_config
+                return MagicMock()  # set_config
             # 第2次 COUNT 抛出非 table-missing 的 SQLAlchemy 错误
             raise SQLAlchemyError("connection refused")
 
         mock_db.execute = AsyncMock(side_effect=_execute_side)
         self._override_db(mock_db)
 
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as client:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             resp = await client.get("/api/v1/growth/campaigns", headers=HEADERS)
 
         assert resp.status_code == 200
