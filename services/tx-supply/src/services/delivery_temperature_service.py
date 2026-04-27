@@ -16,12 +16,12 @@ from __future__ import annotations
 
 import asyncio
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Any, Optional
 
 import structlog
-from sqlalchemy import and_, desc, select, text
+from sqlalchemy import desc, select, text
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -176,9 +176,7 @@ async def get_applicable_threshold(
             ScopeType.GLOBAL.value: None,
         }.get(row.scope_type)
 
-        if row.scope_type == ScopeType.GLOBAL.value:
-            candidates.append((SCOPE_PRIORITY[row.scope_type], row))
-        elif match_value is not None and (row.scope_value or "").lower() == match_value.lower():
+        if row.scope_type == ScopeType.GLOBAL.value or match_value is not None and (row.scope_value or "").lower() == match_value.lower():
             candidates.append((SCOPE_PRIORITY[row.scope_type], row))
 
     if not candidates:

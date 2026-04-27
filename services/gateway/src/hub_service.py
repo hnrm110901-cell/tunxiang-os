@@ -2782,8 +2782,8 @@ async def hub_search_knowledge(db: AsyncSession, query: str, top_k: int) -> dict
         "query": query,
         "results": [
             {"doc_id": "kb-001", "title": "屯象OS架构总览", "chunk": f"... 与查询「{query}」最相关的段落内容 ...", "score": 0.92},
-            {"doc_id": "kb-003", "title": "Adapter开发指南", "chunk": f"... 第二匹配段落 ...", "score": 0.85},
-            {"doc_id": "kb-005", "title": "Mac mini边缘部署手册", "chunk": f"... 第三匹配段落 ...", "score": 0.78},
+            {"doc_id": "kb-003", "title": "Adapter开发指南", "chunk": "... 第二匹配段落 ...", "score": 0.85},
+            {"doc_id": "kb-005", "title": "Mac mini边缘部署手册", "chunk": "... 第三匹配段落 ...", "score": 0.78},
         ][:top_k],
         "generated_answer": f"这是基于知识库的 mock 回答。实际版本将使用 RAG pipeline 针对「{query}」生成精准回答。",
     }

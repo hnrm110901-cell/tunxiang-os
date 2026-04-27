@@ -1,3 +1,94 @@
+## 2026-04-27 DevForge — PR #120 评审修复 Round 2（4 余项全部归零 + merge main）
+
+### Round 2：把 Round 1 延期的 3 项 + false-positive 1 项全部完成
+- **Tailwind 合规** — `apps/web-devforge` 加 `tailwindcss/postcss/autoprefixer` devDeps、`tailwind.config.ts`（preflight 关闭以避免与 AntD reset 冲突）、`postcss.config.js`、`global.css` 加 `@tailwind components/utilities` 指令；与 AntD v5 共存。Round 1 标为 false-positive 是误判——CLAUDE.md 第十条对 `apps/web-*/` 是硬要求，CodeRabbit 引用准确。
+- **Dockerfile USER 非 root** — 加 `useradd --system --no-create-home --shell /usr/sbin/nologin --uid 1001 txuser` + `chown -R` + `USER txuser`，规避 Trivy DS-0002
+- **structlog stdlib bridge** — `utils/logging.py` 重写：用 `ProcessorFormatter` 把 uvicorn / SQLAlchemy / asyncpg 的 stdlib 日志桥接到 JSON 渲染管线，业务日志和框架日志统一格式
+- **CQRS 事件发射** — `shared/events/src/event_types.py` 注册 `DevForgeApplicationEventType`（CREATED/UPDATED/DELETED） + 域名映射 `devforge_application → tx_devforge_application_events` + 加入 `ALL_EVENT_ENUMS`；`api/app_routes.py` 在 POST/PATCH/DELETE 成功路径用 `asyncio.create_task(emit_event(...))` 旁路写入
+
+### 同步合并 origin/main（解锁 PR）
+- main 已并入 web-hub v2.0 三浪 + tx-supply P0 五任务 v366-v370，本分支与 main 双向偏离
+- 冲突点：DEVLOG.md（保留双方条目）+ v366 命名（rename `v366_devforge_application` → `v371_devforge_application`，避开 v366_price_ledger / v367-v370 占用）
+- 计划文档迁移规划表 v366-v381 顺延为 **v371-v386**
+
+### 验证
+- py_compile 全过（app_routes / event_types / logging / db）
+- `npm install` 添加 3 个 Tailwind devDeps 成功
+- `npx tsc --noEmit` 零错误
+- `npx vite build` 通过
+- 所有 12 条 CodeRabbit + Codex 评审项已落实（11 fix + 1 改判为 fix，零延期）
+
+---
+
+## 2026-04-27 DevForge — PR #120 CodeRabbit + Codex 评审修复 Round 1（7 fix + 3 defer + 1 false-positive）
+
+### CodeRabbit + Codex 12 条评审修复
+PR #120 开启后立即收到 CodeRabbit 10 条 + Codex 2 条评审。Fix-First 全部分类处理：
+
+**已修复（7 条，本轮 commit）：**
+- 🔴 `services/tx-devforge/src/api/health_routes.py` — `/readiness` DB 不可达时返回 **503** 而非 200，修 K8s probe 误判 (Codex P1)
+- 🔴 `apps/web-devforge/src/api/client.ts` — 默认 tenant_id 改为 all-zero UUID，避免 `'demo-tenant'` 字面量被后端 401；env 改从 zustand store 读取，避免 localStorage JSON 信封被当作 raw 字符串 (CodeRabbit Critical + Codex P1)
+- 🔴 `apps/web-devforge/src/router.tsx` — 引入 `type ReactNode`，修 strict 模式 TS 编译 (CodeRabbit Critical)
+- 🔴 `services/tx-devforge/src/main.py` — CORSMiddleware 改后注册（外层），TenantMiddleware 加 OPTIONS 预检放行；`allow_credentials` 仅在显式配置 origin 时启用；`@app.on_event` 迁移到 `lifespan` (CodeRabbit Critical)
+- 🟠 `services/tx-devforge/src/db.py` — `check_db_connectivity` 加 `SQLAlchemyError` 捕获，避免 OperationalError 导致 /readiness 500 (CodeRabbit Major)
+- 🟠 `services/tx-devforge/src/middlewares/tenant.py` — 新增 OPTIONS 短路，让 CORS 预检不被 401 拦
+- 🟠 `apps/web-devforge/src/pages/apps/index.tsx` — 真实 `page` 状态接入 `useApplications`，AntD `Table.pagination.onChange` 联动；筛选变化时 useEffect 重置到第 1 页 (CodeRabbit Major)
+
+**延期到 Day-2（3 条，已加 TODO）：**
+- 🟠 `Dockerfile` USER 非 root：仓内 17 个服务有 15 个跑 root，统一治理（与 tx-pay/tx-civic/tx-expense 一并）
+- 🟠 `app_routes.py` CQRS 事件发射（CREATED/UPDATED/DELETED）：需先在 `shared/events/src/event_types.py` 注册 `DevForgeApplicationEventType`，与 v147 事件总线规范对齐
+- 🟠 `logging.py` structlog stdlib bridge：把 uvicorn/sqlalchemy 日志也桥接成 JSON，提升可观测一致性
+
+**False positive 1 条（PR 评论中说明）：**
+- 🟠 `package.json` Tailwind 缺失：本骨架明确选 AntD v5 主题作为唯一样式系统（CLAUDE.md 第十条 + 与 web-forge-admin 保持一致），不引入第二套 CSS 框架。**这是设计决策，不是疏漏。**
+
+### 验证
+- `python3 -m py_compile` 5 文件全过
+- `cd apps/web-devforge && npx tsc --noEmit` 零错误
+- `npx vite build` 通过（chunk size 警告：AntD 800k → 后续 manualChunks 优化）
+
+---
+
+## 2026-04-27 DevForge 研运平台 — Day-1 骨架并行启动
+
+### 今日完成
+- [docs] 落档 [docs/devforge-platform-plan.md](docs/devforge-platform-plan.md)：15 模块 × 5 类资源 × 4 阶段(MVP/V1/V2/V3) 全量开发计划
+- [tx-devforge] 后端骨架：19 文件（main.py + 5 routes + Application 模型 + Repository + TenantMiddleware + structlog + Prometheus + 3 个具体异常处理器）
+- [shared/db-migrations] v371_devforge_application：表 + 4 条独立 RLS 策略（SELECT/INSERT/UPDATE/DELETE）+ FORCE ROW LEVEL SECURITY；链入 head=v365_forge_ecosystem_metrics
+- [apps/web-devforge] 前端骨架：41 文件，AntD v5 暗色主题 + 15 模块路由 + AppLayout(240+56px) + EnvSwitcher(prod 二次确认+红框) + ⌘K GlobalSearch + 应用中心(02)真实 API 接入 + 13 占位页
+- [scripts] forge_register_resources.py：扫出 57 条资源（21 backend / 18 frontend / 4 edge / 13 adapter / 1 data_asset），Owner 推断 96.5%，--dry-run/--push/--type 三种模式
+- [services/gateway] 路由注册 devforge → DOMAIN_ROUTES 字典加一行（路径前缀模式，与 13 个下游服务一致）
+- [infra/docker] docker-compose.yml + docker-compose.dev.yml 加入 tx-devforge 服务（端口 8017，hot-reload 卷挂载）
+
+### 关键偏差与修复
+- **端口**：原计划 8015，实际分配 **8017**（8015 被 tx-expense 占、8016 被 tx-pay 占）。已同步：Dockerfile / config.py / main.py / vite proxy / api client / pages/apps / 发现脚本 / compose / 计划文档
+- **迁移 head 与命名**：CLAUDE.md 写 229，实测 414 个版本文件（仓内仅 `vNNN_*.py` 单一格式，head=`v365_forge_ecosystem_metrics`）。本服务首迁 经过两次重命名：原起草 `v230_*`（被占）→ 改 `v366_*`（merge main 后被 supplier_price 占）→ 最终 `v371_devforge_application`，down_revision=`v365_forge_ecosystem_metrics`
+- **微服务数**：CLAUDE.md 写 14 业务+2 支撑，实测 21（多出 tx-pay/tx-expense/tx-predict/mcp-server/tunxiang-api 等）
+- **适配器数**：CLAUDE.md 写 10，实测 13
+
+### 数据变化
+- 迁移版本：down_revision=`v365_forge_ecosystem_metrics` → 新 `v371_devforge_application`（已添加，待执行；命名经历 `v230_*` → `v366_*` → `v371_*`，详见上一节）
+- 新增 API 端点：5 个（GET/POST/PATCH/DELETE applications + health）
+- 新增代码：~4500 行（后端 ~1200 + 前端 ~2200 + 脚本 ~830 + 配置 ~270）
+- 新前端应用：1 个（apps/web-devforge，端口 5182）
+- 新后端微服务：1 个（services/tx-devforge，端口 8017）
+
+### 遗留 TODO（Day-2+）
+- 后端 Service 层（当前 API 直调 Repository，待引入；CI/CD 编排逻辑接入时一起加）
+- pytest 测试目录（v371 表 + RLS 跨租户隔离用例必须 Tier 2 起步）
+- helm chart 缺失（tx-pay/tx-civic/tx-expense 同样未补，统一治理）
+- gateway / web-devforge 之间的端到端 token 鉴权（目前仅 X-Tenant-ID 透传）
+- 13 个前端占位页待实装；新建应用 Modal 表单待接 createApplication
+- CODEOWNERS 文件未建（脚本 0 命中），建议 Day-2 由 devforge 后台落地一份
+- forge_register_resources.py --push 待真实跑（需先执行 v371 迁移）
+
+### 明日计划
+- 把 v371 迁移 apply 到 dev 环境，跑 `--push` 把 57 条资源真实入库
+- 后端补 Application 列表的过滤/排序/分页参数 + Repository 单元测试
+- 前端"应用中心"页对接真实数据，添加资源详情 8 Tab 中的"概览"和"依赖拓扑"（拓扑数据先用 metadata_json 占位）
+- 起 06 流水线模块的数据库 schema 设计（v372 迁移草稿）
+
+---
 ## 2026-04-27 屯象Hub v2.0 — 三浪全量交付（Wave 1+2+3）
 
 ### 今日完成
