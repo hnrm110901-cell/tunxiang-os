@@ -36,6 +36,16 @@ class CreatePlanRequest(BaseModel):
     store_orders: list[dict] = Field(
         description="[{store_id, items: [{item_id, item_name, quantity, unit}]}]",
     )
+    # TASK-3 (v368)：温控相关元信息（可选）
+    category: str | None = Field(
+        default=None,
+        description="配送品类（seafood/meat/vegetable...）— 用于绑定温度阈值",
+    )
+    temperature_type: str | None = Field(
+        default=None,
+        description="温度类型（REFRIGERATED/FROZEN/HOT）— 用于绑定温度阈值",
+    )
+    sku_id: str | None = Field(default=None, description="单 SKU 配送时的 SKU ID")
 
 
 class DispatchRequest(BaseModel):
@@ -81,13 +91,38 @@ async def create_distribution_plan(
     x_tenant_id: str = Header(alias="X-Tenant-ID"),
     db: AsyncSession = Depends(get_db),
 ):
-    """创建配送计划"""
+    """创建配送计划
+
+    TASK-3 (v368)：若 body 携带 category/temperature_type/sku_id，
+    自动绑定该配送的温度阈值（用于后续告警评估）。
+    """
     result = await distribution.create_distribution_plan(
         warehouse_id=body.warehouse_id,
         store_orders=body.store_orders,
         tenant_id=x_tenant_id,
         db=db,
     )
+
+    # 自动绑定温度阈值（最佳努力，失败不阻塞配送计划创建）
+    if body.category or body.temperature_type or body.sku_id:
+        try:
+            from ..services import delivery_temperature_service as _dt_svc
+
+            applicable = await _dt_svc.get_applicable_threshold(
+                tenant_id=x_tenant_id,
+                delivery_id=result.get("plan_id"),
+                sku_id=body.sku_id,
+                category=body.category,
+                temperature_type=body.temperature_type,
+                db=db,
+            )
+            if applicable:
+                result["temperature_threshold"] = applicable
+        except (ValueError, KeyError) as _exc:
+            # 温控阈值绑定失败不阻塞主流程
+            result["temperature_threshold"] = None
+            result["temperature_threshold_error"] = str(_exc)
+
     return {"ok": True, "data": result}
 
 

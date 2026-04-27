@@ -147,6 +147,20 @@ class EnergyEventType(str, Enum):
     ALERT_RULE_CREATED = "energy.alert_rule_created"  # 告警规则创建（v164 新增）
 
 
+class DeliveryTempEventType(str, Enum):
+    """配送在途温控事件 — 海鲜冷链命门（v368 新增 / TASK-3）
+
+    覆盖配送车温控全生命周期：
+      - RECORDED:       温度上报（每条可发，可降采样到每分钟一条）
+      - BREACH_STARTED: 连续超限达阈值时长，告警触发
+      - BREACH_ENDED:   超限恢复或人工处理结束
+    """
+
+    RECORDED = "delivery.temperature_recorded"  # 温度记录上报
+    BREACH_STARTED = "delivery.temperature_breach"  # 超限告警触发
+    BREACH_ENDED = "delivery.temperature_breach_ended"  # 超限恢复/告警关闭
+
+
 class ReviewEventType(str, Enum):
     """舆情/评价事件"""
 
@@ -258,6 +272,8 @@ DOMAIN_STREAM_MAP: dict[str, str] = {
     # 新增模块
     "safety": "tx_safety_events",
     "energy": "tx_energy_events",
+    # 配送在途温控（v368 / TASK-3，海鲜冷链命门）
+    "delivery": "tx_delivery_events",
     "opinion": "tx_opinion_events",
     "review": "tx_review_events",
     "recipe": "tx_recipe_events",
@@ -302,6 +318,7 @@ DOMAIN_STREAM_TYPE_MAP: dict[str, str] = {
     "settlement": "settlement",
     "safety": "safety",
     "energy": "energy",
+    "delivery": "delivery",
     "campaign": "campaign",
     "opinion": "opinion",
     "review": "review",
@@ -499,6 +516,7 @@ ALL_EVENT_ENUMS = (
     SettlementEventType,
     SafetyEventType,
     EnergyEventType,
+    DeliveryTempEventType,
     ReviewEventType,
     OpinionEventType,
     RecipeEventType,

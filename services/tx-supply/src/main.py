@@ -146,6 +146,11 @@ from .api.price_ledger_routes import router as price_ledger_router
 
 app.include_router(price_ledger_router)  # 价格台账：快照/趋势/对比/预警规则/预警实例
 
+# ── 配送在途温控告警（TASK-3 / v368）──
+from .api.delivery_temperature_routes import router as delivery_temp_router
+
+app.include_router(delivery_temp_router)  # 配送车温度告警：上报/时序/告警/凭证（海鲜冷链命门）
+
 
 @app.get("/health")
 async def health():

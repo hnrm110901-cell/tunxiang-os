@@ -1,7 +1,7 @@
 """conftest.py — tx-supply 本地测试路径配置
 
 容器路径：/app/services/tx_supply/src/  PYTHONPATH=/app
-本地路径：services/tx-supply/src/       (目录名含 dash)
+本地路径:services/tx-supply/src/       (目录名含 dash)
 
 策略（参照 services/tx-trade/conftest.py）：
   1. ROOT 加入 path → shared.ontology 等跨服务包
