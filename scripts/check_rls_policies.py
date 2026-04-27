@@ -2,35 +2,47 @@
 """RLS 策略安全检查脚本
 
 连接数据库，查询 pg_policies 视图，检查以下问题：
-1. 业务表是否启用了 RLS（ENABLE ROW LEVEL SECURITY）
-2. 是否使用了 FORCE ROW LEVEL SECURITY（防止表 owner 绕过）
-3. 策略中是否使用了正确的变量名（app.tenant_id，禁止 app.current_store_id 等）
-4. 策略中是否有 NULLIF NULL guard（禁止 IS NULL 绕过）
-5. 是否覆盖了四种操作（SELECT / INSERT / UPDATE / DELETE）
+  1. 业务表是否启用了 RLS（ENABLE ROW LEVEL SECURITY）
+  2. 是否使用了 FORCE ROW LEVEL SECURITY（防止表 owner 绕过）
+  3. 策略中是否使用了正确的变量名（app.tenant_id，禁止 app.current_store_id 等）
+  4. 策略中是否有 NULLIF NULL guard（禁止 IS NULL 绕过）
+  5. 是否覆盖了四种操作（SELECT / INSERT / UPDATE / DELETE）
 
 使用方式：
-  python scripts/check_rls_policies.py
+  python scripts/check_rls_policies.py                       # 人类可读报告
+  python scripts/check_rls_policies.py --json                # JSON 供 Go/No-Go 消费
+  python scripts/check_rls_policies.py --strict              # 仅 clean 时 exit 0
 
-环境变量（可通过 .env 或命令行设置）：
-  DATABASE_URL — PostgreSQL 连接串，例如：
-    postgresql://user:pass@localhost:5432/tunxiang_db
+Exit codes:
+  0  = clean（无问题 / strict 模式通过）
+  1  = 发现安全问题
+  2  = DB 连接失败（无法验证）
+  3  = 其他异常（参数错误 / 依赖缺失）
+
+环境变量：
+  DATABASE_URL — PostgreSQL 连接串，兼容多种 scheme：
+    postgresql://user:pass@host:5432/db
+    postgres://user:pass@host:5432/db
+    postgresql+asyncpg://user:pass@host:5432/db  ← SQLAlchemy 格式自动 normalize
 
 依赖：
   pip install asyncpg python-dotenv
 """
+from __future__ import annotations
 
+import argparse
 import asyncio
+import json
 import os
 import re
 import sys
 from dataclasses import dataclass, field
-from typing import Any
 
 try:
     import asyncpg
+    HAS_ASYNCPG = True
 except ImportError:
-    print("ERROR: asyncpg 未安装，请执行: pip install asyncpg")
-    sys.exit(1)
+    HAS_ASYNCPG = False
 
 try:
     from dotenv import load_dotenv
@@ -38,13 +50,22 @@ try:
 except ImportError:
     pass  # python-dotenv 可选
 
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Exit codes
+# ─────────────────────────────────────────────────────────────────────────────
+
+EXIT_CLEAN = 0
+EXIT_ISSUES_FOUND = 1
+EXIT_DB_CONNECT_FAIL = 2
+EXIT_CONFIG_ERROR = 3
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # 配置
 # ─────────────────────────────────────────────────────────────────────────────
-DATABASE_URL = os.environ.get(
-    "DATABASE_URL",
-    "postgresql://postgres:postgres@localhost:5432/tunxiang_db",
-)
+
+DEFAULT_DATABASE_URL = "postgresql://postgres:postgres@localhost:5432/tunxiang_db"
 
 # 正确的 session 变量名
 CORRECT_VAR = "app.tenant_id"
@@ -103,9 +124,22 @@ BUSINESS_TABLES = [
     "premium_cards", "premium_card_tiers", "premium_card_records",
     "points_mall_items", "points_exchange_records",
     "attribution_touchpoints", "attribution_conversions",
-    # AB 测试
-    "ab_tests", "ab_test_assignments",
-    # 外卖
+    # AB 测试（Sprint G v290）
+    "ab_experiments", "ab_experiment_arms",
+    "ab_experiment_assignments", "ab_experiment_events",
+    # 外卖 canonical / publish / dispute（Sprint E v285-v288）
+    "canonical_delivery_orders", "canonical_delivery_items",
+    "dish_publish_registry", "dish_publish_tasks",
+    "xiaohongshu_shop_bindings", "xiaohongshu_verify_events",
+    "delivery_disputes", "delivery_dispute_messages",
+    # D 批次 AI 分析（Sprint D v278-v281）
+    "dish_pricing_suggestions",
+    "cost_root_cause_analyses",
+    "salary_anomaly_analyses",
+    "budget_forecast_analyses",
+    "rfm_outreach_campaigns",
+    "campaign_roi_forecasts",
+    # 外卖（老）
     "delivery_zones", "delivery_time_configs", "delivery_fee_rules",
     # 服务铃
     "service_bell_records",
@@ -117,8 +151,53 @@ BUSINESS_TABLES = [
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# DSN 规范化
+# ─────────────────────────────────────────────────────────────────────────────
+
+_SQLALCHEMY_DIALECT_RE = re.compile(r"^(postgres(?:ql)?)\+[a-z0-9_]+://", re.IGNORECASE)
+
+
+def normalize_dsn(dsn: str) -> str:
+    """把 SQLAlchemy 风格 DSN 转成 asyncpg 可识别的形式
+
+    输入 → 输出：
+      postgresql+asyncpg://...  → postgresql://...
+      postgresql+psycopg2://... → postgresql://...
+      postgres+psycopg://...    → postgres://...
+      postgresql://...          → postgresql://... (不变)
+      postgres://...            → postgres://... (不变)
+    """
+    if not dsn:
+        return dsn
+    match = _SQLALCHEMY_DIALECT_RE.match(dsn)
+    if match:
+        scheme = match.group(1).lower()
+        # 把 scheme+driver:// 替换为 scheme://
+        return re.sub(
+            r"^postgres(?:ql)?\+[a-z0-9_]+://",
+            f"{scheme}://",
+            dsn,
+            count=1,
+            flags=re.IGNORECASE,
+        )
+    return dsn
+
+
+def redact_dsn(dsn: str) -> str:
+    """脱敏 DSN 的密码部分（用于日志打印）"""
+    # postgresql://user:pass@host:port/db → postgresql://user:***@host:port/db
+    return re.sub(
+        r"(://[^:/]+:)[^@]+(@)",
+        r"\1***\2",
+        dsn,
+    )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # 数据结构
 # ─────────────────────────────────────────────────────────────────────────────
+
+
 @dataclass
 class PolicyRecord:
     table_name: str
@@ -131,6 +210,7 @@ class PolicyRecord:
 @dataclass
 class TableRLSStatus:
     table_name: str
+    exists_in_db: bool = False  # 表是否存在于 DB 中
     rls_enabled: bool = False
     force_rls: bool = False
     policies: list[PolicyRecord] = field(default_factory=list)
@@ -154,7 +234,11 @@ class TableRLSStatus:
 # ─────────────────────────────────────────────────────────────────────────────
 # 检查逻辑
 # ─────────────────────────────────────────────────────────────────────────────
-def _check_clause(clause: str | None, table: str, policy: str, clause_type: str) -> list[str]:
+
+
+def _check_clause(
+    clause: str | None, table: str, policy: str, clause_type: str
+) -> list[str]:
     """检查单个 USING 或 WITH CHECK 子句的安全性。"""
     issues: list[str] = []
     if not clause:
@@ -164,8 +248,8 @@ def _check_clause(clause: str | None, table: str, policy: str, clause_type: str)
     for bad_var in FORBIDDEN_VARS:
         if bad_var in clause:
             issues.append(
-                f"[CRITICAL] {table}.{policy} {clause_type} 使用了错误变量 '{bad_var}'，"
-                f"应改为 '{CORRECT_VAR}'"
+                f"[CRITICAL] {table}.{policy} {clause_type} 使用了错误变量 "
+                f"'{bad_var}'，应改为 '{CORRECT_VAR}'"
             )
 
     # 检查是否使用了正确变量名（如果没有禁止变量但也没有正确变量）
@@ -189,10 +273,12 @@ def _check_clause(clause: str | None, table: str, policy: str, clause_type: str)
     # 检查是否完全没有 NULL 保护
     if not has_nullif and not has_is_not_null:
         # 检查是否使用了不带 true 参数的 current_setting
-        if re.search(r"current_setting\s*\(\s*'app\.tenant_id'\s*\)", clause):
+        if re.search(
+            r"current_setting\s*\(\s*'app\.tenant_id'\s*\)", clause
+        ):
             issues.append(
-                f"[HIGH] {table}.{policy} {clause_type} 使用 current_setting 时缺少 'true' 参数，"
-                f"且无 NULLIF/IS NOT NULL guard，变量未设置时可能抛出异常或绕过 RLS"
+                f"[HIGH] {table}.{policy} {clause_type} 使用 current_setting 时"
+                f"缺少 'true' 参数，且无 NULLIF/IS NOT NULL guard"
             )
         elif CORRECT_VAR in clause:
             issues.append(
@@ -205,11 +291,16 @@ def _check_clause(clause: str | None, table: str, policy: str, clause_type: str)
 
 def check_table_rls(status: TableRLSStatus) -> None:
     """对单个表执行完整的 RLS 安全检查，将问题写入 status.issues。"""
+    if not status.exists_in_db:
+        # 表不存在 — 不报问题（可能 migration 未跑）
+        return
 
     # 检查 RLS 是否启用
     if not status.rls_enabled:
-        status.issues.append(f"[CRITICAL] {status.table_name} 未启用 ROW LEVEL SECURITY")
-        return  # 未启用 RLS 则无策略可检查
+        status.issues.append(
+            f"[CRITICAL] {status.table_name} 未启用 ROW LEVEL SECURITY"
+        )
+        return
 
     # 检查 FORCE RLS
     if not status.force_rls:
@@ -220,8 +311,9 @@ def check_table_rls(status: TableRLSStatus) -> None:
 
     # 检查是否有策略
     if not status.policies:
-        status.issues.append(f"[CRITICAL] {status.table_name} 已启用 RLS 但无任何策略，"
-                             f"所有操作将被拒绝（安全但可能影响正常功能）")
+        status.issues.append(
+            f"[CRITICAL] {status.table_name} 已启用 RLS 但无任何策略"
+        )
         return
 
     # 检查操作覆盖率
@@ -230,35 +322,56 @@ def check_table_rls(status: TableRLSStatus) -> None:
     if missing:
         status.issues.append(
             f"[HIGH] {status.table_name} 缺少以下操作的 RLS 策略: "
-            f"{', '.join(sorted(missing))}，这些操作无 RLS 限制"
+            f"{', '.join(sorted(missing))}"
         )
 
     # 检查每条策略的子句安全性
     for policy in status.policies:
         if policy.using_clause:
             status.issues.extend(
-                _check_clause(policy.using_clause, status.table_name,
-                              policy.policy_name, "USING")
+                _check_clause(
+                    policy.using_clause, status.table_name,
+                    policy.policy_name, "USING",
+                )
             )
         if policy.with_check_clause:
             status.issues.extend(
-                _check_clause(policy.with_check_clause, status.table_name,
-                              policy.policy_name, "WITH CHECK")
+                _check_clause(
+                    policy.with_check_clause, status.table_name,
+                    policy.policy_name, "WITH CHECK",
+                )
             )
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 数据库查询
 # ─────────────────────────────────────────────────────────────────────────────
-async def fetch_rls_data(conn: "asyncpg.Connection") -> dict[str, TableRLSStatus]:
+
+
+async def fetch_rls_data(
+    conn: "asyncpg.Connection",
+) -> dict[str, TableRLSStatus]:
     """从 pg_policies 和 pg_tables 获取 RLS 状态数据。"""
     statuses: dict[str, TableRLSStatus] = {}
-
-    # 初始化所有需要检查的表
     for table in BUSINESS_TABLES:
         statuses[table] = TableRLSStatus(table_name=table)
 
-    # 查询 RLS 启用状态（pg_class.relrowsecurity / relforcerowsecurity）
+    # 查询所有 public schema 的表（用于判断表是否存在）
+    existing = await conn.fetch("""
+        SELECT c.relname AS table_name
+        FROM pg_class c
+        JOIN pg_namespace n ON n.oid = c.relnamespace
+        WHERE n.nspname = 'public'
+          AND c.relkind = 'r'
+          AND c.relname = ANY($1)
+    """, BUSINESS_TABLES)
+
+    for row in existing:
+        name = row["table_name"]
+        if name in statuses:
+            statuses[name].exists_in_db = True
+
+    # 查询 RLS 启用状态
     rls_rows = await conn.fetch("""
         SELECT
             c.relname AS table_name,
@@ -277,7 +390,7 @@ async def fetch_rls_data(conn: "asyncpg.Connection") -> dict[str, TableRLSStatus
             statuses[name].rls_enabled = row["rls_enabled"]
             statuses[name].force_rls = row["force_rls"]
 
-    # 查询 RLS 策略（pg_policies 视图）
+    # 查询 RLS 策略
     policy_rows = await conn.fetch("""
         SELECT
             tablename AS table_name,
@@ -308,54 +421,64 @@ async def fetch_rls_data(conn: "asyncpg.Connection") -> dict[str, TableRLSStatus
 # ─────────────────────────────────────────────────────────────────────────────
 # 报告输出
 # ─────────────────────────────────────────────────────────────────────────────
-def print_report(statuses: dict[str, TableRLSStatus]) -> int:
-    """打印检查报告，返回发现的问题总数。"""
-    critical_count = 0
-    high_count = 0
-    medium_count = 0
-    problem_tables: list[TableRLSStatus] = []
-    ok_tables: list[TableRLSStatus] = []
-    missing_tables: list[str] = []
 
-    for table_name, status in statuses.items():
-        # 检查表是否存在于数据库（rls_enabled 默认 False，但我们需要区分"不存在"和"未启用"）
+
+def _count_issues(statuses: dict[str, TableRLSStatus]) -> dict[str, int]:
+    """按严重度统计问题"""
+    critical = 0
+    high = 0
+    medium = 0
+    for status in statuses.values():
+        for issue in status.issues:
+            if "[CRITICAL]" in issue:
+                critical += 1
+            elif "[HIGH]" in issue:
+                high += 1
+            elif "[MEDIUM]" in issue:
+                medium += 1
+    return {
+        "critical": critical,
+        "high": high,
+        "medium": medium,
+        "total": critical + high + medium,
+    }
+
+
+def print_text_report(statuses: dict[str, TableRLSStatus]) -> int:
+    """打印人类可读报告，返回发现的问题总数。"""
+    for status in statuses.values():
         check_table_rls(status)
 
-        if status.has_issues:
-            problem_tables.append(status)
-            for issue in status.issues:
-                if "[CRITICAL]" in issue:
-                    critical_count += 1
-                elif "[HIGH]" in issue:
-                    high_count += 1
-                elif "[MEDIUM]" in issue:
-                    medium_count += 1
-        else:
-            ok_tables.append(status)
-
-    # 检查表是否在数据库中不存在（可能尚未迁移）
-    all_checked = set(statuses.keys())
-    # 注：这里无法区分"不存在"和"rls_enabled=False"，后者已被 check 捕获
-
-    total_issues = critical_count + high_count + medium_count
+    counts = _count_issues(statuses)
+    problem_tables = [s for s in statuses.values() if s.has_issues]
+    ok_tables = [s for s in statuses.values() if not s.has_issues and s.exists_in_db]
+    missing_tables = [s for s in statuses.values() if not s.exists_in_db]
 
     print()
     print("=" * 70)
     print("  屯象OS RLS 策略安全检查报告")
-    print(f"  检查时间: {__import__('datetime').datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    from datetime import datetime
+    print(f"  检查时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print("=" * 70)
 
-    # 汇总
     print()
     print("【检查汇总】")
-    print(f"  总检查表数:  {len(statuses)}")
-    print(f"  无问题表数:  {len(ok_tables)}")
-    print(f"  有问题表数:  {len(problem_tables)}")
-    print(f"  CRITICAL 问题: {critical_count}")
-    print(f"  HIGH     问题: {high_count}")
-    print(f"  MEDIUM   问题: {medium_count}")
+    print(f"  总检查表数:      {len(statuses)}")
+    print(f"  DB 中存在:        {len([s for s in statuses.values() if s.exists_in_db])}")
+    print(f"  DB 中缺失:        {len(missing_tables)}（可能 migration 未跑）")
+    print(f"  无问题表数:      {len(ok_tables)}")
+    print(f"  有问题表数:      {len(problem_tables)}")
+    print(f"  CRITICAL 问题:   {counts['critical']}")
+    print(f"  HIGH     问题:   {counts['high']}")
+    print(f"  MEDIUM   问题:   {counts['medium']}")
 
-    # 有问题的表
+    if missing_tables:
+        print()
+        print("【DB 中缺失的表（不算违规）】")
+        names = sorted(s.table_name for s in missing_tables)
+        for i in range(0, len(names), 5):
+            print("  " + "  ".join(names[i:i+5]))
+
     if problem_tables:
         print()
         print("【问题详情】")
@@ -371,7 +494,6 @@ def print_report(statuses: dict[str, TableRLSStatus]) -> int:
             for issue in status.issues:
                 print(f"    {issue}")
 
-    # 正常表列表
     if ok_tables:
         print()
         print("【检查通过的表】")
@@ -379,46 +501,170 @@ def print_report(statuses: dict[str, TableRLSStatus]) -> int:
         for i in range(0, len(names), 5):
             print("  " + "  ".join(names[i:i+5]))
 
-    # 结论
     print()
     print("=" * 70)
-    if total_issues == 0:
+    if counts["total"] == 0:
         print("  结论: 所有表 RLS 策略检查通过，无安全问题")
     else:
-        print(f"  结论: 发现 {total_issues} 个安全问题，请立即处理 CRITICAL 和 HIGH 级别")
-        if critical_count > 0:
-            print(f"  ACTION REQUIRED: {critical_count} 个 CRITICAL 问题必须在发布前修复")
+        print(f"  结论: 发现 {counts['total']} 个安全问题")
+        if counts["critical"] > 0:
+            print(f"  ACTION REQUIRED: {counts['critical']} 个 CRITICAL 问题必须修复")
     print("=" * 70)
     print()
 
-    return total_issues
+    return counts["total"]
+
+
+def print_json_report(
+    statuses: dict[str, TableRLSStatus], database_url: str
+) -> int:
+    """打印 JSON 报告（供 CI / Go/No-Go 消费），返回问题总数"""
+    for status in statuses.values():
+        check_table_rls(status)
+
+    counts = _count_issues(statuses)
+    problem_tables = [s for s in statuses.values() if s.has_issues]
+    ok_tables = [s for s in statuses.values() if not s.has_issues and s.exists_in_db]
+    missing_tables = [s for s in statuses.values() if not s.exists_in_db]
+
+    payload = {
+        "database_url": redact_dsn(database_url),
+        "summary": {
+            "total_tables": len(statuses),
+            "existing_in_db": sum(1 for s in statuses.values() if s.exists_in_db),
+            "missing_in_db": len(missing_tables),
+            "ok_count": len(ok_tables),
+            "issue_tables": len(problem_tables),
+            **counts,
+            "passed": counts["total"] == 0,
+        },
+        "issues": [
+            {
+                "table": s.table_name,
+                "rls_enabled": s.rls_enabled,
+                "force_rls": s.force_rls,
+                "policy_count": len(s.policies),
+                "covered_cmds": sorted(s.covered_cmds),
+                "issues": s.issues,
+            }
+            for s in sorted(problem_tables, key=lambda s: s.table_name)
+        ],
+        "missing_tables": sorted(s.table_name for s in missing_tables),
+        "ok_tables": sorted(s.table_name for s in ok_tables),
+    }
+    print(json.dumps(payload, ensure_ascii=False, indent=2))
+    return counts["total"]
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 主程序
 # ─────────────────────────────────────────────────────────────────────────────
-async def main() -> None:
-    print(f"连接数据库: {DATABASE_URL.split('@')[-1] if '@' in DATABASE_URL else DATABASE_URL}")
+
+
+async def run_audit(args: argparse.Namespace) -> int:
+    """返回 exit code"""
+    if not HAS_ASYNCPG:
+        _print_err(
+            "asyncpg 未安装；pip install asyncpg 后重试",
+            use_json=args.json,
+        )
+        return EXIT_CONFIG_ERROR
+
+    database_url = args.database_url or os.environ.get(
+        "DATABASE_URL", DEFAULT_DATABASE_URL
+    )
+    normalized = normalize_dsn(database_url)
+    redacted = redact_dsn(normalized)
+
+    if not args.json:
+        print(f"连接数据库: {redacted}", file=sys.stderr)
 
     try:
-        conn = await asyncpg.connect(DATABASE_URL)
-    except Exception as exc:
-        print(f"ERROR: 数据库连接失败: {exc}")
-        print()
-        print("请确认：")
-        print("  1. DATABASE_URL 环境变量已正确设置")
-        print("  2. 数据库服务正在运行")
-        print("  3. 网络/防火墙允许连接")
-        sys.exit(1)
+        conn = await asyncpg.connect(normalized)
+    except Exception as exc:  # noqa: BLE001 — 所有连接异常统一处理
+        _print_err(
+            f"数据库连接失败: {exc}\n"
+            f"请确认：\n"
+            f"  1. DATABASE_URL 环境变量已正确设置（当前: {redacted}）\n"
+            f"  2. 数据库服务正在运行\n"
+            f"  3. 网络/防火墙允许连接",
+            use_json=args.json,
+            database_url=redacted,
+        )
+        return EXIT_DB_CONNECT_FAIL
 
     try:
         statuses = await fetch_rls_data(conn)
-        issue_count = print_report(statuses)
     finally:
         await conn.close()
 
-    sys.exit(0 if issue_count == 0 else 1)
+    if args.json:
+        issue_count = print_json_report(statuses, database_url)
+    else:
+        issue_count = print_text_report(statuses)
+
+    if issue_count == 0:
+        return EXIT_CLEAN
+    if args.strict:
+        return EXIT_ISSUES_FOUND
+    # 非 strict：MEDIUM 问题不阻塞（只 CRITICAL + HIGH 算失败）
+    counts = _count_issues(statuses)
+    critical_high = counts["critical"] + counts["high"]
+    if critical_high > 0:
+        return EXIT_ISSUES_FOUND
+    return EXIT_CLEAN
+
+
+def _print_err(
+    msg: str,
+    *,
+    use_json: bool = False,
+    database_url: str | None = None,
+) -> None:
+    """按输出格式打印错误"""
+    if use_json:
+        print(json.dumps({
+            "error": msg,
+            "database_url": database_url,
+            "summary": {
+                "passed": False,
+                "total": 0,
+                "error": True,
+            },
+        }, ensure_ascii=False, indent=2))
+    else:
+        print(f"ERROR: {msg}", file=sys.stderr)
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        description="屯象OS RLS 策略安全检查",
+    )
+    parser.add_argument(
+        "--database-url",
+        default=None,
+        help="PostgreSQL DSN（默认读 env DATABASE_URL）；"
+             "兼容 postgresql+asyncpg:// 等 SQLAlchemy scheme",
+    )
+    parser.add_argument(
+        "--json", action="store_true",
+        help="JSON 输出（CI 消费）",
+    )
+    parser.add_argument(
+        "--strict", action="store_true",
+        help="严格模式：任何 MEDIUM+ 问题都返回非零",
+    )
+    return parser
+
+
+def main() -> int:
+    parser = build_parser()
+    args = parser.parse_args()
+    try:
+        return asyncio.run(run_audit(args))
+    except KeyboardInterrupt:
+        return EXIT_CONFIG_ERROR
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    sys.exit(main())

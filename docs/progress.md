@@ -1,3 +1,71 @@
+## 2026-04-24 RLS 审计脚本 DSN 兼容 + JSON 输出（Go/No-Go §7 可跑）
+
+### 本次会话目标
+修 `scripts/check_rls_policies.py` 三处问题：
+  1. DSN 不兼容 `postgresql+asyncpg://`（SQLAlchemy scheme） → asyncpg 报 `invalid DSN`
+  2. 无 `--json` 输出 → Go/No-Go 脚本调用时拿不到结构化数据
+  3. Exit code 语义不明确 → "DB 连接失败" 和 "找到违规" 都返回 1
+
+Week 8 Go/No-Go §7 "RLS/凭证/端口/CORS/secrets 零告警" 依赖此脚本正常运行。
+
+Tier 级别：Tier 3（基建/脚本，不触业务路径）。
+
+### 完成状态
+- [x] `normalize_dsn` — SQLAlchemy scheme 规范化（支持 `postgresql+asyncpg/+psycopg2/+psycopg`）
+- [x] `redact_dsn` — 日志 / JSON 输出前脱敏密码
+- [x] `--json` CLI — 结构化输出供 CI 消费
+- [x] `--strict` CLI — 严格模式（MEDIUM 及以上失败）；非 strict 只 CRITICAL+HIGH 失败
+- [x] 4 个 exit code：0 clean / 1 issues / 2 DB fail / 3 config error
+- [x] `exists_in_db` 字段区分"表不存在"和"RLS 未启用"（缺表不算违规）
+- [x] `BUSINESS_TABLES` 增补 Sprint D/E/G 共 18 张新表
+- [x] `scripts/demo_go_no_go.py` checkpoint 7 解析 JSON + exit code 2 降级 SKIPPED
+- [x] **29 TDD 测试全绿** (`tests/tier1/test_rls_audit_cli_tier1.py`) + Ruff 全绿
+
+### 关键决策
+- **importlib 加载脚本** — 测试用 `importlib.util` 加载，避免 asyncpg 依赖缺失时 collection 失败
+- **DSN 正则允许数字** — `psycopg2` 含数字，regex 需 `[a-z0-9_]+`
+- **Exit code 区分"可验证"和"不可验证"** — code 2（DB fail）让 CI 降级为 SKIPPED 而非 FAIL
+- **redact 在 normalize 后** — 日志显示 asyncpg 实际连的 DSN
+- **strict vs default 两档** — 默认 MEDIUM 不 fail（运营改进项），strict 全 fail
+- **`summary.passed` vs `summary.error` 双标志** — passed 业务语义，error 技术失败
+- **JSON 输出含 redacted url** — 避免 CI 日志泄露真实密码
+
+### 交付清单
+```
+修改：
+  scripts/check_rls_policies.py                       重写，+DSN+JSON+strict+exit codes
+  scripts/demo_go_no_go.py                            checkpoint 7 解析 JSON + 2→SKIPPED
+新建：
+  tests/tier1/test_rls_audit_cli_tier1.py             29 测试
+```
+
+### 验证
+```
+# DSN 规范化 + 密码脱敏
+$ python3 scripts/check_rls_policies.py \
+    --database-url "postgresql+asyncpg://u:p@127.0.0.1:9/x"
+连接数据库: postgresql://u:***@127.0.0.1:9/x
+ERROR: 数据库连接失败: ... Connect call failed ...
+$ echo $?
+2                                                    # 不再是笼统的 1
+
+# JSON 输出
+$ python3 scripts/check_rls_policies.py --json ...
+{"error": "...", "database_url": "...(***)", "summary": {...}}
+```
+
+Go/No-Go checkpoint #7：**NO_GO → SKIPPED** (DB 不可用时)
+
+### 下一步
+- Week 7 真实 DB 接入后 checkpoint 7 自动转 GO/NO_GO
+- CI 门禁集成：GitHub Actions `--strict --json`
+- 清理历史 RLS 违规（配合真实 DB 审计）
+- 扩展 BUSINESS_TABLES 随新 migration
+
+### 已知风险
+- `redact_dsn` 不处理 URL-encoded 密码（建议 DSN 不 URL 编码）
+- `BUSINESS_TABLES` 需手动维护（未来可改扫 information_schema）
+- `importlib` 加载依赖 `sys.modules[name]` 注册（测试里已处理）
 ## 2026-04-24 v291 补齐历史 RLS 技术债（14 张表）
 
 ### 本次会话目标

@@ -1,3 +1,66 @@
+## 2026-04-24 RLS 审计脚本 DSN 兼容 + JSON 输出 — Go/No-Go §7 可跑
+
+### 今日完成
+- [scripts/check_rls_policies.py] 重写：normalize_dsn（SQLAlchemy scheme 兼容 postgresql+asyncpg/+psycopg2/+psycopg）+ redact_dsn（密码脱敏）+ --json / --strict / 4 个 exit codes（0/1/2/3）+ exists_in_db 区分缺表和违规 + BUSINESS_TABLES 增补 18 张 Sprint D/E/G 新表
+- [scripts/demo_go_no_go.py] checkpoint 7 解析 script JSON 输出 + exit code 2 → SKIPPED；details 显示 critical/high/medium 分布
+- [tests/tier1/test_rls_audit_cli_tier1.py] 29 测试：DSN 规范化 10 / 脱敏 4 / CLI 契约 7 / exit code 2 / BUSINESS_TABLES 覆盖 6
+- Go/No-Go checkpoint #7: NO_GO → SKIPPED（DB 不可用时正确降级）
+
+### 数据变化
+- 修改：check_rls_policies.py + demo_go_no_go.py
+- 新增：29 tier1 测试
+
+### 遗留问题
+- redact_dsn 不处理 URL-encoded 密码
+- BUSINESS_TABLES 需手动维护（未来扫 information_schema）
+
+### 明日计划
+- 真实 DEMO DB 接入后 checkpoint 7 转 GO
+- CI 门禁：GitHub Actions `--strict --json`
+- 清理历史 RLS 违规
+
+---
+
+## 2026-04-24 桌台×时段服务模式架构升级（v281-v287）
+
+### 今日完成
+- [shared/db-migrations] 7个迁移（v281-v287）：区域服务模式/定价策略/会话继承/拼桌预设/拼桌日志/时段矩阵/利用率物化视图
+- [tx-trade/models/enums.py] 新增 ServiceMode 枚举（dine_first/scan_and_pay/retail）
+- [tx-trade/services/dining_session_service.py] 状态机按 service_mode 分支 + open_table() 继承区域服务模式/定价快照
+- [tx-trade/services/voucher_redeem_service.py] 新建券核销服务（平台券/代金券/积分，核销时机按区域配置）
+- [tx-trade/services/table_merge_preset_service.py] 新建时段拼桌预设服务（执行/回滚/市别切换自动触发）
+- [tx-trade/api/cashier_api.py] 新增3端点：retail-sale/pre-order/redeem-voucher
+- [tx-trade/api/table_merge_preset_routes.py] 新建7端点：预设CRUD/执行/回滚/日志
+- [tx-trade/api/table_period_config_routes.py] 新建4端点：时段配置列表/矩阵视图/批量upsert/删除
+- [tx-trade/api/table_utilization_routes.py] 新建4端点：利用率仪表盘/热力图/Agent建议/刷新视图
+- [tx-trade/main.py] 注册3个新路由模块
+
+### 数据变化
+- 迁移版本：v280 → v287（+7）
+- 新增表：table_merge_presets, table_merge_logs, table_period_configs
+- 新增物化视图：mv_table_utilization
+- 新增字段：table_zones +4列, dining_sessions +2列
+- 新增 API 模块：3个路由文件（18端点）+ 2个服务文件 + 3个收银端点
+- 总新增端点：21个
+
+### 架构决策
+- service_mode 三态（dine_first/scan_and_pay/retail）挂在区域而非订单上 — 区域决定流程
+- 拼桌预设复用已有 merge/split 能力，新增自动触发层 — 不重写底层桌台操作
+- 物化视图 mv_table_utilization 不设 RLS — 通过查询时 WHERE tenant_id 过滤
+- retail 模式不创建 dining_session — 直接零售订单，最简路径
+
+### 遗留问题
+- CashierEngine.create_retail_order() / create_pre_order() 方法体待实现（当前端点有 AttributeError 优雅降级）
+- VoucherRedeemService._redeem_member_points() 待接入 tx-member 服务
+- table_merge_preset_service.on_market_session_switch() 需在 market_session_routes.py 市别切换时调用（集成点已标记）
+
+### 明日计划
+- 实现 CashierEngine 的 retail/pre-order 方法体
+- market_session_routes 集成拼桌自动触发
+- Phase 2 Tier 1 测试用例编写
+
+---
+
 ## 2026-04-24 v291 补齐历史 RLS 技术债 — 14 张表
 
 ### 今日完成
