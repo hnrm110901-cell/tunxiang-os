@@ -5,6 +5,7 @@
 
 所有金额单位：分（fen）。
 """
+
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
@@ -57,29 +58,48 @@ _MARKET_PRICE_DATA: dict[str, dict] = {
 
 _COMPETITOR_PRICING: dict[str, dict] = {
     "费大厨辣椒炒肉": {
-        "辣椒炒肉": 5800, "小炒黄牛肉": 6800, "剁椒鱼头": 8800,
-        "酸汤肥牛": 5800, "午市套餐": 3900, "双人套餐": 12800,
+        "辣椒炒肉": 5800,
+        "小炒黄牛肉": 6800,
+        "剁椒鱼头": 8800,
+        "酸汤肥牛": 5800,
+        "午市套餐": 3900,
+        "双人套餐": 12800,
     },
     "望湘园": {
-        "辣椒炒肉": 6200, "小炒黄牛肉": 7200, "剁椒鱼头": 9800,
-        "红烧肉": 5800, "午市套餐": 4500, "双人套餐": 15800,
+        "辣椒炒肉": 6200,
+        "小炒黄牛肉": 7200,
+        "剁椒鱼头": 9800,
+        "红烧肉": 5800,
+        "午市套餐": 4500,
+        "双人套餐": 15800,
     },
     "海底捞": {
-        "经典锅底": 7800, "牛肉拼盘": 6800, "虾滑": 4800,
-        "午市套餐": 5800, "双人套餐": 16800,
+        "经典锅底": 7800,
+        "牛肉拼盘": 6800,
+        "虾滑": 4800,
+        "午市套餐": 5800,
+        "双人套餐": 16800,
     },
     "太二酸菜鱼": {
-        "酸菜鱼(标准)": 6800, "酸菜鱼(大份)": 8800,
-        "午市套餐": 3990, "双人套餐": 11800,
+        "酸菜鱼(标准)": 6800,
+        "酸菜鱼(大份)": 8800,
+        "午市套餐": 3990,
+        "双人套餐": 11800,
     },
 }
 
 # ─── 我方定价 ───
 
 _OUR_PRICING: dict[str, int] = {
-    "辣椒炒肉": 5500, "小炒黄牛肉": 6500, "剁椒鱼头": 8500,
-    "酸汤肥牛": 5200, "口味虾": 8800, "腊味合蒸": 5800,
-    "午市套餐": 3500, "双人套餐": 11800, "家庭套餐": 19800,
+    "辣椒炒肉": 5500,
+    "小炒黄牛肉": 6500,
+    "剁椒鱼头": 8500,
+    "酸汤肥牛": 5200,
+    "口味虾": 8800,
+    "腊味合蒸": 5800,
+    "午市套餐": 3500,
+    "双人套餐": 11800,
+    "家庭套餐": 19800,
 }
 
 
@@ -98,16 +118,18 @@ class PricingInsightService:
         for i in range(90, 0, -1):
             date = now - timedelta(days=i)
             # 模拟波动
-            variation = (hash(str(i)) % 1000 - 500)
+            variation = hash(str(i)) % 1000 - 500
             # 周末略高
             weekend_boost = 800 if date.weekday() >= 5 else 0
             spend = base_spend + variation + weekend_boost + (90 - i) * 5
-            history.append({
-                "date": date.strftime("%Y-%m-%d"),
-                "avg_spend_fen": max(5000, spend),
-                "order_count": 150 + (hash(str(i + 1)) % 50),
-                "set_meal_pct": 35 + (hash(str(i + 2)) % 15),
-            })
+            history.append(
+                {
+                    "date": date.strftime("%Y-%m-%d"),
+                    "avg_spend_fen": max(5000, spend),
+                    "order_count": 150 + (hash(str(i + 1)) % 50),
+                    "set_meal_pct": 35 + (hash(str(i + 2)) % 15),
+                }
+            )
         return history
 
     # ─── 价格带分析 ───
@@ -125,8 +147,12 @@ class PricingInsightService:
         if city and city in cat_data:
             city_data = {city: cat_data[city]}
         elif city:
-            return {"category": category, "city": city, "status": "no_data",
-                    "message": f"暂无{city}的{category}价格带数据"}
+            return {
+                "category": category,
+                "city": city,
+                "status": "no_data",
+                "message": f"暂无{city}的{category}价格带数据",
+            }
         else:
             city_data = cat_data
 
@@ -135,14 +161,16 @@ class PricingInsightService:
             band_list = []
             for band_key, band_info in bands.items():
                 band_meta = PRICE_BANDS.get(band_key, {})
-                band_list.append({
-                    "band": band_key,
-                    "label": band_meta.get("label", band_key),
-                    "price_range_fen": band_meta.get("range_fen", (0, 0)),
-                    "market_share_pct": band_info["market_share_pct"],
-                    "avg_spend_fen": band_info["avg_spend_fen"],
-                    "key_brands": band_info["brands"],
-                })
+                band_list.append(
+                    {
+                        "band": band_key,
+                        "label": band_meta.get("label", band_key),
+                        "price_range_fen": band_meta.get("range_fen", (0, 0)),
+                        "market_share_pct": band_info["market_share_pct"],
+                        "avg_spend_fen": band_info["avg_spend_fen"],
+                        "key_brands": band_info["brands"],
+                    }
+                )
             result_cities[c] = band_list
 
         return {
@@ -331,13 +359,13 @@ class PricingInsightService:
             return {"status": "no_data", "message": "无消费数据"}
 
         avg_spend = sum(d["avg_spend_fen"] for d in data) / len(data)
-        first_half = data[:len(data) // 2]
-        second_half = data[len(data) // 2:]
+        first_half = data[: len(data) // 2]
+        second_half = data[len(data) // 2 :]
         avg_first = sum(d["avg_spend_fen"] for d in first_half) / len(first_half) if first_half else 0
         avg_second = sum(d["avg_spend_fen"] for d in second_half) / len(second_half) if second_half else 0
 
-        trend = "rising" if avg_second > avg_first * 1.02 else (
-            "declining" if avg_second < avg_first * 0.98 else "stable"
+        trend = (
+            "rising" if avg_second > avg_first * 1.02 else ("declining" if avg_second < avg_first * 0.98 else "stable")
         )
 
         avg_set_meal_pct = sum(d["set_meal_pct"] for d in data) / len(data)
@@ -356,12 +384,12 @@ class PricingInsightService:
 
     def _spend_insight(self, trend: str, avg_spend: int, set_meal_pct: float) -> str:
         trend_cn = {"rising": "上升", "declining": "下降", "stable": "平稳"}.get(trend, trend)
-        return (
-            f"近期客单价{trend_cn}，均值¥{avg_spend / 100:.0f}。"
-            f"套餐占比{set_meal_pct:.0f}%。"
-            + ("建议关注消费降级风险。" if trend == "declining" else
-               "消费升级趋势明显，可适度丰富高客单产品。" if trend == "rising" else
-               "消费稳定，维持当前策略。")
+        return f"近期客单价{trend_cn}，均值¥{avg_spend / 100:.0f}。套餐占比{set_meal_pct:.0f}%。" + (
+            "建议关注消费降级风险。"
+            if trend == "declining"
+            else "消费升级趋势明显，可适度丰富高客单产品。"
+            if trend == "rising"
+            else "消费稳定，维持当前策略。"
         )
 
     # ─── 价值感知差距 ───

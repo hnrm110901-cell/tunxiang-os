@@ -8,7 +8,7 @@ import asyncio
 
 # Feature Flag SDK（try/except 保护，SDK不可用时自动降级为全量开启）
 try:
-    from shared.feature_flags import FlagContext, is_enabled
+    from shared.feature_flags import is_enabled
     from shared.feature_flags.flag_names import OrgFlags
 
     _FLAG_SDK_AVAILABLE = True
@@ -29,6 +29,9 @@ from api.alert_aggregation_routes import router as alert_aggregation_router
 from api.approval_engine_routes import router as approval_engine_router
 from api.approval_router import router as approval_router
 from api.attendance_compliance_routes import router as attendance_compliance_router
+from api.daily_scorecard_routes import bonus_router as bonus_router
+from api.daily_scorecard_routes import lifecycle_router as lifecycle_router
+from api.daily_scorecard_routes import router as daily_scorecard_router
 from api.attendance_routes import router as attendance_router
 from api.brand_management_routes import router as brand_management_router
 from api.certification_routes import router as certification_router
@@ -86,10 +89,12 @@ from api.store_clone_routes import router as store_clone_router
 from api.store_ops_routes import router as store_ops_router
 from api.store_readiness_routes import router as store_readiness_router
 from api.tax_filing_routes import router as tax_filing_router
+from api.ai_salary_advisor_routes import router as ai_salary_advisor_router
 from api.tenant_systems_routes import router as tenant_systems_router
 from api.transfer_routes import router as transfer_db_router
 from api.transfers import router as transfer_router
 from api.unified_schedule_routes import router as unified_schedule_router
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from shared.ontology.src.database import get_db as _shared_get_db
@@ -237,6 +242,10 @@ app.include_router(e_signature_router)  # 电子签约模块（v252表）合同�
 app.include_router(points_router)  # 员工积分+赛马（v253表）积分流水+兑换+赛季
 app.include_router(tax_filing_router)  # 薪税申报对接（v256表）个税申报生成+提交+查询
 app.include_router(attendance_compliance_router)  # 考勤深度合规审计（v255表）GPS/代打/加班超时
+app.include_router(ai_salary_advisor_router)   # AI 薪资推荐（v257）岗位档位+区域系数+工龄曲线
+app.include_router(daily_scorecard_router)  # 日KPI得分卡（v378表）Sprint G5
+app.include_router(bonus_router)  # 绩效奖金计算（v378表）Sprint G5
+app.include_router(lifecycle_router)  # 门店生命周期（v378表）Sprint G5
 from api.franchise_fee_routes import router as franchise_fee_router
 
 app.include_router(franchise_fee_router)  # 加盟收费闭环（天财对标）账单/收款/出账规则/报表

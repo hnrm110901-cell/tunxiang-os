@@ -68,7 +68,7 @@ function calcSubtotal(dish: DishItem, quantity: number, selections: Record<strin
   return unitPrice * quantity;
 }
 
-export const useOrderStore = create<OrderState>((set, get) => ({
+export const useOrderStore = create<OrderState>()((set, get) => ({
   storeId: '',
   storeName: '',
   tableNo: '',

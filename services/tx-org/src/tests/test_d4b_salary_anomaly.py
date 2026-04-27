@@ -12,6 +12,7 @@
   9. v280 迁移静态校验
   10. ModelRouter 注册 salary_anomaly_detection
 """
+
 from __future__ import annotations
 
 import json
@@ -41,6 +42,7 @@ from services.salary_anomaly_service import (  # noqa: E402
 # helpers
 # ──────────────────────────────────────────────────────────────────────
 
+
 def _emp(
     employee_id: str = "e1",
     emp_name: str = "张三",
@@ -57,12 +59,19 @@ def _emp(
     housing_fund_paid: bool = True,
 ) -> EmployeeSalarySignal:
     return EmployeeSalarySignal(
-        employee_id=employee_id, emp_name=emp_name, role=role, city=city,
-        seniority_months=seniority_months, base_salary_fen=base_salary_fen,
-        overtime_hours=overtime_hours, overtime_pay_fen=overtime_pay_fen,
-        commission_fen=commission_fen, total_pay_fen=total_pay_fen,
+        employee_id=employee_id,
+        emp_name=emp_name,
+        role=role,
+        city=city,
+        seniority_months=seniority_months,
+        base_salary_fen=base_salary_fen,
+        overtime_hours=overtime_hours,
+        overtime_pay_fen=overtime_pay_fen,
+        commission_fen=commission_fen,
+        total_pay_fen=total_pay_fen,
         prev_total_pay_fen=prev_total_pay_fen,
-        social_insurance_paid=social_insurance_paid, housing_fund_paid=housing_fund_paid,
+        social_insurance_paid=social_insurance_paid,
+        housing_fund_paid=housing_fund_paid,
     )
 
 
@@ -88,6 +97,7 @@ def _mock_response(payload: dict, usage: dict | None = None) -> dict:
 # 1. SalarySignalBundle 序列化
 # ──────────────────────────────────────────────────────────────────────
 
+
 def test_bundle_serializes():
     b = _bundle()
     d = b.to_json_dict()
@@ -98,16 +108,19 @@ def test_bundle_serializes():
 
 
 def test_bundle_total_payroll_property():
-    b = _bundle([
-        _emp(total_pay_fen=500000),
-        _emp(employee_id="e2", total_pay_fen=300000),
-    ])
+    b = _bundle(
+        [
+            _emp(total_pay_fen=500000),
+            _emp(employee_id="e2", total_pay_fen=300000),
+        ]
+    )
     assert b.total_payroll_fen == 800000
 
 
 # ──────────────────────────────────────────────────────────────────────
 # 2. CachedPromptBuilder
 # ──────────────────────────────────────────────────────────────────────
+
 
 def test_builder_request_structure():
     req = CachedPromptBuilder.build_request(signal_bundle=_bundle())
@@ -140,26 +153,35 @@ def test_builder_system_contains_city_benchmarks():
 # 3. parse_sonnet_response
 # ──────────────────────────────────────────────────────────────────────
 
+
 def test_parse_valid_json():
     payload = {
         "analysis": "一切合规",
         "ranked_anomalies": [
             {
-                "employee_id": "e1", "employee_name": "张三",
-                "anomaly_type": "overtime_excess", "severity": "critical",
-                "evidence": "加班 50h", "impact_fen": 200000, "legal_risk": True,
+                "employee_id": "e1",
+                "employee_name": "张三",
+                "anomaly_type": "overtime_excess",
+                "severity": "critical",
+                "evidence": "加班 50h",
+                "impact_fen": 200000,
+                "legal_risk": True,
             },
         ],
         "remediation_actions": [
             {
-                "action": "调整排班", "owner_role": "store_manager",
-                "deadline_days": 7, "impact_fen": 0,
+                "action": "调整排班",
+                "owner_role": "store_manager",
+                "deadline_days": 7,
+                "impact_fen": 0,
             },
         ],
     }
     usage = {
-        "input_tokens": 1000, "output_tokens": 400,
-        "cache_read_input_tokens": 3000, "cache_creation_input_tokens": 0,
+        "input_tokens": 1000,
+        "output_tokens": 400,
+        "cache_read_input_tokens": 3000,
+        "cache_creation_input_tokens": 0,
     }
     analysis, anomalies, actions, stats = parse_sonnet_response(_mock_response(payload, usage))
     assert analysis == "一切合规"
@@ -172,9 +194,9 @@ def test_parse_valid_json():
 
 def test_parse_code_fence():
     inner = {
-        "analysis": "test", "ranked_anomalies": [],
-        "remediation_actions": [{"action": "ok", "owner_role": "hrd",
-                                 "deadline_days": 7, "impact_fen": 0}],
+        "analysis": "test",
+        "ranked_anomalies": [],
+        "remediation_actions": [{"action": "ok", "owner_role": "hrd", "deadline_days": 7, "impact_fen": 0}],
     }
     wrapped = f"```json\n{json.dumps(inner)}\n```"
     response = {"content": [{"type": "text", "text": wrapped}], "usage": {}}
@@ -194,6 +216,7 @@ def test_parse_broken_falls_back():
 # ──────────────────────────────────────────────────────────────────────
 # 4. Fallback 规则引擎（5 种异常类型）
 # ──────────────────────────────────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_fallback_social_insurance_missing_critical():
@@ -224,12 +247,16 @@ async def test_fallback_overtime_excess():
 async def test_fallback_commission_abuse():
     """提成 > 底薪 200% → commission_abuse high"""
     service = SalaryAnomalyService()
-    b = _bundle([_emp(
-        base_salary_fen=300000,
-        commission_fen=700000,  # 700/300 = 2.33x > 2.0
-        total_pay_fen=1000000,
-        prev_total_pay_fen=800000,  # 避免触发 sudden_raise
-    )])
+    b = _bundle(
+        [
+            _emp(
+                base_salary_fen=300000,
+                commission_fen=700000,  # 700/300 = 2.33x > 2.0
+                total_pay_fen=1000000,
+                prev_total_pay_fen=800000,  # 避免触发 sudden_raise
+            )
+        ]
+    )
     result = await service.analyze(b)
     types = [a.anomaly_type for a in result.ranked_anomalies]
     assert "commission_abuse" in types
@@ -239,12 +266,17 @@ async def test_fallback_commission_abuse():
 async def test_fallback_sudden_raise():
     """涨薪 > 30% → sudden_raise medium"""
     service = SalaryAnomalyService()
-    b = _bundle([_emp(
-        total_pay_fen=700000,
-        prev_total_pay_fen=500000,  # 40% 涨幅
-        # 避免触发其他异常
-        commission_fen=50000, base_salary_fen=600000,
-    )])
+    b = _bundle(
+        [
+            _emp(
+                total_pay_fen=700000,
+                prev_total_pay_fen=500000,  # 40% 涨幅
+                # 避免触发其他异常
+                commission_fen=50000,
+                base_salary_fen=600000,
+            )
+        ]
+    )
     result = await service.analyze(b)
     types = [a.anomaly_type for a in result.ranked_anomalies]
     assert "sudden_raise" in types
@@ -265,8 +297,12 @@ async def test_fallback_empty_employees_returns_skip():
     service = SalaryAnomalyService()
     result = await service.analyze(
         SalarySignalBundle(
-            tenant_id="x", store_id=None, store_name=None,
-            analysis_month=date(2026, 3, 1), city="长沙", employees=[],
+            tenant_id="x",
+            store_id=None,
+            store_name=None,
+            analysis_month=date(2026, 3, 1),
+            city="长沙",
+            employees=[],
         ),
     )
     assert result.ranked_anomalies == []
@@ -277,18 +313,25 @@ async def test_fallback_empty_employees_returns_skip():
 # 5. 排序（legal_risk desc / severity desc）
 # ──────────────────────────────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_fallback_sorts_legal_risk_first():
     """2 员工：一个社保漏缴 + 一个提成异常 → 社保漏缴排第一"""
     service = SalaryAnomalyService()
-    b = _bundle([
-        _emp(employee_id="e1", emp_name="张三",
-             base_salary_fen=300000, commission_fen=700000, total_pay_fen=1000000,
-             prev_total_pay_fen=900000,
-             social_insurance_paid=True),  # commission_abuse (high)
-        _emp(employee_id="e2", emp_name="李四",
-             social_insurance_paid=False),  # critical + legal_risk
-    ])
+    b = _bundle(
+        [
+            _emp(
+                employee_id="e1",
+                emp_name="张三",
+                base_salary_fen=300000,
+                commission_fen=700000,
+                total_pay_fen=1000000,
+                prev_total_pay_fen=900000,
+                social_insurance_paid=True,
+            ),  # commission_abuse (high)
+            _emp(employee_id="e2", emp_name="李四", social_insurance_paid=False),  # critical + legal_risk
+        ]
+    )
     result = await service.analyze(b)
     assert len(result.ranked_anomalies) >= 2
     # 第一条必须是社保漏缴
@@ -300,13 +343,21 @@ async def test_fallback_sorts_legal_risk_first():
 # 6. has_critical / has_legal_risk
 # ──────────────────────────────────────────────────────────────────────
 
+
 def test_result_critical_and_legal_risk_properties():
     from services.salary_anomaly_service import SalaryAnomaly
+
     r = SalaryAnomalyAnalysisResult(
         ranked_anomalies=[
-            SalaryAnomaly(employee_id="e1", employee_name="n",
-                          anomaly_type="other", severity="critical",
-                          evidence="x", impact_fen=0, legal_risk=False),
+            SalaryAnomaly(
+                employee_id="e1",
+                employee_name="n",
+                anomaly_type="other",
+                severity="critical",
+                evidence="x",
+                impact_fen=0,
+                legal_risk=False,
+            ),
         ],
     )
     assert r.has_critical is True
@@ -320,6 +371,7 @@ def test_result_critical_and_legal_risk_properties():
 # 7. invoker 成功 + 失败降级
 # ──────────────────────────────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_invoker_success_path():
     invoked = []
@@ -331,21 +383,30 @@ async def test_invoker_success_path():
                 "analysis": "Sonnet 输出",
                 "ranked_anomalies": [
                     {
-                        "employee_id": "e1", "employee_name": "张三",
-                        "anomaly_type": "below_market", "severity": "high",
+                        "employee_id": "e1",
+                        "employee_name": "张三",
+                        "anomaly_type": "below_market",
+                        "severity": "high",
                         "evidence": "底薪 3500 低于长沙 P50 4200",
-                        "impact_fen": 7000, "legal_risk": False,
+                        "impact_fen": 7000,
+                        "legal_risk": False,
                     },
                 ],
                 "remediation_actions": [
                     {
-                        "action": "涨薪至市场 P50", "owner_role": "hrd",
-                        "deadline_days": 30, "impact_fen": 7000,
+                        "action": "涨薪至市场 P50",
+                        "owner_role": "hrd",
+                        "deadline_days": 30,
+                        "impact_fen": 7000,
                     },
                 ],
             },
-            usage={"input_tokens": 500, "output_tokens": 300,
-                   "cache_read_input_tokens": 3000, "cache_creation_input_tokens": 0},
+            usage={
+                "input_tokens": 500,
+                "output_tokens": 300,
+                "cache_read_input_tokens": 3000,
+                "cache_creation_input_tokens": 0,
+            },
         )
 
     service = SalaryAnomalyService(sonnet_invoker=mock_sonnet)
@@ -376,6 +437,7 @@ async def test_invoker_failure_falls_back_to_rules():
 # 8. cache_hit_rate 计算
 # ──────────────────────────────────────────────────────────────────────
 
+
 def test_cache_hit_rate_zero_when_no_cache():
     r = SalaryAnomalyAnalysisResult(input_tokens=1000, output_tokens=500)
     assert r.cache_hit_rate == 0.0
@@ -383,8 +445,10 @@ def test_cache_hit_rate_zero_when_no_cache():
 
 def test_cache_hit_rate_high():
     r = SalaryAnomalyAnalysisResult(
-        cache_read_tokens=3000, cache_creation_tokens=0,
-        input_tokens=1000, output_tokens=500,
+        cache_read_tokens=3000,
+        cache_creation_tokens=0,
+        input_tokens=1000,
+        output_tokens=500,
     )
     # 3000 / 4000 = 0.75
     assert r.cache_hit_rate == pytest.approx(0.75, abs=0.001)
@@ -405,8 +469,15 @@ def test_thresholds_match_design():
 # ──────────────────────────────────────────────────────────────────────
 
 _MIG_PATH = os.path.join(
-    os.path.dirname(__file__), "..", "..", "..", "..",
-    "shared", "db-migrations", "versions", "v280_salary_anomaly_analyses.py"
+    os.path.dirname(__file__),
+    "..",
+    "..",
+    "..",
+    "..",
+    "shared",
+    "db-migrations",
+    "versions",
+    "v280_salary_anomaly_analyses.py",
 )
 
 
@@ -420,12 +491,23 @@ def _read_mig() -> str:
 def test_v280_creates_table_with_required_columns():
     content = _read_mig()
     for col in (
-        "analysis_month", "analysis_scope", "employee_count", "total_payroll_fen",
-        "city", "signals_snapshot", "ranked_anomalies", "remediation_actions",
-        "sonnet_analysis", "model_id",
-        "cache_read_tokens", "cache_creation_tokens",
-        "input_tokens", "output_tokens",
-        "status", "reviewed_by", "reviewed_at",
+        "analysis_month",
+        "analysis_scope",
+        "employee_count",
+        "total_payroll_fen",
+        "city",
+        "signals_snapshot",
+        "ranked_anomalies",
+        "remediation_actions",
+        "sonnet_analysis",
+        "model_id",
+        "cache_read_tokens",
+        "cache_creation_tokens",
+        "input_tokens",
+        "output_tokens",
+        "status",
+        "reviewed_by",
+        "reviewed_at",
         "employee_id",
     ):
         assert col in content, f"缺列 {col}"
@@ -463,10 +545,20 @@ def test_v280_down_revision_chains_to_v279():
 # 10. ModelRouter 注册
 # ──────────────────────────────────────────────────────────────────────
 
+
 def test_model_router_registers_salary_anomaly_detection():
     path = os.path.join(
-        os.path.dirname(__file__), "..", "..", "..", "..",
-        "services", "tunxiang-api", "src", "shared", "core", "model_router.py"
+        os.path.dirname(__file__),
+        "..",
+        "..",
+        "..",
+        "..",
+        "services",
+        "tunxiang-api",
+        "src",
+        "shared",
+        "core",
+        "model_router.py",
     )
     if not os.path.exists(path):
         pytest.skip("model_router.py 不存在")

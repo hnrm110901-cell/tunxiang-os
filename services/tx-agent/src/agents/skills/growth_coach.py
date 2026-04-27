@@ -274,8 +274,7 @@ class GrowthCoachAgent(SkillAgent):
     # Sprint D1 / PR 批次 6：纯培训路径推荐，不触发业务决策，豁免
     constraint_scope = set()
     constraint_waived_reason = (
-        "成长教练纯员工技能差距分析与个性化培训路径推荐，"
-        "不直接操作毛利/食安/客户体验三条业务约束维度"
+        "成长教练纯员工技能差距分析与个性化培训路径推荐，不直接操作毛利/食安/客户体验三条业务约束维度"
     )
 
     def get_supported_actions(self) -> list[str]:

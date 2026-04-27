@@ -18,8 +18,7 @@ class IntelReporterAgent(SkillAgent):
     # Sprint D1 / PR 批次 6：纯情报汇总报告，不触发业务决策，豁免
     constraint_scope = set()
     constraint_waived_reason = (
-        "情报周报生成纯数据汇总与报告输出（竞对/需求/新品/原料/商圈），"
-        "不直接操作毛利/食安/客户体验三条业务约束维度"
+        "情报周报生成纯数据汇总与报告输出（竞对/需求/新品/原料/商圈），不直接操作毛利/食安/客户体验三条业务约束维度"
     )
 
     def get_supported_actions(self) -> list[str]:

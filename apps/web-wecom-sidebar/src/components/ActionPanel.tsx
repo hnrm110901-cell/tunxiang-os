@@ -1,15 +1,14 @@
 /**
- * ActionPanel.tsx — 导购快捷操作（发优惠券 / 打标签 / 添加备注）
+ * ActionPanel.tsx — 导购快捷操作（聊天 + 发优惠券 + 打标签 + 添加备注）
  *
- * 三个按钮，点击后弹出对应操作面板（底部抽屉形式）。
- * 完成操作后通过 onActionDone 回调通知父组件刷新数据。
+ * 精简为头部小按钮样式，抽屉面板保留完整功能。
+ * 发券/打标签能力已集成到Tab中，这里保留备注入口和聊天入口。
  */
 import React, { useState, useEffect } from 'react';
 import type { CustomerProfile, Coupon, ActionPanelMode } from '../types';
 import {
   fetchIssuableCoupons,
   issueCoupon,
-  updateCustomerTags,
   updateWecomRemark,
 } from '../api/memberApi';
 
@@ -60,165 +59,6 @@ function Drawer({
         </div>
       </div>
     </>
-  );
-}
-
-// ─── 发券面板 ──────────────────────────────────────────────────────
-function CouponDrawer({
-  open,
-  customerId,
-  onClose,
-  onDone,
-}: {
-  open: boolean;
-  customerId: string;
-  onClose: () => void;
-  onDone: () => void;
-}): React.ReactElement {
-  const [coupons, setCoupons] = useState<Coupon[]>([]);
-  const [loadingCoupons, setLoadingCoupons] = useState(false);
-  const [issuing, setIssuing] = useState<string | null>(null);
-  const [feedback, setFeedback] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    setLoadingCoupons(true);
-    fetchIssuableCoupons()
-      .then(setCoupons)
-      .catch(() => setCoupons([]))
-      .finally(() => setLoadingCoupons(false));
-  }, [open]);
-
-  async function handleIssue(couponId: string): Promise<void> {
-    setIssuing(couponId);
-    setFeedback(null);
-    try {
-      await issueCoupon(customerId, couponId);
-      setFeedback('发券成功！');
-      setTimeout(() => {
-        onDone();
-        onClose();
-      }, 800);
-    } catch {
-      setFeedback('发券失败，请重试');
-    } finally {
-      setIssuing(null);
-    }
-  }
-
-  return (
-    <Drawer open={open} title="选择优惠券" onClose={onClose}>
-      {feedback && (
-        <p className="text-sm text-center text-tx-success mb-3">{feedback}</p>
-      )}
-      {loadingCoupons ? (
-        <p className="text-sm text-tx-text-3 text-center py-4">加载中...</p>
-      ) : coupons.length === 0 ? (
-        <p className="text-sm text-tx-text-3 text-center py-4">暂无可发放的优惠券</p>
-      ) : (
-        <ul className="flex flex-col gap-2">
-          {coupons.map((c) => (
-            <li
-              key={c.coupon_id}
-              className="flex items-center justify-between p-3 bg-tx-bg-2
-                         rounded-tx-md border border-tx-border"
-            >
-              <div>
-                <p className="text-sm font-medium text-tx-text-1">{c.name}</p>
-                <p className="text-xs text-tx-text-3">{c.discount_desc}</p>
-              </div>
-              <button
-                onClick={() => handleIssue(c.coupon_id)}
-                disabled={issuing === c.coupon_id}
-                className="px-3 py-1.5 bg-tx-primary text-white text-xs rounded-tx-md
-                           disabled:opacity-50 active:scale-[0.97] transition-transform"
-              >
-                {issuing === c.coupon_id ? '发送中...' : '发放'}
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-    </Drawer>
-  );
-}
-
-// ─── 打标签面板 ────────────────────────────────────────────────────
-const PRESET_TAGS = [
-  '高消费', '常客', '商务宴请', '家庭聚餐', '过生日',
-  '口味清淡', '不辣', '海鲜爱好者', '素食', '需要发票',
-];
-
-function TagDrawer({
-  open,
-  customer,
-  onClose,
-  onDone,
-}: {
-  open: boolean;
-  customer: CustomerProfile;
-  onClose: () => void;
-  onDone: () => void;
-}): React.ReactElement {
-  const [selected, setSelected] = useState<Set<string>>(
-    () => new Set(customer.tags),
-  );
-  const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    if (open) setSelected(new Set(customer.tags));
-  }, [open, customer.tags]);
-
-  function toggle(tag: string): void {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      next.has(tag) ? next.delete(tag) : next.add(tag);
-      return next;
-    });
-  }
-
-  async function handleSave(): Promise<void> {
-    setSaving(true);
-    try {
-      await updateCustomerTags(customer.customer_id, Array.from(selected));
-      onDone();
-      onClose();
-    } catch {
-      // 保持当前状态，让用户重试
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  return (
-    <Drawer open={open} title="打标签" onClose={onClose}>
-      <div className="flex flex-wrap gap-2 mb-4">
-        {PRESET_TAGS.map((tag) => {
-          const active = selected.has(tag);
-          return (
-            <button
-              key={tag}
-              onClick={() => toggle(tag)}
-              className={`px-3 py-1.5 rounded-full text-sm transition-colors duration-150
-                          ${active
-                            ? 'bg-tx-primary text-white'
-                            : 'bg-tx-bg-2 text-tx-text-2 border border-tx-border'
-                          }`}
-            >
-              {tag}
-            </button>
-          );
-        })}
-      </div>
-      <button
-        onClick={handleSave}
-        disabled={saving}
-        className="w-full py-3 bg-tx-primary text-white font-medium rounded-tx-md
-                   disabled:opacity-50 active:bg-tx-primary-active transition-colors"
-      >
-        {saving ? '保存中...' : '保存标签'}
-      </button>
-    </Drawer>
   );
 }
 
@@ -281,55 +121,29 @@ function RemarkDrawer({
   );
 }
 
-// ─── 主面板 ────────────────────────────────────────────────────────
+// ─── 主面板（精简为小按钮） ─────────────────────────────────────────
 export function ActionPanel({
   customer,
   onActionDone,
 }: ActionPanelProps): React.ReactElement {
   const [mode, setMode] = useState<ActionPanelMode>(null);
 
-  const actions: Array<{
-    id: ActionPanelMode;
-    label: string;
-    icon: string;
-    colorClass: string;
-  }> = [
-    { id: 'coupon', label: '发优惠券', icon: '🎫', colorClass: 'bg-orange-50 text-tx-primary' },
-    { id: 'tag',    label: '打标签',   icon: '🏷️', colorClass: 'bg-blue-50 text-blue-600' },
-    { id: 'remark', label: '写备注',   icon: '📝', colorClass: 'bg-green-50 text-tx-success' },
-  ];
-
   return (
     <>
-      {/* 三按钮行 */}
-      <div className="flex gap-2">
-        {actions.map((action) => (
-          <button
-            key={action.id}
-            onClick={() => setMode(action.id)}
-            className={`flex-1 flex flex-col items-center gap-1.5 py-3 rounded-tx-md
-                        ${action.colorClass} font-medium
-                        active:scale-[0.97] transition-transform duration-200`}
-          >
-            <span className="text-xl leading-none">{action.icon}</span>
-            <span className="text-xs">{action.label}</span>
-          </button>
-        ))}
-      </div>
+      {/* 紧凑按钮组 */}
+      <button
+        onClick={() => setMode('remark')}
+        className="w-8 h-8 flex items-center justify-center rounded-full
+                   bg-tx-bg-2 text-tx-text-2 active:bg-tx-bg-3 transition-colors"
+        title="写备注"
+      >
+        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round"
+                d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+        </svg>
+      </button>
 
       {/* 抽屉 */}
-      <CouponDrawer
-        open={mode === 'coupon'}
-        customerId={customer.customer_id}
-        onClose={() => setMode(null)}
-        onDone={onActionDone}
-      />
-      <TagDrawer
-        open={mode === 'tag'}
-        customer={customer}
-        onClose={() => setMode(null)}
-        onDone={onActionDone}
-      />
       <RemarkDrawer
         open={mode === 'remark'}
         customer={customer}

@@ -15,6 +15,7 @@
 
 所有端点通过 X-Tenant-ID header 传递租户 ID（由 Gateway 注入）。
 """
+
 import uuid
 from datetime import date
 from typing import Annotated, Any
@@ -32,6 +33,7 @@ router = APIRouter(prefix="/intel", tags=["market-intel-external"])
 
 # ─── 依赖项 ───
 
+
 async def get_db() -> AsyncSession:  # type: ignore[return]
     """数据库 session 依赖（由应用 lifespan 中注入真实实现）"""
     raise NotImplementedError("请在应用启动时注入 DB session factory")
@@ -46,6 +48,7 @@ async def get_tenant_id(x_tenant_id: Annotated[str, Header()]) -> uuid.UUID:
 
 
 # ─── 请求/响应模型 ───
+
 
 class CompetitorBrandCreate(BaseModel):
     name: str = Field(..., max_length=100)
@@ -91,6 +94,7 @@ class CrawlTaskPatch(BaseModel):
 
 # ─── 通用响应工具 ───
 
+
 def ok(data: Any) -> dict:
     return {"ok": True, "data": data, "error": None}
 
@@ -102,6 +106,7 @@ def err(message: str, status_code: int = 400) -> None:
 # ═══════════════════════════════════════
 # 竞对品牌
 # ═══════════════════════════════════════
+
 
 @router.get("/competitors")
 async def list_competitors(
@@ -159,6 +164,7 @@ async def create_competitor(
     """新增竞对品牌档案"""
     brand_id = uuid.uuid4()
     import json
+
     await db.execute(
         text("""
             INSERT INTO competitor_brands
@@ -232,6 +238,7 @@ async def trigger_competitor_snapshot(
 ) -> dict:
     """手动触发竞对快照采集"""
     from services.competitor_monitor_ext import CompetitorMonitorExtService
+
     svc = CompetitorMonitorExtService(db)
     result = await svc.run_competitor_snapshot(tenant_id, competitor_id)
     if not result.get("ok"):
@@ -242,6 +249,7 @@ async def trigger_competitor_snapshot(
 # ═══════════════════════════════════════
 # 点评情报
 # ═══════════════════════════════════════
+
 
 @router.get("/reviews")
 async def list_reviews(
@@ -305,6 +313,7 @@ async def collect_reviews(
 ) -> dict:
     """手动触发点评采集"""
     from services.review_collector import ReviewCollectorService
+
     svc = ReviewCollectorService(db)
     result = await svc.collect_store_reviews(
         tenant_id=tenant_id,
@@ -321,6 +330,7 @@ async def collect_reviews(
 # ═══════════════════════════════════════
 # 市场趋势
 # ═══════════════════════════════════════
+
 
 @router.get("/trends")
 async def list_trends(
@@ -381,6 +391,7 @@ async def scan_dish_trends(
 ) -> dict:
     """手动触发菜品趋势扫描"""
     from services.trend_scanner import TrendScannerService
+
     svc = TrendScannerService(db)
     result = await svc.scan_dish_trends(tenant_id, req.city, req.cuisine_type)
     if not result.get("ok"):
@@ -396,6 +407,7 @@ async def scan_ingredient_trends(
 ) -> dict:
     """手动触发食材趋势扫描"""
     from services.trend_scanner import TrendScannerService
+
     svc = TrendScannerService(db)
     result = await svc.scan_ingredient_trends(tenant_id, req.category, req.region)
     if not result.get("ok"):
@@ -407,6 +419,7 @@ async def scan_ingredient_trends(
 # 采集任务调度
 # ═══════════════════════════════════════
 
+
 @router.post("/tasks", status_code=201)
 async def create_crawl_task(
     req: CrawlTaskCreate,
@@ -415,6 +428,7 @@ async def create_crawl_task(
 ) -> dict:
     """创建采集任务"""
     import json
+
     task_id = uuid.uuid4()
     await db.execute(
         text("""
@@ -513,7 +527,7 @@ async def update_crawl_task(
     result = await db.execute(
         text(f"""
             UPDATE intel_crawl_tasks
-            SET {', '.join(updates)}
+            SET {", ".join(updates)}
             WHERE id = :task_id AND tenant_id = :tenant_id
         """),
         params,

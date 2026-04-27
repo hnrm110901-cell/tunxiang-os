@@ -13,6 +13,7 @@ ForgeNode — mac-station 离线感知决策引擎
 SKILL.yaml 扫描路径（glob）：
     /Users/lichun/tunxiang-os/services/*/skills/*/SKILL.yaml
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -21,9 +22,8 @@ from typing import Optional
 
 import httpx
 import structlog
-from pydantic import BaseModel, Field
-
 from offline_buffer import BufferedOperation, BufferStats, OfflineBuffer
+from pydantic import BaseModel, Field
 
 logger = structlog.get_logger(__name__)
 
@@ -48,18 +48,20 @@ _SKILLS_ROOT = os.getenv(
 
 class OfflineDecision(BaseModel):
     """ForgeNode 对某个 Skill+Action 组合的离线决策结果"""
+
     skill_name: str
     action: str
-    can_execute: bool                   # True=可执行  False=拒绝
-    mode: str                           # "full" / "limited" / "disabled" / "unknown"
-    requires_buffer: bool               # True=需写离线缓冲，联网后同步
-    local_storage: Optional[str] = None # "sqlite_wal" 等
+    can_execute: bool  # True=可执行  False=拒绝
+    mode: str  # "full" / "limited" / "disabled" / "unknown"
+    requires_buffer: bool  # True=需写离线缓冲，联网后同步
+    local_storage: Optional[str] = None  # "sqlite_wal" 等
     fallback_message: Optional[str] = None
-    reason: str = ""                    # 决策原因（调试用）
+    reason: str = ""  # 决策原因（调试用）
 
 
 class SkillOfflineStatus(BaseModel):
     """单个 Skill 的完整离线状态汇总"""
+
     skill_name: str
     display_name: str = ""
     can_operate: bool
@@ -73,6 +75,7 @@ class SkillOfflineStatus(BaseModel):
 
 class ForgeStatus(BaseModel):
     """ForgeNode 整体状态"""
+
     is_online: bool
     last_check_at: Optional[str] = None
     cloud_url: str
@@ -139,8 +142,9 @@ class ForgeNode:
 
         使用 pathlib.glob 避免依赖 shell，出错时单个文件跳过，不影响全局。
         """
-        import yaml  # type: ignore[import-untyped]
         from pathlib import Path
+
+        import yaml  # type: ignore[import-untyped]
 
         root = Path(self._skills_root)
         if not root.exists():
@@ -508,16 +512,8 @@ class ForgeNode:
             capabilities: list[dict] = cfg.get("capabilities") or []
             sync_strategy: dict = cfg.get("sync_strategy") or {}
 
-            actions_available = [
-                cap["action"]
-                for cap in capabilities
-                if cap.get("mode") in ("full", "limited")
-            ]
-            actions_disabled = [
-                cap["action"]
-                for cap in capabilities
-                if cap.get("mode") == "disabled"
-            ]
+            actions_available = [cap["action"] for cap in capabilities if cap.get("mode") in ("full", "limited")]
+            actions_disabled = [cap["action"] for cap in capabilities if cap.get("mode") == "disabled"]
 
             result.append(
                 SkillOfflineStatus(

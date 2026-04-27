@@ -14,9 +14,9 @@ Tier 1 测试：全电发票 / 金税四期
 import os
 import sys
 import uuid
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 SRC = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src"))
@@ -59,7 +59,6 @@ class TestInvoiceComplianceTier1:
         同一订单重复申请发票，返回已有发票记录（幂等）。
         场景：收银员手抖点了两次"申请发票"按钮。
         """
-        from services.tx_trade.src.services.invoice_service import create_invoice_request
 
         mock_db = AsyncMock()
         order_id = str(uuid.uuid4())
@@ -123,7 +122,7 @@ class TestInvoiceComplianceTier1:
             f"无效纳税人识别号 {invalid_tax_no_short} 应被拒绝（太短）"
         )
         assert not re.match(pattern, invalid_tax_no_special), (
-            f"含特殊字符的纳税人识别号应被拒绝"
+            "含特殊字符的纳税人识别号应被拒绝"
         )
 
     @pytest.mark.asyncio
@@ -132,7 +131,6 @@ class TestInvoiceComplianceTier1:
         发票状态流转：pending → submitted → completed / failed。
         场景：金税四期平台响应延迟，发票需要异步处理。
         """
-        from services.tx_trade.src.services.invoice_service import get_invoice_status
 
         mock_db = AsyncMock()
         invoice_id = str(uuid.uuid4())

@@ -196,6 +196,75 @@ describe('tradeApi.txFetchOffline — Tier 1 离线队列语义', () => {
     expect(res.error?.code).toBe('BUSINESS_REJECT');
     expect(enqueue).not.toHaveBeenCalled();
   });
+
+  // ──────────────────────────────────────────────────────────────────────
+  //  R-补2-1（Tier1）— 离线入队必须携带 idempotencyKey 给 enqueue
+  //  防止：页面刷新/POS 重启 → 内存 _idemStore 丢失 → 同单二次入队 → server 双扣
+  // ──────────────────────────────────────────────────────────────────────
+
+  it('R-补2-1：徐记 17 桌 settleOrderOffline 入队时把 idempotencyKey=settle:${orderId} 传给 enqueue', async () => {
+    setOnline(false);
+    const enqueueSpy: OfflineEnqueueFn = vi.fn(async () => 'offline_xj17_1');
+    registerOfflineEnqueue(enqueueSpy);
+    installFetch(vi.fn());
+
+    await settleOrderOffline('xj17-O-202604240047');
+
+    // 核心断言：enqueue 接到的 op 必须含 idempotencyKey 字段，且与在线 key 命名一致
+    expect(enqueueSpy).toHaveBeenCalledTimes(1);
+    const opArg = (enqueueSpy as ReturnType<typeof vi.fn>).mock.calls[0][0] as {
+      type: string;
+      payload: Record<string, unknown>;
+      idempotencyKey: string;
+    };
+    expect(opArg.type).toBe('settle_order');
+    expect(opArg.idempotencyKey).toBe('settle:xj17-O-202604240047');
+  });
+
+  it('R-补2-1：createPaymentOffline 入队 key=payment:${orderId}:${method}（method-aware 防跨方式合并）', async () => {
+    const { createPaymentOffline } = await import('../tradeApi');
+    setOnline(false);
+    const enqueueSpy: OfflineEnqueueFn = vi.fn(async () => 'offline_pay_1');
+    registerOfflineEnqueue(enqueueSpy);
+    installFetch(vi.fn());
+
+    await createPaymentOffline('O-pay-1', 'alipay', 12800, 'TRADE-NO-1');
+
+    expect(enqueueSpy).toHaveBeenCalledTimes(1);
+    const opArg = (enqueueSpy as ReturnType<typeof vi.fn>).mock.calls[0][0] as {
+      idempotencyKey: string;
+    };
+    expect(opArg.idempotencyKey).toBe('payment:O-pay-1:alipay');
+  });
+
+  it('R-补2-1：内存 _idemStore 清掉后再入队，enqueue 仍接到同一稳定 idempotencyKey（IDB 持久化前提）', async () => {
+    setOnline(false);
+    const enqueueSpy: OfflineEnqueueFn = vi.fn(async (op) => `offline_${op.idempotencyKey}_${Date.now()}`);
+    registerOfflineEnqueue(enqueueSpy);
+    installFetch(vi.fn());
+
+    // 第一次入队
+    await settleOrderOffline('o-restart-1');
+    const firstCallArg = (enqueueSpy as ReturnType<typeof vi.fn>).mock.calls[0][0] as {
+      idempotencyKey: string;
+    };
+
+    // 模拟 POS 重启：内存 _idemStore 被清
+    _resetOfflineIdempotencyForTest();
+
+    // 重启后再次入队（同订单）— 内存已无幂等记录，但 enqueue 收到的 key 必须仍稳定
+    await settleOrderOffline('o-restart-1');
+    const secondCallArg = (enqueueSpy as ReturnType<typeof vi.fn>).mock.calls[1][0] as {
+      idempotencyKey: string;
+    };
+
+    // 关键断言：跨"_idemStore 重置" 边界，传给 enqueue 的 idempotencyKey 完全相同
+    // 由 enqueue 持久化进 IndexedDB → replay 时按 IDB 中的 key 发 X-Idempotency-Key →
+    // server replay cache 命中 → 拦截第二次 settle → 杜绝双扣
+    expect(secondCallArg.idempotencyKey).toBe(firstCallArg.idempotencyKey);
+    expect(secondCallArg.idempotencyKey).toBe('settle:o-restart-1');
+    expect(enqueueSpy).toHaveBeenCalledTimes(2);
+  });
 });
 
 describe('tradeApi — P1-3 分级超时', () => {

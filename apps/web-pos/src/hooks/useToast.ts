@@ -29,7 +29,7 @@ function newId(): string {
   return `toast_${Date.now()}_${rand}`;
 }
 
-export const useToastStore = create<ToastState>((set) => ({
+export const useToastStore = create<ToastState>()((set) => ({
   toasts: [],
   push: (message, type) => {
     const id = newId();

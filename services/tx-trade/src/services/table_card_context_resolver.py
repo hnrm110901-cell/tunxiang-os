@@ -192,7 +192,7 @@ class BusinessRuleEngine:
             return scored_fields, [], {}
 
         duration_minutes = (context.current_time - seated_at).total_seconds() / 60
-        vip = True if table_data.get("is_vip") else False
+        vip = bool(table_data.get("is_vip"))
         threshold = 180 if vip else 120  # 3h for VIP, 2h for normal
 
         alerts = {}

@@ -13,12 +13,22 @@ from shared.ontology.src.database import init_db
 
 from .api.allergen_routes import router as allergen_router
 from .api.approval_routes import router as approval_router
+from .api.banquet_capacity_routes import router as banquet_capacity_router
+from .api.banquet_contract_routes import router as banquet_contract_router
+from .api.banquet_lead_routes import router as banquet_lead_router
+from .api.banquet_material_routes import router as banquet_material_router
 from .api.banquet_order_routes import router as banquet_order_router  # Y-A8 宴席支付闭环
+from .api.banquet_order_v2_routes import router as banquet_order_v2_router
 from .api.banquet_payment_routes import router as banquet_payment_router
+from .api.banquet_production_routes import router as banquet_production_router
+from .api.banquet_quote_routes import router as banquet_quote_router
 from .api.banquet_routes import router as banquet_router
+from .api.banquet_schedule_routes import router as banquet_schedule_router
+from .api.banquet_venue_routes import router as banquet_venue_router
 from .api.booking_api import router as booking_router
 from .api.booking_prep_routes import router as booking_prep_router
 from .api.booking_webhook_routes import router as booking_webhook_router
+from .api.call_center_routes import router as call_center_router
 from .api.cashier_api import router as cashier_router
 from .api.chef_at_home_routes import router as chef_at_home_router
 from .api.collab_order_routes import router as collab_order_router
@@ -53,6 +63,7 @@ from .api.kds_analytics_routes import router as kds_analytics_router
 from .api.kds_by_session_routes import router as kds_by_session_router
 from .api.kds_chef_stats_routes import router as kds_chef_stats_router
 from .api.kds_config_routes import router as kds_config_router
+from .api.kds_delta_routes import router as kds_delta_router
 from .api.kds_pause_grab_routes import router as kds_pause_grab_router
 from .api.kds_prep_routes import router as kds_prep_router
 from .api.kds_routes import router as kds_router
@@ -124,12 +135,24 @@ async def lifespan(app: FastAPI):
 
     from shared.ontology.src.database import async_session_factory
 
+    from .security.rbac import assert_no_dev_bypass_in_production
+    from .services.audit_outbox import start_audit_outbox_flusher
     from .services.cook_time_stats import start_daily_scheduler
     from .services.group_buy_scheduler import start_group_buy_expiry_scheduler
+
+    # 启动门禁（PR-2 / §19 R-A4-7）：拒绝生产环境 TX_AUTH_ENABLED=false 配置漂移。
+    # 必须在 init_db / scheduler 之前 — fail-loud，让 k8s readiness probe 失败。
+    assert_no_dev_bypass_in_production()
 
     await init_db()
     asyncio.create_task(start_daily_scheduler(async_session_factory))
     asyncio.create_task(start_group_buy_expiry_scheduler(async_session_factory))
+
+    # PR-4 / R-A4-2：audit JSONL outbox 后台 flusher（消费 PR-3 落本地的审计行）。
+    # 60s 间隔（默认）；TX_AUDIT_OUTBOX_FLUSHER_DISABLED=true 可紧急关停。
+    audit_outbox_flusher_task, audit_outbox_flusher_stop = start_audit_outbox_flusher(
+        async_session_factory,
+    )
 
     # Feature Flag 检查：TradeFlags.DELIVERY_AUTO_ACCEPT（外卖自动接单）
     # 关闭时跳过自动接单初始化，外卖订单须人工在接单面板手动接单
@@ -157,6 +180,15 @@ async def lifespan(app: FastAPI):
         pass  # feature_flags SDK不可用，外卖自动接单状态由环境变量控制
 
     yield
+
+    # ── Graceful shutdown ─────────────────────────────────────────────
+    # PR-4：通知 audit outbox flusher 停止 + 等待最后一次 flush 完成（最多 10s），
+    # 防止 SIGTERM 时 outbox 文件残留几秒未消费的 audit 行。
+    audit_outbox_flusher_stop.set()
+    try:
+        await asyncio.wait_for(audit_outbox_flusher_task, timeout=10.0)
+    except asyncio.TimeoutError:
+        audit_outbox_flusher_task.cancel()
 
 
 app = FastAPI(
@@ -199,6 +231,7 @@ app.include_router(printer_router)
 app.include_router(approval_router)
 app.include_router(booking_router)
 app.include_router(booking_webhook_router)  # 多平台预订 Webhook + Mock 生成
+app.include_router(call_center_router)  # v290 预订电话集成（来电弹屏/回拨任务/通话统计）
 app.include_router(kds_shortage_router)
 app.include_router(scan_order_router)
 app.include_router(order_ops_router)
@@ -224,6 +257,30 @@ app.include_router(delivery_ops_router)
 app.include_router(omni_channel_router, prefix="/api/v1")
 app.include_router(banquet_payment_router)
 app.include_router(banquet_order_router)  # Y-A8 /api/v1/trade/banquet — 定金/尾款状态机
+# Phase 1+2 宴会全流程模块
+app.include_router(banquet_lead_router)
+app.include_router(banquet_quote_router)
+app.include_router(banquet_venue_router)
+app.include_router(banquet_order_v2_router)
+app.include_router(banquet_contract_router)
+app.include_router(banquet_production_router)
+app.include_router(banquet_material_router)
+app.include_router(banquet_capacity_router)
+app.include_router(banquet_schedule_router)
+# Phase 3 宴会执行+结算+售后
+from .api.banquet_aftercare_routes import router as banquet_aftercare_router
+from .api.banquet_execution_routes import router as banquet_execution_router
+from .api.banquet_live_order_routes import router as banquet_live_order_router
+from .api.banquet_settlement_routes import router as banquet_settlement_routes_router
+
+app.include_router(banquet_execution_router)
+app.include_router(banquet_live_order_router)
+app.include_router(banquet_settlement_routes_router)
+app.include_router(banquet_aftercare_router)
+# Phase 4 AI宴会大脑+经营看板
+from .api.banquet_ai_routes import router as banquet_ai_router
+
+app.include_router(banquet_ai_router)
 app.include_router(collab_order_router)
 app.include_router(table_layout_router)
 app.include_router(chef_at_home_router)
@@ -367,6 +424,11 @@ from .api.wine_storage_routes import router as wine_storage_router
 
 app.include_router(wine_storage_router)
 
+# ── S7: 电子邀请函（模板/实例/发布/公开访问/RSVP）──
+from .api.invitation_routes import router as invitation_router
+
+app.include_router(invitation_router)
+
 
 try:
     from .api.table_card_api import router as table_card_router
@@ -408,6 +470,28 @@ _sprint_e_mount = auto_mount_routes(
 )
 # 校验：失败 → stderr + WARNING；env AUTO_MOUNT_STRICT=1 时 sys.exit(1)
 validate_result(_sprint_e_mount)
+
+# ── v281-v283: 区域服务模式 + 时段拼桌预设 + 桌台时段配置 + 利用率分析 ──
+from .api.table_merge_preset_routes import router as table_merge_preset_router
+from .api.table_period_config_routes import router as table_period_config_router
+from .api.table_utilization_routes import router as table_utilization_router
+
+app.include_router(table_merge_preset_router)  # v284 时段拼桌预设（方案配置/执行/回滚）
+app.include_router(table_period_config_router)  # v286 桌台×时段配置矩阵
+app.include_router(table_utilization_router)  # v287 桌台利用率分析（Agent数据基础）
+
+# ── S3: KDS计件配菜 + 显示配置 ──
+from .api.kds_display_config_routes import router as kds_display_config_router
+from .api.kds_piecework_routes import router as kds_piecework_router
+
+app.include_router(kds_piecework_router, prefix="/api/v1/kds-piecework")
+app.include_router(kds_display_config_router, prefix="/api/v1/kds-display")
+app.include_router(kds_delta_router)  # KDS Delta增量同步 + 设备心跳
+
+# ── Phase 2c: 外卖异议工作流（自动裁决+人工复核）──
+from .api.delivery_dispute_routes import router as delivery_dispute_router
+
+app.include_router(delivery_dispute_router)
 
 
 @app.get("/health")

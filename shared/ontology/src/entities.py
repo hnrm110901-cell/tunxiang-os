@@ -440,6 +440,11 @@ class OrderItem(TenantBase):
     gift_reason: Mapped[str | None] = mapped_column(String(200), comment="赠菜原因")
     combo_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), comment="所属套餐ID(NULL=非套餐)")
 
+    # 条码划菜（v342）
+    barcode: Mapped[str | None] = mapped_column(String(30), comment="菜品条码(格式:门店编号-MMDD-桌号-序号)")
+    barcode_scanned_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), comment="条码扫描确认时间")
+    scanned_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), comment="扫码确认人ID")
+
     order: Mapped["Order"] = relationship("Order", back_populates="items")
 
 

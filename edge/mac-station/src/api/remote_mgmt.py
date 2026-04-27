@@ -14,6 +14,7 @@
 统一响应格式: {"ok": bool, "data": {}, "error": {}}
 所有接口需 X-Tenant-ID header。
 """
+
 from __future__ import annotations
 
 import os
@@ -103,14 +104,16 @@ async def get_device_info(
 
     ota = get_ota_manager()
 
-    return _ok({
-        **status,
-        "ota": {
-            "current_version": ota.current_version,
-            "current_version_code": ota.current_version_code,
-            "state": ota.state.value,
-        },
-    })
+    return _ok(
+        {
+            **status,
+            "ota": {
+                "current_version": ota.current_version,
+                "current_version_code": ota.current_version_code,
+                "state": ota.state.value,
+            },
+        }
+    )
 
 
 # ── 系统资源 ──
@@ -130,29 +133,31 @@ async def get_system_stats(
 
     stats = _collect_system_stats()
 
-    return _ok({
-        "cpu_usage_pct": stats.cpu_usage_pct,
-        "memory": {
-            "usage_pct": stats.memory_usage_pct,
-            "total_mb": stats.memory_total_mb,
-            "used_mb": stats.memory_used_mb,
-        },
-        "disk": {
-            "usage_pct": stats.disk_usage_pct,
-            "total_gb": stats.disk_total_gb,
-            "used_gb": stats.disk_used_gb,
-        },
-        "network": {
-            "bytes_sent": stats.network_bytes_sent,
-            "bytes_recv": stats.network_bytes_recv,
-        },
-        "load_avg": {
-            "1m": stats.load_avg_1m,
-            "5m": stats.load_avg_5m,
-            "15m": stats.load_avg_15m,
-        },
-        "uptime_seconds": stats.uptime_seconds,
-    })
+    return _ok(
+        {
+            "cpu_usage_pct": stats.cpu_usage_pct,
+            "memory": {
+                "usage_pct": stats.memory_usage_pct,
+                "total_mb": stats.memory_total_mb,
+                "used_mb": stats.memory_used_mb,
+            },
+            "disk": {
+                "usage_pct": stats.disk_usage_pct,
+                "total_gb": stats.disk_total_gb,
+                "used_gb": stats.disk_used_gb,
+            },
+            "network": {
+                "bytes_sent": stats.network_bytes_sent,
+                "bytes_recv": stats.network_bytes_recv,
+            },
+            "load_avg": {
+                "1m": stats.load_avg_1m,
+                "5m": stats.load_avg_5m,
+                "15m": stats.load_avg_15m,
+            },
+            "uptime_seconds": stats.uptime_seconds,
+        }
+    )
 
 
 # ── 远程命令 ──
@@ -198,14 +203,16 @@ async def execute_remote_command(
 
     result = await service.execute_command(cmd_request)
 
-    return _ok({
-        "command_id": result.command_id,
-        "command_type": result.command_type,
-        "success": result.success,
-        "output": result.output,
-        "error": result.error,
-        "duration_ms": round((result.finished_at - result.started_at) * 1000, 1),
-    })
+    return _ok(
+        {
+            "command_id": result.command_id,
+            "command_type": result.command_type,
+            "success": result.success,
+            "output": result.output,
+            "error": result.error,
+            "duration_ms": round((result.finished_at - result.started_at) * 1000, 1),
+        }
+    )
 
 
 # ── OTA 更新 ──
@@ -227,24 +234,28 @@ async def ota_check_update(
     update = await ota.check_update()
 
     if update is None:
-        return _ok({
-            "has_update": False,
+        return _ok(
+            {
+                "has_update": False,
+                "current_version": ota.current_version,
+                "current_version_code": ota.current_version_code,
+            }
+        )
+
+    return _ok(
+        {
+            "has_update": True,
             "current_version": ota.current_version,
             "current_version_code": ota.current_version_code,
-        })
-
-    return _ok({
-        "has_update": True,
-        "current_version": ota.current_version,
-        "current_version_code": ota.current_version_code,
-        "available_update": {
-            "version_name": update.version_name,
-            "version_code": update.version_code,
-            "release_notes": update.release_notes,
-            "is_forced": update.is_forced,
-            "file_size_bytes": update.file_size_bytes,
-        },
-    })
+            "available_update": {
+                "version_name": update.version_name,
+                "version_code": update.version_code,
+                "release_notes": update.release_notes,
+                "is_forced": update.is_forced,
+                "file_size_bytes": update.file_size_bytes,
+            },
+        }
+    )
 
 
 @router.post("/ota/update")
@@ -301,10 +312,12 @@ async def ota_get_history(
     from services.ota_manager import get_ota_manager
 
     ota = get_ota_manager()
-    return _ok({
-        "items": ota.get_history(limit),
-        "current_version": ota.current_version,
-    })
+    return _ok(
+        {
+            "items": ota.get_history(limit),
+            "current_version": ota.current_version,
+        }
+    )
 
 
 @router.post("/ota/rollback")
@@ -350,24 +363,28 @@ async def get_recent_logs(
         raise _err("INVALID_LOG_FILE", "Invalid log file path", 400)
 
     if not log_path.exists():
-        return _ok({
-            "file": safe_name,
-            "lines": [],
-            "total_lines": 0,
-            "note": "Log file not found",
-        })
+        return _ok(
+            {
+                "file": safe_name,
+                "lines": [],
+                "total_lines": 0,
+                "note": "Log file not found",
+            }
+        )
 
     try:
         with open(log_path, "r", encoding="utf-8", errors="replace") as f:
             all_lines = f.readlines()
 
         recent = all_lines[-lines:]
-        return _ok({
-            "file": safe_name,
-            "lines": [line.rstrip("\n") for line in recent],
-            "total_lines": len(all_lines),
-            "returned_lines": len(recent),
-        })
+        return _ok(
+            {
+                "file": safe_name,
+                "lines": [line.rstrip("\n") for line in recent],
+                "total_lines": len(all_lines),
+                "returned_lines": len(recent),
+            }
+        )
     except OSError as exc:
         raise _err("LOG_READ_ERROR", f"Failed to read log file: {exc}", 500) from exc
 
@@ -386,9 +403,11 @@ async def get_command_history(
     from services.remote_command import get_remote_command_service
 
     service = get_remote_command_service()
-    return _ok({
-        "items": service.get_history(limit),
-    })
+    return _ok(
+        {
+            "items": service.get_history(limit),
+        }
+    )
 
 
 # ── 心跳历史 ──
@@ -405,6 +424,8 @@ async def get_heartbeat_history(
     from services.device_registry import get_device_registry
 
     registry = get_device_registry()
-    return _ok({
-        "items": registry.get_heartbeat_history(limit),
-    })
+    return _ok(
+        {
+            "items": registry.get_heartbeat_history(limit),
+        }
+    )
