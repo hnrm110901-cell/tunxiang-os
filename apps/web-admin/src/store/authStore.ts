@@ -109,7 +109,7 @@ function scheduleTokenRefresh(store: { getState: () => AuthState }): void {
 
 // ─── Store ───
 
-export const useAuthStore = create<AuthState>((set, get, store) => ({
+export const useAuthStore = create<AuthState>()((set, get, store) => ({
   token: null,
   user: null,
   isAuthenticated: false,

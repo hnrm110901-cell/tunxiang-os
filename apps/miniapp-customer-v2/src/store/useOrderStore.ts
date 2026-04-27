@@ -58,7 +58,7 @@ type OrderStore = OrderState & OrderActions
 
 // ─── Store ───────────────────────────────────────────────────────────────────
 
-export const useOrderStore = create<OrderStore>((set, get) => ({
+export const useOrderStore = create<OrderStore>()((set, get) => ({
   // state
   currentOrder: null,
   orderList: [],
