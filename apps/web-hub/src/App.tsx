@@ -11,7 +11,7 @@ import {
   useParams,
   useLocation,
 } from 'react-router-dom';
-import { useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 
 /* ─── v1.0 页面组件（保留兼容） ─── */
 import { MerchantsPage } from './pages/MerchantsPage';
@@ -27,8 +27,26 @@ import { PlatformDataPage } from './pages/PlatformDataPage';
 /* ─── v2.0 模块 ─── */
 import { useHubStore } from './store/hubStore';
 import { ListPanel } from './components/ListPanel';
+import { CmdK } from './components/CmdK';
+import { CopilotDrawer } from './components/CopilotDrawer';
 import type { WorkMode, WorkspaceType, ListItem } from './types/hub';
 import { WORKSPACE_META, OBJECT_PAGE_TABS } from './types/hub';
+
+/* ─── v2.0 Workspace 页面 ─── */
+import { TodayPage as TodayPageV2 } from './workspaces/TodayPage';
+import { StreamPage as StreamPageV2 } from './workspaces/StreamPage';
+import { EdgesWorkspace } from './workspaces/EdgesWorkspace';
+import { ServicesWorkspace } from './workspaces/ServicesWorkspace';
+import { MigrationsWorkspace } from './workspaces/MigrationsWorkspace';
+import { AdaptersWorkspace } from './workspaces/AdaptersWorkspace';
+import { CustomersWorkspace } from './workspaces/CustomersWorkspace';
+import { IncidentsWorkspace } from './workspaces/IncidentsWorkspace';
+import { StoresWorkspace } from './workspaces/StoresWorkspace';
+import { AgentsWorkspace } from './workspaces/AgentsWorkspace';
+import { PlaybooksPage as PlaybooksPageV2 } from './workspaces/PlaybooksPage';
+import { WorkbenchPage } from './workspaces/WorkbenchPage';
+import { SettingsPage } from './workspaces/SettingsPage';
+import { JourneyPage } from './workspaces/JourneyPage';
 
 /* ═══════════════════════════════════════════════════════════════
    色板常量
@@ -232,7 +250,7 @@ function TopNav() {
   const navigate = useNavigate();
   const location = useLocation();
   const { workMode, setWorkMode, activeWorkspace, setActiveWorkspace, setCmdKOpen } = useHubStore();
-  const [wsMenuOpen, setWsMenuOpen] = __useState(false);
+  const [wsMenuOpen, setWsMenuOpen] = useState(false);
 
   /* 从 URL 同步工作模式 */
   useEffect(() => {
@@ -340,47 +358,16 @@ function TopNav() {
   );
 }
 
-/* 使用 React.useState 并加别名避免与 import 冲突 */
-import { useState as __useState } from 'react';
+/* ═══════════════════════════════════════════════════════════════
+   Today / Stream — 使用真实 Workspace 组件
+   ═══════════════════════════════════════════════════════════════ */
+function TodayPage() { return <TodayPageV2 />; }
+function StreamPage() { return <StreamPageV2 />; }
 
 /* ═══════════════════════════════════════════════════════════════
-   Today 页（占位）
+   Playbooks 页 — 使用真实 Workspace 组件
    ═══════════════════════════════════════════════════════════════ */
-function TodayPage() {
-  return (
-    <div style={sty.placeholder}>
-      <div style={{ fontSize: 32 }}>&#9728;</div>
-      <div style={{ fontSize: 18, fontWeight: 600, color: C.text }}>Today</div>
-      <div>今日待办 / 告警 / Incident / 续约</div>
-    </div>
-  );
-}
-
-/* ═══════════════════════════════════════════════════════════════
-   Stream 页（占位）
-   ═══════════════════════════════════════════════════════════════ */
-function StreamPage() {
-  return (
-    <div style={sty.placeholder}>
-      <div style={{ fontSize: 32 }}>&#x26A1;</div>
-      <div style={{ fontSize: 18, fontWeight: 600, color: C.text }}>Stream</div>
-      <div>全局实时事件流（SSE）</div>
-    </div>
-  );
-}
-
-/* ═══════════════════════════════════════════════════════════════
-   Playbooks 页（占位）
-   ═══════════════════════════════════════════════════════════════ */
-function PlaybooksPage() {
-  return (
-    <div style={sty.placeholder}>
-      <div style={{ fontSize: 32 }}>&#x1F4D6;</div>
-      <div style={{ fontSize: 18, fontWeight: 600, color: C.text }}>Playbooks</div>
-      <div>剧本库</div>
-    </div>
-  );
-}
+function PlaybooksPage() { return <PlaybooksPageV2 />; }
 
 /* ═══════════════════════════════════════════════════════════════
    Workspace 双栏布局
@@ -413,8 +400,19 @@ function WorkspaceLayout() {
   }, [workspace]);
 
   const wsKey = WORKSPACE_META[ws] ? ws : 'customers';
-  const items = getMockItems(wsKey);
 
+  /* 专用 Workspace 组件 — edges / services 已实现完整版 */
+  if (wsKey === 'edges') return <EdgesWorkspace />;
+  if (wsKey === 'services') return <ServicesWorkspace />;
+  if (wsKey === 'migrations') return <MigrationsWorkspace />;
+  if (wsKey === 'adapters') return <AdaptersWorkspace />;
+  if (wsKey === 'customers') return <CustomersWorkspace />;
+  if (wsKey === 'incidents') return <IncidentsWorkspace />;
+  if (wsKey === 'stores') return <StoresWorkspace />;
+  if (wsKey === 'agents') return <AgentsWorkspace />;
+
+  /* 其他 Workspace 使用通用骨架 */
+  const items = getMockItems(wsKey);
   const filterChips = [
     { key: 'online', label: '在线' },
     { key: 'offline', label: '离线' },
@@ -498,6 +496,9 @@ function WorkspaceObjectRoute() {
    App 根组件
    ═══════════════════════════════════════════════════════════════ */
 function AppLayout() {
+  const { cmdkOpen, setCmdKOpen, copilotOpen, setCopilotOpen, activeWorkspace, selectedObjectId, activeTab } = useHubStore();
+  const navigate = useNavigate();
+
   return (
     <div style={sty.root}>
       <TopNav />
@@ -508,6 +509,8 @@ function AppLayout() {
           <Route path="/today" element={<Navigate to="/" replace />} />
           <Route path="/stream" element={<StreamPage />} />
           <Route path="/playbooks" element={<PlaybooksPage />} />
+          <Route path="/workbench" element={<WorkbenchPage />} />
+          <Route path="/journeys" element={<JourneyPage />} />
           <Route path="/w/:workspace/:id" element={<WorkspaceObjectRoute />} />
           <Route path="/w/:workspace" element={<WorkspaceLayout />} />
           <Route path="/w" element={<Navigate to="/w/customers" replace />} />
@@ -517,6 +520,9 @@ function AppLayout() {
             <Route key={from} path={from} element={<Navigate to={to} replace />} />
           ))}
 
+          {/* v2.0 Settings 平台底座 */}
+          <Route path="/settings/*" element={<SettingsPage />} />
+
           {/* v1.0 保留页面（billing/platform 暂无 v2 对应） */}
           <Route path="/billing" element={<BillingPage />} />
           <Route path="/platform" element={<PlatformDataPage />} />
@@ -525,6 +531,42 @@ function AppLayout() {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </div>
+
+      {/* 全局 Cmd-K 命令面板 */}
+      <CmdK
+        open={cmdkOpen}
+        onClose={() => setCmdKOpen(false)}
+        commands={[
+          { id: 'nav-today',      group: 'navigate', icon: '☀️', title: 'Today',        description: '今日看板',    action: () => navigate('/') },
+          { id: 'nav-stream',     group: 'navigate', icon: '⚡', title: 'Stream',       description: '实时事件流',  action: () => navigate('/stream') },
+          { id: 'nav-customers',  group: 'navigate', icon: '🏢', title: 'Customers',    description: '客户管理',    action: () => navigate('/w/customers') },
+          { id: 'nav-stores',     group: 'navigate', icon: '🏪', title: 'Stores',       description: '门店总览',    action: () => navigate('/w/stores') },
+          { id: 'nav-edges',      group: 'navigate', icon: '🖥', title: 'Edges',        description: '边缘节点',    action: () => navigate('/w/edges'), shortcut: '⌘E' },
+          { id: 'nav-services',   group: 'navigate', icon: '⚙️', title: 'Services',     description: '微服务监控',  action: () => navigate('/w/services') },
+          { id: 'nav-adapters',   group: 'navigate', icon: '🔌', title: 'Adapters',     description: '适配器监控',  action: () => navigate('/w/adapters') },
+          { id: 'nav-agents',     group: 'navigate', icon: '🤖', title: 'Agents',       description: 'Agent 监控',  action: () => navigate('/w/agents') },
+          { id: 'nav-migrations', group: 'navigate', icon: '📋', title: 'Migrations',   description: '迁移管理',    action: () => navigate('/w/migrations') },
+          { id: 'nav-incidents',  group: 'navigate', icon: '🚨', title: 'Incidents',    description: '事件响应',    action: () => navigate('/w/incidents') },
+          { id: 'nav-playbooks',  group: 'navigate', icon: '📖', title: 'Playbooks',    description: '剧本库',      action: () => navigate('/playbooks') },
+          { id: 'nav-journeys',   group: 'navigate', icon: '🗺', title: 'Journeys',       description: '客户旅程编排',  action: () => navigate('/journeys') },
+          { id: 'nav-workbench',  group: 'navigate', icon: '>_', title: 'Workbench Shell', description: 'SRE 命令行工作台', action: () => navigate('/workbench'), shortcut: '⌘`' },
+          { id: 'act-copilot',    group: 'action',   icon: '🤖', title: '打开 Copilot', description: 'AI 助手',     action: () => setCopilotOpen(true), shortcut: '⌘/' },
+          { id: 'set-billing',    group: 'settings',  icon: '💰', title: '计费账单',     description: '订阅与账单',  action: () => navigate('/billing') },
+          { id: 'set-flags',      group: 'settings',  icon: '🚩', title: 'Feature Flags', description: '特性开关管理', action: () => navigate('/settings#flags') },
+          { id: 'set-releases',   group: 'settings',  icon: '🚀', title: 'Releases',      description: '发布管理',     action: () => navigate('/settings#releases') },
+          { id: 'set-billing-v2', group: 'settings',  icon: '💰', title: 'Billing (v2)',   description: '账单管理v2',   action: () => navigate('/settings#billing') },
+          { id: 'set-security',   group: 'settings',  icon: '🔒', title: 'Security',       description: '安全与审计',   action: () => navigate('/settings#security') },
+          { id: 'set-knowledge',  group: 'settings',  icon: '📚', title: 'Knowledge Base', description: 'RAG知识库',    action: () => navigate('/settings#knowledge') },
+          { id: 'set-tenancy',    group: 'settings',  icon: '🏢', title: 'Tenancy',        description: '租户管理',     action: () => navigate('/settings#tenancy') },
+        ]}
+      />
+
+      {/* Copilot 抽屉 */}
+      <CopilotDrawer
+        open={copilotOpen}
+        onClose={() => setCopilotOpen(false)}
+        context={{ workspace: activeWorkspace || undefined, object_id: selectedObjectId || undefined, tab: activeTab || undefined }}
+      />
     </div>
   );
 }
