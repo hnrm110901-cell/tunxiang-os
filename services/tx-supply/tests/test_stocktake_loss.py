@@ -734,3 +734,76 @@ async def test_create_loss_case_manual_with_responsible_party():
     assert result["net_loss_amount_fen"] == 150_000
     assert result["case_no"] == "LOSS-20260427-0002"
     assert result["case_status"] == "DRAFT"
+
+
+# ─────────────────────────────────────────────────────────────────────
+# Test 15: hotfix v371 — auto_create 必须用 Decimal 而非 float（金额精度）
+# ─────────────────────────────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_auto_create_uses_decimal_precision():
+    """cost_price 含 4 位小数（NUMERIC(10,4)）时，单价转分必须无浮点误差。
+
+    场景：
+      - cost_price = 12.3456 元/kg  → 1234 分/kg（取 12.3456*100 整数部分）
+      - 用 float * 100 在某些值上会得到 1233 或 1234.999...
+      - 用 Decimal('12.3456') * 100 永远精确得到 1234.5600 → int 截断为 1234
+      - 数量差 = 100kg → 总损 = 100 * 1234 = 123400 分（必须刚好等于此值）
+    """
+    stocktake_id = str(uuid.uuid4())
+    ing1 = str(uuid.uuid4())
+
+    db = FakeDB()
+    db.queue.append(("ROW", None))  # set_config
+    db.queue.append(
+        (
+            "ROW",
+            {
+                "id": uuid.UUID(stocktake_id),
+                "store_id": uuid.UUID(STORE_ID),
+                "status": "completed",
+            },
+        )
+    )
+    # 高精度场景：cost_price = "12.3456"，差异 100kg
+    db.queue.append(
+        (
+            "ROWS",
+            [
+                {
+                    "ingredient_id": uuid.UUID(ing1),
+                    "expected_qty": "200.000",   # 字符串模拟 NUMERIC 行为
+                    "actual_qty": "100.000",
+                    "cost_price": "12.3456",
+                },
+            ],
+        )
+    )
+    # fn_next_loss_case_no
+    db.queue.append(("ONE", {"case_no": "LOSS-20260427-0003"}))
+    # INSERT case
+    db.queue.append(("ROW", None))
+    # INSERT item
+    db.queue.append(("ROW", None))
+
+    result = await auto_create_loss_case_from_stocktake(
+        stocktake_id=stocktake_id,
+        tenant_id=TENANT_A,
+        db=db,
+        created_by=USER_ID,
+        threshold_fen=1,  # 用 1 分阈值确保一定建案
+    )
+
+    assert result is not None
+    # unit_cost_fen = int(Decimal("12.3456") * 100) = int(Decimal("1234.5600")) = 1234
+    # 差异 100kg * 1234 分/kg = 123400 分
+    # 用 float(12.3456) * 100 = 1234.5599999999... → round() = 1235，
+    # 然后 100 * 1235 = 123500，结果会偏 100 分。
+    assert result["total_loss_amount_fen"] == 123_400, (
+        f"金额必须用 Decimal 计算，期望 123400 分；得到 {result['total_loss_amount_fen']}"
+        f"（若得到 123500/123455/123456，说明回退用了 float）"
+    )
+    assert result["total_gain_amount_fen"] == 0
+    assert result["net_loss_amount_fen"] == 123_400
+    assert result["item_count"] == 1
