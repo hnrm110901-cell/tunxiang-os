@@ -17,6 +17,7 @@ from typing import Optional
 
 import structlog
 from sqlalchemy import func, select
+from sqlalchemy.exc import ProgrammingError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -545,6 +546,18 @@ async def _process_item_to_inventory(
     db.add(tx)
     await db.flush()
 
+    # ── 库位级粒度入库（v367 TASK-2）──
+    # 失败不影响主流程，仅记录 warning（货已入门店库存）
+    location_info = await _try_allocate_to_location(
+        ingredient=ingredient,
+        accepted_qty=accepted_qty,
+        batch_no=item.batch_no,
+        expiry_date=item.expiry_date,
+        store_id=store_id,
+        tenant_id=tenant_id,
+        db=db,
+    )
+
     return {
         "ingredient_id": str(item.ingredient_id),
         "ingredient_name": item.ingredient_name,
@@ -552,7 +565,57 @@ async def _process_item_to_inventory(
         "qty_before": qty_before,
         "qty_after": qty_after,
         "transaction_id": str(tx.id),
+        "location": location_info,
     }
+
+
+async def _try_allocate_to_location(
+    *,
+    ingredient: Ingredient,
+    accepted_qty: float,
+    batch_no: Optional[str],
+    expiry_date: Optional[date],
+    store_id: str,
+    tenant_id: str,
+    db: AsyncSession,
+) -> Optional[dict]:
+    """尝试将本次入库写入库位粒度库存（inventory_by_location）。
+
+    失败不抛出（只记 warning），保证收货主流程不被库位体系问题阻塞。
+    场景：未配置库位/类目无温区映射 → 跳过；配置完整 → 成功落位。
+    """
+    # 延迟导入，避免循环依赖
+    from decimal import Decimal as _Decimal
+
+    from ..models.warehouse_location import AutoAllocateRequest as _AAR
+    from . import warehouse_location_service as _wls
+
+    try:
+        req = _AAR(
+            ingredient_id=str(ingredient.id),
+            store_id=str(store_id),
+            quantity=_Decimal(str(accepted_qty)),
+            batch_no=batch_no,
+            expiry_date=expiry_date,
+            ingredient_category=getattr(ingredient, "category", None),
+        )
+        return await _wls.auto_allocate_location(
+            body=req, tenant_id=tenant_id, db=db
+        )
+    except _wls.WarehouseLocationError as exc:
+        logger.warning(
+            "receiving_auto_allocate_skipped",
+            ingredient_id=str(ingredient.id),
+            reason=str(exc),
+            tenant_id=tenant_id,
+        )
+        return {"skipped": True, "reason": str(exc)}
+    except ProgrammingError as exc:
+        logger.warning(
+            "receiving_auto_allocate_db_unavailable",
+            reason=str(exc),
+        )
+        return {"skipped": True, "reason": "warehouse_location tables not migrated"}
 
 
 # ─── 5. 全部拒收 ─────────────────────────────────────────
