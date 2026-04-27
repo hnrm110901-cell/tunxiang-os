@@ -39,6 +39,7 @@ from .api.split_routes import router as split_router
 from .api.vat_ledger_routes import router as vat_ledger_router
 from .api.vat_routes import router as vat_router
 from .api.wine_storage_routes import router as wine_storage_router
+from .api.invoice_ocr_routes import router as invoice_ocr_router
 
 
 @asynccontextmanager
@@ -114,6 +115,9 @@ app.include_router(payroll_router)  # /api/v1/finance/payroll/*
 
 # v102 企业增值税：申报单管理 + 进项发票录入/验证 + 税率参考
 app.include_router(vat_router)  # /api/v1/finance/vat/*
+
+# v380 金税四期OCR发票识别：OCR识别 + SHA-256去重 + 验真
+app.include_router(invoice_ocr_router, prefix="/api/v1/invoice-ocr")  # /api/v1/invoice-ocr/*
 
 
 @app.get("/health")
