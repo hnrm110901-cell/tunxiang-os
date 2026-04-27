@@ -1,0 +1,98 @@
+{
+  "merchant": "尚宫厨",
+  "merchant_id": "shanggongchu",
+  "evaluated_at": "2026-04-26",
+  "evaluator": "屯象产品",
+  "environment": "Interested Prospect",
+  "score": 85,
+  "dimensions": {
+    "transaction_fulfillment": {
+      "weight": 0.25,
+      "score": 88,
+      "notes": "宴席 + 堂食 + 外卖三合一业态，tx-trade 宴席模块适配",
+      "evidence": [
+        "tx-trade 宴席模块（banquet.py）对标宴席预订 + 定金 + 桌卡管理",
+        "支付宝 V3 + 多方结算引擎已交付",
+        "12 家门店（8 大店 + 4 小店）全覆盖"
+      ]
+    },
+    "supply_chain": {
+      "weight": 0.15,
+      "score": 78,
+      "notes": "现有数据分散在 5+ 系统，迁移复杂度中等",
+      "evidence": [
+        "POS：奥琦玮，会员：天财，外卖：三平台直连",
+        "宴席预订从 Excel + 微信群数字化",
+        "统一商品中心可承接多源数据整合"
+      ]
+    },
+    "financial_settlement": {
+      "weight": 0.15,
+      "score": 82,
+      "notes": "跨省 3 省经营，税务复杂度中等，费控系统已交付",
+      "evidence": [
+        "费控管理系统 27 表 + 6 AI Agent 交付",
+        "涉及长沙/武汉/南昌 3 地税务",
+        "明厨亮灶已接入"
+      ]
+    },
+    "member_growth": {
+      "weight": 0.15,
+      "score": 88,
+      "notes": "高客单宴席场景 CLV 分析价值高，私域6模块 + S1-S4 全量交付",
+      "evidence": [
+        "Sprint P 私域6模块完整覆盖",
+        "高客单 CLV 分析可提升宴席复购",
+        "3 个营销 Agent 适配宴席定价场景"
+      ]
+    },
+    "ai_intelligence": {
+      "weight": 0.15,
+      "score": 88,
+      "notes": "宴席定价 + CLV 分析 AI 价值高，menu_advisor Agent 依赖强",
+      "evidence": [
+        "17 个 Agent + 记忆进化系统",
+        "宴席场景 menu_advisor Agent 适配",
+        "AI 运营教练 4 模式上线"
+      ]
+    },
+    "organization_hr": {
+      "weight": 0.10,
+      "score": 78,
+      "notes": "员工年龄结构偏大，培训成本较高",
+      "evidence": [
+        "平均员工年龄 38 岁，店长均在岗 5 年以上",
+        "需要额外培训成本 ~¥80k",
+        "tx-org 排班/绩效模块可降低管理难度"
+      ]
+    },
+    "compliance_security": {
+      "weight": 0.05,
+      "score": 85,
+      "notes": "跨省合规需城市监管平台支持",
+      "evidence": [
+        "城市监管平台 6 城市适配器上线",
+        "等保三级合规 Phase 0-5 完成",
+        "明厨亮灶已接入"
+      ]
+    }
+  },
+  "risks": [
+    {
+      "risk": "宴席模块需实际场景 UAT 验证",
+      "severity": "medium",
+      "mitigation": "Week 7-8 前完成 2 场宴席 UAT"
+    },
+    {
+      "risk": "员工培训成本需控制",
+      "severity": "medium",
+      "mitigation": "录制操作视频 + 现场师带徒 2 周"
+    }
+  ],
+  "go_no_go_recommendation": "GO",
+  "conditions": [
+    "Week 7 完成宴席模块 UAT 2 场",
+    "Week 8 培训材料完成 + 店长考试合格率 ≥ 80%",
+    "Week 9 前 Pilot 一家大店"
+  ]
+}

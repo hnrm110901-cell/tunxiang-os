@@ -7,6 +7,7 @@
 4. 记录决策日志（AgentDecisionLog）
 5. 返回：风险评级 + 异常项列表 + 审计建议
 """
+
 from __future__ import annotations
 
 import json
@@ -19,17 +20,17 @@ logger = structlog.get_logger()
 client = anthropic.AsyncAnthropic()  # 从环境变量 ANTHROPIC_API_KEY 读取
 
 # ─── 阈值常量 ──────────────────────────────────────────────────────
-MARGIN_THRESHOLD = 0.65        # 成本率上限（cost/revenue > 65% 触发告警）
-VOID_RATE_THRESHOLD = 0.05     # 作废率上限（void/total > 5% 触发告警）
-CASH_DIFF_THRESHOLD_FEN = 10_000   # 现金差异阈值（100元=10000分）
+MARGIN_THRESHOLD = 0.65  # 成本率上限（cost/revenue > 65% 触发告警）
+VOID_RATE_THRESHOLD = 0.05  # 作废率上限（void/total > 5% 触发告警）
+CASH_DIFF_THRESHOLD_FEN = 10_000  # 现金差异阈值（100元=10000分）
 DISCOUNT_RATE_THRESHOLD = 0.20  # 折扣率上限（discount/revenue > 20% 触发告警）
 
 # Fallback 分级阈值
-CASH_DIFF_CRITICAL_FEN = 50_000    # 现金差异 > 500元 → critical
-VOID_RATE_CRITICAL = 0.10          # 作废率 > 10% → critical
-DISCOUNT_RATE_HIGH = 0.25          # 折扣率 > 25% → high
-MARGIN_HIGH = 0.65                 # 成本率 > 65% → high
-MARGIN_MEDIUM = 0.55               # 成本率 > 55% → medium
+CASH_DIFF_CRITICAL_FEN = 50_000  # 现金差异 > 500元 → critical
+VOID_RATE_CRITICAL = 0.10  # 作废率 > 10% → critical
+DISCOUNT_RATE_HIGH = 0.25  # 折扣率 > 25% → high
+MARGIN_HIGH = 0.65  # 成本率 > 65% → high
+MARGIN_MEDIUM = 0.55  # 成本率 > 55% → medium
 
 
 class FinanceAuditor:
@@ -233,31 +234,33 @@ class FinanceAuditor:
         if metrics["void_rate_alert"]:
             alerts.append(f"⚠️ 作废率偏高：{metrics['void_rate']:.1%}（阈值{VOID_RATE_THRESHOLD:.0%}）")
         if metrics["cash_diff_alert"]:
-            alerts.append(f"⚠️ 现金差异异常：¥{metrics['cash_diff_yuan']:.2f}（阈值¥{CASH_DIFF_THRESHOLD_FEN / 100:.0f}）")
+            alerts.append(
+                f"⚠️ 现金差异异常：¥{metrics['cash_diff_yuan']:.2f}（阈值¥{CASH_DIFF_THRESHOLD_FEN / 100:.0f}）"
+            )
         if metrics["discount_alert"]:
             alerts.append(f"⚠️ 折扣率偏高：{metrics['discount_rate']:.1%}（阈值{DISCOUNT_RATE_THRESHOLD:.0%}）")
 
         alert_text = "\n".join(alerts) if alerts else "无预警触发"
 
         return f"""门店财务日报稽核请求：
-门店：{payload.get('store_id')}  日期：{payload.get('date')}
+门店：{payload.get("store_id")}  日期：{payload.get("date")}
 
 【核心财务指标】
-- 当日营收：¥{metrics['revenue_yuan']:.2f}
-- 当日成本：¥{metrics['cost_yuan']:.2f}（成本率：{metrics['margin_rate']:.1%}）
-- 当日折扣合计：¥{payload.get('discount_total_fen', 0) / 100:.2f}（折扣率：{metrics['discount_rate']:.1%}）
-- 作废单：{metrics['void_count']}笔，金额：¥{metrics['void_amount_yuan']:.2f}（作废率：{metrics['void_rate']:.1%}）
-- 现金盘点：实际¥{metrics['cash_actual_yuan']:.2f} / 系统预期¥{metrics['cash_expected_yuan']:.2f}（差异：¥{metrics['cash_diff_yuan']:.2f}）
+- 当日营收：¥{metrics["revenue_yuan"]:.2f}
+- 当日成本：¥{metrics["cost_yuan"]:.2f}（成本率：{metrics["margin_rate"]:.1%}）
+- 当日折扣合计：¥{payload.get("discount_total_fen", 0) / 100:.2f}（折扣率：{metrics["discount_rate"]:.1%}）
+- 作废单：{metrics["void_count"]}笔，金额：¥{metrics["void_amount_yuan"]:.2f}（作废率：{metrics["void_rate"]:.1%}）
+- 现金盘点：实际¥{metrics["cash_actual_yuan"]:.2f} / 系统预期¥{metrics["cash_expected_yuan"]:.2f}（差异：¥{metrics["cash_diff_yuan"]:.2f}）
 
 【规则引擎预警】
 {alert_text}
 
 【三条硬约束校验（Python预计算）】
-- 毛利达标（成本率≤65%）：{'✅ 达标' if metrics['margin_ok'] else '❌ 未达标'}
-- 作废率正常（≤5%）：{'✅ 正常' if metrics['void_rate_ok'] else '❌ 异常'}
-- 现金差异可控（≤¥100）：{'✅ 可控' if metrics['cash_diff_ok'] else '❌ 超阈值'}
+- 毛利达标（成本率≤65%）：{"✅ 达标" if metrics["margin_ok"] else "❌ 未达标"}
+- 作废率正常（≤5%）：{"✅ 正常" if metrics["void_rate_ok"] else "❌ 异常"}
+- 现金差异可控（≤¥100）：{"✅ 可控" if metrics["cash_diff_ok"] else "❌ 超阈值"}
 
-【高折扣订单明细（共{metrics['high_discount_count']}笔）】
+【高折扣订单明细（共{metrics["high_discount_count"]}笔）】
 {hdo_summary}
 
 请基于以上数据进行深度财务稽核分析，识别所有异常模式，输出JSON格式结果。"""
@@ -336,36 +339,44 @@ class FinanceAuditor:
 
         # 生成异常项
         if not metrics["margin_ok"]:
-            anomalies.append({
-                "type": "margin_warning",
-                "description": f"成本率偏高：{metrics['margin_rate']:.1%}，超过65%阈值",
-                "severity": "critical" if margin_rate > 0.75 else "warn",
-                "amount_fen": 0,
-            })
+            anomalies.append(
+                {
+                    "type": "margin_warning",
+                    "description": f"成本率偏高：{metrics['margin_rate']:.1%}，超过65%阈值",
+                    "severity": "critical" if margin_rate > 0.75 else "warn",
+                    "amount_fen": 0,
+                }
+            )
 
         if not metrics["void_rate_ok"]:
-            anomalies.append({
-                "type": "high_void_rate",
-                "description": f"作废率偏高：{metrics['void_rate']:.1%}，超过5%阈值",
-                "severity": "critical" if void_rate > VOID_RATE_CRITICAL else "warn",
-                "amount_fen": int(metrics["void_amount_yuan"] * 100),
-            })
+            anomalies.append(
+                {
+                    "type": "high_void_rate",
+                    "description": f"作废率偏高：{metrics['void_rate']:.1%}，超过5%阈值",
+                    "severity": "critical" if void_rate > VOID_RATE_CRITICAL else "warn",
+                    "amount_fen": int(metrics["void_amount_yuan"] * 100),
+                }
+            )
 
         if not metrics["cash_diff_ok"]:
-            anomalies.append({
-                "type": "cash_discrepancy",
-                "description": f"现金差异异常：¥{metrics['cash_diff_yuan']:.2f}，超过¥100阈值",
-                "severity": "critical" if cash_diff_fen > CASH_DIFF_CRITICAL_FEN else "warn",
-                "amount_fen": cash_diff_fen,
-            })
+            anomalies.append(
+                {
+                    "type": "cash_discrepancy",
+                    "description": f"现金差异异常：¥{metrics['cash_diff_yuan']:.2f}，超过¥100阈值",
+                    "severity": "critical" if cash_diff_fen > CASH_DIFF_CRITICAL_FEN else "warn",
+                    "amount_fen": cash_diff_fen,
+                }
+            )
 
         if metrics["discount_alert"]:
-            anomalies.append({
-                "type": "abnormal_discount",
-                "description": f"折扣率偏高：{metrics['discount_rate']:.1%}，超过20%阈值",
-                "severity": "warn",
-                "amount_fen": 0,
-            })
+            anomalies.append(
+                {
+                    "type": "abnormal_discount",
+                    "description": f"折扣率偏高：{metrics['discount_rate']:.1%}，超过20%阈值",
+                    "severity": "warn",
+                    "amount_fen": 0,
+                }
+            )
 
         # 生成审计建议
         suggestions = []
@@ -392,7 +403,6 @@ class FinanceAuditor:
             },
         }
 
-
     async def analyze_from_mv(self, tenant_id: str, store_id: str | None = None) -> dict:
         """从 mv_store_pnl + mv_channel_margin 快速读取财务健康数据，<5ms，无 Claude 调用。
 
@@ -401,6 +411,7 @@ class FinanceAuditor:
         """
         from sqlalchemy import text
         from sqlalchemy.exc import SQLAlchemyError
+
         from shared.ontology.src.database import get_db
 
         try:

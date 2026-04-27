@@ -6,6 +6,7 @@ GET  /api/v1/org/ota/versions/latest             各类型最新版本（设备�
 PATCH /api/v1/org/ota/versions/{id}/deactivate   撤回版本
 GET  /api/v1/org/ota/stats                       升级进度统计
 """
+
 import uuid
 from typing import Optional
 
@@ -43,7 +44,7 @@ class CreateVersionRequest(BaseModel):
     version_name: str = Field(..., max_length=50)
     version_code: int = Field(..., ge=1)
     min_version_code: int = Field(0, ge=0)
-    download_url: str = Field(..., max_length=500, pattern=r'^https?://')
+    download_url: str = Field(..., max_length=500, pattern=r"^https?://")
     file_sha256: Optional[str] = Field(None, max_length=64)
     file_size_bytes: Optional[int] = None
     release_notes: Optional[str] = None
@@ -74,12 +75,18 @@ async def create_version(
                      :release_notes, :is_forced, :rollout_pct, NOW(), NOW())
             """),
             {
-                "id": version_id, "tenant_id": tenant_id,
-                "target_type": req.target_type, "version_name": req.version_name,
-                "version_code": req.version_code, "min_version_code": req.min_version_code,
-                "download_url": req.download_url, "file_sha256": req.file_sha256,
-                "file_size_bytes": req.file_size_bytes, "release_notes": req.release_notes,
-                "is_forced": req.is_forced, "rollout_pct": req.rollout_pct,
+                "id": version_id,
+                "tenant_id": tenant_id,
+                "target_type": req.target_type,
+                "version_name": req.version_name,
+                "version_code": req.version_code,
+                "min_version_code": req.min_version_code,
+                "download_url": req.download_url,
+                "file_sha256": req.file_sha256,
+                "file_size_bytes": req.file_size_bytes,
+                "release_notes": req.release_notes,
+                "is_forced": req.is_forced,
+                "rollout_pct": req.rollout_pct,
             },
         )
         await db.commit()
@@ -163,16 +170,18 @@ async def get_latest_version(
 
     is_forced = latest["is_forced"] or (current_version_code < latest["min_version_code"])
 
-    return _ok({
-        "has_update": True,
-        "is_forced": is_forced,
-        "version_name": latest["version_name"],
-        "version_code": latest["version_code"],
-        "download_url": latest["download_url"],
-        "file_sha256": latest["file_sha256"],
-        "file_size_bytes": latest["file_size_bytes"],
-        "release_notes": latest["release_notes"],
-    })
+    return _ok(
+        {
+            "has_update": True,
+            "is_forced": is_forced,
+            "version_name": latest["version_name"],
+            "version_code": latest["version_code"],
+            "download_url": latest["download_url"],
+            "file_sha256": latest["file_sha256"],
+            "file_size_bytes": latest["file_size_bytes"],
+            "release_notes": latest["release_notes"],
+        }
+    )
 
 
 @router.patch("/versions/{version_id}/deactivate")

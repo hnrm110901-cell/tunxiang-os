@@ -8,6 +8,7 @@ router = APIRouter(prefix="/api/v1/agent/plans", tags=["planner"])
 @router.post("/generate")
 async def generate_plan(store_id: str):
     from ..agents.planner import DailyPlannerAgent
+
     agent = DailyPlannerAgent(tenant_id="default", store_id=store_id)
     plan = await agent.generate_daily_plan()
     return {"ok": True, "data": plan}

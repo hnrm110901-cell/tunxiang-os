@@ -3,6 +3,7 @@
 对标 Lightspeed / Odoo 库存-菜单联动：
   当食材库存低于阈值时，自动下架依赖此食材的菜品。
 """
+
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -21,6 +22,7 @@ router = APIRouter(prefix="/api/v1/inventory", tags=["inventory-menu"])
 
 # ─── 请求 / 响应 Schema ───
 
+
 class StockUpdateRequest(BaseModel):
     current_stock: float = Field(..., ge=0, description="当前库存量")
     unit: str = Field(..., min_length=1, max_length=20, description="单位，如 kg / 份 / 个")
@@ -33,6 +35,7 @@ class RestockRequest(BaseModel):
 
 
 # ─── 路由 ───
+
 
 @router.post("/ingredient/{ingredient_id}/stock-update")
 async def api_stock_update(

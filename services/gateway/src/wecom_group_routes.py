@@ -9,6 +9,7 @@ POST /api/v1/wecom/groups/{id}/sync      同步群成员
 GET  /api/v1/wecom/groups/{id}/stats     群统计
 GET  /api/v1/wecom/groups/{id}/history   消息历史
 """
+
 from __future__ import annotations
 
 import uuid
@@ -36,6 +37,7 @@ _service = WecomGroupService()
 # 依赖：从 Header 解析 tenant_id
 # ─────────────────────────────────────────────────────────────────
 
+
 def _parse_tenant_id(x_tenant_id: str) -> UUID:
     try:
         return UUID(x_tenant_id)
@@ -47,6 +49,7 @@ async def _get_db():  # type: ignore[return]
     """数据库会话依赖（代理到 gateway 的 database 模块）"""
     try:
         from .database import get_async_session  # type: ignore[import]
+
         async for session in get_async_session():
             yield session
     except ImportError as exc:
@@ -59,6 +62,7 @@ async def _get_db():  # type: ignore[return]
 # ─────────────────────────────────────────────────────────────────
 # Request schemas
 # ─────────────────────────────────────────────────────────────────
+
 
 class CreateConfigRequest(BaseModel):
     group_name: str = Field(..., min_length=1, max_length=100, description="群名称")
@@ -80,7 +84,7 @@ class CreateConfigRequest(BaseModel):
 
 class SendMessageRequest(BaseModel):
     message_type: str = Field(..., description="text | image | news | miniapp")
-    content: dict[str, Any] = Field(..., description="消息内容体，如 {\"content\": \"xxx\"}")
+    content: dict[str, Any] = Field(..., description='消息内容体，如 {"content": "xxx"}')
     sent_by: str = Field(default="system", description="发送者：system 或员工企微 userid")
 
 
@@ -93,6 +97,7 @@ class ExecuteSopRequest(BaseModel):
 # 路由：配置管理
 # ─────────────────────────────────────────────────────────────────
 
+
 @router.post("/configs")
 async def create_group_config(
     req: CreateConfigRequest,
@@ -102,6 +107,7 @@ async def create_group_config(
     tenant_id = _parse_tenant_id(x_tenant_id)
 
     from .database import get_async_session  # type: ignore[import]
+
     async for db in get_async_session():
         config = WecomGroupConfig(
             id=uuid.uuid4(),
@@ -130,13 +136,15 @@ async def create_group_config(
             tenant_id=str(tenant_id),
             group_name=req.group_name,
         )
-        return ok({
-            "config_id": str(config.id),
-            "group_name": config.group_name,
-            "status": config.status,
-            "target_segment_id": config.target_segment_id,
-            "max_members": config.max_members,
-        })
+        return ok(
+            {
+                "config_id": str(config.id),
+                "group_name": config.group_name,
+                "status": config.status,
+                "target_segment_id": config.target_segment_id,
+                "max_members": config.max_members,
+            }
+        )
 
 
 @router.get("/configs")
@@ -149,6 +157,7 @@ async def list_group_configs(
     tenant_id = _parse_tenant_id(x_tenant_id)
 
     from .database import get_async_session  # type: ignore[import]
+
     async for db in get_async_session():
         stmt = (
             select(WecomGroupConfig)
@@ -162,9 +171,8 @@ async def list_group_configs(
 
         # 总数查询
         from sqlalchemy import func
-        count_stmt = select(func.count()).select_from(WecomGroupConfig).where(
-            WecomGroupConfig.tenant_id == tenant_id
-        )
+
+        count_stmt = select(func.count()).select_from(WecomGroupConfig).where(WecomGroupConfig.tenant_id == tenant_id)
         total_result = await db.execute(count_stmt)
         total = total_result.scalar_one()
 
@@ -188,6 +196,7 @@ async def list_group_configs(
 # 路由：群操作
 # ─────────────────────────────────────────────────────────────────
 
+
 @router.post("/{config_id}/create")
 async def create_group(
     config_id: str,
@@ -201,6 +210,7 @@ async def create_group(
         raise HTTPException(status_code=400, detail="config_id 格式错误") from exc
 
     from .database import get_async_session  # type: ignore[import]
+
     async for db in get_async_session():
         result = await _service.create_group(cid, tenant_id, db)
         if not result.get("success"):
@@ -222,6 +232,7 @@ async def send_group_message(
         raise HTTPException(status_code=400, detail="config_id 格式错误") from exc
 
     from .database import get_async_session  # type: ignore[import]
+
     async for db in get_async_session():
         # 查 chatid
         stmt = select(WecomGroupConfig).where(
@@ -262,6 +273,7 @@ async def execute_sop(
         raise HTTPException(status_code=400, detail="config_id 格式错误") from exc
 
     from .database import get_async_session  # type: ignore[import]
+
     async for db in get_async_session():
         result = await _service.execute_sop(
             config_id=cid,
@@ -288,6 +300,7 @@ async def sync_group_members(
         raise HTTPException(status_code=400, detail="config_id 格式错误") from exc
 
     from .database import get_async_session  # type: ignore[import]
+
     async for db in get_async_session():
         result = await _service.sync_group_members(cid, tenant_id, db)
         if not result.get("success"):
@@ -308,6 +321,7 @@ async def get_group_stats(
         raise HTTPException(status_code=400, detail="config_id 格式错误") from exc
 
     from .database import get_async_session  # type: ignore[import]
+
     async for db in get_async_session():
         result = await _service.get_group_stats(cid, tenant_id, db)
         if not result.get("success", True) and result.get("error") == "config not found":
@@ -331,6 +345,7 @@ async def get_message_history(
         raise HTTPException(status_code=400, detail="config_id 格式错误") from exc
 
     from .database import get_async_session  # type: ignore[import]
+
     async for db in get_async_session():
         conditions = [
             WecomGroupMessage.group_config_id == cid,
@@ -350,11 +365,8 @@ async def get_message_history(
         messages = result.scalars().all()
 
         from sqlalchemy import func
-        count_stmt = (
-            select(func.count())
-            .select_from(WecomGroupMessage)
-            .where(*conditions)
-        )
+
+        count_stmt = select(func.count()).select_from(WecomGroupMessage).where(*conditions)
         total_result = await db.execute(count_stmt)
         total = total_result.scalar_one()
 

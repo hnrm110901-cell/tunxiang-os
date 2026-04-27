@@ -8,6 +8,7 @@ Tests all 6 endpoints of the observability router:
   - GET /api/v1/agent/observability/health
   - GET /api/v1/agent/observability/event-chain/{correlation_id}
 """
+
 import os
 import sys
 

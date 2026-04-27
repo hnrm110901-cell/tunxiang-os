@@ -11,6 +11,7 @@
   - 强制 TX_AUTH_ENABLED=true，确保 RBAC 不走 dev bypass
   - get_db / _get_db 依赖用 AsyncMock 覆盖，断言 audit 写入调用次数
 """
+
 from __future__ import annotations
 
 import os
@@ -90,11 +91,13 @@ def _build_app(*, user_id: str | None, role: str, mfa: bool):
 @pytest.mark.asyncio
 async def test_cashier_wechat_pay_returns_200_and_writes_audit():
     app = _build_app(user_id="u-cashier", role="cashier", mfa=False)
-    with patch("src.api.payment_direct_routes.write_audit", new=AsyncMock()) as m_audit, \
-         patch(
-             "src.api.payment_direct_routes.create_wechat_payment",
-             new=AsyncMock(return_value={"payment_id": "wx-1", "ok": True}),
-         ):
+    with (
+        patch("src.api.payment_direct_routes.write_audit", new=AsyncMock()) as m_audit,
+        patch(
+            "src.api.payment_direct_routes.create_wechat_payment",
+            new=AsyncMock(return_value={"payment_id": "wx-1", "ok": True}),
+        ),
+    ):
         client = TestClient(app, raise_server_exceptions=False)
         resp = client.post(
             "/api/v1/payment-direct/wechat",

@@ -23,9 +23,9 @@ class BeijingTraceAdapter(BaseDomainAdapter):
         return data
 
     async def submit(self, payload: dict[str, Any]) -> "SubmissionResult":  # noqa: F821
-        from ..base_city_adapter import SubmissionResult
-
         import uuid
+
+        from ..base_city_adapter import SubmissionResult
 
         mock_ref = f"BJTRACE-{uuid.uuid4().hex[:12].upper()}"
         logger.info(

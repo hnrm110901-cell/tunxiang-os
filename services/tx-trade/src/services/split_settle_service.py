@@ -3,6 +3,7 @@
 对标 Square Split Tender。
 所有金额单位：分（fen）。
 """
+
 import uuid
 from datetime import datetime, timezone
 from typing import Optional
@@ -86,13 +87,15 @@ class SplitSettleService:
         for i in range(person_count):
             bill_id = str(uuid.uuid4())
             amount = per_person + (remainder if i == 0 else 0)
-            bills.append({
-                "bill_id": bill_id,
-                "person_index": i,
-                "amount_fen": amount,
-                "paid": False,
-                "payment_result": None,
-            })
+            bills.append(
+                {
+                    "bill_id": bill_id,
+                    "person_index": i,
+                    "amount_fen": amount,
+                    "paid": False,
+                    "payment_result": None,
+                }
+            )
 
         split_data = {
             "split_id": split_id,
@@ -183,11 +186,7 @@ class SplitSettleService:
             person_totals[person_id] = person_total
 
         # 计算公共菜品（未被认领的）— 均摊
-        unclaimed_total = sum(
-            item.subtotal_fen
-            for iid, item in all_items.items()
-            if iid not in claimed_item_ids
-        )
+        unclaimed_total = sum(item.subtotal_fen for iid, item in all_items.items() if iid not in claimed_item_ids)
 
         person_count = len(assignments)
         shared_per_person: int = unclaimed_total // person_count
@@ -204,17 +203,19 @@ class SplitSettleService:
             shared_amount = shared_per_person + (shared_remainder if i == 0 else 0)
             total_amount = own_amount + shared_amount
 
-            bills.append({
-                "bill_id": bill_id,
-                "person_id": person_id,
-                "person_index": i,
-                "own_items_fen": own_amount,
-                "shared_items_fen": shared_amount,
-                "amount_fen": total_amount,
-                "item_ids": assignment.get("item_ids", []),
-                "paid": False,
-                "payment_result": None,
-            })
+            bills.append(
+                {
+                    "bill_id": bill_id,
+                    "person_id": person_id,
+                    "person_index": i,
+                    "own_items_fen": own_amount,
+                    "shared_items_fen": shared_amount,
+                    "amount_fen": total_amount,
+                    "item_ids": assignment.get("item_ids", []),
+                    "paid": False,
+                    "payment_result": None,
+                }
+            )
 
         # 校验拆账总额 == 订单应付
         split_total = sum(b["amount_fen"] for b in bills)
@@ -305,9 +306,7 @@ class SplitSettleService:
             raise ValueError(f"子账单 {bill_id} 已付款")
 
         if amount_fen < target_bill["amount_fen"]:
-            raise ValueError(
-                f"支付金额 {amount_fen} 不足，子账单应付 {target_bill['amount_fen']}"
-            )
+            raise ValueError(f"支付金额 {amount_fen} 不足，子账单应付 {target_bill['amount_fen']}")
 
         # 调用 PaymentGateway 创建支付
         from .payment_gateway import PaymentGateway
@@ -379,12 +378,8 @@ class SplitSettleService:
             "all_paid": split_data["all_paid"],
             "paid_count": sum(1 for b in split_data["bills"] if b["paid"]),
             "total_count": len(split_data["bills"]),
-            "paid_amount_fen": sum(
-                b["amount_fen"] for b in split_data["bills"] if b["paid"]
-            ),
-            "remaining_amount_fen": sum(
-                b["amount_fen"] for b in split_data["bills"] if not b["paid"]
-            ),
+            "paid_amount_fen": sum(b["amount_fen"] for b in split_data["bills"] if b["paid"]),
+            "remaining_amount_fen": sum(b["amount_fen"] for b in split_data["bills"] if not b["paid"]),
             "bills": [
                 {
                     "bill_id": b["bill_id"],

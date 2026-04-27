@@ -10,6 +10,7 @@
 
 统一响应格式: {"ok": bool, "data": {}, "error": {}}
 """
+
 from __future__ import annotations
 
 import uuid
@@ -136,7 +137,8 @@ async def get_incidents_summary(
     log.info("incidents_summary_requested", tenant_id=x_tenant_id)
 
     try:
-        result = await db.execute(text("""
+        result = await db.execute(
+            text("""
             SELECT
                 alert_type,
                 severity,
@@ -147,7 +149,8 @@ async def get_incidents_summary(
                 resolved_at
             FROM compliance_alerts
             ORDER BY created_at DESC
-        """))
+        """)
+        )
         rows = result.mappings().all()
     except SQLAlchemyError:
         log.exception("incidents_summary_db_error", tenant_id=x_tenant_id)
@@ -190,16 +193,9 @@ async def get_incidents_summary(
             delta = row["resolved_at"] - row["created_at"]
             resolve_minutes_list.append(int(delta.total_seconds() / 60))
 
-    avg_resolve_minutes = (
-        round(sum(resolve_minutes_list) / len(resolve_minutes_list))
-        if resolve_minutes_list
-        else 0
-    )
+    avg_resolve_minutes = round(sum(resolve_minutes_list) / len(resolve_minutes_list)) if resolve_minutes_list else 0
 
-    top_stores = [
-        {"store_id": sid, "count": cnt}
-        for sid, cnt in sorted(by_store.items(), key=lambda x: -x[1])[:5]
-    ]
+    top_stores = [{"store_id": sid, "count": cnt} for sid, cnt in sorted(by_store.items(), key=lambda x: -x[1])[:5]]
 
     return {
         "ok": True,
@@ -326,30 +322,38 @@ async def report_incident(
     }
 
     try:
-        await db.execute(text("""
+        await db.execute(
+            text("""
             INSERT INTO compliance_alerts
                 (id, tenant_id, store_id, alert_type, severity, title,
                  detail, status, source, created_at, updated_at)
             VALUES
                 (:id, :tenant_id, :store_id, :alert_type, :severity, :title,
                  :detail::jsonb, 'open', 'manual', :now, :now)
-        """), {
-            "id": new_id,
-            "tenant_id": x_tenant_id,
-            "store_id": body.store_id,
-            "alert_type": body.incident_type,
-            "severity": body.severity,
-            "title": body.title,
-            "detail": __import__("json").dumps(detail_payload, ensure_ascii=False),
-            "now": now,
-        })
+        """),
+            {
+                "id": new_id,
+                "tenant_id": x_tenant_id,
+                "store_id": body.store_id,
+                "alert_type": body.incident_type,
+                "severity": body.severity,
+                "title": body.title,
+                "detail": __import__("json").dumps(detail_payload, ensure_ascii=False),
+                "now": now,
+            },
+        )
     except SQLAlchemyError:
         log.exception("incident_report_db_error", tenant_id=x_tenant_id)
         raise HTTPException(status_code=500, detail="写入异常事件失败，请稍后重试")
 
-    log.info("incident_reported", incident_id=new_id,
-             store_id=body.store_id, incident_type=body.incident_type,
-             severity=body.severity, tenant_id=x_tenant_id)
+    log.info(
+        "incident_reported",
+        incident_id=new_id,
+        store_id=body.store_id,
+        incident_type=body.incident_type,
+        severity=body.severity,
+        tenant_id=x_tenant_id,
+    )
 
     return {
         "ok": True,
@@ -386,17 +390,19 @@ async def update_incident_status(
     if body.status not in _VALID_STATUSES:
         raise HTTPException(status_code=400, detail=f"status 必须是 {_VALID_STATUSES} 之一")
 
-    log.info("incident_status_updated", incident_id=incident_id,
-             new_status=body.status, tenant_id=x_tenant_id)
+    log.info("incident_status_updated", incident_id=incident_id, new_status=body.status, tenant_id=x_tenant_id)
 
     try:
-        row_result = await db.execute(text("""
+        row_result = await db.execute(
+            text("""
             SELECT id, store_id, alert_type, severity, title,
                    status, detail, created_at, updated_at,
                    resolved_at, resolution_note
             FROM compliance_alerts
             WHERE id = :incident_id
-        """), {"incident_id": incident_id})
+        """),
+            {"incident_id": incident_id},
+        )
         row = row_result.mappings().first()
     except SQLAlchemyError:
         log.exception("incident_status_fetch_error", incident_id=incident_id)
@@ -416,18 +422,21 @@ async def update_incident_status(
         detail["handler_id"] = body.handler_id
         detail["handler_name"] = body.handler_name
     timeline: list = detail.get("timeline", [])
-    timeline.append({
-        "time": now.isoformat(),
-        "action": body.status,
-        "operator": body.handler_name or "system",
-        "remark": body.remark or body.resolution or "",
-    })
+    timeline.append(
+        {
+            "time": now.isoformat(),
+            "action": body.status,
+            "operator": body.handler_name or "system",
+            "remark": body.remark or body.resolution or "",
+        }
+    )
     detail["timeline"] = timeline
 
     resolution_note = body.resolution or body.remark or row["resolution_note"]
 
     try:
-        await db.execute(text("""
+        await db.execute(
+            text("""
             UPDATE compliance_alerts
             SET status = :db_status,
                 detail = :detail::jsonb,
@@ -435,14 +444,16 @@ async def update_incident_status(
                 resolved_at = :resolved_at,
                 updated_at = :now
             WHERE id = :incident_id
-        """), {
-            "db_status": db_status,
-            "detail": __import__("json").dumps(detail, ensure_ascii=False),
-            "resolution_note": resolution_note,
-            "resolved_at": resolved_at,
-            "now": now,
-            "incident_id": incident_id,
-        })
+        """),
+            {
+                "db_status": db_status,
+                "detail": __import__("json").dumps(detail, ensure_ascii=False),
+                "resolution_note": resolution_note,
+                "resolved_at": resolved_at,
+                "now": now,
+                "incident_id": incident_id,
+            },
+        )
     except SQLAlchemyError:
         log.exception("incident_status_update_error", incident_id=incident_id)
         raise HTTPException(status_code=500, detail="更新异常事件状态失败")

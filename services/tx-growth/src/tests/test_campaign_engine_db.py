@@ -10,18 +10,16 @@
 运行：
     pytest services/tx-growth/src/tests/test_campaign_engine_db.py -v
 """
+
 from unittest.mock import AsyncMock, MagicMock, patch
-
-import pytest
-from fastapi.testclient import TestClient
-
-from ..api.campaign_engine_db_routes import VALID_TRANSITIONS, _calc_discount, router
 
 # ---------------------------------------------------------------------------
 # 测试 App
 # ---------------------------------------------------------------------------
-
 from fastapi import FastAPI
+from fastapi.testclient import TestClient
+
+from ..api.campaign_engine_db_routes import VALID_TRANSITIONS, _calc_discount, router
 
 _app = FastAPI()
 _app.include_router(router)
@@ -60,6 +58,7 @@ def _make_mock_db(
 # ---------------------------------------------------------------------------
 # 1. test_create_campaign
 # ---------------------------------------------------------------------------
+
 
 class TestCreateCampaign:
     """创建活动：id非空 / status=draft / rules字段完整"""
@@ -125,6 +124,7 @@ class TestCreateCampaign:
 # 2. test_campaign_status_machine
 # ---------------------------------------------------------------------------
 
+
 class TestCampaignStatusMachine:
     """状态机完整流转 + 非法转换返回 400"""
 
@@ -154,7 +154,7 @@ class TestCampaignStatusMachine:
         ):
             client = TestClient(_app)
             resp = client.post(
-                f"/api/v1/growth/campaigns-v2/camp-abc/activate",
+                "/api/v1/growth/campaigns-v2/camp-abc/activate",
                 headers=_TENANT_HEADERS,
             )
         assert resp.status_code == 200
@@ -217,12 +217,12 @@ class TestCampaignStatusMachine:
 # 3. test_apply_campaign_to_order
 # ---------------------------------------------------------------------------
 
+
 class TestApplyCampaignToOrder:
     """核销：active折扣活动，会员下单满足threshold，返回 applied_campaign_id 和 discount>0"""
 
     def test_apply_active_discount_campaign(self):
         """满足门槛的 active 活动应被核销并返回折扣金额"""
-        import json
 
         camp_row = MagicMock()
         camp_row._mapping = {
@@ -305,6 +305,7 @@ class TestApplyCampaignToOrder:
 # 4. test_campaign_not_applied_when_inactive
 # ---------------------------------------------------------------------------
 
+
 class TestCampaignNotAppliedWhenInactive:
     """非active活动（draft/paused）不应用到订单"""
 
@@ -376,6 +377,7 @@ class TestCampaignNotAppliedWhenInactive:
 # ---------------------------------------------------------------------------
 # 5. test_conflict_detection
 # ---------------------------------------------------------------------------
+
 
 class TestConflictDetection:
     """冲突检测：两个同类型同时间段活动重叠 → conflict=True"""

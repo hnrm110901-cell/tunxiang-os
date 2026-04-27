@@ -7,6 +7,7 @@
   GET  /api/v1/finance/pnl/multi-store         — 多门店 P&L 对比（?date=，总部驾驶舱）
   POST /api/v1/finance/pnl/batch-calculate     — 批量计算（补算历史数据）
 """
+
 from __future__ import annotations
 
 import uuid
@@ -29,6 +30,7 @@ _pnl_engine = PnLEngine()
 
 # ─── 请求 / 响应模型 ──────────────────────────────────────────────────────────
 
+
 class CalculatePnLRequest(BaseModel):
     store_id: str = Field(..., description="门店ID（UUID）")
     date: str = Field(..., description="计算日期 YYYY-MM-DD 或 today")
@@ -41,6 +43,7 @@ class BatchCalculateRequest(BaseModel):
 
 
 # ─── 依赖注入 ─────────────────────────────────────────────────────────────────
+
 
 async def _get_tenant_db(x_tenant_id: str = Header(..., alias="X-Tenant-ID")):
     async for session in get_db_with_tenant(x_tenant_id):
@@ -60,12 +63,11 @@ def _parse_date_param(d: str) -> date:
     try:
         return date.fromisoformat(d)
     except ValueError as exc:
-        raise HTTPException(
-            status_code=400, detail=f"日期格式错误: {d}，请使用 YYYY-MM-DD"
-        ) from exc
+        raise HTTPException(status_code=400, detail=f"日期格式错误: {d}，请使用 YYYY-MM-DD") from exc
 
 
 # ─── POST /pnl/calculate ──────────────────────────────────────────────────────
+
 
 @router.post("/pnl/calculate", summary="触发日 P&L 计算")
 async def calculate_pnl(
@@ -97,6 +99,7 @@ async def calculate_pnl(
 
 
 # ─── GET /pnl/{store_id} ──────────────────────────────────────────────────────
+
 
 @router.get("/pnl/{store_id}", summary="查询门店日 P&L 详情")
 async def get_daily_pnl(
@@ -161,6 +164,7 @@ async def get_daily_pnl(
 
 
 # ─── GET /pnl/trend ───────────────────────────────────────────────────────────
+
 
 @router.get("/pnl/trend", summary="P&L 趋势（30天折线图数据）")
 async def get_pnl_trend(
@@ -240,6 +244,7 @@ async def get_pnl_trend(
 
 
 # ─── GET /pnl/multi-store ─────────────────────────────────────────────────────
+
 
 @router.get("/pnl/multi-store", summary="多门店 P&L 对比（总部驾驶舱）")
 async def get_multi_store_pnl(
@@ -321,8 +326,7 @@ async def get_multi_store_pnl(
                 "total_operating_profit_fen": total_operating_profit,
                 "total_orders_count": total_orders,
                 "avg_gross_margin_pct": (
-                    round(total_gross_profit / total_revenue * 100, 2)
-                    if total_revenue > 0 else 0.0
+                    round(total_gross_profit / total_revenue * 100, 2) if total_revenue > 0 else 0.0
                 ),
             },
             "stores": stores_data,
@@ -331,6 +335,7 @@ async def get_multi_store_pnl(
 
 
 # ─── POST /pnl/batch-calculate ────────────────────────────────────────────────
+
 
 @router.post("/pnl/batch-calculate", summary="批量计算历史 P&L")
 async def batch_calculate_pnl(
@@ -372,13 +377,15 @@ async def batch_calculate_pnl(
 
         try:
             daily = await _pnl_engine.calculate_daily_pnl(tid, sid, current, db)
-            results.append({
-                "date": str(current),
-                "ok": True,
-                "net_revenue_fen": daily.net_revenue_fen,
-                "gross_profit_fen": daily.gross_profit_fen,
-                "operating_profit_fen": daily.operating_profit_fen,
-            })
+            results.append(
+                {
+                    "date": str(current),
+                    "ok": True,
+                    "net_revenue_fen": daily.net_revenue_fen,
+                    "gross_profit_fen": daily.gross_profit_fen,
+                    "operating_profit_fen": daily.operating_profit_fen,
+                }
+            )
         except ValueError as exc:
             errors.append({"date": str(current), "ok": False, "error": str(exc)})
         current += timedelta(days=1)
@@ -398,6 +405,7 @@ async def batch_calculate_pnl(
 
 
 # ─── 工具函数 ─────────────────────────────────────────────────────────────────
+
 
 def _row_to_pnl_dict(store_id: uuid.UUID, pnl_date: date, row) -> dict:
     """将 daily_pnl 查询行转为标准响应字典。"""

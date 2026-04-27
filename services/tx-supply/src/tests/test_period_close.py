@@ -1,4 +1,5 @@
 """月结与成本测试"""
+
 import os
 import sys
 
@@ -81,8 +82,12 @@ class TestCreateCostAdjustment:
         items = [{"ingredient_id": "i1", "old_cost_fen": 100, "new_cost_fen": 200}]
         with pytest.raises(ValueError, match="已月结"):
             await create_cost_adjustment(
-                "store_1", items, "t1", db=None,
-                period_closed=True, month="2026-03",
+                "store_1",
+                items,
+                "t1",
+                db=None,
+                period_closed=True,
+                month="2026-03",
             )
 
     @pytest.mark.asyncio
@@ -131,10 +136,15 @@ class TestGetReceiptBalance:
     async def test_balance_calculation(self):
         data = [
             {
-                "ingredient_id": "i1", "name": "鲈鱼", "unit": "kg",
-                "opening_qty": 100, "opening_cost_fen": 350000,
-                "received_qty": 50, "received_cost_fen": 175000,
-                "issued_qty": 80, "issued_cost_fen": 280000,
+                "ingredient_id": "i1",
+                "name": "鲈鱼",
+                "unit": "kg",
+                "opening_qty": 100,
+                "opening_cost_fen": 350000,
+                "received_qty": 50,
+                "received_cost_fen": 175000,
+                "issued_qty": 80,
+                "issued_cost_fen": 280000,
             },
         ]
         result = await get_receipt_balance("store_1", "2026-03", "t1", db=None, balance_data=data)
@@ -160,8 +170,20 @@ class TestGetPayableSummary:
     @pytest.mark.asyncio
     async def test_payable_summary(self):
         data = [
-            {"supplier_id": "s1", "supplier_name": "供应商A", "total_payable_fen": 100000, "paid_fen": 60000, "po_count": 3},
-            {"supplier_id": "s2", "supplier_name": "供应商B", "total_payable_fen": 50000, "paid_fen": 50000, "po_count": 2},
+            {
+                "supplier_id": "s1",
+                "supplier_name": "供应商A",
+                "total_payable_fen": 100000,
+                "paid_fen": 60000,
+                "po_count": 3,
+            },
+            {
+                "supplier_id": "s2",
+                "supplier_name": "供应商B",
+                "total_payable_fen": 50000,
+                "paid_fen": 50000,
+                "po_count": 2,
+            },
         ]
         result = await get_payable_summary("store_1", "t1", db=None, payable_data=data)
         assert result["supplier_count"] == 2

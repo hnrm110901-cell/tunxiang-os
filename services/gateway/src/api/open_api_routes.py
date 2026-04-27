@@ -34,10 +34,12 @@ _rate_limiter = RateLimiter()
 
 # ── 依赖注入 ───────────────────────────────────────────────────────
 
+
 async def get_db() -> AsyncSession:  # type: ignore[return]
     """获取DB会话（由实际数据库模块提供，此处为接口占位）"""
     try:
         from ..database import get_async_session  # type: ignore[import]
+
         async for session in get_async_session():
             yield session
     except ImportError:
@@ -62,7 +64,7 @@ async def verify_bearer_token(
     if not auth_header.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="缺少Bearer token")
 
-    raw_token = auth_header[len("Bearer "):]
+    raw_token = auth_header[len("Bearer ") :]
     token_info = await _oauth2_service.verify_token(raw_token, required_scope, db)
     if not token_info:
         raise HTTPException(status_code=401, detail="token无效、已过期或已吊销")
@@ -88,6 +90,7 @@ async def verify_bearer_token(
 
 # ── Pydantic请求/响应模型 ──────────────────────────────────────────
 
+
 class CreateApplicationRequest(BaseModel):
     app_name: str = Field(..., min_length=1, max_length=100, description="应用名称")
     scopes: list[str] = Field(default=[], description="授权范围列表")
@@ -112,6 +115,7 @@ class RotateSecretRequest(BaseModel):
 
 
 # ── 应用管理端点 ──────────────────────────────────────────────────
+
 
 @router.post("/applications", status_code=201)
 async def create_application(
@@ -226,6 +230,7 @@ async def get_application_logs(
 
 
 # ── OAuth2端点 ────────────────────────────────────────────────────
+
 
 @router.post("/oauth/token")
 async def issue_token(

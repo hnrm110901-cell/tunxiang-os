@@ -4,6 +4,7 @@
 存储层：PostgreSQL banners 表（v162 迁移创建）
 计数器直接在 banners 表内维护（impression_count / click_count）
 """
+
 from __future__ import annotations
 
 import json
@@ -20,6 +21,7 @@ VALID_BANNER_TYPES = ("hero", "promotion", "announcement", "campaign")
 
 
 # ── 工具函数 ──────────────────────────────────────────────────
+
 
 def _now_utc() -> datetime:
     return datetime.now(timezone.utc)

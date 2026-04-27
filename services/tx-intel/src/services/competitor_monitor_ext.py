@@ -6,6 +6,7 @@
   - 生成结构化情报预警
   - 将快照写入 competitor_snapshots 表
 """
+
 import uuid
 from datetime import date, datetime, timezone
 from decimal import Decimal
@@ -148,13 +149,15 @@ class CompetitorMonitorExtService:
         new_rating = Decimal(str(new_snapshot.get("avg_rating") or "0"))
         if old_rating > 0 and abs(new_rating - old_rating) >= _RATING_CHANGE_THRESHOLD:
             direction = "上升" if new_rating > old_rating else "下降"
-            changes.append({
-                "type": "rating_change",
-                "severity": "high" if abs(new_rating - old_rating) >= Decimal("0.5") else "medium",
-                "description": f"评分{direction} {old_rating} → {new_rating}",
-                "old_value": float(old_rating),
-                "new_value": float(new_rating),
-            })
+            changes.append(
+                {
+                    "type": "rating_change",
+                    "severity": "high" if abs(new_rating - old_rating) >= Decimal("0.5") else "medium",
+                    "description": f"评分{direction} {old_rating} → {new_rating}",
+                    "old_value": float(old_rating),
+                    "new_value": float(new_rating),
+                }
+            )
 
         # ── 菜品增减 ──
         old_dishes: list[dict] = old_snapshot.get("top_dishes") or []
@@ -165,19 +168,23 @@ class CompetitorMonitorExtService:
         added = new_names - old_names
         removed = old_names - new_names
         if added:
-            changes.append({
-                "type": "new_dishes",
-                "severity": "medium",
-                "description": f"新增热门菜品 {len(added)} 个：{', '.join(list(added)[:5])}",
-                "dishes": list(added),
-            })
+            changes.append(
+                {
+                    "type": "new_dishes",
+                    "severity": "medium",
+                    "description": f"新增热门菜品 {len(added)} 个：{', '.join(list(added)[:5])}",
+                    "dishes": list(added),
+                }
+            )
         if removed:
-            changes.append({
-                "type": "removed_dishes",
-                "severity": "low",
-                "description": f"下架热门菜品 {len(removed)} 个：{', '.join(list(removed)[:5])}",
-                "dishes": list(removed),
-            })
+            changes.append(
+                {
+                    "type": "removed_dishes",
+                    "severity": "low",
+                    "description": f"下架热门菜品 {len(removed)} 个：{', '.join(list(removed)[:5])}",
+                    "dishes": list(removed),
+                }
+            )
 
         # ── 价格变动（扫描 top_dishes 中同名菜品的价格）──
         old_price_map = {d.get("name", ""): d.get("price_fen", 0) for d in old_dishes}
@@ -189,15 +196,17 @@ class CompetitorMonitorExtService:
                 pct = abs(new_price - old_price) / old_price
                 if Decimal(str(pct)) >= _PRICE_CHANGE_THRESHOLD:
                     direction = "涨价" if new_price > old_price else "降价"
-                    changes.append({
-                        "type": "price_change",
-                        "severity": "high" if pct >= 0.20 else "medium",
-                        "description": f"菜品「{name}」{direction} {round(pct * 100, 1)}%",
-                        "dish": name,
-                        "old_price_fen": old_price,
-                        "new_price_fen": new_price,
-                        "change_pct": round(float(pct) * 100, 1),
-                    })
+                    changes.append(
+                        {
+                            "type": "price_change",
+                            "severity": "high" if pct >= 0.20 else "medium",
+                            "description": f"菜品「{name}」{direction} {round(pct * 100, 1)}%",
+                            "dish": name,
+                            "old_price_fen": old_price,
+                            "new_price_fen": new_price,
+                            "change_pct": round(float(pct) * 100, 1),
+                        }
+                    )
 
         return {
             "has_changes": len(changes) > 0,
@@ -240,6 +249,7 @@ class CompetitorMonitorExtService:
 
 
 # ─── 内部辅助函数 ───
+
 
 def _pick_platform(platform_ids: dict[str, str]) -> tuple[str, str]:
     """按优先级选择采集平台（美团 > 抖音 > 饿了么 > 大众点评）"""
@@ -295,10 +305,7 @@ async def _fetch_from_platform(source: str, platform_store_id: str) -> dict[str,
         )
         try:
             reviews = await adapter.fetch_store_reviews(platform_store_id, days=30)
-            avg_rating = (
-                sum(float(r.rating) for r in reviews) / len(reviews)
-                if reviews else 0.0
-            )
+            avg_rating = sum(float(r.rating) for r in reviews) / len(reviews) if reviews else 0.0
             return {
                 "avg_rating": round(avg_rating, 2),
                 "review_count": len(reviews),

@@ -16,7 +16,7 @@
 
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import date
 from typing import Any, Optional
 
 import structlog
@@ -46,9 +46,7 @@ router = APIRouter(tags=["store-ops"])
 
 
 def _get_tenant_id(request: Request) -> str:
-    tid = getattr(request.state, "tenant_id", None) or request.headers.get(
-        "X-Tenant-ID", ""
-    )
+    tid = getattr(request.state, "tenant_id", None) or request.headers.get("X-Tenant-ID", "")
     if not tid:
         raise HTTPException(status_code=400, detail="X-Tenant-ID header required")
     return tid
@@ -147,7 +145,8 @@ async def quick_action(
     )
     try:
         result = await execute_quick_action(
-            db, tenant_id,
+            db,
+            tenant_id,
             body.action_type,
             body.target_id,
             body.operator_id,
@@ -200,7 +199,8 @@ async def fill_gap(
     )
     try:
         result = await execute_fill_gap(
-            db, tenant_id,
+            db,
+            tenant_id,
             body.gap_id,
             body.employee_id,
             body.fill_type,

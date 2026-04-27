@@ -13,6 +13,7 @@
   - 采购单/配送单：按日期区间拉取，以 external_id 去重 UPSERT
   - 供应商：全量拉取（分页），以 external_id 去重 UPSERT
 """
+
 from __future__ import annotations
 
 import uuid
@@ -33,6 +34,7 @@ _RECEIVING_RECORDS_TABLE = "receiving_records"
 # 内部工具
 # ──────────────────────────────────────────────────────────────
 
+
 def _date_range(since_date: str, until_date: Optional[str] = None) -> List[str]:
     """生成 [since_date, until_date] 区间的日期字符串列表（含两端）。"""
     start = date.fromisoformat(since_date)
@@ -48,6 +50,7 @@ def _date_range(since_date: str, until_date: Optional[str] = None) -> List[str]:
 # ──────────────────────────────────────────────────────────────
 # 1. 采购入库单同步
 # ──────────────────────────────────────────────────────────────
+
 
 async def sync_purchase_orders(
     tenant_id: str,
@@ -81,6 +84,7 @@ async def sync_purchase_orders(
     # 延迟导入映射层（避免循环依赖）
     import os as _os
     import sys
+
     _service_dir = _os.path.dirname(__file__)
     _repo_root = _os.path.abspath(_os.path.join(_service_dir, "../../../../.."))
     _mapper_dir = _os.path.join(_repo_root, "shared", "adapters", "aoqiwei", "src")
@@ -205,6 +209,7 @@ async def _upsert_purchase_order(unified: dict, db: Any) -> None:
 # 2. 供应商同步
 # ──────────────────────────────────────────────────────────────
 
+
 async def sync_suppliers(
     tenant_id: str,
     *,
@@ -227,6 +232,7 @@ async def sync_suppliers(
     """
     import os as _os
     import sys
+
     _service_dir = _os.path.dirname(__file__)
     _repo_root = _os.path.abspath(_os.path.join(_service_dir, "../../../../.."))
     _mapper_dir = _os.path.join(_repo_root, "shared", "adapters", "aoqiwei", "src")
@@ -334,6 +340,7 @@ async def _upsert_supplier(unified: dict, db: Any) -> None:
 # 3. 配送出库单 → 收货记录同步
 # ──────────────────────────────────────────────────────────────
 
+
 async def sync_receiving_records(
     tenant_id: str,
     store_id: str,
@@ -364,6 +371,7 @@ async def sync_receiving_records(
     """
     import os as _os
     import sys
+
     _service_dir = _os.path.dirname(__file__)
     _repo_root = _os.path.abspath(_os.path.join(_service_dir, "../../../../.."))
     _mapper_dir = _os.path.join(_repo_root, "shared", "adapters", "aoqiwei", "src")

@@ -28,9 +28,7 @@ router = APIRouter(
 
 
 def _get_tenant_id(request: Request) -> str:
-    tid = getattr(request.state, "tenant_id", None) or request.headers.get(
-        "X-Tenant-ID", ""
-    )
+    tid = getattr(request.state, "tenant_id", None) or request.headers.get("X-Tenant-ID", "")
     if not tid:
         raise HTTPException(status_code=400, detail="X-Tenant-ID header required")
     return tid
@@ -64,9 +62,7 @@ class RefundRequest(BaseModel):
     """退款请求"""
 
     order_id: str = Field(..., description="原商户订单号")
-    refund_no: Optional[str] = Field(
-        default=None, description="退款单号，不传则自动生成"
-    )
+    refund_no: Optional[str] = Field(default=None, description="退款单号，不传则自动生成")
     total_fen: int = Field(..., gt=0, description="原订单金额（分）")
     refund_fen: int = Field(..., gt=0, description="退款金额（分）")
     reason: str = Field(default="", description="退款原因")

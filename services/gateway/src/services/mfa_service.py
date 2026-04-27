@@ -20,7 +20,7 @@ logger = structlog.get_logger(__name__)
 
 ISSUER = "屯象OS"
 BACKUP_CODE_COUNT = 8
-BACKUP_CODE_BYTES = 4   # secrets.token_hex(4) → 8字符十六进制
+BACKUP_CODE_BYTES = 4  # secrets.token_hex(4) → 8字符十六进制
 
 
 def _load_encrypt_key() -> bytes:
@@ -154,10 +154,7 @@ class MFAService:
         Returns:
             8个8字符的大写十六进制字符串，例如 ["A3F9B21C", ...]。
         """
-        return [
-            secrets.token_hex(BACKUP_CODE_BYTES).upper()
-            for _ in range(BACKUP_CODE_COUNT)
-        ]
+        return [secrets.token_hex(BACKUP_CODE_BYTES).upper() for _ in range(BACKUP_CODE_COUNT)]
 
     def hash_backup_codes(self, codes: list[str]) -> list[str]:
         """对备用码做 SHA256 哈希，用于数据库存储。

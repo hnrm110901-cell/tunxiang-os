@@ -6,6 +6,7 @@
 - 根据 settlement_days 预测未来资金到账
 - 差异汇总统计
 """
+
 import uuid
 from datetime import date, timedelta
 from typing import Optional
@@ -31,6 +32,7 @@ _PLATFORM_TO_CHANNEL: dict[str, str] = {
 
 
 # ─── Pydantic v2 数据模型 ─────────────────────────────────────────────────────
+
 
 class ChannelRow(BaseModel):
     channel_id: str
@@ -79,6 +81,7 @@ class DiscrepancySummary(BaseModel):
 
 
 # ─── 计算引擎 ─────────────────────────────────────────────────────────────────
+
 
 class ChannelPLCalculator:
     """渠道 P&L 计算 + 对账 + 到账预测"""
@@ -152,16 +155,18 @@ class ChannelPLCalculator:
             gross_profit = gross_rev - commission - food_cost
             gross_margin = (gross_profit / gross_rev) if gross_rev > 0 else 0.0
 
-            channel_rows.append(ChannelRow(
-                channel_id=ch_id,
-                channel_name=ch_name,
-                order_count=int(row["order_count"]),
-                gross_revenue_fen=gross_rev,
-                commission_fen=commission,
-                food_cost_fen=food_cost,
-                gross_profit_fen=gross_profit,
-                gross_margin=round(gross_margin, 4),
-            ))
+            channel_rows.append(
+                ChannelRow(
+                    channel_id=ch_id,
+                    channel_name=ch_name,
+                    order_count=int(row["order_count"]),
+                    gross_revenue_fen=gross_rev,
+                    commission_fen=commission,
+                    food_cost_fen=food_cost,
+                    gross_profit_fen=gross_profit,
+                    gross_margin=round(gross_margin, 4),
+                )
+            )
 
         total_revenue = sum(r.gross_revenue_fen for r in channel_rows)
         total_profit = sum(r.gross_profit_fen for r in channel_rows)
@@ -250,9 +255,7 @@ class ChannelPLCalculator:
         # raw_data 应包含 {"orders": [{"platform_order_id": "...", "amount_fen": ...}, ...]}
         platform_orders: list[dict] = raw_data.get("orders", [])
         platform_order_map: dict[str, int] = {
-            o["platform_order_id"]: o.get("amount_fen", 0)
-            for o in platform_orders
-            if "platform_order_id" in o
+            o["platform_order_id"]: o.get("amount_fen", 0) for o in platform_orders if "platform_order_id" in o
         }
 
         # 2. 从系统查询同平台的完成订单（按 bill_period 过滤）
@@ -281,9 +284,7 @@ class ChannelPLCalculator:
             },
         )
         sys_orders = sys_result.mappings().all()
-        sys_order_map: dict[str, dict] = {
-            row["platform_order_id"]: dict(row) for row in sys_orders
-        }
+        sys_order_map: dict[str, dict] = {row["platform_order_id"]: dict(row) for row in sys_orders}
 
         discrepancies: list[dict] = []
 
@@ -293,24 +294,28 @@ class ChannelPLCalculator:
 
         # 平台有、系统无
         for pid in all_platform_ids - all_sys_ids:
-            discrepancies.append({
-                "platform_order_id": pid,
-                "internal_order_id": None,
-                "platform_amount_fen": platform_order_map[pid],
-                "system_amount_fen": 0,
-                "discrepancy_type": "order_missing_in_system",
-            })
+            discrepancies.append(
+                {
+                    "platform_order_id": pid,
+                    "internal_order_id": None,
+                    "platform_amount_fen": platform_order_map[pid],
+                    "system_amount_fen": 0,
+                    "discrepancy_type": "order_missing_in_system",
+                }
+            )
 
         # 系统有、平台无
         for pid in all_sys_ids - all_platform_ids:
             sys_ord = sys_order_map[pid]
-            discrepancies.append({
-                "platform_order_id": pid,
-                "internal_order_id": str(sys_ord["internal_order_id"]),
-                "platform_amount_fen": 0,
-                "system_amount_fen": sys_ord["total_fen"],
-                "discrepancy_type": "order_missing_in_bill",
-            })
+            discrepancies.append(
+                {
+                    "platform_order_id": pid,
+                    "internal_order_id": str(sys_ord["internal_order_id"]),
+                    "platform_amount_fen": 0,
+                    "system_amount_fen": sys_ord["total_fen"],
+                    "discrepancy_type": "order_missing_in_bill",
+                }
+            )
 
         # 双方都有，比对金额
         for pid in all_platform_ids & all_sys_ids:
@@ -318,13 +323,15 @@ class ChannelPLCalculator:
             s_amt = sys_order_map[pid]["total_fen"]
             diff = abs(p_amt - s_amt)
             if diff > 0:  # 分为单位，差异 > 0.00元即记录
-                discrepancies.append({
-                    "platform_order_id": pid,
-                    "internal_order_id": str(sys_order_map[pid]["internal_order_id"]),
-                    "platform_amount_fen": p_amt,
-                    "system_amount_fen": s_amt,
-                    "discrepancy_type": "amount_mismatch",
-                })
+                discrepancies.append(
+                    {
+                        "platform_order_id": pid,
+                        "internal_order_id": str(sys_order_map[pid]["internal_order_id"]),
+                        "platform_amount_fen": p_amt,
+                        "system_amount_fen": s_amt,
+                        "discrepancy_type": "amount_mismatch",
+                    }
+                )
 
         # 4. 写入差异记录
         if discrepancies:
@@ -371,10 +378,7 @@ class ChannelPLCalculator:
         matched = len(all_platform_ids & all_sys_ids) - sum(
             1 for d in discrepancies if d["discrepancy_type"] == "amount_mismatch"
         )
-        total_diff = sum(
-            abs(d["platform_amount_fen"] - d["system_amount_fen"])
-            for d in discrepancies
-        )
+        total_diff = sum(abs(d["platform_amount_fen"] - d["system_amount_fen"]) for d in discrepancies)
 
         logger.info(
             "bill_reconciled",
@@ -481,14 +485,16 @@ class ChannelPLCalculator:
                 },
             )
 
-            forecasts.append(ReceivableForecast(
-                store_id=store_id,
-                platform=platform,
-                order_date=order_date_val,
-                expected_receive_date=expected_date,
-                expected_amount_fen=expected_fen,
-                status=status,
-            ))
+            forecasts.append(
+                ReceivableForecast(
+                    store_id=store_id,
+                    platform=platform,
+                    order_date=order_date_val,
+                    expected_receive_date=expected_date,
+                    expected_amount_fen=expected_fen,
+                    status=status,
+                )
+            )
 
         await db.commit()
         return forecasts
@@ -549,7 +555,7 @@ class ChannelPLCalculator:
                 FROM platform_bills
                 WHERE store_id = :store_id::UUID
                   AND tenant_id = :tenant_id::UUID
-                  {platform_filter.replace('sd.platform', 'platform') if platform else ''}
+                  {platform_filter.replace("sd.platform", "platform") if platform else ""}
             """),
             bill_params,
         )

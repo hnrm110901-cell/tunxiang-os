@@ -9,6 +9,7 @@
 
 所有端点需要 X-Tenant-ID header（由 TenantMiddleware 校验）。
 """
+
 from __future__ import annotations
 
 import structlog
@@ -17,8 +18,8 @@ from pydantic import BaseModel, Field
 
 from shared.integrations.cos_upload import (
     ALL_ALLOWED_TYPES,
-    COSUploadError,
     IMAGE_TYPES,
+    COSUploadError,
     get_cos_upload_service,
 )
 

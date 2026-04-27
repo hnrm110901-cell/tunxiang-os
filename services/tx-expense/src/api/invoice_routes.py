@@ -7,9 +7,9 @@
   - 核验结果填充供人确认，不自动驳回
   - 集团级去重跨品牌跨门店
 """
+
 from __future__ import annotations
 
-import uuid as uuid_lib
 from datetime import date
 from typing import List, Optional
 from uuid import UUID
@@ -41,22 +41,26 @@ _MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
 # Pydantic Schema
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 class InvoiceUploadMeta(BaseModel):
     """上传发票时的元数据（与文件一起提交）"""
+
     brand_id: UUID
     store_id: UUID
-    application_id: Optional[UUID] = None      # 可先上传再关联申请
+    application_id: Optional[UUID] = None  # 可先上传再关联申请
     expected_amount_fen: Optional[int] = None  # 预期金额（分），用于比对
 
 
 class InvoiceCategoryUpdate(BaseModel):
     """人工确认科目"""
+
     confirmed_category_id: UUID
     notes: Optional[str] = None
 
 
 class DuplicateCheckRequest(BaseModel):
     """集团去重检查（提交前预检）"""
+
     invoice_code: str
     invoice_number: str
     total_amount_fen: int  # 分
@@ -64,12 +68,14 @@ class DuplicateCheckRequest(BaseModel):
 
 class BatchReverifyRequest(BaseModel):
     """批量重新核验"""
+
     invoice_ids: List[UUID] = Field(..., min_length=1, max_length=50)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 辅助函数
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 async def _upload_invoice_file(
     file_bytes: bytes,
@@ -81,6 +87,7 @@ async def _upload_invoice_file(
     COS_SECRET_ID 未配置时自动进入 Mock 模式，返回本地伪路径。
     """
     from shared.integrations.cos_upload import get_cos_upload_service
+
     cos = get_cos_upload_service()
     result = await cos.upload_file(
         file_bytes=file_bytes,
@@ -105,6 +112,7 @@ def _fake_invoice_warning() -> str:
 # ─────────────────────────────────────────────────────────────────────────────
 # 端点1：POST /upload — 上传发票并触发完整核验流程
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @router.post("/upload", status_code=status.HTTP_201_CREATED, summary="上传发票并触发核验")
 async def upload_invoice(
@@ -197,6 +205,7 @@ async def upload_invoice(
 # 端点2：POST /{invoice_id}/verify — 手动触发金税核验
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 @router.post("/{invoice_id}/verify", summary="手动触发金税核验")
 async def verify_invoice(
     invoice_id: UUID,
@@ -249,6 +258,7 @@ async def verify_invoice(
     # 更新核验状态
     try:
         import json as _json
+
         await db.execute(
             text("""
                 UPDATE invoices SET
@@ -284,6 +294,7 @@ async def verify_invoice(
 # ─────────────────────────────────────────────────────────────────────────────
 # 端点3：GET /stats — 发票统计（注意：必须在 /{invoice_id} 之前注册，避免路由遮蔽）
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @router.get("/stats", summary="发票统计")
 async def get_invoice_stats(
@@ -343,11 +354,7 @@ async def get_invoice_stats(
     ocr_attempted_count = row["ocr_attempted_count"] or 0
     total_fen = int(row["total_amount_fen"] or 0)
 
-    ocr_success_rate = (
-        round(ocr_success_count / ocr_attempted_count, 4)
-        if ocr_attempted_count > 0
-        else 0.0
-    )
+    ocr_success_rate = round(ocr_success_count / ocr_attempted_count, 4) if ocr_attempted_count > 0 else 0.0
 
     return {
         "ok": True,
@@ -371,6 +378,7 @@ async def get_invoice_stats(
 # ─────────────────────────────────────────────────────────────────────────────
 # 端点4：POST /duplicate-check — 集团去重预检（必须在 /{invoice_id} 之前注册）
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @router.post("/duplicate-check", summary="集团去重预检")
 async def duplicate_check(
@@ -412,6 +420,7 @@ async def duplicate_check(
 # ─────────────────────────────────────────────────────────────────────────────
 # 端点5：GET / — 发票列表（分页）
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @router.get("/", summary="发票列表")
 async def list_invoices(
@@ -529,6 +538,7 @@ async def list_invoices(
 # ─────────────────────────────────────────────────────────────────────────────
 # 端点4：GET /{invoice_id} — 发票详情
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @router.get("/{invoice_id}", summary="发票详情")
 async def get_invoice(
@@ -651,6 +661,7 @@ def _ocr_raw_summary(ocr_raw) -> Optional[dict]:
         return None
     if isinstance(ocr_raw, str):
         import json as _json
+
         try:
             ocr_raw = _json.loads(ocr_raw)
         except (ValueError, TypeError):
@@ -668,6 +679,7 @@ def _ocr_raw_summary(ocr_raw) -> Optional[dict]:
 # ─────────────────────────────────────────────────────────────────────────────
 # 端点6：PATCH /{invoice_id}/category — 人工确认科目
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @router.patch("/{invoice_id}/category", summary="人工确认科目")
 async def update_invoice_category(
@@ -779,8 +791,12 @@ async def update_invoice_category(
             "total_amount_fen": total_fen,
             "total_amount_yuan": _fen_to_yuan_str(total_fen),
             "verify_status": updated_row.get("verify_status"),
-            "suggested_category_id": str(updated_row["suggested_category_id"]) if updated_row.get("suggested_category_id") else None,
-            "confirmed_category_id": str(updated_row["confirmed_category_id"]) if updated_row.get("confirmed_category_id") else None,
+            "suggested_category_id": str(updated_row["suggested_category_id"])
+            if updated_row.get("suggested_category_id")
+            else None,
+            "confirmed_category_id": str(updated_row["confirmed_category_id"])
+            if updated_row.get("confirmed_category_id")
+            else None,
             "notes": updated_row.get("notes"),
             "updated_at": updated_row["updated_at"].isoformat() if updated_row.get("updated_at") else None,
         }

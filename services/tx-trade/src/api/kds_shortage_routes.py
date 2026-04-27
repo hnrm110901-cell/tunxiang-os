@@ -2,6 +2,7 @@
 
 所有接口需要 X-Tenant-ID header。
 """
+
 from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException, Request

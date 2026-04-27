@@ -16,6 +16,7 @@ phone_hash 安全：
 审计日志：
   每次跨品牌查询（stored_value_query）、积分操作均写入 cross_brand_transactions 表。
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -79,6 +80,7 @@ class CrossBrandTransaction(BaseModel):
 # 自定义异常
 # ─────────────────────────────────────────────────────────────────
 
+
 class InsufficientPointsError(Exception):
     """集团积分余额不足"""
 
@@ -116,9 +118,7 @@ _group_engine = create_async_engine(
     pool_pre_ping=True,
     pool_recycle=300,
 )
-_group_session_factory = async_sessionmaker(
-    _group_engine, class_=AsyncSession, expire_on_commit=False
-)
+_group_session_factory = async_sessionmaker(_group_engine, class_=AsyncSession, expire_on_commit=False)
 
 
 def _hash_phone(phone: str) -> str:
@@ -169,9 +169,7 @@ class GroupMemberService:
         """校验 tenant_id 是否属于该集团旗下品牌。"""
         brand_ids = [uuid.UUID(t) for t in (group_config.get("brand_tenant_ids") or [])]
         if tenant_id not in brand_ids:
-            raise TenantNotInGroupError(
-                f"tenant_id={tenant_id} is not in group brand_tenant_ids"
-            )
+            raise TenantNotInGroupError(f"tenant_id={tenant_id} is not in group brand_tenant_ids")
 
     async def _write_audit_log(
         self,
@@ -250,9 +248,7 @@ class GroupMemberService:
     # 公开业务方法
     # ─────────────────────────────────────────────────────────────
 
-    async def get_or_create_group_profile(
-        self, group_id: UUID, phone: str
-    ) -> GroupMemberProfile:
+    async def get_or_create_group_profile(self, group_id: UUID, phone: str) -> GroupMemberProfile:
         """用 SHA256(phone) 查找集团会员档案，不存在则创建。
 
         使用 INSERT ... ON CONFLICT DO NOTHING 保证并发安全。
@@ -261,10 +257,7 @@ class GroupMemberService:
         async with _group_session_factory() as session:
             # 先查
             result = await session.execute(
-                text(
-                    "SELECT * FROM group_member_profiles "
-                    "WHERE group_id = :group_id AND phone_hash = :phone_hash"
-                ),
+                text("SELECT * FROM group_member_profiles WHERE group_id = :group_id AND phone_hash = :phone_hash"),
                 {"group_id": str(group_id), "phone_hash": phone_hash},
             )
             row = result.mappings().first()
@@ -294,17 +287,12 @@ class GroupMemberService:
 
             # 重新查询（ON CONFLICT 可能是另一个并发请求创建了）
             result2 = await session.execute(
-                text(
-                    "SELECT * FROM group_member_profiles "
-                    "WHERE group_id = :group_id AND phone_hash = :phone_hash"
-                ),
+                text("SELECT * FROM group_member_profiles WHERE group_id = :group_id AND phone_hash = :phone_hash"),
                 {"group_id": str(group_id), "phone_hash": phone_hash},
             )
             row2 = result2.mappings().first()
             if row2 is None:
-                raise RuntimeError(
-                    f"Failed to create group_member_profile for group_id={group_id}"
-                )
+                raise RuntimeError(f"Failed to create group_member_profile for group_id={group_id}")
             return self._row_to_profile(dict(row2))
 
     async def get_cross_brand_profile(
@@ -330,8 +318,7 @@ class GroupMemberService:
         # 安全校验：member_data_shared 开关
         if not group_config.get("member_data_shared", False):
             raise CrossBrandNotAllowedError(
-                f"group_id={group_id} has member_data_shared=False, "
-                "cross-brand profile access denied"
+                f"group_id={group_id} has member_data_shared=False, cross-brand profile access denied"
             )
 
         # 校验请求方品牌属于该集团
@@ -341,9 +328,7 @@ class GroupMemberService:
         group_member = await self.get_or_create_group_profile(group_id, phone)
         phone_hash = _hash_phone(phone)
 
-        brand_tenant_ids: list[UUID] = [
-            uuid.UUID(t) for t in (group_config.get("brand_tenant_ids") or [])
-        ]
+        brand_tenant_ids: list[UUID] = [uuid.UUID(t) for t in (group_config.get("brand_tenant_ids") or [])]
 
         # 查询各品牌储值余额（通过 tenant_db 受 RLS 约束的连接）
         # 注意：这里使用 group_db 连接直接查询各品牌会员表的储值余额，
@@ -393,9 +378,7 @@ class GroupMemberService:
 
                 # 查询品牌名称
                 name_result = await session.execute(
-                    text(
-                        "SELECT group_name FROM brand_groups WHERE id = :group_id LIMIT 1"
-                    ),
+                    text("SELECT group_name FROM brand_groups WHERE id = :group_id LIMIT 1"),
                     {"group_id": str(group_id)},
                 )
                 name_row = name_result.mappings().first()
@@ -523,15 +506,11 @@ class GroupMemberService:
             )
             row = result.mappings().first()
             if row is None:
-                raise GroupNotFoundError(
-                    f"group_member_profile not found for group_id={group_id}"
-                )
+                raise GroupNotFoundError(f"group_member_profile not found for group_id={group_id}")
 
             current_points = int(row["total_points"])
             if current_points < points:
-                raise InsufficientPointsError(
-                    f"Insufficient group points: have {current_points}, need {points}"
-                )
+                raise InsufficientPointsError(f"Insufficient group points: have {current_points}, need {points}")
 
             member_id = row["id"]
             await session.execute(
@@ -612,8 +591,7 @@ class GroupMemberService:
             row = result.mappings().first()
             if row is None or int(row["total_points"]) < points:
                 raise InsufficientPointsError(
-                    f"Insufficient group points for transfer: "
-                    f"have {row['total_points'] if row else 0}, need {points}"
+                    f"Insufficient group points for transfer: have {row['total_points'] if row else 0}, need {points}"
                 )
 
             txn_id = await self._write_audit_log(
@@ -656,10 +634,7 @@ class GroupMemberService:
         async with _group_session_factory() as session:
             # 先找 group_member_id
             m_result = await session.execute(
-                text(
-                    "SELECT id FROM group_member_profiles "
-                    "WHERE group_id = :group_id AND phone_hash = :phone_hash"
-                ),
+                text("SELECT id FROM group_member_profiles WHERE group_id = :group_id AND phone_hash = :phone_hash"),
                 {"group_id": str(group_id), "phone_hash": phone_hash},
             )
             m_row = m_result.mappings().first()
@@ -669,10 +644,7 @@ class GroupMemberService:
             member_id = m_row["id"]
 
             count_result = await session.execute(
-                text(
-                    "SELECT COUNT(*) AS cnt FROM cross_brand_transactions "
-                    "WHERE group_member_id = :member_id"
-                ),
+                text("SELECT COUNT(*) AS cnt FROM cross_brand_transactions WHERE group_member_id = :member_id"),
                 {"member_id": str(member_id)},
             )
             total = int(count_result.scalar_one())
@@ -698,9 +670,7 @@ class GroupMemberService:
         group_config = await self._get_brand_group(group_id)
         return bool(group_config.get("stored_value_interop", False))
 
-    async def sync_brand_visit(
-        self, group_id: UUID, phone: str, tenant_id: UUID
-    ) -> None:
+    async def sync_brand_visit(self, group_id: UUID, phone: str, tenant_id: UUID) -> None:
         """更新 brands_visited 数组（幂等 array_append，避免重复追加）。
 
         同时刷新 last_visit_at。

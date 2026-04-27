@@ -16,6 +16,7 @@
 13. POST /api/v1/growth/campaigns/{id}/deactivate — 正常停用返回 cancelled
 14. POST /api/v1/growth/campaigns/apply-to-order  — 有可用券时返回 eligible_coupons
 """
+
 import os
 import sys
 
@@ -26,7 +27,6 @@ import uuid
 from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from sqlalchemy.exc import OperationalError
@@ -36,8 +36,10 @@ from sqlalchemy.exc import OperationalError
 # shared.ontology.src.database — 提供 get_db
 _fake_db_mod = types.ModuleType("shared.ontology.src.database")
 
+
 async def _fake_get_db():
     yield None
+
 
 _fake_db_mod.get_db = _fake_get_db
 sys.modules.setdefault("shared", types.ModuleType("shared"))
@@ -54,8 +56,12 @@ sys.modules["shared.events.src.emitter"] = _fake_emitter
 
 # services.campaign_engine + services.campaign_repository（相对导入 ..services.*）
 _fake_campaign_engine_inst = MagicMock()
-_fake_campaign_engine_inst.create_campaign = AsyncMock(return_value={"campaign_id": str(uuid.uuid4()), "status": "draft"})
-_fake_campaign_engine_inst.start_campaign = AsyncMock(return_value={"campaign_id": str(uuid.uuid4()), "status": "active"})
+_fake_campaign_engine_inst.create_campaign = AsyncMock(
+    return_value={"campaign_id": str(uuid.uuid4()), "status": "draft"}
+)
+_fake_campaign_engine_inst.start_campaign = AsyncMock(
+    return_value={"campaign_id": str(uuid.uuid4()), "status": "active"}
+)
 _fake_campaign_engine_inst.end_campaign = AsyncMock(return_value={"campaign_id": str(uuid.uuid4()), "status": "ended"})
 
 _fake_engine_mod = types.ModuleType("src.services.campaign_engine")
@@ -80,12 +86,15 @@ _services_mod.campaign_repository = _fake_repo_mod
 
 # ── 加载路由 ──────────────────────────────────────────────────────────────────
 
-with patch.dict("sys.modules", {
-    "src.services.campaign_engine": _fake_engine_mod,
-    "src.services.campaign_repository": _fake_repo_mod,
-}):
+with patch.dict(
+    "sys.modules",
+    {
+        "src.services.campaign_engine": _fake_engine_mod,
+        "src.services.campaign_repository": _fake_repo_mod,
+    },
+):
     with patch("src.services.campaign_engine.CampaignEngine", _fake_engine_mod.CampaignEngine):
-        from api.growth_campaign_routes import router, get_db
+        from api.growth_campaign_routes import get_db, router
 
 app = FastAPI()
 app.include_router(router)
@@ -101,8 +110,10 @@ _NOW = datetime(2026, 4, 4, 10, 0, tzinfo=timezone.utc)
 
 # ── 辅助工具 ──────────────────────────────────────────────────────────────────
 
+
 class _FakeRow:
     """模拟 SQLAlchemy named-column row"""
+
     def __init__(self, **kw):
         for k, v in kw.items():
             setattr(self, k, v)
@@ -146,6 +157,7 @@ def _campaign_row():
 # 场景 1: GET /campaigns — 正常路径返回 items/total
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_list_campaigns_ok():
     """正常列表请求返回 items/total 字段"""
     set_cfg = MagicMock()
@@ -172,6 +184,7 @@ def test_list_campaigns_ok():
 # 场景 2: GET /campaigns — 无效 status 参数
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_list_campaigns_invalid_status():
     """status 参数无效时返回 INVALID_STATUS 错误"""
     mock_db = _make_db()
@@ -189,6 +202,7 @@ def test_list_campaigns_invalid_status():
 # 场景 3: GET /campaigns — 无效 type 参数
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_list_campaigns_invalid_type():
     """type 参数无效时返回 INVALID_TYPE 错误"""
     mock_db = _make_db()
@@ -205,6 +219,7 @@ def test_list_campaigns_invalid_type():
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 场景 4: GET /campaigns — DB 表不存在时降级
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 def test_list_campaigns_table_not_ready():
     """DB 表不存在时返回空列表并包含 TABLE_NOT_READY note"""
@@ -226,6 +241,7 @@ def test_list_campaigns_table_not_ready():
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 场景 5: POST /campaigns — 正常创建
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 def test_create_campaign_ok():
     """正常创建营销活动返回 campaign_id"""
@@ -260,6 +276,7 @@ def test_create_campaign_ok():
 # 场景 6: POST /campaigns — 无效 type
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_create_campaign_invalid_type():
     """无效 campaign type 返回 INVALID_TYPE"""
     mock_db = _make_db()
@@ -280,6 +297,7 @@ def test_create_campaign_invalid_type():
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 场景 7: PUT /campaigns/{id} — draft 活动正常更新
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 def test_update_campaign_ok():
     """draft 活动正常更新，返回更新后的结果"""
@@ -326,6 +344,7 @@ def test_update_campaign_ok():
 # 场景 8: PUT /campaigns/{id} — 活动不存在
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_update_campaign_not_found():
     """活动不存在时返回 NOT_FOUND"""
     _fake_repo_inst.get_campaign = AsyncMock(return_value=None)
@@ -352,13 +371,16 @@ def test_update_campaign_not_found():
 # 场景 9: PUT /campaigns/{id} — 非 draft 状态
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_update_campaign_not_draft():
     """active 状态活动不可修改，返回 NOT_DRAFT"""
-    _fake_repo_inst.get_campaign = AsyncMock(return_value={
-        "id": CAMPAIGN_ID,
-        "status": "active",
-        "config": {},
-    })
+    _fake_repo_inst.get_campaign = AsyncMock(
+        return_value={
+            "id": CAMPAIGN_ID,
+            "status": "active",
+            "config": {},
+        }
+    )
 
     set_cfg = MagicMock()
     mock_db = _make_db(set_cfg)
@@ -381,11 +403,10 @@ def test_update_campaign_not_draft():
 # 场景 10: POST /campaigns/{id}/activate — 正常激活
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_activate_campaign_ok():
     """正常激活活动，返回 ok=True"""
-    _fake_campaign_engine_inst.start_campaign = AsyncMock(
-        return_value={"campaign_id": CAMPAIGN_ID, "status": "active"}
-    )
+    _fake_campaign_engine_inst.start_campaign = AsyncMock(return_value={"campaign_id": CAMPAIGN_ID, "status": "active"})
 
     mock_db = _make_db()
     mock_db.commit = AsyncMock()
@@ -407,11 +428,10 @@ def test_activate_campaign_ok():
 # 场景 11: POST /campaigns/{id}/end — 正常结束
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_end_campaign_ok():
     """正常结束活动，返回 ok=True"""
-    _fake_campaign_engine_inst.end_campaign = AsyncMock(
-        return_value={"campaign_id": CAMPAIGN_ID, "status": "ended"}
-    )
+    _fake_campaign_engine_inst.end_campaign = AsyncMock(return_value={"campaign_id": CAMPAIGN_ID, "status": "ended"})
 
     mock_db = _make_db()
     mock_db.commit = AsyncMock()
@@ -433,16 +453,19 @@ def test_end_campaign_ok():
 # 场景 12: GET /campaigns/{id}/stats — 正常统计
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_get_campaign_stats_ok():
     """正常返回活动效果统计数据"""
-    _fake_repo_inst.get_analytics = AsyncMock(return_value={
-        "campaign_name": "春节大促",
-        "status": "active",
-        "participant_count": 100,
-        "total_cost_fen": 50000,
-        "reward_breakdown": {},
-        "budget_usage": 0.5,
-    })
+    _fake_repo_inst.get_analytics = AsyncMock(
+        return_value={
+            "campaign_name": "春节大促",
+            "status": "active",
+            "participant_count": 100,
+            "total_cost_fen": 50000,
+            "reward_breakdown": {},
+            "budget_usage": 0.5,
+        }
+    )
 
     set_cfg = MagicMock()
     distinct_result = MagicMock()
@@ -472,6 +495,7 @@ def test_get_campaign_stats_ok():
 # 场景 13: POST /campaigns/{id}/deactivate — 正常停用
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_deactivate_campaign_ok():
     """active 活动正常停用，返回 cancelled 状态"""
     set_cfg = MagicMock()
@@ -498,6 +522,7 @@ def test_deactivate_campaign_ok():
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 场景 14: POST /campaigns/apply-to-order — 无可用券
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 def test_apply_to_order_no_eligible_coupons():
     """结账检查无可用券时返回空 eligible_coupons"""

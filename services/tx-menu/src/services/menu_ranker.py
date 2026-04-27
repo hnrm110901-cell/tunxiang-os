@@ -5,6 +5,7 @@
 
 权重：30%趋势 + 25%毛利 + 20%库存 + 15%时段 + 10%低退单
 """
+
 from dataclasses import dataclass
 from typing import Optional
 
@@ -53,6 +54,7 @@ class DishScore:
 
 # ─── 纯函数：5因子评分 ───
 
+
 def calc_trend_score(recent_sales: int, prev_sales: int) -> float:
     """趋势评分：近7天 vs 前7天"""
     if prev_sales <= 0:
@@ -98,6 +100,7 @@ def calc_low_refund_score(refund_rate: float) -> float:
 
 
 # ─── 排名计算 ───
+
 
 def compute_ranking(
     dishes: list[dict],

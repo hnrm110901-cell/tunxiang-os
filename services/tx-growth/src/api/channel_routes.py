@@ -10,6 +10,7 @@
 v144 表：channel_configs / message_send_logs
 RLS 通过 set_config('app.tenant_id') 激活
 """
+
 import uuid
 from datetime import date, datetime, timezone
 from typing import Any, Optional
@@ -29,13 +30,13 @@ router = APIRouter(prefix="/api/v1/channels", tags=["growth-channels"])
 
 # 支持的渠道及默认频率配置
 _DEFAULT_CHANNELS: dict[str, dict] = {
-    "wecom":            {"name": "企业微信",     "max_daily": 3},
-    "sms":              {"name": "短信",          "max_daily": 2},
-    "miniapp":          {"name": "小程序订阅消息", "max_daily": 5},
-    "app_push":         {"name": "App Push",      "max_daily": 3},
-    "pos_receipt":      {"name": "POS小票二维码",  "max_daily": 999},
-    "reservation_page": {"name": "预订确认页",     "max_daily": 1},
-    "store_task":       {"name": "门店人工任务",   "max_daily": 1},
+    "wecom": {"name": "企业微信", "max_daily": 3},
+    "sms": {"name": "短信", "max_daily": 2},
+    "miniapp": {"name": "小程序订阅消息", "max_daily": 5},
+    "app_push": {"name": "App Push", "max_daily": 3},
+    "pos_receipt": {"name": "POS小票二维码", "max_daily": 999},
+    "reservation_page": {"name": "预订确认页", "max_daily": 1},
+    "store_task": {"name": "门店人工任务", "max_daily": 1},
 }
 
 _VALID_CHANNELS = set(_DEFAULT_CHANNELS.keys())
@@ -44,6 +45,7 @@ _VALID_CHANNELS = set(_DEFAULT_CHANNELS.keys())
 # ---------------------------------------------------------------------------
 # 统一响应
 # ---------------------------------------------------------------------------
+
 
 def ok_response(data: Any) -> dict:
     return {"ok": True, "data": data}
@@ -56,6 +58,7 @@ def error_response(code: str, message: str) -> dict:
 # ---------------------------------------------------------------------------
 # 内部工具
 # ---------------------------------------------------------------------------
+
 
 async def _set_tenant(db: AsyncSession, tenant_id: str) -> None:
     await db.execute(
@@ -73,13 +76,14 @@ def _is_table_missing(exc: SQLAlchemyError) -> bool:
 # 请求模型
 # ---------------------------------------------------------------------------
 
+
 class SendMessageRequest(BaseModel):
     channel: str
-    user_id: str                         # 外部 user_id（企微 external_userid 或手机号）
-    content: str                         # 消息内容摘要
-    offer_id: Optional[str] = None       # 关联优惠 ID
-    campaign_id: Optional[str] = None    # 关联活动 ID
-    customer_id: Optional[str] = None    # 内部 customer UUID（可选）
+    user_id: str  # 外部 user_id（企微 external_userid 或手机号）
+    content: str  # 消息内容摘要
+    offer_id: Optional[str] = None  # 关联优惠 ID
+    campaign_id: Optional[str] = None  # 关联活动 ID
+    customer_id: Optional[str] = None  # 内部 customer UUID（可选）
 
     @field_validator("channel")
     @classmethod
@@ -105,6 +109,7 @@ class ChannelConfigRequest(BaseModel):
 # ---------------------------------------------------------------------------
 # 端点
 # ---------------------------------------------------------------------------
+
 
 @router.post("/send")
 async def send_message(
@@ -164,12 +169,14 @@ async def send_message(
             sent_today = 0
 
         if sent_today >= max_daily:
-            return ok_response({
-                "channel": req.channel,
-                "status": "blocked",
-                "reason": f"已达今日发送上限（{max_daily}次/天）",
-                "sent_today": sent_today,
-            })
+            return ok_response(
+                {
+                    "channel": req.channel,
+                    "status": "blocked",
+                    "reason": f"已达今日发送上限（{max_daily}次/天）",
+                    "sent_today": sent_today,
+                }
+            )
 
         # 写入发送日志
         customer_uuid: Optional[uuid.UUID] = None
@@ -223,12 +230,14 @@ async def send_message(
             await db.rollback()
             if _is_table_missing(exc):
                 logger.warning("channel.send_log_table_not_ready", error=str(exc))
-                return ok_response({
-                    "log_id": str(log_id),
-                    "channel": req.channel,
-                    "status": "sent",
-                    "_note": "TABLE_NOT_READY: 日志未持久化",
-                })
+                return ok_response(
+                    {
+                        "log_id": str(log_id),
+                        "channel": req.channel,
+                        "status": "sent",
+                        "_note": "TABLE_NOT_READY: 日志未持久化",
+                    }
+                )
             raise
 
         logger.info(
@@ -238,14 +247,16 @@ async def send_message(
             user_id=req.user_id,
             tenant_id=x_tenant_id,
         )
-        return ok_response({
-            "log_id": str(log_id),
-            "channel": req.channel,
-            "status": "sent",
-            "sent_at": now.isoformat(),
-            "sent_today_after": sent_today + 1,
-            "daily_limit": max_daily,
-        })
+        return ok_response(
+            {
+                "log_id": str(log_id),
+                "channel": req.channel,
+                "status": "sent",
+                "sent_at": now.isoformat(),
+                "sent_today_after": sent_today + 1,
+                "daily_limit": max_daily,
+            }
+        )
 
     except ValueError as exc:
         return error_response("INVALID_PARAM", f"参数格式错误: {exc}")
@@ -312,15 +323,17 @@ async def check_frequency(
             pass
 
         allowed = sent_today < max_daily
-        return ok_response({
-            "channel": channel,
-            "user_id": user_id,
-            "allowed": allowed,
-            "sent_today": int(sent_today),
-            "daily_limit": max_daily,
-            "remaining": max(0, max_daily - int(sent_today)),
-            "reason": "" if allowed else f"已达今日发送上限（{max_daily}次/天）",
-        })
+        return ok_response(
+            {
+                "channel": channel,
+                "user_id": user_id,
+                "allowed": allowed,
+                "sent_today": int(sent_today),
+                "daily_limit": max_daily,
+                "remaining": max(0, max_daily - int(sent_today)),
+                "reason": "" if allowed else f"已达今日发送上限（{max_daily}次/天）",
+            }
+        )
 
     except ValueError as exc:
         return error_response("INVALID_PARAM", f"参数格式错误: {exc}")
@@ -379,29 +392,39 @@ async def get_channel_stats(
         except SQLAlchemyError as exc:
             if _is_table_missing(exc):
                 logger.warning("channel.stats_table_not_ready", error=str(exc))
-                return ok_response({
-                    "channel": channel,
-                    "period": {"start": str(start_date), "end": str(end_date)},
-                    "stats": {"total": 0, "sent_count": 0, "failed_count": 0, "blocked_count": 0, "unique_users": 0},
-                    "_note": "TABLE_NOT_READY",
-                })
+                return ok_response(
+                    {
+                        "channel": channel,
+                        "period": {"start": str(start_date), "end": str(end_date)},
+                        "stats": {
+                            "total": 0,
+                            "sent_count": 0,
+                            "failed_count": 0,
+                            "blocked_count": 0,
+                            "unique_users": 0,
+                        },
+                        "_note": "TABLE_NOT_READY",
+                    }
+                )
             raise
 
         days = max(1, (end_date - start_date).days + 1)
         total = int(row.total) if row else 0
-        return ok_response({
-            "channel": channel,
-            "channel_name": _DEFAULT_CHANNELS.get(channel, {}).get("name", channel),
-            "period": {"start": str(start_date), "end": str(end_date), "days": days},
-            "stats": {
-                "total": total,
-                "sent_count": int(row.sent_count) if row else 0,
-                "failed_count": int(row.failed_count) if row else 0,
-                "blocked_count": int(row.blocked_count) if row else 0,
-                "unique_users": int(row.unique_users) if row else 0,
-                "daily_avg": round(total / days, 1),
-            },
-        })
+        return ok_response(
+            {
+                "channel": channel,
+                "channel_name": _DEFAULT_CHANNELS.get(channel, {}).get("name", channel),
+                "period": {"start": str(start_date), "end": str(end_date), "days": days},
+                "stats": {
+                    "total": total,
+                    "sent_count": int(row.sent_count) if row else 0,
+                    "failed_count": int(row.failed_count) if row else 0,
+                    "blocked_count": int(row.blocked_count) if row else 0,
+                    "unique_users": int(row.unique_users) if row else 0,
+                    "daily_avg": round(total / days, 1),
+                },
+            }
+        )
 
     except ValueError as exc:
         return error_response("INVALID_PARAM", f"参数格式错误: {exc}")
@@ -456,12 +479,14 @@ async def configure_channel(
             max_daily=max_daily,
             tenant_id=x_tenant_id,
         )
-        return ok_response({
-            "channel": req.channel,
-            "max_daily_per_user": max_daily,
-            "settings_updated": True,
-            "updated_at": now.isoformat(),
-        })
+        return ok_response(
+            {
+                "channel": req.channel,
+                "max_daily_per_user": max_daily,
+                "settings_updated": True,
+                "updated_at": now.isoformat(),
+            }
+        )
 
     except ValueError as exc:
         return error_response("INVALID_PARAM", f"参数格式错误: {exc}")
@@ -565,12 +590,14 @@ async def get_send_log(
             }
             for r in rows
         ]
-        return ok_response({
-            "items": items,
-            "total": int(total),
-            "page": page,
-            "size": size,
-        })
+        return ok_response(
+            {
+                "items": items,
+                "total": int(total),
+                "page": page,
+                "size": size,
+            }
+        )
 
     except ValueError as exc:
         return error_response("INVALID_PARAM", f"参数格式错误: {exc}")

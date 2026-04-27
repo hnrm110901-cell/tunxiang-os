@@ -13,6 +13,7 @@
 响应格式：{"ok": bool, "data": {}, "error": {}}
 金额单位：分(fen)
 """
+
 from __future__ import annotations
 
 from datetime import date
@@ -129,13 +130,15 @@ async def api_compute_snapshots(
     succeeded = [k for k, v in summary.items() if v.get("ok")]
     failed = [k for k, v in summary.items() if not v.get("ok")]
 
-    return _ok({
-        "snapshot_date": body.snapshot_date.isoformat(),
-        "snapshot_type": body.snapshot_type,
-        "succeeded_entities": succeeded,
-        "failed_entities": failed,
-        "detail": summary,
-    })
+    return _ok(
+        {
+            "snapshot_date": body.snapshot_date.isoformat(),
+            "snapshot_type": body.snapshot_type,
+            "succeeded_entities": succeeded,
+            "failed_entities": failed,
+            "detail": summary,
+        }
+    )
 
 
 # ─── 2. 趋势查询 ───────────────────────────────────────────────────────────────
@@ -183,14 +186,16 @@ async def api_entity_trend(
         db=db,
     )
 
-    return _ok({
-        "entity_type": entity_type,
-        "snapshot_type": snapshot_type,
-        "start_date": start_date.isoformat(),
-        "end_date": end_date.isoformat(),
-        "count": len(trend),
-        "items": trend,
-    })
+    return _ok(
+        {
+            "entity_type": entity_type,
+            "snapshot_type": snapshot_type,
+            "start_date": start_date.isoformat(),
+            "end_date": end_date.isoformat(),
+            "count": len(trend),
+            "items": trend,
+        }
+    )
 
 
 # ─── 3. 跨品牌对比 ─────────────────────────────────────────────────────────────
@@ -224,13 +229,15 @@ async def api_cross_brand_comparison(
         db=db,
     )
 
-    return _ok({
-        "entity_type": entity_type,
-        "snapshot_date": snapshot_date.isoformat(),
-        "metric_key": metric_key,
-        "count": len(comparison),
-        "ranking": comparison,
-    })
+    return _ok(
+        {
+            "entity_type": entity_type,
+            "snapshot_date": snapshot_date.isoformat(),
+            "metric_key": metric_key,
+            "count": len(comparison),
+            "ranking": comparison,
+        }
+    )
 
 
 # ─── 4. 集团最新快照 ──────────────────────────────────────────────────────────
@@ -282,7 +289,9 @@ async def api_group_snapshot_summary(
         db=db,
     )
 
-    return _ok({
-        "tenant_id": x_tenant_id,
-        "entities": summary,
-    })
+    return _ok(
+        {
+            "tenant_id": x_tenant_id,
+            "entities": summary,
+        }
+    )

@@ -16,6 +16,7 @@
 
 统一响应格式: {"ok": bool, "data": {}, "error": {}}
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -51,9 +52,7 @@ async def _set_rls(db: AsyncSession, tenant_id: str) -> None:
 def _serialize_row(row_dict: Dict[str, Any]) -> Dict[str, Any]:
     """将 UUID / datetime / date 统一序列化为字符串。"""
     for k, v in row_dict.items():
-        if isinstance(v, datetime):
-            row_dict[k] = v.isoformat()
-        elif isinstance(v, date):
+        if isinstance(v, (datetime, date)):
             row_dict[k] = v.isoformat()
         elif type(v).__name__ == "UUID":
             row_dict[k] = str(v)
@@ -74,9 +73,7 @@ class ChecklistItem(BaseModel):
 class PlanCreateReq(BaseModel):
     store_id: str = Field(..., description="门店ID")
     plan_name: str = Field(..., max_length=100, description="计划名称")
-    check_type: str = Field(
-        ..., description="检查类型：temperature|hygiene|pest|supplier|equipment"
-    )
+    check_type: str = Field(..., description="检查类型：temperature|hygiene|pest|supplier|equipment")
     frequency: str = Field(..., description="执行频率：daily|weekly|monthly")
     responsible_role: Optional[str] = Field(None, max_length=50, description="负责岗位")
     checklist: List[ChecklistItem] = Field(default_factory=list, description="检查项清单")
@@ -196,29 +193,34 @@ async def create_plan(
                 :responsible_role, :checklist::jsonb, :is_active, :now, :now
             )
         """)
-        await db.execute(insert_sql, {
-            "id": plan_id,
-            "tenant_id": tenant_id,
-            "store_id": req.store_id,
-            "plan_name": req.plan_name,
-            "check_type": req.check_type,
-            "frequency": req.frequency,
-            "responsible_role": req.responsible_role,
-            "checklist": __import__("json").dumps(checklist_data, ensure_ascii=False),
-            "is_active": req.is_active,
-            "now": now,
-        })
+        await db.execute(
+            insert_sql,
+            {
+                "id": plan_id,
+                "tenant_id": tenant_id,
+                "store_id": req.store_id,
+                "plan_name": req.plan_name,
+                "check_type": req.check_type,
+                "frequency": req.frequency,
+                "responsible_role": req.responsible_role,
+                "checklist": __import__("json").dumps(checklist_data, ensure_ascii=False),
+                "is_active": req.is_active,
+                "now": now,
+            },
+        )
         await db.commit()
 
-        log.info("haccp_plan_created", plan_id=plan_id, check_type=req.check_type,
-                 tenant_id=tenant_id)
-        return {"ok": True, "data": {
-            "plan_id": plan_id,
-            "plan_name": req.plan_name,
-            "check_type": req.check_type,
-            "frequency": req.frequency,
-            "created_at": now.isoformat(),
-        }}
+        log.info("haccp_plan_created", plan_id=plan_id, check_type=req.check_type, tenant_id=tenant_id)
+        return {
+            "ok": True,
+            "data": {
+                "plan_id": plan_id,
+                "plan_name": req.plan_name,
+                "check_type": req.check_type,
+                "frequency": req.frequency,
+                "created_at": now.isoformat(),
+            },
+        }
     except SQLAlchemyError as exc:
         await db.rollback()
         log.error("haccp_create_plan_db_error", tenant_id=tenant_id, error=str(exc), exc_info=True)
@@ -284,8 +286,7 @@ async def update_plan(
         return {"ok": True, "data": {"plan_id": plan_id, "updated_at": now.isoformat()}}
     except SQLAlchemyError as exc:
         await db.rollback()
-        log.error("haccp_update_plan_db_error", plan_id=plan_id, tenant_id=tenant_id,
-                  error=str(exc), exc_info=True)
+        log.error("haccp_update_plan_db_error", plan_id=plan_id, tenant_id=tenant_id, error=str(exc), exc_info=True)
         return {"ok": False, "error": {"message": "更新检查计划失败", "detail": str(exc)}}
 
 
@@ -386,15 +387,11 @@ async def create_record(
         log.warning("haccp_plan_fetch_error", plan_id=req.plan_id, error=str(exc), exc_info=True)
 
     # 构建 critical 查找表
-    critical_items: set[str] = {
-        item["item"] for item in plan_checklist if item.get("critical", False)
-    }
+    critical_items: set[str] = {item["item"] for item in plan_checklist if item.get("critical", False)}
 
     # 计算 critical_failures 和 overall_passed
     results_data = [r.model_dump() for r in req.results]
-    critical_failures = sum(
-        1 for r in req.results if not r.passed and r.item in critical_items
-    )
+    critical_failures = sum(1 for r in req.results if not r.passed and r.item in critical_items)
     overall_passed = all(r.passed for r in req.results) if req.results else None
 
     try:
@@ -409,74 +406,86 @@ async def create_record(
                 :corrective_actions, :now
             )
         """)
-        await db.execute(insert_sql, {
-            "id": record_id,
-            "tenant_id": tenant_id,
-            "store_id": req.store_id,
-            "plan_id": req.plan_id,
-            "operator_id": req.operator_id,
-            "check_date": req.check_date,
-            "results": __import__("json").dumps(results_data, ensure_ascii=False),
-            "overall_passed": overall_passed,
-            "critical_failures": critical_failures,
-            "corrective_actions": req.corrective_actions,
-            "now": now,
-        })
+        await db.execute(
+            insert_sql,
+            {
+                "id": record_id,
+                "tenant_id": tenant_id,
+                "store_id": req.store_id,
+                "plan_id": req.plan_id,
+                "operator_id": req.operator_id,
+                "check_date": req.check_date,
+                "results": __import__("json").dumps(results_data, ensure_ascii=False),
+                "overall_passed": overall_passed,
+                "critical_failures": critical_failures,
+                "corrective_actions": req.corrective_actions,
+                "now": now,
+            },
+        )
         await db.commit()
 
         # 旁路发射 safety.haccp_check_completed 事件
-        asyncio.create_task(emit_event(
-            event_type=SafetyEventType.HACCP_CHECK_COMPLETED,
-            tenant_id=tenant_id,
-            stream_id=record_id,
-            payload={
-                "record_id": record_id,
-                "plan_id": req.plan_id,
-                "check_date": req.check_date.isoformat(),
-                "overall_passed": overall_passed,
-                "critical_failures": critical_failures,
-                "total_items": len(req.results),
-                "passed_items": sum(1 for r in req.results if r.passed),
-            },
-            store_id=req.store_id,
-            source_service="tx-ops",
-            metadata={"operator_id": req.operator_id or ""},
-        ))
-
-        # 若存在关键失控点，额外发射 safety.haccp_critical_failure 事件
-        if critical_failures > 0:
-            failed_critical_items = [
-                r.item for r in req.results
-                if not r.passed and r.item in critical_items
-            ]
-            asyncio.create_task(emit_event(
-                event_type=SafetyEventType.HACCP_CRITICAL_FAILURE,
+        asyncio.create_task(
+            emit_event(
+                event_type=SafetyEventType.HACCP_CHECK_COMPLETED,
                 tenant_id=tenant_id,
                 stream_id=record_id,
                 payload={
                     "record_id": record_id,
                     "plan_id": req.plan_id,
                     "check_date": req.check_date.isoformat(),
+                    "overall_passed": overall_passed,
                     "critical_failures": critical_failures,
-                    "failed_items": failed_critical_items,
-                    "corrective_actions": req.corrective_actions,
+                    "total_items": len(req.results),
+                    "passed_items": sum(1 for r in req.results if r.passed),
                 },
                 store_id=req.store_id,
                 source_service="tx-ops",
                 metadata={"operator_id": req.operator_id or ""},
-            ))
+            )
+        )
 
-        log.info("haccp_record_created", record_id=record_id, plan_id=req.plan_id,
-                 overall_passed=overall_passed, critical_failures=critical_failures,
-                 tenant_id=tenant_id)
-        return {"ok": True, "data": {
-            "record_id": record_id,
-            "plan_id": req.plan_id,
-            "check_date": req.check_date.isoformat(),
-            "overall_passed": overall_passed,
-            "critical_failures": critical_failures,
-            "created_at": now.isoformat(),
-        }}
+        # 若存在关键失控点，额外发射 safety.haccp_critical_failure 事件
+        if critical_failures > 0:
+            failed_critical_items = [r.item for r in req.results if not r.passed and r.item in critical_items]
+            asyncio.create_task(
+                emit_event(
+                    event_type=SafetyEventType.HACCP_CRITICAL_FAILURE,
+                    tenant_id=tenant_id,
+                    stream_id=record_id,
+                    payload={
+                        "record_id": record_id,
+                        "plan_id": req.plan_id,
+                        "check_date": req.check_date.isoformat(),
+                        "critical_failures": critical_failures,
+                        "failed_items": failed_critical_items,
+                        "corrective_actions": req.corrective_actions,
+                    },
+                    store_id=req.store_id,
+                    source_service="tx-ops",
+                    metadata={"operator_id": req.operator_id or ""},
+                )
+            )
+
+        log.info(
+            "haccp_record_created",
+            record_id=record_id,
+            plan_id=req.plan_id,
+            overall_passed=overall_passed,
+            critical_failures=critical_failures,
+            tenant_id=tenant_id,
+        )
+        return {
+            "ok": True,
+            "data": {
+                "record_id": record_id,
+                "plan_id": req.plan_id,
+                "check_date": req.check_date.isoformat(),
+                "overall_passed": overall_passed,
+                "critical_failures": critical_failures,
+                "created_at": now.isoformat(),
+            },
+        }
     except SQLAlchemyError as exc:
         await db.rollback()
         log.error("haccp_create_record_db_error", tenant_id=tenant_id, error=str(exc), exc_info=True)
@@ -514,8 +523,7 @@ async def get_record(
 
         return {"ok": True, "data": {"record": _serialize_row(dict(record))}}
     except SQLAlchemyError as exc:
-        log.error("haccp_get_record_db_error", record_id=record_id, tenant_id=tenant_id,
-                  error=str(exc), exc_info=True)
+        log.error("haccp_get_record_db_error", record_id=record_id, tenant_id=tenant_id, error=str(exc), exc_info=True)
         return {"ok": True, "data": {"record": None}}
 
 

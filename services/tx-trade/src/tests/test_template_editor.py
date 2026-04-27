@@ -9,6 +9,7 @@
 
 共 25+ 测试用例，全部不依赖真实数据库或打印机。
 """
+
 import os
 import sys
 import uuid
@@ -106,7 +107,9 @@ class TestTemplateRenderer:
     @pytest.mark.asyncio
     async def test_store_name_element(self, renderer):
         """store_name element 应包含店名 GBK 编码。"""
-        config = {"elements": [{"id": "e1", "type": "store_name", "align": "center", "bold": True, "size": "double_height"}]}
+        config = {
+            "elements": [{"id": "e1", "type": "store_name", "align": "center", "bold": True, "size": "double_height"}]
+        }
         result = await renderer.render(config, SAMPLE_CONTEXT)
         assert "好味道火锅".encode("gbk") in result
         assert GS_SIZE_DOUBLE_HEIGHT in result
@@ -126,7 +129,7 @@ class TestTemplateRenderer:
         ctx = {**SAMPLE_CONTEXT, "store_address": ""}
         result = await renderer.render(config, ctx)
         # 去掉 ESC_INIT 和 cut 之后基本为空
-        inner = result[len(ESC_INIT):-len(b'\x03' + GS_CUT_PARTIAL) - 1]
+        inner = result[len(ESC_INIT) : -len(b"\x03" + GS_CUT_PARTIAL) - 1]
         assert len(inner) == 0
 
     @pytest.mark.asyncio
@@ -146,8 +149,7 @@ class TestTemplateRenderer:
     @pytest.mark.asyncio
     async def test_order_info_contains_fields(self, renderer):
         """order_info element 应包含桌号/单号。"""
-        config = {"elements": [{"id": "e4", "type": "order_info",
-                                "fields": ["table_no", "order_no"]}]}
+        config = {"elements": [{"id": "e4", "type": "order_info", "fields": ["table_no", "order_no"]}]}
         result = await renderer.render(config, SAMPLE_CONTEXT)
         assert "A08".encode("gbk") in result
         assert "TX20260331120001A".encode("gbk") in result
@@ -155,8 +157,11 @@ class TestTemplateRenderer:
     @pytest.mark.asyncio
     async def test_order_items_contains_dish_names(self, renderer):
         """order_items element 应包含所有菜品名。"""
-        config = {"elements": [{"id": "e6", "type": "order_items",
-                                "show_price": True, "show_qty": True, "show_subtotal": True}]}
+        config = {
+            "elements": [
+                {"id": "e6", "type": "order_items", "show_price": True, "show_qty": True, "show_subtotal": True}
+            ]
+        }
         result = await renderer.render(config, SAMPLE_CONTEXT)
         assert "毛肚".encode("gbk") in result
         assert "黄喉".encode("gbk") in result
@@ -164,16 +169,14 @@ class TestTemplateRenderer:
     @pytest.mark.asyncio
     async def test_order_items_notes_included(self, renderer):
         """order_items 菜品备注应出现在输出中。"""
-        config = {"elements": [{"id": "e6", "type": "order_items",
-                                "show_qty": True, "show_subtotal": True}]}
+        config = {"elements": [{"id": "e6", "type": "order_items", "show_qty": True, "show_subtotal": True}]}
         result = await renderer.render(config, SAMPLE_CONTEXT)
         assert "不要辣".encode("gbk") in result
 
     @pytest.mark.asyncio
     async def test_total_summary_shows_discount(self, renderer):
         """total_summary 应包含折扣和实付金额。"""
-        config = {"elements": [{"id": "e8", "type": "total_summary",
-                                "show_discount": True, "show_service_fee": True}]}
+        config = {"elements": [{"id": "e8", "type": "total_summary", "show_discount": True, "show_service_fee": True}]}
         result = await renderer.render(config, SAMPLE_CONTEXT)
         assert "实付".encode("gbk") in result
         assert "优惠".encode("gbk") in result
@@ -181,8 +184,7 @@ class TestTemplateRenderer:
     @pytest.mark.asyncio
     async def test_total_summary_no_discount_when_zero(self, renderer):
         """discount_yuan=0 时不显示折扣行。"""
-        config = {"elements": [{"id": "e8", "type": "total_summary",
-                                "show_discount": True, "show_service_fee": False}]}
+        config = {"elements": [{"id": "e8", "type": "total_summary", "show_discount": True, "show_service_fee": False}]}
         ctx = {**SAMPLE_CONTEXT, "discount_yuan": 0.0}
         result = await renderer.render(config, ctx)
         assert "优惠".encode("gbk") not in result
@@ -205,11 +207,10 @@ class TestTemplateRenderer:
     @pytest.mark.asyncio
     async def test_qrcode_included(self, renderer):
         """qrcode element 应生成 QR code ESC/POS 指令（以 GS ( k 开头）。"""
-        config = {"elements": [{"id": "e10", "type": "qrcode",
-                                "content_field": "order_id", "size": 6}]}
+        config = {"elements": [{"id": "e10", "type": "qrcode", "content_field": "order_id", "size": 6}]}
         result = await renderer.render(config, SAMPLE_CONTEXT)
         # GS ( k 是二维码指令前缀
-        assert b'\x1d\x28\x6b' in result
+        assert b"\x1d\x28\x6b" in result
 
     @pytest.mark.asyncio
     async def test_qrcode_empty_content_skipped(self, renderer):
@@ -217,29 +218,26 @@ class TestTemplateRenderer:
         config = {"elements": [{"id": "e10", "type": "qrcode", "content": ""}]}
         ctx = {**SAMPLE_CONTEXT, "order_id": ""}
         result = await renderer.render(config, ctx)
-        assert b'\x1d\x28\x6b' not in result
+        assert b"\x1d\x28\x6b" not in result
 
     @pytest.mark.asyncio
     async def test_barcode_included(self, renderer):
         """barcode element 应生成条形码 ESC/POS 指令（GS k）。"""
-        config = {"elements": [{"id": "e14", "type": "barcode",
-                                "content_field": "order_no"}]}
+        config = {"elements": [{"id": "e14", "type": "barcode", "content_field": "order_no"}]}
         result = await renderer.render(config, SAMPLE_CONTEXT)
-        assert b'\x1d\x6b' in result
+        assert b"\x1d\x6b" in result
 
     @pytest.mark.asyncio
     async def test_custom_text_rendered(self, renderer):
         """custom_text 应渲染出文字。"""
-        config = {"elements": [{"id": "e11", "type": "custom_text",
-                                "content": "谢谢惠顾", "align": "center"}]}
+        config = {"elements": [{"id": "e11", "type": "custom_text", "content": "谢谢惠顾", "align": "center"}]}
         result = await renderer.render(config, SAMPLE_CONTEXT)
         assert "谢谢惠顾".encode("gbk") in result
 
     @pytest.mark.asyncio
     async def test_custom_text_variable_substitution(self, renderer):
         """custom_text 支持 {{变量}} 替换。"""
-        config = {"elements": [{"id": "e11", "type": "custom_text",
-                                "content": "单号: {{order_no}}", "align": "left"}]}
+        config = {"elements": [{"id": "e11", "type": "custom_text", "content": "单号: {{order_no}}", "align": "left"}]}
         result = await renderer.render(config, SAMPLE_CONTEXT)
         assert "TX20260331120001A".encode("gbk") in result
 
@@ -253,8 +251,7 @@ class TestTemplateRenderer:
     @pytest.mark.asyncio
     async def test_logo_text_rendered(self, renderer):
         """logo_text 应渲染文字。"""
-        config = {"elements": [{"id": "e13", "type": "logo_text",
-                                "content": "屯象OS", "align": "center"}]}
+        config = {"elements": [{"id": "e13", "type": "logo_text", "content": "屯象OS", "align": "center"}]}
         result = await renderer.render(config, SAMPLE_CONTEXT)
         assert "屯象OS".encode("gbk") in result
 
@@ -289,7 +286,7 @@ class TestTemplateRenderer:
         result = _apply_template_vars(text, ctx)
         assert "A01" in result
         assert "TX001" in result
-        assert "{{xyz}}" in result   # 未定义的变量保留原样
+        assert "{{xyz}}" in result  # 未定义的变量保留原样
 
     def test_yuan_str_format(self):
         """_yuan_str 应输出 ¥XX.XX 格式。"""
@@ -379,8 +376,7 @@ class TestPreviewEndpoint:
         """preview 中 store_name element 应生成带店名的 text 行。"""
         config = {
             "paper_width": 80,
-            "elements": [{"id": "e1", "type": "store_name", "align": "center",
-                          "bold": True, "size": "double_height"}],
+            "elements": [{"id": "e1", "type": "store_name", "align": "center", "bold": True, "size": "double_height"}],
         }
         resp = client.post(
             "/api/v1/receipt-templates/preview",
@@ -422,8 +418,7 @@ class TestPreviewEndpoint:
         """custom_text 中 {{order_no}} 应被示例数据替换。"""
         config = {
             "paper_width": 80,
-            "elements": [{"id": "e11", "type": "custom_text",
-                          "content": "单号: {{order_no}}", "align": "center"}],
+            "elements": [{"id": "e11", "type": "custom_text", "content": "单号: {{order_no}}", "align": "center"}],
         }
         resp = client.post(
             "/api/v1/receipt-templates/preview",
@@ -487,9 +482,18 @@ class TestElementsCatalog:
     def test_catalog_contains_all_element_types(self, client):
         """catalog 应包含全部 12 种 element 类型。"""
         expected_types = {
-            "store_name", "store_address", "separator", "order_info",
-            "order_items", "total_summary", "payment_method", "qrcode",
-            "barcode", "custom_text", "blank_lines", "logo_text",
+            "store_name",
+            "store_address",
+            "separator",
+            "order_info",
+            "order_items",
+            "total_summary",
+            "payment_method",
+            "qrcode",
+            "barcode",
+            "custom_text",
+            "blank_lines",
+            "logo_text",
         }
         resp = client.get(
             "/api/v1/receipt-templates/elements/catalog",

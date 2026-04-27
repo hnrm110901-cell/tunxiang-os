@@ -17,13 +17,12 @@
 
 from __future__ import annotations
 
-from datetime import date, datetime, timezone
+from datetime import datetime, timezone
 from typing import Any, Optional
 from uuid import uuid4
 
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -39,9 +38,7 @@ router = APIRouter(prefix="/api/v1/compliance", tags=["compliance-alerts"])
 
 
 def _get_tenant_id(request: Request) -> str:
-    tid = getattr(request.state, "tenant_id", None) or request.headers.get(
-        "X-Tenant-ID", ""
-    )
+    tid = getattr(request.state, "tenant_id", None) or request.headers.get("X-Tenant-ID", "")
     if not tid:
         raise HTTPException(status_code=400, detail="X-Tenant-ID header required")
     return tid
@@ -222,11 +219,13 @@ async def export_compliance_alerts(
         items.append(d)
 
     log.info("export_compliance_alerts", tenant_id=tenant_id, count=len(items))
-    return _ok({
-        "items": items,
-        "total": len(items),
-        "exported_at": datetime.now(timezone.utc).isoformat(),
-    })
+    return _ok(
+        {
+            "items": items,
+            "total": len(items),
+            "exported_at": datetime.now(timezone.utc).isoformat(),
+        }
+    )
 
 
 @router.get("/alerts/{alert_id}")
@@ -477,25 +476,27 @@ async def get_compliance_dashboard(
         trend_items.append(d)
 
     log.info("compliance_dashboard", tenant_id=tenant_id, total=overview.get("total", 0))
-    return _ok({
-        "overview": {
-            "total": overview["total"],
-            "by_status": {
-                "pending": overview["pending_count"],
-                "acknowledged": overview["acknowledged_count"],
-                "resolved": overview["resolved_count"],
+    return _ok(
+        {
+            "overview": {
+                "total": overview["total"],
+                "by_status": {
+                    "pending": overview["pending_count"],
+                    "acknowledged": overview["acknowledged_count"],
+                    "resolved": overview["resolved_count"],
+                },
+                "by_severity": {
+                    "critical": overview["critical_count"],
+                    "high": overview["high_count"],
+                    "medium": overview["medium_count"],
+                    "low": overview["low_count"],
+                },
             },
-            "by_severity": {
-                "critical": overview["critical_count"],
-                "high": overview["high_count"],
-                "medium": overview["medium_count"],
-                "low": overview["low_count"],
-            },
-        },
-        "by_type": type_items,
-        "by_store": store_items,
-        "trend_7d": trend_items,
-    })
+            "by_type": type_items,
+            "by_store": store_items,
+            "trend_7d": trend_items,
+        }
+    )
 
 
 @router.post("/scan")
@@ -721,8 +722,10 @@ async def trigger_compliance_scan(
     await db.commit()
 
     log.info("compliance_scan", tenant_id=tenant_id, scan_type=req.scan_type, created=created_total)
-    return _ok({
-        "scan_type": req.scan_type,
-        "created_alerts": created_total,
-        "scanned_at": now.isoformat(),
-    })
+    return _ok(
+        {
+            "scan_type": req.scan_type,
+            "created_alerts": created_total,
+            "scanned_at": now.isoformat(),
+        }
+    )

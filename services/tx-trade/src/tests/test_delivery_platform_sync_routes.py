@@ -9,22 +9,22 @@
 6. GET  /soldout-sync/log     — 估清同步日志分页查询
 7. GET  /reconciliation       — 对账汇总查询，返回按平台分组的统计
 """
+
 import os
 import sys
 import types
 import uuid
 from collections import namedtuple
 from datetime import datetime, timezone
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock
 
-import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 # ─── 路径准备 ──────────────────────────────────────────────────────────────────
 _TESTS_DIR = os.path.dirname(__file__)
-_SRC_DIR   = os.path.join(_TESTS_DIR, "..")
-_ROOT_DIR  = os.path.abspath(os.path.join(_TESTS_DIR, "..", "..", "..", ".."))
+_SRC_DIR = os.path.join(_TESTS_DIR, "..")
+_ROOT_DIR = os.path.abspath(os.path.join(_TESTS_DIR, "..", "..", "..", ".."))
 
 for _p in [_SRC_DIR, _ROOT_DIR]:
     if _p not in sys.path:
@@ -39,12 +39,10 @@ def _ensure_pkg(pkg_name: str, pkg_path: str) -> None:
         sys.modules[pkg_name] = mod
 
 
-_ensure_pkg("src",          _SRC_DIR)
-_ensure_pkg("src.api",      os.path.join(_SRC_DIR, "api"))
+_ensure_pkg("src", _SRC_DIR)
+_ensure_pkg("src.api", os.path.join(_SRC_DIR, "api"))
 
-from shared.ontology.src.database import get_db_with_tenant  # noqa: E402
-from src.api.delivery_platform_sync_routes import router, _get_db  # type: ignore[import]  # noqa: E402
-
+from src.api.delivery_platform_sync_routes import _get_db, router  # type: ignore[import]  # noqa: E402
 
 # ─── 工具 ──────────────────────────────────────────────────────────────────────
 
@@ -103,6 +101,7 @@ def _make_app(db_mock):
 # 1. POST /menu-sync/meituan — 正常菜单推送
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_menu_sync_meituan_ok():
     """推送 POS 菜单到美团 → 创建 pending 任务"""
     db = _make_mock_db()
@@ -142,6 +141,7 @@ def test_menu_sync_meituan_ok():
 # 2. POST /menu-sync/{platform} — 不支持的平台
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_menu_sync_unsupported_platform():
     """推送到不支持的平台 → 400"""
     db = _make_mock_db()
@@ -166,6 +166,7 @@ def test_menu_sync_unsupported_platform():
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 3. GET /menu-sync/status — 菜单同步状态
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 def test_menu_sync_status():
     """查询菜单同步状态 → 返回所有平台（含未同步过的）"""
@@ -207,6 +208,7 @@ def test_menu_sync_status():
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 4. POST /soldout-sync — 估清同步到多平台
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 def test_soldout_sync_multi_platform():
     """估清同步到美团+饿了么 → 每个平台各一条日志"""
@@ -252,6 +254,7 @@ def test_soldout_sync_multi_platform():
 # 5. POST /soldout-sync — 无效平台
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_soldout_sync_invalid_platform():
     """指定无效平台 → 400"""
     db = _make_mock_db()
@@ -277,6 +280,7 @@ def test_soldout_sync_invalid_platform():
 # 6. GET /soldout-sync/log — 估清同步日志
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_soldout_sync_log():
     """估清同步日志查询 → 分页返回"""
     now = datetime.now(timezone.utc)
@@ -293,10 +297,12 @@ def test_soldout_sync_log():
     )
 
     # 第一次 execute = COUNT(*)，第二次 = 列表查询
-    db = _make_mock_db(execute_side_effects=[
-        _FakeResult(scalar_value=1),
-        _FakeResult(rows=[log_row]),
-    ])
+    db = _make_mock_db(
+        execute_side_effects=[
+            _FakeResult(scalar_value=1),
+            _FakeResult(rows=[log_row]),
+        ]
+    )
     app = _make_app(db)
     client = TestClient(app)
 
@@ -318,6 +324,7 @@ def test_soldout_sync_log():
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 7. GET /reconciliation — 对账汇总
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 def test_reconciliation_overview():
     """跨平台对账汇总 → 按平台分组，含差异金额"""

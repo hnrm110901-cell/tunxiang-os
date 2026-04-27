@@ -11,6 +11,7 @@
 
 金额单位：全程用分(fen)，推送 ERP 前在适配器内转换为元。
 """
+
 from __future__ import annotations
 
 from datetime import date
@@ -38,50 +39,50 @@ log = structlog.get_logger(__name__)
 
 ACCOUNT_MAPPING: dict[str, dict[str, dict[str, str]]] = {
     "purchase_payment": {
-        "debit":  {"code": "1403", "name": "原材料"},
+        "debit": {"code": "1403", "name": "原材料"},
         "credit": {"code": "2202", "name": "应付账款"},
     },
     "sales_revenue": {
-        "debit":  {"code": "1122", "name": "应收账款"},
+        "debit": {"code": "1122", "name": "应收账款"},
         "credit": {"code": "5001", "name": "主营业务收入"},
     },
     "sales_cash": {
-        "debit":  {"code": "1001", "name": "库存现金"},
+        "debit": {"code": "1001", "name": "库存现金"},
         "credit": {"code": "5001", "name": "主营业务收入"},
     },
     "sales_wechat": {
-        "debit":  {"code": "1012.01", "name": "微信收款"},
+        "debit": {"code": "1012.01", "name": "微信收款"},
         "credit": {"code": "5001", "name": "主营业务收入"},
     },
     "sales_alipay": {
-        "debit":  {"code": "1012.02", "name": "支付宝收款"},
+        "debit": {"code": "1012.02", "name": "支付宝收款"},
         "credit": {"code": "5001", "name": "主营业务收入"},
     },
     "sales_bank_card": {
-        "debit":  {"code": "1002", "name": "银行存款"},
+        "debit": {"code": "1002", "name": "银行存款"},
         "credit": {"code": "5001", "name": "主营业务收入"},
     },
     "waste_loss": {
-        "debit":  {"code": "5602", "name": "管理费用"},
+        "debit": {"code": "5602", "name": "管理费用"},
         "credit": {"code": "1403", "name": "原材料"},
     },
     "payroll": {
-        "debit":  {"code": "5602", "name": "管理费用"},
+        "debit": {"code": "5602", "name": "管理费用"},
         "credit": {"code": "2211", "name": "应付职工薪酬"},
     },
     "cost_transfer": {
-        "debit":  {"code": "5401", "name": "主营业务成本"},
+        "debit": {"code": "5401", "name": "主营业务成本"},
         "credit": {"code": "1403", "name": "原材料"},
     },
 }
 
 # 收款方式 → 科目映射
 _PAY_METHOD_ACCOUNTS: dict[str, tuple[str, str]] = {
-    "cash":      ("1001",    "库存现金"),
-    "wechat":    ("1012.01", "微信收款"),
-    "alipay":    ("1012.02", "支付宝收款"),
-    "bank_card": ("1002",    "银行存款"),
-    "unionpay":  ("1002",    "银行存款"),
+    "cash": ("1001", "库存现金"),
+    "wechat": ("1012.01", "微信收款"),
+    "alipay": ("1012.02", "支付宝收款"),
+    "bank_card": ("1002", "银行存款"),
+    "unionpay": ("1002", "银行存款"),
 }
 
 
@@ -218,7 +219,7 @@ class VoucherGenerator:
             source_id=purchase_order_id,
             tenant_id=tenant_id,
             store_id=str(row["store_id"]),
-            memo=f"采购单#{row['order_no']} 共{total_fen/100:.2f}元",
+            memo=f"采购单#{row['order_no']} 共{total_fen / 100:.2f}元",
         )
         log.info(
             "voucher.generate.purchase.ok",
@@ -293,20 +294,24 @@ class VoucherGenerator:
             else:
                 acc_code, acc_name = "1002", "银行存款"
 
-            entries.append(ERPVoucherEntry(
-                account_code=acc_code,
-                account_name=acc_name,
-                debit_fen=amount,
-                summary=f"{date_str}{acc_name}收入({row['pay_count']}笔)",
-            ))
+            entries.append(
+                ERPVoucherEntry(
+                    account_code=acc_code,
+                    account_name=acc_name,
+                    debit_fen=amount,
+                    summary=f"{date_str}{acc_name}收入({row['pay_count']}笔)",
+                )
+            )
 
         # 贷方：主营业务收入（合计）
-        entries.append(ERPVoucherEntry(
-            account_code=credit_acc["code"],
-            account_name=credit_acc["name"],
-            credit_fen=total_fen,
-            summary=f"{date_str}营业收入合计",
-        ))
+        entries.append(
+            ERPVoucherEntry(
+                account_code=credit_acc["code"],
+                account_name=credit_acc["name"],
+                credit_fen=total_fen,
+                summary=f"{date_str}营业收入合计",
+            )
+        )
 
         voucher = ERPVoucher(
             voucher_type=VoucherType.RECEIPT,
@@ -316,7 +321,7 @@ class VoucherGenerator:
             source_id=f"{store_id}_{date_str}",
             tenant_id=tenant_id,
             store_id=store_id,
-            memo=f"日收入凭证 {date_str} 合计{total_fen/100:.2f}元",
+            memo=f"日收入凭证 {date_str} 合计{total_fen / 100:.2f}元",
         )
         log.info(
             "voucher.generate.daily_revenue.ok",

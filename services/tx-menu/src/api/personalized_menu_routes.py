@@ -13,13 +13,14 @@
   5. 过敏原过滤 — 含用户过敏原的菜品降权或隐藏
   6. 会员价标注 — 订阅会员显示折后价
 """
+
 from __future__ import annotations
 
 from datetime import datetime
 from typing import Optional
 
 import structlog
-from fastapi import APIRouter, Depends, Header, HTTPException, Query
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
@@ -34,6 +35,7 @@ router = APIRouter(prefix="/api/v1/menu/personalized", tags=["personalized-menu"
 
 # ─── Models ────────────────────────────────────────────────────────────────────
 
+
 class PersonalizedDish(BaseModel):
     dish_id: str
     name: str
@@ -41,12 +43,12 @@ class PersonalizedDish(BaseModel):
     price_fen: int
     member_price_fen: Optional[int] = None  # 付费会员价（None=无会员价）
     image_url: str = ""
-    personal_score: float = 0.0              # 个性化综合评分 0-1
-    reason: str = ""                         # 推荐理由
-    reason_type: str = ""                    # history|hot|association|margin
-    allergen_warning: Optional[str] = None   # 过敏原预警文案
+    personal_score: float = 0.0  # 个性化综合评分 0-1
+    reason: str = ""  # 推荐理由
+    reason_type: str = ""  # history|hot|association|margin
+    allergen_warning: Optional[str] = None  # 过敏原预警文案
     allergens: list[str] = Field(default_factory=list)  # 含有的过敏原
-    is_recommended: bool = False             # 是否为推荐菜品
+    is_recommended: bool = False  # 是否为推荐菜品
     is_sold_out: bool = False
     tags: list[str] = Field(default_factory=list)  # 招牌/新品/辣 等标签
 
@@ -54,12 +56,13 @@ class PersonalizedDish(BaseModel):
 class PersonalizedMenuResponse(BaseModel):
     dishes: list[PersonalizedDish]
     recommended_count: int
-    filtered_count: int   # 被过敏原过滤的数量
+    filtered_count: int  # 被过敏原过滤的数量
     meal_period: str
-    user_segment: str     # S1-S5
+    user_segment: str  # S1-S5
 
 
 # ─── 餐段检测 ──────────────────────────────────────────────────────────────────
+
 
 def _current_meal_period() -> str:
     hour = datetime.now().hour
@@ -103,13 +106,14 @@ ALLERGEN_LABELS: dict[str, str] = {
 
 # ─── 4因子评分引擎 ─────────────────────────────────────────────────────────────
 
+
 def _score_dishes(
     dishes: list[PersonalizedDish],
-    history_top: list[str],      # 用户历史高频菜名
-    hot_dishes: list[str],       # 当前时段热销菜名
-    cart_items: list[str],       # 购物车中已有菜品ID
-    user_allergies: list[str],   # 用户过敏原列表
-    is_subscriber: bool,         # 是否付费会员
+    history_top: list[str],  # 用户历史高频菜名
+    hot_dishes: list[str],  # 当前时段热销菜名
+    cart_items: list[str],  # 购物车中已有菜品ID
+    user_allergies: list[str],  # 用户过敏原列表
+    is_subscriber: bool,  # 是否付费会员
 ) -> list[PersonalizedDish]:
     """4因子加权 + 过敏过滤 + 会员价"""
     results = []
@@ -175,22 +179,24 @@ def _score_dishes(
         if matched_allergens:
             score *= 0.1  # 大幅降权但不完全移除（前端控制显隐）
 
-        results.append(PersonalizedDish(
-            dish_id=dish.dish_id,
-            name=name,
-            category=dish.category,
-            price_fen=price,
-            member_price_fen=member_price,
-            image_url=dish.image_url,
-            personal_score=round(score, 4),
-            reason=reason,
-            reason_type=reason_type,
-            allergen_warning=allergen_warning,
-            allergens=dish.allergens,
-            is_recommended=score > 0.2,
-            is_sold_out=dish.is_sold_out,
-            tags=dish.tags,
-        ))
+        results.append(
+            PersonalizedDish(
+                dish_id=dish.dish_id,
+                name=name,
+                category=dish.category,
+                price_fen=price,
+                member_price_fen=member_price,
+                image_url=dish.image_url,
+                personal_score=round(score, 4),
+                reason=reason,
+                reason_type=reason_type,
+                allergen_warning=allergen_warning,
+                allergens=dish.allergens,
+                is_recommended=score > 0.2,
+                is_sold_out=dish.is_sold_out,
+                tags=dish.tags,
+            )
+        )
 
     # 按个性化分排序（降序）
     results.sort(key=lambda d: d.personal_score, reverse=True)
@@ -199,8 +205,10 @@ def _score_dishes(
 
 # ─── Endpoint ──────────────────────────────────────────────────────────────────
 
+
 @router.get("")
 async def get_personalized_menu(
+    request: Request,
     store_id: str = Query(..., description="门店ID"),
     customer_id: str = Query("", description="客户ID（未登录为空）"),
     cart_items: str = Query("", description="购物车菜品ID,逗号分隔"),
@@ -243,18 +251,20 @@ async def get_personalized_menu(
             {"tid": x_tenant_id, "sid": store_id},
         )
         for row in dish_rows.mappings():
-            dishes.append(PersonalizedDish(
-                dish_id=row["dish_id"],
-                name=row["name"],
-                category=row["category"],
-                price_fen=row["price_fen"],
-                member_price_fen=None,
-                image_url=row["image_url"] or "",
-                personal_score=0.0,
-                is_sold_out=not row["is_available"],
-                allergens=row["allergens"] or [],
-                tags=row["tags"] or [],
-            ))
+            dishes.append(
+                PersonalizedDish(
+                    dish_id=row["dish_id"],
+                    name=row["name"],
+                    category=row["category"],
+                    price_fen=row["price_fen"],
+                    member_price_fen=None,
+                    image_url=row["image_url"] or "",
+                    personal_score=0.0,
+                    is_sold_out=not row["is_available"],
+                    allergens=row["allergens"] or [],
+                    tags=row["tags"] or [],
+                )
+            )
     except SQLAlchemyError:
         logger.exception("personalized_menu.dishes_query_failed", tenant_id=x_tenant_id, store_id=store_id)
         dishes = []
@@ -306,12 +316,63 @@ async def get_personalized_menu(
         logger.exception("personalized_menu.hot_dishes_query_failed", tenant_id=x_tenant_id, store_id=store_id)
         hot_dishes = []
 
-    # TODO: 从 tx-member 读取用户画像（Phase 3 feature）
-    user_allergies: list[str] = []   # 用户过敏原
-    is_subscriber = False            # 是否付费会员
-    user_segment = "S3"              # RFM分层
+    # 从 tx-member 读取用户画像
+    user_allergies: list[str] = []
+    is_subscriber = False
+    user_segment = "S3"  # 默认RFM分层
+    if customer_id:
+        try:
+            import os
 
-    # TODO: 从 X-User-Segment / X-User-Prefs headers读取（Phase 3中间件注入）
+            import httpx
+
+            tx_member_url = os.getenv("TX_MEMBER_URL", "http://tx-member:8003")
+            async with httpx.AsyncClient(timeout=3.0) as client:
+                profile_resp = await client.get(
+                    f"{tx_member_url}/api/v1/members/{customer_id}/profile",
+                    headers={"X-Tenant-ID": x_tenant_id},
+                )
+                if profile_resp.status_code == 200:
+                    profile_data = profile_resp.json().get("data", {})
+                    user_allergies = profile_data.get("allergies", [])
+                    is_subscriber = profile_data.get("level", "") in ("gold", "platinum", "vip")
+                    user_segment = profile_data.get("rfm_segment", "S3")
+                else:
+                    logger.warning(
+                        "personalized_menu.member_profile_error",
+                        tenant_id=x_tenant_id,
+                        customer_id=customer_id,
+                        status_code=profile_resp.status_code,
+                    )
+        except (httpx.HTTPError, OSError, ValueError) as exc:
+            logger.warning(
+                "personalized_menu.member_profile_unavailable",
+                tenant_id=x_tenant_id,
+                customer_id=customer_id,
+                error=str(exc),
+            )
+
+    # 从 API Gateway 注入的 header 中读取用户偏好
+    header_segment = request.headers.get("X-User-Segment", "")
+    if header_segment:
+        user_segment = header_segment
+    user_prefs_raw = request.headers.get("X-User-Prefs", "")
+    if user_prefs_raw:
+        # 解析 prefs: "spicy=high,sweet=low,seafood=love"
+        try:
+            for pair in user_prefs_raw.split(","):
+                pair = pair.strip()
+                if "=" in pair:
+                    key, _val = pair.split("=", 1)
+                    # 将偏好中标注为"hate"/"allergy"的加入过敏列表
+                    if _val.strip().lower() in ("hate", "allergy", "avoid"):
+                        if key.strip() not in user_allergies:
+                            user_allergies.append(key.strip())
+        except (ValueError, AttributeError):
+            logger.warning(
+                "personalized_menu.prefs_parse_failed",
+                raw=user_prefs_raw[:200],
+            )
 
     # 从请求参数提取购物车
     cart_list = [c.strip() for c in cart_items.split(",") if c.strip()]

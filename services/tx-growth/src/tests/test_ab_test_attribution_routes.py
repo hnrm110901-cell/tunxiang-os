@@ -26,6 +26,7 @@
 19. POST /api/v1/growth/attribution/order              — 负数 order_amount_fen → 422
 20. GET  /api/v1/growth/attribution/dashboard          — 非法 X-Tenant-ID → 422
 """
+
 import os
 import sys
 
@@ -36,7 +37,6 @@ import uuid
 from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
@@ -57,11 +57,14 @@ _fake_session = AsyncMock()
 _fake_session.commit = AsyncMock()
 _fake_session.rollback = AsyncMock()
 
+
 class _FakeSessionCtx:
     async def __aenter__(self):
         return _fake_session
+
     async def __aexit__(self, *_):
         pass
+
 
 _fake_database.async_session_factory = MagicMock(return_value=_FakeSessionCtx())
 
@@ -74,9 +77,7 @@ sys.modules["shared.ontology.src.database"] = _fake_database
 # Mock structlog
 # ---------------------------------------------------------------------------
 _fake_structlog = types.ModuleType("structlog")
-_fake_structlog.get_logger = MagicMock(return_value=MagicMock(
-    info=MagicMock(), warning=MagicMock(), error=MagicMock()
-))
+_fake_structlog.get_logger = MagicMock(return_value=MagicMock(info=MagicMock(), warning=MagicMock(), error=MagicMock()))
 sys.modules.setdefault("structlog", _fake_structlog)
 
 
@@ -87,12 +88,14 @@ sys.modules.setdefault("structlog", _fake_structlog)
 _ab_svc_mock = MagicMock()
 
 with patch("services.ab_test_service.ABTestService", return_value=_ab_svc_mock):
-    from api.ab_test_routes import router as ab_router, get_db as ab_get_db
+    from api.ab_test_routes import get_db as ab_get_db
+    from api.ab_test_routes import router as ab_router
 
 ab_app = FastAPI()
 ab_app.include_router(ab_router)
 
 _ab_test_id = uuid.uuid4()
+
 
 def _make_ab_db():
     db = AsyncMock()
@@ -100,13 +103,16 @@ def _make_ab_db():
     db.rollback = AsyncMock()
     return db
 
+
 def _ab_db_override(db):
     async def _dep():
         return db
+
     return _dep
 
 
 # --- helpers ---
+
 
 def _fake_test(status="draft"):
     t = MagicMock()
@@ -118,6 +124,7 @@ def _fake_test(status="draft"):
     t.started_at = datetime.now(timezone.utc)
     t.ended_at = datetime.now(timezone.utc)
     return t
+
 
 _VALID_PAYLOAD = {
     "name": "价格AB测试",
@@ -133,6 +140,7 @@ _VALID_PAYLOAD = {
 
 # ── Test 1: 正常创建 AB 测试 ────────────────────────────────────────────────
 
+
 def test_create_ab_test_success():
     db = _make_ab_db()
     _ab_svc_mock.create_test = AsyncMock(return_value=_fake_test())
@@ -146,7 +154,9 @@ def test_create_ab_test_success():
     assert "test_id" in data["data"]
     assert data["data"]["status"] == "draft"
 
+
 # ── Test 2: weight 之和不为 100 → ok=False ───────────────────────────────────
+
 
 def test_create_ab_test_bad_weight():
     db = _make_ab_db()
@@ -163,7 +173,9 @@ def test_create_ab_test_bad_weight():
     # Pydantic validator should reject this
     assert resp.status_code == 422
 
+
 # ── Test 3: 单变体 → 422 ─────────────────────────────────────────────────────
+
 
 def test_create_ab_test_single_variant():
     db = _make_ab_db()
@@ -177,13 +189,13 @@ def test_create_ab_test_single_variant():
     resp = client.post("/api/v1/growth/ab-tests", json=payload, headers=_HEADERS)
     assert resp.status_code == 422
 
+
 # ── Test 4: 列表返回 ──────────────────────────────────────────────────────────
+
 
 def test_list_ab_tests():
     db = _make_ab_db()
-    _ab_svc_mock.list_tests = AsyncMock(return_value=[
-        {"id": str(_ab_test_id), "name": "测试1", "status": "draft"}
-    ])
+    _ab_svc_mock.list_tests = AsyncMock(return_value=[{"id": str(_ab_test_id), "name": "测试1", "status": "draft"}])
     ab_app.dependency_overrides[ab_get_db] = _ab_db_override(db)
 
     client = TestClient(ab_app)
@@ -193,7 +205,9 @@ def test_list_ab_tests():
     assert data["ok"] is True
     assert data["data"]["total"] == 1
 
+
 # ── Test 5: 详情 ──────────────────────────────────────────────────────────────
+
 
 def test_get_ab_test_detail():
     db = _make_ab_db()
@@ -205,7 +219,9 @@ def test_get_ab_test_detail():
     assert resp.status_code == 200
     assert resp.json()["ok"] is True
 
+
 # ── Test 6: 启动测试 ──────────────────────────────────────────────────────────
+
 
 def test_start_ab_test():
     db = _make_ab_db()
@@ -217,7 +233,9 @@ def test_start_ab_test():
     assert resp.status_code == 200
     assert resp.json()["data"]["status"] == "running"
 
+
 # ── Test 7: 暂停测试 ──────────────────────────────────────────────────────────
+
 
 def test_pause_ab_test():
     db = _make_ab_db()
@@ -229,7 +247,9 @@ def test_pause_ab_test():
     assert resp.status_code == 200
     assert resp.json()["data"]["status"] == "paused"
 
+
 # ── Test 8: 手动结论 ──────────────────────────────────────────────────────────
+
 
 def test_conclude_ab_test():
     db = _make_ab_db()
@@ -245,7 +265,9 @@ def test_conclude_ab_test():
     assert resp.status_code == 200
     assert resp.json()["ok"] is True
 
+
 # ── Test 9: 应用获胜变体 ──────────────────────────────────────────────────────
+
 
 def test_apply_winner():
     db = _make_ab_db()
@@ -257,16 +279,20 @@ def test_apply_winner():
     assert resp.status_code == 200
     assert resp.json()["ok"] is True
 
+
 # ── Test 10: 详细统计结果 ─────────────────────────────────────────────────────
+
 
 def test_get_ab_results():
     db = _make_ab_db()
-    _ab_svc_mock.calculate_results = AsyncMock(return_value={
-        "test_id": str(_ab_test_id),
-        "variants": {"A": {"conversion_rate": 0.12}, "B": {"conversion_rate": 0.15}},
-        "p_value": 0.03,
-        "is_significant": True,
-    })
+    _ab_svc_mock.calculate_results = AsyncMock(
+        return_value={
+            "test_id": str(_ab_test_id),
+            "variants": {"A": {"conversion_rate": 0.12}, "B": {"conversion_rate": 0.15}},
+            "p_value": 0.03,
+            "is_significant": True,
+        }
+    )
     ab_app.dependency_overrides[ab_get_db] = _ab_db_override(db)
 
     client = TestClient(ab_app)
@@ -294,28 +320,35 @@ _ORDER_ID = str(uuid.uuid4())
 
 # ── Test 11: 仪表盘 ──────────────────────────────────────────────────────────
 
+
 def test_attribution_dashboard():
-    _roi_svc_mock.get_attribution_dashboard = AsyncMock(return_value={
-        "total_touches": 1200,
-        "total_conversions": 80,
-        "total_revenue_fen": 960000,
-        "average_roi": 3.2,
-    })
+    _roi_svc_mock.get_attribution_dashboard = AsyncMock(
+        return_value={
+            "total_touches": 1200,
+            "total_conversions": 80,
+            "total_revenue_fen": 960000,
+            "average_roi": 3.2,
+        }
+    )
     client = TestClient(attr_app)
     resp = client.get("/api/v1/growth/attribution/dashboard", headers=_HEADERS)
     assert resp.status_code == 200
     assert resp.json()["ok"] is True
     assert "total_touches" in resp.json()["data"]
 
+
 # ── Test 12: 活动 ROI ────────────────────────────────────────────────────────
 
+
 def test_campaign_roi():
-    _roi_svc_mock.calculate_campaign_roi = AsyncMock(return_value={
-        "campaign_id": _CAMPAIGN_ID,
-        "roi": 2.8,
-        "revenue_fen": 280000,
-        "cost_fen": 100000,
-    })
+    _roi_svc_mock.calculate_campaign_roi = AsyncMock(
+        return_value={
+            "campaign_id": _CAMPAIGN_ID,
+            "roi": 2.8,
+            "revenue_fen": 280000,
+            "cost_fen": 100000,
+        }
+    )
     client = TestClient(attr_app)
     resp = client.get(
         f"/api/v1/growth/attribution/campaigns/{_CAMPAIGN_ID}/roi",
@@ -326,14 +359,18 @@ def test_campaign_roi():
     assert data["ok"] is True
     assert data["data"]["roi"] == 2.8
 
+
 # ── Test 13: 旅程 ROI ────────────────────────────────────────────────────────
+
 
 def test_journey_roi():
     journey_id = str(uuid.uuid4())
-    _roi_svc_mock.calculate_journey_roi = AsyncMock(return_value={
-        "journey_id": journey_id,
-        "roi": 1.9,
-    })
+    _roi_svc_mock.calculate_journey_roi = AsyncMock(
+        return_value={
+            "journey_id": journey_id,
+            "roi": 1.9,
+        }
+    )
     client = TestClient(attr_app)
     resp = client.get(
         f"/api/v1/growth/attribution/journeys/{journey_id}/roi",
@@ -342,18 +379,22 @@ def test_journey_roi():
     assert resp.status_code == 200
     assert resp.json()["ok"] is True
 
+
 # ── Test 14: 转化漏斗 ────────────────────────────────────────────────────────
+
 
 def test_conversion_funnel():
     source_id = str(uuid.uuid4())
-    _roi_svc_mock.get_conversion_funnel = AsyncMock(return_value={
-        "source_id": source_id,
-        "steps": [
-            {"name": "触达", "count": 500},
-            {"name": "点击", "count": 200},
-            {"name": "下单", "count": 50},
-        ],
-    })
+    _roi_svc_mock.get_conversion_funnel = AsyncMock(
+        return_value={
+            "source_id": source_id,
+            "steps": [
+                {"name": "触达", "count": 500},
+                {"name": "点击", "count": 200},
+                {"name": "下单", "count": 50},
+            ],
+        }
+    )
     client = TestClient(attr_app)
     resp = client.get(
         f"/api/v1/growth/attribution/funnel/{source_id}",
@@ -362,7 +403,9 @@ def test_conversion_funnel():
     assert resp.status_code == 200
     assert resp.json()["ok"] is True
 
+
 # ── Test 15: 记录触达 ────────────────────────────────────────────────────────
+
 
 def test_record_touch():
     touch_obj = MagicMock()
@@ -389,14 +432,18 @@ def test_record_touch():
     assert data["ok"] is True
     assert data["data"]["channel"] == "sms"
 
+
 # ── Test 16: 订单归因 ────────────────────────────────────────────────────────
 
+
 def test_attribute_order():
-    _roi_svc_mock.attribute_order = AsyncMock(return_value={
-        "attributed": True,
-        "touch_id": str(uuid.uuid4()),
-        "model": "last_touch",
-    })
+    _roi_svc_mock.attribute_order = AsyncMock(
+        return_value={
+            "attributed": True,
+            "touch_id": str(uuid.uuid4()),
+            "model": "last_touch",
+        }
+    )
     client = TestClient(attr_app)
     resp = client.post(
         "/api/v1/growth/attribution/order",
@@ -411,13 +458,17 @@ def test_attribute_order():
     assert resp.status_code == 200
     assert resp.json()["ok"] is True
 
+
 # ── Test 17: 排名列表 ────────────────────────────────────────────────────────
 
+
 def test_top_performers():
-    _roi_svc_mock.get_top_performers = AsyncMock(return_value=[
-        {"campaign_id": _CAMPAIGN_ID, "roi": 5.2, "name": "暑期大促"},
-        {"campaign_id": str(uuid.uuid4()), "roi": 3.1, "name": "会员日"},
-    ])
+    _roi_svc_mock.get_top_performers = AsyncMock(
+        return_value=[
+            {"campaign_id": _CAMPAIGN_ID, "roi": 5.2, "name": "暑期大促"},
+            {"campaign_id": str(uuid.uuid4()), "roi": 3.1, "name": "会员日"},
+        ]
+    )
     client = TestClient(attr_app)
     resp = client.get(
         "/api/v1/growth/attribution/top-performers?limit=5&days=30",
@@ -428,7 +479,9 @@ def test_top_performers():
     assert data["ok"] is True
     assert data["data"]["total"] == 2
 
+
 # ── Test 18: 非法 touch_type → 422 ──────────────────────────────────────────
+
 
 def test_record_touch_bad_type():
     client = TestClient(attr_app)
@@ -444,7 +497,9 @@ def test_record_touch_bad_type():
     )
     assert resp.status_code == 422
 
+
 # ── Test 19: 负数 order_amount_fen → 422 ────────────────────────────────────
+
 
 def test_attribute_order_negative_amount():
     client = TestClient(attr_app)
@@ -459,7 +514,9 @@ def test_attribute_order_negative_amount():
     )
     assert resp.status_code == 422
 
+
 # ── Test 20: 非法 X-Tenant-ID → 422 ─────────────────────────────────────────
+
 
 def test_dashboard_bad_tenant_id():
     client = TestClient(attr_app)

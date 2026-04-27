@@ -19,11 +19,11 @@
 
 from __future__ import annotations
 
+import json
 from datetime import date, datetime, timezone
 from typing import Any, List, Optional
 from uuid import uuid4
 
-import json
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
@@ -98,9 +98,7 @@ TEMPLATES: dict[int, list[dict]] = {
 
 
 def _get_tenant_id(request: Request) -> str:
-    tid = getattr(request.state, "tenant_id", None) or request.headers.get(
-        "X-Tenant-ID", ""
-    )
+    tid = getattr(request.state, "tenant_id", None) or request.headers.get("X-Tenant-ID", "")
     if not tid:
         raise HTTPException(status_code=400, detail="X-Tenant-ID header required")
     return tid
@@ -386,16 +384,18 @@ async def onboarding_dashboard(
     )
     by_target_days = [dict(r._mapping) for r in by_target_result.fetchall()]
 
-    return _ok({
-        "total": summary_row["total"],
-        "in_progress": summary_row["in_progress"],
-        "completed": summary_row["completed"],
-        "overdue": summary_row["overdue"],
-        "terminated": summary_row["terminated"],
-        "avg_completion_days": round(float(summary_row["avg_completion_days"]), 1),
-        "by_store": by_store,
-        "by_target_days": by_target_days,
-    })
+    return _ok(
+        {
+            "total": summary_row["total"],
+            "in_progress": summary_row["in_progress"],
+            "completed": summary_row["completed"],
+            "overdue": summary_row["overdue"],
+            "terminated": summary_row["terminated"],
+            "avg_completion_days": round(float(summary_row["avg_completion_days"]), 1),
+            "by_store": by_store,
+            "by_target_days": by_target_days,
+        }
+    )
 
 
 # ── 4. GET /api/v1/onboarding-paths/templates  训练模板列表 ────────────────────
@@ -405,12 +405,14 @@ async def onboarding_dashboard(
 async def list_templates():
     templates = []
     for days, tasks in TEMPLATES.items():
-        templates.append({
-            "target_days": days,
-            "name": {7: "7天速成模板", 14: "14天标准模板", 30: "30天深度模板"}[days],
-            "task_count": len(tasks),
-            "tasks": tasks,
-        })
+        templates.append(
+            {
+                "target_days": days,
+                "name": {7: "7天速成模板", 14: "14天标准模板", 30: "30天深度模板"}[days],
+                "task_count": len(tasks),
+                "tasks": tasks,
+            }
+        )
     return _ok(templates)
 
 
@@ -476,7 +478,7 @@ async def update_onboarding_path(
     result = await db.execute(
         text(f"""
             UPDATE onboarding_paths
-            SET {', '.join(set_parts)}
+            SET {", ".join(set_parts)}
             WHERE id = :path_id AND tenant_id = :tenant_id AND is_deleted = FALSE
             RETURNING id
         """),
@@ -572,13 +574,15 @@ async def complete_task(
     await db.commit()
     log.info("onboarding_path.task_completed", path_id=path_id, task_idx=task_idx, progress=progress)
 
-    return _ok({
-        "id": path_id,
-        "task_idx": task_idx,
-        "progress_pct": progress,
-        "completed_required": completed_required,
-        "total_required": total_required,
-    })
+    return _ok(
+        {
+            "id": path_id,
+            "task_idx": task_idx,
+            "progress_pct": progress,
+            "completed_required": completed_required,
+            "total_required": total_required,
+        }
+    )
 
 
 # ── 8. PUT /api/v1/onboarding-paths/{path_id}/advance-day  推进训练日 ──────────
@@ -665,9 +669,7 @@ async def complete_onboarding(
 
     tasks = _parse_jsonb(mapping["tasks"]) or []
     # 校验所有 required 任务已完成
-    uncompleted = [
-        t["task"] for t in tasks if t.get("required") and not t.get("completed")
-    ]
+    uncompleted = [t["task"] for t in tasks if t.get("required") and not t.get("completed")]
     if uncompleted:
         raise HTTPException(
             status_code=400,

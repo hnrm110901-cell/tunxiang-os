@@ -2,6 +2,7 @@
 
 数据表：customer_addresses（v133 迁移）
 """
+
 from typing import Any, Optional
 
 import structlog
@@ -19,6 +20,7 @@ router = APIRouter(prefix="/api/v1/member", tags=["address"])
 
 # ── 请求模型 ──────────────────────────────────────────────────
 
+
 class AddressReq(BaseModel):
     customer_id: str
     name: str
@@ -26,13 +28,14 @@ class AddressReq(BaseModel):
     province: str = ""
     city: str = ""
     district: str = ""
-    detail: str = ""           # 详细地址（前端字段名，映射到 detail_address）
+    detail: str = ""  # 详细地址（前端字段名，映射到 detail_address）
     tag: str = "home"
     is_default: bool = False
-    location: Optional[dict] = None   # {"lng": float, "lat": float}
+    location: Optional[dict] = None  # {"lng": float, "lat": float}
 
 
 # ── 辅助函数 ──────────────────────────────────────────────────
+
 
 async def _set_rls(db: AsyncSession, tenant_id: str) -> None:
     await db.execute(
@@ -75,6 +78,7 @@ async def _clear_default(db: AsyncSession, tenant_id: str, customer_id: str) -> 
 
 
 # ── 端点 ──────────────────────────────────────────────────────
+
 
 @router.get("/addresses")
 async def list_addresses(

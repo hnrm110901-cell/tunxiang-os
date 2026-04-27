@@ -26,6 +26,7 @@ prefix: /api/v1/agent-registry
   # 查询
   GET    /stores/{store_id}/active-agents    — 获取门店激活的 Agent
 """
+
 from __future__ import annotations
 
 from typing import Any
@@ -55,6 +56,7 @@ router = APIRouter(prefix="/api/v1/agent-registry", tags=["agent-registry"])
 # 依赖注入
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 async def _get_db(
     x_tenant_id: str = Header("default", alias="X-Tenant-ID"),
 ) -> AsyncSession:
@@ -65,6 +67,7 @@ async def _get_db(
 # ─────────────────────────────────────────────────────────────────────────────
 # 辅助：统一序列化 ORM 对象
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 def _serialize_template(t: Any) -> dict[str, Any]:
     return {
@@ -125,6 +128,7 @@ def _serialize_deployment(d: Any) -> dict[str, Any]:
 # 模板路由
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 @router.post("/templates")
 async def create_template(
     body: CreateTemplateRequest,
@@ -153,7 +157,11 @@ async def list_templates(
     """列出模板（分页+过滤）"""
     svc = AgentRegistryService(db)
     items, total = await svc.list_templates(
-        x_tenant_id, category=category, status=status, page=page, size=size,
+        x_tenant_id,
+        category=category,
+        status=status,
+        page=page,
+        size=size,
     )
     return {
         "ok": True,
@@ -231,6 +239,7 @@ async def deprecate_template(
 # 版本路由
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 @router.post("/templates/{template_id}/versions")
 async def create_version(
     template_id: UUID,
@@ -306,6 +315,7 @@ async def rollback_version(
 # 部署路由
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 @router.post("/deployments")
 async def deploy(
     body: CreateDeploymentRequest,
@@ -333,7 +343,10 @@ async def list_deployments(
     """列出部署"""
     svc = AgentRegistryService(db)
     deployments = await svc.list_deployments(
-        x_tenant_id, template_id=template_id, scope_type=scope_type, scope_id=scope_id,
+        x_tenant_id,
+        template_id=template_id,
+        scope_type=scope_type,
+        scope_id=scope_id,
     )
     return {"ok": True, "data": [_serialize_deployment(d) for d in deployments]}
 
@@ -374,6 +387,7 @@ async def undeploy(
 # ─────────────────────────────────────────────────────────────────────────────
 # 门店查询
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @router.get("/stores/{store_id}/active-agents")
 async def get_active_agents_for_store(

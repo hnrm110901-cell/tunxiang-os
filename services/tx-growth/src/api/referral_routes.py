@@ -9,6 +9,7 @@
   POST  /api/v1/growth/referrals/invite/first-order     首单触发奖励
   GET   /api/v1/growth/referrals/my-invites             我的邀请记录
 """
+
 import uuid
 from datetime import datetime
 from typing import Any, Optional
@@ -161,11 +162,13 @@ async def create_campaign(
         name=campaign.name,
         tenant_id=x_tenant_id,
     )
-    return ok_response({
-        "campaign_id": str(campaign.id),
-        "name": campaign.name,
-        "status": campaign.status,
-    })
+    return ok_response(
+        {
+            "campaign_id": str(campaign.id),
+            "name": campaign.name,
+            "status": campaign.status,
+        }
+    )
 
 
 @router.get("/campaigns")
@@ -192,21 +195,23 @@ async def list_campaigns(
     result = await db.execute(query)
     campaigns = result.scalars().all()
 
-    return ok_response({
-        "items": [
-            {
-                "campaign_id": str(c.id),
-                "name": c.name,
-                "status": c.status,
-                "valid_from": c.valid_from.isoformat() if c.valid_from else None,
-                "valid_until": c.valid_until.isoformat() if c.valid_until else None,
-                "referrer_reward_type": c.referrer_reward_type,
-                "invitee_reward_type": c.invitee_reward_type,
-            }
-            for c in campaigns
-        ],
-        "total": len(campaigns),
-    })
+    return ok_response(
+        {
+            "items": [
+                {
+                    "campaign_id": str(c.id),
+                    "name": c.name,
+                    "status": c.status,
+                    "valid_from": c.valid_from.isoformat() if c.valid_from else None,
+                    "valid_until": c.valid_until.isoformat() if c.valid_until else None,
+                    "referrer_reward_type": c.referrer_reward_type,
+                    "invitee_reward_type": c.invitee_reward_type,
+                }
+                for c in campaigns
+            ],
+            "total": len(campaigns),
+        }
+    )
 
 
 @router.get("/campaigns/{campaign_id}/stats")

@@ -42,7 +42,7 @@ _ROOT = os.path.abspath(os.path.join(_SRC, "..", "..", "..", ".."))
 sys.path.insert(0, _SRC)
 sys.path.insert(0, _ROOT)
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 # ──────────────────────────────────────────────────────────────────────────────
 # 存根：structlog
@@ -125,17 +125,11 @@ sys.modules["shared.events.src.emitter"] = _emitter_mod
 # ──────────────────────────────────────────────────────────────────────────────
 _us_svc = types.ModuleType(f"{_ROOT_PKG}.services.unified_schedule_service")
 _us_svc.auto_detect_gaps = AsyncMock(return_value={"detected": 0})
-_us_svc.batch_create_schedules = AsyncMock(
-    return_value={"inserted": 3, "skipped_conflicts": 0}
-)
-_us_svc.create_schedule = AsyncMock(
-    return_value={"schedule_id": str(uuid4()), "status": "scheduled"}
-)
+_us_svc.batch_create_schedules = AsyncMock(return_value={"inserted": 3, "skipped_conflicts": 0})
+_us_svc.create_schedule = AsyncMock(return_value={"schedule_id": str(uuid4()), "status": "scheduled"})
 _us_svc.detect_conflicts = AsyncMock(return_value=[])
 _us_svc.get_fill_suggestions = AsyncMock(return_value=[])
-_us_svc.get_week_schedule = AsyncMock(
-    return_value={"employees": [], "dates": [], "total_shifts": 0}
-)
+_us_svc.get_week_schedule = AsyncMock(return_value={"employees": [], "dates": [], "total_shifts": 0})
 _us_svc.swap_schedules = AsyncMock(return_value={"swap_request_id": str(uuid4())})
 sys.modules[f"{_ROOT_PKG}.services.unified_schedule_service"] = _us_svc
 
@@ -163,15 +157,14 @@ _so_svc.get_today_dashboard = AsyncMock(
         "anomalies": [],
     }
 )
-_so_svc.get_weekly_summary = AsyncMock(
-    return_value={"days": [], "avg_attendance_rate": 0.93}
-)
+_so_svc.get_weekly_summary = AsyncMock(return_value={"days": [], "avg_attendance_rate": 0.93})
 sys.modules[f"{_ROOT_PKG}.services.store_ops_service"] = _so_svc
 
 
 # ──────────────────────────────────────────────────────────────────────────────
 # 辅助：用 importlib 加载路由文件
 # ──────────────────────────────────────────────────────────────────────────────
+
 
 def _load_router(filename: str, module_name: str, pkg: str = f"{_ROOT_PKG}.api"):
     """从 api/ 目录加载路由文件，强制设置 __package__。"""
@@ -188,9 +181,7 @@ def _load_router(filename: str, module_name: str, pkg: str = f"{_ROOT_PKG}.api")
 # 加载被测路由
 # ──────────────────────────────────────────────────────────────────────────────
 _hr_mod = _load_router("hr_dashboard_routes.py", f"{_ROOT_PKG}.api.hr_dashboard_routes")
-_sched_mod = _load_router(
-    "unified_schedule_routes.py", f"{_ROOT_PKG}.api.unified_schedule_routes"
-)
+_sched_mod = _load_router("unified_schedule_routes.py", f"{_ROOT_PKG}.api.unified_schedule_routes")
 _so_mod = _load_router("store_ops_routes.py", f"{_ROOT_PKG}.api.store_ops_routes")
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -200,6 +191,7 @@ import pytest
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.exc import OperationalError
+
 from shared.ontology.src.database import get_db
 
 app_hr = FastAPI()
@@ -219,6 +211,7 @@ HEADERS = {"X-Tenant-ID": TENANT_ID}
 # 辅助函数
 # ──────────────────────────────────────────────────────────────────────────────
 
+
 def _mock_db() -> AsyncMock:
     return AsyncMock()
 
@@ -226,6 +219,7 @@ def _mock_db() -> AsyncMock:
 def _override_db(mock_session: AsyncMock):
     async def _inner():
         yield mock_session
+
     return _inner
 
 
@@ -243,9 +237,7 @@ def _mappings_result(rows: list) -> MagicMock:
 def _scalar_result(val) -> MagicMock:
     r = MagicMock()
     r.scalar_one = MagicMock(return_value=val)
-    r.mappings = MagicMock(
-        return_value=MagicMock(first=MagicMock(return_value={"total": val}))
-    )
+    r.mappings = MagicMock(return_value=MagicMock(first=MagicMock(return_value={"total": val})))
     return r
 
 
@@ -253,12 +245,11 @@ def _scalar_result(val) -> MagicMock:
 # Part 1 — hr_dashboard_routes.py
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 def _make_mappings_first(data: dict) -> MagicMock:
     """构造 result.mappings().first() 返回指定 dict 的 mock。"""
     r = MagicMock()
-    r.mappings = MagicMock(
-        return_value=MagicMock(first=MagicMock(return_value=data))
-    )
+    r.mappings = MagicMock(return_value=MagicMock(first=MagicMock(return_value=data)))
     return r
 
 
@@ -294,6 +285,7 @@ async def test_hr_dashboard_ok():
     payroll_r = _make_mappings_first({"pending_payroll": 4})
 
     from datetime import date as _date
+
     _trend_row = {"date": _date(2026, 4, 5), "rate": 0.95}
     trend_r = MagicMock()
     trend_r.mappings = MagicMock(return_value=iter([_trend_row]))
@@ -304,16 +296,20 @@ async def test_hr_dashboard_ok():
     mock_db.execute = AsyncMock(
         side_effect=[
             set_cfg,
-            headcount_r, today_r, leave_r, conflict_r,
-            alert_r, payroll_r, trend_r, agent_r,
+            headcount_r,
+            today_r,
+            leave_r,
+            conflict_r,
+            alert_r,
+            payroll_r,
+            trend_r,
+            agent_r,
         ]
     )
 
     app_hr.dependency_overrides[get_db] = _override_db(mock_db)
     try:
-        async with AsyncClient(
-            transport=ASGITransport(app=app_hr), base_url="http://test"
-        ) as ac:
+        async with AsyncClient(transport=ASGITransport(app=app_hr), base_url="http://test") as ac:
             resp = await ac.get("/api/v1/hr/dashboard/", headers=HEADERS)
     finally:
         app_hr.dependency_overrides.pop(get_db, None)
@@ -342,9 +338,7 @@ async def test_hr_dashboard_db_error_graceful():
 
     app_hr.dependency_overrides[get_db] = _override_db(mock_db)
     try:
-        async with AsyncClient(
-            transport=ASGITransport(app=app_hr), base_url="http://test"
-        ) as ac:
+        async with AsyncClient(transport=ASGITransport(app=app_hr), base_url="http://test") as ac:
             resp = await ac.get("/api/v1/hr/dashboard/", headers=HEADERS)
     finally:
         app_hr.dependency_overrides.pop(get_db, None)
@@ -357,9 +351,7 @@ async def test_hr_dashboard_db_error_graceful():
 @pytest.mark.anyio
 async def test_hr_dashboard_missing_tenant():
     """[3] GET /api/v1/hr/dashboard/ — 缺少 X-Tenant-ID → 400。"""
-    async with AsyncClient(
-        transport=ASGITransport(app=app_hr), base_url="http://test"
-    ) as ac:
+    async with AsyncClient(transport=ASGITransport(app=app_hr), base_url="http://test") as ac:
         resp = await ac.get("/api/v1/hr/dashboard/")
 
     assert resp.status_code == 400
@@ -369,6 +361,7 @@ async def test_hr_dashboard_missing_tenant():
 # ══════════════════════════════════════════════════════════════════════════════
 # Part 2 — unified_schedule_routes.py
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 @pytest.mark.anyio
 async def test_schedule_get_week_ok():
@@ -389,8 +382,13 @@ async def test_schedule_get_week_ok():
             }
         ],
         "dates": [
-            "2026-04-06", "2026-04-07", "2026-04-08",
-            "2026-04-09", "2026-04-10", "2026-04-11", "2026-04-12",
+            "2026-04-06",
+            "2026-04-07",
+            "2026-04-08",
+            "2026-04-09",
+            "2026-04-10",
+            "2026-04-11",
+            "2026-04-12",
         ],
         "total_shifts": 0,
     }
@@ -400,9 +398,7 @@ async def test_schedule_get_week_ok():
 
     app_sched.dependency_overrides[get_db] = _override_db(mock_db)
     try:
-        async with AsyncClient(
-            transport=ASGITransport(app=app_sched), base_url="http://test"
-        ) as ac:
+        async with AsyncClient(transport=ASGITransport(app=app_sched), base_url="http://test") as ac:
             resp = await ac.get(
                 "/api/v1/schedules/week",
                 headers=HEADERS,
@@ -429,9 +425,7 @@ async def test_schedule_create_ok():
 
     app_sched.dependency_overrides[get_db] = _override_db(mock_db)
     try:
-        async with AsyncClient(
-            transport=ASGITransport(app=app_sched), base_url="http://test"
-        ) as ac:
+        async with AsyncClient(transport=ASGITransport(app=app_sched), base_url="http://test") as ac:
             resp = await ac.post(
                 "/api/v1/schedules",
                 headers=HEADERS,
@@ -468,9 +462,7 @@ async def test_schedule_batch_create_ok():
 
     app_sched.dependency_overrides[get_db] = _override_db(mock_db)
     try:
-        async with AsyncClient(
-            transport=ASGITransport(app=app_sched), base_url="http://test"
-        ) as ac:
+        async with AsyncClient(transport=ASGITransport(app=app_sched), base_url="http://test") as ac:
             resp = await ac.post(
                 "/api/v1/schedules/batch",
                 headers=HEADERS,
@@ -499,9 +491,7 @@ async def test_schedule_update_invalid_status():
 
     app_sched.dependency_overrides[get_db] = _override_db(mock_db)
     try:
-        async with AsyncClient(
-            transport=ASGITransport(app=app_sched), base_url="http://test"
-        ) as ac:
+        async with AsyncClient(transport=ASGITransport(app=app_sched), base_url="http://test") as ac:
             resp = await ac.put(
                 f"/api/v1/schedules/{uuid4()}",
                 headers=HEADERS,
@@ -536,9 +526,7 @@ async def test_schedule_conflicts_ok():
 
     app_sched.dependency_overrides[get_db] = _override_db(mock_db)
     try:
-        async with AsyncClient(
-            transport=ASGITransport(app=app_sched), base_url="http://test"
-        ) as ac:
+        async with AsyncClient(transport=ASGITransport(app=app_sched), base_url="http://test") as ac:
             # conflicts 端点需要三个必填参数：store_id/start_date/end_date
             resp = await ac.get(
                 "/api/v1/schedules/conflicts",
@@ -563,6 +551,7 @@ async def test_schedule_conflicts_ok():
 # Part 3 — store_ops_routes.py
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 @pytest.mark.anyio
 async def test_store_ops_today_ok():
     """[9] GET /api/v1/store-ops/today — 正常返回今日作战台数据。
@@ -572,17 +561,19 @@ async def test_store_ops_today_ok():
     mock_db = _mock_db()
 
     fake_data = {
-        "total_scheduled": 12, "present": 10,
-        "absent": 1, "leave": 1, "anomalies": [], "fill_gaps": [],
+        "total_scheduled": 12,
+        "present": 10,
+        "absent": 1,
+        "leave": 1,
+        "anomalies": [],
+        "fill_gaps": [],
     }
     _so_mod.get_today_dashboard.return_value = fake_data
     _so_mod.get_today_dashboard.side_effect = None
 
     app_so.dependency_overrides[get_db] = _override_db(mock_db)
     try:
-        async with AsyncClient(
-            transport=ASGITransport(app=app_so), base_url="http://test"
-        ) as ac:
+        async with AsyncClient(transport=ASGITransport(app=app_so), base_url="http://test") as ac:
             resp = await ac.get(
                 "/api/v1/store-ops/today",
                 headers=HEADERS,
@@ -604,8 +595,10 @@ async def test_store_ops_anomalies_ok():
 
     fake_anomalies = [
         {
-            "employee_id": str(uuid4()), "emp_name": "赵六",
-            "anomaly_type": "late", "diff_minutes": 15,
+            "employee_id": str(uuid4()),
+            "emp_name": "赵六",
+            "anomaly_type": "late",
+            "diff_minutes": 15,
         }
     ]
     _so_mod.get_anomalies.return_value = fake_anomalies
@@ -613,9 +606,7 @@ async def test_store_ops_anomalies_ok():
 
     app_so.dependency_overrides[get_db] = _override_db(mock_db)
     try:
-        async with AsyncClient(
-            transport=ASGITransport(app=app_so), base_url="http://test"
-        ) as ac:
+        async with AsyncClient(transport=ASGITransport(app=app_so), base_url="http://test") as ac:
             resp = await ac.get(
                 "/api/v1/store-ops/anomalies",
                 headers=HEADERS,
@@ -642,9 +633,7 @@ async def test_store_ops_quick_action_ok():
 
     app_so.dependency_overrides[get_db] = _override_db(mock_db)
     try:
-        async with AsyncClient(
-            transport=ASGITransport(app=app_so), base_url="http://test"
-        ) as ac:
+        async with AsyncClient(transport=ASGITransport(app=app_so), base_url="http://test") as ac:
             resp = await ac.post(
                 "/api/v1/store-ops/quick-action",
                 headers=HEADERS,
@@ -674,9 +663,7 @@ async def test_store_ops_quick_action_value_error():
 
     app_so.dependency_overrides[get_db] = _override_db(mock_db)
     try:
-        async with AsyncClient(
-            transport=ASGITransport(app=app_so), base_url="http://test"
-        ) as ac:
+        async with AsyncClient(transport=ASGITransport(app=app_so), base_url="http://test") as ac:
             resp = await ac.post(
                 "/api/v1/store-ops/quick-action",
                 headers=HEADERS,
@@ -713,9 +700,7 @@ async def test_store_ops_labor_metrics_ok():
 
     app_so.dependency_overrides[get_db] = _override_db(mock_db)
     try:
-        async with AsyncClient(
-            transport=ASGITransport(app=app_so), base_url="http://test"
-        ) as ac:
+        async with AsyncClient(transport=ASGITransport(app=app_so), base_url="http://test") as ac:
             resp = await ac.get(
                 "/api/v1/store-ops/labor-metrics",
                 headers=HEADERS,

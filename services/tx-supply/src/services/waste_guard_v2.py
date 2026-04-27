@@ -70,16 +70,16 @@ ROOT_CAUSE_MAP: Dict[str, List[Dict[str, Any]]] = {
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 INGREDIENT_COST_PER_KG_FEN: Dict[str, int] = {
-    "ING001": 4_000,   # 猪肉 40元/kg
-    "ING002": 5_000,   # 牛肉 50元/kg
-    "ING003": 3_000,   # 鸡肉 30元/kg
-    "ING004": 8_000,   # 鲜虾 80元/kg
+    "ING001": 4_000,  # 猪肉 40元/kg
+    "ING002": 5_000,  # 牛肉 50元/kg
+    "ING003": 3_000,  # 鸡肉 30元/kg
+    "ING004": 8_000,  # 鲜虾 80元/kg
     "ING005": 12_000,  # 活鱼 120元/kg
-    "ING006": 800,     # 大米 8元/kg
-    "ING007": 600,     # 面粉 6元/kg
-    "ING008": 1_200,   # 食用油 12元/kg
-    "ING009": 500,     # 青菜 5元/kg
-    "ING010": 1_500,   # 辣椒/调料 15元/kg
+    "ING006": 800,  # 大米 8元/kg
+    "ING007": 600,  # 面粉 6元/kg
+    "ING008": 1_200,  # 食用油 12元/kg
+    "ING009": 500,  # 青菜 5元/kg
+    "ING010": 1_500,  # 辣椒/调料 15元/kg
 }
 
 INGREDIENT_NAMES: Dict[str, str] = {
@@ -194,9 +194,7 @@ class WasteGuardV2:
         TOP5 by amount, TOP5 by cost, trend, by type, by reason
         """
         records = [
-            r for r in self._waste_records
-            if r["store_id"] == store_id
-            and start_date <= r["record_date"] <= end_date
+            r for r in self._waste_records if r["store_id"] == store_id and start_date <= r["record_date"] <= end_date
         ]
 
         if not records:
@@ -233,9 +231,7 @@ class WasteGuardV2:
             by_ingredient[ing_id]["waste_types"].append(r["waste_type"])
 
         # TOP5 by cost
-        sorted_by_cost = sorted(
-            by_ingredient.values(), key=lambda x: x["total_cost_fen"], reverse=True
-        )[:5]
+        sorted_by_cost = sorted(by_ingredient.values(), key=lambda x: x["total_cost_fen"], reverse=True)[:5]
         top5_cost = []
         for rank, item in enumerate(sorted_by_cost, 1):
             # Get root causes from the dominant waste type
@@ -245,19 +241,19 @@ class WasteGuardV2:
             dominant_type = max(type_counter, key=type_counter.get) if type_counter else "other"
             root_causes = ROOT_CAUSE_MAP.get(dominant_type, ROOT_CAUSE_MAP["other"])
 
-            top5_cost.append(build_top5_item(
-                rank=rank,
-                item_name=item["ingredient_name"],
-                waste_cost_fen=item["total_cost_fen"],
-                waste_qty=item["total_qty_kg"],
-                total_waste_fen=total_waste_fen,
-                root_causes=root_causes,
-            ))
+            top5_cost.append(
+                build_top5_item(
+                    rank=rank,
+                    item_name=item["ingredient_name"],
+                    waste_cost_fen=item["total_cost_fen"],
+                    waste_qty=item["total_qty_kg"],
+                    total_waste_fen=total_waste_fen,
+                    root_causes=root_causes,
+                )
+            )
 
         # TOP5 by quantity
-        sorted_by_qty = sorted(
-            by_ingredient.values(), key=lambda x: x["total_qty_kg"], reverse=True
-        )[:5]
+        sorted_by_qty = sorted(by_ingredient.values(), key=lambda x: x["total_qty_kg"], reverse=True)[:5]
         top5_qty = [
             {
                 "rank": rank,
@@ -329,7 +325,8 @@ class WasteGuardV2:
         start_date = end_date - timedelta(days=days)
 
         records = [
-            r for r in self._waste_records
+            r
+            for r in self._waste_records
             if r["store_id"] == store_id
             and r["ingredient_id"] == ingredient_id
             and start_date.isoformat() <= r["record_date"] <= end_date.isoformat()
@@ -367,16 +364,18 @@ class WasteGuardV2:
             cost_pct = round(cost / total_cost * 100, 1) if total_cost > 0 else 0
 
             for cause in causes:
-                root_causes.append({
-                    "waste_type": wt,
-                    "waste_type_label": WASTE_TYPES.get(wt, wt),
-                    "root_cause": cause["root_cause"],
-                    "description": cause["description"],
-                    "probability": cause["probability"],
-                    "occurrence_count": count,
-                    "cost_fen": cost,
-                    "cost_pct": cost_pct,
-                })
+                root_causes.append(
+                    {
+                        "waste_type": wt,
+                        "waste_type_label": WASTE_TYPES.get(wt, wt),
+                        "root_cause": cause["root_cause"],
+                        "description": cause["description"],
+                        "probability": cause["probability"],
+                        "occurrence_count": count,
+                        "cost_fen": cost,
+                        "cost_pct": cost_pct,
+                    }
+                )
 
         # Sort by weighted priority (cost * probability)
         root_causes.sort(
@@ -441,16 +440,18 @@ class WasteGuardV2:
         action_items: List[Dict[str, Any]] = []
         for i, rc in enumerate(root_causes[:5]):
             action = ROOT_CAUSE_ACTIONS.get(rc.get("root_cause", "unknown"), "排查原因")
-            action_items.append({
-                "item_id": f"{plan_id}-A{i+1:02d}",
-                "root_cause": rc.get("root_cause", "unknown"),
-                "description": rc.get("description", ""),
-                "action": action,
-                "priority": "high" if i < 2 else "medium",
-                "status": "pending",
-                "assigned_to": None,
-                "due_date": (date.today() + timedelta(days=7 * (i + 1))).isoformat(),
-            })
+            action_items.append(
+                {
+                    "item_id": f"{plan_id}-A{i + 1:02d}",
+                    "root_cause": rc.get("root_cause", "unknown"),
+                    "description": rc.get("description", ""),
+                    "action": action,
+                    "priority": "high" if i < 2 else "medium",
+                    "status": "pending",
+                    "assigned_to": None,
+                    "due_date": (date.today() + timedelta(days=7 * (i + 1))).isoformat(),
+                }
+            )
 
         plan = {
             "plan_id": plan_id,
@@ -500,7 +501,8 @@ class WasteGuardV2:
 
         # Calculate current waste since plan started
         records_since = [
-            r for r in self._waste_records
+            r
+            for r in self._waste_records
             if r["store_id"] == store_id
             and (ingredient_id is None or r["ingredient_id"] == ingredient_id)
             and start_date <= r["record_date"] <= end_date
@@ -562,7 +564,8 @@ class WasteGuardV2:
         start_date = end_date - timedelta(days=30)
 
         historical = [
-            r for r in self._waste_records
+            r
+            for r in self._waste_records
             if r["store_id"] == store_id
             and r["ingredient_id"] == ingredient_id
             and start_date.isoformat() <= r["record_date"] <= end_date.isoformat()
@@ -608,14 +611,16 @@ class WasteGuardV2:
             predicted_cost = int(predicted_qty * cost_per_kg)
             total_predicted_cost += predicted_cost
 
-            daily_predictions.append({
-                "date": pred_date.isoformat(),
-                "day_of_week": pred_date.strftime("%A"),
-                "predicted_qty_kg": predicted_qty,
-                "predicted_cost_fen": predicted_cost,
-                "predicted_cost_yuan": round(predicted_cost / 100, 2),
-                "confidence": 0.75 if days_with_data >= 7 else 0.50,
-            })
+            daily_predictions.append(
+                {
+                    "date": pred_date.isoformat(),
+                    "day_of_week": pred_date.strftime("%A"),
+                    "predicted_qty_kg": predicted_qty,
+                    "predicted_cost_fen": predicted_cost,
+                    "predicted_cost_yuan": round(predicted_cost / 100, 2),
+                    "confidence": 0.75 if days_with_data >= 7 else 0.50,
+                }
+            )
 
         return {
             "store_id": store_id,
@@ -650,11 +655,7 @@ class WasteGuardV2:
         Total waste cost, waste rate vs revenue, vs COGS
         """
         # Get month's records
-        records = [
-            r for r in self._waste_records
-            if r["store_id"] == store_id
-            and r["record_date"].startswith(month)
-        ]
+        records = [r for r in self._waste_records if r["store_id"] == store_id and r["record_date"].startswith(month)]
 
         total_waste_fen = sum(r["waste_cost_fen"] for r in records)
         total_qty_kg = sum(r["quantity_kg"] for r in records)

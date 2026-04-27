@@ -2,6 +2,7 @@
 
 使用 SQLite 内存数据库模拟 PostgreSQL，测试核心业务逻辑。
 """
+
 import uuid
 from datetime import date, timedelta
 from unittest.mock import MagicMock
@@ -37,13 +38,13 @@ async def db_session():
         original_execute = session.execute
 
         async def patched_execute(stmt, *args, **kwargs):
-            if hasattr(stmt, 'text') and 'set_config' in str(stmt):
+            if hasattr(stmt, "text") and "set_config" in str(stmt):
                 return MagicMock()
-            if isinstance(stmt, text) and 'set_config' in str(stmt):
+            if isinstance(stmt, text) and "set_config" in str(stmt):
                 return MagicMock()
             # Handle text objects
             stmt_str = str(stmt) if not isinstance(stmt, str) else stmt
-            if 'set_config' in stmt_str:
+            if "set_config" in stmt_str:
                 return MagicMock()
             return await original_execute(stmt, *args, **kwargs)
 
@@ -106,15 +107,23 @@ async def test_receive_stock_weighted_avg_cost(db_session, sample_ingredient):
     """两次入库后单价为加权平均"""
     await inventory_io.receive_stock(
         ingredient_id=str(sample_ingredient.id),
-        quantity=10.0, unit_cost_fen=5000,
-        batch_no="B001", expiry_date=None,
-        store_id=STORE_ID, tenant_id=TENANT_ID, db=db_session,
+        quantity=10.0,
+        unit_cost_fen=5000,
+        batch_no="B001",
+        expiry_date=None,
+        store_id=STORE_ID,
+        tenant_id=TENANT_ID,
+        db=db_session,
     )
     await inventory_io.receive_stock(
         ingredient_id=str(sample_ingredient.id),
-        quantity=10.0, unit_cost_fen=6000,
-        batch_no="B002", expiry_date=None,
-        store_id=STORE_ID, tenant_id=TENANT_ID, db=db_session,
+        quantity=10.0,
+        unit_cost_fen=6000,
+        batch_no="B002",
+        expiry_date=None,
+        store_id=STORE_ID,
+        tenant_id=TENANT_ID,
+        db=db_session,
     )
 
     await db_session.refresh(sample_ingredient)
@@ -129,9 +138,13 @@ async def test_receive_stock_rejects_zero_quantity(db_session, sample_ingredient
     with pytest.raises(ValueError, match="入库数量必须大于0"):
         await inventory_io.receive_stock(
             ingredient_id=str(sample_ingredient.id),
-            quantity=0, unit_cost_fen=5000,
-            batch_no="B001", expiry_date=None,
-            store_id=STORE_ID, tenant_id=TENANT_ID, db=db_session,
+            quantity=0,
+            unit_cost_fen=5000,
+            batch_no="B001",
+            expiry_date=None,
+            store_id=STORE_ID,
+            tenant_id=TENANT_ID,
+            db=db_session,
         )
 
 
@@ -144,22 +157,33 @@ async def test_issue_stock_fifo(db_session, sample_ingredient):
     # 入库两批
     await inventory_io.receive_stock(
         ingredient_id=str(sample_ingredient.id),
-        quantity=5.0, unit_cost_fen=4000,
-        batch_no="BATCH-OLD", expiry_date=date(2026, 4, 1),
-        store_id=STORE_ID, tenant_id=TENANT_ID, db=db_session,
+        quantity=5.0,
+        unit_cost_fen=4000,
+        batch_no="BATCH-OLD",
+        expiry_date=date(2026, 4, 1),
+        store_id=STORE_ID,
+        tenant_id=TENANT_ID,
+        db=db_session,
     )
     await inventory_io.receive_stock(
         ingredient_id=str(sample_ingredient.id),
-        quantity=10.0, unit_cost_fen=5000,
-        batch_no="BATCH-NEW", expiry_date=date(2026, 5, 1),
-        store_id=STORE_ID, tenant_id=TENANT_ID, db=db_session,
+        quantity=10.0,
+        unit_cost_fen=5000,
+        batch_no="BATCH-NEW",
+        expiry_date=date(2026, 5, 1),
+        store_id=STORE_ID,
+        tenant_id=TENANT_ID,
+        db=db_session,
     )
 
     # 出库 7kg — 应先扣 BATCH-OLD 5kg，再扣 BATCH-NEW 2kg
     result = await inventory_io.issue_stock(
         ingredient_id=str(sample_ingredient.id),
-        quantity=7.0, reason="usage",
-        store_id=STORE_ID, tenant_id=TENANT_ID, db=db_session,
+        quantity=7.0,
+        reason="usage",
+        store_id=STORE_ID,
+        tenant_id=TENANT_ID,
+        db=db_session,
     )
 
     assert result["new_quantity"] == pytest.approx(8.0, abs=0.01)
@@ -175,16 +199,23 @@ async def test_issue_stock_insufficient(db_session, sample_ingredient):
     """库存不足时拒绝出库"""
     await inventory_io.receive_stock(
         ingredient_id=str(sample_ingredient.id),
-        quantity=3.0, unit_cost_fen=5000,
-        batch_no="B001", expiry_date=None,
-        store_id=STORE_ID, tenant_id=TENANT_ID, db=db_session,
+        quantity=3.0,
+        unit_cost_fen=5000,
+        batch_no="B001",
+        expiry_date=None,
+        store_id=STORE_ID,
+        tenant_id=TENANT_ID,
+        db=db_session,
     )
 
     with pytest.raises(ValueError, match="库存不足"):
         await inventory_io.issue_stock(
             ingredient_id=str(sample_ingredient.id),
-            quantity=5.0, reason="usage",
-            store_id=STORE_ID, tenant_id=TENANT_ID, db=db_session,
+            quantity=5.0,
+            reason="usage",
+            store_id=STORE_ID,
+            tenant_id=TENANT_ID,
+            db=db_session,
         )
 
 
@@ -196,15 +227,22 @@ async def test_adjust_stock_gain(db_session, sample_ingredient):
     """盘盈调整"""
     await inventory_io.receive_stock(
         ingredient_id=str(sample_ingredient.id),
-        quantity=10.0, unit_cost_fen=5000,
-        batch_no="B001", expiry_date=None,
-        store_id=STORE_ID, tenant_id=TENANT_ID, db=db_session,
+        quantity=10.0,
+        unit_cost_fen=5000,
+        batch_no="B001",
+        expiry_date=None,
+        store_id=STORE_ID,
+        tenant_id=TENANT_ID,
+        db=db_session,
     )
 
     result = await inventory_io.adjust_stock(
         ingredient_id=str(sample_ingredient.id),
-        quantity=2.0, reason="盘盈-实际多2kg",
-        store_id=STORE_ID, tenant_id=TENANT_ID, db=db_session,
+        quantity=2.0,
+        reason="盘盈-实际多2kg",
+        store_id=STORE_ID,
+        tenant_id=TENANT_ID,
+        db=db_session,
     )
 
     assert result["new_quantity"] == 12.0
@@ -215,16 +253,23 @@ async def test_adjust_stock_loss_negative_rejected(db_session, sample_ingredient
     """盘亏导致负数应拒绝"""
     await inventory_io.receive_stock(
         ingredient_id=str(sample_ingredient.id),
-        quantity=3.0, unit_cost_fen=5000,
-        batch_no="B001", expiry_date=None,
-        store_id=STORE_ID, tenant_id=TENANT_ID, db=db_session,
+        quantity=3.0,
+        unit_cost_fen=5000,
+        batch_no="B001",
+        expiry_date=None,
+        store_id=STORE_ID,
+        tenant_id=TENANT_ID,
+        db=db_session,
     )
 
     with pytest.raises(ValueError, match="调整后库存为负"):
         await inventory_io.adjust_stock(
             ingredient_id=str(sample_ingredient.id),
-            quantity=-5.0, reason="盘亏",
-            store_id=STORE_ID, tenant_id=TENANT_ID, db=db_session,
+            quantity=-5.0,
+            reason="盘亏",
+            store_id=STORE_ID,
+            tenant_id=TENANT_ID,
+            db=db_session,
         )
 
 
@@ -236,20 +281,30 @@ async def test_get_stock_balance(db_session, sample_ingredient):
     """库存余额查询返回批次明细"""
     await inventory_io.receive_stock(
         ingredient_id=str(sample_ingredient.id),
-        quantity=5.0, unit_cost_fen=4000,
-        batch_no="B001", expiry_date=date(2026, 4, 15),
-        store_id=STORE_ID, tenant_id=TENANT_ID, db=db_session,
+        quantity=5.0,
+        unit_cost_fen=4000,
+        batch_no="B001",
+        expiry_date=date(2026, 4, 15),
+        store_id=STORE_ID,
+        tenant_id=TENANT_ID,
+        db=db_session,
     )
     await inventory_io.receive_stock(
         ingredient_id=str(sample_ingredient.id),
-        quantity=8.0, unit_cost_fen=5000,
-        batch_no="B002", expiry_date=date(2026, 5, 1),
-        store_id=STORE_ID, tenant_id=TENANT_ID, db=db_session,
+        quantity=8.0,
+        unit_cost_fen=5000,
+        batch_no="B002",
+        expiry_date=date(2026, 5, 1),
+        store_id=STORE_ID,
+        tenant_id=TENANT_ID,
+        db=db_session,
     )
 
     balance = await inventory_io.get_stock_balance(
         ingredient_id=str(sample_ingredient.id),
-        store_id=STORE_ID, tenant_id=TENANT_ID, db=db_session,
+        store_id=STORE_ID,
+        tenant_id=TENANT_ID,
+        db=db_session,
     )
 
     assert balance["quantity"] == 13.0
@@ -271,21 +326,31 @@ async def test_check_expiring_items(db_session, sample_ingredient):
     # 一个 2 天后到期的批次
     await inventory_io.receive_stock(
         ingredient_id=str(sample_ingredient.id),
-        quantity=3.0, unit_cost_fen=5000,
-        batch_no="EXPIRING", expiry_date=today + timedelta(days=2),
-        store_id=STORE_ID, tenant_id=TENANT_ID, db=db_session,
+        quantity=3.0,
+        unit_cost_fen=5000,
+        batch_no="EXPIRING",
+        expiry_date=today + timedelta(days=2),
+        store_id=STORE_ID,
+        tenant_id=TENANT_ID,
+        db=db_session,
     )
     # 一个 30 天后到期的批次
     await inventory_io.receive_stock(
         ingredient_id=str(sample_ingredient.id),
-        quantity=5.0, unit_cost_fen=5000,
-        batch_no="SAFE", expiry_date=today + timedelta(days=30),
-        store_id=STORE_ID, tenant_id=TENANT_ID, db=db_session,
+        quantity=5.0,
+        unit_cost_fen=5000,
+        batch_no="SAFE",
+        expiry_date=today + timedelta(days=30),
+        store_id=STORE_ID,
+        tenant_id=TENANT_ID,
+        db=db_session,
     )
 
     expiring = await expiry_monitor.check_expiring_items(
-        store_id=STORE_ID, days_ahead=3,
-        tenant_id=TENANT_ID, db=db_session,
+        store_id=STORE_ID,
+        days_ahead=3,
+        tenant_id=TENANT_ID,
+        db=db_session,
     )
 
     assert len(expiring) == 1
@@ -299,14 +364,19 @@ async def test_check_expired_items(db_session, sample_ingredient):
     """过期检测：已过期但有库存"""
     await inventory_io.receive_stock(
         ingredient_id=str(sample_ingredient.id),
-        quantity=2.0, unit_cost_fen=6000,
+        quantity=2.0,
+        unit_cost_fen=6000,
         batch_no="EXPIRED-001",
         expiry_date=date.today() - timedelta(days=3),
-        store_id=STORE_ID, tenant_id=TENANT_ID, db=db_session,
+        store_id=STORE_ID,
+        tenant_id=TENANT_ID,
+        db=db_session,
     )
 
     expired = await expiry_monitor.check_expired_items(
-        store_id=STORE_ID, tenant_id=TENANT_ID, db=db_session,
+        store_id=STORE_ID,
+        tenant_id=TENANT_ID,
+        db=db_session,
     )
 
     assert len(expired) == 1
@@ -321,20 +391,30 @@ async def test_generate_expiry_report(db_session, sample_ingredient):
     # 过期
     await inventory_io.receive_stock(
         ingredient_id=str(sample_ingredient.id),
-        quantity=1.0, unit_cost_fen=5000,
-        batch_no="EXP", expiry_date=today - timedelta(days=1),
-        store_id=STORE_ID, tenant_id=TENANT_ID, db=db_session,
+        quantity=1.0,
+        unit_cost_fen=5000,
+        batch_no="EXP",
+        expiry_date=today - timedelta(days=1),
+        store_id=STORE_ID,
+        tenant_id=TENANT_ID,
+        db=db_session,
     )
     # 3天内
     await inventory_io.receive_stock(
         ingredient_id=str(sample_ingredient.id),
-        quantity=2.0, unit_cost_fen=5000,
-        batch_no="SOON", expiry_date=today + timedelta(days=2),
-        store_id=STORE_ID, tenant_id=TENANT_ID, db=db_session,
+        quantity=2.0,
+        unit_cost_fen=5000,
+        batch_no="SOON",
+        expiry_date=today + timedelta(days=2),
+        store_id=STORE_ID,
+        tenant_id=TENANT_ID,
+        db=db_session,
     )
 
     report = await expiry_monitor.generate_expiry_report(
-        store_id=STORE_ID, tenant_id=TENANT_ID, db=db_session,
+        store_id=STORE_ID,
+        tenant_id=TENANT_ID,
+        db=db_session,
     )
 
     assert report["expired_count"] == 1
@@ -350,14 +430,20 @@ async def test_predict_stockout_no_consumption(db_session, sample_ingredient):
     """无消耗记录时预测返回 None"""
     await inventory_io.receive_stock(
         ingredient_id=str(sample_ingredient.id),
-        quantity=10.0, unit_cost_fen=5000,
-        batch_no="B001", expiry_date=None,
-        store_id=STORE_ID, tenant_id=TENANT_ID, db=db_session,
+        quantity=10.0,
+        unit_cost_fen=5000,
+        batch_no="B001",
+        expiry_date=None,
+        store_id=STORE_ID,
+        tenant_id=TENANT_ID,
+        db=db_session,
     )
 
     forecast = await stock_forecast.predict_stockout(
-        store_id=STORE_ID, ingredient_id=str(sample_ingredient.id),
-        tenant_id=TENANT_ID, db=db_session,
+        store_id=STORE_ID,
+        ingredient_id=str(sample_ingredient.id),
+        tenant_id=TENANT_ID,
+        db=db_session,
     )
 
     assert forecast["estimated_stockout_date"] is None

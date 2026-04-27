@@ -3,6 +3,7 @@
 记录执行 → 计算效果 → 生成学习上下文 → 统计 Agent 表现。
 形成"决策 → 执行 → 效果 → 学习 → 更优决策"正循环。
 """
+
 import time
 
 import structlog
@@ -81,7 +82,12 @@ class DecisionFeedbackService:
             revenue_change = after_revenue - before_revenue
 
             metrics_delta = {
-                "sales_count": {"before": before_sales, "after": after_sales, "change": sales_change, "pct": round(sales_pct, 1)},
+                "sales_count": {
+                    "before": before_sales,
+                    "after": after_sales,
+                    "change": sales_change,
+                    "pct": round(sales_pct, 1),
+                },
                 "revenue": {"before": before_revenue, "after": after_revenue, "change": revenue_change},
             }
 
@@ -110,8 +116,16 @@ class DecisionFeedbackService:
             waste_after = after_data.get("waste_rate", 0)
 
             metrics_delta = {
-                "shortage_count": {"before": shortage_before, "after": shortage_after, "change": shortage_after - shortage_before},
-                "waste_rate": {"before": waste_before, "after": waste_after, "change": round(waste_after - waste_before, 2)},
+                "shortage_count": {
+                    "before": shortage_before,
+                    "after": shortage_after,
+                    "change": shortage_after - shortage_before,
+                },
+                "waste_rate": {
+                    "before": waste_before,
+                    "after": waste_after,
+                    "change": round(waste_after - waste_before, 2),
+                },
             }
 
             # 评分：缺货减少 + 损耗降低
@@ -148,7 +162,12 @@ class DecisionFeedbackService:
             cost_change = after_labor_cost - before_labor_cost
 
             metrics_delta = {
-                "efficiency": {"before": before_efficiency, "after": after_efficiency, "change": round(eff_change, 2), "pct": round(eff_pct, 1)},
+                "efficiency": {
+                    "before": before_efficiency,
+                    "after": after_efficiency,
+                    "change": round(eff_change, 2),
+                    "pct": round(eff_pct, 1),
+                },
                 "labor_cost": {"before": before_labor_cost, "after": after_labor_cost, "change": cost_change},
             }
 
@@ -178,7 +197,11 @@ class DecisionFeedbackService:
 
             metrics_delta = {
                 "reach_rate": {"before": before_reach, "after": after_reach, "change": round(reach_change, 3)},
-                "conversion_rate": {"before": before_conversion, "after": after_conversion, "change": round(conv_change, 3)},
+                "conversion_rate": {
+                    "before": before_conversion,
+                    "after": after_conversion,
+                    "change": round(conv_change, 3),
+                },
             }
 
             # 转化率权重更高

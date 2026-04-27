@@ -19,6 +19,7 @@
     T9.  GET  /api/v1/omni/orders/pending              — 缺少 X-Tenant-ID 返回 400
     T10. POST /api/v1/omni/orders/{id}/accept          — OmniChannelError → 404
 """
+
 from __future__ import annotations
 
 import os
@@ -38,6 +39,7 @@ for _p in [_SRC_DIR, _ROOT_DIR]:
 
 # ─── 建立 src 包层级（使相对导入正常工作） ────────────────────────────────────
 
+
 def _ensure_pkg(pkg_name: str, pkg_path: str) -> None:
     if pkg_name not in sys.modules:
         mod = types.ModuleType(pkg_name)
@@ -46,13 +48,14 @@ def _ensure_pkg(pkg_name: str, pkg_path: str) -> None:
         sys.modules[pkg_name] = mod
 
 
-_ensure_pkg("src",           _SRC_DIR)
-_ensure_pkg("src.api",       os.path.join(_SRC_DIR, "api"))
-_ensure_pkg("src.models",    os.path.join(_SRC_DIR, "models"))
-_ensure_pkg("src.services",  os.path.join(_SRC_DIR, "services"))
+_ensure_pkg("src", _SRC_DIR)
+_ensure_pkg("src.api", os.path.join(_SRC_DIR, "api"))
+_ensure_pkg("src.models", os.path.join(_SRC_DIR, "models"))
+_ensure_pkg("src.services", os.path.join(_SRC_DIR, "services"))
 _ensure_pkg("src.repositories", os.path.join(_SRC_DIR, "repositories"))
 
 # ─── 注入 shared.events 存根（delivery_ops_service 导入它） ───────────────────
+
 
 def _ensure_stub(name: str, attrs: dict | None = None) -> types.ModuleType:
     """如果模块还未注册，创建一个轻量存根。"""
@@ -63,49 +66,48 @@ def _ensure_stub(name: str, attrs: dict | None = None) -> types.ModuleType:
         sys.modules[name] = mod
     return sys.modules[name]
 
+
 _ensure_stub("shared.events", {"UniversalPublisher": object})
 _ensure_stub("shared.adapters")
 _ensure_stub("shared.adapters.base")
 _ensure_stub("shared.adapters.base.src")
 _ensure_stub("shared.adapters.base.src.adapter", {"APIError": Exception})
 
-import asyncio
 from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from shared.ontology.src.database import get_db  # noqa: E402
 
 # ─── 导入被测路由 ───────────────────────────────────────────────────────────────
-
 # delivery_ops_routes
 from src.api.delivery_ops_routes import router as delivery_ops_router  # type: ignore[import]
+from src.api.omni_channel_routes import router as omni_channel_router  # type: ignore[import]
 
 # omni_channel_routes 依赖 omni_channel_service — 先注入存根再导入路由
 # (避免 omni_channel_service 在导入时连接真实 DB 或触发副作用)
 from src.services.omni_channel_service import (  # type: ignore[import]
     OmniChannelError,
-    OmniChannelService,
-    UnsupportedPlatformError,
 )
-from src.api.omni_channel_routes import router as omni_channel_router  # type: ignore[import]
 
 # ─── 公共常量 ──────────────────────────────────────────────────────────────────
 
 TENANT_ID = str(uuid.uuid4())
-STORE_ID  = str(uuid.uuid4())
-_HEADERS  = {"X-Tenant-ID": TENANT_ID}
+STORE_ID = str(uuid.uuid4())
+_HEADERS = {"X-Tenant-ID": TENANT_ID}
 
 
 # ─── 工具函数 ──────────────────────────────────────────────────────────────────
 
+
 def _override_db(db_mock):
     """生成 FastAPI dependency override 函数。"""
+
     def _dep():
         return db_mock
+
     return _dep
 
 
@@ -125,28 +127,28 @@ def _make_app_omni(db_mock):
 
 def _make_db():
     db = AsyncMock()
-    db.commit  = AsyncMock()
+    db.commit = AsyncMock()
     db.execute = AsyncMock()
     return db
 
 
 def _make_store_config(platform: str = "meituan") -> MagicMock:
     cfg = MagicMock()
-    cfg.id                      = uuid.uuid4()
-    cfg.store_id                = uuid.UUID(STORE_ID)
-    cfg.platform                = platform
-    cfg.auto_accept             = True
+    cfg.id = uuid.uuid4()
+    cfg.store_id = uuid.UUID(STORE_ID)
+    cfg.platform = platform
+    cfg.auto_accept = True
     cfg.auto_accept_max_per_hour = 30
-    cfg.busy_mode               = False
+    cfg.busy_mode = False
     cfg.busy_mode_prep_time_min = 40
-    cfg.normal_prep_time_min    = 25
-    cfg.current_prep_time_min   = 25
-    cfg.busy_mode_started_at    = None
-    cfg.busy_mode_auto_off_at   = None
+    cfg.normal_prep_time_min = 25
+    cfg.current_prep_time_min = 25
+    cfg.busy_mode_started_at = None
+    cfg.busy_mode_auto_off_at = None
     cfg.max_delivery_distance_km = 5.0
-    cfg.is_active               = True
-    cfg.updated_at              = datetime.now(timezone.utc)
-    cfg.created_at              = datetime.now(timezone.utc)
+    cfg.is_active = True
+    cfg.updated_at = datetime.now(timezone.utc)
+    cfg.created_at = datetime.now(timezone.utc)
     # model_dump 返回简单 dict，满足路由的 .model_dump(mode="json") 调用
     cfg.model_dump.return_value = {
         "id": str(cfg.id),
@@ -162,6 +164,7 @@ def _make_store_config(platform: str = "meituan") -> MagicMock:
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # T1 — GET /api/v1/delivery/config/{store_id} 正常查询所有平台配置
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 def test_get_all_configs_ok():
     """正常查询门店三个平台配置，返回 ok=True 且 data 列表长度 == 3。"""
@@ -190,6 +193,7 @@ def test_get_all_configs_ok():
 # T2 — PUT /api/v1/delivery/config/{store_id}/{platform} 正常更新配置
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_update_config_ok():
     """正常更新美团配置（出餐时间改为 30 分钟），ok=True。"""
     db = _make_db()
@@ -217,6 +221,7 @@ def test_update_config_ok():
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # T3 — POST /api/v1/delivery/busy-mode/{store_id}/{platform} 正常开启忙碌模式
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 def test_enable_busy_mode_ok():
     """正常开启美团忙碌模式（duration_minutes=120），ok=True 且 busy_mode==True。"""
@@ -247,6 +252,7 @@ def test_enable_busy_mode_ok():
 # T4 — DELETE /api/v1/delivery/busy-mode/{store_id}/{platform} 配置不存在 → 404
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_disable_busy_mode_config_not_found_returns_404():
     """ConfigNotFoundError 时路由应返回 404。"""
     from src.services.delivery_ops_service import ConfigNotFoundError  # type: ignore[import]
@@ -271,6 +277,7 @@ def test_disable_busy_mode_config_not_found_returns_404():
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # T5 — GET /api/v1/delivery/config/{store_id}/{platform} DeliveryOpsError → 400
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 def test_get_config_ops_error_returns_400():
     """DeliveryOpsService 抛出 DeliveryOpsError 时路由应返回 400。"""
@@ -297,18 +304,19 @@ def test_get_config_ops_error_returns_400():
 # T6 — GET /api/v1/omni/orders/pending 正常查询待接单列表
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def _make_unified_order(platform: str = "meituan") -> MagicMock:
     o = MagicMock()
     o.internal_order_id = str(uuid.uuid4())
-    o.platform          = platform
+    o.platform = platform
     o.platform_order_id = f"{platform[:2].upper()}{uuid.uuid4().hex[:8]}"
-    o.status            = "pending"
-    o.total_fen         = 4800
-    o.notes             = None
-    o.customer_phone    = "138****0000"
-    o.delivery_address  = "某某路1号"
-    o.created_at        = datetime.now(timezone.utc)
-    o.items             = []
+    o.status = "pending"
+    o.total_fen = 4800
+    o.notes = None
+    o.customer_phone = "138****0000"
+    o.delivery_address = "某某路1号"
+    o.created_at = datetime.now(timezone.utc)
+    o.items = []
     return o
 
 
@@ -340,6 +348,7 @@ def test_get_pending_orders_ok():
 # T7 — POST /api/v1/omni/orders/{id}/accept 正常接单
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_accept_order_ok():
     """正常接单（estimated_minutes=20），ok=True 且 data 包含 accepted=True。"""
     db = _make_db()
@@ -367,6 +376,7 @@ def test_accept_order_ok():
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # T8 — POST /api/v1/omni/orders/{id}/reject 正常拒单
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 def test_reject_order_ok():
     """正常拒单（reason_code=2），ok=True。"""
@@ -396,6 +406,7 @@ def test_reject_order_ok():
 # T9 — GET /api/v1/omni/orders/pending 缺少 X-Tenant-ID → 400
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_get_pending_orders_missing_tenant_returns_400():
     """不传 X-Tenant-ID，_get_tenant_id 应触发 400。"""
     db = _make_db()
@@ -414,6 +425,7 @@ def test_get_pending_orders_missing_tenant_returns_400():
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # T10 — POST /api/v1/omni/orders/{id}/accept OmniChannelError → 404
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 def test_accept_order_omni_error_returns_404():
     """OmniChannelService.accept_order 抛出 OmniChannelError 时应返回 404。"""

@@ -87,9 +87,7 @@ class OAuth2Service:
             "warning": "app_secret只显示一次，请立即保存，丢失后需要重置",
         }
 
-    async def get_application(
-        self, app_id: UUID, tenant_id: UUID, db: AsyncSession
-    ) -> dict | None:
+    async def get_application(self, app_id: UUID, tenant_id: UUID, db: AsyncSession) -> dict | None:
         """获取应用详情（不含secret哈希）"""
         result = await db.execute(
             text("""
@@ -146,9 +144,7 @@ class OAuth2Service:
         total = count_result.scalar_one()
         return {"items": items, "total": total, "page": page, "size": size}
 
-    async def revoke_application(
-        self, app_id: UUID, tenant_id: UUID, db: AsyncSession
-    ) -> bool:
+    async def revoke_application(self, app_id: UUID, tenant_id: UUID, db: AsyncSession) -> bool:
         """吊销应用，同时吊销所有关联token"""
         result = await db.execute(
             text("""
@@ -384,9 +380,7 @@ class OAuth2Service:
         logger.info("token_revoked", token_id=str(row[0]))
         return True
 
-    async def rotate_secret(
-        self, app_id: UUID, tenant_id: UUID, db: AsyncSession
-    ) -> dict:
+    async def rotate_secret(self, app_id: UUID, tenant_id: UUID, db: AsyncSession) -> dict:
         """重置app_secret，同时吊销该app的所有现存token。
 
         明文new_secret只返回这一次。

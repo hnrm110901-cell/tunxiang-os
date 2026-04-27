@@ -7,11 +7,10 @@ GET  /api/v1/intel/sentiment/alerts               — 差评预警
 
 情感分析使用关键词匹配实现（不依赖外部 NLP 库）。
 """
+
 from __future__ import annotations
 
-import re
-import uuid
-from datetime import date, datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 import structlog
@@ -30,21 +29,69 @@ router = APIRouter(prefix="/api/v1/intel/sentiment", tags=["sentiment"])
 # ─── 情感关键词词典 ──────────────────────────────────────────────────
 
 POSITIVE_KEYWORDS: dict[str, float] = {
-    "好吃": 0.8, "美味": 0.9, "新鲜": 0.7, "推荐": 0.7, "满意": 0.8,
-    "干净": 0.6, "热情": 0.7, "速度快": 0.7, "服务好": 0.8, "环境好": 0.7,
-    "分量足": 0.7, "实惠": 0.7, "味道好": 0.8, "正宗": 0.8, "惊喜": 0.9,
-    "超值": 0.8, "舒适": 0.6, "贴心": 0.7, "回头客": 0.8, "必点": 0.8,
-    "五星": 0.9, "非常好": 0.9, "太棒了": 0.9, "喜欢": 0.7, "入味": 0.7,
-    "嫩": 0.6, "酥脆": 0.7, "香": 0.6, "地道": 0.7, "下次还来": 0.8,
+    "好吃": 0.8,
+    "美味": 0.9,
+    "新鲜": 0.7,
+    "推荐": 0.7,
+    "满意": 0.8,
+    "干净": 0.6,
+    "热情": 0.7,
+    "速度快": 0.7,
+    "服务好": 0.8,
+    "环境好": 0.7,
+    "分量足": 0.7,
+    "实惠": 0.7,
+    "味道好": 0.8,
+    "正宗": 0.8,
+    "惊喜": 0.9,
+    "超值": 0.8,
+    "舒适": 0.6,
+    "贴心": 0.7,
+    "回头客": 0.8,
+    "必点": 0.8,
+    "五星": 0.9,
+    "非常好": 0.9,
+    "太棒了": 0.9,
+    "喜欢": 0.7,
+    "入味": 0.7,
+    "嫩": 0.6,
+    "酥脆": 0.7,
+    "香": 0.6,
+    "地道": 0.7,
+    "下次还来": 0.8,
 }
 
 NEGATIVE_KEYWORDS: dict[str, float] = {
-    "难吃": -0.9, "太咸": -0.7, "太淡": -0.6, "不新鲜": -0.8, "变质": -0.9,
-    "服务差": -0.8, "态度差": -0.8, "上菜慢": -0.7, "等太久": -0.7, "脏": -0.8,
-    "贵": -0.5, "太贵": -0.7, "分量少": -0.7, "不卫生": -0.9, "拉肚子": -0.9,
-    "食物中毒": -1.0, "虫": -0.9, "头发": -0.9, "苍蝇": -0.9, "过期": -0.9,
-    "冷了": -0.6, "凉了": -0.6, "油腻": -0.5, "不好吃": -0.8, "失望": -0.8,
-    "投诉": -0.8, "退款": -0.7, "差评": -0.9, "再也不来": -0.9, "踩雷": -0.8,
+    "难吃": -0.9,
+    "太咸": -0.7,
+    "太淡": -0.6,
+    "不新鲜": -0.8,
+    "变质": -0.9,
+    "服务差": -0.8,
+    "态度差": -0.8,
+    "上菜慢": -0.7,
+    "等太久": -0.7,
+    "脏": -0.8,
+    "贵": -0.5,
+    "太贵": -0.7,
+    "分量少": -0.7,
+    "不卫生": -0.9,
+    "拉肚子": -0.9,
+    "食物中毒": -1.0,
+    "虫": -0.9,
+    "头发": -0.9,
+    "苍蝇": -0.9,
+    "过期": -0.9,
+    "冷了": -0.6,
+    "凉了": -0.6,
+    "油腻": -0.5,
+    "不好吃": -0.8,
+    "失望": -0.8,
+    "投诉": -0.8,
+    "退款": -0.7,
+    "差评": -0.9,
+    "再也不来": -0.9,
+    "踩雷": -0.8,
 }
 
 # 问题分类关键词映射
@@ -58,6 +105,7 @@ ISSUE_CATEGORIES: dict[str, list[str]] = {
 
 
 # ─── 情感分析核心函数 ────────────────────────────────────────────────
+
 
 def _analyze_single_review(content: str, rating: float | None = None) -> dict[str, Any]:
     """分析单条评价的情感"""
@@ -123,6 +171,7 @@ def _analyze_single_review(content: str, rating: float | None = None) -> dict[st
 
 # ─── 请求模型 ────────────────────────────────────────────────────────
 
+
 class ReviewItem(BaseModel):
     platform: str = Field(description="平台: meituan/dianping/douyin/self")
     content: str = Field(description="评价内容")
@@ -135,6 +184,7 @@ class AnalyzeRequest(BaseModel):
 
 
 # ─── DB 查询函数 ──────────────────────────────────────────────────────
+
 
 async def _query_dashboard(
     store_id: str,
@@ -161,8 +211,7 @@ async def _query_dashboard(
               AND created_at BETWEEN :start AND :end
             GROUP BY severity
         """),
-        {"tenant_id": tenant_id, "store_id": store_id,
-         "start": period_start, "end": now.isoformat()},
+        {"tenant_id": tenant_id, "store_id": store_id, "start": period_start, "end": now.isoformat()},
     )
     alert_rows = r_alerts.fetchall()
     negative_count = 0
@@ -184,8 +233,7 @@ async def _query_dashboard(
               AND status = 'completed'
               AND created_at BETWEEN :start AND :end
         """),
-        {"tenant_id": tenant_id, "store_id": store_id,
-         "start": period_start, "end": now.isoformat()},
+        {"tenant_id": tenant_id, "store_id": store_id, "start": period_start, "end": now.isoformat()},
     )
     order_row = r_orders.fetchone()
     total_orders = int(order_row[0] or 0)
@@ -214,8 +262,7 @@ async def _query_dashboard(
             GROUP BY week_start
             ORDER BY week_start
         """),
-        {"tenant_id": tenant_id, "store_id": store_id,
-         "start": period_start, "end": now.isoformat()},
+        {"tenant_id": tenant_id, "store_id": store_id, "start": period_start, "end": now.isoformat()},
     )
     trend_rows = r_trend.fetchall()
     trend = []
@@ -223,11 +270,13 @@ async def _query_dashboard(
         t_neg = int(tr[1] or 0)
         t_total = int(tr[2] or 0)
         t_score = round(-0.8 * (t_neg / t_total) + 0.8 * (1 - t_neg / t_total), 3) if t_total else 0.0
-        trend.append({
-            "date": tr[0].strftime("%Y-%m-%d") if tr[0] else "",
-            "score": t_score,
-            "count": t_total,
-        })
+        trend.append(
+            {
+                "date": tr[0].strftime("%Y-%m-%d") if tr[0] else "",
+                "score": t_score,
+                "count": t_total,
+            }
+        )
 
     return {
         "store_id": store_id,
@@ -237,7 +286,7 @@ async def _query_dashboard(
         "neutral_rate": neutral_rate,
         "negative_rate": negative_rate,
         "avg_sentiment_score": avg_score,
-        "top_praise_keywords": [],   # 无独立评价文本表，待接入后填充
+        "top_praise_keywords": [],  # 无独立评价文本表，待接入后填充
         "top_complaint_keywords": [],
         "trend": trend,
         "competitor_compare": None,  # 需跨门店数据，暂不实现
@@ -286,21 +335,24 @@ async def _query_alerts(
     rows = r.fetchall()
     alerts: list[dict[str, Any]] = []
     for row in rows:
-        alerts.append({
-            "id": str(row[0]),
-            "store_id": str(row[1]) if row[1] else None,
-            "platform": "internal",          # compliance_alerts 无平台字段，标记为内部
-            "rating": None,
-            "content": row[5] or row[4] or "",
-            "sentiment_score": -0.8 if row[2] == "critical" else -0.5,
-            "issues": [],
-            "occurred_at": row[6].isoformat() if row[6] else "",
-            "status": row[3] or "pending",
-        })
+        alerts.append(
+            {
+                "id": str(row[0]),
+                "store_id": str(row[1]) if row[1] else None,
+                "platform": "internal",  # compliance_alerts 无平台字段，标记为内部
+                "rating": None,
+                "content": row[5] or row[4] or "",
+                "sentiment_score": -0.8 if row[2] == "critical" else -0.5,
+                "issues": [],
+                "occurred_at": row[6].isoformat() if row[6] else "",
+                "status": row[3] or "pending",
+            }
+        )
     return alerts
 
 
 # ─── 路由 ─────────────────────────────────────────────────────────────
+
 
 @router.post("/analyze")
 async def analyze_sentiment(
@@ -317,12 +369,14 @@ async def analyze_sentiment(
 
     for review in body.reviews:
         analysis = _analyze_single_review(review.content, review.rating)
-        results.append({
-            "platform": review.platform,
-            "content": review.content[:100],  # 截取前100字
-            "rating": review.rating,
-            **analysis,
-        })
+        results.append(
+            {
+                "platform": review.platform,
+                "content": review.content[:100],  # 截取前100字
+                "rating": review.rating,
+                **analysis,
+            }
+        )
         all_positive.extend(analysis["positive_keywords"])
         all_negative.extend(analysis["negative_keywords"])
         all_issues.extend(analysis["issues"])
@@ -334,6 +388,7 @@ async def analyze_sentiment(
 
     # 关键词频次统计
     from collections import Counter
+
     pos_counts = Counter(all_positive).most_common(10)
     neg_counts = Counter(all_negative).most_common(10)
     issue_counts = Counter(all_issues).most_common(10)

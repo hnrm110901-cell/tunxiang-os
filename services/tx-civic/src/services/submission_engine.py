@@ -27,6 +27,7 @@ MAX_RETRIES = 5
 # 纯函数
 # ---------------------------------------------------------------------------
 
+
 def compute_payload_hash(payload: dict | str) -> str:
     """SHA256 哈希 — 用于幂等性检查。"""
     if isinstance(payload, dict):
@@ -38,7 +39,7 @@ def compute_payload_hash(payload: dict | str) -> str:
 
 def calculate_retry_delay(retry_count: int) -> int:
     """指数退避: 2^retry_count * 60 秒，最大 3600 秒。"""
-    delay = min(2 ** retry_count * 60, 3600)
+    delay = min(2**retry_count * 60, 3600)
     return delay
 
 
@@ -65,6 +66,7 @@ def should_auto_submit(domain: str, alert_type: str | None = None) -> bool:
 # ---------------------------------------------------------------------------
 # 内部辅助
 # ---------------------------------------------------------------------------
+
 
 async def _get_city_adapter(tenant_id: str, store_id: str, domain: str, db: Any) -> dict | None:
     """查找门店所在城市的上报适配器配置。"""
@@ -103,6 +105,7 @@ async def _check_idempotent(tenant_id: str, store_id: str, payload_hash: str, db
 # 业务服务
 # ---------------------------------------------------------------------------
 
+
 async def submit_to_platform(
     tenant_id: str,
     store_id: str,
@@ -119,8 +122,10 @@ async def submit_to_platform(
     submission_id = str(uuid.uuid4())
     payload_hash = compute_payload_hash(data)
     log = logger.bind(
-        tenant_id=tenant_id, store_id=store_id,
-        domain=domain, submission_id=submission_id,
+        tenant_id=tenant_id,
+        store_id=store_id,
+        domain=domain,
+        submission_id=submission_id,
     )
 
     async with TenantSession(tenant_id) as db:
@@ -287,8 +292,12 @@ async def batch_submit(
 
     logger.info(
         "batch_submit_completed",
-        tenant_id=tenant_id, domain=domain,
-        total=len(records), submitted=submitted, skipped=skipped, failed=failed,
+        tenant_id=tenant_id,
+        domain=domain,
+        total=len(records),
+        submitted=submitted,
+        skipped=skipped,
+        failed=failed,
     )
     return {
         "total": len(records),

@@ -29,7 +29,6 @@ WHERE ar.tenant_id = :tenant_id
 ORDER BY ar.account_name, COALESCE(ar.biz_date, DATE(ar.created_at)), ar.created_at
 """
 
-DIMENSIONS = ["store_name", "account_name", "account_type", "biz_date",
-              "order_no", "operator_name"]
+DIMENSIONS = ["store_name", "account_name", "account_type", "biz_date", "order_no", "operator_name"]
 METRICS = ["debit_fen", "credit_fen", "running_balance_fen"]
 FILTERS = ["start_date", "end_date", "store_id"]

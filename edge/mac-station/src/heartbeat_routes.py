@@ -157,10 +157,7 @@ def _find_device_by_id(tenant_id: str, device_id: str) -> dict | None:
 
 
 def _list_devices_for_store(tenant_id: str, store_id: str) -> list[dict]:
-    return [
-        r for r in _device_registry.values()
-        if r["tenant_id"] == tenant_id and r["store_id"] == store_id
-    ]
+    return [r for r in _device_registry.values() if r["tenant_id"] == tenant_id and r["store_id"] == store_id]
 
 
 def _list_devices_for_tenant(tenant_id: str) -> list[dict]:
@@ -261,11 +258,13 @@ async def register_device(
         log.error("device_register_error", error=str(exc))
         raise _err("REGISTER_FAILED", f"设备注册失败: {exc}", 500) from exc
 
-    return _ok({
-        "device_id": device["device_id"],
-        "registered_at": device["registered_at"],
-        "status": device["status"],
-    })
+    return _ok(
+        {
+            "device_id": device["device_id"],
+            "registered_at": device["registered_at"],
+            "status": device["status"],
+        }
+    )
 
 
 @router.post("/api/v1/devices/{device_id}/heartbeat")
@@ -330,12 +329,14 @@ async def device_heartbeat(
 
     log.debug("device_heartbeat_received", device_id=device_id, has_warnings=bool(warnings))
 
-    return _ok({
-        "device_id": device_id,
-        "status": "online",
-        "last_heartbeat_at": now_str,
-        "warnings": warnings,
-    })
+    return _ok(
+        {
+            "device_id": device_id,
+            "status": "online",
+            "last_heartbeat_at": now_str,
+            "warnings": warnings,
+        }
+    )
 
 
 @router.get("/api/v1/devices/alerts")
@@ -405,7 +406,7 @@ async def list_devices(
 
     total = len(devices)
     offset = (page - 1) * size
-    paged = devices[offset: offset + size]
+    paged = devices[offset : offset + size]
 
     return _ok({"items": paged, "total": total, "page": page, "size": size})
 
@@ -458,8 +459,10 @@ async def update_device_status(
         new_status=req.status,
     )
 
-    return _ok({
-        "device_id": device_id,
-        "status": req.status,
-        "updated_at": device["updated_at"],
-    })
+    return _ok(
+        {
+            "device_id": device_id,
+            "status": req.status,
+            "updated_at": device["updated_at"],
+        }
+    )

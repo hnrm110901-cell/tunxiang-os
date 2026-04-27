@@ -2,6 +2,7 @@
 
 聚合当日经营数据，生成复盘报告，支持行动项管理。
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -67,8 +68,7 @@ async def generate_daily_review(
         ),
         "order_count": rev.get("order_count", 0),
         "avg_ticket_fen": (
-            rev.get("total_revenue_fen", 0) // rev.get("order_count", 1)
-            if rev.get("order_count", 0) > 0 else 0
+            rev.get("total_revenue_fen", 0) // rev.get("order_count", 1) if rev.get("order_count", 0) > 0 else 0
         ),
         "table_turnover": rev.get("table_turnover", 0.0),
         "channel_breakdown": rev.get("channel_breakdown", {}),
@@ -96,14 +96,16 @@ async def generate_daily_review(
 
     # 异常列表
     exception_list = []
-    for exc in (exceptions or []):
-        exception_list.append({
-            "exception_id": exc.get("exception_id", ""),
-            "type": exc.get("type", ""),
-            "summary": exc.get("summary", ""),
-            "status": exc.get("status", ""),
-            "impact_fen": exc.get("impact_fen", 0),
-        })
+    for exc in exceptions or []:
+        exception_list.append(
+            {
+                "exception_id": exc.get("exception_id", ""),
+                "type": exc.get("type", ""),
+                "summary": exc.get("summary", ""),
+                "status": exc.get("status", ""),
+                "impact_fen": exc.get("impact_fen", 0),
+            }
+        )
 
     # 菜品表现
     dish_performance = _build_dish_performance(dish_sales or [])
@@ -113,7 +115,11 @@ async def generate_daily_review(
 
     # 自动生成行动项建议
     action_items = _generate_action_suggestions(
-        revenue_summary, cost_summary, margin_summary, exception_list, dish_performance,
+        revenue_summary,
+        cost_summary,
+        margin_summary,
+        exception_list,
+        dish_performance,
     )
 
     review = {
@@ -169,18 +175,20 @@ async def submit_action_items(
     """
     enriched = []
     for idx, item in enumerate(items):
-        enriched.append({
-            "action_id": f"act_{store_id}_{uuid.uuid4().hex[:8]}",
-            "seq": idx,
-            "title": item.get("title", ""),
-            "description": item.get("description", ""),
-            "assignee_id": item.get("assignee_id", ""),
-            "priority": item.get("priority", "medium"),
-            "due_date": item.get("due_date", ""),
-            "status": "pending",
-            "created_by": manager_id,
-            "created_at": datetime.utcnow().isoformat(),
-        })
+        enriched.append(
+            {
+                "action_id": f"act_{store_id}_{uuid.uuid4().hex[:8]}",
+                "seq": idx,
+                "title": item.get("title", ""),
+                "description": item.get("description", ""),
+                "assignee_id": item.get("assignee_id", ""),
+                "priority": item.get("priority", "medium"),
+                "due_date": item.get("due_date", ""),
+                "status": "pending",
+                "created_by": manager_id,
+                "created_at": datetime.utcnow().isoformat(),
+            }
+        )
 
     log.info(
         "action_items_submitted",
@@ -279,14 +287,16 @@ async def sign_off_review(
     )
 
     total_revenue_fen = (review or {}).get("revenue_summary", {}).get("total_revenue_fen", 0)
-    asyncio.create_task(UniversalPublisher.publish(
-        event_type=OpsEventType.DAILY_E7_SETTLEMENT_DONE,
-        tenant_id=uuid.UUID(tenant_id),
-        store_id=uuid.UUID(store_id),
-        entity_id=None,
-        event_data={"store_id": store_id, "total_revenue_fen": total_revenue_fen},
-        source_service="tx-ops",
-    ))
+    asyncio.create_task(
+        UniversalPublisher.publish(
+            event_type=OpsEventType.DAILY_E7_SETTLEMENT_DONE,
+            tenant_id=uuid.UUID(tenant_id),
+            store_id=uuid.UUID(store_id),
+            entity_id=None,
+            event_data={"store_id": store_id, "total_revenue_fen": total_revenue_fen},
+            source_service="tx-ops",
+        )
+    )
 
     return {
         "signed_off": True,
@@ -313,14 +323,16 @@ def _build_dish_performance(dish_sales: List[Dict[str, Any]]) -> List[Dict[str, 
     """构建菜品表现排行。"""
     result = []
     for dish in dish_sales:
-        result.append({
-            "dish_id": dish.get("dish_id", ""),
-            "dish_name": dish.get("dish_name", ""),
-            "qty_sold": dish.get("qty_sold", 0),
-            "revenue_fen": dish.get("revenue_fen", 0),
-            "gross_margin_pct": dish.get("gross_margin_pct", 0.0),
-            "return_rate_pct": dish.get("return_rate_pct", 0.0),
-        })
+        result.append(
+            {
+                "dish_id": dish.get("dish_id", ""),
+                "dish_name": dish.get("dish_name", ""),
+                "qty_sold": dish.get("qty_sold", 0),
+                "revenue_fen": dish.get("revenue_fen", 0),
+                "gross_margin_pct": dish.get("gross_margin_pct", 0.0),
+                "return_rate_pct": dish.get("return_rate_pct", 0.0),
+            }
+        )
     result.sort(key=lambda d: d["revenue_fen"], reverse=True)
     return result
 
@@ -329,15 +341,17 @@ def _build_staff_performance(staff_data: List[Dict[str, Any]]) -> List[Dict[str,
     """构建员工表现汇总。"""
     result = []
     for s in staff_data:
-        result.append({
-            "staff_id": s.get("staff_id", ""),
-            "name": s.get("name", ""),
-            "role": s.get("role", ""),
-            "orders_served": s.get("orders_served", 0),
-            "revenue_fen": s.get("revenue_fen", 0),
-            "complaints": s.get("complaints", 0),
-            "tips_fen": s.get("tips_fen", 0),
-        })
+        result.append(
+            {
+                "staff_id": s.get("staff_id", ""),
+                "name": s.get("name", ""),
+                "role": s.get("role", ""),
+                "orders_served": s.get("orders_served", 0),
+                "revenue_fen": s.get("revenue_fen", 0),
+                "complaints": s.get("complaints", 0),
+                "tips_fen": s.get("tips_fen", 0),
+            }
+        )
     return result
 
 
@@ -354,41 +368,49 @@ def _generate_action_suggestions(
     # 营收达成率低于 80%
     achievement = revenue_summary.get("achievement_pct", 100)
     if achievement < 80:
-        suggestions.append({
-            "type": "revenue",
-            "priority": "high",
-            "title": f"营收达成率仅 {achievement}%，需制定提升方案",
-            "description": "分析客流和客单价，制定次日促销或引流措施",
-        })
+        suggestions.append(
+            {
+                "type": "revenue",
+                "priority": "high",
+                "title": f"营收达成率仅 {achievement}%，需制定提升方案",
+                "description": "分析客流和客单价，制定次日促销或引流措施",
+            }
+        )
 
     # 食材成本率超 40%
     food_ratio = margin_summary.get("food_cost_ratio_pct", 0)
     if food_ratio > 40:
-        suggestions.append({
-            "type": "cost",
-            "priority": "high",
-            "title": f"食材成本率 {food_ratio}%，超出40%警戒线",
-            "description": "核查高成本菜品用量，检查损耗和采购价格",
-        })
+        suggestions.append(
+            {
+                "type": "cost",
+                "priority": "high",
+                "title": f"食材成本率 {food_ratio}%，超出40%警戒线",
+                "description": "核查高成本菜品用量，检查损耗和采购价格",
+            }
+        )
 
     # 异常数量超 3 个
     if len(exception_list) > 3:
-        suggestions.append({
-            "type": "exception",
-            "priority": "medium",
-            "title": f"今日 {len(exception_list)} 个异常事件，需重点关注",
-            "description": "逐个复盘异常根因，制定预防措施",
-        })
+        suggestions.append(
+            {
+                "type": "exception",
+                "priority": "medium",
+                "title": f"今日 {len(exception_list)} 个异常事件，需重点关注",
+                "description": "逐个复盘异常根因，制定预防措施",
+            }
+        )
 
     # 退菜率高的菜品
     for dish in dish_performance:
         if dish.get("return_rate_pct", 0) > 5:
-            suggestions.append({
-                "type": "dish_quality",
-                "priority": "medium",
-                "title": f"菜品「{dish['dish_name']}」退菜率 {dish['return_rate_pct']}%",
-                "description": "与厨师长沟通出品质量，必要时调整配方或暂停售卖",
-            })
+            suggestions.append(
+                {
+                    "type": "dish_quality",
+                    "priority": "medium",
+                    "title": f"菜品「{dish['dish_name']}」退菜率 {dish['return_rate_pct']}%",
+                    "description": "与厨师长沟通出品质量，必要时调整配方或暂停售卖",
+                }
+            )
             break  # 只取第一个高退菜率菜品
 
     return suggestions

@@ -10,6 +10,7 @@
 
 所有金额单位：分（int）。
 """
+
 from __future__ import annotations
 
 import random

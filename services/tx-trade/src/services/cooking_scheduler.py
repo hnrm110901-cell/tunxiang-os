@@ -9,6 +9,7 @@
 - 档口负载均衡建议
 - TableFireCoordinator 集成：分单后自动创建协调计划
 """
+
 import statistics
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -24,13 +25,13 @@ logger = structlog.get_logger()
 # ─── 默认出餐时间预估（秒） ───
 
 DEFAULT_COOKING_TIME_SEC = 300  # 5分钟
-SIMPLE_DISH_SEC = 120           # 简单菜品 2分钟
-COMPLEX_DISH_SEC = 600          # 复杂菜品 10分钟
+SIMPLE_DISH_SEC = 120  # 简单菜品 2分钟
+COMPLEX_DISH_SEC = 600  # 复杂菜品 10分钟
 
 # ─── 历史数据阈值 ───
 
-MIN_HISTORY_SAMPLES = 10        # 最少历史样本数（不足时 fallback 到 BOM 预设值）
-HISTORY_QUERY_LIMIT = 50        # 查询最近 N 条完成记录
+MIN_HISTORY_SAMPLES = 10  # 最少历史样本数（不足时 fallback 到 BOM 预设值）
+HISTORY_QUERY_LIMIT = 50  # 查询最近 N 条完成记录
 
 # ─── 档口负载均衡阈值 ───
 
@@ -157,12 +158,14 @@ async def coordinate_same_table(
         else:
             est_seconds = DEFAULT_COOKING_TIME_SEC
 
-        task_estimates.append({
-            "task_id": task["task_id"],
-            "dish_id": dish_id,
-            "dish_name": task.get("dish_name", ""),
-            "estimated_seconds": est_seconds,
-        })
+        task_estimates.append(
+            {
+                "task_id": task["task_id"],
+                "dish_id": dish_id,
+                "dish_name": task.get("dish_name", ""),
+                "estimated_seconds": est_seconds,
+            }
+        )
 
     # 2) 找到 bottleneck（最慢的菜）
     bottleneck_seconds = max(t["estimated_seconds"] for t in task_estimates)
@@ -174,13 +177,15 @@ async def coordinate_same_table(
     coordination_result: list[dict] = []
     for t in task_estimates:
         delay = bottleneck_seconds - t["estimated_seconds"]
-        coordination_result.append({
-            "task_id": t["task_id"],
-            "dish_name": t["dish_name"],
-            "estimated_seconds": t["estimated_seconds"],
-            "start_delay_seconds": delay,
-            "target_completion": target_completion.isoformat(),
-        })
+        coordination_result.append(
+            {
+                "task_id": t["task_id"],
+                "dish_name": t["dish_name"],
+                "estimated_seconds": t["estimated_seconds"],
+                "start_delay_seconds": delay,
+                "target_completion": target_completion.isoformat(),
+            }
+        )
 
     log.info(
         "cooking_scheduler.coordinate_same_table.done",
@@ -224,9 +229,7 @@ async def create_table_fire_plan(
     """
     from .table_production_plan import TableFireCoordinator
 
-    log = logger.bind(
-        order_id=order_id, table_no=table_no, tenant_id=tenant_id
-    )
+    log = logger.bind(order_id=order_id, table_no=table_no, tenant_id=tenant_id)
 
     if not dept_tasks:
         log.info("cooking_scheduler.table_fire.no_dept_tasks")
@@ -362,9 +365,7 @@ async def estimate_cooking_time(dish_id: str, db: AsyncSession) -> dict:
 
     try:
         result = await db.execute(history_stmt)
-        durations: list[float] = [
-            float(row[0]) for row in result.all() if row[0] is not None and row[0] > 0
-        ]
+        durations: list[float] = [float(row[0]) for row in result.all() if row[0] is not None and row[0] > 0]
     except (ValueError, AttributeError) as exc:
         log.warning("cooking_scheduler.estimate.history_query_failed", error=str(exc))
         durations = []
@@ -448,13 +449,18 @@ async def _calc_load_factor(dish_id: str, db: AsyncSession) -> float:
     """
     # 查档口
     try:
-        station_stmt = select(OrderItem.kds_station).where(
-            and_(
-                OrderItem.dish_id == uuid.UUID(dish_id),
-                OrderItem.kds_station.isnot(None),
-                OrderItem.is_deleted == False,  # noqa: E712
+        station_stmt = (
+            select(OrderItem.kds_station)
+            .where(
+                and_(
+                    OrderItem.dish_id == uuid.UUID(dish_id),
+                    OrderItem.kds_station.isnot(None),
+                    OrderItem.is_deleted == False,  # noqa: E712
+                )
             )
-        ).order_by(OrderItem.created_at.desc()).limit(1)
+            .order_by(OrderItem.created_at.desc())
+            .limit(1)
+        )
         station_result = await db.execute(station_stmt)
         station = station_result.scalar_one_or_none()
     except (ValueError, AttributeError):
@@ -605,11 +611,15 @@ async def get_dept_load(dept_id: str, db: AsyncSession) -> dict:
     log = logger.bind(dept_id=dept_id)
 
     # 查询该档口的 pending 和 cooking 任务
-    pending_stmt = select(func.count()).select_from(OrderItem).where(
-        and_(
-            OrderItem.kds_station == dept_id,
-            OrderItem.sent_to_kds_flag == True,  # noqa: E712
-            OrderItem.is_deleted == False,  # noqa: E712
+    pending_stmt = (
+        select(func.count())
+        .select_from(OrderItem)
+        .where(
+            and_(
+                OrderItem.kds_station == dept_id,
+                OrderItem.sent_to_kds_flag == True,  # noqa: E712
+                OrderItem.is_deleted == False,  # noqa: E712
+            )
         )
     )
     pending_result = await db.execute(pending_stmt)

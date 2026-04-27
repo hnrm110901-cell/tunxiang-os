@@ -9,16 +9,14 @@
   POST /{filing_id}/retry               — 重试失败的申报
   GET  /stats                           — 统计（本年已申报月数/总税额/总人次）
 """
+
 from __future__ import annotations
 
-from datetime import datetime
 from typing import Any
 
 import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel, Field
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from services.tax_filing_service import (
     check_filing_status,
     generate_tax_declaration,
@@ -28,6 +26,7 @@ from services.tax_filing_service import (
     retry_filing,
     submit_to_tax_bureau,
 )
+from sqlalchemy.ext.asyncio import AsyncSession
 
 log = structlog.get_logger(__name__)
 router = APIRouter(prefix="/api/v1/tax-filing", tags=["tax-filing"])

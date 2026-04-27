@@ -8,6 +8,7 @@
   - C扫B（JSAPI / 动态二维码）
   - 退款 / 查询 / 关闭
 """
+
 from __future__ import annotations
 
 import uuid

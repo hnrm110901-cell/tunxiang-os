@@ -22,6 +22,7 @@
 
 推送实现：BackgroundTasks 异步执行，进度写入 menu_push_logs 表。
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -35,9 +36,9 @@ from pydantic import BaseModel, Field
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from shared.ontology.src.database import get_db
 from shared.events.src.emitter import emit_event
 from shared.events.src.event_types import MenuEventType
+from shared.ontology.src.database import get_db
 
 log = structlog.get_logger(__name__)
 
@@ -155,6 +156,7 @@ async def create_menu_plan(
     if req.effective_date:
         try:
             from datetime import date
+
             effective_date = date.fromisoformat(req.effective_date)
         except ValueError:
             _err(400, "无效的 effective_date 格式，应为 YYYY-MM-DD")
@@ -236,9 +238,7 @@ async def list_menu_plans(
         where += " AND status = :status"
         params["status"] = status
 
-    count_res = await db.execute(
-        text(f"SELECT COUNT(*) FROM menu_plans_v2 {where}"), params
-    )
+    count_res = await db.execute(text(f"SELECT COUNT(*) FROM menu_plans_v2 {where}"), params)
     total = count_res.scalar() or 0
 
     params["limit"] = size
@@ -483,14 +483,16 @@ async def get_effective_menu(
             elif r[4] == "availability":
                 is_available = r[5].lower() == "true" if r[5] else is_available
 
-        items.append({
-            "dish_id": str(r[0]),
-            "dish_name": r[1],
-            "price_fen": price_fen,
-            "is_available": is_available,
-            "has_store_override": has_override,
-            "override_type": r[4],
-        })
+        items.append(
+            {
+                "dish_id": str(r[0]),
+                "dish_name": r[1],
+                "price_fen": price_fen,
+                "is_available": is_available,
+                "has_store_override": has_override,
+                "override_type": r[4],
+            }
+        )
 
     return {
         "ok": True,
@@ -576,6 +578,7 @@ async def update_menu_plan(
     if req.effective_date is not None:
         try:
             from datetime import date
+
             params["eff_date"] = date.fromisoformat(req.effective_date)
         except ValueError:
             _err(400, "无效的 effective_date 格式")
@@ -659,14 +662,16 @@ async def publish_menu_plan(
 
     log.info("menu_plan_v2.published", plan_id=plan_id, tenant_id=x_tenant_id)
 
-    asyncio.create_task(emit_event(
-        event_type=MenuEventType.PLAN_DISTRIBUTED,
-        tenant_id=tid,
-        stream_id=plan_id,
-        payload={"plan_id": plan_id, "operator": x_operator, "action": "publish"},
-        source_service="tx-menu",
-        metadata={"operator_id": x_operator or ""},
-    ))
+    asyncio.create_task(
+        emit_event(
+            event_type=MenuEventType.PLAN_DISTRIBUTED,
+            tenant_id=tid,
+            stream_id=plan_id,
+            payload={"plan_id": plan_id, "operator": x_operator, "action": "publish"},
+            source_service="tx-menu",
+            metadata={"operator_id": x_operator or ""},
+        )
+    )
 
     return {
         "ok": True,
@@ -928,12 +933,14 @@ async def create_store_override(
     if req.valid_from:
         try:
             from datetime import date
+
             valid_from = date.fromisoformat(req.valid_from)
         except ValueError:
             _err(400, "无效的 valid_from 格式，应为 YYYY-MM-DD")
     if req.valid_until:
         try:
             from datetime import date
+
             valid_until = date.fromisoformat(req.valid_until)
         except ValueError:
             _err(400, "无效的 valid_until 格式，应为 YYYY-MM-DD")
@@ -971,20 +978,22 @@ async def create_store_override(
         tenant_id=x_tenant_id,
     )
 
-    asyncio.create_task(emit_event(
-        event_type=MenuEventType.STORE_OVERRIDE_SET,
-        tenant_id=tid,
-        stream_id=store_id,
-        payload={
-            "store_id": store_id,
-            "dish_id": req.dish_id,
-            "override_type": req.override_type,
-            "operator": x_operator,
-        },
-        store_id=store_id,
-        source_service="tx-menu",
-        metadata={"operator_id": x_operator or ""},
-    ))
+    asyncio.create_task(
+        emit_event(
+            event_type=MenuEventType.STORE_OVERRIDE_SET,
+            tenant_id=tid,
+            stream_id=store_id,
+            payload={
+                "store_id": store_id,
+                "dish_id": req.dish_id,
+                "override_type": req.override_type,
+                "operator": x_operator,
+            },
+            store_id=store_id,
+            source_service="tx-menu",
+            metadata={"operator_id": x_operator or ""},
+        )
+    )
 
     return {
         "ok": True,
@@ -1032,14 +1041,16 @@ async def delete_store_override(
         tenant_id=x_tenant_id,
     )
 
-    asyncio.create_task(emit_event(
-        event_type=MenuEventType.STORE_OVERRIDE_RESET,
-        tenant_id=tid,
-        stream_id=store_id,
-        payload={"store_id": store_id, "override_id": override_id, "operator": x_operator},
-        store_id=store_id,
-        source_service="tx-menu",
-        metadata={"operator_id": x_operator or ""},
-    ))
+    asyncio.create_task(
+        emit_event(
+            event_type=MenuEventType.STORE_OVERRIDE_RESET,
+            tenant_id=tid,
+            stream_id=store_id,
+            payload={"store_id": store_id, "override_id": override_id, "operator": x_operator},
+            store_id=store_id,
+            source_service="tx-menu",
+            metadata={"operator_id": x_operator or ""},
+        )
+    )
 
     return {"ok": True, "data": {"override_id": override_id, "revoked": True}}

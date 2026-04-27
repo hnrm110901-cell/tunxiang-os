@@ -10,6 +10,7 @@
 7. POST   /api/v1/campaigns/{id}/check    资格检查
 8. GET    /api/v1/campaigns/{id}/analytics 活动效果分析
 """
+
 from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, Header
@@ -30,6 +31,7 @@ engine = CampaignEngine()
 # 统一响应
 # ---------------------------------------------------------------------------
 
+
 def ok_response(data: Any) -> dict:
     return {"ok": True, "data": data}
 
@@ -41,6 +43,7 @@ def error_response(msg: str) -> dict:
 # ---------------------------------------------------------------------------
 # 请求模型
 # ---------------------------------------------------------------------------
+
 
 class CreateCampaignRequest(BaseModel):
     campaign_type: str
@@ -54,6 +57,7 @@ class CheckEligibilityRequest(BaseModel):
 # ---------------------------------------------------------------------------
 # 端点
 # ---------------------------------------------------------------------------
+
 
 @router.post("")
 async def create_campaign(
@@ -145,9 +149,7 @@ async def check_eligibility(
     db: AsyncSession = Depends(get_db),
 ) -> dict:
     """检查客户活动资格"""
-    result = await engine.check_eligibility(
-        req.customer_id, campaign_id, x_tenant_id, db=db
-    )
+    result = await engine.check_eligibility(req.customer_id, campaign_id, x_tenant_id, db=db)
     return ok_response(result)
 
 

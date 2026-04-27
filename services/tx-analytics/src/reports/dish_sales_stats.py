@@ -46,7 +46,13 @@ ORDER BY sales_qty DESC
 
 DIMENSIONS = ["dish_name", "category_name", "store_name"]
 METRICS = [
-    "sales_qty", "sales_amount_fen", "cost_fen", "profit_fen",
-    "revenue_pct", "qty_pct", "qty_rank", "revenue_rank",
+    "sales_qty",
+    "sales_amount_fen",
+    "cost_fen",
+    "profit_fen",
+    "revenue_pct",
+    "qty_pct",
+    "qty_rank",
+    "revenue_rank",
 ]
 FILTERS = ["start_date", "end_date", "store_id", "category_id"]

@@ -6,12 +6,7 @@ from src.services import wechat_pay_notify_service as mod
 
 
 def test_amount_fen_from_decrypted_payer_total() -> None:
-    assert (
-        mod._amount_fen_from_decrypted(
-            {"amount": {"payer_total": 8800, "total": 9000}}
-        )
-        == 8800
-    )
+    assert mod._amount_fen_from_decrypted({"amount": {"payer_total": 8800, "total": 9000}}) == 8800
 
 
 def test_amount_fen_from_decrypted_fallback_total() -> None:

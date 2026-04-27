@@ -7,6 +7,7 @@
 
 WS /ws/menu-board-updates 由 mac-station 转发 Redis 消息到前端。
 """
+
 import json
 import uuid
 from typing import Optional
@@ -27,10 +28,11 @@ router = APIRouter(prefix="/api/v1/menu", tags=["digital-menu-board"])
 
 # ─── Pydantic models ───
 
+
 class DishBoardItem(BaseModel):
     id: str
     name: str
-    price: int             # 分
+    price: int  # 分
     original_price: Optional[int] = None
     image_url: Optional[str] = None
     category: str
@@ -60,6 +62,7 @@ class UpdateAnnouncementRequest(BaseModel):
 
 # ─── Redis helper（可选依赖，不可用时降级为 noop） ───
 
+
 async def _publish_to_redis(channel: str, message: dict) -> bool:
     """向 Redis Pub/Sub 发布消息，供 mac-station WS 转发到前端。
 
@@ -69,6 +72,7 @@ async def _publish_to_redis(channel: str, message: dict) -> bool:
         import os
 
         import redis.asyncio as aioredis  # type: ignore
+
         redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
         async with aioredis.from_url(redis_url, decode_responses=True) as client:
             await client.publish(channel, json.dumps(message, ensure_ascii=False))
@@ -82,6 +86,7 @@ async def _publish_to_redis(channel: str, message: dict) -> bool:
 
 
 # ─── Endpoints ───
+
 
 @router.get("/board-data", response_model=dict)
 async def get_board_data(
@@ -172,8 +177,7 @@ async def get_board_config(
     category_order = [r for (r,) in cat_result.all()] or ["热菜", "海鲜", "凉菜", "主食", "汤品", "饮品"]
 
     special_result = await db.execute(
-        select(Dish.id)
-        .where(
+        select(Dish.id).where(
             Dish.tenant_id == tid,
             Dish.is_deleted.is_(False),
             Dish.is_available.is_(True),
@@ -183,8 +187,7 @@ async def get_board_config(
     special_ids = [str(r) for (r,) in special_result.all()]
 
     featured_result = await db.execute(
-        select(Dish.id)
-        .where(
+        select(Dish.id).where(
             Dish.tenant_id == tid,
             Dish.is_deleted.is_(False),
             Dish.is_available.is_(True),

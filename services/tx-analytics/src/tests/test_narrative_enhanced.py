@@ -2,9 +2,9 @@
 P3-02 经营叙事引擎增强 — 单元测试
 测试对比叙事、异常叙事、日报生成三个端点。
 """
-import pytest
-from fastapi.testclient import TestClient
+
 from fastapi import FastAPI
+from fastapi.testclient import TestClient
 
 from ..api.narrative_enhanced_routes import router
 
@@ -19,6 +19,7 @@ HEADERS = {"X-Tenant-ID": "test-tenant"}
 
 # ─── 辅助函数 ────────────────────────────────────────────────────────────────
 
+
 def get_comparison(store_id: str = "store-001", date_str: str = "2026-04-05"):
     return client.get(
         "/api/v1/analytics/narrative/comparison",
@@ -27,8 +28,7 @@ def get_comparison(store_id: str = "store-001", date_str: str = "2026-04-05"):
     )
 
 
-def get_anomaly(store_id: str = "store-001", date_str: str = "2026-04-06",
-                threshold: float = 2.0):
+def get_anomaly(store_id: str = "store-001", date_str: str = "2026-04-06", threshold: float = 2.0):
     return client.get(
         "/api/v1/analytics/narrative/anomaly",
         params={"store_id": store_id, "date": date_str, "threshold": threshold},
@@ -36,9 +36,13 @@ def get_anomaly(store_id: str = "store-001", date_str: str = "2026-04-06",
     )
 
 
-def post_daily_report(store_id: str = "store-001", date_str: str = "2026-04-05",
-                      include_comparison: bool = True, include_anomaly: bool = True,
-                      template_id: str = None):
+def post_daily_report(
+    store_id: str = "store-001",
+    date_str: str = "2026-04-05",
+    include_comparison: bool = True,
+    include_anomaly: bool = True,
+    template_id: str = None,
+):
     body = {
         "store_id": store_id,
         "date": date_str,
@@ -55,6 +59,7 @@ def post_daily_report(store_id: str = "store-001", date_str: str = "2026-04-05",
 
 
 # ─── Test 1: 对比叙事 ────────────────────────────────────────────────────────
+
 
 class TestComparisonNarrative:
     def test_response_ok(self):
@@ -147,6 +152,7 @@ class TestComparisonNarrative:
 
 # ─── Test 2: 异常叙事 ────────────────────────────────────────────────────────
 
+
 class TestAnomalyDetection:
     def test_response_ok(self):
         """基础响应正常"""
@@ -221,6 +227,7 @@ class TestAnomalyDetection:
 
 
 # ─── Test 3: 日报完整版 ──────────────────────────────────────────────────────
+
 
 class TestDailyReportFormat:
     def test_response_ok(self):

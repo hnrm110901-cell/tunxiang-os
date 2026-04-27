@@ -3,6 +3,7 @@
 统一响应格式: {"ok": bool, "data": {}, "error": {}}
 所有接口需 X-Tenant-ID header。
 """
+
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Request

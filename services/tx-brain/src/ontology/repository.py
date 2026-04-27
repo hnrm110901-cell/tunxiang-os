@@ -97,9 +97,7 @@ class OntologyRepository:
             return {"ok": False, "error": f"{label} node {node_id} not found"}
         return {"ok": True, "node": node.model_dump()}
 
-    def update_node(
-        self, label: str, node_id: str, properties: dict[str, Any]
-    ) -> dict[str, Any]:
+    def update_node(self, label: str, node_id: str, properties: dict[str, Any]) -> dict[str, Any]:
         """Update a node's properties (merge, not replace).
 
         Returns:
@@ -343,9 +341,7 @@ class OntologyRepository:
 
         return []
 
-    def query_neighbors(
-        self, label: str, node_id: str, depth: int = 1
-    ) -> dict[str, Any]:
+    def query_neighbors(self, label: str, node_id: str, depth: int = 1) -> dict[str, Any]:
         """Get all neighbors within N hops.
 
         Returns:
@@ -396,9 +392,7 @@ class OntologyRepository:
 
     # ─── Cypher-like Queries ───
 
-    def find_nodes(
-        self, label: str, filters: Optional[dict[str, Any]] = None
-    ) -> list[dict[str, Any]]:
+    def find_nodes(self, label: str, filters: Optional[dict[str, Any]] = None) -> list[dict[str, Any]]:
         """Find nodes by label and optional property filters.
 
         Args:
@@ -494,9 +488,7 @@ class OntologyRepository:
     def relationship_count(self, rel_type: Optional[str] = None) -> int:
         """Count relationships, optionally by type."""
         if rel_type:
-            return sum(
-                1 for r in self._relationships.values() if r.rel_type == rel_type
-            )
+            return sum(1 for r in self._relationships.values() if r.rel_type == rel_type)
         return len(self._relationships)
 
     def clear(self) -> None:

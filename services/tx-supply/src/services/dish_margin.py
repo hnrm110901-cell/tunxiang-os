@@ -26,16 +26,17 @@ logger = structlog.get_logger(__name__)
 # 枚举 & 常量
 # ---------------------------------------------------------------------------
 
+
 class Channel(str, Enum):
-    DINE_IN = "dine_in"      # 堂食
-    DELIVERY = "delivery"    # 外卖
-    TAKEOUT = "takeout"      # 自提
+    DINE_IN = "dine_in"  # 堂食
+    DELIVERY = "delivery"  # 外卖
+    TAKEOUT = "takeout"  # 自提
 
 
-QUADRANT_STAR = "star"            # 高毛利 + 高销量 —— 明星
+QUADRANT_STAR = "star"  # 高毛利 + 高销量 —— 明星
 QUADRANT_PLOW_HORSE = "plow_horse"  # 低毛利 + 高销量 —— 耕马
-QUADRANT_PUZZLE = "puzzle"        # 高毛利 + 低销量 —— 谜题
-QUADRANT_DOG = "dog"              # 低毛利 + 低销量 —— 狗
+QUADRANT_PUZZLE = "puzzle"  # 高毛利 + 低销量 —— 谜题
+QUADRANT_DOG = "dog"  # 低毛利 + 低销量 —— 狗
 
 # 毛利率阈值：高于此值视为"高毛利"
 DEFAULT_HIGH_MARGIN_THRESHOLD: float = 0.60
@@ -46,6 +47,7 @@ DEFAULT_HIGH_VOLUME_THRESHOLD: float = 1.0
 # ---------------------------------------------------------------------------
 # 数据模型
 # ---------------------------------------------------------------------------
+
 
 @dataclass(frozen=True)
 class DishMarginResult:
@@ -59,16 +61,16 @@ class DishMarginResult:
     bom_cost_fen: int
 
     # 渠道费率
-    platform_commission_rate: float   # 0.0 ~ 1.0，堂食时为 0
+    platform_commission_rate: float  # 0.0 ~ 1.0，堂食时为 0
 
     # 计算结果（分）
-    platform_fee_fen: int             # 平台佣金（分）
-    effective_revenue_fen: int        # 扣佣后有效营收（分）
-    gross_profit_fen: int             # 毛利额（分）
+    platform_fee_fen: int  # 平台佣金（分）
+    effective_revenue_fen: int  # 扣佣后有效营收（分）
+    gross_profit_fen: int  # 毛利额（分）
 
     # 比率
-    gross_margin_rate: float          # 毛利率 = gross_profit_fen / effective_revenue_fen
-    cost_rate: float                  # 成本率 = bom_cost_fen / effective_revenue_fen
+    gross_margin_rate: float  # 毛利率 = gross_profit_fen / effective_revenue_fen
+    cost_rate: float  # 成本率 = bom_cost_fen / effective_revenue_fen
 
     # 四象限（需调用 classify_dish_quadrant 填充，默认空字符串）
     quadrant: str = ""
@@ -80,7 +82,7 @@ class BatchMarginSummary:
 
     total_dishes: int
     avg_gross_margin_rate: float
-    high_margin_count: int     # 毛利率 >= 阈值
+    high_margin_count: int  # 毛利率 >= 阈值
     low_margin_count: int
     results: list[DishMarginResult] = field(default_factory=list)
 
@@ -88,6 +90,7 @@ class BatchMarginSummary:
 # ---------------------------------------------------------------------------
 # 核心纯函数
 # ---------------------------------------------------------------------------
+
 
 def calculate_dish_margin(
     dish_name: str,
@@ -127,9 +130,7 @@ def calculate_dish_margin(
     if bom_cost_fen < 0:
         raise ValueError(f"bom_cost_fen 不能为负数，当前值：{bom_cost_fen}")
     if not (0.0 <= platform_commission_rate < 1.0):
-        raise ValueError(
-            f"platform_commission_rate 必须在 [0, 1) 之间，当前值：{platform_commission_rate}"
-        )
+        raise ValueError(f"platform_commission_rate 必须在 [0, 1) 之间，当前值：{platform_commission_rate}")
 
     # --- 计算平台佣金（向下取整到分） ---
     platform_fee_fen: int = int(selling_price_fen * platform_commission_rate)
@@ -287,6 +288,7 @@ def enrich_quadrant(
     )
     # frozen=True，需用 dataclasses.replace
     from dataclasses import replace
+
     return replace(result, quadrant=quadrant)
 
 

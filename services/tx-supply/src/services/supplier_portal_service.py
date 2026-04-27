@@ -9,6 +9,7 @@
 所有方法无状态，db session 由调用方注入。
 金额单位：分（整数）。
 """
+
 from __future__ import annotations
 
 import uuid
@@ -212,9 +213,7 @@ async def list_suppliers(
     return [_supplier_to_dict(s) for s in suppliers]
 
 
-async def get_supplier_profile(
-    supplier_id: str, *, tenant_id: str, db: AsyncSession
-) -> dict:
+async def get_supplier_profile(supplier_id: str, *, tenant_id: str, db: AsyncSession) -> dict:
     """获取供应商完整档案（含交付统计、最近报价）"""
     await _set_tenant(db, tenant_id)
 
@@ -424,9 +423,7 @@ async def compare_quotes(rfq_id: str, *, tenant_id: str, db: AsyncSession) -> di
             SupplierAccount.is_deleted.is_(False),
         )
     )
-    supplier_map: dict[uuid.UUID, SupplierAccount] = {
-        s.id: s for s in sup_result.scalars().all()
-    }
+    supplier_map: dict[uuid.UUID, SupplierAccount] = {s.id: s for s in sup_result.scalars().all()}
 
     # 计算评分基准值
     min_price = min(q.unit_price_fen for q in quotes)
@@ -460,10 +457,12 @@ async def compare_quotes(rfq_id: str, *, tenant_id: str, db: AsyncSession) -> di
         q.score_detail = score_detail
         q.updated_at = _now()
 
-        scored.append({
-            **_quotation_to_dict(q),
-            "supplier_name": supplier.name if supplier else None,
-        })
+        scored.append(
+            {
+                **_quotation_to_dict(q),
+                "supplier_name": supplier.name if supplier else None,
+            }
+        )
 
     await db.flush()
 
@@ -653,10 +652,7 @@ async def assess_risk(*, tenant_id: str, db: AsyncSession) -> dict:
     risky_result = await db.execute(
         select(SupplierAccount).where(
             SupplierAccount.is_deleted.is_(False),
-            (
-                (SupplierAccount.overall_score < 40.0)
-                | SupplierAccount.status.in_(["suspended", "blacklisted"])
-            ),
+            ((SupplierAccount.overall_score < 40.0) | SupplierAccount.status.in_(["suspended", "blacklisted"])),
         )
     )
     risky_suppliers = risky_result.scalars().all()
@@ -687,10 +683,7 @@ async def assess_risk(*, tenant_id: str, db: AsyncSession) -> dict:
     total_recent = len(recent_deliveries)
 
     if total_recent > 0:
-        anomaly_count = sum(
-            1 for r in recent_deliveries
-            if r.on_time is False or r.quality_result == "fail"
-        )
+        anomaly_count = sum(1 for r in recent_deliveries if r.on_time is False or r.quality_result == "fail")
         anomaly_rate = round(anomaly_count / total_recent, 4)
     else:
         anomaly_count = 0

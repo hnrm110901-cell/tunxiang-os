@@ -69,11 +69,14 @@ class MenuVersion(TenantBase):
     __tablename__ = "menu_versions"
 
     brand_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), nullable=False, index=True,
+        UUID(as_uuid=True),
+        nullable=False,
+        index=True,
         comment="所属品牌",
     )
     version_no: Mapped[str] = mapped_column(
-        String(30), nullable=False,
+        String(30),
+        nullable=False,
         comment="版本号，如 2026.Q1.v3",
     )
     version_name: Mapped[str | None] = mapped_column(
@@ -81,11 +84,15 @@ class MenuVersion(TenantBase):
         comment="版本名称，如 春季新菜单",
     )
     dishes_snapshot: Mapped[list] = mapped_column(
-        JSONB, nullable=False, default=list,
+        JSONB,
+        nullable=False,
+        default=list,
         comment="完整菜品列表快照（防止菜品删除后历史版本失效）",
     )
     status: Mapped[str] = mapped_column(
-        String(20), nullable=False, default=VERSION_STATUS_DRAFT,
+        String(20),
+        nullable=False,
+        default=VERSION_STATUS_DRAFT,
         comment="版本状态: draft/published/archived",
     )
     published_at: Mapped[datetime | None] = mapped_column(
@@ -104,19 +111,28 @@ class MenuDispatchRecord(TenantBase):
     __tablename__ = "menu_dispatch_records"
 
     version_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("menu_versions.id"), nullable=False, index=True,
+        UUID(as_uuid=True),
+        ForeignKey("menu_versions.id"),
+        nullable=False,
+        index=True,
         comment="关联版本",
     )
     store_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), nullable=False, index=True,
+        UUID(as_uuid=True),
+        nullable=False,
+        index=True,
         comment="目标门店",
     )
     dispatch_type: Mapped[str] = mapped_column(
-        String(20), nullable=False, default=DISPATCH_TYPE_FULL,
+        String(20),
+        nullable=False,
+        default=DISPATCH_TYPE_FULL,
         comment="下发类型: full/pilot",
     )
     store_overrides: Mapped[dict] = mapped_column(
-        JSONB, nullable=False, default=dict,
+        JSONB,
+        nullable=False,
+        default=dict,
         comment='门店微调: {"add_dishes":[...],"remove_dishes":[...],"price_overrides":{...}}',
     )
     applied_at: Mapped[datetime | None] = mapped_column(
@@ -124,6 +140,8 @@ class MenuDispatchRecord(TenantBase):
         comment="门店实际应用时间",
     )
     status: Mapped[str] = mapped_column(
-        String(20), nullable=False, default=DISPATCH_STATUS_PENDING,
+        String(20),
+        nullable=False,
+        default=DISPATCH_STATUS_PENDING,
         comment="下发状态: pending/applied/failed",
     )

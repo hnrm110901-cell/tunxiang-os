@@ -1,4 +1,5 @@
 """采购全流程测试"""
+
 import os
 import sys
 
@@ -32,9 +33,13 @@ class TestProcurementStateMachine:
 
 class TestRequisition:
     def test_create(self):
-        req = create_requisition("s1", "emp1", [
-            {"ingredient_id": "i1", "name": "鲈鱼", "quantity": 10, "estimated_price_fen": 3500},
-        ])
+        req = create_requisition(
+            "s1",
+            "emp1",
+            [
+                {"ingredient_id": "i1", "name": "鲈鱼", "quantity": 10, "estimated_price_fen": 3500},
+            ],
+        )
         assert req["requisition_no"].startswith("REQ")
         assert req["total_estimated_fen"] == 35000
         assert req["status"] == "draft"
@@ -53,7 +58,9 @@ class TestRequisition:
 
 class TestPurchaseOrder:
     def test_create_po(self):
-        req = create_requisition("s1", "emp1", [{"ingredient_id": "i1", "name": "鲈鱼", "quantity": 10, "estimated_price_fen": 3500}])
+        req = create_requisition(
+            "s1", "emp1", [{"ingredient_id": "i1", "name": "鲈鱼", "quantity": 10, "estimated_price_fen": 3500}]
+        )
         po = create_purchase_order(req, "sup1", "渔港供应商", "2026-04-01")
         assert po["po_no"].startswith("PO")
         assert po["status"] == "ordered"
@@ -68,7 +75,9 @@ class TestReceiveAndInspect:
 
     def test_quality_issue(self):
         po = {"status": "ordered", "items": [{"quantity": 10}]}
-        delivery = receive_delivery(po, [{"ingredient_id": "i1", "received_qty": 8, "quality": "fail", "notes": "不新鲜"}])
+        delivery = receive_delivery(
+            po, [{"ingredient_id": "i1", "received_qty": 8, "quality": "fail", "notes": "不新鲜"}]
+        )
         assert len(delivery["quality_issues"]) == 1
 
     def test_inspect_pass(self):

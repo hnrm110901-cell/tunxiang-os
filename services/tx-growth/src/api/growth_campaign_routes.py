@@ -12,6 +12,7 @@
 已有的 /api/v1/campaigns 路由器保持不变（向下兼容），
 本路由器作为新标准路径供 miniapp / 总部后台使用。
 """
+
 import asyncio
 import json
 import uuid
@@ -49,6 +50,7 @@ _VALID_TYPES = {"coupon_giveaway", "points_bonus", "discount_event", "referral"}
 # 统一响应
 # ---------------------------------------------------------------------------
 
+
 def ok_response(data: Any) -> dict:
     return {"ok": True, "data": data}
 
@@ -61,15 +63,16 @@ def error_response(code: str, message: str) -> dict:
 # 请求模型
 # ---------------------------------------------------------------------------
 
+
 class CreateGrowthCampaignRequest(BaseModel):
     name: str
-    type: str                                    # coupon_giveaway|points_bonus|discount_event|referral
+    type: str  # coupon_giveaway|points_bonus|discount_event|referral
     description: Optional[str] = None
-    start_at: Optional[str] = None               # ISO8601
-    end_at: Optional[str] = None                 # ISO8601
-    target_segment: str = "all"                  # all|vip|regular|at_risk|new
+    start_at: Optional[str] = None  # ISO8601
+    end_at: Optional[str] = None  # ISO8601
+    target_segment: str = "all"  # all|vip|regular|at_risk|new
     budget_fen: int = 0
-    rules: dict = {}                             # JSONB，如 {"coupon_id": "xxx", "max_claim": 1000}
+    rules: dict = {}  # JSONB，如 {"coupon_id": "xxx", "max_claim": 1000}
 
 
 class UpdateGrowthCampaignRequest(BaseModel):
@@ -93,6 +96,7 @@ class OrderCheckoutPayload(BaseModel):
 # ---------------------------------------------------------------------------
 # 端点
 # ---------------------------------------------------------------------------
+
 
 @router.get("")
 async def list_growth_campaigns(
@@ -262,7 +266,7 @@ async def update_growth_campaign(
         await db.execute(
             text(f"""
                 UPDATE campaigns
-                SET {', '.join(set_parts)}
+                SET {", ".join(set_parts)}
                 WHERE id = :id AND tenant_id = :tid
             """),
             params,
@@ -385,17 +389,19 @@ async def get_growth_campaign_stats(
             # customer_coupons 表尚未就绪时优雅降级
             used_count = 0
 
-        return ok_response({
-            "campaign_id": campaign_id,
-            "campaign_name": analytics["campaign_name"],
-            "status": analytics["status"],
-            "claimed_count": analytics["participant_count"],
-            "used_count": used_count,
-            "total_discount_fen": analytics["total_cost_fen"],
-            "participating_customers": participating_customers,
-            "reward_breakdown": analytics.get("reward_breakdown", {}),
-            "budget_usage": analytics.get("budget_usage", 0.0),
-        })
+        return ok_response(
+            {
+                "campaign_id": campaign_id,
+                "campaign_name": analytics["campaign_name"],
+                "status": analytics["status"],
+                "claimed_count": analytics["participant_count"],
+                "used_count": used_count,
+                "total_discount_fen": analytics["total_cost_fen"],
+                "participating_customers": participating_customers,
+                "reward_breakdown": analytics.get("reward_breakdown", {}),
+                "budget_usage": analytics.get("budget_usage", 0.0),
+            }
+        )
 
     except ValueError as exc:
         return error_response("INVALID_PARAM", f"参数格式错误: {exc}")
@@ -409,6 +415,7 @@ async def get_growth_campaign_stats(
 # ---------------------------------------------------------------------------
 # 补全端点：deactivate + apply-coupon
 # ---------------------------------------------------------------------------
+
 
 class ApplyCouponRequest(BaseModel):
     customer_id: str
@@ -450,10 +457,7 @@ async def deactivate_growth_campaign(
             )
 
         await db.execute(
-            text(
-                "UPDATE promotions SET status = 'cancelled', updated_at = now() "
-                "WHERE tenant_id = :tid AND id = :cid"
-            ),
+            text("UPDATE promotions SET status = 'cancelled', updated_at = now() WHERE tenant_id = :tid AND id = :cid"),
             {"tid": tid, "cid": cid},
         )
         await db.commit()
@@ -564,13 +568,15 @@ async def apply_coupon(
             discount_fen=discount_fen,
         )
 
-        return ok_response({
-            "campaign_id": campaign_id,
-            "coupon_code": req.coupon_code,
-            "customer_id": req.customer_id,
-            "discount_fen": discount_fen,
-            "order_id": req.order_id,
-        })
+        return ok_response(
+            {
+                "campaign_id": campaign_id,
+                "coupon_code": req.coupon_code,
+                "customer_id": req.customer_id,
+                "discount_fen": discount_fen,
+                "order_id": req.order_id,
+            }
+        )
 
     except ValueError as exc:
         return error_response("INVALID_PARAM", f"参数格式错误: {exc}")
@@ -585,6 +591,7 @@ async def apply_coupon(
 # ---------------------------------------------------------------------------
 # 内部工具
 # ---------------------------------------------------------------------------
+
 
 def _is_table_missing(exc: SQLAlchemyError) -> bool:
     msg = str(exc).lower()
@@ -622,6 +629,7 @@ def _row_to_summary(row) -> dict:
 # ---------------------------------------------------------------------------
 # 内部端点 — SkillEventConsumer 消费 order.checkout.completed 事件时调用
 # ---------------------------------------------------------------------------
+
 
 @router.post("/apply-to-order")
 async def apply_coupon_to_order(
@@ -679,12 +687,14 @@ async def apply_coupon_to_order(
         except SQLAlchemyError as exc:
             if _is_table_missing(exc):
                 logger.warning("campaign.apply_to_order.table_not_ready", error=str(exc))
-                return ok_response({
-                    "eligible_coupons": [],
-                    "auto_applicable": False,
-                    "message": "优惠券功能尚未初始化",
-                    "_note": "TABLE_NOT_READY",
-                })
+                return ok_response(
+                    {
+                        "eligible_coupons": [],
+                        "auto_applicable": False,
+                        "message": "优惠券功能尚未初始化",
+                        "_note": "TABLE_NOT_READY",
+                    }
+                )
             raise
 
         # ② 查询当前有效活动（status=active，且在活动期内）
@@ -718,35 +728,39 @@ async def apply_coupon_to_order(
             if minimum_amount_fen > 0 and req.order_amount_fen < minimum_amount_fen:
                 continue  # 不满足门槛，跳过
 
-            eligible_coupons.append({
-                "customer_coupon_id": str(row.cc_id),
-                "coupon_id": str(row.coupon_id),
-                "coupon_name": row.coupon_name,
-                "coupon_type": row.coupon_type,
-                "cash_amount_fen": row.cash_amount_fen,
-                "discount_rate": row.discount_rate,
-                "minimum_amount_fen": minimum_amount_fen,
-                "expire_at": row.expire_at.isoformat() if row.expire_at else None,
-            })
+            eligible_coupons.append(
+                {
+                    "customer_coupon_id": str(row.cc_id),
+                    "coupon_id": str(row.coupon_id),
+                    "coupon_name": row.coupon_name,
+                    "coupon_type": row.coupon_type,
+                    "cash_amount_fen": row.cash_amount_fen,
+                    "discount_rate": row.discount_rate,
+                    "minimum_amount_fen": minimum_amount_fen,
+                    "expire_at": row.expire_at.isoformat() if row.expire_at else None,
+                }
+            )
 
         # ④ 旁路发射事件（仅当有可用券时）
         if eligible_coupons:
-            asyncio.create_task(emit_event(
-                event_type="campaign.checkout_eligible",
-                tenant_id=x_tenant_id,
-                stream_id=req.order_id,
-                payload={
-                    "order_id": req.order_id,
-                    "store_id": req.store_id,
-                    "customer_id": req.customer_id,
-                    "order_amount_fen": req.order_amount_fen,
-                    "eligible_coupon_count": len(eligible_coupons),
-                    "eligible_coupon_ids": [c["coupon_id"] for c in eligible_coupons],
-                },
-                store_id=req.store_id,
-                source_service="tx-growth",
-                metadata={"active_campaign_count": active_campaign_count},
-            ))
+            asyncio.create_task(
+                emit_event(
+                    event_type="campaign.checkout_eligible",
+                    tenant_id=x_tenant_id,
+                    stream_id=req.order_id,
+                    payload={
+                        "order_id": req.order_id,
+                        "store_id": req.store_id,
+                        "customer_id": req.customer_id,
+                        "order_amount_fen": req.order_amount_fen,
+                        "eligible_coupon_count": len(eligible_coupons),
+                        "eligible_coupon_ids": [c["coupon_id"] for c in eligible_coupons],
+                    },
+                    store_id=req.store_id,
+                    source_service="tx-growth",
+                    metadata={"active_campaign_count": active_campaign_count},
+                )
+            )
 
         coupon_count = len(eligible_coupons)
         message = f"发现{coupon_count}张可用优惠券" if coupon_count > 0 else "暂无可用优惠券"
@@ -761,11 +775,13 @@ async def apply_coupon_to_order(
             tenant_id=x_tenant_id,
         )
 
-        return ok_response({
-            "eligible_coupons": eligible_coupons,
-            "auto_applicable": False,   # 预留字段，当前不自动核销
-            "message": message,
-        })
+        return ok_response(
+            {
+                "eligible_coupons": eligible_coupons,
+                "auto_applicable": False,  # 预留字段，当前不自动核销
+                "message": message,
+            }
+        )
 
     except ValueError as exc:
         logger.warning("campaign.apply_to_order.invalid_param", error=str(exc))

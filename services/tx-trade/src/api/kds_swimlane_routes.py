@@ -1,4 +1,5 @@
 """KDS 泳道模式 API 路由"""
+
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Header, HTTPException

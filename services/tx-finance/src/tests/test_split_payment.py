@@ -2,16 +2,15 @@
 
 8 个测试用例，覆盖分账订单创建、幂等、异步通知（微信/支付宝）、调账、试算分润。
 """
+
 import json
 import uuid
 from unittest.mock import AsyncMock, MagicMock, patch
-from urllib.parse import urlencode
 
 import pytest
+from api.split_payment_routes import router
 from fastapi import FastAPI
-from httpx import AsyncClient, ASGITransport
-
-from api.split_payment_routes import router, _make_idempotency_key
+from httpx import ASGITransport, AsyncClient
 
 # ── 测试 App ──────────────────────────────────────────────────────────────────
 
@@ -44,6 +43,7 @@ def _make_receivers(total_fen: int = 10000) -> list[dict]:
 
 # ── 1. test_create_split_order ────────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_create_split_order():
     """POST /orders 发起分账应返回 201 和 split_order_id。"""
@@ -71,6 +71,7 @@ async def test_create_split_order():
 
 
 # ── 2. test_split_idempotency ─────────────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_split_idempotency():
@@ -100,6 +101,7 @@ async def test_split_idempotency():
 
 
 # ── 3. test_async_notify_wechat ───────────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_async_notify_wechat():
@@ -144,6 +146,7 @@ async def test_async_notify_wechat():
 
 # ── 4. test_async_notify_alipay ───────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_async_notify_alipay():
     """POST /orders/{id}/notify 携带支付宝签名头应处理成功。"""
@@ -182,6 +185,7 @@ async def test_async_notify_alipay():
 
 
 # ── 5. test_adjustment_create ─────────────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_adjustment_create():
@@ -227,14 +231,17 @@ async def test_adjustment_create():
 
 # ── 6. test_preview_split_rules ───────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_preview_split_rules():
     """GET /rules/preview 各方金额之和必须等于总金额。"""
-    rules = json.dumps([
-        {"receiver_type": "brand", "receiver_id": "brand_001", "ratio": 2000},
-        {"receiver_type": "franchise", "receiver_id": "store_001", "ratio": 7000},
-        {"receiver_type": "platform_fee", "receiver_id": "platform", "ratio": 1000},
-    ])
+    rules = json.dumps(
+        [
+            {"receiver_type": "brand", "receiver_id": "brand_001", "ratio": 2000},
+            {"receiver_type": "franchise", "receiver_id": "store_001", "ratio": 7000},
+            {"receiver_type": "platform_fee", "receiver_id": "platform", "ratio": 1000},
+        ]
+    )
 
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         resp = await client.get(
@@ -251,15 +258,18 @@ async def test_preview_split_rules():
 
 # ── 7. test_preview_amounts_are_integers ──────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_preview_amounts_are_integers():
     """试算分润各方金额必须是整数（无小数，无浮点精度问题）。"""
     # 选择一个无法整除的总金额，验证余数处理正确
-    rules = json.dumps([
-        {"receiver_type": "brand", "receiver_id": "brand_001", "ratio": 3333},
-        {"receiver_type": "franchise", "receiver_id": "store_001", "ratio": 3333},
-        {"receiver_type": "platform_fee", "receiver_id": "platform", "ratio": 3334},
-    ])
+    rules = json.dumps(
+        [
+            {"receiver_type": "brand", "receiver_id": "brand_001", "ratio": 3333},
+            {"receiver_type": "franchise", "receiver_id": "store_001", "ratio": 3333},
+            {"receiver_type": "platform_fee", "receiver_id": "platform", "ratio": 3334},
+        ]
+    )
 
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         resp = await client.get(
@@ -279,6 +289,7 @@ async def test_preview_amounts_are_integers():
 
 
 # ── 8. test_split_records_list ────────────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_split_records_list():

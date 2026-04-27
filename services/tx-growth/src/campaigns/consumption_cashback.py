@@ -11,6 +11,7 @@
 
 价值：比打折更有价值感（"300块钱消费返30块现金"比"95折"心理感受更强）
 """
+
 from typing import Any
 
 import structlog

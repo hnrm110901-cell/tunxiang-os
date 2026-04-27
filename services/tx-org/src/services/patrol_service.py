@@ -41,6 +41,7 @@ PASS_THRESHOLD = 0.60
 def _get_approval_engine():
     """延迟导入审批引擎。"""
     from .approval_workflow_engine import ApprovalEngine
+
     return ApprovalEngine
 
 
@@ -391,9 +392,7 @@ class PatrolRepository:
         resolution_notes: str | None,
         db: AsyncSession,
     ) -> None:
-        resolved_at_expr = (
-            "NOW()" if new_status == "resolved" else "resolved_at"
-        )
+        resolved_at_expr = "NOW()" if new_status == "resolved" else "resolved_at"
         await db.execute(
             text(
                 f"UPDATE patrol_issues "
@@ -541,18 +540,12 @@ class PatrolService:
             ValueError: category 不合法
         """
         if category not in VALID_CATEGORIES:
-            raise ValueError(
-                f"不支持的检查类别: {category}，"
-                f"支持: {', '.join(sorted(VALID_CATEGORIES))}"
-            )
+            raise ValueError(f"不支持的检查类别: {category}，支持: {', '.join(sorted(VALID_CATEGORIES))}")
 
         for item in items:
             item_type = item.get("item_type", "score")
             if item_type not in VALID_ITEM_TYPES:
-                raise ValueError(
-                    f"不支持的检查项类型: {item_type}，"
-                    f"支持: {', '.join(sorted(VALID_ITEM_TYPES))}"
-                )
+                raise ValueError(f"不支持的检查项类型: {item_type}，支持: {', '.join(sorted(VALID_ITEM_TYPES))}")
 
         template = await PatrolRepository.insert_template(
             tenant_id=tenant_id,
@@ -713,9 +706,7 @@ class PatrolService:
         if not record:
             raise ValueError(f"巡检记录不存在: {record_id}")
         if record["status"] != "in_progress":
-            raise ValueError(
-                f"只有 in_progress 状态的巡检才能提交，当前状态: {record['status']}"
-            )
+            raise ValueError(f"只有 in_progress 状态的巡检才能提交，当前状态: {record['status']}")
 
         # 查询记录明细（含 max_score）
         record_items = await PatrolRepository.get_record_items(
@@ -725,9 +716,7 @@ class PatrolService:
         )
 
         # 建立 template_item_id → record_item 映射
-        item_map: dict[str, dict[str, Any]] = {
-            str(ri["template_item_id"]): ri for ri in record_items
-        }
+        item_map: dict[str, dict[str, Any]] = {str(ri["template_item_id"]): ri for ri in record_items}
 
         total_actual = 0.0
         total_max = 0.0
@@ -754,13 +743,15 @@ class PatrolService:
 
                 # 未通过则加入整改列表
                 if not is_passed:
-                    low_score_items.append({
-                        "item_name": record_item["item_name"],
-                        "actual_score": actual_score,
-                        "max_score": max_score,
-                        "photo_urls": photo_urls,
-                        "notes": notes,
-                    })
+                    low_score_items.append(
+                        {
+                            "item_name": record_item["item_name"],
+                            "actual_score": actual_score,
+                            "max_score": max_score,
+                            "photo_urls": photo_urls,
+                            "notes": notes,
+                        }
+                    )
 
             await PatrolRepository.update_record_item(
                 tenant_id=tenant_id,
@@ -822,7 +813,8 @@ class PatrolService:
                 store_id=store_id,
                 item_name=low_item["item_name"],
                 severity=severity,
-                description=low_item.get("notes") or f"检查项得分不足（{low_item['actual_score']}/{low_item['max_score']}）",
+                description=low_item.get("notes")
+                or f"检查项得分不足（{low_item['actual_score']}/{low_item['max_score']}）",
                 photo_urls=low_item.get("photo_urls") or [],
                 db=db,
             )
@@ -865,10 +857,7 @@ class PatrolService:
             ValueError: severity 不合法
         """
         if severity not in VALID_SEVERITIES:
-            raise ValueError(
-                f"不支持的整改严重程度: {severity}，"
-                f"支持: {', '.join(sorted(VALID_SEVERITIES))}"
-            )
+            raise ValueError(f"不支持的整改严重程度: {severity}，支持: {', '.join(sorted(VALID_SEVERITIES))}")
 
         issue = await PatrolRepository.insert_issue(
             tenant_id=tenant_id,
@@ -951,10 +940,7 @@ class PatrolService:
             ValueError: 状态不合法
         """
         if new_status not in VALID_ISSUE_STATUSES:
-            raise ValueError(
-                f"不支持的整改状态: {new_status}，"
-                f"支持: {', '.join(sorted(VALID_ISSUE_STATUSES))}"
-            )
+            raise ValueError(f"不支持的整改状态: {new_status}，支持: {', '.join(sorted(VALID_ISSUE_STATUSES))}")
 
         await PatrolRepository.update_issue(
             tenant_id=tenant_id,

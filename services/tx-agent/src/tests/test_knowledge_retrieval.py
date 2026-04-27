@@ -8,6 +8,7 @@
 5. Qdrant不可用时graceful降级（返回空结果，不报错）
 6. 批量索引（大量文档一次性写入）
 """
+
 import os
 import sys
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -17,9 +18,9 @@ import pytest
 # 路径设置：从 src/tests/ 向上找到 src/，再找到项目根
 # test文件位于 tunxiang-os/services/tx-agent/src/tests/
 _SRC_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # .../tx-agent/src
-_TX_AGENT_DIR = os.path.dirname(_SRC_DIR)                               # .../tx-agent
-_SERVICES_DIR = os.path.dirname(_TX_AGENT_DIR)                          # .../services
-_ROOT_DIR = os.path.dirname(_SERVICES_DIR)                              # tunxiang-os/
+_TX_AGENT_DIR = os.path.dirname(_SRC_DIR)  # .../tx-agent
+_SERVICES_DIR = os.path.dirname(_TX_AGENT_DIR)  # .../services
+_ROOT_DIR = os.path.dirname(_SERVICES_DIR)  # tunxiang-os/
 sys.path.insert(0, _SRC_DIR)
 sys.path.insert(0, _ROOT_DIR)
 
@@ -32,11 +33,13 @@ from shared.vector_store.indexes import COLLECTIONS, get_vector_size, list_colle
 
 # ── 工具：生成固定长度的假向量 ────────────────────────────────
 
+
 def _fake_vector(val: float = 0.1, size: int = 1536) -> list[float]:
     return [val] * size
 
 
 # ── Qdrant客户端测试 ──────────────────────────────────────────
+
 
 class TestQdrantClientHealthCheck:
     """测试健康检查"""
@@ -192,6 +195,7 @@ class TestQdrantClientSearch:
 
 # ── EmbeddingService测试 ──────────────────────────────────────
 
+
 class TestEmbeddingServiceFallback:
     """测试TF-IDF fallback向量化"""
 
@@ -246,6 +250,7 @@ class TestEmbeddingServiceFallback:
 
 # ── 索引配置测试 ───────────────────────────────────────────────
 
+
 class TestCollectionIndexes:
     """测试预定义collection配置"""
 
@@ -276,6 +281,7 @@ class TestCollectionIndexes:
 
 
 # ── KnowledgeRetrievalService测试 ────────────────────────────
+
 
 class TestIndexDocument:
     """测试1：向量化文本并存入Qdrant"""
@@ -508,12 +514,8 @@ class TestTenantIsolation:
             patch.object(EmbeddingService, "embed_text", return_value=_fake_vector()),
             patch.object(QdrantClient, "upsert", side_effect=fake_upsert),
         ):
-            await KnowledgeRetrievalService.index_document(
-                "menu_knowledge", "doc:001", "招牌菜", {}, "tenant_A"
-            )
-            await KnowledgeRetrievalService.index_document(
-                "menu_knowledge", "doc:002", "特色菜", {}, "tenant_B"
-            )
+            await KnowledgeRetrievalService.index_document("menu_knowledge", "doc:001", "招牌菜", {}, "tenant_A")
+            await KnowledgeRetrievalService.index_document("menu_knowledge", "doc:002", "特色菜", {}, "tenant_B")
 
         assert stored_payloads[0]["tenant_id"] == "tenant_A"
         assert stored_payloads[1]["tenant_id"] == "tenant_B"
@@ -564,9 +566,7 @@ class TestGracefulDegradation:
         """collection不可用时批量索引返回全部失败计数"""
         with patch.object(QdrantClient, "create_collection_if_not_exists", return_value=False):
             docs = [{"doc_id": f"d{i}", "text": f"文档{i}", "metadata": {}} for i in range(5)]
-            result = await KnowledgeRetrievalService.index_documents_batch(
-                "menu_knowledge", docs, "tenant_001"
-            )
+            result = await KnowledgeRetrievalService.index_documents_batch("menu_knowledge", docs, "tenant_001")
             assert result["success"] == 0
             assert result["failed"] == 5
 
@@ -605,9 +605,7 @@ class TestBatchIndex:
     @pytest.mark.asyncio
     async def test_batch_index_empty_docs_returns_zero(self):
         """空文档列表返回0/0"""
-        result = await KnowledgeRetrievalService.index_documents_batch(
-            "menu_knowledge", [], "tenant_001"
-        )
+        result = await KnowledgeRetrievalService.index_documents_batch("menu_knowledge", [], "tenant_001")
         assert result == {"success": 0, "failed": 0}
 
     @pytest.mark.asyncio
@@ -619,9 +617,7 @@ class TestBatchIndex:
             patch.object(QdrantClient, "upsert", return_value=False),
         ):
             docs = [{"doc_id": f"d{i}", "text": f"菜品{i}", "metadata": {}} for i in range(3)]
-            result = await KnowledgeRetrievalService.index_documents_batch(
-                "menu_knowledge", docs, "tenant_001"
-            )
+            result = await KnowledgeRetrievalService.index_documents_batch("menu_knowledge", docs, "tenant_001")
 
         assert result["success"] == 0
         assert result["failed"] == 3
@@ -641,9 +637,7 @@ class TestBatchIndex:
             patch.object(QdrantClient, "upsert", side_effect=fake_upsert),
         ):
             docs = [{"doc_id": f"d{i}", "text": f"菜品{i}", "metadata": {}} for i in range(4)]
-            await KnowledgeRetrievalService.index_documents_batch(
-                "menu_knowledge", docs, "tenant_BATCH"
-            )
+            await KnowledgeRetrievalService.index_documents_batch("menu_knowledge", docs, "tenant_BATCH")
 
         assert len(all_points) == 4
         for point in all_points:

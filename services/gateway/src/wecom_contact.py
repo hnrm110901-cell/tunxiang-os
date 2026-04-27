@@ -8,6 +8,7 @@ API 文档参考：
   https://developer.work.weixin.qq.com/document/path/92572  — 配置客户联系二维码
   https://developer.work.weixin.qq.com/document/path/92113  — 获取客户列表
 """
+
 from __future__ import annotations
 
 from typing import Optional
@@ -33,10 +34,7 @@ class WecomContactSDK(WecomSDK):
           follow_info（跟进信息）
         """
         token = await self.get_access_token()
-        url = (
-            f"{self.BASE}/externalcontact/get"
-            f"?access_token={token}&external_userid={external_userid}"
-        )
+        url = f"{self.BASE}/externalcontact/get?access_token={token}&external_userid={external_userid}"
         async with httpx.AsyncClient(timeout=10) as client:
             try:
                 resp = await client.get(url)
@@ -165,10 +163,7 @@ class WecomContactSDK(WecomSDK):
         返回：[external_userid, ...]
         """
         token = await self.get_access_token()
-        url = (
-            f"{self.BASE}/externalcontact/list"
-            f"?access_token={token}&userid={userid}"
-        )
+        url = f"{self.BASE}/externalcontact/list?access_token={token}&userid={userid}"
         async with httpx.AsyncClient(timeout=10) as client:
             try:
                 resp = await client.get(url)

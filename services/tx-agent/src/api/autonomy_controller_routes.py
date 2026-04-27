@@ -11,10 +11,10 @@
   L2: 低风险操作自动执行 + 高风险操作需人确认
   L3: 大部分操作自动执行 + 人监督审计
 """
+
 from __future__ import annotations
 
 from datetime import date, datetime, timezone
-from typing import Literal
 
 import structlog
 from fastapi import APIRouter, Depends, Header, Query
@@ -78,12 +78,14 @@ AUTONOMY_LEVELS = {
 
 # ── 请求/响应模型 ─────────────────────────────────────────────────────────────
 
+
 class AutonomyConfigUpdate(BaseModel):
     level: int = Field(..., ge=1, le=3, description="自治等级: 1/2/3")
     auto_rules: list[str] | None = Field(None, description="自定义自动执行规则列表（为空则使用默认）")
 
 
 # ── DB 依赖 ──────────────────────────────────────────────────────────────────
+
 
 async def _get_db(
     x_tenant_id: str = Header("default", alias="X-Tenant-ID"),
@@ -93,6 +95,7 @@ async def _get_db(
 
 
 # ── 工具函数 ──────────────────────────────────────────────────────────────────
+
 
 def get_auto_actions(agent_id: str, level: int) -> list[str]:
     """根据 agent_id 和 level 获取可自动执行的操作列表。"""
@@ -108,6 +111,7 @@ def is_auto_executable(agent_id: str, level: int, action: str) -> bool:
 
 # ── 端点 ─────────────────────────────────────────────────────────────────────
 
+
 @router.get("/config")
 async def get_autonomy_configs(
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
@@ -115,12 +119,15 @@ async def get_autonomy_configs(
 ) -> dict:
     """获取各Agent自治等级配置。"""
     try:
-        result = await db.execute(text("""
+        result = await db.execute(
+            text("""
             SELECT agent_id, level, auto_rules, updated_at
             FROM agent_autonomy_configs
             WHERE tenant_id = :tenant_id AND is_deleted = FALSE
             ORDER BY agent_id
-        """), {"tenant_id": x_tenant_id})
+        """),
+            {"tenant_id": x_tenant_id},
+        )
         rows = result.mappings().all()
     except (SQLAlchemyError, ConnectionError):
         # 表可能尚未创建，返回默认配置
@@ -140,14 +147,16 @@ async def get_autonomy_configs(
             auto_rules = []
             updated_at = None
 
-        configs.append({
-            "agent_id": agent_id,
-            "level": level,
-            "level_info": AUTONOMY_LEVELS[level],
-            "auto_rules": auto_rules,
-            "available_rules": rules,
-            "updated_at": updated_at.isoformat() if updated_at else None,
-        })
+        configs.append(
+            {
+                "agent_id": agent_id,
+                "level": level,
+                "level_info": AUTONOMY_LEVELS[level],
+                "auto_rules": auto_rules,
+                "available_rules": rules,
+                "updated_at": updated_at.isoformat() if updated_at else None,
+            }
+        )
 
     return {"ok": True, "data": configs}
 
@@ -167,18 +176,21 @@ async def update_autonomy_config(
     auto_rules = body.auto_rules if body.auto_rules is not None else get_auto_actions(agent_id, level)
     now = datetime.now(timezone.utc)
 
-    await db.execute(text("""
+    await db.execute(
+        text("""
         INSERT INTO agent_autonomy_configs (id, tenant_id, agent_id, level, auto_rules, updated_at)
         VALUES (gen_random_uuid(), :tenant_id, :agent_id, :level, :auto_rules, :now)
         ON CONFLICT (tenant_id, agent_id) WHERE is_deleted = FALSE
         DO UPDATE SET level = :level, auto_rules = :auto_rules, updated_at = :now
-    """), {
-        "tenant_id": x_tenant_id,
-        "agent_id": agent_id,
-        "level": level,
-        "auto_rules": auto_rules,
-        "now": now,
-    })
+    """),
+        {
+            "tenant_id": x_tenant_id,
+            "agent_id": agent_id,
+            "level": level,
+            "auto_rules": auto_rules,
+            "now": now,
+        },
+    )
     await db.commit()
 
     logger.info(
@@ -189,12 +201,15 @@ async def update_autonomy_config(
         auto_rules=auto_rules,
     )
 
-    return {"ok": True, "data": {
-        "agent_id": agent_id,
-        "level": level,
-        "level_info": AUTONOMY_LEVELS[level],
-        "auto_rules": auto_rules,
-    }}
+    return {
+        "ok": True,
+        "data": {
+            "agent_id": agent_id,
+            "level": level,
+            "level_info": AUTONOMY_LEVELS[level],
+            "auto_rules": auto_rules,
+        },
+    }
 
 
 @router.get("/actions")
@@ -233,21 +248,27 @@ async def get_auto_execution_log(
         )
         total = count_result.scalar() or 0
 
-        result = await db.execute(text(f"""
+        result = await db.execute(
+            text(f"""
             SELECT id, agent_id, action, params, result, status, executed_at
             FROM agent_auto_executions
             WHERE {where}
             ORDER BY executed_at DESC
             LIMIT :limit OFFSET :offset
-        """), params)
+        """),
+            params,
+        )
         rows = result.mappings().all()
     except (SQLAlchemyError, ConnectionError):
         return {"ok": True, "data": {"items": [], "total": 0}}
 
-    return {"ok": True, "data": {
-        "items": [dict(r) for r in rows],
-        "total": total,
-    }}
+    return {
+        "ok": True,
+        "data": {
+            "items": [dict(r) for r in rows],
+            "total": total,
+        },
+    }
 
 
 @router.get("/pending")
@@ -260,24 +281,33 @@ async def get_pending_actions(
     """等待人工确认的高风险操作列表。"""
     offset = (page - 1) * size
     try:
-        count_result = await db.execute(text("""
+        count_result = await db.execute(
+            text("""
             SELECT COUNT(*)::int FROM agent_auto_executions
             WHERE tenant_id = :tenant_id AND status = 'pending'
-        """), {"tenant_id": x_tenant_id})
+        """),
+            {"tenant_id": x_tenant_id},
+        )
         total = count_result.scalar() or 0
 
-        result = await db.execute(text("""
+        result = await db.execute(
+            text("""
             SELECT id, agent_id, action, params, created_at
             FROM agent_auto_executions
             WHERE tenant_id = :tenant_id AND status = 'pending'
             ORDER BY created_at ASC
             LIMIT :limit OFFSET :offset
-        """), {"tenant_id": x_tenant_id, "limit": size, "offset": offset})
+        """),
+            {"tenant_id": x_tenant_id, "limit": size, "offset": offset},
+        )
         rows = result.mappings().all()
     except (SQLAlchemyError, ConnectionError):
         return {"ok": True, "data": {"items": [], "total": 0}}
 
-    return {"ok": True, "data": {
-        "items": [dict(r) for r in rows],
-        "total": total,
-    }}
+    return {
+        "ok": True,
+        "data": {
+            "items": [dict(r) for r in rows],
+            "total": total,
+        },
+    }

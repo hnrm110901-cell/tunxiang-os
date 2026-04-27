@@ -13,6 +13,7 @@
   - 本路由注册时加前缀区分，避免与 delivery_panel_router 路径冲突
   - 所有接口遵循 { ok: bool, data: {} } 响应规范
 """
+
 from __future__ import annotations
 
 import random
@@ -37,6 +38,7 @@ router = APIRouter(prefix="/api/v1/delivery", tags=["delivery-orders-ext"])
 
 
 # ─── 工具函数 ──────────────────────────────────────────────────────────────────
+
 
 def _get_tenant_id(request: Request) -> str:
     tid = getattr(request.state, "tenant_id", None) or request.headers.get("X-Tenant-ID", "")
@@ -95,11 +97,11 @@ class CancelRequest(BaseModel):
 # 合法的前向转换（from → allowed next states）
 _FORWARD_MAP: dict[str, set[str]] = {
     "pending_accept": {"accepted"},
-    "confirmed":      {"accepted"},   # 兼容旧状态名
-    "accepted":       {"cooking", "ready"},
-    "cooking":        {"ready"},
-    "ready":          {"delivering", "completed"},
-    "delivering":     {"completed"},
+    "confirmed": {"accepted"},  # 兼容旧状态名
+    "accepted": {"cooking", "ready"},
+    "cooking": {"ready"},
+    "ready": {"delivering", "completed"},
+    "delivering": {"completed"},
 }
 
 
@@ -128,12 +130,9 @@ async def update_order_status(
         raise HTTPException(status_code=400, detail=f"tenant_id 格式错误: {exc}") from exc
 
     try:
-        stmt = (
-            select(DeliveryOrder)
-            .where(
-                DeliveryOrder.id == order_id,
-                DeliveryOrder.tenant_id == tenant_id,
-            )
+        stmt = select(DeliveryOrder).where(
+            DeliveryOrder.id == order_id,
+            DeliveryOrder.tenant_id == tenant_id,
         )
         result = await db.execute(stmt)
         order = result.scalar_one_or_none()
@@ -145,8 +144,7 @@ async def update_order_status(
         if body.status not in allowed:
             raise HTTPException(
                 status_code=409,
-                detail=f"当前状态 '{order.status}' 不允许转换到 '{body.status}'，"
-                       f"合法目标: {sorted(allowed) or '无'}",
+                detail=f"当前状态 '{order.status}' 不允许转换到 '{body.status}'，合法目标: {sorted(allowed) or '无'}",
             )
 
         now = datetime.now(timezone.utc)
@@ -243,6 +241,7 @@ async def cancel_order(
 
 
 # ─── 平台 Webhook 入口（新路径格式，与 delivery_panel_router /webhooks/* 区分）──
+
 
 @router.post("/webhook/meituan", summary="美团外卖 Webhook 入口（mock）")
 async def webhook_meituan_mock(request: Request):
@@ -353,12 +352,14 @@ async def _fetch_dish_items_from_db(
         qty = random.randint(1, 2)
         price_fen = row.price_fen or 1000
         subtotal += price_fen * qty
-        items.append({
-            "name": row.name,
-            "qty": qty,
-            "price_fen": price_fen,
-            "spec": row.spec or "",
-        })
+        items.append(
+            {
+                "name": row.name,
+                "qty": qty,
+                "price_fen": price_fen,
+                "spec": row.spec or "",
+            }
+        )
     return items, subtotal
 
 
@@ -434,9 +435,7 @@ async def mock_new_order(
 
     # 从 DB 历史取样真实菜品和客户信息
     items, subtotal_fen = await _fetch_dish_items_from_db(store_id, tenant_id, db)
-    customer_name, customer_phone, delivery_address = await _fetch_customer_sample_from_db(
-        store_id, tenant_id, db
-    )
+    customer_name, customer_phone, delivery_address = await _fetch_customer_sample_from_db(store_id, tenant_id, db)
 
     if not items:
         log.warning("delivery_order.mock_no_dish_history", store_id=str(store_id))

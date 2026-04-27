@@ -3,6 +3,7 @@
 扫描竞对最新动态、检测价格变动、检测新品上线、检测营销活动、生成威胁预警、对比品牌定位、生成周报。
 新增：generate_weekly_intel_report — 整合竞对快照+点评+市场信号生成结构化周报。
 """
+
 from datetime import date, timedelta
 from typing import Any
 
@@ -26,6 +27,12 @@ class CompetitorWatchAgent(SkillAgent):
     description = "竞对动态扫描、价格变动检测、新品上线检测、营销活动检测、威胁预警、品牌定位对比、竞对周报"
     priority = "P1"
     run_location = "cloud"
+
+    # Sprint D1 / PR Overflow：纯竞对扫描与威胁预警，不触发业务决策，豁免
+    constraint_scope = set()
+    constraint_waived_reason = (
+        "竞对动态监测纯数据扫描与威胁预警报告，输出供市场团队决策参考，不直接操作毛利/食安/客户体验三条业务约束维度"
+    )
 
     def get_supported_actions(self) -> list[str]:
         return [
@@ -64,20 +71,23 @@ class CompetitorWatchAgent(SkillAgent):
             name = comp.get("name", "")
             events = comp.get("recent_events", [])
             for event in events:
-                updates.append({
-                    "competitor": name,
-                    "event_type": event.get("type", "other"),
-                    "title": event.get("title", ""),
-                    "detail": event.get("detail", ""),
-                    "source": event.get("source", "公开渠道"),
-                    "date": event.get("date", ""),
-                    "impact_level": self._assess_impact(event),
-                })
+                updates.append(
+                    {
+                        "competitor": name,
+                        "event_type": event.get("type", "other"),
+                        "title": event.get("title", ""),
+                        "detail": event.get("detail", ""),
+                        "source": event.get("source", "公开渠道"),
+                        "date": event.get("date", ""),
+                        "impact_level": self._assess_impact(event),
+                    }
+                )
 
         updates.sort(key=lambda x: {"critical": 0, "high": 1, "medium": 2, "low": 3}.get(x["impact_level"], 4))
 
         return AgentResult(
-            success=True, action="scan_competitor_updates",
+            success=True,
+            action="scan_competitor_updates",
             data={
                 "updates": updates[:30],
                 "total": len(updates),
@@ -85,7 +95,7 @@ class CompetitorWatchAgent(SkillAgent):
                 "critical_count": sum(1 for u in updates if u["impact_level"] == "critical"),
             },
             reasoning=f"扫描 {len(competitors)} 个竞对，发现 {len(updates)} 条动态，"
-                      f"严重 {sum(1 for u in updates if u['impact_level'] == 'critical')} 条",
+            f"严重 {sum(1 for u in updates if u['impact_level'] == 'critical')} 条",
             confidence=0.75,
         )
 
@@ -120,25 +130,35 @@ class CompetitorWatchAgent(SkillAgent):
             price_gap_pct = round((our_price - new_price) / max(1, new_price) * 100, 1) if our_price else 0
 
             if abs(change_pct) >= 5:
-                alerts.append({
-                    "competitor": competitor,
-                    "dish": dish,
-                    "old_price_yuan": round(old_price / 100, 2),
-                    "new_price_yuan": round(new_price / 100, 2),
-                    "change_pct": change_pct,
-                    "our_price_yuan": round(our_price / 100, 2) if our_price else None,
-                    "price_gap_pct": price_gap_pct,
-                    "direction": "降价" if change_pct < 0 else "涨价",
-                    "threat": "高" if change_pct <= -15 and price_gap_pct > 20 else "中" if change_pct <= -10 else "低",
-                })
+                alerts.append(
+                    {
+                        "competitor": competitor,
+                        "dish": dish,
+                        "old_price_yuan": round(old_price / 100, 2),
+                        "new_price_yuan": round(new_price / 100, 2),
+                        "change_pct": change_pct,
+                        "our_price_yuan": round(our_price / 100, 2) if our_price else None,
+                        "price_gap_pct": price_gap_pct,
+                        "direction": "降价" if change_pct < 0 else "涨价",
+                        "threat": "高"
+                        if change_pct <= -15 and price_gap_pct > 20
+                        else "中"
+                        if change_pct <= -10
+                        else "低",
+                    }
+                )
 
         alerts.sort(key=lambda x: x["change_pct"])
 
         return AgentResult(
-            success=True, action="detect_price_change",
-            data={"alerts": alerts, "total": len(alerts),
-                  "price_drops": sum(1 for a in alerts if a["direction"] == "降价"),
-                  "price_increases": sum(1 for a in alerts if a["direction"] == "涨价")},
+            success=True,
+            action="detect_price_change",
+            data={
+                "alerts": alerts,
+                "total": len(alerts),
+                "price_drops": sum(1 for a in alerts if a["direction"] == "降价"),
+                "price_increases": sum(1 for a in alerts if a["direction"] == "涨价"),
+            },
             reasoning=f"检测到 {len(alerts)} 个竞对价格变动，降价 {sum(1 for a in alerts if a['direction'] == '降价')} 个",
             confidence=0.8,
         )
@@ -152,22 +172,28 @@ class CompetitorWatchAgent(SkillAgent):
         for cp in competitor_products:
             if cp.get("is_new"):
                 overlap = cp.get("dish_name", "") in our_menu
-                new_products.append({
-                    "competitor": cp.get("competitor", ""),
-                    "dish_name": cp.get("dish_name", ""),
-                    "category": cp.get("category", ""),
-                    "price_yuan": round(cp.get("price_fen", 0) / 100, 2),
-                    "launch_date": cp.get("launch_date", ""),
-                    "popularity": cp.get("popularity", "未知"),
-                    "we_have_similar": overlap,
-                    "recommendation": "跟进研发" if not overlap and cp.get("popularity") == "热卖" else "持续观察",
-                })
+                new_products.append(
+                    {
+                        "competitor": cp.get("competitor", ""),
+                        "dish_name": cp.get("dish_name", ""),
+                        "category": cp.get("category", ""),
+                        "price_yuan": round(cp.get("price_fen", 0) / 100, 2),
+                        "launch_date": cp.get("launch_date", ""),
+                        "popularity": cp.get("popularity", "未知"),
+                        "we_have_similar": overlap,
+                        "recommendation": "跟进研发" if not overlap and cp.get("popularity") == "热卖" else "持续观察",
+                    }
+                )
 
         return AgentResult(
-            success=True, action="detect_new_product",
-            data={"new_products": new_products, "total": len(new_products),
-                  "hot_items": sum(1 for p in new_products if p["popularity"] == "热卖"),
-                  "need_follow_up": sum(1 for p in new_products if p["recommendation"] == "跟进研发")},
+            success=True,
+            action="detect_new_product",
+            data={
+                "new_products": new_products,
+                "total": len(new_products),
+                "hot_items": sum(1 for p in new_products if p["popularity"] == "热卖"),
+                "need_follow_up": sum(1 for p in new_products if p["recommendation"] == "跟进研发"),
+            },
             reasoning=f"检测到 {len(new_products)} 个竞对新品，{sum(1 for p in new_products if p['popularity'] == '热卖')} 个热卖",
             confidence=0.75,
         )
@@ -178,22 +204,32 @@ class CompetitorWatchAgent(SkillAgent):
         detected = []
 
         for c in campaigns:
-            detected.append({
-                "competitor": c.get("competitor", ""),
-                "campaign_name": c.get("name", ""),
-                "type": c.get("type", "促销"),
-                "channels": c.get("channels", []),
-                "estimated_discount": c.get("discount_pct", 0),
-                "start_date": c.get("start_date", ""),
-                "end_date": c.get("end_date", ""),
-                "target_audience": c.get("target", "全部"),
-                "threat_level": "high" if c.get("discount_pct", 0) >= 30 else "medium" if c.get("discount_pct", 0) >= 15 else "low",
-            })
+            detected.append(
+                {
+                    "competitor": c.get("competitor", ""),
+                    "campaign_name": c.get("name", ""),
+                    "type": c.get("type", "促销"),
+                    "channels": c.get("channels", []),
+                    "estimated_discount": c.get("discount_pct", 0),
+                    "start_date": c.get("start_date", ""),
+                    "end_date": c.get("end_date", ""),
+                    "target_audience": c.get("target", "全部"),
+                    "threat_level": "high"
+                    if c.get("discount_pct", 0) >= 30
+                    else "medium"
+                    if c.get("discount_pct", 0) >= 15
+                    else "low",
+                }
+            )
 
         return AgentResult(
-            success=True, action="detect_campaign",
-            data={"campaigns": detected, "total": len(detected),
-                  "high_threat": sum(1 for d in detected if d["threat_level"] == "high")},
+            success=True,
+            action="detect_campaign",
+            data={
+                "campaigns": detected,
+                "total": len(detected),
+                "high_threat": sum(1 for d in detected if d["threat_level"] == "high"),
+            },
             reasoning=f"检测到 {len(detected)} 个竞对营销活动，高威胁 {sum(1 for d in detected if d['threat_level'] == 'high')} 个",
             confidence=0.7,
         )
@@ -206,22 +242,28 @@ class CompetitorWatchAgent(SkillAgent):
         for e in events:
             threat = e.get("threat_level", "low")
             threat_info = THREAT_LEVELS.get(threat, THREAT_LEVELS["low"])
-            alerts.append({
-                "competitor": e.get("competitor", ""),
-                "event": e.get("event", ""),
-                "threat_level": threat,
-                "threat_name": threat_info["name"],
-                "response_deadline_hours": threat_info["response_hours"],
-                "suggested_response": e.get("suggested_response", "持续观察"),
-                "affected_stores": e.get("affected_stores", []),
-            })
+            alerts.append(
+                {
+                    "competitor": e.get("competitor", ""),
+                    "event": e.get("event", ""),
+                    "threat_level": threat,
+                    "threat_name": threat_info["name"],
+                    "response_deadline_hours": threat_info["response_hours"],
+                    "suggested_response": e.get("suggested_response", "持续观察"),
+                    "affected_stores": e.get("affected_stores", []),
+                }
+            )
 
         alerts.sort(key=lambda x: THREAT_LEVELS.get(x["threat_level"], {}).get("response_hours", 999))
 
         return AgentResult(
-            success=True, action="generate_threat_alert",
-            data={"alerts": alerts, "total": len(alerts),
-                  "critical_count": sum(1 for a in alerts if a["threat_level"] == "critical")},
+            success=True,
+            action="generate_threat_alert",
+            data={
+                "alerts": alerts,
+                "total": len(alerts),
+                "critical_count": sum(1 for a in alerts if a["threat_level"] == "critical"),
+            },
             reasoning=f"生成 {len(alerts)} 条竞争预警，严重 {sum(1 for a in alerts if a['threat_level'] == 'critical')} 条",
             confidence=0.75,
         )
@@ -265,10 +307,11 @@ class CompetitorWatchAgent(SkillAgent):
             comparisons.append(comparison)
 
         return AgentResult(
-            success=True, action="compare_positioning",
+            success=True,
+            action="compare_positioning",
             data={"comparisons": comparisons, "total_competitors": len(comparisons)},
             reasoning=f"对比 {len(comparisons)} 个竞品定位，"
-                      f"领先 {sum(1 for c in comparisons if c['competitive_status'] == '领先')} 个",
+            f"领先 {sum(1 for c in comparisons if c['competitive_status'] == '领先')} 个",
             confidence=0.7,
         )
 
@@ -282,8 +325,10 @@ class CompetitorWatchAgent(SkillAgent):
 
         summary_points = []
         if price_changes:
-            summary_points.append(f"价格变动: {len(price_changes)} 项，"
-                                 f"降价 {sum(1 for p in price_changes if p.get('direction') == '降价')} 项")
+            summary_points.append(
+                f"价格变动: {len(price_changes)} 项，"
+                f"降价 {sum(1 for p in price_changes if p.get('direction') == '降价')} 项"
+            )
         if new_products:
             summary_points.append(f"新品上线: {len(new_products)} 个")
         if campaigns:
@@ -292,7 +337,8 @@ class CompetitorWatchAgent(SkillAgent):
             summary_points.append(f"门店变动: {len(store_changes)} 处")
 
         return AgentResult(
-            success=True, action="summarize_weekly",
+            success=True,
+            action="summarize_weekly",
             data={
                 "summary_points": summary_points,
                 "price_changes_count": len(price_changes),
@@ -343,9 +389,12 @@ class CompetitorWatchAgent(SkillAgent):
         # ── 4. 综合威胁评估 ──
         threat_score = _calculate_threat_score(snapshot_summary, review_summary, trend_summary)
         threat_level = (
-            "critical" if threat_score >= 75
-            else "high" if threat_score >= 50
-            else "medium" if threat_score >= 25
+            "critical"
+            if threat_score >= 75
+            else "high"
+            if threat_score >= 50
+            else "medium"
+            if threat_score >= 25
             else "low"
         )
 
@@ -380,20 +429,14 @@ class CompetitorWatchAgent(SkillAgent):
 
         reasoning_parts = [f"威胁评分 {threat_score}/100（{threat_level}）"]
         if snapshot_summary.get("rating_dropped_competitors"):
-            reasoning_parts.append(
-                f"{len(snapshot_summary['rating_dropped_competitors'])} 个竞对评分下降"
-            )
+            reasoning_parts.append(f"{len(snapshot_summary['rating_dropped_competitors'])} 个竞对评分下降")
         if snapshot_summary.get("rating_raised_competitors"):
-            reasoning_parts.append(
-                f"{len(snapshot_summary['rating_raised_competitors'])} 个竞对评分上升（需关注）"
-            )
+            reasoning_parts.append(f"{len(snapshot_summary['rating_raised_competitors'])} 个竞对评分上升（需关注）")
         if review_summary.get("own_avg_sentiment") is not None:
             own_sent = review_summary["own_avg_sentiment"]
             reasoning_parts.append(f"自家情感均分 {own_sent:.2f}")
         if trend_summary.get("rising_keywords"):
-            reasoning_parts.append(
-                f"上升趋势关键词 {len(trend_summary['rising_keywords'])} 个"
-            )
+            reasoning_parts.append(f"上升趋势关键词 {len(trend_summary['rising_keywords'])} 个")
 
         return AgentResult(
             success=True,
@@ -405,6 +448,7 @@ class CompetitorWatchAgent(SkillAgent):
 
 
 # ─── 周报生成辅助函数 ───
+
 
 def _analyze_snapshots(snapshots: list[dict]) -> dict[str, Any]:
     """分析竞对快照变化"""
@@ -419,6 +463,7 @@ def _analyze_snapshots(snapshots: list[dict]) -> dict[str, Any]:
 
     # 按 competitor_brand_id 分组，取最新和次新快照对比
     from collections import defaultdict
+
     brand_snaps: dict[str, list[dict]] = defaultdict(list)
     for snap in snapshots:
         brand_snaps[snap.get("competitor_brand_id", "")].append(snap)
@@ -450,10 +495,7 @@ def _analyze_snapshots(snapshots: list[dict]) -> dict[str, Any]:
         latest_snap = snaps_sorted[-1] if snaps_sorted else {}
         promotions = latest_snap.get("active_promotions") or []
         if promotions:
-            new_promotions.extend([
-                {"competitor_brand_id": brand_id, **p}
-                for p in promotions[:3]
-            ])
+            new_promotions.extend([{"competitor_brand_id": brand_id, **p} for p in promotions[:3]])
 
     return {
         "total_snapshots": len(snapshots),
@@ -480,11 +522,7 @@ def _analyze_reviews(
     """分析自家和竞对点评情感对比"""
 
     def avg_sentiment(reviews: list[dict]) -> float | None:
-        scores = [
-            float(r["sentiment_score"])
-            for r in reviews
-            if r.get("sentiment_score") is not None
-        ]
+        scores = [float(r["sentiment_score"]) for r in reviews if r.get("sentiment_score") is not None]
         return round(sum(scores) / len(scores), 3) if scores else None
 
     def avg_rating(reviews: list[dict]) -> float | None:
@@ -499,7 +537,7 @@ def _analyze_reviews(
     # 提取高频负面主题
     negative_topics: dict[str, int] = {}
     for review in own_reviews:
-        for topic in (review.get("topics") or []):
+        for topic in review.get("topics") or []:
             if isinstance(topic, dict) and topic.get("sentiment") == "negative":
                 t = topic.get("topic", "")
                 if t:
@@ -515,14 +553,14 @@ def _analyze_reviews(
         "own_avg_rating": own_rat,
         "competitor_avg_rating": comp_rat,
         "sentiment_gap": (
-            round(float(own_sent) - float(comp_sent), 3)
-            if own_sent is not None and comp_sent is not None
-            else None
+            round(float(own_sent) - float(comp_sent), 3) if own_sent is not None and comp_sent is not None else None
         ),
         "top_negative_topics": [{"topic": t, "count": c} for t, c in top_negative],
         "sentiment_trend": (
-            "领先竞对" if own_sent and comp_sent and own_sent > comp_sent
-            else "落后竞对" if own_sent and comp_sent and own_sent < comp_sent
+            "领先竞对"
+            if own_sent and comp_sent and own_sent > comp_sent
+            else "落后竞对"
+            if own_sent and comp_sent and own_sent < comp_sent
             else "持平"
         ),
     }
@@ -600,50 +638,62 @@ def _generate_recommended_actions(
 
     if snapshot_summary.get("rating_raised_competitors"):
         count = len(snapshot_summary["rating_raised_competitors"])
-        actions.append({
-            "priority": "high",
-            "action": f"重点调研 {count} 个评分上升竞对的改进举措，制定跟进计划",
-            "source": "competitor_snapshot",
-        })
+        actions.append(
+            {
+                "priority": "high",
+                "action": f"重点调研 {count} 个评分上升竞对的改进举措，制定跟进计划",
+                "source": "competitor_snapshot",
+            }
+        )
 
     if snapshot_summary.get("new_promotions"):
-        actions.append({
-            "priority": "high",
-            "action": "竞对有活跃促销活动，评估是否需要制定应对营销方案",
-            "source": "competitor_snapshot",
-        })
+        actions.append(
+            {
+                "priority": "high",
+                "action": "竞对有活跃促销活动，评估是否需要制定应对营销方案",
+                "source": "competitor_snapshot",
+            }
+        )
 
     top_negative = review_summary.get("top_negative_topics", [])
     if top_negative:
         top_issue = top_negative[0]["topic"]
-        actions.append({
-            "priority": "medium",
-            "action": f"自家门店「{top_issue}」被客户多次负面提及，安排专项改善",
-            "source": "review_intel",
-        })
+        actions.append(
+            {
+                "priority": "medium",
+                "action": f"自家门店「{top_issue}」被客户多次负面提及，安排专项改善",
+                "source": "review_intel",
+            }
+        )
 
     sent_gap = review_summary.get("sentiment_gap")
     if sent_gap is not None and sent_gap < -0.1:
-        actions.append({
-            "priority": "medium",
-            "action": f"客户情感得分低于竞对 {abs(sent_gap):.2f}，开展服务品质专项提升",
-            "source": "review_intel",
-        })
+        actions.append(
+            {
+                "priority": "medium",
+                "action": f"客户情感得分低于竞对 {abs(sent_gap):.2f}，开展服务品质专项提升",
+                "source": "review_intel",
+            }
+        )
 
     rising_keywords = trend_summary.get("rising_keywords", [])
     if rising_keywords:
         top_kw = rising_keywords[0]["keyword"]
-        actions.append({
-            "priority": "low",
-            "action": f"市场趋势「{top_kw}」热度上升，研发团队可评估新品研发机会",
-            "source": "market_trend",
-        })
+        actions.append(
+            {
+                "priority": "low",
+                "action": f"市场趋势「{top_kw}」热度上升，研发团队可评估新品研发机会",
+                "source": "market_trend",
+            }
+        )
 
     if not actions:
-        actions.append({
-            "priority": "low",
-            "action": "本周竞争态势平稳，维持常规监测频率",
-            "source": "system",
-        })
+        actions.append(
+            {
+                "priority": "low",
+                "action": "本周竞争态势平稳，维持常规监测频率",
+                "source": "system",
+            }
+        )
 
     return actions

@@ -2,7 +2,8 @@
 
 数据表：invoice_titles / invoices（v146 迁移）
 """
-from typing import Any, Optional
+
+from typing import Any
 
 import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
@@ -19,9 +20,10 @@ router = APIRouter(prefix="/api/v1/member", tags=["invoice"])
 
 # ── 请求模型 ──────────────────────────────────────────────────
 
+
 class InvoiceTitleReq(BaseModel):
     customer_id: str
-    type: str = "personal"         # personal / company
+    type: str = "personal"  # personal / company
     title: str = ""
     tax_id: str = ""
     address: str = ""
@@ -32,6 +34,7 @@ class InvoiceTitleReq(BaseModel):
 
 
 # ── 辅助函数 ──────────────────────────────────────────────────
+
 
 async def _set_rls(db: AsyncSession, tenant_id: str) -> None:
     await db.execute(
@@ -71,6 +74,7 @@ def _row_to_invoice(row: Any) -> dict[str, Any]:
 
 
 # ── 端点 ──────────────────────────────────────────────────────
+
 
 @router.get("/invoice-titles")
 async def list_invoice_titles(

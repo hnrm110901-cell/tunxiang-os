@@ -4,6 +4,7 @@
 支持正序/倒序排列。
 金额单位：分(fen)。
 """
+
 from typing import Optional
 
 import structlog
@@ -20,6 +21,7 @@ VALID_DATE_RANGES = {"today", "week", "month", "quarter"}
 
 
 # ─── 纯函数：计算与均值的偏差百分比 ───
+
 
 def calc_vs_avg_pct(value: float, avg: float) -> Optional[float]:
     """计算与均值偏差百分比"""
@@ -49,6 +51,7 @@ def determine_trend(values: list[float]) -> str:
 
 
 # ─── 门店排行 ───
+
 
 async def get_store_ranking(
     metric: str,
@@ -100,19 +103,22 @@ async def get_store_ranking(
     # 组装结果
     results = []
     for idx, item in enumerate(raw):
-        results.append({
-            "rank": idx + 1,
-            "store_id": item["store_id"],
-            "store_name": item["store_name"],
-            "value": item["value"],
-            "vs_avg_pct": calc_vs_avg_pct(item["value"], avg),
-            "trend": item.get("trend", "flat"),
-        })
+        results.append(
+            {
+                "rank": idx + 1,
+                "store_id": item["store_id"],
+                "store_name": item["store_name"],
+                "value": item["value"],
+                "vs_avg_pct": calc_vs_avg_pct(item["value"], avg),
+                "trend": item.get("trend", "flat"),
+            }
+        )
 
     return results
 
 
 # ─── 多店多指标对比 ───
+
 
 async def get_store_comparison(
     store_ids: list[str],
@@ -165,8 +171,7 @@ async def get_store_comparison(
         filtered = [item for item in raw if item["store_id"] in store_ids]
         filtered.sort(key=lambda x: x["value"], reverse=True)
         metric_data[m] = [
-            {"store_id": item["store_id"], "value": item["value"], "rank": idx + 1}
-            for idx, item in enumerate(filtered)
+            {"store_id": item["store_id"], "value": item["value"], "rank": idx + 1} for idx, item in enumerate(filtered)
         ]
 
     return {
@@ -178,9 +183,8 @@ async def get_store_comparison(
 
 # ─── 数据库查询（通过统一SQL查询层） ───
 
-async def _query_ranking_data(
-    db: AsyncSession, metric: str, date_range: str, tenant_id: str
-) -> list[dict]:
+
+async def _query_ranking_data(db: AsyncSession, metric: str, date_range: str, tenant_id: str) -> list[dict]:
     """查询排行原始数据
 
     根据不同 metric 构造对应的聚合 SQL。
@@ -228,18 +232,18 @@ async def _query_ranking_data(
     row = await db.execute(text(query_str), {"tenant_id": tenant_id})
     results = []
     for r in row.mappings().all():
-        results.append({
-            "store_id": r["store_id"],
-            "store_name": r["store_name"],
-            "value": float(r["value"]),
-            "trend": "flat",
-        })
+        results.append(
+            {
+                "store_id": r["store_id"],
+                "store_name": r["store_name"],
+                "value": float(r["value"]),
+                "trend": "flat",
+            }
+        )
     return results
 
 
-async def _query_stores_info(
-    db: AsyncSession, store_ids: list[str], tenant_id: str
-) -> list[dict]:
+async def _query_stores_info(db: AsyncSession, store_ids: list[str], tenant_id: str) -> list[dict]:
     """查询门店基本信息"""
     row = await db.execute(
         text("""

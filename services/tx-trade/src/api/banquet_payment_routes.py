@@ -15,6 +15,7 @@
   POST   /{banquet_id}/confirmation/sign        — 顾客确认签字
   GET    /{banquet_id}/confirmation/summary     — 确认单摘要（PDF导出用）
 """
+
 from __future__ import annotations
 
 from datetime import date, datetime
@@ -28,7 +29,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db_no_rls, get_db_with_tenant
 
-from ..security.rbac import UserContext, require_role
+from ..security.rbac import (
+    UserContext,
+    assert_mfa_for_high_value,
+    require_role_audited,
+)
 from ..services.banquet_payment_service import BanquetPaymentService
 from ..services.trade_audit_log import write_audit
 
@@ -37,6 +42,7 @@ router = APIRouter(prefix="/api/v1/banquet", tags=["banquet-payment"])
 
 
 # ─── 工具 ───────────────────────────────────────────────────────────────────
+
 
 def _ok(data: object) -> dict:
     return {"ok": True, "data": data, "error": None}
@@ -74,6 +80,7 @@ def _svc(request: Request, db: AsyncSession = Depends(_get_db)) -> BanquetPaymen
 
 # ─── Request Models ──────────────────────────────────────────────────────────
 
+
 class CreateDepositReq(BaseModel):
     total_deposit_fen: int = Field(..., gt=0, description="应付定金总额（分）")
     due_date: Optional[date] = None
@@ -108,15 +115,28 @@ class SignConfirmationReq(BaseModel):
 
 # ─── 定金支付端点 ────────────────────────────────────────────────────────────
 
+
 @router.post("/{banquet_id}/deposit")
 async def create_deposit(
     banquet_id: UUID,
     body: CreateDepositReq,
     request: Request,
     db: AsyncSession = Depends(_get_db),
-    user: UserContext = Depends(require_role("store_manager", "admin")),
+    user: UserContext = Depends(require_role_audited("banquet.deposit.create", "store_manager", "admin")),
 ):
-    """创建定金记录（初始状态 pending；仅店长/管理员）"""
+    """创建定金记录（初始状态 pending；仅店长/管理员）。
+
+    PR-7 / R-A4-4 后续：≥ ¥5000 的定金强制 MFA 验证。
+    阈值可通过环境变量 TX_MFA_THRESHOLD_FEN__BANQUET_DEPOSIT_CREATE 覆盖。
+    """
+    # 高额定金强制 MFA — 防 store_manager token 泄漏被批量盗刷大额定金
+    await assert_mfa_for_high_value(
+        user,
+        db,
+        action="banquet.deposit.create",
+        amount_fen=body.total_deposit_fen,
+        request_id=request.headers.get("X-Request-Id") if hasattr(request, "headers") else None,
+    )
     try:
         tenant_id = UUID(_get_tenant_id(request))
         svc = BanquetPaymentService(tenant_id=str(tenant_id), db=db)
@@ -166,7 +186,7 @@ async def initiate_wechat_pay(
     body: WechatPayReq,
     request: Request,
     db: AsyncSession = Depends(_get_db),
-    user: UserContext = Depends(require_role("store_manager", "admin")),
+    user: UserContext = Depends(require_role_audited("banquet.deposit.wechat_pay", "store_manager", "admin")),
 ):
     """发起微信小程序支付（JSAPI模式；仅店长/管理员）
 
@@ -231,11 +251,9 @@ async def wechat_payment_callback(
 
     # 步骤2：跨租户查询 tenant_id（db 已跳过 RLS）
     from sqlalchemy import text as _text
+
     row = await db.execute(
-        _text(
-            "SELECT tenant_id FROM banquet_deposits "
-            "WHERE payment_no = :pno LIMIT 1"
-        ),
+        _text("SELECT tenant_id FROM banquet_deposits WHERE payment_no = :pno LIMIT 1"),
         {"pno": body.payment_no},
     )
     record = row.mappings().first()
@@ -278,13 +296,14 @@ async def wechat_payment_callback(
 
 # ─── 电子确认单端点 ──────────────────────────────────────────────────────────
 
+
 @router.post("/{banquet_id}/confirmation")
 async def create_confirmation(
     banquet_id: UUID,
     body: CreateConfirmationReq,
     request: Request,
     db: AsyncSession = Depends(_get_db),
-    user: UserContext = Depends(require_role("store_manager", "admin")),
+    user: UserContext = Depends(require_role_audited("banquet.confirmation.create", "store_manager", "admin")),
 ):
     """创建电子确认单（仅店长/管理员）
 
@@ -330,9 +349,7 @@ async def get_confirmation(
     """获取确认单"""
     try:
         tenant_id = UUID(_get_tenant_id(request))
-        confirmation = await svc.get_confirmation(
-            banquet_id=banquet_id, tenant_id=tenant_id
-        )
+        confirmation = await svc.get_confirmation(banquet_id=banquet_id, tenant_id=tenant_id)
         if confirmation is None:
             return _err("确认单不存在", "NOT_FOUND")
         return _ok(confirmation.model_dump(mode="json"))
@@ -346,16 +363,14 @@ async def sign_confirmation(
     body: SignConfirmationReq,
     request: Request,
     db: AsyncSession = Depends(_get_db),
-    user: UserContext = Depends(require_role("store_manager", "admin")),
+    user: UserContext = Depends(require_role_audited("banquet.confirmation.sign", "store_manager", "admin")),
 ):
     """顾客确认签字，将确认单状态更新为 confirmed（仅店长/管理员代签）"""
     try:
         tenant_id = UUID(_get_tenant_id(request))
         svc = BanquetPaymentService(tenant_id=str(tenant_id), db=db)
         # 取最新确认单 id
-        confirmation = await svc.get_confirmation(
-            banquet_id=banquet_id, tenant_id=tenant_id
-        )
+        confirmation = await svc.get_confirmation(banquet_id=banquet_id, tenant_id=tenant_id)
         if confirmation is None:
             return _err("确认单不存在", "NOT_FOUND")
 
@@ -391,9 +406,7 @@ async def get_confirmation_summary(
     try:
         tenant_id = UUID(_get_tenant_id(request))
         # 取最新确认单 id
-        confirmation = await svc.get_confirmation(
-            banquet_id=banquet_id, tenant_id=tenant_id
-        )
+        confirmation = await svc.get_confirmation(banquet_id=banquet_id, tenant_id=tenant_id)
         if confirmation is None:
             return _err("确认单不存在", "NOT_FOUND")
 

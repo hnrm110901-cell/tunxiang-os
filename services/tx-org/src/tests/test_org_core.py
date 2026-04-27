@@ -37,7 +37,6 @@ sys.path.insert(0, _ROOT)
 # ──────────────────────────────────────────────────────────────────────────────
 # 存根注入：franchise_router.py 依赖 ..services.franchise_service
 # ──────────────────────────────────────────────────────────────────────────────
-import importlib
 from unittest.mock import AsyncMock, MagicMock, patch
 
 # 先构造 services 包存根，确保相对导入不报错
@@ -159,13 +158,14 @@ if "structlog" not in sys.modules:
 # ──────────────────────────────────────────────────────────────────────────────
 # 现在才 import 被测路由
 # ──────────────────────────────────────────────────────────────────────────────
-import pytest
-from fastapi import FastAPI
-from httpx import ASGITransport, AsyncClient
 from uuid import uuid4
 
-from api.franchise_router import router as franchise_router
+import pytest
 from api.franchise_mgmt_routes import router as mgmt_router
+from api.franchise_router import router as franchise_router
+from fastapi import FastAPI
+from httpx import ASGITransport, AsyncClient
+
 from shared.ontology.src.database import get_db
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -185,6 +185,7 @@ HEADERS = {"X-Tenant-ID": TENANT_ID}
 # 辅助：构造 SQLAlchemy Row-like mock
 # ──────────────────────────────────────────────────────────────────────────────
 
+
 def _make_row(data: dict) -> MagicMock:
     row = MagicMock()
     row._mapping = data
@@ -199,8 +200,10 @@ def _mock_db_session() -> AsyncMock:
 
 def _override_db(mock_session: AsyncMock):
     """返回可用于 dependency_overrides 的异步生成器覆盖函数。"""
+
     async def _inner():
         yield mock_session
+
     return _inner
 
 
@@ -208,15 +211,14 @@ def _override_db(mock_session: AsyncMock):
 # Part 1 — franchise_router.py（FranchiseService 封装层）
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 @pytest.mark.anyio
 async def test_franchise_router_list_franchisees_ok():
     """[1] GET /api/v1/franchise/franchisees — 正常列表返回 ok=True。"""
     fake_result = {"items": [{"id": "f1", "franchisee_name": "加盟商A"}], "total": 1}
 
     with patch.object(_FakeService, "list_franchisees", new=AsyncMock(return_value=fake_result)):
-        async with AsyncClient(
-            transport=ASGITransport(app=app_router), base_url="http://test"
-        ) as ac:
+        async with AsyncClient(transport=ASGITransport(app=app_router), base_url="http://test") as ac:
             resp = await ac.get(
                 "/api/v1/franchise/franchisees",
                 headers=HEADERS,
@@ -235,9 +237,7 @@ async def test_franchise_router_create_franchisee_ok():
     fake_obj.to_dict.return_value = {"id": "new-f1", "franchisee_name": "新加盟商"}
 
     with patch.object(_FakeService, "create_franchisee", new=AsyncMock(return_value=fake_obj)):
-        async with AsyncClient(
-            transport=ASGITransport(app=app_router), base_url="http://test"
-        ) as ac:
+        async with AsyncClient(transport=ASGITransport(app=app_router), base_url="http://test") as ac:
             resp = await ac.post(
                 "/api/v1/franchise/franchisees",
                 headers=HEADERS,
@@ -257,9 +257,7 @@ async def test_franchise_router_create_franchisee_ok():
 async def test_franchise_router_get_franchisee_not_found():
     """[3] GET /api/v1/franchise/franchisees/{id} — service 返回 None → 404。"""
     with patch.object(_FakeService, "get_franchisee", new=AsyncMock(return_value=None)):
-        async with AsyncClient(
-            transport=ASGITransport(app=app_router), base_url="http://test"
-        ) as ac:
+        async with AsyncClient(transport=ASGITransport(app=app_router), base_url="http://test") as ac:
             fid = str(uuid4())
             resp = await ac.get(
                 f"/api/v1/franchise/franchisees/{fid}",
@@ -278,9 +276,7 @@ async def test_franchise_router_generate_batch_value_error():
         "create_royalty_bill_batch",
         new=AsyncMock(side_effect=ValueError("当月账单已生成")),
     ):
-        async with AsyncClient(
-            transport=ASGITransport(app=app_router), base_url="http://test"
-        ) as ac:
+        async with AsyncClient(transport=ASGITransport(app=app_router), base_url="http://test") as ac:
             resp = await ac.post(
                 "/api/v1/franchise/royalty/generate-batch",
                 headers=HEADERS,
@@ -294,9 +290,7 @@ async def test_franchise_router_generate_batch_value_error():
 @pytest.mark.anyio
 async def test_franchise_router_missing_tenant_header():
     """[5] GET /api/v1/franchise/franchisees — 缺少 X-Tenant-ID → 400。"""
-    async with AsyncClient(
-        transport=ASGITransport(app=app_router), base_url="http://test"
-    ) as ac:
+    async with AsyncClient(transport=ASGITransport(app=app_router), base_url="http://test") as ac:
         resp = await ac.get("/api/v1/franchise/franchisees")  # 故意不带 header
 
     assert resp.status_code == 400
@@ -306,6 +300,7 @@ async def test_franchise_router_missing_tenant_header():
 # ══════════════════════════════════════════════════════════════════════════════
 # Part 2 — franchise_mgmt_routes.py（直接 SQL + get_db 依赖）
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 @pytest.mark.anyio
 async def test_mgmt_list_franchisees_ok():
@@ -331,9 +326,7 @@ async def test_mgmt_list_franchisees_ok():
 
     app_mgmt.dependency_overrides[get_db] = _override_db(mock_db)
     try:
-        async with AsyncClient(
-            transport=ASGITransport(app=app_mgmt), base_url="http://test"
-        ) as ac:
+        async with AsyncClient(transport=ASGITransport(app=app_mgmt), base_url="http://test") as ac:
             resp = await ac.get(
                 "/api/v1/org/franchise/franchisees",
                 headers=HEADERS,
@@ -365,9 +358,7 @@ async def test_mgmt_create_franchisee_duplicate_no():
 
     app_mgmt.dependency_overrides[get_db] = _override_db(mock_db)
     try:
-        async with AsyncClient(
-            transport=ASGITransport(app=app_mgmt), base_url="http://test"
-        ) as ac:
+        async with AsyncClient(transport=ASGITransport(app=app_mgmt), base_url="http://test") as ac:
             resp = await ac.post(
                 "/api/v1/org/franchise/franchisees",
                 headers=HEADERS,
@@ -398,9 +389,7 @@ async def test_mgmt_get_franchisee_not_found():
 
     app_mgmt.dependency_overrides[get_db] = _override_db(mock_db)
     try:
-        async with AsyncClient(
-            transport=ASGITransport(app=app_mgmt), base_url="http://test"
-        ) as ac:
+        async with AsyncClient(transport=ASGITransport(app=app_mgmt), base_url="http://test") as ac:
             resp = await ac.get(
                 f"/api/v1/org/franchise/franchisees/{uuid4()}",
                 headers=HEADERS,
@@ -415,7 +404,7 @@ async def test_mgmt_get_franchisee_not_found():
 @pytest.mark.anyio
 async def test_mgmt_patch_status_invalid_transition():
     """[9] PATCH /api/v1/org/franchise/franchisees/{id}/status
-       — 状态 terminated → operating 不允许 → 422。"""
+    — 状态 terminated → operating 不允许 → 422。"""
     mock_db = _mock_db_session()
 
     set_cfg_result = MagicMock()
@@ -428,9 +417,7 @@ async def test_mgmt_patch_status_invalid_transition():
 
     app_mgmt.dependency_overrides[get_db] = _override_db(mock_db)
     try:
-        async with AsyncClient(
-            transport=ASGITransport(app=app_mgmt), base_url="http://test"
-        ) as ac:
+        async with AsyncClient(transport=ASGITransport(app=app_mgmt), base_url="http://test") as ac:
             resp = await ac.patch(
                 "/api/v1/org/franchise/franchisees/f-001/status",
                 headers=HEADERS,
@@ -458,9 +445,7 @@ async def test_mgmt_create_franchisee_db_error():
 
     app_mgmt.dependency_overrides[get_db] = _override_db(mock_db)
     try:
-        async with AsyncClient(
-            transport=ASGITransport(app=app_mgmt), base_url="http://test"
-        ) as ac:
+        async with AsyncClient(transport=ASGITransport(app=app_mgmt), base_url="http://test") as ac:
             resp = await ac.post(
                 "/api/v1/org/franchise/franchisees",
                 headers=HEADERS,

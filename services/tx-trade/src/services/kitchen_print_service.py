@@ -8,6 +8,7 @@
 
 所有打印内容使用 receipt_service.py 中的 ESC/POS 工具常量。
 """
+
 import base64
 import os
 import sys
@@ -57,6 +58,7 @@ def _get_print_queue():
 
     try:
         from print_queue import PrintQueue  # noqa: PLC0415
+
         _print_queue = PrintQueue()
         logger.info("kitchen_print.queue_loaded", db_path=os.getenv("PRINT_QUEUE_DB", "(default)"))
     except ImportError:
@@ -103,22 +105,22 @@ def format_kitchen_ticket(
         ESC/POS 字节流
     """
     cols = 48 if paper_width == 80 else 32
-    sep = b'-' * cols + LF
+    sep = b"-" * cols + LF
     buf = bytearray()
 
     # 初始化打印机
-    buf += ESC + b'\x40'
+    buf += ESC + b"\x40"
 
     # 档口名（居中大字加粗）
     buf += ALIGN_CENTER + DOUBLE_HEIGHT + BOLD_ON
-    buf += f"[{dept_name}]\n".encode('gbk', errors='replace')
+    buf += f"[{dept_name}]\n".encode("gbk", errors="replace")
     buf += NORMAL_SIZE + BOLD_OFF
 
     # 桌号 + 订单号
     buf += ALIGN_LEFT
     buf += BOLD_ON
-    buf += f"桌号: {table_number or '-'}".encode('gbk', errors='replace')
-    buf += f"  单号: {order_no[-6:] if len(order_no) > 6 else order_no}\n".encode('gbk', errors='replace')
+    buf += f"桌号: {table_number or '-'}".encode("gbk", errors="replace")
+    buf += f"  单号: {order_no[-6:] if len(order_no) > 6 else order_no}\n".encode("gbk", errors="replace")
     buf += BOLD_OFF
     buf += sep
 
@@ -129,20 +131,20 @@ def format_kitchen_ticket(
         notes = item.get("notes", "")
 
         buf += BOLD_ON + DOUBLE_HEIGHT
-        buf += f"  {dish_name}  x{quantity}\n".encode('gbk', errors='replace')
+        buf += f"  {dish_name}  x{quantity}\n".encode("gbk", errors="replace")
         buf += NORMAL_SIZE + BOLD_OFF
 
         if notes:
-            buf += f"    [{notes}]\n".encode('gbk', errors='replace')
+            buf += f"    [{notes}]\n".encode("gbk", errors="replace")
 
     buf += sep
 
     # 序号 + 时间
     now_str = datetime.now(timezone.utc).strftime("%H:%M")
     if seq > 0:
-        buf += f"序号: #{seq}  {now_str}\n".encode('gbk', errors='replace')
+        buf += f"序号: #{seq}  {now_str}\n".encode("gbk", errors="replace")
     else:
-        buf += f"时间: {now_str}\n".encode('gbk', errors='replace')
+        buf += f"时间: {now_str}\n".encode("gbk", errors="replace")
 
     buf += LF + CUT
     return bytes(buf)
@@ -168,32 +170,32 @@ def format_rush_ticket(
     └──────────────────────────────┘
     """
     cols = 48 if paper_width == 80 else 32
-    sep = b'-' * cols + LF
+    sep = b"-" * cols + LF
     buf = bytearray()
 
-    buf += ESC + b'\x40'
+    buf += ESC + b"\x40"
 
     # 超大字 "催"
     buf += ALIGN_CENTER + DOUBLE_HEIGHT + BOLD_ON
-    buf += "*** 催 ***\n".encode('gbk', errors='replace')
+    buf += "*** 催 ***\n".encode("gbk", errors="replace")
     buf += NORMAL_SIZE + BOLD_OFF
 
     # 档口名
     buf += BOLD_ON
-    buf += f"[{dept_name}]\n".encode('gbk', errors='replace')
+    buf += f"[{dept_name}]\n".encode("gbk", errors="replace")
     buf += BOLD_OFF
     buf += sep
 
     # 菜品（大字加粗）
     buf += ALIGN_LEFT + BOLD_ON + DOUBLE_HEIGHT
-    buf += f"  {dish_name}  x{quantity}\n".encode('gbk', errors='replace')
+    buf += f"  {dish_name}  x{quantity}\n".encode("gbk", errors="replace")
     buf += NORMAL_SIZE + BOLD_OFF
 
     # 桌号
     buf += BOLD_ON
-    buf += f"  桌号: {table_number or '-'}".encode('gbk', errors='replace')
+    buf += f"  桌号: {table_number or '-'}".encode("gbk", errors="replace")
     if order_no:
-        buf += f"  单号: {order_no[-6:]}\n".encode('gbk', errors='replace')
+        buf += f"  单号: {order_no[-6:]}\n".encode("gbk", errors="replace")
     else:
         buf += LF
     buf += BOLD_OFF
@@ -224,36 +226,36 @@ def format_remake_ticket(
     └──────────────────────────────┘
     """
     cols = 48 if paper_width == 80 else 32
-    sep = b'-' * cols + LF
+    sep = b"-" * cols + LF
     buf = bytearray()
 
-    buf += ESC + b'\x40'
+    buf += ESC + b"\x40"
 
     # 超大字 "重做"
     buf += ALIGN_CENTER + DOUBLE_HEIGHT + BOLD_ON
-    buf += "** 重做 **\n".encode('gbk', errors='replace')
+    buf += "** 重做 **\n".encode("gbk", errors="replace")
     buf += NORMAL_SIZE + BOLD_OFF
 
     # 档口名
     buf += BOLD_ON
-    buf += f"[{dept_name}]\n".encode('gbk', errors='replace')
+    buf += f"[{dept_name}]\n".encode("gbk", errors="replace")
     buf += BOLD_OFF
     buf += sep
 
     # 菜品（大字加粗）
     buf += ALIGN_LEFT + BOLD_ON + DOUBLE_HEIGHT
-    buf += f"  {dish_name}  x{quantity}\n".encode('gbk', errors='replace')
+    buf += f"  {dish_name}  x{quantity}\n".encode("gbk", errors="replace")
     buf += NORMAL_SIZE + BOLD_OFF
 
     # 原因（加粗）
     buf += BOLD_ON
-    buf += f"  原因: {reason}\n".encode('gbk', errors='replace')
+    buf += f"  原因: {reason}\n".encode("gbk", errors="replace")
     buf += BOLD_OFF
 
     # 桌号
-    buf += f"  桌号: {table_number or '-'}".encode('gbk', errors='replace')
+    buf += f"  桌号: {table_number or '-'}".encode("gbk", errors="replace")
     if order_no:
-        buf += f"  单号: {order_no[-6:]}\n".encode('gbk', errors='replace')
+        buf += f"  单号: {order_no[-6:]}\n".encode("gbk", errors="replace")
     else:
         buf += LF
 
@@ -417,13 +419,15 @@ async def print_kitchen_tickets_for_dispatch(
             printer_id=printer_id,
         )
 
-        results.append({
-            "dept_id": dept.get("dept_id"),
-            "dept_name": dept_name,
-            "printed": printed,
-            "printer_address": printer_address,
-            "item_count": len(items),
-        })
+        results.append(
+            {
+                "dept_id": dept.get("dept_id"),
+                "dept_name": dept_name,
+                "printed": printed,
+                "printer_address": printer_address,
+                "item_count": len(items),
+            }
+        )
 
     log.info("kitchen_print.dispatch_done", results=results)
     return results

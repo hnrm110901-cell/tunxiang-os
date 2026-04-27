@@ -4,15 +4,15 @@
 负责费用申请的创建、查询、提交、附件上传等操作。
 共12个端点，覆盖费用申请全生命周期（草稿→提交→审批→归档）。
 """
+
 from __future__ import annotations
 
-import asyncio
 from datetime import date
-from typing import Any, Dict, List, Optional, TYPE_CHECKING
+from typing import Any, Dict, List, Optional
 from uuid import UUID
 
 import structlog
-from fastapi import APIRouter, Depends, Header, HTTPException, Query, UploadFile, File, status
+from fastapi import APIRouter, Depends, File, Header, HTTPException, Query, UploadFile, status
 from pydantic import BaseModel, Field
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -22,12 +22,14 @@ from src.models.expense_enums import ExpenseStatus
 
 try:
     from src.services.expense_application_service import ExpenseApplicationService
+
     _expense_svc = ExpenseApplicationService()
 except ImportError:
     _expense_svc = None  # type: ignore[assignment]
 
 try:
     from src.services.approval_engine_service import ApprovalEngineService
+
     _approval_svc = ApprovalEngineService()
 except ImportError:
     _approval_svc = None  # type: ignore[assignment]
@@ -39,6 +41,7 @@ log = structlog.get_logger(__name__)
 # ---------------------------------------------------------------------------
 # 依赖注入
 # ---------------------------------------------------------------------------
+
 
 async def get_tenant_id(x_tenant_id: str = Header(..., alias="X-Tenant-ID")) -> UUID:
     try:
@@ -69,6 +72,7 @@ def _get_approval_service() -> "ApprovalEngineService":
 # ---------------------------------------------------------------------------
 # Pydantic Schema
 # ---------------------------------------------------------------------------
+
 
 class ExpenseItemCreate(BaseModel):
     category_id: UUID
@@ -102,10 +106,7 @@ class ExpenseApplicationUpdate(BaseModel):
 class SubmitApplicationRequest(BaseModel):
     compliance_explanation: Optional[str] = Field(
         None,
-        description=(
-            "超标说明（当费用项超标20%-50%时必填）。"
-            "说明将记录到申请备注，供审批人参考。"
-        ),
+        description=("超标说明（当费用项超标20%-50%时必填）。说明将记录到申请备注，供审批人参考。"),
         max_length=500,
     )
 
@@ -120,6 +121,7 @@ class PaginatedResponse(BaseModel):
 # ---------------------------------------------------------------------------
 # 端点实现
 # ---------------------------------------------------------------------------
+
 
 @router.post("/applications", status_code=status.HTTP_201_CREATED)
 async def create_application(
@@ -258,7 +260,9 @@ async def update_application(
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     except Exception as exc:
-        log.error("expense_application_update_failed", error=str(exc), application_id=str(application_id), exc_info=True)
+        log.error(
+            "expense_application_update_failed", error=str(exc), application_id=str(application_id), exc_info=True
+        )
         raise HTTPException(status_code=500, detail="更新申请失败，请稍后重试")
 
 
@@ -325,7 +329,9 @@ async def submit_application(
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     except Exception as exc:
-        log.error("expense_application_submit_failed", error=str(exc), application_id=str(application_id), exc_info=True)
+        log.error(
+            "expense_application_submit_failed", error=str(exc), application_id=str(application_id), exc_info=True
+        )
         raise HTTPException(status_code=500, detail="提交申请失败，请稍后重试")
 
 
@@ -362,6 +368,7 @@ async def add_attachment(
 
     try:
         from shared.integrations.cos_upload import get_cos_upload_service
+
         cos = get_cos_upload_service()
         upload_result = await cos.upload_file(
             file_bytes=file_content,
@@ -556,7 +563,9 @@ async def delete_application(
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     except Exception as exc:
-        log.error("expense_application_delete_failed", error=str(exc), application_id=str(application_id), exc_info=True)
+        log.error(
+            "expense_application_delete_failed", error=str(exc), application_id=str(application_id), exc_info=True
+        )
         raise HTTPException(status_code=500, detail="撤回申请失败，请稍后重试")
 
 
@@ -579,10 +588,10 @@ import src.services.expense_standard_service as _std_svc  # noqa: E402
 class ExpenseStandardCreate(BaseModel):
     brand_id: UUID
     name: str
-    staff_level: str     # StaffLevel 枚举值（store_staff/store_manager/region_manager/brand_manager/executive）
-    city_tier: str       # CityTier 枚举值（tier1/tier2/tier3/other）
-    expense_type: str    # TravelExpenseType 枚举值（accommodation/meal/transport/other_travel）
-    daily_limit: int     # 每日限额，单位分(fen)，1元=100分
+    staff_level: str  # StaffLevel 枚举值（store_staff/store_manager/region_manager/brand_manager/executive）
+    city_tier: str  # CityTier 枚举值（tier1/tier2/tier3/other）
+    expense_type: str  # TravelExpenseType 枚举值（accommodation/meal/transport/other_travel）
+    daily_limit: int  # 每日限额，单位分(fen)，1元=100分
     single_limit: Optional[int] = None  # 单笔限额，单位分(fen)，None=不限单笔
     notes: Optional[str] = None
     effective_from: Optional[date] = None
@@ -593,14 +602,16 @@ class ComplianceCheckRequest(BaseModel):
     staff_level: str
     destination_city: str
     expense_type: str
-    amount: int          # 申请金额，单位分(fen)
+    amount: int  # 申请金额，单位分(fen)
     is_daily: bool = False
 
 
 @router.get("/standards")
 async def list_standards(
     brand_id: UUID = Query(..., description="品牌ID"),
-    staff_level: Optional[str] = Query(None, description="员工职级过滤（store_staff/store_manager/region_manager/brand_manager/executive）"),
+    staff_level: Optional[str] = Query(
+        None, description="员工职级过滤（store_staff/store_manager/region_manager/brand_manager/executive）"
+    ),
     city_tier: Optional[str] = Query(None, description="城市级别过滤（tier1/tier2/tier3/other）"),
     tenant_id: UUID = Depends(get_tenant_id),
     db: AsyncSession = Depends(get_db),
@@ -731,19 +742,15 @@ async def list_city_tiers(
     is_system=True 为系统预置数据（北上广深等），租户可追加自定义城市映射。
     """
     try:
-        from sqlalchemy import func
+        from sqlalchemy import select
+
         from ..models.expense_standard import StandardCityTier as _SCT
 
         where = [_SCT.tenant_id == tenant_id]
         if city_name:
             where.append(_SCT.city_name.like(f"%{city_name}%"))
 
-        stmt = (
-            select(_SCT)
-            .where(*where)
-            .order_by(_SCT.tier.asc(), _SCT.city_name.asc())
-            .limit(100)
-        )
+        stmt = select(_SCT).where(*where).order_by(_SCT.tier.asc(), _SCT.city_name.asc()).limit(100)
         result = await db.execute(stmt)
         rows = list(result.scalars().all())
 

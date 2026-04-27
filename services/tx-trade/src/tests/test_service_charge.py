@@ -11,6 +11,7 @@
 8. 模板下发到多门店
 9. 模板不存在时报错
 """
+
 import os
 import sys
 
@@ -32,6 +33,7 @@ TENANT_ID = _uid()
 def _clear_stores():
     """每个测试前清空内存存储"""
     from services.service_charge import _charge_configs, _charge_records, _charge_templates
+
     _charge_configs.clear()
     _charge_templates.clear()
     _charge_records.clear()
@@ -43,14 +45,20 @@ async def test_calculate_by_person():
     from services.service_charge import calculate_service_charge, set_charge_config
 
     store_id = _uid()
-    await set_charge_config(store_id, {
-        "mode": "by_person",
-        "charge_per_person_fen": 500,
-        "enabled": True,
-    }, TENANT_ID)
+    await set_charge_config(
+        store_id,
+        {
+            "mode": "by_person",
+            "charge_per_person_fen": 500,
+            "enabled": True,
+        },
+        TENANT_ID,
+    )
 
     result = await calculate_service_charge(
-        order_id=_uid(), store_id=store_id, tenant_id=TENANT_ID,
+        order_id=_uid(),
+        store_id=store_id,
+        tenant_id=TENANT_ID,
         guest_count=4,
     )
     assert result["amount_fen"] == 2000
@@ -64,14 +72,20 @@ async def test_calculate_by_table():
     from services.service_charge import calculate_service_charge, set_charge_config
 
     store_id = _uid()
-    await set_charge_config(store_id, {
-        "mode": "by_table",
-        "room_charge_fen": 8800,
-        "enabled": True,
-    }, TENANT_ID)
+    await set_charge_config(
+        store_id,
+        {
+            "mode": "by_table",
+            "room_charge_fen": 8800,
+            "enabled": True,
+        },
+        TENANT_ID,
+    )
 
     result = await calculate_service_charge(
-        order_id=_uid(), store_id=store_id, tenant_id=TENANT_ID,
+        order_id=_uid(),
+        store_id=store_id,
+        tenant_id=TENANT_ID,
         room_type="VIP",
     )
     assert result["amount_fen"] == 8800
@@ -84,16 +98,22 @@ async def test_calculate_by_time():
     from services.service_charge import calculate_service_charge, set_charge_config
 
     store_id = _uid()
-    await set_charge_config(store_id, {
-        "mode": "by_time",
-        "time_unit_minutes": 30,
-        "charge_per_unit_fen": 2000,
-        "free_minutes": 120,
-        "enabled": True,
-    }, TENANT_ID)
+    await set_charge_config(
+        store_id,
+        {
+            "mode": "by_time",
+            "time_unit_minutes": 30,
+            "charge_per_unit_fen": 2000,
+            "free_minutes": 120,
+            "enabled": True,
+        },
+        TENANT_ID,
+    )
 
     result = await calculate_service_charge(
-        order_id=_uid(), store_id=store_id, tenant_id=TENANT_ID,
+        order_id=_uid(),
+        store_id=store_id,
+        tenant_id=TENANT_ID,
         duration_minutes=150,
     )
     assert result["amount_fen"] == 2000
@@ -107,15 +127,21 @@ async def test_calculate_by_amount_waived():
     from services.service_charge import calculate_service_charge, set_charge_config
 
     store_id = _uid()
-    await set_charge_config(store_id, {
-        "mode": "by_amount",
-        "waive_above_fen": 50000,
-        "base_charge_fen": 3000,
-        "enabled": True,
-    }, TENANT_ID)
+    await set_charge_config(
+        store_id,
+        {
+            "mode": "by_amount",
+            "waive_above_fen": 50000,
+            "base_charge_fen": 3000,
+            "enabled": True,
+        },
+        TENANT_ID,
+    )
 
     result = await calculate_service_charge(
-        order_id=_uid(), store_id=store_id, tenant_id=TENANT_ID,
+        order_id=_uid(),
+        store_id=store_id,
+        tenant_id=TENANT_ID,
         order_amount_fen=60000,
     )
     assert result["amount_fen"] == 0
@@ -128,7 +154,9 @@ async def test_calculate_no_config():
     from services.service_charge import calculate_service_charge
 
     result = await calculate_service_charge(
-        order_id=_uid(), store_id=_uid(), tenant_id=TENANT_ID,
+        order_id=_uid(),
+        store_id=_uid(),
+        tenant_id=TENANT_ID,
         guest_count=4,
     )
     assert result["amount_fen"] == 0
@@ -170,7 +198,8 @@ async def test_publish_template():
     from services.service_charge import create_charge_template, get_charge_config, publish_template
 
     template = await create_charge_template(
-        name="人头费模板", rules={"mode": "by_person", "charge_per_person_fen": 600},
+        name="人头费模板",
+        rules={"mode": "by_person", "charge_per_person_fen": 600},
         tenant_id=TENANT_ID,
     )
     store_ids = [_uid(), _uid()]

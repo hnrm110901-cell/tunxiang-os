@@ -10,6 +10,7 @@
 7. 毛利保护
 8. CONFIG_SCHEMA结构
 """
+
 import asyncio
 import os
 import sys

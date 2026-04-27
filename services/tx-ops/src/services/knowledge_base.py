@@ -2,6 +2,7 @@
 
 支持将经营改进案例沉淀为组织知识，并提供检索和推荐能力。
 """
+
 from __future__ import annotations
 
 import uuid
@@ -101,8 +102,7 @@ async def save_case(
         except SQLAlchemyError as exc:
             log.error("case_save_db_error", exc_info=True, error=str(exc), tenant_id=tenant_id)
 
-    log.info("case_saved", case_id=case_id, store_id=store_id,
-             tenant_id=tenant_id, category=case["category"])
+    log.info("case_saved", case_id=case_id, store_id=store_id, tenant_id=tenant_id, category=case["category"])
     return case
 
 
@@ -164,12 +164,14 @@ async def search_cases(
                 continue
             if category and c.get("category") != category:
                 continue
-            searchable = " ".join([
-                c.get("title", ""),
-                c.get("problem", ""),
-                c.get("solution", ""),
-                " ".join(c.get("tags", [])),
-            ]).lower()
+            searchable = " ".join(
+                [
+                    c.get("title", ""),
+                    c.get("problem", ""),
+                    c.get("solution", ""),
+                    " ".join(c.get("tags", [])),
+                ]
+            ).lower()
             if keyword_lower in searchable:
                 results.append(c)
 
@@ -243,8 +245,13 @@ async def get_sop_suggestions(
     templates = custom_templates or _SOP_TEMPLATES
     suggestions = templates.get(issue_type, [])
 
-    log.info("sop_suggestions_queried", store_id=store_id, tenant_id=tenant_id,
-             issue_type=issue_type, suggestion_count=len(suggestions))
+    log.info(
+        "sop_suggestions_queried",
+        store_id=store_id,
+        tenant_id=tenant_id,
+        issue_type=issue_type,
+        suggestion_count=len(suggestions),
+    )
 
     return {
         "store_id": store_id,
@@ -274,15 +281,17 @@ async def get_best_practices(
     sorted_stores = sorted(metrics, key=lambda x: x.get("value", 0), reverse=True)
     top_stores = sorted_stores[:3]
 
-    related_cases = [
-        c for c in all_cases
-        if c.get("tenant_id") == tenant_id and metric in c.get("tags", [])
-    ]
+    related_cases = [c for c in all_cases if c.get("tenant_id") == tenant_id and metric in c.get("tags", [])]
 
     recommendations = _build_recommendations(metric, top_stores)
 
-    log.info("best_practices_queried", tenant_id=tenant_id, metric=metric,
-             top_store_count=len(top_stores), related_case_count=len(related_cases))
+    log.info(
+        "best_practices_queried",
+        tenant_id=tenant_id,
+        metric=metric,
+        top_store_count=len(top_stores),
+        related_case_count=len(related_cases),
+    )
 
     return {
         "metric": metric,
@@ -314,11 +323,13 @@ def _build_recommendations(
     advice = _metric_advice.get(metric, f"学习 {metric} 指标优秀门店的经验")
 
     if top_stores:
-        recommendations.append({
-            "type": "benchmark",
-            "title": f"标杆门店对标 — {metric}",
-            "description": advice,
-            "reference_stores": [s.get("store_id", "") for s in top_stores],
-        })
+        recommendations.append(
+            {
+                "type": "benchmark",
+                "title": f"标杆门店对标 — {metric}",
+                "description": advice,
+                "reference_stores": [s.get("store_id", "") for s in top_stores],
+            }
+        )
 
     return recommendations

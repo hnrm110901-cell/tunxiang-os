@@ -4,6 +4,7 @@
 统一响应格式: {"ok": bool, "data": {}, "error": {}}
 所有接口需 X-Tenant-ID header。
 """
+
 from typing import Optional
 
 import structlog
@@ -35,12 +36,13 @@ from ..services.stockout_sync import (
     restore_dish,
 )
 
-
 # ─── 依赖注入占位 ───
+
 
 async def get_db() -> AsyncSession:  # type: ignore[override]
     """数据库会话依赖 — 由 main.py 中 app.dependency_overrides 注入"""
     raise NotImplementedError("DB session dependency not configured")
+
 
 log = structlog.get_logger()
 

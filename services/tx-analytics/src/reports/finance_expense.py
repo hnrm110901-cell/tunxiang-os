@@ -105,7 +105,10 @@ EXPENSE_CATEGORIES = ["food_material", "labor", "rent", "utilities", "other"]
 
 DIMENSIONS = ["store_name", "expense_category", "expense_subcategory"]
 METRICS = [
-    "amount_fen", "budget_fen", "budget_usage_pct",
-    "over_budget_fen", "entry_count",
+    "amount_fen",
+    "budget_fen",
+    "budget_usage_pct",
+    "over_budget_fen",
+    "entry_count",
 ]
 FILTERS = ["start_date", "end_date", "store_id"]

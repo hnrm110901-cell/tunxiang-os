@@ -8,6 +8,7 @@ GET /api/v1/analytics/realtime/alerts         — 实时异常告警
 RLS 安全：所有 DB 查询均通过 set_config('app.tenant_id', ...) 设置租户上下文。
 容错：DB 查询失败时返回空数据结构，不返回 500，保证驾驶舱始终可用。
 """
+
 from datetime import date, datetime, timezone
 from typing import Optional
 
@@ -52,8 +53,10 @@ async def get_today_realtime(
                 params["store_id"] = store_id
 
             # 营收/订单数/客单价
-            summary_row = (await session.execute(
-                text(f"""
+            summary_row = (
+                (
+                    await session.execute(
+                        text(f"""
                     SELECT
                         COALESCE(SUM(o.final_amount_fen), 0)  AS revenue_fen,
                         COUNT(*) AS order_count,
@@ -67,8 +70,12 @@ async def get_today_realtime(
                       AND o.is_deleted = false
                       {store_filter}
                 """),
-                params,
-            )).mappings().one()
+                        params,
+                    )
+                )
+                .mappings()
+                .one()
+            )
 
             revenue_fen: int = summary_row["revenue_fen"] or 0
             order_count: int = summary_row["order_count"] or 0
@@ -77,20 +84,24 @@ async def get_today_realtime(
             avg_order_fen: int = revenue_fen // order_count if order_count > 0 else 0
 
             # 新增会员数（今日注册）
-            new_members: int = (await session.execute(
-                text("""
+            new_members: int = (
+                await session.execute(
+                    text("""
                     SELECT COUNT(*) FROM customers
                     WHERE tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid
                       AND created_at >= :start
                       AND created_at <= :end
                       AND is_deleted = false
                 """),
-                {"start": today_start, "end": today_end},
-            )).scalar() or 0
+                    {"start": today_start, "end": today_end},
+                )
+            ).scalar() or 0
 
             # 今日热销 TOP 5 菜品
-            top_dishes_rows = (await session.execute(
-                text(f"""
+            top_dishes_rows = (
+                (
+                    await session.execute(
+                        text(f"""
                     SELECT oi.item_name, SUM(oi.quantity) AS cnt
                     FROM order_items oi
                     JOIN orders o ON o.id = oi.order_id
@@ -105,13 +116,14 @@ async def get_today_realtime(
                     ORDER BY cnt DESC
                     LIMIT 5
                 """),
-                params,
-            )).mappings().all()
+                        params,
+                    )
+                )
+                .mappings()
+                .all()
+            )
 
-            top_dishes = [
-                {"name": r["item_name"], "count": int(r["cnt"])}
-                for r in top_dishes_rows
-            ]
+            top_dishes = [{"name": r["item_name"], "count": int(r["cnt"])} for r in top_dishes_rows]
 
             data = {
                 "as_of": datetime.now(tz=timezone.utc).isoformat(),
@@ -123,23 +135,31 @@ async def get_today_realtime(
                 "new_members_today": new_members,
                 "top_dishes_today": top_dishes,
             }
-            log.info("realtime.today", tenant=x_tenant_id, store_id=store_id,
-                     order_count=order_count, revenue_fen=revenue_fen)
+            log.info(
+                "realtime.today",
+                tenant=x_tenant_id,
+                store_id=store_id,
+                order_count=order_count,
+                revenue_fen=revenue_fen,
+            )
             return {"ok": True, "data": data}
 
     except SQLAlchemyError as exc:
         log.warning("realtime.today.db_error", tenant=x_tenant_id, error=str(exc))
-        return {"ok": True, "data": {
-            "as_of": datetime.now(tz=timezone.utc).isoformat(),
-            "revenue_fen": 0,
-            "order_count": 0,
-            "avg_order_fen": 0,
-            "refund_count": 0,
-            "refund_amount_fen": 0,
-            "new_members_today": 0,
-            "top_dishes_today": [],
-            "_error": "db_unavailable",
-        }}
+        return {
+            "ok": True,
+            "data": {
+                "as_of": datetime.now(tz=timezone.utc).isoformat(),
+                "revenue_fen": 0,
+                "order_count": 0,
+                "avg_order_fen": 0,
+                "refund_count": 0,
+                "refund_amount_fen": 0,
+                "new_members_today": 0,
+                "top_dishes_today": [],
+                "_error": "db_unavailable",
+            },
+        }
 
 
 @router.get("/hourly-trend")
@@ -165,8 +185,10 @@ async def get_hourly_trend(
             if store_id:
                 params["store_id"] = store_id
 
-            rows = (await session.execute(
-                text(f"""
+            rows = (
+                (
+                    await session.execute(
+                        text(f"""
                     SELECT
                         EXTRACT(HOUR FROM o.order_time AT TIME ZONE 'Asia/Shanghai') AS hour,
                         COALESCE(SUM(o.final_amount_fen), 0)                          AS revenue_fen,
@@ -181,8 +203,12 @@ async def get_hourly_trend(
                     GROUP BY hour
                     ORDER BY hour
                 """),
-                params,
-            )).mappings().all()
+                        params,
+                    )
+                )
+                .mappings()
+                .all()
+            )
 
             hours = [
                 {
@@ -192,8 +218,7 @@ async def get_hourly_trend(
                 }
                 for r in rows
             ]
-            log.info("realtime.hourly_trend", tenant=x_tenant_id, store_id=store_id,
-                     hours_count=len(hours))
+            log.info("realtime.hourly_trend", tenant=x_tenant_id, store_id=store_id, hours_count=len(hours))
             return {"ok": True, "data": {"hours": hours, "current_hour": current_hour}}
 
     except SQLAlchemyError as exc:
@@ -213,8 +238,10 @@ async def get_store_comparison(
         async with async_session_factory() as session:
             await _set_tenant(session, x_tenant_id)
 
-            rows = (await session.execute(
-                text("""
+            rows = (
+                (
+                    await session.execute(
+                        text("""
                     SELECT
                         s.store_name,
                         COALESCE(SUM(o.final_amount_fen), 0) AS revenue_fen,
@@ -232,8 +259,12 @@ async def get_store_comparison(
                     ORDER BY revenue_fen DESC
                     LIMIT 20
                 """),
-                {"start": today_start, "end": today_end},
-            )).mappings().all()
+                        {"start": today_start, "end": today_end},
+                    )
+                )
+                .mappings()
+                .all()
+            )
 
             stores = [
                 {
@@ -266,8 +297,10 @@ async def get_realtime_alerts(
         async with async_session_factory() as session:
             await _set_tenant(session, x_tenant_id)
 
-            rows = (await session.execute(
-                text("""
+            rows = (
+                (
+                    await session.execute(
+                        text("""
                     SELECT
                         aa.severity   AS level,
                         aa.alert_type AS type,
@@ -283,8 +316,12 @@ async def get_realtime_alerts(
                     ORDER BY aa.severity DESC, aa.created_at DESC
                     LIMIT 50
                 """),
-                {"today_start": today_start},
-            )).mappings().all()
+                        {"today_start": today_start},
+                    )
+                )
+                .mappings()
+                .all()
+            )
 
             alerts = [
                 {

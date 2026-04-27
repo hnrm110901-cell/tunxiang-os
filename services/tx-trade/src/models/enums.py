@@ -1,4 +1,5 @@
 """交易域枚举定义"""
+
 import enum
 
 
@@ -30,17 +31,18 @@ class TableStatus(str, enum.Enum):
 
 
 class OrderType(str, enum.Enum):
-    dine_in = "dine_in"       # 堂食（桌台就餐）
-    takeout = "takeout"       # 外带（到店自取，柜台即点即付）
-    delivery = "delivery"     # 外卖（平台配送：美团/饿了么/抖音）
-    banquet = "banquet"       # 宴席（包场预订）
+    dine_in = "dine_in"  # 堂食（桌台就餐）
+    takeout = "takeout"  # 外带（到店自取，柜台即点即付）
+    delivery = "delivery"  # 外卖（平台配送：美团/饿了么/抖音）
+    banquet = "banquet"  # 宴席（包场预订）
     self_pickup = "self_pickup"  # 自提（线上下单，到店自提，凭取餐码提货）
-    retail = "retail"         # 零售（商品零售，非餐饮，如伴手礼/预制菜）
+    retail = "retail"  # 零售（商品零售，非餐饮，如伴手礼/预制菜）
 
 
 class PayMode(str, enum.Enum):
     """支付时序模式 — 区域/会话级别"""
-    prepay = "prepay"    # 先付后餐（快餐/外带/自提默认）
+
+    prepay = "prepay"  # 先付后餐（快餐/外带/自提默认）
     postpay = "postpay"  # 先餐后付（堂食默认）
 
 
@@ -94,3 +96,11 @@ class QueueSource(str, enum.Enum):
     meituan = "meituan"
     reservation = "reservation"
     wechat = "wechat"
+
+
+class ServiceMode(str, enum.Enum):
+    """服务模式 — 区域级别，决定订单全流程走向"""
+
+    dine_first = "dine_first"  # 先吃后付（包厢/卡座/正餐堂食）
+    scan_and_pay = "scan_and_pay"  # 扫码即付（大厅快餐/茶饮/自助）
+    retail = "retail"  # 纯零售（便利店窗口/外带柜台，无桌台无会话）

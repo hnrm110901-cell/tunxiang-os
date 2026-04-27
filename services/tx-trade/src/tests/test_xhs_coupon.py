@@ -8,6 +8,7 @@
 5. Webhook 端点冒烟
 6. POI 绑定端点冒烟
 """
+
 import os
 import sys
 
@@ -20,6 +21,7 @@ from shared.adapters.xiaohongshu.src.xhs_client import XHSClient
 # ===========================================================================
 # 1. XHSClient 签名
 # ===========================================================================
+
 
 def test_sign_deterministic():
     """相同参数生成相同签名"""
@@ -51,6 +53,7 @@ def test_sign_sorted_keys():
 # 2. 公共参数
 # ===========================================================================
 
+
 def test_common_params_structure():
     """公共参数包含 app_id/timestamp/nonce"""
     client = XHSClient(app_id="my_app", app_secret="my_secret")
@@ -64,6 +67,7 @@ def test_common_params_structure():
 # ===========================================================================
 # 3. API 调用冒烟（Mock 模式）
 # ===========================================================================
+
 
 @pytest.mark.asyncio
 async def test_verify_coupon_mock():

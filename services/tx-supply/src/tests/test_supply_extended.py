@@ -15,6 +15,7 @@
   - DB 依赖通过 app.dependency_overrides[_get_db] 注入 mock AsyncSession
   - mock execute 使用 MagicMock 模拟 fetchall 返回空列表（无供应商场景）
 """
+
 from __future__ import annotations
 
 import os
@@ -39,9 +40,13 @@ def _make_supply_stubs():
 
     # structlog
     sl = types.ModuleType("structlog")
-    sl.get_logger = MagicMock(return_value=MagicMock(
-        info=MagicMock(), warning=MagicMock(), error=MagicMock(),
-    ))
+    sl.get_logger = MagicMock(
+        return_value=MagicMock(
+            info=MagicMock(),
+            warning=MagicMock(),
+            error=MagicMock(),
+        )
+    )
     sys.modules.setdefault("structlog", sl)
 
     # shared
@@ -86,8 +91,10 @@ _make_supply_stubs()
 
 # ─── 导入路由模块 ──────────────────────────────────────────────────────────────
 
-from api.procurement_recommend_routes import router  # noqa: E402
-from api.procurement_recommend_routes import _get_db  # noqa: E402
+from api.procurement_recommend_routes import (
+    _get_db,  # noqa: E402
+    router,  # noqa: E402
+)
 
 # ─── 公共常量 ──────────────────────────────────────────────────────────────────
 
@@ -140,12 +147,14 @@ def _make_recommendation(ingredient_name: str, is_urgent: bool = False):
     rec.estimated_cost_fen = 4800
     rec.supplier_name = "食材供应商A"
     rec.is_urgent = is_urgent
-    rec.model_dump = MagicMock(return_value={
-        "recommendation_id": rec.recommendation_id,
-        "ingredient_id": rec.ingredient_id,
-        "ingredient_name": ingredient_name,
-        "is_urgent": is_urgent,
-    })
+    rec.model_dump = MagicMock(
+        return_value={
+            "recommendation_id": rec.recommendation_id,
+            "ingredient_id": rec.ingredient_id,
+            "ingredient_name": ingredient_name,
+            "is_urgent": is_urgent,
+        }
+    )
     return rec
 
 
@@ -308,9 +317,7 @@ def test_get_procurement_alerts_urgent():
         autospec=False,
     ) as MockSvc:
         mock_svc_instance = MagicMock()
-        mock_svc_instance.generate_recommendations = AsyncMock(
-            return_value=[urgent_rec, normal_rec]
-        )
+        mock_svc_instance.generate_recommendations = AsyncMock(return_value=[urgent_rec, normal_rec])
         MockSvc.return_value = mock_svc_instance
 
         resp = client.get(

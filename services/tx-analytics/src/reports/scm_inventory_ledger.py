@@ -42,7 +42,16 @@ WHERE it.tenant_id = :tenant_id
 ORDER BY it.tx_date DESC, it.created_at DESC
 """
 
-DIMENSIONS = ["store_name", "tx_date", "ingredient_name", "ingredient_category",
-              "tx_type", "tx_type_label", "batch_no", "supplier_name", "operator_name"]
+DIMENSIONS = [
+    "store_name",
+    "tx_date",
+    "ingredient_name",
+    "ingredient_category",
+    "tx_type",
+    "tx_type_label",
+    "batch_no",
+    "supplier_name",
+    "operator_name",
+]
 METRICS = ["qty", "unit_price_fen", "cost_fen"]
 FILTERS = ["start_date", "end_date", "store_id", "ingredient_id"]

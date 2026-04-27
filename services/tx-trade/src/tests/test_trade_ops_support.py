@@ -12,14 +12,15 @@
   - sys.modules stub 解决相对导入
   - 每个路由文件 >= 3 个测试，合计 20 个
 """
+
 import os
 import sys
 import types
 
 # ─── 路径准备 ─────────────────────────────────────────────────────────────────
 _TESTS_DIR = os.path.dirname(__file__)
-_SRC_DIR   = os.path.abspath(os.path.join(_TESTS_DIR, ".."))
-_ROOT_DIR  = os.path.abspath(os.path.join(_TESTS_DIR, "..", "..", "..", ".."))
+_SRC_DIR = os.path.abspath(os.path.join(_TESTS_DIR, ".."))
+_ROOT_DIR = os.path.abspath(os.path.join(_TESTS_DIR, "..", "..", "..", ".."))
 
 for _p in [_SRC_DIR, _ROOT_DIR]:
     if _p not in sys.path:
@@ -27,6 +28,7 @@ for _p in [_SRC_DIR, _ROOT_DIR]:
 
 
 # ─── 包层级注册 ───────────────────────────────────────────────────────────────
+
 
 def _ensure_pkg(name: str, path: str) -> None:
     if name not in sys.modules:
@@ -36,12 +38,13 @@ def _ensure_pkg(name: str, path: str) -> None:
         sys.modules[name] = mod
 
 
-_ensure_pkg("src",          _SRC_DIR)
-_ensure_pkg("src.api",      os.path.join(_SRC_DIR, "api"))
+_ensure_pkg("src", _SRC_DIR)
+_ensure_pkg("src.api", os.path.join(_SRC_DIR, "api"))
 _ensure_pkg("src.services", os.path.join(_SRC_DIR, "services"))
 
 
 # ─── stub 工具 ────────────────────────────────────────────────────────────────
+
 
 def _stub_module(full_name: str, **attrs):
     """注入最小存根模块到 sys.modules，避免真实导入失败。"""
@@ -76,10 +79,12 @@ _stub_module(
 # ─── stub: approval_service（被 approval_routes 导入）────────────────────────
 # ApprovalService 必须作为真实类存在，否则 approval_routes 的 import 会失败
 
+
 class _FakeApprovalService:
     """ApprovalService 最小化存根，供 approval_routes import 时使用。
     测试时通过 patch('src.api.approval_routes.ApprovalService') 替换实例。
     """
+
     def __init__(self, db=None, tenant_id: str = "", store_id: str = ""):
         self.db = db
         self.tenant_id = tenant_id
@@ -107,6 +112,7 @@ _approval_svc_stub.ApprovalService = _FakeApprovalService  # type: ignore[attr-d
 # ─── stub: src.db（被 service_bell_routes 用 ..db.get_db 导入）───────────────
 # get_db 必须是真实可调用，才能作为 dependency_overrides 的 key
 
+
 async def _src_db_get_db_placeholder():  # noqa: D401
     """src.db.get_db 占位符，测试时通过 dependency_overrides 替换。"""
     yield None  # pragma: no cover
@@ -117,32 +123,31 @@ _stub_module("src.db", get_db=_src_db_get_db_placeholder)
 # ─── 正式导入 ──────────────────────────────────────────────────────────────────
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+import src.db as _src_db_mod  # type: ignore
 from shared.ontology.src.database import get_db as shared_get_db  # noqa: E402
+from src.api.approval_routes import router as approval_router  # type: ignore
+from src.api.dish_practice_routes import router as dish_practice_router  # type: ignore
 
 # ─── 各路由导入 ───────────────────────────────────────────────────────────────
-from src.api.review_routes import router as review_router               # type: ignore
-from src.api.service_bell_routes import router as service_bell_router   # type: ignore
-import src.db as _src_db_mod                                            # type: ignore
-from src.api.store_management_routes import router as store_mgmt_router # type: ignore
-from src.api.dish_practice_routes import router as dish_practice_router # type: ignore
-from src.api.approval_routes import router as approval_router           # type: ignore
+from src.api.review_routes import router as review_router  # type: ignore
+from src.api.service_bell_routes import router as service_bell_router  # type: ignore
+from src.api.store_management_routes import router as store_mgmt_router  # type: ignore
 
 # service_bell_routes 使用 src.db.get_db（..db），approval_routes 使用 shared.ontology.src.database.get_db
 # 两者是不同对象，需要分别 override
-_src_get_db    = _src_db_mod.get_db   # service_bell 使用的依赖 key
-_shared_get_db = shared_get_db        # approval 使用的依赖 key
+_src_get_db = _src_db_mod.get_db  # service_bell 使用的依赖 key
+_shared_get_db = shared_get_db  # approval 使用的依赖 key
 
 # ─── 常量 ─────────────────────────────────────────────────────────────────────
-TENANT_ID   = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
-STORE_ID    = "s1"
-ORDER_ID    = "ord-001"
+TENANT_ID = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+STORE_ID = "s1"
+ORDER_ID = "ord-001"
 APPROVAL_ID = "apv-001"
-CALL_ID     = "cccccccc-cccc-cccc-cccc-cccccccccccc"
-DISH_ID     = "dddddddd-dddd-dddd-dddd-dddddddddddd"
+CALL_ID = "cccccccc-cccc-cccc-cccc-cccccccccccc"
+DISH_ID = "dddddddd-dddd-dddd-dddd-dddddddddddd"
 PRACTICE_ID = "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee"
 
 HEADERS = {"X-Tenant-ID": TENANT_ID}
@@ -150,11 +155,12 @@ HEADERS = {"X-Tenant-ID": TENANT_ID}
 
 # ─── 工具函数 ─────────────────────────────────────────────────────────────────
 
+
 def _make_mock_db() -> AsyncMock:
     db = AsyncMock()
-    db.commit   = AsyncMock()
+    db.commit = AsyncMock()
     db.rollback = AsyncMock()
-    db.execute  = AsyncMock(return_value=MagicMock())
+    db.execute = AsyncMock(return_value=MagicMock())
     return db
 
 
@@ -170,8 +176,10 @@ def _make_app(*routers, db: AsyncMock | None = None, use_src_db: bool = False) -
         app.include_router(r)
 
     if db is not None:
+
         async def _override():
             yield db
+
         if use_src_db:
             app.dependency_overrides[_src_get_db] = _override
         else:
@@ -183,6 +191,7 @@ def _make_app(*routers, db: AsyncMock | None = None, use_src_db: bool = False) -
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 #  review_routes 测试（4 个）
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 def test_review_list_default():
     """评价列表默认查询：返回 ok=True 且包含 items/total/avg_rating。"""
@@ -284,20 +293,22 @@ def test_review_stats():
 #  service_bell_routes 测试（4 个）
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def _make_fake_call():
     """构造服务铃呼叫 mock 对象。"""
-    from unittest.mock import MagicMock
     from datetime import datetime, timezone
+    from unittest.mock import MagicMock
+
     call = MagicMock()
-    call.id            = CALL_ID
-    call.store_id      = STORE_ID
-    call.table_no      = "A01"
-    call.call_type     = "water"
+    call.id = CALL_ID
+    call.store_id = STORE_ID
+    call.table_no = "A01"
+    call.call_type = "water"
     call.call_type_label = "加水"
-    call.status        = "pending"
-    call.operator_id   = None
-    call.called_at     = datetime(2026, 4, 5, 10, 0, 0, tzinfo=timezone.utc)
-    call.responded_at  = None
+    call.status = "pending"
+    call.operator_id = None
+    call.called_at = datetime(2026, 4, 5, 10, 0, 0, tzinfo=timezone.utc)
+    call.responded_at = None
     return call
 
 
@@ -386,8 +397,9 @@ def test_service_bell_respond_call_success():
     db = _make_mock_db()
     fake_call = _make_fake_call()
     from datetime import datetime, timezone
-    fake_call.status       = "responded"
-    fake_call.operator_id  = "op-001"
+
+    fake_call.status = "responded"
+    fake_call.operator_id = "op-001"
     fake_call.responded_at = datetime(2026, 4, 5, 10, 5, 0, tzinfo=timezone.utc)
 
     with patch(
@@ -411,6 +423,7 @@ def test_service_bell_respond_call_success():
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 #  store_management_routes 测试（4 个）
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 def test_store_list_all():
     """门店列表默认查询：返回 ok=True，items 包含 id/name 字段。"""
@@ -497,6 +510,7 @@ def test_table_get_not_found():
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 #  dish_practice_routes 测试（3 个）
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 def test_dish_practice_get_templates():
     """获取通用做法模板：返回 ok=True 且 data 包含模板列表。"""
@@ -594,14 +608,15 @@ def test_dish_practice_get_missing_tenant():
 #  approval_routes 测试（4 个）
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def _make_mock_approval_svc() -> MagicMock:
     """构造 ApprovalService mock 实例，所有方法为 AsyncMock。"""
     svc = MagicMock()
-    svc.create_approval  = AsyncMock()
-    svc.approve          = AsyncMock()
-    svc.reject           = AsyncMock()
-    svc.list_approvals   = AsyncMock()
-    svc.get_approval     = AsyncMock()
+    svc.create_approval = AsyncMock()
+    svc.approve = AsyncMock()
+    svc.reject = AsyncMock()
+    svc.list_approvals = AsyncMock()
+    svc.get_approval = AsyncMock()
     return svc
 
 

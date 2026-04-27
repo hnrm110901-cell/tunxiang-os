@@ -12,6 +12,7 @@
 # from .api.lifecycle_routes import router as lifecycle_router
 # app.include_router(lifecycle_router, prefix="/api/v1/lifecycle")
 """
+
 from __future__ import annotations
 
 import uuid
@@ -64,18 +65,10 @@ async def _set_rls(db: AsyncSession, tenant_id: uuid.UUID) -> None:
 class LifecycleConfigUpdateReq(BaseModel):
     """更新阶段配置请求体"""
 
-    days_threshold: Optional[int] = Field(
-        None, ge=1, description="判断天数阈值（天）"
-    )
-    auto_action: Optional[str] = Field(
-        None, description="自动触发动作：coupon / wecom_message / sms / none"
-    )
-    coupon_template_id: Optional[str] = Field(
-        None, description="发券时使用的券模板 UUID"
-    )
-    message_template: Optional[str] = Field(
-        None, description="企微/短信推送消息模板"
-    )
+    days_threshold: Optional[int] = Field(None, ge=1, description="判断天数阈值（天）")
+    auto_action: Optional[str] = Field(None, description="自动触发动作：coupon / wecom_message / sms / none")
+    coupon_template_id: Optional[str] = Field(None, description="发券时使用的券模板 UUID")
+    message_template: Optional[str] = Field(None, description="企微/短信推送消息模板")
     is_active: Optional[bool] = Field(None, description="是否启用该阶段规则")
 
 
@@ -237,9 +230,7 @@ async def trigger_reclassify(
     logger.info("lifecycle_reclassify_triggered", tenant_id=str(tenant_id))
 
     t0 = time.monotonic()
-    result = await _service.batch_reclassify(
-        tenant_id=str(tenant_id), db=db
-    )
+    result = await _service.batch_reclassify(tenant_id=str(tenant_id), db=db)
     elapsed = round(time.monotonic() - t0, 3)
 
     logger.info(
@@ -384,15 +375,17 @@ async def get_lifecycle_config(
         if stage in db_configs:
             configs.append(db_configs[stage])
         else:
-            configs.append({
-                "stage": stage,
-                "days_threshold": default_thresholds.get(stage),
-                "auto_action": "none",
-                "coupon_template_id": None,
-                "message_template": None,
-                "is_active": False,
-                "_is_default": True,
-            })
+            configs.append(
+                {
+                    "stage": stage,
+                    "days_threshold": default_thresholds.get(stage),
+                    "auto_action": "none",
+                    "coupon_template_id": None,
+                    "message_template": None,
+                    "is_active": False,
+                    "_is_default": True,
+                }
+            )
 
     return {"ok": True, "data": {"configs": configs}}
 
@@ -471,13 +464,17 @@ async def update_lifecycle_config(
         auto_action=row[2] if row else None,
     )
 
-    updated = {
-        "stage": row[0],
-        "days_threshold": row[1],
-        "auto_action": row[2],
-        "coupon_template_id": str(row[3]) if row[3] else None,
-        "message_template": row[4],
-        "is_active": row[5],
-    } if row else {"stage": stage, "updated": True}
+    updated = (
+        {
+            "stage": row[0],
+            "days_threshold": row[1],
+            "auto_action": row[2],
+            "coupon_template_id": str(row[3]) if row[3] else None,
+            "message_template": row[4],
+            "is_active": row[5],
+        }
+        if row
+        else {"stage": stage, "updated": True}
+    )
 
     return {"ok": True, "data": updated}

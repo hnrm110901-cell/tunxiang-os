@@ -16,10 +16,11 @@
     prefilled = await mapper.extract_prefilled_answers()
     # 然后传给 POST /api/v1/onboarding/start 的 prefilled_answers
 """
+
 from __future__ import annotations
 
 import asyncio
-from typing import Any, Optional
+from typing import Any
 
 import structlog
 
@@ -127,12 +128,14 @@ class TiancaiConfigMapper:
                 else:
                     ptype = "kitchen"
 
-                printers.append({
-                    "name": p.get("name", p.get("printerName", f"{ptype}打印机")),
-                    "printer_type": ptype,
-                    "ip": p.get("ip", p.get("ipAddress", "")),
-                    "is_default": bool(p.get("isDefault", p.get("default", False))),
-                })
+                printers.append(
+                    {
+                        "name": p.get("name", p.get("printerName", f"{ptype}打印机")),
+                        "printer_type": ptype,
+                        "ip": p.get("ip", p.get("ipAddress", "")),
+                        "is_default": bool(p.get("isDefault", p.get("default", False))),
+                    }
+                )
 
             if printers:
                 answers["printers"] = printers
@@ -154,13 +157,15 @@ class TiancaiConfigMapper:
 
             shifts = []
             for h in hours:
-                shifts.append({
-                    "shift_name": h.get("name", h.get("shiftName", "营业时段")),
-                    "start_time": h.get("startTime", h.get("start", "10:00")),
-                    "end_time": h.get("endTime", h.get("end", "22:00")),
-                    "settlement_cutoff": h.get("settleTime", "02:00"),
-                    "is_overnight": bool(h.get("overnight", False)),
-                })
+                shifts.append(
+                    {
+                        "shift_name": h.get("name", h.get("shiftName", "营业时段")),
+                        "start_time": h.get("startTime", h.get("start", "10:00")),
+                        "end_time": h.get("endTime", h.get("end", "22:00")),
+                        "settlement_cutoff": h.get("settleTime", "02:00"),
+                        "is_overnight": bool(h.get("overnight", False)),
+                    }
+                )
 
             if shifts:
                 answers["shifts"] = shifts
@@ -218,12 +223,14 @@ class TiancaiConfigMapper:
 
             zones = []
             for idx, k in enumerate(kitchens):
-                zones.append({
-                    "zone_code": str(k.get("code", k.get("kitchenCode", f"zone_{idx}"))),
-                    "zone_name": str(k.get("name", k.get("kitchenName", f"档口{idx+1}"))),
-                    "display_order": idx,
-                    "alert_minutes": int(k.get("alertMinutes", k.get("warnTime", 8))),
-                })
+                zones.append(
+                    {
+                        "zone_code": str(k.get("code", k.get("kitchenCode", f"zone_{idx}"))),
+                        "zone_name": str(k.get("name", k.get("kitchenName", f"档口{idx + 1}"))),
+                        "display_order": idx,
+                        "alert_minutes": int(k.get("alertMinutes", k.get("warnTime", 8))),
+                    }
+                )
 
             if zones:
                 answers["kds_zones"] = zones
@@ -244,12 +251,18 @@ class TiancaiConfigMapper:
 
             # 天财支付类型 → 屯象支付方式
             TIANCAI_PAY_MAP = {
-                "WEIXIN": "wechat", "WECHAT": "wechat",
-                "ALIPAY": "alipay", "ZHIFUBAO": "alipay",
-                "CASH": "cash", "XIANJIN": "cash",
-                "UNIONPAY": "unionpay", "YINHANGKA": "unionpay",
-                "MEMBER": "stored_value", "HUIYUAN": "stored_value",
-                "GUAZHANG": "agreement", "CREDIT": "agreement",
+                "WEIXIN": "wechat",
+                "WECHAT": "wechat",
+                "ALIPAY": "alipay",
+                "ZHIFUBAO": "alipay",
+                "CASH": "cash",
+                "XIANJIN": "cash",
+                "UNIONPAY": "unionpay",
+                "YINHANGKA": "unionpay",
+                "MEMBER": "stored_value",
+                "HUIYUAN": "stored_value",
+                "GUAZHANG": "agreement",
+                "CREDIT": "agreement",
             }
 
             methods = []
@@ -292,9 +305,12 @@ class TiancaiConfigMapper:
                 return
 
             TIANCAI_CHANNEL_MAP = {
-                "MEITUAN": "meituan", "MT": "meituan",
-                "ELEME": "eleme", "ELM": "eleme",
-                "DOUYIN": "douyin", "TK": "douyin",
+                "MEITUAN": "meituan",
+                "MT": "meituan",
+                "ELEME": "eleme",
+                "ELM": "eleme",
+                "DOUYIN": "douyin",
+                "TK": "douyin",
             }
 
             channels = []
@@ -358,6 +374,7 @@ async def run_tiancai_migration(
     返回迁移摘要，供 MigrationDashboard 展示。
     """
     import importlib
+
     _menu_mod = importlib.import_module("shared.adapters.tiancai-shanglong.src.menu_sync")
     TiancaiMenuSync = _menu_mod.TiancaiMenuSync
     _member_mod = importlib.import_module("shared.adapters.tiancai-shanglong.src.member_sync")
@@ -402,9 +419,9 @@ async def run_tiancai_migration(
     summary["prefilled_answers"] = prefilled
     summary["next_step"] = (
         f"POST /api/v1/onboarding/start  body: "
-        f'{{\"tenant_id\": \"{tenant_id}\", '
-        f'\"migration_source\": \"tiancai\", '
-        f'\"prefilled_answers\": <见 prefilled_answers>}}'
+        f'{{"tenant_id": "{tenant_id}", '
+        f'"migration_source": "tiancai", '
+        f'"prefilled_answers": <见 prefilled_answers>}}'
     )
 
     return summary

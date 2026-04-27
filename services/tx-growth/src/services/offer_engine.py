@@ -9,6 +9,7 @@
 
 v144 DB 化：移除内存存储，改为 async SQLAlchemy + offers/offer_redemptions 表
 """
+
 import json
 import uuid
 from datetime import datetime, timezone
@@ -25,19 +26,20 @@ logger = structlog.get_logger(__name__)
 # OfferEngine
 # ---------------------------------------------------------------------------
 
+
 class OfferEngine:
     """优惠策略引擎 — 核心不是发券，而是利益结构设计"""
 
     OFFER_TYPES = [
-        "new_customer_trial",   # 新客体验
-        "first_addon",          # 首单加购
-        "second_visit",         # 二次到店
-        "birthday_reward",      # 生日礼遇
-        "stored_value_bonus",   # 储值赠送
-        "banquet_inquiry_gift", # 宴会咨询礼
-        "referral_reward",      # 老带新奖励
-        "new_dish_trial",       # 新品尝鲜
-        "off_peak_traffic",     # 闲时引流
+        "new_customer_trial",  # 新客体验
+        "first_addon",  # 首单加购
+        "second_visit",  # 二次到店
+        "birthday_reward",  # 生日礼遇
+        "stored_value_bonus",  # 储值赠送
+        "banquet_inquiry_gift",  # 宴会咨询礼
+        "referral_reward",  # 老带新奖励
+        "new_dish_trial",  # 新品尝鲜
+        "off_peak_traffic",  # 闲时引流
     ]
 
     # 各优惠类型的默认参数
@@ -506,8 +508,7 @@ class OfferEngine:
         projected_cost_fen = per_discount_fen * estimated_redemption_count
         projected_revenue_lift_fen = int(avg_order_fen * 1.5 * estimated_redemption_count)
         projected_roi = (
-            round(projected_revenue_lift_fen / max(1, projected_cost_fen), 2)
-            if projected_cost_fen > 0 else 0
+            round(projected_revenue_lift_fen / max(1, projected_cost_fen), 2) if projected_cost_fen > 0 else 0
         )
 
         return {

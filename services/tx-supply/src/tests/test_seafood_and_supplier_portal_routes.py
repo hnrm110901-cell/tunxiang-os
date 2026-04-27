@@ -29,6 +29,7 @@
 
 测试数量: 27 个测试用例
 """
+
 from __future__ import annotations
 
 import sys
@@ -41,8 +42,10 @@ _shared_ont = types.ModuleType("shared.ontology")
 _shared_ont_src = types.ModuleType("shared.ontology.src")
 _shared_db_mod = types.ModuleType("shared.ontology.src.database")
 
+
 async def _placeholder_get_db():
     yield None
+
 
 _shared_db_mod.get_db = _placeholder_get_db
 sys.modules.setdefault("shared", _shared)
@@ -96,9 +99,11 @@ for _pkg in ["src", "src.api", "src.services"]:
 sys.modules["src.services.supplier_portal_service"] = _sp_svc_mod
 
 import os
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
+
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from sqlalchemy.exc import ProgrammingError
@@ -121,7 +126,8 @@ def _mock_db():
 # ═══════════════════════════════════════════════════════════════════════════════
 
 import api.seafood_routes as _seafood_module
-from api.seafood_routes import router as seafood_router, _get_db as seafood_get_db
+from api.seafood_routes import _get_db as seafood_get_db
+from api.seafood_routes import router as seafood_router
 
 
 def _seafood_client(db_mock):
@@ -447,7 +453,8 @@ class TestSeafoodAlertsAndMonitoring:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 import api.supplier_portal_routes as _portal_module
-from api.supplier_portal_routes import router as portal_router, _get_db as portal_get_db
+from api.supplier_portal_routes import _get_db as portal_get_db
+from api.supplier_portal_routes import router as portal_router
 
 SUPPLIER_ID = str(uuid.uuid4())
 RFQ_ID = "rfq_" + str(uuid.uuid4())[:8]
@@ -506,9 +513,7 @@ class TestRegisterSupplier:
         with patch.object(
             _portal_module.svc,
             "register_supplier",
-            new=AsyncMock(
-                side_effect=ProgrammingError("relation does not exist", None, None)
-            ),
+            new=AsyncMock(side_effect=ProgrammingError("relation does not exist", None, None)),
         ):
             resp = _portal_client(db).post(
                 "/api/v1/suppliers",

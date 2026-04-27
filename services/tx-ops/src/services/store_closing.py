@@ -2,6 +2,7 @@
 
 从 check_item_templates 加载 E5 模板，结合 workflow_engine 状态机。
 """
+
 from __future__ import annotations
 
 import uuid
@@ -46,17 +47,19 @@ async def create_closing_checklist(
     checklist_id = f"close_{store_id}_{date_.isoformat()}_{uuid.uuid4().hex[:8]}"
     items = []
     for idx, tpl_item in enumerate(node_def.get("check_items", [])):
-        items.append({
-            "item_id": f"{checklist_id}_item_{idx:03d}",
-            "seq": idx,
-            "text": tpl_item["item"],
-            "required": tpl_item.get("required", False),
-            "status": "pending",
-            "result": None,
-            "checked_by": None,
-            "checked_at": None,
-            "note": None,
-        })
+        items.append(
+            {
+                "item_id": f"{checklist_id}_item_{idx:03d}",
+                "seq": idx,
+                "text": tpl_item["item"],
+                "required": tpl_item.get("required", False),
+                "status": "pending",
+                "result": None,
+                "checked_by": None,
+                "checked_at": None,
+                "note": None,
+            }
+        )
 
     checklist = {
         "checklist_id": checklist_id,
@@ -125,21 +128,22 @@ async def record_closing_stocktake(
         total_expected += expected
         total_actual += actual
 
-        enriched.append({
-            "line_id": f"{stocktake_id}_l{idx:03d}",
-            "ingredient_id": item.get("ingredient_id", ""),
-            "name": item.get("name", ""),
-            "expected_qty": expected,
-            "actual_qty": actual,
-            "unit": item.get("unit", ""),
-            "variance": round(diff, 3),
-            "variance_pct": round(diff_pct, 2),
-            "has_variance": has_variance,
-        })
+        enriched.append(
+            {
+                "line_id": f"{stocktake_id}_l{idx:03d}",
+                "ingredient_id": item.get("ingredient_id", ""),
+                "name": item.get("name", ""),
+                "expected_qty": expected,
+                "actual_qty": actual,
+                "unit": item.get("unit", ""),
+                "variance": round(diff, 3),
+                "variance_pct": round(diff_pct, 2),
+                "has_variance": has_variance,
+            }
+        )
 
     total_variance_pct = (
-        round((total_actual - total_expected) / total_expected * 100, 2)
-        if total_expected != 0 else 0.0
+        round((total_actual - total_expected) / total_expected * 100, 2) if total_expected != 0 else 0.0
     )
 
     result = {
@@ -195,15 +199,17 @@ async def record_waste_report(
     for idx, item in enumerate(waste_items):
         cost = item.get("cost_fen", 0)
         total_cost_fen += cost
-        enriched.append({
-            "line_id": f"{report_id}_l{idx:03d}",
-            "ingredient_id": item.get("ingredient_id", ""),
-            "name": item.get("name", ""),
-            "qty": item.get("qty", 0),
-            "unit": item.get("unit", ""),
-            "reason": item.get("reason", ""),
-            "cost_fen": cost,
-        })
+        enriched.append(
+            {
+                "line_id": f"{report_id}_l{idx:03d}",
+                "ingredient_id": item.get("ingredient_id", ""),
+                "name": item.get("name", ""),
+                "qty": item.get("qty", 0),
+                "unit": item.get("unit", ""),
+                "reason": item.get("reason", ""),
+                "cost_fen": cost,
+            }
+        )
 
     result = {
         "waste_report_id": report_id,
@@ -315,8 +321,13 @@ def get_closing_status(
     """
     if checklist is None:
         return {
-            "total": 0, "checked": 0, "passed": 0, "blocked": 0,
-            "can_close": False, "has_stocktake": False, "has_waste_report": False,
+            "total": 0,
+            "checked": 0,
+            "passed": 0,
+            "blocked": 0,
+            "can_close": False,
+            "has_stocktake": False,
+            "has_waste_report": False,
         }
 
     items = checklist.get("items", [])

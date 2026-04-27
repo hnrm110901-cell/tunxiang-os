@@ -12,17 +12,17 @@
 
 金额约定：所有金额字段为分(fen)。
 """
+
 from __future__ import annotations
 
 import hashlib
-import uuid
 from datetime import datetime, timezone
 from typing import Optional
 from uuid import UUID
 
 import structlog
-from sqlalchemy import func, select, text, update
-from sqlalchemy.exc import IntegrityError, SQLAlchemyError
+from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = structlog.get_logger(__name__)
@@ -31,6 +31,7 @@ logger = structlog.get_logger(__name__)
 # ─────────────────────────────────────────────────────────────────────────────
 # 辅助
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 def _now_utc() -> datetime:
     return datetime.now(tz=timezone.utc)
@@ -49,6 +50,7 @@ def _compute_group_key(invoice_code: str, invoice_number: str) -> str:
 # ─────────────────────────────────────────────────────────────────────────────
 # 集团级发票去重服务
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class InvoiceDedupService:
     """
@@ -170,9 +172,7 @@ class InvoiceDedupService:
                 )
 
             # 插入 cross_ref
-            await self._upsert_cross_ref(
-                db, group_key, tenant_id, invoice_id, expense_application_id, now
-            )
+            await self._upsert_cross_ref(db, group_key, tenant_id, invoice_id, expense_application_id, now)
 
             log.info(
                 "invoice_dedup_new_group",
@@ -221,9 +221,7 @@ class InvoiceDedupService:
             )
 
         # 插入 cross_ref（幂等）
-        await self._upsert_cross_ref(
-            db, group_key, tenant_id, invoice_id, expense_application_id, now
-        )
+        await self._upsert_cross_ref(db, group_key, tenant_id, invoice_id, expense_application_id, now)
 
         if is_cross_brand:
             log.warning(
@@ -257,9 +255,7 @@ class InvoiceDedupService:
             "first_tenant_id": str(first_tenant_id),
             "first_invoice_id": str(first_invoice_id),
             "first_reported_at": (
-                first_reported_at.isoformat()
-                if hasattr(first_reported_at, "isoformat")
-                else str(first_reported_at)
+                first_reported_at.isoformat() if hasattr(first_reported_at, "isoformat") else str(first_reported_at)
             ),
             "message": message,
         }
@@ -407,19 +403,27 @@ class InvoiceDedupService:
             first_reported = row["first_reported_at"]
             reported = row["reported_at"]
             resolved = row["resolved_at"]
-            items.append({
-                "group_id": row["group_id"],
-                "invoice_id": str(row["invoice_id"]),
-                "expense_application_id": str(row["expense_application_id"]) if row["expense_application_id"] else None,
-                "first_tenant_id": str(row["first_tenant_id"]),
-                "first_invoice_id": str(row["first_invoice_id"]),
-                "first_reported_at": first_reported.isoformat() if hasattr(first_reported, "isoformat") else str(first_reported),
-                "total_usage_count": int(row["total_usage_count"]),
-                "is_cross_brand": str(row["first_tenant_id"]) != str(tenant_id),
-                "reported_at": reported.isoformat() if hasattr(reported, "isoformat") else str(reported),
-                "resolved_at": resolved.isoformat() if resolved and hasattr(resolved, "isoformat") else (str(resolved) if resolved else None),
-                "resolve_note": row["resolve_note"],
-            })
+            items.append(
+                {
+                    "group_id": row["group_id"],
+                    "invoice_id": str(row["invoice_id"]),
+                    "expense_application_id": str(row["expense_application_id"])
+                    if row["expense_application_id"]
+                    else None,
+                    "first_tenant_id": str(row["first_tenant_id"]),
+                    "first_invoice_id": str(row["first_invoice_id"]),
+                    "first_reported_at": first_reported.isoformat()
+                    if hasattr(first_reported, "isoformat")
+                    else str(first_reported),
+                    "total_usage_count": int(row["total_usage_count"]),
+                    "is_cross_brand": str(row["first_tenant_id"]) != str(tenant_id),
+                    "reported_at": reported.isoformat() if hasattr(reported, "isoformat") else str(reported),
+                    "resolved_at": resolved.isoformat()
+                    if resolved and hasattr(resolved, "isoformat")
+                    else (str(resolved) if resolved else None),
+                    "resolve_note": row["resolve_note"],
+                }
+            )
 
         return {
             "items": items,
@@ -527,9 +531,7 @@ class InvoiceDedupService:
             raise LookupError(f"invoice_dedup_groups 中不存在 group_id: {group_id}")
 
         if row["resolved_at"] is not None:
-            raise ValueError(
-                f"去重组 {group_id} 已于 {row['resolved_at']} 处理，请勿重复提交"
-            )
+            raise ValueError(f"去重组 {group_id} 已于 {row['resolved_at']} 处理，请勿重复提交")
 
         now = _now_utc()
         try:

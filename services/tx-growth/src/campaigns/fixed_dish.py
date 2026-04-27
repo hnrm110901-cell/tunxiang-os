@@ -3,6 +3,7 @@
 典型场景: 每周三剁椒鱼头半价, 点指定菜品即享特价/赠品
 支持指定菜品ID列表, 生效时段, 优惠方式(折扣/减免/赠品)。
 """
+
 from typing import Any
 
 import structlog

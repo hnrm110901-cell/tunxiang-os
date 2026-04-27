@@ -52,8 +52,15 @@ ORDER BY actual_fen DESC
 
 DIMENSIONS = ["store_name", "cashier_name", "employee_id", "grade_level"]
 METRICS = [
-    "order_count", "total_amount_fen", "discount_fen", "actual_fen",
-    "cancel_count", "manual_discount_count", "avg_ticket_fen",
-    "anomaly_count", "commission_fen", "output_rank",
+    "order_count",
+    "total_amount_fen",
+    "discount_fen",
+    "actual_fen",
+    "cancel_count",
+    "manual_discount_count",
+    "avg_ticket_fen",
+    "anomaly_count",
+    "commission_fen",
+    "output_rank",
 ]
 FILTERS = ["start_date", "end_date", "store_id"]

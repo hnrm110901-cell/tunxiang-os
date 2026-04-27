@@ -5,6 +5,7 @@ Mock接口，结构与金蝶K3/Cloud兼容。
 金额单位: 分(fen), int类型。
 导出状态: pending → processing → completed / failed
 """
+
 import uuid
 from datetime import datetime, timezone
 from typing import Optional
@@ -24,18 +25,18 @@ EXPORT_STATUS_FAILED = "failed"
 
 # ─── 金蝶科目编码常量 ───
 
-ACCOUNT_RAW_MATERIAL = "1403"       # 原材料
-ACCOUNT_AP = "2202"                 # 应付账款
-ACCOUNT_MAIN_BIZ_COST = "5401"     # 主营业务成本
-ACCOUNT_GOODS_IN_TRANSIT = "1406"   # 在途物资
-ACCOUNT_SALARY_PAYABLE = "2211"     # 应付职工薪酬
-ACCOUNT_ADMIN_EXPENSE = "5602"      # 管理费用-工资
-ACCOUNT_CASH = "1001"               # 库存现金
-ACCOUNT_BANK = "1002"               # 银行存款
-ACCOUNT_WECHAT_PAY = "1012.01"     # 微信收款
-ACCOUNT_ALIPAY = "1012.02"         # 支付宝收款
+ACCOUNT_RAW_MATERIAL = "1403"  # 原材料
+ACCOUNT_AP = "2202"  # 应付账款
+ACCOUNT_MAIN_BIZ_COST = "5401"  # 主营业务成本
+ACCOUNT_GOODS_IN_TRANSIT = "1406"  # 在途物资
+ACCOUNT_SALARY_PAYABLE = "2211"  # 应付职工薪酬
+ACCOUNT_ADMIN_EXPENSE = "5602"  # 管理费用-工资
+ACCOUNT_CASH = "1001"  # 库存现金
+ACCOUNT_BANK = "1002"  # 银行存款
+ACCOUNT_WECHAT_PAY = "1012.01"  # 微信收款
+ACCOUNT_ALIPAY = "1012.02"  # 支付宝收款
 ACCOUNT_MAIN_BIZ_REVENUE = "5001"  # 主营业务收入
-ACCOUNT_INVENTORY_GOODS = "1405"   # 库存商品
+ACCOUNT_INVENTORY_GOODS = "1405"  # 库存商品
 
 
 def _make_voucher_entry(
@@ -78,6 +79,7 @@ def _make_export_record(
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 #  1. 采购入库汇总 → 金蝶凭证
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 async def export_purchase_receipt(
     store_id: str,
@@ -147,13 +149,18 @@ async def export_purchase_receipt(
     }
 
     return _make_export_record(
-        "purchase_receipt", store_id, month, tenant_id, voucher,
+        "purchase_receipt",
+        store_id,
+        month,
+        tenant_id,
+        voucher,
     )
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 #  2. 成本结转汇总 → 金蝶凭证
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 async def export_cost_transfer(
     store_id: str,
@@ -219,13 +226,18 @@ async def export_cost_transfer(
     }
 
     return _make_export_record(
-        "cost_transfer", store_id, month, tenant_id, voucher,
+        "cost_transfer",
+        store_id,
+        month,
+        tenant_id,
+        voucher,
     )
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 #  3. 调拨出入库汇总 → 金蝶凭证
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 async def export_transfer_in_out(
     store_id: str,
@@ -284,31 +296,35 @@ async def export_transfer_in_out(
 
     entries = []
     if out_fen > 0:
-        entries.extend([
-            _make_voucher_entry(
-                ACCOUNT_GOODS_IN_TRANSIT,
-                debit_fen=out_fen,
-                summary=f"{month}调拨出库({out_cnt}笔)",
-            ),
-            _make_voucher_entry(
-                ACCOUNT_RAW_MATERIAL,
-                credit_fen=out_fen,
-                summary=f"{month}调拨出库-原材料减少",
-            ),
-        ])
+        entries.extend(
+            [
+                _make_voucher_entry(
+                    ACCOUNT_GOODS_IN_TRANSIT,
+                    debit_fen=out_fen,
+                    summary=f"{month}调拨出库({out_cnt}笔)",
+                ),
+                _make_voucher_entry(
+                    ACCOUNT_RAW_MATERIAL,
+                    credit_fen=out_fen,
+                    summary=f"{month}调拨出库-原材料减少",
+                ),
+            ]
+        )
     if in_fen > 0:
-        entries.extend([
-            _make_voucher_entry(
-                ACCOUNT_RAW_MATERIAL,
-                debit_fen=in_fen,
-                summary=f"{month}调拨入库({in_cnt}笔)",
-            ),
-            _make_voucher_entry(
-                ACCOUNT_GOODS_IN_TRANSIT,
-                credit_fen=in_fen,
-                summary=f"{month}调拨入库-在途冲减",
-            ),
-        ])
+        entries.extend(
+            [
+                _make_voucher_entry(
+                    ACCOUNT_RAW_MATERIAL,
+                    debit_fen=in_fen,
+                    summary=f"{month}调拨入库({in_cnt}笔)",
+                ),
+                _make_voucher_entry(
+                    ACCOUNT_GOODS_IN_TRANSIT,
+                    credit_fen=in_fen,
+                    summary=f"{month}调拨入库-在途冲减",
+                ),
+            ]
+        )
 
     voucher = {
         "voucher_type": "转",
@@ -319,13 +335,18 @@ async def export_transfer_in_out(
     }
 
     return _make_export_record(
-        "transfer_in_out", store_id, month, tenant_id, voucher,
+        "transfer_in_out",
+        store_id,
+        month,
+        tenant_id,
+        voucher,
     )
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 #  4. 工资计提 → 金蝶凭证
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 async def export_salary_accrual(
     store_id: str,
@@ -384,13 +405,18 @@ async def export_salary_accrual(
     }
 
     return _make_export_record(
-        "salary_accrual", store_id, month, tenant_id, voucher,
+        "salary_accrual",
+        store_id,
+        month,
+        tenant_id,
+        voucher,
     )
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 #  5. 收营日报 → 金蝶凭证
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 async def export_daily_revenue(
     store_id: str,
@@ -471,13 +497,18 @@ async def export_daily_revenue(
     }
 
     return _make_export_record(
-        "daily_revenue", store_id, date_str, tenant_id, voucher,
+        "daily_revenue",
+        store_id,
+        date_str,
+        tenant_id,
+        voucher,
     )
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 #  6. 销售出库汇总 → 金蝶凭证
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 async def export_sales_delivery(
     store_id: str,
@@ -539,13 +570,18 @@ async def export_sales_delivery(
     }
 
     return _make_export_record(
-        "sales_delivery", store_id, month, tenant_id, voucher,
+        "sales_delivery",
+        store_id,
+        month,
+        tenant_id,
+        voucher,
     )
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 #  7. 导出历史查询
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 async def get_export_history(
     tenant_id: str,
@@ -624,6 +660,7 @@ async def get_export_history(
 #  8. 重试失败导出
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 async def retry_failed_export(
     export_id: str,
     tenant_id: str,
@@ -658,9 +695,7 @@ async def retry_failed_export(
         raise ValueError(f"Export record not found: {export_id}")
 
     if original["status"] != EXPORT_STATUS_FAILED:
-        raise ValueError(
-            f"Only failed exports can be retried, current status: {original['status']}"
-        )
+        raise ValueError(f"Only failed exports can be retried, current status: {original['status']}")
 
     export_type = original["export_type"]
     store_id = original["store_id"]

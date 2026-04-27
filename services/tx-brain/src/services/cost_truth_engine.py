@@ -20,11 +20,11 @@ logger = structlog.get_logger()
 
 # 加工费用（分/菜）- 按菜品类型
 PROCESSING_COST_MAP: dict[str, int] = {
-    "招牌热菜": 300,   # 3元加工费
-    "凉菜": 100,       # 1元
-    "汤品": 200,       # 2元
-    "主食": 150,       # 1.5元
-    "default": 200,    # 2元默认
+    "招牌热菜": 300,  # 3元加工费
+    "凉菜": 100,  # 1元
+    "汤品": 200,  # 2元
+    "主食": 150,  # 1.5元
+    "default": 200,  # 2元默认
 }
 
 # 能源成本分摊（分/菜）
@@ -73,9 +73,7 @@ class CostTruthEngine:
         selling_price_fen = dish_props.get("price_fen", 0)
 
         # Get BOM entries via USES_INGREDIENT relationships
-        bom_rels = self.repo.get_relationships(
-            "Dish", dish_id, rel_type="USES_INGREDIENT", direction="out"
-        )
+        bom_rels = self.repo.get_relationships("Dish", dish_id, rel_type="USES_INGREDIENT", direction="out")
 
         bom_entries: list[BOMEntry] = []
         total_material_cost_fen = 0
@@ -116,9 +114,7 @@ class CostTruthEngine:
 
         # Processing cost based on category
         category_name = self._get_dish_category(dish_id)
-        processing_cost_fen = PROCESSING_COST_MAP.get(
-            category_name, PROCESSING_COST_MAP["default"]
-        )
+        processing_cost_fen = PROCESSING_COST_MAP.get(category_name, PROCESSING_COST_MAP["default"])
 
         # Total cost
         total_cost_fen = total_material_cost_fen + processing_cost_fen + ENERGY_COST_PER_DISH_FEN
@@ -180,9 +176,7 @@ class CostTruthEngine:
         order_total_fen = order_props.get("total_fen", 0)
 
         # Get order items via CONTAINS relationships
-        item_rels = self.repo.get_relationships(
-            "Order", order_id, rel_type="CONTAINS", direction="out"
-        )
+        item_rels = self.repo.get_relationships("Order", order_id, rel_type="CONTAINS", direction="out")
 
         items: list[dict[str, Any]] = []
         total_cost_fen = 0
@@ -196,14 +190,16 @@ class CostTruthEngine:
             if dish_cost.get("ok"):
                 item_cost = dish_cost["total_cost_fen"] * quantity
                 total_cost_fen += item_cost
-                items.append({
-                    "dish_id": dish_id,
-                    "dish_name": dish_cost.get("dish_name", ""),
-                    "quantity": quantity,
-                    "unit_cost_fen": dish_cost["total_cost_fen"],
-                    "total_cost_fen": item_cost,
-                    "margin_rate": dish_cost.get("margin_rate", 0.0),
-                })
+                items.append(
+                    {
+                        "dish_id": dish_id,
+                        "dish_name": dish_cost.get("dish_name", ""),
+                        "quantity": quantity,
+                        "unit_cost_fen": dish_cost["total_cost_fen"],
+                        "total_cost_fen": item_cost,
+                        "margin_rate": dish_cost.get("margin_rate", 0.0),
+                    }
+                )
 
         order_margin = 0.0
         if order_total_fen > 0:
@@ -220,9 +216,7 @@ class CostTruthEngine:
             "calculated_at": datetime.now().isoformat(),
         }
 
-    def calculate_store_daily_cost(
-        self, store_id: str, date: str
-    ) -> dict[str, Any]:
+    def calculate_store_daily_cost(self, store_id: str, date: str) -> dict[str, Any]:
         """Calculate daily cost for a store.
 
         Aggregates all order costs + waste + overhead allocation.
@@ -241,9 +235,7 @@ class CostTruthEngine:
         store_props = store_result["node"]["properties"]
 
         # Get all dishes served and estimate daily cost
-        dish_rels = self.repo.get_relationships(
-            "Store", store_id, rel_type="SERVES", direction="out"
-        )
+        dish_rels = self.repo.get_relationships("Store", store_id, rel_type="SERVES", direction="out")
 
         dish_costs: list[dict[str, Any]] = []
         total_food_cost_fen = 0
@@ -260,13 +252,15 @@ class CostTruthEngine:
 
                 daily_cost = dish_cost["total_cost_fen"] * avg_daily
                 total_food_cost_fen += daily_cost
-                dish_costs.append({
-                    "dish_id": dish_id,
-                    "dish_name": dish_cost.get("dish_name", ""),
-                    "daily_sales": avg_daily,
-                    "unit_cost_fen": dish_cost["total_cost_fen"],
-                    "daily_cost_fen": daily_cost,
-                })
+                dish_costs.append(
+                    {
+                        "dish_id": dish_id,
+                        "dish_name": dish_cost.get("dish_name", ""),
+                        "daily_sales": avg_daily,
+                        "unit_cost_fen": dish_cost["total_cost_fen"],
+                        "daily_cost_fen": daily_cost,
+                    }
+                )
 
         # Waste cost (based on store waste_rate)
         waste_rate = store_props.get("waste_rate", 5.0) / 100.0
@@ -299,9 +293,7 @@ class CostTruthEngine:
             "calculated_at": datetime.now().isoformat(),
         }
 
-    def get_cost_trend(
-        self, dish_id: str, days: int = 30
-    ) -> list[dict[str, Any]]:
+    def get_cost_trend(self, dish_id: str, days: int = 30) -> list[dict[str, Any]]:
         """Get daily cost fluctuation for a dish over time.
 
         In dev mode, simulates trend based on ingredient price changes.
@@ -331,39 +323,37 @@ class CostTruthEngine:
             progress = 1.0 - (day_offset / days)
 
             # Calculate cost with partial price change
-            day_cost_fen = self._simulate_historical_cost(
-                dish_id, base_cost, progress
-            )
+            day_cost_fen = self._simulate_historical_cost(dish_id, base_cost, progress)
 
             margin = 0.0
             if selling_price > 0:
                 margin = (selling_price - day_cost_fen) / selling_price
 
-            trend.append({
-                "date": date.strftime("%Y-%m-%d"),
-                "total_cost_fen": day_cost_fen,
-                "margin_rate": round(margin, 4),
-                "cost_change_pct": round(
-                    (day_cost_fen - base_cost) / base_cost * 100 if base_cost > 0 else 0, 2
-                ),
-            })
+            trend.append(
+                {
+                    "date": date.strftime("%Y-%m-%d"),
+                    "total_cost_fen": day_cost_fen,
+                    "margin_rate": round(margin, 4),
+                    "cost_change_pct": round((day_cost_fen - base_cost) / base_cost * 100 if base_cost > 0 else 0, 2),
+                }
+            )
 
         # Add today
         margin_today = 0.0
         if selling_price > 0:
             margin_today = (selling_price - base_cost) / selling_price
-        trend.append({
-            "date": now.strftime("%Y-%m-%d"),
-            "total_cost_fen": base_cost,
-            "margin_rate": round(margin_today, 4),
-            "cost_change_pct": 0.0,
-        })
+        trend.append(
+            {
+                "date": now.strftime("%Y-%m-%d"),
+                "total_cost_fen": base_cost,
+                "margin_rate": round(margin_today, 4),
+                "cost_change_pct": 0.0,
+            }
+        )
 
         return trend
 
-    def detect_cost_anomaly(
-        self, store_id: str, date: str
-    ) -> list[dict[str, Any]]:
+    def detect_cost_anomaly(self, store_id: str, date: str) -> list[dict[str, Any]]:
         """Detect cost anomalies for a store on a given date.
 
         Flags:
@@ -381,9 +371,7 @@ class CostTruthEngine:
         anomalies: list[dict[str, Any]] = []
 
         # Get all dishes for this store
-        dish_rels = self.repo.get_relationships(
-            "Store", store_id, rel_type="SERVES", direction="out"
-        )
+        dish_rels = self.repo.get_relationships("Store", store_id, rel_type="SERVES", direction="out")
 
         for rel in dish_rels:
             dish_id = rel.get("to_node_id", "")
@@ -405,36 +393,38 @@ class CostTruthEngine:
 
                 # Anomaly: price change > 15%
                 if abs(price_change) > 15:
-                    anomalies.append({
-                        "type": "cost_spike",
-                        "severity": "high" if abs(price_change) > 30 else "medium",
-                        "dish_id": dish_id,
-                        "dish_name": dish_cost.get("dish_name", ""),
-                        "ingredient_id": ing_id,
-                        "ingredient_name": entry.get("ingredient_name", ""),
-                        "price_change_pct": price_change,
-                        "cost_impact_fen": entry.get("cost_fen", 0),
-                        "description": (
-                            f"{entry.get('ingredient_name', '')}价格变动"
-                            f"{price_change:+.1f}%，影响{dish_cost.get('dish_name', '')}成本"
-                        ),
-                        "date": date,
-                    })
+                    anomalies.append(
+                        {
+                            "type": "cost_spike",
+                            "severity": "high" if abs(price_change) > 30 else "medium",
+                            "dish_id": dish_id,
+                            "dish_name": dish_cost.get("dish_name", ""),
+                            "ingredient_id": ing_id,
+                            "ingredient_name": entry.get("ingredient_name", ""),
+                            "price_change_pct": price_change,
+                            "cost_impact_fen": entry.get("cost_fen", 0),
+                            "description": (
+                                f"{entry.get('ingredient_name', '')}价格变动"
+                                f"{price_change:+.1f}%，影响{dish_cost.get('dish_name', '')}成本"
+                            ),
+                            "date": date,
+                        }
+                    )
 
             # Check margin anomaly
             margin = dish_cost.get("margin_rate", 0)
             if margin < 0.4:
-                anomalies.append({
-                    "type": "low_margin",
-                    "severity": "high" if margin < 0.3 else "medium",
-                    "dish_id": dish_id,
-                    "dish_name": dish_cost.get("dish_name", ""),
-                    "margin_rate": margin,
-                    "description": (
-                        f"{dish_cost.get('dish_name', '')}毛利率仅{margin:.1%}，低于40%警戒线"
-                    ),
-                    "date": date,
-                })
+                anomalies.append(
+                    {
+                        "type": "low_margin",
+                        "severity": "high" if margin < 0.3 else "medium",
+                        "dish_id": dish_id,
+                        "dish_name": dish_cost.get("dish_name", ""),
+                        "margin_rate": margin,
+                        "description": (f"{dish_cost.get('dish_name', '')}毛利率仅{margin:.1%}，低于40%警戒线"),
+                        "date": date,
+                    }
+                )
 
         # Sort by severity
         severity_order = {"high": 0, "medium": 1, "low": 2}
@@ -442,9 +432,7 @@ class CostTruthEngine:
 
         return anomalies
 
-    def simulate_price_change(
-        self, ingredient_id: str, new_price_fen: int
-    ) -> dict[str, Any]:
+    def simulate_price_change(self, ingredient_id: str, new_price_fen: int) -> dict[str, Any]:
         """Simulate the impact of an ingredient price change.
 
         Answers: "If this ingredient price changes, which dishes are affected
@@ -470,9 +458,7 @@ class CostTruthEngine:
 
         # Find all dishes using this ingredient
         # We need to look at incoming USES_INGREDIENT relationships
-        ing_rels = self.repo.get_relationships(
-            "Ingredient", ingredient_id, rel_type="USES_INGREDIENT", direction="in"
-        )
+        ing_rels = self.repo.get_relationships("Ingredient", ingredient_id, rel_type="USES_INGREDIENT", direction="in")
 
         affected_dishes: list[dict[str, Any]] = []
 
@@ -508,19 +494,21 @@ class CostTruthEngine:
             old_margin = (selling_price - old_total) / selling_price if selling_price > 0 else 0
             new_margin = (selling_price - new_total) / selling_price if selling_price > 0 else 0
 
-            affected_dishes.append({
-                "dish_id": dish_id,
-                "dish_name": dish_props.get("name", ""),
-                "selling_price_fen": selling_price,
-                "old_cost_fen": old_total,
-                "new_cost_fen": new_total,
-                "cost_change_fen": cost_diff,
-                "old_margin": round(old_margin, 4),
-                "new_margin": round(new_margin, 4),
-                "margin_change": round(new_margin - old_margin, 4),
-                "quantity_g": quantity_g,
-                "severity": "high" if abs(new_margin - old_margin) > 0.05 else "medium",
-            })
+            affected_dishes.append(
+                {
+                    "dish_id": dish_id,
+                    "dish_name": dish_props.get("name", ""),
+                    "selling_price_fen": selling_price,
+                    "old_cost_fen": old_total,
+                    "new_cost_fen": new_total,
+                    "cost_change_fen": cost_diff,
+                    "old_margin": round(old_margin, 4),
+                    "new_margin": round(new_margin, 4),
+                    "margin_change": round(new_margin - old_margin, 4),
+                    "quantity_g": quantity_g,
+                    "severity": "high" if abs(new_margin - old_margin) > 0.05 else "medium",
+                }
+            )
 
         # Sort by cost impact
         affected_dishes.sort(key=lambda x: abs(x["cost_change_fen"]), reverse=True)
@@ -551,9 +539,7 @@ class CostTruthEngine:
             List of top cost drivers sorted by total cost contribution
         """
         # Get all dishes served by this store
-        dish_rels = self.repo.get_relationships(
-            "Store", store_id, rel_type="SERVES", direction="out"
-        )
+        dish_rels = self.repo.get_relationships("Store", store_id, rel_type="SERVES", direction="out")
 
         # Aggregate ingredient costs across all dishes
         ingredient_totals: dict[str, dict[str, Any]] = {}
@@ -568,9 +554,7 @@ class CostTruthEngine:
             daily_sales = dish_props.get("daily_sales_avg", 0)
 
             # Get BOM
-            bom_rels = self.repo.get_relationships(
-                "Dish", dish_id, rel_type="USES_INGREDIENT", direction="out"
-            )
+            bom_rels = self.repo.get_relationships("Dish", dish_id, rel_type="USES_INGREDIENT", direction="out")
 
             for bom_rel in bom_rels:
                 ing_id = bom_rel.get("to_node_id", "")
@@ -599,12 +583,14 @@ class CostTruthEngine:
                     }
 
                 ingredient_totals[ing_id]["daily_cost_fen"] += daily_cost
-                ingredient_totals[ing_id]["used_in_dishes"].append({
-                    "dish_id": dish_id,
-                    "dish_name": dish_props.get("name", ""),
-                    "quantity_g": quantity_g,
-                    "daily_sales": daily_sales,
-                })
+                ingredient_totals[ing_id]["used_in_dishes"].append(
+                    {
+                        "dish_id": dish_id,
+                        "dish_name": dish_props.get("name", ""),
+                        "quantity_g": quantity_g,
+                        "daily_sales": daily_sales,
+                    }
+                )
 
         # Sort by daily cost and return top N
         drivers = sorted(
@@ -617,9 +603,7 @@ class CostTruthEngine:
         total_daily = sum(d["daily_cost_fen"] for d in drivers)
         for i, driver in enumerate(drivers):
             driver["rank"] = i + 1
-            driver["cost_share_pct"] = round(
-                driver["daily_cost_fen"] / total_daily * 100 if total_daily > 0 else 0, 2
-            )
+            driver["cost_share_pct"] = round(driver["daily_cost_fen"] / total_daily * 100 if total_daily > 0 else 0, 2)
 
         return drivers
 
@@ -627,9 +611,7 @@ class CostTruthEngine:
 
     def _get_dish_category(self, dish_id: str) -> str:
         """Get the category name for a dish."""
-        cat_rels = self.repo.get_relationships(
-            "Dish", dish_id, rel_type="BELONGS_TO", direction="out"
-        )
+        cat_rels = self.repo.get_relationships("Dish", dish_id, rel_type="BELONGS_TO", direction="out")
         for rel in cat_rels:
             cat_id = rel.get("to_node_id", "")
             cat_node = self.repo.get_node("Category", cat_id)
@@ -637,17 +619,13 @@ class CostTruthEngine:
                 return cat_node["node"]["properties"].get("name", "default")
         return "default"
 
-    def _simulate_historical_cost(
-        self, dish_id: str, current_cost: int, progress: float
-    ) -> int:
+    def _simulate_historical_cost(self, dish_id: str, current_cost: int, progress: float) -> int:
         """Simulate historical cost by interpolating price changes.
 
         At progress=0: all ingredient prices at old level (before changes)
         At progress=1: all prices at current level
         """
-        bom_rels = self.repo.get_relationships(
-            "Dish", dish_id, rel_type="USES_INGREDIENT", direction="out"
-        )
+        bom_rels = self.repo.get_relationships("Dish", dish_id, rel_type="USES_INGREDIENT", direction="out")
 
         adjustment = 0
         for rel in bom_rels:
@@ -676,18 +654,18 @@ class CostTruthEngine:
 
         return current_cost + adjustment
 
-    def _record_cost(
-        self, dish_id: str, cost_fen: int, margin_rate: float
-    ) -> None:
+    def _record_cost(self, dish_id: str, cost_fen: int, margin_rate: float) -> None:
         """Record cost calculation for trend tracking."""
         if dish_id not in self._cost_history:
             self._cost_history[dish_id] = []
 
-        self._cost_history[dish_id].append({
-            "cost_fen": cost_fen,
-            "margin_rate": margin_rate,
-            "calculated_at": datetime.now().isoformat(),
-        })
+        self._cost_history[dish_id].append(
+            {
+                "cost_fen": cost_fen,
+                "margin_rate": margin_rate,
+                "calculated_at": datetime.now().isoformat(),
+            }
+        )
 
         # Keep only last 90 entries
         if len(self._cost_history[dish_id]) > 90:

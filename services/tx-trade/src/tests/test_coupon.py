@@ -13,6 +13,7 @@
 10. 会员价计算（S1 VIP 8.5折）
 11. 券核销审计
 """
+
 import os
 import sys
 
@@ -162,16 +163,19 @@ async def test_verify_and_redeem_coupon():
     _CouponStore._coupons.clear()
 
     coupon_code = "COUPON2026"
-    _CouponStore.save(coupon_code, {
-        "coupon_code": coupon_code,
-        "tenant_id": TENANT_ID,
-        "status": "active",
-        "coupon_type": "general",
-        "discount_fen": 1500,
-        "min_order_amount_fen": 0,
-        "stackable": True,
-        "expires_at": (datetime.now(timezone.utc) + timedelta(days=30)).isoformat(),
-    })
+    _CouponStore.save(
+        coupon_code,
+        {
+            "coupon_code": coupon_code,
+            "tenant_id": TENANT_ID,
+            "status": "active",
+            "coupon_type": "general",
+            "discount_fen": 1500,
+            "min_order_amount_fen": 0,
+            "stackable": True,
+            "expires_at": (datetime.now(timezone.utc) + timedelta(days=30)).isoformat(),
+        },
+    )
 
     db = FakeSession()
 

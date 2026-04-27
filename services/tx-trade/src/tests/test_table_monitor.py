@@ -9,6 +9,7 @@
 6. 单桌详情包含所有菜品状态
 7. 租户隔离
 """
+
 import os
 import sys
 
@@ -27,6 +28,7 @@ from ..services.table_monitor_service import (
 )
 
 # ─── 工具 ───
+
 
 def _uid() -> str:
     return str(uuid.uuid4())
@@ -108,8 +110,8 @@ def _make_task_row(
 
 # ─── 场景1: 空门店返回空列表 ───
 
-class TestEmptyStore:
 
+class TestEmptyStore:
     @pytest.mark.asyncio
     async def test_empty_store_returns_empty_list(self):
         """无活跃任务时返回空列表"""
@@ -120,8 +122,8 @@ class TestEmptyStore:
 
 # ─── 场景2: 进行中订单正确聚合到桌台 ───
 
-class TestOrderAggregation:
 
+class TestOrderAggregation:
     @pytest.mark.asyncio
     async def test_active_orders_aggregated_by_table(self):
         """同一桌台的多道菜聚合为一个 TableStatus"""
@@ -157,15 +159,13 @@ class TestOrderAggregation:
 
 # ─── 场景3: 超时桌台 is_overtime=True ───
 
-class TestOvertimeDetection:
 
+class TestOvertimeDetection:
     @pytest.mark.asyncio
     async def test_overtime_table_flagged(self):
         """超过 DEFAULT_STANDARD_MINUTES 的桌台 is_overtime=True"""
         overtime_minutes = DEFAULT_STANDARD_MINUTES + 10  # 35分钟
-        rows = [
-            _make_task_row("A02", order_created_minutes_ago=overtime_minutes)
-        ]
+        rows = [_make_task_row("A02", order_created_minutes_ago=overtime_minutes)]
         db = _fake_db(first_result=rows, second_result=[])
         result = await TableMonitorService.get_store_overview(STORE_ID, TENANT_ID, db)
 
@@ -177,9 +177,7 @@ class TestOvertimeDetection:
     @pytest.mark.asyncio
     async def test_normal_table_not_overtime(self):
         """在阈值内的桌台 is_overtime=False"""
-        rows = [
-            _make_task_row("A03", order_created_minutes_ago=5)
-        ]
+        rows = [_make_task_row("A03", order_created_minutes_ago=5)]
         db = _fake_db(first_result=rows, second_result=[])
         result = await TableMonitorService.get_store_overview(STORE_ID, TENANT_ID, db)
 
@@ -188,8 +186,8 @@ class TestOvertimeDetection:
 
 # ─── 场景4: 催单次数正确统计 ───
 
-class TestRushCount:
 
+class TestRushCount:
     @pytest.mark.asyncio
     async def test_rush_count_aggregated(self):
         """桌台的 rush_count 取所有任务中的最大值"""
@@ -206,9 +204,7 @@ class TestRushCount:
     @pytest.mark.asyncio
     async def test_rush_status_when_rush_count_positive(self):
         """rush_count>0 且未超时 → status='rush'"""
-        rows = [
-            _make_task_row("A05", rush_count=1, order_created_minutes_ago=5)
-        ]
+        rows = [_make_task_row("A05", rush_count=1, order_created_minutes_ago=5)]
         db = _fake_db(first_result=rows, second_result=[])
         result = await TableMonitorService.get_store_overview(STORE_ID, TENANT_ID, db)
 
@@ -217,8 +213,8 @@ class TestRushCount:
 
 # ─── 场景5: 区域分组正确（包厢/大厅） ───
 
-class TestZoneGrouping:
 
+class TestZoneGrouping:
     def test_vip_prefix_infers_vip_zone(self):
         """VIP前缀桌台 → 包厢"""
         assert _infer_zone("VIP01") == "包厢"
@@ -237,12 +233,18 @@ class TestZoneGrouping:
         db = MagicMock()
 
         mock_hall = MagicMock(
-            table_no="A01", zone="大厅",
-            is_overtime=False, rush_count=0, elapsed_minutes=10,
+            table_no="A01",
+            zone="大厅",
+            is_overtime=False,
+            rush_count=0,
+            elapsed_minutes=10,
         )
         mock_vip = MagicMock(
-            table_no="P01", zone="包厢",
-            is_overtime=True, rush_count=1, elapsed_minutes=35,
+            table_no="P01",
+            zone="包厢",
+            is_overtime=True,
+            rush_count=1,
+            elapsed_minutes=35,
         )
 
         with patch.object(
@@ -261,8 +263,8 @@ class TestZoneGrouping:
 
 # ─── 场景6: 单桌详情包含所有菜品状态 ───
 
-class TestTableDetail:
 
+class TestTableDetail:
     @pytest.mark.asyncio
     async def test_table_detail_includes_all_dish_statuses(self):
         """单桌详情应包含 pending/cooking 状态的菜品"""
@@ -306,8 +308,8 @@ class TestTableDetail:
 
 # ─── 场景7: 租户隔离 ───
 
-class TestTenantIsolation:
 
+class TestTenantIsolation:
     @pytest.mark.asyncio
     async def test_different_tenants_get_independent_results(self):
         """不同租户查询同一门店应各自独立，不互相泄漏数据"""

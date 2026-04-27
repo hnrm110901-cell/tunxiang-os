@@ -30,14 +30,15 @@ runner_routes（5个）：
 19. POST /api/v1/runner/task/{task_id}/pickup          — 领取菜品失败→400
 20. POST /api/v1/runner/task/register                  — 注册传菜任务成功
 """
+
 import os
 import sys
 import types
 
 # ─── 路径准备 ─────────────────────────────────────────────────────────────────
 _TESTS_DIR = os.path.dirname(__file__)
-_SRC_DIR   = os.path.abspath(os.path.join(_TESTS_DIR, ".."))
-_ROOT_DIR  = os.path.abspath(os.path.join(_TESTS_DIR, "..", "..", "..", ".."))
+_SRC_DIR = os.path.abspath(os.path.join(_TESTS_DIR, ".."))
+_ROOT_DIR = os.path.abspath(os.path.join(_TESTS_DIR, "..", "..", "..", ".."))
 
 for _p in [_SRC_DIR, _ROOT_DIR]:
     if _p not in sys.path:
@@ -45,6 +46,7 @@ for _p in [_SRC_DIR, _ROOT_DIR]:
 
 
 # ─── 建立 src 包层级 ──────────────────────────────────────────────────────────
+
 
 def _ensure_pkg(name: str, path: str) -> None:
     if name not in sys.modules:
@@ -54,13 +56,14 @@ def _ensure_pkg(name: str, path: str) -> None:
         sys.modules[name] = mod
 
 
-_ensure_pkg("src",          _SRC_DIR)
-_ensure_pkg("src.api",      os.path.join(_SRC_DIR, "api"))
+_ensure_pkg("src", _SRC_DIR)
+_ensure_pkg("src.api", os.path.join(_SRC_DIR, "api"))
 _ensure_pkg("src.services", os.path.join(_SRC_DIR, "services"))
-_ensure_pkg("src.models",   os.path.join(_SRC_DIR, "models"))
+_ensure_pkg("src.models", os.path.join(_SRC_DIR, "models"))
 
 
 # ─── stub 工具函数 ─────────────────────────────────────────────────────────────
+
 
 def _stub_module(full_name: str, **attrs):
     """注入最小存根模块到 sys.modules，避免真实导入失败。"""
@@ -116,6 +119,7 @@ _stub_module(
 
 # ─── discount_audit_service stub ──────────────────────────────────────────────
 
+
 class _FakeDiscountAuditService:
     def __init__(self, db, tenant_id):
         self.db = db
@@ -132,7 +136,7 @@ _svc_stub = _stub_module("src.services.discount_audit_service")
 _svc_stub.DiscountAuditService = _FakeDiscountAuditService
 
 # ─── TableProductionPlan model stub ──────────────────────────────────────────
-from sqlalchemy import Integer, String, Boolean  # noqa: E402
+from sqlalchemy import Boolean, Integer, String  # noqa: E402
 from sqlalchemy.orm import DeclarativeBase, mapped_column  # noqa: E402
 
 
@@ -142,16 +146,16 @@ class _TestBase(DeclarativeBase):
 
 class _FakeTableProductionPlan(_TestBase):
     __tablename__ = "table_production_plans"
-    id           = mapped_column(Integer, primary_key=True)
-    tenant_id    = mapped_column(Integer)
-    order_id     = mapped_column(Integer)
-    store_id     = mapped_column(Integer)
-    table_no     = mapped_column(String)
-    status       = mapped_column(String)
+    id = mapped_column(Integer, primary_key=True)
+    tenant_id = mapped_column(Integer)
+    order_id = mapped_column(Integer)
+    store_id = mapped_column(Integer)
+    table_no = mapped_column(String)
+    status = mapped_column(String)
     dept_readiness = mapped_column(String)
-    dept_delays    = mapped_column(String)
+    dept_delays = mapped_column(String)
     target_completion = mapped_column(String)
-    is_deleted   = mapped_column(Boolean)
+    is_deleted = mapped_column(Boolean)
 
 
 _tpp_mod = _stub_module("src.models.table_production_plan")
@@ -176,6 +180,7 @@ _stub_module(
 )
 
 # ─── table_production_plan service stub ──────────────────────────────────────
+
 
 class _FakeTableFireCoordinator:
     async def get_expo_view(self, store_id, tenant_id, db):
@@ -203,38 +208,38 @@ _stub_module(
 import uuid  # noqa: E402
 from unittest.mock import AsyncMock, MagicMock, patch  # noqa: E402
 
-import pytest  # noqa: E402
-from fastapi import FastAPI, HTTPException  # noqa: E402
+from fastapi import FastAPI  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 from sqlalchemy.ext.asyncio import AsyncSession  # noqa: E402
 
-from src.api.production_dept_routes import router as production_dept_router  # noqa: E402
+from shared.ontology.src.database import get_db  # noqa: E402
 from src.api.discount_audit_routes import router as discount_audit_router  # noqa: E402
 from src.api.expo_routes import router as expo_router  # noqa: E402
+from src.api.production_dept_routes import router as production_dept_router  # noqa: E402
 from src.api.runner_routes import router as runner_router  # noqa: E402
-from shared.ontology.src.database import get_db  # noqa: E402
 
 # ─── 常量 ─────────────────────────────────────────────────────────────────────
 
 TENANT_ID = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
-STORE_ID  = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
-DEPT_ID   = "cccccccc-cccc-cccc-cccc-cccccccccccc"
-ORDER_ID  = "dddddddd-dddd-dddd-dddd-dddddddddddd"
-TASK_ID   = "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee"
-PLAN_ID   = "ffffffff-ffff-ffff-ffff-ffffffffffff"
-DISH_ID   = "11111111-1111-1111-1111-111111111111"
-BRAND_ID  = "22222222-2222-2222-2222-222222222222"
+STORE_ID = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+DEPT_ID = "cccccccc-cccc-cccc-cccc-cccccccccccc"
+ORDER_ID = "dddddddd-dddd-dddd-dddd-dddddddddddd"
+TASK_ID = "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee"
+PLAN_ID = "ffffffff-ffff-ffff-ffff-ffffffffffff"
+DISH_ID = "11111111-1111-1111-1111-111111111111"
+BRAND_ID = "22222222-2222-2222-2222-222222222222"
 
 HEADERS = {"X-Tenant-ID": TENANT_ID}
 
 
 # ─── 工具函数 ──────────────────────────────────────────────────────────────────
 
+
 def _make_mock_db() -> AsyncMock:
     db = AsyncMock(spec=AsyncSession)
-    db.commit   = AsyncMock()
+    db.commit = AsyncMock()
     db.rollback = AsyncMock()
-    db.execute  = AsyncMock(return_value=MagicMock())
+    db.execute = AsyncMock(return_value=MagicMock())
     return db
 
 
@@ -252,34 +257,34 @@ def _make_app_with_db(db: AsyncMock, router) -> FastAPI:
 def _make_fake_dept():
     """构建最小档口 mock 对象。"""
     dept = MagicMock()
-    dept.id               = uuid.UUID(DEPT_ID)
-    dept.dept_name        = "热菜间"
-    dept.dept_code        = "hot"
-    dept.brand_id         = uuid.UUID(BRAND_ID)
-    dept.store_id         = uuid.UUID(STORE_ID)
-    dept.printer_address  = "192.168.1.100:9100"
-    dept.printer_type     = "network"
-    dept.kds_device_id    = "KDS-001"
-    dept.display_color    = "blue"
-    dept.fixed_fee_type   = None
+    dept.id = uuid.UUID(DEPT_ID)
+    dept.dept_name = "热菜间"
+    dept.dept_code = "hot"
+    dept.brand_id = uuid.UUID(BRAND_ID)
+    dept.store_id = uuid.UUID(STORE_ID)
+    dept.printer_address = "192.168.1.100:9100"
+    dept.printer_type = "network"
+    dept.kds_device_id = "KDS-001"
+    dept.display_color = "blue"
+    dept.fixed_fee_type = None
     dept.default_timeout_minutes = 15
-    dept.sort_order       = 0
-    dept.is_active        = True
-    dept.created_at       = None
-    dept.updated_at       = None
+    dept.sort_order = 0
+    dept.is_active = True
+    dept.created_at = None
+    dept.updated_at = None
     return dept
 
 
 def _make_fake_mapping():
     """构建最小菜品-档口映射 mock 对象。"""
     m = MagicMock()
-    m.id                 = uuid.uuid4()
-    m.dish_id            = uuid.UUID(DISH_ID)
+    m.id = uuid.uuid4()
+    m.dish_id = uuid.UUID(DISH_ID)
     m.production_dept_id = uuid.UUID(DEPT_ID)
-    m.is_primary         = True
-    m.printer_id         = None
-    m.sort_order         = 0
-    m.created_at         = None
+    m.is_primary = True
+    m.printer_id = None
+    m.sort_order = 0
+    m.created_at = None
     return m
 
 
@@ -288,6 +293,7 @@ def _make_fake_mapping():
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 # 场景1: POST /api/v1/production-depts — 创建档口成功
+
 
 def test_create_production_dept_success():
     """创建档口：正常传参，服务层返回档口对象，API 返回 ok+data。"""
@@ -326,6 +332,7 @@ def test_create_production_dept_success():
 
 # 场景2: GET /api/v1/production-depts — 列出档口成功
 
+
 def test_list_production_depts_success():
     """列出档口：返回 items+total，items 数量与服务层返回一致。"""
     db = _make_mock_db()
@@ -352,6 +359,7 @@ def test_list_production_depts_success():
 
 # 场景3: GET /api/v1/production-depts/{dept_id} — 档口不存在→404
 
+
 def test_get_production_dept_not_found():
     """查询单个档口：服务层返回 None，API 应返回 404。"""
     db = _make_mock_db()
@@ -371,6 +379,7 @@ def test_get_production_dept_not_found():
 
 
 # 场景4: DELETE /api/v1/production-depts/{dept_id} — 删除档口成功
+
 
 def test_delete_production_dept_success():
     """删除档口：服务层正常返回（不抛异常），API 返回 deleted=True。"""
@@ -395,15 +404,13 @@ def test_delete_production_dept_success():
 
 # 场景5: POST /api/v1/production-depts/dish-mappings/batch — 超500条→400
 
+
 def test_batch_set_dish_mappings_too_many():
     """批量映射：超过500条限制时应返回 400（无需到服务层）。"""
     db = _make_mock_db()
 
     # 501 条映射
-    mappings = [
-        {"dish_id": str(uuid.uuid4()), "dept_id": DEPT_ID, "is_primary": True}
-        for _ in range(501)
-    ]
+    mappings = [{"dish_id": str(uuid.uuid4()), "dept_id": DEPT_ID, "is_primary": True} for _ in range(501)]
 
     client = TestClient(_make_app_with_db(db, production_dept_router))
     resp = client.post(
@@ -421,6 +428,7 @@ def test_batch_set_dish_mappings_too_many():
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 # 场景6: GET /api/v1/discount/audit-log — 正常返回列表
+
 
 def test_get_audit_log_success():
     """审计日志列表：正常请求，返回 ok=True，data 含 items+total。"""
@@ -464,6 +472,7 @@ def test_get_audit_log_success():
 
 # 场景7: GET /api/v1/discount/audit-log/summary — today 汇总
 
+
 def test_get_audit_summary_today():
     """今日汇总：period=today，返回 total_count / total_discount_amount / high_risk_count。"""
     db = _make_mock_db()
@@ -484,9 +493,7 @@ def test_get_audit_summary_today():
             return {"items": fake_items, "total": 1}
 
         async def get_high_risk_summary(self, **_kw):
-            return {
-                "summary": [{"operator_id": "op_001", "high_risk_count": 2}]
-            }
+            return {"summary": [{"operator_id": "op_001", "high_risk_count": 2}]}
 
     with patch("src.api.discount_audit_routes.DiscountAuditService", _MockSvc):
         client = TestClient(_make_app_with_db(db, discount_audit_router))
@@ -507,6 +514,7 @@ def test_get_audit_summary_today():
 
 
 # 场景8: GET /api/v1/discount/audit-log/high-risk — 高风险记录
+
 
 def test_get_high_risk_discount_records():
     """高风险折扣：返回折扣率超阈值的记录和操作员汇总。"""
@@ -529,9 +537,7 @@ def test_get_high_risk_discount_records():
             return {"items": fake_items, "total": 1}
 
         async def get_high_risk_summary(self, **_kw):
-            return {
-                "summary": [{"operator_id": "op_002", "high_risk_count": 1}]
-            }
+            return {"summary": [{"operator_id": "op_002", "high_risk_count": 1}]}
 
     with patch("src.api.discount_audit_routes.DiscountAuditService", _MockSvc):
         client = TestClient(_make_app_with_db(db, discount_audit_router))
@@ -546,11 +552,12 @@ def test_get_high_risk_discount_records():
     assert body["ok"] is True
     data = body["data"]
     assert data["threshold_pct"] == 30
-    assert len(data["items"]) == 1         # 80/100=80% > 30%，属于高风险
+    assert len(data["items"]) == 1  # 80/100=80% > 30%，属于高风险
     assert len(data["operator_summary"]) == 1
 
 
 # 场景9: GET /api/v1/discount/audit-log — 缺少 X-Tenant-ID → 400
+
 
 def test_audit_log_missing_tenant_id():
     """缺少 X-Tenant-ID 时，应返回 400。"""
@@ -564,6 +571,7 @@ def test_audit_log_missing_tenant_id():
 
 
 # 场景10: GET /api/v1/discount/audit-log/summary — 非法 period → 422
+
 
 def test_audit_summary_invalid_period():
     """period 参数不在 (today|week|month) 范围内，FastAPI 应返回 422。"""
@@ -584,6 +592,7 @@ def test_audit_summary_invalid_period():
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 # 场景11: GET /expo/{store_id}/overview — 传菜督导主视图
+
 
 def test_expo_overview_success():
     """传菜督导主视图：返回活跃桌位票据列表，含 all_ready_count。"""
@@ -619,6 +628,7 @@ def test_expo_overview_success():
 
 # 场景12: POST /expo/{plan_id}/served — 确认传菜完成成功
 
+
 def test_expo_mark_served_success():
     """确认传菜：coordinator.mark_served 返回 True，API 返回 status=served。"""
     db = _make_mock_db()
@@ -646,6 +656,7 @@ def test_expo_mark_served_success():
 
 # 场景13: POST /expo/{plan_id}/served — 计划不存在→404
 
+
 def test_expo_mark_served_not_found():
     """确认传菜：coordinator.mark_served 返回 False（计划不存在），API 返回 404。"""
     db = _make_mock_db()
@@ -655,7 +666,7 @@ def test_expo_mark_served_not_found():
             return []
 
         async def mark_served(self, plan_id, tenant_id, db):
-            return False   # 不存在
+            return False  # 不存在
 
     with patch("src.api.expo_routes.TableFireCoordinator", _MockCoordinator):
         client = TestClient(_make_app_with_db(db, expo_router))
@@ -670,6 +681,7 @@ def test_expo_mark_served_not_found():
 
 # 场景14: GET /expo/{plan_id}/status — 单桌状态查询
 
+
 def test_expo_plan_status_success():
     """单桌协调状态查询：从 DB 拿到 plan，返回 dept_readiness / ready_depts 等。"""
     db = _make_mock_db()
@@ -677,15 +689,14 @@ def test_expo_plan_status_success():
     import datetime
 
     fake_plan = MagicMock()
-    fake_plan.id               = uuid.UUID(PLAN_ID)
-    fake_plan.order_id         = uuid.UUID(ORDER_ID)
-    fake_plan.table_no         = "A01"
-    fake_plan.store_id         = uuid.UUID(STORE_ID)
-    fake_plan.status           = "coordinating"
-    fake_plan.dept_readiness   = {DEPT_ID: True, str(uuid.uuid4()): False}
-    fake_plan.dept_delays      = {}
-    fake_plan.target_completion = datetime.datetime(2026, 4, 5, 12, 0, 0,
-                                                    tzinfo=datetime.timezone.utc)
+    fake_plan.id = uuid.UUID(PLAN_ID)
+    fake_plan.order_id = uuid.UUID(ORDER_ID)
+    fake_plan.table_no = "A01"
+    fake_plan.store_id = uuid.UUID(STORE_ID)
+    fake_plan.status = "coordinating"
+    fake_plan.dept_readiness = {DEPT_ID: True, str(uuid.uuid4()): False}
+    fake_plan.dept_delays = {}
+    fake_plan.target_completion = datetime.datetime(2026, 4, 5, 12, 0, 0, tzinfo=datetime.timezone.utc)
 
     scalar_result = MagicMock()
     scalar_result.scalar_one_or_none.return_value = fake_plan
@@ -711,13 +722,12 @@ def test_expo_plan_status_success():
 
 # 场景15: POST /expo/dispatch/{order_id}/fire — 分单+TableFire成功
 
+
 def test_expo_dispatch_and_fire_success():
     """分单并建 TableFire 计划：两个服务调用均成功，返回 dept_tasks+table_fire。"""
     db = _make_mock_db()
 
-    fake_dept_tasks = [
-        {"dept_id": DEPT_ID, "dept_name": "热菜间", "items": []}
-    ]
+    fake_dept_tasks = [{"dept_id": DEPT_ID, "dept_name": "热菜间", "items": []}]
     fake_dispatch_result = {"dept_tasks": fake_dept_tasks}
     fake_table_fire = {
         "plan_id": PLAN_ID,
@@ -725,12 +735,15 @@ def test_expo_dispatch_and_fire_success():
         "target_completion": "2026-04-05T12:00:00+00:00",
     }
 
-    with patch(
-        "src.api.expo_routes.dispatch_order_to_kds",
-        new=AsyncMock(return_value=fake_dispatch_result),
-    ), patch(
-        "src.api.expo_routes.create_table_fire_plan",
-        new=AsyncMock(return_value=fake_table_fire),
+    with (
+        patch(
+            "src.api.expo_routes.dispatch_order_to_kds",
+            new=AsyncMock(return_value=fake_dispatch_result),
+        ),
+        patch(
+            "src.api.expo_routes.create_table_fire_plan",
+            new=AsyncMock(return_value=fake_table_fire),
+        ),
     ):
         client = TestClient(_make_app_with_db(db, expo_router))
         resp = client.post(
@@ -762,6 +775,7 @@ def test_expo_dispatch_and_fire_success():
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 # 场景16: GET /runner/{store_id}/queue — 传菜员待取菜列表
+
 
 def test_runner_queue_success():
     """传菜员待取菜列表：返回 items+total，items 中含菜品信息。"""
@@ -796,6 +810,7 @@ def test_runner_queue_success():
 
 # 场景17: GET /runner/{store_id}/history — 今日传菜记录
 
+
 def test_runner_history_success():
     """今日传菜记录：返回今日所有 served 菜品，含送达时间。"""
     db = _make_mock_db()
@@ -829,6 +844,7 @@ def test_runner_history_success():
 
 # 场景18: POST /runner/task/{task_id}/ready — 标记ready成功
 
+
 def test_runner_mark_ready_success():
     """KDS 完成出品后标记 ready：服务层返回 ok=True，API 透传返回。"""
     db = _make_mock_db()
@@ -856,6 +872,7 @@ def test_runner_mark_ready_success():
 
 # 场景19: POST /runner/task/{task_id}/pickup — 领取失败→400
 
+
 def test_runner_pickup_failure():
     """传菜员领取：服务层返回 ok=False（任务已被领取），API 应返回 400。"""
     db = _make_mock_db()
@@ -880,6 +897,7 @@ def test_runner_pickup_failure():
 
 
 # 场景20: POST /runner/task/register — 注册传菜任务成功
+
 
 def test_runner_register_task_success():
     """注册传菜任务：KDS分单时调用，服务层返回成功结果。"""

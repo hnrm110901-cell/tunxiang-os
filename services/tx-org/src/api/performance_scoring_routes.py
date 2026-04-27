@@ -2,6 +2,7 @@
 绩效考核路由扩展 — 周期考核与薪资联动
 Y-G8: 绩效评分DB化，补全 performance_routes.py 中缺失的周期/评级/历史端点
 """
+
 from __future__ import annotations
 
 import uuid
@@ -163,8 +164,7 @@ async def list_performance_periods(
     params: dict = {"tid": tid}
     if period_type:
         if period_type not in PERIOD_TYPES:
-            raise HTTPException(status_code=400,
-                                detail=f"period_type 须为 {'/'.join(PERIOD_TYPES)}")
+            raise HTTPException(status_code=400, detail=f"period_type 须为 {'/'.join(PERIOD_TYPES)}")
         conditions.append("period_type = :period_type")
         params["period_type"] = period_type
 
@@ -172,9 +172,7 @@ async def list_performance_periods(
     offset = (page - 1) * size
 
     try:
-        count_res = await db.execute(
-            text(f"SELECT COUNT(*) FROM performance_periods WHERE {where}"), params
-        )
+        count_res = await db.execute(text(f"SELECT COUNT(*) FROM performance_periods WHERE {where}"), params)
         total = count_res.scalar() or 0
 
         rows_res = await db.execute(
@@ -223,8 +221,7 @@ async def create_performance_period(
     await _set_rls(db, tid)
 
     if body.period_type not in PERIOD_TYPES:
-        raise HTTPException(status_code=400,
-                            detail=f"period_type 须为 {'/'.join(PERIOD_TYPES)}")
+        raise HTTPException(status_code=400, detail=f"period_type 须为 {'/'.join(PERIOD_TYPES)}")
 
     period_id = uuid.uuid4()
     now = datetime.now(timezone.utc)
@@ -239,8 +236,7 @@ async def create_performance_period(
             {"tid": tid, "period_key": body.period_key},
         )
         if exists_res.fetchone():
-            raise HTTPException(status_code=409,
-                                detail=f"考核周期 {body.period_key} 已存在")
+            raise HTTPException(status_code=409, detail=f"考核周期 {body.period_key} 已存在")
 
         await db.execute(
             text("""
@@ -270,8 +266,7 @@ async def create_performance_period(
         logger.warning("create_period_db_fallback", error=str(exc))
         period_id = uuid.uuid4()
 
-    logger.info("performance_period_created",
-                period_id=str(period_id), period_key=body.period_key, tenant_id=tid)
+    logger.info("performance_period_created", period_id=str(period_id), period_key=body.period_key, tenant_id=tid)
     return {"ok": True, "data": {"id": str(period_id), "period_key": body.period_key, "name": body.name}}
 
 
@@ -308,6 +303,7 @@ async def batch_evaluate(
 
         try:
             import json
+
             await db.execute(
                 text("""
                     INSERT INTO performance_evaluations
@@ -342,19 +338,20 @@ async def batch_evaluate(
         except ValueError as e:
             raise HTTPException(status_code=400, detail=str(e)) from e
         except SQLAlchemyError as exc:
-            logger.warning("evaluate_db_fallback", error=str(exc),
-                           employee_id=item.employee_id)
+            logger.warning("evaluate_db_fallback", error=str(exc), employee_id=item.employee_id)
 
-        results.append({
-            "employee_id": item.employee_id,
-            "role": item.role,
-            "kpi_scores": item.kpi_scores,
-            "weighted_score": weighted_score,
-            "grade": grade,
-            "grade_label": grade_label,
-            "supervisor_comment": item.supervisor_comment,
-            "weights_used": KPI_WEIGHTS.get(item.role, KPI_WEIGHTS["default"]),
-        })
+        results.append(
+            {
+                "employee_id": item.employee_id,
+                "role": item.role,
+                "kpi_scores": item.kpi_scores,
+                "weighted_score": weighted_score,
+                "grade": grade,
+                "grade_label": grade_label,
+                "supervisor_comment": item.supervisor_comment,
+                "weights_used": KPI_WEIGHTS.get(item.role, KPI_WEIGHTS["default"]),
+            }
+        )
 
     try:
         # 更新周期参与人数和平均分
@@ -382,8 +379,7 @@ async def batch_evaluate(
     except SQLAlchemyError as exc:
         logger.warning("update_period_stats_fallback", error=str(exc))
 
-    logger.info("batch_evaluate_completed",
-                period_id=period_id, count=len(results), tenant_id=tid)
+    logger.info("batch_evaluate_completed", period_id=period_id, count=len(results), tenant_id=tid)
     return {
         "ok": True,
         "data": {
@@ -420,23 +416,26 @@ async def get_period_results(
         rows = rows_res.fetchall()
 
         import json
+
         items = []
         for i, r in enumerate(rows):
             kpi_scores = r.kpi_scores
             if isinstance(kpi_scores, str):
                 kpi_scores = json.loads(kpi_scores)
             grade, grade_label = _compute_grade(float(r.weighted_score or 0))
-            items.append({
-                "rank": i + 1,
-                "employee_id": str(r.employee_id),
-                "role": r.role,
-                "kpi_scores": kpi_scores or {},
-                "weighted_score": float(r.weighted_score or 0),
-                "grade": grade,
-                "grade_label": grade_label,
-                "supervisor_comment": r.supervisor_comment,
-                "evaluated_at": r.evaluated_at.isoformat() if r.evaluated_at else None,
-            })
+            items.append(
+                {
+                    "rank": i + 1,
+                    "employee_id": str(r.employee_id),
+                    "role": r.role,
+                    "kpi_scores": kpi_scores or {},
+                    "weighted_score": float(r.weighted_score or 0),
+                    "grade": grade,
+                    "grade_label": grade_label,
+                    "supervisor_comment": r.supervisor_comment,
+                    "evaluated_at": r.evaluated_at.isoformat() if r.evaluated_at else None,
+                }
+            )
 
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
@@ -481,6 +480,7 @@ async def get_employee_performance_history(
 
     try:
         import json
+
         rows_res = await db.execute(
             text("""
                 SELECT e.period_id, p.period_key, p.period_type, p.name as period_name,
@@ -503,19 +503,21 @@ async def get_employee_performance_history(
             if isinstance(kpi_scores, str):
                 kpi_scores = json.loads(kpi_scores)
             grade, grade_label = _compute_grade(float(r.weighted_score or 0))
-            history.append({
-                "period_id": str(r.period_id),
-                "period_key": r.period_key,
-                "period_type": r.period_type,
-                "period_name": r.period_name,
-                "role": r.role,
-                "kpi_scores": kpi_scores or {},
-                "weighted_score": float(r.weighted_score or 0),
-                "grade": grade,
-                "grade_label": grade_label,
-                "supervisor_comment": r.supervisor_comment,
-                "evaluated_at": r.evaluated_at.isoformat() if r.evaluated_at else None,
-            })
+            history.append(
+                {
+                    "period_id": str(r.period_id),
+                    "period_key": r.period_key,
+                    "period_type": r.period_type,
+                    "period_name": r.period_name,
+                    "role": r.role,
+                    "kpi_scores": kpi_scores or {},
+                    "weighted_score": float(r.weighted_score or 0),
+                    "grade": grade,
+                    "grade_label": grade_label,
+                    "supervisor_comment": r.supervisor_comment,
+                    "evaluated_at": r.evaluated_at.isoformat() if r.evaluated_at else None,
+                }
+            )
 
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
@@ -653,15 +655,17 @@ async def get_performance_stats(
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 from services.performance_scoring_service import (
-    create_review_cycle,
-    list_review_cycles,
-    update_cycle_status,
-    get_cycle_detail,
-    submit_review_score,
-    get_employee_scores,
     aggregate_cycle_scores,
-    calibrate_score as svc_calibrate_score,
+    create_review_cycle,
+    get_cycle_detail,
+    get_employee_scores,
     get_review_stats,
+    list_review_cycles,
+    submit_review_score,
+    update_cycle_status,
+)
+from services.performance_scoring_service import (
+    calibrate_score as svc_calibrate_score,
 )
 
 
@@ -820,8 +824,12 @@ async def get_review_scores_endpoint(
     try:
         eid = uuid.UUID(employee_id) if employee_id else None
         result = await get_employee_scores(
-            db, uuid.UUID(tid), uuid.UUID(cycle_id),
-            employee_id=eid, page=page, size=size,
+            db,
+            uuid.UUID(tid),
+            uuid.UUID(cycle_id),
+            employee_id=eid,
+            page=page,
+            size=size,
         )
         return {"ok": True, "data": result}
     except ValueError as e:
@@ -859,15 +867,17 @@ async def get_my_pending_reviews(
         )
         items = []
         for r in rows.mappings().fetchall():
-            items.append({
-                "employee_id": str(r["employee_id"]),
-                "emp_name": r["emp_name"],
-                "role": r["role"],
-                "store_id": str(r["store_id"]) if r["store_id"] else None,
-                "store_name": r["store_name"],
-                "scored": r["score_id"] is not None,
-                "score_status": r["score_status"],
-            })
+            items.append(
+                {
+                    "employee_id": str(r["employee_id"]),
+                    "emp_name": r["emp_name"],
+                    "role": r["role"],
+                    "store_id": str(r["store_id"]) if r["store_id"] else None,
+                    "store_name": r["store_name"],
+                    "scored": r["score_id"] is not None,
+                    "score_status": r["score_status"],
+                }
+            )
         return {"ok": True, "data": {"items": items, "total": len(items)}}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e

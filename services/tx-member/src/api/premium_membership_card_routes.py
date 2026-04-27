@@ -12,6 +12,7 @@ Y-D7
   GET  /api/v1/member/premium-memberships/stats          统计
   GET  /api/v1/member/premium-memberships/expiring       即将到期（7天内）
 """
+
 from __future__ import annotations
 
 import uuid as _uuid
@@ -98,6 +99,7 @@ _PRODUCTS_BY_TYPE = {p["card_type"]: p for p in PREMIUM_CARD_PRODUCTS}
 
 
 # ─── 工具函数 ────────────────────────────────────────────────────────────────
+
 
 def _parse_tenant(x_tenant_id: str = Header(..., alias="X-Tenant-ID")) -> str:
     try:
@@ -597,23 +599,25 @@ async def list_cards(
         _end = r[6]
         days_remaining = (_end - today).days if _end else None
         product = _PRODUCTS_BY_TYPE.get(r[3], {})
-        items.append({
-            "id": str(r[0]),
-            "card_no": r[1],
-            "member_id": str(r[2]),
-            "card_type": r[3],
-            "card_name": product.get("name", r[3]),
-            "price_fen": r[4],
-            "start_date": str(r[5]) if r[5] else None,
-            "end_date": str(_end) if _end else None,
-            "days_remaining": days_remaining,
-            "status": r[7],
-            "benefits": r[8],
-            "purchase_channel": r[9],
-            "auto_renew": r[10],
-            "is_expiring_soon": 0 <= (days_remaining or 999) <= 7,
-            "created_at": r[11].isoformat() if r[11] else None,
-        })
+        items.append(
+            {
+                "id": str(r[0]),
+                "card_no": r[1],
+                "member_id": str(r[2]),
+                "card_type": r[3],
+                "card_name": product.get("name", r[3]),
+                "price_fen": r[4],
+                "start_date": str(r[5]) if r[5] else None,
+                "end_date": str(_end) if _end else None,
+                "days_remaining": days_remaining,
+                "status": r[7],
+                "benefits": r[8],
+                "purchase_channel": r[9],
+                "auto_renew": r[10],
+                "is_expiring_soon": 0 <= (days_remaining or 999) <= 7,
+                "created_at": r[11].isoformat() if r[11] else None,
+            }
+        )
 
     return {
         "ok": True,

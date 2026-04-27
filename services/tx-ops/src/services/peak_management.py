@@ -2,6 +2,7 @@
 
 提供高峰检测、档口负载监控、服务加派建议、等位拥堵指标、高峰事件处理。
 """
+
 import uuid
 from datetime import datetime, timezone
 from typing import Optional
@@ -13,9 +14,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 log = structlog.get_logger(__name__)
 
 # 高峰判定阈值
-PEAK_OCCUPANCY_THRESHOLD = 0.80   # 上座率 >= 80% 视为高峰
-PEAK_QUEUE_THRESHOLD = 10          # 等位数 >= 10 视为高峰
-DEPT_OVERLOAD_THRESHOLD = 0.90     # 档口负载率 >= 90% 视为过载
+PEAK_OCCUPANCY_THRESHOLD = 0.80  # 上座率 >= 80% 视为高峰
+PEAK_QUEUE_THRESHOLD = 10  # 等位数 >= 10 视为高峰
+DEPT_OVERLOAD_THRESHOLD = 0.90  # 档口负载率 >= 90% 视为过载
 
 
 async def _set_tenant(db: AsyncSession, tenant_id: str) -> None:
@@ -170,15 +171,17 @@ async def get_dept_load_monitor(
         if is_overloaded:
             overloaded_count += 1
 
-        departments.append({
-            "dept_id": str(r["dept_id"]),
-            "dept_name": r["dept_name"],
-            "capacity_per_hour": capacity,
-            "pending_count": pending,
-            "load_rate": round(min(load_rate, 2.0), 2),
-            "avg_wait_seconds": round(r["avg_wait_seconds"]) if r["avg_wait_seconds"] else 0,
-            "is_overloaded": is_overloaded,
-        })
+        departments.append(
+            {
+                "dept_id": str(r["dept_id"]),
+                "dept_name": r["dept_name"],
+                "capacity_per_hour": capacity,
+                "pending_count": pending,
+                "load_rate": round(min(load_rate, 2.0), 2),
+                "avg_wait_seconds": round(r["avg_wait_seconds"]) if r["avg_wait_seconds"] else 0,
+                "is_overloaded": is_overloaded,
+            }
+        )
 
     log.info(
         "dept_load_monitored",
@@ -245,22 +248,24 @@ async def suggest_staff_dispatch(
         if dept["is_overloaded"]:
             # 找到可调派的空闲或低负载档口员工
             available = [
-                s for s in staff_rows
-                if str(s["current_dept_id"]) != dept["dept_id"]
-                and s["role"] in ("cook", "helper", "flexible")
+                s
+                for s in staff_rows
+                if str(s["current_dept_id"]) != dept["dept_id"] and s["role"] in ("cook", "helper", "flexible")
             ]
             if available:
                 candidate = available[0]
-                suggestions.append({
-                    "action": "dispatch",
-                    "target_dept_id": dept["dept_id"],
-                    "target_dept_name": dept["dept_name"],
-                    "staff_id": str(candidate["staff_id"]),
-                    "staff_name": candidate["staff_name"],
-                    "reason": f"档口'{dept['dept_name']}'负载率{dept['load_rate']:.0%}，"
-                              f"待处理{dept['pending_count']}单",
-                    "priority": "high" if dept["load_rate"] > 1.5 else "medium",
-                })
+                suggestions.append(
+                    {
+                        "action": "dispatch",
+                        "target_dept_id": dept["dept_id"],
+                        "target_dept_name": dept["dept_name"],
+                        "staff_id": str(candidate["staff_id"]),
+                        "staff_name": candidate["staff_name"],
+                        "reason": f"档口'{dept['dept_name']}'负载率{dept['load_rate']:.0%}，"
+                        f"待处理{dept['pending_count']}单",
+                        "priority": "high" if dept["load_rate"] > 1.5 else "medium",
+                    }
+                )
 
     log.info(
         "staff_dispatch_suggested",
@@ -333,8 +338,7 @@ async def get_queue_pressure(
         """),
         {"store_id": store_uuid, "tenant_id": tenant_uuid, "now": now},
     )
-    turnover_rows = {r["table_type"]: r["avg_dining_seconds"]
-                     for r in turnover_result.mappings().all()}
+    turnover_rows = {r["table_type"]: r["avg_dining_seconds"] for r in turnover_result.mappings().all()}
 
     queues = []
     total_waiting = 0
@@ -345,22 +349,20 @@ async def get_queue_pressure(
         avg_dining_sec = turnover_rows.get(table_type, 3600)  # 默认1小时
 
         # 预估等待 = 平均用餐时长 * (等位数 / 该桌型台数) — 简化估算
-        estimated_wait_minutes = round(
-            (avg_dining_sec or 3600) * queue_count / max(queue_count, 1) / 60
+        estimated_wait_minutes = round((avg_dining_sec or 3600) * queue_count / max(queue_count, 1) / 60)
+
+        queues.append(
+            {
+                "table_type": table_type,
+                "queue_count": queue_count,
+                "avg_wait_seconds": round(r["avg_wait_seconds"]) if r["avg_wait_seconds"] else 0,
+                "max_wait_seconds": round(r["max_wait_seconds"]) if r["max_wait_seconds"] else 0,
+                "estimated_wait_minutes": estimated_wait_minutes,
+            }
         )
 
-        queues.append({
-            "table_type": table_type,
-            "queue_count": queue_count,
-            "avg_wait_seconds": round(r["avg_wait_seconds"]) if r["avg_wait_seconds"] else 0,
-            "max_wait_seconds": round(r["max_wait_seconds"]) if r["max_wait_seconds"] else 0,
-            "estimated_wait_minutes": estimated_wait_minutes,
-        })
-
     # 拥堵指数 (0-100)
-    congestion_index = min(100, total_waiting * 5 + sum(
-        q["avg_wait_seconds"] / 60 for q in queues
-    ))
+    congestion_index = min(100, total_waiting * 5 + sum(q["avg_wait_seconds"] / 60 for q in queues))
 
     log.info(
         "queue_pressure_calculated",

@@ -24,6 +24,7 @@
 AI 建议触发：差异 > 50000分（500元）
 自动核销：默认 max_amount_fen=10000（100元）
 """
+
 from __future__ import annotations
 
 import uuid
@@ -228,9 +229,7 @@ class ThreeWayMatchEngine:
         # 1. 查采购订单
         po = await self._fetch_purchase_order(purchase_order_id, tenant_id, db)
         if po is None:
-            raise PurchaseOrderNotFoundError(
-                f"采购订单 {purchase_order_id} 不存在或不属于租户 {tenant_id}"
-            )
+            raise PurchaseOrderNotFoundError(f"采购订单 {purchase_order_id} 不存在或不属于租户 {tenant_id}")
 
         po_items: list[dict] = po.get("items", [])
         po_total_fen: int = int(po.get("total_amount_fen", 0))
@@ -389,11 +388,13 @@ class ThreeWayMatchEngine:
                 and_(
                     ThreeWayMatchRecord.tenant_id == tid,
                     ThreeWayMatchRecord.is_deleted.is_(False),
-                    ThreeWayMatchRecord.status.not_in([
-                        MatchStatus.MATCHED.value,
-                        MatchStatus.AUTO_APPROVED.value,
-                        MatchStatus.RESOLVED.value,
-                    ]),
+                    ThreeWayMatchRecord.status.not_in(
+                        [
+                            MatchStatus.MATCHED.value,
+                            MatchStatus.AUTO_APPROVED.value,
+                            MatchStatus.RESOLVED.value,
+                        ]
+                    ),
                     ThreeWayMatchRecord.created_at >= cutoff,
                 )
             )
@@ -435,9 +436,7 @@ class ThreeWayMatchEngine:
         amount_yuan = variance_item.variance_amount_fen / 100
         po_yuan = variance_item.po_amount_fen / 100
         variance_ratio = (
-            variance_item.variance_amount_fen / variance_item.po_amount_fen
-            if variance_item.po_amount_fen > 0
-            else 0.0
+            variance_item.variance_amount_fen / variance_item.po_amount_fen if variance_item.po_amount_fen > 0 else 0.0
         )
 
         prompt = f"""你是餐饮集团财务对账专家。请分析以下采购三单匹配差异，提供简洁的处理建议。
@@ -486,7 +485,7 @@ class ThreeWayMatchEngine:
                 await self._approve_variance(
                     variance_id=vid,
                     tenant_id=tenant_id,
-                    note=f"系统自动核销（差异≤{max_amount_fen/100:.0f}元）",
+                    note=f"系统自动核销（差异≤{max_amount_fen / 100:.0f}元）",
                     db=db,
                 )
                 count += 1
@@ -568,15 +567,17 @@ class ThreeWayMatchEngine:
             qty_diff = po_qty - recv_qty
             if qty_diff > 0.001:  # 允许极小浮点误差
                 variance_fen = round(qty_diff * po_price)
-                line_variances.append({
-                    "ingredient_name": name,
-                    "type": "quantity_variance",
-                    "po_qty": po_qty,
-                    "recv_qty": recv_qty,
-                    "po_unit_price_fen": po_price,
-                    "variance_fen": variance_fen,
-                    "note": f"收货少{qty_diff:.2f}件，差{variance_fen/100:.2f}元",
-                })
+                line_variances.append(
+                    {
+                        "ingredient_name": name,
+                        "type": "quantity_variance",
+                        "po_qty": po_qty,
+                        "recv_qty": recv_qty,
+                        "po_unit_price_fen": po_price,
+                        "variance_fen": variance_fen,
+                        "note": f"收货少{qty_diff:.2f}件，差{variance_fen / 100:.2f}元",
+                    }
+                )
                 qty_variance = True
 
             # 价格差异：发票单价 ≠ 采购单价（在容差外）
@@ -584,19 +585,21 @@ class ThreeWayMatchEngine:
                 price_diff_fen = abs(inv_price - po_price) * max(1, round(inv_qty))
                 if not self._within_tolerance(abs(inv_price - po_price), po_price):
                     variance_fen = round(abs(inv_price - po_price) * inv_qty)
-                    line_variances.append({
-                        "ingredient_name": name,
-                        "type": "price_variance",
-                        "po_qty": po_qty,
-                        "recv_qty": recv_qty,
-                        "po_unit_price_fen": po_price,
-                        "inv_unit_price_fen": inv_price,
-                        "variance_fen": variance_fen,
-                        "note": (
-                            f"发票价{inv_price/100:.2f}元 vs 采购价{po_price/100:.2f}元，"
-                            f"差{(inv_price - po_price)/100:.2f}元/件"
-                        ),
-                    })
+                    line_variances.append(
+                        {
+                            "ingredient_name": name,
+                            "type": "price_variance",
+                            "po_qty": po_qty,
+                            "recv_qty": recv_qty,
+                            "po_unit_price_fen": po_price,
+                            "inv_unit_price_fen": inv_price,
+                            "variance_fen": variance_fen,
+                            "note": (
+                                f"发票价{inv_price / 100:.2f}元 vs 采购价{po_price / 100:.2f}元，"
+                                f"差{(inv_price - po_price) / 100:.2f}元/件"
+                            ),
+                        }
+                    )
                     price_variance = True
 
         # 总金额差异
@@ -822,15 +825,11 @@ class ThreeWayMatchEngine:
 
         if date_from:
             conditions.append("created_at >= :date_from")
-            params["date_from"] = datetime.combine(date_from, datetime.min.time()).replace(
-                tzinfo=timezone.utc
-            )
+            params["date_from"] = datetime.combine(date_from, datetime.min.time()).replace(tzinfo=timezone.utc)
 
         if date_to:
             conditions.append("created_at <= :date_to")
-            params["date_to"] = datetime.combine(date_to, datetime.max.time()).replace(
-                tzinfo=timezone.utc
-            )
+            params["date_to"] = datetime.combine(date_to, datetime.max.time()).replace(tzinfo=timezone.utc)
 
         where_clause = " AND ".join(conditions)
         result = await db.execute(
@@ -849,16 +848,17 @@ class ThreeWayMatchEngine:
         tid = uuid.UUID(tenant_id)
 
         result = await db.execute(
-            select(ThreeWayMatchRecord.id)
-            .where(
+            select(ThreeWayMatchRecord.id).where(
                 and_(
                     ThreeWayMatchRecord.tenant_id == tid,
                     ThreeWayMatchRecord.is_deleted.is_(False),
-                    ThreeWayMatchRecord.status.not_in([
-                        MatchStatus.MATCHED.value,
-                        MatchStatus.AUTO_APPROVED.value,
-                        MatchStatus.RESOLVED.value,
-                    ]),
+                    ThreeWayMatchRecord.status.not_in(
+                        [
+                            MatchStatus.MATCHED.value,
+                            MatchStatus.AUTO_APPROVED.value,
+                            MatchStatus.RESOLVED.value,
+                        ]
+                    ),
                     ThreeWayMatchRecord.variance_amount_fen <= max_amount_fen,
                     ThreeWayMatchRecord.variance_amount_fen > 0,
                 )

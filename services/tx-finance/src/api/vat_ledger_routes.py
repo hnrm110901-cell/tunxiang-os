@@ -11,6 +11,7 @@
   PUT    /pl-accounts/{tax_code}  更新科目映射
   POST   /nuonuo/sync-poc         向诺诺平台推送发票 POC（mock）
 """
+
 import hashlib
 import uuid
 from datetime import date
@@ -20,8 +21,7 @@ from typing import Any, Optional
 import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
 from pydantic import BaseModel, Field
-from sqlalchemy import func, select, update
-from sqlalchemy.exc import IntegrityError, SQLAlchemyError
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db_with_tenant
@@ -31,6 +31,7 @@ router = APIRouter(prefix="/api/v1/finance/vat", tags=["vat-ledger"])
 
 
 # ── 依赖 ──────────────────────────────────────────────────────────────────────
+
 
 async def _get_tenant_db(x_tenant_id: str = Header(..., alias="X-Tenant-ID")):
     """从 Header 提取 tenant_id，返回带 RLS 的 DB session。"""
@@ -54,12 +55,14 @@ def _ok(data: Any) -> dict[str, Any]:
 
 # ── Pydantic Schema ────────────────────────────────────────────────────────────
 
+
 class VatOutputCreateBody(BaseModel):
     """新增销项税记录请求体（通常由发票同步触发）。"""
+
     store_id: Optional[uuid.UUID] = None
     invoice_id: Optional[uuid.UUID] = None
     order_id: Optional[uuid.UUID] = None
-    period_month: str = Field(..., pattern=r'^\d{4}-\d{2}$', description="格式 2026-04")
+    period_month: str = Field(..., pattern=r"^\d{4}-\d{2}$", description="格式 2026-04")
     tax_code: str = Field(..., max_length=20)
     tax_rate: Decimal = Field(..., ge=0, le=1, description="税率，如 0.06")
     amount_excl_tax_fen: int = Field(..., gt=0, description="不含税金额（分）")
@@ -74,9 +77,10 @@ class VatOutputCreateBody(BaseModel):
 
 class VatInputCreateBody(BaseModel):
     """新增进项税记录请求体（通常由采购单同步触发）。"""
+
     store_id: Optional[uuid.UUID] = None
     purchase_order_id: Optional[uuid.UUID] = None
-    period_month: str = Field(..., pattern=r'^\d{4}-\d{2}$')
+    period_month: str = Field(..., pattern=r"^\d{4}-\d{2}$")
     tax_code: str = Field(..., max_length=20)
     tax_rate: Decimal = Field(..., ge=0, le=1)
     amount_excl_tax_fen: int = Field(..., gt=0)
@@ -93,14 +97,16 @@ class VatInputCreateBody(BaseModel):
 
 class PlAccountUpdateBody(BaseModel):
     """更新 P&L 科目映射请求体。"""
+
     pl_account_code: str = Field(..., max_length=20)
     pl_account_name: str = Field(..., max_length=100)
-    account_type: str = Field(..., pattern=r'^(revenue|cost|tax_payable)$')
+    account_type: str = Field(..., pattern=r"^(revenue|cost|tax_payable)$")
     is_active: bool = True
 
 
 class NuonuoSyncPocBody(BaseModel):
     """诺诺平台推送 POC 请求体。"""
+
     invoice_id: uuid.UUID
     invoice_no: Optional[str] = None
     buyer_name: Optional[str] = None
@@ -108,6 +114,7 @@ class NuonuoSyncPocBody(BaseModel):
 
 
 # ── 路由 ──────────────────────────────────────────────────────────────────────
+
 
 @router.get("/output")
 async def list_output_records(
@@ -118,9 +125,10 @@ async def list_output_records(
     db: AsyncSession = Depends(_get_tenant_db),
 ) -> dict[str, Any]:
     """销项税台账列表，按月份分页查询。"""
-    from sqlalchemy import Table, MetaData
+    from sqlalchemy import MetaData, Table
+
     meta = MetaData()
-    tbl = Table('vat_output_records', meta, autoload_with=db.sync_session.bind if hasattr(db, 'sync_session') else None)
+    tbl = Table("vat_output_records", meta, autoload_with=db.sync_session.bind if hasattr(db, "sync_session") else None)
 
     # 使用 text SQL 避免 ORM 模型依赖，保持轻量
     from sqlalchemy import text
@@ -269,8 +277,9 @@ async def create_input_record(
     db: AsyncSession = Depends(_get_tenant_db),
 ) -> dict[str, Any]:
     """新增进项税记录（从采购单同步时调用）。"""
-    from sqlalchemy import text
     import json
+
+    from sqlalchemy import text
 
     record_id = uuid.uuid4()
     try:
@@ -434,15 +443,17 @@ async def get_monthly_summary(
 
     net_payable_fen = output_tax_fen - input_tax_fen
 
-    return _ok({
-        "period_month": period_month,
-        "output_tax_fen": output_tax_fen,       # 销项税额（分）
-        "input_tax_fen": input_tax_fen,          # 进项税额（分，仅已抵扣）
-        "net_payable_fen": net_payable_fen,       # 应缴增值税（分）
-        "output_count": output_count,
-        "input_count": input_count,
-        "pl_summary": pl_summary,
-    })
+    return _ok(
+        {
+            "period_month": period_month,
+            "output_tax_fen": output_tax_fen,  # 销项税额（分）
+            "input_tax_fen": input_tax_fen,  # 进项税额（分，仅已抵扣）
+            "net_payable_fen": net_payable_fen,  # 应缴增值税（分）
+            "output_count": output_count,
+            "input_count": input_count,
+            "pl_summary": pl_summary,
+        }
+    )
 
 
 @router.get("/pl-accounts")
@@ -543,10 +554,12 @@ async def nuonuo_sync_poc(
         note="MOCK — 生产环境请替换为诺诺 SDK 真实调用",
     )
 
-    return _ok({
-        "nuonuo_order_id": mock_order_id,
-        "status": "submitted",
-        "invoice_id": str(body.invoice_id),
-        "mock": True,  # 生产环境删除此字段
-        "note": "MOCK_MODE: 生产环境请接入诺诺开放平台 SDK",
-    })
+    return _ok(
+        {
+            "nuonuo_order_id": mock_order_id,
+            "status": "submitted",
+            "invoice_id": str(body.invoice_id),
+            "mock": True,  # 生产环境删除此字段
+            "note": "MOCK_MODE: 生产环境请接入诺诺开放平台 SDK",
+        }
+    )

@@ -13,15 +13,16 @@
   EnergyEfficiencyProjector → mv_energy_efficiency（能耗管理）
   PublicOpinionProjector    → mv_public_opinion（舆情监控）
 """
-from .discount_health import DiscountHealthProjector
+
 from .channel_margin import ChannelMarginProjector
+from .daily_settlement import DailySettlementProjector
+from .discount_health import DiscountHealthProjector
+from .energy_efficiency import EnergyEfficiencyProjector
 from .inventory_bom import InventoryBomProjector
 from .member_clv import MemberClvProjector
-from .store_pnl import StorePnlProjector
-from .daily_settlement import DailySettlementProjector
-from .safety_compliance import SafetyComplianceProjector
-from .energy_efficiency import EnergyEfficiencyProjector
 from .public_opinion import PublicOpinionProjector
+from .safety_compliance import SafetyComplianceProjector
+from .store_pnl import StorePnlProjector
 
 ALL_PROJECTORS = [
     DiscountHealthProjector,

@@ -2,6 +2,7 @@
 
 与 gateway/src/middleware/ 包内中间件职责对齐，适配单体入口（独立实现）。
 """
+
 import logging
 import time
 import uuid
@@ -22,6 +23,7 @@ class TenantMiddleware(BaseHTTPMiddleware):
                 uuid.UUID(tenant_id)
             except ValueError:
                 from .response import err
+
                 return err("Invalid X-Tenant-ID format", code="INVALID_TENANT", status_code=400)
 
         request.state.tenant_id = tenant_id

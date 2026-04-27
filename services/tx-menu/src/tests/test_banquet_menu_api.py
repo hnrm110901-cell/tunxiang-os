@@ -13,6 +13,9 @@
 
 使用 FastAPI TestClient + dependency_overrides，mock DB，不连真实数据库。
 """
+
+import os
+import sys
 import uuid
 from unittest.mock import AsyncMock, MagicMock
 
@@ -20,14 +23,12 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-import os
-import sys
-
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "..", ".."))
 
-from shared.ontology.src.database import get_db
 from api.banquet_menu_routes import router
+
+from shared.ontology.src.database import get_db
 
 # ─── 构建测试用 App ───────────────────────────────────────────────────────────
 
@@ -119,19 +120,19 @@ class TestListBanquetMenus:
         menu_uuid = uuid.UUID(MENU_ID)
         # 模拟数据库返回一行（按 SQL 列序）
         row = (
-            menu_uuid,          # id
-            "BQ-288",           # menu_code
-            "精品宴288元/位",    # menu_name
-            "premium",          # tier
-            28800,              # per_person_fen
-            20,                 # min_persons
-            2,                  # min_tables
-            "精品宴席",         # description
+            menu_uuid,  # id
+            "BQ-288",  # menu_code
+            "精品宴288元/位",  # menu_name
+            "premium",  # tier
+            28800,  # per_person_fen
+            20,  # min_persons
+            2,  # min_tables
+            "精品宴席",  # description
             ["时令活鲜", "私厨服务"],  # highlights
-            True,               # is_active
-            None,               # valid_from
-            None,               # valid_until
-            0,                  # sort_order
+            True,  # is_active
+            None,  # valid_from
+            None,  # valid_until
+            0,  # sort_order
         )
         mock_db.execute.return_value = _rows_result([row])
 
@@ -234,8 +235,15 @@ class TestGetBanquetMenuDetail:
         """GET /api/v1/menu/banquet-menus/{id} 菜单存在时返回 200 及完整结构"""
         menu_uuid = uuid.UUID(MENU_ID)
         menu_row = (
-            menu_uuid, "BQ-288", "精品宴288元/位",
-            "premium", 28800, 20, 2, "精品宴席", [],
+            menu_uuid,
+            "BQ-288",
+            "精品宴288元/位",
+            "premium",
+            28800,
+            20,
+            2,
+            "精品宴席",
+            [],
         )
         sections_result = _rows_result([])
         items_result = _rows_result([])
@@ -364,11 +372,11 @@ class TestBanquetSessions:
         session_uuid = uuid.UUID(SESSION_ID)
         menu_uuid = uuid.UUID(MENU_ID)
         session_row = (
-            "scheduled",    # status
-            menu_uuid,      # banquet_menu_id
-            "[]",           # table_ids
-            None,           # scheduled_at
-            None,           # current_section_id
+            "scheduled",  # status
+            menu_uuid,  # banquet_menu_id
+            "[]",  # table_ids
+            None,  # scheduled_at
+            None,  # current_section_id
         )
         update_result = _empty_result()
         mock_db.execute.side_effect = [
@@ -431,16 +439,16 @@ class TestBanquetNoticePrint:
 
         session_uuid = uuid.UUID(SESSION_ID)
         session_row = (
-            session_uuid,               # id
-            "张先生婚宴",                # session_name
-            datetime(2026, 6, 1, 18),   # scheduled_at
-            200,                        # guest_count
-            20,                         # table_count
-            "新人要求不上羊肉",           # notes
-            "scheduled",                # status
-            "精品宴288元/位",            # menu_name
-            28800,                      # per_person_fen
-            "premium",                  # tier
+            session_uuid,  # id
+            "张先生婚宴",  # session_name
+            datetime(2026, 6, 1, 18),  # scheduled_at
+            200,  # guest_count
+            20,  # table_count
+            "新人要求不上羊肉",  # notes
+            "scheduled",  # status
+            "精品宴288元/位",  # menu_name
+            28800,  # per_person_fen
+            "premium",  # tier
         )
         menu_items_result = _rows_result([])  # 无菜品分节（空宴席菜单）
 

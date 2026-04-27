@@ -12,11 +12,11 @@
     GET /api/v1/analytics/dishes/pairing-analysis
     GET /api/v1/analytics/dishes/underperforming
 """
+
 import sys
 import types
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
-import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
@@ -25,8 +25,12 @@ from fastapi.testclient import TestClient
 # src
 sys.modules.setdefault("src", types.ModuleType("src"))
 _fake_src_db = types.ModuleType("src.db")
+
+
 async def _fake_get_db():
     yield None
+
+
 _fake_src_db.get_db = _fake_get_db
 sys.modules.setdefault("src.db", _fake_src_db)
 
@@ -38,7 +42,9 @@ if "structlog" not in sys.modules:
 
 # shared.ontology stubs（dish_analytics_routes 需要 async_session_factory）
 for _mod_name in [
-    "shared", "shared.ontology", "shared.ontology.src",
+    "shared",
+    "shared.ontology",
+    "shared.ontology.src",
     "shared.ontology.src.database",
 ]:
     sys.modules.setdefault(_mod_name, types.ModuleType(_mod_name))
@@ -52,10 +58,11 @@ if not hasattr(_fake_db_mod, "get_db_with_tenant"):
 
 # ─── 导入路由 ────────────────────────────────────────────────────────────────
 
+from src.api.dish_analytics_routes import router as dish_router  # noqa: E402
 from src.api.group_dashboard_routes import router as group_router  # noqa: E402
-from src.api.dish_analytics_routes import router as dish_router     # noqa: E402
 
 # ─── 工具 ────────────────────────────────────────────────────────────────────
+
 
 def _make_client(router):
     app = FastAPI()
@@ -71,6 +78,7 @@ _BRAND = "brand-001"
 # ════════════════════════════════════════════════════════════════════════════
 # group_dashboard_routes 测试（纯 mock 数据，无 DB）
 # ════════════════════════════════════════════════════════════════════════════
+
 
 class TestGroupDashboardToday:
     """GET /api/v1/analytics/group/today"""
@@ -120,8 +128,11 @@ class TestGroupDashboardToday:
         )
         summary = resp.json()["data"]["summary"]
         for field in [
-            "total_revenue_fen", "total_orders", "avg_table_turnover",
-            "active_stores", "total_stores",
+            "total_revenue_fen",
+            "total_orders",
+            "avg_table_turnover",
+            "active_stores",
+            "total_stores",
         ]:
             assert field in summary, f"missing field: {field}"
 
@@ -142,9 +153,7 @@ class TestGroupDashboardTrend:
         self.client = _make_client(group_router)
 
     def test_missing_tenant_returns_400(self):
-        resp = self.client.get(
-            f"/api/v1/analytics/group/trend?brand_id={_BRAND}"
-        )
+        resp = self.client.get(f"/api/v1/analytics/group/trend?brand_id={_BRAND}")
         assert resp.status_code == 400
 
     def test_valid_7_days(self):
@@ -196,9 +205,7 @@ class TestGroupDashboardAlerts:
         self.client = _make_client(group_router)
 
     def test_missing_tenant_returns_400(self):
-        resp = self.client.get(
-            f"/api/v1/analytics/group/alerts?brand_id={_BRAND}"
-        )
+        resp = self.client.get(f"/api/v1/analytics/group/alerts?brand_id={_BRAND}")
         assert resp.status_code == 400
 
     def test_valid_returns_200(self):
@@ -234,9 +241,11 @@ class TestGroupDashboardAlerts:
 # dish_analytics_routes 测试（DB 异常时回退空数组）
 # ════════════════════════════════════════════════════════════════════════════
 
+
 def _patched_dish_client():
     """返回 TestClient，并让 async_session_factory 抛出 SQLAlchemyError"""
     import contextlib
+
     from sqlalchemy.exc import SQLAlchemyError
 
     @contextlib.asynccontextmanager
@@ -272,9 +281,7 @@ class TestDishTopSelling:
             "src.api.dish_analytics_routes.async_session_factory",
             return_value=self._failing_session(),
         ):
-            resp = self.client.get(
-                "/api/v1/analytics/dishes/top-selling?days=14"
-            )
+            resp = self.client.get("/api/v1/analytics/dishes/top-selling?days=14")
         assert resp.status_code == 200
         assert resp.json()["data"]["period_days"] == 14
 
@@ -283,9 +290,7 @@ class TestDishTopSelling:
             "src.api.dish_analytics_routes.async_session_factory",
             return_value=self._failing_session(),
         ):
-            resp = self.client.get(
-                "/api/v1/analytics/dishes/top-selling?limit=5"
-            )
+            resp = self.client.get("/api/v1/analytics/dishes/top-selling?limit=5")
         assert resp.status_code == 200
 
     def test_store_id_filter_param_accepted(self):
@@ -293,9 +298,7 @@ class TestDishTopSelling:
             "src.api.dish_analytics_routes.async_session_factory",
             return_value=self._failing_session(),
         ):
-            resp = self.client.get(
-                "/api/v1/analytics/dishes/top-selling?store_id=store-001"
-            )
+            resp = self.client.get("/api/v1/analytics/dishes/top-selling?store_id=store-001")
         assert resp.status_code == 200
 
 
@@ -321,9 +324,7 @@ class TestDishTimeHeatmap:
             "src.api.dish_analytics_routes.async_session_factory",
             return_value=self._failing_session(),
         ):
-            resp = self.client.get(
-                "/api/v1/analytics/dishes/time-heatmap?dish_id=dish-001"
-            )
+            resp = self.client.get("/api/v1/analytics/dishes/time-heatmap?dish_id=dish-001")
         assert resp.status_code == 200
 
 
@@ -346,9 +347,7 @@ class TestDishPairingAnalysis:
             "src.api.dish_analytics_routes.async_session_factory",
             return_value=self._failing_session(),
         ):
-            resp = self.client.get(
-                "/api/v1/analytics/dishes/pairing-analysis?dish_id=dish-001"
-            )
+            resp = self.client.get("/api/v1/analytics/dishes/pairing-analysis?dish_id=dish-001")
         assert resp.status_code == 200
         body = resp.json()
         assert body["ok"] is True
@@ -378,9 +377,7 @@ class TestDishUnderperforming:
             "src.api.dish_analytics_routes.async_session_factory",
             return_value=self._failing_session(),
         ):
-            resp = self.client.get(
-                "/api/v1/analytics/dishes/underperforming?min_sales_threshold=50"
-            )
+            resp = self.client.get("/api/v1/analytics/dishes/underperforming?min_sales_threshold=50")
         assert resp.status_code == 200
 
     def test_period_days_in_response(self):
@@ -388,7 +385,5 @@ class TestDishUnderperforming:
             "src.api.dish_analytics_routes.async_session_factory",
             return_value=self._failing_session(),
         ):
-            resp = self.client.get(
-                "/api/v1/analytics/dishes/underperforming?days=14"
-            )
+            resp = self.client.get("/api/v1/analytics/dishes/underperforming?days=14")
         assert resp.json()["data"]["period_days"] == 14

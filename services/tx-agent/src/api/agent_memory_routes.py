@@ -7,6 +7,7 @@
   DELETE /api/v1/agent-memory/{memory_id}   — 软删除
   POST   /api/v1/agent-memory/consolidate   — 合并重复记忆
 """
+
 from __future__ import annotations
 
 from datetime import datetime

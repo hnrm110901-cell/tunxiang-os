@@ -8,6 +8,7 @@
 
 金额单位：分(fen)
 """
+
 from __future__ import annotations
 
 import uuid
@@ -143,13 +144,15 @@ async def deduct_for_dish(
 
         # 库存不足：记录告警但不阻塞（允许负库存）
         if new_qty < 0:
-            insufficient_stock.append({
-                "ingredient_id": str(ingredient.id),
-                "ingredient_name": ingredient.ingredient_name,
-                "required_qty": consume_qty,
-                "available_qty": old_qty,
-                "shortage_qty": abs(new_qty),
-            })
+            insufficient_stock.append(
+                {
+                    "ingredient_id": str(ingredient.id),
+                    "ingredient_name": ingredient.ingredient_name,
+                    "required_qty": consume_qty,
+                    "available_qty": old_qty,
+                    "shortage_qty": abs(new_qty),
+                }
+            )
             log.warning(
                 "insufficient_stock",
                 ingredient_name=ingredient.ingredient_name,
@@ -170,10 +173,7 @@ async def deduct_for_dish(
             transaction_type="consume",
             quantity=-consume_qty,
             unit_cost_fen=ingredient.unit_price_fen,
-            total_cost_fen=(
-                int(consume_qty * ingredient.unit_price_fen)
-                if ingredient.unit_price_fen else None
-            ),
+            total_cost_fen=(int(consume_qty * ingredient.unit_price_fen) if ingredient.unit_price_fen else None),
             quantity_before=old_qty,
             quantity_after=new_qty,
             performed_by="auto_deduction",
@@ -181,15 +181,17 @@ async def deduct_for_dish(
         )
         db.add(txn)
 
-        deducted.append({
-            "ingredient_id": str(ingredient.id),
-            "ingredient_name": ingredient.ingredient_name,
-            "consumed_qty": consume_qty,
-            "unit": ingredient.unit,
-            "stock_before": old_qty,
-            "stock_after": new_qty,
-            "transaction_id": str(txn.id),
-        })
+        deducted.append(
+            {
+                "ingredient_id": str(ingredient.id),
+                "ingredient_name": ingredient.ingredient_name,
+                "consumed_qty": consume_qty,
+                "unit": ingredient.unit,
+                "stock_before": old_qty,
+                "stock_after": new_qty,
+                "transaction_id": str(txn.id),
+            }
+        )
 
     await db.flush()
 
@@ -254,11 +256,13 @@ async def deduct_for_order(
             )
 
             if result["missing_bom"]:
-                all_missing_bom.append({
-                    "dish_id": dish_id,
-                    "item_name": item_name,
-                    "quantity": quantity,
-                })
+                all_missing_bom.append(
+                    {
+                        "dish_id": dish_id,
+                        "item_name": item_name,
+                        "quantity": quantity,
+                    }
+                )
             else:
                 for d in result["deducted"]:
                     d["order_id"] = order_id
@@ -373,10 +377,7 @@ async def rollback_deduction(
                 transaction_type="rollback",
                 quantity=restore_qty,
                 unit_cost_fen=txn.unit_cost_fen,
-                total_cost_fen=(
-                    int(restore_qty * txn.unit_cost_fen)
-                    if txn.unit_cost_fen else None
-                ),
+                total_cost_fen=(int(restore_qty * txn.unit_cost_fen) if txn.unit_cost_fen else None),
                 quantity_before=old_qty,
                 quantity_after=new_qty,
                 performed_by="auto_rollback",
@@ -388,13 +389,15 @@ async def rollback_deduction(
             # 标记原流水为已删除
             txn.is_deleted = True
 
-            restored_items.append({
-                "ingredient_id": str(ingredient.id),
-                "ingredient_name": ingredient.ingredient_name,
-                "restored_qty": restore_qty,
-                "stock_before": old_qty,
-                "stock_after": new_qty,
-            })
+            restored_items.append(
+                {
+                    "ingredient_id": str(ingredient.id),
+                    "ingredient_name": ingredient.ingredient_name,
+                    "restored_qty": restore_qty,
+                    "stock_before": old_qty,
+                    "stock_after": new_qty,
+                }
+            )
 
     await db.flush()
 

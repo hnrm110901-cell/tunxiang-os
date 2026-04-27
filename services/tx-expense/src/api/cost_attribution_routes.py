@@ -12,6 +12,7 @@
 金额约定：所有金额字段单位为分(fen)，1 元 = 100 分，展示层负责转换。
 所有查询显式传入 tenant_id，确保 RLS 安全隔离。
 """
+
 from __future__ import annotations
 
 import uuid
@@ -39,6 +40,7 @@ _VALID_COST_TYPES = {"food", "labor", "rent", "utility", "other", "manual_rule"}
 # 依赖注入
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 async def get_tenant_id(x_tenant_id: str = Header(..., alias="X-Tenant-ID")) -> UUID:
     try:
         return UUID(x_tenant_id)
@@ -56,6 +58,7 @@ async def get_current_user(x_user_id: str = Header(..., alias="X-User-ID")) -> U
 # ─────────────────────────────────────────────────────────────────────────────
 # Pydantic Schema
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class CreateRuleRequest(BaseModel):
     store_id: UUID = Field(..., description="门店ID")
@@ -80,6 +83,7 @@ class CalculateRequest(BaseModel):
 # 辅助
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def _ok(data: object) -> dict:
     return {"ok": True, "data": data, "error": None}
 
@@ -87,6 +91,7 @@ def _ok(data: object) -> dict:
 # ─────────────────────────────────────────────────────────────────────────────
 # GET /rules — 成本归集配置概览
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @router.get(
     "/rules",
@@ -101,7 +106,8 @@ async def list_rules(
 ):
     try:
         store_filter = "AND store_id = :store_id" if store_id else ""
-        r = await db.execute(text(f"""
+        r = await db.execute(
+            text(f"""
             SELECT
                 store_id::text,
                 cost_type,
@@ -116,29 +122,35 @@ async def list_rules(
               {store_filter}
             GROUP BY store_id, cost_type
             ORDER BY store_id, total_fen DESC
-        """), {
-            "tid": str(tenant_id),
-            "days": days,
-            **({"store_id": str(store_id)} if store_id else {}),
-        })
+        """),
+            {
+                "tid": str(tenant_id),
+                "days": days,
+                **({"store_id": str(store_id)} if store_id else {}),
+            },
+        )
         rows = r.mappings().all()
 
         configs = []
         for row in rows:
-            configs.append({
-                "store_id": row["store_id"],
-                "cost_type": row["cost_type"],
-                "record_count": int(row["record_count"]),
-                "total_fen": int(row["total_fen"]),
-                "avg_fen": int(row["avg_fen"]),
-                "last_updated_at": row["last_updated_at"].isoformat() if row["last_updated_at"] else None,
-            })
+            configs.append(
+                {
+                    "store_id": row["store_id"],
+                    "cost_type": row["cost_type"],
+                    "record_count": int(row["record_count"]),
+                    "total_fen": int(row["total_fen"]),
+                    "avg_fen": int(row["avg_fen"]),
+                    "last_updated_at": row["last_updated_at"].isoformat() if row["last_updated_at"] else None,
+                }
+            )
 
-        return _ok({
-            "days": days,
-            "total_configs": len(configs),
-            "configs": configs,
-        })
+        return _ok(
+            {
+                "days": days,
+                "total_configs": len(configs),
+                "configs": configs,
+            }
+        )
 
     except SQLAlchemyError as e:
         log.error("cost_attribution_list_rules_error", error=str(e), tenant_id=str(tenant_id))
@@ -148,6 +160,7 @@ async def list_rules(
 # ─────────────────────────────────────────────────────────────────────────────
 # POST /rules — 手工录入成本归集条目
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @router.post(
     "/rules",
@@ -162,15 +175,13 @@ async def create_rule(
     db: AsyncSession = Depends(get_db),
 ):
     if body.cost_type not in _VALID_COST_TYPES:
-        raise HTTPException(
-            status_code=400,
-            detail=f"无效的成本类型，允许值: {sorted(_VALID_COST_TYPES)}"
-        )
+        raise HTTPException(status_code=400, detail=f"无效的成本类型，允许值: {sorted(_VALID_COST_TYPES)}")
 
     item_id = uuid.uuid4()
     now = datetime.now(tz=timezone.utc)
     try:
-        await db.execute(text("""
+        await db.execute(
+            text("""
             INSERT INTO cost_attribution_items
               (id, tenant_id, report_id, expense_application_id, store_id,
                attribution_date, cost_type, amount_fen, description,
@@ -179,16 +190,18 @@ async def create_rule(
               (:id, :tid, NULL, NULL, :store_id,
                :attr_date, :cost_type, :amount_fen, :description,
                :now, :now, false)
-        """), {
-            "id": str(item_id),
-            "tid": str(tenant_id),
-            "store_id": str(body.store_id),
-            "attr_date": body.attribution_date,
-            "cost_type": body.cost_type,
-            "amount_fen": body.amount_fen,
-            "description": body.description,
-            "now": now,
-        })
+        """),
+            {
+                "id": str(item_id),
+                "tid": str(tenant_id),
+                "store_id": str(body.store_id),
+                "attr_date": body.attribution_date,
+                "cost_type": body.cost_type,
+                "amount_fen": body.amount_fen,
+                "description": body.description,
+                "now": now,
+            },
+        )
         await db.commit()
 
         log.info(
@@ -198,16 +211,18 @@ async def create_rule(
             cost_type=body.cost_type,
             amount_fen=body.amount_fen,
         )
-        return _ok({
-            "id": str(item_id),
-            "tenant_id": str(tenant_id),
-            "store_id": str(body.store_id),
-            "attribution_date": body.attribution_date.isoformat(),
-            "cost_type": body.cost_type,
-            "amount_fen": body.amount_fen,
-            "description": body.description,
-            "created_at": now.isoformat(),
-        })
+        return _ok(
+            {
+                "id": str(item_id),
+                "tenant_id": str(tenant_id),
+                "store_id": str(body.store_id),
+                "attribution_date": body.attribution_date.isoformat(),
+                "cost_type": body.cost_type,
+                "amount_fen": body.amount_fen,
+                "description": body.description,
+                "created_at": now.isoformat(),
+            }
+        )
 
     except SQLAlchemyError as e:
         await db.rollback()
@@ -218,6 +233,7 @@ async def create_rule(
 # ─────────────────────────────────────────────────────────────────────────────
 # PUT /rules/{rule_id} — 更新成本归集条目
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @router.put(
     "/rules/{rule_id}",
@@ -232,17 +248,17 @@ async def update_rule(
     db: AsyncSession = Depends(get_db),
 ):
     if body.cost_type and body.cost_type not in _VALID_COST_TYPES:
-        raise HTTPException(
-            status_code=400,
-            detail=f"无效的成本类型，允许值: {sorted(_VALID_COST_TYPES)}"
-        )
+        raise HTTPException(status_code=400, detail=f"无效的成本类型，允许值: {sorted(_VALID_COST_TYPES)}")
 
     try:
         # 验证归属
-        r = await db.execute(text("""
+        r = await db.execute(
+            text("""
             SELECT id FROM cost_attribution_items
             WHERE id = :rid AND tenant_id = :tid AND is_deleted = false
-        """), {"rid": str(rule_id), "tid": str(tenant_id)})
+        """),
+            {"rid": str(rule_id), "tid": str(tenant_id)},
+        )
         if not r.first():
             raise HTTPException(status_code=404, detail="成本归集条目不存在")
 
@@ -267,31 +283,39 @@ async def update_rule(
         if len(set_clauses) == 1:
             raise HTTPException(status_code=400, detail="没有可更新的字段")
 
-        await db.execute(text(f"""
+        await db.execute(
+            text(f"""
             UPDATE cost_attribution_items
-            SET {', '.join(set_clauses)}
+            SET {", ".join(set_clauses)}
             WHERE id = :rid AND tenant_id = :tid
-        """), params)
+        """),
+            params,
+        )
         await db.commit()
 
         # 返回更新后的记录
-        r = await db.execute(text("""
+        r = await db.execute(
+            text("""
             SELECT id::text, tenant_id::text, store_id::text,
                    attribution_date, cost_type, amount_fen, description, updated_at
             FROM cost_attribution_items
             WHERE id = :rid AND tenant_id = :tid
-        """), {"rid": str(rule_id), "tid": str(tenant_id)})
+        """),
+            {"rid": str(rule_id), "tid": str(tenant_id)},
+        )
         row = r.mappings().one()
 
-        return _ok({
-            "id": row["id"],
-            "store_id": row["store_id"],
-            "attribution_date": row["attribution_date"].isoformat(),
-            "cost_type": row["cost_type"],
-            "amount_fen": int(row["amount_fen"]),
-            "description": row["description"],
-            "updated_at": row["updated_at"].isoformat(),
-        })
+        return _ok(
+            {
+                "id": row["id"],
+                "store_id": row["store_id"],
+                "attribution_date": row["attribution_date"].isoformat(),
+                "cost_type": row["cost_type"],
+                "amount_fen": int(row["amount_fen"]),
+                "description": row["description"],
+                "updated_at": row["updated_at"].isoformat(),
+            }
+        )
 
     except HTTPException:
         raise
@@ -304,6 +328,7 @@ async def update_rule(
 # ─────────────────────────────────────────────────────────────────────────────
 # POST /calculate — 手动触发归因计算
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @router.post(
     "/calculate",
@@ -318,15 +343,18 @@ async def trigger_calculate(
 ):
     try:
         from ..workers import daily_cost_attribution as _worker
+
         if hasattr(_worker, "run_for_store"):
             result = await _worker.run_for_store(db, tenant_id, body.store_id, body.target_date)
-            return _ok({
-                "store_id": str(body.store_id),
-                "target_date": body.target_date.isoformat(),
-                "queued": False,
-                "result": result,
-                "message": "归因计算已完成",
-            })
+            return _ok(
+                {
+                    "store_id": str(body.store_id),
+                    "target_date": body.target_date.isoformat(),
+                    "queued": False,
+                    "result": result,
+                    "message": "归因计算已完成",
+                }
+            )
     except (ImportError, AttributeError) as e:
         log.warning("cost_attribution_worker_unavailable", error=str(e))
     except HTTPException:
@@ -342,17 +370,20 @@ async def trigger_calculate(
         store_id=str(body.store_id),
         target_date=str(body.target_date),
     )
-    return _ok({
-        "store_id": str(body.store_id),
-        "target_date": body.target_date.isoformat(),
-        "queued": True,
-        "message": "计算任务已加入队列，将在下一个调度周期执行",
-    })
+    return _ok(
+        {
+            "store_id": str(body.store_id),
+            "target_date": body.target_date.isoformat(),
+            "queued": True,
+            "message": "计算任务已加入队列，将在下一个调度周期执行",
+        }
+    )
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # GET /results — 成本归集日报列表
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @router.get(
     "/results",
@@ -396,7 +427,8 @@ async def list_results(
         total = int(r.scalar() or 0)
 
         # 日报列表 + 关联归集条目数
-        r = await db.execute(text(f"""
+        r = await db.execute(
+            text(f"""
             SELECT
                 d.id::text,
                 d.store_id::text,
@@ -423,37 +455,43 @@ async def list_results(
             WHERE {where}
             ORDER BY d.report_date DESC, d.store_id
             LIMIT :limit OFFSET :offset
-        """), params)
+        """),
+            params,
+        )
         rows = r.mappings().all()
 
         reports = []
         for row in rows:
-            reports.append({
-                "id": row["id"],
-                "store_id": row["store_id"],
-                "report_date": row["report_date"].isoformat(),
-                "total_revenue_fen": int(row["total_revenue_fen"]),
-                "food_cost_fen": int(row["food_cost_fen"]),
-                "labor_cost_fen": int(row["labor_cost_fen"]),
-                "other_cost_fen": int(row["other_cost_fen"]),
-                "total_cost_fen": int(row["total_cost_fen"]),
-                "food_cost_rate": float(row["food_cost_rate"]) if row["food_cost_rate"] else None,
-                "labor_cost_rate": float(row["labor_cost_rate"]) if row["labor_cost_rate"] else None,
-                "gross_margin_rate": float(row["gross_margin_rate"]) if row["gross_margin_rate"] else None,
-                "pos_data_source": row["pos_data_source"],
-                "data_status": row["data_status"],
-                "notes": row["notes"],
-                "attribution_item_count": int(row["attribution_item_count"]),
-                "created_at": row["created_at"].isoformat(),
-                "updated_at": row["updated_at"].isoformat(),
-            })
+            reports.append(
+                {
+                    "id": row["id"],
+                    "store_id": row["store_id"],
+                    "report_date": row["report_date"].isoformat(),
+                    "total_revenue_fen": int(row["total_revenue_fen"]),
+                    "food_cost_fen": int(row["food_cost_fen"]),
+                    "labor_cost_fen": int(row["labor_cost_fen"]),
+                    "other_cost_fen": int(row["other_cost_fen"]),
+                    "total_cost_fen": int(row["total_cost_fen"]),
+                    "food_cost_rate": float(row["food_cost_rate"]) if row["food_cost_rate"] else None,
+                    "labor_cost_rate": float(row["labor_cost_rate"]) if row["labor_cost_rate"] else None,
+                    "gross_margin_rate": float(row["gross_margin_rate"]) if row["gross_margin_rate"] else None,
+                    "pos_data_source": row["pos_data_source"],
+                    "data_status": row["data_status"],
+                    "notes": row["notes"],
+                    "attribution_item_count": int(row["attribution_item_count"]),
+                    "created_at": row["created_at"].isoformat(),
+                    "updated_at": row["updated_at"].isoformat(),
+                }
+            )
 
-        return _ok({
-            "total": total,
-            "limit": limit,
-            "offset": offset,
-            "reports": reports,
-        })
+        return _ok(
+            {
+                "total": total,
+                "limit": limit,
+                "offset": offset,
+                "reports": reports,
+            }
+        )
 
     except SQLAlchemyError as e:
         log.error("cost_attribution_list_results_error", error=str(e), tenant_id=str(tenant_id))
@@ -463,6 +501,7 @@ async def list_results(
 # ─────────────────────────────────────────────────────────────────────────────
 # GET /results/{result_id}/breakdown — 日报归集明细
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @router.get(
     "/results/{result_id}/breakdown",
@@ -476,19 +515,23 @@ async def get_result_breakdown(
 ):
     try:
         # 验证日报归属并获取摘要
-        r = await db.execute(text("""
+        r = await db.execute(
+            text("""
             SELECT id::text, store_id::text, report_date,
                    total_revenue_fen, total_cost_fen, data_status,
                    food_cost_rate, labor_cost_rate, gross_margin_rate
             FROM daily_cost_reports
             WHERE id = :rid AND tenant_id = :tid AND is_deleted = false
-        """), {"rid": str(result_id), "tid": str(tenant_id)})
+        """),
+            {"rid": str(result_id), "tid": str(tenant_id)},
+        )
         report_row = r.mappings().first()
         if not report_row:
             raise HTTPException(status_code=404, detail="成本归集日报不存在")
 
         # 归集明细（关联费控申请信息）
-        r = await db.execute(text("""
+        r = await db.execute(
+            text("""
             SELECT
                 c.id::text,
                 c.store_id::text,
@@ -509,7 +552,9 @@ async def get_result_breakdown(
               AND c.tenant_id = :tid
               AND c.is_deleted = false
             ORDER BY c.cost_type, c.amount_fen DESC
-        """), {"rid": str(result_id), "tid": str(tenant_id)})
+        """),
+            {"rid": str(result_id), "tid": str(tenant_id)},
+        )
         item_rows = r.mappings().all()
 
         # 按成本类型聚合
@@ -518,35 +563,41 @@ async def get_result_breakdown(
         for row in item_rows:
             ct = row["cost_type"] or "other"
             type_summary[ct] = type_summary.get(ct, 0) + int(row["amount_fen"])
-            items.append({
-                "id": row["id"],
-                "store_id": row["store_id"],
-                "attribution_date": row["attribution_date"].isoformat(),
-                "cost_type": row["cost_type"],
-                "amount_fen": int(row["amount_fen"]),
-                "description": row["description"],
-                "expense_application_id": row["expense_application_id"],
-                "expense_no": row["expense_no"],
-                "expense_title": row["expense_title"],
-                "created_at": row["created_at"].isoformat(),
-            })
+            items.append(
+                {
+                    "id": row["id"],
+                    "store_id": row["store_id"],
+                    "attribution_date": row["attribution_date"].isoformat(),
+                    "cost_type": row["cost_type"],
+                    "amount_fen": int(row["amount_fen"]),
+                    "description": row["description"],
+                    "expense_application_id": row["expense_application_id"],
+                    "expense_no": row["expense_no"],
+                    "expense_title": row["expense_title"],
+                    "created_at": row["created_at"].isoformat(),
+                }
+            )
 
-        return _ok({
-            "report": {
-                "id": report_row["id"],
-                "store_id": report_row["store_id"],
-                "report_date": report_row["report_date"].isoformat(),
-                "total_revenue_fen": int(report_row["total_revenue_fen"]),
-                "total_cost_fen": int(report_row["total_cost_fen"]),
-                "data_status": report_row["data_status"],
-                "food_cost_rate": float(report_row["food_cost_rate"]) if report_row["food_cost_rate"] else None,
-                "labor_cost_rate": float(report_row["labor_cost_rate"]) if report_row["labor_cost_rate"] else None,
-                "gross_margin_rate": float(report_row["gross_margin_rate"]) if report_row["gross_margin_rate"] else None,
-            },
-            "type_summary": type_summary,
-            "total_items": len(items),
-            "items": items,
-        })
+        return _ok(
+            {
+                "report": {
+                    "id": report_row["id"],
+                    "store_id": report_row["store_id"],
+                    "report_date": report_row["report_date"].isoformat(),
+                    "total_revenue_fen": int(report_row["total_revenue_fen"]),
+                    "total_cost_fen": int(report_row["total_cost_fen"]),
+                    "data_status": report_row["data_status"],
+                    "food_cost_rate": float(report_row["food_cost_rate"]) if report_row["food_cost_rate"] else None,
+                    "labor_cost_rate": float(report_row["labor_cost_rate"]) if report_row["labor_cost_rate"] else None,
+                    "gross_margin_rate": float(report_row["gross_margin_rate"])
+                    if report_row["gross_margin_rate"]
+                    else None,
+                },
+                "type_summary": type_summary,
+                "total_items": len(items),
+                "items": items,
+            }
+        )
 
     except HTTPException:
         raise

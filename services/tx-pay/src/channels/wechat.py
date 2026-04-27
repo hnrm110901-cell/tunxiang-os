@@ -11,6 +11,7 @@
 环境变量：
   WECHAT_PAY_MCH_ID / WECHAT_PAY_API_KEY_V3 / WECHAT_PAY_CERT_PATH / WECHAT_PAY_APPID
 """
+
 from __future__ import annotations
 
 import uuid
@@ -45,6 +46,7 @@ class WechatPayChannel(BasePaymentChannel):
         # 延迟导入：共享模块可能不存在
         try:
             from shared.integrations.wechat_pay import WechatPayService
+
             self._service = WechatPayService()
         except ImportError:
             self._service = None

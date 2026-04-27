@@ -5,18 +5,19 @@
                   running → paused → running（恢复）
          created/running/paused → cancelled
 """
+
 from __future__ import annotations
 
 import uuid
 from datetime import datetime, timezone
 
 import structlog
-from sqlalchemy import func, select, update
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..models.session_run import SessionRun
-from ..models.session_event import SessionEvent
 from ..models.session_checkpoint import SessionCheckpoint
+from ..models.session_event import SessionEvent
+from ..models.session_run import SessionRun
 
 logger = structlog.get_logger()
 
@@ -50,9 +51,7 @@ class SessionRuntimeService:
     # 内部辅助
     # ─────────────────────────────────────────────────────────────────────────
 
-    async def _get_session_or_raise(
-        self, tenant_id: str, session_id: uuid.UUID
-    ) -> SessionRun:
+    async def _get_session_or_raise(self, tenant_id: str, session_id: uuid.UUID) -> SessionRun:
         """获取 SessionRun，不存在时抛出 SessionNotFoundError。"""
         stmt = select(SessionRun).where(
             SessionRun.id == session_id,
@@ -62,9 +61,7 @@ class SessionRuntimeService:
         result = await self.db.execute(stmt)
         session_run = result.scalar_one_or_none()
         if session_run is None:
-            raise SessionNotFoundError(
-                f"Session {session_id} not found for tenant {tenant_id}"
-            )
+            raise SessionNotFoundError(f"Session {session_id} not found for tenant {tenant_id}")
         return session_run
 
     def _assert_transition(self, current: str, target: str) -> None:
@@ -85,9 +82,7 @@ class SessionRuntimeService:
 
     async def _next_sequence_no(self, session_id: uuid.UUID) -> int:
         """获取下一个事件序号。"""
-        stmt = select(func.coalesce(func.max(SessionEvent.sequence_no), 0)).where(
-            SessionEvent.session_id == session_id
-        )
+        stmt = select(func.coalesce(func.max(SessionEvent.sequence_no), 0)).where(SessionEvent.session_id == session_id)
         result = await self.db.execute(stmt)
         current_max: int = result.scalar_one()
         return current_max + 1
@@ -136,9 +131,7 @@ class SessionRuntimeService:
         )
         return session_run
 
-    async def start_session(
-        self, tenant_id: str, session_id: uuid.UUID
-    ) -> SessionRun:
+    async def start_session(self, tenant_id: str, session_id: uuid.UUID) -> SessionRun:
         """启动 Session（created → running）。设置 started_at。"""
         session_run = await self._get_session_or_raise(tenant_id, session_id)
         self._assert_transition(session_run.status, "running")
@@ -221,9 +214,7 @@ class SessionRuntimeService:
         result = await self.db.execute(stmt)
         checkpoint = result.scalar_one_or_none()
         if checkpoint is None:
-            raise SessionNotFoundError(
-                f"Checkpoint {checkpoint_id} not found for session {session_id}"
-            )
+            raise SessionNotFoundError(f"Checkpoint {checkpoint_id} not found for session {session_id}")
 
         now = datetime.now(timezone.utc)
         checkpoint.resolution = resolution
@@ -376,9 +367,7 @@ class SessionRuntimeService:
     # 查询
     # ─────────────────────────────────────────────────────────────────────────
 
-    async def get_session(
-        self, tenant_id: str, session_id: uuid.UUID
-    ) -> SessionRun | None:
+    async def get_session(self, tenant_id: str, session_id: uuid.UUID) -> SessionRun | None:
         """获取 Session 详情。"""
         stmt = select(SessionRun).where(
             SessionRun.id == session_id,

@@ -11,6 +11,7 @@
   - 采购到货 / 厨师手动恢复后可取消沽清
   - 恢复后同步到全链路
 """
+
 import os
 import uuid
 from datetime import datetime, timezone
@@ -172,6 +173,7 @@ async def get_active_soldout(
 
 
 # ─── 内部同步逻辑 ───
+
 
 async def _sync_soldout_to_all(
     record_id: str,

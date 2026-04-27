@@ -19,6 +19,7 @@
 
 所有接口需要 X-Tenant-ID header。
 """
+
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
@@ -46,6 +47,7 @@ router = APIRouter(prefix="/api/v1/production-depts", tags=["production-depts"])
 
 # ─── 公共依赖 ───
 
+
 def _get_tenant_id(request: Request) -> str:
     tid = getattr(request.state, "tenant_id", None) or request.headers.get("X-Tenant-ID", "")
     if not tid:
@@ -58,6 +60,7 @@ def _ok(data) -> dict:
 
 
 # ─── 请求/响应 Schemas ───
+
 
 class CreateDeptReq(BaseModel):
     brand_id: str = Field(description="品牌ID")
@@ -145,6 +148,7 @@ def _mapping_to_dict(m) -> dict:
 
 
 # ─── 档口 CRUD ───
+
 
 @router.post("")
 async def api_create_production_dept(
@@ -297,6 +301,7 @@ async def api_delete_production_dept(
 
 # ─── 菜品-档口映射管理 ───
 
+
 @router.post("/dish-mappings")
 async def api_set_dish_mapping(
     body: SetDishMappingReq,
@@ -367,10 +372,12 @@ async def api_batch_set_dish_mappings(
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    return _ok({
-        "created_count": len(results),
-        "items": [_mapping_to_dict(m) for m in results],
-    })
+    return _ok(
+        {
+            "created_count": len(results),
+            "items": [_mapping_to_dict(m) for m in results],
+        }
+    )
 
 
 @router.delete("/dish-mappings/{dish_id}")
@@ -414,9 +421,11 @@ async def api_list_dept_dishes(
         size=size,
     )
 
-    return _ok({
-        "items": [_mapping_to_dict(m) for m in items],
-        "total": total,
-        "page": page,
-        "size": size,
-    })
+    return _ok(
+        {
+            "items": [_mapping_to_dict(m) for m in items],
+            "total": total,
+            "page": page,
+            "size": size,
+        }
+    )

@@ -12,6 +12,7 @@
 9.  GET  /api/v1/journey/enrollments           — 正常路径返回 items/total
 10. POST /api/v1/journey/definitions/import_template — 不存在的模板名 → 404
 """
+
 import os
 import sys
 
@@ -21,7 +22,6 @@ import uuid
 from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
@@ -42,8 +42,10 @@ _STEP = {
 
 # ── DB mock 工厂 ────────────────────────────────────────────────────────────
 
+
 class _FakeRow:
     """模拟 SQLAlchemy fetchone/fetchall row"""
+
     def __init__(self, values: list):
         self._values = values
 
@@ -75,6 +77,7 @@ _fake_engine.handle_event = AsyncMock(return_value={"enrollments_created": 0})
 
 # patch templates 模块
 import types as _types
+
 _fake_templates_mod = _types.ModuleType("templates.journey_templates")
 _fake_templates_mod.TEMPLATES = {
     "first_visit_welcome": {
@@ -107,24 +110,27 @@ _NOW = datetime(2026, 4, 4, 10, 0, tzinfo=timezone.utc)
 
 
 def _journey_row():
-    return _FakeRow([
-        uuid.UUID(_JOURNEY_ID),         # id
-        "测试旅程",                      # name
-        "旅程描述",                      # description
-        "first_visit",                  # trigger_event
-        [],                             # trigger_conditions
-        [_STEP],                        # steps
-        "new_customer",                 # target_segment
-        False,                          # is_active
-        1,                              # version
-        _NOW,                           # created_at
-        _NOW,                           # updated_at
-    ])
+    return _FakeRow(
+        [
+            uuid.UUID(_JOURNEY_ID),  # id
+            "测试旅程",  # name
+            "旅程描述",  # description
+            "first_visit",  # trigger_event
+            [],  # trigger_conditions
+            [_STEP],  # steps
+            "new_customer",  # target_segment
+            False,  # is_active
+            1,  # version
+            _NOW,  # created_at
+            _NOW,  # updated_at
+        ]
+    )
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 场景 1: GET /definitions — 正常路径
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 def test_list_journey_definitions_ok():
     """返回 items 列表和 total 字段"""
@@ -151,6 +157,7 @@ def test_list_journey_definitions_ok():
 # 场景 2: GET /definitions — 非法 Tenant-ID → 400
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_list_definitions_bad_tenant():
     """X-Tenant-ID 非 UUID 格式时返回 400"""
     resp = client.get("/api/v1/journey/definitions", headers=_BAD_HEADERS)
@@ -160,6 +167,7 @@ def test_list_definitions_bad_tenant():
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 场景 3: POST /definitions — 正常创建
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 def test_create_journey_definition_ok():
     """正常创建旅程，返回 id 和 is_active=False"""
@@ -192,6 +200,7 @@ def test_create_journey_definition_ok():
 # 场景 4: POST /definitions — 缺少 name → 422
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_create_definition_missing_name():
     """name 为必填，缺少时应返回 422"""
     resp = client.post(
@@ -205,6 +214,7 @@ def test_create_definition_missing_name():
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 场景 5: POST /definitions — steps 为空 → 422
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 def test_create_definition_empty_steps():
     """steps 为空时，业务层校验应返回 422"""
@@ -220,6 +230,7 @@ def test_create_definition_empty_steps():
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 场景 6: GET /definitions/{id} — 存在时返回详情
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 def test_get_journey_definition_ok():
     """旅程存在时返回完整字段"""
@@ -251,6 +262,7 @@ def test_get_journey_definition_ok():
 # 场景 7: GET /definitions/{id} — 不存在时返回 404
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_get_journey_definition_not_found():
     """旅程不存在时返回 404"""
     with patch("api.journey_routes.async_session_factory") as mock_factory:
@@ -274,6 +286,7 @@ def test_get_journey_definition_not_found():
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 场景 8: DELETE /definitions/{id} — 软删除成功
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 def test_delete_journey_definition_ok():
     """软删除成功，返回 deleted=True"""
@@ -304,6 +317,7 @@ def test_delete_journey_definition_ok():
 # 场景 9: GET /enrollments — 正常路径
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_list_enrollments_ok():
     """返回 items/total 分页结构"""
     count_result = AsyncMock()
@@ -331,6 +345,7 @@ def test_list_enrollments_ok():
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 场景 10: POST /definitions/import_template — 模板不存在 → 404
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 def test_import_template_not_found():
     """导入不存在的模板名称，应返回 404"""

@@ -4,6 +4,7 @@
   1. Mock 模式 — SDK 未注入或调用失败时自动降级
   2. Real 模式 — 通过 WeComSDK / DingTalkSDK 调用真实 API
 """
+
 from __future__ import annotations
 
 import uuid
@@ -327,9 +328,7 @@ async def diff_employees(
         raise ValueError(f"不支持的 provider: {provider}")
     await _set_tenant(db, tenant_id)
     tid = uuid.UUID(tenant_id)
-    result = await db.execute(
-        select(Employee).where(Employee.tenant_id == tid).where(Employee.is_deleted.is_(False))
-    )
+    result = await db.execute(select(Employee).where(Employee.tenant_id == tid).where(Employee.is_deleted.is_(False)))
     employees = list(result.scalars().all())
     by_phone: dict[str, Employee] = {}
     for emp in employees:

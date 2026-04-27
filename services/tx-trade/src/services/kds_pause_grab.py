@@ -8,6 +8,7 @@
   厨师主动抢取 pending 任务，实现多劳多得激励机制。
   抢单记录到 grabbed_by 字段，作为绩效计件的归属依据。
 """
+
 import uuid
 from datetime import datetime, timezone
 from typing import Optional
@@ -22,6 +23,7 @@ logger = structlog.get_logger()
 
 # ─── 停菜操作 ───
 
+
 async def pause_task(
     task_id: str,
     operator_id: Optional[str],
@@ -32,9 +34,7 @@ async def pause_task(
     适用状态：cooking（已开始制作）
     目标状态：cooking + is_paused=True（状态不变，加停菜标记）
     """
-    result = await db.execute(
-        select(KDSTask).where(KDSTask.id == uuid.UUID(task_id))
-    )
+    result = await db.execute(select(KDSTask).where(KDSTask.id == uuid.UUID(task_id)))
     task = result.scalar_one_or_none()
     if task is None:
         raise ValueError(f"task_id={task_id} 不存在")
@@ -70,9 +70,7 @@ async def resume_task(
     db: AsyncSession,
 ) -> dict:
     """恢复停菜：解除暂停标记，任务重新进入出品队列。"""
-    result = await db.execute(
-        select(KDSTask).where(KDSTask.id == uuid.UUID(task_id))
-    )
+    result = await db.execute(select(KDSTask).where(KDSTask.id == uuid.UUID(task_id)))
     task = result.scalar_one_or_none()
     if task is None:
         raise ValueError(f"task_id={task_id} 不存在")
@@ -102,6 +100,7 @@ async def resume_task(
 
 # ─── 抢单操作 ───
 
+
 async def grab_task(
     task_id: str,
     operator_id: str,
@@ -112,9 +111,7 @@ async def grab_task(
     先到先得：若已被抢走则返回错误提示抢单者。
     同时将 grabbed_by 写入 operator_id，作为绩效归属依据。
     """
-    result = await db.execute(
-        select(KDSTask).where(KDSTask.id == uuid.UUID(task_id))
-    )
+    result = await db.execute(select(KDSTask).where(KDSTask.id == uuid.UUID(task_id)))
     task = result.scalar_one_or_none()
     if task is None:
         raise ValueError(f"task_id={task_id} 不存在")

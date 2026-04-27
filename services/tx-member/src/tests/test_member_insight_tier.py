@@ -32,13 +32,13 @@ invoice_routes.py（3个）：
 17. POST /api/v1/member/invoice-titles         — 缺少 customer_id → 422
 18. GET  /api/v1/member/invoices               — 正常历史发票（空）
 """
+
 import os
 import sys
 import types
 import uuid
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
@@ -47,6 +47,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 
 # ─── 存根注入 ──────────────────────────────────────────────────────────────
+
 
 def _inject_stubs():
     # shared.ontology.src.database
@@ -115,6 +116,7 @@ _MOCK_RFM_UPDATER, _MOCK_PBS = _inject_stubs()
 
 # ─── 辅助 ─────────────────────────────────────────────────────────────────
 
+
 def _uid() -> str:
     return str(uuid.uuid4())
 
@@ -142,6 +144,7 @@ rewards_app.include_router(rewards_mod.router)
 def _rewards_override(db_mock):
     async def _dep():
         return db_mock
+
     rewards_app.dependency_overrides[rewards_mod.get_db] = _dep
 
 
@@ -154,6 +157,7 @@ rfm_app.include_router(rfm_mod.router)
 def _rfm_override(db_mock):
     async def _dep():
         return db_mock
+
     rfm_app.dependency_overrides[rfm_mod.get_db] = _dep
 
 
@@ -166,6 +170,7 @@ tier_app.include_router(tier_mod.router)
 def _tier_override(db_mock):
     async def _dep():
         return db_mock
+
     tier_app.dependency_overrides[tier_mod.get_db] = _dep
 
 
@@ -186,12 +191,14 @@ invoice_app.include_router(invoice_mod.router)
 def _invoice_override(db_mock):
     async def _dep():
         return db_mock
+
     invoice_app.dependency_overrides[invoice_mod.get_db] = _dep
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # ★ member_insight_routes — 3 个测试
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 # 场景 1: POST generate — 正常生成
 def test_insight_generate_ok():
@@ -222,8 +229,14 @@ def test_insight_latest_cache_hit():
     fake_insight = {
         "member_id": member_id,
         "generated_at": "2026-01-01T00:00:00+00:00",
-        "profile": {"visit_count": 10, "last_visit": "2026-01-01", "avg_spend_fen": 30000,
-                    "favorite_dishes": [], "avoided_items": [], "preferences": []},
+        "profile": {
+            "visit_count": 10,
+            "last_visit": "2026-01-01",
+            "avg_spend_fen": 30000,
+            "favorite_dishes": [],
+            "avoided_items": [],
+            "preferences": [],
+        },
         "alerts": [],
         "suggestions": [],
         "service_tips": "test tip",
@@ -258,6 +271,7 @@ def test_insight_latest_cache_miss():
 # ★ rewards_routes — 3 个测试
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 # 场景 4: GET / — 正常商品列表（空）
 def test_rewards_list_ok():
     """商品列表正常查询，返回 ok=True 和空列表。"""
@@ -266,11 +280,13 @@ def test_rewards_list_ok():
     cnt_result.scalar.return_value = 0
     rows_result = MagicMock()
     rows_result.all.return_value = []
-    db.execute = AsyncMock(side_effect=[
-        MagicMock(),    # _set_rls (set_config)
-        cnt_result,     # COUNT(*)
-        rows_result,    # SELECT items
-    ])
+    db.execute = AsyncMock(
+        side_effect=[
+            MagicMock(),  # _set_rls (set_config)
+            cnt_result,  # COUNT(*)
+            rows_result,  # SELECT items
+        ]
+    )
     _rewards_override(db)
 
     client = TestClient(rewards_app)
@@ -288,10 +304,12 @@ def test_rewards_redeem_not_found():
     db = AsyncMock()
     product_result = MagicMock()
     product_result.first.return_value = None
-    db.execute = AsyncMock(side_effect=[
-        MagicMock(),       # _set_rls
-        product_result,    # SELECT product FOR UPDATE
-    ])
+    db.execute = AsyncMock(
+        side_effect=[
+            MagicMock(),  # _set_rls
+            product_result,  # SELECT product FOR UPDATE
+        ]
+    )
     _rewards_override(db)
 
     client = TestClient(rewards_app)
@@ -320,11 +338,13 @@ def test_rewards_redeem_insufficient_points():
     card_result = MagicMock()
     card_result.first.return_value = card_row
 
-    db.execute = AsyncMock(side_effect=[
-        MagicMock(),       # _set_rls
-        product_result,    # SELECT product FOR UPDATE
-        card_result,       # SELECT member_cards FOR UPDATE
-    ])
+    db.execute = AsyncMock(
+        side_effect=[
+            MagicMock(),  # _set_rls
+            product_result,  # SELECT product FOR UPDATE
+            card_result,  # SELECT member_cards FOR UPDATE
+        ]
+    )
     _rewards_override(db)
 
     client = TestClient(rewards_app)
@@ -343,6 +363,7 @@ def test_rewards_redeem_insufficient_points():
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # ★ rfm_routes — 3 个测试
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 # 场景 7: POST /trigger-update — 正常触发
 def test_rfm_trigger_update_ok():
@@ -385,7 +406,7 @@ def test_rfm_distribution_ok():
     assert body["ok"] is True
     levels = [d["level"] for d in body["data"]["distribution"]]
     assert "S1" in levels
-    assert "S3" in levels   # 补全缺失等级
+    assert "S3" in levels  # 补全缺失等级
 
 
 # 场景 9: GET /changes — 正常今日变化（空，降级查询）
@@ -417,6 +438,7 @@ def test_rfm_changes_ok():
 # ★ tier_routes — 3 个测试
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 # 场景 10: GET /tiers — 正常等级列表
 def test_tier_list_ok():
     """查询等级列表正常返回 ok=True。"""
@@ -441,7 +463,7 @@ def test_tier_create_missing_name():
     client = TestClient(tier_app)
     resp = client.post(
         "/api/v1/member/tiers",
-        json={"level": 2},   # 缺少 name
+        json={"level": 2},  # 缺少 name
         headers=HEADERS,
     )
     assert resp.status_code == 422
@@ -469,6 +491,7 @@ def test_tier_get_not_found():
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # ★ platform_routes — 3 个测试
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 # 场景 13: POST /platform/meituan/order — 无效租户ID → 400
 def test_platform_meituan_invalid_tenant():
@@ -541,6 +564,7 @@ def test_platform_stats_ok():
 # ★ invoice_routes — 3 个测试
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 # 场景 16: GET /invoice-titles — 正常列表
 def test_invoice_titles_list_ok():
     """查询发票抬头列表，返回 ok=True 和空列表。"""
@@ -569,7 +593,7 @@ def test_invoice_title_create_missing_field():
     client = TestClient(invoice_app)
     resp = client.post(
         "/api/v1/member/invoice-titles",
-        json={"title": "张三", "type": "personal"},   # 缺少 customer_id
+        json={"title": "张三", "type": "personal"},  # 缺少 customer_id
         headers=HEADERS,
     )
     assert resp.status_code == 422
@@ -583,11 +607,13 @@ def test_invoices_list_ok():
     cnt_result.scalar.return_value = 0
     rows_result = MagicMock()
     rows_result.all.return_value = []
-    db.execute = AsyncMock(side_effect=[
-        MagicMock(),    # _set_rls
-        cnt_result,     # COUNT(*)
-        rows_result,    # SELECT items
-    ])
+    db.execute = AsyncMock(
+        side_effect=[
+            MagicMock(),  # _set_rls
+            cnt_result,  # COUNT(*)
+            rows_result,  # SELECT items
+        ]
+    )
     _invoice_override(db)
 
     client = TestClient(invoice_app)

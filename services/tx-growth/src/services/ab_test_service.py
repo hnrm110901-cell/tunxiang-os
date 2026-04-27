@@ -12,6 +12,7 @@
 
 金额单位：分(fen)
 """
+
 import hashlib
 import math
 import uuid
@@ -31,9 +32,9 @@ log = structlog.get_logger(__name__)
 # ---------------------------------------------------------------------------
 
 _VALID_TRANSITIONS: dict[str, list[str]] = {
-    "draft":     ["running"],
-    "running":   ["paused", "completed"],
-    "paused":    ["running", "completed"],
+    "draft": ["running"],
+    "running": ["paused", "completed"],
+    "paused": ["running", "completed"],
     "completed": [],
 }
 
@@ -44,6 +45,7 @@ _RFM_GROUP_A: frozenset[str] = frozenset({"S1", "S2"})
 # ---------------------------------------------------------------------------
 # 工具函数
 # ---------------------------------------------------------------------------
+
 
 def _stable_hash(value: str) -> int:
     """对字符串取 MD5 前8字节，转为无符号整数（用于稳定幂等分组）。"""
@@ -60,9 +62,7 @@ def _norm_cdf(z: float) -> float:
     return 0.5 * math.erfc(-z / math.sqrt(2))
 
 
-def _two_proportion_z_test(
-    n1: int, conv1: int, n2: int, conv2: int
-) -> tuple[float, float]:
+def _two_proportion_z_test(n1: int, conv1: int, n2: int, conv2: int) -> tuple[float, float]:
     """双比例 Z 检验，返回 (z_value, p_value)。
 
     Args:
@@ -99,6 +99,7 @@ def _two_proportion_z_test(
 # ---------------------------------------------------------------------------
 # ABTestService
 # ---------------------------------------------------------------------------
+
 
 class ABTestService:
     """AB测试服务 — 实验全生命周期管理"""
@@ -138,9 +139,7 @@ class ABTestService:
 
         total_weight = sum(v.get("weight", 0) for v in variants)
         if total_weight != 100:
-            raise ValueError(
-                f"变体权重之和必须为 100，当前为 {total_weight}"
-            )
+            raise ValueError(f"变体权重之和必须为 100，当前为 {total_weight}")
 
         # 验证每个变体都有 variant 字段
         for v in variants:
@@ -149,9 +148,7 @@ class ABTestService:
 
         split_type = test_data.get("split_type", "random")
         if split_type not in ("random", "rfm_based", "store_based"):
-            raise ValueError(
-                f"不支持的分流类型: {split_type}，支持: random | rfm_based | store_based"
-            )
+            raise ValueError(f"不支持的分流类型: {split_type}，支持: random | rfm_based | store_based")
 
         test = ABTest(
             tenant_id=tenant_id,
@@ -224,9 +221,7 @@ class ABTestService:
         if test is None:
             raise ValueError(f"AB测试不存在: {test_id}")
         if test.status != "running":
-            raise ValueError(
-                f"AB测试未在运行中（当前状态: {test.status}），无法分配变体"
-            )
+            raise ValueError(f"AB测试未在运行中（当前状态: {test.status}），无法分配变体")
 
         # 2. 检查是否已有分配记录
         existing_stmt = select(ABTestAssignment).where(
@@ -274,9 +269,7 @@ class ABTestService:
                 updated_at=now,
                 is_deleted=False,
             )
-            .on_conflict_do_nothing(
-                constraint="uq_ab_test_assignments_test_customer"
-            )
+            .on_conflict_do_nothing(constraint="uq_ab_test_assignments_test_customer")
         )
         await db.execute(insert_stmt)
 
@@ -462,9 +455,7 @@ class ABTestService:
             variant_stats[vname]["sample_size"] += 1
             if assignment.is_converted:
                 variant_stats[vname]["conversions"] += 1
-                variant_stats[vname]["total_revenue_fen"] += (
-                    assignment.order_amount_fen or 0
-                )
+                variant_stats[vname]["total_revenue_fen"] += assignment.order_amount_fen or 0
 
         # 计算派生指标
         variants_output: list[dict[str, Any]] = []
@@ -474,14 +465,16 @@ class ABTestService:
             rev = stats["total_revenue_fen"]
             conversion_rate = round(conv / n, 4) if n > 0 else 0.0
             avg_order = rev // conv if conv > 0 else 0
-            variants_output.append({
-                "variant": vname,
-                "sample_size": n,
-                "conversions": conv,
-                "conversion_rate": conversion_rate,
-                "avg_order_amount_fen": avg_order,
-                "total_revenue_fen": rev,
-            })
+            variants_output.append(
+                {
+                    "variant": vname,
+                    "sample_size": n,
+                    "conversions": conv,
+                    "conversion_rate": conversion_rate,
+                    "avg_order_amount_fen": avg_order,
+                    "total_revenue_fen": rev,
+                }
+            )
 
         # 对有序变体排列（A 在前）
         variants_output.sort(key=lambda x: x["variant"])
@@ -513,20 +506,20 @@ class ABTestService:
                             winner = "A"
                             lift_pct = round(
                                 (va["conversion_rate"] - vb["conversion_rate"])
-                                / max(vb["conversion_rate"], 1e-9) * 100, 1
+                                / max(vb["conversion_rate"], 1e-9)
+                                * 100,
+                                1,
                             )
-                            recommendation = (
-                                f"A组转化率高于B组 {lift_pct}%，建议全量推广A版本"
-                            )
+                            recommendation = f"A组转化率高于B组 {lift_pct}%，建议全量推广A版本"
                         else:
                             winner = "B"
                             lift_pct = round(
                                 (vb["conversion_rate"] - va["conversion_rate"])
-                                / max(va["conversion_rate"], 1e-9) * 100, 1
+                                / max(va["conversion_rate"], 1e-9)
+                                * 100,
+                                1,
                             )
-                            recommendation = (
-                                f"B组转化率提升 {lift_pct}%，建议全量推广B版本"
-                            )
+                            recommendation = f"B组转化率提升 {lift_pct}%，建议全量推广B版本"
                     else:
                         confidence_pct = round((1.0 - p_value) * 100, 1)
                         recommendation = (
@@ -535,10 +528,7 @@ class ABTestService:
                         )
                 else:
                     min_needed = test.min_sample_size
-                    recommendation = (
-                        f"样本量不足（需每组至少 {min_needed}，"
-                        f"当前 A={n1}, B={n2}），继续收集数据"
-                    )
+                    recommendation = f"样本量不足（需每组至少 {min_needed}，当前 A={n1}, B={n2}），继续收集数据"
 
         return {
             "test_id": str(test_id),
@@ -717,22 +707,24 @@ class ABTestService:
             total = len(assignments)
             converted = sum(1 for a in assignments if a.is_converted)
 
-            output.append({
-                "test_id": str(test.id),
-                "name": test.name,
-                "status": test.status,
-                "split_type": test.split_type,
-                "primary_metric": test.primary_metric,
-                "campaign_id": test.campaign_id,
-                "journey_id": test.journey_id,
-                "started_at": test.started_at.isoformat() if test.started_at else None,
-                "ended_at": test.ended_at.isoformat() if test.ended_at else None,
-                "winner_variant": test.winner_variant,
-                "total_assignments": total,
-                "total_conversions": converted,
-                "overall_conversion_rate": round(converted / total, 4) if total > 0 else 0.0,
-                "created_at": test.created_at.isoformat(),
-            })
+            output.append(
+                {
+                    "test_id": str(test.id),
+                    "name": test.name,
+                    "status": test.status,
+                    "split_type": test.split_type,
+                    "primary_metric": test.primary_metric,
+                    "campaign_id": test.campaign_id,
+                    "journey_id": test.journey_id,
+                    "started_at": test.started_at.isoformat() if test.started_at else None,
+                    "ended_at": test.ended_at.isoformat() if test.ended_at else None,
+                    "winner_variant": test.winner_variant,
+                    "total_assignments": total,
+                    "total_conversions": converted,
+                    "overall_conversion_rate": round(converted / total, 4) if total > 0 else 0.0,
+                    "created_at": test.created_at.isoformat(),
+                }
+            )
 
         return output
 
@@ -766,9 +758,7 @@ class ABTestService:
 
         allowed = _VALID_TRANSITIONS.get(test.status, [])
         if new_status not in allowed:
-            raise ValueError(
-                f"状态 {test.status} 不允许转换为 {new_status}（允许: {allowed}）"
-            )
+            raise ValueError(f"状态 {test.status} 不允许转换为 {new_status}（允许: {allowed}）")
 
         values: dict[str, Any] = {
             "status": new_status,
@@ -777,11 +767,7 @@ class ABTestService:
         if extra_values:
             values.update(extra_values)
 
-        await db.execute(
-            update(ABTest)
-            .where(ABTest.tenant_id == tenant_id, ABTest.id == test_id)
-            .values(**values)
-        )
+        await db.execute(update(ABTest).where(ABTest.tenant_id == tenant_id, ABTest.id == test_id).values(**values))
         await db.refresh(test)
 
         log.info(
@@ -802,7 +788,10 @@ class ABTestService:
         """启动测试（draft → running）。"""
         now = datetime.now(timezone.utc)
         return await self._transition_status(
-            test_id, tenant_id, "running", db,
+            test_id,
+            tenant_id,
+            "running",
+            db,
             extra_values={"started_at": now},
         )
 
@@ -829,7 +818,10 @@ class ABTestService:
         """
         now = datetime.now(timezone.utc)
         return await self._transition_status(
-            test_id, tenant_id, "completed", db,
+            test_id,
+            tenant_id,
+            "completed",
+            db,
             extra_values={
                 "winner_variant": winner_variant,
                 "ended_at": now,

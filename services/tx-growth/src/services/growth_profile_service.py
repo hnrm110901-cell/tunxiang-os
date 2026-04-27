@@ -3,9 +3,8 @@
 金额单位：分(fen)
 存储层：PostgreSQL customer_growth_profiles 表
 """
+
 import asyncio
-import json
-from datetime import datetime, timezone
 from typing import Optional
 from uuid import UUID
 
@@ -92,9 +91,7 @@ class GrowthProfileService:
     # 查询
     # ------------------------------------------------------------------
 
-    async def get_profile(
-        self, customer_id: UUID, tenant_id: str, db: AsyncSession
-    ) -> Optional[dict]:
+    async def get_profile(self, customer_id: UUID, tenant_id: str, db: AsyncSession) -> Optional[dict]:
         """获取客户增长画像"""
         await self._set_tenant(db, tenant_id)
         result = await db.execute(
@@ -122,9 +119,7 @@ class GrowthProfileService:
     # 创建/更新
     # ------------------------------------------------------------------
 
-    async def upsert_profile(
-        self, customer_id: UUID, data: dict, tenant_id: str, db: AsyncSession
-    ) -> dict:
+    async def upsert_profile(self, customer_id: UUID, data: dict, tenant_id: str, db: AsyncSession) -> dict:
         """创建或更新客户增长画像（INSERT ON CONFLICT UPDATE）"""
         await self._set_tenant(db, tenant_id)
 
@@ -214,9 +209,7 @@ class GrowthProfileService:
     # 复购阶段更新（带状态机校验）
     # ------------------------------------------------------------------
 
-    async def update_repurchase_stage(
-        self, customer_id: UUID, stage: str, tenant_id: str, db: AsyncSession
-    ) -> dict:
+    async def update_repurchase_stage(self, customer_id: UUID, stage: str, tenant_id: str, db: AsyncSession) -> dict:
         """更新复购阶段（带状态机校验）
 
         状态流转: not_started -> first_order_done -> second_order_done -> stable_repeat
@@ -414,9 +407,7 @@ class GrowthProfileService:
     # 批量检测沉默客户
     # ------------------------------------------------------------------
 
-    async def batch_detect_silent(
-        self, tenant_id: str, db: AsyncSession
-    ) -> dict:
+    async def batch_detect_silent(self, tenant_id: str, db: AsyncSession) -> dict:
         """批量检测沉默客户，更新reactivation_priority
 
         规则:
@@ -541,9 +532,7 @@ class GrowthProfileService:
     # P1: 心理距离分层计算
     # ------------------------------------------------------------------
 
-    async def batch_compute_psych_distance(
-        self, tenant_id: str, db: AsyncSession
-    ) -> dict:
+    async def batch_compute_psych_distance(self, tenant_id: str, db: AsyncSession) -> dict:
         """批量计算客户心理距离分层
 
         规则（基于最后互动时间，互动=消费/触达打开/触达回复）:
@@ -556,7 +545,8 @@ class GrowthProfileService:
         await self._set_tenant(db, tenant_id)
 
         # 计算最后互动时间 = MAX(last_order_at, last_growth_touch_at, 最后打开触达时间)
-        result = await db.execute(text("""
+        result = await db.execute(
+            text("""
             WITH last_interaction AS (
                 SELECT
                     cgp.customer_id,
@@ -583,7 +573,8 @@ class GrowthProfileService:
             FROM last_interaction li
             WHERE cgp.customer_id = li.customer_id AND cgp.is_deleted = FALSE
             RETURNING cgp.customer_id, cgp.psych_distance_level
-        """))
+        """)
+        )
         rows = result.fetchall()
 
         dist: dict[str, int] = {}
@@ -598,9 +589,7 @@ class GrowthProfileService:
     # P1: 超级用户分层计算
     # ------------------------------------------------------------------
 
-    async def batch_compute_super_user(
-        self, tenant_id: str, db: AsyncSession
-    ) -> dict:
+    async def batch_compute_super_user(self, tenant_id: str, db: AsyncSession) -> dict:
         """批量计算超级用户分层
 
         规则:
@@ -612,21 +601,24 @@ class GrowthProfileService:
         await self._set_tenant(db, tenant_id)
 
         # 先算CLV百分位阈值
-        percentiles = await db.execute(text("""
+        percentiles = await db.execute(
+            text("""
             SELECT
                 PERCENTILE_CONT(0.97) WITHIN GROUP (ORDER BY c.total_order_amount_fen) AS p97,
                 PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY c.total_order_amount_fen) AS p95,
                 PERCENTILE_CONT(0.90) WITHIN GROUP (ORDER BY c.total_order_amount_fen) AS p90
             FROM customers c
             WHERE c.is_deleted = FALSE AND c.total_order_count > 0
-        """))
+        """)
+        )
         p = percentiles.fetchone()
         if not p or p[0] is None:
             return {"total_updated": 0, "distribution": {}}
 
         p97, p95, p90 = int(p[0] or 0), int(p[1] or 0), int(p[2] or 0)
 
-        result = await db.execute(text("""
+        result = await db.execute(
+            text("""
             UPDATE customer_growth_profiles cgp SET
                 super_user_level = CASE
                     WHEN c.total_order_amount_fen >= :p97 AND c.total_order_count >= 24 THEN 'advocate'
@@ -638,7 +630,9 @@ class GrowthProfileService:
             FROM customers c
             WHERE c.id = cgp.customer_id AND cgp.is_deleted = FALSE AND c.is_deleted = FALSE
             RETURNING cgp.customer_id, cgp.super_user_level
-        """), {"p97": p97, "p95": p95, "p90": p90})
+        """),
+            {"p97": p97, "p95": p95, "p90": p90},
+        )
 
         rows = result.fetchall()
         dist: dict[str, int] = {}
@@ -653,9 +647,7 @@ class GrowthProfileService:
     # P1: 成长里程碑计算
     # ------------------------------------------------------------------
 
-    async def batch_compute_milestones(
-        self, tenant_id: str, db: AsyncSession
-    ) -> dict:
+    async def batch_compute_milestones(self, tenant_id: str, db: AsyncSession) -> dict:
         """批量计算成长里程碑
 
         规则基于消费次数:
@@ -667,7 +659,8 @@ class GrowthProfileService:
         """
         await self._set_tenant(db, tenant_id)
 
-        result = await db.execute(text("""
+        result = await db.execute(
+            text("""
             UPDATE customer_growth_profiles cgp SET
                 growth_milestone_stage = CASE
                     WHEN c.total_order_count >= 24 THEN 'legend'
@@ -681,7 +674,8 @@ class GrowthProfileService:
             FROM customers c
             WHERE c.id = cgp.customer_id AND cgp.is_deleted = FALSE AND c.is_deleted = FALSE
             RETURNING cgp.customer_id, cgp.growth_milestone_stage
-        """))
+        """)
+        )
         rows = result.fetchall()
         dist: dict[str, int] = {}
         for r in rows:
@@ -696,9 +690,7 @@ class GrowthProfileService:
     # P1: 裂变场景识别
     # ------------------------------------------------------------------
 
-    async def batch_compute_referral_scenario(
-        self, tenant_id: str, db: AsyncSession
-    ) -> dict:
+    async def batch_compute_referral_scenario(self, tenant_id: str, db: AsyncSession) -> dict:
         """批量识别裂变场景
 
         P1简化版：基于消费金额和频次粗判
@@ -710,7 +702,8 @@ class GrowthProfileService:
         """
         await self._set_tenant(db, tenant_id)
 
-        result = await db.execute(text("""
+        result = await db.execute(
+            text("""
             UPDATE customer_growth_profiles cgp SET
                 referral_scenario = CASE
                     WHEN cgp.super_user_level IN ('active', 'advocate') THEN 'super_referrer'
@@ -726,12 +719,13 @@ class GrowthProfileService:
             FROM customers c
             WHERE c.id = cgp.customer_id AND cgp.is_deleted = FALSE AND c.is_deleted = FALSE
             RETURNING cgp.customer_id, cgp.referral_scenario
-        """))
+        """)
+        )
         rows = result.fetchall()
         dist: dict[str, int] = {}
         for r in rows:
             scenario = r[1]
-            if scenario and scenario != 'none':
+            if scenario and scenario != "none":
                 dist[scenario] = dist.get(scenario, 0) + 1
 
         logger.info("batch_referral_scenario_done", tenant_id=tenant_id, total=len(rows), distribution=dist)
@@ -741,9 +735,7 @@ class GrowthProfileService:
     # P1: 统一批量计算入口
     # ------------------------------------------------------------------
 
-    async def batch_compute_p1_fields(
-        self, tenant_id: str, db: AsyncSession
-    ) -> dict:
+    async def batch_compute_p1_fields(self, tenant_id: str, db: AsyncSession) -> dict:
         """P1字段统一批量计算（每日定时调用）"""
         results: dict[str, dict] = {}
         results["psych_distance"] = await self.batch_compute_psych_distance(tenant_id, db)
@@ -764,7 +756,8 @@ class GrowthProfileService:
     async def batch_sync_stored_value(self, tenant_id: str, db: AsyncSession) -> dict:
         """同步储值卡余额到增长画像（从stored_value_cards表）"""
         await self._set_tenant(db, tenant_id)
-        result = await db.execute(text("""
+        result = await db.execute(
+            text("""
             UPDATE customer_growth_profiles cgp SET
                 stored_value_balance_fen = COALESCE(svc.total_balance, 0),
                 updated_at = NOW()
@@ -776,7 +769,8 @@ class GrowthProfileService:
             ) svc
             WHERE cgp.customer_id = svc.customer_id AND cgp.is_deleted = FALSE
             RETURNING cgp.customer_id
-        """))
+        """)
+        )
         count = len(result.fetchall())
         logger.info("batch_sync_stored_value_done", tenant_id=tenant_id, updated=count)
         return {"updated": count}
@@ -785,7 +779,8 @@ class GrowthProfileService:
         """同步宴席消费信息到增长画像（从orders表判断高客单包厢消费）"""
         await self._set_tenant(db, tenant_id)
         # 简化方案：客单价>=50000分(500元)且状态paid的订单视为宴席
-        result = await db.execute(text("""
+        result = await db.execute(
+            text("""
             UPDATE customer_growth_profiles cgp SET
                 last_banquet_at = banquet.last_at,
                 last_banquet_store_id = banquet.last_store,
@@ -802,7 +797,8 @@ class GrowthProfileService:
             ) banquet
             WHERE cgp.customer_id = banquet.customer_id AND cgp.is_deleted = FALSE
             RETURNING cgp.customer_id
-        """))
+        """)
+        )
         count = len(result.fetchall())
         logger.info("batch_sync_banquet_done", tenant_id=tenant_id, updated=count)
         return {"updated": count}
@@ -810,7 +806,8 @@ class GrowthProfileService:
     async def batch_sync_channel_info(self, tenant_id: str, db: AsyncSession) -> dict:
         """同步渠道来源信息到增长画像（统计各渠道订单占比）"""
         await self._set_tenant(db, tenant_id)
-        result = await db.execute(text("""
+        result = await db.execute(
+            text("""
             UPDATE customer_growth_profiles cgp SET
                 primary_channel = ch.primary_ch,
                 channel_order_count = ch.ch_count,
@@ -828,7 +825,8 @@ class GrowthProfileService:
             ) ch
             WHERE cgp.customer_id = ch.customer_id AND cgp.is_deleted = FALSE
             RETURNING cgp.customer_id
-        """))
+        """)
+        )
         count = len(result.fetchall())
         logger.info("batch_sync_channel_done", tenant_id=tenant_id, updated=count)
         return {"updated": count}

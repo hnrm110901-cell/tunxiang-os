@@ -6,8 +6,9 @@
   GET  /store-insights    — 多门店经营排名（营收/客流/翻台率/毛利率/健康度）
   GET  /period-analysis   — 餐段分析（按午/晚/夜宵分时段营收/客流/热销菜品）
 """
+
 import uuid
-from datetime import date, datetime, timedelta
+from datetime import date, timedelta
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
@@ -22,6 +23,7 @@ router = APIRouter(prefix="/api/v1/analytics", tags=["insights"])
 
 
 # ─── 辅助 ──────────────────────────────────────────────────────────────────────
+
 
 def _require_tenant(tenant_id: Optional[str]) -> uuid.UUID:
     if not tenant_id:
@@ -65,6 +67,7 @@ def _prev_date_range(period: str) -> tuple[str, str]:
 # ═══════════════════════════════════════════════════════════════════════════════
 # 门店经营洞察
 # ═══════════════════════════════════════════════════════════════════════════════
+
 
 class StoreMetric(BaseModel):
     store_id: str
@@ -170,12 +173,8 @@ async def get_store_insights(
               AND store_id = ANY(:store_ids::uuid[])
             GROUP BY store_id
         """)
-        table_result = await db.execute(
-            table_count_sql, {"tid": str(tid), "store_ids": store_ids}
-        )
-        table_counts: dict[str, int] = {
-            str(r["store_id"]): int(r["cnt"]) for r in table_result.mappings().all()
-        }
+        table_result = await db.execute(table_count_sql, {"tid": str(tid), "store_ids": store_ids})
+        table_counts: dict[str, int] = {str(r["store_id"]): int(r["cnt"]) for r in table_result.mappings().all()}
 
         # ── 上一周期营收（用于计算 revenue_growth）────────────────────────────
         prev_from, prev_to = _prev_date_range(period)
@@ -186,12 +185,8 @@ async def get_store_insights(
               AND stat_date BETWEEN :date_from AND :date_to
             GROUP BY store_id
         """)
-        prev_result = await db.execute(
-            prev_sql, {"tid": str(tid), "date_from": prev_from, "date_to": prev_to}
-        )
-        prev_revenue: dict[str, int] = {
-            str(r["store_id"]): int(r["revenue_fen"]) for r in prev_result.mappings().all()
-        }
+        prev_result = await db.execute(prev_sql, {"tid": str(tid), "date_from": prev_from, "date_to": prev_to})
+        prev_revenue: dict[str, int] = {str(r["store_id"]): int(r["revenue_fen"]) for r in prev_result.mappings().all()}
 
         # ── 合规告警（open）────────────────────────────────────────────────────
         alert_sql = text("""
@@ -203,12 +198,8 @@ async def get_store_insights(
               AND created_at >= :date_from::date
             GROUP BY store_id
         """)
-        alert_result = await db.execute(
-            alert_sql, {"tid": str(tid), "store_ids": store_ids, "date_from": date_from}
-        )
-        alert_counts: dict[str, int] = {
-            str(r["store_id"]): int(r["cnt"]) for r in alert_result.mappings().all()
-        }
+        alert_result = await db.execute(alert_sql, {"tid": str(tid), "store_ids": store_ids, "date_from": date_from})
+        alert_counts: dict[str, int] = {str(r["store_id"]): int(r["cnt"]) for r in alert_result.mappings().all()}
 
         # ── 组装返回数据 ───────────────────────────────────────────────────────
         # period 天数（用于翻台率分母）
@@ -228,20 +219,22 @@ async def get_store_insights(
             prev_rev = prev_revenue.get(sid, 0)
             growth = round((cur_rev - prev_rev) / prev_rev, 4) if prev_rev > 0 else 0.0
 
-            items.append({
-                "store_id": sid,
-                "store_name": r["store_name"],
-                "region": r["region"],
-                "revenue_fen": cur_rev,
-                "order_count": order_count,
-                "guest_count": int(r["guest_count"]),
-                "avg_check_fen": int(r["avg_check_fen"]),
-                "table_turn_rate": turn_rate,
-                "gross_margin": round(float(r["gross_margin"]), 4),
-                "health_score": health,
-                "revenue_growth": growth,
-                "complaint_count": open_alerts,
-            })
+            items.append(
+                {
+                    "store_id": sid,
+                    "store_name": r["store_name"],
+                    "region": r["region"],
+                    "revenue_fen": cur_rev,
+                    "order_count": order_count,
+                    "guest_count": int(r["guest_count"]),
+                    "avg_check_fen": int(r["avg_check_fen"]),
+                    "table_turn_rate": turn_rate,
+                    "gross_margin": round(float(r["gross_margin"]), 4),
+                    "health_score": health,
+                    "revenue_growth": growth,
+                    "complaint_count": open_alerts,
+                }
+            )
 
     except SQLAlchemyError:
         items = []
@@ -263,6 +256,7 @@ async def get_store_insights(
 # ═══════════════════════════════════════════════════════════════════════════════
 # 餐段分析
 # ═══════════════════════════════════════════════════════════════════════════════
+
 
 class TopDish(BaseModel):
     name: str
@@ -287,16 +281,14 @@ class PeriodData(BaseModel):
 # 餐段定义：name → (start_time展示, end_time展示, hour_start_inclusive, hour_end_exclusive)
 # SQL 使用 EXTRACT(HOUR) 取整小时；边界按前闭后开处理
 _PERIODS = [
-    ("早茶",   "07:00", "10:30",  7, 10),
-    ("午餐",   "10:30", "14:00", 10, 14),
+    ("早茶", "07:00", "10:30", 7, 10),
+    ("午餐", "10:30", "14:00", 10, 14),
     ("下午茶", "14:00", "17:00", 14, 17),
-    ("晚餐",   "17:00", "21:00", 17, 21),
-    ("夜宵",   "21:00", "23:59", 21, 24),
+    ("晚餐", "17:00", "21:00", 17, 21),
+    ("夜宵", "21:00", "23:59", 21, 24),
 ]
 
-_PERIOD_META: dict[str, tuple[str, str]] = {
-    name: (start, end) for name, start, end, _, _ in _PERIODS
-}
+_PERIOD_META: dict[str, tuple[str, str]] = {name: (start, end) for name, start, end, _, _ in _PERIODS}
 
 
 def _hour_case_sql() -> str:
@@ -389,9 +381,7 @@ async def get_period_analysis(
             HAVING {_hour_case_sql()} IS NOT NULL
             ORDER BY period_name, cnt DESC
         """)
-        peak_result = await db.execute(
-            peak_sql, {"tid": str(tid), "store_id": store_id, "target_date": target_date}
-        )
+        peak_result = await db.execute(peak_sql, {"tid": str(tid), "store_id": store_id, "target_date": target_date})
         # 每个餐段取 cnt 最大的那个半小时
         peak_hours: dict[str, str] = {}
         for pr in peak_result.mappings().all():
@@ -408,7 +398,7 @@ async def get_period_analysis(
         # ── 热销菜：一次性查所有餐段，Python 侧分组 ───────────────────────────
         dish_sql = text(f"""
             SELECT
-                {_hour_case_sql().replace('created_at', 'o.created_at')} AS period_name,
+                {_hour_case_sql().replace("created_at", "o.created_at")} AS period_name,
                 oi.dish_name,
                 SUM(oi.quantity)::int AS total_qty,
                 SUM(oi.total_price_fen)::bigint AS revenue_fen
@@ -419,12 +409,10 @@ async def get_period_analysis(
               AND o.status = 'paid'
               AND DATE(o.created_at AT TIME ZONE 'Asia/Shanghai') = :target_date
             GROUP BY period_name, oi.dish_name
-            HAVING {_hour_case_sql().replace('created_at', 'o.created_at')} IS NOT NULL
+            HAVING {_hour_case_sql().replace("created_at", "o.created_at")} IS NOT NULL
             ORDER BY period_name, total_qty DESC
         """)
-        dish_result = await db.execute(
-            dish_sql, {"tid": str(tid), "store_id": store_id, "target_date": target_date}
-        )
+        dish_result = await db.execute(dish_sql, {"tid": str(tid), "store_id": store_id, "target_date": target_date})
         # 按餐段分组，每段取前5
         dishes_by_period: dict[str, list[dict]] = {}
         for dr in dish_result.mappings().all():
@@ -432,11 +420,13 @@ async def get_period_analysis(
             if pname not in dishes_by_period:
                 dishes_by_period[pname] = []
             if len(dishes_by_period[pname]) < 5:
-                dishes_by_period[pname].append({
-                    "name": dr["dish_name"],
-                    "count": int(dr["total_qty"]),
-                    "revenue_fen": int(dr["revenue_fen"]),
-                })
+                dishes_by_period[pname].append(
+                    {
+                        "name": dr["dish_name"],
+                        "count": int(dr["total_qty"]),
+                        "revenue_fen": int(dr["revenue_fen"]),
+                    }
+                )
 
         # ── 按照预定顺序输出各餐段 ────────────────────────────────────────────
         for name, start_time, end_time, _, _ in _PERIODS:
@@ -449,19 +439,21 @@ async def get_period_analysis(
             avg_check = revenue_fen // max(1, order_count)
             turn_rate = round(guest_count / table_count, 2) if table_count > 0 else 0.0
 
-            periods_out.append({
-                "period_name": name,
-                "start_time": start_time,
-                "end_time": end_time,
-                "revenue_fen": revenue_fen,
-                "order_count": order_count,
-                "guest_count": guest_count,
-                "avg_check_fen": avg_check,
-                "table_turn_rate": turn_rate,
-                "top_dishes": dishes_by_period.get(name, []),
-                "peak_hour": peak_hours.get(name, ""),
-                "occupancy_rate": 0.0,  # 需桌台实时状态，当前无法计算
-            })
+            periods_out.append(
+                {
+                    "period_name": name,
+                    "start_time": start_time,
+                    "end_time": end_time,
+                    "revenue_fen": revenue_fen,
+                    "order_count": order_count,
+                    "guest_count": guest_count,
+                    "avg_check_fen": avg_check,
+                    "table_turn_rate": turn_rate,
+                    "top_dishes": dishes_by_period.get(name, []),
+                    "peak_hour": peak_hours.get(name, ""),
+                    "occupancy_rate": 0.0,  # 需桌台实时状态，当前无法计算
+                }
+            )
 
     except SQLAlchemyError:
         periods_out = []

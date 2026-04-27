@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import date, datetime, timedelta
+from datetime import date, timedelta
 from typing import Any, Optional
 
 import structlog
@@ -105,12 +105,15 @@ async def _load_current_schedules(
         ORDER BY us.schedule_date, us.start_time
     """)
     try:
-        result = await db.execute(q, {
-            "tenant_id": tenant_id,
-            "store_id": store_id,
-            "week_start": week_start,
-            "week_end": week_end,
-        })
+        result = await db.execute(
+            q,
+            {
+                "tenant_id": tenant_id,
+                "store_id": store_id,
+                "week_start": week_start,
+                "week_end": week_end,
+            },
+        )
         return [dict(r) for r in result.mappings()]
     except (OperationalError, ProgrammingError) as exc:
         logger.warning("workforce_load_schedules_failed", error=str(exc))
@@ -143,11 +146,14 @@ async def _load_revenue_by_slot(
               AND o.status = 'paid'
             GROUP BY slot
         """)
-        result = await db.execute(q, {
-            "tenant_id": tenant_id,
-            "store_id": store_id,
-            "lookback_days": lookback_days,
-        })
+        result = await db.execute(
+            q,
+            {
+                "tenant_id": tenant_id,
+                "store_id": store_id,
+                "lookback_days": lookback_days,
+            },
+        )
         rows = {str(r["slot"]): int(r["revenue_fen"]) for r in result.mappings()}
         if rows:
             return rows
@@ -185,6 +191,9 @@ class WorkforcePlannerAgent(SkillAgent):
     description = "基于历史客流与POS营收数据，分析人力配置合理性并生成最优排班方案"
     priority = "P1"
     run_location = "cloud"
+
+    # Sprint D1 / PR 批次 5：排班直接决定人力成本（margin 维度）
+    constraint_scope = {"margin"}
     agent_level = 2  # 自动生成draft排班 + 30分钟回滚窗口
 
     def get_supported_actions(self) -> list[str]:
@@ -225,8 +234,7 @@ class WorkforcePlannerAgent(SkillAgent):
         """分析当前排班的各时段人效。"""
         store_id = self._store_scope(params)
         if not store_id:
-            return AgentResult(success=False, action="analyze_schedule_efficiency",
-                               error="缺少 store_id")
+            return AgentResult(success=False, action="analyze_schedule_efficiency", error="缺少 store_id")
         week_start, week_end = _week_range()
 
         if not self._db:
@@ -235,9 +243,7 @@ class WorkforcePlannerAgent(SkillAgent):
                 action="analyze_schedule_efficiency",
                 error="数据库连接不可用",
             )
-        schedules = await _load_current_schedules(
-            self._db, self.tenant_id, store_id, week_start, week_end
-        )
+        schedules = await _load_current_schedules(self._db, self.tenant_id, store_id, week_start, week_end)
         revenue = await _load_revenue_by_slot(self._db, self.tenant_id, store_id)
 
         # 统计各时段排班人数（简化：按 start_time 归时段）
@@ -258,9 +264,7 @@ class WorkforcePlannerAgent(SkillAgent):
 
         efficiency: dict[str, float] = {}
         for slot, _, _ in _TIME_SLOTS:
-            efficiency[slot] = _efficiency_score(
-                slot_counts.get(slot, 0), revenue.get(slot, 0)
-            )
+            efficiency[slot] = _efficiency_score(slot_counts.get(slot, 0), revenue.get(slot, 0))
 
         return AgentResult(
             success=True,
@@ -280,8 +284,7 @@ class WorkforcePlannerAgent(SkillAgent):
         """生成排班优化建议。"""
         store_id = self._store_scope(params)
         if not store_id:
-            return AgentResult(success=False, action="suggest_optimization",
-                               error="缺少 store_id")
+            return AgentResult(success=False, action="suggest_optimization", error="缺少 store_id")
 
         if not self._db:
             return AgentResult(
@@ -292,9 +295,7 @@ class WorkforcePlannerAgent(SkillAgent):
 
         # 真实逻辑：对比当前排班 vs 理想配置
         week_start, week_end = _week_range()
-        schedules = await _load_current_schedules(
-            self._db, self.tenant_id, store_id, week_start, week_end
-        )
+        schedules = await _load_current_schedules(self._db, self.tenant_id, store_id, week_start, week_end)
         ideal = await _load_labor_forecast(self._db, self.tenant_id, store_id)
         revenue = await _load_revenue_by_slot(self._db, self.tenant_id, store_id)
 
@@ -361,8 +362,7 @@ class WorkforcePlannerAgent(SkillAgent):
         """获取劳动力需求预测。"""
         store_id = self._store_scope(params)
         if not store_id:
-            return AgentResult(success=False, action="get_labor_forecast",
-                               error="缺少 store_id")
+            return AgentResult(success=False, action="get_labor_forecast", error="缺少 store_id")
 
         if not self._db:
             return AgentResult(
@@ -373,10 +373,7 @@ class WorkforcePlannerAgent(SkillAgent):
         forecast = await _load_labor_forecast(self._db, self.tenant_id, store_id)
 
         total = sum(forecast.values())
-        slot_details = [
-            {"slot": s, "label": label, "ideal_staff": forecast.get(s, 0)}
-            for s, _, label in _TIME_SLOTS
-        ]
+        slot_details = [{"slot": s, "label": label, "ideal_staff": forecast.get(s, 0)} for s, _, label in _TIME_SLOTS]
 
         return AgentResult(
             success=True,
@@ -437,9 +434,7 @@ class WorkforcePlannerAgent(SkillAgent):
 
         svc = RevenueScheduleService()
         try:
-            plan = await svc.generate_weekly_plan(
-                self._db, self.tenant_id, store_id, week_start
-            )
+            plan = await svc.generate_weekly_plan(self._db, self.tenant_id, store_id, week_start)
         except (OperationalError, ProgrammingError) as exc:
             logger.warning(
                 "workforce_revenue_schedule_db_error",
@@ -532,14 +527,9 @@ class WorkforcePlannerAgent(SkillAgent):
             success=True,
             action="apply_optimal_plan",
             data=result,
-            reasoning=(
-                f"已写入{result['inserted_count']}条排班草稿，"
-                f"状态=draft，30分钟内可回滚"
-            ),
+            reasoning=(f"已写入{result['inserted_count']}条排班草稿，状态=draft，30分钟内可回滚"),
             confidence=0.88,
             agent_level=2,
             rollback_window_min=30,
             rollback_id=rollback_id,
         )
-
-

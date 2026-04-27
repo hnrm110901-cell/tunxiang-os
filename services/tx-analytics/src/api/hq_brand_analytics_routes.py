@@ -11,6 +11,7 @@
 RLS安全：X-Tenant-ID header → set_config('app.tenant_id', ...)
 响应格式：{"ok": true, "data": {...}} | {"ok": false, "error": {"message": "..."}}
 """
+
 from __future__ import annotations
 
 import uuid
@@ -34,6 +35,7 @@ _svc = HQBrandAnalyticsService()
 
 
 # ─── 内部辅助 ─────────────────────────────────────────────────────────────────
+
 
 def _require_tenant(tenant_id: Optional[str]) -> str:
     """校验并返回 tenant_id，格式错误抛 400。"""
@@ -159,6 +161,7 @@ async def get_brand_store_performance(
             raise HTTPException(status_code=400, detail=f"date 格式错误，需为 YYYY-MM-DD，实际值：{date!r}")
     else:
         from datetime import date as date_cls
+
         snapshot_date = date_cls.today()
 
     try:
@@ -281,6 +284,7 @@ async def get_brand_pnl(
 
     # 校验 year_month 格式
     import re
+
     if not re.fullmatch(r"\d{4}-\d{2}", year_month):
         raise HTTPException(status_code=400, detail=f"year_month 格式错误，需为 YYYY-MM，实际值：{year_month!r}")
 
@@ -310,7 +314,9 @@ async def get_brand_pnl(
 
 # ─── 私有工具 ─────────────────────────────────────────────────────────────────
 
+
 def _parse_date_str(date_str: str) -> date:
     """将 YYYY-MM-DD 字符串解析为 date 对象，失败抛 ValueError。"""
     from datetime import date as date_cls
+
     return date_cls.fromisoformat(date_str)

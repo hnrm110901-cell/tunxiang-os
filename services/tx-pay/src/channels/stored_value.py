@@ -8,6 +8,7 @@ tx-pay 不直接操作 stored_value_cards 表，保持服务边界清晰。
   2. tx-member 校验余额 → 扣减 → 返回结果
   3. 退款时 tx-pay 调用 tx-member POST /api/v1/member/stored-value/refund
 """
+
 from __future__ import annotations
 
 import uuid

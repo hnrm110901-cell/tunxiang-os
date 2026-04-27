@@ -69,6 +69,9 @@ class ModelRouter:
         "growth_plan_generation": TaskComplexity.COMPLEX,
         "salary_competitiveness": TaskComplexity.COMPLEX,
         "calibration_insight": TaskComplexity.COMPLEX,
+        # Sprint D4b：薪资异常检测（Sonnet 4.7 + Prompt Cache 共享城市基准）
+        # Service 层显式覆盖 model_id=claude-sonnet-4-7 走 Prompt Cache beta
+        "salary_anomaly_detection": TaskComplexity.COMPLEX,
     }
 
     # 复杂度 -> 模型映射
@@ -90,9 +93,7 @@ class ModelRouter:
 
     def get_model(self, task_type: str) -> str:
         """根据任务类型返回推荐模型 ID"""
-        complexity = self.DEFAULT_TASK_MODEL_MAP.get(
-            task_type, TaskComplexity.MODERATE
-        )
+        complexity = self.DEFAULT_TASK_MODEL_MAP.get(task_type, TaskComplexity.MODERATE)
         model = self.COMPLEXITY_MODEL_MAP[complexity]
         logger.debug(
             "model_router_resolve",
@@ -104,9 +105,7 @@ class ModelRouter:
 
     def get_complexity(self, task_type: str) -> TaskComplexity:
         """返回任务复杂度（供调用方决定是否需要 Tool Use 等高级能力）"""
-        return self.DEFAULT_TASK_MODEL_MAP.get(
-            task_type, TaskComplexity.MODERATE
-        )
+        return self.DEFAULT_TASK_MODEL_MAP.get(task_type, TaskComplexity.MODERATE)
 
     def log_call(
         self,

@@ -5,6 +5,7 @@
 端点：
   POST /api/v1/credit/agreements/{id}/approval-callback — 审批结果回调
 """
+
 import asyncio
 import uuid
 from typing import Optional
@@ -25,6 +26,7 @@ router = APIRouter(prefix="/api/v1/credit", tags=["企业挂账-审批回调"])
 
 # ─── 依赖注入 ──────────────────────────────────────────────────────────────────
 
+
 async def _get_tenant_db(x_tenant_id: str = Header(..., alias="X-Tenant-ID")):
     async for session in get_db_with_tenant(x_tenant_id):
         yield session
@@ -39,13 +41,15 @@ def _parse_uuid(val: str, field_name: str) -> uuid.UUID:
 
 # ─── 请求模型 ──────────────────────────────────────────────────────────────────
 
+
 class ApprovalCallbackRequest(BaseModel):
-    decision: str                  # "approved" | "rejected"
+    decision: str  # "approved" | "rejected"
     approver_id: str
     comment: Optional[str] = None
 
 
 # ─── POST /agreements/{id}/approval-callback ─────────────────────────────────
+
 
 @router.post("/agreements/{id}/approval-callback", summary="挂账协议审批结果回调")
 async def approval_callback(
@@ -81,8 +85,7 @@ async def approval_callback(
             {"id": str(id), "tenant_id": str(tid)},
         )
     except Exception as exc:
-        logger.error("approval_callback.query_failed", agreement_id=str(id),
-                     error=str(exc), exc_info=True)
+        logger.error("approval_callback.query_failed", agreement_id=str(id), error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="查询挂账协议失败") from exc
 
     row = select_result.mappings().first()
@@ -115,8 +118,7 @@ async def approval_callback(
             )
             await db.commit()
         except Exception as exc:
-            logger.error("approval_callback.approve_failed", agreement_id=str(id),
-                         error=str(exc), exc_info=True)
+            logger.error("approval_callback.approve_failed", agreement_id=str(id), error=str(exc), exc_info=True)
             raise HTTPException(status_code=500, detail="审批通过更新失败") from exc
 
         event_type = "credit.agreement_approved"
@@ -127,8 +129,7 @@ async def approval_callback(
             "approver_id": str(approver_id),
             "comment": body.comment,
         }
-        logger.info("credit_agreement_approved", agreement_id=str(id),
-                    approver_id=str(approver_id))
+        logger.info("credit_agreement_approved", agreement_id=str(id), approver_id=str(approver_id))
 
     else:  # rejected
         new_status = "terminated"
@@ -144,8 +145,7 @@ async def approval_callback(
             )
             await db.commit()
         except Exception as exc:
-            logger.error("approval_callback.reject_failed", agreement_id=str(id),
-                         error=str(exc), exc_info=True)
+            logger.error("approval_callback.reject_failed", agreement_id=str(id), error=str(exc), exc_info=True)
             raise HTTPException(status_code=500, detail="审批拒绝更新失败") from exc
 
         event_type = "credit.agreement_rejected"
@@ -156,17 +156,20 @@ async def approval_callback(
             "approver_id": str(approver_id),
             "comment": body.comment,
         }
-        logger.info("credit_agreement_rejected", agreement_id=str(id),
-                    approver_id=str(approver_id), comment=body.comment)
+        logger.info(
+            "credit_agreement_rejected", agreement_id=str(id), approver_id=str(approver_id), comment=body.comment
+        )
 
     # 旁路发射结果事件（不阻塞响应）
-    asyncio.create_task(emit_event(
-        event_type=event_type,
-        tenant_id=str(tid),
-        stream_id=str(id),
-        payload=event_payload,
-        source_service="tx-finance",
-    ))
+    asyncio.create_task(
+        emit_event(
+            event_type=event_type,
+            tenant_id=str(tid),
+            stream_id=str(id),
+            payload=event_payload,
+            source_service="tx-finance",
+        )
+    )
 
     return {
         "ok": True,

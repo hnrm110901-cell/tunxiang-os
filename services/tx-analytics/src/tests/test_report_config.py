@@ -9,16 +9,15 @@
   6. test_delete_blocks_system       — DELETE /reports/{id} 系统报表不可删
   7. test_p0_seed_data_count         — 种子数据包含20张报表
 """
+
 from __future__ import annotations
 
-import json
 import sys
 import types
 import uuid
 from typing import Any, AsyncGenerator
 from unittest.mock import AsyncMock, MagicMock
 
-import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
@@ -37,11 +36,14 @@ def _ensure_stub(path: str, attrs: dict | None = None) -> types.ModuleType:
 _ensure_stub("shared")
 _ensure_stub("shared.ontology")
 _ensure_stub("shared.ontology.src")
-_ensure_stub("shared.ontology.src.database", {
-    "get_db": AsyncMock(),
-    "get_db_with_tenant": AsyncMock(),
-    "get_db_no_rls": AsyncMock(),
-})
+_ensure_stub(
+    "shared.ontology.src.database",
+    {
+        "get_db": AsyncMock(),
+        "get_db_with_tenant": AsyncMock(),
+        "get_db_no_rls": AsyncMock(),
+    },
+)
 _ensure_stub("shared.events")
 _ensure_stub("shared.events.src")
 _ensure_stub("shared.events.src.emitter", {"emit_event": AsyncMock()})
@@ -104,21 +106,25 @@ class _FakeSession:
             rid = params.get("id")
             rpt = self._reports.get(rid)
             if rpt:
-                return _FakeResult([{
-                    "id": rid,
-                    "name": rpt.get("name", "Test"),
-                    "description": rpt.get("description", ""),
-                    "category": rpt.get("category", "operation"),
-                    "sql_template": rpt.get("sql_template", "SELECT 1 AS val"),
-                    "default_params": rpt.get("default_params", {}),
-                    "dimensions": rpt.get("dimensions", []),
-                    "metrics": rpt.get("metrics", []),
-                    "filters": rpt.get("filters", []),
-                    "is_system": rpt.get("is_system", False),
-                    "is_active": True,
-                    "created_at": "2026-04-09T00:00:00Z",
-                    "updated_at": "2026-04-09T00:00:00Z",
-                }])
+                return _FakeResult(
+                    [
+                        {
+                            "id": rid,
+                            "name": rpt.get("name", "Test"),
+                            "description": rpt.get("description", ""),
+                            "category": rpt.get("category", "operation"),
+                            "sql_template": rpt.get("sql_template", "SELECT 1 AS val"),
+                            "default_params": rpt.get("default_params", {}),
+                            "dimensions": rpt.get("dimensions", []),
+                            "metrics": rpt.get("metrics", []),
+                            "filters": rpt.get("filters", []),
+                            "is_system": rpt.get("is_system", False),
+                            "is_active": True,
+                            "created_at": "2026-04-09T00:00:00Z",
+                            "updated_at": "2026-04-09T00:00:00Z",
+                        }
+                    ]
+                )
             return _FakeResult([])
 
         if "COUNT(*) FROM report_configs" in sql_str:
@@ -159,7 +165,7 @@ async def _override_get_db() -> AsyncGenerator[Any, None]:
 
 
 # ── 导入路由 ──
-from ..api.report_config_routes import router, _get_db  # noqa: E402
+from ..api.report_config_routes import _get_db, router  # noqa: E402
 
 app = FastAPI()
 app.include_router(router)
@@ -300,24 +306,38 @@ class TestP0SeedCount:
 
     def test_seed_count(self):
         from ..seed_p0_reports import P0_REPORTS
+
         assert len(P0_REPORTS) == 20
 
     def test_all_have_required_fields(self):
         from ..seed_p0_reports import P0_REPORTS
-        required_keys = {"id", "name", "description", "category", "sql_template",
-                         "default_params", "dimensions", "metrics", "filters"}
+
+        required_keys = {
+            "id",
+            "name",
+            "description",
+            "category",
+            "sql_template",
+            "default_params",
+            "dimensions",
+            "metrics",
+            "filters",
+        }
         for rpt in P0_REPORTS:
             missing = required_keys - set(rpt.keys())
             assert not missing, f"报表 {rpt['id']} 缺少字段: {missing}"
 
     def test_categories_coverage(self):
         from ..seed_p0_reports import P0_REPORTS
+
         cats = {r["category"] for r in P0_REPORTS}
         assert cats == {"finance", "operation", "member", "hr"}
 
     def test_category_counts(self):
-        from ..seed_p0_reports import P0_REPORTS
         from collections import Counter
+
+        from ..seed_p0_reports import P0_REPORTS
+
         counts = Counter(r["category"] for r in P0_REPORTS)
         assert counts["finance"] == 7
         assert counts["operation"] == 6
@@ -326,10 +346,12 @@ class TestP0SeedCount:
 
     def test_ids_unique(self):
         from ..seed_p0_reports import P0_REPORTS
+
         ids = [r["id"] for r in P0_REPORTS]
         assert len(ids) == len(set(ids))
 
     def test_all_ids_prefixed_p0(self):
         from ..seed_p0_reports import P0_REPORTS
+
         for rpt in P0_REPORTS:
             assert rpt["id"].startswith("p0_"), f"报表ID {rpt['id']} 缺少 p0_ 前缀"

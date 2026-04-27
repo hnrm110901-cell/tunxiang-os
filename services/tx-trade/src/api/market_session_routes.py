@@ -12,6 +12,7 @@
 统一响应格式: {"ok": bool, "data": {}, "error": {}}
 所有接口需 X-Tenant-ID header。
 """
+
 from __future__ import annotations
 
 import uuid
@@ -78,6 +79,7 @@ _DEFAULT_TEMPLATES = [
 
 # ─── 通用工具 ────────────────────────────────────────────────────────────────
 
+
 def _get_tenant_id(request: Request) -> str:
     tid = getattr(request.state, "tenant_id", None) or request.headers.get("X-Tenant-ID", "")
     if not tid:
@@ -110,6 +112,7 @@ def _is_time_in_session(current: time, start: time, end: time) -> bool:
 
 # ─── Pydantic 模型 ────────────────────────────────────────────────────────────
 
+
 class MarketSessionTemplateCreateReq(BaseModel):
     name: str = Field(max_length=50, description="市别名称，如早市")
     code: str = Field(max_length=20, description="代码，如 breakfast/lunch/dinner/late_night")
@@ -141,6 +144,7 @@ class StoreMarketSessionCreateReq(BaseModel):
 
 # ─── 辅助：当前市别查询 ────────────────────────────────────────────────────────
 
+
 async def _get_current_market_session_id(
     db: AsyncSession,
     tenant_id: str,
@@ -163,14 +167,21 @@ async def _get_current_market_session_id(
     rows = result.fetchall()
 
     for row in rows:
-        start = row.start_time if isinstance(row.start_time, time) else datetime.strptime(str(row.start_time), "%H:%M:%S").time()
-        end = row.end_time if isinstance(row.end_time, time) else datetime.strptime(str(row.end_time), "%H:%M:%S").time()
+        start = (
+            row.start_time
+            if isinstance(row.start_time, time)
+            else datetime.strptime(str(row.start_time), "%H:%M:%S").time()
+        )
+        end = (
+            row.end_time if isinstance(row.end_time, time) else datetime.strptime(str(row.end_time), "%H:%M:%S").time()
+        )
         if _is_time_in_session(now_time, start, end):
             return str(row.id)
     return None
 
 
 # ─── 路由 ─────────────────────────────────────────────────────────────────────
+
 
 @router.get("/current/{store_id}", summary="获取当前进行中市别")
 async def get_current_session(
@@ -208,20 +219,28 @@ async def get_current_session(
     store_rows = store_result.fetchall()
 
     for row in store_rows:
-        start = row.start_time if isinstance(row.start_time, time) else datetime.strptime(str(row.start_time), "%H:%M:%S").time()
-        end = row.end_time if isinstance(row.end_time, time) else datetime.strptime(str(row.end_time), "%H:%M:%S").time()
+        start = (
+            row.start_time
+            if isinstance(row.start_time, time)
+            else datetime.strptime(str(row.start_time), "%H:%M:%S").time()
+        )
+        end = (
+            row.end_time if isinstance(row.end_time, time) else datetime.strptime(str(row.end_time), "%H:%M:%S").time()
+        )
         if _is_time_in_session(now_time, start, end):
             log.info("market_session_matched", source="store", session_id=str(row.id))
-            return _ok({
-                "id": str(row.id),
-                "name": row.name,
-                "start_time": str(row.start_time),
-                "end_time": str(row.end_time),
-                "template_id": str(row.template_id) if row.template_id else None,
-                "menu_plan_id": str(row.menu_plan_id) if row.menu_plan_id else None,
-                "source": "store",
-                "current_time": now_str,
-            })
+            return _ok(
+                {
+                    "id": str(row.id),
+                    "name": row.name,
+                    "start_time": str(row.start_time),
+                    "end_time": str(row.end_time),
+                    "template_id": str(row.template_id) if row.template_id else None,
+                    "menu_plan_id": str(row.menu_plan_id) if row.menu_plan_id else None,
+                    "source": "store",
+                    "current_time": now_str,
+                }
+            )
 
     # 2. 回落到集团模板
     tmpl_result = await db.execute(
@@ -237,19 +256,27 @@ async def get_current_session(
     tmpl_rows = tmpl_result.fetchall()
 
     for row in tmpl_rows:
-        start = row.start_time if isinstance(row.start_time, time) else datetime.strptime(str(row.start_time), "%H:%M:%S").time()
-        end = row.end_time if isinstance(row.end_time, time) else datetime.strptime(str(row.end_time), "%H:%M:%S").time()
+        start = (
+            row.start_time
+            if isinstance(row.start_time, time)
+            else datetime.strptime(str(row.start_time), "%H:%M:%S").time()
+        )
+        end = (
+            row.end_time if isinstance(row.end_time, time) else datetime.strptime(str(row.end_time), "%H:%M:%S").time()
+        )
         if _is_time_in_session(now_time, start, end):
             log.info("market_session_matched", source="template", session_id=str(row.id))
-            return _ok({
-                "id": str(row.id),
-                "name": row.name,
-                "code": row.code,
-                "start_time": str(row.start_time),
-                "end_time": str(row.end_time),
-                "source": "template",
-                "current_time": now_str,
-            })
+            return _ok(
+                {
+                    "id": str(row.id),
+                    "name": row.name,
+                    "code": row.code,
+                    "start_time": str(row.start_time),
+                    "end_time": str(row.end_time),
+                    "source": "template",
+                    "current_time": now_str,
+                }
+            )
 
     log.info("market_session_no_match", reason="no_session_covers_current_time")
     return _ok(None)
@@ -479,3 +506,84 @@ async def update_template(
         _err("市别模板不存在", code=404)
     logger.info("market_session_template_updated", id=str(template_id))
     return _ok({"id": str(template_id)})
+
+
+# ─── 市别切换 + 拼桌自动触发 (v284) ───────────────────────────────────────────
+
+
+class SwitchMarketSessionReq(BaseModel):
+    new_session_id: str = Field(description="目标市别ID（store_market_sessions.id）")
+
+
+@router.post("/switch/{store_id}", summary="手动切换市别（触发拼桌预设）")
+async def switch_market_session(
+    store_id: uuid.UUID,
+    body: SwitchMarketSessionReq,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """手动切换市别，并自动触发关联的拼桌预设。
+
+    流程：
+    1. 验证目标市别存在
+    2. 调用 TableMergePresetService.on_market_session_switch()
+       - 回滚上一个市别的拼桌方案
+       - 执行新市别的 auto_trigger=TRUE 拼桌方案
+    3. 返回切换结果和拼桌执行摘要
+
+    注意：自动市别切换（按时间）由前端/定时任务调用此端点。
+    """
+    tid = _get_tenant_id(request)
+    await _set_rls(db, tid)
+
+    # 验证目标市别存在
+    session_result = await db.execute(
+        text("""
+            SELECT id, name, start_time, end_time
+            FROM store_market_sessions
+            WHERE id = :sid AND store_id = :store_id AND tenant_id = :tid AND is_active = TRUE
+        """),
+        {"sid": body.new_session_id, "store_id": str(store_id), "tid": tid},
+    )
+    session_row = session_result.mappings().one_or_none()
+    if not session_row:
+        _err("目标市别不存在或未激活", code=404)
+
+    # 触发拼桌预设
+    merge_result: dict = {"triggered": False, "detail": "无拼桌预设关联此市别"}
+    try:
+        from ..services.table_merge_preset_service import TableMergePresetService
+
+        merge_svc = TableMergePresetService(db, tid)
+        merge_result = await merge_svc.on_market_session_switch(
+            store_id=store_id,
+            new_session_id=uuid.UUID(body.new_session_id),
+        )
+    except ImportError:
+        logger.warning("table_merge_preset_service_not_available")
+    except ValueError as exc:
+        logger.warning("merge_preset_switch_error", error=str(exc))
+        merge_result = {"triggered": False, "error": str(exc)}
+
+    await db.commit()
+
+    logger.info(
+        "market_session_switched",
+        store_id=str(store_id),
+        new_session_id=body.new_session_id,
+        new_session_name=session_row["name"],
+        merge_triggered=merge_result.get("triggered", False),
+    )
+
+    return _ok(
+        {
+            "store_id": str(store_id),
+            "new_session": {
+                "id": str(session_row["id"]),
+                "name": session_row["name"],
+                "start_time": str(session_row["start_time"]),
+                "end_time": str(session_row["end_time"]),
+            },
+            "merge_preset_result": merge_result,
+        }
+    )

@@ -7,6 +7,7 @@
 
 互斥约束：同一账号不能同时持有上述三个角色中的任意两个。
 """
+
 from enum import Enum
 
 
@@ -27,13 +28,15 @@ class TenantRole(str, Enum):
     CHEF = "chef"
     SUPPLY_MANAGER = "supply_manager"
     FINANCE_STAFF = "finance_staff"
-    AUDITOR = "auditor"       # 租户内审计员（只读）
+    AUDITOR = "auditor"  # 租户内审计员（只读）
     READONLY = "readonly"
 
 
 # 三权分立互斥组（同一人不能同时持有）
-MUTUALLY_EXCLUSIVE_ROLES: frozenset[PlatformRole] = frozenset({
-    PlatformRole.SYSTEM_ADMIN,
-    PlatformRole.AUDIT_ADMIN,
-    PlatformRole.SECURITY_ADMIN,
-})
+MUTUALLY_EXCLUSIVE_ROLES: frozenset[PlatformRole] = frozenset(
+    {
+        PlatformRole.SYSTEM_ADMIN,
+        PlatformRole.AUDIT_ADMIN,
+        PlatformRole.SECURITY_ADMIN,
+    }
+)

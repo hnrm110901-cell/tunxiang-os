@@ -7,6 +7,7 @@
 5. 成就系统
 6. 生日月特权
 """
+
 import os
 import sys
 
@@ -34,6 +35,7 @@ ITEM_ID = str(uuid.uuid4())
 
 
 # ── Mock helpers ─────────────────────────────────────────────
+
 
 class FakeMappingResult:
     def __init__(self, rows):
@@ -70,29 +72,41 @@ def make_db(side_effects=None):
 
 # ── 1. 商城商品列表 ─────────────────────────────────────────
 
+
 class TestListMallItems:
     @pytest.mark.asyncio
     async def test_list_all(self):
         items = [
-            {"id": "i1", "name": "招牌鱼头", "category": "dish",
-             "points_cost": 500, "stock": 10, "image_url": "", "description": ""},
+            {
+                "id": "i1",
+                "name": "招牌鱼头",
+                "category": "dish",
+                "points_cost": 500,
+                "stock": 10,
+                "image_url": "",
+                "description": "",
+            },
         ]
-        db = make_db([
-            FakeResult(),  # _set_tenant
-            FakeResult(scalar_val=1),  # count
-            FakeResult(rows=items),  # items
-        ])
+        db = make_db(
+            [
+                FakeResult(),  # _set_tenant
+                FakeResult(scalar_val=1),  # count
+                FakeResult(rows=items),  # items
+            ]
+        )
         result = await list_mall_items(category=None, tenant_id=TENANT_ID, db=db)
         assert result["total"] == 1
         assert result["page"] == 1
 
     @pytest.mark.asyncio
     async def test_list_by_category(self):
-        db = make_db([
-            FakeResult(),
-            FakeResult(scalar_val=0),
-            FakeResult(rows=[]),
-        ])
+        db = make_db(
+            [
+                FakeResult(),
+                FakeResult(scalar_val=0),
+                FakeResult(rows=[]),
+            ]
+        )
         result = await list_mall_items(category="coupon", tenant_id=TENANT_ID, db=db)
         assert result["total"] == 0
         assert result["items"] == []
@@ -100,21 +114,27 @@ class TestListMallItems:
 
 # ── 2. 积分兑换 ─────────────────────────────────────────────
 
+
 class TestExchangeItem:
     @pytest.mark.asyncio
     async def test_exchange_success(self):
-        db = make_db([
-            FakeResult(),  # _set_tenant
-            FakeResult(rows=[{"id": ITEM_ID, "name": "鱼头", "points_cost": 500, "stock": 5}]),
-            FakeResult(rows=[{"card_id": CARD_ID, "points": 1000}]),
-            FakeResult(),  # deduct points
-            FakeResult(),  # deduct stock
-            FakeResult(),  # insert exchange record
-            FakeResult(),  # insert points log
-        ])
+        db = make_db(
+            [
+                FakeResult(),  # _set_tenant
+                FakeResult(rows=[{"id": ITEM_ID, "name": "鱼头", "points_cost": 500, "stock": 5}]),
+                FakeResult(rows=[{"card_id": CARD_ID, "points": 1000}]),
+                FakeResult(),  # deduct points
+                FakeResult(),  # deduct stock
+                FakeResult(),  # insert exchange record
+                FakeResult(),  # insert points log
+            ]
+        )
         result = await exchange_item(
-            customer_id=CUSTOMER_ID, item_id=ITEM_ID,
-            points_cost=500, tenant_id=TENANT_ID, db=db,
+            customer_id=CUSTOMER_ID,
+            item_id=ITEM_ID,
+            points_cost=500,
+            tenant_id=TENANT_ID,
+            db=db,
         )
         assert result["points_deducted"] == 500
         assert result["status"] == "confirmed"
@@ -122,52 +142,63 @@ class TestExchangeItem:
 
     @pytest.mark.asyncio
     async def test_exchange_insufficient_points(self):
-        db = make_db([
-            FakeResult(),
-            FakeResult(rows=[{"id": ITEM_ID, "name": "鱼头", "points_cost": 500, "stock": 5}]),
-            FakeResult(rows=[{"card_id": CARD_ID, "points": 100}]),  # only 100 points
-        ])
+        db = make_db(
+            [
+                FakeResult(),
+                FakeResult(rows=[{"id": ITEM_ID, "name": "鱼头", "points_cost": 500, "stock": 5}]),
+                FakeResult(rows=[{"card_id": CARD_ID, "points": 100}]),  # only 100 points
+            ]
+        )
         with pytest.raises(ValueError, match="insufficient_points"):
             await exchange_item(CUSTOMER_ID, ITEM_ID, 500, TENANT_ID, db)
 
     @pytest.mark.asyncio
     async def test_exchange_out_of_stock(self):
-        db = make_db([
-            FakeResult(),
-            FakeResult(rows=[{"id": ITEM_ID, "name": "鱼头", "points_cost": 500, "stock": 0}]),
-        ])
+        db = make_db(
+            [
+                FakeResult(),
+                FakeResult(rows=[{"id": ITEM_ID, "name": "鱼头", "points_cost": 500, "stock": 0}]),
+            ]
+        )
         with pytest.raises(ValueError, match="item_out_of_stock"):
             await exchange_item(CUSTOMER_ID, ITEM_ID, 500, TENANT_ID, db)
 
     @pytest.mark.asyncio
     async def test_exchange_item_not_found(self):
-        db = make_db([
-            FakeResult(),
-            FakeResult(rows=[]),  # item not found
-        ])
+        db = make_db(
+            [
+                FakeResult(),
+                FakeResult(rows=[]),  # item not found
+            ]
+        )
         with pytest.raises(ValueError, match="item_not_found"):
             await exchange_item(CUSTOMER_ID, ITEM_ID, 500, TENANT_ID, db)
 
     @pytest.mark.asyncio
     async def test_exchange_cost_mismatch(self):
-        db = make_db([
-            FakeResult(),
-            FakeResult(rows=[{"id": ITEM_ID, "name": "鱼头", "points_cost": 500, "stock": 5}]),
-        ])
+        db = make_db(
+            [
+                FakeResult(),
+                FakeResult(rows=[{"id": ITEM_ID, "name": "鱼头", "points_cost": 500, "stock": 5}]),
+            ]
+        )
         with pytest.raises(ValueError, match="points_cost_mismatch"):
             await exchange_item(CUSTOMER_ID, ITEM_ID, 999, TENANT_ID, db)
 
 
 # ── 3. 兑换历史 ─────────────────────────────────────────────
 
+
 class TestExchangeHistory:
     @pytest.mark.asyncio
     async def test_history_empty(self):
-        db = make_db([
-            FakeResult(),
-            FakeResult(scalar_val=0),
-            FakeResult(rows=[]),
-        ])
+        db = make_db(
+            [
+                FakeResult(),
+                FakeResult(scalar_val=0),
+                FakeResult(rows=[]),
+            ]
+        )
         result = await get_exchange_history(CUSTOMER_ID, TENANT_ID, db)
         assert result["total"] == 0
         assert result["items"] == []
@@ -176,14 +207,22 @@ class TestExchangeHistory:
     async def test_history_with_records(self):
         now = datetime.now(timezone.utc)
         records = [
-            {"id": "e1", "item_id": "i1", "item_name": "鱼头",
-             "points_cost": 500, "status": "confirmed", "created_at": now},
+            {
+                "id": "e1",
+                "item_id": "i1",
+                "item_name": "鱼头",
+                "points_cost": 500,
+                "status": "confirmed",
+                "created_at": now,
+            },
         ]
-        db = make_db([
-            FakeResult(),
-            FakeResult(scalar_val=1),
-            FakeResult(rows=records),
-        ])
+        db = make_db(
+            [
+                FakeResult(),
+                FakeResult(scalar_val=1),
+                FakeResult(rows=records),
+            ]
+        )
         result = await get_exchange_history(CUSTOMER_ID, TENANT_ID, db)
         assert result["total"] == 1
         assert result["items"][0]["item_name"] == "鱼头"
@@ -191,14 +230,19 @@ class TestExchangeHistory:
 
 # ── 4. 上架商品 ─────────────────────────────────────────────
 
+
 class TestCreateMallItem:
     @pytest.mark.asyncio
     async def test_create_dish(self):
         db = make_db([FakeResult(), FakeResult()])
         result = await create_mall_item(
-            name="鱼头券", category="dish", points_cost=500,
-            stock=100, image_url="https://img.test/fish.jpg",
-            tenant_id=TENANT_ID, db=db,
+            name="鱼头券",
+            category="dish",
+            points_cost=500,
+            stock=100,
+            image_url="https://img.test/fish.jpg",
+            tenant_id=TENANT_ID,
+            db=db,
         )
         assert result["name"] == "鱼头券"
         assert result["category"] == "dish"
@@ -210,7 +254,13 @@ class TestCreateMallItem:
         db = make_db([FakeResult()])
         with pytest.raises(ValueError, match="invalid_category"):
             await create_mall_item(
-                "test", "invalid", 100, 10, "", TENANT_ID, db,
+                "test",
+                "invalid",
+                100,
+                10,
+                "",
+                TENANT_ID,
+                db,
             )
 
     @pytest.mark.asyncio
@@ -218,11 +268,18 @@ class TestCreateMallItem:
         db = make_db([FakeResult()])
         with pytest.raises(ValueError, match="points_cost_must_be_positive"):
             await create_mall_item(
-                "test", "dish", 0, 10, "", TENANT_ID, db,
+                "test",
+                "dish",
+                0,
+                10,
+                "",
+                TENANT_ID,
+                db,
             )
 
 
 # ── 5. 成就系统 ─────────────────────────────────────────────
+
 
 class TestAchievements:
     def test_definitions_exist(self):
@@ -239,14 +296,18 @@ class TestAchievements:
     @pytest.mark.asyncio
     async def test_achievement_list(self):
         metrics = {
-            "order_count": 15, "total_spent_fen": 50000,
-            "share_count": 3, "review_count": 0,
+            "order_count": 15,
+            "total_spent_fen": 50000,
+            "share_count": 3,
+            "review_count": 0,
         }
-        db = make_db([
-            FakeResult(),  # _set_tenant
-            FakeResult(rows=[metrics]),  # metrics query
-            FakeResult(rows=[("first_order",), ("orders_10",)]),  # earned
-        ])
+        db = make_db(
+            [
+                FakeResult(),  # _set_tenant
+                FakeResult(rows=[metrics]),  # metrics query
+                FakeResult(rows=[("first_order",), ("orders_10",)]),  # earned
+            ]
+        )
         result = await get_achievement_list(CUSTOMER_ID, TENANT_ID, db)
         assert result["total_count"] == len(ACHIEVEMENT_DEFINITIONS)
         assert result["earned_count"] == 2
@@ -254,23 +315,28 @@ class TestAchievements:
 
 # ── 6. 生日特权 ─────────────────────────────────────────────
 
+
 class TestBirthdayPrivilege:
     @pytest.mark.asyncio
     async def test_birthday_not_set(self):
-        db = make_db([
-            FakeResult(),
-            FakeResult(rows=[{"birthday": None}]),
-        ])
+        db = make_db(
+            [
+                FakeResult(),
+                FakeResult(rows=[{"birthday": None}]),
+            ]
+        )
         result = await check_birthday_privilege(CUSTOMER_ID, TENANT_ID, db)
         assert result["eligible"] is False
         assert result["reason"] == "birthday_not_set"
 
     @pytest.mark.asyncio
     async def test_customer_not_found(self):
-        db = make_db([
-            FakeResult(),
-            FakeResult(rows=[]),
-        ])
+        db = make_db(
+            [
+                FakeResult(),
+                FakeResult(rows=[]),
+            ]
+        )
         with pytest.raises(ValueError, match="customer_not_found"):
             await check_birthday_privilege(CUSTOMER_ID, TENANT_ID, db)
 
@@ -278,11 +344,13 @@ class TestBirthdayPrivilege:
     async def test_birthday_month_match(self):
         current_month = datetime.now(timezone.utc).month
         birthday = date(1990, current_month, 15)
-        db = make_db([
-            FakeResult(),  # _set_tenant
-            FakeResult(rows=[{"birthday": birthday}]),  # customer
-            FakeResult(scalar_val=None),  # not yet claimed
-        ])
+        db = make_db(
+            [
+                FakeResult(),  # _set_tenant
+                FakeResult(rows=[{"birthday": birthday}]),  # customer
+                FakeResult(scalar_val=None),  # not yet claimed
+            ]
+        )
         result = await check_birthday_privilege(CUSTOMER_ID, TENANT_ID, db)
         assert result["eligible"] is True
         assert len(result["rewards"]) == 3

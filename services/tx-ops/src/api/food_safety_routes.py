@@ -12,6 +12,7 @@
 
 统一响应格式: {"ok": bool, "data": {}, "error": {}}
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -37,6 +38,7 @@ log = structlog.get_logger(__name__)
 
 class FoodSampleReq(BaseModel):
     """留样登记请求"""
+
     store_id: str = Field(..., description="门店ID")
     dish_name: str = Field(..., description="菜品名称")
     sample_weight_g: float = Field(..., description="留样重量（克），要求 ≥ 125g")
@@ -49,6 +51,7 @@ class FoodSampleReq(BaseModel):
 
 class TemperatureRecordReq(BaseModel):
     """温度记录请求"""
+
     store_id: str = Field(..., description="门店ID")
     location: str = Field(..., description="测温位置：refrigerator/freezer/hot_display/prep_area")
     temp_celsius: float = Field(..., description="实测温度（摄氏度）")
@@ -59,6 +62,7 @@ class TemperatureRecordReq(BaseModel):
 
 class SafetyInspectionReq(BaseModel):
     """食安检查完成请求"""
+
     store_id: str = Field(..., description="门店ID")
     inspector_id: str = Field(..., description="检查员工号")
     checklist_type: str = Field(..., description="检查类型：daily/weekly/monthly/surprise")
@@ -70,8 +74,11 @@ class SafetyInspectionReq(BaseModel):
 
 class SafetyViolationReq(BaseModel):
     """违规登记请求"""
+
     store_id: str = Field(..., description="门店ID")
-    violation_type: str = Field(..., description="违规类型：expired_ingredient/improper_storage/hygiene/temperature/other")
+    violation_type: str = Field(
+        ..., description="违规类型：expired_ingredient/improper_storage/hygiene/temperature/other"
+    )
     severity: str = Field(..., description="严重程度：minor/major/critical")
     description: str = Field(..., description="违规详情")
     reporter_id: str = Field(..., description="上报人员工号")
@@ -125,24 +132,26 @@ async def log_food_sample(
     sample_id = str(uuid.uuid4())
     logged_at = datetime.now(timezone.utc)
 
-    asyncio.create_task(emit_event(
-        event_type=SafetyEventType.SAMPLE_LOGGED,
-        tenant_id=x_tenant_id,
-        stream_id=sample_id,
-        payload={
-            "sample_id": sample_id,
-            "dish_name": req.dish_name,
-            "sample_weight_g": req.sample_weight_g,
-            "meal_period": req.meal_period,
-            "sampler_id": req.sampler_id,
-            "storage_temp_celsius": req.storage_temp_celsius,
-            "expiry_hours": req.expiry_hours,
-            "notes": req.notes,
-        },
-        store_id=req.store_id,
-        source_service="tx-ops",
-        metadata={"stat_date": date.today().isoformat()},
-    ))
+    asyncio.create_task(
+        emit_event(
+            event_type=SafetyEventType.SAMPLE_LOGGED,
+            tenant_id=x_tenant_id,
+            stream_id=sample_id,
+            payload={
+                "sample_id": sample_id,
+                "dish_name": req.dish_name,
+                "sample_weight_g": req.sample_weight_g,
+                "meal_period": req.meal_period,
+                "sampler_id": req.sampler_id,
+                "storage_temp_celsius": req.storage_temp_celsius,
+                "expiry_hours": req.expiry_hours,
+                "notes": req.notes,
+            },
+            store_id=req.store_id,
+            source_service="tx-ops",
+            metadata={"stat_date": date.today().isoformat()},
+        )
+    )
 
     log.info(
         "food_safety_sample_logged",
@@ -185,31 +194,30 @@ async def record_temperature(
         t_min, t_max = threshold["min"], threshold["max"]
         if not (t_min <= req.temp_celsius <= t_max):
             compliant = False
-            anomaly_detail = (
-                f"{threshold['unit']}温度 {req.temp_celsius}°C 超出"
-                f"合规范围 [{t_min}, {t_max}]°C"
-            )
+            anomaly_detail = f"{threshold['unit']}温度 {req.temp_celsius}°C 超出合规范围 [{t_min}, {t_max}]°C"
 
     record_id = str(uuid.uuid4())
 
-    asyncio.create_task(emit_event(
-        event_type=SafetyEventType.TEMPERATURE_RECORDED,
-        tenant_id=x_tenant_id,
-        stream_id=record_id,
-        payload={
-            "record_id": record_id,
-            "location": req.location,
-            "temp_celsius": req.temp_celsius,
-            "recorder_id": req.recorder_id,
-            "equipment_id": req.equipment_id,
-            "compliant": compliant,
-            "anomaly_detail": anomaly_detail,
-            "notes": req.notes,
-        },
-        store_id=req.store_id,
-        source_service="tx-ops",
-        metadata={"stat_date": date.today().isoformat()},
-    ))
+    asyncio.create_task(
+        emit_event(
+            event_type=SafetyEventType.TEMPERATURE_RECORDED,
+            tenant_id=x_tenant_id,
+            stream_id=record_id,
+            payload={
+                "record_id": record_id,
+                "location": req.location,
+                "temp_celsius": req.temp_celsius,
+                "recorder_id": req.recorder_id,
+                "equipment_id": req.equipment_id,
+                "compliant": compliant,
+                "anomaly_detail": anomaly_detail,
+                "notes": req.notes,
+            },
+            store_id=req.store_id,
+            source_service="tx-ops",
+            metadata={"stat_date": date.today().isoformat()},
+        )
+    )
 
     log.info(
         "food_safety_temperature_recorded",
@@ -247,24 +255,26 @@ async def complete_inspection(
     total_items = len(req.items)
     passed_items = sum(1 for i in req.items if i.get("passed", False))
 
-    asyncio.create_task(emit_event(
-        event_type=SafetyEventType.INSPECTION_DONE,
-        tenant_id=x_tenant_id,
-        stream_id=inspection_id,
-        payload={
-            "inspection_id": inspection_id,
-            "inspector_id": req.inspector_id,
-            "checklist_type": req.checklist_type,
-            "total_items": total_items,
-            "passed_items": passed_items,
-            "overall_score": req.overall_score,
-            "violations": req.violations,
-            "corrective_actions": req.corrective_actions,
-        },
-        store_id=req.store_id,
-        source_service="tx-ops",
-        metadata={"stat_date": date.today().isoformat()},
-    ))
+    asyncio.create_task(
+        emit_event(
+            event_type=SafetyEventType.INSPECTION_DONE,
+            tenant_id=x_tenant_id,
+            stream_id=inspection_id,
+            payload={
+                "inspection_id": inspection_id,
+                "inspector_id": req.inspector_id,
+                "checklist_type": req.checklist_type,
+                "total_items": total_items,
+                "passed_items": passed_items,
+                "overall_score": req.overall_score,
+                "violations": req.violations,
+                "corrective_actions": req.corrective_actions,
+            },
+            store_id=req.store_id,
+            source_service="tx-ops",
+            metadata={"stat_date": date.today().isoformat()},
+        )
+    )
 
     log.info(
         "food_safety_inspection_done",
@@ -301,26 +311,28 @@ async def log_violation(
     """
     violation_id = str(uuid.uuid4())
 
-    asyncio.create_task(emit_event(
-        event_type=SafetyEventType.VIOLATION_FOUND,
-        tenant_id=x_tenant_id,
-        stream_id=violation_id,
-        payload={
-            "violation_id": violation_id,
-            "violation_type": req.violation_type,
-            "severity": req.severity,
-            "description": req.description,
-            "reporter_id": req.reporter_id,
-            "corrective_action": req.corrective_action,
-            "ingredient_id": req.ingredient_id,
-        },
-        store_id=req.store_id,
-        source_service="tx-ops",
-        metadata={
-            "stat_date": date.today().isoformat(),
-            "requires_immediate_action": req.severity == "critical",
-        },
-    ))
+    asyncio.create_task(
+        emit_event(
+            event_type=SafetyEventType.VIOLATION_FOUND,
+            tenant_id=x_tenant_id,
+            stream_id=violation_id,
+            payload={
+                "violation_id": violation_id,
+                "violation_type": req.violation_type,
+                "severity": req.severity,
+                "description": req.description,
+                "reporter_id": req.reporter_id,
+                "corrective_action": req.corrective_action,
+                "ingredient_id": req.ingredient_id,
+            },
+            store_id=req.store_id,
+            source_service="tx-ops",
+            metadata={
+                "stat_date": date.today().isoformat(),
+                "requires_immediate_action": req.severity == "critical",
+            },
+        )
+    )
 
     log.warning(
         "food_safety_violation_logged",
@@ -369,14 +381,19 @@ async def get_safety_summary(
         conn = await asyncpg.connect(db_url)
         try:
             await conn.execute("SELECT set_config('app.tenant_id', $1, TRUE)", x_tenant_id)
-            row = await conn.fetchrow("""
+            row = await conn.fetchrow(
+                """
                 SELECT
                     sample_count, temperature_check_count, temperature_anomaly_count,
                     inspection_count, violation_count, critical_violation_count,
                     compliance_score, updated_at
                 FROM mv_safety_compliance
                 WHERE tenant_id = $1 AND store_id = $2 AND stat_week = $3
-            """, x_tenant_id, store_id, stat_week)
+            """,
+                x_tenant_id,
+                store_id,
+                stat_week,
+            )
         finally:
             await conn.close()
     except Exception as exc:  # noqa: BLE001 — DB不可用时降级
@@ -401,10 +418,13 @@ async def get_safety_summary(
     data["stat_week"] = stat_week.isoformat()
     data["source"] = "mv_safety_compliance"
     data["compliance_level"] = (
-        "优秀" if float(data.get("compliance_score") or 0) >= 90 else
-        "合格" if float(data.get("compliance_score") or 0) >= 75 else
-        "警告" if float(data.get("compliance_score") or 0) >= 60 else
-        "危险"
+        "优秀"
+        if float(data.get("compliance_score") or 0) >= 90
+        else "合格"
+        if float(data.get("compliance_score") or 0) >= 75
+        else "警告"
+        if float(data.get("compliance_score") or 0) >= 60
+        else "危险"
     )
 
     return {"ok": True, "data": data}

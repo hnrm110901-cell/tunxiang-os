@@ -2,6 +2,7 @@
 
 提供本班数据摘要查询与交班记录保存功能。
 """
+
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -20,10 +21,11 @@ router = APIRouter(prefix="/api/v1/crew", tags=["crew-handover"])
 
 # ---------- 请求 / 响应模型 ----------
 
+
 class ShiftSummaryData(BaseModel):
     table_count: int
     order_count: int
-    revenue: int                  # 分（整数避免浮点）
+    revenue: int  # 分（整数避免浮点）
     bell_responses: int
     complaints: int
     good_reviews: int
@@ -36,6 +38,7 @@ class HandoverRequest(BaseModel):
 
 
 # ---------- 路由 ----------
+
 
 @router.get("/shift-summary")
 async def get_shift_summary(

@@ -13,6 +13,7 @@
   - max_discount_rate = 0.0 表示管理员无限制（level=10）
   - 折扣 discount_rate < role.max_discount_rate 表示「想打更低的折扣」= 超权限
 """
+
 from __future__ import annotations
 
 import uuid
@@ -34,24 +35,26 @@ logger = structlog.get_logger(__name__)
 @dataclass(frozen=True)
 class RoleSnapshot:
     """员工当前有效角色的权限快照（只读）"""
+
     role_config_id: UUID
     role_name: str
     level: int
-    max_discount_rate: float       # 最低折扣率(%) — 低于此值需审批/拒绝
-    max_wipeoff_fen: int           # 抹零上限(分)
-    max_gift_fen: int              # 赠送上限(分)
-    data_query_days: int           # 可查询历史天数
+    max_discount_rate: float  # 最低折扣率(%) — 低于此值需审批/拒绝
+    max_wipeoff_fen: int  # 抹零上限(分)
+    max_gift_fen: int  # 赠送上限(分)
+    data_query_days: int  # 可查询历史天数
     can_void_order: bool
     can_modify_price: bool
-    can_override_discount: bool    # 可申请审批突破折扣下限
+    can_override_discount: bool  # 可申请审批突破折扣下限
 
 
 @dataclass(frozen=True)
 class PermissionCheckResult:
     """权限检查结果"""
+
     allowed: bool
     require_approval: bool = False
-    approver_min_level: int = 0    # 需要最低几级审批人，0=无需审批
+    approver_min_level: int = 0  # 需要最低几级审批人，0=无需审批
     message: str = ""
 
     @classmethod
@@ -171,21 +174,24 @@ class PermissionRepository:
                  :role_level, :allowed, :require_approval, :approver_min_level,
                  :deny_reason, :order_id, :request_ip)
         """)
-        await session.execute(sql, {
-            "id": str(uuid.uuid4()),
-            "tenant_id": str(tenant_id),
-            "employee_id": str(employee_id),
-            "store_id": str(store_id) if store_id else None,
-            "operation": operation,
-            "amount_fen": amount_fen,
-            "role_level": role_level,
-            "allowed": result.allowed,
-            "require_approval": result.require_approval,
-            "approver_min_level": result.approver_min_level if result.approver_min_level else None,
-            "deny_reason": result.message if not result.allowed else None,
-            "order_id": str(order_id) if order_id else None,
-            "request_ip": request_ip,
-        })
+        await session.execute(
+            sql,
+            {
+                "id": str(uuid.uuid4()),
+                "tenant_id": str(tenant_id),
+                "employee_id": str(employee_id),
+                "store_id": str(store_id) if store_id else None,
+                "operation": operation,
+                "amount_fen": amount_fen,
+                "role_level": role_level,
+                "allowed": result.allowed,
+                "require_approval": result.require_approval,
+                "approver_min_level": result.approver_min_level if result.approver_min_level else None,
+                "deny_reason": result.message if not result.allowed else None,
+                "order_id": str(order_id) if order_id else None,
+                "request_ip": request_ip,
+            },
+        )
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -216,9 +222,7 @@ class PermissionService:
         session: AsyncSession,
     ) -> tuple[Optional[RoleSnapshot], Optional[PermissionCheckResult]]:
         """查询角色快照，找不到时返回拒绝结果"""
-        role = await self._repo.get_employee_role_snapshot(
-            employee_id, tenant_id, store_id, session
-        )
+        role = await self._repo.get_employee_role_snapshot(employee_id, tenant_id, store_id, session)
         if role is None:
             result = PermissionCheckResult.deny("员工未分配角色，操作被拒绝")
             return None, result
@@ -227,7 +231,7 @@ class PermissionService:
     async def check_discount_permission(
         self,
         employee_id: UUID,
-        discount_rate: float,       # 0-100，如 85.0 = 打85折
+        discount_rate: float,  # 0-100，如 85.0 = 打85折
         tenant_id: UUID,
         session: AsyncSession,
         store_id: Optional[UUID] = None,
@@ -243,13 +247,19 @@ class PermissionService:
             - can_override_discount=True → 需审批（approver_min_level = role.level + 2）
             - can_override_discount=False → 直接拒绝
         """
-        role, early_deny = await self._get_role_or_deny(
-            employee_id, tenant_id, store_id, session
-        )
+        role, early_deny = await self._get_role_or_deny(employee_id, tenant_id, store_id, session)
         if early_deny is not None:
             await self._log(
-                tenant_id, employee_id, store_id, "discount",
-                int(discount_rate * 100), None, early_deny, order_id, request_ip, session,
+                tenant_id,
+                employee_id,
+                store_id,
+                "discount",
+                int(discount_rate * 100),
+                None,
+                early_deny,
+                order_id,
+                request_ip,
+                session,
             )
             return early_deny
 
@@ -268,8 +278,16 @@ class PermissionService:
             )
 
         await self._log(
-            tenant_id, employee_id, store_id, "discount",
-            int(discount_rate * 100), role.level, result, order_id, request_ip, session,
+            tenant_id,
+            employee_id,
+            store_id,
+            "discount",
+            int(discount_rate * 100),
+            role.level,
+            result,
+            order_id,
+            request_ip,
+            session,
         )
         logger.info(
             "permission_check_discount",
@@ -295,26 +313,38 @@ class PermissionService:
 
         规则：amount_fen <= role.max_wipeoff_fen → 允许
         """
-        role, early_deny = await self._get_role_or_deny(
-            employee_id, tenant_id, store_id, session
-        )
+        role, early_deny = await self._get_role_or_deny(employee_id, tenant_id, store_id, session)
         if early_deny is not None:
             await self._log(
-                tenant_id, employee_id, store_id, "wipeoff",
-                amount_fen, None, early_deny, order_id, request_ip, session,
+                tenant_id,
+                employee_id,
+                store_id,
+                "wipeoff",
+                amount_fen,
+                None,
+                early_deny,
+                order_id,
+                request_ip,
+                session,
             )
             return early_deny
 
         if role.level >= 10 or amount_fen <= role.max_wipeoff_fen:
             result = PermissionCheckResult.permit()
         else:
-            result = PermissionCheckResult.deny(
-                f"抹零金额 {amount_fen} 分超过本角色上限 {role.max_wipeoff_fen} 分"
-            )
+            result = PermissionCheckResult.deny(f"抹零金额 {amount_fen} 分超过本角色上限 {role.max_wipeoff_fen} 分")
 
         await self._log(
-            tenant_id, employee_id, store_id, "wipeoff",
-            amount_fen, role.level, result, order_id, request_ip, session,
+            tenant_id,
+            employee_id,
+            store_id,
+            "wipeoff",
+            amount_fen,
+            role.level,
+            result,
+            order_id,
+            request_ip,
+            session,
         )
         logger.info(
             "permission_check_wipeoff",
@@ -339,13 +369,19 @@ class PermissionService:
 
         规则：amount_fen <= role.max_gift_fen → 允许
         """
-        role, early_deny = await self._get_role_or_deny(
-            employee_id, tenant_id, store_id, session
-        )
+        role, early_deny = await self._get_role_or_deny(employee_id, tenant_id, store_id, session)
         if early_deny is not None:
             await self._log(
-                tenant_id, employee_id, store_id, "gift",
-                amount_fen, None, early_deny, order_id, request_ip, session,
+                tenant_id,
+                employee_id,
+                store_id,
+                "gift",
+                amount_fen,
+                None,
+                early_deny,
+                order_id,
+                request_ip,
+                session,
             )
             return early_deny
 
@@ -356,13 +392,19 @@ class PermissionService:
         elif amount_fen <= role.max_gift_fen:
             result = PermissionCheckResult.permit()
         else:
-            result = PermissionCheckResult.deny(
-                f"赠送金额 {amount_fen} 分超过本角色上限 {role.max_gift_fen} 分"
-            )
+            result = PermissionCheckResult.deny(f"赠送金额 {amount_fen} 分超过本角色上限 {role.max_gift_fen} 分")
 
         await self._log(
-            tenant_id, employee_id, store_id, "gift",
-            amount_fen, role.level, result, order_id, request_ip, session,
+            tenant_id,
+            employee_id,
+            store_id,
+            "gift",
+            amount_fen,
+            role.level,
+            result,
+            order_id,
+            request_ip,
+            session,
         )
         logger.info(
             "permission_check_gift",
@@ -383,26 +425,38 @@ class PermissionService:
         request_ip: Optional[str] = None,
     ) -> PermissionCheckResult:
         """检查退单权限"""
-        role, early_deny = await self._get_role_or_deny(
-            employee_id, tenant_id, store_id, session
-        )
+        role, early_deny = await self._get_role_or_deny(employee_id, tenant_id, store_id, session)
         if early_deny is not None:
             await self._log(
-                tenant_id, employee_id, store_id, "void_order",
-                None, None, early_deny, order_id, request_ip, session,
+                tenant_id,
+                employee_id,
+                store_id,
+                "void_order",
+                None,
+                None,
+                early_deny,
+                order_id,
+                request_ip,
+                session,
             )
             return early_deny
 
         if role.can_void_order:
             result = PermissionCheckResult.permit()
         else:
-            result = PermissionCheckResult.deny(
-                f"本角色（Level {role.level}）无退单权限，需 Level 7+ 操作"
-            )
+            result = PermissionCheckResult.deny(f"本角色（Level {role.level}）无退单权限，需 Level 7+ 操作")
 
         await self._log(
-            tenant_id, employee_id, store_id, "void_order",
-            None, role.level, result, order_id, request_ip, session,
+            tenant_id,
+            employee_id,
+            store_id,
+            "void_order",
+            None,
+            role.level,
+            result,
+            order_id,
+            request_ip,
+            session,
         )
         logger.info(
             "permission_check_void_order",
@@ -422,26 +476,38 @@ class PermissionService:
         request_ip: Optional[str] = None,
     ) -> PermissionCheckResult:
         """检查改价权限"""
-        role, early_deny = await self._get_role_or_deny(
-            employee_id, tenant_id, store_id, session
-        )
+        role, early_deny = await self._get_role_or_deny(employee_id, tenant_id, store_id, session)
         if early_deny is not None:
             await self._log(
-                tenant_id, employee_id, store_id, "modify_price",
-                None, None, early_deny, order_id, request_ip, session,
+                tenant_id,
+                employee_id,
+                store_id,
+                "modify_price",
+                None,
+                None,
+                early_deny,
+                order_id,
+                request_ip,
+                session,
             )
             return early_deny
 
         if role.can_modify_price:
             result = PermissionCheckResult.permit()
         else:
-            result = PermissionCheckResult.deny(
-                f"本角色（Level {role.level}）无改价权限，需 Level 6+ 操作"
-            )
+            result = PermissionCheckResult.deny(f"本角色（Level {role.level}）无改价权限，需 Level 6+ 操作")
 
         await self._log(
-            tenant_id, employee_id, store_id, "modify_price",
-            None, role.level, result, order_id, request_ip, session,
+            tenant_id,
+            employee_id,
+            store_id,
+            "modify_price",
+            None,
+            role.level,
+            result,
+            order_id,
+            request_ip,
+            session,
         )
         logger.info(
             "permission_check_modify_price",
@@ -461,18 +527,14 @@ class PermissionService:
         request_ip: Optional[str] = None,
     ) -> PermissionCheckResult:
         """检查数据查询天数权限"""
-        role, early_deny = await self._get_role_or_deny(
-            employee_id, tenant_id, store_id, session
-        )
+        role, early_deny = await self._get_role_or_deny(employee_id, tenant_id, store_id, session)
         if early_deny is not None:
             return early_deny
 
         if role.level >= 10 or role.data_query_days >= 9999 or query_days <= role.data_query_days:
             result = PermissionCheckResult.permit()
         else:
-            result = PermissionCheckResult.deny(
-                f"查询范围 {query_days} 天超过本角色权限上限 {role.data_query_days} 天"
-            )
+            result = PermissionCheckResult.deny(f"查询范围 {query_days} 天超过本角色权限上限 {role.data_query_days} 天")
 
         logger.info(
             "permission_check_data_query",
@@ -491,9 +553,7 @@ class PermissionService:
         store_id: Optional[UUID] = None,
     ) -> Optional[RoleSnapshot]:
         """暴露给外部调用的角色查询（供API层直接使用）"""
-        return await self._repo.get_employee_role_snapshot(
-            employee_id, tenant_id, store_id, session
-        )
+        return await self._repo.get_employee_role_snapshot(employee_id, tenant_id, store_id, session)
 
     async def _log(
         self,

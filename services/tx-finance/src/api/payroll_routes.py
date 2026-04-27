@@ -16,9 +16,10 @@ DB 失败时：列表类端点返回空集合（graceful fallback），写操作
 
 统一响应格式: {"ok": bool, "data": {}, "error": {}}
 """
+
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import date
 from typing import Any, Optional
 
 import structlog
@@ -39,9 +40,7 @@ router = APIRouter(prefix="/api/v1/finance/payroll", tags=["payroll"])
 
 
 def _get_tenant_id(request: Request) -> str:
-    tid = getattr(request.state, "tenant_id", None) or request.headers.get(
-        "X-Tenant-ID", ""
-    )
+    tid = getattr(request.state, "tenant_id", None) or request.headers.get("X-Tenant-ID", "")
     if not tid:
         raise HTTPException(status_code=400, detail="X-Tenant-ID header required")
     return tid
@@ -126,9 +125,7 @@ async def get_payroll_summary(
         else:
             period_end = date(year, month_num + 1, 1)
     except (ValueError, IndexError) as exc:
-        raise HTTPException(
-            status_code=400, detail=f"month 格式错误，应为 YYYY-MM，收到: {month}"
-        ) from exc
+        raise HTTPException(status_code=400, detail=f"month 格式错误，应为 YYYY-MM，收到: {month}") from exc
 
     conditions = [
         "tenant_id = :tid::uuid",
@@ -164,22 +161,26 @@ async def get_payroll_summary(
     except SQLAlchemyError as exc:
         log.error("payroll_summary_db_error", error=str(exc), exc_info=True)
         # graceful fallback
-        return _ok({
-            "month": month,
-            "headcount": 0,
-            "gross_total": 0,
-            "paid_total": 0,
-            "pending_approval": 0,
-            "_db_error": True,
-        })
+        return _ok(
+            {
+                "month": month,
+                "headcount": 0,
+                "gross_total": 0,
+                "paid_total": 0,
+                "pending_approval": 0,
+                "_db_error": True,
+            }
+        )
 
-    return _ok({
-        "month": month,
-        "headcount": int(row["headcount"] or 0),
-        "gross_total": int(row["gross_total"] or 0),
-        "paid_total": int(row["paid_total"] or 0),
-        "pending_approval": int(row["pending_approval"] or 0),
-    })
+    return _ok(
+        {
+            "month": month,
+            "headcount": int(row["headcount"] or 0),
+            "gross_total": int(row["gross_total"] or 0),
+            "paid_total": int(row["paid_total"] or 0),
+            "pending_approval": int(row["pending_approval"] or 0),
+        }
+    )
 
 
 # ── 薪资单列表 ───────────────────────────────────────────────────────────────
@@ -345,6 +346,7 @@ async def create_payroll_record(
     net_pay_fen = gross_pay_fen - body.tax_fen
 
     import json as _json
+
     snapshot_json = _json.dumps(body.calc_snapshot) if body.calc_snapshot else None
 
     try:

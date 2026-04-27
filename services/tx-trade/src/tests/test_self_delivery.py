@@ -7,15 +7,16 @@ Y-M4
 2. test_delivery_status_flow    — 完整状态机: pending→assigned→picked_up→delivered
 3. test_rider_workload          — 配送员在途2单 → current_orders=2
 """
+
 import pytest
-from fastapi.testclient import TestClient
 from fastapi import FastAPI
+from fastapi.testclient import TestClient
 
 from ..api.self_delivery_routes import (
-    router,
-    MOCK_RIDERS,
     _MOCK_DELIVERY_ORDERS,
+    MOCK_RIDERS,
     _calc_estimated_minutes,
+    router,
 )
 
 # ─── 测试 App ─────────────────────────────────────────────────────────────────
@@ -26,6 +27,7 @@ client = TestClient(_app)
 
 
 # ─── 辅助函数 ─────────────────────────────────────────────────────────────────
+
 
 def _reset_state() -> None:
     """重置内存存储和 mock 配送员状态"""
@@ -50,17 +52,21 @@ def _create_order(
     order_id: str = "ord-test-001",
 ) -> dict:
     """便捷创建配送单，返回响应 data 字典"""
-    resp = client.post("/api/v1/trade/delivery/orders", json={
-        "order_id": order_id,
-        "store_id": "store-test-001",
-        "delivery_address": "长沙市岳麓区测试路1号",
-        "distance_meters": distance_meters,
-    })
+    resp = client.post(
+        "/api/v1/trade/delivery/orders",
+        json={
+            "order_id": order_id,
+            "store_id": "store-test-001",
+            "delivery_address": "长沙市岳麓区测试路1号",
+            "distance_meters": distance_meters,
+        },
+    )
     assert resp.status_code == 201, resp.text
     return resp.json()["data"]
 
 
 # ─── Test 1: 创建配送单 ───────────────────────────────────────────────────────
+
 
 class TestCreateDeliveryOrder:
     """estimated_minutes = max(15, distance_meters / 250) 计算验证"""
@@ -68,18 +74,19 @@ class TestCreateDeliveryOrder:
     def setup_method(self) -> None:
         _reset_state()
 
-    @pytest.mark.parametrize("distance_meters,expected_minutes", [
-        (0,    15),    # max(15, 0/250) = max(15,0) = 15
-        (500,  15),    # max(15, 500/250) = max(15,2) = 15
-        (1000, 15),    # max(15, 1000/250) = max(15,4) = 15
-        (3750, 15),    # max(15, 3750/250) = max(15,15) = 15
-        (5000, 20),    # max(15, 5000/250) = max(15,20) = 20
-        (10000, 40),   # max(15, 10000/250) = max(15,40) = 40
-        (25000, 100),  # max(15, 25000/250) = max(15,100) = 100
-    ])
-    def test_estimated_minutes_formula(
-        self, distance_meters: int, expected_minutes: int
-    ) -> None:
+    @pytest.mark.parametrize(
+        "distance_meters,expected_minutes",
+        [
+            (0, 15),  # max(15, 0/250) = max(15,0) = 15
+            (500, 15),  # max(15, 500/250) = max(15,2) = 15
+            (1000, 15),  # max(15, 1000/250) = max(15,4) = 15
+            (3750, 15),  # max(15, 3750/250) = max(15,15) = 15
+            (5000, 20),  # max(15, 5000/250) = max(15,20) = 20
+            (10000, 40),  # max(15, 10000/250) = max(15,40) = 40
+            (25000, 100),  # max(15, 25000/250) = max(15,100) = 100
+        ],
+    )
+    def test_estimated_minutes_formula(self, distance_meters: int, expected_minutes: int) -> None:
         """直接验证纯函数"""
         assert _calc_estimated_minutes(distance_meters) == expected_minutes
 
@@ -108,13 +115,13 @@ class TestCreateDeliveryOrder:
         data = _create_order()
         delivery_id = data["id"]
 
-        list_resp = client.get("/api/v1/trade/delivery/orders",
-                               params={"status": "pending"})
+        list_resp = client.get("/api/v1/trade/delivery/orders", params={"status": "pending"})
         ids = [o["id"] for o in list_resp.json()["data"]["items"]]
         assert delivery_id in ids
 
 
 # ─── Test 2: 配送状态机完整流程 ───────────────────────────────────────────────
+
 
 class TestDeliveryStatusFlow:
     """完整状态机: pending → assigned → picked_up → delivered"""
@@ -141,18 +148,14 @@ class TestDeliveryStatusFlow:
         assert assign_data["dispatch_at"] is not None
 
         # 取货
-        pickup_resp = client.post(
-            f"/api/v1/trade/delivery/orders/{delivery_id}/pickup"
-        )
+        pickup_resp = client.post(f"/api/v1/trade/delivery/orders/{delivery_id}/pickup")
         assert pickup_resp.status_code == 200, pickup_resp.text
         pickup_data = pickup_resp.json()["data"]
         assert pickup_data["status"] == "picked_up"
         assert pickup_data["picked_up_at"] is not None
 
         # 送达
-        complete_resp = client.post(
-            f"/api/v1/trade/delivery/orders/{delivery_id}/complete"
-        )
+        complete_resp = client.post(f"/api/v1/trade/delivery/orders/{delivery_id}/complete")
         assert complete_resp.status_code == 200, complete_resp.text
         complete_data = complete_resp.json()["data"]
         assert complete_data["status"] == "delivered"
@@ -212,6 +215,7 @@ class TestDeliveryStatusFlow:
 
 # ─── Test 3: 配送员工作量 ─────────────────────────────────────────────────────
 
+
 class TestRiderWorkload:
     """配送员工作量：在途2单 → current_orders=2"""
 
@@ -236,18 +240,14 @@ class TestRiderWorkload:
         for order in [order1, order2]:
             client.post(
                 f"/api/v1/trade/delivery/orders/{order['id']}/assign",
-                json={"rider_id": "rider-002",
-                      "rider_name": "李骑手",
-                      "rider_phone": "139xxxx0002"},
+                json={"rider_id": "rider-002", "rider_name": "李骑手", "rider_phone": "139xxxx0002"},
             )
 
         resp = client.get("/api/v1/trade/delivery/riders/rider-002/workload")
         assert resp.status_code == 200
         data = resp.json()["data"]
         # 从内存计算在途单数：2 条 assigned 单
-        assert data["current_orders"] == 2, (
-            f"配送员应有 2 个在途单，实际: {data['current_orders']}"
-        )
+        assert data["current_orders"] == 2, f"配送员应有 2 个在途单，实际: {data['current_orders']}"
 
     def test_rider_workload_decreases_on_complete(self) -> None:
         """送达1单后，current_orders 减少"""
@@ -257,9 +257,7 @@ class TestRiderWorkload:
         for order in [order1, order2]:
             client.post(
                 f"/api/v1/trade/delivery/orders/{order['id']}/assign",
-                json={"rider_id": "rider-002",
-                      "rider_name": "李骑手",
-                      "rider_phone": "139xxxx0002"},
+                json={"rider_id": "rider-002", "rider_name": "李骑手", "rider_phone": "139xxxx0002"},
             )
 
         # 送达第一单

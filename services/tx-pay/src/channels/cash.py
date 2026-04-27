@@ -3,6 +3,7 @@
 现金支付不涉及第三方 API 调用，仅记录支付事实。
 由收银员在 POS 端确认收款后调用。
 """
+
 from __future__ import annotations
 
 import uuid

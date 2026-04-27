@@ -2,6 +2,7 @@
 
 每个门店可配置多个班次，KDS生产报表按班次时段切割kds_tasks数据。
 """
+
 import uuid
 from datetime import time
 
@@ -25,21 +26,9 @@ class ShiftConfig(TenantBase):
 
     __tablename__ = "shift_configs"
 
-    store_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), nullable=False, index=True, comment="门店ID"
-    )
-    shift_name: Mapped[str] = mapped_column(
-        String(50), nullable=False, comment="班次名称：早班/午班/晚班"
-    )
-    start_time: Mapped[time] = mapped_column(
-        Time, nullable=False, comment="班次开始时间（本地时）"
-    )
-    end_time: Mapped[time] = mapped_column(
-        Time, nullable=False, comment="班次结束时间（本地时）"
-    )
-    color: Mapped[str] = mapped_column(
-        String(10), nullable=False, default="#FF6B35", comment="前端显示色，如 #FF6B35"
-    )
-    is_active: Mapped[bool] = mapped_column(
-        Boolean, default=True, comment="是否启用"
-    )
+    store_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False, index=True, comment="门店ID")
+    shift_name: Mapped[str] = mapped_column(String(50), nullable=False, comment="班次名称：早班/午班/晚班")
+    start_time: Mapped[time] = mapped_column(Time, nullable=False, comment="班次开始时间（本地时）")
+    end_time: Mapped[time] = mapped_column(Time, nullable=False, comment="班次结束时间（本地时）")
+    color: Mapped[str] = mapped_column(String(10), nullable=False, default="#FF6B35", comment="前端显示色，如 #FF6B35")
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, comment="是否启用")

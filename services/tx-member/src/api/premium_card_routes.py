@@ -19,6 +19,7 @@
   POST /api/v1/member/premium/cards/{id}/renew    续费
   POST /api/v1/member/premium/gift                赠送年卡
 """
+
 import uuid
 from typing import Optional
 
@@ -377,13 +378,15 @@ async def get_card_benefits(
         )
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e)) from e
-    return _ok({
-        "card_id": card_id,
-        "benefits": result.get("tpl_benefits", []),
-        "status": result.get("status"),
-        "expires_at": result.get("expires_at"),
-        "period_end": result.get("period_end"),
-    })
+    return _ok(
+        {
+            "card_id": card_id,
+            "benefits": result.get("tpl_benefits", []),
+            "status": result.get("status"),
+            "expires_at": result.get("expires_at"),
+            "period_end": result.get("period_end"),
+        }
+    )
 
 
 @_legacy_router.get("/cards/{card_id}/usage")
@@ -404,14 +407,16 @@ async def check_benefit_usage(
     except ValueError as e:
         status_code = 404 if _is_not_found(str(e)) else 400
         raise HTTPException(status_code=status_code, detail=str(e)) from e
-    return _ok({
-        "card_id": card_id,
-        "benefit_type": benefit_type,
-        "available": result.get("available"),
-        "remaining_quota": result.get("remaining_quota"),
-        "resets_at": result.get("resets_at"),
-        "benefit_config": result.get("benefit_config"),
-    })
+    return _ok(
+        {
+            "card_id": card_id,
+            "benefit_type": benefit_type,
+            "available": result.get("available"),
+            "remaining_quota": result.get("remaining_quota"),
+            "resets_at": result.get("resets_at"),
+            "benefit_config": result.get("benefit_config"),
+        }
+    )
 
 
 @_legacy_router.post("/cards/{card_id}/renew")

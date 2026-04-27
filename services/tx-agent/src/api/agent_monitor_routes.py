@@ -5,6 +5,7 @@ GET /api/v1/agent-monitor/status    — 各 Agent 运行状态 + 今日统计
 GET /api/v1/agent-monitor/decisions — 最近 Agent 决策日志（带过滤）
 GET /api/v1/agent-monitor/events    — 事件流实时状态（Redis Stream 积压）
 """
+
 from __future__ import annotations
 
 from datetime import date, datetime, timezone
@@ -21,15 +22,15 @@ router = APIRouter(prefix="/api/v1/agent-monitor", tags=["agent-monitor"])
 
 # 9个 Skill Agent 定义
 SKILL_AGENTS = [
-    {"id": "discount_guard",  "name": "折扣守护",  "emoji": "🛡️", "priority": "P0"},
-    {"id": "smart_menu",      "name": "智能排菜",  "emoji": "🍜", "priority": "P0"},
-    {"id": "serve_dispatch",  "name": "出餐调度",  "emoji": "⚡", "priority": "P1"},
-    {"id": "member_insight",  "name": "会员洞察",  "emoji": "👤", "priority": "P1"},
-    {"id": "inventory_alert", "name": "库存预警",  "emoji": "📦", "priority": "P1"},
-    {"id": "finance_audit",   "name": "财务稽核",  "emoji": "💰", "priority": "P1"},
-    {"id": "store_inspect",   "name": "巡店质检",  "emoji": "🔍", "priority": "P2"},
-    {"id": "smart_service",   "name": "智能客服",  "emoji": "💬", "priority": "P2"},
-    {"id": "private_ops",     "name": "私域运营",  "emoji": "📣", "priority": "P2"},
+    {"id": "discount_guard", "name": "折扣守护", "emoji": "🛡️", "priority": "P0"},
+    {"id": "smart_menu", "name": "智能排菜", "emoji": "🍜", "priority": "P0"},
+    {"id": "serve_dispatch", "name": "出餐调度", "emoji": "⚡", "priority": "P1"},
+    {"id": "member_insight", "name": "会员洞察", "emoji": "👤", "priority": "P1"},
+    {"id": "inventory_alert", "name": "库存预警", "emoji": "📦", "priority": "P1"},
+    {"id": "finance_audit", "name": "财务稽核", "emoji": "💰", "priority": "P1"},
+    {"id": "store_inspect", "name": "巡店质检", "emoji": "🔍", "priority": "P2"},
+    {"id": "smart_service", "name": "智能客服", "emoji": "💬", "priority": "P2"},
+    {"id": "private_ops", "name": "私域运营", "emoji": "📣", "priority": "P2"},
 ]
 
 
@@ -49,7 +50,8 @@ async def get_agent_status(
     """各 Agent 今日执行统计"""
     today = date.today().isoformat()
     try:
-        result = await db.execute(text("""
+        result = await db.execute(
+            text("""
             SELECT
                 agent_id,
                 COUNT(*)::int AS total_decisions,
@@ -60,7 +62,9 @@ async def get_agent_status(
             WHERE tenant_id = :tenant_id
               AND DATE(created_at AT TIME ZONE 'Asia/Shanghai') = :today
             GROUP BY agent_id
-        """), {"tenant_id": x_tenant_id, "today": today})
+        """),
+            {"tenant_id": x_tenant_id, "today": today},
+        )
         rows = result.fetchall()
         stats_by_agent = {r.agent_id: r for r in rows}
     except Exception as exc:  # noqa: BLE001
@@ -70,14 +74,16 @@ async def get_agent_status(
     agents = []
     for agent in SKILL_AGENTS:
         stats = stats_by_agent.get(agent["id"])
-        agents.append({
-            **agent,
-            "status": "active" if stats else "idle",
-            "today_decisions": int(stats.total_decisions) if stats else 0,
-            "avg_confidence": round(float(stats.avg_confidence), 2) if stats and stats.avg_confidence else None,
-            "last_active_at": stats.last_active_at.isoformat() if stats and stats.last_active_at else None,
-            "high_confidence_count": int(stats.high_confidence_count) if stats else 0,
-        })
+        agents.append(
+            {
+                **agent,
+                "status": "active" if stats else "idle",
+                "today_decisions": int(stats.total_decisions) if stats else 0,
+                "avg_confidence": round(float(stats.avg_confidence), 2) if stats and stats.avg_confidence else None,
+                "last_active_at": stats.last_active_at.isoformat() if stats and stats.last_active_at else None,
+                "high_confidence_count": int(stats.high_confidence_count) if stats else 0,
+            }
+        )
 
     total_decisions = sum(a["today_decisions"] for a in agents)
     active_count = sum(1 for a in agents if a["status"] == "active")
@@ -111,7 +117,8 @@ async def get_recent_decisions(
             where_clause += " AND agent_id = :agent_id"
             params["agent_id"] = agent_id
 
-        result = await db.execute(text(f"""
+        result = await db.execute(
+            text(f"""
             SELECT id::text, agent_id, action, decision_type,
                    confidence, reasoning, output_action,
                    constraints_check, created_at
@@ -119,7 +126,9 @@ async def get_recent_decisions(
             {where_clause}
             ORDER BY created_at DESC
             LIMIT :limit
-        """), params)
+        """),
+            params,
+        )
         rows = result.fetchall()
         return {
             "ok": True,

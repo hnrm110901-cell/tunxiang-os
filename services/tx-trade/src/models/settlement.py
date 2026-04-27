@@ -1,4 +1,5 @@
 """结算模型 — 日结/班结/交接班"""
+
 import uuid
 
 from sqlalchemy import Date, DateTime, ForeignKey, Integer, String, func
@@ -12,15 +13,12 @@ from .enums import SettlementType
 
 class Settlement(TenantBase):
     """日结/班结记录"""
+
     __tablename__ = "settlements"
 
-    store_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("stores.id"), nullable=False, index=True
-    )
+    store_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("stores.id"), nullable=False, index=True)
     settlement_date: Mapped[str] = mapped_column(Date, nullable=False, index=True)
-    settlement_type: Mapped[str] = mapped_column(
-        String(20), nullable=False, default=SettlementType.daily.value
-    )
+    settlement_type: Mapped[str] = mapped_column(String(20), nullable=False, default=SettlementType.daily.value)
 
     # 汇总金额（分）
     total_revenue_fen: Mapped[int] = mapped_column(Integer, default=0, comment="总营收(分)")
@@ -53,16 +51,13 @@ class Settlement(TenantBase):
 
 class ShiftHandover(TenantBase):
     """交接班记录"""
+
     __tablename__ = "shift_handovers"
 
-    store_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("stores.id"), nullable=False, index=True
-    )
+    store_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("stores.id"), nullable=False, index=True)
     from_employee_id: Mapped[str] = mapped_column(String(50), nullable=False)
     to_employee_id: Mapped[str] = mapped_column(String(50), nullable=False)
-    handover_at: Mapped[str] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
-    )
+    handover_at: Mapped[str] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     # 交接时段汇总
     orders_count: Mapped[int] = mapped_column(Integer, default=0)

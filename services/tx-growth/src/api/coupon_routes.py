@@ -7,6 +7,7 @@
 4. GET  /api/v1/growth/coupons/my                 我的优惠券（重定向到 tx-member）
 5. POST /api/v1/growth/coupons/{coupon_id}/apply  核销优惠券（收银员确认后）
 """
+
 import asyncio
 import uuid
 from datetime import date, datetime, timezone
@@ -34,6 +35,7 @@ _TABLE_NOT_READY_TABLES = {"coupons", "customer_coupons"}
 # 统一响应
 # ---------------------------------------------------------------------------
 
+
 def ok_response(data: Any) -> dict:
     return {"ok": True, "data": data}
 
@@ -45,6 +47,7 @@ def error_response(code: str, message: str) -> dict:
 # ---------------------------------------------------------------------------
 # 请求模型
 # ---------------------------------------------------------------------------
+
 
 class ClaimCouponRequest(BaseModel):
     coupon_id: str
@@ -60,13 +63,14 @@ class VerifyCouponRequest(BaseModel):
 class ApplyCouponRequest(BaseModel):
     order_id: str
     store_id: str
-    order_amount_fen: int   # 订单金额（分）
+    order_amount_fen: int  # 订单金额（分）
     operator_id: str
 
 
 # ---------------------------------------------------------------------------
 # 内部工具
 # ---------------------------------------------------------------------------
+
 
 async def _set_tenant(db: AsyncSession, tenant_id: str) -> None:
     await db.execute(
@@ -101,6 +105,7 @@ def _row_to_coupon(row) -> dict:
 # ---------------------------------------------------------------------------
 # 端点
 # ---------------------------------------------------------------------------
+
 
 @router.get("/available")
 async def list_available_coupons(
@@ -222,6 +227,7 @@ async def claim_coupon(
         expire_at = None
         if coupon.expiry_days:
             from datetime import timedelta
+
             expire_at = now + timedelta(days=coupon.expiry_days)
 
         # ⑥ 创建 customer_coupon
@@ -263,13 +269,15 @@ async def claim_coupon(
             customer_id=str(customer_id),
             tenant_id=x_tenant_id,
         )
-        return ok_response({
-            "customer_coupon_id": str(new_id),
-            "coupon_id": str(coupon_id),
-            "coupon_name": coupon.name,
-            "status": "unused",
-            "expire_at": expire_at.isoformat() if expire_at else None,
-        })
+        return ok_response(
+            {
+                "customer_coupon_id": str(new_id),
+                "coupon_id": str(coupon_id),
+                "coupon_name": coupon.name,
+                "status": "unused",
+                "expire_at": expire_at.isoformat() if expire_at else None,
+            }
+        )
 
     except ValueError as exc:
         logger.warning("coupon.claim_invalid_param", error=str(exc))
@@ -353,12 +361,14 @@ async def verify_coupon(
             customer_id=str(customer_id),
             tenant_id=x_tenant_id,
         )
-        return ok_response({
-            "customer_coupon_id": str(cc_id),
-            "coupon_name": row.coupon_name,
-            "status": "used",
-            "used_at": now.isoformat(),
-        })
+        return ok_response(
+            {
+                "customer_coupon_id": str(cc_id),
+                "coupon_name": row.coupon_name,
+                "status": "used",
+                "used_at": now.isoformat(),
+            }
+        )
 
     except ValueError as exc:
         logger.warning("coupon.verify_invalid_param", error=str(exc))
@@ -384,13 +394,14 @@ async def my_coupons(
     消费者券包管理（已领/已用/已过期列表）统一由 tx-member 维护，
     此处返回重定向提示，前端应调用 /api/v1/member/coupons。
     """
-    return ok_response({
-        "redirect": "/api/v1/member/coupons",
-        "_note": (
-            "客户优惠券列表由 tx-member 统一管理。"
-            "请携带相同 X-Tenant-ID 和 customer_id 调用 /api/v1/member/coupons"
-        ),
-    })
+    return ok_response(
+        {
+            "redirect": "/api/v1/member/coupons",
+            "_note": (
+                "客户优惠券列表由 tx-member 统一管理。请携带相同 X-Tenant-ID 和 customer_id 调用 /api/v1/member/coupons"
+            ),
+        }
+    )
 
 
 @router.post("/{coupon_id}/apply")
@@ -445,7 +456,10 @@ async def apply_coupon(
         if row.status == "used":
             return {"ok": False, "error": {"code": "COUPON_ALREADY_USED", "message": "该券已使用，不可重复核销"}}, 409
         if row.status != "unused":
-            return {"ok": False, "error": {"code": "INVALID_COUPON_STATUS", "message": f"券状态不可核销: {row.status}"}}, 409
+            return {
+                "ok": False,
+                "error": {"code": "INVALID_COUPON_STATUS", "message": f"券状态不可核销: {row.status}"},
+            }, 409
 
         # ③ 有效期校验
         if row.expire_at and row.expire_at < now:
@@ -506,35 +520,39 @@ async def apply_coupon(
         )
 
         # ⑦ 旁路发射事件（失败不影响主流程）
-        asyncio.create_task(emit_event(
-            event_type=CampaignEventType.COUPON_APPLIED,
-            tenant_id=x_tenant_id,
-            stream_id=coupon_id,
-            payload={
+        asyncio.create_task(
+            emit_event(
+                event_type=CampaignEventType.COUPON_APPLIED,
+                tenant_id=x_tenant_id,
+                stream_id=coupon_id,
+                payload={
+                    "customer_coupon_id": str(row.cc_id),
+                    "coupon_id": coupon_id,
+                    "order_id": req.order_id,
+                    "store_id": req.store_id,
+                    "operator_id": req.operator_id,
+                    "discount_amount_fen": discount_amount_fen,
+                    "order_amount_fen": req.order_amount_fen,
+                    "used_at": now.isoformat(),
+                },
+                store_id=req.store_id,
+                source_service="tx-growth",
+                metadata={"operator_id": req.operator_id},
+            )
+        )
+
+        return ok_response(
+            {
                 "customer_coupon_id": str(row.cc_id),
                 "coupon_id": coupon_id,
+                "coupon_name": row.coupon_name,
                 "order_id": req.order_id,
                 "store_id": req.store_id,
-                "operator_id": req.operator_id,
-                "discount_amount_fen": discount_amount_fen,
-                "order_amount_fen": req.order_amount_fen,
+                "status": "used",
                 "used_at": now.isoformat(),
-            },
-            store_id=req.store_id,
-            source_service="tx-growth",
-            metadata={"operator_id": req.operator_id},
-        ))
-
-        return ok_response({
-            "customer_coupon_id": str(row.cc_id),
-            "coupon_id": coupon_id,
-            "coupon_name": row.coupon_name,
-            "order_id": req.order_id,
-            "store_id": req.store_id,
-            "status": "used",
-            "used_at": now.isoformat(),
-            "discount_amount_fen": discount_amount_fen,
-        })
+                "discount_amount_fen": discount_amount_fen,
+            }
+        )
 
     except ValueError as exc:
         logger.warning("coupon.apply_invalid_param", error=str(exc))

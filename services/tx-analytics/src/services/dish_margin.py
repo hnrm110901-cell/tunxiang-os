@@ -6,6 +6,7 @@
 金额单位: 分(fen), int
 毛利率: 百分比, Decimal(5,2)
 """
+
 import uuid
 from datetime import date
 from decimal import ROUND_HALF_UP, Decimal
@@ -20,6 +21,7 @@ DEFAULT_LOW_MARGIN_THRESHOLD_PCT = Decimal("30.00")  # 30%
 
 
 # ─── 纯函数：毛利计算 ───
+
 
 def compute_margin(selling_price_fen: int, cost_fen: int) -> dict:
     """纯函数：计算单品毛利
@@ -83,13 +85,11 @@ def filter_low_margin(
     threshold_pct: Decimal,
 ) -> list[dict]:
     """纯函数：筛选低于阈值的菜品"""
-    return [
-        d for d in dish_margins
-        if d.get("margin_rate", Decimal("100")) < threshold_pct
-    ]
+    return [d for d in dish_margins if d.get("margin_rate", Decimal("100")) < threshold_pct]
 
 
 # ─── 业务函数（需要 DB） ───
+
 
 def calculate_dish_margin(
     dish_id: uuid.UUID,
@@ -165,19 +165,19 @@ def get_dish_margin_ranking(
 
         margin = compute_margin(selling_price_fen, cost_fen)
         # 附加销量信息
-        sales_qty = _get_dish_sales_in_range(
-            dish_id, store_id, date_range[0], date_range[1], tenant_id, db
-        )
+        sales_qty = _get_dish_sales_in_range(dish_id, store_id, date_range[0], date_range[1], tenant_id, db)
 
-        margins.append({
-            "dish_id": str(dish_id),
-            "dish_name": dish.get("dish_name", ""),
-            "category": dish.get("category", ""),
-            "sales_qty": sales_qty,
-            "revenue_fen": selling_price_fen * sales_qty,
-            "total_cost_fen": cost_fen * sales_qty,
-            **margin,
-        })
+        margins.append(
+            {
+                "dish_id": str(dish_id),
+                "dish_name": dish.get("dish_name", ""),
+                "category": dish.get("category", ""),
+                "sales_qty": sales_qty,
+                "revenue_fen": selling_price_fen * sales_qty,
+                "total_cost_fen": cost_fen * sales_qty,
+                **margin,
+            }
+        )
 
     ranked = compute_margin_ranking(margins, sort_by=sort_by)
 
@@ -221,11 +221,13 @@ def get_low_margin_dishes(
         cost_fen = _get_dish_cost(dish_id, tenant_id, db) or dish.get("cost_fen", 0) or 0
 
         margin = compute_margin(selling_price_fen, cost_fen)
-        margins.append({
-            "dish_id": str(dish_id),
-            "dish_name": dish.get("dish_name", ""),
-            **margin,
-        })
+        margins.append(
+            {
+                "dish_id": str(dish_id),
+                "dish_name": dish.get("dish_name", ""),
+                **margin,
+            }
+        )
 
     low_margin = filter_low_margin(margins, threshold_pct)
     # 按毛利率升序
@@ -245,17 +247,22 @@ def get_low_margin_dishes(
 
 # ─── DB 访问桩 ───
 
+
 def _get_dish_info(dish_id: uuid.UUID, tenant_id: uuid.UUID, db) -> Optional[dict]:
     """查询菜品基本信息"""
     if db is None:
         return None
     try:
         from sqlalchemy import text
-        result = db.execute(text("""
+
+        result = db.execute(
+            text("""
             SELECT id, dish_name, dish_code, price_fen, cost_fen, category_id
             FROM dishes
             WHERE id = :dish_id AND tenant_id = :tenant_id AND is_deleted = FALSE
-        """), {"dish_id": dish_id, "tenant_id": tenant_id})
+        """),
+            {"dish_id": dish_id, "tenant_id": tenant_id},
+        )
         row = result.mappings().first()
         return dict(row) if row else None
     except (ImportError, AttributeError):
@@ -268,13 +275,17 @@ def _get_store_dishes(store_id: uuid.UUID, tenant_id: uuid.UUID, db) -> list[dic
         return []
     try:
         from sqlalchemy import text
-        result = db.execute(text("""
+
+        result = db.execute(
+            text("""
             SELECT id, dish_name, dish_code, price_fen, cost_fen
             FROM dishes
             WHERE (store_id = :store_id OR store_id IS NULL)
               AND tenant_id = :tenant_id
               AND is_available = TRUE AND is_deleted = FALSE
-        """), {"store_id": store_id, "tenant_id": tenant_id})
+        """),
+            {"store_id": store_id, "tenant_id": tenant_id},
+        )
         return [dict(row) for row in result.mappings().all()]
     except (ImportError, AttributeError):
         return []
@@ -292,29 +303,36 @@ def _get_dish_cost(dish_id: uuid.UUID, tenant_id: uuid.UUID, db) -> Optional[int
         from datetime import datetime, timezone
 
         from sqlalchemy import text
+
         now = datetime.now(timezone.utc)
         # 取当前有效 BOM
-        bom_result = db.execute(text("""
+        bom_result = db.execute(
+            text("""
             SELECT id FROM bom_templates
             WHERE dish_id = :dish_id AND tenant_id = :tenant_id
               AND is_active = TRUE AND is_deleted = FALSE
               AND effective_date <= :now
               AND (expiry_date IS NULL OR expiry_date > :now)
             ORDER BY effective_date DESC LIMIT 1
-        """), {"dish_id": dish_id, "tenant_id": tenant_id, "now": now})
+        """),
+            {"dish_id": dish_id, "tenant_id": tenant_id, "now": now},
+        )
         bom_id = bom_result.scalar_one_or_none()
         if bom_id is None:
             return None
 
         # 汇总 BOM 成本
-        cost_result = db.execute(text("""
+        cost_result = db.execute(
+            text("""
             SELECT COALESCE(SUM(
                 CAST(standard_qty * (1 + COALESCE(waste_factor, 0)) * COALESCE(unit_cost_fen, 0) AS INTEGER)
             ), 0) as total_cost
             FROM bom_items
             WHERE bom_id = :bom_id AND tenant_id = :tenant_id
               AND is_deleted = FALSE AND item_action != 'REMOVE'
-        """), {"bom_id": bom_id, "tenant_id": tenant_id})
+        """),
+            {"bom_id": bom_id, "tenant_id": tenant_id},
+        )
         return cost_result.scalar_one_or_none() or 0
     except (ImportError, AttributeError):
         return None
@@ -333,7 +351,9 @@ def _get_dish_sales_in_range(
         return 0
     try:
         from sqlalchemy import text
-        result = db.execute(text("""
+
+        result = db.execute(
+            text("""
             SELECT COALESCE(SUM(oi.quantity), 0)
             FROM order_items oi
             JOIN orders o ON oi.order_id = o.id
@@ -344,13 +364,15 @@ def _get_dish_sales_in_range(
               AND o.status IN ('completed', 'paid')
               AND o.is_deleted = FALSE
               AND oi.is_deleted = FALSE
-        """), {
-            "dish_id": dish_id,
-            "store_id": store_id,
-            "tenant_id": tenant_id,
-            "start_date": start_date,
-            "end_date": end_date,
-        })
+        """),
+            {
+                "dish_id": dish_id,
+                "store_id": store_id,
+                "tenant_id": tenant_id,
+                "start_date": start_date,
+                "end_date": end_date,
+            },
+        )
         return result.scalar_one_or_none() or 0
     except (ImportError, AttributeError):
         return 0

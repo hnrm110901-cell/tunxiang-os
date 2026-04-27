@@ -2,15 +2,18 @@
 企微SCRM私域Agent — 自动化会员触达
 P3-05: 生日祝福 / 沉睡唤醒 / 订单后回访
 """
-import structlog
-from fastapi import APIRouter, HTTPException, Query, Header, Depends
-from pydantic import BaseModel
-from typing import Optional
-from datetime import datetime, date, timedelta
+
 import uuid
-from sqlalchemy.ext.asyncio import AsyncSession
+from datetime import date, datetime, timedelta
+from typing import Optional
+
+import structlog
+from fastapi import APIRouter, Depends, Header, HTTPException, Query
+from pydantic import BaseModel
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from shared.ontology.src.database import get_db
 
 logger = structlog.get_logger()
@@ -33,6 +36,7 @@ POST_ORDER_TEMPLATES = {
 
 # ─── Pydantic Models ─────────────────────────────────────────────────────────
 
+
 class BirthdaySendRequest(BaseModel):
     member_ids: list[str]
     message_template: str = "default"  # default / vip / super_vip
@@ -53,6 +57,7 @@ class PostOrderScheduleRequest(BaseModel):
 
 
 # ─── 动作1: 生日祝福 ──────────────────────────────────────────────────────────
+
 
 @router.get("/birthday/upcoming")
 async def get_birthday_upcoming(
@@ -125,18 +130,20 @@ async def get_birthday_upcoming(
             phone = row["phone"] or ""
             phone_masked = phone[:3] + "****" + phone[-4:] if len(phone) >= 7 else phone
 
-            members_sorted.append({
-                "member_id": row["member_id"],
-                "name": row["name"] or "",
-                "phone_masked": phone_masked,
-                "birthday": str(bday),
-                "days_until": days_until,
-                "level": level,
-                "total_spend_fen": row["total_spent_fen"] or 0,
-                "recommend_template": recommend_template,
-                "send_status": "pending",
-                "wecom_connected": False,  # WeChat绑定状态待企微API对接
-            })
+            members_sorted.append(
+                {
+                    "member_id": row["member_id"],
+                    "name": row["name"] or "",
+                    "phone_masked": phone_masked,
+                    "birthday": str(bday),
+                    "days_until": days_until,
+                    "level": level,
+                    "total_spend_fen": row["total_spent_fen"] or 0,
+                    "recommend_template": recommend_template,
+                    "send_status": "pending",
+                    "wecom_connected": False,  # WeChat绑定状态待企微API对接
+                }
+            )
         members_sorted.sort(key=lambda x: x["days_until"])
     except SQLAlchemyError as e:
         logger.error("get_birthday_upcoming_db_error", error=str(e))
@@ -206,13 +213,15 @@ async def send_birthday_messages(
         elif member.get("unsubscribed"):
             results.append({"member_id": mid, "status": "skipped", "reason": "已退订营销消息"})
         else:
-            results.append({
-                "member_id": mid,
-                "name": member["name"],
-                "status": "success",
-                "scheduled_at": str(body.send_time or datetime.now()),
-                "template_used": body.message_template,
-            })
+            results.append(
+                {
+                    "member_id": mid,
+                    "name": member["name"],
+                    "status": "success",
+                    "scheduled_at": str(body.send_time or datetime.now()),
+                    "template_used": body.message_template,
+                }
+            )
 
     success_count = len([r for r in results if r["status"] == "success"])
     failed_count = len([r for r in results if r["status"] == "failed"])
@@ -230,6 +239,7 @@ async def send_birthday_messages(
 
 
 # ─── 动作2: 沉睡会员唤醒 ─────────────────────────────────────────────────────
+
 
 @router.get("/dormant/list")
 async def get_dormant_list(
@@ -398,25 +408,29 @@ async def wake_dormant_members(
         elif not member["wecom_connected"]:
             results.append({"member_id": mid, "status": "failed", "reason": "未绑定企微"})
         elif member["dormant_days"] > 180:
-            results.append({
-                "member_id": mid,
-                "name": member["name"],
-                "status": "skipped",
-                "reason": "沉睡超180天，系统建议不主动触达",
-            })
+            results.append(
+                {
+                    "member_id": mid,
+                    "name": member["name"],
+                    "status": "skipped",
+                    "reason": "沉睡超180天，系统建议不主动触达",
+                }
+            )
         else:
             offer_desc = {
                 "coupon": f"满减券 ¥{body.offer_value_fen // 100}",
                 "points": f"赠送积分 {body.offer_value_fen}",
                 "free_dish": f"免费菜品券（价值¥{body.offer_value_fen // 100}）",
             }[body.offer_type]
-            results.append({
-                "member_id": mid,
-                "name": member["name"],
-                "status": "success",
-                "offer_sent": offer_desc,
-                "predicted_response_rate": member["predicted_response_rate"],
-            })
+            results.append(
+                {
+                    "member_id": mid,
+                    "name": member["name"],
+                    "status": "success",
+                    "offer_sent": offer_desc,
+                    "predicted_response_rate": member["predicted_response_rate"],
+                }
+            )
 
     success_count = len([r for r in results if r["status"] == "success"])
 
@@ -441,6 +455,7 @@ async def wake_dormant_members(
 
 
 # ─── 动作3: 订单后回访 ───────────────────────────────────────────────────────
+
 
 @router.post("/post-order/schedule")
 async def schedule_post_order(body: PostOrderScheduleRequest):
@@ -510,16 +525,18 @@ async def get_post_order_stats(
         for row in result.mappings().all():
             member_name = row["member_name"] or ""
             name_masked = (member_name[0] + "**") if member_name else ""
-            pending_today.append({
-                "task_id": f"task-{uuid.uuid4().hex[:8]}",
-                "order_id": row["order_id"],
-                "member_id": row["member_id"],
-                "member_name": name_masked,
-                "spend_fen": row["spend_fen"] or 0,
-                "order_time": str(row["order_time"]),
-                "template": "satisfaction",
-                "status": "pending",
-            })
+            pending_today.append(
+                {
+                    "task_id": f"task-{uuid.uuid4().hex[:8]}",
+                    "order_id": row["order_id"],
+                    "member_id": row["member_id"],
+                    "member_name": name_masked,
+                    "spend_fen": row["spend_fen"] or 0,
+                    "order_time": str(row["order_time"]),
+                    "template": "satisfaction",
+                    "status": "pending",
+                }
+            )
     except SQLAlchemyError as e:
         logger.error("get_post_order_stats_db_error", error=str(e))
         pending_today = []
@@ -564,6 +581,7 @@ async def get_post_order_stats(
 
 # ─── 整体效果汇总 ─────────────────────────────────────────────────────────────
 
+
 @router.get("/performance")
 async def get_scrm_performance():
     """3个Agent动作的本月执行效果汇总"""
@@ -598,7 +616,7 @@ async def get_scrm_performance():
                 "replied": 418,
                 "reply_rate": 0.335,
                 "repurchase_lift": 0.082,  # 复购率提升8.2%
-                "review_rate": 0.186,       # 评价率18.6%
+                "review_rate": 0.186,  # 评价率18.6%
                 "revenue_fen": 1286800,
                 "trend": "+5% vs 上月",
             },

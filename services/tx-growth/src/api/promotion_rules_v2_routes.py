@@ -25,6 +25,7 @@ RLS: NULLIF(current_setting('app.tenant_id', true), '')::uuid
 统一响应格式: {"ok": bool, "data": {}, "error": {}}
 所有接口需 X-Tenant-ID header
 """
+
 from __future__ import annotations
 
 import uuid
@@ -49,11 +50,11 @@ router = APIRouter(prefix="/api/v1/promotions", tags=["promotion-rules-v2"])
 
 
 class PromotionType(str, Enum):
-    TIME_DISCOUNT = "TIME_DISCOUNT"      # 时段折扣
-    ITEM_DISCOUNT = "ITEM_DISCOUNT"      # 品项指定折扣
-    BUY_GIFT = "BUY_GIFT"               # 买赠
-    FULL_REDUCE = "FULL_REDUCE"         # 满减
-    VOUCHER_VERIFY = "VOUCHER_VERIFY"   # 团购券/美团券核销
+    TIME_DISCOUNT = "TIME_DISCOUNT"  # 时段折扣
+    ITEM_DISCOUNT = "ITEM_DISCOUNT"  # 品项指定折扣
+    BUY_GIFT = "BUY_GIFT"  # 买赠
+    FULL_REDUCE = "FULL_REDUCE"  # 满减
+    VOUCHER_VERIFY = "VOUCHER_VERIFY"  # 团购券/美团券核销
 
 
 class PromotionStatus(str, Enum):
@@ -346,7 +347,7 @@ def _is_weekday_match(order_time: datetime, weekdays: Optional[List[int]]) -> bo
         return True
     # Python weekday(): 0=周一...6=周日，转换为0=周日,1=周一...6=周六
     py_weekday = order_time.weekday()  # 0=Mon...6=Sun
-    converted = (py_weekday + 1) % 7   # 0=Sun,1=Mon...6=Sat
+    converted = (py_weekday + 1) % 7  # 0=Sun,1=Mon...6=Sat
     return converted in weekdays
 
 
@@ -401,7 +402,7 @@ def _apply_rule(
                 if it.unit_price_fen > item_price_fen:
                     diff = (it.unit_price_fen - item_price_fen) * it.qty
                     total_discount += diff
-                    detail_parts.append(f"{it.name} 特价 {item_price_fen/100:.2f}元")
+                    detail_parts.append(f"{it.name} 特价 {item_price_fen / 100:.2f}元")
             elif discount_pct is not None:
                 # 指定折扣
                 item_total = it.unit_price_fen * it.qty
@@ -450,7 +451,7 @@ def _apply_rule(
             "rule_name": rule["name"],
             "promotion_type": ptype,
             "discount_fen": amount,
-            "detail": f"满{threshold//100}减{amount//100}",
+            "detail": f"满{threshold // 100}减{amount // 100}",
         }
 
     # VOUCHER_VERIFY 不在 calculate 端点中自动适用，需通过 verify 端点
@@ -674,7 +675,7 @@ async def update_rule(
             text(
                 f"""
                 UPDATE promotion_rules_v2
-                SET {', '.join(set_parts)}
+                SET {", ".join(set_parts)}
                 WHERE id = :rule_id
                   AND tenant_id = :tid
                   AND is_deleted = FALSE
@@ -804,14 +805,19 @@ async def calculate_promotions(
         total_discount_fen += result["discount_fen"]
 
     # 若有多个非叠加规则，取折扣最大的一个
-    non_stackable = [d for d in applied_discounts if not any(
-        r["id"] == d["rule_id"] and r.get("stack_allowed") for r in eligible_rules
-    )]
+    non_stackable = [
+        d
+        for d in applied_discounts
+        if not any(r["id"] == d["rule_id"] and r.get("stack_allowed") for r in eligible_rules)
+    ]
     if len(non_stackable) > 1:
         best = max(non_stackable, key=lambda x: x["discount_fen"])
-        stackable = [d for d in applied_discounts if d["rule_id"] != best["rule_id"]
-                     and any(r["id"] == d["rule_id"] and r.get("stack_allowed")
-                             for r in eligible_rules)]
+        stackable = [
+            d
+            for d in applied_discounts
+            if d["rule_id"] != best["rule_id"]
+            and any(r["id"] == d["rule_id"] and r.get("stack_allowed") for r in eligible_rules)
+        ]
         applied_discounts = [best] + stackable
         total_discount_fen = sum(d["discount_fen"] for d in applied_discounts)
 
@@ -820,9 +826,7 @@ async def calculate_promotions(
         (r.get("gross_margin_threshold_pct") or 20 for r in eligible_rules),
         default=20,
     )
-    margin_ok, actual_margin = _check_gross_margin(
-        body.order_items, total_discount_fen, min_margin_threshold
-    )
+    margin_ok, actual_margin = _check_gross_margin(body.order_items, total_discount_fen, min_margin_threshold)
 
     if not margin_ok:
         # 毛利不达标：尝试截断折扣直到达标
@@ -837,29 +841,27 @@ async def calculate_promotions(
         acc_discount = 0
         for disc in sorted(applied_discounts, key=lambda x: x["discount_fen"]):
             test_discount = acc_discount + disc["discount_fen"]
-            ok_test, margin_test = _check_gross_margin(
-                body.order_items, test_discount, min_margin_threshold
-            )
+            ok_test, margin_test = _check_gross_margin(body.order_items, test_discount, min_margin_threshold)
             if ok_test:
                 applied_discounts_filtered.append(disc)
                 acc_discount = test_discount
         applied_discounts = applied_discounts_filtered
         total_discount_fen = acc_discount
-        _, actual_margin = _check_gross_margin(
-            body.order_items, total_discount_fen, min_margin_threshold
-        )
+        _, actual_margin = _check_gross_margin(body.order_items, total_discount_fen, min_margin_threshold)
 
     final_total_fen = original_total_fen - total_discount_fen
 
-    return _ok({
-        "original_total_fen": original_total_fen,
-        "total_discount_fen": total_discount_fen,
-        "final_total_fen": final_total_fen,
-        "applied_rules": applied_discounts,
-        "gross_margin_pct": actual_margin,
-        "gross_margin_threshold_pct": min_margin_threshold,
-        "margin_constraint_passed": margin_ok,
-    })
+    return _ok(
+        {
+            "original_total_fen": original_total_fen,
+            "total_discount_fen": total_discount_fen,
+            "final_total_fen": final_total_fen,
+            "applied_rules": applied_discounts,
+            "gross_margin_pct": actual_margin,
+            "gross_margin_threshold_pct": min_margin_threshold,
+            "margin_constraint_passed": margin_ok,
+        }
+    )
 
 
 @router.post("/voucher/verify")
@@ -899,11 +901,13 @@ async def verify_voucher(
         )
         existing_row = existing.fetchone()
         if existing_row and existing_row.is_used:
-            return _ok({
-                "valid": False,
-                "reason": "券码已使用",
-                "used_at": existing_row.used_at.isoformat() if existing_row.used_at else None,
-            })
+            return _ok(
+                {
+                    "valid": False,
+                    "reason": "券码已使用",
+                    "used_at": existing_row.used_at.isoformat() if existing_row.used_at else None,
+                }
+            )
 
         # 查找激活的 VOUCHER_VERIFY 规则
         rule_rows = await db.execute(
@@ -925,10 +929,12 @@ async def verify_voucher(
         )
         rule_row = rule_rows.fetchone()
         if not rule_row:
-            return _ok({
-                "valid": False,
-                "reason": "无可用的团购券核销规则",
-            })
+            return _ok(
+                {
+                    "valid": False,
+                    "reason": "无可用的团购券核销规则",
+                }
+            )
 
         face_value_fen = rule_row.voucher_face_value_fen or 0
 
@@ -959,16 +965,18 @@ async def verify_voucher(
         )
         await db.commit()
 
-        return _ok({
-            "valid": True,
-            "voucher_code": voucher_code,
-            "rule_id": str(rule_row.id),
-            "rule_name": rule_row.name,
-            "platform": rule_row.voucher_platform,
-            "face_value_fen": face_value_fen,
-            "face_value_yuan": face_value_fen / 100,
-            "log_id": str(log_id),
-        })
+        return _ok(
+            {
+                "valid": True,
+                "voucher_code": voucher_code,
+                "rule_id": str(rule_row.id),
+                "rule_name": rule_row.name,
+                "platform": rule_row.voucher_platform,
+                "face_value_fen": face_value_fen,
+                "face_value_yuan": face_value_fen / 100,
+                "log_id": str(log_id),
+            }
+        )
     except SQLAlchemyError as exc:
         await db.rollback()
         logger.error("verify_voucher_db_error", error=str(exc), exc_info=True)
@@ -1030,11 +1038,13 @@ async def promotion_effect_report(
             row["avg_discount_fen"] = row["avg_discount_fen"] or 0
             row["total_uses"] = row["total_uses"] or 0
 
-        return _ok({
-            "items": rows,
-            "period": {"start_date": start_date, "end_date": end_date},
-            "note": "规则触发次数将在 events 表 DISCOUNT.APPLIED 事件接入后完整统计",
-        })
+        return _ok(
+            {
+                "items": rows,
+                "period": {"start_date": start_date, "end_date": end_date},
+                "note": "规则触发次数将在 events 表 DISCOUNT.APPLIED 事件接入后完整统计",
+            }
+        )
     except SQLAlchemyError as exc:
         logger.error("promotion_effect_report_db_error", error=str(exc), exc_info=True)
         _err("报表查询失败", 500)

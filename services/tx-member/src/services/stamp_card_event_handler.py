@@ -8,6 +8,7 @@
 
 本模块提供事件处理函数，由 tx-member 的事件消费器调用。
 """
+
 from __future__ import annotations
 
 from typing import Any, Callable

@@ -6,6 +6,7 @@
 - 常用菜品名 → 菜品ID 映射持久化（JSON文件）
 - 网络不可用时：用本地缓存 + 模糊匹配兜底
 """
+
 from __future__ import annotations
 
 import json
@@ -19,7 +20,7 @@ import structlog
 
 log: structlog.stdlib.BoundLogger = structlog.get_logger(__name__)
 
-_CACHE_PATH = os.environ.get("VOICE_CACHE_PATH", "/tmp/txos_voice_cache.json")
+_CACHE_PATH = os.environ.get("VOICE_CACHE_PATH", "/tmp/txos_voice_cache.json")  # noqa: S108 — dev default，生产走 env VOICE_CACHE_PATH
 _LRU_MAXSIZE = 50
 _FUZZY_THRESHOLD = 0.6  # 相似度阈值，低于此值不采用模糊匹配结果
 

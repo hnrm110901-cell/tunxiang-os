@@ -15,6 +15,7 @@ settlement → feedback → archived
 
 所有金额单位：分（fen）。
 """
+
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Optional
@@ -54,9 +55,19 @@ def _now_iso() -> str:
 # ─── 13阶段状态机 ───
 
 BANQUET_STAGES = [
-    "lead", "consultation", "proposal", "quotation", "contract",
-    "deposit_paid", "menu_confirmed", "preparation", "rehearsal",
-    "execution", "settlement", "feedback", "archived",
+    "lead",
+    "consultation",
+    "proposal",
+    "quotation",
+    "contract",
+    "deposit_paid",
+    "menu_confirmed",
+    "preparation",
+    "rehearsal",
+    "execution",
+    "settlement",
+    "feedback",
+    "archived",
 ]
 
 STAGE_LABELS = {
@@ -80,14 +91,14 @@ STAGE_TRANSITIONS: dict[str, list[str]] = {
     "lead": ["consultation", "proposal", "cancelled"],
     "consultation": ["proposal", "cancelled"],
     "proposal": ["quotation", "consultation", "cancelled"],  # 可退回沟通
-    "quotation": ["contract", "proposal", "cancelled"],      # 可退回方案
+    "quotation": ["contract", "proposal", "cancelled"],  # 可退回方案
     "contract": ["deposit_paid", "cancelled"],
     "deposit_paid": ["menu_confirmed"],
     "menu_confirmed": ["preparation"],
     "preparation": ["rehearsal", "execution"],  # 小规模可跳过彩排
     "rehearsal": ["execution"],
     "execution": ["settlement"],
-    "settlement": ["feedback", "archived"],     # 可跳过回访
+    "settlement": ["feedback", "archived"],  # 可跳过回访
     "feedback": ["archived"],
     "archived": [],
     "cancelled": [],
@@ -99,6 +110,7 @@ def can_stage_transition(current: str, target: str) -> bool:
 
 
 # ─── 合同号生成 ───
+
 
 def _gen_contract_no(store_id: str) -> str:
     """生成合同号：BQ-门店缩写-年月-序号"""
@@ -369,26 +381,33 @@ class BanquetLifecycleService:
                 "decoration_cost_fen": decoration_cost,
                 "beverage_cost_fen": beverage_cost,
                 "misc_cost_fen": misc_cost,
-                "total_cost_fen": food_cost + labor_cost + venue["cost_fen"] + decoration_cost + beverage_cost + misc_cost,
+                "total_cost_fen": food_cost
+                + labor_cost
+                + venue["cost_fen"]
+                + decoration_cost
+                + beverage_cost
+                + misc_cost,
             }
 
             margin_fen = tier_total - cost_breakdown["total_cost_fen"]
             margin_rate = margin_fen / tier_total if tier_total > 0 else 0
 
-            tiers.append({
-                "tier": tier_name,
-                "tier_label": {"economy": "经济档", "standard": "标准档", "premium": "豪华档"}[tier_name],
-                "price_per_head_fen": tier_price,
-                "total_fen": tier_total,
-                "menu_items": menu_items,
-                "course_count": len(menu_items),
-                "venue": venue,
-                "decoration": decoration,
-                "service_plan": service_plan,
-                "cost_breakdown": cost_breakdown,
-                "margin_fen": margin_fen,
-                "margin_rate": round(margin_rate, 4),
-            })
+            tiers.append(
+                {
+                    "tier": tier_name,
+                    "tier_label": {"economy": "经济档", "standard": "标准档", "premium": "豪华档"}[tier_name],
+                    "price_per_head_fen": tier_price,
+                    "total_fen": tier_total,
+                    "menu_items": menu_items,
+                    "course_count": len(menu_items),
+                    "venue": venue,
+                    "decoration": decoration,
+                    "service_plan": service_plan,
+                    "cost_breakdown": cost_breakdown,
+                    "margin_fen": margin_fen,
+                    "margin_rate": round(margin_rate, 4),
+                }
+            )
 
         # 推荐档次：预算匹配
         budget_per_head = budget_fen // guest_count if guest_count > 0 else 0
@@ -704,10 +723,7 @@ class BanquetLifecycleService:
             raise ValueError(f"Contract {contract_id}: deposit not paid yet")
 
         now = _now_iso()
-        menu_total = sum(
-            item.get("price_fen", 0) * item.get("quantity", 1)
-            for item in final_menu_items
-        )
+        menu_total = sum(item.get("price_fen", 0) * item.get("quantity", 1) for item in final_menu_items)
 
         contract["final_menu_items"] = final_menu_items
         contract["menu_confirmed"] = True
@@ -776,8 +792,7 @@ class BanquetLifecycleService:
             ("特殊器材准备 — 装饰物料/鲜花/气球/横幅到位", "宴会经理", True),
             ("餐具清点 — 确认足够的碗碟杯筷（含备用10%）", "前厅领班", True),
             ("菜品试做 — 主要菜品预制准备和试味", "行政总厨", True),
-            ("活鲜入池 — 活海鲜入养殖池暂养", "海鲜池管理员",
-             event_type in ("wedding", "business", "anniversary")),
+            ("活鲜入池 — 活海鲜入养殖池暂养", "海鲜池管理员", event_type in ("wedding", "business", "anniversary")),
         ]
 
         # T-1: 彩排准备
@@ -796,10 +811,12 @@ class BanquetLifecycleService:
             ("迎宾 — 引导宾客入座、发放伴手礼", "服务团队", True),
             ("开场仪式 — 按流程执行(婚礼仪式/祝寿/致辞等)", "宴会协调员", True),
             ("上菜 — 按顺序上菜：冷盘→热菜→主菜→汤→甜品→水果", "传菜组", True),
-            ("祝酒/互动环节 — 协助敬酒、游戏互动", "宴会协调员",
-             event_type in ("wedding", "birthday", "team_building")),
-            ("甜品/蛋糕环节 — 切蛋糕、甜品台开放", "甜品师",
-             event_type in ("wedding", "birthday", "anniversary")),
+            (
+                "祝酒/互动环节 — 协助敬酒、游戏互动",
+                "宴会协调员",
+                event_type in ("wedding", "birthday", "team_building"),
+            ),
+            ("甜品/蛋糕环节 — 切蛋糕、甜品台开放", "甜品师", event_type in ("wedding", "birthday", "anniversary")),
             ("送客 — 客户致谢、伴手礼分发、合影留念", "宴会经理", True),
             ("现场拆除与清洁 — 宴会结束后30分钟内开始", "保洁组", True),
         ]
@@ -828,21 +845,23 @@ class BanquetLifecycleService:
 
             for task, responsible, required in tasks:
                 item_id = f"CL-{_gen_id()}"
-                items.append({
-                    "checklist_item_id": item_id,
-                    "contract_id": contract_id,
-                    "phase": phase,
-                    "phase_name": phase_name,
-                    "due_offset_days": offset,
-                    "due_date": due_date,
-                    "task": task,
-                    "responsible": responsible,
-                    "status": "pending",  # pending/in_progress/completed/skipped
-                    "required": required,
-                    "notes": None,
-                    "completed_at": None,
-                    "created_at": now,
-                })
+                items.append(
+                    {
+                        "checklist_item_id": item_id,
+                        "contract_id": contract_id,
+                        "phase": phase,
+                        "phase_name": phase_name,
+                        "due_offset_days": offset,
+                        "due_date": due_date,
+                        "task": task,
+                        "responsible": responsible,
+                        "status": "pending",  # pending/in_progress/completed/skipped
+                        "required": required,
+                        "notes": None,
+                        "completed_at": None,
+                        "created_at": now,
+                    }
+                )
 
         _checklists[contract_id] = items
 
@@ -1122,10 +1141,13 @@ class BanquetLifecycleService:
         now = _now_iso()
 
         satisfaction_level = (
-            "excellent" if satisfaction_score >= 9 else
-            "good" if satisfaction_score >= 7 else
-            "average" if satisfaction_score >= 5 else
-            "poor"
+            "excellent"
+            if satisfaction_score >= 9
+            else "good"
+            if satisfaction_score >= 7
+            else "average"
+            if satisfaction_score >= 5
+            else "poor"
         )
 
         feedback = {
@@ -1245,11 +1267,7 @@ class BanquetLifecycleService:
         Returns:
             {total_leads, funnel: [{stage, count, value_fen}], conversion_rates}
         """
-        leads = [
-            l for l in _leads.values()
-            if l["tenant_id"] == self.tenant_id
-            and l["store_id"] == store_id
-        ]
+        leads = [l for l in _leads.values() if l["tenant_id"] == self.tenant_id and l["store_id"] == store_id]
 
         total = len(leads)
         funnel: dict[str, dict] = {}
@@ -1265,16 +1283,13 @@ class BanquetLifecycleService:
         # 转化率
         lead_count = funnel.get("lead", {}).get("count", 0)
         proposal_count = sum(
-            funnel.get(s, {}).get("count", 0)
-            for s in BANQUET_STAGES[BANQUET_STAGES.index("proposal"):]
+            funnel.get(s, {}).get("count", 0) for s in BANQUET_STAGES[BANQUET_STAGES.index("proposal") :]
         )
         contract_count = sum(
-            funnel.get(s, {}).get("count", 0)
-            for s in BANQUET_STAGES[BANQUET_STAGES.index("contract"):]
+            funnel.get(s, {}).get("count", 0) for s in BANQUET_STAGES[BANQUET_STAGES.index("contract") :]
         )
         executed_count = sum(
-            funnel.get(s, {}).get("count", 0)
-            for s in BANQUET_STAGES[BANQUET_STAGES.index("execution"):]
+            funnel.get(s, {}).get("count", 0) for s in BANQUET_STAGES[BANQUET_STAGES.index("execution") :]
         )
 
         conversion_rates = {
@@ -1308,21 +1323,16 @@ class BanquetLifecycleService:
         start_date, end_date = date_range
 
         settled_contracts = [
-            c for c in _contracts.values()
+            c
+            for c in _contracts.values()
             if c["tenant_id"] == self.tenant_id
             and c["store_id"] == store_id
             and c.get("status") == "settled"
             and start_date <= c["event_date"] <= end_date
         ]
 
-        total_revenue = sum(
-            c.get("settlement", {}).get("final_total_fen", 0)
-            for c in settled_contracts
-        )
-        total_tables = sum(
-            c.get("settlement", {}).get("billing_tables", c["table_count"])
-            for c in settled_contracts
-        )
+        total_revenue = sum(c.get("settlement", {}).get("final_total_fen", 0) for c in settled_contracts)
+        total_tables = sum(c.get("settlement", {}).get("billing_tables", c["table_count"]) for c in settled_contracts)
 
         # 按类型分组
         by_type: dict[str, dict] = {}

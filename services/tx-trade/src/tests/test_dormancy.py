@@ -1,4 +1,5 @@
 """沉睡天数检测测试"""
+
 import os
 import sys
 
@@ -61,10 +62,12 @@ class TestScan:
 
 class TestSuggest:
     def test_cleanup_suggestions(self):
-        scan = {"dormant": [
-            {"name": "旧券A", "dormancy_days": 120, "dormancy_status": "dead"},
-            {"name": "从未用B", "dormancy_days": 9999, "dormancy_status": "never"},
-        ]}
+        scan = {
+            "dormant": [
+                {"name": "旧券A", "dormancy_days": 120, "dormancy_status": "dead"},
+                {"name": "从未用B", "dormancy_days": 9999, "dormancy_status": "never"},
+            ]
+        }
         suggestions = suggest_cleanup(scan)
         assert len(suggestions) == 2
         assert "停用" in suggestions[0]

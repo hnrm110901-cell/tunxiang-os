@@ -14,26 +14,23 @@
 from __future__ import annotations
 
 import asyncio
-import json
 import os
-import tempfile
-from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, List
-from unittest.mock import AsyncMock, MagicMock, patch
-
-import pytest
-import pytest_asyncio
 
 # 将 src 目录加入 path（无需安装包）
 import sys
+from datetime import datetime, timedelta, timezone
+from typing import Any
+from unittest.mock import AsyncMock, MagicMock
+
+import pytest
+import pytest_asyncio
 
 SRC_DIR = os.path.join(os.path.dirname(__file__), "..", "src")
 sys.path.insert(0, SRC_DIR)
 
 from conflict_resolver import ConflictResolver  # noqa: E402
-from sync_tracker import SyncTracker  # noqa: E402
 from sync_engine import SyncEngine, _max_updated_at  # noqa: E402
-
+from sync_tracker import SyncTracker  # noqa: E402
 
 # ─── 工具函数 ──────────────────────────────────────────────────────────────
 

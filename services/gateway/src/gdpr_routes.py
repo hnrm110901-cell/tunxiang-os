@@ -6,6 +6,7 @@ POST /api/v1/gdpr/anonymize/{customer_id}          匿名化客户数据
 GET  /api/v1/gdpr/audit-log                        GDPR操作审计日志
 POST /api/v1/gdpr/consent                          记录用户同意
 """
+
 from __future__ import annotations
 
 import structlog
@@ -16,7 +17,7 @@ from .models.gdpr import (
     CreateDataRequestIn,
     RecordConsentIn,
 )
-from .response import err, ok, paginated
+from .response import ok, paginated
 from .services.gdpr_service import GDPRService
 
 logger = structlog.get_logger(__name__)

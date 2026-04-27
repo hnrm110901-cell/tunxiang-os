@@ -12,14 +12,15 @@
 9.  GET  /api/v1/manager/discount-requests      — 返回 1 条申请，含 status 字段
 10. POST /api/v1/manager/broadcast-message      — 无 DB，返回 msg_id + sent_at
 """
+
 import os
 import sys
 import types
 
 # ─── 路径准备 ─────────────────────────────────────────────────────────────────
 _TESTS_DIR = os.path.dirname(__file__)
-_SRC_DIR   = os.path.join(_TESTS_DIR, "..")
-_ROOT_DIR  = os.path.abspath(os.path.join(_TESTS_DIR, "..", "..", "..", ".."))
+_SRC_DIR = os.path.join(_TESTS_DIR, "..")
+_ROOT_DIR = os.path.abspath(os.path.join(_TESTS_DIR, "..", "..", "..", ".."))
 
 for _p in [_SRC_DIR, _ROOT_DIR]:
     if _p not in sys.path:
@@ -27,6 +28,7 @@ for _p in [_SRC_DIR, _ROOT_DIR]:
 
 
 # ─── 建立 src 包层级 ──────────────────────────────────────────────────────────
+
 
 def _ensure_pkg(name: str, path: str) -> None:
     if name not in sys.modules:
@@ -36,25 +38,25 @@ def _ensure_pkg(name: str, path: str) -> None:
         sys.modules[name] = mod
 
 
-_ensure_pkg("src",     _SRC_DIR)
+_ensure_pkg("src", _SRC_DIR)
 _ensure_pkg("src.api", os.path.join(_SRC_DIR, "api"))
 
 # ─── 导入 ─────────────────────────────────────────────────────────────────────
 
 import datetime  # noqa: E402
-import pytest    # noqa: E402
 from unittest.mock import AsyncMock, MagicMock  # noqa: E402
+
 from fastapi import FastAPI  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 from sqlalchemy.exc import SQLAlchemyError  # noqa: E402
 
-from src.api.manager_app_routes import router  # type: ignore[import]  # noqa: E402
 from shared.ontology.src.database import get_db  # noqa: E402
+from src.api.manager_app_routes import router  # type: ignore[import]  # noqa: E402
 
 # ─── 常量 ─────────────────────────────────────────────────────────────────────
 
-TENANT_ID  = "11111111-1111-1111-1111-111111111111"
-STORE_ID   = "22222222-2222-2222-2222-222222222222"
+TENANT_ID = "11111111-1111-1111-1111-111111111111"
+STORE_ID = "22222222-2222-2222-2222-222222222222"
 REQUEST_ID = "33333333-3333-3333-3333-333333333333"
 
 HEADERS = {"X-Tenant-ID": TENANT_ID}
@@ -65,7 +67,7 @@ HEADERS = {"X-Tenant-ID": TENANT_ID}
 def _make_mock_db() -> AsyncMock:
     """创建最小化的 mock AsyncSession。"""
     db = AsyncMock()
-    db.commit   = AsyncMock()
+    db.commit = AsyncMock()
     db.rollback = AsyncMock()
     return db
 
@@ -108,16 +110,19 @@ def _make_app_with_db(db: AsyncMock) -> FastAPI:
 # 场景 1: GET /realtime-kpi — 正常聚合，返回 revenue_fen
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_realtime_kpi_today_success():
     """正常聚合：DB 返回营收行，响应含 revenue_fen 字段。"""
     db = _make_mock_db()
 
     set_cfg_result = MagicMock()
-    agg_row = _fake_row({
-        "revenue_fen":   88000,
-        "order_count":   12,
-        "avg_check_fen": 7333,
-    })
+    agg_row = _fake_row(
+        {
+            "revenue_fen": 88000,
+            "order_count": 12,
+            "avg_check_fen": 7333,
+        }
+    )
     agg_result = _mappings_one_or_none(agg_row)
 
     db.execute = AsyncMock(side_effect=[set_cfg_result, agg_result])
@@ -142,6 +147,7 @@ def test_realtime_kpi_today_success():
 # 场景 2: GET /realtime-kpi?period=year — 非法 period → 422
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_realtime_kpi_invalid_period():
     """period=year 不在正则允许范围（today|week|month），FastAPI 返回 422。"""
     db = _make_mock_db()
@@ -159,6 +165,7 @@ def test_realtime_kpi_invalid_period():
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 场景 3: GET /realtime-kpi — SQLAlchemyError → graceful 零值降级
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 def test_realtime_kpi_db_error():
     """DB 抛 SQLAlchemyError 时，端点不应崩溃，返回 ok=True + 零值数据。"""
@@ -184,6 +191,7 @@ def test_realtime_kpi_db_error():
 # 场景 4: GET /alerts — 返回 ok=True + data=[]
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_get_alerts_returns_empty_list():
     """alerts 端点无 DB 调用，直接返回空列表。"""
     # 无 DB 依赖，直接构建 app（不注入 db override 也可）
@@ -202,6 +210,7 @@ def test_get_alerts_returns_empty_list():
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 场景 5: POST /alerts/{id}/read — 返回 is_read=True + alert_id
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 def test_mark_alert_read():
     """标记预警已读（幂等，无 DB），返回 alert_id 和 is_read=True。"""
@@ -223,6 +232,7 @@ def test_mark_alert_read():
 # 场景 6: POST /discount/approve — UPDATE RETURNING 成功，approved=True
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_discount_approve_success():
     """折扣审批成功：DB 先 set_config，再 UPDATE RETURNING 返回行。"""
     db = _make_mock_db()
@@ -239,8 +249,8 @@ def test_discount_approve_success():
         "/api/v1/manager/discount/approve",
         json={
             "request_id": REQUEST_ID,
-            "approved":   True,
-            "reason":     "合规",
+            "approved": True,
+            "reason": "合规",
         },
         headers=HEADERS,
     )
@@ -257,12 +267,13 @@ def test_discount_approve_success():
 # 场景 7: POST /discount/approve — UPDATE RETURNING None → 404
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_discount_approve_not_found():
     """UPDATE RETURNING 返回 None（申请不存在）→ 404。"""
     db = _make_mock_db()
 
     set_cfg_result = MagicMock()
-    update_result  = _mappings_one_or_none(None)
+    update_result = _mappings_one_or_none(None)
 
     db.execute = AsyncMock(side_effect=[set_cfg_result, update_result])
 
@@ -271,7 +282,7 @@ def test_discount_approve_not_found():
         "/api/v1/manager/discount/approve",
         json={
             "request_id": "99999999-9999-9999-9999-999999999999",
-            "approved":   False,
+            "approved": False,
         },
         headers=HEADERS,
     )
@@ -282,6 +293,7 @@ def test_discount_approve_not_found():
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 场景 8: GET /staff-online — 返回 2 条员工，含 name 字段
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 def test_staff_online_success():
     """在岗员工列表：DB 返回 2 条记录，验证 count 和 name 字段存在。"""
@@ -314,23 +326,26 @@ def test_staff_online_success():
 # 场景 9: GET /discount-requests — 返回 1 条申请，含 status 字段
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_get_discount_requests_success():
     """折扣申请列表：DB 返回 1 条记录，验证 status 字段存在。"""
     db = _make_mock_db()
 
     set_cfg_result = MagicMock()
-    req_row = _fake_row({
-        "id":              REQUEST_ID,
-        "applicant":       "王五",
-        "applicant_role":  "waiter",
-        "table_label":     "A03",
-        "discount_type":   "percent",
-        "discount_amount": 10,
-        "reason":          "顾客投诉",
-        "status":          "pending",
-        "manager_reason":  None,
-        "created_at":      datetime.datetime(2026, 4, 4, 10, 0, 0),
-    })
+    req_row = _fake_row(
+        {
+            "id": REQUEST_ID,
+            "applicant": "王五",
+            "applicant_role": "waiter",
+            "table_label": "A03",
+            "discount_type": "percent",
+            "discount_amount": 10,
+            "reason": "顾客投诉",
+            "status": "pending",
+            "manager_reason": None,
+            "created_at": datetime.datetime(2026, 4, 4, 10, 0, 0),
+        }
+    )
     select_result = _mappings_all([req_row])
 
     db.execute = AsyncMock(side_effect=[set_cfg_result, select_result])
@@ -352,6 +367,7 @@ def test_get_discount_requests_success():
 # 场景 10: POST /broadcast-message — 无 DB，返回 msg_id + sent_at
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_broadcast_message_success():
     """广播消息（无 DB），响应含 msg_id 和 sent_at 字段。"""
     app = FastAPI()
@@ -362,8 +378,8 @@ def test_broadcast_message_success():
         "/api/v1/manager/broadcast-message",
         json={
             "store_id": STORE_ID,
-            "message":  "今日特价：红烧肉半价！",
-            "target":   "all",
+            "message": "今日特价：红烧肉半价！",
+            "target": "all",
         },
         headers=HEADERS,
     )

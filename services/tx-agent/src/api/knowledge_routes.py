@@ -2,6 +2,7 @@
 
 提供文档上传、分块管理、混合检索等知识库管理能力。
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -13,8 +14,8 @@ from uuid import uuid4
 
 import structlog
 from fastapi import APIRouter, File, Form, HTTPException, Query, UploadFile
-from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
 
 from shared.ontology.src.database import TenantSession
 

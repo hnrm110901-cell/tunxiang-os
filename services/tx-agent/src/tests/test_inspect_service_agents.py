@@ -1,4 +1,5 @@
 """StoreInspect + SmartService Agent 测试"""
+
 import asyncio
 import os
 import sys
@@ -13,6 +14,7 @@ TID = "00000000-0000-0000-0000-000000000001"
 
 # ─── StoreInspect 测试 ───
 
+
 class TestHealthCheck:
     def test_all_healthy(self):
         agent = StoreInspectAgent(tenant_id=TID)
@@ -22,9 +24,14 @@ class TestHealthCheck:
 
     def test_some_issues(self):
         agent = StoreInspectAgent(tenant_id=TID)
-        result = asyncio.run(agent.execute("health_check", {
-            "devices": {"printer_ok": False, "internet_ok": False, "mac_station_running": True},
-        }))
+        result = asyncio.run(
+            agent.execute(
+                "health_check",
+                {
+                    "devices": {"printer_ok": False, "internet_ok": False, "mac_station_running": True},
+                },
+            )
+        )
         assert result.data["overall_score"] < 100
         assert len(result.data["issues"]) == 2
 
@@ -62,34 +69,51 @@ class TestRunbook:
 class TestMaintenance:
     def test_overdue(self):
         agent = StoreInspectAgent(tenant_id=TID)
-        result = asyncio.run(agent.execute("predict_maintenance", {
-            "devices": [
-                {"type": "printer", "last_maintained_days_ago": 120},
-                {"type": "scale", "last_maintained_days_ago": 50},
-            ],
-        }))
+        result = asyncio.run(
+            agent.execute(
+                "predict_maintenance",
+                {
+                    "devices": [
+                        {"type": "printer", "last_maintained_days_ago": 120},
+                        {"type": "scale", "last_maintained_days_ago": 50},
+                    ],
+                },
+            )
+        )
         assert result.data["predictions"][0]["urgency"] == "overdue"
 
 
 class TestFoodSafety:
     def test_good_compliance(self):
         agent = StoreInspectAgent(tenant_id=TID)
-        result = asyncio.run(agent.execute("food_safety_status", {
-            "violations": [], "total_inspections": 100,
-        }))
+        result = asyncio.run(
+            agent.execute(
+                "food_safety_status",
+                {
+                    "violations": [],
+                    "total_inspections": 100,
+                },
+            )
+        )
         assert result.data["status"] == "good"
         assert result.data["compliance_rate_pct"] == 100.0
 
     def test_critical(self):
         agent = StoreInspectAgent(tenant_id=TID)
-        result = asyncio.run(agent.execute("food_safety_status", {
-            "violations": [{"type": "temp", "resolved": False}] * 15,
-            "total_inspections": 100,
-        }))
+        result = asyncio.run(
+            agent.execute(
+                "food_safety_status",
+                {
+                    "violations": [{"type": "temp", "resolved": False}] * 15,
+                    "total_inspections": 100,
+                },
+            )
+        )
         assert result.data["status"] == "critical"
 
 
 # ─── SmartService 测试 ───
+
 
 class TestComplaint:
     def test_food_quality(self):
@@ -107,12 +131,22 @@ class TestComplaint:
 class TestTrainingNeeds:
     def test_finds_needs(self):
         agent = SmartServiceAgent(tenant_id=TID)
-        result = asyncio.run(agent.execute("assess_training_needs", {
-            "employees": [
-                {"name": "张三", "role": "waiter", "skills": ["服务礼仪"], "performance_score": 45},
-                {"name": "李四", "role": "waiter", "skills": ["服务礼仪", "点菜推荐", "投诉处理", "结账操作", "卫生规范"], "performance_score": 90},
-            ],
-        }))
+        result = asyncio.run(
+            agent.execute(
+                "assess_training_needs",
+                {
+                    "employees": [
+                        {"name": "张三", "role": "waiter", "skills": ["服务礼仪"], "performance_score": 45},
+                        {
+                            "name": "李四",
+                            "role": "waiter",
+                            "skills": ["服务礼仪", "点菜推荐", "投诉处理", "结账操作", "卫生规范"],
+                            "performance_score": 90,
+                        },
+                    ],
+                },
+            )
+        )
         assert result.data["total"] == 1  # 只有张三
         assert result.data["needs"][0]["urgency"] == "high"
 
@@ -120,10 +154,15 @@ class TestTrainingNeeds:
 class TestSkillGaps:
     def test_identifies_gaps(self):
         agent = SmartServiceAgent(tenant_id=TID)
-        result = asyncio.run(agent.execute("analyze_skill_gaps", {
-            "role": "waiter",
-            "skill_scores": {"服务礼仪": 90, "点菜推荐": 40, "投诉处理": 30},
-        }))
+        result = asyncio.run(
+            agent.execute(
+                "analyze_skill_gaps",
+                {
+                    "role": "waiter",
+                    "skill_scores": {"服务礼仪": 90, "点菜推荐": 40, "投诉处理": 30},
+                },
+            )
+        )
         assert len(result.data["gaps"]) >= 2
         assert result.data["total_gap_impact_yuan"] > 0
 
@@ -131,11 +170,16 @@ class TestSkillGaps:
 class TestEffectiveness:
     def test_high_improvement(self):
         agent = SmartServiceAgent(tenant_id=TID)
-        result = asyncio.run(agent.execute("evaluate_effectiveness", {
-            "pre_scores": [50, 55, 45, 60],
-            "post_scores": [80, 85, 75, 90],
-            "attendance_rate": 95,
-        }))
+        result = asyncio.run(
+            agent.execute(
+                "evaluate_effectiveness",
+                {
+                    "pre_scores": [50, 55, 45, 60],
+                    "post_scores": [80, 85, 75, 90],
+                    "attendance_rate": 95,
+                },
+            )
+        )
         assert result.data["effectiveness"] == "high"
         assert result.data["improvement"] > 15
 
@@ -148,11 +192,16 @@ class TestEffectiveness:
 class TestImprovements:
     def test_generates_suggestions(self):
         agent = SmartServiceAgent(tenant_id=TID)
-        result = asyncio.run(agent.execute("generate_improvements", {
-            "top_issues": [
-                {"type": "wait_time", "count": 8},
-                {"type": "food_quality", "count": 3},
-            ],
-        }))
+        result = asyncio.run(
+            agent.execute(
+                "generate_improvements",
+                {
+                    "top_issues": [
+                        {"type": "wait_time", "count": 8},
+                        {"type": "food_quality", "count": 3},
+                    ],
+                },
+            )
+        )
         assert result.data["total"] == 2
         assert result.data["improvements"][0]["priority"] == "high"

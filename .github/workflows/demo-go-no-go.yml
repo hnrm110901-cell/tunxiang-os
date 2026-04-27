@@ -1,0 +1,183 @@
+name: DEMO Go/No-Go
+
+# Week 8 Go/No-Go 10 项门槛自动化（CLAUDE.md § 22 / docs/sprint-plan § 3）
+#
+# PR 时：仅跑无 DB 依赖的 checkpoint（scorecards / 话术 / signoff 模板 /
+#        demo-reset 存在 / seed.sql 结构）
+# 主干 push：同上 + 推送 artifact 供 dashboard 消费
+# 手动触发：可选择 --strict（任何 NO_GO 即 fail）
+#
+# 与 tier1-gate.yml 互补：tier1 专跑 Tier 1 测试，本工作流跑其余 9 个 checkpoint。
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      # 相关路径变更时触发
+      - 'scripts/demo_go_no_go.py'
+      - 'scripts/check_rls_policies.py'
+      - 'docs/demo/**'
+      - 'infra/demo/**'
+      - 'tests/integration/test_sprint_h_demo.py'
+      - '.github/workflows/demo-go-no-go.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/demo_go_no_go.py'
+      - 'docs/demo/**'
+      - 'infra/demo/**'
+  workflow_dispatch:
+    inputs:
+      strict:
+        description: '严格模式：任何 NO_GO 即 fail（默认只 fail 在 scripts/docs/scorecards 类 checkpoint）'
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  go-no-go:
+    name: 10 项 Go/No-Go 检查
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+
+      - name: 安装最小依赖
+        run: |
+          # 本工作流只需 pytest + 标准库
+          pip install --quiet pytest pytest-asyncio
+
+      - name: 运行 Go/No-Go（--skip-tests --json）
+        id: check
+        run: |
+          # --skip-tests 跳过 Tier 1 子进程（由 tier1-gate.yml 专门跑）
+          # --json 结构化输出供后续解析
+          set +e
+          python scripts/demo_go_no_go.py --skip-tests --json > /tmp/go-no-go.json
+          EXIT=$?
+          set -e
+
+          echo "exit_code=$EXIT" >> $GITHUB_OUTPUT
+
+          # 打印人类可读版本
+          python scripts/demo_go_no_go.py --skip-tests
+
+          # JSON 摘要
+          python - <<'PY'
+          import json
+          with open("/tmp/go-no-go.json") as f:
+              data = json.load(f)
+          summary = data["summary"]
+          print(f"::notice title=Go/No-Go 汇总::GO={summary['GO']} NO_GO={summary['NO_GO']} WARNING={summary['WARNING']} SKIPPED={summary['SKIPPED']}")
+          # 对非 GO 的 checkpoint 打 annotation
+          for check in data["checks"]:
+              if check["status"] == "NO_GO":
+                  print(f"::error title=Go/No-Go §{check['checkpoint_id']} NO_GO::{check['name']} — {check['details']}")
+              elif check["status"] == "WARNING":
+                  print(f"::warning title=Go/No-Go §{check['checkpoint_id']} WARNING::{check['name']} — {check['details']}")
+          PY
+
+      - name: 上传 Go/No-Go JSON artifact
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: demo-go-no-go-report
+          path: /tmp/go-no-go.json
+          retention-days: 30
+
+      - name: 门禁判定
+        run: |
+          # 只 fail "本 PR 应该修复"的 NO_GO（scripts/docs/scorecards 类）
+          # 跳过环境依赖失败（DB/k6/nightly log 缺失走 SKIPPED 不影响）
+          #
+          # --strict（manual dispatch 勾选时）：任何 NO_GO 即 fail
+          python - <<'PY'
+          import json, sys, os
+          with open("/tmp/go-no-go.json") as f:
+              data = json.load(f)
+          checks = data["checks"]
+
+          # PR / push 默认：只 block 这些 checkpoint（本 PR 可控）
+          BLOCKING_IDS = {
+              1,   # Tier 1 测试（本工作流 --skip-tests 时转 SKIPPED，不会 block）
+              5,   # 收银员签字
+              6,   # 3 商户 scorecard
+              8,   # demo-reset.sh
+              10,  # 演示话术
+          }
+          # Strict 模式：全部 block（CI dispatch 手动触发）
+          strict = (os.environ.get("INPUT_STRICT", "false").lower() == "true")
+          if strict:
+              BLOCKING_IDS = set(range(1, 11))
+
+          failed = []
+          for c in checks:
+              if c["status"] != "NO_GO":
+                  continue
+              if c["checkpoint_id"] in BLOCKING_IDS:
+                  failed.append(c)
+
+          if failed:
+              print("❌ Blocking NO_GO checkpoints:", file=sys.stderr)
+              for c in failed:
+                  print(f"  §{c['checkpoint_id']} {c['name']}: {c['details']}", file=sys.stderr)
+              sys.exit(1)
+          print("✅ 所有可控 checkpoint 通过（SKIPPED 不 block PR）")
+          PY
+        env:
+          INPUT_STRICT: ${{ inputs.strict }}
+
+      - name: PR 评论 Go/No-Go 汇总
+        if: github.event_name == 'pull_request' && always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const data = JSON.parse(fs.readFileSync('/tmp/go-no-go.json', 'utf8'));
+            const rows = data.checks.map(c => {
+              const emoji = {GO: '✅', NO_GO: '❌', WARNING: '⚠️', SKIPPED: '⏭️'}[c.status] || '❓';
+              return `| ${c.checkpoint_id} | ${emoji} **${c.status}** | ${c.name} | ${c.details || ''} |`;
+            }).join('\n');
+            const body = [
+              `## DEMO Go/No-Go 汇总`,
+              ``,
+              `| # | 状态 | 检查项 | 详情 |`,
+              `|---|------|--------|------|`,
+              rows,
+              ``,
+              `**汇总**: ✅ GO × ${data.summary.GO} · ❌ NO_GO × ${data.summary.NO_GO} · ⚠️ WARNING × ${data.summary.WARNING} · ⏭️ SKIPPED × ${data.summary.SKIPPED}`,
+              ``,
+              `> PR 模式：SKIPPED 不 block（环境依赖缺 DB/k6/nightly log 走此路径）`,
+              `> Week 8 前：在 DEMO 环境手动触发 \`workflow_dispatch\` + \`strict\` 全面 block`,
+            ].join('\n');
+
+            // 找现有 bot 评论更新 / 否则新建
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner, repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            const existing = comments.find(c =>
+              c.user.login === 'github-actions[bot]' &&
+              c.body.startsWith('## DEMO Go/No-Go 汇总')
+            );
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner, repo: context.repo.repo,
+                comment_id: existing.id, body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner, repo: context.repo.repo,
+                issue_number: context.issue.number, body,
+              });
+            }

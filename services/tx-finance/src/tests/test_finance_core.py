@@ -6,6 +6,7 @@ tx-finance 核心路由测试
     cd /Users/lichun/tunxiang-os/services/tx-finance
     pytest src/tests/test_finance_core.py -v
 """
+
 from __future__ import annotations
 
 import sys
@@ -13,9 +14,7 @@ import types
 import uuid
 from datetime import date, datetime
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock, patch
-
-import pytest
+from unittest.mock import AsyncMock, MagicMock
 
 # ─── 注入缺失的存根模块 ──────────────────────────────────────────────────────
 
@@ -30,9 +29,7 @@ def _make_stub(name: str, **attrs) -> types.ModuleType:
 # structlog 存根
 if "structlog" not in sys.modules:
     stub_log = MagicMock()
-    stub_log.get_logger.return_value = MagicMock(
-        info=MagicMock(), error=MagicMock(), warning=MagicMock()
-    )
+    stub_log.get_logger.return_value = MagicMock(info=MagicMock(), error=MagicMock(), warning=MagicMock())
     sys.modules["structlog"] = stub_log
 
 # shared.ontology.src.database 存根
@@ -56,9 +53,7 @@ sys.modules["services.channel_pl_calculator"] = _make_stub(
 # sqlalchemy 系列存根（text / AsyncSession / SQLAlchemyError）
 if "sqlalchemy" not in sys.modules:
     sa_stub = _make_stub("sqlalchemy", text=lambda s: s)
-    sa_exc_stub = _make_stub(
-        "sqlalchemy.exc", SQLAlchemyError=type("SQLAlchemyError", (Exception,), {})
-    )
+    sa_exc_stub = _make_stub("sqlalchemy.exc", SQLAlchemyError=type("SQLAlchemyError", (Exception,), {}))
     sa_ext_stub = _make_stub("sqlalchemy.ext")
     sa_ext_async = _make_stub("sqlalchemy.ext.asyncio", AsyncSession=MagicMock())
     sys.modules["sqlalchemy"] = sa_stub
@@ -73,12 +68,11 @@ SQLAlchemyError = sys.modules["sqlalchemy.exc"].SQLAlchemyError
 
 # ─── 加载被测路由模块 ─────────────────────────────────────────────────────────
 
-from src.api import settlement_routes, payroll_routes  # noqa: E402
-
 # ─── FastAPI TestClient ───────────────────────────────────────────────────────
-
 from fastapi import FastAPI
 from fastapi.testclient import TestClient  # noqa: E402
+
+from src.api import payroll_routes, settlement_routes  # noqa: E402
 
 TENANT_ID = str(uuid.uuid4())
 STORE_ID = str(uuid.uuid4())
@@ -397,9 +391,7 @@ class TestPayrollRoutes:
         fetch_result.mappings.return_value.first.return_value = fetch_row
 
         mock_sess = AsyncMock()
-        mock_sess.execute = AsyncMock(
-            side_effect=[set_rls_result, fetch_result, update_result]
-        )
+        mock_sess.execute = AsyncMock(side_effect=[set_rls_result, fetch_result, update_result])
         mock_sess.commit = AsyncMock()
 
         app = _build_app()
@@ -422,9 +414,7 @@ class TestPayrollRoutes:
         set_rls_result = MagicMock()
 
         mock_sess = AsyncMock()
-        mock_sess.execute = AsyncMock(
-            side_effect=[set_rls_result, SQLAlchemyError("DB down")]
-        )
+        mock_sess.execute = AsyncMock(side_effect=[set_rls_result, SQLAlchemyError("DB down")])
 
         app = _build_app()
         app.dependency_overrides[payroll_routes.get_db] = lambda: mock_sess

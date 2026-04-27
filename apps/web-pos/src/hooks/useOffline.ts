@@ -18,13 +18,57 @@ export interface OfflineOperation {
   payload: Record<string, unknown>;
   createdAt: string;
   retryCount: number;
+  /**
+   * 幂等键（R-补2-1 / Tier1）。replay 时作为 `X-Idempotency-Key` header 发给 server
+   * 的 replay cache，防止同单跨会话/跨设备重连双扣。
+   * 旧版本 IndexedDB 中已有的 op 没有这个字段（undefined），replay 前由
+   * `deriveIdempotencyKey(op)` 从 type+payload 派生稳定 key 兜底。
+   */
+  idempotencyKey?: string;
 }
+
+/**
+ * 旧版本 IndexedDB 队列里的 op 没有 idempotencyKey 字段时，按 type+payload 派生稳定 key。
+ * 与 tradeApi 在线路径的命名规则保持一致（settle:{orderId} / payment:{orderId}:{method}），
+ * 让"离线入队 → 网络恢复 replay" 与"短网络抖动重试" 走同一个 server replay cache 窗口。
+ *
+ * 暴露为模块级函数便于单测；非公开 API。
+ */
+export function deriveIdempotencyKey(op: OfflineOperation): string {
+  if (op.idempotencyKey) return op.idempotencyKey;
+  const orderId = (op.payload.orderId as string | undefined) ?? '';
+  const method = (op.payload.method as string | undefined) ?? '';
+  switch (op.type) {
+    case 'settle_order':
+      return `settle:${orderId}`;
+    case 'create_payment':
+      return `payment:${orderId}:${method}`;
+    case 'add_item': {
+      const dishId = (op.payload.dishId as string | undefined) ?? '';
+      // add_item 缺乏天然唯一锚点，加 op.id 兜底（同一 op 重试稳定，不同 op 不会撞）
+      return `add_item:${orderId}:${dishId}:${op.id}`;
+    }
+    case 'create_order':
+      // 老 op 没有 server 侧 orderId，用 op.id（前端临时 ID）做兜底
+      return `create_order:${op.id}`;
+    default:
+      return `legacy:${op.id}`;
+  }
+}
+
+/**
+ * enqueue 入参形态。R-补2-1（Tier1）：调用方必须显式提供 `idempotencyKey`，
+ * 老调用点（仅传 type+payload）通过 TS 编译期错误暴露，强制走稳定 key 路径。
+ */
+export type EnqueueInput = Omit<OfflineOperation, 'id' | 'createdAt' | 'retryCount' | 'idempotencyKey'> & {
+  idempotencyKey?: string;
+};
 
 interface UseOfflineResult {
   isOnline: boolean;
   offlineQueue: OfflineOperation[];
   queueLength: number;
-  enqueue: (op: Omit<OfflineOperation, 'id' | 'createdAt' | 'retryCount'>) => Promise<string>;
+  enqueue: (op: EnqueueInput) => Promise<string>;
   syncQueue: () => Promise<void>;
   syncing: boolean;
   clearQueue: () => Promise<void>;
@@ -100,9 +144,17 @@ async function clearAllOps(): Promise<void> {
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
 const TENANT_ID = import.meta.env.VITE_TENANT_ID || '';
 
-async function replayOperation(op: OfflineOperation): Promise<boolean> {
+/**
+ * 单条 op 重放。R-补2-1（Tier1）：必须带 `X-Idempotency-Key` header，让 server
+ * replay cache 在跨会话/重启场景下拦截重复请求，防止同单双扣。
+ *
+ * 暴露为模块级 export 便于单测，非业务 UI 直接调用。
+ */
+export async function replayOperation(op: OfflineOperation): Promise<boolean> {
+  const idempotencyKey = deriveIdempotencyKey(op);
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
+    'X-Idempotency-Key': idempotencyKey,
     ...(TENANT_ID ? { 'X-Tenant-ID': TENANT_ID } : {}),
   };
 
@@ -221,14 +273,19 @@ export function useOffline(): UseOfflineResult {
 
   // 入队
   const enqueue = useCallback(async (
-    op: Omit<OfflineOperation, 'id' | 'createdAt' | 'retryCount'>,
+    op: EnqueueInput,
   ): Promise<string> => {
     const id = `offline_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-    const fullOp: OfflineOperation = {
+    // R-补2-1：未传 idempotencyKey 时按 type+payload 派生稳定 key（与 replay 保持一致）
+    const fullOpDraft: OfflineOperation = {
       ...op,
       id,
       createdAt: new Date().toISOString(),
       retryCount: 0,
+    };
+    const fullOp: OfflineOperation = {
+      ...fullOpDraft,
+      idempotencyKey: op.idempotencyKey ?? deriveIdempotencyKey(fullOpDraft),
     };
     await putOp(fullOp);
     await refreshQueue();

@@ -9,6 +9,7 @@
 
 金额：所有金额统一使用分（int），避免浮点精度问题。
 """
+
 from __future__ import annotations
 
 from datetime import date, datetime, timezone
@@ -35,16 +36,18 @@ from pydantic import BaseModel, Field
 
 class DeliveryPlatformStats(BaseModel):
     """单个平台日统计"""
+
     platform: str
     order_count: int = 0
-    revenue_fen: int = 0          # 平台营收（总金额）
-    commission_fen: int = 0       # 平台佣金
-    net_revenue_fen: int = 0      # 实收 = revenue - commission
-    effective_rate: float = 0.0   # 实际费率 = commission / revenue
+    revenue_fen: int = 0  # 平台营收（总金额）
+    commission_fen: int = 0  # 平台佣金
+    net_revenue_fen: int = 0  # 实收 = revenue - commission
+    effective_rate: float = 0.0  # 实际费率 = commission / revenue
 
 
 class DeliveryDailyStats(BaseModel):
     """外卖日统计汇总"""
+
     date: date
     tenant_id: UUID
     store_id: UUID
@@ -58,6 +61,7 @@ class DeliveryDailyStats(BaseModel):
 # ─────────────────────────────────────────────────────────────────
 # 聚合器
 # ─────────────────────────────────────────────────────────────────
+
 
 class DeliveryAggregator:
     """外卖平台聚合器 — 统一调度美团/饿了么/抖音订单流转"""
@@ -189,8 +193,7 @@ class DeliveryAggregator:
                         "created_at": datetime.now(timezone.utc).isoformat(),
                     },
                 )
-                log.info("delivery_order_broadcasted_to_kds",
-                         platform_order_id=order.platform_order_id)
+                log.info("delivery_order_broadcasted_to_kds", platform_order_id=order.platform_order_id)
             except Exception as exc:  # noqa: BLE001 — MLPS3-P0: KDS广播失败不阻断接单，最外层兜底
                 # 广播失败不阻断主流程
                 log.warning("delivery_kds_broadcast_failed", error=str(exc), exc_info=True)
@@ -258,7 +261,12 @@ class DeliveryAggregator:
           写入 delivery_orders.status + updated_at
         """
         valid_statuses = {
-            "confirmed", "preparing", "ready", "dispatched", "delivered", "cancelled",
+            "confirmed",
+            "preparing",
+            "ready",
+            "dispatched",
+            "delivered",
+            "cancelled",
         }
         if status not in valid_statuses:
             raise ValueError(f"无效的配送状态: {status}，合法值：{valid_statuses}")

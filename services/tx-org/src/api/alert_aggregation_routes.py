@@ -22,8 +22,8 @@
 
 from __future__ import annotations
 
-from datetime import date, datetime, timezone, timedelta
-from typing import Any, List, Optional
+from datetime import date, datetime, timedelta, timezone
+from typing import Any
 from uuid import UUID
 
 import structlog
@@ -44,9 +44,7 @@ SEVERITY_WEIGHT = {"critical": 3, "warning": 2, "info": 1}
 
 
 def _get_tenant_id(request: Request) -> str:
-    tid = getattr(request.state, "tenant_id", None) or request.headers.get(
-        "X-Tenant-ID", ""
-    )
+    tid = getattr(request.state, "tenant_id", None) or request.headers.get("X-Tenant-ID", "")
     if not tid:
         raise HTTPException(status_code=400, detail="X-Tenant-ID header required")
     return tid
@@ -95,25 +93,25 @@ async def get_risk_matrix(
         at = r["alert_type"]
         stores.add(sid)
         alert_types.add(at)
-        matrix.append({
-            "store_id": sid,
-            "alert_type": at,
-            "critical_count": r["critical_count"],
-            "warning_count": r["warning_count"],
-            "info_count": r["info_count"],
-            "total": r["total"],
-            "weighted_score": (
-                r["critical_count"] * 3
-                + r["warning_count"] * 2
-                + r["info_count"] * 1
-            ),
-        })
+        matrix.append(
+            {
+                "store_id": sid,
+                "alert_type": at,
+                "critical_count": r["critical_count"],
+                "warning_count": r["warning_count"],
+                "info_count": r["info_count"],
+                "total": r["total"],
+                "weighted_score": (r["critical_count"] * 3 + r["warning_count"] * 2 + r["info_count"] * 1),
+            }
+        )
 
-    return _ok({
-        "matrix": matrix,
-        "stores": sorted(stores),
-        "alert_types": sorted(alert_types),
-    })
+    return _ok(
+        {
+            "matrix": matrix,
+            "stores": sorted(stores),
+            "alert_types": sorted(alert_types),
+        }
+    )
 
 
 # ── 2. 预警趋势分析 ──────────────────────────────────────────────────────────
@@ -141,11 +139,20 @@ async def get_trend_analysis(
         GROUP BY period, alert_type
         ORDER BY period
     """)
-    rows = (await db.execute(sql, {
-        "tid": tenant_id,
-        "group_by": group_by,
-        "since": since,
-    })).mappings().all()
+    rows = (
+        (
+            await db.execute(
+                sql,
+                {
+                    "tid": tenant_id,
+                    "group_by": group_by,
+                    "since": since,
+                },
+            )
+        )
+        .mappings()
+        .all()
+    )
 
     trends = [
         {
@@ -249,9 +256,19 @@ async def get_employee_risk_profile(
         WHERE tenant_id = :tid AND employee_id = :eid AND is_deleted = FALSE
         ORDER BY created_at DESC
     """)
-    alert_rows = (await db.execute(alerts_sql, {
-        "tid": tenant_id, "eid": employee_id,
-    })).mappings().all()
+    alert_rows = (
+        (
+            await db.execute(
+                alerts_sql,
+                {
+                    "tid": tenant_id,
+                    "eid": employee_id,
+                },
+            )
+        )
+        .mappings()
+        .all()
+    )
 
     # 训练进度
     training_sql = text("""
@@ -260,9 +277,19 @@ async def get_employee_risk_profile(
         WHERE tenant_id = :tid AND employee_id = :eid AND is_deleted = FALSE
         ORDER BY created_at DESC
     """)
-    training_rows = (await db.execute(training_sql, {
-        "tid": tenant_id, "eid": employee_id,
-    })).mappings().all()
+    training_rows = (
+        (
+            await db.execute(
+                training_sql,
+                {
+                    "tid": tenant_id,
+                    "eid": employee_id,
+                },
+            )
+        )
+        .mappings()
+        .all()
+    )
 
     # 认证状态
     cert_sql = text("""
@@ -271,9 +298,19 @@ async def get_employee_risk_profile(
         WHERE tenant_id = :tid AND employee_id = :eid AND is_deleted = FALSE
         ORDER BY created_at DESC
     """)
-    cert_rows = (await db.execute(cert_sql, {
-        "tid": tenant_id, "eid": employee_id,
-    })).mappings().all()
+    cert_rows = (
+        (
+            await db.execute(
+                cert_sql,
+                {
+                    "tid": tenant_id,
+                    "eid": employee_id,
+                },
+            )
+        )
+        .mappings()
+        .all()
+    )
 
     # 带教关系
     mentor_sql = text("""
@@ -284,9 +321,19 @@ async def get_employee_risk_profile(
             AND is_deleted = FALSE
         ORDER BY created_at DESC
     """)
-    mentor_rows = (await db.execute(mentor_sql, {
-        "tid": tenant_id, "eid": employee_id,
-    })).mappings().all()
+    mentor_rows = (
+        (
+            await db.execute(
+                mentor_sql,
+                {
+                    "tid": tenant_id,
+                    "eid": employee_id,
+                },
+            )
+        )
+        .mappings()
+        .all()
+    )
 
     def _row_to_dict(r: Any) -> dict:
         d = dict(r)
@@ -297,13 +344,15 @@ async def get_employee_risk_profile(
                 d[k] = str(v)
         return d
 
-    return _ok({
-        "employee_id": employee_id,
-        "alerts": [_row_to_dict(r) for r in alert_rows],
-        "training": [_row_to_dict(r) for r in training_rows],
-        "certifications": [_row_to_dict(r) for r in cert_rows],
-        "mentorship": [_row_to_dict(r) for r in mentor_rows],
-    })
+    return _ok(
+        {
+            "employee_id": employee_id,
+            "alerts": [_row_to_dict(r) for r in alert_rows],
+            "training": [_row_to_dict(r) for r in training_rows],
+            "certifications": [_row_to_dict(r) for r in cert_rows],
+            "mentorship": [_row_to_dict(r) for r in mentor_rows],
+        }
+    )
 
 
 # ── 5. 问题店列表 ────────────────────────────────────────────────────────────
@@ -433,14 +482,16 @@ async def get_action_effectiveness(
         for r in type_rows
     ]
 
-    return _ok({
-        "total": total,
-        "resolved": resolved,
-        "resolution_rate": round(resolved / total * 100, 1) if total else 0,
-        "avg_resolution_hours": round(ov["avg_resolution_hours"], 1) if ov["avg_resolution_hours"] else None,
-        "dri_conversion_rate": round((ov["with_order"] or 0) / total * 100, 1) if total else 0,
-        "by_type": by_type,
-    })
+    return _ok(
+        {
+            "total": total,
+            "resolved": resolved,
+            "resolution_rate": round(resolved / total * 100, 1) if total else 0,
+            "avg_resolution_hours": round(ov["avg_resolution_hours"], 1) if ov["avg_resolution_hours"] else None,
+            "dri_conversion_rate": round((ov["with_order"] or 0) / total * 100, 1) if total else 0,
+            "by_type": by_type,
+        }
+    )
 
 
 # ── 7. 人力中枢总览 ─────────────────────────────────────────────────────────
@@ -561,46 +612,48 @@ async def get_hub_overview(
     peak_r = (await db.execute(peak_sql, params)).mappings().one()
     coaching_r = (await db.execute(coaching_sql, params)).mappings().one()
 
-    return _ok({
-        "alerts": {
-            "total_unresolved": alerts_r["total_unresolved"],
-            "critical": alerts_r["critical"],
-            "resolution_rate": float(alerts_r["resolution_rate"]),
-        },
-        "staffing": {
-            "total_templates": staffing_r["total_templates"],
-            "gap_stores": staffing_r["gap_stores"],
-        },
-        "training": {
-            "in_progress": training_r["in_progress"],
-            "overdue": training_r["overdue"],
-            "completion_rate": float(training_r["completion_rate"]),
-        },
-        "certification": {
-            "total": cert_r["total"],
-            "pass_rate": float(cert_r["pass_rate"]),
-            "expiring_soon": cert_r["expiring_soon"],
-        },
-        "mentorship": {
-            "active": mentor_r["active"],
-            "avg_score": round(float(mentor_r["avg_score"]), 1),
-        },
-        "readiness": {
-            "avg_score": round(float(readiness_r["avg_score"]), 1),
-            "red_stores": readiness_r["red_stores"],
-            "green_stores": readiness_r["green_stores"],
-        },
-        "peak_guard": {
-            "upcoming": peak_r["upcoming"],
-            "avg_coverage": round(float(peak_r["avg_coverage"]), 1),
-            "low_coverage": peak_r["low_coverage"],
-        },
-        "coaching": {
-            "this_week": coaching_r["this_week"],
-            "acceptance_rate": float(coaching_r["acceptance_rate"]),
-            "avg_lift": float(coaching_r["avg_lift"]),
-        },
-    })
+    return _ok(
+        {
+            "alerts": {
+                "total_unresolved": alerts_r["total_unresolved"],
+                "critical": alerts_r["critical"],
+                "resolution_rate": float(alerts_r["resolution_rate"]),
+            },
+            "staffing": {
+                "total_templates": staffing_r["total_templates"],
+                "gap_stores": staffing_r["gap_stores"],
+            },
+            "training": {
+                "in_progress": training_r["in_progress"],
+                "overdue": training_r["overdue"],
+                "completion_rate": float(training_r["completion_rate"]),
+            },
+            "certification": {
+                "total": cert_r["total"],
+                "pass_rate": float(cert_r["pass_rate"]),
+                "expiring_soon": cert_r["expiring_soon"],
+            },
+            "mentorship": {
+                "active": mentor_r["active"],
+                "avg_score": round(float(mentor_r["avg_score"]), 1),
+            },
+            "readiness": {
+                "avg_score": round(float(readiness_r["avg_score"]), 1),
+                "red_stores": readiness_r["red_stores"],
+                "green_stores": readiness_r["green_stores"],
+            },
+            "peak_guard": {
+                "upcoming": peak_r["upcoming"],
+                "avg_coverage": round(float(peak_r["avg_coverage"]), 1),
+                "low_coverage": peak_r["low_coverage"],
+            },
+            "coaching": {
+                "this_week": coaching_r["this_week"],
+                "acceptance_rate": float(coaching_r["acceptance_rate"]),
+                "avg_lift": float(coaching_r["avg_lift"]),
+            },
+        }
+    )
 
 
 # ── 8. 周度人力简报 ──────────────────────────────────────────────────────────
@@ -693,31 +746,30 @@ async def get_weekly_digest(
     """)
     cert_r = (await db.execute(cert_sql, params)).mappings().one()
 
-    return _ok({
-        "week_start": this_monday.isoformat(),
-        "new_alerts": new_this,
-        "resolved_alerts": resolved_this,
-        "net_change": new_this - resolved_this,
-        "critical_events": [
-            {
-                "id": str(r["id"]),
-                "store_id": str(r["store_id"]),
-                "alert_type": r["alert_type"],
-                "title": r["title"],
-                "created_at": r["created_at"].isoformat() if r["created_at"] else None,
-            }
-            for r in critical_rows
-        ],
-        "top_problem_stores": [
-            {"store_id": str(r["store_id"]), "risk_score": float(r["risk_score"])}
-            for r in top_rows
-        ],
-        "training_completions": train_r["cnt"],
-        "new_certifications": cert_r["cnt"],
-        "week_over_week": {
-            "new_alerts_change": new_this - new_last,
-            "new_alerts_change_pct": (
-                round((new_this - new_last) / new_last * 100, 1) if new_last else None
-            ),
-        },
-    })
+    return _ok(
+        {
+            "week_start": this_monday.isoformat(),
+            "new_alerts": new_this,
+            "resolved_alerts": resolved_this,
+            "net_change": new_this - resolved_this,
+            "critical_events": [
+                {
+                    "id": str(r["id"]),
+                    "store_id": str(r["store_id"]),
+                    "alert_type": r["alert_type"],
+                    "title": r["title"],
+                    "created_at": r["created_at"].isoformat() if r["created_at"] else None,
+                }
+                for r in critical_rows
+            ],
+            "top_problem_stores": [
+                {"store_id": str(r["store_id"]), "risk_score": float(r["risk_score"])} for r in top_rows
+            ],
+            "training_completions": train_r["cnt"],
+            "new_certifications": cert_r["cnt"],
+            "week_over_week": {
+                "new_alerts_change": new_this - new_last,
+                "new_alerts_change_pct": (round((new_this - new_last) / new_last * 100, 1) if new_last else None),
+            },
+        }
+    )

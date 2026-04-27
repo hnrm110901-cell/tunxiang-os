@@ -58,8 +58,12 @@ ORDER BY total_dishes_served DESC
 
 DIMENSIONS = ["store_name", "runner_name", "employee_id", "grade_level"]
 METRICS = [
-    "order_count", "total_dishes_served",
-    "avg_serve_duration_min", "timeout_order_count", "timeout_rate_pct",
-    "commission_fen", "output_rank",
+    "order_count",
+    "total_dishes_served",
+    "avg_serve_duration_min",
+    "timeout_order_count",
+    "timeout_rate_pct",
+    "commission_fen",
+    "output_rank",
 ]
 FILTERS = ["start_date", "end_date", "store_id"]

@@ -3,6 +3,7 @@
 统一响应格式: {"ok": bool, "data": {}, "error": {}}
 所有接口需 X-Tenant-ID header。
 """
+
 from typing import AsyncGenerator, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
@@ -28,6 +29,7 @@ router = APIRouter(prefix="/api/v1/chef-at-home", tags=["chef-at-home"])
 
 
 # ─── 通用辅助 ───
+
 
 def _get_tenant_id(request: Request) -> str:
     tid = getattr(request.state, "tenant_id", None) or request.headers.get("X-Tenant-ID", "")
@@ -56,6 +58,7 @@ def _err(msg: str, code: int = 400) -> None:
 
 
 # ─── 请求模型 ───
+
 
 class DishItem(BaseModel):
     dish_id: str
@@ -136,8 +139,11 @@ async def api_list_chefs(
     """查询可用厨师列表"""
     tenant_id = _get_tenant_id(request)
     result = await list_available_chefs(
-        date=date, area=area, cuisine_type=cuisine_type,
-        tenant_id=tenant_id, db=db,
+        date=date,
+        area=area,
+        cuisine_type=cuisine_type,
+        tenant_id=tenant_id,
+        db=db,
     )
     return _ok(result)
 
@@ -168,7 +174,10 @@ async def api_get_chef_schedule(
     tenant_id = _get_tenant_id(request)
     try:
         result = await get_chef_schedule(
-            chef_id=chef_id, month=month, tenant_id=tenant_id, db=db,
+            chef_id=chef_id,
+            month=month,
+            tenant_id=tenant_id,
+            db=db,
         )
         return _ok(result)
     except ValueError as e:
@@ -204,8 +213,10 @@ async def api_confirm_booking(
     tenant_id = _get_tenant_id(request)
     try:
         result = await confirm_booking(
-            booking_id=booking_id, payment_id=req.payment_id,
-            tenant_id=tenant_id, db=db,
+            booking_id=booking_id,
+            payment_id=req.payment_id,
+            tenant_id=tenant_id,
+            db=db,
         )
         return _ok(result)
     except ValueError as e:
@@ -223,8 +234,10 @@ async def api_start_service(
     tenant_id = _get_tenant_id(request)
     try:
         result = await start_service(
-            booking_id=booking_id, chef_id=req.chef_id,
-            tenant_id=tenant_id, db=db,
+            booking_id=booking_id,
+            chef_id=req.chef_id,
+            tenant_id=tenant_id,
+            db=db,
         )
         return _ok(result)
     except ValueError as e:
@@ -242,8 +255,10 @@ async def api_complete_service(
     tenant_id = _get_tenant_id(request)
     try:
         result = await complete_service(
-            booking_id=booking_id, photos=req.photos,
-            tenant_id=tenant_id, db=db,
+            booking_id=booking_id,
+            photos=req.photos,
+            tenant_id=tenant_id,
+            db=db,
         )
         return _ok(result)
     except ValueError as e:
@@ -261,8 +276,11 @@ async def api_rate_service(
     tenant_id = _get_tenant_id(request)
     try:
         result = await rate_service(
-            booking_id=booking_id, rating=req.rating, comment=req.comment,
-            tenant_id=tenant_id, db=db,
+            booking_id=booking_id,
+            rating=req.rating,
+            comment=req.comment,
+            tenant_id=tenant_id,
+            db=db,
         )
         return _ok(result)
     except ValueError as e:
@@ -280,7 +298,10 @@ async def api_get_booking_history(
     """获取顾客预约历史"""
     tenant_id = _get_tenant_id(request)
     result = await get_booking_history(
-        customer_id=customer_id, tenant_id=tenant_id, db=db,
-        page=page, size=size,
+        customer_id=customer_id,
+        tenant_id=tenant_id,
+        db=db,
+        page=page,
+        size=size,
     )
     return _ok(result)

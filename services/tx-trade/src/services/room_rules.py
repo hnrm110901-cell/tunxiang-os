@@ -2,6 +2,7 @@
 
 金额单位统一为分(fen)。
 """
+
 import uuid
 from datetime import datetime, timezone
 
@@ -192,12 +193,16 @@ async def get_room_usage_today(
     Returns:
         [{"room": {...}, "status": str, "current_order_id": str|None, "time_elapsed_minutes": int|None}]
     """
-    stmt = select(Table).where(
-        Table.store_id == store_id,
-        Table.tenant_id == tenant_id,
-        Table.is_deleted.is_(False),
-        Table.is_active.is_(True),
-    ).order_by(Table.area, Table.sort_order)
+    stmt = (
+        select(Table)
+        .where(
+            Table.store_id == store_id,
+            Table.tenant_id == tenant_id,
+            Table.is_deleted.is_(False),
+            Table.is_active.is_(True),
+        )
+        .order_by(Table.area, Table.sort_order)
+    )
 
     result = await db.execute(stmt)
     tables = result.scalars().all()
@@ -222,20 +227,22 @@ async def get_room_usage_today(
             except (ValueError, TypeError):
                 pass
 
-        rooms.append({
-            "room": {
-                "id": str(t.id),
-                "table_no": t.table_no,
-                "area": t.area,
-                "seats": t.seats,
-                "floor": t.floor,
-                "minimum_charge_fen": t.min_consume_fen or 0,
-            },
-            "status": t.status,
-            "current_order_id": str(t.current_order_id) if t.current_order_id else None,
-            "time_elapsed_minutes": time_elapsed_minutes,
-            "time_limit_minutes": config.get("time_limit_minutes"),
-        })
+        rooms.append(
+            {
+                "room": {
+                    "id": str(t.id),
+                    "table_no": t.table_no,
+                    "area": t.area,
+                    "seats": t.seats,
+                    "floor": t.floor,
+                    "minimum_charge_fen": t.min_consume_fen or 0,
+                },
+                "status": t.status,
+                "current_order_id": str(t.current_order_id) if t.current_order_id else None,
+                "time_elapsed_minutes": time_elapsed_minutes,
+                "time_limit_minutes": config.get("time_limit_minutes"),
+            }
+        )
 
     logger.info(
         "room_usage_queried",

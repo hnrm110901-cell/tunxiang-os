@@ -5,6 +5,7 @@
   GET  /api/v1/finance/seafood-loss          — 查询损耗记录（?store_id=&date=）
   GET  /api/v1/finance/seafood-loss/analysis — 损耗趋势分析（?store_id=&days=）
 """
+
 from __future__ import annotations
 
 import uuid
@@ -24,6 +25,7 @@ router = APIRouter(tags=["finance-seafood-loss"])
 
 
 # ─── 请求模型 ─────────────────────────────────────────────────────────────────
+
 
 class RecordSeafoodLossRequest(BaseModel):
     store_id: str = Field(..., description="门店ID（UUID）")
@@ -48,6 +50,7 @@ class RecordSeafoodLossRequest(BaseModel):
 
 # ─── 依赖注入 ─────────────────────────────────────────────────────────────────
 
+
 async def _get_tenant_db(x_tenant_id: str = Header(..., alias="X-Tenant-ID")):
     async for session in get_db_with_tenant(x_tenant_id):
         yield session
@@ -66,12 +69,11 @@ def _parse_date_param(d: str) -> date:
     try:
         return date.fromisoformat(d)
     except ValueError as exc:
-        raise HTTPException(
-            status_code=400, detail=f"日期格式错误: {d}，请使用 YYYY-MM-DD"
-        ) from exc
+        raise HTTPException(status_code=400, detail=f"日期格式错误: {d}，请使用 YYYY-MM-DD") from exc
 
 
 # ─── POST /seafood-loss/record — 录入活鲜死亡损耗 ────────────────────────────
+
 
 @router.post("/seafood-loss/record", summary="录入活鲜死亡损耗")
 async def record_seafood_loss(
@@ -156,6 +158,7 @@ async def record_seafood_loss(
 
 
 # ─── GET /seafood-loss — 查询损耗记录 ────────────────────────────────────────
+
 
 @router.get("/seafood-loss", summary="查询活鲜损耗记录")
 async def get_seafood_loss_records(
@@ -262,6 +265,7 @@ async def get_seafood_loss_records(
 
 
 # ─── GET /seafood-loss/analysis — 损耗趋势分析 ───────────────────────────────
+
 
 @router.get("/seafood-loss/analysis", summary="活鲜损耗趋势分析")
 async def get_seafood_loss_analysis(

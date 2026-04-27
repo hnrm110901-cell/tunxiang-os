@@ -12,6 +12,7 @@
 4. 打印队列管理（排队/补打/状态查询）
 5. 连接池复用（避免频繁开关 TCP 连接）
 """
+
 import asyncio
 import uuid
 from datetime import datetime, timezone
@@ -27,9 +28,9 @@ logger = structlog.get_logger()
 
 
 class PrinterRole(str, Enum):
-    CASHIER = "cashier"    # 收银打印机
-    KITCHEN = "kitchen"    # 厨打打印机
-    LABEL = "label"        # 标签打印机
+    CASHIER = "cashier"  # 收银打印机
+    KITCHEN = "kitchen"  # 厨打打印机
+    LABEL = "label"  # 标签打印机
 
 
 class PrintTaskStatus(str, Enum):
@@ -127,10 +128,10 @@ class PrintManager:
     MAX_QUEUE_SIZE = 500
 
     def __init__(self):
-        self._printers: dict[str, PrinterInfo] = {}    # {printer_id: PrinterInfo}
+        self._printers: dict[str, PrinterInfo] = {}  # {printer_id: PrinterInfo}
         self._connections: dict[str, ESCPOSPrinter] = {}  # {printer_id: ESCPOSPrinter}
-        self._task_queue: list[PrintTask] = []           # 打印队列
-        self._task_history: dict[str, PrintTask] = {}    # {task_id: PrintTask}
+        self._task_queue: list[PrintTask] = []  # 打印队列
+        self._task_history: dict[str, PrintTask] = {}  # {task_id: PrintTask}
         self._lock = asyncio.Lock()
         self._template = ReceiptTemplate()
 
@@ -380,11 +381,7 @@ class PrintManager:
 
     async def get_print_queue(self, store_id: str) -> list[dict]:
         """获取门店打印队列。"""
-        return [
-            t.to_dict()
-            for t in self._task_queue
-            if t.store_id == store_id
-        ]
+        return [t.to_dict() for t in self._task_queue if t.store_id == store_id]
 
     async def get_printer_status(self, store_id: str) -> list[dict]:
         """获取门店所有打印机状态。"""
@@ -402,11 +399,13 @@ class PrintManager:
             else:
                 status = PrinterStatus.OFFLINE
 
-            results.append({
-                **info.to_dict(),
-                "status": status.value,
-                "connected": conn is not None and conn.is_connected if conn else False,
-            })
+            results.append(
+                {
+                    **info.to_dict(),
+                    "status": status.value,
+                    "connected": conn is not None and conn.is_connected if conn else False,
+                }
+            )
         return results
 
     async def configure_store_printers(
@@ -426,10 +425,7 @@ class PrintManager:
             注册后的 PrinterInfo 列表
         """
         # 移除该门店的旧配置
-        old_ids = [
-            pid for pid, info in self._printers.items()
-            if info.store_id == store_id
-        ]
+        old_ids = [pid for pid, info in self._printers.items() if info.store_id == store_id]
         for pid in old_ids:
             await self.unregister_printer(pid)
 
@@ -478,12 +474,13 @@ class PrintManager:
             LF,
             LINE_WIDTH,
         )
+
         buf = bytearray()
         buf += ESC_INIT
         buf += ESC_ALIGN_CENTER + GS_SIZE_DOUBLE_BOTH + ESC_BOLD_ON
         buf += "屯象OS 打印测试".encode("gbk", errors="replace") + LF
         buf += GS_SIZE_NORMAL + ESC_BOLD_OFF
-        buf += (b'=' * LINE_WIDTH) + LF
+        buf += (b"=" * LINE_WIDTH) + LF
         buf += ESC_ALIGN_LEFT
         buf += f"打印机ID: {printer_id}".encode("gbk", errors="replace") + LF
         buf += f"IP地址:   {info.ip}:{info.port}".encode("gbk", errors="replace") + LF
@@ -491,16 +488,16 @@ class PrintManager:
         buf += f"门店ID:   {info.store_id}".encode("gbk", errors="replace") + LF
         if info.dept_id:
             buf += f"档口ID:   {info.dept_id}".encode("gbk", errors="replace") + LF
-        buf += (b'-' * LINE_WIDTH) + LF
+        buf += (b"-" * LINE_WIDTH) + LF
         buf += "中文打印测试: 屯象科技".encode("gbk", errors="replace") + LF
         buf += "1234567890 ABCDEFGHIJ".encode("gbk", errors="replace") + LF
-        buf += (b'-' * LINE_WIDTH) + LF
+        buf += (b"-" * LINE_WIDTH) + LF
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         buf += ESC_ALIGN_CENTER
         buf += f"测试时间: {now}".encode("gbk", errors="replace") + LF
         buf += "打印正常".encode("gbk", errors="replace") + LF
         buf += ESC_ALIGN_LEFT
-        buf += ESC_FEED + b'\x03' + GS_CUT_PARTIAL
+        buf += ESC_FEED + b"\x03" + GS_CUT_PARTIAL
 
         task = PrintTask(
             task_id=str(uuid.uuid4()),
@@ -537,11 +534,7 @@ class PrintManager:
     def _find_kitchen_printer(self, store_id: str, dept_id: str) -> Optional[str]:
         """查找门店指定档口的厨打打印机。"""
         for pid, info in self._printers.items():
-            if (
-                info.store_id == store_id
-                and info.role == PrinterRole.KITCHEN
-                and info.dept_id == dept_id
-            ):
+            if info.store_id == store_id and info.role == PrinterRole.KITCHEN and info.dept_id == dept_id:
                 return pid
         return None
 
@@ -551,7 +544,7 @@ class PrintManager:
             self._task_queue.append(task)
             # 限制队列长度
             if len(self._task_queue) > self.MAX_QUEUE_SIZE:
-                self._task_queue = self._task_queue[-self.MAX_QUEUE_SIZE:]
+                self._task_queue = self._task_queue[-self.MAX_QUEUE_SIZE :]
 
         task.status = PrintTaskStatus.PRINTING
 
@@ -689,8 +682,5 @@ def get_printer_preset(model_key: str) -> dict:
     """
     preset = SUPPORTED_PRINTERS.get(model_key)
     if preset is None:
-        raise ValueError(
-            f"不支持的打印机型号: {model_key}，"
-            f"支持的型号: {', '.join(SUPPORTED_PRINTERS.keys())}"
-        )
+        raise ValueError(f"不支持的打印机型号: {model_key}，支持的型号: {', '.join(SUPPORTED_PRINTERS.keys())}")
     return preset

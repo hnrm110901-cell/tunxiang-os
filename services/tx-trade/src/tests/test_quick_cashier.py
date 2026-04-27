@@ -10,17 +10,17 @@
 注意：打印模板测试（3/4）纯 Python 逻辑，无外部依赖，直接单元测试。
      后端 API 测试（1/2/5）使用 FastAPI TestClient + AsyncMock，复用 test_trade_misc 的存根模式。
 """
+
 import os
 import sys
 import types
-from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock
 
 # ─── 路径准备 ────────────────────────────────────────────────────────────────
 
 _TESTS_DIR = os.path.dirname(__file__)
-_SRC_DIR   = os.path.abspath(os.path.join(_TESTS_DIR, ".."))
-_ROOT_DIR  = os.path.abspath(os.path.join(_TESTS_DIR, "..", "..", "..", ".."))
+_SRC_DIR = os.path.abspath(os.path.join(_TESTS_DIR, ".."))
+_ROOT_DIR = os.path.abspath(os.path.join(_TESTS_DIR, "..", "..", "..", ".."))
 
 for _p in [_SRC_DIR, _ROOT_DIR]:
     if _p not in sys.path:
@@ -28,6 +28,7 @@ for _p in [_SRC_DIR, _ROOT_DIR]:
 
 
 # ─── sys.modules 存根 ────────────────────────────────────────────────────────
+
 
 def _stub(name: str, **attrs):
     """注入轻量模块存根（仅当不存在时）。"""
@@ -47,56 +48,60 @@ def _ensure_pkg(name: str, path: str) -> None:
         sys.modules[name] = mod
 
 
-_ensure_pkg("src",          _SRC_DIR)
-_ensure_pkg("src.api",      os.path.join(_SRC_DIR, "api"))
+_ensure_pkg("src", _SRC_DIR)
+_ensure_pkg("src.api", os.path.join(_SRC_DIR, "api"))
 _ensure_pkg("src.services", os.path.join(_SRC_DIR, "services"))
 
 _stub("shared")
 _stub("shared.events")
 _stub("shared.events.src")
 
-import asyncio as _asyncio                                   # noqa: E402
 
 async def _fake_emit_event(*_args, **_kwargs):
     pass
 
-_stub("shared.events.src.emitter",   emit_event=_fake_emit_event)
 
-import enum as _enum                                         # noqa: E402
+_stub("shared.events.src.emitter", emit_event=_fake_emit_event)
+
+import enum as _enum  # noqa: E402
+
 
 class _OrderEventType(_enum.Enum):
-    PAID    = "ORDER.PAID"
+    PAID = "ORDER.PAID"
     CREATED = "ORDER.CREATED"
+
 
 _stub("shared.events.src.event_types", OrderEventType=_OrderEventType)
 _stub("shared.ontology")
 _stub("shared.ontology.src")
 
-import types as _types                                       # noqa: E402
+import types as _types  # noqa: E402
 
 _db_mod = _types.ModuleType("shared.ontology.src.database")
+
 
 async def _get_db_placeholder():
     yield None  # pragma: no cover
 
-_db_mod.get_db             = _get_db_placeholder
+
+_db_mod.get_db = _get_db_placeholder
 _db_mod.get_db_with_tenant = _get_db_placeholder
-_db_mod.get_db_no_rls      = _get_db_placeholder
+_db_mod.get_db_no_rls = _get_db_placeholder
 sys.modules["shared.ontology.src.database"] = _db_mod
 
 # ─── 导入被测模块 ────────────────────────────────────────────────────────────
 
-from src.api.quick_cashier_routes import router as qc_router  # type: ignore[import]  # noqa: E402
-from shared.ontology.src.database import get_db                # noqa: E402
+from fastapi import FastAPI  # noqa: E402
+from fastapi.testclient import TestClient  # noqa: E402
 
-from fastapi import FastAPI                                    # noqa: E402
-from fastapi.testclient import TestClient                      # noqa: E402
+from shared.ontology.src.database import get_db  # noqa: E402
+from src.api.quick_cashier_routes import router as qc_router  # type: ignore[import]  # noqa: E402
 
 # ─── 常量 ────────────────────────────────────────────────────────────────────
 
 TENANT_ID = "11111111-1111-1111-1111-111111111111"
-STORE_ID  = "22222222-2222-2222-2222-222222222222"
-HEADERS   = {"X-Tenant-ID": TENANT_ID}
+STORE_ID = "22222222-2222-2222-2222-222222222222"
+HEADERS = {"X-Tenant-ID": TENANT_ID}
 
 # ─── 工具函数 ────────────────────────────────────────────────────────────────
 
@@ -104,7 +109,7 @@ HEADERS   = {"X-Tenant-ID": TENANT_ID}
 def _make_mock_db() -> AsyncMock:
     """最小化 AsyncSession mock。"""
     db = AsyncMock()
-    db.commit   = AsyncMock()
+    db.commit = AsyncMock()
     db.rollback = AsyncMock()
     return db
 
@@ -138,6 +143,7 @@ def _make_qc_app(db: AsyncMock) -> FastAPI:
 # 测试 1: 牌号按顺序分配
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_table_number_assignment_sequential():
     """第一张订单应分配到 call_number='001'（无前缀，seq=1）；
     第二张订单分配到 '002'（seq=2）。
@@ -145,11 +151,13 @@ def test_table_number_assignment_sequential():
     """
     db1 = _make_mock_db()
     # 第一次 execute: config（无前缀，max=999）→ seq UPSERT 返回 1 → INSERT quick_orders
-    db1.execute = AsyncMock(side_effect=[
-        _mappings_first({"prefix": "", "max_number": 999, "daily_reset": True}),
-        _scalar(1),         # seq = 1 → "001"
-        MagicMock(),        # quick_orders INSERT
-    ])
+    db1.execute = AsyncMock(
+        side_effect=[
+            _mappings_first({"prefix": "", "max_number": 999, "daily_reset": True}),
+            _scalar(1),  # seq = 1 → "001"
+            MagicMock(),  # quick_orders INSERT
+        ]
+    )
 
     app1 = _make_qc_app(db1)
     client1 = TestClient(app1)
@@ -169,11 +177,13 @@ def test_table_number_assignment_sequential():
 
     # 第二张订单 seq=2
     db2 = _make_mock_db()
-    db2.execute = AsyncMock(side_effect=[
-        _mappings_first({"prefix": "", "max_number": 999, "daily_reset": True}),
-        _scalar(2),         # seq = 2 → "002"
-        MagicMock(),
-    ])
+    db2.execute = AsyncMock(
+        side_effect=[
+            _mappings_first({"prefix": "", "max_number": 999, "daily_reset": True}),
+            _scalar(2),  # seq = 2 → "002"
+            MagicMock(),
+        ]
+    )
     app2 = _make_qc_app(db2)
     client2 = TestClient(app2)
     r2 = client2.post(
@@ -194,6 +204,7 @@ def test_table_number_assignment_sequential():
 # 测试 2: 牌号回绕复用（max_number 循环）
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_table_number_recycled_after_collected():
     """max_number=5 时，第 5 张订单取号后，DB UPSERT 将 seq 回绕为 1。
     验证：seq=5 时返回 '005'；通过 SQL CASE WHEN 回绕后，seq=1 时返回 '001'。
@@ -204,11 +215,13 @@ def test_table_number_recycled_after_collected():
     """
     # 模拟 seq=5（当前到达 max）
     db_at_max = _make_mock_db()
-    db_at_max.execute = AsyncMock(side_effect=[
-        _mappings_first({"prefix": "", "max_number": 5, "daily_reset": True}),
-        _scalar(5),    # 当前 seq = 5
-        MagicMock(),
-    ])
+    db_at_max.execute = AsyncMock(
+        side_effect=[
+            _mappings_first({"prefix": "", "max_number": 5, "daily_reset": True}),
+            _scalar(5),  # 当前 seq = 5
+            MagicMock(),
+        ]
+    )
     app = _make_qc_app(db_at_max)
     r = TestClient(app).post(
         "/api/v1/quick-cashier/order",
@@ -224,11 +237,13 @@ def test_table_number_recycled_after_collected():
 
     # 模拟回绕后 seq=1（DB CASE WHEN current_seq >= max_number THEN 1 …）
     db_recycled = _make_mock_db()
-    db_recycled.execute = AsyncMock(side_effect=[
-        _mappings_first({"prefix": "", "max_number": 5, "daily_reset": True}),
-        _scalar(1),    # 回绕后 seq = 1
-        MagicMock(),
-    ])
+    db_recycled.execute = AsyncMock(
+        side_effect=[
+            _mappings_first({"prefix": "", "max_number": 5, "daily_reset": True}),
+            _scalar(1),  # 回绕后 seq = 1
+            MagicMock(),
+        ]
+    )
     app2 = _make_qc_app(db_recycled)
     r2 = TestClient(app2).post(
         "/api/v1/quick-cashier/order",
@@ -247,25 +262,26 @@ def test_table_number_recycled_after_collected():
 # 测试 3: 厨打单格式
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_kitchen_ticket_format():
     """厨打单必须包含：牌号（#XXX）和所有品项名称。
     纯字符串测试，无网络/DB 依赖。
     """
+
     # 直接测试打印模板逻辑（内联实现，避免 import 路径问题）
     def _fmt_kitchen(table_number: str, order_type: str, created_at: str, items: list) -> str:
         type_label = {"dine_in": "堂食", "takeaway": "外带", "pack": "打包"}.get(order_type, order_type)
-        item_lines = "\n".join(
-            f"  {item['name'].ljust(12)} × {item['qty']}" for item in items
-        )
+        item_lines = "\n".join(f"  {item['name'].ljust(12)} × {item['qty']}" for item in items)
         return (
             "================================\n"
-            + f"          ★ 厨  打  单 ★\n"
+            + "          ★ 厨  打  单 ★\n"
             + "================================\n\n"
             + f"              #{table_number}\n\n"
             + f"类型: {type_label}\n"
             + f"时间: {created_at[11:19]}\n"
             + "--------------------------------\n"
-            + item_lines + "\n"
+            + item_lines
+            + "\n"
             + "--------------------------------\n"
         )
 
@@ -275,7 +291,7 @@ def test_kitchen_ticket_format():
         created_at="2026-04-06T14:30:00+00:00",
         items=[
             {"name": "剁椒鱼头", "qty": 1},
-            {"name": "白米饭",   "qty": 2},
+            {"name": "白米饭", "qty": 2},
         ],
     )
 
@@ -291,21 +307,20 @@ def test_kitchen_ticket_format():
 # 测试 4: 结账单合计计算
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_receipt_total_calculation():
     """结账单合计应等于所有品项 qty × unit_price_fen 之和。
     验证：不依赖 API，纯数学计算。
     """
     items = [
-        {"name": "剁椒鱼头", "qty": 1, "unit_price_fen": 8800},   # 88.00
-        {"name": "白米饭",   "qty": 3, "unit_price_fen": 300},    # 9.00  (300×3=900)
-        {"name": "可乐",     "qty": 2, "unit_price_fen": 500},    # 10.00 (500×2=1000)
+        {"name": "剁椒鱼头", "qty": 1, "unit_price_fen": 8800},  # 88.00
+        {"name": "白米饭", "qty": 3, "unit_price_fen": 300},  # 9.00  (300×3=900)
+        {"name": "可乐", "qty": 2, "unit_price_fen": 500},  # 10.00 (500×2=1000)
     ]
     # 8800 + 900 + 1000 = 10700 分 = ¥107.00
     expected_total_fen = 8800 + (300 * 3) + (500 * 2)  # = 10700 分
     computed_total = sum(item["qty"] * item["unit_price_fen"] for item in items)
-    assert computed_total == expected_total_fen, (
-        f"合计计算错误：expected {expected_total_fen}，got {computed_total}"
-    )
+    assert computed_total == expected_total_fen, f"合计计算错误：expected {expected_total_fen}，got {computed_total}"
     assert computed_total == 10700
     assert f"{computed_total / 100:.2f}" == "107.00", "结账单金额格式应为两位小数"
 
@@ -319,6 +334,7 @@ def test_receipt_total_calculation():
 # 测试 5: 出餐就绪时触发叫号（/call 端点）
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_caller_display_call_on_ready():
     """调用 POST /{quick_order_id}/call 端点后：
     - HTTP 状态码 = 200
@@ -326,8 +342,8 @@ def test_caller_display_call_on_ready():
     - 返回的 call_number 与 DB 中的一致
     - called_at 不为 None
     """
-    from uuid import uuid4
     from datetime import datetime, timezone
+    from uuid import uuid4
 
     order_id = str(uuid4())
     call_number = "007"
@@ -353,8 +369,6 @@ def test_caller_display_call_on_ready():
     assert resp.status_code == 200, f"Expected 200, got {resp.status_code}: {resp.text}"
     data = resp.json()["data"]
     assert data["status"] == "calling", f"Expected status='calling', got '{data['status']}'"
-    assert data["call_number"] == call_number, (
-        f"Expected call_number='{call_number}', got '{data['call_number']}'"
-    )
+    assert data["call_number"] == call_number, f"Expected call_number='{call_number}', got '{data['call_number']}'"
     assert data["called_at"] is not None, "called_at 应在叫号后被记录"
     assert data["quick_order_id"] == order_id

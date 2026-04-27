@@ -68,9 +68,7 @@ _engine = ApprovalEngine()
 
 
 def _get_tenant_id(request: Request) -> str:
-    tid = getattr(request.state, "tenant_id", None) or request.headers.get(
-        "X-Tenant-ID", ""
-    )
+    tid = getattr(request.state, "tenant_id", None) or request.headers.get("X-Tenant-ID", "")
     if not tid:
         raise HTTPException(status_code=400, detail="X-Tenant-ID header required")
     return tid
@@ -126,10 +124,7 @@ async def create_template(
     if req.business_type not in VALID_BUSINESS_TYPES:
         raise HTTPException(
             status_code=400,
-            detail=(
-                f"不支持的业务类型: {req.business_type}，"
-                f"支持: {', '.join(sorted(VALID_BUSINESS_TYPES))}"
-            ),
+            detail=(f"不支持的业务类型: {req.business_type}，支持: {', '.join(sorted(VALID_BUSINESS_TYPES))}"),
         )
 
     trigger_json = json.dumps(req.trigger_conditions, ensure_ascii=False)
@@ -223,10 +218,7 @@ async def update_template(
     tenant_id = _get_tenant_id(request)
 
     exist = await db.execute(
-        text(
-            "SELECT id FROM approval_flow_templates "
-            "WHERE id = :id AND tenant_id = :tid"
-        ),
+        text("SELECT id FROM approval_flow_templates WHERE id = :id AND tenant_id = :tid"),
         {"id": template_id, "tid": tenant_id},
     )
     if not exist.first():
@@ -246,11 +238,7 @@ async def update_template(
         params["is_active"] = req.is_active
 
     await db.execute(
-        text(
-            f"UPDATE approval_flow_templates "
-            f"SET {', '.join(set_parts)} "
-            f"WHERE id = :id AND tenant_id = :tid"
-        ),
+        text(f"UPDATE approval_flow_templates SET {', '.join(set_parts)} WHERE id = :id AND tenant_id = :tid"),
         params,
     )
     await db.commit()
@@ -273,10 +261,7 @@ async def add_node(
     tenant_id = _get_tenant_id(request)
 
     exist = await db.execute(
-        text(
-            "SELECT id FROM approval_flow_templates "
-            "WHERE id = :id AND tenant_id = :tid"
-        ),
+        text("SELECT id FROM approval_flow_templates WHERE id = :id AND tenant_id = :tid"),
         {"id": template_id, "tid": tenant_id},
     )
     if not exist.first():
@@ -293,10 +278,7 @@ async def add_node(
     if order_exist.first():
         raise HTTPException(
             status_code=409,
-            detail=(
-                f"节点序号 {req.node_order} 已存在，"
-                f"请使用 PUT .../nodes/{req.node_order} 更新或选择其他序号"
-            ),
+            detail=(f"节点序号 {req.node_order} 已存在，请使用 PUT .../nodes/{req.node_order} 更新或选择其他序号"),
         )
 
     node = await _insert_node(template_id, req, tenant_id, db)
@@ -329,9 +311,7 @@ async def update_node(
         )
 
     auto_cond_json = (
-        json.dumps(req.auto_approve_condition.model_dump(), ensure_ascii=False)
-        if req.auto_approve_condition
-        else None
+        json.dumps(req.auto_approve_condition.model_dump(), ensure_ascii=False) if req.auto_approve_condition else None
     )
     await db.execute(
         text(
@@ -381,9 +361,7 @@ async def _insert_node(
 ) -> dict[str, Any]:
     """插入节点，返回节点 dict（不 commit）"""
     auto_cond_json = (
-        json.dumps(req.auto_approve_condition.model_dump(), ensure_ascii=False)
-        if req.auto_approve_condition
-        else None
+        json.dumps(req.auto_approve_condition.model_dump(), ensure_ascii=False) if req.auto_approve_condition else None
     )
     result = await db.execute(
         text(
@@ -580,9 +558,7 @@ async def get_instance(
 
     # 附加模板节点配置（流程图用）
     if template_id:
-        instance_dict["template_nodes"] = await _fetch_template_nodes(
-            template_id, tenant_id, db
-        )
+        instance_dict["template_nodes"] = await _fetch_template_nodes(template_id, tenant_id, db)
 
     # 查询节点审批时间线
     timeline_rows = await db.execute(
@@ -599,9 +575,7 @@ async def get_instance(
         ),
         {"iid": instance_id, "tid": tenant_id, "tmpl_id": template_id or ""},
     )
-    instance_dict["timeline"] = [
-        _row_to_dict(r) for r in timeline_rows.mappings().fetchall()
-    ]
+    instance_dict["timeline"] = [_row_to_dict(r) for r in timeline_rows.mappings().fetchall()]
 
     return _ok(instance_dict)
 

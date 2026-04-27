@@ -18,6 +18,7 @@
 # CREATE POLICY dispatch_codes_tenant ON dispatch_codes
 #   USING (tenant_id = NULLIF(current_setting('app.tenant_id', TRUE), '')::UUID);
 """
+
 import random
 import string
 import uuid
@@ -44,9 +45,11 @@ SUPPORTED_PLATFORMS = ("meituan", "eleme", "douyin", "dianping")
 # 数据类
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class DispatchCode:
     """出餐码记录（对应 dispatch_codes 表）"""
+
     id: str
     tenant_id: str
     order_id: str
@@ -61,6 +64,7 @@ class DispatchCode:
 @dataclass
 class ScanResult:
     """扫码确认结果"""
+
     success: bool
     order_id: Optional[str] = None
     platform: Optional[str] = None
@@ -92,15 +96,13 @@ def _save(dc: DispatchCode) -> None:
 
 
 def _list_pending(tenant_id: str) -> list[DispatchCode]:
-    return [
-        dc for dc in _store_by_order.get(tenant_id, {}).values()
-        if not dc.confirmed
-    ]
+    return [dc for dc in _store_by_order.get(tenant_id, {}).values() if not dc.confirmed]
 
 
 # ---------------------------------------------------------------------------
 # 纯函数：生成短码
 # ---------------------------------------------------------------------------
+
 
 def generate_dispatch_code(order_id: str, tenant_id: str) -> str:
     """为外卖订单生成 6 位 base62 短码（碰撞检测）。
@@ -126,14 +128,13 @@ def generate_dispatch_code(order_id: str, tenant_id: str) -> str:
                 attempt=attempt,
             )
             return code
-    raise RuntimeError(
-        f"生成出餐码碰撞超过 {MAX_COLLISION_RETRIES} 次，请检查存储容量"
-    )
+    raise RuntimeError(f"生成出餐码碰撞超过 {MAX_COLLISION_RETRIES} 次，请检查存储容量")
 
 
 # ---------------------------------------------------------------------------
 # Mock 平台回调客户端
 # ---------------------------------------------------------------------------
+
 
 class _MockPlatformClient:
     """Mock 平台出餐回调（生产环境替换为真实 HTTP 调用）"""
@@ -159,6 +160,7 @@ def set_platform_client(client: Any) -> None:
 # ---------------------------------------------------------------------------
 # 服务类
 # ---------------------------------------------------------------------------
+
 
 class DispatchCodeService:
     """出餐码核心业务逻辑"""
@@ -325,6 +327,7 @@ class DispatchCodeService:
 # ---------------------------------------------------------------------------
 # 平台回调（内部）
 # ---------------------------------------------------------------------------
+
 
 async def _notify_platform(platform: str, order_id: str) -> None:
     """调用平台出餐回调，失败记录日志但不向上抛出。

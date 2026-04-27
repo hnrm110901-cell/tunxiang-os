@@ -58,7 +58,11 @@ ORDER BY charge_amount_fen DESC
 
 DIMENSIONS = ["store_name", "biz_date", "card_type", "tx_type"]
 METRICS = [
-    "tx_count", "charge_amount_fen", "gift_amount_fen",
-    "total_amount_fen", "member_count", "gift_rate_pct",
+    "tx_count",
+    "charge_amount_fen",
+    "gift_amount_fen",
+    "total_amount_fen",
+    "member_count",
+    "gift_rate_pct",
 ]
 FILTERS = ["start_date", "end_date", "store_id"]

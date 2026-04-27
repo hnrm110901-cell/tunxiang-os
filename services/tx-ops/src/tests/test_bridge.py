@@ -8,6 +8,7 @@
 5. _event_to_dict 正确转换 AgentEvent dataclass
 6. 端到端: EventBus.publish → bridge handler → 创建派单
 """
+
 from __future__ import annotations
 
 import os
@@ -35,6 +36,7 @@ STORE = "store_001"
 
 # ─── Mock EventBus ───
 
+
 class MockEventBus:
     def __init__(self):
         self.handlers: dict[str, list[tuple[str, any]]] = {}
@@ -46,6 +48,7 @@ class MockEventBus:
 
 
 # ─── Mock AgentEvent (dataclass) ───
+
 
 @dataclass
 class MockAgentEvent:
@@ -61,6 +64,7 @@ class MockAgentEvent:
 # ═══════════════════════════════════════════════
 # 1. route_to_dispatch — 可派单事件
 # ═══════════════════════════════════════════════
+
 
 class TestRouteToDispatch:
     @pytest.mark.asyncio
@@ -139,6 +143,7 @@ class TestRouteToDispatch:
 # 2. register_agent_hooks
 # ═══════════════════════════════════════════════
 
+
 class TestRegisterAgentHooks:
     def test_registers_all_dispatchable_events(self):
         """注册所有可派单事件的处理器"""
@@ -160,6 +165,7 @@ class TestRegisterAgentHooks:
 # 3. listen_agent_events
 # ═══════════════════════════════════════════════
 
+
 class TestListenAgentEvents:
     @pytest.mark.asyncio
     async def test_registers_handlers(self):
@@ -175,6 +181,7 @@ class TestListenAgentEvents:
 # ═══════════════════════════════════════════════
 # 4. _event_to_dict
 # ═══════════════════════════════════════════════
+
 
 class TestEventToDict:
     def test_converts_dataclass(self):
@@ -204,15 +211,14 @@ class TestEventToDict:
 # 5. 配置映射完整性
 # ═══════════════════════════════════════════════
 
+
 class TestConfigMappings:
     def test_all_dispatchable_events_have_alert_type(self):
         """所有可派单事件都有对应的 alert_type 映射"""
         for event_type in DISPATCHABLE_EVENTS:
-            assert event_type in EVENT_TO_ALERT_TYPE, \
-                f"{event_type} missing from EVENT_TO_ALERT_TYPE"
+            assert event_type in EVENT_TO_ALERT_TYPE, f"{event_type} missing from EVENT_TO_ALERT_TYPE"
 
     def test_all_dispatchable_events_have_severity(self):
         """所有可派单事件都有对应的严重级别"""
         for event_type in DISPATCHABLE_EVENTS:
-            assert event_type in EVENT_SEVERITY_MAP, \
-                f"{event_type} missing from EVENT_SEVERITY_MAP"
+            assert event_type in EVENT_SEVERITY_MAP, f"{event_type} missing from EVENT_SEVERITY_MAP"

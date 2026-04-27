@@ -5,9 +5,10 @@
 共12个端点，覆盖年度/月度预算管控全流程。
 金额单位统一为分(fen)，展示层负责除以100转元。
 """
+
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 from uuid import UUID
 
 import structlog
@@ -17,6 +18,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
+
 from ..services.budget_service import BudgetService
 
 router = APIRouter()
@@ -28,6 +30,7 @@ _budget_svc = BudgetService()
 # ---------------------------------------------------------------------------
 # 依赖注入
 # ---------------------------------------------------------------------------
+
 
 async def get_tenant_id(x_tenant_id: str = Header(..., alias="X-Tenant-ID")) -> UUID:
     try:
@@ -47,17 +50,12 @@ async def get_current_user(x_user_id: str = Header(..., alias="X-User-ID")) -> U
 # Pydantic Schema
 # ---------------------------------------------------------------------------
 
+
 class BudgetCreate(BaseModel):
     budget_name: str = Field(..., max_length=200, description="预算名称")
     budget_year: int = Field(..., ge=2020, le=2100, description="预算年份")
-    budget_month: Optional[int] = Field(
-        None, ge=1, le=12,
-        description="预算月份（不传=年度预算，1-12=月度预算）"
-    )
-    budget_type: str = Field(
-        "expense",
-        description="预算类型：expense/travel/procurement"
-    )
+    budget_month: Optional[int] = Field(None, ge=1, le=12, description="预算月份（不传=年度预算，1-12=月度预算）")
+    budget_type: str = Field("expense", description="预算类型：expense/travel/procurement")
     store_id: Optional[UUID] = Field(None, description="门店ID（不传=集团预算）")
     department: Optional[str] = Field(None, max_length=100, description="部门")
     total_amount: int = Field(..., gt=0, description="预算总额（分），1元=100分")
@@ -79,9 +77,7 @@ class AllocationCreate(BaseModel):
 
 
 class AdjustmentCreate(BaseModel):
-    adjustment_type: str = Field(
-        ..., description="调整类型：increase/decrease/reallocate"
-    )
+    adjustment_type: str = Field(..., description="调整类型：increase/decrease/reallocate")
     amount: int = Field(..., description="调整金额（分，正增负减）")
     reason: Optional[str] = Field(None, description="调整原因")
     approved_by: Optional[UUID] = Field(None, description="审批人员工ID")
@@ -90,6 +86,7 @@ class AdjustmentCreate(BaseModel):
 # ---------------------------------------------------------------------------
 # 端点实现
 # ---------------------------------------------------------------------------
+
 
 @router.post("", status_code=status.HTTP_201_CREATED)
 async def create_budget(
@@ -132,12 +129,10 @@ async def create_budget(
 @router.get("")
 async def list_budgets(
     year: Optional[int] = Query(None, description="预算年份过滤"),
-    month: Optional[int] = Query(None, ge=0, le=12,
-                                  description="月份过滤（0=年度预算，1-12=月度预算，不传=全部）"),
+    month: Optional[int] = Query(None, ge=0, le=12, description="月份过滤（0=年度预算，1-12=月度预算，不传=全部）"),
     budget_type: Optional[str] = Query(None, description="预算类型过滤：expense/travel/procurement"),
     store_id: Optional[UUID] = Query(None, description="门店ID过滤"),
-    budget_status: Optional[str] = Query(None, alias="status",
-                                          description="状态过滤：draft/active/locked/expired"),
+    budget_status: Optional[str] = Query(None, alias="status", description="状态过滤：draft/active/locked/expired"),
     tenant_id: UUID = Depends(get_tenant_id),
     db: AsyncSession = Depends(get_db),
 ) -> Dict[str, Any]:
@@ -276,9 +271,7 @@ async def update_budget(
     """
     try:
         update_data = {k: v for k, v in body.model_dump().items() if v is not None}
-        result = await _budget_svc.update_budget(
-            db=db, tenant_id=tenant_id, budget_id=budget_id, data=update_data
-        )
+        result = await _budget_svc.update_budget(db=db, tenant_id=tenant_id, budget_id=budget_id, data=update_data)
         await db.commit()
         log.info("budget_updated_via_api", tenant_id=str(tenant_id), budget_id=str(budget_id))
         return {"ok": True, "data": result}
@@ -433,9 +426,7 @@ async def get_execution_rate(
     金额单位为分(fen)，rate 为小数（如 0.8567 = 85.67%）。
     """
     try:
-        result = await _budget_svc.get_execution_rate(
-            db=db, tenant_id=tenant_id, budget_id=budget_id
-        )
+        result = await _budget_svc.get_execution_rate(db=db, tenant_id=tenant_id, budget_id=budget_id)
         return {"ok": True, "data": result}
     except LookupError:
         raise HTTPException(status_code=404, detail="预算不存在或无权访问")
@@ -458,9 +449,7 @@ async def take_snapshot(
     月末会自动触发批量快照，也可按需手动创建。
     """
     try:
-        result = await _budget_svc.take_snapshot(
-            db=db, tenant_id=tenant_id, budget_id=budget_id
-        )
+        result = await _budget_svc.take_snapshot(db=db, tenant_id=tenant_id, budget_id=budget_id)
         await db.commit()
         log.info(
             "budget_snapshot_via_api",

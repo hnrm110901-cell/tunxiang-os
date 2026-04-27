@@ -3,6 +3,7 @@
 字段映射参考美团外卖开放平台文档（openapi.waimai.meituan.com）。
 签名算法：SHA-256（appSecret + 请求参数字典序拼接 + appSecret）。
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -48,20 +49,21 @@ class MeituanAdapter(BaseDeliveryAdapter):
             for ri in raw_items:
                 unit_price = int(ri.get("price", 0))
                 qty = int(ri.get("quantity", 1))
-                items.append(DeliveryOrderItem(
-                    platform_item_id=str(ri.get("food_id", "")),
-                    name=ri.get("name", ""),
-                    qty=qty,
-                    unit_price_fen=unit_price,
-                    spec=ri.get("spec") or ri.get("app_food_code"),
-                    total_fen=unit_price * qty,
-                ))
+                items.append(
+                    DeliveryOrderItem(
+                        platform_item_id=str(ri.get("food_id", "")),
+                        name=ri.get("name", ""),
+                        qty=qty,
+                        unit_price_fen=unit_price,
+                        spec=ri.get("spec") or ri.get("app_food_code"),
+                        total_fen=unit_price * qty,
+                    )
+                )
 
             # 配送时间：美团使用 Unix 时间戳（秒）
             eta_ts: Optional[int] = raw.get("estimate_arrive_time")
             estimated_delivery_at: Optional[datetime] = (
-                datetime.fromtimestamp(eta_ts, tz=timezone.utc)
-                if eta_ts else None
+                datetime.fromtimestamp(eta_ts, tz=timezone.utc) if eta_ts else None
             )
 
             order = DeliveryOrder(
@@ -94,11 +96,7 @@ class MeituanAdapter(BaseDeliveryAdapter):
             params: dict = json.loads(payload)
             # 排除 sign 字段本身
             params.pop("sign", None)
-            sorted_str = "".join(
-                f"{k}{v}"
-                for k, v in sorted(params.items())
-                if v is not None and v != ""
-            )
+            sorted_str = "".join(f"{k}{v}" for k, v in sorted(params.items()) if v is not None and v != "")
             raw_str = f"{self.app_secret}{sorted_str}{self.app_secret}"
             expected = hashlib.sha256(raw_str.encode("utf-8")).hexdigest().upper()
             return hmac.compare_digest(expected, signature.upper())

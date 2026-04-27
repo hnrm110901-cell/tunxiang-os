@@ -2,6 +2,7 @@
 
 所有测试不需要真实打印机，验证 ESC/POS 指令生成和模板渲染的正确性。
 """
+
 import os
 import sys
 
@@ -155,27 +156,27 @@ class TestESCPOSCommands:
     """ESC/POS 指令常量和工具函数测试。"""
 
     def test_init_command(self):
-        assert ESC_INIT == b'\x1b\x40'
+        assert ESC_INIT == b"\x1b\x40"
 
     def test_align_commands(self):
-        assert ESC_ALIGN_LEFT == b'\x1b\x61\x00'
-        assert ESC_ALIGN_CENTER == b'\x1b\x61\x01'
-        assert ESC_ALIGN_RIGHT == b'\x1b\x61\x02'
+        assert ESC_ALIGN_LEFT == b"\x1b\x61\x00"
+        assert ESC_ALIGN_CENTER == b"\x1b\x61\x01"
+        assert ESC_ALIGN_RIGHT == b"\x1b\x61\x02"
 
     def test_bold_commands(self):
-        assert ESC_BOLD_ON == b'\x1b\x45\x01'
-        assert ESC_BOLD_OFF == b'\x1b\x45\x00'
+        assert ESC_BOLD_ON == b"\x1b\x45\x01"
+        assert ESC_BOLD_OFF == b"\x1b\x45\x00"
 
     def test_size_commands(self):
-        assert GS_SIZE_NORMAL == b'\x1d\x21\x00'
-        assert GS_SIZE_DOUBLE_BOTH == b'\x1d\x21\x11'
+        assert GS_SIZE_NORMAL == b"\x1d\x21\x00"
+        assert GS_SIZE_DOUBLE_BOTH == b"\x1d\x21\x11"
 
     def test_cut_commands(self):
-        assert GS_CUT_PARTIAL == b'\x1d\x56\x01'
-        assert GS_CUT_FULL == b'\x1d\x56\x00'
+        assert GS_CUT_PARTIAL == b"\x1d\x56\x01"
+        assert GS_CUT_FULL == b"\x1d\x56\x00"
 
     def test_open_drawer_command(self):
-        assert ESC_OPEN_DRAWER == b'\x1b\x70\x00\x19\xfa'
+        assert ESC_OPEN_DRAWER == b"\x1b\x70\x00\x19\xfa"
 
     def test_line_width(self):
         assert LINE_WIDTH == 48
@@ -232,32 +233,24 @@ class TestReceiptTemplate:
 
     @pytest.mark.asyncio
     async def test_cashier_receipt_generates_bytes(self):
-        content = await ReceiptTemplate.render_cashier_receipt(
-            _sample_order(), _sample_store(), _sample_payment()
-        )
+        content = await ReceiptTemplate.render_cashier_receipt(_sample_order(), _sample_store(), _sample_payment())
         assert isinstance(content, bytes)
         assert len(content) > 100
 
     @pytest.mark.asyncio
     async def test_cashier_receipt_contains_store_name(self):
-        content = await ReceiptTemplate.render_cashier_receipt(
-            _sample_order(), _sample_store(), _sample_payment()
-        )
+        content = await ReceiptTemplate.render_cashier_receipt(_sample_order(), _sample_store(), _sample_payment())
         assert "尝在一起".encode("gbk") in content
 
     @pytest.mark.asyncio
     async def test_cashier_receipt_contains_init_and_cut(self):
-        content = await ReceiptTemplate.render_cashier_receipt(
-            _sample_order(), _sample_store(), _sample_payment()
-        )
+        content = await ReceiptTemplate.render_cashier_receipt(_sample_order(), _sample_store(), _sample_payment())
         assert content[:2] == ESC_INIT
         assert GS_CUT_PARTIAL in content
 
     @pytest.mark.asyncio
     async def test_cashier_receipt_contains_payment_method(self):
-        content = await ReceiptTemplate.render_cashier_receipt(
-            _sample_order(), _sample_store(), _sample_payment()
-        )
+        content = await ReceiptTemplate.render_cashier_receipt(_sample_order(), _sample_store(), _sample_payment())
         assert "微信支付".encode("gbk") in content
 
     @pytest.mark.asyncio
@@ -266,9 +259,7 @@ class TestReceiptTemplate:
             {"item_name": "剁椒鱼头", "quantity": 1, "notes": "少辣", "spec": "大份"},
             {"item_name": "农家小炒肉", "quantity": 1, "notes": ""},
         ]
-        content = await ReceiptTemplate.render_kitchen_ticket(
-            items, "A05", "热菜档", "TX202603271200001A"
-        )
+        content = await ReceiptTemplate.render_kitchen_ticket(items, "A05", "热菜档", "TX202603271200001A")
         assert isinstance(content, bytes)
         assert "热菜档".encode("gbk") in content
         assert "A05".encode("gbk") in content
@@ -283,9 +274,7 @@ class TestReceiptTemplate:
 
     @pytest.mark.asyncio
     async def test_checkout_bill_generates_bytes(self):
-        content = await ReceiptTemplate.render_checkout_bill(
-            _sample_order(), _sample_store()
-        )
+        content = await ReceiptTemplate.render_checkout_bill(_sample_order(), _sample_store())
         assert isinstance(content, bytes)
         assert "结 账 单".encode("gbk") in content
 
@@ -298,9 +287,7 @@ class TestReceiptTemplate:
 
     @pytest.mark.asyncio
     async def test_label_generates_bytes(self):
-        content = await ReceiptTemplate.render_label(
-            dish_name="剁椒鱼头", table_no="A05", seq=3, notes="少辣"
-        )
+        content = await ReceiptTemplate.render_label(dish_name="剁椒鱼头", table_no="A05", seq=3, notes="少辣")
         assert isinstance(content, bytes)
         assert "剁椒鱼头".encode("gbk") in content
         assert b"#3" in content
@@ -323,9 +310,7 @@ class TestCutAndDrawerCommands:
     @pytest.mark.asyncio
     async def test_cashier_receipt_partial_cut(self):
         """收银小票应使用半切。"""
-        content = await ReceiptTemplate.render_cashier_receipt(
-            _sample_order(), _sample_store(), _sample_payment()
-        )
+        content = await ReceiptTemplate.render_cashier_receipt(_sample_order(), _sample_store(), _sample_payment())
         assert GS_CUT_PARTIAL in content
         # 半切指令应在末尾
         assert content.endswith(GS_CUT_PARTIAL)
@@ -338,7 +323,7 @@ class TestCutAndDrawerCommands:
 
     def test_open_drawer_bytes(self):
         """开钱箱指令字节正确。"""
-        assert ESC_OPEN_DRAWER == b'\x1b\x70\x00\x19\xfa'
+        assert ESC_OPEN_DRAWER == b"\x1b\x70\x00\x19\xfa"
         assert len(ESC_OPEN_DRAWER) == 5
 
 
@@ -355,16 +340,27 @@ class TestKitchenDispatch:
 
         # 注册三个厨打打印机
         await mgr.register_printer(
-            "p_hot", "192.168.1.101", 9100, "kitchen",
-            "store_001", "tenant_001", dept_id="dept_hot", name="热菜打印机"
+            "p_hot", "192.168.1.101", 9100, "kitchen", "store_001", "tenant_001", dept_id="dept_hot", name="热菜打印机"
         )
         await mgr.register_printer(
-            "p_cold", "192.168.1.102", 9100, "kitchen",
-            "store_001", "tenant_001", dept_id="dept_cold", name="凉菜打印机"
+            "p_cold",
+            "192.168.1.102",
+            9100,
+            "kitchen",
+            "store_001",
+            "tenant_001",
+            dept_id="dept_cold",
+            name="凉菜打印机",
         )
         await mgr.register_printer(
-            "p_staple", "192.168.1.103", 9100, "kitchen",
-            "store_001", "tenant_001", dept_id="dept_staple", name="面点打印机"
+            "p_staple",
+            "192.168.1.103",
+            9100,
+            "kitchen",
+            "store_001",
+            "tenant_001",
+            dept_id="dept_staple",
+            name="面点打印机",
         )
 
         # 验证打印机注册正确
@@ -377,12 +373,10 @@ class TestKitchenDispatch:
         """验证按档口查找厨打打印机。"""
         mgr = PrintManager()
         await mgr.register_printer(
-            "p1", "192.168.1.101", 9100, "kitchen",
-            "store_001", "tenant_001", dept_id="dept_hot"
+            "p1", "192.168.1.101", 9100, "kitchen", "store_001", "tenant_001", dept_id="dept_hot"
         )
         await mgr.register_printer(
-            "p2", "192.168.1.102", 9100, "kitchen",
-            "store_001", "tenant_001", dept_id="dept_cold"
+            "p2", "192.168.1.102", 9100, "kitchen", "store_001", "tenant_001", dept_id="dept_cold"
         )
 
         assert mgr._find_kitchen_printer("store_001", "dept_hot") == "p1"
@@ -393,10 +387,7 @@ class TestKitchenDispatch:
     async def test_register_and_unregister(self):
         """验证打印机注册和注销。"""
         mgr = PrintManager()
-        await mgr.register_printer(
-            "p1", "192.168.1.100", 9100, "cashier",
-            "store_001", "tenant_001"
-        )
+        await mgr.register_printer("p1", "192.168.1.100", 9100, "cashier", "store_001", "tenant_001")
         assert "p1" in mgr._printers
 
         await mgr.unregister_printer("p1")
@@ -423,14 +414,8 @@ class TestKitchenDispatch:
     async def test_find_cashier_printer(self):
         """验证查找收银打印机。"""
         mgr = PrintManager()
-        await mgr.register_printer(
-            "p_cashier", "192.168.1.100", 9100, "cashier",
-            "store_001", "tenant_001"
-        )
-        await mgr.register_printer(
-            "p_kitchen", "192.168.1.101", 9100, "kitchen",
-            "store_001", "tenant_001"
-        )
+        await mgr.register_printer("p_cashier", "192.168.1.100", 9100, "cashier", "store_001", "tenant_001")
+        await mgr.register_printer("p_kitchen", "192.168.1.101", 9100, "kitchen", "store_001", "tenant_001")
 
         pid = mgr._find_printer("store_001", PrinterRole.CASHIER)
         assert pid == "p_cashier"
@@ -465,9 +450,9 @@ class TestPrinterDriverInit:
 
 
 class TestPrintManagerSingleton:
-
     def test_get_print_manager_returns_same_instance(self):
         from services.print_manager import get_print_manager
+
         mgr1 = get_print_manager()
         mgr2 = get_print_manager()
         assert mgr1 is mgr2
@@ -477,14 +462,14 @@ class TestPrintManagerSingleton:
 
 
 class TestPrintTask:
-
     def test_task_to_dict(self):
         from services.print_manager import PrintTask
+
         task = PrintTask(
             task_id="test-001",
             printer_id="p1",
             template_type="cashier_receipt",
-            content=b'\x1b\x40hello',
+            content=b"\x1b\x40hello",
             tenant_id="t1",
             store_id="s1",
             order_id="o1",
@@ -493,5 +478,5 @@ class TestPrintTask:
         assert d["task_id"] == "test-001"
         assert d["printer_id"] == "p1"
         assert d["status"] == "pending"
-        assert d["content_size"] == len(b'\x1b\x40hello')
+        assert d["content_size"] == len(b"\x1b\x40hello")
         assert d["order_id"] == "o1"

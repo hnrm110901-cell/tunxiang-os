@@ -5,6 +5,7 @@
   GET    /api/v1/store-clone/{task_id}/progress  查询进度
   GET    /api/v1/store-clone/history   克隆历史
 """
+
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Header, HTTPException
@@ -18,6 +19,7 @@ router = APIRouter(prefix="/api/v1/store-clone", tags=["store-clone"])
 
 
 # ── 依赖注入 ───────────────────────────────────────────────────────────────────
+
 
 async def _get_db(
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
@@ -34,6 +36,7 @@ def _get_tenant_id(
 
 # ── Pydantic 模型 ───────────────────────────────────────────────────────────────
 
+
 class CloneRequest(BaseModel):
     source_store_id: UUID
     target_store_id: UUID
@@ -47,6 +50,7 @@ class CloneResponse(BaseModel):
 
 
 # ── 端点 ───────────────────────────────────────────────────────────────────────
+
 
 @router.post("", response_model=CloneResponse)
 async def start_clone(

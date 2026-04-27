@@ -6,6 +6,7 @@
 存储：payment_idempotency 表
 格式：{device_id}-{order_id[:8]}-{unix_ts}
 """
+
 from __future__ import annotations
 
 import json
@@ -34,13 +35,15 @@ class IdempotencyGuard:
             已有支付结果（dict）或 None（首次请求）
         """
         result = await self._db.execute(
-            text("""
+            text(
+                """
                 SELECT payment_id, status, trade_no, amount_fen, channel_data
                 FROM payment_idempotency
                 WHERE idempotency_key = :key
                   AND tenant_id = :tenant_id::UUID
                   AND created_at > NOW() - INTERVAL ':hours hours'
-            """.replace(":hours", str(_IDEMPOTENCY_WINDOW_HOURS))),
+            """.replace(":hours", str(_IDEMPOTENCY_WINDOW_HOURS))
+            ),
             {"key": idempotency_key, "tenant_id": tenant_id},
         )
         row = result.fetchone()

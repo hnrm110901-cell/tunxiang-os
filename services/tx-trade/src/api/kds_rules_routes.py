@@ -17,6 +17,7 @@
 所有端点需要 X-Tenant-ID header。
 持久化方式：kds_rules_config 表（JSON存储）。
 """
+
 from __future__ import annotations
 
 import json
@@ -35,6 +36,7 @@ router = APIRouter(tags=["kds-rules"])
 
 # ─── 公共依赖 ───────────────────────────────────────────────────────────────
 
+
 def _get_tenant_id(request: Request) -> str:
     tid = getattr(request.state, "tenant_id", None) or request.headers.get("X-Tenant-ID", "")
     if not tid:
@@ -44,8 +46,10 @@ def _get_tenant_id(request: Request) -> str:
 
 # ─── 请求 / 响应 Schemas ────────────────────────────────────────────────────
 
+
 class KDSRuleConfig(BaseModel):
     """KDS多维标识与颜色规则配置（门店级别）"""
+
     # 超时预警
     warn_minutes: int = Field(default=15, ge=1, le=120, description="超时预警时长（分钟）")
     warn_color: str = Field(default="#FFA500", max_length=20, description="预警颜色（橙）")
@@ -74,6 +78,7 @@ _DEFAULTS = KDSRuleConfig()
 
 
 # ─── GET /{store_id} ─────────────────────────────────────────────────────────
+
 
 @router.get("/{store_id}")
 async def get_kds_rules(
@@ -104,6 +109,7 @@ async def get_kds_rules(
 
 
 # ─── PUT /{store_id} ─────────────────────────────────────────────────────────
+
 
 @router.put("/{store_id}")
 async def put_kds_rules(

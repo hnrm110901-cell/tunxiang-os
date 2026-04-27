@@ -34,11 +34,13 @@ AUTH_EXEMPT_PREFIXES: tuple[str, ...] = (
 )
 
 # 免认证白名单路径（精确匹配）
-AUTH_EXEMPT_EXACT: frozenset[str] = frozenset({
-    "/",
-    "/health",
-    "/openapi.json",
-})
+AUTH_EXEMPT_EXACT: frozenset[str] = frozenset(
+    {
+        "/",
+        "/health",
+        "/openapi.json",
+    }
+)
 
 
 def _is_exempt(path: str) -> bool:
@@ -82,7 +84,9 @@ class AuthMiddleware(BaseHTTPMiddleware):
         # 开发模式：跳过认证，注入 mock 数据
         if not self._auth_enabled:
             request.state.user_id = "dev-user-mock"
-            request.state.tenant_id = getattr(request.state, "tenant_id", None) or "a0000000-0000-0000-0000-000000000001"
+            request.state.tenant_id = (
+                getattr(request.state, "tenant_id", None) or "a0000000-0000-0000-0000-000000000001"
+            )
             request.state.role = "admin"
             request.state.mfa_verified = False
             request.state.auth_method = "dev_bypass"
@@ -110,9 +114,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
         auth_header = request.headers.get("Authorization", "")
         if not auth_header.startswith("Bearer "):
             logger.warning("auth_missing_token", path=path, method=request.method)
-            return _error_response(
-                401, "AUTH_REQUIRED", "Authorization header with Bearer token is required"
-            )
+            return _error_response(401, "AUTH_REQUIRED", "Authorization header with Bearer token is required")
 
         token = auth_header[7:]  # 去掉 "Bearer " 前缀
         if not token:

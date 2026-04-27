@@ -14,13 +14,14 @@
 11. /trend — DB 异常时返回全零趋势，不抛错
 12. _period_to_date_range — 各 period 参数纯函数测试
 """
+
 import os
 import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 import uuid
-from datetime import date, timedelta
+from datetime import date
 from unittest.mock import AsyncMock
 
 import pytest
@@ -29,6 +30,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy.exc import OperationalError
 
 # ─── 工具类 ────────────────────────────────────────────────
+
 
 def _uid() -> str:
     return str(uuid.uuid4())
@@ -46,6 +48,7 @@ _BASE_HEADERS = {
 
 class FakeRow:
     """模拟 SQLAlchemy Row 对象"""
+
     def __init__(self, **kwargs):
         for k, v in kwargs.items():
             setattr(self, k, v)
@@ -53,6 +56,7 @@ class FakeRow:
 
 class FakeResult:
     """模拟 SQLAlchemy CursorResult"""
+
     def __init__(self, rows=None):
         self._rows = rows or []
 
@@ -73,6 +77,7 @@ def _make_db(*execute_results):
 # ─── 加载路由 ──────────────────────────────────────────────
 
 from api.crew_stats_routes import _period_to_date_range, router
+
 from shared.ontology.src.database import get_db
 
 app = FastAPI()
@@ -81,14 +86,17 @@ app.include_router(router)
 
 def _override_db(db):
     """生成依赖覆盖函数"""
+
     def _dep():
         return db
+
     return _dep
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 场景 1: GET /me — 正常路径，有绩效数据
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 @pytest.mark.asyncio
 async def test_get_my_stats_with_data():
@@ -119,7 +127,7 @@ async def test_get_my_stats_with_data():
     assert data["table_count"] == 8
     assert data["revenue_contributed"] == 128000
     assert data["complaint_count"] == 1
-    assert data["avg_check"] == 16000        # 128000 // 8
+    assert data["avg_check"] == 16000  # 128000 // 8
     assert data["period"] == "today"
     assert data["operator_id"] == OPERATOR_ID
 
@@ -127,6 +135,7 @@ async def test_get_my_stats_with_data():
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 场景 2: GET /me — 无数据行时返回 graceful empty
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 @pytest.mark.asyncio
 async def test_get_my_stats_empty_rows():
@@ -154,13 +163,12 @@ async def test_get_my_stats_empty_rows():
 # 场景 3: GET /me — DB 异常 fallback
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 @pytest.mark.asyncio
 async def test_get_my_stats_db_error_fallback():
     """SQLAlchemyError 时 fallback 返回全零，HTTP 200，ok=True"""
     db = AsyncMock()
-    db.execute = AsyncMock(
-        side_effect=OperationalError("stmt", {}, Exception("conn refused"))
-    )
+    db.execute = AsyncMock(side_effect=OperationalError("stmt", {}, Exception("conn refused")))
 
     app.dependency_overrides[get_db] = _override_db(db)
     client = TestClient(app)
@@ -180,6 +188,7 @@ async def test_get_my_stats_db_error_fallback():
 # 场景 4: GET /me — 缺少 X-Tenant-ID → 422
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_get_my_stats_missing_tenant_header():
     """缺少 X-Tenant-ID 时返回 422（FastAPI 自动校验必填 Header）"""
     db = AsyncMock()
@@ -187,7 +196,7 @@ def test_get_my_stats_missing_tenant_header():
     client = TestClient(app)
     resp = client.get(
         f"/api/v1/crew/stats/me?store_id={STORE_ID}",
-        headers={"X-Operator-ID": OPERATOR_ID},   # 故意不传 Tenant
+        headers={"X-Operator-ID": OPERATOR_ID},  # 故意不传 Tenant
     )
     assert resp.status_code == 422
 
@@ -196,6 +205,7 @@ def test_get_my_stats_missing_tenant_header():
 # 场景 5: GET /me — 缺少 X-Operator-ID → 422
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_get_my_stats_missing_operator_header():
     """缺少 X-Operator-ID 时返回 422"""
     db = AsyncMock()
@@ -203,7 +213,7 @@ def test_get_my_stats_missing_operator_header():
     client = TestClient(app)
     resp = client.get(
         f"/api/v1/crew/stats/me?store_id={STORE_ID}",
-        headers={"X-Tenant-ID": TENANT_ID},       # 故意不传 Operator
+        headers={"X-Tenant-ID": TENANT_ID},  # 故意不传 Operator
     )
     assert resp.status_code == 422
 
@@ -212,13 +222,14 @@ def test_get_my_stats_missing_operator_header():
 # 场景 6: GET /leaderboard — revenue 指标正常排行
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 @pytest.mark.asyncio
 async def test_leaderboard_revenue_metric():
     """revenue 指标返回 items 列表，rank/badge 正确"""
     rows = [
         FakeRow(crew_id=_uid(), metric_value=200000, revenue_fen=200000, table_count=12),
         FakeRow(crew_id=_uid(), metric_value=150000, revenue_fen=150000, table_count=10),
-        FakeRow(crew_id=_uid(), metric_value=90000,  revenue_fen=90000,  table_count=7),
+        FakeRow(crew_id=_uid(), metric_value=90000, revenue_fen=90000, table_count=7),
     ]
     db = _make_db(FakeResult(), FakeResult(rows=rows))
 
@@ -245,6 +256,7 @@ async def test_leaderboard_revenue_metric():
 # 场景 7: GET /leaderboard — turns 指标
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 @pytest.mark.asyncio
 async def test_leaderboard_turns_metric():
     """turns 指标正常返回 items，value 对应 table_count"""
@@ -270,6 +282,7 @@ async def test_leaderboard_turns_metric():
 # 场景 8: GET /leaderboard — metric=upsell → 空列表
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_leaderboard_upsell_metric_returns_empty():
     """upsell 字段暂未支持，graceful 返回空列表"""
     db = AsyncMock()
@@ -290,13 +303,12 @@ def test_leaderboard_upsell_metric_returns_empty():
 # 场景 9: GET /leaderboard — DB 异常 fallback
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 @pytest.mark.asyncio
 async def test_leaderboard_db_error_fallback():
     """DB 异常时返回空列表，HTTP 200，ok=True"""
     db = AsyncMock()
-    db.execute = AsyncMock(
-        side_effect=OperationalError("stmt", {}, Exception("timeout"))
-    )
+    db.execute = AsyncMock(side_effect=OperationalError("stmt", {}, Exception("timeout")))
 
     app.dependency_overrides[get_db] = _override_db(db)
     client = TestClient(app)
@@ -316,6 +328,7 @@ async def test_leaderboard_db_error_fallback():
 # Pydantic V2 在 Query 参数中不做字符串→整数 coerce，导致 HTTP 路径
 # 必然 422。此处直接测试路由函数内部逻辑，覆盖业务路径。
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 @pytest.mark.asyncio
 async def test_get_trend_seven_days():
@@ -364,15 +377,14 @@ async def test_get_trend_seven_days():
 # 场景 11: get_trend 函数 — DB 异常时返回全零序列
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 @pytest.mark.asyncio
 async def test_get_trend_db_error_returns_zero_series():
     """DB 异常时直接调用函数返回全零趋势，不抛错"""
     from api.crew_stats_routes import get_trend
 
     db = AsyncMock()
-    db.execute = AsyncMock(
-        side_effect=OperationalError("stmt", {}, Exception("conn error"))
-    )
+    db.execute = AsyncMock(side_effect=OperationalError("stmt", {}, Exception("conn error")))
 
     result = await get_trend(
         operator_id=OPERATOR_ID,
@@ -393,6 +405,7 @@ async def test_get_trend_db_error_returns_zero_series():
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 场景 12: _period_to_date_range — 纯函数单元测试
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 def test_period_today_returns_today_range():
     start, end = _period_to_date_range("today")

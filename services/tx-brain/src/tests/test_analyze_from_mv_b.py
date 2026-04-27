@@ -18,16 +18,16 @@
   - get_db() 通过 async generator 模拟（async def mock_get_db(): yield mock_db）
   - SQLAlchemyError 注入模拟 DB 故障
 """
+
 from __future__ import annotations
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
 from sqlalchemy.exc import SQLAlchemyError
 
 from ..agents.finance_auditor import FinanceAuditor
 from ..agents.member_insight import MemberInsightAgent
-
 
 # ═══════════════════════════════════════════════════════════════════
 # FinanceAuditor.analyze_from_mv
@@ -93,9 +93,7 @@ def _make_finance_db(
     channel_result = MagicMock()
     channel_result.mappings.return_value.all.return_value = channel_rows or []
 
-    db.execute = AsyncMock(
-        side_effect=[set_config_result, pnl_result, channel_result]
-    )
+    db.execute = AsyncMock(side_effect=[set_config_result, pnl_result, channel_result])
     return db
 
 
@@ -284,7 +282,7 @@ async def test_member_insight_mv_empty():
 
     # total_members=0 的模拟行
     row = MagicMock()
-    row.__getitem__ = lambda self, key: {"total_members": 0}.get(key, None)
+    row.__getitem__ = lambda self, key: {"total_members": 0}.get(key)
     row._mapping = {"total_members": 0}
 
     mock_db = _make_member_db(row=row)

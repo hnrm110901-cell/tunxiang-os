@@ -14,6 +14,7 @@
 11. 风控检查 — 大额预警
 12. 风控检查 — 零金额拒绝
 """
+
 import os
 import sys
 
@@ -34,6 +35,7 @@ TENANT_ID = _uid()
 @pytest.fixture(autouse=True)
 def _clear_stores():
     from services.payment_direct import _payments, _risk_records
+
     _payments.clear()
     _risk_records.clear()
 
@@ -44,7 +46,9 @@ async def test_wechat_payment():
     from services.payment_direct import create_wechat_payment
 
     result = await create_wechat_payment(
-        order_id=_uid(), amount_fen=5000, tenant_id=TENANT_ID,
+        order_id=_uid(),
+        amount_fen=5000,
+        tenant_id=TENANT_ID,
         openid="oXXX_mock_openid",
     )
     assert "prepay_id" in result
@@ -59,7 +63,9 @@ async def test_alipay_payment():
     from services.payment_direct import create_alipay_payment
 
     result = await create_alipay_payment(
-        order_id=_uid(), amount_fen=8800, tenant_id=TENANT_ID,
+        order_id=_uid(),
+        amount_fen=8800,
+        tenant_id=TENANT_ID,
         subject="测试订单",
     )
     assert result["trade_status"] == "TRADE_SUCCESS"
@@ -73,7 +79,9 @@ async def test_unionpay_payment():
     from services.payment_direct import create_unionpay_payment
 
     result = await create_unionpay_payment(
-        order_id=_uid(), amount_fen=12000, tenant_id=TENANT_ID,
+        order_id=_uid(),
+        amount_fen=12000,
+        tenant_id=TENANT_ID,
         card_no_masked="6222****1234",
     )
     assert result["respCode"] == "00"
@@ -86,7 +94,9 @@ async def test_query_payment_status():
     from services.payment_direct import create_wechat_payment, query_payment_status
 
     pay = await create_wechat_payment(
-        order_id=_uid(), amount_fen=3000, tenant_id=TENANT_ID,
+        order_id=_uid(),
+        amount_fen=3000,
+        tenant_id=TENANT_ID,
     )
     result = await query_payment_status(pay["payment_id"], TENANT_ID)
     assert result["status"] == "success"
@@ -108,7 +118,9 @@ async def test_full_refund():
     from services.payment_direct import create_wechat_payment, process_refund, query_payment_status
 
     pay = await create_wechat_payment(
-        order_id=_uid(), amount_fen=5000, tenant_id=TENANT_ID,
+        order_id=_uid(),
+        amount_fen=5000,
+        tenant_id=TENANT_ID,
     )
     result = await process_refund(pay["payment_id"], 5000, "客户要求", TENANT_ID)
     assert result["status"] == "refund_success"
@@ -124,7 +136,9 @@ async def test_partial_refund():
     from services.payment_direct import create_alipay_payment, process_refund, query_payment_status
 
     pay = await create_alipay_payment(
-        order_id=_uid(), amount_fen=10000, tenant_id=TENANT_ID,
+        order_id=_uid(),
+        amount_fen=10000,
+        tenant_id=TENANT_ID,
     )
     result = await process_refund(pay["payment_id"], 3000, "部分退款", TENANT_ID)
     assert result["amount_fen"] == 3000
@@ -139,7 +153,9 @@ async def test_refund_exceeds_amount():
     from services.payment_direct import create_wechat_payment, process_refund
 
     pay = await create_wechat_payment(
-        order_id=_uid(), amount_fen=5000, tenant_id=TENANT_ID,
+        order_id=_uid(),
+        amount_fen=5000,
+        tenant_id=TENANT_ID,
     )
     with pytest.raises(ValueError, match="exceeds payment amount"):
         await process_refund(pay["payment_id"], 9999, "超额退款", TENANT_ID)
@@ -170,8 +186,10 @@ async def test_risk_check_normal():
     from services.payment_direct import get_payment_risk_check
 
     result = await get_payment_risk_check(
-        order_id=_uid(), tenant_id=TENANT_ID,
-        amount_fen=5000, payment_count_today=3,
+        order_id=_uid(),
+        tenant_id=TENANT_ID,
+        amount_fen=5000,
+        payment_count_today=3,
     )
     assert result["risk_level"] == "low"
     assert result["allow"] is True
@@ -184,7 +202,8 @@ async def test_risk_check_large_amount():
     from services.payment_direct import get_payment_risk_check
 
     result = await get_payment_risk_check(
-        order_id=_uid(), tenant_id=TENANT_ID,
+        order_id=_uid(),
+        tenant_id=TENANT_ID,
         amount_fen=200000,
     )
     assert result["risk_level"] == "high"
@@ -198,7 +217,8 @@ async def test_risk_check_zero_amount():
     from services.payment_direct import get_payment_risk_check
 
     result = await get_payment_risk_check(
-        order_id=_uid(), tenant_id=TENANT_ID,
+        order_id=_uid(),
+        tenant_id=TENANT_ID,
         amount_fen=0,
     )
     assert result["risk_level"] == "rejected"

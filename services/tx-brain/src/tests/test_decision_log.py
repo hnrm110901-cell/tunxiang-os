@@ -10,18 +10,17 @@
   - AsyncSession 以 AsyncMock 替代
   - SQLAlchemyError 注入模拟 DB 故障
 """
+
 from __future__ import annotations
 
 import uuid
-from datetime import date, datetime, timezone
-from unittest.mock import AsyncMock, MagicMock, patch, call
-import json
+from datetime import date
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from sqlalchemy.exc import SQLAlchemyError
 
 # ── 被测模块 ──────────────────────────────────────────────────────────────────
-
 from ..agents.finance_auditor import FinanceAuditor
 
 # ── 测试固定值 ─────────────────────────────────────────────────────────────────
@@ -177,7 +176,7 @@ class TestDecisionLog:
         params = captured_params[0]
 
         # 验证必填字段存在且非空
-        assert params["id"]                            # UUID
+        assert params["id"]  # UUID
         assert params["tenant_id"] == TENANT_ID
         assert params["store_id"] == STORE_ID
         assert params["agent_id"] == "finance_auditor"

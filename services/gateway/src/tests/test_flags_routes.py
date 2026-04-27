@@ -11,6 +11,7 @@
 测试策略：独立构造一个 FastAPI 应用，只挂载 flags_routes.router，
 避免 Gateway 全链路 middleware 干扰（JWT/API Key 等在此场景不需要）。
 """
+
 from __future__ import annotations
 
 import os
@@ -25,9 +26,7 @@ from httpx import ASGITransport, AsyncClient
 
 # ─── 路径修正：让 tests 能 import 到 src 和 shared ───
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-sys.path.insert(
-    0, os.path.join(os.path.dirname(__file__), "..", "..", "..", "..")
-)
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "..", ".."))
 
 from api.flags_routes import _CACHE  # noqa: E402
 from api.flags_routes import router as flags_router  # noqa: E402
@@ -65,6 +64,7 @@ def app() -> FastAPI:
 # 1. domain=trade 返回 A1 三个 flag
 # ─────────────────────────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_domain_trade_returns_a1_flags(app: FastAPI):
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
@@ -90,6 +90,7 @@ async def test_domain_trade_returns_a1_flags(app: FastAPI):
 # 2. 未带 X-Tenant-ID 返回 401 AUTH_MISSING
 # ─────────────────────────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_missing_tenant_returns_401(app: FastAPI):
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
@@ -103,6 +104,7 @@ async def test_missing_tenant_returns_401(app: FastAPI):
 # ─────────────────────────────────────────────────────────────────
 # 3. domain=unknown 返回 400 INVALID_DOMAIN
 # ─────────────────────────────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_invalid_domain_returns_400(app: FastAPI):
@@ -121,6 +123,7 @@ async def test_invalid_domain_returns_400(app: FastAPI):
 # ─────────────────────────────────────────────────────────────────
 # 4. 不同 tenant 可能得到不同布尔值（灰度规则）
 # ─────────────────────────────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_different_tenants_cached_separately(app: FastAPI):
@@ -154,6 +157,7 @@ async def test_different_tenants_cached_separately(app: FastAPI):
 # 5. request_id 存在且格式为 UUID v4
 # ─────────────────────────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_request_id_is_uuid_v4(app: FastAPI):
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
@@ -177,6 +181,7 @@ async def test_request_id_is_uuid_v4(app: FastAPI):
 # ─────────────────────────────────────────────────────────────────
 # 6. 响应时间 < 100ms P95（60s 缓存生效后）
 # ─────────────────────────────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_cached_response_under_100ms(app: FastAPI):
@@ -205,6 +210,7 @@ async def test_cached_response_under_100ms(app: FastAPI):
 # ─────────────────────────────────────────────────────────────────
 # 额外：domain=all 返回全部 domain 的聚合结果（前端启动时可一次拉取）
 # ─────────────────────────────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_domain_all_returns_merged_flags(app: FastAPI):

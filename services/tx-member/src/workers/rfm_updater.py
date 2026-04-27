@@ -18,6 +18,7 @@
                      收到后立即调用 RFMUpdater.update_single_customer()
                      实现单客户 RFM 实时刷新，补充凌晨批量任务。
 """
+
 from __future__ import annotations
 
 import uuid
@@ -36,6 +37,7 @@ BATCH_SIZE = 500
 
 
 # ── 评分函数 ───────────────────────────────────────────────────
+
 
 def _calc_r_score(recency_days: int) -> int:
     """R评分：最近消费天数 → 1-5分（越近越高）"""
@@ -67,11 +69,11 @@ def _calc_m_score(amount_fen: int) -> int:
     """M评分：累计消费金额（分）→ 1-5分（越高越高）"""
     if amount_fen >= 1_000_000:  # 1万元
         return 5
-    if amount_fen >= 500_000:    # 5000元
+    if amount_fen >= 500_000:  # 5000元
         return 4
-    if amount_fen >= 200_000:    # 2000元
+    if amount_fen >= 200_000:  # 2000元
         return 3
-    if amount_fen >= 50_000:     # 500元
+    if amount_fen >= 50_000:  # 500元
         return 2
     return 1
 
@@ -80,14 +82,14 @@ def _calc_rfm_level(r: int, f: int, m: int) -> str:
     """综合 RFM 等级：R+F+M 总分划分"""
     total = r + f + m
     if total >= 13:
-        return "S1"   # 顶级VIP  13-15分
+        return "S1"  # 顶级VIP  13-15分
     if total >= 10:
-        return "S2"   # 高价值   10-12分
+        return "S2"  # 高价值   10-12分
     if total >= 7:
-        return "S3"   # 中等     7-9分
+        return "S3"  # 中等     7-9分
     if total >= 4:
-        return "S4"   # 低频     4-6分
-    return "S5"       # 沉睡     3分
+        return "S4"  # 低频     4-6分
+    return "S5"  # 沉睡     3分
 
 
 def _calc_risk_score(recency_days: int, r_score: int) -> float:
@@ -103,6 +105,7 @@ def _calc_risk_score(recency_days: int, r_score: int) -> float:
 
 
 # ── RFMUpdater ────────────────────────────────────────────────
+
 
 class RFMUpdater:
     """RFM 批量更新器
@@ -125,8 +128,7 @@ class RFMUpdater:
 
         # 从 customers 表取 DISTINCT tenant_id（只处理有数据的租户）
         result = await db.execute(
-            select(distinct(Customer.tenant_id))
-            .where(Customer.is_deleted == False)  # noqa: E712
+            select(distinct(Customer.tenant_id)).where(Customer.is_deleted == False)  # noqa: E712
         )
         tenant_ids: list[uuid.UUID] = [row[0] for row in result.all()]
 
@@ -196,7 +198,7 @@ class RFMUpdater:
             )
             .where(Customer.tenant_id == tenant_id)
             .where(Customer.is_deleted == False)  # noqa: E712
-            .where(Customer.is_merged == False)   # noqa: E712
+            .where(Customer.is_merged == False)  # noqa: E712
         )
         rows = result.all()
 
@@ -230,31 +232,31 @@ class RFMUpdater:
 
             level_counts[level] = level_counts.get(level, 0) + 1
 
-            updates.append({
-                "id": customer_id,
-                "r_score": r,
-                "f_score": f,
-                "m_score": m,
-                "rfm_level": level,
-                "rfm_recency_days": min(recency_days, 9999),
-                "risk_score": risk,
-                "rfm_updated_at": now,
-                "updated_at": now,
-            })
+            updates.append(
+                {
+                    "id": customer_id,
+                    "r_score": r,
+                    "f_score": f,
+                    "m_score": m,
+                    "rfm_level": level,
+                    "rfm_recency_days": min(recency_days, 9999),
+                    "risk_score": risk,
+                    "rfm_updated_at": now,
+                    "updated_at": now,
+                }
+            )
 
         # 批量 UPDATE，每批 BATCH_SIZE 条，避免长事务
         # SQLAlchemy asyncio bulk update mappings：传入 list[dict]，
         # 每个 dict 必须含 "id" 作为 WHERE 条件，其余字段作为 SET 值。
         total_updated = 0
         for batch_start in range(0, len(updates), BATCH_SIZE):
-            batch = updates[batch_start: batch_start + BATCH_SIZE]
+            batch = updates[batch_start : batch_start + BATCH_SIZE]
             await db.execute(update(Customer), batch)
             await db.commit()
             total_updated += len(batch)
 
-        elapsed_ms = int(
-            (datetime.now(timezone.utc) - tenant_started).total_seconds() * 1000
-        )
+        elapsed_ms = int((datetime.now(timezone.utc) - tenant_started).total_seconds() * 1000)
 
         # 尝试记录每日快照（表不存在时忽略）
         stats = {
@@ -369,8 +371,8 @@ class RFMUpdater:
             )
             .where(Customer.id == customer_id)
             .where(Customer.tenant_id == tenant_id)
-            .where(Customer.is_deleted == False)   # noqa: E712
-            .where(Customer.is_merged == False)    # noqa: E712
+            .where(Customer.is_deleted == False)  # noqa: E712
+            .where(Customer.is_merged == False)  # noqa: E712
         )
         row = result.one_or_none()
         if row is None:
@@ -496,9 +498,7 @@ class RFMEventListener:
 
             for _stream, entries in messages:
                 for entry_id, fields in entries:
-                    await self._handle_event_entry(
-                        redis, entry_id, fields, session_factory
-                    )
+                    await self._handle_event_entry(redis, entry_id, fields, session_factory)
 
     async def _handle_event_entry(
         self,
@@ -548,6 +548,7 @@ class RFMEventListener:
             )
             # 写 DLQ
             from datetime import datetime, timezone
+
             await redis.xadd(
                 DLQ_STREAM_KEY,
                 {

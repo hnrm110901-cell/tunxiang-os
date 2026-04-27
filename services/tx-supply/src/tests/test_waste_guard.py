@@ -1,4 +1,5 @@
 """损耗监控纯函数测试"""
+
 import os
 import sys
 

@@ -161,16 +161,18 @@ class ReasoningEngine:
             if is_inverse:
                 direction = "下降" if factor_change > 0 else "上升"
 
-            factors.append({
-                "factor": factor_name,
-                "cn_name": cn_name,
-                "change_pct": round(factor_change, 2),
-                "weight": weight,
-                "contribution_pct": round(contribution_pct, 2),
-                "direction": direction,
-                "unit": factor_def.get("unit", ""),
-                "confidence": round(0.7 + weight * 0.3, 2),
-            })
+            factors.append(
+                {
+                    "factor": factor_name,
+                    "cn_name": cn_name,
+                    "change_pct": round(factor_change, 2),
+                    "weight": weight,
+                    "contribution_pct": round(contribution_pct, 2),
+                    "direction": direction,
+                    "unit": factor_def.get("unit", ""),
+                    "confidence": round(0.7 + weight * 0.3, 2),
+                }
+            )
 
             remaining_pct -= abs(contribution_pct)
 
@@ -179,16 +181,18 @@ class ReasoningEngine:
 
         # Add "other" factor for unexplained portion
         if abs(remaining_pct) > 0.1:
-            factors.append({
-                "factor": "other",
-                "cn_name": "其他因素",
-                "change_pct": round(remaining_pct, 2),
-                "weight": 0.0,
-                "contribution_pct": round(remaining_pct, 2),
-                "direction": "上升" if remaining_pct > 0 else "下降",
-                "unit": "",
-                "confidence": 0.3,
-            })
+            factors.append(
+                {
+                    "factor": "other",
+                    "cn_name": "其他因素",
+                    "change_pct": round(remaining_pct, 2),
+                    "weight": 0.0,
+                    "contribution_pct": round(remaining_pct, 2),
+                    "direction": "上升" if remaining_pct > 0 else "下降",
+                    "unit": "",
+                    "confidence": 0.3,
+                }
+            )
 
         return {
             "ok": True,
@@ -243,15 +247,17 @@ class ReasoningEngine:
             direction = "正向" if contribution > 0 else "负向"
             confidence = min(0.95, 0.5 + abs(contribution) / 20.0)
 
-            attributions.append({
-                "factor": factor,
-                "cn_name": self._get_factor_cn_name(factor),
-                "contribution_pct": round(contribution, 2),
-                "direction": direction,
-                "confidence": round(confidence, 2),
-                "factor_change_pct": round(factor_change, 2),
-                "weight": weight,
-            })
+            attributions.append(
+                {
+                    "factor": factor,
+                    "cn_name": self._get_factor_cn_name(factor),
+                    "contribution_pct": round(contribution, 2),
+                    "direction": direction,
+                    "confidence": round(confidence, 2),
+                    "factor_change_pct": round(factor_change, 2),
+                    "weight": weight,
+                }
+            )
 
         # Sort by absolute contribution
         attributions.sort(key=lambda x: abs(x["contribution_pct"]), reverse=True)
@@ -266,9 +272,7 @@ class ReasoningEngine:
             "analyzed_at": datetime.now().isoformat(),
         }
 
-    def compare_stores(
-        self, store_ids: list[str], metrics: list[str]
-    ) -> dict[str, Any]:
+    def compare_stores(self, store_ids: list[str], metrics: list[str]) -> dict[str, Any]:
         """Compare stores and explain performance differences.
 
         Args:
@@ -283,11 +287,13 @@ class ReasoningEngine:
         for sid in store_ids:
             store_result = self.repo.get_node("Store", sid)
             if store_result.get("ok"):
-                stores_data.append({
-                    "store_id": sid,
-                    "store_name": store_result["node"]["properties"].get("name", ""),
-                    "properties": store_result["node"]["properties"],
-                })
+                stores_data.append(
+                    {
+                        "store_id": sid,
+                        "store_name": store_result["node"]["properties"].get("name", ""),
+                        "properties": store_result["node"]["properties"],
+                    }
+                )
 
         if len(stores_data) < 2:
             return {"ok": False, "error": "Need at least 2 valid stores to compare"}
@@ -296,18 +302,20 @@ class ReasoningEngine:
 
         for metric in metrics:
             metric_key_current = f"{metric}_current"
-            metric_key = metric_key_current if any(
-                metric_key_current in s["properties"] for s in stores_data
-            ) else metric
+            metric_key = (
+                metric_key_current if any(metric_key_current in s["properties"] for s in stores_data) else metric
+            )
 
             values = []
             for store in stores_data:
                 val = store["properties"].get(metric_key, store["properties"].get(metric, 0))
-                values.append({
-                    "store_id": store["store_id"],
-                    "store_name": store["store_name"],
-                    "value": val,
-                })
+                values.append(
+                    {
+                        "store_id": store["store_id"],
+                        "store_name": store["store_name"],
+                        "value": val,
+                    }
+                )
 
             # Sort by value descending
             values.sort(key=lambda x: x["value"] if isinstance(x["value"], (int, float)) else 0, reverse=True)
@@ -316,18 +324,18 @@ class ReasoningEngine:
             worst = values[-1]
 
             # Generate explanation
-            explanation = self._explain_difference(
-                best, worst, metric, stores_data
-            )
+            explanation = self._explain_difference(best, worst, metric, stores_data)
 
-            comparisons.append({
-                "metric": metric,
-                "rankings": values,
-                "best": best,
-                "worst": worst,
-                "gap": self._calc_gap(best["value"], worst["value"]),
-                "explanation": explanation,
-            })
+            comparisons.append(
+                {
+                    "metric": metric,
+                    "rankings": values,
+                    "best": best,
+                    "worst": worst,
+                    "gap": self._calc_gap(best["value"], worst["value"]),
+                    "explanation": explanation,
+                }
+            )
 
         return {
             "ok": True,
@@ -337,9 +345,7 @@ class ReasoningEngine:
             "analyzed_at": datetime.now().isoformat(),
         }
 
-    def generate_insight(
-        self, store_id: str, period: str = "last_week"
-    ) -> dict[str, Any]:
+    def generate_insight(self, store_id: str, period: str = "last_week") -> dict[str, Any]:
         """Auto-generate top 5 insights for a store.
 
         Scans all available data and produces prioritized insights.
@@ -366,86 +372,86 @@ class ReasoningEngine:
             margin_change = margin_current - margin_previous
             if abs(margin_change) > 0.02:
                 direction = "上升" if margin_change > 0 else "下降"
-                insights.append({
-                    "type": "margin_change",
-                    "priority": "high",
-                    "category": "毛利",
-                    "title": f"毛利率{direction}",
-                    "description": (
-                        f"{store_name}毛利率从{margin_previous:.1%}{direction}至"
-                        f"{margin_current:.1%}，变动{abs(margin_change):.1%}"
-                    ),
-                    "metric_value": margin_current,
-                    "metric_change": round(margin_change, 4),
-                    "action": "查看成本分析" if margin_change < 0 else "保持当前策略",
-                })
+                insights.append(
+                    {
+                        "type": "margin_change",
+                        "priority": "high",
+                        "category": "毛利",
+                        "title": f"毛利率{direction}",
+                        "description": (
+                            f"{store_name}毛利率从{margin_previous:.1%}{direction}至"
+                            f"{margin_current:.1%}，变动{abs(margin_change):.1%}"
+                        ),
+                        "metric_value": margin_current,
+                        "metric_change": round(margin_change, 4),
+                        "action": "查看成本分析" if margin_change < 0 else "保持当前策略",
+                    }
+                )
 
         # 2. Check traffic change
         traffic_change = store_props.get("traffic_change_pct", 0)
         if abs(traffic_change) > 3:
             direction = "上升" if traffic_change > 0 else "下降"
-            insights.append({
-                "type": "traffic_change",
-                "priority": "high" if abs(traffic_change) > 10 else "medium",
-                "category": "客流",
-                "title": f"客流量{direction}{abs(traffic_change):.1f}%",
-                "description": (
-                    f"{store_name}本周客流量{direction}{abs(traffic_change):.1f}%"
-                ),
-                "metric_value": traffic_change,
-                "action": "分析客流下降原因" if traffic_change < 0 else "分析增长来源",
-            })
+            insights.append(
+                {
+                    "type": "traffic_change",
+                    "priority": "high" if abs(traffic_change) > 10 else "medium",
+                    "category": "客流",
+                    "title": f"客流量{direction}{abs(traffic_change):.1f}%",
+                    "description": (f"{store_name}本周客流量{direction}{abs(traffic_change):.1f}%"),
+                    "metric_value": traffic_change,
+                    "action": "分析客流下降原因" if traffic_change < 0 else "分析增长来源",
+                }
+            )
 
         # 3. Check waste rate
         waste_rate = store_props.get("waste_rate", 0)
         if waste_rate > 5:
-            insights.append({
-                "type": "waste_alert",
-                "priority": "medium",
-                "category": "损耗",
-                "title": f"损耗率偏高: {waste_rate:.1f}%",
-                "description": (
-                    f"{store_name}损耗率{waste_rate:.1f}%，超出5%标准线"
-                ),
-                "metric_value": waste_rate,
-                "action": "审查备料流程和库存管理",
-            })
+            insights.append(
+                {
+                    "type": "waste_alert",
+                    "priority": "medium",
+                    "category": "损耗",
+                    "title": f"损耗率偏高: {waste_rate:.1f}%",
+                    "description": (f"{store_name}损耗率{waste_rate:.1f}%，超出5%标准线"),
+                    "metric_value": waste_rate,
+                    "action": "审查备料流程和库存管理",
+                }
+            )
 
         # 4. Check discount rate
         discount_rate = store_props.get("discount_rate", 0)
         if discount_rate > 10:
-            insights.append({
-                "type": "discount_alert",
-                "priority": "medium",
-                "category": "折扣",
-                "title": f"折扣率偏高: {discount_rate:.1f}%",
-                "description": (
-                    f"{store_name}折扣率{discount_rate:.1f}%，高于10%健康线"
-                ),
-                "metric_value": discount_rate,
-                "action": "审查折扣权限和活动规则",
-            })
+            insights.append(
+                {
+                    "type": "discount_alert",
+                    "priority": "medium",
+                    "category": "折扣",
+                    "title": f"折扣率偏高: {discount_rate:.1f}%",
+                    "description": (f"{store_name}折扣率{discount_rate:.1f}%，高于10%健康线"),
+                    "metric_value": discount_rate,
+                    "action": "审查折扣权限和活动规则",
+                }
+            )
 
         # 5. Check ingredient price changes (via dishes)
-        dish_rels = self.repo.get_relationships(
-            "Store", store_id, rel_type="SERVES", direction="out"
-        )
+        dish_rels = self.repo.get_relationships("Store", store_id, rel_type="SERVES", direction="out")
         price_alerts: list[dict[str, Any]] = []
         for rel in dish_rels:
             dish_id = rel.get("to_node_id", "")
-            bom_rels = self.repo.get_relationships(
-                "Dish", dish_id, rel_type="USES_INGREDIENT", direction="out"
-            )
+            bom_rels = self.repo.get_relationships("Dish", dish_id, rel_type="USES_INGREDIENT", direction="out")
             for bom_rel in bom_rels:
                 ing_id = bom_rel.get("to_node_id", "")
                 ing_node = self.repo.get_node("Ingredient", ing_id)
                 if ing_node.get("ok"):
                     pct = ing_node["node"]["properties"].get("price_change_pct", 0)
                     if abs(pct) > 15:
-                        price_alerts.append({
-                            "ingredient": ing_node["node"]["properties"].get("name", ""),
-                            "change_pct": pct,
-                        })
+                        price_alerts.append(
+                            {
+                                "ingredient": ing_node["node"]["properties"].get("name", ""),
+                                "change_pct": pct,
+                            }
+                        )
 
         # Deduplicate
         seen_ingredients: set[str] = set()
@@ -458,18 +464,20 @@ class ReasoningEngine:
 
         if unique_alerts:
             names = "、".join(a["ingredient"] for a in unique_alerts[:3])
-            insights.append({
-                "type": "cost_anomaly",
-                "priority": "high",
-                "category": "成本",
-                "title": f"食材价格异动: {names}",
-                "description": (
-                    f"{len(unique_alerts)}种食材价格大幅变动: " +
-                    ", ".join(f"{a['ingredient']}{a['change_pct']:+.0f}%" for a in unique_alerts[:3])
-                ),
-                "metric_value": len(unique_alerts),
-                "action": "评估成本影响，考虑调整售价或BOM",
-            })
+            insights.append(
+                {
+                    "type": "cost_anomaly",
+                    "priority": "high",
+                    "category": "成本",
+                    "title": f"食材价格异动: {names}",
+                    "description": (
+                        f"{len(unique_alerts)}种食材价格大幅变动: "
+                        + ", ".join(f"{a['ingredient']}{a['change_pct']:+.0f}%" for a in unique_alerts[:3])
+                    ),
+                    "metric_value": len(unique_alerts),
+                    "action": "评估成本影响，考虑调整售价或BOM",
+                }
+            )
 
         # Sort by priority
         priority_order = {"high": 0, "medium": 1, "low": 2}
@@ -485,9 +493,7 @@ class ReasoningEngine:
             "generated_at": datetime.now().isoformat(),
         }
 
-    def answer_why(
-        self, question: str, store_id: Optional[str] = None
-    ) -> dict[str, Any]:
+    def answer_why(self, question: str, store_id: Optional[str] = None) -> dict[str, Any]:
         """Answer a natural language "why" question with structured analysis.
 
         Example: "为什么上周营收下降了？" →
@@ -519,9 +525,7 @@ class ReasoningEngine:
                 return {"ok": False, "error": "No store found"}
 
         # Decompose the metric change
-        analysis = self.analyze_metric_change(
-            store_id, metric, "上周", "本周"
-        )
+        analysis = self.analyze_metric_change(store_id, metric, "上周", "本周")
 
         if not analysis.get("ok"):
             return {"ok": False, "error": analysis.get("error", "Analysis failed")}
@@ -532,9 +536,7 @@ class ReasoningEngine:
 
         answer_parts: list[str] = []
         if top_factors:
-            answer_parts.append(
-                f"{metric}{'下降' if direction == 'decline' else '上升'}的主要原因："
-            )
+            answer_parts.append(f"{metric}{'下降' if direction == 'decline' else '上升'}的主要原因：")
             for i, factor in enumerate(top_factors[:3], 1):
                 answer_parts.append(
                     f"{i}. {factor['cn_name']}{factor['direction']}"
@@ -555,9 +557,7 @@ class ReasoningEngine:
             "answered_at": datetime.now().isoformat(),
         }
 
-    def predict_trend(
-        self, store_id: str, metric: str, days_ahead: int = 7
-    ) -> dict[str, Any]:
+    def predict_trend(self, store_id: str, metric: str, days_ahead: int = 7) -> dict[str, Any]:
         """Predict metric trend for the next N days.
 
         Uses store properties and known patterns for simple forecasting.
@@ -595,7 +595,7 @@ class ReasoningEngine:
         for day in range(1, days_ahead + 1):
             date = now + timedelta(days=day)
             # Simple linear extrapolation with dampening
-            dampening = 0.95 ** day  # Predictions become less certain
+            dampening = 0.95**day  # Predictions become less certain
             daily_change = change_rate * dampening / 7  # Weekly → daily
 
             predicted_value = current_value * (1 + daily_change * day)
@@ -606,13 +606,17 @@ class ReasoningEngine:
 
             confidence = max(0.3, 0.9 - 0.08 * day)
 
-            predictions.append({
-                "date": date.strftime("%Y-%m-%d"),
-                "day_of_week": date.strftime("%A"),
-                "predicted_value": round(predicted_value, 4) if isinstance(predicted_value, float) else predicted_value,
-                "confidence": round(confidence, 2),
-                "is_weekend": date.weekday() >= 5,
-            })
+            predictions.append(
+                {
+                    "date": date.strftime("%Y-%m-%d"),
+                    "day_of_week": date.strftime("%A"),
+                    "predicted_value": round(predicted_value, 4)
+                    if isinstance(predicted_value, float)
+                    else predicted_value,
+                    "confidence": round(confidence, 2),
+                    "is_weekend": date.weekday() >= 5,
+                }
+            )
 
         return {
             "ok": True,
@@ -627,9 +631,7 @@ class ReasoningEngine:
 
     # ─── Private Helpers ───
 
-    def _get_factor_change(
-        self, store_props: dict[str, Any], factor: str, metric: str
-    ) -> float:
+    def _get_factor_change(self, store_props: dict[str, Any], factor: str, metric: str) -> float:
         """Get the change percentage for a specific factor."""
         # Try direct property first
         change = store_props.get(f"{factor}_change_pct")

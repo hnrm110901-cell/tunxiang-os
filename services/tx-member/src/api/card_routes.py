@@ -26,6 +26,7 @@ router = APIRouter(prefix="/api/v1/member/card", tags=["member-card"])
 
 # ── 请求模型 ──────────────────────────────────────────────────
 
+
 class CreateCardTypeRequest(BaseModel):
     name: str
     rules: dict = Field(default_factory=dict)
@@ -55,6 +56,7 @@ class BatchOperationsRequest(BaseModel):
 
 # ── 1. 创建卡类型 ─────────────────────────────────────────────
 
+
 @router.post("/types")
 async def create_card_type_route(
     body: CreateCardTypeRequest,
@@ -70,6 +72,7 @@ async def create_card_type_route(
 
 
 # ── 2. 获取卡类型列表 ─────────────────────────────────────────
+
 
 @router.get("/types")
 async def list_card_types(
@@ -88,6 +91,7 @@ async def list_card_types(
 
 # ── 3. 设置卡等级 ─────────────────────────────────────────────
 
+
 @router.put("/types/{card_type_id}/levels")
 async def set_card_levels_route(
     card_type_id: str,
@@ -104,6 +108,7 @@ async def set_card_levels_route(
 
 
 # ── 4. 批量创建匿名实体卡 ─────────────────────────────────────
+
 
 @router.post("/types/{card_type_id}/anonymous-cards")
 async def create_anonymous_cards(
@@ -122,6 +127,7 @@ async def create_anonymous_cards(
 
 # ── 5. 发卡 ───────────────────────────────────────────────────
 
+
 @router.post("/issue")
 async def issue_card_route(
     body: IssueCardRequest,
@@ -137,6 +143,7 @@ async def issue_card_route(
 
 
 # ── 6. 等级升级 ───────────────────────────────────────────────
+
 
 @router.post("/cards/{card_id}/upgrade")
 async def upgrade_level_route(
@@ -154,6 +161,7 @@ async def upgrade_level_route(
 
 # ── 7. 等级降级 ───────────────────────────────────────────────
 
+
 @router.post("/cards/{card_id}/downgrade")
 async def downgrade_level_route(
     card_id: str,
@@ -169,6 +177,7 @@ async def downgrade_level_route(
 
 
 # ── 8. 设置会员日 ─────────────────────────────────────────────
+
 
 @router.put("/types/{card_type_id}/member-day")
 async def set_member_day_route(
@@ -187,6 +196,7 @@ async def set_member_day_route(
 
 # ── 9. 获取卡权益 ─────────────────────────────────────────────
 
+
 @router.get("/cards/{card_id}/benefits")
 async def get_card_benefits_route(
     card_id: str,
@@ -203,6 +213,7 @@ async def get_card_benefits_route(
 
 
 # ── 10. 批量操作 ──────────────────────────────────────────────
+
 
 @router.post("/batch-operations")
 async def batch_card_operations_route(

@@ -16,23 +16,23 @@ stored_value_routes.py（5个）
 9. POST /api/v1/members/{id}/stored-value/consume   — 余额充足，扣款成功
 10. POST /api/v1/members/{id}/stored-value/consume  — 余额不足，返回 success=False
 """
+
 from __future__ import annotations
 
 import os
 import sys
 import types
 import uuid
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock
 
-import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 # ─── sys.path 设置 ─────────────────────────────────────────────────────────────
 
 _TESTS_DIR = os.path.dirname(__file__)
-_SRC_DIR   = os.path.abspath(os.path.join(_TESTS_DIR, ".."))
-_ROOT_DIR  = os.path.abspath(os.path.join(_TESTS_DIR, "..", "..", "..", ".."))
+_SRC_DIR = os.path.abspath(os.path.join(_TESTS_DIR, ".."))
+_ROOT_DIR = os.path.abspath(os.path.join(_TESTS_DIR, "..", "..", "..", ".."))
 
 for _p in [_SRC_DIR, _ROOT_DIR]:
     if _p not in sys.path:
@@ -40,6 +40,7 @@ for _p in [_SRC_DIR, _ROOT_DIR]:
 
 
 # ─── 注入 shared.ontology.src.database 存根（如尚未真实导入）────────────────────
+
 
 def _ensure_stub(mod_name: str) -> None:
     if mod_name not in sys.modules:
@@ -55,26 +56,28 @@ _ensure_stub("shared.ontology.src.database")
 # get_db 占位符（真实对象由 dependency_overrides 替换）
 _db_stub = sys.modules["shared.ontology.src.database"]
 if not hasattr(_db_stub, "get_db"):
+
     async def _get_db_stub():  # pragma: no cover
         yield None
+
     _db_stub.get_db = _get_db_stub
 
-from shared.ontology.src.database import get_db  # noqa: E402
-
 # ─── 导入被测路由（保证 shared 存根已注册）──────────────────────────────────────
-
 from api.discount_engine_routes import router as discount_router  # type: ignore[import]
 from api.stored_value_routes import router as stored_value_router  # type: ignore[import]
+
+from shared.ontology.src.database import get_db  # noqa: E402
 
 # ─── 常量 ──────────────────────────────────────────────────────────────────────
 
 TENANT_ID = str(uuid.uuid4())
 MEMBER_ID = str(uuid.uuid4())
-STORE_ID  = str(uuid.uuid4())
-HEADERS   = {"X-Tenant-ID": TENANT_ID}
+STORE_ID = str(uuid.uuid4())
+HEADERS = {"X-Tenant-ID": TENANT_ID}
 
 
 # ─── DB Mock 工厂 ───────────────────────────────────────────────────────────────
+
 
 class _FakeMappingsResult:
     """模拟 result.mappings().all() / .first() / 直接迭代 的返回"""
@@ -102,7 +105,7 @@ def _make_db(execute_side_effect=None) -> AsyncMock:
     """返回一个可配置 execute side_effect 的 DB AsyncMock"""
     db = AsyncMock()
     db.execute = AsyncMock(side_effect=execute_side_effect)
-    db.commit  = AsyncMock()
+    db.commit = AsyncMock()
     db.rollback = AsyncMock()
     return db
 
@@ -127,6 +130,7 @@ def _make_app_stored_value(db_mock) -> TestClient:
 
 # 场景 1: GET /api/v1/discount/rules — 正常返回规则列表 ─────────────────────────
 
+
 def test_get_discount_rules_ok():
     """查询激活规则：返回 ok=True，data.rules 为列表"""
     rule_row = {
@@ -142,7 +146,7 @@ def test_get_discount_rules_ok():
     }
     # _fetch_active_rules 调用两次 execute：SET CONFIG + SELECT
     execute_results = [
-        _FakeMappingsResult(),         # SET CONFIG 无需返回行
+        _FakeMappingsResult(),  # SET CONFIG 无需返回行
         _FakeMappingsResult([rule_row]),
     ]
     call_idx = {"i": 0}
@@ -166,6 +170,7 @@ def test_get_discount_rules_ok():
 
 # 场景 2: GET /api/v1/discount/rules — 缺少 X-Tenant-ID → 400 ──────────────────
 
+
 def test_get_discount_rules_missing_tenant():
     """不提供 X-Tenant-ID 时返回 400"""
     db = _make_db()
@@ -176,6 +181,7 @@ def test_get_discount_rules_missing_tenant():
 
 
 # 场景 3: POST /api/v1/discount/calculate — 单折扣（会员85折）正常计算 ──────────
+
 
 def test_calculate_member_discount_ok():
     """会员85折：10000分 × 0.85 = 8500分，节省1500分"""
@@ -195,10 +201,10 @@ def test_calculate_member_discount_ok():
     log_insert_result = _FakeMappingsResult()
 
     call_results = [
-        _FakeMappingsResult(),          # SET CONFIG (fetch_active_rules)
-        _FakeMappingsResult([rule_row]),# SELECT discount_rules
-        _FakeMappingsResult(),          # SET CONFIG (insert_log 内部的 set_config — 此处路由不调用)
-        log_insert_result,              # INSERT checkout_discount_log
+        _FakeMappingsResult(),  # SET CONFIG (fetch_active_rules)
+        _FakeMappingsResult([rule_row]),  # SELECT discount_rules
+        _FakeMappingsResult(),  # SET CONFIG (insert_log 内部的 set_config — 此处路由不调用)
+        log_insert_result,  # INSERT checkout_discount_log
     ]
     call_idx = {"i": 0}
 
@@ -235,6 +241,7 @@ def test_calculate_member_discount_ok():
 
 # 场景 4: POST /api/v1/discount/calculate — 无效 discount type → 400 ─────────────
 
+
 def test_calculate_invalid_discount_type():
     """传入不合法的 discount type 时应立即返回 400"""
     db = _make_db()
@@ -253,6 +260,7 @@ def test_calculate_invalid_discount_type():
 
 
 # 场景 5: POST /api/v1/discount/rules — 创建折扣规则成功 ─────────────────────────
+
 
 def test_create_discount_rule_ok():
     """新建折扣规则，DB INSERT 成功后返回 rule_id"""
@@ -294,6 +302,7 @@ def test_create_discount_rule_ok():
 
 # 场景 6: GET /api/v1/members/{id}/stored-value — 返回余额与流水 ────────────────
 
+
 def test_get_stored_value_ok():
     """返回账户余额 + 最近20条流水"""
     account_id = str(uuid.uuid4())
@@ -309,9 +318,9 @@ def test_get_stored_value_ok():
     call_idx = {"i": 0}
     # execute: SET LOCAL → SELECT account → (commit) → SELECT transactions
     results_seq = [
-        _FakeMappingsResult(),                # SET LOCAL
-        _FakeMappingsResult([account_row]),   # SELECT stored_value_accounts
-        _FakeMappingsResult(txn_rows),        # SELECT stored_value_transactions
+        _FakeMappingsResult(),  # SET LOCAL
+        _FakeMappingsResult([account_row]),  # SELECT stored_value_accounts
+        _FakeMappingsResult(txn_rows),  # SELECT stored_value_transactions
     ]
 
     async def _side(stmt, params=None):
@@ -338,6 +347,7 @@ def test_get_stored_value_ok():
 
 # 场景 7: POST recharge — 充100000分，档位赠15000分 ─────────────────────────────
 
+
 def test_recharge_with_bonus():
     """充100000分（≥100000分档），应赠15000分，total_credited=115000"""
     account_id = str(uuid.uuid4())
@@ -351,10 +361,10 @@ def test_recharge_with_bonus():
 
     call_idx = {"i": 0}
     results_seq = [
-        _FakeMappingsResult(),              # SET LOCAL
-        _FakeMappingsResult([account_row]), # SELECT account
-        _FakeMappingsResult(),              # UPDATE balance
-        _FakeMappingsResult(),              # INSERT transaction
+        _FakeMappingsResult(),  # SET LOCAL
+        _FakeMappingsResult([account_row]),  # SELECT account
+        _FakeMappingsResult(),  # UPDATE balance
+        _FakeMappingsResult(),  # INSERT transaction
     ]
 
     async def _side(stmt, params=None):
@@ -387,6 +397,7 @@ def test_recharge_with_bonus():
 
 # 场景 8: POST recharge — 金额 < 100分 → 422 ────────────────────────────────────
 
+
 def test_recharge_amount_too_small():
     """充值金额低于100分应被 Pydantic validator 拒绝，返回 422"""
     db = _make_db()
@@ -406,6 +417,7 @@ def test_recharge_amount_too_small():
 
 # 场景 9: POST consume — 余额充足，扣款成功 ──────────────────────────────────────
 
+
 def test_consume_sufficient_balance():
     """账户余额20000分，消费8800分，应成功并返回 balance_after=11200"""
     account_id = str(uuid.uuid4())
@@ -419,10 +431,10 @@ def test_consume_sufficient_balance():
 
     call_idx = {"i": 0}
     results_seq = [
-        _FakeMappingsResult(),              # SET LOCAL
-        _FakeMappingsResult([account_row]), # SELECT account
-        _FakeMappingsResult(),              # UPDATE balance
-        _FakeMappingsResult(),              # INSERT transaction
+        _FakeMappingsResult(),  # SET LOCAL
+        _FakeMappingsResult([account_row]),  # SELECT account
+        _FakeMappingsResult(),  # UPDATE balance
+        _FakeMappingsResult(),  # INSERT transaction
     ]
 
     async def _side(stmt, params=None):
@@ -454,6 +466,7 @@ def test_consume_sufficient_balance():
 
 # 场景 10: POST consume — 余额不足，返回 success=False ───────────────────────────
 
+
 def test_consume_insufficient_balance():
     """账户余额1000分，尝试消费5000分，返回 success=False 和 insufficient_fen=4000"""
     account_id = str(uuid.uuid4())
@@ -467,8 +480,8 @@ def test_consume_insufficient_balance():
 
     call_idx = {"i": 0}
     results_seq = [
-        _FakeMappingsResult(),              # SET LOCAL
-        _FakeMappingsResult([account_row]), # SELECT account
+        _FakeMappingsResult(),  # SET LOCAL
+        _FakeMappingsResult([account_row]),  # SELECT account
     ]
 
     async def _side(stmt, params=None):

@@ -53,6 +53,7 @@ INDUSTRY_BENCHMARKS: Dict[str, Dict[str, Any]] = {
 
 # ── 状态判定工具 ───────────────────────────────────────────────
 
+
 def _rate_status_higher_better(value: float, benchmark: Dict[str, Any]) -> str:
     """值越高越好的指标状态判定（人均产值、人时营业额、人时待客数、工作有效性）。"""
     target = benchmark["target"]
@@ -81,6 +82,7 @@ def _rate_status_ratio(value: float, benchmark: Dict[str, Any]) -> str:
 
 
 # ── 五大指标计算 ───────────────────────────────────────────────
+
 
 def compute_labor_cost_ratio(total_labor_fen: int, total_revenue_fen: int) -> dict:
     """人力成本占比 = 人力总成本 / 总营收。"""
@@ -248,10 +250,7 @@ def compute_store_efficiency(store_data: dict) -> dict:
         "guests_per_hour": 0.15,
         "work_effectiveness": 0.20,
     }
-    total_score = sum(
-        _STATUS_SCORES[ind["status"]] * weights[key]
-        for key, ind in indicators.items()
-    )
+    total_score = sum(_STATUS_SCORES[ind["status"]] * weights[key] for key, ind in indicators.items())
     total_score = round(total_score, 1)
 
     if total_score >= 90:
@@ -277,18 +276,21 @@ def compute_store_efficiency(store_data: dict) -> dict:
 
 # ── 多门店对比 ─────────────────────────────────────────────────
 
+
 def compare_stores(stores_data: List[dict]) -> dict:
     """多门店人效对比排名。返回按综合评分降序的排名列表。"""
     results: List[dict] = []
     for sd in stores_data:
         report = compute_store_efficiency(sd)
-        results.append({
-            "store_id": report["store_id"],
-            "store_name": report["store_name"],
-            "overall_score": report["overall_score"],
-            "overall_status": report["overall_status"],
-            "indicators": report["indicators"],
-        })
+        results.append(
+            {
+                "store_id": report["store_id"],
+                "store_name": report["store_name"],
+                "overall_score": report["overall_score"],
+                "overall_status": report["overall_status"],
+                "indicators": report["indicators"],
+            }
+        )
     results.sort(key=lambda r: r["overall_score"], reverse=True)
     for rank, r in enumerate(results, 1):
         r["rank"] = rank
@@ -325,16 +327,18 @@ def generate_efficiency_alerts(indicators_or_store: dict) -> List[dict]:
         if ind["status"] in ("warning", "critical"):
             level = "high" if ind["status"] == "critical" else "medium"
             label = _INDICATOR_LABELS.get(key, key)
-            alerts.append({
-                "indicator": key,
-                "label": label,
-                "level": level,
-                "status": ind["status"],
-                "value": ind["value"],
-                "gap": ind["gap"],
-                "message": f"{label}{'严重不达标' if level == 'high' else '需要关注'}，"
-                           f"当前值 {ind['value']}，与目标差距 {ind['gap']}",
-            })
+            alerts.append(
+                {
+                    "indicator": key,
+                    "label": label,
+                    "level": level,
+                    "status": ind["status"],
+                    "value": ind["value"],
+                    "gap": ind["gap"],
+                    "message": f"{label}{'严重不达标' if level == 'high' else '需要关注'}，"
+                    f"当前值 {ind['value']}，与目标差距 {ind['gap']}",
+                }
+            )
     # 按严重程度排序
     priority = {"high": 0, "medium": 1}
     alerts.sort(key=lambda a: priority.get(a["level"], 9))
@@ -342,6 +346,7 @@ def generate_efficiency_alerts(indicators_or_store: dict) -> List[dict]:
 
 
 # ── 多角色看板 ─────────────────────────────────────────────────
+
 
 def get_boss_view(brand_data: dict) -> dict:
     """老板看：品牌整体人效 + 门店排名 + 成本趋势。
@@ -369,7 +374,14 @@ def get_boss_view(brand_data: dict) -> dict:
     cost_trend: List[dict] = []
     for i in range(min(len(monthly_labor), len(monthly_revenue))):
         ratio = monthly_labor[i] / monthly_revenue[i] if monthly_revenue[i] > 0 else 0.0
-        cost_trend.append({"month_index": i, "labor_fen": monthly_labor[i], "revenue_fen": monthly_revenue[i], "ratio": round(ratio, 4)})
+        cost_trend.append(
+            {
+                "month_index": i,
+                "labor_fen": monthly_labor[i],
+                "revenue_fen": monthly_revenue[i],
+                "ratio": round(ratio, 4),
+            }
+        )
 
     return {
         "role": "boss",
@@ -466,14 +478,16 @@ def get_manager_view(store_data: dict) -> dict:
         hours = emp.get("hours", 0)
         rev = emp.get("revenue_fen", 0)
         rph = round(rev / hours) if hours > 0 else 0
-        emp_performance.append({
-            "emp_id": emp.get("emp_id", ""),
-            "emp_name": emp.get("emp_name", ""),
-            "hours": hours,
-            "revenue_fen": rev,
-            "revenue_per_hour_fen": rph,
-            "guests": emp.get("guests", 0),
-        })
+        emp_performance.append(
+            {
+                "emp_id": emp.get("emp_id", ""),
+                "emp_name": emp.get("emp_name", ""),
+                "hours": hours,
+                "revenue_fen": rev,
+                "revenue_per_hour_fen": rph,
+                "guests": emp.get("guests", 0),
+            }
+        )
     emp_performance.sort(key=lambda e: e["revenue_per_hour_fen"], reverse=True)
 
     return {

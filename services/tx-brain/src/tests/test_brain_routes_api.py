@@ -17,6 +17,7 @@
   - 每类端点覆盖：正常路径 / APIConnectionError 降级 / 必填字段缺失 → 422
   - 使用 httpx.AsyncClient + ASGITransport（无需真实 HTTP 服务器）
 """
+
 from __future__ import annotations
 
 import uuid
@@ -49,9 +50,7 @@ def headers() -> dict[str, str]:
 @pytest.fixture
 async def client():
     """ASGITransport 客户端，不需要真实监听端口。"""
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as ac:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
         yield ac
 
 
@@ -70,9 +69,7 @@ async def test_discount_analyze_success(client, headers):
         "risk_factors": [],
         "constraints_check": {"margin_ok": True, "safety_ok": True, "exp_ok": True},
     }
-    with patch(
-        "services.tx_brain.src.api.brain_routes.discount_guardian"
-    ) as mock_agent:
+    with patch("services.tx_brain.src.api.brain_routes.discount_guardian") as mock_agent:
         mock_agent.analyze = AsyncMock(return_value=mock_result)
         resp = await client.post(
             "/api/v1/brain/discount/analyze",
@@ -97,9 +94,7 @@ async def test_discount_analyze_success(client, headers):
 @pytest.mark.asyncio
 async def test_discount_analyze_connection_error(client, headers):
     """折扣分析：Agent 抛出 APIConnectionError → 返回 ok=False + AI_CONNECTION_ERROR。"""
-    with patch(
-        "services.tx_brain.src.api.brain_routes.discount_guardian"
-    ) as mock_agent:
+    with patch("services.tx_brain.src.api.brain_routes.discount_guardian") as mock_agent:
         mock_agent.analyze = AsyncMock(
             side_effect=anthropic.APIConnectionError(request=None)  # type: ignore[arg-type]
         )
@@ -140,18 +135,14 @@ async def test_member_insight_success(client, headers):
         "recommended_dishes": ["清蒸石斑鱼"],
         "action_suggestions": ["邀请加入VIP社群"],
     }
-    with patch(
-        "services.tx_brain.src.api.brain_routes.member_insight"
-    ) as mock_agent:
+    with patch("services.tx_brain.src.api.brain_routes.member_insight") as mock_agent:
         mock_agent.analyze = AsyncMock(return_value=mock_result)
         resp = await client.post(
             "/api/v1/brain/member/insight",
             headers=headers,
             json={
                 "member": {"id": "M001", "name": "张三", "total_fen": 50000},
-                "orders": [
-                    {"id": "O001", "amount_fen": 10000, "items": ["清蒸石斑鱼"]}
-                ],
+                "orders": [{"id": "O001", "amount_fen": 10000, "items": ["清蒸石斑鱼"]}],
             },
         )
 
@@ -164,9 +155,7 @@ async def test_member_insight_success(client, headers):
 @pytest.mark.asyncio
 async def test_member_insight_api_error(client, headers):
     """会员洞察：Agent 抛出 APIError → 返回 ok=False + AI_API_ERROR。"""
-    with patch(
-        "services.tx_brain.src.api.brain_routes.member_insight"
-    ) as mock_agent:
+    with patch("services.tx_brain.src.api.brain_routes.member_insight") as mock_agent:
         mock_agent.analyze = AsyncMock(
             side_effect=anthropic.APIStatusError(
                 message="rate limit",
@@ -212,9 +201,7 @@ async def test_dispatch_predict_success(client, headers):
         "recommendations": ["优先安排活鲜区厨师"],
         "source": "claude",
     }
-    with patch(
-        "services.tx_brain.src.api.brain_routes.dispatch_predictor"
-    ) as mock_agent:
+    with patch("services.tx_brain.src.api.brain_routes.dispatch_predictor") as mock_agent:
         mock_agent.predict = AsyncMock(return_value=mock_result)
         resp = await client.post(
             "/api/v1/brain/dispatch/predict",
@@ -250,9 +237,7 @@ async def test_dispatch_predict_success(client, headers):
 @pytest.mark.asyncio
 async def test_dispatch_predict_connection_error(client, headers):
     """出餐预测：APIConnectionError → ok=False + AI_CONNECTION_ERROR。"""
-    with patch(
-        "services.tx_brain.src.api.brain_routes.dispatch_predictor"
-    ) as mock_agent:
+    with patch("services.tx_brain.src.api.brain_routes.dispatch_predictor") as mock_agent:
         mock_agent.predict = AsyncMock(
             side_effect=anthropic.APIConnectionError(request=None)  # type: ignore[arg-type]
         )
@@ -285,9 +270,7 @@ async def test_patrol_analyze_success(client, headers):
         "auto_alert_required": False,
         "source": "claude",
     }
-    with patch(
-        "services.tx_brain.src.api.brain_routes.patrol_inspector"
-    ) as mock_agent:
+    with patch("services.tx_brain.src.api.brain_routes.patrol_inspector") as mock_agent:
         mock_agent.analyze = AsyncMock(return_value=mock_result)
         resp = await client.post(
             "/api/v1/brain/patrol/analyze",
@@ -354,9 +337,7 @@ async def test_finance_audit_success(client, headers):
         },
         "source": "claude",
     }
-    with patch(
-        "services.tx_brain.src.api.brain_routes.finance_auditor"
-    ) as mock_agent:
+    with patch("services.tx_brain.src.api.brain_routes.finance_auditor") as mock_agent:
         mock_agent.analyze = AsyncMock(return_value=mock_result)
         resp = await client.post(
             "/api/v1/brain/finance/audit",
@@ -381,9 +362,7 @@ async def test_finance_audit_success(client, headers):
 @pytest.mark.asyncio
 async def test_finance_audit_connection_error(client, headers):
     """财务稽核：APIConnectionError → ok=False。"""
-    with patch(
-        "services.tx_brain.src.api.brain_routes.finance_auditor"
-    ) as mock_agent:
+    with patch("services.tx_brain.src.api.brain_routes.finance_auditor") as mock_agent:
         mock_agent.analyze = AsyncMock(
             side_effect=anthropic.APIConnectionError(request=None)  # type: ignore[arg-type]
         )
@@ -425,9 +404,7 @@ async def test_customer_service_handle_success(client, headers):
         "escalate_to_human": False,
         "source": "claude",
     }
-    with patch(
-        "services.tx_brain.src.api.brain_routes.customer_service"
-    ) as mock_agent:
+    with patch("services.tx_brain.src.api.brain_routes.customer_service") as mock_agent:
         mock_agent.handle = AsyncMock(return_value=mock_result)
         resp = await client.post(
             "/api/v1/brain/customer-service/handle",
@@ -483,9 +460,7 @@ async def test_crm_campaign_success(client, headers):
         "constraints_check": {"discount_compliant": True},
         "source": "claude",
     }
-    with patch(
-        "services.tx_brain.src.api.brain_routes.crm_operator"
-    ) as mock_agent:
+    with patch("services.tx_brain.src.api.brain_routes.crm_operator") as mock_agent:
         mock_agent.generate_campaign = AsyncMock(return_value=mock_result)
         resp = await client.post(
             "/api/v1/brain/crm/campaign",
@@ -513,9 +488,7 @@ async def test_crm_campaign_success(client, headers):
 @pytest.mark.asyncio
 async def test_crm_campaign_connection_error(client, headers):
     """私域运营：APIConnectionError → ok=False + AI_CONNECTION_ERROR。"""
-    with patch(
-        "services.tx_brain.src.api.brain_routes.crm_operator"
-    ) as mock_agent:
+    with patch("services.tx_brain.src.api.brain_routes.crm_operator") as mock_agent:
         mock_agent.generate_campaign = AsyncMock(
             side_effect=anthropic.APIConnectionError(request=None)  # type: ignore[arg-type]
         )
@@ -606,9 +579,7 @@ async def test_inventory_analyze_success(client, headers):
         "constraints_check": {"food_safety_ok": True},
         "source": "claude",
     }
-    with patch(
-        "services.tx_brain.src.api.brain_routes.inventory_sentinel"
-    ) as mock_agent:
+    with patch("services.tx_brain.src.api.brain_routes.inventory_sentinel") as mock_agent:
         mock_agent.analyze = AsyncMock(return_value=mock_result)
         resp = await client.post(
             "/api/v1/brain/inventory/analyze",
@@ -626,9 +597,7 @@ async def test_inventory_analyze_success(client, headers):
                         "unit_cost_fen": 4000,
                     }
                 ],
-                "sales_history": [
-                    {"ingredient_name": "猪肉", "daily_usage": 3.5}
-                ],
+                "sales_history": [{"ingredient_name": "猪肉", "daily_usage": 3.5}],
             },
         )
 
@@ -643,9 +612,7 @@ async def test_inventory_analyze_success(client, headers):
 @pytest.mark.asyncio
 async def test_inventory_analyze_connection_error(client, headers):
     """库存预警分析：APIConnectionError → ok=False + AI_CONNECTION_ERROR。"""
-    with patch(
-        "services.tx_brain.src.api.brain_routes.inventory_sentinel"
-    ) as mock_agent:
+    with patch("services.tx_brain.src.api.brain_routes.inventory_sentinel") as mock_agent:
         mock_agent.analyze = AsyncMock(
             side_effect=anthropic.APIConnectionError(request=None)  # type: ignore[arg-type]
         )
@@ -698,21 +665,15 @@ async def test_inventory_analyze_missing_required_field(client, headers):
 async def test_menu_optimize_success(client, headers):
     """智能排菜：Agent 正常返回推荐菜品排序及套餐建议。"""
     mock_result = {
-        "featured_dishes": [
-            {"dish_id": "D001", "dish_name": "红烧肉", "reason": "高毛利 + 临期食材消化"}
-        ],
+        "featured_dishes": [{"dish_id": "D001", "dish_name": "红烧肉", "reason": "高毛利 + 临期食材消化"}],
         "dishes_to_promote": ["D002", "D003"],
         "dishes_to_deplete": ["D004"],
-        "suggested_combos": [
-            {"combo_name": "家庭套餐A", "dishes": ["D001", "D002"], "combo_price_fen": 18800}
-        ],
+        "suggested_combos": [{"combo_name": "家庭套餐A", "dishes": ["D001", "D002"], "combo_price_fen": 18800}],
         "menu_adjustments": [{"action": "feature", "dish_id": "D001", "position": 1}],
         "constraints_check": {"margin_ok": True, "food_safety_ok": True},
         "source": "claude",
     }
-    with patch(
-        "services.tx_brain.src.api.brain_routes.menu_optimizer"
-    ) as mock_agent:
+    with patch("services.tx_brain.src.api.brain_routes.menu_optimizer") as mock_agent:
         mock_agent.optimize = AsyncMock(return_value=mock_result)
         resp = await client.post(
             "/api/v1/brain/menu/optimize",
@@ -759,9 +720,7 @@ async def test_menu_optimize_success(client, headers):
 @pytest.mark.asyncio
 async def test_menu_optimize_connection_error(client, headers):
     """智能排菜：APIConnectionError → ok=False + AI_CONNECTION_ERROR。"""
-    with patch(
-        "services.tx_brain.src.api.brain_routes.menu_optimizer"
-    ) as mock_agent:
+    with patch("services.tx_brain.src.api.brain_routes.menu_optimizer") as mock_agent:
         mock_agent.optimize = AsyncMock(
             side_effect=anthropic.APIConnectionError(request=None)  # type: ignore[arg-type]
         )
@@ -820,9 +779,7 @@ async def test_discount_mv_insight_success(client, headers):
         "data": {"discount_rate": 0.15, "unauthorized_count": 0},
         "risk_signal": "normal",
     }
-    with patch(
-        "services.tx_brain.src.api.brain_routes.discount_guardian"
-    ) as mock_agent:
+    with patch("services.tx_brain.src.api.brain_routes.discount_guardian") as mock_agent:
         mock_agent.analyze_from_mv = AsyncMock(return_value=mock_result)
         resp = await client.get(
             "/api/v1/brain/discount/mv-insight",
@@ -848,9 +805,7 @@ async def test_inventory_mv_insight_success(client, headers):
         },
         "risk_signal": "warning",
     }
-    with patch(
-        "services.tx_brain.src.api.brain_routes.inventory_sentinel"
-    ) as mock_agent:
+    with patch("services.tx_brain.src.api.brain_routes.inventory_sentinel") as mock_agent:
         mock_agent.analyze_from_mv = AsyncMock(return_value=mock_result)
         resp = await client.get(
             "/api/v1/brain/inventory/mv-insight",
@@ -877,9 +832,7 @@ async def test_finance_mv_insight_success(client, headers):
         },
         "risk_signal": "normal",
     }
-    with patch(
-        "services.tx_brain.src.api.brain_routes.finance_auditor"
-    ) as mock_agent:
+    with patch("services.tx_brain.src.api.brain_routes.finance_auditor") as mock_agent:
         mock_agent.analyze_from_mv = AsyncMock(return_value=mock_result)
         resp = await client.get(
             "/api/v1/brain/finance/mv-insight",
@@ -906,9 +859,7 @@ async def test_member_mv_insight_success(client, headers):
         },
         "risk_signal": "normal",
     }
-    with patch(
-        "services.tx_brain.src.api.brain_routes.member_insight"
-    ) as mock_agent:
+    with patch("services.tx_brain.src.api.brain_routes.member_insight") as mock_agent:
         mock_agent.analyze_from_mv = AsyncMock(return_value=mock_result)
         resp = await client.get(
             "/api/v1/brain/member/mv-insight",

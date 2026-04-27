@@ -13,6 +13,7 @@
 输出：
   每道菜 → 推荐备料份数（整数）
 """
+
 from datetime import date
 from typing import Optional
 
@@ -25,14 +26,14 @@ logger = structlog.get_logger()
 
 # 节假日系数（简单版，实际可接外部API）
 _HOLIDAY_BOOST = {
-    "2026-01-01": 1.5,   # 元旦
-    "2026-02-17": 2.0,   # 春节
-    "2026-05-01": 1.4,   # 劳动节
-    "2026-10-01": 1.5,   # 国庆节
+    "2026-01-01": 1.5,  # 元旦
+    "2026-02-17": 2.0,  # 春节
+    "2026-05-01": 1.4,  # 劳动节
+    "2026-10-01": 1.5,  # 国庆节
 }
 
-_SAFETY_FACTOR = 1.1   # 安全系数
-_LOOKBACK_WEEKS = 4    # 回溯周数
+_SAFETY_FACTOR = 1.1  # 安全系数
+_LOOKBACK_WEEKS = 4  # 回溯周数
 
 
 async def get_prep_recommendations(
@@ -76,16 +77,18 @@ async def get_prep_recommendations(
         boost = holiday_factor * booking_boost.get(dish_id, 1.0)
         recommended = max(1, round(baseline * boost * _SAFETY_FACTOR))
 
-        recommendations.append({
-            "dish_id": dish_id,
-            "dish_name": dish["dish_name"],
-            "dept_id": dish["dept_id"],
-            "dept_name": dish.get("dept_name", ""),
-            "recommended_qty": recommended,
-            "baseline_qty": round(baseline, 1),
-            "boost_factor": round(boost, 2),
-            "reason": _build_reason(holiday_factor, booking_boost.get(dish_id, 1.0)),
-        })
+        recommendations.append(
+            {
+                "dish_id": dish_id,
+                "dish_name": dish["dish_name"],
+                "dept_id": dish["dept_id"],
+                "dept_name": dish.get("dept_name", ""),
+                "recommended_qty": recommended,
+                "baseline_qty": round(baseline, 1),
+                "boost_factor": round(boost, 2),
+                "reason": _build_reason(holiday_factor, booking_boost.get(dish_id, 1.0)),
+            }
+        )
 
     # 按推荐数量倒序，方便厨师优先备高需求菜品
     recommendations.sort(key=lambda x: x["recommended_qty"], reverse=True)
@@ -180,11 +183,14 @@ async def _query_booking_boost(
         GROUP BY bpi.dish_id
     """)
     try:
-        result = await db.execute(sql, {
-            "tenant_id": tenant_id,
-            "store_id": store_id,
-            "target_date": target_date,
-        })
+        result = await db.execute(
+            sql,
+            {
+                "tenant_id": tenant_id,
+                "store_id": store_id,
+                "target_date": target_date,
+            },
+        )
         rows = result.mappings().all()
         # 有预订的菜品给 1.2x boost
         return {r["dish_id"]: 1.2 for r in rows if r["booking_qty"] > 0}

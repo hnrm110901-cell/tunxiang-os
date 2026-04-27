@@ -24,6 +24,7 @@ Webhook（平台 → 屯象）：
 注意：平台配置（app_id/app_secret/commission_rate）目前从环境变量读取（演示），
       生产环境应从 delivery_platform_configs 表查询（已在 delivery_ops_routes 中管理）。
 """
+
 from __future__ import annotations
 
 import os
@@ -53,6 +54,7 @@ router = APIRouter(prefix="/api/v1/delivery", tags=["delivery-panel"])
 
 
 # ─── 工具函数 ──────────────────────────────────────────────────────────────────
+
 
 def _get_tenant_id(request: Request) -> str:
     """从 request.state 或 Header 获取 tenant_id"""
@@ -123,6 +125,7 @@ def _serialize_order(order) -> dict:
 
 # ─── Pydantic 请求模型 ─────────────────────────────────────────────────────────
 
+
 class AcceptOrderRequest(BaseModel):
     prep_time_minutes: int = Field(default=20, ge=5, le=120, description="预计备餐分钟数")
 
@@ -134,19 +137,14 @@ class RejectOrderRequest(BaseModel):
 
 class AutoAcceptRuleRequest(BaseModel):
     is_enabled: Optional[bool] = None
-    business_hours_start: Optional[str] = Field(
-        None, description="营业开始时间 HH:MM，如 09:00"
-    )
-    business_hours_end: Optional[str] = Field(
-        None, description="营业结束时间 HH:MM，如 22:00"
-    )
+    business_hours_start: Optional[str] = Field(None, description="营业开始时间 HH:MM，如 09:00")
+    business_hours_end: Optional[str] = Field(None, description="营业结束时间 HH:MM，如 22:00")
     max_concurrent_orders: Optional[int] = Field(None, ge=1, le=100)
-    excluded_platforms: Optional[list[str]] = Field(
-        None, description='不自动接单的平台列表，如 ["meituan"]'
-    )
+    excluded_platforms: Optional[list[str]] = Field(None, description='不自动接单的平台列表，如 ["meituan"]')
 
 
 # ─── Webhook 接收端点 ──────────────────────────────────────────────────────────
+
 
 async def _handle_platform_webhook(
     platform: str,
@@ -166,9 +164,7 @@ async def _handle_platform_webhook(
 
     # 从请求体或 query 中获取 store_id（生产环境应从平台配置表按 shop_id 反查）
     store_id_str: str = (
-        payload.get("store_id")
-        or request.query_params.get("store_id")
-        or os.getenv(f"{platform.upper()}_STORE_ID", "")
+        payload.get("store_id") or request.query_params.get("store_id") or os.getenv(f"{platform.upper()}_STORE_ID", "")
     )
     if not store_id_str:
         raise HTTPException(status_code=400, detail="无法确定 store_id，请在请求中携带")
@@ -299,6 +295,7 @@ async def webhook_douyin(
 
 # ─── 订单管理 ──────────────────────────────────────────────────────────────────
 
+
 @router.get("/orders", summary="外卖订单统一列表")
 async def list_delivery_orders(
     request: Request,
@@ -334,6 +331,7 @@ async def list_delivery_orders(
         target_date = date.fromisoformat(date_str) if date_str else None
 
         from ..repositories.delivery_order_repo import DeliveryOrderRepository
+
         items, total = await DeliveryOrderRepository.list_orders(
             db,
             tenant_id,
@@ -376,6 +374,7 @@ async def get_delivery_order(
     try:
         tenant_id = UUID(tenant_id_str)
         from ..repositories.delivery_order_repo import DeliveryOrderRepository
+
         order = await DeliveryOrderRepository.get_by_id(db, order_id, tenant_id)
         if order is None:
             raise HTTPException(status_code=404, detail="订单不存在")
@@ -415,6 +414,7 @@ async def accept_delivery_order(
 
         # 先查订单，获取 store_id 以拿平台配置
         from ..repositories.delivery_order_repo import DeliveryOrderRepository
+
         order_check = await DeliveryOrderRepository.get_by_id(db, order_id, tenant_id)
         if order_check is None:
             raise HTTPException(status_code=404, detail="订单不存在")
@@ -466,6 +466,7 @@ async def reject_delivery_order(
         tenant_id = UUID(tenant_id_str)
 
         from ..repositories.delivery_order_repo import DeliveryOrderRepository
+
         order_check = await DeliveryOrderRepository.get_by_id(db, order_id, tenant_id)
         if order_check is None:
             raise HTTPException(status_code=404, detail="订单不存在")
@@ -517,6 +518,7 @@ async def mark_order_ready(
         tenant_id = UUID(tenant_id_str)
 
         from ..repositories.delivery_order_repo import DeliveryOrderRepository
+
         order_check = await DeliveryOrderRepository.get_by_id(db, order_id, tenant_id)
         if order_check is None:
             raise HTTPException(status_code=404, detail="订单不存在")
@@ -547,6 +549,7 @@ async def mark_order_ready(
 
 
 # ─── 统计 ──────────────────────────────────────────────────────────────────────
+
 
 @router.get("/stats", summary="今日外卖汇总统计")
 async def delivery_stats(
@@ -585,6 +588,7 @@ async def delivery_stats(
 
 # ─── 自动接单规则 ──────────────────────────────────────────────────────────────
 
+
 @router.get("/auto-accept-rules", summary="查询自动接单规则")
 async def get_auto_accept_rule(
     request: Request,
@@ -614,15 +618,9 @@ async def get_auto_accept_rule(
                 "store_id": str(rule.store_id),
                 "is_enabled": rule.is_enabled,
                 "business_hours_start": (
-                    rule.business_hours_start.strftime("%H:%M")
-                    if rule.business_hours_start
-                    else None
+                    rule.business_hours_start.strftime("%H:%M") if rule.business_hours_start else None
                 ),
-                "business_hours_end": (
-                    rule.business_hours_end.strftime("%H:%M")
-                    if rule.business_hours_end
-                    else None
-                ),
+                "business_hours_end": (rule.business_hours_end.strftime("%H:%M") if rule.business_hours_end else None),
                 "max_concurrent_orders": rule.max_concurrent_orders,
                 "excluded_platforms": rule.excluded_platforms or [],
                 "updated_at": rule.updated_at.isoformat() if rule.updated_at else None,
@@ -703,15 +701,9 @@ async def upsert_auto_accept_rule(
                 "store_id": str(rule.store_id),
                 "is_enabled": rule.is_enabled,
                 "business_hours_start": (
-                    rule.business_hours_start.strftime("%H:%M")
-                    if rule.business_hours_start
-                    else None
+                    rule.business_hours_start.strftime("%H:%M") if rule.business_hours_start else None
                 ),
-                "business_hours_end": (
-                    rule.business_hours_end.strftime("%H:%M")
-                    if rule.business_hours_end
-                    else None
-                ),
+                "business_hours_end": (rule.business_hours_end.strftime("%H:%M") if rule.business_hours_end else None),
                 "max_concurrent_orders": rule.max_concurrent_orders,
                 "excluded_platforms": rule.excluded_platforms or [],
                 "updated_at": rule.updated_at.isoformat() if rule.updated_at else None,

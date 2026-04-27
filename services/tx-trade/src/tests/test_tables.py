@@ -2,6 +2,7 @@
 
 使用 mock AsyncSession 避免真实数据库依赖。
 """
+
 import os
 import sys
 import uuid
@@ -210,7 +211,10 @@ class TestRoomRules:
         from services.room_rules import check_minimum_charge
 
         room = _make_table(
-            table_no="VIP01", area="包间", min_consume_fen=50000, tenant_id=TENANT_ID,
+            table_no="VIP01",
+            area="包间",
+            min_consume_fen=50000,
+            tenant_id=TENANT_ID,
         )
         db = _mock_db_returning(room)
 
@@ -225,7 +229,10 @@ class TestRoomRules:
         from services.room_rules import check_minimum_charge
 
         room = _make_table(
-            table_no="VIP02", area="包间", min_consume_fen=50000, tenant_id=TENANT_ID,
+            table_no="VIP02",
+            area="包间",
+            min_consume_fen=50000,
+            tenant_id=TENANT_ID,
         )
         db = _mock_db_returning(room)
 

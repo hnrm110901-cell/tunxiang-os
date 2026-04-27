@@ -27,17 +27,18 @@
 所有接口需 X-Tenant-ID header。
 金额单位：分（int）。
 """
+
 from __future__ import annotations
 
 import uuid
-from datetime import date, datetime, timezone
+from datetime import datetime, timezone
 from typing import Any, Optional
 
 import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from fastapi import status as http_status
 from pydantic import BaseModel, Field
-from sqlalchemy.exc import OperationalError, ProgrammingError, InterfaceError
+from sqlalchemy.exc import InterfaceError, OperationalError, ProgrammingError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql import text
 
@@ -55,9 +56,7 @@ router = APIRouter(prefix="/api/v1/org/franchise", tags=["franchise-contracts"])
 class ContractCreate(BaseModel):
     franchisee_id: str
     franchisee_name: Optional[str] = None
-    contract_type: str = Field(
-        ..., description="initial / renewal / amendment"
-    )
+    contract_type: str = Field(..., description="initial / renewal / amendment")
     sign_date: str
     start_date: str
     end_date: str
@@ -176,14 +175,12 @@ async def get_expiring_contracts(
         for r in rows:
             r["warning"] = True
 
-        logger.info("franchise_contracts_expiring_queried", tenant_id=x_tenant_id,
-                     days=days, count=len(rows))
+        logger.info("franchise_contracts_expiring_queried", tenant_id=x_tenant_id, days=days, count=len(rows))
         return {"ok": True, "data": {"items": rows, "total": len(rows)}}
 
     except (OperationalError, InterfaceError, ProgrammingError) as exc:
         logger.error("expiring_contracts_db_error", error=str(exc), tenant_id=x_tenant_id)
-        raise HTTPException(status_code=http_status.HTTP_503_SERVICE_UNAVAILABLE,
-                            detail=_db_unavailable_response())
+        raise HTTPException(status_code=http_status.HTTP_503_SERVICE_UNAVAILABLE, detail=_db_unavailable_response())
 
 
 @router.get("/contracts")
@@ -240,8 +237,7 @@ async def list_contracts(
 
     except (OperationalError, InterfaceError, ProgrammingError) as exc:
         logger.error("contracts_list_db_error", error=str(exc), tenant_id=x_tenant_id)
-        raise HTTPException(status_code=http_status.HTTP_503_SERVICE_UNAVAILABLE,
-                            detail=_db_unavailable_response())
+        raise HTTPException(status_code=http_status.HTTP_503_SERVICE_UNAVAILABLE, detail=_db_unavailable_response())
 
 
 @router.get("/contracts/{contract_id}")
@@ -277,8 +273,7 @@ async def get_contract(
         raise
     except (OperationalError, InterfaceError, ProgrammingError) as exc:
         logger.error("contract_detail_db_error", error=str(exc), contract_id=contract_id)
-        raise HTTPException(status_code=http_status.HTTP_503_SERVICE_UNAVAILABLE,
-                            detail=_db_unavailable_response())
+        raise HTTPException(status_code=http_status.HTTP_503_SERVICE_UNAVAILABLE, detail=_db_unavailable_response())
 
 
 @router.post("/contracts")
@@ -335,8 +330,7 @@ async def create_contract(
         )
         row = result.mappings().first()
 
-        logger.info("franchise_contract_created", tenant_id=x_tenant_id,
-                     contract_id=new_id, contract_no=contract_no)
+        logger.info("franchise_contract_created", tenant_id=x_tenant_id, contract_id=new_id, contract_no=contract_no)
         return {"ok": True, "data": dict(row)}
 
     except HTTPException:
@@ -344,8 +338,7 @@ async def create_contract(
     except (OperationalError, InterfaceError, ProgrammingError) as exc:
         await db.rollback()
         logger.error("contract_create_db_error", error=str(exc), tenant_id=x_tenant_id)
-        raise HTTPException(status_code=http_status.HTTP_503_SERVICE_UNAVAILABLE,
-                            detail=_db_unavailable_response())
+        raise HTTPException(status_code=http_status.HTTP_503_SERVICE_UNAVAILABLE, detail=_db_unavailable_response())
 
 
 @router.put("/contracts/{contract_id}")
@@ -399,8 +392,12 @@ async def update_contract(
         )
         row = result.mappings().first()
 
-        logger.info("franchise_contract_updated", tenant_id=x_tenant_id,
-                     contract_id=contract_id, fields=list(body.model_dump(exclude_none=True).keys()))
+        logger.info(
+            "franchise_contract_updated",
+            tenant_id=x_tenant_id,
+            contract_id=contract_id,
+            fields=list(body.model_dump(exclude_none=True).keys()),
+        )
         return {"ok": True, "data": dict(row)}
 
     except HTTPException:
@@ -408,8 +405,7 @@ async def update_contract(
     except (OperationalError, InterfaceError, ProgrammingError) as exc:
         await db.rollback()
         logger.error("contract_update_db_error", error=str(exc), contract_id=contract_id)
-        raise HTTPException(status_code=http_status.HTTP_503_SERVICE_UNAVAILABLE,
-                            detail=_db_unavailable_response())
+        raise HTTPException(status_code=http_status.HTTP_503_SERVICE_UNAVAILABLE, detail=_db_unavailable_response())
 
 
 @router.post("/contracts/{contract_id}/send-alert")
@@ -469,8 +465,7 @@ async def send_contract_alert(
         raise
     except (OperationalError, InterfaceError, ProgrammingError) as exc:
         logger.error("contract_alert_db_error", error=str(exc), contract_id=contract_id)
-        raise HTTPException(status_code=http_status.HTTP_503_SERVICE_UNAVAILABLE,
-                            detail=_db_unavailable_response())
+        raise HTTPException(status_code=http_status.HTTP_503_SERVICE_UNAVAILABLE, detail=_db_unavailable_response())
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -533,8 +528,9 @@ async def set_fee_schedule(
 
         await db.commit()
 
-        logger.info("franchise_fee_schedule_set", tenant_id=x_tenant_id,
-                     contract_id=contract_id, count=len(created_ids))
+        logger.info(
+            "franchise_fee_schedule_set", tenant_id=x_tenant_id, contract_id=contract_id, count=len(created_ids)
+        )
 
         return {
             "ok": True,
@@ -550,8 +546,7 @@ async def set_fee_schedule(
     except (OperationalError, InterfaceError, ProgrammingError) as exc:
         await db.rollback()
         logger.error("fee_schedule_db_error", error=str(exc), contract_id=contract_id)
-        raise HTTPException(status_code=http_status.HTTP_503_SERVICE_UNAVAILABLE,
-                            detail=_db_unavailable_response())
+        raise HTTPException(status_code=http_status.HTTP_503_SERVICE_UNAVAILABLE, detail=_db_unavailable_response())
 
 
 @router.get("/contracts/{contract_id}/fees")
@@ -630,8 +625,7 @@ async def get_contract_fees(
 
     except (OperationalError, InterfaceError, ProgrammingError) as exc:
         logger.error("contract_fees_db_error", error=str(exc), contract_id=contract_id)
-        raise HTTPException(status_code=http_status.HTTP_503_SERVICE_UNAVAILABLE,
-                            detail=_db_unavailable_response())
+        raise HTTPException(status_code=http_status.HTTP_503_SERVICE_UNAVAILABLE, detail=_db_unavailable_response())
 
 
 @router.post("/contracts/{contract_id}/collect")
@@ -657,8 +651,7 @@ async def collect_fee(
         if fee is None:
             raise HTTPException(
                 status_code=404,
-                detail={"ok": False, "error": {"code": "NOT_FOUND",
-                        "message": "收费记录不存在或不属于该合同"}},
+                detail={"ok": False, "error": {"code": "NOT_FOUND", "message": "收费记录不存在或不属于该合同"}},
             )
 
         new_paid = fee["paid_fen"] + body.paid_fen
@@ -711,9 +704,14 @@ async def collect_fee(
         )
         row = updated.mappings().first()
 
-        logger.info("franchise_fee_collected", tenant_id=x_tenant_id,
-                     contract_id=contract_id, fee_id=body.fee_id,
-                     paid_fen=body.paid_fen, new_status=new_status)
+        logger.info(
+            "franchise_fee_collected",
+            tenant_id=x_tenant_id,
+            contract_id=contract_id,
+            fee_id=body.fee_id,
+            paid_fen=body.paid_fen,
+            new_status=new_status,
+        )
         return {"ok": True, "data": dict(row)}
 
     except HTTPException:
@@ -721,8 +719,7 @@ async def collect_fee(
     except (OperationalError, InterfaceError, ProgrammingError) as exc:
         await db.rollback()
         logger.error("fee_collect_db_error", error=str(exc), contract_id=contract_id)
-        raise HTTPException(status_code=http_status.HTTP_503_SERVICE_UNAVAILABLE,
-                            detail=_db_unavailable_response())
+        raise HTTPException(status_code=http_status.HTTP_503_SERVICE_UNAVAILABLE, detail=_db_unavailable_response())
 
 
 @router.get("/fee-summary")
@@ -795,8 +792,7 @@ async def get_fee_summary(
         )
         by_franchisee = [dict(r) for r in by_franchisee_result.mappings().all()]
 
-        logger.info("franchise_fee_summary_queried", tenant_id=x_tenant_id,
-                     total_records=totals["total_records"])
+        logger.info("franchise_fee_summary_queried", tenant_id=x_tenant_id, total_records=totals["total_records"])
         return {
             "ok": True,
             "data": {
@@ -812,8 +808,7 @@ async def get_fee_summary(
 
     except (OperationalError, InterfaceError, ProgrammingError) as exc:
         logger.error("fee_summary_db_error", error=str(exc), tenant_id=x_tenant_id)
-        raise HTTPException(status_code=http_status.HTTP_503_SERVICE_UNAVAILABLE,
-                            detail=_db_unavailable_response())
+        raise HTTPException(status_code=http_status.HTTP_503_SERVICE_UNAVAILABLE, detail=_db_unavailable_response())
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -854,8 +849,12 @@ async def get_overdue_fees(
 
         total_overdue_fen = sum(r["amount_fen"] - r["paid_fen"] for r in rows)
 
-        logger.info("franchise_fees_overdue_queried", tenant_id=x_tenant_id,
-                     count=len(rows), total_overdue_fen=total_overdue_fen)
+        logger.info(
+            "franchise_fees_overdue_queried",
+            tenant_id=x_tenant_id,
+            count=len(rows),
+            total_overdue_fen=total_overdue_fen,
+        )
         return {
             "ok": True,
             "data": {
@@ -867,8 +866,7 @@ async def get_overdue_fees(
 
     except (OperationalError, InterfaceError, ProgrammingError) as exc:
         logger.error("fees_overdue_db_error", error=str(exc), tenant_id=x_tenant_id)
-        raise HTTPException(status_code=http_status.HTTP_503_SERVICE_UNAVAILABLE,
-                            detail=_db_unavailable_response())
+        raise HTTPException(status_code=http_status.HTTP_503_SERVICE_UNAVAILABLE, detail=_db_unavailable_response())
 
 
 @router.get("/fees/stats")
@@ -916,8 +914,7 @@ async def get_fee_stats(
         )
         by_type = [dict(r) for r in by_type_result.mappings().all()]
 
-        logger.info("franchise_fees_stats_queried", tenant_id=x_tenant_id,
-                     total_amount_fen=totals["total_amount_fen"])
+        logger.info("franchise_fees_stats_queried", tenant_id=x_tenant_id, total_amount_fen=totals["total_amount_fen"])
         return {
             "ok": True,
             "data": {
@@ -931,8 +928,7 @@ async def get_fee_stats(
 
     except (OperationalError, InterfaceError, ProgrammingError) as exc:
         logger.error("fees_stats_db_error", error=str(exc), tenant_id=x_tenant_id)
-        raise HTTPException(status_code=http_status.HTTP_503_SERVICE_UNAVAILABLE,
-                            detail=_db_unavailable_response())
+        raise HTTPException(status_code=http_status.HTTP_503_SERVICE_UNAVAILABLE, detail=_db_unavailable_response())
 
 
 @router.get("/fees")
@@ -988,8 +984,7 @@ async def list_fees(
 
     except (OperationalError, InterfaceError, ProgrammingError) as exc:
         logger.error("fees_list_db_error", error=str(exc), tenant_id=x_tenant_id)
-        raise HTTPException(status_code=http_status.HTTP_503_SERVICE_UNAVAILABLE,
-                            detail=_db_unavailable_response())
+        raise HTTPException(status_code=http_status.HTTP_503_SERVICE_UNAVAILABLE, detail=_db_unavailable_response())
 
 
 @router.post("/fees")
@@ -1039,15 +1034,19 @@ async def create_fee_record(
         )
         row = result.mappings().first()
 
-        logger.info("franchise_fee_record_created", tenant_id=x_tenant_id,
-                     fee_id=new_id, fee_type=body.fee_type, amount_fen=body.amount_fen)
+        logger.info(
+            "franchise_fee_record_created",
+            tenant_id=x_tenant_id,
+            fee_id=new_id,
+            fee_type=body.fee_type,
+            amount_fen=body.amount_fen,
+        )
         return {"ok": True, "data": dict(row)}
 
     except (OperationalError, InterfaceError, ProgrammingError) as exc:
         await db.rollback()
         logger.error("fee_create_db_error", error=str(exc), tenant_id=x_tenant_id)
-        raise HTTPException(status_code=http_status.HTTP_503_SERVICE_UNAVAILABLE,
-                            detail=_db_unavailable_response())
+        raise HTTPException(status_code=http_status.HTTP_503_SERVICE_UNAVAILABLE, detail=_db_unavailable_response())
 
 
 @router.put("/fees/{fee_id}/pay")
@@ -1124,8 +1123,9 @@ async def pay_fee_record(
         )
         row = updated.mappings().first()
 
-        logger.info("franchise_fee_paid", tenant_id=x_tenant_id, fee_id=fee_id,
-                     paid_fen=body.paid_fen, new_status=new_status)
+        logger.info(
+            "franchise_fee_paid", tenant_id=x_tenant_id, fee_id=fee_id, paid_fen=body.paid_fen, new_status=new_status
+        )
         return {"ok": True, "data": dict(row)}
 
     except HTTPException:
@@ -1133,5 +1133,4 @@ async def pay_fee_record(
     except (OperationalError, InterfaceError, ProgrammingError) as exc:
         await db.rollback()
         logger.error("fee_pay_db_error", error=str(exc), fee_id=fee_id)
-        raise HTTPException(status_code=http_status.HTTP_503_SERVICE_UNAVAILABLE,
-                            detail=_db_unavailable_response())
+        raise HTTPException(status_code=http_status.HTTP_503_SERVICE_UNAVAILABLE, detail=_db_unavailable_response())

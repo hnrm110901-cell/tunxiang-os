@@ -6,41 +6,42 @@ service_calls 表的 CRUD + 实时看板。
 统一响应格式: {"ok": bool, "data": {}, "error": {}}
 所有接口需 X-Tenant-ID header。
 """
+
 from __future__ import annotations
 
+import asyncio
 import uuid
 from datetime import datetime, timezone
 from typing import Optional
 
+import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from shared.ontology.src.database import get_db
-
-import asyncio
 from shared.events.src.emitter import emit_event
 from shared.events.src.event_types import TableEventType
+from shared.ontology.src.database import get_db
 
-import structlog
 logger = structlog.get_logger()
 
 router = APIRouter(prefix="/api/v1/service-calls", tags=["service-calls"])
 
 VALID_CALL_TYPES = {
-    "call_waiter",       # 呼叫服务员
-    "urge_dish",         # 催菜
-    "need_item",         # 需要物品（纸巾/餐具/热水等）
-    "complaint",         # 投诉
+    "call_waiter",  # 呼叫服务员
+    "urge_dish",  # 催菜
+    "need_item",  # 需要物品（纸巾/餐具/热水等）
+    "complaint",  # 投诉
     "checkout_request",  # 买单请求（自助扫码场景）
-    "other",             # 其他
+    "other",  # 其他
 }
 
 VALID_STATUSES = {"pending", "handling", "handled", "cancelled"}
 
 
 # ─── 工具 ─────────────────────────────────────────────────────────────────────
+
 
 def _get_tenant_id(request: Request) -> str:
     tid = getattr(request.state, "tenant_id", None) or request.headers.get("X-Tenant-ID", "")
@@ -66,16 +67,18 @@ def _now_utc() -> datetime:
 
 # ─── 请求模型 ─────────────────────────────────────────────────────────────────
 
+
 class CreateServiceCallReq(BaseModel):
     """发起服务呼叫"""
-    store_id:             uuid.UUID
-    table_session_id:     uuid.UUID  = Field(description="堂食会话ID（dining_sessions.id）")
-    call_type:            str        = Field(description="呼叫类型")
-    content:              Optional[str] = Field(default=None, max_length=500, description="呼叫内容")
-    target_dish_id:       Optional[uuid.UUID] = None
+
+    store_id: uuid.UUID
+    table_session_id: uuid.UUID = Field(description="堂食会话ID（dining_sessions.id）")
+    call_type: str = Field(description="呼叫类型")
+    content: Optional[str] = Field(default=None, max_length=500, description="呼叫内容")
+    target_dish_id: Optional[uuid.UUID] = None
     target_order_item_id: Optional[uuid.UUID] = None
-    called_by:            str = Field(default="pos", description="来源：pos/self_order/crew_app/kds")
-    caller_name:          Optional[str] = Field(default=None, max_length=50)
+    called_by: str = Field(default="pos", description="来源：pos/self_order/crew_app/kds")
+    caller_name: Optional[str] = Field(default=None, max_length=50)
 
     @field_validator("call_type")
     @classmethod
@@ -95,16 +98,19 @@ class CreateServiceCallReq(BaseModel):
 
 class HandleCallReq(BaseModel):
     """处理（响应）服务呼叫"""
+
     handled_by: uuid.UUID = Field(description="处理员工ID")
 
 
 class BatchHandleReq(BaseModel):
     """批量处理多个呼叫（服务员清空待处理队列）"""
-    call_ids:   list[uuid.UUID]
+
+    call_ids: list[uuid.UUID]
     handled_by: uuid.UUID
 
 
 # ─── 路由 ─────────────────────────────────────────────────────────────────────
+
 
 @router.post("", summary="发起服务呼叫")
 async def create_service_call(
@@ -183,29 +189,33 @@ async def create_service_call(
             "store_id": body.store_id,
             "session_id": body.table_session_id,
             "event_type": TableEventType.SERVICE_CALLED.value,
-            "payload": __import__("json").dumps({
-                "call_id": str(call_id),
-                "call_type": body.call_type,
-                "content": body.content,
-            }),
+            "payload": __import__("json").dumps(
+                {
+                    "call_id": str(call_id),
+                    "call_type": body.call_type,
+                    "content": body.content,
+                }
+            ),
             "op_type": "customer" if body.called_by == "self_order" else "employee",
         },
     )
 
     # 旁路发送跨域事件
-    asyncio.create_task(emit_event(
-        event_type=TableEventType.SERVICE_CALLED,
-        tenant_id=uuid.UUID(tid),
-        stream_id=str(body.table_session_id),
-        payload={
-            "call_id": str(call_id),
-            "call_type": body.call_type,
-            "content": body.content,
-            "called_by": body.called_by,
-        },
-        store_id=body.store_id,
-        source_service="tx-trade",
-    ))
+    asyncio.create_task(
+        emit_event(
+            event_type=TableEventType.SERVICE_CALLED,
+            tenant_id=uuid.UUID(tid),
+            stream_id=str(body.table_session_id),
+            payload={
+                "call_id": str(call_id),
+                "call_type": body.call_type,
+                "content": body.content,
+                "called_by": body.called_by,
+            },
+            store_id=body.store_id,
+            source_service="tx-trade",
+        )
+    )
 
     logger.info(
         "service_call_created",
@@ -433,10 +443,10 @@ async def get_store_service_stats(
 
     # 汇总行
     totals = {
-        "total_calls":       sum(r["total_calls"] for r in stats),
-        "handled_calls":     sum(r["handled_calls"] for r in stats),
-        "pending_calls":     sum(r["pending_calls"] for r in stats),
-        "over_sla_count":    sum(r["over_sla_count"] for r in stats),
+        "total_calls": sum(r["total_calls"] for r in stats),
+        "handled_calls": sum(r["handled_calls"] for r in stats),
+        "pending_calls": sum(r["pending_calls"] for r in stats),
+        "over_sla_count": sum(r["over_sla_count"] for r in stats),
     }
 
     return _ok({"by_type": stats, "totals": totals})

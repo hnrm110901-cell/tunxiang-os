@@ -51,6 +51,7 @@
 # CREATE INDEX idx_svat_account_id ON stored_value_account_transactions(account_id, created_at DESC);
 # CREATE INDEX idx_svat_order_id ON stored_value_account_transactions(order_id) WHERE order_id IS NOT NULL;
 """
+
 from __future__ import annotations
 
 import uuid
@@ -70,39 +71,53 @@ class StoredValueAccount(TenantBase):
     - StoredValueCard 以"卡号"为维度（支持实体卡、匿名卡）
     - StoredValueAccount 以"会员账户"为维度（一个会员一个账户）
     """
+
     __tablename__ = "stored_value_accounts"
 
     member_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), nullable=False, index=True,
+        UUID(as_uuid=True),
+        nullable=False,
+        index=True,
         comment="关联会员 ID",
     )
 
     # 余额（元，Numeric 精度避免浮点误差）
     balance: Mapped[float] = mapped_column(
-        Numeric(10, 2), nullable=False, default=0,
+        Numeric(10, 2),
+        nullable=False,
+        default=0,
         comment="本金余额（元）",
     )
     gift_balance: Mapped[float] = mapped_column(
-        Numeric(10, 2), nullable=False, default=0,
+        Numeric(10, 2),
+        nullable=False,
+        default=0,
         comment="赠送余额（元），可分开核销",
     )
 
     # 累计统计
     total_recharged: Mapped[float] = mapped_column(
-        Numeric(12, 2), nullable=False, default=0,
+        Numeric(12, 2),
+        nullable=False,
+        default=0,
         comment="累计充值金额（元）",
     )
     total_consumed: Mapped[float] = mapped_column(
-        Numeric(12, 2), nullable=False, default=0,
+        Numeric(12, 2),
+        nullable=False,
+        default=0,
         comment="累计消费金额（元）",
     )
 
     status: Mapped[str] = mapped_column(
-        String(20), nullable=False, default="active",
+        String(20),
+        nullable=False,
+        default="active",
         comment="账户状态：active | frozen | expired",
     )
     expired_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True,
+        DateTime(timezone=True),
+        nullable=True,
         comment="账户到期时间，NULL=永不过期",
     )
 
@@ -117,56 +132,72 @@ class StoredValueAccountTransaction(TenantBase):
 
     记录每笔操作的 balance_before / balance_after，满足对账需求。
     """
+
     __tablename__ = "stored_value_account_transactions"
 
     account_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), nullable=False, index=True,
+        UUID(as_uuid=True),
+        nullable=False,
+        index=True,
         comment="关联储值账户 ID",
     )
     transaction_type: Mapped[str] = mapped_column(
-        String(20), nullable=False,
+        String(20),
+        nullable=False,
         comment="recharge | consume | refund | transfer_in | transfer_out | gift",
     )
 
     # 金额字段（元）
     amount: Mapped[float] = mapped_column(
-        Numeric(10, 2), nullable=False,
+        Numeric(10, 2),
+        nullable=False,
         comment="变动金额（正=增加，负=减少，元）",
     )
     gift_amount: Mapped[float] = mapped_column(
-        Numeric(10, 2), nullable=False, default=0,
+        Numeric(10, 2),
+        nullable=False,
+        default=0,
         comment="赠送余额变动（元）",
     )
 
     # 流水快照（用于对账）
     balance_before: Mapped[float] = mapped_column(
-        Numeric(10, 2), nullable=False,
+        Numeric(10, 2),
+        nullable=False,
         comment="操作前本金余额快照（元）",
     )
     balance_after: Mapped[float] = mapped_column(
-        Numeric(10, 2), nullable=False,
+        Numeric(10, 2),
+        nullable=False,
         comment="操作后本金余额快照（元）",
     )
     gift_balance_before: Mapped[float] = mapped_column(
-        Numeric(10, 2), nullable=False, default=0,
+        Numeric(10, 2),
+        nullable=False,
+        default=0,
         comment="操作前赠送余额快照（元）",
     )
     gift_balance_after: Mapped[float] = mapped_column(
-        Numeric(10, 2), nullable=False, default=0,
+        Numeric(10, 2),
+        nullable=False,
+        default=0,
         comment="操作后赠送余额快照（元）",
     )
 
     # 关联业务
     order_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), nullable=True,
+        UUID(as_uuid=True),
+        nullable=True,
         comment="关联订单 ID（消费时填写）",
     )
     operator_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), nullable=True,
+        UUID(as_uuid=True),
+        nullable=True,
         comment="操作员 ID",
     )
     remark: Mapped[str | None] = mapped_column(
-        String(500), nullable=True,
+        String(500),
+        nullable=True,
         comment="备注",
     )
 

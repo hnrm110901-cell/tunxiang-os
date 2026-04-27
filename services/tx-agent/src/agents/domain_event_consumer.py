@@ -5,6 +5,7 @@
 
 运行方式：作为后台 Task 在 tx-agent 启动时运行。
 """
+
 import asyncio
 import json
 import os
@@ -20,30 +21,32 @@ logger = structlog.get_logger()
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 
 # 高复杂度事件：需要 Orchestrator 多 Agent 联动处理
-ORCHESTRATOR_EVENTS: frozenset[str] = frozenset({
-    "supply.stock.zero",           # 库存清零 → 智能排菜+库存预警+私域运营 联动
-    "supply.receiving.variance",   # 收货差异 → 财务稽核+供应链 联动
-    "trade.discount.blocked",      # 折扣违规 → 折扣守护+财务稽核 联动
-    "finance.cost_rate.exceeded",  # 成本超标 → 财务稽核+智能排菜 联动
-    "org.attendance.exception",    # 考勤异常 → 门店质检+HR 联动
-})
+ORCHESTRATOR_EVENTS: frozenset[str] = frozenset(
+    {
+        "supply.stock.zero",  # 库存清零 → 智能排菜+库存预警+私域运营 联动
+        "supply.receiving.variance",  # 收货差异 → 财务稽核+供应链 联动
+        "trade.discount.blocked",  # 折扣违规 → 折扣守护+财务稽核 联动
+        "finance.cost_rate.exceeded",  # 成本超标 → 财务稽核+智能排菜 联动
+        "org.attendance.exception",  # 考勤异常 → 门店质检+HR 联动
+    }
+)
 
 # 各域 Stream → 消费者组名
 DOMAIN_STREAMS: dict[str, str] = {
-    "trade_events":   "tx-agent-trade",
-    "supply_events":  "tx-agent-supply",
+    "trade_events": "tx-agent-trade",
+    "supply_events": "tx-agent-supply",
     "finance_events": "tx-agent-finance",
-    "org_events":     "tx-agent-org",
-    "member_events":  "tx-agent-member",
+    "org_events": "tx-agent-org",
+    "member_events": "tx-agent-member",
 }
 
 # event_type 前缀 → source_agent 标识
 DOMAIN_SOURCE_MAP: dict[str, str] = {
-    "trade.":   "tx-trade",
-    "supply.":  "tx-supply",
+    "trade.": "tx-trade",
+    "supply.": "tx-supply",
     "finance.": "tx-finance",
-    "org.":     "tx-org",
-    "member.":  "tx-member",
+    "org.": "tx-org",
+    "member.": "tx-member",
 }
 
 
@@ -64,10 +67,13 @@ class DomainEventConsumer:
 
     async def _get_redis(self) -> object:
         import redis.asyncio as aioredis
+
         if self._redis is None:
             self._redis = await aioredis.from_url(
-                REDIS_URL, decode_responses=True,
-                socket_connect_timeout=3, socket_timeout=3,
+                REDIS_URL,
+                decode_responses=True,
+                socket_connect_timeout=3,
+                socket_timeout=3,
             )
         return self._redis
 
@@ -80,9 +86,7 @@ class DomainEventConsumer:
             except Exception:  # noqa: BLE001 — BUSYGROUP 表示已存在，忽略
                 pass
 
-    async def _convert_to_agent_event(
-        self, stream_key: str, fields: dict
-    ) -> Optional[AgentEvent]:
+    async def _convert_to_agent_event(self, stream_key: str, fields: dict) -> Optional[AgentEvent]:
         """将 Redis Stream 字段转换为 AgentEvent"""
         event_type = fields.get("event_type", "")
         store_id = fields.get("store_id", "") or ""
@@ -156,9 +160,7 @@ class DomainEventConsumer:
                     "event_data": event.data,
                 }
                 # 传入事件级 tenant_id，让 Orchestrator 按真实租户计费和隔离日志
-                result = await self.master_agent.orchestrate(
-                    event, context, tenant_id=effective_tenant_id
-                )
+                result = await self.master_agent.orchestrate(event, context, tenant_id=effective_tenant_id)
                 logger.info(
                     "orchestrator_dispatched",
                     event_type=event.event_type,
@@ -202,10 +204,7 @@ class DomainEventConsumer:
         logger.info("domain_event_consumer_started", streams=list(DOMAIN_STREAMS.keys()))
 
         while self._running:
-            tasks = [
-                self.consume_once(stream_key, group_name)
-                for stream_key, group_name in DOMAIN_STREAMS.items()
-            ]
+            tasks = [self.consume_once(stream_key, group_name) for stream_key, group_name in DOMAIN_STREAMS.items()]
             await asyncio.gather(*tasks, return_exceptions=True)
             await asyncio.sleep(0.5)  # 500ms 轮询间隔
 

@@ -2,6 +2,7 @@
 
 TenantMiddleware 来自 tenant_middleware：JWT claims 优先、X-Tenant-ID 兜底（须晚于 AuthMiddleware）。
 """
+
 import time
 
 import structlog
@@ -9,6 +10,7 @@ from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware
 
 logger = structlog.get_logger()
+
 
 class RequestLogMiddleware(BaseHTTPMiddleware):
     """请求日志 — structlog JSON 格式"""

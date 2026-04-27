@@ -10,6 +10,7 @@
 
 金额约定：所有入参和存储均为分(fen)。
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -44,6 +45,7 @@ logger = structlog.get_logger(__name__)
 # 内部工具
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def _now_utc() -> datetime:
     return datetime.now(tz=timezone.utc)
 
@@ -75,6 +77,7 @@ async def _get_account_by_id(
 # ─────────────────────────────────────────────────────────────────────────────
 # 1. create_account
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 async def create_account(
     db: AsyncSession,
@@ -185,6 +188,7 @@ async def create_account(
 # 2. get_account
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 async def get_account(
     db: AsyncSession,
     tenant_id: uuid.UUID,
@@ -214,6 +218,7 @@ async def get_account(
 # ─────────────────────────────────────────────────────────────────────────────
 # 3. record_expense
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 async def record_expense(
     db: AsyncSession,
@@ -254,8 +259,7 @@ async def record_expense(
     warning_note: Optional[str] = None
     if balance_after < 0:
         warning_note = (
-            f"【余额不足警告】本次支出后余额为 {balance_after} 分，"
-            f"已透支 {abs(balance_after)} 分，请尽快申请补充"
+            f"【余额不足警告】本次支出后余额为 {balance_after} 分，已透支 {abs(balance_after)} 分，请尽快申请补充"
         )
         combined_notes = "\n".join(filter(None, [notes, warning_note]))
     else:
@@ -266,7 +270,7 @@ async def record_expense(
         tenant_id=tenant_id,
         account_id=account_id,
         transaction_type=PettyCashTransactionType.DAILY_USE.value,
-        amount=-amount,                  # 支出存为负数
+        amount=-amount,  # 支出存为负数
         balance_after=balance_after,
         description=description,
         reference_id=reference_id,
@@ -306,7 +310,7 @@ async def record_expense(
             notification_service.send_notification(
                 db=db,
                 tenant_id=tenant_id,
-                application_id=account.id,       # 以 account.id 作为关联ID
+                application_id=account.id,  # 以 account.id 作为关联ID
                 recipient_id=account.keeper_id,
                 recipient_role="store_keeper",
                 event_type=NotificationEventType.REMINDER.value,
@@ -328,6 +332,7 @@ async def record_expense(
 # ─────────────────────────────────────────────────────────────────────────────
 # 4. record_replenishment
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 async def record_replenishment(
     db: AsyncSession,
@@ -369,7 +374,7 @@ async def record_replenishment(
         tenant_id=tenant_id,
         account_id=account_id,
         transaction_type=PettyCashTransactionType.REPLENISHMENT.value,
-        amount=amount,                   # 收入为正数
+        amount=amount,  # 收入为正数
         balance_after=balance_after,
         description=f"备用金补充拨付，金额 {amount} 分",
         reference_id=reference_id,
@@ -402,6 +407,7 @@ async def record_replenishment(
 # ─────────────────────────────────────────────────────────────────────────────
 # 5. reconcile_with_pos
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 async def reconcile_with_pos(
     db: AsyncSession,
@@ -449,9 +455,7 @@ async def reconcile_with_pos(
                 transaction_type=PettyCashTransactionType.POS_RECONCILE_ADJUST.value,
                 amount=diff,
                 balance_after=balance_after,
-                description=(
-                    f"POS日结对账自动调平，差额 {diff} 分，POS日结ID: {pos_session_id}"
-                ),
+                description=(f"POS日结对账自动调平，差额 {diff} 分，POS日结ID: {pos_session_id}"),
                 reference_type="pos_session",
                 operator_id=account.keeper_id,
                 is_reconciled=True,
@@ -508,6 +512,7 @@ async def reconcile_with_pos(
 # ─────────────────────────────────────────────────────────────────────────────
 # 6. freeze_account
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 async def freeze_account(
     db: AsyncSession,
@@ -595,6 +600,7 @@ async def freeze_account(
 # 7. unfreeze_account
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 async def unfreeze_account(
     db: AsyncSession,
     tenant_id: uuid.UUID,
@@ -663,6 +669,7 @@ async def unfreeze_account(
 # 8. draft_replenishment_request
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 async def draft_replenishment_request(
     db: AsyncSession,
     tenant_id: uuid.UUID,
@@ -695,9 +702,7 @@ async def draft_replenishment_request(
     # 不超过审批额度上限
     suggested_amount = min(suggested_amount, account.approved_limit)
 
-    days_left = (
-        round(account.balance / daily_avg, 1) if daily_avg > 0 else 999.0
-    )
+    days_left = round(account.balance / daily_avg, 1) if daily_avg > 0 else 999.0
 
     reason = (
         f"余额低于阈值自动起草：当前余额 {account.balance} 分"
@@ -718,7 +723,7 @@ async def draft_replenishment_request(
     )
 
     # application_id 为 None：只返回建议，前端确认后调用 expense_application_service.create_application()
-    store_name = str(account.store_id)   # 暂用 store_id 字符串，路由层可按需替换为真实门店名
+    store_name = str(account.store_id)  # 暂用 store_id 字符串，路由层可按需替换为真实门店名
     prefill_title = f"【{store_name}】备用金补充申请"
     prefill_notes = (
         f"当前余额 {account.balance} 分（{round(account.balance / 100, 2)} 元），"
@@ -741,6 +746,7 @@ async def draft_replenishment_request(
 # 9. update_daily_avg
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 async def update_daily_avg(
     db: AsyncSession,
     tenant_id: uuid.UUID,
@@ -760,9 +766,7 @@ async def update_daily_avg(
     seven_days_ago = today - timedelta(days=6)
 
     # 统计近7天 DAILY_USE 流水合计（amount 为负数，取绝对值）
-    sum_stmt = select(
-        func.coalesce(func.sum(PettyCashTransaction.amount), 0).label("total_expense")
-    ).where(
+    sum_stmt = select(func.coalesce(func.sum(PettyCashTransaction.amount), 0).label("total_expense")).where(
         PettyCashTransaction.tenant_id == tenant_id,
         PettyCashTransaction.account_id == account_id,
         PettyCashTransaction.transaction_type == PettyCashTransactionType.DAILY_USE.value,
@@ -773,9 +777,7 @@ async def update_daily_avg(
     total_expense_signed = int(sum_result.scalar_one())
 
     # 7天内实际有流水的天数（避免新账户用固定7除）
-    days_stmt = select(
-        func.count(PettyCashTransaction.expense_date.distinct()).label("days_count")
-    ).where(
+    days_stmt = select(func.count(PettyCashTransaction.expense_date.distinct()).label("days_count")).where(
         PettyCashTransaction.tenant_id == tenant_id,
         PettyCashTransaction.account_id == account_id,
         PettyCashTransaction.transaction_type == PettyCashTransactionType.DAILY_USE.value,
@@ -810,6 +812,7 @@ async def update_daily_avg(
 # ─────────────────────────────────────────────────────────────────────────────
 # 10. generate_monthly_settlement
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 async def generate_monthly_settlement(
     db: AsyncSession,
@@ -938,6 +941,7 @@ async def generate_monthly_settlement(
 # 11. confirm_settlement
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 async def confirm_settlement(
     db: AsyncSession,
     tenant_id: uuid.UUID,
@@ -973,10 +977,7 @@ async def confirm_settlement(
     if settlement.status not in allowed_statuses:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=(
-                f"核销单当前状态为 '{settlement.status}'，"
-                "只有 DRAFT 或 SUBMITTED 状态的核销单才可确认"
-            ),
+            detail=(f"核销单当前状态为 '{settlement.status}'，只有 DRAFT 或 SUBMITTED 状态的核销单才可确认"),
         )
 
     now = _now_utc()
@@ -1020,6 +1021,7 @@ async def confirm_settlement(
 # 12. get_balance_summary
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 async def get_balance_summary(
     db: AsyncSession,
     tenant_id: uuid.UUID,
@@ -1053,11 +1055,7 @@ async def get_balance_summary(
     if store_ids is not None:
         conditions.append(PettyCashAccount.store_id.in_(store_ids))
 
-    stmt = (
-        select(PettyCashAccount)
-        .where(*conditions)
-        .order_by(PettyCashAccount.store_id)
-    )
+    stmt = select(PettyCashAccount).where(*conditions).order_by(PettyCashAccount.store_id)
     result = await db.execute(stmt)
     accounts = list(result.scalars().all())
 
@@ -1088,6 +1086,7 @@ async def get_balance_summary(
 # 13. get_account_by_store  （与 get_account 相同职责，预加载最近10条流水）
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 async def get_account_by_store(
     db: AsyncSession,
     tenant_id: uuid.UUID,
@@ -1106,9 +1105,7 @@ async def get_account_by_store(
             PettyCashAccount.tenant_id == tenant_id,
             PettyCashAccount.store_id == store_id,
         )
-        .options(
-            selectinload(PettyCashAccount.transactions)
-        )
+        .options(selectinload(PettyCashAccount.transactions))
     )
     result = await db.execute(stmt)
     account = result.scalar_one_or_none()
@@ -1135,6 +1132,7 @@ async def get_account_by_store(
 # ─────────────────────────────────────────────────────────────────────────────
 # 14. check_balance_alert
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 async def check_balance_alert(
     db: AsyncSession,
@@ -1195,6 +1193,7 @@ async def check_balance_alert(
 # ─────────────────────────────────────────────────────────────────────────────
 # 15. get_account_stats  （看板统计视图）
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 async def get_account_stats(
     db: AsyncSession,

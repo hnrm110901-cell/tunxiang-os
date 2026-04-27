@@ -12,6 +12,7 @@
   - 使用软删除（is_deleted=True + deleted_at），保证可追溯
   - confirm_store_name 必须与实际门店名一致
 """
+
 from __future__ import annotations
 
 import uuid
@@ -34,6 +35,7 @@ router = APIRouter(prefix="/api/v1/ops/trial-data", tags=["试营业数据清除
 
 # ─── 请求 / 响应模型 ─────────────────────────────────────────────────────────
 
+
 class ClearRequestBody(BaseModel):
     store_id: str = Field(..., description="目标门店ID")
     reason: str = Field(..., min_length=5, description="清除原因（不少于5字）")
@@ -51,6 +53,7 @@ class StatusQuery(BaseModel):
 
 # ─── 辅助函数 ─────────────────────────────────────────────────────────────────
 
+
 async def _verify_clear_permission(
     db: AsyncSession,
     tenant_id: str,
@@ -59,10 +62,7 @@ async def _verify_clear_permission(
     """只有集团超级管理员可执行试营业数据清除。"""
     try:
         row = await db.execute(
-            text(
-                "SELECT role FROM employees "
-                "WHERE tenant_id = :tid AND id = :oid AND is_deleted = FALSE LIMIT 1"
-            ),
+            text("SELECT role FROM employees WHERE tenant_id = :tid AND id = :oid AND is_deleted = FALSE LIMIT 1"),
             {"tid": tenant_id, "oid": operator_id},
         )
         result = row.fetchone()
@@ -107,10 +107,7 @@ async def _get_store_name(
     """查询门店名称（用于 confirm_store_name 校验）。"""
     try:
         row = await db.execute(
-            text(
-                "SELECT name FROM stores "
-                "WHERE tenant_id = :tid AND id = :sid AND is_deleted = FALSE LIMIT 1"
-            ),
+            text("SELECT name FROM stores WHERE tenant_id = :tid AND id = :sid AND is_deleted = FALSE LIMIT 1"),
             {"tid": tenant_id, "sid": store_id},
         )
         result = row.fetchone()
@@ -121,6 +118,7 @@ async def _get_store_name(
 
 
 # ─── 路由 ─────────────────────────────────────────────────────────────────────
+
 
 @router.get("/scope")
 async def get_clear_scope():
@@ -312,14 +310,14 @@ async def execute_clear(
     # 所有清除均用 is_deleted=TRUE + deleted_at，保证可追溯
     tables_to_clear = [
         # (表名, where条件参数key)
-        ("orders",               "store_id"),
-        ("order_items",          "store_id"),
-        ("payments",             "store_id"),
-        ("daily_settlements",    "store_id"),
-        ("shift_reports",        "store_id"),
-        ("biz_deposits",         "store_id"),
+        ("orders", "store_id"),
+        ("order_items", "store_id"),
+        ("payments", "store_id"),
+        ("daily_settlements", "store_id"),
+        ("shift_reports", "store_id"),
+        ("biz_deposits", "store_id"),
         ("wine_storage_records", "store_id"),
-        ("stocktake_records",    "store_id"),
+        ("stocktake_records", "store_id"),
     ]
 
     cleared: dict[str, int] = {}

@@ -24,6 +24,7 @@ DB 表说明：
   tables.config->>shape    ↔ API shape
   tables.config->>note     ↔ API note
 """
+
 import json
 import uuid
 from typing import Optional
@@ -40,6 +41,7 @@ router = APIRouter(tags=["store-management"])
 
 
 # ─── 工具 ──────────────────────────────────────────────────────────────────────
+
 
 def _ok(data: dict | list) -> dict:
     return {"ok": True, "data": data, "error": None}
@@ -98,6 +100,7 @@ def _row_to_table(row) -> dict:
 
 # ─── 请求/响应模型 ─────────────────────────────────────────────────────────────
 
+
 class StoreCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=64)
     type: str = Field("direct", pattern="^(direct|franchise)$")
@@ -135,6 +138,7 @@ class TablePatch(BaseModel):
 
 
 # ─── 门店端点 ──────────────────────────────────────────────────────────────────
+
 
 @router.get("/api/v1/trade/stores")
 async def list_stores(
@@ -357,6 +361,7 @@ async def delete_store(
 
 
 # ─── 桌台端点 ──────────────────────────────────────────────────────────────────
+
 
 @router.get("/api/v1/trade/tables")
 async def list_tables(

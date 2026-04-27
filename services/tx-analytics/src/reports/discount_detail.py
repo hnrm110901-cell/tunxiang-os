@@ -62,8 +62,14 @@ ORDER BY biz_date DESC, discount_fen DESC
 
 DIMENSIONS = ["store_name", "biz_date", "discount_type", "discount_type_label"]
 METRICS = [
-    "order_count", "total_amount_fen", "discount_fen", "actual_fen",
-    "discount_rate_pct", "order_share_pct",
-    "high_discount_count", "margin_alert_count", "avg_discount_fen",
+    "order_count",
+    "total_amount_fen",
+    "discount_fen",
+    "actual_fen",
+    "discount_rate_pct",
+    "order_share_pct",
+    "high_discount_count",
+    "margin_alert_count",
+    "avg_discount_fen",
 ]
 FILTERS = ["start_date", "end_date", "store_id"]

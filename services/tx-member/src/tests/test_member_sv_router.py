@@ -13,21 +13,20 @@
 9.  GET  /api/v1/sv/charge-rules                        — 充值赠送规则列表查询
 10. POST /api/v1/sv/charge-rules                        — 创建充值赠送规则（bonus=0 → 400）
 """
+
 import os
 import sys
 import types
 import uuid
-from decimal import Decimal
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
-import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 # ─── sys.path ──────────────────────────────────────────────────────────────────
 _TESTS_DIR = os.path.dirname(__file__)
-_SRC_DIR   = os.path.abspath(os.path.join(_TESTS_DIR, ".."))
-_ROOT_DIR  = os.path.abspath(os.path.join(_TESTS_DIR, "..", "..", "..", ".."))
+_SRC_DIR = os.path.abspath(os.path.join(_TESTS_DIR, ".."))
+_ROOT_DIR = os.path.abspath(os.path.join(_TESTS_DIR, "..", "..", "..", ".."))
 
 for _p in [_SRC_DIR, _ROOT_DIR]:
     if _p not in sys.path:
@@ -35,6 +34,7 @@ for _p in [_SRC_DIR, _ROOT_DIR]:
 
 
 # ─── 包层级设置 ────────────────────────────────────────────────────────────────
+
 
 def _ensure_pkg(name: str, path: str | None = None) -> types.ModuleType:
     if name not in sys.modules:
@@ -46,13 +46,13 @@ def _ensure_pkg(name: str, path: str | None = None) -> types.ModuleType:
     return sys.modules[name]
 
 
-_ensure_pkg("src",     _SRC_DIR)
+_ensure_pkg("src", _SRC_DIR)
 _ensure_pkg("src.api", os.path.join(_SRC_DIR, "api"))
 
 
 # ─── 真实 SQLAlchemy 模型存根（路由文件内部执行 select(StoredValueCard)） ────────
 
-from sqlalchemy import Integer, String, Boolean
+from sqlalchemy import Boolean, Integer, String
 from sqlalchemy.orm import DeclarativeBase, mapped_column
 
 
@@ -62,28 +62,30 @@ class _TestBase(DeclarativeBase):
 
 class _FakeStoredValueCard(_TestBase):
     """最小化 StoredValueCard 存根，让 select(StoredValueCard) 能构造 SQL。"""
+
     __tablename__ = "stored_value_cards"
-    id          = mapped_column(Integer, primary_key=True)
-    tenant_id   = mapped_column(Integer)
+    id = mapped_column(Integer, primary_key=True)
+    tenant_id = mapped_column(Integer)
     customer_id = mapped_column(Integer)
-    status      = mapped_column(String)
-    is_deleted  = mapped_column(Boolean)
-    created_at  = mapped_column(Integer)
+    status = mapped_column(String)
+    is_deleted = mapped_column(Boolean)
+    created_at = mapped_column(Integer)
 
 
 class _FakeStoredValueTransaction(_TestBase):
     """最小化 StoredValueTransaction 存根。"""
+
     __tablename__ = "stored_value_transactions"
-    id         = mapped_column(Integer, primary_key=True)
-    tenant_id  = mapped_column(Integer)
-    txn_type   = mapped_column(String)
+    id = mapped_column(Integer, primary_key=True)
+    tenant_id = mapped_column(Integer)
+    txn_type = mapped_column(String)
     amount_fen = mapped_column(Integer)
     is_deleted = mapped_column(Boolean)
 
 
 # 注入 models.stored_value
 _sv_models_mod = types.ModuleType("models.stored_value")
-_sv_models_mod.StoredValueCard        = _FakeStoredValueCard
+_sv_models_mod.StoredValueCard = _FakeStoredValueCard
 _sv_models_mod.StoredValueTransaction = _FakeStoredValueTransaction
 _ensure_pkg("models")
 sys.modules["models.stored_value"] = _sv_models_mod
@@ -91,11 +93,14 @@ sys.modules["models.stored_value"] = _sv_models_mod
 
 # ─── 异常类定义（与 StoredValueService 使用的同名异常） ──────────────────────────
 
+
 class CardNotActiveError(Exception):
     pass
 
+
 class CardNotFoundError(Exception):
     pass
+
 
 class InsufficientBalanceError(Exception):
     pass
@@ -103,11 +108,16 @@ class InsufficientBalanceError(Exception):
 
 # ─── StoredValueService 存根工厂 ───────────────────────────────────────────────
 
+
 def _make_sv_svc_stub() -> MagicMock:
     svc = MagicMock()
     for method in (
-        "create_card", "recharge_direct", "consume_by_id",
-        "refund_by_transaction", "get_balance", "get_transactions_by_id",
+        "create_card",
+        "recharge_direct",
+        "consume_by_id",
+        "refund_by_transaction",
+        "get_balance",
+        "get_transactions_by_id",
         "exchange_points_for_balance",
     ):
         setattr(svc, method, AsyncMock(return_value={}))
@@ -119,7 +129,7 @@ def _make_sv_svc_stub() -> MagicMock:
 _svc_mod = types.ModuleType("services.stored_value_service")
 _svc_mod.StoredValueService = MagicMock(return_value=_make_sv_svc_stub())
 _svc_mod.CardNotActiveError = CardNotActiveError
-_svc_mod.CardNotFoundError  = CardNotFoundError
+_svc_mod.CardNotFoundError = CardNotFoundError
 _svc_mod.InsufficientBalanceError = InsufficientBalanceError
 _ensure_pkg("services")
 sys.modules["services.stored_value_service"] = _svc_mod
@@ -141,8 +151,10 @@ _ensure_pkg("shared.ontology.src")
 
 _db_mod = types.ModuleType("shared.ontology.src.database")
 
+
 async def _fake_get_db_with_tenant(tenant_id):  # noqa: ARG001
     yield AsyncMock()
+
 
 _db_mod.get_db_with_tenant = _fake_get_db_with_tenant
 _db_mod.get_db = MagicMock()
@@ -154,10 +166,11 @@ sys.modules["shared.ontology.src.database"] = _db_mod
 import importlib  # noqa: E402
 
 _router_mod = importlib.import_module("api.stored_value_router")
-_svc_singleton: MagicMock = _router_mod._svc   # 路由文件模块级 _svc 单例
+_svc_singleton: MagicMock = _router_mod._svc  # 路由文件模块级 _svc 单例
 
 
 # ─── FastAPI 测试 app 构建 ─────────────────────────────────────────────────────
+
 
 def _make_app(db_mock: AsyncMock) -> FastAPI:
     """构建含路由的 FastAPI app，并用 db_mock 覆盖 _get_tenant_db 依赖。"""
@@ -175,9 +188,9 @@ def _make_app(db_mock: AsyncMock) -> FastAPI:
 
 TENANT_ID = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
 MEMBER_ID = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
-CARD_ID   = uuid.uuid4()
-TX_ID     = "cccccccc-cccc-cccc-cccc-cccccccccccc"
-HEADERS   = {"X-Tenant-ID": TENANT_ID}
+CARD_ID = uuid.uuid4()
+TX_ID = "cccccccc-cccc-cccc-cccc-cccccccccccc"
+HEADERS = {"X-Tenant-ID": TENANT_ID}
 
 
 def _uid() -> str:
@@ -186,7 +199,7 @@ def _uid() -> str:
 
 def _make_db() -> AsyncMock:
     db = AsyncMock()
-    db.commit   = AsyncMock()
+    db.commit = AsyncMock()
     db.rollback = AsyncMock()
 
     # 默认 execute 返回一个带 scalar_one_or_none() -> None 的 mock
@@ -201,6 +214,7 @@ def _make_db() -> AsyncMock:
 # ──────────────────────────────────────────────────────────────────────────────
 # 场景 1: POST /members/{member_id}/sv/charge — 充值成功（含 bonus）
 # ──────────────────────────────────────────────────────────────────────────────
+
 
 def test_charge_success_with_bonus():
     """充值成功：_svc.recharge_direct 返回余额，路由附加 bonus_fen 字段。"""
@@ -242,6 +256,7 @@ def test_charge_success_with_bonus():
 # 场景 2: POST /members/{member_id}/sv/charge — 卡未激活 → 400
 # ──────────────────────────────────────────────────────────────────────────────
 
+
 def test_charge_card_not_active():
     """recharge_direct 抛 CardNotActiveError 时路由返回 400。"""
     db = _make_db()
@@ -251,12 +266,10 @@ def test_charge_card_not_active():
     _card_result = MagicMock()
     _card_result.scalar_one_or_none.return_value = fake_card
     _rule_result = MagicMock()
-    _rule_result.fetchone.return_value = None   # 无赠送规则
+    _rule_result.fetchone.return_value = None  # 无赠送规则
     db.execute = AsyncMock(side_effect=[_card_result, _rule_result])
 
-    _svc_singleton.recharge_direct = AsyncMock(
-        side_effect=CardNotActiveError("储值卡已停用")
-    )
+    _svc_singleton.recharge_direct = AsyncMock(side_effect=CardNotActiveError("储值卡已停用"))
 
     app = _make_app(db)
     client = TestClient(app)
@@ -273,6 +286,7 @@ def test_charge_card_not_active():
 # ──────────────────────────────────────────────────────────────────────────────
 # 场景 3: POST /members/{member_id}/sv/consume — 消费成功
 # ──────────────────────────────────────────────────────────────────────────────
+
 
 def test_consume_success():
     """消费核销成功：返回 ok=True 及消费后余额。"""
@@ -303,12 +317,11 @@ def test_consume_success():
 # 场景 4: POST /members/{member_id}/sv/consume — 余额不足 → 400
 # ──────────────────────────────────────────────────────────────────────────────
 
+
 def test_consume_insufficient_balance():
     """consume_by_id 抛 InsufficientBalanceError 时路由返回 400。"""
     db = _make_db()
-    _svc_singleton.consume_by_id = AsyncMock(
-        side_effect=InsufficientBalanceError("余额不足")
-    )
+    _svc_singleton.consume_by_id = AsyncMock(side_effect=InsufficientBalanceError("余额不足"))
 
     app = _make_app(db)
     client = TestClient(app)
@@ -326,14 +339,15 @@ def test_consume_insufficient_balance():
 # 场景 5: POST /sv/transactions/{tx_id}/refund — 退款成功
 # ──────────────────────────────────────────────────────────────────────────────
 
+
 def test_refund_success():
     """按消费流水退款成功，返回 ok=True。"""
     db = _make_db()
 
     # 模拟找到 consume 类型的流水
     fake_txn = MagicMock()
-    fake_txn.txn_type   = "consume"
-    fake_txn.amount_fen = -5000   # 消费记为负数
+    fake_txn.txn_type = "consume"
+    fake_txn.amount_fen = -5000  # 消费记为负数
 
     _txn_result = MagicMock()
     _txn_result.scalar_one_or_none.return_value = fake_txn
@@ -360,6 +374,7 @@ def test_refund_success():
 # 场景 6: POST /sv/transactions/{tx_id}/refund — 流水不存在 → 404
 # ──────────────────────────────────────────────────────────────────────────────
 
+
 def test_refund_txn_not_found():
     """流水不存在时路由返回 404。"""
     db = _make_db()
@@ -383,6 +398,7 @@ def test_refund_txn_not_found():
 # ──────────────────────────────────────────────────────────────────────────────
 # 场景 7: GET /members/{member_id}/sv/balance — 余额查询成功
 # ──────────────────────────────────────────────────────────────────────────────
+
 
 def test_get_balance_success():
     """余额查询成功：找到储值卡，返回 balance_fen 等字段。"""
@@ -419,6 +435,7 @@ def test_get_balance_success():
 # ──────────────────────────────────────────────────────────────────────────────
 # 场景 8: GET /members/{member_id}/sv/transactions — 流水分页查询
 # ──────────────────────────────────────────────────────────────────────────────
+
 
 def test_get_transactions_success():
     """流水分页查询成功：返回 items 和 total 字段。"""
@@ -461,6 +478,7 @@ def test_get_transactions_success():
 # 场景 9: GET /sv/charge-rules — 充值赠送规则列表
 # ──────────────────────────────────────────────────────────────────────────────
 
+
 def test_list_charge_rules_success():
     """充值赠送规则列表查询：返回 ok=True 及规则数组。"""
     db = _make_db()
@@ -501,6 +519,7 @@ def test_list_charge_rules_success():
 # 场景 10: POST /sv/charge-rules — bonus_amount=0 → 400
 # ──────────────────────────────────────────────────────────────────────────────
 
+
 def test_create_charge_rule_bonus_zero():
     """bonus_amount=0 时路由应返回 400（赠送金额必须大于0）。"""
     db = _make_db()
@@ -511,7 +530,7 @@ def test_create_charge_rule_bonus_zero():
         "/api/v1/sv/charge-rules",
         json={
             "charge_amount": 10000,
-            "bonus_amount": 0,       # 违反业务规则
+            "bonus_amount": 0,  # 违反业务规则
         },
         headers=HEADERS,
     )

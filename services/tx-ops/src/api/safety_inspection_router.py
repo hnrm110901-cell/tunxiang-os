@@ -18,13 +18,14 @@ complete_inspection 业务逻辑：
 
 统一响应格式: {"ok": bool, "data": {}, "error": {}}
 """
+
 from __future__ import annotations
 
 import asyncio
 import os
 import uuid
 from datetime import date, datetime, timezone
-from typing import Any, List, Optional
+from typing import Any, Optional
 
 import asyncpg
 import structlog
@@ -47,6 +48,7 @@ _DB_URL = os.getenv(
 #  内部工具
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 async def _get_conn(tenant_id: str) -> asyncpg.Connection:
     """获取已设置 RLS 上下文的数据库连接。"""
     conn = await asyncpg.connect(_DB_URL)
@@ -57,6 +59,7 @@ async def _get_conn(tenant_id: str) -> asyncpg.Connection:
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 #  请求模型
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 class StartInspectionReq(BaseModel):
     store_id: str = Field(..., description="门店ID（UUID）")
@@ -121,21 +124,23 @@ async def start_inspection(
     finally:
         await conn.close()
 
-    asyncio.create_task(emit_event(
-        event_type=SafetyInspectionEventType.INSPECTION_STARTED,
-        tenant_id=x_tenant_id,
-        stream_id=inspection_id,
-        payload={
-            "inspection_id": inspection_id,
-            "store_id": req.store_id,
-            "inspector_id": req.inspector_id,
-            "inspection_type": req.inspection_type,
-            "inspection_date": req.inspection_date.isoformat(),
-        },
-        store_id=req.store_id,
-        source_service="tx-ops",
-        metadata={"stat_date": req.inspection_date.isoformat()},
-    ))
+    asyncio.create_task(
+        emit_event(
+            event_type=SafetyInspectionEventType.INSPECTION_STARTED,
+            tenant_id=x_tenant_id,
+            stream_id=inspection_id,
+            payload={
+                "inspection_id": inspection_id,
+                "store_id": req.store_id,
+                "inspector_id": req.inspector_id,
+                "inspection_type": req.inspection_type,
+                "inspection_date": req.inspection_date.isoformat(),
+            },
+            store_id=req.store_id,
+            source_service="tx-ops",
+            metadata={"stat_date": req.inspection_date.isoformat()},
+        )
+    )
 
     log.info(
         "safety_inspection_started",
@@ -344,8 +349,7 @@ async def score_item(
         conn2 = await _get_conn(x_tenant_id)
         try:
             item_row = await conn2.fetchrow(
-                "SELECT is_critical, item_code, item_name FROM biz_food_safety_items "
-                "WHERE tenant_id = $1 AND id = $2",
+                "SELECT is_critical, item_code, item_name FROM biz_food_safety_items WHERE tenant_id = $1 AND id = $2",
                 uuid.UUID(x_tenant_id),
                 uuid.UUID(item_id),
             )
@@ -353,20 +357,22 @@ async def score_item(
             await conn2.close()
 
         if item_row and item_row["is_critical"]:
-            asyncio.create_task(emit_event(
-                event_type=SafetyInspectionEventType.CRITICAL_ITEM_FAILED,
-                tenant_id=x_tenant_id,
-                stream_id=inspection_id,
-                payload={
-                    "inspection_id": inspection_id,
-                    "item_id": item_id,
-                    "item_code": item_row["item_code"],
-                    "item_name": item_row["item_name"],
-                    "issue_description": req.issue_description,
-                },
-                source_service="tx-ops",
-                metadata={"requires_immediate_action": True},
-            ))
+            asyncio.create_task(
+                emit_event(
+                    event_type=SafetyInspectionEventType.CRITICAL_ITEM_FAILED,
+                    tenant_id=x_tenant_id,
+                    stream_id=inspection_id,
+                    payload={
+                        "inspection_id": inspection_id,
+                        "item_id": item_id,
+                        "item_code": item_row["item_code"],
+                        "item_name": item_row["item_name"],
+                        "issue_description": req.issue_description,
+                    },
+                    source_service="tx-ops",
+                    metadata={"requires_immediate_action": True},
+                )
+            )
 
     return {
         "ok": True,
@@ -469,29 +475,29 @@ async def complete_inspection(
         await conn2.close()
 
     event_type = (
-        SafetyInspectionEventType.INSPECTION_COMPLETED
-        if is_passed
-        else SafetyInspectionEventType.INSPECTION_FAILED
+        SafetyInspectionEventType.INSPECTION_COMPLETED if is_passed else SafetyInspectionEventType.INSPECTION_FAILED
     )
-    asyncio.create_task(emit_event(
-        event_type=event_type,
-        tenant_id=x_tenant_id,
-        stream_id=inspection_id,
-        payload={
-            "inspection_id": inspection_id,
-            "store_id": str(inspection_row["store_id"]),
-            "inspector_id": str(inspection_row["inspector_id"]),
-            "inspection_type": inspection_row["inspection_type"],
-            "inspection_date": inspection_row["inspection_date"].isoformat(),
-            "overall_score": round(overall_score, 2),
-            "pass_threshold": pass_threshold,
-            "is_passed": is_passed,
-            "has_critical_fail": has_critical_fail,
-        },
-        store_id=str(inspection_row["store_id"]),
-        source_service="tx-ops",
-        metadata={"stat_date": inspection_row["inspection_date"].isoformat()},
-    ))
+    asyncio.create_task(
+        emit_event(
+            event_type=event_type,
+            tenant_id=x_tenant_id,
+            stream_id=inspection_id,
+            payload={
+                "inspection_id": inspection_id,
+                "store_id": str(inspection_row["store_id"]),
+                "inspector_id": str(inspection_row["inspector_id"]),
+                "inspection_type": inspection_row["inspection_type"],
+                "inspection_date": inspection_row["inspection_date"].isoformat(),
+                "overall_score": round(overall_score, 2),
+                "pass_threshold": pass_threshold,
+                "is_passed": is_passed,
+                "has_critical_fail": has_critical_fail,
+            },
+            store_id=str(inspection_row["store_id"]),
+            source_service="tx-ops",
+            metadata={"stat_date": inspection_row["inspection_date"].isoformat()},
+        )
+    )
 
     log.info(
         "safety_inspection_completed",
@@ -636,10 +642,7 @@ async def monthly_report(
             "avg_score": round(float(summary["avg_score"]), 2) if summary["avg_score"] else None,
             "correction_total_fail_items": total_fail_items,
             "correction_completed_items": corrected_items,
-            "correction_rate": (
-                round(corrected_items / total_fail_items, 4)
-                if total_fail_items > 0 else None
-            ),
+            "correction_rate": (round(corrected_items / total_fail_items, 4) if total_fail_items > 0 else None),
         },
     }
 

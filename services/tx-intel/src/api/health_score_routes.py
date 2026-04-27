@@ -7,6 +7,7 @@
 评分算法：5个维度加权平均，纯Python，不调用Claude。
 如果无法查询真实数据，返回带 _is_mock: true 的演示数据。
 """
+
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Annotated, Any
@@ -24,6 +25,7 @@ router = APIRouter(prefix="/api/v1/intel", tags=["health-score"])
 
 # ─── 依赖项 ───────────────────────────────────────────────────────────────────
 
+
 async def get_db() -> AsyncSession:  # type: ignore[return]
     """数据库 session 依赖（由应用 lifespan 中注入真实实现）"""
     raise NotImplementedError("请在应用启动时注入 DB session factory")
@@ -39,11 +41,11 @@ async def get_tenant_id(x_tenant_id: Annotated[str, Header()]) -> uuid.UUID:
 # ─── 评分算法 ─────────────────────────────────────────────────────────────────
 
 DIMENSION_WEIGHTS = {
-    "revenue_trend": 0.30,        # 营收趋势
-    "cost_control": 0.25,         # 成本控制
-    "customer_satisfaction": 0.20, # 顾客满意度
-    "operational_efficiency": 0.15, # 运营效率
-    "inventory_health": 0.10,     # 库存健康
+    "revenue_trend": 0.30,  # 营收趋势
+    "cost_control": 0.25,  # 成本控制
+    "customer_satisfaction": 0.20,  # 顾客满意度
+    "operational_efficiency": 0.15,  # 运营效率
+    "inventory_health": 0.10,  # 库存健康
 }
 
 DIMENSION_LABELS = {
@@ -66,10 +68,7 @@ def _score_to_grade(score: float) -> str:
 
 
 def _calc_overall(dim_scores: dict[str, float]) -> float:
-    total = sum(
-        dim_scores.get(k, 50) * w
-        for k, w in DIMENSION_WEIGHTS.items()
-    )
+    total = sum(dim_scores.get(k, 50) * w for k, w in DIMENSION_WEIGHTS.items())
     return round(total, 1)
 
 
@@ -100,9 +99,8 @@ async def _set_rls(db: AsyncSession, tenant_id: uuid.UUID) -> None:
 
 # ─── 真实数据查询 ──────────────────────────────────────────────────────────────
 
-async def _query_revenue_trend(
-    db: AsyncSession, tenant_id: uuid.UUID, store_id: str | None
-) -> float:
+
+async def _query_revenue_trend(db: AsyncSession, tenant_id: uuid.UUID, store_id: str | None) -> float:
     """营收趋势评分：比较本月vs上月日均营收"""
     now = datetime.now(timezone.utc)
     # 本月起始
@@ -176,9 +174,7 @@ async def _query_revenue_trend(
     return max(0.0, (ratio - 0.6) / 0.2 * 50.0)
 
 
-async def _query_cost_control(
-    db: AsyncSession, tenant_id: uuid.UUID, store_id: str | None
-) -> float:
+async def _query_cost_control(db: AsyncSession, tenant_id: uuid.UUID, store_id: str | None) -> float:
     """成本控制评分：食材+人力占营收比"""
     now = datetime.now(timezone.utc)
     month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
@@ -233,9 +229,7 @@ async def _query_cost_control(
     return max(0.0, (0.70 - cost_ratio) / 0.10 * 50.0)
 
 
-async def _query_customer_satisfaction(
-    db: AsyncSession, tenant_id: uuid.UUID, store_id: str | None
-) -> float:
+async def _query_customer_satisfaction(db: AsyncSession, tenant_id: uuid.UUID, store_id: str | None) -> float:
     """顾客满意度评分：退单率 + 平均评分"""
     now = datetime.now(timezone.utc)
     week_start = now - timedelta(days=7)
@@ -280,9 +274,7 @@ async def _query_customer_satisfaction(
     return round(refund_score, 1)
 
 
-async def _query_operational_efficiency(
-    db: AsyncSession, tenant_id: uuid.UUID, store_id: str | None
-) -> float:
+async def _query_operational_efficiency(db: AsyncSession, tenant_id: uuid.UUID, store_id: str | None) -> float:
     """运营效率评分：出餐时间 + 翻台率"""
     now = datetime.now(timezone.utc)
     week_start = now - timedelta(days=7)
@@ -324,9 +316,7 @@ async def _query_operational_efficiency(
     return round(time_score, 1)
 
 
-async def _query_inventory_health(
-    db: AsyncSession, tenant_id: uuid.UUID, store_id: str | None
-) -> float:
+async def _query_inventory_health(db: AsyncSession, tenant_id: uuid.UUID, store_id: str | None) -> float:
     """库存健康评分：损耗率 + 临期数量"""
     now = datetime.now(timezone.utc)
     params: dict[str, Any] = {"tenant_id": str(tenant_id)}

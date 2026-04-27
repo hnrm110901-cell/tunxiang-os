@@ -2,6 +2,7 @@
 
 典型场景: 月卡39元享每日1份特价菜, 年卡399元享全年8折+生日双倍积分
 """
+
 from typing import Any
 
 import structlog
@@ -28,9 +29,15 @@ CONFIG_SCHEMA = {
                         "items": {
                             "type": "object",
                             "properties": {
-                                "type": {"type": "string", "enum": [
-                                    "daily_dish", "discount", "points_multiplier", "free_delivery",
-                                ]},
+                                "type": {
+                                    "type": "string",
+                                    "enum": [
+                                        "daily_dish",
+                                        "discount",
+                                        "points_multiplier",
+                                        "free_delivery",
+                                    ],
+                                },
                                 "value": {"type": "number"},
                                 "description": {"type": "string"},
                             },

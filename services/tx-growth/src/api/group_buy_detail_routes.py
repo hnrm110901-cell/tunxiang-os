@@ -29,6 +29,7 @@ router = APIRouter(tags=["group-buy"])
 # 统一响应
 # ---------------------------------------------------------------------------
 
+
 def ok_response(data: Any) -> dict:
     return {"ok": True, "data": data}
 
@@ -40,6 +41,7 @@ def error_response(code: str, message: str) -> dict:
 # ---------------------------------------------------------------------------
 # 内部工具
 # ---------------------------------------------------------------------------
+
 
 async def _set_tenant(db: AsyncSession, tenant_id: str) -> None:
     await db.execute(
@@ -57,8 +59,9 @@ def _is_table_missing(exc: SQLAlchemyError) -> bool:
 # 请求模型
 # ---------------------------------------------------------------------------
 
+
 class JoinGroupRequest(BaseModel):
-    campaign_id: str       # group_buy_activities.id
+    campaign_id: str  # group_buy_activities.id
     team_id: Optional[str] = None  # 指定加入某团，None 则开新团
     customer_id: str
     quantity: int = 1
@@ -67,6 +70,7 @@ class JoinGroupRequest(BaseModel):
 # ---------------------------------------------------------------------------
 # 端点
 # ---------------------------------------------------------------------------
+
 
 @router.get("/api/v1/group-buy/campaigns/{campaign_id}")
 async def get_campaign_detail(
@@ -129,13 +133,15 @@ async def get_campaign_detail(
                 {"customer_id": str(m.customer_id), "joined_at": m.joined_at.isoformat() if m.joined_at else None}
                 for m in members_result.fetchall()
             ]
-            teams.append({
-                "team_id": str(t.id),
-                "target_size": t.target_size,
-                "current_size": t.current_size,
-                "expired_at": t.expired_at.isoformat() if t.expired_at else None,
-                "members": members,
-            })
+            teams.append(
+                {
+                    "team_id": str(t.id),
+                    "target_size": t.target_size,
+                    "current_size": t.current_size,
+                    "expired_at": t.expired_at.isoformat() if t.expired_at else None,
+                    "members": members,
+                }
+            )
 
         campaign_data = {
             "id": str(act.id),
@@ -251,6 +257,7 @@ async def join_group(
                 return error_response("MAX_TEAMS", "活动开团数已达上限")
 
             from datetime import timedelta
+
             team_id_val = uuid.uuid4()
             expired_at = now + timedelta(minutes=act.time_limit_minutes)
 
@@ -340,14 +347,16 @@ async def join_group(
             team_status=team_status,
             tenant_id=x_tenant_id,
         )
-        return ok_response({
-            "member_id": str(member_id),
-            "team_id": str(team_id_val),
-            "campaign_id": str(act_id),
-            "current_size": new_size,
-            "target_size": target,
-            "status": team_status,
-        })
+        return ok_response(
+            {
+                "member_id": str(member_id),
+                "team_id": str(team_id_val),
+                "campaign_id": str(act_id),
+                "current_size": new_size,
+                "target_size": target,
+                "status": team_status,
+            }
+        )
 
     except ValueError as exc:
         return error_response("INVALID_PARAM", f"参数格式错误: {exc}")

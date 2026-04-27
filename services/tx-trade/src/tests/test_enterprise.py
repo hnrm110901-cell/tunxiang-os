@@ -12,6 +12,7 @@
 9. 未结账单查询
 10. 边界场景（重复账单/零额度）
 """
+
 import os
 import sys
 
@@ -26,6 +27,7 @@ import pytest
 
 class FakeSession:
     """模拟 AsyncSession 用于纯逻辑测试"""
+
     def __init__(self):
         self.added = []
         self.flushed = False
@@ -62,6 +64,7 @@ def _clear_stores():
     """清理模块级内存存储"""
     from services.enterprise_account import _agreement_prices, _enterprises, _sign_records
     from services.enterprise_billing import _bill_items, _bills
+
     _enterprises.clear()
     _agreement_prices.clear()
     _sign_records.clear()
@@ -82,6 +85,7 @@ class TestEnterpriseAccount:
     async def test_create_enterprise(self):
         """企业建档成功"""
         from services.enterprise_account import EnterpriseAccountService
+
         db = FakeSession()
         svc = EnterpriseAccountService(db, TENANT_ID)
 
@@ -103,6 +107,7 @@ class TestEnterpriseAccount:
     async def test_create_enterprise_invalid_cycle(self):
         """不支持的账期类型应失败"""
         from services.enterprise_account import EnterpriseAccountService
+
         db = FakeSession()
         svc = EnterpriseAccountService(db, TENANT_ID)
 
@@ -118,15 +123,16 @@ class TestEnterpriseAccount:
     async def test_update_enterprise(self):
         """更新企业信息"""
         from services.enterprise_account import EnterpriseAccountService
+
         db = FakeSession()
         svc = EnterpriseAccountService(db, TENANT_ID)
 
         created = await svc.create_enterprise(
-            name="初始名称", contact="联系人", credit_limit_fen=100000,
+            name="初始名称",
+            contact="联系人",
+            credit_limit_fen=100000,
         )
-        updated = await svc.update_enterprise(
-            created["id"], {"name": "新名称", "credit_limit_fen": 200000}
-        )
+        updated = await svc.update_enterprise(created["id"], {"name": "新名称", "credit_limit_fen": 200000})
 
         assert updated["name"] == "新名称"
         assert updated["credit_limit_fen"] == 200000
@@ -135,6 +141,7 @@ class TestEnterpriseAccount:
     async def test_list_enterprises_tenant_isolation(self):
         """租户隔离：只能看到自己的企业"""
         from services.enterprise_account import EnterpriseAccountService
+
         db = FakeSession()
 
         svc_a = EnterpriseAccountService(db, TENANT_ID)
@@ -165,6 +172,7 @@ class TestCreditCheck:
     async def test_credit_sufficient(self):
         """额度充足"""
         from services.enterprise_account import EnterpriseAccountService
+
         db = FakeSession()
         svc = EnterpriseAccountService(db, TENANT_ID)
 
@@ -180,6 +188,7 @@ class TestCreditCheck:
     async def test_credit_insufficient(self):
         """额度不足"""
         from services.enterprise_account import EnterpriseAccountService
+
         db = FakeSession()
         svc = EnterpriseAccountService(db, TENANT_ID)
 
@@ -194,6 +203,7 @@ class TestCreditCheck:
     async def test_credit_after_sign(self):
         """签单后额度减少"""
         from services.enterprise_account import EnterpriseAccountService
+
         db = FakeSession()
         svc = EnterpriseAccountService(db, TENANT_ID)
 
@@ -219,12 +229,16 @@ class TestAuthorizeSign:
     async def test_sign_success(self):
         """签单成功"""
         from services.enterprise_account import EnterpriseAccountService
+
         db = FakeSession()
         svc = EnterpriseAccountService(db, TENANT_ID)
 
         ent = await svc.create_enterprise("徐记海鲜", "张经理", 5000000)
         result = await svc.authorize_sign(
-            ent["id"], "order-001", "李总", 150000,  # ¥1500
+            ent["id"],
+            "order-001",
+            "李总",
+            150000,  # ¥1500
         )
 
         assert result["authorized"] is True
@@ -236,12 +250,16 @@ class TestAuthorizeSign:
     async def test_sign_rejected_credit_exceeded(self):
         """额度超限拒绝签单"""
         from services.enterprise_account import EnterpriseAccountService
+
         db = FakeSession()
         svc = EnterpriseAccountService(db, TENANT_ID)
 
         ent = await svc.create_enterprise("小额企业", "联系人", 100000)  # ¥1000
         result = await svc.authorize_sign(
-            ent["id"], "order-001", "王总", 200000,  # ¥2000，超过额度
+            ent["id"],
+            "order-001",
+            "王总",
+            200000,  # ¥2000，超过额度
         )
 
         assert result["authorized"] is False
@@ -252,6 +270,7 @@ class TestAuthorizeSign:
     async def test_sign_requires_signer_name(self):
         """签单必须有授权人姓名"""
         from services.enterprise_account import EnterpriseAccountService
+
         db = FakeSession()
         svc = EnterpriseAccountService(db, TENANT_ID)
 
@@ -267,6 +286,7 @@ class TestAuthorizeSign:
     async def test_multiple_signs_accumulate(self):
         """多次签单额度累计"""
         from services.enterprise_account import EnterpriseAccountService
+
         db = FakeSession()
         svc = EnterpriseAccountService(db, TENANT_ID)
 
@@ -293,6 +313,7 @@ class TestAgreementPrice:
     async def test_set_and_get_agreement_price(self):
         """设置并查询协议价"""
         from services.enterprise_account import EnterpriseAccountService
+
         db = FakeSession()
         svc = EnterpriseAccountService(db, TENANT_ID)
 
@@ -311,6 +332,7 @@ class TestAgreementPrice:
     async def test_agreement_price_not_found(self):
         """未设置协议价返回None"""
         from services.enterprise_account import EnterpriseAccountService
+
         db = FakeSession()
         svc = EnterpriseAccountService(db, TENANT_ID)
 
@@ -333,6 +355,7 @@ class TestMonthlyBilling:
         """生成月结账单"""
         from services.enterprise_account import EnterpriseAccountService, _sign_records
         from services.enterprise_billing import EnterpriseBillingService
+
         db = FakeSession()
 
         acct_svc = EnterpriseAccountService(db, TENANT_ID)
@@ -367,6 +390,7 @@ class TestMonthlyBilling:
         """重复生成同月账单应失败"""
         from services.enterprise_account import EnterpriseAccountService
         from services.enterprise_billing import EnterpriseBillingService
+
         db = FakeSession()
 
         acct_svc = EnterpriseAccountService(db, TENANT_ID)
@@ -393,6 +417,7 @@ class TestPaymentConfirmation:
         """全额收款"""
         from services.enterprise_account import EnterpriseAccountService, _sign_records
         from services.enterprise_billing import EnterpriseBillingService
+
         db = FakeSession()
 
         acct_svc = EnterpriseAccountService(db, TENANT_ID)
@@ -414,6 +439,7 @@ class TestPaymentConfirmation:
         }
         # 手动增加已用额度（模拟签单流程）
         from services.enterprise_account import _enterprises
+
         _enterprises[ent["id"]]["used_fen"] = 200000
 
         bill = await bill_svc.generate_monthly_bill(ent["id"], "2026-03")
@@ -432,6 +458,7 @@ class TestPaymentConfirmation:
         """部分收款"""
         from services.enterprise_account import EnterpriseAccountService, _sign_records
         from services.enterprise_billing import EnterpriseBillingService
+
         db = FakeSession()
 
         acct_svc = EnterpriseAccountService(db, TENANT_ID)
@@ -473,6 +500,7 @@ class TestStatement:
         """生成对账单PDF数据"""
         from services.enterprise_account import EnterpriseAccountService, _sign_records
         from services.enterprise_billing import EnterpriseBillingService
+
         db = FakeSession()
 
         acct_svc = EnterpriseAccountService(db, TENANT_ID)
@@ -506,6 +534,7 @@ class TestStatement:
         """未生成账单时请求对账单应失败"""
         from services.enterprise_account import EnterpriseAccountService
         from services.enterprise_billing import EnterpriseBillingService
+
         db = FakeSession()
 
         acct_svc = EnterpriseAccountService(db, TENANT_ID)
@@ -531,6 +560,7 @@ class TestEnterpriseAnalytics:
         """基础消费分析"""
         from services.enterprise_account import EnterpriseAccountService, _sign_records
         from services.enterprise_billing import EnterpriseBillingService
+
         db = FakeSession()
 
         acct_svc = EnterpriseAccountService(db, TENANT_ID)
@@ -575,6 +605,7 @@ class TestOutstandingBills:
         """查询未结账单"""
         from services.enterprise_account import EnterpriseAccountService, _sign_records
         from services.enterprise_billing import EnterpriseBillingService
+
         db = FakeSession()
 
         acct_svc = EnterpriseAccountService(db, TENANT_ID)
@@ -619,6 +650,7 @@ class TestEdgeCases:
     async def test_zero_credit_limit_rejected(self):
         """零额度创建企业应失败"""
         from services.enterprise_account import EnterpriseAccountService
+
         db = FakeSession()
         svc = EnterpriseAccountService(db, TENANT_ID)
 
@@ -629,6 +661,7 @@ class TestEdgeCases:
     async def test_sign_zero_amount_rejected(self):
         """零金额签单应失败"""
         from services.enterprise_account import EnterpriseAccountService
+
         db = FakeSession()
         svc = EnterpriseAccountService(db, TENANT_ID)
 
@@ -642,6 +675,7 @@ class TestEdgeCases:
         """超额收款应失败"""
         from services.enterprise_account import EnterpriseAccountService, _sign_records
         from services.enterprise_billing import EnterpriseBillingService
+
         db = FakeSession()
 
         acct_svc = EnterpriseAccountService(db, TENANT_ID)

@@ -16,9 +16,9 @@ DB 失败时：列表类端点返回空集合，不返回 500。
 
 统一响应格式: {"ok": bool, "data": {}, "error": {}}
 """
+
 from __future__ import annotations
 
-from datetime import datetime
 from typing import Any, Optional
 
 import structlog
@@ -130,11 +130,7 @@ PERMISSION_TREE = [
     },
 ]
 
-ALL_PERM_KEYS = [
-    child["key"]
-    for group in PERMISSION_TREE
-    for child in group["children"]
-]
+ALL_PERM_KEYS = [child["key"] for group in PERMISSION_TREE for child in group["children"]]
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 #  请求模型
@@ -169,9 +165,7 @@ class BatchUserRolesReq(BaseModel):
 
 
 def _get_tenant_id(request: Request) -> str:
-    tid = getattr(request.state, "tenant_id", None) or request.headers.get(
-        "X-Tenant-ID", ""
-    )
+    tid = getattr(request.state, "tenant_id", None) or request.headers.get("X-Tenant-ID", "")
     if not tid:
         raise HTTPException(status_code=400, detail="X-Tenant-ID header required")
     return tid
@@ -274,21 +268,24 @@ async def list_roles_admin(
         perms = d.get("permissions_json") or []
         if isinstance(perms, str):
             import json
+
             try:
                 perms = json.loads(perms)
             except (ValueError, TypeError):
                 perms = []
-        items.append({
-            "id": d["id"],
-            "name": d.get("role_name", ""),
-            "code": d.get("role_code", ""),
-            "level": d.get("level", 5),
-            "is_preset": False,
-            "status": "active",
-            "permissions": perms,
-            "permission_count": len(perms),
-            "created_at": d.get("created_at"),
-        })
+        items.append(
+            {
+                "id": d["id"],
+                "name": d.get("role_name", ""),
+                "code": d.get("role_code", ""),
+                "level": d.get("level", 5),
+                "is_preset": False,
+                "status": "active",
+                "permissions": perms,
+                "permission_count": len(perms),
+                "created_at": d.get("created_at"),
+            }
+        )
 
     log.info("roles_admin_listed", tenant_id=tenant_id, total=total, page=page)
     return _ok({"items": items, "total": total, "page": page, "size": size})
@@ -305,6 +302,7 @@ async def create_role_admin(
     await _set_rls(db, tenant_id)
 
     import json as _json
+
     perms_json = _json.dumps(req.permissions, ensure_ascii=False)
     # role_code 由 name 生成（小写+下划线）
     role_code = req.name.lower().replace(" ", "_").replace("-", "_")[:30]
@@ -338,6 +336,7 @@ async def create_role_admin(
     perms = d.get("permissions_json") or []
     if isinstance(perms, str):
         import json
+
         try:
             perms = json.loads(perms)
         except (ValueError, TypeError):
@@ -370,6 +369,7 @@ async def update_role_admin(
     await _set_rls(db, tenant_id)
 
     import json as _json
+
     perms_json = _json.dumps(req.permissions, ensure_ascii=False)
 
     set_parts = ["permissions_json = :permissions_json::jsonb", "updated_at = NOW()"]
@@ -412,6 +412,7 @@ async def update_role_admin(
     perms = d.get("permissions_json") or []
     if isinstance(perms, str):
         import json
+
         try:
             perms = json.loads(perms)
         except (ValueError, TypeError):
@@ -423,15 +424,17 @@ async def update_role_admin(
         role_id=role_id,
         perm_count=len(perms),
     )
-    return _ok({
-        "id": d["id"],
-        "name": d.get("role_name", ""),
-        "code": d.get("role_code", ""),
-        "level": d.get("level", 5),
-        "permissions": perms,
-        "permission_count": len(perms),
-        "updated_at": d.get("updated_at"),
-    })
+    return _ok(
+        {
+            "id": d["id"],
+            "name": d.get("role_name", ""),
+            "code": d.get("role_code", ""),
+            "level": d.get("level", 5),
+            "permissions": perms,
+            "permission_count": len(perms),
+            "updated_at": d.get("updated_at"),
+        }
+    )
 
 
 @router.delete("/roles-admin/{role_id}")
@@ -547,22 +550,25 @@ async def list_user_roles(
         perms = d.get("permissions") or []
         if isinstance(perms, str):
             import json
+
             try:
                 perms = json.loads(perms)
             except (ValueError, TypeError):
                 perms = []
-        items.append({
-            "id": d["id"],
-            "name": d.get("full_name", ""),
-            "phone": d.get("phone", ""),
-            "store_id": d.get("store_id"),
-            "status": d.get("status", ""),
-            "employment_type": d.get("employment_type", ""),
-            "role_id": d.get("role_id"),
-            "roles": [d["role_name"]] if d.get("role_name") else [],
-            "permissions": perms,
-            "created_at": d.get("created_at"),
-        })
+        items.append(
+            {
+                "id": d["id"],
+                "name": d.get("full_name", ""),
+                "phone": d.get("phone", ""),
+                "store_id": d.get("store_id"),
+                "status": d.get("status", ""),
+                "employment_type": d.get("employment_type", ""),
+                "role_id": d.get("role_id"),
+                "roles": [d["role_name"]] if d.get("role_name") else [],
+                "permissions": perms,
+                "created_at": d.get("created_at"),
+            }
+        )
 
     log.info("user_roles_listed", tenant_id=tenant_id, total=total, page=page)
     return _ok({"items": items, "total": total, "page": page, "size": size})
@@ -585,11 +591,7 @@ async def update_user_roles(
     if req.roles:
         try:
             role_result = await db.execute(
-                text(
-                    "SELECT id, name FROM roles "
-                    "WHERE tenant_id = :tid::uuid AND name = :rname "
-                    "LIMIT 1"
-                ),
+                text("SELECT id, name FROM roles WHERE tenant_id = :tid::uuid AND name = :rname LIMIT 1"),
                 {"tid": tenant_id, "rname": req.roles[0]},
             )
             role_row = role_result.mappings().first()
@@ -621,11 +623,13 @@ async def update_user_roles(
 
     d = _row_to_dict(row)
     log.info("user_roles_updated", user_id=user_id, roles=req.roles)
-    return _ok({
-        "id": d["id"],
-        "name": d.get("full_name", ""),
-        "roles": [role_name] if role_name else req.roles,
-    })
+    return _ok(
+        {
+            "id": d["id"],
+            "name": d.get("full_name", ""),
+            "roles": [role_name] if role_name else req.roles,
+        }
+    )
 
 
 @router.post("/user-roles/batch")
@@ -642,11 +646,7 @@ async def batch_set_user_roles(
     if req.roles:
         try:
             role_result = await db.execute(
-                text(
-                    "SELECT id FROM roles "
-                    "WHERE tenant_id = :tid::uuid AND name = :rname "
-                    "LIMIT 1"
-                ),
+                text("SELECT id FROM roles WHERE tenant_id = :tid::uuid AND name = :rname LIMIT 1"),
                 {"tid": tenant_id, "rname": req.roles[0]},
             )
             role_row = role_result.mappings().first()
@@ -704,10 +704,7 @@ async def list_audit_logs(
 
     if keyword:
         # keyword 匹配操作人 id（user_id）、resource_type 或 details 文本
-        conditions.append(
-            "(al.user_id::text ILIKE :kw OR al.resource_type ILIKE :kw "
-            "OR al.details::text ILIKE :kw)"
-        )
+        conditions.append("(al.user_id::text ILIKE :kw OR al.resource_type ILIKE :kw OR al.details::text ILIKE :kw)")
         params["kw"] = f"%{keyword}%"
 
     if action:
@@ -758,21 +755,24 @@ async def list_audit_logs(
         details = d.get("details") or {}
         if isinstance(details, str):
             import json
+
             try:
                 details = json.loads(details)
             except (ValueError, TypeError):
                 details = {}
-        items.append({
-            "id": d["id"],
-            "time": d.get("created_at"),
-            "user_id": d.get("user_id"),
-            "action": d.get("action", ""),
-            "resource_type": d.get("resource_type", ""),
-            "resource_id": d.get("resource_id"),
-            "ip": d.get("ip_address", ""),
-            "user_agent": d.get("user_agent", ""),
-            "detail": details,
-        })
+        items.append(
+            {
+                "id": d["id"],
+                "time": d.get("created_at"),
+                "user_id": d.get("user_id"),
+                "action": d.get("action", ""),
+                "resource_type": d.get("resource_type", ""),
+                "resource_id": d.get("resource_id"),
+                "ip": d.get("ip_address", ""),
+                "user_agent": d.get("user_agent", ""),
+                "detail": details,
+            }
+        )
 
     log.info("audit_logs_listed", tenant_id=tenant_id, total=total, page=page)
     return _ok({"items": items, "total": total, "page": page, "size": size})

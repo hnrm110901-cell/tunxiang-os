@@ -5,6 +5,7 @@
 
 金额单位：分(fen)
 """
+
 import asyncio
 from datetime import datetime, timedelta, timezone
 from typing import Optional
@@ -45,8 +46,13 @@ class GrowthRepairService:
     """服务修复案例管理"""
 
     VALID_STATES = (
-        "opened", "acknowledged", "compensating",
-        "observing", "recovered", "failed", "closed",
+        "opened",
+        "acknowledged",
+        "compensating",
+        "observing",
+        "recovered",
+        "failed",
+        "closed",
     )
     VALID_SEVERITIES = ("low", "medium", "high", "critical")
     VALID_SOURCE_TYPES = ("complaint", "bad_review", "refund", "agent_detected", "manual")
@@ -71,9 +77,7 @@ class GrowthRepairService:
                 f"Allowed targets from '{current_state}': {allowed}"
             )
 
-    async def _get_case_state(
-        self, case_id: UUID, tenant_id: str, db: AsyncSession
-    ) -> dict:
+    async def _get_case_state(self, case_id: UUID, tenant_id: str, db: AsyncSession) -> dict:
         """查case当前状态"""
         result = await db.execute(
             text("""
@@ -89,8 +93,12 @@ class GrowthRepairService:
         return dict(row._mapping)
 
     async def _update_profile_repair_status(
-        self, customer_id: str, status: str, case_id: Optional[str],
-        tenant_id: str, db: AsyncSession,
+        self,
+        customer_id: str,
+        status: str,
+        case_id: Optional[str],
+        tenant_id: str,
+        db: AsyncSession,
     ) -> None:
         """同步更新customer_growth_profiles.service_repair_status"""
         await db.execute(
@@ -161,9 +169,7 @@ class GrowthRepairService:
         case = dict(result.fetchone()._mapping)
 
         # 同步更新profile
-        await self._update_profile_repair_status(
-            str(customer_id), "complaint_open", case_id, tenant_id, db
-        )
+        await self._update_profile_repair_status(str(customer_id), "complaint_open", case_id, tenant_id, db)
 
         asyncio.create_task(
             emit_event(
@@ -193,9 +199,7 @@ class GrowthRepairService:
     # 确认（opened -> acknowledged）
     # ------------------------------------------------------------------
 
-    async def acknowledge(
-        self, case_id: UUID, tenant_id: str, db: AsyncSession
-    ) -> dict:
+    async def acknowledge(self, case_id: UUID, tenant_id: str, db: AsyncSession) -> dict:
         """确认案例: opened -> acknowledged"""
         await self._set_tenant(db, tenant_id)
         current = await self._get_case_state(case_id, tenant_id, db)
@@ -248,6 +252,7 @@ class GrowthRepairService:
         self._validate_transition(current["repair_state"], "compensating")
 
         import json
+
         result = await db.execute(
             text("""
                 UPDATE growth_service_repair_cases
@@ -369,9 +374,7 @@ class GrowthRepairService:
     # 标记恢复（observing -> recovered）
     # ------------------------------------------------------------------
 
-    async def mark_recovered(
-        self, case_id: UUID, tenant_id: str, db: AsyncSession
-    ) -> dict:
+    async def mark_recovered(self, case_id: UUID, tenant_id: str, db: AsyncSession) -> dict:
         """标记客户恢复: observing -> recovered"""
         await self._set_tenant(db, tenant_id)
         current = await self._get_case_state(case_id, tenant_id, db)
@@ -417,9 +420,7 @@ class GrowthRepairService:
     # 标记失败（observing -> failed）
     # ------------------------------------------------------------------
 
-    async def mark_failed(
-        self, case_id: UUID, tenant_id: str, db: AsyncSession
-    ) -> dict:
+    async def mark_failed(self, case_id: UUID, tenant_id: str, db: AsyncSession) -> dict:
         """标记修复失败: observing -> failed"""
         await self._set_tenant(db, tenant_id)
         current = await self._get_case_state(case_id, tenant_id, db)
@@ -456,9 +457,7 @@ class GrowthRepairService:
     # 关闭案例（recovered/failed -> closed）
     # ------------------------------------------------------------------
 
-    async def close_case(
-        self, case_id: UUID, tenant_id: str, db: AsyncSession
-    ) -> dict:
+    async def close_case(self, case_id: UUID, tenant_id: str, db: AsyncSession) -> dict:
         """关闭案例: recovered/failed -> closed"""
         await self._set_tenant(db, tenant_id)
         current = await self._get_case_state(case_id, tenant_id, db)
@@ -476,9 +475,7 @@ class GrowthRepairService:
         updated = dict(result.fetchone()._mapping)
 
         # 清理profile status -> 'none'
-        await self._update_profile_repair_status(
-            str(current["customer_id"]), "none", None, tenant_id, db
-        )
+        await self._update_profile_repair_status(str(current["customer_id"]), "none", None, tenant_id, db)
 
         asyncio.create_task(
             emit_event(
@@ -585,9 +582,7 @@ class GrowthRepairService:
         items = [dict(r._mapping) for r in rows_result.fetchall()]
         return {"items": items, "total": total}
 
-    async def get_case(
-        self, case_id: UUID, tenant_id: str, db: AsyncSession
-    ) -> Optional[dict]:
+    async def get_case(self, case_id: UUID, tenant_id: str, db: AsyncSession) -> Optional[dict]:
         """查询单个修复案例"""
         await self._set_tenant(db, tenant_id)
 

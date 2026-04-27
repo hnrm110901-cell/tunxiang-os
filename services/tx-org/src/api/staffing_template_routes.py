@@ -11,14 +11,15 @@
   DELETE /api/v1/staffing-templates/{template_id} 软删除
 """
 
+from datetime import datetime, timezone
+from typing import Any, List, Optional
+from uuid import uuid4
+
+import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
-from typing import Any, Optional, List
-from uuid import uuid4
-from datetime import datetime, timezone
-import structlog
 
 from shared.ontology.src.database import get_db
 
@@ -126,12 +127,14 @@ async def staffing_template_summary(
         for r in rows
     ]
 
-    return _ok({
-        "by_store_type": by_store_type,
-        "total_positions": sum(r["total_positions"] for r in by_store_type),
-        "total_min_count": sum(r["total_min_count"] for r in by_store_type),
-        "total_recommended_count": sum(r["total_recommended_count"] for r in by_store_type),
-    })
+    return _ok(
+        {
+            "by_store_type": by_store_type,
+            "total_positions": sum(r["total_positions"] for r in by_store_type),
+            "total_min_count": sum(r["total_min_count"] for r in by_store_type),
+            "total_recommended_count": sum(r["total_recommended_count"] for r in by_store_type),
+        }
+    )
 
 
 # ── POST /batch (before /{template_id} to avoid route clash) ────────
@@ -176,14 +179,30 @@ async def batch_upsert_staffing_templates(
 
     for item in body:
         new_id = str(uuid4())
-        result = (await db.execute(sql, {
-            "id": new_id, "tid": tenant_id,
-            "store_type": item.store_type, "position": item.position,
-            "shift": item.shift, "day_type": item.day_type,
-            "min_count": item.min_count, "recommended_count": item.recommended_count,
-            "peak_buffer": item.peak_buffer, "min_skill_level": item.min_skill_level,
-            "notes": item.notes, "is_active": item.is_active, "now": now,
-        })).mappings().first()
+        result = (
+            (
+                await db.execute(
+                    sql,
+                    {
+                        "id": new_id,
+                        "tid": tenant_id,
+                        "store_type": item.store_type,
+                        "position": item.position,
+                        "shift": item.shift,
+                        "day_type": item.day_type,
+                        "min_count": item.min_count,
+                        "recommended_count": item.recommended_count,
+                        "peak_buffer": item.peak_buffer,
+                        "min_skill_level": item.min_skill_level,
+                        "notes": item.notes,
+                        "is_active": item.is_active,
+                        "now": now,
+                    },
+                )
+            )
+            .mappings()
+            .first()
+        )
 
         if result and result["is_insert"]:
             created += 1
@@ -192,8 +211,7 @@ async def batch_upsert_staffing_templates(
 
     await db.commit()
 
-    log.info("staffing_template.batch_upsert", created=created, updated=updated,
-             total=len(body), tenant_id=tenant_id)
+    log.info("staffing_template.batch_upsert", created=created, updated=updated, total=len(body), tenant_id=tenant_id)
 
     return _ok({"created": created, "updated": updated, "total": len(body)})
 
@@ -223,9 +241,19 @@ async def copy_staffing_templates(
           AND is_active = TRUE
           AND is_deleted = FALSE
     """)
-    rows = (await db.execute(fetch_sql, {
-        "tid": tenant_id, "source_type": body.source_store_type,
-    })).mappings().all()
+    rows = (
+        (
+            await db.execute(
+                fetch_sql,
+                {
+                    "tid": tenant_id,
+                    "source_type": body.source_store_type,
+                },
+            )
+        )
+        .mappings()
+        .all()
+    )
 
     if not rows:
         raise HTTPException(status_code=404, detail="No active templates found for source store_type")
@@ -245,28 +273,44 @@ async def copy_staffing_templates(
     copied = 0
     for r in rows:
         new_id = str(uuid4())
-        result = await db.execute(insert_sql, {
-            "id": new_id, "tid": tenant_id,
-            "store_type": body.target_store_type,
-            "position": r["position"], "shift": r["shift"],
-            "day_type": r["day_type"],
-            "min_count": r["min_count"], "recommended_count": r["recommended_count"],
-            "peak_buffer": r["peak_buffer"], "min_skill_level": r["min_skill_level"],
-            "notes": r["notes"], "is_active": r["is_active"], "now": now,
-        })
+        result = await db.execute(
+            insert_sql,
+            {
+                "id": new_id,
+                "tid": tenant_id,
+                "store_type": body.target_store_type,
+                "position": r["position"],
+                "shift": r["shift"],
+                "day_type": r["day_type"],
+                "min_count": r["min_count"],
+                "recommended_count": r["recommended_count"],
+                "peak_buffer": r["peak_buffer"],
+                "min_skill_level": r["min_skill_level"],
+                "notes": r["notes"],
+                "is_active": r["is_active"],
+                "now": now,
+            },
+        )
         if result.rowcount > 0:
             copied += 1
 
     await db.commit()
 
-    log.info("staffing_template.copied", source=body.source_store_type,
-             target=body.target_store_type, copied=copied, tenant_id=tenant_id)
+    log.info(
+        "staffing_template.copied",
+        source=body.source_store_type,
+        target=body.target_store_type,
+        copied=copied,
+        tenant_id=tenant_id,
+    )
 
-    return _ok({
-        "source_store_type": body.source_store_type,
-        "target_store_type": body.target_store_type,
-        "copied": copied,
-    })
+    return _ok(
+        {
+            "source_store_type": body.source_store_type,
+            "target_store_type": body.target_store_type,
+            "copied": copied,
+        }
+    )
 
 
 # ── GET / list ───────────────────────────────────────────────────────
@@ -345,11 +389,18 @@ async def create_staffing_template(
           AND COALESCE(day_type, '') = COALESCE(:day_type, '')
           AND is_deleted = FALSE
     """)
-    dup = (await db.execute(dup_sql, {
-        "tid": tenant_id, "store_type": body.store_type,
-        "position": body.position, "shift": body.shift,
-        "day_type": body.day_type,
-    })).first()
+    dup = (
+        await db.execute(
+            dup_sql,
+            {
+                "tid": tenant_id,
+                "store_type": body.store_type,
+                "position": body.position,
+                "shift": body.shift,
+                "day_type": body.day_type,
+            },
+        )
+    ).first()
     if dup:
         raise HTTPException(
             status_code=409,
@@ -370,19 +421,40 @@ async def create_staffing_template(
              :notes, :is_active, FALSE, :now, :now)
         RETURNING id::text AS template_id
     """)
-    result = (await db.execute(sql, {
-        "id": new_id, "tid": tenant_id,
-        "store_type": body.store_type, "position": body.position,
-        "shift": body.shift, "day_type": body.day_type,
-        "min_count": body.min_count, "recommended_count": body.recommended_count,
-        "peak_buffer": body.peak_buffer, "min_skill_level": body.min_skill_level,
-        "notes": body.notes, "is_active": body.is_active, "now": now,
-    })).mappings().first()
+    result = (
+        (
+            await db.execute(
+                sql,
+                {
+                    "id": new_id,
+                    "tid": tenant_id,
+                    "store_type": body.store_type,
+                    "position": body.position,
+                    "shift": body.shift,
+                    "day_type": body.day_type,
+                    "min_count": body.min_count,
+                    "recommended_count": body.recommended_count,
+                    "peak_buffer": body.peak_buffer,
+                    "min_skill_level": body.min_skill_level,
+                    "notes": body.notes,
+                    "is_active": body.is_active,
+                    "now": now,
+                },
+            )
+        )
+        .mappings()
+        .first()
+    )
 
     await db.commit()
 
-    log.info("staffing_template.created", template_id=new_id, tenant_id=tenant_id,
-             store_type=body.store_type, position=body.position)
+    log.info(
+        "staffing_template.created",
+        template_id=new_id,
+        tenant_id=tenant_id,
+        store_type=body.store_type,
+        position=body.position,
+    )
 
     return _ok({"template_id": str(result["template_id"])})
 
@@ -446,8 +518,9 @@ async def update_staffing_template(
 
     await db.commit()
 
-    log.info("staffing_template.updated", template_id=template_id, tenant_id=tenant_id,
-             updated_fields=list(fields.keys()))
+    log.info(
+        "staffing_template.updated", template_id=template_id, tenant_id=tenant_id, updated_fields=list(fields.keys())
+    )
 
     return _ok({"template_id": template_id})
 

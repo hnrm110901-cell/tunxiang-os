@@ -14,6 +14,7 @@ Y-I2
   GET  /api/v1/trade/douyin-voucher/stores              已授权门店列表
   POST /api/v1/trade/douyin-voucher/stores/{id}/authorize  门店授权
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -29,7 +30,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
 
-from ..security.rbac import UserContext, require_role
+from ..security.rbac import UserContext, require_role_audited
 from ..services.trade_audit_log import write_audit
 
 logger = structlog.get_logger(__name__)
@@ -195,7 +196,7 @@ async def verify_voucher(
     body: VerifyVoucherRequest,
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
     db: AsyncSession = Depends(get_db),
-    user: UserContext = Depends(require_role("cashier", "store_manager", "admin")),
+    user: UserContext = Depends(require_role_audited("douyin_voucher.verify", "cashier", "store_manager", "admin")),
 ) -> dict:
     """
     核销团购券
@@ -329,7 +330,9 @@ async def batch_verify_vouchers(
     body: BatchVerifyRequest,
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
     db: AsyncSession = Depends(get_db),
-    user: UserContext = Depends(require_role("cashier", "store_manager", "admin")),
+    user: UserContext = Depends(
+        require_role_audited("douyin_voucher.batch_verify", "cashier", "store_manager", "admin")
+    ),
 ) -> dict:
     """批量核销（最多50张）"""
     results = []
@@ -342,19 +345,23 @@ async def batch_verify_vouchers(
         if dy_resp["code"] == 0:
             order_id = f"dy-order-{uuid.uuid4().hex[:12]}"
             success_count += 1
-            results.append({
-                "voucher_code": req.voucher_code,
-                "success": True,
-                "order_id": order_id,
-                "voucher_info": dy_resp["data"],
-            })
+            results.append(
+                {
+                    "voucher_code": req.voucher_code,
+                    "success": True,
+                    "order_id": order_id,
+                    "voucher_info": dy_resp["data"],
+                }
+            )
         elif dy_resp["code"] in (40002, 40003):
             fail_count += 1
-            results.append({
-                "voucher_code": req.voucher_code,
-                "success": False,
-                "error": {"code": f"VOUCHER_{dy_resp['code']}", "message": dy_resp["msg"]},
-            })
+            results.append(
+                {
+                    "voucher_code": req.voucher_code,
+                    "success": False,
+                    "error": {"code": f"VOUCHER_{dy_resp['code']}", "message": dy_resp["msg"]},
+                }
+            )
         else:
             # 平台错误 → 写重试队列
             task_id = _enqueue_retry(
@@ -364,12 +371,14 @@ async def batch_verify_vouchers(
                 error_msg=dy_resp["msg"],
             )
             fail_count += 1
-            results.append({
-                "voucher_code": req.voucher_code,
-                "success": False,
-                "error": {"code": "PLATFORM_ERROR", "message": dy_resp["msg"]},
-                "retry_task_id": task_id,
-            })
+            results.append(
+                {
+                    "voucher_code": req.voucher_code,
+                    "success": False,
+                    "error": {"code": "PLATFORM_ERROR", "message": dy_resp["msg"]},
+                    "retry_task_id": task_id,
+                }
+            )
 
     logger.info(
         "douyin_batch_verify_completed",
@@ -507,22 +516,26 @@ async def get_reconciliation_report(
     unmatched = local_count - matched
     discrepancy_amount_fen = 31600  # 2张未匹配的券（15800×2）
 
-    unmatched_records = [
-        {
-            "voucher_code": "DY_UNDEF_A001",
-            "local_order_id": "dy-order-aaa001",
-            "platform_status": "not_found",
-            "amount_fen": 15800,
-            "issue": "本地已核销，平台无记录",
-        },
-        {
-            "voucher_code": "DY_UNDEF_A002",
-            "local_order_id": None,
-            "platform_status": "used",
-            "amount_fen": 15800,
-            "issue": "平台已核销，本地无记录",
-        },
-    ] if unmatched > 0 else []
+    unmatched_records = (
+        [
+            {
+                "voucher_code": "DY_UNDEF_A001",
+                "local_order_id": "dy-order-aaa001",
+                "platform_status": "not_found",
+                "amount_fen": 15800,
+                "issue": "本地已核销，平台无记录",
+            },
+            {
+                "voucher_code": "DY_UNDEF_A002",
+                "local_order_id": None,
+                "platform_status": "used",
+                "amount_fen": 15800,
+                "issue": "平台已核销，本地无记录",
+            },
+        ]
+        if unmatched > 0
+        else []
+    )
 
     logger.info(
         "douyin_reconciliation_report",
@@ -588,7 +601,7 @@ async def manual_retry(
     task_id: str,
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
     db: AsyncSession = Depends(get_db),
-    user: UserContext = Depends(require_role("store_manager", "admin")),
+    user: UserContext = Depends(require_role_audited("douyin_voucher.retry.manual", "store_manager", "admin")),
 ) -> dict:
     """手动重试失败核销（仅店长/管理员）"""
     task = _RETRY_QUEUE.get(task_id)
@@ -676,12 +689,11 @@ async def auto_retry_queue(
     background_tasks: BackgroundTasks,
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
     db: AsyncSession = Depends(get_db),
-    user: UserContext = Depends(require_role("store_manager", "admin")),
+    user: UserContext = Depends(require_role_audited("douyin_voucher.retry.auto", "store_manager", "admin")),
 ) -> dict:
     """触发批量自动重试（最大3次；仅店长/管理员）"""
     pending_tasks = [
-        t for t in _RETRY_QUEUE.values()
-        if t["status"] == "pending" and t["retry_count"] < MAX_RETRY_TIMES
+        t for t in _RETRY_QUEUE.values() if t["status"] == "pending" and t["retry_count"] < MAX_RETRY_TIMES
     ]
 
     if not pending_tasks:
@@ -767,7 +779,7 @@ async def authorize_store(
     body: AuthorizeStoreRequest,
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
     db: AsyncSession = Depends(get_db),
-    user: UserContext = Depends(require_role("admin", "tenant_admin")),
+    user: UserContext = Depends(require_role_audited("douyin_voucher.store.authorize", "admin", "tenant_admin")),
 ) -> dict:
     """门店授权（绑定抖音商户ID；仅 admin/tenant_admin）"""
     if store_id in _AUTHORIZED_STORES:

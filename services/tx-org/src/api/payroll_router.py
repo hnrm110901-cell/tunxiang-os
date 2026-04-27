@@ -139,9 +139,7 @@ async def calculate_payroll(
     store_id = _uuid(req.store_id, "store_id")
 
     try:
-        records = await _engine.calculate_monthly_payroll(
-            db, tenant_id, store_id, req.year, req.month
-        )
+        records = await _engine.calculate_monthly_payroll(db, tenant_id, store_id, req.year, req.month)
     except (ValueError, KeyError, ZeroDivisionError) as exc:
         log.error("payroll.calculate.validation_error", error=str(exc), exc_info=True)
         raise HTTPException(status_code=400, detail=f"薪资计算参数异常: {exc}") from exc
@@ -150,21 +148,23 @@ async def calculate_payroll(
         raise HTTPException(status_code=500, detail=f"数据库访问失败: {exc}") from exc
 
     await db.commit()
-    return _ok({
-        "year": req.year,
-        "month": req.month,
-        "store_id": req.store_id,
-        "calculated_count": len(records),
-        "records": [
-            {
-                "employee_id": str(r.employee_id),
-                "gross_salary_fen": r.gross_salary_fen,
-                "net_salary_fen": r.net_salary_fen,
-                "status": r.status,
-            }
-            for r in records
-        ],
-    })
+    return _ok(
+        {
+            "year": req.year,
+            "month": req.month,
+            "store_id": req.store_id,
+            "calculated_count": len(records),
+            "records": [
+                {
+                    "employee_id": str(r.employee_id),
+                    "gross_salary_fen": r.gross_salary_fen,
+                    "net_salary_fen": r.net_salary_fen,
+                    "status": r.status,
+                }
+                for r in records
+            ],
+        }
+    )
 
 
 # ── 薪资记录 ──────────────────────────────────────────────────────────────────
@@ -304,20 +304,22 @@ async def get_payroll_summary(
     store_uuid = _uuid(store_id, "store_id")
 
     summary = await _engine.get_payroll_summary(db, tenant_id, store_uuid, year, month)
-    return _ok({
-        "tenant_id": str(summary.tenant_id),
-        "store_id": str(summary.store_id),
-        "year": summary.period_year,
-        "month": summary.period_month,
-        "employee_count": summary.employee_count,
-        "total_gross_fen": summary.total_gross_fen,
-        "total_gross_yuan": round(summary.total_gross_fen / 100, 2),
-        "total_net_fen": summary.total_net_fen,
-        "total_net_yuan": round(summary.total_net_fen / 100, 2),
-        "total_si_fen": summary.total_si_fen,
-        "total_si_yuan": round(summary.total_si_fen / 100, 2),
-        "by_position": summary.by_position,
-    })
+    return _ok(
+        {
+            "tenant_id": str(summary.tenant_id),
+            "store_id": str(summary.store_id),
+            "year": summary.period_year,
+            "month": summary.period_month,
+            "employee_count": summary.employee_count,
+            "total_gross_fen": summary.total_gross_fen,
+            "total_gross_yuan": round(summary.total_gross_fen / 100, 2),
+            "total_net_fen": summary.total_net_fen,
+            "total_net_yuan": round(summary.total_net_fen / 100, 2),
+            "total_si_fen": summary.total_si_fen,
+            "total_si_yuan": round(summary.total_si_fen / 100, 2),
+            "by_position": summary.by_position,
+        }
+    )
 
 
 @router.get("/payslip/{employee_id}")
@@ -338,16 +340,18 @@ async def get_payslip(
             status_code=404,
             detail=f"工资条不存在: employee_id={employee_id}, {year}-{month:02d}",
         )
-    return _ok({
-        "employee_id": str(payslip.employee_id),
-        "period": f"{payslip.period_year}-{payslip.period_month:02d}",
-        "status": payslip.record.status,
-        "gross_salary_fen": payslip.record.gross_salary_fen,
-        "gross_salary_yuan": round(payslip.record.gross_salary_fen / 100, 2),
-        "net_salary_fen": payslip.record.net_salary_fen,
-        "net_salary_yuan": round(payslip.record.net_salary_fen / 100, 2),
-        "items": payslip.items,
-    })
+    return _ok(
+        {
+            "employee_id": str(payslip.employee_id),
+            "period": f"{payslip.period_year}-{payslip.period_month:02d}",
+            "status": payslip.record.status,
+            "gross_salary_fen": payslip.record.gross_salary_fen,
+            "gross_salary_yuan": round(payslip.record.gross_salary_fen / 100, 2),
+            "net_salary_fen": payslip.record.net_salary_fen,
+            "net_salary_yuan": round(payslip.record.net_salary_fen / 100, 2),
+            "items": payslip.items,
+        }
+    )
 
 
 @router.get("/attendance")
@@ -747,12 +751,14 @@ async def get_my_payslip_detail(
 
     def _add(label: str, fen: int, is_deduction: bool = False) -> None:
         if fen != 0:
-            items_display.append({
-                "label": label,
-                "amount_fen": fen,
-                "amount_yuan": round(fen / 100, 2),
-                "is_deduction": is_deduction,
-            })
+            items_display.append(
+                {
+                    "label": label,
+                    "amount_fen": fen,
+                    "amount_yuan": round(fen / 100, 2),
+                    "is_deduction": is_deduction,
+                }
+            )
 
     _add("基本工资", _fen("base_salary_fen"))
     _add("提成", _fen("commission_fen"))
@@ -761,39 +767,45 @@ async def get_my_payslip_detail(
     _add("考勤扣款", _fen("deductions_fen"), is_deduction=True)
     _add("养老/医疗/失业险（个人）", _fen("social_insurance_fen"), is_deduction=True)
     _add("住房公积金（个人）", _fen("housing_fund_fen"), is_deduction=True)
-    items_display.append({
-        "label": "应发合计",
-        "amount_fen": _fen("gross_salary_fen"),
-        "amount_yuan": round(_fen("gross_salary_fen") / 100, 2),
-        "is_deduction": False,
-        "is_summary": True,
-    })
-    items_display.append({
-        "label": "实发合计",
-        "amount_fen": _fen("net_salary_fen"),
-        "amount_yuan": round(_fen("net_salary_fen") / 100, 2),
-        "is_deduction": False,
-        "is_summary": True,
-    })
+    items_display.append(
+        {
+            "label": "应发合计",
+            "amount_fen": _fen("gross_salary_fen"),
+            "amount_yuan": round(_fen("gross_salary_fen") / 100, 2),
+            "is_deduction": False,
+            "is_summary": True,
+        }
+    )
+    items_display.append(
+        {
+            "label": "实发合计",
+            "amount_fen": _fen("net_salary_fen"),
+            "amount_yuan": round(_fen("net_salary_fen") / 100, 2),
+            "is_deduction": False,
+            "is_summary": True,
+        }
+    )
 
-    return _ok({
-        "id": str(rec["id"]),
-        "employee_id": str(rec["employee_id"]),
-        "period": f"{rec['period_year']}-{rec['period_month']:02d}",
-        "period_year": rec["period_year"],
-        "period_month": rec["period_month"],
-        "status": rec["status"],
-        "gross_salary_fen": _fen("gross_salary_fen"),
-        "gross_salary_yuan": round(_fen("gross_salary_fen") / 100, 2),
-        "net_salary_fen": _fen("net_salary_fen"),
-        "net_salary_yuan": round(_fen("net_salary_fen") / 100, 2),
-        "work_days": rec.get("work_days", 0),
-        "work_hours": float(rec.get("work_hours") or 0),
-        "overtime_hours": float(rec.get("overtime_hours") or 0),
-        "confirmed_at": rec.get("confirmed_at"),
-        "paid_at": rec.get("paid_at"),
-        "items": items_display,
-    })
+    return _ok(
+        {
+            "id": str(rec["id"]),
+            "employee_id": str(rec["employee_id"]),
+            "period": f"{rec['period_year']}-{rec['period_month']:02d}",
+            "period_year": rec["period_year"],
+            "period_month": rec["period_month"],
+            "status": rec["status"],
+            "gross_salary_fen": _fen("gross_salary_fen"),
+            "gross_salary_yuan": round(_fen("gross_salary_fen") / 100, 2),
+            "net_salary_fen": _fen("net_salary_fen"),
+            "net_salary_yuan": round(_fen("net_salary_fen") / 100, 2),
+            "work_days": rec.get("work_days", 0),
+            "work_hours": float(rec.get("work_hours") or 0),
+            "overtime_hours": float(rec.get("overtime_hours") or 0),
+            "confirmed_at": rec.get("confirmed_at"),
+            "paid_at": rec.get("paid_at"),
+            "items": items_display,
+        }
+    )
 
 
 @router.put("/schemes/{scheme_id}")
@@ -840,7 +852,7 @@ async def update_salary_scheme(
     row = await db.execute(
         text(f"""
             UPDATE salary_schemes
-            SET {', '.join(set_parts)}
+            SET {", ".join(set_parts)}
             WHERE tenant_id = :tenant_id AND id = :id AND is_deleted = FALSE
             RETURNING *
         """),

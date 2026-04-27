@@ -49,9 +49,15 @@ ORDER BY total_revenue_fen DESC
 
 DIMENSIONS = ["store_name", "store_code"]
 METRICS = [
-    "employee_count", "total_orders", "total_revenue_fen",
-    "waiter_count", "chef_count", "cashier_count",
-    "waiter_revenue_fen", "chef_revenue_fen", "cashier_revenue_fen",
+    "employee_count",
+    "total_orders",
+    "total_revenue_fen",
+    "waiter_count",
+    "chef_count",
+    "cashier_count",
+    "waiter_revenue_fen",
+    "chef_revenue_fen",
+    "cashier_revenue_fen",
     "avg_revenue_per_emp_fen",
 ]
 FILTERS = ["start_date", "end_date", "store_id"]

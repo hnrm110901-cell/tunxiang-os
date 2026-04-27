@@ -10,6 +10,7 @@
 7. 无需补货时 auto 返回 skipped=True，items_count=0
 8. 租户隔离：不同 tenant_id 只能看到自己的数据
 """
+
 import os
 import sys
 
@@ -23,6 +24,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 # ─── 工具 ───
+
 
 def _uid() -> str:
     return str(uuid.uuid4())
@@ -82,6 +84,7 @@ from services.smart_replenishment import (
 #  场景 1: 库存低于 safety_stock 触发补货
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 @pytest.mark.asyncio
 async def test_trigger_when_below_safety_stock():
     """current < safety_stock 应触发补货建议"""
@@ -104,9 +107,11 @@ async def test_trigger_when_below_safety_stock():
     # 当前库存 = 5（低于安全库存 10）
     current_stocks = {ING_PORK: 5.0}
 
-    with patch.object(svc, "get_thresholds", AsyncMock(return_value=thresholds)), \
-         patch.object(svc, "_fetch_current_stocks", AsyncMock(return_value=current_stocks)), \
-         patch.object(svc, "_fetch_consumption_speed", AsyncMock(return_value=({}, {}))):
+    with (
+        patch.object(svc, "get_thresholds", AsyncMock(return_value=thresholds)),
+        patch.object(svc, "_fetch_current_stocks", AsyncMock(return_value=current_stocks)),
+        patch.object(svc, "_fetch_consumption_speed", AsyncMock(return_value=({}, {}))),
+    ):
         items = await svc.check_and_recommend(STORE_ID, TENANT_A, db=None)
 
     assert len(items) == 1
@@ -118,6 +123,7 @@ async def test_trigger_when_below_safety_stock():
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 #  场景 2: 库存高于 safety_stock 不触发
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 @pytest.mark.asyncio
 async def test_no_trigger_when_above_safety_stock():
@@ -139,9 +145,11 @@ async def test_no_trigger_when_above_safety_stock():
     # 库存 = 15，高于安全库存 10
     current_stocks = {ING_PORK: 15.0}
 
-    with patch.object(svc, "get_thresholds", AsyncMock(return_value=thresholds)), \
-         patch.object(svc, "_fetch_current_stocks", AsyncMock(return_value=current_stocks)), \
-         patch.object(svc, "_fetch_consumption_speed", AsyncMock(return_value=({}, {}))):
+    with (
+        patch.object(svc, "get_thresholds", AsyncMock(return_value=thresholds)),
+        patch.object(svc, "_fetch_current_stocks", AsyncMock(return_value=current_stocks)),
+        patch.object(svc, "_fetch_consumption_speed", AsyncMock(return_value=({}, {}))),
+    ):
         items = await svc.check_and_recommend(STORE_ID, TENANT_A, db=None)
 
     assert len(items) == 0
@@ -150,6 +158,7 @@ async def test_no_trigger_when_above_safety_stock():
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 #  场景 3: 补货量 = target - current，按 min_order_qty 向上取整
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 @pytest.mark.asyncio
 async def test_recommend_qty_ceiling_by_min_order_qty():
@@ -171,9 +180,11 @@ async def test_recommend_qty_ceiling_by_min_order_qty():
     ]
     current_stocks = {ING_PORK: 7.0}
 
-    with patch.object(svc, "get_thresholds", AsyncMock(return_value=thresholds)), \
-         patch.object(svc, "_fetch_current_stocks", AsyncMock(return_value=current_stocks)), \
-         patch.object(svc, "_fetch_consumption_speed", AsyncMock(return_value=({}, {}))):
+    with (
+        patch.object(svc, "get_thresholds", AsyncMock(return_value=thresholds)),
+        patch.object(svc, "_fetch_current_stocks", AsyncMock(return_value=current_stocks)),
+        patch.object(svc, "_fetch_consumption_speed", AsyncMock(return_value=({}, {}))),
+    ):
         items = await svc.check_and_recommend(STORE_ID, TENANT_A, db=None)
 
     assert len(items) == 1
@@ -202,9 +213,11 @@ async def test_recommend_qty_exact_multiple_unchanged():
     ]
     current_stocks = {ING_PORK: 10.0}
 
-    with patch.object(svc, "get_thresholds", AsyncMock(return_value=thresholds)), \
-         patch.object(svc, "_fetch_current_stocks", AsyncMock(return_value=current_stocks)), \
-         patch.object(svc, "_fetch_consumption_speed", AsyncMock(return_value=({}, {}))):
+    with (
+        patch.object(svc, "get_thresholds", AsyncMock(return_value=thresholds)),
+        patch.object(svc, "_fetch_current_stocks", AsyncMock(return_value=current_stocks)),
+        patch.object(svc, "_fetch_consumption_speed", AsyncMock(return_value=({}, {}))),
+    ):
         items = await svc.check_and_recommend(STORE_ID, TENANT_A, db=None)
 
     assert items[0].recommend_qty == 40.0
@@ -213,6 +226,7 @@ async def test_recommend_qty_exact_multiple_unchanged():
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 #  场景 4: dual 规则 — 高消耗速度提前触发
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 @pytest.mark.asyncio
 async def test_dual_rule_early_trigger_on_high_consumption():
@@ -239,9 +253,11 @@ async def test_dual_rule_early_trigger_on_high_consumption():
     consumption_map = {ING_FISH: 5.0}
     avg_map = {ING_FISH: 3.0}
 
-    with patch.object(svc, "get_thresholds", AsyncMock(return_value=thresholds)), \
-         patch.object(svc, "_fetch_current_stocks", AsyncMock(return_value=current_stocks)), \
-         patch.object(svc, "_fetch_consumption_speed", AsyncMock(return_value=(consumption_map, avg_map))):
+    with (
+        patch.object(svc, "get_thresholds", AsyncMock(return_value=thresholds)),
+        patch.object(svc, "_fetch_current_stocks", AsyncMock(return_value=current_stocks)),
+        patch.object(svc, "_fetch_consumption_speed", AsyncMock(return_value=(consumption_map, avg_map))),
+    ):
         items = await svc.check_and_recommend(STORE_ID, TENANT_A, db=None)
 
     assert len(items) == 1
@@ -271,9 +287,11 @@ async def test_dual_rule_no_early_trigger_when_normal_consumption():
     consumption_map = {ING_FISH: 2.0}
     avg_map = {ING_FISH: 2.0}
 
-    with patch.object(svc, "get_thresholds", AsyncMock(return_value=thresholds)), \
-         patch.object(svc, "_fetch_current_stocks", AsyncMock(return_value=current_stocks)), \
-         patch.object(svc, "_fetch_consumption_speed", AsyncMock(return_value=(consumption_map, avg_map))):
+    with (
+        patch.object(svc, "get_thresholds", AsyncMock(return_value=thresholds)),
+        patch.object(svc, "_fetch_current_stocks", AsyncMock(return_value=current_stocks)),
+        patch.object(svc, "_fetch_consumption_speed", AsyncMock(return_value=(consumption_map, avg_map))),
+    ):
         items = await svc.check_and_recommend(STORE_ID, TENANT_A, db=None)
 
     assert len(items) == 0
@@ -283,6 +301,7 @@ async def test_dual_rule_no_early_trigger_when_normal_consumption():
 #  场景 5: 阈值设置 + 读取
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 @pytest.mark.asyncio
 async def test_set_and_get_threshold():
     """set_threshold 写入后 get_thresholds 可读取"""
@@ -291,9 +310,7 @@ async def test_set_and_get_threshold():
     now_dt = datetime.now(timezone.utc)
 
     # mock set_threshold 的 DB 返回
-    upsert_result = FakeResult(
-        rows=[FakeRow(id=uuid.UUID(threshold_id), updated_at=now_dt)]
-    )
+    upsert_result = FakeResult(rows=[FakeRow(id=uuid.UUID(threshold_id), updated_at=now_dt)])
     # mock get_thresholds 的 DB 返回
     select_result = FakeResult(
         rows=[
@@ -310,12 +327,14 @@ async def test_set_and_get_threshold():
         ]
     )
 
-    db = _make_db(execute_results=[
-        FakeResult(),           # set_config
-        upsert_result,          # INSERT ... ON CONFLICT
-        FakeResult(),           # set_config (get_thresholds)
-        select_result,          # SELECT
-    ])
+    db = _make_db(
+        execute_results=[
+            FakeResult(),  # set_config
+            upsert_result,  # INSERT ... ON CONFLICT
+            FakeResult(),  # set_config (get_thresholds)
+            select_result,  # SELECT
+        ]
+    )
 
     threshold = await svc.set_threshold(
         store_id=STORE_ID,
@@ -359,6 +378,7 @@ async def test_set_threshold_validates_target_gte_safety():
 #  场景 6: 自动申购单创建，source 标注正确
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 @pytest.mark.asyncio
 async def test_auto_create_requisition_sets_source():
     """auto_create_requisition 成功时 source='smart_replenishment'
@@ -393,6 +413,7 @@ async def test_auto_create_requisition_sets_source():
 #  场景 7: 无需补货时 auto 返回 skipped=True
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 @pytest.mark.asyncio
 async def test_auto_skipped_when_no_replenishment_needed():
     """库存充足时 auto_create_requisition 返回 skipped=True，不创建申购单"""
@@ -411,6 +432,7 @@ async def test_auto_skipped_when_no_replenishment_needed():
 #  场景 8: 租户隔离
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 @pytest.mark.asyncio
 async def test_tenant_isolation():
     """不同 tenant_id 的查询互不干扰，set_config 携带正确租户 ID"""
@@ -428,15 +450,9 @@ async def test_tenant_isolation():
     await svc.get_thresholds(STORE_ID, TENANT_B, db=db)
 
     # 第一次调用是 set_config，应带 TENANT_B
-    assert any(
-        p.get("tid") == TENANT_B
-        for p in executed_params
-    ), "set_config 应传入 TENANT_B"
+    assert any(p.get("tid") == TENANT_B for p in executed_params), "set_config 应传入 TENANT_B"
     # 不应出现 TENANT_A
-    assert not any(
-        p.get("tenant_id") == TENANT_A
-        for p in executed_params
-    ), "不应查询 TENANT_A 的数据"
+    assert not any(p.get("tenant_id") == TENANT_A for p in executed_params), "不应查询 TENANT_A 的数据"
 
 
 @pytest.mark.asyncio
@@ -459,9 +475,11 @@ async def test_urgency_is_urgent_when_below_half_safety():
     # current = 8 < safety*0.5 = 10 → urgent
     current_stocks = {ING_PORK: 8.0}
 
-    with patch.object(svc, "get_thresholds", AsyncMock(return_value=thresholds)), \
-         patch.object(svc, "_fetch_current_stocks", AsyncMock(return_value=current_stocks)), \
-         patch.object(svc, "_fetch_consumption_speed", AsyncMock(return_value=({}, {}))):
+    with (
+        patch.object(svc, "get_thresholds", AsyncMock(return_value=thresholds)),
+        patch.object(svc, "_fetch_current_stocks", AsyncMock(return_value=current_stocks)),
+        patch.object(svc, "_fetch_consumption_speed", AsyncMock(return_value=({}, {}))),
+    ):
         items = await svc.check_and_recommend(STORE_ID, TENANT_A, db=None)
 
     assert len(items) == 1

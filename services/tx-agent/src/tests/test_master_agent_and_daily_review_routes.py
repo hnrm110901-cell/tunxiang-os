@@ -11,6 +11,7 @@ Covered routes:
 
 Total: 16 test cases
 """
+
 import os
 import sys
 import types
@@ -19,8 +20,10 @@ import types
 _src_mod = types.ModuleType("src")
 _db_mod = types.ModuleType("src.db")
 
+
 async def _fake_get_db():
     yield None
+
 
 _db_mod.get_db = _fake_get_db
 sys.modules.setdefault("src", _src_mod)
@@ -29,18 +32,20 @@ sys.modules.setdefault("src.db", _db_mod)
 # Ensure the tx-agent src directory is on the path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
-from unittest.mock import AsyncMock, MagicMock, patch
-
 
 # ─────────────────────────────────────────────────────────────────────────────
 # App fixture: master_agent_routes
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def _build_master_app():
-    from api.master_agent_routes import router, _task_store
+    from api.master_agent_routes import _task_store, router
+
     app = FastAPI()
     app.include_router(router)
     return app, _task_store
@@ -56,6 +61,7 @@ def master_client():
 # ─────────────────────────────────────────────────────────────────────────────
 # POST /api/v1/agent/execute
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_execute_no_intent_returns_failed(master_client):
@@ -144,6 +150,7 @@ async def test_execute_brain_fallback_returns_failed(master_client):
 # GET /api/v1/agent/tasks/{task_id}
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_get_task_status_not_found(master_client):
     """Non-existent task_id returns ok=False."""
@@ -158,7 +165,7 @@ async def test_get_task_status_not_found(master_client):
 @pytest.mark.asyncio
 async def test_get_task_status_found():
     """Existing task_id returns ok=True with task data."""
-    from api.master_agent_routes import router, _task_store
+    from api.master_agent_routes import _task_store, router
 
     # Pre-populate the task store
     _task_store["test-task-99"] = {
@@ -187,6 +194,7 @@ async def test_get_task_status_found():
 # ─────────────────────────────────────────────────────────────────────────────
 # GET /api/v1/agent/health
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_agent_health_when_brain_reachable(master_client):
@@ -220,9 +228,7 @@ async def test_agent_health_when_brain_unreachable(master_client):
     mock_client = AsyncMock()
     mock_client.__aenter__ = AsyncMock(return_value=mock_client)
     mock_client.__aexit__ = AsyncMock(return_value=False)
-    mock_client.get = AsyncMock(
-        side_effect=httpx.RequestError("connection refused")
-    )
+    mock_client.get = AsyncMock(side_effect=httpx.RequestError("connection refused"))
 
     with patch("api.master_agent_routes.httpx.AsyncClient", return_value=mock_client):
         async with master_client as c:
@@ -238,6 +244,7 @@ async def test_agent_health_when_brain_unreachable(master_client):
 # ─────────────────────────────────────────────────────────────────────────────
 # POST /api/v1/agent/chat
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_chat_no_intent_returns_help_message(master_client):
@@ -304,9 +311,11 @@ async def test_chat_brain_fallback_returns_error_message(master_client):
 # App fixture: daily_review_routes
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 @pytest.fixture
 def daily_review_client():
     from api.daily_review_routes import router
+
     app = FastAPI()
     app.include_router(router)
     transport = ASGITransport(app=app)
@@ -316,6 +325,7 @@ def daily_review_client():
 # ─────────────────────────────────────────────────────────────────────────────
 # GET /api/v1/daily-review/today
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_daily_review_today_returns_state(daily_review_client):
@@ -332,7 +342,7 @@ async def test_daily_review_today_returns_state(daily_review_client):
     data = body["data"]
     assert data["store_id"] == "store-001"
     assert "nodes" in data
-    assert len(data["nodes"]) == 8   # E1-E8
+    assert len(data["nodes"]) == 8  # E1-E8
     assert "completion_rate" in data
     assert "health_score" in data
 
@@ -358,6 +368,7 @@ async def test_daily_review_today_nodes_have_required_fields(daily_review_client
 # ─────────────────────────────────────────────────────────────────────────────
 # POST /api/v1/daily-review/complete-node
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_complete_node_success(daily_review_client):
@@ -406,6 +417,7 @@ async def test_complete_node_already_done_returns_400(daily_review_client):
 # ─────────────────────────────────────────────────────────────────────────────
 # GET /api/v1/daily-review/multi-store
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_multi_store_summary_returns_list(daily_review_client):

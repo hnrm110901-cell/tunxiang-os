@@ -42,9 +42,7 @@ router = APIRouter(prefix="/api/v1/points", tags=["employee-points"])
 
 
 def _get_tenant_id(request: Request) -> str:
-    tid = getattr(request.state, "tenant_id", None) or request.headers.get(
-        "X-Tenant-ID", ""
-    )
+    tid = getattr(request.state, "tenant_id", None) or request.headers.get("X-Tenant-ID", "")
     if not tid:
         raise HTTPException(status_code=400, detail="X-Tenant-ID header required")
     return tid
@@ -118,8 +116,13 @@ async def award_points(
     tid = _get_tenant_id(request)
     try:
         result = await pts_svc.award_points_v2(
-            db, tid, body.employee_id, body.rule_code,
-            reason=body.reason, operator_id=body.operator_id, source=body.source,
+            db,
+            tid,
+            body.employee_id,
+            body.rule_code,
+            reason=body.reason,
+            operator_id=body.operator_id,
+            source=body.source,
         )
         await db.commit()
         return _ok(result)
@@ -137,8 +140,13 @@ async def deduct_points(
     tid = _get_tenant_id(request)
     try:
         result = await pts_svc.deduct_points_v2(
-            db, tid, body.employee_id, body.rule_code,
-            reason=body.reason, operator_id=body.operator_id, source=body.source,
+            db,
+            tid,
+            body.employee_id,
+            body.rule_code,
+            reason=body.reason,
+            operator_id=body.operator_id,
+            source=body.source,
         )
         await db.commit()
         return _ok(result)
@@ -158,13 +166,15 @@ async def get_balance(
         balance = await pts_svc.get_employee_balance_v2(db, tid, employee_id)
         level = pts_svc.compute_level(balance)
         next_name, to_next = pts_svc._next_level_info(balance)
-        return _ok({
-            "employee_id": employee_id,
-            "balance": balance,
-            "level": level,
-            "next_level": next_name,
-            "points_to_next": to_next,
-        })
+        return _ok(
+            {
+                "employee_id": employee_id,
+                "balance": balance,
+                "level": level,
+                "next_level": next_name,
+                "points_to_next": to_next,
+            }
+        )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
 
@@ -243,8 +253,13 @@ async def create_reward(
     """创建兑换商品"""
     tid = _get_tenant_id(request)
     result = await pts_svc.create_reward(
-        db, tid, body.reward_name, body.reward_type,
-        body.points_cost, body.stock, body.description,
+        db,
+        tid,
+        body.reward_name,
+        body.reward_type,
+        body.points_cost,
+        body.stock,
+        body.description,
     )
     await db.commit()
     return _ok(result)
@@ -300,9 +315,16 @@ async def create_season(
     if ed <= sd:
         raise HTTPException(status_code=400, detail="结束日期须晚于开始日期")
     result = await pts_svc.create_horse_race_season(
-        db, tid, body.season_name, sd, ed,
-        body.scope_type, body.scope_id, body.ranking_dimension,
-        body.prizes, body.rules,
+        db,
+        tid,
+        body.season_name,
+        sd,
+        ed,
+        body.scope_type,
+        body.scope_id,
+        body.ranking_dimension,
+        body.prizes,
+        body.rules,
     )
     await db.commit()
     return _ok(result)

@@ -7,6 +7,7 @@
 
 对标：Lightspeed 和 Odoo 的库存-菜单联动。
 """
+
 import math
 import os
 import uuid
@@ -37,10 +38,10 @@ class ImpactedDish:
     dish_name: str
     ingredient_id: str
     ingredient_name: str
-    per_dish_usage: float       # 每份菜消耗食材量
-    estimated_servings: int     # 估算可出品份数
-    auto_soldout: bool          # 是否自动下架
-    low_stock: bool             # 是否低库存预警
+    per_dish_usage: float  # 每份菜消耗食材量
+    estimated_servings: int  # 估算可出品份数
+    auto_soldout: bool  # 是否自动下架
+    low_stock: bool  # 是否低库存预警
 
 
 @dataclass
@@ -148,6 +149,7 @@ async def _fetch_all_ingredient_stocks(
 
 
 # ─── 核心业务函数 ───
+
 
 async def check_ingredient_impact(
     ingredient_id: str,
@@ -433,17 +435,19 @@ async def get_soldout_watch(
                 continue
 
             seen_dishes.add(dish.dish_id)
-            watch_list.append({
-                "dish_id": dish.dish_id,
-                "dish_name": dish.dish_name,
-                "ingredient_name": dish.ingredient_name,
-                "ingredient_id": dish.ingredient_id,
-                "estimated_servings": dish.estimated_servings,
-                "is_auto_soldout": dish.auto_soldout,
-                "is_low_stock": dish.low_stock,
-                "current_stock": current_stock,
-                "unit": stock_info["unit"],
-            })
+            watch_list.append(
+                {
+                    "dish_id": dish.dish_id,
+                    "dish_name": dish.dish_name,
+                    "ingredient_name": dish.ingredient_name,
+                    "ingredient_id": dish.ingredient_id,
+                    "estimated_servings": dish.estimated_servings,
+                    "is_auto_soldout": dish.auto_soldout,
+                    "is_low_stock": dish.low_stock,
+                    "current_stock": current_stock,
+                    "unit": stock_info["unit"],
+                }
+            )
 
     # 按紧急程度排序：已下架 > 低库存，可出份数从少到多
     watch_list.sort(key=lambda x: (not x["is_auto_soldout"], x["estimated_servings"]))
@@ -478,15 +482,17 @@ async def get_inventory_dashboard(
 
             impacted_count = len(impacted)
             if impacted_count > 0:
-                alerts.append({
-                    "ingredient_id": ingredient_id,
-                    "ingredient_name": stock_info["ingredient_name"],
-                    "current_stock": current_stock,
-                    "threshold": stock_info["threshold"],
-                    "unit": stock_info["unit"],
-                    "impacted_dishes_count": impacted_count,
-                    "auto_soldout_count": len(auto_soldout),
-                })
+                alerts.append(
+                    {
+                        "ingredient_id": ingredient_id,
+                        "ingredient_name": stock_info["ingredient_name"],
+                        "current_stock": current_stock,
+                        "threshold": stock_info["threshold"],
+                        "unit": stock_info["unit"],
+                        "impacted_dishes_count": impacted_count,
+                        "auto_soldout_count": len(auto_soldout),
+                    }
+                )
 
     # 按影响菜品数降序
     alerts.sort(key=lambda x: x["impacted_dishes_count"], reverse=True)
@@ -500,6 +506,7 @@ async def get_inventory_dashboard(
 
 
 # ─── 内部广播 / 同步函数（失败不阻塞主流程）───
+
 
 async def _broadcast_menu_updated(
     dish_ids: list[str],

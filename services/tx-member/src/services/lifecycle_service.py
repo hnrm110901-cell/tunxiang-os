@@ -7,6 +7,7 @@
 - 营销触发失败（发券/推送 API 报错）记录日志但不阻塞分类流程
 - tenant_id 显式传入，所有 DB 查询带 tenant_id 参数
 """
+
 from __future__ import annotations
 
 from datetime import datetime, timezone
@@ -88,9 +89,7 @@ class LifecycleService:
             last_order_at = last_order_at.replace(tzinfo=timezone.utc)
 
         days_since_first = (now - first_order_at).days
-        days_since_last = (
-            (now - last_order_at).days if last_order_at is not None else days_since_first
-        )
+        days_since_last = (now - last_order_at).days if last_order_at is not None else days_since_first
 
         new_threshold = self.DEFAULT_THRESHOLDS["new"]
         active_threshold = self.DEFAULT_THRESHOLDS["active"]
@@ -155,14 +154,10 @@ class LifecycleService:
         if new_stage != old_stage:
             await self._update_member_stage(member_id, tenant_id, new_stage, db)
             days_since_last = (
-                (datetime.now(timezone.utc) - customer["last_order_at"]).days
-                if customer["last_order_at"]
-                else None
+                (datetime.now(timezone.utc) - customer["last_order_at"]).days if customer["last_order_at"] else None
             )
             trigger_reason = (
-                f"days_since_last_visit={days_since_last}"
-                if days_since_last is not None
-                else "first_classification"
+                f"days_since_last_visit={days_since_last}" if days_since_last is not None else "first_classification"
             )
             action_result = await self.trigger_intervention(
                 member_id=member_id,
@@ -211,8 +206,12 @@ class LifecycleService:
         members = await self._fetch_all_members(tenant_id=tenant_id, db=db)
 
         counters: dict[str, int] = {
-            "new": 0, "active": 0, "dormant": 0,
-            "churned": 0, "reactivated": 0, "changed": 0,
+            "new": 0,
+            "active": 0,
+            "dormant": 0,
+            "churned": 0,
+            "reactivated": 0,
+            "changed": 0,
         }
 
         for member in members:
@@ -302,17 +301,11 @@ class LifecycleService:
 
         try:
             if new_stage == LifecycleStage.DORMANT:
-                action_taken = await self._handle_dormant(
-                    member_id, tenant_id, config, db
-                )
+                action_taken = await self._handle_dormant(member_id, tenant_id, config, db)
             elif new_stage == LifecycleStage.CHURNED:
-                action_taken = await self._handle_churned(
-                    member_id, tenant_id, config, db
-                )
+                action_taken = await self._handle_churned(member_id, tenant_id, config, db)
             elif new_stage == LifecycleStage.REACTIVATED:
-                action_taken = await self._handle_reactivated(
-                    member_id, tenant_id, config, db
-                )
+                action_taken = await self._handle_reactivated(member_id, tenant_id, config, db)
         except (SQLAlchemyError, ConnectionError, TimeoutError, ValueError) as exc:  # 营销失败兜底，记录日志不阻塞
             error_msg = str(exc)
             action_taken = "none"
@@ -416,9 +409,7 @@ class LifecycleService:
             {new, active, dormant, churned, reactivated, total,
              ratios: {new: float, active: float, ...}}
         """
-        counts = await self._query_stage_counts(
-            tenant_id=tenant_id, store_id=store_id, db=db
-        )
+        counts = await self._query_stage_counts(tenant_id=tenant_id, store_id=store_id, db=db)
         total = counts.get("total", 0)
 
         ratios: dict[str, float] = {}
@@ -575,8 +566,12 @@ class LifecycleService:
         rows = result.fetchall()
 
         counts: dict[str, int] = {
-            "new": 0, "active": 0, "dormant": 0,
-            "churned": 0, "reactivated": 0, "total": 0,
+            "new": 0,
+            "active": 0,
+            "dormant": 0,
+            "churned": 0,
+            "reactivated": 0,
+            "total": 0,
         }
         for stage, cnt in rows:
             if stage in counts:

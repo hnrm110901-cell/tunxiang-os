@@ -96,16 +96,20 @@ class PayrollEngine:
             LIMIT 1
         """)
         row = (
-            await db.execute(
-                sql,
-                {
-                    "tenant_id": tenant_id,
-                    "store_id": store_id,
-                    "role": employee_role,
-                    "as_of": as_of,
-                },
+            (
+                await db.execute(
+                    sql,
+                    {
+                        "tenant_id": tenant_id,
+                        "store_id": store_id,
+                        "role": employee_role,
+                        "as_of": as_of,
+                    },
+                )
             )
-        ).mappings().first()
+            .mappings()
+            .first()
+        )
         return dict(row) if row else None
 
     # ── 步骤 2：读取当月日绩效汇总 ────────────────────────────────────────
@@ -145,17 +149,21 @@ class PayrollEngine:
         """)
         period_start, period_end = self._period_dates(year, month)
         row = (
-            await db.execute(
-                sql,
-                {
-                    "tenant_id": tenant_id,
-                    "store_id": store_id,
-                    "employee_id": employee_id,
-                    "period_start": period_start,
-                    "period_end": period_end,
-                },
+            (
+                await db.execute(
+                    sql,
+                    {
+                        "tenant_id": tenant_id,
+                        "store_id": store_id,
+                        "employee_id": employee_id,
+                        "period_start": period_start,
+                        "period_end": period_end,
+                    },
+                )
             )
-        ).mappings().first()
+            .mappings()
+            .first()
+        )
 
         if not row:
             return {
@@ -208,26 +216,30 @@ class PayrollEngine:
         if salary_type == "monthly":
             base_salary_fen: int = cfg.get("base_salary_fen") or 0
             base_pay = compute_base_salary(base_salary_fen, attendance_days, work_days)
-            line_items.append({
-                "item_type": "base",
-                "item_name": "基本工资",
-                "amount_fen": base_pay,
-                "quantity": Decimal(str(attendance_days)),
-                "unit_price_fen": int(base_salary_fen / work_days) if work_days else 0,
-                "notes": f"月薪{base_salary_fen}分 × 出勤{attendance_days}天/{work_days}天",
-            })
+            line_items.append(
+                {
+                    "item_type": "base",
+                    "item_name": "基本工资",
+                    "amount_fen": base_pay,
+                    "quantity": Decimal(str(attendance_days)),
+                    "unit_price_fen": int(base_salary_fen / work_days) if work_days else 0,
+                    "notes": f"月薪{base_salary_fen}分 × 出勤{attendance_days}天/{work_days}天",
+                }
+            )
         elif salary_type == "hourly":
             hourly_rate: int = cfg.get("hourly_rate_fen") or 0
             work_hours = attendance_days * 8
             base_pay = int(hourly_rate * work_hours)
-            line_items.append({
-                "item_type": "base",
-                "item_name": "时薪基本工资",
-                "amount_fen": base_pay,
-                "quantity": Decimal(str(work_hours)),
-                "unit_price_fen": hourly_rate,
-                "notes": f"时薪{hourly_rate}分 × {work_hours}小时",
-            })
+            line_items.append(
+                {
+                    "item_type": "base",
+                    "item_name": "时薪基本工资",
+                    "amount_fen": base_pay,
+                    "quantity": Decimal(str(work_hours)),
+                    "unit_price_fen": hourly_rate,
+                    "notes": f"时薪{hourly_rate}分 × {work_hours}小时",
+                }
+            )
             base_salary_fen = hourly_rate * work_days * 8  # 用于后续推算
         else:
             # piecework 无底薪
@@ -238,14 +250,16 @@ class PayrollEngine:
         seniority_fen = compute_seniority_subsidy(seniority_months)
         if seniority_fen > 0:
             base_pay += seniority_fen
-            line_items.append({
-                "item_type": "base",
-                "item_name": "工龄补贴",
-                "amount_fen": seniority_fen,
-                "quantity": None,
-                "unit_price_fen": None,
-                "notes": f"司龄{seniority_months}个月",
-            })
+            line_items.append(
+                {
+                    "item_type": "base",
+                    "item_name": "工龄补贴",
+                    "amount_fen": seniority_fen,
+                    "quantity": None,
+                    "unit_price_fen": None,
+                    "notes": f"司龄{seniority_months}个月",
+                }
+            )
 
         # ── 加班费 ────────────────────────────────────────────────────────
         if overtime_hours > 0:
@@ -254,14 +268,16 @@ class PayrollEngine:
             else:
                 hourly_for_ot = derive_hourly_rate(base_salary_fen or 1, work_days)
             overtime_pay = compute_overtime_pay(hourly_for_ot, overtime_hours, "weekday")
-            line_items.append({
-                "item_type": "overtime",
-                "item_name": "加班费",
-                "amount_fen": overtime_pay,
-                "quantity": Decimal(str(overtime_hours)),
-                "unit_price_fen": int(hourly_for_ot * 1.5),
-                "notes": f"加班{overtime_hours}小时 × 时薪{hourly_for_ot}分 × 1.5倍",
-            })
+            line_items.append(
+                {
+                    "item_type": "overtime",
+                    "item_name": "加班费",
+                    "amount_fen": overtime_pay,
+                    "quantity": Decimal(str(overtime_hours)),
+                    "unit_price_fen": int(hourly_for_ot * 1.5),
+                    "notes": f"加班{overtime_hours}小时 × 时薪{hourly_for_ot}分 × 1.5倍",
+                }
+            )
         else:
             overtime_pay = 0
 
@@ -276,25 +292,29 @@ class PayrollEngine:
                 base_amount_fen = perf.get("total_revenue_fen", 0)  # profit 暂用 revenue 代替
             commission = int(base_amount_fen * commission_rate)
             if commission > 0:
-                line_items.append({
-                    "item_type": "commission",
-                    "item_name": "销售提成",
-                    "amount_fen": commission,
-                    "quantity": Decimal(str(base_amount_fen)),
-                    "unit_price_fen": None,
-                    "notes": f"{commission_base_key}基数{base_amount_fen}分 × {commission_rate}",
-                })
+                line_items.append(
+                    {
+                        "item_type": "commission",
+                        "item_name": "销售提成",
+                        "amount_fen": commission,
+                        "quantity": Decimal(str(base_amount_fen)),
+                        "unit_price_fen": None,
+                        "notes": f"{commission_base_key}基数{base_amount_fen}分 × {commission_rate}",
+                    }
+                )
         elif commission_type == "fixed":
             commission = perf.get("base_commission_fen", 0)
             if commission > 0:
-                line_items.append({
-                    "item_type": "commission",
-                    "item_name": "固定提成",
-                    "amount_fen": commission,
-                    "quantity": None,
-                    "unit_price_fen": None,
-                    "notes": "按日绩效固定提成汇总",
-                })
+                line_items.append(
+                    {
+                        "item_type": "commission",
+                        "item_name": "固定提成",
+                        "amount_fen": commission,
+                        "quantity": None,
+                        "unit_price_fen": None,
+                        "notes": "按日绩效固定提成汇总",
+                    }
+                )
         else:
             commission = 0
 
@@ -312,14 +332,16 @@ class PayrollEngine:
                 piece_count = perf["total_orders"]
                 unit_label = "订单"
             piecework_pay = piece_count * piecework_rate
-            line_items.append({
-                "item_type": "piecework",
-                "item_name": f"计件工资（{unit_label}）",
-                "amount_fen": piecework_pay,
-                "quantity": Decimal(str(piece_count)),
-                "unit_price_fen": piecework_rate,
-                "notes": f"{piece_count}{unit_label} × {piecework_rate}分",
-            })
+            line_items.append(
+                {
+                    "item_type": "piecework",
+                    "item_name": f"计件工资（{unit_label}）",
+                    "amount_fen": piecework_pay,
+                    "quantity": Decimal(str(piece_count)),
+                    "unit_price_fen": piecework_rate,
+                    "notes": f"{piece_count}{unit_label} × {piecework_rate}分",
+                }
+            )
         else:
             piecework_pay = 0
 
@@ -328,14 +350,16 @@ class PayrollEngine:
         if kpi_bonus_max > 0 and kpi_score > 0:
             kpi_ratio = Decimal(str(min(kpi_score, 100))) / Decimal("100")
             kpi_bonus = int(kpi_bonus_max * kpi_ratio)
-            line_items.append({
-                "item_type": "kpi",
-                "item_name": "绩效奖金",
-                "amount_fen": kpi_bonus,
-                "quantity": Decimal(str(kpi_score)),
-                "unit_price_fen": kpi_bonus_max,
-                "notes": f"KPI得分{kpi_score} × 上限{kpi_bonus_max}分",
-            })
+            line_items.append(
+                {
+                    "item_type": "kpi",
+                    "item_name": "绩效奖金",
+                    "amount_fen": kpi_bonus,
+                    "quantity": Decimal(str(kpi_score)),
+                    "unit_price_fen": kpi_bonus_max,
+                    "notes": f"KPI得分{kpi_score} × 上限{kpi_bonus_max}分",
+                }
+            )
         else:
             kpi_bonus = 0
 
@@ -346,38 +370,42 @@ class PayrollEngine:
             work_days,
         )
         late_ded = compute_late_deduction(late_count, late_deduction_per_time_fen)
-        early_ded = compute_early_leave_deduction(
-            early_leave_count, early_leave_deduction_per_time_fen
-        )
+        early_ded = compute_early_leave_deduction(early_leave_count, early_leave_deduction_per_time_fen)
         deduction_total = abs_ded + late_ded + early_ded
 
         if abs_ded > 0:
-            line_items.append({
-                "item_type": "deduction",
-                "item_name": "缺勤扣款",
-                "amount_fen": -abs_ded,
-                "quantity": Decimal(str(absence_days)),
-                "unit_price_fen": None,
-                "notes": f"缺勤{absence_days}天",
-            })
+            line_items.append(
+                {
+                    "item_type": "deduction",
+                    "item_name": "缺勤扣款",
+                    "amount_fen": -abs_ded,
+                    "quantity": Decimal(str(absence_days)),
+                    "unit_price_fen": None,
+                    "notes": f"缺勤{absence_days}天",
+                }
+            )
         if late_ded > 0:
-            line_items.append({
-                "item_type": "deduction",
-                "item_name": "迟到扣款",
-                "amount_fen": -late_ded,
-                "quantity": Decimal(str(late_count)),
-                "unit_price_fen": late_deduction_per_time_fen,
-                "notes": f"迟到{late_count}次 × {late_deduction_per_time_fen}分/次",
-            })
+            line_items.append(
+                {
+                    "item_type": "deduction",
+                    "item_name": "迟到扣款",
+                    "amount_fen": -late_ded,
+                    "quantity": Decimal(str(late_count)),
+                    "unit_price_fen": late_deduction_per_time_fen,
+                    "notes": f"迟到{late_count}次 × {late_deduction_per_time_fen}分/次",
+                }
+            )
         if early_ded > 0:
-            line_items.append({
-                "item_type": "deduction",
-                "item_name": "早退扣款",
-                "amount_fen": -early_ded,
-                "quantity": Decimal(str(early_leave_count)),
-                "unit_price_fen": early_leave_deduction_per_time_fen,
-                "notes": f"早退{early_leave_count}次 × {early_leave_deduction_per_time_fen}分/次",
-            })
+            line_items.append(
+                {
+                    "item_type": "deduction",
+                    "item_name": "早退扣款",
+                    "amount_fen": -early_ded,
+                    "quantity": Decimal(str(early_leave_count)),
+                    "unit_price_fen": early_leave_deduction_per_time_fen,
+                    "notes": f"早退{early_leave_count}次 × {early_leave_deduction_per_time_fen}分/次",
+                }
+            )
 
         return (
             base_pay,
@@ -444,6 +472,7 @@ class PayrollEngine:
             RETURNING id
         """)
         import json
+
         result = await db.execute(
             sql,
             {
@@ -509,14 +538,16 @@ class PayrollEngine:
         # 插入各项明细
         items_to_insert = list(line_items)
         if tax_fen > 0:
-            items_to_insert.append({
-                "item_type": "tax",
-                "item_name": "个人所得税",
-                "amount_fen": -tax_fen,
-                "quantity": None,
-                "unit_price_fen": None,
-                "notes": "累计预扣法",
-            })
+            items_to_insert.append(
+                {
+                    "item_type": "tax",
+                    "item_name": "个人所得税",
+                    "amount_fen": -tax_fen,
+                    "quantity": None,
+                    "unit_price_fen": None,
+                    "notes": "累计预扣法",
+                }
+            )
 
         for item in items_to_insert:
             await db.execute(
@@ -609,9 +640,7 @@ class PayrollEngine:
         actual_month_index = month_index if month_index is not None else month
 
         # 1. 薪资配置
-        cfg = await self._get_config(
-            db, tenant_id, store_id, employee_role, period_start
-        )
+        cfg = await self._get_config(db, tenant_id, store_id, employee_role, period_start)
         if not cfg:
             log.warning(
                 "payroll_config_missing",
@@ -634,9 +663,7 @@ class PayrollEngine:
             }
 
         # 2. 日绩效汇总
-        perf = await self._get_monthly_performance(
-            db, tenant_id, store_id, employee_id, year, month
-        )
+        perf = await self._get_monthly_performance(db, tenant_id, store_id, employee_id, year, month)
 
         # 3. 计算各项
         (
@@ -663,17 +690,13 @@ class PayrollEngine:
         )
 
         gross_pay_fen = (
-            base_pay_fen
-            + overtime_pay_fen
-            + commission_fen
-            + piecework_pay_fen
-            + kpi_bonus_fen
-            - deduction_fen
+            base_pay_fen + overtime_pay_fen + commission_fen + piecework_pay_fen + kpi_bonus_fen - deduction_fen
         )
         gross_pay_fen = max(0, gross_pay_fen)
 
         # 4. 简易个税（累计预扣法）
         from services.income_tax import IncomeTaxCalculator
+
         tax_calc = IncomeTaxCalculator()
         tax_result = tax_calc.calculate_monthly(
             current_month_income=gross_pay_fen / 100.0,
@@ -816,11 +839,13 @@ class PayrollEngine:
                     employee_id=str(emp["employee_id"]),
                     error=str(exc),
                 )
-                results.append({
-                    "employee_id": str(emp["employee_id"]),
-                    "error": str(exc),
-                    "status": "error",
-                })
+                results.append(
+                    {
+                        "employee_id": str(emp["employee_id"]),
+                        "error": str(exc),
+                        "status": "error",
+                    }
+                )
 
         return results
 
@@ -858,9 +883,7 @@ class PayrollEngine:
         )
         row = result.mappings().first()
         if not row:
-            raise ValueError(
-                f"薪资单不存在或状态非 draft: record_id={record_id}"
-            )
+            raise ValueError(f"薪资单不存在或状态非 draft: record_id={record_id}")
 
         await db.commit()
         log.info(
@@ -915,15 +938,19 @@ class PayrollEngine:
               AND is_deleted      = false
         """)
         curr_row = (
-            await db.execute(
-                curr_sql,
-                {
-                    "tenant_id": tenant_id,
-                    "store_id": store_id,
-                    "period_start": period_start,
-                },
+            (
+                await db.execute(
+                    curr_sql,
+                    {
+                        "tenant_id": tenant_id,
+                        "store_id": store_id,
+                        "period_start": period_start,
+                    },
+                )
             )
-        ).mappings().first()
+            .mappings()
+            .first()
+        )
 
         # 上月对比
         if month == 1:
@@ -945,15 +972,19 @@ class PayrollEngine:
               AND is_deleted       = false
         """)
         prev_row = (
-            await db.execute(
-                prev_sql,
-                {
-                    "tenant_id": tenant_id,
-                    "store_id": store_id,
-                    "period_start": prev_period_start,
-                },
+            (
+                await db.execute(
+                    prev_sql,
+                    {
+                        "tenant_id": tenant_id,
+                        "store_id": store_id,
+                        "period_start": prev_period_start,
+                    },
+                )
             )
-        ).mappings().first()
+            .mappings()
+            .first()
+        )
 
         # 环比计算
         def _ratio(curr_val: float | None, prev_val: float | None) -> float | None:

@@ -8,6 +8,7 @@
   POST /{id}/cancel        — 取消自动续费
   GET  /plans              — 获取可用订阅方案列表
 """
+
 from __future__ import annotations
 
 import uuid
@@ -16,7 +17,7 @@ from typing import Optional
 
 import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -30,6 +31,7 @@ router = APIRouter(prefix="/api/v1/member/subscriptions", tags=["subscription"])
 
 # ─── DB 依赖 ────────────────────────────────────────────────────────────────────
 
+
 async def _get_tenant_db(x_tenant_id: str = Header(..., alias="X-Tenant-ID")):
     async for session in get_db_with_tenant(x_tenant_id):
         yield session
@@ -42,6 +44,7 @@ def _require_tenant(tenant_id: Optional[str]) -> str:
 
 
 # ─── Models ────────────────────────────────────────────────────────────────────
+
 
 class SubscriptionPlan(BaseModel):
     plan_id: str
@@ -71,21 +74,32 @@ class SubscriptionResponse(BaseModel):
 
 PLANS: dict[str, SubscriptionPlan] = {
     "monthly": SubscriptionPlan(
-        plan_id="monthly", name="月卡", price_fen=1990, period_days=30,
+        plan_id="monthly",
+        name="月卡",
+        price_fen=1990,
+        period_days=30,
         benefits=["每单9折", "免配送费", "生日双倍积分", "专属会员价"],
     ),
     "quarterly": SubscriptionPlan(
-        plan_id="quarterly", name="季卡", price_fen=4990, period_days=90, popular=True,
+        plan_id="quarterly",
+        name="季卡",
+        price_fen=4990,
+        period_days=90,
+        popular=True,
         benefits=["月卡全部权益", "每月满50减20券", "新品优先体验", "积分1.5倍"],
     ),
     "yearly": SubscriptionPlan(
-        plan_id="yearly", name="年卡", price_fen=16800, period_days=365,
+        plan_id="yearly",
+        name="年卡",
+        price_fen=16800,
+        period_days=365,
         benefits=["季卡全部权益", "专属客服", "优先排队", "生日免费菜品", "积分2倍", "跨品牌通用"],
     ),
 }
 
 
 # ─── Endpoints ─────────────────────────────────────────────────────────────────
+
 
 @router.get("/plans")
 async def list_plans(
@@ -111,10 +125,7 @@ async def create_subscription(
     now = datetime.now(timezone.utc)
     expires = now + timedelta(days=plan.period_days)
     sub_id = str(uuid.uuid4())
-    out_trade_no = (
-        f"SUB{now.strftime('%Y%m%d%H%M%S')}"
-        f"{str(uuid.uuid4()).replace('-', '')[:8].upper()}"
-    )
+    out_trade_no = f"SUB{now.strftime('%Y%m%d%H%M%S')}{str(uuid.uuid4()).replace('-', '')[:8].upper()}"
 
     try:
         await db.execute(
@@ -148,6 +159,7 @@ async def create_subscription(
     # 调用微信支付预下单
     try:
         from shared.integrations.wechat_pay import WechatPayService
+
         wechat = WechatPayService()
         payment_params = await wechat.create_prepay(
             out_trade_no=out_trade_no,

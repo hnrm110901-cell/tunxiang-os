@@ -2,6 +2,7 @@
 
 多租户 RLS 隔离，structlog 日志。
 """
+
 from __future__ import annotations
 
 import uuid
@@ -16,6 +17,7 @@ logger = structlog.get_logger(__name__)
 
 
 # ── 工具函数 ──────────────────────────────────────────────────
+
 
 def _now_utc() -> datetime:
     return datetime.now(timezone.utc)
@@ -59,9 +61,14 @@ async def create_group_order(
                     :code, 'open', 1, :now, :exp)
         """),
         {
-            "gid": group_id, "tid": tenant_id, "iid": initiator_id,
-            "sid": store_id, "tbl": table_id,
-            "code": invite_code, "now": now, "exp": expires_at,
+            "gid": group_id,
+            "tid": tenant_id,
+            "iid": initiator_id,
+            "sid": store_id,
+            "tbl": table_id,
+            "code": invite_code,
+            "now": now,
+            "exp": expires_at,
         },
     )
 
@@ -73,8 +80,7 @@ async def create_group_order(
                 (id, tenant_id, group_id, customer_id, role, joined_at)
             VALUES (:mid, :tid, :gid, :cid, 'creator', :now)
         """),
-        {"mid": member_id, "tid": tenant_id, "gid": group_id,
-         "cid": initiator_id, "now": now},
+        {"mid": member_id, "tid": tenant_id, "gid": group_id, "cid": initiator_id, "now": now},
     )
     await db.flush()
 
@@ -150,8 +156,7 @@ async def join_group_order(
                 (id, tenant_id, group_id, customer_id, role, joined_at)
             VALUES (:mid, :tid, :gid, :cid, 'member', :now)
         """),
-        {"mid": member_id, "tid": tenant_id, "gid": group_id,
-         "cid": customer_id, "now": now},
+        {"mid": member_id, "tid": tenant_id, "gid": group_id, "cid": customer_id, "now": now},
     )
 
     new_count = group["member_count"] + 1
@@ -211,6 +216,7 @@ async def send_gift(
     expires_at = now + timedelta(days=7)
 
     import json
+
     await db.execute(
         text("""
             INSERT INTO gifts
@@ -220,10 +226,15 @@ async def send_gift(
                     :cfg::jsonb, :code, 'pending', :now, :exp)
         """),
         {
-            "gid": gift_id, "tid": tenant_id, "sid": sender_id,
-            "phone": receiver_phone, "gtype": gift_type,
+            "gid": gift_id,
+            "tid": tenant_id,
+            "sid": sender_id,
+            "phone": receiver_phone,
+            "gtype": gift_type,
             "cfg": json.dumps(gift_config, ensure_ascii=False),
-            "code": share_code, "now": now, "exp": expires_at,
+            "code": share_code,
+            "now": now,
+            "exp": expires_at,
         },
     )
     await db.flush()
@@ -283,9 +294,13 @@ async def create_share_link(
                     :code, 0, 0, :now, :exp)
         """),
         {
-            "lid": link_id, "tid": tenant_id, "cid": customer_id,
-            "ctype": campaign_type, "code": referral_code,
-            "now": now, "exp": expires_at,
+            "lid": link_id,
+            "tid": tenant_id,
+            "cid": customer_id,
+            "ctype": campaign_type,
+            "code": referral_code,
+            "now": now,
+            "exp": expires_at,
         },
     )
     await db.flush()
@@ -353,8 +368,11 @@ async def track_referral(
             VALUES (:rid, :tid, :refid, :nid, 10, 10, :now)
         """),
         {
-            "rid": referral_id, "tid": tenant_id, "refid": referrer_id,
-            "nid": new_customer_id, "now": now,
+            "rid": referral_id,
+            "tid": tenant_id,
+            "refid": referrer_id,
+            "nid": new_customer_id,
+            "now": now,
         },
     )
 

@@ -8,6 +8,7 @@
 所有金额单位：分（fen）。
 无 BOM 数据时使用行业平均估算值（30%），并在结果中标注 is_estimated: true。
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -41,14 +42,16 @@ def _safe_ratio(numerator: int | float, denominator: int | float, precision: int
 
 # ─── 数据类 ──────────────────────────────────────────────────────────────────
 
+
 @dataclass
 class CostHealthResult:
     """成本健康度评分结果"""
+
     food_cost_rate: float
     score: float
-    status: str         # excellent | normal | high | critical
-    status_label: str   # 中文标签
-    color: str          # green | yellow | orange | red
+    status: str  # excellent | normal | high | critical
+    status_label: str  # 中文标签
+    color: str  # green | yellow | orange | red
     target_rate: float = 0.30
     gap_to_target: float = 0.0
 
@@ -70,6 +73,7 @@ class CostHealthResult:
 @dataclass
 class DailyCostReport:
     """日成本快报"""
+
     store_id: str
     biz_date: str
     revenue_fen: int
@@ -103,6 +107,7 @@ class DailyCostReport:
 @dataclass
 class CostBreakdownReport:
     """成本明细报表"""
+
     store_id: str
     start_date: str
     end_date: str
@@ -127,6 +132,7 @@ class CostBreakdownReport:
 
 
 # ─── CostEngineService ────────────────────────────────────────────────────────
+
 
 class CostEngineService:
     """成本核算服务
@@ -161,12 +167,8 @@ class CostEngineService:
         )
 
         # 从快照获取成本数据
-        snapshot = await self._repo.fetch_daily_cost_from_snapshots(
-            store_id, biz_date, tenant_id, db
-        )
-        revenue_fen = await self._repo.fetch_daily_revenue_for_cost(
-            store_id, biz_date, tenant_id, db
-        )
+        snapshot = await self._repo.fetch_daily_cost_from_snapshots(store_id, biz_date, tenant_id, db)
+        revenue_fen = await self._repo.fetch_daily_revenue_for_cost(store_id, biz_date, tenant_id, db)
 
         food_cost_fen = snapshot["total_food_cost_fen"]
         is_estimated = False
@@ -216,18 +218,20 @@ class CostEngineService:
 
         # ── 节点2：成本率超标事件 ─────────────────────────────
         if health.status in ("high", "critical"):
-            asyncio.create_task(UniversalPublisher.publish(
-                event_type=FinanceEventType.COST_RATE_EXCEEDED,
-                tenant_id=tenant_id,
-                store_id=store_id,
-                entity_id=store_id,
-                event_data={
-                    "category": "food_cost",
-                    "actual_pct": round(food_cost_rate * 100, 2),
-                    "threshold_pct": round(_NORMAL_THRESHOLD * 100, 2),
-                },
-                source_service="tx-finance",
-            ))
+            asyncio.create_task(
+                UniversalPublisher.publish(
+                    event_type=FinanceEventType.COST_RATE_EXCEEDED,
+                    tenant_id=tenant_id,
+                    store_id=store_id,
+                    entity_id=store_id,
+                    event_data={
+                        "category": "food_cost",
+                        "actual_pct": round(food_cost_rate * 100, 2),
+                        "threshold_pct": round(_NORMAL_THRESHOLD * 100, 2),
+                    },
+                    source_service="tx-finance",
+                )
+            )
         return DailyCostReport(
             store_id=str(store_id),
             biz_date=str(biz_date),
@@ -270,9 +274,7 @@ class CostEngineService:
         total_revenue_fen = 0
         current = start_date
         while current <= end_date:
-            daily_rev = await self._repo.fetch_daily_revenue_for_cost(
-                store_id, current, tenant_id, db
-            )
+            daily_rev = await self._repo.fetch_daily_revenue_for_cost(store_id, current, tenant_id, db)
             total_revenue_fen += daily_rev
             current += timedelta(days=1)
 
@@ -310,18 +312,14 @@ class CostEngineService:
         db: AsyncSession,
     ) -> dict[str, Any]:
         """读取门店固定成本配置（月度金额，分）"""
-        config = await self._repo.fetch_store_fixed_cost_config(
-            store_id, tenant_id, db
-        )
+        config = await self._repo.fetch_store_fixed_cost_config(store_id, tenant_id, db)
         return {
             "store_id": str(store_id),
             "monthly_rent_fen": config["monthly_rent_fen"],
             "monthly_utility_fen": config["monthly_utility_fen"],
             "monthly_other_fixed_fen": config["monthly_other_fixed_fen"],
             "monthly_total_fixed_fen": (
-                config["monthly_rent_fen"]
-                + config["monthly_utility_fen"]
-                + config["monthly_other_fixed_fen"]
+                config["monthly_rent_fen"] + config["monthly_utility_fen"] + config["monthly_other_fixed_fen"]
             ),
         }
 
@@ -354,6 +352,7 @@ class CostEngineService:
 
 
 # ─── 成本健康度评分（纯函数，可单独测试）──────────────────────────────────────
+
 
 def calculate_cost_health_score(food_cost_rate: float) -> CostHealthResult:
     """食材成本率 → 健康度评分

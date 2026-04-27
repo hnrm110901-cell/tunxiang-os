@@ -8,6 +8,7 @@
 Week 2 P0 验收物：指标口径字典（可追溯到字段）
 每个指标包含：中英文名称 / 计算公式 / 数据来源表+字段 / 更新频率 / 统计口径说明
 """
+
 from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException, Query
@@ -67,7 +68,6 @@ METRICS_DICT: dict[str, dict] = {
         "refresh_sla": "分析类 ≤15分钟",
         "note": "按自然日（Asia/Shanghai时区）统计，非自然月按实际营业天数除",
     },
-
     # ── 毛利域 ────────────────────────────────────────────────────────────────
     "margin_rate": {
         "name_zh": "综合毛利率",
@@ -105,7 +105,6 @@ METRICS_DICT: dict[str, dict] = {
         "refresh_sla": "分析类 ≤15分钟",
         "note": "折扣超过订单总额 30% 视为异常，阈值可在 agent_kpi_configs 中调整",
     },
-
     # ── 客流域 ────────────────────────────────────────────────────────────────
     "table_turnover_rate": {
         "name_zh": "翻台率",
@@ -144,7 +143,6 @@ METRICS_DICT: dict[str, dict] = {
         "refresh_sla": "分析类 ≤15分钟",
         "note": "统计周期：滚动30天，统计范围：当月有消费记录的会员中，有2次及以上消费的比例",
     },
-
     # ── 出餐域 ────────────────────────────────────────────────────────────────
     "avg_dish_time_seconds": {
         "name_zh": "平均出餐时间",
@@ -171,7 +169,6 @@ METRICS_DICT: dict[str, dict] = {
         "refresh_sla": "交易类 ≤5分钟",
         "note": "10分钟为默认上限，可在门店设置中调整；宴会场次另有独立超时阈值",
     },
-
     # ── 会员域 ────────────────────────────────────────────────────────────────
     "stored_value_balance_fen": {
         "name_zh": "储值卡余额",
@@ -198,7 +195,6 @@ METRICS_DICT: dict[str, dict] = {
         "refresh_sla": "分析类 ≤15分钟",
         "note": "来自物化视图 mv_member_clv（v148建立），每15分钟由投影器刷新",
     },
-
     # ── 库存域 ────────────────────────────────────────────────────────────────
     "waste_rate": {
         "name_zh": "食材损耗率",
@@ -207,7 +203,10 @@ METRICS_DICT: dict[str, dict] = {
         "unit": "%",
         "formula": "SUM(waste_qty * unit_cost_fen) / SUM(total_consumed_cost_fen) * 100",
         "sources": [
-            {"table": "inventory_transactions", "fields": ["transaction_type", "quantity", "ingredient_id", "created_at"]},
+            {
+                "table": "inventory_transactions",
+                "fields": ["transaction_type", "quantity", "ingredient_id", "created_at"],
+            },
             {"table": "ingredients", "fields": ["id", "unit_cost_fen", "name"]},
         ],
         "refresh_sla": "分析类 ≤15分钟",
@@ -225,7 +224,6 @@ METRICS_DICT: dict[str, dict] = {
         "refresh_sla": "交易类 ≤5分钟",
         "note": "实时菜品可用状态，从 dish_availability 表读取，由收银/KDS触发更新",
     },
-
     # ── 合规域 ────────────────────────────────────────────────────────────────
     "daily_settlement_rate": {
         "name_zh": "日结合规率",
@@ -251,7 +249,6 @@ METRICS_DICT: dict[str, dict] = {
         "refresh_sla": "分析类 ≤15分钟",
         "note": "每个未处理告警扣5分，来自食安/环保/证照等合规检查模块",
     },
-
     # ── 财务域 ────────────────────────────────────────────────────────────────
     "gross_profit_fen": {
         "name_zh": "毛利润",
@@ -279,7 +276,6 @@ METRICS_DICT: dict[str, dict] = {
         "refresh_sla": "分析类 ≤15分钟",
         "note": "需 tx-finance PLService 完成成本归集后才精确，月度数据 T+3 日确认",
     },
-
     # ── 宴会域 ────────────────────────────────────────────────────────────────
     "banquet_deposit_rate": {
         "name_zh": "宴会定金回收率",
@@ -299,18 +295,19 @@ METRICS_DICT: dict[str, dict] = {
 # ─── 指标域说明 ────────────────────────────────────────────────────────────────
 
 DOMAIN_DESCRIPTIONS = {
-    "revenue":    {"name_zh": "营收域",   "sla": "交易类≤5分钟 / 分析类≤15分钟"},
-    "margin":     {"name_zh": "毛利域",   "sla": "分析类≤15分钟"},
-    "traffic":    {"name_zh": "客流域",   "sla": "分析类≤15分钟"},
-    "kds":        {"name_zh": "出餐域",   "sla": "交易类≤5分钟"},
-    "member":     {"name_zh": "会员域",   "sla": "分析类≤15分钟"},
-    "inventory":  {"name_zh": "库存域",   "sla": "分析类≤15分钟"},
-    "compliance": {"name_zh": "合规域",   "sla": "分析类≤15分钟"},
-    "finance":    {"name_zh": "财务域",   "sla": "分析类≤15分钟"},
-    "banquet":    {"name_zh": "宴会域",   "sla": "交易类≤5分钟"},
+    "revenue": {"name_zh": "营收域", "sla": "交易类≤5分钟 / 分析类≤15分钟"},
+    "margin": {"name_zh": "毛利域", "sla": "分析类≤15分钟"},
+    "traffic": {"name_zh": "客流域", "sla": "分析类≤15分钟"},
+    "kds": {"name_zh": "出餐域", "sla": "交易类≤5分钟"},
+    "member": {"name_zh": "会员域", "sla": "分析类≤15分钟"},
+    "inventory": {"name_zh": "库存域", "sla": "分析类≤15分钟"},
+    "compliance": {"name_zh": "合规域", "sla": "分析类≤15分钟"},
+    "finance": {"name_zh": "财务域", "sla": "分析类≤15分钟"},
+    "banquet": {"name_zh": "宴会域", "sla": "交易类≤5分钟"},
 }
 
 # ─── 端点 ─────────────────────────────────────────────────────────────────────
+
 
 @router.get("/domains", summary="获取指标域列表")
 async def list_domains():

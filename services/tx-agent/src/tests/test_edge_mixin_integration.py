@@ -10,11 +10,12 @@ Tests:
 Run:
     pytest services/tx-agent/src/tests/test_edge_mixin_integration.py -v
 """
+
 from __future__ import annotations
 
 import os
 import sys
-from unittest.mock import AsyncMock, patch, MagicMock
+from unittest.mock import AsyncMock, patch
 
 _here = os.path.dirname(__file__)
 _src = os.path.abspath(os.path.join(_here, ".."))
@@ -22,16 +23,13 @@ if _src not in sys.path:
     sys.path.insert(0, _src)
 
 import pytest
-
 from agents.skills.discount_guard import DiscountGuardAgent
 from agents.skills.inventory_alert import InventoryAlertAgent
-
 
 # ─── DiscountGuardAgent Edge Integration ────────────────────────────────────
 
 
 class TestDiscountGuardEdge:
-
     @pytest.mark.asyncio
     async def test_edge_shortcut_high_confidence(self) -> None:
         """When edge returns high confidence (>0.8), agent skips Claude API."""
@@ -127,7 +125,6 @@ class TestDiscountGuardEdge:
 
 
 class TestInventoryAlertEdge:
-
     @pytest.mark.asyncio
     async def test_traffic_forecast_boosts_demand(self) -> None:
         """When edge predicts peak traffic, demand_multiplier increases."""
@@ -205,7 +202,6 @@ class TestInventoryAlertEdge:
 
 
 class TestEdgeAwareMixin:
-
     @pytest.mark.asyncio
     async def test_edge_property_creates_singleton(self) -> None:
         """edge property creates client on first access and reuses it."""

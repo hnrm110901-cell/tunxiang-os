@@ -8,6 +8,7 @@
 
 所有接口需要 X-Tenant-ID 请求头。
 """
+
 from __future__ import annotations
 
 import os
@@ -36,6 +37,7 @@ def _require_tenant(x_tenant_id: str = Header(..., alias="X-Tenant-ID")) -> str:
 
 async def _get_db() -> AsyncSession:  # type: ignore[misc]
     from ..database import get_session
+
     async for session in get_session():
         yield session
 
@@ -44,8 +46,10 @@ async def _get_db() -> AsyncSession:  # type: ignore[misc]
 # 请求模型
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 class CampaignBriefBody(BaseModel):
     """活动简报：运营填写基本意图，AI 自动规划内容+受众+渠道+发送节奏"""
+
     model_config = ConfigDict(extra="ignore")
 
     campaign_type: str  # new_dish_launch/member_win_back/holiday_promo/daily_special
@@ -59,6 +63,7 @@ class CampaignBriefBody(BaseModel):
 
 class AutoJourneyBody(BaseModel):
     """触发 AI 驱动旅程"""
+
     model_config = ConfigDict(extra="ignore")
 
     trigger_event: str  # post_order / first_order / silent / birthday / upgrade
@@ -70,6 +75,7 @@ class AutoJourneyBody(BaseModel):
 
 class ChannelTestBody(BaseModel):
     """渠道连通性测试"""
+
     model_config = ConfigDict(extra="ignore")
 
     channels: list[str] = ["sms", "wechat_subscribe"]
@@ -80,6 +86,7 @@ class ChannelTestBody(BaseModel):
 # ─────────────────────────────────────────────────────────────────────────────
 # 路由
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @router.post("/campaign-brief")
 async def submit_campaign_brief(
@@ -167,12 +174,12 @@ async def trigger_auto_journey(
     由 Agent 完成：画像读取 → 内容生成 → 约束校验 → 发送 → 留痕。
     """
     event_to_action = {
-        "post_order":  "execute_post_order_touch",
+        "post_order": "execute_post_order_touch",
         "first_order": "execute_welcome_journey",
-        "silent":      "execute_winback_journey",
-        "birthday":    "execute_birthday_care",
-        "upgrade":     "execute_upgrade_celebration",
-        "churn":       "execute_churn_rescue",
+        "silent": "execute_winback_journey",
+        "birthday": "execute_birthday_care",
+        "upgrade": "execute_upgrade_celebration",
+        "churn": "execute_churn_rescue",
     }
 
     action = event_to_action.get(body.trigger_event)
@@ -376,6 +383,7 @@ async def test_channel_connectivity(
         if channel == "sms":
             if body.test_phone:
                 from shared.integrations.sms_service import SMSService
+
                 svc = SMSService()
                 r = await svc.send_verification_code(body.test_phone, "TEST")
                 results[channel] = {"status": r.get("status"), "is_mock": svc.is_mock}
@@ -384,31 +392,42 @@ async def test_channel_connectivity(
 
         elif channel == "wechat_subscribe":
             from shared.integrations.wechat_subscribe import WechatSubscribeService
+
             svc = WechatSubscribeService()
             results[channel] = {"status": "configured" if not svc.is_mock else "mock_mode", "is_mock": svc.is_mock}
 
         elif channel in ("wechat_oa", "wecom_chat"):
             from shared.integrations.wechat_marketing import WeChatOAService, WeComService
+
             if channel == "wechat_oa":
                 svc_oa = WeChatOAService()
-                results[channel] = {"status": "configured" if not svc_oa.is_mock else "mock_mode", "is_mock": svc_oa.is_mock}
+                results[channel] = {
+                    "status": "configured" if not svc_oa.is_mock else "mock_mode",
+                    "is_mock": svc_oa.is_mock,
+                }
             else:
                 svc_wc = WeComService()
-                results[channel] = {"status": "configured" if not svc_wc.is_mock else "mock_mode", "is_mock": svc_wc.is_mock}
+                results[channel] = {
+                    "status": "configured" if not svc_wc.is_mock else "mock_mode",
+                    "is_mock": svc_wc.is_mock,
+                }
 
         elif channel == "meituan":
             from shared.integrations.meituan_marketing import MeituanMarketingAdapter
+
             adp = MeituanMarketingAdapter()
             results[channel] = {"status": "configured" if not adp.is_mock else "mock_mode", "is_mock": adp.is_mock}
 
         elif channel == "douyin":
             from shared.integrations.douyin_marketing import DouyinMarketingAdapter
+
             adp = DouyinMarketingAdapter()
             results[channel] = {"status": "configured" if not adp.is_mock else "mock_mode", "is_mock": adp.is_mock}
 
         elif channel == "xiaohongshu":
             try:
                 from shared.integrations.xiaohongshu_marketing import XiaohongshuMarketingAdapter
+
                 adp = XiaohongshuMarketingAdapter()
                 results[channel] = {
                     "status": "configured" if not adp.is_mock else "mock_mode",
@@ -420,9 +439,7 @@ async def test_channel_connectivity(
         else:
             results[channel] = {"status": "unknown_channel"}
 
-    all_configured = all(
-        r.get("status") in ("configured", "mock_mode") for r in results.values()
-    )
+    all_configured = all(r.get("status") in ("configured", "mock_mode") for r in results.values())
 
     return {
         "ok": True,
@@ -438,6 +455,7 @@ async def test_channel_connectivity(
 # ─────────────────────────────────────────────────────────────────────────────
 # 工具函数
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 def _build_audience_recommendation(
     target_segment: Optional[str],
@@ -470,11 +488,14 @@ def _build_audience_recommendation(
             "description": "日推适合B/C层会员提频",
         },
     }
-    return segment_map.get(campaign_type, {
-        "segment": target_segment or "all_active",
-        "estimated_size": 500,
-        "description": "默认活跃会员",
-    })
+    return segment_map.get(
+        campaign_type,
+        {
+            "segment": target_segment or "all_active",
+            "estimated_size": 500,
+            "description": "默认活跃会员",
+        },
+    )
 
 
 def _build_channel_plan(
@@ -501,11 +522,11 @@ def _build_channel_plan(
 def _forecast_roi(campaign_type: str, audience_size: int) -> dict[str, Any]:
     """预测活动 ROI（基于历史数据基准）"""
     benchmarks: dict[str, dict[str, float]] = {
-        "new_dish_launch":  {"ctr": 0.18, "cvr": 0.12, "avg_order_fen": 9200},
-        "member_win_back":  {"ctr": 0.22, "cvr": 0.08, "avg_order_fen": 7800},
-        "holiday_promo":    {"ctr": 0.25, "cvr": 0.15, "avg_order_fen": 12000},
-        "daily_special":    {"ctr": 0.12, "cvr": 0.10, "avg_order_fen": 6500},
-        "birthday_care":    {"ctr": 0.45, "cvr": 0.35, "avg_order_fen": 15000},
+        "new_dish_launch": {"ctr": 0.18, "cvr": 0.12, "avg_order_fen": 9200},
+        "member_win_back": {"ctr": 0.22, "cvr": 0.08, "avg_order_fen": 7800},
+        "holiday_promo": {"ctr": 0.25, "cvr": 0.15, "avg_order_fen": 12000},
+        "daily_special": {"ctr": 0.12, "cvr": 0.10, "avg_order_fen": 6500},
+        "birthday_care": {"ctr": 0.45, "cvr": 0.35, "avg_order_fen": 15000},
     }
     bm = benchmarks.get(campaign_type, {"ctr": 0.15, "cvr": 0.10, "avg_order_fen": 8000})
     estimated_clicks = int(audience_size * bm["ctr"])

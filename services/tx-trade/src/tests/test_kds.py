@@ -12,6 +12,7 @@
 9. KDS操作 — 缺料上报
 10. KDS操作 — 任务时间线完整性
 """
+
 import os
 import sys
 
@@ -24,6 +25,7 @@ from unittest.mock import AsyncMock
 import pytest
 
 # ─── 工具 ───
+
 
 def _uid() -> str:
     return str(uuid.uuid4())
@@ -73,6 +75,7 @@ def _make_mock_db(execute_results=None):
 
 # ─── 测试 1: 分单 — 菜品分配到正确档口 ───
 
+
 @pytest.mark.asyncio
 async def test_dispatch_order_maps_dishes_to_depts():
     """验证菜品根据 dish_dept_mappings 分配到正确的档口"""
@@ -84,8 +87,12 @@ async def test_dispatch_order_maps_dishes_to_depts():
     # Mock: 第一次查询返回映射，第二次返回档口信息
     mapping_result = FakeResult(rows=[(dish_kp_uuid, dept_hot_uuid)])
     dept_obj = FakeRow(
-        id=dept_hot_uuid, dept_name="热菜间", dept_code="HOT",
-        sort_order=1, tenant_id=uuid.UUID(TENANT_ID), is_deleted=False,
+        id=dept_hot_uuid,
+        dept_name="热菜间",
+        dept_code="HOT",
+        sort_order=1,
+        tenant_id=uuid.UUID(TENANT_ID),
+        is_deleted=False,
     )
     dept_result = FakeResult(rows=[dept_obj])
 
@@ -102,6 +109,7 @@ async def test_dispatch_order_maps_dishes_to_depts():
 
 
 # ─── 测试 2: 分单 — 未映射菜品归入默认档口 ───
+
 
 @pytest.mark.asyncio
 async def test_dispatch_unmapped_dish_goes_to_default():
@@ -121,6 +129,7 @@ async def test_dispatch_unmapped_dish_goes_to_default():
 
 # ─── 测试 3: 出餐排序 — VIP优先 ───
 
+
 @pytest.mark.asyncio
 async def test_cooking_order_vip_first():
     """VIP 订单应排在普通订单前面"""
@@ -129,15 +138,17 @@ async def test_cooking_order_vip_first():
     db = AsyncMock()
     now = datetime.now(timezone.utc).isoformat()
 
-    dept_tasks = [{
-        "dept_id": DEPT_HOT,
-        "dept_name": "热菜间",
-        "items": [
-            {"task_id": _uid(), "dish_name": "普通菜A", "is_vip": False, "urgent": False, "created_at": now},
-            {"task_id": _uid(), "dish_name": "VIP菜B", "is_vip": True, "urgent": False, "created_at": now},
-        ],
-        "priority": 1,
-    }]
+    dept_tasks = [
+        {
+            "dept_id": DEPT_HOT,
+            "dept_name": "热菜间",
+            "items": [
+                {"task_id": _uid(), "dish_name": "普通菜A", "is_vip": False, "urgent": False, "created_at": now},
+                {"task_id": _uid(), "dish_name": "VIP菜B", "is_vip": True, "urgent": False, "created_at": now},
+            ],
+            "priority": 1,
+        }
+    ]
 
     result = await calculate_cooking_order(dept_tasks, db)
     items = result[0]["items"]
@@ -147,6 +158,7 @@ async def test_cooking_order_vip_first():
 
 # ─── 测试 4: 出餐排序 — 催菜最高优先 ───
 
+
 @pytest.mark.asyncio
 async def test_cooking_order_urgent_highest():
     """催菜标记的任务应排在最前面，优先于 VIP"""
@@ -155,16 +167,18 @@ async def test_cooking_order_urgent_highest():
     db = AsyncMock()
     now = datetime.now(timezone.utc).isoformat()
 
-    dept_tasks = [{
-        "dept_id": DEPT_HOT,
-        "dept_name": "热菜间",
-        "items": [
-            {"task_id": _uid(), "dish_name": "VIP菜", "is_vip": True, "urgent": False, "created_at": now},
-            {"task_id": _uid(), "dish_name": "催菜", "is_vip": False, "urgent": True, "created_at": now},
-            {"task_id": _uid(), "dish_name": "普通菜", "is_vip": False, "urgent": False, "created_at": now},
-        ],
-        "priority": 1,
-    }]
+    dept_tasks = [
+        {
+            "dept_id": DEPT_HOT,
+            "dept_name": "热菜间",
+            "items": [
+                {"task_id": _uid(), "dish_name": "VIP菜", "is_vip": True, "urgent": False, "created_at": now},
+                {"task_id": _uid(), "dish_name": "催菜", "is_vip": False, "urgent": True, "created_at": now},
+                {"task_id": _uid(), "dish_name": "普通菜", "is_vip": False, "urgent": False, "created_at": now},
+            ],
+            "priority": 1,
+        }
+    ]
 
     result = await calculate_cooking_order(dept_tasks, db)
     items = result[0]["items"]
@@ -172,6 +186,7 @@ async def test_cooking_order_urgent_highest():
 
 
 # ─── 测试 5: KDS操作 — 开始制作 ───
+
 
 @pytest.mark.asyncio
 async def test_start_cooking_transitions_to_cooking():
@@ -183,8 +198,11 @@ async def test_start_cooking_transitions_to_cooking():
 
     # 确保任务初始为 pending
     _task_store[task_id] = {
-        "task_id": task_id, "status": STATUS_PENDING,
-        "urgent": False, "remake_count": 0, "timeline": [],
+        "task_id": task_id,
+        "status": STATUS_PENDING,
+        "urgent": False,
+        "remake_count": 0,
+        "timeline": [],
     }
 
     result = await start_cooking(task_id, "chef_001", db)
@@ -195,6 +213,7 @@ async def test_start_cooking_transitions_to_cooking():
 
 # ─── 测试 6: KDS操作 — 完成出品 ───
 
+
 @pytest.mark.asyncio
 async def test_finish_cooking_transitions_to_done():
     """cooking → done 状态流转"""
@@ -204,8 +223,11 @@ async def test_finish_cooking_transitions_to_done():
     task_id = _uid()
 
     _task_store[task_id] = {
-        "task_id": task_id, "status": STATUS_COOKING,
-        "urgent": False, "remake_count": 0, "timeline": [],
+        "task_id": task_id,
+        "status": STATUS_COOKING,
+        "urgent": False,
+        "remake_count": 0,
+        "timeline": [],
         "started_at": datetime.now(timezone.utc).isoformat(),
         "operator_id": "chef_001",
     }
@@ -218,6 +240,7 @@ async def test_finish_cooking_transitions_to_done():
 
 # ─── 测试 7: KDS操作 — 重做重置状态 ───
 
+
 @pytest.mark.asyncio
 async def test_remake_resets_to_pending():
     """重做应将状态重置为 pending 并标记 urgent"""
@@ -227,8 +250,11 @@ async def test_remake_resets_to_pending():
     task_id = _uid()
 
     _task_store[task_id] = {
-        "task_id": task_id, "status": STATUS_DONE,
-        "urgent": False, "remake_count": 0, "timeline": [],
+        "task_id": task_id,
+        "status": STATUS_DONE,
+        "urgent": False,
+        "remake_count": 0,
+        "timeline": [],
     }
 
     result = await request_remake(task_id, "菜品过咸", db)
@@ -239,6 +265,7 @@ async def test_remake_resets_to_pending():
 
 
 # ─── 测试 8: 超时预警 — 分级判定 ───
+
 
 def test_timeout_classification():
     """验证超时分级：normal / warning / critical"""
@@ -256,6 +283,7 @@ def test_timeout_classification():
 
 # ─── 测试 9: KDS操作 — 缺料上报 ───
 
+
 @pytest.mark.asyncio
 async def test_report_shortage():
     """缺料上报应记录事件并返回成功"""
@@ -265,8 +293,11 @@ async def test_report_shortage():
     task_id = _uid()
 
     _task_store[task_id] = {
-        "task_id": task_id, "status": "cooking",
-        "urgent": False, "remake_count": 0, "timeline": [],
+        "task_id": task_id,
+        "status": "cooking",
+        "urgent": False,
+        "remake_count": 0,
+        "timeline": [],
     }
 
     result = await report_shortage(task_id, "ingredient_001", db)
@@ -278,6 +309,7 @@ async def test_report_shortage():
 
 
 # ─── 测试 10: KDS操作 — 任务时间线完整性 ───
+
 
 @pytest.mark.asyncio
 async def test_task_timeline_completeness():
@@ -294,8 +326,11 @@ async def test_task_timeline_completeness():
     task_id = _uid()
 
     _task_store[task_id] = {
-        "task_id": task_id, "status": STATUS_PENDING,
-        "urgent": False, "remake_count": 0, "timeline": [],
+        "task_id": task_id,
+        "status": STATUS_PENDING,
+        "urgent": False,
+        "remake_count": 0,
+        "timeline": [],
     }
 
     # pending → cooking → done

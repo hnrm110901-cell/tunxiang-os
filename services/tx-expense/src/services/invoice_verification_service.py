@@ -14,6 +14,7 @@
 
 金额约定：所有金额均为分(fen)。
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -29,7 +30,7 @@ from uuid import UUID
 
 import httpx
 import structlog
-from sqlalchemy import select, text
+from sqlalchemy import text
 from sqlalchemy.exc import OperationalError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -42,12 +43,13 @@ log = structlog.get_logger(__name__)
 # ─────────────────────────────────────────────────────────────────────────────
 
 _VAT_ALLOWED_TAX_RATES = {Decimal("0.01"), Decimal("0.03"), Decimal("0.06"), Decimal("0.09"), Decimal("0.13")}
-_TAX_TOLERANCE_FEN = 2   # 允许误差：0.02元 = 2分
+_TAX_TOLERANCE_FEN = 2  # 允许误差：0.02元 = 2分
 _QUOTA_INVOICE_MAX_FEN = 100_000  # 定额发票单张限额：1000元（单位：分），实际以税局规定为准
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 辅助
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 def _now_utc() -> datetime:
     return datetime.now(tz=timezone.utc)
@@ -80,6 +82,7 @@ def _parse_date_str(raw: str) -> Optional[str]:
 # ─────────────────────────────────────────────────────────────────────────────
 # OCR 识别
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 async def _get_baidu_access_token(client: httpx.AsyncClient) -> str:
     """用 API Key + Secret Key 换取百度 access_token（有效期30天）。"""
@@ -216,11 +219,13 @@ def _parse_baidu_items(commodity_names: list, words: dict) -> list:
         tax_rate_str = ""
         if idx < len(commodity_taxes) and isinstance(commodity_taxes[idx], dict):
             tax_rate_str = commodity_taxes[idx].get("word", "")
-        items.append({
-            "name": name,
-            "amount_fen": _parse_amount_to_fen(amount_str),
-            "tax_rate": _parse_tax_rate(tax_rate_str),
-        })
+        items.append(
+            {
+                "name": name,
+                "amount_fen": _parse_amount_to_fen(amount_str),
+                "tax_rate": _parse_tax_rate(tax_rate_str),
+            }
+        )
     return items
 
 
@@ -231,7 +236,9 @@ async def _ocr_aliyun(file_bytes: bytes) -> dict:
     access_key_secret = os.environ.get("ALIYUN_OCR_ACCESS_KEY_SECRET", "")
 
     if not endpoint or not access_key_id or not access_key_secret:
-        return _ocr_error_result("aliyun", "ALIYUN_OCR_ENDPOINT / ALIYUN_OCR_ACCESS_KEY_ID / ALIYUN_OCR_ACCESS_KEY_SECRET 未全部配置")
+        return _ocr_error_result(
+            "aliyun", "ALIYUN_OCR_ENDPOINT / ALIYUN_OCR_ACCESS_KEY_ID / ALIYUN_OCR_ACCESS_KEY_SECRET 未全部配置"
+        )
 
     img_b64 = base64.b64encode(file_bytes).decode("utf-8")
 
@@ -309,9 +316,9 @@ def _ocr_mock_result() -> dict:
         "seller_tax_id": "91110108MA01ABCD12",
         "buyer_name": "屯象测试门店",
         "buyer_tax_id": "91430100MA4LTEST01",
-        "total_amount_fen": 113000,      # 1130.00元
-        "tax_amount_fen": 13000,          # 130.00元（税率约11.5%，示例数据）
-        "amount_without_tax_fen": 100000, # 1000.00元
+        "total_amount_fen": 113000,  # 1130.00元
+        "tax_amount_fen": 13000,  # 130.00元（税率约11.5%，示例数据）
+        "amount_without_tax_fen": 100000,  # 1000.00元
         "tax_rate": 0.13,
         "items": [
             {"name": "食材采购-猪肉", "amount_fen": 60000, "tax_rate": 0.09},
@@ -392,10 +399,11 @@ async def ocr_recognize(file_bytes: bytes, file_type: str, provider: str = None)
 # 金税四期核验
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 async def verify_with_tax_authority(
     invoice_code: str,
     invoice_number: str,
-    invoice_date: str,    # YYYY-MM-DD
+    invoice_date: str,  # YYYY-MM-DD
     total_amount_fen: int,
     buyer_tax_id: str = None,
 ) -> dict:
@@ -511,6 +519,7 @@ async def verify_with_tax_authority(
 # 集团级去重
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def compute_dedup_hash(invoice_code: str, invoice_number: str, total_amount_fen: int) -> str:
     """
     计算发票去重哈希。
@@ -567,9 +576,10 @@ async def check_duplicate(
 # 科目自动建议（Claude API）
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 async def suggest_category(
     seller_name: str,
-    items_description: str,    # 发票明细商品名称拼接
+    items_description: str,  # 发票明细商品名称拼接
     invoice_type: str,
     existing_categories: list[dict],  # [{"id": str, "name": str, "code": str}]
 ) -> dict:
@@ -607,8 +617,7 @@ async def suggest_category(
 
     model = os.environ.get("CLAUDE_MODEL", "claude-haiku-4-5-20251001")
     categories_text = "\n".join(
-        f"- ID={cat['id']}, 名称={cat['name']}, 代码={cat.get('code', '')}"
-        for cat in existing_categories
+        f"- ID={cat['id']}, 名称={cat['name']}, 代码={cat.get('code', '')}" for cat in existing_categories
     )
     prompt = (
         f"你是餐饮企业财务助手，请根据以下发票信息，从候选科目中选择最合适的一个费用科目。\n\n"
@@ -666,9 +675,7 @@ async def suggest_category(
 
     try:
         content_blocks = data.get("content", [])
-        text_content = next(
-            (blk["text"] for blk in content_blocks if blk.get("type") == "text"), ""
-        )
+        text_content = next((blk["text"] for blk in content_blocks if blk.get("type") == "text"), "")
         # 提取 JSON（防止模型返回 markdown 代码块）
         text_content = text_content.strip()
         if text_content.startswith("```"):
@@ -714,6 +721,7 @@ async def suggest_category(
 # 税额合规性检查
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def check_tax_compliance(
     invoice_type: str,
     total_amount_fen: int,
@@ -747,17 +755,14 @@ def check_tax_compliance(
             actual_yuan = float(tax_fen_dec) / 100
             deviation_rate = float(deviation_fen / expected_tax_fen * 100) if expected_tax_fen != 0 else 0.0
             issues.append(
-                f"税额与税率不匹配：期望 {expected_yuan:.2f}元，实际 {actual_yuan:.2f}元"
-                f"（偏差 {deviation_rate:.2f}%）"
+                f"税额与税率不匹配：期望 {expected_yuan:.2f}元，实际 {actual_yuan:.2f}元（偏差 {deviation_rate:.2f}%）"
             )
 
     # 校验2：增值税专用发票税率范围
     if invoice_type == InvoiceType.VAT_SPECIAL.value:
         if tax_rate_decimal not in _VAT_ALLOWED_TAX_RATES:
             rates_str = "/".join(str(int(r * 100)) + "%" for r in sorted(_VAT_ALLOWED_TAX_RATES))
-            issues.append(
-                f"专用发票税率不在允许范围（{rates_str}），实际税率：{int(tax_rate_decimal * 100)}%"
-            )
+            issues.append(f"专用发票税率不在允许范围（{rates_str}），实际税率：{int(tax_rate_decimal * 100)}%")
 
     # 校验3：定额发票单张金额超限
     if invoice_type == InvoiceType.QUOTA.value:
@@ -774,6 +779,7 @@ def check_tax_compliance(
 # 核心流程：上传并处理发票
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 async def process_invoice_upload(
     db: AsyncSession,
     tenant_id: UUID,
@@ -783,10 +789,10 @@ async def process_invoice_upload(
     file_bytes: bytes,
     file_name: str,
     file_type: str,
-    file_url: str,          # 已上传到Supabase Storage的URL
+    file_url: str,  # 已上传到Supabase Storage的URL
     file_size: int,
     application_id: UUID = None,
-    expected_amount_fen: int = None,   # 申请单中预期金额，用于比对
+    expected_amount_fen: int = None,  # 申请单中预期金额，用于比对
 ) -> dict:
     """
     发票上传完整处理流程：
@@ -968,7 +974,11 @@ async def process_invoice_upload(
             needs_manual_review = True
             await _update_invoice_field(db, invoice_id, "dedup_hash", dedup_hash)
             await _update_invoice_field(db, invoice_id, "is_duplicate", True)
-            log.warning("invoice_duplicate_found", invoice_id=str(invoice_id), duplicate_of=str(duplicate_info["duplicate_invoice_id"]))
+            log.warning(
+                "invoice_duplicate_found",
+                invoice_id=str(invoice_id),
+                duplicate_of=str(duplicate_info["duplicate_invoice_id"]),
+            )
         else:
             await _update_invoice_field(db, invoice_id, "dedup_hash", dedup_hash)
 
@@ -992,9 +1002,7 @@ async def process_invoice_upload(
     try:
         categories = await _fetch_categories(db, tenant_id)
         if categories and ocr_result["success"]:
-            items_desc = "；".join(
-                item.get("name", "") for item in ocr_result.get("items", []) if item.get("name")
-            )
+            items_desc = "；".join(item.get("name", "") for item in ocr_result.get("items", []) if item.get("name"))
             suggested_category = await suggest_category(
                 seller_name=ocr_result.get("seller_name", ""),
                 items_description=items_desc,
@@ -1010,9 +1018,7 @@ async def process_invoice_upload(
             inv_date = datetime.strptime(invoice_date_str, "%Y-%m-%d").date()
             current_year = date.today().year
             if inv_date.year != current_year:
-                compliance_issues.append(
-                    f"发票日期不在当年（{current_year}年）：发票日期为 {invoice_date_str}"
-                )
+                compliance_issues.append(f"发票日期不在当年（{current_year}年）：发票日期为 {invoice_date_str}")
                 needs_manual_review = True
             if inv_date > date.today():
                 compliance_issues.append(f"发票日期 {invoice_date_str} 为未来日期，疑似虚假发票")
@@ -1066,6 +1072,7 @@ async def process_invoice_upload(
     if invoice_code and invoice_number:
         try:
             from .invoice_dedup_service import invoice_dedup_service as _dedup_svc
+
             group_dedup_result = await _dedup_svc.check_group_dedup(
                 db=db,
                 invoice_code=invoice_code,
@@ -1076,9 +1083,7 @@ async def process_invoice_upload(
             )
             if group_dedup_result.get("is_duplicate"):
                 # 在 invoices 记录的 notes 字段追加集团去重警告
-                warning_note = (
-                    f"[集团去重警告] {group_dedup_result.get('message', '跨品牌重复发票')}"
-                )
+                warning_note = f"[集团去重警告] {group_dedup_result.get('message', '跨品牌重复发票')}"
                 try:
                     await db.execute(
                         text("""
@@ -1148,6 +1153,7 @@ async def process_invoice_upload(
 # 批量重新核验（管理端）
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 async def reverify_invoices(
     db: AsyncSession,
     tenant_id: UUID,
@@ -1193,10 +1199,7 @@ async def reverify_invoices(
                 verify_result = await verify_with_tax_authority(
                     invoice_code=row.get("invoice_code", ""),
                     invoice_number=row.get("invoice_number", ""),
-                    invoice_date=(
-                        row["invoice_date"].strftime("%Y-%m-%d")
-                        if row.get("invoice_date") else ""
-                    ),
+                    invoice_date=(row["invoice_date"].strftime("%Y-%m-%d") if row.get("invoice_date") else ""),
                     total_amount_fen=row.get("total_amount") or 0,
                     buyer_tax_id=row.get("buyer_tax_id"),
                 )
@@ -1252,6 +1255,7 @@ async def reverify_invoices(
 # ─────────────────────────────────────────────────────────────────────────────
 # 内部辅助方法
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 async def _update_invoice_field(db: AsyncSession, invoice_id: UUID, field: str, value) -> None:
     """单字段更新发票记录，封装重复SQL。"""

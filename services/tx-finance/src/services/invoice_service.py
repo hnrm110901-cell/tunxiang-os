@@ -7,6 +7,7 @@
   - 重打发票（重新获取 PDF 链接）
   - 红冲（作废发票）
 """
+
 import uuid
 from datetime import datetime, timezone
 from decimal import Decimal
@@ -45,9 +46,7 @@ class InvoiceService:
 
     # ── 内部工具 ──────────────────────────────────────────────────────────────
 
-    async def _get_invoice(
-        self, invoice_id: uuid.UUID, tenant_id: uuid.UUID, db: AsyncSession
-    ) -> Invoice:
+    async def _get_invoice(self, invoice_id: uuid.UUID, tenant_id: uuid.UUID, db: AsyncSession) -> Invoice:
         result = await db.execute(
             select(Invoice).where(
                 Invoice.id == invoice_id,
@@ -56,14 +55,10 @@ class InvoiceService:
         )
         invoice = result.scalar_one_or_none()
         if invoice is None:
-            raise InvoiceNotFoundError(
-                f"发票 {invoice_id} 不存在或不属于租户 {tenant_id}"
-            )
+            raise InvoiceNotFoundError(f"发票 {invoice_id} 不存在或不属于租户 {tenant_id}")
         return invoice
 
-    def _validate_amount(
-        self, invoice_amount: Decimal, order_amount: Decimal
-    ) -> None:
+    def _validate_amount(self, invoice_amount: Decimal, order_amount: Decimal) -> None:
         """校验发票金额与订单金额，防止异常开票。"""
         diff = abs(invoice_amount - order_amount)
         if diff > _AMOUNT_TOLERANCE:
@@ -144,9 +139,7 @@ class InvoiceService:
             tax_number=invoice_info.get("tax_number"),
             amount=amount,
             tax_amount=(
-                Decimal(str(invoice_info["tax_amount"]))
-                if invoice_info.get("tax_amount") is not None
-                else None
+                Decimal(str(invoice_info["tax_amount"])) if invoice_info.get("tax_amount") is not None else None
             ),
             platform_request_id=request_id,
             status="pending",
@@ -194,9 +187,7 @@ class InvoiceService:
         """
         invoice = await self._get_invoice(invoice_id, tenant_id, db)
         if invoice.status != "failed":
-            raise InvoiceStatusError(
-                f"发票 {invoice_id} 状态为 {invoice.status}，只有 failed 状态可重试"
-            )
+            raise InvoiceStatusError(f"发票 {invoice_id} 状态为 {invoice.status}，只有 failed 状态可重试")
 
         log = logger.bind(invoice_id=str(invoice_id), tenant_id=str(tenant_id))
         log.info("invoice.retry_start")
@@ -292,9 +283,7 @@ class InvoiceService:
         """
         invoice = await self._get_invoice(invoice_id, tenant_id, db)
         if invoice.status != "issued":
-            raise InvoiceStatusError(
-                f"发票 {invoice_id} 状态为 {invoice.status}，只有 issued 状态可重打"
-            )
+            raise InvoiceStatusError(f"发票 {invoice_id} 状态为 {invoice.status}，只有 issued 状态可重打")
 
         log = logger.bind(invoice_id=str(invoice_id), tenant_id=str(tenant_id))
 
@@ -326,9 +315,7 @@ class InvoiceService:
         """
         invoice = await self._get_invoice(invoice_id, tenant_id, db)
         if invoice.status != "issued":
-            raise InvoiceStatusError(
-                f"发票 {invoice_id} 状态为 {invoice.status}，只有 issued 状态可作废"
-            )
+            raise InvoiceStatusError(f"发票 {invoice_id} 状态为 {invoice.status}，只有 issued 状态可作废")
         if not invoice.invoice_no or not invoice.invoice_code:
             raise InvoiceStatusError("发票号码或发票代码缺失，无法红冲")
 
@@ -384,12 +371,13 @@ class InvoiceService:
 
 # ── 工具函数 ──────────────────────────────────────────────────────────────────
 
+
 def _invoice_kind(invoice_type: str) -> str:
     """将内部发票类型映射到诺诺 invoiceKind 值。"""
     mapping = {
-        "vat_special": "2",    # 增值税专用发票
-        "vat_normal": "1",     # 增值税普通发票
-        "electronic": "3",     # 全电发票/电子普票
+        "vat_special": "2",  # 增值税专用发票
+        "vat_normal": "1",  # 增值税普通发票
+        "electronic": "3",  # 全电发票/电子普票
     }
     return mapping.get(invoice_type, "3")
 

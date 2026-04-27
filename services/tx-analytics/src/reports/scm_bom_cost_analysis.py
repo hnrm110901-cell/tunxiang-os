@@ -44,6 +44,5 @@ ORDER BY margin_rate ASC
 """
 
 DIMENSIONS = ["dish_name", "dish_category", "bom_version"]
-METRICS = ["sell_price_fen", "bom_cost_fen", "margin_fen", "margin_rate",
-           "ingredient_count", "yield_rate"]
+METRICS = ["sell_price_fen", "bom_cost_fen", "margin_fen", "margin_rate", "ingredient_count", "yield_rate"]
 FILTERS = ["store_id"]

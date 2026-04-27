@@ -10,6 +10,7 @@
   - get_db() 通过 contextlib.asynccontextmanager 模拟
   - SQLAlchemyError 注入模拟 DB 故障
 """
+
 from __future__ import annotations
 
 import uuid
@@ -125,12 +126,13 @@ class TestCRMOperatorAnalyzeFromMV:
             "source": "fallback",
         }
 
-        with patch(
-            "services.tx_brain.src.agents.crm_operator.get_db",
-            return_value=_fake_get_db(db_session),
-        ), patch.object(
-            agent, "generate_campaign", new=AsyncMock(return_value=fallback_result)
-        ) as mock_generate:
+        with (
+            patch(
+                "services.tx_brain.src.agents.crm_operator.get_db",
+                return_value=_fake_get_db(db_session),
+            ),
+            patch.object(agent, "generate_campaign", new=AsyncMock(return_value=fallback_result)) as mock_generate,
+        ):
             result = await agent.analyze_from_mv(TENANT_ID, STORE_ID)
 
         mock_generate.assert_awaited_once()
@@ -150,12 +152,13 @@ class TestCRMOperatorAnalyzeFromMV:
             "source": "fallback",
         }
 
-        with patch(
-            "services.tx_brain.src.agents.crm_operator.get_db",
-            return_value=_fake_get_db(db_session),
-        ), patch.object(
-            agent, "generate_campaign", new=AsyncMock(return_value=fallback_result)
-        ) as mock_generate:
+        with (
+            patch(
+                "services.tx_brain.src.agents.crm_operator.get_db",
+                return_value=_fake_get_db(db_session),
+            ),
+            patch.object(agent, "generate_campaign", new=AsyncMock(return_value=fallback_result)) as mock_generate,
+        ):
             result = await agent.analyze_from_mv(TENANT_ID, STORE_ID)
 
         mock_generate.assert_awaited_once()
@@ -204,12 +207,13 @@ class TestCustomerServiceAnalyzeFromMV:
             "source": "fallback",
         }
 
-        with patch(
-            "services.tx_brain.src.agents.customer_service.get_db",
-            return_value=_fake_get_db(db_session),
-        ), patch.object(
-            agent, "handle", new=AsyncMock(return_value=fallback_result)
-        ) as mock_handle:
+        with (
+            patch(
+                "services.tx_brain.src.agents.customer_service.get_db",
+                return_value=_fake_get_db(db_session),
+            ),
+            patch.object(agent, "handle", new=AsyncMock(return_value=fallback_result)) as mock_handle,
+        ):
             result = await agent.analyze_from_mv(TENANT_ID, STORE_ID)
 
         mock_handle.assert_awaited_once()
@@ -230,12 +234,13 @@ class TestCustomerServiceAnalyzeFromMV:
             "source": "fallback",
         }
 
-        with patch(
-            "services.tx_brain.src.agents.customer_service.get_db",
-            return_value=_fake_get_db(db_session),
-        ), patch.object(
-            agent, "handle", new=AsyncMock(return_value=fallback_result)
-        ) as mock_handle:
+        with (
+            patch(
+                "services.tx_brain.src.agents.customer_service.get_db",
+                return_value=_fake_get_db(db_session),
+            ),
+            patch.object(agent, "handle", new=AsyncMock(return_value=fallback_result)) as mock_handle,
+        ):
             result = await agent.analyze_from_mv(TENANT_ID, STORE_ID)
 
         mock_handle.assert_awaited_once()

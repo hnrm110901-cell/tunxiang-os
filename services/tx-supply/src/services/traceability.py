@@ -3,6 +3,7 @@
 追溯链必须完整：供应商 -> 入库 -> 领用 -> BOM -> 菜品 -> 订单 -> 客户
 所有操作强制 tenant_id 租户隔离。
 """
+
 import uuid
 from datetime import datetime, timezone
 from enum import Enum
@@ -16,29 +17,29 @@ log = structlog.get_logger()
 
 
 class TraceNodeType(str, Enum):
-    supplier = "supplier"           # 供应商
-    receiving = "receiving"         # 入库验收
-    storage = "storage"             # 仓储
-    requisition = "requisition"     # 领用
-    bom = "bom"                     # BOM 配方
-    dish = "dish"                   # 菜品出品
-    order = "order"                 # 订单
-    customer = "customer"           # 客户
+    supplier = "supplier"  # 供应商
+    receiving = "receiving"  # 入库验收
+    storage = "storage"  # 仓储
+    requisition = "requisition"  # 领用
+    bom = "bom"  # BOM 配方
+    dish = "dish"  # 菜品出品
+    order = "order"  # 订单
+    customer = "customer"  # 客户
 
 
 class TraceDirection(str, Enum):
-    forward = "forward"    # 正向：供应商 -> 客户
+    forward = "forward"  # 正向：供应商 -> 客户
     backward = "backward"  # 反向：客户 -> 供应商
 
 
 # ─── 内部存储（可替换为 DB） ───
 
 
-_batches: dict[str, dict] = {}            # batch_no -> 批次主档
+_batches: dict[str, dict] = {}  # batch_no -> 批次主档
 _batch_transactions: dict[str, list] = {}  # batch_no -> [事务记录]
-_bom_links: dict[str, list] = {}          # ingredient_id -> [dish_id]
-_order_dishes: dict[str, list] = {}       # order_id -> [{dish_id, batch_nos}]
-_order_customers: dict[str, dict] = {}    # order_id -> {customer_id, customer_name}
+_bom_links: dict[str, list] = {}  # ingredient_id -> [dish_id]
+_order_dishes: dict[str, list] = {}  # order_id -> [{dish_id, batch_nos}]
+_order_customers: dict[str, dict] = {}  # order_id -> {customer_id, customer_name}
 _ingredient_suppliers: dict[str, list] = {}  # ingredient_id -> [supplier_info]
 _ingredient_alternatives: dict[str, list] = {}  # ingredient_id -> [alt_ingredient_id]
 
@@ -168,36 +169,42 @@ def full_trace_forward(
         }
 
     # 1. 供应商节点
-    chain.append({
-        "node_type": TraceNodeType.supplier.value,
-        "label": f"供应商: {batch.get('supplier_name', '未知')}",
-        "supplier_id": batch.get("supplier_id"),
-        "supplier_name": batch.get("supplier_name"),
-        "timestamp": batch.get("received_at"),
-    })
+    chain.append(
+        {
+            "node_type": TraceNodeType.supplier.value,
+            "label": f"供应商: {batch.get('supplier_name', '未知')}",
+            "supplier_id": batch.get("supplier_id"),
+            "supplier_name": batch.get("supplier_name"),
+            "timestamp": batch.get("received_at"),
+        }
+    )
 
     # 2. 入库验收节点
-    chain.append({
-        "node_type": TraceNodeType.receiving.value,
-        "label": f"入库验收: {batch.get('ingredient_name', '')} x{batch.get('quantity', 0)}{batch.get('unit', '')}",
-        "store_id": batch.get("store_id"),
-        "received_by": batch.get("received_by"),
-        "quantity": batch.get("quantity"),
-        "timestamp": batch.get("received_at"),
-    })
+    chain.append(
+        {
+            "node_type": TraceNodeType.receiving.value,
+            "label": f"入库验收: {batch.get('ingredient_name', '')} x{batch.get('quantity', 0)}{batch.get('unit', '')}",
+            "store_id": batch.get("store_id"),
+            "received_by": batch.get("received_by"),
+            "quantity": batch.get("quantity"),
+            "timestamp": batch.get("received_at"),
+        }
+    )
 
     # 3. 事务记录中的领用节点
     transactions = _batch_transactions.get(key, [])
     for txn in transactions:
-        chain.append({
-            "node_type": txn.get("node_type", TraceNodeType.requisition.value),
-            "label": txn.get("action", "操作"),
-            "operator": txn.get("operator"),
-            "location": txn.get("location"),
-            "quantity": txn.get("quantity"),
-            "timestamp": txn.get("timestamp"),
-            "reference_id": txn.get("reference_id"),
-        })
+        chain.append(
+            {
+                "node_type": txn.get("node_type", TraceNodeType.requisition.value),
+                "label": txn.get("action", "操作"),
+                "operator": txn.get("operator"),
+                "location": txn.get("location"),
+                "quantity": txn.get("quantity"),
+                "timestamp": txn.get("timestamp"),
+                "reference_id": txn.get("reference_id"),
+            }
+        )
 
     # 4. BOM + 菜品关联
     ingredient_id = batch.get("ingredient_id")
@@ -207,12 +214,14 @@ def full_trace_forward(
         dish_ids = _bom_links.get(ing_key, [])
         for did in dish_ids:
             affected_dishes.append(did)
-            chain.append({
-                "node_type": TraceNodeType.dish.value,
-                "label": f"菜品出品: {did}",
-                "dish_id": did,
-                "ingredient_id": ingredient_id,
-            })
+            chain.append(
+                {
+                    "node_type": TraceNodeType.dish.value,
+                    "label": f"菜品出品: {did}",
+                    "dish_id": did,
+                    "ingredient_id": ingredient_id,
+                }
+            )
 
     # 5. 订单 + 客户
     affected_orders: list[str] = []
@@ -224,22 +233,26 @@ def full_trace_forward(
         for d in dishes:
             if d.get("dish_id") in affected_dishes or batch_no in d.get("batch_nos", []):
                 affected_orders.append(order_id)
-                chain.append({
-                    "node_type": TraceNodeType.order.value,
-                    "label": f"订单: {order_id}",
-                    "order_id": order_id,
-                    "dish_id": d.get("dish_id"),
-                })
+                chain.append(
+                    {
+                        "node_type": TraceNodeType.order.value,
+                        "label": f"订单: {order_id}",
+                        "order_id": order_id,
+                        "dish_id": d.get("dish_id"),
+                    }
+                )
                 # 客户
                 cust = _order_customers.get(okey)
                 if cust and cust.get("customer_id") not in affected_customers:
                     affected_customers.append(cust["customer_id"])
-                    chain.append({
-                        "node_type": TraceNodeType.customer.value,
-                        "label": f"客户: {cust.get('customer_name', '未知')}",
-                        "customer_id": cust["customer_id"],
-                        "order_id": order_id,
-                    })
+                    chain.append(
+                        {
+                            "node_type": TraceNodeType.customer.value,
+                            "label": f"客户: {cust.get('customer_name', '未知')}",
+                            "customer_id": cust["customer_id"],
+                            "order_id": order_id,
+                        }
+                    )
                 break
 
     complete = len(chain) >= 3  # 至少有供应商 + 入库 + 一个下游节点
@@ -295,25 +308,31 @@ def full_trace_backward(
     okey = f"{tenant_id}:{order_id}"
     cust = _order_customers.get(okey)
     if cust:
-        chain.append({
-            "node_type": TraceNodeType.customer.value,
-            "label": f"客户: {cust.get('customer_name', '未知')}",
-            "customer_id": cust.get("customer_id"),
-        })
+        chain.append(
+            {
+                "node_type": TraceNodeType.customer.value,
+                "label": f"客户: {cust.get('customer_name', '未知')}",
+                "customer_id": cust.get("customer_id"),
+            }
+        )
 
     # 2. 订单节点
-    chain.append({
-        "node_type": TraceNodeType.order.value,
-        "label": f"订单: {order_id}",
-        "order_id": order_id,
-    })
+    chain.append(
+        {
+            "node_type": TraceNodeType.order.value,
+            "label": f"订单: {order_id}",
+            "order_id": order_id,
+        }
+    )
 
     # 3. 菜品节点
-    chain.append({
-        "node_type": TraceNodeType.dish.value,
-        "label": f"菜品: {dish_id}",
-        "dish_id": dish_id,
-    })
+    chain.append(
+        {
+            "node_type": TraceNodeType.dish.value,
+            "label": f"菜品: {dish_id}",
+            "dish_id": dish_id,
+        }
+    )
 
     # 4. 查找该菜品使用的批次号
     source_batches: list[str] = []
@@ -329,32 +348,38 @@ def full_trace_backward(
         batch = _batches.get(bkey)
         if batch:
             # 原料节点
-            chain.append({
-                "node_type": TraceNodeType.bom.value,
-                "label": f"原料: {batch.get('ingredient_name', '未知')} (批次 {bno})",
-                "ingredient_id": batch.get("ingredient_id"),
-                "batch_no": bno,
-                "quantity": batch.get("quantity"),
-            })
+            chain.append(
+                {
+                    "node_type": TraceNodeType.bom.value,
+                    "label": f"原料: {batch.get('ingredient_name', '未知')} (批次 {bno})",
+                    "ingredient_id": batch.get("ingredient_id"),
+                    "batch_no": bno,
+                    "quantity": batch.get("quantity"),
+                }
+            )
             # 入库节点
-            chain.append({
-                "node_type": TraceNodeType.receiving.value,
-                "label": f"入库: {batch.get('received_at', '')}",
-                "store_id": batch.get("store_id"),
-                "received_by": batch.get("received_by"),
-                "timestamp": batch.get("received_at"),
-            })
+            chain.append(
+                {
+                    "node_type": TraceNodeType.receiving.value,
+                    "label": f"入库: {batch.get('received_at', '')}",
+                    "store_id": batch.get("store_id"),
+                    "received_by": batch.get("received_by"),
+                    "timestamp": batch.get("received_at"),
+                }
+            )
             # 供应商节点
             supplier_name = batch.get("supplier_name", "未知")
             supplier_id = batch.get("supplier_id")
             if supplier_id and supplier_id not in source_suppliers:
                 source_suppliers.append(supplier_id)
-            chain.append({
-                "node_type": TraceNodeType.supplier.value,
-                "label": f"供应商: {supplier_name}",
-                "supplier_id": supplier_id,
-                "supplier_name": supplier_name,
-            })
+            chain.append(
+                {
+                    "node_type": TraceNodeType.supplier.value,
+                    "label": f"供应商: {supplier_name}",
+                    "supplier_id": supplier_id,
+                    "supplier_name": supplier_name,
+                }
+            )
 
     complete = len(source_batches) > 0 and len(source_suppliers) > 0
 
@@ -411,24 +436,28 @@ def get_trace_timeline(
         }
 
     # 入库节点
-    timeline.append({
-        "timestamp": batch.get("received_at"),
-        "node_type": TraceNodeType.receiving.value,
-        "action": f"入库验收 {batch.get('ingredient_name', '')}",
-        "operator": batch.get("received_by"),
-        "location": batch.get("store_id"),
-    })
+    timeline.append(
+        {
+            "timestamp": batch.get("received_at"),
+            "node_type": TraceNodeType.receiving.value,
+            "action": f"入库验收 {batch.get('ingredient_name', '')}",
+            "operator": batch.get("received_by"),
+            "location": batch.get("store_id"),
+        }
+    )
 
     # 事务节点
     transactions = _batch_transactions.get(key, [])
     for txn in transactions:
-        timeline.append({
-            "timestamp": txn.get("timestamp"),
-            "node_type": txn.get("node_type", "unknown"),
-            "action": txn.get("action", ""),
-            "operator": txn.get("operator"),
-            "location": txn.get("location"),
-        })
+        timeline.append(
+            {
+                "timestamp": txn.get("timestamp"),
+                "node_type": txn.get("node_type", "unknown"),
+                "action": txn.get("action", ""),
+                "operator": txn.get("operator"),
+                "location": txn.get("location"),
+            }
+        )
 
     # 按时间排序
     timeline.sort(key=lambda x: x.get("timestamp") or "")
@@ -577,47 +606,59 @@ def build_ingredient_graph(
     graph_edges: list[dict] = []
 
     # 原料中心节点
-    graph_nodes.append({
-        "id": ingredient_id,
-        "type": "ingredient",
-        "label": f"原料 {ingredient_id}",
-    })
+    graph_nodes.append(
+        {
+            "id": ingredient_id,
+            "type": "ingredient",
+            "label": f"原料 {ingredient_id}",
+        }
+    )
 
     # 菜品节点
     for did in bom_dishes:
         graph_nodes.append({"id": did, "type": "dish", "label": f"菜品 {did}"})
-        graph_edges.append({
-            "source": ingredient_id,
-            "target": did,
-            "relation": "used_in_bom",
-        })
+        graph_edges.append(
+            {
+                "source": ingredient_id,
+                "target": did,
+                "relation": "used_in_bom",
+            }
+        )
 
     # 供应商节点
     for sup in suppliers:
         sid = sup.get("supplier_id", "unknown")
-        graph_nodes.append({
-            "id": sid,
-            "type": "supplier",
-            "label": sup.get("supplier_name", "未知供应商"),
-        })
-        graph_edges.append({
-            "source": sid,
-            "target": ingredient_id,
-            "relation": "supplies",
-        })
+        graph_nodes.append(
+            {
+                "id": sid,
+                "type": "supplier",
+                "label": sup.get("supplier_name", "未知供应商"),
+            }
+        )
+        graph_edges.append(
+            {
+                "source": sid,
+                "target": ingredient_id,
+                "relation": "supplies",
+            }
+        )
 
     # 替代料节点
     for alt_id in alternatives:
-        graph_nodes.append({
-            "id": alt_id,
-            "type": "alternative",
-            "label": f"替代料 {alt_id}",
-        })
-        graph_edges.append({
-            "source": ingredient_id,
-            "target": alt_id,
-            "relation": "alternative_for",
-        })
+        graph_nodes.append(
+            {
+                "id": alt_id,
+                "type": "alternative",
+                "label": f"替代料 {alt_id}",
+            }
+        )
+        graph_edges.append(
+            {
+                "source": ingredient_id,
+                "target": alt_id,
+                "relation": "alternative_for",
+            }
+        )
 
     log.info(
         "ingredient_graph_built",

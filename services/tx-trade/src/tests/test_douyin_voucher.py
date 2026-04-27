@@ -5,27 +5,31 @@
   2. test_verify_already_used        — 已核销券（DY_USED_ 前缀）：success=False，error 含"已核销"
   3. test_reconciliation_report      — 对账报表：返回必要字段，discrepancy_amount_fen 为整数
 """
+
 from __future__ import annotations
 
-import pytest
+import os
+import sys
+
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-import sys
-import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../../../../.."))
 
 # Sprint A4：RBAC 装饰器在 TX_AUTH_ENABLED=false 时注入 mock 用户，
 # 使现有测试无需手动构造 JWT / UserContext。强制写入以覆盖其他测试模块的设置。
 os.environ["TX_AUTH_ENABLED"] = "false"
 
-from services.tx_trade.src.api.douyin_voucher_routes import router, _RETRY_QUEUE, _AUTHORIZED_STORES
-from shared.ontology.src.database import get_db
 from unittest.mock import AsyncMock
+
+from services.tx_trade.src.api.douyin_voucher_routes import _RETRY_QUEUE, router
+
+from shared.ontology.src.database import get_db
 
 # ──────────────────────────────────────────────────────────────────────────────
 # 测试 App
 # ──────────────────────────────────────────────────────────────────────────────
+
 
 async def _mock_get_db():
     """Mock DB：Sprint A4 新增 write_audit 需要 db session，但本测试套件
@@ -55,6 +59,7 @@ def _clear_retry_queue():
 # 测试 1：正常核销 — success=True，order_id 非空
 # ──────────────────────────────────────────────────────────────────────────────
 
+
 class TestVerifyVoucherSuccess:
     def setup_method(self):
         _clear_retry_queue()
@@ -82,9 +87,7 @@ class TestVerifyVoucherSuccess:
         assert data["ok"] is True
         assert data["success"] is True, f"核销应成功，实际: {data}"
         assert data["order_id"], "order_id 不能为空"
-        assert data["order_id"].startswith("dy-order-"), (
-            f"order_id 格式错误：{data['order_id']}"
-        )
+        assert data["order_id"].startswith("dy-order-"), f"order_id 格式错误：{data['order_id']}"
 
         vi = data["voucher_info"]
         assert "product_name" in vi, "voucher_info 缺少 product_name"
@@ -149,6 +152,7 @@ class TestVerifyVoucherSuccess:
 # 测试 2：已核销券（DY_USED_ 前缀）— success=False，error 含"已核销"
 # ──────────────────────────────────────────────────────────────────────────────
 
+
 class TestVerifyAlreadyUsed:
     def setup_method(self):
         _clear_retry_queue()
@@ -178,12 +182,8 @@ class TestVerifyAlreadyUsed:
         assert "error" in data, "应返回 error 字段"
 
         error = data["error"]
-        assert "已核销" in error["message"], (
-            f"错误信息应包含'已核销'，实际: '{error['message']}'"
-        )
-        assert error["code"] == "VOUCHER_ALREADY_USED", (
-            f"错误码应为 VOUCHER_ALREADY_USED，实际: '{error['code']}'"
-        )
+        assert "已核销" in error["message"], f"错误信息应包含'已核销'，实际: '{error['message']}'"
+        assert error["code"] == "VOUCHER_ALREADY_USED", f"错误码应为 VOUCHER_ALREADY_USED，实际: '{error['code']}'"
 
     def test_verify_already_used_not_added_to_retry_queue(self):
         """已核销券失败不应进入重试队列（是业务拒绝，不是平台错误）"""
@@ -199,9 +199,7 @@ class TestVerifyAlreadyUsed:
             headers=TENANT_HEADER,
         )
 
-        assert len(_RETRY_QUEUE) == initial_queue_size, (
-            "已核销券不应被加入重试队列"
-        )
+        assert len(_RETRY_QUEUE) == initial_queue_size, "已核销券不应被加入重试队列"
 
     def test_verify_expired_voucher(self):
         """DY_EXP_ 前缀：已过期券"""
@@ -240,9 +238,7 @@ class TestVerifyAlreadyUsed:
         assert data["retry_task_id"], "retry_task_id 不能为空"
 
         # 验证确实写入了重试队列
-        assert len(_RETRY_QUEUE) > initial_queue_size, (
-            "平台错误必须写入重试队列，不能丢弃"
-        )
+        assert len(_RETRY_QUEUE) > initial_queue_size, "平台错误必须写入重试队列，不能丢弃"
 
         task_id = data["retry_task_id"]
         assert task_id in _RETRY_QUEUE, f"task_id {task_id} 应在重试队列中"
@@ -252,6 +248,7 @@ class TestVerifyAlreadyUsed:
 # ──────────────────────────────────────────────────────────────────────────────
 # 测试 3：对账报表 — 返回必要字段，discrepancy_amount_fen 为整数
 # ──────────────────────────────────────────────────────────────────────────────
+
 
 class TestReconciliationReport:
     def test_reconciliation_report_required_fields(self):
@@ -271,8 +268,11 @@ class TestReconciliationReport:
 
         report = data["data"]
         required_fields = {
-            "local_count", "platform_count", "matched",
-            "unmatched", "discrepancy_amount_fen",
+            "local_count",
+            "platform_count",
+            "matched",
+            "unmatched",
+            "discrepancy_amount_fen",
         }
         missing = required_fields - set(report.keys())
         assert not missing, f"对账报表缺少必要字段: {missing}"
@@ -308,9 +308,7 @@ class TestReconciliationReport:
         unmatched = report["unmatched"]
 
         assert local >= matched, f"local_count({local}) 不能小于 matched({matched})"
-        assert unmatched == local - matched, (
-            f"unmatched({unmatched}) 应等于 local_count({local}) - matched({matched})"
-        )
+        assert unmatched == local - matched, f"unmatched({unmatched}) 应等于 local_count({local}) - matched({matched})"
         assert matched >= 0
         assert unmatched >= 0
 
@@ -349,9 +347,7 @@ class TestReconciliationReport:
             headers=TENANT_HEADER,
         )
         data = resp.json()
-        assert data["data"]["discrepancy_amount_fen"] >= 0, (
-            "discrepancy_amount_fen 不能为负数"
-        )
+        assert data["data"]["discrepancy_amount_fen"] >= 0, "discrepancy_amount_fen 不能为负数"
 
     def test_reconciliation_unmatched_records_present_when_unmatched_gt0(self):
         """unmatched > 0 时，unmatched_records 不能为空列表"""
@@ -364,9 +360,7 @@ class TestReconciliationReport:
         report = data["data"]
 
         if report["unmatched"] > 0:
-            assert len(report["unmatched_records"]) > 0, (
-                "unmatched > 0 时，unmatched_records 不应为空"
-            )
+            assert len(report["unmatched_records"]) > 0, "unmatched > 0 时，unmatched_records 不应为空"
         else:
             # unmatched == 0 → unmatched_records 可以为空
             assert report["discrepancy_amount_fen"] == 0

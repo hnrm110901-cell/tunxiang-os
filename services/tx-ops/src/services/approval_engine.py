@@ -10,6 +10,7 @@
 依赖：SQLAlchemy text() + asyncpg（DB 连接由路由层注入）
 日志：structlog JSON 格式
 """
+
 from __future__ import annotations
 
 import uuid
@@ -152,9 +153,7 @@ class ApprovalEngine:
             {"tenant_id": tenant_id, "business_type": business_type},
         )
         if row is None:
-            raise ValueError(
-                f"未找到 business_type={business_type!r} 的有效审批模板"
-            )
+            raise ValueError(f"未找到 business_type={business_type!r} 的有效审批模板")
 
         template_id: str = str(row["id"])
         raw_steps: List[Dict[str, Any]] = row["steps"] or []
@@ -162,10 +161,7 @@ class ApprovalEngine:
         # 2. 筛选适用步骤
         active_steps = _filter_steps_by_amount(raw_steps, amount_fen)
         if not active_steps:
-            raise ValueError(
-                f"模板 {row['template_name']!r} 中没有与 "
-                f"amount_fen={amount_fen} 匹配的审批步骤"
-            )
+            raise ValueError(f"模板 {row['template_name']!r} 中没有与 amount_fen={amount_fen} 匹配的审批步骤")
 
         total_steps = len(active_steps)
         instance_id = str(uuid.uuid4())
@@ -219,12 +215,11 @@ class ApprovalEngine:
             db=db,
             tenant_id=tenant_id,
             instance_id=instance_id,
-            recipient_id=step_role,           # role 作为 recipient_id（生产可扩展为查员工表）
+            recipient_id=step_role,  # role 作为 recipient_id（生产可扩展为查员工表）
             recipient_name=step_role,
             notification_type="pending",
             message=(
-                f"【待审批】{title} — {initiator_name} 发起，"
-                f"请以 {step_role} 身份审批（第1步，共{total_steps}步）"
+                f"【待审批】{title} — {initiator_name} 发起，请以 {step_role} 身份审批（第1步，共{total_steps}步）"
             ),
         )
 
@@ -290,9 +285,7 @@ class ApprovalEngine:
 
         current_status: str = inst["status"]
         if current_status != "pending":
-            raise ValueError(
-                f"审批实例当前状态为 {current_status!r}，无法执行 {action!r} 操作"
-            )
+            raise ValueError(f"审批实例当前状态为 {current_status!r}，无法执行 {action!r} 操作")
 
         # 超时检查
         deadline = inst["deadline_at"]
@@ -395,10 +388,7 @@ class ApprovalEngine:
                 recipient_id=initiator_id,
                 recipient_name=initiator_name,
                 notification_type="rejected",
-                message=(
-                    f"【审批驳回】{title} 已被 {approver_name}（{approver_role}）驳回。"
-                    f"原因：{comment or '无'}"
-                ),
+                message=(f"【审批驳回】{title} 已被 {approver_name}（{approver_role}）驳回。原因：{comment or '无'}"),
             )
             return {
                 "instance_id": instance_id,
@@ -451,9 +441,7 @@ class ApprovalEngine:
                 if s.get("step_no") == next_step_no:
                     next_step_config = s
                     break
-            next_role: str = (
-                next_step_config.get("role", "unknown") if next_step_config else "unknown"
-            )
+            next_role: str = next_step_config.get("role", "unknown") if next_step_config else "unknown"
             await _send_notification(
                 db=db,
                 tenant_id=tenant_id,
@@ -461,10 +449,7 @@ class ApprovalEngine:
                 recipient_id=next_role,
                 recipient_name=next_role,
                 notification_type="pending",
-                message=(
-                    f"【待审批】{title} — 第{next_step_no}步审批，"
-                    f"请以 {next_role} 身份审批（共{total_steps}步）"
-                ),
+                message=(f"【待审批】{title} — 第{next_step_no}步审批，请以 {next_role} 身份审批（共{total_steps}步）"),
             )
             return {
                 "instance_id": instance_id,
@@ -512,9 +497,7 @@ class ApprovalEngine:
             raw_steps: List[Dict[str, Any]] = row["template_steps"] or []
             current_step: int = row["current_step"]
             # 找当前步骤角色
-            step_cfg: Optional[Dict[str, Any]] = next(
-                (s for s in raw_steps if s.get("step_no") == current_step), None
-            )
+            step_cfg: Optional[Dict[str, Any]] = next((s for s in raw_steps if s.get("step_no") == current_step), None)
             role: str = step_cfg.get("role", "") if step_cfg else ""
             if role == approver_id:
                 result.append(dict(row))

@@ -1,4 +1,5 @@
 """Course Firing Service — 打菜时机控制"""
+
 import os
 import uuid
 from dataclasses import dataclass
@@ -199,17 +200,19 @@ async def get_courses_status(
         fired_count = sum(1 for t in tasks if t.course_status == "fired")
         done_count = sum(1 for t in tasks if t.status == "done")
 
-        statuses.append(CourseStatus(
-            course_name=course.course_name,
-            course_label=course.course_label,
-            sort_order=course.sort_order,
-            status=course.status,
-            dish_count=dish_count,
-            fired_count=fired_count,
-            done_count=done_count,
-            fired_at=course.fired_at,
-            fired_by=str(course.fired_by) if course.fired_by else None,
-        ))
+        statuses.append(
+            CourseStatus(
+                course_name=course.course_name,
+                course_label=course.course_label,
+                sort_order=course.sort_order,
+                status=course.status,
+                dish_count=dish_count,
+                fired_count=fired_count,
+                done_count=done_count,
+                fired_at=course.fired_at,
+                fired_by=str(course.fired_by) if course.fired_by else None,
+            )
+        )
 
     return statuses
 
