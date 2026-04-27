@@ -76,6 +76,15 @@ ACCOUNT_MAPPING: dict[str, dict[str, dict[str, str]]] = {
     },
 }
 
+# W1.7 VoucherType (中文 ERP 约定) → financial_vouchers.voucher_type (英文 DB 约定)
+_VOUCHER_TYPE_ERP_TO_DB: dict[str, str] = {
+    "收": "receipt",     # RECEIPT — 收款凭证
+    "付": "payment",     # PAYMENT — 付款凭证
+    "记": "cost",        # MEMO    — 记账凭证 (通常成本结转)
+    "转": "cost",        # TRANSFER — 转账凭证 (归到 cost, 后续 W2 可独立)
+}
+
+
 # 收款方式 → 科目映射
 _PAY_METHOD_ACCOUNTS: dict[str, tuple[str, str]] = {
     "cash": ("1001", "库存现金"),
@@ -330,6 +339,148 @@ class VoucherGenerator:
             entry_count=len(entries),
         )
         return voucher
+
+    # ─── W1.7: 持久化 + 推送端到端 ────────────────────────────────────────
+
+    async def persist_to_db(
+        self,
+        erp_voucher: ERPVoucher,
+        *,
+        voucher_service,  # FinancialVoucherService (forward ref 避循环导入)
+        session: AsyncSession,
+        voucher_no: str | None = None,
+        event_type: str | None = None,
+        event_id: "uuid.UUID | None" = None,
+    ) -> "FinancialVoucher":
+        """ERPVoucher pydantic → FinancialVoucher ORM 持久化.
+
+        把推 ERP 前的 pydantic 生成物落地到 financial_vouchers + lines.
+        调用方继续拿 erp_voucher 走 push_to_erp — DB 写入是 SSOT, ERP 推送是同步.
+
+        Args:
+            erp_voucher: 由 generate_from_* 方法生成的 pydantic.
+            voucher_service: FinancialVoucherService 实例 (W1.3+).
+                注入 period_service 时自动走账期校验.
+            voucher_no: 自定义凭证编号. None 时默认 AUTO_{erp_voucher_id[:8]}.
+            event_type/event_id: 幂等键 (可选). 建议:
+                daily_revenue: uuid.uuid5(NAMESPACE_URL, f"daily_revenue:{store}:{date}")
+                purchase_order: uuid.uuid5(NAMESPACE_URL, f"purchase_order:{order_id}")
+
+        Returns:
+            已 flush 未 commit 的 FinancialVoucher. caller 持事务边界.
+        """
+        import uuid as _uuid
+
+        # 延迟 import 避循环: service 依赖 model 依赖 generator
+        from services.financial_voucher_service import (  # type: ignore
+            VoucherCreateInput,
+            VoucherLineInput,
+        )
+
+        payload = VoucherCreateInput(
+            tenant_id=_uuid.UUID(erp_voucher.tenant_id),
+            store_id=_uuid.UUID(erp_voucher.store_id) if erp_voucher.store_id else None,
+            voucher_no=voucher_no or f"AUTO_{erp_voucher.voucher_id[:8]}",
+            voucher_date=erp_voucher.business_date,
+            voucher_type=_VOUCHER_TYPE_ERP_TO_DB[erp_voucher.voucher_type.value],
+            source_type=erp_voucher.source_type,
+            source_id=(
+                _uuid.UUID(erp_voucher.source_id)
+                if erp_voucher.source_id and self._looks_like_uuid(erp_voucher.source_id)
+                else None
+            ),
+            event_type=event_type,
+            event_id=event_id,
+            lines=[
+                VoucherLineInput(
+                    account_code=e.account_code,
+                    account_name=e.account_name,
+                    debit_fen=e.debit_fen,
+                    credit_fen=e.credit_fen,
+                    summary=e.summary,
+                )
+                for e in erp_voucher.entries
+            ],
+        )
+        return await voucher_service.create(payload, session=session)
+
+    async def persist_and_push(
+        self,
+        erp_voucher: ERPVoucher,
+        *,
+        voucher_service,
+        erp_type: str,
+        session: AsyncSession,
+        voucher_no: str | None = None,
+        event_type: str | None = None,
+        event_id: "uuid.UUID | None" = None,
+    ) -> "tuple[FinancialVoucher, ERPPushResult]":
+        """端到端编排: 持久化 → 推 ERP → 推成功时标记 exported.
+
+        顺序:
+          1. persist_to_db: 写 financial_vouchers + lines (SSOT).
+          2. push_to_erp: 推金蝶/用友. 失败记 erp_push_log, 不回滚 DB.
+          3. 推成功时: 更新 status='exported' + exported_at.
+
+        事务边界: 调用方持 commit, service 内只 flush. 典型用法:
+            async with db.begin():
+                voucher, push_result = await gen.persist_and_push(...)
+                # 若要求推 ERP 失败也回滚 DB, 此处 raise
+
+        Returns:
+            (FinancialVoucher ORM, ERPPushResult).
+        """
+        from datetime import datetime, timezone
+
+        # 1. 持久化 DB
+        financial_voucher = await self.persist_to_db(
+            erp_voucher,
+            voucher_service=voucher_service,
+            session=session,
+            voucher_no=voucher_no,
+            event_type=event_type,
+            event_id=event_id,
+        )
+
+        log.info(
+            "voucher.persist_and_push.persisted",
+            db_voucher_id=str(financial_voucher.id),
+            voucher_no=financial_voucher.voucher_no,
+        )
+
+        # 2. 推 ERP (失败不回滚 DB)
+        push_result = await self.push_to_erp(
+            erp_voucher,
+            tenant_id=erp_voucher.tenant_id,
+            erp_type=erp_type,
+            db=session,
+        )
+
+        # 3. 推成功 → 更新 status
+        if push_result.status == PushStatus.SUCCESS:
+            financial_voucher.status = "exported"
+            financial_voucher.exported_at = datetime.now(timezone.utc)
+            await session.flush()
+
+        log.info(
+            "voucher.persist_and_push.done",
+            db_voucher_id=str(financial_voucher.id),
+            push_status=push_result.status.value,
+            erp_voucher_id=push_result.erp_voucher_id,
+        )
+
+        return financial_voucher, push_result
+
+    @staticmethod
+    def _looks_like_uuid(s: str) -> bool:
+        """保守判 source_id 是否 UUID 格式 (否则置 None 避免 UUID() 报错)."""
+        import uuid as _uuid
+
+        try:
+            _uuid.UUID(s)
+            return True
+        except (ValueError, AttributeError, TypeError):
+            return False
 
     # ─── 推送凭证 ─────────────────────────────────────────────────────────
 
