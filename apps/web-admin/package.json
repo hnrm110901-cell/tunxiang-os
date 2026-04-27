@@ -21,7 +21,7 @@
     "react": "^18.3.0",
     "react-dom": "^18.3.0",
     "react-router-dom": "^7.14.1",
-    "zustand": "^4.4.0",
+    "zustand": "^5.0.12",
     "@tunxiang/design-system": "workspace:*",
     "@tx/tokens": "workspace:*"
   },
