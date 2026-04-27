@@ -13,18 +13,15 @@ SOP <-> IM双向桥接端点。
   GET  /interactions           — 列出交互记录（分页）
   GET  /quick-actions          — 列出快捷操作
 """
+
 from __future__ import annotations
 
-from typing import Optional
-from uuid import UUID
-
-from fastapi import APIRouter, Depends, Header, HTTPException, Query
+from fastapi import APIRouter, Depends, Header, Query
 from pydantic import BaseModel, Field
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from services.tx_agent.src.services.im_sop_bridge_service import (
     IMSOPBridgeService,
 )
+from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter(prefix="/api/v1/agent/im-sop", tags=["im-sop"])
 
@@ -36,6 +33,7 @@ router = APIRouter(prefix="/api/v1/agent/im-sop", tags=["im-sop"])
 
 # ── 通用 ──
 
+
 class OkResponse(BaseModel):
     ok: bool
     data: dict | None = None
@@ -44,8 +42,10 @@ class OkResponse(BaseModel):
 
 # ── 推送请求 ──
 
+
 class TaskItem(BaseModel):
     """任务列表项"""
+
     task_name: str = Field(..., description="任务名称")
     status: str = Field("pending", description="任务状态")
     priority: str = Field("normal", description="优先级")
@@ -56,6 +56,7 @@ class TaskItem(BaseModel):
 
 class PushTaskCardRequest(BaseModel):
     """推送任务卡请求"""
+
     store_id: str = Field(..., description="门店ID")
     user_id: str = Field(..., description="接收人ID")
     slot_name: str = Field(..., description="时段名称")
@@ -66,11 +67,10 @@ class PushTaskCardRequest(BaseModel):
 
 class PushAlertCardRequest(BaseModel):
     """推送预警卡请求"""
+
     store_id: str = Field(..., description="门店ID")
     user_id: str = Field(..., description="接收人ID")
-    alert_type: str = Field(
-        ..., description="预警类型: overdue/violation/anomaly/threshold"
-    )
+    alert_type: str = Field(..., description="预警类型: overdue/violation/anomaly/threshold")
     anomalies: list[dict] = Field(
         ...,
         description="异常列表 [{title, description, severity}]",
@@ -82,6 +82,7 @@ class PushAlertCardRequest(BaseModel):
 
 class CoachingContent(BaseModel):
     """教练内容"""
+
     title: str | None = Field(None, description="标题")
     summary: str | None = Field(None, description="摘要")
     metrics: dict | None = Field(None, description="指标数据")
@@ -92,6 +93,7 @@ class CoachingContent(BaseModel):
 
 class PushCoachingCardRequest(BaseModel):
     """推送教练卡请求"""
+
     store_id: str = Field(..., description="门店ID")
     user_id: str = Field(..., description="接收人ID")
     coaching_type: str = Field(
@@ -104,6 +106,7 @@ class PushCoachingCardRequest(BaseModel):
 
 class CorrectiveActionDetail(BaseModel):
     """纠正动作详情"""
+
     id: str = Field(..., description="纠正动作ID")
     title: str = Field(..., description="标题")
     description: str = Field(..., description="描述")
@@ -115,6 +118,7 @@ class CorrectiveActionDetail(BaseModel):
 
 class PushCorrectiveCardRequest(BaseModel):
     """推送纠正卡请求"""
+
     store_id: str = Field(..., description="门店ID")
     user_id: str = Field(..., description="责任人ID")
     action: CorrectiveActionDetail = Field(..., description="纠正动作详情")
@@ -123,8 +127,10 @@ class PushCorrectiveCardRequest(BaseModel):
 
 # ── 回调请求 ──
 
+
 class IMCallbackRequest(BaseModel):
     """IM回调请求"""
+
     store_id: str = Field(..., description="门店ID")
     user_id: str = Field(..., description="操作人ID")
     action_code: str = Field(..., description="操作代码")
@@ -137,6 +143,7 @@ class IMCallbackRequest(BaseModel):
 
 class PhotoUploadRequest(BaseModel):
     """照片上传请求"""
+
     store_id: str = Field(..., description="门店ID")
     user_id: str = Field(..., description="上传人ID")
     instance_id: str = Field(..., description="任务实例ID")
@@ -148,6 +155,7 @@ class PhotoUploadRequest(BaseModel):
 # ══════════════════════════════════════════════
 # 依赖注入
 # ══════════════════════════════════════════════
+
 
 async def get_db() -> AsyncSession:
     """数据库会话依赖 — 由main.py中的lifespan注入"""

@@ -12,13 +12,14 @@
   sop_templates / sop_time_slots / sop_tasks / sop_task_instances
   sop_corrective_actions / sop_store_configs
 """
+
 from __future__ import annotations
 
-from datetime import datetime, timezone, date, time, timedelta
+from datetime import date, datetime, time, timedelta, timezone
 from uuid import UUID, uuid4
 
 import structlog
-from sqlalchemy import func, select, update, and_, or_, text, literal_column
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = structlog.get_logger(__name__)
@@ -114,7 +115,9 @@ class SOPSchedulerService:
 
         # 2. 懒生成今日任务实例
         generated = await self.generate_daily_instances(
-            tenant_id, store_id, today,
+            tenant_id,
+            store_id,
+            today,
         )
         if generated > 0:
             logger.info(
@@ -130,7 +133,9 @@ class SOPSchedulerService:
         local_now = now + store_tz_offset
         current_time = local_now.time()
         current_slot = await self.get_current_slot(
-            tenant_id, store_id, current_time,
+            tenant_id,
+            store_id,
+            current_time,
         )
 
         # 4. 检查超时任务
@@ -142,7 +147,10 @@ class SOPSchedulerService:
         if current_slot is not None:
             slot_info = current_slot
             slot_tasks = await self.get_slot_tasks(
-                tenant_id, store_id, today, current_slot["slot_code"],
+                tenant_id,
+                store_id,
+                today,
+                current_slot["slot_code"],
             )
 
         # 6. 汇总概况
@@ -166,7 +174,10 @@ class SOPSchedulerService:
     # ──────────────────────────────────────────────
 
     async def generate_daily_instances(
-        self, tenant_id: str, store_id: str, target_date: date,
+        self,
+        tenant_id: str,
+        store_id: str,
+        target_date: date,
     ) -> int:
         """为指定门店生成一天的任务实例
 
@@ -260,7 +271,8 @@ class SOPSchedulerService:
                 due_at = due_at.replace(tzinfo=timezone.utc)
             else:
                 due_at = datetime.combine(
-                    target_date, time(23, 0),
+                    target_date,
+                    time(23, 0),
                 ).replace(tzinfo=timezone.utc)
 
             instance_id = uuid4()
@@ -308,7 +320,10 @@ class SOPSchedulerService:
     # ──────────────────────────────────────────────
 
     async def get_current_slot(
-        self, tenant_id: str, store_id: str, current_time: time,
+        self,
+        tenant_id: str,
+        store_id: str,
+        current_time: time,
     ) -> dict | None:
         """获取当前时段信息
 
@@ -356,9 +371,13 @@ class SOPSchedulerService:
         }
 
     async def get_slot_tasks(
-        self, tenant_id: str, store_id: str,
-        target_date: date, slot_code: str,
-        *, role: str | None = None,
+        self,
+        tenant_id: str,
+        store_id: str,
+        target_date: date,
+        slot_code: str,
+        *,
+        role: str | None = None,
     ) -> list[dict]:
         """获取指定时段的任务列表（可按角色过滤）
 
@@ -416,26 +435,28 @@ class SOPSchedulerService:
 
         tasks: list[dict] = []
         for row in rows:
-            tasks.append({
-                "instance_id": str(row.instance_id),
-                "task_id": str(row.task_id),
-                "task_code": row.task_code,
-                "task_name": row.task_name,
-                "task_type": row.task_type,
-                "priority": row.priority,
-                "target_role": row.target_role,
-                "status": row.status,
-                "duration_min": row.duration_min,
-                "instructions": row.instructions,
-                "checklist_items": row.checklist_items,
-                "started_at": row.started_at.isoformat() if row.started_at else None,
-                "completed_at": row.completed_at.isoformat() if row.completed_at else None,
-                "due_at": row.due_at.isoformat() if row.due_at else None,
-                "assignee_id": str(row.assignee_id) if row.assignee_id else None,
-                "result": row.result,
-                "compliance": row.compliance,
-                "ai_suggestion": row.ai_suggestion,
-            })
+            tasks.append(
+                {
+                    "instance_id": str(row.instance_id),
+                    "task_id": str(row.task_id),
+                    "task_code": row.task_code,
+                    "task_name": row.task_name,
+                    "task_type": row.task_type,
+                    "priority": row.priority,
+                    "target_role": row.target_role,
+                    "status": row.status,
+                    "duration_min": row.duration_min,
+                    "instructions": row.instructions,
+                    "checklist_items": row.checklist_items,
+                    "started_at": row.started_at.isoformat() if row.started_at else None,
+                    "completed_at": row.completed_at.isoformat() if row.completed_at else None,
+                    "due_at": row.due_at.isoformat() if row.due_at else None,
+                    "assignee_id": str(row.assignee_id) if row.assignee_id else None,
+                    "result": row.result,
+                    "compliance": row.compliance,
+                    "ai_suggestion": row.ai_suggestion,
+                }
+            )
 
         return tasks
 
@@ -444,7 +465,9 @@ class SOPSchedulerService:
     # ──────────────────────────────────────────────
 
     async def check_overdue_tasks(
-        self, tenant_id: str, store_id: str,
+        self,
+        tenant_id: str,
+        store_id: str,
     ) -> list[dict]:
         """检查超时任务，标记为overdue并创建纠正动作
 
@@ -543,16 +566,18 @@ class SOPSchedulerService:
                 },
             )
 
-            overdue_list.append({
-                "instance_id": str(row.id),
-                "task_code": row.task_code,
-                "task_name": row.task_name,
-                "slot_code": row.slot_code,
-                "priority": row.priority,
-                "due_at": row.due_at.isoformat(),
-                "corrective_action_id": str(action_id),
-                "severity": severity,
-            })
+            overdue_list.append(
+                {
+                    "instance_id": str(row.id),
+                    "task_code": row.task_code,
+                    "task_name": row.task_name,
+                    "slot_code": row.slot_code,
+                    "priority": row.priority,
+                    "due_at": row.due_at.isoformat(),
+                    "corrective_action_id": str(action_id),
+                    "severity": severity,
+                }
+            )
 
         await self.db.flush()
 
@@ -571,7 +596,10 @@ class SOPSchedulerService:
     # ──────────────────────────────────────────────
 
     async def on_business_event(
-        self, tenant_id: str, event_type: str, payload: dict,
+        self,
+        tenant_id: str,
+        event_type: str,
+        payload: dict,
     ) -> list[str]:
         """事件触发的SOP任务
 
@@ -606,7 +634,10 @@ class SOPSchedulerService:
         # ── 温度异常：创建critical纠正动作 ──
         if event_type == "supply.temperature.abnormal":
             await self._handle_temperature_abnormal(
-                tid, sid, payload, triggered_ids,
+                tid,
+                sid,
+                payload,
+                triggered_ids,
             )
             return triggered_ids
 
@@ -657,8 +688,11 @@ class SOPSchedulerService:
         return triggered_ids
 
     async def _handle_temperature_abnormal(
-        self, tid: UUID, sid: UUID,
-        payload: dict, triggered_ids: list[str],
+        self,
+        tid: UUID,
+        sid: UUID,
+        payload: dict,
+        triggered_ids: list[str],
     ) -> None:
         """处理温度异常事件：创建critical纠正动作"""
         now = datetime.now(timezone.utc)
@@ -720,10 +754,7 @@ class SOPSchedulerService:
                 "action_type": "immediate",
                 "severity": "critical",
                 "title": f"温度异常警报：{equipment}",
-                "description": (
-                    f"设备 {equipment} 温度异常，当前温度 {temperature}。"
-                    f"需立即检查并处理，防止食材变质。"
-                ),
+                "description": (f"设备 {equipment} 温度异常，当前温度 {temperature}。需立即检查并处理，防止食材变质。"),
                 "assignee_id": tid,  # 占位，实际应查组织表
                 "due_at": now + timedelta(minutes=30),
                 "status": CORRECTIVE_STATUS_OPEN,
@@ -744,7 +775,10 @@ class SOPSchedulerService:
     # ──────────────────────────────────────────────
 
     async def get_daily_summary(
-        self, tenant_id: str, store_id: str, target_date: date,
+        self,
+        tenant_id: str,
+        store_id: str,
+        target_date: date,
     ) -> dict:
         """获取每日SOP执行概况
 
@@ -778,9 +812,7 @@ class SOPSchedulerService:
         overall = result.fetchone()
 
         total = overall.total if overall else 0
-        completed = (overall.completed if overall else 0) + (
-            overall.auto_completed if overall else 0
-        )
+        completed = (overall.completed if overall else 0) + (overall.auto_completed if overall else 0)
         completion_rate = (completed / total * 100) if total > 0 else 0.0
 
         # 按时段统计
@@ -888,7 +920,9 @@ class SOPSchedulerService:
     # ──────────────────────────────────────────────
 
     async def get_store_sop_config(
-        self, tenant_id: str, store_id: str,
+        self,
+        tenant_id: str,
+        store_id: str,
     ) -> dict | None:
         """获取门店SOP配置（模板+时段+任务数量）"""
         tid = UUID(tenant_id)
@@ -940,8 +974,12 @@ class SOPSchedulerService:
         }
 
     async def bind_store_template(
-        self, tenant_id: str, store_id: str, template_id: str,
-        *, timezone: str = "Asia/Shanghai",
+        self,
+        tenant_id: str,
+        store_id: str,
+        template_id: str,
+        *,
+        timezone: str = "Asia/Shanghai",
         custom_overrides: dict | None = None,
     ) -> dict:
         """绑定门店到SOP模板"""
@@ -1056,7 +1094,10 @@ class SOPSchedulerService:
         return result.fetchone()
 
     async def _get_tick_summary(
-        self, tid: UUID, sid: UUID, target_date: date,
+        self,
+        tid: UUID,
+        sid: UUID,
+        target_date: date,
     ) -> dict:
         """获取tick时的快速概况"""
         result = await self.db.execute(

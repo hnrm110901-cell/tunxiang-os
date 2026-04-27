@@ -6,6 +6,7 @@
 3. 对每个门店执行scheduler.tick()
 4. 统计处理结果
 """
+
 from __future__ import annotations
 
 import os
@@ -16,8 +17,8 @@ from sqlalchemy import select
 
 from shared.ontology.src.database import get_db_with_tenant
 
-from ..services.sop_scheduler_service import SOPSchedulerService
 from ..models.sop import SOPStoreConfig
+from ..services.sop_scheduler_service import SOPSchedulerService
 
 logger = structlog.get_logger(__name__)
 

@@ -5,6 +5,7 @@
   GET  /api/v1/predict/traffic/{store_id}/today   — 今日剩余时段客流预测
   POST /api/v1/predict/traffic/train              — 触发模型训练
 """
+
 from typing import Optional
 
 import structlog
@@ -21,6 +22,7 @@ router = APIRouter(prefix="/api/v1/predict/traffic", tags=["traffic-forecast"])
 
 # ── 依赖注入 ──
 
+
 def _require_tenant(x_tenant_id: Optional[str] = Header(None, alias="X-Tenant-ID")) -> str:
     if not x_tenant_id:
         raise HTTPException(status_code=400, detail="X-Tenant-ID header 必填")
@@ -33,6 +35,7 @@ async def _get_tenant_db(x_tenant_id: str = Header(..., alias="X-Tenant-ID")):
 
 
 # ── 1. 未来7天小时级客流预测 ──
+
 
 @router.get(
     "/{store_id}",
@@ -57,6 +60,7 @@ async def get_traffic_forecast_7days(
 
 # ── 2. 今日剩余时段客流预测 ──
 
+
 @router.get(
     "/{store_id}/today",
     summary="今日剩余时段客流预测",
@@ -79,6 +83,7 @@ async def get_traffic_forecast_today(
 
 
 # ── 3. 触发模型训练 ──
+
 
 @router.post(
     "/train",

@@ -147,6 +147,20 @@ class EnergyEventType(str, Enum):
     ALERT_RULE_CREATED = "energy.alert_rule_created"  # 告警规则创建（v164 新增）
 
 
+class DeliveryTempEventType(str, Enum):
+    """配送在途温控事件 — 海鲜冷链命门（v368 新增 / TASK-3）
+
+    覆盖配送车温控全生命周期：
+      - RECORDED:       温度上报（每条可发，可降采样到每分钟一条）
+      - BREACH_STARTED: 连续超限达阈值时长，告警触发
+      - BREACH_ENDED:   超限恢复或人工处理结束
+    """
+
+    RECORDED = "delivery.temperature_recorded"  # 温度记录上报
+    BREACH_STARTED = "delivery.temperature_breach"  # 超限告警触发
+    BREACH_ENDED = "delivery.temperature_breach_ended"  # 超限恢复/告警关闭
+
+
 class ReviewEventType(str, Enum):
     """舆情/评价事件"""
 
@@ -172,6 +186,18 @@ class RecipeEventType(str, Enum):
     PROCUREMENT_PRICE_CHANGED = "recipe.procurement_price_changed"  # 采购价变动
     MENU_PRICE_ADJUSTED = "recipe.menu_price_adjusted"  # 菜单价格调整
     MARGIN_ALERT = "recipe.margin_alert"  # 毛利预警
+
+
+class PriceEventType(str, Enum):
+    """供应链价格台账事件 — 价格快照写入与异常预警（v366 新增）
+
+    由 services/tx-supply/src/services/price_ledger_service.py 触发：
+      - RECORDED：每次收货确认/采购单/手工录入完成后立即发射
+      - ALERT_TRIGGERED：价格快照写入后命中预警规则时发射
+    """
+
+    RECORDED = "price.recorded"  # 价格快照写入
+    ALERT_TRIGGERED = "price.alert_triggered"  # 命中预警阈值
 
 
 # ──────────────────────────────────────────────────────────────────────
@@ -246,6 +272,8 @@ DOMAIN_STREAM_MAP: dict[str, str] = {
     # 新增模块
     "safety": "tx_safety_events",
     "energy": "tx_energy_events",
+    # 配送在途温控（v368 / TASK-3，海鲜冷链命门）
+    "delivery": "tx_delivery_events",
     "opinion": "tx_opinion_events",
     "review": "tx_review_events",
     "recipe": "tx_recipe_events",
@@ -262,8 +290,18 @@ DOMAIN_STREAM_MAP: dict[str, str] = {
     "growth": "tx_growth_events",
     # 知识库域
     "knowledge": "tx_knowledge_events",
+    # 库位域（v367 TASK-2，仓储细化）
+    "location": "tx_location_events",
+    # 配送签收凭证域（v369 新增，TASK-4）
+    "delivery": "tx_delivery_events",
+    # 盘亏处理审批闭环（v370 新增，TASK-5）
+    "stocktake": "tx_stocktake_events",
     # 旧系统适配器域（Sprint F1 / PR F，14 个 POS / 外卖 / 物流 / 财税适配器统一入口）
     "adapter": "tx_adapter_events",
+    # 供应链价格台账域（v366 新增）
+    "price": "tx_price_events",
+    # DevForge 内部研运平台域（v371 新增）
+    "devforge_application": "tx_devforge_application_events",
     # 兼容旧域
     "trade": "trade_events",
     "supply": "supply_events",
@@ -286,6 +324,7 @@ DOMAIN_STREAM_TYPE_MAP: dict[str, str] = {
     "settlement": "settlement",
     "safety": "safety",
     "energy": "energy",
+    "delivery": "delivery",
     "campaign": "campaign",
     "opinion": "opinion",
     "review": "review",
@@ -300,8 +339,16 @@ DOMAIN_STREAM_TYPE_MAP: dict[str, str] = {
     "growth": "growth",
     # 知识库域
     "knowledge": "knowledge",
+    # 库位域（v367 TASK-2）
+    "location": "location",
+    # 盘亏处理审批闭环（v370 新增，TASK-5）
+    "stocktake": "stocktake_loss_case",
     # 旧系统适配器域（Sprint F1 / PR F）
     "adapter": "adapter",
+    # 供应链价格台账域（v366 新增）
+    "price": "price",
+    # DevForge 内部研运平台域（v371 新增）
+    "devforge_application": "devforge_application",
 }
 
 # ──────────────────────────────────────────────────────────────────────
@@ -363,6 +410,19 @@ class CampaignEventType(str, Enum):
     BUDGET_EXHAUSTED = "campaign.budget_exhausted"  # 活动预算耗尽
 
 
+class StocktakeLossEventType(str, Enum):
+    """盘亏处理审批闭环事件 — 案件登记 → 审批 → 财务核销
+
+    供 tx-finance 通过事件订阅自动生成凭证（不需要直接 API 调用）。
+    """
+
+    CASE_CREATED = "stocktake.loss_case_created"  # 案件登记（DRAFT 状态）
+    SUBMITTED = "stocktake.loss_submitted"  # 提交审批（→ PENDING_APPROVAL）
+    APPROVED = "stocktake.loss_approved"  # 最终节点通过（→ APPROVED，触发 tx-finance 准备凭证）
+    REJECTED = "stocktake.loss_rejected"  # 任一节点驳回（→ REJECTED）
+    WRITTEN_OFF = "stocktake.loss_written_off"  # 财务核销完成（→ WRITTEN_OFF）
+
+
 # ──────────────────────────────────────────────────────────────────────
 # 增长中枢域（私域复购链路，v184 新增）
 # ──────────────────────────────────────────────────────────────────────
@@ -421,6 +481,32 @@ class AdapterEventType(str, Enum):
     CREDENTIAL_EXPIRED = "adapter.credential_expired"  # Token/AccessKey 到期
 
 
+class LocationEventType(str, Enum):
+    """库位事件 — 仓储库存细化（v367 TASK-2）
+
+    用于追踪库位级别的库存变更与食材绑定操作：
+      INVENTORY_MOVED    — 库位间转移（更新 inventory_by_location）
+      LOCATION_BOUND     — 食材绑定到主库位
+    """
+
+    INVENTORY_MOVED = "location.inventory_moved"
+    LOCATION_BOUND = "location.location_bound"
+
+
+class DeliveryProofEventType(str, Enum):
+    """配送签收凭证事件（TASK-4，v369 新增）
+
+    覆盖配送末端三个关键节点：
+      1. 电子签收完成（SIGNED）          — 触发结算/对账
+      2. 损坏拍照取证上报（DAMAGE_REPORTED） — 触发供应商索赔流程
+      3. 损坏处理决议（DAMAGE_RESOLVED）  — RETURNED 时财务侧自动开红字凭证
+    """
+
+    SIGNED = "delivery.signed"
+    DAMAGE_REPORTED = "delivery.damage_reported"
+    DAMAGE_RESOLVED = "delivery.damage_resolved"
+
+
 class GrowthEventType(str, Enum):
     """增长中枢事件 — 私域复购链路"""
 
@@ -436,6 +522,18 @@ class GrowthEventType(str, Enum):
     CALENDAR_TRIGGER_FIRED = "growth.calendar_trigger_fired"
     WEATHER_SIGNAL_RECEIVED = "growth.weather_signal_received"
     STORE_READINESS_EVALUATED = "growth.store_readiness_evaluated"
+
+
+class DevForgeApplicationEventType(str, Enum):
+    """DevForge 应用目录生命周期事件 — 内部研运平台 CMDB 写路径。
+
+    每次 application 表的 create/update/soft_delete 都旁路写入事件总线
+    （CLAUDE.md 第十五条 v147 规范），供后续审计/拓扑/灰度联动消费。
+    """
+
+    CREATED = "devforge_application.created"
+    UPDATED = "devforge_application.updated"
+    DELETED = "devforge_application.deleted"
 
 
 def resolve_stream_key(event_type: str) -> str:
@@ -467,6 +565,7 @@ ALL_EVENT_ENUMS = (
     SettlementEventType,
     SafetyEventType,
     EnergyEventType,
+    DeliveryTempEventType,
     ReviewEventType,
     OpinionEventType,
     RecipeEventType,
@@ -480,12 +579,22 @@ ALL_EVENT_ENUMS = (
     SafetyInspectionEventType,
     # 营销活动域（v157 新增）
     CampaignEventType,
+    # 盘亏处理审批闭环（v370 新增）
+    StocktakeLossEventType,
     # 知识库域
     KnowledgeEventType,
     # 增长中枢域（v184 新增）
     GrowthEventType,
+    # 配送签收凭证域（v369 新增，TASK-4）
+    DeliveryProofEventType,
     # 菜谱方案域（v245 新增，模块3.4）
     MenuEventType,
+    # 库位域（v367 TASK-2，仓储细化）
+    LocationEventType,
     # 旧系统适配器域（Sprint F1 / PR F）
     AdapterEventType,
+    # 供应链价格台账域（v366 新增）
+    PriceEventType,
+    # DevForge 内部研运平台域（v371 新增）
+    DevForgeApplicationEventType,
 )

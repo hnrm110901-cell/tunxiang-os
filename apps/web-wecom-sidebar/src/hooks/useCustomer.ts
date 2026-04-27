@@ -1,8 +1,8 @@
 /**
- * useCustomer.ts — 通过企微 externalUserId 查询会员信息
+ * useCustomer.ts — 通过企微 externalUserId 查询会员360画像
  */
 import { useState, useEffect } from 'react';
-import { fetchCustomerByWecomId } from '../api/memberApi';
+import { fetchProfile360 } from '../api/memberApi';
 import type { CustomerProfile } from '../types';
 
 export interface UseCustomerResult {
@@ -25,7 +25,7 @@ export function useCustomer(externalUserId: string | null): UseCustomerResult {
     setLoading(true);
     setError(null);
 
-    fetchCustomerByWecomId(externalUserId)
+    fetchProfile360(externalUserId)
       .then((data) => {
         if (!cancelled) setCustomer(data);
       })

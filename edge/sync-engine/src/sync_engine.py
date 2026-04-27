@@ -8,6 +8,7 @@
 冲突策略：云端优先，保留本地终态（见 conflict_resolver.py）
 批量大小：每批 500 条，避免内存溢出
 """
+
 from __future__ import annotations
 
 import os
@@ -197,9 +198,7 @@ class SyncEngine:
 
             synced_ids: list[int] = []
             for table, records in by_table.items():
-                ok = await self._bulk_upsert_to_cloud(
-                    table, records, tenant_id
-                )
+                ok = await self._bulk_upsert_to_cloud(table, records, tenant_id)
                 if ok:
                     synced_ids.extend(id_map[table])
                     total_synced += len(records)
@@ -241,9 +240,7 @@ class SyncEngine:
         last_ts = "1970-01-01T00:00:00+00:00"
 
         while True:
-            records = await self._fetch_from_cloud(
-                table, tenant_id, since=None, page=page, size=self._batch_size
-            )
+            records = await self._fetch_from_cloud(table, tenant_id, since=None, page=page, size=self._batch_size)
             if not records:
                 break
 
@@ -276,9 +273,7 @@ class SyncEngine:
         last_ts = watermark
 
         while True:
-            records = await self._fetch_from_cloud(
-                table, tenant_id, since=watermark, page=page, size=self._batch_size
-            )
+            records = await self._fetch_from_cloud(table, tenant_id, since=watermark, page=page, size=self._batch_size)
             if not records:
                 break
 
@@ -339,14 +334,10 @@ class SyncEngine:
                     return []
                 return body.get("data", {}).get("items", [])
         except httpx.ConnectError as exc:
-            logger.error(
-                "sync_engine.cloud_connect_error", table=table, error=str(exc)
-            )
+            logger.error("sync_engine.cloud_connect_error", table=table, error=str(exc))
             raise
         except httpx.TimeoutException as exc:
-            logger.error(
-                "sync_engine.cloud_timeout", table=table, error=str(exc)
-            )
+            logger.error("sync_engine.cloud_timeout", table=table, error=str(exc))
             raise
         except httpx.HTTPStatusError as exc:
             logger.error(
@@ -359,9 +350,7 @@ class SyncEngine:
 
     # ─── 内部方法：本地写入 ────────────────────────────────────────────────
 
-    async def _upsert_to_local(
-        self, table: str, records: List[dict], resolve_conflicts: bool = True
-    ) -> None:
+    async def _upsert_to_local(self, table: str, records: List[dict], resolve_conflicts: bool = True) -> None:
         """批量 UPSERT 到本地 PG
 
         当 resolve_conflicts=True 时，先查询本地现有记录，调用 ConflictResolver 决定最终值。
@@ -376,21 +365,13 @@ class SyncEngine:
         # 动态构造 UPSERT SQL（需要所有列名一致，取第一条记录的 keys）
         columns = list(records[0].keys())
         if "id" not in columns:
-            logger.warning(
-                "sync_engine.upsert_no_id_column", table=table
-            )
+            logger.warning("sync_engine.upsert_no_id_column", table=table)
             return
 
         col_list = ", ".join(f'"{c}"' for c in columns)
         placeholders = ", ".join(f":{c}" for c in columns)
-        update_set = ", ".join(
-            f'"{c}" = EXCLUDED."{c}"' for c in columns if c != "id"
-        )
-        sql = (
-            f'INSERT INTO "{table}" ({col_list}) '
-            f"VALUES ({placeholders}) "
-            f'ON CONFLICT (id) DO UPDATE SET {update_set}'
-        )
+        update_set = ", ".join(f'"{c}" = EXCLUDED."{c}"' for c in columns if c != "id")
+        sql = f'INSERT INTO "{table}" ({col_list}) VALUES ({placeholders}) ON CONFLICT (id) DO UPDATE SET {update_set}'
 
         try:
             async with self._local_pool.begin() as conn:
@@ -407,9 +388,7 @@ class SyncEngine:
             )
             raise
 
-    async def _apply_conflict_resolution(
-        self, table: str, remote_records: List[dict]
-    ) -> List[dict]:
+    async def _apply_conflict_resolution(self, table: str, remote_records: List[dict]) -> List[dict]:
         """对每条远端记录进行冲突解决，返回最终要写入的记录列表"""
         if not self._local_pool:
             return remote_records
@@ -452,9 +431,7 @@ class SyncEngine:
 
     # ─── 内部方法：云端推送 ────────────────────────────────────────────────
 
-    async def _bulk_upsert_to_cloud(
-        self, table: str, records: List[dict], tenant_id: str
-    ) -> bool:
+    async def _bulk_upsert_to_cloud(self, table: str, records: List[dict], tenant_id: str) -> bool:
         """批量推送到云端 /api/v1/sync/bulk-upsert
 
         POST /api/v1/sync/bulk-upsert
@@ -488,9 +465,7 @@ class SyncEngine:
             )
             return False
         except httpx.TimeoutException as exc:
-            logger.error(
-                "sync_engine.cloud_push_timeout", table=table, error=str(exc)
-            )
+            logger.error("sync_engine.cloud_push_timeout", table=table, error=str(exc))
             return False
         except httpx.HTTPStatusError as exc:
             logger.error(
@@ -504,11 +479,8 @@ class SyncEngine:
 
 # ─── 工具函数 ──────────────────────────────────────────────────────────────
 
+
 def _max_updated_at(records: List[dict]) -> str:
     """提取记录列表中最大的 updated_at 字符串"""
-    ts_list = [
-        str(r["updated_at"])
-        for r in records
-        if r.get("updated_at") is not None
-    ]
+    ts_list = [str(r["updated_at"]) for r in records if r.get("updated_at") is not None]
     return max(ts_list) if ts_list else "1970-01-01T00:00:00+00:00"

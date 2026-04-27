@@ -90,7 +90,7 @@ class PublicOpinionProjector(ProjectorBase):
                 updated_at      = NOW()
             WHERE tenant_id = $1 AND store_id = $2
               AND stat_week = $3 AND platform = $4
-            """,
+            """,  # noqa: S608 — sentiment_col 来自白名单
             self.tenant_id,
             UUID(str(store_id)),
             stat_week,

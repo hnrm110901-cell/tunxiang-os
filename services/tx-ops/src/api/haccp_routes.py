@@ -52,7 +52,7 @@ async def _set_rls(db: AsyncSession, tenant_id: str) -> None:
 def _serialize_row(row_dict: Dict[str, Any]) -> Dict[str, Any]:
     """将 UUID / datetime / date 统一序列化为字符串。"""
     for k, v in row_dict.items():
-        if isinstance(v, datetime) or isinstance(v, date):
+        if isinstance(v, (datetime, date)):
             row_dict[k] = v.isoformat()
         elif type(v).__name__ == "UUID":
             row_dict[k] = str(v)

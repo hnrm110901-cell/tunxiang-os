@@ -17,8 +17,10 @@ from .api.onboarding_routes import router as onboarding_router
 from .api.open_api_routes import router as open_api_router
 from .auth import router as auth_router
 from .gdpr_routes import router as gdpr_router
+from .group_ops_routes import router as group_ops_router
 from .growth_intel_relay import router as relay_router
 from .hub_api import router as hub_router
+from .material_routes import router as material_router
 from .middleware import AuthMiddleware, RequestLogMiddleware, TenantMiddleware
 from .middleware.audit_middleware import AuditMiddleware
 from .personalization_middleware import PersonalizationMiddleware
@@ -172,6 +174,11 @@ app.include_router(wecom_internal_router)
 
 # 企微群运营 SOP API
 app.include_router(wecom_group_router)
+
+# 社群运营工具 API（标签管理 + 群发任务）
+app.include_router(group_ops_router)
+# 企业素材库 API（分组 + 素材 CRUD + 时段匹配）
+app.include_router(material_router)
 
 # GDPR 个人信息保护合规 API
 app.include_router(gdpr_router)

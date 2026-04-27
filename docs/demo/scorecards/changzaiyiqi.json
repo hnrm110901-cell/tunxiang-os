@@ -1,59 +1,80 @@
 {
   "merchant": "尝在一起",
   "merchant_id": "changzaiyiqi",
-  "evaluated_at": "2026-04-24",
+  "evaluated_at": "2026-04-26",
   "evaluator": "屯象产品 + 品智 POS 技术团队",
   "environment": "Pilot Candidate",
-  "score": 86,
+  "score": 88,
   "dimensions": {
-    "technical_fit": {
-      "score": 88,
-      "notes": "当前使用品智 POS 单一系统，屯象全替代风险低",
+    "transaction_fulfillment": {
+      "weight": 0.25,
+      "score": 95,
+      "notes": "品智 POS 适配器成熟，快餐连锁核心链路全覆盖",
       "evidence": [
-        "品智 Adapter 已完成 90%（shared/adapters/pinzhi）",
-        "门店数 5 家，技术栈单一",
-        "无 23 系统整合难题"
+        "品智 Adapter 已完成 100%（shared/adapters/pinzhi）",
+        "门店数 5 家，技术栈单一，替代风险低",
+        "支付宝 V3 + 多方结算引擎已交付",
+        "卡券内核持久化完成"
       ]
     },
-    "data_migration_risk": {
-      "score": 92,
-      "notes": "品智 POS 单一数据源，迁移周期 45 天",
+    "supply_chain": {
+      "weight": 0.15,
+      "score": 80,
+      "notes": "快餐 SKU 少，库存管理简单，统一商品中心满足需求",
       "evidence": [
-        "历史 2 年订单数据约 20 万条",
-        "会员数据 8000+",
-        "库存 SKU 300+"
+        "库存 SKU 300+，BOM 简单",
+        "统一商品中心 Phase 1-5 + Sprint B1-B7 交付",
+        "tx-supply 覆盖库存/BOM/采购/食安"
       ]
     },
-    "operational_readiness": {
+    "financial_settlement": {
+      "weight": 0.15,
       "score": 85,
-      "notes": "小型连锁，店长 / 收银员培训周期短",
+      "notes": "小型连锁财务需求适中，费控系统满足日常管控",
       "evidence": [
-        "5 家门店总员工 40 人",
-        "技术总监配合意愿强"
-      ]
-    },
-    "cost_effectiveness": {
-      "score": 90,
-      "notes": "替代品智 POS 费用节省 ¥5k/月/店",
-      "evidence": [
-        "品智年付 ¥48k/店",
-        "屯象基础设施分摊 ¥2.4k/月/店"
-      ]
-    },
-    "regulatory_compliance": {
-      "score": 88,
-      "notes": "金税四期基本覆盖",
-      "evidence": [
+        "费控管理系统 27 表 + 6 AI Agent 交付",
         "全电发票日均 200+ 张",
         "无跨省税务复杂度"
       ]
     },
-    "ai_value_realization": {
-      "score": 80,
-      "notes": "小店 AI 投入产出比较低，主要价值在管控自动化",
+    "member_growth": {
+      "weight": 0.15,
+      "score": 90,
+      "notes": "Sprint P 私域6模块 + S1-S4 全量交付，快餐会员运营场景全覆盖",
       "evidence": [
-        "SOP 时间轴 + 巡店 Agent 为主",
-        "成本根因分析频次不高（月度 vs 连锁的周度）"
+        "活码/人群包/营销任务/社群/素材库/客户旅程SOP",
+        "流失预测 + 游戏化 + 拼团适配快餐高频消费",
+        "3 个营销 Agent（策略/路由/优化）",
+        "会员数据 8000+ 可直接导入 CDP"
+      ]
+    },
+    "ai_intelligence": {
+      "weight": 0.15,
+      "score": 90,
+      "notes": "SOP 时间轴 + 巡店 Agent 为主，AI 运营教练提升管控自动化",
+      "evidence": [
+        "SOP 时间轴引擎 + 记忆进化系统",
+        "AI 运营教练 4 模式上线",
+        "小店 AI 投入产出比通过管控自动化提升"
+      ]
+    },
+    "organization_hr": {
+      "weight": 0.10,
+      "score": 80,
+      "notes": "5 家门店 40 人，排班/角色管理需求简单",
+      "evidence": [
+        "tx-org 45 路由文件覆盖员工/排班/角色/绩效/薪资",
+        "技术总监配合意愿强，培训周期短"
+      ]
+    },
+    "compliance_security": {
+      "weight": 0.05,
+      "score": 85,
+      "notes": "单城市运营，合规复杂度低",
+      "evidence": [
+        "等保三级合规 Phase 0-5 完成",
+        "RLS 租户隔离完整",
+        "金税四期基本覆盖"
       ]
     }
   },

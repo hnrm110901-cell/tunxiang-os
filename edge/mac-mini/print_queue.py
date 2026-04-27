@@ -8,15 +8,12 @@
 
 SQLite 文件路径通过环境变量 PRINT_QUEUE_DB 配置。
 """
-import asyncio
-import aiosqlite
-import base64
-import json
 import os
-from dataclasses import dataclass, field
-from datetime import datetime, timezone, timedelta
-from typing import Callable, Awaitable, List, Optional
+from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
+from typing import Awaitable, Callable, List, Optional
 
+import aiosqlite
 import structlog
 
 logger = structlog.get_logger()

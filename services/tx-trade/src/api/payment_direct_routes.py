@@ -14,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
 
-from ..security.rbac import UserContext, require_role
+from ..security.rbac import UserContext, require_mfa_audited, require_role_audited
 from ..services.payment_direct import (
     create_alipay_payment,
     create_unionpay_payment,
@@ -88,7 +88,7 @@ class RiskCheckReq(BaseModel):
 async def api_wechat_pay(
     body: WechatPayReq,
     request: Request,
-    user: UserContext = Depends(require_role("cashier", "store_manager", "admin")),
+    user: UserContext = Depends(require_role_audited("payment.wechat.create", "cashier", "store_manager", "admin")),
     db: AsyncSession = Depends(get_db),
 ):
     """微信支付下单"""
@@ -123,7 +123,7 @@ async def api_wechat_pay(
 async def api_alipay_pay(
     body: AlipayPayReq,
     request: Request,
-    user: UserContext = Depends(require_role("cashier", "store_manager", "admin")),
+    user: UserContext = Depends(require_role_audited("payment.alipay.create", "cashier", "store_manager", "admin")),
     db: AsyncSession = Depends(get_db),
 ):
     """支付宝支付下单"""
@@ -157,7 +157,7 @@ async def api_alipay_pay(
 async def api_unionpay_pay(
     body: UnionpayPayReq,
     request: Request,
-    user: UserContext = Depends(require_role("cashier", "store_manager", "admin")),
+    user: UserContext = Depends(require_role_audited("payment.unionpay.create", "cashier", "store_manager", "admin")),
     db: AsyncSession = Depends(get_db),
 ):
     """银联支付下单"""
@@ -190,7 +190,7 @@ async def api_unionpay_pay(
 async def api_query_status(
     payment_id: str,
     request: Request,
-    user: UserContext = Depends(require_role("cashier", "store_manager", "admin")),
+    user: UserContext = Depends(require_role_audited("payment.status.query", "cashier", "store_manager", "admin")),
 ):
     """查询支付状态（只读，不写审计）"""
     tenant_id = _get_tenant_id(request)
@@ -207,7 +207,7 @@ async def api_query_status(
 async def api_refund(
     body: RefundReq,
     request: Request,
-    user: UserContext = Depends(require_role("store_manager", "admin")),
+    user: UserContext = Depends(require_mfa_audited("payment.refund", "store_manager", "admin")),
     db: AsyncSession = Depends(get_db),
 ):
     """退款 — 仅店长/管理员可操作（收银员不能直接退）"""
@@ -242,7 +242,7 @@ async def api_refund(
 async def api_concurrent_pay(
     body: ConcurrentPayReq,
     request: Request,
-    user: UserContext = Depends(require_role("cashier", "store_manager", "admin")),
+    user: UserContext = Depends(require_role_audited("payment.concurrent", "cashier", "store_manager", "admin")),
     db: AsyncSession = Depends(get_db),
 ):
     """并发支付（多方式同时支付）"""
@@ -272,7 +272,7 @@ async def api_concurrent_pay(
 async def api_risk_check(
     body: RiskCheckReq,
     request: Request,
-    user: UserContext = Depends(require_role("cashier", "store_manager", "admin")),
+    user: UserContext = Depends(require_role_audited("payment.risk.check", "cashier", "store_manager", "admin")),
 ):
     """风控检查（只读决策，不写审计）"""
     tenant_id = _get_tenant_id(request)

@@ -254,6 +254,27 @@ services:
       - ../../services/mcp-server:/app/services/mcp-server
       - ../../shared:/app/shared
 
+  # DevForge 内部研发平台 :8017（与 tx-forge 外部市场严格区分）
+  # 注意：mount 目标路径用下划线 tx_devforge（Python 模块名不支持 dash），
+  # 与生产 Dockerfile 第 6 行 COPY 目标一致；pip install 路径同步用下划线。
+  tx-devforge:
+    <<: *service-common
+    image: python:3.11-slim
+    working_dir: /app
+    command: >
+      sh -c "pip install -q -i https://pypi.tuna.tsinghua.edu.cn/simple -r services/tx_devforge/requirements.txt &&
+             uvicorn services.tx_devforge.src.main:app --host 0.0.0.0 --port 8017 --reload"
+    ports:
+      - "8017:8017"
+    environment:
+      <<: *common-env
+      DEVFORGE_DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-tunxiang}:${POSTGRES_PASSWORD:-changeme_dev}@postgres:5432/${POSTGRES_DB:-tunxiang_os}
+      DEVFORGE_PORT: "8017"
+      DEVFORGE_LOG_LEVEL: DEBUG
+    volumes:
+      - ../../services/tx-devforge:/app/services/tx_devforge
+      - ../../shared:/app/shared
+
   # ── 前端 Vite Dev Server ──────────────────────────────────
   web-admin:
     image: node:20-alpine

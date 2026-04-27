@@ -6,6 +6,7 @@
   - 失败自动重试最多 3 次，指数退避
   - 返回标准化 Pydantic V2 模型
 """
+
 import asyncio
 import hashlib
 import hmac
@@ -27,12 +28,14 @@ _RETRY_BASE_WAIT = 1.0
 
 # ─── 标准化返回模型 ───
 
+
 class DouyinReview(BaseModel):
     """抖音单条点评/评论"""
+
     review_id: str
     content: str
-    rating: Decimal              # 1.0 ~ 5.0
-    author_level: str            # 'regular' | 'vip' | 'kol'
+    rating: Decimal  # 1.0 ~ 5.0
+    author_level: str  # 'regular' | 'vip' | 'kol'
     review_date: date
     like_count: int = 0
     tags: list[str] = Field(default_factory=list)
@@ -40,20 +43,22 @@ class DouyinReview(BaseModel):
 
 class DouyinTrendingDish(BaseModel):
     """抖音热门菜品趋势条目"""
+
     keyword: str
     category: str
     city: str
     cuisine_type: str
-    trend_score: Decimal         # 0.00 ~ 100.00（平台热度指数标准化）
-    trend_direction: str         # 'rising' | 'stable' | 'declining'
-    mention_count: int           # 近7天提及量
-    view_count: int              # 近7天相关视频播放量
+    trend_score: Decimal  # 0.00 ~ 100.00（平台热度指数标准化）
+    trend_direction: str  # 'rising' | 'stable' | 'declining'
+    mention_count: int  # 近7天提及量
+    view_count: int  # 近7天相关视频播放量
     period_start: date
     period_end: date
     raw_data: dict[str, Any] = Field(default_factory=dict)
 
 
 # ─── HTTP 工具 ───
+
 
 async def _request_with_retry(
     client: httpx.AsyncClient,
@@ -103,6 +108,7 @@ async def _request_with_retry(
 
 
 # ─── 适配器主体 ───
+
 
 class DouyinAdapter:
     """抖音本地生活适配器（异步）"""
@@ -166,13 +172,16 @@ class DouyinAdapter:
         cursor: str | None = None
 
         while True:
-            params = self._build_signed_params({
-                "poi_id": platform_store_id,
-                "count": 50,
-                **({"cursor": cursor} if cursor else {}),
-            })
+            params = self._build_signed_params(
+                {
+                    "poi_id": platform_store_id,
+                    "count": 50,
+                    **({"cursor": cursor} if cursor else {}),
+                }
+            )
             raw = await _request_with_retry(
-                client, "GET",
+                client,
+                "GET",
                 f"{self._BASE_URL}/poi/comment/list",
                 params=params,
             )
@@ -193,15 +202,17 @@ class DouyinAdapter:
                     items = []  # 触发外层 break
                     break
 
-                reviews.append(DouyinReview(
-                    review_id=str(item.get("commentId", "")),
-                    content=item.get("content", ""),
-                    rating=Decimal(str(item.get("star", "0"))),
-                    author_level=_map_author_level(item.get("authorLevel", "")),
-                    review_date=review_date,
-                    like_count=item.get("likeCount", 0),
-                    tags=item.get("tags", []),
-                ))
+                reviews.append(
+                    DouyinReview(
+                        review_id=str(item.get("commentId", "")),
+                        content=item.get("content", ""),
+                        rating=Decimal(str(item.get("star", "0"))),
+                        author_level=_map_author_level(item.get("authorLevel", "")),
+                        review_date=review_date,
+                        like_count=item.get("likeCount", 0),
+                        tags=item.get("tags", []),
+                    )
+                )
 
             if not items:
                 break
@@ -236,15 +247,18 @@ class DouyinAdapter:
         period_end = date.today()
         period_start = period_end - timedelta(days=7)
 
-        params = self._build_signed_params({
-            "city": city,
-            "category": cuisine_type,
-            "date_from": period_start.isoformat(),
-            "date_to": period_end.isoformat(),
-            "limit": 50,
-        })
+        params = self._build_signed_params(
+            {
+                "city": city,
+                "category": cuisine_type,
+                "date_from": period_start.isoformat(),
+                "date_to": period_end.isoformat(),
+                "limit": 50,
+            }
+        )
         raw = await _request_with_retry(
-            client, "GET",
+            client,
+            "GET",
             f"{self._BASE_URL}/trend/dish/ranking",
             params=params,
         )
@@ -252,19 +266,21 @@ class DouyinAdapter:
         trends: list[DouyinTrendingDish] = []
         for item in raw.get("data", {}).get("dishes", []):
             raw_score: float = item.get("heatIndex", 0)
-            trends.append(DouyinTrendingDish(
-                keyword=item.get("dishName", ""),
-                category=item.get("category", cuisine_type),
-                city=city,
-                cuisine_type=cuisine_type,
-                trend_score=Decimal(str(min(100.0, raw_score))),
-                trend_direction=_map_trend_direction(item.get("trend", "")),
-                mention_count=item.get("mentionCount", 0),
-                view_count=item.get("viewCount", 0),
-                period_start=period_start,
-                period_end=period_end,
-                raw_data=item,
-            ))
+            trends.append(
+                DouyinTrendingDish(
+                    keyword=item.get("dishName", ""),
+                    category=item.get("category", cuisine_type),
+                    city=city,
+                    cuisine_type=cuisine_type,
+                    trend_score=Decimal(str(min(100.0, raw_score))),
+                    trend_direction=_map_trend_direction(item.get("trend", "")),
+                    mention_count=item.get("mentionCount", 0),
+                    view_count=item.get("viewCount", 0),
+                    period_start=period_start,
+                    period_end=period_end,
+                    raw_data=item,
+                )
+            )
 
         elapsed = time.monotonic() - t0
         log.info(
@@ -278,6 +294,7 @@ class DouyinAdapter:
 
 
 # ─── 内部辅助函数 ───
+
 
 def _map_author_level(level_str: str) -> str:
     """将抖音用户等级字符串映射到内部作者分级"""

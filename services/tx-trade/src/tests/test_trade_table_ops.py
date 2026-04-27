@@ -460,7 +460,7 @@ class TestTableOpsRoutes:
 # ═══════════════════════════════════════════════════════════════
 
 
-def _make_session_mock(token: str = "tok_test") -> MagicMock:
+def _make_session_mock(token: str = "tok_test") -> MagicMock:  # noqa: S107 — 测试占位 token
     s = MagicMock()
     s.id = uuid.uuid4()
     s.session_token = token

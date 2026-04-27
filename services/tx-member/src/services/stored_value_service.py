@@ -387,7 +387,21 @@ class StoredValueService:
         db.add(txn)
 
         logger.info("stored_value_consume", card_no=card_no, amount=amount_fen, gift_deduct=gift_deduct)
-        return {
+
+        # ─── 跨店分账：消费店 != 充值店时自动触发 ───
+        split_result = None
+        consume_store_uuid = uuid.UUID(store_id) if store_id else None
+        if consume_store_uuid and card.store_id and consume_store_uuid != card.store_id:
+            split_result = await self._trigger_cross_store_split(
+                db=db,
+                tenant_id=card.tenant_id,
+                transaction_id=txn.id,
+                recharge_store_id=card.store_id,
+                consume_store_id=consume_store_uuid,
+                amount_fen=amount_fen,
+            )
+
+        result = {
             "card_no": card_no,
             "consume_fen": amount_fen,
             "gift_deducted_fen": gift_deduct,
@@ -396,6 +410,9 @@ class StoredValueService:
             "gift_balance_fen": card.gift_balance_fen,
             "txn_id": str(txn.id),
         }
+        if split_result:
+            result["split"] = split_result
+        return result
 
     async def consume_by_id(
         self,
@@ -444,7 +461,23 @@ class StoredValueService:
         db.add(txn)
 
         logger.info("stored_value_consume_by_id", card_id=str(card_id), amount=amount_fen)
-        return _txn_to_dict(txn)
+
+        # ─── 跨店分账：消费店 != 充值店时自动触发 ───
+        split_result = None
+        if store_id and card.store_id and store_id != card.store_id:
+            split_result = await self._trigger_cross_store_split(
+                db=db,
+                tenant_id=tenant_id,
+                transaction_id=txn.id,
+                recharge_store_id=card.store_id,
+                consume_store_id=store_id,
+                amount_fen=amount_fen,
+            )
+
+        result = _txn_to_dict(txn)
+        if split_result:
+            result["split"] = split_result
+        return result
 
     # ──────────────────────────────────────────────────────────────
     # 退款
@@ -488,13 +521,28 @@ class StoredValueService:
         db.add(txn)
 
         logger.info("stored_value_refund", card_no=card_no, amount=amount_fen)
-        return {
+
+        # ─── 退款分账冲正：如关联订单有分账记录则反向冲正 ───
+        reversal_result = None
+        if order_id:
+            reversal_result = await self._trigger_split_reversal(
+                db=db,
+                tenant_id=card.tenant_id,
+                original_order_id=order_id,
+                refund_transaction_id=str(txn.id),
+                refund_amount_fen=amount_fen,
+            )
+
+        result = {
             "card_no": card_no,
             "refund_fen": amount_fen,
             "balance_fen": card.balance_fen,
             "gift_balance_fen": card.gift_balance_fen,
             "txn_id": str(txn.id),
         }
+        if reversal_result:
+            result["split_reversal"] = reversal_result
+        return result
 
     async def refund_by_transaction(
         self,
@@ -558,7 +606,22 @@ class StoredValueService:
             orig_txn_id=str(transaction_id),
             refund_amount=refund_amount_fen,
         )
-        return _txn_to_dict(refund_txn)
+
+        # ─── 退款分账冲正：如原始消费有分账记录则反向冲正 ───
+        reversal_result = None
+        if orig_txn.order_id:
+            reversal_result = await self._trigger_split_reversal(
+                db=db,
+                tenant_id=tenant_id,
+                original_order_id=str(orig_txn.order_id),
+                refund_transaction_id=str(refund_txn.id),
+                refund_amount_fen=refund_amount_fen,
+            )
+
+        result = _txn_to_dict(refund_txn)
+        if reversal_result:
+            result["split_reversal"] = reversal_result
+        return result
 
     # ──────────────────────────────────────────────────────────────
     # 流水查询
@@ -1295,6 +1358,76 @@ class StoredValueService:
             "points_deducted": points,
             "balance_before_fen": balance_before,
         }
+
+    # ──────────────────────────────────────────────────────────────
+    # 跨店分账辅助方法
+    # ──────────────────────────────────────────────────────────────
+
+    async def _trigger_cross_store_split(
+        self,
+        db: AsyncSession,
+        tenant_id: uuid.UUID,
+        transaction_id: uuid.UUID,
+        recharge_store_id: uuid.UUID,
+        consume_store_id: uuid.UUID,
+        amount_fen: int,
+    ) -> dict | None:
+        """跨店消费时触发分账（异常不阻塞主流程）"""
+        try:
+            from services.tx_finance_client import get_split_service
+
+            split_svc = get_split_service(db, str(tenant_id))
+            return await split_svc.trigger_split_on_consume(
+                transaction_id=str(transaction_id),
+                recharge_store_id=str(recharge_store_id),
+                consume_store_id=str(consume_store_id),
+                amount_fen=amount_fen,
+            )
+        except ImportError:
+            # tx-finance 客户端未配置，降级跳过
+            logger.warning(
+                "sv_split.client_unavailable",
+                transaction_id=str(transaction_id),
+            )
+            return None
+        except Exception:
+            # 分账失败不阻塞消费主流程，记录日志后续人工处理
+            logger.exception(
+                "sv_split.trigger_failed",
+                transaction_id=str(transaction_id),
+            )
+            return None
+
+    async def _trigger_split_reversal(
+        self,
+        db: AsyncSession,
+        tenant_id: uuid.UUID,
+        original_order_id: str,
+        refund_transaction_id: str,
+        refund_amount_fen: int,
+    ) -> dict | None:
+        """退款时触发分账冲正（异常不阻塞主流程）"""
+        try:
+            from services.tx_finance_client import get_split_service
+
+            split_svc = get_split_service(db, str(tenant_id))
+            return await split_svc.create_reversal_record(
+                original_transaction_id=original_order_id,
+                refund_transaction_id=refund_transaction_id,
+                refund_amount_fen=refund_amount_fen,
+            )
+        except ImportError:
+            logger.warning(
+                "sv_split_reversal.client_unavailable",
+                original_order_id=original_order_id,
+            )
+            return None
+        except Exception:
+            logger.exception(
+                "sv_split_reversal.trigger_failed",
+                original_order_id=original_order_id,
+            )
+            return None
 
     # ──────────────────────────────────────────────────────────────
     # 内部辅助方法

@@ -8,6 +8,7 @@
   POST /sync-today/{merchant_code} — 同步今日数据
   POST /sync-menu/{merchant_code}/{store_id} — 同步菜品数据
 """
+
 from __future__ import annotations
 
 from datetime import date
@@ -16,6 +17,8 @@ from uuid import UUID
 import structlog
 from fastapi import APIRouter, Depends
 
+from shared.tenant_registry import MERCHANT_CODE_TO_TENANT_UUID
+
 from ...modules.gateway.integrations.pos_sync_schemas import (
     BackfillRequest,
     SyncTodayRequest,
@@ -23,7 +26,6 @@ from ...modules.gateway.integrations.pos_sync_schemas import (
 from ...modules.gateway.integrations.pos_sync_service import POSSyncService
 from ...shared.core.exceptions import POSAdapterError
 from ...shared.response import err, ok
-from shared.tenant_registry import MERCHANT_CODE_TO_TENANT_UUID
 
 logger = structlog.get_logger(__name__)
 

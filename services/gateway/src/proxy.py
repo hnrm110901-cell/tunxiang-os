@@ -64,6 +64,9 @@ DOMAIN_ROUTES = {
     "insights": os.getenv("TX_ANALYTICS_URL", "http://localhost:8009"),
     # 支付中枢（tx-pay:8016）
     "pay": os.getenv("TX_PAY_URL", "http://localhost:8016"),
+    # DevForge 内部研发运维平台（tx-devforge:8017）
+    # 与 tx-forge（外部 ISV 市场）严格区分
+    "devforge": os.getenv("TX_DEVFORGE_URL", "http://localhost:8017"),
 }
 
 # 旧单体回退（M4a 后可移除）

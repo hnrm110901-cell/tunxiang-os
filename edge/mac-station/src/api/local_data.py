@@ -9,17 +9,16 @@
 
 Mock 模式：不依赖真实 PG，返回模拟数据。
 """
+
 from __future__ import annotations
 
-import time
 import uuid
 from datetime import datetime, timezone
 from typing import Any
 
 import structlog
-from fastapi import APIRouter, Query
-
 from config import get_config
+from fastapi import APIRouter, Query
 from services.offline_cache import get_offline_cache
 
 logger = structlog.get_logger(__name__)
@@ -70,38 +69,184 @@ def _mock_today_orders(store_id: str) -> list[dict[str, Any]]:
 def _mock_menu() -> list[dict[str, Any]]:
     """生成 Mock 菜单。"""
     return [
-        {"dish_id": "dish_001", "name": "红烧肉", "price_fen": 6800, "category": "热菜", "available": True, "sold_out": False},
-        {"dish_id": "dish_002", "name": "宫保鸡丁", "price_fen": 4800, "category": "热菜", "available": True, "sold_out": False},
-        {"dish_id": "dish_003", "name": "麻婆豆腐", "price_fen": 2800, "category": "热菜", "available": True, "sold_out": False},
-        {"dish_id": "dish_004", "name": "酸辣土豆丝", "price_fen": 1800, "category": "凉菜", "available": True, "sold_out": False},
-        {"dish_id": "dish_005", "name": "番茄蛋汤", "price_fen": 1200, "category": "汤类", "available": True, "sold_out": False},
-        {"dish_id": "dish_006", "name": "蛋炒饭", "price_fen": 1500, "category": "主食", "available": True, "sold_out": False},
-        {"dish_id": "dish_007", "name": "水煮鱼", "price_fen": 7800, "category": "热菜", "available": True, "sold_out": True},
+        {
+            "dish_id": "dish_001",
+            "name": "红烧肉",
+            "price_fen": 6800,
+            "category": "热菜",
+            "available": True,
+            "sold_out": False,
+        },
+        {
+            "dish_id": "dish_002",
+            "name": "宫保鸡丁",
+            "price_fen": 4800,
+            "category": "热菜",
+            "available": True,
+            "sold_out": False,
+        },
+        {
+            "dish_id": "dish_003",
+            "name": "麻婆豆腐",
+            "price_fen": 2800,
+            "category": "热菜",
+            "available": True,
+            "sold_out": False,
+        },
+        {
+            "dish_id": "dish_004",
+            "name": "酸辣土豆丝",
+            "price_fen": 1800,
+            "category": "凉菜",
+            "available": True,
+            "sold_out": False,
+        },
+        {
+            "dish_id": "dish_005",
+            "name": "番茄蛋汤",
+            "price_fen": 1200,
+            "category": "汤类",
+            "available": True,
+            "sold_out": False,
+        },
+        {
+            "dish_id": "dish_006",
+            "name": "蛋炒饭",
+            "price_fen": 1500,
+            "category": "主食",
+            "available": True,
+            "sold_out": False,
+        },
+        {
+            "dish_id": "dish_007",
+            "name": "水煮鱼",
+            "price_fen": 7800,
+            "category": "热菜",
+            "available": True,
+            "sold_out": True,
+        },
     ]
 
 
 def _mock_tables() -> list[dict[str, Any]]:
     """生成 Mock 桌台状态。"""
     return [
-        {"table_id": "table_01", "table_no": "A1", "seats": 4, "status": "occupied", "current_order_id": "ord_mock_003", "occupied_since": "2026-04-02T11:30:00Z"},
-        {"table_id": "table_02", "table_no": "A2", "seats": 4, "status": "free", "current_order_id": None, "occupied_since": None},
-        {"table_id": "table_03", "table_no": "A3", "seats": 6, "status": "free", "current_order_id": None, "occupied_since": None},
-        {"table_id": "table_04", "table_no": "B1", "seats": 2, "status": "reserved", "current_order_id": None, "occupied_since": None},
-        {"table_id": "table_05", "table_no": "B2", "seats": 2, "status": "free", "current_order_id": None, "occupied_since": None},
-        {"table_id": "table_06", "table_no": "C1", "seats": 8, "status": "occupied", "current_order_id": "ord_mock_002", "occupied_since": "2026-04-02T11:45:00Z"},
-        {"table_id": "table_07", "table_no": "C2", "seats": 10, "status": "free", "current_order_id": None, "occupied_since": None},
+        {
+            "table_id": "table_01",
+            "table_no": "A1",
+            "seats": 4,
+            "status": "occupied",
+            "current_order_id": "ord_mock_003",
+            "occupied_since": "2026-04-02T11:30:00Z",
+        },
+        {
+            "table_id": "table_02",
+            "table_no": "A2",
+            "seats": 4,
+            "status": "free",
+            "current_order_id": None,
+            "occupied_since": None,
+        },
+        {
+            "table_id": "table_03",
+            "table_no": "A3",
+            "seats": 6,
+            "status": "free",
+            "current_order_id": None,
+            "occupied_since": None,
+        },
+        {
+            "table_id": "table_04",
+            "table_no": "B1",
+            "seats": 2,
+            "status": "reserved",
+            "current_order_id": None,
+            "occupied_since": None,
+        },
+        {
+            "table_id": "table_05",
+            "table_no": "B2",
+            "seats": 2,
+            "status": "free",
+            "current_order_id": None,
+            "occupied_since": None,
+        },
+        {
+            "table_id": "table_06",
+            "table_no": "C1",
+            "seats": 8,
+            "status": "occupied",
+            "current_order_id": "ord_mock_002",
+            "occupied_since": "2026-04-02T11:45:00Z",
+        },
+        {
+            "table_id": "table_07",
+            "table_no": "C2",
+            "seats": 10,
+            "status": "free",
+            "current_order_id": None,
+            "occupied_since": None,
+        },
     ]
 
 
 def _mock_inventory(store_id: str) -> list[dict[str, Any]]:
     """生成 Mock 库存。"""
     return [
-        {"ingredient_id": "ing_001", "name": "五花肉", "unit": "kg", "quantity": 15.5, "min_stock": 5.0, "is_low": False, "category": "肉类"},
-        {"ingredient_id": "ing_002", "name": "鸡胸肉", "unit": "kg", "quantity": 3.2, "min_stock": 5.0, "is_low": True, "category": "肉类"},
-        {"ingredient_id": "ing_003", "name": "豆腐", "unit": "kg", "quantity": 8.0, "min_stock": 3.0, "is_low": False, "category": "豆制品"},
-        {"ingredient_id": "ing_004", "name": "土豆", "unit": "kg", "quantity": 12.0, "min_stock": 5.0, "is_low": False, "category": "蔬菜"},
-        {"ingredient_id": "ing_005", "name": "鸡蛋", "unit": "个", "quantity": 45.0, "min_stock": 30.0, "is_low": False, "category": "蛋类"},
-        {"ingredient_id": "ing_006", "name": "草鱼", "unit": "kg", "quantity": 1.5, "min_stock": 3.0, "is_low": True, "category": "水产"},
+        {
+            "ingredient_id": "ing_001",
+            "name": "五花肉",
+            "unit": "kg",
+            "quantity": 15.5,
+            "min_stock": 5.0,
+            "is_low": False,
+            "category": "肉类",
+        },
+        {
+            "ingredient_id": "ing_002",
+            "name": "鸡胸肉",
+            "unit": "kg",
+            "quantity": 3.2,
+            "min_stock": 5.0,
+            "is_low": True,
+            "category": "肉类",
+        },
+        {
+            "ingredient_id": "ing_003",
+            "name": "豆腐",
+            "unit": "kg",
+            "quantity": 8.0,
+            "min_stock": 3.0,
+            "is_low": False,
+            "category": "豆制品",
+        },
+        {
+            "ingredient_id": "ing_004",
+            "name": "土豆",
+            "unit": "kg",
+            "quantity": 12.0,
+            "min_stock": 5.0,
+            "is_low": False,
+            "category": "蔬菜",
+        },
+        {
+            "ingredient_id": "ing_005",
+            "name": "鸡蛋",
+            "unit": "个",
+            "quantity": 45.0,
+            "min_stock": 30.0,
+            "is_low": False,
+            "category": "蛋类",
+        },
+        {
+            "ingredient_id": "ing_006",
+            "name": "草鱼",
+            "unit": "kg",
+            "quantity": 1.5,
+            "min_stock": 3.0,
+            "is_low": True,
+            "category": "水产",
+        },
     ]
 
 

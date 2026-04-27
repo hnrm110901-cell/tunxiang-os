@@ -8,6 +8,7 @@
   POST   /api/v1/agent/feedback/evolve                -- 手动触发进化
   GET    /api/v1/agent/feedback/stats                  -- 进化统计
 """
+
 from __future__ import annotations
 
 import structlog
@@ -43,7 +44,8 @@ class RecordSignalRequest(BaseModel):
         description="信号来源",
     )
     source_id: str | None = Field(
-        default=None, description="关联的卡片/任务/建议ID",
+        default=None,
+        description="关联的卡片/任务/建议ID",
     )
     signal_data: dict = Field(
         default_factory=dict,

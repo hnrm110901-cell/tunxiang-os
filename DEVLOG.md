@@ -21,6 +21,52 @@
 - branch protection 配置：main 要求通过三个 workflow
 - dispatch 测试：strict mode 验证 Week 8 全套
 - nightly-rls-audit.yml：每日跑真实 DB
+## 2026-04-24 Tier 1 契约测试补齐 — Go/No-Go §1 转 GO
+
+### 今日完成
+- [tests/tier1/test_offline_crdt_tier1.py] 21 测试：断网 4h 终态保护 + 时间戳多格式 + CRDT 乱序/幂等 + offline_sync_service 静态契约
+- [tests/tier1/test_rls_all_tables_tier1.py] 12 测试：cross-service RLS 扫描（严格最近 20 migration + 宽松历史跟踪 + 豁免白名单 31 条 + 禁止模式扫描）
+- [scripts/demo_go_no_go.py] glob 扩 3 位置（services/*/tests/ + services/*/src/tests/ + tests/tier1/）+ 按父目录分组跑 pytest 避免 conftest 冲突 + RLS 审计 DB 连接失败降级为 SKIPPED
+- [Go/No-Go §1] Tier 1 checkpoint 从 WARNING 转 ✅ GO（9 文件 / 3 组 全绿）
+- [项目总计 tier1 测试] 92 通过（existing 59 + new 33）
+
+### 数据变化
+- 新增测试：33 个（21 CRDT + 12 RLS）
+- 修改 Go/No-Go 脚本：glob + 分组 + DB 容错
+
+### 遗留问题
+- 9 个 tier1 文件分布 3 目录；未来可统一到 tests/tier1/
+- RLS 豁免白名单 31 条需季度 audit
+- check_rls_policies.py DSN 不兼容 postgresql+asyncpg
+- 历史 RLS 技术债 ~40 张表需补
+
+### 明日计划
+- Week 7 真实 DEMO 环境：DB seed + k6 + nightly
+- Tier 1 CI 门禁：GitHub Actions `demo_go_no_go.py --strict --skip-tests`
+- check_rls_policies.py DSN 修复
+
+---
+
+## 2026-04-24 RLS 审计脚本 DSN 兼容 + JSON 输出 — Go/No-Go §7 可跑
+
+### 今日完成
+- [scripts/check_rls_policies.py] 重写：normalize_dsn（SQLAlchemy scheme 兼容 postgresql+asyncpg/+psycopg2/+psycopg）+ redact_dsn（密码脱敏）+ --json / --strict / 4 个 exit codes（0/1/2/3）+ exists_in_db 区分缺表和违规 + BUSINESS_TABLES 增补 18 张 Sprint D/E/G 新表
+- [scripts/demo_go_no_go.py] checkpoint 7 解析 script JSON 输出 + exit code 2 → SKIPPED；details 显示 critical/high/medium 分布
+- [tests/tier1/test_rls_audit_cli_tier1.py] 29 测试：DSN 规范化 10 / 脱敏 4 / CLI 契约 7 / exit code 2 / BUSINESS_TABLES 覆盖 6
+- Go/No-Go checkpoint #7: NO_GO → SKIPPED（DB 不可用时正确降级）
+
+### 数据变化
+- 修改：check_rls_policies.py + demo_go_no_go.py
+- 新增：29 tier1 测试
+
+### 遗留问题
+- redact_dsn 不处理 URL-encoded 密码
+- BUSINESS_TABLES 需手动维护（未来扫 information_schema）
+
+### 明日计划
+- 真实 DEMO DB 接入后 checkpoint 7 转 GO
+- CI 门禁：GitHub Actions `--strict --json`
+- 清理历史 RLS 违规
 
 ---
 
@@ -38,6 +84,12 @@
 - [tx-trade/api/table_merge_preset_routes.py] 新建7端点
 - [tx-trade/api/table_period_config_routes.py] 新建4端点
 - [tx-trade/api/table_utilization_routes.py] 新建4端点
+- [tx-trade/services/voucher_redeem_service.py] 新建券核销服务（平台券/代金券/积分，核销时机按区域配置）
+- [tx-trade/services/table_merge_preset_service.py] 新建时段拼桌预设服务（执行/回滚/市别切换自动触发）
+- [tx-trade/api/cashier_api.py] 新增3端点：retail-sale/pre-order/redeem-voucher
+- [tx-trade/api/table_merge_preset_routes.py] 新建7端点：预设CRUD/执行/回滚/日志
+- [tx-trade/api/table_period_config_routes.py] 新建4端点：时段配置列表/矩阵视图/批量upsert/删除
+- [tx-trade/api/table_utilization_routes.py] 新建4端点：利用率仪表盘/热力图/Agent建议/刷新视图
 - [tx-trade/main.py] 注册3个新路由模块
 
 ### 数据变化
@@ -57,6 +109,258 @@
 - VoucherRedeemService._redeem_member_points() 占位，待接入 tx-member
 
 ---
+
+- 新增表：table_merge_presets, table_merge_logs, table_period_configs
+- 新增物化视图：mv_table_utilization
+- 新增字段：table_zones +4列, dining_sessions +2列
+- 新增 API 模块：3个路由文件（18端点）+ 2个服务文件 + 3个收银端点
+- 总新增端点：21个
+
+### 架构决策
+- service_mode 三态（dine_first/scan_and_pay/retail）挂在区域而非订单上 — 区域决定流程
+- 拼桌预设复用已有 merge/split 能力，新增自动触发层 — 不重写底层桌台操作
+- 物化视图 mv_table_utilization 不设 RLS — 通过查询时 WHERE tenant_id 过滤
+- retail 模式不创建 dining_session — 直接零售订单，最简路径
+
+### 遗留问题
+- CashierEngine.create_retail_order() / create_pre_order() 方法体待实现（当前端点有 AttributeError 优雅降级）
+- VoucherRedeemService._redeem_member_points() 待接入 tx-member 服务
+- table_merge_preset_service.on_market_session_switch() 需在 market_session_routes.py 市别切换时调用（集成点已标记）
+
+### 明日计划
+- 实现 CashierEngine 的 retail/pre-order 方法体
+- market_session_routes 集成拼桌自动触发
+- Phase 2 Tier 1 测试用例编写
+
+---
+
+## 2026-04-24 v291 补齐历史 RLS 技术债 — 14 张表
+
+### 今日完成
+- [v291 迁移] `v291_fill_rls_historical_debt.py`：统一模板 ENABLE RLS + FORCE RLS + DROP POLICY IF EXISTS + CREATE POLICY + DO $$ information_schema guard + $POLICY$ dollar-quoted + COMMENT ON POLICY 记录原 migration 来源 + downgrade 不 DROP TABLE
+- [14 张表] 分 5 个历史 migration：v053 supply chain (2) / v062 central kitchen (3) / v064 WMS (3) / v067 three-way match (2) / v090 pilot tracking (4)
+- [18 TDD 测试] v291 migration 静态校验 13 + 前提验证 5（证实 5 个原 migration 确实无 ENABLE RLS）
+- [审计发现] 真违规 14 / 假阳性 36（f-string policy 原正则无法匹配）/ 合法豁免 31
+
+### 数据变化
+- 迁移版本：v290 → v291
+- 新增测试：18 个
+
+### 遗留问题
+- 原 PR #98 的 tier1 RLS 扫描正则需升级（DOTALL + `\S+`）消除 36 假阳性
+- PR #100 rls-gate.yml 同步升级
+- payment_events 独立 PR 讨论（FK vs RLS）
+- v291 depends_on v290；合入顺序需协调
+
+### 明日计划
+- 推 PR #98 regex 升级（同步消除假阳性）
+- 真实 DB 环境验证 14 张表 RLS 生效
+
+---
+
+## 2026-04-27 DevForge — PR #120 评审修复 Round 2（4 余项全部归零 + merge main）
+
+### Round 2：把 Round 1 延期的 3 项 + false-positive 1 项全部完成
+- **Tailwind 合规** — `apps/web-devforge` 加 `tailwindcss/postcss/autoprefixer` devDeps、`tailwind.config.ts`（preflight 关闭以避免与 AntD reset 冲突）、`postcss.config.js`、`global.css` 加 `@tailwind components/utilities` 指令；与 AntD v5 共存。Round 1 标为 false-positive 是误判——CLAUDE.md 第十条对 `apps/web-*/` 是硬要求，CodeRabbit 引用准确。
+- **Dockerfile USER 非 root** — 加 `useradd --system --no-create-home --shell /usr/sbin/nologin --uid 1001 txuser` + `chown -R` + `USER txuser`，规避 Trivy DS-0002
+- **structlog stdlib bridge** — `utils/logging.py` 重写：用 `ProcessorFormatter` 把 uvicorn / SQLAlchemy / asyncpg 的 stdlib 日志桥接到 JSON 渲染管线，业务日志和框架日志统一格式
+- **CQRS 事件发射** — `shared/events/src/event_types.py` 注册 `DevForgeApplicationEventType`（CREATED/UPDATED/DELETED） + 域名映射 `devforge_application → tx_devforge_application_events` + 加入 `ALL_EVENT_ENUMS`；`api/app_routes.py` 在 POST/PATCH/DELETE 成功路径用 `asyncio.create_task(emit_event(...))` 旁路写入
+
+### 同步合并 origin/main（解锁 PR）
+- main 已并入 web-hub v2.0 三浪 + tx-supply P0 五任务 v366-v370，本分支与 main 双向偏离
+- 冲突点：DEVLOG.md（保留双方条目）+ v366 命名（rename `v366_devforge_application` → `v371_devforge_application`，避开 v366_price_ledger / v367-v370 占用）
+- 计划文档迁移规划表 v366-v381 顺延为 **v371-v386**
+
+### 验证
+- py_compile 全过（app_routes / event_types / logging / db）
+- `npm install` 添加 3 个 Tailwind devDeps 成功
+- `npx tsc --noEmit` 零错误
+- `npx vite build` 通过
+- 所有 12 条 CodeRabbit + Codex 评审项已落实（11 fix + 1 改判为 fix，零延期）
+
+---
+
+## 2026-04-27 DevForge — PR #120 CodeRabbit + Codex 评审修复 Round 1（7 fix + 3 defer + 1 false-positive）
+
+### CodeRabbit + Codex 12 条评审修复
+PR #120 开启后立即收到 CodeRabbit 10 条 + Codex 2 条评审。Fix-First 全部分类处理：
+
+**已修复（7 条，本轮 commit）：**
+- 🔴 `services/tx-devforge/src/api/health_routes.py` — `/readiness` DB 不可达时返回 **503** 而非 200，修 K8s probe 误判 (Codex P1)
+- 🔴 `apps/web-devforge/src/api/client.ts` — 默认 tenant_id 改为 all-zero UUID，避免 `'demo-tenant'` 字面量被后端 401；env 改从 zustand store 读取，避免 localStorage JSON 信封被当作 raw 字符串 (CodeRabbit Critical + Codex P1)
+- 🔴 `apps/web-devforge/src/router.tsx` — 引入 `type ReactNode`，修 strict 模式 TS 编译 (CodeRabbit Critical)
+- 🔴 `services/tx-devforge/src/main.py` — CORSMiddleware 改后注册（外层），TenantMiddleware 加 OPTIONS 预检放行；`allow_credentials` 仅在显式配置 origin 时启用；`@app.on_event` 迁移到 `lifespan` (CodeRabbit Critical)
+- 🟠 `services/tx-devforge/src/db.py` — `check_db_connectivity` 加 `SQLAlchemyError` 捕获，避免 OperationalError 导致 /readiness 500 (CodeRabbit Major)
+- 🟠 `services/tx-devforge/src/middlewares/tenant.py` — 新增 OPTIONS 短路，让 CORS 预检不被 401 拦
+- 🟠 `apps/web-devforge/src/pages/apps/index.tsx` — 真实 `page` 状态接入 `useApplications`，AntD `Table.pagination.onChange` 联动；筛选变化时 useEffect 重置到第 1 页 (CodeRabbit Major)
+
+**延期到 Day-2（3 条，已加 TODO）：**
+- 🟠 `Dockerfile` USER 非 root：仓内 17 个服务有 15 个跑 root，统一治理（与 tx-pay/tx-civic/tx-expense 一并）
+- 🟠 `app_routes.py` CQRS 事件发射（CREATED/UPDATED/DELETED）：需先在 `shared/events/src/event_types.py` 注册 `DevForgeApplicationEventType`，与 v147 事件总线规范对齐
+- 🟠 `logging.py` structlog stdlib bridge：把 uvicorn/sqlalchemy 日志也桥接成 JSON，提升可观测一致性
+
+**False positive 1 条（PR 评论中说明）：**
+- 🟠 `package.json` Tailwind 缺失：本骨架明确选 AntD v5 主题作为唯一样式系统（CLAUDE.md 第十条 + 与 web-forge-admin 保持一致），不引入第二套 CSS 框架。**这是设计决策，不是疏漏。**
+
+### 验证
+- `python3 -m py_compile` 5 文件全过
+- `cd apps/web-devforge && npx tsc --noEmit` 零错误
+- `npx vite build` 通过（chunk size 警告：AntD 800k → 后续 manualChunks 优化）
+
+---
+
+## 2026-04-27 DevForge 研运平台 — Day-1 骨架并行启动
+
+### 今日完成
+- [docs] 落档 [docs/devforge-platform-plan.md](docs/devforge-platform-plan.md)：15 模块 × 5 类资源 × 4 阶段(MVP/V1/V2/V3) 全量开发计划
+- [tx-devforge] 后端骨架：19 文件（main.py + 5 routes + Application 模型 + Repository + TenantMiddleware + structlog + Prometheus + 3 个具体异常处理器）
+- [shared/db-migrations] v371_devforge_application：表 + 4 条独立 RLS 策略（SELECT/INSERT/UPDATE/DELETE）+ FORCE ROW LEVEL SECURITY；链入 head=v365_forge_ecosystem_metrics
+- [apps/web-devforge] 前端骨架：41 文件，AntD v5 暗色主题 + 15 模块路由 + AppLayout(240+56px) + EnvSwitcher(prod 二次确认+红框) + ⌘K GlobalSearch + 应用中心(02)真实 API 接入 + 13 占位页
+- [scripts] forge_register_resources.py：扫出 57 条资源（21 backend / 18 frontend / 4 edge / 13 adapter / 1 data_asset），Owner 推断 96.5%，--dry-run/--push/--type 三种模式
+- [services/gateway] 路由注册 devforge → DOMAIN_ROUTES 字典加一行（路径前缀模式，与 13 个下游服务一致）
+- [infra/docker] docker-compose.yml + docker-compose.dev.yml 加入 tx-devforge 服务（端口 8017，hot-reload 卷挂载）
+
+### 关键偏差与修复
+- **端口**：原计划 8015，实际分配 **8017**（8015 被 tx-expense 占、8016 被 tx-pay 占）。已同步：Dockerfile / config.py / main.py / vite proxy / api client / pages/apps / 发现脚本 / compose / 计划文档
+- **迁移 head 与命名**：CLAUDE.md 写 229，实测 414 个版本文件（仓内仅 `vNNN_*.py` 单一格式，head=`v365_forge_ecosystem_metrics`）。本服务首迁 经过两次重命名：原起草 `v230_*`（被占）→ 改 `v366_*`（merge main 后被 supplier_price 占）→ 最终 `v371_devforge_application`，down_revision=`v365_forge_ecosystem_metrics`
+- **微服务数**：CLAUDE.md 写 14 业务+2 支撑，实测 21（多出 tx-pay/tx-expense/tx-predict/mcp-server/tunxiang-api 等）
+- **适配器数**：CLAUDE.md 写 10，实测 13
+
+### 数据变化
+- 迁移版本：down_revision=`v365_forge_ecosystem_metrics` → 新 `v371_devforge_application`（已添加，待执行；命名经历 `v230_*` → `v366_*` → `v371_*`，详见上一节）
+- 新增 API 端点：5 个（GET/POST/PATCH/DELETE applications + health）
+- 新增代码：~4500 行（后端 ~1200 + 前端 ~2200 + 脚本 ~830 + 配置 ~270）
+- 新前端应用：1 个（apps/web-devforge，端口 5182）
+- 新后端微服务：1 个（services/tx-devforge，端口 8017）
+
+### 遗留 TODO（Day-2+）
+- 后端 Service 层（当前 API 直调 Repository，待引入；CI/CD 编排逻辑接入时一起加）
+- pytest 测试目录（v371 表 + RLS 跨租户隔离用例必须 Tier 2 起步）
+- helm chart 缺失（tx-pay/tx-civic/tx-expense 同样未补，统一治理）
+- gateway / web-devforge 之间的端到端 token 鉴权（目前仅 X-Tenant-ID 透传）
+- 13 个前端占位页待实装；新建应用 Modal 表单待接 createApplication
+- CODEOWNERS 文件未建（脚本 0 命中），建议 Day-2 由 devforge 后台落地一份
+- forge_register_resources.py --push 待真实跑（需先执行 v371 迁移）
+
+### 明日计划
+- 把 v371 迁移 apply 到 dev 环境，跑 `--push` 把 57 条资源真实入库
+- 后端补 Application 列表的过滤/排序/分页参数 + Repository 单元测试
+- 前端"应用中心"页对接真实数据，添加资源详情 8 Tab 中的"概览"和"依赖拓扑"（拓扑数据先用 metadata_json 占位）
+- 起 06 流水线模块的数据库 schema 设计（v372 迁移草稿）
+
+---
+## 2026-04-27 屯象Hub v2.0 — 三浪全量交付（Wave 1+2+3）
+
+### 今日完成
+
+#### Wave 1 · 救命（核心框架 + 实时流）
+- [web-hub] 核心布局重构: 侧边栏菜单 → 顶部5工作模式导航（Today/Stream/Workspaces/Playbooks/Cmd-K）
+- [web-hub] App.tsx 完全重写（570行）: 双栏布局 + v1兼容路由重定向
+- [web-hub] 类型系统 src/types/hub.ts: WorkMode/Workspace/Object/HealthScore/StreamEvent 全部v2类型
+- [web-hub] Zustand Store src/store/hubStore.ts: 导航/面板/Stream连接全局状态
+- [web-hub] CmdK 命令面板（410行）: ⌘K快捷键、搜索过滤、键盘导航、20+预置命令
+- [web-hub] ObjectPage 八Tab框架（356行）: Overview/Timeline/Traces/Cost/Logs/Related/Actions/Playbooks
+- [web-hub] CopilotDrawer AI抽屉（488行）: ⌘/快捷键、SSE流式对话、上下文感知
+- [web-hub] ListPanel 通用列表面板（274行）: 搜索+筛选chips+虚拟滚动
+- [web-hub] EdgesWorkspace（605行）: 87节点看板 + SVG拓扑图 + Wake/Reboot/Push
+- [web-hub] ServicesWorkspace（481行）: 17微服务 + SVG Service Map + SLO错误预算
+- [web-hub] TodayPage（230行）: 今日KPI卡片 + 待办 + 告警 + 续约
+- [web-hub] StreamPage（212行）: SSE实时事件流 + 分类过滤 + 暂停/继续
+- [gateway] Wave1 API 16个新端点: today/stream(SSE)/edges(7)/services(4)/copilot/customers扩展(2)
+
+#### Wave 2 · 扩域（8个Workspace全覆盖）
+- [web-hub] CustomersWorkspace（580行）: 健康分5维SVG雷达图 + Playbook引擎 + ARR拆解
+- [web-hub] IncidentsWorkspace（700行）: 6阶段状态流转 + 指挥链三角色 + Postmortem生成 + 精确到秒时间线
+- [web-hub] MigrationsWorkspace（550行）: 五段式管线(映射→回放→追平→双跑→切流) + SLI指标
+- [web-hub] AdaptersWorkspace（600行）: 15适配器 + CSS Grid热力矩阵 + 字段映射可视化
+- [web-hub] StoresWorkspace（500行）: 15门店 + 设备网格(Mac mini/POS/KDS/打印机) + 远程巡店
+- [web-hub] AgentsWorkspace（600行）: 9 Agent + Trace瀑布图 + Action沙箱 + 三条约束统计
+- [web-hub] PlaybooksPage（450行）: 6剧本卡片网格 + 执行历史 + SLI趋势柱状图
+- [gateway] Wave2 API 29个新端点: customers(5)/incidents(6)/migrations(7)/adapters(5)/playbooks(4)/stores扩展
+
+#### Wave 3 · 平台化（Settings + Workbench + Journey）
+- [web-hub] SettingsPage（680行）: 6子模块（Flags灰度/Releases GitOps/Billing账单/Security审计/Knowledge RAG/Tenancy租户）
+- [web-hub] WorkbenchPage（1001行）: Stripe风格SRE终端 + Tab补全 + 命令历史 + 表格/JSON输出
+- [web-hub] JourneyPage（500行）: SVG流程编排器 + 4种节点 + 拖拽平移 + 配置面板 + 3个预置旅程
+- [gateway] Wave3 API 16个新端点: settings(10)/workbench(1)/journey(5)
+
+### 数据变化
+- 前端代码: 2,826行(v1) → 14,620行(v2), +417%
+- 后端API: 14端点(v1) → 73端点(v2), +421%
+- 后端代码: ~500行(v1) → 3,423行(v2), +585%
+- 新增文件: 18个前端 + 2个后端修改
+- 8/8 Workspace 全部实现完整 Object Page 八Tab
+
+### 架构升级对照
+| 维度 | v1.0 | v2.0 |
+|------|------|------|
+| 主入口 | 侧边栏12菜单 | Cmd-K + Workspace |
+| 数据流 | useEffect轮询 | SSE + 物化视图 |
+| 详情页 | 列表跳详情 | Object Page 八Tab |
+| AI | 监控Agent | Copilot抽屉(问答+上下文) |
+| 客户成功 | "健康分88" | 5维雷达图+Playbook+Journey |
+| 故障管理 | 工单+优先级 | Incident全生命周期+Postmortem |
+| 配置 | 表单提交 | Settings六模块+Workbench Shell |
+| 迁移 | 模板列表 | 五段式管线+SLI |
+
+### 遗留项
+- [ ] Copilot v2 Action-capable（沙箱执行73个Action）
+- [ ] 决策可解释AB实验
+- [ ] Voice-ready（P3，Web Speech API）
+- [ ] 所有Mock数据接入真实DB（73个 # TODO 标注）
+
+### 明日计划
+- 启动 Vite dev server 进行视觉走查
+- Mock数据逐步替换为真实DB查询
+- Copilot接入tx-brain Claude API
+
+## 2026-04-25 Sprint P — 私域增长6大模块(对标iCC Grow)
+
+### 今日完成
+- [tx-growth] 活码拉新引擎: 4表(live_codes/scans/channel_stats/store_bindings) + LiveCodeService(733行) + 15端点(/api/v1/growth/live-codes/*)
+- [tx-growth] 精准人群包引擎: 3表(audience_packs/pack_members/pack_presets) + AudiencePackService(796行) + 12端点(/api/v1/growth/audience-packs/*) + 8个系统预设(生日/沉睡/高价值等)
+- [tx-growth] 营销任务日历: 4表(marketing_tasks/assignments/executions/effects) + MarketingTaskService(762行) + 18端点(/api/v1/growth/marketing-tasks/*) + 日历视图
+- [gateway] 社群运营工具: 2表(group_tags/group_tag_bindings) + 1表(group_mass_sends) + GroupOpsService(663行) + 14端点(/api/v1/wecom/group-ops/*)
+- [gateway] 企业素材库: 2表(material_groups/material_library) + MaterialService(564行) + 10端点(/api/v1/materials/*) + 分时段匹配
+- [tx-agent] 客户触达SOP: 4表(customer_journey_templates/steps/enrollments/step_logs) + CustomerJourneyService(1550行) + 18端点(/api/v1/agent/customer-journey/*) + 3个预设旅程(消费后关怀链/沉睡召回/生日关怀)
+
+### 数据变化
+- 迁移版本: v294 → v303 (9个新迁移, 含3个桥接)
+- 新增表: 20张 (全部含RLS策略)
+- 新增API端点: ~87个
+- 新增代码: 8,734行(5,068服务+2,635路由+1,031迁移)
+- 3个main.py已注册路由+定时任务
+
+### 竞品对标(iCC Grow差距修复)
+| 模块 | 差距修复前 | 修复后 |
+|------|----------|--------|
+| 活码拉新矩阵 | 完全缺失 | 成员/社群/LBS三类活码+渠道统计 |
+| 人群包引擎 | 基础member_tags | 5维度17条件+动态/静态+8预设 |
+| 营销任务日历 | 无 | 总部→门店闭环+效果追踪+排行榜 |
+| 社群运营工具 | 基础群管理 | 群标签+群发+批量操作 |
+| 素材库 | 无 | 分组+分时段+7种类型 |
+| 客户触达SOP | 门店运营SOP | 客户生命周期触达链+3预设旅程 |
+
+### 模块6: 企微侧边栏360画像(同日追加)
+- [tx-member] 360°画像聚合API: v304迁移(coupon_send_logs) + Profile360Service(995行) + 11端点(/api/v1/member/profile360/*)
+  - 4种入口: by-wecom/by-phone/by-card/by-id
+  - 聚合8+张表: customers/orders/order_items/stored_value/points/coupons/coupon_send_logs/member_level
+  - 1v1发券追踪: 发放/核销/ROI + 员工/门店统计
+  - AI话术建议: 规则引擎(生日/常点菜/可用券/储值/回访)
+  - 手机号脱敏
+- [web-wecom-sidebar] 前端增强: 11个文件(6修改+5新增, 1712行TypeScript)
+  - 4Tab布局: 会员信息/会员标签/会员卡/券包
+  - 紫色横向菜品偏好柱状图
+  - 渐变色会员卡视觉(按等级配色)
+  - AI话术建议琥珀色卡片
+  - 生日提醒粉色徽章
+  - 1v1发券+状态追踪(已发/已领/已用/过期/失败)
+
+### 遗留项
+- [ ] 前端页面: web-admin总部后台(活码/人群包/营销任务/社群管理页面)
+
+### 明日计划
+- web-admin 总部后台私域管理页面开发
 
 ## 2026-04-24 Sprint H 集成验证基建 — 徐记海鲜 DEMO Go/No-Go
 

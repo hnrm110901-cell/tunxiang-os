@@ -10,6 +10,7 @@ API 路由 → PaymentNexusService → RoutingEngine → Channel
   4. 发射支付事件
   5. 日汇总查询
 """
+
 from __future__ import annotations
 
 from datetime import date, datetime, timezone
@@ -20,9 +21,9 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .channels.base import (
-    PayMethod,
     PaymentRequest,
     PaymentResult,
+    PayMethod,
     PayStatus,
     RefundResult,
     TradeType,
@@ -183,7 +184,10 @@ class PaymentNexusService:
             raise ValueError(f"退款金额({refund_amount_fen})超过原支付金额({original_fen})")
 
         channel = await self._routing.resolve(
-            self._db, str(tenant_id), str(store_id), PayMethod(method),
+            self._db,
+            str(tenant_id),
+            str(store_id),
+            PayMethod(method),
         )
         result = await channel.refund(
             payment_id=payment_id,
@@ -300,22 +304,25 @@ class PaymentNexusService:
     ) -> None:
         """发射支付确认事件到事件总线"""
         try:
-            from shared.events.src.emitter import emit_event
-            from shared.events.src.event_types import PaymentEventType
             import asyncio
 
-            asyncio.create_task(emit_event(
-                event_type=PaymentEventType.CONFIRMED,
-                tenant_id=tenant_id,
-                stream_id=order_id,
-                payload={
-                    "payment_id": result.payment_id,
-                    "amount_fen": result.amount_fen,
-                    "method": result.method.value,
-                    "trade_no": result.trade_no,
-                },
-                store_id=store_id,
-                source_service="tx-pay",
-            ))
+            from shared.events.src.emitter import emit_event
+            from shared.events.src.event_types import PaymentEventType
+
+            asyncio.create_task(
+                emit_event(
+                    event_type=PaymentEventType.CONFIRMED,
+                    tenant_id=tenant_id,
+                    stream_id=order_id,
+                    payload={
+                        "payment_id": result.payment_id,
+                        "amount_fen": result.amount_fen,
+                        "method": result.method.value,
+                        "trade_no": result.trade_no,
+                    },
+                    store_id=store_id,
+                    source_service="tx-pay",
+                )
+            )
         except ImportError:
             logger.debug("event_emitter_not_available")

@@ -5,7 +5,11 @@ export default defineConfig({
   timeout: 30_000,
   retries: 1,
   fullyParallel: true,
-  reporter: [['html', { open: 'never' }], ['list']],
+  reporter: [
+    ['html', { open: 'never' }],
+    ['list'],
+    ['json', { outputFile: 'playwright-report/results.json' }],
+  ],
 
   use: {
     baseURL: 'http://localhost:5173',

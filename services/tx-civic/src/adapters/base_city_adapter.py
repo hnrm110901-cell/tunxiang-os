@@ -127,9 +127,9 @@ class BaseCityAdapter(ABC):
                 results[domain] = False
         return results
 
-    async def close(self) -> None:
+    async def close(self) -> None:  # noqa: B027 — 空钩子，子类按需实现
         """释放资源，子类可覆盖。"""
-        pass
+        return None
 
     # ------------------------------------------------------------------
     # 异步上下文管理器

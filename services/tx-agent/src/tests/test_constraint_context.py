@@ -340,6 +340,7 @@ async def test_serve_dispatch_experience_violation_blocks_decision():
 # 8. 批次 3（W6 定价营销）
 # ──────────────────────────────────────────────────────────────────────
 
+
 def test_batch_3_pricing_skills_declare_scope():
     _import_skills_or_skip()
     from agents.skills.menu_advisor import MenuAdvisorAgent
@@ -350,9 +351,15 @@ def test_batch_3_pricing_skills_declare_scope():
     from agents.skills.seasonal_campaign import SeasonalCampaignAgent
     from agents.skills.smart_menu import SmartMenuAgent
 
-    for cls in (SmartMenuAgent, MenuAdvisorAgent, PointsAdvisorAgent,
-                SeasonalCampaignAgent, PersonalizationAgent,
-                NewCustomerConvertAgent, ReferralGrowthAgent):
+    for cls in (
+        SmartMenuAgent,
+        MenuAdvisorAgent,
+        PointsAdvisorAgent,
+        SeasonalCampaignAgent,
+        PersonalizationAgent,
+        NewCustomerConvertAgent,
+        ReferralGrowthAgent,
+    ):
         assert cls.constraint_scope == {"margin"}, f"{cls.__name__} 应声明 margin-only scope"
 
 
@@ -363,8 +370,14 @@ def test_batch_3_registry_contains_points_advisor():
     # points_advisor 是本批次新加的注册
     assert "points_advisor" in SKILL_REGISTRY
     # 其他 6 个早已在 ALL_SKILL_AGENTS
-    for aid in ("smart_menu", "menu_advisor", "seasonal_campaign",
-                "personalization", "new_customer_convert", "referral_growth"):
+    for aid in (
+        "smart_menu",
+        "menu_advisor",
+        "seasonal_campaign",
+        "personalization",
+        "new_customer_convert",
+        "referral_growth",
+    ):
         assert aid in SKILL_REGISTRY, f"{aid} 未注册"
 
 
@@ -377,10 +390,13 @@ async def test_smart_menu_simulate_cost_fills_margin_context():
 
     agent = SmartMenuAgent(tenant_id="t1")
     # 售价 100 元 / 成本 40 元 → 毛利率 60%，远超 15% 阈值
-    result = await agent.run("simulate_cost", {
-        "bom_items": [{"cost_fen": 4000, "quantity": 1}],
-        "target_price_fen": 10000,
-    })
+    result = await agent.run(
+        "simulate_cost",
+        {
+            "bom_items": [{"cost_fen": 4000, "quantity": 1}],
+            "target_price_fen": 10000,
+        },
+    )
     assert result.constraints_detail["scope"] == "margin"
     assert "margin" in result.constraints_detail["scopes_checked"]
     assert result.constraints_passed is True
@@ -396,10 +412,13 @@ async def test_smart_menu_low_margin_blocks_decision():
 
     agent = SmartMenuAgent(tenant_id="t1")
     # 售价 100 元 / 成本 90 元 → 毛利率 10%，< 15% 阈值
-    result = await agent.run("simulate_cost", {
-        "bom_items": [{"cost_fen": 9000, "quantity": 1}],
-        "target_price_fen": 10000,
-    })
+    result = await agent.run(
+        "simulate_cost",
+        {
+            "bom_items": [{"cost_fen": 9000, "quantity": 1}],
+            "target_price_fen": 10000,
+        },
+    )
     assert result.constraints_detail["scope"] == "margin"
     assert result.constraints_passed is False
     assert any("毛利底线违规" in v for v in result.constraints_detail["violations"])
@@ -414,15 +433,16 @@ async def test_menu_advisor_optimize_pricing_picks_worst_margin_as_basis():
 
     agent = MenuAdvisorAgent(tenant_id="t1")
     # 两道菜：一道毛利 70% 健康，一道毛利 5% 危险 → checker 以 5% 为准拦截
-    result = await agent.run("optimize_pricing", {
-        "dishes": [
-            {"dish_name": "A", "price_fen": 10000, "cost_fen": 3000,
-             "category_avg_price_fen": 9000},
-            {"dish_name": "B", "price_fen": 10000, "cost_fen": 9500,
-             "category_avg_price_fen": 11000},
-        ],
-        "target_margin_pct": 60,
-    })
+    result = await agent.run(
+        "optimize_pricing",
+        {
+            "dishes": [
+                {"dish_name": "A", "price_fen": 10000, "cost_fen": 3000, "category_avg_price_fen": 9000},
+                {"dish_name": "B", "price_fen": 10000, "cost_fen": 9500, "category_avg_price_fen": 11000},
+            ],
+            "target_margin_pct": 60,
+        },
+    )
     assert result.constraints_detail["scope"] == "margin"
     # 最差毛利 5% < 15% 阈值，应拦截
     assert result.constraints_passed is False
@@ -431,6 +451,7 @@ async def test_menu_advisor_optimize_pricing_picks_worst_margin_as_basis():
 # ──────────────────────────────────────────────────────────────────────
 # 9. 批次 4（W7 库存原料）
 # ──────────────────────────────────────────────────────────────────────
+
 
 def test_batch_4_inventory_skills_declare_scope():
     _import_skills_or_skip()
@@ -465,8 +486,14 @@ def test_batch_4_registry_contains_enterprise_activation():
     # enterprise_activation 是本 PR 新加的注册
     assert "enterprise_activation" in SKILL_REGISTRY
     # 其他 6 个在上批次/本批次之前已注册
-    for aid in ("inventory_alert", "new_product_scout", "trend_discovery",
-                "pilot_recommender", "banquet_growth", "private_ops"):
+    for aid in (
+        "inventory_alert",
+        "new_product_scout",
+        "trend_discovery",
+        "pilot_recommender",
+        "banquet_growth",
+        "private_ops",
+    ):
         assert aid in SKILL_REGISTRY, f"{aid} 未注册"
 
 
@@ -479,12 +506,15 @@ async def test_inventory_alert_check_expiration_fills_safety_context():
 
     agent = InventoryAlertAgent(tenant_id="t1")
     # 所有食材 remaining_hours >= 24h 阈值
-    result = await agent.run("check_expiration", {
-        "items": [
-            {"name": "鱼头", "remaining_hours": 48.0, "batch_id": "B-001"},
-            {"name": "辣椒", "remaining_hours": 72.0, "batch_id": "B-002"},
-        ],
-    })
+    result = await agent.run(
+        "check_expiration",
+        {
+            "items": [
+                {"name": "鱼头", "remaining_hours": 48.0, "batch_id": "B-001"},
+                {"name": "辣椒", "remaining_hours": 72.0, "batch_id": "B-002"},
+            ],
+        },
+    )
     assert result.constraints_detail["scope"] == "safety"
     assert "safety" in result.constraints_detail["scopes_checked"]
     assert result.constraints_passed is True
@@ -499,12 +529,15 @@ async def test_inventory_alert_expired_ingredient_blocks_decision():
 
     agent = InventoryAlertAgent(tenant_id="t1")
     # 鱼头仅剩 6 小时 < 24h 阈值 → safety 违规
-    result = await agent.run("check_expiration", {
-        "items": [
-            {"name": "鱼头", "remaining_hours": 6.0, "batch_id": "B-001"},
-            {"name": "辣椒", "remaining_hours": 48.0, "batch_id": "B-002"},
-        ],
-    })
+    result = await agent.run(
+        "check_expiration",
+        {
+            "items": [
+                {"name": "鱼头", "remaining_hours": 6.0, "batch_id": "B-001"},
+                {"name": "辣椒", "remaining_hours": 48.0, "batch_id": "B-002"},
+            ],
+        },
+    )
     assert result.constraints_detail["scope"] == "safety"
     assert result.constraints_passed is False
     assert any("食安" in v or "临期" in v for v in result.constraints_detail["violations"])
@@ -528,6 +561,7 @@ async def test_trend_discovery_waived_scope():
 # 10. 批次 5（W8 合规运营：4 豁免 + 3 真实 scope）
 # ──────────────────────────────────────────────────────────────────────
 
+
 def test_batch_5_compliance_skills_declare_scope():
     _import_skills_or_skip()
     from agents.skills.attendance_compliance_agent import AttendanceComplianceAgent
@@ -539,8 +573,7 @@ def test_batch_5_compliance_skills_declare_scope():
     from agents.skills.workforce_planner import WorkforcePlannerAgent
 
     # 4 个豁免（HR 观察/建议类）
-    for cls in (ComplianceAlertAgent, AttendanceComplianceAgent,
-                AttendanceRecoveryAgent, TurnoverRiskAgent):
+    for cls in (ComplianceAlertAgent, AttendanceComplianceAgent, AttendanceRecoveryAgent, TurnoverRiskAgent):
         assert cls.constraint_scope == set(), f"{cls.__name__} 应为空 scope (豁免)"
         assert cls.constraint_waived_reason is not None, f"{cls.__name__} 缺 waived_reason"
         assert len(cls.constraint_waived_reason) >= 30, (
@@ -563,8 +596,7 @@ def test_batch_5_registry_contains_4_new_skills():
     from agents.skills import SKILL_REGISTRY
 
     # 4 个本 PR 新注册的
-    for aid in ("attendance_compliance", "attendance_recovery",
-                "turnover_risk", "workforce_planner"):
+    for aid in ("attendance_compliance", "attendance_recovery", "turnover_risk", "workforce_planner"):
         assert aid in SKILL_REGISTRY, f"{aid} 未注册"
     # 3 个本 PR 之前已注册的
     for aid in ("compliance_alert", "store_inspect", "off_peak_traffic"):
@@ -601,6 +633,7 @@ async def test_turnover_risk_waived_scope():
 # 11. 批次 6 + Overflow（W9 最后 14 Skill，冲 100% 覆盖）
 # ──────────────────────────────────────────────────────────────────────
 
+
 def test_batch_6_content_insight_skills_all_waived():
     """批次 6 七个纯报告类 Skill 应全部豁免，reason ≥30 字符且无黑名单说辞"""
     _import_skills_or_skip()
@@ -613,20 +646,20 @@ def test_batch_6_content_insight_skills_all_waived():
     from agents.skills.smart_customer_service import SmartCustomerServiceAgent
 
     waived = [
-        ReviewInsightAgent, ReviewSummaryAgent, IntelReporterAgent,
-        AuditTrailAgent, GrowthCoachAgent, SalaryAdvisorAgent,
+        ReviewInsightAgent,
+        ReviewSummaryAgent,
+        IntelReporterAgent,
+        AuditTrailAgent,
+        GrowthCoachAgent,
+        SalaryAdvisorAgent,
         SmartCustomerServiceAgent,
     ]
     for cls in waived:
         assert cls.constraint_scope == set(), f"{cls.__name__} 应豁免"
         reason = cls.constraint_waived_reason
-        assert reason is not None and len(reason) >= 30, (
-            f"{cls.__name__} waived_reason 长度 {len(reason or '')} < 30"
-        )
+        assert reason is not None and len(reason) >= 30, f"{cls.__name__} waived_reason 长度 {len(reason or '')} < 30"
         for blacklist in ("N/A", "不适用", "跳过"):
-            assert blacklist not in reason, (
-                f"{cls.__name__} 含黑名单 {blacklist}"
-            )
+            assert blacklist not in reason, f"{cls.__name__} 含黑名单 {blacklist}"
 
 
 def test_overflow_margin_skills():
@@ -638,8 +671,13 @@ def test_overflow_margin_skills():
     from agents.skills.high_value_member import HighValueMemberAgent
     from agents.skills.member_insight import MemberInsightAgent
 
-    for cls in (AiMarketingOrchestratorAgent, DormantRecallAgent,
-                HighValueMemberAgent, MemberInsightAgent, CashierAuditAgent):
+    for cls in (
+        AiMarketingOrchestratorAgent,
+        DormantRecallAgent,
+        HighValueMemberAgent,
+        MemberInsightAgent,
+        CashierAuditAgent,
+    ):
         assert cls.constraint_scope == {"margin"}, f"{cls.__name__} 应为 margin"
 
 
@@ -665,9 +703,7 @@ def test_100_percent_registry_coverage():
     _import_skills_or_skip()
     from agents.skills import SKILL_REGISTRY
 
-    assert len(SKILL_REGISTRY) >= 50, (
-        f"SKILL_REGISTRY 只有 {len(SKILL_REGISTRY)} 个，未达 50 覆盖率目标"
-    )
+    assert len(SKILL_REGISTRY) >= 50, f"SKILL_REGISTRY 只有 {len(SKILL_REGISTRY)} 个，未达 50 覆盖率目标"
 
     missing_scope: list[str] = []
     empty_without_reason: list[str] = []
@@ -684,21 +720,15 @@ def test_100_percent_registry_coverage():
         if scope == set():
             reason = getattr(cls, "constraint_waived_reason", None)
             if not reason or len(reason) < 30:
-                empty_without_reason.append(
-                    f"{agent_id}(reason_len={len(reason or '')})"
-                )
+                empty_without_reason.append(f"{agent_id}(reason_len={len(reason or '')})")
                 continue
             for blacklist in ("N/A", "不适用", "跳过"):
                 if blacklist in reason:
                     blacklist_violations.append(f"{agent_id}: {blacklist!r}")
 
     assert not missing_scope, f"缺 constraint_scope: {missing_scope}"
-    assert not empty_without_reason, (
-        f"豁免 Skill 缺 ≥30 字符 reason: {empty_without_reason}"
-    )
-    assert not blacklist_violations, (
-        f"豁免 reason 含黑名单说辞: {blacklist_violations}"
-    )
+    assert not empty_without_reason, f"豁免 Skill 缺 ≥30 字符 reason: {empty_without_reason}"
+    assert not blacklist_violations, f"豁免 reason 含黑名单说辞: {blacklist_violations}"
 
 
 def test_batch_6_overflow_new_registrations():
@@ -708,6 +738,5 @@ def test_batch_6_overflow_new_registrations():
 
     # 批次 6 新注册：review_summary / audit_trail / growth_coach / smart_customer_service
     # Overflow 新注册：cashier_audit
-    for aid in ("review_summary", "audit_trail", "growth_coach",
-                "smart_customer_service", "cashier_audit"):
+    for aid in ("review_summary", "audit_trail", "growth_coach", "smart_customer_service", "cashier_audit"):
         assert aid in SKILL_REGISTRY, f"{aid} 未注册"

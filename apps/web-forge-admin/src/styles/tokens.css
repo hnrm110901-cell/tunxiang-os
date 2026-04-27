@@ -1,0 +1,46 @@
+/* 屯象 OS Design Tokens v2.0 · 暗色默认
+   生产环境从 @tunxiang/design-tokens 包导入
+   此文件为开发期 inline 备份 */
+
+:root, [data-theme="dark"] {
+  --ink-50: #E8ECF2; --ink-100: #C7CFDB; --ink-200: #A6B2C5; --ink-300: #93A0B4;
+  --ink-400: #5E6E80; --ink-500: #3D4D62; --ink-600: #26384F; --ink-700: #1A2D44;
+  --ink-800: #102236; --ink-900: #0B1726; --ink-950: #06101C;
+  --ember-100: #FCE8D2; --ember-200: #F8C99B; --ember-300: #F5A86B;
+  --ember-500: #F08438; --ember-600: #B85F22; --ember-700: #7A3E18; --ember-900: #3A1F0E;
+  --green-200: #5DCAA5; --green-400: #1D9E75; --green-900: #04342C;
+  --amber-100: #FAC775; --amber-200: #EF9F27; --amber-900: #412402;
+  --blue-200: #85B7EB; --blue-400: #378ADD; --blue-900: #042C53;
+  --crimson-400: #E24B4A; --crimson-600: #A32D2D;
+
+  --bg-primary: var(--ink-900);
+  --bg-secondary: var(--ink-800);
+  --bg-surface: var(--ink-700);
+  --bg-elevated: var(--ink-600);
+  --text-primary: var(--ink-100);
+  --text-secondary: var(--ink-300);
+  --text-tertiary: var(--ink-400);
+  --border-tertiary: var(--ink-700);
+  --border-secondary: var(--ink-600);
+  --focus: var(--ember-500);
+
+  --font-serif: "方正悠宋", "Source Han Serif SC", "Songti SC", serif;
+  --font-sans: "PingFang SC", "Microsoft YaHei", -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", "SF Mono", "Consolas", monospace;
+
+  --r-xs: 4px; --r-sm: 6px; --r-md: 8px; --r-lg: 12px; --r-xl: 16px;
+  --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px;
+  --space-5: 20px; --space-6: 24px; --space-8: 32px;
+}
+
+[data-theme="light"] {
+  --bg-primary: #FFFFFF;
+  --bg-secondary: #FAFBFC;
+  --bg-surface: #F5F5F5;
+  --bg-elevated: #FFFFFF;
+  --text-primary: var(--ink-900);
+  --text-secondary: #5E6E80;
+  --text-tertiary: #93A0B4;
+  --border-tertiary: #E8EAED;
+  --border-secondary: #D7D7D7;
+}
