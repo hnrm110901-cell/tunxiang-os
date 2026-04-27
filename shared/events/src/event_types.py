@@ -294,6 +294,8 @@ DOMAIN_STREAM_MAP: dict[str, str] = {
     "location": "tx_location_events",
     # 配送签收凭证域（v369 新增，TASK-4）
     "delivery": "tx_delivery_events",
+    # 盘亏处理审批闭环（v370 新增，TASK-5）
+    "stocktake": "tx_stocktake_events",
     # 旧系统适配器域（Sprint F1 / PR F，14 个 POS / 外卖 / 物流 / 财税适配器统一入口）
     "adapter": "tx_adapter_events",
     # 供应链价格台账域（v366 新增）
@@ -337,6 +339,8 @@ DOMAIN_STREAM_TYPE_MAP: dict[str, str] = {
     "knowledge": "knowledge",
     # 库位域（v367 TASK-2）
     "location": "location",
+    # 盘亏处理审批闭环（v370 新增，TASK-5）
+    "stocktake": "stocktake_loss_case",
     # 旧系统适配器域（Sprint F1 / PR F）
     "adapter": "adapter",
     # 供应链价格台账域（v366 新增）
@@ -400,6 +404,19 @@ class CampaignEventType(str, Enum):
     COUPON_APPLIED = "campaign.coupon_applied"
     COUPON_EXPIRED = "campaign.coupon_expired"
     BUDGET_EXHAUSTED = "campaign.budget_exhausted"  # 活动预算耗尽
+
+
+class StocktakeLossEventType(str, Enum):
+    """盘亏处理审批闭环事件 — 案件登记 → 审批 → 财务核销
+
+    供 tx-finance 通过事件订阅自动生成凭证（不需要直接 API 调用）。
+    """
+
+    CASE_CREATED = "stocktake.loss_case_created"  # 案件登记（DRAFT 状态）
+    SUBMITTED = "stocktake.loss_submitted"  # 提交审批（→ PENDING_APPROVAL）
+    APPROVED = "stocktake.loss_approved"  # 最终节点通过（→ APPROVED，触发 tx-finance 准备凭证）
+    REJECTED = "stocktake.loss_rejected"  # 任一节点驳回（→ REJECTED）
+    WRITTEN_OFF = "stocktake.loss_written_off"  # 财务核销完成（→ WRITTEN_OFF）
 
 
 # ──────────────────────────────────────────────────────────────────────
@@ -546,6 +563,8 @@ ALL_EVENT_ENUMS = (
     SafetyInspectionEventType,
     # 营销活动域（v157 新增）
     CampaignEventType,
+    # 盘亏处理审批闭环（v370 新增）
+    StocktakeLossEventType,
     # 知识库域
     KnowledgeEventType,
     # 增长中枢域（v184 新增）
