@@ -308,6 +308,147 @@ class FinancialVoucherService:
         )
         return voucher
 
+    # ── 红冲 (W1.5) ───────────────────────────────────────────────────
+
+    async def red_flush(
+        self,
+        voucher_id: uuid.UUID,
+        *,
+        operator_id: uuid.UUID,
+        reason: str,
+        session: AsyncSession,
+        new_voucher_no: str | None = None,
+    ) -> FinancialVoucher:
+        """红冲凭证 — 对 exported 凭证的唯一合法纠错路径.
+
+        金税四期要求: 已推 ERP 的凭证不能删改, 必须生成反向分录入账.
+        本方法:
+          1. 前置校验原凭证可红冲 (exported / 未被红冲 / 未作废 / 本身不是红冲)
+          2. 构造红字凭证: 借贷对调, 金额保持正 (DB CHECK 要求), 凭证级 total_amount_fen 取负
+          3. 双向 link: 新凭证 red_flush_of = 原; 原 red_flushed_by = 新
+          4. 同事务 flush
+
+        账期校验: 红冲**绕过** is_date_writable (period_service 校验).
+          理由: 红冲本身就是 closed/locked 账期凭证的唯一合法纠错路径,
+          若校验会让闭账凭证永远无法修正, 违反金税四期.
+
+        Args:
+            voucher_id: 被红冲的原凭证 id
+            operator_id: 操作员 UUID (审计)
+            reason: 红冲原因 (必填, 审计)
+            new_voucher_no: 红字凭证编号. None 时自动 "{原 voucher_no}-R".
+
+        Returns:
+            新创建的红冲凭证 (含反向 lines, total_amount_fen < 0).
+
+        Raises:
+            ValueError: 原凭证不存在 / 非 exported / 已被红冲 / 本身是红冲 / 已作废
+        """
+        # ── 1. 前置校验 ────────────────────────────────────────────────
+        original = await session.get(FinancialVoucher, voucher_id)
+        if original is None:
+            raise ValueError(f"凭证不存在: {voucher_id}")
+
+        if not reason or not reason.strip():
+            raise ValueError("红冲原因必填 (审计留痕)")
+
+        if original.status != "exported":
+            raise ValueError(
+                f"凭证 {original.voucher_no} 状态={original.status}, "
+                f"只有 exported 凭证需要红冲 (draft/confirmed 请直接 void)"
+            )
+        if original.voided:
+            raise ValueError(
+                f"凭证 {original.voucher_no} 已作废, 不能再红冲"
+            )
+        if original.has_been_red_flushed:
+            raise ValueError(
+                f"凭证 {original.voucher_no} 已被红冲 "
+                f"(→ {original.red_flushed_by_voucher_id}), 不可重复红冲"
+            )
+        if original.is_red_flush_voucher:
+            raise ValueError(
+                f"凭证 {original.voucher_no} 本身是红冲凭证, 不能再被红冲 (防递归)"
+            )
+
+        # ── 2. 构造红字凭证 — 借贷对调, 金额保持正 (DB CHECK) ────────
+        red_voucher_no = new_voucher_no or f"{original.voucher_no}-R"
+        red = FinancialVoucher(
+            id=uuid.uuid4(),
+            tenant_id=original.tenant_id,
+            store_id=original.store_id,
+            voucher_no=red_voucher_no,
+            voucher_date=original.voucher_date,  # 红冲沿用原业务日期 (审计可对应)
+            voucher_type=original.voucher_type,
+            # 凭证级金额取负 (红字显示), 分录级仍正
+            total_amount_fen=-(original.total_amount_fen or 0),
+            total_amount=(
+                -float(original.total_amount)
+                if original.total_amount is not None else None
+            ),
+            entries=self._reverse_entries_jsonb(original.entries),
+            source_type=original.source_type,
+            source_id=original.source_id,
+            status="draft",  # 红冲凭证重新走 draft → confirmed → exported (再推 ERP)
+            # 不继承 event_id (红冲是手工操作, 不走事件幂等)
+            event_type="red_flush.voucher",
+            event_id=None,
+            voided=False,
+        )
+        # 借贷对调: 原借变贷, 原贷变借 (金额正)
+        red.lines = [
+            FinancialVoucherLine(
+                id=uuid.uuid4(),
+                tenant_id=original.tenant_id,
+                line_no=idx + 1,
+                account_code=orig_line.account_code,
+                account_name=orig_line.account_name,
+                debit_fen=orig_line.credit_fen,   # 交换
+                credit_fen=orig_line.debit_fen,
+                summary=f"红冲: {orig_line.summary or ''}".strip(),
+            )
+            for idx, orig_line in enumerate(original.lines)
+        ]
+
+        # ── 3. 双向 link ──────────────────────────────────────────────
+        red.red_flush_of_voucher_id = original.id
+        session.add(red)
+        await session.flush()  # 先 flush 拿到 red.id
+
+        original.red_flushed_by_voucher_id = red.id
+        # 作废原因冗余写入原凭证 voided_reason 以明确 (不改 voided=TRUE —
+        # 红冲与作废是两条语义, 原凭证仍 exported, 仅被 red_flushed)
+        await session.flush()
+
+        log.info(
+            "voucher.red_flush.ok",
+            original_id=str(voucher_id),
+            red_voucher_id=str(red.id),
+            red_voucher_no=red_voucher_no,
+            operator_id=str(operator_id),
+            reason=reason,
+        )
+        return red
+
+    @staticmethod
+    def _reverse_entries_jsonb(
+        original_entries: list[dict[str, Any]],
+    ) -> list[dict[str, Any]]:
+        """entries JSONB 借贷对调 (元字段, 兼容 ERP 推送).
+
+        原 entry {debit: 100, credit: 0} → 红冲 {debit: 0, credit: 100}
+        """
+        reversed_entries: list[dict[str, Any]] = []
+        for e in original_entries:
+            reversed_entries.append({
+                "account_code": e.get("account_code"),
+                "account_name": e.get("account_name"),
+                "debit": e.get("credit", 0),   # 交换
+                "credit": e.get("debit", 0),
+                "summary": f"红冲: {e.get('summary', '')}".strip(),
+            })
+        return reversed_entries
+
     # ── 查询 ──────────────────────────────────────────────────────────
 
     async def get_by_event(

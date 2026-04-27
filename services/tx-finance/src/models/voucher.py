@@ -179,6 +179,20 @@ class FinancialVoucher(Base):
         comment="作废原因 (审计). DB 允许 NULL, 应用层 (W1.3 PR) 强制非空."
     )
 
+    # v272 红冲链接. DB CHECK 守互斥 (不能同时是红冲凭证且被红冲).
+    # red_flush_of_voucher_id 非空: 本凭证是红字凭证 (total_amount_fen 取负, 借贷对调)
+    # red_flushed_by_voucher_id 非空: 本凭证被红冲 (UNIQUE partial, 最多一次)
+    red_flush_of_voucher_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("financial_vouchers.id", ondelete="RESTRICT"),
+        comment="本凭证是哪个原凭证的红冲 (红字凭证)."
+    )
+    red_flushed_by_voucher_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("financial_vouchers.id", ondelete="RESTRICT"),
+        comment="本凭证被哪个红冲凭证冲正 (最多一次)."
+    )
+
     # 时间戳
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
@@ -209,6 +223,11 @@ class FinancialVoucher(Base):
             "voided = FALSE "
             "OR (voided = TRUE AND voided_at IS NOT NULL AND voided_by IS NOT NULL)",
             name="chk_voucher_void_consistency",
+        ),
+        # v272 CHECK: 红冲互斥 — 一张凭证不能既是红冲又被红冲 (防红冲链)
+        CheckConstraint(
+            "red_flush_of_voucher_id IS NULL OR red_flushed_by_voucher_id IS NULL",
+            name="chk_voucher_red_flush_exclusive",
         ),
     )
 
@@ -242,6 +261,17 @@ class FinancialVoucher(Base):
     def is_balanced_from_lines(self) -> bool:
         """基于 lines 子表判定借贷平衡 (W1.3 切换后成为主判定)."""
         return self.total_debit_fen_from_lines() == self.total_credit_fen_from_lines()
+
+    # ── W1.5: 红冲判定 (纯属性, 状态机在 FinancialVoucherService.red_flush) ──
+    @property
+    def is_red_flush_voucher(self) -> bool:
+        """本凭证是一张红字凭证 (red_flush_of_voucher_id 非空)."""
+        return self.red_flush_of_voucher_id is not None
+
+    @property
+    def has_been_red_flushed(self) -> bool:
+        """本凭证已被红冲 (red_flushed_by_voucher_id 非空, 最多一次)."""
+        return self.red_flushed_by_voucher_id is not None
 
     # ── W1.2: 作废状态机 ──────────────────────────────────────────────
     # 区别于红冲 (W1.5 PR 引入 red_flush_* 字段 + red_flush() 方法):
@@ -327,6 +357,17 @@ class FinancialVoucher(Base):
             "voided_by": str(self.voided_by) if self.voided_by else None,
             "voided_reason": self.voided_reason,
             "is_active": self.is_active,
+            # v272: 红冲
+            "red_flush_of_voucher_id": (
+                str(self.red_flush_of_voucher_id)
+                if self.red_flush_of_voucher_id else None
+            ),
+            "red_flushed_by_voucher_id": (
+                str(self.red_flushed_by_voucher_id)
+                if self.red_flushed_by_voucher_id else None
+            ),
+            "is_red_flush_voucher": self.is_red_flush_voucher,
+            "has_been_red_flushed": self.has_been_red_flushed,
         }
 
 
