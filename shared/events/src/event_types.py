@@ -292,6 +292,8 @@ DOMAIN_STREAM_MAP: dict[str, str] = {
     "knowledge": "tx_knowledge_events",
     # 库位域（v367 TASK-2，仓储细化）
     "location": "tx_location_events",
+    # 配送签收凭证域（v369 新增，TASK-4）
+    "delivery": "tx_delivery_events",
     # 旧系统适配器域（Sprint F1 / PR F，14 个 POS / 外卖 / 物流 / 财税适配器统一入口）
     "adapter": "tx_adapter_events",
     # 供应链价格台账域（v366 新增）
@@ -470,6 +472,20 @@ class LocationEventType(str, Enum):
     LOCATION_BOUND = "location.location_bound"
 
 
+class DeliveryProofEventType(str, Enum):
+    """配送签收凭证事件（TASK-4，v369 新增）
+
+    覆盖配送末端三个关键节点：
+      1. 电子签收完成（SIGNED）          — 触发结算/对账
+      2. 损坏拍照取证上报（DAMAGE_REPORTED） — 触发供应商索赔流程
+      3. 损坏处理决议（DAMAGE_RESOLVED）  — RETURNED 时财务侧自动开红字凭证
+    """
+
+    SIGNED = "delivery.signed"
+    DAMAGE_REPORTED = "delivery.damage_reported"
+    DAMAGE_RESOLVED = "delivery.damage_resolved"
+
+
 class GrowthEventType(str, Enum):
     """增长中枢事件 — 私域复购链路"""
 
@@ -534,6 +550,8 @@ ALL_EVENT_ENUMS = (
     KnowledgeEventType,
     # 增长中枢域（v184 新增）
     GrowthEventType,
+    # 配送签收凭证域（v369 新增，TASK-4）
+    DeliveryProofEventType,
     # 菜谱方案域（v245 新增，模块3.4）
     MenuEventType,
     # 库位域（v367 TASK-2，仓储细化）
