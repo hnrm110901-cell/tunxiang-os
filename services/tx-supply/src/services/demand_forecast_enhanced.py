@@ -20,6 +20,7 @@ from typing import Any, Optional
 
 import structlog
 from sqlalchemy import func, select, text
+from sqlalchemy.exc import OperationalError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .demand_forecast import DemandForecastService
@@ -198,7 +199,7 @@ class EnhancedDemandForecastService:
 
         try:
             return await self._fetch_weather_from_api(target_date, city)
-        except Exception as exc:
+        except (OSError, ValueError, TimeoutError, KeyError) as exc:
             log.warning(
                 "demand_forecast_enhanced.weather_api_failed",
                 city=city,
@@ -409,7 +410,7 @@ class EnhancedDemandForecastService:
                 },
             )
             rows = result.fetchall()
-        except Exception as exc:
+        except (SQLAlchemyError, OperationalError) as exc:
             log.warning(
                 "demand_forecast_enhanced.correction_query_failed",
                 ingredient_id=ingredient_id,
@@ -467,7 +468,7 @@ class EnhancedDemandForecastService:
             )
             row = result.fetchone()
             return str(row.category) if row and row.category else None
-        except Exception as exc:
+        except (SQLAlchemyError, OperationalError) as exc:
             log.debug(
                 "demand_forecast_enhanced.category_query_failed",
                 ingredient_id=ingredient_id,

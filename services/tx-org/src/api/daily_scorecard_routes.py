@@ -76,7 +76,7 @@ async def compute_daily_scorecards(
         return {"ok": True, "data": {"score_date": str(target_date), "scorecards": result}}
     except SQLAlchemyError as exc:
         logger.error("compute_scorecards_failed", store_id=str(store_id), error=str(exc))
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        raise HTTPException(status_code=500, detail="Internal database error") from exc
 
 
 @router.get("/{store_id}/today")
@@ -94,7 +94,7 @@ async def get_today_ranking(
         return {"ok": True, "data": {"date": str(date.today()), "ranking": result}}
     except SQLAlchemyError as exc:
         logger.error("get_ranking_failed", store_id=str(store_id), error=str(exc))
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        raise HTTPException(status_code=500, detail="Internal database error") from exc
 
 
 @router.get("/{store_id}/employee/{employee_id}")
@@ -119,7 +119,7 @@ async def get_employee_scorecard_history(
         return {"ok": True, "data": {"employee_id": str(employee_id), "records": result}}
     except SQLAlchemyError as exc:
         logger.error("get_scorecard_failed", employee_id=str(employee_id), error=str(exc))
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        raise HTTPException(status_code=500, detail="Internal database error") from exc
 
 
 @router.post("/{store_id}/push")
@@ -138,7 +138,7 @@ async def push_daily_scorecards(
         return {"ok": True, "data": {"pushed_count": pushed_count, "score_date": str(target_date)}}
     except SQLAlchemyError as exc:
         logger.error("push_scorecards_failed", store_id=str(store_id), error=str(exc))
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        raise HTTPException(status_code=500, detail="Internal database error") from exc
 
 
 # ── 奖金端点 ────────────────────────────────────────────────────────
@@ -160,7 +160,7 @@ async def preview_monthly_bonus(
         return {"ok": True, "data": result}
     except SQLAlchemyError as exc:
         logger.error("preview_bonus_failed", store_id=str(store_id), error=str(exc))
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        raise HTTPException(status_code=500, detail="Internal database error") from exc
 
 
 @bonus_router.post("/{store_id}/calculate")
@@ -179,7 +179,7 @@ async def calculate_monthly_bonus(
         return {"ok": True, "data": {"year": year, "month": month, "bonuses": result}}
     except SQLAlchemyError as exc:
         logger.error("calculate_bonus_failed", store_id=str(store_id), error=str(exc))
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        raise HTTPException(status_code=500, detail="Internal database error") from exc
 
 
 @bonus_router.get("/rules")
@@ -197,7 +197,7 @@ async def get_bonus_rules(
         return {"ok": True, "data": {"rules": result}}
     except SQLAlchemyError as exc:
         logger.error("get_bonus_rules_failed", error=str(exc))
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        raise HTTPException(status_code=500, detail="Internal database error") from exc
 
 
 @bonus_router.put("/rules")
@@ -220,7 +220,7 @@ async def update_bonus_rules(
         return {"ok": True, "data": result}
     except SQLAlchemyError as exc:
         logger.error("update_bonus_rules_failed", error=str(exc))
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        raise HTTPException(status_code=500, detail="Internal database error") from exc
 
 
 # ── 门店生命周期端点 ────────────────────────────────────────────────
@@ -237,7 +237,7 @@ async def get_lifecycle_overview(
         return {"ok": True, "data": {"stores": result}}
     except SQLAlchemyError as exc:
         logger.error("get_lifecycle_overview_failed", error=str(exc))
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        raise HTTPException(status_code=500, detail="Internal database error") from exc
 
 
 @lifecycle_router.get("/{store_id}")
@@ -254,4 +254,4 @@ async def get_store_lifecycle(
         return {"ok": True, "data": result}
     except SQLAlchemyError as exc:
         logger.error("get_store_lifecycle_failed", store_id=str(store_id), error=str(exc))
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        raise HTTPException(status_code=500, detail="Internal database error") from exc

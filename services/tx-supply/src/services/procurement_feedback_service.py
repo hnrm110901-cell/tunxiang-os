@@ -19,6 +19,7 @@ from typing import Any, Optional
 
 import structlog
 from sqlalchemy import func, text
+from sqlalchemy.exc import OperationalError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 log = structlog.get_logger(__name__)
@@ -239,7 +240,7 @@ class ProcurementFeedbackService:
                 },
             )
             rows = result.fetchall()
-        except Exception as exc:
+        except (SQLAlchemyError, OperationalError) as exc:
             log.warning(
                 "procurement_feedback.correction_query_failed",
                 ingredient_id=ingredient_id,

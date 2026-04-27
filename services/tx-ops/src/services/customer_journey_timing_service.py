@@ -73,6 +73,7 @@ class CustomerJourneyTimingService:
         )
 
         column = _EVENT_COLUMN_MAP[event_type]
+        assert column in ("arrived_at", "seated_at", "ordered_at", "first_served_at", "paid_at", "left_at")
 
         if event_type == "arrived":
             # 创建新旅程

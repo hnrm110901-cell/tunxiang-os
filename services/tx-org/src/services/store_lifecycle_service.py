@@ -433,7 +433,7 @@ class StoreLifecycleService:
 
             if initial_stage == "plateau" and declining_months >= 2:
                 decline_pct = (
-                    (monthly_rev[-1] - monthly_rev[0]) / max(monthly_rev[-1], 1)
+                    (monthly_rev[-1] - monthly_rev[0]) / max(monthly_rev[0], 1)
                     if monthly_rev[-1] > 0
                     else 0
                 )

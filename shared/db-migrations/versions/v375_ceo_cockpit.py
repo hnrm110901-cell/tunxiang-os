@@ -33,7 +33,7 @@ def upgrade() -> None:
     # ─────────────────────────────────────────────────────────────────
     op.execute(f"""
         ALTER TABLE {_TABLE}
-            ADD COLUMN IF NOT EXISTS snapshot_hour SMALLINT,
+            ADD COLUMN IF NOT EXISTS snapshot_hour SMALLINT NOT NULL DEFAULT 0,
             ADD COLUMN IF NOT EXISTS delivery_commission_fen BIGINT NOT NULL DEFAULT 0,
             ADD COLUMN IF NOT EXISTS top_dishes JSONB NOT NULL DEFAULT '[]'::JSONB,
             ADD COLUMN IF NOT EXISTS loss_dishes JSONB NOT NULL DEFAULT '[]'::JSONB,
