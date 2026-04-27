@@ -139,6 +139,11 @@ from .api.mrp_routes import router as mrp_router
 
 app.include_router(mrp_router, prefix="/api/v1/supply/mrp")  # MRP预估：需求计算/生产建议/采购建议/领料（v282表）
 
+# ── 配送在途温控告警（TASK-3 / v368）──
+from .api.delivery_temperature_routes import router as delivery_temp_router
+
+app.include_router(delivery_temp_router)  # 配送车温度告警：上报/时序/告警/凭证（海鲜冷链命门）
+
 
 @app.get("/health")
 async def health():
