@@ -1043,6 +1043,51 @@ Tier 级别：Tier 2（薪资合规影响组织运营成本，未触资金链路
 
 ---
 
+## 2026-04-23 Sprint D4b：薪资异常检测 Sonnet 4.7 + Prompt Cache（城市基准共享）
+
+### 本次会话目标
+按 `docs/sprint-plan-2026Q2-unified.md` D 批次推进 D4b（复用 D4a 建立的 CachedPromptBuilder 模式）：每月 HR 审核薪资表时，Sonnet 4.7 自动标注异常（底薪低于市场 / 加班超法定 36h / 调薪突增 / 提成异常 / 社保漏缴）+ 给出 remediation action + HRD 采纳/驳回/升级审核。城市薪资 P25/P50/P75 基准表 cacheable（~3KB），多店多月共享 cache 命中率 ≥75%。
+
+Tier 级别：Tier 2（薪资合规影响组织运营成本，未触资金链路）。
+
+### 完成状态
+- [x] **ModelRouter 注册** `salary_anomaly_detection → COMPLEX`（Service 层显式覆盖 `claude-sonnet-4-7` 走 Prompt Cache beta）
+- [x] **v280 迁移**：`salary_anomaly_analyses` 表（6 状态机 pending/analyzed/acted_on/dismissed/escalated/error + 4 scope monthly_batch/single_employee/anomaly_triggered/manual + Prompt Cache 4 字段 cache_read/creation/input/output + RLS app.tenant_id + 3 索引 + UNIQUE(tenant, store, month) WHERE scope='monthly_batch'）
+- [x] **`SalaryAnomalyService`**：`CachedPromptBuilder`（2 段 cacheable system：稳定 schema + 城市基准 `CITY_BENCHMARKS` 长沙/北京/上海/武汉/成都 P25/P50/P75 + 合规红线）+ invoker 协议 `async (request: dict) → response: dict` + 规则引擎 fallback（5 类异常覆盖：below_market / overtime_excess / sudden_raise / commission_abuse / social_insurance_missing）+ 排序 legal_risk desc → severity desc → impact_fen desc + `save_analysis_to_db` 自动升级 critical/legal_risk → status='escalated'
+- [x] **3 路 API**：`POST /api/v1/org/salary/anomaly/analyze`（月度/批量员工薪资信号入参 → ranked_anomalies + remediation + cache stats）+ `POST /review/{id}`（HRD act_on/dismiss/escalate）+ `GET /summary`（按 status+city 聚合 + Prompt Cache 命中率门槛 0.75）
+- [x] **27 TDD 测试全绿**（0.04s）：Bundle 序列化 2 / CachedPromptBuilder 结构+城市基准 2 / parse_sonnet_response valid+code-fence+broken 3 / Fallback 5 类异常+空队列 6 / 排序 legal_risk 优先 1 / has_critical+has_legal_risk 1 / invoker 成功+失败降级 2 / cache_hit_rate 计算+门槛 4 / v280 迁移静态 5 / ModelRouter 注册 1
+- [x] Ruff 全绿
+
+### 关键决策
+- **城市基准 cacheable 而不是运行时查表** — P25/P50/P75 通过 CITY_BENCHMARKS dict 硬编码进 CachedPromptBuilder 第 2 段 system。月度更新只需重新 deploy，不需要每次查 DB。多店多月分析全部复用同一段 cache → 理论命中率 ~85% 稳态。
+- **不硬编码 status 升级到 Service 层** — `save_analysis_to_db` 在持久化时根据 `has_critical OR has_legal_risk` 自动升级 status='escalated'；API 层直接返回持久化后 status。避免 Service 层和 DB 层状态不一致。
+- **fallback 规则 5 类全覆盖而非仅法律红线** — 即便 Sonnet 不可用，规则引擎依然产出 ranked_anomalies。法律红线（overtime_excess > 36h、social_insurance_missing）自动 severity='critical' + legal_risk=true。
+- **commission_abuse 阈值 200% 底薪而非绝对值** — 小工底薪 3000 + 提成 2000 正常（比 66%），主厨底薪 8000 + 提成 18000 异常（比 225%）。跨岗位鲁棒。
+- **UNIQUE (tenant, store, month) WHERE scope='monthly_batch'** — 同店同月只允许一次批量扫描（幂等），但 single_employee/anomaly_triggered/manual 可多次。与 D4a cost_root_cause 月度唯一策略一致。
+
+### 交付清单
+```
+新建：
+  shared/db-migrations/versions/v280_salary_anomaly_analyses.py     (137 行 DDL + RLS + 3 索引 + 表/列注释)
+  services/tx-org/src/services/salary_anomaly_service.py            (~600 行 Service + CachedPromptBuilder + invoker)
+  services/tx-org/src/api/salary_anomaly_routes.py                  (~320 行 3 端点 + Pydantic 模型)
+  services/tx-org/src/tests/test_d4b_salary_anomaly.py              (27 测试覆盖协议/规则/解析/cache/迁移)
+修改：
+  services/tunxiang-api/src/shared/core/model_router.py             +3 行（salary_anomaly_detection → COMPLEX）
+```
+
+### 下一步
+- **D4c 预算预测**（budget_forecast_analysis）— 复用 CachedPromptBuilder 模式，历史 P&L benchmark 作为 cacheable system，预测下月品牌/门店成本结构异常
+- **D4a+D4b cache 命中率落盘** — PR #85（D4a）合入 + D4b 上线 6 周后，统计 `cache_read_tokens / total_input_tokens` 真实命中率是否 ≥ 0.75
+- **`CachedPromptBuilder` 抽成 `shared/prompt_cache/`** — D4a/D4b/D4c 已有 3 份几乎同构的 builder，抽 trait + 子类化；各子类只填 `domain_benchmarks` 段
+
+### 已知风险
+- **真实 Anthropic SDK 未接入** — `SalaryAnomalyService(invoker=...)` 需上层注入真实 client；当前回退到规则引擎跑通端到端
+- **城市基准过时风险** — `CITY_BENCHMARKS` 硬编码 5 城市 P25/P50/P75 来自 2025 行业报告，需每季度刷新；长期应改读 `city_benchmark` 表但表层级 cache 会打破
+- **commission_abuse ratio 2.0 对高提成场景误报** — 奢华餐厅主厨提成比底薪高 2.5x 是正常，需加"高端店白名单"豁免（暂未实装）
+
+---
+
 ## 2026-04-23 Sprint D1 批次 6 + Overflow：14 Skill 冲 100% 覆盖 + CI 门禁
 
 ### 本次会话目标
