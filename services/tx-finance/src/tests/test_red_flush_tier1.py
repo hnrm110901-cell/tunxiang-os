@@ -115,6 +115,10 @@ class TestRedFlushGeneration:
         session = AsyncMock()
         session.get = AsyncMock(return_value=original)
         session.flush = AsyncMock()
+        # [W2.D] pre-check 默认返 None (无孤儿)
+        _pre = MagicMock()
+        _pre.scalar_one_or_none = MagicMock(return_value=None)
+        session.execute = AsyncMock(return_value=_pre)
 
         red = await svc.red_flush(
             original.id,
@@ -146,6 +150,10 @@ class TestRedFlushGeneration:
         session = AsyncMock()
         session.get = AsyncMock(return_value=original)
         session.flush = AsyncMock()
+        # [W2.D] pre-check 默认返 None (无孤儿)
+        _pre = MagicMock()
+        _pre.scalar_one_or_none = MagicMock(return_value=None)
+        session.execute = AsyncMock(return_value=_pre)
 
         red = await svc.red_flush(
             original.id, operator_id=uuid.uuid4(),
@@ -166,6 +174,10 @@ class TestRedFlushGeneration:
         session = AsyncMock()
         session.get = AsyncMock(return_value=original)
         session.flush = AsyncMock()
+        # [W2.D] pre-check 默认返 None (无孤儿)
+        _pre = MagicMock()
+        _pre.scalar_one_or_none = MagicMock(return_value=None)
+        session.execute = AsyncMock(return_value=_pre)
 
         red = await svc.red_flush(
             original.id, operator_id=uuid.uuid4(),
@@ -183,6 +195,10 @@ class TestRedFlushGeneration:
         session = AsyncMock()
         session.get = AsyncMock(return_value=original)
         session.flush = AsyncMock()
+        # [W2.D] pre-check 默认返 None (无孤儿)
+        _pre = MagicMock()
+        _pre.scalar_one_or_none = MagicMock(return_value=None)
+        session.execute = AsyncMock(return_value=_pre)
 
         red = await svc.red_flush(
             original.id, operator_id=uuid.uuid4(),
@@ -202,6 +218,10 @@ class TestRedFlushGeneration:
         session = AsyncMock()
         session.get = AsyncMock(return_value=original)
         session.flush = AsyncMock()
+        # [W2.D] pre-check 默认返 None (无孤儿)
+        _pre = MagicMock()
+        _pre.scalar_one_or_none = MagicMock(return_value=None)
+        session.execute = AsyncMock(return_value=_pre)
 
         red = await svc.red_flush(
             original.id, operator_id=uuid.uuid4(),
@@ -217,6 +237,10 @@ class TestRedFlushGeneration:
         session = AsyncMock()
         session.get = AsyncMock(return_value=original)
         session.flush = AsyncMock()
+        # [W2.D] pre-check 默认返 None (无孤儿)
+        _pre = MagicMock()
+        _pre.scalar_one_or_none = MagicMock(return_value=None)
+        session.execute = AsyncMock(return_value=_pre)
 
         red = await svc.red_flush(
             original.id, operator_id=uuid.uuid4(),
@@ -234,6 +258,10 @@ class TestRedFlushGeneration:
         session = AsyncMock()
         session.get = AsyncMock(return_value=original)
         session.flush = AsyncMock()
+        # [W2.D] pre-check 默认返 None (无孤儿)
+        _pre = MagicMock()
+        _pre.scalar_one_or_none = MagicMock(return_value=None)
+        session.execute = AsyncMock(return_value=_pre)
 
         red = await svc.red_flush(
             original.id, operator_id=uuid.uuid4(),
@@ -250,6 +278,10 @@ class TestRedFlushGeneration:
         session = AsyncMock()
         session.get = AsyncMock(return_value=original)
         session.flush = AsyncMock()
+        # [W2.D] pre-check 默认返 None (无孤儿)
+        _pre = MagicMock()
+        _pre.scalar_one_or_none = MagicMock(return_value=None)
+        session.execute = AsyncMock(return_value=_pre)
 
         red = await svc.red_flush(
             original.id, operator_id=uuid.uuid4(),
@@ -268,6 +300,10 @@ class TestRedFlushRejections:
     async def _service_with_voucher(self, voucher: FinancialVoucher):
         session = AsyncMock()
         session.get = AsyncMock(return_value=voucher)
+        # [W2.D] pre-check (red_flush_of_voucher_id 查孤儿) 默认返 None
+        pre_miss = MagicMock()
+        pre_miss.scalar_one_or_none = MagicMock(return_value=None)
+        session.execute = AsyncMock(return_value=pre_miss)
         return FinancialVoucherService(), session
 
     @pytest.mark.asyncio
@@ -370,6 +406,10 @@ class TestRedFlushBypassesPeriodCheck:
         session = AsyncMock()
         session.get = AsyncMock(return_value=original)
         session.flush = AsyncMock()
+        # [W2.D] pre-check 默认返 None (无孤儿)
+        _pre = MagicMock()
+        _pre.scalar_one_or_none = MagicMock(return_value=None)
+        session.execute = AsyncMock(return_value=_pre)
 
         red = await svc.red_flush(
             original.id, operator_id=uuid.uuid4(),
@@ -382,6 +422,118 @@ class TestRedFlushBypassesPeriodCheck:
 
 
 # ─── v272 迁移文件结构 ────────────────────────────────────────────
+
+
+class TestW2DRedFlushOrphanProtection:
+    """[W2.D §19 DBA P1-5] 孤儿红字凭证防护 (应用层 pre-check + DB UNIQUE 兜底)."""
+
+    @pytest.mark.asyncio
+    async def test_red_flush_rejects_when_orphan_red_exists(self):
+        """已有红字凭证指向 original (孤儿) → 应用层 pre-check 拒.
+
+        场景: W1.5 红冲 flush #1 成功 + flush #2 失败 (连接断+误 commit) →
+        红字凭证已落 DB, 原凭证 red_flushed_by_voucher_id=NULL.
+        此时重试 red_flush(original) 必须拒绝 (防生成第二张红字孤儿).
+        """
+        svc = FinancialVoucherService()
+        original = _exported_voucher()
+
+        # 模拟已有孤儿红字凭证
+        orphan_red = FinancialVoucher(
+            id=uuid.uuid4(), tenant_id=original.tenant_id,
+            voucher_no="V_ORPHAN_RED", voucher_type="sales",
+            status="draft", entries=[], voided=False,
+            red_flush_of_voucher_id=original.id,
+        )
+
+        session = AsyncMock()
+        session.get = AsyncMock(return_value=original)
+        # pre-check 返孤儿
+        pre_hit = MagicMock()
+        pre_hit.scalar_one_or_none = MagicMock(return_value=orphan_red)
+        session.execute = AsyncMock(return_value=pre_hit)
+
+        with pytest.raises(ValueError, match="孤儿|DBA 手工修复"):
+            await svc.red_flush(
+                original.id, operator_id=uuid.uuid4(),
+                reason="重试", session=session,
+            )
+
+    @pytest.mark.asyncio
+    async def test_red_flush_db_unique_violation_raises_clear_error(self):
+        """[W2.D DB 兜底] v276 UNIQUE 并发触发 → 明确"并发红冲冲突"消息."""
+        from sqlalchemy.exc import IntegrityError
+
+        svc = FinancialVoucherService()
+        original = _exported_voucher()
+
+        session = AsyncMock()
+        session.get = AsyncMock(return_value=original)
+        # pre-check miss (两 worker 都过 pre-check)
+        pre_miss = MagicMock()
+        pre_miss.scalar_one_or_none = MagicMock(return_value=None)
+        session.execute = AsyncMock(return_value=pre_miss)
+        # flush 撞 v276 UNIQUE
+        fake_orig = Exception(
+            'duplicate key value violates unique constraint "ix_fv_red_flush_of"'
+        )
+        session.flush = AsyncMock(
+            side_effect=IntegrityError("INSERT ...", {}, fake_orig)
+        )
+
+        with pytest.raises(ValueError, match="并发红冲冲突"):
+            await svc.red_flush(
+                original.id, operator_id=uuid.uuid4(),
+                reason="并发", session=session,
+            )
+
+
+class TestV276RedFlushOfUniqueMigration:
+    """[W2.D] v276 migration 结构断言."""
+
+    migration_src: str = ""
+
+    @pytest.fixture(autouse=True)
+    def _load_migration(self):
+        path = (
+            Path(__file__).resolve().parents[4]
+            / "shared" / "db-migrations" / "versions"
+            / "v276_red_flush_of_unique.py"
+        )
+        assert path.exists(), f"v276 迁移不存在: {path}"
+        self.migration_src = path.read_text(encoding="utf-8")
+
+    def test_revision_is_v276(self):
+        assert re.search(r'^revision\s*=\s*"v276"', self.migration_src, re.M)
+
+    def test_down_revision_is_v274(self):
+        assert re.search(r'^down_revision\s*=\s*"v274"', self.migration_src, re.M)
+
+    def test_drops_old_non_unique_index(self):
+        """step 1: DROP INDEX IF EXISTS 老 ix_fv_red_flush_of."""
+        assert re.search(
+            r"DROP\s+INDEX\s+CONCURRENTLY\s+IF\s+EXISTS\s+ix_fv_red_flush_of",
+            self.migration_src, re.I,
+        )
+
+    def test_creates_unique_partial_index(self):
+        """step 2: CREATE UNIQUE INDEX CONCURRENTLY partial."""
+        assert re.search(
+            r"CREATE\s+UNIQUE\s+INDEX\s+CONCURRENTLY.*?ix_fv_red_flush_of"
+            r".*?WHERE\s+red_flush_of_voucher_id\s+IS\s+NOT\s+NULL",
+            self.migration_src, re.S | re.I,
+        )
+
+    def test_uses_autocommit_block(self):
+        """CONCURRENTLY 必须在 autocommit_block."""
+        assert "autocommit_block" in self.migration_src
+
+    def test_migration_documents_orphan_risk(self):
+        """docstring 说明 W1.5 孤儿风险 + §19 P1-5 关联."""
+        assert re.search(
+            r"(W1\.5|孤儿|P1-5|§19|flush.*#2)",
+            self.migration_src,
+        )
 
 
 class TestV272MigrationFileStructure:

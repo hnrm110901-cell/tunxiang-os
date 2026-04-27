@@ -206,6 +206,20 @@ class TestContainsDate:
 # ─── Service: ensure_period ────────────────────────────────────────
 
 
+class _FakeSavepoint:
+    """[W2.C] 模拟 session.begin_nested() 返回的 async context manager.
+
+    真 SQLAlchemy 的 begin_nested() 返回 SAVEPOINT transaction.
+    异常时自动 ROLLBACK TO SAVEPOINT, 异常继续向外传播.
+    """
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        # 不抑制异常 (返 False), 让 IntegrityError 穿透到 service 的 try/except
+        return False
+
+
 class TestEnsurePeriod:
     @pytest.mark.asyncio
     async def test_ensure_creates_when_missing(self):
@@ -217,6 +231,8 @@ class TestEnsurePeriod:
         mock_miss.scalar_one_or_none = MagicMock(return_value=None)
         session.execute = AsyncMock(return_value=mock_miss)
         session.flush = AsyncMock()
+        # [W2.C] begin_nested 返回 fake savepoint
+        session.begin_nested = MagicMock(return_value=_FakeSavepoint())
 
         p = await svc.ensure_period(
             tenant_id=uuid.uuid4(), year=2026, month=4, session=session,
@@ -226,6 +242,8 @@ class TestEnsurePeriod:
         assert p.period_end == date(2026, 4, 30)
         session.add.assert_called_once()
         session.flush.assert_awaited_once()
+        # [W2.C] 必走 SAVEPOINT
+        session.begin_nested.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_ensure_returns_existing(self):
@@ -242,9 +260,55 @@ class TestEnsurePeriod:
         )
         assert p is existing
         session.add.assert_not_called()  # 不重复 INSERT
+        # [W2.C] 已存在 → 不进 SAVEPOINT
+        session.begin_nested.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_ensure_race_does_not_rollback_outer_transaction(self):
+        """[W2.C 业务价值测试] 并发 race 不破坏调用方前置写入.
+
+        模拟: create_voucher 流程内调用 ensure_period, 若 ensure_period 触发 race:
+        - W2.C 前: session.rollback() 清空 caller 的凭证/分录写入 (丢数据)
+        - W2.C 后: SAVEPOINT 回滚只影响 period INSERT, caller 前置写入保留
+        """
+        from sqlalchemy.exc import IntegrityError
+
+        svc = AccountingPeriodService()
+        winner = _period(year=2026, month=4)
+
+        session = AsyncMock()
+        miss = MagicMock()
+        miss.scalar_one_or_none = MagicMock(return_value=None)
+        hit = MagicMock()
+        hit.scalar_one_or_none = MagicMock(return_value=winner)
+        session.execute = AsyncMock(side_effect=[miss, hit])
+
+        session.flush = AsyncMock(side_effect=IntegrityError(
+            "INSERT ...", {},
+            Exception('duplicate key value violates unique constraint "uq_ap_tenant_year_month"'),
+        ))
+        session.begin_nested = MagicMock(return_value=_FakeSavepoint())
+        session.rollback = AsyncMock()
+        # 模拟外层事务内已有前置写入 (e.g. create_voucher 已 add 凭证)
+        session.add = MagicMock()
+
+        await svc.ensure_period(
+            tenant_id=winner.tenant_id, year=2026, month=4, session=session,
+        )
+
+        # 业务价值: session.rollback 从不调 (外层事务完整保留)
+        assert session.rollback.await_count == 0
+        # 流程走: begin_nested → add (尝试) → flush (IntegrityError) → SAVEPOINT 自动撤销
+        session.begin_nested.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_ensure_refetches_on_concurrent_race(self):
+        """[W2.C 关键修复] race 分支只回滚 SAVEPOINT, 不调 session.rollback().
+
+        原问题: rollback() 会清空外层事务的所有前置写入 (CFO P0-2 年化百万丢单).
+        修复: begin_nested() 创建 SAVEPOINT, flush 失败自动 ROLLBACK TO SAVEPOINT,
+        外层事务完整保留.
+        """
         from sqlalchemy.exc import IntegrityError
 
         svc = AccountingPeriodService()
@@ -252,7 +316,7 @@ class TestEnsurePeriod:
 
         winner = _period(year=2026, month=4)
 
-        # 预查 miss → add → flush IntegrityError → rollback → refetch hit
+        # 预查 miss → begin_nested → add → flush IntegrityError → refetch hit
         miss = MagicMock()
         miss.scalar_one_or_none = MagicMock(return_value=None)
         hit = MagicMock()
@@ -265,13 +329,18 @@ class TestEnsurePeriod:
         session.flush = AsyncMock(
             side_effect=IntegrityError("INSERT ...", {}, fake_orig)
         )
+        # [W2.C] SAVEPOINT 正常退出 (异常穿透), session.rollback 不应被调
+        session.begin_nested = MagicMock(return_value=_FakeSavepoint())
         session.rollback = AsyncMock()
 
         p = await svc.ensure_period(
             tenant_id=winner.tenant_id, year=2026, month=4, session=session,
         )
         assert p is winner
-        session.rollback.assert_awaited_once()
+        # [W2.C 核心断言] 不调 session.rollback() — 外层事务保持完整
+        session.rollback.assert_not_called()
+        # SAVEPOINT 被创建
+        session.begin_nested.assert_called_once()
 
 
 # ─── Service: close / reopen / lock ────────────────────────────────
@@ -463,6 +532,8 @@ class TestPeriodLookup:
         mock_miss.scalar_one_or_none = MagicMock(return_value=None)
         session.execute = AsyncMock(return_value=mock_miss)
         session.flush = AsyncMock()
+        # [W2.C] ensure_period 走 SAVEPOINT
+        session.begin_nested = MagicMock(return_value=_FakeSavepoint())
 
         result = await svc.is_date_writable(
             tenant_id=uuid.uuid4(), biz_date=date(2026, 4, 15),

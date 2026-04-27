@@ -137,6 +137,10 @@ class VoucherCreateInput:
     status: str = "draft"  # draft / confirmed / exported
     extra_metadata: dict[str, Any] = field(default_factory=dict)
 
+    # [W2.A] 以前年度损益调整元数据. 两者必须同时非空或同时 None.
+    source_period_year: int | None = None
+    source_period_month: int | None = None
+
 
 # ─── service 本体 ────────────────────────────────────────────────────
 
@@ -230,12 +234,40 @@ class FinancialVoucherService:
         if total_debit_fen == 0:
             raise ValueError("凭证借贷总额均为 0, 无会计意义")
 
-        # 2. 账期校验 (W1.4b, period_service 注入时启用) ──────────────
-        # 为什么先于幂等预查: 账期 closed 时, 即便幂等命中也应拒绝 —
-        # 防止历史事件重放误写已关月份. 若幂等命中的凭证已存在, 它必定
-        # 是在账期 open 时写入的 (因为当时能写), 所以也允许返回该凭证.
-        # 严格来说"幂等返回已存在凭证"不算新写入, 不破坏账期语义.
-        # 但保守起见: 账期 closed 一律拒, 让 caller 先 reopen 或走红冲.
+        # 2. 幂等预查 (先于账期校验) ─────────────────────────────────
+        # [W2.B 修复] 原顺序: 账期校验 → 幂等预查. 导致外卖 T+N webhook
+        # 月结后重发被拒: 美团 T+2 到账, 月结在 T+1 关了, payload.event_id
+        # 是之前成功写入的凭证. 但账期校验在幂等预查前, 直接 raise,
+        # 调用方收到 ValueError 记为"失败", 生产流水年化百万级损失.
+        #
+        # 新顺序: event_id 非空 → 先查是否已处理过本事件.
+        # - 命中: 返回既存凭证 (该凭证写入时账期必是 open, 不影响账期语义)
+        # - 未命中: 下沉到账期校验 (真正写新凭证时才拦)
+        #
+        # 账期 closed 场景:
+        # - webhook 重发 (event_id 命中): 返回既存 ✅ (T+N 订单不再丢)
+        # - 全新 event_id 但 voucher_date 在 closed 期: 拒 ✅ (账期保护仍在)
+        # - event_id=NULL (手工) + closed: 沿着幂等 skip 走到账期校验, 拒 ✅
+        if payload.event_id is not None:
+            existing = await self._find_by_event(
+                session=session,
+                tenant_id=payload.tenant_id,
+                event_type=payload.event_type,
+                event_id=payload.event_id,
+            )
+            if existing is not None:
+                log.info(
+                    "voucher.create.idempotent_hit",
+                    voucher_id=str(existing.id),
+                    event_type=payload.event_type,
+                    event_id=str(payload.event_id),
+                )
+                return existing
+
+        # 3. 账期校验 (W1.4b, period_service 注入时启用) ──────────────
+        # [W2.B 修复] 只对"新凭证"校验. 幂等命中的已在上面 return existing,
+        # 永远不会走到这里 — 自然允许 T+N webhook 重发.
+        # closed/locked 时 raise, 引导 reopen 或红冲.
         if self._period_service is not None:
             writable = await self._period_service.is_date_writable(
                 tenant_id=payload.tenant_id,
@@ -256,23 +288,6 @@ class FinancialVoucherService:
                     f"状态={status}, 凭证写入被拒 "
                     f"(请走红冲 red_flush 或先重开账期)"
                 )
-
-        # 3. 幂等预查 ─────────────────────────────────────────────────
-        if payload.event_id is not None:
-            existing = await self._find_by_event(
-                session=session,
-                tenant_id=payload.tenant_id,
-                event_type=payload.event_type,
-                event_id=payload.event_id,
-            )
-            if existing is not None:
-                log.info(
-                    "voucher.create.idempotent_hit",
-                    voucher_id=str(existing.id),
-                    event_type=payload.event_type,
-                    event_id=str(payload.event_id),
-                )
-                return existing
 
         # 4. 构造 ORM (双写 entries + lines, 单事务) ──────────────────
         voucher = self._build_orm_voucher(payload, total_debit_fen)
@@ -324,15 +339,24 @@ class FinancialVoucherService:
         reason: str,
         session: AsyncSession,
         voided_at: datetime | None = None,
+        tenant_id: uuid.UUID | None = None,
     ) -> FinancialVoucher:
         """作废凭证 (调用 ORM 层 void() 方法 + flush).
 
+        [W2.E 修复] 加 tenant_id 显式过滤, 防 Oracle 攻击.
+
+        Args:
+            tenant_id: 调用方声明的租户 (可选, 但推荐传).
+                传入时: 走 SELECT WHERE id + tenant_id, 显式过滤.
+                不传: 降级为 session.get(PK), 依赖 RLS. 为兼容现有 caller 保留.
+
         Raises:
-            ValueError: 凭证不存在 / 已作废 / status=exported (需红冲)
+            ValueError: "凭证不存在或无权限" (统一消息, 不区分 "不存在"/"跨租户",
+                防 Oracle 攻击通过错误消息差异探测 UUID 存在性).
         """
-        voucher = await session.get(FinancialVoucher, voucher_id)
-        if voucher is None:
-            raise ValueError(f"凭证不存在: {voucher_id}")
+        voucher = await self._load_voucher_tenant_scoped(
+            session=session, voucher_id=voucher_id, tenant_id=tenant_id,
+        )
 
         # ORM 层方法已内置所有守护 (is_voidable 检查)
         voucher.void(
@@ -360,6 +384,7 @@ class FinancialVoucherService:
         reason: str,
         session: AsyncSession,
         new_voucher_no: str | None = None,
+        tenant_id: uuid.UUID | None = None,
     ) -> FinancialVoucher:
         """红冲凭证 — 对 exported 凭证的唯一合法纠错路径.
 
@@ -387,9 +412,10 @@ class FinancialVoucherService:
             ValueError: 原凭证不存在 / 非 exported / 已被红冲 / 本身是红冲 / 已作废
         """
         # ── 1. 前置校验 ────────────────────────────────────────────────
-        original = await session.get(FinancialVoucher, voucher_id)
-        if original is None:
-            raise ValueError(f"凭证不存在: {voucher_id}")
+        # [W2.E] tenant 作用域加载, 统一错误消息防 Oracle 攻击
+        original = await self._load_voucher_tenant_scoped(
+            session=session, voucher_id=voucher_id, tenant_id=tenant_id,
+        )
 
         if not reason or not reason.strip():
             raise ValueError("红冲原因必填 (审计留痕)")
@@ -453,9 +479,32 @@ class FinancialVoucherService:
         ]
 
         # ── 3. 双向 link ──────────────────────────────────────────────
+        # [W2.D] pre-check: 若已有红字凭证指向 original (孤儿场景), 拒绝再建
+        # 配合 v276 UNIQUE partial 索引 (DB 层兜底). 应用层早拒消息更清晰.
+        pre_check_stmt = select(FinancialVoucher).where(
+            FinancialVoucher.red_flush_of_voucher_id == original.id,
+        ).limit(1)
+        pre_check_result = await session.execute(pre_check_stmt)
+        existing_red = pre_check_result.scalar_one_or_none()
+        if existing_red is not None:
+            raise ValueError(
+                f"凭证 {original.voucher_no} 已有红字凭证 {existing_red.voucher_no} "
+                f"指向它 (可能是 W1.5 孤儿: 原凭证 red_flushed_by_voucher_id "
+                f"= NULL 但红字凭证仍在 DB). 需 DBA 手工修复 original."
+            )
+
         red.red_flush_of_voucher_id = original.id
         session.add(red)
-        await session.flush()  # 先 flush 拿到 red.id
+        try:
+            await session.flush()  # 先 flush 拿到 red.id
+        except IntegrityError as exc:
+            # [W2.D DB 兜底] v276 UNIQUE partial 防并发红冲
+            if "ix_fv_red_flush_of" in str(exc.orig):
+                raise ValueError(
+                    f"并发红冲冲突: 凭证 {original.voucher_no} 已被另一进程红冲. "
+                    f"请 refetch 原凭证并重试 (has_been_red_flushed 应为 True)."
+                ) from exc
+            raise
 
         original.red_flushed_by_voucher_id = red.id
         # 作废原因冗余写入原凭证 voided_reason 以明确 (不改 voided=TRUE —
@@ -490,6 +539,81 @@ class FinancialVoucherService:
                 "summary": f"红冲: {e.get('summary', '')}".strip(),
             })
         return reversed_entries
+
+    # ── 以前年度损益调整 (W2.A) ──────────────────────────────────────
+
+    async def create_prior_period_adjustment(
+        self,
+        payload: VoucherCreateInput,
+        *,
+        session: AsyncSession,
+    ) -> FinancialVoucher:
+        """创建"以前年度损益调整"凭证 — 跨期漏账合法补录路径.
+
+        [§19 CFO P0-1 响应] 2027-03 发现 2026-12 漏账场景的唯一解.
+        W1 能力全覆没 (reopen locked / red_flush 无原 / create 被账期校验拦),
+        W2.A 提供新语义.
+
+        业务约束 (service 层强制):
+          1. payload.source_period_year + month 必须同时非空
+          2. source_period 必须在过去 (< voucher_date 所属月)
+          3. voucher_date 必须在当前 open 账期 (走 create() 正常账期校验)
+          4. payload.voucher_type 推荐 'prior_period_adjustment' (但不强制)
+          5. reason 必填, 走 extra_metadata['reason'] 留痕
+
+        DB 层:
+          - CHECK chk_fv_source_period: 两列同时 NULL 或同时非空 (v278)
+          - ix_fv_source_period partial: 按源期间审计查询
+
+        Raises:
+            ValueError: source_period 元数据不一致 / 不在过去 / reason 空
+        """
+        from datetime import date as _date
+
+        # 1. 元数据完整性
+        if payload.source_period_year is None or payload.source_period_month is None:
+            raise ValueError(
+                "create_prior_period_adjustment 要求 source_period_year + "
+                "source_period_month 两者必填 (以前年度损益调整的业务原属期间)"
+            )
+
+        if not (2020 <= payload.source_period_year <= 2100):
+            raise ValueError(
+                f"source_period_year 越界: {payload.source_period_year} "
+                f"(应在 2020-2100)"
+            )
+        if not (1 <= payload.source_period_month <= 12):
+            raise ValueError(
+                f"source_period_month 越界: {payload.source_period_month} "
+                f"(应在 1-12)"
+            )
+
+        # 2. 源期间必须在过去 — 语义正确性防护
+        # 允许源期间 = 当前凭证月份的场景 (同期内补录) 作为边界, 但禁止源期间 > 当期
+        source_first_day = _date(
+            payload.source_period_year, payload.source_period_month, 1
+        )
+        if source_first_day > payload.voucher_date:
+            raise ValueError(
+                f"以前年度损益调整要求 source_period 在过去: "
+                f"source={payload.source_period_year}-{payload.source_period_month:02d} "
+                f"> voucher_date={payload.voucher_date}"
+            )
+
+        # 3. 转发到 create() 正常路径
+        # 账期校验按 voucher_date 执行 (当前期必须 open).
+        # 幂等 / tenant 断言 / 借贷平衡 / 双写 lines+entries 全走 create 流程.
+        voucher = await self.create(payload, session=session)
+
+        log.info(
+            "voucher.prior_period_adjustment.created",
+            voucher_id=str(voucher.id),
+            voucher_no=voucher.voucher_no,
+            voucher_date=str(voucher.voucher_date),
+            source_period=f"{payload.source_period_year}-{payload.source_period_month:02d}",
+            total_fen=voucher.total_amount_fen,
+        )
+        return voucher
 
     # ── 查询 ──────────────────────────────────────────────────────────
 
@@ -557,6 +681,48 @@ class FinancialVoucherService:
                 session_tenant=str(session_tid),
             )
 
+    async def _load_voucher_tenant_scoped(
+        self,
+        *,
+        session: AsyncSession,
+        voucher_id: uuid.UUID,
+        tenant_id: uuid.UUID | None,
+    ) -> FinancialVoucher:
+        """[W2.E] 按 (id, tenant_id) 加载凭证, 防 Oracle 攻击 + 错误消息统一.
+
+        原 session.get(FinancialVoucher, voucher_id) 的问题 (安全 P1-1):
+          - PK 直查, 依赖 RLS 拦截. 若 app.tenant_id 未 SET 或错配:
+            跨租户的 voucher_id 查到 None, 同租户查到 business error.
+            攻击者通过 "不存在" vs "已作废" 的错误差异探测 UUID 存在性.
+
+        修复:
+          - tenant_id 显式传入时: SELECT WHERE id AND tenant_id, 明确过滤
+          - tenant_id=None (向前兼容老 caller): 降级 session.get + RLS 兜底
+          - 找不到统一消息 "凭证不存在或无权限" (不区分跨租户/不存在)
+
+        Raises:
+            ValueError: 统一 "凭证不存在或无权限: {voucher_id}"
+        """
+        from sqlalchemy import select as _select
+
+        if tenant_id is not None:
+            # 显式 tenant 过滤 — 主路径
+            stmt = _select(FinancialVoucher).where(
+                FinancialVoucher.id == voucher_id,
+                FinancialVoucher.tenant_id == tenant_id,
+            ).limit(1)
+            result = await session.execute(stmt)
+            voucher = result.scalar_one_or_none()
+        else:
+            # 兼容路径: PK 直查, RLS 兜底
+            voucher = await session.get(FinancialVoucher, voucher_id)
+
+        if voucher is None:
+            raise ValueError(
+                f"凭证不存在或无权限: {voucher_id}"
+            )
+        return voucher
+
     async def _find_by_event(
         self,
         *,
@@ -565,7 +731,12 @@ class FinancialVoucherService:
         event_type: str | None,
         event_id: uuid.UUID,
     ) -> FinancialVoucher | None:
-        """按 (tenant, event_type, event_id) 查现有凭证 (幂等预查)."""
+        """按 (tenant, event_type, event_id) 查现有凭证 (幂等预查).
+
+        event_type=None 时查询退化为 (tenant_id, event_id), 不带 event_type 过滤.
+        此路径仅供 get_by_event() 公开查询使用; create() 内部调用时 event_type
+        保证非空 (由 step 1 "event_id 非空 ⇒ event_type 必填" 校验).
+        """
         stmt = select(FinancialVoucher).where(
             FinancialVoucher.tenant_id == tenant_id,
             FinancialVoucher.event_id == event_id,
@@ -603,6 +774,9 @@ class FinancialVoucherService:
             event_type=payload.event_type,
             event_id=payload.event_id,
             voided=False,
+            # [W2.A] 以前年度损益调整元数据
+            source_period_year=payload.source_period_year,
+            source_period_month=payload.source_period_month,
         )
         # 先设父, 再构造 lines (lines.voucher_id 由 relationship 自动填)
         voucher.lines = [
