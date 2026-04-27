@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 # Feature Flag SDK（try/except 保护，SDK不可用时自动降级为全量开启）
 try:
-    from shared.feature_flags import FlagContext, is_enabled
+    from shared.feature_flags import is_enabled
     from shared.feature_flags.flag_names import AgentFlags
 
     _FLAG_SDK_AVAILABLE = True
@@ -45,6 +45,7 @@ from .api.shift_routes import router as shift_router
 from .api.store_clone import router as clone_router
 from .api.sync_management_routes import router as sync_management_router
 from .api.telemetry_routes import router as telemetry_router
+from .api.customer_journey_routes import router as customer_journey_router
 from .api.trial_data_routes import router as trial_data_router
 
 app = FastAPI(title="TunxiangOS tx-ops", version="3.0.0", description="日清日结操作层")
@@ -103,6 +104,7 @@ app.include_router(settlement_monitor_router)  # TC-P0-05: 日结监控看板（
 app.include_router(trial_data_router)  # TC-P1-11: 试营业数据清除
 app.include_router(sync_management_router)  # 四系统数据同步协调器管理API
 app.include_router(telemetry_router)  # Sprint A1: POS 前端崩溃上报
+app.include_router(customer_journey_router)  # Sprint G4: 顾客体验链路（6环节SLA+满意度+漏斗）
 
 
 @app.get("/health")

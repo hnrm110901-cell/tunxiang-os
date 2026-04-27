@@ -93,7 +93,10 @@ class CheckResult:
 
 def check_tier1_tests(args: argparse.Namespace) -> CheckResult:
     """1. Tier 1 测试 100% 通过"""
-    tier1_files = list(REPO_ROOT.glob("services/*/src/tests/**/test_*tier1*.py"))
+    tier1_files = list(REPO_ROOT.glob("services/*/tests/**/test_*tier1*.py"))
+    if not tier1_files:
+        # 兼容 src/tests/ 子目录结构
+        tier1_files = list(REPO_ROOT.glob("services/*/src/tests/**/test_*tier1*.py"))
     if not tier1_files:
         return CheckResult(
             checkpoint_id=1,

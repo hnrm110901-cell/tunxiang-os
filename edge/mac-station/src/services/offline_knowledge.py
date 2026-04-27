@@ -5,6 +5,7 @@
 - 查询本地 PostgreSQL 的 knowledge_chunks 表
 - 简化版路由（无需云端 LLM）
 """
+
 from __future__ import annotations
 
 import os
@@ -91,6 +92,7 @@ async def _get_local_embedding(text: str) -> list[float] | None:
     # 降级：TF-IDF
     try:
         from shared.vector_store.embeddings import EmbeddingService
+
         return EmbeddingService._tfidf_embed(text)
     except ImportError:
         logger.warning("tfidf_fallback_import_error")

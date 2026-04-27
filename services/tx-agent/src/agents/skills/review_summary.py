@@ -38,8 +38,7 @@ class ReviewSummaryAgent(SkillAgent):
     # Sprint D1 / PR 批次 6：纯报告生成，不触发业务决策，豁免
     constraint_scope = set()
     constraint_waived_reason = (
-        "复盘总结纯日经营文本汇总与改进行动计划建议，"
-        "不直接操作毛利/食安/客户体验三条业务约束维度，属报告类 Skill"
+        "复盘总结纯日经营文本汇总与改进行动计划建议，不直接操作毛利/食安/客户体验三条业务约束维度，属报告类 Skill"
     )
 
     def get_supported_actions(self) -> list[str]:

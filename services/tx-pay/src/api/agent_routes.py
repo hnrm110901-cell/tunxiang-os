@@ -11,6 +11,7 @@
   - confirm 需要人类生物识别/密码
   - 所有操作留痕
 """
+
 from __future__ import annotations
 
 from typing import Optional
@@ -36,15 +37,13 @@ def set_protocol(protocol) -> None:
 
 def _get_protocol():
     if _protocol is None:
-        from ..protocols.agent_payment import AgentPaymentProtocol
-        from ..deps import get_payment_service
-        import asyncio
         # 延迟初始化
         raise RuntimeError("AgentPaymentProtocol 未初始化")
     return _protocol
 
 
 # ─── 请求模型 ───────────────────────────────────────────────────────
+
 
 class PrepareReq(BaseModel):
     order_id: str
@@ -70,6 +69,7 @@ class RejectReq(BaseModel):
 
 
 # ─── 端点 ───────────────────────────────────────────────────────────
+
 
 @router.post("/prepare")
 async def prepare_payment(

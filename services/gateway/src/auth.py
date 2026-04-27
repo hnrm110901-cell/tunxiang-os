@@ -44,6 +44,69 @@ logger = structlog.get_logger(__name__)
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 
 # ─────────────────────────────────────────────────────────────────
+# Redis — MFA临时secret存储（5分钟TTL）
+# ─────────────────────────────────────────────────────────────────
+_mfa_redis = None
+
+
+async def _get_mfa_redis():
+    """获取Redis连接（单例，延迟初始化）"""
+    global _mfa_redis
+    if _mfa_redis is None:
+        try:
+            import redis.asyncio as aioredis
+
+            _mfa_redis = await aioredis.from_url(
+                os.getenv("REDIS_URL", "redis://localhost:6379/0"),
+                decode_responses=True,
+                socket_connect_timeout=2,
+                socket_timeout=2,
+            )
+        except (ImportError, OSError) as exc:
+            logger.warning("mfa_redis_unavailable", error=str(exc))
+            return None
+    return _mfa_redis
+
+
+async def _store_mfa_temp_secret(user_id: str, encrypted_secret: str) -> None:
+    """将MFA临时secret存入Redis，5分钟TTL"""
+    r = await _get_mfa_redis()
+    if r is not None:
+        try:
+            key = f"mfa:temp:{user_id}"
+            await r.setex(key, 300, encrypted_secret)
+            logger.debug("mfa_temp_secret_stored", user_id=user_id)
+            return
+        except OSError as exc:
+            logger.warning("mfa_temp_secret_store_failed", user_id=user_id, error=str(exc))
+    # Redis不可用 — 仅开发环境允许内存fallback，生产环境直接报错
+    if os.getenv("TX_ENV", "dev") in ("dev", "test"):
+        _mfa_temp_fallback[user_id] = encrypted_secret
+        logger.warning("mfa_temp_secret_stored_in_memory_fallback", user_id=user_id)
+    else:
+        logger.error("mfa_temp_secret_redis_required", user_id=user_id)
+        raise RuntimeError("MFA requires Redis in production")
+
+
+async def _get_mfa_temp_secret(user_id: str) -> Optional[str]:
+    """从Redis读取MFA临时secret"""
+    r = await _get_mfa_redis()
+    if r is not None:
+        try:
+            key = f"mfa:temp:{user_id}"
+            val = await r.get(key)
+            if val:
+                return val
+        except OSError as exc:
+            logger.warning("mfa_temp_secret_get_failed", user_id=user_id, error=str(exc))
+    # fallback: 尝试内存
+    return _mfa_temp_fallback.get(user_id)
+
+
+# 内存fallback（Redis不可用时的降级方案，仅限开发环境）
+_mfa_temp_fallback: dict[str, str] = {}
+
+# ─────────────────────────────────────────────────────────────────
 # 服务实例（进程级单例）
 # ─────────────────────────────────────────────────────────────────
 _jwt_service = JWTService()
@@ -1127,11 +1190,10 @@ async def mfa_setup(request: Request):
     if user.get("mfa_enabled"):
         return err("MFA已启用，如需重置请联系管理员", code="MFA_ALREADY_ENABLED", status_code=409)
 
-    # 生成新 secret 并临时存储（等待验证后正式启用）
-    # 生产环境 TODO: 将临时 secret 存入 Redis（5分钟TTL），不要直接写 DB
+    # 生成新 secret 并临时存储到Redis（5分钟TTL）
     raw_secret = _mfa_service.generate_secret()
     encrypted_secret = _mfa_service.encrypt_secret(raw_secret)
-    user["_pending_mfa_secret_enc"] = encrypted_secret  # 临时存储
+    await _store_mfa_temp_secret(user_id, encrypted_secret)
 
     totp_uri = _mfa_service.get_totp_uri(encrypted_secret, username or "")
 
@@ -1173,9 +1235,11 @@ async def mfa_enable(body: MFASetupEnableBody, request: Request):
     if not user:
         return err("用户不存在", code="USER_NOT_FOUND", status_code=401)
 
-    pending_secret = user.get("_pending_mfa_secret_enc")
+    pending_secret = await _get_mfa_temp_secret(user_id)
     if not pending_secret:
-        return err("请先调用 /mfa/setup 获取二维码", code="MFA_SETUP_REQUIRED", status_code=400)
+        return err(
+            "请先调用 /mfa/setup 获取二维码（临时密钥已过期或未生成）", code="MFA_SETUP_REQUIRED", status_code=400
+        )
 
     # 验证用户提交的TOTP码
     if not _mfa_service.verify_totp(pending_secret, body.code):

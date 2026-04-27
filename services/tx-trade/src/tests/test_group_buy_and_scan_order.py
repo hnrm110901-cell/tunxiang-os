@@ -86,7 +86,7 @@ sys.modules.setdefault("src.services.scan_order_service", _scan_svc)
 import types as _types
 
 _structlog = _types.ModuleType("structlog")
-_structlog.get_logger = lambda: _types.SimpleNamespace(  # type: ignore[attr-defined]
+_structlog.get_logger = lambda *a, **kw: _types.SimpleNamespace(  # type: ignore[attr-defined]
     info=lambda *a, **k: None,
     warning=lambda *a, **k: None,
     error=lambda *a, **k: None,

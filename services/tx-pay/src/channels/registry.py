@@ -8,6 +8,7 @@
     channel = registry.get("wechat")
     channel = registry.find(method=PayMethod.WECHAT, trade_type=TradeType.JSAPI)
 """
+
 from __future__ import annotations
 
 from typing import Optional

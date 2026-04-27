@@ -25,6 +25,7 @@
   POST   /api/v1/agent/memory-evolution/maintenance/decay        — 触发衰减
   POST   /api/v1/agent/memory-evolution/maintenance/consolidate  — 触发整合
 """
+
 from __future__ import annotations
 
 from uuid import UUID
@@ -52,9 +53,7 @@ class RememberRequest(BaseModel):
     store_id: str | None = None
     user_id: str | None = None
     content: str = Field(..., min_length=1, max_length=2000)
-    memory_type: str = Field(
-        ..., pattern="^(preference|pattern|knowledge|constraint)$"
-    )
+    memory_type: str = Field(..., pattern="^(preference|pattern|knowledge|constraint)$")
     category: str = Field(..., min_length=1, max_length=100)
     agent_id: str = "chief"
     source_event: str | None = None
@@ -72,9 +71,7 @@ class RecallRequest(BaseModel):
 
 class RecordEpisodeRequest(BaseModel):
     store_id: str
-    episode_type: str = Field(
-        ..., pattern="^(anomaly|decision|incident|success)$"
-    )
+    episode_type: str = Field(..., pattern="^(anomaly|decision|incident|success)$")
     episode_date: str  # YYYY-MM-DD
     time_slot: str | None = None
     context: dict
@@ -155,10 +152,7 @@ async def remember(
         importance=req.importance,
     )
     await db.commit()
-    logger.info("memory.remembered",
-                tenant_id=x_tenant_id,
-                memory_id=str(memory.id),
-                memory_type=req.memory_type)
+    logger.info("memory.remembered", tenant_id=x_tenant_id, memory_id=str(memory.id), memory_type=req.memory_type)
     return _ok({"memory_id": str(memory.id)})
 
 
@@ -179,10 +173,7 @@ async def recall(
         memory_types=req.memory_types,
         categories=req.categories,
     )
-    logger.info("memory.recalled",
-                tenant_id=x_tenant_id,
-                query_len=len(req.query),
-                results_count=len(results))
+    logger.info("memory.recalled", tenant_id=x_tenant_id, query_len=len(req.query), results_count=len(results))
     return _ok({"items": results, "total": len(results)})
 
 
@@ -245,9 +236,7 @@ async def delete_memory(
     if not deleted:
         _fail(404, f"记忆 {memory_id} 不存在")
     await db.commit()
-    logger.info("memory.deleted",
-                tenant_id=x_tenant_id,
-                memory_id=str(memory_id))
+    logger.info("memory.deleted", tenant_id=x_tenant_id, memory_id=str(memory_id))
     return _ok({"deleted": str(memory_id)})
 
 
@@ -304,10 +293,7 @@ async def record_episode(
         lesson=req.lesson,
     )
     await db.commit()
-    logger.info("episode.recorded",
-                tenant_id=x_tenant_id,
-                episode_id=str(episode.id),
-                episode_type=req.episode_type)
+    logger.info("episode.recorded", tenant_id=x_tenant_id, episode_id=str(episode.id), episode_type=req.episode_type)
     return _ok({"episode_id": str(episode.id)})
 
 
@@ -370,10 +356,9 @@ async def learn_procedure(
         action_template=req.action_template,
     )
     await db.commit()
-    logger.info("procedure.learned",
-                tenant_id=x_tenant_id,
-                procedure_id=str(procedure.id),
-                procedure_name=req.procedure_name)
+    logger.info(
+        "procedure.learned", tenant_id=x_tenant_id, procedure_id=str(procedure.id), procedure_name=req.procedure_name
+    )
     return _ok({"procedure_id": str(procedure.id)})
 
 
@@ -413,10 +398,7 @@ async def update_procedure_outcome(
     if not updated:
         _fail(404, f"规则 {procedure_id} 不存在")
     await db.commit()
-    logger.info("procedure.outcome_updated",
-                tenant_id=x_tenant_id,
-                procedure_id=str(procedure_id),
-                success=req.success)
+    logger.info("procedure.outcome_updated", tenant_id=x_tenant_id, procedure_id=str(procedure_id), success=req.success)
     return _ok({"procedure_id": str(procedure_id), "success": req.success})
 
 
@@ -449,9 +431,7 @@ async def trigger_decay(
     svc = MemoryEvolutionService(db)
     decayed = await svc.decay_memories(tenant_id=x_tenant_id)
     await db.commit()
-    logger.info("maintenance.decay_triggered",
-                tenant_id=x_tenant_id,
-                decayed=decayed)
+    logger.info("maintenance.decay_triggered", tenant_id=x_tenant_id, decayed=decayed)
     return _ok({"memories_decayed": decayed})
 
 
@@ -464,7 +444,5 @@ async def trigger_consolidate(
     svc = MemoryEvolutionService(db)
     consolidated = await svc.consolidate_memories(tenant_id=x_tenant_id)
     await db.commit()
-    logger.info("maintenance.consolidate_triggered",
-                tenant_id=x_tenant_id,
-                consolidated=consolidated)
+    logger.info("maintenance.consolidate_triggered", tenant_id=x_tenant_id, consolidated=consolidated)
     return _ok({"memories_consolidated": consolidated})

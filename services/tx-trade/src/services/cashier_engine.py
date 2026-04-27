@@ -371,6 +371,12 @@ class CashierEngine:
         else:
             subtotal_fen = unit_price_fen * qty
 
+        # 做法加价：从 customizations 中提取做法附加费用（加蛋/加芝士等）
+        practice_extra_fen = 0
+        if customizations and "total_extra_price_fen" in customizations:
+            practice_extra_fen = customizations["total_extra_price_fen"]
+            subtotal_fen += practice_extra_fen
+
         # BOM 成本（从已加载的 dish 对象取，无额外查询）
         food_cost_fen = None
         gross_margin = None
@@ -1378,4 +1384,269 @@ class CashierEngine:
             "to_table": target_table_no,
             "status": order.status,
             "operator_id": operator_id,
+        }
+
+    # ─────────────────────────────────────
+    # 8. 多模式收银（Phase 2: 区域服务模式）
+    # ─────────────────────────────────────
+
+    async def create_retail_order(
+        self,
+        store_id: str,
+        items: list[dict],
+        payment_method: str = "wechat",
+        payment_amount_fen: int = 0,
+        auth_code: Optional[str] = None,
+    ) -> dict:
+        """零售快速收银 — 无桌台无会话，扫码→付款→完成
+
+        适用场景：便利店窗口、外带柜台、伴手礼/预制菜零售。
+        一步完成：创建订单 + 添加商品 + 结算支付。
+
+        Args:
+            store_id:           门店ID
+            items:              商品列表 [{barcode?, name, qty, unit_price_fen}]
+            payment_method:     支付方式（cash/wechat/alipay）
+            payment_amount_fen: 支付金额（分）
+            auth_code:          B扫C付款码（wechat/alipay 时使用）
+
+        Returns:
+            {order_id, order_no, total_fen, payment_status, items_count}
+        """
+        store_uuid = uuid.UUID(store_id)
+        order_no = _gen_order_no()
+        order_id = uuid.uuid4()
+
+        # 计算商品总额
+        total_fen = 0
+        order_items: list[OrderItem] = []
+        for item in items:
+            qty = int(item.get("qty", 1))
+            unit_price = int(item.get("unit_price_fen", 0))
+            subtotal = unit_price * qty
+            total_fen += subtotal
+
+            oi = OrderItem(
+                id=uuid.uuid4(),
+                tenant_id=self.tenant_id,
+                order_id=order_id,
+                dish_id=None,
+                item_name=item.get("name", "零售商品"),
+                quantity=qty,
+                unit_price_fen=unit_price,
+                subtotal_fen=subtotal,
+                notes=item.get("barcode", ""),
+                customizations={},
+                pricing_mode="fixed",
+            )
+            order_items.append(oi)
+
+        if not order_items:
+            raise ValueError("商品列表不能为空")
+
+        # 创建零售订单（无桌台关联）
+        order = Order(
+            id=order_id,
+            tenant_id=self.tenant_id,
+            order_no=order_no,
+            store_id=store_uuid,
+            table_number=None,
+            customer_id=None,
+            sales_channel="retail",
+            guest_count=0,
+            total_amount_fen=total_fen,
+            discount_amount_fen=0,
+            final_amount_fen=total_fen,
+            status=OrderStatus.pending.value,
+        )
+        self.db.add(order)
+        for oi in order_items:
+            self.db.add(oi)
+
+        await self.db.flush()
+
+        # 自动结算
+        payment_result = await self.settle_order(
+            order_id=str(order_id),
+            payments=[
+                {
+                    "method": payment_method,
+                    "amount_fen": payment_amount_fen or total_fen,
+                    "trade_no": auth_code,
+                }
+            ],
+        )
+
+        # 旁路事件
+        asyncio.create_task(
+            emit_event(
+                event_type=OrderEventType.PAID,
+                tenant_id=self.tenant_id,
+                stream_id=str(order_id),
+                payload={
+                    "order_no": order_no,
+                    "order_type": "retail",
+                    "total_fen": total_fen,
+                    "items_count": len(order_items),
+                    "payment_method": payment_method,
+                },
+                store_id=store_id,
+                source_service="tx-trade",
+            )
+        )
+
+        logger.info(
+            "retail_order_created",
+            order_no=order_no,
+            store_id=store_id,
+            items_count=len(order_items),
+            total_fen=total_fen,
+            payment_method=payment_method,
+        )
+
+        return {
+            "order_id": str(order_id),
+            "order_no": order_no,
+            "total_fen": total_fen,
+            "items_count": len(order_items),
+            "payment_status": payment_result.get("status", "completed"),
+        }
+
+    async def create_pre_order(
+        self,
+        store_id: str,
+        table_no: str,
+        booking_id: Optional[str] = None,
+        items: Optional[list[dict]] = None,
+        customer_phone: Optional[str] = None,
+        expected_arrival: Optional[str] = None,
+    ) -> dict:
+        """预点单 — 包厢客人到店前预选菜品（dine_first 模式专属）
+
+        流程：客人电话/小程序预点 → 订单状态 pre_ordered → 客人到店 → fire 起菜。
+        预点单不锁桌（桌台仍保持 reserved），不扣库存。
+
+        Args:
+            store_id:          门店ID
+            table_no:          预订桌号
+            booking_id:        关联预订单ID
+            items:             预点菜品 [{dish_id, dish_name, qty, unit_price_fen}]
+            customer_phone:    顾客手机号
+            expected_arrival:  预计到店时间
+
+        Returns:
+            {order_id, order_no, items_count, status, table_no}
+        """
+        store_uuid = uuid.UUID(store_id)
+        items = items or []
+
+        # 验证桌台存在
+        result = await self.db.execute(
+            select(Table).where(
+                Table.store_id == store_uuid,
+                Table.table_no == table_no,
+                Table.tenant_id == self.tenant_id,
+                Table.is_active == True,  # noqa: E712
+            )
+        )
+        table = result.scalar_one_or_none()
+        if not table:
+            raise ValueError(f"桌台不存在: {table_no}")
+
+        # 预点单允许 free 和 reserved 两种桌态
+        if table.status not in (TableStatus.free.value, TableStatus.reserved.value):
+            raise ValueError(f"桌台 {table_no} 当前状态 {table.status}，预点单仅允许空闲或已预订状态的桌台")
+
+        # 创建预点订单（status=pre_ordered，不锁桌）
+        order_no = _gen_order_no()
+        order_id = uuid.uuid4()
+
+        total_fen = 0
+        order_items: list[OrderItem] = []
+        for item in items:
+            qty = int(item.get("qty", 1))
+            unit_price = int(item.get("unit_price_fen", 0))
+            subtotal = unit_price * qty
+            total_fen += subtotal
+
+            oi = OrderItem(
+                id=uuid.uuid4(),
+                tenant_id=self.tenant_id,
+                order_id=order_id,
+                dish_id=uuid.UUID(item["dish_id"]) if item.get("dish_id") else None,
+                item_name=item.get("dish_name", ""),
+                quantity=qty,
+                unit_price_fen=unit_price,
+                subtotal_fen=subtotal,
+                notes=f"预点单 | 到店时间: {expected_arrival or '未定'}",
+                customizations=item.get("customizations", {}),
+                pricing_mode="fixed",
+            )
+            order_items.append(oi)
+
+        order = Order(
+            id=order_id,
+            tenant_id=self.tenant_id,
+            order_no=order_no,
+            store_id=store_uuid,
+            table_number=table_no,
+            customer_id=None,
+            customer_phone=customer_phone,
+            sales_channel="dine_in",
+            guest_count=0,
+            total_amount_fen=total_fen,
+            discount_amount_fen=0,
+            final_amount_fen=total_fen,
+            status="pre_ordered",
+            order_metadata={
+                "is_pre_order": True,
+                "booking_id": booking_id,
+                "expected_arrival": expected_arrival,
+                "customer_phone": customer_phone,
+            },
+        )
+        self.db.add(order)
+        for oi in order_items:
+            self.db.add(oi)
+
+        await self.db.flush()
+
+        # 旁路事件
+        asyncio.create_task(
+            emit_event(
+                event_type=OrderEventType.CREATED,
+                tenant_id=self.tenant_id,
+                stream_id=str(order_id),
+                payload={
+                    "order_no": order_no,
+                    "order_type": "pre_order",
+                    "table_no": table_no,
+                    "booking_id": booking_id,
+                    "items_count": len(order_items),
+                    "total_fen": total_fen,
+                    "expected_arrival": expected_arrival,
+                },
+                store_id=store_id,
+                source_service="tx-trade",
+            )
+        )
+
+        logger.info(
+            "pre_order_created",
+            order_no=order_no,
+            store_id=store_id,
+            table_no=table_no,
+            booking_id=booking_id,
+            items_count=len(order_items),
+            total_fen=total_fen,
+        )
+
+        return {
+            "order_id": str(order_id),
+            "order_no": order_no,
+            "items_count": len(order_items),
+            "total_fen": total_fen,
+            "status": "pre_ordered",
+            "table_no": table_no,
+            "booking_id": booking_id,
         }

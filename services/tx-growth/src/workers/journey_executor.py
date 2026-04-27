@@ -20,10 +20,13 @@
 import os
 import uuid
 from datetime import datetime, timedelta, timezone
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import httpx
 import structlog
+
+if TYPE_CHECKING:
+    import redis.asyncio as aioredis  # noqa: F401 — 仅供类型注解
 from models.journey_instance import JourneyInstance
 from services.journey_orchestrator import (
     _journey_executions,

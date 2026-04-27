@@ -85,7 +85,7 @@ const sessionSnapshot = restoreSession()
 
 // ─── Store ───────────────────────────────────────────────────────────────────
 
-export const useUserStore = create<UserStore>((set) => ({
+export const useUserStore = create<UserStore>()((set) => ({
   ...DEFAULT_STATE,
   ...sessionSnapshot,
 

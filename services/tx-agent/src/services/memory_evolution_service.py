@@ -9,6 +9,7 @@
 - 过程性记忆(agent_procedures): 学到的规则/策略
 - 记忆审计(agent_memory_history): 变更日志
 """
+
 from __future__ import annotations
 
 import math
@@ -78,7 +79,11 @@ class MemoryEvolutionService:
 
         # 搜索相似记忆
         existing = await self._find_similar_memory(
-            tenant_id, store_id, user_id, embedding, content,
+            tenant_id,
+            store_id,
+            user_id,
+            embedding,
+            content,
             memory_type=memory_type,
         )
 
@@ -122,8 +127,12 @@ class MemoryEvolutionService:
             }
 
             await self._log_history(
-                tenant_id, str(existing.id), "agent_memories",
-                "UPDATE", old_snapshot, new_snapshot,
+                tenant_id,
+                str(existing.id),
+                "agent_memories",
+                "UPDATE",
+                old_snapshot,
+                new_snapshot,
                 reason=f"superseded by {memory.id}",
             )
 
@@ -151,8 +160,11 @@ class MemoryEvolutionService:
         )
 
         await self._log_history(
-            tenant_id, str(memory.id), "agent_memories",
-            "ADD", None,
+            tenant_id,
+            str(memory.id),
+            "agent_memories",
+            "ADD",
+            None,
             {"memory_key": memory.memory_key, "content": memory.content},
             reason="new memory created",
         )
@@ -185,7 +197,10 @@ class MemoryEvolutionService:
         embedding = await self._generate_embedding(query)
 
         results = await self._retriever.hybrid_search(
-            tenant_id, store_id, user_id, query,
+            tenant_id,
+            store_id,
+            user_id,
+            query,
             embedding=embedding,
             top_k=top_k,
             memory_types=memory_types,
@@ -235,15 +250,17 @@ class MemoryEvolutionService:
             cat = m.category or "uncategorized"
             if cat not in profile:
                 profile[cat] = []
-            profile[cat].append({
-                "id": str(m.id),
-                "memory_key": m.memory_key,
-                "content": m.content,
-                "confidence": m.confidence,
-                "importance": m.importance,
-                "memory_type": m.memory_type,
-                "updated_at": m.updated_at.isoformat() if m.updated_at else None,
-            })
+            profile[cat].append(
+                {
+                    "id": str(m.id),
+                    "memory_key": m.memory_key,
+                    "content": m.content,
+                    "confidence": m.confidence,
+                    "importance": m.importance,
+                    "memory_type": m.memory_type,
+                    "updated_at": m.updated_at.isoformat() if m.updated_at else None,
+                }
+            )
 
         logger.info(
             "store_profile_aggregated",
@@ -280,15 +297,17 @@ class MemoryEvolutionService:
             cat = m.category or "uncategorized"
             if cat not in profile:
                 profile[cat] = []
-            profile[cat].append({
-                "id": str(m.id),
-                "memory_key": m.memory_key,
-                "content": m.content,
-                "confidence": m.confidence,
-                "importance": m.importance,
-                "memory_type": m.memory_type,
-                "updated_at": m.updated_at.isoformat() if m.updated_at else None,
-            })
+            profile[cat].append(
+                {
+                    "id": str(m.id),
+                    "memory_key": m.memory_key,
+                    "content": m.content,
+                    "confidence": m.confidence,
+                    "importance": m.importance,
+                    "memory_type": m.memory_type,
+                    "updated_at": m.updated_at.isoformat() if m.updated_at else None,
+                }
+            )
 
         logger.info(
             "user_profile_aggregated",
@@ -335,8 +354,11 @@ class MemoryEvolutionService:
         await self.db.flush()
 
         await self._log_history(
-            tenant_id, str(episode.id), "agent_episodes",
-            "ADD", None,
+            tenant_id,
+            str(episode.id),
+            "agent_episodes",
+            "ADD",
+            None,
             {"episode_type": episode_type, "lesson": lesson},
             reason="episode recorded",
         )
@@ -371,9 +393,7 @@ class MemoryEvolutionService:
                 AgentEpisode.store_id == UUID(store_id),
                 AgentEpisode.is_deleted == False,  # noqa: E712
             )
-            .where(
-                AgentEpisode.lesson.ilike(f"%{safe_query}%")
-            )
+            .where(AgentEpisode.lesson.ilike(f"%{safe_query}%"))
             .order_by(AgentEpisode.episode_date.desc())
             .limit(limit)
         )
@@ -406,8 +426,11 @@ class MemoryEvolutionService:
         await self.db.flush()
 
         await self._log_history(
-            tenant_id, str(procedure.id), "agent_procedures",
-            "ADD", None,
+            tenant_id,
+            str(procedure.id),
+            "agent_procedures",
+            "ADD",
+            None,
             {"procedure_name": procedure_name, "trigger_pattern": trigger_pattern},
             reason="procedure learned",
         )
@@ -433,13 +456,10 @@ class MemoryEvolutionService:
         now = datetime.now(timezone.utc)
         pid = UUID(procedure_id)
 
-        stmt = (
-            select(AgentProcedure)
-            .where(
-                AgentProcedure.id == pid,
-                AgentProcedure.tenant_id == UUID(tenant_id),
-                AgentProcedure.is_deleted == False,  # noqa: E712
-            )
+        stmt = select(AgentProcedure).where(
+            AgentProcedure.id == pid,
+            AgentProcedure.tenant_id == UUID(tenant_id),
+            AgentProcedure.is_deleted == False,  # noqa: E712
         )
         result = await self.db.execute(stmt)
         procedure = result.scalars().first()
@@ -464,7 +484,9 @@ class MemoryEvolutionService:
         await self.db.flush()
 
         await self._log_history(
-            tenant_id, procedure_id, "agent_procedures",
+            tenant_id,
+            procedure_id,
+            "agent_procedures",
             "UPDATE",
             old_snapshot,
             {"success_rate": new_rate, "execution_count": new_count},
@@ -486,21 +508,15 @@ class MemoryEvolutionService:
         trigger_pattern: str,
     ) -> list[AgentProcedure]:
         """查找匹配的过程性记忆"""
-        stmt = (
-            select(AgentProcedure)
-            .where(
-                AgentProcedure.tenant_id == UUID(tenant_id),
-                AgentProcedure.is_deleted == False,  # noqa: E712
-                AgentProcedure.is_active == True,  # noqa: E712
-                AgentProcedure.trigger_pattern == trigger_pattern,
-            )
+        stmt = select(AgentProcedure).where(
+            AgentProcedure.tenant_id == UUID(tenant_id),
+            AgentProcedure.is_deleted == False,  # noqa: E712
+            AgentProcedure.is_active == True,  # noqa: E712
+            AgentProcedure.trigger_pattern == trigger_pattern,
         )
 
         if store_id:
-            stmt = stmt.where(
-                (AgentProcedure.store_id == UUID(store_id))
-                | (AgentProcedure.store_id.is_(None))
-            )
+            stmt = stmt.where((AgentProcedure.store_id == UUID(store_id)) | (AgentProcedure.store_id.is_(None)))
         else:
             stmt = stmt.where(AgentProcedure.store_id.is_(None))
 
@@ -521,13 +537,10 @@ class MemoryEvolutionService:
         now = datetime.now(timezone.utc)
         tid = UUID(tenant_id)
 
-        stmt = (
-            select(AgentMemory)
-            .where(
-                AgentMemory.tenant_id == tid,
-                AgentMemory.is_deleted == False,  # noqa: E712
-                (AgentMemory.valid_until.is_(None)) | (AgentMemory.valid_until > now),
-            )
+        stmt = select(AgentMemory).where(
+            AgentMemory.tenant_id == tid,
+            AgentMemory.is_deleted == False,  # noqa: E712
+            (AgentMemory.valid_until.is_(None)) | (AgentMemory.valid_until > now),
         )
         result = await self.db.execute(stmt)
         memories = result.scalars().all()
@@ -552,7 +565,9 @@ class MemoryEvolutionService:
             if m.confidence < _DECAY_FLOOR:
                 m.valid_until = now
                 await self._log_history(
-                    tenant_id, str(m.id), "agent_memories",
+                    tenant_id,
+                    str(m.id),
+                    "agent_memories",
                     "DECAY",
                     {"confidence": old_confidence},
                     {"confidence": m.confidence, "valid_until": now.isoformat()},
@@ -726,14 +741,11 @@ class MemoryEvolutionService:
         else:
             # 降级：精确 key 匹配
             key = content_text[:200]
-            stmt = (
-                select(AgentMemory)
-                .where(
-                    AgentMemory.tenant_id == UUID(tenant_id),
-                    AgentMemory.is_deleted == False,  # noqa: E712
-                    AgentMemory.memory_key == key,
-                    (AgentMemory.valid_until.is_(None)) | (AgentMemory.valid_until > now),
-                )
+            stmt = select(AgentMemory).where(
+                AgentMemory.tenant_id == UUID(tenant_id),
+                AgentMemory.is_deleted == False,  # noqa: E712
+                AgentMemory.memory_key == key,
+                (AgentMemory.valid_until.is_(None)) | (AgentMemory.valid_until > now),
             )
             if store_id:
                 stmt = stmt.where(AgentMemory.store_id == UUID(store_id))
@@ -797,10 +809,7 @@ class MemoryEvolutionService:
         if embedding:
             embedding_str = "[" + ",".join(str(v) for v in embedding) + "]"
             await self.db.execute(
-                text(
-                    "UPDATE agent_memories SET embedding = :emb::vector "
-                    "WHERE id = :mid"
-                ),
+                text("UPDATE agent_memories SET embedding = :emb::vector WHERE id = :mid"),
                 {"emb": embedding_str, "mid": memory.id},
             )
 

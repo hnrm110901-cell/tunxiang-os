@@ -161,10 +161,15 @@ async function txFetch<T>(path: string, options: TxFetchTradeOptions = {}): Prom
 /**
  * 离线队列入队器的最小接口。
  * 生产由 useOffline.enqueue 提供；测试可注入 stub。
+ *
+ * R-补2-1（Tier1 / 防 saga 双扣）：`idempotencyKey` 必须随 op 一起入队，
+ * replay 时作为 `X-Idempotency-Key` header 发到 server replay cache，
+ * 防止"页面刷新 → 内存 _idemStore 丢失 → 同单二次入队"导致的双扣。
  */
 export type OfflineEnqueueFn = (op: {
   type: 'create_order' | 'add_item' | 'settle_order' | 'create_payment';
   payload: Record<string, unknown>;
+  idempotencyKey: string;
 }) => Promise<string>;
 
 let _enqueueFn: OfflineEnqueueFn | null = null;
@@ -254,7 +259,13 @@ export async function txFetchOffline<T>(
       };
     }
 
-    const offlineId = await _enqueueFn({ type: offlineType, payload: offlinePayload });
+    // R-补2-1：必须把 idempotencyKey 传给 enqueue，让 IndexedDB 持久化它，
+    // 否则页面刷新后内存 _idemStore 丢失 → replay 时无 X-Idempotency-Key → server 双扣。
+    const offlineId = await _enqueueFn({
+      type: offlineType,
+      payload: offlinePayload,
+      idempotencyKey,
+    });
     _idemStore.set(idempotencyKey, { expireAt: now + IDEMPOTENCY_TTL_MS, offlineId });
     return {
       ok: true,

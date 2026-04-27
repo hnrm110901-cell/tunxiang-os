@@ -664,8 +664,7 @@ class TurnoverRiskAgent(SkillAgent):
     # Sprint D1 / PR 批次 5：纯离职风险评分 + 干预建议，不决定资金/食材/出餐，豁免
     constraint_scope = set()
     constraint_waived_reason = (
-        "离职风险纯多维信号扫描与评分，输出干预建议供 HR 参考，"
-        "不直接操作毛利/食安/客户体验三条业务约束维度"
+        "离职风险纯多维信号扫描与评分，输出干预建议供 HR 参考，不直接操作毛利/食安/客户体验三条业务约束维度"
     )
 
     def get_supported_actions(self) -> list[str]:

@@ -43,6 +43,18 @@ _AMAP_DRIVING_URL = "https://restapi.amap.com/v3/direction/driving"
 # 地球半径（km）- 用于 Haversine 距离计算
 _EARTH_RADIUS_KM = 6371.0
 
+# ─── 轻量内存共享存储（用于路线/司机任务的临时状态，DB 迁移未覆盖的遗留路径） ───
+_SHARED_STORE: Dict[str, Any] = {
+    "trips": {},
+    "now_iso": lambda: datetime.now(timezone.utc).isoformat(),
+    "gen_id": lambda prefix: f"{prefix}_{uuid.uuid4().hex[:12]}",
+}
+
+
+def _shared() -> Dict[str, Any]:
+    """返回进程内共享内存存储（trips / now_iso / gen_id）。"""
+    return _SHARED_STORE
+
 
 async def _set_tenant(db: AsyncSession, tenant_id: str) -> None:
     """在当前 DB 连接上设置 RLS 租户上下文"""

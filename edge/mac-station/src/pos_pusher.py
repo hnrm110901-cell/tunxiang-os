@@ -10,6 +10,7 @@ POS 实时推送器 — 通过 WebSocket 向收银终端推送折扣守护预警
 - 精准推送：push_to_terminal → 指定 terminal_id
 - 死连接自动清理：发送失败时从注册表移除
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -27,29 +28,31 @@ logger = structlog.get_logger()
 @dataclass
 class DiscountAlert:
     """折扣守护预警数据结构"""
-    alert_id: str          # uuid
+
+    alert_id: str  # uuid
     store_id: str
     order_id: str
     employee_id: str
     employee_name: str
-    discount_rate: float   # 0.0-1.0，实际折扣率
-    threshold: float       # 允许的最大折扣率
-    amount_fen: int        # 折扣金额（分）
-    risk_level: str        # "medium" | "high" | "critical"
-    message: str           # 中文说明
-    timestamp: str         # ISO 8601
+    discount_rate: float  # 0.0-1.0，实际折扣率
+    threshold: float  # 允许的最大折扣率
+    amount_fen: int  # 折扣金额（分）
+    risk_level: str  # "medium" | "high" | "critical"
+    message: str  # 中文说明
+    timestamp: str  # ISO 8601
 
 
 @dataclass
 class OperationAlert:
     """运营通知数据结构"""
+
     alert_id: str
     store_id: str
-    alert_type: str   # "stock_low" | "expiry_warning" | "shift_reminder" | "sales_milestone"
+    alert_type: str  # "stock_low" | "expiry_warning" | "shift_reminder" | "sales_milestone"
     title: str
     body: str
-    severity: str     # "info" | "warning" | "critical"
-    timestamp: str    # ISO 8601
+    severity: str  # "info" | "warning" | "critical"
+    timestamp: str  # ISO 8601
 
 
 # ─── 推送器 ───
@@ -183,9 +186,7 @@ class POSPusher:
         )
         return sent
 
-    async def push_to_terminal(
-        self, store_id: str, terminal_id: str, message: dict
-    ) -> bool:
+    async def push_to_terminal(self, store_id: str, terminal_id: str, message: dict) -> bool:
         """精准推送到指定终端。
 
         Args:
