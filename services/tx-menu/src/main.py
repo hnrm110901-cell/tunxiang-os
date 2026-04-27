@@ -71,6 +71,14 @@ app.include_router(menu_plan_v2_router)  # 菜谱方案批量下发V2+门店Over
 from .api.dish_profit_advisor_routes import router as dish_profit_advisor_router
 
 app.include_router(dish_profit_advisor_router)  # G1 菜品利润图谱增强（定价建议/桌均利润/品类配比/共现图谱/食材联动）
+from .api.dynamic_pricing_routes import router as dynamic_pricing_router
+
+app.include_router(dynamic_pricing_router)  # D3c AI动态定价引擎（时段/需求/库存/天气/会员→智能价格）
+
+# ── Phase 2c: 菜单一键多平台发布（美团/饿了么/抖音同步）──
+from .api.multi_platform_publish_routes import router as multi_platform_publish_router
+
+app.include_router(multi_platform_publish_router)
 
 
 @app.get("/health")

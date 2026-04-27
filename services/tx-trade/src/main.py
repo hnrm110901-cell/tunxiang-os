@@ -445,6 +445,11 @@ app.include_router(kds_piecework_router, prefix="/api/v1/kds-piecework")
 app.include_router(kds_display_config_router, prefix="/api/v1/kds-display")
 app.include_router(kds_delta_router)  # KDS Delta增量同步 + 设备心跳
 
+# ── Phase 2c: 外卖异议工作流（自动裁决+人工复核）──
+from .api.delivery_dispute_routes import router as delivery_dispute_router
+
+app.include_router(delivery_dispute_router)
+
 
 @app.get("/health")
 async def health():

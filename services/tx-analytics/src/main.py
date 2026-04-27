@@ -39,6 +39,7 @@ from .api.narrative_enhanced_routes import router as narrative_enhanced_router  
 from .api.nlq_routes import router as nlq_router
 from .api.private_domain_routes import router as private_domain_router
 from .api.ceo_cockpit_routes import router as ceo_cockpit_router  # G6: CEO今日经营驾驶舱（7端点）
+from .api.cost_root_cause_routes import router as cost_root_cause_router  # v379: 成本根因分析Agent（4端点）
 from .api.report_builder_routes import router as report_builder_router  # S5: 报表配置化引擎（12端点）
 from .api.report_config_routes import router as report_config_router
 from .api.report_routes import router as report_router
@@ -111,6 +112,7 @@ app.include_router(special_ops_report_router)  # 特殊操作报表：14端点
 app.include_router(banquet_analytics_router)  # S7 宴会分析报表：8端点
 app.include_router(report_builder_router)  # S5 报表配置化引擎：12端点
 app.include_router(ceo_cockpit_router)  # G6 CEO今日经营驾驶舱：7端点
+app.include_router(cost_root_cause_router)  # v379 成本根因分析Agent：4端点
 
 
 @app.get("/health")
