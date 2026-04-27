@@ -29,6 +29,6 @@
     "vite": "^5.4.0",
     "vitest": "^2.0.0",
     "@playwright/test": "^1.46.0",
-    "eslint": "^9.9.0"
+    "eslint": "^10.2.1"
   }
 }
