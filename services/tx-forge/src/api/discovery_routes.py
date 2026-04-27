@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 from uuid import uuid4
 
 import structlog
@@ -9,6 +9,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
+
 from ..schemas.discovery_schemas import IntentSearchRequest, SearchClick
 
 router = APIRouter(prefix="/api/v1/forge/discovery", tags=["智能发现"])
@@ -161,9 +162,7 @@ async def list_combos(
         params["target_role"] = target_role
     where = " AND ".join(clauses)
 
-    total_row = await db.execute(
-        text(f"SELECT COUNT(*) FROM forge.app_combos WHERE {where}"), params
-    )
+    total_row = await db.execute(text(f"SELECT COUNT(*) FROM forge.app_combos WHERE {where}"), params)
     total = total_row.scalar() or 0
 
     rows = await db.execute(

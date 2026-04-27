@@ -8,6 +8,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
+
 from ..schemas.evidence_schemas import EvidenceCardCreate, EvidenceCardUpdate
 
 router = APIRouter(prefix="/api/v1/forge/evidence", tags=["证据卡片"])
@@ -80,9 +81,7 @@ async def list_evidence_cards(
         clauses.append("is_active = true")
     where = " AND ".join(clauses)
 
-    total_row = await db.execute(
-        text(f"SELECT COUNT(*) FROM forge.evidence_cards WHERE {where}"), params
-    )
+    total_row = await db.execute(text(f"SELECT COUNT(*) FROM forge.evidence_cards WHERE {where}"), params)
     total = total_row.scalar() or 0
 
     rows = await db.execute(

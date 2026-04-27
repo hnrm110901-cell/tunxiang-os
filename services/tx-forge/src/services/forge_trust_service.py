@@ -3,13 +3,10 @@
 import json
 from uuid import uuid4
 
+import structlog
 from fastapi import HTTPException
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
-
-import structlog
-
-from ..constants import AGENT_REGISTRY
 
 log = structlog.get_logger(__name__)
 
@@ -22,11 +19,11 @@ class ForgeTrustService:
     """信任分级管理 — 对标 ServiceNow AI Control Tower"""
 
     TIER_POLICIES: dict[str, dict] = {
-        "T0": {"data_access": "none",       "action_scope": "none",          "financial": False},
-        "T1": {"data_access": "read",       "action_scope": "none",          "financial": False},
+        "T0": {"data_access": "none", "action_scope": "none", "financial": False},
+        "T1": {"data_access": "read", "action_scope": "none", "financial": False},
         "T2": {"data_access": "read_write", "action_scope": "non_financial", "financial": False},
-        "T3": {"data_access": "read_write", "action_scope": "all",           "financial": True},
-        "T4": {"data_access": "full",       "action_scope": "all",           "financial": True},
+        "T3": {"data_access": "read_write", "action_scope": "all", "financial": True},
+        "T4": {"data_access": "full", "action_scope": "all", "financial": True},
     }
 
     # ── 获取信任等级定义 ─────────────────────────────────────────
@@ -44,10 +41,7 @@ class ForgeTrustService:
         rows = result.mappings().all()
         if not rows:
             # 回退到内存定义
-            return [
-                {"tier_id": k, "policy": v, "sort_order": i}
-                for i, (k, v) in enumerate(self.TIER_POLICIES.items())
-            ]
+            return [{"tier_id": k, "policy": v, "sort_order": i} for i, (k, v) in enumerate(self.TIER_POLICIES.items())]
         return [dict(r) for r in rows]
 
     # ── 获取应用信任状态 ─────────────────────────────────────────
@@ -267,9 +261,7 @@ class ForgeTrustService:
             history_row = history_result.mappings().first()
             if history_row and history_row["days_active"] < 90:
                 requirements_met = False
-                requirement_errors.append(
-                    f"运行时间不足 90 天 (当前 {int(history_row['days_active'])} 天)"
-                )
+                requirement_errors.append(f"运行时间不足 90 天 (当前 {int(history_row['days_active'])} 天)")
 
             rating_result = await db.execute(
                 text("""
@@ -281,9 +273,7 @@ class ForgeTrustService:
             rating_row = rating_result.mappings().first()
             if rating_row and (rating_row["rating"] or 0) < 4.0:
                 requirements_met = False
-                requirement_errors.append(
-                    f"评分低于 4.0 (当前 {rating_row['rating']})"
-                )
+                requirement_errors.append(f"评分低于 4.0 (当前 {rating_row['rating']})")
 
         # 创建待审核记录
         audit_id = f"audit_{uuid4().hex[:12]}"

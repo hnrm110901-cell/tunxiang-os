@@ -3,8 +3,8 @@
 import uuid
 from typing import Optional
 
-from sqlalchemy import String, Integer, BigInteger, Boolean, Numeric
-from sqlalchemy.dialects.postgresql import UUID, JSONB
+from sqlalchemy import BigInteger, Boolean, Integer, Numeric, String
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from shared.ontology.src.base import TenantBase

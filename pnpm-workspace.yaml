@@ -8,3 +8,4 @@ packages:
   - "apps/web-forge-admin"
   - "shared/design-system"
   - "apps/h5-self-order"
+  - "packages/*"

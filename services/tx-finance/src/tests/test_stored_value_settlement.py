@@ -39,7 +39,10 @@ def _make_stub(name: str, **attrs) -> types.ModuleType:
 if "structlog" not in sys.modules:
     _stub_log = MagicMock()
     _stub_log.get_logger.return_value = MagicMock(
-        info=MagicMock(), error=MagicMock(), warning=MagicMock(), debug=MagicMock(),
+        info=MagicMock(),
+        error=MagicMock(),
+        warning=MagicMock(),
+        debug=MagicMock(),
         exception=MagicMock(),
     )
     sys.modules["structlog"] = _stub_log
@@ -114,9 +117,7 @@ sys.modules["src.services.stored_value_split_service"] = _split_svc_stub
 sys.modules["src.tasks.settlement_scheduler"] = _scheduler_stub
 sys.modules["src.services.settlement_notify_service"] = _notify_stub
 
-_routes_path = (
-    pathlib.Path(__file__).parent.parent / "api" / "stored_value_settlement_routes.py"
-)
+_routes_path = pathlib.Path(__file__).parent.parent / "api" / "stored_value_settlement_routes.py"
 _spec = importlib.util.spec_from_file_location(
     "src.api.stored_value_settlement_routes",
     _routes_path,
@@ -224,9 +225,7 @@ class TestStoredValueSettlementRoutes:
     def test_create_rule_invalid_ratio_400(self):
         """三方比例之和 != 1.0 时应返回 400。"""
         svc_mock = AsyncMock()
-        svc_mock.create_rule = AsyncMock(
-            side_effect=ValueError("三方比例之和必须为 1.0000")
-        )
+        svc_mock.create_rule = AsyncMock(side_effect=ValueError("三方比例之和必须为 1.0000"))
 
         db = _mock_db()
         app = self._build_app(db)
@@ -490,9 +489,7 @@ class TestStoredValueSettlementRoutes:
     def test_confirm_batch_invalid_status_400(self):
         """确认非 draft 状态的批次应返回 400。"""
         scheduler_mock = AsyncMock()
-        scheduler_mock.confirm_settlement_batch = AsyncMock(
-            side_effect=ValueError("只能确认 draft 状态的批次")
-        )
+        scheduler_mock.confirm_settlement_batch = AsyncMock(side_effect=ValueError("只能确认 draft 状态的批次"))
 
         db = _mock_db()
         app = self._build_app(db)
@@ -637,7 +634,7 @@ class TestStoredValueSplitLogic:
 
         r_amount = int(Decimal(amount_fen) * r_ratio)  # 1500
         h_amount = int(Decimal(amount_fen) * h_ratio)  # 1500
-        c_amount = amount_fen - r_amount - h_amount     # 7000
+        c_amount = amount_fen - r_amount - h_amount  # 7000
 
         assert r_amount == 1500
         assert h_amount == 1500
@@ -654,7 +651,7 @@ class TestStoredValueSplitLogic:
 
         r_amount = int(Decimal(amount_fen) * r_ratio)  # 1500 (floor)
         h_amount = int(Decimal(amount_fen) * h_ratio)  # 1500 (floor)
-        c_amount = amount_fen - r_amount - h_amount     # 7001 (吸收尾差)
+        c_amount = amount_fen - r_amount - h_amount  # 7001 (吸收尾差)
 
         assert r_amount + c_amount + h_amount == amount_fen
         assert c_amount == 7001

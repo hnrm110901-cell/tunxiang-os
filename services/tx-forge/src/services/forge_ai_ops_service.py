@@ -40,9 +40,7 @@ class ForgeAIOpsService:
     #  Agent 全景
     # ──────────────────────────────────────────────────────────
 
-    async def get_agent_observatory(
-        self, db: AsyncSession, *, store_id: str | None = None
-    ) -> dict:
+    async def get_agent_observatory(self, db: AsyncSession, *, store_id: str | None = None) -> dict:
         """9 大 Agent 全景仪表盘：决策量 / 置信度 / 延迟 / 约束违规。"""
         store_filter = "AND store_id = :store_id" if store_id else ""
         params: dict = {}
@@ -88,10 +86,7 @@ class ForgeAIOpsService:
             """),
             params,
         )
-        violation_map: dict[str, int] = {
-            r["agent_id"]: r["violation_count"]
-            for r in violation_result.mappings().all()
-        }
+        violation_map: dict[str, int] = {r["agent_id"]: r["violation_count"] for r in violation_result.mappings().all()}
 
         # 活跃会话
         active_result = await db.execute(
@@ -106,10 +101,7 @@ class ForgeAIOpsService:
             """),
             params,
         )
-        active_map: dict[str, int] = {
-            r["agent_id"]: r["active_sessions"]
-            for r in active_result.mappings().all()
-        }
+        active_map: dict[str, int] = {r["agent_id"]: r["active_sessions"] for r in active_result.mappings().all()}
 
         # 组装 9 个 agent
         agents = []
@@ -122,18 +114,20 @@ class ForgeAIOpsService:
             vc = violation_map.get(aid, 0)
             total_decisions += dc
             total_violations += vc
-            agents.append({
-                "agent_id": aid,
-                "name": reg["name"],
-                "priority": reg["priority"],
-                "inference_layer": reg["inference_layer"],
-                "decision_count_7d": dc,
-                "avg_confidence": stats.get("avg_confidence", 0),
-                "avg_execution_ms": stats.get("avg_execution_ms", 0),
-                "last_decision_at": stats.get("last_decision_at"),
-                "constraint_violations_7d": vc,
-                "active_sessions": active_map.get(aid, 0),
-            })
+            agents.append(
+                {
+                    "agent_id": aid,
+                    "name": reg["name"],
+                    "priority": reg["priority"],
+                    "inference_layer": reg["inference_layer"],
+                    "decision_count_7d": dc,
+                    "avg_confidence": stats.get("avg_confidence", 0),
+                    "avg_execution_ms": stats.get("avg_execution_ms", 0),
+                    "last_decision_at": stats.get("last_decision_at"),
+                    "constraint_violations_7d": vc,
+                    "active_sessions": active_map.get(aid, 0),
+                }
+            )
 
         summary = {
             "total_agents": len(AGENT_REGISTRY),
@@ -149,9 +143,7 @@ class ForgeAIOpsService:
     #  单 Agent 详情
     # ──────────────────────────────────────────────────────────
 
-    async def get_agent_detail(
-        self, db: AsyncSession, agent_id: str, *, days: int = 7
-    ) -> dict:
+    async def get_agent_detail(self, db: AsyncSession, agent_id: str, *, days: int = 7) -> dict:
         """单 Agent 决策分布、置信度直方图、约束明细、日趋势。"""
         params = {"agent_id": agent_id, "days": days}
 
@@ -315,9 +307,7 @@ class ForgeAIOpsService:
 
         return {"items": items, "total": total, "page": page, "size": size}
 
-    async def get_trace_detail(
-        self, db: AsyncSession, session_id: str
-    ) -> dict:
+    async def get_trace_detail(self, db: AsyncSession, session_id: str) -> dict:
         """单次会话：运行信息 + 事件时间线。"""
         # 会话主记录
         run_result = await db.execute(
@@ -394,9 +384,7 @@ class ForgeAIOpsService:
     #  模型注册表 & LLM 成本
     # ──────────────────────────────────────────────────────────
 
-    async def get_model_registry(
-        self, db: AsyncSession, *, days: int = 30
-    ) -> list[dict]:
+    async def get_model_registry(self, db: AsyncSession, *, days: int = 30) -> list[dict]:
         """模型调用汇总：调用量 / 延迟 / Token / 成本 / 成功率。"""
         result = await db.execute(
             text("""
@@ -490,9 +478,7 @@ class ForgeAIOpsService:
             "totals": totals,
         }
 
-    async def get_llm_latency_stats(
-        self, db: AsyncSession, *, days: int = 7
-    ) -> dict:
+    async def get_llm_latency_stats(self, db: AsyncSession, *, days: int = 7) -> dict:
         """延迟百分位统计：全局 P50/P95/P99 + 按模型分解。"""
         # 全局百分位
         global_result = await db.execute(

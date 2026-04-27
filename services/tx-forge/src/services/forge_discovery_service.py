@@ -26,16 +26,16 @@ logger = structlog.get_logger(__name__)
 
 # ── 意图 → 分类映射（关键词匹配占位，后续接 Claude 解析） ──────
 _INTENT_KEYWORD_MAP: dict[str, list[str]] = {
-    "supply_chain":  ["采购", "库存", "供应链", "进货", "配送", "仓库"],
-    "delivery":      ["外卖", "配送", "骑手", "美团", "饿了么"],
-    "finance":       ["财务", "发票", "对账", "税务", "报销", "成本"],
-    "ai_addon":      ["AI", "智能", "预测", "推荐", "自动化", "机器人"],
-    "iot":           ["IoT", "传感器", "温控", "摄像头", "设备"],
-    "analytics":     ["报表", "分析", "数据", "仪表盘", "驾驶舱", "洞察"],
-    "marketing":     ["营销", "优惠券", "活动", "私域", "会员", "促销"],
-    "hr":            ["排班", "考勤", "薪资", "人力", "员工", "绩效"],
-    "payment":       ["支付", "收银", "结算", "刷卡", "微信支付"],
-    "compliance":    ["食安", "合规", "审计", "等保", "监管", "检查"],
+    "supply_chain": ["采购", "库存", "供应链", "进货", "配送", "仓库"],
+    "delivery": ["外卖", "配送", "骑手", "美团", "饿了么"],
+    "finance": ["财务", "发票", "对账", "税务", "报销", "成本"],
+    "ai_addon": ["AI", "智能", "预测", "推荐", "自动化", "机器人"],
+    "iot": ["IoT", "传感器", "温控", "摄像头", "设备"],
+    "analytics": ["报表", "分析", "数据", "仪表盘", "驾驶舱", "洞察"],
+    "marketing": ["营销", "优惠券", "活动", "私域", "会员", "促销"],
+    "hr": ["排班", "考勤", "薪资", "人力", "员工", "绩效"],
+    "payment": ["支付", "收银", "结算", "刷卡", "微信支付"],
+    "compliance": ["食安", "合规", "审计", "等保", "监管", "检查"],
 }
 
 # ── 角色定义 ──────────────────────────────────────────────────
@@ -466,11 +466,11 @@ class ForgeDiscoveryService:
         # 角色热门单应用（按安装量）
         # 根据角色映射分类
         role_category_map: dict[str, list[str]] = {
-            "品牌总监":   ["analytics", "marketing", "ai_addon"],
-            "门店店长":   ["iot", "hr", "compliance"],
-            "运营经理":   ["analytics", "supply_chain", "hr"],
-            "财务总监":   ["finance", "analytics", "payment"],
-            "IT负责人":   ["ai_addon", "iot", "compliance"],
+            "品牌总监": ["analytics", "marketing", "ai_addon"],
+            "门店店长": ["iot", "hr", "compliance"],
+            "运营经理": ["analytics", "supply_chain", "hr"],
+            "财务总监": ["finance", "analytics", "payment"],
+            "IT负责人": ["ai_addon", "iot", "compliance"],
             "供应链经理": ["supply_chain", "finance", "analytics"],
         }
         categories = role_category_map.get(role, [])
@@ -497,7 +497,6 @@ class ForgeDiscoveryService:
             "combos": combos,
             "top_apps": top_apps,
             "suggested_categories": [
-                {"category": cat, "name": APP_CATEGORIES.get(cat, {}).get("name", cat)}
-                for cat in categories
+                {"category": cat, "name": APP_CATEGORIES.get(cat, {}).get("name", cat)} for cat in categories
             ],
         }

@@ -18,19 +18,17 @@ from fastapi import HTTPException
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..constants import TRUST_TIERS
-
 logger = structlog.get_logger(__name__)
 
 # ── 证据卡片类型 + 权重 ──────────────────────────────────────
 CARD_TYPES: dict[str, dict] = {
-    "security_audit":    {"name": "安全审计",   "weight": 0.25},
-    "performance_test":  {"name": "性能测试",   "weight": 0.15},
-    "compliance_cert":   {"name": "合规认证",   "weight": 0.20},
-    "user_review":       {"name": "用户评价",   "weight": 0.10},
-    "uptime_sla":        {"name": "SLA 可用性", "weight": 0.15},
-    "data_handling":     {"name": "数据处理",   "weight": 0.10},
-    "incident_history":  {"name": "事故记录",   "weight": 0.05},
+    "security_audit": {"name": "安全审计", "weight": 0.25},
+    "performance_test": {"name": "性能测试", "weight": 0.15},
+    "compliance_cert": {"name": "合规认证", "weight": 0.20},
+    "user_review": {"name": "用户评价", "weight": 0.10},
+    "uptime_sla": {"name": "SLA 可用性", "weight": 0.15},
+    "data_handling": {"name": "数据处理", "weight": 0.10},
+    "incident_history": {"name": "事故记录", "weight": 0.05},
 }
 
 UPDATABLE_FIELDS = {"title", "summary", "evidence_data", "score", "is_active"}
@@ -211,9 +209,7 @@ class ForgeEvidenceService:
                 weighted_sum += best_score * weight
                 total_weight += weight
 
-        trust_score = round(
-            weighted_sum / total_weight, 1
-        ) if total_weight > 0 else 0.0
+        trust_score = round(weighted_sum / total_weight, 1) if total_weight > 0 else 0.0
 
         # 统计过期卡片
         expired_result = await db.execute(

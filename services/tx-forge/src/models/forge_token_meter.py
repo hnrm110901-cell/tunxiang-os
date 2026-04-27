@@ -1,6 +1,6 @@
 """Token 计量 ORM"""
 
-from sqlalchemy import String, Integer, BigInteger, Boolean
+from sqlalchemy import BigInteger, Boolean, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from shared.ontology.src.base import TenantBase

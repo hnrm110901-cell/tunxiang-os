@@ -1,4 +1,5 @@
 """宴会结算 ORM模型"""
+
 import uuid
 from datetime import datetime
 from typing import Optional
@@ -35,9 +36,28 @@ class BanquetSettlement(TenantBase):
     b2b_client_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True))
     b2b_monthly: Mapped[bool] = mapped_column(Boolean, default=False)
     notes: Mapped[Optional[str]] = mapped_column(Text)
-    __table_args__ = (Index("idx_bs_banquet", "tenant_id", "banquet_id"), Index("idx_bs_store", "tenant_id", "store_id"), {"comment": "宴会结算"})
+    __table_args__ = (
+        Index("idx_bs_banquet", "tenant_id", "banquet_id"),
+        Index("idx_bs_store", "tenant_id", "store_id"),
+        {"comment": "宴会结算"},
+    )
+
     def to_dict(self) -> dict:
-        return {"id": str(self.id), "settlement_no": self.settlement_no, "banquet_id": str(self.banquet_id), "contract_amount_fen": self.contract_amount_fen, "deposit_paid_fen": self.deposit_paid_fen, "live_order_amount_fen": self.live_order_amount_fen, "subtotal_fen": self.subtotal_fen, "balance_due_fen": self.balance_due_fen, "payment_method": self.payment_method, "invoice_status": self.invoice_status, "b2b_monthly": self.b2b_monthly, "settled_at": self.settled_at.isoformat() if self.settled_at else None}
+        return {
+            "id": str(self.id),
+            "settlement_no": self.settlement_no,
+            "banquet_id": str(self.banquet_id),
+            "contract_amount_fen": self.contract_amount_fen,
+            "deposit_paid_fen": self.deposit_paid_fen,
+            "live_order_amount_fen": self.live_order_amount_fen,
+            "subtotal_fen": self.subtotal_fen,
+            "balance_due_fen": self.balance_due_fen,
+            "payment_method": self.payment_method,
+            "invoice_status": self.invoice_status,
+            "b2b_monthly": self.b2b_monthly,
+            "settled_at": self.settled_at.isoformat() if self.settled_at else None,
+        }
+
 
 class BanquetSettlementItem(TenantBase):
     __tablename__ = "banquet_settlement_items"
@@ -50,5 +70,15 @@ class BanquetSettlementItem(TenantBase):
     source: Mapped[str] = mapped_column(String(30), default="contract")
     source_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True))
     __table_args__ = (Index("idx_bsi_settlement", "tenant_id", "settlement_id"), {"comment": "结算明细"})
+
     def to_dict(self) -> dict:
-        return {"id": str(self.id), "settlement_id": str(self.settlement_id), "item_type": self.item_type, "item_name": self.item_name, "quantity": self.quantity, "unit_price_fen": self.unit_price_fen, "subtotal_fen": self.subtotal_fen, "source": self.source}
+        return {
+            "id": str(self.id),
+            "settlement_id": str(self.settlement_id),
+            "item_type": self.item_type,
+            "item_name": self.item_name,
+            "quantity": self.quantity,
+            "unit_price_fen": self.unit_price_fen,
+            "subtotal_fen": self.subtotal_fen,
+            "source": self.source,
+        }

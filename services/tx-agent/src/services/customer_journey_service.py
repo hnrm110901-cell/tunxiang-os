@@ -706,7 +706,9 @@ class CustomerJourneyService:
             audience_filter = tpl.audience_filter or {}
             if audience_filter:
                 passed = await self._check_audience_filter(
-                    cid, tid, audience_filter,
+                    cid,
+                    tid,
+                    audience_filter,
                 )
                 if not passed:
                     logger.debug(

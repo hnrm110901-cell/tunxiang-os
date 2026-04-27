@@ -19,7 +19,6 @@
 
 import os
 import uuid
-from typing import Optional
 
 import httpx
 import structlog
@@ -56,12 +55,7 @@ class ApprovalNotifyService:
         )
 
         title = f"【待审批】{object_type} - {object_name}"
-        description = (
-            f"申请人：{requester_name}\n"
-            f"类型：{object_type}\n"
-            f"摘要：{object_name}\n"
-            f"请在审批截止前处理"
-        )
+        description = f"申请人：{requester_name}\n类型：{object_type}\n摘要：{object_name}\n请在审批截止前处理"
         detail_url = f"{self.FRONTEND_BASE_URL}/approval/{request_id}"
 
         for wecom_id in approver_wecom_ids:
@@ -82,9 +76,7 @@ class ApprovalNotifyService:
         tenant_id: uuid.UUID,
     ) -> None:
         """审批通过 — 通知申请人。"""
-        message = (
-            f"您的 {object_type}「{object_name}」审批已全部通过，系统将自动激活。"
-        )
+        message = f"您的 {object_type}「{object_name}」审批已全部通过，系统将自动激活。"
         await self._send_text_to_employee(
             employee_id=requester_id,
             content=message,
@@ -100,10 +92,7 @@ class ApprovalNotifyService:
         tenant_id: uuid.UUID,
     ) -> None:
         """审批拒绝 — 通知申请人（含拒绝原因）。"""
-        message = (
-            f"您的 {object_type}「{object_name}」审批被拒绝，"
-            f"原因：{reason}。请修改后重新提交。"
-        )
+        message = f"您的 {object_type}「{object_name}」审批被拒绝，原因：{reason}。请修改后重新提交。"
         await self._send_text_to_employee(
             employee_id=requester_id,
             content=message,
@@ -118,9 +107,7 @@ class ApprovalNotifyService:
         tenant_id: uuid.UUID,
     ) -> None:
         """审批超时 — 通知申请人。"""
-        message = (
-            f"您的 {object_type}「{object_name}」审批已超时，请重新提交审批申请。"
-        )
+        message = f"您的 {object_type}「{object_name}」审批已超时，请重新提交审批申请。"
         await self._send_text_to_employee(
             employee_id=requester_id,
             content=message,
@@ -145,9 +132,7 @@ class ApprovalNotifyService:
 
         title = f"【审批升级】{object_type} - {object_name}"
         description = (
-            f"申请人：{requester_name}\n"
-            f"原审批角色 {original_role} 未在规定时间内处理\n"
-            f"已升级到您的角色，请尽快审批"
+            f"申请人：{requester_name}\n原审批角色 {original_role} 未在规定时间内处理\n已升级到您的角色，请尽快审批"
         )
         detail_url = f"{self.FRONTEND_BASE_URL}/approval/{request_id}"
 
@@ -303,11 +288,7 @@ class ApprovalNotifyService:
 
             data = resp.json()
             employees: list[dict] = data.get("data", {}).get("items", [])
-            return [
-                emp["wecom_user_id"]
-                for emp in employees
-                if emp.get("wecom_user_id")
-            ]
+            return [emp["wecom_user_id"] for emp in employees if emp.get("wecom_user_id")]
         except (httpx.HTTPStatusError, httpx.ConnectError, httpx.TimeoutException) as exc:
             log.warning(
                 "approval_notify.fetch_approvers_failed",

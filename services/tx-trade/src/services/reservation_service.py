@@ -862,16 +862,18 @@ class ReservationService:
                 min_cap, max_cap = config["capacity"]
                 if min_cap <= guest_count <= max_cap:
                     conflicts = await self.check_conflicts(store_id, date, "11:00", room_name=name)
-                    results.append({
-                        "room_code": name,
-                        "room_name": name,
-                        "room_type": "private",
-                        "min_guests": min_cap,
-                        "max_guests": max_cap,
-                        "deposit_fen": config.get("min_spend_fen", 0),
-                        "available": len(conflicts) == 0,
-                        "conflict_count": len(conflicts),
-                    })
+                    results.append(
+                        {
+                            "room_code": name,
+                            "room_name": name,
+                            "room_type": "private",
+                            "min_guests": min_cap,
+                            "max_guests": max_cap,
+                            "deposit_fen": config.get("min_spend_fen", 0),
+                            "available": len(conflicts) == 0,
+                            "conflict_count": len(conflicts),
+                        }
+                    )
             return results
 
         results = []
@@ -879,19 +881,20 @@ class ReservationService:
             # 检查该包间当天是否有冲突（全天任意时段）
             active_records = await self._repo.list_by_store_date_active(store_id, date)
             conflict_count = sum(
-                1 for r in active_records
-                if r.room_name == room.room_code or r.room_name == room.room_name
+                1 for r in active_records if r.room_name == room.room_code or r.room_name == room.room_name
             )
-            results.append({
-                "room_code": room.room_code,
-                "room_name": room.room_name,
-                "room_type": room.room_type,
-                "min_guests": room.min_guests,
-                "max_guests": room.max_guests,
-                "deposit_fen": room.deposit_fen,
-                "available": True,  # 包间在某些时段可用
-                "conflict_count": conflict_count,
-            })
+            results.append(
+                {
+                    "room_code": room.room_code,
+                    "room_name": room.room_name,
+                    "room_type": room.room_type,
+                    "min_guests": room.min_guests,
+                    "max_guests": room.max_guests,
+                    "deposit_fen": room.deposit_fen,
+                    "available": True,  # 包间在某些时段可用
+                    "conflict_count": conflict_count,
+                }
+            )
 
         return results
 
@@ -923,7 +926,10 @@ class ReservationService:
 
             # 统计该时段已有预订数
             reserved_count = await self._config_repo.count_reservations_in_slot(
-                store_id, date, start_str, end_str,
+                store_id,
+                date,
+                start_str,
+                end_str,
             )
 
             max_res = slot.max_reservations
@@ -933,17 +939,19 @@ class ReservationService:
                 available = False
                 reason = f"该时段已满（{reserved_count}/{max_res}）"
 
-            results.append({
-                "id": str(slot.id),
-                "slot_name": slot.slot_name,
-                "start_time": start_str,
-                "end_time": end_str,
-                "dining_duration_min": slot.dining_duration_min,
-                "max_reservations": max_res,
-                "current_reservations": reserved_count,
-                "available": available,
-                "reason": reason,
-            })
+            results.append(
+                {
+                    "id": str(slot.id),
+                    "slot_name": slot.slot_name,
+                    "start_time": start_str,
+                    "end_time": end_str,
+                    "dining_duration_min": slot.dining_duration_min,
+                    "max_reservations": max_res,
+                    "current_reservations": reserved_count,
+                    "available": available,
+                    "reason": reason,
+                }
+            )
 
         return results
 
@@ -979,14 +987,18 @@ class ReservationService:
                     break
 
             conflicts = await self.check_conflicts(
-                store_id, date, time_slot,
+                store_id,
+                date,
+                time_slot,
                 duration_min=duration,
                 room_name=db_room.room_code,
             )
             # 也检查 room_name 匹配的冲突
             if not conflicts:
                 conflicts = await self.check_conflicts(
-                    store_id, date, time_slot,
+                    store_id,
+                    date,
+                    time_slot,
                     duration_min=duration,
                     room_name=db_room.room_name,
                 )
@@ -1003,7 +1015,9 @@ class ReservationService:
             raise ValueError(f"Unknown room: {room_code}")
 
         conflicts = await self.check_conflicts(
-            store_id, date, time_slot,
+            store_id,
+            date,
+            time_slot,
             room_name=room_code,
         )
         return {

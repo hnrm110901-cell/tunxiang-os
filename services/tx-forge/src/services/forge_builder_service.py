@@ -1,14 +1,12 @@
 """Forge Builder 可视化Agent构建器 — PostgreSQL 异步实现 (v2.5)"""
 
 import json
-from datetime import datetime, timezone
 from uuid import uuid4
 
+import structlog
 from fastapi import HTTPException
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
-
-import structlog
 
 log = structlog.get_logger(__name__)
 
@@ -111,9 +109,7 @@ class ForgeBuilderService:
 
         where = " AND ".join(conditions)
 
-        total_row = await db.execute(
-            text(f"SELECT count(*) FROM forge_builder_projects WHERE {where}"), params
-        )
+        total_row = await db.execute(text(f"SELECT count(*) FROM forge_builder_projects WHERE {where}"), params)
         total = total_row.scalar() or 0
 
         rows = await db.execute(
@@ -147,9 +143,7 @@ class ForgeBuilderService:
         return dict(row)
 
     # ── 更新项目 ─────────────────────────────────────────────
-    async def update_project(
-        self, db: AsyncSession, project_id: str, updates: dict
-    ) -> dict:
+    async def update_project(self, db: AsyncSession, project_id: str, updates: dict) -> dict:
         invalid_keys = set(updates.keys()) - self._ALLOWED_UPDATE_FIELDS
         if invalid_keys:
             raise HTTPException(
@@ -180,7 +174,7 @@ class ForgeBuilderService:
         result = await db.execute(
             text(f"""
                 UPDATE forge_builder_projects
-                SET {', '.join(set_parts)}
+                SET {", ".join(set_parts)}
                 WHERE project_id = :pid AND is_deleted = false
                 RETURNING project_id, project_name, status, updated_at
             """),
@@ -241,9 +235,7 @@ class ForgeBuilderService:
         }
 
     # ── 模板列表 ─────────────────────────────────────────────
-    async def list_templates(
-        self, db: AsyncSession, *, template_type: str | None = None
-    ) -> list[dict]:
+    async def list_templates(self, db: AsyncSession, *, template_type: str | None = None) -> list[dict]:
         conditions = ["is_deleted = false"]
         params: dict = {}
 

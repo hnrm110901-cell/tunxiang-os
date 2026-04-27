@@ -2,11 +2,10 @@
 
 from uuid import uuid4
 
+import structlog
 from fastapi import HTTPException
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
-
-import structlog
 
 from ..constants import REVIEW_DECISIONS
 
@@ -157,9 +156,7 @@ class ForgeReviewService:
         return {"items": items, "total": total}
 
     # ── 审核历史 ─────────────────────────────────────────────
-    async def get_review_history(
-        self, db: AsyncSession, app_id: str
-    ) -> list[dict]:
+    async def get_review_history(self, db: AsyncSession, app_id: str) -> list[dict]:
         result = await db.execute(
             text("""
                 SELECT review_id, app_id, reviewer_id, decision,

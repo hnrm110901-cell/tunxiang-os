@@ -1,10 +1,13 @@
 from __future__ import annotations
+
 from typing import Any, Dict, Optional
 from uuid import UUID
+
 import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from shared.ontology.src.database import get_db
 
 router = APIRouter(prefix="/api/v1/forge/developers", tags=["developers"])
@@ -47,7 +50,9 @@ async def list_developers(
     params: Dict[str, Any] = {"tid": x_tenant_id, "limit": size, "offset": offset}
     if status:
         params["status"] = status
-    rows = await db.execute(text(f"SELECT * FROM forge.developers {where} ORDER BY created_at DESC LIMIT :limit OFFSET :offset"), params)
+    rows = await db.execute(
+        text(f"SELECT * FROM forge.developers {where} ORDER BY created_at DESC LIMIT :limit OFFSET :offset"), params
+    )
     return {"items": [dict(r) for r in rows.mappings().all()], "page": page, "size": size}
 
 
@@ -58,7 +63,10 @@ async def get_developer(
     x_tenant_id: str = Header(...),
 ) -> Dict[str, Any]:
     await _set_tenant(db, x_tenant_id)
-    row = await db.execute(text("SELECT * FROM forge.developers WHERE id = :id AND tenant_id = :tid"), {"id": str(developer_id), "tid": x_tenant_id})
+    row = await db.execute(
+        text("SELECT * FROM forge.developers WHERE id = :id AND tenant_id = :tid"),
+        {"id": str(developer_id), "tid": x_tenant_id},
+    )
     result = row.mappings().first()
     if not result:
         raise HTTPException(404, "Developer not found")
@@ -75,7 +83,10 @@ async def update_developer(
     await _set_tenant(db, x_tenant_id)
     sets = ", ".join(f"{k} = :{k}" for k in body)
     params = {**body, "id": str(developer_id), "tid": x_tenant_id}
-    result = await db.execute(text(f"UPDATE forge.developers SET {sets}, updated_at = now() WHERE id = :id AND tenant_id = :tid RETURNING *"), params)
+    result = await db.execute(
+        text(f"UPDATE forge.developers SET {sets}, updated_at = now() WHERE id = :id AND tenant_id = :tid RETURNING *"),
+        params,
+    )
     await db.commit()
     row = result.mappings().first()
     if not row:

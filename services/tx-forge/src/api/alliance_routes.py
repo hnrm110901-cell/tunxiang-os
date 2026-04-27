@@ -8,6 +8,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
+
 from ..schemas.alliance_schemas import AllianceListingCreate
 
 router = APIRouter(prefix="/api/v1/forge/alliance", tags=["跨品牌联盟"])
@@ -72,9 +73,7 @@ async def list_listings(
         params["sharing_mode"] = sharing_mode
     where = " AND ".join(clauses)
 
-    total_row = await db.execute(
-        text(f"SELECT COUNT(*) FROM forge.alliance_listings WHERE {where}"), params
-    )
+    total_row = await db.execute(text(f"SELECT COUNT(*) FROM forge.alliance_listings WHERE {where}"), params)
     total = total_row.scalar() or 0
 
     rows = await db.execute(

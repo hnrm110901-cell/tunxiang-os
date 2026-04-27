@@ -3,11 +3,10 @@
 import json
 from uuid import uuid4
 
+import structlog
 from fastapi import HTTPException
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
-
-import structlog
 
 log = structlog.get_logger(__name__)
 
@@ -116,9 +115,7 @@ class ForgeAllianceService:
 
         where = " AND ".join(conditions)
 
-        total_row = await db.execute(
-            text(f"SELECT count(*) FROM forge_alliance_listings l WHERE {where}"), params
-        )
+        total_row = await db.execute(text(f"SELECT count(*) FROM forge_alliance_listings l WHERE {where}"), params)
         total = total_row.scalar() or 0
 
         rows = await db.execute(
@@ -174,9 +171,7 @@ class ForgeAllianceService:
         return listing
 
     # ── 安装联盟应用 ─────────────────────────────────────────
-    async def install_alliance_app(
-        self, db: AsyncSession, *, listing_id: str
-    ) -> dict:
+    async def install_alliance_app(self, db: AsyncSession, *, listing_id: str) -> dict:
         # 获取 listing
         listing_row = await db.execute(
             text("""

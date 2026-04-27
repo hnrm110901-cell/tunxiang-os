@@ -1,7 +1,5 @@
 """Token计量 Pydantic schemas"""
 
-from typing import Optional
-
 from pydantic import BaseModel
 
 

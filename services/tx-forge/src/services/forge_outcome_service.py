@@ -13,7 +13,6 @@
 from __future__ import annotations
 
 import json
-import math
 from uuid import uuid4
 
 import structlog
@@ -27,12 +26,12 @@ logger = structlog.get_logger(__name__)
 
 # ── 允许值枚举 ────────────────────────────────────────────────
 OUTCOME_TYPES = {
-    "resolution",       # 问题解决（客服场景）
-    "conversion",       # 转化（营销场景）
-    "retention",        # 留存（会员场景）
-    "cost_saving",      # 降本（运营场景）
+    "resolution",  # 问题解决（客服场景）
+    "conversion",  # 转化（营销场景）
+    "retention",  # 留存（会员场景）
+    "cost_saving",  # 降本（运营场景）
     "compliance_pass",  # 合规通过（食安/财务）
-    "custom",           # 自定义
+    "custom",  # 自定义
 }
 
 MEASUREMENT_METHODS = {"event_count", "duration", "value_delta", "manual"}
@@ -232,7 +231,8 @@ class ForgeOutcomeService:
                     "store_id": store_id or "platform",
                     "amount_fen": price_fen,
                     "platform_fee_fen": int(price_fen * PRICING_MODELS["usage_based"]["platform_fee_rate"]),
-                    "developer_payout_fen": price_fen - int(price_fen * PRICING_MODELS["usage_based"]["platform_fee_rate"]),
+                    "developer_payout_fen": price_fen
+                    - int(price_fen * PRICING_MODELS["usage_based"]["platform_fee_rate"]),
                     "fee_rate": PRICING_MODELS["usage_based"]["platform_fee_rate"],
                 },
             )
@@ -297,7 +297,10 @@ class ForgeOutcomeService:
                     "store_id": row_dict["store_id"] or "platform",
                     "neg_amount": -row_dict["revenue_fen"],
                     "neg_fee": -int(row_dict["revenue_fen"] * PRICING_MODELS["usage_based"]["platform_fee_rate"]),
-                    "neg_payout": -(row_dict["revenue_fen"] - int(row_dict["revenue_fen"] * PRICING_MODELS["usage_based"]["platform_fee_rate"])),
+                    "neg_payout": -(
+                        row_dict["revenue_fen"]
+                        - int(row_dict["revenue_fen"] * PRICING_MODELS["usage_based"]["platform_fee_rate"])
+                    ),
                     "fee_rate": PRICING_MODELS["usage_based"]["platform_fee_rate"],
                 },
             )
@@ -374,19 +377,19 @@ class ForgeOutcomeService:
             confidence = float(log_entry.get("confidence") or 0.5)
             raw_weight = time_factor * confidence
             total_raw_weight += raw_weight
-            attributed_agents.append({
-                "agent_id": log_entry["agent_id"],
-                "decision_id": str(log_entry["id"]),
-                "decision_type": log_entry["decision_type"],
-                "raw_weight": raw_weight,
-                "weight": 0.0,  # 归一化后填充
-            })
+            attributed_agents.append(
+                {
+                    "agent_id": log_entry["agent_id"],
+                    "decision_id": str(log_entry["id"]),
+                    "decision_type": log_entry["decision_type"],
+                    "raw_weight": raw_weight,
+                    "weight": 0.0,  # 归一化后填充
+                }
+            )
 
         # 归一化权重
         for agent in attributed_agents:
-            agent["weight"] = round(
-                agent["raw_weight"] / total_raw_weight, 4
-            ) if total_raw_weight > 0 else 0.0
+            agent["weight"] = round(agent["raw_weight"] / total_raw_weight, 4) if total_raw_weight > 0 else 0.0
             del agent["raw_weight"]
 
         # 记录结果事件

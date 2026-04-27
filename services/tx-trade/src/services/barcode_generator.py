@@ -68,7 +68,4 @@ def generate_barcodes_for_order(
     Returns:
         条码列表，按序号排列
     """
-    return [
-        generate_barcode(store_code, table_no, seq=i + 1, order_time=order_time)
-        for i in range(item_count)
-    ]
+    return [generate_barcode(store_code, table_no, seq=i + 1, order_time=order_time) for i in range(item_count)]

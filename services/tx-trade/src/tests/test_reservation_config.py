@@ -537,28 +537,32 @@ def test_get_available_fallback(MockService):
     """无数据库配置时应 fallback 到硬编码配置并返回数据。"""
     db = _make_mock_db()
     mock_svc = AsyncMock()
-    mock_svc.get_available_rooms = AsyncMock(return_value=[
-        {
-            "room_code": "梅花厅",
-            "room_name": "梅花厅",
-            "room_type": "private",
-            "min_guests": 4,
-            "max_guests": 8,
-            "deposit_fen": 80000,
-            "available": True,
-            "conflict_count": 0,
-        }
-    ])
-    mock_svc.get_available_time_slots = AsyncMock(return_value=[
-        {
-            "time": "11:00",
-            "meal": "lunch",
-            "label": "午餐 11:00",
-            "available": True,
-            "conflict_count": 0,
-            "reason": "",
-        }
-    ])
+    mock_svc.get_available_rooms = AsyncMock(
+        return_value=[
+            {
+                "room_code": "梅花厅",
+                "room_name": "梅花厅",
+                "room_type": "private",
+                "min_guests": 4,
+                "max_guests": 8,
+                "deposit_fen": 80000,
+                "available": True,
+                "conflict_count": 0,
+            }
+        ]
+    )
+    mock_svc.get_available_time_slots = AsyncMock(
+        return_value=[
+            {
+                "time": "11:00",
+                "meal": "lunch",
+                "label": "午餐 11:00",
+                "available": True,
+                "conflict_count": 0,
+                "reason": "",
+            }
+        ]
+    )
     MockService.return_value = mock_svc
 
     client = TestClient(_make_app_with_db(db))

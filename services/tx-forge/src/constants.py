@@ -2,34 +2,40 @@
 
 # ── 应用分类 ──────────────────────────────────────────────
 APP_CATEGORIES: dict[str, dict] = {
-    "supply_chain":  {"name": "供应链",   "icon": "📦", "description": "采购、库存、配送管理"},
-    "delivery":      {"name": "外卖配送", "icon": "🛵", "description": "外卖平台对接与骑手调度"},
-    "finance":       {"name": "财务",     "icon": "💰", "description": "发票、对账、税务合规"},
-    "ai_addon":      {"name": "AI增值",   "icon": "🤖", "description": "智能推荐、预测、自动化"},
-    "iot":           {"name": "IoT设备",  "icon": "📡", "description": "智能厨房、传感器、物联网"},
-    "analytics":     {"name": "数据分析", "icon": "📊", "description": "经营报表与决策洞察"},
-    "marketing":     {"name": "营销",     "icon": "📣", "description": "优惠券、活动、私域运营"},
-    "hr":            {"name": "人力资源", "icon": "👥", "description": "排班、考勤、薪资管理"},
-    "payment":       {"name": "支付",     "icon": "💳", "description": "聚合支付与资金管理"},
-    "compliance":    {"name": "合规",     "icon": "🛡️", "description": "食品安全、等保、审计"},
+    "supply_chain": {"name": "供应链", "icon": "📦", "description": "采购、库存、配送管理"},
+    "delivery": {"name": "外卖配送", "icon": "🛵", "description": "外卖平台对接与骑手调度"},
+    "finance": {"name": "财务", "icon": "💰", "description": "发票、对账、税务合规"},
+    "ai_addon": {"name": "AI增值", "icon": "🤖", "description": "智能推荐、预测、自动化"},
+    "iot": {"name": "IoT设备", "icon": "📡", "description": "智能厨房、传感器、物联网"},
+    "analytics": {"name": "数据分析", "icon": "📊", "description": "经营报表与决策洞察"},
+    "marketing": {"name": "营销", "icon": "📣", "description": "优惠券、活动、私域运营"},
+    "hr": {"name": "人力资源", "icon": "👥", "description": "排班、考勤、薪资管理"},
+    "payment": {"name": "支付", "icon": "💳", "description": "聚合支付与资金管理"},
+    "compliance": {"name": "合规", "icon": "🛡️", "description": "食品安全、等保、审计"},
 }
 
 # ── 定价模型 ──────────────────────────────────────────────
 PRICING_MODELS: dict[str, dict] = {
-    "free":         {"name": "免费",       "platform_fee_rate": 0.00},
-    "one_time":     {"name": "一次性买断", "platform_fee_rate": 0.20},
-    "monthly":      {"name": "月订阅",     "platform_fee_rate": 0.15},
-    "per_store":    {"name": "按门店计费", "platform_fee_rate": 0.15},
-    "usage_based":  {"name": "按用量计费", "platform_fee_rate": 0.10},
-    "freemium":     {"name": "免费增值",   "platform_fee_rate": 0.15},
+    "free": {"name": "免费", "platform_fee_rate": 0.00},
+    "one_time": {"name": "一次性买断", "platform_fee_rate": 0.20},
+    "monthly": {"name": "月订阅", "platform_fee_rate": 0.15},
+    "per_store": {"name": "按门店计费", "platform_fee_rate": 0.15},
+    "usage_based": {"name": "按用量计费", "platform_fee_rate": 0.10},
+    "freemium": {"name": "免费增值", "platform_fee_rate": 0.15},
 }
 
 # ── 枚举集合 ──────────────────────────────────────────────
 DEV_TYPES: set[str] = {"individual", "company", "internal"}
 
 APP_STATUSES: set[str] = {
-    "draft", "submitted", "in_review", "approved",
-    "published", "rejected", "suspended", "deprecated",
+    "draft",
+    "submitted",
+    "in_review",
+    "approved",
+    "published",
+    "rejected",
+    "suspended",
+    "deprecated",
 }
 
 REVIEW_DECISIONS: set[str] = {"approved", "rejected", "needs_revision"}
@@ -38,15 +44,15 @@ PAYOUT_STATUSES: set[str] = {"pending", "processing", "completed", "failed"}
 
 # ── AI Agent 注册表 ───────────────────────────────────────
 AGENT_REGISTRY: list[dict] = [
-    {"agent_id": "discount_guardian",   "name": "折扣守护", "priority": "P0", "inference_layer": "edge+cloud"},
-    {"agent_id": "menu_recommender",    "name": "智能排菜", "priority": "P0", "inference_layer": "cloud"},
-    {"agent_id": "kitchen_dispatcher",  "name": "出餐调度", "priority": "P1", "inference_layer": "edge"},
-    {"agent_id": "member_insight",      "name": "会员洞察", "priority": "P1", "inference_layer": "cloud"},
-    {"agent_id": "inventory_alerter",   "name": "库存预警", "priority": "P1", "inference_layer": "edge+cloud"},
-    {"agent_id": "finance_auditor",     "name": "财务稽核", "priority": "P1", "inference_layer": "cloud"},
-    {"agent_id": "patrol_inspector",    "name": "巡店质检", "priority": "P2", "inference_layer": "cloud"},
-    {"agent_id": "smart_service",       "name": "智能客服", "priority": "P2", "inference_layer": "cloud"},
-    {"agent_id": "private_domain",      "name": "私域运营", "priority": "P2", "inference_layer": "cloud"},
+    {"agent_id": "discount_guardian", "name": "折扣守护", "priority": "P0", "inference_layer": "edge+cloud"},
+    {"agent_id": "menu_recommender", "name": "智能排菜", "priority": "P0", "inference_layer": "cloud"},
+    {"agent_id": "kitchen_dispatcher", "name": "出餐调度", "priority": "P1", "inference_layer": "edge"},
+    {"agent_id": "member_insight", "name": "会员洞察", "priority": "P1", "inference_layer": "cloud"},
+    {"agent_id": "inventory_alerter", "name": "库存预警", "priority": "P1", "inference_layer": "edge+cloud"},
+    {"agent_id": "finance_auditor", "name": "财务稽核", "priority": "P1", "inference_layer": "cloud"},
+    {"agent_id": "patrol_inspector", "name": "巡店质检", "priority": "P2", "inference_layer": "cloud"},
+    {"agent_id": "smart_service", "name": "智能客服", "priority": "P2", "inference_layer": "cloud"},
+    {"agent_id": "private_domain", "name": "私域运营", "priority": "P2", "inference_layer": "cloud"},
 ]
 
 # ─── v1.5 Trust & Governance ──────────────────────────────────────────
@@ -62,8 +68,13 @@ TRUST_TIERS = {
 TRUST_AUDIT_TYPES = {"upgrade", "downgrade", "initial", "suspend"}
 
 VIOLATION_TYPES = {
-    "permission_denied", "token_exceeded", "rate_limited",
-    "constraint_violated", "kill_switched", "data_boundary", "action_blocked"
+    "permission_denied",
+    "token_exceeded",
+    "rate_limited",
+    "constraint_violated",
+    "kill_switched",
+    "data_boundary",
+    "action_blocked",
 }
 
 VIOLATION_SEVERITIES = {"P0", "P1", "P2", "P3"}
@@ -91,9 +102,14 @@ OWASP_AGENTIC_TOP10 = [
 # ─── v2.0 Agent Exchange ──────────────────────────────────────────────
 
 OUTCOME_TYPES = {
-    "conversion", "retention", "revenue_lift", "cost_saved",
-    "complaint_resolved", "recommendation_accepted",
-    "churn_prevented", "upsell_success"
+    "conversion",
+    "retention",
+    "revenue_lift",
+    "cost_saved",
+    "complaint_resolved",
+    "recommendation_accepted",
+    "churn_prevented",
+    "upsell_success",
 }
 
 MEASUREMENT_METHODS = {"event_count", "delta_compare", "attribution"}
@@ -101,8 +117,13 @@ MEASUREMENT_METHODS = {"event_count", "delta_compare", "attribution"}
 VERIFICATION_METHODS = {"auto", "manual", "hybrid"}
 
 EVIDENCE_CARD_TYPES = {
-    "security_scan", "performance_benchmark", "compliance_cert",
-    "guardrail_test", "customer_case", "data_privacy", "uptime_sla"
+    "security_scan",
+    "performance_benchmark",
+    "compliance_cert",
+    "guardrail_test",
+    "customer_case",
+    "data_privacy",
+    "uptime_sla",
 }
 
 TARGET_ROLES = {"品牌总监", "门店店长", "运营经理", "财务总监"}

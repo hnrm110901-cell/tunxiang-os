@@ -17,12 +17,12 @@ logger = structlog.get_logger()
 
 # 出菜序配置
 COURSE_CONFIG = {
-    "cold_dish":    {"name": "凉菜",     "order": 1, "offset_min": 0},
-    "hot_dish":     {"name": "热菜",     "order": 2, "offset_min": 15},
-    "main_course":  {"name": "大菜",     "order": 3, "offset_min": 30},
-    "staple":       {"name": "主食",     "order": 4, "offset_min": 50},
-    "soup":         {"name": "汤",       "order": 5, "offset_min": 55},
-    "dessert":      {"name": "甜品/水果", "order": 6, "offset_min": 65},
+    "cold_dish": {"name": "凉菜", "order": 1, "offset_min": 0},
+    "hot_dish": {"name": "热菜", "order": 2, "offset_min": 15},
+    "main_course": {"name": "大菜", "order": 3, "offset_min": 30},
+    "staple": {"name": "主食", "order": 4, "offset_min": 50},
+    "soup": {"name": "汤", "order": 5, "offset_min": 55},
+    "dessert": {"name": "甜品/水果", "order": 6, "offset_min": 65},
 }
 
 # 时段→开餐时间
@@ -87,19 +87,21 @@ class BanquetProductionService:
             target_time = time(min(target_h, 23), target_m)
 
             task_id = str(uuid.uuid4())
-            tasks_to_insert.append({
-                "id": task_id,
-                "tid": self.tenant_id,
-                "plan_id": plan_id,
-                "course_no": course_no,
-                "course_name": config["name"],
-                "dish_id": dish.get("product_id") or dish.get("dish_id"),
-                "dish_name": dish.get("dish_name", dish.get("name", "未知菜品")),
-                "quantity": table_count,
-                "prep_time_min": dish.get("prep_time_min", 15),
-                "cook_time_min": dish.get("cook_time_min", 10),
-                "target_serve_time": target_time.isoformat(),
-            })
+            tasks_to_insert.append(
+                {
+                    "id": task_id,
+                    "tid": self.tenant_id,
+                    "plan_id": plan_id,
+                    "course_no": course_no,
+                    "course_name": config["name"],
+                    "dish_id": dish.get("product_id") or dish.get("dish_id"),
+                    "dish_name": dish.get("dish_name", dish.get("name", "未知菜品")),
+                    "quantity": table_count,
+                    "prep_time_min": dish.get("prep_time_min", 15),
+                    "cook_time_min": dish.get("cook_time_min", 10),
+                    "target_serve_time": target_time.isoformat(),
+                }
+            )
 
         # 计算备菜开始时间(最早任务的prep_time_min之前)
         if tasks_to_insert:
@@ -139,10 +141,15 @@ class BanquetProductionService:
                     :timeline::jsonb, :staff::jsonb, 'planned')
             """),
             {
-                "id": plan_id, "tid": self.tenant_id, "bid": banquet_id,
-                "sid": store_id, "pdate": event_date,
-                "dishes": total_dishes, "servings": total_servings,
-                "prep": prep_start.isoformat(), "svc": service_start.isoformat(),
+                "id": plan_id,
+                "tid": self.tenant_id,
+                "bid": banquet_id,
+                "sid": store_id,
+                "pdate": event_date,
+                "dishes": total_dishes,
+                "servings": total_servings,
+                "prep": prep_start.isoformat(),
+                "svc": service_start.isoformat(),
                 "timeline": json.dumps(course_timeline, ensure_ascii=False),
                 "staff": json.dumps(staff_required),
             },
@@ -164,12 +171,20 @@ class BanquetProductionService:
             )
 
         await self.db.flush()
-        logger.info("banquet_production_plan_generated", plan_id=plan_id, banquet_id=banquet_id,
-                     dishes=total_dishes, servings=total_servings)
+        logger.info(
+            "banquet_production_plan_generated",
+            plan_id=plan_id,
+            banquet_id=banquet_id,
+            dishes=total_dishes,
+            servings=total_servings,
+        )
 
         return {
-            "id": plan_id, "banquet_id": banquet_id, "plan_date": event_date.isoformat(),
-            "total_dishes": total_dishes, "total_servings": total_servings,
+            "id": plan_id,
+            "banquet_id": banquet_id,
+            "plan_date": event_date.isoformat(),
+            "total_dishes": total_dishes,
+            "total_servings": total_servings,
             "prep_start_time": prep_start.isoformat(),
             "service_start_time": service_start.isoformat(),
             "staff_required": staff_required,
@@ -191,9 +206,12 @@ class BanquetProductionService:
                     RETURNING id
                 """),
                 {
-                    "task_id": a["task_id"], "tid": self.tenant_id,
-                    "chef_id": a.get("chef_id"), "chef_name": a.get("chef_name"),
-                    "station_id": a.get("station_id"), "station_name": a.get("station_name"),
+                    "task_id": a["task_id"],
+                    "tid": self.tenant_id,
+                    "chef_id": a.get("chef_id"),
+                    "chef_name": a.get("chef_name"),
+                    "station_id": a.get("station_id"),
+                    "station_name": a.get("station_name"),
                 },
             )
             if result.mappings().first():
@@ -215,7 +233,9 @@ class BanquetProductionService:
         }
 
         row = await self.db.execute(
-            text("SELECT status FROM banquet_production_tasks WHERE id = :id AND tenant_id = :tid AND is_deleted = FALSE"),
+            text(
+                "SELECT status FROM banquet_production_tasks WHERE id = :id AND tenant_id = :tid AND is_deleted = FALSE"
+            ),
             {"id": task_id, "tid": self.tenant_id},
         )
         current = row.scalar_one_or_none()
@@ -232,7 +252,9 @@ class BanquetProductionService:
             extra_sql = ", completed_at = :now"
 
         await self.db.execute(
-            text(f"UPDATE banquet_production_tasks SET status = :status, updated_at = :now {extra_sql} WHERE id = :id AND tenant_id = :tid"),
+            text(
+                f"UPDATE banquet_production_tasks SET status = :status, updated_at = :now {extra_sql} WHERE id = :id AND tenant_id = :tid"
+            ),
             {"id": task_id, "tid": self.tenant_id, "status": new_status, "now": now},
         )
         await self.db.flush()
@@ -250,7 +272,9 @@ class BanquetProductionService:
             raise ValueError(f"排产计划不存在: {plan_id}")
 
         tasks_row = await self.db.execute(
-            text("SELECT * FROM banquet_production_tasks WHERE plan_id = :pid AND tenant_id = :tid AND is_deleted = FALSE ORDER BY course_no"),
+            text(
+                "SELECT * FROM banquet_production_tasks WHERE plan_id = :pid AND tenant_id = :tid AND is_deleted = FALSE ORDER BY course_no"
+            ),
             {"pid": plan_id, "tid": self.tenant_id},
         )
         tasks = [dict(t) for t in tasks_row.mappings().all()]
@@ -262,7 +286,9 @@ class BanquetProductionService:
     async def get_plan_by_banquet(self, banquet_id: str) -> dict | None:
         """按宴会ID获取排产计划"""
         row = await self.db.execute(
-            text("SELECT id FROM banquet_production_plans WHERE banquet_id = :bid AND tenant_id = :tid AND is_deleted = FALSE ORDER BY created_at DESC LIMIT 1"),
+            text(
+                "SELECT id FROM banquet_production_plans WHERE banquet_id = :bid AND tenant_id = :tid AND is_deleted = FALSE ORDER BY created_at DESC LIMIT 1"
+            ),
             {"bid": banquet_id, "tid": self.tenant_id},
         )
         plan_id = row.scalar_one_or_none()

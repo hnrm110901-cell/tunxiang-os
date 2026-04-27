@@ -11,9 +11,7 @@ from shared.ontology.src.base import TenantBase
 
 class ForgeOntologyBinding(TenantBase):
     __tablename__ = "forge_ontology_bindings"
-    __table_args__ = (
-        UniqueConstraint("app_id", "entity_name", name="uq_ontology_binding"),
-    )
+    __table_args__ = (UniqueConstraint("app_id", "entity_name", name="uq_ontology_binding"),)
 
     app_id: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
     entity_name: Mapped[str] = mapped_column(String(50), nullable=False)

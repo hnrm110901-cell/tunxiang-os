@@ -1237,7 +1237,9 @@ async def mfa_enable(body: MFASetupEnableBody, request: Request):
 
     pending_secret = await _get_mfa_temp_secret(user_id)
     if not pending_secret:
-        return err("请先调用 /mfa/setup 获取二维码（临时密钥已过期或未生成）", code="MFA_SETUP_REQUIRED", status_code=400)
+        return err(
+            "请先调用 /mfa/setup 获取二维码（临时密钥已过期或未生成）", code="MFA_SETUP_REQUIRED", status_code=400
+        )
 
     # 验证用户提交的TOTP码
     if not _mfa_service.verify_totp(pending_secret, body.code):

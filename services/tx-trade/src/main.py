@@ -135,12 +135,24 @@ async def lifespan(app: FastAPI):
 
     from shared.ontology.src.database import async_session_factory
 
+    from .security.rbac import assert_no_dev_bypass_in_production
+    from .services.audit_outbox import start_audit_outbox_flusher
     from .services.cook_time_stats import start_daily_scheduler
     from .services.group_buy_scheduler import start_group_buy_expiry_scheduler
+
+    # 启动门禁（PR-2 / §19 R-A4-7）：拒绝生产环境 TX_AUTH_ENABLED=false 配置漂移。
+    # 必须在 init_db / scheduler 之前 — fail-loud，让 k8s readiness probe 失败。
+    assert_no_dev_bypass_in_production()
 
     await init_db()
     asyncio.create_task(start_daily_scheduler(async_session_factory))
     asyncio.create_task(start_group_buy_expiry_scheduler(async_session_factory))
+
+    # PR-4 / R-A4-2：audit JSONL outbox 后台 flusher（消费 PR-3 落本地的审计行）。
+    # 60s 间隔（默认）；TX_AUDIT_OUTBOX_FLUSHER_DISABLED=true 可紧急关停。
+    audit_outbox_flusher_task, audit_outbox_flusher_stop = start_audit_outbox_flusher(
+        async_session_factory,
+    )
 
     # Feature Flag 检查：TradeFlags.DELIVERY_AUTO_ACCEPT（外卖自动接单）
     # 关闭时跳过自动接单初始化，外卖订单须人工在接单面板手动接单
@@ -168,6 +180,15 @@ async def lifespan(app: FastAPI):
         pass  # feature_flags SDK不可用，外卖自动接单状态由环境变量控制
 
     yield
+
+    # ── Graceful shutdown ─────────────────────────────────────────────
+    # PR-4：通知 audit outbox flusher 停止 + 等待最后一次 flush 完成（最多 10s），
+    # 防止 SIGTERM 时 outbox 文件残留几秒未消费的 audit 行。
+    audit_outbox_flusher_stop.set()
+    try:
+        await asyncio.wait_for(audit_outbox_flusher_task, timeout=10.0)
+    except asyncio.TimeoutError:
+        audit_outbox_flusher_task.cancel()
 
 
 app = FastAPI(
@@ -446,6 +467,11 @@ from .api.kds_piecework_routes import router as kds_piecework_router
 app.include_router(kds_piecework_router, prefix="/api/v1/kds-piecework")
 app.include_router(kds_display_config_router, prefix="/api/v1/kds-display")
 app.include_router(kds_delta_router)  # KDS Delta增量同步 + 设备心跳
+
+# ── Phase 2c: 外卖异议工作流（自动裁决+人工复核）──
+from .api.delivery_dispute_routes import router as delivery_dispute_router
+
+app.include_router(delivery_dispute_router)
 
 
 @app.get("/health")

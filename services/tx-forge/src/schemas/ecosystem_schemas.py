@@ -1,8 +1,7 @@
 """生态健康 Pydantic schemas"""
 
-from datetime import date, datetime
-from typing import Dict, Optional
-from uuid import UUID
+from datetime import date
+from typing import Dict
 
 from pydantic import BaseModel, Field
 

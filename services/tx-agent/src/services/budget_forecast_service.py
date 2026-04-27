@@ -521,21 +521,25 @@ class BudgetForecastService:
             used_fen = int(row.get("used_fen", 0))
 
             if rate >= ALERT_EXECUTION_RATE_URGENT:
-                alerts.append(BudgetAlert(
-                    alert_type="urgent",
-                    category_code=code,
-                    current_rate=round(rate, 4),
-                    message=f"{code} 已超支 {rate:.1%}，预算 {total_fen/100:.0f} 元，已用 {used_fen/100:.0f} 元",
-                    suggested_action=f"立即冻结 {code} 非必要支出，向 CFO 申请追加预算或从其他科目调剂",
-                ))
+                alerts.append(
+                    BudgetAlert(
+                        alert_type="urgent",
+                        category_code=code,
+                        current_rate=round(rate, 4),
+                        message=f"{code} 已超支 {rate:.1%}，预算 {total_fen / 100:.0f} 元，已用 {used_fen / 100:.0f} 元",
+                        suggested_action=f"立即冻结 {code} 非必要支出，向 CFO 申请追加预算或从其他科目调剂",
+                    )
+                )
             elif rate >= ALERT_EXECUTION_RATE_WARNING:
-                alerts.append(BudgetAlert(
-                    alert_type="warning",
-                    category_code=code,
-                    current_rate=round(rate, 4),
-                    message=f"{code} 执行率 {rate:.1%}，接近上限",
-                    suggested_action=f"控制 {code} 后续支出节奏，预留当月缓冲",
-                ))
+                alerts.append(
+                    BudgetAlert(
+                        alert_type="warning",
+                        category_code=code,
+                        current_rate=round(rate, 4),
+                        message=f"{code} 执行率 {rate:.1%}，接近上限",
+                        suggested_action=f"控制 {code} 后续支出节奏，预留当月缓冲",
+                    )
+                )
 
         # 连续超支检测
         try:
@@ -562,17 +566,17 @@ class BudgetForecastService:
             logger.warning("budget_consecutive_query_failed error=%s", exc)
             return alerts
 
-        consecutive_overspend = sum(
-            1 for r in recent_rows if float(r.get("rate", 0)) > 1.0
-        )
+        consecutive_overspend = sum(1 for r in recent_rows if float(r.get("rate", 0)) > 1.0)
         if consecutive_overspend >= CONSECUTIVE_OVERSPEND_ESCALATION:
-            alerts.append(BudgetAlert(
-                alert_type="escalation",
-                category_code="overall",
-                current_rate=0.0,
-                message=f"连续 {consecutive_overspend} 个月整体预算超支，需要管理层介入",
-                suggested_action="安排 CFO 与店长/部门负责人预算复盘会议，重新制定预算基线",
-            ))
+            alerts.append(
+                BudgetAlert(
+                    alert_type="escalation",
+                    category_code="overall",
+                    current_rate=0.0,
+                    message=f"连续 {consecutive_overspend} 个月整体预算超支，需要管理层介入",
+                    suggested_action="安排 CFO 与店长/部门负责人预算复盘会议，重新制定预算基线",
+                )
+            )
 
         return alerts
 
@@ -606,9 +610,7 @@ class BudgetForecastService:
                     "建议：1) 优化菜品 BOM 配方 2) 与供应商重新议价 3) 减少高成本低毛利菜品推荐"
                 )
             elif ratio > 0.35:
-                suggestions.append(
-                    f"食材成本占营收 {ratio:.1%}，接近红线。建议关注供应商价格波动和损耗率"
-                )
+                suggestions.append(f"食材成本占营收 {ratio:.1%}，接近红线。建议关注供应商价格波动和损耗率")
 
         # 人工成本趋势
         labor_data = latest.categories.get("labor_cost", {})
@@ -625,7 +627,7 @@ class BudgetForecastService:
             marketing_used = marketing_data.get("used_fen", 0)
             if revenue_used > 0 and marketing_used > revenue_used * 0.05:
                 suggestions.append(
-                    f"营销费占营收 {marketing_used/revenue_used:.1%}，超过 5%。"
+                    f"营销费占营收 {marketing_used / revenue_used:.1%}，超过 5%。"
                     "建议评估各渠道 ROI，砍掉低效渠道，集中资源到私域"
                 )
 
@@ -644,14 +646,10 @@ class BudgetForecastService:
             avg_rate = sum(exec_rates) / len(exec_rates)
             if avg_rate < 0.7:
                 suggestions.append(
-                    f"近 {len(exec_rates)} 月平均执行率仅 {avg_rate:.1%}，预算可能偏高。"
-                    "建议下调基线以提高预算准确性"
+                    f"近 {len(exec_rates)} 月平均执行率仅 {avg_rate:.1%}，预算可能偏高。建议下调基线以提高预算准确性"
                 )
             elif avg_rate > 0.95:
-                suggestions.append(
-                    f"近 {len(exec_rates)} 月平均执行率 {avg_rate:.1%}，预算偏紧。"
-                    "建议适当上调缓冲空间"
-                )
+                suggestions.append(f"近 {len(exec_rates)} 月平均执行率 {avg_rate:.1%}，预算偏紧。建议适当上调缓冲空间")
 
         if not suggestions:
             suggestions.append("当前预算执行情况健康，暂无特别优化建议")
@@ -824,14 +822,10 @@ class BudgetForecastService:
                 int(revenue_fen * MAX_INGREDIENT_COST_RATIO),
             )
             forecast.confidence = min(forecast.confidence, 0.6)
-            forecast.factors.append(
-                f"毛利底线约束触发：食材成本从 {ratio:.1%} 强制下调至 38%"
-            )
+            forecast.factors.append(f"毛利底线约束触发：食材成本从 {ratio:.1%} 强制下调至 38%")
             # 重算总支出
             forecast.total_amount_fen = sum(
-                c.predicted_amount_fen
-                for c in forecast.categories
-                if c.category_code != "revenue"
+                c.predicted_amount_fen for c in forecast.categories if c.category_code != "revenue"
             )
 
         return forecast
@@ -855,14 +849,16 @@ class BudgetForecastService:
         for code in CATEGORY_CODES:
             values = cat_history.get(code, [])
             if not values:
-                categories.append(CategoryForecast(
-                    category_code=code,
-                    predicted_amount_fen=0,
-                    lower_bound_fen=0,
-                    upper_bound_fen=0,
-                    yoy_change_pct=0.0,
-                    mom_change_pct=0.0,
-                ))
+                categories.append(
+                    CategoryForecast(
+                        category_code=code,
+                        predicted_amount_fen=0,
+                        lower_bound_fen=0,
+                        upper_bound_fen=0,
+                        yoy_change_pct=0.0,
+                        mom_change_pct=0.0,
+                    )
+                )
                 continue
 
             avg = int(sum(values) / len(values))
@@ -879,14 +875,16 @@ class BudgetForecastService:
             lower = int(predicted * 0.85)
             upper = int(predicted * 1.15)
 
-            categories.append(CategoryForecast(
-                category_code=code,
-                predicted_amount_fen=predicted,
-                lower_bound_fen=lower,
-                upper_bound_fen=upper,
-                yoy_change_pct=0.0,  # 降级无同比
-                mom_change_pct=round(mom_change, 4),
-            ))
+            categories.append(
+                CategoryForecast(
+                    category_code=code,
+                    predicted_amount_fen=predicted,
+                    lower_bound_fen=lower,
+                    upper_bound_fen=upper,
+                    yoy_change_pct=0.0,  # 降级无同比
+                    mom_change_pct=round(mom_change, 4),
+                )
+            )
 
         total = sum(c.predicted_amount_fen for c in categories if c.category_code != "revenue")
 
@@ -897,10 +895,7 @@ class BudgetForecastService:
             categories=categories,
             total_amount_fen=total,
             confidence=0.4,  # 降级预测置信度较低
-            reasoning=(
-                f"基于最近 {len(history.months)} 个月历史均值 + 环比趋势的降级预测"
-                "（AI 服务不可用时自动启用）"
-            ),
+            reasoning=(f"基于最近 {len(history.months)} 个月历史均值 + 环比趋势的降级预测（AI 服务不可用时自动启用）"),
             factors=["降级模式：仅使用历史统计，未考虑季节和外部因素"],
             model_id="fallback_rules",
         )
@@ -946,30 +941,39 @@ class BudgetForecastService:
                     "store_id": store_id,
                     "agent_id": "budget_forecast_d4c",
                     "decision_type": "budget_forecast",
-                    "input_context": json.dumps({
-                        "target_year": forecast.target_year,
-                        "target_month": forecast.target_month,
-                        "store_id": forecast.store_id,
-                        "model_id": forecast.model_id,
-                        "factors": forecast.factors,
-                    }, ensure_ascii=False),
+                    "input_context": json.dumps(
+                        {
+                            "target_year": forecast.target_year,
+                            "target_month": forecast.target_month,
+                            "store_id": forecast.store_id,
+                            "model_id": forecast.model_id,
+                            "factors": forecast.factors,
+                        },
+                        ensure_ascii=False,
+                    ),
                     "reasoning": forecast.reasoning,
-                    "output_action": json.dumps({
-                        "total_amount_fen": forecast.total_amount_fen,
-                        "categories": [
-                            {
-                                "category_code": c.category_code,
-                                "predicted_amount_fen": c.predicted_amount_fen,
-                                "lower_bound_fen": c.lower_bound_fen,
-                                "upper_bound_fen": c.upper_bound_fen,
-                            }
-                            for c in forecast.categories
-                        ],
-                    }, ensure_ascii=False),
-                    "constraints_check": json.dumps({
-                        "margin_check": "passed",
-                        "ingredient_cost_ratio": self._calc_ingredient_ratio(forecast),
-                    }, ensure_ascii=False),
+                    "output_action": json.dumps(
+                        {
+                            "total_amount_fen": forecast.total_amount_fen,
+                            "categories": [
+                                {
+                                    "category_code": c.category_code,
+                                    "predicted_amount_fen": c.predicted_amount_fen,
+                                    "lower_bound_fen": c.lower_bound_fen,
+                                    "upper_bound_fen": c.upper_bound_fen,
+                                }
+                                for c in forecast.categories
+                            ],
+                        },
+                        ensure_ascii=False,
+                    ),
+                    "constraints_check": json.dumps(
+                        {
+                            "margin_check": "passed",
+                            "ingredient_cost_ratio": self._calc_ingredient_ratio(forecast),
+                        },
+                        ensure_ascii=False,
+                    ),
                     "confidence": forecast.confidence,
                     "created_at": now,
                 },

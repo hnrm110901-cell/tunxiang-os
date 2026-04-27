@@ -2,11 +2,10 @@
 
 from uuid import uuid4
 
+import structlog
 from fastapi import HTTPException
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
-
-import structlog
 
 from ..constants import APP_CATEGORIES, PRICING_MODELS
 
@@ -36,9 +35,15 @@ class ForgeAppService:
     """应用提交、更新、搜索、详情"""
 
     _ALLOWED_UPDATE_FIELDS = {
-        "app_name", "description", "icon_url", "screenshots",
-        "pricing_model", "price_fen", "permissions",
-        "api_endpoints", "webhook_urls",
+        "app_name",
+        "description",
+        "icon_url",
+        "screenshots",
+        "pricing_model",
+        "price_fen",
+        "permissions",
+        "api_endpoints",
+        "webhook_urls",
     }
 
     _SORT_MAP = {
@@ -141,9 +146,7 @@ class ForgeAppService:
         return app_row
 
     # ── 更新应用 ─────────────────────────────────────────────
-    async def update_app(
-        self, db: AsyncSession, app_id: str, updates: dict
-    ) -> dict:
+    async def update_app(self, db: AsyncSession, app_id: str, updates: dict) -> dict:
         filtered = {k: v for k, v in updates.items() if k in self._ALLOWED_UPDATE_FIELDS}
         if not filtered:
             raise HTTPException(
@@ -339,9 +342,11 @@ class ForgeAppService:
 
 # ── 工具函数 ─────────────────────────────────────────────────
 
+
 def _json_or_empty(val: list | None) -> str:
     """将 list 序列化为 JSON 字符串供 ::jsonb cast，None → '[]'"""
     import json
+
     if val is None:
         return "[]"
     return json.dumps(val, ensure_ascii=False)

@@ -2,6 +2,7 @@
 
 管理ISV生态、商品审核、安装订阅、收入结算、AI OPS可观测性、信任治理 · MCP · Ontology。
 """
+
 import structlog
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -9,28 +10,28 @@ from prometheus_fastapi_instrumentator import Instrumentator
 
 logger = structlog.get_logger(__name__)
 
-from .api.developer_routes import router as developer_router
-from .api.app_routes import router as app_router
-from .api.review_routes import router as review_router
-from .api.installation_routes import router as installation_router
-from .api.sdk_routes import router as sdk_router
-from .api.sandbox_routes import router as sandbox_router
-from .api.payout_routes import router as payout_router
-from .api.analytics_routes import router as analytics_router
 from .api.ai_ops_routes import router as ai_ops_router
-from .api.trust_routes import router as trust_router
-from .api.runtime_routes import router as runtime_router
+from .api.alliance_routes import router as alliance_router
+from .api.analytics_routes import router as analytics_router
+from .api.app_routes import router as app_router
+from .api.auto_review_routes import router as auto_review_router
+from .api.builder_routes import router as builder_router
+from .api.developer_routes import router as developer_router
+from .api.discovery_routes import router as discovery_router
+from .api.ecosystem_routes import router as ecosystem_router
+from .api.evidence_routes import router as evidence_router
+from .api.installation_routes import router as installation_router
 from .api.mcp_routes import router as mcp_router
 from .api.ontology_routes import router as ontology_router
 from .api.outcome_routes import router as outcome_router
+from .api.payout_routes import router as payout_router
+from .api.review_routes import router as review_router
+from .api.runtime_routes import router as runtime_router
+from .api.sandbox_routes import router as sandbox_router
+from .api.sdk_routes import router as sdk_router
 from .api.token_routes import router as token_router
-from .api.discovery_routes import router as discovery_router
-from .api.evidence_routes import router as evidence_router
-from .api.builder_routes import router as builder_router
-from .api.auto_review_routes import router as auto_review_router
-from .api.alliance_routes import router as alliance_router
+from .api.trust_routes import router as trust_router
 from .api.workflow_routes import router as workflow_router
-from .api.ecosystem_routes import router as ecosystem_router
 
 app = FastAPI(
     title="TunxiangOS tx-forge",

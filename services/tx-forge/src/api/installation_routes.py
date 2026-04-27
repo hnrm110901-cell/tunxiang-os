@@ -1,10 +1,13 @@
 from __future__ import annotations
-from typing import Any, Dict, Optional
+
+from typing import Any, Dict
 from uuid import UUID
+
 import structlog
-from fastapi import APIRouter, Depends, Header, HTTPException, Query
+from fastapi import APIRouter, Depends, Header, HTTPException
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from shared.ontology.src.database import get_db
 
 router = APIRouter(prefix="/api/v1/forge/installations", tags=["installations"])
@@ -39,7 +42,9 @@ async def uninstall_app(
 ) -> Dict[str, Any]:
     await _set_tenant(db, x_tenant_id)
     result = await db.execute(
-        text("UPDATE forge.installations SET status = 'uninstalled', updated_at = now() WHERE app_id = :id AND tenant_id = :tid AND status = 'active' RETURNING id"),
+        text(
+            "UPDATE forge.installations SET status = 'uninstalled', updated_at = now() WHERE app_id = :id AND tenant_id = :tid AND status = 'active' RETURNING id"
+        ),
         {"id": str(app_id), "tid": x_tenant_id},
     )
     await db.commit()
@@ -70,7 +75,9 @@ async def installation_status(
 ) -> Dict[str, Any]:
     await _set_tenant(db, x_tenant_id)
     row = await db.execute(
-        text("SELECT * FROM forge.installations WHERE app_id = :id AND tenant_id = :tid ORDER BY created_at DESC LIMIT 1"),
+        text(
+            "SELECT * FROM forge.installations WHERE app_id = :id AND tenant_id = :tid ORDER BY created_at DESC LIMIT 1"
+        ),
         {"id": str(app_id), "tid": x_tenant_id},
     )
     result = row.mappings().first()

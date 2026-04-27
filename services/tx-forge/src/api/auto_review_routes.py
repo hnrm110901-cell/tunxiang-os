@@ -8,6 +8,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
+
 from ..schemas.auto_review_schemas import AutoReviewRequest
 
 router = APIRouter(prefix="/api/v1/forge/auto-review", tags=["AI审核"])
@@ -86,9 +87,7 @@ async def list_auto_reviews(
         params["app_id"] = app_id
     where = " AND ".join(clauses)
 
-    total_row = await db.execute(
-        text(f"SELECT COUNT(*) FROM forge.auto_reviews WHERE {where}"), params
-    )
+    total_row = await db.execute(text(f"SELECT COUNT(*) FROM forge.auto_reviews WHERE {where}"), params)
     total = total_row.scalar() or 0
 
     rows = await db.execute(

@@ -21,7 +21,7 @@ from typing import Optional
 import structlog
 from models.approval import ApprovalRequest, ApprovalWorkflow
 from services.approval_service import ApprovalService
-from sqlalchemy import and_, select, text
+from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 log = structlog.get_logger(__name__)

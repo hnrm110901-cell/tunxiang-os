@@ -3,7 +3,7 @@
 import datetime as dt
 from typing import Optional
 
-from sqlalchemy import Date, Integer, BigInteger, Numeric
+from sqlalchemy import BigInteger, Date, Integer, Numeric
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 

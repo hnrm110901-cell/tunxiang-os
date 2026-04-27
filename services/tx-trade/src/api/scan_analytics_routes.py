@@ -78,7 +78,10 @@ async def api_scan_stats(
     if date_to:
         try:
             to_dt = datetime.fromisoformat(date_to).replace(
-                hour=23, minute=59, second=59, tzinfo=timezone.utc,
+                hour=23,
+                minute=59,
+                second=59,
+                tzinfo=timezone.utc,
             )
         except ValueError:
             raise HTTPException(status_code=400, detail=f"无效日期格式: {date_to}")

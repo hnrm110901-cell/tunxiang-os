@@ -1,10 +1,12 @@
 from __future__ import annotations
-from typing import Any, Dict, Optional
-from uuid import UUID
+
+from typing import Any, Dict
+
 import structlog
-from fastapi import APIRouter, Depends, Header, HTTPException, Query
+from fastapi import APIRouter, Depends, Header, HTTPException
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from shared.ontology.src.database import get_db
 
 router = APIRouter(prefix="/api/v1/forge/trust", tags=["信任管理"])
@@ -79,6 +81,7 @@ class ForgeTrustService:
 # ---------------------------------------------------------------------------
 # Routes
 # ---------------------------------------------------------------------------
+
 
 @router.post("/audit")
 async def submit_trust_audit(

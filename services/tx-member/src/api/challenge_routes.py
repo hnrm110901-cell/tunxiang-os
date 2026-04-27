@@ -210,8 +210,18 @@ async def update_challenge(
     if not updates:
         return _err("NO_CHANGES", "no fields to update")
 
-    ALLOWED_COLUMNS = {"name", "description", "type", "rules", "reward", "goal_value",
-                       "start_date", "end_date", "max_participants", "is_active"}
+    ALLOWED_COLUMNS = {
+        "name",
+        "description",
+        "type",
+        "rules",
+        "reward",
+        "goal_value",
+        "start_date",
+        "end_date",
+        "max_participants",
+        "is_active",
+    }
     set_parts: list[str] = ["updated_at = NOW()"]
     params: dict[str, Any] = {"tid": x_tenant_id, "cid": challenge_id}
     for key, val in updates.items():
@@ -283,9 +293,7 @@ async def join_challenge_api(
 ):
     """6. 会员参加挑战 → challenge_engine.join_challenge"""
     try:
-        progress = await challenge_engine.join_challenge(
-            db, x_tenant_id, req.customer_id, req.challenge_id
-        )
+        progress = await challenge_engine.join_challenge(db, x_tenant_id, req.customer_id, req.challenge_id)
         return _ok(progress)
     except ValueError as e:
         return _err("JOIN_FAILED", str(e))
@@ -320,9 +328,7 @@ async def claim_reward(
 ):
     """8. 领取挑战奖励 → challenge_engine.claim_reward"""
     try:
-        result = await challenge_engine.claim_reward(
-            db, x_tenant_id, req.customer_id, req.challenge_id
-        )
+        result = await challenge_engine.claim_reward(db, x_tenant_id, req.customer_id, req.challenge_id)
         return _ok(result)
     except ValueError as e:
         return _err("CLAIM_FAILED", str(e))
