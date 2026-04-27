@@ -36,9 +36,21 @@ import uuid
 from datetime import date, datetime
 from typing import Any
 
-from sqlalchemy import BigInteger, Date, DateTime, Index, Numeric, String, func
+from sqlalchemy import (
+    BigInteger,
+    CheckConstraint,
+    Date,
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    Numeric,
+    String,
+    UniqueConstraint,
+    func,
+)
 from sqlalchemy.dialects.postgresql import JSONB, UUID
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .cost_snapshot import Base
 
@@ -143,6 +155,17 @@ class FinancialVoucher(Base):
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
 
+    # v266 子表关系. lines 为会计分录 SSOT (W1.3 PR 切写路径).
+    # cascade="all, delete-orphan": voucher 删则 lines 自动清理 (与 DB 层
+    # ON DELETE CASCADE 双保险). order_by line_no 保证渲染/推送序一致.
+    lines: Mapped[list["FinancialVoucherLine"]] = relationship(
+        "FinancialVoucherLine",
+        back_populates="voucher",
+        cascade="all, delete-orphan",
+        order_by="FinancialVoucherLine.line_no",
+        lazy="selectin",
+    )
+
     __table_args__ = (
         Index(
             "idx_financial_vouchers_tenant_store_date",
@@ -167,6 +190,21 @@ class FinancialVoucher(Base):
         total_credit_fen = sum(round(e.get("credit", 0) * 100) for e in self.entries)
         return total_debit_fen == total_credit_fen
 
+    # ── W1.1: 基于 lines 子表的借贷平衡 (fen SSOT) ─────────────────────
+    # is_balanced() 仍读 entries JSONB 以保兼容; W1.3 PR 切 caller
+    # 到 is_balanced_from_lines() 后, is_balanced() 会被废弃.
+    def total_debit_fen_from_lines(self) -> int:
+        """从 lines 子表求借方总和 (分). 已是整数, 无精度损失."""
+        return sum(line.debit_fen for line in self.lines)
+
+    def total_credit_fen_from_lines(self) -> int:
+        """从 lines 子表求贷方总和 (分)."""
+        return sum(line.credit_fen for line in self.lines)
+
+    def is_balanced_from_lines(self) -> bool:
+        """基于 lines 子表判定借贷平衡 (W1.3 切换后成为主判定)."""
+        return self.total_debit_fen_from_lines() == self.total_credit_fen_from_lines()
+
     def to_dict(self) -> dict:
         return {
             "id": str(self.id),
@@ -183,5 +221,116 @@ class FinancialVoucher(Base):
             "status": self.status,
             "exported_at": self.exported_at.isoformat() if self.exported_at else None,
             "is_balanced": self.is_balanced(),
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+        }
+
+
+class FinancialVoucherLine(Base):
+    """财务凭证分录子表 (v266 SSOT, W1.1 建).
+
+    取代 FinancialVoucher.entries JSONB. 每行一个会计分录 (借或贷).
+
+    会计约束 (DB 层 CHECK, 不可绕过):
+      - 借贷互斥: (debit_fen=0 AND credit_fen>0) OR (debit_fen>0 AND credit_fen=0)
+      - 非负:     debit_fen >= 0 AND credit_fen >= 0
+      - 至少一方非零: 由互斥约束的 > 0 分支蕴含
+
+    金额单位: 全部 BIGINT 分 (屯象 fen 约定, 与父 voucher.total_amount_fen 一致).
+    元字段不保留 — 新表没有历史负担.
+
+    租户冗余 (tenant_id 与父 voucher 同值):
+      为什么冗余而非仅靠 voucher_id JOIN 父表:
+        1. 防跨租户 JOIN 攻击: 单靠 voucher_id 关联, 恶意租户伪造 voucher_id
+           可能绕过 RLS USING; 子表自带 tenant_id 走相同 app.tenant_id 校验, 零风险.
+        2. 性能: 科目总账 (tenant_id, account_code) 单表索引比 JOIN 父表快 10x+.
+    """
+    __tablename__ = "financial_voucher_lines"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    tenant_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), nullable=False,
+        comment="租户 ID (RLS). 与 voucher.tenant_id 同步."
+    )
+    voucher_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("financial_vouchers.id", ondelete="CASCADE"),
+        nullable=False,
+        comment="父凭证 ID (CASCADE 删)."
+    )
+    line_no: Mapped[int] = mapped_column(
+        Integer, nullable=False,
+        comment="凭证内分录序号 (1-based)."
+    )
+
+    # 会计科目
+    account_code: Mapped[str] = mapped_column(
+        String(20), nullable=False,
+        comment="科目代码 (e.g. 6001 主营业务收入)."
+    )
+    account_name: Mapped[str] = mapped_column(
+        String(100), nullable=False,
+        comment="科目名称 (冗余, ERP 推送直接读)."
+    )
+
+    # 借贷金额 (分, 互斥)
+    debit_fen: Mapped[int] = mapped_column(
+        BigInteger, nullable=False, default=0,
+        comment="借方金额 (分). 与 credit_fen 互斥, 非负."
+    )
+    credit_fen: Mapped[int] = mapped_column(
+        BigInteger, nullable=False, default=0,
+        comment="贷方金额 (分). 与 debit_fen 互斥, 非负."
+    )
+
+    summary: Mapped[str | None] = mapped_column(
+        String(200),
+        comment="分录摘要."
+    )
+
+    # 时间戳
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    # 反向关系
+    voucher: Mapped["FinancialVoucher"] = relationship(
+        "FinancialVoucher", back_populates="lines"
+    )
+
+    __table_args__ = (
+        CheckConstraint(
+            "(debit_fen = 0 AND credit_fen > 0) "
+            "OR (debit_fen > 0 AND credit_fen = 0)",
+            name="chk_fvl_debit_credit_exclusive",
+        ),
+        CheckConstraint(
+            "debit_fen >= 0 AND credit_fen >= 0",
+            name="chk_fvl_non_negative",
+        ),
+        UniqueConstraint(
+            "voucher_id", "line_no",
+            name="uq_fvl_voucher_line_no",
+        ),
+        Index("ix_fvl_voucher_id", "voucher_id"),
+        Index("ix_fvl_tenant_account", "tenant_id", "account_code"),
+        Index("ix_fvl_tenant_created", "tenant_id", "created_at"),
+    )
+
+    def to_dict(self) -> dict:
+        return {
+            "id": str(self.id),
+            "tenant_id": str(self.tenant_id),
+            "voucher_id": str(self.voucher_id),
+            "line_no": self.line_no,
+            "account_code": self.account_code,
+            "account_name": self.account_name,
+            "debit_fen": self.debit_fen,
+            "credit_fen": self.credit_fen,
+            "summary": self.summary,
             "created_at": self.created_at.isoformat() if self.created_at else None,
         }
