@@ -29,6 +29,20 @@ depends_on: Union[str, Sequence[str], None] = None
 
 _NEW_TABLES = ["sv_transactions", "sv_charge_rules"]
 
+
+def _table_exists(name: str) -> bool:
+    """幂等保护：v383 chain consolidation 后此 migration 可能在已建表的环境重跑。"""
+    return bool(op.get_bind().execute(sa.text(
+        "SELECT 1 FROM information_schema.tables "
+        "WHERE table_schema = 'public' AND table_name = :t"
+    ), {"t": name}).first())
+
+
+def _index_exists(name: str) -> bool:
+    return bool(op.get_bind().execute(sa.text(
+        "SELECT 1 FROM pg_indexes WHERE schemaname = 'public' AND indexname = :n"
+    ), {"n": name}).first())
+
 # v006+ 安全模式：NULL guard + FORCE
 _RLS_CONDITION = (
     "current_setting('app.tenant_id', TRUE) IS NOT NULL "
@@ -50,6 +64,7 @@ def _enable_safe_rls(table_name: str) -> None:
         ),
         ("delete", f"FOR DELETE USING ({_RLS_CONDITION})"),
     ]:
+        op.execute(f"DROP POLICY IF EXISTS {table_name}_rls_{action} ON {table_name}")
         op.execute(
             f"CREATE POLICY {table_name}_rls_{action} ON {table_name} "
             f"AS PERMISSIVE {clause}"
@@ -57,6 +72,14 @@ def _enable_safe_rls(table_name: str) -> None:
 
 
 def upgrade() -> None:
+    # 幂等保护：v383 chain consolidation 后此 migration 可能在 sv_transactions/
+    # sv_charge_rules 已建好的环境重跑（部分历史环境曾应用过该并行分支）。
+    # 如果表已存在，跳过 create_table/create_index，仅重新配置 RLS（DROP+CREATE policy 已幂等）。
+    if _table_exists("sv_transactions") and _table_exists("sv_charge_rules"):
+        for tn in _NEW_TABLES:
+            _enable_safe_rls(tn)
+        return
+
     # ── sv_transactions ────────────────────────────────────────────
     # 轻量版储值流水，以 card_id 关联 stored_value_cards（v015 主表）。
     # 相比 stored_value_transactions 增加 balance_before 快照，便于对账。

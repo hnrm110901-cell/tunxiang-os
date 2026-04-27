@@ -54,6 +54,8 @@ def upgrade() -> None:
         DROP POLICY IF EXISTS receiving_orders_update ON receiving_orders;
         DROP POLICY IF EXISTS receiving_orders_delete ON receiving_orders;
 
+        DROP POLICY IF EXISTS receiving_orders_select ON receiving_orders;
+
         CREATE POLICY receiving_orders_select ON receiving_orders
             FOR SELECT
             USING (
@@ -61,6 +63,8 @@ def upgrade() -> None:
                 AND current_setting('app.tenant_id', TRUE) IS NOT NULL
                 AND current_setting('app.tenant_id', TRUE) <> ''
             );
+
+        DROP POLICY IF EXISTS receiving_orders_insert ON receiving_orders;
 
         CREATE POLICY receiving_orders_insert ON receiving_orders
             FOR INSERT
@@ -70,6 +74,8 @@ def upgrade() -> None:
                 AND current_setting('app.tenant_id', TRUE) <> ''
             );
 
+        DROP POLICY IF EXISTS receiving_orders_update ON receiving_orders;
+
         CREATE POLICY receiving_orders_update ON receiving_orders
             FOR UPDATE
             USING (
@@ -77,6 +83,8 @@ def upgrade() -> None:
                 AND current_setting('app.tenant_id', TRUE) IS NOT NULL
                 AND current_setting('app.tenant_id', TRUE) <> ''
             );
+
+        DROP POLICY IF EXISTS receiving_orders_delete ON receiving_orders;
 
         CREATE POLICY receiving_orders_delete ON receiving_orders
             FOR DELETE
@@ -131,6 +139,8 @@ def upgrade() -> None:
         DROP POLICY IF EXISTS stocktake_sessions_update ON stocktake_sessions;
         DROP POLICY IF EXISTS stocktake_sessions_delete ON stocktake_sessions;
 
+        DROP POLICY IF EXISTS stocktake_sessions_select ON stocktake_sessions;
+
         CREATE POLICY stocktake_sessions_select ON stocktake_sessions
             FOR SELECT
             USING (
@@ -138,6 +148,8 @@ def upgrade() -> None:
                 AND current_setting('app.tenant_id', TRUE) IS NOT NULL
                 AND current_setting('app.tenant_id', TRUE) <> ''
             );
+
+        DROP POLICY IF EXISTS stocktake_sessions_insert ON stocktake_sessions;
 
         CREATE POLICY stocktake_sessions_insert ON stocktake_sessions
             FOR INSERT
@@ -147,6 +159,8 @@ def upgrade() -> None:
                 AND current_setting('app.tenant_id', TRUE) <> ''
             );
 
+        DROP POLICY IF EXISTS stocktake_sessions_update ON stocktake_sessions;
+
         CREATE POLICY stocktake_sessions_update ON stocktake_sessions
             FOR UPDATE
             USING (
@@ -154,6 +168,8 @@ def upgrade() -> None:
                 AND current_setting('app.tenant_id', TRUE) IS NOT NULL
                 AND current_setting('app.tenant_id', TRUE) <> ''
             );
+
+        DROP POLICY IF EXISTS stocktake_sessions_delete ON stocktake_sessions;
 
         CREATE POLICY stocktake_sessions_delete ON stocktake_sessions
             FOR DELETE

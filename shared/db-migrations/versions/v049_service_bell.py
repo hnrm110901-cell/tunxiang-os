@@ -53,6 +53,8 @@ def upgrade() -> None:
         ALTER TABLE service_bell_calls ENABLE ROW LEVEL SECURITY;
         ALTER TABLE service_bell_calls FORCE ROW LEVEL SECURITY;
 
+        DROP POLICY IF EXISTS service_bell_calls_tenant_isolation ON service_bell_calls;
+
         CREATE POLICY service_bell_calls_tenant_isolation ON service_bell_calls
             AS PERMISSIVE FOR ALL
             USING (
