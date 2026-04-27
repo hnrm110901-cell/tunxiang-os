@@ -174,6 +174,18 @@ class RecipeEventType(str, Enum):
     MARGIN_ALERT = "recipe.margin_alert"  # 毛利预警
 
 
+class PriceEventType(str, Enum):
+    """供应链价格台账事件 — 价格快照写入与异常预警（v366 新增）
+
+    由 services/tx-supply/src/services/price_ledger_service.py 触发：
+      - RECORDED：每次收货确认/采购单/手工录入完成后立即发射
+      - ALERT_TRIGGERED：价格快照写入后命中预警规则时发射
+    """
+
+    RECORDED = "price.recorded"  # 价格快照写入
+    ALERT_TRIGGERED = "price.alert_triggered"  # 命中预警阈值
+
+
 # ──────────────────────────────────────────────────────────────────────
 # 屯象OS系统级域
 # ──────────────────────────────────────────────────────────────────────
@@ -266,6 +278,8 @@ DOMAIN_STREAM_MAP: dict[str, str] = {
     "location": "tx_location_events",
     # 旧系统适配器域（Sprint F1 / PR F，14 个 POS / 外卖 / 物流 / 财税适配器统一入口）
     "adapter": "tx_adapter_events",
+    # 供应链价格台账域（v366 新增）
+    "price": "tx_price_events",
     # 兼容旧域
     "trade": "trade_events",
     "supply": "supply_events",
@@ -306,6 +320,8 @@ DOMAIN_STREAM_TYPE_MAP: dict[str, str] = {
     "location": "location",
     # 旧系统适配器域（Sprint F1 / PR F）
     "adapter": "adapter",
+    # 供应链价格台账域（v366 新增）
+    "price": "price",
 }
 
 # ──────────────────────────────────────────────────────────────────────
@@ -506,4 +522,6 @@ ALL_EVENT_ENUMS = (
     LocationEventType,
     # 旧系统适配器域（Sprint F1 / PR F）
     AdapterEventType,
+    # 供应链价格台账域（v366 新增）
+    PriceEventType,
 )

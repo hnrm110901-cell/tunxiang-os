@@ -471,6 +471,43 @@ async def complete_receiving(
                     )
                 )
 
+    # ── 价格台账（v366）：每个有效入库的明细写一条价格快照 ──
+    if order.supplier_id is not None:
+        from .price_ledger_service import record_price as _record_price
+
+        for item in order.items:
+            if (
+                item.unit_price_fen is None
+                or float(item.accepted_quantity or 0) <= 0
+            ):
+                continue
+            try:
+                await _record_price(
+                    tenant_id=tenant_id,
+                    ingredient_id=str(item.ingredient_id),
+                    supplier_id=str(order.supplier_id),
+                    unit_price_fen=int(item.unit_price_fen),
+                    db=db,
+                    quantity_unit=getattr(item, "expected_unit", None)
+                    or getattr(item, "unit", None),
+                    captured_at=order.signed_at or _now(),
+                    source_doc_type="receiving",
+                    source_doc_id=str(order.id),
+                    source_doc_no=getattr(order, "delivery_note_no", None)
+                    or str(order.id)[:8],
+                    store_id=str(order.store_id) if order.store_id else None,
+                    notes="receiving v2 auto-captured",
+                    created_by=signer_id,
+                )
+            except (ValueError, RuntimeError) as exc:
+                # 价格快照失败不影响收货主流程
+                logger.warning(
+                    "price_ledger_record_failed",
+                    order_id=order_id,
+                    ingredient_id=str(item.ingredient_id),
+                    error=str(exc),
+                )
+
     return {
         "order_id": order_id,
         "status": order.status,

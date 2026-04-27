@@ -141,6 +141,11 @@ from .api.mrp_routes import router as mrp_router
 
 app.include_router(mrp_router, prefix="/api/v1/supply/mrp")  # MRP预估：需求计算/生产建议/采购建议/领料（v282表）
 
+# ── 价格台账 + 预警（v366：对标奥琦玮供应链）──
+from .api.price_ledger_routes import router as price_ledger_router
+
+app.include_router(price_ledger_router)  # 价格台账：快照/趋势/对比/预警规则/预警实例
+
 
 @app.get("/health")
 async def health():

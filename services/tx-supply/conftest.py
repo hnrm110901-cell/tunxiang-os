@@ -1,4 +1,4 @@
-"""conftest.py — tx-supply 本地测试路径配置（v367 TASK-2 新增）
+"""conftest.py — tx-supply 本地测试路径配置
 
 容器路径：/app/services/tx_supply/src/  PYTHONPATH=/app
 本地路径：services/tx-supply/src/       (目录名含 dash)
