@@ -51,6 +51,8 @@ class ModelRouter:
         "data_extraction": TaskComplexity.SIMPLE,
         "knowledge_summary": TaskComplexity.SIMPLE,
         "journey_message": TaskComplexity.SIMPLE,
+        # Sprint D3a：RFM 触达消息生成（Haiku 4.5 足够）
+        "rfm_outreach_message": TaskComplexity.SIMPLE,
         # 中等任务
         "discount_analysis": TaskComplexity.MODERATE,
         "anomaly_detection": TaskComplexity.MODERATE,
