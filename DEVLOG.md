@@ -1,3 +1,27 @@
+## 2026-04-24 v291 补齐历史 RLS 技术债 — 14 张表
+
+### 今日完成
+- [v291 迁移] `v291_fill_rls_historical_debt.py`：统一模板 ENABLE RLS + FORCE RLS + DROP POLICY IF EXISTS + CREATE POLICY + DO $$ information_schema guard + $POLICY$ dollar-quoted + COMMENT ON POLICY 记录原 migration 来源 + downgrade 不 DROP TABLE
+- [14 张表] 分 5 个历史 migration：v053 supply chain (2) / v062 central kitchen (3) / v064 WMS (3) / v067 three-way match (2) / v090 pilot tracking (4)
+- [18 TDD 测试] v291 migration 静态校验 13 + 前提验证 5（证实 5 个原 migration 确实无 ENABLE RLS）
+- [审计发现] 真违规 14 / 假阳性 36（f-string policy 原正则无法匹配）/ 合法豁免 31
+
+### 数据变化
+- 迁移版本：v290 → v291
+- 新增测试：18 个
+
+### 遗留问题
+- 原 PR #98 的 tier1 RLS 扫描正则需升级（DOTALL + `\S+`）消除 36 假阳性
+- PR #100 rls-gate.yml 同步升级
+- payment_events 独立 PR 讨论（FK vs RLS）
+- v291 depends_on v290；合入顺序需协调
+
+### 明日计划
+- 推 PR #98 regex 升级（同步消除假阳性）
+- 真实 DB 环境验证 14 张表 RLS 生效
+
+---
+
 ## 2026-04-27 DevForge — PR #120 评审修复 Round 2（4 余项全部归零 + merge main）
 
 ### Round 2：把 Round 1 延期的 3 项 + false-positive 1 项全部完成
